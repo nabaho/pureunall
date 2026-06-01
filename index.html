@@ -4816,6 +4816,7 @@ function ContractModal(props){
   }, [tab]);
   var pcs = useState(false); var pastSearch = pcs[0]; var setPastSearch = pcs[1];
   var ar = useState([]); var autoResults = ar[0]; var setAutoResults = ar[1];
+  var aidx = useState(-1); var autoIdx = aidx[0]; var setAutoIdx = aidx[1];   // 자동완성 키보드 선택 인덱스
   var cd = useState(false); var confirmedDuplicate = cd[0]; var setConfirmedDuplicate = cd[1];
   // 과거 데이터 입력용: 계약번호 수동 편집
   var en = useState(false); var editNo = en[0]; var setEditNo = en[1];
@@ -5848,6 +5849,16 @@ function ContractModal(props){
               var res = searchPastCompanies(q2);
               setAutoResults(res.slice(0,6));
             } else { setAutoResults([]); }
+            setAutoIdx(-1);
+          },
+          onKeyDown:function(e){
+            if(autoResults.length === 0) return;
+            if(e.key === 'ArrowDown'){ e.preventDefault(); setAutoIdx(function(p){ return p < autoResults.length-1 ? p+1 : 0; }); }
+            else if(e.key === 'ArrowUp'){ e.preventDefault(); setAutoIdx(function(p){ return p > 0 ? p-1 : autoResults.length-1; }); }
+            else if(e.key === 'Enter'){
+              if(autoIdx >= 0 && autoIdx < autoResults.length){ e.preventDefault(); onSelectPastCompany(autoResults[autoIdx]); setAutoResults([]); setAutoIdx(-1); }
+            }
+            else if(e.key === 'Escape'){ setAutoResults([]); setAutoIdx(-1); }
           },
           onFocus:function(e){
             if((f.company.name||'').length >= 2){
@@ -5870,11 +5881,13 @@ function ContractModal(props){
                 e.preventDefault();
                 onSelectPastCompany(r);
                 setAutoResults([]);
+                setAutoIdx(-1);
               },
               style:{ padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid #f8fafc',
+                background: autoIdx === i ? '#dbeafe' : '',
                 display:'flex', justifyContent:'space-between', alignItems:'center' },
-              onMouseEnter:function(e){ e.currentTarget.style.background='#eff6ff'; },
-              onMouseLeave:function(e){ e.currentTarget.style.background=''; } },
+              onMouseEnter:function(e){ setAutoIdx(i); },
+              onMouseLeave:function(e){ e.currentTarget.style.background = autoIdx===i?'#dbeafe':''; } },
               h('div', null,
                 h('div', { style:{ fontSize:'12px', fontWeight:600, color:'#1e293b' } }, r.label),
                 h('div', { style:{ fontSize:'10px', color:'#64748b', fontFamily:'monospace', marginTop:'1px' } },
@@ -19510,8 +19523,120 @@ function AppSettingsSection(){
   if(!existing){ dbSet('app_settings', DEFAULT); existing = DEFAULT; }
   var s = useState(existing); var f = s[0]; var setF = s[1];
   function set(k, v){ var next = Object.assign({}, f); next[k] = v; setF(next); dbSet('app_settings', next); }
+  var vk = useState((function(){ try { return localStorage.getItem('pureun_v6_vision_api_key')||''; } catch(e){ return ''; } })());
+  var visionKey = vk[0]; var setVisionKey = vk[1];
+  var sk = useState(false); var showKeys = sk[0]; var setShowKeys = sk[1];   // API 키 마스킹 토글
+  var _isKeyAdmin = isAdminByUser(CURRENT_USER);   // 총괄 관리자만 키 관리
+  var nk = useState((function(){ try { return JSON.parse(localStorage.getItem('pureun_v6_nts_api_key')||'""')||''; } catch(e){ return ''; } })());
+  var ntsKey = nk[0]; var setNtsKey = nk[1];
+  var gk = useState((function(){ try { return localStorage.getItem('pureun_v6_gcal_api_key')||''; } catch(e){ return ''; } })());
+  var gcalKey = gk[0]; var setGcalKey = gk[1];
+  // 사용자 정의 API 키 목록
+  var ck = useState((function(){ try { return JSON.parse(localStorage.getItem('pureun_v6_custom_api_keys')||'[]')||[]; } catch(e){ return []; } })());
+  var customKeys = ck[0]; var setCustomKeys = ck[1];
+  var nl = useState(''); var newKeyLabel = nl[0]; var setNewKeyLabel = nl[1];
+  var nv = useState(''); var newKeyVal = nv[0]; var setNewKeyVal = nv[1];
+  function saveLsKey(lsKey, val, label){
+    try {
+      var v = (val||'').trim();
+      if(v){ localStorage.setItem(lsKey, v); showToast('🔑 '+label+' 저장됨'); }
+      else { localStorage.removeItem(lsKey); showToast('🔑 '+label+' 삭제 — 기본값 사용'); }
+    } catch(e){ showToast('저장 실패'); }
+  }
+  function persistCustom(arr){ setCustomKeys(arr); try { localStorage.setItem('pureun_v6_custom_api_keys', JSON.stringify(arr)); } catch(e){} }
+  function addCustomKey(){
+    var lb = (newKeyLabel||'').trim(); var v = (newKeyVal||'').trim();
+    if(!lb){ showToast('키 이름을 입력하세요'); return; }
+    if(!v){ showToast('키 값을 입력하세요'); return; }
+    persistCustom(customKeys.concat([{ id:'k-'+Date.now().toString(36), label:lb, value:v }]));
+    setNewKeyLabel(''); setNewKeyVal('');
+    showToast('🔑 "'+lb+'" 추가됨');
+  }
 
   return h(PolicyCard, { title:'앱 설정', icon:'⚙️', headBg:'#f1f5f9', headFg:'#334155', collapseId:'sys_app', defaultOpen:false },
+    _isKeyAdmin && h(PolicyRow, {
+      label:'🔐 API 키 관리',
+      hint:'총괄 관리자 전용',
+      control: h('div', { style:{ display:'flex', alignItems:'center', gap:'8px' } },
+        h('button', { onClick:function(){ setShowKeys(!showKeys); },
+          style:{ padding:'6px 12px', background: showKeys?'#fef3c7':'#f1f5f9', color:'#334155', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer' } },
+          showKeys ? '🙈 키 숨기기' : '👁 키 보기')
+      )
+    }),
+    _isKeyAdmin && h(PolicyRow, {
+      label:'OCR Vision API 키',
+      hint:'사업자등록증 OCR용. 비워두면 기본 키 사용',
+      control: h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
+        h('input', { type: showKeys?'text':'password', value:visionKey,
+          onChange:function(e){ setVisionKey(e.target.value); },
+          placeholder:'AIza... (Google Cloud Vision API 키)',
+          style:{ width:'320px', maxWidth:'100%', padding:'6px 9px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'monospace' } }),
+        h('button', { onClick:function(){
+            var k = (visionKey||'').trim();
+            try {
+              if(k){ localStorage.setItem('pureun_v6_vision_api_key', k); showToast('🔑 Vision API 키 저장됨'); }
+              else { localStorage.removeItem('pureun_v6_vision_api_key'); showToast('🔑 키 삭제 — 기본 키 사용'); }
+            } catch(e){ showToast('저장 실패'); }
+          },
+          style:{ padding:'6px 12px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '저장')
+      )
+    }),
+    _isKeyAdmin && h(PolicyRow, {
+      label:'NTS 사업자조회 키',
+      hint:'사업자등록 상태 조회용 (공공데이터포털)',
+      control: h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
+        h('input', { type: showKeys?'text':'password', value:ntsKey, onChange:function(e){ setNtsKey(e.target.value); },
+          placeholder:'공공데이터포털 서비스 키',
+          style:{ width:'320px', maxWidth:'100%', padding:'6px 9px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'monospace' } }),
+        h('button', { onClick:function(){
+            var v=(ntsKey||'').trim();
+            if(v){ dbSet('nts_api_key', v); showToast('🔑 NTS 키 저장됨'); }
+            else { dbRemove('nts_api_key'); showToast('🔑 NTS 키 삭제'); }
+          },
+          style:{ padding:'6px 12px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '저장')
+      )
+    }),
+    _isKeyAdmin && h(PolicyRow, {
+      label:'Google Calendar 키',
+      hint:'대시보드 캘린더 연동용. 변경 후 새로고침(F5)',
+      control: h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
+        h('input', { type: showKeys?'text':'password', value:gcalKey, onChange:function(e){ setGcalKey(e.target.value); },
+          placeholder:'AIza... (비워두면 기본 키)',
+          style:{ width:'320px', maxWidth:'100%', padding:'6px 9px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'monospace' } }),
+        h('button', { onClick:function(){ saveLsKey('pureun_v6_gcal_api_key', gcalKey, 'Calendar 키'); },
+          style:{ padding:'6px 12px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '저장')
+      )
+    }),
+    _isKeyAdmin && h(PolicyRow, {
+      label:'사용자 정의 키 추가',
+      hint:'이름과 값을 입력해 새 API 키를 보관',
+      control: h('div', { style:{ display:'flex', flexDirection:'column', gap:'8px', width:'100%' } },
+        // 추가 입력
+        h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
+          h('input', { type:'text', value:newKeyLabel, onChange:function(e){ setNewKeyLabel(e.target.value); },
+            placeholder:'키 이름 (예: 카카오 알림톡)',
+            style:{ width:'160px', padding:'6px 9px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px' } }),
+          h('input', { type: showKeys?'text':'password', value:newKeyVal, onChange:function(e){ setNewKeyVal(e.target.value); },
+            placeholder:'키 값',
+            style:{ width:'220px', padding:'6px 9px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'monospace' } }),
+          h('button', { onClick:addCustomKey,
+            style:{ padding:'6px 12px', background:'#059669', color:'#fff', border:'none', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '+ 추가')
+        ),
+        // 저장된 사용자 키 목록
+        customKeys.length > 0 && h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px' } },
+          customKeys.map(function(ckItem){
+            return h('div', { key:ckItem.id, style:{ display:'flex', alignItems:'center', gap:'6px', padding:'5px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'4px' } },
+              h('span', { style:{ fontSize:'11.5px', fontWeight:700, color:'#334155', minWidth:'110px' } }, ckItem.label),
+              h('input', { type: showKeys?'text':'password', value:ckItem.value,
+                onChange:function(e){ var v=e.target.value; persistCustom(customKeys.map(function(x){ return x.id===ckItem.id?Object.assign({},x,{value:v}):x; })); },
+                style:{ flex:1, padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11px', fontFamily:'monospace' } }),
+              h('button', { onClick:function(){ persistCustom(customKeys.filter(function(x){ return x.id!==ckItem.id; })); showToast('삭제됨'); },
+                style:{ padding:'4px 8px', background:'#fee2e2', color:'#b91c1c', border:'1px solid #fca5a5', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer' } }, '삭제')
+            );
+          })
+        )
+      )
+    }),
     h(PolicyRow, {
       label:'회계연도',
       hint:'MM-DD 형식',
@@ -31491,7 +31616,7 @@ function CorpDashboard(props){
   // 특정 직원 SID 필터: 특수 키워드가 아닌 경우만 (gcal, pureun 등 제외)
   var filterIsStaffSid = calFilter && !filterIsPureun && !filterIsEum && !filterIsEumWork && !filterIsEumKeyword && !filterIsGcal && !filterEumId;
   // ── 구글 캘린더 연동 ──
-  var GCAL_API_KEY    = 'AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo';
+  var GCAL_API_KEY    = (function(){ try { var k=(localStorage.getItem('pureun_v6_gcal_api_key')||'').trim(); if(k) return k; } catch(e){} return 'AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo'; })();
   var GCAL_CAL_ID     = 'euh07th7tvlco9corqen9lqpts@group.calendar.google.com';
   var GCAL_OAUTH_ID   = '30712196914-1qc61a41ptmo6u7hbk71i70g00k3a8lk.apps.googleusercontent.com';
   var GCAL_SCOPE      = 'https://www.googleapis.com/auth/calendar.events';
@@ -40077,10 +40202,14 @@ function parseBizLicense(text){
 
 // ── Google Vision API OCR (캘린더와 동일 GCP API 키 재사용) ──
 var VISION_API_KEY = 'AIzaSyDSyHfxmCQvTZy-P2fOKzlreTYSKIARnTM';
+function getVisionApiKey(){
+  try { var k = (localStorage.getItem('pureun_v6_vision_api_key')||'').trim(); if(k) return k; } catch(e){}
+  return VISION_API_KEY;
+}
 function ocrWithGoogleVision(base64){
   var pure = (base64 && base64.indexOf(',') >= 0) ? base64.split(',')[1] : base64;
   if(!pure) return Promise.reject(new Error('NO_IMAGE'));
-  return fetch('https://vision.googleapis.com/v1/images:annotate?key=' + VISION_API_KEY, {
+  return fetch('https://vision.googleapis.com/v1/images:annotate?key=' + getVisionApiKey(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -49061,7 +49190,12 @@ function App(){
   // 세션 키만으로 판단하지 않음 — 세션의 sid가 user_accounts에서 활성 사용자로 매핑되어야 로그인 상태
   function isValidSession(){
     var sid = getSessionSid();
-    if(!sid) return false;
+    if(!sid){
+      // 세션이 없으면 자동로그인 sid로 복원 (브라우저 재시작 후에도 유지)
+      var auto = getAutoLogin();
+      if(auto && buildCurrentUser(auto)){ setSession(auto); refreshCurrentUser(); return true; }
+      return false;
+    }
     return !!buildCurrentUser(sid);
   }
   var lgS = useState(isValidSession()); var isLoggedIn = lgS[0]; var setIsLoggedIn = lgS[1];
