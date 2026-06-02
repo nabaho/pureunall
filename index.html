@@ -31604,6 +31604,7 @@ function CorpDashboard(props){
   useEffect(function(){ setCalYm(selYm); }, [selYm]);
   // 직원 필터 (null = 전체)
   var calFilterS = useState(null); var calFilter = calFilterS[0]; var setCalFilter = calFilterS[1];
+  var extPopS = useState(null); var extPopover = extPopS[0]; var setExtPopover = extPopS[1];
   var cewmS = useState(null); var eumWorkModal = cewmS[0]; var setEumWorkModal = cewmS[1];
   var limS = useState(null); var leaveInputModal = limS[0]; var setLeaveInputModal = limS[1];
 
@@ -31783,6 +31784,7 @@ function CorpDashboard(props){
       calEvents.push({ date:s.date, sid:'EXT_'+s.externalId, type:'external',
         label: prefix+' '+ext.name+(s.title?' · '+s.title:''),
         color: ext.color || '#7c3aed',
+        tip: ext.name+(ext.role?' ('+ext.role+')':'')+(ext.contact?'\n☎ '+ext.contact:'')+(ext.note?'\n📝 요구사항: '+ext.note:''),
         evId:s.id, draggable:true });
     } else {
       // 푸른 직원 일정
@@ -31827,8 +31829,13 @@ function CorpDashboard(props){
               })()
             : '';
     var col = r.type==='trip' ? '#1e40af' : r.type==='telework' ? '#7c3aed' : r.type==='eum-work' ? '#7c3aed' : r.type==='sick' ? '#dc2626' : (staffColorMap[r.sid]||'#64748b');
+    var evTip = '';
+    if(r.type==='eum-work' && r.externalId){
+      var _et = (dbGet('external_staff',[])||[]).find(function(x){return x.id===r.externalId;});
+      if(_et) evTip = _et.name+(_et.role?' ('+_et.role+')':'')+(_et.contact?'\n☎ '+_et.contact:'')+(_et.note?'\n📝 요구사항: '+_et.note:'');
+    }
     calEvents.push({ date:r.date, sid:r.sid, type:(r.type==='trip'||r.type==='telework'||r.type==='eum-work')?r.type:'leave',
-      label:lbl, color:col, evId:r.id, draggable:true });
+      label:lbl, color:col, tip:evTip, evId:r.id, draggable:true });
   });
   // 2-2) 휴직 (loa: 시작일·종료일에만 표시) - 푸른 직원만
   var _allLoaUsers = dbGet('user_accounts', []) || [];  // 휴직자는 users(assignable)에서 제외되므로 전체 목록 사용
@@ -32060,6 +32067,21 @@ function CorpDashboard(props){
     setCalDragOver(null);
     try {
       var data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      // 외부협력자 칩 드롭 → 이음센터 근무 일정 추가
+      if(data && data.kind === 'ext-staff' && data.extId){
+        var exArr = dbGet('external_staff', []) || [];
+        var exObj = exArr.find(function(x){ return x.id === data.extId; });
+        if(!exObj){ return; }
+        var sArr = dbGet('my_schedules', []) || [];
+        var dup = sArr.find(function(s){ return s.date===newDate && s.externalId===data.extId; });
+        if(dup){ showToast('이미 '+newDate+' '+exObj.name+' 등록됨'); return; }
+        sArr.push({ id:'sch-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+          date:newDate, sid:CURRENT_USER.sid, type:'eum-work', externalId:data.extId, title:'', note:'' });
+        dbSet('my_schedules', sArr);
+        showToast('🏛️ '+newDate+' '+exObj.name+' 이음센터 등록');
+        setCalRfk(calRfk+1);
+        return;
+      }
       if(!data || !data.evType || !data.evId) return;
       if(data.fromDate === newDate) return;
       if(data.evType === 'gcal'){
@@ -32257,6 +32279,36 @@ function CorpDashboard(props){
                 border:'1.5px solid #fff',pointerEvents:'none',lineHeight:1}},
               dupDates>9?'9+':String(dupDates)
             )
+          );
+        }),
+        // 이음 모드일 때 외부협력자 이름 칩 표시 (푸른 직원처럼 원형, 외부는 점선 테두리로 구분)
+        !IS_MOBILE && (calFilter==='eum-keyword' || calFilter==='eum') && extStaffList.filter(function(x){return x.active!==false;}).map(function(ex){
+          return h('div',{ key:ex.id, style:{position:'relative',flexShrink:0} },
+            h('button',{
+              draggable:'true',
+              onDragStart:function(e){
+                e.dataTransfer.effectAllowed='copy';
+                e.dataTransfer.setData('text/plain', JSON.stringify({ kind:'ext-staff', extId:ex.id }));
+              },
+              onClick:function(e){
+                var rect=e.currentTarget.getBoundingClientRect();
+                setExtPopover({ ext:ex, x:rect.left, y:rect.bottom+6 });
+              },
+              title: ex.name+' ('+(ex.role||'외부')+') — 클릭: 상세 / 끌어서 날짜에 놓기: 이음센터 등록',
+              style:{width:'26px',height:'26px',borderRadius:'50%',
+                border:'2px dashed '+(ex.color||'#7c3aed'),
+                background:ex.color||'#7c3aed',color:'#fff',fontSize:'10px',fontWeight:700,cursor:'grab',
+                display:'inline-flex',alignItems:'center',justifyContent:'center',
+                boxSizing:'border-box',padding:0}},
+              ex.name.slice(0,2)
+            ),
+            h('div',{ title:'외부협력자',
+              style:{position:'absolute',top:'-4px',right:'-4px',
+                width:'13px',height:'13px',borderRadius:'50%',
+                background:'#fff',color:ex.color||'#7c3aed',fontSize:'8px',fontWeight:800,
+                display:'flex',alignItems:'center',justifyContent:'center',
+                border:'1.5px solid '+(ex.color||'#7c3aed'),pointerEvents:'none',lineHeight:1}},
+              '外')
           );
         })
       ),
@@ -33045,6 +33097,36 @@ function CorpDashboard(props){
       ),
 
       // ── 색상 피커 팝업 ──
+      extPopover && h('div',{
+        style:{position:'fixed',inset:0,zIndex:3000},
+        onClick:function(){ setExtPopover(null); }
+      }),
+      extPopover && h('div',{
+        style:{position:'fixed',left:Math.min(extPopover.x, window.innerWidth-280)+'px',
+          top:extPopover.y+'px',zIndex:3001,
+          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px',
+          padding:'14px 16px',boxShadow:'0 8px 24px rgba(0,0,0,0.18)',width:'260px'},
+        onClick:function(e){ e.stopPropagation(); }},
+        h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid #f1f5f9'}},
+          h('span',{style:{width:'14px',height:'14px',borderRadius:'50%',background:extPopover.ext.color||'#7c3aed',display:'inline-block',flexShrink:0}}),
+          h('span',{style:{fontSize:'14px',fontWeight:800,color:'#1e293b'}}, extPopover.ext.name),
+          h('span',{style:{fontSize:'11px',fontWeight:700,color:'#7c3aed',background:'#ede9fe',padding:'2px 8px',borderRadius:'8px'}}, extPopover.ext.role||'')
+        ),
+        h('div',{style:{display:'flex',flexDirection:'column',gap:'7px',fontSize:'12px',color:'#334155'}},
+          h('div',null, h('span',{style:{fontWeight:700,color:'#64748b'}},'소속  '), extPopover.ext.org||'-'),
+          h('div',null, h('span',{style:{fontWeight:700,color:'#64748b'}},'☎ 연락처  '),
+            extPopover.ext.contact
+              ? h('a',{href:'tel:'+extPopover.ext.contact, style:{color:'#1e40af',textDecoration:'none'}}, extPopover.ext.contact)
+              : '-'),
+          h('div',{style:{display:'flex',flexDirection:'column',gap:'3px'}},
+            h('span',{style:{fontWeight:700,color:'#64748b'}},'📝 요구사항'),
+            h('div',{style:{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'6px',padding:'7px 9px',fontSize:'11.5px',lineHeight:1.5,whiteSpace:'pre-wrap',color:'#475569',minHeight:'18px'}},
+              extPopover.ext.note || '(요구사항 없음)')
+          )
+        ),
+        h('button',{ onClick:function(){ setExtPopover(null); },
+          style:{marginTop:'12px',width:'100%',padding:'7px',background:'#f1f5f9',color:'#475569',border:'none',borderRadius:'6px',fontSize:'11.5px',fontWeight:700,cursor:'pointer'}}, '닫기')
+      ),
       colorPicker && h('div',{
         style:{position:'fixed',inset:0,zIndex:3000},
         onClick:function(){ setColorPicker(null); }
@@ -33194,7 +33276,7 @@ function CorpDashboard(props){
                     } : null,
                     onMouseEnter:function(e){ e.currentTarget.style.filter='brightness(0.88)'; },
                     onMouseLeave:function(e){ e.currentTarget.style.filter=''; },
-                    title: ev.tooltipText || ev.label,
+                    title: ev.tip || ev.tooltipText || ev.label,
                     style:{
                       background: ev.color,
                       color: '#fff',
