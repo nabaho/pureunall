@@ -5524,6 +5524,9 @@ function ContractModal(props){
     }
     ocrExtract(img).then(function(res){
       var ext = res.fields || {};
+      var _card = (typeof parseBizCard==='function') ? parseBizCard(res.text||'') : {};
+      // 명함 전용 필드(직책·주소·이름)는 사업자등록증 파서에 없으므로 보강 (기존 값 없을 때만)
+      ['name','position','address','phone','email','company'].forEach(function(k){ if(_card[k] && !ext[k]) ext[k] = _card[k]; });
       var engine = res.engine || 'tesseract';
       var filled = 0; var filledKeys = [];
       var FIELD_LABELS = {
@@ -5659,6 +5662,8 @@ function ContractModal(props){
                               showToast('🔍 명함 OCR 처리 중...');
                               ocrExtract(wkImg).then(function(res){
                                 var ext = res.fields || {};
+                                var card = (typeof parseBizCard==='function') ? parseBizCard(res.text||'') : {};
+                                ext = Object.assign({}, ext, card);  // 명함 필드(이름·직책·주소·회사) 우선 보강
                                 setF(function(prev){
                                   var ws = (prev.company.workers || []).slice();
                                   var nw = Object.assign({}, ws[idx]);
@@ -6179,6 +6184,8 @@ function ContractModal(props){
                           showToast('🔍 명함 OCR 처리 중...');
                           ocrExtract(ctImg).then(function(res){
                             var ext = res.fields || {};
+                            var card = (typeof parseBizCard==='function') ? parseBizCard(res.text||'') : {};
+                            ext = Object.assign({}, ext, card);  // 명함 필드(이름·직책·전화·이메일) 우선 보강
                             var cs = f.company.contacts.slice();
                             var c = Object.assign({}, cs[idx]);
                             if(ext.name) c.name = ext.name;
@@ -40140,14 +40147,15 @@ function parseBizLicense(text){
     var m=compact.match(ceoRe[i]);
     if(m&&m[1]) out.ceo=m[1].trim();
   }
-  // 다중 대표자 처리
+  // 다중 대표자 처리 (쉼표·가운뎃점으로 명확히 구분된 경우만)
   if(out.ceo){
-    var multiCeo=compact.match(new RegExp(out.ceo+'[\\s,]*([가-힣]{2,5})',''));
-    if(multiCeo&&multiCeo[1]&&multiCeo[1]!==out.ceo) out.ceo2=multiCeo[1];
+    var multiCeo=compact.match(new RegExp(out.ceo+'\\s*[,·및]\\s*([가-힣]{2,5})'));
+    var _labels=/^(개업|법인|사업|등록|업태|종목|주소|전화|성명|상호|소재|발급|교부|연월)/;
+    if(multiCeo&&multiCeo[1]&&multiCeo[1]!==out.ceo&&!_labels.test(multiCeo[1])) out.ceo2=multiCeo[1];
   }
 
   // ⑤ 업태 + 종목 (같은 행 또는 연속 행)
-  var bizLine=compact.match(/업\s*태\s*[：:]?\s*([가-힣A-Za-z,·\s]{1,60}?)\s*종\s*목\s*[：:]?\s*([가-힣A-Za-z,·\-\s]{1,80}?)(?=\s*(?:사\s*업\s*장|개\s*업|발\s*급|$))/);
+  var bizLine=compact.match(/업\s*태\s*[：:]?\s*([가-힣A-Za-z,·\s]{1,60}?)\s*종\s*목\s*[：:]?\s*([가-힣A-Za-z,·\-\s]{1,80}?)(?=\s*(?:사\s*업\s*장|개\s*업|발\s*급|전\s*화|연\s*락|교\s*부|법\s*인|$))/);
   if(bizLine){
     var bv=bizLine[1].trim().replace(/\s+/g,' ');
     var cv2=bizLine[2].trim().replace(/\s+/g,' ');
@@ -40156,7 +40164,7 @@ function parseBizLicense(text){
   } else {
     var bizTypeM=compact.match(/업\s*태\s*[：:]?\s*([가-힣A-Za-z,·\s]{1,60}?)(?=\s*(?:종\s*목|발|사|법|$))/);
     if(bizTypeM){ var v=bizTypeM[1].trim().replace(/\s+/g,' '); if(v.length>1&&v.length<60) out.bizType=v; }
-    var bizCatM=compact.match(/종\s*목\s*[：:]?\s*([가-힣A-Za-z,·\-\s]{1,80}?)(?=\s*(?:사\s*업\s*장|개\s*업|발\s*급|교\s*부|$))/);
+    var bizCatM=compact.match(/종\s*목\s*[：:]?\s*([가-힣A-Za-z,·\-\s]{1,80}?)(?=\s*(?:사\s*업\s*장|개\s*업|발\s*급|전\s*화|연\s*락|교\s*부|법\s*인|$))/);
     if(bizCatM){ var v=bizCatM[1].trim().replace(/\s+/g,' '); if(v.length>1&&v.length<80) out.bizCategory=v; }
   }
 
@@ -40266,6 +40274,40 @@ function ocrExtract(imgBase64, onProgress){
 
 // ── 호환성: 기존 코드가 parseOcrText 직접 호출하는 경우 ──
 function parseOcrText(text){ return parseBizLicense(text); }
+
+// ── 명함 전용 파서 (이름·직책·주소·회사·전화·이메일) ──
+function parseBizCard(text){
+  var out = {};
+  if(!text) return out;
+  var raw = String(text).replace(/\r/g,'');
+  var lines = raw.split('\n').map(function(s){ return s.replace(/^\s+|\s+$/g,''); }).filter(function(s){ return s; });
+  // 이메일
+  var em = raw.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/);
+  if(em) out.email = em[0];
+  // 전화 (Mobile/휴대폰 우선, 없으면 첫 휴대폰 번호)
+  var mobileLine = lines.find(function(l){ return /(mobile|휴대|핸드|hp|cell|010)/i.test(l) && /\d{3,4}[-\s.]?\d{4}/.test(l); });
+  var phoneSrc = mobileLine || raw;
+  var ph = phoneSrc.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/) || phoneSrc.match(/0\d{1,2}[-\s.)]+\d{3,4}[-\s.]?\d{4}/);
+  if(ph) out.phone = ph[0].replace(/[\s.)]+/g,'-').replace(/\(/g,'').replace(/-+/g,'-').replace(/^-|-$/g,'');
+  // 직책
+  var posRe = /(대표이사|대표노무사|대표변호사|대표|부대표|회장|부회장|사장|부사장|전무|상무|이사장|이사|감사|본부장|실장|소장|국장|부장|차장|과장|팀장|파트장|주임|대리|사원|선임|책임|수석|매니저|노무사|변호사|세무사|회계사|관세사|법무사|원장|센터장|연구원|교수|강사)/;
+  var posLine = lines.find(function(l){ return posRe.test(l) && l.length <= 12; });
+  if(posLine){ var pm = posLine.match(posRe); if(pm) out.position = pm[0]; }
+  // 회사/기관
+  var coRe = /(주식회사|\(주\)|㈜|유한회사|합자회사|학교법인|재단법인|사단법인|의료법인|법인|재단|센터|연구소|노무법인|법무법인|세무법인|컴퍼니|코퍼레이션|company|corp|inc|co\.?,?\s*ltd)/i;
+  var coLine = lines.find(function(l){ return coRe.test(l); });
+  if(coLine) out.company = coLine.replace(/\s{2,}/g,' ');
+  // 주소 (우편번호 또는 행정구역 키워드)
+  var addrLine = lines.find(function(l){ return /(특별시|광역시|특별자치|[가-힣]+도\s|[가-힣]+시\s|[가-힣]+군|[가-힣]+구\s|[가-힣]+읍|[가-힣]+면|[가-힣]+동|[가-힣]+로\s?\d|[가-힣]+길\s?\d)/.test(l) && l.length >= 6; });
+  if(addrLine) out.address = addrLine.replace(/^\d{5}\s*/,'').replace(/\s{2,}/g,' ');
+  // 이름: 직책/회사/주소/이메일/전화 줄이 아닌, 한글 2~5자 단독 줄 (상단 우선)
+  var nameLine = lines.find(function(l){
+    var clean = l.replace(/\s/g,'');
+    return /^[가-힣]{2,5}$/.test(clean) && !posRe.test(l) && !coRe.test(l);
+  });
+  if(nameLine) out.name = nameLine.replace(/\s/g,'');
+  return out;
+}
 
 // ── 통장 사본 OCR 파싱 ──
 function parseBankbook(text){
