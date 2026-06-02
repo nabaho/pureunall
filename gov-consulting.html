@@ -38,6 +38,9 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .hdr-tab{padding:6px 14px;border-radius:8px;border:1.5px solid var(--dash-border);background:transparent;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--dash-t2);}
 .hdr-tab:hover{border-color:#64b5f6;color:#64b5f6;}
 .hdr-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.hdr-home{padding:8px 16px;font-size:13px;background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);}
+.hdr-home:hover{background:var(--accent);color:#fff;border-color:#fff;}
+.hdr-sub{padding:5px 9px;font-size:11px;opacity:.85;}
 .set-page{max-width:1200px;margin:0 auto;padding:24px 20px;}
 .set-page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;}
 .set-type-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:10px;}
@@ -467,12 +470,12 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
 <!-- HEADER -->
 <header class="hdr">
-  <div class="logo">푸른<span>노무법인</span> <span style="font-size:11px;font-weight:700;opacity:.75;">정부컨설팅 일정관리</span></div>
+  <div class="logo" id="brandLogo" title="캘린더로 이동" style="cursor:pointer;">푸른<span>노무법인</span> <span style="font-size:11px;font-weight:700;opacity:.75;">정부컨설팅 일정관리</span></div>
   <div id="hdrUser" style="display:flex;align-items:center;gap:6px;flex-shrink:0;"></div>
   <div class="sep"></div>
-  <button class="hdr-tab active" id="tabMain">📅 캘린더</button>
-  <button class="hdr-tab" id="tabTimeline">📊 타임라인</button>
-  <button class="hdr-tab" id="tabEnded">🔒 종료사업장</button>
+  <button class="hdr-tab hdr-home active" id="tabMain">🏠 캘린더</button>
+  <button class="hdr-tab hdr-sub" id="tabTimeline">📊 타임라인</button>
+  <button class="hdr-tab hdr-sub" id="tabEnded">🔒 종료사업장</button>
   <div class="sep"></div>
   <div id="calControls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <div class="mode-toggle">
@@ -1530,7 +1533,7 @@ async function doLogin(){
       localStorage.setItem('p_loginFails',0);
       err.textContent='5회 실패 — 30초간 잠금됩니다.';
     }else{
-      err.textContent=`이름 또는 비밀번호가 올바르지 않습니다. (${fails}/5)`;
+      err.textContent=`이름 또는 비밀번호가 올바르지 않습니다. (${fails}/5) — 초기화된 경우 123456으로 로그인하세요.`;
     }
     err.classList.add('on');
     q('#loginPw').value='';q('#loginPw').focus();
@@ -1668,17 +1671,27 @@ function restoreDeletedCo(coId){
 }
 
 // 영구 삭제 (종료사업장 화면에서 실행)
+let _purgeTimers={};
+const _purgingIds=new Set();
 function purgeDeletedCo(coId){
-  const cos=getCos();const co=cos.find(c=>c.id===coId);
+  const co=getCos().find(c=>c.id===coId);
   if(!co)return;
-  const scheds=getScheds();
-  const related=scheds.filter(s=>s.coId===coId);
-  showConfirm(`'${co.name}' 완전삭제 — 일정 ${related.length}건·사진 모두 삭제(복구 불가)`,()=>{
-    related.forEach(s=>{try{deletePhotoFromDB(s.id);}catch(e){}});
-    setScheds(scheds.filter(s=>s.coId!==coId));
-    setCos(cos.filter(c=>c.id!==coId));
+  // 즉시 영구삭제하지 않고, 화면에서 숨긴 뒤 3초 복귀 토스트. 3초 경과 시 실제 삭제.
+  _purgingIds.add(coId);
+  renderEndedView();
+  clearTimeout(_purgeTimers[coId]);
+  _purgeTimers[coId]=setTimeout(()=>{
+    const s=getScheds(),c=getCos();
+    s.filter(x=>x.coId===coId).forEach(x=>{try{deletePhotoFromDB(x.id);}catch(e){}});
+    setScheds(s.filter(x=>x.coId!==coId));
+    setCos(c.filter(x=>x.id!==coId));
+    _purgingIds.delete(coId);
     renderEndedView();renderDash();renderCal();renderSummaryBar();
-    toast('완전히 삭제되었습니다');
+  },3000);
+  showUndoToast(`'${co.name}' 완전삭제 — 3초 후 복구 불가`, ()=>{
+    clearTimeout(_purgeTimers[coId]);
+    _purgingIds.delete(coId);
+    renderEndedView();
   });
 }
 
@@ -1704,7 +1717,7 @@ function restoreConsulting(coId,typeId){
 function renderEndedView(){
   const allCos=getCos();
   const cos=allCos.filter(c=>c.active!==false&&!c.deleted);
-  const deletedCos=allCos.filter(c=>c.deleted);
+  const deletedCos=allCos.filter(c=>c.deleted&&!_purgingIds.has(c.id));
   const types=getTypes();
   const staff=getStaff();
   const endedItems=cos.flatMap(co=>{
@@ -1978,7 +1991,7 @@ function renderDash(){
 // ===== TIMELINE (GANTT) =====
 function renderTimeline(){
   const tlAtt=q('#tlAttFilter')?.value||'';
-  const cos=getCos().filter(c=>c.active!==false&&!c.deleted);
+  const cos=getCos().filter(c=>c.active!==false);
   const types=getTypes();
   const scheds=getScheds();
   const staff=getStaff();
@@ -1992,7 +2005,7 @@ function renderTimeline(){
       if(!done.length&&!co.deadlines?.[tid])return;
       if(tlAtt&&!done.some(s=>s.attId===tlAtt||s.coAttId===tlAtt))return;
       const att=staff.find(a=>a.id===co.defAtt)||staff[0];
-      rows.push({co,tid,t,done,att,ended:!!(co.endedTypes?.[tid]),deadline:co.deadlines?.[tid]||''});
+      rows.push({co,tid,t,done,att,ended:!!(co.endedTypes?.[tid])||!!co.deleted,deadline:co.deadlines?.[tid]||''});
     });
   });
   if(!rows.length){q('#tlBody').innerHTML=`<div class="gantt-empty">등록된 컨설팅이 없습니다.</div>`;return;}
@@ -2053,7 +2066,7 @@ function renderTimeline(){
     return `<div class="gantt-row${ended?' ended-row-g':''}">
       <div class="gantt-info">
         <div class="gantt-co" title="${co.name}">${co.name}</div>
-        <div class="gantt-type"><span style="background:${t.color};width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;"></span>${t.fullName||t.name}${ended?' <span style="color:var(--danger);font-size:9px;font-weight:700;">종료</span>':''}</div>
+        <div class="gantt-type"><span style="background:${t.color};width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;"></span>${t.fullName||t.name}${ended?' <span style="color:var(--danger);font-size:9px;font-weight:700;">'+(co.deleted?'종료·삭제':'종료')+'</span>':''}</div>
         <div style="font-size:10px;color:var(--t2);margin-top:1px;">${attName}${maxR>0?` · ${done.length}/${maxR}회`:` · ${done.length}회`} ${dlBadge}</div>
       </div>
       <div class="gantt-bar-area">${bgLines}<div class="gantt-bg-today" style="left:${todayR*100}%"></div>${barHtml}${dlHtml}${dotsHtml}</div>
@@ -3233,6 +3246,7 @@ function showTab(tab){
 
 function bind(){
   q('#tabMain').onclick=()=>showTab('main');
+  q('#brandLogo').onclick=()=>showTab('main');
   q('#tabTimeline').onclick=()=>showTab('timeline');
   q('#dashSettingsBtn').onclick=()=>showTab('settings');
   q('#tabEnded').onclick=()=>showTab('ended');
