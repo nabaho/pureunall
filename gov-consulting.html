@@ -954,6 +954,7 @@ async function verifyPw(input,stored){
   if(!stored)return input==='123456';
   if(input===stored)return true;                 // 평문 일치(구버전)
   try{ if((await hashPw(input))===stored)return true; }catch(e){}  // 해시 일치
+  if(simpleHash(input)===stored)return true;     // 다른 컨텍스트(file://↔HTTPS) 해시 호환
   return false;
 }
 
@@ -992,8 +993,8 @@ async function fbSyncDown(){
       const snap=await _fbDB.ref(node).get();
       if(snap.exists()){
         _fbSuppress=true;
-        lsSet(lsKey,JSON.stringify(snap.val()));
-        _fbSuppress=false;
+        try{ lsSet(lsKey,JSON.stringify(snap.val())); }
+        finally{ _fbSuppress=false; }
       }
     }catch(e){}
   }
@@ -1008,8 +1009,8 @@ function fbSubscribe(){
       const incoming=JSON.stringify(snap.val());
       if(localStorage.getItem(lsKey)===incoming)return; // 동일하면 skip
       _fbSuppress=true;
-      lsSet(lsKey,incoming);
-      _fbSuppress=false;
+      try{ lsSet(lsKey,incoming); }
+      finally{ _fbSuppress=false; }
       if(typeof renderDash==='function'){renderDash();renderCal();renderSummaryBar();renderNotifBadge();}
     });
   }
@@ -1574,7 +1575,9 @@ async function savePwChange(){
   staff[idx].pin=hashed;
   setStaff(staff);
   closeModal('mbPwChange');
-  toast('비밀번호가 변경되었습니다');
+  if(FB_READY)toast('비밀번호가 변경되었습니다');
+  else toast('⚠ 변경됨(오프라인) — 온라인 접속 후 다시 변경하세요','err');
+  if(typeof renderStaffList==='function')renderStaffList();
 }
 
 function applySession(){
