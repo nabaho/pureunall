@@ -12580,10 +12580,14 @@ function roleInfo(v){ return ROLES.find(function(r){return r.v===v;}) || ROLES[2
   try {
     var savedVer = localStorage.getItem(verKey);
     if(savedVer !== CURRENT_VER){
-      // 버전 불일치 → USERS_SEED로 강제 리셋
-      localStorage.setItem(key, JSON.stringify(USERS_SEED));
       localStorage.setItem(verKey, CURRENT_VER);
-      return;
+      var existed0 = localStorage.getItem(key);
+      if(!existed0){
+        // 데이터가 아예 없는 새 환경에서만 SEED 적용
+        localStorage.setItem(key, JSON.stringify(USERS_SEED));
+        return;
+      }
+      // 기존 직원명단(비밀번호·역할 등)이 있으면 보존하고 아래 정리 로직만 수행
     }
     // 버전 일치 시에도 중복 sid 제거
     var raw = localStorage.getItem(key);
