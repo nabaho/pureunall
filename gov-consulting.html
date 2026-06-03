@@ -484,6 +484,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
       <button class="mode-btn" data-mode="day">일</button>
     </div>
     <select class="att-filter" id="attFilter"></select>
+    <select class="att-filter" id="yearSel" title="연도 이동"></select>
     <button class="cal-nav" id="calPrev">◀</button>
     <div class="cal-title" id="calTitle"></div>
     <button class="cal-nav" id="calNext">▶</button>
@@ -546,6 +547,11 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
   <aside class="dash">
     <div class="dash-top">
       <input class="dash-search" id="dashSearch" placeholder="🔍 사업장 검색...">
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <select id="dashAttFilter" style="flex:1;min-width:0;padding:6px 8px;border:1.5px solid var(--dash-border);border-radius:8px;background:var(--dash-sf);color:var(--dash-text);font-family:inherit;font-size:11px;font-weight:700;outline:none;cursor:pointer;"><option value="">담당 전체</option></select>
+        <select id="dashStatusFilter" style="flex:1;min-width:0;padding:6px 8px;border:1.5px solid var(--dash-border);border-radius:8px;background:var(--dash-sf);color:var(--dash-text);font-family:inherit;font-size:11px;font-weight:700;outline:none;cursor:pointer;"><option value="active">진행중</option><option value="ended">종료</option><option value="all">전체</option></select>
+      </div>
+      <div id="dashCount" style="font-size:10px;font-weight:800;color:var(--dash-text);opacity:.7;margin-top:5px;"></div>
       <button class="dash-add" id="dashAddBtn">+ 사업장 추가</button>
     </div>
     <div class="dash-body" id="dashList"></div>
@@ -907,7 +913,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
 <script>
 // ===== localStorage 안전 래퍼 (용량 초과 방지) =====
-const LS_VALID_KEYS=['p_staff','p_types','p_cos','p_scheds','p_env','p_fieldState','p_lastUserId','p_session','p_autoSession','p_loginFails','p_loginLock','p_roundlog'];
+const LS_VALID_KEYS=['p_staff','p_types','p_cos','p_scheds','p_env','p_fieldState','p_lastUserId','p_session','p_autoSession','p_loginFails','p_loginLock','p_roundlog','p_favCos'];
 // 시작 시: 정상 키 외의 잔재(과거 사진 등) 제거로 용량 확보
 (function cleanupLS(){
   try{
@@ -1058,7 +1064,7 @@ const HOLIDAYS={
   '01-01':'신정','03-01':'삼일절','05-05':'어린이날',
   '06-06':'현충일','08-15':'광복절','10-03':'개천절',
   '10-09':'한글날','12-25':'성탄절',
-  // 음력 기반 (2024~2028 사전계산)
+  // 음력 기반 (2024~2033 사전계산)
   '2024-02-09':'설날연휴','2024-02-10':'설날','2024-02-11':'설날연휴',
   '2024-02-12':'대체공휴일','2024-04-10':'국회의원선거일',
   '2024-05-06':'대체공휴일','2024-05-15':'부처님오신날',
@@ -1077,6 +1083,23 @@ const HOLIDAYS={
   '2028-01-26':'설날연휴','2028-01-27':'설날','2028-01-28':'설날연휴',
   '2028-05-02':'부처님오신날',
   '2028-09-02':'추석연휴','2028-09-03':'추석','2028-09-04':'추석연휴',
+  '2029-02-12':'설날연휴','2029-02-13':'설날','2029-02-14':'설날연휴',
+  '2029-05-07':'대체공휴일','2029-05-20':'부처님오신날','2029-05-21':'대체공휴일',
+  '2029-09-21':'추석연휴','2029-09-22':'추석','2029-09-23':'추석연휴','2029-09-24':'대체공휴일',
+  '2030-02-02':'설날연휴','2030-02-03':'설날','2030-02-04':'설날연휴','2030-02-05':'대체공휴일',
+  '2030-05-06':'대체공휴일','2030-05-09':'부처님오신날',
+  '2030-09-11':'추석연휴','2030-09-12':'추석','2030-09-13':'추석연휴',
+  '2031-01-22':'설날연휴','2031-01-23':'설날','2031-01-24':'설날연휴',
+  '2031-03-03':'대체공휴일','2031-05-28':'부처님오신날',
+  '2031-09-30':'추석연휴','2031-10-01':'추석','2031-10-02':'추석연휴',
+  '2032-02-10':'설날연휴','2032-02-11':'설날','2032-02-12':'설날연휴',
+  '2032-05-16':'부처님오신날','2032-05-17':'대체공휴일','2032-08-16':'대체공휴일',
+  '2032-09-18':'추석연휴','2032-09-19':'추석','2032-09-20':'추석연휴','2032-09-21':'대체공휴일',
+  '2032-10-04':'대체공휴일','2032-10-11':'대체공휴일','2032-12-27':'대체공휴일',
+  '2033-01-30':'설날연휴','2033-01-31':'설날','2033-02-01':'설날연휴','2033-02-02':'대체공휴일',
+  '2033-05-06':'부처님오신날',
+  '2033-09-07':'추석연휴','2033-09-08':'추석','2033-09-09':'추석연휴',
+  '2033-10-10':'대체공휴일','2033-12-26':'대체공휴일',
 };
 function getHoliday(ds){
   if(HOLIDAYS[ds])return HOLIDAYS[ds];
@@ -1135,7 +1158,7 @@ async function loadPhotosFromDB(){
 }
 
 // ===== STATE =====
-const S={calMode:'month',calY:new Date().getFullYear(),calM:new Date().getMonth(),calWk:todayStr(),calDay:todayStr(),attFilter:'',curUser:'a1',dashSearch:''};
+const S={calMode:'month',calY:new Date().getFullYear(),calM:new Date().getMonth(),calWk:todayStr(),calDay:todayStr(),attFilter:'',curUser:'a1',dashSearch:'',dashAtt:'',dashStatus:'active'};
 // isField state per co+type combo → localStorage p_fieldState
 function getFieldState(coId,typeId){
   const map=JSON.parse(localStorage.getItem('p_fieldState')||'{}');
@@ -1849,6 +1872,7 @@ function refreshStaffDropdowns(){
   const noneOpt='<option value="">없음</option>';
   const opts=staff.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
   const af=q('#attFilter');if(af){af.innerHTML=`<option value="">전체</option>`+opts;af.value=S.attFilter||'';}
+  const daf=q('#dashAttFilter');if(daf){daf.innerHTML=`<option value="">담당 전체</option>`+opts;daf.value=S.dashAtt||'';}
   if(q('#mCoAtt'))q('#mCoAtt').innerHTML=opts;
   if(q('#mCoCoAtt'))q('#mCoCoAtt').innerHTML=noneOpt+opts;
   if(q('#mEditAtt'))q('#mEditAtt').innerHTML=opts;
@@ -1868,12 +1892,23 @@ function deadlineBadge(dl){
   return`<span class="dl-badge dl-safe">📅 ${dl.slice(5).replace('-','/')} (D-${diff})</span>`;
 }
 
+// ===== 즐겨찾기 (기기 로컬, 미동기화) =====
+function getFavs(){try{return JSON.parse(localStorage.getItem('p_favCos')||'[]');}catch{return[];}}
+function toggleFav(coId){const f=getFavs();const i=f.indexOf(coId);if(i>=0)f.splice(i,1);else f.unshift(coId);lsSet('p_favCos',JSON.stringify(f));renderDash();}
+
 // ===== DASHBOARD =====
 function renderDash(){
   const search=S.dashSearch;
-  const cos=getCos().filter(c=>c.active!==false&&!c.deleted&&(!search||c.name.includes(search))&&myVisible(c));
+  const attF=S.dashAtt||'';
+  const status=S.dashStatus||'active';
+  const showEnded=status!=='active';
+  const favs=getFavs();
+  let cos=getCos().filter(c=>c.active!==false&&!c.deleted&&(!search||c.name.includes(search))&&myVisible(c));
+  if(attF)cos=cos.filter(c=>c.defAtt===attF||c.defCoAtt===attF);
+  cos=[...cos.filter(c=>favs.includes(c.id)),...cos.filter(c=>!favs.includes(c.id))]; // 즐겨찾기 우선
   const types=getTypes();
   if(!cos.length){
+    const dc0=q('#dashCount');if(dc0)dc0.textContent='';
     q('#dashList').innerHTML=`<div class="dash-empty">사업장을 추가하면<br>여기에 나타납니다<br><br><button class="dash-add" style="width:auto;padding:8px 16px" onclick="openCoModal()">+ 추가</button></div>`;
     return;
   }
@@ -1883,8 +1918,20 @@ function renderDash(){
     const rows=(co.types||[]).map(tid=>{
       const t=types.find(x=>x.id===tid);
       if(!t||t.active===false)return'';
-      // 종료된 컨설팅 대시보드에서 숨김
-      if(co.endedTypes?.[tid])return'';
+      // 종료된 컨설팅: 진행중 모드에선 숨김, 종료/전체 모드에선 회색 표시
+      if(co.endedTypes?.[tid]){
+        if(!showEnded)return'';
+        const cnt=getScheds().filter(s=>s.coId===co.id&&s.typeId===tid).length;
+        return `<div class="drow" style="opacity:.5;cursor:default;">
+          <span class="drag-icon" style="opacity:.3">⠿</span>
+          <span class="type-bar" style="background:${t.color}"></span>
+          <div class="type-info">
+            <div class="type-name">${t.fullName||t.name}</div>
+            ${t.agency?`<div style="font-size:9px;color:var(--t2);font-weight:600;">${t.agency}</div>`:''}
+            <div class="round-badge" style="color:var(--danger)">🔒 종료 (${cnt}회)</div>
+          </div>
+        </div>`;
+      }
       const nr=nextRound(co.id,tid);
       const isF=getFieldState(co.id,tid);
       const done=getScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
@@ -1926,9 +1973,13 @@ function renderDash(){
         </div>
       </div>`;
     }).filter(Boolean).join('');
+    const activeCount=(co.types||[]).filter(tid=>{const t=types.find(x=>x.id===tid);return t&&t.active!==false&&!co.endedTypes?.[tid];}).length;
+    if(status==='ended'&&activeCount>0)return''; // 종료 필터: 진행중 컨설팅 남은 사업장 제외
     if(!rows)return'';
     return `<div class="dcard">
       <div class="dcard-hd">
+        <span class="dcard-no" style="font-size:11px;font-weight:900;color:var(--t2);min-width:18px;text-align:center;flex-shrink:0;"></span>
+        <button class="co-fav-btn" data-coid="${co.id}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 1px;line-height:1;" title="즐겨찾기 상단 고정">${favs.includes(co.id)?'⭐':'☆'}</button>
         <span class="att-dot" style="background:${att.color}"></span>
         <div class="dcard-name" title="${co.name}">${co.name}</div>
         <span class="att-label" style="background:${att.color}" title="주담당">${att.name}</span>
@@ -1939,6 +1990,11 @@ function renderDash(){
       <div class="dcard-rows">${rows}</div>
     </div>`;
   }).join('');
+
+  // 번호 자동 매김 (필터·정렬 반영) + 총 개수
+  const cards=qa('#dashList .dcard');
+  cards.forEach((card,i)=>{const n=card.querySelector('.dcard-no');if(n)n.textContent=i+1;});
+  const dc=q('#dashCount');if(dc)dc.textContent=cards.length?`총 ${cards.length}곳`:'';
 
   // Bind drag events
   qa('#dashList .drow').forEach(row=>{
@@ -1968,6 +2024,10 @@ function renderDash(){
   // 사업장 삭제 버튼
   qa('#dashList .co-del-btn').forEach(b=>b.onclick=e=>{
     e.stopPropagation();deleteCo(b.dataset.coid);
+  });
+  // 즐겨찾기 버튼
+  qa('#dashList .co-fav-btn').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();toggleFav(b.dataset.coid);
   });
   qa('#dashList .fmt-btn').forEach(btn=>{
     btn.onclick=e=>{
@@ -2095,7 +2155,17 @@ function renderCal(){
   initCalDrop();
 }
 
+function fillYearSel(){
+  const sel=q('#yearSel');if(!sel)return;
+  const ys=getScheds().map(s=>+(s.date||'').slice(0,4)).filter(Boolean);
+  const now=new Date().getFullYear();
+  let min=ys.length?Math.min(...ys):now, max=ys.length?Math.max(...ys):now;
+  min=Math.min(min,now-1); max=Math.max(max,now+1, S.calY);
+  let html='';for(let y=max;y>=min;y--)html+=`<option value="${y}">${y}년</option>`;
+  sel.innerHTML=html; sel.value=S.calY;
+}
 function calTitle(){
+  fillYearSel();
   const dp=q('#calDayPicker'),wp=q('#calWeekPicker');
   if(S.calMode==='month'){
     q('#calTitle').textContent=`${S.calY}년 ${S.calM+1}월`;
@@ -3308,6 +3378,9 @@ function bind(){
   qa('[data-mode]').forEach(b=>b.onclick=()=>{S.calMode=b.dataset.mode;qa('[data-mode]').forEach(x=>x.classList.toggle('on',x.dataset.mode===S.calMode));renderCal();});
   // Dashboard
   q('#dashSearch').oninput=e=>{S.dashSearch=e.target.value;renderDash();};
+  q('#yearSel').onchange=e=>{S.calY=+e.target.value;renderCal();};
+  q('#dashAttFilter').onchange=e=>{S.dashAtt=e.target.value;renderDash();};
+  q('#dashStatusFilter').onchange=e=>{S.dashStatus=e.target.value;renderDash();};
   q('#dashAddBtn').onclick=()=>openCoModal();
   q('#mDayCls').onclick=()=>closeModal('mbDay');
   q('#mSingleCls').onclick=()=>closeModal('mbSingle');
