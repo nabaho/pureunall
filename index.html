@@ -1941,7 +1941,7 @@ window.erpBackup = function(){
 
 // ── 긴급 Firebase 강제 재동기화 (콘솔에서: erpSyncNow()) ──
 window.erpSyncNow = function(){
-  if(!window.fbDb){ console.log('❌ Firebase 미연결'); return; }
+  if(!fbDb){ console.log('❌ Firebase 미연결'); return; }
   console.log('🔄 Firebase 강제 재동기화 시작...');
   var SYNC_KEYS2 = ['finance_income','contracts','cases','consultings','funds',
     'payroll_monthly','activity_log','consult_logs'];
@@ -1952,7 +1952,7 @@ window.erpSyncNow = function(){
     if(!raw) return;
     try { updates['data/'+k] = { v: JSON.parse(raw), u: ts }; } catch(e){}
   });
-  window.fbDb.ref().update(updates)
+  fbDb.ref().update(updates)
     .then(function(){ console.log('✅ Firebase 재동기화 완료'); })
     .catch(function(e){ console.log('❌ 실패:', e.message); });
 };
@@ -2034,6 +2034,17 @@ function dbSet(k, v){
 
       // 폴백: 전체 set (Diff 미적용 시 — DIFF_KEYS는 객체, 그 외는 원형 유지)
       if(!diffApplied){
+        // ── 데이터 손실 방어: 이전에 데이터가 있었는데 0건으로 덮어쓰려 하면 서버 푸시 차단 ──
+        if(Array.isArray(v) && v.length === 0 && Array.isArray(prev) && prev.length > 0){
+          console.warn('[데이터보호] '+k+': '+prev.length+'건 → 0건 — Firebase 푸시 차단(로컬만 저장)');
+          try { showToast('⚠ '+k+'가 0건이 되어 서버 동기화를 막았습니다 (데이터 보호)'); } catch(_){}
+          return true;
+        }
+        // ── 대량 급감 경고 (10건 이상이 절반 이하로 줄면 알림, 푸시는 허용) ──
+        if(Array.isArray(v) && Array.isArray(prev) && prev.length >= 10 && v.length < prev.length * 0.5){
+          console.warn('[데이터주의] '+k+': '+prev.length+'건 → '+v.length+'건 급감');
+          try { showToast('⚠ '+k+'가 '+prev.length+'→'+v.length+'건으로 크게 줄었습니다 — 확인하세요'); } catch(_){}
+        }
         var fbValue = (DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v)) ? arrayToIdMap(v) : v;
         fbDb.ref('data/'+k).set({v:fbValue, u:ts}).catch(fbSyncFail);
       }
@@ -7690,7 +7701,7 @@ function ContractManagement(){
       (function(){
         var on = mgrFilter === 'mine';
         var myCount = contracts.filter(function(c){
-          return c.managerMain === CURRENT_USER_SID || (c.managerSubs||[]).indexOf(CURRENT_USER_SID) >= 0;
+          return isActiveContract(c) && (c.managerMain === CURRENT_USER_SID || (c.managerSubs||[]).indexOf(CURRENT_USER_SID) >= 0);
         }).length;
         return h('button', { onClick:function(){ setMgrFilter('mine'); },
           style:{ padding:'4px 12px', borderRadius:'14px', cursor:'pointer', fontSize:'11.5px',
@@ -7704,7 +7715,7 @@ function ContractManagement(){
       users.map(function(u){
         var on = mgrFilter === u.sid;
         var cnt = contracts.filter(function(c){
-          return c.managerMain === u.sid || (c.managerSubs||[]).indexOf(u.sid) >= 0;
+          return isActiveContract(c) && (c.managerMain === u.sid || (c.managerSubs||[]).indexOf(u.sid) >= 0);
         }).length;
         if(cnt === 0 && !on) return null;  // 담당 0건이면 숨김 (선택중이면 유지)
         return h('button', { key:u.sid, onClick:function(){ setMgrFilter(u.sid); },
@@ -13095,7 +13106,6 @@ function migrateCompanyData(){
 }
 (function(){
   if(!dbGet('company_migration_v1_done', false)){
-    migrateCompanyData();
     dbSet('company_migration_v1_done', true);
   }
 })();
