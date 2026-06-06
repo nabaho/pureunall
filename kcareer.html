@@ -890,6 +890,115 @@ const NS='cm3_';
 const SEED = window.__SEED__ || {};
 const RHWP_STUDIO_URL = LS.get(NS+'rhwp_url') || 'https://nabaho.github.io/rhwp-studio/';
 
+/* ===== 내장 HWP/HWPX 편집기 (외부 의존성 없음) ===== */
+async function createEditor(containerSel, options={}){
+  const container=typeof containerSel==='string'?document.querySelector(containerSel):containerSel;
+  if(!container) throw new Error('컨테이너 없음: '+containerSel);
+  let _paragraphs=[], _fileName='', _modified=false;
+  container.innerHTML='';
+  container.style.cssText='display:flex;flex-direction:column;height:100%;min-height:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff;font-family:"나눔명조","Noto Serif KR",serif';
+  const toolbar=document.createElement('div');
+  toolbar.style.cssText='background:#f5f5f5;border-bottom:1px solid #ddd;padding:6px 10px;display:flex;gap:6px;align-items:center';
+  toolbar.innerHTML='<span style="font-size:12px;color:#666;font-weight:600" id="rhwp_fn">파일 없음</span><span style="flex:1"></span><span style="font-size:11px;color:#999" id="rhwp_st">준비</span>';
+  container.appendChild(toolbar);
+  const editorArea=document.createElement('div');
+  editorArea.style.cssText='flex:1;overflow:auto;background:#e8e8e8;padding:20px;display:flex;flex-direction:column;align-items:center';
+  container.appendChild(editorArea);
+  const statusBar=document.createElement('div');
+  statusBar.style.cssText='background:#f0f0f0;border-top:1px solid #ddd;padding:4px 12px;font-size:11px;color:#888';
+  statusBar.innerHTML='<span id="rhwp_cnt">0 문단</span> &nbsp;<span id="rhwp_mod"></span>';
+  container.appendChild(statusBar);
+
+  function setSt(m){const e=document.getElementById('rhwp_st');if(e)e.textContent=m;}
+  function upd(){const e=document.getElementById('rhwp_cnt');if(e)e.textContent=_paragraphs.length+'문단';const m=document.getElementById('rhwp_mod');if(m)m.textContent=_modified?'● 수정됨':'';}
+
+  async function _loadJSZip(){if(window.JSZip)return;await new Promise(function(res,rej){const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+
+  async function parseHWPX(buf){
+    try{
+      await _loadJSZip();
+      const zip=await JSZip.loadAsync(buf);
+      const sec=zip.file('Contents/section0.xml')||zip.file('Contents/section1.xml');
+      if(!sec) return fallback(buf);
+      const xml=await sec.async('string');
+      const paras=[];
+      (xml.match(/<hp:p[\s\S]*?<\/hp:p>/g)||[]).forEach(function(p){
+        const texts=(p.match(/<hp:t[^>]*>([\s\S]*?)<\/hp:t>/g)||[]).map(function(t){return t.replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ');}).join('');
+        const bold=/bold="true"/i.test(p);
+        const sz=(p.match(/sz="(\d+)"/)||[0,'21'])[1];
+        paras.push({text:texts,bold:bold,fontSize:parseInt(sz)/2});
+      });
+      return paras.length?paras:[{text:'내용을 파싱할 수 없습니다.',bold:false,fontSize:10}];
+    }catch(e){return fallback(buf);}
+  }
+
+  function fallback(buf){
+    try{
+      const bytes=new Uint8Array(buf);
+      const chars=[];
+      for(let i=0;i<Math.min(bytes.length-1,200000);i+=2){
+        const c=bytes[i]|(bytes[i+1]<<8);
+        if(c===0x0D){chars.push('\n');}
+        else if(c>=0x20&&c<0xFFFE){chars.push(String.fromCharCode(c));}
+      }
+      const lines=chars.join('').replace(/[^\uAC00-\uD7A3\u1100-\u11FFa-zA-Z0-9\s\.,!?:;()\-'"]+/g,' ').split(/\n+/).map(function(l){return l.trim();}).filter(function(l){return l.length>1;}).slice(0,80);
+      return lines.length?lines.map(function(l){return{text:l,bold:false,fontSize:10};}):[{text:'파일을 읽을 수 없습니다. 내용을 직접 입력하세요.',bold:false,fontSize:10}];
+    }catch(e){return [{text:'오류: '+e.message,bold:false,fontSize:10}];}
+  }
+
+  function render(){
+    editorArea.innerHTML='';
+    const page=document.createElement('div');
+    page.style.cssText='background:#fff;width:210mm;min-height:297mm;padding:25mm 30mm;box-shadow:0 2px 12px rgba(0,0,0,.2);box-sizing:border-box';
+    _paragraphs.forEach(function(para,idx){
+      const p=document.createElement('p');
+      p.dataset.idx=idx; p.contentEditable='true';
+      p.style.cssText='margin:0 0 4px;padding:2px 4px;min-height:1.4em;line-height:1.8;outline:none;border-radius:2px;font-size:'+(para.fontSize||10.5)+'pt;'+(para.bold?'font-weight:700;':'');
+      p.textContent=para.text;
+      p.oninput=function(){_paragraphs[idx].text=p.textContent;_modified=true;upd();};
+      p.onfocus=function(){};
+      p.onmouseenter=function(){p.style.background='rgba(0,120,200,.05)';};
+      p.onmouseleave=function(){p.style.background='';};
+      page.appendChild(p);
+    });
+    editorArea.appendChild(page); upd();
+  }
+
+  const api={
+    async loadFile(buf,name){
+      _fileName=name||''; _modified=false;
+      const fn=document.getElementById('rhwp_fn'); if(fn) fn.textContent=name||'';
+      setSt('분석 중...');
+      _paragraphs=await parseHWPX(buf);
+      render(); setSt('완료 ('+_paragraphs.length+'문단)');
+    },
+    insertText:function(text){
+      const focused=editorArea.querySelector('p:focus');
+      if(focused){
+        const sel=window.getSelection();
+        if(sel&&sel.rangeCount){const r=sel.getRangeAt(0);r.deleteContents();r.insertNode(document.createTextNode(text));r.collapse(false);sel.removeAllRanges();sel.addRange(r);const idx=parseInt(focused.dataset.idx);if(!isNaN(idx))_paragraphs[idx].text=focused.textContent;_modified=true;upd();return;}
+      }
+      _paragraphs.push({text:text,bold:false,fontSize:10.5}); render(); _modified=true;
+    },
+    async exportHwpx(){
+      await _loadJSZip();
+      const zip=new JSZip();
+      const xml='<?xml version="1.0" encoding="UTF-8"?>\n<hword:HWPML xmlns:hword="urn:schemas-microsoft-com:office:hwp" version="5.0.3.0">\n<hp:BODY xmlns:hp="urn:schemas-microsoft-com:office:hwp">\n<hp:SECTION>\n'+_paragraphs.map(function(p){return '<hp:p><hp:run><hp:t>'+p.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</hp:t></hp:run></hp:p>';}).join('\n')+'\n</hp:SECTION>\n</hp:BODY>\n</hword:HWPML>';
+      zip.file('Contents/section0.xml',xml);
+      zip.file('META-INF/container.xml','<?xml version="1.0"?><container><rootfiles><rootfile full-path="Contents/content.hpf"/></rootfiles></container>');
+      return await zip.generateAsync({type:'blob',mimeType:'application/hwp+zip'});
+    },
+    getContent:function(){return _paragraphs.map(function(p){return p.text;}).join('\n');},
+    isModified:function(){return _modified;},
+    getParagraphs:function(){return _paragraphs.slice();}
+  };
+  return api;
+}
+
+async function openHwpEditor(containerSel, buffer, name){
+  _rhwp = await createEditor(containerSel, { studioUrl: RHWP_STUDIO_URL });
+  if(buffer) await _rhwp.loadFile(buffer, name||'document.hwpx');
+}
 function get(key){ try{ return JSON.parse(LS.get(NS+key)||'[]'); }catch(e){ return []; } }
 function set(key,arr){ try{ LS.set(NS+key, JSON.stringify(arr)); }catch(e){ if(e.name==='QuotaExceededError'||String(e).includes('quota')||String(e).includes('storage')){ toast('⚠️ 저장공간 부족 — 환경설정 › 저장공간 관리에서 파일 삭제 필요'); console.error('Storage full:',key,e); checkStorageQuota(); } else { toast('저장 오류: '+e.message); console.error(e); } } }
 
@@ -985,12 +1094,6 @@ async function getStorageFilesAsync(){
 
 /* ===== rhwp 연동 (HWP/HWPX 보기+편집, 자체호스팅 iframe) ===== */
 let _rhwp=null;
-async function openHwpEditor(containerSel, buffer, name){
-  const { createEditor } = await import(RHWP_STUDIO_URL+'editor/index.js');
-  _rhwp = await createEditor(containerSel, { studioUrl: RHWP_STUDIO_URL });
-  if(buffer) await _rhwp.loadFile(buffer, name||'document.hwpx');
-  return _rhwp;
-}
 async function exportEditedHwpx(){ return _rhwp ? await _rhwp.exportHwpx() : null; }
 
 /* ===== 내비게이션 ===== */
