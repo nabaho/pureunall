@@ -9114,6 +9114,82 @@ function CompanyManagement(){
   if(!existing){ dbSet('companies', COMPANY_DEMO_SEED); existing = COMPANY_DEMO_SEED; }
   var c = useState(existing); var companies = c[0]; var setCompanies = c[1];
 
+  // ── 보수총액신고: 연도별 데이터 (wage_reports[연도][업체id] = {filed,taxReply,eiSi,health,memo}) ──
+  var _wrYS = useState(String(new Date().getFullYear()));
+  var wageYear = _wrYS[0]; var setWageYear = _wrYS[1];
+  var _wrS = useState((dbGet('wage_reports', {})||{})[String(new Date().getFullYear())] || {});
+  var wageRep = _wrS[0]; var setWageRep = _wrS[1];
+  useEffect(function(){
+    var a = dbGet('wage_reports', {}) || {};
+    setWageRep(a[wageYear] || {});
+  }, [wageYear]);
+  function wageSet(cid, key, val){
+    var cur = Object.assign({}, wageRep[cid] || {}); cur[key] = val;
+    var next = Object.assign({}, wageRep); next[cid] = cur;
+    setWageRep(next);
+    var a = dbGet('wage_reports', {}) || {}; a[wageYear] = next; dbSet('wage_reports', a);
+  }
+  function wageCell(co, key){
+    return h('input', { value:(wageRep[co.id]||{})[key]||'', onChange:function(e){ wageSet(co.id, key, e.target.value); },
+      placeholder:'-', style:{ width:'62px', padding:'3px 4px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'10.5px', textAlign:'center' } });
+  }
+  var wageYearOpts = [];
+  for(var _wy=(new Date().getFullYear()+1); _wy>=(new Date().getFullYear()-3); _wy--){ wageYearOpts.push(String(_wy)); }
+  // 보수총액신고 엑셀 가져오기 (사업장명/관리번호로 사무대행 업체 매칭 → 해당 연도 신고칸 채움)
+  function importWageXlsx(e){
+    var file = e.target.files && e.target.files[0]; if(!file) return;
+    if(typeof XLSX === 'undefined'){ showToast('엑셀 모듈 로딩중'); return; }
+    var agents = companies.filter(function(co){ return co.status==='suboffice' || co.isSuboffice; });
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try {
+        var wb = XLSX.read(ev.target.result, { type:'array' });
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var data = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+        var hi = data.findIndex(function(row){ return row.some(function(x){ return String(x).indexOf('사업장')>=0 || String(x).indexOf('업체')>=0; }); });
+        if(hi<0){ showToast('⚠️ 헤더(사업장명) 행 없음'); return; }
+        var hdr = data[hi].map(function(x){ return String(x).trim(); });
+        function col(ns){ for(var i=0;i<hdr.length;i++){ for(var j=0;j<ns.length;j++){ if(hdr[i].indexOf(ns[j])>=0) return i; } } return -1; }
+        var cName=col(['사업장','업체']), cBiz=col(['관리번호','사업자']),
+            cFiled=col(['신고서','전달']), cReply=col(['세무사','회신']),
+            cEi=col(['고용','산재']), cHealth=col(['건강']), cMemo=col(['비고']);
+        function digits(x){ return String(x||'').replace(/[^0-9]/g,''); }
+        function norm(x){ return String(x||'').replace(/\s|\(주\)|㈜|주식회사/g,'').toLowerCase(); }
+        function fmtv(x){ var s=String(x||'').trim(); return s.replace(' 00:00:00',''); }
+        var a = dbGet('wage_reports', {}) || {};
+        var next = Object.assign({}, a[wageYear] || {});
+        var matched=0;
+        for(var r=hi+1;r<data.length;r++){
+          var row=data[r]; if(!row||!row.length) continue;
+          var nm=cName>=0?String(row[cName]||'').trim():'';
+          var bz=cBiz>=0?String(row[cBiz]||'').trim():'';
+          if(!nm && !bz) continue;
+          var bzD=digits(bz), bz10=bzD.slice(0,10);
+          var co=agents.find(function(c){
+            if(nm && (c.name||'').trim()===nm) return true;
+            if(nm && norm(c.name)===norm(nm)) return true;
+            var cD=digits(c.bizNo);
+            if(bz10.length>=10 && cD.slice(0,10)===bz10) return true;
+            if(bzD.length>=10 && cD===bzD) return true;
+            return false;
+          });
+          if(!co) continue;
+          var cur=Object.assign({}, next[co.id]||{});
+          if(cFiled>=0) cur.filed=fmtv(row[cFiled]);
+          if(cReply>=0) cur.taxReply=fmtv(row[cReply]);
+          if(cEi>=0) cur.eiSi=fmtv(row[cEi]);
+          if(cHealth>=0) cur.health=fmtv(row[cHealth]);
+          if(cMemo>=0) cur.memo=fmtv(row[cMemo]);
+          next[co.id]=cur; matched++;
+        }
+        a[wageYear]=next; dbSet('wage_reports', a); setWageRep(next);
+        showToast('📤 '+wageYear+'년 '+matched+'개 업체 반영됨');
+      } catch(err){ showToast('가져오기 실패: '+(err&&err.message)); }
+      e.target.value='';
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
   // 주담당 표시 폴백 (표시 전용, 데이터 변경 없음): 본인 값이 비면 ① 같은 업체명을 가진 다른 회사 레코드의 주담당 ② 해당 업체 입금건의 주담당 이름 순으로 표시
   var incomeMgrByCoName = {};
   (function(){
@@ -9855,6 +9931,14 @@ function CompanyManagement(){
         );
       })(),
       h('div', { style:{ flex:1 } }),
+      statusTab === 'suboffice' && h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginRight:'6px' } },
+        h('span', { style:{ fontSize:'11px', color:'#0f766e', fontWeight:700 } }, '🧾 보수총액신고'),
+        h('select', { value:wageYear, onChange:function(e){ setWageYear(e.target.value); },
+          style:{ padding:'4px 8px', border:'1px solid #99f6e4', borderRadius:'4px', fontSize:'11.5px', fontWeight:700, color:'#0f766e' } },
+          wageYearOpts.map(function(y){ return h('option', { key:y, value:y }, y+'년'); })),
+        h('label', { style:{ background:'#f0fdfa', color:'#0f766e', border:'1px solid #99f6e4', padding:'5px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } },
+          '📤 신고 가져오기', h('input', { type:'file', accept:'.xlsx,.xls', onChange:importWageXlsx, style:{ display:'none' } }))
+      ),
       h('button', { onClick:exportExcel,
         style:{ background:'#fff', color:'#16a34a', border:'1px solid #16a34a', padding:'5px 14px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer' } },
         '📥 엑셀')
@@ -9921,6 +10005,10 @@ function CompanyManagement(){
                 ),
                 h('th', { key:'h5' }, '대표자'),
                 h('th', { key:'h6', onClick:function(){toggleSort('address');}, style:{ cursor:'pointer', userSelect:'none' } }, '지점' + sortIcon('address')),
+                h('th', { key:'hw1', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '신고서전달'),
+                h('th', { key:'hw2', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '세무사회신'),
+                h('th', { key:'hw3', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '고용·산재'),
+                h('th', { key:'hw4', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '건강'),
                 h('th', { key:'h7' }, '특이사항'),
                 h('th', { key:'h8', className:'ac', style:{ width:'60px' } }, '관리')
               ]
@@ -9967,7 +10055,7 @@ function CompanyManagement(){
         )),
         h('tbody', null,
           filtered.length === 0
-            ? h('tr', null, h('td', { colSpan: statusTab === 'suboffice' ? 10 : 22, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
+            ? h('tr', null, h('td', { colSpan: statusTab === 'suboffice' ? 14 : 22, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
             : pg.paged.map(function(co, idx){
                 var expiring = isExpiringSoon(co);
                 // ★ 계약 중단: 주황 배경 구분
@@ -10036,6 +10124,10 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                           h('div', { style:{ marginTop:'2px' } }, renderCell(co, 'ceo2', co.ceo2, {})))
                       : renderCell(co, 'ceo', co.ceo, {})),
                     h('td', null, renderCell(co, 'address', co.address, {})),
+                    h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'filed')),
+                    h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'taxReply')),
+                    h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'eiSi')),
+                    h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'health')),
                     h('td', null, renderCell(co, 'note', co.note, {})),
                     h('td', { className:'ac' },
                       h('div', { style:{ display:'flex', flexDirection:'column', gap:'3px', alignItems:'center' } },
@@ -10539,6 +10631,26 @@ function CompanyEditModal(props){
                 }); });
               }
             }))
+        ),
+        // 세무사무실 정보 (보수총액신고·연말정산 등 세무 연계용)
+        h('div', { style:{ background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:'6px', padding:'10px 12px', marginBottom:'10px' } },
+          h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#0f766e', marginBottom:'8px' } }, '🧾 세무사무실 정보'),
+          h('div', { className:'fld' }, h('label', null, '세무사무실명 / 담당자'),
+            h('div', { style:{ display:'flex', gap:'6px' } },
+              h('input', { type:'text', value:f.taxOfficeName || '', onChange:set('taxOfficeName'), placeholder:'○○세무회계', style:{ flex:1 } }),
+              h('input', { type:'text', value:f.taxContact || '', onChange:set('taxContact'), placeholder:'담당자', style:{ flex:1 } })
+            )),
+          h('div', { className:'fld' }, h('label', null, '연락처 / 팩스'),
+            h('div', { style:{ display:'flex', gap:'6px' } },
+              h('input', { type:'text', value:f.taxPhone || '', onChange:set('taxPhone'),
+                onBlur:function(e){ var v = fmtPhone(e.target.value); if(v !== e.target.value) set('taxPhone')({target:{value:v,type:'text'}}); },
+                placeholder:'전화', inputmode:'tel', style:{ flex:1 } }),
+              h('input', { type:'text', value:f.taxFax || '', onChange:set('taxFax'),
+                onBlur:function(e){ var v = fmtPhone(e.target.value); if(v !== e.target.value) set('taxFax')({target:{value:v,type:'text'}}); },
+                placeholder:'팩스', style:{ flex:1 } })
+            )),
+          h('div', { className:'fld' }, h('label', null, '이메일'),
+            h('input', { type:'email', value:f.taxEmail || '', onChange:set('taxEmail'), placeholder:'tax@office.kr' }))
         ),
         // 계약 정보
         h('div', { style:{ background:'#fef9c3', border:'1px solid #fde68a', borderRadius:'6px', padding:'10px 12px', marginBottom:'10px' } },
@@ -17781,15 +17893,19 @@ function getContractForms(){
     dbSet('contract_forms', CONTRACT_FORM_SEED);
     return CONTRACT_FORM_SEED.slice();
   }
-  // 마이그레이션: 시드의 새 양식 ID가 저장본에 없으면 자동 추가 (사용자 수정본은 보존)
+  // 사용자가 의도적으로 삭제한 시드 양식 ID (되살리지 않음)
+  var removedSeeds = dbGet('contract_forms_removed', []) || [];
+  var removedMap = {};
+  removedSeeds.forEach(function(rid){ removedMap[rid] = true; });
+  // 마이그레이션: 시드의 새 양식 ID가 저장본에 없으면 자동 추가 (사용자 수정본·삭제분은 보존)
   var existingIds = {};
   arr.forEach(function(f){ existingIds[f.id] = true; });
   var added = 0;
   CONTRACT_FORM_SEED.forEach(function(seed){
-    if(!existingIds[seed.id]){ arr.push(seed); added++; }
+    if(!existingIds[seed.id] && !removedMap[seed.id]){ arr.push(seed); added++; }
   });
   CASE_CHEDANG_FORMS.forEach(function(seed){
-    if(!existingIds[seed.id]){ arr.push(seed); added++; }
+    if(!existingIds[seed.id] && !removedMap[seed.id]){ arr.push(seed); added++; }
   });
   if(added > 0){ dbSet('contract_forms', arr); }
   return arr;
@@ -18548,8 +18664,21 @@ function ContractFormMasters(){
   async function del(id){
     var fm = forms.find(function(x){return x.id===id;});
     if(!(await popConfirm('"' + (fm?fm.name:'') + '" 양식을 삭제하시겠습니까?'))) return;
-    var _ud=forms.slice(); persist(forms.filter(function(x){ return x.id !== id; }));
-    showToastUndo('🗑️ 양식 삭제됨', function(){persist(_ud);});
+    var _ud=forms.slice();
+    // 시드 양식이면 삭제 기록(마이그레이션 자동복원 방지)
+    var isSeed = CONTRACT_FORM_SEED.concat(CASE_CHEDANG_FORMS).some(function(s){ return s.id === id; });
+    if(isSeed){
+      var rm = dbGet('contract_forms_removed', []) || [];
+      if(rm.indexOf(id) < 0){ rm.push(id); dbSet('contract_forms_removed', rm); }
+    }
+    persist(forms.filter(function(x){ return x.id !== id; }));
+    showToastUndo('🗑️ 양식 삭제됨', function(){
+      if(isSeed){
+        var rm2 = (dbGet('contract_forms_removed', []) || []).filter(function(x){ return x !== id; });
+        dbSet('contract_forms_removed', rm2);
+      }
+      persist(_ud);
+    });
   }
   function dup(id){
     var fm = forms.find(function(x){return x.id===id;});
