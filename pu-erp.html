@@ -110,7 +110,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 .sb-menu-item.active::before { content: ''; position: absolute; left: -8px; top: 0; bottom: 0; width: 3px; background: #60a5fa; }
 .sb-menu-item .mi-icon { width: 16px; font-size: 13px; }
 .sb-menu-item .mi-text { flex: 1; }
-.sb-menu-item .mi-badge { background: #f59e0b; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 8px; font-weight: 700; }
+.sb-menu-item .mi-badge { background: #475569; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 8px; font-weight: 700; }
 
 /* === 우측 컨테이너 === */
 .right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -122,7 +122,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 .hd-title { font-size: 14px; color: #334155; font-weight: 500; }
 .hd-spacer { flex: 1; }
 .hd-user { display: flex; align-items: center; gap: 4px; padding: 3px 8px 3px 4px; border: 1px solid #e5e7eb; border-radius: 24px; }
-.hd-user .av { width: 28px; height: 28px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.hd-user .av { width: 28px; height: 28px; border-radius: 50%; background: #2563eb; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
 .hd-user .nm { font-size: 11.5px; color: #1e293b; font-weight: 600; white-space: nowrap; }
 .hd-admin { background: #fef3c7; color: #b45309; font-size: 10px; padding: 3px 8px; border-radius: 4px; font-weight: 700; margin-left: 4px; }
 .hd-month { display: flex; align-items: center; gap: 2px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 1px; white-space: nowrap; }
@@ -7331,6 +7331,7 @@ function ContractManagement(){
   var q = useState(''); var query = q[0]; var setQuery = q[1];
   var m = useState(null); var modal = m[0]; var setModal = m[1];
   var pm = useState(null); var printModal = pm[0]; var setPrintModal = pm[1];
+  var dm = useState(null); var docModal = dm[0]; var setDocModal = dm[1];   // 계약서 보관함(NAS 링크)
   // 통합 검색 포커스
   var initFocus = useGlobalSearchFocus();
   useEffect(function(){ if(initFocus){ setQuery(initFocus); setKindFilter('all'); setMgrFilter('all'); } }, [initFocus]);
@@ -7814,6 +7815,11 @@ function ContractManagement(){
           title:'계약서 출력' },
           '📄 계약서'),
         h('button', {
+          onClick:function(e){ e.stopPropagation(); setDocModal(c); },
+          style:{ background:'#e0f2fe', color:'#075985', border:'1px solid #7dd3fc', padding:'4px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' },
+          title:'서명 계약서(스캔본) NAS 보관함' },
+          '📎 보관함'),
+        h('button', {
           onClick:function(e){ e.stopPropagation(); doTransfer(c.id); },
           style:{ flex:1, background:'#dcfce7', color:'#166534', border:'1px solid #166534', padding:'4px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } },
           '➡ 이관 (' + kindsArr.length + '개)'),
@@ -8091,7 +8097,8 @@ function ContractManagement(){
       })
     ),
     modal && h(ContractModal, { cur:modal.cur, onSave:save, onClose:close }),
-    printModal && h(ContractFormPrintModal, { contract:printModal, onClose:closePrintModal })
+    printModal && h(ContractFormPrintModal, { contract:printModal, onClose:closePrintModal }),
+    docModal && h(ContractDocVault, { contract:docModal, onClose:function(){ setDocModal(null); } })
   );
 }
 //  - 사건유형 (case_types): 약어-연도-순번 자동 관리번호 생성
@@ -12769,7 +12776,14 @@ function UnifiedDetailModal(props){
   var c = props.cur;
   var users = getActiveUsers();
   var _contracts = dbGet('contracts', []) || [];
-  var _linkedContract = _contracts.find(function(x){ return (c.companyId && x.companyId && x.companyId === c.companyId) || (c.bizNo && x.bizNo && x.bizNo === c.bizNo); }) || null;
+  // 원본 계약: sourceContractNo(이관 출처) 우선 → companyId/bizNo 보조
+  var _linkedContract = (c.sourceContractNo || c.contractNo)
+      ? _contracts.find(function(x){ return x.contractNo === (c.sourceContractNo || c.contractNo); })
+      : null;
+  if(!_linkedContract){
+    _linkedContract = _contracts.find(function(x){ return (c.companyId && x.companyId && x.companyId === c.companyId) || (c.bizNo && x.bizNo && x.bizNo === c.bizNo); }) || null;
+  }
+  var _cpm = useState(null); var _contractPrint = _cpm[0]; var _setContractPrint = _cpm[1];
   function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : sid; }
 
   function row(label, val){
@@ -12830,7 +12844,12 @@ function UnifiedDetailModal(props){
     h('div', { className:'modal', style:{ width:'720px' }, onClick:function(e){ e.stopPropagation(); } },
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, props.headerIcon + ' ' + props.headerTitle),
-        h('button', { className:'x', onClick:props.onClose }, '×')
+        h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
+          _linkedContract && h('button', { onClick:function(){ _setContractPrint(_linkedContract); },
+            title:'이 건의 원본 계약서 보기/출력 (계약금액·업무범위 확인)',
+            style:{ background:'#fef3c7', color:'#854d0e', border:'1px solid #f59e0b', padding:'4px 10px', borderRadius:'5px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '\ud83d\udcc4 원본 계약서'),
+          h('button', { className:'x', onClick:props.onClose }, '×')
+        )
       ),
       h('div', { className:'modal-b', style:{ maxHeight:'72vh', overflowY:'auto', padding:'14px 18px' } },
         // 명함/사업자등록증 이미지
@@ -12945,7 +12964,8 @@ function UnifiedDetailModal(props){
       h('div', { className:'modal-f' },
         h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'),
         props.onEdit && h('button', { className:'btn-primary', onClick:props.onEdit }, '✏️ 수정')
-      )
+      ),
+      _contractPrint && h(ContractFormPrintModal, { contract:_contractPrint, onClose:function(){ _setContractPrint(null); } })
     )
   );
 }
@@ -18068,6 +18088,82 @@ function fillContractVars(template, contract){
   return result;
 }
 
+// ============ 계약서 보관함 (NAS 링크 관리) ============
+// 서명 완료된 계약서 스캔본을 NAS에 보관하고, ERP에는 링크만 등록/열람
+function ContractDocVault(props){
+  useEscClose(props.onClose);
+  var contract = props.contract;
+  var cid = contract.id;
+  var all = dbGet('contract_docs', {}) || {};
+  var ls = useState((all[cid] || []).slice()); var docs = ls[0]; var setDocs = ls[1];
+  var nn = useState(''); var newName = nn[0]; var setNewName = nn[1];
+  var nu = useState(''); var newUrl = nu[0]; var setNewUrl = nu[1];
+  function persist(arr){
+    setDocs(arr);
+    var cur = dbGet('contract_docs', {}) || {};
+    cur[cid] = arr;
+    dbSet('contract_docs', cur);
+  }
+  function addDoc(){
+    var nm = (newName||'').trim();
+    var url = (newUrl||'').trim();
+    if(!url){ showToast('NAS 링크(주소)를 붙여넣으세요'); return; }
+    if(!/^https?:\/\//i.test(url)){ showToast('http 또는 https로 시작하는 링크여야 합니다'); return; }
+    if(!nm) nm = '계약서 ' + (docs.length+1);
+    persist(docs.concat([{ id:'doc-'+Date.now().toString(36), name:nm, url:url, addedAt:new Date().toISOString().slice(0,10) }]));
+    setNewName(''); setNewUrl('');
+    showToast('📎 링크 등록됨');
+  }
+  function delDoc(id){
+    if(!confirm('이 링크를 보관함에서 삭제합니까? (NAS의 실제 파일은 지워지지 않습니다)')) return;
+    persist(docs.filter(function(d){ return d.id !== id; }));
+    showToast('삭제됨');
+  }
+  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target===e.currentTarget) props.onClose(); } },
+    h('div', { className:'modal', style:{ width:'560px', maxWidth:'94vw' }, onClick:function(e){ e.stopPropagation(); } },
+      h('div', { className:'modal-h', style:{ padding:'14px 18px', borderBottom:'1px solid #e5e7eb', display:'flex', justifyContent:'space-between', alignItems:'center' } },
+        h('div', { className:'t', style:{ fontWeight:700, color:'#1e293b' } }, '📎 계약서 보관함 — ' + (contract.companyName||'')),
+        h('button', { onClick:props.onClose, style:{ fontSize:'18px', color:'#94a3b8', cursor:'pointer', background:'none', border:'none' } }, '×')
+      ),
+      h('div', { style:{ padding:'16px 18px' } },
+        h('div', { style:{ background:'#f0f9ff', border:'1px solid #bae6fd', borderRadius:'6px', padding:'10px 12px', fontSize:'11.5px', color:'#075985', lineHeight:'1.6', marginBottom:'14px' } },
+          '서명한 계약서(스캔본)는 NAS에 보관하고, 여기엔 그 파일의 NAS 링크만 등록합니다. ',
+          'NAS File Station에서 파일 우클릭 → 공유 링크 생성 → 그 주소를 아래에 붙여넣으세요.'),
+        docs.length === 0
+          ? h('div', { style:{ color:'#94a3b8', textAlign:'center', padding:'24px', border:'1px dashed #cbd5e1', borderRadius:'6px', fontSize:'12px', marginBottom:'14px' } }, '등록된 계약서 링크가 없습니다')
+          : h('div', { style:{ marginBottom:'14px', display:'flex', flexDirection:'column', gap:'6px' } },
+              docs.map(function(d){
+                return h('div', { key:d.id, style:{ display:'flex', alignItems:'center', gap:'8px', border:'1px solid #e5e7eb', borderRadius:'6px', padding:'8px 10px' } },
+                  h('span', { style:{ fontSize:'15px' } }, '📄'),
+                  h('div', { style:{ flex:1, minWidth:0 } },
+                    h('a', { href:d.url, target:'_blank', rel:'noopener',
+                      style:{ fontSize:'12.5px', color:'#1d4ed8', fontWeight:600, textDecoration:'none', display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, d.name),
+                    h('div', { style:{ fontSize:'10px', color:'#94a3b8' } }, '등록 ' + d.addedAt)),
+                  h('a', { href:d.url, target:'_blank', rel:'noopener',
+                    style:{ background:'#dbeafe', color:'#1e40af', border:'none', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, textDecoration:'none' } }, '열기'),
+                  h('button', { onClick:function(){ delDoc(d.id); },
+                    style:{ background:'#fee2e2', color:'#991b1b', border:'none', padding:'4px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '삭제')
+                );
+              })
+            ),
+        h('div', { style:{ borderTop:'1px solid #e5e7eb', paddingTop:'12px' } },
+          h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'6px' } }, '+ 계약서 링크 추가'),
+          h('input', { value:newName, onChange:function(e){ setNewName(e.target.value); },
+            placeholder:'이름 (예: 자문계약서 원본 / 비우면 자동)',
+            style:{ width:'100%', boxSizing:'border-box', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', marginBottom:'6px' } }),
+          h('div', { style:{ display:'flex', gap:'6px' } },
+            h('input', { value:newUrl, onChange:function(e){ setNewUrl(e.target.value); },
+              placeholder:'NAS 공유 링크 붙여넣기 (https://...)',
+              style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'monospace' } }),
+            h('button', { onClick:addDoc,
+              style:{ background:'#075985', color:'#fff', border:'none', padding:'7px 16px', borderRadius:'4px', fontSize:'12px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } }, '등록')
+          )
+        )
+      )
+    )
+  );
+}
+
 // ============ 계약서 출력 모달 (종류별 탭) ============
 function ContractFormPrintModal(props){
   useEscClose(props.onClose);
@@ -18075,9 +18171,61 @@ function ContractFormPrintModal(props){
   var allForms = getContractForms();
   var kindsArr = contract.kinds || (contract.kind ? [contract.kind] : []);
 
-  // 종류별 활성 양식 그룹
+  // ── 계약별 계약서 본문 오버라이드 ──
+  // 계약(contracts) 레코드에 contractFormOverrides[양식ID] = {body,name,kind,groupName} 저장
+  // (구버전: 문자열 본문도 호환). 계약 단위라 사건/컨설팅마다 충돌 없이 따로 보관
+  var _ovr = (contract.contractFormOverrides) || {};
+  function ovrBodyOf(v){ return (v && typeof v === 'object') ? (v.body||'') : (v||''); }
+  // 저장된 오버라이드 본문 (없으면 표준)
+  function overrideBody(f){
+    if(_ovr && _ovr[f.id] != null) return ovrBodyOf(_ovr[f.id]);
+    return f.body || '';
+  }
+  function hasOverride(f){ return !!(_ovr && _ovr[f.id] != null); }
+  // 편집중 본문 (양식ID → 텍스트). 초기엔 비움(=overrideBody 사용)
+  var em = useState({}); var editMap = em[0]; var setEditMap = em[1];
+  function curBody(f){ return (editMap[f.id] != null) ? editMap[f.id] : overrideBody(f); }
+  function setBody(fid, txt){ var n = Object.assign({}, editMap); n[fid] = txt; setEditMap(n); }
+  // 이 계약에 저장 (양식 메타 함께 보관 → 표준양식 삭제돼도 복원 가능)
+  function saveOverride(f){
+    var arr = dbGet('contracts', []) || [];
+    var idx = arr.findIndex(function(x){ return x.id === contract.id; });
+    if(idx < 0){ showToast('계약 레코드를 찾을 수 없습니다'); return; }
+    var ov = Object.assign({}, arr[idx].contractFormOverrides || {});
+    ov[f.id] = { body: curBody(f), name: f.name||'', kind: f.kind||'', groupName: f.groupName||'' };
+    arr[idx] = Object.assign({}, arr[idx], { contractFormOverrides: ov });
+    dbSet('contracts', arr);
+    _ovr = ov; contract.contractFormOverrides = ov;
+    showToast('💾 이 계약 전용 양식 저장됨');
+  }
+  // 표준으로 되돌리기 (오버라이드 삭제)
+  function resetOverride(f){
+    var arr = dbGet('contracts', []) || [];
+    var idx = arr.findIndex(function(x){ return x.id === contract.id; });
+    if(idx >= 0 && arr[idx].contractFormOverrides){
+      var ov = Object.assign({}, arr[idx].contractFormOverrides);
+      delete ov[f.id];
+      arr[idx] = Object.assign({}, arr[idx], { contractFormOverrides: ov });
+      dbSet('contracts', arr);
+      _ovr = ov; contract.contractFormOverrides = ov;
+    }
+    var n = Object.assign({}, editMap); delete n[f.id]; setEditMap(n);
+    showToast('↩ 표준 양식으로 복귀');
+  }
+
+  // 종류별 활성 양식 그룹 + 고아 오버라이드 복원
+  // (표준양식이 삭제됐어도 이 계약에 저장된 수정본은 임시 양식으로 살려서 출력 가능)
   function formsForKind(kindV){
-    return allForms.filter(function(f){ return f.enabled && f.kind === kindV; });
+    var list = allForms.filter(function(f){ return f.enabled && f.kind === kindV; });
+    var existIds = {}; list.forEach(function(f){ existIds[f.id] = 1; });
+    Object.keys(_ovr).forEach(function(fid){
+      if(existIds[fid]) return;
+      var v = _ovr[fid];
+      var meta = (v && typeof v === 'object') ? v : { body:v, name:'', kind:kindV, groupName:'' };
+      if((meta.kind || kindV) !== kindV) return;
+      list.push({ id:fid, enabled:true, kind:kindV, name:(meta.name||'(삭제된 표준양식)')+' ⚠', groupName:meta.groupName||'', body:meta.body||'', _orphan:true });
+    });
+    return list;
   }
 
   // 첫 종류 자동 선택
@@ -18100,6 +18248,18 @@ function ContractFormPrintModal(props){
       var payrollSet = ['fm-pr-payroll','fm-pr-pension','fm-pr-health','fm-pr-employment','fm-pr-cms'];
       var sel = allIds.filter(function(id){return payrollSet.indexOf(id)>=0;});
       initSelMap[kv] = sel.length > 0 ? sel : allIds;
+    } else if(kv === 'case'){
+      // 사건 업무유형 코드 → 이름 변환 후, 양식 groupName이 일치하는 것만 자동 체크
+      var caseCode = (contract.typeCodes && contract.typeCodes['case']) || '';
+      var caseTypes = (typeof getKindTypes === 'function') ? getKindTypes('case') : [];
+      var ct = caseTypes.find(function(t){ return t.code === caseCode; });
+      var caseName = ct ? ct.name : '';
+      var formsK = formsForKind(kv);
+      var matched = caseName ? formsK.filter(function(f){
+        var g = f.groupName || '';
+        return g && (g === caseName || caseName.indexOf(g) >= 0 || g.indexOf(caseName) >= 0);
+      }).map(function(f){return f.id;}) : [];
+      initSelMap[kv] = matched.length > 0 ? matched : allIds;
     } else {
       initSelMap[kv] = allIds;
     }
@@ -18124,26 +18284,40 @@ function ContractFormPrintModal(props){
     setSelMap(next);
   }
 
+  // 직인 자동 날인: escape된 본문에서 '푸른노무법인'이 포함된 줄의 '(인)'을 직인 이미지로 치환
+  function applyStampHtml(escapedBody){
+    var stamp = (typeof getCompanyStamp === 'function') ? getCompanyStamp() : '';
+    if(!stamp) return escapedBody;
+    var imgTag = '<img src="'+stamp+'" style="display:inline-block;width:48px;height:48px;vertical-align:middle;margin-left:2px;" alt="(인)">';
+    return escapedBody.split('\n').map(function(line){
+      if(line.indexOf('푸른노무법인') >= 0){
+        var pos = line.lastIndexOf('(인)');
+        if(pos >= 0) return line.slice(0,pos) + imgTag + line.slice(pos+3);
+      }
+      return line;
+    }).join('\n');
+  }
   // 다중 양식 인쇄/PDF (선택된 모든 양식을 페이지 구분으로)
   function doPrintMulti(){
     if(selectedForms.length === 0){ showToast('체크된 양식이 없습니다'); return; }
     var allRendered = selectedForms.map(function(f){
-      return { name: f.name, body: fillContractVars(f.body, contract) };
+      return { name: f.name, body: fillContractVars(curBody(f), contract) };
     });
     var w = window.open('', '_blank', 'width=900,height=700');
     if(!w){ showToast('팝업 차단 해제 필요'); return; }
     var pages = allRendered.map(function(item){
       return '<div class="page">'
-        + (allRendered.length > 1 ? '<div class="title">' + item.name + '</div>' : '')
-        + '<pre>' + item.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>'
+        + '<div class="title">' + item.name + '</div>'
+        + '<pre>' + applyStampHtml(item.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')) + '</pre>'
         + '</div>';
     }).join('');
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>' + (allRendered[0].name) + (allRendered.length>1?' 외 '+(allRendered.length-1)+'건':'') + '</title>'
-      + '<style>body{font-family:"맑은 고딕",sans-serif;line-height:1.7;font-size:13px;margin:0;}'
-      + '.page{padding:40px;page-break-after:always;}'
-      + '.page:last-child{page-break-after:auto;}'
-      + '.title{font-size:11px;color:#94a3b8;border-bottom:1px solid #cbd5e1;padding-bottom:6px;margin-bottom:24px;}'
-      + 'pre{white-space:pre-wrap;word-wrap:break-word;font-family:inherit;margin:0;}</style>'
+      + '<style>body{font-family:"맑은 고딕",sans-serif;line-height:1.7;font-size:13px;margin:0;background:#f1f5f9;}'
+      + '.page{padding:40px 48px;page-break-after:always;background:#fff;max-width:760px;margin:0 auto 24px;border:1px solid #cbd5e1;box-shadow:0 1px 4px rgba(0,0,0,0.08);}'
+      + '.page:last-child{page-break-after:auto;margin-bottom:0;}'
+      + '.title{font-size:12px;color:#1e40af;font-weight:700;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:8px 12px;margin-bottom:24px;}'
+      + 'pre{white-space:pre-wrap;word-wrap:break-word;font-family:inherit;margin:0 auto;max-width:640px;}'
+      + '@media print{body{background:#fff;}.page{border:none;box-shadow:none;margin:0 auto;}}</style>'
       + '</head><body>' + pages
       + '<script>window.onload=function(){window.print();}<\x2fscript>'
       + '</body></html>';
@@ -18161,7 +18335,7 @@ function ContractFormPrintModal(props){
     var to = pc.email || co.email || '';
     if(!to){ to = prompt('받는 사람 이메일 입력:', ''); if(!to) return; }
     var subjectTxt = '[푸른노무법인] ' + selectedForms.map(function(f){return f.name;}).join(', ') + ' (' + (contract.contractNo||'') + ')';
-    var bodyTxt = selectedForms.map(function(f){return '【'+f.name+'】\n'+fillContractVars(f.body, contract);}).join('\n\n----------------\n\n');
+    var bodyTxt = selectedForms.map(function(f){return '【'+f.name+'】\n'+fillContractVars(curBody(f), contract);}).join('\n\n----------------\n\n');
     var subject = encodeURIComponent(subjectTxt);
     var body = encodeURIComponent(bodyTxt);
     if(body.length > 1800){
@@ -18179,7 +18353,7 @@ function ContractFormPrintModal(props){
       var formsK = formsForKind(kv);
       ids.forEach(function(fid){
         var f = formsK.find(function(x){return x.id===fid;});
-        if(f) allRendered.push({ name: k.label + ' - ' + f.name, body: fillContractVars(f.body, contract) });
+        if(f) allRendered.push({ name: k.label + ' - ' + f.name, body: fillContractVars(curBody(f), contract) });
       });
     });
     if(allRendered.length === 0){ showToast('체크된 양식이 없습니다'); return; }
@@ -18188,15 +18362,16 @@ function ContractFormPrintModal(props){
     var pages = allRendered.map(function(item){
       return '<div class="page">'
         + '<div class="title">' + item.name + '</div>'
-        + '<pre>' + item.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>'
+        + '<pre>' + applyStampHtml(item.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')) + '</pre>'
         + '</div>';
     }).join('');
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>계약서 일괄</title>'
-      + '<style>body{font-family:"맑은 고딕",sans-serif;line-height:1.7;font-size:13px;margin:0;}'
-      + '.page{padding:40px;page-break-after:always;}'
-      + '.page:last-child{page-break-after:auto;}'
-      + '.title{font-size:11px;color:#94a3b8;border-bottom:1px solid #cbd5e1;padding-bottom:6px;margin-bottom:24px;}'
-      + 'pre{white-space:pre-wrap;word-wrap:break-word;font-family:inherit;margin:0;}</style>'
+      + '<style>body{font-family:"맑은 고딕",sans-serif;line-height:1.7;font-size:13px;margin:0;background:#f1f5f9;}'
+      + '.page{padding:40px 48px;page-break-after:always;background:#fff;max-width:760px;margin:0 auto 24px;border:1px solid #cbd5e1;box-shadow:0 1px 4px rgba(0,0,0,0.08);}'
+      + '.page:last-child{page-break-after:auto;margin-bottom:0;}'
+      + '.title{font-size:12px;color:#1e40af;font-weight:700;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:8px 12px;margin-bottom:24px;}'
+      + 'pre{white-space:pre-wrap;word-wrap:break-word;font-family:inherit;margin:0 auto;max-width:640px;}'
+      + '@media print{body{background:#fff;}.page{border:none;box-shadow:none;margin:0 auto;}}</style>'
       + '</head><body>' + pages
       + '<script>window.onload=function(){window.print();}<\x2fscript>'
       + '</body></html>';
@@ -18262,15 +18437,30 @@ function ContractFormPrintModal(props){
             });
           })
         ),
-        // 미리보기 (체크된 양식들을 페이지 구분으로 표시)
+        // 미리보기 + 업체별 편집 (체크된 양식들)
         selectedForms.length > 0
           ? h('div', { style:{ background:'#fff', border:'1px solid #cbd5e1', borderRadius:'4px', minHeight:'300px' } },
               selectedForms.map(function(f, i){
-                return h('div', { key:f.id, style:{ padding:'24px 28px', borderBottom: i < selectedForms.length-1 ? '2px dashed #e5e7eb' : 'none' } },
-                  selectedForms.length > 1 && h('div', { style:{ fontSize:'11px', color:'#64748b', borderBottom:'1px solid #e5e7eb', paddingBottom:'6px', marginBottom:'14px', fontWeight:700 } },
-                    '📄 ' + (i+1) + '/' + selectedForms.length + ' · ' + f.name),
-                  h('pre', { style:{ whiteSpace:'pre-wrap', wordWrap:'break-word', fontFamily:'"맑은 고딕", sans-serif', fontSize:'12.5px', lineHeight:'1.7', margin:0, color:'#1e293b' } },
-                    fillContractVars(f.body, contract))
+                return h('div', { key:f.id, style:{ padding:'16px 18px', borderBottom: i < selectedForms.length-1 ? '2px dashed #e5e7eb' : 'none' } },
+                  h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', borderBottom:'1px solid #e5e7eb', paddingBottom:'6px', marginBottom:'10px' } },
+                    h('span', { style:{ fontSize:'11.5px', color:'#64748b', fontWeight:700, flex:1 } },
+                      '📄 ' + (selectedForms.length>1 ? (i+1)+'/'+selectedForms.length+' · ' : '') + f.name
+                      + (hasOverride(f) ? '  ·  ' : '')),
+                    hasOverride(f) && h('span', { style:{ fontSize:'10.5px', color:'#166534', background:'#dcfce7', border:'1px solid #bbf7d0', borderRadius:'4px', padding:'2px 6px', fontWeight:700 } }, '✔ 이 계약 전용본'),
+                    h('button', { onClick:function(){ saveOverride(f); },
+                      title:'편집한 본문을 이 계약 전용으로 저장 (다음 출력 시 자동 적용)',
+                      style:{ background:'#166534', color:'#fff', border:'none', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '💾 이 계약에 저장'),
+                    hasOverride(f) && h('button', { onClick:function(){ if(confirm('이 업체 전용 수정본을 삭제하고 표준 양식으로 되돌립니까?')) resetOverride(f); },
+                      style:{ background:'#fee2e2', color:'#991b1b', border:'1px solid #fca5a5', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '↩ 표준으로')
+                  ),
+                  h('textarea', { value: curBody(f),
+                    onChange:function(e){ setBody(f.id, e.target.value); },
+                    spellcheck:false,
+                    style:{ width:'100%', minHeight:'220px', boxSizing:'border-box', resize:'vertical',
+                      fontFamily:'"맑은 고딕", monospace', fontSize:'12px', lineHeight:'1.6', color:'#1e293b',
+                      border:'1px solid #cbd5e1', borderRadius:'4px', padding:'10px 12px' } }),
+                  h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'4px' } },
+                    '※ 위 본문을 직접 수정 후 [💾 이 계약에 저장]을 누르면 이 계약에만 적용됩니다. {{변수}}는 출력 시 자동 치환·직인 날인됩니다.')
                 );
               })
             )
@@ -18648,8 +18838,10 @@ function ContractFormMasters(){
                         },
                         style:{ background:'#166534', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '복제'),
                       h('button', { type:'button', onClick:function(){
+                          var delId = previewForm.id;
                           if(confirm('"'+previewForm.name+'" 삭제?')){
-                            persist(forms.filter(function(x){return x.id!==previewForm.id;}));
+                            persist(forms.filter(function(x){return x.id!==delId;}));
+                            if(clickedForm && clickedForm.id===delId) setClickedForm(null);
                             setPreviewForm(null);
                             showToast('삭제됨');
                           }
@@ -38239,6 +38431,8 @@ function ClosedManagement(){
   var caf = useState('all'); var colAmt = caf[0]; var setColAmt = caf[1];
   // 종료된 업체 상세 모달
   var dmc = useState(null); var detailModalCo = dmc[0]; var setDetailModalCo = dmc[1];
+  // 종료 계약 계약서 출력 모달
+  var cpm = useState(null); var closedPrint = cpm[0]; var setClosedPrint = cpm[1];
   // 표시 개수/페이지 (7개 탭 공용)
   var clPgS = useState(1); var closedPage = clPgS[0]; var setClosedPage = clPgS[1];
   var clPsS = useState(20); var closedPageSize = clPsS[0]; var setClosedPageSize = clPsS[1];
@@ -38888,6 +39082,12 @@ function ClosedManagement(){
                   h('td', { style:{ fontSize:'12px' } }, userName(a.managerMain)),
                   h('td', { className:'ar', style:{ fontFamily:'monospace' } }, a.contractAmount ? a.contractAmount.toLocaleString() : '-'),
                   h('td', { className:'ac' },
+                    h('button', { onClick:function(){
+                        var full = (dbGet('contracts', []) || []).find(function(x){return x.id===a.id;}) || a;
+                        setClosedPrint(full);
+                      },
+                      title:'저장된 계약서 보기/출력',
+                      style:{ background:'#fef3c7', color:'#854d0e', border:'1px solid #f59e0b', padding:'2px 8px', borderRadius:'5px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', marginRight:'3px' } }, '\ud83d\udcc4 계약서'),
                     a.reason === '취소' && h('button', { onClick:function(){restore(a.id);},
                       style:{ background:'#dbeafe', color:'#1e40af', border:'1px solid #93c5fd', padding:'2px 8px', borderRadius:'5px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', marginRight:'3px' } }, '\u21a9 복구'),
                     h('button', { onClick:function(){unarchiveContract(a.id);},
@@ -39073,6 +39273,8 @@ function ClosedManagement(){
     activeTab === 'fund'       && renderBiz('funds', bizFundItems),
     activeTab === 'other'      && renderBiz('other_projects', bizOtherItems),
     _clBar,
+    // 종료 계약 계약서 출력 모달
+    closedPrint && h(ContractFormPrintModal, { contract:closedPrint, onClose:function(){ setClosedPrint(null); } }),
     // 종료된 업체 상세 모달
     detailModalCo && h('div', { className:'modal-bg', onClick:function(e){if(e.target===e.currentTarget)setDetailModalCo(null);} },
       h('div', { className:'modal', style:{ width:'560px', maxHeight:'85vh', overflowY:'auto' }, onClick:function(e){e.stopPropagation();} },
