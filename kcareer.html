@@ -57,7 +57,7 @@ body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;color:var(
   #page-home h2{font-size:22px}
   .toolbar{gap:6px}
   .tb-input{min-width:100%!important;flex:1}
-  .dt{overflow-x:auto}
+  .dt{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px)}
   .dt table{min-width:640px}
   .kpi-grid{grid-template-columns:1fr 1fr}
   .field-grid{grid-template-columns:1fr!important}
@@ -222,7 +222,7 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
 /* 툴바·표 */
 .toolbar{border-radius:12px!important;box-shadow:0 8px 24px -20px rgba(20,30,50,.25)}
 .dt table{border-radius:12px!important;box-shadow:0 8px 24px -20px rgba(20,30,50,.22)}
-.dt thead th{background:#FBFAF6!important;color:var(--ink)!important;border-bottom:2px solid var(--border)!important;font-weight:700;position:sticky;top:0}
+.dt thead th{background:#FBFAF6!important;color:var(--ink)!important;border-bottom:2px solid var(--border)!important;font-weight:700;position:sticky;top:0;z-index:5;box-shadow:0 2px 4px rgba(0,0,0,.06)}
 .dt tbody tr{transition:background .12s}
 .dt tbody tr:hover{background:#FBF7EC!important}
 /* 버튼 */
@@ -241,7 +241,7 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
 @keyframes popin{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
 .modal-h{font-family:'Noto Serif KR',serif;cursor:move;user-select:none}
 .form-split{display:flex;gap:18px;align-items:flex-start}
-.fs-prev{flex:1.15;min-width:0}
+.fs-prev{flex:1.15;min-width:0;max-height:80vh;overflow-y:auto;position:sticky;top:0}
 .fs-form{flex:1;min-width:260px}
 #modalForm .modal.wide{width:920px}
 @media(max-width:780px){ .form-split{flex-direction:column} #modalForm .modal.wide{width:560px} }
@@ -295,6 +295,7 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
     <div id="sidePreviewBody"><div style="color:#aaa;font-size:13px;padding:30px;text-align:center">파일을 선택하세요</div></div>
     <div id="sidePreviewFoot">
       <button class="btn primary" id="spBtnBig" style="flex:1">📄 크게 보기</button>
+      <button class="btn" id="spBtnEdit" style="display:none;background:#4A6FA5;color:#fff;border-color:#4A6FA5">✏️ 수정</button>
       <button class="btn" id="spBtnDl">⬇ 다운로드</button>
     </div>
   </div>
@@ -318,6 +319,137 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
           <div style="font-weight:600;color:var(--navy);margin-bottom:10px">이번 달 등록 내역</div>
           <div id="homeList" class="empty">집계 대기</div>
         </div>
+      </div></section>
+      <section class="page-view" id="page-resume-hub"><div class="page">
+        <h2>이력서·프로필 관리</h2><div class="desc">양식 편집·보관·제출기록 통합 관리</div>
+
+        <!-- 탭 -->
+        <div class="tabrow" id="rh-tabrow">
+          <button class="tab active" data-tab="rh-edit" onclick="rhTab('rh-edit',this)">✏️ 양식 편집</button>
+          <button class="tab" data-tab="rh-resume" onclick="rhTab('rh-resume',this)">📁 이력서 보관함</button>
+          <button class="tab" data-tab="rh-profile" onclick="rhTab('rh-profile',this)">👤 프로필 보관함</button>
+          <button class="tab" data-tab="rh-pdf" onclick="rhTab('rh-pdf',this)">📄 PDF 편집</button>
+        </div>
+
+        <!-- 탭1: 양식 편집 (이력서 생성 + 프로필 통합) -->
+        <div class="tabpanel active" id="rh-edit">
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <button class="btn primary" onclick="rhSetDomain('resume')">📄 이력서 작성</button>
+            <button class="btn" onclick="rhSetDomain('profile')">👤 프로필 작성</button>
+            <span id="rh-domain-label" style="font-size:12px;color:var(--text-mute);align-self:center;margin-left:4px">이력서 모드</span>
+          </div>
+          <!-- 양식 업로드 -->
+          <div class="card" style="margin-bottom:12px">
+            <div class="rc-h">① 양식 업로드 <span class="rc-mute">(PDF 권장 · HWP·HWPX·DOCX 가능)</span></div>
+            <div class="dropzone" id="rcDrop">📄 PDF · HWP · HWPX · DOCX 파일을 끌어놓거나 클릭해서 선택</div>
+            <input type="file" id="rcFile" accept=".pdf,.hwp,.hwpx,.docx" style="display:none">
+            <label style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;color:var(--text-mute)">
+              <input type="checkbox" id="rcSaveLib"> 가져올 때 양식 보관함에도 추가
+            </label>
+          </div>
+          <!-- 양식 보관함 -->
+          <div class="card" style="margin-bottom:12px">
+            <div class="rc-h">② 양식 보관함</div>
+            <div id="rcTplLib" class="empty">보관된 양식 없음</div>
+          </div>
+          <!-- 편집 영역 -->
+          <div class="card" id="rcEditCard" style="display:none">
+            <div class="rc-bar" style="margin-bottom:12px">
+              <div class="rc-h" style="margin:0">③ 편집</div>
+              <div class="rc-actions">
+                <button class="btn primary" id="rcSaveBtn">💾 완성본 생성</button>
+                <button class="btn" id="rcDocxSaveBtn" style="display:none" onclick="exportDocxFile()">💾 DOCX 저장</button>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:6px">양식 미리보기</div>
+                <div id="rcEditorMsg" class="rc-mute">양식을 업로드하면 미리보기가 나타납니다</div>
+                <div id="rcPdfPreview" style="display:none"></div>
+                <div id="rhwpEditor"></div>
+                <div id="docxEditorWrap" style="display:none;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <div style="background:var(--soft);padding:8px 14px;font-size:12px;color:var(--text-mute);border-bottom:1px solid var(--border)">📝 편집 — 커서 위치에 오른쪽 항목 클릭하면 삽입</div>
+                  <div id="docxEditor" contenteditable="true" spellcheck="false" style="min-height:500px;padding:24px 32px;font-size:13px;line-height:1.8;outline:none;background:#fff;max-height:70vh;overflow:auto"></div>
+                </div>
+                <div id="rcDropRows" style="display:none;margin-top:12px">
+                  <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:8px">📋 채울 항목</div>
+                  <div id="rcDropRowList"></div>
+                </div>
+              </div>
+              <div id="rcDragPanel">
+                <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:8px">경력·자격 목록 — 드래그 또는 클릭</div>
+                <div id="rcCatTabs" style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:8px"></div>
+                <div style="display:flex;gap:6px;margin-bottom:8px">
+                  <input type="text" id="rcDragSearch" placeholder="🔍 검색..." style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;outline:none">
+                  <select id="rcDragYear" style="font-size:12px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;width:90px"><option value="">전체연도</option></select>
+                </div>
+                <div id="rcDragList" style="border:1px solid var(--border);border-radius:6px;max-height:350px;overflow-y:auto"></div>
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                  <button class="btn primary" style="width:100%;font-size:12px" onclick="autoFillBasicInfo()">✨ 기본정보 자동 채우기</button>
+                </div>
+                <div style="margin-top:8px">
+                  <button class="btn primary" style="width:100%;font-size:13px;font-weight:600;padding:10px" id="rhGenBtn" onclick="generateFilledHWP('resume')">📄 완성본 HWP 생성</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="rcFillPanel" class="rc-fill" style="display:none"></div>
+        </div>
+
+        <!-- 탭2: 이력서 보관함 -->
+        <div class="tabpanel" id="rh-resume">
+          <div id="rh-resume-content">
+            <div class="toolbar">
+              <input class="tb-input" data-f="q" placeholder="종류·기관·메모 검색" style="min-width:200px">
+              <select class="tb-select" data-f="year"><option value="">전체 기관</option></select>
+              <div class="tb-spacer"></div>
+              <span class="cnt"></span>
+              <button class="btn primary" onclick="openDocSaveModal('resume','existing',null)">+ 기존 이력서 추가</button>
+            </div>
+            <div class="dt" id="rh-resume-dt"><div class="empty">보관된 이력서가 없습니다</div></div>
+          </div>
+        </div>
+
+        <!-- 탭3: 프로필 보관함 -->
+        <div class="tabpanel" id="rh-profile">
+          <div id="rh-profile-content">
+            <div class="toolbar">
+              <input class="tb-input" data-f="q" placeholder="종류·기관·메모 검색" style="min-width:200px">
+              <select class="tb-select" data-f="year"><option value="">전체 기관</option></select>
+              <div class="tb-spacer"></div>
+              <span class="cnt"></span>
+              <button class="btn primary" onclick="openDocSaveModal('profile','existing',null)">+ 기존 프로필 추가</button>
+            </div>
+            <div class="dt" id="rh-profile-dt"><div class="empty">보관된 프로필이 없습니다</div></div>
+          </div>
+        </div>
+
+        <!-- 탭4: PDF 편집 -->
+        <div class="tabpanel" id="rh-pdf">
+          <div class="card" style="margin-bottom:12px">
+            <div class="rc-h">PDF 편집 <span class="rc-mute">— PDF 위에 클릭해서 텍스트 추가 후 저장</span></div>
+            <div class="dropzone" id="pdfEditDrop">📄 편집할 PDF 파일을 끌어놓거나 클릭해서 선택</div>
+            <input type="file" id="pdfEditFile" accept=".pdf" style="display:none">
+          </div>
+          <div id="pdfEditArea" style="display:none">
+            <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+              <button class="btn primary" onclick="savePdfEdited()">💾 수정본 PDF 저장</button>
+              <button class="btn" onclick="pdfEditUndo()">↩ 마지막 취소</button>
+              <select id="pdfFontSize" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px">
+                <option value="10">10pt</option><option value="11" selected>11pt</option><option value="12">12pt</option>
+                <option value="14">14pt</option><option value="16">16pt</option>
+              </select>
+              <span style="font-size:11px;color:var(--text-mute)">💡 PDF 위 원하는 위치 클릭 → 텍스트 입력 → Enter</span>
+            </div>
+            <div style="position:relative;display:inline-block" id="pdfEditCanvasWrap">
+              <canvas id="pdfEditCanvas" style="display:block;border:1px solid var(--border);cursor:text;max-width:100%"></canvas>
+              <div id="pdfTextOverlay" style="position:absolute;top:0;left:0;pointer-events:none"></div>
+              <input id="pdfTextInput" type="text" style="display:none;position:absolute;border:2px solid var(--teal);border-radius:4px;padding:2px 6px;font-size:12px;outline:none;min-width:120px;background:rgba(255,255,255,.95);z-index:10">
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:var(--text-mute)" id="pdfEditPageInfo"></div>
+          </div>
+        </div>
+
       </div></section>
       <section class="page-view" id="page-resume-create"><div class="page">
         <h2>이력서 생성</h2><div class="desc">PDF 양식 업로드 → 오른쪽 경력 목록을 드래그해서 항목에 놓으면 자동 입력</div>
@@ -1124,7 +1256,7 @@ async function exportEditedHwpx(){ return _rhwp ? await _rhwp.exportHwpx() : nul
 
 /* ===== 내비게이션 ===== */
 let NAV=[
-  {g:'이력서관리', items:[['page-resume-create','이력서 생성'],['page-resume-store','이력서 보관'],['page-profile','프로필 작성보관'],['page-certdoc','경력증명서 보관']]},
+  {g:'이력서관리', items:[['page-resume-hub','이력서·프로필 관리'],['page-resume-create','이력서 생성'],['page-resume-store','이력서 보관'],['page-profile','프로필 작성보관'],['page-certdoc','경력증명서 보관']]},
   {g:'회의·비용관리', items:[['page-meetfee','회의등비용신청'],['page-etcfee','기타비용신청']]},
   {g:'경력관리', items:[['page-wiccok','위촉장'],['page-license','자격증'],['page-complete','수료증'],['page-award','표창 및 포상'],['page-edu','학력']]},
   {g:'실적관리', items:[['page-case','사건실적'],['page-consult','컨설팅실적'],['page-fund','기금실적'],['page-lecture','강의실적'],['page-etc','기타실적']]},
@@ -1198,6 +1330,7 @@ function nav_to(id,label,grp){
   document.getElementById('main').scrollTop=0;
   if(window.innerWidth<=820) toggleSidebar(false);
   const nm=id.slice(5); if(typeof CAREER_CFG!=='undefined'&&CAREER_CFG[nm]) renderCareer(nm);
+  if(id==='page-resume-hub'){ _safe(()=>initResumeHub()); }
   if(id==='page-resume-store' && typeof renderDocStore==='function') renderDocStore('resume');
   if(id==='page-profile' && typeof renderDocStore==='function') renderDocStore('profile');
   if(id==='page-certdoc' && typeof renderDocStore==='function') renderDocStore('certdoc');
@@ -1324,7 +1457,150 @@ function checkFilename(){
   const ok=location.protocol!=='file:'; b.classList.toggle('show',!ok);
 }
 
-/* ===== 이력서 생성: 양식 가져오기 → rhwp 편집 → 저장 ===== */
+/* ===== 이력서·프로필 통합 허브 ===== */
+var _rhDomain='resume';
+function initResumeHub(){
+  _safe(()=>initDocCreate('resume'));
+  _safe(()=>renderRhDocList('resume'));
+  _safe(()=>renderRhDocList('profile'));
+  _safe(()=>initPdfEditor());
+  _initDragPanel();
+}
+function rhTab(tabId, btn){
+  document.querySelectorAll('#page-resume-hub .tabpanel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#rh-tabrow .tab').forEach(b=>b.classList.remove('active'));
+  const panel=document.getElementById(tabId); if(panel) panel.classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(tabId==='rh-resume') renderRhDocList('resume');
+  if(tabId==='rh-profile') renderRhDocList('profile');
+}
+function rhSetDomain(domain){
+  _rhDomain=domain;
+  const lbl=document.getElementById('rh-domain-label');
+  if(lbl) lbl.textContent=domain==='resume'?'이력서 모드':'프로필 모드';
+  const genBtn=document.getElementById('rhGenBtn');
+  if(genBtn){ genBtn.textContent='📄 완성본 '+(domain==='resume'?'이력서':'프로필')+' 생성'; genBtn.onclick=()=>generateFilledHWP(domain); }
+  _safe(()=>initDocCreate(domain));
+}
+function renderRhDocList(domain){
+  const D=DOMAINS[domain]; if(!D) return;
+  const dtId=domain==='resume'?'rh-resume-dt':'rh-profile-dt';
+  const box=document.getElementById(dtId); if(!box) return;
+  const data=get(D.store);
+  if(!data.length){ box.innerHTML='<div class="empty">보관된 '+D.label+'이 없습니다</div>'; return; }
+  const byYear={}; data.forEach(r=>{ const y=r.year||'기타'; (byYear[y]=byYear[y]||[]).push(r); });
+  box.innerHTML=Object.keys(byYear).sort().reverse().map(y=>{
+    return '<div style="margin-bottom:16px"><div style="font-weight:600;color:var(--navy);margin-bottom:8px">'+y+' ('+byYear[y].length+'건)</div>'
+      +byYear[y].map(r=>{
+        const has=!!getFile(r.id);
+        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:#fff">'
+          +'<div style="flex:1"><div style="font-weight:500;font-size:13px">'+(r.kind||D.label)+'</div><div style="font-size:11px;color:var(--text-mute)">'+(r.org||'')+(r.memo?' · '+r.memo:'')+'</div></div>'
+          +(has?'<button class="btn sm" style="background:var(--navy);color:#fff" onclick="showBig(\''+r.id+'\')">📄 보기</button><button class="btn sm" onclick="downloadFile(\''+r.id+'\')">⬇</button>':'')
+          +'<button class="btn sm" style="color:#fff;background:var(--red)" onclick="delDoc(\''+domain+'\',\''+r.id+'\')">🗑 삭제</button>'
+          +'</div>';
+      }).join('')+'</div>';
+  }).join('');
+}
+
+/* ===== PDF 편집 (pdf-lib) ===== */
+var _pdfEditDoc=null, _pdfEditPage=0, _pdfEditScale=1.4, _pdfEditTexts=[], _pdfEditName='';
+async function _loadPdfLib(){
+  if(window.PDFLib) return;
+  await new Promise((res,rej)=>{ const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+    s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+}
+function initPdfEditor(){
+  const drop=document.getElementById('pdfEditDrop'); const file=document.getElementById('pdfEditFile');
+  if(!drop||!file) return;
+  drop.onclick=()=>file.click();
+  file.onchange=e=>{ if(e.target.files[0]) loadPdfForEdit(e.target.files[0]); };
+  drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('drag'); };
+  drop.ondragleave=()=>drop.classList.remove('drag');
+  drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer.files[0]) loadPdfForEdit(e.dataTransfer.files[0]); };
+  // canvas 클릭 → 텍스트 입력
+  const canvas=document.getElementById('pdfEditCanvas'); if(!canvas) return;
+  canvas.onclick=function(e){
+    const inp=document.getElementById('pdfTextInput'); if(!inp) return;
+    const rect=canvas.getBoundingClientRect();
+    const x=e.clientX-rect.left, y=e.clientY-rect.top;
+    inp.style.display='block'; inp.style.left=x+'px'; inp.style.top=(y-14)+'px';
+    inp.dataset.x=x; inp.dataset.y=y; inp.value=''; inp.focus();
+    inp.onkeydown=function(ev){
+      if(ev.key==='Enter'){ ev.preventDefault(); _confirmPdfText(inp); }
+      if(ev.key==='Escape'){ inp.style.display='none'; }
+    };
+    inp.onblur=function(){ if(inp.value.trim()) _confirmPdfText(inp); else inp.style.display='none'; };
+  };
+}
+async function loadPdfForEdit(file){
+  _pdfEditName=file.name; _pdfEditTexts=[];
+  const buf=await file.arrayBuffer();
+  toast('⏳ PDF 로딩 중...');
+  try{
+    await _loadPdfLib();
+    _pdfEditDoc=await PDFLib.PDFDocument.load(buf);
+    await _renderPdfEditPage(0);
+    document.getElementById('pdfEditArea').style.display='';
+    document.getElementById('pdfEditDrop').style.display='none';
+    toast('PDF 열림 — 원하는 위치 클릭 후 텍스트 입력');
+  }catch(e){ toast('PDF 로드 오류: '+e.message); }
+}
+async function _renderPdfEditPage(pageIdx){
+  if(!window._pdfjs||!_pdfEditDoc) return;
+  const pdfBytes=await _pdfEditDoc.save();
+  const pdf=await window._pdfjs.getDocument({data:pdfBytes}).promise;
+  _pdfEditPage=Math.min(pageIdx,pdf.numPages-1);
+  const page=await pdf.getPage(_pdfEditPage+1);
+  const vp=page.getViewport({scale:_pdfEditScale});
+  const canvas=document.getElementById('pdfEditCanvas');
+  canvas.width=vp.width; canvas.height=vp.height;
+  canvas.style.maxWidth='100%';
+  await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+  const info=document.getElementById('pdfEditPageInfo');
+  if(info) info.textContent=pdf.numPages+'페이지 중 '+(pageIdx+1)+'페이지 · 추가된 텍스트: '+_pdfEditTexts.length+'개';
+  // PDF.js 로드 확인
+  if(!window._pdfjs && !window.pdfjsLib){
+    await new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; sc.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; window._pdfjs=window.pdfjsLib; res(); }; sc.onerror=rej; document.head.appendChild(sc); });
+  }
+}
+function _confirmPdfText(inp){
+  const text=inp.value.trim(); if(!text){ inp.style.display='none'; return; }
+  const x=parseFloat(inp.dataset.x), y=parseFloat(inp.dataset.y);
+  const fontSize=parseInt(document.getElementById('pdfFontSize')?.value||'11');
+  // 캔버스 좌표 → PDF 좌표
+  const canvas=document.getElementById('pdfEditCanvas');
+  const pdfX=x/_pdfEditScale;
+  const pdfY=(canvas.height-y)/_pdfEditScale;
+  _pdfEditTexts.push({text,pdfX,pdfY,fontSize,pageIdx:_pdfEditPage});
+  // 캔버스에 즉시 미리보기
+  const ctx=canvas.getContext('2d'); ctx.fillStyle='#000'; ctx.font=fontSize*_pdfEditScale+'px Noto Serif KR, serif';
+  ctx.fillText(text,x,y);
+  inp.style.display='none';
+  toast('텍스트 추가됨 (저장 버튼으로 PDF 생성)');
+}
+function pdfEditUndo(){
+  if(!_pdfEditTexts.length){ toast('취소할 내용 없음'); return; }
+  _pdfEditTexts.pop();
+  _renderPdfEditPage(_pdfEditPage);
+  toast('마지막 텍스트 취소됨');
+}
+async function savePdfEdited(){
+  if(!_pdfEditDoc||!_pdfEditTexts.length){ toast('추가된 텍스트가 없습니다'); return; }
+  toast('⏳ PDF 생성 중...');
+  try{
+    const font=await _pdfEditDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+    _pdfEditTexts.forEach(function(t){
+      const pages=_pdfEditDoc.getPages(); const page=pages[t.pageIdx||0];
+      page.drawText(t.text,{x:t.pdfX,y:t.pdfY,size:t.fontSize||11,font:font,color:PDFLib.rgb(0,0,0)});
+    });
+    const bytes=await _pdfEditDoc.save();
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=(_pdfEditName||'document').replace('.pdf','')+'_수정.pdf'; a.click();
+    toast('✅ 수정본 PDF 저장됨');
+  }catch(e){ toast('PDF 저장 오류: '+e.message); }
+}
 const USER_INFO={
   성명:'권형하', 자격:'공인노무사 제3016호', 생년월일:'1975.01.07',
   전화:'041-556-0035', 이메일:'370-6@daum.net',
@@ -1700,8 +1976,8 @@ function initDocCreate(domain){ const cfg=DOMAINS[domain].create; const drop=doc
   drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('drag'); };
   drop.ondragleave=()=>drop.classList.remove('drag');
   drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer.files[0]) importTemplateFile(e.dataTransfer.files[0],domain); };
-  document.getElementById(cfg.fillBtn).onclick=()=>toggleFillPanel(domain);
-  document.getElementById(cfg.saveBtn).onclick=()=>openDocSaveModal(domain,'generate');
+  const fillBtn=document.getElementById(cfg.fillBtn); if(fillBtn) fillBtn.onclick=()=>toggleFillPanel(domain);
+  const saveBtn=document.getElementById(cfg.saveBtn); if(saveBtn) saveBtn.onclick=()=>openDocSaveModal(domain,'generate');
   renderTplLib(domain);
 }
 
@@ -2148,6 +2424,16 @@ function showSidePreview(id){
     }
     const bb=document.getElementById('spBtnBig'); if(bb) bb.onclick=function(){showBig(id);};
     const bd=document.getElementById('spBtnDl'); if(bd) bd.onclick=function(){downloadFile(id);};
+    // 수정 버튼 — 해당 레코드의 페이지 찾기
+    const be=document.getElementById('spBtnEdit');
+    if(be){
+      var foundPage=null;
+      if(typeof CAREER_CFG!=='undefined') Object.keys(CAREER_CFG).forEach(function(pg){
+        var store=CAREER_CFG[pg].store; if(get(store).find(function(r){return r.id===id;})) foundPage=pg;
+      });
+      if(foundPage){ be.style.display=''; be.onclick=function(){ hideSidePreview(); openForm(foundPage,id,false); }; }
+      else { be.style.display='none'; }
+    }
   },200);
 }
 function hideSidePreview(){ clearTimeout(_spTimer); clearTimeout(_spLeaveTimer);
@@ -2210,8 +2496,9 @@ const FORM_DEFS={
   wiccok:{title:'위촉장',store:'wiccok',fields:[
     {key:'type',label:'유형',type:'select',options:['위촉장','협약서','기타'],default:'위촉장'},
     {key:'org',label:'발급기관',required:true},{key:'titleVal',label:'위촉내용',full:true},
-    {key:'issueDate',label:'발급일',date:true},{key:'periodStart',label:'위촉시작',date:true},
-    {key:'periodEnd',label:'위촉종료',date:true},{key:'note',label:'발급번호'}]},
+    {key:'issueDate',label:'발급일',date:true,onchange:'wiccokIssueDateChange'},
+    {key:'_periodRow',label:'위촉기간',type:'period_row'},
+    {key:'note',label:'발급번호'}]},
   award:{title:'표창·포상',store:'wiccok',fields:[
     {key:'type',label:'유형',type:'select',options:['표창','포상'],default:'표창'},
     {key:'org',label:'수여기관',required:true},{key:'titleVal',label:'내용',full:true},
@@ -2276,17 +2563,28 @@ function openForm(page,editId,showPrev){ const def=FORM_DEFS[page]; if(!def) ret
   const rec=editId?get(def.store).find(r=>r.id===editId)||{}:{};
   $('modalTitle').textContent=(editId?'수정: ':'새 등록: ')+def.title;
   const fields='<div class="field-grid">'+def.fields.map(f=>{
+    if(f.type==='period_row'){
+      const ps=rec.periodStart||'', pe=rec.periodEnd||'';
+      return '<div class="field" style="grid-column:1/-1"><label>위촉기간</label>'
+        +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+        +'<input id="ff-periodStart" value="'+ps+'" placeholder="YYYY.MM.DD" oninput="autoDate(this)" style="width:140px">'
+        +'<span style="color:var(--text-mute);font-size:13px">~</span>'
+        +'<input id="ff-periodEnd" value="'+pe+'" placeholder="YYYY.MM.DD" oninput="autoDate(this)" style="width:140px">'
+        +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:400;cursor:pointer;white-space:nowrap">'
+        +'<input type="checkbox" id="ff-sameAsIssue" onchange="wiccokSameAsIssue(this)"> 발급일과 동일</label>'
+        +'</div></div>';
+    }
     const val=rec[f.key]!==undefined?rec[f.key]:(f.default||'');
     let inp;
-    if(f.type==='select') inp=`<select id="ff-${f.key}">${f.options.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
-    else inp=`<input id="ff-${f.key}" value="${String(val||'').replace(/"/g,'&quot;')}"${f.date?' placeholder="YYYY.MM.DD" oninput="autoDate(this)"':''}>`;
-    return `<div class="field"${f.full?' style="grid-column:1/-1"':''}><label>${f.label}${f.required?' *':''}</label>${inp}</div>`;
+    if(f.type==='select') inp='<select id="ff-'+f.key+'">'+(f.options||[]).map(o=>'<option'+(o===val?' selected':'')+'>'+o+'</option>').join('')+'</select>';
+    else inp='<input id="ff-'+f.key+'" value="'+String(val||'').replace(/"/g,'&quot;')+'"'+(f.date?' placeholder="YYYY.MM.DD" oninput="autoDate(this)"':'')+'>'; 
+    return '<div class="field"'+(f.full?' style="grid-column:1/-1"':'')+'>'+"<label>"+f.label+(f.required?' *':'')+"</label>"+inp+'</div>';
   }).join('')+'</div>';
   const modal=document.querySelector('#modalForm .modal');
   if(showPrev && editId && getFile(editId)){ var ext=fileExt(editId), u=fileURL(editId);
     var isPDF=ext==='pdf';
     var prev = isPDF
-      ? '<div id="splitPdfBox" style="height:60vh;border-radius:8px;overflow:hidden;background:#525659"><div style="text-align:center;padding:30px;color:#ccc">⏳ PDF 로딩 중...</div></div>'
+      ? '<div id="splitPdfBox" style="height:80vh;border-radius:8px;overflow:hidden;background:#525659"><div style="text-align:center;padding:30px;color:#ccc">⏳ PDF 로딩 중...</div></div>'
       : (/^(png|jpg|jpeg|gif|webp)$/.test(ext) ? '<img src="'+u+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px;cursor:zoom-in" onclick="showBig(\''+editId+'\')">'  
       : '<div class="empty" style="padding:14px">📎 '+ (getFile(editId).name||'첨부됨') +' (미리보기 미지원 형식)</div>');
     $('modalBody').innerHTML='<div class="form-split"><div class="fs-prev"><div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:6px">첨부 원본</div>'+prev+'</div><div class="fs-form">'+fields+'</div></div>';
@@ -2296,8 +2594,12 @@ function openForm(page,editId,showPrev){ const def=FORM_DEFS[page]; if(!def) ret
   $('modalForm').classList.add('open');
 }
 function closeForm(){ $('modalForm').classList.remove('open'); _formCtx=null; }
+function wiccokSameAsIssue(cb){
+  const issueDate=v('ff-issueDate'); if(!issueDate) return;
+  if(cb.checked){ const ps=document.getElementById('ff-periodStart'); if(ps){ ps.value=issueDate; } }
+}
 function saveForm(){ if(!_formCtx) return; const {page,editId}=_formCtx; const def=FORM_DEFS[page]; const data={};
-  def.fields.forEach(f=>data[f.key]=v('ff-'+f.key));
+  def.fields.forEach(f=>{ if(f.type==='period_row'){ data.periodStart=v('ff-periodStart'); data.periodEnd=v('ff-periodEnd'); } else data[f.key]=v('ff-'+f.key); });
   for(const f of def.fields){ if(f.required&&!data[f.key]){ toast('필수: '+f.label); return; } }
   const db=get(def.store);
   if(editId){ const i=db.findIndex(r=>r.id===editId); if(i>=0){ db[i]={...db[i],...data,savedAt:new Date().toISOString()}; set(def.store,db); _flashId=editId; toast('수정 완료'); } }
@@ -2397,6 +2699,7 @@ const CAREER_CFG={
 };
 function rowActions(id,store,label,page){ const has=!!getFile(id), L=(label||'').replace(/['"]/g,'');
   return '<span style="display:inline-flex;gap:3px">'+
+
     (has?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="showBig('${id}')" onmouseenter="hoverThumb('${id}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📄 보기</button><button class="btn sm" style="background:var(--teal);color:#fff;border-color:var(--teal)" onclick="downloadFile('${id}')">⬇</button><button class="btn sm" onclick="deleteAttach('${id}','${page}')" title="원본만 삭제 후 재업로드" style="color:var(--red);font-size:11px">🗑원본</button>`
         :`<button class="btn sm" onclick="attachRec('${id}','${store}','${page}')">📎 첨부</button>`)+
     `<button class="btn sm" onclick="memoRec('${store}','${id}','${page}')">💬</button>`+
@@ -2407,6 +2710,14 @@ function deleteAttach(id,page){ if(!confirm('첨부 원본만 삭제합니다.\n
 function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   const sec=document.getElementById('page-'+name); if(!sec) return;
   let data=get(cfg.store); if(cfg.filter) data=data.filter(cfg.filter);
+  // 중복 의심 감지 및 배지
+  var _dupGrp={}; data.forEach(function(r){ var k=dupKey(r); (_dupGrp[k]=_dupGrp[k]||[]).push(r.id); });
+  var _dupIds=new Set(); Object.values(_dupGrp).forEach(function(ids){ if(ids.length>1) ids.forEach(function(id){ _dupIds.add(id); }); });
+  var dupBadgeEl=sec.querySelector('.dup-badge-bar');
+  if(_dupIds.size>0){
+    if(!dupBadgeEl){ dupBadgeEl=document.createElement('div'); dupBadgeEl.className='dup-badge-bar'; dupBadgeEl.style.cssText='background:#FEF3C7;border:1px solid #F6D860;border-radius:6px;padding:7px 12px;margin-bottom:10px;font-size:12px;display:flex;align-items:center;gap:10px'; const dt=sec.querySelector('.dt'); if(dt) dt.before(dupBadgeEl); }
+    dupBadgeEl.innerHTML='⚠️ <b>중복 의심 '+_dupIds.size+'건</b> 감지됨 &nbsp; <a href="#" onclick="openDupManager(\''+name+'\');return false" style="color:#92400E;font-weight:600;text-decoration:underline">🔀 중복관리 열기</a>';
+  } else { if(dupBadgeEl) dupBadgeEl.remove(); }
   const yrSel=sec.querySelector('[data-f="year"]');
   if(yrSel){ const yrs=[...new Set(data.map(r=>r.year||(r.issueDate||r.date||'').slice(0,4)).filter(Boolean))].sort().reverse();
     const cur=yrSel.value; yrSel.innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option${y===cur?' selected':''}>${y}</option>`).join(''); }
@@ -2537,8 +2848,20 @@ function openZip(page){ const cfg=CAREER_CFG[page]; let data=get(cfg.store); if(
 /* ===== 중복관리 ===== */
 var _dupPage=null;
 function dupKey(r){
-  if(r.bank!==undefined) return ((r.bank||'')+'|'+(r.number||'')).replace(/\s+/g,'').toLowerCase();
-  return ((r.org||'')+'|'+(r.titleVal||r.title||r.topic||r.project||r.kind||'')).replace(/\s+/g,'').toLowerCase(); }
+  // 공백·특수문자 제거, 한글 초성 무시하여 정규화
+  function norm(s){ return (s||'').replace(/[\s\-·\(\)「」『』《》【】]/g,'').toLowerCase(); }
+  if(r.bank!==undefined) return norm(r.bank)+'|'+norm(r.number);
+  // 기관명 앞 10자 + 직책 조합으로 키 생성 (부분 일치 허용)
+  var org=norm(r.org||'').slice(0,10);
+  var title=norm(r.titleVal||r.title||r.topic||r.project||r.kind||'').slice(0,6);
+  return org+'|'+title;
+}
+function dupSimilar(a, b){
+  var oa=(a.org||a.bank||'').replace(/[\s\-·\(\)]/g,'').toLowerCase();
+  var ob=(b.org||b.bank||'').replace(/[\s\-·\(\)]/g,'').toLowerCase();
+  if(!oa||!ob) return false;
+  return oa.includes(ob.slice(0,8))||ob.includes(oa.slice(0,8));
+}
 function getDupData(page){ if(CAREER_CFG&&CAREER_CFG[page]){ let d=get(CAREER_CFG[page].store); if(CAREER_CFG[page].filter) d=d.filter(CAREER_CFG[page].filter); return d; }
   if(page==='personal_doc') return get('personal'); if(page==='account') return get('account'); if(page==='id_doc') return get('id_docs'); return []; }
 function getDupStore(page){ if(CAREER_CFG&&CAREER_CFG[page]) return CAREER_CFG[page].store; if(page==='personal_doc') return 'personal'; if(page==='account') return 'account'; if(page==='id_doc') return 'id_docs'; return page; }
