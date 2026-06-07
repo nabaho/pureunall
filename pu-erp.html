@@ -63,7 +63,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; font-family: -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; color: #1e293b; background: #f3f4f6; }
 /* 다크모드 - 부드러운 야간 모드 (눈 피로 감소) */
-body.dark-mode { filter: invert(0.9) hue-rotate(180deg); background: #202124; }
+body.dark-mode { filter: invert(1) hue-rotate(180deg); background: #202124; }
 body.dark-mode img, body.dark-mode video, body.dark-mode svg { filter: invert(1) hue-rotate(180deg); }
 body.dark-mode .keep-color { filter: invert(1) hue-rotate(180deg); }
 button { font-family: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
@@ -7518,7 +7518,21 @@ function ContractManagement(){
       if(n > 0) _dupT.push(p[1]+' '+n+'건');
     });
     if(ct.contractNo && _dupT.length > 0){
-      showToast('⚠ 이미 이관된 계약 ('+_dupT.join(', ')+') — 중복 이관 중단');
+      // 데드락 복구: 대상 레코드는 이미 있는데 계약이 '이관완료'로 안 바뀐 상태
+      //  → 중복 생성하지 말고, 계약 상태만 정리해 계약관리에서 내보냄
+      var _ok = await popConfirm('이미 이관된 데이터가 있습니다 (' + _dupT.join(', ') + ').\n이전 이관이 덜 끝난 상태로 보입니다.\n\n계약을 "이관완료"로 정리하시겠습니까?\n(이미 있는 데이터를 그대로 사용하며, 중복 생성하지 않습니다)');
+      if(!_ok) return;
+      try {
+        archiveContract(Object.assign({}, ct, { transferredTo: _dupT.join(', ') }), '이관완료');
+        showToast('✓ 계약을 이관완료로 정리했습니다 (' + _dupT.join(', ') + ')');
+      } catch(err){
+        console.error('[이관완료 정리 오류]', err);
+        showToast('❌ 정리 실패: ' + (err && err.message ? err.message : ''));
+        return;
+      }
+      var _navMap = { '업체':'biz/company', '사건':'biz/case', '컨설팅':'biz/consulting', '기금':'biz/fund', '기타사업':'biz/other' };
+      var _nav = _navMap[(_dupT[0]||'').split(' ')[0]];
+      if(_nav && typeof window.navigateTo === 'function'){ setTimeout(function(){ try{ window.navigateTo(_nav); }catch(_){} }, 600); }
       return;
     }
     if(!(await popConfirm('계약 ' + ct.contractNo + ' (' + ct.companyName + ')을 이관하시겠습니까?\n\n→ ' + labels + '\n→ 상태: 이관완료\n→ 칸반에서 사라짐'))) return;
@@ -44011,6 +44025,43 @@ function LeaveManagement(){
   );
 }
 // ============================================================
+// DC 적립금 가로형 엑셀 파서: 1행 헤더(이름|2025-01|2025-02…), 이름으로 직원 매칭
+function parseDCWide(file, allUsers, cb){
+  try{
+    var rd = new FileReader();
+    rd.onload = function(ev){
+      try{
+        var wb = XLSX.read(ev.target.result, { type:'array' });
+        var sheet = wb.Sheets[wb.SheetNames[0]];
+        var raw = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
+        if(!raw || raw.length < 2){ cb(null, '데이터가 없습니다'); return; }
+        var header = raw[0];
+        function toYM(v){ var s=String(v).replace(/[^0-9]/g,''); if(s.length>=6) return s.slice(0,4)+'-'+s.slice(4,6); return ''; }
+        var ymCols = [];
+        for(var c=1;c<header.length;c++){ var ym=toYM(header[c]); if(ym) ymCols.push({ c:c, ym:ym }); }
+        if(!ymCols.length){ cb(null, '년월 열(예: 2025-01)을 찾지 못했습니다. 1행 헤더를 확인하세요'); return; }
+        var nameToSid = {};
+        (allUsers||[]).forEach(function(u){ nameToSid[String(u.name).replace(/\s/g,'')] = u.sid; });
+        var resRows=[], unmatched=[], totalEntries=0, totalAmount=0;
+        for(var r=1;r<raw.length;r++){
+          var row=raw[r]; if(!row) continue;
+          var nmRaw=String(row[0]||'').trim(); var nm=nmRaw.replace(/\s/g,''); if(!nm) continue;
+          var sid=nameToSid[nm]||null;
+          var entries=[];
+          ymCols.forEach(function(col){ var amt=parseInt(String(row[col.c]).replace(/[^0-9-]/g,''))||0; if(amt>0) entries.push({ ym:col.ym, amount:amt }); });
+          if(!entries.length) continue;
+          if(sid){ totalEntries+=entries.length; totalAmount+=entries.reduce(function(s,e){return s+e.amount;},0); }
+          else unmatched.push(nmRaw);
+          resRows.push({ name:nmRaw, sid:sid, matched:!!sid, entries:entries });
+        }
+        cb({ rows:resRows, unmatched:unmatched, totalEntries:totalEntries, totalAmount:totalAmount }, null);
+      }catch(e){ cb(null, '엑셀 파싱 오류: '+e.message); }
+    };
+    rd.onerror = function(){ cb(null, '파일 읽기 실패'); };
+    rd.readAsArrayBuffer(file);
+  }catch(e){ cb(null, e.message); }
+}
+
 // 퇴직정산 (RetirementSettlement)
 // - DC형 퇴직연금 적립금 추적
 // - 매월 자동 적립 (월별급여 확정 시)
@@ -44028,6 +44079,8 @@ function RetirementSettlement(){
   var calcS = useState(null); var calcModal = calcS[0]; var setCalcModal = calcS[1];
   // 퇴사자 정산 state
   var settleS = useState(null); var settleModal = settleS[0]; var setSettleModal = settleS[1];
+  // 적립금 엑셀 가져오기 미리보기
+  var dcImpS = useState(null); var dcImp = dcImpS[0]; var setDcImp = dcImpS[1];
 
   var policy = getPensionPolicy();
 
@@ -44057,6 +44110,25 @@ function RetirementSettlement(){
       payrollMonths: calcPayrollMonths(u.sid)
     };
   });
+
+  // 적립금 엑셀 반영: 같은 (직원,년월)은 덮어쓰기
+  function commitDCImport(){
+    if(!dcImp) return;
+    var list = getDCContributions();
+    dcImp.rows.forEach(function(R){
+      if(!R.sid) return;
+      R.entries.forEach(function(e){
+        list = list.filter(function(x){ return !(x.sid===R.sid && x.ym===e.ym); });
+        list.push({ id:'dc-imp-'+R.sid+'-'+e.ym, sid:R.sid, ym:e.ym, amount:e.amount, paidDate:'', note:'엑셀 import', auto:false });
+      });
+    });
+    setDCContributions(list);
+    var cnt = dcImp.rows.filter(function(r){return r.sid;}).reduce(function(s,r){return s+r.entries.length;},0);
+    setDcImp(null);
+    setRefresh(refresh+1);
+    showToast('✅ 적립금 ' + cnt + '건 반영');
+  }
+  function pickDCFile(f){ if(f) parseDCWide(f, allUsers, function(d,err){ if(err){ showToast('⚠ '+err); return; } setDcImp(d); }); }
 
   var dcCount = rows.filter(function(r){return r.pension.type==='DC';}).length;
   var dbCount = rows.filter(function(r){return r.pension.type==='DB';}).length;
@@ -44227,6 +44299,39 @@ function RetirementSettlement(){
       })
     ),
     h('div', { style:{ display:'flex', justifyContent:'flex-end', marginBottom:'8px' } }, zoomControl(retZoom, setRetZoom)),
+
+    // ─── 적립금 엑셀 가져오기 (드래그앤드롭) ───
+    tab === 'balance' && h('div', { style:{ marginBottom:'10px' } },
+      !dcImp ? h('div', {
+          onDragOver:function(e){ e.preventDefault(); },
+          onDrop:function(e){ e.preventDefault(); pickDCFile(e.dataTransfer.files && e.dataTransfer.files[0]); },
+          onClick:function(){ var inp=document.getElementById('dcImpFile'); if(inp) inp.click(); },
+          style:{ border:'2px dashed #93c5fd', background:'#f0f9ff', borderRadius:'8px', padding:'12px', textAlign:'center', cursor:'pointer' } },
+        h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e40af' } }, '📥 적립금 엑셀 가져오기 — 파일을 끌어다 놓거나 클릭'),
+        h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginTop:'4px' } }, '양식: 1행 헤더(이름 | 2025-01 | 2025-02 …), 각 칸에 월 적립금. 이름으로 직원 매칭. 같은 직원·월은 덮어씀.'),
+        h('input', { id:'dcImpFile', type:'file', accept:'.xlsx,.xls,.csv', style:{ display:'none' },
+          onChange:function(e){ pickDCFile(e.target.files && e.target.files[0]); e.target.value=''; } })
+      ) : h('div', { style:{ border:'1px solid #93c5fd', background:'#fff', borderRadius:'8px', padding:'12px' } },
+        h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e40af', marginBottom:'6px' } }, '📋 가져오기 미리보기'),
+        h('div', { style:{ fontSize:'11px', color:'#334155', marginBottom:'8px' } },
+          '매칭 ' + dcImp.rows.filter(function(r){return r.sid;}).length + '명 · 적립 ' + dcImp.totalEntries + '건 · 합계 ' + dcImp.totalAmount.toLocaleString() + '원'
+          + (dcImp.unmatched.length ? '   ⚠ 매칭실패(제외): ' + dcImp.unmatched.join(', ') : '')),
+        h('div', { style:{ maxHeight:'160px', overflow:'auto', border:'1px solid #e2e8f0', borderRadius:'6px', marginBottom:'8px' } },
+          h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'10.5px' } },
+            h('tbody', null, dcImp.rows.map(function(R,i){
+              return h('tr', { key:i, style:{ borderBottom:'1px solid #f1f5f9', background: R.sid?'#fff':'#fef2f2' } },
+                h('td', { style:{ padding:'4px 8px', fontWeight:600 } }, R.name + (R.sid?'':' (매칭실패)')),
+                h('td', { style:{ padding:'4px 8px', color:'#64748b' } }, R.entries.length + '건'),
+                h('td', { style:{ padding:'4px 8px', textAlign:'right', fontWeight:600 } }, R.entries.reduce(function(s,e){return s+e.amount;},0).toLocaleString()+'원')
+              );
+            }))
+          )),
+        h('div', { style:{ display:'flex', gap:'8px', justifyContent:'flex-end' } },
+          h('button', { onClick:function(){ setDcImp(null); }, style:{ padding:'7px 14px', borderRadius:'6px', border:'1px solid #cbd5e1', background:'#fff', fontSize:'12px', cursor:'pointer' } }, '취소'),
+          h('button', { onClick:commitDCImport, style:{ padding:'7px 14px', borderRadius:'6px', border:'none', background:'#1e40af', color:'#fff', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '✅ 반영')
+        )
+      )
+    ),
 
     // ─── 탭 1: 적립금 현황 ───
     tab === 'balance' && h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'auto', zoom:retZoom/100 } },
