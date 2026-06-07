@@ -2023,6 +2023,7 @@ function dbSet(k, v){
     return false;
   }
   _dbCache[k] = v; // 메모리 캐시 갱신
+  try { window.dispatchEvent(new CustomEvent('pureun-saved', { detail:{ key:k, at:Date.now() } })); } catch(_){}
   scheduleAutoSnap(); // 자동 스냅샷 예약
 
   // Firebase 동기화 (백그라운드, 실패해도 LS는 저장됨)
@@ -3252,6 +3253,41 @@ var ImgStore = {
   }
 };
 window.ImgStore = ImgStore;
+// idb 참조('idb:..')면 IndexedDB에서 비동기 로드, 일반 base64면 그대로 표시 (하위호환)
+function AsyncImg(props){
+  var src = props.src || '';
+  var st = useState(ImgStore.isRef(src) ? null : src); var data = st[0]; var setData = st[1];
+  useEffect(function(){
+    if(!ImgStore.isRef(src)){ setData(src); return; }
+    var alive = true;
+    ImgStore.load(src).then(function(d){ if(alive) setData(d); }).catch(function(){ if(alive) setData(null); });
+    return function(){ alive = false; };
+  }, [src]);
+  var rest = {}; for(var k in props){ if(k !== 'src') rest[k] = props[k]; }
+  return h('img', Object.assign({ src: data || '' }, rest));
+}
+window.AsyncImg = AsyncImg;
+// 이미지 자동 축소 (가로 maxW px 이하, JPEG quality) — base64 용량 5~10배 절감
+function compressImage(dataUrl, maxW, quality){
+  maxW = maxW || 1024; quality = quality || 0.7;
+  return new Promise(function(resolve){
+    if(!dataUrl || dataUrl.indexOf('data:image') !== 0){ resolve(dataUrl); return; }
+    var im = new Image();
+    im.onload = function(){
+      var w = im.width, hg = im.height;
+      if(w > maxW){ hg = Math.round(hg * maxW / w); w = maxW; }
+      try {
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = hg;
+        cv.getContext('2d').drawImage(im, 0, 0, w, hg);
+        var out = cv.toDataURL('image/jpeg', quality);
+        resolve(out.length < dataUrl.length ? out : dataUrl);
+      } catch(e){ resolve(dataUrl); }
+    };
+    im.onerror = function(){ resolve(dataUrl); };
+    im.src = dataUrl;
+  });
+}
+window.compressImage = compressImage;
 // window 노출 (브라우저 콘솔에서 import 시 사용)
 window.idbBulkPut = idbBulkPut;
 window.idbGetAll = idbGetAll;
@@ -5265,17 +5301,21 @@ function ContractModal(props){
       showToast('📄 PDF 변환 중...');
       pdfFirstPageToBase64(file, function(b64, err){
         if(err){ showToast('❌ '+err); return; }
+        compressImage(b64, 1024, 0.7).then(function(b64){
         if(customCb){ customCb(b64); return; }
         var nextC = Object.assign({}, f.company); nextC[field] = b64;
         setF(function(prev){ return Object.assign({}, prev, { company: nextC }); });
         showToast('✅ PDF 변환 완료 → OCR 추출 버튼 클릭');
+        });
       });
     } else {
       fileToBase64(file, function(b64){
+        compressImage(b64, 1024, 0.7).then(function(b64){
         if(customCb){ customCb(b64); return; }
         var nextC = Object.assign({}, f.company); nextC[field] = b64;
         setF(function(prev){ return Object.assign({}, prev, { company: nextC }); });
         showToast('첨부됨 — 🔍 OCR 추출 버튼으로 자동 채움');
+        });
       });
     }
   }
@@ -5577,7 +5617,7 @@ function ContractModal(props){
       ),
       img
         ? h('div', { style:{ position:'relative', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'hidden', background:'#f8fafc', height:'54px' } },
-            h('img', { src:img, style:{ width:'100%', height:'54px', objectFit:'contain', display:'block' } }),
+            h(AsyncImg, { src:img, style:{ width:'100%', height:'54px', objectFit:'contain', display:'block' } }),
             h('button', { onClick:function(){ clearImg(field); },
               style:{ position:'absolute', top:'2px', right:'2px', background:'#fff', border:'1px solid #fecaca', color:'#dc2626', borderRadius:'4px', width:'20px', height:'20px', fontSize:'12px', cursor:'pointer', lineHeight:'18px', padding:0 } }, '×')
           )
@@ -5674,12 +5714,14 @@ function ContractModal(props){
           if(ext.position && !w02.pos) w02.pos = ext.position;
           ws2[0] = w02; nc.workers = ws2;
         }
+        // OCR로 1개 이상 추출되면 원본 이미지 삭제 (텍스트만 보관, 용량 절감)
+        if(filled > 0 && (field === 'bizLicenseImg' || field === 'businessCardImg')){ nc[field] = ''; }
         return Object.assign({}, prev, { company: nc });
       });
       setOcrField('');
       var engineLabel = engine === 'vision' ? '[Google Vision]' : engine === 'claude' ? '[Claude Vision]' : '[Tesseract]';
       if(filled > 0){
-        showToast('✅ OCR 완료 '+engineLabel+': '+filledKeys.join('·')+' ('+filled+'개) — 확인·수정 필요');
+        showToast('✅ OCR 완료 '+engineLabel+': '+filledKeys.join('·')+' ('+filled+'개) — 원본 이미지 정리됨, 텍스트 확인·수정');
       } else {
         showToast('⚠️ 추출 없음 '+engineLabel+' — 이미지 품질 확인 또는 수동 입력');
       }
@@ -5776,7 +5818,7 @@ function ContractModal(props){
                   return h('div', { style:{ display:'flex', alignItems:'center', gap:'8px' } },
                     wkImg
                       ? h('div', { style:{ position:'relative', border:'1px solid #fecaca', borderRadius:'5px', overflow:'hidden', background:'#fff7ed', height:'38px', width:'130px', flexShrink:0 } },
-                          h('img', { src:wkImg, style:{ width:'130px', height:'38px', objectFit:'contain', display:'block' } }),
+                          h(AsyncImg, { src:wkImg, style:{ width:'130px', height:'38px', objectFit:'contain', display:'block' } }),
                           h('button', { onClick:function(){
                               var ws=f.company.workers.slice(); ws[idx]=Object.assign({},ws[idx],{cardImg:''});
                               setF(function(prev){return Object.assign({},prev,{company:Object.assign({},prev.company,{workers:ws})});});
@@ -6304,7 +6346,7 @@ function ContractModal(props){
               return h('div', { style:{ display:'flex', alignItems:'center', gap:'8px' } },
                 ctImg
                   ? h('div', { style:{ position:'relative', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'hidden', background:'#f8fafc', height:'38px', width:'120px', flexShrink:0 } },
-                      h('img', { src:ctImg, style:{ width:'120px', height:'38px', objectFit:'contain', display:'block' } }),
+                      h(AsyncImg, { src:ctImg, style:{ width:'120px', height:'38px', objectFit:'contain', display:'block' } }),
                       h('button', { onClick:function(){
                           var cs=f.company.contacts.slice(); cs[idx]=Object.assign({},cs[idx],{cardImg:''});
                           setF(function(prev){return Object.assign({},prev,{company:Object.assign({},prev.company,{contacts:cs})});});
@@ -7039,7 +7081,7 @@ function transferContract(contract){
       var casePc = (caseCo.contacts || []).find(function(x){return x.isPrimary;}) || (caseCo.contacts || [])[0] || {};
       var newCase = {
         id: 'c-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5) + '-' + Math.random().toString(36).slice(2,5),
-        caseNo: caseNo, typeCode: typeCode,
+        caseNo: caseNo, typeCode: typeCode, typeName: (t ? t.name : ''),
         // 회사 공유 정보 (계약관리 → 동기화)
         companyName: contract.companyName,
         bizNo: contract.bizNo,
@@ -8031,6 +8073,12 @@ var CASE_STATUS = [
   { v:'transferred',label:'이송',    color:'#94a3b8', bg:'#f1f5f9' }
 ];
 function statusInfo(v){ return CASE_STATUS.find(function(x){return x.v===v;}) || CASE_STATUS[0]; }
+function caseStatusKr(v){
+  var s = CASE_STATUS.find(function(x){ return x.v===v; });
+  if(s) return s.label;
+  var m = { open:'진행중', progress:'진행중', pending:'대기', review:'검토중', closed:'종결', done:'완료', cancelled:'취소', hold:'보류' };
+  return m[v] || v;
+}
 
 var CASE_DEMO_SEED = [];
 
@@ -11362,7 +11410,7 @@ function CaseManagement(props){
       var t = types.find(function(x){return x.code===c.typeCode;});
       var jur = c.jurisdiction || {};
       var totalIncome = (c.incomes||[]).filter(function(i){return i.confirmed;}).reduce(function(s,i){return s+i.amount;}, 0);
-      var statusLabel = (CASE_STATUS.find(function(s){return s.v===c.status;})||{}).label || c.status;
+      var statusLabel = caseStatusKr(c.status);
       return {
         '#': idx + 1,
         '사건번호': c.caseNo,
@@ -11744,7 +11792,7 @@ function CaseManagement(props){
 
   var filtered = cases.filter(function(c){
     if(c && c._deleted) return false;  // #D 휴지통 항목 숨김
-    if(statusFilter === 'open' && c.status === 'closed') return false;
+    if(statusFilter !== 'closed' && c.status === 'closed') return false;
     if(statusFilter !== 'all' && statusFilter !== 'open' && c.status !== statusFilter) return false;
     if(typeFilter !== 'all' && c.typeCode !== typeFilter) return false;
     if(monthOnly){
@@ -11850,7 +11898,6 @@ function CaseManagement(props){
               borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
               background: statusFilter!=='all'?'#eff6ff':'#f8fafc',
               color: statusFilter!=='all'?'#1e40af':'#64748b', fontWeight: statusFilter!=='all'?700:400, cursor:'pointer' } },
-            h('option', { value:'all' }, '전체 상태'),
             CASE_STATUS.filter(function(s){ return s.v !== 'closed'; }).map(function(s){ return h('option', { key:s.v, value:s.v }, s.label); }),
             h('option', { value:'closed' }, '📦 종결 보기')),
           h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
@@ -11882,7 +11929,6 @@ function CaseManagement(props){
           setStatusFilter(e.target.value);
         },
           style:{ padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } },
-          h('option', { value:'all' }, '전체 상태'),
           CASE_STATUS.filter(function(s){ return s.v !== 'closed'; }).map(function(s){ return h('option', { key:s.v, value:s.v }, s.label); }),
           h('option', { value:'closed' }, '📦 종결된 건 보기 →')),
         h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
@@ -12037,7 +12083,7 @@ function CaseManagement(props){
               return h('tr', { key:c.id, draggable:true,
                 onDragStart:function(ev){
                   var ju = c.jurisdiction||{};
-                  var st = (CASE_STATUS.find(function(s){return s.v===c.status;})||{}).label || c.status || '';
+                  var st = caseStatusKr(c.status) || '';
                   var txt = [c.caseNo||'', (t?t.name:''), c.companyName||'', userName(c.managerMain),
                     (c.managerSubs||[]).map(userName).join(','), ju.org||'', ju.officer||'', ju.phone||'', ju.email||'',
                     c.receiveDate||'', c.dueDate||'', (c.retainerFee||0), (c.successFee||0), st, (c.note||'')].join('\t');
@@ -12309,7 +12355,7 @@ function CaseManagement(props){
         h('div', { onClick:function(){
             var it = ctxMenu.item; var ju = it.jurisdiction||{};
             var _t = types.find(function(x){ return x.code === it.typeCode; });
-            var st = (CASE_STATUS.find(function(s){return s.v===it.status;})||{}).label || it.status || '';
+            var st = caseStatusKr(it.status) || '';
             var txt = [it.caseNo||'', (_t?_t.name:''), it.companyName||'', userName(it.managerMain),
               (it.managerSubs||[]).map(userName).join(','), ju.org||'', ju.officer||'', ju.phone||'', ju.email||'',
               it.receiveDate||'', it.dueDate||'', (it.retainerFee||0), (it.successFee||0), st, (it.note||'')].join('\t');
@@ -12607,7 +12653,7 @@ function CaseDetailModal(props){
   var c = props.cur;
   var caseTypes = getCaseTypes();
   var t = caseTypes.find(function(x){return x.code===c.typeCode;});
-  var statusInfo = (CASE_STATUS.find(function(s){return s.v===c.status;}) || { label:c.status, v:c.status });
+  var statusInfo = (CASE_STATUS.find(function(s){return s.v===c.status;}) || { label:caseStatusKr(c.status), v:c.status });
 
   // D+ / 기한 임박
   var dPlus = '';
@@ -12635,7 +12681,7 @@ function CaseDetailModal(props){
     bg:'#fefce8', border:'#fde68a', headColor:'#854d0e', headBorder:'#ca8a04',
     rows:[
       ['사건번호', h('span', { style:{ fontFamily:'monospace', fontWeight:700 } }, c.caseNo)],
-      ['사건유형', h('span', { style:{ background:'#ede9fe', color:'#1e40af', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontWeight:700 } }, t ? t.name : c.typeCode)],
+      ['사건유형', h('span', { style:{ background:'#ede9fe', color:'#1e40af', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontWeight:700 } }, t ? t.name : (c.typeName || '기타'))],
       ['진행상태', h('span', { style:{ background:'#dcfce7', color:'#166534', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontWeight:700 } }, statusInfo.label)],
       ['수임일', (c.receiveDate || '-') + dPlus],
       ['기한', c.dueDate ? c.dueDate + dueWarn : '-'],
@@ -12756,10 +12802,10 @@ function UnifiedDetailModal(props){
         (c.businessCardImg || c.bizLicenseImg) && h('div', { style:{ display:'flex', gap:'10px', marginBottom:'14px' } },
           c.businessCardImg && h('div', { style:{ flex:1, background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'8px', textAlign:'center' } },
             h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#475569', marginBottom:'4px' } }, '📇 명함'),
-            h('img', { src:c.businessCardImg, style:{ maxWidth:'100%', maxHeight:'140px', borderRadius:'4px' } })),
+            h(AsyncImg, { src:c.businessCardImg, style:{ maxWidth:'100%', maxHeight:'140px', borderRadius:'4px' } })),
           c.bizLicenseImg && h('div', { style:{ flex:1, background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'8px', textAlign:'center' } },
             h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#475569', marginBottom:'4px' } }, '📋 사업자등록증'),
-            h('img', { src:c.bizLicenseImg, style:{ maxWidth:'100%', maxHeight:'140px', borderRadius:'4px' } }))
+            h(AsyncImg, { src:c.bizLicenseImg, style:{ maxWidth:'100%', maxHeight:'140px', borderRadius:'4px' } }))
         ),
         // 회사정보
         section(companySection),
@@ -14344,7 +14390,16 @@ function MinWageSection(){
   function save(){ dbSet('min_wage', f); showToast('저장됨'); }
   function reset(){ setF(DEFAULT); showToast('기본값 복원'); }
 
+  var _nowY = (new Date()).getFullYear(), _nowM = (new Date()).getMonth()+1;
+  var _alert = null;
+  if((f.year||0) < _nowY){
+    _alert = { msg:'⚠️ 현재 '+ (f.year||'?') +'년 기준입니다. '+_nowY+'년 최저임금으로 갱신하세요.', bg:'#fee2e2', bd:'#fca5a5', fg:'#b91c1c' };
+  } else if(_nowM >= 7 && (f.year||0) <= _nowY){
+    _alert = { msg:'📅 내년('+(_nowY+1)+') 최저임금이 고시되었는지 확인하세요. (매년 8월 고시 → 1/1 시행)', bg:'#fffbeb', bd:'#fde68a', fg:'#92400e' };
+  }
+
   return h('div', { style:{ marginBottom:'12px' } },
+    _alert && h('div', { style:{ background:_alert.bg, border:'1px solid '+_alert.bd, color:_alert.fg, borderRadius:'6px', padding:'8px 12px', fontSize:'11.5px', fontWeight:700, marginBottom:'10px' } }, _alert.msg),
     h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#475569', padding:'6px 0 4px', borderBottom:'2px solid #1e40af', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px', userSelect:'none' } },
       h('span', null, '최저임금'),
       h('div', { style:{ flex:1 } }),
@@ -22031,7 +22086,7 @@ function CompanyInfoForm(){
         // 미리보기
         h('div', { style:{ width:'72px', height:'72px', background:'#fff', border:'1px dashed #fde68a', borderRadius:'4px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 } },
           currentStamp
-            ? h('img', { src:currentStamp, alt:'직인', style:{ maxWidth:'66px', maxHeight:'66px' } })
+            ? h(AsyncImg, { src:currentStamp, alt:'직인', style:{ maxWidth:'66px', maxHeight:'66px' } })
             : h('span', { style:{ fontSize:'10.5px', color:'#94a3b8' } }, '직인 없음')
         ),
         h('div', { style:{ flex:1, fontSize:'10px', color:'#451a03', lineHeight:'1.4' } },
@@ -22746,6 +22801,21 @@ function DataLogMasters(){
   );
 }
 
+// 저장 상태 표시 (자동저장 → 변경 즉시 '✓ 저장됨 시각')
+function SaveIndicator(){
+  var s = useState(0); var at = s[0]; var setAt = s[1];
+  useEffect(function(){
+    function on(){ setAt(Date.now()); }
+    window.addEventListener('pureun-saved', on);
+    return function(){ window.removeEventListener('pureun-saved', on); };
+  }, []);
+  if(!at) return h('span', { style:{ fontSize:'11.5px', color:'#94a3b8', fontWeight:600 } }, '자동 저장');
+  var d = new Date(at);
+  var p = function(n){ return ('0'+n).slice(-2); };
+  return h('span', { style:{ fontSize:'11.5px', color:'#16a34a', fontWeight:700, display:'inline-flex', alignItems:'center', gap:'4px' } },
+    '✓ 저장됨 ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()));
+}
+
 function EnvSettings(){
   // 마지막 활성 탭 복원 (localStorage)
   var savedTab = (function(){
@@ -22828,6 +22898,9 @@ function EnvSettings(){
           }, et.name);
         })
       )
+    ),
+    h('div', { style:{ display:'flex', justifyContent:'flex-end', alignItems:'center', padding:'2px 2px 6px', minHeight:'18px' } },
+      h(SaveIndicator, null)
     ),
     tab === 'company'
       ? h(CompanyInfoForm, null)
@@ -31957,7 +32030,7 @@ function Certificate(){
           h('span', { style:{ fontSize:'22px', fontWeight:700, letterSpacing:'8px' } }, company.name || '푸른노무법인'),
           (function(){
             var stamp = company.stampDataUrl || (typeof DEFAULT_STAMP_DATAURL !== 'undefined' ? DEFAULT_STAMP_DATAURL : '');
-            return stamp ? h('img', { src:stamp, alt:'직인',
+            return stamp ? h(AsyncImg, { src:stamp, alt:'직인',
               style:{ width:'72px', height:'72px', marginLeft:'12px', marginRight:'-30px',
                 position:'relative', top:'4px', objectFit:'contain' } }) : null;
           })()
@@ -37164,7 +37237,7 @@ function ProjectManagementShared(props){
 
   // 필터링
   var filtered = items.filter(function(it){
-    if(statusFilter === 'open' && it.status === 'closed') return false;
+    if(statusFilter !== 'closed' && it.status === 'closed') return false;
     if(statusFilter !== 'all' && statusFilter !== 'open' && it.status !== statusFilter) return false;
     if(typeFilter !== 'all' && it.typeCode !== typeFilter) return false;
     // monthOnly는 담당자 필터/검색어 없을 때만 적용
@@ -37315,7 +37388,7 @@ function ProjectManagementShared(props){
               borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
               background: statusFilter!=='open'?'#eff6ff':'#f8fafc',
               color: statusFilter!=='open'?'#1e40af':'#64748b', fontWeight: statusFilter!=='open'?700:400 } },
-            h('option',{value:'open'},'종료 제외'), h('option',{value:'all'},'전체'), h('option',{value:'pending'},'대기'), h('option',{value:'progress'},'진행중'), h('option',{value:'closed'},'📦 종료 보기')),
+            h('option',{value:'open'},'종료 제외'), h('option',{value:'pending'},'대기'), h('option',{value:'progress'},'진행중'), h('option',{value:'closed'},'📦 종료 보기')),
           h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid '+(typeFilter!=='all'?'#2563eb':'#cbd5e1'),
               borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', flexShrink:0,
@@ -37349,7 +37422,6 @@ function ProjectManagementShared(props){
       },
         style:{ padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } },
         h('option', { value:'open' }, '종료 제외 전체'),
-        h('option', { value:'all' }, '전체 (종료 포함)'),
         h('option', { value:'pending' }, '대기'),
         h('option', { value:'progress' }, '진행중'),
         h('option', { value:'closed' }, '📦 종료된 건 보기 →')),
@@ -46768,7 +46840,7 @@ function PayrollPayslip(props){
     ),
     // 최저임금 경고
     calc.minWageWarning && h('div', {className:'no-print', style:{background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',padding:'8px 14px',marginBottom:'10px',maxWidth:'700px',margin:'0 auto 10px',fontSize:'11.5px',color:'#b91c1c',fontWeight:700}},
-      '⚠️ 최저임금 위반 우려: 기본급 ' + (rec.baseSalary||0).toLocaleString() + '원이 2026 최저임금 월 ' + calc.minWageMonthly.toLocaleString() + '원(시급 9,860원 × 209h) 미달'
+      '⚠️ 최저임금 위반 우려: 기본급 ' + (rec.baseSalary||0).toLocaleString() + '원이 2026 최저임금 월 ' + calc.minWageMonthly.toLocaleString() + '원(시급 10,320원 × 209h) 미달'
     ),
     // ── 좌우 분할: [좌: 입력 폼 + 잠금 + 추이 + 변경이력] / [우: 명세서 본문] ──
     h('div', { className:'pay-grid', style:{display:'grid', gridTemplateColumns: window.innerWidth<=768?'1fr':'minmax(0,1fr) minmax(0,1fr)', gap: window.innerWidth<=768?'10px':'14px', alignItems:'flex-start'} },
