@@ -5746,7 +5746,7 @@ function ContractModal(props){
   var tabBody;
   if(tab === 'company'){
     var clientType = f.clientType || 'company';
-    var showCompany = clientType !== 'worker';
+    var showCompany = true;  // 근로자 단독이어도 상대 회사(피신청인) 입력 필요 → 항상 표시
     var showWorker = clientType !== 'company';
 
     function ctBtn(v, icon, label){
@@ -5760,25 +5760,16 @@ function ContractModal(props){
     }
 
     tabBody = h('div', null,
-      // 의뢰인 유형 토글 (최상단)
-      h('div', { style:{ background:'#fff7ed', border:'1px solid #fed7aa', borderRadius:'6px', padding:'10px 12px', marginBottom:'14px' } },
-        h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#9a3412', marginBottom:'6px' } },
-          '⚖️ 의뢰인 유형 선택 (계약/사건의 주체)'),
-        h('div', { style:{ display:'flex', gap:'6px' } },
-          ctBtn('company', '🏢', '회사'),
-          ctBtn('worker',  '👤', '근로자(개인)'),
-          ctBtn('both',    '🏢+👤', '둘 다')
-        ),
-        h('div', { style:{ fontSize:'10.5px', color:'#9a3412', marginTop:'6px', lineHeight:1.5 } },
-          clientType === 'company' ? '· 회사가 의뢰인 (자문/컨설팅 일반 케이스)'
-            : clientType === 'worker' ? '· 근로자가 의뢰인 (해고·체불·산재 등 노동 사건). 회사 정보는 피신청인/사용자로 자동 처리'
-            : '· 회사 + 근로자 동시 등록 (특수 케이스)')
-      ),
+      // 의뢰인 유형 안내 (토글은 탭 줄 위 상단 고정으로 이동)
+      h('div', { style:{ fontSize:'10.5px', color:'#9a3412', background:'#fff7ed', border:'1px solid #fed7aa', borderRadius:'6px', padding:'7px 10px', marginBottom:'12px', lineHeight:1.5 } },
+        clientType === 'company' ? '· 회사가 의뢰인 (자문/컨설팅 일반 케이스)'
+          : clientType === 'worker' ? '· 근로자가 의뢰인 (해고·체불·산재 등 노동 사건). 회사 정보는 피신청인/사용자로 자동 처리'
+          : '· 회사 + 근로자 동시 등록 (특수 케이스)'),
 
       // 의뢰인(근로자) 섹션 - clientType='worker' 또는 'both'일 때만 표시 (토글 박스 직후 노출)
       showWorker && h('div', { style:{ display:'flex', alignItems:'center', borderBottom:'1px solid #e5e7eb', paddingBottom:'4px', marginTop:'10px', marginBottom:'8px' } },
         h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b', flex:1, display:'flex', alignItems:'center', gap:'6px' } },
-          h('span', null, '👥 의뢰인(근로자) (' + (f.company.workers||[]).length + ')'),
+          h('span', null, '👥 근로자(의뢰인) (' + (f.company.workers||[]).length + ')'),
           h('span', {
             title: '💡 빠른 입력\n\n' +
               '엑셀 한 줄 일괄 입력:\n' +
@@ -5971,7 +5962,7 @@ function ContractModal(props){
         h('div', { onClick:function(e){ e.stopPropagation(); setCoOpen(function(v){return !v;}); },
           style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b', borderBottom:'1px solid #e5e7eb', paddingBottom:'4px', marginBottom:'8px', display:'flex', alignItems:'center', gap:'6px',
             cursor:'pointer', userSelect:'none' } },
-          h('span', null, clientType === 'both' ? '🏢 회사정보 (피신청인 또는 사용자)' : '🏢 회사정보'),
+          h('span', null, clientType === 'worker' ? '🏢 상대 회사(피신청인·사용자) — 선택' : clientType === 'both' ? '🏢 회사정보 (피신청인 또는 사용자)' : '🏢 회사정보'),
           h('span', {
             title: '💡 빠른 입력 방법 2가지\n\n' +
               '① OCR 자동 추출\n' +
@@ -6074,7 +6065,7 @@ function ContractModal(props){
           })
         )
       ),
-      (clientType !== 'worker') && fld('사업자번호',
+      fld('사업자번호',
         h('input', { type:'text', value:f.company.bizNo, onChange:setCompanyField('bizNo'), onBlur:onBizNoBlur, placeholder:'000-00-00000', inputmode:'numeric' })),
 
       // 동일 회사 계약 실시간 안내 (종류별 구분)
@@ -6922,6 +6913,36 @@ function ContractModal(props){
             ? h('span', { style:{ fontSize:'10.5px', color:'#dc2626', fontWeight:700 } }, '🚫 이미 사용 중: ' + (dupHit.companyName||'-'))
             : editNo && h('span', { style:{ fontSize:'10.5px', color: canSuperEdit()?'#2563eb':'#f59e0b' } },
                 canSuperEdit() ? '🛡️ 관리자 권한으로 수정 가능' : '⚠️ 과거 데이터 입력 시에만 사용')
+        );
+      })(),
+      // ── 의뢰인 유형 토글 (항상 보이게 상단 고정) ──
+      (function(){
+        var ct = f.clientType || 'company';
+        function ctBar(v, label, tip){
+          var on = ct === v;
+          return h('button', { type:'button', title:tip,
+            onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { clientType: v }); }); setTab('company'); },
+            style:{ flex:1, padding:'9px 6px', border:'1.5px solid '+(on?'#1e40af':'#fdba74'),
+              background: on?'#1e40af':'#fff', color: on?'#fff':'#9a3412',
+              borderRadius:'6px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, label);
+        }
+        var ctDesc = ct === 'company'
+          ? '🏢 회사가 의뢰인 — 회사정보(회사명·대표자·사업자번호)를 입력합니다. 예) 취업규칙·자문·컨설팅·인사노무 일반'
+          : ct === 'worker'
+          ? '👤 근로자가 의뢰인 — 근로자 정보(이름·연락처·주소)를 입력하고, 상대 회사(피신청인)는 아래에서 선택 입력합니다. 예) 부당해고·임금체불·산재'
+          : '🏢+👤 회사와 근로자를 함께 등록 — 양측 정보를 모두 입력합니다. 예) 노사 양쪽 관련 특수 케이스';
+        return h('div', { style:{ margin:'12px 16px 0', background:'#fff7ed', border:'1.5px solid #fb923c', borderRadius:'8px', padding:'8px 10px' } },
+          h('div', { style:{ fontSize:'11px', fontWeight:800, color:'#9a3412', marginBottom:'6px' } },
+            '⚖️ 의뢰인 유형 — 먼저 선택하세요 (버튼에 마우스를 올리면 설명)'),
+          h('div', { style:{ display:'flex', gap:'6px' } },
+            ctBar('company', '🏢 회사(의뢰인)',
+              '【회사가 의뢰인일 때】\n회사정보(회사명·대표자·사업자번호·주소)를 입력합니다.\n\n예) 취업규칙 작성, 인사노무 자문, 컨설팅,\n임금체계 설계, 평가보상 등 회사 의뢰 업무'),
+            ctBar('worker',  '👤 근로자(의뢰인)',
+              '【근로자가 의뢰인일 때】\n근로자 정보(이름·주민번호·연락처·주소)를 입력합니다.\n상대 회사(피신청인·사용자)는 아래 "상대 회사" 칸에 선택 입력.\n\n예) 부당해고 구제신청, 임금체불 진정,\n산재 신청 등 근로자 대리 사건'),
+            ctBar('both',    '🏢+👤 둘 다',
+              '【회사+근로자 함께】\n양측 정보를 모두 입력합니다.\n\n예) 노사 양쪽이 얽힌 특수 케이스,\n집단 사건에서 회사·근로자 정보를 함께 관리할 때')
+          ),
+          h('div', { style:{ fontSize:'10.5px', color:'#9a3412', marginTop:'7px', lineHeight:1.5, background:'#fffbeb', borderRadius:'5px', padding:'5px 8px' } }, ctDesc)
         );
       })(),
       // 탭 헤더
@@ -49018,7 +49039,7 @@ function ChangePasswordModal(props){
               presetSid && h('div', { className:'fld' },
                 h('label', null, '계정'),
                 h('input', { type:'text', readOnly:true,
-                  value:(function(){ var u=(dbGet('user_accounts',USERS_SEED)||[]).find(function(x){return x.sid===presetSid;}); return u?(u.name+' ('+(u.loginId||u.sid)+')'):presetSid; })(),
+                  value:(function(){ var u=(dbGet('user_accounts',USERS_SEED)||[]).find(function(x){return x.sid===presetSid;}); if(!u) return presetSid; var lid=u.loginId||u.sid; return (lid===u.name) ? u.name : (u.name+' ('+lid+')'); })(),
                   style:{ background:'#f1f5f9', color:'#475569' } })),
               h('div', { className:'fld' },
                 h('label', null, '현재 비밀번호'),
