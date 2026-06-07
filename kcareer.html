@@ -320,39 +320,65 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
         </div>
       </div></section>
       <section class="page-view" id="page-resume-create"><div class="page">
-        <h2>이력서 생성</h2><div class="desc">기관 HWP/HWPX 양식을 가져오면 rhwp가 동일하게 렌더 → 그 안에서 편집 → 저장</div>
+        <h2>이력서 생성</h2><div class="desc">PDF 양식 업로드 → 오른쪽 경력 목록을 드래그해서 항목에 놓으면 자동 입력</div>
 
-        <div class="card">
-          <div class="rc-h">① 양식 가져오기</div>
-          <div class="dropzone" id="rcDrop">📄 기관 HWP/HWPX 양식을 끌어놓거나 클릭해서 선택</div>
-          <input type="file" id="rcFile" accept=".hwp,.hwpx" style="display:none">
+        <div class="card" style="margin-bottom:14px">
+          <div class="rc-h">① 양식 업로드 <span class="rc-mute">(PDF 권장 · HWP·HWPX·DOCX도 가능)</span></div>
+          <div class="dropzone" id="rcDrop">📄 PDF · HWP · HWPX · DOCX 파일을 끌어놓거나 클릭해서 선택</div>
+          <input type="file" id="rcFile" accept=".pdf,.hwp,.hwpx,.docx" style="display:none">
           <label style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;color:var(--text-mute)">
             <input type="checkbox" id="rcSaveLib"> 가져올 때 양식 보관함에도 추가
           </label>
         </div>
 
-        <div class="card" style="margin-top:14px">
+        <div class="card" style="margin-bottom:14px">
           <div class="rc-h">② 양식 보관함 <span class="rc-mute">(자주 쓰는 기관 양식)</span></div>
           <div id="rcTplLib" class="empty">보관된 양식 없음</div>
         </div>
 
-        <div class="card" style="margin-top:14px">
-          <div class="rc-bar">
+        <div class="card" id="rcEditCard" style="display:none">
+          <div class="rc-bar" style="margin-bottom:12px">
             <div class="rc-h" style="margin:0">③ 편집</div>
             <div class="rc-actions">
-              <button class="btn" id="rcFillBtn">📋 내 정보 패널</button>
-              <button class="btn primary" id="rcSaveBtn">💾 HWPX로 저장</button>
+              <button class="btn primary" id="rcSaveBtn">💾 완성본 생성</button>
               <button class="btn" id="rcDocxSaveBtn" style="display:none" onclick="exportDocxFile()">💾 DOCX 저장</button>
             </div>
           </div>
-          <div id="rcFillPanel" class="rc-fill" style="display:none"></div>
-          <div id="rcEditorMsg" class="rc-mute" style="margin:8px 0">양식을 가져오면 여기에 편집기가 열립니다. (rhwp-studio 자체호스팅 배포 후 동작)</div>
-          <div id="rhwpEditor"></div>
-          <div id="docxEditorWrap" style="display:none;border:1px solid var(--border);border-radius:10px;overflow:hidden">
-            <div style="background:var(--soft);padding:8px 14px;font-size:12px;color:var(--text-mute);border-bottom:1px solid var(--border)">📝 DOCX 편집 — 클릭해서 커서 위치 지정 후 오른쪽 패널에서 [→삽입] 클릭</div>
-            <div id="docxEditor" contenteditable="true" spellcheck="false" style="min-height:500px;padding:24px 32px;font-size:13px;line-height:1.8;outline:none;background:#fff;max-height:70vh;overflow:auto"></div>
+          <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start">
+            <div>
+              <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:6px">양식 미리보기 — 오른쪽 항목을 드래그해서 점선 칸에 놓으세요</div>
+              <div id="rcEditorMsg" class="rc-mute" style="margin:8px 0">양식을 업로드하면 여기에 미리보기가 나타납니다</div>
+              <div id="rcPdfPreview" style="display:none"></div>
+              <div id="rhwpEditor"></div>
+              <div id="docxEditorWrap" style="display:none;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                <div style="background:var(--soft);padding:8px 14px;font-size:12px;color:var(--text-mute);border-bottom:1px solid var(--border)">📝 편집 — 커서 위치에 오른쪽 항목 클릭하면 삽입</div>
+                <div id="docxEditor" contenteditable="true" spellcheck="false" style="min-height:500px;padding:24px 32px;font-size:13px;line-height:1.8;outline:none;background:#fff;max-height:70vh;overflow:auto"></div>
+              </div>
+              <div id="rcDropRows" style="display:none;margin-top:12px">
+                <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:8px">📋 채울 항목 — 오른쪽에서 드래그해서 각 칸에 놓으세요</div>
+                <div id="rcDropRowList"></div>
+              </div>
+            </div>
+            <div id="rcDragPanel">
+              <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:8px">경력·자격 목록 — 드래그해서 왼쪽에 놓기</div>
+              <div id="rcCatTabs" style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:8px"></div>
+              <div style="display:flex;gap:6px;margin-bottom:8px">
+                <input type="text" id="rcDragSearch" placeholder="🔍 검색..." style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;outline:none">
+                <select id="rcDragYear" style="font-size:12px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;width:90px">
+                  <option value="">전체연도</option>
+                </select>
+              </div>
+              <div id="rcDragList" style="border:1px solid var(--border);border-radius:6px;max-height:400px;overflow-y:auto"></div>
+              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                <button class="btn primary" style="width:100%;font-size:12px" onclick="autoFillBasicInfo()">✨ 기본정보 자동 채우기</button>
+              </div>
+              <div style="margin-top:8px">
+                <button class="btn primary" style="width:100%;font-size:13px;font-weight:600;padding:10px" onclick="generateFilledHWP('resume')">📄 완성본 HWP 생성</button>
+              </div>
+            </div>
           </div>
         </div>
+        <div id="rcFillPanel" class="rc-fill" style="display:none"></div>
       </div></section>
       <section class="page-view" id="page-resume-store" ondragover="pageDropOver(event,'resume')" ondragleave="pageDropLeave(event)" ondrop="pageDropFile(event,'resume')"><div class="page"><div class="page-drop-overlay" id="ovl-page-resume-store"><span>📎 이력서 파일을 놓으면 저장됩니다</span></div>
         <h2>이력서 보관</h2><div class="desc">생성·업로드한 이력서를 연도·기관별로 보관 (원본 양식 + 생성본 함께 보관)</div>
@@ -1392,23 +1418,166 @@ async function exportDocxFile(){
   toast('원본 DOCX 다운로드됨 — 수정 내용은 직접 복사해서 붙여넣기 하세요');
 }
 
+/* ===== 이력서 생성 — PDF 미리보기 + 드래그 경력 패널 ===== */
+var _rcPdfData=null, _rcFileName='', _rcVarMap={};
+
 async function mountEditor(buffer,name,cfg){
   cfg=cfg||DOMAINS.resume.create;
   try{ _lastOriginal={name, b64:abToB64(buffer)}; }catch(e){}
   const ext=(name.split('.').pop()||'').toLowerCase();
-  // DOCX 분기
-  if(ext==='docx'||ext==='doc'){
-    await mountDocx(buffer, name); return;
+  const editCard=document.getElementById('rcEditCard'); if(editCard) editCard.style.display='';
+  _rcFileName=name;
+
+  if(ext==='pdf'){
+    /* PDF 모드: PDF.js 미리보기 + 드래그 패널 */
+    _rcPdfData=buffer;
+    const msg=document.getElementById(cfg.msg||'rcEditorMsg'); if(msg) msg.style.display='none';
+    const wrap=document.getElementById('docxEditorWrap'); if(wrap) wrap.style.display='none';
+    const hw=document.getElementById('rhwpEditor'); if(hw) hw.innerHTML='';
+    const prev=document.getElementById('rcPdfPreview');
+    if(prev){ prev.style.display=''; prev.style.cssText='border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#525659;padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;max-height:70vh;overflow-y:auto';
+      prev.innerHTML='<div style="color:#ccc;font-size:12px">⏳ PDF 로딩 중...</div>';
+      try{
+        if(!window._pdfjs){ await new Promise(function(res,rej){ var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; sc.onload=function(){ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; window._pdfjs=window.pdfjsLib; res(); }; sc.onerror=rej; document.head.appendChild(sc); }); }
+        const pdf=await window._pdfjs.getDocument({data:b64ToAb(abToB64(buffer))}).promise;
+        prev.innerHTML='';
+        for(var i=1;i<=Math.min(pdf.numPages,5);i++){
+          const pg=await pdf.getPage(i); const vp=pg.getViewport({scale:1.4});
+          const cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height; cv.style.cssText='max-width:100%;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+          await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; prev.appendChild(cv);
+        }
+      }catch(e){ prev.innerHTML='<div style="color:#ccc;padding:20px">PDF 렌더 오류: '+e.message+'</div>'; }
+    }
+    /* 드롭 행 목록 표시 */
+    const drows=document.getElementById('rcDropRows'); if(drows) drows.style.display='';
+    _initDropRows();
+    _activeEditorType='pdf';
+  } else if(ext==='docx'||ext==='doc'){
+    const prev=document.getElementById('rcPdfPreview'); if(prev) prev.style.display='none';
+    const drows=document.getElementById('rcDropRows'); if(drows) drows.style.display='none';
+    await mountDocx(buffer,name);
+  } else {
+    const prev=document.getElementById('rcPdfPreview'); if(prev) prev.style.display='none';
+    const drows=document.getElementById('rcDropRows'); if(drows) drows.style.display='none';
+    const wrap=document.getElementById('docxEditorWrap'); if(wrap) wrap.style.display='none';
+    _activeEditorType='hwp';
+    const msg=document.getElementById(cfg.msg||'rcEditorMsg');
+    try{ if(msg) msg.textContent='편집기 로딩 중…'; await openHwpEditor(cfg.editor||'#rhwpEditor',buffer,name); if(msg) msg.style.display='none'; }
+    catch(e){ _activeEditorType=null; if(msg){ msg.style.display=''; msg.textContent='편집기 오류: '+e.message; } }
   }
-  // HWP/HWPX: rhwp-studio
-  const wrap=document.getElementById('docxEditorWrap'); if(wrap) wrap.style.display='none';
-  const hwpWrap=document.getElementById('rhwpEditor'); if(hwpWrap) hwpWrap.style.display='';
-  const saveBtnHwp=document.getElementById('rcSaveBtn'); if(saveBtnHwp) saveBtnHwp.style.display='';
-  const saveBtnDocx=document.getElementById('rcDocxSaveBtn'); if(saveBtnDocx) saveBtnDocx.style.display='none';
-  _activeEditorType='hwp';
-  const msg=document.getElementById(cfg.msg);
-  try{ msg.textContent='편집기 로딩 중…'; await openHwpEditor(cfg.editor, buffer, name); msg.style.display='none'; _activeEditorType='hwp'; }
-  catch(e){ _activeEditorType=null; msg.style.display=''; msg.textContent='편집기를 열 수 없습니다. rhwp-studio 자체호스팅 주소를 환경설정에서 확인하세요. ('+e.message+')'; }
+  _initDragPanel();
+}
+
+/* 드롭 행 목록 초기화 */
+var _DROP_FIELDS=[
+  {id:'df_name',label:'성명',key:'성명',auto:true},
+  {id:'df_birth',label:'생년월일',key:'생년월일',auto:true},
+  {id:'df_phone',label:'연락처',key:'전화',auto:true},
+  {id:'df_email',label:'이메일',key:'이메일',auto:true},
+  {id:'df_org',label:'소속',key:'소속',auto:true},
+  {id:'df_addr',label:'주소',key:'주소',auto:true},
+  {id:'df_c1',label:'경력 1행',key:'',auto:false},
+  {id:'df_c2',label:'경력 2행',key:'',auto:false},
+  {id:'df_c3',label:'경력 3행',key:'',auto:false},
+  {id:'df_c4',label:'경력 4행',key:'',auto:false},
+  {id:'df_c5',label:'경력 5행',key:'',auto:false},
+  {id:'df_q1',label:'자격증 1',key:'',auto:false},
+  {id:'df_q2',label:'자격증 2',key:'',auto:false},
+];
+
+function _initDropRows(){
+  const box=document.getElementById('rcDropRowList'); if(!box) return;
+  box.innerHTML='';
+  _DROP_FIELDS.forEach(function(f){
+    const row=document.createElement('div');
+    row.id='droprow_'+f.id;
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 8px;border:2px dashed var(--border);border-radius:6px;margin-bottom:6px;background:#fafafa;min-height:36px;transition:all .15s';
+    row.dataset.fieldId=f.id;
+    const lbl=document.createElement('span'); lbl.style.cssText='font-size:11px;color:var(--text-mute);flex-shrink:0;width:70px'; lbl.textContent=f.label+' :';
+    const val=document.createElement('span'); val.id='dropval_'+f.id; val.style.cssText='flex:1;font-size:12px;font-weight:500;color:var(--ink)';
+    if(f.auto&&USER_INFO[f.key]){ val.textContent=USER_INFO[f.key]; _rcVarMap[f.id]=USER_INFO[f.key]; row.style.borderColor='var(--teal)'; row.style.background='#E8F5F0'; }
+    else { val.textContent='← 오른쪽에서 드래그'; val.style.color='#bbb'; }
+    const clrBtn=document.createElement('button'); clrBtn.className='btn sm'; clrBtn.textContent='✕'; clrBtn.style.cssText='flex-shrink:0;font-size:10px;color:var(--red)';
+    clrBtn.onclick=function(){ _rcVarMap[f.id]=''; val.textContent='← 오른쪽에서 드래그'; val.style.color='#bbb'; row.style.borderColor='var(--border)'; row.style.background='#fafafa'; };
+    // 드롭 이벤트
+    row.ondragover=function(e){ e.preventDefault(); row.style.borderColor='var(--teal)'; row.style.background='#E8F5F0'; };
+    row.ondragleave=function(){ if(!_rcVarMap[f.id]){ row.style.borderColor='var(--border)'; row.style.background='#fafafa'; } };
+    row.ondrop=function(e){ e.preventDefault();
+      const data=e.dataTransfer.getData('text/plain'); if(!data) return;
+      const parsed=JSON.parse(data);
+      _rcVarMap[f.id]=parsed.text; val.textContent=parsed.text; val.style.color='var(--ink)';
+      row.style.borderColor='var(--teal)'; row.style.background='#E8F5F0';
+      toast('✅ '+f.label+' = '+parsed.text.slice(0,20));
+    };
+    row.appendChild(lbl); row.appendChild(val); row.appendChild(clrBtn); box.appendChild(row);
+  });
+}
+
+/* 드래그 경력 패널 초기화 */
+var _rcActiveCat='위촉장';
+var _rcCatData={};
+
+function _initDragPanel(){
+  _rcCatData={
+    '위촉장': get('wiccok').map(function(r){ return {text:(r.org||'')+(r.periodStart?' ('+r.periodStart+'~'+(r.periodEnd||'현재')+')':'')+(r.titleVal?' '+r.titleVal:''), sub:(r.type||'')+(r.issueDate?' · '+r.issueDate:''), year:r.issueDate?r.issueDate.slice(0,4):''}; }),
+    '자격증': get('cert').map(function(r){ return {text:(r.title||'')+(r.num?' '+r.num:''), sub:'취득: '+(r.date||'-'), year:r.date?r.date.slice(0,4):''}; }),
+    '컨설팅': get('consult').map(function(r){ return {text:(r.org||'')+(r.year?' ('+r.year+')':''), sub:'컨설팅', year:r.year||''}; }),
+    '강의':   get('lecture').map(function(r){ return {text:(r.topic||r.org||'')+(r.date?' ('+r.date+')':''), sub:'강의', year:r.date?r.date.slice(0,4):''}; }),
+    '학력':   get('edu').map(function(r){ return {text:(r.school||'')+' '+(r.degree||''), sub:(r.graduated||''), year:r.graduated?r.graduated.slice(0,4):''}; }),
+    '사건':   get('case').map(function(r){ return {text:(r.org||'')+(r.year?' ('+r.year+')':''), sub:'사건', year:r.year||''}; })
+  };
+  // 카테고리 탭
+  const tabBox=document.getElementById('rcCatTabs'); if(!tabBox) return;
+  tabBox.innerHTML='';
+  Object.keys(_rcCatData).forEach(function(cat){
+    const tb=document.createElement('button'); tb.className='btn sm'+(cat===_rcActiveCat?' primary':'');
+    tb.style.cssText='font-size:10px;padding:2px 7px'; tb.textContent=cat+'('+_rcCatData[cat].length+')';
+    tb.onclick=function(){ _rcActiveCat=cat; tabBox.querySelectorAll('button').forEach(function(b){b.classList.remove('primary');}); tb.classList.add('primary'); _renderDragList(); };
+    tabBox.appendChild(tb);
+  });
+  // 연도 옵션
+  const yrSel=document.getElementById('rcDragYear'); if(yrSel){
+    const years=new Set(); Object.values(_rcCatData).forEach(function(arr){ arr.forEach(function(item){ if(item.year) years.add(item.year); }); });
+    yrSel.innerHTML='<option value="">전체연도</option>'+Array.from(years).sort().reverse().map(function(y){ return '<option>'+y+'</option>'; }).join('');
+    yrSel.onchange=_renderDragList;
+  }
+  const srch=document.getElementById('rcDragSearch'); if(srch){ srch.oninput=_renderDragList; srch.value=''; }
+  _renderDragList();
+}
+
+function _renderDragList(){
+  const box=document.getElementById('rcDragList'); if(!box) return;
+  const kw=(document.getElementById('rcDragSearch')||{}).value||''; const kwL=kw.toLowerCase();
+  const yr=(document.getElementById('rcDragYear')||{}).value||'';
+  const items=(_rcCatData[_rcActiveCat]||[]).filter(function(item){
+    return (!kwL||item.text.toLowerCase().includes(kwL)||item.sub.toLowerCase().includes(kwL))&&(!yr||item.year===yr);
+  });
+  box.innerHTML='';
+  if(!items.length){ box.innerHTML='<div style="padding:14px;text-align:center;font-size:12px;color:#aaa">결과 없음</div>'; return; }
+  items.forEach(function(item){
+    const row=document.createElement('div');
+    row.style.cssText='padding:8px 10px;border-bottom:1px solid var(--border);cursor:grab;display:flex;gap:8px;align-items:center;user-select:none';
+    row.draggable=true;
+    row.innerHTML='<span style="color:#ccc;font-size:16px;flex-shrink:0">⠿</span>'
+      +'<div style="flex:1"><div style="font-size:12px;font-weight:500;color:var(--ink)">'+item.text+'</div>'
+      +'<div style="font-size:10px;color:var(--text-mute)">'+item.sub+(item.year?' · '+item.year:'')+'</div></div>';
+    row.ondragstart=function(e){ e.dataTransfer.setData('text/plain', JSON.stringify({text:item.text,sub:item.sub})); row.style.opacity='0.5'; };
+    row.ondragend=function(){ row.style.opacity=''; };
+    // 클릭도 지원 (편집기 삽입)
+    row.onclick=function(){ insertToEditor(item.text); };
+    row.onmouseenter=function(){ row.style.background='var(--soft)'; };
+    row.onmouseleave=function(){ row.style.background=''; };
+    box.appendChild(row);
+  });
+}
+
+function autoFillBasicInfo(){
+  _DROP_FIELDS.filter(function(f){return f.auto;}).forEach(function(f){
+    if(USER_INFO[f.key]){ _rcVarMap[f.id]=USER_INFO[f.key];
+      const val=document.getElementById('dropval_'+f.id); if(val){ val.textContent=USER_INFO[f.key]; val.style.color='var(--ink)'; }
+      const row=document.getElementById('droprow_'+f.id); if(row){ row.style.borderColor='var(--teal)'; row.style.background='#E8F5F0'; }
+    }
+  }); toast('✅ 기본정보 자동 입력됨');
 }
 function tplList(d){ return get(DOMAINS[d].tplKey); }
 async function importTemplateFile(file,d){ const cfg=DOMAINS[d].create;
@@ -1649,19 +1818,200 @@ function delCustomItem(gi,ii){ if(!confirm('이 항목을 삭제합니까?')) re
 function toggleFillPanel(d){ const p=document.getElementById(DOMAINS[d].create.fillPanel);
   if(p.style.display==='none'){ renderFillPanelTabbed(p,d); p.style.display=''; } else p.style.display='none'; }
 function renderFillPanelTabbed(p,d){
-  p.innerHTML='<div style="display:flex;gap:4px;margin-bottom:10px">'
+  p.innerHTML='<div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">'
     +'<button class="btn sm" id="fpTab1" onclick="fpSwitch(1,\''+d+'\',this.closest(\'.rc-fill\'))">기본정보</button>'
-    +'<button class="btn sm primary" id="fpTab2" onclick="fpSwitch(2,\''+d+'\',this.closest(\'.rc-fill\'))">📋 경력 요약</button>'
+    +'<button class="btn sm primary" id="fpTab3" onclick="fpSwitch(3,\''+d+'\',this.closest(\'.rc-fill\'))">🎯 변수 채우기</button>'
+    +'<button class="btn sm" id="fpTab2" onclick="fpSwitch(2,\''+d+'\',this.closest(\'.rc-fill\'))">📋 경력 요약</button>'
     +'</div><div id="fpContent"></div>';
-  fpSwitch(2,d,p);
+  fpSwitch(3,d,p);
 }
 function fpSwitch(tab,d,p){
   const box=p.querySelector('#fpContent'); if(!box) return;
+  p.querySelectorAll('[id^=fpTab]').forEach(function(b){ b.classList.remove('primary'); });
+  const t=p.querySelector('#fpTab'+tab); if(t) t.classList.add('primary');
   if(tab===1){ box.innerHTML=''; renderFillPanel(box); }
+  else if(tab===3){ box.innerHTML=''; renderVarFill(box,d); }
   else{ box.innerHTML=''; renderCareerSummary(box); }
 }
+/* ===== 변수 채우기 패널 ===== */
+var _varMap={}, _varTarget=null;
+function renderVarFill(box,d){
+  // 기본정보 자동 치환 목록
+  const AUTO_VARS=['{{성명}}','{{생년월일}}','{{자격}}','{{전화}}','{{이메일}}','{{주소}}','{{소속}}'];
+  const AUTO_VALS=[USER_INFO['성명']||'',USER_INFO['생년월일']||'',USER_INFO['자격']||'',USER_INFO['전화']||'',USER_INFO['이메일']||'',USER_INFO['주소']||'',USER_INFO['소속']||''];
+  AUTO_VARS.forEach(function(v,i){ _varMap[v]=AUTO_VALS[i]; });
+
+  // 선택 변수 목록 (경력1~5, 자격증1~3, 컨설팅1~3 등)
+  var SEL_VARS=['{{경력1}}','{{경력2}}','{{경력3}}','{{경력4}}','{{경력5}}',
+    '{{자격증1}}','{{자격증2}}','{{자격증3}}','{{컨설팅1}}','{{컨설팅2}}','{{강의1}}','{{강의2}}','{{학력1}}'];
+  SEL_VARS.forEach(function(v){ if(!_varMap[v]) _varMap[v]=''; });
+
+  box.innerHTML='';
+
+  // ① 완성본 생성 버튼
+  var genBtn=document.createElement('button'); genBtn.className='btn primary'; genBtn.style.cssText='width:100%;margin-bottom:12px;font-weight:600';
+  genBtn.textContent='📄 완성본 HWP 생성 · 다운로드';
+  genBtn.onclick=function(){ generateFilledHWP(d); };
+  box.appendChild(genBtn);
+
+  // ② 자동 치환 섹션
+  var autoSec=document.createElement('div'); autoSec.style.cssText='margin-bottom:12px';
+  autoSec.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--teal);margin-bottom:6px;padding:4px 8px;background:#E8F5F0;border-radius:4px">🔁 자동 치환 (환경설정 기본정보)</div>';
+  AUTO_VARS.forEach(function(v,i){
+    var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px';
+    row.innerHTML='<code style="background:var(--color-background-secondary,#f4f0eb);padding:1px 5px;border-radius:3px;font-size:11px;flex-shrink:0">'+v+'</code>'
+      +'<span style="flex:1;color:var(--text-mute,#888);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(AUTO_VALS[i]||'<미입력>')+'</span>';
+    autoSec.appendChild(row);
+  });
+  box.appendChild(autoSec);
+
+  // ③ 선택 변수 섹션
+  var selSec=document.createElement('div');
+  selSec.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--navy,#1a3a5c);margin-bottom:8px;padding:4px 8px;background:#EAF1FF;border-radius:4px">✏️ 직접 선택 (경력·자격증·컨설팅)</div>';
+
+  SEL_VARS.forEach(function(v){
+    var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border,#e8e4de);font-size:12px';
+    var codeEl=document.createElement('code'); codeEl.style.cssText='background:var(--color-background-secondary,#f4f0eb);padding:1px 5px;border-radius:3px;font-size:11px;flex-shrink:0;cursor:pointer;border:1px solid transparent';
+    codeEl.textContent=v;
+    var valEl=document.createElement('span'); valEl.style.cssText='flex:1;font-size:11px;color:var(--ink,#333);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer';
+    valEl.textContent=_varMap[v]||'(비어있음)';
+    valEl.style.color=_varMap[v]?'var(--ink,#333)':'#aaa';
+    var selBtn=document.createElement('button'); selBtn.className='btn sm'; selBtn.style.cssText='flex-shrink:0;font-size:10px';
+    selBtn.textContent='선택';
+    selBtn.onclick=function(){ _varTarget=v; showCareerPicker(v,valEl,box); };
+    codeEl.onclick=function(){ _varTarget=v; showCareerPicker(v,valEl,box); };
+    valEl.onclick=function(){ _varTarget=v; showCareerPicker(v,valEl,box); };
+    row.appendChild(codeEl); row.appendChild(valEl); row.appendChild(selBtn);
+    selSec.appendChild(row);
+  });
+  box.appendChild(selSec);
+}
+
+/* ===== 경력 선택 피커 (필터+검색) ===== */
+function showCareerPicker(varName,valEl,parentBox){
+  var existing=parentBox.querySelector('#varPicker'); if(existing) existing.remove();
+  var picker=document.createElement('div'); picker.id='varPicker';
+  picker.style.cssText='position:sticky;top:0;z-index:5;background:var(--bg,#fff);border:2px solid var(--teal,#0E7C66);border-radius:10px;padding:10px;margin:8px 0;box-shadow:0 4px 16px rgba(0,0,0,.12)';
+
+  // 헤더
+  var hd=document.createElement('div'); hd.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:8px';
+  hd.innerHTML='<span style="font-size:12px;font-weight:600;color:var(--teal,#0E7C66);flex:1">'+varName+' 에 넣을 내용 선택</span>';
+  var cls=document.createElement('button'); cls.className='btn sm'; cls.textContent='✕'; cls.onclick=function(){ picker.remove(); };
+  hd.appendChild(cls); picker.appendChild(hd);
+
+  // 카테고리 탭
+  var cats=['위촉장','자격증','컨설팅','강의','학력','사건'];
+  var catData={
+    '위촉장': get('wiccok').map(function(r){ return {label:(r.org||'')+(r.issueDate?' ('+r.issueDate+')':''), sub:r.type||'위촉장', year:r.issueDate?r.issueDate.slice(0,4):''}; }),
+    '자격증': get('cert').map(function(r){ return {label:(r.title||'')+(r.date?' ('+r.date+')':''), sub:'자격·수료', year:r.date?r.date.slice(0,4):''}; }),
+    '컨설팅': get('consult').map(function(r){ return {label:(r.org||'')+(r.year?' ('+r.year+')':''), sub:'컨설팅', year:r.year||''}; }),
+    '강의':   get('lecture').map(function(r){ return {label:(r.topic||r.org||'')+(r.date?' ('+r.date+')':''), sub:'강의', year:r.date?r.date.slice(0,4):''}; }),
+    '학력':   get('edu').map(function(r){ return {label:(r.school||'')+' '+(r.degree||'')+(r.graduated?' ('+r.graduated+')':''), sub:'학력', year:r.graduated?r.graduated.slice(0,4):''}; }),
+    '사건':   get('case').map(function(r){ return {label:(r.org||'')+(r.year?' ('+r.year+')':''), sub:'사건', year:r.year||''}; })
+  };
+  var activeCat='위촉장';
+
+  // 탭 행
+  var tabRow=document.createElement('div'); tabRow.style.cssText='display:flex;gap:3px;margin-bottom:8px;flex-wrap:wrap';
+  cats.forEach(function(cat){
+    var tb=document.createElement('button'); tb.className='btn sm'; tb.style.cssText='font-size:10px;padding:2px 6px';
+    tb.textContent=cat+'('+catData[cat].length+')';
+    if(cat===activeCat) tb.classList.add('primary');
+    tb.onclick=function(){ activeCat=cat; tabRow.querySelectorAll('button').forEach(function(b){b.classList.remove('primary');}); tb.classList.add('primary'); renderList(); };
+    tabRow.appendChild(tb);
+  });
+  picker.appendChild(tabRow);
+
+  // 검색 + 연도 필터
+  var filterRow=document.createElement('div'); filterRow.style.cssText='display:flex;gap:6px;margin-bottom:8px';
+  var searchInp=document.createElement('input'); searchInp.type='text'; searchInp.placeholder='🔍 기관명·내용 검색...'; searchInp.style.cssText='flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border,#e8e4de);border-radius:6px;outline:none';
+  var yearSel=document.createElement('select'); yearSel.style.cssText='font-size:12px;padding:5px 6px;border:1px solid var(--border,#e8e4de);border-radius:6px;width:80px';
+  yearSel.innerHTML='<option value="">전체연도</option>';
+  var years=new Set();
+  cats.forEach(function(c){ catData[c].forEach(function(item){ if(item.year) years.add(item.year); }); });
+  Array.from(years).sort().reverse().forEach(function(y){ yearSel.innerHTML+='<option>'+y+'</option>'; });
+  filterRow.appendChild(searchInp); filterRow.appendChild(yearSel);
+  picker.appendChild(filterRow);
+
+  // 직접 입력
+  var directRow=document.createElement('div'); directRow.style.cssText='display:flex;gap:6px;margin-bottom:8px';
+  var directInp=document.createElement('input'); directInp.type='text'; directInp.placeholder='직접 입력...'; directInp.style.cssText='flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border,#e8e4de);border-radius:6px;outline:none';
+  var directBtn=document.createElement('button'); directBtn.className='btn sm primary'; directBtn.textContent='입력';
+  directBtn.onclick=function(){ if(directInp.value.trim()){ applyVar(varName,directInp.value.trim(),valEl); picker.remove(); } };
+  directRow.appendChild(directInp); directRow.appendChild(directBtn);
+  picker.appendChild(directRow);
+
+  // 목록
+  var listBox=document.createElement('div'); listBox.style.cssText='max-height:200px;overflow-y:auto;border:1px solid var(--border,#e8e4de);border-radius:6px';
+  picker.appendChild(listBox);
+
+  function renderList(){
+    var kw=searchInp.value.trim().toLowerCase();
+    var yr=yearSel.value;
+    var items=catData[activeCat].filter(function(item){
+      var matchKw=!kw||item.label.toLowerCase().includes(kw);
+      var matchYr=!yr||item.year===yr;
+      return matchKw&&matchYr;
+    });
+    listBox.innerHTML='';
+    if(!items.length){ listBox.innerHTML='<div style="padding:12px;text-align:center;font-size:12px;color:#aaa">결과 없음</div>'; return; }
+    items.forEach(function(item){
+      var row=document.createElement('div'); row.style.cssText='padding:7px 10px;border-bottom:1px solid var(--border,#e8e4de);display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:12px';
+      row.innerHTML='<div><div style="font-weight:500;color:var(--ink,#333)">'+item.label+'</div><div style="font-size:10px;color:var(--text-mute,#888)">'+item.sub+(item.year?' · '+item.year:'')+'</div></div>';
+      var selB=document.createElement('button'); selB.className='btn sm primary'; selB.style.cssText='font-size:10px;padding:2px 7px;flex-shrink:0';
+      selB.textContent='선택';
+      selB.onclick=function(e){ e.stopPropagation(); applyVar(varName,item.label,valEl); picker.remove(); };
+      row.onclick=function(){ applyVar(varName,item.label,valEl); picker.remove(); };
+      row.onmouseenter=function(){ row.style.background='var(--soft,#f8f4ee)'; };
+      row.onmouseleave=function(){ row.style.background=''; };
+      row.appendChild(selB); listBox.appendChild(row);
+    });
+  }
+  searchInp.oninput=renderList; yearSel.onchange=renderList;
+  renderList();
+
+  // 피커를 varName 행 아래에 삽입
+  parentBox.appendChild(picker);
+  picker.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function applyVar(varName,value,valEl){
+  _varMap[varName]=value;
+  if(valEl){ valEl.textContent=value; valEl.style.color='var(--ink,#333)'; }
+  toast('✅ '+varName+' = '+value.slice(0,20)+(value.length>20?'...':''));
+}
+
+/* ===== 완성본 HWP 생성 ===== */
+async function generateFilledHWP(d){
+  const cfg=DOMAINS[d]; if(!cfg) return toast('도메인 오류');
+  // 최근 업로드된 템플릿 찾기
+  const tpls=tplList(d);
+  if(!tpls.length){ toast('양식 보관함에 템플릿이 없습니다. ① 양식 가져오기에서 HWP를 업로드하고 보관함 추가 체크하세요.'); return; }
+  const latest=tpls[0];
+  const f=await getFileAsync(latest.id); if(!f||!f.base64){ toast('원본 파일을 찾을 수 없습니다'); return; }
+  toast('⏳ 완성본 생성 중...');
+  try{
+    await _loadJSZip();
+    const zip=await JSZip.loadAsync(b64ToAb(f.base64));
+    // 모든 파일에서 변수 치환
+    const fileNames=Object.keys(zip.files);
+    for(var i=0;i<fileNames.length;i++){
+      var fname=fileNames[i]; var zf=zip.files[fname];
+      if(zf.dir) continue;
+      if(/\.(xml|rels|hpf)$/i.test(fname)){
+        var txt=await zf.async('string');
+        Object.keys(_varMap).forEach(function(v){ if(_varMap[v]) txt=txt.split(v).join(_varMap[v]); });
+        zip.file(fname,txt);
+      }
+    }
+    const blob=await zip.generateAsync({type:'blob',mimeType:'application/hwp+zip'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=(latest.name||'완성본').replace(/\.hwpx?$/i,'')+'_완성본.hwpx'; a.click();
+    toast('✅ 완성본 저장됨');
+  }catch(e){ toast('오류: '+e.message); console.error(e); }
+}
+
 function renderFillPanel(p){
-  // 편집기 상태 안내
   const editorOn=_activeEditorType==='hwp'||_activeEditorType==='docx';
   const notice=document.createElement('div');
   notice.style.cssText='font-size:11px;padding:6px 10px;border-radius:6px;margin-bottom:10px;'+(editorOn?'background:#E8F5F0;color:var(--teal)':'background:#FEF3C7;color:#92400E');
