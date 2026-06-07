@@ -1574,7 +1574,7 @@ function fbShouldSync(k){
   return true;
 }
 // App Check reCAPTCHA v3 사이트키 — Firebase 콘솔에서 발급 후 따옴표 안에 붙여넣기 (비어있으면 비활성, 동작에 영향 없음)
-var FB_APPCHECK_KEY = '';
+var FB_APPCHECK_KEY = '6Ldu1hEtAAAAABB9lH9EMEyd7uBLEy9H5HxJoua_';
 try {
   if(typeof firebase !== 'undefined' && firebase.initializeApp){
     firebase.initializeApp(FB_CONFIG);
@@ -9114,7 +9114,7 @@ function CompanyManagement(){
   if(!existing){ dbSet('companies', COMPANY_DEMO_SEED); existing = COMPANY_DEMO_SEED; }
   var c = useState(existing); var companies = c[0]; var setCompanies = c[1];
 
-  // ── 보수총액신고: 연도별 데이터 (wage_reports[연도][업체id] = {filed,taxReply,eiSi,health,memo}) ──
+  // ── 보수총액신고: 연도별 데이터 (wage_reports[연도][업체id] = {filed,taxReq,taxReply,eiSi,health,memo}) ──
   var _wrYS = useState(String(new Date().getFullYear()));
   var wageYear = _wrYS[0]; var setWageYear = _wrYS[1];
   var _wrS = useState((dbGet('wage_reports', {})||{})[String(new Date().getFullYear())] || {});
@@ -9130,8 +9130,15 @@ function CompanyManagement(){
     var a = dbGet('wage_reports', {}) || {}; a[wageYear] = next; dbSet('wage_reports', a);
   }
   function wageCell(co, key){
-    return h('input', { value:(wageRep[co.id]||{})[key]||'', onChange:function(e){ wageSet(co.id, key, e.target.value); },
-      placeholder:'-', style:{ width:'62px', padding:'3px 4px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'10.5px', textAlign:'center' } });
+    var val = (wageRep[co.id]||{})[key]||'';
+    var isISO = /^\d{4}-\d{2}-\d{2}$/.test(val);
+    // 기존 엑셀 가져오기 값(비ISO 텍스트/시리얼)은 텍스트로 표시 유지, 비었거나 ISO면 캘린더 입력
+    if(val && !isISO){
+      return h('input', { value:val, onChange:function(e){ wageSet(co.id, key, e.target.value); },
+        placeholder:'-', title:'기존값(텍스트) - 지우면 캘린더 입력', style:{ width:'90px', padding:'3px 4px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'10.5px', textAlign:'center' } });
+    }
+    return h('input', { type:'date', value:val, onChange:function(e){ wageSet(co.id, key, e.target.value); },
+      style:{ width:'112px', padding:'3px 4px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'10.5px', textAlign:'center', fontFamily:'inherit' } });
   }
   var wageYearOpts = [];
   for(var _wy=(new Date().getFullYear()+1); _wy>=(new Date().getFullYear()-3); _wy--){ wageYearOpts.push(String(_wy)); }
@@ -9151,7 +9158,7 @@ function CompanyManagement(){
         var hdr = data[hi].map(function(x){ return String(x).trim(); });
         function col(ns){ for(var i=0;i<hdr.length;i++){ for(var j=0;j<ns.length;j++){ if(hdr[i].indexOf(ns[j])>=0) return i; } } return -1; }
         var cName=col(['사업장','업체']), cBiz=col(['관리번호','사업자']),
-            cFiled=col(['신고서','전달']), cReply=col(['세무사','회신']),
+            cFiled=col(['신고서','전달']), cReq=col(['세무사요청','요청']), cReply=col(['세무사회신','회신']),
             cEi=col(['고용','산재']), cHealth=col(['건강']), cMemo=col(['비고']);
         function digits(x){ return String(x||'').replace(/[^0-9]/g,''); }
         function norm(x){ return String(x||'').replace(/\s|\(주\)|㈜|주식회사/g,'').toLowerCase(); }
@@ -9176,6 +9183,7 @@ function CompanyManagement(){
           if(!co) continue;
           var cur=Object.assign({}, next[co.id]||{});
           if(cFiled>=0) cur.filed=fmtv(row[cFiled]);
+          if(cReq>=0) cur.taxReq=fmtv(row[cReq]);
           if(cReply>=0) cur.taxReply=fmtv(row[cReply]);
           if(cEi>=0) cur.eiSi=fmtv(row[cEi]);
           if(cHealth>=0) cur.health=fmtv(row[cHealth]);
@@ -9188,6 +9196,85 @@ function CompanyManagement(){
       e.target.value='';
     };
     reader.readAsArrayBuffer(file);
+  }
+
+  // ── 세무사무실 보수총액 신고자료 일괄요청 ──
+  var taxMailS = useState(false); var taxMailModal = taxMailS[0]; var setTaxMailModal = taxMailS[1];
+  var _tfeS = useState((function(){ try{ return localStorage.getItem('pureun_v6_tax_from_email')||''; }catch(e){ return ''; } })());
+  var taxFromEmail = _tfeS[0]; var setTaxFromEmail = _tfeS[1];
+  var taxSendingS = useState(''); var taxSending = taxSendingS[0]; var setTaxSending = taxSendingS[1];
+  // 사무대행 업체 중 세무사무실 이메일 있는 곳 → 이메일 기준 중복제거 그룹
+  function buildTaxGroups(){
+    var byEmail = {};
+    companies.forEach(function(co){
+      if(!(co.status==='suboffice' || co.isSuboffice)) return;
+      var em = (co.taxEmail||'').trim().toLowerCase();
+      if(!em) return;
+      if(!byEmail[em]) byEmail[em] = { email:(co.taxEmail||'').trim(), office:co.taxOfficeName||'', contact:co.taxContact||'', cos:[] };
+      if(!byEmail[em].office && co.taxOfficeName) byEmail[em].office = co.taxOfficeName;
+      if(!byEmail[em].contact && co.taxContact) byEmail[em].contact = co.taxContact;
+      byEmail[em].cos.push(co);
+    });
+    return Object.keys(byEmail).map(function(k){ return byEmail[k]; })
+      .sort(function(a,b){ return (b.cos.length-a.cos.length); });
+  }
+  function taxMailSubject(){ return '['+wageYear+'년 보수총액신고] 신고자료 요청 - 푸른노무법인'; }
+  function taxMailBody(g){
+    var list = g.cos.map(function(co, i){ return (i+1)+'. '+co.name+(co.bizNoFull? ' ('+co.bizNoFull+')':''); }).join('\n');
+    return (g.contact? g.contact+'님, ':'')+'안녕하세요. 푸른노무법인입니다.\n\n'
+      + wageYear+'년 보수총액신고 업무 진행을 위해 아래 사업장의 신고자료(연간 보수총액 등) 요청드립니다.\n\n'
+      + '── 대상 사업장 ('+g.cos.length+'개) ──\n' + list + '\n\n'
+      + '회신 부탁드립니다. 감사합니다.\n\n푸른노무법인';
+  }
+  function taxMailtoUrl(g){
+    return 'mailto:'+encodeURIComponent(g.email)
+      +'?subject='+encodeURIComponent(taxMailSubject())
+      +'&body='+encodeURIComponent(taxMailBody(g));
+  }
+  // Gmail send-as 자동발송 (기존 캘린더 OAuth 토큰 재사용, gmail.send 스코프 필요)
+  var GMAIL_OAUTH_ID = '30712196914-1qc61a41ptmo6u7hbk71i70g00k3a8lk.apps.googleusercontent.com';
+  function gmailSignIn(){
+    var redirect = (window.location.protocol === 'https:')
+      ? (window.location.origin + window.location.pathname).replace(/\/+$/, '')
+      : 'https://nabaho.github.io/pureunall/pu-erp.html';
+    var url = 'https://accounts.google.com/o/oauth2/v2/auth?'
+      +'client_id='+encodeURIComponent(GMAIL_OAUTH_ID)
+      +'&redirect_uri='+encodeURIComponent(redirect)
+      +'&response_type=token'
+      +'&scope='+encodeURIComponent('https://www.googleapis.com/auth/gmail.send')
+      +'&include_granted_scopes=true';
+    window.location.href = url;
+  }
+  function b64url(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  function gmailSendOne(to, subject, body, from){
+    var headers = [];
+    if(from) headers.push('From: '+from);
+    headers.push('To: '+to);
+    headers.push('Subject: =?UTF-8?B?'+b64url(subject).replace(/-/g,'+').replace(/_/g,'/')+'?=');
+    headers.push('MIME-Version: 1.0');
+    headers.push('Content-Type: text/plain; charset="UTF-8"');
+    headers.push('Content-Transfer-Encoding: base64');
+    var raw = headers.join('\r\n')+'\r\n\r\n'+btoa(unescape(encodeURIComponent(body)));
+    return fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+window._gcalToken, 'Content-Type':'application/json' },
+      body: JSON.stringify({ raw: b64url(raw) })
+    }).then(function(r){ if(!r.ok) return r.json().then(function(j){ throw new Error((j.error&&j.error.message)||('HTTP '+r.status)); }); return r.json(); });
+  }
+  function gmailSendAll(groups){
+    if(!window._gcalToken || Date.now() >= (window._gcalExpiry||0)-60000){
+      showToast('Google 로그인 필요 - 인증 후 다시 실행하세요'); gmailSignIn(); return;
+    }
+    var from = (taxFromEmail||'').trim();
+    var i = 0, ok = 0, fail = 0;
+    function next(){
+      if(i >= groups.length){ setTaxSending(''); showToast('📧 발송완료 성공'+ok+' 실패'+fail); return; }
+      var g = groups[i]; setTaxSending('발송중 '+(i+1)+'/'+groups.length+' · '+(g.office||g.email));
+      gmailSendOne(g.email, taxMailSubject(), taxMailBody(g), from)
+        .then(function(){ ok++; }).catch(function(e){ fail++; console.error('[gmail]', g.email, e.message); })
+        .then(function(){ i++; setTimeout(next, 400); });
+    }
+    next();
   }
 
   // 주담당 표시 폴백 (표시 전용, 데이터 변경 없음): 본인 값이 비면 ① 같은 업체명을 가진 다른 회사 레코드의 주담당 ② 해당 업체 입금건의 주담당 이름 순으로 표시
@@ -9937,7 +10024,10 @@ function CompanyManagement(){
           style:{ padding:'4px 8px', border:'1px solid #99f6e4', borderRadius:'4px', fontSize:'11.5px', fontWeight:700, color:'#0f766e' } },
           wageYearOpts.map(function(y){ return h('option', { key:y, value:y }, y+'년'); })),
         h('label', { style:{ background:'#f0fdfa', color:'#0f766e', border:'1px solid #99f6e4', padding:'5px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } },
-          '📤 신고 가져오기', h('input', { type:'file', accept:'.xlsx,.xls', onChange:importWageXlsx, style:{ display:'none' } }))
+          '📤 신고 가져오기', h('input', { type:'file', accept:'.xlsx,.xls', onChange:importWageXlsx, style:{ display:'none' } })),
+        h('button', { onClick:function(){ setTaxMailModal(true); },
+          style:{ background:'#0f766e', color:'#fff', border:'none', padding:'5px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } },
+          '📧 세무사무실 일괄요청')
       ),
       h('button', { onClick:exportExcel,
         style:{ background:'#fff', color:'#16a34a', border:'1px solid #16a34a', padding:'5px 14px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer' } },
@@ -10006,6 +10096,7 @@ function CompanyManagement(){
                 h('th', { key:'h5' }, '대표자'),
                 h('th', { key:'h6', onClick:function(){toggleSort('address');}, style:{ cursor:'pointer', userSelect:'none' } }, '지점' + sortIcon('address')),
                 h('th', { key:'hw1', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '신고서전달'),
+                h('th', { key:'hwR', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '세무사요청'),
                 h('th', { key:'hw2', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '세무사회신'),
                 h('th', { key:'hw3', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '고용·산재'),
                 h('th', { key:'hw4', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '건강'),
@@ -10055,7 +10146,7 @@ function CompanyManagement(){
         )),
         h('tbody', null,
           filtered.length === 0
-            ? h('tr', null, h('td', { colSpan: statusTab === 'suboffice' ? 14 : 22, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
+            ? h('tr', null, h('td', { colSpan: statusTab === 'suboffice' ? 16 : 22, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
             : pg.paged.map(function(co, idx){
                 var expiring = isExpiringSoon(co);
                 // ★ 계약 중단: 주황 배경 구분
@@ -10125,6 +10216,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                       : renderCell(co, 'ceo', co.ceo, {})),
                     h('td', null, renderCell(co, 'address', co.address, {})),
                     h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'filed')),
+                    h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'taxReq')),
                     h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'taxReply')),
                     h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'eiSi')),
                     h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'health')),
@@ -10356,6 +10448,57 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
         )
       )
     ),
+
+    // ★ 세무사무실 보수총액 신고자료 일괄요청 모달
+    taxMailModal && (function(){
+      var groups = buildTaxGroups();
+      var noEmail = companies.filter(function(c){ return (c.status==='suboffice'||c.isSuboffice) && !((c.taxEmail||'').trim()); });
+      return h('div', { onClick:function(){ if(!taxSending) setTaxMailModal(false); },
+        style:{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' } },
+        h('div', { onClick:function(e){ e.stopPropagation(); },
+          style:{ background:'#fff', borderRadius:'12px', padding:'22px', width:'620px', maxWidth:'96vw', maxHeight:'88vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.25)' } },
+          h('div', { style:{ fontWeight:800, fontSize:'16px', color:'#0f766e', marginBottom:'4px' } }, '📧 세무사무실 보수총액 신고자료 일괄요청'),
+          h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'14px' } },
+            wageYear+'년 · 세무사무실 ', h('strong',{style:{color:'#0f766e'}}, groups.length+'곳'), ' (이메일 중복 제거됨) · 대상 사업장 ',
+            h('strong',{style:{color:'#0f766e'}}, groups.reduce(function(s,g){return s+g.cos.length;},0)+'개')),
+          // 발송주소(다음) 설정
+          h('div', { style:{ background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:'8px', padding:'10px 12px', marginBottom:'12px' } },
+            h('label', { style:{ fontSize:'11.5px', fontWeight:700, color:'#0f766e', display:'block', marginBottom:'5px' } }, '보내는 주소 (다음 업무메일 · Gmail send-as 등록 시 이 주소로 발송)'),
+            h('input', { type:'email', value:taxFromEmail, placeholder:'예: pureun@daum.net (비우면 Gmail 기본주소)',
+              onChange:function(e){ setTaxFromEmail(e.target.value); try{ localStorage.setItem('pureun_v6_tax_from_email', e.target.value); }catch(_){} },
+              style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', boxSizing:'border-box' } })),
+          // 발송 액션
+          h('div', { style:{ display:'flex', gap:'8px', marginBottom:'12px', flexWrap:'wrap' } },
+            h('button', { disabled:!!taxSending || groups.length===0,
+              onClick:function(){ if(confirm(groups.length+'곳에 Gmail 자동발송할까요?')) gmailSendAll(groups); },
+              style:{ background: taxSending?'#94a3b8':'#dc2626', color:'#fff', border:'none', padding:'8px 14px', borderRadius:'6px', fontSize:'12.5px', fontWeight:700, cursor: taxSending?'default':'pointer' } },
+              taxSending ? ('⏳ '+taxSending) : '🚀 Gmail 자동발송 (전체)'),
+            h('span', { style:{ fontSize:'11px', color:'#94a3b8', alignSelf:'center' } }, '또는 아래 사무실별 [메일작성]으로 다음메일에서 개별 발송')),
+          // 사무실별 목록
+          groups.length===0
+            ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'30px', fontSize:'12.5px' } }, '세무사무실 이메일이 등록된 사무대행 업체가 없습니다. (업체 상세 → 세무사무실 정보 → 이메일)')
+            : h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden' } },
+                groups.map(function(g, gi){
+                  return h('div', { key:gi, style:{ borderBottom: gi<groups.length-1?'1px solid #f1f5f9':'none', padding:'10px 12px' } },
+                    h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', marginBottom:'4px' } },
+                      h('div', null,
+                        h('span', { style:{ fontWeight:700, fontSize:'13px', color:'#1e293b' } }, g.office || '(사무실명 미입력)'),
+                        g.contact && h('span', { style:{ fontSize:'11.5px', color:'#64748b', marginLeft:'6px' } }, g.contact),
+                        h('div', { style:{ fontSize:'11.5px', color:'#0f766e', fontFamily:'monospace' } }, g.email)),
+                      h('a', { href:taxMailtoUrl(g),
+                        style:{ background:'#f0fdfa', color:'#0f766e', border:'1px solid #99f6e4', padding:'5px 12px', borderRadius:'6px', fontSize:'11.5px', fontWeight:700, textDecoration:'none', whiteSpace:'nowrap', flexShrink:0 } }, '✉️ 메일작성')),
+                    h('div', { style:{ fontSize:'11.5px', color:'#475569', lineHeight:'1.6' } },
+                      g.cos.map(function(c){return c.name;}).join(', ')),
+                    h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'2px' } }, '사업장 '+g.cos.length+'개'));
+                })),
+          noEmail.length>0 && h('div', { style:{ marginTop:'10px', fontSize:'11px', color:'#b45309', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 10px' } },
+            '⚠️ 세무사무실 이메일 미입력 사업장 '+noEmail.length+'개 (제외됨): '+noEmail.slice(0,8).map(function(c){return c.name;}).join(', ')+(noEmail.length>8?' 외':'')),
+          h('div', { style:{ display:'flex', justifyContent:'flex-end', marginTop:'14px' } },
+            h('button', { disabled:!!taxSending, onClick:function(){ setTaxMailModal(false); },
+              style:{ padding:'8px 18px', background:'#f1f5f9', color:'#475569', border:'1px solid #e2e8f0', borderRadius:'6px', fontSize:'12.5px', fontWeight:600, cursor: taxSending?'default':'pointer' } }, '닫기'))
+        )
+      );
+    })(),
 
     detailModal && h(CompanyDetailModal, {
       cur: detailModal,
@@ -37903,9 +38046,10 @@ function ProjectManagementShared(props){
 h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, idx + 1),
                   h('td', null,
                     h('span', {
-                      title:'유형 변경 시 자동으로 관리번호가 갱신됩니다',
+                      onClick:function(){ setDetailModal(it); },
+                      title:'상세 보기',
                       style:{ fontFamily:'monospace', fontWeight:700, fontSize:'11.5px',
-                        color:'#1e293b', cursor:'default' }
+                        color:'#2563eb', cursor:'pointer', textDecoration:'underline' }
                     }, it.no || '-')
                   ),
                   colVis.type && h('td', null,
@@ -49662,8 +49806,8 @@ function LoginScreen(props){
         setLoading(false); return;
       }
       var storedPw = u.loginPw || u.password || '';
-      // 비밀번호 미입력 시 검증 생략 (무비번 로그인 허용). 입력했을 때만 일치 검사.
-      if(pw && storedPw && !verifyPw(pw, storedPw)){
+      // 비번이 설정된 계정은 빈 비번 거부(틀린 비번 처리). 비번 미설정 계정만 무비번 로그인 허용.
+      if(storedPw && (!pw || !verifyPw(pw, storedPw))){
         var newFail = failCount + 1;
         setFailCount(newFail); localStorage.setItem(FAIL_KEY, String(newFail));
         if(newFail >= MAX_FAIL + 3){
