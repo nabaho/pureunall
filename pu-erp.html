@@ -2053,6 +2053,13 @@ window.erpDiag = function(){
   console.log('  erpRestore(0)  - 최근 스냅샷으로 복원');
   console.log('  erpBackup()    - JSON 백업 다운로드');
   console.log('  erpSyncNow()   - Firebase 강제 재동기화');
+  console.log('  erpAllowBulk() - 대량 삭제 15초간 허용 (절반 이하 급감 차단 우회)');
+};
+
+// ── 대량 삭제 의도 표시 (콘솔에서: erpAllowBulk()) — 이후 15초 내 저장은 절반급감 차단을 통과 ──
+window.erpAllowBulk = function(){
+  window._bulkDeleteIntent = Date.now();
+  console.log('✅ 대량 삭제 15초간 허용됨 — 지금 저장/삭제하세요');
 };
 
 function dbSet(k, v){
@@ -2128,10 +2135,15 @@ function dbSet(k, v){
             }
           }
         }
-        // ── 대량 급감 경고 (10건 이상이 절반 이하로 줄면 알림, 푸시는 허용) ──
+        // ── 대량 급감 차단 (10건 이상이 절반 이하로 줄면 서버 푸시 차단 + 경고. 로컬은 저장됨) ──
+        //    의도한 대량 삭제는 콘솔에서 erpAllowBulk() 실행 후 15초 내 저장 시 통과
         if(Array.isArray(v) && Array.isArray(prev) && prev.length >= 10 && v.length < prev.length * 0.5){
-          console.warn('[데이터주의] '+k+': '+prev.length+'건 → '+v.length+'건 급감');
-          try { showToast('⚠ '+k+'가 '+prev.length+'→'+v.length+'건으로 크게 줄었습니다 — 확인하세요'); } catch(_){}
+          var _bulkOk = window._bulkDeleteIntent && (Date.now() - window._bulkDeleteIntent < 15000);
+          if(!_bulkOk){
+            console.warn('[데이터보호] '+k+': '+prev.length+'건 → '+v.length+'건 절반 이하 급감 — Firebase 푸시 차단(로컬만 저장)');
+            try { showToast('⚠ '+k+'가 '+prev.length+'→'+v.length+'건으로 절반 이하 급감 — 서버 동기화를 막았습니다 (데이터 보호). 의도한 변경이면 콘솔에 erpAllowBulk() 입력 후 다시 저장하세요'); } catch(_){}
+            return true;
+          }
         }
         var fbValue = (DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v)) ? arrayToIdMap(v) : v;
         fbDb.ref('data/'+k).set({v:fbValue, u:ts}).catch(fbSyncFail);
@@ -4667,7 +4679,10 @@ function kindSubLabel(c, kv){
     var types = getKindTypes(kv);
     var found = types.find(function(t){ return t.code === c.typeCodes[kv]; });
     if(found) return (found.name || '').toString().trim().slice(0, 20);
-    v = c.typeCodes[kv]; // 코드 그대로 표시
+    var raw = (c.typeCodes[kv] || '').toString();
+    // 등록된 유형이 아닐 때: 사람이 읽는 코드(숫자 없음)만 그대로 표시.
+    // 숫자가 섞인 건 내부 자동생성 ID(예: case-mpz7pd42ogb)로 보고 표시하지 않음.
+    if(raw && !/\d/.test(raw)) v = raw;
   }
   if(!v){
     if(kv === 'consulting') v = c.consultingType || c.programName || '';
@@ -21264,32 +21279,78 @@ function BackupSection(){
     showToast('백업 완료 (' + Object.keys(data).length + '키, ' + fmtBytes(json.length) + ')');
   }
 
+  function readTextFile(file){
+    return new Promise(function(res, rej){
+      var reader = new FileReader();
+      reader.onload = function(ev){ res(ev.target.result); };
+      reader.onerror = function(){ rej(new Error('파일 읽기 실패')); };
+      reader.readAsText(file);
+    });
+  }
   async function processRestoreFile(file){
     if(!file) return;
-    if(!(await popConfirm('현재 데이터를 백업 파일로 덮어씁니다. 진행하시겠습니까?'))) return;
-    var reader = new FileReader();
-    reader.onload = function(ev){
-      try {
-        var parsed = JSON.parse(ev.target.result);
-        if(!parsed.data){ throw new Error('잘못된 형식'); }
-        var toRemove = [];
-        for(var i=0; i<localStorage.length; i++){
-          var k = localStorage.key(i);
-          if(k && k.indexOf(KEY) === 0) toRemove.push(k);
-        }
-        toRemove.forEach(function(k){ localStorage.removeItem(k); });
-        Object.keys(parsed.data).forEach(function(k){
-          localStorage.setItem(k, parsed.data[k]);
-        });
-        var rec = { id:Date.now(), ts:new Date().toISOString(), kind:'restore', status:'success', size:ev.target.result.length, fileName:file.name, keyCount: Object.keys(parsed.data).length };
-        saveHistory([rec].concat(history).slice(0,50));
-        showToast('복원 완료. 새로고침합니다...');
-        setTimeout(function(){ location.reload(); }, 1000);
-      } catch(err){
-        showToast('복원 실패: ' + err.message);
+    var text;
+    try { text = await readTextFile(file); }
+    catch(e){ showToast('복원 실패: ' + e.message); return; }
+    var parsed;
+    try {
+      parsed = JSON.parse(text);
+      if(!parsed || !parsed.data || typeof parsed.data !== 'object') throw new Error('잘못된 형식');
+    } catch(e){ showToast('복원 실패: ' + e.message); return; }
+
+    // 두 형식 지원:
+    //  - 정제형식 : data.contracts = [ ... ]            (논리 키 + 값)
+    //  - raw-dump : data["pureun_v6_contracts"] = "..."  (LS 키 + 문자열)
+    var d = parsed.data;
+    var writes = [];      // { lsKey, raw } — localStorage에 쓸 항목
+    var fbUpdates = {};   // 'data/<key>' = { v, u } — Firebase 반영
+    var summary = [];     // 미리보기용 "키: N건"
+    var now = Date.now();
+    Object.keys(d).forEach(function(kk){
+      var logicalKey, lsKey, raw, valueObj, haveObj = false;
+      if(kk.indexOf(KEY) === 0){            // raw-dump
+        logicalKey = kk.slice(KEY.length);
+        lsKey = kk;
+        raw = (typeof d[kk] === 'string') ? d[kk] : JSON.stringify(d[kk]);
+      } else {                              // 정제형식 (논리 키)
+        logicalKey = kk;
+        lsKey = KEY + kk;
+        valueObj = d[kk]; haveObj = true;
+        raw = JSON.stringify(valueObj);
       }
-    };
-    reader.readAsText(file);
+      if(logicalKey.indexOf('_meta_') === 0) return;  // 백업에 든 옛 메타는 무시(아래서 새로 설정)
+      writes.push({ lsKey: lsKey, raw: raw });
+      if(fbShouldSync(logicalKey)){
+        if(!haveObj){ try { valueObj = JSON.parse(raw); haveObj = true; } catch(_){ haveObj = false; } }
+        if(haveObj){
+          fbUpdates['data/' + logicalKey] = { v: valueObj, u: now };
+          writes.push({ lsKey: KEY + '_meta_' + logicalKey, raw: String(now) });  // 메타 갱신 → 서버가 다시 덮어쓰지 못하게
+          try { _dbCache[logicalKey] = valueObj; } catch(_){}
+          if(Array.isArray(valueObj)) summary.push(logicalKey + ': ' + valueObj.length + '건');
+        }
+      }
+    });
+
+    if(writes.length === 0){ showToast('복원할 데이터가 없습니다'); return; }
+    summary.sort();
+    var msg = '복원 미리보기 — 아래 데이터로 현재 내용을 덮어쓰고 서버에도 반영합니다.\n\n'
+      + (summary.length ? summary.join('\n') : '(데이터 키 없음)')
+      + '\n\n진행하시겠습니까?';
+    if(!(await popConfirm(msg))) return;
+
+    try {
+      writes.forEach(function(w){ localStorage.setItem(w.lsKey, w.raw); });
+      var fbOk = true;
+      if(fbDb && Object.keys(fbUpdates).length){
+        try { await fbDb.ref().update(fbUpdates); }
+        catch(e){ fbOk = false; showToast('⚠ 로컬은 복원됨 / 서버 반영 실패: ' + (e && e.message) + ' — 콘솔에서 erpSyncNow() 시도하세요'); }
+      }
+      var rec = { id:Date.now(), ts:new Date().toISOString(), kind:'restore', status:'success', size:text.length, fileName:file.name, keyCount: Object.keys(fbUpdates).length || writes.length };
+      saveHistory([rec].concat(history).slice(0,50));
+      if(fbOk){ showToast('복원 완료. 새로고침합니다...'); setTimeout(function(){ location.reload(); }, 1200); }
+    } catch(err){
+      showToast('복원 실패: ' + err.message);
+    }
   }
   async function doRestore(e){
     var file = e.target.files && e.target.files[0];
