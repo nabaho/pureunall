@@ -13509,20 +13509,22 @@ function UserAccountModal(props){
             style:{ background:'#f1f5f9', fontFamily:'monospace', fontWeight:600, color:'#475569' },
             title:'직책에 따라 자동 부여 (노무사=P, 기타=A)' })),
         h('div', { className:'fld' }, h('label', null, '이름'),
-          h('input', { type:'text', value:f.name, onChange:set('name') })),
+          h('input', { type:'text', value:f.name||'', readOnly:true,
+            style:{ background:'#f1f5f9', color:'#475569' }, title:'근로자명부에서 수정' })),
         h('div', { className:'fld' }, h('label', null, '직책'),
-          h('select', { value:f.title||'노무사', onChange:set('title') },
-            ['대표노무사','노무사','사무장','차장','과장','대리','주임','사무직','인턴'].map(function(t){ return h('option',{key:t,value:t},t); }))),
+          h('input', { type:'text', value:f.title||'', readOnly:true,
+            style:{ background:'#f1f5f9', color:'#475569' }, title:'근로자명부에서 수정' })),
         h('div', { className:'fld' }, h('label', null, '권한'),
           h('select', { value:f.role, onChange:set('role') },
             ROLES.map(function(r){ return h('option', { key:r.v, value:r.v }, r.label); }))),
         h('div', { className:'fld' }, h('label', null, '지사'),
-          h('select', { value:f.branch, onChange:set('branch') },
-            BRANCHES.map(function(b){ return h('option', { key:b, value:b }, b); }))),
+          h('input', { type:'text', value:f.branch||'', readOnly:true,
+            style:{ background:'#f1f5f9', color:'#475569' }, title:'근로자명부에서 수정' })),
         h('div', { className:'fld' }, h('label', null, '상태'),
-          h('select', { value:f.status, onChange:set('status') },
-            h('option', { value:'active' }, '재직'),
-            h('option', { value:'retired' }, '퇴직'))),
+          h('input', { type:'text', value: f.status==='retired'?'퇴직':(f.status==='leave'?'휴직':'재직'), readOnly:true,
+            style:{ background:'#f1f5f9', color:'#475569' }, title:'입사·휴직·퇴직은 근로자명부에서 수정' })),
+        h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', margin:'-2px 0 6px', paddingLeft:'100px' } },
+          'ⓘ 이름·직책·지사·상태는 근로자명부에서 수정합니다. 여기선 권한·로그인만 변경됩니다.'),
         h('div', { style:{borderTop:'1px dashed #e2e8f0',margin:'10px 0 6px',paddingTop:'8px'} },
           h('div', { style:{fontSize:'11px',fontWeight:700,color:'#475569',marginBottom:'8px'} }, '🔐 로그인 설정')
         ),
@@ -14098,6 +14100,9 @@ function backfill2026Details(){
 
 // ============ P- 사번 순차 재정렬 마이그레이션 (1회) ============
 (function migrateSids(){
+  return; // ⚠️ 영구 비활성화 (2026): 이 마이그레이션은 "1회 실행" 플래그를 기기별 localStorage에 저장하지만
+          //   정작 바꾸는 데이터는 공용(Firebase)이라, 새 기기가 접속할 때마다 사번을 한 칸씩 더 밀어
+          //   담당자가 박재원→김혜민→박한별 식으로 계속 순환하는 데이터 손상을 일으킴. 절대 재실행 금지.
   if(localStorage.getItem('pureun_v6_sid_remap_v1_done') === 'true') return;
   var SID_MAP = {
     'P-003':'P-002','P-004':'P-003','P-005':'P-004',
@@ -15496,7 +15501,13 @@ function UserWithRateSection(){
       setPct(form.sid, isLawyerByUser(form) ? 15 : 13);
       showToast('추가됨');
     } else {
-      persistUsers(users.map(function(x){ return x.sid === form.sid ? form : x; }));
+      // A안: 사용자관리는 계정 필드(권한·로그인ID·비밀번호)만 수정한다.
+      // 이름·직책·지사·상태·주민번호 등 인사정보는 근로자명부 소관 →
+      // 최신 저장본을 다시 읽어 인사필드를 절대 덮어쓰지 않도록 병합 저장.
+      var latest = dbGet('user_accounts', users) || users;
+      persistUsers(latest.map(function(x){ return x.sid === form.sid
+        ? Object.assign({}, x, { role: form.role, loginId: form.loginId, loginPw: form.loginPw })
+        : x; }));
       showToast('수정됨');
     }
     close();
@@ -15558,7 +15569,7 @@ function UserWithRateSection(){
     h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginBottom:'6px' } },
       '계정·권한·성과% 관리 (성과%는 입금 시 자동 분배)'),
     h('div', { className:'dt-toolbar' },
-      h('button', { className:'btn-primary', onClick:openAdd }, '+ 추가'),
+      h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginRight:'4px' }, title:'신규 직원은 근로자명부에서 등록하세요' }, '👤 신규 등록 → 근로자명부'),
       h('input', { className:'dt-search', placeholder:'🔍 사번·이름·직책 검색', value:query, onChange:function(e){ setQuery(e.target.value); } }),
       // 필터 토글
       h('div', { style:{ display:'inline-flex', gap:'4px', marginLeft:'8px' } },
@@ -18869,6 +18880,8 @@ function ContractFormMasters(){
       if(rm.indexOf(id) < 0){ rm.push(id); dbSet('contract_forms_removed', rm); }
     }
     persist(forms.filter(function(x){ return x.id !== id; }));
+    if(clickedForm && clickedForm.id===id) setClickedForm(null);
+    if(hoverForm && hoverForm.id===id) setHoverForm(null);
     showToastUndo('🗑️ 양식 삭제됨', function(){
       if(isSeed){
         var rm2 = (dbGet('contract_forms_removed', []) || []).filter(function(x){ return x !== id; });
@@ -19062,7 +19075,7 @@ function ContractFormMasters(){
           h('div', { style:{ background:'#f8fafc', borderBottom:'1px solid #e5e7eb', padding:'8px 14px', display:'flex', alignItems:'center', gap:'8px' } },
             h('span', { style:{ fontSize:'13px' } }, k.icon),
             h('span', { style:{ fontWeight:700, color:k.color, fontSize:'13px', flex:1 } }, k.label + ' 양식'),
-            h('label', { title:'HWPX/HWP/DOCX/DOC/PDF 파일 업로드',
+            h('label', { title:'📎 파일을 이 버튼 위로 끌어다 놓으면 업로드됩니다 (클릭해서 선택도 가능)\n· 지원 형식: HWPX · HWP · DOCX · DOC · PDF\n· 여러 개 한꺼번에 가능 · 파일당 최대 1MB',
               onDragOver:function(e){e.preventDefault();e.currentTarget.style.background='#bbf7d0';},
               onDragLeave:function(e){e.currentTarget.style.background='#dcfce7';},
               onDrop:function(e){
@@ -19166,15 +19179,7 @@ function ContractFormMasters(){
                           showToast('복제됨');
                         },
                         style:{ background:'#166534', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '복제'),
-                      h('button', { type:'button', onClick:function(){
-                          var delId = previewForm.id;
-                          if(confirm('"'+previewForm.name+'" 삭제?')){
-                            persist(forms.filter(function(x){return x.id!==delId;}));
-                            if(clickedForm && clickedForm.id===delId) setClickedForm(null);
-                            setPreviewForm(null);
-                            showToast('삭제됨');
-                          }
-                        },
+                      h('button', { type:'button', onClick:function(){ del(previewForm.id); },
                         style:{ background:'#dc2626', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '삭제')
                     ),
                     previewForm.attachments && previewForm.attachments.length > 0
@@ -19189,8 +19194,8 @@ function ContractFormMasters(){
                     previewForm.body
                       ? h('div', { style:{ display:'flex', justifyContent:'center' } },
                           h('pre', { style:{ whiteSpace:'pre-wrap', fontFamily:'"Malgun Gothic","맑은 고딕",monospace', fontSize: Math.max(9, Math.min(15, Math.round(7 + (100-leftPct)/8))) + 'px', color:'#334155', lineHeight:1.8,
-                              background:'#fff', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'20px 24px', margin:0, maxHeight:'500px', overflow:'auto',
-                              width:'100%', maxWidth:'640px', boxSizing:'border-box' } },
+                              background:'#fff', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'20px 24px', margin:'0 auto', maxHeight:'500px', overflow:'auto',
+                              width: window.innerWidth<=768 ? '100%' : 'fit-content', minWidth: window.innerWidth<=768 ? '0' : '55%', maxWidth:'640px', boxSizing:'border-box' } },
                             previewForm.body))
                       : h('div', { style:{ color:'#94a3b8', fontSize:'11px', textAlign:'center', marginTop:'40px' } }, '본문 없음')
                   )
@@ -30113,6 +30118,14 @@ function PersonalCalendar(props){
     byDate[date].push(ev);
   }
   mySchedules.forEach(function(s){ addEv(s.date, {type:'schedule', title:s.title, time:s.time||'', color:'#1e40af', evId:s.id, draggable:true}); });
+  // 휴가·출장·근태 표시 (편집·이동은 type:'leave' 경로로 통일 → onEditEvent/moveCalendarEvent가 attendance_records 처리)
+  var ATT_LABEL = { 'leave':'연차','halfday-am':'오전반차','halfday-pm':'오후반차','leave-hour':'시간연차','special-leave':'특별휴가','sick':'병가','telework':'재택근무','trip':'출장','maternity':'출산휴가','parental-leave':'육아휴직','eum-work':'이음센터' };
+  var ATT_COLOR = { 'leave':'#16a34a','halfday-am':'#16a34a','halfday-pm':'#16a34a','leave-hour':'#16a34a','special-leave':'#0d9488','sick':'#dc2626','telework':'#7c3aed','trip':'#ea580c','maternity':'#db2777','parental-leave':'#db2777','eum-work':'#2563eb' };
+  var ATT_ICON = { 'leave':'🌴','halfday-am':'🌓','halfday-pm':'🌗','leave-hour':'⏱️','special-leave':'🎉','sick':'🤒','telework':'🏠','trip':'✈️','maternity':'👶','parental-leave':'👶','eum-work':'🏛️' };
+  myAttendance.forEach(function(r){
+    var lbl = ATT_LABEL[r.type]; if(!lbl) return;
+    addEv(r.date, { type:'leave', title:(ATT_ICON[r.type]||'🌴')+' '+lbl, color:ATT_COLOR[r.type]||'#16a34a', evId:r.id, attType:r.type, draggable:true });
+  });
   // 사건/컨설팅/출퇴근은 내 캘린더에 표시 안 함 - 직접 추가한 일정만
   // 자문료/미수 표시 — 보안 강화로 캘린더에서 완전 제거 (직원 일정·휴가·출장만 표시)
   var showAdvisory = false;
@@ -30297,7 +30310,7 @@ function PersonalCalendar(props){
         return h('div',{key:i, onClick:function(){setSelDate(cell.date);},
           onDoubleClick:function(){
             setSelDate(cell.date);
-            setQuickMenuModal({ date:cell.date });
+            onAddSchedule(cell.date);
           },
           onDragOver:function(e){e.preventDefault(); if(cell.date!==dragOverDate) setDragOverDate(cell.date);},
           onDragLeave:function(){setDragOverDate(null);},
