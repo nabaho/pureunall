@@ -62,6 +62,10 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .set-tbl .num-sm:focus{border-color:var(--accent);}
 .set-tbl .act-cell{display:flex;gap:5px;align-items:center;}
 .hdr-r{margin-left:auto;display:flex;align-items:center;gap:8px;}
+[data-tip]{position:relative;}
+[data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;background:#1f2937;color:#fff;font-size:11px;font-weight:700;padding:5px 9px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .12s .15s;z-index:1000;}
+[data-tip]::before{content:"";position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-bottom-color:#1f2937;opacity:0;pointer-events:none;transition:opacity .12s .15s;z-index:1000;}
+[data-tip]:hover::after,[data-tip]:hover::before{opacity:1;}
 .user-sel{padding:6px 10px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;}
 .user-sel:focus{border-color:var(--info);}
 .mode-toggle{display:flex;border:1.5px solid var(--dash-border);border-radius:8px;overflow:hidden;}
@@ -71,7 +75,13 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .zip-btn{padding:6px 12px;background:var(--ok);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;}
 .zip-btn:hover{background:#248a80;}
 
-.body{display:grid;grid-template-columns:290px 1fr;overflow:hidden;flex:1;}
+.body{display:grid;grid-template-columns:var(--dash-w,290px) 6px 1fr;overflow:hidden;flex:1;}
+.dash-resizer{position:relative;cursor:col-resize;background:linear-gradient(var(--dash-border),var(--dash-border)) center/2px 50% no-repeat;transition:background .15s;}
+.dash-resizer:hover,.dash-resizer.dragging,.dash-resizer.hint{background:var(--accent);}
+.dash-resizer::before,.dash-resizer::after{position:absolute;left:50%;opacity:0;pointer-events:none;transition:opacity .15s;z-index:60;}
+.dash-resizer::before{content:"";top:7px;transform:translateX(-50%);border:5px solid transparent;border-bottom-color:var(--accent);}
+.dash-resizer::after{content:"↔ 드래그하여 폭 조절";top:16px;transform:translateX(-50%);white-space:nowrap;background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:5px 9px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.25);}
+.dash-resizer:hover::before,.dash-resizer:hover::after,.dash-resizer.dragging::before,.dash-resizer.dragging::after,.dash-resizer.hint::before,.dash-resizer.hint::after{opacity:1;}
 
 /* DASHBOARD */
 .dash{display:flex;flex-direction:column;border-right:1px solid var(--dash-border);background:var(--dash-bg);overflow:hidden;}
@@ -88,21 +98,25 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .dash-empty{text-align:center;padding:30px 10px;color:var(--dash-t2);font-size:12px;}
 
 /* DASHBOARD CARDS */
-.dcard{background:var(--dash-sf);border:1px solid var(--dash-border);border-radius:10px;margin-bottom:8px;overflow:hidden;}
-.dcard-hd{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:10px 10px 8px;border-bottom:1px solid var(--dash-border);}
+.dcard{background:var(--dash-sf);border:1px solid var(--dash-border);border-radius:10px;margin-bottom:var(--card-gap,8px);overflow:hidden;}
+.dcard-hd{display:flex;flex-direction:column;align-items:stretch;gap:var(--hd-gap,6px);padding:var(--hd-pt,10px) 10px var(--hd-pb,8px);border-bottom:1px solid var(--dash-border);}
 .dcard-name{font-size:16px;font-weight:900;line-height:1.25;color:var(--dash-text);word-break:break-all;}
 .dcard-meta{display:flex;align-items:center;gap:8px;}
+#viewMain.dash-wide .dcard-hd{flex-direction:row;align-items:center;gap:8px;}
+#viewMain.dash-wide .dcard-name{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#viewMain.dash-wide .dcard-meta{flex-shrink:0;}
+#viewMain.dash-wide .type-info>div{line-height:1.15;}
 .att-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .att-label{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:#fff;white-space:nowrap;}
-.dcard-rows{padding:4px 0;}
+.dcard-rows{padding:var(--rows-py,4px) 0;}
 
 /* DRAGGABLE ROW */
-.drow{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:grab;transition:background .15s;position:relative;user-select:none;}
+.drow{display:flex;align-items:center;gap:6px;padding:var(--drow-py,6px) 10px;cursor:grab;transition:background .15s;position:relative;user-select:none;}
 .drow:hover{background:rgba(33,150,243,.1);}
 .drow.dragging{opacity:.4;}
 .drow.drop-ghost{background:rgba(33,150,243,.15);border-radius:6px;}
 .drag-icon{font-size:14px;opacity:.4;flex-shrink:0;color:var(--dash-t2);}
-.type-bar{width:3px;height:28px;border-radius:2px;flex-shrink:0;}
+.type-bar{width:3px;height:var(--bar-h,28px);border-radius:2px;flex-shrink:0;}
 .type-info{flex:1;min-width:0;}
 .type-name{font-size:11px;font-weight:800;color:var(--dash-text);}
 .round-badge{font-size:10px;color:var(--dash-t2);font-weight:600;}
@@ -380,6 +394,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
   /* 메인: 가로 2분할 → 세로 스택 */
   .body{grid-template-columns:1fr !important;grid-template-rows:auto 1fr;overflow-y:auto;}
+  .dash-resizer{display:none;}
   .dash{border-right:none;border-bottom:2px solid var(--dash-border);max-height:42vh;}
   .cal-area{min-height:55vh;}
 
@@ -471,34 +486,35 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
 <!-- HEADER -->
 <header class="hdr">
-  <div class="logo" id="brandLogo" title="캘린더로 이동" style="cursor:pointer;">푸른<span>노무법인</span> <span style="font-size:11px;font-weight:700;opacity:.75;">정부컨설팅 일정관리</span></div>
+  <div class="logo" id="brandLogo" data-tip="클릭하면 캘린더로 이동" style="cursor:pointer;">푸른<span>노무법인</span> <span style="font-size:11px;font-weight:700;opacity:.75;">정부컨설팅 일정관리</span></div>
   <div id="hdrUser" style="display:flex;align-items:center;gap:6px;flex-shrink:0;"></div>
   <div class="sep"></div>
-  <button class="hdr-tab hdr-home active" id="tabMain">🏠 캘린더</button>
-  <button class="hdr-tab hdr-sub" id="tabTimeline">📊 타임라인</button>
-  <button class="hdr-tab hdr-sub" id="tabEnded">🔒 종료사업장</button>
+  <button class="hdr-tab hdr-home active" id="tabMain" data-tip="캘린더 — 월·주·일 일정 보기">🏠 캘린더</button>
+  <button class="hdr-tab hdr-sub" id="tabTimeline" data-tip="타임라인 — 사업장별 진행 현황을 가로 막대로">📊 타임라인</button>
+  <button class="hdr-tab hdr-sub" id="tabEnded" data-tip="종료된 사업장 모아보기">🔒 종료사업장</button>
   <div class="sep"></div>
   <div id="calControls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <div class="mode-toggle">
-      <button class="mode-btn on" data-mode="month">월</button>
-      <button class="mode-btn" data-mode="week">주</button>
-      <button class="mode-btn" data-mode="day">일</button>
+      <button class="mode-btn on" data-mode="month" data-tip="월간 보기">월</button>
+      <button class="mode-btn" data-mode="week" data-tip="주간 보기">주</button>
+      <button class="mode-btn" data-mode="day" data-tip="일간 보기">일</button>
     </div>
-    <select class="att-filter" id="attFilter"></select>
-    <select class="att-filter" id="yearSel" title="연도 이동"></select>
-    <button class="cal-nav" id="calPrev">◀</button>
+    <span data-tip="담당 노무사별로 일정 필터" style="display:inline-flex;"><select class="att-filter" id="attFilter"></select></span>
+    <span data-tip="연도 이동 — 선택한 해로 점프" style="display:inline-flex;"><select class="att-filter" id="yearSel"></select></span>
+    <button class="cal-nav" id="calPrev" data-tip="이전 기간으로">◀</button>
     <div class="cal-title" id="calTitle"></div>
-    <button class="cal-nav" id="calNext">▶</button>
-    <button class="cal-today-btn" id="calTodayBtn">오늘</button>
-    <input type="date" id="calDayPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;" title="날짜 직접 선택">
-    <input type="week" id="calWeekPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;" title="주 직접 선택">
+    <button class="cal-nav" id="calNext" data-tip="다음 기간으로">▶</button>
+    <button class="cal-today-btn" id="calTodayBtn" data-tip="오늘 날짜로 이동">오늘</button>
+    <span data-tip="날짜 직접 선택" style="display:inline-flex;"><input type="date" id="calDayPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;"></span>
+    <span data-tip="주 직접 선택" style="display:inline-flex;"><input type="week" id="calWeekPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;"></span>
   </div>
   <div class="hdr-r">
-    <span id="fbStatus" title="클라우드 동기화 상태" style="font-size:13px;align-self:center;">⚪</span>
-    <button class="notif-btn" id="notifBtn" title="알림">🔔<span class="notif-badge" id="notifBadge" style="display:none;">0</span></button>
-    <button class="notif-btn" id="statsBtn" title="노무사별 통계">📊</button>
-    <button class="notif-btn" id="helpBtn" title="단축키 (?)">⌨️</button>
-    <button class="zip-btn" id="zipBtn">📦 ZIP</button>
+    <span id="hdrLogout" style="display:flex;align-items:center;"></span>
+    <span id="fbStatus" data-tip="클라우드 동기화 상태 (🟢 연결 / 🔴 오류 / ⚪ 미연결)" style="font-size:13px;align-self:center;">⚪</span>
+    <button class="notif-btn" id="notifBtn" data-tip="알림 · 오늘 할 일">🔔<span class="notif-badge" id="notifBadge" style="display:none;">0</span></button>
+    <button class="notif-btn" id="statsBtn" data-tip="노무사별 통계">📊</button>
+    <button class="notif-btn" id="helpBtn" data-tip="키보드 단축키 안내 ( ? )">⌨️</button>
+    <button class="zip-btn" id="zipBtn" data-tip="전체 데이터 백업 — ZIP 파일로 내보내기">📦 ZIP</button>
   </div>
 </header>
 
@@ -558,6 +574,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
     <div class="dash-body" id="dashList"></div>
     <button class="dash-settings" id="dashSettingsBtn">⚙️ 환경설정</button>
   </aside>
+
+  <div class="dash-resizer" id="dashResizer"></div>
 
   <!-- CALENDAR -->
   <div class="cal-area">
@@ -793,10 +811,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
     <div class="mhdr"><h3 id="mCoTitle">사업장 추가</h3><button class="mcls" id="mCoCls">✕</button></div>
     <div class="mbody">
       <div class="fld"><label class="flbl">사업장명</label><input class="fi" id="mCoName" placeholder="예: 디와이엠솔루션"></div>
-      <div class="f2">
-        <div class="fld"><label class="flbl">주담당 노무사</label><select class="fsel" id="mCoAtt"></select></div>
-        <div class="fld"><label class="flbl">부담당(협업) 노무사</label><select class="fsel" id="mCoCoAtt"></select></div>
-      </div>
+      <div class="fld"><label class="flbl">주담당 노무사</label><select class="fsel" id="mCoAtt" onchange="renderCoCoAtts()"></select></div>
+      <div class="fld"><label class="flbl">부담당(협업) 노무사 <span style="font-size:10px;color:var(--t2);font-weight:600;">(복수 선택)</span></label><div id="mCoCoAttChips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;"></div></div>
       <div class="fld">
         <label class="flbl">진행 컨설팅 (복수선택)</label>
         <div id="mCoTypes" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;"></div>
@@ -821,10 +837,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
     <div class="mhdr"><h3 id="mEditTitle">일정 수정</h3><button class="mcls" id="mEditCls">✕</button></div>
     <div class="mbody">
       <div class="fld"><label class="flbl">방문일</label><div id="mEditDate" style="font-size:14px;font-weight:900;color:var(--accent)"></div></div>
-      <div class="f2">
-        <div class="fld"><label class="flbl">주담당 노무사</label><select class="fsel" id="mEditAtt"></select></div>
-        <div class="fld"><label class="flbl">부담당(협업) 노무사</label><select class="fsel" id="mEditCoAtt"></select></div>
-      </div>
+      <div class="fld"><label class="flbl">주담당 노무사</label><select class="fsel" id="mEditAtt" onchange="renderEditCoAtts()"></select></div>
+      <div class="fld"><label class="flbl">부담당(협업) 노무사 <span style="font-size:10px;color:var(--t2);font-weight:600;">(복수 선택)</span></label><div id="mEditCoAttChips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;"></div></div>
       <div class="f2">
         <div class="fld"><label class="flbl">컨설팅</label><div id="mEditType" style="font-size:13px;font-weight:700;"></div></div>
         <div class="fld"><label class="flbl">회차 <span style="font-size:10px;color:var(--t2);font-weight:600;">(날짜순 자동)</span></label><input class="fi" id="mEditRound" type="number" min="1" readonly style="background:var(--sf2);color:var(--t2);cursor:not-allowed;"></div>
@@ -1180,6 +1194,17 @@ let dragItem=null;
 let edit_id=null,edit_isField=true;
 // Co modal state
 let co_editId=null,co_selTypes=new Set();
+let co_selCoAtts=[], edit_selCoAtts=[];
+// 부담당(협업) 노무사 다중 지원: 사업장 co.defCoAtts / 일정 sc.coAttIds (구버전 단일 defCoAtt·coAttId 호환)
+function getCoAtts(o){
+  if(!o)return [];
+  if(Array.isArray(o.coAttIds))return o.coAttIds.filter(Boolean);
+  if(Array.isArray(o.defCoAtts))return o.defCoAtts.filter(Boolean);
+  if(o.coAttId)return [o.coAttId];
+  if(o.defCoAtt)return [o.defCoAtt];
+  return [];
+}
+function coAttStaffList(o){const st=getStaff();return getCoAtts(o).map(id=>st.find(a=>a.id===id)).filter(Boolean);}
 // Stamp state
 const ST={sid:null,photos:[null,null],times:[null,null],done:[false,false],pos:'bottom-left',color:'#ffb347',slot:0};
 
@@ -1216,7 +1241,7 @@ function openDayModal(date){
         const co=cos.find(c=>c.id===sc.coId);
         const ty=types.find(t=>t.id===sc.typeId);
         const att=getStaff().find(a=>a.id===sc.attId);
-        const coAtt=sc.coAttId?getStaff().find(a=>a.id===sc.coAttId):null;
+        const coAtts=coAttStaffList(sc);
         const hasPh=PHOTOS[sc.id]&&(PHOTOS[sc.id].c0||PHOTOS[sc.id].c1);
         const ic=sc.isField?'📍 현장방문':'🏢 사무실';
         return `<div class="day-item" data-sid="${sc.id}">
@@ -1227,7 +1252,7 @@ function openDayModal(date){
             <div class="day-item-co">${co?.name||'?'}</div>
             <div class="day-item-meta">
               <span class="day-badge" style="background:${att?.color||'#ccc'};color:#fff">${att?.name||'?'}</span>
-              ${coAtt?`<span class="day-badge" style="background:${coAtt.color}44;color:${coAtt.color};border:1px solid ${coAtt.color}">+${coAtt.name}</span>`:''}
+              ${coAtts.map(c=>`<span class="day-badge" style="background:${c.color}44;color:${c.color};border:1px solid ${c.color}">+${c.name}</span>`).join('')}
               <span class="day-badge" style="background:var(--sf2);color:var(--text)">${sc.round}회차</span>
               <span class="day-badge" style="background:${sc.isField?'rgba(21,101,192,.12)':'rgba(59,130,246,.12)'};color:${sc.isField?'var(--accent)':'var(--info)'}">${ic}</span>
               ${hasPh?`<span class="day-ph">📷 사진 등록됨</span>`:''}
@@ -1256,7 +1281,7 @@ function buildNotifications(){
   const items=[];
 
   // 오늘 내 일정
-  const todaySched=getScheds().filter(s=>s.date===today&&(admin||s.attId===me||s.coAttId===me));
+  const todaySched=getScheds().filter(s=>s.date===today&&(admin||s.attId===me||getCoAtts(s).includes(me)));
   todaySched.forEach(s=>{
     const co=cos.find(c=>c.id===s.coId);if(!co)return;
     const t=types.find(x=>x.id===s.typeId);
@@ -1269,7 +1294,7 @@ function buildNotifications(){
   cos.forEach(co=>{
     (co.types||[]).forEach(tid=>{
       if(co.endedTypes?.[tid])return;
-      if(!admin&&co.defAtt!==me&&co.defCoAtt!==me)return; // 내 담당만
+      if(!admin&&co.defAtt!==me&&!getCoAtts(co).includes(me))return; // 내 담당만
       const t=types.find(x=>x.id===tid);if(!t)return;
       const dl=co.deadlines?.[tid];
       const done=getScheds().filter(s=>s.coId===co.id&&s.typeId===tid);
@@ -1421,10 +1446,10 @@ function saveSingle(){
   const newId=uid();
   // 담당자 배정: 사업장 정담당 우선, 협업노무사가 등록해도 정담당 유지
   const defA=co?.defAtt||myId()||'a1';
-  const defCoA=co?.defCoAtt||'';
+  const defCoAs=getCoAtts(co);
   const attErr=checkAttLimit(defA,single.selDate);
   if(attErr){toast(attErr,'err');return;}
-  scheds.push({id:newId,date:single.selDate,attId:defA,coAttId:defCoA,
+  scheds.push({id:newId,date:single.selDate,attId:defA,coAttIds:defCoAs,
     coId:single.coId,typeId:single.typeId,round:0,isField:single.isField});
   setScheds(scheds);
   reorderRounds(single.coId,single.typeId);
@@ -1611,9 +1636,9 @@ function applySession(){
     <div class="user-badge" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);">
       <div class="user-badge-dot" style="background:${sess.color}"></div>
       <div class="user-badge-name" style="color:#fff;">${sess.name}${sess.isAdmin?' 👑':''}</div>
-    </div>
-    <button class="logout-btn" onclick="openPwChange()" title="내 비밀번호 변경" style="margin-right:4px;">🔑</button>
-    <button class="logout-btn" onclick="doLogout()" title="로그아웃">로그아웃</button>`;
+    </div>`;
+  const lo=q('#hdrLogout');
+  if(lo)lo.innerHTML=`<button class="logout-btn" onclick="openPwChange()" data-tip="비밀번호 변경" style="margin-right:4px;">🔑</button><button class="logout-btn" onclick="doLogout()" title="로그아웃" style="margin-right:4px;">로그아웃</button>`;
   // attFilter: 비관리자도 자유롭게 사용 가능 (필터로 본인만 보기 가능)
   renderDash();renderCal();renderSummaryBar();renderNotifBadge();
 }
@@ -1621,7 +1646,7 @@ function applySession(){
 // isOwner: 이 일정이 내 것인지
 function canEdit(sc){
   if(isAdmin())return true;
-  return sc.attId===myId()||sc.coAttId===myId();
+  return sc.attId===myId()||getCoAtts(sc).includes(myId());
 }
 
 // 대시보드: 비관리자는 자기 담당 사업장만
@@ -1629,8 +1654,8 @@ function myVisible(co){
   if(isAdmin())return true;
   const scheds=getScheds();
   // 담당 또는 협업으로 배정된 사업장
-  if(co.defAtt===myId()||co.defCoAtt===myId())return true;
-  return scheds.some(s=>s.coId===co.id&&(s.attId===myId()||s.coAttId===myId()));
+  if(co.defAtt===myId()||getCoAtts(co).includes(myId()))return true;
+  return scheds.some(s=>s.coId===co.id&&(s.attId===myId()||getCoAtts(s).includes(myId())));
 }
 
 function nextRound(coId,typeId){return getScheds().filter(s=>s.coId===coId&&s.typeId===typeId).length+1;}
@@ -1860,9 +1885,9 @@ function addStaff(){
 }
 
 function deleteStaff(id){
-  const inUseSched=getScheds().some(s=>s.attId===id||s.coAttId===id);
+  const inUseSched=getScheds().some(s=>s.attId===id||getCoAtts(s).includes(id));
   if(inUseSched){toast('일정에 배정된 직원은 삭제할 수 없습니다','err');return;}
-  const inUseCo=getCos().some(c=>c.defAtt===id||c.defCoAtt===id);
+  const inUseCo=getCos().some(c=>c.defAtt===id||getCoAtts(c).includes(id));
   if(inUseCo){toast('사업장에 담당으로 지정된 직원은 삭제할 수 없습니다','err');return;}
   setStaff(getStaff().filter(s=>s.id!==id));
   renderStaffList();refreshStaffDropdowns();toast('삭제됨');
@@ -1870,14 +1895,11 @@ function deleteStaff(id){
 
 function refreshStaffDropdowns(){
   const staff=getStaff();
-  const noneOpt='<option value="">없음</option>';
   const opts=staff.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
   const af=q('#attFilter');if(af){af.innerHTML=`<option value="">전체</option>`+opts;af.value=S.attFilter||'';}
   const daf=q('#dashAttFilter');if(daf){daf.innerHTML=`<option value="">담당 전체</option>`+opts;daf.value=S.dashAtt||'';}
   if(q('#mCoAtt'))q('#mCoAtt').innerHTML=opts;
-  if(q('#mCoCoAtt'))q('#mCoCoAtt').innerHTML=noneOpt+opts;
   if(q('#mEditAtt'))q('#mEditAtt').innerHTML=opts;
-  if(q('#mEditCoAtt'))q('#mEditCoAtt').innerHTML=noneOpt+opts;
   const tf=q('#tlAttFilter');if(tf){const v=tf.value;tf.innerHTML=`<option value="">전체</option>`+opts;tf.value=v;}
 }
 
@@ -1905,7 +1927,7 @@ function renderDash(){
   const showEnded=status!=='active';
   const favs=getFavs();
   let cos=getCos().filter(c=>c.active!==false&&!c.deleted&&(!search||c.name.includes(search))&&myVisible(c));
-  if(attF)cos=cos.filter(c=>c.defAtt===attF||c.defCoAtt===attF);
+  if(attF)cos=cos.filter(c=>c.defAtt===attF||getCoAtts(c).includes(attF));
   cos=[...cos.filter(c=>favs.includes(c.id)),...cos.filter(c=>!favs.includes(c.id))]; // 즐겨찾기 우선
   const types=getTypes();
   if(!cos.length){
@@ -1915,7 +1937,7 @@ function renderDash(){
   }
   q('#dashList').innerHTML=cos.map(co=>{
     const att=getStaff().find(a=>a.id===co.defAtt)||getStaff()[0];
-    const coAtt=co.defCoAtt?getStaff().find(a=>a.id===co.defCoAtt):null;
+    const coAtts=coAttStaffList(co);
     const rows=(co.types||[]).map(tid=>{
       const t=types.find(x=>x.id===tid);
       if(!t||t.active===false)return'';
@@ -1986,7 +2008,7 @@ function renderDash(){
           <span class="att-dot" style="background:${att.color}"></span>
           <span style="flex:1"></span>
           <span class="att-label" style="background:${att.color}" title="주담당">${att.name}</span>
-          ${coAtt?`<span class="att-label" style="background:${coAtt.color}99;border:1px solid ${coAtt.color};" title="부담당(협업)">+${coAtt.name}</span>`:''}
+          ${coAtts.map(c=>`<span class="att-label" style="background:${c.color}99;border:1px solid ${c.color};" title="부담당(협업)">+${c.name}</span>`).join('')}
           <button style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--t2);padding:0 2px" onclick="openCoModal('${co.id}')" title="수정">✏️</button>
           <button class="co-del-btn" data-coid="${co.id}" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--danger);padding:0 2px" title="사업장 삭제">🗑️</button>
         </div>
@@ -2070,7 +2092,7 @@ function renderTimeline(){
       const t=types.find(x=>x.id===tid);if(!t||t.active===false)return;
       const done=scheds.filter(s=>s.coId===co.id&&s.typeId===tid);
       if(!done.length&&!co.deadlines?.[tid])return;
-      if(tlAtt&&!done.some(s=>s.attId===tlAtt||s.coAttId===tlAtt))return;
+      if(tlAtt&&!done.some(s=>s.attId===tlAtt||getCoAtts(s).includes(tlAtt)))return;
       const att=staff.find(a=>a.id===co.defAtt)||staff[0];
       rows.push({co,tid,t,done,att,ended:!!(co.endedTypes?.[tid])||!!co.deleted,deadline:co.deadlines?.[tid]||''});
     });
@@ -2204,20 +2226,20 @@ function getISOWeek(d){
 
 function chipHtml(sc){
   const att=getStaff().find(a=>a.id===sc.attId);
-  const coAtt=sc.coAttId?getStaff().find(a=>a.id===sc.coAttId):null;
+  const coAtts=coAttStaffList(sc);
   const co=getCos().find(c=>c.id===sc.coId);
   const ty=getTypes().find(t=>t.id===sc.typeId);
   const ic=sc.isField?'📍':'🏢';
   const col=ty?.color||att?.color||'#999';
   const tyShort=(ty?.name||'').slice(0,2);
   const hasPh=PHOTOS[sc.id]&&(PHOTOS[sc.id].c0||PHOTOS[sc.id].c1);
-  const coAttStr=coAtt?` +${coAtt.name}`:'';
+  const coAttStr=coAtts.length?' +'+coAtts.map(c=>c.name).join('+'):'';
   const mine=canEdit(sc);
   const chipStyle=mine
     ?`background:${col};cursor:grab;`
     :`background:${col};opacity:.45;cursor:not-allowed;filter:saturate(.7);`;
   const titleSuffix=mine?'\n⠿ 끌어서 날짜 이동':'\n🔒 타인 일정 (읽기 전용)';
-  return `<div class="chip" draggable="${mine?'true':'false'}" data-mine="${mine?1:0}" style="${chipStyle}" data-sid="${sc.id}" title="${co?.name||''} · ${ty?.name||''} ${sc.round}회차 (${att?.name||''}${coAttStr})${sc.memo?'\n📝 '+sc.memo:''}${titleSuffix}">${ic} [${tyShort}] ${(co?.name||'?').slice(0,4)} ${sc.round}회(${sc.isField?'방문':'사무실'})${hasPh?' 📷':''}${sc.memo?' 📝':''}${coAtt?` <span style="opacity:.8">+${coAtt.name.slice(0,1)}</span>`:''}</div>`;
+  return `<div class="chip" draggable="${mine?'true':'false'}" data-mine="${mine?1:0}" style="${chipStyle}" data-sid="${sc.id}" title="${co?.name||''} · ${ty?.name||''} ${sc.round}회차 (${att?.name||''}${coAttStr})${sc.memo?'\n📝 '+sc.memo:''}${titleSuffix}">${ic} [${tyShort}] ${(co?.name||'?').slice(0,4)} ${sc.round}회(${sc.isField?'방문':'사무실'})${hasPh?' 📷':''}${sc.memo?' 📝':''}${coAtts.length?` <span style="opacity:.8">+${coAtts.map(c=>c.name.slice(0,1)).join('')}</span>`:''}</div>`;
 }
 
 // ===== DRAG & DROP (이벤트 위임) =====
@@ -2302,7 +2324,7 @@ function moveChip(sid,newDate){
 function getFilteredScheds(ds){
   const activeIds=new Set(getCos().filter(c=>c.active!==false&&!c.deleted).map(c=>c.id));
   let sc=getScheds().filter(s=>s.date===ds&&activeIds.has(s.coId));
-  if(S.attFilter)sc=sc.filter(s=>s.attId===S.attFilter||s.coAttId===S.attFilter);
+  if(S.attFilter)sc=sc.filter(s=>s.attId===S.attFilter||getCoAtts(s).includes(S.attFilter));
   return sc;
 }
 
@@ -2329,7 +2351,7 @@ function renderDay(){
       const co=cos.find(c=>c.id===s.coId);
       const ty=types.find(t=>t.id===s.typeId);
       const att=staff.find(a=>a.id===s.attId);
-      const coAtt=s.coAttId?staff.find(a=>a.id===s.coAttId):null;
+      const coAtts=getCoAtts(s).map(id=>staff.find(a=>a.id===id)).filter(Boolean);
       const hasPh=PHOTOS[s.id]&&(PHOTOS[s.id].c0||PHOTOS[s.id].c1);
       const mine=canEdit(s);
       const cardStyle=mine?'':'opacity:.55;background:rgba(0,0,0,.02);';
@@ -2341,7 +2363,7 @@ function renderDay(){
           ${s.memo?`<div style="font-size:11px;color:var(--text);margin-top:5px;padding:6px 8px;background:var(--sf2);border-radius:6px;border-left:2px solid var(--accent);white-space:pre-wrap;">📝 ${s.memo}</div>`:''}
           <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
             <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;background:${att?.color||'#ccc'};color:#fff;">${att?.name||'?'}</span>
-            ${coAtt?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${coAtt.color}33;color:${coAtt.color};border:1px solid ${coAtt.color}">+${coAtt.name}</span>`:''}
+            ${coAtts.map(c=>`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${c.color}33;color:${c.color};border:1px solid ${c.color}">+${c.name}</span>`).join('')}
             ${hasPh?`<span style="font-size:10px;font-weight:700;color:var(--ok);">📷 사진 등록됨</span>`:''}
           </div>
         </div>
@@ -2459,7 +2481,7 @@ function checkAttLimit(attId,date,excludeId=null){
   const env=getEnv();
   const maxVal=env[`attMax_${attId}`]??env.maxDailyPerAtt;
   if(!maxVal||maxVal<=0)return null;
-  const cnt=getScheds().filter(s=>s.date===date&&(s.attId===attId||s.coAttId===attId)&&s.id!==excludeId).length;
+  const cnt=getScheds().filter(s=>s.date===date&&(s.attId===attId||getCoAtts(s).includes(attId))&&s.id!==excludeId).length;
   if(cnt>=maxVal){
     const att=getStaff().find(a=>a.id===attId);
     return `${att?.name||'?'} 노무사는 ${date}에 이미 ${cnt}건 담당 중입니다 (최대 ${maxVal}건).`;
@@ -2602,12 +2624,12 @@ function handleDrop(date,item){
   if(exErr){toast(exErr,'err');return;}
   const ty=getTypes().find(t=>t.id===item.typeId);
   const defA=co?.defAtt||myId()||'a1';
-  const defCoA=co?.defCoAtt||'';
+  const defCoAs=getCoAtts(co);
   const attErr=checkAttLimit(defA,date);
   if(attErr){toast(attErr,'err');return;}
   const newId=uid();
   const scheds=getScheds();
-  scheds.push({id:newId,date,attId:defA,coAttId:defCoA,coId:item.coId,typeId:item.typeId,round:0,isField:item.isField});
+  scheds.push({id:newId,date,attId:defA,coAttIds:defCoAs,coId:item.coId,typeId:item.typeId,round:0,isField:item.isField});
   setScheds(scheds);
   reorderRounds(item.coId,item.typeId);
   const maxR=getCoMaxRounds(item.coId,item.typeId);
@@ -2628,9 +2650,9 @@ function openViewModal(sid){
   const co=getCos().find(c=>c.id===sc.coId);
   const ty=getTypes().find(t=>t.id===sc.typeId);
   const att=getStaff().find(a=>a.id===sc.attId);
-  const coAtt=sc.coAttId?getStaff().find(a=>a.id===sc.coAttId):null;
+  const coAtts=coAttStaffList(sc);
   const hasPh=PHOTOS[sid]&&(PHOTOS[sid].c0||PHOTOS[sid].c1);
-  toast(`🔒 ${co?.name||'?'} · ${ty?.name||''} ${sc.round}회차 · ${att?.name||''}${coAtt?` +${coAtt.name}`:''}${hasPh?' 📷':''} (읽기전용)`);
+  toast(`🔒 ${co?.name||'?'} · ${ty?.name||''} ${sc.round}회차 · ${att?.name||''}${coAtts.length?' +'+coAtts.map(c=>c.name).join('+'):''}${hasPh?' 📷':''} (읽기전용)`);
 }
 
 function openEditModal(sid){
@@ -2641,9 +2663,8 @@ function openEditModal(sid){
   edit_id=sid;edit_isField=sc.isField;
   q('#mEditTitle').textContent=`${co?.name||'?'} 수정`;
   q('#mEditDate').textContent=korDate(sc.date);
-  const noneOpt=`<option value="">없음</option>`;
   q('#mEditAtt').innerHTML=getStaff().map(a=>`<option value="${a.id}" ${a.id===sc.attId?'selected':''}>${a.name}</option>`).join('');
-  q('#mEditCoAtt').innerHTML=noneOpt+getStaff().map(a=>`<option value="${a.id}" ${a.id===(sc.coAttId||'')?'selected':''}>${a.name}</option>`).join('');
+  edit_selCoAtts=getCoAtts(sc); renderEditCoAtts();
   q('#mEditType').textContent=`${ty?.name||'?'}`;
   q('#mEditRound').value=sc.round;
   q('#mEditMemo').value=sc.memo||'';
@@ -2694,13 +2715,12 @@ function copyEdit(){
 
 function saveEdit(){
   const attId=q('#mEditAtt').value;
-  const coAttId=q('#mEditCoAtt').value||'';
-  if(coAttId&&coAttId===attId){toast('정담당과 협업노무사는 동일인일 수 없습니다','err');return;}
+  const coAttIds=edit_selCoAtts.filter(id=>id&&id!==attId);
   const scheds=getScheds();
   const idx=scheds.findIndex(s=>s.id===edit_id);
   if(idx===-1)return;
   scheds[idx].attId=attId;
-  scheds[idx].coAttId=coAttId;
+  scheds[idx].coAttIds=coAttIds; scheds[idx].coAttId=undefined;
   scheds[idx].isField=edit_isField;
   scheds[idx].memo=q('#mEditMemo').value.trim();
   setScheds(scheds);closeModal('mbEdit');renderCal();renderDash();toast('수정됨');
@@ -2729,7 +2749,7 @@ function openCoModal(editId=null){
   q('#mCoTitle').textContent=editId?'사업장 수정':'사업장 추가';
   q('#mCoName').value=co?.name||'';
   q('#mCoAtt').innerHTML=getStaff().map(a=>`<option value="${a.id}" ${(co?.defAtt||S.curUser)===a.id?'selected':''}>${a.name}</option>`).join('');
-  q('#mCoCoAtt').innerHTML=`<option value="">없음</option>`+getStaff().map(a=>`<option value="${a.id}" ${(co?.defCoAtt||'')===a.id?'selected':''}>${a.name}</option>`).join('');
+  co_selCoAtts=getCoAtts(co); renderCoCoAtts();
   if(co?.types)co.types.forEach(t=>co_selTypes.add(t));
   if(co?.deadlines)co_deadlines={...co.deadlines};
   if(co?.customRounds)co_rounds={...co.customRounds};
@@ -2783,14 +2803,32 @@ function renderCoTypes(){
   }).join('');
 }
 
+function _renderCoAttChips(boxId,mainSelId,selArr,rerender){
+  const box=q('#'+boxId); if(!box)return selArr;
+  const main=q('#'+mainSelId)?q('#'+mainSelId).value:'';
+  selArr=selArr.filter(id=>id&&id!==main);
+  const list=getStaff().filter(a=>a.id!==main);
+  box.innerHTML=list.length?list.map(a=>{
+    const on=selArr.includes(a.id);
+    return `<div class="topt ${on?'on':''}" data-aid="${a.id}" style="font-size:11px;padding:5px 10px;cursor:pointer;${on?`border-color:${a.color};background:${a.color}22;color:${a.color}`:''}">${on?'+':''}${a.name}</div>`;
+  }).join(''):'<span style="font-size:11px;color:var(--t2);">선택 가능한 노무사 없음</span>';
+  qa('#'+boxId+' .topt').forEach(o=>o.onclick=()=>{
+    const id=o.dataset.aid; const i=selArr.indexOf(id);
+    i>=0?selArr.splice(i,1):selArr.push(id);
+    rerender();
+  });
+  return selArr;
+}
+function renderCoCoAtts(){ co_selCoAtts=_renderCoAttChips('mCoCoAttChips','mCoAtt',co_selCoAtts,renderCoCoAtts); }
+function renderEditCoAtts(){ edit_selCoAtts=_renderCoAttChips('mEditCoAttChips','mEditAtt',edit_selCoAtts,renderEditCoAtts); }
+
 function saveCo(){
   const name=q('#mCoName').value.trim();
   if(!name){toast('사업장명을 입력해주세요','err');return;}
-  const defAtt=q('#mCoAtt').value;const defCoAtt=q('#mCoCoAtt').value||'';
-  if(defCoAtt&&defCoAtt===defAtt){toast('정담당과 협업노무사는 동일인일 수 없습니다','err');return;}
+  const defAtt=q('#mCoAtt').value;const defCoAtts=co_selCoAtts.filter(id=>id&&id!==defAtt);
   const cos=getCos();
-  if(co_editId){const idx=cos.findIndex(c=>c.id===co_editId);if(idx!==-1)cos[idx]={...cos[idx],name,defAtt,defCoAtt,types:[...co_selTypes],deadlines:{...co_deadlines},customRounds:{...co_rounds},customMandatory:{...co_mandatory}};}
-  else cos.push({id:uid(),name,defAtt,defCoAtt,types:[...co_selTypes],deadlines:{...co_deadlines},customRounds:{...co_rounds},customMandatory:{...co_mandatory},active:true});
+  if(co_editId){const idx=cos.findIndex(c=>c.id===co_editId);if(idx!==-1)cos[idx]={...cos[idx],name,defAtt,defCoAtts,defCoAtt:undefined,types:[...co_selTypes],deadlines:{...co_deadlines},customRounds:{...co_rounds},customMandatory:{...co_mandatory}};}
+  else cos.push({id:uid(),name,defAtt,defCoAtts,types:[...co_selTypes],deadlines:{...co_deadlines},customRounds:{...co_rounds},customMandatory:{...co_mandatory},active:true});
   setCos(cos);closeModal('mbCo');renderDash();renderCal();toast(co_editId?'수정됨':'추가됨');
 }
 
@@ -2852,7 +2890,7 @@ function renderAttLimitList(){
     const maxKey=`attMax_${s.id}`;
     const maxVal=env[maxKey]??env.maxDailyPerAtt;
     // 오늘 이 노무사 담당 건수
-    const todayCnt=getScheds().filter(sc=>sc.date===today&&(sc.attId===s.id||sc.coAttId===s.id)).length;
+    const todayCnt=getScheds().filter(sc=>sc.date===today&&(sc.attId===s.id||getCoAtts(sc).includes(s.id))).length;
     const over=maxVal>0&&todayCnt>=maxVal;
     return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--sf2);">
       <span style="width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0;display:inline-block;"></span>
@@ -3216,7 +3254,7 @@ function renderStats(){
   const cos=getCos();
   const monthScheds=getScheds().filter(s=>s.date.startsWith(prefix));
   const rows=staff.map(a=>{
-    const mine=monthScheds.filter(s=>s.attId===a.id||s.coAttId===a.id);
+    const mine=monthScheds.filter(s=>s.attId===a.id||getCoAtts(s).includes(a.id));
     const field=mine.filter(s=>s.isField).length;
     const office=mine.filter(s=>!s.isField).length;
     const coIds=new Set(mine.map(s=>s.coId));
@@ -3453,6 +3491,97 @@ function applyMobileLayout(){
   }
 }
 
+function setDashDensity(w){
+  const body=document.getElementById('viewMain');
+  if(!body)return;
+  const f=Math.max(0,Math.min(1,(w-320)/240)); // 320px=기본, 560px=최대 압축
+  const r=(a,b)=>Math.round(a-(a-b)*f)+'px';
+  body.style.setProperty('--card-gap',r(8,3));
+  body.style.setProperty('--hd-gap',r(6,2));
+  body.style.setProperty('--hd-pt',r(10,3));
+  body.style.setProperty('--hd-pb',r(8,2));
+  body.style.setProperty('--rows-py',r(4,1));
+  body.style.setProperty('--drow-py',r(6,1));
+  body.style.setProperty('--bar-h',r(28,13));
+  body.classList.toggle('dash-wide', w>=380);
+}
+
+function initDashResizer(){
+  const body=document.getElementById('viewMain');
+  const rez=document.getElementById('dashResizer');
+  if(!body||!rez)return;
+  const MIN=220, MAX=560;
+  const saved=parseInt(localStorage.getItem('p_dashW'),10);
+  const startW=(saved>=MIN&&saved<=MAX)?saved:290;
+  if(saved>=MIN&&saved<=MAX)body.style.setProperty('--dash-w',saved+'px');
+  setDashDensity(startW);
+  if(window.innerWidth>768 && !localStorage.getItem('p_dashHintSeen')){
+    rez.classList.add('hint');
+    setTimeout(()=>rez.classList.remove('hint'),4000);
+    localStorage.setItem('p_dashHintSeen','1');
+  }
+  let dragging=false;
+  rez.addEventListener('mousedown',e=>{
+    if(window.innerWidth<=768)return;
+    dragging=true;rez.classList.add('dragging');rez.classList.remove('hint');
+    document.body.style.userSelect='none';document.body.style.cursor='col-resize';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    let w=e.clientX-body.getBoundingClientRect().left;
+    w=Math.max(MIN,Math.min(MAX,w));
+    body.style.setProperty('--dash-w',w+'px');
+    setDashDensity(w);
+  });
+  window.addEventListener('mouseup',()=>{
+    if(!dragging)return;
+    dragging=false;rez.classList.remove('dragging');
+    document.body.style.userSelect='';document.body.style.cursor='';
+    const w=parseInt(getComputedStyle(body).getPropertyValue('--dash-w'),10);
+    if(w)localStorage.setItem('p_dashW',w);
+  });
+}
+
+let _modalDrag=null;
+function makeModalDraggable(box,handle){
+  if(!box||!handle||handle.dataset.dragBound)return;
+  handle.dataset.dragBound='1';
+  handle.style.cursor='move';
+  handle.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;
+    if(e.target.closest('button,input,select,textarea,a,label,[contenteditable]'))return;
+    _modalDrag={box,sx:e.clientX,sy:e.clientY,ox:box._dx||0,oy:box._dy||0};
+    document.body.style.userSelect='none';
+    e.preventDefault();
+  });
+}
+function _resetModalPos(box){ if(box){box._dx=0;box._dy=0;box.style.transform='';} }
+function initModalDrag(){
+  document.querySelectorAll('.mb .modal').forEach(m=>makeModalDraggable(m,m.firstElementChild));
+  document.querySelectorAll('.mb').forEach(ov=>{
+    new MutationObserver(()=>{ if(!ov.classList.contains('open'))_resetModalPos(ov.querySelector('.modal')); })
+      .observe(ov,{attributes:true,attributeFilter:['class']});
+  });
+  [['statsPanel',1],['shortcutPanel',1],['notifPanel',0]].forEach(([id,inner])=>{
+    const panel=document.getElementById(id); if(!panel)return;
+    const box=inner?panel.firstElementChild:panel;
+    const handle=inner?(box&&box.firstElementChild):panel.firstElementChild;
+    if(!box||!handle)return;
+    makeModalDraggable(box,handle);
+    new MutationObserver(()=>{ if(getComputedStyle(panel).display==='none')_resetModalPos(box); })
+      .observe(panel,{attributes:true,attributeFilter:['style']});
+  });
+}
+document.addEventListener('mousemove',e=>{
+  if(!_modalDrag)return;
+  const b=_modalDrag.box;
+  b._dx=_modalDrag.ox+(e.clientX-_modalDrag.sx);
+  b._dy=_modalDrag.oy+(e.clientY-_modalDrag.sy);
+  b.style.transform='translate('+b._dx+'px,'+b._dy+'px)';
+});
+document.addEventListener('mouseup',()=>{ if(_modalDrag){_modalDrag=null;document.body.style.userSelect='';} });
+
 function init(){
   // 로그인 화면 시계
   const clk=()=>{const d=new Date();const el=document.getElementById('loginClock');if(el)el.textContent=`${p2(d.getHours())}:${p2(d.getMinutes())} KST`;};
@@ -3466,6 +3595,8 @@ function init(){
   loadPhotosFromDB();
   fbInit();
   applyMobileLayout();
+  initDashResizer();
+  initModalDrag();
   window.addEventListener('resize',applyMobileLayout);
   renderDash();renderCal();renderSummaryBar();
 }
