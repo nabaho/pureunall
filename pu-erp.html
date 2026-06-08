@@ -566,6 +566,58 @@ var useRef = React.useRef;
 var useEffect = React.useEffect;
 var Component = React.Component;
 
+// 전역 오류 배너: ErrorBoundary가 못 잡는 비동기/이벤트 오류를 화면 하단에 표시
+(function(){
+  function showErrBanner(msg){
+    try{
+      var id='erp-global-err'; var ex=document.getElementById(id); if(ex) ex.remove();
+      var d=document.createElement('div'); d.id=id;
+      d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#7f1d1d;color:#fff;padding:10px 14px;font-size:12px;font-family:sans-serif;box-shadow:0 -2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;gap:10px;';
+      var s=document.createElement('span'); s.style.cssText='flex:1;word-break:break-all;';
+      s.textContent='⚠️ 오류: '+msg+' — 화면이 멈추면 새로고침(F5)';
+      var b=document.createElement('button'); b.textContent='닫기';
+      b.style.cssText='background:#fff;color:#7f1d1d;border:none;border-radius:4px;padding:4px 10px;font-weight:700;cursor:pointer;flex-shrink:0;';
+      b.onclick=function(){ d.remove(); };
+      d.appendChild(s); d.appendChild(b); document.body.appendChild(d);
+    }catch(e){}
+  }
+  window.addEventListener('error', function(ev){
+    var m=(ev.error&&ev.error.message)||ev.message||'';
+    if(/ResizeObserver loop/i.test(m)) return;
+    showErrBanner(m||'알 수 없는 오류');
+  });
+  window.addEventListener('unhandledrejection', function(ev){
+    showErrBanner('비동기 오류: '+((ev.reason&&ev.reason.message)||String(ev.reason)));
+  });
+})();
+// 화면 멈춤(메인스레드 블로킹) 감지기: 200ms+ 멈춤을 콘솔에 기록
+(function(){
+  try{
+    if(!window.PerformanceObserver) return;
+    var _lastLT=0;
+    var po=new PerformanceObserver(function(list){
+      list.getEntries().forEach(function(e){
+        if(e.duration>=200){
+          var now=Date.now(); if(now-_lastLT<800) return; _lastLT=now;
+          console.warn('🐢 화면 멈춤 '+Math.round(e.duration)+'ms @'+new Date().toLocaleTimeString());
+        }
+      });
+    });
+    po.observe({entryTypes:['longtask']});
+  }catch(e){}
+})();
+// fb_data_changed 디바운스: 다발 변경을 150ms로 묶어 리렌더 폭증 방지
+var _fbChangedKeys=null, _fbChangedTimer=null;
+function _scheduleFbChanged(k){
+  if(!_fbChangedKeys) _fbChangedKeys={};
+  _fbChangedKeys[k]=1;
+  if(_fbChangedTimer) return;
+  _fbChangedTimer=setTimeout(function(){
+    _fbChangedTimer=null;
+    var keys=Object.keys(_fbChangedKeys||{}); _fbChangedKeys=null;
+    try{ window.dispatchEvent(new CustomEvent('fb_data_changed',{detail:keys.length===1?keys[0]:'batch'})); }catch(e){}
+  },150);
+}
 // ErrorBoundary: 렌더링 에러 발생 시 명확한 메시지 표시
 class ErrorBoundary extends Component {
   constructor(props){ super(props); this.state = { error: null, info: null }; }
@@ -3064,7 +3116,7 @@ function fbSetupListener(){
         localStorage.setItem(KEY+k, JSON.stringify(arrValue));
         localStorage.setItem(KEY+'_meta_'+k, String(v.u));
         _dbCache[k] = arrValue; // 캐시 갱신
-        try { window.dispatchEvent(new CustomEvent('fb_data_changed', {detail:k})); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+        try { _scheduleFbChanged(k); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
       } catch(e){ window._erpErrLog && window._erpErrLog(e); }
     }
   });
@@ -6994,7 +7046,7 @@ function ContractModal(props){
               '← 이전'),
             // 다음 또는 저장
             isLast
-              ? h('button', { className:'btn-primary', onClick:save }, '✓ 저장')
+              ? h('button', { className:'btn-primary', onClick:function(){ Promise.resolve().then(save).catch(function(e){ console.error('[계약저장오류]', e); try{ showToast('❌ 저장 오류: ' + ((e && e.message) || String(e))); }catch(_){} }); } }, '✓ 저장')
               : h('button', { className:'btn-primary', onClick:goNext },
                   tab === 'company' ? '다음 → 계약정보' : '다음 → 담당자정보')
           );
@@ -11108,11 +11160,13 @@ function CompanyDetailModal(props){
 
 
 function detectDuplicates(form, existingCases){
-  // 환경설정 미적용 시에도 동작하도록 기본값 사용
-  var crit = dbGet('dup_criteria', null) || {
-    threshold: 50,
-    weights: { bizNoMatch:100, companyExact:60, companyPartial:30, phoneMatch:50 },
-    phoneExclude: [], whitelist: []
+  // 환경설정 미적용/부분저장 시에도 동작하도록 항목별 기본값 병합
+  var _critRaw = dbGet('dup_criteria', null) || {};
+  var crit = {
+    threshold: (typeof _critRaw.threshold === 'number') ? _critRaw.threshold : 50,
+    weights: Object.assign({ bizNoMatch:100, companyExact:60, companyPartial:30, phoneMatch:50 }, _critRaw.weights || {}),
+    phoneExclude: _critRaw.phoneExclude || [],
+    whitelist: _critRaw.whitelist || []
   };
   var results = [];
   var fBiz = (form.bizNo||'').replace(/[^0-9]/g,'');
@@ -17714,9 +17768,9 @@ function extractTemplateText(file, cb){
             for(var p=1;p<=doc.numPages;p++){(function(pg){
               chain=chain.then(function(){return doc.getPage(pg);})
                 .then(function(page){return page.getTextContent();})
-                .then(function(tc){ pages.push(tc.items.map(function(it){return it.str;}).join(' ')); });
+                .then(function(tc){ var s=''; tc.items.forEach(function(it){ s+=it.str; if(it.hasEOL) s+='\n'; }); pages.push(s); });
             })(p);}
-            return chain.then(function(){ cb(pages.join('\n').replace(/\n{3,}/g,'\n\n').trim(), null); });
+            return chain.then(function(){ cb(pages.join('\n').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim(), null); });
           }).catch(function(err){ cb('','PDF 추출 실패: '+err.message); });
         }catch(err){ cb('','PDF 추출 실패: '+err.message); }
       };
@@ -19032,9 +19086,12 @@ function ContractFormMasters(){
               '📥 체당금 시드')
           ),
           // 탭 본문: 왼쪽 목록 + 드래그 핸들 + 오른쪽 미리보기
-          h('div', { style:{ display:'flex', minHeight:'320px', userSelect: isDraggingRef.current ? 'none' : 'auto' } },
+          h('div', { style:{ display:'flex', flexDirection: window.innerWidth<=768?'column':'row', minHeight:'320px', userSelect: isDraggingRef.current ? 'none' : 'auto' } },
             // 왼쪽: 양식 목록
-            h('div', { style:{ flex:'0 0 '+leftPct+'%', borderRight:'none', overflow:'auto', minWidth:'200px' } },
+            h('div', { style:{ flex: window.innerWidth<=768?'none':('0 0 '+leftPct+'%'), width: window.innerWidth<=768?'100%':'auto', borderRight:'none', overflow:'auto', minWidth: window.innerWidth<=768?'0':'200px', maxHeight: window.innerWidth<=768?'40vh':'none' },
+              onDragOver:function(e){ if(e.dataTransfer&&e.dataTransfer.types&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')>=0){ e.preventDefault(); e.currentTarget.style.background='#f0fdf4'; } },
+              onDragLeave:function(e){ e.currentTarget.style.background=''; },
+              onDrop:function(e){ e.currentTarget.style.background=''; if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){ e.preventDefault(); e.stopPropagation(); quickUpload(k.v, e.dataTransfer.files); } } },
               list.length === 0
                 ? h('div', { style:{ color:'#cbd5e1', fontSize:'11.5px', textAlign:'center', padding:'48px', border:'1px dashed #e5e7eb', margin:'16px', borderRadius:'4px' } }, '양식 없음 — 위 버튼으로 추가하세요')
                 : h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11.5px' } },
@@ -19081,7 +19138,7 @@ function ContractFormMasters(){
             h('div', {
               onMouseDown: onResizerMouseDown,
               title: '드래그하여 크기 조절',
-              style:{ width:'6px', flexShrink:0, background:'#e5e7eb', cursor:'col-resize', position:'relative',
+              style:{ display: window.innerWidth<=768?'none':'block', width:'6px', flexShrink:0, background:'#e5e7eb', cursor:'col-resize', position:'relative',
                 borderLeft:'1px solid #d1d5db', borderRight:'1px solid #d1d5db',
                 transition:'background .1s' },
               onMouseEnter:function(e){ e.currentTarget.style.background='#93c5fd'; },
@@ -19091,8 +19148,8 @@ function ContractFormMasters(){
                 color:'#94a3b8', fontSize:'10px', letterSpacing:'1px', pointerEvents:'none' } }, '⋮')
             ),
             // 오른쪽: 미리보기 패널 (폰트 크기 leftPct에 따라 반응)
-            h('div', { style:{ flex:1, padding:'14px', background:'#f8fafc', overflow:'auto', minWidth:'160px',
-              fontSize: Math.max(9, Math.min(15, Math.round(7 + (100-leftPct)/8))) + 'px' } },
+            h('div', { style:{ flex:1, width: window.innerWidth<=768?'100%':'auto', padding:'14px', background:'#f8fafc', overflow:'auto', minWidth: window.innerWidth<=768?'0':'160px',
+              fontSize: window.innerWidth<=768 ? '12px' : (Math.max(9, Math.min(15, Math.round(7 + (100-leftPct)/8))) + 'px') } },
               previewForm
                 ? h('div', null,
                     h('div', { style:{ fontWeight:700, color:'#1e293b', marginBottom:'8px', fontSize:'12px', borderBottom:'1px solid #e5e7eb', paddingBottom:'6px', display:'flex', alignItems:'center', gap:'6px',
@@ -51048,7 +51105,7 @@ function ERPMain(props){
           else if(e.key==='ArrowRight'){el.scrollBy({left:120,behavior:'smooth'});e.preventDefault();}
           else if(e.key==='ArrowLeft'){el.scrollBy({left:-120,behavior:'smooth'});e.preventDefault();}
         }
-      }, mainContent)
+      }, h(ErrorBoundary, { label: current, key: current }, mainContent))
     ),
     // 모바일 보안 모드 표시 (재무 정보 차단 상태 안내) — 관리자 제외
     window.IS_MOBILE && !(CURRENT_USER && CURRENT_USER.isAdmin) && h('div', {
