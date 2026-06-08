@@ -419,7 +419,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   /* 재무 화면 헤더(제목+버튼 가로 배치) 줄바꿈 허용 — 출금관리 등 제목이 세로로 눌리는 문제 해소 */
   [style*="align-items: flex-start"][style*="margin-bottom: 14px"] { flex-wrap: wrap !important; gap: 8px; }
   /* 나의업무 좌측 위젯 + 우측 캘린더 2단 → 1단 (좌측 위젯 글자 세로 눌림 해소) */
-  .mydesk-grid { grid-template-columns: 1fr !important; }
+  .mydesk-grid { grid-template-columns: minmax(0,1fr) !important; }
   /* 나의업무 폰 컴팩트 */
   .md-cal-col { order: -1 !important; position: static !important; margin-bottom: 14px; }
   .md-leave-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 5px !important; }
@@ -30219,13 +30219,13 @@ function PersonalCalendar(props){
         style:{background:'#fff',border:'1px solid #cbd5e1',borderRadius:'4px',padding:'3px 8px',cursor:'pointer',fontSize:'10px',color:'#475569',marginLeft:'4px'}},'오늘')
     ),
     // 요일 헤더
-    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}},
+    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,minmax(0,1fr))',gap:'4px'}},
       DOW.map(function(d,i){
         return h('div',{key:i,style:{textAlign:'center',fontSize:'10px',fontWeight:700,color:i===0?'#dc2626':i===6?'#1e40af':'#64748b',padding:'4px 0'}},d);
       })
     ),
     // 날짜 그리드
-    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}},
+    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,minmax(0,1fr))',gap:'4px'}},
       grid.map(function(cell,i){
         if(!cell.date) return h('div',{key:i});
         var isToday = cell.date === todayStr;
@@ -30896,7 +30896,7 @@ function MyDeskV2(props){
   }
 
 
-  return h('div', { className:'page', style:{ paddingRight:'14px' } },
+  return h('div', { className:'page', style:{ paddingRight: window.IS_MOBILE ? '4px' : '14px' } },
     // ── 헤더 ──
     h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px' } },
       h('div', null,
@@ -33700,7 +33700,7 @@ function CorpDashboard(props){
       })
     );
 
-  return h('div',{className:'corp-dash',style:{margin:!IS_MOBILE?(dashTab==='calendar'?'-24px':'-24px -24px 0 -24px'):0,padding:IS_MOBILE?'4px 6px':(dashTab==='calendar'?'0':'4px 10px'),height:!IS_MOBILE&&dashTab==='calendar'?'calc(100vh - 46px)':'auto',display:!IS_MOBILE&&dashTab==='calendar'?'flex':'block',flexDirection:'column',overflow:!IS_MOBILE&&dashTab==='calendar'?'hidden':'visible'}},
+  return h('div',{className:'corp-dash',style:{margin:!IS_MOBILE?(dashTab==='calendar'?'-24px':'-24px -24px 0 -24px'):'0 -10px',padding:IS_MOBILE?'4px 2px':(dashTab==='calendar'?'0':'4px 10px'),height:!IS_MOBILE&&dashTab==='calendar'?'calc(100vh - 46px)':'auto',display:!IS_MOBILE&&dashTab==='calendar'?'flex':'block',flexDirection:'column',overflow:!IS_MOBILE&&dashTab==='calendar'?'hidden':'visible'}},
 
     // 탭 전환 바 + 캘린더 필터 통합 행
     h('div',{style:{display:'flex',alignItems:'center',gap:'4px',marginBottom:'4px',background:'#fff',padding:'4px 6px',borderRadius:'8px',border:'1px solid #e2e8f0',flexShrink:0}},
@@ -42518,7 +42518,7 @@ function AttendanceManagement(){
       ),
       h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}},
         cells.map(function(d,idx){
-          if(d===null) return h('div',{key:idx,style:{minHeight:'90px',background:'#f8fafc',border:'1px solid #f1f5f9',borderRadius:'8px'}});
+          if(d===null) return h('div',{key:idx,style:{minHeight:window.innerWidth<=768?'52px':'90px',background:'#f8fafc',border:'1px solid #f1f5f9',borderRadius:'8px'}});
           var ds = selYM+'-'+String(d).padStart(2,'0');
           var dow = (firstDay+d-1)%7;
           var isWeekend = dow===0||dow===6;
@@ -42539,7 +42539,7 @@ function AttendanceManagement(){
               else if(dragNewItem) dropNewItem(dragNewItem, ds);
               setDragId(null); setDragNewItem(null); setDragOver(null);
             },
-            style:{minHeight:'90px', border:'2px solid '+(isDragOver?'#3b82f6':isToday?'#1e40af':'#e2e8f0'),
+            style:{minHeight:window.innerWidth<=768?'52px':'90px', border:'2px solid '+(isDragOver?'#3b82f6':isToday?'#1e40af':'#e2e8f0'),
               borderRadius:'8px', padding:'3px 4px', cursor:(dragId||dragNewItem)?'copy':'pointer',
               background:isDragOver?'#dbeafe':isToday?'#eff6ff':isWeekend||isHoliday?'#f8fafc':'#fff',
               transition:'background 0.1s, border-color 0.1s', overflow:'hidden'}
@@ -44715,7 +44715,20 @@ function RetirementSettlement(){
 
   return h('div', { className:'page' },
     // KPI
-    h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'4px', marginBottom:'10px' } },
+    window.innerWidth <= 768
+    ? h('div', { style:{ display:'flex', overflowX:'auto', gap:'4px', marginBottom:'8px', WebkitOverflowScrolling:'touch', paddingBottom:'4px' } },
+        [
+          { bg:'#dbeafe', bd:'#93c5fd', fg:'#1e40af', label:'🏦 DC 가입자', val:dcCount+'명' },
+          { bg:'#ede9fe', bd:'#c4b5fd', fg:'#2563eb', label:'🏛️ DB 가입자', val:dbCount+'명' },
+          { bg:'#fee2e2', bd:'#fca5a5', fg:'#dc2626', label:'⚠️ 미가입', val:noneCount+'명' },
+          { bg:'#dcfce7', bd:'#86efac', fg:'#166534', label:'💰 DC 적립금', val:totalBalance.toLocaleString()+'원' }
+        ].map(function(k,i){
+          return h('div', { key:i, style:{ flexShrink:0, minWidth:'80px', background:k.bg, border:'1px solid '+k.bd, borderRadius:'6px', padding:'5px 8px', textAlign:'center' } },
+            h('div', { style:{ fontSize:'9px', color:k.fg, fontWeight:700, whiteSpace:'nowrap', marginBottom:'1px' } }, k.label),
+            h('div', { style:{ fontSize:'12px', fontWeight:800, color:k.fg, fontFamily:'monospace', whiteSpace:'nowrap' } }, k.val));
+        })
+      )
+    : h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'4px', marginBottom:'10px' } },
       h('div', { style:{ background:'#dbeafe', border:'1px solid #93c5fd', borderRadius:'6px', padding:'4px 6px', textAlign:'center' } },
         h('div', { style:{ fontSize:'10px', color:'#1e40af', fontWeight:700, whiteSpace:'nowrap' } }, '🏦 DC 가입자'),
         h('div', { style:{ fontSize:'13px', fontWeight:800, color:'#1e40af', lineHeight:1.2 } }, dcCount+'명')),
@@ -44731,7 +44744,7 @@ function RetirementSettlement(){
     ),
 
     // 안내 박스
-    h('div', { style:{ background:'#fef3c7', border:'1px solid #fde68a', borderRadius:'7px', padding:'10px 14px', marginBottom:'14px', fontSize:'11.5px', color:'#451a03', lineHeight:'1.7' } },
+    h('div', { style:{ background:'#fef3c7', border:'1px solid #fde68a', borderRadius:'7px', padding: window.innerWidth<=768?'7px 10px':'10px 14px', marginBottom: window.innerWidth<=768?'10px':'14px', fontSize: window.innerWidth<=768?'10px':'11.5px', color:'#451a03', lineHeight: window.innerWidth<=768?'1.5':'1.7' } },
       h('strong', null, '💡 퇴직연금 자동 적립: '), 'DC 가입자는 ',
       h('strong', null, '월별급여 일괄확정'), ' 시 그 달치 적립금이 자동 누적됩니다 (월 임금 × ',
       h('strong', null, (policy.contributionRate*100).toFixed(2)+'%'), '). 미가입자는 퇴직 시 ',
@@ -46193,6 +46206,7 @@ function PayrollLedger(props){
   // 표 확대(돋보기) 배율 (저장됨, 80~200%)
   var zmS = usePersistedState('payroll_zoom', 100); var zoom = zmS[0]; var setZoom = zmS[1];
   var emS = useState(false); var emailModal = emS[0]; var setEmailModal = emS[1];
+  var toS = useState(false); var toolsOpen = toS[0]; var setToolsOpen = toS[1];
   function clampZoom(v){ return Math.max(80, Math.min(200, v)); }
 
   // 임금항목 SSOT → 동적 컬럼 (환경설정 sortOrder/hidden 반영)
@@ -46447,6 +46461,7 @@ function PayrollLedger(props){
 
   var thStyle = {padding:'3px 3px',background:'#f8fafc',borderBottom:'2px solid #e2e8f0',fontSize:'10px',fontWeight:700,color:'#475569',whiteSpace:'nowrap',position:'sticky',top:0};
   var tdNum = {padding:'2px 4px',textAlign:'right',fontFamily:'monospace',fontSize:'10.5px',whiteSpace:'nowrap'};
+  var IS_M = window.innerWidth <= 768;
   var inputNum = {width:'65px',padding:'1px 3px',border:'1px solid #e2e8f0',borderRadius:'5px',fontSize:'10px',fontFamily:'monospace',textAlign:'right'};
 
   return h('div', null,
@@ -46510,8 +46525,10 @@ function PayrollLedger(props){
               style:{padding:'6px 10px',background:'#fff',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:600,whiteSpace:'nowrap'} }, '🔓 마감 잠금')
       ),
       // ── 2행: 보조액션(가로스크롤) + 확정버튼 고정 ──
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
-        h('div', { style:{ display:'flex', gap:'4px', alignItems:'center', overflowX:'auto', WebkitOverflowScrolling:'touch', flex:1, paddingBottom:'2px', minWidth:0 } },
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap: IS_M?'wrap':'nowrap' } },
+        IS_M && h('button', { onClick:function(){ setToolsOpen(!toolsOpen); },
+          style:{padding:'6px 10px',background:toolsOpen?'#1e40af':'#f1f5f9',color:toolsOpen?'#fff':'#475569',border:'1px solid '+(toolsOpen?'#1e40af':'#cbd5e1'),borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, toolsOpen?'도구 ▴':'🛠 도구 ▾'),
+        h('div', { style:{ display: (IS_M && !toolsOpen)?'none':'flex', gap:'4px', alignItems:'center', overflowX:'auto', WebkitOverflowScrolling:'touch', flex:1, paddingBottom:'2px', minWidth:0, width: IS_M?'100%':'auto', order: IS_M?3:0 } },
           h('button', { onClick:copyPrev,
             style:{padding:'6px 10px',background:'#f59e0b',color:'#fff',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, '📋 전월복사'),
           copyBackup && copyBackup.ym === props.selYM && h('button', { onClick:undoCopy,
@@ -46660,11 +46677,48 @@ function PayrollLedger(props){
           style:{padding:'8px 14px',background:'#059669',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:800,whiteSpace:'nowrap',flexShrink:0,boxShadow:'0 2px 6px rgba(5,150,105,0.3)'} }, '✅ 확정')
       )
     ),
-    h('div', { style:{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'auto', maxHeight:'calc(100vh - 280px)', zoom: zoom/100 } },
+    IS_M
+    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px' } },
+        users.map(function(u, idx){
+          var rec = getRec(u.sid);
+          var calc = calcPayroll(rec);
+          var st = rec.status||'draft';
+          var stBg = st==='confirmed'?'#dcfce7':st==='paid'?'#cffafe':'#fef9c3';
+          var stFg = st==='confirmed'?'#166534':st==='paid'?'#2563eb':'#854d0e';
+          var stLb = st==='confirmed'?'확정':st==='paid'?'지급':'대기';
+          return h('div', { key:u.sid, onClick:function(){ props.onSelect(u.sid); },
+            style:{ background:'#fff', border:'1px solid #e2e8f0', borderLeft:'4px solid '+stFg,
+              borderRadius:'8px', padding:'10px 12px', cursor:'pointer', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' } },
+            h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'6px' } },
+              h('span', { style:{ fontWeight:800, color:'#fff', fontSize:'10px', background:'#475569', borderRadius:'4px', padding:'1px 5px', flexShrink:0 } }, idx+1),
+              h('span', { style:{ fontWeight:700, color:'#1e293b', fontSize:'13px', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, u.name),
+              u.status==='leave' && h('span', { style:{ fontSize:'9.5px', background:'#fef3c7', color:'#92400e', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '휴직'),
+              u.status==='resigned' && h('span', { style:{ fontSize:'9.5px', background:'#fee2e2', color:'#991b1b', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '퇴사'),
+              u.title && h('span', { style:{ fontSize:'10px', color:'#64748b', flexShrink:0 } }, u.title),
+              h('span', { style:{ fontSize:'10px', background:stBg, color:stFg, padding:'1px 7px', borderRadius:'10px', fontWeight:700, flexShrink:0 } }, stLb)
+            ),
+            h('div', { style:{ display:'flex', gap:'6px' } },
+              h('div', { style:{ flex:1, background:'#f0fdf4', borderRadius:'6px', padding:'5px 7px', textAlign:'center' } },
+                h('div', { style:{ fontSize:'9px', color:'#166534', fontWeight:700, marginBottom:'1px' } }, '지급액'),
+                h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#166534', fontFamily:'monospace' } }, calc.grossPay.toLocaleString())
+              ),
+              h('div', { style:{ flex:1, background:'#fef3c7', borderRadius:'6px', padding:'5px 7px', textAlign:'center' } },
+                h('div', { style:{ fontSize:'9px', color:'#854d0e', fontWeight:700, marginBottom:'1px' } }, '공제'),
+                h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#854d0e', fontFamily:'monospace' } }, calc.totalDeduct.toLocaleString())
+              ),
+              h('div', { style:{ flex:1, background:'#ecfeff', borderRadius:'6px', padding:'5px 7px', textAlign:'center' } },
+                h('div', { style:{ fontSize:'9px', color:'#2563eb', fontWeight:700, marginBottom:'1px' } }, '실지급'),
+                h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#2563eb', fontFamily:'monospace' } }, calc.netPay.toLocaleString())
+              )
+            )
+          );
+        })
+      )
+    : h('div', { style:{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'auto', maxHeight:'calc(100vh - 280px)', zoom: zoom/100 } },
       h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11px' } },
         h('thead', null, h('tr', null,
           h('th', { style:thStyle }, '#'),
-          h('th', { style:Object.assign({},thStyle,{textAlign:'left',minWidth:'52px'}) }, '이름'),
+          h('th', { style:Object.assign({},thStyle,{textAlign:'left',minWidth:'52px'}, IS_M?{position:'sticky',left:0,zIndex:3}:{}) }, '이름'),
           h('th', { style:Object.assign({},thStyle,{textAlign:'left',minWidth:'52px'}) }, '직책'),
           // 지급 항목
           h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'62px',color:'#1e40af'}) }, '시급'),
@@ -46739,7 +46793,7 @@ function PayrollLedger(props){
             })();
             return h('tr', { key:u.sid, style:{borderBottom:'1px solid #f1f5f9', background: effectivePause ? '#fef3c7' : 'transparent'} },
               h('td', {style:{padding:'4px',textAlign:'center',color:'#94a3b8',fontSize:'10.5px'}}, idx+1),
-              h('td', {style:{padding:'4px 6px',fontWeight:600,fontSize:'11px',whiteSpace:'nowrap'}},
+              h('td', {style:Object.assign({padding:'4px 6px',fontWeight:600,fontSize:'11px',whiteSpace:'nowrap'}, IS_M?{position:'sticky',left:0,zIndex:1,background:effectivePause?'#fef3c7':'#fff'}:{})},
                 u.name,
                 loaActive && h('span', {
                   title:'휴직: '+(loaPolicy?loaPolicy.name:loaActive.code)+(loaActive.plannedEndDate?' (~'+loaActive.plannedEndDate+')':''),
