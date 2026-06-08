@@ -89,8 +89,9 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
 /* DASHBOARD CARDS */
 .dcard{background:var(--dash-sf);border:1px solid var(--dash-border);border-radius:10px;margin-bottom:8px;overflow:hidden;}
-.dcard-hd{display:flex;align-items:center;gap:8px;padding:10px 10px 8px;border-bottom:1px solid var(--dash-border);}
-.dcard-name{flex:1;font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dash-text);}
+.dcard-hd{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:10px 10px 8px;border-bottom:1px solid var(--dash-border);}
+.dcard-name{font-size:16px;font-weight:900;line-height:1.25;color:var(--dash-text);word-break:break-all;}
+.dcard-meta{display:flex;align-items:center;gap:8px;}
 .att-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .att-label{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:#fff;white-space:nowrap;}
 .dcard-rows{padding:4px 0;}
@@ -1978,14 +1979,17 @@ function renderDash(){
     if(!rows)return'';
     return `<div class="dcard">
       <div class="dcard-hd">
-        <span class="dcard-no" style="font-size:11px;font-weight:900;color:var(--t2);min-width:18px;text-align:center;flex-shrink:0;"></span>
-        <button class="co-fav-btn" data-coid="${co.id}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 1px;line-height:1;" title="즐겨찾기 상단 고정">${favs.includes(co.id)?'⭐':'☆'}</button>
-        <span class="att-dot" style="background:${att.color}"></span>
         <div class="dcard-name" title="${co.name}">${co.name}</div>
-        <span class="att-label" style="background:${att.color}" title="주담당">${att.name}</span>
-        ${coAtt?`<span class="att-label" style="background:${coAtt.color}99;border:1px solid ${coAtt.color};" title="부담당(협업)">+${coAtt.name}</span>`:''}
-        <button style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--t2);padding:0 2px" onclick="openCoModal('${co.id}')" title="수정">✏️</button>
-        <button class="co-del-btn" data-coid="${co.id}" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--danger);padding:0 2px" title="사업장 삭제">🗑️</button>
+        <div class="dcard-meta">
+          <span class="dcard-no" style="font-size:11px;font-weight:900;color:var(--t2);min-width:18px;text-align:center;flex-shrink:0;"></span>
+          <button class="co-fav-btn" data-coid="${co.id}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 1px;line-height:1;" title="즐겨찾기 상단 고정">${favs.includes(co.id)?'⭐':'☆'}</button>
+          <span class="att-dot" style="background:${att.color}"></span>
+          <span style="flex:1"></span>
+          <span class="att-label" style="background:${att.color}" title="주담당">${att.name}</span>
+          ${coAtt?`<span class="att-label" style="background:${coAtt.color}99;border:1px solid ${coAtt.color};" title="부담당(협업)">+${coAtt.name}</span>`:''}
+          <button style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--t2);padding:0 2px" onclick="openCoModal('${co.id}')" title="수정">✏️</button>
+          <button class="co-del-btn" data-coid="${co.id}" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--danger);padding:0 2px" title="사업장 삭제">🗑️</button>
+        </div>
       </div>
       <div class="dcard-rows">${rows}</div>
     </div>`;
