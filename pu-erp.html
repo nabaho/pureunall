@@ -2983,7 +2983,7 @@ window.popConfirm = function(msg, onYes, opts){
   });
   // 메시지
   var msgEl = document.createElement('div');
-  Object.assign(msgEl.style, { color:'#1e293b', marginBottom:'8px', lineHeight:'1.45', whiteSpace:'pre-line', wordBreak:'keep-all' });
+  Object.assign(msgEl.style, { color:'#1e293b', marginBottom:'8px', lineHeight:'1.45', whiteSpace:'pre-line', wordBreak:'keep-all', maxHeight:'60vh', overflowY:'auto' });
   msgEl.textContent = msg;
   box.appendChild(msgEl);
   // 버튼들
@@ -11521,6 +11521,8 @@ function CaseEditModal(props){
             h('input', { type:'text', value:f.title||'', onChange:setV('title'), placeholder:'예: 부당해고 구제신청', style:inputS })),
           h('div', { className:'fld' }, h('label', null, isWorkerCase ? '상대방 사업장명' : '의뢰인 (회사명) *'),
             h('input', { type:'text', value:f.companyName||'', onChange:setV('companyName'), style:inputS })),
+          !isWorkerCase && h('div', { className:'fld' }, h('label', null, '상대방'),
+            h('input', { type:'text', value:f.opponent||'', onChange:setV('opponent'), placeholder:'상대방 (회사·근로자·기관 등)', style:inputS })),
           h('div', { className:'fld' }, h('label', null, '사업자번호'),
             h('input', { type:'text', value:f.bizNo||'', onChange:setV('bizNo'), placeholder:'000-00-00000', inputmode:'numeric', style:inputS })),
           h('div', { className:'fld' }, h('label', null, '대표자'),
@@ -12497,6 +12499,7 @@ function CaseManagement(props){
         h('th', { style:{ width:'34px', textAlign:'center', color:'#94a3b8' } }, '#'),
         h('th', { onClick:function(){toggleSort('caseNo');}, style:{ cursor:'pointer', userSelect:'none' } }, '사건번호' + sortIcon('caseNo')),
         h('th', { onClick:function(){toggleSort('companyName');}, style:{ cursor:'pointer', userSelect:'none' } }, '의뢰인' + sortIcon('companyName')),
+        h('th', { style:{ minWidth:'80px' } }, '상대방'),
         h('th', { onClick:function(){toggleSort('managerMain');}, style:{ cursor:'pointer', userSelect:'none', minWidth:'70px' } }, '주담당' + sortIcon('managerMain')),
         h('th', { style:{ minWidth:'90px' } }, '부담당'),
         h('th', null, '관할기관'),
@@ -12513,7 +12516,7 @@ function CaseManagement(props){
       )),
       h('tbody', null,
         filtered.length === 0
-          ? h('tr', null, h('td', { colSpan:15, className:'ac', style:{ color:'#94a3b8', padding:'40px' } },
+          ? h('tr', null, h('td', { colSpan:16, className:'ac', style:{ color:'#94a3b8', padding:'40px' } },
               cases.length === 0 ? '등록된 사건이 없습니다' : '검색 결과가 없습니다'))
           : pgCase.paged.map(function(c, idx){
               var t = types.find(function(x){return x.code===c.typeCode;});
@@ -12596,6 +12599,14 @@ function CaseManagement(props){
                         : (c.companyName||'-')),
                   h('div', { style:{ marginTop:'3px' } },
                     (t || typeFallback) && h('span', { style:{ background:typeBg, color:typeColor, fontSize:'10.5px', padding:'2px 7px', borderRadius:'10px', fontWeight:700 } }, t ? t.name : typeFallback))
+                ),
+
+                // 상대방 (근로자 사건은 사업장명, 그 외는 별도 입력값)
+                h('td', null,
+                  (function(){ var op = c.opponent || (c.clientType === 'worker' ? (c.companyName||'') : '');
+                    return op
+                      ? h('span', { style:{ color:'#475569', fontSize:'12px' } }, op)
+                      : h('span', { style:{ color:'#cbd5e1' } }, '-'); })()
                 ),
 
                 // 주담당
@@ -12737,7 +12748,7 @@ function CaseManagement(props){
       // footer: 필터된 건 합계
       filtered.length > 0 && h('tfoot', null,
         h('tr', { style:{ background:'#f8fafc', borderTop:'2px solid #e5e7eb', fontWeight:700 } },
-          h('td', { colSpan:12, style:{ padding:'6px 10px', fontSize:'11.5px', color:'#475569', textAlign:'right' } },
+          h('td', { colSpan:13, style:{ padding:'6px 10px', fontSize:'11.5px', color:'#475569', textAlign:'right' } },
             '합계 ' + filtered.length + '건'),
           h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:'#2563eb' } },
             filtered.reduce(function(s,c){return s+(canSeeAmount(c)?(c.retainerFee||0):0);},0).toLocaleString()),
