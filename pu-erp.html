@@ -2062,6 +2062,92 @@ window.erpAllowBulk = function(){
   console.log('✅ 대량 삭제 15초간 허용됨 — 지금 저장/삭제하세요');
 };
 
+// ── 서버 자동백업: 하루 1회, data/와 분리된 serverBackups/ 칸에 스냅샷 저장(30일치 유지) ──
+//    이 칸은 동기화(fbInitialSync)·자동삭제 루틴이 건드리지 않음.
+var SERVER_BACKUP_KEYS = [
+  'contracts','cases','consultings','funds','other_projects','companies',
+  'finance_income','payroll_monthly','attendance_records','my_schedules',
+  'leave_grants','leave_of_absence','mgr_rates','policy_access',
+  'biz_case_types','biz_cons_types','biz_fund_types','biz_other_types',
+  'activity_log','trash_bin','consult_logs'
+];
+function buildBackupSnapshot(){
+  var data = {};
+  SERVER_BACKUP_KEYS.forEach(function(k){
+    var raw = localStorage.getItem(KEY+k);
+    if(raw){ try { data[k] = JSON.parse(raw); } catch(e){} }
+  });
+  return { savedAt: new Date().toISOString(), version:'v6', data: data };
+}
+function serverBackupDaily(force){
+  if(typeof fbDb === 'undefined' || !fbDb) return;
+  var ymd = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD (로컬 기준)
+  if(!force && localStorage.getItem('pureun_v6_last_server_backup') === ymd) return;
+  var snap = buildBackupSnapshot();
+  // 빈 스냅샷(데이터 미로드 등)은 저장하지 않음
+  var hasData = SERVER_BACKUP_KEYS.some(function(k){ return Array.isArray(snap.data[k]) && snap.data[k].length > 0; });
+  if(!hasData) return;
+  fbDb.ref('serverBackups/'+ymd).set(snap)
+    .then(function(){
+      localStorage.setItem('pureun_v6_last_server_backup', ymd);
+      console.log('[ERP] 서버 자동백업 저장: '+ymd);
+      return fbDb.ref('serverBackups').once('value');
+    })
+    .then(function(s){
+      if(!s) return;
+      var obj = s.val() || {};
+      var dates = Object.keys(obj).sort(); // YYYY-MM-DD는 사전순=시간순
+      if(dates.length > 30){
+        var updates = {};
+        dates.slice(0, dates.length - 30).forEach(function(dd){ updates['serverBackups/'+dd] = null; });
+        return fbDb.ref().update(updates);
+      }
+    })
+    .catch(function(e){ window._erpErrLog && window._erpErrLog(e); });
+}
+window.erpServerBackupNow = function(){ serverBackupDaily(true); console.log('서버 백업 시도(강제)'); };
+
+// ── 수시 자동백업: 앱이 열려 있는 동안 30분마다, "바뀐 게 있을 때만" serverBackupsRecent/에 저장(최근 24개 유지) ──
+//    일간 보관함(serverBackups)과 완전히 분리. 변화 감지는 데이터 JSON의 경량 해시 비교.
+var RECENT_BACKUP_INTERVAL_MIN = 30;
+var RECENT_BACKUP_KEEP = 24;
+function _quickHash(str){
+  var h = 2166136261; // FNV-1a 32bit
+  for(var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+}
+function serverBackupRecent(){
+  if(typeof fbDb === 'undefined' || !fbDb) return;
+  var snap = buildBackupSnapshot();
+  var hasData = SERVER_BACKUP_KEYS.some(function(k){ return Array.isArray(snap.data[k]) && snap.data[k].length > 0; });
+  if(!hasData) return;
+  var sig = _quickHash(JSON.stringify(snap.data));
+  if(localStorage.getItem('pureun_v6_recent_sig') === sig) return; // 변화 없음 → 건너뜀
+  var key = String(Date.now()); // 13자리 ms → 사전순=시간순
+  fbDb.ref('serverBackupsRecent/'+key).set(snap)
+    .then(function(){
+      localStorage.setItem('pureun_v6_recent_sig', sig);
+      console.log('[ERP] 수시 백업 저장: '+new Date().toLocaleString('sv-SE'));
+      return fbDb.ref('serverBackupsRecent').once('value');
+    })
+    .then(function(s){
+      if(!s) return;
+      var obj = s.val() || {};
+      var keys = Object.keys(obj).sort();
+      if(keys.length > RECENT_BACKUP_KEEP){
+        var updates = {};
+        keys.slice(0, keys.length - RECENT_BACKUP_KEEP).forEach(function(kk){ updates['serverBackupsRecent/'+kk] = null; });
+        return fbDb.ref().update(updates);
+      }
+    })
+    .catch(function(e){ window._erpErrLog && window._erpErrLog(e); });
+}
+function startRecentBackupTimer(){
+  if(window._recentBackupTimer) return;
+  window._recentBackupTimer = setInterval(serverBackupRecent, RECENT_BACKUP_INTERVAL_MIN * 60 * 1000);
+}
+window.erpRecentBackupNow = function(){ serverBackupRecent(); console.log('수시 백업 시도'); };
+
 function dbSet(k, v){
   // Diff Sync: 동일 값이면 스킵 (불필요한 Firebase 쓰기 방지)
   var newJson;
@@ -3163,6 +3249,7 @@ if(fbDb){
       }
       _fbSynced = true;
       fbSetupListener();
+      try { setTimeout(function(){ serverBackupDaily(false); startRecentBackupTimer(); }, 3000); } catch(e){}
     }).catch(function(e){
       console.warn('[Firebase] 초기 동기화 실패:', e && e.message);
       _fbSynced = true;
@@ -6915,7 +7002,7 @@ function ContractModal(props){
         }) : null;
         var inputBaseS = { fontFamily:'monospace', fontSize:'12px', padding:'3px 6px', border:'1px solid '+(dupHit?'#dc2626':'#3b82f6'), borderRadius:'4px', textAlign:'center', background:dupHit?'#fef2f2':'#fff' };
 
-        return h('div', { style:{ padding:'10px 16px 0', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' } },
+        return h('div', { style:{ padding: window.innerWidth<=768?'4px 12px 0':'10px 16px 0', display:'flex', alignItems:'center', gap: window.innerWidth<=768?'6px':'10px', flexWrap:'wrap' } },
           h('span', { style:{ fontSize:'11.5px', color:'#64748b', fontWeight:600 } }, '계약번호:'),
           editNo
             ? h('span', { style:{ display:'inline-flex', alignItems:'center', gap:'4px' } },
@@ -6985,23 +7072,24 @@ function ContractModal(props){
       // ── 의뢰인 유형 토글 (항상 보이게 상단 고정) ──
       (function(){
         var ct = f.clientType || 'company';
+        var M = window.innerWidth<=768;
         function ctBar(v, label, tip){
           var on = ct === v;
           return h('button', { type:'button', title:tip,
             onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { clientType: v }); }); setTab('company'); },
-            style:{ flex:1, padding:'9px 6px', border:'1.5px solid '+(on?'#1e40af':'#fdba74'),
+            style:{ flex:1, padding: M?'5px 3px':'9px 6px', border:'1.5px solid '+(on?'#1e40af':'#fdba74'),
               background: on?'#1e40af':'#fff', color: on?'#fff':'#9a3412',
-              borderRadius:'6px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, label);
+              borderRadius:'6px', fontSize: M?'10px':'12px', fontWeight:700, cursor:'pointer' } }, label);
         }
         var ctDesc = ct === 'company'
           ? '🏢 회사가 의뢰인 — 회사정보(회사명·대표자·사업자번호)를 입력합니다. 예) 취업규칙·자문·컨설팅·인사노무 일반'
           : ct === 'worker'
           ? '👤 근로자가 의뢰인 — 근로자 정보(이름·연락처·주소)를 입력하고, 상대 회사(피신청인)는 아래에서 선택 입력합니다. 예) 부당해고·임금체불·산재'
           : '🏢+👤 회사와 근로자를 함께 등록 — 양측 정보를 모두 입력합니다. 예) 노사 양쪽 관련 특수 케이스';
-        return h('div', { style:{ margin:'12px 16px 0', background:'#fff7ed', border:'1.5px solid #fb923c', borderRadius:'8px', padding:'8px 10px' } },
-          h('div', { style:{ fontSize:'11px', fontWeight:800, color:'#9a3412', marginBottom:'6px' } },
+        return h('div', { style:{ margin: M?'5px 10px 0':'12px 16px 0', background:'#fff7ed', border:'1.5px solid #fb923c', borderRadius:'8px', padding: M?'5px 7px':'8px 10px' } },
+          h('div', { style:{ fontSize: M?'9.5px':'11px', fontWeight:800, color:'#9a3412', marginBottom: M?'3px':'6px' } },
             '⚖️ 의뢰인 유형 — 먼저 선택하세요 (버튼에 마우스를 올리면 설명)'),
-          h('div', { style:{ display:'flex', gap:'6px' } },
+          h('div', { style:{ display:'flex', gap: M?'4px':'6px' } },
             ctBar('company', '🏢 회사(의뢰인)',
               '【회사가 의뢰인일 때】\n회사정보(회사명·대표자·사업자번호·주소)를 입력합니다.\n\n예) 취업규칙 작성, 인사노무 자문, 컨설팅,\n임금체계 설계, 평가보상 등 회사 의뢰 업무'),
             ctBar('worker',  '👤 근로자(의뢰인)',
@@ -7009,11 +7097,11 @@ function ContractModal(props){
             ctBar('both',    '🏢+👤 둘 다',
               '【회사+근로자 함께】\n양측 정보를 모두 입력합니다.\n\n예) 노사 양쪽이 얽힌 특수 케이스,\n집단 사건에서 회사·근로자 정보를 함께 관리할 때')
           ),
-          h('div', { style:{ fontSize:'10.5px', color:'#9a3412', marginTop:'7px', lineHeight:1.5, background:'#fffbeb', borderRadius:'5px', padding:'5px 8px' } }, ctDesc)
+          h('div', { style:{ fontSize: M?'9px':'10.5px', color:'#9a3412', marginTop: M?'3px':'7px', lineHeight: M?1.3:1.5, background:'#fffbeb', borderRadius:'5px', padding: M?'3px 6px':'5px 8px' } }, ctDesc)
         );
       })(),
       // 탭 헤더
-      h('div', { style:{ display:'flex', borderBottom:'1px solid #e5e7eb', marginTop:'10px', background:'#f8fafc' } },
+      h('div', { style:{ display:'flex', borderBottom:'1px solid #e5e7eb', marginTop: window.innerWidth<=768?'5px':'10px', background:'#f8fafc' } },
         tabBtn('company',  '기업정보',   '🏢'),
         tabBtn('contract', '계약정보',   '📄'),
         tabBtn('manager',  '담당자정보', '👤'),
@@ -13431,31 +13519,21 @@ function roleInfo(v){ return ROLES.find(function(r){return r.v===v;}) || ROLES[2
   var CURRENT = '20260503_fee_v1';
   try {
     if(localStorage.getItem(verKey) === CURRENT) return;
-    // 버전 불일치 시: 기존 데이터에서 id별로 fee/payDay 업데이트만 반영
+    // [2026-06-08] fee/payDay 자동 덮어쓰기 제거 — 새 브라우저에서 최근 수정한 자문료·세금계산서
+    // 납부일이 옛 시드값으로 되돌아가던 문제 방지. 회사 데이터가 완전히 비었을 때만 초기 시드.
     var existing = localStorage.getItem('pureun_v6_companies');
-    if(!existing){
+    if(!existing || existing === '[]'){
       localStorage.setItem('pureun_v6_companies', JSON.stringify(COMPANY_DEMO_SEED));
-    } else {
-      var arr; try{ arr = JSON.parse(existing); }catch(e){ arr = []; window._erpErrLog&&window._erpErrLog(e); }
-      var seedMap = {};
-      COMPANY_DEMO_SEED.forEach(function(s){ seedMap[s.id]=s; });
-      arr = arr.map(function(co){
-        var seed = seedMap[co.id];
-        if(!seed) return co;
-        // fee/payDay만 SEED 값으로 업데이트 (나머지 변경사항 보존)
-        return Object.assign({}, co, {
-          monthlyAdvisoryFee: seed.monthlyAdvisoryFee,
-          taxInvoicePaymentDay: seed.taxInvoicePaymentDay
-        });
-      });
-      localStorage.setItem('pureun_v6_companies', JSON.stringify(arr));
     }
     localStorage.setItem(verKey, CURRENT);
   } catch(e){ window._erpErrLog && window._erpErrLog(e); }
 })();
 
-// finance_income 샘플 데이터 전체 제거 (fi-adv- 접두어 + 샘플 + 사건/컨설팅/기금 자동생성분)
-(function injectAdvisoryIncomeSeed(){
+// finance_income 샘플 데이터 전체 제거 — [2026-06-08 비활성화]
+// 이 루틴은 플래그가 없는 브라우저(새 기기·새 브라우저·캐시 삭제)에서 열 때마다
+// finance_income을 빈 배열로 비우고 서버까지 지워, 실데이터(자문수입)를 삭제하는 문제가 있었음.
+// 일회성 정리용 코드라 더 이상 필요 없으므로 제거(주석 처리). 원본은 아래 보존.
+/* (function injectAdvisoryIncomeSeed(){
   var verKey = 'pureun_v6_fi_version';
   var CLEAR = '20260510_clear_v3';
   try {
@@ -13470,7 +13548,7 @@ function roleInfo(v){ return ROLES.find(function(r){return r.v===v;}) || ROLES[2
       console.log('[ERP] finance_income 샘플 전체 초기화');
     }
   } catch(e){ window._erpErrLog && window._erpErrLog(e); }
-})();
+})(); */
 
 function nextSid(prefix, allUsers){
   // P- 또는 A- 접두로 시작하는 사번 중 최대 번호 + 1
@@ -21287,21 +21365,12 @@ function BackupSection(){
       reader.readAsText(file);
     });
   }
-  async function processRestoreFile(file){
-    if(!file) return;
-    var text;
-    try { text = await readTextFile(file); }
-    catch(e){ showToast('복원 실패: ' + e.message); return; }
-    var parsed;
-    try {
-      parsed = JSON.parse(text);
-      if(!parsed || !parsed.data || typeof parsed.data !== 'object') throw new Error('잘못된 형식');
-    } catch(e){ showToast('복원 실패: ' + e.message); return; }
-
+  // 파일/서버백업 공용: 백업 data 객체를 로컬+서버에 복원 (미리보기 확인 포함)
+  async function applyBackupData(d, sourceLabel){
+    if(!d || typeof d !== 'object'){ showToast('복원 실패: 잘못된 형식'); return; }
     // 두 형식 지원:
     //  - 정제형식 : data.contracts = [ ... ]            (논리 키 + 값)
     //  - raw-dump : data["pureun_v6_contracts"] = "..."  (LS 키 + 문자열)
-    var d = parsed.data;
     var writes = [];      // { lsKey, raw } — localStorage에 쓸 항목
     var fbUpdates = {};   // 'data/<key>' = { v, u } — Firebase 반영
     var summary = [];     // 미리보기용 "키: N건"
@@ -21333,7 +21402,7 @@ function BackupSection(){
 
     if(writes.length === 0){ showToast('복원할 데이터가 없습니다'); return; }
     summary.sort();
-    var msg = '복원 미리보기 — 아래 데이터로 현재 내용을 덮어쓰고 서버에도 반영합니다.\n\n'
+    var msg = '복원 미리보기 ('+(sourceLabel||'백업')+') — 아래 데이터로 현재 내용을 덮어쓰고 서버에도 반영합니다.\n\n'
       + (summary.length ? summary.join('\n') : '(데이터 키 없음)')
       + '\n\n진행하시겠습니까?';
     if(!(await popConfirm(msg))) return;
@@ -21345,12 +21414,24 @@ function BackupSection(){
         try { await fbDb.ref().update(fbUpdates); }
         catch(e){ fbOk = false; showToast('⚠ 로컬은 복원됨 / 서버 반영 실패: ' + (e && e.message) + ' — 콘솔에서 erpSyncNow() 시도하세요'); }
       }
-      var rec = { id:Date.now(), ts:new Date().toISOString(), kind:'restore', status:'success', size:text.length, fileName:file.name, keyCount: Object.keys(fbUpdates).length || writes.length };
+      var rec = { id:Date.now(), ts:new Date().toISOString(), kind:'restore', status:'success', size:0, fileName:(sourceLabel||'백업'), keyCount: Object.keys(fbUpdates).length || writes.length };
       saveHistory([rec].concat(history).slice(0,50));
       if(fbOk){ showToast('복원 완료. 새로고침합니다...'); setTimeout(function(){ location.reload(); }, 1200); }
     } catch(err){
       showToast('복원 실패: ' + err.message);
     }
+  }
+  async function processRestoreFile(file){
+    if(!file) return;
+    var text;
+    try { text = await readTextFile(file); }
+    catch(e){ showToast('복원 실패: ' + e.message); return; }
+    var parsed;
+    try {
+      parsed = JSON.parse(text);
+      if(!parsed || !parsed.data || typeof parsed.data !== 'object') throw new Error('잘못된 형식');
+    } catch(e){ showToast('복원 실패: ' + e.message); return; }
+    await applyBackupData(parsed.data, file.name);
   }
   async function doRestore(e){
     var file = e.target.files && e.target.files[0];
@@ -21363,6 +21444,44 @@ function BackupSection(){
   async function onDrop(e){ e.preventDefault(); setIsDragOver(false); var file = e.dataTransfer.files && e.dataTransfer.files[0]; if(file) await processRestoreFile(file); }
 
   function clearHistory(){ saveHistory([]); showToast('이력 삭제됨'); }
+
+  // 서버 백업 보관함 목록 로드 (일간 + 수시)
+  var sb0 = useState({ loading:true, list:[] }); var sbState = sb0[0]; var setSbState = sb0[1];
+  useEffect(function(){
+    if(typeof fbDb === 'undefined' || !fbDb){ setSbState({ loading:false, list:[] }); return; }
+    function counts(data){
+      var c = [];
+      ['contracts','finance_income','payroll_monthly','companies','attendance_records'].forEach(function(k){
+        if(Array.isArray(data[k])) c.push(k+' '+data[k].length);
+      });
+      return c.join(' · ');
+    }
+    Promise.all([
+      fbDb.ref('serverBackups').once('value').catch(function(){ return null; }),
+      fbDb.ref('serverBackupsRecent').once('value').catch(function(){ return null; })
+    ]).then(function(res){
+      var list = [];
+      function add(s, kind){
+        var obj = (s && s.val()) || {};
+        Object.keys(obj).forEach(function(k){
+          var snap = obj[k] || {}; var data = snap.data || {};
+          var when = snap.savedAt ? new Date(snap.savedAt) : null;
+          var label = (kind === 'daily')
+            ? k                                              // YYYY-MM-DD
+            : (when ? when.toLocaleString('sv-SE').slice(5,16) : k); // MM-DD HH:mm
+          var sortAt = when ? when.getTime() : (parseInt(k,10) || 0);
+          list.push({ key:kind+':'+k, kind:kind, label:label, sortAt:sortAt, data:data, summary:counts(data) });
+        });
+      }
+      add(res[0], 'daily');
+      add(res[1], 'recent');
+      list.sort(function(a,b){ return b.sortAt - a.sortAt; });
+      setSbState({ loading:false, list:list });
+    }).catch(function(){ setSbState({ loading:false, list:[] }); });
+  }, []);
+  async function restoreFromServer(entry){
+    await applyBackupData(entry.data, (entry.kind === 'daily' ? '서버백업 ' : '수시백업 ') + entry.label);
+  }
 
   return h(PolicyCard, { title:'백업 · 복원', icon:'💾', headBg:'#f0fdf4', headFg:'#0f766e', collapseId:'sys_backup', defaultOpen:false },
     h(PolicyRow, {
@@ -21417,6 +21536,34 @@ function BackupSection(){
         )
       )
     }),
+    // 서버 백업 보관함 (data/와 분리, 하루 1회 자동, 30일 보관)
+    h('div', { style:{ marginTop:'14px' } },
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
+        h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b' } }, '🗄️ 서버 백업 보관함'),
+        h('span', { style:{ background:'#e2e8f0', color:'#475569', fontSize:'10.5px', padding:'2px 7px', borderRadius:'10px', fontWeight:600 } }, sbState.list.length + '개'),
+        h('div', { style:{ flex:1 } }),
+        h('span', { style:{ fontSize:'10.5px', color:'#94a3b8' } }, '일간 30일 · 수시 30분(최근 24)')
+      ),
+      sbState.loading
+        ? h('div', { style:{ color:'#94a3b8', fontSize:'12px', textAlign:'center', padding:'16px', background:'#f8fafc', borderRadius:'4px' } }, '불러오는 중...')
+        : (sbState.list.length === 0
+          ? h('div', { style:{ color:'#94a3b8', fontSize:'12px', textAlign:'center', padding:'16px', background:'#f8fafc', borderRadius:'4px' } }, '서버 백업 없음 (다음 접속 시 자동 생성)')
+          : h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px' } },
+              sbState.list.map(function(it){
+                return h('div', { key:it.key, style:{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px' } },
+                  h('span', { style:{ flexShrink:0, fontSize:'9.5px', fontWeight:700, padding:'2px 6px', borderRadius:'10px',
+                    background: it.kind==='daily' ? '#dbeafe' : '#dcfce7', color: it.kind==='daily' ? '#1d4ed8' : '#15803d' } },
+                    it.kind==='daily' ? '일간' : '수시'),
+                  h('div', { style:{ flex:1, minWidth:0 } },
+                    h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#1e293b' } }, it.label),
+                    h('div', { style:{ fontSize:'10.5px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, it.summary || '-')
+                  ),
+                  h('button', { onClick:function(){ restoreFromServer(it); },
+                    style:{ background:'#0f766e', color:'#fff', padding:'6px 12px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '이 백업으로 복원')
+                );
+              })
+            ))
+    ),
     // 이력
     h('div', { style:{ marginTop:'14px' } },
       h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
