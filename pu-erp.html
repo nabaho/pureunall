@@ -2072,12 +2072,31 @@ var SERVER_BACKUP_KEYS = [
   'activity_log','trash_bin','consult_logs'
 ];
 function buildBackupSnapshot(){
+  // 환경설정·정책·기준 등 전체 키 포함 (메타/세션/UI 전용만 제외)
+  var SNAP_EXCLUDE = { force_pw:1,last_login_id:1,save_id_flag:1,current_menu:1,env_last_tab:1,
+    open_groups:1,dark_mode:1,sidebar_collapsed:1,corp_dash_tab:1,mydesk_cal_custom_w:1,
+    mydesk_cal_size:1,mydesk_widget_collapsed:1,last_server_backup:1,recent_sig:1 };
   var data = {};
-  SERVER_BACKUP_KEYS.forEach(function(k){
-    var raw = localStorage.getItem(KEY+k);
-    if(raw){ try { data[k] = JSON.parse(raw); } catch(e){} }
-  });
+  for(var i=0;i<localStorage.length;i++){
+    var full = localStorage.key(i);
+    if(!full || full.indexOf(KEY)!==0) continue;
+    var k = full.slice(KEY.length);
+    if(k.indexOf('_meta_')===0 || k.indexOf('pinned_menus_')===0 || k.indexOf('login_')===0 || k.indexOf('session')===0) continue;
+    if(SNAP_EXCLUDE[k] || /api_key/i.test(k)) continue; // API 키는 백업에서 제외
+    var raw = localStorage.getItem(full);
+    if(raw==null) continue;
+    try { data[k] = JSON.parse(raw); } catch(e){ data[k] = raw; }
+  }
   return { savedAt: new Date().toISOString(), version:'v6', data: data };
+}
+// 백업 목록용 경량 요약(주요 키 건수) — 인덱스에 저장해 목록 로드시 전체 데이터를 안 받게 함
+function _snapSummary(data){
+  data = data || {};
+  var c = [];
+  ['contracts','finance_income','payroll_monthly','companies','attendance_records'].forEach(function(k){
+    if(Array.isArray(data[k])) c.push(k+' '+data[k].length);
+  });
+  return c.join(' · ');
 }
 function serverBackupDaily(force){
   if(typeof fbDb === 'undefined' || !fbDb) return;
@@ -2087,19 +2106,19 @@ function serverBackupDaily(force){
   // 빈 스냅샷(데이터 미로드 등)은 저장하지 않음
   var hasData = SERVER_BACKUP_KEYS.some(function(k){ return Array.isArray(snap.data[k]) && snap.data[k].length > 0; });
   if(!hasData) return;
-  fbDb.ref('serverBackups/'+ymd).set(snap)
+  var w = {}; w['serverBackups/'+ymd] = snap; w['serverBackupsIndex/'+ymd] = { savedAt:snap.savedAt, summary:_snapSummary(snap.data) };
+  fbDb.ref().update(w)
     .then(function(){
       localStorage.setItem('pureun_v6_last_server_backup', ymd);
       console.log('[ERP] 서버 자동백업 저장: '+ymd);
-      return fbDb.ref('serverBackups').once('value');
+      return fbDb.ref('serverBackupsIndex').once('value'); // 경량 인덱스로 prune
     })
     .then(function(s){
       if(!s) return;
-      var obj = s.val() || {};
-      var dates = Object.keys(obj).sort(); // YYYY-MM-DD는 사전순=시간순
+      var dates = Object.keys(s.val() || {}).sort(); // YYYY-MM-DD는 사전순=시간순
       if(dates.length > 30){
         var updates = {};
-        dates.slice(0, dates.length - 30).forEach(function(dd){ updates['serverBackups/'+dd] = null; });
+        dates.slice(0, dates.length - 30).forEach(function(dd){ updates['serverBackups/'+dd] = null; updates['serverBackupsIndex/'+dd] = null; });
         return fbDb.ref().update(updates);
       }
     })
@@ -2124,19 +2143,19 @@ function serverBackupRecent(){
   var sig = _quickHash(JSON.stringify(snap.data));
   if(localStorage.getItem('pureun_v6_recent_sig') === sig) return; // 변화 없음 → 건너뜀
   var key = String(Date.now()); // 13자리 ms → 사전순=시간순
-  fbDb.ref('serverBackupsRecent/'+key).set(snap)
+  var w = {}; w['serverBackupsRecent/'+key] = snap; w['serverBackupsRecentIndex/'+key] = { savedAt:snap.savedAt, summary:_snapSummary(snap.data) };
+  fbDb.ref().update(w)
     .then(function(){
       localStorage.setItem('pureun_v6_recent_sig', sig);
       console.log('[ERP] 수시 백업 저장: '+new Date().toLocaleString('sv-SE'));
-      return fbDb.ref('serverBackupsRecent').once('value');
+      return fbDb.ref('serverBackupsRecentIndex').once('value'); // 경량 인덱스로 prune
     })
     .then(function(s){
       if(!s) return;
-      var obj = s.val() || {};
-      var keys = Object.keys(obj).sort();
+      var keys = Object.keys(s.val() || {}).sort();
       if(keys.length > RECENT_BACKUP_KEEP){
         var updates = {};
-        keys.slice(0, keys.length - RECENT_BACKUP_KEEP).forEach(function(kk){ updates['serverBackupsRecent/'+kk] = null; });
+        keys.slice(0, keys.length - RECENT_BACKUP_KEEP).forEach(function(kk){ updates['serverBackupsRecent/'+kk] = null; updates['serverBackupsRecentIndex/'+kk] = null; });
         return fbDb.ref().update(updates);
       }
     })
@@ -5779,13 +5798,14 @@ function ContractModal(props){
             onDragOver:function(e){ e.preventDefault(); },
             onDrop:onCardDrop(field),
             onPaste:onPasteImg,
+            onClick:function(e){ var inp = e.currentTarget.querySelector('input[type=file]'); if(inp){ e.preventDefault(); inp.click(); } }, // 모바일: 탭 시 사진 선택창 직접 열기(display:none input 탭 미작동 회피)
             tabIndex:0,
-            title:'클릭 후 Ctrl+V로 화면 캡처 붙여넣기 가능',
+            title:'탭하여 사진·파일 선택 (카메라·갤러리) · PC는 드래그/Ctrl+V',
             style:{ display:'flex', alignItems:'center', gap:'6px', border:'1px dashed #cbd5e1', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', background:'#f8fafc', minHeight:'38px', outline:'none' } },
             h('span', { style:{ fontSize:'14px' } }, '📎'),
             h('div', null,
-              h('div', { style:{ fontSize:'10.5px', color:'#475569', fontWeight:600 } }, '이미지/PDF 클릭 또는 드래그'),
-              h('div', { style:{ fontSize:'10.5px', color:'#94a3b8' } }, 'JPG·PNG·PDF — OCR 지원 · Ctrl+V 붙여넣기')
+              h('div', { style:{ fontSize:'10.5px', color:'#475569', fontWeight:600 } }, '📷 사진·파일 첨부 (탭)'),
+              h('div', { style:{ fontSize:'10.5px', color:'#94a3b8' } }, '갤러리·카메라·PDF · PC는 드래그/Ctrl+V')
             ),
             h('input', { type:'file', accept:'image/*,.pdf', onChange:onCardSelect(field), style:{ display:'none' } })
           )
@@ -12694,13 +12714,6 @@ function CaseManagement(props){
                   h('div', { style:{ display:'flex', flexDirection:'column', gap:'3px', alignItems:'center' } },
                     h('button', { onClick:function(){ openEdit(c); },
                       style:{ background:'#dbeafe', color:'#1e40af', border:'1px solid #93c5fd', padding:'2px 8px', borderRadius:'5px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', minWidth:'46px' } }, '수정'),
-                    h('button', { onClick:function(){
-                        var copy = Object.assign({}, c);
-                        delete copy.id; delete copy.caseNo; delete copy.createdAt; delete copy.closedDate; delete copy.permanentArchived;
-                        copy.status = 'open'; copy.caseResult = ''; copy.closeReason = '';
-                        setModal({ mode:'new', initData: copy });
-                      },
-                      style:{ background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', padding:'2px 8px', borderRadius:'5px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', minWidth:'46px' } }, '복제'),
                     c.status !== 'closed'
                       ? h('button', { onClick:function(){ closeCase(c.id); },
                           style:{ background:'#fef3c7', color:'#854d0e', border:'1px solid #fde68a', padding:'2px 8px', borderRadius:'5px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', minWidth:'46px' } }, '종료')
@@ -21335,7 +21348,7 @@ function BackupSection(){
     var size = 0;
     for(var i=0; i<localStorage.length; i++){
       var k = localStorage.key(i);
-      if(k && k.indexOf(KEY) === 0){
+      if(k && k.indexOf(KEY) === 0 && !/api_key/i.test(k)){
         var v = localStorage.getItem(k);
         data[k] = v;
         size += (k.length + v.length);
@@ -21445,32 +21458,38 @@ function BackupSection(){
 
   function clearHistory(){ saveHistory([]); showToast('이력 삭제됨'); }
 
-  // 서버 백업 보관함 목록 로드 (일간 + 수시)
+  // 서버 백업 보관함 목록 로드 (일간 + 수시) — 경량 인덱스만 읽음(전체 데이터 미수신)
   var sb0 = useState({ loading:true, list:[] }); var sbState = sb0[0]; var setSbState = sb0[1];
   useEffect(function(){
     if(typeof fbDb === 'undefined' || !fbDb){ setSbState({ loading:false, list:[] }); return; }
-    function counts(data){
-      var c = [];
-      ['contracts','finance_income','payroll_monthly','companies','attendance_records'].forEach(function(k){
-        if(Array.isArray(data[k])) c.push(k+' '+data[k].length);
-      });
-      return c.join(' · ');
+    // 인덱스가 없으면(구버전 백업) 1회 생성 후 사용
+    function loadIndex(indexPath, fullPath){
+      return fbDb.ref(indexPath).once('value').then(function(s){
+        var obj = (s && s.val()) || {};
+        if(Object.keys(obj).length) return obj;
+        return fbDb.ref(fullPath).once('value').then(function(fs){
+          var full = (fs && fs.val()) || {}; var idx = {}; var upd = {};
+          Object.keys(full).forEach(function(k){
+            var snap = full[k] || {}; idx[k] = { savedAt:snap.savedAt||'', summary:_snapSummary(snap.data||{}) };
+            upd[indexPath+'/'+k] = idx[k];
+          });
+          if(Object.keys(upd).length) fbDb.ref().update(upd).catch(function(){});
+          return idx;
+        }).catch(function(){ return {}; });
+      }).catch(function(){ return {}; });
     }
     Promise.all([
-      fbDb.ref('serverBackups').once('value').catch(function(){ return null; }),
-      fbDb.ref('serverBackupsRecent').once('value').catch(function(){ return null; })
+      loadIndex('serverBackupsIndex', 'serverBackups'),
+      loadIndex('serverBackupsRecentIndex', 'serverBackupsRecent')
     ]).then(function(res){
       var list = [];
-      function add(s, kind){
-        var obj = (s && s.val()) || {};
-        Object.keys(obj).forEach(function(k){
-          var snap = obj[k] || {}; var data = snap.data || {};
-          var when = snap.savedAt ? new Date(snap.savedAt) : null;
-          var label = (kind === 'daily')
-            ? k                                              // YYYY-MM-DD
-            : (when ? when.toLocaleString('sv-SE').slice(5,16) : k); // MM-DD HH:mm
+      function add(obj, kind){
+        Object.keys(obj || {}).forEach(function(k){
+          var it = obj[k] || {}; var when = it.savedAt ? new Date(it.savedAt) : null;
+          var label = (kind === 'daily') ? k : (when ? when.toLocaleString('sv-SE').slice(5,16) : k);
           var sortAt = when ? when.getTime() : (parseInt(k,10) || 0);
-          list.push({ key:kind+':'+k, kind:kind, label:label, sortAt:sortAt, data:data, summary:counts(data) });
+          list.push({ key:kind+':'+k, kind:kind, fbKey:k, path:(kind==='daily'?'serverBackups':'serverBackupsRecent'),
+                      label:label, sortAt:sortAt, summary:it.summary || '' });
         });
       }
       add(res[0], 'daily');
@@ -21480,7 +21499,11 @@ function BackupSection(){
     }).catch(function(){ setSbState({ loading:false, list:[] }); });
   }, []);
   async function restoreFromServer(entry){
-    await applyBackupData(entry.data, (entry.kind === 'daily' ? '서버백업 ' : '수시백업 ') + entry.label);
+    try {
+      var s = await fbDb.ref(entry.path + '/' + entry.fbKey).once('value');
+      var snap = (s && s.val()) || {};
+      await applyBackupData(snap.data || {}, (entry.kind === 'daily' ? '서버백업 ' : '수시백업 ') + entry.label);
+    } catch(e){ window._erpErrLog && window._erpErrLog(e); alert('백업을 불러오지 못했습니다.'); }
   }
 
   return h(PolicyCard, { title:'백업 · 복원', icon:'💾', headBg:'#f0fdf4', headFg:'#0f766e', collapseId:'sys_backup', defaultOpen:false },
@@ -38426,13 +38449,6 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                     h('div', { style:{ display:'flex', flexDirection:'column', gap:'3px', alignItems:'center' } },
                       h('button', { onClick:function(){ setEditModal(Object.assign({}, it)); },
                         style:{ background:'#dbeafe', color:'#1e40af', border:'1px solid #93c5fd', padding:'2px 8px', borderRadius:'5px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', minWidth:'46px' } }, '수정'),
-                      h('button', { onClick:function(){
-                          var copy = Object.assign({}, it);
-                          delete copy.id; delete copy.no; delete copy.createdAt; delete copy.closedAt;
-                          copy.status = 'pending'; copy.closedReason = '';
-                          setEditModal(Object.assign({ _isNew: true }, copy));
-                        },
-                        style:{ background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', padding:'2px 8px', borderRadius:'5px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', minWidth:'46px' } }, '복제'),
                       it.status !== 'closed'
                         ? h('button', { onClick:function(){ closeItem(it.id); },
                             style:{ background:'#fef3c7', color:'#854d0e', border:'1px solid #fde68a', padding:'2px 8px', borderRadius:'5px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', minWidth:'46px' } }, '종료')
