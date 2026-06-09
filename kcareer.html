@@ -76,6 +76,7 @@ body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;color:var(
 .scroll-hint{display:none}
 #sidePreview{position:fixed;right:-520px;top:0;bottom:0;width:400px;background:#fff;border-left:2px solid var(--border);box-shadow:-4px 0 24px rgba(0,0,0,.12);z-index:18;display:flex;flex-direction:column;transition:right .2s ease}
 #sidePreview.open{right:0}
+#sidePreview.pinned{z-index:70}
 .content-wrap{transition:padding-right .2s ease}
 .content-wrap.sp-open{padding-right:400px}
 #sidePreviewResizer{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:col-resize;z-index:2;background:transparent;transition:background .15s}
@@ -2386,7 +2387,7 @@ function renderCareerSummary(box){
 }
 
 /* ===== 사이드 미리보기 패널 ===== */
-var _spTimer=null,_spId=null,_spLeaveTimer=null;
+var _spTimer=null,_spId=null,_spLeaveTimer=null,_spPinned=false;
 function showSidePreview(id){
   if(_spId===id){clearTimeout(_spLeaveTimer);return;} clearTimeout(_spTimer); clearTimeout(_spLeaveTimer);
   _spTimer=setTimeout(async function(){
@@ -2441,17 +2442,23 @@ function showSidePreview(id){
       if(typeof CAREER_CFG!=='undefined') Object.keys(CAREER_CFG).forEach(function(pg){
         var store=CAREER_CFG[pg].store; if(get(store).find(function(r){return r.id===id;})) foundPage=pg;
       });
-      if(foundPage){ be.style.display=''; be.onclick=function(){ hideSidePreview(); openForm(foundPage,id,true); }; }
+      if(foundPage){ be.style.display=''; be.onclick=function(){ pinSidePreview(); openForm(foundPage,id,false); }; }
       else { be.style.display='none'; }
     }
   },200);
 }
-function hideSidePreview(){ clearTimeout(_spTimer); clearTimeout(_spLeaveTimer);
+function hideSidePreview(){ if(_spPinned) return; clearTimeout(_spTimer); clearTimeout(_spLeaveTimer);
   _spLeaveTimer=setTimeout(function(){ _spId=null;
     const p=document.getElementById('sidePreview'); if(p) p.classList.remove('open');
     const cw=document.querySelector('.content-wrap'); if(cw) cw.classList.remove('sp-open');
   },500); }
 function keepSidePreview(){ clearTimeout(_spLeaveTimer); }
+function pinSidePreview(){ _spPinned=true; clearTimeout(_spTimer); clearTimeout(_spLeaveTimer);
+  const p=document.getElementById('sidePreview'); if(p) p.classList.add('open','pinned');
+  const w=(p&&p.offsetWidth)||400; const ov=document.getElementById('modalForm'); if(ov) ov.style.paddingRight=(w+24)+'px'; }
+function unpinSidePreview(){ if(!_spPinned) return; _spPinned=false;
+  const p=document.getElementById('sidePreview'); if(p) p.classList.remove('pinned');
+  const ov=document.getElementById('modalForm'); if(ov) ov.style.paddingRight=''; hideSidePreview(); }
 /* ===== 사이드 패널 좌우 드래그 리사이저 ===== */
 function initSideResize(){
   const panel=document.getElementById('sidePreview'), handle=document.getElementById('sidePreviewResizer'); if(!panel||!handle) return;
@@ -2621,7 +2628,7 @@ function openForm(page,editId,showPrev){ const def=FORM_DEFS[page]; if(!def) ret
   } else { $('modalBody').innerHTML=fields; if(modal) modal.classList.remove('wide'); }
   $('modalForm').classList.add('open');
 }
-function closeForm(){ $('modalForm').classList.remove('open'); _formCtx=null; }
+function closeForm(){ $('modalForm').classList.remove('open'); _formCtx=null; unpinSidePreview(); }
 function wiccokSameAsIssue(cb){
   const issueDate=v('ff-issueDate'); if(!issueDate) return;
   if(cb.checked){ const ps=document.getElementById('ff-periodStart'); if(ps){ ps.value=issueDate; } }
