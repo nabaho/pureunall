@@ -33928,10 +33928,11 @@ function CorpDashboard(props){
             : r.type==='eum-work' ? (function(){
                 if(r.externalId){
                   var ext = (dbGet('external_staff',[])||[]).find(function(x){return x.id===r.externalId;});
-                  if(ext) return '🏛️ ' + ext.name + ' 이음센터' + (r.note?' '+r.note:'');
+                  var _tEum = (r.startTime ? r.startTime.replace(':','') + '-' + (r.endTime||'').replace(':','') + ' ' : '');
+        if(ext) return '🏛️ ' + _tEum + ext.name + ' 이음센터' + (r.note?' '+r.note:'');
                 }
                 var u = users.find(function(x){return x.sid===r.sid;});
-                return '🏛️ ' + (u?u.name+' 이음센터':'이음센터') + (r.note?' '+r.note:'');
+                return '🏛️ ' + _tEum + (u?u.name+' 이음센터':'이음센터') + (r.note?' '+r.note:'');
               })()
             : '';
     var col = r.type==='trip' ? '#1e40af' : r.type==='telework' ? '#2563eb' : r.type==='eum-work' ? '#2563eb' : r.type==='sick' ? '#dc2626' : (staffColorMap[r.sid]||'#64748b');
@@ -36353,6 +36354,19 @@ function CorpDashboard(props){
               style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'5px',
                 fontSize:'13px', fontFamily:'inherit', boxSizing:'border-box' }})
           ),
+          // 근무시간 (선택)
+          h('div', { style:{ marginBottom:'12px' }},
+            h('label', { style:{ fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px' }}, '근무시간 (선택)'),
+            h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' }},
+              h('input', { type:'time', value:eumWorkModal.startTime||'',
+                onChange:function(e){ setEumWorkModal(Object.assign({},eumWorkModal,{startTime:e.target.value})); },
+                style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'13px', fontFamily:'inherit', boxSizing:'border-box' }}),
+              h('span', { style:{ color:'#94a3b8', fontSize:'12px' }}, '~'),
+              h('input', { type:'time', value:eumWorkModal.endTime||'',
+                onChange:function(e){ setEumWorkModal(Object.assign({},eumWorkModal,{endTime:e.target.value})); },
+                style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'13px', fontFamily:'inherit', boxSizing:'border-box' }})),
+            h('div', { style:{ fontSize:'10px', color:'#94a3b8', marginTop:'3px' }}, '입력 시 캘린더에 "0900-1300 이름 이음센터"로 표시 — 사람별 근무시간 구분 가능')
+          ),
           // 메모
           h('div', { style:{ marginBottom:'4px' }},
             h('label', { style:{ fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px' }}, '메모 (선택)'),
@@ -36398,7 +36412,8 @@ function CorpDashboard(props){
                   if(dup){ showToast('해당 날짜 이미 등록됨'); return; }
                   var newEumId = 'att-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
                   att.unshift({ id:newEumId,
-                    sid:targetSid, externalId:targetExtId, date:eumWorkModal.date, type:'eum-work', hours:8, note:eumWorkModal.note||'' });
+                    sid:targetSid, externalId:targetExtId, date:eumWorkModal.date, type:'eum-work', hours:8, note:eumWorkModal.note||'',
+                    startTime:eumWorkModal.startTime||'', endTime:eumWorkModal.endTime||'' });
                   dbSet('attendance_records', att);
                   // 구글 캘린더 동기화
                   if(gcalAuthed && GCAL_CAL_ID){
