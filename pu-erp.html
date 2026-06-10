@@ -51689,7 +51689,8 @@ function ERPMain(props){
       var ctrl = e.ctrlKey || e.metaKey;
       // Alt+1~5 → 각 그룹 첫 화면
       if(e.altKey && !ctrl && !e.shiftKey){
-        var map = { '1':'dash/corp', '2':'biz/contract', '3':'hr/staff', '4':'fin/income', '5':'env/settings' };
+        var map = { '1':'dash/my', '2':'biz/company', '3':'biz/case', '4':'biz/consulting', '5':'biz/contract',
+                    '6':'fin/income', '7':'hr/attend', '8':'dash/corp', '9':'env/settings' };
         if(map[e.key]){ e.preventDefault(); selectMenu(map[e.key]); return; }
       }
       // Ctrl+S → 열린 모달의 저장 버튼 클릭
@@ -52041,10 +52042,35 @@ document.addEventListener('keydown', function(e){
     if(modalBg){ e.preventDefault(); modalBg.click(); return; }
   }
 
-  // Ctrl+/ : 단축키 도움말
+  // Ctrl+/ : 단축키 안내판 (토글)
   if((e.ctrlKey || e.metaKey) && e.key === '/' && !isInput){
     e.preventDefault();
-    showToast('⌨️ 단축키: ↑↓메뉴이동 | Enter선택 | ←→그룹접기 | Esc모달닫기 | Ctrl+/도움말', 5000);
+    var ex = document.getElementById('erp-shortcut-help');
+    if(ex){ ex.remove(); return; }
+    var bg = document.createElement('div');
+    bg.id = 'erp-shortcut-help';
+    bg.className = 'modal-bg';
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:2147483000;display:flex;align-items:center;justify-content:center;';
+    function row(k, d){ return '<div style="display:flex;gap:12px;padding:4px 0;border-bottom:1px solid #f8fafc;align-items:baseline;">'
+      + '<kbd style="flex-shrink:0;min-width:110px;font-family:monospace;font-size:11.5px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:5px;padding:2px 8px;text-align:center;color:#334155;">'+k+'</kbd>'
+      + '<span style="font-size:12px;color:#475569;">'+d+'</span></div>'; }
+    function grp(t, rows){ return '<div style="margin-bottom:14px;"><div style="font-size:12px;font-weight:800;color:#1e40af;margin-bottom:6px;">'+t+'</div>'+rows.join('')+'</div>'; }
+    bg.innerHTML = '<div class="modal" style="width:560px;max-width:94vw;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+      + '<div class="modal-h" style="display:flex;justify-content:space-between;align-items:center;background:#1e40af;color:#fff;padding:13px 18px;">'
+      + '<div class="t" style="font-size:14px;font-weight:800;">⌨️ 키보드 단축키</div>'
+      + '<button class="x" style="background:rgba(255,255,255,0.15);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;">×</button></div>'
+      + '<div style="padding:16px 20px;max-height:70vh;overflow-y:auto;">'
+      + grp('이동·검색', [row('Ctrl + K','전역 검색'), row('/','현재 화면 검색창으로 포커스'),
+          row('Alt + 1~9','1 나의업무 · 2 업체 · 3 사건 · 4 컨설팅 · 5 계약 · 6 입금 · 7 근태 · 8 법인대시보드 · 9 환경설정'),
+          row('Ctrl + /','이 안내판 열기/닫기')])
+      + grp('작업', [row('Ctrl + S','열린 모달 저장'), row('Ctrl + N','현재 화면 등록/추가'),
+          row('Esc','모달 닫기'), row('Enter','검색 실행 · 입력 저장'), row('Shift + Enter','메모 줄바꿈')])
+      + grp('사이드바 (마우스 없이)', [row('↑ ↓','메뉴 이동 (순환)'), row('Enter','메뉴 진입'),
+          row('← →','그룹 접기/펴기'), row('Ctrl + 방향키','본문 스크롤')])
+      + grp('표 인라인 편집 (업체관리)', [row('더블클릭','셀 편집 시작'), row('Enter / Esc','저장 / 취소'), row('Tab','다음 셀 이동하며 편집')])
+      + '</div></div>';
+    bg.addEventListener('click', function(ev){ if(ev.target === bg || (ev.target.className||'').indexOf('x') >= 0){ bg.remove(); } });
+    document.body.appendChild(bg);
     return;
   }
 
