@@ -34135,6 +34135,18 @@ function CorpDashboard(props){
     setCalDragOver(null);
     try {
       var data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      // 내부 직원 칩 드롭 → 해당 직원 이음센터 근무 일정 추가
+      if(data && data.kind === 'int-staff' && data.sid){
+        var sArr0 = dbGet('my_schedules', []) || [];
+        var dup0 = sArr0.find(function(s){ return s.date===newDate && s.sid===data.sid && s.type==='eum-work' && !s.externalId; });
+        if(dup0){ showToast('이미 '+newDate+' '+(data.name||data.sid)+' 이음센터 등록됨'); return; }
+        sArr0.push({ id:'sch-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+          date:newDate, sid:data.sid, type:'eum-work', title:'', note:'' });
+        dbSet('my_schedules', sArr0);
+        showToast('🏛️ '+newDate+' '+(data.name||'')+' 이음센터 등록');
+        setCalRfk(calRfk+1);
+        return;
+      }
       // 외부협력자 칩 드롭 → 이음센터 근무 일정 추가
       if(data && data.kind === 'ext-staff' && data.extId){
         var exArr = dbGet('external_staff', []) || [];
@@ -34323,6 +34335,11 @@ function CorpDashboard(props){
           }
           return h('div',{key:u.sid, style:{position:'relative',flexShrink:0}},
             h('button',{
+              draggable:'true',
+              onDragStart:function(e){
+                e.dataTransfer.effectAllowed='copy';
+                e.dataTransfer.setData('text/plain', JSON.stringify({ kind:'int-staff', sid:u.sid, name:u.name }));
+              },
               onClick:function(){ setCalFilter(isActive?null:u.sid); },
               onMouseEnter:function(e){
                 var rect=e.currentTarget.getBoundingClientRect();
