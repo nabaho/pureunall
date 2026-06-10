@@ -24744,7 +24744,7 @@ function FinanceIncome(){
 
   return h('div', { className:'page' },
     // 서브탭
-    h('div', { style:{ display:'flex', gap:'4px', marginBottom:'8px', borderBottom:'2px solid #e5e7eb', paddingBottom:'0', overflowX:'auto' } },
+    h('div', { style:{ display:'flex', gap:'4px', marginBottom:'8px', borderBottom:'2px solid #e2e8f0', paddingBottom:'0', overflowX:'auto' } },
       SUBTABS.map(function(t){
         var on = subTab === t.v;
         return h('button', { key:t.v, onClick:function(){ setSubTab(t.v); },
@@ -24844,7 +24844,7 @@ function IncomeUnmatchedTab(props){
   var thS = {padding:'8px 10px', textAlign:'left', fontSize:'11px', fontWeight:700, color:'#475569', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap'};
   var tdS = {padding:'8px 10px', fontSize:'11.5px', color:'#1e293b', borderBottom:'1px solid #f1f5f9'};
 
-  var filterBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', cursor:'pointer', fontSize:'13px', color:'#475569' };
+  var filterBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'10px', cursor:'pointer', fontSize:'13px', color:'#475569' };
   var activeBtn = { background:'#ea580c', color:'#fff', borderColor:'#ea580c', fontWeight:700 };
   var color = '#ea580c', bg = '#fff7ed';
   var sumAmt = currentList.reduce(function(s,fi){return s+(fi.amount||0);},0);
@@ -24931,10 +24931,10 @@ function IncomeUnmatchedTab(props){
     compact && h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px'} },
       h('div', { style:{display:'flex', alignItems:'center', gap:'8px'} },
         h('button', { onClick:monthPrev,
-          style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'} }, '◀'),
+          style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'10px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'} }, '◀'),
         h('div', { style:{fontWeight:700, fontSize:'15px', minWidth:'80px', textAlign:'center', color:'#1e293b'} }, monthFilter || '----'),
         h('button', { onClick:monthNext,
-          style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'} }, '▶'),
+          style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'10px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'} }, '▶'),
         h('button', { onClick:function(){setMonthFilter(todayYM());},
           title:'이번 달로',
           style:{marginLeft:'4px', background:monthFilter===todayYM()?'#1e40af':'#f8fafc', color:monthFilter===todayYM()?'#fff':'#475569', border:'1px solid #e2e8f0', borderRadius:'4px', padding:'4px 10px', cursor:'pointer', fontSize:'12px', fontWeight:600} }, '오늘')
@@ -24955,14 +24955,14 @@ function IncomeUnmatchedTab(props){
         modeBtn('year',  '🗓️ 연도별'),
         modeBtn('all',   '📋 전체')
       ),
-      mode === 'month' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+      mode === 'month' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
         h('button', { onClick:monthPrev, style:filterBtn, title:'이전 월' }, '◀'),
         h('input', { type:'month', value:monthFilter,
           onChange:function(e){ if(e.target.value) setMonthFilter(e.target.value); },
           style:{padding:'4px 8px',border:'1px solid #e2e8f0',borderRadius:'4px',fontSize:'13px',fontFamily:'monospace',fontWeight:700,color:color} }),
         h('button', { onClick:monthNext, style:filterBtn, title:'다음 월' }, '▶')
       ),
-      mode === 'year' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+      mode === 'year' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
         h('button', { onClick:yearPrev, style:filterBtn, title:'이전 연도' }, '◀'),
         h('span', { style:{padding:'4px 14px',fontSize:'14px',fontFamily:'monospace',fontWeight:700,color:color, minWidth:'76px', textAlign:'center'} }, monthFilter+'년'),
         h('button', { onClick:yearNext, style:filterBtn, title:'다음 연도' }, '▶')
@@ -25473,14 +25473,14 @@ function IncomePendingTab(){
         var normalAmt = normalPending.reduce(function(s,p){return s+(p.amount||0);},0);
         var unrecoverAmt = unrecoverable.reduce(function(s,p){return s+(p.amount||0);},0);
         return h('div', { style:{display:'flex',flexDirection:'column',gap:'4px',alignItems:'flex-end'} },
-          h('div', { style:{padding:'3px 8px',background:'#fff',border:'1px solid #fecaca',borderRadius:'6px',fontSize:'11px',fontWeight:700,color:'#991b1b'} },
+          h('div', { style:{padding:'3px 8px',background:'#fff',border:'1px solid #fecaca',borderRadius:'10px',fontSize:'11px',fontWeight:700,color:'#991b1b'} },
             '대기 ' + normalPending.length + '건 / ' + normalAmt.toLocaleString() + '원'),
           unrecoverable.length > 0 && h('div', { style:{padding:'4px 14px',background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',fontSize:'11px',fontWeight:700,color:'#991b1b'} },
             '🔴 회수불능 ' + unrecoverable.length + '건 / ' + unrecoverAmt.toLocaleString() + '원')
         );
       })(),
       h('button', { onClick:function(){setTrashModalOpen(true);},
-        style:{padding:'2px 6px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'6px',cursor:'pointer',fontSize:'10px',flexShrink:0,fontWeight:700,color:'#475569'} },
+        style:{padding:'2px 6px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'10px',cursor:'pointer',fontSize:'10px',flexShrink:0,fontWeight:700,color:'#475569'} },
         '🗑️ 휴지통 (' + trashItems.length + ')')
     ),
 
@@ -25531,7 +25531,7 @@ function IncomePendingTab(){
           h('div', { style:{fontSize:'48px',marginBottom:'10px'} }, '✓'),
           h('div', { style:{fontWeight:700,fontSize:'14px',color:'#166534',marginBottom:'4px'} }, '미입금 대기 없음'),
           h('div', { style:{fontSize:'11.5px',color:'#15803d'} }, '모든 사무관리 항목이 입금확정 처리되었습니다.'))
-      : h('div', { style:{border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden',background:'#fff'} },
+      : h('div', { style:{border:'1px solid #e2e8f0',borderRadius:'10px',overflow:'hidden',background:'#fff'} },
           h('table', { style:{width:'100%',borderCollapse:'collapse',fontSize:'11.5px'} },
             h('thead', null, h('tr', null,
               h('th', {style:Object.assign({},thS,{width:'40px',textAlign:'center'})}, '#'),
@@ -26210,7 +26210,7 @@ function IncomeListTab(){
     showToast(rows.length + '건 다운로드');
   }
   var color = '#1e40af', bg = '#eff6ff';
-  var filterBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', cursor:'pointer', fontSize:'13px', color:'#475569' };
+  var filterBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'10px', cursor:'pointer', fontSize:'13px', color:'#475569' };
   var mode = monthFilter === '' ? 'all' : (monthFilter.length === 4 ? 'year' : 'month');
   function modeBtn(m, label){
     var on = mode === m;
@@ -26233,7 +26233,7 @@ function IncomeListTab(){
         modeBtn('year',  '🗓️ 연도별'),
         modeBtn('all',   '📋 전체')
       ),
-      mode === 'month' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+      mode === 'month' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
         h('button', { onClick:monthPrev, style:filterBtn, title:'이전 월' }, '◀'),
         h('input', { type:'month', value:monthFilter,
           onChange:function(e){ if(e.target.value) setMonthFilter(e.target.value); },
@@ -26256,7 +26256,7 @@ function IncomeListTab(){
           style:{ padding:'3px 8px', background:locked?'#dc2626':'#fff', color:locked?'#fff':'#475569', border:'1px solid '+(locked?'#dc2626':'#cbd5e1'), borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:locked?700:600 } },
           locked ? '🔒 마감됨' : '🔓 마감 잠금');
       })(),
-      mode === 'year' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+      mode === 'year' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
         h('button', { onClick:yearPrev, style:filterBtn, title:'이전 연도' }, '◀'),
         h('span', { style:{padding:'4px 14px',fontSize:'14px',fontFamily:'monospace',fontWeight:700,color:color, minWidth:'76px', textAlign:'center'} }, monthFilter+'년'),
         h('button', { onClick:yearNext, style:filterBtn, title:'다음 연도' }, '▶')
@@ -26288,7 +26288,7 @@ function IncomeListTab(){
         style:{ padding:'7px 12px', border:'1px solid #16a34a', background:'#f0fdf4', color:'#16a34a', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer' } }, '📥 엑셀 다운로드')
     ),
     // 테이블
-    h('div', { style:{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'auto', maxHeight:'calc(100vh - 380px)' } },
+    h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'auto', maxHeight:'calc(100vh - 380px)' } },
       h('table', { className:'dt' },
         h('thead', null, h('tr', null,
           h('th',{style:{width:'30px'}},'#'),
@@ -26991,7 +26991,7 @@ function IncomeCompanyTab(){
     return h('div',{
       onClick:function(e){e.stopPropagation();},
       style:{position:'fixed',left:left+'px',top:top+'px',width:W+'px',
-        background:'#fff',border:'1px solid #e2e8f0',borderRadius:'8px',
+        background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',
         boxShadow:'0 8px 24px rgba(0,0,0,0.15)',zIndex:9100,padding:'12px'}},
       // 헤더
       h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'8px'}},
@@ -27007,7 +27007,7 @@ function IncomeCompanyTab(){
         h('div',{style:{fontSize:'11px',fontWeight:600,color:'#991b1b',marginBottom:'6px'}},'정말 입금 해제하시겠습니까?'),
         h('div',{style:{display:'flex',gap:'4px',justifyContent:'flex-end'}},
           h('button',{onClick:function(){setConfirming(false);},
-            style:{padding:'3px 9px',border:'1px solid #cbd5e1',borderRadius:'5px',background:'#fff',cursor:'pointer',fontSize:'10.5px'}},'취소'),
+            style:{padding:'3px 9px',border:'1px solid #cbd5e1',borderRadius:'10px',background:'#fff',cursor:'pointer',fontSize:'10.5px'}},'취소'),
           h('button',{onClick:function(){
               persist(incomes.filter(function(i){return i.id!==existing.id;}));
               showToast('해제'); setCellModal(null);
@@ -27087,7 +27087,7 @@ function IncomeCompanyTab(){
 
   return h('div',{onClick:function(){setCellModal(null);}},
     // 유형 탭
-    h('div',{style:{display:'flex',gap:'4px',marginBottom:'7px',borderBottom:'2px solid #e5e7eb',overflowX:'auto',WebkitOverflowScrolling:'touch'}},
+    h('div',{style:{display:'flex',gap:'4px',marginBottom:'7px',borderBottom:'2px solid #e2e8f0',overflowX:'auto',WebkitOverflowScrolling:'touch'}},
       TYPE_TABS.map(function(t){
         var on=typeTab===t.v;
         var cnt= t.v==='all'
@@ -27102,7 +27102,7 @@ function IncomeCompanyTab(){
     ),
     // KPI
     h('div',{style:{display:'flex',gap:'4px',marginBottom:'7px',overflowX:'auto',WebkitOverflowScrolling:'touch'}},
-      h('div',{style:{background:curTab.bg,border:'1px solid #e5e7eb',borderRadius:'6px',padding:'4px 7px',textAlign:'center',flexShrink:0,minWidth:'68px'}},
+      h('div',{style:{background:curTab.bg,border:'1px solid #e2e8f0',borderRadius:'6px',padding:'4px 7px',textAlign:'center',flexShrink:0,minWidth:'68px'}},
         h('div',{style:{fontSize:'8.5px',color:curTab.color,fontWeight:700,whiteSpace:'nowrap'}},curTab.icon+' '+curTab.label),
         h('div',{style:{fontSize:'13px',fontWeight:800,color:curTab.color,lineHeight:1.4}},SOURCE_LIST.length+'개')),
       h('div',{style:{background:'#dcfce7',border:'1px solid #bbf7d0',borderRadius:'6px',padding:'4px 7px',textAlign:'center',flexShrink:0,minWidth:'68px'}},
@@ -27121,9 +27121,9 @@ function IncomeCompanyTab(){
     // 툴바
     h('div',{style:{display:'flex',gap:'4px',marginBottom:'6px',alignItems:'center',flexWrap:'wrap'}},
       h('div',{style:{display:'flex',alignItems:'center',gap:'3px',flexShrink:0}},
-        h('button',{onClick:function(){setSelYear(selYear-1);},style:{padding:'3px 6px',border:'1px solid #cbd5e1',borderRadius:'5px',background:'#fff',cursor:'pointer',fontSize:'13px'}},'◀'),
+        h('button',{onClick:function(){setSelYear(selYear-1);},style:{padding:'3px 6px',border:'1px solid #cbd5e1',borderRadius:'10px',background:'#fff',cursor:'pointer',fontSize:'13px'}},'◀'),
         h('span',{style:{fontWeight:700,fontSize:'12px',minWidth:'36px',textAlign:'center'}},selYear+'년'),
-        h('button',{onClick:function(){setSelYear(selYear+1);},style:{padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'5px',background:'#fff',cursor:'pointer',fontSize:'13px'}},'▶')
+        h('button',{onClick:function(){setSelYear(selYear+1);},style:{padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'10px',background:'#fff',cursor:'pointer',fontSize:'13px'}},'▶')
       ),
       h('input',{placeholder:'🔍 사업장/담당자',value:query,onChange:function(e){setQuery(e.target.value);},
         style:{width:'110px',padding:'4px 7px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'11px'}}),
@@ -27327,7 +27327,7 @@ function IncomeCompanyTab(){
       importState.msg
     ),
     // 매트릭스 테이블
-    h('div',{style:{background:'#fff',border:'1px solid #e5e7eb',borderRadius:'6px',overflow:'auto',maxHeight:'calc(100vh - 240px)'}},
+    h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',overflow:'auto',maxHeight:'calc(100vh - 240px)'}},
       h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'10.5px',tableLayout:'fixed'}},
         h('colgroup',null,
           h('col',{style:{width:'24px'}}),
@@ -27357,7 +27357,7 @@ function IncomeCompanyTab(){
                 style:{padding:'2px 1px',textAlign:'center',verticalAlign:'bottom',
                   background:isNow?'#dbeafe':allDone?'#dcfce7':'#f8fafc',
                   color:isNow?'#1e40af':allDone?'#166534':'#1e293b',
-                  borderLeft:'1px solid #e5e7eb'}},
+                  borderLeft:'1px solid #e2e8f0'}},
                 h('div',{style:{fontSize:'10px',fontWeight:isNow||allDone?700:500,lineHeight:'1.2'}},m+'월'),
                 h('input',{type:'checkbox',checked:allDone,
                   onChange:function(e){toggleMonthAll(m,e.target.checked);},
@@ -27496,7 +27496,7 @@ function IncomeCompanyTab(){
         style:{position:'fixed',
           top:Math.min(cellCtxMenu.y, window.innerHeight-160)+'px',
           left:Math.min(cellCtxMenu.x, window.innerWidth-200)+'px',
-          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'6px',boxShadow:'0 8px 24px rgba(0,0,0,0.15)',
+          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',boxShadow:'0 8px 24px rgba(0,0,0,0.15)',
           padding:'4px',minWidth:'180px',zIndex:9701} },
         h('div', { style:{ fontSize:'10px', color:'#94a3b8', padding:'4px 8px', borderBottom:'1px solid #e2e8f0', marginBottom:'4px', fontWeight:600 } },
           cellCtxMenu.co.name + ' / ' + cellCtxMenu.m + '월'),
@@ -27537,7 +27537,7 @@ function IncomeCompanyTab(){
     cmsAlertOpen && todayCMSUnpaid.length > 0 && h('div',{
       style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9500,display:'flex',alignItems:'center',justifyContent:'center'}},
       h('div',{onClick:function(e){e.stopPropagation();},
-        style:{background:'#fff',borderRadius:'12px',padding:'24px',maxWidth:'380px',width:'90%',boxShadow:'0 16px 48px rgba(0,0,0,0.25)'}},
+        style:{background:'#fff',borderRadius:'10px',padding:'24px',maxWidth:'380px',width:'90%',boxShadow:'0 16px 48px rgba(0,0,0,0.25)'}},
         h('div',{style:{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}},
           h('div',{style:{fontSize:'28px'}},'🏦'),
           h('div',null,
@@ -27559,7 +27559,7 @@ function IncomeCompanyTab(){
         ),
         h('div',{style:{display:'flex',gap:'8px'}},
           h('button',{onClick:function(){setCmsAlertOpen(false);},
-            style:{flex:1,padding:'8px',border:'1px solid #cbd5e1',borderRadius:'6px',background:'#fff',cursor:'pointer',fontSize:'12px'}},'나중에'),
+            style:{flex:1,padding:'8px',border:'1px solid #cbd5e1',borderRadius:'10px',background:'#fff',cursor:'pointer',fontSize:'12px'}},'나중에'),
           h('button',{onClick:function(){
               // 당일 CMS 일괄 입금 확정
               var ym=nowYear+'-'+('0'+nowMonth).slice(-2);
@@ -27678,7 +27678,7 @@ function IncomeKindTab(props){
   var srcMenu = { 'case':'biz/case', 'consulting':'biz/consulting', 'fund':'biz/fund', 'other':'biz/other' };
   function goSrc(){ if(window.navigateTo) window.navigateTo(srcMenu[kind]||'biz/case'); }
 
-  var filterBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', cursor:'pointer', fontSize:'13px', color:'#475569' };
+  var filterBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'10px', cursor:'pointer', fontSize:'13px', color:'#475569' };
   var activeBtn = { background:color, color:'#fff', borderColor:color, fontWeight:700 };
   var thS = { padding:'9px 10px', fontWeight:700, color:'#475569', fontSize:'11.5px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', textAlign:'left', whiteSpace:'nowrap' };
   var tdS = { padding:'8px 10px', borderBottom:'1px solid #f1f5f9', fontSize:'11.5px' };
@@ -27709,14 +27709,14 @@ function IncomeKindTab(props){
       ),
 
       // 모드별 네비게이션
-      mode === 'month' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+      mode === 'month' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
         h('button', { onClick:monthPrev, style:filterBtn, title:'이전 월' }, '◀'),
         h('input', { type:'month', value:monthFilter,
           onChange:function(e){ if(e.target.value) setMonthFilter(e.target.value); },
           style:{padding:'4px 8px',border:'1px solid #e2e8f0',borderRadius:'4px',fontSize:'13px',fontFamily:'monospace',fontWeight:700,color:color} }),
         h('button', { onClick:monthNext, style:filterBtn, title:'다음 월' }, '▶')
       ),
-      mode === 'year' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+      mode === 'year' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
         h('button', { onClick:yearPrev, style:filterBtn, title:'이전 연도' }, '◀'),
         h('span', { style:{padding:'4px 14px',fontSize:'14px',fontFamily:'monospace',fontWeight:700,color:color, minWidth:'76px', textAlign:'center'} }, monthFilter+'년'),
         h('button', { onClick:yearNext, style:filterBtn, title:'다음 연도' }, '▶')
@@ -27754,7 +27754,7 @@ function IncomeKindTab(props){
             '사무관리로 이동 →')
         )
       // 테이블
-      : h('div', { style:{border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden',background:'#fff'} },
+      : h('div', { style:{border:'1px solid #e2e8f0',borderRadius:'10px',overflow:'hidden',background:'#fff'} },
           h('table', { style:{width:'100%',borderCollapse:'collapse',fontSize:'11.5px'} },
             h('thead', null, h('tr', null,
               h('th', {style:Object.assign({},thS,{width:'40px',textAlign:'center'})}, '#'),
@@ -27884,7 +27884,7 @@ function PerfSplitModal(props){
         var pv = previewShares(inc.amount, mainPct);
         var inputS = {width:'60px',padding:'3px 5px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'11px',textAlign:'right',fontFamily:'monospace'};
         var amtInputS = {width:'84px',padding:'3px 5px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'11px',textAlign:'right',fontFamily:'monospace'};
-        return h('div', {key:inc.id, style:{border:'1px solid #e5e7eb',borderRadius:'8px',padding:'14px',marginBottom:'12px',background:'#f8fafc'}},
+        return h('div', {key:inc.id, style:{border:'1px solid #e2e8f0',borderRadius:'8px',padding:'14px',marginBottom:'12px',background:'#f8fafc'}},
           // 헤더
           h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
             h('div', null,
@@ -27932,7 +27932,7 @@ function PerfSplitModal(props){
             h('span',null,'원')
           ),
           // 미리보기 - 각자 요율 표시
-          h('div',{style:{background:'#fff',border:'1px solid #e5e7eb',borderRadius:'5px',padding:'8px 12px',fontSize:'11px',marginBottom:'8px'}},
+          h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',padding:'8px 12px',fontSize:'11px',marginBottom:'8px'}},
             h('div',{style:{display:'flex',justifyContent:'space-between',padding:'2px 0'}},
               h('span',null,'\uD83D\uDFE3 '+userName(item.managerMain)+' (주담당 '+mainBaseRate+'%) × '+pv.mainBase.toLocaleString()+'원'),
               h('span',{style:{fontFamily:'monospace',fontWeight:700,color:'#2563eb'}},pv.mainAmt.toLocaleString()+'원')),
@@ -27947,7 +27947,7 @@ function PerfSplitModal(props){
             '이 건 적용')
         );
       }),
-      h('div',{style:{borderTop:'1px solid #e5e7eb',paddingTop:'12px',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+      h('div',{style:{borderTop:'1px solid #e2e8f0',paddingTop:'12px',display:'flex',justifyContent:'space-between',alignItems:'center'}},
         h('div',{style:{fontSize:'10.5px',color:'#94a3b8'}},'※ 자문료(업체 입금)는 성과급 반영 대상이 아닙니다 (사건·컨설팅·기금·기타만 반영)'),
         h('button',{onClick:props.onClose,style:{padding:'7px 14px',border:'1px solid #cbd5e1',borderRadius:'4px',background:'#fff',cursor:'pointer'}},'닫기')
       )
@@ -28177,7 +28177,7 @@ function IncomeDetailModal(props){
               ),
               h('div', { className:'fld' },
                 h('label', null, '해제 사유 *'),
-                h('div', { style:{display:'flex',flexDirection:'column',gap:'4px',padding:'8px 10px',border:'1px solid #e2e8f0',borderRadius:'5px',background:'#fff'} },
+                h('div', { style:{display:'flex',flexDirection:'column',gap:'4px',padding:'8px 10px',border:'1px solid #e2e8f0',borderRadius:'10px',background:'#fff'} },
                   REASONS.map(function(r){
                     var sel = rc === r;
                     return h('label', { key:r,
@@ -28538,17 +28538,17 @@ function FinanceExpense(){
     h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px', marginBottom:'8px' } },
       h('div', { style:{ display:'flex', gap:'4px', overflowX:'auto', WebkitOverflowScrolling:'touch' } },
         h('button', { onClick:downloadCSV,
-          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '⬇ CSV'),
+          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '⬇ CSV'),
         h('button', { onClick:function(){setShowBulk(true);},
-          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '📋 일괄'),
+          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '📋 일괄'),
         h('button', { onClick:function(){setShowCardImport(true);},
-          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '💳 카드엑셀'),
+          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '💳 카드엑셀'),
         h('button', { onClick:function(){setShowLastCopy(true);},
           style:{ padding:'3px 8px', background:'#fef3c7', border:'1px solid #fde68a', borderRadius:'5px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#92400e', flexShrink:0 } }, '📋 지난달'),
         h('button', { onClick:function(){setShowRecurring(true);},
-          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '🔁 정기'),
+          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '🔁 정기'),
         h('button', { onClick:function(){setShowBudget(true);},
-          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '📊 예산'),
+          style:{ padding:'3px 8px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'10px', fontWeight:600, color:'#475569', flexShrink:0 } }, '📊 예산'),
         h('button', { onClick:function(){setBulkFeeMode(!bulkFeeMode); setBulkSel({});},
           style:{ padding:'3px 8px', background:bulkFeeMode?'#f59e0b':'#fff', color:bulkFeeMode?'#fff':'#475569', border:'1px solid '+(bulkFeeMode?'#f59e0b':'#cbd5e1'), borderRadius:'5px', cursor:'pointer', fontSize:'10px', fontWeight:600, flexShrink:0 } }, '🏦 수수료'),
         // ── 월 마감 잠금 토글
@@ -28702,7 +28702,7 @@ function FinanceExpense(){
             ? h('div',{style:{padding:'40px',textAlign:'center',color:'#94a3b8',background:'#f8fafc',borderRadius:'6px'}},'내역 없음')
             : subGroups
             // 법인카드: 카드별 묶기
-            ? h('div',{style:{background:'#fff',border:'1px solid #e5e7eb',borderRadius:'6px'}},
+            ? h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px'}},
                 subGroups.map(function(sg,si){
                   var subKey = 'card::'+sg.name;
                   var subOpen = !!openSubGroup[subKey];
@@ -28765,7 +28765,7 @@ function FinanceExpense(){
                   h('button',{onClick:function(){setBulkSel({});},
                     style:{background:'#fff',color:'#92400e',border:'1px solid #fde68a',padding:'5px 10px',borderRadius:'4px',fontSize:'10.5px',cursor:'pointer'}},'선택 해제')
                 ),
-                h('div',{style:{background:'#fff',border:'1px solid #e5e7eb',borderRadius:'6px',overflow:'hidden'}},
+                h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',overflow:'hidden'}},
                 catItems.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).map(function(it,i){
                   var isEB = it.category==='exp-employer-burden';
                   var isPaid = it.paid===true;
@@ -28930,7 +28930,7 @@ function LastMonthCopyModal(props){
         // 리스트
         lastItems.length === 0
           ? h('div', { style:{ textAlign:'center', padding:'40px', color:'#94a3b8', fontSize:'12px' } }, '지난달('+prevYM+')에 출금 내역이 없습니다.')
-          : h('div', { style:{ border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'hidden' } },
+          : h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'6px', overflow:'hidden' } },
               lastItems.map(function(it, i){
                 var c = catMap[it.category] || { name:it.category, color:'#94a3b8' };
                 var on = !!sel[it.id];
@@ -28951,13 +28951,13 @@ function LastMonthCopyModal(props){
               })
             )
       ),
-      h('div', { className:'mf', style:{ display:'flex', alignItems:'center', gap:'10px', padding:'12px 16px', borderTop:'1px solid #e5e7eb' } },
+      h('div', { className:'mf', style:{ display:'flex', alignItems:'center', gap:'10px', padding:'12px 16px', borderTop:'1px solid #e2e8f0' } },
         h('span', { style:{ fontSize:'12px', color:'#64748b' } },
           '선택 ', h('span', { style:{ color:'#dc2626', fontWeight:700 } }, selIds.length+'건'),
           ' · 합계 ', h('span', { style:{ fontFamily:'monospace', color:'#dc2626', fontWeight:700 } }, selTotal.toLocaleString()+'원')
         ),
         h('div', { style:{ flex:1 } }),
-        h('button', { onClick:props.onClose, style:{ padding:'7px 14px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'12px', fontWeight:600 } }, '취소'),
+        h('button', { onClick:props.onClose, style:{ padding:'7px 14px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'12px', fontWeight:600 } }, '취소'),
         h('button', { onClick:apply, disabled:selIds.length===0,
           style:{ padding:'7px 18px', background:selIds.length===0?'#cbd5e1':'#1e40af', color:'#fff', border:'none', borderRadius:'5px', cursor:selIds.length===0?'not-allowed':'pointer', fontSize:'12px', fontWeight:700 } }, '✓ 선택 '+selIds.length+'건 복사')
       )
@@ -29136,7 +29136,7 @@ function ExpenseDetailModal(props){
               h('div',{style:{fontSize:'11.5px',fontWeight:700,color:'#1e40af'}},'📋 세부항목 ('+details.length+')'),
               h('div',{style:{flex:1}}),
               h('button',{type:'button',onClick:clearDetails,
-                style:{background:'#fff',border:'1px solid #fca5a5',color:'#b91c1c',padding:'2px 8px',borderRadius:'5px',fontSize:'10.5px',cursor:'pointer'}},'전체 제거')
+                style:{background:'#fff',border:'1px solid #fca5a5',color:'#b91c1c',padding:'2px 8px',borderRadius:'10px',fontSize:'10.5px',cursor:'pointer'}},'전체 제거')
             ),
             details.map(function(d,i){
               return h('div',{key:i,style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'5px'}},
@@ -29152,7 +29152,7 @@ function ExpenseDetailModal(props){
             }),
             h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginTop:'6px',paddingTop:'6px',borderTop:'1px dashed #ddd6fe'}},
               h('button',{type:'button',onClick:addDetail,
-                style:{background:'#fff',border:'1px solid #93c5fd',color:'#2563eb',padding:'4px 10px',borderRadius:'5px',fontSize:'11px',fontWeight:600,cursor:'pointer'}},'+ 항목 추가'),
+                style:{background:'#fff',border:'1px solid #93c5fd',color:'#2563eb',padding:'4px 10px',borderRadius:'10px',fontSize:'11px',fontWeight:600,cursor:'pointer'}},'+ 항목 추가'),
               h('div',{style:{flex:1,textAlign:'right',fontSize:'11.5px',color:'#1e40af',fontWeight:700}},
                 '합계 ', h('span',{style:{fontFamily:'monospace',fontSize:'13px',marginLeft:'4px'}}, (f.amount||0).toLocaleString()+'원'))
             )
@@ -29250,7 +29250,7 @@ function RecurringExpenseModal(props){
         ),
         h('div', { style:{ display:'flex', gap:'8px', marginBottom:'10px' } },
           h('button', { onClick:addNew, style:{ padding:'7px 14px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:700 } }, '+ 정기 항목 추가'),
-          h('button', { onClick:applyToCurrentMonth, style:{ padding:'7px 14px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600 } }, '이번 달에 즉시 적용')
+          h('button', { onClick:applyToCurrentMonth, style:{ padding:'7px 14px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'11.5px', fontWeight:600 } }, '이번 달에 즉시 적용')
         ),
         recs.length===0
           ? h('div', { style:{ background:'#f8fafc', borderRadius:'8px', padding:'40px', textAlign:'center', color:'#94a3b8', fontSize:'12px' } }, '등록된 정기출금이 없습니다')
@@ -29424,7 +29424,7 @@ function ExpenseBulkImportModal(props){
         h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 14px', marginBottom:'12px', fontSize:'11.5px', color:'#1e40af', lineHeight:'1.7' } },
           h('div', { style:{ fontWeight:700, marginBottom:'4px' } }, '📌 형식 안내 (탭 또는 쉼표 구분)'),
           '한 줄에 하나의 출금: ',
-          h('code', { style:{ background:'#fff', padding:'1px 6px', borderRadius:'5px', fontSize:'11px' } }, '지급처\\t금액\\t비고\\t날짜'),
+          h('code', { style:{ background:'#fff', padding:'1px 6px', borderRadius:'10px', fontSize:'11px' } }, '지급처\\t금액\\t비고\\t날짜'),
           h('br',null),
           '날짜 생략 시 아래 "기본 날짜" 사용. 비고는 선택. 엑셀에서 4컬럼 복사 → 붙여넣기 가능.'
         ),
@@ -29746,7 +29746,7 @@ function CardExcelImportModal(props){
             })(),
             h('div',{style:{flex:1,textAlign:'right',fontSize:'12px',fontWeight:700,color:'#dc2626'}},'합계 '+totalAmt.toLocaleString()+'원')
           ),
-          h('div',{style:{maxHeight:'320px',overflowY:'auto',border:'1px solid #e5e7eb',borderRadius:'4px'}},
+          h('div',{style:{maxHeight:'320px',overflowY:'auto',border:'1px solid #e2e8f0',borderRadius:'4px'}},
             h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'}},
               h('thead',null,h('tr',{style:{background:'#f8fafc',position:'sticky',top:0}},
                 h('th',{style:{padding:'6px 8px',textAlign:'left',width:'30px'}},'#'),
@@ -29773,7 +29773,7 @@ function CardExcelImportModal(props){
                         setCatOverride(nx);
                       },
                       title: isAuto ? '자동 분류 (수정 가능)' : '사용자 수정됨',
-                      style:{width:'100%',padding:'3px 5px',border:'1px solid '+(isAuto?'#bfdbfe':'#fcd34d'),borderRadius:'5px',fontSize:'10.5px',background:'#fff',
+                      style:{width:'100%',padding:'3px 5px',border:'1px solid '+(isAuto?'#bfdbfe':'#fcd34d'),borderRadius:'10px',fontSize:'10.5px',background:'#fff',
                         color: curCat ? curCat.color : '#475569', fontWeight:600}},
                       allCats.map(function(c){
                         return h('option',{key:c.code,value:c.code}, c.name);
@@ -30002,7 +30002,7 @@ function HelpBot(props){
           }}, m.content)
         );
       }),
-      loading && h('div', {style:{display:'flex', gap:'4px', padding:'8px 12px', background:'#fff', borderRadius:'14px', border:'1px solid #e2e8f0', width:'fit-content'}},
+      loading && h('div', {style:{display:'flex', gap:'4px', padding:'8px 12px', background:'#fff', borderRadius:'10px', border:'1px solid #e2e8f0', width:'fit-content'}},
         [0,1,2].map(function(i){
           return h('div', {key:i, style:{width:'6px', height:'6px', borderRadius:'50%', background:'#94a3b8',
             animation:'bounce 1s infinite', animationDelay:(i*0.2)+'s'}});
@@ -30293,7 +30293,7 @@ function FinanceInvoice(){
       return h('div', { style:{ padding:'16px', textAlign:'center', color:'#94a3b8', fontSize:'12px' } }, '⏳ 아카이브 데이터 로딩 중...');
     }
 
-    var uploadArea = h('div', { style:{ background:'#fff', border:'2px dashed #cbd5e1', borderRadius:'8px', padding:'14px', marginBottom:'12px' } },
+    var uploadArea = h('div', { style:{ background:'#fff', border:'2px dashed #cbd5e1', borderRadius:'10px', padding:'14px', marginBottom:'12px' } },
       h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'10px' } },
         h('div', null,
           h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b' } }, '📁 홈택스 매출 세금계산서 엑셀 업로드'),
@@ -30477,7 +30477,7 @@ function FinanceInvoice(){
         function yearNext(){ var y = parseInt(monthFilter.slice(0,4),10); setMonthFilter(String(y+1)); }
         function quarterPrev(){ var y = parseInt(monthFilter.slice(0,4),10); var q = parseInt(monthFilter.slice(-1),10); q--; if(q<1){q=4;y--;} setMonthFilter(y+'-Q'+q); }
         function quarterNext(){ var y = parseInt(monthFilter.slice(0,4),10); var q = parseInt(monthFilter.slice(-1),10); q++; if(q>4){q=1;y++;} setMonthFilter(y+'-Q'+q); }
-        var navBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', cursor:'pointer', fontSize:'13px', color:'#475569' };
+        var navBtn = { padding:'4px 8px', border:'1px solid #cbd5e1', background:'#fff', borderRadius:'10px', cursor:'pointer', fontSize:'13px', color:'#475569' };
         return h('div', { style:{ display:'flex', gap:'8px', marginBottom:'14px', alignItems:'center', flexWrap:'wrap' } },
           h('button', { onClick:addNew,
             style:{ background:'#1e40af', color:'#fff', border:'none', padding:'7px 14px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '+ 세금계산서 발행'),
@@ -30493,19 +30493,19 @@ function FinanceInvoice(){
             modeBtn('all',     '📋 전체')
           ),
           // 모드별 네비
-          mode === 'month' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+          mode === 'month' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
             h('button', { onClick:monthPrev, style:navBtn }, '◀'),
             h('input', { type:'month', value:monthFilter,
               onChange:function(e){ if(e.target.value) setMonthFilter(e.target.value); },
               style:{padding:'4px 8px',border:'1px solid #e2e8f0',borderRadius:'4px',fontSize:'13px',fontFamily:'monospace',fontWeight:700,color:'#1e40af'} }),
             h('button', { onClick:monthNext, style:navBtn }, '▶')
           ),
-          mode === 'quarter' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+          mode === 'quarter' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
             h('button', { onClick:quarterPrev, style:navBtn }, '◀'),
             h('span', { style:{padding:'4px 14px',fontSize:'14px',fontFamily:'monospace',fontWeight:700,color:'#1e40af', minWidth:'94px', textAlign:'center'} }, monthFilter),
             h('button', { onClick:quarterNext, style:navBtn }, '▶')
           ),
-          mode === 'year' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'7px'} },
+          mode === 'year' && h('div', { style:{display:'flex',gap:'4px',alignItems:'center',background:'#fff',padding:'4px',border:'1px solid #e2e8f0',borderRadius:'10px'} },
             h('button', { onClick:yearPrev, style:navBtn }, '◀'),
             h('span', { style:{padding:'4px 14px',fontSize:'14px',fontFamily:'monospace',fontWeight:700,color:'#1e40af', minWidth:'76px', textAlign:'center'} }, monthFilter+'년'),
             h('button', { onClick:yearNext, style:navBtn }, '▶')
@@ -30513,7 +30513,7 @@ function FinanceInvoice(){
           mode === 'all' && h('span', { style:{padding:'7px 14px', fontSize:'12px', color:'#94a3b8', fontWeight:600, background:'#f8fafc', border:'1px dashed #cbd5e1', borderRadius:'6px'} }, '전체 기간')
         );
       })(),
-      h('div', { style:{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'auto', maxHeight:'calc(100vh - 380px)' } },
+      h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'auto', maxHeight:'calc(100vh - 380px)' } },
         h('table', { className:'dt' },
           h('thead', null, h('tr', null,
             h('th', { style:{ width:'30px' } }, '#'),
@@ -30568,7 +30568,7 @@ function FinanceInvoice(){
 
   return h('div', { className:'page' },
     // 탭
-    h('div', { style:{ display:'flex', gap:'4px', marginBottom:'14px', borderBottom:'2px solid #e5e7eb' } },
+    h('div', { style:{ display:'flex', gap:'4px', marginBottom:'14px', borderBottom:'2px solid #e2e8f0' } },
       [
         { v:'issue', label:'🧾 발행관리 ('+invoices.length+')' },
         { v:'archive', label:'🗄️ 업체별 아카이브'+(invLoaded?' ('+invoiceCompanies.length+')':'') }
@@ -30910,14 +30910,14 @@ function PersonalCalendar(props){
         onDragOver:function(e){e.preventDefault();},
         onDragLeave:function(){navHoverLeave('prev');},
         title:'드래그 중 머무르면 자동 이동',
-        style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'}},'◀'),
+        style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'10px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'}},'◀'),
       h('div',{style:{fontSize:'12px',fontWeight:700,color:'#1e293b',minWidth:'80px',textAlign:'center'}},calYm),
       h('button',{onClick:function(){ymShift(1);},
         onDragEnter:function(e){e.preventDefault(); navHoverEnter('next');},
         onDragOver:function(e){e.preventDefault();},
         onDragLeave:function(){navHoverLeave('next');},
         title:'드래그 중 머무르면 자동 이동',
-        style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'}},'▶'),
+        style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'10px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'}},'▶'),
       h('button',{onClick:function(){setCalYm(todayStr.slice(0,7)); setSelDate(todayStr);},
         style:{background:'#fff',border:'1px solid #cbd5e1',borderRadius:'4px',padding:'3px 8px',cursor:'pointer',fontSize:'10px',color:'#475569',marginLeft:'4px'}},'오늘')
     ),
@@ -31017,7 +31017,7 @@ function PersonalCalendar(props){
         ),
         h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
           h('button',{onClick:function(){setAdvQuickModal(null);},
-            style:{background:'#fff',color:'#64748b',border:'1px solid #cbd5e1',padding:'7px 16px',borderRadius:'5px',fontSize:'12px',cursor:'pointer',fontWeight:600}},
+            style:{background:'#fff',color:'#64748b',border:'1px solid #cbd5e1',padding:'7px 16px',borderRadius:'10px',fontSize:'12px',cursor:'pointer',fontWeight:600}},
             advQuickModal.paid ? '닫기' : '취소'),
           !advQuickModal.paid && h('button',{onClick:function(){
             var mgrSid = advQuickModal.co.managerMain || sid;
@@ -31053,7 +31053,7 @@ function PersonalCalendar(props){
       style:{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9998}},
       h('div',{onClick:function(e){e.stopPropagation();},
         style:{position:'fixed',top:Math.min(ctxMenu.y, window.innerHeight-180)+'px',left:Math.min(ctxMenu.x, window.innerWidth-160)+'px',
-          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'6px',boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
+          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
           padding:'4px',minWidth:'140px',zIndex:9999}},
         h('div',{onClick:function(){
             onEditEvent({type:ctxMenu.ev.type, evId:ctxMenu.ev.evId, attType:ctxMenu.ev.attType, date:ctxMenu.date});
@@ -31610,7 +31610,7 @@ function MyDeskV2(props){
       ),
       h('div', {style:{display:'flex',gap:'6px',alignItems:'center'}},
         h('button',{onClick:refreshDash, title:'데이터 새로고침',
-          style:{padding:'7px 10px',background:'#fff',color:'#475569',border:'1px solid #e2e8f0',borderRadius:'5px',cursor:'pointer',fontSize:'13px',fontWeight:700}},'🔄'),
+          style:{padding:'7px 10px',background:'#fff',color:'#475569',border:'1px solid #e2e8f0',borderRadius:'10px',cursor:'pointer',fontSize:'13px',fontWeight:700}},'🔄'),
         h('button', { onClick:function(){navigate('dash/corp');},
           style:{ padding:'7px 14px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'12px', fontWeight:700 } },
           CURRENT_USER.isAdmin ? '🏢 법인 대시보드 →' : '📅 전체 일정 캘린더 →')
@@ -31670,20 +31670,20 @@ function MyDeskV2(props){
               style:{ fontSize:'10.5px', color:'#2563eb', background:'transparent', border:'1px solid #bfdbfe', borderRadius:'4px', padding:'3px 8px', cursor:'pointer', fontWeight:600 } }, '상세 →')
           ),
           h('div', { className:'md-leave-grid', style:{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'8px', marginBottom:'10px' } },
-            h('div', { style:{ background:'#fff', borderRadius:'5px', padding:'8px', textAlign:'center' } },
+            h('div', { style:{ background:'#fff', borderRadius:'10px', padding:'8px', textAlign:'center' } },
               h('div', { style:{ fontSize:'10px', color:'#64748b', fontWeight:600 } }, '총 부여'),
               h('div', { style:{ fontSize:'18px', fontWeight:800, color:'#2563eb', fontFamily:'monospace' } }, myLeave.grant + '일'),
               myLeave.carryOver > 0 && h('div', { style:{ fontSize:'10px', color:'#2563eb', fontWeight:600 } }, '(이월 '+myLeave.carryOver+')')
             ),
-            h('div', { style:{ background:'#fff', borderRadius:'5px', padding:'8px', textAlign:'center' } },
+            h('div', { style:{ background:'#fff', borderRadius:'10px', padding:'8px', textAlign:'center' } },
               h('div', { style:{ fontSize:'10px', color:'#64748b', fontWeight:600 } }, '사용'),
               h('div', { style:{ fontSize:'18px', fontWeight:800, color:'#ea580c', fontFamily:'monospace' } }, (Math.round(myLeave.used*10)/10) + '일')
             ),
-            h('div', { style:{ background:'#fff', borderRadius:'5px', padding:'8px', textAlign:'center' } },
+            h('div', { style:{ background:'#fff', borderRadius:'10px', padding:'8px', textAlign:'center' } },
               h('div', { style:{ fontSize:'10px', color:'#64748b', fontWeight:600 } }, '잔여'),
               h('div', { style:{ fontSize:'18px', fontWeight:800, color: myLeave.remain<3?'#dc2626':myLeave.remain<5?'#ea580c':'#16a34a', fontFamily:'monospace' } }, (Math.round(myLeave.remain*10)/10) + '일')
             ),
-            h('div', { style:{ background:'#fff', borderRadius:'5px', padding:'8px', textAlign:'center' } },
+            h('div', { style:{ background:'#fff', borderRadius:'10px', padding:'8px', textAlign:'center' } },
               h('div', { style:{ fontSize:'10px', color:'#64748b', fontWeight:600 } }, '사용률'),
               h('div', { style:{ fontSize:'18px', fontWeight:800, color:'#475569', fontFamily:'monospace' } }, myLeave.grant>0 ? Math.round(myLeave.used/myLeave.grant*100) + '%' : '-')
             )
@@ -31851,7 +31851,7 @@ function MyDeskV2(props){
             { v:'work-item',  label:'일반업무',   cnt:myWorkItems.length }
           ];
 
-          return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px', marginBottom:'14px' } },
+          return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'12px', marginBottom:'14px' } },
             // 헤더
             h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px', flexWrap:'wrap', gap:'8px' } },
               h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e293b' } },
@@ -32110,7 +32110,7 @@ function MyDeskV2(props){
         ),
         // 크기 조절 툴바
         h('div', { style:{ display:'flex', justifyContent:'flex-end', gap:'4px',
-            background:'#fff', border:'1px solid #e2e8f0', borderRadius:'7px',
+            background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px',
             padding:'5px 8px', marginBottom:'8px', alignItems:'center' } },
           h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', fontWeight:600, marginRight:'4px' } }, '크기'),
           [
@@ -32277,7 +32277,7 @@ function MyDeskV2(props){
     workItemModal && h('div', { onClick:function(){setWorkItemModal(null);},
       style:{ position:'fixed', inset:0, zIndex:2200, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }},
       h('div', { onClick:function(e){e.stopPropagation();},
-        style:{ background:'#fff', borderRadius:'12px', padding:'22px 24px', minWidth:'420px', maxWidth:'540px', width:'90vw',
+        style:{ background:'#fff', borderRadius:'10px', padding:'22px 24px', minWidth:'420px', maxWidth:'540px', width:'90vw',
           boxShadow:'0 12px 40px rgba(0,0,0,0.22)', maxHeight:'92vh', overflowY:'auto' }},
         h('div', { style:{ fontSize:'15px', fontWeight:700, color:'#1e293b', marginBottom:'16px', display:'flex', alignItems:'center', gap:'8px' }},
           h('span', { style:{ background:'#0f766e', color:'#fff', borderRadius:'6px', padding:'2px 8px', fontSize:'12px' }},
@@ -32447,7 +32447,7 @@ function MyDeskV2(props){
     bizCaseModal && h('div', { onClick:function(){setBizCaseModal(null);},
       style:{ position:'fixed', inset:0, zIndex:2100, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }},
       h('div', { onClick:function(e){e.stopPropagation();},
-        style:{ background:'#fff', borderRadius:'12px', padding:'22px 24px', minWidth:'420px', maxWidth:'560px', width:'90vw',
+        style:{ background:'#fff', borderRadius:'10px', padding:'22px 24px', minWidth:'420px', maxWidth:'560px', width:'90vw',
           boxShadow:'0 12px 40px rgba(0,0,0,0.22)', maxHeight:'92vh', overflowY:'auto' }},
         // 제목
         h('div', { style:{ fontSize:'15px', fontWeight:700, color:'#1e293b', marginBottom:'16px', display:'flex', alignItems:'center', gap:'8px' }},
@@ -32604,7 +32604,7 @@ function MyDeskV2(props){
     gcalCreateModal && h('div', { onClick:function(){setGcalCreateModal(null);},
       style:{ position:'fixed', inset:0, zIndex:3000, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }},
       h('div', { onClick:function(e){e.stopPropagation();}, className:'drag-box',
-        style:{ background:'#fff', borderRadius:'12px', width:'480px', maxWidth:'95vw',
+        style:{ background:'#fff', borderRadius:'10px', width:'480px', maxWidth:'95vw',
           boxShadow:'0 8px 40px rgba(0,0,0,0.3)', overflow:'visible' }},
         h('div', { className:'drag-handle', style:{ height:'6px', background: gcalCreateModal.color||'#2563eb', borderRadius:'12px 12px 0 0', cursor:'grab' }}),
         h('div', { style:{ padding:'20px 20px 16px', position:'relative' }},
@@ -32633,7 +32633,7 @@ function MyDeskV2(props){
           ),
           // 업체 검색
           h('div',{style:{position:'relative',marginBottom:'8px'}},
-            h('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:'6px',background:'#f8fafc'}},
+            h('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',border:'1px solid #e2e8f0',borderRadius:'6px',background:'#f8fafc'}},
               h('span',{style:{fontSize:'16px',color:'#5f6368'}},'🏢'),
               h('input',{type:'text',value:gcalCreateModal.companyName,
                 onChange:function(e){setGcalCreateModal(Object.assign({},gcalCreateModal,{companyName:e.target.value,companyId:''}));},
@@ -32644,7 +32644,7 @@ function MyDeskV2(props){
               var q=gcalCreateModal.companyName.toLowerCase();
               var matches=(dbGet('companies',[])||[]).filter(function(c){return !c.closedDate&&!c.permanentArchived&&(c.name||'').toLowerCase().includes(q);}).slice(0,5);
               if(!matches.length) return null;
-              return h('div',{style:{position:'absolute',top:'100%',left:0,right:0,background:'#fff',border:'1px solid #e5e7eb',borderRadius:'6px',boxShadow:'0 4px 16px rgba(0,0,0,0.15)',zIndex:100,marginTop:'2px'}},
+              return h('div',{style:{position:'absolute',top:'100%',left:0,right:0,background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',boxShadow:'0 4px 16px rgba(0,0,0,0.15)',zIndex:100,marginTop:'2px'}},
                 matches.map(function(c){
                   return h('div',{key:c.id,onClick:function(){setGcalCreateModal(Object.assign({},gcalCreateModal,{companyId:c.id,companyName:c.name,location:gcalCreateModal.location||(c.address||''),'color':gcalCreateModal.color}));},
                     style:{padding:'8px 12px',cursor:'pointer',fontSize:'12.5px',color:'#3c4043',borderBottom:'1px solid #f1f3f4'},
@@ -32656,13 +32656,13 @@ function MyDeskV2(props){
               );
             })()
           ),
-          h('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:'6px',marginBottom:'8px',background:'#f8fafc'}},
+          h('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',border:'1px solid #e2e8f0',borderRadius:'6px',marginBottom:'8px',background:'#f8fafc'}},
             h('span',{style:{fontSize:'16px',color:'#5f6368'}},'📍'),
             h('input',{type:'text',value:gcalCreateModal.location,
               onChange:function(e){setGcalCreateModal(Object.assign({},gcalCreateModal,{location:e.target.value}));},
               placeholder:'장소 추가',style:{flex:1,border:'none',background:'transparent',outline:'none',fontSize:'13px',color:'#3c4043',fontFamily:'inherit'}})
           ),
-          h('div',{style:{display:'flex',alignItems:'flex-start',gap:'8px',padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:'6px',marginBottom:'12px',background:'#f8fafc'}},
+          h('div',{style:{display:'flex',alignItems:'flex-start',gap:'8px',padding:'8px 10px',border:'1px solid #e2e8f0',borderRadius:'6px',marginBottom:'12px',background:'#f8fafc'}},
             h('span',{style:{fontSize:'16px',color:'#5f6368',marginTop:'2px'}},'📝'),
             h('textarea',{value:gcalCreateModal.desc,rows:2,
               onChange:function(e){setGcalCreateModal(Object.assign({},gcalCreateModal,{desc:e.target.value}));},
@@ -32710,7 +32710,7 @@ function MyDeskV2(props){
       style:{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.15)' }},
       h('div', { onClick:function(e){e.stopPropagation();}, className:'drag-box',
         style:{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-          background:'#fff', borderRadius:'12px', padding:'18px', minWidth:'480px', maxWidth:'560px',
+          background:'#fff', borderRadius:'10px', padding:'18px', minWidth:'480px', maxWidth:'560px',
           boxShadow:'0 8px 32px rgba(0,0,0,0.2)', zIndex:2001, maxHeight:'90vh', overflowY:'auto' }},
         h('div', { className:'drag-handle', style:{ fontWeight:700, fontSize:'14px', color:'#1e293b', marginBottom:'14px', display:'flex', alignItems:'center', gap:'8px', cursor:'grab', userSelect:'none' }},
           h('span', null, '📅 ' + quickMenuModal.date.replace(/-/g,'.')),
@@ -32740,7 +32740,7 @@ function MyDeskV2(props){
           })
         ),
         // 노무 업무일지 (확장)
-        h('div', { style:{ borderTop:'1px solid #e5e7eb', paddingTop:'12px' } },
+        h('div', { style:{ borderTop:'1px solid #e2e8f0', paddingTop:'12px' } },
           h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'8px' } }, '📝 업무일지 — 노무 업무 유형'),
           h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'4px' } },
             [].concat(WORK_LOG_TYPES,[
@@ -32762,7 +32762,7 @@ function MyDeskV2(props){
                   setQuickModal({ kind:'log', logType:t.v, logLabel:t.label, logIcon:t.icon,
                     date:d, time:(new Date()).toTimeString().slice(0,5), target:'', summary:'', note:'' });
                 },
-                style:{ background:'#f8fafc', border:'1px solid #e5e7eb', borderRadius:'5px',
+                style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'5px',
                   padding:'8px 4px', cursor:'pointer', fontSize:'10.5px', fontWeight:600, color:'#475569',
                   display:'flex', flexDirection:'column', alignItems:'center', gap:'3px' },
                 onMouseEnter:function(e){e.currentTarget.style.background='#dbeafe';e.currentTarget.style.color='#1e40af';e.currentTarget.style.borderColor='#bfdbfe';},
@@ -33248,7 +33248,7 @@ function Certificate(){
       // ── 좌: 발급 폼 + 미리보기 ──
       h('div', null,
         // 입력 폼
-        h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'10px', marginBottom:'10px' } },
+        h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'10px', marginBottom:'10px' } },
           h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'6px' } },
             h('div', null,
               h('label', { style:{ fontSize:'10.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'2px' } }, '증명서 종류'),
@@ -33324,7 +33324,7 @@ function Certificate(){
         ),
         // 미리보기
         h('div', { style:{ fontSize:'11px', color:'#94a3b8', fontWeight:600, marginBottom:'6px' } }, '── 미리보기 ──'),
-        h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'30px 40px',
+        h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'30px 40px',
           boxShadow:'0 2px 8px rgba(0,0,0,0.04)' } },
           renderCertContent()
         )
@@ -34420,7 +34420,7 @@ function CorpDashboard(props){
   return h('div',{className:'corp-dash',style:{margin:!IS_MOBILE?(dashTab==='calendar'?'-24px':'-24px -24px 0 -24px'):'0 -10px',padding:IS_MOBILE?'4px 2px':(dashTab==='calendar'?'0':'4px 10px'),height:!IS_MOBILE&&dashTab==='calendar'?'calc(100vh - 46px)':'auto',display:!IS_MOBILE&&dashTab==='calendar'?'flex':'block',flexDirection:'column',overflow:!IS_MOBILE&&dashTab==='calendar'?'hidden':'visible'}},
 
     // 탭 전환 바 + 캘린더 필터 통합 행
-    h('div',{style:{display:'flex',alignItems:'center',gap:'4px',marginBottom:'4px',background:'#fff',padding:'4px 6px',borderRadius:'8px',border:'1px solid #e2e8f0',flexShrink:0}},
+    h('div',{style:{display:'flex',alignItems:'center',gap:'4px',marginBottom:'4px',background:'#fff',padding:'4px 6px',borderRadius:'10px',border:'1px solid #e2e8f0',flexShrink:0}},
       h('div',{style:{display:'flex',gap:'3px',flexShrink:0}},
         (IS_ADMIN ? [
           {v:'calendar',  label:'📅 캘린더',     desc:'일정·휴가·마감'},
@@ -34583,11 +34583,11 @@ function CorpDashboard(props){
         h(MonthNav, { onPrev:monthPrev, onNext:monthNext, label:selYm })
       ),
       h('button',{onClick:corpRefresh, title:'데이터 새로고침',
-        style:{border:'1px solid #e2e8f0',background:'#fff',borderRadius:'5px',padding:'5px 10px',cursor:'pointer',fontSize:'14px'}},'🔄')
+        style:{border:'1px solid #e2e8f0',background:'#fff',borderRadius:'10px',padding:'5px 10px',cursor:'pointer',fontSize:'14px'}},'🔄')
     ),
 
     // 분석 탭 서브탭 스위처 (관리자만)
-    IS_ADMIN && !dashFull && dashTab === 'analytics' && h('div', { style:{ display:'flex', gap:'4px', marginBottom:'8px', borderBottom:'2px solid #e5e7eb', paddingBottom:'4px' } },
+    IS_ADMIN && !dashFull && dashTab === 'analytics' && h('div', { style:{ display:'flex', gap:'4px', marginBottom:'8px', borderBottom:'2px solid #e2e8f0', paddingBottom:'4px' } },
       [
         { v:'revenue', label:'💹 매출·지출' },
         { v:'staff',   label:'👤 직원별 실적' },
@@ -35309,19 +35309,19 @@ function CorpDashboard(props){
             onDragLeaveNext: function(){ calNavDragLeave('next'); setCalNavHover(null); },
             navHover: calNavHover }),
           h('button',{onClick:function(){ var ym=todayYM(); setCalYm(ym); setSelYm(ym); },
-            style:{padding:'4px 10px', border:'1px solid #e2e8f0', background:'#fff', borderRadius:'6px',
+            style:{padding:'4px 10px', border:'1px solid #e2e8f0', background:'#fff', borderRadius:'10px',
               cursor:'pointer', fontSize:'11.5px', fontWeight:600, color:'#475569'}},'오늘'),
           !IS_MOBILE && h('div',{style:{position:'relative'}},
             h('input',{type:'text', value:calSearchQ, placeholder:'일정 검색',
               onInput:function(e){setCalSearchQ(e.target.value);},
-              style:{padding:'4px 22px 4px 24px', fontSize:'11.5px', border:'1px solid #e2e8f0', borderRadius:'6px', width:'130px', background:'#fff', boxSizing:'border-box'}}),
+              style:{padding:'4px 22px 4px 24px', fontSize:'11.5px', border:'1px solid #e2e8f0', borderRadius:'10px', width:'130px', background:'#fff', boxSizing:'border-box'}}),
             h('span',{style:{position:'absolute',left:'7px',top:'50%',transform:'translateY(-50%)',fontSize:'10px',pointerEvents:'none'}},'🔍'),
             calSearchQ && h('span',{onClick:function(){setCalSearchQ('');},
               style:{position:'absolute',right:'5px',top:'50%',transform:'translateY(-50%)',fontSize:'12px',cursor:'pointer',color:'#94a3b8'}},'✕')
           )
         ),
         h('button',{onClick:corpRefresh, title:'데이터 새로고침',
-          style:{border:'1px solid #e2e8f0',background:'#fff',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',fontSize:'13px'}},'🔄')
+          style:{border:'1px solid #e2e8f0',background:'#fff',borderRadius:'10px',padding:'4px 8px',cursor:'pointer',fontSize:'13px'}},'🔄')
       ),
 
       // ── 색상 피커 팝업 ──
@@ -35332,7 +35332,7 @@ function CorpDashboard(props){
       extPopover && h('div',{
         style:{position:'fixed',left:Math.min(extPopover.x, window.innerWidth-280)+'px',
           top:extPopover.y+'px',zIndex:3001,
-          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px',
+          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',
           padding:'14px 16px',boxShadow:'0 8px 24px rgba(0,0,0,0.18)',width:'260px'},
         onClick:function(e){ e.stopPropagation(); }},
         h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid #f1f5f9'}},
@@ -35364,7 +35364,7 @@ function CorpDashboard(props){
         onMouseLeave:function(){ setColorPicker(null); },
         style:{position:'fixed',left:Math.min(colorPicker.x, window.innerWidth-230)+'px',
           top:colorPicker.y+'px',zIndex:3001,
-          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px',
+          background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',
           padding:'12px',boxShadow:'0 8px 24px rgba(0,0,0,0.15)',width:'220px'}},
         h('div',{style:{fontSize:'11.5px',fontWeight:700,color:'#1e293b',marginBottom:'8px',display:'flex',alignItems:'center',gap:'6px'}},
           h('span',{style:{width:'16px',height:'16px',borderRadius:'50%',background:colorPicker.color,display:'inline-block'}}),
@@ -35455,7 +35455,7 @@ function CorpDashboard(props){
                   }
                 }
               } : null,
-              onMouseEnter: cell.date ? function(e){ e.currentTarget.style.background=isCalDragOver?'#fef3c7':isToday?'#fefce8':isOtherMonth?'#e5e7eb':'#f8fafc'; } : null,
+              onMouseEnter: cell.date ? function(e){ e.currentTarget.style.background=isCalDragOver?'#fef3c7':isToday?'#fefce8':isOtherMonth?'#e2e8f0':'#f8fafc'; } : null,
               onMouseLeave: cell.date ? function(e){ e.currentTarget.style.background=isCalDragOver?'#fef3c7':isToday?'#fef9c3':isOtherMonth?'#f1f3f4':isHoliday?'#fff5f5':'#fff'; } : null,
               style:{ background: isCalDragOver?'#fef3c7':isToday?'#fef9c3':isOtherMonth?'#f1f3f4':isHoliday?'#fff5f5':(calMatchSet[cell.date]?'#fff7ed':'#fff'),
                 height: IS_MOBILE?'64px':undefined, minHeight:!IS_MOBILE?'0':undefined, overflow:'hidden', padding: IS_MOBILE?'3px 3px 2px':'5px 4px 3px', position:'relative',
@@ -35576,7 +35576,7 @@ function CorpDashboard(props){
           ),
           h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
             h('button',{onClick:function(){setCorpAdvQuickModal(null);},
-              style:{background:'#fff',color:'#64748b',border:'1px solid #cbd5e1',padding:'7px 16px',borderRadius:'5px',fontSize:'12px',cursor:'pointer',fontWeight:600}},
+              style:{background:'#fff',color:'#64748b',border:'1px solid #cbd5e1',padding:'7px 16px',borderRadius:'10px',fontSize:'12px',cursor:'pointer',fontWeight:600}},
               corpAdvQuickModal.paid ? '닫기' : '취소'),
             !corpAdvQuickModal.paid && CURRENT_USER.isAdmin && h('button',{onClick:function(){
               var mgrSid = corpAdvQuickModal.co.managerMain || '';
@@ -35615,7 +35615,7 @@ function CorpDashboard(props){
         style:{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.15)' }},
         h('div', { onClick:function(e){e.stopPropagation();}, className:'drag-box',
           style:{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-            background:'#fff', borderRadius:'12px', padding:'20px', minWidth:'280px', maxWidth:'360px',
+            background:'#fff', borderRadius:'10px', padding:'20px', minWidth:'280px', maxWidth:'360px',
             boxShadow:'0 8px 32px rgba(0,0,0,0.2)', zIndex:2001 }},
           h('div', { className:'drag-handle', style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'12px', cursor:'grab', userSelect:'none' }},
             h('div', { style:{ display:'flex', alignItems:'center', gap:'10px' }},
@@ -35813,7 +35813,7 @@ function CorpDashboard(props){
           style:{ position:'fixed', inset:0, zIndex:2002, background:'rgba(0,0,0,0.2)' }},
           h('div', { onClick:function(e){e.stopPropagation();},
             style:{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-              background:'#fff', borderRadius:'12px', padding:'20px', minWidth:'380px', maxWidth:'460px',
+              background:'#fff', borderRadius:'10px', padding:'20px', minWidth:'380px', maxWidth:'460px',
               boxShadow:'0 8px 32px rgba(0,0,0,0.25)', zIndex:2003 }},
             h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }},
               h('div', { style:{ fontWeight:700, fontSize:'14px', color:'#1e293b' }}, typeLabel),
@@ -35873,7 +35873,7 @@ function CorpDashboard(props){
         style:{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.1)' }},
         h('div', { onClick:function(e){e.stopPropagation();},
           style:{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-            background:'#fff', borderRadius:'12px', padding:'16px', minWidth:'260px', maxWidth:'340px',
+            background:'#fff', borderRadius:'10px', padding:'16px', minWidth:'260px', maxWidth:'340px',
             boxShadow:'0 8px 32px rgba(0,0,0,0.2)', zIndex:2001 }},
           h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' }},
             h('div', { style:{ fontWeight:700, fontSize:'14px', color:'#1e293b' }},
@@ -35904,7 +35904,7 @@ function CorpDashboard(props){
         style:{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.3)' }},
         h('div', { onClick:function(e){e.stopPropagation();}, className:'drag-box',
           style:{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-            background:'#fff', borderRadius:'12px', padding:'0', width:'min(480px,95vw)',
+            background:'#fff', borderRadius:'10px', padding:'0', width:'min(480px,95vw)',
             boxShadow:'0 8px 40px rgba(0,0,0,0.25)', zIndex:2001, overflow:'hidden' }},
           // 헤더
           h('div',{className:'drag-handle', style:{padding:'16px 20px 0', borderBottom:'1px solid #f1f5f9', marginBottom:'0', cursor:'grab', userSelect:'none'}},
@@ -35919,7 +35919,7 @@ function CorpDashboard(props){
           // 탭 (일정/할일)
           (function(){
             var tk = quickCreate.tabKind || 'schedule';
-            return h('div',{style:{display:'flex', padding:'0 20px', borderBottom:'1px solid #e5e7eb'}},
+            return h('div',{style:{display:'flex', padding:'0 20px', borderBottom:'1px solid #e2e8f0'}},
               h('div',{onClick:function(){setQuickCreate(Object.assign({},quickCreate,{tabKind:'schedule'}));},
                 style:{padding:'12px 16px 10px', fontSize:'14px', fontWeight: tk==='schedule'?600:500,
                 color: tk==='schedule'?'#2563eb':'#5f6368',
@@ -35944,7 +35944,7 @@ function CorpDashboard(props){
                 h('span',{style:{fontSize:'18px',color:'#5f6368',width:'24px',textAlign:'center'}},'🔔'),
                 h('select',{value:quickCreate.todoPriority||'normal',
                   onChange:function(e){setQuickCreate(Object.assign({},quickCreate,{todoPriority:e.target.value}));},
-                  style:{border:'none',borderBottom:'1px solid #e5e7eb',fontSize:'14px',color:'#202124',
+                  style:{border:'none',borderBottom:'1px solid #e2e8f0',fontSize:'14px',color:'#202124',
                     outline:'none',background:'transparent',fontFamily:'inherit',cursor:'pointer',padding:'4px 0'}},
                   h('option',{value:'high'},'⚠️ 높음'),
                   h('option',{value:'normal'},'보통'),
@@ -36033,7 +36033,7 @@ function CorpDashboard(props){
           ),
           // 하단 버튼 (탭에 따라 저장 로직 분기)
           h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',
-            padding:'12px 20px', borderTop:'1px solid #e5e7eb'}},
+            padding:'12px 20px', borderTop:'1px solid #e2e8f0'}},
             h('button',{onClick:function(){setQuickCreate(null);},
               style:{padding:'8px 16px',background:'transparent',border:'none',borderRadius:'6px',
                 color:'#5f6368',fontSize:'14px',fontWeight:600,cursor:'pointer'}},'취소'),
@@ -36110,7 +36110,7 @@ function CorpDashboard(props){
         style:{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,0.3)'}},
         h('div',{onClick:function(e){e.stopPropagation();},
           style:{position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',
-            background:'#fff',borderRadius:'12px',padding:'0',width:'min(600px,95vw)',
+            background:'#fff',borderRadius:'10px',padding:'0',width:'min(600px,95vw)',
             boxShadow:'0 8px 40px rgba(0,0,0,0.25)',zIndex:3001,overflow:'hidden'}},
           // 헤더
           h('div',{style:{padding:'16px 20px 0',borderBottom:'1px solid #f1f5f9'}},
@@ -36143,7 +36143,7 @@ function CorpDashboard(props){
               h('span',{style:{fontSize:'18px',color:'#5f6368',width:'24px',textAlign:'center'}},'📍'),
               h('input',{type:'text',value:gcalEditModal.location||'',placeholder:'위치 추가',
                 onChange:function(e){setGcalEditModal(Object.assign({},gcalEditModal,{location:e.target.value}));},
-                style:{flex:1,border:'none',borderBottom:'1px solid #e5e7eb',fontSize:'14px',
+                style:{flex:1,border:'none',borderBottom:'1px solid #e2e8f0',fontSize:'14px',
                   color:'#202124',outline:'none',background:'transparent',fontFamily:'inherit',padding:'4px 0'}})
             ),
             // 참석자
@@ -36151,7 +36151,7 @@ function CorpDashboard(props){
               h('span',{style:{fontSize:'18px',color:'#5f6368',width:'24px',textAlign:'center'}},'👥'),
               h('input',{type:'text',value:gcalEditModal.attendees||'',placeholder:'참석자 이메일 (쉼표 구분)',
                 onChange:function(e){setGcalEditModal(Object.assign({},gcalEditModal,{attendees:e.target.value}));},
-                style:{flex:1,border:'none',borderBottom:'1px solid #e5e7eb',fontSize:'14px',
+                style:{flex:1,border:'none',borderBottom:'1px solid #e2e8f0',fontSize:'14px',
                   color:'#202124',outline:'none',background:'transparent',fontFamily:'inherit',padding:'4px 0'}})
             ),
             // 설명
@@ -36160,7 +36160,7 @@ function CorpDashboard(props){
               h('textarea',{value:gcalEditModal.desc||'',placeholder:'설명 추가',
                 onChange:function(e){setGcalEditModal(Object.assign({},gcalEditModal,{desc:e.target.value}));},
                 rows:3,
-                style:{flex:1,border:'none',borderBottom:'1px solid #e5e7eb',fontSize:'14px',
+                style:{flex:1,border:'none',borderBottom:'1px solid #e2e8f0',fontSize:'14px',
                   color:'#202124',outline:'none',background:'transparent',fontFamily:'inherit',padding:'4px 0',resize:'none'}})
             ),
             // 캘린더
@@ -36174,7 +36174,7 @@ function CorpDashboard(props){
           ),
           // 저장/취소 버튼
           h('div',{style:{display:'flex',justifyContent:'flex-end',gap:'8px',
-            padding:'12px 20px',borderTop:'1px solid #e5e7eb'}},
+            padding:'12px 20px',borderTop:'1px solid #e2e8f0'}},
             h('button',{onClick:function(){setGcalEditModal(null);},
               style:{padding:'8px 16px',background:'transparent',border:'none',borderRadius:'6px',
                 color:'#5f6368',fontSize:'14px',fontWeight:600,cursor:'pointer'}},'취소'),
@@ -36201,7 +36201,7 @@ function CorpDashboard(props){
         style:{position:'fixed',inset:0,zIndex:9998}},
         h('div',{onClick:function(e){e.stopPropagation();},
           style:{position:'fixed',top:Math.min(calCtxMenu.y, window.innerHeight-200)+'px',left:Math.min(calCtxMenu.x, window.innerWidth-180)+'px',
-            background:'#fff',border:'1px solid #e2e8f0',borderRadius:'6px',boxShadow:'0 8px 24px rgba(0,0,0,0.15)',
+            background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',boxShadow:'0 8px 24px rgba(0,0,0,0.15)',
             padding:'4px',minWidth:'160px',zIndex:9999}},
           h('div',{onClick:function(){
               setEvDetail({ ev:calCtxMenu.ev, date:calCtxMenu.date });
@@ -36264,7 +36264,7 @@ function CorpDashboard(props){
       style:{ position:'fixed', inset:0, zIndex:4000, background:'rgba(0,0,0,0.3)' }},
       h('div', { onClick:function(e){e.stopPropagation();},
         style:{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-          background:'#fff', borderRadius:'12px', padding:'0', width:'min(440px,95vw)',
+          background:'#fff', borderRadius:'10px', padding:'0', width:'min(440px,95vw)',
           boxShadow:'0 8px 40px rgba(0,0,0,0.25)', zIndex:4001, overflow:'hidden' }},
         h('div', { style:{ background:'#1e40af', padding:'14px 18px', display:'flex', alignItems:'center', gap:'8px' }},
           h('span', { style:{ fontSize:'18px' } }, '💼'),
@@ -36327,7 +36327,7 @@ function CorpDashboard(props){
             ),
             h('div', { style:{ display:'flex', gap:'8px' }},
               h('button', { onClick:function(){ setLeaveInputModal(null); },
-                style:{ padding:'8px 16px', border:'1px solid #e2e8f0', borderRadius:'6px', background:'#fff',
+                style:{ padding:'8px 16px', border:'1px solid #e2e8f0', borderRadius:'10px', background:'#fff',
                   color:'#64748b', fontSize:'13px', fontWeight:600, cursor:'pointer' }}, '취소'),
               h('button', { onClick:function(){
                 if(!leaveInputModal.date){ showToast('날짜를 선택하세요'); return; }
@@ -36384,7 +36384,7 @@ function CorpDashboard(props){
       style:{ position:'fixed', inset:0, zIndex:4000, background:'rgba(0,0,0,0.3)' }},
       h('div', { onClick:function(e){e.stopPropagation();}, className:'drag-box',
         style:{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-          background:'#fff', borderRadius:'12px', padding:'0', width:'min(420px,95vw)',
+          background:'#fff', borderRadius:'10px', padding:'0', width:'min(420px,95vw)',
           boxShadow:'0 8px 40px rgba(0,0,0,0.25)', zIndex:4001, overflow:'hidden' }},
         h('div', { className:'drag-handle', style:{ background:'#2563eb', padding:'14px 18px', display:'flex', alignItems:'center', gap:'8px', cursor:'grab', userSelect:'none' }},
           h('span', { style:{ fontSize:'18px' } }, '🏛️'),
@@ -36487,7 +36487,7 @@ function CorpDashboard(props){
             ),
             h('div', { style:{ display:'flex', gap:'8px' }},
               h('button', { onClick:function(){ setEumWorkModal(null); },
-                style:{ padding:'8px 16px', border:'1px solid #e2e8f0', borderRadius:'6px', background:'#fff',
+                style:{ padding:'8px 16px', border:'1px solid #e2e8f0', borderRadius:'10px', background:'#fff',
                   color:'#64748b', fontSize:'13px', fontWeight:600, cursor:'pointer' }}, '취소'),
               h('button', { id:'eum-save-btn', onClick:function(){
                   if(!eumWorkModal.date){ showToast('날짜를 선택하세요'); return; }
@@ -36654,7 +36654,7 @@ function CorpDashboard(props){
               var oneLine = [subLine1, subLine2].filter(Boolean).join('  ·  ');
               return h('div',{key:it.id||i,
                 onClick:function(){gotoItem(menuId, title);},
-                style:{padding:'6px 10px',background:'#fff',border:'1px solid #f1f5f9',borderRadius:'5px',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',fontSize:'11.5px',transition:'all 0.1s'},
+                style:{padding:'6px 10px',background:'#fff',border:'1px solid #f1f5f9',borderRadius:'10px',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',fontSize:'11.5px',transition:'all 0.1s'},
                 onMouseEnter:function(e){e.currentTarget.style.background=color+'11';e.currentTarget.style.borderColor=color+'66';},
                 onMouseLeave:function(e){e.currentTarget.style.background='#fff';e.currentTarget.style.borderColor='#f1f5f9';}},
                 h('span',{style:{fontWeight:700,color:'#1e293b',fontSize:'12px',whiteSpace:'nowrap',flexShrink:0}},title),
@@ -36925,7 +36925,7 @@ function CorpDashboard(props){
               var perfBonusTotal = perfBonusMain + perfBonusSub;
 
               // 카드 공통 스타일
-              var cardBox = { background:'#fff', border:'1px solid #e2e8f0', borderRadius:'6px', padding: window.innerWidth<=480?'4px 6px':'5px 8px' };
+              var cardBox = { background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding: window.innerWidth<=480?'4px 6px':'5px 8px' };
               var cardHd  = { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px', paddingBottom:'8px', borderBottom:'1px solid #f1f5f9' };
               var cardTtl = { fontWeight:700, fontSize:'13px', color:'#1e293b', display:'flex', alignItems:'center', gap:'6px' };
               var cardLink= { fontSize:'10.5px', color:'#3b82f6', cursor:'pointer', textDecoration:'underline', background:'none', border:'none', padding:0 };
@@ -37540,12 +37540,12 @@ function FinancePnL(){
     // 연도 네비 + CSV (KPI 위)
     h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
       h('div',{style:{display:'flex',alignItems:'center',gap:'4px'}},
-        h('button',{onClick:yearPrev,style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'}},'◀'),
+        h('button',{onClick:yearPrev,style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'10px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'}},'◀'),
         h('div',{style:{fontWeight:700,fontSize:'13px',minWidth:'54px',textAlign:'center'}},selYear+'년'),
-        h('button',{onClick:yearNext,style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'}},'▶')
+        h('button',{onClick:yearNext,style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'10px',padding:'4px 8px',cursor:'pointer',fontSize:'13px',color:'#475569'}},'▶')
       ),
       h('button',{onClick:downloadCSV,
-        style:{padding:'3px 8px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'10px',fontWeight:600,color:'#475569'}},'⬇ CSV')
+        style:{padding:'3px 8px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'10px',cursor:'pointer',fontSize:'10px',fontWeight:600,color:'#475569'}},'⬇ CSV')
     ),
 
     // KPI
@@ -37891,7 +37891,7 @@ function FinanceReceivable(props){
   return h('div', { className:'page' },
     h('div', { style:{ display:'flex', justifyContent:'flex-end', marginBottom:'8px' } },
       h('button', { onClick:downloadCSV,
-        style:{ padding:'7px 14px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600, color:'#475569' } }, '⬇ CSV')
+        style:{ padding:'7px 14px', background:'#fff', border:'1px solid #cbd5e1', borderRadius:'10px', cursor:'pointer', fontSize:'11.5px', fontWeight:600, color:'#475569' } }, '⬇ CSV')
     ),
 
     // 등급별 KPI 카드 (5개 + 전체)
@@ -37943,7 +37943,7 @@ function FinanceReceivable(props){
     ),
 
     // 미수금 테이블
-    h('div', { style:{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'auto', maxHeight:'calc(100vh - 480px)' } },
+    h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'auto', maxHeight:'calc(100vh - 480px)' } },
       h('table', { className:'dt' },
         h('thead', null, h('tr', null,
           h('th', { style:{ width:'30px' } }, '#'),
@@ -38062,7 +38062,7 @@ function FinanceVAT(){
         h('div', { style:{ fontSize:'8.5px', color:'#854d0e', fontWeight:700, whiteSpace:'nowrap' } }, '📑 ' + selYear + '년 부가세'),
         h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#854d0e', lineHeight:1.4, fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, totalYearVat.toLocaleString() + '원'))
     ),
-    h('div', { style:{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'hidden' } },
+    h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'hidden' } },
       h('table', { className:'dt' },
         h('thead', null, h('tr', null,
           h('th', { style:{textAlign:'center',width:'40px'} }, '#'),
@@ -38676,7 +38676,7 @@ function ProjectManagementShared(props){
       h('div', { style:{ position:'relative' } },
         h('button', { onClick:function(){setColSettings(!colSettings);},
           style:{ background:'#fff', color:'#475569', border:'1px solid #cbd5e1', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '⚙️ 컬럼'),
-        colSettings && h('div', { style:{ position:'absolute', top:'calc(100% + 4px)', right:0, background:'#fff', border:'1px solid #e2e8f0', borderRadius:'6px', boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'8px', minWidth:'180px', zIndex:100 } },
+        colSettings && h('div', { style:{ position:'absolute', top:'calc(100% + 4px)', right:0, background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'8px', minWidth:'180px', zIndex:100 } },
           h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#64748b', padding:'4px 6px', marginBottom:'4px', borderBottom:'1px solid #e2e8f0' } }, '컬럼 표시'),
           [
             {k:'no', l:'#'},{k:'type', l:'유형'},{k:'company', l:'업체명'},{k:'bizNo', l:'사업자번호'},
@@ -38745,7 +38745,7 @@ function ProjectManagementShared(props){
               );
             })
       )
-    : h('div', { style:{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:'6px', overflow:'auto', maxHeight:'calc(100vh - 320px)' } },
+    : h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'auto', maxHeight:'calc(100vh - 320px)' } },
       h('table', { className:'dt' },
         h('thead', null, h('tr', null,
           colVis.no && h('th', { style:{ width:'30px' } }, '#'),
