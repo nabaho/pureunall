@@ -563,6 +563,39 @@ input[data-inputtype="numeric"] {
 .page table td[style*="#f0fdfa"], .page table th[style*="#f0fdfa"] {
   background: #f8fafc !important;
 }
+/* ============ 전역 디자인 통일 (PC·모바일 공통 규격) ============ */
+/* 모달: 모서리 12px·헤더 규격·제목 크기 통일 */
+.modal{ border-radius:12px !important; overflow:hidden; }
+.modal-h{ padding:13px 18px !important; }
+.modal-h .t{ font-size:14px !important; font-weight:800 !important; letter-spacing:-0.2px; }
+.modal-h .x{ width:28px; height:28px; border-radius:8px !important; font-size:16px !important; display:inline-flex; align-items:center; justify-content:center; }
+.modal-f{ padding:12px 18px !important; }
+/* 입력 요소: 글꼴·모서리 통일 */
+input, select, textarea{ font-family:inherit !important; border-radius:6px !important; }
+input:focus, select:focus, textarea:focus{ outline:2px solid #bfdbfe; outline-offset:0; }
+/* 버튼: 글꼴 상속 (모양·크기는 용도별 유지) */
+button{ font-family:inherit !important; }
+/* 표: 행 높이·글자 크기 규격 */
+.dt th{ font-size:11px !important; padding:7px 8px !important; }
+.dt td{ font-size:11.5px !important; padding:6px 8px !important; }
+/* 페이지 공통 여백 */
+.page{ padding:14px 18px !important; }
+/* ============ 모바일 규격 (768px 이하) ============ */
+@media (max-width:768px){
+  /* 입력칸: 16px = 모바일 자동 확대 방지 + 탭 영역 42px */
+  input, select, textarea{ font-size:16px !important; min-height:42px; box-sizing:border-box; }
+  input[type='checkbox'], input[type='radio']{ min-height:auto; width:20px; height:20px; }
+  /* 모달: 화면 폭 통일 + 위아래 여백 */
+  .modal{ width:94vw !important; max-width:94vw !important; max-height:88vh !important; }
+  .modal-b{ padding:14px !important; }
+  /* 페이지 여백 축소 */
+  .page{ padding:10px !important; }
+  /* 표는 가로 스크롤 유지하되 글자 한 단계 ↑ */
+  .dt th{ font-size:11.5px !important; }
+  .dt td{ font-size:12.5px !important; padding:8px !important; }
+  /* 말풍선: 모바일에서는 탭 시 깜빡임 방지 위해 숨김 (title로 대체) */
+  .erp-tip:hover::after, .erp-tip:hover::before{ display:none; }
+}
 /* 업체관리 표: 앞 3열(체크·번호·업체명) 고정 — 가로 스크롤 시에도 업체명 유지 */
 .dt th:nth-child(1), .dt td:nth-child(1){ position:sticky; left:0; z-index:3; background:#fff; }
 .dt th:nth-child(2), .dt td:nth-child(2){ position:sticky; left:30px; z-index:3; background:#fff; }
