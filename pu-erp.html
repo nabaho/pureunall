@@ -34493,7 +34493,7 @@ function CorpDashboard(props){
             h('button',{
               draggable:'true',
               onDragStart:function(e){
-                e.dataTransfer.effectAllowed='copy';
+                e.dataTransfer.effectAllowed='copyMove';
                 e.dataTransfer.setData('text/plain', JSON.stringify({ kind:'int-staff', sid:u.sid, name:u.name }));
               },
               onClick:function(){ setCalFilter(isActive?null:u.sid); },
@@ -34532,7 +34532,7 @@ function CorpDashboard(props){
             h('button',{
               draggable:'true',
               onDragStart:function(e){
-                e.dataTransfer.effectAllowed='copy';
+                e.dataTransfer.effectAllowed='copyMove';
                 e.dataTransfer.setData('text/plain', JSON.stringify({ kind:'ext-staff', extId:ex.id }));
               },
               onClick:function(e){
