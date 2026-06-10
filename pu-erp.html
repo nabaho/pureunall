@@ -51541,8 +51541,22 @@ function ERPMain(props){
     } catch(e){ window._erpErrLog && window._erpErrLog(e); }
     return '';
   })();
-  // ★ 시작화면 결정: ①URL hash ②개인 설정 ③역할 기본(관리자·위임관리인=법인대시보드, 직원=나의업무)
+  // ★ 시작화면 결정: ①URL hash ②마지막 본 화면(기기별) ③개인 설정 ④역할 기본
   var startMenu = (function(){
+    // 마지막 본 화면 복원 (이 기기·이 사용자 기준, 권한·모바일 차단 메뉴는 제외)
+    try {
+      var lastMenu = localStorage.getItem('pureun_v6_session_last_menu_' + (CURRENT_USER.sid||''));
+      if(lastMenu && isMenuPermitted(CURRENT_USER, lastMenu)){
+        var _blocked = false;
+        if(window.IS_MOBILE && !(CURRENT_USER && CURRENT_USER.isAdmin)){
+          MENUS.forEach(function(grp){
+            if(grp.hideOnMobile){ grp.items.forEach(function(it){ if(it.id === lastMenu) _blocked = true; }); }
+            else { grp.items.forEach(function(it){ if(it.id === lastMenu && it.hideOnMobile) _blocked = true; }); }
+          });
+        }
+        if(!_blocked) return lastMenu;
+      }
+    } catch(e){}
     var personal = dbGet('start_menu_' + (CURRENT_USER.sid||''), null);
     if(personal) return personal;
     if(CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin) return 'dash/corp';
@@ -51637,6 +51651,7 @@ function ERPMain(props){
       });
     }
     setCurrent(id);
+    try { localStorage.setItem('pureun_v6_session_last_menu_' + (CURRENT_USER.sid||''), id); } catch(e){}
     dbSet('current_menu', id);
     // 그룹 자동 펼침 제거 (즐겨찾기/검색 클릭 시 사이드바 펼침 방지)
     // 사용자가 직접 펼친 상태가 그대로 유지됨
