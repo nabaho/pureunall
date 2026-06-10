@@ -536,6 +536,39 @@ input[data-inputtype="numeric"] {
   50%{ transform:translateY(-5px); opacity:1; }
 }
 </style>
+<style id="calm-tables">
+/* ── 차분 모드(B안): 표 안 파스텔 배경만 무채색화 — 입력 시 시선 분산 줄이기 ──
+   대상: 페이지 표의 셀/헤더 배경 중 장식성 파스텔(노랑·연두·파랑·보라·청록·주황)
+   보존: 빨강 계열(위험·미수 신호), 테두리 색(계약임박 주황 등), 버튼·배지·요약카드
+   되돌리기: 이 <style id="calm-tables"> 블록 통째로 삭제 */
+.page table td[style*="#fef3c7"], .page table th[style*="#fef3c7"],
+.page table td[style*="#fef9c3"], .page table th[style*="#fef9c3"],
+.page table td[style*="#fefce8"], .page table th[style*="#fefce8"],
+.page table td[style*="#fffbeb"], .page table th[style*="#fffbeb"],
+.page table td[style*="#fde68a"], .page table th[style*="#fde68a"],
+.page table td[style*="#fff7ed"], .page table th[style*="#fff7ed"],
+.page table td[style*="#ffedd5"], .page table th[style*="#ffedd5"],
+.page table td[style*="#dcfce7"], .page table th[style*="#dcfce7"],
+.page table td[style*="#f0fdf4"], .page table th[style*="#f0fdf4"],
+.page table td[style*="#d1fae5"], .page table th[style*="#d1fae5"],
+.page table td[style*="#dbeafe"], .page table th[style*="#dbeafe"],
+.page table td[style*="#eff6ff"], .page table th[style*="#eff6ff"],
+.page table td[style*="#e0f2fe"], .page table th[style*="#e0f2fe"],
+.page table td[style*="#f0f9ff"], .page table th[style*="#f0f9ff"],
+.page table td[style*="#ede9fe"], .page table th[style*="#ede9fe"],
+.page table td[style*="#f5f3ff"], .page table th[style*="#f5f3ff"],
+.page table td[style*="#faf5ff"], .page table th[style*="#faf5ff"],
+.page table td[style*="#cffafe"], .page table th[style*="#cffafe"],
+.page table td[style*="#ecfeff"], .page table th[style*="#ecfeff"],
+.page table td[style*="#f0fdfa"], .page table th[style*="#f0fdfa"] {
+  background: #f8fafc !important;
+}
+@media (max-width:768px){
+  /* 모바일: KPI 한 줄 6칸 → 3칸×2줄 컴팩트 (화면 점유 절반 이하) */
+  .mkpi-grid{ grid-auto-flow: row !important; grid-template-columns: repeat(3,minmax(0,1fr)) !important; gap:3px !important; }
+  .mkpi-grid > div{ padding:3px 2px !important; }
+}
+</style>
 </head>
 <body>
 <div id="root"></div>
@@ -589,6 +622,133 @@ var Component = React.Component;
   window.addEventListener('unhandledrejection', function(ev){
     showErrBanner('비동기 오류: '+((ev.reason&&ev.reason.message)||String(ev.reason)));
   });
+})();
+// ── 데이터 감시 알림: 문제 발생 시 지속 팝업(닫기 전까지 유지) + 대응책 안내 + 최근 50건 기록(erpAlerts()) ──
+(function(){
+  var LOGK='pureun_v6_session_alert_log'; // session 접두어 → 동기화·백업 제외(기기 내 기록)
+  function logAlert(entry){
+    try{
+      var arr=[]; try{ arr=JSON.parse(localStorage.getItem(LOGK)||'[]'); }catch(_){ arr=[]; }
+      arr.unshift(entry); if(arr.length>50) arr=arr.slice(0,50);
+      localStorage.setItem(LOGK, JSON.stringify(arr));
+    }catch(_){}
+  }
+  var _lastByTitle={};
+  window.erpAlert=function(level, title, detail, advice){
+    try{
+      var now=Date.now();
+      if(_lastByTitle[title] && now-_lastByTitle[title]<30000) return; // 30초 내 같은 알림 중복 억제
+      _lastByTitle[title]=now;
+      logAlert({t:now, level:level, title:title, detail:detail, advice:advice});
+      var wrap=document.getElementById('erp-alert-wrap');
+      if(!wrap){
+        wrap=document.createElement('div'); wrap.id='erp-alert-wrap';
+        wrap.style.cssText='position:fixed;top:60px;right:12px;z-index:2147483646;display:flex;flex-direction:column;gap:8px;max-width:380px;width:calc(100vw - 24px);';
+        document.body.appendChild(wrap);
+      }
+      var bg = level==='danger' ? '#7f1d1d' : '#92400e';
+      var d=document.createElement('div');
+      d.style.cssText='background:'+bg+';color:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:13px;line-height:1.5;';
+      var tEl=document.createElement('div'); tEl.style.cssText='font-weight:700;font-size:14px;';
+      tEl.textContent=(level==='danger'?'🛑 ':'⚠️ ')+title; d.appendChild(tEl);
+      if(detail){ var de=document.createElement('div'); de.style.cssText='margin-top:4px;opacity:.95;'; de.textContent=detail; d.appendChild(de); }
+      if(advice){ var ad=document.createElement('div'); ad.style.cssText='margin-top:6px;padding:7px 9px;background:rgba(255,255,255,.14);border-radius:6px;'; ad.textContent='👉 '+advice; d.appendChild(ad); }
+      var tm=document.createElement('div'); tm.style.cssText='margin-top:4px;font-size:11px;opacity:.7;'; tm.textContent=new Date(now).toLocaleString(); d.appendChild(tm);
+      var btn=document.createElement('button'); btn.textContent='닫기';
+      btn.style.cssText='margin-top:8px;background:#fff;color:'+bg+';border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:12px;';
+      btn.onclick=function(){ d.remove(); };
+      d.appendChild(btn);
+      wrap.appendChild(d);
+      if(level!=='danger'){ setTimeout(function(){ try{ d.remove(); }catch(_){}}, 60000); } // 주의 등급은 60초 후 자동 닫힘
+    }catch(_){}
+  };
+  window.erpAlerts=function(){ try{ return JSON.parse(localStorage.getItem(LOGK)||'[]'); }catch(_){ return []; } };
+})();
+// ── 빌드 버전 표시: 배포가 실제 적용됐는지 화면에서 즉시 확인 (좌하단 작은 라벨) ──
+var ERP_BUILD = 'V1 (2026-06-09)';
+(function(){
+  try{
+    var d=document.createElement('div');
+    d.id='erp-build-badge';
+    d.textContent='빌드 '+ERP_BUILD;
+    d.title='이 숫자가 GitHub에 올린 버전과 같으면 배포 성공. 다르면 강력 새로고침(Ctrl+Shift+R) 필요.';
+    d.style.cssText='position:fixed;left:8px;bottom:6px;z-index:2147483645;font-size:10px;color:#94a3b8;background:rgba(15,23,42,.55);padding:2px 7px;border-radius:6px;pointer-events:auto;opacity:.8;';
+    document.addEventListener('DOMContentLoaded', function(){ try{ document.body.appendChild(d); }catch(_){}});
+    if(document.body) document.body.appendChild(d);
+    console.log('[ERP 빌드] '+ERP_BUILD);
+  }catch(_){}
+})();
+// ── 접속 시 자가진단: 중복·급감을 자동 점검해 문제 시 erpAlert 팝업 (수동 검토 대체) ──
+(function(){
+  setTimeout(function(){
+    try{
+      var KEYP='pureun_v6_';
+      var CHECK=['companies','contracts','cases','consultings','funds','other_projects','payroll_monthly','user_accounts','finance_income'];
+      var LABEL={companies:'업체관리',contracts:'계약관리',cases:'사건관리',consultings:'컨설팅',funds:'기금',other_projects:'기타사업',payroll_monthly:'급여',user_accounts:'직원계정',finance_income:'자문수입'};
+      var SNAPK='pureun_v6_session_selfcheck_counts'; // 기기 내 기록(동기화 제외)
+      var prev={}; try{ prev=JSON.parse(localStorage.getItem(SNAPK)||'{}'); }catch(_){ prev={}; }
+      var cur={};
+      CHECK.forEach(function(k){
+        var arr; try{ arr=JSON.parse(localStorage.getItem(KEYP+k)||'null'); }catch(_){ arr=null; }
+        if(!Array.isArray(arr)) return;
+        cur[k]=arr.length;
+        // 1) 중복 id 점검
+        var seen={}, dup=0;
+        arr.forEach(function(x){ var id=x&&x.id; if(!id) return; if(seen[id]) dup++; else seen[id]=1; });
+        if(dup>0){
+          window.erpAlert && erpAlert('warn', LABEL[k]+'에 중복 데이터 '+dup+'건 발견', '같은 id가 두 번 이상 들어있습니다. 화면에 같은 항목이 중복 표시될 수 있습니다.', '정리된 복원 파일로 ⬆복원하거나, 중복 항목을 직접 삭제하세요.');
+        }
+        // 2) 지난 접속 대비 급감 점검 (10건 이상 → 절반 미만)
+        if(typeof prev[k]==='number' && prev[k]>=10 && arr.length < prev[k]*0.5){
+          window.erpAlert && erpAlert('danger', LABEL[k]+' 데이터가 지난 접속보다 크게 줄었습니다', '지난 접속 '+prev[k]+'건 → 현재 '+arr.length+'건.', '의도한 삭제가 아니면 환경설정→💾 서버백업(일간/수시)에서 직전 시점으로 복원하세요.');
+        }
+      });
+      localStorage.setItem(SNAPK, JSON.stringify(cur));
+    }catch(_){}
+  }, 8000); // 동기화 안정 후 점검
+})();
+// ── 모바일 음성 검색 🎤: 말하면 현재 화면 검색창에 입력 (안드로이드 크롬 등 지원 브라우저) ──
+(function(){
+  if(!(window.innerWidth <= 768)) return;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function setReactInput(inp, text){
+    try{
+      var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(inp, text);
+      inp.dispatchEvent(new Event('input', { bubbles:true }));
+      inp.dispatchEvent(new Event('change', { bubbles:true }));
+    }catch(_){ inp.value = text; }
+  }
+  function findSearchInput(){
+    var cands = Array.prototype.slice.call(document.querySelectorAll('input.dt-search, input[placeholder*="검색"], input[placeholder*="업체명"], input[placeholder*="회사"]'));
+    for(var i=0;i<cands.length;i++){
+      var r = cands[i].getBoundingClientRect();
+      if(r.width>0 && r.height>0) return cands[i];
+    }
+    return null;
+  }
+  var btn=document.createElement('button');
+  btn.id='erp-voice-btn'; btn.textContent='🎤';
+  btn.title='음성으로 검색어 입력';
+  btn.style.cssText='position:fixed;right:16px;bottom:142px;z-index:900;width:48px;height:48px;border-radius:50%;border:none;background:#0f766e;color:#fff;font-size:20px;box-shadow:0 6px 16px rgba(15,118,110,.4);cursor:pointer;';
+  function attach(){ try{ document.body.appendChild(btn); }catch(_){} }
+  if(document.body) attach(); else document.addEventListener('DOMContentLoaded', attach);
+  btn.onclick=function(){
+    var inp=findSearchInput();
+    if(!inp){ alert('이 화면에는 검색창이 없습니다. 목록 화면(계약·업체 등)에서 사용하세요.'); return; }
+    if(!SR){ alert('이 브라우저는 음성인식을 지원하지 않습니다.\n검색창을 누른 뒤 키보드의 🎤(음성 자판)를 사용하세요.'); inp.focus(); return; }
+    try{
+      var rec=new SR(); rec.lang='ko-KR'; rec.interimResults=false; rec.maxAlternatives=1;
+      btn.textContent='👂'; btn.style.background='#dc2626';
+      rec.onresult=function(ev){
+        var text=(ev.results[0][0].transcript||'').trim();
+        if(text){ setReactInput(inp, text); inp.focus(); }
+      };
+      rec.onend=function(){ btn.textContent='🎤'; btn.style.background='#0f766e'; };
+      rec.onerror=function(){ btn.textContent='🎤'; btn.style.background='#0f766e'; };
+      rec.start();
+    }catch(e){ btn.textContent='🎤'; btn.style.background='#0f766e'; alert('음성인식 시작 실패: '+(e&&e.message||e)); }
+  };
 })();
 // 화면 멈춤(메인스레드 블로킹) 감지기: 200ms+ 멈춤을 콘솔에 기록
 (function(){
@@ -961,6 +1121,9 @@ function fbSyncFail(e){
   try { window._erpErrLog && window._erpErrLog(e); } catch(_){}
   try { console.warn('Firebase sync failed:', e); } catch(_){}
   window._fbSyncFails = (window._fbSyncFails||0) + 1;
+  if(window._fbSyncFails === 3){
+    try { window.erpAlert && erpAlert('warn', '클라우드 동기화 연속 실패', '변경사항이 서버에 저장되지 않고 있습니다 (이 기기에는 저장됨).', '네트워크·로그인 확인 후에도 반복되면 새로고침하세요. 그래도 안 되면 환경설정→💾→⬇백업으로 수동 백업해 두세요.'); } catch(_){}
+  }
   var now = Date.now();
   if(now - _fbSyncFailAt > 10000){
     _fbSyncFailAt = now;
@@ -2246,6 +2409,7 @@ function dbSet(k, v){
           var _bulkOk = window._bulkDeleteIntent && (Date.now() - window._bulkDeleteIntent < 15000);
           if(!_bulkOk){
             console.warn('[데이터보호] '+k+': '+prev.length+'건 → '+v.length+'건 절반 이하 급감 — Firebase 푸시 차단(로컬만 저장)');
+            try { window.erpAlert && erpAlert('danger', '데이터 급감 차단: '+k, prev.length+'건 → '+v.length+'건으로 절반 이하 급감하여 서버 전송을 차단했습니다 (이 기기에는 저장됨).', '실수/오류라면: 새로고침하지 말고 환경설정→💾 서버백업(일간/수시)에서 복원하세요. 의도한 대량 삭제라면: F12 콘솔에 erpAllowBulk() 입력 후 15초 내 다시 저장.'); } catch(_){}
             try { showToast('⚠ '+k+'가 '+prev.length+'→'+v.length+'건으로 절반 이하 급감 — 서버 동기화를 막았습니다 (데이터 보호). 의도한 변경이면 콘솔에 erpAllowBulk() 입력 후 다시 저장하세요'); } catch(_){}
             return true;
           }
@@ -3230,6 +3394,11 @@ function fbSetupListener(){
       try {
         // #4 Tier 3: 객체 형식이면 배열화
         var arrValue = normalizeFbValue(v.v);
+        try { var _oldRaw = localStorage.getItem(KEY+k); var _oldArr = _oldRaw ? JSON.parse(_oldRaw) : null;
+          if(Array.isArray(_oldArr) && Array.isArray(arrValue) && _oldArr.length >= 10 && arrValue.length < _oldArr.length * 0.5){
+            window.erpAlert && erpAlert('danger', '다른 기기에서 '+k+' 데이터가 크게 줄었습니다', '서버 동기화 수신으로 '+_oldArr.length+'건 → '+arrValue.length+'건이 되었습니다.', '의도한 삭제가 아니면 환경설정→💾 서버백업(일간/수시)에서 직전 시점으로 복원하세요.');
+          }
+        } catch(_e){}
         localStorage.setItem(KEY+k, JSON.stringify(arrValue));
         localStorage.setItem(KEY+'_meta_'+k, String(v.u));
         _dbCache[k] = arrValue; // 캐시 갱신
@@ -3247,6 +3416,11 @@ function fbSetupListener(){
       try {
         // #4 Tier 3: 객체 형식이면 배열화
         var arrValue = normalizeFbValue(v.v);
+        try { var _oldRaw2 = localStorage.getItem(KEY+k); var _oldArr2 = _oldRaw2 ? JSON.parse(_oldRaw2) : null;
+          if(Array.isArray(_oldArr2) && Array.isArray(arrValue) && _oldArr2.length >= 10 && arrValue.length < _oldArr2.length * 0.5){
+            window.erpAlert && erpAlert('danger', '서버의 '+k+' 데이터가 이 기기보다 크게 적습니다', '동기화 수신으로 '+_oldArr2.length+'건 → '+arrValue.length+'건이 되었습니다.', '의도한 삭제가 아니면 환경설정→💾 서버백업(일간/수시)에서 직전 시점으로 복원하세요.');
+          }
+        } catch(_e){}
         localStorage.setItem(KEY+k, JSON.stringify(arrValue));
         localStorage.setItem(KEY+'_meta_'+k, String(v.u));
         _dbCache[k] = arrValue; // 캐시 갱신
@@ -3555,7 +3729,7 @@ function MonthKpiHeader(props){
       props.extra
     ),
     // KPI (4열 grid 고정 — 항상 한 줄)
-    kpis.length > 0 && h('div', { style:{ display:'grid', gridAutoFlow:'column', gridAutoColumns:'minmax(0,1fr)', gap:'4px' } },
+    kpis.length > 0 && h('div', { className:'mkpi-grid', style:{ display:'grid', gridAutoFlow:'column', gridAutoColumns:'minmax(0,1fr)', gap:'4px' } },
       kpis.map(function(k, i){
         return h('div', { key:i, onClick:k.onClick||null,
           style:{ background:k.bg||'#fff', color:k.fg||'#1e293b',
@@ -6814,15 +6988,21 @@ function ContractModal(props){
         h('strong', null, '노무사·관리자 ' + lawyers.length + '명'),
         '이 표시됩니다. (사용자 추가/이름 변경 시 자동 반영)'
       ),
-      // 주담당
-      h('div', { className:'fld' }, h('label', null, '주담당 *'),
-        h('select', { value:f.managerMain || '', onChange:function(e){ changeMgrMain(e.target.value); } },
+      // 주담당 — 저장값이 SID 또는 이름 어느 쪽이어도 이름으로 해석해 표시
+      (function(){
+        var _mmName = (function(){
+          var v = f.managerMain || ''; if(!v) return '';
+          var bySid = lawyers.find(function(u){ return u.sid === v; });
+          return bySid ? bySid.name : v; // sid면 이름으로 변환, 이미 이름이면 그대로
+        })();
+        return h('div', { className:'fld' }, h('label', null, '주담당 *'),
+        h('select', { value:_mmName, onChange:function(e){ changeMgrMain(e.target.value); } },
           [h('option', { key:'__empty', value:'' }, '— 주담당 선택 —')].concat(
             (function(){
               // 담당 가능한 직원 + 기존 주담당(휴직중이면 라벨)
               var optList = assignable.slice();
-              if(f.managerMain && !optList.find(function(u){return u.name===f.managerMain;})){
-                var orig = lawyers.find(function(u){return u.name===f.managerMain;});
+              if(_mmName && !optList.find(function(u){return u.name===_mmName;})){
+                var orig = lawyers.find(function(u){return u.name===_mmName;});
                 if(orig){
                   var st = getUserAssignStatus(orig.sid);
                   optList = optList.concat([Object.assign({}, orig, { _statusLabel: st.label })]);
@@ -6833,7 +7013,8 @@ function ContractModal(props){
                 return h('option', { key:u.sid, value:u.name, style: u._statusLabel ? { color:'#dc2626' } : {} }, label);
               });
             })()
-          ))),
+          )));
+      })(),
       // 부담당 다중 (드롭다운으로 추가 + 칩으로 표시)
       h('div', { className:'fld' }, h('label', null, '부담당 (복수 선택)'),
         h('div', null,
@@ -7569,6 +7750,7 @@ function ContractManagement(){
     }
   }
   function openAdd(){ setModal({ mode:'add', cur:null }); }
+  window._erpOpenNewContract = openAdd; // 모바일 📷 버튼 연결용
   function openEdit(cur){ setModal({ mode:'edit', cur:cur }); }
   function close(){ setModal(null); }
   async function save(form){
@@ -8271,6 +8453,9 @@ function ContractManagement(){
         );
       })
     ),
+    window.innerWidth <= 768 && h('button', { onClick:openAdd, title:'명함·사업자등록증 촬영으로 계약 추가',
+      style:{ position:'fixed', right:'16px', bottom:'76px', zIndex:900, width:'56px', height:'56px', borderRadius:'50%',
+        border:'none', background:'#1e40af', color:'#fff', fontSize:'24px', boxShadow:'0 6px 16px rgba(30,64,175,.45)', cursor:'pointer' } }, '📷'),
     modal && h(ContractModal, { cur:modal.cur, onSave:save, onClose:close }),
     printModal && h(ContractFormPrintModal, { contract:printModal, onClose:closePrintModal }),
     docModal && h(ContractDocVault, { contract:docModal, onClose:function(){ setDocModal(null); } })
@@ -13538,7 +13723,7 @@ function roleInfo(v){ return ROLES.find(function(r){return r.v===v;}) || ROLES[2
 })();
 
 // ERP_COMPANIES SEED 버전 관리 - 공급대가/납부일 업데이트 반영
-(function initCompaniesSeed(){
+(function initCompaniesSeed(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var verKey = 'pureun_v6_co_version';
   var CURRENT = '20260503_fee_v1';
   try {
@@ -14184,6 +14369,7 @@ function backfill2026Details(){
 
 // ============ 2026 1~4월 급여 시드 (Excel 파싱 결과) ============
 (function(){
+  return; // ⚠비활성화(2026): 2026 1~4월 급여를 하드코딩 값으로 덮어쓰던 일회성 시드. 라이브에 실데이터가 있으므로 새 기기/동기화 전 실행 시 실급여를 덮을 위험 → 영구 비활성.
   if(dbGet('payroll_seed_2026_q1_done', false)) return;
   var data = [{"id": "pay-P-001-2026-01", "empSid": "P-001", "empName": "권형하", "ym": "2026-01", "dependents": 2, "note": "", "hourlyWage": 9569, "workHours": 209, "baseSalary": 2000000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2000000, "absentDeduction": 0, "grossPay": 2000000, "taxableIncome": 2000000, "incomeTax": 19520, "localTax": 1950, "nationalPension": 116800, "healthInsurance": 71900, "longTermCare": 9440, "employmentInsurance": 0, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 219610, "netPay": 1780390, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-A-001-2026-01", "empSid": "A-001", "empName": "최기운", "ym": "2026-01", "dependents": 1, "note": "", "hourlyWage": 15072, "workHours": 209, "baseSalary": 3150000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 200000, "nonTaxableCar": 200000, "nonTaxableChildcare": 0, "bonus": 105000, "subtotal": 3655000, "absentDeduction": 0, "grossPay": 3655000, "taxableIncome": 3255000, "incomeTax": 95430, "localTax": 9540, "nationalPension": 0, "healthInsurance": 117010, "longTermCare": 15370, "employmentInsurance": 29290, "healthInsuranceAdj": 15610, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 282250, "netPay": 3372750, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-A-003-2026-01", "empSid": "A-003", "empName": "김보람", "ym": "2026-01", "dependents": 1, "note": "", "hourlyWage": 15550, "workHours": 209, "baseSalary": 3250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 3250000, "absentDeduction": 0, "grossPay": 3250000, "taxableIncome": 3250000, "incomeTax": 95430, "localTax": 9540, "nationalPension": 139980, "healthInsurance": 116830, "longTermCare": 15350, "employmentInsurance": 29250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 406380, "netPay": 2843620, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-A-004-2026-01", "empSid": "A-004", "empName": "주민정", "ym": "2026-01", "dependents": 1, "note": "", "hourlyWage": 12679, "workHours": 209, "baseSalary": 2650000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2650000, "absentDeduction": 0, "grossPay": 2650000, "taxableIncome": 2650000, "incomeTax": 43970, "localTax": 4390, "nationalPension": 111720, "healthInsurance": 95260, "longTermCare": 12510, "employmentInsurance": 23850, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 291700, "netPay": 2358300, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-A-002-2026-01", "empSid": "A-002", "empName": "신욱임", "ym": "2026-01", "dependents": 1, "note": "", "hourlyWage": 21429, "workHours": 105, "baseSalary": 2250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2250000, "absentDeduction": 0, "grossPay": 2250000, "taxableIncome": 2250000, "incomeTax": 27560, "localTax": 2750, "nationalPension": 93950, "healthInsurance": 80880, "longTermCare": 10620, "employmentInsurance": 20250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 236010, "netPay": 2013990, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-A-006-2026-01", "empSid": "A-006", "empName": "김석우", "ym": "2026-01", "dependents": 1, "note": "", "hourlyWage": 11050, "workHours": 183, "baseSalary": 2022180, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2022180, "absentDeduction": 0, "grossPay": 2022180, "taxableIncome": 2022180, "incomeTax": 20170, "localTax": 2010, "nationalPension": 0, "healthInsurance": 0, "longTermCare": 0, "employmentInsurance": 0, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 22180, "netPay": 2000000, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-P-004-2026-01", "empSid": "P-004", "empName": "박한별", "ym": "2026-01", "dependents": 1, "note": "", "hourlyWage": 17703, "workHours": 209, "baseSalary": 3700000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 450000, "subtotal": 4150000, "absentDeduction": 0, "grossPay": 4150000, "taxableIncome": 4150000, "incomeTax": 214650, "localTax": 21460, "nationalPension": 195790, "healthInsurance": 149190, "longTermCare": 19600, "employmentInsurance": 37350, "healthInsuranceAdj": 68810, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 706850, "netPay": 3443150, "businessExpense": 325340, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-P-005-2026-01", "empSid": "P-005", "empName": "김혜민", "ym": "2026-01", "dependents": 1, "note": "휴직 중", "hourlyWage": 13397, "workHours": 128, "baseSalary": 1716130, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 90459, "subtotal": 1806589, "absentDeduction": 0, "grossPay": 1806589, "taxableIncome": 1806589, "incomeTax": 15110, "localTax": 1510, "nationalPension": 99560, "healthInsurance": 64940, "longTermCare": 8530, "employmentInsurance": 16250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 205900, "netPay": 1600689, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-P-006-2026-01", "empSid": "P-006", "empName": "박재원", "ym": "2026-01", "dependents": 1, "note": "", "hourlyWage": 13397, "workHours": 209, "baseSalary": 2800000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 558181, "subtotal": 3358181, "absentDeduction": 0, "grossPay": 3358181, "taxableIncome": 3358181, "incomeTax": 107660, "localTax": 10760, "nationalPension": 99560, "healthInsurance": 120720, "longTermCare": 15860, "employmentInsurance": 30220, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 384780, "netPay": 2973401, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-A-005-2026-01", "empSid": "A-005", "empName": "박은비", "ym": "2026-01", "dependents": 1, "note": "", "hourlyWage": 10766, "workHours": 209, "baseSalary": 2250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2250000, "absentDeduction": 0, "grossPay": 2250000, "taxableIncome": 2250000, "incomeTax": 27560, "localTax": 2750, "nationalPension": 99560, "healthInsurance": 80880, "longTermCare": 10620, "employmentInsurance": 20250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 241620, "netPay": 2008380, "businessExpense": 0, "status": "paid", "paidDate": "2026-02-05"}, {"id": "pay-P-001-2026-02", "empSid": "P-001", "empName": "권형하", "ym": "2026-02", "dependents": 2, "note": "대표", "hourlyWage": 9569, "workHours": 209, "baseSalary": 2000000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2000000, "absentDeduction": 0, "grossPay": 2000000, "taxableIncome": 2000000, "incomeTax": 19520, "localTax": 1950, "nationalPension": 116800, "healthInsurance": 71900, "longTermCare": 9440, "employmentInsurance": 0, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": -194640, "totalDeduction": 24970, "netPay": 1975030, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-A-001-2026-02", "empSid": "A-001", "empName": "최기운", "ym": "2026-02", "dependents": 1, "note": "사무장", "hourlyWage": 15072, "workHours": 209, "baseSalary": 3150000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 200000, "nonTaxableCar": 200000, "nonTaxableChildcare": 0, "bonus": 150000, "subtotal": 3700000, "absentDeduction": 0, "grossPay": 3700000, "taxableIncome": 3300000, "incomeTax": 102770, "localTax": 10270, "nationalPension": 0, "healthInsurance": 118630, "longTermCare": 15580, "employmentInsurance": 29700, "healthInsuranceAdj": 15610, "otherDeduction": 0, "yearEndAdj": 439380, "totalDeduction": 731940, "netPay": 2968060, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-A-003-2026-02", "empSid": "A-003", "empName": "김보람", "ym": "2026-02", "dependents": 1, "note": "직원", "hourlyWage": 15550, "workHours": 209, "baseSalary": 3250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 3250000, "absentDeduction": 0, "grossPay": 3250000, "taxableIncome": 3250000, "incomeTax": 95430, "localTax": 9540, "nationalPension": 139980, "healthInsurance": 116830, "longTermCare": 15350, "employmentInsurance": 29250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": -1022010, "totalDeduction": -615630, "netPay": 3865630, "businessExpense": 40000, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-A-004-2026-02", "empSid": "A-004", "empName": "주민정", "ym": "2026-02", "dependents": 1, "note": "직원", "hourlyWage": 12679, "workHours": 209, "baseSalary": 2650000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2650000, "absentDeduction": 0, "grossPay": 2650000, "taxableIncome": 2650000, "incomeTax": 43970, "localTax": 4390, "nationalPension": 111720, "healthInsurance": 95260, "longTermCare": 12510, "employmentInsurance": 23850, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": -185010, "totalDeduction": 106690, "netPay": 2543310, "businessExpense": 58600, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-A-002-2026-02", "empSid": "A-002", "empName": "신욱임", "ym": "2026-02", "dependents": 1, "note": "직원", "hourlyWage": 21429, "workHours": 105, "baseSalary": 2250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2250000, "absentDeduction": 0, "grossPay": 2250000, "taxableIncome": 2250000, "incomeTax": 27560, "localTax": 2750, "nationalPension": 93950, "healthInsurance": 80880, "longTermCare": 10620, "employmentInsurance": 20250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": -114130, "totalDeduction": 121880, "netPay": 2128120, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-A-006-2026-02", "empSid": "A-006", "empName": "김석우", "ym": "2026-02", "dependents": 1, "note": "직원", "hourlyWage": 11066, "workHours": 183, "baseSalary": 2025070, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2025070, "absentDeduction": 0, "grossPay": 2025070, "taxableIncome": 2025070, "incomeTax": 20170, "localTax": 2010, "nationalPension": 0, "healthInsurance": 0, "longTermCare": 0, "employmentInsurance": 0, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 2890, "totalDeduction": 25070, "netPay": 2000000, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-P-004-2026-02", "empSid": "P-004", "empName": "박한별", "ym": "2026-02", "dependents": 1, "note": "노무사", "hourlyWage": 17703, "workHours": 209, "baseSalary": 3700000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 499090, "subtotal": 4199090, "absentDeduction": 0, "grossPay": 4199090, "taxableIncome": 4199090, "incomeTax": 219990, "localTax": 21990, "nationalPension": 195790, "healthInsurance": 150950, "longTermCare": 19830, "employmentInsurance": 37790, "healthInsuranceAdj": 68810, "otherDeduction": 0, "yearEndAdj": -363420, "totalDeduction": 351730, "netPay": 3847360, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-P-005-2026-02", "empSid": "P-005", "empName": "김혜민", "ym": "2026-02", "dependents": 1, "note": "휴직 중", "hourlyWage": 13397, "workHours": 75, "baseSalary": 1000000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 1063854, "subtotal": 2063854, "absentDeduction": 0, "grossPay": 2063854, "taxableIncome": 2063854, "incomeTax": 21450, "localTax": 2140, "nationalPension": 99560, "healthInsurance": 74190, "longTermCare": 9740, "employmentInsurance": 18570, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": -620660, "totalDeduction": -395010, "netPay": 2458864, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-P-006-2026-02", "empSid": "P-006", "empName": "박재원", "ym": "2026-02", "dependents": 1, "note": "노무사", "hourlyWage": 13397, "workHours": 209, "baseSalary": 2800000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 695454, "subtotal": 3495454, "absentDeduction": 0, "grossPay": 3495454, "taxableIncome": 3495454, "incomeTax": 124770, "localTax": 12470, "nationalPension": 99560, "healthInsurance": 125660, "longTermCare": 16510, "employmentInsurance": 31450, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": -1033290, "totalDeduction": -622870, "netPay": 4118324, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-A-005-2026-02", "empSid": "A-005", "empName": "박은비", "ym": "2026-02", "dependents": 1, "note": "직원", "hourlyWage": 10766, "workHours": 209, "baseSalary": 2250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2250000, "absentDeduction": 0, "grossPay": 2250000, "taxableIncome": 2250000, "incomeTax": 27560, "localTax": 2750, "nationalPension": 99560, "healthInsurance": 80880, "longTermCare": 10620, "employmentInsurance": 20250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": -158540, "totalDeduction": 83080, "netPay": 2166920, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-P-009-2026-02", "empSid": "P-009", "empName": "임혜미", "ym": "2026-02", "dependents": 0, "note": "노무사", "hourlyWage": 10320, "workHours": 149, "baseSalary": 1540629, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 1540629, "absentDeduction": 0, "grossPay": 1540629, "taxableIncome": 1540629, "incomeTax": 0, "localTax": 0, "nationalPension": 0, "healthInsurance": 0, "longTermCare": 0, "employmentInsurance": 13860, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 13860, "netPay": 1526769, "businessExpense": 0, "status": "paid", "paidDate": "2026-03-05"}, {"id": "pay-P-001-2026-03", "empSid": "P-001", "empName": "권형하", "ym": "2026-03", "dependents": 2, "note": "대표", "hourlyWage": 9569, "workHours": 209, "baseSalary": 2000000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2000000, "absentDeduction": 0, "grossPay": 2000000, "taxableIncome": 2000000, "incomeTax": 19520, "localTax": 1950, "nationalPension": 116800, "healthInsurance": 71900, "longTermCare": 9440, "employmentInsurance": 0, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 219610, "netPay": 1780390, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-A-001-2026-03", "empSid": "A-001", "empName": "최기운", "ym": "2026-03", "dependents": 1, "note": "사무장", "hourlyWage": 15072, "workHours": 209, "baseSalary": 3150000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 200000, "nonTaxableCar": 200000, "nonTaxableChildcare": 0, "bonus": 165000, "subtotal": 3715000, "absentDeduction": 0, "grossPay": 3715000, "taxableIncome": 3315000, "incomeTax": 102770, "localTax": 10270, "nationalPension": 0, "healthInsurance": 119170, "longTermCare": 15650, "employmentInsurance": 29830, "healthInsuranceAdj": 15610, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 293300, "netPay": 3421700, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-A-003-2026-03", "empSid": "A-003", "empName": "김보람", "ym": "2026-03", "dependents": 1, "note": "직원", "hourlyWage": 15550, "workHours": 209, "baseSalary": 3250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 3250000, "absentDeduction": 0, "grossPay": 3250000, "taxableIncome": 3250000, "incomeTax": 95430, "localTax": 9540, "nationalPension": 139980, "healthInsurance": 116830, "longTermCare": 15350, "employmentInsurance": 29250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 406380, "netPay": 2843620, "businessExpense": 113000, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-A-004-2026-03", "empSid": "A-004", "empName": "주민정", "ym": "2026-03", "dependents": 1, "note": "직원", "hourlyWage": 12679, "workHours": 209, "baseSalary": 2650000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2650000, "absentDeduction": 0, "grossPay": 2650000, "taxableIncome": 2650000, "incomeTax": 43970, "localTax": 4390, "nationalPension": 111720, "healthInsurance": 95260, "longTermCare": 12510, "employmentInsurance": 23850, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 291700, "netPay": 2358300, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-A-002-2026-03", "empSid": "A-002", "empName": "신욱임", "ym": "2026-03", "dependents": 1, "note": "직원", "hourlyWage": 21429, "workHours": 105, "baseSalary": 2250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2250000, "absentDeduction": 0, "grossPay": 2250000, "taxableIncome": 2250000, "incomeTax": 27560, "localTax": 2750, "nationalPension": 93950, "healthInsurance": 80880, "longTermCare": 10620, "employmentInsurance": 20250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 236010, "netPay": 2013990, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-A-006-2026-03", "empSid": "A-006", "empName": "김석우", "ym": "2026-03", "dependents": 1, "note": "직원", "hourlyWage": 11050, "workHours": 183, "baseSalary": 2022180, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2022180, "absentDeduction": 0, "grossPay": 2022180, "taxableIncome": 2022180, "incomeTax": 20170, "localTax": 2010, "nationalPension": 0, "healthInsurance": 0, "longTermCare": 0, "employmentInsurance": 0, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 22180, "netPay": 2000000, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-P-004-2026-03", "empSid": "P-004", "empName": "박한별", "ym": "2026-03", "dependents": 1, "note": "휴직 중", "hourlyWage": 17703, "workHours": 209, "baseSalary": 3700000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 3700000, "absentDeduction": 0, "grossPay": 3700000, "taxableIncome": 3700000, "incomeTax": 151670, "localTax": 15160, "nationalPension": 195790, "healthInsurance": 133010, "longTermCare": 17470, "employmentInsurance": 33300, "healthInsuranceAdj": 68810, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 615210, "netPay": 3084790, "businessExpense": 237080, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-P-005-2026-03", "empSid": "P-005", "empName": "김혜민", "ym": "2026-03", "dependents": 1, "note": "휴직 중", "hourlyWage": 14354, "workHours": 202, "baseSalary": 2903226, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 150000, "subtotal": 3343549, "absentDeduction": 0, "grossPay": 3343549, "taxableIncome": 3343549, "incomeTax": 107660, "localTax": 10760, "nationalPension": 99560, "healthInsurance": 120200, "longTermCare": 15790, "employmentInsurance": 30090, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 384060, "netPay": 2959489, "businessExpense": 295620, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-P-006-2026-03", "empSid": "P-006", "empName": "박재원", "ym": "2026-03", "dependents": 1, "note": "노무사", "hourlyWage": 14354, "workHours": 209, "baseSalary": 3000000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 225000, "subtotal": 3525000, "absentDeduction": 0, "grossPay": 3525000, "taxableIncome": 3525000, "incomeTax": 129660, "localTax": 12960, "nationalPension": 99560, "healthInsurance": 126720, "longTermCare": 16650, "employmentInsurance": 31720, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 417270, "netPay": 3107730, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-A-005-2026-03", "empSid": "A-005", "empName": "박은비", "ym": "2026-03", "dependents": 1, "note": "직원", "hourlyWage": 10766, "workHours": 209, "baseSalary": 2250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2250000, "absentDeduction": 0, "grossPay": 2250000, "taxableIncome": 2250000, "incomeTax": 27560, "localTax": 2750, "nationalPension": 99560, "healthInsurance": 80880, "longTermCare": 10620, "employmentInsurance": 20250, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 241620, "netPay": 2008380, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-P-009-2026-03", "empSid": "P-009", "empName": "임혜미", "ym": "2026-03", "dependents": 0, "note": "노무사", "hourlyWage": 10320, "workHours": 209, "baseSalary": 2156880, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2156880, "absentDeduction": 0, "grossPay": 2156880, "taxableIncome": 2156880, "incomeTax": 24340, "localTax": 2430, "nationalPension": 102410, "healthInsurance": 77530, "longTermCare": 10180, "employmentInsurance": 19410, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 236300, "netPay": 1920580, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-P-008-2026-03", "empSid": "P-008", "empName": "김동현", "ym": "2026-03", "dependents": 0, "note": "노무사", "hourlyWage": 10320, "workHours": 108, "baseSalary": 1113229, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 1113229, "absentDeduction": 0, "grossPay": 1113229, "taxableIncome": 1113229, "incomeTax": 0, "localTax": 0, "nationalPension": 0, "healthInsurance": 0, "longTermCare": 0, "employmentInsurance": 10010, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 10010, "netPay": 1103219, "businessExpense": 0, "status": "paid", "paidDate": "2026-04-05"}, {"id": "pay-P-001-2026-04", "empSid": "P-001", "empName": "권형하", "ym": "2026-04", "dependents": 2, "note": "대표", "hourlyWage": 9569, "workHours": 209, "baseSalary": 2000000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2000000, "absentDeduction": 0, "grossPay": 2000000, "taxableIncome": 2000000, "incomeTax": 19520, "localTax": 1950, "nationalPension": 116800, "healthInsurance": 71900, "longTermCare": 9440, "employmentInsurance": -54000, "healthInsuranceAdj": -240600, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": -74990, "netPay": 2074990, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-A-001-2026-04", "empSid": "A-001", "empName": "최기운", "ym": "2026-04", "dependents": 1, "note": "사무장", "hourlyWage": 15072, "workHours": 209, "baseSalary": 3150000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 200000, "nonTaxableCar": 200000, "nonTaxableChildcare": 0, "bonus": 182078, "subtotal": 3732078, "absentDeduction": 0, "grossPay": 3732078, "taxableIncome": 3332078, "incomeTax": 105210, "localTax": 10520, "nationalPension": 0, "healthInsurance": 119780, "longTermCare": 15730, "employmentInsurance": 29980, "healthInsuranceAdj": -40410, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 240810, "netPay": 3491268, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-A-003-2026-04", "empSid": "A-003", "empName": "김보람", "ym": "2026-04", "dependents": 1, "note": "직원", "hourlyWage": 15550, "workHours": 209, "baseSalary": 3250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 3250000, "absentDeduction": 0, "grossPay": 3250000, "taxableIncome": 3250000, "incomeTax": 95430, "localTax": 9540, "nationalPension": 139980, "healthInsurance": 116830, "longTermCare": 15350, "employmentInsurance": 29250, "healthInsuranceAdj": 67980, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 474360, "netPay": 2775640, "businessExpense": 187500, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-A-004-2026-04", "empSid": "A-004", "empName": "주민정", "ym": "2026-04", "dependents": 1, "note": "직원", "hourlyWage": 12679, "workHours": 209, "baseSalary": 2650000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 637000, "subtotal": 3287000, "absentDeduction": 0, "grossPay": 3287000, "taxableIncome": 3287000, "incomeTax": 100320, "localTax": 10030, "nationalPension": 111720, "healthInsurance": 118160, "longTermCare": 15520, "employmentInsurance": 29580, "healthInsuranceAdj": 91320, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 476650, "netPay": 2810350, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-A-002-2026-04", "empSid": "A-002", "empName": "신욱임", "ym": "2026-04", "dependents": 1, "note": "직원", "hourlyWage": 21429, "workHours": 105, "baseSalary": 2250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2250000, "absentDeduction": 0, "grossPay": 2250000, "taxableIncome": 2250000, "incomeTax": 27560, "localTax": 2750, "nationalPension": 93950, "healthInsurance": 80880, "longTermCare": 10620, "employmentInsurance": 20250, "healthInsuranceAdj": 43860, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 279870, "netPay": 1970130, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-A-006-2026-04", "empSid": "A-006", "empName": "김석우", "ym": "2026-04", "dependents": 1, "note": "직원", "hourlyWage": 11050, "workHours": 183, "baseSalary": 2022180, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2022180, "absentDeduction": 0, "grossPay": 2022180, "taxableIncome": 2022180, "incomeTax": 20170, "localTax": 2010, "nationalPension": 0, "healthInsurance": 0, "longTermCare": 0, "employmentInsurance": 0, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 22180, "netPay": 2000000, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-P-004-2026-04", "empSid": "P-004", "empName": "박한별", "ym": "2026-04", "dependents": 1, "note": "휴직 중", "hourlyWage": 17703, "workHours": 209, "baseSalary": 3700000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 540000, "subtotal": 4240000, "absentDeduction": 0, "grossPay": 4240000, "taxableIncome": 4240000, "incomeTax": 228000, "localTax": 22800, "nationalPension": 195790, "healthInsurance": 152420, "longTermCare": 20020, "employmentInsurance": 38160, "healthInsuranceAdj": 459930, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 1117120, "netPay": 3122880, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-P-005-2026-04", "empSid": "P-005", "empName": "김혜민", "ym": "2026-04", "dependents": 1, "note": "휴직 중", "hourlyWage": 14354, "workHours": 202, "baseSalary": 2900000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 1766678, "subtotal": 4956678, "absentDeduction": 0, "grossPay": 4956678, "taxableIncome": 4956678, "incomeTax": 327050, "localTax": 32700, "nationalPension": 99560, "healthInsurance": 178190, "longTermCare": 23410, "employmentInsurance": 44610, "healthInsuranceAdj": 334500, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 1040020, "netPay": 3916658, "businessExpense": 142500, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-P-006-2026-04", "empSid": "P-006", "empName": "박재원", "ym": "2026-04", "dependents": 1, "note": "노무사", "hourlyWage": 14354, "workHours": 209, "baseSalary": 3000000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 1913895, "subtotal": 5213895, "absentDeduction": 0, "grossPay": 5213895, "taxableIncome": 5213895, "incomeTax": 363520, "localTax": 36350, "nationalPension": 99560, "healthInsurance": 187430, "longTermCare": 24620, "employmentInsurance": 46920, "healthInsuranceAdj": 284040, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 1042440, "netPay": 4171455, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-A-005-2026-04", "empSid": "A-005", "empName": "박은비", "ym": "2026-04", "dependents": 1, "note": "직원", "hourlyWage": 10766, "workHours": 209, "baseSalary": 2250000, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 234000, "subtotal": 2484000, "absentDeduction": 0, "grossPay": 2484000, "taxableIncome": 2484000, "incomeTax": 34950, "localTax": 3490, "nationalPension": 99560, "healthInsurance": 89290, "longTermCare": 11730, "employmentInsurance": 22350, "healthInsuranceAdj": -7290, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 254080, "netPay": 2229920, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-P-009-2026-04", "empSid": "P-009", "empName": "임혜미", "ym": "2026-04", "dependents": 0, "note": "노무사", "hourlyWage": 10320, "workHours": 209, "baseSalary": 2156880, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2156880, "absentDeduction": 0, "grossPay": 2156880, "taxableIncome": 2156880, "incomeTax": 24340, "localTax": 2430, "nationalPension": 102410, "healthInsurance": 77530, "longTermCare": 10180, "employmentInsurance": 19410, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 236300, "netPay": 1920580, "businessExpense": 0, "status": "paid", "paidDate": "2026-05-05"}, {"id": "pay-P-008-2026-04", "empSid": "P-008", "empName": "김동현", "ym": "2026-04", "dependents": 0, "note": "노무사", "hourlyWage": 10320, "workHours": 209, "baseSalary": 2156880, "overtimePay": 0, "nightPay": 0, "holidayPay": 0, "extraOvertimePay": 0, "unusedLeavePay": 0, "nonTaxableMeal": 0, "nonTaxableCar": 0, "nonTaxableChildcare": 0, "bonus": 0, "subtotal": 2156880, "absentDeduction": 0, "grossPay": 2156880, "taxableIncome": 2156880, "incomeTax": 24340, "localTax": 2430, "nationalPension": 102410, "healthInsurance": 77530, "longTermCare": 10180, "employmentInsurance": 19410, "healthInsuranceAdj": 0, "otherDeduction": 0, "yearEndAdj": 0, "totalDeduction": 236300, "netPay": 1920580, "businessExpense": 8400, "status": "paid", "paidDate": "2026-05-05"}];
   var existing = dbGet('payroll_monthly', []);
@@ -14203,7 +14389,7 @@ function backfill2026Details(){
 })();
 
 // ============ 임금항목 '결근공제' 자동 추가 (1회) ============
-(function migrateAbsentItem(){
+(function migrateAbsentItem(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   if(dbGet('pay_item_absent_v1_done', false)) return;
   var items = dbGet('pay_items', null);
   if(items && Array.isArray(items) && !items.find(function(x){ return x.code === 'absent'; })){
@@ -14288,6 +14474,7 @@ function backfill2026Details(){
 
 // ============ 가짜(데모) 데이터 1회 자동 삭제 ============
 (function(){
+  return; // ⚠비활성화(2026): 데모데이터(ct-N·c-N 등) 자동삭제 일회성 루틴. 실데이터엔 영향 없으나 자동삭제 경로 자체를 막기 위해 비활성.
   if(dbGet('demo_purge_v1_done', false)) return;
   // 계약관리: ct-1 ~ ct-12 (CONTRACT_DEMO_SEED ID 패턴)
   var contracts = dbGet('contracts', []);
@@ -15464,7 +15651,7 @@ function sortUsers(arr){
 }
 
 // 사번 체계 마이그레이션 (1회 실행)
-(function migrateUserSids(){
+(function migrateUserSids(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   try {
     if(localStorage.getItem('pureun_v6_user_sid_migrated_v2')) return;
     var current = dbGet('user_accounts', null);
@@ -19391,7 +19578,7 @@ var ROLE_PRESETS = [
 
 
 // ============ 급여대장 실데이터 반영 (2026.1~4월) + 근로자명부 업데이트 ============
-(function loadRealPayrollData(){
+(function loadRealPayrollData(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_real_payroll_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19435,7 +19622,7 @@ var ROLE_PRESETS = [
 
 
 // ============ 2025년 급여대장 실적 반영 (v3: 장기요양정산·기타공제 포함) ============
-(function loadPayroll2025(){
+(function loadPayroll2025(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_real_payroll_v3';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19460,7 +19647,7 @@ var ROLE_PRESETS = [
 })();
 
 // ============ 퇴직자 user_accounts 등록 ============
-(function addResignedUsers(){
+(function addResignedUsers(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_resigned_users_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19504,7 +19691,7 @@ var ROLE_PRESETS = [
 })();
 
 // 퇴사자 상태값 정규화 (resigned→retired, resignDate→retireDate) — 일회성·멱등
-(function normalizeResignedStatus(){
+(function normalizeResignedStatus(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_normalize_resigned_v1';
   try{
     if(localStorage.getItem(VER)) return;
@@ -19533,7 +19720,7 @@ var ROLE_PRESETS = [
 
 
 // ============ 연차대장 실적 반영 ============
-(function loadLeaveData(){
+(function loadLeaveData(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_leave_real_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19570,7 +19757,7 @@ var ROLE_PRESETS = [
 })();
 
 // ============ 사무대행 업체 반영 ============
-(function loadSamdmCompanies(){
+(function loadSamdmCompanies(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_sadm_companies_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19616,7 +19803,7 @@ var ROLE_PRESETS = [
 
 
 // ============ 컨설팅 유형 → 수행기관 분리 마이그레이션 ============
-(function migrateConsAgency(){
+(function migrateConsAgency(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_cons_agency_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19642,7 +19829,7 @@ var ROLE_PRESETS = [
 
 
 // ============ 급여 108 / 기금 / 노조 강제 재구성 ============
-(function rebuildSalFndUnn(){
+(function rebuildSalFndUnn(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_sal_fnd_unn_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19674,7 +19861,7 @@ var ROLE_PRESETS = [
 // ============ companyId 자동 백필 (A단계: 텍스트 연결 → ID 연결 강화) ============
 // 기존 데이터에 companyId가 없으면 companyName으로 매칭해서 자동 채움
 // 회사명 변경 시 과거 통계가 끊어지는 문제 방지
-(function backfillCompanyId(){
+(function backfillCompanyId(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_companyid_backfill_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19727,7 +19914,7 @@ var ROLE_PRESETS = [
 })();
 
 // ============ 자문사 82개 강제 재구성 v2 (실무자·연락처·고용보험가입자수 포함) ============
-(function rebuildAdvisory82(){
+(function rebuildAdvisory82(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_adv82_v2';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19752,7 +19939,7 @@ var ROLE_PRESETS = [
 })();
 
 // ============ 자문/급여/기금/노조 중복 병합 v2 (정규화 + 사업자번호) ============
-(function mergeDuplicateActiveV2(){
+(function mergeDuplicateActiveV2(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_merge_dup_v2';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19843,7 +20030,7 @@ var ROLE_PRESETS = [
 
 // ============ 자문/급여/기금/노조 중복 업체 병합 ============
 // 같은 이름의 활성 업체가 여러 개일 때 → 하나로 합치고 모든 필드 보강
-(function mergeDuplicateActive(){
+(function mergeDuplicateActive(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_merge_dup_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19903,7 +20090,7 @@ var ROLE_PRESETS = [
 })();
 
 // ============ 사무대행 업체 status 수정 + 담당자 매핑 (v2) ============
-(function fixSubofficeData(){
+(function fixSubofficeData(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_sadm_fix_v2';
   try {
     if(localStorage.getItem(VER)) return;
@@ -19949,7 +20136,7 @@ var ROLE_PRESETS = [
 
 // ============ 사무대행 ↔ 자문 중복 업체 병합 ============
 // 같은 이름의 active 자문/급여/기금/노조 업체와 suboffice 사무대행 업체 → 활성 1건으로 병합
-(function mergeSubofficeIntoActive(){
+(function mergeSubofficeIntoActive(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_merge_suboffice_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -20001,7 +20188,7 @@ var ROLE_PRESETS = [
 })();
 
 // ============ 자문사/급여/기금/노조 업체 전체 반영 ============
-(function loadAllCompanyData(){
+(function loadAllCompanyData(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_all_companies_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -20081,7 +20268,7 @@ var ROLE_PRESETS = [
 })();
 
 // ============ 실제 자문료 업체 데이터 마이그레이션 ============
-(function loadRealCompanyData(){
+(function loadRealCompanyData(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_real_companies_v1';
   try {
     if(localStorage.getItem(VER)) return;
@@ -20111,7 +20298,7 @@ var ROLE_PRESETS = [
 //   일반 직원(노무사·사무직 포함): 대시보드+사무관리만
 //   환경설정에서 관리자가 그룹(인사/재무)을 개인별 추가 허용 가능
 // ══════════════════════════════════════════════════════
-(function staffPermReset(){
+(function staffPermReset(){ return; /* ⚠비활성화(2026): 새 기기·캐시삭제 시 공용 Firebase 데이터를 옛 하드코딩 값으로 덮어쓰던 일회성 시드/마이그레이션. 라이브에 실데이터가 이미 있으므로 영구 비활성. 코드는 보존. */
   var VER = 'pureun_v6_staff_perm_v2'; // v2: 모든 비관리자 동일 정책 적용
   try {
     if(localStorage.getItem(VER)) return;
@@ -42211,12 +42398,14 @@ function parseBizLicense(text){
 }
 function getVisionApiKey(){
   try { var k = (localStorage.getItem('pureun_v6_vision_api_key')||'').trim(); if(k) return k; } catch(e){}
-  return VISION_API_KEY;
+  return ''; // 저장된 키 없음 → Vision 건너뛰고 로컬 OCR(Tesseract)로 폴백
 }
 function ocrWithGoogleVision(base64){
+  var key = getVisionApiKey();
+  if(!key) return Promise.reject(new Error('NO_VISION_KEY')); // 키 없으면 로컬 OCR로 폴백
   var pure = (base64 && base64.indexOf(',') >= 0) ? base64.split(',')[1] : base64;
   if(!pure) return Promise.reject(new Error('NO_IMAGE'));
-  return fetch('https://vision.googleapis.com/v1/images:annotate?key=' + getVisionApiKey(), {
+  return fetch('https://vision.googleapis.com/v1/images:annotate?key=' + key, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
