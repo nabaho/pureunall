@@ -10513,7 +10513,7 @@ function CompanyManagement(){
         filtered.length === 0
           ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'40px', fontSize:'12px' } }, '등록된 데이터가 없습니다')
           : pg.paged.map(function(co, idx){
-              var mgrU = users.find(function(u){return u.sid===co.managerMain;});
+              var mgrU = users.find(function(u){return u.sid===co.managerMain || u.name===co.managerMain;});
               var subNames = (co.managerSubs||[]).map(function(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid; }).filter(Boolean);
               var expiring = isExpiringSoon(co);
               var typeColors = { '자문':['#dbeafe','#1e40af'], '급여':['#dcfce7','#166534'], '노조':['#ede9fe','#1d4ed8'], '기금':['#fef3c7','#854d0e'] };
