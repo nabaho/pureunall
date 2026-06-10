@@ -16545,6 +16545,21 @@ function BizTypeCard(props){
     setInput(''); setShortIn(''); setAgencyIn(''); showToast('추가됨');
   }
   function del(code){ persist(list.filter(function(x){ return x.code !== code; })); }
+  function editType(x){
+    var sh = window.prompt('약어 (최대 4자)', x.short || ''); if(sh === null) return;
+    var nm = window.prompt('유형 이름', x.name || ''); if(nm === null) return;
+    sh = sh.trim().slice(0,4); nm = nm.trim();
+    if(!sh || !nm){ showToast('약어와 이름을 모두 입력하세요'); return; }
+    var ag = null;
+    if(cat.key === 'consulting'){ ag = window.prompt('기관 (없으면 비워두기)', x.agency || ''); if(ag === null) ag = x.agency || ''; }
+    persist(list.map(function(it){
+      if(it.code !== x.code) return it;
+      var nx = Object.assign({}, it, { short:sh, name:nm });
+      if(ag !== null) nx.agency = ag.trim();
+      return nx;
+    }));
+    showToast('✏ 수정됨 — 코드 유지, 기존 사건·컨설팅 연결 그대로');
+  }
   function reseed(){ persist(cat.seed.slice()); showToast('시드 복원됨'); }
 
   // 드래그 핸들러
@@ -16613,6 +16628,8 @@ function BizTypeCard(props){
                 x.name,
                 cat.key === 'consulting' && x.agency ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#64748b', background:'#f1f5f9', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null
               ),
+              h('button', { onClick:function(){ editType(x); }, title:'수정 (코드 유지 — 기존 연결 안 끊김)',
+                style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer' } }, '✏'),
               h('button', { onClick:function(){ del(x.code); },
                 style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', width:'16px', flexShrink:0, height:'22px', fontSize:'12px', cursor:'pointer' } }, '×')
             );
