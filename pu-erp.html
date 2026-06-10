@@ -11704,7 +11704,7 @@ function CaseEditModal(props){
                 }))),
           h('div', { className:'fld' }, h('label', null, '사건명/제목'),
             h('input', { type:'text', value:f.title||'', onChange:setV('title'), placeholder:'예: 부당해고 구제신청', style:inputS })),
-          h('div', { className:'fld' }, h('label', null, isWorkerCase ? '상대방 사업장명' : '의뢰인 (회사명) *'),
+          h('div', { className:'fld' }, h('label', null, isWorkerCase ? '상대방 (회사명)' : '의뢰인 (회사명) *'),
             h('input', { type:'text', value:f.companyName||'', onChange:setV('companyName'), style:inputS })),
           !isWorkerCase && h('div', { className:'fld' }, h('label', null, '상대방'),
             h('input', { type:'text', value:f.opponent||'', onChange:setV('opponent'), placeholder:'상대방 (회사·근로자·기관 등)', style:inputS })),
