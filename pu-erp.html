@@ -51380,6 +51380,16 @@ function ERPMain(props){
     _fpRaw = '';
     try { localStorage.removeItem('pureun_v6_force_pw'); } catch(e){}
   }
+  // 깃발이 있어도 실제 비밀번호가 이미 변경됐으면 팝업 불필요 → 깃발 제거 (재발 방지)
+  if(_fpRaw){
+    try {
+      var _fpU = (dbGet('user_accounts', []) || []).find(function(x){ return x.sid === _fpRaw; });
+      if(_fpU && !isDefaultPwStored(_fpU.loginPw || _fpU.password || '')){
+        _fpRaw = '';
+        localStorage.removeItem('pureun_v6_force_pw');
+      }
+    } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+  }
   var fpcS = useState(_fpRaw); var forcePwSid = fpcS[0]; var setForcePwSid = fpcS[1];
   useEffect(function(){
     if(isAdminByUser(CURRENT_USER)) return;  // 관리자(권형하)는 접속 시 자동 투어 생략
