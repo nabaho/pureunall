@@ -11813,7 +11813,12 @@ function CaseEditModal(props){
                   )),
             h('div', { className:'fld' }, h('label', null, '진행상태'),
               h('select', { value:f.status||'pending', onChange:setV('status'), style:inputS },
-                CASE_STATUS.map(function(s){ return h('option', { key:s.v, value:s.v }, s.label); })))
+                CASE_STATUS.map(function(s){ return h('option', { key:s.v, value:s.v }, s.label); }))),
+            h('div', { className:'fld' }, h('label', null, '의뢰인 구분'),
+              h('select', { value:caseClientType, onChange:setV('clientType'), style:inputS },
+                h('option', { value:'company' }, '🏢 회사가 의뢰인'),
+                h('option', { value:'worker' }, '👤 근로자가 의뢰인 (회사는 상대방)'),
+                h('option', { value:'both' }, '🔄 회사 + 근로자')))
           ),
           // 담당
           h('div', { className:'fld' }, h('label', null, '주담당 *'),
