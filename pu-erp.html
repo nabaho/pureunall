@@ -33926,10 +33926,10 @@ function CorpDashboard(props){
             : r.type==='trip' ? '🚗 출장'+who + (r.note?' '+r.note:'')
             : r.type==='telework' ? '🏠 재택'+who + (r.note?' '+r.note:'')
             : r.type==='eum-work' ? (function(){
+                var _tEum = (r.startTime ? r.startTime.replace(':','') + '-' + (r.endTime||'').replace(':','') + ' ' : '');
                 if(r.externalId){
                   var ext = (dbGet('external_staff',[])||[]).find(function(x){return x.id===r.externalId;});
-                  var _tEum = (r.startTime ? r.startTime.replace(':','') + '-' + (r.endTime||'').replace(':','') + ' ' : '');
-        if(ext) return '🏛️ ' + _tEum + ext.name + ' 이음센터' + (r.note?' '+r.note:'');
+                  if(ext) return '🏛️ ' + _tEum + ext.name + ' 이음센터' + (r.note?' '+r.note:'');
                 }
                 var u = users.find(function(x){return x.sid===r.sid;});
                 return '🏛️ ' + _tEum + (u?u.name+' 이음센터':'이음센터') + (r.note?' '+r.note:'');
