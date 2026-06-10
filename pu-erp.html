@@ -703,7 +703,7 @@ var ERP_BUILD = 'V1 (2026-06-09)';
         var seen={}, dup=0;
         arr.forEach(function(x){ var id=x&&x.id; if(!id) return; if(seen[id]) dup++; else seen[id]=1; });
         if(dup>0){
-          window.erpAlert && erpAlert('warn', LABEL[k]+'에 중복 데이터 '+dup+'건 발견', '같은 id가 두 번 이상 들어있습니다. 화면에 같은 항목이 중복 표시될 수 있습니다.', '정리된 복원 파일로 ⬆복원하거나, 중복 항목을 직접 삭제하세요.');
+          window.erpAlert && erpAlert('warn', LABEL[k]+'에 중복 데이터 '+dup+'건 발견', '같은 id가 두 번 이상 들어있습니다. 화면에 같은 항목이 중복 표시될 수 있습니다.', '환경설정 → 시스템 → 데이터 관리 → [중복 데이터 검사 및 제거]에서 🔍 지금 검사 후 클릭 한 번으로 정리됩니다.');
         }
         // 2) 지난 접속 대비 급감 점검 (10건 이상 → 절반 미만)
         if(typeof prev[k]==='number' && prev[k]>=10 && arr.length < prev[k]*0.5){
