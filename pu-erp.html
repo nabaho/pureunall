@@ -976,6 +976,23 @@ function verifyPw(pw, stored){
   return legacyDecodePw(stored) === pw;
 }
 function isLegacyPw(stored){ return !!stored && String(stored).indexOf('v2$') !== 0; }
+// 전역 Ctrl+K (캡처 단계): 한글 입력 상태(e.key가 'ㅏ' 등)여도 e.code로 인식 — 전역 검색 포커스
+window.addEventListener('keydown', function(e){
+  if(!(e.ctrlKey || e.metaKey)) return;
+  if(e.code !== 'KeyK' && e.key !== 'k' && e.key !== 'K') return;
+  e.preventDefault();
+  e.stopPropagation();
+  try {
+    var gi = document.getElementById('erp-global-search');
+    if(gi){ gi.focus(); gi.select && gi.select(); return; }
+    // 전역 검색이 없으면(모바일 등) 보이는 검색창 아무거나
+    var ins = document.querySelectorAll('input[placeholder*="검색"], input.dt-search');
+    for(var i=0;i<ins.length;i++){
+      var r = ins[i].getBoundingClientRect();
+      if(r.width>0 && r.height>0){ ins[i].focus(); ins[i].select && ins[i].select(); return; }
+    }
+  } catch(_e){}
+}, true);
 // 전역 ESC: 가장 위 모달의 × 버튼 클릭 (입력 중이어도 동작, 각 모달의 자체 ESC와 충돌 없음)
 window.addEventListener('keydown', function(e){
   if(e.key !== 'Escape') return;
@@ -4695,7 +4712,7 @@ function GlobalSearch(props){
   }
 
   return h('div',{className:'hd-gsearch', style:{position:'relative',marginRight:'12px'}},
-    h('input',{type:'text', ref:inputRef, placeholder:'🔍 검색 (Ctrl+K)',
+    h('input',{type:'text', ref:inputRef, id:'erp-global-search', placeholder:'🔍 검색 (Ctrl+K)',
       value:query,
       onChange:function(e){setQuery(e.target.value); setOpen(true);},
       onFocus:function(){setOpen(true);},
