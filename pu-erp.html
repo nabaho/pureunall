@@ -3504,6 +3504,19 @@ function fbSetupListener(){
   if(!fbDb) return;
   if(_fbListenerSetup) return; // 중복 등록 차단
   _fbListenerSetup = true;
+  // 동기화 핑퐁 감지: 같은 키가 60초 내 6회 이상 변경 수신되면 경보 (구버전 기기와의 형식 되돌리기 충돌 의심)
+  var _fbStorm = {};
+  function _stormCheck(k){
+    var now = Date.now();
+    var s = _fbStorm[k] || (_fbStorm[k] = []);
+    s.push(now);
+    while(s.length && now - s[0] > 60000) s.shift();
+    if(s.length === 6){
+      window.erpAlert && erpAlert('warn', '동기화 충돌 의심: ' + k,
+        '같은 데이터가 1분에 ' + s.length + '회 이상 변경 수신됨. 구버전으로 열려있는 PC가 데이터를 되돌리고 있을 수 있습니다.',
+        '모든 사무실 PC에서 Ctrl+Shift+R로 최신 코드를 적용하세요.');
+    }
+  }
   fbDb.ref('data').on('child_changed', function(snap){
     var k = snap.key;
     var v = snap.val();
@@ -3512,9 +3525,19 @@ function fbSetupListener(){
     var localTime = parseInt(localStorage.getItem(KEY+'_meta_'+k) || '0', 10);
     if(v.u > localTime){
       try {
+        _stormCheck(k);
         // #4 Tier 3: 객체 형식이면 배열화
         var arrValue = normalizeFbValue(v.v);
-        try { var _oldRaw = localStorage.getItem(KEY+k); var _oldArr = _oldRaw ? JSON.parse(_oldRaw) : null;
+        try { var _oldRaw = localStorage.getItem(KEY+k);
+          // 대용량 키는 전체 파싱 대신 항목수 근사(정규식)로 급감 검사 — 멈춤 방지
+          var _oldArr = null;
+          if(_oldRaw && _oldRaw.length > 300000){
+            var _oldCnt = (_oldRaw.match(/"id":/g) || []).length;
+            _oldArr = _oldCnt >= 10 ? { length:_oldCnt, _approx:true } : null;
+            if(_oldArr) _oldArr = Object.assign([], { length:_oldCnt });
+          } else {
+            _oldArr = _oldRaw ? JSON.parse(_oldRaw) : null;
+          }
           if(Array.isArray(_oldArr) && Array.isArray(arrValue) && _oldArr.length >= 10 && arrValue.length < _oldArr.length * 0.5){
             window.erpAlert && erpAlert('danger', '다른 기기에서 '+k+' 데이터가 크게 줄었습니다', '서버 동기화 수신으로 '+_oldArr.length+'건 → '+arrValue.length+'건이 되었습니다.', '의도한 삭제가 아니면 환경설정→💾 서버백업(일간/수시)에서 직전 시점으로 복원하세요.');
           }
@@ -3536,7 +3559,14 @@ function fbSetupListener(){
       try {
         // #4 Tier 3: 객체 형식이면 배열화
         var arrValue = normalizeFbValue(v.v);
-        try { var _oldRaw2 = localStorage.getItem(KEY+k); var _oldArr2 = _oldRaw2 ? JSON.parse(_oldRaw2) : null;
+        try { var _oldRaw2 = localStorage.getItem(KEY+k);
+          var _oldArr2 = null;
+          if(_oldRaw2 && _oldRaw2.length > 300000){
+            var _oldCnt2 = (_oldRaw2.match(/"id":/g) || []).length;
+            _oldArr2 = _oldCnt2 >= 10 ? Object.assign([], { length:_oldCnt2 }) : null;
+          } else {
+            _oldArr2 = _oldRaw2 ? JSON.parse(_oldRaw2) : null;
+          }
           if(Array.isArray(_oldArr2) && Array.isArray(arrValue) && _oldArr2.length >= 10 && arrValue.length < _oldArr2.length * 0.5){
             window.erpAlert && erpAlert('danger', '서버의 '+k+' 데이터가 이 기기보다 크게 적습니다', '동기화 수신으로 '+_oldArr2.length+'건 → '+arrValue.length+'건이 되었습니다.', '의도한 삭제가 아니면 환경설정→💾 서버백업(일간/수시)에서 직전 시점으로 복원하세요.');
           }
