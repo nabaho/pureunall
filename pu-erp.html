@@ -42894,8 +42894,8 @@ function AttendanceManagement(){
 
   var TYPES = [
     { v:'leave',       label:'연차',     icon:'🏖️', color:'#16a34a', bg:'#dcfce7', deductLeave:true,  hours:8 },
-    { v:'halfday-am',  label:'오전반차', icon:'🌅', color:'#2563eb', bg:'#cffafe', deductLeave:true,  hours:4 },
-    { v:'halfday-pm',  label:'오후반차', icon:'🌇', color:'#2563eb', bg:'#cffafe', deductLeave:true,  hours:4 },
+    { v:'halfday-am',  label:'연차(오전)', icon:'🌅', color:'#2563eb', bg:'#cffafe', deductLeave:true,  hours:4, legacy:true },
+    { v:'halfday-pm',  label:'연차(오후)', icon:'🌇', color:'#2563eb', bg:'#cffafe', deductLeave:true,  hours:4, legacy:true },
     { v:'leave-hour',  label:'시간연차', icon:'⏱️', color:'#0d9488', bg:'#ccfbf1', deductLeave:true,  hours:0 },
     { v:'sick',        label:'병가',     icon:'🤒', color:'#dc2626', bg:'#fee2e2' },
     { v:'public',      label:'공가',     icon:'📋', color:'#2563eb', bg:'#ede9fe' },
@@ -42908,9 +42908,18 @@ function AttendanceManagement(){
   ];
   var TYPE_MAP = {};
   TYPES.forEach(function(t){ TYPE_MAP[t.v]=t; });
+  // 시간대 표시 접미사 + (유형,시간대)→저장형 변환 (연차+오전/오후는 기존 반차 코드로 저장: 차감계산 무변경)
+  function periodSfx(r){ return r && r.period==='am' ? '(오전)' : r && r.period==='pm' ? '(오후)' : ''; }
+  function resolveTypePeriod(t, p){
+    p = p || 'full';
+    if(t === 'leave' && p === 'am') return { type:'halfday-am', period:'full' };
+    if(t === 'leave' && p === 'pm') return { type:'halfday-pm', period:'full' };
+    if(t === 'leave-hour') return { type:t, period:'full' };
+    return { type:t, period:p };
+  }
 
   // 빠른 입력 form
-  var fs = useState({ date:todayYMD(), type:'leave', hours:1, note:'' });
+  var fs = useState({ date:todayYMD(), type:'leave', hours:1, note:'', period:'full' });
   var form = fs[0]; var setForm = fs[1];
 
   // 드래그 state
@@ -43003,7 +43012,9 @@ function AttendanceManagement(){
   // 등록
   async function addRecord(ds){
     if(!selSid || selSid==='all'){ showToast('개별 직원을 선택하세요'); return; }
-    var type = form.type;
+    var _rp = resolveTypePeriod(form.type, form.period);
+    var type = _rp.type;
+    var period = _rp.period;
     var hours = 0;
     if(type==='leave-hour'){
       var _sh = users.find(function(u){return u.sid===selSid;});
@@ -43015,6 +43026,7 @@ function AttendanceManagement(){
     // 중복 검사
     var dup = records.find(function(r){
       if(r.sid!==selSid||r.date!==date||r.type!==type) return false;
+      if((r.period||'full') !== period) return false;
       if(type==='leave-hour') return (r.hours||0)===hours;
       return true;
     });
@@ -43023,6 +43035,7 @@ function AttendanceManagement(){
       date:date, sid:selSid, type:type, note:form.note||'',
       createdAt:(new Date()).toISOString() };
     if(type==='leave-hour') rec.hours=hours;
+    if(period!=='full') rec.period=period;
     persist([rec].concat(records));
     showToast(type==='leave-hour'?'시간연차 '+hours+'h 등록':'등록 완료');
   }
@@ -43036,7 +43049,9 @@ function AttendanceManagement(){
   async function submitDayModal(){
     if(!dayModal) return;
     if(!selSid || selSid==='all'){ showToast('개별 직원을 선택하세요'); return; }
-    var attType = dayModal.type;
+    var _rp2 = resolveTypePeriod(dayModal.type, dayModal.period);
+    var attType = dayModal.type ? _rp2.type : '';
+    var attPeriod = _rp2.period;
     var otOver = parseFloat(dayModal.otOvertime)||0;
     var otNight = parseFloat(dayModal.otNight)||0;
     var otHoliday = parseFloat(dayModal.otHoliday)||0;
@@ -43053,6 +43068,7 @@ function AttendanceManagement(){
       }
       var dup = records.find(function(r){
         if(r.sid!==selSid||r.date!==dayModal.date||r.type!==attType) return false;
+        if((r.period||'full') !== attPeriod) return false;
         if(attType==='leave-hour') return (r.hours||0)===hours;
         return true;
       });
@@ -43063,8 +43079,9 @@ function AttendanceManagement(){
           date:dayModal.date, sid:selSid, type:attType, note:dayModal.note||'',
           createdAt:(new Date()).toISOString() };
         if(attType==='leave-hour') rec.hours=hours;
+        if(attPeriod!=='full') rec.period=attPeriod;
         persist([rec].concat(records));
-        msgs.push((TYPE_MAP[attType]||{}).label||attType);
+        msgs.push(((TYPE_MAP[attType]||{}).label||attType)+periodSfx(rec));
       }
     }
     if(otOver>0){ addOTRecord(dayModal.date, 'overtime', otOver, dayModal.note||''); msgs.push('연장'+otOver+'h'); }
@@ -43092,7 +43109,7 @@ function AttendanceManagement(){
     if(item.type==='special-leave') rec.days = item.days || 1;
     persist([rec].concat(records));
     var t = TYPE_MAP[item.type];
-    var lbl = (t?t.icon+' '+t.label:item.type) + (item.type==='leave-hour'?' '+(item.hours||1)+'h':'') + ' · ' + date.slice(5);
+    var lbl = (t?t.icon+' '+t.label:item.type) + periodSfx(item) + (item.type==='leave-hour'?' '+(item.hours||1)+'h':'') + ' · ' + date.slice(5);
     showToast('등록 ' + lbl);
   }
 
@@ -43146,7 +43163,7 @@ function AttendanceManagement(){
 
           return h('div',{key:idx,
             onClick:function(){ if(!dragId && !dragNewItem){ setForm(Object.assign({},form,{date:ds})); } },
-            onDoubleClick:function(){ if(!selSid || selSid==='all'){ showToast('개별 직원을 선택하세요'); return; } setDayModal({date:ds, type:'leave', hours:1, note:'', otOvertime:0, otNight:0, otHoliday:0}); },
+            onDoubleClick:function(){ if(!selSid || selSid==='all'){ showToast('개별 직원을 선택하세요'); return; } setDayModal({date:ds, type:'leave', hours:1, note:'', period:'full', otOvertime:0, otNight:0, otHoliday:0}); },
             onDragOver:function(e){ if(selSid==='all') return; e.preventDefault(); setDragOver(ds); },
             onDragLeave:function(){ setDragOver(null); },
             onDrop:function(e){
@@ -43174,7 +43191,7 @@ function AttendanceManagement(){
                 var emp = users.find(function(u){return u.sid===r.sid;});
                 empName = (emp ? emp.name : r.sid) + ' ';
               }
-              var label = empName+t.icon+' '+t.label+(r.type==='leave-hour'?' '+(r.hours||0)+'h':'')+(r.note?' ('+r.note+')':'');
+              var label = empName+t.icon+' '+t.label+periodSfx(r)+(r.type==='leave-hour'?' '+(r.hours||0)+'h':'')+(r.note?' ('+r.note+')':'');
               var isDragging = dragId===r.id;
               var isAllView = selSid === 'all';
               return h('div',{key:ri,draggable:!isAllView,
@@ -43244,7 +43261,7 @@ function AttendanceManagement(){
             h('label', {style:{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'1px'}}, '휴가구분'),
             h('select', {value:form.type, onChange:function(e){setForm(Object.assign({},form,{type:e.target.value}));},
               style:{width:'100%',padding:'6px 8px',border:'1px solid #cbd5e1',borderRadius:'5px',fontSize:'12px'}},
-              TYPES.map(function(t){return h('option',{key:t.v,value:t.v},t.icon+' '+t.label);}))
+              TYPES.filter(function(t){return !t.legacy;}).map(function(t){return h('option',{key:t.v,value:t.v},t.icon+' '+t.label);}))
           )
         ),
         // 비고 + 등록 (2열)
@@ -43289,7 +43306,7 @@ function AttendanceManagement(){
             var t=TYPE_MAP[r.type]||{color:'#64748b',bg:'#f1f5f9',icon:'?',label:r.type};
             return h('div', {key:r.id, style:{display:'flex',alignItems:'center',gap:'6px',padding:'5px 10px',borderBottom:'1px solid #f1f5f9'}},
               h('span', {style:{fontFamily:'monospace',fontSize:'11px',color:'#475569',minWidth:'45px'}}, (r.date||'').slice(5)),
-              h('span', {style:{background:t.color,color:'#fff',fontSize:'10px',padding:'2px 6px',borderRadius:'8px',fontWeight:600}}, t.icon+' '+t.label),
+              h('span', {style:{background:t.color,color:'#fff',fontSize:'10px',padding:'2px 6px',borderRadius:'8px',fontWeight:600}}, t.icon+' '+t.label+periodSfx(r)),
               r.note && h('span', {style:{fontSize:'10px',color:'#94a3b8',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, r.note),
               h('button', {onClick:function(){delRecord(r.id);}, style:{background:'none',border:'none',color:'#dc2626',fontSize:'14px',cursor:'pointer',padding:'0 2px'}}, '×')
             );
@@ -43391,7 +43408,20 @@ function AttendanceManagement(){
             h('div',null,
               h('label',{style:{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'1px'}},'휴가 구분'),
               h('select',{value:form.type,onChange:function(e){setForm(Object.assign({},form,{type:e.target.value}));},style:Object.assign({width:'100%'},inputS)},
-                TYPES.map(function(t){return h('option',{key:t.v,value:t.v},t.icon+' '+t.label);}))
+                TYPES.filter(function(t){return !t.legacy;}).map(function(t){return h('option',{key:t.v,value:t.v},t.icon+' '+t.label);}))
+            ),
+            form.type!=='leave-hour' && h('div',null,
+              h('label',{style:{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'1px'}},'시간대'),
+              h('div',{style:{display:'flex',gap:'4px'}},
+                [{v:'full',l:'종일'},{v:'am',l:'오전'},{v:'pm',l:'오후'}].map(function(p){
+                  var on=(form.period||'full')===p.v;
+                  return h('button',{key:p.v,
+                    onClick:function(){setForm(Object.assign({},form,{period:p.v}));},
+                    className:'erp-tip','data-tip': p.v==='full' ? '하루 전체' : (form.type==='leave' ? '연차 0.5일 차감 ('+p.l+'반차)' : p.l+' 반일'),
+                    style:{flex:1,padding:'5px 0',fontSize:'11px',fontWeight:on?700:500,
+                      background:on?'#1e40af':'#fff',color:on?'#fff':'#475569',
+                      border:'1px solid '+(on?'#1e40af':'#cbd5e1'),borderRadius:'4px',cursor:'pointer'}},p.l);
+                }))
             ),
             form.type==='leave-hour' && h('div',null,
               h('label',{style:{fontSize:'10.5px',color:'#0d9488',fontWeight:600,display:'block',marginBottom:'3px'}},
@@ -43464,7 +43494,7 @@ function AttendanceManagement(){
                     h('td',{style:Object.assign({},tdS,{fontFamily:'monospace',color:'#475569'})},r.date.slice(5)),
                     h('td',{style:tdS},
                       h('span',{style:{background:t.color,color:'#fff',fontSize:'10px',padding:'2px 6px',borderRadius:'8px',fontWeight:700}},
-                        t.icon+' '+t.label+(r.type==='leave-hour'?' '+(r.hours||0)+'h':''))),
+                        t.icon+' '+t.label+periodSfx(r)+(r.type==='leave-hour'?' '+(r.hours||0)+'h':''))),
                     h('td',{style:Object.assign({},tdS,{fontSize:'10.5px',color:'#64748b'})},r.note||'-'),
                     h('td',{style:Object.assign({},tdS,{textAlign:'center',padding:'2px'})},
                       h('button',{onClick:function(){delRecord(r.id);},style:{background:'none',border:'none',color:'#dc2626',fontSize:'13px',cursor:'pointer'}},'×'))
@@ -43574,7 +43604,7 @@ function AttendanceManagement(){
                   var t = rec ? TYPE_MAP[rec.type] : null;
                   var dt = new Date(year, month-1, d);
                   var isWk = dt.getDay()===0||dt.getDay()===6;
-                  var title = (rec?t.label:'') + (otSum>0?(rec?' / ':'')+'연장 '+otSum+'h':'');
+                  var title = (rec?t.label+periodSfx(rec):'') + (otSum>0?(rec?' / ':'')+'연장 '+otSum+'h':'');
                   return h('td',{key:d,
                     onClick:function(){setSelSid(u.sid);setTab('individual');},
                     title:title||'-',
@@ -43609,7 +43639,7 @@ function AttendanceManagement(){
           )
         ),
         h('div',{style:{marginTop:'10px',padding:'8px 12px',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'5px',fontSize:'10.5px',color:'#64748b'}},
-          '범례: ', TYPES.map(function(t,i){return h('span',{key:t.v,style:{marginRight:'10px',display:'inline-block'}},t.icon+' '+t.label);}),
+          '범례: ', TYPES.filter(function(t){return !t.legacy;}).map(function(t,i){return h('span',{key:t.v,style:{marginRight:'10px',display:'inline-block'}},t.icon+' '+t.label);}),
           h('span',{style:{marginLeft:'10px',color:'#92400e',fontWeight:700}},'+Xh = 연장근로 시간'))
       );
     })(),
@@ -43629,7 +43659,19 @@ function AttendanceManagement(){
               onChange:function(e){setDayModal(Object.assign({},dayModal,{type:e.target.value}));},
               style:{width:'100%'}},
               h('option',{value:''},'— 등록 안 함 (초과근로만 입력) —'),
-              TYPES.map(function(t){return h('option',{key:t.v,value:t.v},t.icon+' '+t.label);}))
+              TYPES.filter(function(t){return !t.legacy;}).map(function(t){return h('option',{key:t.v,value:t.v},t.icon+' '+t.label);}))
+          ),
+          dayModal.type && dayModal.type!=='leave-hour' && h('div',{className:'fld'},
+            h('label',null,'시간대'),
+            h('div',{style:{display:'flex',gap:'6px'}},
+              [{v:'full',l:'종일'},{v:'am',l:'오전'},{v:'pm',l:'오후'}].map(function(p){
+                var on=(dayModal.period||'full')===p.v;
+                return h('button',{key:p.v,
+                  onClick:function(){setDayModal(Object.assign({},dayModal,{period:p.v}));},
+                  style:{flex:1,padding:'7px 0',fontSize:'12px',fontWeight:on?700:500,
+                    background:on?'#1e40af':'#fff',color:on?'#fff':'#475569',
+                    border:'1px solid '+(on?'#1e40af':'#cbd5e1'),borderRadius:'5px',cursor:'pointer'}},p.l);
+              }))
           ),
           dayModal.type==='leave-hour' && h('div',{className:'fld'},
             h('label',null,(function(){
