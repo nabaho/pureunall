@@ -563,6 +563,13 @@ input[data-inputtype="numeric"] {
 .page table td[style*="#f0fdfa"], .page table th[style*="#f0fdfa"] {
   background: #f8fafc !important;
 }
+/* 말풍선 툴팁: className 'erp-tip' + data-tip 속성 */
+.erp-tip{ position:relative; }
+.erp-tip:hover::after{ content:attr(data-tip); position:absolute; bottom:130%; left:50%; transform:translateX(-50%);
+  background:#1e293b; color:#fff; padding:4px 9px; border-radius:6px; font-size:10.5px; font-weight:600;
+  white-space:nowrap; z-index:2147483600; pointer-events:none; box-shadow:0 3px 8px rgba(0,0,0,.25); }
+.erp-tip:hover::before{ content:''; position:absolute; bottom:calc(130% - 4px); left:50%; transform:translateX(-50%);
+  border:4px solid transparent; border-top-color:#1e293b; z-index:2147483600; pointer-events:none; }
 @media (max-width:768px){
   /* 모바일: KPI 한 줄 6칸 → 3칸×2줄 컴팩트 (화면 점유 절반 이하) */
   .mkpi-grid{ grid-auto-flow: row !important; grid-template-columns: repeat(3,minmax(0,1fr)) !important; gap:3px !important; }
@@ -16628,7 +16635,7 @@ function BizTypeCard(props){
                 x.name,
                 cat.key === 'consulting' && x.agency ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#64748b', background:'#f1f5f9', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null
               ),
-              h('button', { onClick:function(){ editType(x); }, title:'수정 (코드 유지 — 기존 연결 안 끊김)',
+              h('button', { onClick:function(){ editType(x); }, className:'erp-tip', 'data-tip':'✏ 수정 가능 (코드 유지 — 연결 안 끊김)',
                 style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer' } }, '✏'),
               h('button', { onClick:function(){ del(x.code); },
                 style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', width:'16px', flexShrink:0, height:'22px', fontSize:'12px', cursor:'pointer' } }, '×')
