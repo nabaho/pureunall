@@ -36476,9 +36476,9 @@ function CorpDashboard(props){
               else if(menuId==='biz/case' && it.startDate) line1Parts.push('📅 '+it.startDate);
               var subLine1 = line1Parts.join(' · ');
               // 2줄: 사업장 담당자·연락처 (적극 fallback)
-              var contactName = it.contactName || '';
-              var contactPhone = it.contactPhone || '';
-              var ceoName = it.ceoName || '';
+              var contactName = it.contactName || it.primaryContactName || '';
+              var contactPhone = it.contactPhone || it.primaryContactPhone || '';
+              var ceoName = it.ceoName || it.ceo || '';
               if(!contactName || !contactPhone){
                 var co = null;
                 if(it.companyId) co = (allCompanies||[]).find(function(c){return c.id===it.companyId;});
