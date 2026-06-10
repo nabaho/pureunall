@@ -4950,7 +4950,28 @@ function NotificationCenter(){
             })
       ),
       alerts.length>0 && h('div',{style:{padding:'8px 14px',background:'#f8fafc',borderTop:'1px solid #e2e8f0',fontSize:'10.5px',color:'#64748b',textAlign:'center'}},
-        '항목 클릭 시 해당 화면으로 이동')
+        '항목 클릭 시 해당 화면으로 이동'),
+      // 시스템 경고 이력 (자가진단 등 — 이 기기 기록)
+      (function(){
+        var logs = [];
+        try { logs = JSON.parse(localStorage.getItem('pureun_v6_session_alert_log')||'[]'); } catch(e){}
+        if(!logs.length) return null;
+        var recent = logs.slice(-15).reverse();
+        return h('div',{style:{borderTop:'2px solid #e2e8f0',maxHeight:'180px',overflowY:'auto',background:'#fffbeb'}},
+          h('div',{style:{padding:'7px 14px',fontSize:'11px',fontWeight:800,color:'#92400e',display:'flex',justifyContent:'space-between',alignItems:'center',position:'sticky',top:0,background:'#fffbeb'}},
+            h('span',null,'⚠️ 시스템 경고 이력 ('+logs.length+')'),
+            h('button',{onClick:function(e){ e.stopPropagation(); try{ localStorage.removeItem('pureun_v6_session_alert_log'); }catch(_e){} setOpen(false); showToast('경고 이력 비움'); },
+              style:{background:'none',border:'1px solid #fde68a',borderRadius:'4px',fontSize:'10px',color:'#92400e',cursor:'pointer',padding:'1px 7px'}},'비우기')),
+          recent.map(function(g,i){
+            var dt = new Date(g.t||0);
+            var ts = (dt.getMonth()+1)+'/'+dt.getDate()+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+            return h('div',{key:i,style:{padding:'6px 14px',borderTop:'1px solid #fef3c7'}},
+              h('div',{style:{fontSize:'11px',fontWeight:700,color:g.level==='danger'?'#b91c1c':'#92400e'}},
+                (g.level==='danger'?'🚨 ':'⚠️ ')+(g.title||'')),
+              h('div',{style:{fontSize:'10px',color:'#a16207',marginTop:'1px'}}, ts + (g.detail?' · '+g.detail:'')));
+          })
+        );
+      })()
     ),
     // 외부 클릭 시 닫기
     open && h('div',{onClick:function(){setOpen(false);},
@@ -10320,6 +10341,20 @@ function CompanyManagement(){
             style:{ padding:'9px 14px', background:'#2563eb', color:'#fff', border:'none',
               borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' }
           }, '👤 ' + selIds.size + '개 선택 · 주담당 배정'),
+          selIds.size > 0 && h('button', {
+            onClick:function(){
+              var d = window.prompt('난이도 (1 쉬움 ~ 5 어려움, 비우면 해제)', '');
+              if(d === null) return;
+              d = d.trim();
+              if(d !== '' && ['1','2','3','4','5'].indexOf(d) < 0){ showToast('1~5 사이 숫자를 입력하세요'); return; }
+              persist(companies.map(function(c){ return selIds.has(c.id) ? Object.assign({}, c, { difficulty: d }) : c; }));
+              showToast('⭐ ' + selIds.size + '개 업체 난이도 ' + (d || '해제') + ' 적용');
+              clearSel();
+            },
+            className:'erp-tip', 'data-tip':'선택 업체들의 난이도를 한 번에 지정 (1 쉬움 ~ 5 어려움)',
+            style:{ padding:'9px 14px', background:'#854d0e', color:'#fff', border:'none',
+              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' }
+          }, '⭐ 난이도 일괄'),
           selIds.size > 0 && h('button', {
             onClick:clearSel,
             style:{ padding:'9px 10px', background:'#f1f5f9', color:'#475569', border:'1px solid #e2e8f0',
@@ -16674,7 +16709,7 @@ function BizTypeCard(props){
       h('span', null, cat.title),
       h('span', { style:{ fontWeight:600, fontSize:'12px' } }, '(' + list.length + ')'),
       h('div', { style:{ flex:1 } }),
-      h('button', { onClick:function(e){ e.stopPropagation(); reseed(); }, title:'시드 복원',
+      h('button', { onClick:function(e){ e.stopPropagation(); reseed(); }, className:'erp-tip', 'data-tip':'⚠️ 기본 유형으로 되돌림 — 추가·수정한 유형이 사라집니다',
         style:{ fontSize:'10.5px', padding:'2px 8px', background:'transparent', color:cat.headFg, border:'1px solid '+cat.headFg, borderRadius:'4px', opacity:.6, cursor:'pointer', marginLeft:'6px' } }, '복원')
     ),
     h('div', null,
