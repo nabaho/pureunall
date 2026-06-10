@@ -21619,6 +21619,14 @@ function BackupSection(){
     if(!(await popConfirm(msg))) return;
 
     try {
+      // 저장공간 확보(quota 초과 방지): 교체될 키의 기존 값 제거, 전체복원(30키 이상)이면 앱 키 전부 제거 후 새로 씀
+      try {
+        if(writes.length >= 30){
+          Object.keys(localStorage).forEach(function(k){ if(k.indexOf(KEY) === 0){ localStorage.removeItem(k); } });
+        } else {
+          writes.forEach(function(w){ try{ localStorage.removeItem(w.lsKey); localStorage.removeItem(w.lsKey.replace(KEY, KEY+'_meta_')); }catch(_e){} });
+        }
+      } catch(_e){}
       writes.forEach(function(w){ localStorage.setItem(w.lsKey, w.raw); });
       var fbOk = true;
       if(fbDb && Object.keys(fbUpdates).length){
