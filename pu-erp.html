@@ -36468,9 +36468,9 @@ function CorpDashboard(props){
                 if(!co && it.sourceId) co = (allCompanies||[]).find(function(c){return c.id===it.sourceId;});
                 if(!co && it.companyName) co = (allCompanies||[]).find(function(c){return c.name===it.companyName;});
                 if(co){
-                  if(!contactName) contactName = co.contactName||'';
-                  if(!contactPhone) contactPhone = co.contactPhone||'';
-                  if(!ceoName) ceoName = co.ceoName||'';
+                  if(!contactName) contactName = co.primaryContactName || co.contactName || '';
+                  if(!contactPhone) contactPhone = co.primaryContactPhone || co.contactPhone || '';
+                  if(!ceoName) ceoName = co.ceo || co.ceoName || '';
                 }
               }
               var line2Parts = [];
@@ -36478,18 +36478,19 @@ function CorpDashboard(props){
               else if(ceoName) line2Parts.push('👤 대표 '+ceoName);
               if(contactPhone) line2Parts.push('📞 '+contactPhone);
               var subLine2 = line2Parts.join('  ·  ');
+              // 의뢰인 구분 배지 (회사/근로자/둘다)
+              var clientBadge = it.clientType === 'worker' ? '👤근로자 의뢰' : (it.clientType === 'both' ? '🔄회사+근로자' : (it.clientType === 'company' ? '🏢회사 의뢰' : ''));
+              // 한 줄 압축: 제목 · 부가정보 · 담당자정보를 한 줄에
+              var oneLine = [subLine1, subLine2].filter(Boolean).join('  ·  ');
               return h('div',{key:it.id||i,
                 onClick:function(){gotoItem(menuId, title);},
-                style:{padding:'8px 11px',background:'#fff',border:'1px solid #f1f5f9',borderRadius:'5px',cursor:'pointer',display:'flex',alignItems:'flex-start',gap:'8px',fontSize:'11.5px',transition:'all 0.1s'},
+                style:{padding:'6px 10px',background:'#fff',border:'1px solid #f1f5f9',borderRadius:'5px',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',fontSize:'11.5px',transition:'all 0.1s'},
                 onMouseEnter:function(e){e.currentTarget.style.background=color+'11';e.currentTarget.style.borderColor=color+'66';},
                 onMouseLeave:function(e){e.currentTarget.style.background='#fff';e.currentTarget.style.borderColor='#f1f5f9';}},
-                h('div',{style:{flex:1,minWidth:0}},
-                  h('div',{style:{fontWeight:700,color:'#1e293b',fontSize:'12px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},title),
-                  subLine1 && h('div',{style:{fontSize:'10.5px',color:'#475569',marginTop:'4px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},subLine1),
-                  subLine2 && h('div',{style:{fontSize:'10.5px',color:'#2563eb',marginTop:'4px',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},subLine2),
-                  !subLine2 && h('div',{style:{fontSize:'10px',color:'#cbd5e1',marginTop:'4px',fontStyle:'italic'}}, '담당자 정보 미입력')
-                ),
-                isAll && h('span',{style:{fontSize:'10.5px',padding:'2px 6px',background:color+'22',color:color,borderRadius:'8px',fontWeight:700,whiteSpace:'nowrap',marginTop:'2px'}},mgrText(it)||'미지정')
+                h('span',{style:{fontWeight:700,color:'#1e293b',fontSize:'12px',whiteSpace:'nowrap',flexShrink:0}},title),
+                clientBadge && h('span',{style:{fontSize:'9.5px',padding:'1px 6px',background: it.clientType==='worker' ? '#fff7ed' : '#eff6ff', color: it.clientType==='worker' ? '#9a3412' : '#1e40af', border:'1px solid '+(it.clientType==='worker' ? '#fed7aa' : '#bfdbfe'), borderRadius:'8px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0}}, clientBadge),
+                h('span',{style:{flex:1,minWidth:0,fontSize:'10.5px',color: subLine2 ? '#475569' : '#94a3b8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}, oneLine || '사업장 담당자(실무자) 미입력 — 업체관리에서 입력'),
+                isAll && h('span',{style:{fontSize:'10.5px',padding:'2px 6px',background:color+'22',color:color,borderRadius:'8px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0}},mgrText(it)||'미지정')
               );
             }),
             filteredItems.length>30 && h('div',{style:{fontSize:'10.5px',color:'#94a3b8',textAlign:'center',padding:'4px'}}, '+ '+(filteredItems.length-30)+'건 더 (모듈에서 확인)')
