@@ -2802,6 +2802,38 @@ var CompanyRef = {
       if(!item.bizNo && co.bizNo) item.bizNo = co.bizNo;
     }
     return item;
+  },
+  // 업체관리에 없는 회사면 '컨설팅' 유형으로 자동 등록 후 companyId 부여
+  registerIfMissing: function(item, sourceLabel){
+    if(!item || !item.companyName || !String(item.companyName).trim()) return item;
+    this.attachId(item);
+    if(item.companyId) return item;
+    try {
+      var types = dbGet('biz_company_types', []) || [];
+      if(!types.some(function(t){ return t && t.name === '컨설팅'; })){
+        var maxO = types.length ? Math.max.apply(null, types.map(function(x){ return x.sortOrder||0; })) : 0;
+        types.push({ code:'company-auto-consult', short:'컨설', name:'컨설팅', sortOrder:maxO+10 });
+        dbSet('biz_company_types', types);
+      }
+    } catch(_e){}
+    var rec = {
+      id:'co-auto-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      name:String(item.companyName).trim(), bizNo:item.bizNo||'',
+      bizType:item.bizType||'', bizCategory:item.bizCategory||'', ceo:item.ceo||'', ceo2:'',
+      zipcode:item.zipcode||'', address:item.address||'', phone:item.phone||'', fax:'', email:item.email||'',
+      monthlyAdvisoryFee:0, companySize:item.companySize||'', employmentInsuredCount:0, injuryInsuredCount:0,
+      contractStartDate:item.startDate||'', contractEndDate:'', taxInvoiceIssueDay:'', taxInvoicePaymentDay:'', vatType:'',
+      typeCode:'컨설팅', status:'active', managerMain:item.managerMain||'', managerSubs:[],
+      note:'자동 등록 ('+(sourceLabel||'컨설팅')+')',
+      primaryContactName:item.primaryContactName||'', primaryContactPhone:item.primaryContactPhone||'',
+      primaryContactEmail:item.primaryContactEmail||'', sourceContractNo:item.sourceContractNo||'',
+      createdAt:(new Date()).toISOString()
+    };
+    var cos = dbGet('companies', []) || [];
+    cos.push(rec); dbSet('companies', cos);
+    item.companyId = rec.id;
+    try { showToast('🏢 업체 자동 등록: ' + rec.name + ' → 업체관리 [컨설팅] 탭'); } catch(_e){}
+    return item;
   }
 };
 
@@ -7595,6 +7627,7 @@ function transferContract(contract){
       note: '계약(' + contract.contractNo + ')에서 이관'
     };
     if(kindV === 'fund'){ item2.estDate = contract.signDate; delete item2.startDate; delete item2.endDate; }
+    if(kindV === 'consulting'){ try { CompanyRef.registerIfMissing(item2, '계약 이관'); } catch(_e){} }
     arr2.unshift(item2); dbSet(storageMap[kindV], arr2);
     // 컨설팅은 계약일(startDate)순 자동 재정렬 (소급 입력 자연 정렬)
     if(kindV === 'consulting'){
