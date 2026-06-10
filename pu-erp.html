@@ -2331,6 +2331,20 @@ function startRecentBackupTimer(){
 window.erpRecentBackupNow = function(){ serverBackupRecent(); console.log('수시 백업 시도'); };
 
 function dbSet(k, v){
+  // 데이터보호: 배열 내 동일 id 중복 자동 제거 (id가 문자열인 항목만 대상)
+  if(Array.isArray(v) && v.length > 1){
+    var _ids = {}; var _hadDup = false;
+    var _dd = v.filter(function(x){
+      var i = x && x.id;
+      if(typeof i !== 'string' || !i) return true;
+      if(_ids[i]){ _hadDup = true; return false; }
+      _ids[i] = 1; return true;
+    });
+    if(_hadDup){
+      console.warn('[데이터보호] ' + k + ': 중복 id ' + (v.length - _dd.length) + '건 자동 제거');
+      v = _dd;
+    }
+  }
   // Diff Sync: 동일 값이면 스킵 (불필요한 Firebase 쓰기 방지)
   var newJson;
   try { newJson = JSON.stringify(v); } catch(e){ return false; }
