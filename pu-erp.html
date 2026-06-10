@@ -33478,8 +33478,8 @@ function CorpDashboard(props){
   // 권한: 관리자/위임관리인 = KPI/분석/직원별업무 전체 접근
   var IS_ADMIN = !!(CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin);
 
-  // 탭 초기값 — 관리자·비관리자 모두 캘린더로 시작
-  var initTab = 'calendar';
+  // 탭 초기값 — 마지막 본 탭 복원 (없으면 캘린더)
+  var initTab = dbGet('corp_dash_tab', null) || 'calendar';
   var tbS = useState(initTab); var dashTab = tbS[0]; var setDashTab = tbS[1];
   var fsS = useState(false); var dashFull = fsS[0]; var setDashFull = fsS[1];
   function changeTab(t){ setDashTab(t); dbSet('corp_dash_tab', t); }
@@ -51610,7 +51610,10 @@ function ERPMain(props){
   var c = useState(window.innerWidth <= 768); var collapsed = c[0]; var setCollapsed = c[1];
   var now = new Date();
   var m = useState({ y:now.getFullYear(), m:now.getMonth()+1, d:now.getDate() }); var month = m[0]; var setMonth = m[1];
-  var o = useState({ dash:false, biz:false, hr:false, fin:false, env:false }); var openSet = o[0]; var setOpenSet = o[1];
+  var o = useState(function(){
+    var saved = dbGet('open_groups', null);
+    return (saved && typeof saved === 'object') ? saved : { dash:false, biz:false, hr:false, fin:false, env:false };
+  }); var openSet = o[0]; var setOpenSet = o[1];
   // 메뉴 history 스택 (뒤로가기 + 최근 본 항목)
   var hs = useState([]); var menuHistory = hs[0]; var setMenuHistory = hs[1];
 
@@ -51669,7 +51672,6 @@ function ERPMain(props){
     }
     setCurrent(id);
     try { localStorage.setItem('pureun_v6_session_last_menu_' + (CURRENT_USER.sid||''), id); } catch(e){}
-    dbSet('current_menu', id);
     // 그룹 자동 펼침 제거 (즐겨찾기/검색 클릭 시 사이드바 펼침 방지)
     // 사용자가 직접 펼친 상태가 그대로 유지됨
     // 모바일: 메뉴 선택 후 사이드바 자동 닫힘
@@ -51684,7 +51686,6 @@ function ERPMain(props){
     var prev = menuHistory[0];
     setMenuHistory(function(arr){ return arr.slice(1); });
     setCurrent(prev);
-    dbSet('current_menu', prev);
     var f = findMenu(prev);
     if(f){
       var next = Object.assign({}, openSet, (function(){var x={}; x[f.grp.gid]=true; return x;})());
