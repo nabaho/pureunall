@@ -40606,6 +40606,23 @@ function StaffRosterModal(props){
           });
         },
         style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } })),
+      // 퇴직 정산 스냅샷 — 분쟁·증명서 대응용 최소 기록 (임금채권·퇴직급여 시효 3년 대비)
+      f.status === 'retired' && h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'10px 12px', marginBottom:'12px' } },
+        h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#92400e', marginBottom:'8px' } }, '📋 퇴직 정산 스냅샷 (시효 3년 대비 기록 — 원본 서류는 자료보관소에)'),
+        h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'8px' } },
+          fld('평균임금 (월 환산)', h('input', { type:'text', value:(f.settleAvgWage||0).toLocaleString(), onChange:setNum('settleAvgWage'),
+            placeholder:'마지막 3개월 평균',
+            style:{ width:'100%', padding:'7px 10px', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'12.5px', textAlign:'right', fontFamily:'monospace', boxSizing:'border-box' } })),
+          fld('퇴직금 지급액', h('input', { type:'text', value:(f.settleSeverance||0).toLocaleString(), onChange:setNum('settleSeverance'),
+            style:{ width:'100%', padding:'7px 10px', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'12.5px', textAlign:'right', fontFamily:'monospace', boxSizing:'border-box' } })),
+          fld('퇴직금 지급일', inp('settleSeverancePaidDate','date')),
+          fld('연차 미사용수당', h('input', { type:'text', value:(f.settleLeavePay||0).toLocaleString(), onChange:setNum('settleLeavePay'),
+            style:{ width:'100%', padding:'7px 10px', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'12.5px', textAlign:'right', fontFamily:'monospace', boxSizing:'border-box' } })),
+          fld('4대보험 상실신고일', inp('settleInsLossDate','date')),
+          fld('정산 비고', h('input', { type:'text', value:f.settleNote||'', onChange:set('settleNote'), placeholder:'예: 미사용 연차 5일 정산 포함',
+            style:{ width:'100%', padding:'7px 10px', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } }))
+        )
+      ),
       fld('기본급 (원)', h('input', { type:'text', value:(f.baseSalary||0).toLocaleString(), onChange:setNum('baseSalary'),
         style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', textAlign:'right', fontFamily:'monospace', boxSizing:'border-box' } })),
       // 임금 계산방법·지급일
