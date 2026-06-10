@@ -10515,6 +10515,7 @@ function CompanyManagement(){
                 h('th', { key:'hw3', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '고용·산재'),
                 h('th', { key:'hw4', style:{ background:'#f0fdfa', color:'#0f766e', fontSize:'10.5px' } }, '건강'),
                 h('th', { key:'h7' }, '특이사항'),
+                h('th', { key:'h7b', className:'ac erp-tip', 'data-tip':'난이도: 1 쉬움 ~ 5 어려움 (셀 더블클릭으로 입력)', style:{ width:'52px' } }, '난이도'),
                 h('th', { key:'h8', className:'ac', style:{ width:'60px' } }, '관리')
               ]
             : [
@@ -10555,12 +10556,13 @@ function CompanyManagement(){
                 h('th', { key:'a16', className:'contract-only', onClick:function(){toggleSort('contractEndDate');}, style:{ cursor:'pointer', userSelect:'none' }, title:'계약별 고유 필드' }, '계약종료' + sortIcon('contractEndDate')),
                 h('th', { key:'a17', className:'contract-only ar hide-fee-col', onClick:function(){toggleSort('monthlyAdvisoryFee');}, style:{ cursor:'pointer', userSelect:'none' }, title:'계약별 고유 필드' }, '월자문료' + sortIcon('monthlyAdvisoryFee')),
                 h('th', { key:'a18' }, '특이사항'),
+                h('th', { key:'a18b', className:'ac erp-tip', 'data-tip':'난이도: 1 쉬움 ~ 5 어려움 (셀 더블클릭으로 입력)', style:{ width:'52px' } }, '난이도'),
                 h('th', { key:'a19', className:'ac', style:{ width:'60px' } }, '관리')
               ]
         )),
         h('tbody', null,
           filtered.length === 0
-            ? h('tr', null, h('td', { colSpan: statusTab === 'suboffice' ? 16 : 22, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
+            ? h('tr', null, h('td', { colSpan: statusTab === 'suboffice' ? 17 : 23, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
             : pg.paged.map(function(co, idx){
                 var expiring = isExpiringSoon(co);
                 // ★ 계약 중단: 주황 배경 구분
@@ -10635,6 +10637,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                     h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'eiSi')),
                     h('td', { style:{ background:'#f0fdfa' } }, wageCell(co, 'health')),
                     h('td', null, renderCell(co, 'note', co.note, {})),
+                  h('td', { className:'ac' }, renderCell(co, 'difficulty', co.difficulty ? h('span',{style:{fontWeight:700,padding:'1px 7px',borderRadius:'8px',background:({1:'#dcfce7',2:'#ecfccb',3:'#fef9c3',4:'#ffedd5',5:'#fee2e2'})[co.difficulty]||'#f1f5f9',color:({1:'#166534',2:'#4d7c0f',3:'#854d0e',4:'#c2410c',5:'#b91c1c'})[co.difficulty]||'#475569'}}, co.difficulty) : '-', {select:[{v:'',label:'-'},{v:'1',label:'1 쉬움'},{v:'2',label:'2'},{v:'3',label:'3 보통'},{v:'4',label:'4'},{v:'5',label:'5 어려움'}]})),
                     h('td', { className:'ac' },
                       h('div', { style:{ display:'flex', flexDirection:'column', gap:'3px', alignItems:'center' } },
                         h('button', { onClick:function(){ editCompany(co.id); },
@@ -10773,6 +10776,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                   h('td', { className:'contract-only ar hide-fee-col' }, renderCell(co, 'monthlyAdvisoryFee', (co.monthlyAdvisoryFee||0).toLocaleString() + '원', { numeric:true, type:'text' })),
                   // 특이사항
                   h('td', null, renderCell(co, 'note', co.note, {})),
+                  h('td', { className:'ac' }, renderCell(co, 'difficulty', co.difficulty ? h('span',{style:{fontWeight:700,padding:'1px 7px',borderRadius:'8px',background:({1:'#dcfce7',2:'#ecfccb',3:'#fef9c3',4:'#ffedd5',5:'#fee2e2'})[co.difficulty]||'#f1f5f9',color:({1:'#166534',2:'#4d7c0f',3:'#854d0e',4:'#c2410c',5:'#b91c1c'})[co.difficulty]||'#475569'}}, co.difficulty) : '-', {select:[{v:'',label:'-'},{v:'1',label:'1 쉬움'},{v:'2',label:'2'},{v:'3',label:'3 보통'},{v:'4',label:'4'},{v:'5',label:'5 어려움'}]})),
                   // 관리
                   h('td', { className:'ac' },
                     h('div', { style:{ display:'flex', flexDirection:'column', gap:'3px', alignItems:'center' } },
