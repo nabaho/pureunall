@@ -25771,7 +25771,23 @@ function IncomePendingTab(){
                     h('div', { style:{marginTop:'8px',padding:'6px 8px',background:'#fff',borderRadius:'4px',fontSize:'10.5px',color:'#9a3412',display:'flex',justifyContent:'space-between'} },
                       h('span', null, '※ 분할% × 직책요율 = 실 지급액'),
                       h('span', { style:{fontWeight:700} }, '조정 합계: ' + totalAmt.toLocaleString() + '원')
-                    )
+                    ),
+                    // 세금 공제 계산 + 세후 실지급액 표시
+                    (function(){
+                      var taxRate = ded.bizIncomeTax ? 3.3 : (ded.etcIncomeTax ? 8.8 : 0);
+                      if(!taxRate || totalAmt <= 0) return null;
+                      var taxLabel = ded.bizIncomeTax ? '사업소득세 3.3%' : '기타소득세 8.8%';
+                      var taxAmt = Math.round(totalAmt * taxRate / 100);
+                      var net = totalAmt - taxAmt;
+                      return h('div', { style:{marginTop:'6px',padding:'8px 10px',background:'#ecfdf5',border:'1px solid #6ee7b7',borderRadius:'4px',fontSize:'11px',color:'#065f46'} },
+                        h('div', { style:{display:'flex',justifyContent:'space-between'} },
+                          h('span', null, '세금 공제 (' + taxLabel + ')'),
+                          h('span', { style:{fontFamily:'monospace'} }, totalAmt.toLocaleString() + ' × ' + taxRate + '% = -' + taxAmt.toLocaleString() + '원')),
+                        h('div', { style:{display:'flex',justifyContent:'space-between',marginTop:'4px',paddingTop:'4px',borderTop:'1px dashed #6ee7b7'} },
+                          h('span', { style:{fontWeight:800} }, '💵 실지급액 (세후)'),
+                          h('span', { style:{fontWeight:800,fontSize:'12.5px'} }, net.toLocaleString() + '원'))
+                      );
+                    })()
                   );
                 })(),
                 (calc.totalDeducted > 0 || !perfOn || ded.personalRevenue) && h('div', { style:{ marginTop:'8px', padding:'6px 10px', background:'#fff', borderRadius:'4px', fontSize:'10.5px', color:'#475569', fontFamily:'monospace' } },
