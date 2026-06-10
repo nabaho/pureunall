@@ -31887,7 +31887,8 @@ function MyDeskV2(props){
                           ),
                           h('td', { style:{ padding:'7px', textAlign:'center', fontSize:'10.5px', color:'#475569' } },
                             (function(){
-                              var sMap = { progress:'진행중', pending:'대기', review:'검토중', open:'진행중', closed:'완료', done:'완료', cancelled:'취소', hold:'보류' };
+                              var sMap = { progress:'진행중', pending:'대기', review:'검토중', open:'진행중', closed:'완료', done:'완료', cancelled:'취소', hold:'보류',
+                                           consult:'상담접수', negotiate:'협의중', confirmed:'계약확정', signed:'최종확정', active:'진행중' };
                               var raw = it.status||'';
                               return sMap[raw] || raw;
                             })()),
@@ -32009,13 +32010,13 @@ function MyDeskV2(props){
             padding:'5px 8px', marginBottom:'8px', alignItems:'center' } },
           h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', fontWeight:600, marginRight:'4px' } }, '크기'),
           [
-            { v:'sm', label:'작게' },
-            { v:'md', label:'중간' },
-            { v:'lg', label:'크게' },
-            { v:'full', label:'⛶ 전체' }
+            { v:'sm', label:'작게', tip:'캘린더를 작게 — 목록 공간 넓힘' },
+            { v:'md', label:'중간', tip:'캘린더 중간 크기 (기본)' },
+            { v:'lg', label:'크게', tip:'캘린더를 크게 — 일정 글씨 잘 보임' },
+            { v:'full', label:'⛶ 전체', tip:'캘린더를 화면 가득 채움' }
           ].map(function(b){
             var on = calSize === b.v;
-            return h('button', { key:b.v, onClick:function(){setCalSize(b.v);},
+            return h('button', { key:b.v, onClick:function(){setCalSize(b.v);}, className:'erp-tip', 'data-tip':b.tip,
               style:{ padding:'4px 9px', fontSize:'11px', fontWeight:on?700:500,
                 background: on?'#1e40af':'transparent', color: on?'#fff':'#64748b',
                 border:'1px solid '+(on?'#1e40af':'#e2e8f0'), borderRadius:'4px', cursor:'pointer' } },
