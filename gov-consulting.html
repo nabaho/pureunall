@@ -21,7 +21,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 <style>
 @font-face{font-family:'RadioGothic';src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2206-01@1.0/EF_ladio.woff2') format('woff2');font-weight:normal;font-display:swap;}
 @font-face{font-family:'LogoCasual';src:url('https://fonts.gstatic.com/s/itim/v14/0nknC9ziJOYewARKkc7ZdwU.woff2') format('woff2');font-weight:normal;font-display:swap;}
-:root{--bg:#f0f7ff;--surface:#fff;--sf2:#e3f0fb;--border:#b3cde8;--accent:#1565c0;--text:#0d1f35;--t2:#4a6a88;--ok:#2a9d8f;--danger:#e94560;--info:#2196f3;--r:12px;
+:root{--bg:#f0f7ff;--surface:#fff;--sf2:#e3f0fb;--border:#b3cde8;--accent:#1565c0;--text:#0d1f35;--t2:#4a6a88;--ok:#2a9d8f;--danger:#e94560;--hol:#d11a2a;--info:#2196f3;--r:12px;
 --dash-bg:#1a3a5c;--dash-sf:#244a6e;--dash-border:#2e5880;--dash-text:#ddeeff;--dash-t2:#7aafd0;}
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);}
@@ -66,13 +66,15 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 [data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;background:#1f2937;color:#fff;font-size:11px;font-weight:700;padding:5px 9px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .12s .15s;z-index:1000;}
 [data-tip]::before{content:"";position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-bottom-color:#1f2937;opacity:0;pointer-events:none;transition:opacity .12s .15s;z-index:1000;}
 [data-tip]:hover::after,[data-tip]:hover::before{opacity:1;}
+.hdr-r [data-tip]::after{left:auto;right:0;transform:none;}
+.hdr-r [data-tip]::before{left:auto;right:10px;transform:none;}
 .user-sel{padding:6px 10px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;}
 .user-sel:focus{border-color:var(--info);}
 .mode-toggle{display:flex;border:1.5px solid var(--dash-border);border-radius:8px;overflow:hidden;}
 .mode-btn{padding:5px 12px;border:none;background:transparent;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--dash-t2);}
 .mode-btn.on{background:var(--accent);color:#fff;}
 .att-filter{padding:6px 10px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:11px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;}
-.zip-btn{padding:6px 12px;background:var(--ok);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;}
+.zip-btn{padding:0 12px;height:30px;display:inline-flex;align-items:center;background:var(--ok);color:#fff;border:1.5px solid transparent;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;}
 .zip-btn:hover{background:#248a80;}
 
 .body{display:grid;grid-template-columns:var(--dash-w,290px) 6px 1fr;overflow:hidden;flex:1;}
@@ -133,8 +135,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .cal-tb{display:flex;align-items:center;gap:8px;padding:12px 16px;flex-wrap:wrap;flex-shrink:0;}
 .cal-nav{width:30px;height:30px;border:1.5px solid var(--dash-border);border-radius:8px;background:var(--dash-sf);cursor:pointer;font-size:13px;color:var(--dash-t2);}
 .cal-nav:hover{border-color:var(--info);color:var(--info);}
-.cal-title{font-size:18px;font-weight:900;min-width:120px;color:#cce3f7;}
-.cal-today-btn{padding:5px 11px;border:1.5px solid var(--dash-border);border-radius:8px;background:var(--dash-sf);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:#64b5f6;}
+.cal-title{font-size:21px;font-weight:900;min-width:130px;color:#fff;text-align:center;letter-spacing:.5px;text-shadow:0 1px 3px rgba(0,0,0,.35);}
+.cal-today-btn{padding:6px 11px;border:1.5px solid var(--dash-border);border-radius:8px;background:var(--dash-sf);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:#64b5f6;}
 .cal-today-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
 .cal-body{flex:1;overflow-y:auto;padding:0 16px 16px;}
 
@@ -144,7 +146,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .mg{background:var(--surface);border-radius:var(--r);border:1px solid var(--border);overflow:hidden;}
 .mg-head{display:grid;grid-template-columns:repeat(7,1fr);background:var(--sf2);}
 .mg-hc{text-align:center;padding:8px 0;font-size:11px;font-weight:800;color:var(--t2);}
-.mg-hc.h-sun{color:var(--danger);}
+.mg-hc.h-sun{color:var(--hol);}
 .mg-hc.h-sat{color:var(--info);}
 .mg-body{display:grid;grid-template-columns:repeat(7,1fr);}
 .mc{min-height:130px;border-top:1px solid var(--border);border-right:1px solid var(--border);padding:6px;transition:background .1s;}
@@ -179,11 +181,11 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .mc-date{font-size:12px;font-weight:700;margin-bottom:3px;line-height:1;}
 .mc-date.om-c,.mc-date.dis-c{color:var(--border);}
 .mc-date.today-c{background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;}
-.mc-date.sun-c{color:var(--danger);}
+.mc-date.sun-c{color:var(--hol);font-weight:900;}
 .mc-date.sat-c{color:var(--info);}
-.mc-date.hol-c{color:var(--danger);}
-.hol-name{font-size:9px;font-weight:700;color:var(--danger);line-height:1;margin-bottom:2px;}
-.wc-hol{font-size:9px;font-weight:700;color:var(--danger);line-height:1;margin-top:1px;}
+.mc-date.hol-c{color:var(--hol);font-weight:900;}
+.hol-name{font-size:10px;font-weight:900;color:var(--hol);line-height:1;margin-bottom:2px;}
+.wc-hol{font-size:10px;font-weight:900;color:var(--hol);line-height:1;margin-top:1px;}
 .chips{display:flex;flex-direction:column;gap:2px;}
 .chip{border-radius:4px;padding:2px 5px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
 .chip:hover{filter:brightness(.9);}
@@ -321,8 +323,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .gantt-dot:hover{transform:translate(-50%,-50%) scale(1.15);z-index:6;}
 .gantt-dot-inner{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);}
 .gantt-dot.office .gantt-dot-inner{background:#fff !important;border-width:2.5px;border-style:solid;}
-.gantt-dot-lbl{position:absolute;top:33px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:700;color:var(--t2);white-space:nowrap;}
-.gantt-dot-date{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--t2);white-space:nowrap;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 4px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9;}
+.gantt-dot-lbl{position:absolute;top:33px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--t2);white-space:nowrap;}
+.gantt-dot-date{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--t2);white-space:nowrap;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 4px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9;}
 .gantt-dot:hover .gantt-dot-date{opacity:1;}
 .gantt-stat{width:90px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:11px;color:var(--t2);border-left:1px solid var(--border);padding:8px 4px;}
 .gantt-stat-pct{font-size:13px;font-weight:900;color:var(--text);}
@@ -342,7 +344,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .staff-row{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sf2);}
 .staff-row:last-child{border-bottom:none;}
 .staff-color{width:28px;height:28px;padding:1px;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;background:none;flex-shrink:0;}
-.staff-name-inp{flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-family:inherit;font-size:13px;font-weight:700;background:var(--surface);color:var(--text);outline:none;}
+.staff-name-inp{flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;background:var(--surface);color:var(--text);outline:none;}
 .staff-name-inp:focus{border-color:var(--accent);}
 .set-tab{padding:12px 20px;border:none;background:transparent;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--t2);border-bottom:3px solid transparent;margin-bottom:-2px;}
 .set-tab:hover{color:var(--accent);}
@@ -350,7 +352,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .stab-content{display:none;}
 .stab-content.active{display:flex;flex-direction:column;}
 .user-badge{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--dash-sf);border-radius:8px;border:1px solid var(--dash-border);}
-.notif-btn{position:relative;background:var(--dash-sf);border:1px solid var(--dash-border);border-radius:8px;padding:5px 10px;font-size:14px;cursor:pointer;color:var(--dash-text);}
+.notif-btn{position:relative;background:var(--dash-sf);border:1.5px solid var(--dash-border);border-radius:8px;padding:0 10px;height:30px;display:inline-flex;align-items:center;font-size:14px;cursor:pointer;color:var(--dash-text);}
 .notif-btn:hover{border-color:#64b5f6;}
 .notif-badge{position:absolute;top:-5px;right:-5px;background:var(--danger);color:#fff;font-size:9px;font-weight:900;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;}
 .notif-item{padding:9px 10px;border-radius:8px;margin-bottom:4px;cursor:pointer;transition:background .1s;}
@@ -358,7 +360,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .user-badge-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .user-badge-name{font-size:12px;font-weight:800;color:var(--dash-text);}
 .user-badge-role{font-size:10px;color:var(--dash-t2);font-weight:600;}
-.logout-btn{padding:5px 10px;border:1.5px solid var(--dash-border);border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;font-family:inherit;color:var(--dash-t2);}
+.logout-btn{padding:0 10px;height:30px;display:inline-flex;align-items:center;border:1.5px solid var(--dash-border);border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;font-family:inherit;color:var(--dash-t2);}
 .logout-btn:hover{border-color:var(--danger);color:#ff8fa3;}
 /* 요약바 */
 .summary-bar{display:flex;gap:8px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;}
@@ -378,6 +380,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .bulk-cell.sel-field{background:var(--accent);color:#fff;border-color:var(--accent);}
 .bulk-cell.sel-office{background:#fff;color:var(--info);border:2px solid var(--info);}
 
+.dash-m-toggle{display:none;}
 /* ===== 모바일 반응형 ===== */
 @media (max-width:768px){
   .hdr{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:8px 10px;-webkit-overflow-scrolling:touch;}
@@ -396,6 +399,9 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
   .body{grid-template-columns:1fr !important;grid-template-rows:auto 1fr;overflow-y:auto;}
   .dash-resizer{display:none;}
   .dash{border-right:none;border-bottom:2px solid var(--dash-border);max-height:42vh;}
+  .dash-m-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 12px;border:none;border-bottom:1px solid var(--dash-border);background:var(--dash-sf);color:var(--dash-text);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;}
+  .dash.m-collapsed{max-height:none;}
+  .dash.m-collapsed .dash-top,.dash.m-collapsed .dash-body,.dash.m-collapsed .dash-settings{display:none;}
   .cal-area{min-height:55vh;}
 
   /* 요약바: 가로 스크롤 */
@@ -405,7 +411,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
   /* 캘린더 컨트롤: 본문 위로 이동된 바 */
   #mobileCtrlBar #calControls{display:flex;flex-wrap:wrap;gap:6px;width:100%;}
-  #calControls .cal-title{font-size:14px;font-weight:900;white-space:nowrap;}
+  #calControls .cal-title{font-size:17px;font-weight:900;white-space:nowrap;color:#fff;}
   #calControls .mode-btn{padding:6px 12px;font-size:13px;}
   #calControls .att-filter{font-size:12px;padding:5px 6px;}
   #calControls .cal-nav,#calControls .cal-today-btn{padding:5px 10px;white-space:nowrap;}
@@ -443,7 +449,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 }
 .login-top{display:flex;align-items:center;justify-content:space-between;padding:22px 30px;flex-shrink:0;}
 .login-brand{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.55);backdrop-filter:blur(12px);padding:9px 16px 9px 9px;border-radius:14px;box-shadow:0 4px 20px rgba(80,100,160,.10);}
-.login-brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#f5a623,#e8870c);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;}
+.login-brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#f5a623,#e8870c);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;}
 .login-brand-name{font-size:14px;font-weight:900;color:#26304a;letter-spacing:-.3px;}
 .login-brand-sub{font-size:10px;font-weight:700;color:#8a93ad;letter-spacing:1px;}
 .login-status{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#5a647e;background:rgba(255,255,255,.5);backdrop-filter:blur(12px);padding:8px 15px;border-radius:30px;box-shadow:0 4px 16px rgba(80,100,160,.08);}
@@ -453,7 +459,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .login-eyebrow{font-size:12px;font-weight:800;letter-spacing:4px;color:#8e98b6;margin-bottom:14px;}
 .login-title{font-size:clamp(24px,3.5vw,40px);font-weight:900;line-height:1.3;color:#222a40;letter-spacing:-1px;margin:0 0 14px;}
 .login-title span{background:linear-gradient(110deg,#e8870c,#f5a623,#d97706);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-.login-desc{font-size:14px;color:#7c859e;margin:0 0 30px;font-weight:500;}
+.login-desc{font-size:14px;color:#7c859e;margin:0 0 30px;font-weight:600;}
 .login-card{width:100%;max-width:420px;background:rgba(255,255,255,.66);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.75);border-radius:22px;padding:26px 26px 24px;box-shadow:0 20px 60px rgba(180,140,40,.18);text-align:left;}
 .login-field{margin-bottom:16px;}
 .login-field label{display:block;font-size:12px;font-weight:800;color:#5a647e;margin-bottom:7px;}
@@ -465,7 +471,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .login-remember input{width:15px;height:15px;cursor:pointer;accent-color:#e8870c;}
 .login-pwchange{background:none;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:800;color:#d97706;padding:2px;}
 .login-pwchange:hover{text-decoration:underline;}
-.login-submit{width:100%;padding:15px;border:none;border-radius:13px;background:linear-gradient(135deg,#e8870c,#f5a623);color:#fff;font-family:inherit;font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 8px 24px rgba(220,140,20,.32);transition:transform .12s,box-shadow .12s;letter-spacing:.5px;}
+.login-submit{width:100%;padding:15px;border:none;border-radius:12px;background:linear-gradient(135deg,#e8870c,#f5a623);color:#fff;font-family:inherit;font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 8px 24px rgba(220,140,20,.32);transition:transform .12s,box-shadow .12s;letter-spacing:.5px;}
 .login-submit:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(220,140,20,.42);}
 .login-submit:active{transform:translateY(0);}
 .login-foot{text-align:center;padding:18px;font-size:11px;color:#9aa3bb;font-weight:600;flex-shrink:0;}
@@ -562,6 +568,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
   <!-- LEFT DASHBOARD -->
   <aside class="dash">
+    <button id="dashMToggle" class="dash-m-toggle">📋 사업장 목록 <span id="dashMArrow">▾</span></button>
     <div class="dash-top">
       <input class="dash-search" id="dashSearch" placeholder="🔍 사업장 검색...">
       <div style="display:flex;gap:6px;margin-top:6px;">
@@ -658,6 +665,19 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
         <div style="font-size:11px;color:var(--t2);margin-bottom:10px;">백업 JSON 파일을 불러와 데이터를 복원합니다. 기존 데이터는 덮어씁니다.</div>
         <button class="btn btn-s" id="importJsonBtn" style="width:100%;padding:10px;">JSON 파일 가져오기</button>
         <div id="importStatus" style="font-size:11px;color:var(--ok);font-weight:700;margin-top:8px;"></div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div style="font-size:13px;font-weight:800;">🛡 자동 백업 (이 기기)</div>
+          <button class="restore-btn" id="snapNowBtn" style="border-color:var(--accent);color:var(--accent);background:transparent;">지금 스냅샷</button>
+        </div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:10px;">이 브라우저에 매일 자동으로 최근 8개까지 보관합니다. 실수로 데이터를 지웠을 때 [복원]으로 되돌립니다. (기기 저장소가 지워지면 사라지니 가끔 파일 내보내기도 함께 하세요)</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="autoDlChk"> 파일 자동 다운로드</label>
+          <label style="display:flex;align-items:center;gap:6px;">주기 <select id="autoDlFreqSel" style="padding:3px 6px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;"><option value="weekly">매주</option><option value="daily">매일</option></select></label>
+          <label style="display:flex;align-items:center;gap:6px;">보관 개수 <input type="number" id="autoKeepInp" min="3" max="30" style="width:56px;padding:3px 6px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;"></label>
+        </div>
+        <div id="autoBackupList" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;"></div>
       </div>
     </div>
     <input type="file" id="importJsonFi" accept=".json" style="display:none;">
@@ -928,7 +948,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
 <script>
 // ===== localStorage 안전 래퍼 (용량 초과 방지) =====
-const LS_VALID_KEYS=['p_staff','p_types','p_cos','p_scheds','p_env','p_fieldState','p_lastUserId','p_session','p_autoSession','p_loginFails','p_loginLock','p_roundlog','p_favCos'];
+const LS_VALID_KEYS=['p_staff','p_types','p_cos','p_scheds','p_env','p_fieldState','p_lastUserId','p_session','p_autoSession','p_loginFails','p_loginLock','p_roundlog','p_favCos','p_autobackups','p_autoDl','p_autoKeep','p_lastAutoDl','p_autoDlFreq','p_dashW','p_dashHintSeen','p_dashMCollapsed'];
 // 시작 시: 정상 키 외의 잔재(과거 사진 등) 제거로 용량 확보
 (function cleanupLS(){
   try{
@@ -1085,19 +1105,21 @@ const HOLIDAYS={
   '2024-05-06':'대체공휴일','2024-05-15':'부처님오신날',
   '2024-09-16':'추석연휴','2024-09-17':'추석','2024-09-18':'추석연휴',
   '2025-01-28':'설날연휴','2025-01-29':'설날','2025-01-30':'설날연휴',
-  '2025-03-03':'대체공휴일','2025-05-05':'어린이날/부처님오신날',
+  '2025-03-03':'대체공휴일','2025-05-05':'어린이날/부처님오신날','2025-05-06':'대체공휴일',
   '2025-06-03':'대통령선거일',
   '2025-10-05':'추석연휴','2025-10-06':'추석','2025-10-07':'추석연휴',
   '2025-10-08':'대체공휴일',
   '2026-02-16':'설날연휴','2026-02-17':'설날','2026-02-18':'설날연휴',
-  '2026-05-24':'부처님오신날',
+  '2026-03-02':'대체공휴일','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일',
+  '2026-06-03':'지방선거일','2026-08-17':'대체공휴일','2026-10-05':'대체공휴일',
   '2026-09-24':'추석연휴','2026-09-25':'추석','2026-09-26':'추석연휴',
-  '2027-02-06':'설날연휴','2027-02-07':'설날','2027-02-08':'설날연휴',
-  '2027-05-13':'부처님오신날',
+  '2027-02-06':'설날연휴','2027-02-07':'설날','2027-02-08':'설날연휴','2027-02-09':'대체공휴일',
+  '2027-05-13':'부처님오신날','2027-08-16':'대체공휴일',
   '2027-09-14':'추석연휴','2027-09-15':'추석','2027-09-16':'추석연휴',
+  '2027-10-04':'대체공휴일','2027-10-11':'대체공휴일','2027-12-27':'대체공휴일',
   '2028-01-26':'설날연휴','2028-01-27':'설날','2028-01-28':'설날연휴',
-  '2028-05-02':'부처님오신날',
-  '2028-09-02':'추석연휴','2028-09-03':'추석','2028-09-04':'추석연휴',
+  '2028-04-12':'국회의원선거일','2028-05-02':'부처님오신날',
+  '2028-09-02':'추석연휴','2028-09-03':'추석','2028-09-04':'추석연휴','2028-09-05':'대체공휴일',
   '2029-02-12':'설날연휴','2029-02-13':'설날','2029-02-14':'설날연휴',
   '2029-05-07':'대체공휴일','2029-05-20':'부처님오신날','2029-05-21':'대체공휴일',
   '2029-09-21':'추석연휴','2029-09-22':'추석','2029-09-23':'추석연휴','2029-09-24':'대체공휴일',
@@ -1465,44 +1487,107 @@ function saveSingle(){
 }
 
 // ===== E: 백업/복원 =====
+const BK_KEYS=['p_staff','p_types','p_cos','p_scheds','p_fieldState','p_env'];
+function buildBackupData(){
+  const d={version:1,exported:new Date().toISOString()};
+  BK_KEYS.forEach(k=>d[k]=localStorage.getItem(k));
+  return d;
+}
 function exportJson(){
-  const data={
-    version:1,exported:new Date().toISOString(),
-    p_staff:localStorage.getItem('p_staff'),
-    p_types:localStorage.getItem('p_types'),
-    p_cos:localStorage.getItem('p_cos'),
-    p_scheds:localStorage.getItem('p_scheds'),
-    p_fieldState:localStorage.getItem('p_fieldState'),
-    p_env:localStorage.getItem('p_env'),
-  };
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify(buildBackupData(),null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`푸른노무법인_백업_${todayStr()}.json`;
   a.click();
   toast('백업 파일 다운로드 완료');
 }
-
+// 백업 데이터 적용: 로컬 + 클라우드 동시 반영 (파일/스냅샷 복원 공용)
+function applyBackup(data,statusEl){
+  BK_KEYS.forEach(k=>{ if(data[k]!=null){ lsSet(k,data[k]); try{fbPush(k,JSON.parse(data[k]));}catch(e){} } });
+  if(statusEl)statusEl.textContent=`✅ ${(''+data.exported).slice(0,10)} 백업 복원 완료`;
+  renderDash();renderCal();renderSummaryBar();renderSettings();renderStaffList();
+  toast('복원 완료 (클라우드 반영)');
+}
 function importJson(file){
   const r=new FileReader();
   r.onload=e=>{
     try{
       const data=JSON.parse(e.target.result);
       if(!data.version){toast('올바른 백업 파일이 아닙니다','err');return;}
-      showConfirm(`${data.exported?.slice(0,10)} 백업으로 복원 — 현재 데이터를 덮어씁니다.`,()=>{
-        if(data.p_staff)lsSet('p_staff',data.p_staff);
-        if(data.p_types)lsSet('p_types',data.p_types);
-        if(data.p_cos)lsSet('p_cos',data.p_cos);
-        if(data.p_scheds)lsSet('p_scheds',data.p_scheds);
-        if(data.p_fieldState)lsSet('p_fieldState',data.p_fieldState);
-        if(data.p_env)lsSet('p_env',data.p_env);
-        q('#importStatus').textContent=`✅ ${data.exported?.slice(0,10)} 백업 복원 완료`;
-        renderDash();renderCal();renderSummaryBar();renderSettings();renderStaffList();
-        toast('복원 완료');
+      showConfirm(`${(''+data.exported).slice(0,10)} 백업으로 복원 — 현재 데이터를 덮어씁니다.`,()=>{
+        takeSnapshot('복원 직전 자동저장');
+        applyBackup(data,q('#importStatus'));
+        renderAutoBackups();
       });
     }catch(err){toast('파일 읽기 실패','err');}
   };
   r.readAsText(file);
+}
+
+// ===== 자동 백업 (이 기기 localStorage 스냅샷, 최근 8개) =====
+const AUTOBK_KEY='p_autobackups', AUTOBK_MAX=8;
+function autoKeepMax(){ let n=parseInt(localStorage.getItem('p_autoKeep'),10); if(!(n>=3&&n<=30))n=AUTOBK_MAX; return n; }
+function autoDlOn(){ return localStorage.getItem('p_autoDl')!=='0'; } // 기본 켜짐
+function autoDlFreq(){ return localStorage.getItem('p_autoDlFreq')==='daily'?'daily':'weekly'; } // 기본 매주
+function autoDownloadDaily(){
+  if(!autoDlOn())return;
+  let cos=[],sch=[];
+  try{cos=JSON.parse(localStorage.getItem('p_cos')||'[]');sch=JSON.parse(localStorage.getItem('p_scheds')||'[]');}catch(e){}
+  if(!cos.length && !sch.length)return;
+  const today=todayStr(), last=localStorage.getItem('p_lastAutoDl');
+  if(last===today)return;
+  if(autoDlFreq()==='weekly' && last){
+    const diff=(new Date(today)-new Date(last))/86400000;
+    if(diff<7)return;
+  }
+  lsSet('p_lastAutoDl',today);
+  exportJson();
+}
+function getAutoBackups(){ try{return JSON.parse(localStorage.getItem(AUTOBK_KEY))||[];}catch(e){return [];} }
+function _bkSig(d){ return BK_KEYS.map(k=>d[k]).join('|'); }
+function takeSnapshot(label){
+  const list=getAutoBackups();
+  const data=buildBackupData();
+  if(list.length && _bkSig(list[0].data)===_bkSig(data)) return false; // 직전과 동일하면 생략
+  list.unshift({t:new Date().toISOString(),label:label||'자동저장',data});
+  let keep=autoKeepMax();
+  while(keep>=1){
+    if(lsSet(AUTOBK_KEY,JSON.stringify(list.slice(0,keep))))return true;
+    keep=Math.floor(keep/2); // 용량 초과 시 보관 수를 줄여 재시도
+  }
+  return false;
+}
+function autoSnapshotDaily(){
+  let cos=[],sch=[];
+  try{cos=JSON.parse(localStorage.getItem('p_cos')||'[]');sch=JSON.parse(localStorage.getItem('p_scheds')||'[]');}catch(e){}
+  if(!cos.length && !sch.length) return; // 데이터 없음/미동기화 시 건너뜀
+  const today=todayStr();
+  const hasToday=getAutoBackups().some(s=>(s.t||'').slice(0,10)===today && (s.label||'').indexOf('복원 직전')<0);
+  if(!hasToday) takeSnapshot('일일 자동백업');
+}
+function restoreSnapshot(idx){
+  const s=getAutoBackups()[idx]; if(!s)return;
+  showConfirm(`${(s.t||'').slice(0,16).replace('T',' ')} 시점으로 복원합니다. 현재 데이터를 덮어쓰고 클라우드에도 반영됩니다.`,()=>{
+    takeSnapshot('복원 직전 자동저장');
+    applyBackup(s.data,null);
+    renderAutoBackups();
+  });
+}
+function renderAutoBackups(){
+  const dl=q('#autoDlChk'); if(dl){dl.checked=autoDlOn(); dl.onchange=()=>{lsSet('p_autoDl',dl.checked?'1':'0');toast(dl.checked?'파일 자동 다운로드 켜짐':'파일 자동 다운로드 꺼짐');};}
+  const fq=q('#autoDlFreqSel'); if(fq){fq.value=autoDlFreq(); fq.onchange=()=>{lsSet('p_autoDlFreq',fq.value);toast(fq.value==='daily'?'매일 다운로드':'매주 다운로드');};}
+  const kp=q('#autoKeepInp'); if(kp){kp.value=autoKeepMax(); kp.onchange=()=>{let n=parseInt(kp.value,10); if(!(n>=3&&n<=30))n=AUTOBK_MAX; lsSet('p_autoKeep',String(n)); kp.value=n; const l=getAutoBackups(); lsSet(AUTOBK_KEY,JSON.stringify(l.slice(0,n))); renderAutoBackups();};}
+  const box=q('#autoBackupList'); if(!box)return;
+  const list=getAutoBackups();
+  if(!list.length){ box.innerHTML='<div style="font-size:11px;color:var(--t2);">아직 자동백업이 없습니다. 앱을 사용하면 매일 자동으로 저장됩니다.</div>'; return; }
+  box.innerHTML=list.map((s,i)=>{
+    const when=(s.t||'').slice(0,16).replace('T',' ');
+    let cnt=''; try{cnt=`사업장 ${JSON.parse(s.data.p_cos||'[]').length} · 일정 ${JSON.parse(s.data.p_scheds||'[]').length}`;}catch(e){}
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+      <div style="min-width:0;"><div style="font-size:12px;font-weight:800;">${when}</div><div style="font-size:10px;color:var(--t2);">${s.label||''}${cnt?' · '+cnt:''}</div></div>
+      <button class="restore-btn" onclick="restoreSnapshot(${i})">복원</button>
+    </div>`;
+  }).join('');
 }
 
 // 캔버스를 파일로 저장 (저장 위치 선택 → 미지원 시 일반 다운로드)
@@ -1733,6 +1818,7 @@ function purgeDeletedCo(coId){
   renderEndedView();
   clearTimeout(_purgeTimers[coId]);
   _purgeTimers[coId]=setTimeout(()=>{
+    takeSnapshot('사업장 완전삭제 직전');
     const s=getScheds(),c=getCos();
     s.filter(x=>x.coId===coId).forEach(x=>{try{deletePhotoFromDB(x.id);}catch(e){}});
     setScheds(s.filter(x=>x.coId!==coId));
@@ -1889,6 +1975,7 @@ function deleteStaff(id){
   if(inUseSched){toast('일정에 배정된 직원은 삭제할 수 없습니다','err');return;}
   const inUseCo=getCos().some(c=>c.defAtt===id||getCoAtts(c).includes(id));
   if(inUseCo){toast('사업장에 담당으로 지정된 직원은 삭제할 수 없습니다','err');return;}
+  takeSnapshot('직원 삭제 직전');
   setStaff(getStaff().filter(s=>s.id!==id));
   renderStaffList();refreshStaffDropdowns();toast('삭제됨');
 }
@@ -2021,6 +2108,7 @@ function renderDash(){
   const cards=qa('#dashList .dcard');
   cards.forEach((card,i)=>{const n=card.querySelector('.dcard-no');if(n)n.textContent=i+1;});
   const dc=q('#dashCount');if(dc)dc.textContent=cards.length?`총 ${cards.length}곳`:'';
+  const dmt=q('#dashMToggle');if(dmt)dmt.firstChild.textContent=`📋 사업장 목록 ${cards.length?cards.length+'곳 ':''}`;
 
   // Bind drag events
   qa('#dashList .drow').forEach(row=>{
@@ -2337,7 +2425,7 @@ function renderDay(){
   // 날짜 헤더
   html+=`<div style="padding:14px 16px;border-bottom:1px solid var(--border);background:var(--sf2);display:flex;align-items:center;gap:10px;">
     <div style="font-size:22px;font-weight:900;color:${ds===today?'var(--accent)':'var(--text)'};">${ds.slice(5).replace('-','/')}</div>
-    ${hol?`<span style="font-size:12px;font-weight:800;color:var(--danger);">🔴 ${hol}</span>`:''}
+    ${hol?`<span style="font-size:12px;font-weight:900;color:var(--hol);">🔴 ${hol}</span>`:''}
     <span style="font-size:12px;font-weight:700;color:var(--t2);">${sc.length}건</span>
   </div>`;
   if(!sc.length){
@@ -2411,7 +2499,7 @@ function renderMonth(){
     const moreBtn=moreCount>0?`<button class="mc-more-btn" data-date="${ds}">+${moreCount}건</button>`:'';
     const dc=`mc-date${isToday?' today-c':(sun||isHol)?' hol-c':sat?' sat-c':''}`;
     const holLabel=hol?`<div class="hol-name">${hol}</div>`:'';
-    cells+=`<div class="${cls}" data-date="${ds}" style="${isHol?'background:rgba(233,69,96,.04)':''}"><div class="mc-date-wrap"><div class="${dc}">${d}</div>${moreBtn}</div>${holLabel}<div class="chips">${chips}</div></div>`;
+    cells+=`<div class="${cls}" data-date="${ds}" style="${isHol?'background:rgba(209,26,42,.07)':''}"><div class="mc-date-wrap"><div class="${dc}">${d}</div>${moreBtn}</div>${holLabel}<div class="chips">${chips}</div></div>`;
   }
   // 다음 달 날짜
   let ny=y,nm=m+1;if(nm>11){nm=0;ny++;}
@@ -2455,11 +2543,11 @@ function renderWeek(){
     const sc=getFilteredScheds(ds);
     const chips=sc.map(chipHtml).join('');
     const isHolDay=hol&&!isSunday;
-    const dnStyle=isSunday||hol?'color:var(--danger)':isSat?'color:var(--info)':'';
-    cols+=`<div class="wc" style="${isHolDay?'background:rgba(233,69,96,.03)':''}">
+    const dnStyle=isSunday||hol?'color:var(--hol);font-weight:900':isSat?'color:var(--info)':'';
+    cols+=`<div class="wc" style="${isHolDay?'background:rgba(209,26,42,.06)':''}">
       <div class="wc-hd ${isToday?'today-col':''}">
         <div class="wc-name" style="${dnStyle}">${WN[i]}</div>
-        <div class="wc-num" style="${isSunday||hol?'color:var(--danger)':''}">${cur.getDate()}</div>
+        <div class="wc-num" style="${isSunday||hol?'color:var(--hol);font-weight:900':''}">${cur.getDate()}</div>
         ${hol?`<div class="wc-hol">${hol}</div>`:''}
       </div>
       <div class="wc-body ${isSunday?'dis':''}" data-date="${ds}">${chips}</div></div>`;
@@ -2868,7 +2956,7 @@ function renderEnv(){
       </div>
       ${r.type==='number'?`
         <input type="number" min="${r.min}" max="${r.max}" value="${env[r.key]}"
-          style="width:64px;padding:6px;border:1.5px solid var(--border);border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:800;text-align:center;outline:none;background:var(--surface);"
+          style="width:64px;padding:6px;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:800;text-align:center;outline:none;background:var(--surface);"
           onchange="saveEnvField('${r.key}',+this.value)">
       `:`
         <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
@@ -2901,7 +2989,7 @@ function renderAttLimitList(){
       <div style="display:flex;align-items:center;gap:6px;">
         <span style="font-size:10px;color:var(--t2);">최대</span>
         <input type="number" min="0" max="20" value="${maxVal}"
-          style="width:52px;padding:5px;border:1.5px solid var(--border);border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;text-align:center;outline:none;background:var(--surface);"
+          style="width:52px;padding:5px;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;text-align:center;outline:none;background:var(--surface);"
           onchange="saveEnvField('attMax_${s.id}',+this.value);renderAttLimitList();">
         <span style="font-size:10px;color:var(--t2);">건 (0=무제한)</span>
       </div>
@@ -2979,6 +3067,7 @@ function addType(){
 function deleteType(id){
   const inUse=getScheds().some(s=>s.typeId===id);
   if(inUse){toast('사용 중인 컨설팅은 삭제할 수 없습니다 (비활성 권장)','err');return;}
+  takeSnapshot('컨설팅종류 삭제 직전');
   const types=getTypes().filter(t=>t.id!==id);
   setTypes(types);
   // 사업장 types 배열에서도 제거
@@ -3237,6 +3326,9 @@ const SHORTCUTS=[
   {key:'1 2 3 4',desc:'캘린더 / 타임라인 / 종료 / 환경설정'},
   {key:'Esc',desc:'모달·패널 닫기'},
   {key:'?',desc:'이 도움말 열기'},
+  {key:'Shift+휠',desc:'캘린더에서 이전 / 다음 기간 이동'},
+  {key:'🖱 드래그',desc:'컨설팅 행 → 날짜 칸: 일정 등록 · 내 일정 칩: 날짜 이동'},
+  {key:'🖱 드래그',desc:'대시보드 경계: 폭 조절 · 팝업 제목줄: 위치 이동'},
 ];
 
 // ===== 노무사별 통계 =====
@@ -3333,6 +3425,16 @@ function initShortcuts(){
   });
 }
 
+function initCalWheel(){
+  const area=q('.cal-area'); if(!area)return;
+  area.addEventListener('wheel',e=>{
+    if(!e.shiftKey)return;
+    if(q('#viewMain').style.display==='none')return;
+    e.preventDefault();
+    (e.deltaY>0||e.deltaX>0)?q('#calNext')?.click():q('#calPrev')?.click();
+  },{passive:false});
+}
+
 function setCalMode(mode){
   showTab('main');
   S.calMode=mode;
@@ -3380,6 +3482,7 @@ function bind(){
     if(btn.dataset.stab==='type')renderSettings();
     if(btn.dataset.stab==='staff')renderStaffList();
     if(btn.dataset.stab==='roundlog')renderRoundLog();
+    if(btn.dataset.stab==='backup')renderAutoBackups();
   });
   q('#tlAttFilter').innerHTML=`<option value="">전체</option>`+getStaff().map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
   q('#tlAttFilter').onchange=renderTimeline;
@@ -3436,6 +3539,7 @@ function bind(){
   q('#exportJsonBtn').onclick=exportJson;
   q('#importJsonBtn').onclick=()=>q('#importJsonFi').click();
   q('#importJsonFi').onchange=e=>{const f=e.target.files[0];if(f)importJson(f);e.target.value='';};
+  const _snb=q('#snapNowBtn'); if(_snb)_snb.onclick=()=>{ takeSnapshot('수동 스냅샷'); renderAutoBackups(); toast('현재 데이터를 스냅샷으로 저장했습니다'); };
   // Company modal
   q('#mCoCls').onclick=()=>closeModal('mbCo');
   q('#mCoCancelBtn').onclick=()=>closeModal('mbCo');
@@ -3597,6 +3701,18 @@ function init(){
   applyMobileLayout();
   initDashResizer();
   initModalDrag();
+  initCalWheel();
+  const dmt=q('#dashMToggle');
+  if(dmt){
+    if(localStorage.getItem('p_dashMCollapsed')==='1'){q('.dash').classList.add('m-collapsed');const a=q('#dashMArrow');if(a)a.textContent='▸';}
+    dmt.onclick=()=>{
+      const d=q('.dash'),on=d.classList.toggle('m-collapsed');
+      lsSet('p_dashMCollapsed',on?'1':'0');
+      const a=q('#dashMArrow');if(a)a.textContent=on?'▸':'▾';
+    };
+  }
+  setTimeout(autoSnapshotDaily,8000);
+  setTimeout(autoDownloadDaily,9000);
   window.addEventListener('resize',applyMobileLayout);
   renderDash();renderCal();renderSummaryBar();
 }
