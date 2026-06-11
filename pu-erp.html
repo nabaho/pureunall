@@ -21794,8 +21794,20 @@ function BackupSection(){
     var a = document.createElement('a');
     var ts = new Date();
     var fname = 'pureun-erp-backup-' + ts.getFullYear() + String(ts.getMonth()+1).padStart(2,'0') + String(ts.getDate()).padStart(2,'0') + '-' + String(ts.getHours()).padStart(2,'0') + String(ts.getMinutes()).padStart(2,'0') + '.json';
-    a.href = url; a.download = fname; a.click();
-    URL.revokeObjectURL(url);
+    // 모바일 + 공유 가능 환경(인앱·다음 등 다운로드 미지원 브라우저 대응): 공유 시트 우선
+    var file = null;
+    try { file = new File([blob], fname, { type:'application/json' }); } catch(_e){}
+    if(window.IS_MOBILE && file && navigator.canShare && navigator.canShare({ files:[file] })){
+      navigator.share({ files:[file], title:fname })
+        .then(function(){ showToast('📤 백업 파일 공유됨 — 내 파일·드라이브·카톡 등에 저장하세요'); })
+        .catch(function(){
+          // 공유 취소/실패 → 일반 다운로드 시도
+          a.href = url; a.download = fname; a.click();
+        });
+    } else {
+      a.href = url; a.download = fname; a.click();
+    }
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
     // 이력 추가
     var rec = { id:Date.now(), ts:ts.toISOString(), kind:kind, status:'success', size:json.length, fileName:fname, keyCount: Object.keys(data).length };
     var newHistory = [rec].concat(history).slice(0, 50); // 최근 50건
