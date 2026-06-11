@@ -8785,6 +8785,36 @@ function getCaseTypes(){
 }
 function getActiveUsers(){ return sortUsers(dbGet('user_accounts', USERS_SEED).filter(function(u){return u.status==='active';})); }
 
+// ── 담당자 정규화 (부팅 시 1회 실행, 멱등): 이름으로 저장된 managerMain/managerSubs를 사번으로 변환 ──
+//    (엑셀 반입·이관 흔적 — 직원 명부의 정확한 이름과 일치할 때만 변환하므로 반복 실행·다기기 동시 실행 무해)
+function normalizeManagerSids(){
+  try {
+    var us = dbGet('user_accounts', []) || [];
+    if(!us.length) return;
+    var sids = {}; var byName = {};
+    us.forEach(function(u){ if(u && u.sid){ sids[u.sid] = 1; if(u.name) byName[String(u.name).trim()] = u.sid; } });
+    ['companies','contracts','cases','consultings','funds','other_projects'].forEach(function(k){
+      var a = dbGet(k, []) || [];
+      if(!Array.isArray(a) || !a.length) return;
+      var ch = 0;
+      a.forEach(function(x){
+        if(!x) return;
+        var mm = String(x.managerMain || '').trim();
+        if(mm && !sids[mm] && byName[mm]){ x.managerMain = byName[mm]; ch++; }
+        if(Array.isArray(x.managerSubs)){
+          x.managerSubs = x.managerSubs.map(function(s){
+            var t = String(s || '').trim();
+            if(t && !sids[t] && byName[t]){ ch++; return byName[t]; }
+            return s;
+          });
+        }
+      });
+      if(ch){ dbSet(k, a); console.log('[담당자정규화] ' + k + ': 이름→사번 ' + ch + '건'); }
+    });
+  } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+}
+try { normalizeManagerSids(); } catch(e){}
+
 // ============================================================
 // 담당 가능 여부 (휴직 + 담당배제 토글 통합)
 // ============================================================
