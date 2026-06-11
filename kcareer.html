@@ -6,6 +6,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>권형하 경력관리</title>
+<meta name="theme-color" content="#1B2A4A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="경력관리">
+<script>(function(){var svg="<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='512' height='512' rx='100' fill='#1B2A4A'/><rect x='150' y='120' width='212' height='272' rx='18' fill='#fff'/><rect x='185' y='175' width='142' height='16' rx='8' fill='#0E7C66'/><rect x='185' y='215' width='142' height='12' rx='6' fill='#B89030'/><rect x='185' y='252' width='110' height='12' rx='6' fill='#cbd5e1'/><rect x='185' y='289' width='142' height='12' rx='6' fill='#cbd5e1'/><rect x='185' y='326' width='90' height='12' rx='6' fill='#cbd5e1'/></svg>";var icon='data:image/svg+xml,'+encodeURIComponent(svg);function L(rel,href){var l=document.createElement('link');l.rel=rel;l.href=href;document.head.appendChild(l);}L('icon',icon);L('apple-touch-icon',icon);try{ if(localStorage.getItem('kc_theme')==='dark') document.documentElement.classList.add('dark'); }catch(e){}
+document.addEventListener('DOMContentLoaded',function(){ var tb=document.getElementById('themeBtn'); if(tb) tb.textContent=document.documentElement.classList.contains('dark')?'☀️':'🌙'; });try{var m={name:'권형하 경력관리',short_name:'경력관리',start_url:location.href,scope:location.href.replace(/[^/]*$/,''),display:'standalone',background_color:'#1B2A4A',theme_color:'#1B2A4A',icons:[{src:icon,sizes:'any',type:'image/svg+xml',purpose:'any'}]};var b=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});L('manifest',URL.createObjectURL(b));}catch(e){}})();</script>
 <style>
 :root{
   --navy:#1B2A4A; --teal:#0E7C66; --red:#B23B3B;
@@ -45,7 +52,8 @@ body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;color:var(
 .tabpanel.active{display:block}
 .api-row{margin-bottom:10px}
 .api-row label{display:block;font-size:12px;color:var(--text-mute);margin-bottom:4px}
-.hamburger{display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;margin-right:8px;padding:0}
+.hamburger{display:none;background:var(--navy);border:none;color:#fff;font-size:18px;cursor:pointer;margin-right:10px;padding:8px 12px;border-radius:9px;line-height:1;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(20,30,50,.28)}
+.hamburger:active{transform:translateY(1px)}
 .nav-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:35}
 .nav-backdrop.show{display:block}
 @media (max-width:820px){
@@ -147,6 +155,26 @@ body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;color:var(
 .tag.purple{background:#3C348920;color:#3C3489}
 .id-chip{font-family:monospace;font-size:11px;color:var(--text-mute);background:var(--hover);padding:2px 6px;border-radius:4px}
 .warn-ico{font-size:12px;margin-left:4px;cursor:help}
+.pglimit-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;margin:14px 0 4px;font-size:12px;color:var(--text-mute)}
+.pglimit-btn{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 14px;font-size:12px;cursor:pointer;color:var(--text)}
+.pglimit-btn:hover{background:var(--soft,#f5f5f5)}
+.pglimit-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+.pglimit-info{margin-left:6px}
+.nofile-bar{margin:0 0 10px;display:flex;align-items:center;flex-wrap:wrap}
+.nofile-btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 13px;font-size:12px;cursor:pointer;color:var(--text)}
+.nofile-btn:hover{background:var(--soft,#f5f5f5)}
+.nofile-btn.active{background:#9A7520;color:#fff;border-color:#9A7520;font-weight:700}
+.th-sort{cursor:pointer;user-select:none;white-space:nowrap}
+.th-sort:hover{background:rgba(0,0,0,.05)}
+/* ===== 다크 모드 ===== */
+html.dark{ --bg:#10151d; --card:#1a212e; --ink:#e6eaf1; --border:#2b3545; --border-soft:#2b3545; --hover:#222c3a; --text:#e6eaf1; --text-sub:#aab3c2; --text-mute:#8a94a5; --soft:#222c3a; }
+html.dark body{background:var(--bg);color:var(--text)}
+html.dark .topbar{background:rgba(16,21,29,.92)}
+html.dark .modal{background:var(--card);color:var(--text)}
+html.dark input,html.dark select,html.dark textarea{background:#222c3a;color:var(--text);border-color:var(--border)}
+html.dark .dt thead th,html.dark .th-sort:hover{background:#222c3a}
+html.dark .pglimit-btn,html.dark .nofile-btn,html.dark .cv-chip,html.dark .cv-pop{background:#1a212e;color:var(--text)}
+html.dark .empty{color:var(--text-mute)}
 .dt tbody tr.row-warn{background:#FFF8E1}
 .dt tbody tr.row-warn:hover{background:#FFF3CD}
 .dt tbody tr.row-flash{animation:rowflash 1.4s ease}
@@ -251,9 +279,34 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
 .fs-form{flex:1;min-width:260px}
 #modalForm .modal.wide{width:920px}
 @media(max-width:780px){ .form-split{flex-direction:column} #modalForm .modal.wide{width:560px} }
+.modal-ov.as-drawer{justify-content:flex-end;align-items:stretch;padding:0}
+.modal-ov.as-drawer .modal{width:560px!important;max-width:100%;height:100vh;max-height:100vh;border-radius:0;margin:0;overflow:auto;box-shadow:-4px 0 20px rgba(0,0,0,.18)}
+.modal-ov.as-drawer .form-split{flex-direction:column;gap:10px}
+.modal-ov.as-drawer .fs-prev{max-height:48vh;overflow:auto}
+@media(max-width:780px){ .modal-ov.as-drawer .modal{width:100%!important} }
 /* 페이지 진입 페이드 */
 .page-view.active .page{animation:fadein .22s ease}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* ===== 모바일 다듬기 (터치·여백·가독성) ===== */
+@media(max-width:780px){
+  .page{padding:14px 12px!important}
+  .page-title{font-size:20px}
+  .btn{padding:9px 13px;font-size:13.5px;border-radius:11px!important}
+  .btn.sm{padding:7px 12px;font-size:12.5px;border-radius:9px!important}
+  .tab{padding:10px 14px!important;font-size:13.5px!important}
+  .cv-chip{padding:10px 11px;font-size:12px}
+  .pglimit-btn{padding:9px 18px;font-size:13px}
+  .card{border-radius:13px!important;padding:14px}
+  #page-quickcv .tb-select{flex:1 1 100%}
+  .dt thead th{font-size:12px}
+}
+/* ===== 빠른 이력서·데이터 창 미감 ===== */
+.cv-sheet{border-radius:10px;box-shadow:0 4px 22px -10px rgba(20,30,50,.20),0 1px 3px rgba(20,30,50,.06)}
+.cv-pop{border-radius:14px;box-shadow:0 18px 50px -20px rgba(10,20,40,.45)}
+.cv-pop-h{background:linear-gradient(100deg,#22345A,#0E7C66)}
+.cv-chip{transition:transform .08s,box-shadow .12s,border-color .12s}
+.cv-chip:hover{transform:translateY(-1px);box-shadow:0 4px 12px -6px rgba(20,30,50,.3)}
+.cv-rowdel{transition:background .12s}
 /* 사이드바 그룹 구분 강화 */
 .nav-toggle-all{background:rgba(184,144,47,.14)!important;color:#E8D9AF!important;border:1px solid rgba(184,144,47,.38);font-weight:600}
 .nav-toggle-all:hover{background:rgba(184,144,47,.28)!important;color:#fff!important}
@@ -265,6 +318,43 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
 .nav-item.sub{margin:1px 10px;border-radius:8px;color:#BBC6DA}
 .nav-item.active{background:rgba(184,144,47,.18)!important;color:#fff!important;border-left-color:var(--gold)!important}
 .nav-item:hover{background:var(--sidebar-hover)!important}
+.cv-sheet{background:#fff;width:210mm;max-width:100%;min-height:280mm;margin:0 auto;padding:16mm;border:1px solid var(--border);box-shadow:0 1px 6px rgba(0,0,0,.08);color:#111;font-size:13px;line-height:1.5}
+.cv-sheet h2{font-size:26px;text-align:center;letter-spacing:8px;margin:0 0 16px}
+.cv-sheet table{width:100%;border-collapse:collapse;margin-bottom:14px}
+.cv-sheet th,.cv-sheet td{border:1px solid #333;padding:6px 8px;vertical-align:middle}
+.cv-sheet th{background:#f1f3f5;font-weight:700;white-space:nowrap;text-align:center}
+.cv-sheet [contenteditable]{outline:none;min-height:1.4em}
+.cv-sheet [contenteditable]:focus{background:#fffbe6}
+.cv-photocell{width:90px;height:120px;border:1px solid #333;background:#f8f9fa;display:flex;align-items:center;justify-content:center;font-size:11px;color:#999;cursor:pointer;overflow:hidden;flex:0 0 90px}
+.cv-photocell img{width:100%;height:100%;object-fit:cover}
+.cv-chip{display:block;width:100%;text-align:left;border:1px solid var(--border);background:#fff;border-radius:6px;padding:6px 8px;margin-bottom:5px;font-size:11px;cursor:pointer;line-height:1.35}
+.cv-chip:hover{background:#eef6f5;border-color:var(--teal)}
+.cv-chip-h{font-size:11px;font-weight:700;color:var(--navy);margin:10px 0 4px}
+.cv-pop{position:fixed;top:120px;right:24px;width:260px;max-height:70vh;z-index:75;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden}
+.cv-pop-h{background:var(--navy);color:#fff;padding:8px 10px;font-size:12px;font-weight:700;cursor:move;flex:0 0 auto;user-select:none}
+.cv-pop-b{padding:10px;overflow:auto;flex:1}
+.cv-chip[draggable]{cursor:grab}
+.cv-sheet [contenteditable].cv-drop{background:#fff3cd;outline:2px dashed var(--teal)}
+.cv-rowdel{border:1px solid #f0c0c0;background:#fff;color:var(--red);border-radius:5px;padding:1px 8px;font-size:12px;cursor:pointer;line-height:1.3}
+.cv-rowdel:hover{background:#fde8e8}
+@media(max-width:780px){ .cv-pop{left:8px!important;right:8px!important;top:auto!important;bottom:8px!important;width:auto!important;max-height:48vh} }
+.cv-photo-picker{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:80;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+.cv-pp-inner{background:#fff;border-radius:12px;padding:16px;max-width:560px;width:100%}
+.cv-pp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
+@media(max-width:780px){
+  #cvPalette{width:100%!important;flex:1 1 100%!important;max-height:240px}
+  .cv-sheet{padding:8mm;min-height:auto}
+  .cv-sheet h2{font-size:21px;letter-spacing:4px}
+  .cv-sheet th,.cv-sheet td{padding:4px 5px;font-size:12px}
+  .cv-pp-inner{padding:12px}
+}
+@media print{
+  body *{visibility:hidden!important}
+  #cvSheet,#cvSheet *{visibility:visible!important}
+  #cvSheet{position:absolute;left:0;top:0;width:100%;border:none;box-shadow:none;margin:0;padding:0}
+  .cv-noprint{display:none!important}
+  @page{size:A4;margin:14mm}
+}
 </style>
 </head>
 <body>
@@ -306,7 +396,7 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
     </div>
   </div>
   <div class="content-wrap">
-    <div class="topbar"><button class="hamburger" id="hamburger" aria-label="메뉴">☰</button><span id="tbTitle">홈</span><span class="crumb" id="tbCrumb"></span><span style="flex:1"></span><button class="btn" id="searchBtn" style="font-size:12px">🔍 전체검색</button><button class="btn" id="printBtn" style="font-size:12px">🖨 인쇄</button></div>
+    <div class="topbar"><button class="hamburger" id="hamburger" aria-label="메뉴">☰</button><span id="tbTitle">홈</span><span class="crumb" id="tbCrumb"></span><span style="flex:1"></span><button class="btn" id="themeBtn" style="font-size:12px" onclick="toggleTheme()">🌙</button><button class="btn" id="searchBtn" style="font-size:12px">🔍 전체검색</button><button class="btn" id="printBtn" style="font-size:12px">🖨 인쇄</button></div>
     <main class="main" id="main">
       <section class="page-view active" id="page-home"><div class="page">
         <div id="noJsNotice" style="background:#FFF4E5;border:1px solid #F0C887;border-radius:10px;padding:18px 16px;margin-bottom:18px;color:#8A5A00;font-size:14px;line-height:1.7">
@@ -605,6 +695,28 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
           <div id="cdBody"></div>
         </div>
       </div></section>
+      <section class="page-view" id="page-quickcv"><div class="page">
+        <div style="font-size:22px;font-weight:800;color:var(--navy)">⚡ 빠른 이력서</div>
+        <div style="color:var(--text-mute);font-size:13px;margin-top:2px">프로필·경력 데이터를 클릭만으로 채워 PDF로 저장 — 타이핑 최소화</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;align-items:center">
+          <select id="cvTpl" class="tb-select" onchange="renderQuickCV()"><option value="resume">표준 이력서</option><option value="cert">경력증명서</option></select>
+          <button class="btn" onclick="cvAutoFill()">↻ 자동채움</button>
+          <button class="btn" onclick="cvPickPhoto()">🖼 사진</button>
+          <button class="btn" onclick="cvTogglePalette()">📋 데이터</button>
+          <button class="btn" onclick="cvClearAll()" style="color:var(--red)">🧹 비우기</button>
+          <div style="flex:1;min-width:8px"></div>
+          <button class="btn" onclick="cvSendToEditor()">📝 한글편집기로</button>
+          <button class="btn" onclick="cvExportHwpx()">📄 HWPX</button>
+          <button class="btn primary" onclick="printCV()">🖨 PDF</button>
+        </div>
+        <div id="cvForms" style="margin:0 0 10px"></div>
+        <div style="overflow:auto"><div id="cvSheet" class="cv-sheet" ondragover="event.preventDefault()" ondrop="cvDrop(event)"></div></div>
+        <div id="cvPalettePop" class="cv-pop" style="display:none">
+          <div class="cv-pop-h" id="cvPopHead">📋 데이터 끌어넣기 <span style="font-weight:400;font-size:10px;opacity:.85">(드래그 또는 클릭)</span><button type="button" onclick="document.getElementById('cvPalettePop').style.display='none'" style="float:right;background:none;border:none;color:#fff;cursor:pointer;font-size:14px;line-height:1">✕</button></div>
+          <div class="cv-pop-b" id="cvPaletteBody"></div>
+        </div>
+        <div id="cvPhotoPicker" class="cv-photo-picker" style="display:none"></div>
+      </div></section>
       <section class="page-view" id="page-meetfee" ondragover="pageDropOver(event,'meetfee')" ondragleave="pageDropLeave(event)" ondrop="pageDropFile(event,'meetfee')"><div class="page"><div class="page-drop-overlay" id="ovl-page-meetfee"><span>📎 영수증·증빙을 놓으면 OCR 자동 등록</span></div>
         <div class="page-head"><div class="page-title">🧾 회의등비용신청</div><div class="page-desc">회의·상담·출장 등 비용 신청·기록</div></div>
         <div class="toolbar">
@@ -839,7 +951,12 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
         <div class="tabpanel active" id="tab-personal"><div class="desc">기본정보 · 사진 · 신분증 보관 (이력서·증명서 공통)</div>
           <div class="card"><div class="rc-h">기본정보</div><div class="field-grid" id="piGrid"></div>
             <button class="btn primary" id="piSave" style="margin-top:10px">기본정보 저장</button></div>
-
+          <div class="card" id="galleryCard" style="margin-top:12px"><div class="rc-h">📷 사진 보관함 <span style="font-size:11px;font-weight:400;color:var(--text-mute)">— 이력서·프로필에서 불러와 쓸 개인 사진</span></div>
+            <div class="ocr-zone" id="galleryDrop" style="margin-bottom:10px">📷 사진을 끌어놓거나 클릭해서 업로드 (JPG·PNG·WEBP, 여러 장 가능)</div>
+            <input type="file" id="galleryInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple style="display:none">
+            <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px"><span id="galleryCnt"></span></div>
+            <div id="galleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px"></div>
+          </div>
         </div>
         <div class="tabpanel" id="tab-account"><div class="desc">계좌 정보 관리</div>
           <div class="card">
@@ -1183,6 +1300,7 @@ function loadSeed(){
 
 /* ===== 파일 저장: IndexedDB (대용량) + localStorage 자동 마이그레이션 ===== */
 const _cache={};
+const _fileIdSet=new Set();
 let _idb=null;
 
 function _openIDB(){ return new Promise(function(res,rej){
@@ -1195,7 +1313,7 @@ function _openIDB(){ return new Promise(function(res,rej){
 
 function saveFileUnified(id,file){ /* async-safe: fire-and-forget */
   const rec={id:id,name:file.name,ext:file.ext,size:file.size,base64:file.base64||'',savedAt:file.savedAt||new Date().toISOString()};
-  _cache[id]=rec;
+  _cache[id]=rec; _fileIdSet.add(id);
   _openIDB().then(function(db){
     const tx=db.transaction('files','readwrite'); tx.objectStore('files').put(rec);
     tx.oncomplete=function(){ /* 구 localStorage 청크 정리 */
@@ -1210,6 +1328,8 @@ function getFile(id){
   const m=localStorage.getItem(NS+'pf_meta_'+id); if(m){ try{ const meta=JSON.parse(m); let b64=''; for(let i=0;i<meta.chunks;i++) b64+=(localStorage.getItem(NS+'pf_chunk_'+id+'_'+i)||''); const f={...meta,base64:b64}; _cache[id]=f; return f; }catch(e){} }
   return null;
 }
+/* 첨부 존재 여부(동기): _cache 미적재라도 IDB 인덱스로 판정 */
+function fileExists(id){ return _cache[id]!=null || _fileIdSet.has(id) || localStorage.getItem(NS+'pf_meta_'+id)!=null; }
 
 async function getFileAsync(id){
   if(_cache[id]) return _cache[id];
@@ -1221,7 +1341,7 @@ async function getFileAsync(id){
 }
 
 function deleteFile(id){
-  delete _cache[id];
+  delete _cache[id]; _fileIdSet.delete(id);
   _openIDB().then(function(db){ db.transaction('files','readwrite').objectStore('files').delete(id); }).catch(function(){});
   /* localStorage 청크도 정리 */
   const m=localStorage.getItem(NS+'pf_meta_'+id); if(m){ try{ const meta=JSON.parse(m); for(let i=0;i<(meta.chunks||0);i++) localStorage.removeItem(NS+'pf_chunk_'+id+'_'+i); }catch(e){} } localStorage.removeItem(NS+'pf_meta_'+id);
@@ -1233,6 +1353,25 @@ async function getAllFilesFromIDB(){ try{
     const req=db.transaction('files','readonly').objectStore('files').getAll();
     req.onsuccess=function(){ res(req.result||[]); }; req.onerror=function(){ res([]); }; });
 }catch(e){ return []; } }
+
+/* IDB에 저장된 파일 ID만 가져와 동기 존재확인용 인덱스 구성 (보기/첨부 판정 정확화) */
+async function getAllFileIdsFromIDB(){ try{
+  const db=await _openIDB(); return new Promise(function(res){
+    const req=db.transaction('files','readonly').objectStore('files').getAllKeys();
+    req.onsuccess=function(){ res(req.result||[]); }; req.onerror=function(){ res([]); }; });
+}catch(e){ return []; } }
+async function loadFileIndex(){
+  try{ (await getAllFileIdsFromIDB()).forEach(function(id){ _fileIdSet.add(id); }); }catch(e){}
+  try{ for(var k in localStorage){ if(k.indexOf(NS+'pf_meta_')===0) _fileIdSet.add(k.replace(NS+'pf_meta_','')); } }catch(e){}
+  _refreshAttachUI();
+}
+function _refreshAttachUI(){ try{
+  var active=document.querySelector('.page-view.active');
+  if(active){ var pid=(active.id||'').replace('page-',''); if(typeof CAREER_CFG!=='undefined' && CAREER_CFG[pid]) renderCareer(pid); }
+  if(typeof renderAccounts==='function') renderAccounts();
+  if(typeof renderPersonalDocs==='function') renderPersonalDocs();
+  if(typeof renderIDDocs==='function' && (!hasIDPin()||_idUnlocked)) renderIDDocs();
+}catch(e){ console.warn('refresh attach',e); } }
 
 /* localStorage → IDB 마이그레이션 (최초 1회) */
 async function migrateFilesToIDB(){
@@ -1267,7 +1406,7 @@ async function exportEditedHwpx(){ return _rhwp ? await _rhwp.exportHwpx() : nul
 
 /* ===== 내비게이션 ===== */
 let NAV=[
-  {g:'이력서관리', items:[['page-resume-hub','이력서 생성·보관'],['page-profile','프로필 작성보관'],['page-certdoc','경력증명서 보관']]},
+  {g:'이력서관리', items:[['page-quickcv','⚡ 빠른 이력서(PDF)'],['page-resume-hub','이력서 생성·보관'],['page-profile','프로필 작성보관'],['page-certdoc','경력증명서 보관']]},
   {g:'회의·비용관리', items:[['page-meetfee','회의등비용신청'],['page-etcfee','기타비용신청']]},
   {g:'경력관리', items:[['page-wiccok','위촉장'],['page-license','자격증'],['page-complete','수료증'],['page-award','표창 및 포상'],['page-edu','학력']]},
   {g:'실적관리', items:[['page-case','사건실적'],['page-consult','컨설팅실적'],['page-fund','기금실적'],['page-lecture','강의실적'],['page-etc','기타실적']]},
@@ -1342,6 +1481,7 @@ function nav_to(id,label,grp){
   if(window.innerWidth<=820) toggleSidebar(false);
   const nm=id.slice(5); if(typeof CAREER_CFG!=='undefined'&&CAREER_CFG[nm]) renderCareer(nm);
   if(id==='page-resume-hub'){ _safe(()=>initResumeHub()); }
+  if(id==='page-quickcv'){ _safe(renderQuickCV); }
   if(id==='page-resume-store' && typeof renderDocStore==='function') renderDocStore('resume');
   if(id==='page-profile' && typeof renderDocStore==='function') renderDocStore('profile');
   if(id==='page-certdoc' && typeof renderDocStore==='function') renderDocStore('certdoc');
@@ -1414,15 +1554,14 @@ function fmtKRW(n){ return (n||0).toLocaleString('ko-KR')+'원'; }
 function renderHome(){
   const ym=thisMonth();
   const career=['wiccok','license','complete','award','edu'], perf=['case','consult','fund','lecture','etc'];
-  let cCnt=0,pCnt=0,amt=0;
+  let cCnt=0,pCnt=0;
   const inMonth=r=>{ const d=(r.savedAt||r.issueDate||r.date||'').replace(/-/g,'.'); return d.startsWith(ym); };
   career.forEach(k=>get(k).forEach(r=>{ if(inMonth(r)) cCnt++; }));
-  perf.forEach(k=>get(k).forEach(r=>{ if(inMonth(r)){ pCnt++; amt+=Number(r.amt)||0; } }));
+  perf.forEach(k=>get(k).forEach(r=>{ if(inMonth(r)){ pCnt++; } }));
   const kpi=document.getElementById('homeKpi');
   kpi.innerHTML=[
     ['이번 달 경력 등록',cCnt+'건',''],
     ['이번 달 실적 등록',pCnt+'건',''],
-    ['이번 달 실적 금액',fmtKRW(amt),''],
     ['전체 보유 데이터',(career.concat(perf).reduce((s,k)=>s+get(k).length,0))+'건','경력+실적'],
   ].map(([l,v,s])=>`<div class="kpi"><div class="k-label">${l}</div><div class="k-val">${v}</div><div class="k-sub">${s}</div></div>`).join('');
   const LBL={wiccok:'위촉장',license:'자격증',complete:'수료증',award:'표창·포상',edu:'학력',case:'사건',consult:'컨설팅',fund:'기금',lecture:'강의',etc:'기타실적'};
@@ -1503,7 +1642,7 @@ function renderRhDocList(domain){
   box.innerHTML=Object.keys(byYear).sort().reverse().map(y=>{
     return '<div style="margin-bottom:16px"><div style="font-weight:600;color:var(--navy);margin-bottom:8px">'+y+' ('+byYear[y].length+'건)</div>'
       +byYear[y].map(r=>{
-        const has=!!getFile(r.id);
+        const has=fileExists(r.id);
         return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:#fff">'
           +'<div style="flex:1"><div style="font-weight:500;font-size:13px">'+(r.kind||D.label)+'</div><div style="font-size:11px;color:var(--text-mute)">'+(r.org||'')+(r.memo?' · '+r.memo:'')+'</div></div>'
           +(has?'<button class="btn sm" style="background:var(--navy);color:#fff" onclick="showBig(\''+r.id+'\')">📄 보기</button><button class="btn sm" onclick="downloadFile(\''+r.id+'\')">⬇</button>':'')
@@ -2574,12 +2713,12 @@ const FORM_DEFS={
     {key:'date',label:'일자',date:true,required:true},
     {key:'type',label:'구분',type:'select',options:['회의','출장','식대','교통','기타'],default:'회의'},
     {key:'content',label:'내용/사유',full:true},{key:'amt',label:'금액',type:'number'},
-    {key:'org',label:'지출처/수령인'}]},
+    {key:'org',label:'지출처/수령인'},{key:'acct',label:'입금계좌',type:'account_ref',full:true}]},
   etcfee:{title:'기타비용신청',store:'etcfee',prefix:'EF',fields:[
     {key:'date',label:'일자',date:true,required:true},
     {key:'type',label:'구분',type:'select',options:['회의','출장','식대','교통','기타'],default:'기타'},
     {key:'content',label:'내용/사유',full:true},{key:'amt',label:'금액',type:'number'},
-    {key:'org',label:'지출처/수령인'}]},
+    {key:'org',label:'지출처/수령인'},{key:'acct',label:'입금계좌',type:'account_ref',full:true}]},
   personal_doc:{title:'신분증·사진',store:'personal',prefix:'PI',fields:[
     {key:'kind',label:'종류',type:'select',options:['신분증','운전면허증','주민등록증','통장사본','사진','기타'],default:'신분증'},
     {key:'name',label:'내용/명칭',required:true},{key:'number',label:'번호(주민/면허/계좌 등)'},
@@ -2609,6 +2748,13 @@ function openForm(page,editId,showPrev){ const def=FORM_DEFS[page]; if(!def) ret
         +'<input type="checkbox" id="ff-sameAsIssue" onchange="wiccokSameAsIssue(this)"> 발급일과 동일</label>'
         +'</div></div>';
     }
+    if(f.type==='account_ref'){
+      const accts=get('account'); const cur=rec[f.key]||'';
+      const opts='<option value="">(선택 안 함)</option>'+accts.map(a=>'<option value="'+a.id+'"'+(a.id===cur?' selected':'')+'>'+escapeHtml((a.bank||'')+' '+(a.number||'')+(a.holder?' ('+a.holder+')':''))+'</option>').join('');
+      return '<div class="field" style="grid-column:1/-1"><label>'+f.label+'</label>'
+        +'<select id="ff-'+f.key+'" onchange="checkTongjang(this.value)">'+opts+'</select>'
+        +'<div id="acctTongjangStatus" style="margin-top:6px;font-size:12px"></div></div>';
+    }
     const val=rec[f.key]!==undefined?rec[f.key]:(f.default||'');
     let inp;
     if(f.type==='select') inp='<select id="ff-'+f.key+'">'+(f.options||[]).map(o=>'<option'+(o===val?' selected':'')+'>'+o+'</option>').join('')+'</select>';
@@ -2616,25 +2762,49 @@ function openForm(page,editId,showPrev){ const def=FORM_DEFS[page]; if(!def) ret
     return '<div class="field"'+(f.full?' style="grid-column:1/-1"':'')+'>'+"<label>"+f.label+(f.required?' *':'')+"</label>"+inp+'</div>';
   }).join('')+'</div>';
   const modal=document.querySelector('#modalForm .modal');
-  if(showPrev && editId && getFile(editId)){ var ext=fileExt(editId), u=fileURL(editId);
-    var isPDF=ext==='pdf';
-    var prev = isPDF
-      ? '<div id="splitPdfBox" style="height:80vh;border-radius:8px;overflow:hidden;background:#525659"><div style="text-align:center;padding:30px;color:#ccc">⏳ PDF 로딩 중...</div></div>'
-      : (/^(png|jpg|jpeg|gif|webp)$/.test(ext) ? '<img src="'+u+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px;cursor:zoom-in" onclick="showBig(\''+editId+'\')">'  
-      : '<div class="empty" style="padding:14px">📎 '+ (getFile(editId).name||'첨부됨') +' (미리보기 미지원 형식)</div>');
-    $('modalBody').innerHTML='<div class="form-split"><div class="fs-prev"><div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:6px">첨부 원본</div>'+prev+'</div><div class="fs-form">'+fields+'</div></div>';
-    if(isPDF) setTimeout(()=>showPDFInline(editId,'splitPdfBox'),50);
-    if(modal) modal.classList.add('wide');
+  if(showPrev && editId && fileExists(editId)){
+    $('modalBody').innerHTML='<div class="form-split"><div class="fs-prev"><div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:6px">첨부 원본</div><div id="fsPrevBox"><div style="text-align:center;padding:30px;color:#999">⏳ 원본 로딩 중...</div></div></div><div class="fs-form">'+fields+'</div></div>';
+    if(modal) modal.classList.add('wide'); _renderFormPreview(editId);
   } else { $('modalBody').innerHTML=fields; if(modal) modal.classList.remove('wide'); }
   $('modalForm').classList.add('open');
+  var _arSel=document.getElementById('ff-acct'); if(_arSel) checkTongjang(_arSel.value);
 }
-function closeForm(){ $('modalForm').classList.remove('open'); _formCtx=null; unpinSidePreview(); }
+function closeForm(){ const ov=$('modalForm'); ov.classList.remove('open'); ov.classList.remove('as-drawer'); _formCtx=null; unpinSidePreview(); }
+function openEditDrawer(page,id){ openForm(page,id,true); const ov=document.getElementById('modalForm'); if(ov) ov.classList.add('as-drawer'); }
+function _renderFormPreview(id){
+  const render=function(f){ const box=document.getElementById('fsPrevBox'); if(!box) return; const ext=(f.ext||'').toLowerCase();
+    if(ext==='pdf'){ box.innerHTML='<div id="splitPdfBox" style="height:78vh;border-radius:8px;overflow:hidden;background:#525659"><div style="text-align:center;padding:30px;color:#ccc">⏳ PDF 로딩 중...</div></div>'; setTimeout(function(){ showPDFInline(id,'splitPdfBox'); },50); }
+    else if(/^(png|jpg|jpeg|gif|webp)$/.test(ext)){ const u=fileURL(id); box.innerHTML='<img src="'+(u||'')+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px;cursor:zoom-in" onclick="showBig(\''+id+'\')">'; }
+    else box.innerHTML='<div class="empty" style="padding:14px">📎 '+escapeHtml(f.name||'첨부됨')+' (미리보기 미지원 형식)</div>'; };
+  const f=getFile(id); if(f) render(f); else getFileAsync(id).then(function(g){ if(g) render(g); else { const box=document.getElementById('fsPrevBox'); if(box) box.innerHTML='<div class="empty" style="padding:14px">원본을 불러올 수 없습니다</div>'; } });
+}
+/* ===== 비용 폼: 입금계좌 통장사본 제출여부 검토 + 출력 ===== */
+function checkTongjang(acctId){ const box=document.getElementById('acctTongjangStatus'); if(!box) return;
+  if(!acctId){ box.innerHTML='<span style="color:var(--text-mute)">입금계좌를 선택하면 통장사본 제출여부를 검토합니다.</span>'; return; }
+  if(fileExists(acctId)){
+    box.innerHTML='<span style="color:var(--teal);font-weight:600">✅ 통장사본 보관됨</span> '
+      +'<button type="button" class="btn sm" onclick="showBig(\''+acctId+'\')">📄 보기</button> '
+      +'<button type="button" class="btn sm" onclick="downloadFile(\''+acctId+'\')">⬇ 출력(PDF)</button> '
+      +'<button type="button" class="btn sm" onclick="printFile(\''+acctId+'\')">🖨 인쇄</button>';
+  } else {
+    box.innerHTML='<span style="color:var(--red);font-weight:600">⚠️ 통장사본 미제출</span> '
+      +'<span style="color:var(--text-mute)">— 비용 청구 시 통장사본 PDF가 필요할 수 있습니다.</span> '
+      +'<button type="button" class="btn sm" onclick="attachTongjangFromForm(\''+acctId+'\')">📎 지금 첨부</button>';
+  } }
+function attachTongjangFromForm(acctId){ const inp=document.createElement('input'); inp.type='file'; inp.accept='.pdf,.jpg,.jpeg,.png';
+  inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return; await saveAttach(acctId,f); renderAccounts(); checkTongjang(acctId); toast('통장사본 첨부됨'); }; inp.click(); }
+function printFile(id){ const go=function(f){ const ext=(f.ext||'').toLowerCase(); const mt=ext==='pdf'?'application/pdf':(ext==='png'?'image/png':(/jpe?g/.test(ext)?'image/jpeg':'application/octet-stream'));
+    const url=URL.createObjectURL(new Blob([b64ToAb(f.base64)],{type:mt})); const w=window.open(url,'_blank'); if(!w){ toast('팝업이 차단되었습니다 — 허용 후 다시 시도'); return; }
+    setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} },800); };
+  const f=getFile(id); if(f) go(f); else getFileAsync(id).then(function(g){ if(g) go(g); else toast('원본 없음'); }); }
 function wiccokSameAsIssue(cb){
   const issueDate=v('ff-issueDate'); if(!issueDate) return;
   if(cb.checked){ const ps=document.getElementById('ff-periodStart'); if(ps){ ps.value=issueDate; } }
 }
 function saveForm(){ if(!_formCtx) return; const {page,editId}=_formCtx; const def=FORM_DEFS[page]; const data={};
-  def.fields.forEach(f=>{ if(f.type==='period_row'){ data.periodStart=v('ff-periodStart'); data.periodEnd=v('ff-periodEnd'); } else data[f.key]=v('ff-'+f.key); });
+  def.fields.forEach(f=>{ if(f.type==='period_row'){ data.periodStart=v('ff-periodStart'); data.periodEnd=v('ff-periodEnd'); }
+    else if(f.type==='account_ref'){ const id=v('ff-'+f.key); data[f.key]=id; const a=get('account').find(x=>x.id===id); data.acctLabel=a?((a.bank||'')+' '+(a.number||'')).trim():''; }
+    else data[f.key]=v('ff-'+f.key); });
   for(const f of def.fields){ if(f.required&&!data[f.key]){ toast('필수: '+f.label); return; } }
   const db=get(def.store);
   if(editId){ const i=db.findIndex(r=>r.id===editId); if(i>=0){ db[i]={...db[i],...data,savedAt:new Date().toISOString()}; set(def.store,db); _flashId=editId; toast('수정 완료'); } }
@@ -2661,7 +2831,7 @@ function validateRecord(type,r){ const w=[];
 const CAREER_CFG={
   wiccok:{store:'wiccok',filter:r=>r.type!=='표창'&&r.type!=='포상',qFields:['org','titleVal','issuer'],
     cols:['ID','유형','위촉내용(직책)','발급기관','위촉인','발급일','위촉시작','위촉종료','관리'],
-    row:(r,p)=>{const w=validateRecord('wiccok',r),sp=splitPeriod(r.period),_pg=(r.type==='표창'||r.type==='포상')?'award':'wiccok';return `<tr class="${w.length?'row-warn':''}" style="cursor:pointer" onclick="openForm('${_pg}','${r.id}',true)">
+    row:(r,p)=>{const w=validateRecord('wiccok',r),sp=splitPeriod(r.period),_pg=(r.type==='표창'||r.type==='포상')?'award':'wiccok';return `<tr class="${w.length?'row-warn':''}" style="cursor:pointer">
       <td><span class="id-chip">${r.id}</span>${w.length?`<span class="warn-ico" title="${w.join(' / ')}">⚠️</span>`:''}</td>
       <td><span class="tag navy">${r.type||'위촉장'}</span></td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.titleVal||'-'}</td>
@@ -2673,76 +2843,76 @@ const CAREER_CFG={
       <td onclick="event.stopPropagation()">${rowActions(r.id,'wiccok',r.org||r.titleVal,p)}</td></tr>`;}},
   award:{store:'wiccok',filter:r=>r.type==='표창'||r.type==='포상',qFields:['org','titleVal','issuer'],
     cols:['ID','유형','수여기관','수여자','내용','수상일','문서번호','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('award','${r.id}',true)"><td><span class="id-chip">${r.id}</span></td><td><span class="tag amber">${r.type}</span></td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><span class="tag amber">${r.type}</span></td>
       <td><strong>${r.org||'-'}</strong></td><td style="font-size:11px;color:var(--text-mute)">${r.issuer||'-'}</td>
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.titleVal||'-'}</td>
       <td>${formatDate(r.issueDate)||r.year||'-'}</td>
       <td style="font-size:11px;color:var(--text-mute)">${r.note||'-'}</td><td onclick="event.stopPropagation()">${rowActions(r.id,'wiccok',r.org||r.titleVal,p)}</td></tr>`},
   license:{store:'cert',filter:r=>!/수료|이수/.test(r.title||''),qFields:['title','org','issuer','num'],
     cols:['ID','자격명','발급기관','발급자','취득일','자격번호','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('license','${r.id}',true)"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.title||'-'}</strong></td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.title||'-'}</strong></td>
       <td>${r.org||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.issuer||'-'}</td>
       <td>${formatDate(r.date)||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.num||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'cert',r.title,p)}</td></tr>`},
   complete:{store:'cert',filter:r=>/수료|이수/.test(r.title||''),qFields:['title','org','issuer'],
     cols:['ID','과정명','발급기관','발급자','수료일','이수시간','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('complete','${r.id}',true)"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.title||'-'}</strong></td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.title||'-'}</strong></td>
       <td>${r.org||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.issuer||'-'}</td>
       <td>${formatDate(r.date)||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.duration?r.duration+'h':'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'cert',r.title,p)}</td></tr>`},
   edu:{store:'edu',qFields:['school','degree','major'],
     cols:['ID','학교명','학과·전공','학위','재학기간','졸업구분','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('edu','${r.id}',true)"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.school||'-'}</strong></td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.school||'-'}</strong></td>
       <td style="font-size:11px">${r.major||'-'}</td><td>${r.degree||'-'}</td>
       <td style="font-size:11px">${r.period||'-'}</td><td>${r.graduated||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'edu',r.school,p)}</td></tr>`},
   consult:{store:'consult',qFields:['org','project','agency','main'],
     cols:['ID','유형','고객사','과제','수행기관','담당','연도','상태','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('consult','${r.id}',true)"><td><span class="id-chip">${r.id}</span></td><td><span class="tag navy">${r.type||'-'}</span></td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><span class="tag navy">${r.type||'-'}</span></td>
       <td><strong>${r.org||'-'}</strong></td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
       <td style="font-size:11px">${r.agency||'-'}</td><td>${r.main||'-'}</td><td>${r.year||'-'}</td>
       <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'consult',r.org,p)}</td></tr>`},
   lecture:{store:'lecture',qFields:['topic','org','speaker'],
     cols:['ID','주제','주관','일자','시간','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('lecture','${r.id}',true)"><td><span class="id-chip">${r.id}</span></td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td>
       <td><strong>${r.topic||'-'}</strong></td><td>${r.org||'-'}</td><td>${formatDate(r.date)||'-'}</td>
       <td>${r.duration?r.duration+'h':'-'}</td><td>${r.year||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'lecture',r.topic,p)}</td></tr>`},
   case:{store:'case',qFields:['org','project','type'],
     cols:['ID','유형','의뢰인/사업장','사건내용','상태','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('case','${r.id}',true)"><td><span class="id-chip">${r.id}</span></td><td><span class="tag navy">${r.type||'-'}</span></td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><span class="tag navy">${r.type||'-'}</span></td>
       <td><strong>${r.org||'-'}</strong></td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
       <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td><td>${r.year||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'case',r.org,p)}</td></tr>`},
   fund:{store:'fund',qFields:['org','project'],
     cols:['ID','기업/기금','내용','상태','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('fund','${r.id}')"><td><span class="id-chip">${r.id}</span></td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td>
       <td><strong>${r.org||'-'}</strong></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
       <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td><td>${r.year||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'fund',r.org,p)}</td></tr>`},
   etc:{store:'etc',qFields:['org','project','type'],
     cols:['ID','유형','기관/고객','내용','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('etc','${r.id}')"><td><span class="id-chip">${r.id}</span></td><td>${r.type||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td>${r.type||'-'}</td>
       <td><strong>${r.org||'-'}</strong></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td><td>${r.year||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'etc',r.org,p)}</td></tr>`},
   meetfee:{store:'meetfee',qFields:['content','org','type'],
     cols:['ID','일자','구분','내용/사유','금액','지출처/수령인','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('meetfee','${r.id}')"><td><span class="id-chip">${r.id}</span></td><td>${formatDate(r.date)||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td>${formatDate(r.date)||'-'}</td>
       <td><span class="tag navy">${r.type||'-'}</span></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.content||'-'}</td>
       <td style="text-align:right">${r.amt?Number(r.amt).toLocaleString('ko-KR')+'원':'-'}</td><td>${r.org||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'meetfee',r.content,p)}</td></tr>`},
   etcfee:{store:'etcfee',qFields:['content','org','type'],
     cols:['ID','일자','구분','내용/사유','금액','지출처/수령인','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openForm('etcfee','${r.id}')"><td><span class="id-chip">${r.id}</span></td><td>${formatDate(r.date)||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td>${formatDate(r.date)||'-'}</td>
       <td><span class="tag navy">${r.type||'-'}</span></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.content||'-'}</td>
       <td style="text-align:right">${r.amt?Number(r.amt).toLocaleString('ko-KR')+'원':'-'}</td><td>${r.org||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'etcfee',r.content,p)}</td></tr>`},
 };
-function rowActions(id,store,label,page){ const has=!!getFile(id), L=(label||'').replace(/['"]/g,'');
+function rowActions(id,store,label,page){ const has=fileExists(id), L=(label||'').replace(/['"]/g,'');
   return '<span style="display:inline-flex;gap:3px">'+
 
-    (has?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="showBig('${id}')" onmouseenter="hoverThumb('${id}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📄 보기</button><button class="btn sm" style="background:var(--teal);color:#fff;border-color:var(--teal)" onclick="downloadFile('${id}')">⬇</button><button class="btn sm" onclick="deleteAttach('${id}','${page}')" title="원본만 삭제 후 재업로드" style="color:var(--red);font-size:11px">🗑원본</button>`
+    (has?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" style="background:var(--teal);color:#fff;border-color:var(--teal)" onclick="downloadFile('${id}')">⬇</button><button class="btn sm" onclick="deleteAttach('${id}','${page}')" title="원본만 삭제 후 재업로드" style="color:var(--red);font-size:11px">🗑원본</button>`
         :`<button class="btn sm" onclick="attachRec('${id}','${store}','${page}')">📎 첨부</button>`)+
     `<button class="btn sm" onclick="memoRec('${store}','${id}','${page}')">💬</button>`+
     `<button class="btn sm" style="color:#fff;background:var(--red);border-color:var(--red)" onclick="delRec('${store}','${id}','${page}')">🗑 삭제</button></span>`;
@@ -2767,25 +2937,42 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   const yr=yrSel?yrSel.value:'', tp=sec.querySelector('[data-f="type"]')?.value||'';
   let rows=data.filter(r=>{ if(q&&!cfg.qFields.some(f=>(r[f]||'').toLowerCase().includes(q))) return false;
     if(yr&&(r.year||(r.issueDate||r.date||'').slice(0,4))!==yr) return false; if(tp&&r.type!==tp) return false; return true; });
-  rows.sort((a,b)=>(b.issueDate||b.date||b.year||'').localeCompare(a.issueDate||a.date||a.year||''));
+  const ss=_sortState[name];
+  if(ss){ const keyed=rows.map(function(r){ return {r:r, k:_cellText(cfg.row(r,name),ss.col)}; });
+    keyed.sort(function(a,b){ const xa=a.k,xb=b.k; const sa=xa.replace(/[,\s원]/g,''), sb=xb.replace(/[,\s원]/g,'');
+      let rr; if(sa&&sb&&/^-?[\d.]+$/.test(sa)&&/^-?[\d.]+$/.test(sb)) rr=parseFloat(sa)-parseFloat(sb); else rr=xa.localeCompare(xb,'ko'); return rr*ss.dir; });
+    rows=keyed.map(function(o){return o.r;}); }
+  else { rows.sort((a,b)=>(b.issueDate||b.date||b.year||'').localeCompare(a.issueDate||a.date||a.year||'')); }
   const cntEl=sec.querySelector('.cnt'); if(cntEl) cntEl.textContent=rows.length+'건';
+  const missingCount=rows.filter(function(r){ return !fileExists(r.id); }).length;
+  if(_noFileOnly[name]) rows=rows.filter(function(r){ return !fileExists(r.id); });
+  const nofileBar='<div class="nofile-bar"><button type="button" class="nofile-btn'+(_noFileOnly[name]?' active':'')+'" onclick="toggleNoFile(\''+name+'\')">📎 원본 없는 항목만'+(missingCount?' ('+missingCount+')':'')+'</button>'+(_noFileOnly[name]?'<span style="font-size:11px;color:var(--text-mute);margin-left:8px">행을 열어 원본을 첨부하세요</span>':'')+'</div>';
   const box=sec.querySelector('.dt');
-  const limit=_pageLimit[name]||40; const view=rows.slice(0,limit);
+  const raw=(_pageLimit[name]==null)?20:_pageLimit[name]; const limit=raw<0?rows.length:raw; const view=rows.slice(0,limit);
   const label=(typeof FORM_DEFS!=='undefined'&&FORM_DEFS[name]&&FORM_DEFS[name].title)||'항목';
-  if(!rows.length){ box.innerHTML='<div class="empty"><div class="emp-ico">📭</div>아직 등록된 '+label+'이(가) 없습니다.<br><span style="font-size:12px">상단 <b>＋ 새 '+label+'</b> 버튼으로 첫 항목을 등록하세요.</span></div>'; return; }
-  box.innerHTML='<table><thead><tr><th class="rownum-h">№</th>'+cfg.cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>'+view.map((r,i)=>cfg.row(r,name).replace(/<tr\b[^>]*>/, m=>m+'<td class="rownum">'+(i+1)+'</td>')).join('')+'</tbody></table>'
+  if(!rows.length){ box.innerHTML=nofileBar+(_noFileOnly[name]?'<div class="empty"><div class="emp-ico">✅</div>미첨부 항목이 없습니다 — 모든 원본이 첨부되어 있습니다.</div>':'<div class="empty"><div class="emp-ico">📭</div>아직 등록된 '+label+'이(가) 없습니다.<br><span style="font-size:12px">상단 <b>＋ 새 '+label+'</b> 버튼으로 첫 항목을 등록하세요.</span></div>'); return; }
+  box.innerHTML=nofileBar+'<table><thead><tr><th class="rownum-h">№</th>'+cfg.cols.map((c,ci)=> c==='관리' ? `<th>${c}</th>` : `<th class="th-sort" onclick="sortCol('${name}',${ci})">${c}${ss&&ss.col===ci?(ss.dir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>'+view.map((r,i)=>cfg.row(r,name).replace(/<tr\b[^>]*>/, m=>m+'<td class="rownum">'+(i+1)+'</td>')).join('')+'</tbody></table>'
     +'<div class="scroll-hint">← 좌우로 밀어 더 보기 →</div>'
-    +(rows.length>limit?'<button class="btn more-btn" onclick="_pageLimit[\''+name+'\']='+(limit+40)+';renderCareer(\''+name+'\')">더 보기 (남은 '+(rows.length-limit)+'건)</button>':'');
+    +'<div class="pglimit-bar">표시 개수 '
+      +[20,50,100].map(function(n){ return '<button type="button" class="pglimit-btn'+(raw===n?' active':'')+'" onclick="setPageLimit(\''+name+'\','+n+')">'+n+'</button>'; }).join('')
+      +'<button type="button" class="pglimit-btn'+(raw<0?' active':'')+'" onclick="setPageLimit(\''+name+'\',-1)">전체</button>'
+      +'<span class="pglimit-info">총 '+rows.length+'건 중 '+Math.min(limit,rows.length)+'건 표시</span></div>';
   box.querySelectorAll('th').forEach((th,idx)=>{ if(th.textContent==='관리'||th.textContent==='№') return; th.style.cursor='pointer'; th.title='클릭하면 정렬'; th.onclick=()=>sortTable(box,th,idx); });
   box.querySelectorAll('tbody tr').forEach(tr=>{ const chip=tr.querySelector('.id-chip'); if(!chip) return; const rid=chip.textContent.trim();
     tr.addEventListener('dragover',e=>{ e.preventDefault(); tr.style.boxShadow='inset 0 0 0 2px var(--teal)'; });
     tr.addEventListener('dragleave',()=>{ tr.style.boxShadow=''; });
     tr.addEventListener('drop',e=>{ e.preventDefault(); tr.style.boxShadow=''; const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) dropAttach(rid,cfg.store,name,f); });
-    tr.addEventListener('mouseenter',()=>{ getFileAsync(rid).then(f=>{ if(f) showSidePreview(rid); }); });
-    tr.addEventListener('mouseleave',()=>{ hideSidePreview(); }); });
+    tr.style.cursor='pointer';
+    tr.addEventListener('click',e=>{ if(e.target.closest('button,a,input,select,textarea,.btn,.id-chip')) return; openEditDrawer(name, rid); }); });
   if(_flashId){ box.querySelectorAll('tbody tr').forEach(tr=>{ if(tr.textContent.indexOf(_flashId)>=0) tr.classList.add('row-flash'); }); _flashId=null; }
 }
 var _flashId=null, _pageLimit={};
+var _noFileOnly={}, _sortState={};
+function toggleNoFile(name){ _noFileOnly[name]=!_noFileOnly[name]; renderCareer(name); }
+function sortCol(name,i){ const s=_sortState[name]; if(s&&s.col===i){ s.dir*=-1; } else { _sortState[name]={col:i,dir:1}; } renderCareer(name); }
+function _cellText(trHtml,i){ const t=document.createElement('table'); t.innerHTML='<tbody>'+trHtml+'</tbody>'; const tr=t.querySelector('tr'); if(!tr) return ''; const td=tr.children[i]; return td?(td.textContent||'').trim():''; }
+function toggleTheme(){ const on=!document.documentElement.classList.contains('dark'); document.documentElement.classList.toggle('dark',on); try{ localStorage.setItem('kc_theme',on?'dark':'light'); }catch(e){} const b=document.getElementById('themeBtn'); if(b) b.textContent=on?'☀️':'🌙'; }
+function setPageLimit(name,n){ _pageLimit[name]=n; renderCareer(name); }
 function sortTable(box,th,idx){
   const tb=box.querySelector('tbody'); if(!tb) return; const rows=[...tb.querySelectorAll('tr')]; if(rows.length<2&&rows[0]&&rows[0].querySelector('[colspan]')) return;
   const dir=th.dataset.dir==='asc'?'desc':'asc'; box.querySelectorAll('th').forEach(h=>{ h.dataset.dir=''; h.textContent=h.textContent.replace(/ [▲▼]$/,''); }); th.dataset.dir=dir;
@@ -2825,6 +3012,34 @@ function showBig(id){ const ext=fileExt(id), u=fileURL(id); if(!u){
     : '<div style="padding:30px;text-align:center">이 형식은 미리보기를 지원하지 않습니다.<br><br><button class="btn primary" onclick="downloadFile(\''+id+'\')">⬇ 다운로드</button></div>';
   document.getElementById('imgModal').classList.add('open'); }
 function closeBig(){ document.getElementById('imgModal').classList.remove('open'); }
+function toggleCard(headEl){ const card=headEl.closest('.card')||headEl.parentNode; if(!card) return; const body=card.querySelector('.cbody'); const arw=headEl.querySelector('.arw'); if(!body) return;
+  body.style.transition='max-height .25s ease';
+  if(body.dataset.collapsed==='1'){ body.style.maxHeight=body.scrollHeight+'px'; setTimeout(function(){ body.style.overflow=''; },260); body.dataset.collapsed='0'; if(arw) arw.textContent='▼'; }
+  else { body.style.overflow='hidden'; body.style.maxHeight=body.scrollHeight+'px'; requestAnimationFrame(function(){ body.style.maxHeight='0px'; }); body.dataset.collapsed='1'; if(arw) arw.textContent='▶'; } }
+function _showShortcutHelp(){ let d=document.getElementById('kbHelp'); if(d){ d.remove(); return; }
+  d=document.createElement('div'); d.id='kbHelp'; d.style.cssText='position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px';
+  d.innerHTML='<div style="background:var(--card);color:var(--text);border-radius:14px;padding:20px 22px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)"><div style="font-weight:700;font-size:15px;margin-bottom:12px;color:var(--navy)">⌨️ 키보드 단축키</div>'
+   +[['Esc','열린 창·서랍 닫기'],['Ctrl + S','편집 중인 항목 저장'],['Ctrl + K  /  /','전체검색 열기'],['N','현재 목록에 새 항목'],['?','이 도움말 열기/닫기']].map(function(a){return '<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--border)"><kbd style="background:var(--hover);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;font-family:monospace">'+a[0]+'</kbd><span style="font-size:13px">'+a[1]+'</span></div>';}).join('')
+   +'<div style="text-align:right;margin-top:14px"><button class="btn sm" onclick="document.getElementById(\'kbHelp\').remove()">닫기</button></div></div>';
+  d.onclick=function(e){ if(e.target===d) d.remove(); }; document.body.appendChild(d); }
+document.addEventListener('keydown', function(e){
+  const tag=(e.target&&e.target.tagName)||''; const typing=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(e.target&&e.target.isContentEditable));
+  const fm=document.getElementById('modalForm'); const formOpen=fm&&fm.classList.contains('open');
+  if(e.key==='Escape'){
+    const help=document.getElementById('kbHelp'); if(help){ help.remove(); e.preventDefault(); return; }
+    if(formOpen){ closeForm(); e.preventDefault(); return; }
+    const ms=document.getElementById('modalSearch'); if(ms&&ms.classList.contains('open')){ closeSearch(); e.preventDefault(); return; }
+    const im=document.getElementById('imgModal'); if(im&&im.classList.contains('open')){ closeBig(); e.preventDefault(); return; }
+    const pp=document.getElementById('cvPalettePop'); if(pp&&pp.style.display&&pp.style.display!=='none'){ pp.style.display='none'; e.preventDefault(); return; }
+    return; }
+  if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')){ if(formOpen){ e.preventDefault(); saveForm(); } return; }
+  if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){ e.preventDefault(); openSearch(); return; }
+  const _ms=document.getElementById('modalSearch'); const _searchOpen=_ms&&_ms.classList.contains('open');
+  if(typing||formOpen||_searchOpen||e.ctrlKey||e.metaKey||e.altKey) return;
+  if(e.key==='/'){ e.preventDefault(); openSearch(); return; }
+  if(e.key==='?'){ e.preventDefault(); _showShortcutHelp(); return; }
+  if(e.key==='n'||e.key==='N'){ const ap=document.querySelector('.page-view.active'); if(ap){ const nm=ap.id.slice(5); if(typeof CAREER_CFG!=='undefined'&&CAREER_CFG[nm]){ e.preventDefault(); openForm(nm); } } return; }
+});
 
 /* PDF.js 인라인 렌더링 */
 async function showPDFInline(id,containerId){
@@ -2920,7 +3135,7 @@ function renderDup(){ const page=_dupPage; const data=getDupData(page);
      return '<div class="card" style="margin-bottom:12px"><div style="font-weight:600;color:var(--navy);margin-bottom:8px">'+label+' <span style="color:var(--amber)">('+g.length+'건 중복)</span></div>'
        + g.map(function(r){
            var info=[r.id, formatDate(r.issueDate||r.date)||r.year||'', r.number||''].filter(Boolean).join(' · ');
-           var hasFile=!!getFile(r.id);
+           var hasFile=fileExists(r.id);
            return '<div style="display:flex;gap:6px;align-items:center;font-size:12px;padding:6px 0;border-top:1px solid var(--border);flex-wrap:wrap">'
              +'<span class="id-chip">'+r.id+'</span><span style="flex:1;min-width:100px">'+info+'</span>'
              +(hasFile?'<span style="color:var(--teal);font-size:11px">📎원본</span>':'')
@@ -2973,8 +3188,8 @@ function runGlobalSearch(){ var q=(document.getElementById('gsInput').value||'')
     }).join('');
 }
 function gsGo(page){ var info=navInfo('page-'+page)||{label:page,grp:''}; closeSearch(); nav_to('page-'+page, info.label, info.grp||''); }
-function downloadFile(id){ const f=getFile(id); if(!f) return; const blob=new Blob([b64ToAb(f.base64)]);
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=f.name||id; a.click(); }
+function downloadFile(id){ const go=function(f){ const blob=new Blob([b64ToAb(f.base64)]); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=f.name||id; a.click(); };
+  const f=getFile(id); if(f){ go(f); } else { getFileAsync(id).then(function(g){ if(g) go(g); else toast('원본 없음'); }); } }
 function attachRec(id,store,page){ const inp=document.createElement('input'); inp.type='file'; inp.accept='.pdf,.jpg,.jpeg,.png,.hwp,.hwpx';
   inp.onchange=async()=>{ const file=inp.files[0]; if(!file) return; await saveAttach(id,file); renderCareer(page); openForm(page,id,true); }; inp.click(); }
 async function saveAttach(id,file){ const buf=await file.arrayBuffer();
@@ -3095,7 +3310,7 @@ function matchByFilename(file,db,page){
     if(page==='award'&&/표창|포상|상장/.test(fname)) score+=10;
     if(page==='wiccok'&&/위촉|협약/.test(fname)) score+=10;
     if((page==='license'||page==='complete')&&/자격|수료|이수/.test(fname)) score+=10;
-    if(getFile(r.id)) score-=100;
+    if(fileExists(r.id)) score-=100;
     if(score>bestScore&&score>=50){ bestScore=score; best={...r,_score:score}; } }
   return best;
 }
@@ -3192,18 +3407,185 @@ function initApiTab(){ const gv=document.getElementById('apiGV'),an=document.get
 }
 
 /* ===== 환경설정: 개인정보·계좌·데이터·백업 ===== */
-const PI_FIELDS=[['name','성명'],['license','자격'],['birth','생년월일'],['phone','전화'],['email','이메일'],['addr','주소'],['org','소속']];
+const PI_FIELDS=[['name','성명'],['license','자격'],['birth','생년월일'],['gender','성별'],['phone','전화'],['email','이메일'],['addr','주소'],['org','소속']];
 function getProfileInfo(){ const o=get('profile_info'); if(o&&!Array.isArray(o)&&Object.keys(o).length) return o;
   return {name:USER_INFO['성명'],license:USER_INFO['자격'],birth:USER_INFO['생년월일'],phone:USER_INFO['전화'],email:USER_INFO['이메일'],addr:USER_INFO['주소'],org:USER_INFO['소속']}; }
 function renderPersonal(){ const g=document.getElementById('piGrid'); if(!g) return; const info=getProfileInfo();
   g.innerHTML=PI_FIELDS.map(([k,l])=>`<div class="field"${k==='addr'?' style="grid-column:1/-1"':''}><label>${l}</label><input id="pi-${k}" value="${String(info[k]||'').replace(/"/g,'&quot;')}"></div>`).join('');
   renderPersonalDocs(); }
 function savePersonalInfo(){ const o={}; PI_FIELDS.forEach(([k])=>o[k]=document.getElementById('pi-'+k).value.trim()); set('profile_info',o); toast('기본정보 저장됨'); }
+/* ===== 사진 보관함 (IDB 저장, gallery 메타) ===== */
+function renderGallery(){ const grid=document.getElementById('galleryGrid'); if(!grid) return;
+  const arr=get('gallery'); const cnt=document.getElementById('galleryCnt'); if(cnt) cnt.textContent=arr.length?arr.length+'장 보관 중':'';
+  if(!arr.length){ grid.innerHTML='<div style="grid-column:1/-1;font-size:12px;color:var(--text-mute)">아직 보관된 사진이 없습니다.</div>'; return; }
+  grid.innerHTML=arr.map(function(p){ return '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff">'
+    +'<div style="aspect-ratio:3/4;background:#f3f4f6;display:flex;align-items:center;justify-content:center;cursor:zoom-in" onclick="showBig(\''+p.id+'\')">'
+    +'<img data-pid="'+p.id+'" alt="" style="width:100%;height:100%;object-fit:cover"></div>'
+    +'<div style="display:flex;align-items:center;gap:4px;padding:5px 6px">'
+    +'<span style="flex:1;min-width:0;font-size:10px;color:var(--text-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(p.name||'')+'">'+escapeHtml(p.name||'사진')+'</span>'
+    +'<button class="btn sm" style="color:var(--red);font-size:11px;padding:2px 6px" onclick="delGalleryPhoto(\''+p.id+'\')">🗑</button></div></div>'; }).join('');
+  arr.forEach(function(p){ fileURLAsync(p.id).then(function(u){ if(!u) return; const img=grid.querySelector('img[data-pid="'+p.id+'"]'); if(img) img.src=u; }); });
+}
+async function addGalleryPhotos(files){
+  const list=Array.from(files||[]).filter(function(f){ return /^image\//.test(f.type); });
+  if(!list.length){ toast('이미지 파일만 업로드할 수 있습니다'); return; }
+  for(const f of list){ const buf=await f.arrayBuffer();
+    const id='PHOTO'+Date.now()+Math.random().toString(36).slice(2,6); const ext=(f.name.split('.').pop()||'').toLowerCase();
+    saveFileUnified(id,{id:id,name:f.name,ext:ext,size:f.size,base64:abToB64(buf),savedAt:new Date().toISOString()});
+    const arr=get('gallery'); arr.unshift({id:id,name:f.name,ext:ext,size:f.size,savedAt:new Date().toISOString()}); set('gallery',arr); }
+  renderGallery(); toast(list.length+'장 업로드됨');
+}
+function delGalleryPhoto(id){ if(!confirm('이 사진을 삭제할까요?')) return; deleteFile(id); set('gallery',get('gallery').filter(function(p){ return p.id!==id; })); renderGallery(); toast('삭제됨'); }
+/* ===== 빠른 이력서 (프로필 클릭채움 → PDF) ===== */
+let _cvFocus=null, _cvPhotoId='';
+function renderQuickCV(){ const sheet=document.getElementById('cvSheet'); if(!sheet) return;
+  const info=get('profile_info')||{}; _cvPhotoId=info.cvPhoto||_cvPhotoId||'';
+  const tpl=(document.getElementById('cvTpl')||{}).value||'resume';
+  function ce(v){ return '<div contenteditable="true" onfocus="_cvFocus=this">'+escapeHtml(v||'')+'</div>'; }
+  function rowOf(r,tag){ return {period:r.date||r.period||r.year||'', org:r.org||r.client||r.title||'', role:'['+tag+'] '+(r.title||r.content||r.titleVal||'')}; }
+  const wic=get('wiccok').map(function(r){ return {period:r.period||r.issueDate||r.year||'',org:r.org||'',role:(r.type||'')+(r.titleVal?' '+r.titleVal:'')}; });
+  const acts=[].concat(get('consult').map(function(r){return rowOf(r,'컨설팅');}),get('case').map(function(r){return rowOf(r,'사건');}),get('lecture').map(function(r){return rowOf(r,'강의');}),get('fund').map(function(r){return rowOf(r,'기금');}),get('etc').map(function(r){return rowOf(r,'기타');}));
+  const edu=get('edu').map(function(r){ return {period:r.period||r.year||'',school:r.school||'',deg:(r.degree||'')+(r.graduated?(' / '+r.graduated):'')}; });
+  const eduRows=(edu.length?edu:[{},{}]).map(function(e){ return '<tr><td>'+ce(e.period)+'</td><td>'+ce(e.school)+'</td><td>'+ce(e.deg)+'</td>'+_cvDelTd()+'</tr>'; }).join('');
+  const career=[].concat(wic,acts); const careerRows=(career.length?career:[{},{},{}]).map(function(a){ return '<tr><td>'+ce(a.period)+'</td><td>'+ce(a.org)+'</td><td>'+ce(a.role)+'</td>'+_cvDelTd()+'</tr>'; }).join('');
+  if(tpl==='cert'){
+    const d=new Date(); const today=d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';
+    sheet.innerHTML='<h2>경 력 증 명 서</h2>'
+      +'<table style="margin-bottom:16px"><tbody>'
+        +'<tr><th>성명</th><td>'+ce(info.name)+'</td><th>생년월일</th><td>'+ce(info.birth)+'</td></tr>'
+        +'<tr><th>주소</th><td colspan="3">'+ce(info.addr)+'</td></tr>'
+        +'<tr><th>자격</th><td>'+ce(info.license)+'</td><th>소속</th><td>'+ce(info.org)+'</td></tr>'
+      +'</tbody></table>'
+      +'<div style="font-weight:700;margin:6px 0 4px">경력사항</div>'
+      +'<table><thead><tr><th style="width:130px">기간</th><th>소속·기관</th><th>직위 / 담당업무</th><th class="cv-noprint"></th></tr></thead><tbody id="cvCareerBody">'+careerRows+'</tbody></table>'+_cvAddBtn('career')
+      +'<div style="text-align:center;margin:28px 0 14px">위와 같이 경력을 증명합니다.</div>'
+      +'<div style="text-align:center;margin-bottom:22px" contenteditable="true" onfocus="_cvFocus=this">'+escapeHtml(today)+'</div>'
+      +'<div style="text-align:right;font-size:15px"><div contenteditable="true" onfocus="_cvFocus=this">'+escapeHtml(info.org||'')+'</div><div style="margin-top:6px">발급책임자　　　　　　(인)</div></div>';
+  } else {
+    sheet.innerHTML='<h2>이 력 서</h2>'
+      +'<div style="display:flex;gap:12px;margin-bottom:14px">'
+        +'<div class="cv-photocell" id="cvPhotoCell" onclick="cvPickPhoto()">사진</div>'
+        +'<table style="flex:1;margin:0"><tbody>'
+          +'<tr><th>성명</th><td>'+ce(info.name)+'</td><th>생년월일</th><td>'+ce(info.birth)+'</td></tr>'
+          +'<tr><th>성별</th><td>'+ce(info.gender)+'</td><th>연락처</th><td>'+ce(info.phone)+'</td></tr>'
+          +'<tr><th>이메일</th><td>'+ce(info.email)+'</td><th>자격</th><td>'+ce(info.license)+'</td></tr>'
+          +'<tr><th>주소</th><td colspan="3">'+ce(info.addr)+'</td></tr>'
+          +'<tr><th>소속</th><td colspan="3">'+ce(info.org)+'</td></tr>'
+        +'</tbody></table></div>'
+      +'<div style="font-weight:700;margin:6px 0 4px">학력사항</div>'
+      +'<table><thead><tr><th style="width:130px">기간</th><th>학교</th><th>전공/학위·졸업</th><th class="cv-noprint"></th></tr></thead><tbody id="cvEduBody">'+eduRows+'</tbody></table>'+_cvAddBtn('edu')
+      +'<div style="font-weight:700;margin:6px 0 4px">경력 및 주요활동</div>'
+      +'<table><thead><tr><th style="width:130px">기간</th><th>기관</th><th>직책/내용</th><th class="cv-noprint"></th></tr></thead><tbody id="cvCareerBody">'+careerRows+'</tbody></table>'+_cvAddBtn('career')
+      +'<div style="font-weight:700;margin:6px 0 4px">기타사항 / 자기소개</div>'
+      +'<div contenteditable="true" onfocus="_cvFocus=this" style="border:1px solid #333;min-height:80px;padding:8px">'+escapeHtml(info.cvNote||'')+'</div>';
+    if(_cvPhotoId) fileURLAsync(_cvPhotoId).then(function(u){ const c=document.getElementById('cvPhotoCell'); if(c&&u) c.innerHTML='<img src="'+u+'">'; });
+  }
+  renderCVPalette(info); renderCvForms();
+}
+function _cvCareerLines(){ const items=[];
+  get('wiccok').forEach(function(r){ items.push((r.org||'')+' '+(r.type||'')+(r.titleVal?' '+r.titleVal:'')+(r.period?' ('+r.period+')':'')); });
+  get('consult').forEach(function(r){ items.push('[컨설팅] '+(r.title||r.org||r.content||'')); });
+  get('case').forEach(function(r){ items.push('[사건] '+(r.title||r.content||'')); });
+  get('lecture').forEach(function(r){ items.push('[강의] '+(r.title||r.org||'')); });
+  return items.filter(function(s){ return s && s.trim() && s.replace(/\[[^\]]*\]/g,'').trim(); }); }
+function _cvPersonalPairs(info){ info=info||get('profile_info')||{}; return [['성명',info.name],['생년월일',info.birth],['성별',info.gender],['연락처',info.phone],['이메일',info.email],['주소',info.addr],['자격',info.license],['소속',info.org]].filter(function(a){ return a[1]; }); }
+function cvCopyAll(kind){ const lines=(kind==='career')?_cvCareerLines():_cvPersonalPairs().map(function(a){return a[0]+': '+a[1];}); if(!lines.length){ toast('복사할 내용이 없습니다'); return; } cvCopyText(lines.join('\n')); }
+function renderCVPalette(info){ const p=document.getElementById('cvPaletteBody'); if(!p) return; info=info||get('profile_info')||{};
+  function chip(label,val){ if(!val) return ''; return '<button type="button" class="cv-chip" draggable="true" data-v="'+escapeHtml(val)+'" ondragstart="cvDragStart(event)" onclick="cvChipClick(this.dataset.v)"><b style="color:#888">'+escapeHtml(label)+'</b><br>'+escapeHtml(val)+'</button>'; }
+  let html='<div style="display:flex;gap:4px;margin-bottom:8px">'
+    +'<button type="button" class="pglimit-btn'+(!_cvCopyMode?' active':'')+'" style="flex:1;padding:4px 2px;font-size:11px" onclick="cvSetCopyMode(false)">📝 이력서에</button>'
+    +'<button type="button" class="pglimit-btn'+(_cvCopyMode?' active':'')+'" style="flex:1;padding:4px 2px;font-size:11px" onclick="cvSetCopyMode(true)">📋 한글용 복사</button></div>'
+    +'<div style="display:flex;gap:4px;margin-bottom:8px">'
+    +'<button type="button" class="btn sm" style="flex:1" onclick="cvCopyAll(\'personal\')">👤 인적사항 전체복사</button>'
+    +'<button type="button" class="btn sm" style="flex:1" onclick="cvCopyAll(\'career\')">📋 경력 전체복사</button></div>'
+    +'<div class="cv-chip-h">'+(_cvCopyMode?'항목을 클릭하면 복사됩니다 → 한글 양식에 붙여넣기(Ctrl+V)':'채울 칸 클릭 후 항목 클릭, 또는 칸으로 끌어다 놓기')+'</div><div class="cv-chip-h">인적사항</div>';
+  _cvPersonalPairs(info).forEach(function(a){ html+=chip(a[0],a[1]); });
+  const real=_cvCareerLines();
+  if(real.length){ html+='<div class="cv-chip-h">경력·활동 ('+real.length+')</div>'; real.slice(0,40).forEach(function(v){ html+=chip('항목',v); }); }
+  p.innerHTML=html;
+}
+function cvInsert(text){ const t=_cvFocus; if(!t){ toast('먼저 채울 칸을 클릭하세요'); return; }
+  const cur=(t.textContent||'').trim(); t.textContent=cur?cur+' '+text:text; }
+var _cvCopyMode=false;
+function cvSetCopyMode(on){ _cvCopyMode=!!on; renderCVPalette(); }
+function cvChipClick(text){ if(_cvCopyMode) cvCopyText(text); else cvInsert(text); }
+function cvCopyText(text){ const done=function(){ toast('복사됨: '+(text.length>20?text.slice(0,20)+'…':text)+' — 한글에 붙여넣기(Ctrl+V)'); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done).catch(function(){ _cvCopyFallback(text,done); }); }
+  else _cvCopyFallback(text,done); }
+function _cvCopyFallback(text,cb){ try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb&&cb(); }catch(e){ toast('복사 실패 — 항목을 길게 눌러 복사해 주세요'); } }
+function _cvDelTd(){ return '<td class="cv-noprint"><button type="button" class="cv-rowdel" onclick="cvDelRow(this)">✕</button></td>'; }
+function _cvAddBtn(which){ return '<div class="cv-noprint" style="margin:-10px 0 14px"><button type="button" class="btn sm" onclick="cvAddRow(\''+which+'\')">+ 행 추가</button></div>'; }
+function _cvBlankRow(cols){ let h='<tr>'; for(let i=0;i<cols;i++) h+='<td><div contenteditable="true" onfocus="_cvFocus=this"></div></td>'; return h+_cvDelTd()+'</tr>'; }
+function cvDelRow(btn){ const tr=btn.closest('tr'); if(tr) tr.remove(); }
+function cvAddRow(which){ const tb=document.getElementById(which==='edu'?'cvEduBody':'cvCareerBody'); if(!tb) return; tb.insertAdjacentHTML('beforeend',_cvBlankRow(3)); }
+function cvClearAll(){ if(!confirm('이력서의 모든 입력 칸을 비웁니다.\n(저장된 프로필·경력 데이터는 그대로 유지) 계속할까요?')) return;
+  const sheet=document.getElementById('cvSheet'); if(!sheet) return; sheet.querySelectorAll('[contenteditable]').forEach(function(c){ c.textContent=''; }); toast('모두 비웠습니다 — ↻ 자동채움으로 다시 채울 수 있습니다'); }
+function cvDragStart(e){ try{ e.dataTransfer.setData('text/plain', e.currentTarget.dataset.v||''); e.dataTransfer.effectAllowed='copy'; }catch(_){} }
+function cvDrop(e){ e.preventDefault(); const text=(e.dataTransfer&&e.dataTransfer.getData('text/plain'))||''; if(!text) return;
+  let cell=e.target; while(cell && cell!==e.currentTarget && !(cell.getAttribute&&cell.getAttribute('contenteditable')==='true')) cell=cell.parentNode;
+  if(cell && cell.getAttribute && cell.getAttribute('contenteditable')==='true'){ const cur=(cell.textContent||'').trim(); cell.textContent=cur?cur+' '+text:text; }
+  else toast('이력서 칸 위에 놓아주세요'); }
+function cvTogglePalette(){ const p=document.getElementById('cvPalettePop'); if(!p) return; const show=(p.style.display==='none'||!p.style.display); p.style.display=show?'flex':'none'; if(show){ renderCVPalette(); _makeDrag('cvPopHead','cvPalettePop'); } }
+function _makeDrag(handleId,popId){ const h=document.getElementById(handleId),pop=document.getElementById(popId); if(!h||!pop||h._dragInit) return; h._dragInit=true;
+  let sx,sy,ox,oy,drag=false;
+  const down=function(e){ if(e.target.tagName==='BUTTON') return; drag=true; const q=e.touches?e.touches[0]:e; sx=q.clientX; sy=q.clientY; const r=pop.getBoundingClientRect(); ox=r.left; oy=r.top; pop.style.right='auto'; pop.style.bottom='auto'; pop.style.left=ox+'px'; pop.style.top=oy+'px'; e.preventDefault(); };
+  const move=function(e){ if(!drag) return; const q=e.touches?e.touches[0]:e; pop.style.left=(ox+q.clientX-sx)+'px'; pop.style.top=(oy+q.clientY-sy)+'px'; };
+  const up=function(){ drag=false; };
+  h.addEventListener('mousedown',down); document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
+  h.addEventListener('touchstart',down,{passive:false}); document.addEventListener('touchmove',move,{passive:false}); document.addEventListener('touchend',up); }
+function cvAutoFill(){ renderQuickCV(); toast('프로필 기준으로 다시 채웠습니다'); }
+function cvPickPhoto(){ const arr=get('gallery');
+  if(!arr.length){ toast('사진 보관함이 비어있습니다 — 환경설정 › 개인정보보관에서 업로드'); return; }
+  if(arr.length===1){ cvSetPhoto(arr[0].id); toast('보관함 사진을 자동으로 불러왔습니다'); return; }
+  const box=document.getElementById('cvPhotoPicker'); if(!box) return;
+  box.style.display='flex';
+  box.innerHTML='<div class="cv-pp-inner"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>사진 선택</b><button class="btn sm" onclick="document.getElementById(\'cvPhotoPicker\').style.display=\'none\'">닫기</button></div><div class="cv-pp-grid" id="cvPpGrid"></div></div>';
+  const grid=document.getElementById('cvPpGrid');
+  grid.innerHTML=arr.map(function(p){ return '<img data-pid="'+p.id+'" style="width:90px;height:120px;object-fit:cover;border:1px solid var(--border);border-radius:6px;cursor:pointer" onclick="cvSetPhoto(\''+p.id+'\')">'; }).join('');
+  arr.forEach(function(p){ fileURLAsync(p.id).then(function(u){ if(!u) return; const img=grid.querySelector('img[data-pid="'+p.id+'"]'); if(img) img.src=u; }); });
+}
+function cvSetPhoto(id){ _cvPhotoId=id; const info=get('profile_info')||{}; info.cvPhoto=id; set('profile_info',info);
+  fileURLAsync(id).then(function(u){ const c=document.getElementById('cvPhotoCell'); if(c&&u) c.innerHTML='<img src="'+u+'">'; });
+  const box=document.getElementById('cvPhotoPicker'); if(box) box.style.display='none'; }
+function printCV(){ const sheet=document.getElementById('cvSheet'); const tpl=(document.getElementById('cvTpl')||{}).value||'resume';
+  if(sheet&&tpl==='resume'){ const note=sheet.querySelector('div[contenteditable][style*="min-height:80px"]'); if(note){ const info=get('profile_info')||{}; info.cvNote=(note.textContent||'').trim(); set('profile_info',info); } }
+  window.print(); }
+async function _ensureJSZip(){ if(window.JSZip) return; await new Promise(function(res,rej){ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+function _cvCollectLines(sheet){ const lines=[]; const h=sheet.querySelector('h2'); lines.push(h?h.textContent.trim():'이력서');
+  sheet.querySelectorAll('table').forEach(function(tb){ tb.querySelectorAll('tr').forEach(function(tr){ const c=Array.from(tr.querySelectorAll('th,td')).map(function(x){return (x.textContent||'').trim();}).filter(Boolean); if(c.length) lines.push(c.join('  ')); }); });
+  sheet.querySelectorAll(':scope > div[contenteditable]').forEach(function(d){ const t=(d.textContent||'').trim(); if(t) lines.push(t); });
+  return lines; }
+function _cvHwpxXml(lines){ const esc=function(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<hword:HWPML xmlns:hword="urn:schemas-microsoft-com:office:hwp" version="5.0.3.0">\n<hp:BODY xmlns:hp="urn:schemas-microsoft-com:office:hwp">\n<hp:SECTION>\n'+lines.map(function(t){return '<hp:p><hp:run><hp:t>'+esc(t)+'</hp:t></hp:run></hp:p>';}).join('\n')+'\n</hp:SECTION>\n</hp:BODY>\n</hword:HWPML>'; }
+async function _cvHwpxZip(outType){ const sheet=document.getElementById('cvSheet'); if(!sheet) return null;
+  try{ await _ensureJSZip(); }catch(e){ toast('HWPX 모듈 로드 실패 (인터넷 필요)'); return null; }
+  const zip=new JSZip(); zip.file('Contents/section0.xml',_cvHwpxXml(_cvCollectLines(sheet)));
+  zip.file('META-INF/container.xml','<?xml version="1.0"?><container><rootfiles><rootfile full-path="Contents/content.hpf"/></rootfiles></container>');
+  return await zip.generateAsync({type:outType,mimeType:'application/hwp+zip'}); }
+async function cvExportHwpx(){ const blob=await _cvHwpxZip('blob'); if(!blob) return;
+  const tpl=(document.getElementById('cvTpl')||{}).value||'resume';
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(tpl==='cert'?'경력증명서':'이력서')+'_'+((get('profile_info')||{}).name||'')+'.hwpx'; a.click();
+  toast('HWPX 저장됨 — 한글에서 열어 레이아웃을 정리하세요(텍스트 기준)'); }
+async function cvSendToEditor(){ const buf=await _cvHwpxZip('arraybuffer'); if(!buf) return;
+  nav_to('page-resume-hub','이력서 생성·보관','이력서관리');
+  const editBtn=document.querySelector('#rh-tabrow .tab[data-tab="rh-edit"]'); if(typeof rhTab==='function') rhTab('rh-edit', editBtn);
+  try{ if(typeof mountEditor!=='function') throw new Error('editor unavailable'); await mountEditor(buf,'빠른이력서.hwpx'); toast('한글편집기로 보냈습니다 — 표 서식은 한글에서 정리하세요'); }
+  catch(e){ console.warn('send to editor',e); const blob=new Blob([buf],{type:'application/hwp+zip'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='빠른이력서.hwpx'; a.click(); toast('편집기 적재 실패 — HWPX 파일로 내려받았습니다'); } }
+function renderCvForms(){ const box=document.getElementById('cvForms'); if(!box) return; const arr=get('cvforms');
+  let html='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px dashed var(--border);border-radius:8px;padding:8px"><b style="font-size:12px">📁 기관 제출 양식 보관</b><button class="btn sm" onclick="cvAddForm()">📎 양식 업로드</button>';
+  arr.forEach(function(f){ html+='<span style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:3px 6px">'+escapeHtml(f.name||'양식')+' <a href="#" onclick="downloadFile(\''+f.id+'\');return false">⬇</a> <a href="#" onclick="cvDelForm(\''+f.id+'\');return false" style="color:var(--red)">✕</a></span>'; });
+  if(!arr.length) html+='<span style="font-size:11px;color:var(--text-mute)">기관 양식(HWPX·PDF)을 올려두면 여기서 내려받아 한글로 마무리</span>';
+  html+='</div>'; box.innerHTML=html; }
+async function cvAddForm(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='.hwp,.hwpx,.pdf,.doc,.docx,.jpg,.jpeg,.png';
+  inp.onchange=async function(){ const f=inp.files[0]; if(!f) return; const buf=await f.arrayBuffer(); const id='CVFORM'+Date.now()+Math.random().toString(36).slice(2,6); const ext=(f.name.split('.').pop()||'').toLowerCase();
+    saveFileUnified(id,{id:id,name:f.name,ext:ext,size:f.size,base64:abToB64(buf),savedAt:new Date().toISOString()});
+    const arr=get('cvforms'); arr.unshift({id:id,name:f.name,ext:ext}); set('cvforms',arr); renderCvForms(); toast('기관 양식 보관됨'); }; inp.click(); }
+function cvDelForm(id){ if(!confirm('이 양식을 삭제할까요?')) return; deleteFile(id); set('cvforms',get('cvforms').filter(function(f){return f.id!==id;})); renderCvForms(); }
 function renderPersonalDocs(){ const box=document.getElementById('piDocs'); if(!box) return;
   const arr=get('personal'); const cnt=document.getElementById('piCnt'); if(cnt) cnt.textContent=arr.length+'건';
   if(!arr.length){ box.innerHTML='<div class="empty"><div class="emp-ico">📭</div>신분증·사진 없음<br><span style="font-size:12px">OCR 드롭존에 파일을 끌어놓거나 + 직접 추가</span></div>'; return; }
   box.innerHTML='<table><thead><tr><th class="rownum-h">№</th><th>종류</th><th>내용/명칭</th><th>번호</th><th>메모</th><th>관리</th></tr></thead><tbody>'
-    +arr.map((d,i)=>{ const has=!!getFile(d.id); const eid=d.id;
+    +arr.map((d,i)=>{ const has=fileExists(d.id); const eid=d.id;
       return '<tr style="cursor:pointer" onclick="openForm(\'personal_doc\',\''+eid+'\')" ondragover="event.preventDefault();this.style.boxShadow=\'inset 0 0 0 2px var(--teal)\'" ondragleave="this.style.boxShadow=\'\'" ondrop="event.preventDefault();this.style.boxShadow=\'\';const f=event.dataTransfer.files[0];if(f)dropPersonalDoc(\''+eid+'\',f)">'
       +'<td class="rownum">'+(i+1)+'</td><td>'+escapeHtml(d.kind||'기타')+'</td><td><b>'+escapeHtml(d.name||'-')+'</b></td>'
       +'<td style="font-size:11px;color:var(--text-mute)">'+escapeHtml(d.number||'-')+'</td><td style="font-size:11px;color:var(--text-mute)">'+escapeHtml(d.memo||'')+'</td>'
@@ -3227,7 +3609,7 @@ function renderAccounts(){ const box=document.getElementById('acList'); if(!box)
   const arr=get('account'); const cnt=document.getElementById('acCnt'); if(cnt) cnt.textContent=arr.length+'건';
   if(!arr.length){ box.innerHTML='<div class="empty"><div class="emp-ico">🏦</div>등록된 계좌 없음<br><span style="font-size:12px">OCR 드롭존에 통장사본을 끌어놓거나 + 계좌 추가</span></div>'; return; }
   box.innerHTML='<table><thead><tr><th class="rownum-h">№</th><th>은행</th><th>계좌번호</th><th>예금주</th><th>메모</th><th>관리</th></tr></thead><tbody>'
-    +arr.map((a,i)=>{ const aid=a.id; const has=!!getFile(aid);
+    +arr.map((a,i)=>{ const aid=a.id; const has=fileExists(aid);
       return '<tr style="cursor:pointer" onclick="openForm(\'account\',\''+aid+'\')" ondragover="event.preventDefault();this.style.boxShadow=\'inset 0 0 0 2px var(--teal)\'" ondragleave="this.style.boxShadow=\'\'" ondrop="event.preventDefault();this.style.boxShadow=\'\';const f=event.dataTransfer.files[0];if(f)dropAccountDoc(\''+aid+'\',f)">'
       +'<td class="rownum">'+(i+1)+'</td><td><b>'+escapeHtml(a.bank||'-')+'</b></td><td>'+escapeHtml(a.number||'-')+'</td>'
       +'<td>'+escapeHtml(a.holder||'-')+'</td><td style="font-size:11px;color:var(--text-mute)">'+escapeHtml(a.memo||'')+'</td>'
@@ -3236,7 +3618,7 @@ function renderAccounts(){ const box=document.getElementById('acList'); if(!box)
         :'<button class="btn sm" onclick="attachAccountDoc(\''+aid+'\')">📎 첨부</button>')
       +'<button class="btn sm" onclick="delAccount(\''+aid+'\')" style="color:#fff;background:var(--red);border-color:var(--red)">🗑 삭제</button>'
       +'</span></td></tr>'; }).join('')+'</tbody></table>';
-  box.querySelectorAll('tbody tr').forEach(function(tr){ const onc=tr.getAttribute('onclick')||''; const id=onc.match(/openForm\('account','([^']+)'/); if(id&&getFile(id[1])){ tr.addEventListener('mouseenter',function(){showSidePreview(id[1]);}); tr.addEventListener('mouseleave',hideSidePreview); } });
+  box.querySelectorAll('tbody tr').forEach(function(tr){ const onc=tr.getAttribute('onclick')||''; const m=onc.match(/openForm\('account','([^']+)'/); if(m){ tr.removeAttribute('onclick'); tr.style.cursor='pointer'; tr.addEventListener('click',function(e){ if(e.target.closest('button,a,input,select,textarea,.btn')) return; openEditDrawer('account', m[1]); }); } });
 }
 async function dropAccountDoc(id,file){ await saveAttach(id,file); renderAccounts(); toast('원본 첨부됨'); }
 function delAccountFile(id){ if(!confirm('첨부 원본만 삭제합니다. 계좌 정보는 유지됩니다.')) return; deleteFile(id); renderAccounts(); toast('원본 삭제됨'); }
@@ -3304,7 +3686,7 @@ function renderIDDocs(){
   const arr=get('id_docs'); const cnt=document.getElementById('idCnt'); if(cnt) cnt.textContent=arr.length+'건';
   if(!arr.length){ box.innerHTML='<div class="empty"><div class="emp-ico">🪪</div>신분증 없음<br><span style="font-size:12px">OCR 드롭존에 파일을 끌어놓거나 + 직접 추가</span></div>'; return; }
   box.innerHTML='<table><thead><tr><th class="rownum-h">№</th><th>종류</th><th>명칭</th><th>번호</th><th>만료일</th><th>관리</th></tr></thead><tbody>'
-    +arr.map((d,i)=>{ const has=!!getFile(d.id); const m=idMaskOn(); const dispNum=m?maskNum(d.number):d.number;
+    +arr.map((d,i)=>{ const has=fileExists(d.id); const m=idMaskOn(); const dispNum=m?maskNum(d.number):d.number;
       return '<tr style="cursor:pointer" onclick="openIDDoc(\''+d.id+'\')" ondragover="event.preventDefault();this.style.boxShadow=\'inset 0 0 0 2px var(--teal)\'" ondragleave="this.style.boxShadow=\'\'" ondrop="event.preventDefault();this.style.boxShadow=\'\';dropIDDoc(\''+d.id+'\',event.dataTransfer.files[0])">'
         +'<td class="rownum">'+(i+1)+'</td><td>'+escapeHtml(d.kind||'기타')+'</td><td><b>'+escapeHtml(d.name||'-')+'</b></td>'
         +'<td style="font-size:11px;'+(m?'color:var(--text-mute)':'')+'">'+escapeHtml(dispNum||'-')+'</td>'
@@ -3401,12 +3783,19 @@ function initSettings(){
   const acFile=document.getElementById('acFileInput'); if(acFile){ acFile.onchange=async()=>{ await ocrDrop(acFile.files,'account'); renderAccounts(); acFile.value=''; }; }
   const acZone=document.querySelector('#tab-account .ocr-zone'); if(acZone){ acZone.onclick=()=>{ const inp=document.getElementById('acFileInput'); if(inp) inp.click(); }; acZone.ondragover=e=>{ e.preventDefault(); acZone.classList.add('drag'); }; acZone.ondragleave=()=>acZone.classList.remove('drag'); acZone.ondrop=async e=>{ e.preventDefault(); acZone.classList.remove('drag'); await ocrDrop(e.dataTransfer.files,'account'); renderAccounts(); }; }
   const dt=document.getElementById('dtReseed'); if(dt) dt.onclick=reseed;
+  // 사진 보관함
+  const gIn=document.getElementById('galleryInput'); const gDrop=document.getElementById('galleryDrop');
+  if(gIn) gIn.onchange=()=>{ addGalleryPhotos(gIn.files); gIn.value=''; };
+  if(gDrop){ gDrop.onclick=()=>{ if(gIn) gIn.click(); };
+    gDrop.ondragover=e=>{ e.preventDefault(); gDrop.classList.add('drag'); };
+    gDrop.ondragleave=()=>gDrop.classList.remove('drag');
+    gDrop.ondrop=e=>{ e.preventDefault(); gDrop.classList.remove('drag'); if(e.dataTransfer.files) addGalleryPhotos(e.dataTransfer.files); }; }
   const bx=document.getElementById('bkExport'); if(bx) bx.onclick=backupExport;
   const bi=document.getElementById('bkImport'); if(bi) bi.onclick=backupImport;
   // 메뉴 관리
   const nmAG=document.getElementById('nmAddGrp'); if(nmAG) nmAG.onclick=addCustomGrp;
   const nmAI=document.getElementById('nmAddItem'); if(nmAI) nmAI.onclick=addCustomItem;
-  renderMenuManager(); renderPersonal(); renderAccounts(); _safe(initIDSecurity);
+  renderMenuManager(); renderPersonal(); renderAccounts(); renderGallery(); _safe(initIDSecurity);
 }
 
 /* ===== 부트 ===== */
@@ -3453,6 +3842,7 @@ _safe(()=>{ document.getElementById('brand').onclick=()=>{ nav_to('page-home','�
   const sp=document.getElementById('sidePreview'); if(sp){ sp.addEventListener('mouseenter',keepSidePreview); sp.addEventListener('mouseleave',hideSidePreview); } });
 _safe(()=>nav_to('page-home','홈',null)); _safe(renderHome); _safe(checkFilename); _safe(checkBackupReminder); _safe(checkStorageQuota);
 _safe(()=>setTimeout(migrateFilesToIDB,1500)); /* localStorage → IDB 자동 이전 */
+_safe(loadFileIndex); /* IDB 파일 인덱스 로드 → 보기/첨부 버튼 정확화 */
 _safe(()=>setTimeout(()=>{ initNavDrag(); initTabScroll(); initSideResize(); },150));
 </script>
 </body>
