@@ -1913,6 +1913,7 @@ function dbGet(k, def){
   try {
     var v = localStorage.getItem(KEY+k);
     var parsed = v ? JSON.parse(v) : def;
+    if(parsed == null) parsed = def;
     _dbCache[k] = parsed;
     return parsed;
   } catch(e){ return def; }
@@ -47100,9 +47101,10 @@ function PayrollLedger(props){
 
   function persist(arr){ setRecs(arr); dbSet('payroll_monthly', arr); }
   function getRec(sid){
-    var rec = recs.find(function(r){return r.empSid===sid && r.ym===props.selYM;});
+    var _recs = recs || []; var _users = users || [];
+    var rec = _recs.find(function(r){return r.empSid===sid && r.ym===props.selYM;});
     if(rec) return rec;
-    var u = users.find(function(x){return x.sid===sid;});
+    var u = _users.find(function(x){return x.sid===sid;});
     return {
       id:'pay-'+sid+'-'+props.selYM, empSid:sid, empName:u?u.name:sid,
       deptName:(u&&u.branch)||'', position:(u&&u.title)||'',
