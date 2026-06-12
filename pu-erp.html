@@ -21977,6 +21977,16 @@ function BackupSection(){
   }, []);
   async function restoreFromServer(entry){
     try {
+      // ⚠️ 되돌리기 경고: '백업'이 아니라 과거 시점으로 데이터를 교체하는 동작임을 명확히
+      var warn = '⚠️ 과거 시점으로 되돌리기\n\n'
+        + '선택한 백업: ' + entry.label + '\n\n'
+        + '이 작업은 백업 저장이 아니라, 현재 모든 데이터를 위 시점의 데이터로 교체(덮어쓰기)합니다.\n'
+        + '그 이후에 입력·수정한 내용은 사라집니다.\n\n'
+        + '진행 전에 현재 상태를 수시 백업으로 자동 저장해 두므로, 잘못 눌렀다면 방금 저장된 백업으로 다시 돌아올 수 있습니다.\n\n'
+        + '정말 ' + entry.label + ' 시점으로 되돌리시겠습니까?';
+      if(!(await popConfirm(warn))) return;
+      // 복원 직전 현재 상태 자동 저장 (실수 시 원클릭 복귀용)
+      try { localStorage.removeItem('pureun_v6_recent_sig'); serverBackupRecent(); } catch(_e){}
       var s = await fbDb.ref(entry.path + '/' + entry.fbKey).once('value');
       var snap = (s && s.val()) || {};
       await applyBackupData(snap.data || {}, (entry.kind === 'daily' ? '서버백업 ' : '수시백업 ') + entry.label);
@@ -22059,7 +22069,7 @@ function BackupSection(){
                     h('div', { style:{ fontSize:'10.5px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, it.summary || '-')
                   ),
                   h('button', { onClick:function(){ restoreFromServer(it); },
-                    style:{ background:'#0f766e', color:'#fff', padding:'6px 12px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '이 백업으로 복원')
+                    style:{ background:'#0f766e', color:'#fff', padding:'6px 12px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '⏪ 이 시점으로 되돌리기')
                 );
               })
             ))
