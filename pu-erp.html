@@ -30860,6 +30860,7 @@ function PersonalCalendar(props){
   var ATT_ICON = { 'leave':'🌴','halfday-am':'🌓','halfday-pm':'🌗','leave-hour':'⏱️','special-leave':'🎉','sick':'🤒','telework':'🏠','trip':'✈️','maternity':'👶','parental-leave':'👶','eum-work':'🏛️' };
   myAttendance.forEach(function(r){
     var lbl = ATT_LABEL[r.type]; if(!lbl) return;
+    if(r.type === 'eum-work' && r.externalId) return; // 외부인(변호사 등) 이음센터 배정은 개인 캘린더에 표시 안 함 (로스터 화면에만 표시)
     addEv(r.date, { type:'leave', title:(ATT_ICON[r.type]||'🌴')+' '+lbl, color:ATT_COLOR[r.type]||'#16a34a', evId:r.id, attType:r.type, draggable:true });
   });
   // 사건/컨설팅/출퇴근은 내 캘린더에 표시 안 함 - 직접 추가한 일정만
