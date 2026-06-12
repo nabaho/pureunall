@@ -10509,16 +10509,13 @@ function CompanyManagement(){
               '📁 ' + subofficeCount)
           ),
           // 유형 칩 (활성 탭에서만)
-          statusTab !== 'suboffice' && COMPANY_TYPE_FILTERS.filter(function(tf){ return tf.v !== 'all'; }).map(function(tf0){
-            var on = typeFilter === tf0.v;
-            return h('button', { key:tf0.v, onClick:function(){ setTypeFilter(on ? 'all' : tf0.v); },
-              style:{ padding:'5px 10px', borderRadius:'20px', cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
-                border:'1px solid '+(on?tf0.color:'#cbd5e1'),
-                background: on ? tf0.color : '#f8fafc',
-                color: on ? '#fff' : '#475569',
-                fontSize:'11px', fontWeight: on ? 700 : 500 } },
-              tf0.icon + ' ' + tf0.label + ' ' + typeCount(tf0.v));
-          }),
+          statusTab !== 'suboffice' && h('div', { style:{ display:'inline-flex', alignItems:'center', gap:'5px', flexShrink:0 } },
+            h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
+              style:{ padding:'5px 8px', border:'1px solid '+(typeFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'20px', fontSize:'11px', fontFamily:'inherit', background:'#f8fafc',
+                color: typeFilter!=='all'?'#1e40af':'#475569', fontWeight: typeFilter!=='all'?700:400, cursor:'pointer', flexShrink:0 } },
+              COMPANY_TYPE_FILTERS.map(function(tf0){ return h('option', { key:tf0.v, value:tf0.v }, tf0.icon + ' ' + tf0.label); })),
+            h('span', { style:{ fontSize:'11px', color:'#475569', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } }, typeCount(typeFilter) + '건')
+          ),
           // 담당자
           h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
             style:{ padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'20px', fontSize:'11px',
@@ -10553,18 +10550,13 @@ function CompanyManagement(){
         '⏸ 계약 중단 (' + companies.filter(function(c){return !!c.suspended;}).length + ')'),
       // (종료 탭 제거: 종료 업체는 종료관리에서 조회)
       h('div', { style:{ width:'1px', height:'24px', background:'#e2e8f0', margin:'0 4px' } }),
-      statusTab !== 'suboffice' && COMPANY_TYPE_FILTERS.filter(function(tf){ return tf.v !== 'all'; }).map(function(tf0){
-        var on = typeFilter === tf0.v;
-        var cnt = typeCount(tf0.v);
-        return h('button', { key:tf0.v, onClick:function(){ setTypeFilter(on ? 'all' : tf0.v); },
-          title: on ? '다시 클릭하면 전체 활성으로 복귀' : '',
-          style:{ padding:'5px 11px', borderRadius:'4px', cursor:'pointer',
-            border:'1px solid '+(on?tf0.color:'#cbd5e1'),
-            background: on ? tf0.color : '#fff',
-            color: on ? '#fff' : '#475569',
-            fontSize:'11.5px', fontWeight: on ? 700 : 500 } },
-          tf0.icon + ' ' + tf0.label + ' (' + cnt + ')');
-      }),
+      statusTab !== 'suboffice' && h('div', { style:{ display:'inline-flex', alignItems:'center', gap:'6px' } },
+        h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
+          style:{ padding:'5px 10px', border:'1px solid '+(typeFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'4px', fontSize:'11.5px', fontFamily:'inherit',
+            color: typeFilter!=='all'?'#1e40af':'#475569', fontWeight: typeFilter!=='all'?700:400, cursor:'pointer' } },
+          COMPANY_TYPE_FILTERS.map(function(tf0){ return h('option', { key:tf0.v, value:tf0.v }, tf0.icon + ' ' + tf0.label); })),
+        h('span', { style:{ fontSize:'11.5px', color:'#475569', fontWeight:700, whiteSpace:'nowrap' } }, typeCount(typeFilter) + '건')
+      ),
       h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
         style:{ padding:'5px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'inherit' } },
         h('option', { value:'all' }, '담당자 전체'),
