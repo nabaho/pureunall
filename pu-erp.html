@@ -4554,7 +4554,7 @@ function Header(props){
   var clS = useState(false); var showConsultLog = clS[0]; var setShowConsultLog = clS[1];
 
   return h('header', { className:'hd' },
-    h('button', { className:'hd-burger', onClick:onBurger, title:'사이드바 토글' }, '☰'),
+    h('button', { className:'hd-burger erp-tip', onClick:onBurger, 'data-tip':'메뉴 접기/펼치기 — 접으면 화면을 넓게 쓸 수 있어요' }, '☰'),
     props.onBack && h('button', {
       onClick: props.onBack, title:'이전 메뉴로 돌아가기',
       style:{ background:'rgba(255,255,255,0.12)', border:'1px solid rgba(255,255,255,0.25)', color:'#fff', padding:'5px 12px', borderRadius:'5px', fontSize:'13px', fontWeight:600, cursor:'pointer', marginRight:'8px' }
