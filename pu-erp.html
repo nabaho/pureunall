@@ -21566,6 +21566,13 @@ function AdminResetSection(){
       '업무 데이터(계약·사건·재무 등)는 유지됩니다.\n\n계속하시겠습니까?'
     );
     if(!ok) return;
+    // 🔒 2차 잠금: 확인 문구를 정확히 타이핑해야만 실행 (실수 클릭 방지)
+    var typed = window.prompt('되돌릴 수 없는 작업입니다.\n\n실행하려면 아래 문구를 정확히 입력하세요:\n\n계정초기화');
+    if(typed === null) return;
+    if(String(typed).trim() !== '계정초기화'){
+      showToast('문구가 일치하지 않아 취소되었습니다');
+      return;
+    }
     setLoading(true); setMsg('');
     try{
       localStorage.removeItem('pureun_v6_user_accounts');
