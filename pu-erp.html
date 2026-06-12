@@ -12161,7 +12161,21 @@ function CaseManagement(props){
   var sb = useState({ key:'', dir:'asc' }); var sortBy = sb[0]; var setSortBy = sb[1];
   var ctx = useState(null); var ctxMenu = ctx[0]; var setCtxMenu = ctx[1];   // 우클릭 메뉴
   var dp = useState(null); var dropPreview = dp[0]; var setDropPreview = dp[1];   // 외부→ERP 드롭 미리보기
-  var tr = useState(false); var trashOpen = tr[0]; var setTrashOpen = tr[1];   // #D 휴지통 모달
+  var tr = useState(false); var trashOpen = tr[0]; var setTrashOpen = tr[1];   // #D 휴지통 모달 (버튼 제거됨 — 렌더 코드는 유지)
+  var gmS = useState(false); var gapModal = gmS[0]; var setGapModal = gmS[1];   // 결번 검사 모달
+  var caseCvKey = 'pureun_v6_cols_cases';
+  var caseDefaultCols = {opponent:true, mgrMain:true, mgrSubs:true, jurOrg:true, jurOfficer:true, jurPhone:true, jurEmail:true, receiveDate:true, dueDate:true, retainerFee:true, successFee:true, status:true, note:true};
+  var savedCaseCols = (function(){ try{ var sc=localStorage.getItem(caseCvKey); return sc?JSON.parse(sc):caseDefaultCols; }catch(e){ return caseDefaultCols; } })();
+  var cvvS = useState(Object.assign({}, caseDefaultCols, savedCaseCols)); var colVis = cvvS[0]; var setColVis = cvvS[1];
+  var cssS = useState(false); var colSettings = cssS[0]; var setColSettings = cssS[1];
+  function toggleCol(k){
+    var next = Object.assign({}, colVis, {[k]: !colVis[k]});
+    setColVis(next);
+    try{ localStorage.setItem(caseCvKey, JSON.stringify(next)); }catch(e){ window._erpErrLog && window._erpErrLog(e); }
+  }
+  var _cvBeforeFee = ['opponent','mgrMain','mgrSubs','jurOrg','jurOfficer','jurPhone','jurEmail','receiveDate','dueDate'];
+  var visBeforeFee = 4 + _cvBeforeFee.filter(function(k){return colVis[k];}).length; // 전체 표시 시 13 (원본 colSpan과 동일)
+  var visColCount = visBeforeFee + ['retainerFee','successFee','status','note'].filter(function(k){return colVis[k];}).length + 1;
   var cl = useState(null); var closeModal = cl[0]; var setCloseModal = cl[1];   // 종료 처리 모달 (#B안: 결과+성공보수처리+메모)
   // 통합 검색 포커스
   var initFocus = useGlobalSearchFocus();
@@ -12246,7 +12260,62 @@ function CaseManagement(props){
     setCases(dbGet('cases', []) || []);  // 화면 갱신
     showToast('휴지통으로 이동됨');
   }
-  function reseed(){ persist([]); showToast('초기화'); }
+  // 결번 검사 (사건번호 시리즈) — 종료 건 번호는 사용 중으로 간주, 변경 금지
+  function detectCaseGaps(){
+    var bySeries = {};
+    cases.forEach(function(c){
+      var m = (c.caseNo||'').match(/^(.+)-(\d+)$/);
+      if(!m) return;
+      var series = m[1]; var num = parseInt(m[2],10);
+      if(!bySeries[series]) bySeries[series] = [];
+      bySeries[series].push({ num:num, item:c, closed:c.status==='closed' });
+    });
+    var result = [];
+    Object.keys(bySeries).sort().forEach(function(series){
+      var arr = bySeries[series].sort(function(a,b){return a.num-b.num;});
+      var maxN = arr[arr.length-1].num;
+      var existNums = arr.map(function(x){return x.num;});
+      var missing = [];
+      for(var i=1;i<=maxN;i++){ if(existNums.indexOf(i)===-1) missing.push(i); }
+      result.push({ series:series, max:maxN, items:arr, missing:missing });
+    });
+    return result;
+  }
+  async function moveCaseToNumber(caseId, targetNum){
+    var target = cases.find(function(x){return x.id===caseId;});
+    if(!target){ showToast('항목을 찾을 수 없음'); return; }
+    var oldNo = target.caseNo;
+    var m = oldNo.match(/^(.+)-(\d+)$/);
+    if(!m){ showToast('번호 패턴이 아님'); return; }
+    var newNo = m[1] + '-' + String(targetNum).padStart(3,'0');
+    if(!(await popConfirm('번호 변경:\n\n' + oldNo + ' → ' + newNo + '\n\n기존 번호('+oldNo+') 자리는 결번이 됩니다.\n진행하시겠습니까?'))) return;
+    persist(cases.map(function(x){ return x.id===caseId ? Object.assign({},x,{caseNo:newNo}) : x; }));
+    showToast('✓ '+oldNo+' → '+newNo+' 변경됨');
+  }
+  async function reseqCaseSeries(series, seriesItems){
+    var sorted = seriesItems.slice().sort(function(a,b){return a.num - b.num;});
+    var fixedNums = {}; sorted.forEach(function(x){ if(x.closed) fixedNums[x.num] = true; });
+    var actives = sorted.filter(function(x){ return !x.closed; });
+    var changes = [];
+    var nextNum = 1;
+    actives.forEach(function(x){
+      while(fixedNums[nextNum]) nextNum++;
+      if(x.num !== nextNum) changes.push({ id:x.item.id, oldNo:x.item.caseNo, newNo:series+'-'+String(nextNum).padStart(3,'0'), companyName:x.item.companyName });
+      nextNum++;
+    });
+    if(changes.length === 0){ showToast('이미 연번 상태 (종결 건 번호는 유지)'); return; }
+    var fixedCnt = Object.keys(fixedNums).length;
+    var msg = '⚠️ '+series+' 시리즈 연번 재정렬\n\n총 '+changes.length+'건 변경'+(fixedCnt?' (종결 '+fixedCnt+'건 번호는 그대로 유지)':'')+':\n\n';
+    changes.forEach(function(c){ msg += '  '+c.oldNo+' → '+c.newNo+' ('+(c.companyName||'-')+')\n'; });
+    msg += '\n진행하시겠습니까?\n(되돌리려면 개별 [이동] 버튼 사용)';
+    if(!(await popConfirm(msg))) return;
+    var changeMap = {}; changes.forEach(function(c){ changeMap[c.id] = c.newNo; });
+    persist(cases.map(function(x){
+      if(changeMap[x.id]) return Object.assign({}, x, { caseNo:changeMap[x.id] });
+      return x;
+    }));
+    showToast('✓ '+series+' 시리즈 '+changes.length+'건 재정렬 완료');
+  }
 
   // 정렬
   function toggleSort(key){
@@ -12802,11 +12871,30 @@ function CaseManagement(props){
             return h('option', { key:u.sid, value:u.sid }, u.name);
           })),
         h('div', { className:'sp' }),
-        CURRENT_USER && CURRENT_USER.isAdmin && h('button', { onClick:function(){setTrashOpen(true);},
-          title:'삭제된 사건 복원',
-          style:{ background:'#fff', color:'#dc2626', border:'1px solid #fca5a5', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', marginRight:'4px' } },
-          '🗑️ 휴지통 (' + (TrashBin.list('cases').length) + ')'),
-        h('button', { className:'btn-secondary', onClick:reseed, title:'초기화' }, '초기화'),
+        h('button', { onClick:function(){setGapModal(true);},
+          title:'시리즈별 번호 결번 검사 + 번호 재정렬',
+          style:{ background:'#fff7ed', color:'#9a3412', border:'1px solid #fed7aa', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '🔍 결번 검사'),
+        h('div', { style:{ position:'relative' } },
+          h('button', { onClick:function(){setColSettings(!colSettings);},
+            style:{ background:'#fff', color:'#475569', border:'1px solid #cbd5e1', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '⚙️ 컬럼'),
+          colSettings && h('div', { style:{ position:'absolute', top:'calc(100% + 4px)', right:0, background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'8px', minWidth:'180px', zIndex:100 } },
+            h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#64748b', padding:'4px 6px', marginBottom:'4px', borderBottom:'1px solid #e2e8f0' } }, '컬럼 표시'),
+            [
+              {k:'opponent', l:'상대방'},{k:'mgrMain', l:'주담당'},{k:'mgrSubs', l:'부담당'},
+              {k:'jurOrg', l:'관할기관'},{k:'jurOfficer', l:'관할담당자'},{k:'jurPhone', l:'관할연락처'},{k:'jurEmail', l:'관할이메일'},
+              {k:'receiveDate', l:'수임일'},{k:'dueDate', l:'기한'},{k:'retainerFee', l:'착수금'},{k:'successFee', l:'성공보수'},
+              {k:'status', l:'상태'},{k:'note', l:'비고'}
+            ].map(function(cc){
+              return h('label', { key:cc.k, style:{ display:'flex', alignItems:'center', gap:'6px', padding:'4px 6px', cursor:'pointer', fontSize:'11.5px', borderRadius:'5px' },
+                onMouseEnter:function(e){e.currentTarget.style.background='#f1f5f9';},
+                onMouseLeave:function(e){e.currentTarget.style.background='';}
+                },
+                h('input', { type:'checkbox', checked:colVis[cc.k], onChange:function(){toggleCol(cc.k);}, style:{ margin:0 } }),
+                h('span', null, cc.l)
+              );
+            })
+          )
+        ),
         h('button', { onClick:exportExcel,
           style:{ background:'#fff', color:'#16a34a', border:'1px solid #86efac', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', marginRight:'4px' } }, '📥 엑셀'),
         h(PageSizeSelector, { pageSize:casePageSize, setPageSize:setCasePageSize, setPage:pgCase.setPage })
@@ -12884,24 +12972,24 @@ function CaseManagement(props){
         h('th', { style:{ width:'34px', textAlign:'center', color:'#94a3b8' } }, '#'),
         h('th', { onClick:function(){toggleSort('caseNo');}, style:{ cursor:'pointer', userSelect:'none' } }, '사건번호' + sortIcon('caseNo')),
         h('th', { onClick:function(){toggleSort('companyName');}, style:{ cursor:'pointer', userSelect:'none' } }, '의뢰인' + sortIcon('companyName')),
-        h('th', { style:{ minWidth:'80px' } }, '상대방'),
-        h('th', { onClick:function(){toggleSort('managerMain');}, style:{ cursor:'pointer', userSelect:'none', minWidth:'70px' } }, '주담당' + sortIcon('managerMain')),
-        h('th', { style:{ minWidth:'90px' } }, '부담당'),
-        h('th', null, '관할기관'),
-        h('th', null, '관할담당자'),
-        h('th', null, '관할연락처'),
-        h('th', null, '관할이메일'),
-        h('th', { onClick:function(){toggleSort('receiveDate');}, style:{ cursor:'pointer', userSelect:'none' } }, '수임일' + sortIcon('receiveDate')),
-        h('th', { onClick:function(){toggleSort('dueDate');}, style:{ cursor:'pointer', userSelect:'none' } }, '기한' + sortIcon('dueDate')),
-        h('th', { onClick:function(){toggleSort('retainerFee');}, style:{ cursor:'pointer', userSelect:'none' } }, '착수금' + sortIcon('retainerFee')),
-        h('th', { onClick:function(){toggleSort('successFee');}, style:{ cursor:'pointer', userSelect:'none' } }, '성공보수' + sortIcon('successFee')),
-        h('th', { style:{ width:'70px' } }, '상태'),
-        h('th', { style:{ width:'40px' } }, '비고'),
+        colVis.opponent && h('th', { style:{ minWidth:'80px' } }, '상대방'),
+        colVis.mgrMain && h('th', { onClick:function(){toggleSort('managerMain');}, style:{ cursor:'pointer', userSelect:'none', minWidth:'70px' } }, '주담당' + sortIcon('managerMain')),
+        colVis.mgrSubs && h('th', { style:{ minWidth:'90px' } }, '부담당'),
+        colVis.jurOrg && h('th', null, '관할기관'),
+        colVis.jurOfficer && h('th', null, '관할담당자'),
+        colVis.jurPhone && h('th', null, '관할연락처'),
+        colVis.jurEmail && h('th', null, '관할이메일'),
+        colVis.receiveDate && h('th', { onClick:function(){toggleSort('receiveDate');}, style:{ cursor:'pointer', userSelect:'none' } }, '수임일' + sortIcon('receiveDate')),
+        colVis.dueDate && h('th', { onClick:function(){toggleSort('dueDate');}, style:{ cursor:'pointer', userSelect:'none' } }, '기한' + sortIcon('dueDate')),
+        colVis.retainerFee && h('th', { onClick:function(){toggleSort('retainerFee');}, style:{ cursor:'pointer', userSelect:'none' } }, '착수금' + sortIcon('retainerFee')),
+        colVis.successFee && h('th', { onClick:function(){toggleSort('successFee');}, style:{ cursor:'pointer', userSelect:'none' } }, '성공보수' + sortIcon('successFee')),
+        colVis.status && h('th', { style:{ width:'70px' } }, '상태'),
+        colVis.note && h('th', { style:{ width:'40px' } }, '비고'),
         h('th', { className:'ac' }, '관리')
       )),
       h('tbody', null,
         filtered.length === 0
-          ? h('tr', null, h('td', { colSpan:16, className:'ac', style:{ color:'#94a3b8', padding:'40px' } },
+          ? h('tr', null, h('td', { colSpan:visColCount, className:'ac', style:{ color:'#94a3b8', padding:'40px' } },
               cases.length === 0 ? '등록된 사건이 없습니다' : '검색 결과가 없습니다'))
           : pgCase.paged.map(function(c, idx){
               var t = types.find(function(x){return x.code===c.typeCode;});
@@ -12987,7 +13075,7 @@ function CaseManagement(props){
                 ),
 
                 // 상대방 (근로자 사건은 사업장명, 그 외는 별도 입력값)
-                h('td', null,
+                colVis.opponent && h('td', null,
                   (function(){ var op = c.opponent || (c.clientType === 'worker' ? (c.companyName||'') : '');
                     return op
                       ? h('span', { style:{ color:'#475569', fontSize:'12px' } }, op)
@@ -12995,14 +13083,14 @@ function CaseManagement(props){
                 ),
 
                 // 주담당
-                h('td', { style:{ minWidth:'70px' } },
+                colVis.mgrMain && h('td', { style:{ minWidth:'70px' } },
                   c.managerMain
                     ? h('span', { style:{ background:'#ede9fe', color:'#1e40af', fontSize:'11.5px', fontWeight:700, padding:'3px 9px', borderRadius:'10px', whiteSpace:'nowrap' } }, userName(c.managerMain))
                     : h('span', { style:{ color:'#cbd5e1' } }, '-')
                 ),
 
                 // 부담당
-                h('td', { style:{ minWidth:'90px' } },
+                colVis.mgrSubs && h('td', { style:{ minWidth:'90px' } },
                   (c.managerSubs||[]).length > 0
                     ? h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'3px' } },
                         c.managerSubs.map(function(sid){
@@ -13014,29 +13102,29 @@ function CaseManagement(props){
                 ),
 
                 // 관할기관
-                h('td', { style:{ fontSize:'12px', color: jur.org ? '#1e293b' : '#cbd5e1' } }, jur.org || '-'),
+                colVis.jurOrg && h('td', { style:{ fontSize:'12px', color: jur.org ? '#1e293b' : '#cbd5e1' } }, jur.org || '-'),
                 // 관할담당자
-                h('td', { style:{ fontSize:'12px', color: jur.officer ? '#1e293b' : '#cbd5e1' } }, jur.officer || '-'),
+                colVis.jurOfficer && h('td', { style:{ fontSize:'12px', color: jur.officer ? '#1e293b' : '#cbd5e1' } }, jur.officer || '-'),
                 // 관할연락처
-                h('td', { style:{ fontSize:'11.5px', fontFamily:'monospace', color: jur.phone ? '#1e293b' : '#cbd5e1' } }, jur.phone || '-'),
+                colVis.jurPhone && h('td', { style:{ fontSize:'11.5px', fontFamily:'monospace', color: jur.phone ? '#1e293b' : '#cbd5e1' } }, jur.phone || '-'),
                 // 관할이메일
-                h('td', { style:{ fontSize:'11px', color: jur.email ? '#1e293b' : '#cbd5e1' } }, jur.email || '-'),
+                colVis.jurEmail && h('td', { style:{ fontSize:'11px', color: jur.email ? '#1e293b' : '#cbd5e1' } }, jur.email || '-'),
 
                 // 수임일 + D+
-                h('td', null,
+                colVis.receiveDate && h('td', null,
                   h('div', { style:{ fontFamily:'monospace', fontSize:'11.5px' } }, c.receiveDate ? c.receiveDate.replace(/-/g,'.') : '-'),
                   dPlus && h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'2px' } }, dPlus)
                 ),
 
                 // 기한
-                h('td', null,
+                colVis.dueDate && h('td', null,
                   c.dueDate
                     ? h('div', { style:{ fontFamily:'monospace', fontSize:'11.5px', color: dueWarn ? '#dc2626' : '#1e293b', fontWeight: dueWarn ? 700 : 500 } }, c.dueDate.replace(/-/g,'.'))
                     : h('span', { style:{ color:'#cbd5e1' } }, '-')
                 ),
 
                 // 착수금: 금액 표시 (입금여부는 재무관리에서)
-                h('td', { style:{ textAlign:'right', padding:'4px 8px' } },
+                colVis.retainerFee && h('td', { style:{ textAlign:'right', padding:'4px 8px' } },
                   c.retainerFee
                     ? h('div', null,
                         h('div', { style:{ fontFamily:'monospace', fontSize:'11.5px', fontWeight:600, color: retainerPaid ? '#059669' : '#1e293b' } },
@@ -13053,7 +13141,7 @@ function CaseManagement(props){
                 ),
 
                 // 성공보수: % 모드 / 금액 모드 분리 표시
-                h('td', { style:{ textAlign:'right', padding:'4px 8px' } },
+                colVis.successFee && h('td', { style:{ textAlign:'right', padding:'4px 8px' } },
                   c.successFee
                     ? (c.successFeeType === 'percent'
                         ? h('div', null,
@@ -13073,7 +13161,7 @@ function CaseManagement(props){
                 ),
 
                 // ★ #2 인라인 상태 변경 셀
-                h('td', { className:'ac', style:{ minWidth:'70px' } },
+                colVis.status && h('td', { className:'ac', style:{ minWidth:'70px' } },
                   c.status !== 'closed'
                     ? h('select', {
                         value: c.status || 'open',
@@ -13098,7 +13186,7 @@ function CaseManagement(props){
                 ),
 
                 // 비고: 말풍선 hover
-                h('td', { className:'ac' },
+                colVis.note && h('td', { className:'ac' },
                   c.note
                     ? h('span', { title: c.note,
                         style:{ display:'inline-block', cursor:'help', fontSize:'14px', lineHeight:'1' } }, '📝')
@@ -13133,11 +13221,11 @@ function CaseManagement(props){
       // footer: 필터된 건 합계
       filtered.length > 0 && h('tfoot', null,
         h('tr', { style:{ background:'#f8fafc', borderTop:'2px solid #e5e7eb', fontWeight:700 } },
-          h('td', { colSpan:13, style:{ padding:'6px 10px', fontSize:'11.5px', color:'#475569', textAlign:'right' } },
+          h('td', { colSpan:visBeforeFee, style:{ padding:'6px 10px', fontSize:'11.5px', color:'#475569', textAlign:'right' } },
             '합계 ' + filtered.length + '건'),
-          h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:'#2563eb' } },
+          colVis.retainerFee && h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:'#2563eb' } },
             filtered.reduce(function(s,c){return s+(canSeeAmount(c)?(c.retainerFee||0):0);},0).toLocaleString()),
-          h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:'#2563eb' } },
+          colVis.successFee && h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:'#2563eb' } },
             filtered.reduce(function(s,c){
               if(!canSeeAmount(c)) return s;
               if(c.successFeeType === 'percent'){
@@ -13146,7 +13234,7 @@ function CaseManagement(props){
               }
               return s + (c.successFee||0);
             }, 0).toLocaleString()),
-          h('td', { colSpan:2 })
+          h('td', { colSpan:(colVis.status?1:0)+(colVis.note?1:0)+1 })
         )
       )
     )),
@@ -13172,6 +13260,62 @@ function CaseManagement(props){
       onEdit: function(){ openEdit(companyModal); setCompanyModal(null); }
     }),
     // #D 휴지통 모달
+    gapModal && h('div', { onClick:function(){setGapModal(false);},
+      style:{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15,23,42,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 } },
+      h('div', { onClick:function(e){e.stopPropagation();},
+        style:{ background:'#fff', borderRadius:'14px', padding:'20px', width:'min(680px, 92vw)', maxHeight:'82vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.25)' } },
+        h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px' } },
+          h('div', null,
+            h('div', { style:{fontSize:'15px',fontWeight:700,color:'#1e293b'} }, '🔍 결번 검사 — ⚖️ 사건관리'),
+            h('div', { style:{fontSize:'11px',color:'#94a3b8',marginTop:'2px'} }, '시리즈별 번호 누락 확인 · 종결 건 번호는 사용 중으로 보호')
+          ),
+          h('button', { onClick:function(){setGapModal(false);},
+            style:{ background:'transparent', border:'none', fontSize:'18px', cursor:'pointer', color:'#94a3b8' } }, '×')
+        ),
+        (function(){
+          var gaps = detectCaseGaps();
+          var withMissing = gaps.filter(function(g){return g.missing.length > 0;});
+          return withMissing.length === 0
+            ? h('div', { style:{ textAlign:'center', color:'#16a34a', padding:'30px', fontSize:'13px', fontWeight:600 } },
+                '✓ 모든 시리즈에 결번이 없습니다')
+            : h('div', null,
+                withMissing.map(function(g){
+                  return h('div', { key:g.series, style:{marginBottom:'16px',border:'1px solid #fed7aa',borderRadius:'8px',padding:'12px',background:'#fff7ed'} },
+                    h('div', { style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'} },
+                      h('div', null,
+                        h('div', { style:{fontSize:'13px',fontWeight:700,color:'#9a3412'} }, g.series),
+                        h('div', { style:{fontSize:'11px',color:'#9a3412',marginTop:'2px'} }, '결번 '+g.missing.length+'개: ' + g.missing.map(function(n){return String(n).padStart(3,'0');}).join(', '))
+                      ),
+                      h('button', { onClick:function(){ reseqCaseSeries(g.series, g.items); },
+                        title:'활성 건만 1부터 연속 번호로 재할당 (종결 건 번호는 유지)',
+                        style:{background:'#2563eb',color:'#fff',border:'none',padding:'6px 12px',borderRadius:'5px',fontSize:'11px',fontWeight:700,cursor:'pointer'} },
+                        '🔄 1부터 연번 재정렬')
+                    ),
+                    h('div', { style:{background:'#fff',borderRadius:'6px',padding:'8px'} },
+                      h('div', { style:{fontSize:'10.5px',color:'#64748b',marginBottom:'6px',fontWeight:600} }, '이동 가능 사건:'),
+                      g.items.filter(function(x){return !x.closed && x.num > g.missing[0];}).slice(0, 10).map(function(x){
+                        var minMissing = g.missing.find(function(n){return n < x.num;});
+                        return h('div', { key:x.item.id, style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',borderBottom:'1px solid #f1f5f9',fontSize:'11.5px'} },
+                          h('div', null,
+                            h('span', { style:{fontFamily:'monospace',color:'#1e40af',fontWeight:700} }, String(x.num).padStart(3,'0')),
+                            h('span', { style:{color:'#1e293b',marginLeft:'10px'} }, x.item.companyName||'-')
+                          ),
+                          minMissing ? h('button', {
+                            onClick:function(){ moveCaseToNumber(x.item.id, minMissing); },
+                            style:{background:'#ea580c',color:'#fff',border:'none',padding:'4px 10px',borderRadius:'4px',fontSize:'10.5px',fontWeight:700,cursor:'pointer'} },
+                            '→ '+String(minMissing).padStart(3,'0')+'로 이동'
+                          ) : null
+                        );
+                      })
+                    )
+                  );
+                })
+              );
+        })(),
+        h('div', { style:{fontSize:'10.5px',color:'#94a3b8',marginTop:'10px',lineHeight:1.6} },
+          '※ 동작: 선택한 사건 번호를 결번 자리로 변경합니다. 종결된 사건의 번호는 검사·재정렬 어디에서도 변경되지 않습니다.')
+      )
+    ),
     trashOpen && h(TrashCaseModal, {
       onClose: function(){ setTrashOpen(false); setCases(dbGet('cases', []) || []); },
       types: types
