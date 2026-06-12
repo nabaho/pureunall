@@ -30853,7 +30853,10 @@ function PersonalCalendar(props){
     if(!byDate[date]) byDate[date] = [];
     byDate[date].push(ev);
   }
-  mySchedules.forEach(function(s){ addEv(s.date, {type:'schedule', title:s.title, time:s.time||'', color:'#1e40af', evId:s.id, draggable:true}); });
+  mySchedules.forEach(function(s){
+    if(s.externalId) return; // 외부인(이음센터 변호사 등) 배정은 개인 캘린더에 표시 안 함 (로스터 화면에만)
+    addEv(s.date, {type:'schedule', title:s.title, time:s.time||'', color:'#1e40af', evId:s.id, draggable:true});
+  });
   // 휴가·출장·근태 표시 (편집·이동은 type:'leave' 경로로 통일 → onEditEvent/moveCalendarEvent가 attendance_records 처리)
   var ATT_LABEL = { 'leave':'연차','halfday-am':'오전반차','halfday-pm':'오후반차','leave-hour':'시간연차','special-leave':'특별휴가','sick':'병가','telework':'재택근무','trip':'출장','maternity':'출산휴가','parental-leave':'육아휴직','eum-work':'이음센터' };
   var ATT_COLOR = { 'leave':'#16a34a','halfday-am':'#16a34a','halfday-pm':'#16a34a','leave-hour':'#16a34a','special-leave':'#0d9488','sick':'#dc2626','telework':'#7c3aed','trip':'#ea580c','maternity':'#db2777','parental-leave':'#db2777','eum-work':'#2563eb' };
