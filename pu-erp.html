@@ -39982,7 +39982,7 @@ function ClosedManagement(){
         sub: h('div',{style:{display:'flex',gap:'4px',alignItems:'center',flexWrap:'wrap'}},
           h('span',{style:{background:rb,color:rc,fontSize:'10px',padding:'2px 6px',borderRadius:'8px',fontWeight:700}},a.reason),
           transferMissing && h('span',{style:{background:'#fee2e2',color:'#dc2626',fontSize:'10.5px',padding:'1px 5px',borderRadius:'4px',fontWeight:700}},'⚠️ 이관데이터 없음')),
-        manager:userName(a.managerMain), amount: a.contractAmount||0, amountLabel: a.contractAmount?(a.contractAmount).toLocaleString():'-',
+        manager:userName(a.managerMain), amount: a.contractAmount||0, amountLabel: !canSeeAmount(a) ? '🔒' : (a.contractAmount?(a.contractAmount).toLocaleString():'-'),
         action: h('div',{style:{display:'flex',gap:'4px'}},
           h('button',{onClick:function(){unarchiveContract(a.id);},style:{background:'#f1f5f9',color:'#64748b',border:'1px solid #cbd5e1',padding:'2px 8px',borderRadius:'5px',fontSize:'10.5px',cursor:'pointer'}},'해제'),
           transferMissing && h('button',{
@@ -40007,7 +40007,7 @@ function ClosedManagement(){
         sub: reasonText ? h('span',{style:{fontSize:'10.5px',color:'#9a3412',fontStyle:'italic'}}, reasonText) : null,
         manager:userName(co.managerMain),
         amount: fee,
-        amountLabel: fee>0 ? fee.toLocaleString()+' (월)' : '-',
+        amountLabel: !canSeeAmount(co) ? '🔒' : (fee>0 ? fee.toLocaleString()+' (월)' : '-'),
         action: h('button',{onClick:(function(co2){return async function(){
           if(!(await popConfirm('"'+co2.name+'" 업체를 활성으로 복원하시겠습니까?'))) return;
           var all=dbGet('companies',[]).map(function(x){return x.id===co2.id?Object.assign({},x,{status:'active'}):x;});
@@ -40024,7 +40024,7 @@ function ClosedManagement(){
         var nodes = [h('span',{style:{background:R.b,color:R.c,padding:'1px 5px',borderRadius:'5px',fontSize:'10.5px',fontWeight:700}},R.l)];
         if(c.successFeeStatus === 'unrecoverable' && (c.successFee||0) > 0){
           nodes.push(h('span',{style:{background:'#fee2e2',color:'#991b1b',padding:'1px 5px',borderRadius:'5px',fontSize:'10.5px',fontWeight:700,marginLeft:'3px'}},
-            '🔴 회수불능 '+c.successFee.toLocaleString()+'원'));
+            '🔴 회수불능 '+(canSeeAmount(c)?c.successFee.toLocaleString()+'원':'')));
         }
         return h('span',{style:{display:'flex',gap:'3px',alignItems:'center',flexWrap:'wrap'}},nodes);
       })();
@@ -40034,7 +40034,7 @@ function ClosedManagement(){
         sub: h('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap',alignItems:'center'}},
           t?h('span',{style:{fontSize:'10px',color:'#1e40af'}},t.name):null,
           caseResultBadge),
-        manager:userName(c.managerMain), amount:(c.retainerFee||0)+(c.successFee||0), amountLabel: ((c.retainerFee||0)+(c.successFee||0))>0?((c.retainerFee||0)+(c.successFee||0)).toLocaleString():'-',
+        manager:userName(c.managerMain), amount:(c.retainerFee||0)+(c.successFee||0), amountLabel: !canSeeAmount(c) ? '🔒' : (((c.retainerFee||0)+(c.successFee||0))>0?((c.retainerFee||0)+(c.successFee||0)).toLocaleString():'-'),
         action: h('button',{onClick:(function(id){return function(){unarchiveCase(id);};})(c.id),style:{background:'#f1f5f9',color:'#64748b',border:'1px solid #cbd5e1',padding:'2px 8px',borderRadius:'5px',fontSize:'10.5px',cursor:'pointer'}},'해제')
       });
     });
@@ -40042,7 +40042,7 @@ function ClosedManagement(){
       allRows.push({ _date:(it.endDate||it.closedAt||'').slice(0,10), _kind:it._src.label, _kindColor:it._src.color, _kindBg:it._src.bg,
         _storeKey:it._src.key, _itemId:it.id, _displayName:(it.no||'')+' '+(it.companyName||''),
         no:it.no||'-', company:it.companyName, sub: h('span',{style:{fontSize:'10px',color:it._src.color}},it._typeName),
-        manager:userName(it.managerMain), amount:(it.contractFee||0)+(it.balanceFee||0), amountLabel:((it.contractFee||0)+(it.balanceFee||0))>0?((it.contractFee||0)+(it.balanceFee||0)).toLocaleString():'-',
+        manager:userName(it.managerMain), amount:(it.contractFee||0)+(it.balanceFee||0), amountLabel: !canSeeAmount(it) ? '🔒' : (((it.contractFee||0)+(it.balanceFee||0))>0?((it.contractFee||0)+(it.balanceFee||0)).toLocaleString():'-'),
         action: h('button',{onClick:(function(src,id){return function(){unarchiveBiz(src.key,id);};})(it._src,it.id),style:{background:'#f1f5f9',color:'#64748b',border:'1px solid #cbd5e1',padding:'2px 8px',borderRadius:'5px',fontSize:'10.5px',cursor:'pointer'}},'해제')
       });
     });
