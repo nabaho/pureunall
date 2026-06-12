@@ -51772,7 +51772,14 @@ function ERPMain(props){
       return function(){ clearTimeout(t); };
     }
   }, []);
-  var c = useState(window.innerWidth <= 768); var collapsed = c[0]; var setCollapsed = c[1];
+  var c = useState(function(){
+    if(window.innerWidth <= 768) return true;
+    try { return localStorage.getItem('pureun_v6_session_sb_collapsed') === '1'; } catch(e){ return false; }
+  }); var collapsed = c[0]; var setCollapsed = c[1];
+  function setCollapsedSave(v){
+    setCollapsed(v);
+    try { localStorage.setItem('pureun_v6_session_sb_collapsed', v ? '1' : '0'); } catch(e){}
+  }
   var now = new Date();
   var m = useState({ y:now.getFullYear(), m:now.getMonth()+1, d:now.getDate() }); var month = m[0]; var setMonth = m[1];
   var o = useState(function(){
@@ -52014,7 +52021,7 @@ function ERPMain(props){
       onToggleAll: toggleAll,
       allOpened: MENUS.every(function(g){ return openSet[g.gid]; }),
       menuHistory: menuHistory,
-      onCollapse: function(){ setCollapsed(true); },
+      onCollapse: function(){ setCollapsedSave(true); },
       onLogout: onLogout
     }),
     !collapsed && h('div', { className:'sb-overlay', onClick:function(){ setCollapsed(true); } }),
@@ -52022,7 +52029,7 @@ function ERPMain(props){
       h(Header, {
         title: title, month: month,
         onPrev: prevMonth, onNext: nextMonth, onToday: today,
-        onBurger: function(){ setCollapsed(!collapsed); },
+        onBurger: function(){ setCollapsedSave(!collapsed); },
         onBack: menuHistory.length > 0 ? goBack : null,
         onNavigate: selectMenu,
         onLogout: onLogout,
