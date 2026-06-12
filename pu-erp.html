@@ -47417,9 +47417,9 @@ function PayrollLedger(props){
         h('div', { style:{ fontSize:'10.5px', color:'#2563eb', fontWeight:600 } }, '✅ 실지급액'),
         h('div', { style:{ fontSize:'14px', fontWeight:800, color:'#2563eb', fontFamily:'monospace' } }, totals.net.toLocaleString()+'원'))
     ),
-    h('div', { style:{ marginBottom:'6px' } },
-      // ── 1행: 월 이동 + 잠금 ──
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'6px' } },
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'6px' } },
+      // ── 월 이동 + 잠금 (한 줄 통합) ──
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 } },
         h(MonthNav, { onPrev:function(){changeMonth(-1);}, onNext:function(){changeMonth(1);}, label:props.selYM }),
         isPayrollLocked(props.selYM)
           ? h('button',{ onClick:async function(){
@@ -47437,8 +47437,8 @@ function PayrollLedger(props){
               },
               style:{padding:'6px 10px',background:'#fff',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:600,whiteSpace:'nowrap'} }, '🔓 마감 잠금')
       ),
-      // ── 2행: 보조액션(가로스크롤) + 확정버튼 고정 ──
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap: IS_M?'wrap':'nowrap' } },
+      // ── 보조액션 + 확정 (월이동 옆 같은 줄) ──
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap: IS_M?'wrap':'nowrap', flex:1, minWidth:0 } },
         IS_M && h('button', { onClick:function(){ setToolsOpen(!toolsOpen); },
           style:{padding:'6px 10px',background:toolsOpen?'#1e40af':'#f1f5f9',color:toolsOpen?'#fff':'#475569',border:'1px solid '+(toolsOpen?'#1e40af':'#cbd5e1'),borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, toolsOpen?'도구 ▴':'🛠 도구 ▾'),
         h('div', { style:{ display: (IS_M && !toolsOpen)?'none':'flex', gap:'4px', alignItems:'center', overflowX:'auto', WebkitOverflowScrolling:'touch', flex:1, paddingBottom:'2px', minWidth:0, width: IS_M?'100%':'auto', order: IS_M?3:0 } },
