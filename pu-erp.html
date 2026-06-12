@@ -15612,19 +15612,14 @@ function usePagination(items, pageSize){
   var paged = (items||[]).slice((safePage-1)*ps, safePage*ps);
   return { page:safePage, setPage:setPage, total:total, paged:paged, count:len, pageSize:ps };
 }
-// 표시 개수 선택기 (각 모듈 상단 우측) — 드롭다운 "N개씩 보기" + 확인 버튼
+// 표시 개수 선택기 (각 모듈 상단 우측) — 드롭다운 "N개씩 보기" (선택 즉시 적용)
 function PageSizeSelector(props){
   var pageSize = props.pageSize; var setPageSize = props.setPageSize; var setPage = props.setPage;
   if(!setPageSize) return null;
-  var ss = useState(pageSize); var sel = ss[0]; var setSel = ss[1];
-  useEffect(function(){ setSel(pageSize); }, [pageSize]);
-  return h('div', { style:{ display:'inline-flex', alignItems:'center', gap:'4px' } },
-    h('select', { value:sel, onChange:function(e){ setSel(parseInt(e.target.value,10)); },
-      style:{ padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:'#1e293b', cursor:'pointer' } },
-      [20,50,100,99999].map(function(sz){ return h('option', { key:sz, value:sz }, sz===99999?'전체 보기':sz+'개씩 보기'); })
-    ),
-    h('button', { type:'button', onClick:function(){ setPageSize(sel); setPage && setPage(1); },
-      style:{ padding:'4px 11px', border:'1px solid #1e40af', background:'#1e40af', color:'#fff', borderRadius:'5px', fontSize:'11.5px', fontWeight:700, cursor:'pointer' } }, '확인')
+  return h('select', { value:pageSize,
+    onChange:function(e){ setPageSize(parseInt(e.target.value,10)); setPage && setPage(1); },
+    style:{ padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:'#1e293b', cursor:'pointer' } },
+    [20,50,100,99999].map(function(sz){ return h('option', { key:sz, value:sz }, sz===99999?'전체 보기':sz+'개씩 보기'); })
   );
 }
 function PaginationBar(props){
