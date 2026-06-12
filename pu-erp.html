@@ -8408,44 +8408,28 @@ function ContractManagement(){
         monthOnly ? '✓ 이번 달만' : '📅 이번 달만') ]
     }),
     showHelp && h(ContractHelpModal, { onClose:function(){ setShowHelp(false); } }),
-    // 종류 탭 — 모바일: 줄바꿈(전부 표시) / PC: wrap
-    h('div', { style:{ display:'flex', flexWrap:'wrap',
-      overflowX:'visible',
-      WebkitOverflowScrolling:'touch',
-      gap:'6px', marginBottom:'10px', paddingBottom: window.innerWidth<=768?'6px':'14px',
-      borderBottom:'2px solid #e5e7eb' } },
-      [{ v:'all', label:'전체', icon:'📊', color:'#475569' }].concat(CONTRACT_KINDS).map(function(k){
-        var on = kindFilter === k.v;
-        var cnt = kindCount(k.v);
-        var _m = window.innerWidth<=768;
-        return h('button', { key:k.v,
-          onClick:function(){ setKindFilter(k.v); setSelSubType('all'); },
-          style:{ padding: _m?'6px 11px':'8px 14px', borderRadius: _m?'20px':'6px',
-            cursor:'pointer', flexShrink: _m?0:undefined, whiteSpace:'nowrap',
-            border: on ? '2px solid '+k.color : '1px solid #cbd5e1',
-            background: on ? k.color : '#f8fafc',
-            color: on ? '#fff' : '#64748b',
-            fontSize: _m?'12px':'12.5px', fontWeight: on ? 700 : 500,
-            display:'inline-flex', alignItems:'center', gap:'4px' } },
-          h('span', null, k.icon),
-          h('span', null, k.label),
-          cnt > 0 && h('span', { style:{ background: on?'rgba(255,255,255,0.3)':'#e2e8f0', color: on?'#fff':'#64748b', fontSize:'10px', padding:'1px 6px', borderRadius:'10px', fontWeight:700 } }, cnt)
-        );
-      })
-    ),
+    // (종류 탭은 아래 툴바 드롭다운으로 통합)
     // 툴바+담당자 필터 영역 틀고정
     h('div', { style:{ position: window.innerWidth<=768?'static':'sticky', top:0, zIndex: window.innerWidth<=768?0:50, background:'#fff',
       boxShadow: window.innerWidth<=768?'none':'0 2px 6px rgba(0,0,0,0.07)', marginLeft:'-16px', marginRight:'-16px',
       padding:'6px 10px', marginBottom:'6px', isolation:'isolate' } },
-    // 툴바 — 모바일: 검색+등록 한 줄 / PC: 기존
-    h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
+    // 툴바 — 등록·검색·종류·담당자·마감잠금·번호재정렬 한 줄 (좁으면 줄바꿈)
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
       h('button', { className:'btn-primary', onClick:openAdd, disabled:isContractLocked(selYM),
         style: Object.assign({ padding: window.innerWidth<=768?'8px 12px':'', fontSize: window.innerWidth<=768?'12px':'' },
           isContractLocked(selYM) ? { opacity:0.5, cursor:'not-allowed' } : {}) }, '+ 등록'),
       h('input', { className:'dt-search', placeholder:'🔍 번호·의뢰인·메모',
         value:query, onChange:function(e){ setQuery(e.target.value); },
-        style:{ flex:1, minWidth:0 } }),
-      window.innerWidth > 768 && h('div', { style:{ flex:1 } }),
+        style:{ flex:1, minWidth: window.innerWidth<=768?'140px':'220px' } }),
+      h('select', { value:kindFilter, onChange:function(e){ setKindFilter(e.target.value); setSelSubType('all'); },
+        style:{ padding:'6px 10px', border:'1px solid '+(kindFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:kindFilter!=='all'?'#1e40af':'#475569', fontWeight:kindFilter!=='all'?700:400, cursor:'pointer' } },
+        [{ v:'all', label:'전체', icon:'📊' }].concat(CONTRACT_KINDS).map(function(k){ return h('option', { key:k.v, value:k.v }, k.icon + ' ' + k.label); })),
+      h('span', { style:{ fontSize:'11.5px', color:'#475569', fontWeight:700, whiteSpace:'nowrap' } }, kindCount(kindFilter) + '건'),
+      h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
+        style:{ padding:'6px 10px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:mgrFilter!=='all'?'#1e40af':'#475569', fontWeight:mgrFilter!=='all'?700:400, cursor:'pointer' } },
+        h('option', { value:'all' }, '👤 전체 담당자'),
+        h('option', { value:'mine' }, '⭐ 내 업무'),
+        users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); })),
       // ── 월 마감 잠금 + 번호재정렬 (모바일 숨김)
       window.innerWidth > 768 && (function(){
         var locked = isContractLocked(selYM);
@@ -8476,49 +8460,7 @@ function ContractManagement(){
         style:{ padding:'6px 12px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600 } },
         '🔢 번호 재정렬')
     ),
-    // 담당자 필터 칩 그룹
-    h('div', { style:{ display:'flex', alignItems:'center', gap:'4px', marginBottom:'14px', flexWrap:'wrap', padding:'8px 10px', background:'#f8fafc', border:'1px solid #e5e7eb', borderRadius:'6px' } },
-      h('span', { style:{ fontSize:'11.5px', color:'#475569', fontWeight:600, marginRight:'4px' } }, '👤 담당자:'),
-      // 전체
-      (function(){
-        var on = mgrFilter === 'all';
-        return h('button', { onClick:function(){ setMgrFilter('all'); },
-          style:{ padding: window.innerWidth<=768?'3px 9px':'4px 12px', borderRadius:'14px', cursor:'pointer', fontSize: window.innerWidth<=768?'10.5px':'11.5px',
-            border:'1px solid '+(on?'#1e40af':'#cbd5e1'),
-            background: on ? '#1e40af' : '#fff',
-            color: on ? '#fff' : '#475569',
-            fontWeight: on ? 700 : 500 } }, '전체 (' + contracts.length + ')');
-      })(),
-      // 내 업무
-      (function(){
-        var on = mgrFilter === 'mine';
-        var myCount = contracts.filter(function(c){
-          return isActiveContract(c) && (c.managerMain === CURRENT_USER_SID || (c.managerSubs||[]).indexOf(CURRENT_USER_SID) >= 0);
-        }).length;
-        return h('button', { onClick:function(){ setMgrFilter('mine'); },
-          style:{ padding: window.innerWidth<=768?'3px 9px':'4px 12px', borderRadius:'14px', cursor:'pointer', fontSize: window.innerWidth<=768?'10.5px':'11.5px',
-            border:'1px solid '+(on?'#dc2626':'#fecaca'),
-            background: on ? '#dc2626' : '#fef2f2',
-            color: on ? '#fff' : '#991b1b',
-            fontWeight: 700 } }, '⭐ 내 업무 (' + myCount + ')');
-      })(),
-      h('span', { style:{ width:'1px', height:'18px', background:'#cbd5e1', margin:'0 4px' } }),
-      // 사용자 칩
-      users.map(function(u){
-        var on = mgrFilter === u.sid;
-        var cnt = contracts.filter(function(c){
-          return isActiveContract(c) && (c.managerMain === u.sid || (c.managerSubs||[]).indexOf(u.sid) >= 0);
-        }).length;
-        if(cnt === 0 && !on) return null;  // 담당 0건이면 숨김 (선택중이면 유지)
-        return h('button', { key:u.sid, onClick:function(){ setMgrFilter(u.sid); },
-          style:{ padding: window.innerWidth<=768?'3px 8px':'4px 11px', borderRadius:'14px', cursor:'pointer', fontSize: window.innerWidth<=768?'10.5px':'11.5px',
-            border:'1px solid '+(on?'#2563eb':'#cbd5e1'),
-            background: on ? '#ede9fe' : '#fff',
-            color: on ? '#1e40af' : '#475569',
-            fontWeight: on ? 700 : 500 } },
-          u.name + ' (' + cnt + ')');
-      })
-    )
+    // (담당자 필터는 위 툴바 드롭다운으로 통합)
     ),
     // 칸반 보드 (3컬럼 / 단독 보기)
     h('div', { style:{ display:'grid', gridTemplateColumns: window.innerWidth<=768?'1fr':(focusCol==='all'?'repeat(3, 1fr)':'1fr'), gap:'8px' } },
