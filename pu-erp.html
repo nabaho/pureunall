@@ -9559,13 +9559,7 @@ function CaseFeePopup(props){
         style:{width:'100%',padding:'5px 8px',border:'1.5px solid '+(isPartial?'#f59e0b':isFull?'#10b981':'#cbd5e1'),borderRadius:'4px',fontSize:'13px',fontWeight:700,textAlign:'right',boxSizing:'border-box',fontFamily:'monospace'}}),
       h('div',{style:{display:'flex',gap:'4px',marginTop:'3px'}},
         h('button',{type:'button',onClick:function(){setActualAmt(remaining);},
-          style:{flex:1,padding:'3px',border:'1px solid #10b981',borderRadius:'5px',background:'#f0fdf4',color:'#059669',cursor:'pointer',fontSize:'10px',fontWeight:700}},'완납 '+remaining.toLocaleString()),
-        remaining>10000 && h('button',{type:'button',onClick:function(){setActualAmt(Math.round(remaining/2/1000)*1000);},
-          style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},'½'),
-        remaining>10000 && h('button',{type:'button',onClick:function(){setActualAmt(Math.round(remaining/3/1000)*1000);},
-          style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},'⅓'),
-        remaining>10000 && h('button',{type:'button',onClick:function(){setActualAmt(Math.round(remaining/4/1000)*1000);},
-          style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},'¼')
+          style:{flex:1,padding:'3px',border:'1px solid #10b981',borderRadius:'5px',background:'#f0fdf4',color:'#059669',cursor:'pointer',fontSize:'10px',fontWeight:700}},'완납 '+remaining.toLocaleString())
       )
     ),
     h('div',{style:{marginBottom:'9px'}},
@@ -9649,13 +9643,7 @@ function ProjectFeePopup(props){
         style:{width:'100%',padding:'5px 8px',border:'1.5px solid '+(isPartial?'#f59e0b':isFull?'#10b981':'#cbd5e1'),borderRadius:'4px',fontSize:'13px',fontWeight:700,textAlign:'right',boxSizing:'border-box',fontFamily:'monospace'}}),
       h('div',{style:{display:'flex',gap:'4px',marginTop:'3px'}},
         h('button',{type:'button',onClick:function(){setActualAmt(remaining);},
-          style:{flex:1,padding:'3px',border:'1px solid #10b981',borderRadius:'5px',background:'#f0fdf4',color:'#059669',cursor:'pointer',fontSize:'10px',fontWeight:700}},'완납 '+remaining.toLocaleString()),
-        remaining>10000 && h('button',{type:'button',onClick:function(){setActualAmt(Math.round(remaining/2/1000)*1000);},
-          style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},'½'),
-        remaining>10000 && h('button',{type:'button',onClick:function(){setActualAmt(Math.round(remaining/3/1000)*1000);},
-          style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},'⅓'),
-        remaining>10000 && h('button',{type:'button',onClick:function(){setActualAmt(Math.round(remaining/4/1000)*1000);},
-          style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},'¼')
+          style:{flex:1,padding:'3px',border:'1px solid #10b981',borderRadius:'5px',background:'#f0fdf4',color:'#059669',cursor:'pointer',fontSize:'10px',fontWeight:700}},'완납 '+remaining.toLocaleString())
       )
     ),
     h('div',{style:{marginBottom:'9px'}},
@@ -25870,16 +25858,7 @@ function IncomePendingTab(){
                     remaining > 10000 && h('div',{style:{display:'flex',gap:'4px'}},
                       h('button',{type:'button',onClick:function(){setConfirmModal(Object.assign({},confirmModal,{actualAmt:remaining}));},
                         style:{flex:1,padding:'3px',border:'1px solid #10b981',borderRadius:'5px',background:'#f0fdf4',color:'#059669',cursor:'pointer',fontSize:'10px',fontWeight:700}},
-                        '완납 '+remaining.toLocaleString()),
-                      remaining > 20000 && h('button',{type:'button',onClick:function(){setConfirmModal(Object.assign({},confirmModal,{actualAmt:Math.round(remaining/2/1000)*1000}));},
-                        style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},
-                        '½'),
-                      remaining > 20000 && h('button',{type:'button',onClick:function(){setConfirmModal(Object.assign({},confirmModal,{actualAmt:Math.round(remaining/3/1000)*1000}));},
-                        style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},
-                        '⅓'),
-                      remaining > 20000 && h('button',{type:'button',onClick:function(){setConfirmModal(Object.assign({},confirmModal,{actualAmt:Math.round(remaining/4/1000)*1000}));},
-                        style:{flex:'0 0 auto',padding:'3px 8px',border:'1px solid #f59e0b',borderRadius:'5px',background:'#fefce8',color:'#a16207',cursor:'pointer',fontSize:'11px',fontWeight:700}},
-                        '¼')
+                        '완납 '+remaining.toLocaleString())
                     )
                   );
                 })()
