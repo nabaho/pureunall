@@ -38283,13 +38283,24 @@ function ProjectManagementShared(props){
   var gm = useState(false); var gapModal = gm[0]; var setGapModal = gm[1];
   function detectGaps(){
     var bySeries = {};
+    function isClosedRec(it){ return it.status === 'closed' || it.permanentArchived; }
     items.forEach(function(it){
       var no = it.no || '';
       var m = no.match(/^(.+)-(\d+)$/);  // 마지막 -숫자 패턴
       if(!m) return;
       var series = m[1]; var num = parseInt(m[2], 10);
       if(!bySeries[series]) bySeries[series] = [];
-      bySeries[series].push({ num:num, item:it });
+      bySeries[series].push({ num:num, item:it, closed:isClosedRec(it) });
+    });
+    // 종료관리(closed_archive)에 보관된 번호도 사용 중으로 간주 — 결번으로 잡아 재사용하면 안 됨
+    (dbGet('closed_archive', [])||[]).forEach(function(a){
+      var no = a.no || a.mgmtNo || '';
+      var m = no.match(/^(.+)-(\d+)$/);
+      if(!m) return;
+      var series = m[1]; var num = parseInt(m[2], 10);
+      if(!bySeries[series]) return; // 이 모듈에 없는 시리즈는 무시
+      if(bySeries[series].some(function(x){return x.num===num;})) return;
+      bySeries[series].push({ num:num, item:{ id:null, no:no, companyName:(a.name||a.companyName||'')+' (종료보관)' }, closed:true, archiveOnly:true });
     });
     var result = [];
     Object.keys(bySeries).sort().forEach(function(series){
@@ -38318,16 +38329,22 @@ function ProjectManagementShared(props){
     showToast('✓ '+oldNo+' → '+newNo+' 변경됨');
   }
 
-  // 시리즈 전체 연번 재정렬 (1부터 결번 없이)
+  // 시리즈 연번 재정렬 — 종료·보관 건 번호는 고정, 활성 건만 빈 번호에 순서대로 재배치
   async function reseqSeries(series, seriesItems){
     var sorted = seriesItems.slice().sort(function(a,b){return a.num - b.num;});
+    var fixedNums = {}; // 종료·보관 건이 점유한 번호 (변경 금지)
+    sorted.forEach(function(x){ if(x.closed) fixedNums[x.num] = true; });
+    var actives = sorted.filter(function(x){ return !x.closed; });
     var changes = [];
-    sorted.forEach(function(x, i){
-      var newNum = i+1;
-      if(x.num !== newNum) changes.push({ id:x.item.id, oldNo:x.item.no, newNo:series+'-'+String(newNum).padStart(3,'0'), companyName:x.item.companyName });
+    var nextNum = 1;
+    actives.forEach(function(x){
+      while(fixedNums[nextNum]) nextNum++; // 종료 건 번호는 건너뜀
+      if(x.num !== nextNum) changes.push({ id:x.item.id, oldNo:x.item.no, newNo:series+'-'+String(nextNum).padStart(3,'0'), companyName:x.item.companyName });
+      nextNum++;
     });
-    if(changes.length === 0){ showToast('이미 연번 상태'); return; }
-    var msg = '⚠️ '+series+' 시리즈 연번 재정렬\n\n총 '+changes.length+'건 변경:\n\n';
+    if(changes.length === 0){ showToast('이미 연번 상태 (종료 건 번호는 유지)'); return; }
+    var fixedCnt = Object.keys(fixedNums).length;
+    var msg = '⚠️ '+series+' 시리즈 연번 재정렬\n\n총 '+changes.length+'건 변경'+(fixedCnt?' (종료 '+fixedCnt+'건 번호는 그대로 유지)':'')+':\n\n';
     changes.forEach(function(c){ msg += '  '+c.oldNo+' → '+c.newNo+' ('+(c.companyName||'-')+')\n'; });
     msg += '\n진행하시겠습니까?\n(되돌리려면 개별 [이동] 버튼 사용)';
     if(!(await popConfirm(msg))) return;
@@ -39157,7 +39174,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                     // 이동 가능 사업장 목록 (결번보다 큰 번호만)
                     h('div', { style:{background:'#fff',borderRadius:'6px',padding:'8px'} },
                       h('div', { style:{fontSize:'10.5px',color:'#64748b',marginBottom:'6px',fontWeight:600} }, '이동 가능 사업장:'),
-                      g.items.filter(function(x){return x.num > g.missing[0];}).slice(0, 10).map(function(x){
+                      g.items.filter(function(x){return !x.closed && x.num > g.missing[0];}).slice(0, 10).map(function(x){
                         var minMissing = g.missing.find(function(n){return n < x.num;});
                         return h('div', { key:x.item.id, style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',borderBottom:'1px solid #f1f5f9',fontSize:'11.5px'} },
                           h('div', null,
