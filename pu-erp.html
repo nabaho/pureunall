@@ -7747,7 +7747,7 @@ function transferContract(contract){
       note: '계약(' + contract.contractNo + ')에서 이관'
     };
     if(kindV === 'fund'){ item2.estDate = contract.signDate; delete item2.startDate; delete item2.endDate; }
-    if(kindV === 'consulting'){ try { CompanyRef.registerIfMissing(item2, '계약 이관'); } catch(_e){} }
+    // (제거) 컨설팅 이관 시 업체관리 자동 등록 — 컨설팅 사업장은 컨설팅관리에서만 관리
     arr2.unshift(item2); dbSet(storageMap[kindV], arr2);
     // 컨설팅은 계약일(startDate)순 자동 재정렬 (소급 입력 자연 정렬)
     if(kindV === 'consulting'){
@@ -8817,6 +8817,23 @@ function normalizeManagerSids(){
   } catch(e){ window._erpErrLog && window._erpErrLog(e); }
 }
 try { normalizeManagerSids(); } catch(e){}
+
+// ── 컨설팅 자동등록 업체 정리 (부팅 시 1회, 멱등): 업체관리는 계약 업체 전용, 컨설팅 사업장은 컨설팅관리에서만 ──
+(function(){
+  try {
+    var cos = dbGet('companies', []) || [];
+    var keep = cos.filter(function(c){
+      return !(c && c.typeCode === '컨설팅' && String(c.note||'').indexOf('자동 등록') >= 0);
+    });
+    if(keep.length !== cos.length){
+      dbSet('companies', keep);
+      console.log('[정리] 컨설팅 자동등록 업체 ' + (cos.length - keep.length) + '곳 제거 (컨설팅관리 기록은 유지)');
+    }
+    var types = dbGet('biz_company_types', []) || [];
+    var t2 = types.filter(function(t){ return t && t.name !== '컨설팅'; });
+    if(t2.length !== types.length) dbSet('biz_company_types', t2);
+  } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+})();
 
 // ============================================================
 // 담당 가능 여부 (휴직 + 담당배제 토글 통합)
