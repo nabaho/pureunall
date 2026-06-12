@@ -12802,14 +12802,14 @@ function CaseManagement(props){
             return h('option', { key:u.sid, value:u.sid }, u.name);
           })),
         h('div', { className:'sp' }),
-        h('button', { onClick:exportExcel,
-          style:{ background:'#fff', color:'#16a34a', border:'1px solid #86efac', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', marginRight:'4px' } }, '📥 엑셀'),
-        h(PageSizeSelector, { pageSize:casePageSize, setPageSize:setCasePageSize, setPage:pgCase.setPage }),
         CURRENT_USER && CURRENT_USER.isAdmin && h('button', { onClick:function(){setTrashOpen(true);},
           title:'삭제된 사건 복원',
           style:{ background:'#fff', color:'#dc2626', border:'1px solid #fca5a5', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', marginRight:'4px' } },
           '🗑️ 휴지통 (' + (TrashBin.list('cases').length) + ')'),
-        h('button', { className:'btn-secondary', onClick:reseed, title:'초기화' }, '초기화')
+        h('button', { className:'btn-secondary', onClick:reseed, title:'초기화' }, '초기화'),
+        h('button', { onClick:exportExcel,
+          style:{ background:'#fff', color:'#16a34a', border:'1px solid #86efac', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', marginRight:'4px' } }, '📥 엑셀'),
+        h(PageSizeSelector, { pageSize:casePageSize, setPageSize:setCasePageSize, setPage:pgCase.setPage })
       ),
     window.innerWidth <= 768
     ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px' } },
