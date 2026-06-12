@@ -10640,7 +10640,8 @@ function CompanyManagement(){
       ),
       h('button', { onClick:exportExcel,
         style:{ background:'#fff', color:'#16a34a', border:'1px solid #16a34a', padding:'5px 14px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer' } },
-        '📥 엑셀')
+        '📥 엑셀'),
+      h(PageSizeSelector, { pageSize:coPageSize, setPageSize:setCoPageSize, setPage:pg.setPage })
     ),
     // 테이블 (모바일: 카드 뷰 / PC: 기존 테이블)
     window.innerWidth <= 768
@@ -12872,6 +12873,7 @@ function CaseManagement(props){
         h('div', { className:'sp' }),
         h('button', { onClick:exportExcel,
           style:{ background:'#fff', color:'#16a34a', border:'1px solid #86efac', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', marginRight:'4px' } }, '📥 엑셀'),
+        h(PageSizeSelector, { pageSize:casePageSize, setPageSize:setCasePageSize, setPage:pgCase.setPage }),
         CURRENT_USER && CURRENT_USER.isAdmin && h('button', { onClick:function(){setTrashOpen(true);},
           title:'삭제된 사건 복원',
           style:{ background:'#fff', color:'#dc2626', border:'1px solid #fca5a5', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', marginRight:'4px' } },
@@ -15613,10 +15615,11 @@ function usePagination(items, pageSize){
   var paged = (items||[]).slice((safePage-1)*ps, safePage*ps);
   return { page:safePage, setPage:setPage, total:total, paged:paged, count:len, pageSize:ps };
 }
-function PaginationBar(props){
-  var page = props.page; var total = props.total; var setPage = props.setPage; var count = props.count;
-  var pageSize = props.pageSize; var setPageSize = props.setPageSize;
-  var sizeSelector = setPageSize ? h('div', { style:{ display:'flex', alignItems:'center', gap:'4px', marginRight:'10px' } },
+// 표시 개수 선택기 (각 모듈 상단 우측에 배치) — 하단 PaginationBar에서 분리
+function PageSizeSelector(props){
+  var pageSize = props.pageSize; var setPageSize = props.setPageSize; var setPage = props.setPage;
+  if(!setPageSize) return null;
+  return h('div', { style:{ display:'inline-flex', alignItems:'center', gap:'4px' } },
     h('span', { style:{ fontSize:'11px', color:'#94a3b8' } }, '표시'),
     [20,50,100,99999].map(function(sz){
       var on = pageSize === sz;
@@ -15625,7 +15628,12 @@ function PaginationBar(props){
           background:on?'#1e40af':'#fff', color:on?'#fff':'#1e293b', borderRadius:'5px',
           fontSize:'11px', fontWeight:on?700:400, cursor:'pointer' } }, sz===99999?'전체':sz+'개');
     })
-  ) : null;
+  );
+}
+function PaginationBar(props){
+  var page = props.page; var total = props.total; var setPage = props.setPage; var count = props.count;
+  var setPageSize = props.setPageSize;
+  var sizeSelector = null; // 표시개수 선택기는 각 모듈 상단(PageSizeSelector)으로 이동
   if(!total || total <= 1){
     return setPageSize ? h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'center', padding:'10px 0' } },
       sizeSelector, h('span', { style:{ fontSize:'11px', color:'#94a3b8' } }, '총 '+count+'건')) : null;
@@ -38862,7 +38870,8 @@ function ProjectManagementShared(props){
         )
       ),
       h('button', { onClick:exportExcel,
-        style:{ background:'#fff', color:'#16a34a', border:'1px solid #86efac', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '📥 엑셀')
+        style:{ background:'#fff', color:'#16a34a', border:'1px solid #86efac', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '📥 엑셀'),
+      h(PageSizeSelector, { pageSize:projPageSize, setPageSize:setProjPageSize, setPage:pgConsult.setPage })
     ),
     // 테이블 — 모바일 카드뷰 / PC 테이블
     window.innerWidth <= 768
@@ -39873,7 +39882,8 @@ function ClosedManagement(){
         style:{ padding: window.innerWidth<=768?'9px 11px':'5px 14px',
           background:'#fff', color:'#16a34a', border:'1px solid #16a34a',
           borderRadius:'8px', fontSize:'13px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-        '📥')
+        '📥'),
+      h(PageSizeSelector, { pageSize:closedPageSize, setPageSize:setClosedPageSize, setPage:setClosedPage })
     );
   }
 
