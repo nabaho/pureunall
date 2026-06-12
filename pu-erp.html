@@ -30855,7 +30855,8 @@ function PersonalCalendar(props){
   }
   mySchedules.forEach(function(s){
     if(s.externalId) return; // 외부인(이음센터 변호사 등) 배정은 개인 캘린더에 표시 안 함 (로스터 화면에만)
-    addEv(s.date, {type:'schedule', title:s.title, time:s.time||'', color:'#1e40af', evId:s.id, draggable:true});
+    var t = s.title || (s.type==='eum-work' ? '🏛️ 이음센터' : '📅 일정');
+    addEv(s.date, {type:'schedule', title:t, time:s.time||'', color:'#1e40af', evId:s.id, draggable:true});
   });
   // 휴가·출장·근태 표시 (편집·이동은 type:'leave' 경로로 통일 → onEditEvent/moveCalendarEvent가 attendance_records 처리)
   var ATT_LABEL = { 'leave':'연차','halfday-am':'오전반차','halfday-pm':'오후반차','leave-hour':'시간연차','special-leave':'특별휴가','sick':'병가','telework':'재택근무','trip':'출장','maternity':'출산휴가','parental-leave':'육아휴직','eum-work':'이음센터' };
@@ -31413,7 +31414,6 @@ function MyDeskV2(props){
   var gcmS = useState(null); var gcalCreateModal = gcmS[0]; var setGcalCreateModal = gcmS[1];
   // 캘린더 크기: 'sm'(320), 'md'(480), 'lg'(640), 'full'(전체), 'custom'(드래그)
   var csS = useState(dbGet('mydesk_cal_size','sm')); var calSize = csS[0]; var setCalSizeRaw = csS[1];
-  function setCalSize(s){ setCalSizeRaw(s); dbSet('mydesk_cal_size', s); }
   var cwS = useState(dbGet('mydesk_cal_custom_w', 480)); var customW = cwS[0]; var setCustomW = cwS[1];
   var calColPx = calSize === 'custom' ? (customW+'px') : ({ sm:'320px', md:'480px', lg:'640px', full:'1fr' }[calSize] || '320px');
   // quickModal = null | {kind:'todo'|'schedule'|'leave'|'log', ...}
@@ -31767,36 +31767,34 @@ function MyDeskV2(props){
             })
           )
         ),
-        // 🏖️ 내 휴가 잔여 (현재 연도)
-        myLeave && h('div', { style:{ marginBottom:'14px', background:'#ecfeff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'12px 14px' } },
-          h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px' } },
-            h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#2563eb' } },
+        // 🏖️ 내 휴가 잔여 (현재 연도) — 컴팩트
+        myLeave && h('div', { style:{ marginBottom:'10px', background:'#ecfeff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'7px 10px' } },
+          h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'5px' } },
+            h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#2563eb' } },
               '🏖️ 내 휴가 잔여 (' + myLeave.year + '년)'
-            ),
-            h('button', { onClick:function(){navigate('hr/leave');},
-              style:{ fontSize:'10.5px', color:'#2563eb', background:'transparent', border:'1px solid #bfdbfe', borderRadius:'4px', padding:'3px 8px', cursor:'pointer', fontWeight:600 } }, '상세 →')
+            )
           ),
-          h('div', { className:'md-leave-grid', style:{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'8px', marginBottom:'10px' } },
-            h('div', { style:{ background:'#fff', borderRadius:'10px', padding:'8px', textAlign:'center' } },
-              h('div', { style:{ fontSize:'10px', color:'#64748b', fontWeight:600 } }, '총 부여'),
-              h('div', { style:{ fontSize:'18px', fontWeight:800, color:'#2563eb', fontFamily:'monospace' } }, myLeave.grant + '일'),
-              myLeave.carryOver > 0 && h('div', { style:{ fontSize:'10px', color:'#2563eb', fontWeight:600 } }, '(이월 '+myLeave.carryOver+')')
+          h('div', { className:'md-leave-grid', style:{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'6px', marginBottom:'5px' } },
+            h('div', { style:{ background:'#fff', borderRadius:'8px', padding:'4px 6px', textAlign:'center' } },
+              h('div', { style:{ fontSize:'9.5px', color:'#64748b', fontWeight:600 } }, '총 부여'),
+              h('div', { style:{ fontSize:'13px', fontWeight:800, color:'#2563eb', fontFamily:'monospace' } }, myLeave.grant + '일'),
+              myLeave.carryOver > 0 && h('div', { style:{ fontSize:'9.5px', color:'#2563eb', fontWeight:600 } }, '(이월 '+myLeave.carryOver+')')
             ),
-            h('div', { style:{ background:'#fff', borderRadius:'10px', padding:'8px', textAlign:'center' } },
-              h('div', { style:{ fontSize:'10px', color:'#64748b', fontWeight:600 } }, '사용'),
-              h('div', { style:{ fontSize:'18px', fontWeight:800, color:'#ea580c', fontFamily:'monospace' } }, (Math.round(myLeave.used*10)/10) + '일')
+            h('div', { style:{ background:'#fff', borderRadius:'8px', padding:'4px 6px', textAlign:'center' } },
+              h('div', { style:{ fontSize:'9.5px', color:'#64748b', fontWeight:600 } }, '사용'),
+              h('div', { style:{ fontSize:'13px', fontWeight:800, color:'#ea580c', fontFamily:'monospace' } }, (Math.round(myLeave.used*10)/10) + '일')
             ),
-            h('div', { style:{ background:'#fff', borderRadius:'10px', padding:'8px', textAlign:'center' } },
-              h('div', { style:{ fontSize:'10px', color:'#64748b', fontWeight:600 } }, '잔여'),
-              h('div', { style:{ fontSize:'18px', fontWeight:800, color: myLeave.remain<3?'#dc2626':myLeave.remain<5?'#ea580c':'#16a34a', fontFamily:'monospace' } }, (Math.round(myLeave.remain*10)/10) + '일')
+            h('div', { style:{ background:'#fff', borderRadius:'8px', padding:'4px 6px', textAlign:'center' } },
+              h('div', { style:{ fontSize:'9.5px', color:'#64748b', fontWeight:600 } }, '잔여'),
+              h('div', { style:{ fontSize:'13px', fontWeight:800, color: myLeave.remain<3?'#dc2626':myLeave.remain<5?'#ea580c':'#16a34a', fontFamily:'monospace' } }, (Math.round(myLeave.remain*10)/10) + '일')
             ),
-            h('div', { style:{ background:'#fff', borderRadius:'10px', padding:'8px', textAlign:'center' } },
-              h('div', { style:{ fontSize:'10px', color:'#64748b', fontWeight:600 } }, '사용률'),
-              h('div', { style:{ fontSize:'18px', fontWeight:800, color:'#475569', fontFamily:'monospace' } }, myLeave.grant>0 ? Math.round(myLeave.used/myLeave.grant*100) + '%' : '-')
+            h('div', { style:{ background:'#fff', borderRadius:'8px', padding:'4px 6px', textAlign:'center' } },
+              h('div', { style:{ fontSize:'9.5px', color:'#64748b', fontWeight:600 } }, '사용률'),
+              h('div', { style:{ fontSize:'13px', fontWeight:800, color:'#475569', fontFamily:'monospace' } }, myLeave.grant>0 ? Math.round(myLeave.used/myLeave.grant*100) + '%' : '-')
             )
           ),
           // 진행률 바
-          h('div', { style:{ background:'#e0f2fe', height:'8px', borderRadius:'4px', overflow:'hidden', marginBottom:'8px' } },
+          h('div', { style:{ background:'#e0f2fe', height:'5px', borderRadius:'3px', overflow:'hidden', marginBottom:'4px' } },
             h('div', { style:{ width: Math.min(100, myLeave.grant>0 ? myLeave.used/myLeave.grant*100 : 0)+'%', height:'100%', background: myLeave.remain<3?'#dc2626':myLeave.remain<5?'#ea580c':'#2563eb', transition:'width 0.3s' } })
           ),
           // 사용 내역 분리
@@ -32215,25 +32213,7 @@ function MyDeskV2(props){
         },
           h('div', { style:{ width:'4px', height:'40px', background:'#cbd5e1', borderRadius:'2px', opacity:0.6 } })
         ),
-        // 크기 조절 툴바
-        h('div', { style:{ display:'flex', justifyContent:'flex-end', gap:'4px',
-            background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px',
-            padding:'5px 8px', marginBottom:'8px', alignItems:'center' } },
-          h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', fontWeight:600, marginRight:'4px' } }, '크기'),
-          [
-            { v:'sm', label:'작게', tip:'캘린더를 작게 — 목록 공간 넓힘' },
-            { v:'md', label:'중간', tip:'캘린더 중간 크기 (기본)' },
-            { v:'lg', label:'크게', tip:'캘린더를 크게 — 일정 글씨 잘 보임' },
-            { v:'full', label:'⛶ 전체', tip:'캘린더를 화면 가득 채움' }
-          ].map(function(b){
-            var on = calSize === b.v;
-            return h('button', { key:b.v, onClick:function(){setCalSize(b.v);}, className:'erp-tip', 'data-tip':b.tip,
-              style:{ padding:'4px 9px', fontSize:'11px', fontWeight:on?700:500,
-                background: on?'#1e40af':'transparent', color: on?'#fff':'#64748b',
-                border:'1px solid '+(on?'#1e40af':'#e2e8f0'), borderRadius:'4px', cursor:'pointer' } },
-              b.label);
-          })
-        ),
+        // (크기 조절 툴바 제거)
         h(PersonalCalendar, {
           sid:sid,
           myCases:myCases,
