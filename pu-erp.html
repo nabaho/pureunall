@@ -15623,19 +15623,19 @@ function usePagination(items, pageSize){
   var paged = (items||[]).slice((safePage-1)*ps, safePage*ps);
   return { page:safePage, setPage:setPage, total:total, paged:paged, count:len, pageSize:ps };
 }
-// 표시 개수 선택기 (각 모듈 상단 우측에 배치) — 하단 PaginationBar에서 분리
+// 표시 개수 선택기 (각 모듈 상단 우측) — 드롭다운 "N개씩 보기" + 확인 버튼
 function PageSizeSelector(props){
   var pageSize = props.pageSize; var setPageSize = props.setPageSize; var setPage = props.setPage;
   if(!setPageSize) return null;
+  var ss = useState(pageSize); var sel = ss[0]; var setSel = ss[1];
+  useEffect(function(){ setSel(pageSize); }, [pageSize]);
   return h('div', { style:{ display:'inline-flex', alignItems:'center', gap:'4px' } },
-    h('span', { style:{ fontSize:'11px', color:'#94a3b8' } }, '표시'),
-    [20,50,100,99999].map(function(sz){
-      var on = pageSize === sz;
-      return h('button', { key:sz, onClick:function(){ setPageSize(sz); setPage && setPage(1); },
-        style:{ padding:'4px 8px', margin:'0 1px', border:'1px solid '+(on?'#1e40af':'#e2e8f0'),
-          background:on?'#1e40af':'#fff', color:on?'#fff':'#1e293b', borderRadius:'5px',
-          fontSize:'11px', fontWeight:on?700:400, cursor:'pointer' } }, sz===99999?'전체':sz+'개');
-    })
+    h('select', { value:sel, onChange:function(e){ setSel(parseInt(e.target.value,10)); },
+      style:{ padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'11.5px', fontFamily:'inherit', color:'#1e293b', cursor:'pointer' } },
+      [20,50,100,99999].map(function(sz){ return h('option', { key:sz, value:sz }, sz===99999?'전체 보기':sz+'개씩 보기'); })
+    ),
+    h('button', { type:'button', onClick:function(){ setPageSize(sel); setPage && setPage(1); },
+      style:{ padding:'4px 11px', border:'1px solid #1e40af', background:'#1e40af', color:'#fff', borderRadius:'5px', fontSize:'11.5px', fontWeight:700, cursor:'pointer' } }, '확인')
   );
 }
 function PaginationBar(props){
@@ -25402,6 +25402,7 @@ function IncomePendingTab(){
   var sd = useState('desc'); var sortDir = sd[0]; var setSortDir = sd[1];
   var cm = useState(null); var confirmModal = cm[0]; var setConfirmModal = cm[1];
   var vff = useState('all'); var vatFilter = vff[0]; var setVatFilter = vff[1];
+  var ppsS = useState(99999); var pendPageSize = ppsS[0]; var setPendPageSize = ppsS[1]; // 기본: 전체 보기
   // 종료된 업체명 set (companyName 매칭용)
   var closedCompanyNames = {};
   var companyVatMap = {};
@@ -25628,6 +25629,8 @@ function IncomePendingTab(){
     return sortDir === 'asc' ? cmp : -cmp;
   });
 
+  var pendPg = usePagination(filtered, pendPageSize);
+
   function toggleSort(key){
     if(sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir(key === 'amount' || key === 'startDate' ? 'desc' : 'asc'); }
@@ -25703,7 +25706,8 @@ function IncomePendingTab(){
         style:{padding:'5px 10px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'4px',cursor:'pointer',fontSize:'10.5px',color:'#64748b'} },
         '✕ 초기화'),
       h('span', { style:{flex:1} }),
-      h('span', { style:{fontSize:'11px',color:'#475569',fontWeight:700} }, '결과 ' + filtered.length + '건')
+      h('span', { style:{fontSize:'11px',color:'#475569',fontWeight:700} }, '결과 ' + filtered.length + '건'),
+      h(PageSizeSelector, { pageSize:pendPageSize, setPageSize:setPendPageSize, setPage:pendPg.setPage })
     ),
 
     // 리스트
@@ -25731,7 +25735,7 @@ function IncomePendingTab(){
               h('th', {style:Object.assign({},thS,{textAlign:'center',width:'60px'})}, '삭제')
             )),
             h('tbody', null,
-              filtered.map(function(p, idx){
+              pendPg.paged.map(function(p, idx){
                 var coName = p.item.companyName || '';
                 var isClosed = !!closedCompanyNames[coName];
                 return h('tr', { key:p.itemId+'-'+p.kind, style:Object.assign({borderBottom:'1px solid #f1f5f9'}, isClosed?{background:'#fef2f2'}:{}) },
@@ -25786,6 +25790,8 @@ function IncomePendingTab(){
             )
           )
         ),
+
+    h(PaginationBar, { page:pendPg.page, total:pendPg.total, setPage:pendPg.setPage, count:pendPg.count }),
 
     // 입금확정 모달
     confirmModal && (function(){
