@@ -615,6 +615,7 @@ button{ font-family:inherit !important; }
 /* 화면 상단 요소용: 풍선을 아래쪽으로 (왼쪽 끝 요소는 풍선을 오른쪽으로 치우침) */
 .erp-tip.tip-down:hover::after{ bottom:auto; top:130%; left:0; transform:none; }
 .erp-tip.tip-down:hover::before{ bottom:auto; top:calc(130% - 4px); border-top-color:transparent; border-bottom-color:#1e293b; left:14px; transform:none; }
+.erp-tip.tip-wrap:hover::after{ white-space:normal; width:220px; line-height:1.45; text-align:left; }
 @media (max-width:768px){
   /* 모바일: KPI 한 줄 6칸 → 3칸×2줄 컴팩트 (화면 점유 절반 이하) */
   .mkpi-grid{ grid-auto-flow: row !important; grid-template-columns: repeat(3,minmax(0,1fr)) !important; gap:3px !important; }
@@ -25844,6 +25845,7 @@ function IncomePendingTab(){
                       '기납입: '+alreadyPaid.toLocaleString()+'원 / 잔액: '+remaining.toLocaleString()+'원'),
                     h('div', { style:{display:'flex',alignItems:'center',gap:'6px'} },
                       h('span', { style:{fontSize:'11px',color:'#1e293b',fontWeight:600,whiteSpace:'nowrap'} }, '💵 실제입금'),
+                      h('span', { className:'erp-tip tip-wrap', 'data-tip':'분할입금 방법 — 실제 들어온 금액만 입력하고 확정하세요. 약정액보다 적게 넣으면 자동으로 분할로 기록되고 잔액이 남습니다. 잔금이 또 들어오면 그 금액을 입력해 다시 확정하면 됩니다.', style:{fontSize:'11px',color:'#2563eb',cursor:'help',whiteSpace:'nowrap'} }, 'ⓘ'),
                       h('input', {
                         type:'text', value:aAmt.toLocaleString(),
                         onChange:function(e){
