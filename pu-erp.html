@@ -1772,6 +1772,14 @@ function openAddressSearch(onComplete){
             alerts.push({type:'unpaid', color:'#dc2626', text:'미수금 '+days+'일경과 · '+(inc.companyName||inc.client||'')+' '+amt+'원'});
           }
         });
+        // 종료 요청 (담당자 본인 + 관리자에게 표시)
+        (dbGet('close_requests', [])||[]).forEach(function(r){
+          if(r.status !== 'pending') return;
+          var mine = String(r.targetSid) === String(CURRENT_USER.sid);
+          if(!mine && !isAdminByUser(CURRENT_USER) && !CURRENT_USER.isSubAdmin) return;
+          alerts.push({ type:'closeReq', color:'#b45309',
+            text:'📨 종료 요청 · ' + (r.label||'') + ' — ' + (r.requestedByName||'') + ' 요청' + (mine?' (내 담당)':'') });
+        });
         // 퇴사자 미정산 성과급 (admin만)
         var retiredUsers = (dbGet('user_accounts', [])||[]).filter(function(u){return u.status==='retired';});
         retiredUsers.forEach(function(u){
@@ -8005,6 +8013,8 @@ function ContractManagement(){
   async function doClose(id){
     var ct = contracts.find(function(x){return x.id===id;});
     if(!ct) return;
+    if(!canCloseDirect(ct)){ erpRequestClose(ct, '계약 ' + (ct.contractNo||'') + ' ' + (ct.companyName||'')); return; }
+    erpClearCloseReq(ct.id);
     var statusLabel = ({ consult:'상담접수', negotiate:'협의중', confirmed:'계약확정', signed:'최종확정' })[ct.status] || ct.status;
     if(!(await popConfirm('계약 ' + ct.contractNo + ' (' + ct.companyName + ')\n현재 상태: ' + statusLabel + '\n\n종료 처리하시겠습니까?\n→ 상태: 종료\n→ 칸반에서 사라짐\n→ 종료관리에서 확인 가능'))) return;
     archiveContract(ct, '종료');
@@ -12628,6 +12638,8 @@ function CaseManagement(props){
   function closeCase(caseId){
     var c = cases.find(function(x){return x.id===caseId;});
     if(!c) return;
+    if(!canCloseDirect(c)){ erpRequestClose(c, '사건 ' + (c.caseNo||'') + ' ' + (c.companyName||'')); return; }
+    erpClearCloseReq(c.id);
     setCloseModal({
       caseId: caseId,
       caseNo: c.caseNo,
@@ -15536,6 +15548,38 @@ function isMyItem(item, sid){
     if((item.managerSubs||[]).indexOf(u.name) >= 0) return true;
   }
   return false;
+}
+// ============ 종료 권한: 담당자 본인·관리자·위임관리인만 직접 종료 ============
+function canCloseDirect(item){
+  if(isAdminByUser(CURRENT_USER)) return true;
+  if(CURRENT_USER.isSubAdmin) return true;
+  return isMyItem(item, CURRENT_USER.sid);
+}
+// 담당자가 아닌 사람이 종료 시도 → 종료 요청 등록 (담당자 🔔 알림으로 표시)
+async function erpRequestClose(item, label){
+  var mgrName = (typeof userName === 'function' ? userName(item.managerMain) : '') || '담당자';
+  var ok = await popConfirm(
+    '🔒 종료는 담당자(' + mgrName + ') 본인만 할 수 있습니다.\n\n' +
+    '대신 종료 요청을 보낼까요?\n' +
+    '담당자의 알림(🔔)에 표시되며, 담당자가 확인 후 직접 종료하면 처리됩니다.');
+  if(!ok) return;
+  var reqs = dbGet('close_requests', []) || [];
+  if(reqs.some(function(r){ return r.itemId === item.id && r.status === 'pending'; })){
+    showToast('이미 종료 요청이 등록되어 있습니다'); return;
+  }
+  reqs.unshift({ id:'creq-'+Date.now(), itemId:item.id, label:label,
+    targetSid:item.managerMain, requestedBy:CURRENT_USER.sid, requestedByName:CURRENT_USER.name||'',
+    ts:new Date().toISOString(), status:'pending' });
+  dbSet('close_requests', reqs.slice(0,100));
+  showToast('📨 종료 요청 전송 — 담당자: ' + mgrName);
+}
+// 직접 종료 시 해당 항목의 대기 요청 정리
+function erpClearCloseReq(itemId){
+  try {
+    var reqs = dbGet('close_requests', []) || [];
+    var left = reqs.filter(function(r){ return !(r.itemId === itemId && r.status === 'pending'); });
+    if(left.length !== reqs.length) dbSet('close_requests', left);
+  } catch(e){}
 }
 function canSeeAmount(item){
   if(isAdminByUser(CURRENT_USER)) return true;
@@ -38404,6 +38448,8 @@ function ProjectManagementShared(props){
   function closeItem(id){
     var it = items.find(function(x){return x.id===id;});
     if(!it) return;
+    if(!canCloseDirect(it)){ erpRequestClose(it, (it.no||'') + ' ' + (it.companyName||'')); return; }
+    erpClearCloseReq(it.id);
     // 기존 종료 내용 있으면 그대로 종료 처리, 없으면 모달 열기
     if(it.closedReason && it.endDate){
       var today = todayYMD();
