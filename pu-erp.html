@@ -10297,6 +10297,11 @@ function CompanyManagement(){
       return c.status === statusTab && (code === 'all' || c.typeCode === code);
     }).length;
   }
+  function mgrCount(sid){
+    return companies.filter(function(c){
+      return c.status === statusTab && (sid === 'all' || c.managerMain === sid || (c.managerSubs||[]).indexOf(sid) !== -1);
+    }).length;
+  }
 
   // 인라인 편집 셀 렌더
   // ★ 주담당 전용 셀: 빈 경우 "+ 지정", 지정된 경우 이름 + ✕
@@ -10459,12 +10464,15 @@ function CompanyManagement(){
             h('span', { style:{ fontSize:'11px', color:'#475569', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } }, typeCount(typeFilter) + '건')
           ),
           // 담당자
-          h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
-            style:{ padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'20px', fontSize:'11px',
-              fontFamily:'inherit', background:'#f8fafc', flexShrink:0, cursor:'pointer',
-              color: mgrFilter!=='all'?'#1e40af':'#64748b', fontWeight: mgrFilter!=='all'?700:400 } },
-            h('option', { value:'all' }, '👤 담당자'),
-            users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); }))
+          h('div', { style:{ display:'inline-flex', alignItems:'center', gap:'4px', flexShrink:0 } },
+            h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
+              style:{ padding:'5px 8px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'20px', fontSize:'11px',
+                fontFamily:'inherit', background:'#f8fafc', flexShrink:0, cursor:'pointer',
+                color: mgrFilter!=='all'?'#1e40af':'#64748b', fontWeight: mgrFilter!=='all'?700:400 } },
+              h('option', { value:'all' }, '👤 담당자'),
+              users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); })),
+            mgrFilter !== 'all' && h('span', { style:{ fontSize:'11px', color:'#1e40af', fontWeight:700, whiteSpace:'nowrap' } }, mgrCount(mgrFilter) + '개')
+          )
         )
       )
     : h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'14px', flexWrap:'wrap' } },
@@ -10499,10 +10507,14 @@ function CompanyManagement(){
           COMPANY_TYPE_FILTERS.map(function(tf0){ return h('option', { key:tf0.v, value:tf0.v }, tf0.icon + ' ' + tf0.label); })),
         h('span', { style:{ fontSize:'11.5px', color:'#475569', fontWeight:700, whiteSpace:'nowrap' } }, typeCount(typeFilter) + '건')
       ),
-      h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
-        style:{ padding:'5px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'inherit' } },
-        h('option', { value:'all' }, '담당자 전체'),
-        users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); })),
+      h('div', { style:{ display:'inline-flex', alignItems:'center', gap:'4px' } },
+        h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
+          style:{ padding:'5px 10px', border:'1px solid '+(mgrFilter!=='all'?'#1e40af':'#cbd5e1'), borderRadius:'4px', fontSize:'11.5px', fontFamily:'inherit',
+            color: mgrFilter!=='all'?'#1e40af':'#475569', fontWeight: mgrFilter!=='all'?700:400 } },
+          h('option', { value:'all' }, '담당자 전체'),
+          users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); })),
+        mgrFilter !== 'all' && h('span', { style:{ fontSize:'11.5px', color:'#1e40af', fontWeight:700, whiteSpace:'nowrap' } }, mgrCount(mgrFilter) + '개')
+      ),
       h('div', { style:{ position:'relative', display:'inline-flex', alignItems:'center' } },
         h('input', { className:'dt-search', placeholder:'🔍 업체명·사업자번호·대표자·업태·종목·주소·담당자·전화·메모',
           value:query,
