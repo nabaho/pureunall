@@ -4577,6 +4577,7 @@ function Header(props){
     h(FirebaseStatus, null),
 
     h(NotificationCenter, null),
+    h(DesktopViewToggle, null),
     h(DarkModeToggle, null),
     // 📞 상담기록 버튼
     h('button', { onClick:function(){ setShowConsultLog(true); }, title:'상담전화 기록 (📞)',
@@ -4782,6 +4783,32 @@ function GlobalSearch(props){
             })
           ]
     )
+  );
+}
+
+// ============ PC 화면 보기 토글 (모바일에서 viewport 폭 강제) ============
+function DesktopViewToggle(){
+  var ds = useState(dbGet('force_desktop_view', false)); var on = ds[0]; var setOn = ds[1];
+  function applyViewport(force){
+    var meta = document.querySelector('meta[name="viewport"]');
+    if(!meta){ return; }
+    if(force) meta.setAttribute('content', 'width=1280, user-scalable=yes');
+    else meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=3.0, user-scalable=yes');
+  }
+  useEffect(function(){ applyViewport(on); }, [on]);
+  // 폰에서만 의미가 있으므로 작은 화면에서만 노출
+  if(window.innerWidth > 768 && !on) return null;
+  function toggle(){
+    var next = !on;
+    setOn(next);
+    dbSet('force_desktop_view', next);
+    applyViewport(next);
+    showToast(next ? '🖥️ PC 화면 보기 ON (손가락으로 확대/축소)' : '📱 모바일 화면으로 복귀');
+  }
+  return h('button', { onClick:toggle,
+    title: on ? '모바일 화면으로 복귀' : 'PC 화면처럼 보기 (폭 1280)',
+    style:{ background: on?'#1e40af':'none', border: on?'1px solid #fff':'none', color:'#fff', fontSize:'18px', cursor:'pointer', padding:'6px 10px', marginRight:'8px', borderRadius:'6px' } },
+    on ? '📱' : '🖥️'
   );
 }
 
