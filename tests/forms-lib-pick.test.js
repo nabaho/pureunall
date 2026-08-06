@@ -41,3 +41,52 @@ test('pickRepresentative: 빈 양식이 여럿이면 기입란 많고 최신인 
 test('pickRepresentative: 빈 배열이면 null', () => {
   assert.strictEqual(L.pickRepresentative([]).rep, null);
 });
+
+test('pickRepresentative: 빈 양식에 사무소 주소(review)가 있어도 탈락하지 않는다', () => {
+  // Finding 2 — scanPii는 주소를 kind:'review'로 보고한다(자동 치환 대상이 아님).
+  // pickRepresentative는 kind:'redact'만 '더러움'으로 봐야 한다. 필터를
+  // scanPii(...).length === 0 으로 되돌리면 이 테스트가 실패해야 한다.
+  const members = [
+    {
+      rel: 'case/실사건.hwp',
+      mtime: 9000,
+      html: '<p>성명 : 김철수 800101-1234567</p>',   // 진짜 주민번호 — kind:'redact'
+    },
+    {
+      rel: 'form/빈양식.hwp',
+      mtime: 1000,
+      html: '<p>성명 : ______</p>' +
+            '<p>주소 : ______</p>' +
+            // 노무법인 사무소 주소 — 실제 개인 주소가 아니라 kind:'review'로만 잡혀야 한다.
+            '<p>사무소 주소: 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층</p>',
+    },
+  ];
+  const r = L.pickRepresentative(members);
+  assert.strictEqual(r.rep.rel, 'form/빈양식.hwp');
+  assert.strictEqual(r.pickedBy, 'blank');
+});
+
+test('blankScore: 밑줄뿐 아니라 괄호공백·콜론공백 기입란도 잡는다 (Finding 1)', () => {
+  const paren = '<p>성명 (    )</p><p>주소 (    )</p>';
+  const colon = '<p>성명 :     </p><p>주소 :     </p>';
+  assert.ok(L.blankScore(paren) > 0, '괄호공백 기입란이 0점이면 안 된다');
+  assert.ok(L.blankScore(colon) > 0, '콜론공백 기입란이 0점이면 안 된다');
+});
+
+test('pickRepresentative: 괄호공백·콜론공백으로만 표시된 빈 양식도 대표로 뽑힌다 (Finding 1)', () => {
+  const members = [
+    { rel: 'case/실사건.hwp', mtime: 9000, html: '<p>성명 : 김철수 800101-1234567</p>' },
+    { rel: 'form/괄호식.hwp', mtime: 1000, html: '<p>성명 (    )</p><p>주소 (    )</p>' },
+  ];
+  const r1 = L.pickRepresentative(members);
+  assert.strictEqual(r1.rep.rel, 'form/괄호식.hwp');
+  assert.strictEqual(r1.pickedBy, 'blank');
+
+  const members2 = [
+    { rel: 'case/실사건.hwp', mtime: 9000, html: '<p>성명 : 김철수 800101-1234567</p>' },
+    { rel: 'form/콜론식.hwp', mtime: 1000, html: '<p>성명 :     </p><p>주소 :     </p>' },
+  ];
+  const r2 = L.pickRepresentative(members2);
+  assert.strictEqual(r2.rep.rel, 'form/콜론식.hwp');
+  assert.strictEqual(r2.pickedBy, 'blank');
+});

@@ -684,7 +684,12 @@ function flagIssues(html) {
 // 없으면 최신 사건본을 골라 익명화해 승격한다 — 현행 서식이 사건 폴더에만
 // 남아 있는 경우가 많기 때문(설계문서 §3.2).
 function blankScore(html) {
-  const text = stripTags(html);
+  // stripTags는 공백 뭉치를 한 칸으로 뭉개고 끝 공백을 trim하므로
+  // "(    )"·":     " 같은 공백-기반 기입란 표시가 살아남지 못한다
+  // (\(\s{2,}\)·[:：]\s{3,}가 절대 매치되지 않음 — Task 7 리뷰에서 발견).
+  // labelProbeView는 태그만 줄바꿈으로 바꾸고 공백은 원문 그대로 두므로
+  // 세 가지 기입란 표시(밑줄·괄호공백·콜론공백)를 모두 잡을 수 있다.
+  const text = labelProbeView(html);
   const marks = text.match(/_{2,}|\(\s{2,}\)|[:：]\s{3,}/g);
   return marks ? marks.length : 0;
 }
