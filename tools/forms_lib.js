@@ -679,6 +679,35 @@ function flagIssues(html) {
   return flags;
 }
 
+// ── 대표본 선정 ──
+// 빈 양식(밑줄·괄호공백 기입란이 많고 PII가 없는 판본)이 정본으로 가장 안전하다.
+// 없으면 최신 사건본을 골라 익명화해 승격한다 — 현행 서식이 사건 폴더에만
+// 남아 있는 경우가 많기 때문(설계문서 §3.2).
+function blankScore(html) {
+  const text = stripTags(html);
+  const marks = text.match(/_{2,}|\(\s{2,}\)|[:：]\s{3,}/g);
+  return marks ? marks.length : 0;
+}
+
+function pickRepresentative(members) {
+  const list = (members || []).filter(Boolean);
+  if (!list.length) return { rep: null, pickedBy: null };
+
+  // ※ 실행 중 변경(2026-08-06): scanPii는 {label, kind, sample}을 돌려주고
+  //    주소는 kind:'review'(자동 치환 대상 아님)다. 'redact' 종류만 '더러움'으로 본다.
+  //    원래 코드(scanPii(...).length === 0)를 그대로 두면 주소 있는 서식이 전부
+  //    탈락해 pickedBy:'blank'가 사실상 안 나온다 — 실측 70건 중 29건이 주소를 갖는다.
+  const hasRedactable = h => scanPii(h).some(f => f.kind === 'redact');
+  const clean = list.filter(m => !hasRedactable(m.html) && blankScore(m.html) > 0);
+  if (clean.length) {
+    clean.sort((a, b) => blankScore(b.html) - blankScore(a.html) || (b.mtime || 0) - (a.mtime || 0));
+    return { rep: clean[0], pickedBy: 'blank' };
+  }
+  const byNew = list.slice().sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
+  return { rep: byNew[0], pickedBy: 'anonymized-latest' };
+}
+
 module.exports = { normalizeForHash, formHash, shingles, similarity, clusterByContent,
                    isTitleLine, stripTags, splitSegments, classify,
-                   PII_RULES, anonymize, scanPii, extractVars, flagIssues };
+                   PII_RULES, anonymize, scanPii, extractVars, flagIssues,
+                   blankScore, pickRepresentative };
