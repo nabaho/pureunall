@@ -139,3 +139,50 @@ test('splitSegments: 자간 제목이라도 본문이 실하면 서식으로 남
   assert.strictEqual(segs.length, 2);
   assert.strictEqual(segs[1].title, '지급명령신청');
 });
+
+// ── 과분할 회귀: 장/절/관/편 표제와 순번 글머리가 서식 제목으로 둔갑하던 문제 ──
+// 실측 6,848건에서 "제1장총칙"(484회)·"제1절통칙"(325회)·"②임금계산기간및지급일등"
+// (123회) 등 장절·목록 표지가 제목줄로 잡혀, 취업규칙 한 건이 장절 수만큼
+// 조각났다. 조문(제N조) 배제 규칙과 같은 자리에 장/절/관/편·순번 배제 규칙을 둔다.
+
+test('isTitleLine: 장/절/관/편 머리는 제목이 아니다', () => {
+  assert.ok(!L.isTitleLine('제 1 장 총 칙'));
+  assert.ok(!L.isTitleLine('제 1 절  통 칙'));
+  assert.ok(!L.isTitleLine('제3장  복무'));
+  assert.ok(!L.isTitleLine('제 2 장  채 용'));
+  assert.ok(!L.isTitleLine('제 1 관 통 칙'));
+  assert.ok(!L.isTitleLine('제 1 편  총 칙'));
+});
+
+test('isTitleLine: 동그라미 숫자·아라비아 숫자 순번 글머리는 제목이 아니다', () => {
+  assert.ok(!L.isTitleLine('② 임 금 계 산 기 간 및 지 급 일 등'));
+  assert.ok(!L.isTitleLine('①  목   적'));
+  assert.ok(!L.isTitleLine('1.  목   적'));
+  assert.ok(!L.isTitleLine('1)  목   적'));
+});
+
+test('isTitleLine: 순번 글머리라도 서식 어미(TITLE_TAIL)가 있으면 제목이다', () => {
+  // 한 문서에 여러 서식을 번호로 나열한 경우 — 서식 어미가 순번 배제를 이긴다.
+  assert.ok(L.isTitleLine('1. 위임장'));
+  assert.ok(L.isTitleLine('2) 확인서'));
+});
+
+test('isTitleLine: 별지·호서식 이름은 여전히 제목이다', () => {
+  assert.ok(L.isTitleLine('제 3 호 서 식'));
+  assert.ok(L.isTitleLine('별지 제3호의2서식 간이대지급금 지급청구서'));
+});
+
+test('splitSegments: 취업규칙 장절 제목은 세그먼트를 나누지 않는다', () => {
+  const body = '이 규칙은 취업에 관한 사항을 정함을 목적으로 한다. '.repeat(6);
+  const html = [
+    '<p>취   업   규   칙</p>',
+    '<p>제 1 장  총 칙</p>',
+    '<p>제1조 목적 ' + body + '</p>',
+    '<p>제 2 장  채 용</p>',
+    '<p>제2조 채용 ' + body + '</p>',
+  ].join('');
+  const segs = L.splitSegments(html);
+  assert.strictEqual(segs.length, 1);
+  assert.strictEqual(segs[0].title, '취업규칙');
+  assert.ok(segs[0].html.includes('제 2 장'));
+});
