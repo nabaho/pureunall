@@ -56,8 +56,15 @@ test('splitSegments: 제목 앞 머리말은 첫 조각에 붙는다', () => {
   assert.ok(segs[0].html.includes('붙임1'));
 });
 
-test('splitSegments: 표 안의 짧은 셀은 제목으로 오인하지 않는다', () => {
+test('splitSegments: 제목 뒤 표는 새 조각을 만들지 않는다', () => {
   const html = '<p>위   임   장</p><table><tr><td>동의서</td><td>내용</td></tr></table>';
   const segs = L.splitSegments(html);
   assert.strictEqual(segs.length, 1);
+});
+
+test('splitSegments: 표 셀의 중첩 <p>는 경계를 만든다 (알려진 한계)', () => {
+  const html = '<p>위   임   장</p><table><tr><td><p>동의서</p></td><td>내용</td></tr></table>';
+  const segs = L.splitSegments(html);
+  // 현재 구현은 <td> 안의 <p>도 경계로 삼는다. hwp2html.py 출력이 이런 구조를 만들지 않아 문제없다.
+  assert.strictEqual(segs.length, 2);
 });
