@@ -191,7 +191,7 @@ function anonymize(html, names) {
   // {{변수}}는 이미 치환된 자리이므로 보호했다가 되돌린다.
   const vault = [];
   out = out.replace(/\{\{[^}]+\}\}/g, m => {
-    vault.push(m); return ' V' + (vault.length - 1) + ' ';
+    vault.push(m); return '\u0000V' + (vault.length - 1) + '\u0000';
   });
   for (const [label, re, ok] of PII_RULES) {
     out = out.replace(re, m => {
@@ -205,7 +205,7 @@ function anonymize(html, names) {
     const re = new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
     out = out.replace(re, () => { hits['이름'] = (hits['이름'] || 0) + 1; return '{{이름}}'; });
   }
-  out = out.replace(/ V(\d+) /g, (_, i) => vault[+i]);
+  out = out.replace(/\u0000V(\d+)\u0000/g, (_, i) => vault[+i]);
   return { html: out, hits };
 }
 
