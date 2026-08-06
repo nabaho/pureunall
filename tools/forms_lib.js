@@ -29,17 +29,23 @@ function shingles(text, k) {
   return s;
 }
 
-function similarity(a, b) {
-  const A = shingles(a), B = shingles(b);
+// 이미 생성된 shingle 집합에 대한 자카드 계수 계산 (내부용)
+function jaccardSets(A, B) {
   if (!A.size || !B.size) return 0;
   let inter = 0;
   for (const x of A) if (B.has(x)) inter++;
   return inter / (A.size + B.size - inter);
 }
 
+function similarity(a, b) {
+  const A = shingles(a), B = shingles(b);
+  return jaccardSets(A, B);
+}
+
 // ── 군집 ──
 // 1차: 정규화 해시로 완전동일 묶음. 2차: 묶음 대표끼리 유사도로 병합.
-// O(n²)이지만 1차에서 크게 접히므로 실측 규모(수천 건)에서 충분하다.
+// 각 묶음 대표의 shingle 집합을 미리 생성한 후 쌍별 자카드 계수로 비교.
+// shingle 재계산을 피함으로써 O(n²) 비교 성능 최적화.
 function clusterByContent(items, threshold) {
   const th = threshold == null ? 0.85 : threshold;
   const byHash = new Map();
@@ -49,6 +55,7 @@ function clusterByContent(items, threshold) {
     byHash.get(h).push(it);
   }
   const groups = [...byHash.values()];
+  const repShingles = groups.map(g => shingles(g[0].text));
   const merged = [];
   const used = new Array(groups.length).fill(false);
   for (let i = 0; i < groups.length; i++) {
@@ -57,7 +64,7 @@ function clusterByContent(items, threshold) {
     let bucket = groups[i].slice();
     for (let j = i + 1; j < groups.length; j++) {
       if (used[j]) continue;
-      if (similarity(groups[i][0].text, groups[j][0].text) >= th) {
+      if (jaccardSets(repShingles[i], repShingles[j]) >= th) {
         used[j] = true;
         bucket = bucket.concat(groups[j]);
       }
