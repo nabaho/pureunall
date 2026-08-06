@@ -74,4 +74,50 @@ function clusterByContent(items, threshold) {
   return merged;
 }
 
-module.exports = { normalizeForHash, formHash, shingles, similarity, clusterByContent };
+// ── 세그먼트 분할 ──
+// 한 HWP에 서식이 여러 개 들어 있다(예: 위임약정서+위임장+취하서+동의서+CMS).
+// 경계는 중앙 제목줄. 자간을 벌린 제목(위 임 장)과 서식 어미로 끝나는 제목을 모두 잡는다.
+const TITLE_TAIL = /(위임장|위임계약서|약정서|동의서|신청서|청구서|진정서|취하서|확인서|확인원|신고서|계산서|보고서|합의서|경위서|의견서|보정서|각서|서약서|확약서|명세서|증명서|선정서|위임약정서|고지확인서)$/;
+
+function isTitleLine(text) {
+  const t = String(text || '').trim();
+  const bare = t.replace(/\s/g, '');
+  if (bare.length < 3 || bare.length > 24) return false;
+  if (/[.。]$/.test(t)) return false;                 // 문장은 제목이 아니다
+  if (/^제\s*\d+\s*조/.test(bare)) return false;      // 조문 머리
+  const spaced = (t.length - bare.length) / bare.length >= 0.5;
+  return spaced || TITLE_TAIL.test(bare);
+}
+
+function stripTags(s) {
+  return String(s || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function splitSegments(html) {
+  const src = String(html || '');
+  // 최상위 <p>만 경계 후보로 본다. 표 안(<td>) 짧은 셀은 제목이 아니다.
+  const parts = src.split(/(?=<p>)/);
+  const segs = [];
+  let cur = null;
+  for (const part of parts) {
+    const m = /^<p>([\s\S]*?)<\/p>/.exec(part);
+    const text = m ? stripTags(m[1]) : '';
+    if (m && isTitleLine(text)) {
+      cur = { title: text.replace(/\s/g, ''), html: part, index: segs.length };
+      segs.push(cur);
+    } else if (cur) {
+      cur.html += part;
+    } else {
+      // 첫 제목 이전의 머리말 — 버리지 않고 보관했다가 첫 조각에 붙인다
+      segs._preamble = (segs._preamble || '') + part;
+    }
+  }
+  if (!segs.length) return [{ title: '', html: src, index: 0 }];
+  if (segs._preamble) { segs[0].html = segs._preamble + segs[0].html; delete segs._preamble; }
+  return segs;
+}
+
+module.exports = { normalizeForHash, formHash, shingles, similarity, clusterByContent,
+                   isTitleLine, stripTags, splitSegments };
