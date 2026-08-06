@@ -117,9 +117,15 @@ function buildForms(records, taxonomy, names) {
     while (usedIds.has(id)) id = id + 'x';
     usedIds.add(id);
 
+    // splitSegments가 <p> 제목줄만 보므로, 제목이 표(<td>) 안에만 있으면 못 찾는다
+    // (실측 90개 세그먼트 중 25개, 28%). 그때도 사람이 훑어볼 수 있게 본문 앞
+    // 24자로 title을 채우긴 하지만, 그건 '검출된 제목'이 아니라 대체값이다.
+    // 이 구분이 없으면 검토표·검토 페이지에서 대체값을 진짜 제목처럼 보게 된다.
+    const titleDetected = !!rep.title;
     forms.push({
       id,
       title: rep.title || L.stripTags(body).slice(0, 24),
+      titleDetected,
       domain: cls.domain,
       track: cls.track,
       category: cls.category,

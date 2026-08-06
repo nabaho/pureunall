@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const R = require('../tools/forms_report.js');
 
 const FORMS = [{
-  id: 'wa-abc1234567', title: '위임약정서', domain: 'wageArrears',
+  id: 'wa-abc1234567', title: '위임약정서', titleDetected: true, domain: 'wageArrears',
   track: ['수임·위임'], category: 'mandate', esign: true, signer: 'worker',
   jurisdiction: '천안',
   vars: [{ key: '이름' }, { key: '주민등록번호' }],
@@ -78,20 +78,34 @@ test('reviewRows: 여러 플래그가 함께 있어도 주소포함이 유지된
 });
 
 // ── 추가 2: 제목 미검출 표시 ──
-// 세그먼트 분할이 표 안의 제목을 못 찾으면 title이 빈 문자열로 온다. 사람이
-// 직접 제목을 달아야 하는 서식이므로 서식명 칸에서 구분돼야 한다.
-test('reviewRows: title이 비어 있으면 서식명 칸에 (제목 미검출)이 앞에 붙는다', () => {
-  const forms = [{ ...FORMS[0], title: '' }];
+// 세그먼트 분할이 표 안의 제목을 못 찾으면 buildForms가 titleDetected=false를
+// 매기고, title은 본문 앞 24자로 채워 넣는다(빈 문자열이 아니다!). 예전 검사는
+// title이 빈 문자열인지를 봤는데, buildForms가 항상 대체값을 채워 넣으므로
+// title이 실제로 비는 일이 없어 그 조건은 결코 참이 될 수 없었다 — 통과하고
+// 있었지만 옳은 이유로 통과한 게 아니었다. titleDetected를 직접 봐야 한다.
+test('reviewRows: titleDetected가 false면 서식명 칸에 (제목 미검출)이 앞에 붙는다', () => {
+  const forms = [{ ...FORMS[0], titleDetected: false }];
   const h = R.reviewRows(forms).headers;
   const row = R.reviewRows(forms).rows[0];
   const cell = row[h.indexOf('서식명')];
   assert.ok(cell.startsWith('(제목 미검출)'));
 });
 
-test('reviewRows: title이 있으면 (제목 미검출) 표시가 붙지 않는다', () => {
+test('reviewRows: titleDetected가 true면 (제목 미검출) 표시가 붙지 않는다', () => {
   const h = R.reviewRows(FORMS).headers;
   const row = R.reviewRows(FORMS).rows[0];
   const cell = row[h.indexOf('서식명')];
   assert.strictEqual(cell, '위임약정서');
   assert.ok(!cell.includes('제목 미검출'));
+});
+
+test('reviewHtml: titleDetected가 false면 소제목에도 (제목 미검출) 표시가 보인다', () => {
+  const forms = [{ ...FORMS[0], titleDetected: false }];
+  const html = R.reviewHtml(forms);
+  assert.ok(html.includes('(제목 미검출)'));
+});
+
+test('reviewHtml: titleDetected가 true면 (제목 미검출) 표시가 없다', () => {
+  const html = R.reviewHtml(FORMS);
+  assert.ok(!html.includes('제목 미검출'));
 });

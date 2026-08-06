@@ -23,9 +23,11 @@ function reviewRows(forms) {
     '',                                                   // 승인 — 노무사가 O/X 기입
     f.source.pickedBy === 'anonymized-latest' ? 'O' : '',  // 육안확인 필요
     DOMAIN_LABEL[f.domain] || f.domain,
-    // 제목 미검출 — 표 안에 있던 제목은 세그먼트 분할이 못 찾아 title이 빈
-    // 문자열로 온다. 사람이 직접 제목을 달아야 하므로 표시로 구분한다.
-    f.title ? f.title : '(제목 미검출) ' + L.stripTags(f.body).slice(0, 24),
+    // 제목 미검출 — 표 안에 있던 제목은 세그먼트 분할이 못 찾는다.
+    // buildForms가 이미 title을 본문 앞 24자로 채워 넣으므로 title이 비는 일은
+    // 없다 — titleDetected로 실제 검출 여부를 봐야 한다. 사람이 직접 제목을
+    // 달아야 하므로 표시로 구분한다.
+    f.titleDetected ? f.title : '(제목 미검출) ' + f.title,
     f.category,
     f.esign ? 'O' : '',
     f.signer || '',
@@ -48,7 +50,7 @@ function reviewHtml(forms) {
   const list = forms || [];
   const items = list.map((f, i) => `
 <section class="form">
-  <h2>${i + 1}. ${esc(f.title)} <span class="id">${esc(f.id)}</span></h2>
+  <h2>${i + 1}. ${f.titleDetected ? '' : '<span class="untitled">(제목 미검출)</span> '}${esc(f.title)} <span class="id">${esc(f.id)}</span></h2>
   <dl>
     <dt>도메인</dt><dd>${esc(DOMAIN_LABEL[f.domain] || f.domain)} / ${esc((f.track || []).join(', '))}</dd>
     <dt>분류</dt><dd>${esc(f.category)}${f.esign ? ' · <b>전자서명 대상</b>' : ''}${f.jurisdiction ? ' · 관할 ' + esc(f.jurisdiction) : ''}</dd>
@@ -74,6 +76,7 @@ function reviewHtml(forms) {
  dt{color:#666}
  dd{margin:0}
  .flags{color:#c00;font-weight:700}
+ .untitled{color:#c00;font-weight:700}
  .src{font-family:monospace;font-size:12px;word-break:break-all}
  .body{border-top:1px dashed #ccd;padding-top:16px}
  .body table{border-collapse:collapse;width:100%;margin:8px 0}

@@ -129,6 +129,31 @@ test('buildForms: 한 파일이 같은 서식을 두 번 담아도 cluster는 1�
   assert.deepStrictEqual(forms[0].source.cluster, ['x/두벌.hwp']);
 });
 
+// ── Finding: 제목 미검출 표시가 죽어 있던 문제 ──
+// splitSegments는 <p> 제목줄만 본다. 제목이 표(<td>) 안에만 있으면 못 찾아
+// title:''로 세그먼트가 온다(실측 90개 세그먼트 중 25개, 28%). buildForms가
+// 그때도 본문 앞 24자로 title을 채워 넣긴 하지만, 그건 검출된 제목이 아니라
+// 대체값이다 — 이 구분을 titleDetected로 남겨야 검토표에서 사람이 알아본다.
+test('buildForms: 제목이 표 안에만 있으면 titleDetected=false이고 title은 본문으로 채워진다', () => {
+  const html = '<table><tr><td>위임장</td></tr>'
+    + '<tr><td>표 안의 내용입니다. 표 안의 내용입니다.</td></tr></table>';
+  const forms = P.buildForms([{ rel: 'a/표서식.hwp', mtime: 1, err: null, html }], TX, []);
+  assert.strictEqual(forms.length, 1);
+  assert.strictEqual(forms[0].titleDetected, false);
+  assert.ok(forms[0].title.length > 0);
+});
+
+test('buildForms: 제목이 문단으로 검출되면 titleDetected=true', () => {
+  const recs = [{
+    rel: '2. 임금체불/위임장.hwp', mtime: 1000, err: null,
+    html: '<p>위   임   장</p><p>위임인 : ( 서 명 ) 성명 : ______</p>',
+  }];
+  const forms = P.buildForms(recs, TX, []);
+  assert.strictEqual(forms.length, 1);
+  assert.strictEqual(forms[0].titleDetected, true);
+  assert.strictEqual(forms[0].title, '위임장');
+});
+
 test('buildForms: id는 도메인 접두어를 갖고 유일하다', () => {
   const recs = [
     { rel: 'a/위임장.hwp',  mtime: 1, err: null, html: '<p>위   임   장</p><p>본문 하나</p>' },
