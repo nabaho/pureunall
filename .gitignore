@@ -77,3 +77,6 @@ GEMINI_API_KEY*
 .codex-task.md
 .codex-input/
 node_modules/
+
+# --- 서식집 스캔 중간산출물 (실주민번호·계좌 포함 → 커밋 금지) ---
+_forms_out/
