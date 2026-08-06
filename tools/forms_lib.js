@@ -98,7 +98,7 @@ function stripTags(s) {
 function splitSegments(html) {
   const src = String(html || '');
   // 문자열의 모든 <p> 앞에서 자르므로 중첩된 <p>도 경계가 된다.
-  // hwp2html.py가 <td> 안에 <p>를 만들지 않아(셀 여러 줄은 <br>로 연결, 1×1 레이아웃 표는 최상위 <p>로 펼침) 현무상 안전하다.
+  // hwp2html.py가 <td> 안에 <p>를 만들지 않아(셀 여러 줄은 <br>로 연결, 1×1 레이아웃 표는 최상위 <p>로 펼침) 실무상 안전하다.
   // 다른 변환기를 붙이면 이 가정을 다시 확인해야 한다.
   const parts = src.split(/(?=<p>)/);
   const segs = [];
