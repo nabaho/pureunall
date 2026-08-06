@@ -79,14 +79,79 @@ function clusterByContent(items, threshold) {
 // 경계는 중앙 제목줄. 자간을 벌린 제목(위 임 장)과 서식 어미로 끝나는 제목을 모두 잡는다.
 const TITLE_TAIL = /(위임장|위임계약서|약정서|동의서|신청서|청구서|진정서|취하서|확인서|확인원|신고서|계산서|보고서|합의서|경위서|의견서|보정서|각서|서약서|확약서|명세서|증명서|선정서|위임약정서|고지확인서)$/;
 
-function isTitleLine(text) {
+// ── 제목 판정에서 '자간'만 믿으면 안 되는 이유 ──
+// 한글 서식은 **기입란 라벨**도 칸을 맞추려고 자간을 벌린다(주 소 :, 성 명 :,
+// 년 월 일). 모양만 보면 벌려 쓴 제목(위 임 장)과 구별되지 않는다. 실측 70건에서
+// 자간 규칙 단독으로 189개 제목줄이 잡혔고 그중 태반이 라벨·상용구였다
+// (서식 144종 / 문서 70건). 그래서 세 가지를 더 본다.
+//   ① 콜론 — 콜론으로 끝나면 기입란 라벨이지 제목이 아니다.
+//   ② 상용구 사전 — 서식마다 되풀이되는 머리말(년월일·첨부서류·신청취지…).
+//   ③ 본문 유무 — 진짜 서식은 제목 아래에 내용이 있다(splitSegments에서 판정).
+// TITLE_TAIL(서식 어미)은 지금까지처럼 강한 양성 신호로 남긴다.
+
+// 상용구·기입란 라벨. 장식(글머리표·번호·괄호)을 걷어낸 알맹이로 비교한다.
+// TITLE_TAIL의 어미와 겹치는 낱말은 넣지 않는다 — 넣으면 진짜 서식을 잃는다.
+const BOILERPLATE = new RegExp('^(?:' + [
+  // 머리말·구획
+  '년월일', '년', '월', '일', '다음', '아래', '이상', '끝', '목차', '서언', '전문',
+  '첨부서류', '첨부자료', '첨부', '별첨', '별첨자료', '붙임', '참고자료', '입증방법',
+  '입증자료', '관계법령', '근거법령', '유의사항', '작성요령', '기재요령',
+  // 신청·청구 문서의 고정 소제목
+  '신청취지', '신청이유', '신청원인', '청구취지', '청구원인', '청구이유',
+  '진정취지', '진정이유', '고소취지', '고소이유', '신청내용', '청구내용',
+  '당사자표시', '당사자', '사건표시', '사건개요', '사실관계',
+  // 기입란 라벨
+  '주소', '자택주소', '현주소', '소재지', '사업장소재지', '성명', '이름', '생년월일',
+  '주민등록번호', '연락처', '전화', '전화번호', '휴대전화', '이메일', '직위', '직책',
+  '대표자', '담당자', '수신자', '발신자', '수신', '발신', '참조', '제목', '일시',
+  '장소', '금액', '합계', '소계', '총액', '단가', '수량', '비고', '기타', '기타사항',
+  '인지대', '송달료', '수령내역', '지급내역', '체불내역', '근무기간', '재직기간',
+  // 당사자 라벨
+  '위임자', '수임자', '위임인', '수임인', '신청인', '피신청인', '청구인', '피청구인',
+  '진정인', '피진정인', '채권자', '채무자', '근로자', '사업주', '사용자', '대리인',
+].join('|') + ')$');
+
+// 한글 음절·자모, 한자, 라틴 문자는 정상. 그 밖의 '글자'가 섞이면 HWP→HTML 변환
+// 잔재로 본다. (소스에 낯선 글자를 직접 박지 않으려고 \u 표기로 적는다.)
+const NATIVE_LETTER = [
+  '\\uAC00-\\uD7A3',   // 한글 음절
+  '\\u1100-\\u11FF',   // 한글 자모
+  '\\u3131-\\u318E',   // 한글 호환 자모
+  '\\u4E00-\\u9FFF',   // 한자
+  '\\uF900-\\uFAFF',   // 한자 호환
+  'A-Za-z',
+].join('');
+const FOREIGN_LETTER = new RegExp('(?![' + NATIVE_LETTER + '])\\p{L}', 'u');
+
+// 제목 후보에서 장식(번호·글머리표·괄호류)을 걷어낸 알맹이.
+// '20년월일'·'--다음--'·'□위임자'·'【첨부자료】'가 모두 상용구 사전에 걸리게 한다.
+function titleCore(bare) {
+  return bare.replace(/^[^가-힣A-Za-z]+/, '').replace(/[^가-힣A-Za-z]+$/, '');
+}
+
+// 0 = 제목 아님, 1 = 약한 제목(자간으로만 추정), 2 = 강한 제목(서식 어미).
+// 약한 제목은 splitSegments에서 본문 길이 검사를 한 번 더 통과해야 서식이 된다.
+function titleRank(text) {
   const t = String(text || '').trim();
   const bare = t.replace(/\s/g, '');
-  if (bare.length < 3 || bare.length > 24) return false;
-  if (/[.。]$/.test(t)) return false;                 // 문장은 제목이 아니다
-  if (/^제\s*\d+\s*조/.test(bare)) return false;      // 조문 머리
+  if (bare.length < 3 || bare.length > 24) return 0;
+  if (/[.。]$/.test(t)) return 0;                 // 문장은 제목이 아니다
+  if (/^제\s*\d+\s*조/.test(bare)) return 0;      // 조문 머리
+  if (/[:：]$/.test(bare)) return 0;              // 콜론으로 끝나면 기입란 라벨
+  if (BOILERPLATE.test(titleCore(bare))) return 0;
+  if (TITLE_TAIL.test(bare)) return 2;
+  // 어미가 약한데 줄 안에 콜론까지 있으면 라벨이다('- 성 명 : 대표 (☎ )').
+  if (/[:：]/.test(bare)) return 0;
+  // HWP 제어문자가 글자로 새어 나온 잔재(금 ÈĀ 원 송 달 료). 한글·라틴 문자가
+  // 아닌 '글자'가 섞여 있으면 사람이 붙인 제목이 아니다. 기호(※ ■ ☐ ․)는
+  // \p{L}이 아니므로 여기에 걸리지 않는다.
+  if (FOREIGN_LETTER.test(bare)) return 0;
   const spaced = (t.length - bare.length) / bare.length >= 0.5;
-  return spaced || TITLE_TAIL.test(bare);
+  return spaced ? 1 : 0;
+}
+
+function isTitleLine(text) {
+  return titleRank(text) > 0;
 }
 
 function stripTags(s) {
@@ -95,30 +160,52 @@ function stripTags(s) {
     .replace(/\s+/g, ' ').trim();
 }
 
+// 제목 아래 본문의 최소 길이(태그를 걷어낸 글자 수).
+// 강한 제목은 "본문이 아예 없는가"만 본다 — 표 한 칸짜리 서식도 있기 때문에 낮게 잡는다.
+// 약한 제목(자간만으로 추정)은 문서 한 장 분량의 본문을 요구한다. 라벨 아래에는
+// 다음 라벨까지의 몇 글자밖에 없고, 진짜 서식 본문은 그보다 한 자릿수 이상 길다.
+const MIN_BODY_STRONG = 1;
+const MIN_BODY_WEAK = 120;
+
 function splitSegments(html) {
   const src = String(html || '');
   // 문자열의 모든 <p> 앞에서 자르므로 중첩된 <p>도 경계가 된다.
   // hwp2html.py가 <td> 안에 <p>를 만들지 않아(셀 여러 줄은 <br>로 연결, 1×1 레이아웃 표는 최상위 <p>로 펼침) 실무상 안전하다.
   // 다른 변환기를 붙이면 이 가정을 다시 확인해야 한다.
   const parts = src.split(/(?=<p>)/);
-  const segs = [];
+  const raw = [];
   let cur = null;
+  let preamble = '';
   for (const part of parts) {
     const m = /^<p>([\s\S]*?)<\/p>/.exec(part);
-    const text = m ? stripTags(m[1]) : '';
-    if (m && isTitleLine(text)) {
-      cur = { title: text.replace(/\s/g, ''), html: part, index: segs.length };
-      segs.push(cur);
+    const rank = m ? titleRank(stripTags(m[1])) : 0;
+    if (rank) {
+      cur = { title: stripTags(m[1]).replace(/\s/g, ''), html: part, rank };
+      raw.push(cur);
     } else if (cur) {
       cur.html += part;
     } else {
       // 첫 제목 이전의 머리말 — 버리지 않고 보관했다가 첫 조각에 붙인다
-      segs._preamble = (segs._preamble || '') + part;
+      preamble += part;
     }
   }
+  if (!raw.length) return [{ title: '', html: src, index: 0 }];
+
+  // 본문이 부실한 조각은 서식이 아니다 — 앞 조각에 되돌려 붙인다.
+  // "제목처럼 생겼는가"를 더 정교하게 맞히려 애쓰는 대신, 잘라 놓고 결과를 보고
+  // 무르는 방식이라 어떤 낱말이 제목인지 알아맞힐 필요가 없다.
+  const segs = [];
+  for (const s of raw) {
+    const body = stripTags(s.html.replace(/^<p>[\s\S]*?<\/p>/, ''));
+    if (body.length >= (s.rank >= 2 ? MIN_BODY_STRONG : MIN_BODY_WEAK)) { segs.push(s); continue; }
+    if (segs.length) { segs[segs.length - 1].html += s.html; continue; }
+    // 앞에 붙일 조각이 없다. 약한 제목이면 머리말로 흘려보내고,
+    // 강한 제목이면 서식을 잃지 않도록 그대로 살린다.
+    if (s.rank >= 2) segs.push(s); else preamble += s.html;
+  }
   if (!segs.length) return [{ title: '', html: src, index: 0 }];
-  if (segs._preamble) { segs[0].html = segs._preamble + segs[0].html; delete segs._preamble; }
-  return segs;
+  segs[0].html = preamble + segs[0].html;
+  return segs.map((s, i) => ({ title: s.title, html: s.html, index: i }));
 }
 
 // ── 분류 ──

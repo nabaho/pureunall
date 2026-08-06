@@ -23,6 +23,41 @@ test('collectNames: 서식 어휘는 인명으로 오인하지 않는다', () =>
   assert.deepStrictEqual(names, []);
 });
 
+// ── Finding B 회귀 ──
+// 문서 상태 꼬리표가 인명 사전에 들어가면 anonymize가 그 낱말을 본문 전역에서
+// {{이름}}으로 바꿔 무관한 서식을 망가뜨린다. '최종'의 '최'는 진짜 성씨라서
+// 성씨 검사만으로는 못 막는다 — 사전과 함께 써야 한다.
+test('collectNames: 문서 상태 꼬리표는 인명이 아니다', () => {
+  const names = P.collectNames([
+    { rel: 'a/위임장_최종.hwp' },
+    { rel: 'b/합의서_검토.hwp' },
+    { rel: 'c/진정서_제출.hwp' },
+    { rel: 'd/청구서_수정본.hwp' },
+    { rel: 'e/확인서_보완.hwp' },
+    { rel: 'f/신고서_반려.hwp' },
+  ]);
+  assert.deepStrictEqual(names, []);
+});
+
+test('collectNames: 성씨가 아닌 낱말·지역명·기관명은 인명이 아니다', () => {
+  const names = P.collectNames([
+    { rel: 'a/진정서_작성예제.hwp' },   // 성씨 아님
+    { rel: 'b/확인서_법정도산.hwp' },   // 성씨 아님
+    { rel: 'c/위임장-천안.hwp' },       // 관할 지역
+    { rel: 'd/입금계좌_하나은행.hwp' },  // 기관 — '하'는 성씨지만 은행이다
+  ]);
+  assert.deepStrictEqual(names, []);
+});
+
+test('collectNames: 성씨로 시작하는 그럴듯한 이름은 남긴다', () => {
+  const names = P.collectNames([
+    { rel: 'a/위임장_최지훈.hwp' },
+    { rel: 'b/합의서-강민.hwp' },
+    { rel: 'c/청구서_남궁민수.hwp' },
+  ]);
+  assert.deepStrictEqual(names.sort(), ['강민', '남궁민수', '최지훈']);
+});
+
 test('buildForms: 복합 파일이 서식 단위로 펼쳐진다', () => {
   const recs = [{
     rel: '2. 임금체불/위임장-취하서.hwp', mtime: 1000, err: null,
@@ -60,6 +95,38 @@ test('buildForms: 사건본만 있으면 익명화 후 pickedBy=anonymized-lates
   assert.ok(forms[0].body.includes('{{주민등록번호}}'));
   assert.ok(!forms[0].body.includes('홍길동'));
   assert.ok(forms[0].review.flags.includes('구법용어'));
+});
+
+// ── Finding A 회귀 ──
+// pickedBy가 'blank'여도 익명화는 돈다. pickRepresentative의 '깨끗함' 검사는
+// 숫자형 PII만 보고 인명 사전을 아예 보지 못하므로, 서명란만 빈 판본에 실명이
+// 남아 있으면 그대로 GitHub Pages에 실린다.
+test('buildForms: pickedBy=blank 판본도 인명이 지워진다', () => {
+  const recs = [{
+    rel: '사건/위임장.hwp', mtime: 100, err: null,
+    html: '<p>위   임   장</p><p>사건 : 홍길동 외 1인 임금체불 진정 사건 일체</p>'
+        + '<p>위임인 성명 : ______  (인)</p>',
+  }];
+  const forms = P.buildForms(recs, TX, ['홍길동']);
+  assert.strictEqual(forms.length, 1);
+  assert.strictEqual(forms[0].source.pickedBy, 'blank');   // 대표본 선정은 그대로
+  assert.ok(!forms[0].body.includes('홍길동'));
+  assert.ok(forms[0].body.includes('{{이름}}'));
+});
+
+test('buildForms: 진짜 빈 양식에서 익명화는 아무것도 바꾸지 않는다', () => {
+  const html = '<p>위   임   장</p><p>위임인 성명 : ______  (인)</p><p>주소 : ______</p>';
+  const forms = P.buildForms([{ rel: 'a/위임장.hwp', mtime: 1, err: null, html }], TX, ['홍길동']);
+  assert.strictEqual(forms[0].source.pickedBy, 'blank');
+  assert.strictEqual(forms[0].body, html);
+});
+
+// ── Finding C 회귀 ──
+test('buildForms: 한 파일이 같은 서식을 두 번 담아도 cluster는 1건', () => {
+  const seg = '<p>위   임   장</p><p>위임인 : ( 서 명 ) 성명 : ______</p>';
+  const forms = P.buildForms([{ rel: 'x/두벌.hwp', mtime: 1, err: null, html: seg + seg }], TX, []);
+  assert.strictEqual(forms.length, 1);
+  assert.deepStrictEqual(forms[0].source.cluster, ['x/두벌.hwp']);
 });
 
 test('buildForms: id는 도메인 접두어를 갖고 유일하다', () => {
