@@ -188,22 +188,35 @@ function classify(relPath, html, taxonomy) {
 //   (b) 숫자 문자 참조(&#45; 등) → 실제 문자 + 남는 자리는 공백.
 //       HWP→HTML 변환기가 하이픈을 &#45;로 뱉는 사례가 있다.
 //   (c) &nbsp; → 공백.
-//   (d) {{변수}} → 공백. 이미 치환된 자리는 다시 건드리지 않는다(vault).
+//   (d) 보이지 않는 문자(소프트 하이픈·제로폭)는 공백으로, 전각 숫자는 ASCII 숫자로.
+//   (e) {{변수}} → 공백. 이미 치환된 자리는 다시 건드리지 않는다(vault).
 //       단 "변수 이름처럼 생긴 것"만 보호한다. 예전처럼 {{...}} 아무거나 보호하면
 //       {{ 790101-1234567 }} 같은 껍데기가 진짜 주민번호를 통째로 삼켜버린다.
 //
 // 이 방식 덕분에 예전의 널문자 센티널 vault(치환했다가 되돌리는 방식)가 통째로
 // 없어졌다. 되돌리는 단계 자체가 없으므로 입력에 널 문자가 섞여 있어도
 // 복원 정규식이 undefined를 뱉는 일이 구조적으로 불가능하다.
-const TAG_RE = /<[^>]+>/g;
+// 마크업 한 덩어리 = 주석 또는 태그. detectView·compactView·applyMatches가
+// 모두 이 하나를 쓴다 — 셋이 "마크업이란 무엇인가"에 대해 다르게 판단하면
+// 좌표와 태그 보존이 어긋난다.
+// 주석을 먼저 태우는 이유: 안에 '>'가 들어갈 수 있어 <[^>]+>로는 중간에서 잘린다.
+const MARKUP_RE = /<!--[\s\S]*?-->|<[^>]+>/g;
 const ENTITY_RE = /&nbsp;|&#(?:[xX][0-9a-fA-F]+|\d+);/g;
-const VAULT_RE = /\{\{[A-Za-z_가-힣][^{}]{0,63}\}\}/g;
+// 변수 이름 전체 모양을 강제한다. 예전 /\{\{[A-Za-z_가-힣][^{}]{0,63}\}\}/ 는
+// 첫 글자만 검사해서 {{주민 790101-1234567}}·{{x790101-1234567}}처럼
+// 이름 흉내만 낸 껍데기가 진짜 주민번호를 통째로 삼켰다.
+const VAULT_RE = /\{\{[A-Za-z_가-힣][A-Za-z0-9_가-힣]{0,63}\}\}/g;
+// 눈에 보이지 않지만 숫자 사이에 끼어 자릿수와 \b 앵커를 깨뜨리는 문자들.
+// 소프트 하이픈 U+00AD, 제로폭 U+200B~200D·U+2060, BOM U+FEFF.
+// 소스에 보이지 않는 문자를 그대로 박아 넣지 않는다 — 반드시 이스케이프 표기로.
+const INVISIBLE_G = /[\u00AD\u200B-\u200D\u2060\uFEFF]/g;
+const FULLWIDTH_DIGIT_G = /[\uFF10-\uFF19]/g;
 
 function blanks(n) { return ' '.repeat(n); }
 
-function detectView(src) {
-  let v = String(src == null ? '' : src).replace(TAG_RE, m => blanks(m.length));
-  v = v.replace(ENTITY_RE, m => {
+// 길이를 1:1로 유지하면서 (b)(c)(d)를 적용한다. detectView와 markupView가 공유한다.
+function foldView(v) {
+  v = v.replace(ENTITY_RE, (m, offset, whole) => {
     let ch = ' ';
     if (m.toLowerCase() !== '&nbsp;') {
       const body = m.slice(2, -1);
@@ -215,31 +228,68 @@ function detectView(src) {
       }
     }
     if (ch.length > m.length) ch = ' ';   // 길이가 넘치면 포기하고 공백
-    return ch + blanks(m.length - ch.length);
+    const pad = blanks(m.length - ch.length);
+    // 남는 자리를 어느 쪽에 둘지: 풀어낸 글자가 숫자이고 바로 뒤도 숫자면
+    // 왼쪽에 몰아서 뒤 숫자와 붙인다(&#55;90101-1234567 → "    790101-…").
+    // 그 외에는 오른쪽 — 앞 숫자와 붙어야 하는 경우(123456&#55;)를 지킨다.
+    const next = whole[offset + m.length];
+    const joinRight = /\d/.test(ch) && next !== undefined && /\d/.test(next);
+    return joinRight ? pad + ch : ch + pad;
   });
+  return v.replace(INVISIBLE_G, ' ')
+          .replace(FULLWIDTH_DIGIT_G, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 0x30));
+}
+
+function detectView(src) {
+  const v = foldView(String(src == null ? '' : src).replace(MARKUP_RE, m => blanks(m.length)));
   return v.replace(VAULT_RE, m => blanks(m.length));
 }
 
-// 태그를 아예 지운 '압축 뷰'와 원문 좌표 대응표(map[i] = 원문에서의 위치).
+// ── 마크업 내부 뷰 ── (detectView의 정확한 반대)
+// 태그 속성값과 주석 본문만 남기고 바깥은 전부 공백. 길이는 역시 1:1이다.
+// detectView·compactView가 태그 구간을 통째로 지우기 때문에 alt="790101-1234567"이나
+// <!-- 790101-1234567 --> 같은 값은 두 뷰 어디에도 보이지 않는다. 여기서만 보인다.
+function markupView(src) {
+  const s = String(src == null ? '' : src);
+  const out = new Array(s.length).fill(' ');
+  const rx = new RegExp(MARKUP_RE.source, 'g');
+  let m;
+  while ((m = rx.exec(s)) !== null) {
+    const isComment = m[0].slice(0, 4) === '<!--';
+    const from = m.index + (isComment ? 4 : 1);              // '<!--' / '<' 다음
+    const to = m.index + m[0].length - (isComment ? 3 : 1);  // '-->' / '>' 앞
+    for (let i = from; i < to; i++) out[i] = s[i];
+  }
+  return foldView(out.join(''));
+}
+
+// 태그와 보이지 않는 문자를 아예 지운 '압축 뷰'와 원문 좌표 대응표
+// (map[i] = 원문에서의 위치).
 // 공백 뷰는 표 셀이 달라붙는 것을 막아 주지만, 그 대가로 숫자 한가운데를 태그가
 // 가르는 경우(790101-1234<b>567</b>)를 놓친다. 압축 뷰는 정확히 그 반대다.
-// 그래서 둘 다 본다 — 단 압축 뷰에서는 주민번호 규칙만, 그것도 looksLikeRrn을
-// 통과한 것만 인정한다. 셀이 융합돼 생기는 헛매치가 유효한 생년월일·성별자리까지
-// 갖출 확률은 낮고, 설령 걸려도 결과는 마스킹이라 안전한 방향이다.
-// 계좌·전화 규칙은 압축 뷰에서 돌리지 않는다 — 셀을 가로질러 과잉 삼킬 위험이 크다.
+// 제로폭 문자가 숫자 한가운데 낀 경우(790101-123<U+200B>4567)도 같은 계열의
+// 미탐이라 여기서 함께 닫는다 — 공백 뷰는 길이를 지켜야 해서 공백으로만 바꿀 수
+// 있고, 그러면 자릿수가 여전히 끊긴다.
+// 그래서 둘 다 본다 — 단 압축 뷰에서는 COMPACT_RULES만, 그것도 검증 함수를
+// 통과한 것만 인정한다. 셀이 융합돼 생기는 헛매치가 유효한 생년월일·성별자리(또는
+// 11자리 휴대폰 꼴)까지 갖출 확률은 낮고, 설령 걸려도 결과는 마스킹이라 안전한
+// 방향이다. 계좌·유선전화 규칙은 압축 뷰에서 돌리지 않는다 — 자릿수 폭이 넓어
+// 셀을 가로질러 과잉 삼킬 위험이 크다.
 function compactView(src) {
   const s = String(src == null ? '' : src);
   const v = detectView(s);
-  const rx = new RegExp(TAG_RE.source, 'g');
+  const rx = new RegExp(MARKUP_RE.source, 'g');
   const drop = [];
   let t;
   while ((t = rx.exec(s)) !== null) drop.push([t.index, t.index + t[0].length]);
+  const inv = new RegExp(INVISIBLE_G.source);
   let text = '';
   const map = [];
   let di = 0;
   for (let i = 0; i < v.length; i++) {
     while (di < drop.length && i >= drop[di][1]) di++;
-    if (di < drop.length && i >= drop[di][0]) continue;   // 태그 안쪽
+    if (di < drop.length && i >= drop[di][0]) continue;   // 태그·주석 안쪽
+    if (inv.test(s[i])) continue;                         // 보이지 않는 문자
     map.push(i);
     text += v[i];
   }
@@ -262,7 +312,16 @@ function findMatches(view, re, ok) {
 
 // 하이픈 자리에 올 수 있는 문자들 — ASCII 하이픈, U+2010~2015 대시류, 전각 하이픈.
 // 숫자 문자 참조(&#45; 등)는 detectView가 이미 실제 문자로 풀어놓는다.
-const DASH = '[-\\u2010-\\u2015\\uFF0D]';
+const DASH_CHARS = '-\\u2010-\\u2015\\uFF0D';
+const DASH = '[' + DASH_CHARS + ']';
+
+// 전화번호 마디 구분자. 대시류·점·닫는 괄호는 앞뒤로 공백을 조금 허용하고,
+// 구분자가 아예 없거나 공백 한 칸인 경우도 인정한다.
+// 공백은 **한 칸까지만** 허용하는 것이 핵심이다. detectView에서 </td><td>는
+// 공백 9칸, <br>은 4칸, </p><p>는 7칸이 되므로 한 칸짜리 허용으로는 셀을
+// 가로질러 융합될 수 없다. 셀이 나뉜 전화번호는 압축 뷰 패스가 따로 잡는다.
+const PSEP = '(?:\\s{0,3}[' + DASH_CHARS + '.)]\\s{0,3}|\\s?)';
+const PSEP_REQ = '(?:\\s{0,3}[' + DASH_CHARS + '.)]\\s{0,3}|\\s)';   // 구분자 생략 불가
 
 // 주민번호 생년월일·성별자리 sanity 검사. 13자리 맨숫자 규칙에 반드시 붙인다.
 // (없으면 무관한 13자리 일련번호를 통째로 먹는다.)
@@ -275,22 +334,47 @@ function looksLikeRrn(s) {
   return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31 && g >= 1 && g <= 8;
 }
 
+// 휴대폰 sanity 검사. 압축 뷰 패스와 공백으로 갈라진 형태에 붙인다.
+// 정확히 11자리이고 01[016789]로 시작해야 한다.
+function looksLikePhone(s) {
+  const d = s.replace(/\D/g, '');
+  return d.length === 11 && /^01[016789]/.test(d);
+}
+
 // 순서가 중요하다. 주민번호(######-#######)는 법인등록번호와 형태가 같고,
 // 사업자등록번호(###-##-#####)는 계좌번호 패턴에도 걸린다. 좁은 것부터 먼저 태운다.
 // 3번째 원소는 선택적 검증 함수 — 정규식만으로 못 가리는 오탐을 막는다.
 const PII_RULES = [
-  // 구분자가 있는 주민번호. 대시류 전부 + 공백만으로 갈라진 경우까지 잡는다.
-  // 공백 형태는 HWP 표에서 셀이 나뉜 <td>790101</td><td>1234567</td>가
-  // detectView에서 공백으로 이어지며 만들어지는, 실무상 가장 흔한 모양이다.
-  // 검증 함수를 일부러 달지 않았다 — 991301-1234567처럼 날짜가 깨진 값도
-  // 개인정보일 가능성이 높으니 가리는 쪽이 안전하다. 대신 6자리·7자리 숫자가
-  // 나란히 놓인 무관한 표를 삼킬 수 있는데, 이 서식들에서 금액은 콤마를 달고
-  // 나오므로 실측 위험이 낮다고 보고 미탐보다 오탐을 택한다.
-  ['주민등록번호',   new RegExp('\\b\\d{6}(?:\\s*' + DASH + '\\s*|\\s+)[1-8]\\d{6}\\b', 'g'), null],
-  // 구분자 없는 13자리. 반드시 검증 함수와 함께 쓴다.
-  ['주민등록번호',   /\b\d{13}\b/g, looksLikeRrn],
-  ['연락처',         /\b01[016789][-)]?\s?\d{3,4}-?\d{4}\b/g, null],
-  ['전화번호',       /\b0\d{1,2}[-)]\s?\d{3,4}-\d{4}\b/g, null],
+  // (1) 대시류로 갈라진 주민번호. 검증 함수를 일부러 달지 않았다 —
+  //     991301-1234567처럼 달이 깨진 값도 사람이 손으로 적은 주민번호일
+  //     가능성이 높으니 가리는 쪽이 안전하다. 대시가 실제로 찍혀 있으므로
+  //     무관한 두 숫자가 우연히 이 꼴이 될 위험은 거의 없다.
+  //     앞뒤 경계를 \b가 아니라 (?<!\d)/(?!\d)로 잡는다. \b는 영문자에 붙은
+  //     숫자(예: {{x790101-1234567}}의 껍데기 안쪽)를 놓치는데, 자릿수를
+  //     넘치게 하는 것은 '숫자'뿐이므로 숫자만 막으면 충분하다.
+  ['주민등록번호',   new RegExp('(?<!\\d)\\d{6}\\s*' + DASH + '\\s*[1-8]\\d{6}(?!\\d)', 'g'), null],
+  // (2) 공백만으로 갈라진 주민번호. HWP 표에서 셀이 나뉜
+  //     <td>790101</td><td>1234567</td>가 detectView에서 공백으로 이어지며
+  //     만들어지는, 실무상 가장 흔한 모양이다.
+  //     **여기에는 반드시 검증 함수를 단다.** \s+는 길이 제한이 없어서
+  //     </td><td> 자리의 공백을 통째로 건너뛰는데, 검증 없이 두면
+  //     <td>250000</td><td>1234567</td>(단가·수량)나
+  //     <td>202301</td><td>1500000</td>(연월·금액)처럼 서로 무관한 두 셀을
+  //     한 덩어리로 잡아 버린다. 그리고 applyMatches는 매치 구간 전체를
+  //     자리표시자 하나로 바꾸므로, 두 번째 셀의 값은 '라벨링'되는 게 아니라
+  //     **삭제**된다 — 체불금품확인서에서 임금 액수가 소리 없이 사라진다.
+  //     (예전 주석은 "금액은 콤마를 달고 나온다"며 이 위험을 넘겼지만,
+  //      1,800,000은 그렇더라도 콤마 없는 금액·사번·연월 코드는 아니다.)
+  //     남는 오탐: 230115 1800000처럼 mm=01 dd=15 g=1로 구조가 온전한 값은
+  //     원리상 구별할 수 없다. 이건 감수한다 — 미탐보다 오탐이 안전하다.
+  ['주민등록번호',   /(?<!\d)\d{6}\s+[1-8]\d{6}(?!\d)/g, looksLikeRrn],
+  // (3) 구분자 없는 13자리. 반드시 검증 함수와 함께 쓴다.
+  ['주민등록번호',   /(?<!\d)\d{13}(?!\d)/g, looksLikeRrn],
+  // 휴대폰. 010 1234 5678·010.1234.5678도 평범한 한국식 표기다.
+  ['연락처',         new RegExp('\\b01[016789]' + PSEP + '\\d{3,4}' + PSEP + '\\d{4}\\b', 'g'), null],
+  // 유선전화. 구분자 생략은 허용하지 않는다 — 0으로 시작하는 8~11자리 숫자를
+  // 통째로 삼키게 된다.
+  ['전화번호',       new RegExp('\\b0\\d{1,2}' + PSEP_REQ + '\\d{3,4}' + PSEP_REQ + '\\d{4}\\b', 'g'), null],
   ['사업자등록번호', /\b\d{3}-\d{2}-\d{5}\b/g, null],
   // 계좌번호는 은행마다 자릿수가 달라 넓게 잡되,
   //  - 숫자 10자리 이상만 인정하고(날짜 2023-01-15 배제),
@@ -299,6 +383,9 @@ const PII_RULES = [
   //    끝 네 자리가 잘려 남던 문제).
   ['계좌번호',       /\b(?!(?:19|20)\d{2}-(?:0\d|1[0-2])-)\d{2,6}-\d{2,6}-\d{2,8}(?:-\d{1,4})?\b/g,
                      s => s.replace(/\D/g, '').length >= 10],
+  // 이메일. 맨 뒤에 둔다 — 앞의 숫자 규칙들이 먼저 자기 몫을 가져가야
+  // PII_RULES[0]이 주민번호라는 소비자 가정(lastIndex 회귀 테스트)이 유지된다.
+  ['이메일',         /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24}\b/g, null],
 ];
 
 // ── 스캔 전용 규칙 ──
@@ -319,10 +406,15 @@ const SCAN_ONLY_RULES = [
    null],
 ];
 
-// 압축 뷰 보완 패스에서 쓸 주민번호 규칙 — 검증 함수를 강제로 붙인다.
-const RRN_STRICT = PII_RULES
-  .filter(r => r[0] === '주민등록번호')
-  .map(r => [r[0], r[1], looksLikeRrn]);
+// 압축 뷰 보완 패스에서 쓸 규칙 — 검증 함수를 **강제로** 붙인다.
+// 압축 뷰는 태그를 지워 셀을 붙여 놓으므로, 검증 없는 규칙을 돌리면
+// 무관한 셀들이 융합돼 데이터가 지워진다(위 (2)번 규칙과 같은 사고).
+// 주민번호는 looksLikeRrn, 휴대폰은 looksLikePhone(정확히 11자리 + 01[016789]).
+// 휴대폰 검증은 충분히 좁아서 셀 융합 오탐이 사실상 나오지 않는다 —
+// <td>010</td><td>1234</td><td>5678</td>는 잡고, 무관한 숫자 셋은 자릿수에서 걸린다.
+const COMPACT_RULES = PII_RULES
+  .filter(r => r[0] === '주민등록번호' || r[0] === '연락처')
+  .map(r => [r[0], r[1], r[0] === '주민등록번호' ? looksLikeRrn : looksLikePhone]);
 
 // 규칙표는 얼려서 내보낸다. 다만 안에 든 RegExp 객체 자체는 얼리지 않는다 —
 // g 플래그 정규식을 Object.freeze하면 lastIndex가 read-only가 되어
@@ -331,7 +423,7 @@ const RRN_STRICT = PII_RULES
 function deepFreezeRules(rules) { rules.forEach(Object.freeze); return Object.freeze(rules); }
 deepFreezeRules(PII_RULES);
 deepFreezeRules(SCAN_ONLY_RULES);
-deepFreezeRules(RRN_STRICT);
+deepFreezeRules(COMPACT_RULES);
 
 // 원문 좌표의 매치 구간들을 자리표시자로 바꾼다.
 function applyMatches(src, ms, make) {
@@ -341,16 +433,40 @@ function applyMatches(src, ms, make) {
     if (m.start < pos) continue;   // 앞 매치와 겹치면 건너뛴다
     // 매치 구간에 걸린 태그는 살려서 자리표시자 뒤에 붙인다.
     // 표 셀 경계(</td><td>)나 인라인 태그를 통째로 삼키면 서식 뼈대가 무너진다.
-    const tags = (src.slice(m.start, m.end).match(TAG_RE) || []).join('');
+    const tags = (src.slice(m.start, m.end).match(MARKUP_RE) || []).join('');
     out += src.slice(pos, m.start) + make() + tags;
     pos = m.end;
   }
   return out + src.slice(pos);
 }
 
+// 매치 구간이 엔티티(&#55; · &nbsp;)를 반쪽만 물면 통째로 삼키도록 넓힌다.
+// detectView는 엔티티를 '실제 문자 + 남는 자리 공백'으로 펴기 때문에, 그 남는
+// 공백 자리에서 매치가 시작·종료되면 원문에는 '&#55' 같은 반토막이 남는다
+// (&#55;90101-1234567 → "&#55{{주민등록번호}}"). 개인정보가 새는 건 아니지만
+// 서식에 쓰레기가 남으므로 경계를 엔티티 단위로 맞춘다.
+function snapToEntities(src, ms) {
+  if (!ms.length) return ms;
+  const rx = new RegExp(ENTITY_RE.source, 'g');
+  const ents = [];
+  let e;
+  while ((e = rx.exec(src)) !== null) ents.push([e.index, e.index + e[0].length]);
+  if (!ents.length) return ms;
+  return ms.map(m => {
+    let start = m.start, end = m.end;
+    for (const [a, b] of ents) {
+      if (a < end && b > start) {            // 반쪽이라도 겹치면
+        if (a < start) start = a;
+        if (b > end) end = b;
+      }
+    }
+    return { start, end };
+  });
+}
+
 // 한 규칙을 원문에 적용한다. 매치는 감지용 뷰에서 찾고, 치환은 원문 좌표에 한다.
 function applyRule(src, re, ok, make) {
-  return applyMatches(src, findMatches(detectView(src), re, ok), make);
+  return applyMatches(src, snapToEntities(src, findMatches(detectView(src), re, ok)), make);
 }
 
 // 압축 뷰에서 찾아 원문 좌표로 되돌려 적용한다.
@@ -358,7 +474,7 @@ function applyRuleCompact(src, re, ok, make) {
   const { text, map } = compactView(src);
   const ms = findMatches(text, re, ok)
     .map(m => ({ start: map[m.start], end: map[m.end - 1] + 1 }));
-  return applyMatches(src, ms, make);
+  return applyMatches(src, snapToEntities(src, ms), make);
 }
 
 function anonymize(html, names) {
@@ -369,19 +485,35 @@ function anonymize(html, names) {
     return '{{' + label + '}}';
   };
   for (const [label, re, ok] of PII_RULES) out = applyRule(out, re, ok, bump(label));
-  // 태그가 숫자 한가운데를 가른 주민번호 보완 패스.
+  // 태그·제로폭 문자가 숫자 한가운데를 가른 주민번호·휴대폰 보완 패스.
   // 앞 단계에서 이미 치환된 자리는 {{주민등록번호}}가 되어 vault에 걸리므로
   // 두 번 세거나 두 번 치환되지 않는다.
-  for (const [label, re, ok] of RRN_STRICT) out = applyRuleCompact(out, re, ok, bump(label));
+  for (const [label, re, ok] of COMPACT_RULES) out = applyRuleCompact(out, re, ok, bump(label));
   // 인명 치환은 규칙 통과 뒤에 돈다. applyRule이 매번 detectView를 다시 뜨므로
   // 방금 넣은 {{연락처}} 같은 자리표시자도 vault에 들어가 다시 매치되지 않는다
   // (예전에는 인명 '연락처'가 {{연락처}}를 또 먹어 {{{{이름}}}}가 됐다).
+  //
+  // ── 성능 (알고 남긴 비용) ──
+  // applyRule은 규칙마다·이름마다 detectView를 처음부터 다시 뜬다. 아래 압축 뷰
+  // 패스는 거기에 더해 compactView(=detectView + 문자마다 map 배열 push)를 또 뜬다.
+  // 실측: 90KB 문서 × 이름 200개 기준 187ms → 850ms (약 4.5배).
+  // 이름 200개는 최악값이고 실제 서식 한 건의 인명 사전은 훨씬 작다. 17,483건을
+  // 한 번 돌리는 배치 작업이라 감수하고 지금은 최적화하지 않는다.
+  // (뷰를 캐시하려면 '치환할 때마다 원문이 바뀐다'는 전제가 깨지므로 재진입
+  //  안전성을 처음부터 다시 증명해야 한다. 배치가 느려서 문제가 되면 그때
+  //  compactView의 map을 Int32Array로 바꾸는 것부터 손대면 된다.)
   for (const n of (names || [])) {
     if (!n || n.length < 2) continue;
     const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // 앞뒤가 한글이면 다른 낱말의 일부다 — '정산'이 '정산금/정산서'를 먹지 않도록.
     const re = new RegExp('(?<![\\uAC00-\\uD7A3])' + esc + '(?![\\uAC00-\\uD7A3])', 'g');
     out = applyRule(out, re, null, bump('이름'));
+    // 인라인 태그가 이름을 가른 경우(홍<b>길동</b>). 위임장에서 이름은 가장
+    // 많이 나오는 개인정보이고, 사전에 실린 정확한 문자열만 찾으므로 셀이
+    // 융합돼 헛매치가 날 위험이 사실상 없다 — 그래서 압축 뷰도 함께 본다.
+    // 공백 뷰 패스가 먼저 잡은 자리는 {{이름}}이 되어 vault에 걸리므로
+    // 두 번 세지 않는다.
+    out = applyRuleCompact(out, re, null, bump('이름'));
   }
   return { html: out, hits };
 }
@@ -395,36 +527,42 @@ function scanPii(html) {
   const src = String(html || '');
   let work = detectView(src);
   const found = [];
-  const byLabel = new Map();
+  // 라벨만으로 키를 잡으면 같은 라벨이 다른 kind로 두 번 나올 때 먼저 본 kind가
+  // 그대로 굳는다. 오늘은 라벨과 kind가 1:1이라 드러나지 않지만, 규칙을 하나
+  // 옮기는 순간 조용히 틀린 kind가 나가고 게이트 계산이 어긋난다. 둘 다로 잡는다.
+  const byKey = new Map();
   const entry = (label, kind) => {
-    let e = byLabel.get(label);
-    if (!e) { e = { label, sample: '', kind, _s: [] }; byLabel.set(label, e); found.push(e); }
+    const key = kind + ':' + label;
+    let e = byKey.get(key);
+    if (!e) { e = { label, sample: '', kind, _s: [] }; byKey.set(key, e); found.push(e); }
     return e;
   };
-  const run = (rules, kind) => {
+  // 한 뷰를 규칙 순서대로 '소비'하며 훑는다. 찾은 자리는 같은 길이의 공백으로
+  // 지운다 — 길이를 유지해야 뒤 규칙의 앵커와 좌표가 어긋나지 않는다.
+  const sweep = (view, rules, kind) => {
+    let w = view;
     for (const [label, re, ok] of rules) {
-      const ms = findMatches(work, re, ok);
+      const ms = findMatches(w, re, ok);
       if (!ms.length) continue;
       const e = entry(label, kind);
-      // 찾은 자리는 같은 길이의 공백으로 지운다. 길이를 유지해야 뒤 규칙의
-      // \b 앵커와 좌표가 어긋나지 않는다.
       let next = '', pos = 0;
       for (const m of ms) {
-        next += work.slice(pos, m.start) + blanks(m.end - m.start);
+        next += w.slice(pos, m.start) + blanks(m.end - m.start);
         pos = m.end;
         e._s.push(m.text.replace(/\s+/g, ' ').trim());
       }
-      work = next + work.slice(pos);
+      w = next + w.slice(pos);
     }
+    return w;
   };
 
-  run(PII_RULES, 'redact');          // 지워야 하는 것
+  work = sweep(work, PII_RULES, 'redact');          // 지워야 하는 것
 
-  // 압축 뷰 보완 패스 — 태그가 숫자 한가운데를 가른 주민번호.
+  // 압축 뷰 보완 패스 — 태그·제로폭 문자가 숫자 한가운데를 가른 주민번호·휴대폰.
   // work는 원문과 길이가 1:1이므로, 해당 구간이 이미 공백이면 앞에서 소비된 것.
   {
     const { text, map } = compactView(src);
-    for (const [label, re, ok] of RRN_STRICT) {
+    for (const [label, re, ok] of COMPACT_RULES) {
       for (const m of findMatches(text, re, ok)) {
         const s = map[m.start], e = map[m.end - 1] + 1;
         if (!/\S/.test(work.slice(s, e))) continue;
@@ -434,7 +572,22 @@ function scanPii(html) {
     }
   }
 
-  run(SCAN_ONLY_RULES, 'review');    // 사람이 보고 정할 것
+  // ── 마크업 내부 패스 (검출 전용) ──
+  // detectView·compactView는 태그 구간을 통째로 지우므로 alt="790101-1234567",
+  // title="010-1234-5678", href="tel:…", <!-- 790101-1234567 --> 안의 값은
+  // 두 뷰 어디에도 보이지 않는다. 여기서만 본다.
+  //
+  // **검출만 하고 anonymize는 마크업을 손대지 않는다.** 근거:
+  // 현재 유일한 입력원인 fund-erp/tools/hwp2html.py는 본문 텍스트를 오직 요소
+  // 내용으로만 내보내고(esc()를 거쳐 <p>…</p>·<td>…</td>), 속성은 colspan·
+  // rowspan과 <col style="width:…%">뿐이며 주석은 아예 만들지 않는다.
+  // 즉 실측 위험은 0이고 이 패스는 다른 변환기가 붙었을 때를 위한 이중 방어선이다.
+  // 그런 상황에서 속성 안쪽을 자동 치환하면 얻는 것 없이 마크업만 깨질 수 있으므로,
+  // kind:'redact'로 보고해 Task 10 게이트를 떨어뜨리고 사람이 보게 하는 쪽을 택했다.
+  // (그래서 이 패스가 잡은 것은 "검출되면 반드시 지워진다" 불변식의 예외다.)
+  sweep(markupView(src), PII_RULES, 'redact');
+
+  work = sweep(work, SCAN_ONLY_RULES, 'review');    // 사람이 보고 정할 것
   for (const e of found) { e.sample = [...new Set(e._s)].slice(0, 3).join(' / '); delete e._s; }
   return found;
 }
