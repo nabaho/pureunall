@@ -594,10 +594,17 @@ function scanPii(html) {
 
 // ── 변수 추출 ──
 // 기입란 라벨 → 표준 변수명. docs-esign의 submission 필드명과 맞춘다.
+// '주소'(개인 주소)의 맨 알맹이 조각 `주\s*소`는 '사업장소재지'의 `사업장\s*주소`
+// 안에도 그대로 들어 있어, "사업장 주소" 라벨만 있는 서식에서도 개인 주소가
+// 수집됐다고 잘못 표시된다(필수 항목 '주소'가 실제로는 비어 있는데 채워진 것처럼 보임).
+// 음의 후방탐색으로 '사업장' 접두를 가진 경우를 bare 조각에서 제외해 복합 라벨
+// ('사업장소재지')만 매치하게 한다. LABEL_MAP의 다른 항목들도 같은 유형의 겹침이
+// 있는지 확인했다 — 나머지는 서로 다른 키의 복합 라벨 안에 다른 키의 alone 조각이
+// 끼어 있는 사례가 없어 손대지 않았다.
 const LABEL_MAP = [
   ['이름',           /(성\s*명|이\s*름|근로자\s*명|위임인\s*성명)/],
   ['주민등록번호',   /(주민\s*(등록)?\s*번호|생년월일)/],
-  ['주소',           /(주\s*소|자택\s*주소|현\s*주소)/],
+  ['주소',           /((?<!사업장\s*)주\s*소|자택\s*주소|현\s*주소)/],
   ['근로자연락처',   /(연\s*락\s*처|휴대\s*전화|전화\s*번호)/],
   ['입금계좌',       /(계좌\s*번호|입금\s*계좌|예\s*금\s*주)/],
   ['회사명',         /(회\s*사\s*명|사업체\s*명|상\s*호)/],
@@ -609,6 +616,16 @@ function varType(key) {
   if (/일$|일자$/.test(key)) return 'date';
   if (/금$|액$|료$|보수율$/.test(key)) return 'money';
   return 'text';
+}
+
+// 빈 기입란 탐지 전용 뷰. stripTags는 태그를 지우고 공백 뭉치를 한 칸으로
+// 뭉개므로(Task 3/4/5 소비자가 그 동작에 의존해 stripTags 자체는 건드리지 않는다),
+// "라벨 뒤 공백 3칸 이상" 같은 판정에는 쓸 수 없다 — 뭉개지고 나면 살아남는
+// 공백 뭉치가 없기 때문이다. 태그를 줄바꿈으로 바꿔 각 문단·셀을 한 줄로 만들고
+// 공백은 그대로 둔다. stripTags와 같은 엔티티만 해독한다.
+function labelProbeView(s) {
+  return String(s || '').replace(/<[^>]+>/g, '\n').replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 }
 
 function extractVars(html) {
@@ -623,10 +640,12 @@ function extractVars(html) {
   while ((m = re.exec(src))) push(m[1].trim());
 
   // ② 빈 기입란 — "라벨 : ____" 또는 "라벨 :" 뒤 공백
-  const text = stripTags(src);
+  // 콜론 둘레와 공백-뭉치 대안은 줄바꿈을 삼키지 않는 [ \t]만 쓴다 — \s를 쓰면
+  // 다음 줄의 라벨이나 콜론까지 이어 붙어 버린다. 줄 끝 판정은 m 플래그의 $로.
+  const probeText = labelProbeView(src);
   for (const [key, labelRe] of LABEL_MAP) {
-    const probe = new RegExp(labelRe.source + '\\s*[:：]\\s*(_{2,}|\\s{3,}|$)', 'm');
-    if (probe.test(text)) push(key);
+    const probe = new RegExp(labelRe.source + '[ \\t]*[:：][ \\t]*(_{2,}|[ \\t]{3,}|$)', 'm');
+    if (probe.test(probeText)) push(key);
   }
 
   return keys.map(k => ({

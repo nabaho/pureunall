@@ -60,3 +60,29 @@ test('flagIssues: 법인 사무소 주소가 있으면 주소포함 플래그만
   assert.ok(flags.includes('주소포함'), '주소포함 플래그가 있어야 함');
   assert.ok(!flags.includes('PII잔존'), 'PII잔존 플래그가 없어야 함');
 });
+
+// Finding 1 회귀: 공백만으로 표시된 빈 기입란은 stripTags를 거치면 공백 뭉치가
+// 한 칸으로 뭉개져 \s{3,} 대안이 죽은 코드가 된다. 뒤에 다른 문단이 이어 붙으면
+// 문서 끝의 $도 못 살려낸다 — labelProbeView가 태그를 줄바꿈으로 바꿔 줄 단위로
+// 봐야 라벨을 잡을 수 있다.
+test('extractVars: 라벨 뒤 공백만 있고 뒤에 다른 문단이 이어져도 변수로 승격', () => {
+  const v = L.extractVars('<p>성    명 :        </p><p>다음 문단</p>');
+  assert.deepStrictEqual(v.map(x => x.key), ['이름']);
+});
+
+// Finding 2 회귀: 개인 주소 '주소'의 bare 조각이 '사업장 주소' 안에도 들어 있어,
+// 회사 주소만 있는 서식에서 필수 항목 '주소'가 채워진 것처럼 잘못 보고됐다.
+test('extractVars: 사업장 주소는 사업장소재지만 잡고 개인 주소로 새지 않는다', () => {
+  const v = L.extractVars('<p>사업장 주소 :        </p>');
+  assert.deepStrictEqual(v.map(x => x.key), ['사업장소재지']);
+});
+
+// Finding 2 회귀 보강: 위 수정이 평범한 개인 주소 필드까지 죽이지 않았는지 확인.
+// 주소 예시는 실사건 데이터 대신 법인 사무소 주소(충남 천안시 서북구 원두정8길 6,
+// 두정빌딩 3층)를 쓴다.
+test('extractVars: 평범한 개인 주소 라벨은 여전히 주소로 잡힌다', () => {
+  const v1 = L.extractVars('<p>현주소 :        </p>');
+  assert.ok(v1.map(x => x.key).includes('주소'));
+  const v2 = L.extractVars('<p>주    소 :        </p><p>충남 천안시 서북구 원두정8길 6, 두정빌딩 3층</p>');
+  assert.ok(v2.map(x => x.key).includes('주소'));
+});
