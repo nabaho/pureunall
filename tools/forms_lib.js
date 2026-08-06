@@ -592,6 +592,74 @@ function scanPii(html) {
   return found;
 }
 
+// ── 변수 추출 ──
+// 기입란 라벨 → 표준 변수명. docs-esign의 submission 필드명과 맞춘다.
+const LABEL_MAP = [
+  ['이름',           /(성\s*명|이\s*름|근로자\s*명|위임인\s*성명)/],
+  ['주민등록번호',   /(주민\s*(등록)?\s*번호|생년월일)/],
+  ['주소',           /(주\s*소|자택\s*주소|현\s*주소)/],
+  ['근로자연락처',   /(연\s*락\s*처|휴대\s*전화|전화\s*번호)/],
+  ['입금계좌',       /(계좌\s*번호|입금\s*계좌|예\s*금\s*주)/],
+  ['회사명',         /(회\s*사\s*명|사업체\s*명|상\s*호)/],
+  ['사업장소재지',   /(소\s*재\s*지|사업장\s*주소)/],
+];
+const REQUIRED_KEYS = new Set(['이름', '주민등록번호', '주소', '근로자연락처']);
+
+function varType(key) {
+  if (/일$|일자$/.test(key)) return 'date';
+  if (/금$|액$|료$|보수율$/.test(key)) return 'money';
+  return 'text';
+}
+
+function extractVars(html) {
+  const src = String(html || '');
+  const keys = [];
+  const seen = new Set();
+  const push = k => { if (k && !seen.has(k)) { seen.add(k); keys.push(k); } };
+
+  // ① 이미 박혀 있는 {{변수}}
+  let m;
+  const re = /\{\{([^}]+)\}\}/g;
+  while ((m = re.exec(src))) push(m[1].trim());
+
+  // ② 빈 기입란 — "라벨 : ____" 또는 "라벨 :" 뒤 공백
+  const text = stripTags(src);
+  for (const [key, labelRe] of LABEL_MAP) {
+    const probe = new RegExp(labelRe.source + '\\s*[:：]\\s*(_{2,}|\\s{3,}|$)', 'm');
+    if (probe.test(text)) push(key);
+  }
+
+  return keys.map(k => ({
+    key: k,
+    label: k,
+    type: varType(k),
+    required: REQUIRED_KEYS.has(k),
+  }));
+}
+
+// ── 플래그 ──
+// 2021.10.14 임금채권보장법 개정: 체당금→대지급금, 소액체당금→간이대지급금,
+// 일반체당금→도산대지급금. 다만 관서 제출 서식은 원문을 따라야 하므로 치환은
+// 노무사 판단 사항이고 여기서는 표시만 한다.
+const OLD_TERMS = /체당금/;
+const CONSENT_MISMATCH = /회비\s*산출|회원\s*서비스|회원에\s*대한\s*추천/;
+
+function flagIssues(html) {
+  const flags = [];
+  const text = stripTags(html);
+  if (OLD_TERMS.test(text)) flags.push('구법용어');
+  if (CONSENT_MISMATCH.test(text)) flags.push('동의서용도불일치');
+  // ※ 실행 중 변경(2026-08-06): Task 5의 적대적 리뷰 후 scanPii가
+  //    {label, kind, sample}을 돌려주고 kind는 'redact'|'review'다.
+  //    주소는 'review' — 법인 자기 주소가 거의 모든 위임장에 있어 자동 치환하면 안 되고
+  //    사람이 판단해야 하기 때문이다. 따라서 'PII잔존'은 redact 종류만 센다.
+  //    (원래 코드는 scanPii(html).length여서 주소 있는 서식마다 오탐이 뜬다.)
+  const pii = scanPii(html);
+  if (pii.some(f => f.kind === 'redact')) flags.push('PII잔존');
+  if (pii.some(f => f.kind === 'review')) flags.push('주소포함');
+  return flags;
+}
+
 module.exports = { normalizeForHash, formHash, shingles, similarity, clusterByContent,
                    isTitleLine, stripTags, splitSegments, classify,
-                   PII_RULES, anonymize, scanPii };
+                   PII_RULES, anonymize, scanPii, extractVars, flagIssues };
