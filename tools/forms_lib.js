@@ -170,5 +170,62 @@ function classify(relPath, html, taxonomy) {
   return { domain, track, category, esign, signer, jurisdiction };
 }
 
+// ── 익명화 / PII ──
+// 순서가 중요하다. 주민번호(######-#######)는 법인등록번호와 형태가 같고,
+// 사업자등록번호(###-##-#####)는 계좌번호 패턴에도 걸린다. 좁은 것부터 먼저 태운다.
+// 3번째 원소는 선택적 검증 함수 — 정규식만으로 못 가리는 오탐을 막는다.
+const PII_RULES = [
+  ['주민등록번호',   /\b\d{6}\s*-\s*[1-8]\d{6}\b/g, null],
+  ['연락처',         /\b01[016789][-)]?\s?\d{3,4}-?\d{4}\b/g, null],
+  ['전화번호',       /\b0\d{1,2}[-)]\s?\d{3,4}-\d{4}\b/g, null],
+  ['사업자등록번호', /\b\d{3}-\d{2}-\d{5}\b/g, null],
+  // 계좌번호는 은행마다 자릿수가 달라 넓게 잡되, 날짜(2023-01-15)를 삼키지 않도록
+  // 숫자 10자리 이상만 인정한다.
+  ['계좌번호',       /\b\d{2,6}-\d{2,6}-\d{2,8}(?:-\d{1,3})?\b/g,
+                     s => s.replace(/\D/g, '').length >= 10],
+];
+
+function anonymize(html, names) {
+  let out = String(html || '');
+  const hits = {};
+  // {{변수}}는 이미 치환된 자리이므로 보호했다가 되돌린다.
+  const vault = [];
+  out = out.replace(/\{\{[^}]+\}\}/g, m => {
+    vault.push(m); return ' V' + (vault.length - 1) + ' ';
+  });
+  for (const [label, re, ok] of PII_RULES) {
+    out = out.replace(re, m => {
+      if (ok && !ok(m)) return m;
+      hits[label] = (hits[label] || 0) + 1;
+      return '{{' + label + '}}';
+    });
+  }
+  for (const n of (names || [])) {
+    if (!n || n.length < 2) continue;
+    const re = new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    out = out.replace(re, () => { hits['이름'] = (hits['이름'] || 0) + 1; return '{{이름}}'; });
+  }
+  out = out.replace(/ V(\d+) /g, (_, i) => vault[+i]);
+  return { html: out, hits };
+}
+
+function scanPii(html) {
+  // anonymize와 같은 순서로 '소비'하며 훑는다. 원문에 규칙을 각각 돌리면
+  // 010-9999-8888 하나가 연락처·전화번호·계좌번호 셋으로 중복 보고된다.
+  let work = stripTags(html);
+  const found = [];
+  for (const [label, re, ok] of PII_RULES) {
+    const samples = [];
+    work = work.replace(new RegExp(re.source, 'g'), m => {
+      if (ok && !ok(m)) return m;
+      samples.push(m);
+      return ' ';
+    });
+    if (samples.length) found.push({ label, sample: [...new Set(samples)].slice(0, 3).join(' / ') });
+  }
+  return found;
+}
+
 module.exports = { normalizeForHash, formHash, shingles, similarity, clusterByContent,
-                   isTitleLine, stripTags, splitSegments, classify };
+                   isTitleLine, stripTags, splitSegments, classify,
+                   PII_RULES, anonymize, scanPii };
