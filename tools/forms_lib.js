@@ -121,5 +121,54 @@ function splitSegments(html) {
   return segs;
 }
 
+// ── 분류 ──
+const CATEGORY_RULES = [
+  ['mandate',       /위임장|위임약정|약정서|선임신고|수임|선정서/],
+  ['consent',       /개인정보|동의서|자동이체|CMS|계좌/i],
+  ['wageGuarantee', /체당금|대지급금|도산등사실|지급청구서/],
+  ['complaint',     /진정서|진정신고|취하서|고소장|확인원|발급신청서/],
+  ['civil',         /지급명령|배당요구|채권계산|가압류|보정서|변론기일|이의신청|소장|준비서면/],
+  ['settlement',    /합의서|확약서|각서/],
+];
+
+// 관할 지청 — 사무소가 실제로 쓰는 곳만 둔다. 새 지청은 여기에 추가.
+const JURISDICTIONS = ['천안', '평택', '보령', '아산', '서산', '대전', '청주', '홍성'];
+
+const SIGN_WORKER   = /위임인|진정인|신청인|청구인|근로자|취하인|동의자|본\s*인/;
+const SIGN_EMPLOYER = /사업주|사용자|대표이사|회사|법인/;
+const SIGN_MARK     = /\(\s*인\s*\)|㊞|서\s*명|날인|자필/;
+
+function classify(relPath, html, taxonomy) {
+  const rel = String(relPath || '');
+  const text = stripTags(html);
+  const hay = rel + ' ' + text.slice(0, 400);
+
+  const hits = (taxonomy.tracks || []).filter(t => new RegExp(t.re).test(rel));
+  const track = hits.map(t => t.name);
+
+  let domain = 'other';
+  if (hits.length) {
+    const count = {};
+    for (const h of hits) count[h.domain] = (count[h.domain] || 0) + 1;
+    domain = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b))[0];
+  }
+
+  let category = 'internal';
+  for (const [name, re] of CATEGORY_RULES) { if (re.test(hay)) { category = name; break; } }
+
+  const hasMark = SIGN_MARK.test(text);
+  let signer = null;
+  if (hasMark) signer = SIGN_WORKER.test(text) ? 'worker'
+                      : SIGN_EMPLOYER.test(text) ? 'employer' : null;
+
+  const esign = signer === 'worker' &&
+    ['mandate', 'consent', 'complaint', 'wageGuarantee', 'civil', 'settlement'].includes(category);
+
+  let jurisdiction = null;
+  for (const j of JURISDICTIONS) { if (rel.includes(j)) { jurisdiction = j; break; } }
+
+  return { domain, track, category, esign, signer, jurisdiction };
+}
+
 module.exports = { normalizeForHash, formHash, shingles, similarity, clusterByContent,
-                   isTitleLine, stripTags, splitSegments };
+                   isTitleLine, stripTags, splitSegments, classify };
