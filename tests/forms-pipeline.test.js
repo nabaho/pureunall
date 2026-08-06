@@ -7,11 +7,14 @@ const path = require('path');
 const P = require('../tools/forms_pipeline.js');
 const TX = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tools', 'forms_taxonomy.json'), 'utf8'));
 
-test('collectNames: 파일명 끝의 인명 후보를 뽑는다', () => {
+// ── 인명 수집 ──
+// 파일명 꼬리는 힌트일 뿐이고, 채택 근거는 '문서 안에서 이름 자리에 섰는가'다.
+// 아래 테스트의 인명은 전부 가공 인물이다(실데이터 금지).
+test('collectNames: 파일명 후보가 이름 자리에서 확인되면 채택한다', () => {
   const names = P.collectNames([
-    { rel: 'a/진정취하서_강지훈.hwp' },
-    { rel: 'b/대리인 선임신고서_김석범.hwp' },
-    { rel: 'c/위임약정서.hwp' },
+    { rel: 'a/진정취하서_강지훈.hwp', html: '<p>취하인 : 강지훈 (인)</p>' },
+    { rel: 'b/대리인 선임신고서_김석범.hwp', html: '<p>위 임 인 : 김석범</p>' },
+    { rel: 'c/위임약정서.hwp', html: '<p>위임약정서</p>' },
   ]);
   assert.ok(names.includes('강지훈'));
   assert.ok(names.includes('김석범'));
@@ -51,11 +54,117 @@ test('collectNames: 성씨가 아닌 낱말·지역명·기관명은 인명이 �
 
 test('collectNames: 성씨로 시작하는 그럴듯한 이름은 남긴다', () => {
   const names = P.collectNames([
-    { rel: 'a/위임장_최지훈.hwp' },
-    { rel: 'b/합의서-강민.hwp' },
-    { rel: 'c/청구서_남궁민수.hwp' },
+    { rel: 'a/위임장_최지훈.hwp', html: '<p>위임인 : 최지훈</p>' },
+    { rel: 'b/합의서-강민.hwp', html: '<p>신청인 : 강민 (인)</p>' },
+    { rel: 'c/청구서_남궁민수.hwp', html: '<p>청구인 : 남궁민수</p>' },
   ]);
   assert.deepStrictEqual(names.sort(), ['강민', '남궁민수', '최지훈']);
+});
+
+// ── Finding: 파일명만 보던 인명 수집이 전수 corpus에서 무너진 문제 ──
+// 표본 70건에서 후보 1개였던 것이 6,848건에서 193개가 됐고 태반이 보통명사였다
+// (노동부·연장근로·표준모델·조치사항·원칙·공고…). 성씨 검사로는 못 막는다 —
+// 노·연·표·조·원·공이 전부 실제 성씨다. anonymize는 사전의 낱말을 서식 본문
+// 전역에서 {{이름}}으로 바꾸므로 '노동부'가 들어가면 거의 모든 진정서가 망가진다.
+test('collectNames: 이름 자리에 서지 않는 파일명 꼬리는 인명이 아니다', () => {
+  const names = P.collectNames([
+    // '노'는 성씨이고 '노동부'는 3자다 — 모양만으로는 인명과 구별되지 않는다.
+    { rel: 'a/위임장_노동부.hwp',
+      html: '<p>노동부 체불진정과 관련된 일체의 권한을 위임합니다.</p>' },
+    { rel: 'b/동의서_연장근로.hwp',
+      html: '<p>연장근로 시에 가산임금을 지급받기로 한다.</p>' },
+    { rel: 'c/보고서_표준모델.hwp', html: '<p>개인정보보호법 표준모델 적용 안내</p>' },
+    { rel: 'd/규정_조치사항.hwp', html: '<p>성희롱 발생 시 조치사항 및 예방교육</p>' },
+  ]);
+  assert.deepStrictEqual(names, []);
+});
+
+test('collectNames: 파일명에 없어도 이름 자리에 있으면 채택한다', () => {
+  const names = P.collectNames([
+    { rel: '서식/위임장.hwp', html: '<p>위 임 인 : 홍길동 (서명 또는 날인)</p>' },
+    { rel: '서식/진정서.hwp',
+      html: '<table><tr><td>성명</td><td>임꺽정</td></tr></table>' },
+  ]);
+  assert.deepStrictEqual(names.sort(), ['임꺽정', '홍길동']);
+});
+
+test('collectNames: 라벨 뒤가 빈칸이면 인명이 생기지 않는다', () => {
+  const names = P.collectNames([
+    { rel: 'a/위임장.hwp', html: '<p>성 명 : ______</p><p>위임인 :</p>' },
+    { rel: 'b/진정서.hwp',
+      html: '<table><tr><td>성명</td><td>   </td></tr>'
+          + '<tr><td>진정인</td><td>________</td></tr></table>' },
+  ]);
+  assert.deepStrictEqual(names, []);
+});
+
+test('collectNames: 라벨 뒤가 이미 치환된 자리표시자면 인명이 생기지 않는다', () => {
+  const names = P.collectNames([
+    { rel: 'a/위임장.hwp', html: '<p>성 명 : {{이름}}</p>' },
+    { rel: 'b/진정서.hwp',
+      html: '<table><tr><td>진정인</td><td>{{이름}}</td></tr></table>' },
+  ]);
+  assert.deepStrictEqual(names, []);
+  // 자리표시자의 조각('이름')도 새어 나오면 안 된다 — {{이름}}을 다시 먹는다.
+  assert.ok(!names.includes('이름'));
+});
+
+test('collectNames: 이름 길이 한계 — 5자 이상은 인명이 아니다', () => {
+  const names = P.collectNames([
+    { rel: 'a/위임장_남궁민수철.hwp', html: '<p>위임인 : 남궁민수철</p>' },
+    { rel: 'b/신청서.hwp', html: '<p>신청인 : 사내근로복지기금</p>' },
+  ]);
+  assert.deepStrictEqual(names, []);
+});
+
+test('collectNames: 2자·4자는 증거를 하나 더 요구한다', () => {
+  // 4자 합성 라벨이 표 머리글 자리에 앉은 경우 — 파일명 증거가 없으므로 탈락.
+  const headers = P.collectNames([{
+    rel: 'a/신고서.hwp',
+    html: '<table><tr><td>성명</td><td>서명날인</td></tr>'
+        + '<tr><td>이름</td><td>연령</td></tr></table>',
+  }]);
+  assert.deepStrictEqual(headers, []);
+  // 같은 4자라도 파일명에 나오면 복성 이름으로 본다.
+  const four = P.collectNames([
+    { rel: 'a/위임장_남궁민수.hwp', html: '<p>위임인 : 남궁민수</p>' },
+  ]);
+  assert.deepStrictEqual(four, ['남궁민수']);
+  // 2자는 콜론형 관측이면 충분하다(표 머리글은 콜론을 달지 않는다).
+  const two = P.collectNames([{ rel: 'b/위임장.hwp', html: '<p>위임인 : 황철 ( 서 명 )</p>' }]);
+  assert.deepStrictEqual(two, ['황철']);
+});
+
+test('collectNames: 스스로 값을 이끄는 기입란 라벨은 인명이 아니다', () => {
+  // '연'은 성씨이고 '연락처'는 3자라 모양은 인명과 같다. 그러나 서식 곳곳에서
+  // 스스로 콜론 앞에 서므로(= 라벨 구실) 구조적으로 걸러진다.
+  const recs = [{
+    rel: 'a/진정서.hwp',
+    html: '<table><tr><td>성명</td><td>연락처</td></tr></table>'
+        + '<p>연락처 : 010-1111-2222</p><p>연락처 : 041-000-0000</p>'
+        + '<p>연락처 : 010-3333-4444</p><p>연락처 : 010-5555-6666</p>'
+        + '<p>연락처 : 010-7777-8888</p>',
+  }];
+  assert.deepStrictEqual(P.collectNames(recs), []);
+});
+
+test('collectNames: 값이 이름 하나가 아니면(법인명 등) 채택하지 않는다', () => {
+  const names = P.collectNames([
+    { rel: 'a/약정서_하룡.hwp', html: '<p>성 명 : 주식회사 하룡 (인)</p>' },
+    { rel: 'b/계약서.hwp', html: '<p>근로자 전원에게 상여금을 지급한다.</p>' },
+  ]);
+  assert.deepStrictEqual(names, []);
+});
+
+// 사무소 노무사는 위임장의 '수임인' 자리에 인쇄돼 있는 고정 문구다. 지우면
+// '공인노무사 {{이름}}'이 되어 빈 서식을 쓰는 사람이 채워야 할 칸으로 오해한다.
+// 의뢰인 개인정보가 아니라 직무상 공개되는 업무 정보이기도 하다.
+test('collectNames: 사무소 소속 노무사 이름은 인명 사전에 넣지 않는다', () => {
+  const names = P.collectNames([
+    { rel: 'a/위임장_권형하.hwp',
+      html: '<p>수임인 : 권형하</p><p>위임인 : 홍길동</p>' },
+  ]);
+  assert.deepStrictEqual(names, ['홍길동']);
 });
 
 test('buildForms: 복합 파일이 서식 단위로 펼쳐진다', () => {
