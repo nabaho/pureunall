@@ -47,3 +47,23 @@ test('clusterByContent: 완전동일 3건이 한 군집으로', () => {
   assert.ok(groups.some(g => g.join(',') === 'a,b,c'));
   assert.ok(groups.some(g => g.join(',') === 'd'));
 });
+
+// Minor 4 회귀: 위 테스트는 해시가 같은 항목끼리만 있어서 2차 유사도 병합
+// (jaccardSets(repShingles[i], repShingles[j]))이 실행은 되어도 성공한 적이 없다
+// (전부 완전동일이라 1차 해시에서 이미 합쳐짐). 커밋 ef5266c가 이 비교를
+// similarity(...) → jaccardSets(repShingles[i], repShingles[j])로 바꿨는데,
+// repShingles가 잘못된 인덱스를 가리켜도 이 테스트는 통과한다. 해시가 다르지만
+// 문구가 비슷한 두 항목이 실제로 병합되는지, 무관한 항목은 병합되지 않는지를
+// 직접 확인한다.
+test('clusterByContent: 해시는 다르지만 유사한 두 판본은 병합되고 무관한 문서는 남는다', () => {
+  const base = Array.from({ length: 40 }, (_, i) => '조항' + i).join(' ');
+  const items = [
+    { key: 'a', text: base },
+    { key: 'b', text: base + ' 추가문단 하나' },
+    { key: 'c', text: '전혀 다른 문서 여섯 일곱 여덟 아홉 열' },
+  ];
+  const groups = L.clusterByContent(items).map(g => g.map(x => x.key).sort());
+  assert.strictEqual(groups.length, 2);
+  assert.ok(groups.some(g => g.join(',') === 'a,b'));
+  assert.ok(groups.some(g => g.join(',') === 'c'));
+});

@@ -52,3 +52,14 @@ test('jurisdiction: 지청명을 뽑는다', () => {
 test('매칭 트랙이 없으면 domain은 other', () => {
   assert.strictEqual(c('x/사진.hwp', '<p>내용</p>').domain, 'other');
 });
+
+// Minor 3 회귀: signFields의 label은 서식 캡션(누가 서명하는 자리인가)이어야
+// 하고, 문서 제목이 새어 들어가면 안 된다.
+test('signFieldLabel: 서명자 역할·카테고리로 캡션을 고른다', () => {
+  assert.strictEqual(L.signFieldLabel('worker', 'mandate'), '위임인');
+  assert.strictEqual(L.signFieldLabel('worker', 'complaint'), '진정인');
+  assert.strictEqual(L.signFieldLabel('worker', 'wageGuarantee'), '신청인');
+  assert.strictEqual(L.signFieldLabel('employer', 'mandate'), '사업주');
+  assert.strictEqual(L.signFieldLabel('worker', 'internal'), '근로자');
+  assert.strictEqual(L.signFieldLabel(null, 'mandate'), '서명');
+});

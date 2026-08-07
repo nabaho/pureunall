@@ -22,7 +22,9 @@ RELEVANT = re.compile('|'.join('(?:%s)' % t['re'] for t in TX['tracks']))
 
 
 def walk(root):
-    """OneDrive 폴더는 재분석 지점이라 os.scandir의 is_dir()이 어긋날 수 있어 isdir로 판별."""
+    """OneDrive 폴더는 재분석 지점(reparse point)이 섞여 있어 os.scandir로 직접 훑으면
+    디렉터리 판별이 어긋날 수 있다. os.walk는 내부적으로 이를 감내하므로 직접 스캔
+    대신 os.walk로 순회한다."""
     for dirpath, dirnames, filenames in os.walk(root):
         for n in filenames:
             if os.path.splitext(n)[1].lower() == '.hwp':
@@ -35,11 +37,17 @@ def main():
         print('스캔 루트가 없습니다: %s' % root); return 1
     os.makedirs(OUT_DIR, exist_ok=True)
 
+    # err가 없는(성공한) 레코드만 건너뛴다. err가 있는 레코드는 다음 실행에서 다시
+    # 시도한다 — 진짜 HWP가 아닌 파일은 매번 다시 실패할 뿐이지만, 파일이 잠겨
+    # 있어서 등 일시적으로 실패한 건은 재시도할 기회를 줘야 한다.
     done = set()
     if os.path.exists(OUT):
         with io.open(OUT, encoding='utf-8') as f:
             for line in f:
-                try: done.add(json.loads(line)['rel'])
+                try:
+                    rec = json.loads(line)
+                    if rec.get('err') is None:
+                        done.add(rec['rel'])
                 except Exception: pass
         print('이어하기: 기존 %d건 건너뜀' % len(done))
 

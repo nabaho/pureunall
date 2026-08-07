@@ -72,6 +72,26 @@ test('extractVars: 라벨 뒤 공백만 있고 뒤에 다른 문단이 이어져
 
 // Finding 2 회귀: 개인 주소 '주소'의 bare 조각이 '사업장 주소' 안에도 들어 있어,
 // 회사 주소만 있는 서식에서 필수 항목 '주소'가 채워진 것처럼 잘못 보고됐다.
+// Important 회귀: anonymize(PII_RULES)가 채워진 값을 지우며 박아 넣는 자리표시자
+// ({{연락처}}·{{전화번호}}·{{계좌번호}})는 LABEL_MAP이 빈 기입란에서 쓰는 표준 키
+// (근로자연락처·입금계좌)와 달랐다. 같은 개념이 원문 상태(빈 칸/채워진 값)에 따라
+// 다른 키·다른 required로 잡히던 문제를 별칭 매핑으로 하나로 합친다.
+test('extractVars: 익명화 자리표시자와 빈 기입란 라벨이 같은 표준 키로 모인다', () => {
+  const blank = L.extractVars('<p>연락처 : ______</p>');
+  const filled1 = L.extractVars('<p>{{연락처}}</p>');
+  const filled2 = L.extractVars('<p>{{전화번호}}</p>');
+  assert.deepStrictEqual(blank.map(v => v.key), ['근로자연락처']);
+  assert.deepStrictEqual(filled1.map(v => v.key), ['근로자연락처']);
+  assert.deepStrictEqual(filled2.map(v => v.key), ['근로자연락처']);
+  assert.ok(blank[0].required && filled1[0].required && filled2[0].required);
+
+  const acctBlank = L.extractVars('<p>계좌번호 : ______</p>');
+  const acctFilled = L.extractVars('<p>{{계좌번호}}</p>');
+  assert.deepStrictEqual(acctBlank.map(v => v.key), ['입금계좌']);
+  assert.deepStrictEqual(acctFilled.map(v => v.key), ['입금계좌']);
+  assert.strictEqual(acctBlank[0].required, acctFilled[0].required);
+});
+
 test('extractVars: 사업장 주소는 사업장소재지만 잡고 개인 주소로 새지 않는다', () => {
   const v = L.extractVars('<p>사업장 주소 :        </p>');
   assert.deepStrictEqual(v.map(x => x.key), ['사업장소재지']);

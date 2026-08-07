@@ -330,7 +330,8 @@ function buildForms(records, taxonomy, names) {
       signer: cls.signer,
       jurisdiction: cls.jurisdiction,
       vars: L.extractVars(body),
-      signFields: cls.signer ? [{ role: cls.signer, label: rep.title || '서명', type: 'sign' }] : [],
+      // label은 서식 캡션(위임인/신청인/사업주 등)이어야 한다 — 문서 제목이 아니다.
+      signFields: cls.signer ? [{ role: cls.signer, label: L.signFieldLabel(cls.signer, cls.category), type: 'sign' }] : [],
       body,
       source: {
         file: rep.rel,

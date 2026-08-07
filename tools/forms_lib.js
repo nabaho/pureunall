@@ -274,6 +274,25 @@ function classify(relPath, html, taxonomy) {
   return { domain, track, category, esign, signer, jurisdiction };
 }
 
+// ── 서명란 라벨 ──
+// signFields[].label은 "누가 서명하는 자리인가"를 나타내는 캡션이어야 한다.
+// 서식 제목(rep.title, 예: '위임약정서')을 그대로 넣으면 문서 제목이 캡션
+// 자리에 들어가 버린다 — Phase 1에서 e서명 템플릿을 만들 때 그대로 읽으므로
+// 미리 고쳐 둔다. signer('worker'/'employer')와 category로 실제 당사자 호칭을
+// 고른다. 매핑에 없는 조합(예: category:'internal')은 무난한 기본값으로 떨어진다.
+const SIGNER_ROLE_LABEL = {
+  worker: {
+    mandate: '위임인', complaint: '진정인', wageGuarantee: '신청인',
+    civil: '신청인', consent: '동의자', settlement: '근로자',
+  },
+  employer: '사업주',
+};
+function signFieldLabel(signer, category) {
+  if (signer === 'employer') return SIGNER_ROLE_LABEL.employer;
+  if (signer === 'worker') return SIGNER_ROLE_LABEL.worker[category] || '근로자';
+  return '서명';
+}
+
 // ── 익명화 / PII ──
 //
 // 이 두 함수(anonymize·scanPii)가 실사건 원본 17,483건과 GitHub Pages에 공개될
@@ -716,6 +735,17 @@ const LABEL_MAP = [
 ];
 const REQUIRED_KEYS = new Set(['이름', '주민등록번호', '주소', '근로자연락처']);
 
+// ── {{변수}} 자리표시자의 별칭 ──
+// anonymize(PII_RULES)는 검출 목적의 이름(연락처·전화번호·계좌번호)으로
+// {{...}}를 새로 박아 넣는데, 이건 LABEL_MAP이 빈 기입란에서 쓰는 표준 키
+// (근로자연락처·입금계좌 — docs-esign submission 필드명과 맞춘 것)를 거치지
+// 않는다. 그 결과 같은 개념이 원문이 빈 칸이었는지 채워진 값이었는지에 따라
+// 서로 다른 키로 잡히고, REQUIRED_KEYS 판정도 어긋난다(예: 근로자연락처는
+// required지만 별칭인 연락처·전화번호는 아닌 것으로 보임). PII_RULES의
+// 라벨 자체는 scanPii 리포트에도 쓰이므로 건드리지 않고, 여기 ①단계에서
+// 수집할 때만 표준 키로 되돌린다.
+const VAR_ALIASES = { '연락처': '근로자연락처', '전화번호': '근로자연락처', '계좌번호': '입금계좌' };
+
 function varType(key) {
   if (/일$|일자$/.test(key)) return 'date';
   if (/금$|액$|료$|보수율$/.test(key)) return 'money';
@@ -741,7 +771,10 @@ function extractVars(html) {
   // ① 이미 박혀 있는 {{변수}}
   let m;
   const re = /\{\{([^}]+)\}\}/g;
-  while ((m = re.exec(src))) push(m[1].trim());
+  while ((m = re.exec(src))) {
+    const raw = m[1].trim();
+    push(VAR_ALIASES[raw] || raw);
+  }
 
   // ② 빈 기입란 — "라벨 : ____" 또는 "라벨 :" 뒤 공백
   // 콜론 둘레와 공백-뭉치 대안은 줄바꿈을 삼키지 않는 [ \t]만 쓴다 — \s를 쓰면
@@ -817,6 +850,6 @@ function pickRepresentative(members) {
 }
 
 module.exports = { normalizeForHash, formHash, shingles, similarity, clusterByContent,
-                   isTitleLine, stripTags, splitSegments, classify,
+                   isTitleLine, stripTags, splitSegments, classify, signFieldLabel,
                    PII_RULES, anonymize, scanPii, extractVars, flagIssues,
                    blankScore, pickRepresentative };

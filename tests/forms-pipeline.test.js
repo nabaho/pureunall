@@ -167,6 +167,19 @@ test('collectNames: 사무소 소속 노무사 이름은 인명 사전에 넣지
   assert.deepStrictEqual(names, ['홍길동']);
 });
 
+// Minor 3 회귀: signFields.label은 서식 제목이 아니라 서명자 캡션이어야 한다.
+// 예전에는 rep.title(예: '위임약정서')이 그대로 label에 들어갔다.
+test('buildForms: signFields.label은 문서 제목이 아니라 서명자 캡션이다', () => {
+  const recs = [{
+    rel: '2. 임금체불/위임약정서.hwp', mtime: 1000, err: null,
+    html: '<p>위 임 약 정 서</p><p>위임인 : ( 서 명 )</p>',
+  }];
+  const forms = P.buildForms(recs, TX, []);
+  assert.strictEqual(forms.length, 1);
+  assert.strictEqual(forms[0].title, '위임약정서');
+  assert.deepStrictEqual(forms[0].signFields, [{ role: 'worker', label: '위임인', type: 'sign' }]);
+});
+
 test('buildForms: 복합 파일이 서식 단위로 펼쳐진다', () => {
   const recs = [{
     rel: '2. 임금체불/위임장-취하서.hwp', mtime: 1000, err: null,

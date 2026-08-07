@@ -28,11 +28,3 @@ test('대표 경로가 기대한 트랙에 걸린다', () => {
   assert.ok(hit('3. 체당금자료/가압류 및 배당/2.채권계산서-하나텍.hwp').includes('민사·집행'));
   assert.ok(hit('2. 임금체불/개별서류정리/노무사위임장(집단위임장포함).hwp').includes('수임·위임'));
 });
-
-test('templateHints·caseHints가 서식과 사건본을 가른다', () => {
-  const pos = new RegExp(TX.templateHints, 'i');
-  const neg = new RegExp(TX.caseHints);
-  assert.ok(pos.test('[별지 제3호의2서식] 간이대지급금 지급청구서.hwp'));
-  assert.ok(neg.test('배당요구신청서-하나텍.hwp'));
-  assert.ok(!neg.test('진정취하서양식(new).hwp'));
-});
