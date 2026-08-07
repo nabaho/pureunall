@@ -109,3 +109,47 @@ test('reviewHtml: titleDetected가 true면 (제목 미검출) 표시가 없다',
   const html = R.reviewHtml(FORMS);
   assert.ok(!html.includes('제목 미검출'));
 });
+
+// ── 추가 3: 제목 미검출 서식은 검토표 맨 뒤로 ──
+// 서식을 제목(서식 유형)으로 묶은 뒤로 미검출 항목은 '사람이 이름을 붙여야 하는
+// 일감'이지 검토할 서식이 아니다. 검토 가능한 목록 사이에 섞이면 노무사의
+// 진도를 끊으므로 뒤에 따로 모은다(의뢰인 결정).
+const MIXED = [
+  { ...FORMS[0], id: 'wa-untitled01', title: '표 안의 내용입니다', titleDetected: false },
+  { ...FORMS[0], id: 'ia-titled0001', title: '요양급여신청서', domain: 'industrialAccident' },
+  { ...FORMS[0], id: 'wa-untitled02', title: '가나다라마바사', titleDetected: false,
+    domain: 'industrialAccident' },
+  { ...FORMS[0], id: 'wa-titled0001', title: '위임약정서' },
+];
+
+test('reviewRows: 제목 미검출 행은 모두 맨 뒤에 모인다', () => {
+  const t = R.reviewRows(MIXED);
+  const cells = t.rows.map(r => r[t.headers.indexOf('서식명')]);
+  assert.strictEqual(cells.length, 4);
+  const firstUntitled = cells.findIndex(c => c.startsWith('(제목 미검출)'));
+  assert.strictEqual(firstUntitled, 2);
+  assert.ok(cells.slice(2).every(c => c.startsWith('(제목 미검출)')));
+  assert.ok(cells.slice(0, 2).every(c => !c.includes('제목 미검출')));
+});
+
+test('reviewRows: 제목 검출 행은 도메인 → 서식명 순으로 늘어선다', () => {
+  const t = R.reviewRows(MIXED);
+  const dom = t.headers.indexOf('도메인');
+  const name = t.headers.indexOf('서식명');
+  assert.deepStrictEqual(t.rows.slice(0, 2).map(r => [r[dom], r[name]]),
+    [['산재', '요양급여신청서'], ['임금체불', '위임약정서']]);
+});
+
+test('reviewRows: 정렬이 입력 배열을 뒤집지 않는다', () => {
+  const before = MIXED.map(f => f.id);
+  R.reviewRows(MIXED);
+  assert.deepStrictEqual(MIXED.map(f => f.id), before);
+});
+
+test('reviewHtml: 제목 미검출 서식은 뒤쪽 번호를 받는다', () => {
+  const html = R.reviewHtml(MIXED);
+  const order = [...html.matchAll(/<h2>(\d+)\. (?:<span class="untitled">)?/g)]
+    .map(m => [Number(m[1]), !!m[0].includes('untitled')]);
+  assert.deepStrictEqual(order, [[1, false], [2, false], [3, true], [4, true]]);
+  assert.ok(html.includes('맨 뒤에 따로 모았다'));
+});

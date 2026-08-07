@@ -230,6 +230,41 @@ function domainPrefix(domain) {
             consulting: 'cs', fund: 'fd', bargaining: 'bg' })[domain] || 'ot';
 }
 
+// ── 서식 유형 키 ──
+// 제목은 splitSegments가 이미 공백을 지운 상태로 넘어온다. 그래도 그대로 키로
+// 쓰면 같은 서식이 갈라진다 — 판본마다 장식이 다르기 때문이다
+// ('[위임장]', '위임장(개정)'의 괄호·대괄호, 'CMS동의서'와 'cms동의서'의 대소문자).
+// 그래서 글자(한글·한자·라틴)와 숫자만 남기고 소문자로 눕힌 것을 키로 쓴다.
+// 장식만으로 이루어진 제목은 알맹이가 비므로 원문을 그대로 키로 쓴다 —
+// 빈 키로 뭉치면 서로 무관한 서식이 한 종으로 접힌다.
+// (한자 범위는 forms_lib의 NATIVE_LETTER와 같은 착상으로 \u 표기로 적는다.)
+const TITLE_DECOR = new RegExp('[^0-9A-Za-z\\uAC00-\\uD7A3\\u4E00-\\u9FFF]+', 'g');
+function titleKey(title) {
+  const bare = String(title || '').replace(/\s+/g, '');
+  const core = bare.replace(TITLE_DECOR, '').toLowerCase();
+  return core || bare;
+}
+
+// ── 무엇을 한 '서식'으로 볼 것인가 ──
+//
+// 예전에는 **내용 군집** 하나가 서식 한 종이었다. 전수 6,848건에서 이 모델이
+// 무너졌다. 같은 위임약정서의 사본끼리 자카드 유사도가 0.49~0.83으로 나온다
+// (익명화해도 숫자가 그대로다 — 다른 것은 개인정보가 아니라 **조항 문구 자체**다).
+// 사무소 표준서식이 10년 넘게 개정돼 왔고 사건 폴더마다 그 시절 판본이 박제돼
+// 있으니, 진짜 같은 서식이 병합 임계값 0.85를 넘지 못한다. 결과가 검토표 4,390행 —
+// 노무사가 볼 수 있는 분량이 아니다.
+//
+// 그래서 의뢰인 결정에 따라 모델을 바꾼다: **제목(서식 유형)으로 묶고 판본은
+// 그 아래에 쌓는다.** 노무사는 서식 유형 약 880종을 판단하고, 판본은 필요한
+// 곳에서만 파고든다.
+//   · 묶는 키 = 도메인 + 정규화한 제목. 도메인을 함께 넣는 이유는 같은 '동의서'라도
+//     산재 동의서와 교섭 동의서는 다른 서식이기 때문이다.
+//   · 도메인은 taxonomy 트랙을 **파일 경로에만** 대보므로(classify가 domain을
+//     rel에서만 뽑는다) 대표본을 고르기 전에도 확정된다. 나중에 대표본으로
+//     classify를 다시 돌려도 같은 도메인이 나온다 — 같은 묶음의 구성원은 모두
+//     같은 도메인이므로.
+//   · 제목이 검출되지 않은 세그먼트(titleDetected=false)는 묶을 제목이 없다.
+//     예전 그대로 내용 군집으로 묶는다.
 function buildForms(records, taxonomy, names) {
   // ① 레코드 → 세그먼트(서식 단위)
   const segs = [];
@@ -242,10 +277,21 @@ function buildForms(records, taxonomy, names) {
     }
   }
 
-  // ② 군집
-  const groups = L.clusterByContent(segs);
+  // ② 묶기 — 제목이 있으면 서식 유형(도메인+제목)으로, 없으면 내용 군집으로.
+  // Map은 삽입 순서를 지키고 segs의 순서는 records 순서로 결정되므로, 같은
+  // corpus를 다시 돌리면 묶음 순서도 그대로다(id 안정성의 전제).
+  const byType = new Map();
+  const untitled = [];
+  for (const s of segs) {
+    if (!s.title) { untitled.push(s); continue; }
+    const domain = L.classify(s.rel, '', taxonomy).domain;
+    const k = domain + '\t' + titleKey(s.title);
+    if (!byType.has(k)) byType.set(k, []);
+    byType.get(k).push(s);
+  }
+  const groups = [...byType.values()].concat(L.clusterByContent(untitled));
 
-  // ③ 군집마다 대표본 → 서식 레코드
+  // ③ 묶음마다 대표본 → 서식 레코드
   const forms = [];
   const usedIds = new Set();
   for (const g of groups) {
@@ -292,9 +338,14 @@ function buildForms(records, taxonomy, names) {
         segment: +String(rep.key).split('#')[1] || 0,
         hash,
         pickedBy,
-        // 한 파일이 같은 군집에 조각을 둘 이상 낼 수 있다(같은 서식이 한 문서에
-        // 두 번 실린 경우). 경로를 그대로 나열하면 Task 9 보고서의 '중복 N건'이
-        // 부풀어 노무사가 파일 수를 잘못 읽는다. 순서를 지키며 중복만 걷어낸다.
+        // 이 서식 유형의 판본이 나온 **서로 다른 원본 파일** 목록.
+        // 한 파일이 같은 묶음에 조각을 둘 이상 낼 수 있다(같은 서식이 한 문서에
+        // 두 번 실렸거나, 한 사건 폴더의 문서에 같은 제목이 두 번 나오는 경우).
+        // 경로를 그대로 나열하면 검토표의 판본 수가 부풀어 노무사가 파일 수를
+        // 잘못 읽는다. 순서를 지키며 중복만 걷어낸다.
+        // 제목 묶음으로 바뀐 뒤에는 이 목록의 길이가 곧 '판본 수'다 —
+        // 판본은 사건 폴더마다 한 벌씩 박제된 그 시절 서식이기 때문이다.
+        // 별도 필드를 두지 않는 이유: 같은 수를 두 군데에 적으면 어긋난다.
         cluster: [...new Set(g.map(x => x.rel))],
       },
       review: { status: 'pending', flags: L.flagIssues(body), reviewedBy: '', reviewedAt: '' },

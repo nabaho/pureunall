@@ -14,12 +14,36 @@ const DOMAIN_LABEL = {
   consulting: '컨설팅', fund: '기금', bargaining: '교섭', other: '기타',
 };
 
+// ── '중복' 열은 그대로 두고 판본 수로 읽는다 ──
+// 서식을 제목(서식 유형)으로 묶은 뒤로 한 행은 한 서식 유형이고, 그 아래 판본이
+// 여러 벌 쌓인다. 판본 수 = source.cluster.length(= 판본이 나온 서로 다른 원본
+// 파일 수)이고, 이는 '중복' 열이 이미 담고 있던 바로 그 수다. 같은 수를 담는
+// 열을 하나 더 만들면 노무사가 둘을 비교하다가 뜻을 헷갈린다. 그래서 열을
+// 새로 만들지 않고 이 열을 재사용한다 — 노무사는 이 열이 큰 행에서
+// '판본이 여러 벌 쌓인 서식 유형'을 바로 알아본다.
 const HEADERS = ['승인', '육안확인', '도메인', '서식명', '분류', '전자서명', '서명자',
                  '관할', '트랙', '변수', '플래그', '중복', '대표본 경로', '본문 미리보기'];
 const RATIOS  = [0.4, 0.5, 0.8, 2.2, 0.8, 0.6, 0.6, 0.5, 1.4, 2.0, 1.0, 0.5, 3.6, 4.0];
 
+// ── 검토 순서 ──
+// 제목이 검출된 서식이 앞, 미검출이 뒤(의뢰인 결정). 미검출 서식은 사람이 제목을
+// 붙여 주기 전에는 목록에서 이름으로 찾을 수 없는 미완성 항목이라, 검토 가능한
+// 목록 사이에 섞이면 노무사의 진도를 끊는다. 뒤에 따로 모아 두면 '이름 붙이기'라는
+// 다른 종류의 작업으로 한꺼번에 처리할 수 있다.
+// 각 덩어리 안에서는 도메인 → 서식명 순 — 같은 도메인의 서식이 붙어 있어야
+// 비슷한 서식을 잇달아 보며 판단할 수 있다. 마지막 id 비교는 동점 처리용이라
+// 같은 corpus면 순서가 항상 같다.
+function sortForReview(forms) {
+  const label = f => DOMAIN_LABEL[f.domain] || f.domain || '';
+  return (forms || []).slice().sort((a, b) =>
+    (a.titleDetected ? 0 : 1) - (b.titleDetected ? 0 : 1) ||
+    label(a).localeCompare(label(b), 'ko') ||
+    String(a.title || '').localeCompare(String(b.title || ''), 'ko') ||
+    String(a.id || '').localeCompare(String(b.id || '')));
+}
+
 function reviewRows(forms) {
-  const rows = (forms || []).map(f => [
+  const rows = sortForReview(forms).map(f => [
     '',                                                   // 승인 — 노무사가 O/X 기입
     f.source.pickedBy === 'anonymized-latest' ? 'O' : '',  // 육안확인 필요
     DOMAIN_LABEL[f.domain] || f.domain,
@@ -47,7 +71,14 @@ function esc(s) {
 }
 
 function reviewHtml(forms) {
-  const list = forms || [];
+  const list = sortForReview(forms);
+  // 미검출이 하나도 없으면 안내 문장 자체를 넣지 않는다 — 없는 표시를 설명해
+  // 두면 페이지를 검색하는 사람이 있지도 않은 항목을 찾게 된다.
+  const nUntitled = list.filter(f => !f.titleDetected).length;
+  const untitledNote = nUntitled
+    ? `<br>제목이 검출되지 않은 <b class="untitled">(제목 미검출)</b> ${nUntitled}종은 `
+      + '사람이 제목을 붙여야 하는 항목이라 맨 뒤에 따로 모았다.'
+    : '';
   const items = list.map((f, i) => `
 <section class="form">
   <h2>${i + 1}. ${f.titleDetected ? '' : '<span class="untitled">(제목 미검출)</span> '}${esc(f.title)} <span class="id">${esc(f.id)}</span></h2>
@@ -86,7 +117,8 @@ function reviewHtml(forms) {
 <body>
 <h1>서식집 검토 — ${list.length}종</h1>
 <p class="lead">엑셀 검토표에서 승인열에 O를 준 서식의 문구를 여기서 정독한다.
-<b class="flags">플래그가 붙은 서식</b>과 대표본 선정이 <code>anonymized-latest</code>인 서식은 반드시 확인.</p>
+<b class="flags">플래그가 붙은 서식</b>과 대표본 선정이 <code>anonymized-latest</code>인 서식은 반드시 확인.<br>
+한 항목 = 서식 유형 한 종(제목 기준)이고, <b>중복 N건</b>은 그 유형의 판본이 나온 원본 파일 수 = 판본 수다.${untitledNote}</p>
 ${items}
 </body></html>`;
 }
@@ -105,14 +137,17 @@ function main() {
   console.log('코퍼스 %d건 / 인명 사전 %d개', records.length, names.length);
 
   const forms = P.buildForms(records, taxonomy, names);
-  console.log('서식 %d종', forms.length);
+  const nTitled = forms.filter(f => f.titleDetected).length;
+  const nUntitled = forms.length - nTitled;
+  console.log('서식 %d종 (제목 검출 %d · 미검출 %d)', forms.length, nTitled, nUntitled);
 
   // 엑셀
   const XG = require(path.join(ROOT, 'xlsx_gen.js'));
   const t = reviewRows(forms);
   const u8 = XG.build({
     sheet: '서식집', title: '서식집 검토표', sub: '생성 ' + new Date().toISOString().slice(0, 10)
-      + ' · 서식 ' + forms.length + '종 / 원본 ' + records.length + '건',
+      + ' · 서식 유형 ' + forms.length + '종(제목 ' + nTitled + ' · 미검출 ' + nUntitled + ')'
+      + ' / 원본 ' + records.length + '건 · 중복 열 = 판본 수',
     headers: t.headers, colRatios: t.colRatios, rows: t.rows, landscape: true,
   });
   const xlsxPath = path.join(OUT_DIR, '서식집_검토표.xlsx');
@@ -128,6 +163,19 @@ function main() {
   console.log('\n=== 도메인별 ===');
   Object.entries(byDomain).sort((a, b) => b[1] - a[1])
     .forEach(([d, n]) => console.log('  %s %s', String(n).padStart(5), DOMAIN_LABEL[d] || d));
+  // 판본이 많이 쌓인 서식 유형 — 노무사가 어디부터 파고들지 정하는 기준.
+  console.log('\n=== 판본 수 상위 15 ===');
+  forms.slice().sort((a, b) => b.source.cluster.length - a.source.cluster.length
+      || String(a.id).localeCompare(String(b.id)))
+    .slice(0, 15)
+    .forEach(f => console.log('  %s %s %s', String(f.source.cluster.length).padStart(5),
+      (DOMAIN_LABEL[f.domain] || f.domain).padEnd(6), f.titleDetected ? f.title : '(제목 미검출)'));
+
+  const byFlag = {};
+  forms.forEach(f => (f.review.flags || []).forEach(x => (byFlag[x] = (byFlag[x] || 0) + 1)));
+  console.log('\n=== 플래그별 ===');
+  Object.entries(byFlag).sort((a, b) => b[1] - a[1])
+    .forEach(([x, n]) => console.log('  %s %s', String(n).padStart(5), x));
   console.log('\n전자서명 대상 %d종 / 육안확인 필요 %d종 / 플래그 %d종',
     forms.filter(f => f.esign).length,
     forms.filter(f => f.source.pickedBy === 'anonymized-latest').length,

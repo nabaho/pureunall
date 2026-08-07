@@ -263,6 +263,104 @@ test('buildForms: 제목이 문단으로 검출되면 titleDetected=true', () =>
   assert.strictEqual(forms[0].title, '위임장');
 });
 
+// ── 모델 변경 회귀: 내용 군집 → 서식 유형(제목) 묶음 ──
+// 전수 6,848건에서 같은 위임약정서 사본끼리 자카드 0.49~0.83이 나온다(조항 문구
+// 자체가 판본마다 다르기 때문). 내용 군집으로는 병합 임계값 0.85를 못 넘어
+// 검토표가 4,390행이 됐다. 이제 제목이 같으면 문구가 달라도 한 종으로 묶고
+// 판본 수를 남긴다.
+test('buildForms: 같은 도메인·같은 제목이면 문구가 달라도 한 종으로 묶인다', () => {
+  const recs = [
+    { rel: '2. 임금체불/구판/진정서.hwp', mtime: 100, err: null,
+      html: '<p>진   정   서</p><p>진정인은 아래와 같이 임금 및 퇴직금의 체불 사실을'
+          + ' 신고하오니 조속히 조사하여 주시기 바랍니다.</p>' },
+    { rel: '2. 임금체불/신판/진정서.hwp', mtime: 200, err: null,
+      html: '<p>진   정   서</p><p>위 진정인은 사용자로부터 지급받지 못한 금품에 관하여'
+          + ' 근로기준법 제36조에 따른 조치를 구합니다.</p>' },
+  ];
+  // 전제 확인 — 두 본문은 예전 내용 군집 방식이었다면 병합되지 않았다.
+  const L = require('../tools/forms_lib.js');
+  assert.ok(L.similarity(L.normalizeForHash(recs[0].html), L.normalizeForHash(recs[1].html)) < 0.85);
+
+  const forms = P.buildForms(recs, TX, []);
+  assert.strictEqual(forms.length, 1);
+  assert.strictEqual(forms[0].title, '진정서');
+  assert.strictEqual(forms[0].titleDetected, true);
+  // 판본 수 = 판본이 나온 서로 다른 원본 파일 수(= source.cluster의 길이)
+  assert.strictEqual(forms[0].source.cluster.length, 2);
+  assert.deepStrictEqual(forms[0].source.cluster.slice().sort(),
+    ['2. 임금체불/구판/진정서.hwp', '2. 임금체불/신판/진정서.hwp']);
+});
+
+test('buildForms: 한 파일이 같은 제목을 두 번 담아도 판본 수는 1', () => {
+  const seg = '<p>진   정   서</p><p>진정 내용 본문입니다.</p>';
+  const forms = P.buildForms(
+    [{ rel: '2. 임금체불/두벌.hwp', mtime: 1, err: null, html: seg + seg }], TX, []);
+  assert.strictEqual(forms.length, 1);
+  assert.strictEqual(forms[0].source.cluster.length, 1);
+});
+
+// 같은 '동의서'라도 산재 동의서와 교섭 동의서는 다른 서식이다. 그래서 묶는 키에
+// 도메인을 함께 넣는다.
+test('buildForms: 제목이 같아도 도메인이 다르면 따로 남는다', () => {
+  const html = '<p>동   의   서</p><p>본인은 아래 사항에 동의합니다.</p>';
+  const forms = P.buildForms([
+    { rel: '산재/요양건/동의서.hwp', mtime: 1, err: null, html },
+    { rel: '교섭/단체협약건/동의서.hwp', mtime: 2, err: null, html },
+  ], TX, []);
+  assert.strictEqual(forms.length, 2);
+  assert.deepStrictEqual(forms.map(f => f.domain).sort(), ['bargaining', 'industrialAccident']);
+  forms.forEach(f => assert.strictEqual(f.source.cluster.length, 1));
+});
+
+// 제목 장식·대소문자는 판본마다 다르다. 키에서는 걷어내되 화면에 보이는 title은
+// 대표본의 것을 그대로 남긴다.
+test('buildForms: 제목의 장식과 대소문자 차이는 같은 서식으로 본다', () => {
+  const forms = P.buildForms([
+    { rel: '2. 임금체불/a/CMS동의서.hwp', mtime: 1, err: null,
+      html: '<p>※ CMS 동 의 서</p><p>자동이체 신청 내용 갑.</p>' },
+    { rel: '2. 임금체불/b/cms동의서.hwp', mtime: 2, err: null,
+      html: '<p>cms 동 의 서</p><p>자동이체 신청 내용 을. 문구가 다르다.</p>' },
+  ], TX, []);
+  assert.strictEqual(forms.length, 1);
+  assert.strictEqual(forms[0].source.cluster.length, 2);
+});
+
+// 제목이 없는 세그먼트는 묶을 제목이 없다 — 예전대로 내용 군집으로만 묶인다.
+// (제목으로 묶었다면 title이 전부 ''이라 도메인마다 한 덩어리가 됐을 것이다.)
+test('buildForms: 제목 미검출 세그먼트는 제목이 아니라 내용으로 묶인다', () => {
+  const a = '<table><tr><td>위임장</td></tr>'
+    + '<tr><td>표 안의 갑 내용입니다. 표 안의 갑 내용입니다.</td></tr></table>';
+  const b = '<table><tr><td>확인서</td></tr>'
+    + '<tr><td>전혀 다른 을 문장이 들어 있는 칸입니다.</td></tr></table>';
+  const forms = P.buildForms([
+    { rel: '2. 임금체불/x/1.hwp', mtime: 1, err: null, html: a },
+    { rel: '2. 임금체불/y/2.hwp', mtime: 2, err: null, html: a },
+    { rel: '2. 임금체불/z/3.hwp', mtime: 3, err: null, html: b },
+  ], TX, []);
+  assert.strictEqual(forms.length, 2);
+  forms.forEach(f => assert.strictEqual(f.titleDetected, false));
+  assert.deepStrictEqual(forms.map(f => f.source.cluster.length).sort(), [1, 2]);
+});
+
+// 노무사는 서식을 id로 지목한다. 같은 corpus를 다시 돌렸는데 id가 바뀌면
+// 검토표에 적어 둔 지목이 전부 어긋난다.
+test('buildForms: 같은 입력을 두 번 돌려도 id가 그대로다', () => {
+  const recs = [
+    { rel: '2. 임금체불/a/진정서.hwp', mtime: 100, err: null,
+      html: '<p>진   정   서</p><p>갑 판본의 본문입니다.</p>' },
+    { rel: '2. 임금체불/b/진정서.hwp', mtime: 200, err: null,
+      html: '<p>진   정   서</p><p>을 판본은 문구가 사뭇 다르게 적혀 있다.</p>' },
+    { rel: '산재/요양/동의서.hwp', mtime: 300, err: null,
+      html: '<p>동   의   서</p><p>동의 본문.</p>' },
+    { rel: '2. 임금체불/c/표서식.hwp', mtime: 400, err: null,
+      html: '<table><tr><td>확인서</td></tr><tr><td>표 안의 내용입니다.</td></tr></table>' },
+  ];
+  const one = P.buildForms(recs, TX, []).map(f => f.id);
+  const two = P.buildForms(recs, TX, []).map(f => f.id);
+  assert.deepStrictEqual(one, two);
+  assert.strictEqual(new Set(one).size, one.length);
+});
+
 test('buildForms: id는 도메인 접두어를 갖고 유일하다', () => {
   const recs = [
     { rel: 'a/위임장.hwp',  mtime: 1, err: null, html: '<p>위   임   장</p><p>본문 하나</p>' },
