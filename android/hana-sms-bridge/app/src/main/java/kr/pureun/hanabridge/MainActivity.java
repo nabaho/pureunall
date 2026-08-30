@@ -400,7 +400,7 @@ public final class MainActivity extends Activity {
                 tellServer(canRead, 0, true, SmsHistoryReader.lastCapped);
                 importing = false;
                 runOnUiThread(() -> {
-                    status.setText("최근 " + HISTORY_DAYS + "일 문자함에서 하나 거래문자를 찾지 못했습니다.\n" +
+                    status.setText("최근 " + HISTORY_DAYS + "일 문자함에 하나 거래문자가 없었습니다.\n" +
                             "문자를 지우셨거나, 알림이 문자가 아닌 앱 푸시로 오는 경우입니다.");
                     history.setEnabled(true);
                 });
