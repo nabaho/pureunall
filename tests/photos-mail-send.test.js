@@ -138,11 +138,11 @@ test('★★ 받는 주소를 «손으로 치지 않는다» — 오타 한 글�
 
 test('★★ 이메일이 없는 명함은 «안 나온다» — 골라도 보낼 수가 없다', () => {
   const idx = {
-    a: { k: 'card', n: '김동현', c: '대천맛김', e: 'kim@x.com' },
-    b: { k: 'card', n: '김동수', c: '대천맛김' },              // 이메일 없음
-    c: { k: 'biz', n: '대천맛김', e: 'biz@x.com' }             // 사람이 아니다
+    a: { k: 'card', n: '김동현', c: '가나김산업', e: 'kim@x.com' },
+    b: { k: 'card', n: '김동수', c: '가나김산업' },              // 이메일 없음
+    c: { k: 'biz', n: '가나김산업', e: 'biz@x.com' }             // 사람이 아니다
   };
-  const out = M.pickMailPeople(idx, '대천맛김');
+  const out = M.pickMailPeople(idx, '가나김산업');
   assert.equal(out.length, 1, '★★ 이메일 없는 명함·업체 줄이 섞였습니다');
   assert.equal(out[0].email, 'kim@x.com');
 });
@@ -153,10 +153,10 @@ test('★ 두 글자 미만으로는 안 찾는다 — 전부가 쏟아지면 �
   assert.deepEqual(Array.prototype.slice.call(M.pickMailPeople(idx, '')), []);
 });
 
-test('★ 회사 표기가 달라도 찾는다 — 「(주)대천맛김」·「대천맛김」', () => {
-  const idx = { a: { k: 'card', n: '김동현', c: '(주)대천맛김', e: 'kim@x.com' } };
-  assert.equal(M.pickMailPeople(idx, '대천맛김').length, 1);
-  assert.equal(M.pickMailPeople(idx, '주식회사 대천맛김').length, 1);
+test('★ 회사 표기가 달라도 찾는다 — 「(주)가나김산업」·「가나김산업」', () => {
+  const idx = { a: { k: 'card', n: '김동현', c: '(주)가나김산업', e: 'kim@x.com' } };
+  assert.equal(M.pickMailPeople(idx, '가나김산업').length, 1);
+  assert.equal(M.pickMailPeople(idx, '주식회사 가나김산업').length, 1);
 });
 
 /* ══════ ⑥ 보내는 길이 기업정보함과 «같은 길»인가 ══════ */

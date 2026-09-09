@@ -1,7 +1,7 @@
 /* 🚫 스팸 자동 거르기 (대표 지시 2026-09-08 「스펨메일은 자동으로 거르게 만들어 달라」)
 
    대표께서 짚으신 한 통 — 받은메일함 09.08 09:29
-     주소 「-????x?!@ksz.com」 · 제목에 못 읽은 글자 다섯 · 받는이 「3696322@daum.net」
+     주소 「-????x?!@ksz.com」 · 제목에 못 읽은 글자 다섯 · 받는이 「cust23@daum.net」
 
    ⚠⚠ 이 검사에서 가장 중요한 것은 «멀쩡한 메일을 안 잡는가»다.
      자문사 메일 한 통이 조용히 사라지는 것이 스팸 백 통보다 아프다. 스팸을 놓치면
@@ -53,7 +53,7 @@ const THE_SPAM = {
   _slug:'INBOX-x', _key:'INBOX-x:172722',
   e:'-????x?!@ksz.com', f:'-????x?!@ksz.com',
   s:'&' + FFFD + FFFD + '&' + FFFD + FFFD + '' + FFFD + 'e' + FFFD + 'e' + FFFD + 'e ~~',
-  t:'3696322@daum.net', tn:'3696322@daum.net',
+  t:'cust23@daum.net', tn:'cust23@daum.net',
   p:'지속력! 단단함! 사이즈 벌크업이 필요하셨다면 지금 클릭하세요 무조건 증정! 빅이벤트 행사중!',
   d:1788827356000, r:0, a:0, g:0, z:3460
 };
@@ -83,14 +83,14 @@ test('★★★ 까닭을 «못 적으면 안 거른다»', () => {
 const REAL_GOOD = [
   { _slug:'INBOX-x', e:'worksos@nosa.or.kr', f:'근로자이음센터', s:'근로자이음센터 운영기관 선정 안내', t:'370-6@daum.net' },
   /* ③ 이 잡던 것들 — 참조·전달로 온 «멀쩡한» 메일 */
-  { _slug:'INBOX-x', e:'jaesung.kim@momstouch.co.kr', f:'김재성', s:'[맘스터치] 복직요청서_이은경님', t:'yuncpa@hanmail.net' },
-  { _slug:'INBOX-x', e:'yuncpa@hanmail.net', f:'윤현철', s:'교육수당 및 상담수당 지급명세서-윤현철', t:'hmhtax114@naver.com' },
+  { _slug:'INBOX-x', e:'jaesung.kim@momstouch.co.kr', f:'김재성', s:'[맘스터치] 복직요청서_이은경님', t:'cust61@hanmail.net' },
+  { _slug:'INBOX-x', e:'cust61@hanmail.net', f:'윤현철', s:'교육수당 및 상담수당 지급명세서-윤현철', t:'cust37@naver.com' },
   /* ④ 가 잡던 것들 — 기계가 보내는 정상 메일(이름과 주소가 같다) */
   { _slug:'INBOX-x', e:'kepco@kepco.co.kr', f:'kepco@kepco.co.kr', s:'이메일청구 접수 인증번호 전송', t:'370-6@daum.net' },
   { _slug:'INBOX-x', e:'service@kcplaa.or.kr', f:'service@kcplaa.or.kr', s:'[訃音] 최재호 노무사님 모친상', t:'370-6@daum.net' },
   /* 제목이 «파일 이름»인 것 — 읽히는 글자 비율로 가리려 했다가 이것들이 걸렸다 */
-  { _slug:'INBOX-x', e:'hns09588@gmail.com', f:'김하나', s:'처벌불원의사 확인서.hwp', t:'370-6@daum.net' },
-  { _slug:'INBOX-x', e:'53179ny@naver.com', f:'김나연', s:'26.4.14_김나연_아이본병원.pdf', t:'370-6@daum.net' },
+  { _slug:'INBOX-x', e:'cust38@gmail.com', f:'김하나', s:'처벌불원의사 확인서.hwp', t:'370-6@daum.net' },
+  { _slug:'INBOX-x', e:'cust24@naver.com', f:'김나연', s:'26.4.14_김나연_아이본병원.pdf', t:'370-6@daum.net' },
   /* 자기에게 쓴 쪽지 — 제목이 「ㅇㅇㅇ」 */
   { _slug:'INBOX-x', e:'370-6@daum.net', f:'푸른노무법인', s:'ㅇㅇㅇ', t:'370-6@daum.net' },
   /* 주소에 «점·더하기·밑줄»이 든 멀쩡한 주소 — 규약이 허락한 글자다 */

@@ -81,7 +81,7 @@ const flush = async () => { for (let i = 0; i < 40; i++) await new Promise(r => 
 
 test('★★ 큰 파일이 «창고로» 간다 — 요청에는 자리만 실린다', async () => {
   const c = boot();
-  await c.addLocalFiles({ files: [{ name: '태양농산_착수보고서.pptx', size: MB(11.7) }] });
+  await c.addLocalFiles({ files: [{ name: '가나농산_착수보고서.pptx', size: MB(11.7) }] });
   await flush();
   assert.equal(c.put.length, 1, '창고에 안 올렸습니다');
   assert.match(c.put[0].path, /^pucards\/mailout\/uidA\//, '엉뚱한 자리에 올립니다: ' + c.put[0].path);

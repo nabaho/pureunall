@@ -67,7 +67,7 @@ function world(me, cos, opt) {
 const CO = (id, name, main, subs, types, ended) =>
   ({ id, name, defAtt: main, defCoAtts: subs || [], types: types || [], endedTypes: ended || {}, active: true });
 
-const HB = () => CO('c1', '주식회사 에이치비씨솔루션', 'a1', ['a2'], ['t1']);
+const HB = () => CO('c1', '주식회사 가나비씨솔루션', 'a1', ['a2'], ['t1']);
 
 /* ══ 뜨는가 ══════════════════════════════════════════════════════ */
 
@@ -96,7 +96,7 @@ test('★★ 남의 사업은 안 뜬다', () => {
 
 test('★★★ 처음 쓰는 사람에게는 «안» 띄운다 — 안 그러면 스물한 건이 한꺼번에 뜬다', () => {
   /* 담아 둔 것이 아예 없는 사람은 씨앗만 심고 넘어가야 한다. */
-  const w = world('a2', [HB(), CO('c2', '태양농산', 'a2', [], ['t1'])], {});
+  const w = world('a2', [HB(), CO('c2', '가나농산', 'a2', [], ['t1'])], {});
   w.checkNewAssignments();
   assert.strictEqual(w.__shown.length, 0, '첫 로그인에 지난 것이 전부 쏟아진다');
   assert.ok(w.__store.p_naSeen_a2, '씨앗을 안 심었다 — 다음에 또 전부 새것이 된다');
@@ -123,7 +123,7 @@ test('★★★ 「확인」이 본 것으로 담아 둔다 — 안 담으면 �
 /* ══ 무엇을 「새것」으로 보는가 ═══════════════════════════════════ */
 
 test('★★★ 사업장이 같아도 «사업이 늘면» 새것이다 — 그래서 짝으로 담는다', () => {
-  /* 에이치비씨솔루션에 기술보호(t1) 말고 t2 가 붙었다.
+  /* 가나비씨솔루션에 기술보호(t1) 말고 t2 가 붙었다.
      사업장 이름만 담으면 이걸 통째로 놓친다. */
   const co = HB(); co.types = ['t1', 't2'];
   const w = world('a2', [co], { store: { p_naSeen_a2: '["c1:t1"]' } });

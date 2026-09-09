@@ -418,7 +418,7 @@ test('★★ 안 넘기면 «제대로» 읽는다 — 물려주기가 읽기를
 test('★★★ 아는 사람이 빠진 것을 넘기면 «통째로 다시» 읽는다 — 반만 새 값이면 못 짚는다', async () => {
   const { F, reads } = rig({});
   const two = ONE.concat([{ kind: 'idcard', photo: { year: '2026', id: 'p2', owner: 'u1' },
-    fields: { company: '해찬솔에프쓰리', name: '박선희', docName: '주민등록증' } }]);
+    fields: { company: '해찬솔에프쓰리', name: '이영희', docName: '주민등록증' } }]);
   await F.sendToWorkerMany(two, { '해찬솔에프쓰리__강석': {} });   // 한 사람만 아는 값
   assert.equal(reads.length, 2,
     '★★★ 반쪽짜리를 그대로 믿었습니다 — 모르는 사람의 이름·회사를 빈 칸으로 보고 덮습니다');

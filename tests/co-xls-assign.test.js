@@ -9,7 +9,7 @@
      ② 유형이 급여가 아닌 곳은 **유형을 급여로 바꾼다**
      ③ 이메일 빈 줄은 이름 앞머리가 같으면 **위 줄과 같은 사람으로 본다**
      ④ 세무 이메일은 담당 직원 칸으로 — 다만 **담당이 한 사람일 때만**
-        (cpabong@naver.com 이 세 사람에 걸쳐 있는 것을 확인하고 좁혔다) */
+        (cust27@naver.com 이 세 사람에 걸쳐 있는 것을 확인하고 좁혔다) */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -172,11 +172,11 @@ test('★ 세무 이메일이 담당 한 사람에만 걸리면 넣는다', () =
 
 test('★ 여러 담당에 걸린 세무 이메일은 넣지 않는다 — 남의 자료가 엉뚱한 칸에 들어간다', () => {
   const items = [
-    { who: '주민정', tMail: 'cpabong@naver.com' },
-    { who: '박은비', tMail: 'cpabong@naver.com' },
-    { who: '신욱임', tMail: 'cpabong@naver.com' }
+    { who: '주민정', tMail: 'cust27@naver.com' },
+    { who: '박은비', tMail: 'cust27@naver.com' },
+    { who: '신욱임', tMail: 'cust27@naver.com' }
   ];
-  assert.equal(P.taxMailSafe(items)['cpabong@naver.com'], false);
+  assert.equal(P.taxMailSafe(items)['cust27@naver.com'], false);
 });
 
 test('★ 여러 담당에 걸린 세무 이메일도 넣는다 — 배달 규칙을 고친 뒤로는 안전하다', () => {
@@ -184,11 +184,11 @@ test('★ 여러 담당에 걸린 세무 이메일도 넣는다 — 배달 규�
      2026-08-24 에 배달을 고쳤다(제목에서 사업장 찾기 → 담당 한 사람 → 공용 칸).
      ⚠ 넣어 두면 제목에 사업장이 적힌 메일은 곧바로 임자에게 간다.
      검사 tests/mail-shared-sender.test.js 가 그 배달을 못 박는다. */
-  const its = [{ kind: 'ok', sid: 'A-004', who: '주민정', tName: '정담회계법인', tMail: 'cpabong@naver.com' }];
+  const its = [{ kind: 'ok', sid: 'A-004', who: '주민정', tName: '가나회계법인', tMail: 'cust27@naver.com' }];
   const r = P.patchFor({ id: 'c1', name: '가람떡집', typeCode: '급여' }, its,
-    { taxSafe: { 'cpabong@naver.com': false } });
-  assert.equal(r.patch.taxEmail, 'cpabong@naver.com');
-  assert.equal(r.patch.taxOfficeName, '정담회계법인');
+    { taxSafe: { 'cust27@naver.com': false } });
+  assert.equal(r.patch.taxEmail, 'cust27@naver.com');
+  assert.equal(r.patch.taxOfficeName, '가나회계법인');
   assert.ok(r.why.some(w => /제목으로 가른다/.test(w)), '어떻게 갈리는지 알려야 합니다');
 });
 

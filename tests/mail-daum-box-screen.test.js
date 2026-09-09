@@ -400,10 +400,10 @@ test('★ 옆줄 위 덩어리는 틀고정 — 폴더를 내려도 [메일쓰�
 test('★ 주소만으로는 누구인지 모른다 — 기업정보함에서 이름·회사를 찾아 붙인다', () => {
   const c = load({ folders: FOLDERS, msgs: MSGS });
   c.allItems = () => ({
-    a: { id:'a', email:'huamstoneceo@gmail.com', name:'김대표', company:'화암스톤' },
+    a: { id:'a', email:'cust39@gmail.com', name:'김대표', company:'화암스톤' },
     b: { id:'b', email:'tax@hanse.kr', name:'박세무', company:'' }
   });
-  assert.equal(c.mbNameOf('huamstoneceo@gmail.com'), '김대표 (화암스톤)');
+  assert.equal(c.mbNameOf('cust39@gmail.com'), '김대표 (화암스톤)');
   assert.equal(c.mbNameOf('tax@hanse.kr'), '박세무', '회사가 없으면 이름만');
   assert.equal(c.mbNameOf('none@x.com', '메일이 알려준 이름'), '메일이 알려준 이름',
     '명함에 없으면 메일이 알려 준 이름을 쓴다');
