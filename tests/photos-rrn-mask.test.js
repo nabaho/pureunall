@@ -90,6 +90,20 @@ function runReadPhoto(masked, opts) {
       autoOk: function () { return { auto: false, why: '' }; }
     }
   };
+  /* ── 무료 판독(2026-09-08)으로 갈 때도 «사본만» 가는지 잰다 ──
+     ⚠ 기본은 안 켠다: 무료 판독이 없어도 이 파일의 본래 규칙(사본만 AI 로)이
+       그대로 재져야 한다. opts.freeRead 를 준 검사에서만 그 길로 들어간다.
+     ⚠ null 을 돌려준다 = 「이 길로는 못 읽었다」 — 그러면 예전 길로 이어진다.
+       그래서 이 대역을 켜도 아래 다른 검사들의 답이 안 바뀐다. */
+  if (opts.freeRead) {
+    ctx.PuDocRead.freeRead = function (o) {
+      got.free = (o && o.imgs) || null;
+      return Promise.resolve(null);
+    };
+  }
+  /* freeReadTry 가 window.PuDocRead 로 있는지 본다(다른 게이트 셋과 같은 관례) —
+     vm 상자엔 window 가 없어 스스로를 window 로 채워 준다. */
+  ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx;
   vm.createContext(ctx);
   /* ⚠ 2026-08-24: 판독이 여러 쪽을 «덩이»로 나눠 읽게 되어 readPhoto 가 덩이 층을
      거쳐 판독기를 부른다. 그 층을 함께 실어야 한다 — 안 실으면 그 줄에서
@@ -125,6 +139,17 @@ function runReadPhoto(masked, opts) {
     cutFn(app, 'function readHoldIds('),
     cutFn(app, 'function renderReadAsk('),
     cutFn(app, 'function readQuotaWatch('),
+    /* ⚠ 2026-09-08 — 사업자등록증 «무료 판독»이 readPhoto 앞에 붙었다. 안 실으면
+       그 줄에서 ReferenceError 로 멎어 이 파일의 가림 검사가 통째로 운다 —
+       **벌써 네 번째 같은 일이다.**
+       ⚠ 대역을 만들지 «않는다»(위 한도 판단과 같은 까닭): 진짜 것을 실으면
+         「무료 길이 원본을 집어 가지는 않나」까지 여기서 함께 재게 된다.
+       ⚠ freeOcrPref 는 localStorage 를 보는데 여기엔 없다 — 함수 안에서 try/catch 로
+         받아 «켬»으로 답한다. 그것이 실제 기본값이므로 그대로 잰다. */
+    cutFn(app, 'function freeOcrPref('),
+    cutFn(app, 'function freeReadTry('),
+    cutFn(app, 'function freeReadAsk('),
+    cutFn(app, 'function markFree('),
     cutFn(app, 'function readPhoto('),
     'var __p = readPhoto("p1", ' +
       (masked === undefined ? 'undefined' : JSON.stringify(masked)) + ');'
@@ -148,6 +173,20 @@ test('가린 사본만 판독기로 간다', async (t) => {
     const got = await runReadPhoto(undefined);
     assert.deepEqual(got.read, ['data:image/jpeg;base64,ORIGINAL']);
     assert.equal(got.loaded, 1);
+  });
+
+  /* ── 무료 판독(2026-09-08)도 같은 울타리 안이다 ──────────────────────────
+     ★ 무료 판독은 서류가 «무엇인지 알기 전에» 먼저 돌아간다. 그래서 계약서·
+       근태표 사진도 한 번은 이 길을 지나간다 — 그때 원본을 집어 가면 가림이
+       통째로 무의미해진다. 사본이 왔으면 무료 길에도 «사본만» 가야 한다. */
+  await t.test('★ 무료 판독으로도 «사본만» 간다 — 원본을 집어 가지 않는다', async () => {
+    const got = await runReadPhoto('data:image/jpeg;base64,MASKED', { freeRead: true });
+    /* ⚠ Array.from 으로 «호스트 쪽 배열」로 바꿔 견준다 — got.free 의 원소는
+       vm 상자(다른 realm) 안에서 만든 배열이라, 값이 같아도 assert.deepEqual 은
+       "같은 realm 인가"까지 봐서 실패한다(원소가 원시 문자열이라 값 자체는 안전하다). */
+    assert.deepEqual(Array.from(got.free || []), ['data:image/jpeg;base64,MASKED'],
+      '★ 무료 판독이 원본을 집어 갔습니다 — 가린 뜻이 없습니다: ' + JSON.stringify(got.free));
+    assert.equal(got.loaded, 0, '가린 사본이 있는데 무료 판독이 원본을 또 받았습니다');
   });
 });
 

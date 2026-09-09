@@ -157,6 +157,10 @@
 <script src="js/pu-co-cards.js?v=1"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
+<!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
+     ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
+       PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
+<script src="js/pu-doc-read.js?v=37"></script>
 <script>
 (function(){
 'use strict';
@@ -71280,222 +71284,19 @@ function getCompLeaveBalance(sid){
 // 전략: 브라우저 API 키 노출을 막기 위해 Tesseract.js 강화 + 전처리 사용
 
 // ── Tesseract.js 동적 로드 ──
-var __ocrLoading = null;
-function loadTesseract(){
-  if(typeof window.Tesseract !== 'undefined') return Promise.resolve();
-  if(__ocrLoading) return __ocrLoading;
-  __ocrLoading = new Promise(function(resolve, reject){
-    var s = document.createElement('script');
-    s.src = 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js';
-    s.onload = function(){ resolve(); };
-    s.onerror = function(){ __ocrLoading = null; reject(new Error('Tesseract.js 로드 실패')); };
-    document.head.appendChild(s);
-  });
-  return __ocrLoading;
-}
-
-// ── 이미지 전처리: 선명도·대비 향상 ──
-function preprocessImage(base64, width, height){
-  return new Promise(function(resolve){
-    var img = new Image();
-    img.onload = function(){
-      var MAX = 1800;
-      var scale = Math.min(1, MAX / Math.max(img.width, img.height));
-      var w = Math.round(img.width * scale);
-      var h = Math.round(img.height * scale);
-      var cv = document.createElement('canvas');
-      cv.width = w; cv.height = h;
-      var ctx = cv.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      // ① 그레이스케일
-      var id = ctx.getImageData(0, 0, w, h);
-      var d = id.data;
-      for(var i=0; i<d.length; i+=4){
-        var g = Math.round(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
-        d[i]=d[i+1]=d[i+2]=g;
-      }
-      // ② 대비 향상 (contrast stretch)
-      var mn=255,mx=0;
-      for(var i=0; i<d.length; i+=4){ if(d[i]<mn)mn=d[i]; if(d[i]>mx)mx=d[i]; }
-      if(mx>mn){
-        var rng=mx-mn;
-        for(var i=0; i<d.length; i+=4){
-          var v=Math.min(255,Math.round((d[i]-mn)/rng*255));
-          d[i]=d[i+1]=d[i+2]=v;
-        }
-      }
-      // ③ 샤프닝 커널
-      ctx.putImageData(id, 0, 0);
-      ctx.filter='sharpen';
-      resolve(cv.toDataURL('image/png'));
-    };
-    img.src = base64;
-  });
-}
+/* Tesseract 싣기와 사진 손질은 공용 판독 층에 있다 (js/pu-doc-read.js, 2026-09-08).
+   ⚠ 여기에 다시 만들지 말 것 — 판(@5.1.1)과 손질 방법이 갈라지면 같은 사진을
+     화면마다 다르게 읽는다. 취업규칙 서고도 같은 판을 쓴다. */
 
 // ── 사업자등록증 전용 강력 파서 ──
+/* ── 사업자등록증 글자 → 칸 : 공용 판독 층으로 «옮겼다» (2026-09-08) ──
+   ⚠ 돌려주는 칸 이름은 **그대로**다(name·bizNo·bizCategory·ceo2·zipcode…).
+     이 이름으로 받는 자리가 이 파일에 여섯 군데 있다 — 이름이 바뀌면 코드는
+     멀쩡한데 값이 조용히 안 붙는다.
+   ⚠ 국세청 체크섬 사본이 이 안에 있었는데 지웠다 — 검산하는 곳은
+     js/pu-doc-read.js 하나여야 한다(그 파일 머리에 그렇게 적혀 있다). */
 function parseBizLicense(text){
-  var out = {};
-  if(!text) return out;
-  var norm = text
-    .replace(/[：]/g,':').replace(/[（]/g,'(').replace(/[）]/g,')').replace(/[－―‒\u2013\u2014]/g,'-')
-    .replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248);})
-    .replace(/\r/g,'');
-  var compact = norm.replace(/[\r\n]+/g,' ').replace(/\s+/g,' ');
-  var lines = norm.split(/[\r\n]+/).map(function(l){return l.trim();}).filter(Boolean);
-
-  // ① 사업자등록번호 — 국세청 체크섬 검증 통과한 후보만 채택 (오인식 숫자 차단)
-  function _validBizNo(d){
-    if(!/^\d{10}$/.test(d)) return false;
-    var w=[1,3,7,1,3,7,1,3,5], s=0;
-    for(var i=0;i<9;i++) s+=parseInt(d[i],10)*w[i];
-    s+=Math.floor(parseInt(d[8],10)*5/10);
-    return (10-(s%10))%10===parseInt(d[9],10);
-  }
-  var bizNums = text.match(/[0-9]{3}\s*[-\u2013\u2014.]?\s*[0-9]{2}\s*[-\u2013\u2014.]?\s*[0-9]{5}/g) || [];
-  for(var i=0;i<bizNums.length;i++){
-    var d=bizNums[i].replace(/\D/g,'');
-    if(d.length===10 && _validBizNo(d)){ out.bizNo=d.slice(0,3)+'-'+d.slice(3,5)+'-'+d.slice(5); break; }
-  }
-
-  // ② 법인등록번호
-  var corpNums = text.match(/[0-9]{6}[-\u2013\u2014][0-9]{7}/g)||[];
-  if(corpNums.length) out.corpNo = corpNums[0];
-
-  // ③ 상호/법인명
-  var nameRe = [
-    /(?:법\s*인\s*명|상\s*호)\s*[:(]\s*([\s\S]{1,50}?)(?=\s*(?:대\s*표|법\s*인\s*등|사\s*업|등\s*록|\d{3}-))/,
-    /(?:법\s*인\s*명|상\s*호)\s*[:]\s*([^\n대표사업등록]{2,50})/,
-    /([가-힣A-Za-z0-9·()（）㈜㈔\s]{1,}(?:주식회사|㈜|\(주\)|유한회사|\(유\)|합자회사|협동조합|재단법인|사단법인|의료법인|사회복지법인|영농조합법인|농업회사법인|노무법인|법무법인|세무법인)[가-힣A-Za-z0-9·()\s]*)/,
-    /((?:주식회사|㈜|\(주\)|유한회사|재단법인|사단법인|노무법인|법무법인)[가-힣A-Za-z0-9·\s]{1,40})/
-  ];
-  for(var i=0;i<nameRe.length&&!out.name;i++){
-    var m=compact.match(nameRe[i]);
-    if(m&&m[1]){
-      var v=m[1].replace(/\s+/g,'').replace(/[:]/g,'').trim();
-      v=v.replace(/^(법인명|상호|명칭|성명)[)\]:：]*\s*/,'');
-      v=v.replace(/^[，,\.)\]]+|[，,\.([]+$/g,'').trim();
-      if(v.length>=2&&v.length<=60) out.name=v;
-    }
-  }
-  if(!out.name){
-    for(var i=0;i<lines.length;i++){
-      var l=lines[i];
-      if(/(㈜|\(주\)|주식회사|노무법인|법무법인|세무법인|사단법인|재단법인)/.test(l)&&l.length<=60&&!/대표|사업자|등록|주소|업태/.test(l)){
-        out.name=l.replace(/\s+/g,' ').trim(); break;
-      }
-    }
-  }
-
-  // ④ 대표자
-  var ceoPatterns = [
-    /(?:대\s*표\s*자\s*(?:성\s*명)?|성\s*명\s*\(?대\s*표\s*자\)?)\s*[:]?\s*([가-힣]{2,5})(?=[\s,·및]|$)/,
-    /대\s*표\s*자?\s*[:]\s*([가-힣]{2,5})/,
-    /성\s*명\s+([가-힣]{2,5})(?:\s+대\s*표)/,
-    /대\s*표\s+([가-힣]{2,5})(?!\s*[이가은는을를의])/
-  ];
-  for(var i=0;i<ceoPatterns.length&&!out.ceo;i++){
-    var m=compact.match(ceoPatterns[i]);
-    if(m&&m[1]) out.ceo=m[1].trim();
-  }
-  if(!out.ceo){
-    for(var i=0;i<lines.length-1;i++){
-      if(/대\s*표\s*자/.test(lines[i])&&/^[가-힣]{2,5}$/.test(lines[i+1].replace(/\s/g,''))){
-        out.ceo=lines[i+1].replace(/\s/g,''); break;
-      }
-      var sameLine=lines[i].match(/대\s*표\s*자\s+([가-힣]{2,5})/);
-      if(sameLine){ out.ceo=sameLine[1].trim(); break; }
-    }
-  }
-  if(out.ceo){
-    var _labels=/^(개업|법인|사업|등록|업태|종목|주소|전화|성명|상호|소재|발급|교부|연월)/;
-    var multiCeo=compact.match(new RegExp(out.ceo+'\\s*[,·및]\\s*([가-힣]{2,5})'));
-    if(multiCeo&&multiCeo[1]&&multiCeo[1]!==out.ceo&&!_labels.test(multiCeo[1])) out.ceo2=multiCeo[1];
-  }
-
-  // ⑤ 업태/종목
-  var bizLine=compact.match(/업\s*태\s*[:]?\s*([가-힣A-Za-z,·\s]{1,60}?)\s*종\s*목\s*[:]?\s*([가-힣A-Za-z,·\-\s]{1,80}?)(?=\s*(?:사\s*업\s*장|개\s*업|발\s*급|전\s*화|연\s*락|교\s*부|법\s*인|$))/);
-  if(bizLine){
-    var bv=bizLine[1].trim().replace(/\s+/g,' ');
-    var cv2=bizLine[2].trim().replace(/\s+/g,' ');
-    if(bv.length>1) out.bizType=bv;
-    if(cv2.length>1) out.bizCategory=cv2;
-  } else {
-    var btM=compact.match(/업\s*태\s*[:]?\s*([가-힣A-Za-z,·\s]{1,60}?)(?=\s*(?:종\s*목|발|사|법|$))/);
-    if(btM){ var v=btM[1].trim().replace(/\s+/g,' '); if(v.length>1&&v.length<60) out.bizType=v; }
-    var bcM=compact.match(/종\s*목\s*[:]?\s*([가-힣A-Za-z,·\-\s]{1,80}?)(?=\s*(?:사\s*업\s*장|개\s*업|발\s*급|전\s*화|연\s*락|교\s*부|법\s*인|$))/);
-    if(bcM){ var v=bcM[1].trim().replace(/\s+/g,' '); if(v.length>1&&v.length<80) out.bizCategory=v; }
-  }
-  if(!out.bizType||!out.bizCategory){
-    for(var i=0;i<lines.length;i++){
-      var l=lines[i];
-      if(/^업\s*태/.test(l)&&!out.bizType){
-        var v=l.replace(/^업\s*태\s*[:]/,'').trim().replace(/\s+/g,' ');
-        if(v.length>1) out.bizType=v;
-        var ctPart=l.match(/종\s*목\s*[:]\s*(.+)/);
-        if(ctPart&&!out.bizCategory) out.bizCategory=ctPart[1].trim().replace(/\s+/g,' ');
-      }
-      if(/^종\s*목/.test(l)&&!out.bizCategory){
-        var v=l.replace(/^종\s*목\s*[:]/,'').trim().replace(/\s+/g,' ');
-        if(v.length>1) out.bizCategory=v;
-      }
-    }
-  }
-
-  // ⑥ 주소
-  var addrRe = [
-    /(?:사\s*업\s*장\s*소\s*재\s*지|소\s*재\s*지|사\s*업\s*장\s*주\s*소)\s*[:]?\s*([가-힣A-Za-z0-9\s,·\-()\[\]]{5,200}?)(?=\s*(?:업\s*태|종\s*목|개\s*업|전\s*화|법\s*인|발\s*급|수\s*입|대\s*표|$))/,
-    /((?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)[특별시광역도특별자치시도]*\s*[가-힣A-Za-z0-9\s,·\-()]{10,200})/
-  ];
-  for(var i=0;i<addrRe.length&&!out.address;i++){
-    var m=compact.match(addrRe[i]);
-    if(m&&m[1]){
-      var v=m[1].trim().replace(/\s+/g,' ');
-      v=v.replace(/(?:업태|종목|개업|발급|전화|교부|대표).*$/,'').trim();
-      v=v.replace(/^[가-힣\s]*소\s*재\s*지\s*[|:：]?\s*/,'').replace(/[|]/g,' ').replace(/\s+/g,' ').trim();
-      if(v.length>5) out.address=v;
-    }
-  }
-  if(!out.address){
-    for(var i=0;i<lines.length;i++){
-      var l=lines[i];
-      if(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/.test(l)&&l.length>=10&&l.length<=200&&!/대표|사업자|등록번호|업태|종목/.test(l)){
-        out.address=l.replace(/^[가-힣\s]*소\s*재\s*지\s*[|:：]?\s*/,'').replace(/[|]/g,' ').replace(/^\d{5}\s*/,'').replace(/\s+/g,' ').trim(); break;
-      }
-    }
-  }
-
-  // ⑦ 우편번호
-  if(!out.zipcode){
-    var withoutBiz=text.replace(/\d{3}[-\u2013]?\d{2}[-\u2013]?\d{5}/g,'');
-    var zipM=withoutBiz.match(/(?:우편번호|\(우\))?\s*\[?(\d{5})\]?(?!\d)/);
-    if(zipM) out.zipcode=zipM[1];
-  }
-
-  // ⑧ 전화 — 사업자·법인번호 숫자열을 먼저 제거해 오염 차단
-  var compactNoBiz = compact.replace(/\d{3}\s*[-.]?\s*\d{2}\s*[-.]?\s*\d{5}/g,' ').replace(/\d{6}\s*-\s*\d{7}/g,' ');
-  var phoneM=compactNoBiz.match(/(?:전\s*화|Tel|TEL|☎|연\s*락\s*처)?\s*(0\d{1,2})[\s\-.(]{0,2}(\d{3,4})[\s\-.)]{0,2}(\d{4})/);
-  if(phoneM) out.phone=phoneM[1]+'-'+phoneM[2]+'-'+phoneM[3];
-  if(!out.phone){
-    for(var i=0;i<lines.length;i++){
-      var lm=lines[i].match(/(0\d{1,2})[-.\s]?(\d{3,4})[-.\s]?(\d{4})/);
-      if(lm&&!/사업자|법인|등록/.test(lines[i])){ out.phone=lm[1]+'-'+lm[2]+'-'+lm[3]; break; }
-    }
-  }
-
-  // ⑨ 개업연월일
-  var openM=compact.match(/(?:개\s*업\s*(?:연\s*월\s*일)?|설\s*립\s*일)\s*[:]?\s*(\d{4})\s*[년./-]\s*(\d{1,2})\s*[월./-]\s*(\d{1,2})/);
-  if(openM) out.openDate=openM[1]+'-'+(openM[2].length===1?'0':'')+openM[2]+'-'+(openM[3].length===1?'0':'')+openM[3];
-
-  // ⑩ 직책
-  var posM=compact.match(/(?:대표이사|대표|부장|과장|차장|팀장|대리|이사|상무|전무|사장|회장|노무사|변호사|공인회계사)/);
-  if(posM) out.position=posM[0];
-
-  // ⑪ 이메일
-  var emailM=text.match(/[\w.+-]+@[\w-]+\.[A-Za-z]{2,}(?:\.[A-Za-z]{2,})?/);
-  if(emailM) out.email=emailM[0];
-
-  return out;
+  return PuDocRead.bizregParse(text);
 }
 /* ══ Vision 판독 — 열쇠는 «서버»가 든다 (2026-09-08) ═══════════════════════
    ★★★ 여기 있던 `getVisionApiKey()` 를 걷어냈다. 그것은 열쇠를 «공용 DB»
@@ -71535,31 +71336,13 @@ function ocrWithGoogleVision(base64){
 }
 
 // ── Tesseract.js 멀티패스 OCR ──
+/* ── 브라우저 판독 — 공용 판독 층으로 «옮겼다» (2026-09-08) ──
+   사진첩도 같은 일을 하게 되어(사업자등록증 무료 판독) js/pu-doc-read.js 한 곳으로 모았다.
+   ⚠ 돌려주는 모양은 그대로다: { text, fields, engine } — 부르는 자리를 안 고쳐도 된다.
+   ⚠ 여기 있던 loadTesseract·preprocessImage 도 함께 갔다. 되살리지 말 것 —
+     두 곳에 두면 한쪽만 좋아지고, 같은 서류를 앱마다 다르게 읽는다. */
 function ocrWithTesseract(imgBase64, onProgress){
-  return loadTesseract().then(function(){
-    // 원본 OCR
-    var pass1 = window.Tesseract.recognize(imgBase64, 'kor+eng', {
-      logger: function(m){ if(onProgress) onProgress(m); },
-      tessedit_pageseg_mode: '6'
-    });
-    // 전처리 이미지 OCR
-    var pass2 = preprocessImage(imgBase64).then(function(processed){
-      return window.Tesseract.recognize(processed, 'kor+eng', {
-        tessedit_pageseg_mode: '6'
-      });
-    });
-    return Promise.all([pass1, pass2.catch(function(){ return {data:{text:''}}; })]);
-  }).then(function(results){
-    // 두 결과 중 더 긴 텍스트 우선, 병합
-    var t1 = results[0] && results[0].data ? results[0].data.text : '';
-    var t2 = results[1] && results[1].data ? results[1].data.text : '';
-    var merged = t1.length >= t2.length ? t1 : t2;
-    // 두 결과 파싱 후 합치기
-    var f1 = parseBizLicense(t1);
-    var f2 = parseBizLicense(t2);
-    var combined = Object.assign({}, f2, f1);
-    return { text: merged, fields: combined, engine:'tesseract' };
-  });
+  return PuDocRead.browserRead(imgBase64, onProgress);
 }
 
 // ── 메인 OCR 진입점 (Tesseract fallback) ──

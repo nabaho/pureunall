@@ -11,16 +11,50 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const R = path.join(__dirname, '..');
+const { stripComments } = require('./strip-comments.js');
 
-/* 저장소 뿌리의 화면들만 본다(참고용·목업 폴더는 뺀다). */
+/* 저장소 뿌리의 화면들만 본다(참고용·목업 폴더는 뺀다).
+   ⚠ **주석을 걷은 사본(bare)을 함께 들고 있는다** (2026-09-08). 예전에는 원문을
+     글자로 훑어서, 「PuDocRead.freeRead 를 여기서 부른다」고 «설명하는 주석»만
+     써도 이 검사가 깨졌다. 주석은 아무것도 부를 수 없다 — 그런데 그 헛경보를
+     끄려고 사람이 GATED 에 이름을 더하면 **울타리가 실제로 넓어진다.**
+     헛경보는 울타리를 넓히는 쪽으로 사람을 떠민다. 그래서 걷고 본다.
+   ⚠ 스크립트 태그는 «원문»에서 본다 — 걷개가 마크업을 손댈 일이 없게. */
 function appFiles() {
   return fs.readdirSync(R)
     .filter(f => f.endsWith('.html'))
-    .map(f => ({ name: f, src: fs.readFileSync(path.join(R, f), 'utf8') }));
+    .map(f => {
+      const src = fs.readFileSync(path.join(R, f), 'utf8');
+      return { name: f, src: src, bare: stripComments(src) };
+    });
 }
 
 const loadsReader = a => /<script[^>]+src="js\/pu-doc-read\.js/.test(a.src);
 const loadsMasker = a => /<script[^>]+src="js\/pu-rrn-mask\.js/.test(a.src);
+
+/* 이 화면이 «사진·글을 내보내는» 판독 함수를 실제로 부르나.
+   ⚠ SAFE 는 아래에 있다 — 이 함수는 검사가 돌 때 불리므로 그때는 이미 있다.
+
+   ★★ 왜 「실었나」가 아니라 「부르나」로 보는가 (2026-09-08)
+     푸른이알피가 판독 층을 싣게 됐다 — 사업자등록증 파서와 «브라우저» 판독
+     (Tesseract)을 쓰려고다. 그 둘은 계산과 브라우저 안 일뿐이라 **사진도 글도
+     어디로도 안 나간다.** 그런데도 「실었으면 지우개도」로 재면, 쓰지도 않을
+     지우개를 싣거나 KNOWN_OPEN 에 이름을 올려야 한다 — 둘 다 나쁘다.
+     ⚠ 특히 KNOWN_OPEN 에 올리는 것은 **감수 범위를 말없이 넓히는 일**이고,
+       그 목록은 「늘리지 말 것」이라고 스스로 적어 두었다.
+   ⚠ 이 판정은 아래 SAFE 하나에 달려 있다. SAFE 에 «내보내는» 이름을 잘못 넣으면
+     이 검사와 아래 검사가 **함께** 눈을 감는다 — SAFE 에 이름을 더할 때는
+     「이것이 사진이나 글을 밖으로 보내는가」만 묻는다. */
+function readerCalls(a) {
+  const out = [];
+  const re = /PuDocRead\.(\w+)/g;
+  let m;
+  while ((m = re.exec(a.bare)) !== null) {
+    if (SAFE.indexOf(m[1]) >= 0) continue;
+    out.push({ name: m[1], at: m.index });
+  }
+  return out;
+}
 
 /* ⚠ **아는 채로 열어 둔 화면.** 늘리는 것은 감수 범위를 말없이 넓히는 일이라
    대표께 물어야 한다.
@@ -32,8 +66,12 @@ const loadsMasker = a => /<script[^>]+src="js\/pu-rrn-mask\.js/.test(a.src);
      새 화면이 필요하면 대표께 다시 물어야 한다. */
 const KNOWN_OPEN = ['gov-consulting.html'];
 
+/* ⚠ 이름을 그대로 둔다 — 「실은」이 아니라 「내보내는 판독을 부르는」으로 재지만,
+   지키는 것은 같다: **사진·글을 밖으로 보내는 화면에는 지우개가 있어야 한다.** */
 test('★ 판독 층을 실은 화면은 가림 층도 싣는다', () => {
-  const bad = appFiles().filter(a => loadsReader(a) && !loadsMasker(a)).map(a => a.name);
+  const bad = appFiles()
+    .filter(a => loadsReader(a) && readerCalls(a).length && !loadsMasker(a))
+    .map(a => a.name);
   const extra = bad.filter(n => KNOWN_OPEN.indexOf(n) < 0);
   assert.deepEqual(extra, [],
     '★ 판독은 하는데 주민번호 지우개가 없는 화면이 새로 생겼습니다: ' + extra.join(', ')
@@ -46,7 +84,7 @@ test('아는 구멍이 메워지면 목록에서 빼라고 알린다', () => {
   const apps = appFiles();
   const stale = KNOWN_OPEN.filter(n => {
     const a = apps.filter(x => x.name === n)[0];
-    return !a || !loadsReader(a) || loadsMasker(a);
+    return !a || !loadsReader(a) || !readerCalls(a).length || loadsMasker(a);
   });
   assert.deepEqual(stale, [],
     '이 화면들은 이제 지켜집니다 — KNOWN_OPEN 에서 빼 주세요: ' + stale.join(', '));
@@ -69,13 +107,31 @@ const SAFE = ['init', 'bizNoDigits', 'bizNoValid', 'fmtBizNo', 'mapTo', 'keysFro
   /* isOurs 는 «판정»뿐이다(2026-09-08) — 서식의 소속·회사 칸이 우리 법인인지 보고
      참·거짓을 돌려준다. 사진도 글도 어디로 안 보낸다. 위촉장을 거래처 자료로
      보내지 않게 막는 데 쓴다(대표 지시 「위촉장등은 보내기 필요 없다」). */
-  'isOurs', 'OUR_NAMES', 'OUR_LABELS'];
+  'isOurs', 'OUR_NAMES', 'OUR_LABELS',
+  /* ── 무료 판독의 «계산 조각»들 (2026-09-08) ────────────────────────────────
+     사업자등록증 글자에서 칸을 뽑는 계산뿐이다. 글자를 받아 값을 돌려주고 끝난다 —
+     아무것도 부르지 않고 아무 데도 안 보낸다(js/pu-doc-read.js 의 bizregParse 참고).
+     ⚠ freeRead 는 **여기 없다.** 그것은 사진을 Vision 으로 보낸다 — GATED 몫이다.
+       그 둘을 한 칸에 넣으면 이 울타리가 통째로 뜻을 잃는다. */
+  'bizregParse', 'bizregFields', 'bizregTitle', 'bizregNo', 'bizregLooks',
+  /* browserRead·browserText — Tesseract 로 **브라우저 안에서** 읽는다.
+     사진이 이 컴퓨터를 떠나지 않는다. 그래서 지우개가 필요 없는 유일한 판독이다.
+     ⚠ 이 둘의 «무료»는 요금이 아니라 «안 나간다»는 뜻이기도 하다 — 헷갈리지 말 것. */
+  'browserRead', 'browserText'];
 
 /* 그 앱에서 판독기를 부르는 것이 허락된 자리. 각 앱의 울타리 검사가 따로 지킨다. */
 const GATED = {
   'pu-paydata.html': ['runRead', 'runSheetRead', 'readOneSum'],
+  /* ⚠ freeReadTry·freeReadAsk — 무료 판독이 사진을 «우리 서버 대리인»에게 보내는
+       자리다(거기서 구글 Vision 으로 간다). 가림을 «안» 거친다 — 사진첩 자동 판독이
+       예전부터 원본을 그대로 보내고 있고(2026-08-17 대표 결정 「이대로 감수한다」),
+       이 길은 그 감수 범위를 넓히지 않는다: 보내는 사진이 «같은 사진»이고 오히려
+       Gemini 대신 글자만 뽑는 쪽으로 간다.
+     ⚠ 이름을 한글로 짓지 «말 것». 아래 fnAround 의 \w 가 한글을 못 읽어 자리가
+       「(모름)」이 되고, 그러면 이 목록에 적을 수가 없어 **울타리 밖**에 놓인다
+       (freeReadAsk 가 처음엔 「무료판독」이었다가 그래서 이름을 바꿨다). */
   'pu-photos.html': ['startRead', 'readPhoto', 'imgChunkMakers', 'readDocChunked',
-    'runReadChunks', 'textChunkMakers'],
+    'runReadChunks', 'textChunkMakers', 'freeReadTry', 'freeReadAsk'],
   'gov-consulting.html': ['refCapRead'],      // 아는 채로 열어 둔 곳(KNOWN_OPEN)
   /* 경력관리 — 위촉장·자격증·경력증명서를 읽는다(대표 지시 2026-09-06 「사진첩 판독기로 바꿔라」).
      ⚠ 부르는 자리는 _kcReader 하나뿐이다. 이 층을 다른 곳에서 또 부르면 여기서 걸린다 —
@@ -93,14 +149,11 @@ function fnAround(src, at) {
 test('★ 판독기를 부르는 자리가 앱마다 정해진 곳뿐이다', () => {
   const bad = [];
   appFiles().forEach(a => {
-    const re = /PuDocRead\.(\w+)/g;
-    let m;
-    while ((m = re.exec(a.src)) !== null) {
-      if (SAFE.indexOf(m[1]) >= 0) continue;
-      const fn = fnAround(a.src, m.index);
+    readerCalls(a).forEach(c => {
+      const fn = fnAround(a.bare, c.at);
       const ok = GATED[a.name] || [];
-      if (ok.indexOf(fn) < 0) bad.push(a.name + ' : ' + fn + ' → PuDocRead.' + m[1]);
-    }
+      if (ok.indexOf(fn) < 0) bad.push(a.name + ' : ' + fn + ' → PuDocRead.' + c.name);
+    });
   });
   assert.deepEqual(bad, [],
     '★ 판독기를 부르는 새 길이 생겼습니다: ' + bad.join(' / ')

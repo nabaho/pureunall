@@ -2035,6 +2035,24 @@ exports.readDoc = functions
    ⚠ **판독을 막지 않는다.** 세다 실패해도 그냥 넘어간다 — 세는 일 때문에 읽기가
      멈추면 그것이 훨씬 큰 손해다. 그래서 await 하되 catch 로 삼킨다.
    ⚠ 담는 것은 **숫자뿐**이다. 사진·글·사람 이름은 한 글자도 안 담는다. */
+/* 이달 Vision 무료 몫이 몇 장 남았나.
+   돌려주는 것: { left, used, known }
+     known:false — 셈을 «못 읽었다». 0 이 아니라 «모른다»다. 부르는 쪽이 그 둘을
+       가려 말해야 한다 — 「다 썼습니다」와 「모릅니다」는 손쓸 곳이 다르다.
+   ⚠ 여기서 실패를 삼켜 0 을 돌려주면 「한 장도 안 썼다」가 되어 문턱이 통째로
+     헛돈다. 셈을 못 읽는 것과 안 쓴 것을 «절대» 같게 다루지 말 것. */
+async function visionMonthLeft() {
+  try {
+    const db = getDatabase();
+    const s = await db.ref(DR.visionMonthPath()).once("value");
+    const used = Math.max(0, Number(s.val()) || 0);
+    return { left: Math.max(0, DR.VISION_FREE_MONTH - used), used: used, known: true };
+  } catch (e) {
+    console.warn("Vision 달 셈 못 읽음(그래서 안 부른다):", String((e && e.message) || e));
+    return { left: 0, used: 0, known: false };
+  }
+}
+
 async function bumpReadTally(app, kind, howMany) {
   /* ⚠ 몇을 더할지 받는다 — Vision 은 «장 수»로 값을 받으므로 한 번에 여러 장이면
        그만큼 더해야 한다. 안 받으면 1 이다(Gemini 는 요청 수로 센다). */
@@ -2100,6 +2118,25 @@ exports.readVision = functions
 
     const v = VR.validate((req.body && typeof req.body === "object") ? req.body : {});
     if (!v.ok) { res.status(400).json({ ok: false, error: v.error }); return; }
+
+    /* ── 달 몫(1,000장)을 넘길 판이면 «부르지 않는다» (대표 결정 2026-09-08 ③㉮) ──
+       ⚠⚠ 넘겨도 Vision 은 그냥 읽어 주고 **요금이 붙는다.** 그런데 화면은 그 판독을
+         「0원」이라 적고 있다 — 그 말이 거짓이 되는 자리가 정확히 여기다.
+       ★ 그래서 부르기 «전»에 센 것을 본다. 막으면 부르는 쪽은 브라우저 판독
+         (Tesseract)으로 물러선다 — 그쪽은 정말 한 푼도 안 든다.
+       ⚠ 셈을 «못 읽었을 때»도 막는다. 얼마 썼는지 모르는 채로 부르면 그것이 곧
+         요금이고, 막아도 일은 된다(브라우저 판독으로 계속 읽힌다) — 그래서
+         모를 때는 안 부르는 쪽이 맞다. 열어 두는 쪽은 돈이 나가고도 모른다. */
+    const 남은것 = await visionMonthLeft();
+    if (남은것.left < v.images.length) {
+      res.status(429).json({ ok: false,
+        error: 남은것.known
+          ? ("Vision 의 이달 무료 몫(" + DR.VISION_FREE_MONTH + "장)이 "
+             + 남은것.left + "장 남아 " + v.images.length + "장을 읽지 못합니다"
+             + " — 브라우저 판독으로 대신합니다.")
+          : "Vision 을 이달 얼마나 썼는지 확인하지 못해 부르지 않았습니다 — 브라우저 판독으로 대신합니다." });
+      return;
+    }
 
     /* ★★ 열쇠 «없이» 부르는 것이 본길이다 (2026-09-08).
          이 서버에는 «자기 신분증»이 있다(App Engine 기본 서비스 계정) — 그것으로

@@ -83,7 +83,9 @@ test('★ 지나가는 층도 그 둘만 부른다 — 뒷문이 되면 안 된�
 /* 격자에서 사람이 「가리고 판독」을 누른 길은 **가린 사본만** 읽어야 한다.
    여기서 원본을 함께 실으면 가린 뜻이 통째로 없어진다. */
 test('★ 가린 사본이 왔으면 원본을 함께 보내지 않는다', () => {
-  const m = html.match(/function readPhoto\(id, masked\)[\s\S]*?\n\}/);
+  /* ⚠ 2026-09-08 — 무료 판독(opt)이 셋째 인자로 붙었다. 인자 개수를 못 박지
+     않는다 — 늘어도 이 검사가 지키는 것(가린 사본만 간다)은 그대로다. */
+  const m = html.match(/function readPhoto\(id, masked[^)]*\)[\s\S]*?\n\}/);
   assert.ok(m, 'readPhoto 를 찾을 수 없습니다');
   assert.match(m[0], /masked\s*\n?\s*\?\s*Promise\.resolve\(\[masked\]\)/,
     '★ 가린 사본이 있는데 원본도 함께 보내면 가린 뜻이 없습니다');
