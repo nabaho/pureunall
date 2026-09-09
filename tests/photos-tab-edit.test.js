@@ -159,7 +159,13 @@ test('빈 이름으로 고치면 원래 이름으로 돌아간다 — 되돌릴 
 
 test('★ 없앤 분류는 탭 줄에서 빠지고, 되살리는 길이 있다', () => {
   const fn = fnOf(app, 'renderKindTabs');
-  assert.match(fn, /k === 'all' \|\| !KIND_HIDDEN\[k\]/, '삭제가 탭 줄에 안 걸립니다');
+  /* ⚠ 2026-09-09 — 갈래(사진|서류)가 붙으면서 탭을 고르는 줄이 둘로 나뉘었다.
+     예전에는 `k === 'all' || !KIND_HIDDEN[k]` 라는 «글자 그대로»를 찾아서, 규칙은
+     그대로인데 표현만 바뀌자 헛깨졌다. 지킬 것은 두 가지다 —
+     ① 없앤 것은 탭 줄에서 빠진다 ② 「전체」는 없앨 수 없다(돌아갈 자리). */
+  assert.match(fn, /KIND_HIDDEN\[k\]/, '삭제가 탭 줄에 안 걸립니다');
+  assert.match(fn, /k !== 'all' && KIND_HIDDEN\[k\]|k === 'all' \|\| !KIND_HIDDEN\[k\]/,
+    '★ 「전체」까지 없앨 수 있게 됐습니다 — 돌아갈 자리가 사라집니다');
   const add = fnOf(app, 'openAddKind');
   assert.match(add, /없앤 분류 되살리기/, '★ 없애면 ✎ 로 못 들어가니 되살릴 길이 없어집니다');
   assert.match(add, /unhideKind/);
