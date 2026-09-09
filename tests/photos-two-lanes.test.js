@@ -48,6 +48,10 @@ function 상자(o) {
     cutFn(APP, 'function isCustomTab('),
     cutFn(APP, 'function kindTabKeyOf('),
     cutFn(APP, 'function tabsOf('),
+    /* laneOf 가 이것을 본다 — 「other 인데 값을 하나라도 읽었나」를 가르는 자리다.
+       ⚠ 대역을 만들지 «않는다». 이 갈림이 곧 「서류인가 아닌가」의 답이라, 가짜로
+         두면 이 파일에서 가장 무거운 규칙을 재지 않게 된다. */
+    cutFn(APP, 'function readAnyField('),
     cutFn(APP, 'function laneOf('),
     cutFn(APP, 'function lanesOn('),
     cutFn(APP, 'function laneHasTab('),
@@ -91,14 +95,27 @@ test('★ 아직 안 읽은 것(답 안 한 것)은 «서류»다 — 대표 결
   assert.equal(갈래({}), 'doc', '표시가 아예 없는 것도 서류로 둡니다');
 });
 
-test('★★ 「기타서류」(other)는 사진 갈래로 «안» 간다 — PIC_KINDS 를 쓰지 않았다', () => {
-  /* PIC_KINDS 에는 other 가 들어 있다(noTextKind 용). 그것을 갈래에 쓰면
-     상호·대표자를 다 읽고도 other 로 온 서류가 사진 칸에 숨는다. */
-  assert.equal(갈래({ kind: 'doc', read: { kind: 'other' } }), 'doc',
-    '★★ 기타서류가 사진 칸에 숨었습니다 — 기업정보함으로 갈 서류가 영영 안 갑니다');
-  const src = BARE.slice(BARE.indexOf('function laneOf('), BARE.indexOf('function laneOf(') + 700);
+test('★★★ other 는 «둘»로 갈린다 — 값을 읽었으면 서류, 아무것도 못 읽었으면 사진', () => {
+  /* 대표 지적 2026-09-09 「여전히 사진이 서류로 된 곳이 있다」 — 판독기가
+     「서류로 보이지 않음」이라 한 현장 사진 스물다섯 장이 서류 칸에 앉아 있었다.
+     이 화면은 그 갈림을 이미 쓰고 있었다(readLabel·needsCheck) — 갈래만 안 썼다. */
+  assert.equal(갈래({ kind: 'doc', read: { kind: 'other', fields: {} } }), 'pic',
+    '★★★ 판독기가 «서류가 아니라»고 한 사진이 서류 칸에 남습니다 — 대표 지적 그대로입니다');
+  assert.equal(갈래({ kind: 'doc', read: { kind: 'other', fields: { company: '㈜가야' } } }), 'doc',
+    '★★ 값을 읽어낸 「기타 서류」가 사진 칸에 숨었습니다 — 기업정보함으로 갈 서류가 영영 안 갑니다');
+  /* PIC_KINDS 를 그대로 가져다 쓰면 위 갈림이 사라진다(그 표는 값을 안 본다) */
+  const src = BARE.slice(BARE.indexOf('function laneOf('), BARE.indexOf('function laneOf(') + 900);
   assert.equal(/PIC_KINDS\b(?!_)/.test(src.replace(/LANE_PIC_KINDS/g, '')), false,
-    '★★ laneOf 가 PIC_KINDS 를 봅니다 — 그 표에는 other 가 들어 있습니다');
+    '★★ laneOf 가 PIC_KINDS 를 봅니다 — 그 표는 값을 읽었는지 안 가립니다');
+});
+
+test('★★★ 사람이 손으로 옮긴 것은 «되돌아오지 않는다» — 안 그러면 끌어서 옮길 수가 없다', () => {
+  /* 서류 칸에 끌어다 놓으면 retagPhotos 가 기타서류(other) + ack:true 로 적는다.
+     ack 예외가 없으면 위 규칙이 그것을 곧바로 사진으로 되돌려, 놓아도 제자리로 튄다. */
+  assert.equal(갈래({ kind: 'doc', read: { kind: 'other', fields: {}, ack: true } }), 'doc',
+    '★★★ 서류 칸에 놓은 사진이 사진 칸으로 되돌아갑니다 — 끌어서 옮기기가 헛돕니다');
+  assert.equal(갈래({ kind: 'doc', read: { kind: 'meeting', fields: {}, ack: true } }), 'pic',
+    '★ 사진 칸에 놓은 것이 서류로 되돌아갑니다');
 });
 
 test('★★ 판독이 «실패»한 것은 서류 갈래다 — 사진 칸에 숨으면 다시 안 읽힌다', () => {
@@ -278,7 +295,81 @@ test('★★ 남의 사진에는 그 단추가 «안 보인다»', () => {
     '★ 이미 사진 갈래인 것에도 보입니다 — 눌러도 아무 일이 없는 단추가 가장 나쁩니다');
 });
 
-/* ══════ ⑧ 합친 「전체사진」은 없앴다 (①㉮) ═══════════════════════════════════ */
+/* ══════ ⑧ 「서류」 딱지가 갈래를 따른다 (대표 지적 2026-09-09) ═══════════════ */
+
+test('★★★ 「서류」 딱지는 «사진 갈래»에 안 붙는다 — 갈래 한 곳에서 정한다', () => {
+  /* 2026-08-17 에 같은 지적이 있었고(「이 사진은 서류가 아닌데 왜 서류라고 되어 있나」)
+     그때는 meeting «하나만» 뺐다. 그 방식은 갈래가 늘 때마다 여기도 함께 고쳐야 해서
+     2026-09-09 에 또 같은 지적이 왔다 — 그래서 laneOf 를 그대로 따르게 했다. */
+  const g = stripComments(APP.match(/function renderGrid\(\)[\s\S]*?\n\}/)[0]);
+  assert.match(g, /const hasTag = \(it\.meta\.kind === 'doc' && laneOf\(it\) === 'doc'\)/,
+    '★★★ 딱지가 갈래를 안 따릅니다 — 갈래가 늘 때마다 여기서 또 어긋납니다');
+  /* 갈래를 안 보고 read.kind 를 «직접» 견주는 옛 방식으로 되돌아가지 않았나 */
+  assert.equal(/hasTag = \([^)]*rk !== 'meeting'/.test(g), false,
+    '★★ 딱지가 다시 read.kind 를 직접 봅니다 — 그것이 두 번 어긋난 방식입니다');
+});
+
+/* ══════ ⑨ 끌어서 갈래 옮기기 (대표 물음 2026-09-09) ═════════════════════════ */
+
+test('★ 갈래 스위치가 «놓을 자리»다 — data-lane 을 달고 놓으면 옮긴다', () => {
+  assert.match(stripComments(cutFn(APP, 'function laneSwitch(')), /data-lane="/,
+    '★ 스위치에 놓을 자리 표시가 없습니다 — 끌어다 놓아도 아무 일이 없습니다');
+  /* ⚠ data-key 를 쓰면 «끌 수 있는 탭»이 되어 순서 바꾸기·분류 옮기기에 섞인다 */
+  assert.equal(/data-key="/.test(stripComments(cutFn(APP, 'function laneSwitch('))), false,
+    '★ 스위치가 분류 탭의 표시(data-key)를 씁니다 — 탭 순서 목록에 섞입니다');
+});
+
+test('★★ 놓았을 때 «새 저장 길»을 만들지 않는다 — 분류 탭에 놓는 것과 같은 길', () => {
+  const drop = stripComments(APP.slice(
+    APP.indexOf("$('kinds').addEventListener('drop'"),
+    APP.indexOf("$('kinds').addEventListener('dragend'")));
+  assert.match(drop, /data-lane/, '★ 놓기 처리가 갈래 스위치를 안 봅니다');
+  assert.match(drop, /retagPhotos\(ids, LANE_DROP_TAB\[/,
+    '★★ 갈래로 옮길 때 딴 길로 저장합니다 — 옮기는 길은 retagPhotos 하나여야 합니다');
+  /* 갈래를 «먼저» 가른다 — 재는 것은 «판정 차례»다(변수를 어느 줄에서 만드는가가
+     아니다. 처음에 그것을 재다가 이 검사가 헛깨졌다). */
+  assert.match(drop, /if \(ln\)[\s\S]{0,160}?else if \(b\)/,
+    '★ 갈래를 먼저 가르지 않습니다 — 나중에 스위치에 data-key 가 붙으면 조용히 딴 데로 갑니다');
+});
+
+test('★★ 서류 칸으로 놓아도 «판독하지 않는다» — 스무 장이면 하루 몫이 사라진다', () => {
+  const 표 = APP.match(/^const LANE_DROP_TAB = \{[^}]*\};/m)[0];
+  assert.match(표, /pic:\s*'meeting'/, '사진 칸으로 놓으면 회의사진이어야 합니다');
+  assert.match(표, /doc:\s*'other'/,
+    '★★ 서류 칸으로 놓을 때 판독을 부르거나 딴 갈래로 적습니다 — 기타서류로 «적기만» 해야 합니다');
+  /* 놓기 처리에 판독을 부르는 자리가 없어야 한다 */
+  const drop = stripComments(APP.slice(
+    APP.indexOf("$('kinds').addEventListener('drop'"),
+    APP.indexOf("$('kinds').addEventListener('dragend'")));
+  assert.equal(/readPhoto\(|queueRead\(|readWaitRun\(/.test(drop), false,
+    '★★ 놓는 손짓 하나로 판독이 돕니다 — 여러 장을 놓으면 하루 몫이 그 자리에서 사라집니다');
+});
+
+test('놓을 수 있는 자리라는 «표시»가 뜬다 — 안 되는 줄 알고 마는 것을 막는다', () => {
+  const over = stripComments(APP.slice(
+    APP.indexOf("$('kinds').addEventListener('dragover'"),
+    APP.indexOf("$('kinds').addEventListener('dragleave'")));
+  assert.match(over, /data-lane/, '★ 갈래 스위치 위에서 놓기 표시가 안 뜹니다');
+  assert.match(over, /markDropTab\(/, '표시를 그리는 자리가 없습니다');
+});
+
+/* ══════ ⑩ 붙임머리 뒤로 사진이 비치지 않는다 (대표 지적 2026-09-09) ═════════ */
+
+test('★★ 붙임머리가 «그 위»까지 덮는다 — 올라가는 사진이 보이면 안 된다', () => {
+  /* 스크롤 상자(#main)에 위 패딩이 있고 sticky 의 top:0 은 «패딩 안쪽»에 붙는다 —
+     그래서 탭 줄 위에 그만큼이 비고 사진이 그 틈으로 지나갔다. */
+  assert.match(APP, /#kinds::before\{[^}]*background:var\(--bg\)/,
+    '★★ 붙임머리 위를 덮는 것이 없습니다 — 그 틈으로 사진이 올라가는 것이 보입니다');
+  assert.match(APP, /#kinds::before\{[^}]*height:var\(--mainPadT/,
+    '★ 덮는 높이를 숫자로 박았습니다 — #main 의 패딩과 어긋나면 틈이 되살아납니다');
+  /* 같은 값을 둘이 «나눠» 쓰는지 — 두 곳에 숫자를 적으면 한쪽만 고쳐진다 */
+  assert.match(APP, /#main\{padding:var\(--mainPadT/,
+    '★ #main 이 그 변수를 안 씁니다 — 덮개와 패딩이 서로 다른 값이 됩니다');
+  assert.match(APP, /:root\{\s*--mainPadT:\s*\d+px\s*\}/,
+    '★ 넓은 화면에서 그 값을 정하는 자리가 없습니다');
+});
+
+/* ══════ ⑪ 합친 「전체사진」은 없앴다 (①㉮) ═══════════════════════════════════ */
 
 test('★ 둘을 합친 「전체사진」 칸이 없다 — 셋이 되면 다시 헷갈린다', () => {
   const 표 = APP.match(/^const KIND_TABS = \[[\s\S]*?^\];/m)[0];

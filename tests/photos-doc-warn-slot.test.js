@@ -21,6 +21,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 /* 색은 «값»이 아니라 «뜻»으로 본다 — 팔레트를 정리해도 안 깨지게 */
 const P = require('./lib-palette.js');
+const { cutFn } = require('./cut-fn.js');
 
 const R = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(R, 'pu-photos.html'), 'utf8');
@@ -98,6 +99,14 @@ function cellFor(o) {
     String: String, Set: Set, Boolean: Boolean
   };
   vm.createContext(ctx);
+  /* 🗂 「서류」 딱지가 «갈래»를 보게 됐다(2026-09-09) — 안 실으면 칸이 통째로 안 그려진다.
+     ⚠ 대역을 만들지 «않는다»: 이 파일이 재는 것이 「서류 딱지가 언제 붙나」이고,
+       그 답이 이제 laneOf 안에 있다. 가짜로 두면 정작 그 규칙을 안 재게 된다. */
+  vm.runInContext([
+    app.match(/^const LANE_PIC_KINDS = \{[^}]*\};/m)[0].replace('const ', 'var '),
+    cutFn(app, 'function readAnyField('),
+    cutFn(app, 'function laneOf(')
+  ].join('\n'), ctx);
   /* 떼어낸 대목은 forEach 안의 몸통이라 if/else 가 짝이 맞다 — 그대로 돌린다. */
   vm.runInContext(SLICE, ctx);
   return ctx.html;

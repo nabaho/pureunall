@@ -101,12 +101,31 @@ test('★ 둘은 같은 자리(사업자등록증 탭)에 쌓인다 — 찾을 �
    "이 사진은 서류가 아닌데 왜 서류라고 되어 있나" — 딱지는 원래 «어느 단추로
    올렸나»(서류 고르기 = 고화질)를 적은 것이라, 서류 고르기로 올린 회의사진에도
    붙었다. 판독이 이미 무엇인지 가려 놓았으므로 사진으로 가려진 것에는 안 붙인다. */
+/* ⚠ 2026-09-09 — 같은 지적이 또 왔다(「여전히 사진이 서류로 된 곳이 있다」). 이번에는
+     판독기가 «서류로 보이지 않음»이라 한 현장 사진이었다. meeting 하나만 빼는 방식은
+     갈래가 늘 때마다 여기서 또 어긋나므로, 딱지가 **갈래(laneOf)를 그대로 따르게** 했다.
+   ⚠ 그래서 이 검사도 «글자»가 아니라 «규칙»을 본다 — 실제로 돌려서, 사진으로 가려진
+     것이 사진 갈래인지 본다. 옛 검사는 `rk !== 'meeting'` 이라는 표현을 붙잡고 있었다. */
+function 갈래(meta) {
+  const ctx = { String: String, Object: Object, Boolean: Boolean };
+  vm.createContext(ctx);
+  vm.runInContext([
+    app.match(/^const LANE_PIC_KINDS = \{[^}]*\};/m)[0].replace('const ', 'var '),
+    cutFn(app, 'function readAnyField('),
+    cutFn(app, 'function laneOf(')
+  ].join('\n'), ctx);
+  ctx.__it = { id: 'p1', meta: meta };
+  return vm.runInContext('laneOf(__it)', ctx);
+}
+
 test('★ 판독이 회의·현장 사진으로 본 것에는 「서류」 딱지를 안 붙인다', () => {
-  const i = app.indexOf("const rk = it.meta.read && it.meta.read.kind;");
-  assert.ok(i > 0, '격자 딱지 판단을 찾지 못했습니다');
-  const line = app.slice(i, i + 260);
-  assert.match(line, /it\.meta\.kind === 'doc' && rk !== 'meeting'/,
+  const g = app.match(/function renderGrid\(\)[\s\S]*?\n\}/)[0];
+  assert.match(g, /const hasTag = \([^)]*laneOf\(it\) === 'doc'\)/,
+    '격자 딱지 판단을 찾지 못했습니다 — 딱지가 갈래를 따르지 않습니다');
+  assert.equal(갈래({ kind: 'doc', read: { kind: 'meeting' } }), 'pic',
     '★ 회의사진에 「서류」가 붙으면 대표가 사진첩 분류 전체를 못 믿게 됩니다');
+  assert.equal(갈래({ kind: 'doc', read: { kind: 'other', fields: {} } }), 'pic',
+    '★ 판독기가 «서류가 아니라»고 한 사진에 「서류」가 붙습니다 — 2026-09-09 지적 그대로입니다');
 });
 
 test('크게 보기 제목줄도 같은 규칙이다 — 한쪽만 고치면 열 때마다 또 틀린 말이 보인다', () => {
@@ -121,11 +140,11 @@ test('크게 보기 제목줄도 같은 규칙이다 — 한쪽만 고치면 열
 });
 
 test('아직 안 읽은 사진에는 딱지를 그대로 붙인다 — 읽히기 전 유일한 실마리다', () => {
-  const i = app.indexOf("const rk = it.meta.read && it.meta.read.kind;");
-  const line = app.slice(i, i + 260);
-  /* rk 가 undefined 면 !== 'meeting' 이 참이라 딱지가 붙는다 — 그 성질을 못박는다 */
-  assert.ok(!/rk === 'doc'|rk && rk !==/.test(line),
+  /* 갈래가 「서류」면 딱지가 붙는다(위 hasTag) — 그러니 «안 읽은 것이 서류 갈래인가»가
+     곧 이 규칙이다. 대표 결정 ③㉮ 와 같은 자리다: 모르겠으면 서류. */
+  assert.equal(갈래({ kind: 'doc' }), 'doc',
     '★ 판독 전 사진의 딱지가 사라지면, 고화질로 올린 서류인지 알 길이 없어집니다');
+  assert.equal(갈래({}), 'doc', '표시가 아예 없는 옛 사진도 서류 갈래여야 합니다');
 });
 
 test('같은 회사의 등록증·증명원은 기업정보함에서 한 곳으로 모인다 — 사업자번호가 열쇠', () => {
