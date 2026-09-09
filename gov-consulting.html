@@ -6141,6 +6141,34 @@ function coNewDays(co){
   });
   return m;
 }
+/* 대시보드 사업장 차례 — 견주는 규칙 하나로 모은다 (대표 지시 2026-09-09
+   「새로 입력된건은 최상위에 … 기업순서를 바꿀수 있게 … 드래그」).
+   ⚠ 손으로 정한 차례(dashOrder)를 «맨 먼저» 본다 — ⭐즐겨찾기보다도 앞이다.
+     즐겨찾기를 뒤에 두면, 즐겨찾기 아닌 것을 즐겨찾기 위로 끌어도 다음에 그릴 때
+     도로 아래로 튕겨 내려간다(끌어도 «안 바뀐 것처럼» 보인다) — 실제로 그렇게
+     될 뻔한 것을 눈으로 보고 여기로 옮겼다. 손으로 만진 자리는 무엇을 대신해서라도
+     그 자리를 지켜야 «끌었다»는 말이 거짓이 안 된다.
+   ⚠ 값을 못 박지 않는다 — «손댄 것이 있는가»만 본다. 둘 다 손댔으면 숫자로,
+     하나만 손댔으면 그것이 위로 온다.
+   ⚠ 새것이 «가나다」를 대신한다(대표 결정 ①㉮) — 마감이 급한 사업장은 ⭐·마감
+     정렬에서 이미 위에 있으므로 밀려나지 않는다.
+   함수로 뺀 까닭 — renderDash 안 닫힌 화살괄호 함수는 검사가 못 잡아 뺀다
+   (fnSrc 는 「function 이름(」만 찾는다). 이 규칙은 눈에 안 보이면 다음 사람이
+   말없이 깨뜨리기 딱 좋다. */
+function dashCompareItems(a,b,favs,dashOrder){
+  const ha=dashOrder[a.co.id], hb=dashOrder[b.co.id];
+  const oa=ha!=null, ob=hb!=null;
+  if(oa&&ob)return ha-hb;
+  if(oa!==ob)return oa?-1:1;
+  const fa=favs.includes(a.co.id)?0:1, fb=favs.includes(b.co.id)?0:1;
+  if(fa!==fb)return fa-fb;
+  const na=coIsNew(a.co), nb=coIsNew(b.co);
+  if(na!==nb)return na?-1:1;
+  if(na&&nb)return coNewDays(a.co)-coNewDays(b.co);
+  const da=a.risk?.minDiff??9999, db=b.risk?.minDiff??9999;
+  if(da!==db)return da-db;
+  return String(a.co.name).localeCompare(String(b.co.name),'ko');
+}
 /* 넣는 자리마다 도장을 찍는다 — 한 군데라도 빠지면 그 길로 들어온 것은 조용히 안 뜬다 */
 function stampNewCo(co){ co.createdAt=todayStr(); return co; }
 function stampNewType(co,tid){
@@ -6368,22 +6396,7 @@ function renderDash(){
      그 자리를 지켜야 «끌었다»는 말이 거짓이 안 된다.
      ⚠ 값을 못 박지 않는다 — «손댄 것이 있는가»만 본다. 둘 다 손댔으면 숫자로,
        하나만 손댔으면 그것이 위로 온다. */
-  const sortItems=arr=>[...arr].sort((a,b)=>{
-    const ha=_dashOrder[a.co.id], hb=_dashOrder[b.co.id];
-    const oa=ha!=null, ob=hb!=null;
-    if(oa&&ob)return ha-hb;
-    if(oa!==ob)return oa?-1:1;
-    const fa=favs.includes(a.co.id)?0:1, fb=favs.includes(b.co.id)?0:1;
-    if(fa!==fb)return fa-fb;
-    /* 새것이 «가나다」를 대신한다 (대표 결정 2026-09-09 ①㉮) — 마감이 급한 사업장은
-       ⭐·마감 정렬에서 이미 위에 있으므로 밀려나지 않는다. */
-    const na=coIsNew(a.co), nb=coIsNew(b.co);
-    if(na!==nb)return na?-1:1;
-    if(na&&nb)return coNewDays(a.co)-coNewDays(b.co);
-    const da=a.risk?.minDiff??9999, db=b.risk?.minDiff??9999;
-    if(da!==db)return da-db;
-    return String(a.co.name).localeCompare(String(b.co.name),'ko');
-  });
+  const sortItems=arr=>[...arr].sort((a,b)=>dashCompareItems(a,b,favs,_dashOrder));
   const groups=[];
   const addGroup=(title,items)=>{if(items.length)groups.push({title,items:sortItems(items)});};
   const activeItems=prepared.filter(x=>!x.endedOnly);
