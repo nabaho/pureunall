@@ -42,6 +42,8 @@
        표지 옆 글자가 152px 밖에 안 남아 제목이 예닐곱 줄로 쏟아졌다.
        받으신 원본도 600 보다 넓다. 700 은 메일 프로그램이 다 견디는 폭이다. */
   var 넓이 = 700;
+  var 기본배너그림 = 'https://nabaho.github.io/pureunall/img/news-banner.png';
+  var 기본뉴스그림 = 'https://nabaho.github.io/pureunall/img/news-side.png';
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -113,11 +115,11 @@
     var s = 설정 || {};
     var 회 = 회차한벌 || {};
     var 속 =
-      '<div style="font-size:27px;font-weight:bold;color:#ffffff;letter-spacing:3px;'
+      '<div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:3px;'
       + 'font-family:Georgia,\'Times New Roman\',serif;line-height:1.2;">'
       + esc(s.배너글 || 'WEEKLY NEWS LETTER') + '</div>'
       + '<div style="height:16px;line-height:16px;font-size:1px;">&nbsp;</div>'
-      + '<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>'
+      + '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
       + '<td style="background-color:' + 색.짙은갈 + ';padding:9px 22px;">'
       + '<span style="font-size:15px;color:#ffffff;font-weight:bold;font-family:' + 폰트 + ';">'
       /* ⚠ 짧은이름(「8월 5주차」)이 아니라 이름을 쓴다 — 원본 띠가 「2026년 08월 5주차」로
@@ -125,21 +127,20 @@
       + esc(회.이름 || '주간뉴스레터') + '</span>'
       + '</td></tr></table>';
 
-    /* 사진을 넣으신 경우 — 글자를 사진 «위»에 얹지 않는다.
-       메일에서 겹쳐 놓기(background-image·position)는 절반의 프로그램에서 깨진다.
-       사진을 위에, 회차 띠를 아래에 «쌓는다» — 어디서든 같게 보인다. */
-    var 사진 = img주소(s.배너그림)
-      ? '<tr><td style="padding:0;font-size:0;line-height:0;">'
-        + '<img src="' + img주소(s.배너그림) + '" width="' + (넓이 - 56) + '" alt=""'
-        + ' style="display:block;width:100%;"></td></tr>'
-      : '';
+    /* 원본처럼 «왼쪽 제목 · 오른쪽 그림»인 큰 표지다.
+       글자를 그림 위에 겹치면 Outlook에서 무너지므로 두 칸 표로 같은 인상을 만든다. */
+    var g = img주소(s.배너그림 || 기본배너그림);
+    var 사진 = g
+      ? '<td width="47%" style="font-size:0;line-height:0;background-color:#5d4b3d;">'
+        + '<img src="' + g + '" width="300" height="184" alt=""'
+        + ' style="display:block;width:100%;height:184px;object-fit:cover;"></td>'
+      : '<td width="47%" style="height:184px;background-color:#5d4b3d;">&nbsp;</td>';
 
     return '<tr><td style="padding:0 28px;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + ' style="background-color:' + 색.갈 + ';">'
-      + 사진
-      + '<tr><td align="center" style="padding:' + (사진 ? '18px 20px 20px' : '34px 20px 30px') + ' 20px;">'
-      + 속 + '</td></tr></table></td></tr>';
+      + '<tr><td width="53%" valign="middle" style="padding:30px 24px;">'
+      + 속 + '</td>' + 사진 + '</tr></table></td></tr>';
   }
 
   /* ── 꼭지 차림표 넷 ──────────────────────────────────────────────────
@@ -147,7 +148,7 @@
        대개 무시한다 — 누르면 헛일이 되는 손잡이는 두지 않는다. */
   function 차림표() {
     var 칸 = Core.꼭지들.map(function (g) {
-      return '<td align="center" width="25%" style="padding:14px 4px;font-size:14px;'
+      return '<td align="center" width="25%" style="padding:17px 4px;font-size:15px;'
         + 'font-weight:bold;color:' + 색.글 + ';font-family:' + 폰트 + ';">'
         + esc(g.이름) + '</td>';
     }).join('');
@@ -225,7 +226,7 @@
        ⚠ 설정에 그림 주소가 있을 때만이다. 없으면 예전처럼 줄만 그린다 —
          자리만 잡아 두고 빈 네모를 그리면 「그림이 깨졌나」로 보인다.
        ⚠ 우리 홈페이지에 올린 그림만 나간다(mail-send.js 의 IMG_HOST_OK). */
-    var g = img주소(그림);
+    var g = img주소(그림 || 기본뉴스그림);
     if (!g) {
       return '<tr><td style="padding:16px 28px 0 28px;' + 글칸 + '">' + 줄 + '</td></tr>';
     }
@@ -498,7 +499,8 @@
       + ' style="border-top:2px solid ' + 색.갈 + ';">'
       + '<tr><td style="padding:18px 0 0 0;font-size:12px;line-height:1.9;color:#8a837a;'
       + 'font-family:' + 폰트 + ';">'
-      + '기사는 <b>제목과 원문 링크</b>만 싣습니다. 본문은 각 언론사 홈페이지에서 보실 수 있습니다.<br><br>'
+      + '기사는 원문을 옮기지 않고 <b>푸른노무법인이 직접 정리한 글</b>만 싣습니다. '
+      + '출처와 원문 링크는 함께 밝힙니다.<br><br>'
       + '<span style="color:' + 색.글 + ';font-weight:bold;font-size:13px;">'
       + esc(s.회사이름 || '푸른노무법인') + '</span><br>'
       + esc(s.꼬리한줄 || '대표노무사 권형하') + (s.회신주소 ? ' &nbsp;·&nbsp; ' + esc(s.회신주소) : '')
@@ -664,7 +666,7 @@
     });
 
     줄.push('---');
-    줄.push('기사는 제목과 원문 링크만 싣습니다. 본문은 각 언론사 홈페이지에서 보실 수 있습니다.');
+    줄.push('기사는 원문을 옮기지 않고 푸른노무법인이 직접 정리한 글만 싣습니다. 출처와 원문 링크는 함께 밝힙니다.');
     줄.push(설.회사이름 || '푸른노무법인');
     if (설.회신주소) 줄.push(설.회신주소);
     return 줄.join('\n');

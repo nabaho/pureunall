@@ -190,6 +190,14 @@ test('★★ 쓴 것을 «저장»한다 — 안 하면 새로 고칠 때 되돌
   assert.match(저장, /우리말 = /, '★ 담는 자리가 없다');
 });
 
+test('★ 상세 창은 뉴스레터 표지·차림표·기사 본문 순서의 내부 문서다', () => {
+  const 그리기 = 함수몸(화면, '줄창그리기');
+  assert.match(그리기, /article-hero/, '큰 뉴스레터 표지가 없습니다');
+  assert.match(그리기, /article-nav/, '꼭지 차림표가 없습니다');
+  assert.match(그리기, /article-title/, '기사 제목 띠가 없습니다');
+  assert.match(화면, /#rowbox \.article\{/, '팝업 내부 문서 서식이 없습니다');
+});
+
 test('★ 목록에서 «썼는지» 바로 보인다 — 안 보이면 편지에서 찾게 된다', () => {
   const 칸 = 함수몸(화면, '꼭지칸하나');
   assert.match(칸, /wtag/, '★ 딱지가 없다');
