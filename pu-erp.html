@@ -147,7 +147,8 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
 <script src="js/pu-ontology.js?v=21"></script>
-<script src="js/pu-ontology-write.js?v=1" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
+<script src="js/pu-company-write.js?v=1"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
      그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-xls.js?v=3"></script>
@@ -39072,6 +39073,12 @@ var _ontHeavyRaw=null, _ontIdxAt=0;
 function OntologyAuditPanel(){
   var OW=window.PuOntologyWrite;
   var writeIssues=OW&&typeof OW.getIssues==='function'?OW.getIssues():[];
+  var CW=window.PuCompanyWrite, companyWriteAudit=null;
+  try{
+    if(CW&&typeof CW.audit==='function') companyWriteAudit=CW.audit(dbGet('companies',[])||[],{
+      actor:(window.CURRENT_USER&&CURRENT_USER.sid)||'',now:Date.now()
+    });
+  }catch(_companyAuditError){ window._erpErrLog&&window._erpErrLog(_companyAuditError); }
   var rs=useState(null); var report=rs[0]; var setReport=rs[1];
   var bs=useState(false); var busy=bs[0]; var setBusy=bs[1];
   var qs=useState(''); var query=qs[0]; var setQuery=qs[1];
@@ -39256,6 +39263,10 @@ function OntologyAuditPanel(){
       h('strong',null,'저장 관문 · 기존 프로그램 관찰 모드'),
       ' — 현재 화면에서 발견한 온톨로지 저장 위반 '+writeIssues.length+'건. 기존 업무는 막지 않고 기록하며, 새 프로그램은 기본으로 차단합니다.',
       writeIssues.length>0&&h('div',{style:{marginTop:'5px',color:'#854d0e'}},writeIssues.slice(-5).map(function(x){return x.program+' · '+x.path+' · '+x.message;}).join(' / '))),
+    companyWriteAudit&&h('div',{style:{background:companyWriteAudit.ok?'#f0fdf4':'#fffbeb',padding:'9px 12px',borderRadius:'7px',fontSize:'11.5px',color:companyWriteAudit.ok?'#166534':'#854d0e',marginBottom:'12px'}},
+      h('strong',null,'업체 원자적 저장 전환 준비'),
+      ' — 전체 '+companyWriteAudit.total+'건 · 계약 적용 '+companyWriteAudit.contracted+'건 · 이관 대기 '+companyWriteAudit.legacy+'건 · 자동 준비 '+companyWriteAudit.ready.length+'건 · 사람 확인 '+companyWriteAudit.blocked.length+'건 · 중복 ID '+companyWriteAudit.duplicates.length+'건.',
+      h('div',{style:{marginTop:'5px',color:'#475569'}},'현재는 읽기 전용 진단입니다. 기존 업체를 백업·이관한 뒤 업체 저장과 삭제를 수정차수 트랜잭션으로 전환합니다.')),
     !report&&h('div',{style:{padding:'24px',textAlign:'center',color:'#94a3b8',background:'#f8fafc',borderRadius:'7px',fontSize:'12.5px'}},'진단을 실행하면 ID 누락·중복, 끊어진 업체·담당자·업무·재무 관계를 찾습니다.'),
     report&&h('div',null,
       h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'12px'}},
