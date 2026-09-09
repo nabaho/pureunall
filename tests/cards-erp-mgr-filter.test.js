@@ -109,13 +109,32 @@ test('목록 걸러내기가 mgrs 로 견준다 — label 로 견주면 부담�
   assert.match(fn, /ErpMatch\.mgrs\(it\)/, '배지 글자로 견주고 있습니다');
 });
 
-test('담당자를 직접 고르는 필터가 상단에 있다', () => {
-  assert.match(app, /id="pcMgrFilter"[^>]*onchange="filterErpMgr\(this\.value\)"/,
-    '담당자 선택 필터가 없습니다');
+/* ⚠ 2026-09-09 — 「담당 전체」 드롭다운(#pcMgrFilter)을 없앴다(대표 지시).
+   「고르는」 일은 표의 담당 배지를 누르면 그대로 되고(아래 검사), «정렬»은 담당
+   열 제목을 눌러 새로 연다 — 드롭다운이 하던 두 일을 각각 다른 길로 넘겼을 뿐,
+   퇴사자를 뺀 담당 이름 목록을 세는 일(🚪 이어받기 띠가 쓴다)은 그대로 남았다. */
+test('담당자 선택 «드롭다운»은 없앴다 — 고르기는 배지로, 정렬은 열 제목으로', () => {
+  assert.ok(!/id="pcMgrFilter"/.test(app),
+    '★ 담당자 선택 드롭다운이 되살아났다 — 대표 지시로 없앤 것이다');
+  assert.ok(!/id="pcSort"/.test(app),
+    '★ 정렬 순서 드롭다운이 되살아났다 — 열 제목 클릭으로 대신하기로 했다');
   const fn = fnBody('renderPCTable');
-  assert.match(fn, /ErpMatch\.mgrs\(it\)/, '필터 목록에 부담당을 포함하지 않습니다');
-  assert.match(fn, /mgrSel\.value = state\.erpMgr \|\| ''/,
-    '현재 선택한 담당자가 필터에 표시되지 않습니다');
+  /* 드롭다운은 없어졌지만, 그 목록을 «세는 일»은 남아야 한다 — 안 그러면
+     「🚪 퇴사한 담당 — 이어받기」 띠가 늘 0명이 된다(mgrGoneChipHtml 이 이 값을 쓴다). */
+  assert.match(fn, /ErpMatch\.mgrs\(it\)/, '담당 이름을 모으는 일이 사라졌다');
+  assert.match(fn, /_mgrGone = _allMgrs\.filter\(mbRetired\)/,
+    '퇴사자를 가르는 셈이 사라졌다 — 이어받기 띠가 늘 0명이 된다');
+});
+
+test('담당 열 제목을 누르면 정렬된다 — 다른 열과 «같은 방식»이다', () => {
+  const fn = fnBody('renderPCTable');
+  assert.match(fn, /onclick="sortBy\('manager'\)"/,
+    '★ 담당 열 제목이 다른 열처럼 눌러서 정렬되지 않는다');
+  assert.match(fn, /담당\$\{sortArrow\('manager'\)\}/,
+    '★ 정렬 방향 화살표가 없다 — 다른 열(이름·회사·등록일)에는 있다');
+  const sw = fnBody('listItems');
+  assert.match(sw, /case 'manager': return \(ErpMatch\.mgrs\(it\)\[0\]\) \|\| '';/,
+    '★ 담당으로 정렬할 값을 어디서도 정하지 않는다');
 });
 
 test('「담당」 배지를 누르면 걸러진다 — 줄 클릭과 겹치지 않게 막는다', () => {
