@@ -17,9 +17,21 @@
      의심스러우면 안 채우는 쪽이 맞다. 잘못 낸 서류는 되돌릴 수 없다. */
 (function (root) {
 
-  /* 쓸 수 있는 열쇠 — kcareer-hwpxfill 의 목록 표 열쇠와 «같아야» 한다.
-     여기만 늘리면 채우는 쪽이 모르는 열쇠를 받는다. */
-  var KEYS = ['period', 'org', 'role', 'school', 'major', 'none'];
+  /* 쓸 수 있는 열쇠 — 채우는 쪽(kcareer-hwpxfill)에서 «빌려 온다».
+     ⚠★ 예전에는 여기 손으로 적어 두었다. 그래서 채우는 쪽에 area(소재지)·degree(학위)·
+       dept(부서)·title(직위)가 들어왔을 때 이쪽은 모른 채로 남았다.
+       실측 2026-09-09 — 「기간|학교명|전공|소재지|학위」 서식에서:
+         · AI 가 «맞게» ["period","school","major","area","degree"] 라 답하면
+           모르는 말이라 보고 **답을 통째로 버렸다**(null → 사전으로 되돌아감).
+         · 물음에 area·degree 가 «없어» AI 는 학위를 major 로 답할 수밖에 없었고,
+           같은 열쇠는 첫 열만 쓰므로 학위 칸은 **none** 이 됐다.
+       그래서 소재지·학위는 사전에 없는 서식에서는 «영영» 못 짚는 칸이었다.
+     ⚠ 다시 손으로 적지 말 것 — 두 곳에 적으면 반드시 어긋난다(검사로 못박았다). */
+  var _X = (typeof require === 'function' && typeof module !== 'undefined')
+    ? require('./kcareer-hwpxfill.js')
+    : root.KcareerHwpxFill;
+  var KEYS = ((_X && _X.LIST_FILL_KEYS) || ['period', 'org', 'role', 'school', 'major'])
+    .concat(['none']);
 
   function norm(s) {
     return String(s == null ? '' : s).replace(/[\s　]+/g, '').trim();
@@ -44,9 +56,16 @@
       '  period — 기간·연도·재직기간처럼 «언제»를 적는 열',
       '  org    — 기관명·학교명이 아닌 근무처·발급기관처럼 «어디»를 적는 열',
       '  school — 학교 이름을 적는 열',
-      '  major  — 전공·학과·학위를 적는 열',
-      '  role   — 직위·직책·담당업무처럼 «무엇을 했는지» 적는 열',
+      '  major  — 전공·학과를 적는 열',
+      '  degree — 학위·졸업구분(학사·석사·졸업·수료)을 적는 열',
+      '  area   — 소재지·지역처럼 «어느 지방»인지 적는 열',
+      '  dept   — 부서·소속팀을 적는 열',
+      '  title  — 직위·직책·직급을 적는 열',
+      '  role   — 담당업무·활동내용처럼 «무엇을 했는지» 적는 열',
       '  none   — 위에 없거나 비고·번호처럼 우리가 채우지 않을 열',
+      '',
+      '⚠ 「전공」과 「학위」가 따로 있는 표라면 major 와 degree 로 갈라 고르세요.',
+      '⚠ 「직위」와 「담당업무」가 따로 있는 표라면 title 과 role 로 갈라 고르세요.',
       '',
       '규칙:',
       '  · 열 개수와 «똑같은 개수»로 답하세요 (' + cols.length + '개).',
@@ -54,7 +73,7 @@
       '  · 확실하지 않으면 none 을 고르세요. 틀리게 넣는 것이 안 넣는 것보다 나쁩니다.',
       '',
       'JSON 배열 하나만 답하세요. 설명은 붙이지 마세요.',
-      '예: ["period","org","role","none"]'
+      '예: ["period","school","major","area","degree"]'
     ].join('\n');
   }
 
@@ -87,7 +106,11 @@
     var n = Object.keys(has).length;
     if (n < 2) return '';
     if (has.school) return 'edu';
-    if (has.org && (has.role || has.period)) return 'career';
+    /* ⚠ 학교명 칸이 없는 학력 표도 있다 — 「기간|전공|학위」 꼴.
+       전공·학위·소재지는 학력에만 쓰는 열쇠라 이것만으로도 학력으로 본다.
+       ⚠ 경력 판정보다 «먼저» 본다 — 학력 표에 경력이 박히면 서류가 틀린다. */
+    if (has.major || has.degree || has.area) return 'edu';
+    if (has.org && (has.role || has.period || has.title || has.dept)) return 'career';
     return '';
   }
 

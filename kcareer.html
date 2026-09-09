@@ -1055,13 +1055,15 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=4"></script>
 <script src="js/pu-doc-read.js?v=37"></script>
-<script src="js/kcareer-hwpxfill.js?v=20"></script>
+<script src="js/kcareer-hwpxfill.js?v=21"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=15"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
-<script src="js/kcareer-colmap-ai.js?v=1"></script>
+<script src="js/kcareer-colmap-ai.js?v=2"></script>
+<!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
+<script src="js/kcareer-slotai.js?v=1"></script>
 <script src="js/kcareer-overlay.js?v=2"></script>
 <!-- AI 판독 호출기 — 열쇠는 회사 서버가 든다(브라우저는 모른다) -->
 <script src="js/pu-ai-call.js?v=2"></script>
@@ -9948,6 +9950,8 @@ async function rhBuildMap(){
   var zip=await JSZip.loadAsync(src);
   var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
   var slots=[],lists=[],warn={textBoxes:0,nested:0},fps=[],data=_cvFillData();
+  /* 구역별 xml 을 들고 있는다 — AI에게 물을 때 «그 줄»을 보여 주려면 필요하다 */
+  var secs=[];
   for(const n of names){
     var xml=await zip.file(n).async('string');
     var m=KcareerFormMap.guess(KcareerFormMap.scan(xml), data);
@@ -9955,10 +9959,84 @@ async function rhBuildMap(){
     slots=slots.concat(m.slots); lists=lists.concat(m.lists);
     warn.textBoxes+=m.warn.textBoxes; warn.nested+=m.warn.nested;
     fps.push(KcareerFormMap.fingerprint(xml));
+    secs.push({xml:xml, slots:m.slots});
   }
   _rhMap={slots:slots,lists:lists,warn:warn,fp:fps.join('/')};
   _rhPicks=rhMemoryLoad(_rhMap.fp)||{};
+  rhRenderMap();                       /* 먼저 사전만으로 그린다 — 기다리게 하지 않는다 */
+  /* ★ 사전이 못 짚은 칸을 AI에게 «한 번» 묻는다(대표 지시 2026-09-09 「근본적 해결」).
+     ⚠ 못 물어도 그냥 간다 — 사전 결과가 이미 화면에 있다. AI 는 «더 채우는» 것뿐이다. */
+  try{ await rhSlotAi(secs, data); }catch(e){ console.warn('[자리짚기] 못 물었습니다', e); }
+}
+
+/* ── 낱개 칸 「자리 짚기」를 AI에게 묻기 (대표 지시 2026-09-09) ──
+   대표 물음: 「이력서 양식이 잘 안채워지고 자기 마음데로 입력된다. 근본적 해결하고 싶다.」
+
+   목록 표는 2026-08-30 에 이미 이 길로 옮겼다(rhColMap). 잘 되니 낱개 칸도 같은 길로 옮긴다.
+   ★ AI 에게 «값»을 만들라고 하지 않는다 — 값은 우리가 갖고 있다.
+     사전이 못 짚은 칸의 «그 줄 글자»만 보내 「어느 칸이 무엇이냐」만 묻는다.
+   ⚠ 개인정보는 kcareer-slotai.js 의 scrub 이 «보내기 전에» 지운다(검사로 못박았다).
+   ⚠ 사전이 짚은 칸은 덮지 않는다(mergeInto) — 오늘 되는 것이 뒷걸음질하지 않는다.
+   ⚠ 한 번 짚은 것은 «서식 지문»으로 담아 둔다 — 같은 서식은 두 번째부터 안 묻는다.
+   ⚠ 못 물어도(인터넷·로그인·AI 고장) 조용히 물러선다 — 사전 결과는 이미 화면에 있다. */
+var RH_SLOTMEM='slot_maps';
+function _rhSlotAll(){ try{ return JSON.parse(LS.get(NS+RH_SLOTMEM)||'{}')||{}; }catch(e){ return {}; } }
+var _rhSlotSaid='';   /* 이 서식에 대해 이미 알렸나 — 잔소리 방지 */
+function _rhSlotSave(fp,picks){
+  if(!fp) return;
+  try{
+    var all=_rhSlotAll();
+    all[fp]={ at:Date.now(), picks:picks||{} };
+    var keys=Object.keys(all);
+    if(keys.length>60){
+      keys.sort(function(a,b){ return (all[a].at||0)-(all[b].at||0); })
+        .slice(0,keys.length-60).forEach(function(k){ delete all[k]; });
+    }
+    LS.set(NS+RH_SLOTMEM, JSON.stringify(all));
+  }catch(e){ console.warn('자리짚기 기억',e); }
+}
+async function rhSlotAi(secs, data){
+  if(!window.KcareerSlotAi || !_rhMap) return 0;
+  var A=KcareerSlotAi, own=(data&&data.fields)||{};
+  /* ⑴ 전에 물어 둔 것이 있으면 그것을 쓴다 — 다시 묻지 않는다 */
+  var 담긴=_rhSlotAll()[_rhMap.fp];
+  if(담긴 && 담긴.picks){
+    var n0=A.mergeInto(_rhMap.slots, 담긴.picks);
+    if(n0){
+      rhRenderMap();
+      /* ⚠ 한 서식에 «한 번만» 알린다 — rhBuildMap 은 채운 뒤·되돌린 뒤에도 다시 돈다 */
+      if(_rhSlotSaid!==_rhMap.fp){ _rhSlotSaid=_rhMap.fp;
+        toast('전에 살펴본 대로 '+n0+'칸을 더 짚어 두었습니다'); }
+    }
+    return n0;
+  }
+  /* ⑵ 물을 것이 있나 */
+  var skel=A.skeletonAll(secs, own);
+  if(!skel.items.length) return 0;
+  var prompt=A.buildPrompt(skel);
+  if(!prompt) return 0;
+  if(!window.PuAiCall || !aiReady()) return 0;      /* 로그인 안 됐으면 조용히 물러선다 */
+
+  toast('⏳ 사전이 모르는 칸 '+skel.items.length+'군데를 살펴보는 중…');
+  var got=null;
+  try{
+    var reply=await PuAiCall.ask([{text:prompt}],
+      { auth:(typeof firebase!=='undefined'&&firebase.auth)?firebase.auth():null,
+        generationConfig:{temperature:0,maxOutputTokens:1500} });
+    got=A.parseReply(PuAiCall.textOf(reply), skel);
+  }catch(e){
+    console.warn('[자리짚기] 못 물었습니다 — 사전으로 갑니다', e && e.message);
+    return 0;
+  }
+  if(!got){ console.warn('[자리짚기] 답을 못 알아들었습니다'); return 0; }
+  if(got.dropped && got.dropped.length) console.warn('[자리짚기] 버린 답', got.dropped);
+
+  var n=A.mergeInto(_rhMap.slots, got.picks);
+  _rhSlotSave(_rhMap.fp, got.picks);                /* 다음부터는 안 묻는다 */
   rhRenderMap();
+  toast(n ? ('✨ '+n+'칸을 더 짚었습니다 — 오른쪽에서 «AI가 짚음»을 확인해 주세요')
+          : '살펴봤지만 더 짚을 칸은 없었습니다');
+  return n;
 }
 
 /* ⚠ 「채울 곳」 서랍에는 글자칸을 «늘어놓지 않는다» — 값 칸마다 한 줄씩 생겨 서랍이 넘친다.
@@ -9992,8 +10070,12 @@ function rhRenderMap(){
   };
   var known=shown.filter(function(s){ return willFill(s); }).length;
 
+  /* AI 가 짚은 것은 «따로» 센다 — 사람이 무엇을 확인해야 하는지 알아야 한다 */
+  var aiCnt=shown.filter(function(s){ return s.ai && _rhPicks[s.id]==null && willFill(s); }).length;
   var html='<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:8px">채울 곳 '
-    +shown.length+'군데 — 알아본 것 '+known+' · 골라 줄 것 '+(shown.length-known)+'</div>';
+    +shown.length+'군데 — 알아본 것 '+known
+    +(aiCnt?' <span style="color:var(--blue)">(그 중 🤖 AI가 짚은 것 '+aiCnt+')</span>':'')
+    +' · 골라 줄 것 '+(shown.length-known)+'</div>';
 
   html+=_rhMap.lists.map(function(l){
     var nm=(l.kind==='edu'?'학력 표':'경력 표');
@@ -10019,6 +10101,10 @@ function rhRenderMap(){
     return '<div class="rh-slot '+(ok?'ok':'miss')+'">'
       +'<div class="r1"><span class="nm">'+escapeHtml(s.left||s.text||'빈 칸')+'</span>'
       +'<span class="loc">'+(s.tbl+1)+'표 '+(s.row+1)+'행 '+(s.col+1)+'열</span></div>'
+      /* ★ AI 가 짚은 칸은 «그렇다고 밝힌다» — 사람이 확인하고 넘어가야 한다.
+         조용히 넣으면 그것이 바로 「자기 마음데로 입력된다」다(대표 제보 2026-09-09). */
+      +(s.ai&&_rhPicks[s.id]==null?'<div style="font-size:10.5px;color:var(--blue);margin-bottom:4px">'
+        +'🤖 AI가 짚었습니다 — 맞는지 확인해 주세요</div>':'')
       +(s.text?'<div style="font-size:10.5px;color:var(--text-mute);margin-bottom:4px">지금 「'
         +escapeHtml(s.text)+'」'+(s.kind==='안내글뒤'?' — 뒤에 이어 씁니다':'')+'</div>':'')
       +(pick&&!ok&&pick!=='__incell'&&pick!=='__stamp'

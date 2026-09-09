@@ -62,6 +62,26 @@
     { re: /이메일|E-?mail/i, key: 'email' }, { re: /주소/, key: 'addr' }
   ];
   /* 목록 표 머리행 열쇠 — 학력·경력 표의 열을 알아본다 */
+  /* ★ 「채울 수 있는 열쇠」는 여기 «한 곳»에만 적는다 (2026-09-09).
+     ⚠ 예전에는 AI 에게 물을 때 고를 수 있는 열쇠(kcareer-colmap-ai.js)를 «따로» 적어 두었다.
+       그래서 여기에 area(소재지)·degree(학위)·dept(부서)·title(직위)를 더했을 때
+       AI 쪽은 모른 채로 남았다 — 실측 2026-09-09:
+         · AI 가 «맞게» ["period","school","major","area","degree"] 라 답하면
+           모르는 말이라 **답을 통째로 버렸다**(parseReply → null).
+         · AI 가 고를 수 있는 것만으로 답하면 학위가 major 로 겹쳐 **none 이 됐다.**
+       즉 「소재지·학위」는 AI 로도 영영 못 짚는 칸이었다.
+     ⚠ 열쇠를 더할 때는 «채우는 쪽이 실제로 그 값을 갖고 있는지» 보고 더한다 —
+       목록 줄의 값은 _cvFillData 의 edu·career 항목에서 온다. */
+  /* 목록 표(학력·경력) 한 줄에 실제로 써 넣을 수 있는 열쇠 */
+  var LIST_FILL_KEYS = ['period', 'school', 'major', 'area', 'degree',
+                        'org', 'dept', 'title', 'role'];
+  /* 낱개 칸(인적사항)에 실제로 써 넣을 수 있는 열쇠.
+     ⚠ rrn(주민등록번호)은 «없다» — 사람이 손으로 고를 때만 나간다(secrets). */
+  var FIELD_FILL_KEYS = ['name', 'nameHanja', 'nameEng', 'birth', 'gender',
+                         'phone', 'phoneWork', 'phoneHome', 'fax',
+                         'email', 'emailWork', 'addr', 'addrWork',
+                         'org', 'dept', 'title', 'orgTitle', 'license'];
+
   var COL_LABELS = [
     { re: /^(기간|연도|년도|재직기간|재학기간|활동기간|기간근무년수|근무기간|수행기간|위촉기간|참여기간|교육기간|근무연월|활동연도|기간년월)$/, key: 'period' },
     { re: /^(학교명?|출신학교|출신교|졸업학교|학교소재지|학교명소재지)$/, key: 'school' },
@@ -876,6 +896,8 @@
   var api = {
     autoFill: autoFill, summarize: summarize,
     fieldKeyOf: fieldKeyOf, colKeyOf: colKeyOf,
+    /* ⚠ AI 에게 물을 때 고를 수 있는 열쇠는 «이것»을 쓴다 — 따로 적으면 어긋난다 */
+    LIST_FILL_KEYS: LIST_FILL_KEYS, FIELD_FILL_KEYS: FIELD_FILL_KEYS,
     cellText: cellText, isEmptyCell: isEmptyCell, fillCell: fillCell, setCellText: setCellText,
     /* 중첩 표를 다루는 자 — 칸 지도도 «같은 것»을 쓴다 */
     tagBlocks: tagBlocks, hasInnerTable: hasInnerTable, ownPart: ownPart,
