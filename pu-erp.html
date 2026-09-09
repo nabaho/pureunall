@@ -151,7 +151,7 @@
 <script src="js/pu-company-write.js?v=1"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
      그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
-<script src="js/pu-co-xls.js?v=3"></script>
+<script src="js/pu-co-xls.js?v=4"></script>
 <!-- 기업정보함 → 업체관리 담당자 메일 (대표 요청 2026-08-27).
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=1"></script>
@@ -13934,7 +13934,7 @@ function erpLoadBankPhotos(cb){
   });
 }
 
-/* 이름 다듬기 — 「김 수현」·「김수현」을 같게 본다. 사람 열쇠(erpWkSafe)와 같은 결이다. */
+/* 이름 다듬기 — 「김 철수」·「김철수」를 같게 본다. 사람 열쇠(erpWkSafe)와 같은 결이다. */
 function erpBankNameKey(v){ return String(v==null?'':v).replace(/\s+/g,''); }
 
 /* ── 이 사람 통장 고르기 (순수 로직 · 검사 대상) ──

@@ -41,8 +41,8 @@ test('★ 업체를 당겨올 때 메일 칸을 함께 담는다 — 안 담아�
   const S = store();
   const got = S.normalizeCompanies({ v: { a: {
     id: 'c1', name: '㈜정일제지', typeCode: '급여', status: 'active', managerMain: 'A-002',
-    contacts: [{ name: '임남용', position: '', email: 'cust12@naver.com', isPrimary: true }],
-    primaryContactName: '임남용', primaryContactEmail: 'cust12@naver.com',
+    contacts: [{ name: '임대용', position: '', email: 'cust12@naver.com', isPrimary: true }],
+    primaryContactName: '임대용', primaryContactEmail: 'cust12@naver.com',
     taxOfficeName: '윤병수회계사무소', taxEmail: 'cust01@hanmail.net'
   } } });
   const co = got[0];
@@ -82,7 +82,7 @@ test('★ 대표 담당자가 맨 위에 온다 — 이 주소로 오면 여기�
   const S = store();
   const rows = S.companyMails({
     contacts: [{ name: '경리', email: 'b@n.kr', isPrimary: false },
-               { name: '임남용', email: 'a@n.kr', isPrimary: true }]
+               { name: '임대용', email: 'a@n.kr', isPrimary: true }]
   });
   assert.equal(rows[0].email, 'a@n.kr');
   assert.equal(rows[1].email, 'b@n.kr');
@@ -91,8 +91,8 @@ test('★ 대표 담당자가 맨 위에 온다 — 이 주소로 오면 여기�
 test('★ 같은 주소가 담당자 칸과 딸림값에 둘 다 있어도 한 번만 보인다', () => {
   const S = store();
   const rows = S.companyMails({
-    contacts: [{ name: '임남용', email: 'a@n.kr', isPrimary: true }],
-    primaryContactName: '임남용', primaryContactEmail: 'A@N.KR'
+    contacts: [{ name: '임대용', email: 'a@n.kr', isPrimary: true }],
+    primaryContactName: '임대용', primaryContactEmail: 'A@N.KR'
   });
   assert.equal(rows.length, 1);
 });
@@ -100,7 +100,7 @@ test('★ 같은 주소가 담당자 칸과 딸림값에 둘 다 있어도 한 �
 test('★ 세무사무소는 갈라서 보여 준다 — 업체 담당자와 뜻이 다르다', () => {
   const S = store();
   const rows = S.companyMails({
-    primaryContactName: '임남용', primaryContactEmail: 'a@n.kr',
+    primaryContactName: '임대용', primaryContactEmail: 'a@n.kr',
     taxOfficeName: '윤병수회계사무소', taxEmail: 't@n.kr'
   });
   assert.equal(rows.length, 2);

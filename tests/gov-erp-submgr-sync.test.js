@@ -103,9 +103,9 @@ function board(over) {
   ctx.ERP.dir = [
     { sid: 'S1', name: '권형하' }, { sid: 'S2', name: '박한별' }, { sid: 'S3', name: '김동현' },
   ];
-  st.cos = [{ id: 'c1', name: '승진텍라인', defAtt: 'a1', defCoAtts: ['a2', 'a3'], types: ['t1'], erpId: 'E1' }];
+  st.cos = [{ id: 'c1', name: '마바텍라인', defAtt: 'a1', defCoAtts: ['a2', 'a3'], types: ['t1'], erpId: 'E1' }];
   ctx.ERP.consultings = [
-    { id: 'E1', companyName: '승진텍라인', managerMain: 'S1', managerSubs: ['S2', 'S3'] },
+    { id: 'E1', companyName: '마바텍라인', managerMain: 'S1', managerSubs: ['S2', 'S3'] },
   ];
   st.ls['pureun_v6_consultings'] = JSON.stringify(ctx.ERP.consultings);
   ctx._formVal = 'E1';                                // 이알피가 건별 칸으로 저장돼 있다

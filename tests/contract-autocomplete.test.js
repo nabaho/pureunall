@@ -113,10 +113,10 @@ function rowsCtx(idx){
 {
   // 업태가 색인에 있는 경우
   const idx = {
-    b1: { k:'biz', c:'주식회사 에이치비씨솔루션', bz:'7888803295', ceo:'김영범', bt:'서비스업', bi:'소프트웨어개발' },
-    c1: { k:'card', c:'주식회사 에이치비씨솔루션', n:'김영범', ti:'대표' }
+    b1: { k:'biz', c:'주식회사 가나비씨솔루션', bz:'7888803295', ceo:'김영범', bt:'서비스업', bi:'소프트웨어개발' },
+    c1: { k:'card', c:'주식회사 가나비씨솔루션', n:'김영범', ti:'대표' }
   };
-  const rows = rowsCtx(idx).pcCompanyRows('에이치비씨');
+  const rows = rowsCtx(idx).pcCompanyRows('가나비씨');
   t('회사 줄이 나온다', rows.length >= 1, true);
   t('★ 업태가 있으면 줄에 보여 준다', /업태 서비스업\/소프트웨어개발/.test(rows[0].sub), true);
   t('★ 고르면 업태가 딸려온다', rows[0]._pc.bizType, '서비스업');
@@ -125,10 +125,10 @@ function rowsCtx(idx){
 {
   // ★ 업태가 색인에 없는 경우 — 이게 대표가 겪은 상황이다
   const idx = {
-    b1: { k:'biz', c:'주식회사 에이치비씨솔루션', bz:'7888803295', ceo:'김영범' },
-    c1: { k:'card', c:'주식회사 에이치비씨솔루션', n:'김영범', ti:'대표' }
+    b1: { k:'biz', c:'주식회사 가나비씨솔루션', bz:'7888803295', ceo:'김영범' },
+    c1: { k:'card', c:'주식회사 가나비씨솔루션', n:'김영범', ti:'대표' }
   };
-  const rows = rowsCtx(idx).pcCompanyRows('에이치비씨');
+  const rows = rowsCtx(idx).pcCompanyRows('가나비씨');
   /* ★ 문구를 그대로 박아 두지 않는다 — 2026-08-11 에 「업태 없음」이 거짓이 됐다.
      이제는 색인에 없어도 고를 때 기업정보함 «원본» 에서 마저 읽으므로 「없음」이라 단정하면
      거짓말이다. 규칙만 못 박는다: 사업자등록증이 있는 회사면 업태 사정을 어떻게든 알린다. */

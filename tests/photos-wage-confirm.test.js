@@ -119,7 +119,7 @@ test('★★★ 「확인했음」(ack)으로는 못 치운다 — ack 는 값�
 });
 
 test('★★ 임금이 «안 적힌» 계약서는 묻지 않는다 — 치울 수 없는 ⚠ 를 안 만든다', () => {
-  assert.equal(W.wageNeedsOk(wc({ name: '박선희' })), false,
+  assert.equal(W.wageNeedsOk(wc({ name: '이영희' })), false,
     '★★ 임금이 없는 계약서에까지 할 일을 달면 치울 수 없는 ⚠ 가 쌓입니다');
   assert.equal(W.wageNeedsOk(wc({ wageType: '월급' })), true,
     '★ 형태만 읽혀도 금액을 물어야 합니다');

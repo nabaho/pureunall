@@ -101,7 +101,7 @@ ok('틀렸다고 표시된 카드는 따로 본다',
 const IT = {
   ptype: '부당해고', cat: '사건', company: '나래산업', title: '천안지청 진정 건',
   officer: '강감독관', client: '홍길동',
-  contacts: [{ name: '이차장', phone: '010-8284-7994', position: '인사팀장' }]
+  contacts: [{ name: '이차장', phone: '010-1200-0026', position: '인사팀장' }]
 };
 let rel = kbRelated(IT).map(c => c._id);
 ok('업무 유형 카드가 붙는다', rel.indexOf('k1') >= 0);
@@ -126,7 +126,7 @@ ok('업무가 없으면 빈 목록 (터지지 않는다)', kbRelated(null).lengt
 /* ══ 전체 검색 ══ */
 items = {
   W1: { company: '나래산업', title: '부당해고 구제신청', mgr_main: { name: '김동현' },
-        contacts: [{ name: '이차장', phone: '010-8284-7994' }, { name: '박대리', phone: '01099998888' }],
+        contacts: [{ name: '이차장', phone: '010-1200-0026' }, { name: '박대리', phone: '01099998888' }],
         mgr_subs: [{ name: '권형하' }],
         ho_note: { sit: '통상임금 다툼이 있었다', todo: '', qa: [{ q: '무엇이 남았나', a: '자료 정리' }],
                    retro: { diff: '초기 대응이 빨랐다' } } },
@@ -167,7 +167,7 @@ ok('기록은 최근 것이 위로', (function () {
 /* ── 찾기 규칙 ── */
 ok('두 번째 담당자 이름으로도 찾힌다', matchQ(items.W1, '박대리') === true);
 ok('전화는 하이픈이 있든 없든 찾힌다',
-  matchQ(items.W1, '010-8284-7994') === true && matchQ(items.W1, '01082847994') === true);
+  matchQ(items.W1, '010-1200-0026') === true && matchQ(items.W1, '01012000026') === true);
 ok('부담당 이름으로도 찾힌다', matchQ(items.W1, '권형하') === true);
 ok('빈 검색어는 다 통과', matchQ(items.W1, '') === true);
 ok('없는 말은 안 찾힌다', matchQ(items.W1, '없는말') === false);

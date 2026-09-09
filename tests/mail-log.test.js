@@ -22,7 +22,7 @@ const FN = fs.readFileSync(path.join(R, 'functions', 'index.js'), 'utf8');
 
 test('★ 보낸이·제목·시각·폴더가 담긴다', () => {
   const r = MR.mailLogRecord({
-    from: '정담회계법인 <acct@jd.kr>', subject: 'RE: 8월 급여대장 송부',
+    from: '가나회계법인 <acct@jd.kr>', subject: 'RE: 8월 급여대장 송부',
     box: '2.급여+사무대행', at: 1700000000000, atts: 2
   });
   assert.match(r.from, /acct@jd\.kr/);

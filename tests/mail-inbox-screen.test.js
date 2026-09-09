@@ -38,10 +38,10 @@ function load(st) {
 }
 
 const BOX = {
-  m1: { from: '정담회계법인 <acct@jd.kr>', subject: 'RE: 8월 급여대장 송부',
+  m1: { from: '가나회계법인 <acct@jd.kr>', subject: 'RE: 8월 급여대장 송부',
     preview: '중도퇴사자 급여대장 보내드립니다', box: '2.급여+사무대행',
     at: 3000, atts: 2, took: 2, seatName: '최기운', shared: false, why: '' },
-  m2: { from: '김나래 <cust12@naver.com>', subject: '장진숙님 근태내역입니다.',
+  m2: { from: '김나은 <cust12@naver.com>', subject: '장진숙님 근태내역입니다.',
     preview: '8월 근태 엑셀 보냅니다', box: '2.급여+사무대행',
     at: 2000, atts: 1, took: 1, seatName: '', shared: true, why: '업체관리에 없는 주소' },
   m3: { from: '유문경 <cust16@naver.com>', subject: '퇴직연금 불입액 문의',
@@ -70,7 +70,7 @@ test('★ 칩으로 걸러 본다', () => {
 });
 
 test('★ 보낸이·제목·미리보기로 찾는다', () => {
-  assert.equal(load({ inbox: BOX, inboxQ: '정담' }).rows().length, 1);
+  assert.equal(load({ inbox: BOX, inboxQ: '가나회계' }).rows().length, 1);
   // 「근태」는 m2 하나뿐이다 — m1 은 급여대장, m3 는 퇴직연금 문의
   assert.equal(load({ inbox: BOX, inboxQ: '근태' }).rows().length, 1);
   // 미리보기까지 훑는다 — m1 의 미리보기에만 있는 말로 찾아 본다

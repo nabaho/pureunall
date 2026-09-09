@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════════
    ■ 대표 화면에서 드러난 것
      등록증 상세의 「메모」에 이렇게 들어 있었다 —
-       「전자세금계산서 전용 전자우편주소: KJKdoc111@Naver.Com」
+       「전자세금계산서 전용 전자우편주소: cust45@naver.com」
      새로 만든 taxInvoiceEmail 칸이 «아니라» 메모다. 예전 판독기에는 그 칸이 없어서
      읽은 것을 메모로 흘려 둔 것이다. 등록증 351장이 거의 다 이 꼴이다.
 
@@ -59,8 +59,8 @@ function loadPick(){
 /* ══════ ① 메모에서 되살린다 ══════ */
 test('★ 메모에 적힌 「전자세금계산서 전용 전자우편주소」를 읽어 낸다 — 등록증 351장이 이 꼴이다', () => {
   const C = loadPick();
-  assert.equal(C.taxInvoiceFromText('전자세금계산서 전용 전자우편주소: KJKdoc111@Naver.Com'),
-    'KJKdoc111@Naver.Com',
+  assert.equal(C.taxInvoiceFromText('전자세금계산서 전용 전자우편주소: cust45@naver.com'),
+    'cust45@naver.com',
     '★ 못 읽으면 이미 판독된 등록증은 한 곳도 이알피로 못 간다');
 });
 

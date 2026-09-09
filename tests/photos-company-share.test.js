@@ -1,12 +1,12 @@
 'use strict';
-/* 「승진텍라인 사진만」 업체 담당자와 공유 — 대표 지시 2026-08-28
+/* 「마바텍라인 사진만」 업체 담당자와 공유 — 대표 지시 2026-08-28
 
-   "승진텍라인 주담당 부담당 같이 되어 있는데 부담당과 같이 공유하려면 사진첩에서
-    어떻게 하는게 공유가 될까. 승진텍라인 사진만 공유하고 싶다. 자동으로 어떻게?"
+   "마바텍라인 주담당 부담당 같이 되어 있는데 부담당과 같이 공유하려면 사진첩에서
+    어떻게 하는게 공유가 될까. 마바텍라인 사진만 공유하고 싶다. 자동으로 어떻게?"
 
    ■ 막혀 있던 것 둘
      ① **회의·현장 사진에는 업체가 안 적혀 있다.** 찾기는 사진에 적힌 업체로 찾으므로
-        「승진텍라인」을 쳐도 서류만 나오고 방문 사진은 안 걸린다.
+        「마바텍라인」을 쳐도 서류만 나오고 방문 사진은 안 걸린다.
      ② **공유가 한 장씩이었다.** 「같이 볼 사람」은 크게 보기 안에만 있었다.
 
    ■ 대표 결정: 이미 올라와 있는 사진은 **㉮ 그대로 둔다** — 훑어서 한꺼번에 걸지 않는다.
@@ -45,8 +45,8 @@ function coCtx(companies) {
 
 test('★ 표기가 달라도 같은 업체로 잡는다 — 사람이 치는 꼴은 제각각이다', () => {
   const c = coCtx(null);
-  const k = c.coNameKey('승진텍라인');
-  ['(주)승진텍라인', '승진텍 라인', '주식회사 승진텍라인', '승진텍라인㈜', ' 승진텍라인 ']
+  const k = c.coNameKey('마바텍라인');
+  ['(주)마바텍라인', '마바텍 라인', '주식회사 마바텍라인', '마바텍라인㈜', ' 마바텍라인 ']
     .forEach(function (v) {
       assert.equal(c.coNameKey(v), k, '★ 「' + v + '」이 다른 업체로 잡힙니다');
     });
@@ -54,30 +54,30 @@ test('★ 표기가 달라도 같은 업체로 잡는다 — 사람이 치는 �
 });
 
 test('★ 이름으로 그 업체를 찾는다', async () => {
-  const c = coCtx([{ id: 'c1', name: '가야엔지니어링' }, { id: 'c2', name: '(주)승진텍라인' }]);
-  const hit = await c.findCompanyByName('승진텍라인');
+  const c = coCtx([{ id: 'c1', name: '가야엔지니어링' }, { id: 'c2', name: '(주)마바텍라인' }]);
+  const hit = await c.findCompanyByName('마바텍라인');
   assert.ok(hit, '★ 못 찾으면 담당자를 알 수 없습니다');
   assert.equal(hit.rec.id, 'c2');
 });
 
 test('★ 같은 이름이 둘이면 «아무것도 안 한다» — 남의 업체 담당자에게 열리면 안 된다', async () => {
-  const c = coCtx([{ id: 'c1', name: '승진텍라인' }, { id: 'c2', name: '(주)승진텍라인' }]);
-  assert.equal(await c.findCompanyByName('승진텍라인'), null,
+  const c = coCtx([{ id: 'c1', name: '마바텍라인' }, { id: 'c2', name: '(주)마바텍라인' }]);
+  assert.equal(await c.findCompanyByName('마바텍라인'), null,
     '★ 둘 중 하나를 골라 버리면 엉뚱한 업체 담당자에게 사진이 열립니다');
 });
 
 test('없는 업체·빈 이름은 조용히 빈손', async () => {
   const c = coCtx([{ id: 'c1', name: '가야엔지니어링' }]);
-  assert.equal(await c.findCompanyByName('승진텍라인'), null);
+  assert.equal(await c.findCompanyByName('마바텍라인'), null);
   assert.equal(await c.findCompanyByName(''), null);
   assert.equal(await c.findCompanyByName(null), null);
 });
 
 test('업체 목록이 배열이든 객체든 다 훑는다 — 푸른이알피가 옮겨 가는 중이다', async () => {
-  const asObj = coCtx({ k1: { id: 'c1', name: '승진텍라인' } });
-  assert.ok(await asObj.findCompanyByName('승진텍라인'));
-  const wrapped = coCtx({ v: [{ id: 'c1', name: '승진텍라인' }] });
-  assert.ok(await wrapped.findCompanyByName('승진텍라인'), '★ v 로 감싼 꼴을 못 읽습니다');
+  const asObj = coCtx({ k1: { id: 'c1', name: '마바텍라인' } });
+  assert.ok(await asObj.findCompanyByName('마바텍라인'));
+  const wrapped = coCtx({ v: [{ id: 'c1', name: '마바텍라인' }] });
+  assert.ok(await wrapped.findCompanyByName('마바텍라인'), '★ v 로 감싼 꼴을 못 읽습니다');
 });
 
 test('★ 주담당·부담당을 다 준다 — 부담당이 빠지면 이 기능의 뜻이 없다', () => {
@@ -102,7 +102,7 @@ function photoCtx(items) {
 
 test('★ 사람이 적은 업체가 먼저, 없으면 판독이 읽은 상호', () => {
   const c = photoCtx([]);
-  assert.equal(c.coNameOf({ meta: { company: '승진텍라인' } }), '승진텍라인');
+  assert.equal(c.coNameOf({ meta: { company: '마바텍라인' } }), '마바텍라인');
   assert.equal(c.coNameOf({ meta: { read: { fields: { company: '가야엔지니어링' } } } }),
     '가야엔지니어링', '★ 서류는 판독이 읽은 상호로 저절로 걸려야 합니다');
   assert.equal(c.coNameOf({ meta: { company: '손으로', read: { fields: { company: '판독' } } } }),
@@ -113,13 +113,13 @@ test('★ 사람이 적은 업체가 먼저, 없으면 판독이 읽은 상호',
 
 test('★ 고른 것이 여러 업체면 «섞였다»고 본다 — 엉뚱한 담당자에게 열리면 안 된다', () => {
   const c = photoCtx([
-    { id: 'a', meta: { company: '승진텍라인' } },
-    { id: 'b', meta: { company: '승진텍라인' } },
+    { id: 'a', meta: { company: '마바텍라인' } },
+    { id: 'b', meta: { company: '마바텍라인' } },
     { id: 'c', meta: { company: '가야엔지니어링' } },
     { id: 'd', meta: {} }
   ]);
-  assert.equal(c.oneCoOf(['a', 'b']), '승진텍라인');
-  assert.equal(c.oneCoOf(['a', 'd']), '승진텍라인', '업체가 없는 사진은 셈에서 빠진다');
+  assert.equal(c.oneCoOf(['a', 'b']), '마바텍라인');
+  assert.equal(c.oneCoOf(['a', 'd']), '마바텍라인', '업체가 없는 사진은 셈에서 빠진다');
   assert.equal(c.oneCoOf(['a', 'c']), '', '★ 섞였는데 한 업체로 보면 남의 담당자에게 열립니다');
   assert.equal(c.oneCoOf(['d']), '');
   assert.equal(c.oneCoOf([]), '');
@@ -161,11 +161,11 @@ const tick = function () { return new Promise(function (r) { setTimeout(r, 0); }
 
 test('★ 업체를 달면 그 업체 담당자에게 «고른 전부»가 열린다', async () => {
   const c = autoCtx({});
-  await c.autoShareByCo(['p1', 'p2', 'p3'], '승진텍라인');
+  await c.autoShareByCo(['p1', 'p2', 'p3'], '마바텍라인');
   assert.equal(c._calls.share.length, 3, '★ 한 장만 열었습니다');
   same(c._calls.share[0].uids, ['U2']);
   assert.equal(c._calls.share[0].owner, 'OWNER', '★ 주인 자리에 써야 남의 사진도 열립니다');
-  assert.equal(c._calls.share[0].why, '승진텍라인 담당', '★ 왜 열렸는지 안 남기면 손으로 넣은 것과 안 갈립니다');
+  assert.equal(c._calls.share[0].why, '마바텍라인 담당', '★ 왜 열렸는지 안 남기면 손으로 넣은 것과 안 갈립니다');
   assert.match(c._calls.toast.join(' '), /이몽룡/, '누구에게 열었는지 말해야 합니다');
 });
 
@@ -177,23 +177,23 @@ test('업체를 못 찾으면 아무 일도 안 한다 — 애매하면 안 여�
 
 test('★ 담당자가 로그인한 적 없으면 «그 사실을 말해 준다»', async () => {
   const c = autoCtx({ mgrs: { co: {}, sids: ['s1'], uids: [], noAcct: ['s1'] } });
-  await c.autoShareByCo(['p1'], '승진텍라인');
+  await c.autoShareByCo(['p1'], '마바텍라인');
   assert.equal(c._calls.share.length, 0);
   assert.match(c._calls.toast.join(' '), /로그인/, '★ 조용히 넘기면 「왜 저 사람만 못 보지」가 됩니다');
 });
 
 test('나 자신은 빼고 연다 — 내 사진에 내 이름이 뜨면 안 된다', async () => {
   const c = autoCtx({ mgrs: { co: {}, sids: ['s1'], uids: ['ME'], noAcct: [] } });
-  await c.autoShareByCo(['p1'], '승진텍라인');
+  await c.autoShareByCo(['p1'], '마바텍라인');
   assert.equal(c._calls.share.length, 0);
 });
 
 test('★ 권한이 없어 다 막히면 그 사실을 말한다 — 조용히 넘기면 못 본 줄 모른다', async () => {
   const c = autoCtx({ fail: true });
-  await c.autoShareByCo(['p1'], '승진텍라인');
+  await c.autoShareByCo(['p1'], '마바텍라인');
   const said = c._calls.alert.join(' ');
   assert.match(said, /열지 못했습니다/, '★ 왜 안 됐는지 안 말합니다');
-  assert.match(said, /승진텍라인/, '어느 업체에서 막혔는지 없으면 스무 장 중 무엇인지 모릅니다');
+  assert.match(said, /마바텍라인/, '어느 업체에서 막혔는지 없으면 스무 장 중 무엇인지 모릅니다');
   /* ⚠ 「내가 올린 사진에만 권한을 줄 수 있습니다」로 되돌리지 말 것 —
      총괄관리자는 사진 자리에 쓸 수 있다. 막는 것은 받는 사람 목록 자리 하나이고,
      그건 콘솔에 규칙을 붙여넣으면 열린다. 잘못 짚어 주면 엉뚱한 데를 뒤진다. */
@@ -204,7 +204,7 @@ test('★ 권한이 없어 다 막히면 그 사실을 말한다 — 조용히 �
 
 test('업체가 없거나 고른 것이 없으면 대조표를 읽지 않는다 — 헛되이 돈이 나간다', async () => {
   const c = autoCtx({});
-  await c.autoShareByCo([], '승진텍라인');
+  await c.autoShareByCo([], '마바텍라인');
   await c.autoShareByCo(['p1'], '');
   assert.equal(c._calls.share.length, 0);
 });

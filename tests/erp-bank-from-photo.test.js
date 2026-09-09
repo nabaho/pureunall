@@ -60,7 +60,7 @@ test('★★★ 예금주 이름이 맞는 것만 후보다 — 회사만 맞으
 });
 
 test('★★★ 이름을 «아직 안 적었으면» 아무것도 안 내놓는다 — 아무나 골라 채우게 된다', () => {
-  const list = [통장({}), 통장({ id: 'b', bankHolder: '박선희' })];
+  const list = [통장({}), 통장({ id: 'b', bankHolder: '이영희' })];
   assert.deepEqual(Array.prototype.slice.call(B.erpBankPickFor(list, '', '가나상사')), []);
   assert.deepEqual(Array.prototype.slice.call(B.erpBankPickFor(list, '   ', '')), []);
 });
