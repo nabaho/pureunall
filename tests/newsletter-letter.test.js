@@ -59,6 +59,28 @@ test('제목은 회차 이름을 그대로 쓴다 — 거래처가 회차로 찾
   assert.equal(편.제목, '푸른노무법인 2026년 08월 5주차 주간뉴스레터 입니다.');
 });
 
+test('★ 표지는 메일 안전한 «왼쪽 제목 · 오른쪽 그림» 두 칸 구조다', () => {
+  const 편 = T.편지짓기(회차자료(), Object.assign({}, 설정, {
+    배너그림: 'https://nabaho.github.io/pureunall/img/news-banner.png'
+  }));
+  assert.match(편.서식, /width="53%"[^>]*valign="middle"/);
+  assert.match(편.서식, /width="47%"[\s\S]*?news-banner\.png/);
+  assert.ok(!/background-image|position:absolute/.test(편.서식));
+});
+
+test('★ 그림 주소를 비워도 푸른 기본 표지와 뉴스 사진이 나온다', () => {
+  const h = T.편지짓기(회차자료(), 설정).서식;
+  assert.match(h, /img\/news-banner\.png/, '기본 표지가 없습니다');
+  assert.match(h, /img\/news-side\.png/, '주간뉴스 옆 기본 사진이 없습니다');
+});
+
+test('★ 꼬리는 현재 규칙대로 «우리가 정리한 글»이라고 말한다', () => {
+  const 편 = T.편지짓기(회차자료(), 설정);
+  assert.match(편.서식, /푸른노무법인이 직접 정리한 글/);
+  assert.match(편.본문, /푸른노무법인이 직접 정리한 글/);
+  assert.ok(!/기사는 <b>제목과 원문 링크<\/b>만/.test(편.서식));
+});
+
 test('기사는 «제목·언론사·링크»까지다 — 본문은 옮기지 않는다', () => {
   const 자료 = 회차자료();
   자료.안.news[0].본문 = '기사 본문을 통째로 넣어 보았다';

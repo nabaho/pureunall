@@ -43,7 +43,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-news-core.js?v=30"></script>
-<script src="js/pu-news-tpl.js?v=10"></script>
+<script src="js/pu-news-tpl.js?v=11"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -383,12 +383,25 @@ table.list tr:hover td{background:#fcfcfd}
 #big{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:80;padding:22px}
 #rowbox{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:82;padding:22px}
 #rowbox.on{display:flex;align-items:center;justify-content:center}
-#rowbox .in{background:#fff;border-radius:14px;width:min(760px,96vw);max-height:90vh;
+#rowbox .in{background:#ece9e5;border-radius:14px;width:min(900px,96vw);max-height:92vh;
   display:flex;flex-direction:column;overflow:hidden}
 #rowbox .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
   display:flex;align-items:center;gap:8px;margin:0;background:var(--brown-soft);color:#4a3c2e}
 #rowbox .in h4 .sp{flex:1}
-#rowbox .bd{overflow:auto;flex:1;min-height:0;padding:14px 16px}
+#rowbox .bd{overflow:auto;flex:1;min-height:0;padding:22px}
+#rowbox .article{max-width:720px;margin:0 auto;background:#fff;border:1px solid #ddd7cf;
+  box-shadow:0 10px 28px rgba(47,38,30,.09)}
+#rowbox .article-hero{display:grid;grid-template-columns:1.05fr .95fr;min-height:150px;background:#6f5a48;color:#fff}
+#rowbox .article-hero .copy{padding:25px 28px;display:flex;flex-direction:column;justify-content:center}
+#rowbox .article-hero .eyebrow{font-family:Georgia,serif;font-size:21px;letter-spacing:2px;font-weight:800}
+#rowbox .article-hero .week{display:inline-block;margin-top:13px;padding:6px 13px;background:#241a13;font-size:12px;font-weight:800}
+#rowbox .article-hero .visual{background:#5d4b3d url('img/news-banner.png') center/cover no-repeat;min-height:150px}
+#rowbox .article-nav{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid #ddd7cf;background:#fff}
+#rowbox .article-nav span{text-align:center;padding:12px 3px;font-size:12px;font-weight:800;color:#4a4037}
+#rowbox .article-body{padding:28px}
+#rowbox .article-title{background:#7b6552;color:#fff;padding:13px 17px;font-size:16px;font-weight:800;line-height:1.55}
+#rowbox .article-meta{padding:10px 3px;color:var(--faint);font-size:11.5px;text-align:right}
+#rowbox .article-write{margin-top:22px;padding-top:20px;border-top:1px solid #e3ded8}
 #rowbox .ft{border-top:1px solid var(--line);padding:11px 16px;display:flex;gap:8px;
   align-items:center;background:var(--paper);flex-wrap:wrap}
 #rowbox .ft .sp{flex:1}
@@ -868,6 +881,8 @@ function 이번회차화면(){
     <span style="width:8px"></span>
     <button class="btn" onclick="크게보기()">👁 크게 보기</button>
     <button class="btn warn" onclick="시험발송()" ${갈수있나.ok?'':'disabled'}>✉ 나에게 시험 발송</button>
+    <button class="btn" onclick="자동발송준비()" ${갈수있나.ok && App.isAdmin?'':'disabled'}>
+      📅 다음 월요일 자동발송 준비</button>
     <button class="btn pri" onclick="진짜보내기()" ${갈수있나.ok && App.isAdmin?'':'disabled'}>
       📨 ${App.유형 ? esc(App.유형)+' ' : ''}${r.셈.보낼곳.toLocaleString()}곳에 보내기</button>
   </div>
@@ -1360,7 +1375,19 @@ function 줄창그리기(){
     ? '⚠ 비우면 이 줄은 <b>편지에 안 나갑니다</b> · 출처는 꼭지 아래에 「참고: '
       + esc(꼬리표(x) || '언론사') + '」로 붙습니다'
     : '비우면 원래 제목이 나갑니다';
-  $('rowB').innerHTML = `
+  const 회 = d.회차 || Core.회차(d.날짜 || new Date().toISOString().slice(0,10));
+  $('rowB').innerHTML =
+   '<div class="article"><div class="article-hero"><div class="copy">'
+   + '<div class="eyebrow">푸른 주간뉴스레터</div>'
+   + '<div><span class="week">' + esc((회&&회.이름)||'주간뉴스레터') + '</span></div>'
+   + '</div><div class="visual"></div></div>'
+   + '<div class="article-nav">'
+   + Core.꼭지들.map(function(v){ return '<span>' + esc(v.이름) + '</span>'; }).join('')
+   + '</div><div class="article-body">'
+   + '<div class="article-title">' + esc(x.제목||'') + '</div>'
+   + '<div class="article-meta">' + esc([꼬리표(x), x.발행일 || x.선고글 || ''].filter(Boolean).join(' · '))
+   + (u ? ' · <a href="' + esc(u) + '" target="_blank" rel="noopener">원문 보기 ↗</a>' : '')
+   + '</div><div class="article-write">' + `
    <label class="f">원문 ${기사인가 ? '<span style="font-weight:400;color:var(--faint)">(편지에는 안 실립니다)</span>' : ''}</label>
    <div class="orig"><b>${esc(x.제목||'')}</b>
     <div style="color:var(--faint);font-size:11.5px;margin-top:5px">
@@ -1375,7 +1402,7 @@ function 줄창그리기(){
     <b>㉠ 사실</b>(누가·언제·무엇)은 저작물이 아닙니다 — 우리 문장으로 전할 수 있습니다.<br>
     <b>㉡ 그 아래 「사업장은 무엇을 챙기나」</b>를 붙이면 그건 <b>우리 저작물</b>입니다.<br>
     <b>✗ 본문을 옮기기</b> · 문장만 조금 바꿔 옮기기 · 제목+리드를 그대로 붙이기는
-    안 됩니다 — 유료 구독 매체라 약관으로도 막습니다.</div>`;
+    안 됩니다 — 유료 구독 매체라 약관으로도 막습니다.</div></div></div></div>`;
   창.classList.add('on');
   const t = $('rowW'); if(t) t.focus();
 }
@@ -1705,6 +1732,44 @@ const 시험즉시URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/s
 function 시험받을주소(){
   const 정한것 = String((App.설정 && App.설정.시험주소) || '').trim();
   return 정한것 || 보내는주소();
+}
+
+function 다음월요일(){
+  const d = new Date();
+  const 더할날 = (8 - d.getDay()) % 7 || 7;
+  d.setDate(d.getDate() + 더할날);
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + day;
+}
+
+/* 자동 일꾼은 내용을 만들지 않는다. 사람이 본 «확정본»과 당시 명단을 한 벌로 봉인해 둔다. */
+async function 자동발송준비(){
+  if(!App.isAdmin) return toast('자동발송 준비는 총괄관리자만 할 수 있습니다');
+  const d = 지금회차(), r = 명단셈(), 갈수있나 = Core.보낼수있나(d, r.셈);
+  if(!갈수있나.ok) return toast(갈수있나.까닭, 8000);
+  const 편 = 지금편지(); if(!편) return toast('실을 것이 없습니다');
+  const 날 = 다음월요일(), 첨 = 첨부셈(r.ok.length);
+  if(!confirm('「' + 편.제목 + '」을\n' + 날 + ' 월요일 오전 8시 자동발송용으로 준비합니다.\n\n'
+    + '· 받는 곳 ' + r.ok.length.toLocaleString() + '곳\n'
+    + '· 준비 뒤 내용을 고치면 다시 준비해야 합니다.\n'
+    + '· 설정에서 자동발송을 켜야 실제로 나갑니다.'
+    + 첨.말 + '\n\n확정본을 준비할까요?')) return;
+
+  const 받는이 = {}, 보냄표 = {};
+  const to = r.ok.map(function(x){
+    const 열 = String(x.email||'').trim().toLowerCase().replace(/[.#$/[\]]/g,'_');
+    const 번호 = 새추적번호();
+    if(열){ 받는이[번호] = 열; 보냄표[열] = { 보냄:true }; }
+    return Object.assign({}, x, { track:번호 });
+  });
+  await db.ref('newsletter/weeklyReady').set({
+    상태:'준비', 보낼날:날, 회차열쇠:d.열쇠, 준비한때:Date.now(),
+    준비한이:(App.me&&App.me.email)||'', to:to,
+    subject:편.제목, body:편.본문, html:편.서식, spacingSec:BULK_GAP_SEC,
+    files:첨.파일들, 링크들:편.링크들||[], 받는이:받는이, 보냄표:보냄표,
+    from:보내는주소()
+  });
+  toast('📅 ' + 날 + ' 자동발송 확정본을 준비했습니다 — 설정의 자동발송이 켜져 있어야 나갑니다', 12000);
 }
 
 async function 시험발송(){
@@ -2569,6 +2634,13 @@ function 설정화면(){
        </select>
       </div>
       <div>
+       <label class="f">월요일 오전 8시 자동발송</label>
+       <select id="cfgAuto" onchange="설정저장()">
+        <option value="n" ${s.자동발송===true?'':'selected'}>꺼짐 — 준비만 하고 보내지 않음</option>
+        <option value="y" ${s.자동발송===true?'selected':''}>켜짐 — 확정본이 있을 때만 발송</option>
+       </select>
+      </div>
+      <div>
        <label class="f">보내는 주소 ${도움(
          '받는 쪽에 이 주소로 보입니다.<br>'
          + '⚠ <b>같은 사서함의 별칭만</b> 됩니다 — daum.net·hanmail.net 둘이 한 사서함입니다. '
@@ -2803,6 +2875,7 @@ function 설정저장(){
     전화: g('cfgTel'),
     보내는주소: g('cfgFrom'),
     대표자도: g('cfgCeo') !== 'n',
+    자동발송: g('cfgAuto') === 'y',
     추적밑주소: g('cfgTrack'),
     뉴스그림: g('cfgNews'),
     배너그림: g('cfgBanner'),

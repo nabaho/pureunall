@@ -27,6 +27,7 @@ const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
 const { homepageUrl } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
 const OntologyServerWrite = require("./ontology-write-server");
+const NewsletterWeekly = require("./newsletter-weekly");
 
 if (!getApps().length) initializeApp();
 
@@ -798,6 +799,76 @@ exports.sendScheduledMail = functions
     }
     console.log("sendScheduledMail", { looked: ids.length, sent: sent, failed: failed });
     return null;
+  });
+
+/* 월요일 거래처 뉴스레터 — 화면에서 «확정본 준비»를 한 경우에만 예약 대기열에 건다.
+   기본값은 꺼짐이다. 빈 편지·지난주 준비본·이미 처리한 준비본은 절대 보내지 않는다. */
+exports.weeklyNewsletterSend = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 180, memory: "512MB" })
+  .pubsub.schedule("every monday 08:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const [cSnap, rSnap] = await Promise.all([
+      db.ref("newsletter/config").once("value"),
+      db.ref("newsletter/weeklyReady").once("value"),
+    ]);
+    const config = cSnap.val() || {};
+    const ready = rSnap.val() || {};
+    const today = NewsletterWeekly.todaySeoul(Date.now());
+    const gate = NewsletterWeekly.check(config, ready, today);
+    if (!gate.ok) {
+      console.log("[뉴스레터 자동발송] 건너뜀 — " + gate.reason);
+      return null;
+    }
+
+    /* transaction 으로 먼저 찜한다. 함수가 겹쳐 실행돼도 한 쪽만 통과한다. */
+    const lock = await db.ref("newsletter/weeklyReady/상태").transaction((v) =>
+      v === "준비" ? "거는중" : undefined);
+    if (!lock.committed) {
+      console.log("[뉴스레터 자동발송] 이미 처리 중이거나 완료됨");
+      return null;
+    }
+
+    try {
+      const v = MB.validateBulk(ready);
+      if (!v.ok) throw new Error(v.error);
+      const now = Date.now();
+      const batchId = "nw" + now.toString(36);
+      const rows = MB.buildQueue(v, now, ready.준비한이 || "weeklyNewsletterSend", batchId);
+      const upd = {};
+      rows.forEach((row) => {
+        const key = db.ref(MD.CARDS_ROOT + "/scheduled").push().key;
+        upd[MD.CARDS_ROOT + "/scheduled/" + key] = row;
+      });
+      const issue = "newsletter/issues/" + ready.회차열쇠 + "/";
+      upd[issue + "상태"] = "발송";
+      upd[issue + "보낸때"] = now;
+      upd[issue + "받는수"] = rows.length;
+      upd[issue + "batchId"] = batchId;
+      upd[issue + "보낸이"] = "weeklyNewsletterSend";
+      upd[issue + "링크들"] = ready.링크들 || [];
+      Object.keys(ready.받는이 || {}).forEach((k) => {
+        upd[issue + "받는이/" + k] = ready.받는이[k];
+      });
+      Object.keys(ready.보냄표 || {}).forEach((k) => {
+        upd["newsletter/opens/" + ready.회차열쇠 + "/" + k] = ready.보냄표[k];
+      });
+      upd["newsletter/weeklyReady/상태"] = "완료";
+      upd["newsletter/weeklyReady/완료때"] = now;
+      upd["newsletter/weeklyReady/batchId"] = batchId;
+      upd["newsletter/weeklyReady/받는수"] = rows.length;
+      /* 대기열·회차 상태·열람표를 한 번에 쓴다. 중간 실패로 절반만 발송되는 일을 막는다. */
+      await db.ref().update(upd);
+      console.log("[뉴스레터 자동발송] " + rows.length + "곳 예약 완료");
+      return null;
+    } catch (e) {
+      await db.ref("newsletter/weeklyReady").update({
+        상태: "오류", 오류때: Date.now(), 오류: String((e && e.message) || e).slice(0, 300)
+      });
+      throw e;
+    }
   });
 
 // ═══ 사진첩 — 서버 쪽 사진 이사 (2026-08-13, PR #192 뒤) ═══
