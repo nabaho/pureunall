@@ -105,11 +105,29 @@ function ymdKST(now) {
    ⚠ vision 을 n 에 합치면 «몫이 다른 곳»이 한 숫자에 섞인다 — Gemini 는 하루 몫이고
      Vision 은 «달마다» 1,000장이다. 합치면 어느 쪽이 남았는지 알 수가 없다. */
 const TALLY_KINDS = ["n", "quota", "vision"];
+
+/* ── Vision 의 무료 몫은 «달마다» 1,000장이다 (2026-09-08) ────────────────────
+   ⚠⚠ Gemini 의 «하루» 몫과 **다른 셈**이다. 날짜로만 세면 「이달에 얼마 썼나」에
+     답할 수 없고, 그러면 1,000장을 넘긴 뒤에도 화면은 「0원」이라 적는다 —
+     싸다는 것과 0원이라는 것을 섞어 적는 일은 창고 버킷에서 이미 한 번 겪었다.
+   ★ 세는 자리는 같은 표를 쓴다: ai_read_tally/2026-09/_all/vision
+     날짜 자리(2026-09-08)와 달 자리(2026-09)가 한 표에 나란히 있어도 안 섞인다 —
+     열쇠 글자가 다르고 규칙의 $ymd 가 둘을 다 받는다(규칙은 안 고쳐도 된다). */
+function ymKST(now) { return ymdKST(now).slice(0, 7); }
+const VISION_FREE_MONTH = 1000;
+function visionMonthPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all/vision"; }
+
 function tallyPaths(app, ymd, kind) {
   const k = TALLY_KINDS.indexOf(kind) >= 0 ? kind : "n";
   const d = ymd || ymdKST();
-  return ["ai_read_tally/" + d + "/" + appOf(app) + "/" + k,
-          "ai_read_tally/" + d + "/_all/" + k];
+  const out = ["ai_read_tally/" + d + "/" + appOf(app) + "/" + k,
+               "ai_read_tally/" + d + "/_all/" + k];
+  /* ⚠ Vision 은 «달» 자리도 함께 올린다 — 안 올리면 위 문턱이 볼 숫자가 없다.
+     ⚠ 이미 달 자리를 받았으면 더하지 않는다 — 같은 자리를 한 번에 두 번 올린다. */
+  if (k === "vision" && String(d).length > 7) {
+    out.push("ai_read_tally/" + String(d).slice(0, 7) + "/_all/" + k);
+  }
+  return out;
 }
 
 /* 부르는 쪽이 정할 수 있는 값 — **여기 적힌 것만** 받는다.
@@ -205,5 +223,7 @@ async function callGemini(fetchFn, key, parts, waits, cfg) {
 module.exports = {
   MODELS, MAX_BODY_BYTES, MAX_OUTPUT_TOKENS,
   isTransient, validate, geminiBody, modelUrl, safeReason, callGemini, dailyQuotaGone,
-  APPS, appOf, ymdKST, tallyPaths, TALLY_KINDS
+  APPS, appOf, ymdKST, tallyPaths, TALLY_KINDS,
+  /* 달 몫 문턱 — 까닭은 ymKST 머리에 */
+  ymKST, VISION_FREE_MONTH, visionMonthPath
 };

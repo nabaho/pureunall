@@ -29,6 +29,17 @@ const ERP_RAW = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
 const ERP = stripComments(ERP_RAW);
 const READER = stripComments(fs.readFileSync(path.join(ROOT, 'js', 'pu-doc-read.js'), 'utf8'));
 
+/* readVision 함수 몸통 전체 — «다음 exports.» 까지.
+   ⚠ 2026-09-08 이전에는 고정폭(i + 3000)으로 잘라 썼다. 달 몫 문턱을 앞에
+     붙이자 진짜 응답문(res.json)이 그 폭 밖으로 밀려나 이 검사들이 헛깨졌다 —
+     「지금 값」이 아니라 «규칙»을 본다(CLAUDE.md): 고정폭 대신 함수의 실제 끝을 찾는다. */
+function readVisionBody() {
+  const i = IDX.indexOf('exports.readVision');
+  if (i < 0) return '';
+  const next = IDX.indexOf('\nexports.', i + 10);
+  return IDX.slice(i, next > i ? next : IDX.length);
+}
+
 /* ══════ ① 열쇠가 브라우저에 없다 ═══════════════════════════════════ */
 
 test('★★★ 브라우저가 Vision 을 «직접» 부르지 않는다 — 그러면 열쇠가 브라우저에 있다는 뜻이다', () => {
@@ -58,8 +69,7 @@ test('★★★ 서버가 열쇠를 «브라우저로 돌려주지» 않는다',
     'function readVisionKey('));
   assert.ok(fn, 'readVisionKey 가 없습니다');
   /* 답으로 나가는 것은 글과 쪽수뿐이어야 한다 */
-  const i = IDX.indexOf('exports.readVision');
-  const 몸 = IDX.slice(i, i + 3000);
+  const 몸 = readVisionBody();
   const 답 = (몸.match(/res\.json\(\{[^}]*\}\)/g) || []).join(' ');
   assert.ok(!/key/i.test(답), '★★★ 답에 열쇠가 섞여 나갑니다: ' + 답);
   assert.match(답, /text/, '글을 안 돌려줍니다');
@@ -111,9 +121,8 @@ test('오류 글이 없거나 모양이 다르면 조용히 빈 글', () => {
 /* ══════ ③ 로그인한 사람만 ═══════════════════════════════════════ */
 
 test('★★★ 로그인 확인을 «부르기 전에» 한다 — 아니면 우리 열쇠가 공개 판독기가 된다', () => {
-  const i = IDX.indexOf('exports.readVision');
-  assert.ok(i > 0, 'readVision 이 없습니다');
-  const 몸 = IDX.slice(i, i + 3000);
+  const 몸 = readVisionBody();
+  assert.ok(몸, 'readVision 이 없습니다');
   const 문지기 = 몸.indexOf('requireReader');
   const 부르기 = 몸.indexOf('VR.callVision');
   assert.ok(문지기 > 0, '★★★ 누가 부르는지 확인하지 않습니다');
@@ -152,8 +161,7 @@ test('★ 모르는 갈래는 «부른 수»로 떨어진다 — 아무 이름�
 });
 
 test('★★ Vision 을 부른 뒤 «반드시» 센다 — 안 세면 달 몫이 얼마 남았는지 알 수 없다', () => {
-  const i = IDX.indexOf('exports.readVision');
-  const 몸 = IDX.slice(i, i + 3000);
+  const 몸 = readVisionBody();
   assert.match(몸, /bumpReadTally\([^)]*vision/,
     '★★ Vision 을 센 자리가 없습니다 — 달마다 1,000장 가운데 얼마 썼는지 모릅니다');
   const 셈 = 몸.indexOf('bumpReadTally('), 되돌림 = 몸.indexOf('if (!r.ok)');
@@ -163,8 +171,7 @@ test('★★ Vision 을 부른 뒤 «반드시» 센다 — 안 세면 달 몫�
 /* ══════ ⑤ 열쇠가 없을 때 ═════════════════════════════════════════ */
 
 test('★★ 부를 자격이 없으면 «고장»이 아니라 그렇다고 말한다 — 물러설 길이 있다', () => {
-  const i = IDX.indexOf('exports.readVision');
-  const 몸 = IDX.slice(i, i + 3500);
+  const 몸 = readVisionBody();
   /* ⚠ 「503 이라는 글자가 있나」로는 모자랐다 — 이 조각 안 다른 곳에도 503 이 있어,
        답을 500 으로 바꿔도 통과했다(되돌림에서 드러났다). 그 줄 하나를 겨눈다. */
   assert.match(몸, /res\.status\(503\)/,
@@ -178,8 +185,7 @@ test('★★ 부를 자격이 없으면 «고장»이 아니라 그렇다고 말
 /* ══════ ⑥ 열쇠 «없이» 부르는 것이 본길이다 (2026-09-08) ════════════ */
 
 test('★★★ 열쇠가 없어도 «서버 신분증»으로 부른다 — 만들 열쇠도 넣을 열쇠도 없다', () => {
-  const i = IDX.indexOf('exports.readVision');
-  const 몸 = IDX.slice(i, i + 3500);
+  const 몸 = readVisionBody();
   assert.match(몸, /fetchSaToken/,
     '★★★ 열쇠가 없으면 그냥 포기합니다 — 서버에는 «자기 신분증»이 있어 열쇠가 필요 없습니다');
   /* 열쇠가 있으면 그것을 «먼저» 쓴다 — 신분증 길이 막히는 자리가 있을 수 있다 */
@@ -251,8 +257,7 @@ test('★★ 그 밖의 실패는 «켜기 문제로 뭉개지 않는다» — �
 });
 
 test('★★★ Vision 셈은 «장 수»로 센다 — 요청 수로 세면 달 몫이 틀린다', () => {
-  const i = IDX.indexOf('exports.readVision');
-  const 몸 = IDX.slice(i, i + 3500);
+  const 몸 = readVisionBody();
   assert.match(몸, /bumpReadTally\(v\.app,\s*"vision",\s*r\.pages/,
     '★★★ 한 번에 1 만 더합니다 — Vision 은 «장 수»로 값을 받으므로, 여러 장 보낸 날의 '
     + '셈이 실제보다 적게 나오고 「1,000장 가운데 얼마 남았나」가 틀립니다');

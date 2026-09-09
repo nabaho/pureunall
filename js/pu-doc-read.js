@@ -1263,6 +1263,409 @@
          검사가 그 둘(여기서 안 주는 것 · 화면이 안 넘기는 것)을 못 박는다.
          갈래 자체는 여러 검사가 「열쇠를 주면 어떻게 되는가」를 재는 데 쓰고 있어
          남겨 둔다(지우면 검사 50여 곳이 함께 죽는다). */
+  /* ══ ⑧ 무료 판독 — 사업자등록증은 «글자만» 뽑아 규칙으로 채운다 ═══════════════
+       (대표 결정 2026-09-08 · 목업 docs/mockups/photos-free-ocr-bizreg.html
+        「1추천대로, 2 자동보낸다. 3 추천대로」)
+
+     ★ 왜 이 길이 있나 — 하루 AI 몫은 사진첩·기업정보함·급여·경력관리 «넷의 합»이라
+       서류를 몰아 올리는 날 한도에 걸린다. 사업자등록증은 틀이 정해진 서류여서
+       글자만 있으면 규칙으로 칸을 채울 수 있고, 그 길에는 AI 몫이 한 번도 안 든다.
+
+     ⚠⚠ **어설프게 무료로 읽어 두는 것이 안 읽는 것보다 나쁘다.** 값이 틀린 줄도
+       모르고 기업 상세로 나간다. 그래서 «둘 다» 맞아야 이 길로 간다:
+         ① 제목에 사업자등록증·고유번호증 글자가 있다
+         ② 사업자등록번호가 **국세청 체크섬을 통과**한다
+       하나만 맞으면 null 을 돌려주고, 부르는 쪽은 지금처럼 AI 로 간다.
+
+     ⚠ 사업자등록증 «하나만» 한다(대표 결정 ①㉮). 명함·급여명세서·근로계약서는
+       서류마다 칸이 다르고 자리도 제각각이라, 규칙으로 짜면 **틀린 값을 자신 있게**
+       채운다. 통장은 더 위험하다 — 계좌 한 자리가 틀리면 딴 데로 돈이 간다.
+
+     ⚠ `via`(글자가 어디서 왔나)는 그대로 두고 「AI 를 안 썼다」는 `free` 로 **따로**
+       적는다. 한 칸에 섞으면 pu-photos 의 staleRead 가 「더 나은 길이 생겼다」로
+       읽어, 무료로 읽어 둔 것을 영영 다시 읽는다 — 아끼려던 것을 되레 태운다. */
+
+  /* ⚠ **긴 것부터** 본다. 「사업자등록증명」 안에 「사업자등록증」이 들어 있어,
+       짧은 것을 먼저 찾으면 증명서를 등록증이라 적는다 — 그러면 기업 상세의
+       갈래(tags)가 틀린 이름으로 생긴다(docName 이 곧 갈래 이름이다). */
+  var BIZREG_TITLES = ['사업자등록증명원', '사업자등록증명', '사업자등록증', '고유번호증'];
+
+  /* 제목을 찾는다 — 없으면 빈 문자열.
+     ⚠ 공백을 **모두** 걷고 견준다. 판독기가 「사 업 자 등 록 증」처럼 글자마다
+       띄워 오는 일이 흔하다(괘선·도장 때문에 글자 간격이 벌어져 그렇게 읽힌다). */
+  function bizregTitle(text) {
+    var flat = String(text == null ? '' : text).replace(/\s+/g, '');
+    for (var i = 0; i < BIZREG_TITLES.length; i++) {
+      if (flat.indexOf(BIZREG_TITLES[i]) >= 0) return BIZREG_TITLES[i];
+    }
+    return '';
+  }
+
+  /* 체크섬을 «통과한» 첫 사업자등록번호. 통과한 것이 없으면 빈 문자열.
+     ⚠ 이것이 이 길의 안전장치다 — 흐린 사진에서 한 자리를 잘못 읽으면 여기서 걸린다. */
+  function bizregNo(text) {
+    var hit = String(text == null ? '' : text)
+      .match(/[0-9]{3}\s*[-–—.]?\s*[0-9]{2}\s*[-–—.]?\s*[0-9]{5}/g) || [];
+    for (var i = 0; i < hit.length; i++) {
+      var d = bizNoDigits(hit[i]);
+      if (d.length === 10 && bizNoValid(d)) return fmtBizNo(d);
+    }
+    return '';
+  }
+
+  /* 무료로 읽어도 되는 서류인가 — 제목과 번호가 «둘 다» 있어야 한다. */
+  function bizregLooks(text) { return !!(bizregTitle(text) && bizregNo(text)); }
+
+  /* ── 사업자등록증 글자 → 칸 (푸른이알피에 있던 것을 여기로 «옮겼다», 2026-09-08) ──
+     ⚠ 옮긴 까닭: 사진첩도 같은 일을 하게 됐다. 두 곳에 두면 한쪽만 좋아지고,
+       사업자등록증을 «앱마다 다르게» 읽게 된다.
+     ⚠ 돌려주는 칸 이름은 **푸른이알피가 쓰던 그대로**다(name·bizNo·bizCategory…).
+       그 이름으로 받는 자리가 푸른이알피에 여섯 군데 있다 — 이름을 바꾸면 코드는
+       멀쩡한데 값이 조용히 안 붙는다. 판독 이름으로 바꾸는 일은 아래 bizregFields 가 한다.
+     ⚠ 체크섬은 이 파일의 bizNoValid 를 쓴다(옮기며 제 안에 있던 사본을 지웠다) —
+       사업자등록번호를 검산하는 곳은 이 파일 하나여야 한다. */
+  function bizregParse(text) {
+    var out = {};
+    if (!text) return out;
+    var norm = text
+      .replace(/[：]/g, ':').replace(/[（]/g, '(').replace(/[）]/g, ')').replace(/[－―‒–—]/g, '-')
+      .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 65248); })
+      .replace(/\r/g, '');
+    var compact = norm.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
+    var lines = norm.split(/[\r\n]+/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var i, m, v;
+
+    /* ① 사업자등록번호 — 국세청 체크섬 검증 통과한 후보만 채택 (오인식 숫자 차단) */
+    var bizNums = text.match(/[0-9]{3}\s*[-–—.]?\s*[0-9]{2}\s*[-–—.]?\s*[0-9]{5}/g) || [];
+    for (i = 0; i < bizNums.length; i++) {
+      var d = bizNums[i].replace(/\D/g, '');
+      if (d.length === 10 && bizNoValid(d)) { out.bizNo = d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5); break; }
+    }
+
+    /* ② 법인등록번호 */
+    var corpNums = text.match(/[0-9]{6}[-–—][0-9]{7}/g) || [];
+    if (corpNums.length) out.corpNo = corpNums[0];
+
+    /* ③ 상호/법인명 */
+    var nameRe = [
+      /(?:법\s*인\s*명|상\s*호)\s*[:(]\s*([\s\S]{1,50}?)(?=\s*(?:대\s*표|법\s*인\s*등|사\s*업|등\s*록|\d{3}-))/,
+      /(?:법\s*인\s*명|상\s*호)\s*[:]\s*([^\n대표사업등록]{2,50})/,
+      /([가-힣A-Za-z0-9·()（）㈜㈔\s]{1,}(?:주식회사|㈜|\(주\)|유한회사|\(유\)|합자회사|협동조합|재단법인|사단법인|의료법인|사회복지법인|영농조합법인|농업회사법인|노무법인|법무법인|세무법인)[가-힣A-Za-z0-9·()\s]*)/,
+      /((?:주식회사|㈜|\(주\)|유한회사|재단법인|사단법인|노무법인|법무법인)[가-힣A-Za-z0-9·\s]{1,40})/
+    ];
+    for (i = 0; i < nameRe.length && !out.name; i++) {
+      m = compact.match(nameRe[i]);
+      if (m && m[1]) {
+        v = m[1].replace(/\s+/g, '').replace(/[:]/g, '').trim();
+        /* ⚠ **「단체명」을 함께 걷는다** (2026-09-08 무료 판독을 붙이며 찾음).
+             법인 사업자등록증의 이름표는 「법인명(단체명)」이다. 위 regex 가
+             「법인명(」까지 먹고 나면 값이 «단체명)주식회사○○» 로 남는다 —
+             그러면 기업 상세에 그 글자가 상호로 들어간다.
+             예전에는 사람이 눈으로 보고 고쳤지만, 이제 무료 판독이 스스로 보낸다.
+           ⚠ 여러 겹일 수 있어 «없어질 때까지» 걷는다(「법인명)단체명):○○」). */
+        var 앞 = '';
+        while (앞 !== v) {
+          앞 = v;
+          v = v.replace(/^(법인명|단체명|상호|명칭|성명)[)\]:：]*\s*/, '');
+        }
+        v = v.replace(/^[，,\.)\]]+|[，,\.([]+$/g, '').trim();
+        if (v.length >= 2 && v.length <= 60) out.name = v;
+      }
+    }
+    if (!out.name) {
+      for (i = 0; i < lines.length; i++) {
+        if (/(㈜|\(주\)|주식회사|노무법인|법무법인|세무법인|사단법인|재단법인)/.test(lines[i])
+            && lines[i].length <= 60 && !/대표|사업자|등록|주소|업태/.test(lines[i])) {
+          out.name = lines[i].replace(/\s+/g, ' ').trim(); break;
+        }
+      }
+    }
+
+    /* ④ 대표자 */
+    var ceoRe = [
+      /(?:대\s*표\s*자\s*(?:성\s*명)?|성\s*명\s*\(?대\s*표\s*자\)?)\s*[:]?\s*([가-힣]{2,5})(?=[\s,·및]|$)/,
+      /대\s*표\s*자?\s*[:]\s*([가-힣]{2,5})/,
+      /성\s*명\s+([가-힣]{2,5})(?:\s+대\s*표)/,
+      /대\s*표\s+([가-힣]{2,5})(?!\s*[이가은는을를의])/
+    ];
+    for (i = 0; i < ceoRe.length && !out.ceo; i++) {
+      m = compact.match(ceoRe[i]);
+      if (m && m[1]) out.ceo = m[1].trim();
+    }
+    if (!out.ceo) {
+      for (i = 0; i < lines.length - 1; i++) {
+        if (/대\s*표\s*자/.test(lines[i]) && /^[가-힣]{2,5}$/.test(lines[i + 1].replace(/\s/g, ''))) {
+          out.ceo = lines[i + 1].replace(/\s/g, ''); break;
+        }
+        var sameLine = lines[i].match(/대\s*표\s*자\s+([가-힣]{2,5})/);
+        if (sameLine) { out.ceo = sameLine[1].trim(); break; }
+      }
+    }
+    if (out.ceo) {
+      var 이름표 = /^(개업|법인|사업|등록|업태|종목|주소|전화|성명|상호|소재|발급|교부|연월)/;
+      var 둘 = compact.match(new RegExp(out.ceo + '\\s*[,·및]\\s*([가-힣]{2,5})'));
+      if (둘 && 둘[1] && 둘[1] !== out.ceo && !이름표.test(둘[1])) out.ceo2 = 둘[1];
+    }
+
+    /* ⑤ 업태/종목 */
+    var bizLine = compact.match(/업\s*태\s*[:]?\s*([가-힣A-Za-z,·\s]{1,60}?)\s*종\s*목\s*[:]?\s*([가-힣A-Za-z,·\-\s]{1,80}?)(?=\s*(?:사\s*업\s*장|개\s*업|발\s*급|전\s*화|연\s*락|교\s*부|법\s*인|$))/);
+    if (bizLine) {
+      var bv = bizLine[1].trim().replace(/\s+/g, ' ');
+      var cv = bizLine[2].trim().replace(/\s+/g, ' ');
+      if (bv.length > 1) out.bizType = bv;
+      if (cv.length > 1) out.bizCategory = cv;
+    } else {
+      var btM = compact.match(/업\s*태\s*[:]?\s*([가-힣A-Za-z,·\s]{1,60}?)(?=\s*(?:종\s*목|발|사|법|$))/);
+      if (btM) { v = btM[1].trim().replace(/\s+/g, ' '); if (v.length > 1 && v.length < 60) out.bizType = v; }
+      var bcM = compact.match(/종\s*목\s*[:]?\s*([가-힣A-Za-z,·\-\s]{1,80}?)(?=\s*(?:사\s*업\s*장|개\s*업|발\s*급|전\s*화|연\s*락|교\s*부|법\s*인|$))/);
+      if (bcM) { v = bcM[1].trim().replace(/\s+/g, ' '); if (v.length > 1 && v.length < 80) out.bizCategory = v; }
+    }
+    if (!out.bizType || !out.bizCategory) {
+      for (i = 0; i < lines.length; i++) {
+        if (/^업\s*태/.test(lines[i]) && !out.bizType) {
+          v = lines[i].replace(/^업\s*태\s*[:]/, '').trim().replace(/\s+/g, ' ');
+          if (v.length > 1) out.bizType = v;
+          var 종목부 = lines[i].match(/종\s*목\s*[:]\s*(.+)/);
+          if (종목부 && !out.bizCategory) out.bizCategory = 종목부[1].trim().replace(/\s+/g, ' ');
+        }
+        if (/^종\s*목/.test(lines[i]) && !out.bizCategory) {
+          v = lines[i].replace(/^종\s*목\s*[:]/, '').trim().replace(/\s+/g, ' ');
+          if (v.length > 1) out.bizCategory = v;
+        }
+      }
+    }
+
+    /* ⑥ 주소 */
+    var addrRe = [
+      /(?:사\s*업\s*장\s*소\s*재\s*지|소\s*재\s*지|사\s*업\s*장\s*주\s*소)\s*[:]?\s*([가-힣A-Za-z0-9\s,·\-()\[\]]{5,200}?)(?=\s*(?:업\s*태|종\s*목|개\s*업|전\s*화|법\s*인|발\s*급|수\s*입|대\s*표|$))/,
+      /((?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)[특별시광역도특별자치시도]*\s*[가-힣A-Za-z0-9\s,·\-()]{10,200})/
+    ];
+    for (i = 0; i < addrRe.length && !out.address; i++) {
+      m = compact.match(addrRe[i]);
+      if (m && m[1]) {
+        v = m[1].trim().replace(/\s+/g, ' ');
+        v = v.replace(/(?:업태|종목|개업|발급|전화|교부|대표).*$/, '').trim();
+        v = v.replace(/^[가-힣\s]*소\s*재\s*지\s*[|:：]?\s*/, '').replace(/[|]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (v.length > 5) out.address = v;
+      }
+    }
+    if (!out.address) {
+      for (i = 0; i < lines.length; i++) {
+        if (/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/.test(lines[i])
+            && lines[i].length >= 10 && lines[i].length <= 200
+            && !/대표|사업자|등록번호|업태|종목/.test(lines[i])) {
+          out.address = lines[i].replace(/^[가-힣\s]*소\s*재\s*지\s*[|:：]?\s*/, '')
+            .replace(/[|]/g, ' ').replace(/^\d{5}\s*/, '').replace(/\s+/g, ' ').trim();
+          break;
+        }
+      }
+    }
+
+    /* ⑦ 우편번호 */
+    if (!out.zipcode) {
+      var 번호뺀것 = text.replace(/\d{3}[-–]?\d{2}[-–]?\d{5}/g, '');
+      var zipM = 번호뺀것.match(/(?:우편번호|\(우\))?\s*\[?(\d{5})\]?(?!\d)/);
+      if (zipM) out.zipcode = zipM[1];
+    }
+
+    /* ⑧ 전화 — 사업자·법인번호 숫자열을 «먼저» 걷어 오염을 막는다 */
+    var 번호없는줄 = compact.replace(/\d{3}\s*[-.]?\s*\d{2}\s*[-.]?\s*\d{5}/g, ' ').replace(/\d{6}\s*-\s*\d{7}/g, ' ');
+    var telM = 번호없는줄.match(/(?:전\s*화|Tel|TEL|☎|연\s*락\s*처)?\s*(0\d{1,2})[\s\-.(]{0,2}(\d{3,4})[\s\-.)]{0,2}(\d{4})/);
+    if (telM) out.phone = telM[1] + '-' + telM[2] + '-' + telM[3];
+    if (!out.phone) {
+      for (i = 0; i < lines.length; i++) {
+        var lm = lines[i].match(/(0\d{1,2})[-.\s]?(\d{3,4})[-.\s]?(\d{4})/);
+        if (lm && !/사업자|법인|등록/.test(lines[i])) { out.phone = lm[1] + '-' + lm[2] + '-' + lm[3]; break; }
+      }
+    }
+
+    /* ⑨ 개업연월일 */
+    var openM = compact.match(/(?:개\s*업\s*(?:연\s*월\s*일)?|설\s*립\s*일)\s*[:]?\s*(\d{4})\s*[년./-]\s*(\d{1,2})\s*[월./-]\s*(\d{1,2})/);
+    if (openM) out.openDate = openM[1] + '-' + (openM[2].length === 1 ? '0' : '') + openM[2] + '-' + (openM[3].length === 1 ? '0' : '') + openM[3];
+
+    /* ⑩ 직책 */
+    var posM = compact.match(/(?:대표이사|대표|부장|과장|차장|팀장|대리|이사|상무|전무|사장|회장|노무사|변호사|공인회계사)/);
+    if (posM) out.position = posM[0];
+
+    /* ⑪ 이메일 */
+    var emailM = text.match(/[\w.+-]+@[\w-]+\.[A-Za-z]{2,}(?:\.[A-Za-z]{2,})?/);
+    if (emailM) out.email = emailM[0];
+
+    return out;
+  }
+
+  /* 푸른이알피 이름 → «판독 이름»(company·bizno·bizItem…). 사진첩·기업정보함이 쓰는 말이다.
+     ⚠ 안 옮기는 칸이 있고, 그것은 **일부러**다:
+       · email    — 등록증에 적힌 주소가 세금계산서 «전용» 주소라는 보장이 없다.
+                    taxInvoiceEmail 로 옮기면 엉뚱한 주소가 발급처로 굳는다.
+       · zipcode  — address 안에 이미 들어 있는 일이 많고, 따로 담을 칸이 없다.
+       · position — 대표자 «직책»이라 기업 상세에 자리가 없다.
+       · issueDate(등록증 발급일) — 규칙으로는 못 찾는다. 「○○세무서장」 옆 날짜와
+                    개업일이 글자만 보면 구별되지 않아, 잘못 넣으면 «어느 등록증이
+                    최신인가»를 뒤집는다(그 판단이 이 칸을 만든 까닭이었다).
+       빠뜨린 것이 아니라 **못 채우는 칸**이다 — 화면이 그렇게 말한다. */
+  function bizregFields(text) {
+    var raw = bizregParse(text);
+    var out = {};
+    var title = bizregTitle(text);
+    if (title) out.docName = title;
+    if (raw.name) out.company = raw.name;
+    if (raw.ceo) out.ceo = raw.ceo;
+    if (raw.bizNo) out.bizno = raw.bizNo;
+    if (raw.corpNo) out.corpno = raw.corpNo;
+    if (raw.openDate) out.openDate = raw.openDate;
+    if (raw.bizType) out.bizType = raw.bizType;
+    if (raw.bizCategory) out.bizItem = raw.bizCategory;
+    if (raw.phone) out.companyTel = raw.phone;
+    if (raw.address) out.address = raw.address;
+    /* 공동대표는 담을 칸이 없다 — 버리지 말고 메모에 적는다.
+       ⚠ 대표자 칸에 둘을 넣지 «말 것». 그러면 계약서·신고서에 「김○○,이○○」로 나간다. */
+    if (raw.ceo2) out.memo = '공동대표 ' + raw.ceo + ' · ' + raw.ceo2;
+    return out;
+  }
+
+  /* ── 브라우저 판독(Tesseract) — 돈이 한 푼도 안 나가는 마지막 길 ──
+     ⚠ Vision 이 안 될 때만 온다(안 켜짐·달 몫 다 씀·자격 실패). 첫 판독은 한글
+       사전 15MB 를 내려받아 느리다 — 그래서 «먼저» 쓰지 않는다.
+     ⚠ 판을 못 박아 둔다(@5.1.1). 취업규칙 서고(rules.html)와 «같은 판·같은 곳»이라
+       브라우저가 이미 받아 둔 것을 다시 쓴다. */
+  var TESS_LIB = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+  var tessLoading = null;
+  function loadTess() {
+    if (global.Tesseract) return Promise.resolve();
+    if (tessLoading) return tessLoading;
+    tessLoading = new Promise(function (resolve, reject) {
+      var d = global.document;
+      if (!d) { reject(new Error('브라우저가 아닙니다')); return; }
+      var s = d.createElement('script');
+      s.src = TESS_LIB;
+      s.onload = function () { resolve(); };
+      /* ⚠ 실패하면 «지워야» 다시 시도할 수 있다. 안 지우면 한 번 끊긴 뒤로
+           영영 같은 실패를 돌려준다(서고 OCR 에서 겪은 자리다). */
+      s.onerror = function () { tessLoading = null; reject(new Error('Tesseract.js 를 못 불러왔습니다')); };
+      d.head.appendChild(s);
+    });
+    return tessLoading;
+  }
+
+  /* 흐린 사진을 조금 낫게 — 회색으로 바꾸고 대비를 늘린다(푸른이알피에서 옮긴 것). */
+  function sharpenImg(base64) {
+    return new Promise(function (resolve) {
+      var d = global.document;
+      if (!d || !global.Image) { resolve(base64); return; }
+      var img = new global.Image();
+      img.onload = function () {
+        var MAX = 1800;
+        var scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        var w = Math.round(img.width * scale);
+        var h = Math.round(img.height * scale);
+        var cv = d.createElement('canvas');
+        cv.width = w; cv.height = h;
+        var ctx = cv.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        var id = ctx.getImageData(0, 0, w, h);
+        var px = id.data, i;
+        for (i = 0; i < px.length; i += 4) {
+          var g = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]);
+          px[i] = px[i + 1] = px[i + 2] = g;
+        }
+        var mn = 255, mx = 0;
+        for (i = 0; i < px.length; i += 4) { if (px[i] < mn) mn = px[i]; if (px[i] > mx) mx = px[i]; }
+        if (mx > mn) {
+          var rng = mx - mn;
+          for (i = 0; i < px.length; i += 4) {
+            var 값 = Math.min(255, Math.round((px[i] - mn) / rng * 255));
+            px[i] = px[i + 1] = px[i + 2] = 값;
+          }
+        }
+        ctx.putImageData(id, 0, 0);
+        resolve(cv.toDataURL('image/png'));
+      };
+      /* ⚠ 손질에 실패해도 원본으로 읽을 수 있어야 한다 — 여기서 멈추면 무료 길이 통째로 막힌다. */
+      img.onerror = function () { resolve(base64); };
+      img.src = base64;
+    });
+  }
+
+  /* 사진 한 장을 브라우저에서 읽는다 — 원본과 손질본 두 벌로 읽어 «긴 쪽»을 쓴다.
+     돌려주는 칸 이름은 푸른이알피가 쓰던 그대로다(bizregParse 참고). */
+  function browserRead(img, onProgress) {
+    return loadTess().then(function () {
+      var 원본 = global.Tesseract.recognize(img, 'kor+eng', {
+        logger: function (m) { if (onProgress) onProgress(m); },
+        tessedit_pageseg_mode: '6'
+      });
+      var 손질 = sharpenImg(img).then(function (fixed) {
+        return global.Tesseract.recognize(fixed, 'kor+eng', { tessedit_pageseg_mode: '6' });
+      });
+      return Promise.all([원본, 손질.catch(function () { return { data: { text: '' } }; })]);
+    }).then(function (got) {
+      var t1 = (got[0] && got[0].data) ? String(got[0].data.text || '') : '';
+      var t2 = (got[1] && got[1].data) ? String(got[1].data.text || '') : '';
+      /* 두 벌에서 읽힌 칸을 합친다 — 원본 쪽이 이긴다. */
+      var f1 = bizregParse(t1), f2 = bizregParse(t2), fields = {}, k;
+      for (k in f2) if (Object.prototype.hasOwnProperty.call(f2, k)) fields[k] = f2[k];
+      for (k in f1) if (Object.prototype.hasOwnProperty.call(f1, k)) fields[k] = f1[k];
+      return { text: (t1.length >= t2.length ? t1 : t2), fields: fields, engine: 'tesseract' };
+    });
+  }
+
+  /* 여러 장에서 글자만 — 쪽 차례대로 이어 붙인다.
+     ⚠ 한 쪽이 실패해도 나머지는 살린다. 스캔은 한 쪽만 비뚤어도 그 쪽만 안 읽힌다. */
+  function browserText(imgs) {
+    var list = Array.isArray(imgs) ? imgs : [imgs];
+    return list.reduce(function (chain, one) {
+      return chain.then(function (acc) {
+        return browserRead(one)
+          .then(function (r) { return acc.concat([r.text]); })
+          .catch(function () { return acc; });
+      });
+    }, Promise.resolve([])).then(function (parts) { return parts.join('\n'); });
+  }
+
+  /* 글자를 «공짜로» 얻는다 — Vision 먼저, 안 되면 브라우저 (대표 결정 ③㉮).
+     ⚠ Vision 이 왜 안 됐는지는 남긴다. 조용히 물러서면 「달 몫을 다 썼다」인지
+       「API 를 안 켰다」인지 알 길이 없고, 그 둘은 손쓸 곳이 다르다. */
+  function freeText(imgs, app) {
+    return visionText(imgs, app).catch(function (e) {
+      try {
+        if (global.console) global.console.warn('[무료 판독] Vision 대신 브라우저로:', (e && e.message) || e);
+      } catch (_) {}
+      return browserText(imgs);
+    });
+  }
+
+  /* ── 무료 판독의 «입구» ──
+     받는 것: { text }        이미 뽑아 둔 글자가 있으면 그것 — Vision 도 안 부른다(진짜 0원)
+              { imgs, app }   사진이면 글자를 먼저 뽑는다
+     돌려주는 것: 판독 결과(read) 또는 **null**.
+       null = 「이 길로는 못 읽는다」 — 부르는 쪽은 지금처럼 AI 로 가면 된다.
+       ⚠ 던지지(throw) 않는다. 던지면 부르는 쪽이 「판독 실패」로 적어,
+         멀쩡한 서류가 실패한 것처럼 남고 다시 읽을 것 목록에 쌓인다. */
+  function freeRead(o) {
+    var got = o || {};
+    var pre = String(got.text || '');
+    var step = pre
+      ? Promise.resolve({ text: pre, from: 'text' })
+      : freeText(got.imgs, got.app).then(function (t) { return { text: String(t || ''), from: 'ocr' }; });
+    return step.then(function (r) {
+      if (!bizregLooks(r.text)) return null;
+      var fields = bizregFields(r.text);
+      /* ⚠ 칸 «개수»로 세지 않는다 — 어느 칸이 있는지가 중요하다. 상호가 없으면
+           autoOk 가 어차피 막고(「회사나 이름을 읽지 못했습니다」), 번호가 없으면
+           기업 상세로 갈 열쇠가 없다. 그 둘이 이 길의 최소 조건이다. */
+      if (!fields.company || !fields.bizno) return null;
+      var parsed = { kind: 'bizreg' }, k;
+      for (k in fields) if (Object.prototype.hasOwnProperty.call(fields, k)) parsed[k] = fields[k];
+      return afterRead(parsed, r.from === 'text' ? 'text' : 'image').then(function (read) {
+        read.free = true;             /* AI 를 안 썼다 — 화면이 「0원」이라 적는 근거 */
+        read.freeFrom = r.from;       /* 글자를 어디서 얻었나 (text = 원문이 이미 있었다) */
+        read.freeN = Object.keys(read.fields || {}).length;
+        return read;
+      });
+    });
+  }
+
   function keysFrom(db, opts) {
     opts = opts || {};
     var auth = opts.auth || null;   // firebase.auth() — 로그인 증명을 얻는 곳
@@ -1405,6 +1808,13 @@
     readDocText: readDocText,
     appName: appName, APP_KO: APP_KO,   /* ⑤ 앱별 판독 셈 — 검사가 이것을 겨눈다 */
     visionText: visionText,    /* 글자만 뽑기 — 몫이 Gemini 와 따로다 (2026-09-08) */
+    /* ⑧ 무료 판독 (대표 결정 2026-09-08) — 까닭은 위 bizregTitle 머리에.
+       freeRead 가 입구이고, 나머지는 그 조각을 따로 재 볼 수 있게 열어 둔 것이다.
+       ⚠ bizregParse 는 푸른이알피의 parseBizLicense 가 그대로 부른다 — 지우지 말 것. */
+    freeRead: freeRead,
+    bizregParse: bizregParse, bizregFields: bizregFields,
+    bizregTitle: bizregTitle, bizregNo: bizregNo, bizregLooks: bizregLooks,
+    browserRead: browserRead, browserText: browserText,
     readWageTable: readWageTable,
     readTableText: readTableText,
     summarizeText: summarizeText,

@@ -975,6 +975,11 @@ body.phsheet #pu-version-fab{display:none!important}
 #readPanel .again.ai{width:100%;margin-top:6px;background:#f8fafc;border-color:#bfdbfe;
   color:#1e40af;font-weight:800}
 #readPanel .again.ai:disabled{opacity:.6}
+/* 🤖 AI 로 더 자세히 읽기 — 무료로 읽은 뒤에만 나온다 (대표 결정 2026-09-08).
+   ⚠ 지우기(.ai)와 **같은 색 계열**로 둔다. 둘 다 「누르면 몫·요금이 드는 단추」라
+     한눈에 같은 무리로 보여야 한다. 보내기(파랑 채움)와 헷갈리면 안 된다. */
+#readPanel .again.aiup{width:100%;margin-top:6px;background:#eff6ff;border-color:#bfdbfe;
+  color:#1e40af;font-weight:800}
 #readPanel .again.pri{background:var(--blue);color:#fff;border-color:var(--blue);
   width:100%;margin-top:8px}
 /* 판독 단추 옆의 🔒 — 눌러야 할 것이 둘이라 헷갈리지 않게 살짝 갈라 둔다 */
@@ -1281,6 +1286,9 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   #setCards > .card{max-width:none}
   #setUse{grid-column:1;grid-row:1}
   #setBackup{grid-column:1;grid-row:2}
+  /* 무료 판독 — 왼쪽 아래(2026-09-08). 짧은 카드라 왼쪽에 쌓는 규칙을 그대로 따른다.
+     ⚠ 보유기간(#setKeep)의 span 2 를 건드리지 말 것 — 그것이 오른쪽을 통째로 쓴다. */
+  #setFree{grid-column:1;grid-row:3}
   #setKeep{grid-column:2;grid-row:1 / span 2}
 }
 
@@ -1568,6 +1576,14 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 #readPanel .kd.warn{background:#fffbeb;color:#854d0e}
 #readPanel .msg{font-size:12.5px;color:#166534}
 #readPanel .msg.warn{color:#854d0e}
+/* 「0원」 — 무료로 읽었다는 딱지 (대표 결정 2026-09-08).
+   ⚠ 갈래 딱지(.kd)와 **같은 줄**이라 크기를 키우지 말 것. 커지면 설명(.msg)이
+     밀려 줄이 둘로 접힌다 — 2026-09-08 에 판독 띠에서 바로 그 일을 겪었다.
+   ⚠ 색을 파랑으로 둔다: 초록(.kd)은 「잘 읽혔다」, 노랑(.warn)은 「봐 달라」인데
+     이것은 그 둘이 아니라 «어떻게 읽었나»다. 뜻이 다르면 색도 달라야 한다. */
+#readPanel .free{font-size:12px;font-weight:800;padding:3px 8px;border-radius:5px;
+  background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;white-space:nowrap}
+#readPanel .free.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 /* 읽어낸 값은 오른쪽 명함 사진과 한 글자씩 견주는 자리다 — 크고 또렷해야 한다.
    값은 굵게, 이름표는 흐리게 두어 눈이 값으로 먼저 간다. */
 #readPanel table{width:100%;font-size:14.5px;color:var(--ink);border-collapse:collapse;line-height:1.65}
@@ -2095,6 +2111,31 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
          <div id="useBarWrap"><div id="useBar"></div></div>
          <p class="mignote" id="useNote">사진 본문만 더한 값이라 실제 저장량은 이보다 조금 많습니다.</p>
          <pre id="useOut"></pre>
+       </div>
+
+       <!-- ── 무료 판독 (대표 결정 2026-09-08) ────────────────────────────────
+            목업 docs/mockups/photos-free-ocr-bizreg.html
+            ⚠ 끌 수 있게 둔다 — 판독 «정확도»에 관한 일이라 되돌릴 길이 있어야 한다.
+            ⚠ 「무료로 읽은 것을 자동으로 보낼까」는 **묻지 않는다.** 대표님이
+              「자동보낸다」로 정하셨다(②㉯). 보내는 길이 빈 칸만 채우고 있는 값은
+              절대 안 덮으므로(pu-doc-file.js 의 sendToCoInfo) 그렇게 해도 잃는 것이 없다. -->
+       <div class="card" id="setFree">
+         <div class="row" style="border:none"><span>🆓 사업자등록증 무료 판독</span></div>
+         <!-- ⚠ 스위치 모양을 새로 만들지 «않는다» — 이 화면의 다른 켜기·끄기(카메라
+              설정·백업)가 모두 이 모양이다. 여기만 다르면 「같은 일인데 다른 물건」이 된다. -->
+         <label class="bkopt" for="freeOcrOn">
+           <input type="checkbox" id="freeOcrOn" onchange="toggleFreeOcr(this.checked)">
+           사업자등록증은 <b>AI 를 안 쓰고</b> 먼저 읽기
+         </label>
+         <p class="mignote">사업자등록증은 <b>글자만 뽑아 규칙으로</b> 채웁니다 —
+           <b>AI 하루 몫을 안 씁니다.</b> 칸이 비면 결과 칸에
+           「🤖 AI 로 더 자세히 읽기」가 나옵니다.</p>
+         <div class="row" style="border:none"><span>이달 무료 판독</span><b id="freeMeter">-</b></div>
+         <p class="mignote" id="freeMeterNote">구글 Vision 은 <b>달마다 1,000장까지 0원</b>입니다.
+           넘으면 <b>브라우저 판독</b>으로 저절로 바뀝니다 — 그쪽은 한도가 없고 역시 0원입니다
+           (다만 첫 판독이 느립니다).</p>
+         <p class="mignote">⚠ 이 길로는 <b>문서 제목·등록증 발급일·전자세금계산서 주소</b>를
+           채우지 못합니다. 다른 서류(명함·급여명세서·근로계약서·통장)는 지금처럼 AI 가 읽습니다.</p>
        </div>
 
        <!-- 보유기간 — 개인정보 보유기준(2026-08-06). 모아 보여주기만 하고 지우는 것은 사람이 고른다.
@@ -6958,6 +6999,13 @@ function staleRead(it) {
   if (!r) return false;
   if (r.ack) return false;                       // 사람이 확인한 것은 안 뒤집는다
   if (RESTALE_SKIP[r.kind]) return false;        // 다시 읽어도 나올 것이 없다
+  /* ⚠⚠ 무료로 읽은 것은 «자동으로» 다시 읽지 않는다 (대표 결정 2026-09-08).
+       무료 판독은 AI 물음을 **아예 쓰지 않았다.** 그래서 아래 ①에 걸릴 값이 없는데도
+       pv 가 없어 늘 「물음이 바뀌었다」로 잡힌다 — 그대로 두면 무료로 읽은 것 전부가
+       이튿날 AI 대기열에 들어간다. **아끼려고 만든 길이 되레 몫을 태운다.**
+     ★ 대신 사람이 고를 길을 준다 — 결과 칸의 「🤖 AI 로 더 자세히 읽기」.
+       무료로 못 채운 칸이 있다는 것을 화면이 먼저 말하고, 누를지는 사람이 정한다. */
+  if (r.free) return false;
   if (readPromptVer(r) < PuDocRead.PROMPT_VERSION) return true;      // ① 물음이 바뀌었다
   if (it.meta.hasText && r.via !== 'text') return true;              // ② 더 나은 길이 생겼다
   return false;
@@ -7202,29 +7250,52 @@ const tallyKo = function (k) {
   return t[k] || k;
 };
 let readTally = null;
+/* 이달 «무료» 판독(Vision) 셈 — 하루 셈과 **자리가 다르다**(달마다 1,000장이 무료다).
+   ⚠ 하루 셈에 섞어 세지 말 것 — Gemini 는 하루 몫, Vision 은 달 몫이라
+     한 숫자에 담으면 어느 쪽이 남았는지 알 수가 없다(서버 doc-read.js 와 같은 규칙). */
+let readTallyMonth = null;
+const VISION_FREE_MONTH = 1000;
+function visionMonthUsed() {
+  return Math.max(0, Number((readTallyMonth && readTallyMonth._all && readTallyMonth._all.vision) || 0));
+}
+
 function readTallyLine() {
   if (!readTally) return '';
   const all = Number((readTally._all && readTally._all.n) || 0);
-  if (!all) return '';
+  /* 오늘 «무료로» 글자만 뽑은 장수. AI 몫과 갈라 적는다 — 이 숫자가 클수록 아낀 것이다. */
+  const 무료 = Number((readTally._all && readTally._all.vision) || 0);
+  /* ⚠ 무료만 있는 날에도 띠가 말을 해야 한다. 예전에는 AI 셈(all)이 0 이면 통째로
+       빈 줄이었다 — 무료로 스무 장을 읽은 날이 「아무것도 안 한 날」로 보인다. */
+  if (!all && !무료) return '';
   const 칸 = Object.keys(readTally)
     .filter(function (k) { return k !== '_all' && Number((readTally[k] || {}).n || 0) > 0; })
     .sort(function (a, b) { return Number(readTally[b].n || 0) - Number(readTally[a].n || 0); })
     .map(function (k) { return tallyKo(k) + ' ' + Number(readTally[k].n || 0); });
   const 막힘 = Number((readTally._all && readTally._all.quota) || 0);
+  const 이달 = visionMonthUsed();
   /* ⚠ 한 줄에 곁들이는 값이다(2026-09-08 지시로 제 줄에서 내렸다) — 짧게 적고
        앱별 갈래·까닭은 title 로 옮긴다. 좁아지면 이것이 먼저 잘린다. */
-  return '<span class="tly" title="오늘 판독 ' + all + '번'
+  return '<span class="tly" title="오늘 AI 판독 ' + all + '번'
     + (칸.length ? ' (' + esc(칸.join(' · ')) + ')' : '')
     + (막힘 ? '\n한도로 막힌 ' + 막힘 + '번' : '')
-    + '\n사진첩·기업정보함·급여·경력관리가 열쇠 하나를 나눠 씁니다 — 회사 전체의 하루 몫입니다.">'
-    + '· 오늘 <b>' + all + '번</b>' + (막힘 ? ' (막힘 ' + 막힘 + ')' : '') + '</span>';
+    + '\n사진첩·기업정보함·급여·경력관리가 열쇠 하나를 나눠 씁니다 — 회사 전체의 하루 몫입니다.'
+    + (무료 ? '\n\n무료로 글자만 뽑은 것 ' + 무료 + '장 — 사업자등록증으로 읽힌 것은 AI 몫을 안 썼습니다.' : '')
+    + (readTallyMonth ? '\n이달 무료 판독 ' + 이달 + ' / ' + VISION_FREE_MONTH
+        + '장 (넘으면 브라우저 판독으로 바뀝니다 — 그쪽도 0원입니다)' : '') + '">'
+    + (all ? '· 오늘 <b>' + all + '번</b>' + (막힘 ? ' (막힘 ' + 막힘 + ')' : '') : '')
+    + (무료 ? (all ? ' · ' : '· ') + '무료 <b>' + 무료 + '장</b>' : '') + '</span>';
 }
 function loadReadTally() {
   /* 한국 날짜로 센다 — 서버(ymdKST)와 같은 날을 봐야 숫자가 맞는다 */
   const ymd = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-  return PuPhotoStore.readTally(ymd)
-    .then(function (v) { readTally = v; renderReadAsk(); })
-    .catch(function (e) { console.warn('[판독 셈]', e); });
+  /* ⚠ 달 셈도 함께 읽는다 — 같은 표의 «달 자리»(2026-09)라 읽는 함수가 하나로 된다.
+     ⚠ 둘 중 하나가 실패해도 나머지는 살린다. 셈 때문에 띠가 안 뜨면 손해다. */
+  return Promise.all([
+    PuPhotoStore.readTally(ymd).then(function (v) { readTally = v; })
+      .catch(function (e) { console.warn('[판독 셈]', e); }),
+    PuPhotoStore.readTally(ymd.slice(0, 7)).then(function (v) { readTallyMonth = v; })
+      .catch(function (e) { console.warn('[무료 판독 달 셈]', e); })
+  ]).then(function () { renderReadAsk(); renderFreeMeter(); });
 }
 
 function renderReadAsk() {
@@ -7583,12 +7654,156 @@ function imgChunkMakers(imgs) {
   });
 }
 
+/* ── 사업자등록증은 «무료로» 먼저 읽는다 (대표 결정 2026-09-08) ────────────────
+     목업 docs/mockups/photos-free-ocr-bizreg.html · 「1추천대로, 2 자동보낸다. 3 추천대로」
+
+   ★ 하루 AI 몫은 사진첩·기업정보함·급여·경력관리 «넷의 합»이다. 사업자등록증은
+     틀이 정해진 서류라 글자만 있으면 규칙으로 칸을 채울 수 있고, 그 길에는
+     AI 몫이 한 번도 안 든다. 판정과 파서는 공용 판독 층에 있다(PuDocRead.freeRead).
+
+   ⚠ 끌 수 있게 둔다. 판독 «정확도»에 관한 일이라 사람이 되돌릴 길이 있어야 한다.
+     기본은 켬 — 안 켜 두면 아무도 안 켜고, 그러면 만든 뜻이 없다. */
+const FREE_OCR_LS = 'puphotos_free_ocr';
+function freeOcrPref() { try { return localStorage.getItem(FREE_OCR_LS) !== '0'; } catch (_) { return true; } }
+function setFreeOcrPref(on) {
+  try { localStorage.setItem(FREE_OCR_LS, on ? '1' : '0'); } catch (_) {}
+}
+function toggleFreeOcr(on) {
+  setFreeOcrPref(on);
+  toast(on ? '🆓 사업자등록증은 AI 를 안 쓰고 먼저 읽습니다'
+           : '사업자등록증도 지금부터 AI 로 읽습니다 — 하루 몫을 씁니다', 4500);
+}
+/* 이달 무료 판독이 얼마나 찼나 — 설정 화면의 한 줄.
+   ⚠ 셈을 «못 읽었을 때»와 «0장»을 갈라 적는다. 둘을 같이 「0장」이라 적으면
+     한도가 다 찬 것을 「아직 안 썼다」로 읽는다(서버도 같은 규칙이다). */
+function renderFreeMeter() {
+  const box = $('freeMeter');
+  if (!box) return;
+  const on = $('freeOcrOn');
+  if (on) on.checked = freeOcrPref();
+  if (!readTallyMonth) { box.textContent = '아직 못 읽었습니다'; return; }
+  const 쓴것 = visionMonthUsed();
+  box.textContent = 쓴것 + ' / ' + VISION_FREE_MONTH + '장';
+  const note = $('freeMeterNote');
+  if (note) {
+    note.style.color = (쓴것 >= VISION_FREE_MONTH) ? '#854d0e' : '';
+  }
+}
+
+/* 무료 길로 읽어 본다 — 되면 판독 결과, 안 되면 **null**(부르는 쪽은 AI 로 간다).
+   ⚠ 절대 던지지 않는다. 던지면 멀쩡한 서류가 「판독 실패」로 남고 다시 읽을 것에 쌓인다.
+   ⚠ 사진이 **여러 장이면 안 한다.** 사업자등록증은 한 장이 곧 한 문서다(docPages 참고).
+     여러 쪽 묶음을 첫 장만 보고 갈래를 정하면 2쪽 이후를 버리고도 버린 줄을 모른다.
+     글자가 이미 있는 문서는 쪽수와 상관없다 — 글자에 다 들어 있다. */
+/* ⚠ opt.noFree — 사람이 「🤖 AI 로 더 자세히 읽기」를 누른 길이다. 이때 무료로 또
+     읽으면 **같은 답이 또 나오고** 누른 사람은 아무 일도 안 일어난 것으로 본다.
+     무료 판독이 못 채우는 칸이 있어서 누른 것이므로, 그 길은 곧장 AI 로 가야 한다. */
+function freeReadTry(text, imgs, opt) {
+  if (opt && opt.noFree) return Promise.resolve(null);
+  if (!freeOcrPref()) return Promise.resolve(null);
+  if (!window.PuDocRead || !PuDocRead.freeRead) return Promise.resolve(null);
+  if (text) return freeReadAsk({ text: text });
+  if ((imgs || []).length !== 1) return Promise.resolve(null);
+  return freeReadAsk({ imgs: imgs, app: 'photos' });
+}
+function freeReadAsk(o) {
+  return PuDocRead.freeRead(o).catch(function (e) {
+    console.warn('[무료 판독]', e);
+    return null;
+  });
+}
+
+/* 무료로 읽었다는 표시를 판독 기록에 옮긴다.
+   ⚠ 판독 길이 둘이라 **한 함수**로 둔다 — 한쪽에만 적으면 그 길로 읽은 것에만
+     「0원」이 붙어, 같은 서류가 올릴 때와 다시 읽을 때 달라 보인다.
+   ⚠ free 를 via 에 섞지 «말 것». via 는 「글자가 어디서 왔나」이고 free 는
+     「AI 를 안 썼나」다 — 섞으면 staleRead 가 「더 나은 길이 생겼다」로 읽어
+     무료로 읽어 둔 것을 영영 다시 읽는다(아끼려던 것을 되레 태운다). */
+function markFree(read, r) {
+  if (!r || !r.free) return read;
+  read.free = true;
+  read.freeFrom = r.freeFrom || '';
+  read.freeN = Number(r.freeN) || 0;
+  return read;
+}
+
+/* ── 무료로 읽었을 때 «비었으면 눈에 걸려야 하는» 칸 ────────────────────────────
+   ⚠ 법인등록번호(corpno)는 **여기 넣지 않는다.** 개인사업자에게는 아예 없는 칸이라
+     넣으면 멀쩡한 개인사업자 등록증마다 「1칸 비었음」이 붙는다 — 늘 켜져 있는
+     경고는 아무도 안 본다.
+   ⚠ 상호·사업자번호도 넣지 않는다. 그 둘이 없으면 무료 길이 애초에 안 열린다
+     (PuDocRead.freeRead 가 null 을 준다) — 여기까지 올 수가 없다. */
+const FREE_CORE = [['ceo', '대표자'], ['bizType', '업태'], ['bizItem', '종목'], ['address', '소재지']];
+function freeMissing(read) {
+  const f = readFields(read) || {};
+  const out = [];
+  FREE_CORE.forEach(function (p) { if (!String(f[p[0]] || '').trim()) out.push(p[1]); });
+  return out;
+}
+function freeCount(read) {
+  const n = Number(read && read.freeN) || 0;
+  return n || Object.keys(readFields(read) || {}).length;
+}
+
+/* 「0원」 딱지 — 갈래 딱지 옆 «같은 줄»이다. 그래서 짧게만 적고 나머지는 title 로 옮긴다. */
+function freeChip(read) {
+  if (!read || !read.free) return '';
+  const 빈 = freeMissing(read);
+  const 안내 = '글자만 뽑아 규칙으로 채웠습니다 — AI 하루 몫을 한 번도 안 썼습니다.'
+    + '\n읽은 칸 ' + freeCount(read) + '개'
+    + (read.freeFrom === 'text' ? '\n문서에 있던 글자를 그대로 썼습니다 — Vision 도 안 불렀습니다' : '')
+    + (빈.length ? '\n못 읽은 칸: ' + 빈.join(' · ') : '')
+    + '\n문서 제목·등록증 발급일·전자세금계산서 주소는 이 길로는 못 채웁니다.';
+  return '<span class="free' + (빈.length ? ' warn' : '') + '" title="' + esc(안내) + '">0원'
+    + (빈.length ? ' · ' + 빈.length + '칸 비었음' : '') + '</span>';
+}
+
+/* 표 아래 설명 한 덩이 + 「AI 로 더」 단추.
+   ⚠ **못 채우는 칸을 숨기지 않는다.** 이 길은 값이 적은 대신 공짜다 — 그 거래를
+     사람이 알고 있어야 「왜 기업 상세가 덜 찼나」에 스스로 답할 수 있다. */
+function freeBox(read) {
+  if (!read || !read.free) return '';
+  const 빈 = freeMissing(read);
+  return '<p class="note">💡 <b>글자만 뽑아 규칙으로 채웠습니다</b> — 읽은 칸 '
+    + freeCount(read) + '개 · <b>AI 하루 몫을 안 썼습니다</b>'
+    + (read.freeFrom === 'text' ? '(문서에 있던 글자를 그대로 썼습니다)' : '') + '. '
+    + (빈.length ? '못 읽은 칸: <b>' + esc(빈.join(' · ')) + '</b>. ' : '')
+    + '문서 제목·등록증 발급일·전자세금계산서 주소는 이 길로는 채우지 못합니다.</p>'
+    + '<button class="again aiup" onclick="readWithAi()">🤖 AI 로 더 자세히 읽기 (오늘 몫 1번)</button>';
+}
+
+/* 사람이 「AI 로 더 자세히 읽기」를 눌렀다 — 무료 길을 **건너뛰고** 곧장 AI 로.
+   ⚠ 건너뛰지 않으면 같은 무료 답이 또 나오고, 누른 사람은 아무 일도 안 일어난
+     것으로 본다(freeReadTry 의 noFree 참고).
+   ⚠ 가림 확인은 「다시 판독」과 «같게» 지킨다 — 이 길로 원본이 AI 에 나가면
+     저쪽에서 막아 둔 것이 여기서 새는 셈이다. */
+function readWithAi() {
+  const id = viewerId;
+  if (!id) return;
+  if (maskForced(maskItem())) { startPhotoMask(); return; }
+  $('readPanel').innerHTML = '<div class="box"><p class="note" style="margin:0">AI 로 판독 중…</p></div>';
+  readPhoto(id, null, { noFree: true }).then(function () {
+    renderGridBar();
+    renderGrid();
+  }).catch(function (e) {
+    console.warn('[AI 로 더 읽기]', e);
+    if (viewerId === id) {
+      $('readPanel').innerHTML = '<div class="box"><p class="note" style="margin:0">판독하지 못했습니다 — ' +
+        esc((e && e.message) || e) + '</p><button class="again" onclick="readAgain()">다시 시도</button></div>';
+    }
+  });
+}
+
 function readDocChunked(sibs, job) {
   const list = sibs || [];
-  if (docTextOf(list)) return runReadChunks(textChunkMakers(list));
+  const text = docTextOf(list);
   const imgs = list.map(function (s) { return s.full; }).filter(function (f) { return safeSrc(f); });
-  if (!imgs.length) return PuDocRead.read(job && job.full);
-  return runReadChunks(imgChunkMakers(imgs));
+  return freeReadTry(text, imgs).then(function (free) {
+    if (free) return free;
+    if (text) return runReadChunks(textChunkMakers(list));
+    if (!imgs.length) return PuDocRead.read(job && job.full);
+    return runReadChunks(imgChunkMakers(imgs));
+  });
 }
 
 function startRead(job) {
@@ -7621,6 +7836,8 @@ function startRead(job) {
       pv: PuDocRead.PROMPT_VERSION,
       via: r.via || 'image'
     };
+    /* 무료로 읽었으면 그 표시를 옮긴다 — 까닭은 markFree 머리에 */
+    markFree(read, r);
     if (sibs.length > 1) read.pagesRead = sibs.length;
     /* 한도에 걸렸으면 여기서 알아채 **남은 것을 안 두드린다**(㉱) */
     readQuotaWatch(read);
@@ -15241,7 +15458,10 @@ function renderReadPanel(it) {
     /* ⚠ 표보다 **먼저** 나와야 한다. 표를 다 읽고 나서야 "작았구나"를 알면
        이미 그 값을 믿은 뒤다. */
     smallBox(it) +
+    /* ⚠ 딱지·「0원」·설명이 **한 줄**이다(대표 지시 2026-08-30 「자리가 넓으면 두 줄로
+       만들지 마라」). 긴 말은 title 로 옮긴다 — 좁아지면 설명이 먼저 잘린다. */
     '<div class="top"><span class="kd' + warn + '">' + esc(readLabel(read)) + '</span>' +
+    freeChip(read) +
     (tail ? '<span class="msg' + warn + '">' + esc(tail) + '</span>' : '') + '</div>' +
     /* ── 읽을 글자가 없는 사진에는 «작은 한 줄»만 (대표 지시 2026-08-29) ──
        도구줄에서는 뺐지만 길을 없애지는 않는다 — 명함을 사진으로 올렸다가
@@ -15262,6 +15482,9 @@ function renderReadPanel(it) {
     (docTitle(it) ? '<div class="dtitle">' + esc(docTitle(it)) + '</div>' : '') +
     cause +
     (rows ? '<table>' + rows + '</table>' : '') +
+    /* 💡 무료로 읽었다는 말과 「AI 로 더」 단추 — 표 **바로 아래**다. 표를 다 읽고
+       나서야 「칸이 왜 적지」를 알게 되면, 이미 그 적은 값을 믿은 뒤다. */
+    freeBox(read) +
     /* 💰 임금 확인 — 읽은 칸 바로 아래다(대표 지시 2026-09-02). 표에 섞어 두면
        「고칠 수 있는 칸」인 줄 모르고 그냥 지나친다. */
     wageBox(it) +
@@ -15319,7 +15542,7 @@ function docPages(id) {
 /* masked = 사람이 가린 **사본**. 주면 창고에서 원본을 다시 받지 않고 이것을 읽힌다.
    ⚠ 사본은 **판독기에만** 간다 — 창고의 원본은 손대지 않는다(계약서는 증빙이라
      5년을 보관해야 하고, 잘못 가렸을 때 되돌릴 것이 있어야 한다). */
-function readPhoto(id, masked) {
+function readPhoto(id, masked, opt) {
   const it = gridItems.find(function (x) { return x.id === id; });
   if (!it) return Promise.resolve();
   /* 사진이 있는 **주인 자리**에서 본문을 받고, 결과도 그 자리에 쓴다.
@@ -15355,7 +15578,16 @@ function readPhoto(id, masked) {
     : Promise.resolve(null);
 
   return textP.then(function (tx) {
-    if (tx && docTextOf(tx)) return runReadChunks(textChunkMakers(tx));
+    /* ── 사업자등록증은 «무료로» 먼저 (대표 결정 2026-09-08) ────────────────────
+       ⚠⚠ **판독 길이 둘이다** — 올릴 때는 startRead→readDocChunked 가 읽고,
+         다시 읽을 때는 여기가 읽는다. 한쪽만 물리면 「올릴 때는 0원인데 다시
+         판독을 누르면 AI 를 쓰는」 화면이 된다(경력관리에서 이미 겪은 자리다). */
+    const 있는글자 = tx ? docTextOf(tx) : '';
+    if (있는글자) {
+      return freeReadTry(있는글자, [], opt).then(function (free) {
+        return free || runReadChunks(textChunkMakers(tx));
+      });
+    }
     const source = masked
       ? Promise.resolve([masked])
       : Promise.all(pages.map(function (p) {
@@ -15365,7 +15597,9 @@ function readPhoto(id, masked) {
     return source.then(function (fulls) {
       const imgs = fulls.filter(function (f) { return safeSrc(f); });
       if (!imgs.length) throw new Error('사진 본문을 불러오지 못했습니다');
-      return runReadChunks(imgChunkMakers(imgs));
+      return freeReadTry('', imgs, opt).then(function (free) {
+        return free || runReadChunks(imgChunkMakers(imgs));
+      });
     });
   }).then(function (r) {
     const v = PuDocRead.autoOk(r);
@@ -15383,6 +15617,8 @@ function readPhoto(id, masked) {
       via: r.via || 'image'
     };
     /* 몇 쪽을 함께 보고 낸 답인지 남긴다 — 「2쪽인데 왜 같은 내용인가」에 답한다. */
+    /* 무료로 읽었으면 그 표시를 옮긴다 — 까닭은 markFree 머리에 */
+    markFree(read, r);
     if (pages.length > 1) read.pagesRead = pages.length;
     /* ⚠ 올릴 때 읽는 길(startRead)과 **같은 규칙**이다 — 한도를 여기서도 알아챈다.
        한쪽만 부르면 다른 길로 백 번 두드리는 것이 그대로 남는다. */
@@ -17439,6 +17675,9 @@ function showView(name) {
     /* 지난 사진도 여기서 한 번 센다 — 예전에는 [지난 사진 찾기]를 눌러야 알 수 있어
        담당자가 「몇 장 밀렸는지」를 영영 모르고 지나쳤다. 부르는 곳은 여기 하나뿐이다. */
     findOld();
+    /* 무료 판독 스위치·이달 셈 — 이미 읽어 둔 값만 그린다(서버를 다시 두드리지 않는다).
+       ⚠ 스위치 상태를 여기서 맞춰 줘야 한다. 안 그리면 껐는데도 켜진 것으로 보인다. */
+    renderFreeMeter();
   }
   if (name === 'trash') {
     /* 열 때 비로소 불러온다. 지난 해 휴지통까지 훑는 것도 여기서 —

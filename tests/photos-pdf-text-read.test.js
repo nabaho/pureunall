@@ -186,8 +186,13 @@ test('★ 올린 뒤 판독하는 길에서 글자를 쓴다', () => {
   assert.match(fnOf(app, 'startRead'), /readDocChunked\(sibs, job\)/,
     '★ 올릴 때 읽는 길이 글자·덩이 층을 안 거칩니다');
   const fn = fnOf(app, 'readDocChunked');
-  assert.match(fn, /if \(docTextOf\(list\)\) return runReadChunks\(textChunkMakers\(list\)\);/,
+  /* ⚠ 2026-09-08 — 사업자등록증 무료 판독(freeReadTry)이 앞에 붙어 «글자가
+     있으면 textChunkMakers, 없으면 imgChunkMakers」 갈림을 감싼다. 지킬 것은
+     그 갈림이 살아 있는가이지, 감싸는 줄이 있고 없고가 아니다. */
+  assert.match(fn, /if \(text\) return runReadChunks\(textChunkMakers\(list\)\);/,
     '★ 글자가 있어도 안 쓰면 예전처럼 그림으로 갑니다');
+  assert.match(fn, /const text = docTextOf\(list\);/,
+    '★ 글자를 안 뽑습니다 — 위 갈림이 늘 거짓이 됩니다');
   assert.match(fn, /imgChunkMakers\(imgs\)/, '그림으로 물러나는 길이 사라졌습니다');
   assert.match(fnOf(app, 'textChunkMakers'), /PuDocRead\.readDocText\(/);
   assert.match(fnOf(app, 'imgChunkMakers'), /PuDocRead\.read\(g\.length > 1 \? g : g\[0\]\)/,
@@ -197,10 +202,15 @@ test('★ 올린 뒤 판독하는 길에서 글자를 쓴다', () => {
 test('★ 「다시 판독」 길에서는 그림을 아예 «안 내려받는다» — 여기가 비용의 큰 몫이다', () => {
   const fn = fnOf(app, 'readPhoto');
   assert.match(fn, /PuPhotoStore\.loadText\(/, '★ 담아 둔 글자를 안 씁니다');
-  const goText = 'if (tx && docTextOf(tx)) return runReadChunks(textChunkMakers(tx));';
-  assert.ok(fn.indexOf(goText) > 0, '★ 글자로 가는 길이 없습니다');
+  /* ⚠ 2026-09-08 — 무료 판독(freeReadTry)이 이 갈림을 감싸며 tx 를 문자열
+     (있는글자)로 먼저 뽑는다. 글자 리터럴을 그대로 박지 않고 «갈림이 있는가·
+     그것이 textChunkMakers(tx) 로 가는가»만 본다. */
+  assert.match(fn, /const 있는글자 = tx \? docTextOf\(tx\) : '';/,
+    '★ 글자를 안 뽑습니다 — 아래 갈림이 늘 그림 길로 갑니다');
+  const goIdx = fn.search(/if \(있는글자\)[\s\S]{0,120}?runReadChunks\(textChunkMakers\(tx\)\)/);
+  assert.ok(goIdx > 0, '★ 글자로 가는 길이 없습니다');
   /* 글자로 갈 때 loadFull 이 «그 뒤»에만 있어야 한다 — 앞에 있으면 늘 내려받는다. */
-  assert.ok(fn.indexOf(goText) < fn.indexOf('loadFull('),
+  assert.ok(goIdx < fn.indexOf('loadFull('),
     '★ 글자로 갈 때도 그림을 내려받고 있습니다 — 아끼려던 것이 그대로 나갑니다');
 });
 
