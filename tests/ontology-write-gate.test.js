@@ -102,6 +102,16 @@ test('트랜잭션 저장은 서버의 최신 수정차수를 다시 비교한�
   await assert.rejects(() => gateway.save(ref, {id:'case-1'}, {entityType:'Case', expectedRevision:2}), /다른 사용자가/);
 });
 
+test('신규 저장은 같은 영구 ID가 서버에 이미 있으면 덮어쓰지 않는다', async () => {
+  let current = { id:'case-1', entityType:'Case', schemaVersion:O.VERSION,
+    contractVersion:W.CONTRACT_VERSION, createdAt:1, updatedAt:2, revision:1 };
+  const before=JSON.stringify(current);
+  const ref = { transaction(fn){ const next=fn(current); if(next === undefined) return Promise.resolve({committed:false}); current=next; return Promise.resolve({committed:true}); } };
+  const gateway = W.createGateway({mode:'enforce', actor:'sid-1', now:()=>5});
+  await assert.rejects(() => gateway.save(ref, {id:'case-1'}, {entityType:'Case', expectedRevision:-1}), /다른 사용자가/);
+  assert.equal(JSON.stringify(current),before);
+});
+
 function fakeFirebase(){
   const calls=[];
   function ref(path){

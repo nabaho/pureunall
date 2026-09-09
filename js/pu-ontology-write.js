@@ -1,4 +1,4 @@
-/* 푸른통합 온톨로지 저장 관문 v1
+/* 푸른통합 온톨로지 저장 관문 v2
  *
  * 기존 앱은 data-mode="observe" 로 위반을 기록만 한다. 새 앱은 선언이 없으면
  * enforce 이며, 이 모듈의 prepareRecord/createGateway 를 지나야 저장된다.
@@ -87,7 +87,13 @@
     options=options||{};
     var previous=options.previous||null, now=options.now==null?Date.now():options.now;
     var expected=options.expectedRevision;
-    if(previous && expected!=null && Number(previous.revision||0)!==Number(expected)){
+    /* expectedRevision 계약
+       -1 = 새 레코드(서버에 없어야 함), 0 = revision 없는 기존 레코드,
+       1 이상 = 그 수정차수여야 함. undefined만 비교를 생략한다.
+       이전 구현은 서버 레코드가 없을 때 비교를 건너뛰어, 삭제된 건을 오래된
+       화면이 되살리거나 같은 id의 신규 업체를 덮어쓸 수 있었다. */
+    var actualRevision=previous?Number(previous.revision||0):-1;
+    if(expected!=null && actualRevision!==Number(expected)){
       return {ok:false,value:null,issues:[issue('revision_conflict','다른 사용자가 먼저 수정했습니다. 최신 자료를 다시 연 뒤 저장하세요.','revision')]};
     }
     var out=copy(record)||{};
@@ -108,7 +114,7 @@
     options=options||{};
     if(!previous || typeof previous!=='object') return {ok:false,value:null,issues:[issue('delete_target_missing','삭제할 원본을 찾지 못했습니다.')]};
     var next=Object.assign({},previous,{_deleted:true,deletedAt:options.now==null?Date.now():options.now,deletedBy:clean(options.actor)});
-    return prepareRecord(next,Object.assign({},options,{entityType:previous.entityType,previous:previous}));
+    return prepareRecord(next,Object.assign({},options,{entityType:options.entityType||previous.entityType,previous:previous}));
   }
 
   function recordLike(value){ return !!(value&&typeof value==='object'&&!Array.isArray(value)&&(own(value,'id')||own(value,'entityType'))); }
@@ -169,9 +175,11 @@
         });
       },
       remove:function(ref,previous,ctx){
-        var gone=tombstone(previous,Object.assign({actor:actor,now:now()},ctx||{}));
+        ctx=ctx||{};
+        var gone=tombstone(previous,Object.assign({actor:actor,now:now()},ctx));
         if(!gone.ok) return Promise.reject(new Error(gone.issues[0].message));
-        return this.save(ref,gone.value,Object.assign({},ctx||{},{entityType:previous.entityType,expectedRevision:previous.revision}));
+        var expected=own(ctx,'expectedRevision')?ctx.expectedRevision:Number(previous.revision||0);
+        return this.save(ref,gone.value,Object.assign({},ctx,{entityType:ctx.entityType||previous.entityType,expectedRevision:expected}));
       }
     };
   }
