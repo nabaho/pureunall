@@ -45,6 +45,7 @@
     return token(opts.auth).then(function (t) {
       if (!t) throw new Error('로그인을 확인해 주세요');
       var body = { parts: parts };
+      if (opts.app) body.app = String(opts.app);
       if (opts.generationConfig) body.generationConfig = opts.generationConfig;
       return f(URL, {
         method: 'POST',

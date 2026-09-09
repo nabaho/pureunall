@@ -42,6 +42,7 @@
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
 </script>
 <script src="xlsx_gen.js?v=15"></script>
+<script src="js/pu-ai-call.js?v=3"></script>
 <script src="js/pu-news-core.js?v=30"></script>
 <script src="js/pu-news-tpl.js?v=11"></script>
 <style>
@@ -601,7 +602,7 @@ var App = {
   /* 고른 것 — «주소»를 열쇠로 지닌다. 번호나 줄 위치로 지니면 유형 칩을 누르는 순간
      엉뚱한 곳이 골라진다(표가 다시 그려지기 때문이다). */
   고른것: {},
-  지금열쇠: '', 길: 'auto', 보내는중: false,
+  지금열쇠: '', 길: 'auto', 보내는중: false, AI중: false,
   /* 고른 유형(자문·급여·노조·기금). 빈 값이면 전체.
      ★★ 첫 값은 «전체»다 (대표 결정 2026-09-07 「116곳 전부」).
        ⚠ 이것이 2026-09-03 「자문 기본값으로」를 «뒤집은 것»이다. 옛 메모를 읽고
@@ -1304,9 +1305,11 @@ function 꼭지칸하나(d){
          「담았는데 왜 안 나가나」를 편지에서 찾으신다. */
     const 기사인가 = x && x.갈래 === '기사';
     const 내글 = String((x && x.우리말) || '').trim();
+    const AI글 = String((x && x.AI초안) || '').trim();
     const 딱지 = !기사인가 ? ''
       : (내글 ? '<span class="wtag">✎ 우리 말 있음</span>'
-              : '<span class="wtag no">✎ 아직 안 씀 — 안 실림</span>');
+              : (AI글 ? '<span class="wtag no">✨ AI 초안 — 검토 필요</span>'
+                       : '<span class="wtag no">✎ 아직 안 씀 — 안 실림</span>'));
     return `<div class="item${실?'':' off'}">
       <input type="checkbox" class="ck" ${실?'checked':''}
         onchange="실음바꾸기('${g.키}',${i})" onclick="event.stopPropagation()"
@@ -1326,6 +1329,8 @@ function 꼭지칸하나(d){
      <span class="ttl">${esc(g.이름)}</span>
      <span class="cnt">실릴 것 ${셈.실림} / 담긴 것 ${셈.담김}</span>
      <span class="sp"></span>
+     ${g.키==='news' && 것.length ? `<button class="mini" onclick="AI초안짓기()"
+       ${App.AI중?'disabled':''}>✨ ${App.AI중?'AI 작성 중…':'AI '+것.filter(x=>!String(x.우리말||'').trim()).length+'건 초안'}</button>` : ''}
      ${것.length ? `<button class="mini" onclick="꼭지모두('${g.키}',true)">☑ 모두 싣기</button>
      <button class="mini" onclick="꼭지모두('${g.키}',false)">☐ 모두 빼기</button>` : ''}
      <button class="mini" onclick="손으로담기('${g.키}')">＋ 손으로 담기</button>
@@ -1337,6 +1342,52 @@ function 꼭지칸하나(d){
    ⚠ 저장까지 해야 한다. 화면만 바꾸면 새로 고치는 순간 되돌아가고,
      그 사이에 보내면 «화면에서 뺀 줄이 편지에 실려» 나간다. */
 function 꼭지보기(키){ App.보는꼭지 = 키; render(); }
+
+/* 제목·출처·수집된 요약만 AI에 보내 «우리 말» 후보를 만든다.
+   결과는 AI초안에만 저장한다 — 우리말로 옮겨 저장하기 전에는 편지에 절대 안 실린다. */
+async function AI초안짓기(){
+  if(App.AI중) return;
+  const d = 지금회차(), 것 = d.안.news || [];
+  const 대상 = 것.map(function(x,i){ return { x:x, i:i }; })
+    .filter(function(v){ return !String(v.x.우리말||'').trim(); });
+  if(!대상.length) return toast('이미 모든 기사에 우리 말이 있습니다');
+  if(!window.PuAiCall) return toast('AI 호출기를 불러오지 못했습니다', 8000);
+  if(!confirm('주간노동뉴스 ' + 대상.length + '건의 초안을 AI로 만듭니다.\n\n'
+    + '결과는 곧바로 편지에 실리지 않습니다. 각 기사를 눌러 사실을 확인하고 저장해야 합니다.')) return;
+  App.AI중 = true; render();
+  try{
+    const 자료 = 대상.map(function(v){
+      const x=v.x;
+      return { 번호:v.i, 제목:String(x.제목||'').slice(0,220),
+        출처:String(x.언론사||'').slice(0,80),
+        참고:String(x.요약||x.본문||'').replace(/\s+/g,' ').slice(0,700) };
+    });
+    const 지시 = '당신은 푸른노무법인의 뉴스레터 편집자입니다. 아래 공개 기사 정보만 근거로 '
+      + '각 항목을 한국어 2문장으로 정리하세요. 첫 문장은 확인 가능한 사실, 둘째 문장은 '
+      + '사업주·인사담당자가 확인할 실무 포인트입니다. 주어진 정보에 없는 숫자·날짜·판단은 '
+      + '절대 만들지 말고, 정보가 부족하면 단정하지 마세요. 원문 문장을 복사하지 마세요. '
+      + '다른 설명 없이 JSON 배열만 답하세요. 모양: [{"번호":0,"초안":"..."}]\n\n'
+      + JSON.stringify(자료);
+    const 답 = await PuAiCall.ask([{ text:지시 }], {
+      auth:firebase.auth(), fetch:window.fetch.bind(window), app:'news',
+      generationConfig:{ temperature:0, maxOutputTokens:4096 }
+    });
+    const 글 = PuAiCall.textOf(답);
+    let rows; try{ rows=JSON.parse(글); }catch(_){ throw new Error('AI 답을 목록으로 읽지 못했습니다'); }
+    if(!Array.isArray(rows)) throw new Error('AI 답의 모양이 맞지 않습니다');
+    let n=0;
+    rows.forEach(function(r){
+      const i=Number(r&&r.번호), t=String((r&&r.초안)||'').trim().slice(0,700);
+      if(!Number.isInteger(i)||i<0||i>=것.length||!t||String(것[i].우리말||'').trim()) return;
+      것[i].AI초안=t; n++;
+    });
+    if(!n) throw new Error('쓸 수 있는 AI 초안이 없습니다');
+    await 회차저장(d);
+    toast('✨ AI 초안 ' + n + '건을 만들었습니다 — 각 줄을 눌러 확인 후 저장해 주세요', 12000);
+  }catch(e){
+    toast('AI 초안을 만들지 못했습니다: ' + ((e&&e.message)||e), 12000);
+  }finally{ App.AI중=false; render(); }
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    줄 하나 — 자세히 보고 «우리 말로» 쓴다 (대표 지시 2026-09-08)
@@ -1397,7 +1448,7 @@ function 줄창그리기(){
    <label class="f">✎ 우리 말로 — 편지에는 <b>이 글만</b> 실립니다</label>
    <textarea id="rowW" rows="5" placeholder="${esc(기사인가
      ? '여기에 쓰시면 이 글이 편지에 실립니다. 비우면 이 줄은 안 나갑니다.'
-     : '한 줄로 고쳐 쓰시면 그것이 제목으로 나갑니다. 비우면 원래 제목이 나갑니다.')}">${esc(x.우리말||'')}</textarea>
+     : '한 줄로 고쳐 쓰시면 그것이 제목으로 나갑니다. 비우면 원래 제목이 나갑니다.')}">${esc(x.우리말||x.AI초안||'')}</textarea>
    <div class="note" style="margin-top:11px"><b>이렇게 쓰면 됩니다</b><br>
     <b>㉠ 사실</b>(누가·언제·무엇)은 저작물이 아닙니다 — 우리 문장으로 전할 수 있습니다.<br>
     <b>㉡ 그 아래 「사업장은 무엇을 챙기나」</b>를 붙이면 그건 <b>우리 저작물</b>입니다.<br>
@@ -1416,7 +1467,7 @@ function 우리말저장(){
   const x = (d.안[키] || [])[i];
   if(!x) return 줄창닫기();
   const v = String(($('rowW') && $('rowW').value) || '').trim();
-  if(v) x.우리말 = v; else delete x.우리말;
+  if(v){ x.우리말 = v; delete x.AI초안; } else delete x.우리말;
   회차저장(d)
     .then(function(){ 줄창닫기(); render();
       toast(v ? '✎ 우리 말로 담았습니다 — 편지에 이 글이 실립니다'

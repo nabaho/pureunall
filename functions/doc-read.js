@@ -83,7 +83,7 @@ function validate(body) {
      아는 이름만 받는다. 모르면 'other' 다. 여기 걸러 두지 않으면 실시간DB 열쇠에
      못 쓰는 글자(. # $ / [ ])가 들어가 그 자리가 통째로 안 써진다.
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";
