@@ -79,6 +79,9 @@ test('담당 칸은 기본 폭이 작고 사용자가 조절할 수 있다', () 
   assert.match(app, /manager:'128px'/, '담당 칸 기본 폭이 128px가 아닙니다');
   assert.match(app, /<col data-col="manager" style="width:\$\{managerW\}">/,
     '담당 칸 폭이 다른 열처럼 저장·적용되지 않습니다');
-  assert.match(app, /담당\$\{rz\('manager'\)\}/,
+  /* ⚠ 2026-09-09 — 담당 머리글이 눌러서 정렬되게 되며(sortBy('manager')) 화살표
+     (sortArrow)가 «폭 조절 손잡이(rz)보다 앞에» 끼어들었다. 손잡이가 사라진 게
+     아니라 자리가 밀렸을 뿐이다 — 둘 다 있는지를 본다. */
+  assert.match(app, /담당\$\{sortArrow\('manager'\)\}\$\{rz\('manager'\)\}/,
     '담당 헤더에 폭 조절 손잡이가 없습니다');
 });

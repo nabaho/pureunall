@@ -40,7 +40,10 @@ test('★ 담당 칸이 «왼쪽» 정렬이다 — 뒤 딱지가 이름을 밀�
 });
 
 test('머리글도 값과 같은 쪽으로 붙는다', () => {
-  const m = SRC.match(/<th style="text-align:(\w+)">담당/);
+  /* ⚠ 2026-09-09 — 담당 머리글이 눌러서 정렬되게 되며(sortBy('manager'))
+     style 뒤에 cursor:pointer 가 붙고 onclick·title 도 끼어들었다. text-align 값만
+     본다 — 정렬 방향이 지켜지는지가 이 검사의 뜻이지, 속성이 몇 개 붙었는지가 아니다. */
+  const m = SRC.match(/<th style="text-align:(\w+)[;"][^>]*>담당/);
   assert.ok(m, '담당 머리글을 찾지 못했다');
   assert.equal(m[1], 'left', '머리글과 값이 서로 다른 쪽에 붙으면 어느 칸인지 헷갈린다');
 });

@@ -77,14 +77,19 @@ test('★★ 많으면 «셋까지»만 이름을 적고 나머지는 수로 —
 
 /* ══════ ② 한 번만 센다 ══════ */
 
-test('★★★ 고르개를 만들 때 «함께» 가른다 — 따로 세면 6,315장을 두 벌 훑는다', () => {
+/* ⚠ 2026-09-09 — 「담당 전체」 드롭다운(#pcMgrFilter)을 없앴다(대표 지시).
+   그 드롭다운을 채우던 고르개(nonRetiredPicks)도 함께 사라졌다 — 이 자리에 남을
+   일이 아니다(옆줄 「담당자별」에는 그대로 있다, cards-mgr-pick-no-retired.test.js
+   가 지킨다). 여기서 못 박을 것은 «퇴사자를 세는 셈»이 한 번의 훑기 안에서 되는가다. */
+test('★★★ 담당 이름을 모으며 «함께» 퇴사자를 가른다 — 따로 세면 6,315장을 두 벌 훑는다', () => {
   const fn = fnBody('renderPCTable');
+  assert.ok(!/nonRetiredPicks\(/.test(fn),
+    '★ 사라진 드롭다운의 고르개가 남아 있다 — 죽은 코드다');
   const at = fn.indexOf('const _allMgrs = ');
   assert.ok(at > 0, '★ 담당 이름을 모으는 자리를 못 찾았다');
-  const seg = fn.slice(at, fn.indexOf('mgrSel.innerHTML', at));
+  const seg = fn.slice(at, fn.indexOf('/* 지역 드롭다운은', at));
   assert.match(seg, /_mgrGone = _allMgrs\.filter\(mbRetired\)/,
     '★★★ 빠진 퇴사자를 안 가른다 — 띠가 늘 0명이 된다');
-  assert.match(seg, /nonRetiredPicks\(_allMgrs, state\.erpMgr\)/, '★ 고르개가 같은 목록을 안 쓴다');
   /* 두 번 훑지 않는다 — allItems 를 여기서 한 번만 부른다 */
   assert.equal((seg.match(/allItems\(\)/g) || []).length, 1,
     '★★ 목록을 두 번 훑는다 — 폴더를 열 때마다 그만큼 멈춘다');
