@@ -1,4 +1,4 @@
-{
+﻿{
   "rules": {
     "billing": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
@@ -201,6 +201,14 @@
       "cons_type_colors": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)",
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)"
+      },
+      "gov_dash_order": {
+        ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)",
+        ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)",
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true))",
+          ".write": "auth != null && (auth.uid === $uid || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true))"
+        }
       },
       "co_no_seq": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)",

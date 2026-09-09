@@ -171,6 +171,14 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .new-badge{display:inline-block;vertical-align:middle;flex-shrink:0;margin-left:5px;
   background:#dc2626;color:#fff;font-size:9.5px;font-weight:900;padding:1.5px 6px;
   border-radius:9px;letter-spacing:.3px;line-height:1.5;white-space:nowrap;}
+/* 사업장 차례 — 끌어서 옮기기 (대표 지시 2026-09-09) */
+.dcard-grip{flex-shrink:0;cursor:grab;color:var(--dash-border);font-size:13px;
+  line-height:1;padding:0 1px;user-select:none;}
+.dcard-grip:hover{color:var(--dash-t2);}
+.dcard-hand{flex-shrink:0;font-size:10px;opacity:.7;}
+.dcard.dcard-dragging{opacity:.4;}
+.dcard.drop-before{box-shadow:inset 0 3px 0 var(--accent);}
+.dcard.drop-after{box-shadow:inset 0 -3px 0 var(--accent);}
 .ph-badge.pre{background:#fffbeb;color:#854d0e;border:1px solid #fbbf24;}
 .ph-badge.done{background:#f8fafc;color:#166534;border:1px solid #4ade80;}
 #viewMain.dash-wide .dcard-hd{flex-direction:row;align-items:center;gap:8px;}
@@ -2330,6 +2338,7 @@ function fbInit(){
            불렀는데, 그때 아직 클라우드가 안 붙어 있으면 그냥 되돌아가고 «다시는 시도하지
            않았다» — 느린 연결에서는 색이 영영 안 왔다. 구독은 셋 다 붙은 자리에 모은다. */
         subscribeErpColors(); // 직원 색 구독 (푸른이알피가 정한다)
+        subscribeDashOrder(); // 내 사업장 차례 구독 (사람마다 따로, 2026-09-09)
         publishTypeColors();  // 사업 색 올리기 (이 앱이 원본이다)
         updateFbStatus('🟢');
         if(_savePending===0)setSaveState('saved','저장 완료','클라우드 연결이 정상입니다.');
@@ -6119,12 +6128,59 @@ function coIsNew(co){
   const m=co.typeAddedAt||{};
   return (co.types||[]).some(tid=>!co.endedTypes?.[tid]&&daysSince(m[tid])<NEW_DAYS);
 }
+/* «얼마나» 최근인가 — coIsNew 가 예로 쓴 것과 «같은 자리»를 본다.
+   ⚠ 딴 기준으로 재면 NEW 딱지는 붙었는데 맨 위로는 안 올라가는 어긋남이 생긴다. */
+function coNewDays(co){
+  if(!co)return 1e9;
+  let m=daysSince(co.createdAt);
+  const ta=co.typeAddedAt||{};
+  (co.types||[]).forEach(tid=>{
+    if(co.endedTypes?.[tid])return;
+    const d=daysSince(ta[tid]);
+    if(d<m)m=d;
+  });
+  return m;
+}
 /* 넣는 자리마다 도장을 찍는다 — 한 군데라도 빠지면 그 길로 들어온 것은 조용히 안 뜬다 */
 function stampNewCo(co){ co.createdAt=todayStr(); return co; }
 function stampNewType(co,tid){
   if(!co||!tid)return;
   if(!co.typeAddedAt)co.typeAddedAt={};
   co.typeAddedAt[tid]=todayStr();
+}
+
+/* ══ 사업장 차례 — «내가 손으로» 정한 것 (대표 지시 2026-09-09 「①㉮②㉮」) ══
+   ⚠ 사람마다 따로다. PC 를 바꿔도 따라오게 내 uid 밑에 담아 두되(gov_dash_order),
+     여기 이 앱을 열자마자 쓸 수 있어야 하니 이 기기 자리에도 사본을 둔다.
+   ⚠ 이 값이 사라져도(첫 접속·기기 초기화) 잃는 것이 없다 — 그냥 ①㉮ 규칙
+     (새것 먼저·가나다)으로 돌아갈 뿐이다. 그래서 BK_KEYS(백업)에도 안 넣는다. */
+const DASH_ORDER_KEY='p_dashOrder';
+function getDashOrderLocal(){
+  try{ const v=JSON.parse(localStorage.getItem(DASH_ORDER_KEY)||'{}');
+    return (v&&typeof v==='object'&&!Array.isArray(v))?v:{}; }
+  catch(e){ return {}; }
+}
+function setDashOrderLocal(obj){ try{ localStorage.setItem(DASH_ORDER_KEY,JSON.stringify(obj)); }catch(e){} }
+let _dashOrder=getDashOrderLocal();   // 서버가 붙기 전에도 지난 자리를 그대로 쓴다
+function subscribeDashOrder(){
+  if(!FB_READY||!_fbDB||!_fbAuthUid)return;
+  _fbOn(_fbDB.ref('data/gov_dash_order/'+_fbAuthUid), '내 사업장 차례', snap=>{
+    const v=snap.val();
+    _dashOrder=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
+    setDashOrderLocal(_dashOrder);
+    try{ renderDash(); }catch(e){}
+  });
+}
+/* 끌어 옮긴 «그 묶음 안»만 다시 매겨 저장한다.
+   ⚠ .update() 로 «더한다» — .set() 을 쓰면 다른 묶음에서 이미 정해 둔 차례가
+     통째로 지워진다. 한 묶음을 옮겼다고 다른 묶음까지 잃으면 안 된다. */
+function saveDashOrder(map){
+  _dashOrder=Object.assign({},_dashOrder,map);
+  setDashOrderLocal(_dashOrder);
+  if(FB_READY&&_fbDB&&_fbAuthUid){
+    try{ _fbDB.ref('data/gov_dash_order/'+_fbAuthUid).update(map); }
+    catch(e){ console.warn('사업장 차례 저장 실패',e); }
+  }
 }
 function dashPhaseBadges(co,types){
   const out=[];
@@ -6305,9 +6361,25 @@ function renderDash(){
     q('#dashList').innerHTML=`<div class="dash-empty">사업장을 추가하면<br>여기에 나타납니다<br><br><button class="dash-add" style="width:auto;padding:8px 16px" onclick="openCoModal()">+ 추가</button></div>`;
     return;
   }
+  /* ⚠ 손으로 정한 차례(_dashOrder)를 «맨 먼저» 본다 — ⭐즐겨찾기보다도 앞이다.
+     즐겨찾기를 뒤에 두면, 즐겨찾기 아닌 것을 즐겨찾기 위로 끌어도 다음에 그릴 때
+     도로 아래로 튕겨 내려간다(끌어도 «안 바뀐 것처럼» 보인다) — 실제로 그렇게
+     될 뻔한 것을 눈으로 보고 여기로 옮겼다. 손으로 만진 자리는 무엇을 대신해서라도
+     그 자리를 지켜야 «끌었다»는 말이 거짓이 안 된다.
+     ⚠ 값을 못 박지 않는다 — «손댄 것이 있는가»만 본다. 둘 다 손댔으면 숫자로,
+       하나만 손댔으면 그것이 위로 온다. */
   const sortItems=arr=>[...arr].sort((a,b)=>{
+    const ha=_dashOrder[a.co.id], hb=_dashOrder[b.co.id];
+    const oa=ha!=null, ob=hb!=null;
+    if(oa&&ob)return ha-hb;
+    if(oa!==ob)return oa?-1:1;
     const fa=favs.includes(a.co.id)?0:1, fb=favs.includes(b.co.id)?0:1;
     if(fa!==fb)return fa-fb;
+    /* 새것이 «가나다」를 대신한다 (대표 결정 2026-09-09 ①㉮) — 마감이 급한 사업장은
+       ⭐·마감 정렬에서 이미 위에 있으므로 밀려나지 않는다. */
+    const na=coIsNew(a.co), nb=coIsNew(b.co);
+    if(na!==nb)return na?-1:1;
+    if(na&&nb)return coNewDays(a.co)-coNewDays(b.co);
     const da=a.risk?.minDiff??9999, db=b.risk?.minDiff??9999;
     if(da!==db)return da-db;
     return String(a.co.name).localeCompare(String(b.co.name),'ko');
@@ -6359,6 +6431,8 @@ function renderDash(){
           <div class="dcard-sub">${dashCardSummary(co,types,item.risk)}</div>
         </div>
         <div class="dcard-meta">
+          <span class="dcard-grip" title="끌어서 순서 바꾸기 (같은 묶음 안에서만)">⠿</span>
+          ${_dashOrder[co.id]!=null?'<span class="dcard-hand" title="손으로 정한 자리">✋</span>':''}
           <span class="dcard-no" style="font-size:11px;font-weight:900;color:var(--t2);min-width:18px;text-align:center;flex-shrink:0;"></span>
           <button class="co-fav-btn" data-coid="${co.id}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 1px;line-height:1;" title="즐겨찾기 상단 고정">${favs.includes(co.id)?'⭐':'☆'}</button>
           <span class="att-dot" style="background:${staffColor(att)}"></span>
@@ -6477,6 +6551,66 @@ function renderDash(){
       btn.closest('.fmtog').querySelectorAll('.fmt-btn').forEach(b=>{
         b.className='fmt-btn'+(b.dataset.f==='1'&&f?' on':(b.dataset.f==='0'&&!f?' on office':''));
       });
+    };
+  });
+
+  /* 사업장 차례 — 손잡이를 잡고 끌어서 옮긴다 (대표 지시 2026-09-09
+     「새로 입력된건은 최상위에 올라오게 하고 기업순서를 바꿀수 있게 … 드래그」).
+     ⚠ «묶음(section) 안에서만» 옮겨진다 — 담당·마감 구간을 넘나드는 끌기는
+       차례가 아니라 담당을 바꾸는 일이라 여기서 하지 않는다(승인 목업의 결정).
+     ⚠ 옮긴 자리를 «즉시 다시 그리지 않는다» — renderDash() 를 다시 부르면
+       방금 옮긴 카드가 화면에서 사라졌다 나타나는 것처럼 깜빡인다. DOM 을
+       손으로 옮기고 번호만 다시 매긴다. 차례는 이미 saveDashOrder 로 저장했으니
+       다음에 다시 그릴 때(구독이 돌아올 때)도 같은 자리를 지킨다. */
+  let _dashDragId=null;
+  qa('#dashList .dcard').forEach(card=>{
+    const grip=card.querySelector('.dcard-grip');
+    if(!grip)return;
+    card.draggable=true;
+    card.ondragstart=e=>{
+      if(!e.target.closest('.dcard-grip')){ e.preventDefault(); return; }
+      _dashDragId=card.dataset.coid;
+      card.classList.add('dcard-dragging');
+      try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',_dashDragId); }catch(_){}
+    };
+    card.ondragend=()=>{
+      card.classList.remove('dcard-dragging');
+      qa('#dashList .drop-before,#dashList .drop-after').forEach(c=>c.classList.remove('drop-before','drop-after'));
+      _dashDragId=null;
+    };
+    card.ondragover=e=>{
+      if(!_dashDragId||_dashDragId===card.dataset.coid)return;
+      const mySection=card.closest('.dash-section');
+      const srcCard=q(`.dcard[data-coid="${_dashDragId}"]`);
+      if(!srcCard||srcCard.closest('.dash-section')!==mySection)return;   // ⚠ 묶음을 못 넘는다
+      e.preventDefault();
+      const rect=card.getBoundingClientRect();
+      const before=(e.clientY-rect.top)<rect.height/2;
+      card.classList.toggle('drop-before',before);
+      card.classList.toggle('drop-after',!before);
+    };
+    card.ondragleave=e=>{
+      if(!card.contains(e.relatedTarget))card.classList.remove('drop-before','drop-after');
+    };
+    card.ondrop=e=>{
+      e.preventDefault();
+      const before=card.classList.contains('drop-before');
+      card.classList.remove('drop-before','drop-after');
+      if(!_dashDragId||_dashDragId===card.dataset.coid)return;
+      const section=card.closest('.dash-section');
+      const srcCard=q(`.dcard[data-coid="${_dashDragId}"]`);
+      if(!srcCard||srcCard.closest('.dash-section')!==section)return;
+      section.insertBefore(srcCard, before?card:card.nextSibling);
+      /* «그 묶음 안» 차례를 통째로 다시 매긴다 — 일부만 적으면 다음 렌더에서
+         손 안 댄 나머지가 옛 값과 뒤섞여 자리가 어긋난다. */
+      const map={};
+      qa('.dcard',section).forEach((c,i)=>{ map[c.dataset.coid]=i; });
+      saveDashOrder(map);
+      qa('#dashList .dcard').forEach((c,i)=>{ const n=c.querySelector('.dcard-no'); if(n)n.textContent=i+1; });
+      if(!srcCard.querySelector('.dcard-hand')){
+        const gripEl=srcCard.querySelector('.dcard-grip');
+        if(gripEl)gripEl.insertAdjacentHTML('afterend','<span class="dcard-hand" title="손으로 정한 자리">✋</span>');
+      }
     };
   });
 }
