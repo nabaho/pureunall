@@ -219,9 +219,14 @@ test('★ 거르개·갈래·찾기가 «같은 목록»을 만든다 — 따로
   assert.equal(c.mbVisibleRows().length, 1);
 });
 
-test('전체메일은 폴더를 합쳐 보여 준다', () => {
+test('전체메일은 «받은» 폴더를 합쳐 보여 준다 — 우리가 낸 것은 안 든다', () => {
+  /* 대표 정의 2026-09-09 — 아래 「전체메일 = 받은메일 전체」 절에서 낱낱이 본다.
+     ⚠ 통수를 박지 않는다(표가 늘면 깨진다) — 어느 칸에서 왔는지로 본다. */
   const c = load({ folders: FOLDERS, msgs: MSGS, state:{ mbBox:'*all' } });
-  assert.equal(c.mbVisibleRows().length, 3);
+  const rows = c.mbVisibleRows();
+  assert.ok(rows.length >= 2, '받은메일함의 줄까지 사라졌습니다');
+  assert.ok(rows.every(v=>v._slug === 'B_INBOX'),
+    '보낸메일함의 줄이 전체메일에 섞여 있습니다');
 });
 
 test('내게쓴메일함은 내가 나에게 보낸 것만 — 아니면 받은 메일이 다 딸려 온다', () => {
@@ -232,6 +237,136 @@ test('내게쓴메일함은 내가 나에게 보낸 것만 — 아니면 받은 
   const rows = c.mbVisibleRows();
   assert.equal(rows.length, 1);
   assert.equal(rows[0].u, 30);
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   「전체메일」 = 받은메일 전체 (대표 정의 2026-09-09)
+   ══════════════════════════════════════════════════════════════════════════
+   「전체메일은 받은메일 전체를 의미하고 받은메일함은 받음메일중 업무별로 배분한메일중
+     나머지메일을 의미한다」
+
+   ★ 오던 길 — 전체메일이 «폴더를 다 합치는» 칸이었다. 그래서 대표 화면(2026-09-09)에서
+     목록 절반에 「보낸메일함」 딱지가 붙어 있었다. 실측 그날: 우리가 낸 칸과 휴지통이
+     1,225통(보낸 400 · 내게쓴 400 · 임시 269 · 예약 142 · 휴지통 14).
+
+   ⚠ 통수를 박지 않는다 — 칸마다 표를 한 통씩 넣고 «어느 칸에서 왔는가»로 본다.
+     폴더가 늘어도, 통수가 바뀌어도 이 검사는 그대로 산다.
+   ★ 「뺐다」와 함께 「없어진 것이 아니다」도 본다 — 그 칸을 열면 그대로 있어야 한다.
+     그것을 안 보면, 보낸메일함을 통째로 안 비추는 고침도 이 검사를 통과한다
+     (우리 화면은 다음메일을 비추는 거울이다 — 비추기를 그만두는 것은 고침이 아니다). */
+
+const AF = Object.assign({}, FOLDERS, {
+  B_ARCH: { path:'Archive', name:'Archive', kind:'archive', order:8, total:2, unseen:0 }
+});
+/* 칸마다 한 통 — 제목이 곧 「어느 칸에서 왔나」다 */
+const AOLD = { '9': { u:9, f:'옛사람', e:'old@x.com', t:'370-6@daum.net',
+                      s:'왔다-지난메일', d:1, r:1, g:0, a:0 } };
+const AM = {
+  B_INBOX: { '1': { u:1, f:'받은이', e:'in@x.com',  t:'370-6@daum.net', s:'왔다-받은메일함', d:9, r:0, g:0, a:0 } },
+  B_MINE:  { '2': { u:2, f:'업무',   e:'job@x.com', t:'370-6@daum.net', s:'왔다-업무별칸',   d:8, r:0, g:0, a:0 } },
+  B_ARCH:  { '3': { u:3, f:'보관',   e:'ar@x.com',  t:'370-6@daum.net', s:'왔다-보관메일함', d:7, r:1, g:0, a:0 } },
+  B_SENT:  { '4': { u:4, f:'푸른노무법인', e:'370-6@daum.net', t:'c@x.com', s:'냈다-보낸메일함', d:6, r:1, g:0, a:0 } },
+  B_TOME:  { '5': { u:5, f:'푸른노무법인', e:'370-6@daum.net', t:'370-6@daum.net', s:'냈다-내게쓴메일함', d:5, r:1, g:0, a:0 } },
+  B_DRAFT: { '6': { u:6, f:'푸른노무법인', e:'370-6@daum.net', t:'c@x.com', s:'냈다-임시보관함', d:4, r:1, g:0, a:0 } },
+  B_SCHED: { '7': { u:7, f:'푸른노무법인', e:'370-6@daum.net', t:'c@x.com', s:'냈다-예약메일함', d:3, r:1, g:0, a:0 } },
+  B_TRASH: { '8': { u:8, f:'버린이', e:'tr@x.com', t:'370-6@daum.net', s:'버렸다-휴지통', d:2, r:1, g:0, a:0 } }
+};
+const OUR_OWN = [['B_SENT','냈다-보낸메일함'], ['B_TOME','냈다-내게쓴메일함'],
+  ['B_DRAFT','냈다-임시보관함'], ['B_SCHED','냈다-예약메일함'], ['B_TRASH','버렸다-휴지통']];
+const subj = c => c.mbVisibleRows().map(v=>String(v.s||''));
+
+test('★★ 전체메일에 «우리가 낸 것»이 안 든다 — 대표 정의 2026-09-09', () => {
+  const c = load({ folders: AF, msgs: AM, state:{ mbBox:'*all' } });
+  const s = subj(c);
+  OUR_OWN.forEach(([, t])=>assert.ok(s.indexOf(t) < 0, t + ' 이 전체메일에 들어 있습니다'));
+});
+
+test('★★ 받은 것은 «하나도» 안 빠진다 — 받은메일함 + 업무별 칸 + 보관메일함', () => {
+  const c = load({ folders: AF, msgs: AM, state:{ mbBox:'*all' } });
+  const s = subj(c);
+  ['왔다-받은메일함', '왔다-업무별칸', '왔다-보관메일함']
+    .forEach(t=>assert.ok(s.indexOf(t) >= 0, t + ' 이 전체메일에서 빠졌습니다'));
+});
+
+test('★★ 뺀 것은 «없어진 것이 아니다» — 그 칸을 열면 그대로 있다', () => {
+  OUR_OWN.forEach(([slug, t])=>{
+    const c = load({ folders: AF, msgs: AM, state:{ mbBox:slug } });
+    assert.ok(subj(c).indexOf(t) >= 0, slug + ' 칸을 열었는데 그 메일이 없습니다');
+  });
+});
+
+test('★★ 통수와 목록이 «같은 잣대»다 — 목록에서 뺀 것이 통수에 남으면 끝 쪽이 빈다', () => {
+  const c = load({ folders: AF, msgs: AM, state:{ mbBox:'*all' } });
+  const GOT = { inbox:1, custom:1, archive:1 };
+  const got   = Object.values(AF).filter(f=>GOT[f.kind]).reduce((s,f)=>s+Number(f.total||0), 0);
+  const every = Object.values(AF).reduce((s,f)=>s+Number(f.total||0), 0);
+  assert.equal(c.mbBoxTotal(), got);
+  assert.ok(got < every, '검사 표에 «우리가 낸 칸»이 없어 이 검사가 헛돕니다');
+});
+
+test('★★ 읽어 오는 폴더도 받은 것만 — 걸러 버릴 것을 굳이 받아 오지 않는다', () => {
+  const c = load({ folders: AF, msgs: AM, state:{ mbBox:'*all' } });
+  const need = c.mbNeedSlugs('*all');
+  OUR_OWN.forEach(([slug])=>assert.ok(need.indexOf(slug) < 0, slug + ' 을 읽어 옵니다'));
+  ['B_INBOX', 'B_MINE', 'B_ARCH']
+    .forEach(s=>assert.ok(need.indexOf(s) >= 0, s + ' 을 안 읽어 옵니다'));
+});
+
+test('★ 「안읽음」 셈에도 우리가 낸 칸은 안 든다 — 눌러도 전체메일에 없는 통수다', () => {
+  /* 실측 2026-09-09: 보낸메일함에 «안 읽은 것 4통»이 적혀 있었다. 우리가 보낸 편지를
+     안읽음에 넣으면 그 숫자가 뜻을 잃고, 눌러도 전체메일에는 그 4통이 없다. */
+  const f2 = JSON.parse(JSON.stringify(AF));
+  Object.keys(f2).forEach(k=>{ f2[k].unseen = 0; });
+  f2.B_INBOX.unseen = 2;
+  f2.B_SENT.unseen  = 4;
+  const c = load({ folders: f2, msgs: AM, state:{ mbBox:'*all' } });
+  const n = Number((c.mailSideHtml().match(/<em>(\d+)<\/em>\s*<span>안읽음/) || [])[1]);
+  assert.equal(n, 2, '안읽음 셈에 보낸메일함의 4통이 섞였습니다');
+  /* ⚠ 폰 서랍도 «같은 잣대»여야 한다 — 한쪽만 고치면 PC 와 폰이 다른 숫자를 낸다 */
+  const n2 = Number((c.mbDrawerHtml().match(/안읽음\s*<b>(\d+)<\/b>/) || [])[1]);
+  assert.equal(n2, 2, '폰 서랍의 안읽음 셈이 PC 와 다릅니다');
+});
+
+test('★ 📦 지난 메일은 전체메일에 안 든다 — 제자리가 그 칸뿐이다', () => {
+  /* ⚠ 넣으면 3,316줄이 쏟아지고, 더 나쁜 것은 «그 칸을 들렀을 때만» 들어와
+       전체메일 통수가 들쭉날쭉해진다(안 들르면 0통, 들르면 3,316통). */
+  const msgs = Object.assign({}, AM, { '*old': AOLD });
+  const c = load({ folders: AF, msgs: msgs, state:{ mbBox:'*all' } });
+  assert.ok(subj(c).indexOf('왔다-지난메일') < 0, '지난 메일이 전체메일에 쏟아집니다');
+  const c2 = load({ folders: AF, msgs: msgs, state:{ mbBox:'*old' } });
+  assert.ok(subj(c2).indexOf('왔다-지난메일') >= 0, '지난 메일 칸에서도 안 보입니다');
+  /* ★ 자물쇠가 «둘»인지 본다 — 지금은 「폴더가 아니라서」 빠지는 것이기도 하다.
+       누군가 지난 메일을 폴더 목록에 등록하면 그 하나로는 안 막힌다. 그래서 이름으로
+       한 번 더 막아 두었고, 그 자물쇠가 살아 있는지를 여기서 본다. */
+  const f3 = Object.assign({}, AF, {
+    '*old': { path:'*old', name:'지난 메일', kind:'custom', order:9, total:3316, unseen:0 }
+  });
+  const c3 = load({ folders: f3, msgs: msgs, state:{ mbBox:'*all' } });
+  assert.ok(subj(c3).indexOf('왔다-지난메일') < 0,
+    '지난 메일을 폴더로 등록하면 전체메일에 딸려 듭니다 — 자물쇠가 하나뿐입니다');
+});
+
+test('★ 어느 칸인지 «모르는» 줄은 전체메일에 안 든다 — 모르는 것을 받은 것이라 할 수 없다', () => {
+  /* 다음메일에서 폴더가 사라져도 손에 든 줄은 남는다. 그 줄은 받은 것인지 우리가 낸
+     것인지 알 길이 없다 — 전체메일은 «받은메일 전체»이므로 모르는 것은 안 넣는다.
+     ⚠ 없어지는 것이 아니다. 새로고침으로 폴더 목록이 다시 오면 제자리로 돌아온다. */
+  const msgs = Object.assign({}, AM, { B_GONE: { '99': { u:99, f:'없는칸', e:'g@x.com',
+    t:'370-6@daum.net', s:'왔다-사라진칸', d:1, r:1, g:0, a:0 } } });
+  const c = load({ folders: AF, msgs: msgs, state:{ mbBox:'*all' } });
+  assert.ok(subj(c).indexOf('왔다-사라진칸') < 0, '어느 칸인지 모르는 줄이 전체메일에 듭니다');
+});
+
+test('★ 내게쓴메일함 칸(*tome)까지 좁히지 않았다 — 내가 나에게 쓴 것은 «낸 것»이다', () => {
+  /* ⚠ 받은 것만 남기는 규칙을 여기까지 번지게 하면 이 칸이 늘 0통이 된다 */
+  const c = load({ folders: AF, msgs: AM, state:{ mbBox:'*tome' } });
+  assert.ok(subj(c).indexOf('냈다-내게쓴메일함') >= 0, '*tome 칸이 통째로 비었습니다');
+});
+
+test('★ 옆줄에 두 칸의 «뜻»이 적혀 있다 — 정의가 화면에 없으면 다시 어긋난다', () => {
+  const c = load({ folders: AF, msgs: AM });
+  const h = c.mailSideHtml();
+  assert.match(h, /전체메일 — 받은메일 전체/, '전체메일이 무엇인지 안 적혀 있습니다');
+  assert.match(h, /업무별 칸으로 안 간 나머지/, '받은메일함이 무엇인지 안 적혀 있습니다');
 });
 
 /* ══════ 갈래 단추줄 — 없앴다 ══════ */
@@ -680,10 +815,14 @@ test('★ 쪽이 하나여도 «보기설정»은 남는다 — 몇 통씩 볼�
   assert.ok(c.mbBoxHtml().indexOf('mbViewSetOpen()') > 0, '보기설정까지 함께 사라졌다');
 });
 
-test('전체메일은 폴더들의 통수를 합쳐 센다', () => {
+test('전체메일은 «받은» 폴더들의 통수를 합쳐 센다', () => {
   const c = load({ folders: FOLDERS, msgs: MSGS, state: { mbBox: '*all' } });
-  const sum = Object.values(FOLDERS).reduce((s, f) => s + f.total, 0);
-  assert.equal(c.mbBoxTotal(), sum);
+  const GOT = { inbox:1, custom:1, archive:1 };
+  const got = Object.values(FOLDERS).filter(f=>GOT[f.kind]).reduce((s,f)=>s+f.total, 0);
+  const every = Object.values(FOLDERS).reduce((s, f) => s + f.total, 0);
+  assert.equal(c.mbBoxTotal(), got);
+  /* ⚠ 표에 «우리가 낸 칸»이 없으면 위 줄은 아무것도 안 지킨다 */
+  assert.ok(got < every, '검사 표에 보낸·임시·휴지통이 없어 이 검사가 헛돕니다');
 });
 
 /* ══════ 폰 — 다음메일 «앱»과 같은 차림 (대표 화면 2026-08-24) ══════

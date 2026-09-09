@@ -111,9 +111,15 @@ test('★★ 목록에 「INBOX」·「Sent Messages」가 안 나온다 — 옆
 });
 
 test('★★ 사람이 보는 이름으로 나온다', () => {
-  const got = boxes(load());
-  ['받은메일함', '보낸메일함'].forEach(nm =>
+  /* ⚠ 「보낸메일함」은 이 목록에 «있을 수 없다» — 전체메일은 받은메일 전체이므로
+       우리가 낸 칸은 안 든다(대표 정의 2026-09-09 · mbGotFolder). 그래도 그 칸의
+       이름표는 지켜야 하니, 목록이 아니라 이름표를 직접 물어 본다. */
+  const c = load();
+  const got = boxes(c);
+  ['받은메일함', '1.자문사답변'].forEach(nm =>
     assert.ok(got.indexOf(nm) >= 0, nm + ' 이 안 나옵니다: ' + got.join(' · ')));
+  assert.equal(c.mbFolderLabel(c.mbFolderBy('SE')), '보낸메일함',
+    '보낸메일함이 다음메일 원문 이름으로 나옵니다');
 });
 
 test('★ 손으로 만든 폴더는 «제 이름»을 쓴다 — 대표가 붙인 이름이라 그게 맞다', () => {
