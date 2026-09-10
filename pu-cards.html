@@ -28381,8 +28381,10 @@ function coSmeState(txt, now){
 function coSmeChipHtml(o){
   const st = coSmeState(coVal(o, 'smeExpiry'));
   if(!st) return '';
+  /* ⚠ 색은 «팔레트 안»에서만 고른다 — tests/color-palette-apps.test.js 가 지킨다.
+     처음에 주황 글자를 #92400e 로 썼다가 걸렸다(팔레트의 짙은 주황은 #854d0e 다). */
   const color = { gone:'#991b1b;background:#fef2f2;border-color:#fecaca',
-                  soon:'#92400e;background:#fffbeb;border-color:#fde68a',
+                  soon:'#854d0e;background:#fffbeb;border-color:#fde68a',
                   ok:'#1e40af;background:#eff6ff;border-color:#bfdbfe' }[st.cls];
   return `<span title="중소기업 확인서 — ${esc(st.why)}" style="font-size:11px;font-weight:700;
     border:1px solid;border-radius:9px;padding:1px 8px;white-space:nowrap;color:${color}">🏅 ${esc(st.text)}</span>`;
