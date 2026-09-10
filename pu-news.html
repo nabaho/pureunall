@@ -43,8 +43,8 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=31"></script>
-<script src="js/pu-news-tpl.js?v=12"></script>
+<script src="js/pu-news-core.js?v=32"></script>
+<script src="js/pu-news-tpl.js?v=13"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -807,7 +807,7 @@ function 지금회차(){
   const 회차한벌 = (있는것 && 있는것.회차) || (열쇠 === 회.열쇠 ? 회 : 회차로부터(열쇠));
   return Object.assign({
     열쇠: 열쇠, 회차: 회차한벌, 상태: '초안',
-    안: { news:[], policy:[], case:[], hr:[] }, 우리글: ''
+    안: { news:[], policy:[], case:[], hr:[] }, 우리글: '', 지역뉴스: []
   }, 있는것 || {});
 }
 /* 열쇠(2026-08-w5)에서 회차 한 벌을 되살린다 — 지난 회차를 열 때 쓴다 */
@@ -827,7 +827,8 @@ function 회차저장(자료){
   App.회차들[자료.열쇠] = 자료;
   return db.ref('newsletter/issues/' + 자료.열쇠).update({
     회차: 자료.회차, 상태: 자료.상태 || '초안', 안: 자료.안 || {},
-    우리글: 자료.우리글 || '', 범위: 자료.범위 || App.설정.범위 || '자문중',
+    우리글: 자료.우리글 || '', 지역뉴스: 자료.지역뉴스 || [],
+    범위: 자료.범위 || App.설정.범위 || '자문중',
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
   });
 }
@@ -964,6 +965,9 @@ function 이번회차화면(){
       style="${App.길==='ilabor'?'':'background:var(--brown-soft);border-color:#d9cec1;color:#4a3c2e'}">
       📥 노무사회 자료 <b>${(App.노무사회||[]).length||''}</b>건</button>
     <span class="sep"></span>
+    <button class="btn ${App.길==='region'?'pri':''}" onclick="길바꾸기('region')">
+      📍 지역뉴스 <b>${(d.지역뉴스||[]).length||''}</b>건</button>
+    <span class="sep"></span>
     <button class="btn" onclick="연습채우기()">🧪 연습용 샘플</button>
     <span class="tail">ⓘ 제목·원문 링크만 싣습니다 ·
       <a onclick="길바꾸기('fwd')">받은 것 그대로 전달</a></span>
@@ -1007,6 +1011,8 @@ function 이번회차화면(){
       씻어 내므로 받는 쪽에서 조금 달라 보일 수 있습니다.<br>
       지금 하시던 일을 못 쓰게 막지는 않으려고 남겨 두었습니다.</div>
     </div></div>` : ''}
+
+  ${App.길==='region' ? 지역뉴스관리(d) : ''}
 
    <!-- ★ 꼭지 넷을 2×2 로 (대표 지시 2026-09-03 「고용·노동정책 등 아래 내용이
         전혀 안 보인다」). 쌓아 두면 둘째 꼭지부터 첫 화면에서 안 보인다. -->
@@ -1595,6 +1601,41 @@ function 손으로담기(칸){
   회차저장(d).then(render);
 }
 
+/* 지역뉴스는 공통 꼭지와 갈라 보관한다. 적용지역이 맞는 업체에만 통마다 끼우며,
+   원문을 옮기지 않고 담당자가 직접 쓴 설명이 있어야 저장된다. */
+function 지역뉴스관리(d){
+  const a = d.지역뉴스 || [];
+  const 줄 = a.length ? a.map(function(x,i){
+    return `<div class="item"><span class="pill">${esc(x.지역||'전국')}</span>
+      <span class="t" title="${esc(x.제목||'')}">${esc(x.우리말||x.제목||'')}</span>
+      <span class="src">${esc(x.언론사||x.기관||'')}</span>
+      <button class="x" title="지역뉴스에서 빼기" onclick="지역뉴스빼기(${i})">✕</button></div>`;
+  }).join('') : '<div class="pad hint">아직 지역뉴스가 없습니다. 전국 공통 뉴스레터는 그대로 나갑니다.</div>';
+  return `<div class="box" style="margin-top:12px"><h3>📍 주소에 맞춰 보내는 지역뉴스
+    <span class="cnt">${a.length}건</span><span class="sp"></span>
+    <button class="mini" onclick="지역뉴스담기()">＋ 지역뉴스 추가</button></h3>
+    <div class="jarbody">${줄}</div><div class="pad hint">
+    적용지역은 <b>전국</b>, <b>충남</b>, <b>충남/천안시</b>, <b>충남/서산시</b>처럼 적습니다.
+    업체 주소를 못 읽으면 전국 공통판만 보내며 다른 지역 소식은 섞지 않습니다.</div></div>`;
+}
+function 지역뉴스담기(){
+  const 지역 = String(prompt('적용지역을 적어 주세요\n예: 전국, 충남, 충남/천안시, 충남/서산시', '충남') || '').trim();
+  if(!지역) return;
+  const 제목 = String(prompt('관리용 원문 제목을 적어 주세요') || '').trim(); if(!제목) return;
+  const 링크 = String(prompt('공식 원문 링크를 적어 주세요') || '').trim();
+  const 출처 = String(prompt('출처 기관을 적어 주세요\n예: 서산시, 천안시, 고용노동부') || '').trim();
+  const 우리말 = String(prompt('뉴스레터에 실을 푸른노무법인의 설명을 적어 주세요\n원문 문장을 복사하지 마세요.') || '').trim();
+  if(!우리말) return toast('푸른노무법인이 직접 쓴 설명이 없으면 지역뉴스에 넣지 않습니다', 8000);
+  const d = 지금회차(); d.지역뉴스 = d.지역뉴스 || [];
+  d.지역뉴스.push({ 지역:지역.slice(0,40), 제목:제목.slice(0,220), 링크:링크.slice(0,1000),
+    언론사:출처.slice(0,80), 우리말:우리말.slice(0,1200), 갈래:'지역기사' });
+  회차저장(d).then(render).catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||''),7000));
+}
+function 지역뉴스빼기(i){
+  const d=지금회차(); if(!(d.지역뉴스||[])[i]) return;
+  d.지역뉴스.splice(i,1); 회차저장(d).then(render);
+}
+
 /* ══════ 길 ① 자동으로 담기 ══════ */
 /* 이 회차에 드는 기사가 몇 건인지 — 화면이 «왜 그만큼 담기는지» 말할 수 있게.
    ⚠ 예전에는 「지금 모아 둔 기사 43건」이라 크게 적어 놓고 채우면 0건이 담겼다.
@@ -1708,12 +1749,51 @@ function 붙여넣기옮기기(더하기){
 }
 
 /* ══════ 미리보기 ══════ */
-function 지금편지(미리보기){
+function 지금편지(미리보기, 받는지역){
   const d = 지금회차();
   /* ⚠ 「따로 더한 분」을 함께 넘긴다 — 사전 동의를 못 받은 줄이 있으면 (광고)가 켜진다.
        지난 회차에는 안 넘긴다(아래 회차크게·지난미리보기) — 그때 나간 그대로여야 한다. */
   return Tpl.편지짓기(Object.assign({}, d, { 범위: App.설정.범위, 더한분들: App.더한분들 }),
-                      App.설정, { 미리보기: 미리보기 === true });
+                      App.설정, { 미리보기: 미리보기 === true, 지역: 받는지역 || '' });
+}
+
+/* 같은 공통 편지를 쓰되, 지역조각만 업체마다 달리 싣는다. 주소 원문은 보내지 않고
+   명단에 이미 붙은 표준 지역코드만 서버에 넘긴다. */
+function 지역뉴스붙인명단(명단, d){
+  return (명단||[]).map(function(x){
+    const 지역 = String(x.지역||'전국');
+    return Object.assign({}, x, {
+      region: 지역,
+      regionHtml: Tpl.지역뉴스조각((d&&d.지역뉴스)||[], 지역),
+      regionText: Tpl.지역뉴스평문((d&&d.지역뉴스)||[], 지역)
+    });
+  });
+}
+
+/* 대량발송은 서버가 통마다 치환하지만 시험메일은 즉시발송 길을 쓴다.
+   추적 링크는 실제와 같게 둔 채 지역 자리만 여기서 한 번 치환한다. */
+function 지역판씌우기(편, d, 지역){
+  const 지역코드 = String(지역||'전국');
+  return Object.assign({}, 편, {
+    서식:String(편.서식||'').split('{지역뉴스}').join(Tpl.지역뉴스조각((d&&d.지역뉴스)||[], 지역코드)),
+    본문:String(편.본문||'').split('{지역뉴스평문}').join(Tpl.지역뉴스평문((d&&d.지역뉴스)||[], 지역코드))
+  });
+}
+
+/* 발송 직전 주소 판별 결과를 보여 준다. 「전국」은 주소가 없거나 알아내지 못한 곳도
+   포함하므로, 담당자가 실제 발송 전에 업체 주소를 보완할 수 있다. */
+function 지역판요약(명단){
+  const 셈 = {};
+  (명단||[]).forEach(function(x){
+    const 지역 = String(x.지역||'전국');
+    셈[지역] = (셈[지역]||0) + 1;
+  });
+  const 항목 = Object.keys(셈).sort(function(a,b){
+    if(a==='전국') return 1;
+    if(b==='전국') return -1;
+    return 셈[b]-셈[a] || a.localeCompare(b, 'ko');
+  }).map(function(k){ return k + ' ' + 셈[k].toLocaleString(); });
+  return 항목.length ? 항목.join(' · ') : '없음';
 }
 /* ⚠ 미리보기그리기() 를 걷었다 (대표 지시 2026-09-08 — 오른쪽은 「핵심만」).
      그릴 자리(#pvFrame)가 없어져 «부르면 아무 일도 안 하는» 함수가 되었다.
@@ -1854,12 +1934,13 @@ async function 자동발송준비(){
   const 날 = 다음월요일(), 첨 = 첨부셈(r.ok.length);
   if(!confirm('「' + 편.제목 + '」을\n' + 날 + ' 월요일 오전 8시 자동발송용으로 준비합니다.\n\n'
     + '· 받는 곳 ' + r.ok.length.toLocaleString() + '곳\n'
+    + '· 지역판 ' + 지역판요약(r.ok) + '\n'
     + '· 준비 뒤 내용을 고치면 다시 준비해야 합니다.\n'
     + '· 설정에서 자동발송을 켜야 실제로 나갑니다.'
     + 첨.말 + '\n\n확정본을 준비할까요?')) return;
 
   const 받는이 = {}, 보냄표 = {};
-  const to = r.ok.map(function(x){
+  const to = 지역뉴스붙인명단(r.ok, d).map(function(x){
     const 열 = String(x.email||'').trim().toLowerCase().replace(/[.#$/[\]]/g,'_');
     const 번호 = 새추적번호();
     if(열){ 받는이[번호] = 열; 보냄표[열] = { 보냄:true }; }
@@ -1876,7 +1957,10 @@ async function 자동발송준비(){
 }
 
 async function 시험발송(){
-  const 편 = 지금편지(); if(!편) return toast('실을 것이 없습니다');
+  /* 시험 주소는 자문사 명단에 없으므로 전국판을 넣는다. 지금편지()는 실제와 같은
+     추적 링크를 유지하고, 대량발송 서버를 안 거치는 지역 자리만 직접 치환한다. */
+  let 편 = 지금편지(); if(!편) return toast('실을 것이 없습니다');
+  편 = 지역판씌우기(편, 지금회차(), '전국');
   const 받을곳 = 시험받을주소();
   if(!받을곳) return toast('시험 받을 주소가 없습니다 — 설정에서 넣어 주세요', 9000);
   /* ★ 시험에도 «첨부를 그대로» 붙인다 — 진짜와 다른 것을 보면 시험이 아니다 */
@@ -1965,6 +2049,7 @@ async function 진짜보내기(){
           + Core.유형들.map(t=>t.키).filter(k=>k!==App.유형).join('·') + ` 에는 안 나갑니다)\n`
         : `· 유형 — 전체 (${Core.유형들.map(t=>t.키).join('·')} 모두 나갑니다)\n`)
     + `· 받는 곳 — ${r.ok.length.toLocaleString()}곳 (한 곳에 한 통씩, 서로 주소가 안 보입니다)\n`
+    + `· 지역판 — ${지역판요약(r.ok)}\n`
     + `· 뺀 곳 — 수신거부 ${r.셈.수신거부} · 주소없음 ${r.셈.주소없음} · 겹침 ${r.셈.겹침}\n`
     + `· 다 나가는 데 ${걸림}`
     /* ★ 첨부가 붙으면 «몇 MB 가 몇 곳에» 가는지 여기서 말한다 —
@@ -1984,8 +2069,9 @@ async function 진짜보내기(){
        ⚠ 대장 쓰기가 실패하면 «걸지 않는다» — 번호만 실린 편지가 나가고 대장이 없으면
          그 회차의 열람은 한 건도 안 잡힌다. 보내기 전에 멈추는 쪽이 낫다.
        ⚠ 한 번의 update 로 담는다 — 110번 나눠 쓰면 중간에 끊겨 절반만 남는다. */
+    const 보낼명단 = 지역뉴스붙인명단(r.ok, d);
     const 대장 = {};
-    r.ok.forEach(function(x){
+    보낼명단.forEach(function(x){
       const 열 = String(x.email||'').trim().toLowerCase().replace(/[.#$/[\]]/g,'_');
       if(!열) return;
       x.track = 새추적번호();
@@ -1995,7 +2081,7 @@ async function 진짜보내기(){
       await db.ref('newsletter/issues/' + d.열쇠 + '/받는이').update(대장);
     }
 
-    const j = await 걸기({ to:r.ok, subject:편.제목, body:편.본문, html:편.서식,
+    const j = await 걸기({ to:보낼명단, subject:편.제목, body:편.본문, html:편.서식,
                            spacingSec: BULK_GAP_SEC, files: 첨.파일들 });
     d.상태 = '발송'; d.보낸때 = Date.now(); d.받는수 = r.ok.length; d.batchId = j.batchId || '';
     d.보낸이 = (App.me && App.me.email) || '';

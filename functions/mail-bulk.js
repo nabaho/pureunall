@@ -84,6 +84,10 @@ function cleanTargets(list) {
            functions/news-track.js 번호열쇠() 와 «같은 잣대»여야 한다. */
       track: String(o.track == null ? '' : o.track)
         .trim().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40),
+      /* 지역판은 업체 주소에서 화면이 만든다. 주소 원문은 서버로 복제하지 않는다. */
+      region: String(o.region || o.지역 || '전국').trim().slice(0, 40) || '전국',
+      regionHtml: String(o.regionHtml == null ? '' : o.regionHtml),
+      regionText: String(o.regionText == null ? '' : o.regionText),
     });
   });
   return { ok: out, bad: bad, dup: dup };
@@ -100,6 +104,12 @@ function spacingMs(sec) {
 /* 걸기 전에 미리 막을 것 — 때가 되어서야 알면 이미 절반이 나갔다 */
 function validateBulk(p) {
   const body = p && typeof p === 'object' ? p : {};
+  /* 한 업체의 지역조각이 비정상적으로 크면 요청 전체를 막는다. 대량발송 요청 크기와
+     메일 본문을 동시에 지키는 상한이며, 조용히 자르면 업체마다 내용이 달라진다. */
+  const tooLarge = (Array.isArray(body.to) ? body.to : []).some(function (x) {
+    return x && (String(x.regionHtml || '').length > 20000 || String(x.regionText || '').length > 6000);
+  });
+  if (tooLarge) return { ok: false, error: '업체별 지역뉴스가 너무 깁니다.' };
   const t = cleanTargets(body.to);
   if (!t.ok.length) return { ok: false, error: '보낼 수 있는 주소가 없습니다.' };
   if (t.ok.length > MAX_BULK) {
@@ -144,6 +154,7 @@ function buildQueue(v, now, by, batchId) {
   return v.targets.map(function (t, i) {
     const vals = { 이름: t.name, 회사: t.company, 직책: t.title,
                    name: t.name, company: t.company, title: t.title,
+                   지역뉴스: t.regionHtml || '', 지역뉴스평문: t.regionText || '',
                    /* ★ 열람·클릭 추적 열쇠 — 편지 몸통의 {추적열쇠} 가 통마다 이 값으로 바뀐다.
                         안 채우면 «모두가 같은 사람»으로 찍혀 누가 열었는지 알 수 없다.
                       ★ 2026-09-03: 보내는 쪽이 «뜻 없는 번호»(t.track)를 함께 주면 그것을 쓴다.

@@ -478,6 +478,39 @@
       + 'font-family:' + 폰트 + ';">' + 몸 + '</td></tr></table></td></tr>';
   }
 
+  /* 업체 주소에 맞는 지역 소식만 통마다 끼운다. 민간 기사 원문은 받지 않고
+     담당자가 새로 쓴 «우리 말»과 출처·원문 링크만 싣는다. */
+  function 지역뉴스조각(뉴스들, 받는지역) {
+    var 것 = Core.지역뉴스고르기(뉴스들 || [], 받는지역)
+      .filter(function (x) { return x && String(x.우리말 || '').trim(); });
+    if (!것.length) return '';
+    var 줄 = 것.map(function (x) {
+      var u = href(x.링크);
+      return '<div style="padding:3px 0 9px 11px;border-left:3px solid ' + 색.바탕 + ';margin-bottom:7px;">'
+        + esc(String(x.우리말 || '').trim()).replace(/\r?\n/g, '<br>')
+        + (u ? ' <a href="' + u + '" style="color:' + 색.남색 + ';font-size:12px;'
+            + 'text-decoration:none;font-weight:bold;">원문 ↗</a>' : '')
+        + '<div style="font-size:11.5px;color:' + 색.흐린글 + ';padding-top:4px;">'
+        + esc([x.지역 || '전국', x.언론사 || x.기관 || ''].filter(Boolean).join(' · ')) + '</div></div>';
+    }).join('');
+    return 줄긋기(22) + 꼭지제목({ 이름:'우리 지역 노동소식', 딱지:'Local' })
+      + '<tr><td style="padding:16px 28px 0 28px;font-size:14px;line-height:1.95;color:'
+      + 색.글 + ';font-family:' + 폰트 + ';">' + 줄 + '</td></tr>';
+  }
+
+  function 지역뉴스평문(뉴스들, 받는지역) {
+    var 것 = Core.지역뉴스고르기(뉴스들 || [], 받는지역)
+      .filter(function (x) { return x && String(x.우리말 || '').trim(); });
+    if (!것.length) return '';
+    var 줄 = ['[우리 지역 노동소식]'];
+    것.forEach(function (x) {
+      줄.push('· ' + String(x.우리말 || '').trim());
+      줄.push('  ' + [x.지역 || '전국', x.언론사 || x.기관 || ''].filter(Boolean).join(' · '));
+      if (x.링크) 줄.push('  ' + x.링크);
+    });
+    return 줄.join('\n') + '\n\n';
+  }
+
   /* ── 꼬리 ────────────────────────────────────────────────────────────
      ⚠ (광고) 표기와 수신거부 안내는 «명단 범위»가 정한다 —
        사람이 잊어도 기계가 켠다(Core.광고표기필요한가). */
@@ -575,12 +608,16 @@
        그 주 한 통이 통째로 빈 껍데기가 된다 — 안 보내느니만 못하다. */
     if (!그린것) return null;
 
+    /* 미리보기는 전국판을 바로 그리고, 실제 대량발송용은 받는 업체마다 바꿀 자리를 남긴다. */
+    var 지역칸 = (옵션 && 옵션.지역)
+      ? 지역뉴스조각(d.지역뉴스 || [], 옵션.지역)
+      : (미리 ? 지역뉴스조각(d.지역뉴스 || [], '전국') : '{지역뉴스}');
     var html =
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + ' style="background-color:' + 색.바탕 + ';"><tr><td align="center" style="padding:0;">'
       + '<table role="presentation" width="' + 넓이 + '" cellpadding="0" cellspacing="0" border="0"'
       + ' style="width:' + 넓이 + 'px;background-color:#ffffff;">'
-      + 머리(설) + 배너(회, 설) + 차림표() + 속 + 꼬리(설, 범위, 더한것)
+      + 머리(설) + 배너(회, 설) + 차림표() + 속 + 지역칸 + 꼬리(설, 범위, 더한것)
       + '</table></td></tr></table>';
 
     /* ★ 열람 그림 — 보이지 않는 1×1. 받는 쪽이 편지를 열면 우리 서버가 그것을 내주고
@@ -602,7 +639,7 @@
     return {
       제목: Core.제목짓기(회, 범위, 더한것),
       서식: html + 추적그림,
-      본문: 평문짓기(회차자료, 설정),
+      본문: 평문짓기(회차자료, 설정, (옵션 && 옵션.지역) || (미리 ? '전국' : '')),
       회차: 회,
       꼭지수: 그린것,
       /* 서버가 «번호»로 찾을 목록. 보낼 때 회차에 함께 담아 두어야 클릭이 통한다. */
@@ -615,7 +652,7 @@
      ══════════════════════════════════════════════════════════════════════
      ⚠ 서버가 서식에서 «알아서» 뽑게 두면 표 뼈대가 글자로 쏟아진다.
        여기서 사람이 읽을 모양으로 따로 짓는다. */
-  function 평문짓기(회차자료, 설정) {
+  function 평문짓기(회차자료, 설정, 받는지역) {
     var d = 회차자료 || {};
     var 회 = d.회차 || (Core.회차(d.날짜 || new Date().toISOString().slice(0, 10)));
     /* ⚠ 서식을 못 읽는 프로그램이 보는 몫이다 — 여기서도 같이 걸러야 한다.
@@ -670,6 +707,10 @@
       줄.push('');
     });
 
+    줄.push(받는지역
+      ? 지역뉴스평문(d.지역뉴스 || [], 받는지역).replace(/\n+$/, '')
+      : '{지역뉴스평문}');
+
     줄.push('---');
     줄.push('기사는 원문을 옮기지 않고 푸른노무법인이 직접 정리한 글만 싣습니다. 출처와 원문 링크는 함께 밝힙니다.');
     줄.push(설.회사이름 || '푸른노무법인');
@@ -681,7 +722,8 @@
     return 줄.join('\n');
   }
 
-  var API = { 편지짓기: 편지짓기, 평문짓기: 평문짓기, 색: 색, 넓이: 넓이 };
+  var API = { 편지짓기: 편지짓기, 평문짓기: 평문짓기,
+    지역뉴스조각: 지역뉴스조각, 지역뉴스평문: 지역뉴스평문, 색: 색, 넓이: 넓이 };
   if (typeof module === 'object' && module.exports) module.exports = API;
   else global.PuNewsTpl = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
