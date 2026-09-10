@@ -168,7 +168,10 @@ test('★★ 「부른 수」와 「한도에 막힌 수」를 «가른다» —
 
 test('★★ 앱별과 «합계»를 함께 센다 — 합계가 없으면 「오늘 몇 번」을 못 말한다', () => {
   const p = DR.tallyPaths('photos', '2026-09-08', 'n');
-  assert.equal(p.length, 2, '★ 세는 자리가 둘(앱별·합계)이 아닙니다');
+  /* ⚠ 개수를 «못 박지» 않는다 — 2026-09-10 에 이번 달 요금 한도가 생기면서
+     「달 합계」 자리가 하나 더 늘었다(ai_read_tally/2026-09/_all/n).
+     지켜야 할 것은 개수가 아니라 「앱별과 하루 합계가 함께 오르는가」다. */
+  assert.ok(p.length >= 2, '★ 세는 자리가 앱별·합계 둘에 못 미칩니다');
   assert.ok(p.some(function (x) { return x.indexOf('/photos/') > 0; }), '앱별 자리가 없습니다');
   assert.ok(p.some(function (x) { return x.indexOf('_all') > 0; }), '합계 자리가 없습니다');
   /* 앱이 달라지면 앱별 자리«만» 달라진다 — 합계는 같은 자리에 모여야 한다 */

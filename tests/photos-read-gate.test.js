@@ -73,6 +73,9 @@ function loadGate(items, said) {
     cutFn(raw, 'function batchSizes(') + '\n' +
     cutFn(raw, 'function upBatchKey(') + '\n' +
     cutFn(raw, 'function readHoldOf(') + '\n' +
+    /* ⚠ 2026-09-10 — 문지기가 「그림이 붙어 있나」도 본다. **원본 그대로** 싣는다
+       (대역을 만들면 화면과 다른 규칙을 보게 된다). */
+    cutFn(raw, 'function hasPic(') + '\n' +
     cutFn(raw, 'function readSkipWhy(') + '\n' +
     ';this.readSkipWhy = readSkipWhy; this.readHoldOf = readHoldOf; this.MIN = READ_ASK_MIN;', ctx);
   return ctx;
@@ -81,27 +84,47 @@ function loadGate(items, said) {
 function batch(n, extra) {
   const out = [];
   for (let i = 0; i < n; i++) {
-    out.push({ id: 'p' + i, meta: Object.assign({ by: 'u1', upAt: 100, kind: 'doc' }, extra || {}) });
+    out.push({ id: 'p' + i, meta: Object.assign({ by: 'u1', upAt: 100, kind: 'doc', loc: 'storage' }, extra || {}) });
   }
   return out;
 }
 
 test('★★ 사람이 「그냥 사진」이라고 한 것은 판독에 «안» 보낸다', () => {
-  const g = loadGate([{ id: 'a', meta: { by: 'u1', upAt: 1, kind: 'photo' } }]);
-  assert.equal(g.readSkipWhy({ meta: { by: 'u1', upAt: 1, kind: 'photo' } }), 'pic',
+  const g = loadGate([{ id: 'a', meta: { by: 'u1', upAt: 1, kind: 'photo', loc: 'storage' } }]);
+  assert.equal(g.readSkipWhy({ meta: { by: 'u1', upAt: 1, kind: 'photo', loc: 'storage' } }), 'pic',
     '★★ 사람이 이미 말해 준 것을 무시하고 있습니다 — 그것이 이 고침의 전부입니다.');
-  assert.equal(g.readSkipWhy({ meta: { by: 'u1', upAt: 1, kind: 'doc' } }), '',
+  assert.equal(g.readSkipWhy({ meta: { by: 'u1', upAt: 1, kind: 'doc', loc: 'storage' } }), '',
     '★ 서류라고 한 것은 읽어야 합니다');
+});
+
+/* ══════ ①-2 그림이 «없는» 칸 (대표 물음 2026-09-10 「계속 안 되나」) ══════
+   실측: 운영 929칸 가운데 하나가 나눠 쓴 기록만 남고 사진이 없었다
+   (shareBy·shareWith·used — 올리다 끊겼거나 사진만 지워진 자리).
+   그것이 「안 읽은 서류 1장」으로 세어져 띠에 「1장 판독」이 떴고,
+   **눌러도 보낼 그림이 없어 아무 일도 안 일어났다.** 대표님께는 그것이
+   「판독이 계속 안 된다」로 보였다 — 화면이 할 수 없는 일을 시키고 있었다. */
+test('★★ 그림이 «없는» 칸은 판독에 안 건다 — 눌러도 아무 일이 안 일어나는 단추를 만들지 않는다', () => {
+  const g = loadGate([]);
+  assert.equal(g.readSkipWhy({ meta: { shareBy: { u: 'x' }, used: { at: 1 } } }), 'nopic',
+    '★★ 그림이 없는 칸을 「안 읽은 서류」로 셉니다 — 띠에 단추가 뜨는데 눌러도\n' +
+    '  보낼 것이 없어 아무 일도 안 일어납니다(2026-09-10 실제로 그랬습니다).');
+  /* 그림이 어디에 적혀 있든 «있으면» 읽는다 — 자리가 여럿이라 하나만 보면 옛 사진이 빠진다 */
+  [{ loc: 'storage' }, { fullUrl: 'https://x' }, { thumbUrl: 'https://x' },
+   { path: 'p/x.jpg' }, { url: 'https://x' }, { data: 'data:image/jpeg;base64,AA' }]
+    .forEach(function (pic) {
+      assert.equal(g.readSkipWhy({ meta: Object.assign({ kind: 'doc' }, pic) }), '',
+        '★ 그림이 ' + Object.keys(pic)[0] + ' 에 있는 사진을 판독에서 빼고 있습니다 — 옛 사진이 통째로 막힙니다');
+    });
 });
 
 test('★★ 이미 «사진»으로 읽힌 것은 다시 안 읽는다 — 그러나 「모름」은 다시 읽는다', () => {
   const g = loadGate([]);
-  assert.equal(g.readSkipWhy({ meta: { read: { kind: 'meeting' } } }), 'pic',
+  assert.equal(g.readSkipWhy({ meta: { loc: 'storage', read: { kind: 'meeting' } } }), 'pic',
     '★ 회의·현장으로 읽힌 것을 또 읽으면 같은 답에 요금만 듭니다');
-  assert.equal(g.readSkipWhy({ meta: { read: { kind: 'other' } } }), '',
+  assert.equal(g.readSkipWhy({ meta: { loc: 'storage', read: { kind: 'other' } } }), '',
     '★★ 「종류를 모름(other)」까지 막으면 안 됩니다 — 굳은 사진을 되살리는 것이\n' +
     '  판 번호(PROMPT_VERSION)의 존재 이유입니다(RESTALE_SKIP 옆 설명과 같은 규칙).');
-  assert.equal(g.readSkipWhy({ meta: { read: { kind: 'meeting', error: '잠시 바쁩니다' } } }), '',
+  assert.equal(g.readSkipWhy({ meta: { loc: 'storage', read: { kind: 'meeting', error: '잠시 바쁩니다' } } }), '',
     '★ 실패한 기록은 갈래를 믿을 수 없습니다 — 막으면 안 됩니다');
 });
 

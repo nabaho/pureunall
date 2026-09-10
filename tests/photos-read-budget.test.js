@@ -30,6 +30,13 @@ function constOf(name) {
 function load(items) {
   const queued = [];
   const note = { style: {}, textContent: '' };
+  /* ⚠ 2026-09-10 — 문지기가 「그림이 붙어 있나」도 본다(그림 없는 칸을 「안 읽은 서류」로
+     세어 눌러도 아무 일이 안 일어나는 단추가 떴다). 이 파일의 표본은 전부 «진짜 사진»을
+     나타내므로 그림 자리를 붙여 준다 — 규칙을 끄는 것이 아니라 표본을 실제와 맞추는 것이다.
+     그림 유무 규칙 자체는 tests/photos-read-gate.test.js 가 이빨을 대고 지킨다. */
+  (items || []).forEach(function (it) {
+    if (it && it.meta && !it.meta.loc) it.meta.loc = 'storage';
+  });
   const ctx = {
     Math, Object, String, Number,
     /* ⚠ 2026-08-24: 판 번호가 둘로 갈렸다. 다시 읽기는 «물음 판»을 보므로 그것도
@@ -70,9 +77,15 @@ function load(items) {
        ⚠ 이 파일의 표본에는 upAt 이 없다(옛 사진과 같은 모양) — 그래서 「한 뭉치로
          묶여 붙잡히는」 일이 없고, 이 파일의 주제(한도 셈)가 그대로 재진다. */
     'var readQuotaOut = false; var readAskSaid = "";',
+    /* ⚠ 2026-09-10 — 이번 달 «돈» 한도가 붙었다(대표 결정 ₩30,000). 넘었을 때만
+       사람에게 한 번 묻는 문(okOverBudget)이라 여기서는 「안 넘었다」로 둔다.
+       이 파일의 주제는 «한 번에 몇 장»이지 요금이 아니다 — 요금 쪽은
+       tests/ai-spend-cap.test.js 가 서버와 나란히 세워 본다. */
+    'function okOverBudget() { return true; }',
     'var _bszSrc = null, _bszN = -1, _bsz = null;',
     constOf('READ_ASK_MIN'),
-    fnOf('batchSizes'), fnOf('upBatchKey'), fnOf('readHoldOf'), fnOf('readSkipWhy'),
+    /* ⚠ 2026-09-10 — 문지기가 「그림이 붙어 있나」(hasPic)도 본다. 원본 그대로 싣는다. */
+    fnOf('batchSizes'), fnOf('upBatchKey'), fnOf('readHoldOf'), fnOf('hasPic'), fnOf('readSkipWhy'),
     'function renderReadAsk() {}',
     fnOf('neverRead'), fnOf('staleRead'), fnOf('autoReadPending'),
     /* ⚠ 2026-09-08 — 판독이 «누를 때만»으로 바뀌었다(대표 지시). autoReadPending 은

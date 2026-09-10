@@ -237,8 +237,9 @@ test('★ 올릴 때 읽는 길과 다시 읽는 길이 «같은» 덩이 층을
     assert.match(fn, /runReadChunks\(/, d + ' 가 덩이 층을 안 씁니다');
   });
   const rp = cutFn(app, 'function readPhoto(');
-  assert.match(rp, /runReadChunks\(textChunkMakers\(tx\)\)/, '다시 읽기의 글자 길이 안 나뉩니다');
-  assert.match(rp, /runReadChunks\(imgChunkMakers\(imgs\)\)/, '다시 읽기의 그림 길이 안 나뉩니다');
+  /* ⚠ 인자 개수는 안 박는다 — 2026-09-10 에 「사람이 눌렀나」가 하나 더 붙었다 */
+  assert.match(rp, /runReadChunks\(textChunkMakers\(tx[,)]/, '다시 읽기의 글자 길이 안 나뉩니다');
+  assert.match(rp, /runReadChunks\(imgChunkMakers\(imgs[,)]/, '다시 읽기의 그림 길이 안 나뉩니다');
 });
 
 test('★ 다시 읽는 길이 쪽 경계를 잃지 않는다 — 이어 붙이면 나눌 수가 없다', () => {

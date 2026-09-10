@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="푸른사진첩">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=22"></script>
+<script src="js/pu-ontology.js?v=23"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=2"></script>
@@ -7084,6 +7084,13 @@ function readHoldOf(it) {
   return (batchSizes()[upBatchKey(it)] || 1) >= READ_ASK_MIN;
 }
 
+/* 이 칸에 «그림이 붙어 있나» — 판독은 그림이 있어야 할 수 있다.
+   ⚠ 자리를 여럿 본다. 창고에 있는 것(loc·fullUrl·thumbUrl·path)과 옛 방식으로 칸
+     안에 든 것(url·data)이 섞여 있다 — 하나만 보면 옛 사진이 통째로 빠진다. */
+function hasPic(m) {
+  return !!(m && (m.loc || m.fullUrl || m.thumbUrl || m.path || m.url || m.data));
+}
+
 /* 판독에 안 보내는 까닭. **빈 문자열이면 보낸다.** */
 function readSkipWhy(it) {
   const m = (it && it.meta) || {};
@@ -7094,6 +7101,16 @@ function readSkipWhy(it) {
        판 번호(PROMPT_VERSION)의 존재 이유다. RESTALE_SKIP 옆의 설명과 같은 규칙. */
   if (r && !r.error && r.kind === 'meeting') return 'pic';
   if (readHoldOf(it)) return 'hold';         // ③ 큰 뭉치 — 무엇인지 묻는 중
+  /* ④ 그림이 «아예 없는» 칸 (2026-09-10 재어 보고 찾음).
+       929칸 중 하나가 나눠 쓴 기록(shareBy·shareWith·used)만 남고 사진이 없었다 —
+       올리다 끊겼거나 사진만 지워진 자리다. 그것이 「안 읽은 서류 1장」으로 세어져
+       띠에 「1장 판독」이 떴고, **눌러도 보낼 그림이 없어 아무 일도 안 일어났다.**
+       대표님은 그것을 「판독이 계속 안 된다」로 보셨다(2026-09-10 물음).
+     ⚠ 지우지 «않는다» — 유령 칸은 그대로 두기로 이미 정했다(2026-08-15).
+       세지만 않으면 된다. 지우는 것은 되돌릴 수 없고, 안 세는 것은 언제든 되돌린다.
+     ⚠ «맨 뒤»에 둔다. 앞에 두면 까닭이 늘 이것으로 적혀, 「사진이라 안 보낸다」와
+       「보낼 그림이 없다」를 갈라 볼 수 없게 된다 — 까닭을 적는 뜻이 사라진다. */
+  if (!hasPic(m)) return 'nopic';
   return '';
 }
 
@@ -7531,10 +7548,10 @@ function renderAiBudget() {
     now.textContent = wonText(s.spent)
       + (s.limit > 0 ? ' / ' + wonText(s.limit) : ' (한도 없음)')
       + (s.over ? '  🛑 멈춤' : s.near ? '  ⚠ 경고' : '');
-    now.style.color = s.over ? '#b91c1c' : s.near ? '#854d0e' : '';
+    now.style.color = s.over ? '#991b1b' : s.near ? '#854d0e' : '';
   }
   const note = $('aiSpendNote');
-  if (note) note.style.color = s.over ? '#b91c1c' : '';
+  if (note) note.style.color = s.over ? '#991b1b' : '';
 
   const box = $('aiBudgetBox');
   if (!box) return;
