@@ -598,10 +598,22 @@ test('matchByFilename은 fs 원본이 붙은 레코드도 이미 첨부된 것�
   // fileExists는 base64만 보므로 fs 레코드에 두 번째 파일이 붙어버린다
   // ⚠ 점수 매기는 부분이 _fnScore 로 떨어져 나갔다(일대일 짝짓기와 잫대를 함께 쓰려고).
   //    규칙은 그대로다 — 겨누는 자리만 옆긴다.
+  /* ⚠ 2026-09-10: 잣대가 js/kcareer-fnmatch.js 로 갔다. _fnScore 는 «넘기는 자리»다.
+     그래서 겨누는 곳을 옮긴다 — 규칙은 그대로다. */
   const src = funcSource('_fnScore');
-  assert.match(src, /hasOriginal\(r\)/);
-  assert.ok(!/fileExists\(r\.id\)/.test(src));
-  assert.match(funcSource('matchByFilename'), /_fnScore\(/, '같은 잫대를 써야 합니다');
+  assert.match(src, /hasOriginal/, 'hasOriginal 을 넘겨야 fs 경로가 붙은 것도 «있는 것»으로 봅니다');
+  assert.ok(!/fileExists\(r\.id\)/.test(src),
+    'fileExists 는 base64 만 본다 — fs 경로가 붙은 레코드에 두 번째 파일이 붙는다');
+  assert.match(funcSource('matchByFilename'), /_fnScore\(/, '같은 잣대를 써야 합니다');
+  /* ★ 그리고 «실제로» 그렇게 도는지 본다 — 글자만 보면 기능을 꺼도 통과한다 */
+  const FM2 = require('../js/kcareer-fnmatch.js');
+  const hasOrig = function (r) { return r.src === 'fs' ? !!r.relPath : false; };
+  const 붙은것 = { id: 'W2', org: '충청남도교육청', year: '2025', src: 'fs', relPath: 'x/y.pdf' };
+  const 안붙은것 = { id: 'W1', org: '충청남도교육청', year: '2025' };
+  const k2 = FM2.fnKey('2025 충청남도교육청 위촉장.pdf');
+  assert.ok(FM2.score(k2, 붙은것, 'wiccok', { hasOriginal: hasOrig })
+          < FM2.score(k2, 안붙은것, 'wiccok', { hasOriginal: hasOrig }),
+    '★ fs 경로가 붙은 레코드를 뒤로 미루지 않습니다');
 });
 
 test('fsFindAttachTarget은 원본 없는 기존 레코드만 돌려준다', () => {
