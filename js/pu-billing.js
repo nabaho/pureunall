@@ -423,6 +423,82 @@
     return res;
   }
 
+  /* ══ 🤖 AI 판독 이번 달 한도 (대표 결정 2026-09-10) ═════════════════════
+       「3만원으로 하고 만약 25000원 넘으면 경고해 달라」
+
+     ★ 위쪽 billing/* 과 «다른 자리»다. 그쪽은 구글이 준 **진짜 요금**이고
+       이쪽은 판독 횟수 × 단가로 낸 **어림**이다. 진짜 요금은 하루 늦게 오는데
+       그것으로 막으면 이미 다 쓴 뒤에 막는다. 그래서 우리가 센 횟수로 미리 막고,
+       며칠 뒤 진짜 요금이 찍히면 설정에서 단가를 그 값에 맞춘다.
+     ⚠⚠ 계산식은 **세 곳이 같은 답**을 내야 한다 —
+       ① 서버 functions/doc-read.js(aiSpentWon·aiBudgetOf) ② 사진첩 pu-photos.html
+       ③ 포털(여기). 하나만 달라지면 화면은 「남았다」는데 서버가 막는다.
+       tests/ai-spend-cap.test.js 가 셋을 나란히 세워 견준다 — 고칠 때 함께 고친다.
+     ⚠ 0 은 «끔»이다. 한도 0 이면 아무것도 안 막는다(경고선도 같다). */
+  var AI_TALLY_ROOT = 'ai_read_tally';
+  var AI_BUDGET_ROOT = 'ai_read_budget';
+  var AI_BUDGET_DEFAULT = { limit: 30000, warn: 25000, wonPerRead: 4 };
+
+  /* 한국 달 이름(2026-09) — 서버(doc-read.js 의 ymKST)와 «같은 칸»을 봐야 숫자가 맞는다.
+     ⚠ 브라우저 시간대를 믿지 않는다. 해외에서 열어도 회사 달로 세야 한다. */
+  function aiYm(now) {
+    var t = num(now);
+    var k = new Date((t === null ? Date.now() : t) + 9 * 60 * 60 * 1000);
+    return k.getUTCFullYear() + '-' + String(k.getUTCMonth() + 1).padStart(2, '0');
+  }
+
+  /* 설정이 없거나 망가졌으면 기본값으로 물러선다 — 서버 aiBudgetOf 와 같은 규칙이다.
+     ⚠ 0 으로 채우지 «말 것». 「한도 0원」이 되어 판독이 통째로 막힌 것처럼 보인다. */
+  function aiBudgetOf(raw) {
+    var b = (raw && typeof raw === 'object') ? raw : {};
+    var pick = function (v, d) {
+      var n = Number(v);
+      return (isFinite(n) && n >= 0) ? n : d;
+    };
+    return {
+      limit: pick(b.limit, AI_BUDGET_DEFAULT.limit),
+      warn: pick(b.warn, AI_BUDGET_DEFAULT.warn),
+      wonPerRead: pick(b.wonPerRead, AI_BUDGET_DEFAULT.wonPerRead)
+    };
+  }
+
+  /* 이번 달 판독이 얼마나 됐나. 셈을 못 읽었으면 has:false — **아무것도 안 그린다**.
+     ⚠ 「못 읽었다」를 ₩0 으로 적지 말 것. 다 쓴 것을 「아직 안 썼다」로 읽는다. */
+  function aiSummarize(budgetRaw, monthTally) {
+    var b = aiBudgetOf(budgetRaw);
+    var reads = (monthTally && monthTally._all) ? num(monthTally._all.n) : null;
+    if (reads === null || reads < 0) {
+      return { has: false, reads: null, spent: null, limit: b.limit, warn: b.warn,
+        wonPerRead: b.wonPerRead, over: false, near: false, tone: 'none' };
+    }
+    var spent = Math.round(reads * b.wonPerRead);
+    var over = b.limit > 0 && spent >= b.limit;
+    var near = b.warn > 0 && spent >= b.warn;
+    return { has: true, reads: reads, spent: spent, limit: b.limit, warn: b.warn,
+      wonPerRead: b.wonPerRead, over: over, near: near,
+      tone: over ? 'over' : near ? 'warn' : 'ok' };
+  }
+
+  /* 셈과 설정 둘을 함께 지켜본다 — 하나가 바뀌면 같이 다시 그린다.
+     ⚠ 설정 읽기에 실패해도 셈은 살린다(그 반대도). 기본 한도로 그리는 편이
+       아무것도 안 그리는 것보다 낫다. */
+  function watchAi(db, now, onValue, onError) {
+    if (!db || typeof db.ref !== 'function') return function () { };
+    var ym = aiYm(now);
+    var tally = null, budget = null;
+    var fire = function () { onValue(aiSummarize(budget, tally)); };
+    var tRef = db.ref(AI_TALLY_ROOT + '/' + ym);
+    var bRef = db.ref(AI_BUDGET_ROOT);
+    var tCb = tRef.on('value', function (s) { tally = s.val(); fire(); },
+      function (e) { if (onError) onError(e); });
+    var bCb = bRef.on('value', function (s) { budget = s.val(); fire(); },
+      function (e) { if (onError) onError(e); });
+    return function () {
+      try { tRef.off('value', tCb); } catch (e) { /* 이미 끊겼다 */ }
+      try { bRef.off('value', bCb); } catch (e) { /* 이미 끊겼다 */ }
+    };
+  }
+
   global.PuBilling = {
     ROOT: ROOT,
     HISTORY_ROOT: 'billing/history',
@@ -444,5 +520,13 @@
     dayBuckets: dayBuckets,
     sumBuckets: sumBuckets,
     hourlyRates: hourlyRates,
+    /* 🤖 AI 판독 이번 달 한도 (2026-09-10) — 까닭은 aiSummarize 머리에 */
+    AI_TALLY_ROOT: AI_TALLY_ROOT,
+    AI_BUDGET_ROOT: AI_BUDGET_ROOT,
+    AI_BUDGET_DEFAULT: AI_BUDGET_DEFAULT,
+    aiYm: aiYm,
+    aiBudgetOf: aiBudgetOf,
+    aiSummarize: aiSummarize,
+    watchAi: watchAi,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

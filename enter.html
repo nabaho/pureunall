@@ -123,7 +123,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
-<script src="js/pu-billing.js?v=7"></script>
+<script src="js/pu-billing.js?v=8"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -209,6 +209,21 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 #billChip .lb{color:#94a3b8;}
 #billChip .amt{font-weight:800;font-variant-numeric:tabular-nums;}
 #billChip .ago{color:#94a3b8;font-size:.66rem;}
+/* 🤖 AI 판독 이번 달 한도 — 사용액 딱지와 «같은 모양», 색만 바뀐다 (대표 결정 2026-09-10).
+   ⚠ 작대기(진행 막대)를 안 쓴다 — 「₩26,800 / 30,000」이면 얼마나 남았는지 이미 보인다.
+     막대는 같은 말을 한 번 더 하면서 자리를 먹고, 좁은 화면에서 넘쳐 줄을 깨뜨렸다.
+     **색(파랑→노랑→빨강)이 막대가 하던 일을 대신한다.** */
+#aiChip{display:none;align-items:center;gap:7px;background:#eff6ff;border:1px solid #bfdbfe;
+  border-radius:9px;padding:6px 11px;font-size:.72rem;color:#1e40af;cursor:default;font-family:inherit;
+  white-space:nowrap;line-height:1.4;}
+#aiChip .dot{width:7px;height:7px;border-radius:50%;background:#2563eb;flex-shrink:0;}
+#aiChip .lb{opacity:.75;}
+#aiChip .amt{font-weight:800;font-variant-numeric:tabular-nums;}
+#aiChip .of{opacity:.6;font-weight:600;font-size:.66rem;}
+#aiChip[data-tone="warn"]{background:#fffbeb;border-color:#fde68a;color:#92400e;}
+#aiChip[data-tone="warn"] .dot{background:#f59e0b;}
+#aiChip[data-tone="over"]{background:#fee2e2;border-color:#fecaca;color:#991b1b;}
+#aiChip[data-tone="over"] .dot{background:#dc2626;}
 .avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;}
 .logout{color:var(--accent);font-weight:700;cursor:pointer;background:none;border:none;font-size:.8rem;font-family:inherit;}
@@ -345,7 +360,7 @@ body.portal-mode #camFab{display:flex;}
      ⚠ 끊겼거나 확인 중일 때는 말을 그대로 남긴다. 그때가 정작 읽어야 할 때다. */
   .connection-status[data-state="online"] .cs-lb{display:none;}
   .pbar .pmeta .connection-status{flex:0 0 auto;}
-  .pbar #billChip{order:2;flex:0 0 auto;margin-top:7px;padding:4px 8px;font-size:.66rem;gap:5px;}
+  .pbar #billChip,.pbar #aiChip{order:2;flex:0 0 auto;margin-top:7px;padding:4px 8px;font-size:.66rem;gap:5px;}
   /* ── 한 줄에 몰아 넣으려고 접는 것들 (대표 지시 2026-08-20 "최대 1줄") ──
      ⚠ 접는 것은 «다른 데 같은 말이 있는 것» 뿐이다.
        (admin)·직책 → 이름과 사번이면 「내 계정이 맞나」를 가린다. 직책은 아는 사실이다
@@ -355,6 +370,9 @@ body.portal-mode #camFab{display:flex;}
          애초에 폰에서는 «먹지 않는 설정»이다(자동 이동은 PC 에서만 한다). */
   .pbar .pmeta .un-role,.pbar .pmeta .un-title{display:none;}
   .pbar #billChip .lb,.pbar #billChip .ago{display:none;}
+  /* AI 딱지는 「AI 판독」을 «남긴다» — 그 넉 자가 없으면 금액 둘이 나란히 서서
+     어느 쪽이 무엇인지 알 수 없다(사용액 쪽은 창 제목에 같은 말이 또 있어 접었다). */
+  .pbar #aiChip .of{display:none;}
   .pbar #homeBar .hb-lb{display:none;}
   .sec{margin:16px 4px 10px;font-size:.74rem;}
   /* 폰: 동그라미 4열 (앱 서랍 느낌) */
@@ -378,7 +396,7 @@ body.portal-mode #camFab{display:flex;}
 @media (max-width:380px){
   .pbar{gap:0 6px;padding:8px 10px;}
   .pbar .pmeta{font-size:.66rem;min-width:78px;gap:5px;}
-  .pbar #billChip{padding:3px 6px;font-size:.62rem;gap:4px;}
+  .pbar #billChip,.pbar #aiChip{padding:3px 6px;font-size:.62rem;gap:4px;}
   .pbar #homeBar{gap:4px;}
   .pbar #homeBar select{min-width:50px;font-size:.66rem;padding:2px 4px;}
   /* ⚠ 열 수는 위 640px 구간에서 이미 못 박았다(minmax(0,1fr)). 여기서는 «간격만»
@@ -927,6 +945,14 @@ body.portal-mode #moreFab{display:flex;}
         <span class="lb">이번 달</span>
         <span class="amt" id="billAmt">—</span>
         <span class="ago" id="billAgo"></span>
+      </button>
+      <!-- 🤖 AI 판독 이번 달 한도 (대표 결정 2026-09-10) — 위 사용액과 같은 규칙으로
+           관리자에게만 보인다. 셈을 못 읽으면 끝까지 숨긴다(₩0 으로 적지 않는다). -->
+      <button id="aiChip" type="button" title="AI 판독 이번 달 한도">
+        <span class="dot" id="aiDot"></span>
+        <span class="lb">AI 판독</span>
+        <span class="amt" id="aiAmt">—</span>
+        <span class="of" id="aiOf"></span>
       </button>
       <div class="pmeta">
         <span id="statusDot" class="connection-status" data-state="checking" role="status" aria-live="polite">○ 연결 확인 중</span>
@@ -2322,6 +2348,9 @@ body.portal-mode #moreFab{display:flex;}
     _billCur = null;
     var chip = $('billChip');
     if(chip) chip.style.display = 'none';
+    /* ⚠ 아래 되돌아가기(return)보다 «먼저» 부른다 — 관리자였다가 아닌 계정으로
+       바뀌면 여기서 되돌아가는데, 그때 AI 딱지를 안 끄면 남의 금액이 그대로 남는다. */
+    aiChipStart(role);
     if(!billIsAdmin(role) || !window.PuBilling || !db) return;
     // 읽기는 pu-billing 한 곳으로 모은다 — 화면이 db.ref 를 직접 부르지 않는다.
     _billStop = window.PuBilling.watch(db,
@@ -2341,6 +2370,48 @@ body.portal-mode #moreFab{display:flex;}
       var prevStop = _billStop;
       _billStop = function(){ try{ sref.off(); }catch(e){} if(prevStop) prevStop(); };
     } catch(e){ _billSpike = null; }
+  }
+
+  /* ══════ 🤖 AI 판독 이번 달 한도 (대표 결정 2026-09-10) ══════
+     「한도금액제한을 두게 할 수 있나 그리고 일정금액 얼만큼 사용되고 있는지
+       여기 화면에 보이게 할 수 있나」 → 한도 ₩30,000 · 경고 ₩25,000.
+
+     ⚠ 숫자 판단은 전부 js/pu-billing.js(aiSummarize)가 한다. 여기서는 그리기만 한다.
+     ⚠ **관리자에게만** 보인다 — 위 사용액 딱지와 같은 규칙이다(대표 지시 2026-08-17
+       「금액사용은 관리자만 볼 수 있고 나머지는 안 보는 게 좋겠다」).
+       한도를 올리거나 요금을 내는 일은 관리자만 할 수 있어, 다른 사람에게는
+       손쓸 수 없는 숫자다. **막혔다는 사실 자체는** 사진첩 판독 띠가 모두에게 알린다.
+     ⚠ 셈을 못 읽으면 끝까지 숨긴다 — ₩0 을 띄우면 「안 썼다」로 읽힌다. */
+  var _aiStop = null;
+
+  function aiChipStart(role){
+    if(_aiStop){ try { _aiStop(); } catch(e){} _aiStop = null; }
+    var chip = $('aiChip');
+    if(chip) chip.style.display = 'none';
+    if(!billIsAdmin(role) || !window.PuBilling || !window.PuBilling.watchAi || !db) return;
+    _aiStop = window.PuBilling.watchAi(db, Date.now(), aiChipPaint,
+      function(){ aiChipPaint(null); });      // 규칙에 막히면 조용히 감춘다
+  }
+
+  function aiChipPaint(s){
+    var chip = $('aiChip');
+    if(!chip) return;
+    if(!s || !s.has){ chip.style.display = 'none'; return; }
+    chip.style.display = 'inline-flex';
+    chip.dataset.tone = s.tone;
+    var won = window.PuBilling.fmtWon;
+    /* 넘은 뒤에는 「/ 한도」 대신 «다 썼다»고 말한다 — 넘은 숫자 옆의 한도는
+       읽는 사람이 한 번 더 빼 봐야 하는 짐이다. */
+    $('aiAmt').textContent = (s.over ? '🛑 ' : s.near ? '⚠ ' : '') + won(s.spent);
+    $('aiOf').textContent = s.over ? '· 한도 다 씀'
+      : (s.limit > 0 ? '/ ' + s.limit.toLocaleString('ko-KR') : '');
+    chip.title = 'AI 판독 이번 달 한도\n\n'
+      + '이번 달 판독 ' + s.reads.toLocaleString('ko-KR') + '번 · 한 장 약 ' + won(s.wonPerRead) + '\n'
+      + '지금까지 약 ' + won(s.spent) + (s.limit > 0 ? ' (한도 ' + won(s.limit) + ')' : ' (한도 없음)') + '\n'
+      + (s.over ? '\n🛑 자동 판독을 멈췄습니다 — 사람이 누르는 것은 됩니다.\n'
+        : s.near ? '\n⚠ 경고선(' + won(s.warn) + ')을 넘었습니다.\n' : '')
+      + '다음 달 1일에 0 으로 돌아갑니다.\n'
+      + '⚠ 금액은 어림입니다(판독 횟수 × 단가) — 사진첩 ⚙ 설정에서 고칩니다.';
   }
 
   function billPaint(){

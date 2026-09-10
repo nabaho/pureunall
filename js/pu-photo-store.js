@@ -1856,6 +1856,25 @@
       .then(function (s) { return s.val() || null; });
   }
 
+  /* AI 판독 이번 달 한도·경고선·단가 (대표 결정 2026-09-10).
+     ⚠ 요금(billing/*)과 «다른 자리»다 — 그쪽은 구글이 준 진짜 요금이라 관리자만
+       보지만, 이것은 «정책 숫자»여서 직원 누구나 읽는다. 사진첩 띠가
+       「한도를 다 썼습니다」라고 말하려면 이 숫자를 읽을 수 있어야 한다.
+     ⚠ 못 읽으면 null 을 준다 — 화면이 서버와 «같은 기본값»으로 물러선다.
+       0 으로 채우면 「한도 0원」이 되어 판독이 통째로 막힌 것처럼 보인다. */
+  function aiBudget() {
+    if (!deps.db) return Promise.resolve(null);
+    return deps.db.ref('ai_read_budget').once('value')
+      .then(function (s) { return s.val() || null; })
+      .catch(function () { return null; });
+  }
+  /* 한도·경고선을 정한다 — 규칙이 총괄 관리자만 쓰게 막는다(여기서 또 막지 않는다:
+     화면 판정과 서버 규칙이 어긋나면 「눌렀는데 조용히 안 되는」 단추가 된다). */
+  function setAiBudget(patch) {
+    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
+    return deps.db.ref('ai_read_budget').update(patch || {});
+  }
+
   function amAdmin() { return deps.isAdmin; }
   function myUid() { return deps.uid; }
   function myName() { return deps.name; }
@@ -2315,6 +2334,8 @@
     myUid: myUid,
     myName: myName,
     readTally: readTally,      /* ⑤ 오늘 판독 셈 읽기 (2026-09-08) */
+    /* AI 판독 이번 달 한도 (2026-09-10) — 까닭은 aiBudget 머리에 */
+    aiBudget: aiBudget, setAiBudget: setAiBudget,
     lookupName: lookupName,
     touchOwner: touchOwner,
     listOwners: listOwners,

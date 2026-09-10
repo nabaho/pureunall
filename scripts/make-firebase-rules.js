@@ -54,6 +54,25 @@ rules.billing = {
   limit: { '.write': `auth != null && ${ADMIN}`, '.validate': 'newData.isNumber() && newData.val() >= 0' }
 };
 
+/* ══ AI 판독 이번 달 한도 (대표 결정 2026-09-10) ═══════════════════════════
+     한도 ₩30,000 · 경고 ₩25,000 · 목업 docs/mockups/ai-spend-cap.html
+
+   ⚠ 위 billing 과 **다른 자리**다. 그쪽은 구글이 알려 준 «진짜 요금»이라 관리자만
+     보지만, 이쪽은 «정책 숫자»(한도·경고선·단가)여서 **직원 누구나 읽어야 한다** —
+     사진첩 띠가 「한도를 다 썼습니다」라고 말하려면 그 숫자를 읽을 수 있어야 한다
+     (쓴 횟수를 담은 ai_read_tally 도 이미 로그인하면 읽는 자리다).
+   ⚠ 쓰기는 **총괄 관리자만**. 한도를 아무나 올릴 수 있으면 그것은 한도가 아니다.
+   ⚠ 이름 없는 칸은 막는다($other) — 서버가 아는 세 칸만 뜻이 있고, 모르는 칸이
+     쌓이면 「무엇이 진짜 설정인가」를 알 수 없게 된다. */
+rules.ai_read_budget = {
+  '.read': LOGIN,
+  '.write': `auth != null && ${ADMIN}`,
+  limit:      { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+  warn:       { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+  wonPerRead: { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+  $other: { '.validate': false }
+};
+
 /* ══ 역할표 ════════════════════════════════════════════════════════════
    ⚠ 자기 역할을 스스로 올리지 못하게 한다 — 관리자가 아니면 false 로 내리거나
      있던 값을 그대로 두는 것만 된다(.validate). */

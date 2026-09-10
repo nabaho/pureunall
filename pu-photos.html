@@ -21,7 +21,7 @@
 <script src="js/pu-health.js?v=3"></script>
 <script src="js/pu-version.js?v=3"></script>
 <!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
-<script src="js/pu-photo-store.js?v=26"></script>
+<script src="js/pu-photo-store.js?v=27"></script>
 <!-- 주민번호 가림 — 계산 층과, 급여데이터함과 나눠 쓰는 긋기 층 -->
 <script src="js/pu-rrn-mask.js?v=4"></script>
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
@@ -36,12 +36,12 @@
      이 파일이 캐시에 묵으면 옛 지시로 읽어 제목이 안 생기는데, 화면(pu-photos.html)은
      새것이라 제목 자리만 비어 보인다 — 고친 것이 통째로 묻힌 것처럼 된다.
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
-<script src="js/pu-doc-read.js?v=37"></script>
+<script src="js/pu-doc-read.js?v=38"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-doc-file.js?v=29"></script>
 <script src="js/pu-drag.js?v=2"></script>
-<script src="js/pu-billing.js?v=7"></script>
+<script src="js/pu-billing.js?v=8"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
 <style>
@@ -1318,6 +1318,8 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   /* 무료 판독 — 왼쪽 아래(2026-09-08). 짧은 카드라 왼쪽에 쌓는 규칙을 그대로 따른다.
      ⚠ 보유기간(#setKeep)의 span 2 를 건드리지 말 것 — 그것이 오른쪽을 통째로 쓴다. */
   #setFree{grid-column:1;grid-row:3}
+  /* AI 한도 — 왼쪽 맨 아래(2026-09-10). 무료 판독 바로 밑이라 «판독 돈 이야기»가 모인다 */
+  #setAi{grid-column:1;grid-row:4}
   #setKeep{grid-column:2;grid-row:1 / span 2}
 }
 
@@ -2165,6 +2167,34 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
            (다만 첫 판독이 느립니다).</p>
          <p class="mignote">⚠ 이 길로는 <b>문서 제목·등록증 발급일·전자세금계산서 주소</b>를
            채우지 못합니다. 다른 서류(명함·급여명세서·근로계약서·통장)는 지금처럼 AI 가 읽습니다.</p>
+       </div>
+
+       <!-- ── AI 판독 이번 달 한도 (대표 결정 2026-09-10) ────────────────────
+            목업 docs/mockups/ai-spend-cap.html · 한도 ₩30,000 · 경고 ₩25,000
+            ⚠ 이 설정은 **회사 전체**에 걸린다 — 사진첩뿐 아니라 급여·경력관리·
+              기업정보함의 판독도 같은 한 달 몫을 나눠 쓴다. 그래서 총괄 관리자만 고친다.
+            ⚠ 금액은 «어림»이다(판독 횟수 × 단가). 구글의 진짜 요금은 하루 늦게 온다. -->
+       <div class="card" id="setAi">
+         <div class="row" style="border:none"><span>💰 AI 판독 이번 달 한도</span>
+           <b id="aiSpendNow">—</b></div>
+         <p class="mignote" id="aiSpendNote">한도를 넘으면 <b>자동 판독이 멈춥니다.</b>
+           사람이 누르는 것은 얼마가 더 드는지 알려 드린 뒤 그대로 됩니다.
+           다음 달 1일에 저절로 풀립니다.</p>
+         <div id="aiBudgetBox" style="display:none">
+           <div class="row"><div style="flex:1 1 auto"><b style="font-size:13.5px">이번 달 한도</b>
+             <span style="display:block;font-size:12px;color:var(--sub)">넘으면 자동 판독을 멈춥니다</span></div>
+             <input id="aiLimit" type="number" min="0" step="1000" style="width:110px;text-align:right"></div>
+           <div class="row"><div style="flex:1 1 auto"><b style="font-size:13.5px">경고선</b>
+             <span style="display:block;font-size:12px;color:var(--sub)">넘으면 알립니다 — 막지는 않습니다</span></div>
+             <input id="aiWarn" type="number" min="0" step="1000" style="width:110px;text-align:right"></div>
+           <div class="row" style="border-bottom:none"><div style="flex:1 1 auto"><b style="font-size:13.5px">판독 한 장 단가</b>
+             <span style="display:block;font-size:12px;color:var(--sub)">진짜 요금이 찍히면 그 값으로 맞추세요</span></div>
+             <input id="aiWon" type="number" min="0" step="1" style="width:110px;text-align:right"></div>
+           <button class="wide" id="aiBudgetSave" onclick="saveAiBudget()"
+             style="background:#fff;color:var(--blue);border:1px solid var(--blue);margin-top:7px">한도 저장</button>
+           <p class="mignote" style="margin:6px 0 0">⚠ <b>0</b> 으로 두면 그 문턱을 «끕니다».
+             한도를 0 으로 두면 아무것도 안 막습니다.</p>
+         </div>
        </div>
 
        <!-- 보유기간 — 개인정보 보유기준(2026-08-06). 모아 보여주기만 하고 지우는 것은 사람이 고른다.
@@ -7280,6 +7310,9 @@ function readWaitRun() {
   /* ⚠ 걸 것이 없으면 안내를 «감춘다». 안 감추면 지난번 「판독 중… 20장」이 그대로
      남아, 다 끝난 뒤에도 화면은 아직 읽는 중이라고 거짓말을 한다. */
   if (!p || !p.take.length) { if (el) el.style.display = 'none'; renderReadAsk(); return; }
+  /* 이번 달 한도를 넘었으면 한 번 묻는다 — 몇 장에 얼마가 더 드는지 적어서
+     (대표 결정 2026-09-10 ⓵㉮). 안 넘었으면 아무것도 안 묻는다. */
+  if (!okOverBudget(p.take.length)) { renderReadAsk(); return; }
   p.take.forEach(function (it) { queuePhotoRead(it.id); });
   el.style.display = 'block';
   el.textContent = p.rest
@@ -7295,6 +7328,7 @@ function readWaitOne(id) {
   const it = gridItems.find(function (x) { return x.id === id; });
   if (!it) return;
   if (!readWaitOf(it)) { renderGrid(); renderReadAsk(); return; }
+  if (!okOverBudget(1)) { renderReadAsk(); return; }   /* 한도를 넘었으면 한 번 묻는다 */
   queuePhotoRead(it.id);
   renderGrid();
   renderReadAsk();
@@ -7402,7 +7436,22 @@ function readTallyLine() {
     + (readTallyMonth ? '\n이달 무료 판독 ' + 이달 + ' / ' + VISION_FREE_MONTH
         + '장 (넘으면 브라우저 판독으로 바뀝니다 — 그쪽도 0원입니다)' : '') + '">'
     + (all ? '· 오늘 <b>' + all + '번</b>' + (막힘 ? ' (막힘 ' + 막힘 + ')' : '') : '')
-    + (무료 ? (all ? ' · ' : '· ') + '무료 <b>' + 무료 + '장</b>' : '') + '</span>';
+    + (무료 ? (all ? ' · ' : '· ') + '무료 <b>' + 무료 + '장</b>' : '') + '</span>'
+    + aiSpendChip();
+}
+
+/* 이번 달 AI 요금 — 셈 줄 «옆»에 곁들인다 (대표 결정 2026-09-10).
+   ⚠ 경고선을 넘기 «전»에는 안 적는다. 늘 떠 있는 금액은 곧 배경이 되고, 정작
+     넘었을 때 눈에 안 걸린다. 평소 금액은 포털 알약에 늘 있다.
+   ⚠ 한도를 넘은 뒤에는 이 조각이 아니라 띠 전체가 빨갛게 바뀐다(위 renderReadAsk) —
+     같은 말을 두 자리에서 하지 않는다. */
+function aiSpendChip() {
+  const s = aiSpend();
+  if (!s.near || s.over) return '';
+  return '<span class="tly warnmoney" title="이번 달 판독 ' + s.reads + '번 · 약 '
+    + wonText(s.spent) + '\n한도 ' + wonText(s.limit) + ' 을 넘으면 자동 판독이 멈춥니다.'
+    + '\n다음 달 1일에 저절로 풀립니다.">· ⚠ 이번 달 <b>' + wonText(s.spent) + '</b> / '
+    + wonText(s.limit) + '</span>';
 }
 function loadReadTally() {
   /* 한국 날짜로 센다 — 서버(ymdKST)와 같은 날을 봐야 숫자가 맞는다 */
@@ -7413,8 +7462,124 @@ function loadReadTally() {
     PuPhotoStore.readTally(ymd).then(function (v) { readTally = v; })
       .catch(function (e) { console.warn('[판독 셈]', e); }),
     PuPhotoStore.readTally(ymd.slice(0, 7)).then(function (v) { readTallyMonth = v; })
-      .catch(function (e) { console.warn('[무료 판독 달 셈]', e); })
-  ]).then(function () { renderReadAsk(); renderFreeMeter(); });
+      .catch(function (e) { console.warn('[무료 판독 달 셈]', e); }),
+    /* AI 판독 이번 달 한도 설정 (2026-09-10) — 못 읽으면 기본값으로 물러선다 */
+    PuPhotoStore.aiBudget().then(function (v) { aiBudgetRaw = v; })
+      .catch(function (e) { console.warn('[AI 한도 설정]', e); })
+  ]).then(function () { renderReadAsk(); renderFreeMeter(); renderAiBudget(); });
+}
+
+/* ══════ AI 판독 이번 달 요금 (대표 결정 2026-09-10) ═══════════════════════════
+     목업 docs/mockups/ai-spend-cap.html · 한도 ₩30,000 · 경고 ₩25,000
+
+   ★ 금액은 «어림»이다 — 판독 횟수 × 단가. 구글이 주는 진짜 요금은 하루 늦게 오는데,
+     그것으로 막으면 이미 다 쓴 뒤에 막는다. 며칠 뒤 진짜 요금이 찍히면 설정에서
+     단가를 그 값에 맞춘다.
+   ⚠⚠ 계산식을 여기 «다시 적지» 말 것 — 서버(functions/doc-read.js 의 aiSpentWon)와
+     같은 답이 나와야 한다. 두 곳에 적으면 화면은 「남았다」는데 서버가 막는다.
+     그래서 셈은 **js/pu-billing.js 의 aiSummarize 하나**에 두고 여기서는 부르기만 한다
+     (포털 딱지도 같은 것을 부른다 — 두 화면이 다른 금액을 말할 길이 없다).
+     tests/ai-spend-cap.test.js 가 그것과 서버를 나란히 세워 견준다.
+   ⚠ Vision(무료 글자 뽑기)은 안 센다 — 제 문턱이 따로 돌아 유료 구간에 안 들어간다. */
+let aiBudgetRaw = null;
+
+/* 셈 층이 안 실렸을 때 — **막지도 그리지도 않는다.**
+   ⚠ 여기에 기본 한도를 적어 넣지 «말 것». 그러면 계산식이 도로 두 곳이 된다.
+     화면이 못 막아도 서버가 막는다 — 화면은 «알리는 자리»일 뿐이다. */
+const AI_SPEND_NONE = { has: false, reads: null, spent: null, limit: 0, warn: 0,
+  wonPerRead: 0, over: false, near: false, tone: 'none' };
+
+function aiBudgetNow() {
+  return (window.PuBilling && PuBilling.aiBudgetOf)
+    ? PuBilling.aiBudgetOf(aiBudgetRaw)
+    : { limit: 0, warn: 0, wonPerRead: 0 };
+}
+function aiSpend() {
+  if (!window.PuBilling || !PuBilling.aiSummarize) return AI_SPEND_NONE;
+  return PuBilling.aiSummarize(aiBudgetRaw, readTallyMonth);
+}
+function wonText(n) { return '₩' + Math.round(Number(n) || 0).toLocaleString('ko-KR'); }
+
+/* 한도를 넘었을 때 «사람이 누른» 판독을 한 번 확인한다 (대표 결정 ⓵㉮).
+   ⚠ 넘지 않았으면 아무것도 묻지 않는다 — 늘 묻는 창은 곧 아무도 안 읽는다.
+   ⚠ 몇 장에 얼마가 더 드는지 **숫자로** 적는다. 「요금이 듭니다」만으로는 사람이
+     누를지 말지를 정할 수가 없다. */
+function okOverBudget(n) {
+  const s = aiSpend();
+  if (!s.over) return true;
+  const 더 = Math.round((Number(n) || 1) * s.wonPerRead);
+  return confirm('🛑 이번 달 AI 판독 한도를 넘었습니다\n\n'
+    + '지금까지 약 ' + wonText(s.spent) + ' 을 썼습니다(한도 ' + wonText(s.limit) + ').\n'
+    + '그래도 ' + (Number(n) || 1) + '장을 읽으면 약 ' + wonText(더) + ' 이 더 듭니다.\n\n'
+    + '다음 달 1일에 저절로 풀립니다.');
+}
+
+/* 설정 화면의 「💰 AI 판독 이번 달 한도」 카드를 그린다.
+   ⚠ 금액과 «상태»를 한 줄에 함께 적는다 — 숫자만 있으면 얼마가 많은 건지 모른다.
+   ⚠ 셈을 «못 읽었을 때»를 0원이라 적지 «말 것». 다 쓴 것을 「아직 안 썼다」로 읽는다
+     (renderFreeMeter 와 같은 규칙이다).
+   ⚠ 고치는 칸(#aiBudgetBox)은 총괄 관리자에게만 «보인다» — 못 쓰는 칸을 흐리게
+     두면 눌러 보고 조용히 실패한다. 막는 것은 서버 규칙이고 여기는 보임만 정한다. */
+function renderAiBudget() {
+  const now = $('aiSpendNow');
+  if (!now) return;
+  const s = aiSpend();
+  if (!s.has) {
+    now.textContent = '아직 못 읽었습니다';
+    now.style.color = '';
+  } else {
+    now.textContent = wonText(s.spent)
+      + (s.limit > 0 ? ' / ' + wonText(s.limit) : ' (한도 없음)')
+      + (s.over ? '  🛑 멈춤' : s.near ? '  ⚠ 경고' : '');
+    now.style.color = s.over ? '#b91c1c' : s.near ? '#854d0e' : '';
+  }
+  const note = $('aiSpendNote');
+  if (note) note.style.color = s.over ? '#b91c1c' : '';
+
+  const box = $('aiBudgetBox');
+  if (!box) return;
+  if (!PuPhotoStore.amAdmin()) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  /* 지금 걸린 값을 넣어 둔다 — 서버에 아직 아무것도 없으면 «기본값»이 보인다.
+     빈 칸으로 두면 저장 단추가 0 을 밀어 넣어 한도가 통째로 풀린다. */
+  const b = aiBudgetNow();
+  if ($('aiLimit')) $('aiLimit').value = b.limit;
+  if ($('aiWarn')) $('aiWarn').value = b.warn;
+  if ($('aiWon')) $('aiWon').value = b.wonPerRead;
+}
+/* 한도를 저장한다.
+   ⚠ 숫자가 아닌 칸은 «건드리지 않는다» — 셋 중 하나를 지우고 저장했다고 나머지
+     둘까지 기본값으로 되돌아가면 사람은 자기가 안 만진 값이 바뀐 줄 모른다.
+   ⚠ 경고선이 한도보다 크면 경고가 영영 안 뜬다(넘는 순간 이미 막힌다) — 막지는 않고
+     한 번 확인만 받는다. 일부러 그렇게 두는 경우가 있다(한도 0 = 안 막음). */
+function saveAiBudget() {
+  const 숫자 = function (id) {
+    const el = $(id);
+    if (!el || el.value === '') return null;
+    const n = Number(el.value);
+    return (isFinite(n) && n >= 0) ? Math.round(n) : null;
+  };
+  const patch = {};
+  const limit = 숫자('aiLimit'), warn = 숫자('aiWarn'), won = 숫자('aiWon');
+  if (limit !== null) patch.limit = limit;
+  if (warn !== null) patch.warn = warn;
+  if (won !== null) patch.wonPerRead = won;
+  if (!Object.keys(patch).length) { alert('숫자를 넣어 주세요 (0 이상)'); return; }
+  if (limit !== null && warn !== null && limit > 0 && warn > limit
+      && !confirm('경고선(' + wonText(warn) + ')이 한도(' + wonText(limit) + ')보다 큽니다.\n'
+        + '경고가 뜨기 전에 먼저 막힙니다 — 그대로 저장할까요?')) return;
+  const btn = $('aiBudgetSave');
+  if (btn) btn.disabled = true;
+  PuPhotoStore.setAiBudget(patch).then(function () {
+    return PuPhotoStore.aiBudget().then(function (v) { aiBudgetRaw = v; });
+  }).then(function () {
+    renderAiBudget();
+    renderReadAsk();          // 셈 줄의 ⚠ 조각도 새 한도로 다시 그린다
+    toast('💰 이번 달 한도를 ' + wonText(aiBudgetNow().limit) + ' 으로 정했습니다', 4000);
+  }).catch(function (e) {
+    console.warn('[AI 한도 저장]', e);
+    alert('저장하지 못했습니다 — 총괄 관리자만 고칠 수 있습니다\n\n' + (e && e.message || e));
+  }).then(function () { if (btn) btn.disabled = false; });
 }
 
 function renderReadAsk() {
@@ -7436,6 +7601,26 @@ function renderReadAsk() {
       readTallyLine();
     return;
   }
+  /* ── 이번 달 요금 한도 (대표 결정 2026-09-10) ────────────────────────────────
+     ⚠ «오늘 한도»(위) 다음, 「서류입니까?」 물음보다 «먼저» 본다 — 한도를 넘었으면
+       그 물음에 답해도 자동으로는 안 읽히므로, 물어 놓고 못 하는 꼴이 된다.
+     ⚠ 넘어도 **막지는 않는다** — 사람이 누르는 길은 열려 있고, 그것을 띠에 적는다. */
+  const 돈 = aiSpend();
+  if (돈.over) {
+    el.className = 'out';
+    el.style.display = 'flex';
+    el.innerHTML = '<span class="t">🛑 이번 달 AI 판독 한도를 다 썼습니다</span>' +
+      '<span class="d" title="이번 달 판독 ' + 돈.reads + '번 · 약 ' + wonText(돈.spent) +
+      ' (한도 ' + wonText(돈.limit) + ')\n' +
+      '자동 판독을 멈췄습니다 — 다음 달 1일에 저절로 풀립니다.\n' +
+      '사진은 그대로 다 올라가 있습니다(판독만 안 된 것입니다).\n' +
+      '급한 것은 눌러서 읽을 수 있습니다 — 얼마가 더 드는지 먼저 알려 드립니다.">' +
+      '약 ' + wonText(돈.spent) + ' / ' + wonText(돈.limit) +
+      ' · 자동만 멈췄습니다 · <b>급한 것은 눌러서 읽습니다</b></span>' +
+      '<button onclick="readWaitRun()">🔤 그래도 읽기</button>';
+    return;
+  }
+
   const ids = readHoldIds();
   /* ㉲ 물을 것이 없으면 «기다리는 것»을 보여 준다 — 판독은 이제 누를 때만 한다.
      ⚠ 「보류」 물음이 이긴다. 둘 다 띄우면 무엇을 먼저 눌러야 하는지 알 수 없다. */
@@ -7780,16 +7965,20 @@ function runReadChunks(makers) {
   }, Promise.resolve()).then(function () { return mergeReads(outs); });
 }
 
-/* 글자 덩이·그림 덩이를 만드는 것도 두 길이 같이 쓴다. */
-function textChunkMakers(items) {
+/* 글자 덩이·그림 덩이를 만드는 것도 두 길이 같이 쓴다.
+   ⚠ opts 는 «사람이 눌렀나»(manual)를 판독 층까지 실어 나른다 (2026-09-10).
+     서버가 이번 달 한도를 넘었을 때 «자동»만 막고 사람이 누른 것은 통과시키는데,
+     그 갈림이 여기서 시작한다. 안 넘기면 자동으로 보므로 «올릴 때 읽는 길»은
+     아무것도 안 해도 된다 — 그쪽이 곧 자동이다. */
+function textChunkMakers(items, opts) {
   return chunkOf(items, READ_CHUNK_TXT).map(function (g, ci) {
     const from = ci * READ_CHUNK_TXT;
-    return function () { return PuDocRead.readDocText(docTextOf(g, from)); };
+    return function () { return PuDocRead.readDocText(docTextOf(g, from), opts); };
   });
 }
-function imgChunkMakers(imgs) {
+function imgChunkMakers(imgs, opts) {
   return chunkOf(imgs, READ_CHUNK_IMG).map(function (g) {
-    return function () { return PuDocRead.read(g.length > 1 ? g : g[0]); };
+    return function () { return PuDocRead.read(g.length > 1 ? g : g[0], opts); };
   });
 }
 
@@ -15845,10 +16034,15 @@ function readPhoto(id, masked, opt) {
        ⚠⚠ **판독 길이 둘이다** — 올릴 때는 startRead→readDocChunked 가 읽고,
          다시 읽을 때는 여기가 읽는다. 한쪽만 물리면 「올릴 때는 0원인데 다시
          판독을 누르면 AI 를 쓰는」 화면이 된다(경력관리에서 이미 겪은 자리다). */
+    /* ⚠ 이 길은 «사람이 누른» 길이다 — 칸의 🔤, 「다시 판독」, 「N장 판독」이 모두
+       여기로 온다. 그래서 판독 층에 manual 을 실어 보낸다: 이번 달 한도를 넘었을 때
+       서버가 «자동»만 막고 이 길은 통과시킨다(대표 결정 2026-09-10 ⓵㉮).
+       올릴 때 읽는 길(startRead→readDocChunked)은 이것을 «안» 붙인다 — 그쪽이 자동이다. */
+    const 사람이 = { manual: true };
     const 있는글자 = tx ? docTextOf(tx) : '';
     if (있는글자) {
       return freeReadTry(있는글자, [], opt).then(function (free) {
-        return free || runReadChunks(textChunkMakers(tx));
+        return free || runReadChunks(textChunkMakers(tx, 사람이));
       });
     }
     const source = masked
@@ -15861,7 +16055,7 @@ function readPhoto(id, masked, opt) {
       const imgs = fulls.filter(function (f) { return safeSrc(f); });
       if (!imgs.length) throw new Error('사진 본문을 불러오지 못했습니다');
       return freeReadTry('', imgs, opt).then(function (free) {
-        return free || runReadChunks(imgChunkMakers(imgs));
+        return free || runReadChunks(imgChunkMakers(imgs, 사람이));
       });
     });
   }).then(function (r) {
@@ -17943,6 +18137,9 @@ function showView(name) {
     /* 무료 판독 스위치·이달 셈 — 이미 읽어 둔 값만 그린다(서버를 다시 두드리지 않는다).
        ⚠ 스위치 상태를 여기서 맞춰 줘야 한다. 안 그리면 껐는데도 켜진 것으로 보인다. */
     renderFreeMeter();
+    /* AI 이번 달 한도 — 셈은 이미 loadReadTally 가 읽어 두었다. 여기서는 그리기만.
+       ⚠ 고치는 칸의 보임 판정도 여기서 한다(총괄 관리자에게만). */
+    renderAiBudget();
   }
   if (name === 'trash') {
     /* 열 때 비로소 불러온다. 지난 해 휴지통까지 훑는 것도 여기서 —

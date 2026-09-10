@@ -117,14 +117,56 @@ function ymKST(now) { return ymdKST(now).slice(0, 7); }
 const VISION_FREE_MONTH = 1000;
 function visionMonthPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all/vision"; }
 
+/* ── AI 판독 «이번 달 요금» 한도 (대표 결정 2026-09-10) ──────────────────────
+     목업 docs/mockups/ai-spend-cap.html · 한도 ₩30,000 · 경고 ₩25,000
+
+   ★ 왜 — 2026-09-10 부터 판독이 «유료 등급»으로 돈다. 하루 500번 한도가 풀린 대신
+     부른 만큼 요금이 붙는다. 평상시는 월 ₩1,000~3,500(실측)이지만, 뭔가 잘못 돌아
+     사진 700장을 되풀이해 읽으면 하루에도 몇 만 원이 나간다.
+     **한도의 목적은 아껴 쓰는 것이 아니라 «사고를 막는 것»이다.**
+
+   ⚠⚠ 금액은 «어림»이다. 구글이 알려 주는 진짜 요금은 **하루 늦게** 온다 —
+     그것으로 막으면 이미 다 쓴 뒤에 막는다. 그래서 «우리가 센 판독 횟수 × 단가»로
+     즉시 계산해 막고, 며칠 뒤 진짜 요금이 찍히면 단가를 그 값에 맞춘다(화면 설정).
+   ⚠ Vision 은 이 셈에 «안» 넣는다 — 그쪽은 제 문턱(달마다 1,000장)이 따로 돌아
+     유료 구간에 안 들어간다. 한 숫자에 섞으면 어느 쪽이 남았는지 알 수 없게 된다. */
+const AI_BUDGET_PATH = "ai_read_budget";
+const AI_BUDGET_DEFAULT = { limit: 30000, warn: 25000, wonPerRead: 4 };
+
+/* 화면·서버가 «같은 답»을 내야 하므로 계산을 여기 한 곳에 둔다.
+   ⚠ 두 곳에 적으면 화면은 「남았다」는데 서버가 막는 일이 생긴다. */
+function aiSpentWon(reads, wonPerRead) {
+  const n = Math.max(0, Number(reads) || 0);
+  const w = Math.max(0, Number(wonPerRead) || 0);
+  return Math.round(n * w);
+}
+function aiBudgetOf(raw) {
+  const b = (raw && typeof raw === "object") ? raw : {};
+  const pick = function (v, d) {
+    const n = Number(v);
+    return (Number.isFinite(n) && n >= 0) ? n : d;
+  };
+  return {
+    limit: pick(b.limit, AI_BUDGET_DEFAULT.limit),
+    warn: pick(b.warn, AI_BUDGET_DEFAULT.warn),
+    wonPerRead: pick(b.wonPerRead, AI_BUDGET_DEFAULT.wonPerRead)
+  };
+}
+function aiMonthPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all/n"; }
+
 function tallyPaths(app, ymd, kind) {
   const k = TALLY_KINDS.indexOf(kind) >= 0 ? kind : "n";
   const d = ymd || ymdKST();
   const out = ["ai_read_tally/" + d + "/" + appOf(app) + "/" + k,
                "ai_read_tally/" + d + "/_all/" + k];
-  /* ⚠ Vision 은 «달» 자리도 함께 올린다 — 안 올리면 위 문턱이 볼 숫자가 없다.
+  /* ⚠ «달» 자리도 함께 올린다 — 안 올리면 달 문턱이 볼 숫자가 없다.
+       · vision — 달마다 1,000장 무료 몫을 세려고 (2026-09-08)
+       · n      — 이번 달 요금 한도를 세려고 (2026-09-10)
+     ⚠ 둘은 **다른 열쇠**로 나란히 쌓인다(…/_all/n · …/_all/vision) — 한 숫자에
+       섞지 않는다. 하루 몫과 달 몫, 무료와 유료가 뒤엉키면 둘 다 못 읽는다.
+     ⚠ quota(막힌 수)는 달 자리에 안 올린다 — 그것은 «못 쓴 것»이라 요금이 아니다.
      ⚠ 이미 달 자리를 받았으면 더하지 않는다 — 같은 자리를 한 번에 두 번 올린다. */
-  if (k === "vision" && String(d).length > 7) {
+  if ((k === "vision" || k === "n") && String(d).length > 7) {
     out.push("ai_read_tally/" + String(d).slice(0, 7) + "/_all/" + k);
   }
   return out;
@@ -224,6 +266,8 @@ module.exports = {
   MODELS, MAX_BODY_BYTES, MAX_OUTPUT_TOKENS,
   isTransient, validate, geminiBody, modelUrl, safeReason, callGemini, dailyQuotaGone,
   APPS, appOf, ymdKST, tallyPaths, TALLY_KINDS,
+  /* AI 판독 이번 달 요금 한도 (대표 결정 2026-09-10) — 까닭은 AI_BUDGET_PATH 머리에 */
+  AI_BUDGET_PATH, AI_BUDGET_DEFAULT, aiBudgetOf, aiSpentWon, aiMonthPath,
   /* 달 몫 문턱 — 까닭은 ymKST 머리에 */
   ymKST, VISION_FREE_MONTH, visionMonthPath
 };
