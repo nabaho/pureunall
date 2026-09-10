@@ -115,6 +115,9 @@ if (!JSDOM) {
   global.hwpFormHTML = () => '';
   (0, eval)(gF('dgV')); (0, eval)(gF('dgWon')); (0, eval)(gF('dgToday'));
   (0, eval)(gF('_officersOf'));
+  /* 설립합의서 제3조 출연금은 «한 줄기»(foundContrib)에서 온다 — 2026-09-10 */
+  (0, eval)(gF('estabSites')); (0, eval)(gF('siteContribOf'));
+  (0, eval)(gF('foundContribOf')); (0, eval)(gF('foundContrib'));
   (0, eval)(gF('docBody'));
   const F = { name:'가나공동근로복지기금', chairman:'홍길동', fund_type:'공동', contribution_total:10000000 };
   const sites = [SITE, { name:'나다전자(주)', ceo:'최사장', biz_no:'111-11-11111', wrep_name:'김노측' }];
