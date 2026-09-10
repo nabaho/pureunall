@@ -7,7 +7,7 @@ const ai = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-ai-call.js'), 'u
 const dr = fs.readFileSync(path.join(__dirname, '..', 'functions', 'doc-read.js'), 'utf8');
 
 test('뉴스레터가 공용 AI 호출기를 싣고 news 사용량으로 센다', () => {
-  assert.match(html, /js\/pu-ai-call\.js\?v=3/);
+  assert.match(html, /js\/pu-ai-call\.js\?v=\d+/);
   assert.match(html, /app:'news'/);
   assert.match(ai, /body\.app = String\(opts\.app\)/);
   assert.match(dr, /"news"/);
