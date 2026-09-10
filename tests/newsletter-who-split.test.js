@@ -113,9 +113,43 @@ test('갈래로 거를 수 있고, 빈 값이면 전체다', () => {
 });
 
 test('★ 화면이 갈래를 «명단다듬기 뒤»에 가른다 — 보내는 것과 같은 자리', () => {
-  /* 두 벌로 두면 화면엔 27곳인데 113곳에 나간다. */
-  assert.ok(/누구로거르기\(/.test(news), '화면이 갈래 거르개를 안 쓴다');
-  assert.ok(/누구별셈\(/.test(news), '화면이 갈래 셈을 안 쓴다');
+  /* 두 벌로 두면 화면엔 27곳인데 113곳에 나간다.
+     ⚠ 「그 낱말이 어딘가 있나」로 보면 안 된다 — 명단화면 안에서 표를 가르느라
+       누구로거르기 를 이미 세 번 부른다. 걸러야 하는 자리는 «명단셈» 하나다. */
+  const i = news.indexOf('function 명단셈');
+  assert.ok(i >= 0, '명단셈 을 찾을 수 없다');
+  const fn = news.slice(i, news.indexOf('\nfunction ', i + 10));
+  assert.match(fn, /누구별셈\(d\.ok\)/, '명단셈이 갈래를 안 센다 — 칩의 숫자가 빈다');
+  assert.match(fn, /누구로거르기\(d\.ok, App\.누구\)/,
+    '명단셈이 갈래로 안 거른다 — 화면만 갈라지고 «보내는 것»은 안 갈라진다');
+});
+
+test('★ 사업장 명단과 「따로 더한 분」을 «한 번에» 다듬는다 — 잣대가 하나', () => {
+  /* 따로 걸러 뒤에 붙이면 사업장 담당자와 같은 주소인 분이 두 통을 받고,
+     수신거부한 분이 이쪽으로 새어 나간다. */
+  const i = news.indexOf('function 명단셈');
+  const fn = news.slice(i, news.indexOf('\nfunction ', i + 10));
+  assert.match(fn, /더한분들줄로\(App\.더한분들\)/, '따로 더한 분을 안 읽는다');
+  assert.match(fn, /명단다듬기\(\s*g\.줄들\.concat\(/,
+    '따로 더한 분을 사업장 명단과 «함께» 안 다듬는다 — 거르는 잣대가 둘이 된다');
+});
+
+test('★ 「전체 선택」은 «제 표 안»만 고른다 — 표가 셋이 되었으므로', () => {
+  /* 문서 전체를 고르면 대표자 표의 머리를 눌렀는데 담당자 113줄이 함께 골라진다.
+     ⚠ 표가 하나였을 때는 문서 전체가 «맞는» 방법이었다 — 그래서 조용히 되돌아가기 쉽다. */
+  const i = news.indexOf('function 전체선택');
+  assert.ok(i >= 0, '전체선택 을 찾을 수 없다');
+  const fn = news.slice(i, news.indexOf('\nfunction ', i + 10));
+  assert.match(fn, /closest\('table'\)/,
+    '전체 선택이 제 표로 좁혀지지 않는다 — 한 표의 머리가 세 표를 다 고른다');
+});
+
+test('★ 「따로 더한 분」을 읽는 곳과 쓰는 곳이 «같은 자리»다', () => {
+  assert.match(news, /db\.ref\('newsletter\/더한분들'\)/,
+    '읽는 곳이 없다 — 자리 이름이 어긋나면 담아도 화면에 안 나온다');
+  const 쓰 = news.match(/newsletter\/더한분들\//g) || [];
+  assert.ok(쓰.length >= 3,
+    '넣기·빼기·동의 세 길이 다 있어야 한다 (찾은 것 ' + 쓰.length + '곳)');
 });
 
 /* ══════ ④ 「따로 더한 분」 — 새 자리 ══════ */
@@ -221,8 +255,17 @@ test('★ 따로 더한 분을 담는 자리가 «한 곳»이다', () => {
 });
 
 test('★ 기업정보함에서 명함을 뉴스레터 명단으로 보낼 수 있다', () => {
-  assert.ok(/뉴스레터 명단/.test(cards),
-    '기업정보함에 뉴스레터로 보내는 단추가 없다 — 대표 지시 2026-09-09');
+  /* ⚠ 「그 낱말이 어딘가 있나」로 보면 안 된다 — 함수 안의 안내 글에도 그 말이 있다.
+       ★ 단추(메뉴 줄)와 그것이 부르는 함수를 «짝지어» 본다. */
+  assert.match(cards, /onclick="closeFolderMenu\(\);selToNewsletter\(\)"[^<]*뉴스레터 명단에 넣기/,
+    '⋯ 메뉴에 「뉴스레터 명단에 넣기」 줄이 없다 — 대표 지시 2026-09-09');
+  assert.match(cards, /function selToNewsletter/, '그 단추가 부를 함수가 없다');
+  const i = cards.indexOf('function selToNewsletter');
+  const fn = cards.slice(i, i + 2600);
+  assert.match(fn, /newsletter\/더한분들/,
+    '뉴스레터의 「따로 더한 분」 자리에 안 담는다 — 담는 자리가 어긋나면 아무 데도 안 나온다');
+  assert.match(fn, /state\.isAdmin/,
+    '대표만 쓸 수 있게 막지 않았다 — newsletter/* 는 대표 전용이라 남은 오류만 본다');
 });
 
 test('★ 대표자 «전화» 열을 만들지 않는다 — 자료에 그 칸이 없다', () => {
