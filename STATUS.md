@@ -28,7 +28,8 @@
 | **3** | `dev-tools-not-published` | PowerShell 창에는 `bash` 가 없어 `spawnSync bash ENOENT` 로 죽었다 |
 
 **고친 방법**
-- 줄끝은 **읽을 때 한 번** 고른다(`.replace(/\r\n/g,'\n')`) — 정규식마다 `\r?` 를 붙이는 것보다 한 곳이 낫다.
+- 줄끝은 **한 곳에서** 맞춘다 — 읽는 자리를 함수 하나로 모으고 그 정규식을 `\r?\n` 으로 둔다(`rules-casebook-review` 의 `규칙집()`). 흩뿌리지 않는 것이 핵심이고, 방법은 «읽을 때 `.replace(/\r\n/g,'\n')`» 든 «`\r?\n`» 이든 좋다.
+- ⚠ **못 찾으면 «까닭»을 적는다**(`assert.ok(m, '…')`). 안 적으면 `TypeError: Cannot read properties of null (reading '1')` 로 죽어, 다음 사람이 검사가 아니라 **규칙집을 의심한다** — 2026-09-07 에 그 물음이 실제로 왔다.
 - 경로는 **열쇠를 만드는 한 곳**에서 고른다(`.split(path.sep).join('/')`).
 - `bash` 없음은 V3 가 `rm` 을 막는 경우와 **같은 문**으로 건너뛴다. ⚠ `process.env.CI` 면 **절대 안 건너뛴다** — 리눅스에서 bash 가 없으면 그건 진짜 고장이다.
 
