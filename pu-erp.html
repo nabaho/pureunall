@@ -543,6 +543,69 @@ window.erpBlameMark = function(name, t0){
    ⚠ 끊긴 것과 그냥 실패한 것을 갈라 준다. 「시간이 지났습니다」와
      「연결에 실패했습니다」는 다음에 할 일이 다르다(다시 눌러볼지, 설정을 볼지). */
 var FETCH_MS = 20000;
+/* ── NAS(시놀로지) 부르기 — «한 벌» (대표 지시 2026-09-10 「나스 연결 검토」 ①) ──
+   종전에는 로그인 코드가 «두 벌»이었다(설정 화면·7일 자동 백업). 둘 다 비밀번호를
+   **주소줄(URL)에 실어** 보냈다 — `auth.cgi?…&passwd=…`. 그 주소는 DSM 접속 로그에
+   그대로 남고, HTTP 면 사무실 네트워크에 평문으로 흐른다.
+
+   ⚠★ 비밀번호는 **POST 몸통**으로만 보낸다. 주소줄에는 절대 싣지 않는다.
+   ⚠ 아주 옛 DSM 이 POST 로그인을 안 받으면(405 · 오류 101/103) 그때만 GET 으로
+     물러선다 — 그리고 **그 사실을 기록에 적는다**. 조용히 물러서면 사람은 고쳐진 줄 안다.
+     비밀번호가 틀린 것(400)은 방법 탓이 아니므로 물러서지 않는다 — 틀린 비밀번호까지
+     주소줄에 실어 보낼 까닭이 없다.
+   ⚠ HTTPS 가 기본이다(안 정했으면 5001). HTTP 는 사람이 «일부러» 골라야 한다.
+   ⚠ 두 벌로 두면 한 벌만 고쳐진다 — 백업 거름망(SECRET_KEYS)에서 막 겪은 일이다.
+     `tests/nas-login-safe.test.js` 가 로그인 자리가 하나뿐인지 기계로 지킨다. */
+var NAS_METHOD_REJECTED = { 101:1, 103:1 };   // 매개변수 없음 / 없는 방법 — POST 를 안 받는 DSM 의 대답
+function nasBaseOf(cfg){
+  cfg = cfg || {};
+  var https = cfg.useHttps !== false;          // 안 정했으면 HTTPS
+  return (https?'https':'http')+'://'+(cfg.host||'')+':'+(https?(cfg.httpsPort||'5001'):(cfg.port||'5000'));
+}
+function nasIsPlain(cfg){ return !!cfg && cfg.useHttps === false; }
+function nasLoginWith(cfg, log){
+  log = log || function(){};
+  cfg = cfg || {};
+  var base = nasBaseOf(cfg);
+  var body = 'api=SYNO.API.Auth&version=7&method=login&session=FileStation&format=sid'
+           + '&account='+encodeURIComponent(cfg.user||'')+'&passwd='+encodeURIComponent(cfg.pass||'');
+  function read(r){ if(r && r.status===405) return { __405:true }; return r.json(); }
+  function take(d){
+    if(d && d.success && d.data && d.data.sid) return d.data.sid;
+    var code = d && d.error && d.error.code;
+    var e = new Error('NAS 로그인 실패: '+(code||'응답 없음'));
+    e.code = code;
+    e.methodRejected = !!(d && d.__405) || !!NAS_METHOD_REJECTED[code];
+    throw e;
+  }
+  return fetchT(base+'/webapi/auth.cgi', { method:'POST', credentials:'omit',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body }, 20000)
+    .then(read).then(take)
+    .catch(function(e){
+      if(!e || !e.methodRejected) throw e;
+      log('⚠ 이 DSM 은 POST 로그인을 안 받아 GET 으로 들어갑니다 — 비밀번호가 주소줄에 실립니다. DSM 을 업데이트하십시오.', 'err');
+      return fetchT(base+'/webapi/auth.cgi?'+body, {credentials:'omit'}, 20000)
+        .then(function(r){ return r.json(); }).then(take);
+    });
+}
+function nasLogoutWith(cfg, sid){
+  if(!sid) return Promise.resolve();
+  return fetchT(nasBaseOf(cfg)+'/webapi/auth.cgi', { method:'POST', credentials:'omit',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'api=SYNO.API.Auth&version=7&method=logout&session=FileStation&_sid='+encodeURIComponent(sid) }, 10000)
+    .catch(function(){});
+}
+function nasUploadWith(cfg, sid, folder, name, blob){
+  var fd = new FormData();
+  fd.append('api','SYNO.FileStation.Upload'); fd.append('version','3'); fd.append('method','upload');
+  fd.append('path', folder); fd.append('create_parents','true'); fd.append('overwrite','true');
+  fd.append('_sid', sid);
+  fd.append('file', blob, name);
+  return fetchT(nasBaseOf(cfg)+'/webapi/entry.cgi', {method:'POST', body:fd, credentials:'omit'}, 60000)
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(!d || !d.success) throw new Error('업로드 실패 코드: '+(d && d.error && d.error.code)); return d; });
+}
+
 function fetchT(url, opts, ms){
   opts = opts || {};
   var wait = ms || FETCH_MS;
@@ -38516,7 +38579,7 @@ function NasBackupSettings(){
     try{ return safeParse(localStorage.getItem(NAS_KEY), {}); }catch(e){ return {}; }
   })();
   var cs = useState(Object.assign({
-    host:'192.168.0.21', port:'5000', httpsPort:'5001', useHttps:false,
+    host:'192.168.0.21', port:'5000', httpsPort:'5001', useHttps:true,   /* HTTP 는 «일부러» 골라야 한다 */
     user:'', pass:'', folder:'/업무자료/pureun_erp'
   }, initCfg));
   var cfg = cs[0]; var setCfg = cs[1];
@@ -38524,31 +38587,31 @@ function NasBackupSettings(){
   var busyS = useState(false); var busy = busyS[0]; var setBusy = busyS[1];
 
   function addLog(msg, type){ setLogs(function(l){ return [{ts:(new Date()).toLocaleTimeString(), msg:msg, type:type||'info'}].concat(l.slice(0,19)); }); }
-  function save(){ localStorage.setItem(NAS_KEY, JSON.stringify(cfg)); showToast('NAS 설정 저장됨'); addLog('설정 저장됨','ok'); }
+  async function save(){
+    /* HTTP 는 비밀번호가 사무실 네트워크에 평문으로 흐른다 — 저장 전에 한 번 묻는다.
+       (HTTPS 화면에서는 HTTP NAS 를 브라우저가 막으므로 어차피 안 된다 — 그 말도 함께) */
+    if(nasIsPlain(cfg) && !(await popConfirm('HTTP 로 저장합니다.\n\n· NAS 비밀번호가 사무실 네트워크에 «평문»으로 흐릅니다.\n· 이 화면이 HTTPS 면 브라우저가 HTTP NAS 를 막아 연결 자체가 안 됩니다.\n\n그래도 HTTP 로 저장할까요?'))) return;
+    localStorage.setItem(NAS_KEY, JSON.stringify(cfg)); showToast('NAS 설정 저장됨'); addLog('설정 저장됨'+(nasIsPlain(cfg)?' (⚠ HTTP — 평문)':' (HTTPS)'),'ok');
+  }
+  function toHttps(){ setCfg(Object.assign({}, cfg, { useHttps:true })); addLog('HTTPS 로 바꿨습니다 — 「설정 저장」을 눌러 굳히십시오','info'); }
   function field(k){ return function(e){ setCfg(Object.assign({},cfg,(function(){var x={};x[k]=e.target.value;return x;})())) ; }; }
 
   // Synology FileStation API 연동
-  function getNasBase(){ return (cfg.useHttps?'https':'http')+'://'+cfg.host+':'+(cfg.useHttps?(cfg.httpsPort||'5001'):cfg.port); }
-  function isMixedContent(){ return location.protocol==='https:' && !cfg.useHttps; }
+  function getNasBase(){ return nasBaseOf(cfg); }
+  function isMixedContent(){ return location.protocol==='https:' && nasIsPlain(cfg); }
   function getNasErrMsg(err){
     if(err.message==='Failed to fetch'){
-      if(isMixedContent()) return 'Mixed Content 차단 — HTTPS(Netlify)에서 HTTP NAS 직접 접속 불가\n→ 해결①: 아래 "HTTPS 모드" 켜고 NAS 인증서 신뢰 후 재시도\n→ 해결②: 아래 "수동 백업 다운로드" 사용 (항상 작동)';
+      /* ⚠ 종전 안내는 「아래 "HTTPS 모드" 켜고」라고 했는데 **그 단추가 화면에 없었다**(2026-09-10 검토).
+         없는 단추를 찾게 하는 안내는 없느니만 못하다. 이제 그 칸이 있다(🔒 HTTPS 로 연결). */
+      if(isMixedContent()) return '이 화면은 HTTPS 인데 NAS 는 HTTP 라 브라우저가 막습니다(Mixed Content)\n→ 해결①: 위 「🔒 HTTPS 로 연결」을 켜고 저장 (NAS 인증서를 브라우저가 믿어야 합니다)\n→ 해결②: 아래 「수동 백업 다운로드」 (항상 됩니다)';
       return 'NAS 연결 실패 — NAS IP/포트 확인, NAS 전원 확인, DSM CORS 설정 확인';
     }
     return err.message;
   }
 
-  function nasLogin(){
-    return fetchT(getNasBase()+'/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=login&account='+encodeURIComponent(cfg.user)+'&passwd='+encodeURIComponent(cfg.pass)+'&session=FileStation&format=sid', {credentials:'omit'}, 20000)
-      .then(function(r){return r.json();})
-      .then(function(d){
-        if(d.success) return d.data.sid;
-        throw new Error('NAS 로그인 실패: '+(d.error&&d.error.code));
-      });
-  }
-  function nasLogout(sid){
-    return fetchT(getNasBase()+'/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=logout&session=FileStation&_sid='+sid, {credentials:'omit'}, 10000).catch(function(){});
-  }
+  /* 로그인·로그아웃은 위 «한 벌»(nasLoginWith·nasLogoutWith)을 쓴다 — 비밀번호가 주소줄에 안 실린다 */
+  function nasLogin(){ return nasLoginWith(cfg, addLog); }
+  function nasLogout(sid){ return nasLogoutWith(cfg, sid); }
 
   function doBackup(){
     if(!cfg.user||!cfg.pass){ showToast('NAS 아이디/비밀번호를 입력하세요'); return; }
@@ -38585,28 +38648,11 @@ function NasBackupSettings(){
         body:'api=SYNO.FileStation.CreateFolder&version=2&method=create&folder_path='+encodeURIComponent(cfg.folder)+'&name=.&_sid='+sid
       }, 20000).then(function(){ return sid; });
     }).then(function(sid){
-      // 최신 백업 파일 업로드
-      var blob = new Blob([json], {type:'application/json'});
-      var fd = new FormData();
-      fd.append('api', 'SYNO.FileStation.Upload');
-      fd.append('version', '3');
-      fd.append('method', 'upload');
-      fd.append('path', cfg.folder);
-      fd.append('create_parents', 'true');
-      fd.append('overwrite', 'true');
-      fd.append('_sid', sid);
-      fd.append('file', blob, latest);
-      return fetchT(getNasBase()+'/webapi/entry.cgi', {method:'POST', body:fd, credentials:'omit'}, 60000)
-        .then(function(r){return r.json();})
-        .then(function(d){
-          if(!d.success) throw new Error('업로드 실패 코드: '+(d.error&&d.error.code));
-          addLog('✅ 백업 완료: '+cfg.folder+'/'+latest,'ok');
-          // 날짜별 백업 추가
-          var fd2=new FormData(); fd2.append('api','SYNO.FileStation.Upload'); fd2.append('version','3'); fd2.append('method','upload');
-          fd2.append('path',cfg.folder); fd2.append('create_parents','true'); fd2.append('overwrite','true'); fd2.append('_sid',sid);
-          fd2.append('file', new Blob([json],{type:'application/json'}), filename);
-          return fetchT(getNasBase()+'/webapi/entry.cgi', {method:'POST', body:fd2, credentials:'omit'}, 60000).then(function(){return sid;});
-        });
+      /* 최신본 + 날짜본 — 올리는 일은 «한 벌»(nasUploadWith) */
+      return nasUploadWith(cfg, sid, cfg.folder, latest, new Blob([json],{type:'application/json'}))
+        .then(function(){ addLog('✅ 백업 완료: '+cfg.folder+'/'+latest,'ok'); })
+        .then(function(){ return nasUploadWith(cfg, sid, cfg.folder, filename, new Blob([json],{type:'application/json'})); })
+        .then(function(){ return sid; });
     }).then(function(sid){
       addLog('날짜별 백업: '+filename+' 저장','ok');
       /* 뺀 것을 조용히 넘기지 않는다 — 복원한 사람이 「설정이 왜 없지」로 헤매지 않게 */
@@ -38714,6 +38760,24 @@ function NasBackupSettings(){
           h('div', null,
             h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'DSM 포트'),
             h('input', { type:'text', value:cfg.port, onChange:field('port'), placeholder:'5000', style:iS }))
+        ),
+        // 🔒 HTTPS — 종전 오류 안내가 「아래 "HTTPS 모드" 켜고」라고 했지만 그 칸이 «없었다»(2026-09-10 검토)
+        h('div', { style:{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', marginBottom:'12px',
+                          padding:'10px 12px', borderRadius:'8px',
+                          background: nasIsPlain(cfg) ? '#fef2f2' : '#f0fdf4',
+                          border: '1px solid ' + (nasIsPlain(cfg) ? '#fecaca' : '#bbf7d0') } },
+          h('label', { style:{display:'flex', alignItems:'center', gap:'6px', fontSize:'12.5px', fontWeight:600, color:'#1e293b', cursor:'pointer'} },
+            h('input', { type:'checkbox', checked: !nasIsPlain(cfg),
+                         onChange:function(e){ setCfg(Object.assign({}, cfg, { useHttps: !!e.target.checked })); } }),
+            '🔒 HTTPS 로 연결'),
+          h('span', { style:{fontSize:'11.5px', color:'#475569'} }, 'HTTPS 포트'),
+          h('input', { type:'text', value:cfg.httpsPort||'5001', onChange:field('httpsPort'), placeholder:'5001',
+                       style:Object.assign({}, iS, { width:'80px' }) }),
+          nasIsPlain(cfg)
+            ? h('span', { style:{fontSize:'11.5px', color:'#991b1b', fontWeight:600, flex:1, minWidth:'200px'} },
+                '⚠ HTTP — NAS 비밀번호가 사무실 네트워크에 평문으로 흐릅니다. ',
+                h('button', { onClick:toHttps, style:{border:'1px solid #991b1b', background:'#fff', color:'#991b1b', borderRadius:'5px', padding:'2px 8px', fontSize:'11.5px', cursor:'pointer'} }, 'HTTPS 로 바꾸기'))
+            : h('span', { style:{fontSize:'11.5px', color:'#166534'} }, '비밀번호가 암호화된 길로만 갑니다')
         ),
         h('div', { style:{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px'} },
           h('div', null,
@@ -82873,8 +82937,7 @@ function ERPMain(props){
       var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
       if(lastStr && (now - parseInt(lastStr,10)) < WEEK_MS) return; // 아직 7일 안 됨
 
-      // 7일 경과 → 백그라운드 자동 백업 실행
-      var base = (cfg.useHttps?'https':'http')+'://'+cfg.host+':'+(cfg.useHttps?(cfg.httpsPort||'5001'):(cfg.port||'5000'));
+      // 7일 경과 → 백그라운드 자동 백업 실행 (부르는 길은 위 «한 벌» — nasLoginWith·nasUploadWith)
       var folder = cfg.folder || '/업무자료/pureun_erp';
 
       /* ⚠ 아래는 저장소 전체(4MB 가까이)를 읽어 풀었다가 다시 글자로 만든다 — 무겁다.
@@ -82897,29 +82960,19 @@ function ERPMain(props){
       var today = todayYMD();
       var fname = 'pureun_erp_auto_'+today+'.json';
 
-      // NAS 로그인 → 업로드
-      fetchT(base+'/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=login&account='+encodeURIComponent(cfg.user)+'&passwd='+encodeURIComponent(cfg.pass)+'&session=FileStation&format=sid', {credentials:'omit'}, 20000)
-        .then(function(r){return r.json();})
-        .then(function(d){
-          if(!d.success) throw new Error('로그인 실패');
-          var sid = d.data.sid;
-          var fd = new FormData();
-          fd.append('api','SYNO.FileStation.Upload'); fd.append('version','3'); fd.append('method','upload');
-          fd.append('path', folder); fd.append('create_parents','true'); fd.append('overwrite','true');
-          fd.append('_sid', sid);
-          fd.append('file', new Blob([json],{type:'application/json'}), fname);
-          return fetchT(base+'/webapi/entry.cgi', {method:'POST', body:fd, credentials:'omit'}, 60000)
-            .then(function(r){return r.json();})
-            .then(function(res){
-              if(res.success){
-                localStorage.setItem(AUTO_KEY, String(now));
-                showToast('🖥️ NAS 자동 백업 완료 ('+today+')');
-                // 로그아웃
-                fetchT(base+'/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=logout&session=FileStation&_sid='+sid, {credentials:'omit'}, 10000).catch(function(){});
-              }
-            });
+      // NAS 로그인 → 업로드 → 로그아웃 — 비밀번호는 주소줄에 안 실린다
+      var 세션 = null;
+      nasLoginWith(cfg)
+        .then(function(sid){
+          세션 = sid;
+          return nasUploadWith(cfg, sid, folder, fname, new Blob([json],{type:'application/json'}));
         })
-        .catch(function(){ /* 자동 백업 실패는 조용히 무시 (NAS 미연결·CORS 시 정상) */ });
+        .then(function(){
+          localStorage.setItem(AUTO_KEY, String(now));
+          showToast('🖥️ NAS 자동 백업 완료 ('+today+')');
+        })
+        .catch(function(){ /* 자동 백업 실패는 조용히 무시 (NAS 미연결·CORS 시 정상) — ⚠ 남은 일: 실패를 설정 화면 기록에라도 남길 것 */ })
+        .then(function(){ return nasLogoutWith(cfg, 세션); });
       };
       // 한가할 때 — 없는 브라우저면 3초 뒤로 (화면은 그 전에 다 뜬다)
       if(window.requestIdleCallback) requestIdleCallback(_run, { timeout:15000 });
