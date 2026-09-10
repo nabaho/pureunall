@@ -4464,6 +4464,34 @@ function renderCvRecent(){ const box=document.getElementById('homeCvRecent'); if
 function _logCv(type,how){ try{ const a=(get('cvlog')||[]); a.unshift({at:Date.now(),type:type,how:how}); set('cvlog',a.slice(0,20)); if(typeof renderCvRecent==='function') renderCvRecent(); }catch(e){} }
 function goCV(tpl){ nav_to('page-resume-hub','✍️ 서류 만들기','이력서관리');
   _safe(function(){ var b=document.querySelector('#rh-tabrow .tab[data-tab="dm-quick"]'); if(b) rhTab('dm-quick',b); }); const sel=document.getElementById('cvTpl'); if(sel) sel.value=tpl; if(typeof renderQuickCV==='function') renderQuickCV(); }
+/* ═══ 다른 앱에서 곧장 「기관 양식 채우기」로 들어오는 문 (2026-09-10) ═══
+   정부사업신청(gov.html)의 공고 줄 「📝」가 `kcareer.html?go=form&t=공고명` 으로 보낸다.
+   ⚠★ 화면을 «새로 짓지 않았다» — 이미 있는 것을 그대로 연다. 두 곳에 같은 화면을 두면
+      한쪽만 고쳐져 어느 쪽이 맞는지 알 수 없게 된다(보관함 다섯 자리로 앓았던 병이다).
+   ⚠ 그래서 이 문을 «막지 말 것» — 막으면 정부사업신청 쪽 단추가 막다른 길이 된다. */
+function goForm(title){
+  nav_to('page-resume-hub','✍️ 서류 만들기'+(title?(' — '+title):''),'이력서관리');
+  _safe(function(){ var b=document.querySelector('#rh-tabrow .tab[data-tab="rh-edit"]');
+    if(b) rhTab('rh-edit',b); });
+  if(title) toast('「'+title+'」 — 기관 양식을 올려 주세요 (📄 양식 올리기)');
+}
+/* ⚠★ 신원 확인이 «끝난 뒤»에 열어야 한다 — nav_to 는 잠겨 있으면 아무 데도 안 옮긴다.
+     그래서 잠금이 풀릴 때까지 기다렸다가 연다(최대 8초, 그 뒤엔 조용히 그만둔다). */
+function kcOpenFromUrl(tries){
+  try{
+    if(!/[?&]go=form/.test(location.search)) return;
+    var lk=(typeof kcApplyLock==='function')?kcApplyLock():'owner';
+    if(lk!=='owner'){
+      if((tries||0)<20) setTimeout(function(){ kcOpenFromUrl((tries||0)+1); },400);
+      return;
+    }
+    var t='';
+    try{ t=(new URLSearchParams(location.search).get('t')||'').slice(0,80); }catch(e){}
+    goForm(t);
+    /* ⚠ 주소에서 지운다 — 새로고침할 때마다 다시 튀어 들어오면 하던 일을 잃는다 */
+    try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  }catch(e){}
+}
 function renderHomeYr(){ const yrMap=_homeYr||{}; const selEl=document.getElementById('homeYrSel'); const f=selEl?selEl.value:'';
   let yrs=Object.keys(yrMap).sort().reverse(); if(f) yrs=yrs.filter(y=>y===f);
   const box=document.getElementById('homeYrTable'); if(!box) return;
@@ -12225,6 +12253,8 @@ function fbInit(){ if(location.protocol==='file:') return; if(typeof firebase===
       /* ⚠ 안전 모드에서는 클라우드로 오가는 것을 «하나도» 시작하지 않는다.
            신원 확인(resolveMe)은 남긴다 — 그것까지 끄면 대표 잠금에 걸려 못 들어간다. */
       if(u){ authGate(false); if(typeof resolveMe==='function'){ try{ resolveMe(); }catch(e){} }
+        /* 다른 앱에서 「서식 채우기」로 곧장 들어온 경우 — 잠금이 풀리면 그 화면을 연다 */
+        if(typeof kcOpenFromUrl==='function'){ try{ kcOpenFromUrl(0); }catch(e){} }
         if(!KC_SAFE){
           if(typeof puSyncAuto==='function'){ try{ puSyncAuto(); }catch(e){} }
           if(typeof fbLoadApiKeys==='function'){ try{ fbLoadApiKeys(); }catch(e){} }
