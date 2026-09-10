@@ -117,6 +117,9 @@ function runApp(seed) {
     document: { getElementById: el, createElement: () => ({ click(){}, style:{} }) },
     location: { protocol: 'https:' },
     GovG2b: require('../js/gov-g2b.js'),
+    GovCareer: require('../js/gov-career.js'),
+    KcareerAdvSummary: require('../js/kcareer-adv-summary.js'),
+    Promise, navigator: {},
     GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
@@ -126,7 +129,9 @@ function runApp(seed) {
   ctx.window = ctx;
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');   // 부팅은 빼고 함수만 싣는다
-  vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut};', ctx);
+  vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
+    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,'
+    + 'setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   return { api: ctx.__api, el, store };
 }
 
@@ -176,4 +181,149 @@ test('★ 인증키가 없으면 받는 방법을 화면에 적는다', () => {
   r.api.readyNote();
   assert.match(r.el('note').innerHTML, /인증키가 아직 없습니다/);
   assert.match(r.el('note').innerHTML, /Decoding/);
+});
+
+/* ═══════ 신청 재료 탭 (2026-09-10, 대표 승인 「안 A · 접이식」 + 수행실적) ═══════ */
+
+const MAT_LS = {
+  edu: JSON.stringify([{ school: '영남대학교', major: '법학과', degree: '학사',
+                         period: '1999.03 ~ 2003.02', graduated: '졸업' }]),
+  cert: JSON.stringify([{ title: '공인노무사', org: '고용노동부', date: '20100813', num: '제3016호' },
+                        { title: 'NCS 기업활용 수료증', org: '한국산업인력공단', date: '2024-05-30' }]),
+  wiccok: JSON.stringify([
+    { type: '위촉장', org: '충청남도경제진흥원', titleVal: '노무자문위원',
+      periodStart: '2025-03-01', periodEnd: '2099-02-28' },
+    { type: '위촉장', org: '한국산업인력공단', titleVal: 'NCS 컨설턴트',
+      periodStart: '2012-04-01', periodEnd: '2014-03-31' },
+    { type: '표창', org: '고용노동부', titleVal: '노사문화 우수', issueDate: '2023-12-05' }
+  ]),
+  advisory: JSON.stringify([{ org: '○○정밀주식회사', type: '고문', bizType: '제조업',
+                              size: '중소', insured: 412, period: '2019.03~', status: '진행' }]),
+  consult: JSON.stringify([{ year: '2024', project: '일터혁신 상생컨설팅',
+                             org: '○○정밀주식회사', agency: '노사발전재단', status: '완료' }])
+};
+
+/* 가짜 파이어베이스 — «어느 자리를 읽었는지» 기록한다 */
+function fakeDb(map, mode) {
+  const seen = [];
+  return { seen, ref(p) { seen.push(p); return {
+    once() {
+      if (mode === 'fail') return Promise.reject(new Error('권한 없음'));
+      return Promise.resolve({ val: () => (mode === 'empty' ? null : map[p]) });
+    } }; } };
+}
+
+async function runMat(mode) {
+  const r = runApp({ feed: [] });
+  const map = {};
+  Object.keys(MAT_LS).forEach((k) => { map['kcareer/U9/ls/' + k] = MAT_LS[k]; });
+  const db = fakeDb(map, mode);
+  r.api.setFb(db, 'U9');
+  await r.api.matPull();
+  return { ...r, db };
+}
+
+test('두 문(공고·신청 재료)이 화면에 있다', () => {
+  assert.match(src, /id="tbFeed"[^>]*onclick="setTab\('feed'\)"/);
+  assert.match(src, /id="tbMat"[^>]*onclick="setTab\('mat'\)"/);
+  assert.match(src, /<div class="wrap" id="pgFeed">/);
+  assert.match(src, /id="pgMat"/);
+});
+
+test('★ 재료 부품 둘을 싣는다 — 가리기는 경력관리 것을 빌려 쓴다', () => {
+  assert.match(src, /<script src="js\/gov-career\.js\?v=\d+"><\/script>/);
+  assert.match(src, /<script src="js\/kcareer-adv-summary\.js\?v=\d+"><\/script>/,
+    '가리기 모듈을 안 실으면 자문 문장이 통째로 빕니다');
+});
+
+test('★ 문을 바꾸면 화면이 실제로 바뀐다', () => {
+  const r = runApp({ feed: [] });
+  r.api.setTab('mat');
+  assert.equal(r.el('pgFeed').style.display, 'none');
+  assert.equal(r.el('pgMat').style.display, '');
+  assert.match(r.el('tbMat').className, /\bon\b/);
+  r.api.setTab('feed');
+  assert.equal(r.el('pgFeed').style.display, '');
+  assert.equal(r.el('pgMat').style.display, 'none');
+});
+
+test('★★ 창고를 «콕 집어» 읽는다 — 노드를 통째로 읽지 않는다', async () => {
+  const r = await runMat();
+  assert.ok(r.db.seen.length >= 8);
+  r.db.seen.forEach((p) => {
+    assert.match(p, /^kcareer\/U9\/ls\//, '통째로 읽으면 첨부 조각·열쇠까지 딸려 옵니다: ' + p);
+  });
+  assert.ok(r.db.seen.every((p) => p.indexOf('_secrets') < 0));
+});
+
+test('★ 갈래 여섯이 실제로 그려진다', async () => {
+  const r = await runMat();
+  const h = r.el('matBox').innerHTML;
+  ['학력', '자격 · 수료', '위촉 · 위원 경력', '표창 · 포상', '자문 · 고문', '수행 실적']
+    .forEach((n) => assert.ok(h.indexOf(n) >= 0, n + ' 갈래가 없습니다'));
+  assert.match(h, /영남대학교/);
+  assert.match(h, /공인노무사/);
+  assert.match(h, /일터혁신 상생컨설팅/);
+});
+
+test('★ 위촉·위원은 「지금 맡고 있는 것만」이 기본이다', async () => {
+  const r = await runMat();
+  assert.match(r.el('matBox').innerHTML, /충청남도경제진흥원/);
+  assert.ok(r.el('matBox').innerHTML.indexOf('NCS 컨설턴트') < 0,
+    '끝난 위촉이 기본 목록에 보입니다 — 197건이 다 나오면 못 읽습니다');
+  r.api.matLiveTog();
+  assert.match(r.el('matBox').innerHTML, /NCS 컨설턴트/, '끄면 다 보여야 합니다');
+});
+
+test('★★ 자문 목록에는 이름이 그대로 있다 — 대표님이 알아보셔야 한다', async () => {
+  const r = await runMat();
+  assert.match(r.el('matBox').innerHTML, /○○정밀주식회사/);
+});
+
+test('★★ 내보낼 때는 고객사 이름이 한 글자도 안 나간다', async () => {
+  const r = await runMat();
+  const rows = r.api.matRowsFor('advisory');
+  assert.ok(rows.length > 0);
+  rows.forEach((x) => assert.ok(String(x.org).indexOf('정밀') < 0,
+    '이름이 그대로 나갔습니다: ' + x.org));
+  const t = r.api.matText('advisory');
+  assert.ok(t.length > 0, '가린 문장이 만들어져야 합니다');
+  assert.ok(t.indexOf('정밀') < 0 && t.indexOf('주식회사') < 0, '문장에 이름이 샜습니다: ' + t);
+});
+
+test('★★ 재료를 «클라우드로 내보내지 않는다»', () => {
+  // 담으면 대표님 이력이 두 자리에 있게 되고, 한쪽이 낡아 «두 앱이 다른 건수»를 보여 준다.
+  const m = src.match(/function cloudPush\(\)\{[\s\S]*?\n\}/);
+  assert.ok(m, 'cloudPush 를 못 찾았습니다');
+  ['_mat', 'mat:', 'advisory', 'wiccok'].forEach((w) => {
+    assert.ok(m[0].indexOf(w) < 0, 'cloudPush 가 재료를 밀어 올립니다: ' + w);
+  });
+});
+
+test('★★ 재료를 이 기기에도 담지 않는다', async () => {
+  const r = await runMat();
+  Object.keys(r.store).forEach((k) => {
+    const v = String(r.store[k] || '');
+    assert.ok(v.indexOf('영남대학교') < 0 && v.indexOf('정밀') < 0,
+      '재료가 저장되어 남았습니다: ' + k);
+  });
+});
+
+test('★★ 하나도 못 읽으면 «없다»가 아니라 «못 읽었다»고 말한다', async () => {
+  // 「이력이 0건」으로 보이면 대표님이 자료가 날아간 줄 아신다.
+  const r = await runMat('fail');
+  assert.match(r.el('matNote').innerHTML, /읽지 못했습니다/);
+  assert.equal(r.el('matBox').innerHTML, '');
+});
+
+test('★★ 클라우드가 비었으면 «☁ 저장을 한 번 누르시라»고 알려 준다', async () => {
+  // 경력관리에서 한 번도 저장을 안 하면 클라우드는 비어 있다 — 흔한 막다른 길이다.
+  const r = await runMat('empty');
+  const h = r.el('matNote').innerHTML;
+  assert.match(h, /클라우드에는 아직 없습니다/, '무엇이 문제인지 말해야 합니다');
+  assert.match(h, /클라우드에 저장/, '무엇을 하면 되는지도 말해야 합니다');
+});
+
+test('★ 재료 탭을 처음 열면 저절로 받아온다 — 빈 화면을 내놓지 않는다', () => {
+  assert.match(src, /if\(t==='mat' *&& *!_mat\) *matPull\(\);/);
 });

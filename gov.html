@@ -55,6 +55,25 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
 .kw.on{background:var(--navy);color:#FFFFFF;border-color:var(--navy)}
 .note{font-size:12.5px;line-height:1.8;color:var(--text-mute)}
 .empty{padding:34px 12px;text-align:center;color:var(--text-mute);font-size:13px}
+/* ── 「공고」·「신청 재료」 두 문 ──
+   ⚠ 붙박이(sticky)로 두지 않는다 — 위 머리줄이 좁은 화면에서 두 줄로 접히면
+     그만큼 어긋나고, 그걸 맞추려면 높이를 재는 코드가 또 필요해진다. */
+#tabs{display:flex;gap:6px;padding:0 16px;background:var(--card);
+  border-bottom:1px solid var(--border)}
+#tabs .tb{padding:9px 14px;border:0;background:none;font-family:inherit;font-size:13px;
+  cursor:pointer;color:var(--text-mute);border-bottom:2px solid transparent;margin-bottom:-1px}
+#tabs .tb.on{color:var(--navy);font-weight:700;border-bottom-color:var(--navy)}
+.sec{border:1px solid var(--border);border-radius:9px;margin-bottom:9px;background:var(--card)}
+.sec>summary{list-style:none;cursor:pointer;padding:10px 12px;display:flex;gap:9px;
+  align-items:center;font-size:13px;flex-wrap:wrap}
+.sec>summary::-webkit-details-marker{display:none}
+.sec>summary .nm{font-weight:700;color:var(--navy)}
+.sec .body{padding:0 12px 12px}
+.snt{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+  font-size:12.5px;line-height:1.85;margin-bottom:9px;white-space:pre-wrap;word-break:break-all}
+.sml{font-size:11.5px;color:var(--text-mute)}
+.warn{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:9px 11px;
+  font-size:12.5px;color:#991b1b;line-height:1.75;margin-bottom:9px}
 #lock{position:fixed;inset:0;z-index:9999;background:var(--bg);display:none;
   align-items:center;justify-content:center;padding:20px}
 #lock .box{max-width:420px;text-align:center}
@@ -77,7 +96,14 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
   <button class="btn" id="outBtn" onclick="doLogout()" style="display:none">로그아웃</button>
 </div>
 
-<div class="wrap">
+<!-- ⚠ 두 문의 «성격이 다르다» — 공고는 «아직 안 한 일», 신청 재료는 «이미 한 일»이다.
+     재료는 경력관리에서 읽어만 온다(원본은 언제나 저쪽이다). -->
+<div id="tabs">
+  <button class="tb on" id="tbFeed" onclick="setTab('feed')">📋 공고 모아보기</button>
+  <button class="tb" id="tbMat" onclick="setTab('mat')">👤 신청 재료</button>
+</div>
+
+<div class="wrap" id="pgFeed">
   <div class="card">
     <div class="bar">
       <input id="q" placeholder="공고명·기관 검색" style="min-width:190px" oninput="draw()">
@@ -100,6 +126,19 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
   </div>
 </div>
 
+<div class="wrap" id="pgMat" style="display:none">
+  <div class="card" style="margin-bottom:12px">
+    <div class="bar" style="margin-bottom:0">
+      <b style="color:var(--navy)">경력관리에서 당겨온 재료</b>
+      <span class="sml" id="matAt"></span>
+      <div class="sp"></div>
+      <button class="btn primary" onclick="matPull()">🔄 경력관리에서 받아오기</button>
+    </div>
+    <div id="matNote" class="note" style="margin-top:8px"></div>
+  </div>
+  <div id="matBox"></div>
+</div>
+
 <div id="lock"><div class="box">
   <div style="font-size:17px;font-weight:700;margin-bottom:10px">대표 전용 화면입니다</div>
   <div class="note" id="lockWho"></div>
@@ -109,7 +148,7 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=21"></script>
+<script src="js/pu-ontology.js?v=22"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
      ⚠ pu-appbar 를 빼면 오른쪽 「즐겨찾기」 손잡이가 아예 안 뜬다.
@@ -117,6 +156,10 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
 <script src="js/pu-appbar.js?v=10"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<!-- ⚠★ 자문·고문 «이름 가리기»는 경력관리 것을 그대로 빌려 쓴다.
+     두 벌이 되면 한쪽만 고쳐져 고객사 이름이 새는 날이 온다. -->
+<script src="js/kcareer-adv-summary.js?v=1"></script>
+<script src="js/gov-career.js?v=1"></script>
 <script src="js/gov-g2b.js?v=3"></script>
 <script src="js/gov-alio.js?v=1"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
@@ -338,6 +381,182 @@ async function cloudPull(){
   }catch(e){}
 }
 
+/* ═══ 신청 재료 — 경력관리에서 «읽기만» 한다 ═══
+   대표 승인 2026-09-10: 화면은 「안 A · 접이식」, 갈래에 「수행 실적」 포함.
+   범위는 대표 선택 「나」 = 자문·고문 + 경력·자격증·표창·학력 (+ 수행 실적).
+
+   ⚠★ 받아온 재료를 «어디에도 담지 않는다» — 화면이 열려 있는 동안만 머리에 둔다.
+      담으면 ⑴대표님 이력이 두 자리에 있게 되고 ⑵한쪽이 낡아 «두 앱이 다른 건수»를
+      보여 준다. 원본은 언제나 경력관리 하나다. (cloudPush 도 건드리지 않는다.)
+   ⚠★ 경력관리에 한 글자도 쓰지 않는다 — 읽기 전용이다.
+   ⚠★ 자문·고문 이름은 «내보낼 때» 가려 나간다(대표 지시 「목록보이고 내보낼떄 가림」).
+      가리기는 GovCareer 가 KcareerAdvSummary 를 거쳐서만 한다 — 여기서 짓지 않는다. */
+var _mat=null, _matLive=true;
+
+function setTab(t){
+  $('pgFeed').style.display = (t==='mat'?'none':'');
+  $('pgMat').style.display  = (t==='mat'?'':'none');
+  $('tbFeed').className='tb'+(t==='mat'?'':' on');
+  $('tbMat').className ='tb'+(t==='mat'?' on':'');
+  lsSet('tab', t);                       /* ⚠ 클라우드로 내보내지 않는다(lsSet 은 안 밀어낸다) */
+  /* 처음 들어오면 저절로 한 번 받아온다 — 빈 화면을 내놓지 않는다 */
+  if(t==='mat' && !_mat) matPull();
+}
+
+function matNote(h){ $('matNote').innerHTML=h||''; }
+
+async function matPull(){
+  if(!fbDb || !fbUid){ matNote('로그인이 필요합니다.'); return; }
+  matNote('⏳ 경력관리에서 받아오는 중…');
+  var ls={}, okN=0, errN=0;
+  /* ⚠ 창고를 «콕 집어» 읽는다 — 노드를 통째로 읽으면 첨부 조각(수 MB)과
+     API 열쇠(_secrets)까지 딸려 온다. 어느 창고를 읽는지는 GovCareer.paths 가 정한다. */
+  await Promise.all(GovCareer.paths(fbUid).map(function(p){
+    return fbDb.ref(p.path).once('value')
+      .then(function(s){ ls[p.store]=s.val(); okN++; })
+      .catch(function(){ errN++; });
+  }));
+  if(!okN){
+    _mat=null; $('matBox').innerHTML='';
+    matNote('⚠ <b>경력관리 자료를 읽지 못했습니다.</b> 인터넷을 확인하시고 다시 눌러 주세요.');
+    return;
+  }
+  _mat=GovCareer.build(ls, new Date().toISOString().slice(0,10));
+  var c=GovCareer.counts(_mat);
+  $('matAt').textContent='마지막으로 받은 때 : '+new Date().toLocaleString('ko-KR')
+    +' · 모두 '+c.total+'건'+(errN?(' · 못 읽은 창고 '+errN+'개'):'');
+  if(!c.total){
+    matNote('경력관리에 담긴 것이 <b>클라우드에는 아직 없습니다.</b><br>'
+      +'경력관리를 열어 <b>☁ 클라우드에 저장</b>을 한 번 누르신 뒤 다시 받아와 주세요 — '
+      +'이 화면은 «클라우드에 올라간 것»만 읽습니다.');
+  } else matNote('');
+  matDraw();
+}
+
+/* ── 그리기 ── */
+function _b(v){ return '<b>'+esc(v||'-')+'</b>'; }
+function _td(v){ var t=(v==null||v==='')?'-':v; return '<td>'+t+'</td>'; }
+function _tbl(cols, rows, cells){
+  if(!rows.length) return '<div class="sml" style="padding:8px 2px">없습니다.</div>';
+  return '<div class="scroll"><table><thead><tr>'
+    + cols.map(function(c){ return '<th>'+esc(c)+'</th>'; }).join('')
+    + '</tr></thead><tbody>'
+    + rows.map(function(r){ return '<tr>'+cells(r).map(_td).join('')+'</tr>'; }).join('')
+    + '</tbody></table></div>';
+}
+function _sec(key, icon, name, count, open, extra, body){
+  return '<details class="sec"'+(open?' open':'')+'><summary>'
+    +'<span class="nm">'+icon+' '+esc(name)+'</span>'
+    +'<span class="sml">'+esc(count)+'</span>'+(extra||'')
+    +'<div class="sp"></div>'
+    +'<button class="btn sm" onclick="event.preventDefault();matCopy(\''+key+'\')">📋 복사</button> '
+    +'<button class="btn sm" onclick="event.preventDefault();matCsv(\''+key+'\')">📤 CSV</button>'
+    +'</summary><div class="body">'+body+'</div></details>';
+}
+
+/* 위촉·위원은 197건이라 다 펼치면 못 읽는다 — 「지금 맡고 있는 것만」이 기본. */
+function matWicRows(){
+  var a=(_mat&&_mat.wiccok)||[];
+  return _matLive ? a.filter(function(r){ return r.state==='진행'; }) : a;
+}
+function matLiveTog(){ _matLive=!_matLive; matDraw(); }
+
+function matDraw(){
+  if(!_mat){ $('matBox').innerHTML=''; return; }
+  var m=_mat, h='';
+
+  h+=_sec('edu','🎓','학력', m.edu.length+'건', true, '',
+    _tbl(['기간','학교명','학과·전공','학위','졸업구분'], m.edu, function(r){
+      return [esc(r.period), _b(r.school), esc(r.major), esc(r.degree), esc(r.graduated)]; }));
+
+  var lic=m.license.concat([]), cmp=m.complete.concat([]);
+  h+=_sec('cert','📜','자격 · 수료', '자격 '+lic.length+'건 · 수료 '+cmp.length+'건', true, '',
+    _tbl(['구분','자격·과정명','발급기관','취득일','번호·시간'],
+      lic.map(function(r){ r=Object.assign({},r); r._k='자격'; return r; })
+        .concat(cmp.map(function(r){ r=Object.assign({},r); r._k='수료'; return r; })),
+      function(r){ return ['<span class="tag '+(r._k==='자격'?'navy':'teal')+'">'+r._k+'</span>',
+        _b(r.title), esc(r.org), esc(r.date),
+        esc(r.num || (r.duration ? r.duration+'h' : ''))]; }));
+
+  var wr=matWicRows();
+  h+=_sec('wiccok','🏛','위촉 · 위원 경력',
+    m.wiccok.length+'건 · 지금 맡고 있는 것 '
+      + m.wiccok.filter(function(r){ return r.state==='진행'; }).length+'건',
+    false,
+    '<label class="sml" onclick="event.stopPropagation()">'
+      +'<input type="checkbox" '+(_matLive?'checked':'')+' onchange="matLiveTog()"> 지금 맡고 있는 것만</label>',
+    _tbl(['위촉기관','직책','위촉시작','위촉종료','상태'], wr, function(r){
+      return [_b(r.org), esc(r.role), esc(r.start), esc(r.end),
+        r.state ? '<span class="tag '+(r.state==='진행'?'teal':'amber')+'">'+r.state+'</span>'
+                : '<span class="sml">기간 모름</span>']; }));
+
+  h+=_sec('award','🏅','표창 · 포상', m.award.length+'건', false, '',
+    _tbl(['수여기관','내용','수상일'], m.award, function(r){
+      return [_b(r.org), esc(r.title), esc(r.date||r.year)]; }));
+
+  /* ⚠ 목록에는 이름을 그대로 둔다 — 대표님이 알아보셔야 한다. 가리는 것은 내보낼 때다. */
+  var adv=m.advisory;
+  h+=_sec('advisory','🤝','자문 · 고문',
+    adv.length+'개사 · 진행 '+adv.filter(function(r){ return r.status==='진행'; }).length+'개사',
+    true, ' <span class="tag red">내보낼 때 이름 가림</span>',
+    '<div class="warn">⚠ <b>고객사 이름은 내보낼 때 가려집니다.</b> 아래 목록에는 대표님이 '
+      +'알아보시게 실제 이름을 두지만, <b>복사·CSV 로 나갈 때는</b> 「○○제조사」처럼 바뀝니다 — '
+      +'고객사와의 비밀유지 때문입니다.</div>'
+    + (function(){ var t=GovCareer.advisorySentence(adv, new Date().toISOString().slice(0,10));
+        return t ? '<div class="snt">'+esc(t)+'</div>' : ''; })()
+    + _tbl(['고객사','업태·종목','규모','근로자','기간','상태'], adv, function(r){
+        return [_b(r.org), esc([r.bizType,r.bizCategory].filter(Boolean).join(' · ')),
+          esc(r.size), r.insured?r.insured.toLocaleString('ko-KR'):'', esc(r.period),
+          '<span class="tag '+(r.status==='진행'?'teal':'amber')+'">'+esc(r.status||'-')+'</span>']; }));
+
+  h+=_sec('perf','📈','수행 실적', m.perf.length+'건', false, '',
+    _tbl(['연도','갈래','사업·과제','고객사','수행기관','상태'], m.perf, function(r){
+      return [esc(r.year), '<span class="tag navy">'+esc(r.kind)+'</span>', _b(r.project),
+        esc(r.org), esc(r.agency), esc(r.status)]; }));
+
+  $('matBox').innerHTML=h;
+}
+
+/* ── 내보내기 ──
+   ⚠★ 자문·고문은 «반드시» 가려서 나간다. GovCareer 가 가릴 수 없으면 «빈 것»을 돌리므로
+      이름이 든 채로 나갈 길이 없다. 여기에 따로 만들지 말 것. */
+function matRowsFor(k){
+  if(!_mat) return [];
+  if(k==='cert') return _mat.license.concat(_mat.complete);
+  if(k==='wiccok') return matWicRows();
+  if(k==='advisory') return GovCareer.advisoryForExport(_mat.advisory);
+  return _mat[k]||[];
+}
+function matText(k){
+  if(!_mat) return '';
+  if(k==='advisory') return GovCareer.advisorySentence(_mat.advisory, new Date().toISOString().slice(0,10));
+  if(k==='cert') return [GovCareer.sentence('license',_mat.license),
+                         GovCareer.sentence('complete',_mat.complete)].filter(Boolean).join('\n');
+  return GovCareer.sentence(k, matRowsFor(k));
+}
+function matCopy(k){
+  var t=matText(k);
+  if(!t){ toast('내보낼 것이 없습니다'); return; }
+  var done=function(){ toast('복사했습니다 — 신청서에 붙여 넣으세요'); };
+  try{ navigator.clipboard.writeText(t).then(done, function(){ _matCopyOld(t,done); }); }
+  catch(e){ _matCopyOld(t,done); }
+}
+function _matCopyOld(t,done){
+  try{ var ta=document.createElement('textarea'); ta.value=t;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); done(); }catch(e){ toast('복사하지 못했습니다'); }
+}
+function matCsv(k){
+  var rows=matRowsFor(k);
+  if(!rows.length){ toast('내보낼 것이 없습니다'); return; }
+  var keys=Object.keys(rows[0]).filter(function(x){ return x.charAt(0)!=='_'; });
+  var csv=[keys.join(',')].concat(rows.map(function(r){
+    return keys.map(function(x){ return '"'+String(r[x]==null?'':r[x]).replace(/"/g,'""')+'"'; }).join(','); })).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));
+  a.download='정부사업신청_재료_'+k+'.csv'; a.click();
+}
+
 function boot(){
   drawKw(); draw(); readyNote(); applyLock('checking');
   if(location.protocol==='file:'){ applyLock('lock','file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
@@ -353,6 +572,8 @@ function boot(){
     if(!r.ok){ applyLock('lock', r.why); return; }
     applyLock('ok');
     await cloudPull(); drawKw(); draw(); readyNote(); auto();
+    /* 마지막으로 보던 문을 다시 연다 — 재료 탭이면 그때 받아온다(setTab 이 부른다) */
+    setTab(lsGet('tab')==='mat' ? 'mat' : 'feed');
   });
 }
 boot();
