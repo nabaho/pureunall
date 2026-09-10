@@ -329,11 +329,16 @@ function drawPanel(o){
      진짜를 함께 싣는다 — 안 실으면 상세가 통째로 터지고, 그 까닭이 안 보인다. */
   /* ⚠ 2026-08-31: 기업정보 접기/펼치기(대표 지시)로 CO_FIELDS 를 그리는 자리가
      coInfoBoxHtml·coInfoSummary 로 옮겨 갔다 — 대역이 아니라 진짜를 함께 싣는다. */
+  /* ⚠ 2026-09-10: 기업정보 머리줄에 중소기업 확인서 딱지가 붙었다(대표 지시). 위와
+     같은 까닭으로 «진짜»를 싣는다 — 대역을 넣으면 그 딱지가 터져도 이 검사가 모른다.
+     Date·Math 도 함께 넣는다(남은 날을 센다). */
+  ctx.Date = Date; ctx.Math = Math; ctx.isNaN = isNaN;
   vm.runInContext('let _coInfoOpen = true;\n'   // 펼친 채로 봐야 값·출처 줄이 보인다
     + src.match(/^const CO_SRC_SHORT = \{[^}]*\};/m)[0].replace(/^const /, 'var ')
     + '\n' + fnBody('coSrcShort') + '\n'
     + fnBody('coVal') + '\n' + fnBody('coSrcOf') + '\n'
     + fnBody('erpContractPeriod') + '\n' + fnBody('todayYmd') + '\n'
+    + fnBody('coSmeDays') + '\n' + fnBody('coSmeState') + '\n' + fnBody('coSmeChipHtml') + '\n'
     + fnBody('coSrcTagHtml') + '\n' + fnBody('coInfoSummary') + '\n' + fnBody('coInfoBoxHtml') + '\n'
     + fnBody('coDetailPanelHtml'), ctx);
   return ctx.coDetailPanelHtml(o);

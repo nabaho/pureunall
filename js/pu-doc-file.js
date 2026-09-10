@@ -650,9 +650,36 @@
      ⚠ 덮어쓰지 않고 **빈 칸만 채운다.** 나중에 읽은 서식이 먼저 읽은 값을 지우면,
        사람이 고쳐 둔 것도 함께 날아간다. */
   function sendToCoInfo(o) {
+    /* ── 중소기업확인서의 날짜는 «제 칸»으로 (대표 지시 2026-09-10) ──────────────
+       「기업정보에 매년 중소기업 확인서 발급 받고 기간 확인하는 게 필요하다」
+
+       ★★ 확인서와 등록증이 «같은 이름의 칸»을 쓴다. 판독 층은 갈래마다 제 이름을
+         주는데(js/pu-doc-read.js), 확인서(kind=sme)의 issueDate 는 «확인서» 발급일이고
+         등록증(kind=bizreg)의 issueDate 는 «등록증» 발급일이다. 그런데 기업정보로
+         보내는 칸 이름은 한 벌뿐이라, 확인서를 보내면 그 발급일이 「등록증 발급일」
+         자리에 눌러앉았다 — 그 칸은 «어느 등록증이 최신인가»를 가리는 유일한 잣대라
+         (2026-09-07), 확인서 날짜가 앉으면 옛 등록증이 새것으로 보인다.
+       ★ 그래서 확인서에서 온 셋만 제 이름으로 옮겨 담는다. 옮기고 나면 issueDate 는
+         «지운다» — 남겨 두면 옮긴 뜻이 없다(그대로 등록증 칸으로 간다).
+       ⚠ 업체관리(sendToCompany)가 쓰는 이름과 «같은 이름»이다(smeExpiry·smeIssueNo·
+         smeIssueDate — 위 CO_LABEL). 두 벌로 만들면 한쪽만 고쳐진다.
+       ⚠ 갈래를 모르면 손대지 않는다 — 확인서가 아닌 서류의 날짜를 옮기면 그것이
+         바로 이 함정의 반대 방향이다.
+       ⚠⚠ 이 함수를 sendToCoInfo «안»에 둔다. 검사 여럿이 sendToCoInfo 한 덩이만
+         떠서 돌리기 때문이다 — 밖에 두었더니 일곱 벌이 ReferenceError 로 죽었다
+         (2026-09-10 에 실제로 겪었다. 2026-09-07 에 같은 함정을 한 번 적어 두었다). */
+    function smeKeys(kind, fields) {
+      if (kind !== 'sme') return fields;
+      var out = {}, MOVE = { expiry: 'smeExpiry', issueNo: 'smeIssueNo', issueDate: 'smeIssueDate' };
+      Object.keys(fields).forEach(function (k) {
+        if (MOVE[k]) { out[MOVE[k]] = fields[k]; return; }
+        out[k] = fields[k];
+      });
+      return out;
+    }
     o = o || {};
     if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
-    var fields = o.fields || {};
+    var fields = smeKeys(o.kind, o.fields || {});
     var key = bizKey(fields.bizno);
     if (!key) {
       return Promise.resolve({ ok: false, filled: [], message: '사업자번호를 읽지 못해 어느 회사인지 알 수 없습니다' });
@@ -670,6 +697,13 @@
     var KEEP = ['company','ceo','corpno','address','companyTel','mobile','email','homepage','companyFax',
                 'issueDate',
                 'bizType','bizItem','openDate','smeType','product','sales','workers',
+                /* ── 중소기업 확인서 (대표 지시 2026-09-10) ──────────────────
+                   「매년 중소기업 확인서 발급 받고 기간 확인하는 게 필요하다」
+                   ⚠ 유효기간이 없으면 «언제 다시 받아야 하는지»를 알 길이 없다 —
+                     읽어 놓고 버리는 셈이다(업체관리는 이미 이 셋을 받고 있었다).
+                   ⚠ 이름은 바로 위 smeKeys 가 갈아 준다. 확인서의 issueDate 를
+                     그대로 두면 「등록증 발급일」 자리에 앉는다. */
+                'smeExpiry','smeIssueDate','smeIssueNo',
                 'docName','applyNo','applyItems',
                 /* 세금계산서 발급처 (대표 지시 2026-08-30) — 등록증에서 읽는다.
                    ⚠ pu-cards.html 의 CO_FIELDS 와 짝이다. 여기만 늘리면 값은 쌓이는데

@@ -62,7 +62,9 @@ function load(open){
     coVal: (o, f) => (o.extra && o.extra[f]) || o[f] || ''
   };
   vm.createContext(ctx);
-  vm.runInContext(fnBody('coInfoSummary') + '\n' + fnBody('coInfoBoxHtml'), ctx);
+  vm.runInContext(fnBody('coSmeDays') + '\n' + fnBody('coSmeState') + '\n'
+    + fnBody('coSmeChipHtml') + '\n'
+    + fnBody('coInfoSummary') + '\n' + fnBody('coInfoBoxHtml'), ctx);
   return ctx;
 }
 
