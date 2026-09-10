@@ -109,6 +109,9 @@ function reassemble(batches){
   put('bank_ledger_draft', { rows: new Array(50).fill({ memo:'큰 임시 작업분' }) });
   put('co_merge_log', [{ id:'m1' }]);
   put('cms_ledger', [{ id:'cms1' }]);
+  /* 비밀 둘 — 백업 파일이 NAS 공유폴더에 놓이므로 여기 담기면 그대로 새어 나간다 */
+  put('nas_config', { host:'192.168.0.21', user:'admin', pass:'비밀번호' });
+  put('nts_api_key', 'AQ.열쇠');
   const c = {
     console, Object, JSON, Array, String, Number, Date,
     KEY: 'pureun_v6_',
@@ -119,12 +122,17 @@ function reassemble(batches){
     }
   };
   vm.createContext(c);
-  vm.runInContext(slice('function buildBackupSnapshot(){', '// 백업 목록용 경량 요약'), c);
+  /* ⚠ 시작 표식을 SECRET_KEYS 부터로 잡는다 — buildBackupSnapshot 이 그 거름망을 쓴다
+     (2026-09-10 「나스 연결 검토」에서 비밀 거름망을 한 곳으로 모으며 그 위에 세웠다).
+     여기서 값을 «베껴 적지 않는다» — 베끼면 화면과 검사가 갈라져 검사가 거짓말을 한다. */
+  vm.runInContext(slice('var SECRET_KEYS =', '// 백업 목록용 경량 요약'), c);
   const snap = c.buildBackupSnapshot();
   t('진짜 데이터는 백업에 들어간다', !!snap.data.contracts, true);
   t('cms_ledger 도 들어간다 (서버 동기화 대상)', !!snap.data.cms_ledger, true);
   t('★ 올린 통장 파일(bank_ledger_draft)은 백업에 안 들어간다', 'bank_ledger_draft' in snap.data, false);
   t('★ 이 PC 전용 되돌리기 기록도 안 들어간다', 'co_merge_log' in snap.data, false);
+  t('★★ NAS 비밀번호는 백업에 안 들어간다', 'nas_config' in snap.data, false);
+  t('★★ API 열쇠도 안 들어간다', 'nts_api_key' in snap.data, false);
 }
 
 /* ══════ 3. serverBackupWrite — 순서와 실패 처리 ══════ */

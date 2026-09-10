@@ -2794,6 +2794,18 @@ var SERVER_BACKUP_KEYS = [
   'biz_case_types','biz_cons_types','biz_fund_types','biz_other_types',
   'activity_log','trash_bin','consult_logs'
 ];
+/* ── 백업·내보내기에 «담지 않는» 비밀 (2026-09-10 대표 지시 「나스 연결 검토」) ──
+   NAS 비밀번호·API 열쇠는 어느 백업에도 안 담는다. 담기면 그 파일을 볼 수 있는 사람이
+   곧 그 열쇠를 갖는다 — 백업은 «잃어버린 자료를 되찾는 것»이지 «열쇠를 옮기는 것»이 아니다.
+
+   ⚠★ **한 곳에 둔다.** 종전에는 같은 뜻의 정규식이 두 자리에 따로 적혀 있었고,
+     NAS 백업(doBackup)에는 **아예 없었다.** 그래서 NAS 에 올라간 백업 파일 안에
+     NAS 비밀번호와 국세청·사용자 API 열쇠가 그대로 들어갔다. 세 벌로 두면 또 한 벌만
+     고쳐진다 — 이 저장소가 여러 번 밟은 자리다(사진첩 갈래 목록·참고 서랍).
+   ⚠ 새 열쇠를 만들면 이름에 api_key·token·secret 을 넣어라 — 그러면 저절로 걸린다.
+     `tests/backup-no-secrets.test.js` 가 세 자리 모두 이 하나를 쓰는지 기계로 지킨다. */
+var SECRET_KEYS = /api_key|api_keys|nas_config|token|secret|passwd|password/i;
+
 function buildBackupSnapshot(){
   // 환경설정·정책·기준 등 전체 키 포함 (메타/세션/UI 전용만 제외)
   var SNAP_EXCLUDE = { force_pw:1,last_login_id:1,save_id_flag:1,current_menu:1,env_last_tab:1,
@@ -2811,7 +2823,7 @@ function buildBackupSnapshot(){
     if(!full || full.indexOf(KEY)!==0) continue;
     var k = full.slice(KEY.length);
     if(k.indexOf('_meta_')===0 || k.indexOf('pinned_menus_')===0 || k.indexOf('login_')===0 || k.indexOf('session')===0) continue;
-    if(SNAP_EXCLUDE[k] || /api_key|nas_config|token|secret/i.test(k)) continue; // API 키·NAS 설정·토큰·시크릿은 백업에서 제외
+    if(SNAP_EXCLUDE[k] || SECRET_KEYS.test(k)) continue; // 비밀은 백업에서 제외 — 거름망은 SECRET_KEYS 한 곳이다
     var raw = localStorage.getItem(full);
     if(raw==null) continue;
     try { data[k] = JSON.parse(raw); } catch(e){ data[k] = raw; }
@@ -36057,7 +36069,7 @@ function BackupSection(){
     var size = 0;
     for(var i=0; i<localStorage.length; i++){
       var k = localStorage.key(i);
-      if(k && k.indexOf(KEY) === 0 && !/api_key|nas_config|token|secret/i.test(k)){
+      if(k && k.indexOf(KEY) === 0 && !SECRET_KEYS.test(k)){   // 거름망은 SECRET_KEYS 한 곳이다
         var v = localStorage.getItem(k);
         data[k] = v;
         size += (k.length + v.length);
@@ -37099,7 +37111,7 @@ function DataManagementSection(){
     var data = {};
     for(var i=0; i<localStorage.length; i++){
       var k = localStorage.key(i);
-      if(k && k.indexOf(KEY) === 0){ data[k] = localStorage.getItem(k); }
+      if(k && k.indexOf(KEY) === 0 && !SECRET_KEYS.test(k)){ data[k] = localStorage.getItem(k); }
     }
     var json = JSON.stringify({ ts:new Date().toISOString(), kind:'pre-migration', data:data });
     var blob = new Blob([json], { type:'application/json' });
@@ -38542,13 +38554,22 @@ function NasBackupSettings(){
     if(!cfg.user||!cfg.pass){ showToast('NAS 아이디/비밀번호를 입력하세요'); return; }
     setBusy(true);
     addLog('백업 시작...','info');
-    // localStorage 전체 수집
+    var 열린세션 = null;
+    // localStorage 수집 — ⚠ 비밀은 «빼고» 담는다
+    /* ⚠⚠ 이 거름망이 없어서 NAS 에 올라가는 백업 파일 안에 **NAS 비밀번호와
+       API 열쇠가 그대로** 들어가고 있었다(2026-09-10 대표 지시 「나스 연결 검토」).
+       그 파일은 공유폴더에 놓이므로, 그 폴더를 볼 수 있는 사람은 NAS 비밀번호를 얻는다 —
+       그 계정은 쓰기 권한이 있어 백업을 지우거나 바꿀 수도 있다.
+       ⚠ 「고장」이 아니라 **한 자리만 안 고쳐진 것**이었다. 같은 일을 하는 다른 두 자리
+         (스냅샷·수동 내려받기)는 처음부터 이 거름망을 갖고 있었다 — 여기만 없었다.
+       ⚠ 거름망은 **한 곳**에 둔다(SECRET_KEYS). 세 벌로 두면 또 한 벌만 고쳐진다. */
     var data = { _ts:(new Date()).toISOString(), _ver:'v6' };
+    var 뺀것 = 0;
     for(var i=0; i<localStorage.length; i++){
       var k=localStorage.key(i);
-      if(k && k.indexOf('pureun_v6_')===0){
-        try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
-      }
+      if(!k || k.indexOf('pureun_v6_')!==0) continue;
+      if(SECRET_KEYS.test(k)){ 뺀것++; continue; }
+      try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
     }
     var json = JSON.stringify(data, null, 2);
     var filename = 'pureun_erp_backup_'+todayYMD()+'.json';
@@ -38556,6 +38577,7 @@ function NasBackupSettings(){
 
     nasLogin().then(function(sid){
       addLog('NAS 로그인 성공','ok');
+      열린세션 = sid;
       // 폴더 먼저 생성 (이미 있어도 무시)
       return fetchT(getNasBase()+'/webapi/entry.cgi', {
         method:'POST', credentials:'omit',
@@ -38587,16 +38609,30 @@ function NasBackupSettings(){
         });
     }).then(function(sid){
       addLog('날짜별 백업: '+filename+' 저장','ok');
+      /* 뺀 것을 조용히 넘기지 않는다 — 복원한 사람이 「설정이 왜 없지」로 헤매지 않게 */
+      if(뺀것) addLog('🔒 비밀 '+뺀것+'개(NAS 비번·API 열쇠)는 백업에 안 담았습니다 — 복원 뒤 다시 넣으셔야 합니다','info');
       return nasLogout(sid);
     }).catch(function(err){
       addLog('❌ 오류: '+getNasErrMsg(err),'err');
       showToast('NAS 백업 실패 — 아래 로그 확인');
-    }).finally(function(){ setBusy(false); });
+      /* 들어가 놓고 안 나오면 NAS 에 열린 세션이 쌓인다 — 실패한 쪽이 더 자주 일어난다 */
+      if(열린세션) nasLogout(열린세션);
+    }).finally(function(){ setBusy(false); 열린세션 = null; });
   }
 
   async function doRestore(){
     if(!cfg.user||!cfg.pass){ showToast('NAS 아이디/비밀번호를 입력하세요'); return; }
-    if(!(await popConfirm('NAS 최신 백업으로 덮어쓰시겠습니까?\n현재 데이터가 모두 교체됩니다.'))) return;
+    /* ⚠ 「모두 교체됩니다」는 **사실이 아니었다**(2026-09-10 검토).
+       아래 복원은 백업에 «있는» 칸만 덮어쓴다 — 백업에 없는 칸은 그대로 남으므로
+       실제로는 «교체»가 아니라 «합쳐짐»이다. 그 차이가 사람을 속인다:
+       「교체」라고 읽으면 백업 뒤에 만든 자료가 지워질까 봐 복원을 못 하고,
+       반대로 지워진 줄 알고 다시 만들면 두 벌이 된다.
+       ⚠ 말을 실제에 맞춘다 — 실제를 말에 맞추지 «않는다». 다 지우고 넣는 쪽이
+         훨씬 위험하다(백업 뒤에 만든 것이 통째로 사라진다). */
+    if(!(await popConfirm('NAS 최신 백업을 지금 자료 위에 덮어씁니다.\n\n'
+      + '· 백업에 있는 칸은 백업 내용으로 바뀝니다.\n'
+      + '· 백업에 없는 칸(백업 뒤에 만든 것)은 그대로 남습니다.\n'
+      + '· NAS 비번·API 열쇠는 백업에 없으므로 그대로입니다.\n\n계속할까요?'))) return;
     setBusy(true);
     addLog('복원 시작...','info');
     nasLogin().then(function(sid){
@@ -38739,9 +38775,8 @@ function NasBackupSettings(){
             var data = { _ts:(new Date()).toISOString(), _ver:'v6' };
             for(var i=0;i<localStorage.length;i++){
               var k=localStorage.key(i);
-              if(k && k.indexOf('pureun_v6_')===0){
-                try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
-              }
+              if(!k || k.indexOf('pureun_v6_')!==0 || SECRET_KEYS.test(k)) continue;   /* 비밀은 안 담는다 */
+              try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
             }
             var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
             var url=URL.createObjectURL(blob);
@@ -82847,13 +82882,16 @@ function ERPMain(props){
          백업은 급한 일이 아니므로 «화면이 다 뜬 뒤» 로 비켜 놓는다.
          (NAS 설정이 있고 7일이 지난 사람에게만 도는 일이지만, 그때는 확실히 멈췄다) */
       var _run = function(){
-      // 로컬스토리지 수집
+      /* 로컬스토리지 수집 — ⚠ 비밀은 «빼고» 담는다
+         ⚠★ 이 자리가 넷 가운데 **가장 위험했다.** 7일마다 «저절로» 돌아 NAS 공유폴더에
+           올라가는데, 사람이 누르는 것이 아니라 아무도 안 볼 때 돈다. 그래서 NAS 비밀번호와
+           API 열쇠가 든 파일이 조용히 쌓이고 있었다(2026-09-10 대표 지시 「나스 연결 검토」).
+           조용히 새는 것이 이 집에서 가장 아픈 흠이다. */
       var data = { _ts:new Date().toISOString(), _ver:'v6', _auto:true };
       for(var i=0;i<localStorage.length;i++){
         var k=localStorage.key(i);
-        if(k && k.indexOf('pureun_v6_')===0){
-          try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
-        }
+        if(!k || k.indexOf('pureun_v6_')!==0 || SECRET_KEYS.test(k)) continue;
+        try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
       }
       var json = JSON.stringify(data, null, 2);
       var today = todayYMD();
