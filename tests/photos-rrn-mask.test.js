@@ -136,6 +136,10 @@ function runReadPhoto(masked, opts) {
     'var readQuotaOut = false;',
     app.match(/^const READ_FAIL_RULES = \[[\s\S]*?^\];/m)[0],
     cutFn(app, 'function readFailKind('),
+    /* ⚠ 2026-09-10 — 실패한 판독에 «그 시각»을 따로 적는 줄이 붙었다. 안 실으면
+       readPhoto 가 그 줄에서 ReferenceError 로 멎어 이 파일의 가림 검사가 통째로 운다
+       — 벌써 다섯 번째 같은 일이다. 대역을 만들지 않는다(위 한도 판단과 같은 까닭). */
+    cutFn(app, 'function markFail('),
     cutFn(app, 'function readHoldIds('),
     cutFn(app, 'function renderReadAsk('),
     cutFn(app, 'function readQuotaWatch('),
