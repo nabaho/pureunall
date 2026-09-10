@@ -606,6 +606,62 @@ function nasUploadWith(cfg, sid, folder, name, blob){
     .then(function(d){ if(!d || !d.success) throw new Error('업로드 실패 코드: '+(d && d.error && d.error.code)); return d; });
 }
 
+/* ── 날짜별 백업 정리 (검토 ②) ──
+   날짜별 파일(pureun_erp_backup_날짜 · pureun_erp_auto_날짜)이 지우는 코드 없이 무한히 쌓였다 —
+   NAS 용량이 언젠가 찬다. 백업이 끝난 뒤 **가장 새 N개만 남기고** 그보다 오랜 것을 지운다.
+   ⚠★ 지우는 것은 «우리 이름꼴»뿐이다 — latest·undo·그 밖 파일은 이름이 달라 **절대** 안 건드린다.
+   ⚠ 바닥이 있다(NAS_KEEP_MIN) — 보관 개수를 0 이나 1 로 잘못 적어도 다 지워지지 않는다.
+   ⚠ 계획(nasTidyPlan)은 순수 함수다 — 검사가 이름 목록만 넣어 무엇이 지워지는지 «실제로» 본다.
+   ⚠ 정리는 백업을 «따라오는» 일이다 — 정리가 실패해도 백업은 성공이다(부르는 쪽이 catch 한다). */
+var NAS_KEEP_MIN = 5;
+var NAS_DATED_RE = /^pureun_erp_(backup|auto)_(\d{4}-?\d{2}-?\d{2})\.json$/;
+function nasTidyPlan(names, keep){
+  var n = parseInt(keep, 10);
+  if(!(n >= NAS_KEEP_MIN)) return [];                       // 바닥 아래·빈 값·글자 → 아무것도 안 지운다
+  var byKind = {};
+  (names || []).forEach(function(nm){
+    var m = NAS_DATED_RE.exec(String(nm || ''));
+    if(!m) return;                                          // 우리 이름꼴이 아니면 «본 척도 안 한다»
+    (byKind[m[1]] = byKind[m[1]] || []).push({ name: nm, day: m[2].replace(/-/g,'') });
+  });
+  var out = [];
+  Object.keys(byKind).forEach(function(kind){
+    var arr = byKind[kind].sort(function(a,b){ return a.day < b.day ? 1 : a.day > b.day ? -1 : 0; });   // 새것 먼저
+    arr.slice(n).forEach(function(x){ out.push(x.name); });
+  });
+  return out;
+}
+function nasListWith(cfg, sid, folder){
+  return fetchT(nasBaseOf(cfg)+'/webapi/entry.cgi', { method:'POST', credentials:'omit',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'api=SYNO.FileStation.List&version=2&method=list&folder_path='+encodeURIComponent(folder)+'&_sid='+encodeURIComponent(sid) }, 20000)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(!d || !d.success) throw new Error('목록 실패 코드: '+(d && d.error && d.error.code));
+      return ((d.data && d.data.files) || []).filter(function(f){ return f && !f.isdir; }).map(function(f){ return f.name; });
+    });
+}
+function nasDeleteWith(cfg, sid, folder, names){
+  if(!names || !names.length) return Promise.resolve(0);
+  var paths = names.map(function(nm){ return folder.replace(/\/$/,'') + '/' + nm; }).join(',');
+  return fetchT(nasBaseOf(cfg)+'/webapi/entry.cgi', { method:'POST', credentials:'omit',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'api=SYNO.FileStation.Delete&version=2&method=delete&path='+encodeURIComponent(paths)+'&_sid='+encodeURIComponent(sid) }, 30000)
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(!d || !d.success) throw new Error('삭제 실패 코드: '+(d && d.error && d.error.code)); return names.length; });
+}
+function nasTidyWith(cfg, sid, folder, keep, log){
+  log = log || function(){};
+  return nasListWith(cfg, sid, folder).then(function(names){
+    var del = nasTidyPlan(names, keep);
+    if(!del.length){ return 0; }
+    return nasDeleteWith(cfg, sid, folder, del).then(function(n){
+      log('🧹 오래된 날짜별 백업 '+n+'개 정리 — 새 '+parseInt(keep,10)+'개씩 남김 (latest·undo 는 그대로)', 'ok');
+      return n;
+    });
+  });
+}
+
 function fetchT(url, opts, ms){
   opts = opts || {};
   var wait = ms || FETCH_MS;
@@ -38580,7 +38636,8 @@ function NasBackupSettings(){
   })();
   var cs = useState(Object.assign({
     host:'192.168.0.21', port:'5000', httpsPort:'5001', useHttps:true,   /* HTTP 는 «일부러» 골라야 한다 */
-    user:'', pass:'', folder:'/업무자료/pureun_erp'
+    user:'', pass:'', folder:'/업무자료/pureun_erp',
+    keep:'30'                                            /* 날짜별 백업 보관 개수(갈래마다) — 바닥 NAS_KEEP_MIN */
   }, initCfg));
   var cfg = cs[0]; var setCfg = cs[1];
   var logS = useState([]); var logs = logS[0]; var setLogs = logS[1];
@@ -38613,19 +38670,12 @@ function NasBackupSettings(){
   function nasLogin(){ return nasLoginWith(cfg, addLog); }
   function nasLogout(sid){ return nasLogoutWith(cfg, sid); }
 
-  function doBackup(){
-    if(!cfg.user||!cfg.pass){ showToast('NAS 아이디/비밀번호를 입력하세요'); return; }
-    setBusy(true);
-    addLog('백업 시작...','info');
-    var 열린세션 = null;
-    // localStorage 수집 — ⚠ 비밀은 «빼고» 담는다
-    /* ⚠⚠ 이 거름망이 없어서 NAS 에 올라가는 백업 파일 안에 **NAS 비밀번호와
-       API 열쇠가 그대로** 들어가고 있었다(2026-09-10 대표 지시 「나스 연결 검토」).
-       그 파일은 공유폴더에 놓이므로, 그 폴더를 볼 수 있는 사람은 NAS 비밀번호를 얻는다 —
-       그 계정은 쓰기 권한이 있어 백업을 지우거나 바꿀 수도 있다.
-       ⚠ 「고장」이 아니라 **한 자리만 안 고쳐진 것**이었다. 같은 일을 하는 다른 두 자리
-         (스냅샷·수동 내려받기)는 처음부터 이 거름망을 갖고 있었다 — 여기만 없었다.
-       ⚠ 거름망은 **한 곳**에 둔다(SECRET_KEYS). 세 벌로 두면 또 한 벌만 고쳐진다. */
+  /* ⚠⚠ 이 거름망(SECRET_KEYS)이 없어서 NAS 에 올라가는 백업 파일 안에 **NAS 비밀번호와
+     API 열쇠가 그대로** 들어가고 있었다(2026-09-10 대표 지시 「나스 연결 검토」).
+     그 파일은 공유폴더에 놓이므로, 그 폴더를 볼 수 있는 사람은 NAS 비밀번호를 얻는다.
+     ⚠ 「고장」이 아니라 **한 자리만 안 고쳐진 것**이었다 — 거름망은 **한 곳**(SECRET_KEYS)에 둔다.
+     ⚠ 백업과 «복원 전 되돌리기 꾸러미»가 같은 함수를 쓴다 — 두 벌이면 한 벌만 고쳐진다. */
+  function collectLocal(){
     var data = { _ts:(new Date()).toISOString(), _ver:'v6' };
     var 뺀것 = 0;
     for(var i=0; i<localStorage.length; i++){
@@ -38634,7 +38684,16 @@ function NasBackupSettings(){
       if(SECRET_KEYS.test(k)){ 뺀것++; continue; }
       try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
     }
-    var json = JSON.stringify(data, null, 2);
+    return { json: JSON.stringify(data, null, 2), 뺀것: 뺀것 };
+  }
+
+  function doBackup(){
+    if(!cfg.user||!cfg.pass){ showToast('NAS 아이디/비밀번호를 입력하세요'); return; }
+    setBusy(true);
+    addLog('백업 시작...','info');
+    var 열린세션 = null;
+    var 꾸러미 = collectLocal();                          // 비밀은 «빼고» 담는다(SECRET_KEYS)
+    var json = 꾸러미.json, 뺀것 = 꾸러미.뺀것;
     var filename = 'pureun_erp_backup_'+todayYMD()+'.json';
     var latest = 'pureun_erp_latest.json';
 
@@ -38657,7 +38716,10 @@ function NasBackupSettings(){
       addLog('날짜별 백업: '+filename+' 저장','ok');
       /* 뺀 것을 조용히 넘기지 않는다 — 복원한 사람이 「설정이 왜 없지」로 헤매지 않게 */
       if(뺀것) addLog('🔒 비밀 '+뺀것+'개(NAS 비번·API 열쇠)는 백업에 안 담았습니다 — 복원 뒤 다시 넣으셔야 합니다','info');
-      return nasLogout(sid);
+      /* 정리는 백업을 «따라오는» 일 — 실패해도 백업은 성공이다. 다만 조용히 넘기지는 않는다 */
+      return nasTidyWith(cfg, sid, cfg.folder, cfg.keep, addLog)
+        .catch(function(e){ addLog('정리는 건너뜀: '+(e && e.message),'info'); })
+        .then(function(){ return nasLogout(sid); });
     }).catch(function(err){
       addLog('❌ 오류: '+getNasErrMsg(err),'err');
       showToast('NAS 백업 실패 — 아래 로그 확인');
@@ -38666,54 +38728,78 @@ function NasBackupSettings(){
     }).finally(function(){ setBusy(false); 열린세션 = null; });
   }
 
+  /* ── 복원 (검토 ②: «되돌리기»가 없었다) ──
+     잘못 복원하면 끝이었다 — 백업 뒤에 고친 것이 백업 내용으로 덮이고 돌아갈 길이 없었다.
+     이제 복원하기 «직전의 지금 상태»를 NAS 에 pureun_erp_undo.json 으로 먼저 올려 두고,
+     「↩ 복원 전으로 되돌리기」가 그 파일을 다시 덮어쓴다.
+     ⚠ 되돌리기 꾸러미도 collectLocal 이라 비밀은 안 담긴다.
+     ⚠ 되돌리기 자체는 undo 를 다시 쓰지 않는다 — 「복원 직전」이라는 뜻을 지킨다. */
+  function restoreFrom(name, 안내){
+    var url = getNasBase()+'/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path='+encodeURIComponent(cfg.folder+'/'+name)+'&mode=download&_sid=';
+    return function(sid){
+      return fetchT(url+encodeURIComponent(sid), {credentials:'omit'}, 60000).then(function(r){   // 백업 파일은 크다 — 넉넉히
+        if(!r.ok) throw new Error(안내 || ('파일 없음: '+name));
+        return r.json();
+      }).then(function(data){
+        var count=0;
+        Object.keys(data).forEach(function(k){
+          if(k.indexOf('pureun_v6_')===0){ localStorage.setItem(k, typeof data[k]==='string'?data[k]:JSON.stringify(data[k])); count++; }
+        });
+        return count;
+      });
+    };
+  }
   async function doRestore(){
     if(!cfg.user||!cfg.pass){ showToast('NAS 아이디/비밀번호를 입력하세요'); return; }
     /* ⚠ 「모두 교체됩니다」는 **사실이 아니었다**(2026-09-10 검토).
-       아래 복원은 백업에 «있는» 칸만 덮어쓴다 — 백업에 없는 칸은 그대로 남으므로
-       실제로는 «교체»가 아니라 «합쳐짐»이다. 그 차이가 사람을 속인다:
-       「교체」라고 읽으면 백업 뒤에 만든 자료가 지워질까 봐 복원을 못 하고,
-       반대로 지워진 줄 알고 다시 만들면 두 벌이 된다.
-       ⚠ 말을 실제에 맞춘다 — 실제를 말에 맞추지 «않는다». 다 지우고 넣는 쪽이
-         훨씬 위험하다(백업 뒤에 만든 것이 통째로 사라진다). */
+       복원은 백업에 «있는» 칸만 덮어쓴다 — 없는 칸은 그대로 남으므로 «교체»가 아니라 «합쳐짐»이다.
+       ⚠ 말을 실제에 맞춘다 — 실제를 말에 맞추지 «않는다». 다 지우고 넣는 쪽이 훨씬 위험하다. */
     if(!(await popConfirm('NAS 최신 백업을 지금 자료 위에 덮어씁니다.\n\n'
       + '· 백업에 있는 칸은 백업 내용으로 바뀝니다.\n'
       + '· 백업에 없는 칸(백업 뒤에 만든 것)은 그대로 남습니다.\n'
-      + '· NAS 비번·API 열쇠는 백업에 없으므로 그대로입니다.\n\n계속할까요?'))) return;
+      + '· NAS 비번·API 열쇠는 백업에 없으므로 그대로입니다.\n'
+      + '· 지금 상태는 NAS 에 «되돌리기 꾸러미»로 먼저 올려 둡니다 — 잘못되면 ↩ 로 돌아옵니다.\n\n계속할까요?'))) return;
     setBusy(true);
     addLog('복원 시작...','info');
+    var 세션 = null;
     nasLogin().then(function(sid){
+      세션 = sid;
       addLog('NAS 로그인 성공','ok');
-      var url = getNasBase()+'/webapi/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path='+encodeURIComponent(cfg.folder+'/pureun_erp_latest.json')+'&mode=download&_sid='+sid;
-      return fetchT(url, {credentials:'omit'}, 60000).then(function(r){   // 백업 파일은 크다 — 넉넉히
-        if(!r.ok) throw new Error('파일 없음 (아직 백업 안 됨)');
-        return r.json().then(function(data){
-          var count=0;
-          Object.keys(data).forEach(function(k){
-            if(k.indexOf('pureun_v6_')===0){ localStorage.setItem(k, typeof data[k]==='string'?data[k]:JSON.stringify(data[k])); count++; }
-          });
-          addLog('✅ 복원 완료: '+count+'개 항목','ok');
-          showToast('복원 완료 — 새로고침합니다');
-          return nasLogout(sid);
-        }).then(function(){ setTimeout(function(){location.reload();},1500); });
-      });
-    }).catch(function(err){
-      addLog('❌ 복원 오류: '+getNasErrMsg(err),'err');
-      showToast('NAS 복원 실패 — 아래 로그 확인');
-    }).finally(function(){ setBusy(false); });
+      /* ① 되돌리기 꾸러미를 «먼저» — 이것이 안 올라가면 복원하지 않는다(돌아갈 길이 없는 복원은 안 한다) */
+      return nasUploadWith(cfg, sid, cfg.folder, 'pureun_erp_undo.json', new Blob([collectLocal().json],{type:'application/json'}))
+        .then(function(){ addLog('↩ 복원 직전 상태를 pureun_erp_undo.json 으로 올렸습니다','ok'); return sid; });
+    }).then(restoreFrom('pureun_erp_latest.json', '파일 없음 (아직 백업 안 됨)'))
+      .then(function(count){
+        addLog('✅ 복원 완료: '+count+'개 항목 — 잘못됐으면 「↩ 복원 전으로 되돌리기」','ok');
+        showToast('복원 완료 — 새로고침합니다 (잘못됐으면 ↩ 되돌리기)');
+        return nasLogout(세션);
+      }).then(function(){ setTimeout(function(){location.reload();},1500); })
+      .catch(function(err){
+        addLog('❌ 복원 오류: '+getNasErrMsg(err),'err');
+        showToast('NAS 복원 실패 — 아래 로그 확인');
+        if(세션) nasLogout(세션);
+      }).finally(function(){ setBusy(false); });
   }
-
-  function doTest(){
-    if(!cfg.user||!cfg.pass){ showToast('아이디/비밀번호 입력 필요'); return; }
+  async function doUndo(){
+    if(!cfg.user||!cfg.pass){ showToast('NAS 아이디/비밀번호를 입력하세요'); return; }
+    if(!(await popConfirm('마지막 복원 «직전»의 상태로 되돌립니다.\n\n'
+      + '· 그 꾸러미에 있는 칸은 그때 내용으로 바뀝니다.\n'
+      + '· 그 뒤에 만든 칸은 그대로 남습니다.\n\n계속할까요?'))) return;
     setBusy(true);
-    addLog('NAS 연결 테스트 중...','info');
-    nasLogin().then(function(sid){
-      addLog('✅ NAS 연결 성공! ('+getNasBase()+')','ok');
-      showToast('✅ NAS 연결 성공');
-      return nasLogout(sid);
-    }).catch(function(err){
-      addLog('❌ 연결 실패: '+getNasErrMsg(err),'err');
-      showToast('연결 실패 — 아래 로그 확인');
-    }).finally(function(){ setBusy(false); });
+    addLog('되돌리기 시작...','info');
+    var 세션 = null;
+    nasLogin().then(function(sid){ 세션 = sid; addLog('NAS 로그인 성공','ok'); return sid; })
+      .then(restoreFrom('pureun_erp_undo.json', '되돌릴 것이 없습니다 — 이 NAS 에 복원한 적이 없습니다'))
+      .then(function(count){
+        addLog('↩ 되돌리기 완료: '+count+'개 항목','ok');
+        showToast('복원 전으로 되돌렸습니다 — 새로고침합니다');
+        return nasLogout(세션);
+      }).then(function(){ setTimeout(function(){location.reload();},1500); })
+      .catch(function(err){
+        addLog('❌ 되돌리기 오류: '+getNasErrMsg(err),'err');
+        showToast('되돌리기 실패 — 아래 로그 확인');
+        if(세션) nasLogout(세션);
+      }).finally(function(){ setBusy(false); });
   }
 
   var iS = { width:'100%', padding:'8px 10px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'12.5px', boxSizing:'border-box' };
@@ -38790,6 +38876,11 @@ function NasBackupSettings(){
         h('div', { style:{marginBottom:'16px'} },
           h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, '저장 폴더 경로'),
           h('input', { type:'text', value:cfg.folder, onChange:field('folder'), placeholder:'/업무자료/pureun_erp', style:iS })),
+        h('div', { style:{marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'} },
+          h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569'} }, '날짜별 백업 보관 개수'),
+          h('input', { type:'number', min:NAS_KEEP_MIN, value:cfg.keep, onChange:field('keep'), placeholder:'30', style:Object.assign({}, iS, { width:'90px' }) }),
+          h('span', { style:{fontSize:'11.5px', color:'#64748b'} },
+            '새 것부터 이 개수만 남기고(갈래마다) 그보다 오랜 날짜별 파일을 백업 뒤 정리합니다 — 최소 '+NAS_KEEP_MIN+'개 · latest·undo 는 안 건드립니다')),
         h('div', { style:{display:'flex', gap:'8px'} },
           h('button', { onClick:save, style:btnS('#475569') }, '💾 설정 저장'),
           h('button', { onClick:doTest, disabled:busy, style:btnS('#16a34a') }, '🔌 연결 테스트'))
@@ -38801,10 +38892,13 @@ function NasBackupSettings(){
         h('div', { style:{fontSize:'11.5px', color:'#64748b', marginBottom:'14px', lineHeight:1.6} },
           '• 백업: 현재 ERP 전체 데이터 → NAS '+cfg.folder+'/pureun_erp_latest.json', h('br'),
           '• 날짜별 파일도 함께 저장됩니다 (예: pureun_erp_backup_2026-05-17.json)', h('br'),
-          '• 복원: NAS 최신 백업 → 현재 ERP (기존 데이터 덮어씀)'),
-        h('div', { style:{display:'flex', gap:'10px'} },
+          '• 복원: NAS 최신 백업 → 현재 ERP (백업에 있는 칸만 덮어씀 · 복원 직전 상태는 undo 로 먼저 올려 둠)', h('br'),
+          '• 되돌리기: 마지막 복원 «직전» 상태(pureun_erp_undo.json)로 돌아갑니다', h('br'),
+          '• 날짜별 파일은 새 '+(parseInt(cfg.keep,10)||NAS_KEEP_MIN)+'개만 남기고 그보다 오랜 것은 백업 뒤 정리합니다'),
+        h('div', { style:{display:'flex', gap:'10px', flexWrap:'wrap'} },
           h('button', { onClick:doBackup, disabled:busy, style:Object.assign({},btnS('#1e40af'),{flex:1}) }, '📤 NAS에 지금 백업'),
-          h('button', { onClick:doRestore, disabled:busy, style:Object.assign({},btnS('#dc2626'),{flex:1}) }, '📥 NAS에서 복원'))
+          h('button', { onClick:doRestore, disabled:busy, style:Object.assign({},btnS('#dc2626'),{flex:1}) }, '📥 NAS에서 복원'),
+          h('button', { onClick:doUndo, disabled:busy, title:'마지막 복원 직전 상태로', style:Object.assign({},btnS('#475569'),{flex:1}) }, '↩ 복원 전으로 되돌리기'))
       ),
 
       // CORS 안내
@@ -82970,6 +83064,8 @@ function ERPMain(props){
         .then(function(){
           localStorage.setItem(AUTO_KEY, String(now));
           showToast('🖥️ NAS 자동 백업 완료 ('+today+')');
+          /* 정리도 따라온다 — 자동 백업은 매주 한 장씩 쌓이므로 여기서 안 하면 영영 안 한다 */
+          return nasTidyWith(cfg, 세션, folder, cfg.keep).catch(function(){ /* 정리 못 해도 백업은 됐다 */ });
         })
         .catch(function(){ /* 자동 백업 실패는 조용히 무시 (NAS 미연결·CORS 시 정상) — ⚠ 남은 일: 실패를 설정 화면 기록에라도 남길 것 */ })
         .then(function(){ return nasLogoutWith(cfg, 세션); });
