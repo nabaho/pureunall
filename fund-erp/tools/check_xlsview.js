@@ -74,7 +74,9 @@ function Book(names) {
 /* ══════════ fund.html 의 그 함수들 ══════════ */
 global.num = (v) => (v == null || v === '' ? '' : Math.round(Number(String(v).replace(/[^0-9.-]/g, '')) || 0));
 global.S = { year: 2026 };
-['setC', 'clearRange', 'fillSetup', '_officersOf', '_prepCommittee',
+/* 설립 엑셀의 출연금액(F13)도 «한 줄기»(foundContrib)에서 온다 — 2026-09-10 */
+['estabSites', 'siteContribOf', 'foundContribOf', 'foundContrib',
+ 'setC', 'clearRange', 'fillSetup', '_officersOf', '_prepCommittee',
  '_xlsColN', '_xlsPlain', '_xlsRef', '_xlsVlookup', '_xlsJoin', '_xlsRecalc',
  '_xlsPx', '_xlsHTML'].forEach((n) => (0, eval)(gF(n)));
 

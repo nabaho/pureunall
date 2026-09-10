@@ -29,6 +29,8 @@ function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음
 function gV(n){const i=src.indexOf('var '+n+'=');if(i<0)throw Error('없음 '+n);let d=0;
   for(let k=src.indexOf('=',i);k<src.length;k++){const c=src[k];
     if(c==='{'||c==='[')d++;else if(c==='}'||c===']'){d--;if(!d)return src.slice(i,src.indexOf(';',k)+1);}}}
+/* 줄째로 꺼내기 — gV 는 {·[ 로 시작하는 값만 잡는다(글자 하나짜리 상수는 못 잡는다) */
+const gS = n => (src.match(new RegExp('var ' + n + '=[^\\n]*?;')) || [])[0] || '';
 global.esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 global.num = v => { if (v === '' || v == null) return ''; const n = Number(String(v).replace(/,/g,'')); return isFinite(n) ? n : '' };
 global.BAKE_BLANK = (src.match(/var BAKE_BLANK='([^']*)'/) || [])[1];
@@ -39,6 +41,13 @@ global.funds = {};
   gF('korWon'), gF('_docRok'), gF('_siteWrep'), gF('_prepCommittee'), gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'),
   gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'), gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'),
   gF('fillCommittee'), gF('fillRoster'), gF('fillSubsidyDoc'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
+  /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10).
+     hwpFormHTML 이 정관·설립합의서에서 fillPartyList 를, fillDerived 가 foundContrib 를 부른다 —
+     여기 없으면 「foundContrib is not defined」로 이 검사가 통째로 죽는다.
+     ⚠ gV 는 {·[ 로 시작하는 값만 잡는다. 글자 하나짜리 상수는 줄째로 꺼낸다. */
+  gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
+  gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
+  gF('partyNames'), gF('partyJoin'), gF('fillPartyList'), gF('fillPartyDates'),
   gF('fillDerived'), gF('fillFoundContribDoc'), gF('hwpFormHTML')].join('\n'));
 
 let bad = 0;
@@ -87,7 +96,8 @@ console.log('\n■ 기금출연확인서 — 사업장마다 한 장');
   ok('사업장·대표자가 선다', /가나기계 대표이사 김가나/.test(t) && /다라전자 대표이사 이다라/.test(t));
   ok('원본 자리표 「0000(주) 대표이사 0 0 0」이 안 남는다', !/0000\(주\)|0 0 0/.test(t));
   const t0 = draw('contrib', F, []);
-  ok('출연 사업장이 없으면 지어내지 않고 까닭을 남긴다', /기본 출연금이 적힌 참여사업장이 없어/.test(t0) && /￦ [＿_]+/.test(t0)); }
+  /* 글귀는 2026-09-10 에 바뀌었다 — 이제 1인당 단가로도 셈하므로 「기본 출연금」만 말하지 않는다 */
+  ok('출연 사업장이 없으면 지어내지 않고 까닭을 남긴다', /출연 약정액이 적힌 참여사업장이 없어/.test(t0) && /￦ [＿_]+/.test(t0)); }
 
 console.log('\n■ 사업계획서·등기신청서·취임승낙서·인감·등록면허세');
 { const t = draw('bizplan', F);
@@ -214,9 +224,41 @@ console.log('\n■ 값이 없으면 «지어내지 않는다»');
 
 console.log('\n■ 배선');
 ok('hwpFormHTML 이 마지막에 fillDerived 를 부른다', /fillDerived\(d,f,sites,kind\);\s*return "<p class='note'>/.test(gF('hwpFormHTML')));
-ok('설립 출연확인서는 걷어내기 «앞에» 다시 짠다', /if\(kind==='contrib'\) fillFoundContribDoc\(d,f,sites\);\s*stripBaked\(d\);/.test(gF('hwpFormHTML')));
+/* 「바로 앞줄인가」가 아니라 «앞서 도는가»를 본다 — 2026-09-10 에 그 사이로 자리표 채우기가
+   들어왔다(정관·설립합의서). 붙어 있기를 요구하면 새 채움을 넣을 때마다 이 검사가 깨진다. */
+(() => {
+  const h = gF('hwpFormHTML');
+  const a = h.indexOf("if(kind==='contrib') fillFoundContribDoc(d,f,sites);");
+  const b = h.indexOf('stripBaked(d);');
+  ok('설립 출연확인서는 걷어내기 «앞에» 다시 짠다', a >= 0 && b > a);
+  const p = h.indexOf('fillPartyList');
+  ok('정관·설립합의서 자리표도 걷어내기 «앞에» 채운다', p >= 0 && p < b);
+})();
 /* 규칙의 공백은 \s* 여야 한다 — 원본은 붙임공백이다 */
 ok('규칙의 공백을 붙임공백에도 맞춘다 (_rx)', /var _rx=function\(p\)\{ return new RegExp\(String\(p\)\.replace\(\/ \/g,'\\\\s\*'\)\); \};/.test(gF('fillDerived')));
+
+/* ══ 정관·설립합의서에 참여사업장이 «정말» 들어가는가 ══ (2026-09-10)
+   2026-09-10 이전에는 여기 한 글자도 안 들어갔다 — 원본 변환본에 「○○주식회사」 자리표만 있고
+   채우는 길이 없었다. 사업장 명부를 잘 채우는 화면 생성본이 있지만 변환본이 «먼저 이겨서»
+   한 번도 쓰이지 않는다. 그래서 이 검사는 «그린 서식»을 보고, 소스 글자를 보지 않는다. */
+console.log('\n■ 정관·설립합의서 — 참여사업장이 이름으로 선다');
+{
+  const live = SITES.filter(s => s.status !== 'closed');
+  ['agreement', 'charter'].forEach((k) => {
+    const t = draw(k, F, SITES);
+    live.forEach(s => ok(k + ' 에 ' + s.name + ' 이 선다', t.indexOf(s.name) >= 0));
+    ok(k + ' 에 자리표 ○○주식회사·○○회사가 안 남는다', !/(?:○○|XX)\s*(?:주식회사|회사)/.test(t), t.slice(0, 120));
+    /* 탈퇴한 사업장은 설립 서류에 설 수 없다 — 나간 회사의 출연 약정을 적을 수 없다 */
+    ok(k + ' 에 탈퇴한 사업장은 안 선다', t.indexOf('닫은곳') < 0);
+  });
+  /* 서명란은 회사마다 한 줄이어야 한다 — 날인을 회사마다 받기 때문이다 */
+  const ag = draw('agreement', F, SITES);
+  live.forEach(s => ok('설립합의서 서명란에 ' + s.name + ' 이 있다',
+    new RegExp(s.name + '\\s*근로자측\\s*대표').test(ag)));
+  /* 사업장이 없으면 손대지 않는다 — 자리표가 틀린 이름보다 낫다 */
+  const none = draw('agreement', F, []);
+  ok('사업장이 없으면 자리표를 그대로 둔다', /(?:○○|XX)\s*주식회사/.test(none));
+}
 
 console.log(bad ? '\nFAILURES ' + bad : '\nALL PASS (자료가 있는 자리는 서식에 선다, 없는 자리는 비어 있다)');
 process.exit(bad ? 1 : 0);

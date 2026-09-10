@@ -354,7 +354,19 @@ var FIELDS=[['name','기금법인명','text'],['short_name','약칭','text'],['f
      ⚠ 임대인의 주민등록번호는 두지 않는다 — 남의 것이다. 상호(성명)만 받는다.
      ⚠ 기간은 시작일 하나만 받는다 — 서식이 「＿부터 2년간」이라 끝은 셈한다. */
   ['lease_lessor','임대인(상호·성명)','text'],['lease_addr','임차 소재지','text'],['lease_from','임대차 시작일','date'],
-  ['lease_deposit','보증금(원)','text'],['lease_rent','월 임차료(원)','text']];
+  ['lease_deposit','보증금(원)','text'],['lease_rent','월 임차료(원)','text'],
+  /* ── 설립 ── 아래 열 칸은 서식이 «읽고 있었는데 넣을 자리가 없던» 값들이다(2026-09-10 확인).
+     설립합의서·회의록·정관·설립등기신청서·사업자등록신청서·설립 엑셀·감사보고서가 이 값을 묻는데
+     화면에도 일괄 가져오기에도 칸이 없어, 새로 세우는 기금에서는 «영영 빈칸»이었다.
+     ⚠ 출연금 총액은 사업장 합계가 «없을 때만» 쓴다(foundContribOf) — 사업장마다 적어 둔
+       약정액이 먼저다. 그래야 사업장을 한 번 정리하면 서류가 따라온다.
+     ⚠ 회계연도는 MM-DD 두 칸이다. 설립한 해의 감사보고서는 «인가일부터»라 _fyRange 가
+       인가일을 따로 본다 — 여기 값은 1월 1일에 시작하지 않는 기금을 위한 것이다. */
+  ['contribution_total','설립 출연금 총액(원)','text'],['contrib_per_worker','1인당 출연단가(원)','text'],
+  ['rep_org','대표회사·사무국','text'],['estab_date','출연 예정일','date'],
+  ['meeting_date','설립준비위 회의일','date'],['meeting_place','회의 장소','text'],
+  ['rep_position','대표자 직책','text'],['worker_rep','근로자대표','text'],
+  ['fy_start_md','회계연도 시작(MM-DD)','text'],['fy_end_md','회계연도 종료(MM-DD)','text']];
 var KEY5=['inka_no','inka_date','corp_reg_no','reg_date','tax_id_no'];
 /* 임원 명부 — 정관 제25조: 이사는 노·사 각 1~3인, **감사는 노·사 각 1인**.
    직위를 「근로자측 감사」처럼 한 낱말로 담는다. 이미 있는 읽는 쪽들이
@@ -462,7 +474,13 @@ var SITE_FIELDS=[['seq_label','연번','text'],['name','상호','text'],['ceo','
   /* 직전년도 매출액 — 지원금 심사에 쓴다(중소기업 여부·규모). 기업정보함에도 있어 당겨온다.
      해마다 달라지는 값은 [연도별 기록]에 따로 쌓는다(출연금과 같은 구조). */
   ['sales','직전년도 매출액(원)','text'],
-  ['address','소재지','text'],['note','비고','text']];
+  ['address','소재지','text'],['note','비고','text'],
+  /* 기업정보함에 이미 쌓여 있는데 «당겨오지 않던» 값들(2026-09-10).
+     종목은 사업자등록증과 지원신청서가 업태와 갈라 묻고, 기업규모는 지원금 제출서류의
+     중소기업확인서가 필요한지를 가른다. 개업일은 중소기업 판정에 쓰인다.
+     ⚠ 새 칸은 «맨 뒤»에 붙인다 — 가운데 끼우면 이미 만들어 둔 붙여넣기 자료가 밀린다. */
+  ['biz_item','종목','text'],['open_date','개업일','text'],
+  ['sme_type','기업규모','text'],['company_tel','회사 전화','text']];
 /* 협력업체 표시(partner)는 명부 표의 체크상자로 바로 켠다(setSitePartner) —
    여기에 칸 정의를 또 두면 «편집 폼에도 있는 것처럼» 읽혀 헷갈린다. 그래서 지웠다.
    쓰임은 별지15호 ⑩ 협력업체 근로자 수 집계다. */
@@ -486,6 +504,42 @@ var WREP_FIELDS=[['wrep_name','근로자대표 성명','text'],['wrep_title','�
 /* 화면과 서식이 «같은 자리»를 읽게 한 곳에 모은다 */
 function _siteWrep(s){ s=s||{}; return {name:String(s.wrep_name||'').trim(), title:String(s.wrep_title||'').trim(),
   mobile:String(s.wrep_mobile||'').trim(), birth:String(s.wrep_birth||'').trim(), doc:s.wrep_doc||null}; }
+
+/* ══════════ 설립 출연금은 «한 줄기»로 ══════════ (2026-09-10)
+   여태 같은 출연금이 세 곳에서 따로 살았다:
+     ① 사업장의 기본 출연금(s.contrib) — 한글본 기금출연확인서가 봤다
+     ② 상시근로자수 × 1인당 단가        — 엑셀 기금출연확인서가 «따로» 셈했다
+     ③ f.contribution_total             — 합의서·회의록·정관·등기·세무가 봤는데 «넣을 칸이 없었다»
+   그래서 같은 확인서인데 어느 길로 뽑느냐에 따라 금액이 달랐고, ③을 읽는 열두 자리는
+   새로 세우는 기금에서 늘 비어 나갔다. 셋을 여기 하나로 모은다.
+
+   ⚠ 차례가 곧 «믿음의 차례»다. 사업장마다 적어 둔 약정액이 가장 정확하고, 그것이 하나도
+     없을 때만 사람수 × 단가로 어림하며, 그것도 없을 때만 손으로 적은 총액을 쓴다.
+   ⚠ 어림한 것인지(from:'rate') 함께 돌려준다 — 서식에 「어림」이라 적을 수는 없지만
+     화면에서는 무엇을 근거로 한 숫자인지 보여 줘야 한다.
+   ⚠ 탈퇴한 사업장은 빼고 센다 — 나간 회사의 출연 약정을 설립 서류에 적을 수 없다. */
+function estabSites(sites){
+  return (sites||[]).filter(function(s){ return s && (s.status||'active')!=='closed'; });
+}
+/* 사업장 한 곳의 출연 약정액 — 적어 둔 값이 먼저, 없으면 사람수 × 단가.
+   한글본과 엑셀본이 «같은 이 함수»를 쓴다(따로 셈하면 또 어긋난다). */
+function siteContribOf(s,f){
+  var v=num(s&&s.contrib)||0; if(v>0) return v;
+  var rate=num((f||{}).contrib_per_worker)||0, w=num(s&&s.company_size)||0;
+  return (rate>0&&w>0)?rate*w:0;
+}
+function foundContribOf(f,sites){
+  var list=estabSites(sites), sum=0, n=0, est=false;
+  list.forEach(function(s){
+    var v=num(s.contrib)||0;
+    if(!v){ var e=siteContribOf(s,f); if(e>0){ v=e; est=true; } }
+    if(v>0){ sum+=v; n++; }
+  });
+  if(sum>0) return {amt:sum, n:n, of:list.length, from:est?'rate':'sites'};
+  var man=num((f||{}).contribution_total)||0;
+  return man>0 ? {amt:man,n:0,of:list.length,from:'manual'} : {amt:0,n:0,of:list.length,from:'none'};
+}
+function foundContrib(f,sites){ return foundContribOf(f,sites).amt; }
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function $(id){return document.getElementById(id);}
@@ -2381,7 +2435,46 @@ function _cleanAddr(s){
   t=t.replace(/\s*발\s*(?:급)?\s*사?\s*유.*$/,'').trim();      // '발급사유 신규' 꼬리 제거
   return t.length>=6&&t.length<=100?t:'';
 }
+/* ── 사업자등록증 판독 (참여사업장) ── (2026-09-10)
+   고유번호증과 서식이 닮았지만 «묻는 칸이 다르다» — 업태·종목·개업연월일이 있고,
+   번호가 고유번호가 아니라 사업자등록번호다. 그래서 parseTaxId 를 돌려 쓰지 않고 따로 둔다.
+   ⚠ 넣는 칸 이름은 사업장 칸(SITE_FIELDS)을 따른다 — 기금 칸과 이름이 다르다(corp_no ≠ corp_reg_no).
+   ⚠ 못 읽은 칸은 «넣지 않는다». 빈 칸이 틀린 값보다 낫다 — 사업자등록번호 한 자리가 틀리면
+     그 사업장이 들어가는 서류가 전부 틀린다. */
+function _cleanCoName(s){
+  var t=String(s||'').replace(/[^가-힣A-Za-z0-9()㈜·\s]/g,' ').replace(/\s+/g,' ').trim();
+  return (t.length>=2&&t.length<=40)?t:'';
+}
+function _cleanBizWord(s){
+  var t=String(s||'').replace(/[^가-힣A-Za-z0-9,·\s]/g,' ').replace(/\s+/g,' ').trim();
+  return (t.length>=2&&t.length<=40)?t:'';
+}
+function parseBizReg(txt){
+  var flat=_flat(txt), o={}, m;
+  m=flat.match(/(\d{3})\s*-\s*(\d{2})\s*-\s*(\d{5})/); if(m) o.biz_no=m[1]+'-'+m[2]+'-'+m[3];
+  m=flat.match(new RegExp(_loose('법인등록번호')+'[:：]?\\s*(\\d{6})\\s*-\\s*(\\d{7})'));
+  if(!m) m=flat.match(/(\d{6})\s*-\s*(\d{7})/);
+  if(m) o.corp_no=m[1]+'-'+m[2];
+  /* 「법 인 명 ( 단 체 명 ) :」 — 괄호 안의 글자도 띄어져 있다(OCR 잡음이 아니라 원본이 그렇다).
+     괄호를 통째로 «느슨하게» 봐야 한다 — 붙여 쓴 규칙은 하나도 안 맞는다. */
+  m=flat.match(new RegExp('(?:'+_loose('법인명')+'|'+_loose('상호')+'|'+_loose('단체명')+')'
+    +'\\s*(?:\\(\\s*'+_loose('단체명')+'\\s*\\))?\\s*[:：]\\s*(.+?)'
+    +'(?=\\s*'+_loose('대표')+'|\\s*'+_loose('개업')+'|$)'));
+  if(m){ var nm=_cleanCoName(m[1]); if(nm) o.name=nm; }
+  m=flat.match(/[대내]\s*[_.]*\s*표\s*[_.]*\s*자\s*[_.]*\s*(?:성\s*[_.]*\s*명\s*)?[:：]?\s*([가-힣]{2,5})/);
+  if(m) o.ceo=m[1];
+  m=flat.match(new RegExp(_loose('개업연월일')+'[:：]?\\s*(\\d{4})\\s*[년.]?\\s*(\\d{1,2})\\s*[월.]?\\s*(\\d{1,2})'));
+  if(m) o.open_date=m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  m=flat.match(new RegExp(_loose('업태')+'[:：]?\\s*(.+?)(?=\\s*'+_loose('종목')+'|$)'));
+  if(m){ var bt=_cleanBizWord(m[1]); if(bt) o.biz_type=bt; }
+  m=flat.match(new RegExp(_loose('종목')+'[:：]?\\s*(.+?)(?=\\s*'+_loose('개업')+'|\\s*'+_loose('발급')+'|\\s*'+_loose('사업장')+'|$)'));
+  if(m){ var bi=_cleanBizWord(m[1]); if(bi) o.biz_item=bi; }
+  m=flat.match(/사\s*[_.]*\s*업\s*[_.]*\s*장?\s*[_.]*\s*(?:소\s*[_.]*\s*재\s*[_.]*\s*지)?\s*[:：]\s*(.+?)(?=\s*본\s*[_.]*\s*점|\s*업\s*[_.]*\s*태|\s*발\s*[_.]*\s*급|$)/);
+  if(m){ var ad=_cleanAddr(m[1]); if(ad) o.address=ad; }
+  return o;
+}
 var DOC_PARSE={ inka:{label:'고용노동부 설립인가증',fn:parseInka},
+                bizreg:{label:'사업자등록증',fn:parseBizReg},
                 corpreg:{label:'법인 등기사항전부증명서',fn:parseCorpReg},
                 taxid:{label:'고유번호증',fn:parseTaxId},
                 /* 정관은 «칸을 채우는» 서류가 아니다 — 조문 전체가 내용이라 통째로 보관한다.
@@ -2544,7 +2637,7 @@ function renderForms(){
     // 안내 문단 없이 버튼 한 줄로 — 설명은 ⓘ(forms.excel)에
     var inkaBatch='<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap">'
       +(setupReg?(fundMode?'<button class="primary" onclick="fillForm(\'setup\')" style="padding:5px 11px">⬇ 인가 6종 엑셀 채워받기</button><button onclick="previewExcel(\'setup\')" style="padding:5px 11px">👁 엑셀 보기</button>':'<span class="chip ok" style="font-size:10.5px">원본 등록됨 — 채움은 기금의 📑 서식에서</span>'):'<button class="primary" onclick="pickTpl(\'setup\')" style="padding:5px 11px">📎 원본 엑셀 등록(최초 1회)</button>')
-      +'<button onclick="sidePreviewAll()" style="padding:5px 11px">🖨 전체 초안(6종)</button>'+hlp('forms.excel')
+      +'<button class="primary" onclick="estabBundle(\'kinds\')" style="padding:5px 11px" title="여섯 서류를 번호 차례대로 한 화면에 세우고 채울 자리가 몇 곳인지 셉니다 — 그대로 인쇄해 날인하세요">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+hlp('forms.excel')
       +(isSetupFund?'<span class="chip warn" style="font-size:10px">설립중 기금</span>':'')+'</div>';
     var inkaList=docsFor(DOC_KINDS,cur.fund_type||'공동');
     body='<div class="panel"><div class="row"><h2 style="font-size:15px">① 노동부 설립인가 서식</h2>'+typeChip+hlp('forms.hwp')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
@@ -2553,9 +2646,11 @@ function renderForms(){
       +'</div>'+tplCard(TPL.setup)+tplCard(TPL.contribx);
   } else if(S.formPhase==='reg'){
     body='<div class="panel"><div class="row"><h2 style="font-size:15px">② 법인 설립등기 서식</h2>'+typeChip+hlp('forms.hwp')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
+      +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap"><button class="primary" onclick="estabBundle(\'reg\')" style="padding:5px 11px" title="등기 서류를 번호 차례대로 세우고 채울 자리를 셉니다">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+'</div>'
       +docsFor(DOC_REG,cur.fund_type||'공동').map(formRow).join('')+'</div>';
   } else if(S.formPhase==='tax'){
     body='<div class="panel"><div class="row"><h2 style="font-size:15px">③ 고유번호증(세무서) 서식</h2>'+typeChip+hlp('forms.tax')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
+      +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap"><button class="primary" onclick="estabBundle(\'tax\')" style="padding:5px 11px" title="세무서 제출 서류를 번호 차례대로 세우고 채울 자리를 셉니다">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+'</div>'
       +docsFor(DOC_TAX,cur.fund_type||'공동').map(formRow).join('')+'</div>';
   } else if(S.formPhase==='ops'){
     body='<div class="panel"><div class="row"><h2 style="font-size:15px">④ 운영 단계 서식</h2>'+typeChip+hlp('forms.ops')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
@@ -3088,7 +3183,7 @@ function charterGong(f,sites){
   P.push("<p><b>제6조(사업비 재원)</b> ① 공동기금의 사업비는 제10조의 기금운용 사업으로 정한 기본재산의 과실, 사업수입 및 기타의 수입으로 조달한다.<br>② 기본재산 총액이 참여회사 자본금 합계의 100분의 50을 초과하는 경우 그 초과액 범위에서 협의회 의결로 사업비에 충당할 수 있다.<br>③ 공동기금은 당해연도 출연금의 90% 이내에서 협의회가 결정하는 금액을 사업에 사용할 수 있다.</p>");
   P.push("<h2>제2장 재산 및 회계</h2>");
   P.push("<p><b>제7조(재산의 구분)</b> ① 공동기금의 재산은 기본재산과 보통재산으로 구분한다. ② 참여회사가 출연한 재산, 기부·무상 취득 재산, 협의회가 기본재산 편입을 의결한 재산을 기본재산으로 한다.</p>");
-  P.push("<p><b>제8조(공동기금의 조성)</b> ① 둘 이상의 사업주는 법 제62조 제1항에 따라 공동으로 이익금의 일부를 출연하여 공동기금을 조성할 수 있다. 설립 시 출연금은 "+dgWon(f.contribution_total)+"원으로 한다. ② 참여회사는 유가증권, 현금, 기타재산을 출연할 수 있다.</p>");
+  P.push("<p><b>제8조(공동기금의 조성)</b> ① 둘 이상의 사업주는 법 제62조 제1항에 따라 공동으로 이익금의 일부를 출연하여 공동기금을 조성할 수 있다. 설립 시 출연금은 "+dgWon(foundContrib(f,sites))+"원으로 한다. ② 참여회사는 유가증권, 현금, 기타재산을 출연할 수 있다.</p>");
   P.push("<p><b>제9조(출연시기 및 방법)</b> 참여회사가 공동기금을 출연하고자 하는 경우 협의회 결정일부터 30일 이내에 출연 시기를 정하여 협의회에 통보하여야 한다.</p>");
   P.push("<p><b>제10조(공동기금의 운용)</b> 이 공동기금은 관계법령에 의거 금융회사 예입·금전신탁, 수익증권 매입, 국공채 등 유가증권 매입 등의 방법으로 운용한다.</p>");
   P.push("<p><b>제11조(공동기금의 보호)</b> ① 공동기금의 재산은 참여회사의 영업재산으로부터 독립하여 운영한다. ② 공동기금은 자금차입을 할 수 없으며, 참여회사에 전용·대출하거나 출자하지 아니한다.</p>");
@@ -3138,7 +3233,7 @@ function charterGong(f,sites){
   return P.join('');
 }
 // 표준 정관 — 사내근로복지기금(F사내 인가본 기준, 5장 37조)
-function charterSane(f){
+function charterSane(f,sites){
   var fn=esc(f.name||''), addr=dgV(f.address,18), ch=dgV(f.chairman);
   var co=dgV(f.rep_org||f.company,10);
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:f.chairman||''}];
@@ -3153,7 +3248,7 @@ function charterSane(f){
   P.push("<p><b>제6조(수혜대상)</b> 기금의 수혜대상은 "+co+"(이하 \"회사\"라 한다)의 모든 근로자(직접도급업체 소속 근로자 및 파견근로자를 포함한다)와 그의 배우자 및 직계가족으로 한다.</p>");
   P.push("<h2>제2장 재산 및 회계</h2>");
   P.push("<p><b>제7조(재산의 구분)</b> 기금의 재산은 기본재산과 보통재산으로 구분한다. 사업주가 출연한 재산, 기부·무상 취득 재산, 협의회가 기본재산 편입을 의결한 재산을 기본재산으로 한다.</p>");
-  P.push("<p><b>제8조(기금의 조성)</b> ① 회사는 직전 사업연도 법인세·소득세 차감 전 순이익의 100분의 5를 기준으로 협의회와 협의하여 출연할 수 있다. 설립 시 출연금은 "+dgWon(f.contribution_total)+"원으로 한다. ② 유가증권·현금·기타재산을 출연할 수 있다.</p>");
+  P.push("<p><b>제8조(기금의 조성)</b> ① 회사는 직전 사업연도 법인세·소득세 차감 전 순이익의 100분의 5를 기준으로 협의회와 협의하여 출연할 수 있다. 설립 시 출연금은 "+dgWon(foundContrib(f,sites))+"원으로 한다. ② 유가증권·현금·기타재산을 출연할 수 있다.</p>");
   P.push("<p><b>제9조(출연시기 및 방법)</b> 회사가 기금을 출연하고자 하는 경우 협의회 결정일부터 30일 이내에 출연 시기를 정하여 협의회에 통보하여야 한다.</p>");
   P.push("<p><b>제10조(기금의 운용)</b> 이 기금은 관계법령에 의거 금융회사 예입·금전신탁, 수익증권 매입, 국공채 등 유가증권 매입 등의 방법으로 운용한다.</p>");
   P.push("<p><b>제11조(기금의 보호)</b> ① 기금의 재산은 회사의 영업재산으로부터 독립하여 운영한다. ② 자금차입·전용·대출·출자하지 아니한다.</p>");
@@ -3413,6 +3508,103 @@ function stripBaked(root){
 }
 /* ══ 협의회 위원 명부(등기용) ══ 임원 명부에서 측별로 채운다.
    서식이 근로자위원 2줄·사용자위원 2줄이라 명부 차례대로 넣는다. */
+/* ══════════ 서식에 박힌 「○○주식회사」 자리에 참여사업장을 넣는다 ══════════ (2026-09-10)
+   정관 제3조·제4조와 설립합의서는 참여회사를 «이름으로» 적는 서류다. 그런데 원본을 옮긴
+   서식에는 자리표(○○주식회사)만 있고 채우는 길이 없었다 — 사업장을 아무리 정리해도
+   이 두 서류에는 한 글자도 들어가지 않았다. 화면 생성본(charterGong·설립합의서 초안)에는
+   명부가 들어가지만, 원본 변환본이 «먼저 이겨서» 한 번도 쓰이지 않는다.
+
+   ⚠ 사업장이 없으면 손대지 않는다 — 자리표가 남는 편이 틀린 이름보다 낫다.
+   ⚠ stripBaked «앞»에서 돌아야 한다. 뒤에 돌면 자리표가 이미 ＿＿＿ 로 바뀐 뒤라 바꿀 것을
+     못 찾는다(지원신청서에서 같은 실수를 한 적이 있다).
+   ⚠ 채운 마디의 부모에 data-kept 를 달아 걷어내기가 도로 지우지 않게 한다. */
+function partyNames(sites){
+  return estabSites(sites).map(function(s){ return String(s.name||'').trim(); }).filter(Boolean);
+}
+/* 「가, 나 및 다」 — 법령 문서가 회사를 열거하는 방식 */
+function partyJoin(list){
+  var a=(list||[]).filter(Boolean);
+  if(!a.length) return '';
+  if(a.length===1) return a[0];
+  return a.slice(0,-1).join(', ')+' 및 '+a[a.length-1];
+}
+var PARTY_ONE_SRC='(?:○○|XX)\\s*(?:주식회사|회사)';
+var PARTY_RUN_SRC=PARTY_ONE_SRC+'(?:\\s*(?:및|와|과|,)\\s*'+PARTY_ONE_SRC+')+';
+function fillPartyList(root,f,sites){
+  var list=estabSites(sites); if(!list.length) return 0;
+  var names=list.map(function(s){ return String(s.name||'').trim(); }).filter(Boolean);
+  if(!names.length) return 0;
+  var joined=partyJoin(names), n=0, sigAt=0, sigHost=null, last=null;
+  var reAny=new RegExp(PARTY_ONE_SRC);
+  var mark=function(x){ var p=x.parentNode; if(p&&p.setAttribute) p.setAttribute('data-kept','1'); };
+  var walk=document.createTreeWalker(root,4/*TEXT*/,null,false), tn, nodes=[];
+  while((tn=walk.nextNode())) nodes.push(tn);
+  nodes.forEach(function(x){
+    var t=x.nodeValue||'', v=t;
+    if(reAny.test(t)){
+      /* ① 정관 제3조 — 「“○○시 ○○로 ○○, ○○회사, ○○군 …, ○○회사”」 참여회사 소재지 목록.
+         주소와 이름이 «짝»을 이루므로 따옴표 안을 통째로 다시 쓴다. */
+      var q=t.match(/[“"]([^”"]*(?:○○|XX)\s*회사[^”"]*)[”"]/);
+      if(q && (q[1].match(/(?:○○|XX)\s*회사/g)||[]).length>=2){
+        v=t.replace(q[0],'“'+list.map(function(s){
+          return (String(s.address||'').trim()||'＿＿＿＿')+', '+String(s.name||'').trim();
+        }).join(', ')+'”');
+      }
+      /* ② 서명란 — 한 줄이 한 회사다(그 회사 근로자측대표와 대표이사가 나란히 선다).
+         회사마다 날인을 받아야 하므로 줄마다 «다른» 회사를 세운다. */
+      else if(/근로자측\s*대표|근로자\s*대표/.test(t) && /대표이사|사용자측\s*대표/.test(t)){
+        var s0=list[sigAt], nm=s0?String(s0.name||'').trim():'';
+        if(nm){ v=t.replace(new RegExp(PARTY_ONE_SRC,'g'),nm); sigAt++; last=s0; sigHost=x.parentNode; }
+      }
+      /* ③ 그 밖 — 이어진 자리표 뭉치는 목록 전체로, 홀로 선 자리표는 첫 회사로.
+         「A 및 B와 A 및 B 근로자측은」처럼 사용자측·근로자측이 잇달아 오는 자리는 둘 다 채운다. */
+      else {
+        v=t.replace(new RegExp(PARTY_RUN_SRC+'(\\s*근로자측)','g'), joined+'와 '+joined+'$1')
+           .replace(new RegExp(PARTY_RUN_SRC,'g'), joined)
+           .replace(new RegExp(PARTY_ONE_SRC,'g'), names[0]);
+      }
+    }
+    /* ④ 서명 줄 바로 아래의 이름 자리표(× × ×) — 앞은 근로자대표, 뒤는 대표자.
+       모르는 이름은 자리표 그대로 둔다(지어내지 않는다). */
+    else if(last && /×\s*×\s*×/.test(t)){
+      var w=_siteWrep(last), who=[w.name||'', String(last.ceo||'').trim()], i=0;
+      v=t.replace(/×\s*×\s*×/g,function(m){ var s=who[i++]; return s||m; });
+      last=null;
+    }
+    if(v!==t){ x.nodeValue=v; mark(x); n++; }
+  });
+  /* 서명란이 서식에 두 쌍뿐인데 참여사업장이 더 많으면 줄을 «늘린다» —
+     날인은 회사마다 받아야 해서, 두 쌍만 찍혀 나가면 나머지는 손으로 그려야 한다. */
+  if(sigHost && sigAt<list.length){
+    for(var k=sigAt;k<list.length;k++){
+      var s2=list[k], w2=_siteWrep(s2), nm2=String(s2.name||'').trim();
+      sigHost.appendChild(document.createElement('br'));
+      sigHost.appendChild(document.createTextNode(nm2+' 근로자측대표                '+nm2+' 대표이사'));
+      sigHost.appendChild(document.createElement('br'));
+      sigHost.appendChild(document.createTextNode((w2.name||'× × ×')+'   ( 인 )                     '
+        +(String(s2.ceo||'').trim()||'× × ×')+'   ( 인 )'));
+      n++;
+    }
+    if(sigHost.setAttribute) sigHost.setAttribute('data-kept','1');
+  }
+  return n;
+}
+/* 자리표로 남은 날짜 — 「○○○○. ○○. ○○」(협의회 개최일)·「20  년 ○○월 ○○일」(작성일).
+   ⚠ 값이 없으면 손대지 않는다. 오늘 날짜를 협의회 개최일 자리에 넣으면 «없던 회의»가 생긴다. */
+function fillPartyDates(root,f){
+  var md=String((f||{}).meeting_date||'').slice(0,10), n=0;
+  var dot=(md&&/^\d{4}-\d{2}-\d{2}$/.test(md))?_dotDate(md):'';
+  var td=new Date(), ko=td.getFullYear()+'년 '+(td.getMonth()+1)+'월 '+td.getDate()+'일';
+  var walk=document.createTreeWalker(root,4,null,false), tn, nodes=[];
+  while((tn=walk.nextNode())) nodes.push(tn);
+  nodes.forEach(function(x){
+    var t=x.nodeValue||'', v=t;
+    if(dot) v=v.replace(/○{4}\s*\.\s*○{2}\s*\.\s*○{2}\s*\.?/g,dot);
+    v=v.replace(/\b20\s{1,4}년\s*○{2}\s*월\s*○{2}\s*일/g,ko);
+    if(v!==t){ x.nodeValue=v; var p=x.parentNode; if(p&&p.setAttribute)p.setAttribute('data-kept','1'); n++; }
+  });
+  return n;
+}
 function fillRoster(root,f){
   var sideOf=function(o){ var r=String(o.role||'');
     return /사용자/.test(r)?'사용자측':(/근로자/.test(r)?'근로자측':''); };
@@ -3807,6 +3999,9 @@ function hwpFormHTML(kind,f,sites){
   /* 설립 때의 기금출연확인서도 사업장마다 한 장이다 — 원본은 한 장에 「0000(주) 대표이사 0 0 0」
      자리표만 있어, 그대로 두면 사업장이 몇이든 빈 한 장이 나갔다. */
   if(kind==='contrib') fillFoundContribDoc(d,f,sites);
+  /* 정관·설립합의서의 「○○주식회사」 자리표에 참여사업장을 넣는다 — 걷어내기보다 «먼저» 돈다.
+     뒤에 돌면 자리표가 이미 ＿＿＿ 로 바뀌어 바꿀 것을 못 찾는다. */
+  if(kind==='charter'||kind==='agreement'){ fillPartyList(d,f,sites); fillPartyDates(d,f); }
   stripBaked(d);
   /* 위원 격자를 «먼저» 채운다 — 그 줄에 표를 남겨야 아래 라벨 채우기가 비껴간다 */
   fillCommittee(d,f);
@@ -3895,7 +4090,7 @@ function _bizTotals(f){
 }
 var _K=function(n){ return Math.round((num(n)||0)/1000).toLocaleString(); };   // 천원
 function fillDerived(root,f,sites,kind){
-  var b=_boss(f)||{}, boss=(b.name||'').trim(), amt=num(f.contribution_total)||0;
+  var b=_boss(f)||{}, boss=(b.name||'').trim(), amt=foundContrib(f,sites);
   var yr=S.year, today=new Date(), dirs=_prepDirectors(f);
   var todayDot=today.getFullYear()+'. '+(today.getMonth()+1)+'. '+today.getDate()+'.';
   var todayKo=today.getFullYear()+'년 '+(today.getMonth()+1)+'월 '+today.getDate()+'일';
@@ -4055,11 +4250,13 @@ function fillDerived(root,f,sites,kind){
 }
 /* 설립 때의 기금출연확인서 — 사업장마다 한 장. 원본 문구를 그대로 쓰고 자리표만 채운다. */
 function fillFoundContribDoc(root,f,sites){
-  var list=(sites||[]).filter(function(x){ return (x.status||'active')!=='closed'&&(num(x.contrib)||0)>0; });
+  /* 금액은 siteContribOf 하나로 셈한다 — 엑셀본(fillContribXls)이 여태 «사람수 × 단가»를
+     따로 셈해, 같은 확인서인데 어느 길로 뽑느냐에 따라 금액이 달랐다(2026-09-10 고침). */
+  var list=estabSites(sites).filter(function(x){ return siteContribOf(x,f)>0; });
   var today=new Date(), dt=today.getFullYear()+'. '+(today.getMonth()+1)+'. '+today.getDate()+'.';
   var one=function(c){
     var d=document.createElement('p'); d.setAttribute('data-kept','1');
-    var a=c?num(c.contrib):0;
+    var a=c?siteContribOf(c,f):0;
     d.innerHTML='기 금 출 연 확 인 서<br>금&nbsp; 액 : &nbsp;'
       +(a?esc(korWon(a))+'원정(￦ '+Number(a).toLocaleString()+')':BAKE_BLANK+'(￦ '+BAKE_BLANK+')')
       +'<br>상기 금액은 '+esc(f.name||'')+'법인이 고용노동부 인가를 득하여 설립등기 후 예금계좌를 개설할 경우, 10일 이내에 '
@@ -4070,7 +4267,7 @@ function fillFoundContribDoc(root,f,sites){
   var made=list.length?list.map(one):[one(null)];
   while(root.firstChild) root.removeChild(root.firstChild);
   if(!list.length){ var w=document.createElement('p'); w.className='note';
-    w.textContent='※ 기본 출연금이 적힌 참여사업장이 없어 금액을 채우지 못했습니다 — 참여사업장 › 기본 출연금을 넣으면 사업장마다 한 장씩 만들어집니다.';
+    w.textContent='※ 출연 약정액이 적힌 참여사업장이 없어 금액을 채우지 못했습니다 — 참여사업장의 기본 출연금을 넣거나, 기금 정보 › 설립의 1인당 출연단가를 넣으면 사업장마다 한 장씩 만들어집니다.';
     root.appendChild(w); }
   made.forEach(function(x){ root.appendChild(x); });
 }
@@ -4128,7 +4325,7 @@ function docBody(kind,f,sites){
   var fname=esc(f.name||''), chairman=(f.chairman||''), ftype=f.fund_type||'공동';
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:chairman}];
   var note="<p class='note'>※ 초안 자동생성본 — 제출 전 담당자 검토 필수. 밑줄 공란은 수기 기입. 이 창에서 바로 수정할 수 있습니다.</p>";
-  if(kind==='charter'){ return note+(ftype==='사내'?charterSane(f):charterGong(f,sites)); }
+  if(kind==='charter'){ return note+(ftype==='사내'?charterSane(f,sites):charterGong(f,sites)); }
   if(kind==='minutes'){
     return note+"<h1>설립준비위원회 회의록</h1>"
       +"<table><tr><th style='width:120px'>일시</th><td>"+dgV(f.meeting_date,12)+"</td></tr>"
@@ -4139,7 +4336,7 @@ function docBody(kind,f,sites){
       +"<h2>안건</h2><p>1. "+fname+" 설립에 관한 사항<br>2. 정관 제정에 관한 사항<br>3. 임원 선출에 관한 사항<br>4. 기금출연 확정에 관한 사항<br>5. 기타 설립 관련 사항</p>"
       +"<h2>심의 결과</h2><p>제1호: 위원 전원 찬성으로 \""+fname+"\" 설립을 의결하였다.<br>"
       +"제2호: 정관(안)을 원안대로 의결하였다.<br>제3호: 이사장에 "+dgV(chairman)+"을(를) 선출하였다.<br>"
-      +"제4호: 설립 출연금을 "+dgWon(f.contribution_total)+"원으로 확정하였다.<br>제5호: 기타 설립 관련 제반 사항은 이사장에게 위임하기로 의결하였다.</p>"
+      +"제4호: 설립 출연금을 "+dgWon(foundContrib(f,sites))+"원으로 확정하였다.<br>제5호: 기타 설립 관련 제반 사항은 이사장에게 위임하기로 의결하였다.</p>"
       +"<p class='center'>"+dgToday()+"</p>"
       +"<div class='sign'>위원장(이사장): "+dgV(chairman)+" (인)<br>근로자대표: ＿＿＿＿＿＿ (인)<br>사용자대표: ＿＿＿＿＿＿ (인)</div>";
   }
@@ -4484,7 +4681,7 @@ function docBody(kind,f,sites){
       +"<p>아래 당사자들은 「근로복지기본법」에 따라 <b>"+dgV(f.name,14)+"</b>을(를) 설립하기로 합의한다.</p>"
       +"<h2>제1조 (명칭)</h2><p>이 기금법인의 명칭은 \""+dgV(f.name,14)+"\"이라 한다.</p>"
       +"<h2>제2조 (목적사업)</h2><p>"+dgV(f.purpose||'근로자의 생활안정 및 복지증진을 위한 사업',24)+"</p>"
-      +"<h2>제3조 (출연금)</h2><p>참여사업장은 기금법인 설립 시 합계 "+dgWon(f.contribution_total)+"원을 출연한다.</p>"
+      +"<h2>제3조 (출연금)</h2><p>참여사업장은 기금법인 설립 시 합계 "+dgWon(foundContrib(f,sites))+"원을 출연한다.</p>"
       +"<h2>제4조 (기금협의회)</h2><p>기금협의회는 노사 동수로 구성하며, 이사장은 "+dgV(chairman)+"(으)로 한다.</p>"
       +"<p class='center'>"+dgToday()+"</p>"
       +"<div class='sign'>참여사업장 대표 (별첨 명부와 같음) 각 (인)<br>근로자대표: ＿＿＿＿＿＿ (인)</div>"
@@ -4549,10 +4746,10 @@ function docBody(kind,f,sites){
       +"<tr><th>대표자(이사장)</th><td>"+dgV(chairman)+"</td></tr>"
       +"<tr><th>참여사업장</th><td>"+sites.length+"개소</td></tr>"
       +"<tr><th>수혜 근로자 수</th><td>"+emp.toLocaleString()+"명</td></tr>"
-      +"<tr><th>기본재산(출연금)</th><td>"+dgWon(f.contribution_total)+" 원</td></tr></table>"
+      +"<tr><th>기본재산(출연금)</th><td>"+dgWon(foundContrib(f,sites))+" 원</td></tr></table>"
       +"<h2>Ⅱ. 목적사업 계획</h2><p>"+dgV(f.biz_plan||'1. 명절 선물비 등 복리후생비 지급<br>2. 경조사비 지원<br>3. 체육·문화활동비 지원',30)+"</p>"
       +"<h2>Ⅲ. 수지예산 (단위: 원)</h2><table>"
-      +"<tr><th>수입 — 출연금</th><td class='right'>"+dgWon(f.contribution_total)+"</td></tr>"
+      +"<tr><th>수입 — 출연금</th><td class='right'>"+dgWon(foundContrib(f,sites))+"</td></tr>"
       +"<tr><th>수입 — 이자수익(예상)</th><td class='right'>"+dgWon(f.interest_est)+"</td></tr>"
       +"<tr><th>지출 — 목적사업비</th><td class='right'>"+dgWon(f.purpose_budget)+"</td></tr>"
       +"<tr><th>지출 — 일반관리비</th><td class='right'>"+dgWon(f.admin_budget)+"</td></tr></table>"
@@ -4566,7 +4763,7 @@ function docBody(kind,f,sites){
        (지원금 한도 계산 _subPlanAgg 와 같은 규칙). */
     var _sy2=(_docRok()||{}).sy||{};
     var _c2=function(s){ return num((_sy2[s._id]||{}).contrib)||num(s.contrib)||0; };
-    var contribT=sites.reduce(function(a,s){return a+_c2(s);},0)||num(f.contribution_total)||'';
+    var contribT=sites.reduce(function(a,s){return a+_c2(s);},0)||foundContrib(f,sites)||'';
     var rws=sites.map(function(s,i){return "<tr><td class='center'>"+(i+1)+"</td><td>"+esc(s.name||'')+"</td><td>"+dgV(s.biz_no,12)+"</td>"
       +"<td class='right'>"+(num(s.company_size)||'')+"</td><td class='right'>"+(_c2(s)?dgWon(_c2(s)):'')+"</td></tr>";}).join('');
     return note+"<p class='right'>■ 근로복지기본법 시행규칙 [별지 제1호의2서식] (초안)</p>"
@@ -4985,25 +5182,63 @@ function sidePreview(kind){
     +'<div id="docwrap" style="border:1px solid var(--line);border-radius:8px;max-height:72vh;overflow:auto;padding:14px;background:#e2e8f0">'+loadingHTML()+'</div>';
   _loadDocInto(kind);   // 자동생성 → 유형 공통본 → 개별 저장본 순 표시
 }
-// 새 기금 일괄: 인가 6종 전체 초안을 한 화면에 쌓아 미리보기·인쇄(#doced 재사용 → printDoc 그대로)
-function sidePreviewAll(){
-  var f=curForm();
-  var side=$('formSide'); if(!side)return;
-  side.innerHTML='<div class="row" style="margin-bottom:6px"><h2 style="margin:0;font-size:14px">설립 인가 6종 — 전체 초안</h2>'+hlp('forms.draft')+'<span style="flex:1"></span><button class="primary" onclick="printDoc()" style="padding:3px 10px">🖨 전체 인쇄</button></div>'
+/* ══════════ 설립 서류 묶음 — 번호 차례대로 만들어 한 번에 인쇄·날인 ══════════ (2026-09-10)
+   대표 지시: 「필요서류를 번호순서대로 … 자동으로 입력되고 입력된 것을 출력해서 날인할 수 있도록」
+   서류를 하나씩 열어 보던 것을, 한 단계를 통째로 «번호 차례대로» 세워 한 번에 뽑는다.
+
+   ⚠ 채울 자리가 몇 곳인지 «함께» 센다. 이것이 이 화면의 알맹이다 — 날인은 되돌릴 수 없어서,
+     도장을 찍기 «전»에 무엇이 비었는지 알아야 한다. 종전에는 여섯 장을 눈으로 훑어야 했다.
+   ⚠ 이 단계 서류들은 장부를 읽지 않는다(DOC_NEEDS_LEDGER 에 없다) — 그래서 _docExtra 없이 그린다.
+     지원금·운영 단계를 여기 넣으려면 장부부터 읽어야 한다. */
+var ESTAB_PHASES=[
+  ['kinds','① 노동부 설립인가',function(){return DOC_KINDS;}],
+  ['reg','② 법인 설립등기',function(){return DOC_REG;}],
+  ['tax','③ 고유번호증(세무서)',function(){return DOC_TAX;}]
+];
+/* 서류에 남은 «채울 자리» — 밑줄 자리표(＿＿·______)와 회사 자리표(○○)를 센다.
+   ⚠ 못 채워 남은 자리와 «관청이 적는 칸»(접수번호·처리기간)이 섞인다. 그래서 이 수는
+     「아직 덜 됐다」가 아니라 「여기를 보라」는 뜻이다 — 0 을 목표로 삼는 수가 아니다. */
+function _blankCount(t){
+  t=String(t||'');
+  return (t.match(/[＿]{2,}/g)||[]).length
+       + (t.match(/_{4,}/g)||[]).length
+       + (t.match(/○{2,}/g)||[]).length;
+}
+function docBlanks(html){
+  var d=document.createElement('div'); d.innerHTML=String(html||'');
+  return _blankCount(d.textContent||'');
+}
+function estabBundle(phase){
+  var f=curForm(), side=$('formSide'); if(!side) return;
+  var ph=ESTAB_PHASES.filter(function(p){ return p[0]===phase; })[0]||ESTAB_PHASES[0];
+  S._bundlePhase=ph[0];
+  side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px">'
+    +'<h2 style="margin:0;font-size:14px">'+esc(ph[1])+' — 번호 차례</h2>'+hlp('estab.bundle')
+    +'<span class="muted" style="font-size:11px">'+esc(f.short_name||f.name||'')+'</span>'
+    +'<span style="flex:1"></span><button class="primary" onclick="printDoc()" style="padding:3px 10px">🖨 전부 인쇄(날인용)</button></div>'
+    +'<div id="bundleSum" class="row" style="margin:0 0 6px;gap:5px;flex-wrap:wrap"></div>'
     +'<div class="row" style="margin:0 0 6px;gap:6px"><span class="chip" style="font-size:10px">📄 A4 세로 · 여백 20mm</span>'
     +'<span style="flex:1"></span><span class="muted" style="font-size:11px">배율 <b id="docZoomLbl">—</b></span>'
     +'<button onclick="toggleDocZoom()" style="padding:2px 8px;font-size:11px">⤢ 배율</button></div>'
     +'<div id="docwrap" style="border:1px solid var(--line);border-radius:8px;max-height:72vh;overflow:auto;padding:14px;background:#e2e8f0">'+loadingHTML()+'</div>';
   (f._sample?Promise.resolve([]):_loadSites(S.formFund)).then(function(sites){
     // 서식마다 A4 한 장 — 화면에서도 낱장으로 보이고 인쇄 시 그대로 페이지가 나뉜다
-    var lst=docsFor(DOC_KINDS,f.fund_type||'공동');
+    var lst=docsFor(ph[2](),f.fund_type||'공동'), tot=0, chips=[];
     var inner=lst.map(function(d,i){
-      return '<div class="a4"><div class="note" style="text-align:right">'+(i+1)+' / '+lst.length+' · '+esc(d[1])+'</div>'
-        +docBody(d[0],f,sites)+'</div>';
+      var body=docBody(d[0],f,sites), b=docBlanks(body); tot+=b;
+      chips.push('<span class="chip '+(b?'warn':'ok')+'" style="font-size:10.5px">'+(i+1)+'. '+esc(d[1])
+        +(b?' · '+b:' · 다 참')+'</span>');
+      return '<div class="a4"><div class="note" style="text-align:right">'+(i+1)+' / '+lst.length+' · '+esc(d[1])
+        +(b?' · 채울 자리 '+b+'곳':'')+'</div>'+body+'</div>';
     }).join('');
+    var sum=$('bundleSum');
+    if(sum) sum.innerHTML='<span class="stat">서류 '+lst.length+'종</span>'
+      +'<span class="stat"'+(tot?' style="color:var(--warn)"':'')+'>채울 자리 '+tot+'곳</span>'+chips.join('');
     _showDocHTML(inner);
   }).catch(function(e){ var w=$('docwrap'); if(w)w.innerHTML='<div class="msg err">'+esc(e.message)+'</div>'; });
 }
+// 예전 이름 — 인가 단계 묶음을 가리킨다(부르는 곳이 남아 있어 그대로 둔다)
+function sidePreviewAll(){ estabBundle('kinds'); }
 /* ── 생성 서식 → 한글(HWPX) 저장 ──
    화면에 그려진 초안을 공용 서식층(hwpx_doc.js)이 그대로 옮긴다.
    이전엔 이 자리에서 표를 «열폭이 모두 같은 격자»로 뭉개고 병합(colspan·rowspan)을
@@ -5343,7 +5578,7 @@ function fillSetup(wb,f,sites){
         예전엔 F13 을 «출연금이 있을 때만» 덮어써서, 없으면 남의 금액이 그대로 나갔다.
      ⚠ 금융기관명은 우리가 «가진 자료가 아니다» — 비워서 사람이 채우게 한다.
        지어내면 그럴듯하게 틀린 서식이 관청에 간다. */
-  var budget=num(f.contribution_total); setC(ws,'F13',budget?budget.toLocaleString()+'원':'');
+  var budget=foundContrib(f,sites); setC(ws,'F13',budget?budget.toLocaleString()+'원':'');
   setC(ws,'G13','');
   clearRange(ws,14,19,2,8);           /* 둘째 표의 «다른 기금» 샘플 줄 B~H */
   /* ── 셋째 표(A22:E29) — 정관·설립합의서·회의록·기금출연확인서의 «작성 날짜» ──
@@ -5379,19 +5614,19 @@ function fillSetup(wb,f,sites){
 }
 /* 기금출연확인서(사업장별) — [기업정보] 시트를 참여사업장으로 채우면
    확인서 시트가 연번(CJ3) 기준 VLOOKUP으로 해당 사업장 확인서를 만든다.
-   출연금 = 상시근로자수 × 1인당 출연단가(fund.contrib_per_worker, 기본 400,000).
+   ⚠ 금액은 한글본과 «같은 자»(siteContribOf)로 셈한다. 여태 여기서만 「사람수 × 단가」를
+     따로 셈해, 사업장에 적어 둔 약정액을 무시하고 다른 금액이 나갔다(2026-09-10 고침).
    ※ 대표자·근로자 생년월일은 개인정보라 시스템에 저장하지 않음 → 빈 칸(엑셀에서 직접 입력). */
 function fillContribXls(wb,f,sites){
   var info=wb.getWorksheet('기업정보'); if(!info) throw new Error('기업정보 시트를 찾을 수 없습니다');
-  var rate=num(f.contrib_per_worker)||400000;
   sites.forEach(function(s,i){
     var r=2+i;
     info.getCell(r,1).value=i+1;
     setC(info,'B'+r,s.name||''); setC(info,'C'+r,s.ceo||'');
     var n=num(s.company_size)||0;
     if(n) info.getCell(r,8).value=n;
-    var amt=info.getCell(r,9);
-    if(amt.type!==ExcelJS.ValueType.Formula) amt.value=n?n*rate:null;
+    var amt=info.getCell(r,9), v=siteContribOf(s,f);
+    if(amt.type!==ExcelJS.ValueType.Formula) amt.value=v||null;
   });
   if(info.rowCount>=2+sites.length) clearRange(info,2+sites.length,info.rowCount,1,9);
   var doc=wb.getWorksheet('6.기금출연확인서');
@@ -5408,7 +5643,7 @@ function fillSubsidy(wb,f,sites){
   var yrs=f.years||{}, sub={};
   Object.keys(yrs).sort().reverse().some(function(y){ if(yrs[y]&&yrs[y].subsidy){sub=yrs[y].subsidy;return true;} return false; });
   var workerTotal=num(sub.worker_count)||sites.reduce(function(s,x){return s+(num(x.company_size)||0);},0)||'';
-  var contribution=num(f.contribution_total)||num(sub.contribution)||'';
+  var contribution=foundContrib(f,sites)||num(sub.contribution)||'';
   /* ⚠ 예전에는 sub.apply_amount 만 봤다 — SUB_FIELDS 에 «없는 칸»이라 늘 비었고,
      결국 설립 출연금이 신청액으로 공단에 나갔다. 사람이 적은 신청액을 먼저 쓴다.
      옛 이름도 뒤에 남겨 둔다(예전 자료에 그 이름으로 들어간 값이 있을 수 있다). */
@@ -5701,7 +5936,8 @@ function finishSetup(){ var _fid=S.fundId, f0=funds[_fid]; if(!f0) return;
 }
 /* 기금 정보 칸을 넷으로 묶는다 — 6열로 촘촘히 깔면 묶음 표시가 없으면 읽기 어렵다.
    키가 여기 있으면 그 칸 «앞»에 묶음 이름 줄을 넣는다. */
-var INFO_SECS={name:'기본',manager:'담당',chairman:'인가·등기',tax_office:'관할·연락',lease_lessor:'사무소 임대차'};
+var INFO_SECS={name:'기본',manager:'담당',chairman:'인가·등기',tax_office:'관할·연락',lease_lessor:'사무소 임대차',
+  contribution_total:'설립 (합의서·회의록·정관·등기·세무 서식이 읽는 값)'};
 var INFO_W2={tax_office:1,registry_office:1,labor_office:1};   // 안에 단추가 붙어 두 칸 폭이 필요한 칸
 function infoForm(f){
   var _first=true;
@@ -5867,11 +6103,20 @@ function _readOfficers(){
 }
 /* 서류 끌어놓기 → 판독 → 값 확인 후 폼에 반영 (저장은 [💾 저장] 눌러야 확정) */
 function bindDocIntake(){
+  _docScopeFund();   // 사업장 편집에서 돌아왔을 수 있다 — 넣을 자리를 기금 칸으로 되돌린다
   [['dz-inka','inka'],['dz-corpreg','corpreg'],['dz-taxid','taxid'],['dz-charter','charter']].forEach(function(p){
     _dzHandler[p[0]]=function(files){ readDocInto(p[0],p[1],files[0]); };
   });
 }
 var _docFound={}, _docOcr=false, _docFid=null;   // 판독 결과는 시작 시점 기금에 귀속
+/* 판독 결과를 «어느 칸에» 넣을지 — 기금 정보와 참여사업장 편집이 «같은 확인 창»을 쓴다.
+   ⚠ 창을 열 때 정해 두고, 기금 정보 화면으로 돌아오면 되돌린다(bindDocIntake). 안 되돌리면
+     다음번 기금 서류 판독이 사업장 칸을 찾다가 아무 데도 못 넣는다 — 조용히 실패한다.
+   ⚠ 사업장 판독본은 기금에 «원본을 매달지 않는다». 사업자등록증은 그 사업장 것이지
+     기금의 서류가 아니다(funds/{기금}/scans 에 들어가면 인가증 자리를 차지한다). */
+var _docScope={pre:'fd-', out:'docIntakeOut', fields:null, keep:true};
+function _docScopeFund(){ _docScope={pre:'fd-', out:'docIntakeOut', fields:null, keep:true}; }
+function _docLbl(){ var L={}; (_docScope.fields||FIELDS).forEach(function(c){ L[c[0]]=c[1]; }); return L; }
 /* ── 사진첩에서 서류 골라오기 ──
    원본은 사진첩에 그대로 두고, 기금에는 값 + 참조(주인·연도·id)만 남긴다.
    RTDB에 이미지를 넣으면 기금 목록 로딩이 통째로 느려지므로 절대 복사하지 않는다. */
@@ -6105,7 +6350,11 @@ function pickAlbumPhoto(id){
   PuPhotoStore.loadFull(year,id,owner).then(function(src){
     if(!src) throw new Error('원본을 찾지 못했습니다');
     closeM();
-    saveScanRef(fid,kind,{owner:owner||'',year:year,id:id});      // 참조만 저장(이미지는 복사하지 않음)
+    /* 참조만 저장(이미지는 복사하지 않음).
+       ⚠ 참여사업장 서류는 «기금»에 매달지 않는다(_docScope.keep=false) — 사업자등록증은
+         그 사업장 것이지 기금 서류가 아니다. 기금의 scans 에 넣으면 인가증·등기부 자리를
+         차지하고, 기금 정보 화면의 [📎 원본]이 남의 회사 등록증을 연다. */
+    if(_docScope.keep) saveScanRef(fid,kind,{owner:owner||'',year:year,id:id});
     return _dataUrlToFile(src,kind+'.jpg');
   }).then(function(file){
     if(S.fundId!==fid) return;                                     // 그 사이 다른 기금으로 이동 → 버림
@@ -6367,6 +6616,7 @@ function unlinkScan(kind){
   });
 }
 function docZoneLabel(kind){ return ({inka:'설립인가증',corpreg:'법인 등기부등본',taxid:'고유번호증',charter:'정관',
+  bizreg:'사업자등록증',
   sme:'중소기업확인서',reg:'등기부등본',bizno:'사업자등록증',
   wrep:'근로자대표 재직증명서'})[kind]||kind; }   // 뒤 넷은 참여사업장 몫
 /* 드롭존 아래 한 줄 — 사진첩에서 고르기 / 이미 연결된 원본 보기 */
@@ -6378,6 +6628,29 @@ function docZoneLabel(kind){ return ({inka:'설립인가증',corpreg:'법인 등
 var _cardIdx=null, _cardPick={q:'',items:[]};
 /* 사업장 편집 창에서 기업정보함에 다녀올 때 «어느 사업장이었는지» — editSite 가 적어 둔다 */
 var _siteEditSid='';
+/* ══════════ 참여사업장 서류를 사진첩에서 읽어 채운다 ══════════ (2026-09-10)
+   대표 지시: 「사업장의 데이터를 받은 것을 사진첩에서 OCR 하고 … 자동으로 입력되고」
+   ⚠ 기업정보함이 «먼저»다 — 이미 등록된 회사면 [🏢 일괄 채우기]가 빠르고 정확하다.
+     여기는 기업정보함에 없는 회사, 곧 방금 받은 사업자등록증을 위한 길이다.
+   ⚠ 원본을 기금에 매달지 않는다(keep:false) — 사업자등록증은 그 사업장 것이지 기금 서류가
+     아니다. 기금의 scans 에 넣으면 인가증·등기부 자리를 차지한다. */
+var _siteDocKeep=null;
+function _siteDocScope(){
+  _docScope={pre:'se-', out:'siteDocOut', fields:SITE_FIELDS, keep:false};
+  _docFound={}; _docOcr=false;
+}
+/* 편집 창에 지금 쳐 둔 값을 걷어 둔다 — 사진첩·확인 창을 다녀오면 창이 갈린다 */
+function _siteDocGrab(){
+  var keep={};
+  SITE_FIELDS.forEach(function(c){ var el=$('se-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
+  WREP_FIELDS.forEach(function(c){ var el=$('sw-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
+  if(Object.keys(keep).length) _siteDocKeep=keep;
+}
+function bindSiteDocIntake(){
+  _siteDocScope();
+  _dzHandler['dz-sitebiz']=function(files){ _siteDocScope(); readDocInto('dz-sitebiz','bizreg',files[0]); };
+}
+function siteDocAlbum(){ _siteDocGrab(); _siteDocScope(); closeM(); openAlbumPick('dz-sitebiz','bizreg'); }
 function loadCardIdx(){
   if(_cardIdx) return Promise.resolve(_cardIdx);
   return fbDb.ref('pucards/idx').once('value').then(function(s){
@@ -6460,6 +6733,9 @@ function cardFull(r){
    한쪽만 늘리면 추가할 때는 들어오는 값이 편집할 때는 안 들어온다. */
 var SITE_CARD_MAP=[['c','name'],['ceo','ceo'],['bz','biz_no'],['cno','corp_no'],
   ['bt','biz_type'],['wk','company_size'],['sl','sales'],['ad','address'],
+  /* 기업 상세에 쌓여 있는데 여태 버리던 넷 — 종목·개업일·기업규모·회사 전화(2026-09-10).
+     기업정보함은 이미 읽어 두었는데 우리가 받지 않아, 사업자등록증을 다시 봐야 했다. */
+  ['bi','biz_item'],['od','open_date'],['sme','sme_type'],['ct','company_tel'],
   ['n','_c_name'],['ti','_c_position'],['m','_c_mobile'],['e','_c_email']];
 /* ══════════ 참여사업장 일괄 채우기 (대표 지시 2026-09-05) ══════════
    「기업정보함의 정보를 여기서 찾아서 넣을 수 있게 하고 한꺼번에 넣을 수 있게 해라」
@@ -6470,7 +6746,8 @@ var SITE_CARD_MAP=[['c','name'],['ceo','ceo'],['bz','biz_no'],['cno','corp_no'],
      섞인다. 후보가 둘 이상이면 그 사업장은 건너뛴다.
    ⚠ 사업자번호는 «숫자만» 비교한다 — 명부는 412-81-12595, 카드는 4128112595 처럼 적힌다. */
 var SITE_BULK=[['ceo','대표자'],['biz_no','사업자등록번호'],['corp_no','법인등록번호'],
-  ['biz_type','업종'],['company_size','상시근로자수'],['sales','직전년도 매출액'],['address','소재지']];
+  ['biz_type','업종'],['company_size','상시근로자수'],['sales','직전년도 매출액'],['address','소재지'],
+  ['biz_item','종목'],['open_date','개업일'],['sme_type','기업규모'],['company_tel','회사 전화']];
 var SITE_BULK_C=[['name','담당자'],['position','직위'],['mobile','휴대폰'],['email','이메일']];
 /* 사업장 하나에 맞는 기업정보함 카드 — 못 고르면 null(짐작으로 넣지 않는다).
    숫자만 남기는 일은 아래 _digits 를 그대로 쓴다(같은 것을 또 만들지 않는다). */
@@ -6926,7 +7203,7 @@ function readDocInto(zid,kind,file,fromAlbum){
     if(S.fundId!==myFid) return;    // 판독 도중 다른 기금으로 이동 → 결과 버림
     if(_docSrc&&_docSrc.kind===kind){ _docSrc.text=String(txt||''); _docSrc.ocr=!!viaOcr; }
     /* 값이 나왔으면 원본도 남긴다 — 값과 원본은 늘 함께 있어야 되짚을 수 있다 */
-    if(!fromAlbum&&!(funds[myFid]&&(funds[myFid].scans||{})[kind]))
+    if(!fromAlbum&&_docScope.keep&&!(funds[myFid]&&(funds[myFid].scans||{})[kind]))
       _keepDocOriginal(kind,file,myFid).then(function(){
         if(S.fundId===myFid) renderFund();
         toast('원본을 사진첩에 남기고 이 기금에 연결했습니다');
@@ -7081,7 +7358,10 @@ function _docPrevHTML(){
 function openDocConfirm(kind){
   var d=_docSrc; if(!d) return;
   if(d.fid!==S.fundId){ toast('다른 기금에서 읽은 서류입니다 — 다시 올려 주세요','warn'); return; }
-  var LBL={}; FIELDS.forEach(function(c){ LBL[c[0]]=c[1]; });
+  /* 사업장 편집 창 «위»에 이 창을 겹쳐 띄우면 뒤 창이 지워진다(closeM 은 첫 #modalbg 를 지운다).
+     그래서 쳐 둔 값을 걷어 두고 편집 창을 닫은 뒤 이 창만 띄운다 — 반영할 때 그 값으로 다시 연다. */
+  if(_docScope.pre==='se-'&&$('se-name')){ _siteDocGrab(); closeM(); }
+  var LBL=_docLbl();
   var ks=Object.keys(_docFound).filter(function(k){ return _docFound[k]; });
   var rows=ks.length? ks.map(function(k){
       return '<div class="fld"><label>'+esc(LBL[k]||k)+'</label>'
@@ -7134,8 +7414,8 @@ function docReOcr(){
   readDocInto(d.zid,d.kind,d.file);
 }
 function renderDocIntake(){
-  var box=$('docIntakeOut'); if(!box) return;
-  var LBL={}; FIELDS.forEach(function(c){LBL[c[0]]=c[1];});
+  var box=$(_docScope.out); if(!box) return;
+  var LBL=_docLbl();
   var ks=Object.keys(_docFound).filter(function(k){return _docFound[k];});
   if(!ks.length){ box.innerHTML=''; return; }
   box.innerHTML='<div style="border:1px solid '+(_docOcr?'var(--warn)':'var(--acc)')+';border-radius:9px;padding:10px 12px;background:'+(_docOcr?'var(--warn-bg)':'#f8fafc')+'">'
@@ -7151,14 +7431,29 @@ function renderDocIntake(){
 }
 function applyDocFound(){
   if(_docFid&&_docFid!==S.fundId){ toast('다른 기금에서 판독한 결과입니다 — 다시 올려주세요','warn'); return; }
+  /* 참여사업장 갈래 — 편집 창은 이미 닫혀 있다(창은 겹쳐 뜨지 않는다). 칸에 넣는 대신
+     걷어 둔 값 위에 판독값을 얹어 편집 창을 «다시 연다». 기업정보함에서 돌아오는 길과 같다.
+     ⚠ 판독값이 위다 — 확인 창에서 사람이 «보고 고친» 값이기 때문이다(일괄 채우기의
+       「빈 칸만」 규칙과 다른 자리다. 저기는 사람이 한 건씩 보지 않는다). */
+  if(_docScope.pre==='se-'){
+    var pre=Object.assign({}, _siteDocKeep||{});
+    var got=Object.keys(_docFound).filter(function(k){ return _docFound[k]; });
+    got.forEach(function(k){ pre[k]=_docFound[k]; });
+    var _sid=_siteEditSid||'';
+    _siteDocKeep=null; _docScopeFund();
+    editSite(_sid,pre);
+    toast(got.length?(got.length+'개 항목을 채워 편집 창을 다시 열었습니다 — 확인 후 [저장]')
+                    :'반영할 값이 없습니다', got.length?'':'warn');
+    return;
+  }
   var n=0;
   Object.keys(_docFound).forEach(function(k){
-    var el=$('fd-'+k); if(!el||!_docFound[k]) return;
+    var el=$(_docScope.pre+k); if(!el||!_docFound[k]) return;
     el.value=_docFound[k]; n++;
     el.style.background='#f8fafc'; setTimeout(function(){el.style.background='';},1400);
   });
-  markDirty();
-  toast(n?(n+'개 항목을 채웠습니다 — 확인 후 [💾 저장]'):'반영할 칸을 찾지 못했습니다',n?'':'warn');
+  if(_docScope.pre==='fd-') markDirty();   // 사업장 편집은 창 안이라 이탈 경고를 걸지 않는다
+  toast(n?(n+'개 항목을 채웠습니다 — 확인 후 [저장]'):'반영할 칸을 찾지 못했습니다',n?'':'warn');
 }
 /* ══════════ 변경 기록 · 내보내기 · 담당 확인 ══════════
    대표 검토 2026-08-24 ⑧⑨⑩. 노동청·공단에 내는 숫자인데 누가 언제 고쳤는지 남지
@@ -7442,6 +7737,12 @@ function editSite(sid,prefill){
   showModal('<div class="row" style="margin:0 0 10px"><h2 style="margin:0">'+(isNew?'사업장 추가':'사업장 편집')+'</h2>'
     +'<span style="flex:1"></span>'
     +'<button onclick="openCardPick(\'siteedit\')" title="푸른 기업정보함(사업자등록증·명함·기업 상세)에서 상호·대표자·사업자번호·법인등록번호·업종·상시근로자수·소재지·담당자를 빈 칸에만 채웁니다">🏢 기업정보함에서</button></div>'
+    /* 받은 사업자등록증에서 곧바로 읽어 채운다 — 기업정보함에 «없는» 회사를 위한 길 */
+    +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap;align-items:center">'
+    +'<span style="font-size:12.5px;font-weight:700;white-space:nowrap">📥 사업자등록증에서 채우기</span>'+hlp('site.doc')
+    +'<button class="primary" onclick="siteDocAlbum()" style="padding:3px 10px;font-size:11.5px;white-space:nowrap" title="푸른사진첩에 올려 둔 사업자등록증을 골라 읽습니다">🖼 사진첩에서</button>'
+    +dropZoneSlim('dz-sitebiz','파일로 올리기','사업자등록증 PDF·사진에서 상호·대표자·사업자등록번호·법인등록번호·업태·종목·개업일·소재지를 읽습니다','.pdf,image/*')
+    +'</div><div id="siteDocOut" style="margin:0 0 10px"></div>'
     +'<div class="grid">'+flds+'</div>'
     +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">담당자 (대표 연락처)</div>'
     +'<div class="grid">'+cflds+'</div>'
@@ -7451,7 +7752,8 @@ function editSite(sid,prefill){
     +_wrepDocRow(sid,s)
     +'<div class="row" style="justify-content:flex-end;margin-top:16px">'
     +(isNew?'':'<button onclick="delSite(\''+sid+'\')" style="margin-right:auto;color:var(--danger)">삭제</button>')
-    +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>');
+    +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>'
+    ,{after:bindSiteDocIntake});
 }
 function saveSite(sid){
   var base = sid ? ((S.sites&&S.sites[sid])||{}) : Object.assign({status:'active'}, _sitePrefill||{});  // 신규는 연결 프리필(puerp_co_id 등) 보존
@@ -7577,7 +7879,9 @@ var SITE_COLMAP=[
   ['name',        ['상호','사업장명','회사명','업체명','기업명','사업장','회사']],
   ['ceo',         ['대표자','대표','대표이사','성명']],
   ['biz_no',      ['사업자등록번호','사업자번호','사업자','등록번호']],
-  ['biz_type',    ['업종','업태','종목']],
+  ['biz_type',    ['업종','업태']],
+  ['biz_item',    ['종목']],
+  ['open_date',   ['개업일','개업연월일','설립일']],
   ['company_size',['상시근로자','근로자수','인원','상시','직원수','근로자']],
   ['address',     ['소재지','주소','사업장주소']],
   ['seq_label',   ['번호','연번','순번','no']]
@@ -12292,8 +12596,8 @@ var HELP={
    +'<p>사무소를 무상으로 쓰는 경우 <b>전대 사용동의서</b>를 함께 제출합니다.</p>'},
  'forms.ops':{t:'④ 운영 단계 서식',h:'<p>운영 중 제출·발급하는 서식입니다.</p><p>결산·변경이력이 필요한 서식은 아래 링크를 눌러 해당 탭에서 생성하세요 — 실데이터가 있어야 채워집니다.</p>'},
  'forms.sub':{t:'⑤ 근복지원금 신청 서식',h:'<p>매년 지원금을 신청할 때 제출하는 서식 묶음입니다.</p><p>금액·참여사업장은 <b>지원금 입력</b> 탭의 데이터로 채워집니다.</p>'},
- 'forms.draft':{t:'전체 초안(6종) 미리보기',h:'<p>기금 기본정보로 채운 6종 초안입니다. <b>A4 낱장</b>으로 나뉘어 그대로 인쇄됩니다.</p>'
-   +'<p>공식 제출용은 형태가 100% 보존되는 <b>엑셀 채움</b>을 권합니다.</p>'},
+/* 'forms.draft'(전체 초안 6종)는 뗐다 — 「번호 차례대로 전부」(estab.bundle)가 그 자리를 대신한다.
+   화면에 안 놓인 도움말은 검사가 잡는다(내가 만든 규칙이다). */
  'sub.helper':{t:'근로복지넷 입력 도우미',h:'<p>근로복지넷은 <b>인증서·간편인증</b>으로 사람이 직접 로그인하는 곳이라, 앱이 대신 로그인하지 않습니다.</p>'
    +'<p>대신 <b>별지 제1호서식 지원신청서</b>의 칸 차례대로 값을 세워 두고 칸마다 <b>[복사]</b>를 둡니다 — 두 화면을 나란히 놓고 옮겨 적으세요.</p>'
    +'<p>금액·사람 수는 <b>쉼표 없는 숫자</b>로 복사됩니다 — 관공서 입력칸이 쉼표를 안 받는 곳이 많습니다. (화면에는 쉼표를 넣어 보여 줍니다)</p>'
@@ -12415,6 +12719,16 @@ var HELP={
    +'<p><b>출연금</b> — 그 해 이 사업장이 낸 금액<br><b>상시근로자</b> — 그 해 기준 인원<br><b>수혜자</b> — 그 해 복지혜택을 받은 인원</p>'
    +'<p>칸에서 벗어나면 자동 저장됩니다. 위 연도 선택으로 다른 해를 보고, [작년 값 불러오기]로 <b>비어 있는 칸만</b> 채울 수 있습니다(이미 넣은 값은 건드리지 않습니다).</p>'
    +'<p>별지15호 ⑨⑩ 근로자 수는 사업장 명부의 상시근로자와 협력 체크에서 나옵니다 — 여기 값은 연도별 추이·검증용입니다.</p>'},
+ 'estab.bundle':{t:'번호 차례대로 전부 (날인용)',h:'<p>그 단계의 서류를 <b>번호 차례대로</b> 한 화면에 세웁니다. 하나씩 열어 볼 필요가 없습니다.</p>'
+   +'<p><b>맨 위의 「채울 자리 N곳」</b>이 이 화면의 알맹이입니다. <b>날인은 되돌릴 수 없습니다</b> — 도장을 찍기 <b>전</b>에 무엇이 비었는지 보세요. 서류마다 몇 곳인지도 딱지로 붙습니다.</p>'
+   +'<p>이 수에는 <b>관청이 적는 칸</b>(접수번호·처리기간)과 <b>사람이 손으로 적어야 하는 칸</b>(주민등록번호·인감·계좌)도 함께 셉니다. 그래서 <b>0을 목표로 삼는 수가 아닙니다</b> — 「여기를 보라」는 뜻입니다.</p>'
+   +'<p><b>[🖨 전부 인쇄]</b>는 A4 낱장으로 나뉘어 그대로 인쇄됩니다. 그 종이에 날인하면 됩니다.</p>'
+   +'<p>내용은 <b>기금 정보 · 참여사업장 · 임원 명부</b>에서 옵니다. 빈칸이 많으면 그 셋을 먼저 채우세요.</p>'},
+ 'site.doc':{t:'사업장 서류 사진첩에서 찾기',h:'<p>푸른사진첩을 훑어 <b>참여사업장의 사업자등록증</b>을 찾아 줍니다. 사업장마다 사진을 눈으로 뒤질 필요가 없습니다.</p>'
+   +'<p><b>어떻게 찾나</b> — 사진첩이 이미 읽어 둔 <b>서류 제목·회사 이름</b>으로 고릅니다. 사업장 상호까지 맞으면 <b>이름 맞음</b> 딱지를 달고 맨 위에 둡니다.</p>'
+   +'<p><b>읽어 오는 칸</b> — 상호 · 대표자 · 사업자등록번호 · 법인등록번호 · 업태 · 종목 · 개업일 · 소재지</p>'
+   +'<p><b>자동으로 넣지 않습니다.</b> 판독한 값을 <b>왼쪽 원본과 나란히</b> 보여 주고, 고칠 수 있게 한 뒤 [반영]을 눌러야 칸에 들어갑니다. 사업자등록번호 한 자리가 틀리면 서류 전부가 틀립니다.</p>'
+   +'<p><b>기업정보함이 먼저입니다.</b> 이미 등록된 회사면 <b>[🏢 일괄 채우기]</b>가 더 빠르고 정확합니다 — 사진첩 판독은 기업정보함에 <b>없는</b> 회사에 쓰세요.</p>'},
  'newfund':{t:'새 기금 등록',h:'<p><b>신규</b>(설립부터) 또는 <b>기존</b>(이미 설립·운영 중) 기금을 등록합니다.</p><p>담당은 푸른이알피 <b>재직자</b>에서 선택합니다.</p>'},
  'mgr':{t:'담당자 지정',h:'<p>푸른이알피 재직자 명단에서 선택합니다.</p><p><b>주담당 1명</b>, <b>부담당은 여러 명</b> 지정할 수 있습니다.</p>'}
 };

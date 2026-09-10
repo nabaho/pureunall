@@ -33,6 +33,8 @@ function build() {
     + '.replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#39;"); }',
     'function num(v){ if(v===""||v==null) return ""; var n=Number(String(v).replace(/,/g,"")); return isFinite(n)?n:""; }',
     grabFn('dgV'), grabFn('dgWon'), grabFn('dgToday'),
+    /* 정관 제8조의 설립 출연금은 «한 줄기»(foundContrib)에서 온다 — 2026-09-10 */
+    grabFn('estabSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'),
     grabFn('charterGong'), grabFn('charterSane'),
     'this.charterGong=charterGong; this.charterSane=charterSane;',
   ].join('\n');

@@ -58,7 +58,10 @@ _keepDocOriginal('inka', { name: '인가증.pdf' }, 'X').then((r) => {
   console.log('\n■ 배선');
   /* 사진첩에서 온 파일은 이미 이어져 있다 — 두 번 넣으면 사진첩에 사본이 쌓인다 */
   ok('사진첩에서 온 길은 다시 안 넣는다', src.includes('readDocInto(zid,kind,file,true)'));
-  ok('이미 이어져 있으면 안 넣는다', /!fromAlbum&&!\(funds\[myFid\]&&\(funds\[myFid\]\.scans\|\|\{\}\)\[kind\]\)/.test(src));
+  /* _docScope.keep — 참여사업장 사업자등록증은 «기금» 서류가 아니라 남기지 않는다(2026-09-10) */
+  ok('이미 이어져 있으면 안 넣는다',
+    /!fromAlbum&&_docScope\.keep&&!\(funds\[myFid\]&&\(funds\[myFid\]\.scans\|\|\{\}\)\[kind\]\)/.test(src));
+  ok('사업장 서류는 기금에 매달지 않는다', /keep:false/.test(src));
   /* 남기기가 실패해도 판독은 살아야 한다 — 값은 이미 칸에 들어갔다 */
   ok('못 남겨도 판독은 살린다', /판독은 됐지만 원본을 못 남겼습니다/.test(src));
   ok('그때 무엇을 하면 되는지 알려 준다', /\[🖼\]로 사진첩에서 골라 이어 주세요/.test(src));
