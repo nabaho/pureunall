@@ -1049,7 +1049,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
      ⚠ ?v= 는 사진첩(pu-photos.html)의 것과 **같이** 올린다 — 한쪽만 올리면 이 앱만
        옛 판 판독기로 읽어, 같은 캡처가 앱마다 다른 결과를 낸다. -->
 <script src="js/pu-doc-read.js?v=38"></script>
-<script src="js/pu-doc-file.js?v=29"></script>
+<script src="js/pu-doc-file.js?v=30"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=10"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -3472,7 +3472,10 @@ function refCapRead(year, id, owner, byName, dataUrl){
     return PuPhotoStore.saveRead(year, id, read, owner).then(function(){ return read; });
   }).then(function(read){
     if(read.bizNoOk!==true) return null;                 /* 검산 못 한 번호는 사람이 본다 */
-    return PuDocFile.sendToCoInfo({ fields:read.fields, byName:byName||'',
+    /* ⚠ 갈래를 함께 넘긴다 (2026-09-10) — 사진첩과 «같은 모양»이다. 여기 캡처는
+       거의 서식(form)이지만, 한쪽만 안 넘기면 같은 확인서가 들어온 길에 따라
+       다른 칸에 담긴다(js/pu-doc-file.js 의 smeKeys). */
+    return PuDocFile.sendToCoInfo({ fields:read.fields, kind:read.kind||'', byName:byName||'',
       photo:{ year:year, id:id, owner:owner||'' } }).then(function(res){
       /* 보낸 표를 남긴다 — 안 남기면 사진첩이 같은 캡처를 또 보낸다. */
       read.filedInfo={ at:Date.now(), by:byName||'', n:(res.filled||[]).length, message:res.message||'' };
