@@ -5732,6 +5732,56 @@ function selNoMail(){
   });
 }
 
+/* ══════ 📰 뉴스레터 명단에 넣기 (대표 지시 2026-09-09) ══════
+   「추후에 기업정보함에서 추가적으로 더 관리해야될 사람들 명단도 보낼 생각이다
+     이부분도 어디에 별도로 추가해야할 것인지 만들어 달라」
+
+   담는 자리: newsletter/더한분들/{열쇠}  ← 뉴스레터의 「➕ 따로 더한 분」 칸
+
+   ⚠⚠ 사업장 담당자·대표자는 «여기로 넣지 않아도 된다». 뉴스레터가 업체관리
+     (data/companies/v)를 그때그때 읽으므로 저절로 들어가고, 계약이 끝나거나
+     퇴사하면 저절로 빠진다. 이 길은 «사업장에 딸리지 않은 분»의 자리다.
+   ⚠ 그래서 이쪽은 «사본»이다 — 손으로 빼야 빠진다. 담은 날을 함께 적어 둔다.
+   ⚠ 거래 관계 밖이면 사전 동의가 필요하다(정보통신망법 50조). 동의는 «아직»으로
+     담고, 대표께서 뉴스레터 화면에서 「동의 받음」을 누르셔야 (광고) 표기가 꺼진다. */
+function selToNewsletter(){
+  /* 화면 게이트(⋯ 메뉴)를 넘겨도 여기서 막는다 — newsletter/* 는 대표만 쓸 수 있다 */
+  if(!state.isAdmin) return toast('뉴스레터 명단은 대표님만 고치실 수 있습니다', 6000);
+  const ids = Object.keys(state.sel); if(!ids.length) return toast('명함을 먼저 선택하세요');
+  const 것들 = ids.map(id=>state.items[id]).filter(Boolean);
+  /* 수신거부·주소 없음은 «여기서» 뺀다 — 담아 놓고 못 보내면 명단이 부풀기만 한다 */
+  const 쓸것 = 것들.filter(it => !it.noMail && normEmail(it.email));
+  const 뺀수 = 것들.length - 쓸것.length;
+  if(!쓸것.length) return toast('이메일이 있는 명함이 없습니다');
+  puAsk({
+    title: '고른 ' + 쓸것.length.toLocaleString() + '명을<br>뉴스레터 명단에 넣을까요?',
+    body: '뉴스레터의 <b>「➕ 따로 더한 분」</b> 칸으로 들어갑니다.'
+      + (뺀수 ? '<br>주소가 없거나 수신거부인 <b>' + 뺀수 + '명</b>은 빠집니다.' : '')
+      + '<br><br>⚠ 자문 사업장의 담당자·대표자는 <b>넣지 않으셔도 됩니다</b> —'
+      + ' 업체관리에서 저절로 들어갑니다.'
+      + '<br>⚠ 여기 담은 분은 계약이 끝나도 <b>저절로 안 빠집니다.</b>'
+      + '<br>⚠ 거래 관계 밖이면 <b>사전 동의</b>가 필요합니다 — 「동의 아직」으로 담고,'
+      + ' 그동안은 뉴스레터 제목에 <b>(광고)</b>가 붙습니다.',
+    ok: '명단에 넣기', cancel: '그만두기'
+  }).then(async yes=>{
+    if(!yes) return;
+    const 오늘 = new Date().toISOString().slice(0,10);
+    const 묶음 = {};
+    쓸것.forEach(function(it){
+      const 열쇠 = 'c' + String(it.id||'').replace(/[.#$/[\]]/g,'_').slice(0,40);
+      묶음[열쇠] = { 이름: it.name||'', 소속: it.company||'', 직책: it.title||'',
+                     주소: normEmail(it.email), 전화: it.mobile||it.phone||'',
+                     출처: '명함', 명함번호: String(it.id||''),
+                     담은날: 오늘, 담은이: myEmail||'', 동의: false };
+    });
+    try{
+      await db.ref('newsletter/더한분들').update(묶음);
+      state.sel={}; render();
+      toast('📰 ' + Object.keys(묶음).length + '명을 뉴스레터 명단에 넣었습니다', 7000);
+    }catch(e){ toast('넣지 못했습니다: '+((e&&e.message)||''), 8000); }
+  });
+}
+
 /* ① 시험 발송 — 첫 곳 기준으로 «실제로 나갈 모습»을 나에게 한 통 */
 async function bulkTestSend(){
   grabCompose();
@@ -22380,6 +22430,13 @@ function openSelMore(ev){
     <!-- ⚠ 바로 위 「주소록 내보내기」와 **다른 물건**이다(메일용 표 ↔ 폰 연락처).
          아이콘을 📇/📱 로 갈라 두었다 — 나란히 있어 헷갈리면 엉뚱한 것을 내보낸다. -->
     <div class="fmi" onclick="closeFolderMenu();selVcf()">📱 폰 연락처로 저장 · ${n}명</div>
+    <!-- 📰 뉴스레터 명단에 넣기 (대표 지시 2026-09-09)
+         「추후에 기업정보함에서 추가적으로 더 관리해야될 사람들 명단도 보낼 생각이다」
+         ⚠ 사업장 담당자·대표자는 여기로 넣지 «않아도» 된다 — 뉴스레터가 업체관리를
+           그때그때 읽으므로 저절로 들어간다. 이 길은 «사업장에 딸리지 않은 분»의 자리다.
+         ⚠ 그래서 이쪽은 사본이다 — 계약이 끝나도 저절로 안 빠지고, 거래 관계 밖이면
+           사전 동의가 필요하다(정보통신망법 50조). 넣을 때 그것을 함께 말해 준다. -->
+    ${state.isAdmin ? `<div class="fmi" onclick="closeFolderMenu();selToNewsletter()">📰 뉴스레터 명단에 넣기 · ${n}명</div>` : ''}
     <div class="fmi" onclick="closeFolderMenu();selNoMail()">🚫 수신거부로 표시</div>
     ${state.vtab?`<div class="fmi" onclick="closeFolderMenu();selRemoveFromTab()">🚫 탭에서 빼기</div>`:''}
     <div class="fmi danger" onclick="closeFolderMenu();delSel()">🗑 삭제 (휴지통)</div>`;

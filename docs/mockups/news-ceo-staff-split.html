@@ -1,0 +1,326 @@
+<!doctype html><html lang="ko"><meta charset="utf-8">
+<title>목업 — 대표자·담당자 갈라 보내기 · 따로 더한 분</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{
+  --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
+  --line:#e2e8f0; --paper:#f8fafc; --card:#fff;
+  --brown:#6f5a48; --brown-soft:#f5f1ec;
+  --ok:#166534; --warn:#d97706; --bad:#dc2626;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  background:var(--paper);color:var(--ink);font-size:14px;padding:0 0 60px}
+#bar{display:flex;align-items:center;gap:10px;padding:13px 16px;background:#fff;
+  border-bottom:1px solid var(--line)}
+#bar .logo{font-size:19px;font-weight:800;letter-spacing:-.4px}
+#bar .sp{flex:1}
+#tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);background:#fff;padding:0 10px}
+#tabs button{padding:11px 15px;font-size:15px;font-weight:700;color:var(--sub);
+  border:0;background:none;border-bottom:3px solid transparent}
+#tabs button.on{color:var(--navy);border-bottom-color:var(--navy)}
+.wrap{padding:14px 16px;max-width:1500px}
+.hdbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:11px}
+.hdbar .no{font-size:19px;font-weight:800}
+.hdbar .sp{flex:1}
+.btn{padding:7px 13px;border:1px solid var(--line);background:#fff;border-radius:7px;
+  font-size:13px;font-weight:700;color:var(--ink)}
+.btn.pri{background:var(--brown);border-color:var(--brown);color:#fff}
+.mini{padding:4px 9px;border:1px solid var(--line);background:#fff;border-radius:6px;
+  font-size:12px;font-weight:700;color:var(--sub)}
+.badge{padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:800}
+.b-sent{background:#dcfce7;color:var(--ok)} .b-test{background:#fef3c7;color:var(--warn)}
+.b-draft{background:#f1f5f9;color:var(--sub)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.chips .lb{font-size:11.5px;font-weight:800;color:var(--faint);width:44px}
+.chip{padding:5px 11px;border:1px solid var(--line);background:#fff;border-radius:20px;
+  font-size:12.5px;font-weight:700;color:var(--sub)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.box{background:var(--card);border:1px solid var(--line);border-radius:11px;
+  overflow:hidden;margin-bottom:14px}
+.box h3{font-size:14px;padding:11px 14px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:8px;background:#fcfdfe}
+.box h3 .cnt{background:var(--navy);color:#fff;border-radius:20px;padding:1px 9px;font-size:12px}
+.box h3 .why{font-size:11.5px;font-weight:500;color:var(--sub)}
+.box h3 .sp{flex:1}
+table.list{width:100%;border-collapse:collapse;font-size:13px}
+table.list th{background:#f8fafc;text-align:left;padding:8px 10px;font-size:11.5px;
+  color:var(--sub);border-bottom:1px solid var(--line);white-space:nowrap}
+table.list td{padding:8px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
+table.list tr:last-child td{border-bottom:0}
+td.n,th.n{color:var(--faint);text-align:right;width:34px}
+td.ck,th.ck{width:30px}
+.tel{font-variant-numeric:tabular-nums;color:var(--sub)}
+.ty{padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:800}
+.pill{padding:1px 7px;border-radius:20px;font-size:11px;font-weight:800;margin-left:6px}
+.faint{color:var(--faint)}
+.warnbox{border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:11px 13px;
+  margin-bottom:13px;font-size:13px;line-height:1.65}
+.warnbox b{color:#92400e}
+.warnbox .row2{display:flex;align-items:center;gap:9px;margin-top:9px;flex-wrap:wrap}
+.okbox{border:1px solid #bbf7d0;background:#f0fdf4;border-radius:10px;padding:11px 13px;
+  margin-bottom:13px;font-size:13px;line-height:1.65}
+.note{font-size:12px;color:var(--sub);line-height:1.7;padding:10px 14px;background:#fcfdfe;
+  border-top:1px solid var(--line)}
+h2.sec{font-size:16px;font-weight:800;margin:26px 0 11px;padding-left:9px;
+  border-left:4px solid var(--brown)}
+h2.sec small{font-weight:500;color:var(--sub);font-size:12px;margin-left:7px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.kv{font-size:12.5px;line-height:1.9}
+.kv b{display:inline-block;min-width:120px;color:var(--sub)}
+code{background:var(--brown-soft);color:var(--brown);padding:1px 5px;border-radius:4px;
+  font-size:12px;font-family:ui-monospace,Consolas,monospace}
+.mockhead{background:var(--brown);color:#fff;padding:9px 16px;font-size:12.5px;font-weight:700}
+</style>
+
+<div class="mockhead">목업 — 아직 만들지 않았습니다. 이대로 만들지 보아 주십시오.</div>
+
+<div id="bar"><span class="logo">▤ 뉴스레터 관리</span><span class="sp"></span>
+  <span style="font-size:11.5px;font-weight:700;color:var(--sub)">p001@pureun.kr</span></div>
+<div id="tabs">
+  <button>이번 회차</button><button>지난 회차 2</button>
+  <button class="on">받는 명단 146</button><button>보낸 결과</button><button>설정</button>
+</div>
+
+<div class="wrap">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 class="sec">① 지금 무엇이 어긋나 있나 <small>실제 자료로 재 봤습니다 (2026-09-09)</small></h2>
+
+<div class="warnbox">
+  <b>⚠ 대표자 열이 119줄 모두 「—」인 까닭</b> — 화면이 <code>ceoName</code>·<code>ceoPhone</code> 을
+  읽는데, 업체관리가 쓰는 칸 이름은 <code>ceo</code> 입니다. <b>있는 자료를 못 읽고 있었습니다.</b>
+  이름만 바로잡으면 <b>117줄에 대표자 이름이 뜹니다.</b>
+  <div class="row2">
+    <span class="badge b-draft">대표자 이름 <b>0줄 → 117줄</b></span>
+    <span class="badge b-test">대표자 전화 <b>0줄 → 0줄</b> · <code>ceoPhone</code> 은 375곳 어디에도 없습니다</span>
+  </div>
+</div>
+
+<div class="warnbox">
+  <b>⚠ 「대표자 이메일」이라는 칸이 아예 없습니다</b> — 지금 대표자로 나가는 6곳은
+  <b>대표자 주소가 아니라 «회사 메일»</b>(<code>email</code>, 12곳)입니다.
+  그 12곳 가운데 <b>6곳은 담당자 주소와 똑같아</b> 겹침으로 빠집니다.
+  <div class="row2">
+    <span class="badge b-draft">자문중 208곳 · 담당자 주소 113줄 · 대표자 주소 <b>6줄</b></span>
+    <span class="badge b-draft">주소가 하나도 없는 곳 <b>100곳</b></span>
+  </div>
+</div>
+
+<div class="okbox">
+  <b>★ 그런데 대표자 주소가 «기업정보함 명함»에 있습니다</b> — 직책이 대표·사장·회장·이사장인
+  명함이 <b>999장</b>, 그 가운데 자문중 사업장과 이름이 맞고 <b>지금 명단에 없는 주소</b>가
+  <b>대표자 27곳 · 담당자 49곳</b>입니다.
+  <div class="row2">
+    <span class="badge b-sent">보기 — 삼성정공 김이균(대표이사) sam57@ss-precision.co.kr</span>
+    <span class="badge b-sent">㈜세라컴 이강홍(대표이사) leekh@ceracomb.com</span>
+  </div>
+  <div style="margin-top:8px;font-size:12.5px;color:var(--sub)">
+    ⚠ <b>회사 «이름»으로 맞춘 것이라 저절로 넣지 않습니다</b> — 온톨로지 규칙(이름을 열쇠로
+    쓰지 않는다)이고, 실제로 이름만 보고 옮겨 자문 계약이 남의 업체에 들어간 일이 있었습니다.
+    <b>한 곳씩 보고 골라 담는 화면</b>으로 만듭니다.
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 class="sec">② 갈라 놓은 받는 명단 <small>대표자와 담당자가 각자 한 통씩 받습니다</small></h2>
+
+<div class="hdbar">
+  <span class="no">받는 곳 146곳</span>
+  <span style="font-size:12px;color:var(--sub)">기업정보함 208곳에서 ·
+    수신거부 0 · 겹침 14 · 형식틀림 1</span>
+  <span class="sp"></span>
+  <button class="btn pri">↧ 공인노무사회 엑셀</button>
+  <button class="mini">↧ CSV</button>
+  <button class="mini">⟳ 다시 읽기</button>
+  <span class="badge b-sent">자문중</span>
+</div>
+
+<div class="chips">
+  <span class="lb">유형</span>
+  <button class="chip on">📊 전체 146</button>
+  <button class="chip" style="color:#2563eb">📋 자문 44</button>
+  <button class="chip" style="color:#d97706">👜 급여 99</button>
+  <button class="chip">🛡 노조 0</button>
+  <button class="chip" style="color:#d97706">🏦 기금 3</button>
+</div>
+<div class="chips">
+  <span class="lb">누구</span>
+  <button class="chip on">👥 전체 146</button>
+  <button class="chip">🧑‍💼 담당자 113</button>
+  <button class="chip">👔 대표자 <b>27</b></button>
+  <button class="chip">➕ 따로 더한 분 6</button>
+</div>
+
+<div class="box">
+  <h3>🧑‍💼 담당자 <span class="cnt">113</span>
+    <span class="why">사업장 담당자에게 각자 한 통 — 기업정보함에서 퇴사를 켜면 저절로 빠집니다</span>
+    <span class="sp"></span><button class="mini">➕ 명함에서 49곳 더 찾았습니다</button></h3>
+  <table class="list">
+    <tr><th class="ck"><input type="checkbox"></th><th class="n">#</th><th>유형</th><th>회사</th>
+      <th>담당자</th><th>직책</th><th>연락처</th><th>보낼 주소</th><th></th></tr>
+    <tr><td class="ck"><input type="checkbox"></td><td class="n">1</td>
+      <td><span class="ty" style="background:#eff6ff;color:#1e40af">📋 자문</span></td>
+      <td><b>㈜성보물류</b></td><td>이경원</td><td class="faint">—</td>
+      <td class="tel">010-2930-2318</td><td>kwlee7934@gmail.com</td>
+      <td style="text-align:right"><button class="mini">수신거부</button></td></tr>
+    <tr><td class="ck"><input type="checkbox"></td><td class="n">2</td>
+      <td><span class="ty" style="background:#eff6ff;color:#1e40af">📋 자문</span></td>
+      <td><b>㈜세라컴</b></td><td>이주민</td><td class="faint">—</td>
+      <td class="tel">010-9556-7283</td><td>ljm@ceracomb.co.kr</td>
+      <td style="text-align:right"><button class="mini">수신거부</button></td></tr>
+    <tr><td class="ck"><input type="checkbox"></td><td class="n">3</td>
+      <td><span class="ty" style="background:#eff6ff;color:#1e40af">📋 자문</span></td>
+      <td><b>삼성정공주식회사</b></td><td>백초롱</td><td class="faint">—</td>
+      <td class="tel">010-9341-7671</td><td>sam78@ss-precision.co.kr</td>
+      <td style="text-align:right"><button class="mini">수신거부</button></td></tr>
+  </table>
+  <div class="note">★ 대표자 이름·전화 열을 <b>여기서 뺐습니다</b> — 담당자 표에서는 늘 같은 값이
+    되풀이되고, 표 폭만 먹었습니다. 대표자는 아래 제 표에 있습니다.</div>
+</div>
+
+<div class="box">
+  <h3>👔 대표자 <span class="cnt">27</span>
+    <span class="why">대표자 주소로 각자 한 통 — 담당자와 «따로» 갑니다</span>
+    <span class="sp"></span><button class="mini">➕ 명함에서 27곳 골라 담기</button></h3>
+  <table class="list">
+    <tr><th class="ck"><input type="checkbox"></th><th class="n">#</th><th>유형</th><th>회사</th>
+      <th>대표자</th><th>직책</th><th>연락처</th><th>보낼 주소</th><th>어디서</th><th></th></tr>
+    <tr><td class="ck"><input type="checkbox"></td><td class="n">1</td>
+      <td><span class="ty" style="background:#eff6ff;color:#1e40af">📋 자문</span></td>
+      <td><b>삼성정공주식회사</b></td><td>김이균</td><td>대표이사</td><td class="faint">—</td>
+      <td>sam57@ss-precision.co.kr<span class="pill" style="background:#f5f1ec;color:#6f5a48">명함</span></td>
+      <td class="faint">기업정보함</td>
+      <td style="text-align:right"><button class="mini">수신거부</button></td></tr>
+    <tr><td class="ck"><input type="checkbox"></td><td class="n">2</td>
+      <td><span class="ty" style="background:#eff6ff;color:#1e40af">📋 자문</span></td>
+      <td><b>㈜세라컴</b></td><td>이강홍</td><td>대표이사</td><td class="faint">—</td>
+      <td>leekh@ceracomb.com<span class="pill" style="background:#f5f1ec;color:#6f5a48">명함</span></td>
+      <td class="faint">기업정보함</td>
+      <td style="text-align:right"><button class="mini">수신거부</button></td></tr>
+    <tr><td class="ck"><input type="checkbox"></td><td class="n">3</td>
+      <td><span class="ty" style="background:#fffbeb;color:#854d0e">👜 급여</span></td>
+      <td><b>미소신협</b></td><td>이인숙</td><td>이사장</td><td class="faint">—</td>
+      <td>green8914@daum.net<span class="pill" style="background:#eff6ff;color:#1e40af">회사 메일</span></td>
+      <td class="faint">업체관리</td>
+      <td style="text-align:right"><button class="mini">수신거부</button></td></tr>
+  </table>
+  <div class="note">
+    ★ 주소가 «어디서 왔나»를 딱지로 봅니다 — <b>명함</b>(기업정보함 명함) ·
+    <b>회사 메일</b>(업체관리 <code>email</code>) · <b>손입력</b>.<br>
+    ⚠ 「회사 메일」은 대표자 주소가 아닐 수 있습니다. 그래서 딱지를 달아 두고,
+    대표자 본인 주소를 넣으면 그것이 이깁니다.
+  </div>
+</div>
+
+<div class="box">
+  <h3>⚠ 주소가 없는 곳 <span class="cnt" style="background:var(--warn)">100</span>
+    <span class="why">자문중인데 대표자도 담당자도 주소가 없습니다 — 조용히 빠지지 않게 여기 둡니다</span></h3>
+  <table class="list">
+    <tr><th>회사</th><th>대표자</th><th>담당자</th><th>기업정보함 명함에 있나</th><th></th></tr>
+    <tr><td><b>중원공영</b></td><td>정백순</td><td class="faint">—</td>
+      <td><span class="badge b-sent">대표 명함 1장</span></td>
+      <td style="text-align:right"><button class="mini">➕ 명함에서 담기</button></td></tr>
+    <tr><td><b>케이엠에스</b></td><td>김철휘</td><td class="faint">—</td>
+      <td><span class="badge b-sent">대표 명함 1장</span></td>
+      <td style="text-align:right"><button class="mini">➕ 명함에서 담기</button></td></tr>
+    <tr><td><b>○○산업</b></td><td>홍길동</td><td class="faint">—</td>
+      <td><span class="badge b-draft">없음</span></td>
+      <td style="text-align:right"><button class="mini">✎ 손으로 넣기</button></td></tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 class="sec">③ ➕ 따로 더한 분 <small>사업장에 딸리지 않은 분들 — 새로 만드는 자리</small></h2>
+
+<div class="grid2">
+  <div class="box">
+    <h3>➕ 따로 더한 분 <span class="cnt">6</span>
+      <span class="sp"></span><button class="mini">➕ 명함에서</button>
+      <button class="mini">✎ 한 줄 넣기</button><button class="mini">📋 붙여넣기</button></h3>
+    <table class="list">
+      <tr><th class="n">#</th><th>이름</th><th>직책</th><th>소속</th><th>보낼 주소</th>
+        <th>담은 날</th><th>동의</th><th></th></tr>
+      <tr><td class="n">1</td><td>김선임</td><td>대표 공인노무사</td><td>더바름 노무법인</td>
+        <td>lunar0515@naver.com</td><td class="tel">09-09</td>
+        <td><span class="badge b-sent">받음</span></td>
+        <td style="text-align:right"><button class="mini">✕</button></td></tr>
+      <tr><td class="n">2</td><td>박OO</td><td>과장</td><td>아산상공회의소</td>
+        <td>park@example.or.kr</td><td class="tel">09-09</td>
+        <td><span class="badge b-test">아직</span></td>
+        <td style="text-align:right"><button class="mini">✕</button></td></tr>
+      <tr><td class="n">3</td><td>이OO</td><td class="faint">—</td><td>전 자문사 담당</td>
+        <td>lee@example.com</td><td class="tel">09-09</td>
+        <td><span class="badge b-test">아직</span></td>
+        <td style="text-align:right"><button class="mini">✕</button></td></tr>
+    </table>
+    <div class="note">
+      ⚠ <b>이 자리만 «사본»입니다.</b> 사업장 명단은 기업정보함을 그때그때 읽어 계약이
+      끝나면 저절로 빠지지만, 여기 담은 분은 <b>손으로 빼야</b> 빠집니다.
+      그래서 <b>담은 날</b>을 적어 두고 오래된 줄에 「해마다 확인」을 띄웁니다.
+    </div>
+  </div>
+
+  <div class="box">
+    <h3>어디에 담나 · 법은 어떤가</h3>
+    <div style="padding:12px 14px" class="kv">
+      <b>담는 자리</b> <code>newsletter/더한분들/{열쇠}</code><br>
+      <b>담는 칸</b> 이름 · 직책 · 소속 · 주소 · 출처 · 담은날 · 담은이 · 동의<br>
+      <b>거르는 곳</b> 사업장 명단과 <b>같은 함수</b>(명단다듬기) — 수신거부·겹침·형식이 한 잣대<br>
+      <b>넣는 길 셋</b> ① 기업정보함 명함에서 고르기 ② 손으로 한 줄 ③ 붙여넣기<br>
+    </div>
+    <div class="note" style="border-top:1px solid var(--line)">
+      <b>⚠ 법 — 정보통신망법 제50조</b><br>
+      사업장 담당자·대표자는 <b>자문 관계 안</b>이라 대체로 수월합니다. 그런데
+      「따로 더한 분」은 <b>거래 관계 밖일 수 있습니다</b> — 그때는 <b>사전 동의 ·
+      (광고) 표기 · 수신거부 안내</b>가 필요합니다.<br>
+      ★ 그래서 이 자리에 한 줄이라도 「동의 아직」이 있으면
+      <b>(광고) 표기가 저절로 켜집니다</b> — 범위를 넓힐 때 이미 그렇게 하고 있는 그 스위치입니다.
+      대표님이 판단하실 일을 기계가 <b>잊지 않게</b>만 합니다.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 class="sec">④ 기업정보함 쪽 모습 <small>명함을 골라 뉴스레터로 보냅니다</small></h2>
+
+<div class="box">
+  <h3>🏢 기업정보함 — 명함 고른 뒤 도구줄</h3>
+  <div style="padding:14px">
+    <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+      padding:9px 11px;background:#f8fafc;border:1px solid var(--line);border-radius:9px">
+      <b style="font-size:13px">3장</b> <span style="font-size:12.5px;color:var(--sub)">골랐습니다</span>
+      <span class="sp" style="flex:1"></span>
+      <button class="mini">✉ 단체 메일</button>
+      <button class="mini">↧ 내보내기</button>
+      <button class="btn pri" style="font-size:12px;padding:5px 11px">📰 뉴스레터 명단에 넣기</button>
+    </div>
+    <div class="note" style="background:none;border:0;padding:11px 0 0">
+      ★ 넣을 때 <b>어디로 갈지 묻습니다</b> — 이 명함이 자문중 사업장의 대표자·담당자라면
+      <b>그 사업장 칸에 넣고</b>(그러면 계약이 끝나면 저절로 빠집니다),
+      사업장과 상관없는 분이라면 <b>「따로 더한 분」</b>으로 갑니다.<br>
+      ⚠ 사업장 칸에 넣는 것은 <b>업체관리 자료를 고치는 일</b>입니다 —
+      기업정보함이 이미 쓰는 길(<code>sendToCompany</code>)을 그대로 씁니다. 새 길을 만들지 않습니다.
+    </div>
+  </div>
+</div>
+
+<h2 class="sec">⑤ 만들 것 · 안 만들 것</h2>
+<div class="box"><div style="padding:13px 15px;font-size:13px;line-height:1.95">
+  <b style="color:var(--ok)">만듭니다</b><br>
+  ① <code>ceoName</code>→<code>ceo</code> 칸 이름 바로잡기 <span class="faint">(대표자 이름 0→117줄)</span><br>
+  ② 대표자 주소 칸 <code>ceoEmail</code> 을 업체관리에 새로 만들고, 있으면 그것을 먼저 씁니다<br>
+  ③ 표를 <b>담당자 · 대표자 · 따로 더한 분</b> 셋으로 가르고 「누구」 칩을 답니다<br>
+  ④ 기업정보함 명함에서 <b>골라 담는 창</b> — 대표자 27곳 · 담당자 49곳 <span class="faint">(저절로 넣지 않습니다)</span><br>
+  ⑤ <code>newsletter/더한분들</code> 자리와 그 표 · 「동의 아직」이면 (광고) 켜짐<br>
+  ⑥ 기업정보함에 <b>📰 뉴스레터 명단에 넣기</b> 단추<br><br>
+  <b style="color:var(--bad)">안 만듭니다</b><br>
+  ✗ <b>이름으로 맞춰 저절로 담기</b> — 온톨로지 규칙이고, 실제로 계약이 남의 업체에 들어간 일이 있습니다<br>
+  ✗ <b>대표자 전화 열</b> — <code>ceoPhone</code> 이 375곳 어디에도 없어 늘 「—」입니다. 칸이 채워지면 그때<br>
+  ✗ <b>세무사무실·세금계산서 주소</b>(<code>taxEmail</code> 67곳 · <code>taxInvoiceEmail</code> 21곳) —
+  용도가 다릅니다. 거기로 뉴스레터가 가면 「왜 이걸 여기로?」가 됩니다
+</div></div>
+
+</div>
+</html>

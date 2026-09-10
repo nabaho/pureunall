@@ -6743,6 +6743,9 @@ var CO_MERGE_LOG  = 'co_merge_log';    // 되돌리기용 기록 (이 PC에만 �
 var CO_FIELD_LABEL = {
   bizNo:'사업자번호', ceo:'대표자', ceo2:'대표자2', zipcode:'우편번호', address:'주소',
   phone:'전화', fax:'팩스', email:'이메일', bizType:'업태', bizCategory:'종목',
+  /* 대표자 이메일 — email(회사 주소)과 «다른 칸»이다 (대표 결정 2026-09-09).
+     뉴스레터가 대표자와 담당자에게 «각자» 보내려면 대표자 주소가 제 자리에 있어야 한다. */
+  ceoEmail:'대표자 이메일',
   companySize:'규모', industry:'업종', managerMain:'담당',
   primaryContactName:'담당자 이름', primaryContactPhone:'담당자 연락처', primaryContactEmail:'담당자 이메일',
   contractStartDate:'계약 시작일', contractEndDate:'계약 종료일',
@@ -24447,6 +24450,16 @@ function CompanyEditModal(props){
               h('input', { type:'text', value:f.ceo || '', onChange:set('ceo'), placeholder:'대표자 1', style:{ flex:1 } }),
               h('input', { type:'text', value:f.ceo2 || '', onChange:set('ceo2'), placeholder:'대표자 2 (선택)', style:{ flex:1 } })
             )),
+          /* ── 대표자 이메일 (대표 결정 2026-09-09) ─────────────────────────
+             뉴스레터를 «대표자와 담당자에게 각자» 보내려는데, 대표자 주소를 적을
+             자리가 어디에도 없었다. 아래 「회사 이메일」(email)은 사무실·경리 주소인
+             경우가 많아, 실측 2026-09-09 에 값이 있던 12곳 가운데 6곳이 담당자
+             주소와 똑같았다 — 그것을 대표자 주소로 쓰면 대표자는 못 받는다.
+             ⚠ 아래 email 과 «다른 칸»이다. 여기가 비면 뉴스레터가 email 로 물러서되
+               「회사 메일」이라고 밝힌다(js/pu-news-core.js 사업장에서명단). */
+          h('div', { className:'fld' }, h('label', null, '대표자 이메일'),
+            h('input', { type:'email', value:f.ceoEmail || '', onChange:set('ceoEmail'),
+              placeholder:'대표자 본인 주소 — 뉴스레터가 여기로 갑니다' })),
           h('div', { className:'fld' }, h('label', null, '업태 / 종목'),
             h('div', { style:{ display:'flex', gap:'6px' } },
               h('input', { type:'text', value:f.bizType || '', onChange:set('bizType'), placeholder:'업태', style:{ flex:1 } }),
@@ -24498,7 +24511,9 @@ function CompanyEditModal(props){
                 onBlur:function(e){ var v = fmtPhone(e.target.value); if(v !== e.target.value) set('fax')({target:{value:v,type:'text'}}); },
                 placeholder:'팩스', style:{ flex:1 } })
             )),
-          h('div', { className:'fld' }, h('label', null, '대표 이메일'),
+          /* ⚠ 「대표자 이메일」(위)과 «다른 칸»이다 — 여기는 회사·사무실 주소다.
+               예전 이름표가 「대표 이메일」이라 둘이 헷갈렸다(2026-09-09). */
+          h('div', { className:'fld' }, h('label', null, '회사 이메일'),
             h('input', { type:'email', value:f.email || '', onChange:set('email'), placeholder:'contact@company.kr' })),
           h('div', { className:'fld' }, h('label', null, '홈페이지'),
             h('div', { style:{ display:'flex', gap:'6px' } },
