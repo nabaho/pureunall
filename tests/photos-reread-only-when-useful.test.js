@@ -144,7 +144,12 @@ test('★ 판독 결과를 저장할 때 pv·via 를 함께 남긴다 — 안 �
 test('사람이 분류를 정한 것에는 via 를 안 남긴다 — AI 가 읽은 것이 아니다', () => {
   const i = app.indexOf("why: '사람이 분류를 정했습니다'");
   assert.ok(i > 0, '사람이 정하는 자리를 찾지 못했습니다');
-  const seg = app.slice(i, i + 260);
+  /* ⚠ 고정폭(260자)으로 자르고 있었다 — 그 안에 설명 한 줄이 늘자 pv 가 창 밖으로
+     밀려 헛깨졌다(2026-09-10). 재는 것은 «그 객체 안에 무엇이 있나»이므로
+     글자 수가 아니라 **객체가 닫히는 자리**까지 자른다. */
+  const 끝 = app.indexOf('});', i);
+  assert.ok(끝 > i, '사람이 정하는 객체가 닫히는 자리를 찾지 못했습니다');
+  const seg = app.slice(i, 끝);
   assert.match(seg, /pv: PuDocRead\.PROMPT_VERSION/, '물음 판은 남겨야 다시 안 읽습니다');
   assert.ok(!/via:/.test(seg), '사람이 정한 것에 「어느 길로 읽었다」를 적으면 거짓입니다');
 });

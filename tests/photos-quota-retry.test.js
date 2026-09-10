@@ -36,6 +36,7 @@ function 상자() {
     APP.match(/^const LANE_PIC_KINDS = \{[^}]*\};/m)[0].replace('const ', 'var '),
     cutFn(APP, 'function readFailKind('),
     cutFn(APP, 'function ymdKST('),
+    cutFn(APP, 'function markFail('),
     cutFn(APP, 'function worthRetry('),
     cutFn(APP, 'function readAnyField('),
     cutFn(APP, 'function laneOf(')
@@ -95,6 +96,52 @@ test('★ 한도 판정은 «구글이 단정한 말»로만 한다 — 우리 �
   ctx.__r2 = { error: 'AI 키의 하루 사용량을 다 썼을 수 있습니다' };
   assert.notEqual(vm.runInContext('readFailKind(__r2)', ctx), 'quota',
     '★ 우리 짐작 문구까지 한도로 봅니다 — 잠시 바쁜 것이 하루를 기다리게 됩니다');
+});
+
+/* ══════ ①-2 실패 «시각»은 따로 적는다 (대표 지시 2026-09-10) ═══════════════ */
+
+test('★★★ 옛 실패를 오늘 「확인 처리」해도 되걸기가 «밀리지 않는다»', () => {
+  /* at 은 「마지막으로 손댄 때」다 — 확인 처리·분류 옮기기가 갱신한다.
+     그것으로 재면 사흘 전 실패가 「오늘 실패」가 되어 하루 더 갇힌다.
+     실측에서 실제로 한 장이 그 꼴이었다(2026-09-10). */
+  assert.equal(건다({ error: 한도글, failAt: Date.now() - 3 * 하루, at: Date.now() }), true,
+    '★★★ 오늘 손댔다는 이유로 옛 실패를 안 겁니다 — 밀린 까닭을 아무도 알 수 없습니다');
+});
+
+test('★ 실패 시각이 오늘이면 손댄 때와 상관없이 «안» 건다', () => {
+  assert.equal(건다({ error: 한도글, failAt: Date.now(), at: Date.now() - 3 * 하루 }), false,
+    '★ 오늘 실패한 것을 오늘 또 겁니다 — 한도를 더 먹습니다');
+});
+
+test('★ failAt 이 없는 «옛 기록»은 at 으로 물러선다 — 그것들이 갇히면 안 된다', () => {
+  assert.equal(건다({ error: 한도글, at: Date.now() - 3 * 하루 }), true,
+    '★ 옛 기록이 영영 갇힙니다 — failAt 을 만들기 «전»에 실패한 것들입니다');
+  assert.equal(건다({ error: 한도글, at: Date.now() }), false);
+});
+
+test('★★ 실패한 기록에만 실패 시각을 적는다 — 성공에 적으면 뜻 없는 흔적이 남는다', () => {
+  const ctx = 상자();
+  ctx.__a = { error: 한도글 };
+  ctx.__b = { kind: 'bizreg', fields: { company: 'x' } };
+  vm.runInContext('markFail(__a); markFail(__b);', ctx);
+  assert.ok(ctx.__a.failAt > 0, '★★ 실패했는데 시각을 안 적습니다 — 되걸기가 at 으로 되돌아갑니다');
+  assert.equal(ctx.__b.failAt, undefined,
+    '★ 잘된 판독에도 실패 시각을 적습니다 — 다음 사람이 「전에 실패했었구나」로 읽습니다');
+});
+
+test('★★ 판독 길이 «둘»인데 둘 다 실패 시각을 적는다', () => {
+  /* 한쪽에만 적으면 그 길로 실패한 것만 시각이 없어 되걸기가 길마다 다르게 군다
+     — markFree 와 같은 까닭이다(그쪽도 두 곳이다). */
+  assert.equal((stripComments(APP).match(/markFail\(read\);/g) || []).length, 2,
+    '★★ 실패 시각을 적는 자리가 두 곳이 아닙니다 — 한 길로 실패한 것만 갇힙니다');
+});
+
+test('★ 분류를 손으로 정하면 실패 시각도 함께 지운다', () => {
+  const fn = stripComments(cutFn(APP, 'function retagPhotos('));
+  assert.match(fn, /failAt:\s*null/,
+    '★ 실패가 아닌 기록에 실패 시각이 남습니다 — 뜻 없는 흔적이 됩니다');
+  assert.ok(fn.indexOf('it.meta.read') < fn.indexOf('failAt: null'),
+    '★ 앞 기록보다 먼저 적어 덮입니다');
 });
 
 /* ══════ ② 날을 «한국 시각»으로 가른다 ══════════════════════════════════════ */
