@@ -364,7 +364,11 @@ test('★ 판독은 문서마다 한 번만, 그러나 다른 문서는 빠뜨�
        안 실으면 그 자리에서 멎어 이 검사가 통째로 운다.
      ⚠ 이 파일의 표본은 전부 「안 읽은 것」이라 다시 읽기 갈래는 안 쓰인다.
        그래도 부르는 자리가 있으므로 딸린 것(RESTALE_SKIP·readPromptVer)을 채워 준다. */
+  /* ⚠ 2026-09-10 — 이번 달 «돈» 한도가 붙었다(대표 결정 ₩30,000). 넘었을 때만
+     한 번 묻는 문이라 여기서는 「안 넘었다」로 둔다 — 이 검사의 주제는 «문서마다
+     한 번»이다. 요금 쪽은 tests/ai-spend-cap.test.js 가 서버와 나란히 세워 본다. */
   vm.runInContext('var readQuotaOut = false;\nfunction renderGrid() {}\n'
+    + 'function okOverBudget() { return true; }\n'
     + 'var RESTALE_SKIP = {};\nfunction readPromptVer(){ return 0; }\n'
     + fnOf(app, 'reReadWorth') + '\n'
     + fnOf(app, 'autoReadPending') + '\n' + fnOf(app, 'readWaitRun'), ctx);

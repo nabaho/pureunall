@@ -126,9 +126,11 @@ test('★ 판 번호가 둘이다 — 「물음이 바뀐 판」과 「전체 �
 
 test('★ 어느 길로 읽었는지 결과에 남긴다 — 이것이 없으면 ②를 가릴 수 없다', () => {
   assert.match(fnOf(readjs, 'afterRead'), /via: \(via === 'text' \? 'text' : 'image'\)/);
-  assert.match(fnOf(readjs, 'read'), /runDocParts\(parts, 'image'\)/);
-  assert.match(fnOf(readjs, 'readDocText'), /\], 'text'\)/);
-  assert.match(readjs, /function runDocParts\(parts, via\)/);
+  /* ⚠ 인자 «개수»는 안 박는다 — 지킬 것은 「어느 길로 읽었나(via)를 넘기는가」다.
+     2026-09-10 에 「사람이 눌렀나」(opts)가 하나 더 붙었다. */
+  assert.match(fnOf(readjs, 'read'), /runDocParts\(parts, 'image'[,)]/);
+  assert.match(fnOf(readjs, 'readDocText'), /\], 'text'[,)]/);
+  assert.match(readjs, /function runDocParts\(parts, via[,)]/);
   /* 두 갈림길(대리인/열쇠) 모두 넘겨야 한다 — 한쪽만 넘기면 그 길에서 via 가 빈다. */
   assert.equal((fnOf(readjs, 'runDocParts').match(/afterRead\(parsed, via\)/g) || []).length, 2,
     '★ 한쪽 길에서만 넘기면 그 길로 읽은 것이 늘 「그림」으로 남습니다');

@@ -151,10 +151,12 @@ test('★ 글자 판독이 같은 물음(PROMPT_ALL)을 쓴다 — 두 벌이면
 test('★ 사진 길과 글자 길이 같은 뒤처리를 쓴다 — 두 벌이면 한쪽이 옛 길로 남는다', () => {
   /* ⚠ 2026-08-24: runDocParts 가 «어느 길로 읽었나»(via)를 함께 받는다 — 결과에
      남겨야 「글자 있는데 그림으로 읽은 것」만 골라 다시 읽을 수 있다.
-     지킬 것은 「두 길이 같은 뒤처리를 쓴다」이지 인자 개수가 아니다. */
-  assert.match(fnOf(readjs, 'read'), /return runDocParts\(parts, 'image'\);/);
+     지킬 것은 「두 길이 같은 뒤처리를 쓴다」이지 인자 개수가 아니다.
+   ⚠ 그렇게 적어 놓고 정작 닫는 괄호까지 박아 두었다 — 2026-09-10 에 「사람이
+     눌렀나」(opts)를 하나 더 받자 멀쩡한 고침에서 이 검사만 깨졌다. 이제 안 박는다. */
+  assert.match(fnOf(readjs, 'read'), /return runDocParts\(parts, 'image'[,)]/);
   assert.match(fnOf(readjs, 'readDocText'), /return runDocParts\(\[\{ text: /);
-  assert.match(readjs, /function runDocParts\(parts, via\)/);
+  assert.match(readjs, /function runDocParts\(parts, via[,)]/);
 });
 
 test('★ 빈 글자로 AI 를 부르지 않는다 — 헛돈이고 답도 쓸 수 없다', () => {
@@ -195,7 +197,9 @@ test('★ 올린 뒤 판독하는 길에서 글자를 쓴다', () => {
     '★ 글자를 안 뽑습니다 — 위 갈림이 늘 거짓이 됩니다');
   assert.match(fn, /imgChunkMakers\(imgs\)/, '그림으로 물러나는 길이 사라졌습니다');
   assert.match(fnOf(app, 'textChunkMakers'), /PuDocRead\.readDocText\(/);
-  assert.match(fnOf(app, 'imgChunkMakers'), /PuDocRead\.read\(g\.length > 1 \? g : g\[0\]\)/,
+  /* ⚠ 인자 «개수»는 안 박는다 — 지킬 것은 「한 장이면 배열로 안 보낸다」이다
+     (2026-09-10 에 「사람이 눌렀나」(opts)가 하나 더 붙었다). */
+  assert.match(fnOf(app, 'imgChunkMakers'), /PuDocRead\.read\(g\.length > 1 \? g : g\[0\][,)]/,
     '한 장짜리까지 배열로 보내면 「여러 쪽」이라고 잘못 말하게 됩니다');
 });
 
@@ -207,7 +211,7 @@ test('★ 「다시 판독」 길에서는 그림을 아예 «안 내려받는�
      그것이 textChunkMakers(tx) 로 가는가»만 본다. */
   assert.match(fn, /const 있는글자 = tx \? docTextOf\(tx\) : '';/,
     '★ 글자를 안 뽑습니다 — 아래 갈림이 늘 그림 길로 갑니다');
-  const goIdx = fn.search(/if \(있는글자\)[\s\S]{0,120}?runReadChunks\(textChunkMakers\(tx\)\)/);
+  const goIdx = fn.search(/if \(있는글자\)[\s\S]{0,120}?runReadChunks\(textChunkMakers\(tx[,)]/);
   assert.ok(goIdx > 0, '★ 글자로 가는 길이 없습니다');
   /* 글자로 갈 때 loadFull 이 «그 뒤»에만 있어야 한다 — 앞에 있으면 늘 내려받는다. */
   assert.ok(goIdx < fn.indexOf('loadFull('),

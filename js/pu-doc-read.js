@@ -514,13 +514,17 @@
      브라우저는 열쇠를 모르고, 사진과 프롬프트만 보낸다. 모델 고르기·재시도는 서버가 한다.
      ⚠ 서버가 준 **상태 숫자를 그대로** 다시 세운다 — 위쪽 askAny 를 부르는 곳들이
        이 숫자로 판단한다(429 면 잠시 뒤, 403 이면 곧바로 포기). 뭉개면 그 판단이 죽는다. */
-  function askProxy(parts) {
+  function askProxy(parts, opts) {
     return Promise.resolve().then(deps.getToken).then(function (token) {
       if (!token) throw new Error('로그인을 확인해 주세요');
       return deps.fetch(deps.readDocUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ parts: parts, app: appName() })
+        /* manual — «사람이 지금 기다리고 있다»는 표시(2026-09-10).
+           서버가 이번 달 한도를 넘었을 때 «자동»만 막고 이것은 통과시킨다.
+           ⚠ 안 실으면 자동으로 본다 — 모르면 막는 쪽이 맞다. */
+        body: JSON.stringify({ parts: parts, app: appName(),
+          manual: !!(opts && opts.manual) })
       });
     }).then(function (r) {
       return (r && r.json ? r.json() : Promise.resolve(null)).catch(function () { return null; })
@@ -870,7 +874,7 @@
     return readPairsWith(NOTICE_PROMPT, dataUrl);
   }
 
-  function read(dataUrl) {
+  function read(dataUrl, opts) {
     if (!deps.fetch) return Promise.resolve(fail('판독 준비가 되지 않았습니다'));
     /* ⚠ 보낼 크기부터 줄인다(AI_SEND_EDGE) — 담는 크기를 올려도 요금이 안 오르게 */
     return shrinkAllForAi(dataUrl).then(function (small) {
@@ -884,7 +888,7 @@
         return { inline_data: { mime_type: 'image/jpeg', data: b64 } };
       });
       parts.push({ text: PROMPT_ALL + (imgs.length > 1 ? MULTI_NOTE : '') });
-      return runDocParts(parts, 'image');
+      return runDocParts(parts, 'image', opts);
     });
   }
 
@@ -979,22 +983,22 @@
     });
   }
 
-  function readDocText(text) {
+  function readDocText(text, opts) {
     if (!deps.fetch) return Promise.resolve(fail('판독 준비가 되지 않았습니다'));
     var body = String(text == null ? '' : text).trim();
     /* 빈 글자로 AI 를 부르면 헛돈이고 답도 쓸 수 없다 — 부르는 쪽이 그림으로 가야 한다. */
     if (!body) return Promise.resolve(fail('읽을 글자가 없습니다'));
     body = rrnScrub(body);
     if (body === null) return Promise.resolve(fail(NO_SCRUB));
-    return runDocParts([{ text: PROMPT_ALL + TEXT_NOTE + '\n\n' + body }], 'text');
+    return runDocParts([{ text: PROMPT_ALL + TEXT_NOTE + '\n\n' + body }], 'text', opts);
   }
 
   /* 모델·재시도·키 조달·결과 다듬기 — 사진으로 보낼 때와 글자로 보낼 때가 **똑같이**
      쓴다. 두 벌로 두면 한쪽만 고쳐 놓고 다른 쪽은 옛 길로 남는다. */
-  function runDocParts(parts, via) {
+  function runDocParts(parts, via, opts) {
     /* 서버 대리인이 있으면 열쇠를 아예 안 챙긴다(2026-08-17) */
     if (useProxy()) {
-      return askProxy(parts).then(function (j) {
+      return askProxy(parts, opts).then(function (j) {
         var parsed = parseReply(j);
         if (!parsed) throw new Error('AI가 알아볼 수 없는 답을 보냈습니다');
         return afterRead(parsed, via);

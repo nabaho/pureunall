@@ -38,10 +38,21 @@ test('★ Vision 셈은 «달 자리»도 함께 올린다 — 안 올리면 문
   assert.ok(길.length >= 3, '앱 자리·하루 합계·달 합계 셋이 있어야 합니다');
 });
 
-test('★ Gemini 셈(n)은 달 자리를 «안» 올린다 — 몫이 다른 곳이다', () => {
-  const 길 = DR.tallyPaths('photos', '2026-09-08', 'n');
-  assert.equal(길.some(p => /\/2026-09\//.test(p)), false,
-    '★ Gemini 셈이 달 자리에 섞였습니다 — 하루 몫과 달 몫이 한 숫자가 되어 둘 다 못 읽습니다');
+/* ⚠ 2026-09-10 에 규칙이 «바뀌었다» — 그전에는 「Gemini 셈(n)은 달 자리를 안 올린다」였다.
+   이번 달 요금 한도(대표 결정 ₩30,000)가 생기면서 n 도 달 자리를 쓴다.
+   ★ 그래도 지켜야 할 것은 그대로다: **둘이 한 숫자로 섞이지 않는 것.**
+     Vision 은 무료 몫(달 1,000장)을 세고 n 은 유료 판독 횟수를 센다 —
+     한 숫자가 되면 둘 다 못 읽는다. 그래서 «다른 열쇠»로 나란히 쌓는다. */
+test('★ Vision 몫과 Gemini 셈이 «한 숫자로 섞이지» 않는다', () => {
+  const v = DR.tallyPaths('photos', '2026-09-08', 'vision');
+  const n = DR.tallyPaths('photos', '2026-09-08', 'n');
+  assert.equal(v.filter(p => n.includes(p)).length, 0,
+    '★ 무료 몫과 유료 셈이 같은 자리에 쌓입니다 — 둘 다 못 읽게 됩니다');
+  v.forEach(p => assert.match(p, /\/vision$/));
+  n.forEach(p => assert.match(p, /\/n$/));
+  /* 달 자리는 둘 다 쓴다 — 다만 «끝 이름»이 달라 섞이지 않는다 */
+  assert.ok(n.some(p => /\/2026-09\/_all\/n$/.test(p)),
+    '★ 유료 판독이 달 자리를 안 올립니다 — 이번 달 요금 한도가 볼 숫자가 없습니다');
 });
 
 test('달 자리를 이미 받았으면 두 번 올리지 않는다', () => {

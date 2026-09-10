@@ -2013,6 +2013,27 @@ exports.readDoc = functions
     const v = DR.validate(body);
     if (!v.ok) { res.status(400).json({ ok: false, error: v.error }); return; }
 
+    /* ── 이번 달 요금 한도 (대표 결정 2026-09-10 · 한도 ₩30,000 · 경고 ₩25,000) ──
+         목업 docs/mockups/ai-spend-cap.html
+       ⚠⚠ 부르기 «전»에 막는다 — 부른 뒤에 세면 이미 요금이 나간 다음이다.
+       ⚠ 「자동」만 막고 «사람이 누른 것»은 통과시킨다(대표 결정 ⓵㉮). 한도에 걸린 날
+         급한 사업자등록증 한 장을 못 읽으면 그 손해가 요금보다 크다 — 화면이 먼저
+         「그래도 읽겠습니까」로 묻고, 그때만 manual 을 실어 보낸다.
+       ⚠ manual 을 «안 보내는» 부름은 자동으로 본다 — 모르면 막는 쪽이 맞다.
+         급여·경력관리도 한도에 걸리면 함께 멎는다(회사 전체의 한 달 몫이다).
+       ⚠⚠ 셈을 «못 읽으면» 막지 않는다 — Vision 문턱과 **일부러 반대**로 두었다.
+         그쪽은 못 읽은 채 부르면 요금이 나갈 판이라 막았지만, 이쪽은 못 읽었다고
+         판독을 통째로 세우면 그날 일이 멈춘다. 한도는 «사고를 막는 장치»이지
+         일을 세우는 장치가 아니다. */
+    const 몫 = await aiMonthSpend();
+    if (몫.known && 몫.over && !body.manual) {
+      res.status(429).json({ ok: false, overBudget: true, spent: 몫.spent, limit: 몫.limit,
+        error: "이번 달 AI 판독 한도(₩" + 몫.limit.toLocaleString("ko-KR") + ")를 다 썼습니다"
+          + " — 지금까지 약 ₩" + 몫.spent.toLocaleString("ko-KR") + ". 자동 판독을 멈췄습니다."
+          + " 급한 것은 사진을 열어 직접 눌러 주세요." });
+      return;
+    }
+
     const key = await readGeminiKey();
     if (!key) { res.status(503).json({ ok: false, error: "AI 키가 설정되지 않았습니다 — 관리자에게 알려 주세요." }); return; }
 
@@ -2041,6 +2062,29 @@ exports.readDoc = functions
        가려 말해야 한다 — 「다 썼습니다」와 「모릅니다」는 손쓸 곳이 다르다.
    ⚠ 여기서 실패를 삼켜 0 을 돌려주면 「한 장도 안 썼다」가 되어 문턱이 통째로
      헛돈다. 셈을 못 읽는 것과 안 쓴 것을 «절대» 같게 다루지 말 것. */
+/* 이번 달 AI 판독에 «얼마나 썼나» — 어림 금액(판독 수 × 단가).
+   돌려주는 것: { spent, limit, warn, over, known }
+     known:false — 셈이나 설정을 못 읽었다. **그때는 막지 않는다**(위 readDoc 참고).
+   ⚠ 계산식을 여기 적지 «않는다» — 화면과 서버가 같은 답을 내야 하므로
+     doc-read.js 의 aiSpentWon 하나를 둘이 나눠 쓴다. 두 곳에 적으면 화면은
+     「남았다」는데 서버가 막는 일이 생긴다. */
+async function aiMonthSpend() {
+  try {
+    const db = getDatabase();
+    const [셈, 설정] = await Promise.all([
+      db.ref(DR.aiMonthPath()).once("value"),
+      db.ref(DR.AI_BUDGET_PATH).once("value")
+    ]);
+    const b = DR.aiBudgetOf(설정.val());
+    const spent = DR.aiSpentWon(셈.val(), b.wonPerRead);
+    return { spent: spent, limit: b.limit, warn: b.warn,
+             over: b.limit > 0 && spent >= b.limit, known: true };
+  } catch (e) {
+    console.warn("AI 달 요금 못 읽음(막지 않는다):", String((e && e.message) || e));
+    return { spent: 0, limit: 0, warn: 0, over: false, known: false };
+  }
+}
+
 async function visionMonthLeft() {
   try {
     const db = getDatabase();
