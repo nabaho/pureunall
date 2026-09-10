@@ -1,0 +1,213 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>목업 — 다음메일 규칙 정리 · 지난 메일 3년치</title>
+<style>
+  body{margin:0;padding:24px;background:#f8fafc;color:#1e293b;
+       font:14px/1.6 'Malgun Gothic','맑은 고딕',system-ui,sans-serif}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:#64748b;font-size:13px;margin-bottom:22px}
+  .sec{margin:0 0 30px}
+  .sec>h2{font-size:15px;margin:0 0 8px;padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+  .note{background:#fffbeb;border:1px solid #fde68a;color:#854d0e;
+        padding:9px 12px;border-radius:7px;font-size:12.5px;margin:8px 0 14px}
+  .ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+  .frame{background:#fff;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden}
+
+  /* ── 점검 창 ── */
+  .mck header{display:flex;align-items:center;gap:8px;padding:12px 16px;
+              border-bottom:1px solid #e2e8f0}
+  .mck header h3{margin:0;font-size:15px}
+  .mck header .x{margin-left:auto;color:#94a3b8;cursor:pointer}
+  .tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid #e2e8f0;flex-wrap:wrap}
+  .tab{padding:9px 12px;font-size:13px;color:#64748b;cursor:pointer;
+       border-bottom:2px solid transparent}
+  .tab.on{color:#2563eb;border-bottom-color:#2563eb;font-weight:600}
+  .tab .n{background:#e2e8f0;color:#475569;border-radius:9px;padding:0 6px;
+          font-size:11px;margin-left:3px}
+  .tab.on .n{background:#bfdbfe;color:#1e40af}
+  .tab.new{color:#16a34a}
+  .tab.new.on{color:#16a34a;border-bottom-color:#16a34a}
+  .why{background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;
+       padding:9px 12px;margin:12px 16px;font-size:12.5px;color:#475569}
+  .why b{color:#1e293b}
+  .chips{display:flex;gap:8px;margin:0 16px 10px;flex-wrap:wrap}
+  .chip{border:1px solid #e2e8f0;border-radius:14px;padding:3px 11px;font-size:12px;
+        color:#475569;background:#fff}
+  .chip b{color:#1e293b}
+  .chip.warn{background:#fffbeb;border-color:#fde68a;color:#854d0e}
+  .chip.good{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;font-weight:600;color:#64748b;font-size:11.5px;
+     padding:7px 10px;border-bottom:1px solid #e2e8f0;background:#f8fafc}
+  td{padding:7px 10px;border-bottom:1px solid #f8fafc;vertical-align:middle;
+     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  tr.grp td{background:#f8fafc;color:#475569;font-weight:600;font-size:12px}
+  .em{color:#64748b;font-size:11.5px}
+  .old{color:#991b1b}
+  .live{color:#166534}
+  .end{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:4px;
+       padding:0 5px;font-size:11px}
+  .none{background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;border-radius:4px;
+        padding:0 5px;font-size:11px}
+  button{font:inherit;font-size:12px;border:1px solid #cbd5e1;background:#fff;
+         color:#475569;border-radius:6px;padding:4px 10px;cursor:pointer}
+  button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
+  button.go{background:#16a34a;border-color:#16a34a;color:#fff}
+  footer{display:flex;align-items:center;gap:8px;padding:11px 16px;
+         border-top:1px solid #e2e8f0;background:#f8fafc;font-size:12px;color:#64748b}
+  footer .sp{flex:1}
+
+  /* ── 설정 ⑤ 지난 메일 칸 ── */
+  .msbox{padding:14px 16px}
+  .msbox h4{margin:0 0 8px;font-size:13.5px}
+  .done{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+        padding:11px 13px;font-size:12.5px;color:#166534;line-height:1.7}
+  .done b{color:#166534}
+  .more{margin-top:10px;padding:11px 13px;background:#eff6ff;border:1px solid #bfdbfe;
+        border-radius:8px;font-size:12.5px;color:#1e40af;line-height:1.7}
+  .kv{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:#475569}
+  .cap{font-size:11.5px;color:#94a3b8;margin-top:6px}
+  .txt{background:#1e293b;color:#f8fafc;border-radius:8px;padding:11px 13px;
+       font:12px/1.7 Consolas,monospace;white-space:pre;overflow-x:auto;margin-top:8px}
+</style>
+
+<h1>목업 — 다음메일 규칙 정리 · 지난 메일 3년치</h1>
+<div class="sub">대표 지시 2026-09-10 · 승인하신 것: ㉮ Chrome으로 목록 읽기 · ㉯ 목록만 받고 직접 지움 · ㉮ 3년치까지 채움</div>
+
+<!-- ══════════ ① ══════════ -->
+<div class="sec">
+  <h2>① 🔎 메일함 점검 — 갈래 하나를 더합니다 「🧹 다음메일 규칙」</h2>
+  <div class="note">이미 있는 점검 창에 <b>여섯째 갈래</b>로 붙입니다. 새 창을 만들지 않습니다 —
+    「정해 둔 칸」 갈래 바로 옆이라 무르는 자리와 고르는 자리가 붙어 있습니다.</div>
+
+  <div class="frame mck">
+    <header><span>🔎</span><h3>메일함 점검</h3><span class="x">✕</span></header>
+    <div class="tabs">
+      <div class="tab">분류가 다릅니다 <span class="n">12</span></div>
+      <div class="tab">담당을 모릅니다 <span class="n">37</span></div>
+      <div class="tab">끝난 업체 <span class="n">8</span></div>
+      <div class="tab">주소가 겹칩니다 <span class="n">3</span></div>
+      <div class="tab">정해 둔 칸 <span class="n">438</span></div>
+      <div class="tab new on">🧹 다음메일 규칙 <span class="n">438</span></div>
+    </div>
+
+    <div class="why">
+      다음메일의 <b>자동분류는 1,000개가 한도</b>입니다. 지금 <b>998개</b>라 새로 만들 자리가 둘뿐입니다.<br>
+      <b>1년 넘게 한 통도 안 온 주소</b>를 골라 드립니다 — 계약이 끝났거나 담당자가 그만둔 곳입니다.<br>
+      ⚠ <b>지우는 것은 대표님이 다음메일 설정에서 하십니다.</b> 우리 앱은 다음메일에 아무것도 안 씁니다.
+    </div>
+    <div class="chips">
+      <span class="chip">규칙 <b>998</b>개</span>
+      <span class="chip good">✔ 최근 1년 안 <b>560</b></span>
+      <span class="chip warn">⚠ 1년 넘게 <b>438</b></span>
+      <span class="chip">2년 넘게 <b>328</b></span>
+      <span class="chip">3년 넘게 <b>224</b></span>
+    </div>
+
+    <table>
+      <tr><th style="width:27%">보낸 주소</th><th style="width:22%">업체</th>
+          <th style="width:13%">마지막 메일</th><th style="width:11%">받은 통수</th>
+          <th style="width:15%">업체 상태</th><th style="width:12%"></th></tr>
+      <tr class="grp"><td colspan="6">2.급여+사무대행 &nbsp;— 이 칸으로 가는 규칙 <b>131</b>개 중 <b>62</b>개</td></tr>
+      <tr><td>tax_dy15@naver.com</td><td>대영산업</td><td class="old">2023.04.11</td>
+          <td>17통</td><td><span class="end">자문 종료</span></td>
+          <td><button>넘어가기</button></td></tr>
+      <tr><td>wlaks202@naver.com</td><td class="em">(업체 모름)</td><td class="old">2024.02.02</td>
+          <td>3통</td><td><span class="none">명함 없음</span></td>
+          <td><button>넘어가기</button></td></tr>
+      <tr><td>qurgo0416@naver.com</td><td>한빛물류</td><td class="old">2024.11.28</td>
+          <td>41통</td><td>—</td><td><button>넘어가기</button></td></tr>
+      <tr class="grp"><td colspan="6">1.자문사답변 &nbsp;— 이 칸으로 가는 규칙 <b>96</b>개 중 <b>44</b>개</td></tr>
+      <tr><td>rms0921@cu.co.kr</td><td>씨유대전</td><td class="old">2022.08.03</td>
+          <td>8통</td><td><span class="end">자문 종료</span></td>
+          <td><button>넘어가기</button></td></tr>
+      <tr><td>sjkim1@megatouch.co.kr</td><td>메가터치</td><td class="old">2025.01.19</td>
+          <td>112통</td><td>—</td><td><button>넘어가기</button></td></tr>
+      <tr class="grp"><td colspan="6">4.체불 및 체당금메일 &nbsp;— <b>58</b>개 중 <b>31</b>개</td></tr>
+      <tr><td>leekahyun@korea.kr</td><td>고용노동부</td><td class="old">2023.06.30</td>
+          <td>5통</td><td>—</td><td><button>넘어가기</button></td></tr>
+    </table>
+
+    <div class="why ok" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">
+      ★ 이 <b>438개는 푸른메일함에 이미 옮겨 심었습니다.</b> 다음메일에서 지우셔도
+      <b>푸른메일함의 업무 칸은 그대로</b>입니다 — 그 주소가 몇 년 만에 메일을 보내도 제 칸으로 갑니다.<br>
+      ⚠ 다음메일 쪽에서는 받은메일함으로 들어옵니다. <b>메일이 없어지지는 않습니다.</b>
+    </div>
+
+    <footer>
+      <span>메일 11,224통을 봤습니다 · 근거는 <b>3년치</b>입니다</span>
+      <span class="sp"></span>
+      <button class="go">📄 지울 주소 목록 내려받기</button>
+      <button>다시 세기</button><button>닫기</button>
+    </footer>
+  </div>
+
+  <div class="cap">칸(처리방법)별로 묶어 보여 드립니다 — 다음메일 설정 화면이 처리방법으로 훑기 좋게 되어 있어서입니다.</div>
+
+  <div class="note" style="margin-top:14px">「📄 내려받기」를 누르면 이런 글이 파일로 떨어집니다 —
+    다음메일 설정 화면 옆에 띄워 놓고 검색창에 하나씩 붙이시면 됩니다.</div>
+  <div class="txt">푸른노무법인 · 다음메일 자동분류 정리 목록
+만든 날 2026-09-10 · 규칙 998개 중 1년 넘게 안 쓴 것 438개
+
+[2.급여+사무대행]  62개
+tax_dy15@naver.com          2023-04-11  17통  자문 종료
+wlaks202@naver.com          2024-02-02   3통  명함 없음
+qurgo0416@naver.com         2024-11-28  41통
+...
+
+[1.자문사답변]  44개
+rms0921@cu.co.kr            2022-08-03   8통  자문 종료
+...</div>
+</div>
+
+<!-- ══════════ ② ══════════ -->
+<div class="sec">
+  <h2>② 설정 → ⑤ 다음메일에서 — 「3년치까지 더 채우기」 한 줄</h2>
+  <div class="note">지금은 다 채우면 <b>단추가 사라집니다</b>(더 누를 것이 없어서). 거기에 줄 하나를 답니다.
+    ⚠ 판단 근거를 넓히는 일입니다 — 지금은 <b>1년까지만</b> 고르게 보여서, 1년에 한 번 오는 곳을 잘못 지울 수 있습니다.</div>
+
+  <div class="frame">
+    <div class="msbox">
+      <h4>📦 지난 메일</h4>
+      <div class="done">
+        ✅ <b>지난 메일을 다 채웠습니다 — 더 누르실 것이 없습니다.</b><br>
+        <b>3,316통</b>을 담았습니다 · 가장 오래된 것 <b>2025.09.07</b> · <b>1년치</b><br>
+        ⚠ 이 칸만 보시면 최근 몇 달이 비어 보입니다 — 그 메일은 업무 칸에 <b>이미 들어 있어서</b>
+        여기 또 담지 않은 것입니다. 빠진 것이 아닙니다.
+      </div>
+
+      <div class="more">
+        <b>더 깊이 채우면 무엇이 좋습니까</b><br>
+        「이 주소는 <b>몇 년째</b> 한 통도 안 왔다」를 우리 자료로 말할 수 있습니다 —
+        다음메일 규칙 998개를 정리할 때 <b>잘못 지울 일이 거의 없어집니다.</b>
+        <div class="kv">
+          <span>지금 <b>1년치</b> · 3,316통</span>
+          <span>→ <b>3년치</b> · 약 1만 통 (2MB)</span>
+          <span>여러 번 나눠 받습니다</span>
+        </div>
+        <div style="margin-top:9px">
+          <button class="pri">📦 3년치까지 더 채우기</button>
+          <span class="em" style="margin-left:8px">이미 담은 3,316통은 다시 안 받습니다</span>
+        </div>
+      </div>
+      <div class="cap">⚠ 머리글만 받습니다(본문·첨부 안 받음). 다음메일에서 지우는 명령은 이 길에 <b>아예 없습니다</b>.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ③ ══════════ -->
+<div class="sec">
+  <h2>③ 998개를 어떻게 가져오나 — 대표님이 하실 일은 하나뿐입니다</h2>
+  <div class="note">
+    ⓵ 크롬에 <b>Claude 확장을 켜 주십니다</b> (열려 있는 다음메일 설정 화면 그대로).<br>
+    ⓶ 제가 998줄을 <b>읽기만</b> 해서 파일로 만들고, 푸른메일함에 옮겨 심습니다.<br>
+    ⓷ 위 ① 화면에 「지울 것」이 뜹니다. <b>지우시는 것은 대표님이 다음메일에서</b> 하십니다.<br>
+    ⚠ 확장이 안 켜지면, 설정 화면에 <b>한 번 붙여 넣을 짧은 글</b>을 드리는 길도 있습니다.
+  </div>
+  <div class="note ok">
+    ★ 앞으로는 <b>다음메일에 규칙을 새로 안 만드셔도 됩니다.</b> 푸른메일함에서
+    「📌 늘 이 칸으로」를 누르시면 됩니다 — <b>한도가 없습니다.</b><br>
+    ⚠ 다만 다음메일의 <b>폴더 가르기 자체는 그대로 둡니다</b>. 칸이 22개라 <b>8,800줄</b>이 보이는 것이지,
+    다 받은메일함에 쌓이면 <b>400줄</b>만 보입니다.
+  </div>
+</div>

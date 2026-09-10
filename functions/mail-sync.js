@@ -1534,7 +1534,7 @@ module.exports = function build(deps) {
         const st = (await db.ref(ROOT + '/old/state').once('value')).val() || {};
         if (st.done && !b.again) {
           reply(res, 200, { ok: true, done: true, got: Number(st.got || 0),
-            note: '이미 끝났습니다 — 다시 하시려면 「처음부터」를 켜 주세요' });
+            note: '이미 끝났습니다 — 더 깊이 채우시려면 「이어서」를 켜 주세요' });
           return;
         }
 
@@ -1550,9 +1550,22 @@ module.exports = function build(deps) {
             });
           });
         }
+        /* ── 이미 «여기» 담은 것의 이름표 ── (대표 지시 2026-09-10 「3년치까지」)
+           ⚠★ 지문(fps)만으로는 못 거른다 — 지문을 보려면 TOP 으로 받아 봐야 안다.
+             이름표(UIDL)는 목록에 이미 들어 있어 «받아 보기 전에» 거를 수 있다.
+             1년치를 담은 뒤 3년치로 넓히면 앞의 3,316통을 다시 받게 되는데,
+             한 번에 420초뿐이라 그 되받기만으로 예산이 다 간다 — 더 깊이 못 간다.
+           ⚠ 값은 안 읽고 «열쇠»만 쓴다. */
+        const havePop = Object.create(null);
+        let haveN = 0;
+        {
+          const oldMsgs = (await db.ref(ROOT + '/old/msgs').once('value')).val() || {};
+          Object.keys(oldMsgs).forEach((k) => { havePop[k] = 1; haveN++; });
+        }
 
         const pop = await popOpen(user, pass, 60000);
-        const out = { ok: true, got: 0, skip: 0, seen: 0, done: false, oldest: Number(st.oldest || 0) };
+        const out = { ok: true, got: 0, skip: 0, seen: 0, done: false, days: days,
+          have: haveN, already: 0, oldest: Number(st.oldest || 0) };
         try {
           const stat = await pop.cmd('STAT', false);
           out.total = Number((String(stat.head).match(/\+OK\s+(\d+)/) || [])[1] || 0);
@@ -1561,7 +1574,7 @@ module.exports = function build(deps) {
 
           /* 어디부터 이어 갈까 — 이름표로 찾는다(번호는 회차마다 흔들린다) */
           let i = list.length - 1;                      /* 뒤가 새것이다 */
-          if (st.curId) {
+          if (st.curId && !b.fresh) {
             const at = list.findIndex((x) => x.id === st.curId);
             if (at >= 0) i = at - 1;                    /* 그 다음(더 옛것)부터 */
           }
@@ -1576,6 +1589,11 @@ module.exports = function build(deps) {
           for (; i >= 0; i--) {
             if (nowMs() > deadline) break;
             const one = list[i];
+            /* ⚠★ 이미 담은 것은 «받아 보기 전에» 지나간다 — 이름표로 안다.
+                 여기서 안 거르면 3년치로 넓힐 때 앞의 1년치를 통째로 다시 받는다.
+               ⚠ 「연달아 옛것」 셈(oldStreak)은 건드리지 않는다 — 담은 것은 문턱보다
+                 «새것»이라 셈에 넣을 값이 아니다. */
+            if (havePop[popKey(one.id)]) { out.already++; continue; }
             out.seen++;
             let head;
             try {
@@ -1624,8 +1642,12 @@ module.exports = function build(deps) {
           }
           await flush();
           const lastId = (i >= 0 && list[i + 1]) ? list[i + 1].id : (list[0] ? list[0].id : '');
+          /* ⚠★ 끝났어도 «어디까지 갔는지»를 지우지 않는다 (대표 지시 2026-09-10).
+               예전에는 done 이면 curId 를 비웠다. 그래서 1년치를 마친 뒤 3년치로 넓히면
+               «맨 앞부터» 다시 걸어야 했다. 자리를 남겨 두면 그 자리에서 이어 간다.
+             ⚠ 처음부터 다시 걷고 싶으면 fresh 를 켠다 — 그 길도 남겨 둔다. */
           await db.ref(ROOT + '/old/state').update({
-            curId: out.done ? '' : lastId, done: !!out.done, at: nowMs(),
+            curId: lastId, done: !!out.done, at: nowMs(),
             got: Number(st.got || 0) + out.got, oldest: out.oldest, days: days,
           });
         } finally {
