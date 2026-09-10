@@ -509,7 +509,11 @@ test('★ 넘버링 왼쪽에 체크칸 · 전체 선택 · 고른 것만 처리
   /* 대표 지시 2026-09-03: 「넘버링 왼쪽 표시 체크가능하게 일괄 선택등 가능하게」
      ⚠ 110줄에서 몇 곳만 골라 처리하려면 체크칸이 있어야 한다. 지금은 한 줄씩
        「수신거부」를 눌러야 했다. */
-  assert.match(news, /id="chkAll"/, '전체 선택 칸이 없습니다');
+  /* ⚠ 2026-09-09 에 id="chkAll" 을 걷었다 — 표가 셋(담당자·대표자·따로 더한 분)이 되어
+       같은 id 를 세 번 쓸 수 없다. 지키는 «규칙»은 그때나 지금이나 「머리에 전체 선택
+       칸이 있는가」이지 「그 id 가 있는가」가 아니다. */
+  assert.match(news, /<th class="ck"><input type="checkbox" onchange="전체선택\(this\)"/,
+    '표 머리에 전체 선택 칸이 없습니다');
   assert.match(news, /class="chk"/, '줄마다 체크칸이 없습니다');
   assert.match(news, /function 전체선택/, '전체 선택을 다루는 곳이 없습니다');
   assert.match(news, /function 고른것/, '고른 것을 모으는 곳이 없습니다');
@@ -530,20 +534,31 @@ test('★ 연락처가 «옆 열»에 있고 머리와 몸통의 열 수가 맞�
        눈으로는 「왜 이상하지」 정도로만 보이고 무엇이 틀렸는지 모른다. */
   const i = news.indexOf('function 명단화면');
   assert.ok(i >= 0, '명단화면 을 찾을 수 없습니다');
-  const 몸 = news.slice(i, news.indexOf('function ', i + 20));
+  const 몸 = news.slice(i, news.indexOf('\nfunction ', i + 20));
 
-  /* 머리의 <th> 수 */
-  const 머리 = /<tr>\s*<th class="ck">[\s\S]*?<\/tr>/.exec(몸);
-  assert.ok(머리, '표 머리를 찾을 수 없습니다');
-  const th = (머리[0].match(/<th/g) || []).length;
+  /* ⚠ 2026-09-09 부터 표가 «셋»이다 — 담당자 · 대표자 · 따로 더한 분
+       (대표 지시 「각자보내야되서 … 분리해라」). 갈래마다 열이 다르므로
+       «표마다» 머리와 몸통을 맞춰 본다. 하나만 보면 나머지 둘이 밀려도 통과한다. */
+  /* ⚠ 이름이 한글이라 \w 로는 못 잡는다 — 그것 때문에 「0개」가 나왔다 */
+  const 표들 = [...몸.matchAll(/<table class="list"><tr>([\s\S]*?)<\/tr>\$\{([^${}]+)\}<\/table>/g)];
+  assert.ok(표들.length >= 3, '갈래별 표를 못 찾았습니다 (찾은 것 ' + 표들.length + '개)');
 
-  /* 줄의 <td> 수 — 문자열을 이어 붙여 만드니 '<td' 를 센다 */
-  const 줄시작 = 몸.indexOf("return '<tr>'");
-  assert.ok(줄시작 >= 0, '줄 만드는 곳을 찾을 수 없습니다');
-  const 줄 = 몸.slice(줄시작, 몸.indexOf("'</tr>'", 줄시작));
-  const td = (줄.match(/<td/g) || []).length;
+  표들.forEach(function(m){
+    const 이름 = m[2];
+    /* 머리 — ${머리체크} 는 <th> 하나다 */
+    const th = (m[1].match(/<th/g) || []).length + (m[1].includes('${머리체크}') ? 1 : 0);
 
-  assert.equal(td, th, '머리 ' + th + '칸 · 줄 ' + td + '칸 — 표가 한 칸씩 밀립니다');
+    /* 줄 — 문자열을 이어 붙여 만드니 '<td' 를 센다.
+       ⚠ 칸 하나를 돌려주는 도우미(체크칸·유형칸·거부칸)도 «한 칸»으로 센다.
+         빠뜨리면 표가 밀려도 이 검사가 통과한다. */
+    const 시작 = 몸.indexOf('const ' + 이름 + ' =');
+    assert.ok(시작 >= 0, 이름 + ' 를 만드는 곳을 찾을 수 없습니다');
+    const 줄 = 몸.slice(시작, 몸.indexOf("}).join('')", 시작));
+    let td = (줄.match(/<td/g) || []).length;
+    ['체크칸(', '유형칸(', '거부칸('].forEach(function(h){ td += 줄.split(h).length - 1; });
+
+    assert.equal(td, th, 이름 + ' — 머리 ' + th + '칸 · 줄 ' + td + '칸: 표가 한 칸씩 밀립니다');
+  });
 
   /* 연락처가 «아래»가 아니라 «옆»인지 */
   assert.ok(!/사람칸\(/.test(몸), '연락처를 이름 아래에 붙이는 옛 방식이 남아 있습니다');

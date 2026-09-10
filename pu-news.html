@@ -43,7 +43,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=30"></script>
+<script src="js/pu-news-core.js?v=31"></script>
 <script src="js/pu-news-tpl.js?v=12"></script>
 <style>
 :root{
@@ -384,6 +384,20 @@ table.list tr:hover td{background:#fcfcfd}
 #big{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:80;padding:22px}
 #rowbox{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:82;padding:22px}
 #rowbox.on{display:flex;align-items:center;justify-content:center}
+/* 📇 명함에서 담는 창 — 줄창(#rowbox)과 «같은 옷»을 입힌다. 두 창이 다르게 생기면
+   같은 앱에서 온 것으로 안 보인다. 안쪽은 표라서 흰 바탕으로 둔다. */
+#cardbox{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:82;padding:22px}
+#cardbox.on{display:flex;align-items:center;justify-content:center}
+#cardbox .in{background:#fff;border-radius:14px;width:min(1000px,96vw);max-height:92vh;
+  display:flex;flex-direction:column;overflow:hidden}
+#cardbox .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:8px;margin:0;background:var(--brown-soft);color:#4a3c2e}
+#cardbox .in h4 .sp{flex:1}
+#cardbox .bd{overflow:auto;flex:1;min-height:0;padding:0}
+#cardbox .ft{display:flex;align-items:center;gap:8px;padding:11px 16px;
+  border-top:1px solid var(--line);background:var(--paper)}
+#cardbox .ft .sp{flex:1}
+#cardbox .ft .hint{font-size:12px;color:var(--sub)}
 #rowbox .in{background:#ece9e5;border-radius:14px;width:min(900px,96vw);max-height:92vh;
   display:flex;flex-direction:column;overflow:hidden}
 #rowbox .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
@@ -572,6 +586,21 @@ table.list tr:hover td{background:#fcfcfd}
   </div>
 </div></div>
 
+<!-- 📇 기업정보함 명함에서 «골라» 담는 창 (대표 지시 2026-09-09).
+     ⚠ 저절로 담지 않는 까닭은 회사 «이름»으로 맞춘 후보이기 때문이다 —
+       이름만 보고 옮겨 자문 계약이 남의 업체에 들어간 일이 있다(2026-09-05). -->
+<div id="cardbox"><div class="in">
+  <h4><span id="cardT">📇 명함에서 담기</span><span class="sp"></span>
+    <button class="mini" onclick="명함창닫기()">닫기</button></h4>
+  <div class="bd" id="cardB"></div>
+  <div class="ft">
+   <span class="hint" id="cardHint"></span>
+   <span class="sp"></span>
+   <button class="btn" onclick="명함창닫기()">닫기</button>
+   <button class="btn pri" onclick="명함담기()">고른 것 담기</button>
+  </div>
+</div></div>
+
 <div id="ilbox"><div class="in">
   <h4><span id="ilT">📥 공인노무사회 자료</span><span class="sp"></span>
     <button class="mini" onclick="노무사회읽기()">⟳ 다시 읽기</button>
@@ -599,6 +628,14 @@ var db = null;
 var App = {
   me: null, isAdmin: false, tab: 'now',
   설정: {}, 회차들: {}, 사업장들: {}, 막은주소: {}, 브리핑: {},
+  /* 「따로 더한 분」 — newsletter/더한분들 (대표 지시 2026-09-09).
+     ⚠ 사업장 명단과 달리 «사본»이다. 계약이 끝나도 저절로 안 빠진다. */
+  더한분들: {},
+  /* 기업정보함(pucards/idx) — 「받는 명단」 탭을 열 때 한 번만 읽는다(1.3MB).
+     ⚠ null 은 «아직 안 읽었다»이고 {} 는 «읽었는데 비었다»다. 둘을 섞으면 영영 읽는다. */
+  명함들: null, 명함읽는중: false, 명함후보캐시: null,
+  /* 지금 열어 둔 명함 창의 갈래('대표자'|'담당자') 와 거기서 고른 줄 */
+  명함창: '', 명함고름: {},
   /* 고른 것 — «주소»를 열쇠로 지닌다. 번호나 줄 위치로 지니면 유형 칩을 누르는 순간
      엉뚱한 곳이 골라진다(표가 다시 그려지기 때문이다). */
   고른것: {},
@@ -619,6 +656,10 @@ var App = {
        나머지 89개 주소는 그 주를 빈다. 확인 창의 ⚠ 가 그 쪽에 붙어 있다.
      ⚠ 이 값이 «보내는 곳»까지 바꾼다 — 명단셈 하나가 화면·보내기·CSV·엑셀을 다 먹인다. */
   유형: '',
+  /* 고른 «갈래»(담당자·대표자·더한분). 빈 값이면 전체.
+     ★ 유형과 «다른 축»이다 — 유형은 어느 업체인가, 갈래는 그 업체의 누구인가.
+       그래서 칩줄을 두 줄로 두고, 둘을 함께 걸 수 있다(급여 업체의 대표자만 보기). */
+  누구: '',
   /* 판례·행정해석 «후보»들 — 요약이 「행정해석이 몇 건 밀렸나」를 말하는 데 쓴다.
      ⚠ 채우기를 누르기 «전»에도 알아야 한다. 그래서 화면을 열 때 한 번 읽어 둔다
        (판례거리읽기). 자동담기도 같은 자리에 넣는다 — 두 벌로 두면 한쪽만 낡는다. */
@@ -710,13 +751,18 @@ function 불러오기(){
        그래서 공용 수신거부(config/mailBlock)와 «따로» 둔다. 둘을 합쳐서 본다. */
     db.ref('newsletter/blocked').once('value').catch(()=>({val:()=>({})})),
     /* 자동으로 담을 밑감 — 매일 07:00 이 모아 두는 자리 */
-    db.ref('homepage/newsBrief/모음').once('value').catch(()=>({val:()=>({})}))
+    db.ref('homepage/newsBrief/모음').once('value').catch(()=>({val:()=>({})})),
+    /* ★ 「따로 더한 분」 — 사업장에 딸리지 않은 분들 (대표 지시 2026-09-09)
+       ⚠ 여기«만» 사본이다. 위 사업장 명단과 달리 계약이 끝나도 저절로 안 빠진다 —
+         그래서 담은 날을 함께 적어 두고 오래된 줄에 확인을 띄운다. */
+    db.ref('newsletter/더한분들').once('value').catch(()=>({val:()=>({})}))
   ]).then(function(v){
     App.설정  = v[0].val() || {};
     App.회차들 = v[1].val() || {};
     App.사업장들 = v[2].val() || {};
     App.막은주소 = Object.assign({}, v[3].val() || {}, v[4].val() || {});
     App.브리핑 = v[5].val() || {};   /* ⚠ 위 Promise.all 차례와 «번호가 맞아야» 한다 */
+    App.더한분들 = v[6].val() || {};
     if(!App.설정.회사이름) App.설정.회사이름 = '푸른노무법인';
     if(!App.설정.회신주소) App.설정.회신주소 = '370-6@daum.net';
     if(!App.설정.범위)    App.설정.범위 = '자문중';
@@ -807,7 +853,7 @@ function render(){
   m.classList.toggle('who', App.tab==='who');
   if(App.tab==='now')  m.innerHTML = 이번회차화면();
   if(App.tab==='past') m.innerHTML = 지난회차화면();
-  if(App.tab==='who')  m.innerHTML = 명단화면();
+  if(App.tab==='who'){ 명함읽기(); m.innerHTML = 명단화면(); }
   if(App.tab==='res')  m.innerHTML = 결과화면();
   if(App.tab==='cfg')  m.innerHTML = 설정화면();
   /* ⚠ 미리보기는 이제 팝업(크게보기)뿐이다 — 여기서 그릴 것이 없다 */
@@ -835,15 +881,19 @@ function 명단셈(){
        칸을 만들어 채우면 그때 크게 늘어난다. */
   const g = Core.사업장에서명단(App.사업장들, App.설정.범위,
     { 대표자도: App.설정.대표자도 !== false });
-  const d = Core.명단다듬기(g.줄들, App.막은주소);
+  /* ★ 「따로 더한 분」을 «같은 자리에서» 함께 다듬는다 (대표 지시 2026-09-09).
+     ⚠ 따로 걸러 뒤에 붙이면 잣대가 둘이 된다 — 사업장 담당자와 같은 주소인 분이
+       두 통을 받고, 수신거부한 분이 이쪽으로 새어 나간다. */
+  const 더 = Core.더한분들줄로(App.더한분들);
+  const d = Core.명단다듬기(g.줄들.concat(더), App.막은주소);
   /* 거른 «뒤»가 아니라 다듬은 «뒤»에 센다 — 수신거부·겹침을 뺀 실제 보낼 곳으로 세어야
      칩의 숫자와 표의 줄 수가 맞는다. */
   d.유형셈 = Core.유형별셈(d.ok);
+  d.누구셈 = Core.누구별셈(d.ok);
   d.전체 = d.ok;
-  if(App.유형){
-    d.ok = Core.유형으로거르기(d.ok, App.유형);
-    d.셈 = Object.assign({}, d.셈, { 보낼곳: d.ok.length });
-  }
+  if(App.유형) d.ok = Core.유형으로거르기(d.ok, App.유형);
+  if(App.누구) d.ok = Core.누구로거르기(d.ok, App.누구);
+  if(App.유형 || App.누구) d.셈 = Object.assign({}, d.셈, { 보낼곳: d.ok.length });
   d.주소없는곳 = g.주소없는곳;
   d.본곳 = g.본곳;
   return d;
@@ -1660,8 +1710,10 @@ function 붙여넣기옮기기(더하기){
 /* ══════ 미리보기 ══════ */
 function 지금편지(미리보기){
   const d = 지금회차();
-  return Tpl.편지짓기(Object.assign({}, d, { 범위: App.설정.범위 }), App.설정,
-                      { 미리보기: 미리보기 === true });
+  /* ⚠ 「따로 더한 분」을 함께 넘긴다 — 사전 동의를 못 받은 줄이 있으면 (광고)가 켜진다.
+       지난 회차에는 안 넘긴다(아래 회차크게·지난미리보기) — 그때 나간 그대로여야 한다. */
+  return Tpl.편지짓기(Object.assign({}, d, { 범위: App.설정.범위, 더한분들: App.더한분들 }),
+                      App.설정, { 미리보기: 미리보기 === true });
 }
 /* ⚠ 미리보기그리기() 를 걷었다 (대표 지시 2026-09-08 — 오른쪽은 「핵심만」).
      그릴 자리(#pvFrame)가 없어져 «부르면 아무 일도 안 하는» 함수가 되었다.
@@ -2331,18 +2383,21 @@ function 명단화면(){
      ★ 계약종료·퇴사에 «여기서 할 일이 없다» — 기업정보함에서 상태를 바꾸거나
        담당자에 퇴사를 켜면 저절로 빠진다. 두 곳을 맞추려 하면 반드시 어긋난다. */
   const r = 명단셈();
-  const 광고 = Core.광고표기필요한가(App.설정.범위);
+  const 광고 = Core.광고표기필요한가(App.설정.범위, App.더한분들);
   const 골랐수 = Object.keys(App.고른것 || {}).length;
+  const 후보 = 명함후보();
 
   /* ★ 번호는 «보이는 차례»로 1번부터 붙인다 (대표 지시 2026-09-03 「넘버링해달라」).
        유형 → 회사 이름 차례로 늘어놓아, 같은 유형이 붙어 보인다.
      ⚠ 번호는 «이름표가 아니라 세는 수»다 — 거르면 다시 1번부터다.
        업체 번호처럼 고정된 것으로 여기면 「3번이 어제와 다르다」가 된다. */
   const 차례 = Core.유형들.reduce(function(m,t,i){ m[t.키]=i; return m; }, {});
-  const 정렬 = r.ok.slice().sort(function(a,b){
-    const d = (차례[a.유형]||0) - (차례[b.유형]||0);
-    return d !== 0 ? d : String(a.company||'').localeCompare(String(b.company||''), 'ko');
-  });
+  function 늘어놓기(줄들){
+    return 줄들.slice().sort(function(a,b){
+      const d = (차례[a.유형]||0) - (차례[b.유형]||0);
+      return d !== 0 ? d : String(a.company||'').localeCompare(String(b.company||''), 'ko');
+    });
+  }
   /* 사람 칸을 «셋으로 갈랐다» — 이름 · 직책 · 연락처.
      대표 지시 2026-09-03: 「연락처를 아래에 두지말고 옆에두고 열을 일치시켜라」
      ⚠ 예전에는 연락처를 이름 «아래»에 작게 붙였다. 그러면 줄마다 높이가 달라지고
@@ -2354,34 +2409,83 @@ function 명단화면(){
     const t = String(v == null ? '' : v).trim();
     return t ? '<span class="tel">' + esc(t) + '</span>' : 빈칸;
   };
-  const 줄 = 정렬.map(function(x,i){
+  /* 주소가 «어디서 왔나» — 「회사 메일」은 대표자 주소가 아닐 수 있다.
+     밝히지 않으면 화면을 본 사람이 「대표자에게 갔다」고 잘못 읽는다. */
+  const 출처딱지 = function(v){
+    if(v === '본인')   return ' <span class="pill" style="background:#dcfce7;color:var(--ok)">본인</span>';
+    if(v === '회사메일') return ' <span class="pill" style="background:#eff6ff;color:#1e40af">회사 메일</span>';
+    if(v === '명함')   return ' <span class="pill" style="background:var(--brown-soft);color:var(--brown)">명함</span>';
+    return '';
+  };
+  const 체크칸 = function(x){
+    /* ★ 체크칸 — 넘버링 «왼쪽»에 (대표 지시 2026-09-03 「넘버링 왼쪽 표시 체크가능하게」).
+         주소를 값으로 지닌다 — 골라 놓고 표를 다시 그려도 무엇을 골랐는지 잃지 않는다. */
+    return '<td class="ck"><input type="checkbox" class="chk" value="' + esc(x.email) + '"'
+      + (App.고른것[String(x.email).toLowerCase()] ? ' checked' : '')
+      + ' onchange="고름바뀜(this)"></td>';
+  };
+  const 유형칸 = function(x){
     const t = Core.유형들.find(function(v){ return v.키 === x.유형; }) || Core.유형들[0];
-    /* 「누구에게 가나」를 딱지로 — 담당자가 없어 대표자에게 가는 곳이 있다 */
-    const 누구딱지 = x.누구 === '대표자'
-      ? ' <span class="pill" style="background:#eff6ff;color:#1e40af">대표자</span>'
-      : ' <span class="pill" style="background:#f1f5f9;color:var(--sub)">담당자</span>';
-    return '<tr>'
-      /* ★ 체크칸 — 넘버링 «왼쪽»에 (대표 지시 2026-09-03 「넘버링 왼쪽 표시 체크가능하게」).
-           주소를 값으로 지닌다 — 골라 놓고 표를 다시 그려도 무엇을 골랐는지 잃지 않는다. */
-      + '<td class="ck"><input type="checkbox" class="chk" value="' + esc(x.email) + '"'
-        + (App.고른것[String(x.email).toLowerCase()] ? ' checked' : '')
-        + ' onchange="고름바뀜(this)"></td>'
-      + '<td class="n">' + (i+1) + '</td>'
-      + '<td><span class="ty" style="background:' + t.연한빛 + ';color:' + t.진한빛 + '">'
-        + t.표시 + ' ' + esc(t.키) + '</span></td>'
+    return '<td><span class="ty" style="background:' + t.연한빛 + ';color:' + t.진한빛 + '">'
+      + t.표시 + ' ' + esc(t.키) + '</span></td>';
+  };
+  const 머리체크 = '<th class="ck"><input type="checkbox" onchange="전체선택(this)"'
+    + ' title="이 표에 보이는 것 모두"></th>';
+  const 거부칸 = function(x){
+    return '<td style="text-align:right"><button class="mini" onclick="수신거부넣기(\''
+      + esc(x.email) + '\')">수신거부</button></td>';
+  };
+
+  /* ══ 담당자 표 — 대표자 이름·전화 열을 «두지 않는다».
+       줄마다 같은 값이 되풀이되고 표 폭만 먹는다. 대표자는 제 표에 있다. */
+  const 담당줄들 = 늘어놓기(Core.누구로거르기(r.ok, '담당자'));
+  const 담당표 = 담당줄들.map(function(x,i){
+    return '<tr>' + 체크칸(x) + '<td class="n">' + (i+1) + '</td>' + 유형칸(x)
       + '<td><b>' + esc(x.company||'') + '</b></td>'
-      + '<td>' + 글칸(x.대표자) + '</td>'
-      + '<td class="tel">' + 전화칸(x.대표전화) + '</td>'
-      + '<td>' + (x.누구 === '대표자' ? 빈칸 : 글칸(x.name)) + '</td>'
-      + '<td>' + (x.누구 === '대표자' ? 빈칸 : 글칸(x.title)) + '</td>'
-      + '<td class="tel">' + (x.누구 === '대표자' ? 빈칸 : 전화칸(x.전화)) + '</td>'
-      + '<td>' + esc(x.email||'') + 누구딱지 + '</td>'
-      + '<td style="text-align:right"><button class="mini" onclick="수신거부넣기(\'' + esc(x.email) + '\')">수신거부</button></td>'
+      + '<td>' + 글칸(x.name) + '</td>'
+      + '<td>' + 글칸(x.title) + '</td>'
+      + '<td class="tel">' + 전화칸(x.전화) + '</td>'
+      + '<td>' + esc(x.email||'') + '</td>'
+      + 거부칸(x) + '</tr>';
+  }).join('');
+
+  /* ══ 대표자 표 — 대표자에게 «따로» 한 통 간다 (대표 지시 2026-09-09 「각자보내야」).
+       ⚠ 대표자 «전화» 열은 두지 않는다 — ceoPhone 이 사업장 375곳 어디에도 없어
+         늘 「—」다(실측 2026-09-09). 칸이 채워지면 그때 넣는다. */
+  const 대표줄들 = 늘어놓기(Core.누구로거르기(r.ok, '대표자'));
+  const 대표표 = 대표줄들.map(function(x,i){
+    return '<tr>' + 체크칸(x) + '<td class="n">' + (i+1) + '</td>' + 유형칸(x)
+      + '<td><b>' + esc(x.company||'') + '</b></td>'
+      + '<td>' + 글칸(x.대표자 || x.name) + '</td>'
+      + '<td>' + 글칸(x.title) + '</td>'
+      + '<td>' + esc(x.email||'') + 출처딱지(x.출처) + '</td>'
+      + 거부칸(x) + '</tr>';
+  }).join('');
+
+  /* ══ 따로 더한 분 표 — 사업장에 딸리지 않은 분들 */
+  const 더줄들 = Core.누구로거르기(r.ok, '더한분');
+  const 더표 = 더줄들.map(function(x,i){
+    const 원 = (App.더한분들 || {})[x.열쇠] || {};
+    const 동의딱지 = 원.동의 === true
+      ? '<span class="badge b-sent">받음</span>'
+      : '<span class="badge b-test">아직</span>';
+    return '<tr>' + 체크칸(x) + '<td class="n">' + (i+1) + '</td>'
+      + '<td>' + 글칸(x.name) + '</td>'
+      + '<td>' + 글칸(x.title) + '</td>'
+      + '<td>' + 글칸(x.company) + '</td>'
+      + '<td>' + esc(x.email||'') + '</td>'
+      + '<td class="tel">' + 글칸(x.담은날) + '</td>'
+      + '<td>' + 동의딱지 + '</td>'
+      + '<td style="text-align:right">'
+        + '<button class="mini" onclick="더한분동의(\'' + esc(x.열쇠) + '\')">'
+        + (원.동의 === true ? '동의 취소' : '동의 받음') + '</button> '
+        + '<button class="mini" onclick="더한분빼기(\'' + esc(x.열쇠) + '\')">✕</button></td>'
       + '</tr>';
   }).join('');
 
   /* 유형 칩 — 업체관리 도구줄과 «같은 결»이다. 눌린 것을 다시 누르면 전체로 돌아온다. */
   const 칩 = '<div class="chips">'
+    + '<span style="font-size:11.5px;font-weight:800;color:var(--faint);width:40px">유형</span>'
     + '<button class="chip' + (App.유형 ? '' : ' on') + '" onclick="유형칩누르기(\'\')">📊 전체 '
       + (r.전체||[]).length.toLocaleString() + '</button>'
     + Core.유형들.map(function(t){
@@ -2395,17 +2499,41 @@ function 명단화면(){
       }).join('')
     + '</div>';
 
+  /* ★ 갈래 칩 — 유형과 «다른 축»이다 (대표 지시 2026-09-09 「대표자와 담당자 … 분리해라」).
+       두 줄로 두는 까닭: 한 줄에 섞으면 「급여 업체의 대표자만」을 고를 수 없다. */
+  const 누구표시 = { 담당자:'🧑‍💼', 대표자:'👔', 더한분:'➕' };
+  const 누구이름 = { 담당자:'담당자', 대표자:'대표자', 더한분:'따로 더한 분' };
+  const 누구칩 = '<div class="chips">'
+    + '<span style="font-size:11.5px;font-weight:800;color:var(--faint);width:40px">누구</span>'
+    + '<button class="chip' + (App.누구 ? '' : ' on') + '" onclick="누구칩누르기(\'\')">👥 전체 '
+      + (r.전체||[]).length.toLocaleString() + '</button>'
+    + Core.누구갈래.map(function(k){
+        const n = (r.누구셈||{})[k] || 0;
+        return '<button class="chip' + (App.누구 === k ? ' on' : '') + '"'
+          + ' onclick="누구칩누르기(\'' + k + '\')" title="' + esc(누구이름[k]) + '만 봅니다">'
+          + 누구표시[k] + ' ' + esc(누구이름[k]) + ' ' + n + '</button>';
+      }).join('')
+    + '</div>';
+
+  /* 주소가 없는 곳 — «기업정보함에 있나»를 함께 보여 준다. 없다고만 하면 할 일이 안 보인다. */
+  const 후보있는곳 = {};
+  if(후보) (후보.대표자||[]).concat(후보.담당자||[]).forEach(function(c){
+    후보있는곳[c.사업장] = (후보있는곳[c.사업장]||0) + 1;
+  });
   const 빈곳 = (r.주소없는곳||[]).map(function(c){
+    const n = 후보있는곳[c.id] || 0;
     return '<tr><td><b>' + esc(c.name||'') + '</b></td>'
-      + '<td style="color:var(--faint)">' + esc(c.id||'') + '</td>'
-      + '<td style="text-align:right"><span class="badge b-draft">주소 없음</span></td></tr>';
+      + '<td>' + 글칸(c.대표자) + '</td>'
+      + '<td style="text-align:right">' + (n
+          ? '<span class="badge b-sent">명함 ' + n + '장</span>'
+          : '<span class="badge b-draft">명함 없음</span>') + '</td></tr>';
   }).join('');
 
   return `
   <div class="hdbar">
-    <span class="no">받는 곳 ${r.셈.보낼곳.toLocaleString()}곳${App.유형 ? ' <span style="font-size:13px;color:var(--brown)">('+esc(App.유형)+')</span>' : ''}</span>
+    <span class="no">받는 곳 ${r.셈.보낼곳.toLocaleString()}곳${App.유형||App.누구 ? ' <span style="font-size:13px;color:var(--brown)">('+esc([App.유형,App.누구].filter(Boolean).join(' · '))+')</span>' : ''}</span>
     <span style="font-size:12px;color:var(--sub)">
-      ${App.유형 ? '전체 '+(r.전체||[]).length.toLocaleString()+'곳 중 · ' : ''}기업정보함 ${(r.본곳||0).toLocaleString()}곳에서 ·
+      ${App.유형||App.누구 ? '전체 '+(r.전체||[]).length.toLocaleString()+'곳 중 · ' : ''}기업정보함 ${(r.본곳||0).toLocaleString()}곳에서 ·
       수신거부 ${r.셈.수신거부} · 겹침 ${r.셈.겹침} · 형식틀림 ${r.셈.주소없음}</span>
     <span class="sp"></span>
     <button class="btn pri" onclick="노무사회엑셀()">↧ 공인노무사회 엑셀</button>
@@ -2416,6 +2544,7 @@ function 명단화면(){
   </div>
 
   ${칩}
+  ${누구칩}
 
   ${골랐수 ? `<div class="picked">
     <b>${골랐수}곳</b> 골랐습니다
@@ -2425,28 +2554,60 @@ function 명단화면(){
     <button class="mini" onclick="고름지우기()">✕ 선택 풀기</button>
    </div>` : ''}
 
+  ${후보 && (후보.대표자.length + 후보.담당자.length) ? `<div class="note">
+    <b>📇 기업정보함 명함에 «명단에 없는» 주소가 있습니다</b> —
+    대표자 <b>${후보.대표자.length}곳</b> · 담당자 <b>${후보.담당자.length}곳</b>.
+    회사 <b>이름</b>으로 맞춘 것이라 <b>저절로 담지 않습니다</b> — 한 곳씩 보고 고르십시오.
+    <span class="sp"></span>
+    <button class="mini" onclick="명함창열기('대표자')">👔 대표자 ${후보.대표자.length}곳 보기</button>
+    <button class="mini" onclick="명함창열기('담당자')">🧑‍💼 담당자 ${후보.담당자.length}곳 보기</button>
+   </div>` : ''}
+
   <div class="whorest">
-  ${r.ok.length ? `<div class="box">
-    <h3>보낼 곳 <span class="cnt">${r.ok.length}</span>
-      ${App.유형 ? `<span style="font-size:11.5px;color:var(--sub)">${esc(App.유형)}만 봅니다 —
-        「전체」를 누르면 다 보입니다</span>` : ''}</h3>
-    <table class="list"><tr>
-      <th class="ck"><input type="checkbox" id="chkAll" onchange="전체선택(this)"
-        title="이 표에 보이는 것 모두"></th>
-      <th class="n">#</th><th>유형</th><th>회사</th>
-      <th>대표자</th><th class="tel">연락처</th>
-      <th>담당자</th><th>직책</th><th class="tel">연락처</th>
-      <th>보낼 주소</th><th></th></tr>${줄}</table></div>`
-   : (App.유형
-      ? `<div class="note"><b>${esc(App.유형)} 업체 가운데 보낼 곳이 없습니다.</b>
+  ${!r.ok.length ? (App.유형 || App.누구
+      ? `<div class="note"><b>고르신 갈래에 보낼 곳이 없습니다.</b>
          「전체」를 누르면 다시 다 보입니다.</div>`
-      : '<div class="note bad">보낼 곳이 없습니다 — 기업정보함에 담당자 이메일이 있어야 합니다.</div>')}
+      : '<div class="note bad">보낼 곳이 없습니다 — 기업정보함에 담당자 이메일이 있어야 합니다.</div>') : ''}
+
+  ${담당표 ? `<div class="box">
+    <h3>🧑‍💼 담당자 <span class="cnt">${담당줄들.length}</span>
+      <span style="font-size:11.5px;font-weight:500;color:var(--sub)">기업정보함에서 퇴사를 켜면 저절로 빠집니다</span></h3>
+    <table class="list"><tr>
+      ${머리체크}<th class="n">#</th><th>유형</th><th>회사</th>
+      <th>담당자</th><th>직책</th><th class="tel">연락처</th>
+      <th>보낼 주소</th><th></th></tr>${담당표}</table></div>` : ''}
+
+  ${대표표 ? `<div class="box">
+    <h3>👔 대표자 <span class="cnt">${대표줄들.length}</span>
+      <span style="font-size:11.5px;font-weight:500;color:var(--sub)">담당자와 «따로» 한 통 갑니다</span></h3>
+    <table class="list"><tr>
+      ${머리체크}<th class="n">#</th><th>유형</th><th>회사</th>
+      <th>대표자</th><th>직책</th><th>보낼 주소</th><th></th></tr>${대표표}</table>
+    <div class="pad hint" style="padding-bottom:0"><b>「회사 메일」</b> 딱지가 붙은 줄은
+     대표자 본인 주소가 아닐 수 있습니다 — 업체관리의 <b>대표자 이메일</b> 칸을 채우시면
+     그것이 이깁니다.</div></div>` : ''}
+
+  ${(!App.누구 || App.누구 === '더한분') ? `<div class="box">
+    <h3>➕ 따로 더한 분 <span class="cnt">${더줄들.length}</span>
+      <span style="font-size:11.5px;font-weight:500;color:var(--sub)">사업장에 딸리지 않은 분들</span>
+      <span class="sp" style="flex:1"></span>
+      <button class="mini" onclick="더한분넣기()">✎ 한 줄 넣기</button></h3>
+    ${더표 ? `<table class="list"><tr>
+      ${머리체크}<th class="n">#</th><th>이름</th><th>직책</th><th>소속</th>
+      <th>보낼 주소</th><th class="tel">담은 날</th><th>동의</th><th></th></tr>${더표}</table>` : ''}
+    <div class="pad hint" style="padding-bottom:0">
+     ⚠ <b>여기만 «사본»입니다.</b> 사업장 명단은 기업정보함을 그때그때 읽어 계약이 끝나면
+     저절로 빠지지만, 여기 담은 분은 <b>손으로 빼야</b> 빠집니다.<br>
+     ⚠ 거래 관계 밖인 분은 <b>사전 동의</b>가 필요합니다(정보통신망법 50조).
+     「동의 아직」이 한 줄이라도 있으면 <b>(광고) 표기가 저절로 켜집니다.</b></div>
+   </div>` : ''}
 
   ${빈곳 ? `<div class="box">
     <h3>⚠ 주소가 없어 못 보내는 곳 <span class="cnt">${r.주소없는곳.length}</span></h3>
-    <div class="pad hint" style="padding-bottom:0">기업정보함에서 이 곳들의 <b>담당자 이메일</b>을
-     채우시면 다음부터 저절로 들어옵니다. 여기서 지울 일은 없습니다.</div>
-    <table class="list"><tr><th>회사</th><th>사업장 번호</th><th></th></tr>${빈곳}</table></div>` : ''}
+    <div class="pad hint" style="padding-bottom:0">기업정보함에서 이 곳들의 <b>담당자 이메일</b>이나
+     업체관리의 <b>대표자 이메일</b>을 채우시면 다음부터 저절로 들어옵니다.
+     「명함 N장」이라 적힌 곳은 위의 <b>명함에서 보기</b>로 담으실 수 있습니다.</div>
+    <table class="list"><tr><th>회사</th><th>대표자</th><th></th></tr>${빈곳}</table></div>` : ''}
 
   ${!App.유형 ? '' : `<div class="note"><b>지금 기본은 「전체」입니다</b>
    (대표 결정 2026-09-07 「116곳 전부」). 지금은 <b>${esc(App.유형)}</b>만 보고 계십니다 —
@@ -2464,13 +2625,173 @@ function 명단화면(){
   </div>`;
 }
 
+function 누구칩누르기(v){
+  App.누구 = (App.누구 === v) ? '' : String(v || '');
+  render();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   📇 기업정보함 명함에서 «후보»를 찾는다 — 담지는 않는다
+   ══════════════════════════════════════════════════════════════════════════
+   실측 2026-09-09: 자문중 208곳 가운데 지금 명단에 «없는» 주소가
+   대표자 27곳 · 담당자 49곳. 그런데 회사 «이름»으로 맞춘 것이라 저절로 담지 않는다.
+
+   ⚠ 기업정보함(pucards/idx)은 1.3MB 다 — «받는 명단 탭을 열 때 한 번»만 읽는다.
+     처음부터 읽으면 다른 탭만 보시는 분도 그 값을 치른다. */
+function 명함읽기(){
+  if(App.명함들 || App.명함읽는중) return;
+  App.명함읽는중 = true;
+  db.ref('pucards/idx').once('value').then(function(s){
+    App.명함들 = s.val() || {};
+    App.명함읽는중 = false;
+    App.명함후보캐시 = null;
+    if(App.tab === 'who') render();
+  }).catch(function(){ App.명함들 = {}; App.명함읽는중 = false; });
+}
+/* 후보를 한 번만 셈해 둔다 — 표를 다시 그릴 때마다 명함 6,669장을 훑지 않게 */
+function 명함후보(){
+  if(!App.명함들) return null;
+  if(!App.명함후보캐시){
+    App.명함후보캐시 = Core.명함에서주소찾기(App.사업장들, App.명함들, App.설정.범위);
+  }
+  return App.명함후보캐시;
+}
+
+function 명함창열기(갈래){
+  const 후 = 명함후보();
+  if(!후) return toast('기업정보함을 읽는 중입니다 — 잠시 뒤에 다시 눌러 주세요');
+  App.명함창 = 갈래;
+  App.명함고름 = {};
+  명함창그리기();
+  $('cardbox').classList.add('on');
+}
+function 명함창닫기(){ App.명함창 = ''; $('cardbox').classList.remove('on'); }
+function 명함고름(i, on){ if(on) App.명함고름[i] = 1; else delete App.명함고름[i]; 명함창셈(); }
+function 명함모두(el){
+  document.querySelectorAll('#cardB .ck2').forEach(function(c){
+    c.checked = !!el.checked;
+    if(el.checked) App.명함고름[c.value] = 1; else delete App.명함고름[c.value];
+  });
+  명함창셈();
+}
+function 명함창셈(){
+  const n = Object.keys(App.명함고름 || {}).length;
+  const el = $('cardHint');
+  if(el) el.textContent = n ? (n + '곳을 담습니다') : '담을 곳을 고르십시오';
+}
+function 명함창그리기(){
+  if(!App.명함창) return;
+  const 후 = 명함후보(); if(!후) return;
+  const 것들 = 후[App.명함창] || [];
+  const 대표 = App.명함창 === '대표자';
+  $('cardT').textContent = (대표 ? '👔 대표자' : '🧑‍💼 담당자') + ' — 명함에서 담기 ' + 것들.length + '곳';
+  $('cardB').innerHTML =
+    '<div class="pad hint" style="border-bottom:1px solid var(--line)">'
+    + '회사 <b>이름</b>으로 맞춘 후보입니다 — <b>한 곳씩 보고</b> 고르십시오.<br>'
+    + (대표
+        ? '담으면 업체관리의 <b>대표자 이메일</b> 칸에 들어갑니다. 그러면 다른 앱도 그 주소를 씁니다.'
+        : '담으면 업체관리의 <b>담당자</b> 목록에 한 사람이 늘어납니다. 퇴사하면 거기서 끄시면 됩니다.')
+    + '</div>'
+    + '<table class="list"><tr>'
+    + '<th class="ck"><input type="checkbox" onchange="명함모두(this)"></th>'
+    + '<th class="n">#</th><th>회사</th><th>이름</th><th>직책</th><th>명함의 주소</th></tr>'
+    + 것들.map(function(c,i){
+        return '<tr><td class="ck"><input type="checkbox" class="ck2" value="' + i + '"'
+          + ' onchange="명함고름(this.value, this.checked)"></td>'
+          + '<td class="n">' + (i+1) + '</td>'
+          + '<td><b>' + esc(c.회사) + '</b></td>'
+          + '<td>' + esc(c.이름) + '</td>'
+          + '<td>' + esc(c.직책 || '') + '</td>'
+          + '<td>' + esc(c.주소) + '</td></tr>';
+      }).join('')
+    + '</table>';
+  명함창셈();
+}
+/* ★ 여기서 «업체관리 자료»를 고친다 (대표 결정 2026-09-09 「업체관리에 대표자
+     이메일 칸을 새로 만든다」). 임자가 한 곳이라야 계약이 끝날 때 저절로 빠진다.
+   ⚠ 칸 하나만 update 한다 — set 으로 통째 쓰면 다른 방이 같은 업체를 고치던 것을 덮는다. */
+async function 명함담기(){
+  const 후 = 명함후보(); if(!후) return;
+  const 것들 = 후[App.명함창] || [];
+  const 고른 = Object.keys(App.명함고름 || {}).map(function(i){ return 것들[Number(i)]; }).filter(Boolean);
+  if(!고른.length) return toast('담을 곳을 고르십시오');
+  const 대표 = App.명함창 === '대표자';
+  try{
+    for(const c of 고른){
+      if(!c.사업장) continue;
+      if(대표){
+        await db.ref('data/companies/v/' + c.사업장).update({ ceoEmail: c.주소, updatedAt: Date.now() });
+        const co = App.사업장들[c.사업장]; if(co) co.ceoEmail = c.주소;
+      }else{
+        /* 담당자는 contacts 에 한 사람을 «더한다» — 있던 사람을 지우지 않는다 */
+        const co = App.사업장들[c.사업장] || {};
+        const 이제 = Array.isArray(co.contacts) ? co.contacts.slice()
+          : (co.contacts ? Object.keys(co.contacts).map(k=>co.contacts[k]) : []);
+        이제.push({ name: c.이름, position: c.직책, email: c.주소, phone: c.전화 || '' });
+        await db.ref('data/companies/v/' + c.사업장).update({ contacts: 이제, updatedAt: Date.now() });
+        co.contacts = 이제;
+      }
+    }
+    App.명함후보캐시 = null;
+    명함창닫기();
+    render();
+    toast(고른.length + '곳을 담았습니다 — 업체관리에도 함께 들어갔습니다');
+  }catch(e){ toast('담지 못했습니다: ' + ((e&&e.message)||''), 7000); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ➕ 따로 더한 분 — newsletter/더한분들
+   ══════════════════════════════════════════════════════════════════════════
+   ⚠ 여기«만» 사본이다. 사업장 명단은 기업정보함을 그때그때 읽어 계약이 끝나면
+     저절로 빠지지만, 여기 담은 분은 손으로 빼야 빠진다 — 그래서 담은 날을 적는다. */
+async function 더한분넣기(){
+  const 주소 = (window.prompt('보낼 주소 (이메일)') || '').trim();
+  if(!주소) return;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(주소)) return toast('이메일 모양이 아닙니다');
+  const 이름 = (window.prompt('이름', '') || '').trim();
+  const 소속 = (window.prompt('소속 (회사·기관)', '') || '').trim();
+  const 직책 = (window.prompt('직책', '') || '').trim();
+  const 열쇠 = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+  const 값 = { 이름: 이름, 소속: 소속, 직책: 직책, 주소: 주소,
+               출처: '손입력', 담은날: 오늘(), 담은이: (App.me && App.me.email) || '', 동의: false };
+  try{
+    await db.ref('newsletter/더한분들/' + 열쇠).set(값);
+    App.더한분들[열쇠] = 값;
+    render();
+    toast('담았습니다 — 동의를 받으셨으면 「동의 받음」을 눌러 주세요');
+  }catch(e){ toast('담지 못했습니다: ' + ((e&&e.message)||''), 7000); }
+}
+async function 더한분빼기(열쇠){
+  const x = (App.더한분들 || {})[열쇠]; if(!x) return;
+  if(!window.confirm((x.이름 || x.주소) + ' 님을 명단에서 뺍니다.')) return;
+  try{
+    await db.ref('newsletter/더한분들/' + 열쇠).remove();
+    delete App.더한분들[열쇠];
+    render(); toast('뺐습니다');
+  }catch(e){ toast('빼지 못했습니다: ' + ((e&&e.message)||''), 7000); }
+}
+/* 사전 동의를 받았는가 — 이 값 하나가 (광고) 표기를 켜고 끈다 (정보통신망법 50조).
+   ★ 기계가 판단하지 않는다. 대표님이 「받았다」고 표시하실 때만 꺼진다. */
+async function 더한분동의(열쇠){
+  const x = (App.더한분들 || {})[열쇠]; if(!x) return;
+  const 새것 = !(x.동의 === true);
+  try{
+    await db.ref('newsletter/더한분들/' + 열쇠).update({ 동의: 새것, 동의날: 새것 ? 오늘() : '' });
+    x.동의 = 새것; x.동의날 = 새것 ? 오늘() : '';
+    render();
+  }catch(e){ toast('고치지 못했습니다: ' + ((e&&e.message)||''), 7000); }
+}
+
 /* CSV 든 이메일 목록이든 한 길로 받는다 — 두 길로 두면 「어느 쪽이었지」가 된다 */
 /* 명단을 CSV 로 — 지금 화면에 보이는 «그대로»(기업정보함에서 방금 만든 것) */
 function 명단내보내기(){
   const r = 명단셈();
-  const 머리 = '회사,담당자,이메일,직책';
+  /* ★ 「누구」와 「어디서」를 함께 내보낸다 (대표 지시 2026-09-09 「각자 … 분리해라」).
+       CSV 만 보고도 대표자 줄인지 담당자 줄인지, 그 주소가 본인 것인지 회사 메일인지
+       알 수 있어야 한다 — 화면에서만 갈라 놓으면 내보낸 순간 다시 섞인다. */
+  const 머리 = '누구,회사,이름,이메일,직책,어디서';
   const 몸 = r.ok.map(function(x){
-    return [x.company,x.name,x.email,x.title]
+    return [x.누구,x.company,x.누구==='대표자'?(x.대표자||x.name):x.name,x.email,x.title,x.출처]
       .map(v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; })
       .join(',');
   }).join('\r\n');
@@ -2530,9 +2851,12 @@ function 고름바뀜(el){
   고름띠고치기();
 }
 
-/* 이 표에 «보이는 것» 모두 — 유형 칩으로 걸러진 것만이다. 안 보이는 것을 몰래 고르지 않는다. */
+/* 이 표에 «보이는 것» 모두 — 유형·갈래 칩으로 걸러진 것만이다.
+   ⚠ 표가 셋(담당자·대표자·따로 더한 분)이라 «제 표 안»만 고른다. 문서 전체를 고르면
+     대표자 표의 머리를 눌렀는데 담당자 113줄이 함께 골라진다(2026-09-09). */
 function 전체선택(el){
-  document.querySelectorAll('.chk').forEach(function(c){
+  const 안 = (el && el.closest) ? (el.closest('table') || document) : document;
+  안.querySelectorAll('.chk').forEach(function(c){
     c.checked = !!el.checked;
     const e = String(c.value||'').trim().toLowerCase();
     if(!e) return;
