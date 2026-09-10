@@ -44,7 +44,7 @@
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
 <script src="js/pu-news-core.js?v=30"></script>
-<script src="js/pu-news-tpl.js?v=11"></script>
+<script src="js/pu-news-tpl.js?v=12"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -2719,12 +2719,20 @@ function 설정화면(){
        <input type="text" id="cfgName" value="${esc(s.회사이름||'')}" onchange="설정저장()">
       </div>
       <div>
-       <label class="f">전화</label>
+       <label class="f">천안 본사 전화</label>
        <input type="text" id="cfgTel" value="${esc(s.전화||'041-556-0035')}" onchange="설정저장()">
       </div>
       <div class="w2">
-       <label class="f">주소</label>
+       <label class="f">천안 본사 주소</label>
        <input type="text" id="cfgAddr" value="${esc(s.주소||'충남 천안시 서북구 원두정8길 6, 두정빌딩 3층')}" onchange="설정저장()">
+      </div>
+      <div>
+       <label class="f">서산지사 전화</label>
+       <input type="text" id="cfgSeosanTel" value="${esc(s.서산전화||'041-429-0123')}" onchange="설정저장()">
+      </div>
+      <div class="w2">
+       <label class="f">서산지사 주소</label>
+       <input type="text" id="cfgSeosanAddr" value="${esc(s.서산주소||'충남 서산시 남부순환로 1035, 오성빌딩')}" onchange="설정저장()">
       </div>
       <div class="w2">
        <label class="f">꼬리 한 줄</label>
@@ -2924,6 +2932,8 @@ function 설정저장(){
     꼬리한줄: g('cfgFoot'),
     주소: g('cfgAddr'),
     전화: g('cfgTel'),
+    서산주소: g('cfgSeosanAddr'),
+    서산전화: g('cfgSeosanTel'),
     보내는주소: g('cfgFrom'),
     대표자도: g('cfgCeo') !== 'n',
     자동발송: g('cfgAuto') === 'y',
