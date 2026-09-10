@@ -65,6 +65,23 @@
 9. **전체 백업** — 사이드바 [⬇ 전체 백업]. 되돌리기 단추는 «두지 않는다».
 10. **담당 확인** — 담당 아닌 기금을 고칠 때 한 번 묻는다. 막지는 않는다.
 
+⚠⚠ **jsdom 은 CI 에만 있다 — 로컬 초록이 거짓말을 한다** (2026-09-10 실사고)
+`fund-erp/tools/check_wrep.js`·`check_derived.js`·`check_forms.js`·`check_docview.js` 는
+jsdom 이 없으면 그 구간을 **말없이 건너뛰고** 초록으로 끝난다. 서식 채움을 고치고
+「로컬 전부 통과」를 보고 올렸는데 CI 에서 셋이 죽었다(`foundContrib is not defined`).
+**서식·docBody·hwpFormHTML 을 건드렸으면 반드시 jsdom 을 놓고 돌릴 것:**
+```
+npm i jsdom            # 임시 폴더에
+$env:NODE_PATH="<그 폴더>\node_modules"
+node fund-erp/tools/check_derived.js   # …check_*.js 전부
+```
+
+⚠ **원본 .hwp 변환본(fund_forms.js)이 화면 생성본을 «언제나» 이긴다**
+`docBody` 첫 줄이 `hwpFormHTML` 값을 받으면 곧바로 돌려준다. HWP_FORMS 에 30종이 다
+들어 있어 **docBody 의 HTML 생성기 22개는 죽은 코드**다(ops_audit·ops_minutes_close 둘만 산다).
+정관·설립합의서가 사업장을 잘 채우는 코드를 갖고도 ○○ 로 나간 까닭이 이것이다.
+**새 서식 일은 HWP 쪽을 고쳐야 한다.**
+
 ⚠ 새로 생긴 파수꾼 둘 (다른 세션도 걸린다)
 · **같은 이름 함수 중복 선언 금지** — `_mkey` 를 두 번 선언해 청구 잇기가 조용히 깨질 뻔했다.
   나중 선언이 이긴다. 한 파일에 함수 550개라 눈으로는 못 막는다.
