@@ -661,6 +661,9 @@ function renderPanel(name, extra) {
     'function markDirty(){}',
     'function loadStaff(){ return Promise.resolve([]); }',
     'function loadingHTML(m){ return String(m||""); }',
+    /* 사업장 편집 창에 「사업자등록증에서 채우기」 줄이 붙었다(2026-09-10) — 그 줄이 쓰는 것들 */
+    'function bindSiteDocIntake(){}',
+    grabFn('dropZoneSlim'),
     (extra || []).join('\n'),
     grabFn('_primaryContact'), grabFn('_officersOf'), grabFn('_auditorsOf'), grabFn('_offRow'),
     grabFn('_wrepDocRow'),
