@@ -306,6 +306,15 @@ test('사업장 판독은 기금 칸(fd-)이 아니라 사업장 칸(se-)으로 
   assert.match(fn, /keep:false/, '사업자등록증을 «기금» 서류로 매달면 안 된다');
 });
 
+test('사진첩에서 고른 사업장 서류도 «기금»에 매달지 않는다', () => {
+  /* readDocInto 의 _keepDocOriginal 만 막으면 모자란다 — 사진첩 갈래는 saveScanRef 로
+     따로 매단다. 두 문을 다 걸어야 사업자등록증이 기금의 인가증 자리를 차지하지 않는다. */
+  const fn = grabFn('pickAlbumPhoto');
+  assert.match(fn, /if\(_docScope\.keep\) saveScanRef\(/,
+    '사진첩 갈래가 기금 scans 에 그대로 매단다');
+  assert.match(grabFn('readDocInto'), /_docScope\.keep&&/, '파일 갈래도 막혀 있어야 한다');
+});
+
 test('기금 정보 화면으로 돌아오면 넣을 자리를 되돌린다 — 안 되돌리면 조용히 실패한다', () => {
   assert.match(grabFn('bindDocIntake'), /_docScopeFund\(\)/);
   assert.match(grabFn('_docScopeFund'), /pre:'fd-'/);

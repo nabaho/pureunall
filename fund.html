@@ -6350,7 +6350,11 @@ function pickAlbumPhoto(id){
   PuPhotoStore.loadFull(year,id,owner).then(function(src){
     if(!src) throw new Error('원본을 찾지 못했습니다');
     closeM();
-    saveScanRef(fid,kind,{owner:owner||'',year:year,id:id});      // 참조만 저장(이미지는 복사하지 않음)
+    /* 참조만 저장(이미지는 복사하지 않음).
+       ⚠ 참여사업장 서류는 «기금»에 매달지 않는다(_docScope.keep=false) — 사업자등록증은
+         그 사업장 것이지 기금 서류가 아니다. 기금의 scans 에 넣으면 인가증·등기부 자리를
+         차지하고, 기금 정보 화면의 [📎 원본]이 남의 회사 등록증을 연다. */
+    if(_docScope.keep) saveScanRef(fid,kind,{owner:owner||'',year:year,id:id});
     return _dataUrlToFile(src,kind+'.jpg');
   }).then(function(file){
     if(S.fundId!==fid) return;                                     // 그 사이 다른 기금으로 이동 → 버림
