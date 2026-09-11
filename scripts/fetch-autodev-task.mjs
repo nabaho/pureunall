@@ -59,6 +59,17 @@ for (let index = 0; index < (Array.isArray(task.images) ? task.images.length : 0
   imagePaths.push(filePath);
 }
 
+/* ── 공개 전 검문에 넘길 «비밀 낱말» (대표 지시 2026-09-11) ─────────────────
+   건의 원문에 있던 이름·업체·번호를 뽑아 둔다. Codex 가 그것을 코드·주석에 적으면
+   scripts/autodev-privacy-gate.js 가 **밀어 올리기 전에** 멈춘다.
+   ⚠ 이 파일은 «절대 커밋되지 않는다» — 워크플로가 작업 뒤 곧바로 지운다.
+   ⚠ 비밀 자체를 로그에 찍지 않는다. 개수만 적는다. */
+const { createRequire } = await import('node:module');
+const gate = createRequire(import.meta.url)('./autodev-privacy-gate.js');
+const secrets = gate.extractSecrets([task.title, task.content, task.instruction].join('\n'));
+fs.writeFileSync('.codex-guard.json', JSON.stringify({ secrets }), 'utf8');
+process.stdout.write(`공개 전 검문에 넘길 낱말 ${secrets.length}개를 챙겼습니다.\n`);
+
 const outputPath = process.env.GITHUB_OUTPUT;
 if (outputPath) {
   fs.appendFileSync(outputPath, `suggestion_id=${task.suggestionId}\n`);
