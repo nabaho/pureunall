@@ -65,6 +65,16 @@
 9. **전체 백업** — 사이드바 [⬇ 전체 백업]. 되돌리기 단추는 «두지 않는다».
 10. **담당 확인** — 담당 아닌 기금을 고칠 때 한 번 묻는다. 막지는 않는다.
 
+⚠⚠ **기금 검사만 돌리고 올리지 말 것 — 저장소 전체 파수꾼에 걸린다** (2026-09-11 실사고)
+`tests/pair-guards.test.js` 의 **톱니바퀴**: 새 코드는 `PuPhotoStore.loadFull` 이 아니라
+**`loadFullDetail`** 을 쓰고 빈손일 때 `got.why` 를 보여 줘야 한다(허용 수는 «줄어들기만» 한다).
+`tests/fund-ui-structure.test.js` 는 화면에 깔린 설명문을 잡는다(ⓘ 로 접을 것).
+**전체 돌리는 법** — PowerShell 은 인자가 길어 `tests\*.test.js` 를 한 번에 못 넘긴다.
+80개씩 잘라 `node --test @chunk` 로 돌린다(15,400여 건). CI 는
+`node --test tests/*.test.js functions/*.test.js` + `npm i jsdom --no-save`.
+⚠ `tests/rc-open.test.js` 는 **내 PC 에서만** 깨진다(origin/main 내용으로도 깨지고 CI 는 초록) —
+남의 자리라 손대지 않았다. 내 변경 탓인지 헷갈리지 말 것.
+
 ⚠⚠ **jsdom 은 CI 에만 있다 — 로컬 초록이 거짓말을 한다** (2026-09-10 실사고)
 `fund-erp/tools/check_wrep.js`·`check_derived.js`·`check_forms.js`·`check_docview.js` 는
 jsdom 이 없으면 그 구간을 **말없이 건너뛰고** 초록으로 끝난다. 서식 채움을 고치고
