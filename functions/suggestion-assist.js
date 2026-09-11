@@ -126,7 +126,9 @@ function parseAssist(json) {
     const parts = json.candidates[0].content.parts;
     text = parts.map(function (p) { return String((p && p.text) || ""); }).join("");
   } catch (_) { return null; }
-  text = text.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+  /* ⚠ 코드울타리(```json)를 «따로 벗기지 않는다» — 아래 중괄호 찾기가 울타리든
+     군말이든 함께 넘긴다. 벗기는 줄을 따로 두었더니 «지워도 검사가 안 깨지는»
+     죽은 줄이었다(2026-09-11 되돌림 검사에서 드러났다). */
   const from = text.indexOf("{");
   const to = text.lastIndexOf("}");
   if (from < 0 || to <= from) return null;
