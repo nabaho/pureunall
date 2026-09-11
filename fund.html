@@ -2613,8 +2613,46 @@ function parseBizReg(txt){
   if(m){ var ad=_cleanAddr(m[1]); if(ad) o.address=ad; }
   return o;
 }
+/* ── 재직증명서 판독 (참여사업장 근로자대표) ── (2026-09-11)
+   대표 지시: 「참여 기업 근로자·사용자 재직증명서 등을 OCR 해서 자동으로 입력되게」
+
+   이 서류에 «근로자 이름»이 적혀 있다 — 설립합의서 서명란과 별지 제7호 위원 격자가 묻는
+   바로 그 이름이다. 여태는 원본을 «잇기만» 하고 읽지 않아 이름은 늘 손으로 쳤다.
+
+   ⚠⚠ **주민등록번호는 읽지 않는다.** 재직증명서에는 주민번호가 적힌 것이 흔하지만,
+     참여사업장 근로자대표의 주민번호는 «담지 않기로 한» 자리다(WREP_FIELDS 에 칸이 없다).
+     생년월일도 「생년월일」이라 «적힌» 자리만 읽고, 주민번호 앞 여섯 자리에서 캐내지 않는다 —
+     그것은 주민번호를 읽는 일과 같다.
+   ⚠ 회사 이름(wrep_co)은 «칸에 넣지 않는다». 이 증명서가 그 사업장 것이 맞는지 확인 창에서
+     견주기만 한다 — 사업장 상호를 증명서 글자로 덮어쓰면 안 된다.
+   ⚠ 회사마다 양식이 다르다. 못 읽은 칸은 넣지 않는다 — 빈 칸이 틀린 이름보다 낫다. */
+/* 값이 «어디서 끝나는지»를 다음 이름표로 정한다.
+   ⚠ _flat 이 모든 공백을 한 칸으로 줄이므로 「빈칸 두 칸」으로는 못 끊는다 —
+     그렇게 만들었다가 직위에 「팀장 생 년 월 일 1985 03 12」가 통째로 들어왔다. */
+var WREP_STOP=['재직','소속','부서','기간','주소','생년','성명','직위','직급','직책','위와','상기','발급','회사','상호'];
+function _wrepStopRe(){ return '(?:'+WREP_STOP.map(_loose).join('|')+')'; }
+function parseWrepDoc(txt){
+  var flat=_flat(txt), o={}, m, STOP=_wrepStopRe();
+  m=flat.match(new RegExp('(?:'+_loose('성명')+'|'+_loose('이름')+')[:：]\\s*([가-힣]{2,5})(?![가-힣])'));
+  if(m) o.wrep_name=m[1];
+  m=flat.match(new RegExp('(?:'+_loose('직위')+'|'+_loose('직급')+'|'+_loose('직책')+')[:：]\\s*(.+?)'
+    +'(?=\\s*'+STOP+'|$)'));
+  if(m){ var t=_cleanBizWord(m[1]); if(t) o.wrep_title=t; }
+  m=flat.match(new RegExp(_loose('생년월일')+'[:：]?\\s*(\\d{4})\\s*[년.\\-]\\s*(\\d{1,2})\\s*[월.\\-]\\s*(\\d{1,2})'));
+  if(m) o.wrep_birth=m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  /* 발급 회사 — 이름표가 있으면 그것으로, 없으면 글 속의 법인 표기를 찾는다.
+     ⚠ 「주식회사 …」꼴을 «먼저» 본다. 뒤엣꼴을 먼저 보면 「2026년 9월 11일 주식회사」에서
+       날짜 끝의 「11일」이 회사 이름으로 잡힌다(실제로 그랬다). */
+  m=flat.match(new RegExp('(?:'+_loose('회사명')+'|'+_loose('상호')+'|'+_loose('사업장명')+')[:：]\\s*(.+?)'
+    +'(?=\\s*'+_loose('대표')+'|\\s*'+STOP+'|$)'));
+  if(!m) m=flat.match(/((?:주식회사|㈜)\s*[가-힣A-Za-z][가-힣A-Za-z0-9]{1,19})/);
+  if(!m) m=flat.match(/(?:^|[\s(])([가-힣][가-힣A-Za-z0-9]{1,19}\s*(?:주식회사|㈜))/);
+  if(m){ var c=_cleanCoName(m[1]); if(c) o.wrep_co=c; }
+  return o;
+}
 var DOC_PARSE={ inka:{label:'고용노동부 설립인가증',fn:parseInka},
                 bizreg:{label:'사업자등록증',fn:parseBizReg},
+                wrep:{label:'근로자대표 재직증명서',fn:parseWrepDoc},
                 corpreg:{label:'법인 등기사항전부증명서',fn:parseCorpReg},
                 taxid:{label:'고유번호증',fn:parseTaxId},
                 /* 정관은 «칸을 채우는» 서류가 아니다 — 조문 전체가 내용이라 통째로 보관한다.
@@ -6266,7 +6304,13 @@ var _docFound={}, _docOcr=false, _docFid=null;   // 판독 결과는 시작 시�
      기금의 서류가 아니다(funds/{기금}/scans 에 들어가면 인가증 자리를 차지한다). */
 var _docScope={pre:'fd-', out:'docIntakeOut', fields:null, keep:true};
 function _docScopeFund(){ _docScope={pre:'fd-', out:'docIntakeOut', fields:null, keep:true}; }
-function _docLbl(){ var L={}; (_docScope.fields||FIELDS).forEach(function(c){ L[c[0]]=c[1]; }); return L; }
+/* 참여사업장 편집 창 갈래인가 — 사업장 칸(se-)과 근로자대표 칸(sw-) 둘 다 그 창 안에 있다.
+   한쪽만 보면 재직증명서 갈래가 조용히 기금 칸을 찾는다. */
+function _isSiteScope(){ return _docScope.pre==='se-'||_docScope.pre==='sw-'; }
+/* 칸 목록에 «없는» 판독값의 이름표 — 읽기는 했지만 어디에도 넣지 않는 값이다.
+   확인용으로 보여 주기만 하므로 칸 목록(WREP_FIELDS 등)에 넣으면 안 된다. */
+var DOC_EXTRA_LBL={ wrep_co:'발급 회사 (확인용 — 칸에는 안 들어갑니다)' };
+function _docLbl(){ var L=Object.assign({},DOC_EXTRA_LBL); (_docScope.fields||FIELDS).forEach(function(c){ L[c[0]]=c[1]; }); return L; }
 /* ── 사진첩에서 서류 골라오기 ──
    원본은 사진첩에 그대로 두고, 기금에는 값 + 참조(주인·연도·id)만 남긴다.
    RTDB에 이미지를 넣으면 기금 목록 로딩이 통째로 느려지므로 절대 복사하지 않는다. */
@@ -6480,9 +6524,30 @@ function pickAlbumPhoto(id){
   }
   /* 근로자대표 재직증명서 — 판독하지 않는다. 「이 사람이 이 사업장 근로자다」를
      증명하는 서류라 원본만 잇고 화면에서 볼 수 있게 한다. */
+  /* 근로자대표 재직증명서 — 원본을 잇고 «판독도 한다»(2026-09-11 대표 지시).
+     ⚠ 종전에는 잇기만 했다. 그런데 이 서류에 «근로자 이름»이 적혀 있다 — 설립합의서 서명란과
+       별지 제7호 위원 격자가 묻는 바로 그 이름이라, 읽지 않으면 늘 손으로 쳐야 했다.
+     ⚠ 이을 때 편집 창을 «다시 열지 않는다»(keepOpen) — 확인 창을 띄울 참이라,
+       열어 두면 창이 겹쳐 뒤 창이 지워진다. */
   if(_pick.wrep){
-    closeM();
-    saveWrepDocRef(fid,_pick.wrep,{owner:owner||'',year:year,id:id});
+    var _ws=_pick.wrep, _wz=zid||'dz-siterep';
+    var _wb=$('pk-body'); if(_wb) _wb.innerHTML=loadingHTML('원본을 가져와 판독하는 중…');
+    /* 까닭을 받아 오는 길로 간다 — 「원본을 찾지 못했습니다」만으로는 손 쓸 데가 없다.
+       열쇠를 안 넘긴 것인지·지워진 것인지를 저장 층이 알고 있으므로 그대로 적는다. */
+    PuPhotoStore.loadFullDetail(year,id,owner).then(function(got){
+      if(!got||!got.src) throw new Error((got&&got.why)||'원본을 찾지 못했습니다');
+      closeM();
+      saveWrepDocRef(fid,_ws,{owner:owner||'',year:year,id:id},true);
+      return _dataUrlToFile(got.src,'wrep.jpg');
+    }).then(function(file){
+      if(S.fundId!==fid) return;                 // 그 사이 다른 기금으로 이동 → 버림
+      _siteRepScope();
+      readDocInto(_wz,'wrep',file,true);         // 이미 이어 뒀다 — 두 번 넣지 않는다
+    }).catch(function(e){
+      var bb=$('pk-body');
+      var msg='가져오지 못했습니다: '+esc((e&&e.message)||e);
+      if(bb) bb.innerHTML='<div class="msg err">'+msg+'</div>'; else toast(msg,'err');
+    });
     return;
   }
   if(_pick.sid){
@@ -6626,16 +6691,16 @@ function unlinkTxnScan(id){
    ⚠ 지원금 제출서류(subsidy_chk/{연도}/scan/site/…)에 두지 않는다.
      그쪽은 «그 해에 낸 서류»를 세는 자리다. 재직증명서는 해가 아니라 «사람»에 붙는다 —
      근로자대표가 바뀌면 새로 받고, 안 바뀌면 해가 바뀌어도 그대로다. */
-function saveWrepDocRef(fid,sid,ref){
+/* keepOpen 이면 편집 창을 다시 열지 않는다 — 판독 확인 창을 띄울 참일 때다(창은 겹쳐 뜨지 않는다) */
+function saveWrepDocRef(fid,sid,ref,keepOpen){
   var o=Object.assign({at:ymd(),by:(S.user||'')},ref);
   fbDb.ref(NS+'/sites/'+fid+'/'+sid+'/wrep_doc').set(o).then(function(){
     if(S.sitesFor===fid&&S.sites&&S.sites[sid]) S.sites[sid].wrep_doc=o;
     markFundUsed(ref,'근로자대표 재직증명서 — '+_siteName(sid));
-    toast('재직증명서를 이 사업장에 연결했습니다');
-    editSite(sid);                       /* 하던 자리로 돌려 준다 */
+    if(!keepOpen){ toast('재직증명서를 이 사업장에 연결했습니다'); editSite(sid); }
   }).catch(function(e){ toast('연결 저장 실패: '+e.message,'err'); });
 }
-function pickWrepDoc(sid){ openAlbumPick('','wrep','','','',sid); }
+function pickWrepDoc(sid){ _siteRepScope(); openAlbumPick('dz-siterep','wrep','','','',sid); }
 function openWrepDoc(sid){
   var r=(((S.sites||{})[sid])||{}).wrep_doc; if(!r) return;
   if(!photoStoreReady()){ toast('사진첩과 연결되지 않았습니다','err'); return; }
@@ -6796,11 +6861,26 @@ function _siteDocGrab(){
   WREP_FIELDS.forEach(function(c){ var el=$('sw-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
   if(Object.keys(keep).length) _siteDocKeep=keep;
 }
+/* 재직증명서는 «근로자대표 칸»(sw-)으로 간다 — 사업장 칸(se-)이 아니다.
+   두 갈래가 같은 확인 창을 쓰되 넣을 자리만 다르다. */
+function _siteRepScope(){
+  _docScope={pre:'sw-', out:'siteDocOut', fields:WREP_FIELDS, keep:false};
+  _docFound={}; _docOcr=false;
+}
 function bindSiteDocIntake(){
   _siteDocScope();
   _dzHandler['dz-sitebiz']=function(files){ _siteDocScope(); readDocInto('dz-sitebiz','bizreg',files[0]); };
+  _dzHandler['dz-siterep']=function(files){ _siteRepScope(); readDocInto('dz-siterep','wrep',files[0]); };
 }
 function siteDocAlbum(){ _siteDocGrab(); _siteDocScope(); closeM(); openAlbumPick('dz-sitebiz','bizreg'); }
+/* 사진첩에서 재직증명서 고르기.
+   ⚠ 저장된 사업장이면 sid 를 넘겨 원본을 «잇기도» 한다(그 사람에 붙는 서류라 해마다 내지 않는다).
+     아직 저장 전이면 잇을 자리가 없으니 «읽기만» 한다 — 저장한 뒤 다시 고르면 이어진다. */
+function siteRepAlbum(){
+  _siteDocGrab(); _siteRepScope(); closeM();
+  var sid=_siteEditSid||'';
+  openAlbumPick('dz-siterep','wrep','','','',sid);
+}
 function loadCardIdx(){
   if(_cardIdx) return Promise.resolve(_cardIdx);
   return fbDb.ref('pucards/idx').once('value').then(function(s){
@@ -7512,19 +7592,24 @@ function openDocConfirm(kind){
   if(d.fid!==S.fundId){ toast('다른 기금에서 읽은 서류입니다 — 다시 올려 주세요','warn'); return; }
   /* 사업장 편집 창 «위»에 이 창을 겹쳐 띄우면 뒤 창이 지워진다(closeM 은 첫 #modalbg 를 지운다).
      그래서 쳐 둔 값을 걷어 두고 편집 창을 닫은 뒤 이 창만 띄운다 — 반영할 때 그 값으로 다시 연다. */
-  if(_docScope.pre==='se-'&&$('se-name')){ _siteDocGrab(); closeM(); }
+  if(_isSiteScope()&&$('se-name')){ _siteDocGrab(); closeM(); }
   var LBL=_docLbl();
   var ks=Object.keys(_docFound).filter(function(k){ return _docFound[k]; });
+  /* 재직증명서를 낸 회사가 이 사업장이 맞는지 — 다르면 알리되 «막지는 않는다».
+     한 사람이 여러 회사를 거치기도 하고, 상호가 옛것으로 적힌 증명서도 흔하다. */
+  var _siteNm=String((_siteDocKeep&&_siteDocKeep.name)||_siteName(_siteEditSid)||'').trim();
   /* 서류에 적힌 이름이 지금 이름과 «다르면» 눈에 띄게 한다 — 가칭으로 진행하다 인가증을 받으면
      그때 진짜 이름이 정해진다. 그냥 칸에 넣어 두면 이름이 바뀌는 줄 모르고 지나간다.
      ⚠ 바꾸는 것은 [반영] 뒤 [💾 저장]이다 — 여기서 바로 바꾸지 않는다. */
   var _curName=(_docScope.pre==='fd-')?String((funds[S.fundId]||{}).name||'').trim():'';
   var rows=ks.length? ks.map(function(k){
       var diff=(k==='name'&&_curName&&_normName(_docFound[k])!==_normName(_curName));
+      var coOff=(k==='wrep_co'&&_siteNm&&_coNorm(_docFound[k])!==_coNorm(_siteNm));
       return '<div class="fld"><label>'+esc(LBL[k]||k)+'</label>'
-        +'<input id="dcv-'+k+'" value="'+esc(_docFound[k])+'"'+(diff?' style="border-color:var(--warn);background:var(--warn-bg)"':'')+'>'
+        +'<input id="dcv-'+k+'" value="'+esc(_docFound[k])+'"'+((diff||coOff)?' style="border-color:var(--warn);background:var(--warn-bg)"':'')+'>'
         +(diff?'<div class="muted" style="font-size:11px;margin-top:3px;color:var(--warn)">지금 이름과 다릅니다 — 지금: <b>'+esc(_curName)+'</b>'
           +'<br>반영하고 저장하면 <b>이름이 바뀌고</b> 옛 이름은 자취로 남습니다(옛 이름으로도 찾을 수 있습니다).</div>':'')
+        +(coOff?'<div class="muted" style="font-size:11px;margin-top:3px;color:var(--warn)">이 사업장(<b>'+esc(_siteNm)+'</b>)과 다릅니다 — 다른 회사의 증명서인지 확인하세요.</div>':'')
         +'</div>';
     }).join('')
     : '<div class="msg warn" style="font-size:12px">글자는 읽었지만 <b>채울 항목을 못 찾았습니다</b>.'
@@ -7595,10 +7680,12 @@ function applyDocFound(){
      걷어 둔 값 위에 판독값을 얹어 편집 창을 «다시 연다». 기업정보함에서 돌아오는 길과 같다.
      ⚠ 판독값이 위다 — 확인 창에서 사람이 «보고 고친» 값이기 때문이다(일괄 채우기의
        「빈 칸만」 규칙과 다른 자리다. 저기는 사람이 한 건씩 보지 않는다). */
-  if(_docScope.pre==='se-'){
+  if(_isSiteScope()){
     var pre=Object.assign({}, _siteDocKeep||{});
     var got=Object.keys(_docFound).filter(function(k){ return _docFound[k]; });
-    got.forEach(function(k){ pre[k]=_docFound[k]; });
+    /* wrep_co 는 «확인용»이라 칸에 넣지 않는다 — 사업장 상호를 증명서 글자로 덮으면 안 된다 */
+    got.forEach(function(k){ if(k!=='wrep_co') pre[k]=_docFound[k]; });
+    got=got.filter(function(k){ return k!=='wrep_co'; });
     var _sid=_siteEditSid||'';
     _siteDocKeep=null; _docScopeFund();
     editSite(_sid,pre);
@@ -7879,18 +7966,22 @@ var _sitePrefill=null;
 /* 재직증명서 줄 — 별지 제7호 첨부서류 2번이 「설립준비위원의 재직증명서나 그 밖에
    신분을 증명하는 서류」를 요구한다. 근로자대표가 «그 사업장 근로자가 맞는지»를 여기서 잇는다.
    ⚠ 새 사업장은 아직 잇을 자리(사업장 열쇠)가 없다 — 저장한 뒤에 잇는다고 말해 준다. */
+/* 재직증명서 — «잇고 읽는다»(2026-09-11). 위 이름·직위·생년월일이 이 서류에서 나온다.
+   ⚠ 아직 저장 전인 사업장은 이을 자리(사업장 열쇠)가 없다 — 그래도 «읽기»는 된다.
+     저장한 뒤 다시 고르면 원본까지 이어진다. */
 function _wrepDocRow(sid,s){
-  if(!sid) return '<p class="muted" style="font-size:11.5px;margin:8px 2px 0">재직증명서는 <b>저장한 뒤</b>에 이을 수 있습니다.</p>';
-  var r=s&&s.wrep_doc;
+  var r=sid&&s&&s.wrep_doc;
   return '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">'
-    +'<span style="font-size:12.5px;font-weight:600">재직증명서</span>'
+    +'<span style="font-size:12.5px;font-weight:700;white-space:nowrap">📥 재직증명서에서 채우기</span>'+hlp('wrep.read')
+    +'<button class="primary" onclick="siteRepAlbum()" style="padding:3px 10px;font-size:11.5px;white-space:nowrap" '
+    +'title="푸른사진첩에 올려 둔 재직증명서를 골라 읽습니다 — 성명·직위·생년월일이 위 칸에 들어갑니다">🖼 사진첩에서</button>'
+    +dropZoneSlim('dz-siterep','파일로 올리기','재직증명서 PDF·사진에서 성명·직위·생년월일을 읽습니다(주민등록번호는 읽지 않습니다)','.pdf,image/*')
     +(r
-      ? '<span class="chip ok" style="font-size:10.5px">연결됨 · '+esc(r.year)+'년 · '+esc(r.at||'')+'</span>'
-        +'<button onclick="openWrepDoc(\''+sid+'\')" style="padding:3px 9px">👁 보기</button>'
-        +'<button onclick="pickWrepDoc(\''+sid+'\')" style="padding:3px 9px">↻ 바꾸기</button>'
+      ? '<span class="chip ok" style="font-size:10.5px">원본 연결됨 · '+esc(r.year)+'년 · '+esc(r.at||'')+'</span>'
+        +'<button onclick="openWrepDoc(\''+sid+'\')" style="padding:3px 9px">👁 원본</button>'
         +'<button onclick="unlinkWrepDoc(\''+sid+'\')" style="padding:3px 9px;color:var(--danger)">연결 해제</button>'
-      : '<span class="chip dg" style="font-size:10.5px">없음</span>'
-        +'<button class="primary" onclick="pickWrepDoc(\''+sid+'\')" style="padding:3px 9px">🖼 사진첩에서 고르기</button>')
+      : (sid?'<span class="chip dg" style="font-size:10.5px">원본 없음</span>'
+            :'<span class="muted" style="font-size:11px">저장하면 원본도 이어집니다</span>'))
     +'</div>';
 }
 function editSite(sid,prefill){
@@ -12891,6 +12982,12 @@ var HELP={
    +'<p><b>출연금</b> — 그 해 이 사업장이 낸 금액<br><b>상시근로자</b> — 그 해 기준 인원<br><b>수혜자</b> — 그 해 복지혜택을 받은 인원</p>'
    +'<p>칸에서 벗어나면 자동 저장됩니다. 위 연도 선택으로 다른 해를 보고, [작년 값 불러오기]로 <b>비어 있는 칸만</b> 채울 수 있습니다(이미 넣은 값은 건드리지 않습니다).</p>'
    +'<p>별지15호 ⑨⑩ 근로자 수는 사업장 명부의 상시근로자와 협력 체크에서 나옵니다 — 여기 값은 연도별 추이·검증용입니다.</p>'},
+ 'wrep.read':{t:'재직증명서에서 채우기',h:'<p>참여사업장의 <b>근로자대표 성명·직위·생년월일</b>을 재직증명서에서 읽어 위 칸에 넣습니다.</p>'
+   +'<p><b>이 이름이 어디에 쓰이냐면</b> — <b>설립합의서 서명란</b>(회사마다 근로자측대표가 한 줄씩)과 <b>별지 제7호 설립준비위원 격자</b>입니다. 읽지 않으면 그 두 서류의 이름을 사업장마다 손으로 쳐야 합니다.</p>'
+   +'<p><b>주민등록번호는 읽지 않습니다.</b> 재직증명서에 적혀 있어도 가져오지 않습니다 — 근로자대표의 주민번호는 담지 않기로 한 자리입니다. 생년월일도 <b>「생년월일」이라 적힌</b> 자리만 읽고, 주민번호에서 캐내지 않습니다.</p>'
+   +'<p><b>발급 회사</b>는 확인용으로만 보여 줍니다. 이 사업장 상호와 다르면 알려 주되 <b>막지는 않습니다</b> — 상호가 옛것으로 적힌 증명서가 흔합니다. 사업장 상호를 증명서 글자로 덮어쓰지도 않습니다.</p>'
+   +'<p><b>회사마다 양식이 다릅니다.</b> 못 읽은 칸은 비워 둡니다 — 빈 칸이 틀린 이름보다 낫습니다. 왼쪽 원본을 보며 고친 뒤 [↓ 아래 칸에 반영]을 누르세요.</p>'
+   +'<p>저장된 사업장이면 <b>원본도 함께 이어 둡니다</b>(별지 제7호 첨부서류 2번이 요구하는 신분 증명 서류입니다). 아직 저장 전이면 읽기만 되고, 저장한 뒤 다시 고르면 이어집니다.</p>'},
  'name.temp':{t:'가칭 (이름이 아직 확정되지 않음)',h:'<p>설립 중인 기금은 <b>이름부터</b> 정해지지 않습니다. 협의회가 정하고 노동청이 인가해야 확정됩니다.</p>'
    +'<p><b>가칭으로 표시해 두면</b> 서식을 뽑을 때 「이름이 확정되면 다시 뽑으세요」라고 알려 줍니다. 설립 서류에는 기금 이름이 <b>모든 장에</b> 들어갑니다.</p>'
    +'<p><b>서식 글자에 「(가칭)」을 붙이지는 않습니다.</b> 원본 서식에 우리가 글자를 더하는 일이라, 붙일지는 제출하는 사람이 정할 일입니다.</p>'
