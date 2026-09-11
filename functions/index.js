@@ -428,19 +428,25 @@ async function requestRollback(body) {
   return { status: "rollback_requested" };
 }
 
-/* ── 🤖 자동개발 — 지금은 배포하지 않는다 (2026-08-13 대표 결정: "추후에 필요하면 한다") ──
-   OpenAI 에 돈을 내고 코드를 짜게 하는 기능인데 지금은 쓰지 않는다.
-   그런데도 여기서 AUTOMATION_BRIDGE_KEY 를 요구하고 있어서, 그 값이 없는 상태로는
-   `firebase deploy --only functions` (전체 배포)가 검증 단계에서 통째로 멈췄다.
-   메일 세 개와 건의 알림까지 못 올리게 막는 셈이라 내보내기(export)만 잠가 둔다.
+/* ── 🤖 자동개발 — **켰다** (대표 지시 2026-09-11 「자동개발도 켜달라」) ───────────
+   2026-08-13 에 「추후에 필요하면 한다」로 잠가 두었던 것을 이제 연다.
+   건의를 AI(OpenAI Codex)가 직접 고쳐 «변경안(PR)»을 내는 기능이다.
 
-   ⚠ 코드는 그대로 둔다 — 나중에 켤 때 아래 한 줄만 되살리면 된다.
-   켜려면 함께 갖춰야 할 것:
+   ★ 켜기 «전에» 새는 곳을 먼저 막았다 (PR #1188):
+     · 공개 이슈에 건의 내용이 한 글자도 안 실린다 — ID·위험도·자동배포 여부뿐
+       (buildIssue 의 assertNoLeak 가 스스로 지킨다)
+     · 돈 세는 말(입금·거래내역·자문료·마감 …)이 「중요」로 분류된다
+     · 올라갈 코드에 사람 이름·업체명·번호가 섞이면 push 전에 멈춘다
+       (scripts/autodev-privacy-gate.js)
+
+   ⚠ 이 함수가 없으면 «자동개발만» 안 되는 것이 아니다 — 비밀값이 빠진 채로
+     배포하면 검증 단계에서 통째로 멈춰 메일·건의 알림까지 못 올린다.
+     그래서 비밀값 넷이 «다 갖춰진 뒤에» 올린다:
      · AUTOMATION_BRIDGE_KEY  — GitHub 저장소 비밀값과 Firebase 비밀값에 «같은» 임의 문자열
      · AUTOMATION_ENDPOINT    — 배포된 이 함수 URL 을 GitHub 저장소 비밀값에
      · OPENAI_API_KEY         — codex-issue-implementation.yml 이 쓴다 (유료)
-     · GITHUB_AUTOMATION_TOKEN — 이미 있음 (2026-08-13 재발급) */
-const _parkedDevelopmentAutomation = functions
+     · GITHUB_AUTOMATION_TOKEN — Firebase 비밀값에 이미 있다 */
+exports.developmentAutomation = functions
   .runWith({ secrets: ["GITHUB_AUTOMATION_TOKEN", "AUTOMATION_BRIDGE_KEY"] })
   .https.onRequest(async (req, res) => {
     setAutomationCors(req, res);
@@ -466,8 +472,6 @@ const _parkedDevelopmentAutomation = functions
       res.status(error.status || 500).json({ ok: false, error: cleanText(error && error.message || error || "자동개발 처리 실패", 500) });
     }
   });
-// 켤 때 이 줄을 되살린다:  exports.developmentAutomation = _parkedDevelopmentAutomation;
-void _parkedDevelopmentAutomation;   // 안 쓰는 변수 경고만 막는다
 
 // ══════════ 새 건의 → 관리자 폰 알림 (웹푸시 · FCM) ══════════
 //  건의가 등록되면 포털이 suggestions_meta_private/{id} 에 경량 메타를 함께 적는다.
