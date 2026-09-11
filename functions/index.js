@@ -28,6 +28,7 @@ const { homepageUrl } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
 const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
+const 지역뉴스부품 = require("./news-region");
 
 if (!getApps().length) initializeApp();
 
@@ -2877,6 +2878,38 @@ exports.dailyNewsCollect = functions
     await 자리.child("모음").set(남길것);
     await 자리.update({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length });
     console.log("[모으기] 새로 " + 결과.새로 + "건 · 쌓인 것 " + Object.keys(남길것).length + "건");
+    return null;
+  });
+
+/* ══ 주소별 지역뉴스 2단계 — 공식 RSS → 검토대기함 ════════════════════════
+   자동수집은 «후보를 만드는 일»까지만 한다. 회차·메일·홈페이지에는 손대지 않는다.
+   기사 본문·사진은 받지도 저장하지도 않고 제목·날짜·공식 원문 링크만 둔다. */
+exports.dailyRegionalNewsCollect = functions
+  .runWith({ timeoutSeconds: 120, memory: "256MB" })
+  .pubsub.schedule("every day 07:10")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const 자리 = db.ref("newsletter/regionalCandidates");
+    const 있던것 = (await 자리.once("value")).val() || {};
+    const patch = {};
+    let 읽은출처 = 0, 새것 = 0;
+    for (const 출처 of 지역뉴스부품.출처들) {
+      try {
+        const xml = await 글자로받기(출처.목록주소);
+        읽은출처++;
+        지역뉴스부품.후보만들기(xml, 출처, Object.assign({}, 있던것, patch), Date.now())
+          .forEach(function(x){ patch[x.id] = x; 새것++; });
+      } catch (e) {
+        console.warn("[지역뉴스] " + 출처.id + "를 못 읽었습니다", String(e.message || e));
+      }
+    }
+    if (새것) await 자리.update(patch);
+    await db.ref("newsletter/regionalCollectMeta").update({
+      마지막수집:Date.now(), 읽은출처:읽은출처, 전체출처:지역뉴스부품.출처들.length, 새후보:새것
+    });
+    console.log("[지역뉴스] 출처 " + 읽은출처 + "/" + 지역뉴스부품.출처들.length
+      + " · 새 검토후보 " + 새것 + "건");
     return null;
   });
 

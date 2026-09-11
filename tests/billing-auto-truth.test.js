@@ -45,11 +45,14 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
      2026-09-05 대표 지시(「자료가 법제처에서 나오면 안된다 … 자동으로 찾아오고」)로
        «발간자료·판례 모으기»(아침 7:10)가 늘어 일곱이 됐다.
      2026-09-09 거래처 뉴스레터 월요일 자동발송(확정본이 있을 때만)이 늘어 여덟이 됐다.
+     2026-09-11 지역뉴스 검토후보 수집(아침 7:10)이 늘어 아홉이 됐다.
      화면 문구도 같이 고쳤다. 다음에 또 늘면 여기와 화면을 함께 고쳐야 한다. */
   const all = (FIDX + FSYNC).match(/\.pubsub\.schedule\(/g) || [];
-  assert.strictEqual(all.length, 8, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  assert.strictEqual(all.length, 9, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
   assert.ok(ENTER.indexOf('거래처 뉴스레터 월요일 한 번') >= 0,
     '새 자동 일정이 화면 설명에 없습니다');
+  assert.ok(ENTER.indexOf('지역뉴스 후보 모으기 하루 한 번') >= 0,
+    '지역뉴스 자동수집 일정이 화면 설명에 없습니다');
 });
 
 test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에만 돈다', () => {
@@ -95,11 +98,11 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const pay = scheduleOf(FIDX, 'receivePaydataMail');
   const sync = scheduleOf(FSYNC, 'syncMailbox');
   const perDay = Math.round(1440 / send) + Math.round(1440 / pay) + Math.round(1440 / sync)
-    + 2;   // 홈페이지 뉴스 모으기(07:00) · 발간자료·판례 모으기(07:10) — 각 하루 한 번
+    + 3;   // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보 — 각 하루 한 번
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
-  assert.strictEqual(perDay, 290, '셈이 바뀌었다');
-  assert.ok(ENTER.indexOf('하루 <b>290번</b>') >= 0, '뜻풀이에 하루 횟수가 없거나 틀렸다');
-  assert.ok(ENTER.indexOf('하루 290번, 밤낮 같이 돕니다') >= 0, '줄 설명에 하루 횟수가 없거나 틀렸다');
+  assert.strictEqual(perDay, 291, '셈이 바뀌었다');
+  assert.ok(ENTER.indexOf('하루 <b>291번</b>') >= 0, '뜻풀이에 하루 횟수가 없거나 틀렸다');
+  assert.ok(ENTER.indexOf('하루 291번, 밤낮 같이 돕니다') >= 0, '줄 설명에 하루 횟수가 없거나 틀렸다');
 });
 
 test('★★ 옛 «틀린» 숫자가 어디에도 안 남아 있다', () => {
