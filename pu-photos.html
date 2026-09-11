@@ -7799,6 +7799,18 @@ const READ_FAIL_RULES = [
      ⚠ 우리가 만든 한글 429 안내문(「하루 사용량을 다 썼을 수 있습니다」)은 여기 안 넣는다 —
        그건 «짐작»이라 아래 busy 가 맡는다. 여기는 구글이 «단정»해 보낸 말만 본다. */
   { kind: 'quota', re: /exceeded your current quota|quota exceeded|RESOURCE_EXHAUSTED|free_tier_requests|generate_content_free_tier/i },
+  /* ⚠★ 2026-09-11 대표 제보 — 사진첩에 이 영어가 그대로 떴다:
+       「Your prepayment credits are depleted. Please go to AI Studio at
+        https://ai.studio/projects to manage your project and billing.」
+     ★ 「한도」가 아니라 «돈»이다. 위 quota 규칙에 한 글자도 안 걸려 'other' 로 떨어졌고,
+       other 는 worthRetry 가 «참»이라 **자동으로 계속 다시 걸었다**(실측 fails 2).
+       충전하기 전에는 몇 번을 걸어도 같은 답이다 — 2026-09-07 에 quota 를 가른 것과
+       똑같은 까닭이고, 똑같이 갈라 둔다.
+     ★ 한도(quota)와 갈라야 하는 까닭 — 한도는 «기다리면» 풀리지만 돈은 «사람이 넣어야»
+       풀린다. 섞으면 「1분쯤 뒤 다시」라고 안내하게 되고, 그 말을 믿고 기다리면
+       영영 안 된다. 그래서 안내도 「충전이 필요합니다」로 따로 적는다.
+     ⚠ 충전은 **대표만** 할 수 있다(결제 수단이 대표 계정에 있다). */
+  { kind: 'bill',  re: /prepayment credits|billing#prepay|credits are depleted|ai\.studio\/projects/i },
   { kind: 'busy',  re: /잠시 바쁩니다|응답하지 않습니다|알아볼 수 없는 답|국세청/ }
 ];
 /* 같은 까닭으로 이만큼 실패하면 「손으로」로 넘긴다 — 그 이상은 눌러도 같은 답이다. */
@@ -7841,6 +7853,9 @@ function worthRetry(read) {
        새 기록에는 failAt 이 늘 있으므로 이 물러섬은 저절로 줄어든다. */
   const 실패한때 = read.failAt || read.at;
   if (k === 'quota') return !!실패한때 && ymdKST(실패한때) !== ymdKST();
+  /* ⚠ 돈이 떨어진 것은 «날이 바뀌어도» 안 풀린다 — 사람이 충전해야 풀린다.
+       그래서 quota 처럼 「다음 날 한 번」도 걸지 않는다. 충전하면 그때 사람이
+       「다시 판독」을 누르면 된다(사람이 누르는 길은 늘 열려 있다). */
   return k === 'busy' || k === 'other';
 }
 /* 딱지에 적을 말 — 「무엇을 해야 하나」로 적는다. 까닭만 적으면 사람이 다음에
@@ -7848,9 +7863,14 @@ function worthRetry(read) {
 function readFailAdvice(read) {
   const n = (read && read.fails) || 0;
   const k = readFailKind(read);
-  if (n >= FAIL_GIVEUP && k !== 'reup' && k !== 'admin' && k !== 'login' && k !== 'quota') {
+  if (n >= FAIL_GIVEUP && k !== 'reup' && k !== 'admin' && k !== 'login'
+      && k !== 'quota' && k !== 'bill') {
     return n + '번 실패 — 손으로 적어 주세요';
   }
+  /* ★ 돈이 떨어진 것은 «몇 번 실패했나»와 상관없다(한도와 같다) — 열 번 걸려도
+     할 일은 하나, 충전이다. 「손으로 적어 주세요」로 덮이지 않게 위에서 뺐다.
+     ⚠ 「1분쯤 뒤 다시」라고 하지 «말 것» — 기다려도 안 풀린다. 할 사람을 적어 준다. */
+  if (k === 'bill') return 'AI 판독 요금이 떨어졌습니다 — 대표님이 충전해야 합니다';
   /* ★ 한도는 «몇 번 실패했나»와 상관없다 — 열 번 걸려도 안내는 같다.
      그래서 위의 「N번 실패 — 손으로」보다 뒤가 아니라 앞에서 걸러야 하는데,
      n>=3 갈래가 quota 를 안 가로채도록 그 조건에서 뺐다(아래 참조). */
