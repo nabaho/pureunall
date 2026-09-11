@@ -48,6 +48,10 @@ global.funds = {};
   gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
   gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
   gF('partyNames'), gF('partyJoin'), gF('fillPartyList'), gF('fillPartyDates'),
+  /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다.
+     여기 없으면 「fillFundTypeWords is not defined」로 이 검사가 통째로 죽는다. */
+  gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
+  gF('ftypeSkipDoc'), gS('FTYPE_PICK_SRC'), gF('_ftypeSwap'), gF('_ftypeWords'), gF('_isTypePickBox'), gF('fillFundTypeWords'),
   gF('fillDerived'), gF('fillFoundContribDoc'), gF('hwpFormHTML')].join('\n'));
 
 let bad = 0;
@@ -258,6 +262,56 @@ console.log('\n■ 정관·설립합의서 — 참여사업장이 이름으로 �
   /* 사업장이 없으면 손대지 않는다 — 자리표가 틀린 이름보다 낫다 */
   const none = draw('agreement', F, []);
   ok('사업장이 없으면 자리표를 그대로 둔다', /(?:○○|XX)\s*주식회사/.test(none));
+}
+
+/* ══ 공동/사내 — 서식 «전부»가 같은 말을 하는가 ══ (2026-09-11)
+   원본 .hwp 들은 한 집에서 베껴 쓴 탓에 «제목은 공동인데 본문은 사내»라고 적힌 자리가
+   흩어져 있었다. 소스 글자가 아니라 «그린 서식»을 봐야 잡힌다 — 자리는 원본 안에 있고
+   우리 소스에는 없기 때문이다. */
+console.log('\n■ 공동/사내 — 서식 전부가 같은 말을 한다');
+{
+  /* 오염되어 있던 서식들. 공동 기금이면 「사내」가, 사내 기금이면 「공동」이 남으면 안 된다. */
+  const DIRTY = ['agreement', 'minutes', 'bizplan', 'reg_license', 'tax_lease',
+    'ops_asset_change', 'ops_minutes_scope'];
+  /* ⚠ 기금 «이름»에 유형이 들어 있다(가나공동근로복지기금). 사내 쪽 시험은 이름을 바꿔
+       들고 와야 한다 — 아니면 이름 때문에 「공동이 남았다」고 잘못 잡힌다. */
+  const G = Object.assign({}, F, { fund_type: '공동', name: '가나공동근로복지기금' });
+  const N = Object.assign({}, F, { fund_type: '사내', name: '가나사내근로복지기금' });
+  DIRTY.forEach((k) => {
+    const g = draw(k, G, SITES);
+    ok(k + ' — 공동 기금에 「사내근로복지기금」이 안 남는다', g.indexOf('사내근로복지기금') < 0,
+      (g.match(/.{0,24}사내근로복지기금.{0,24}/) || [''])[0]);
+    const n = draw(k, N, SITES);
+    ok(k + ' — 사내 기금에 「공동근로복지기금」이 안 남는다', n.indexOf('공동근로복지기금') < 0,
+      (n.match(/.{0,24}공동근로복지기금.{0,24}/) || [''])[0]);
+  });
+  /* 등기신청서 목적란은 정관을 그대로 옮겨 적는 자리다 — 공동 전용 줄임말까지 따라와야 한다 */
+  const ra = draw('reg_apply', N, SITES);
+  ok('reg_apply — 사내 기금에 「공동기금법인」이 안 남는다', ra.indexOf('공동기금법인') < 0,
+    (ra.match(/.{0,24}공동기금법인.{0,24}/) || [''])[0]);
+  /* ① 설립인가신청서는 «고르는 칸»이다 — 둘 다 적혀 있어야 하고 표만 옮긴다 */
+  const ig = draw('inka', G, SITES), inn = draw('inka', N, SITES);
+  ok('inka — 공동이어도 두 갈래가 모두 적혀 있다', /사내근로복지기금법인/.test(ig) && /공동근로복지기금법인/.test(ig));
+  ok('inka — 사내이어도 두 갈래가 모두 적혀 있다', /사내근로복지기금법인/.test(inn) && /공동근로복지기금법인/.test(inn));
+  ok('inka — 사내면 사내 쪽에 표가 선다', /\[V\]\s*사내근로복지기금법인/.test(inn), inn.slice(0, 80));
+  ok('inka — 공동이면 공동 쪽에 표가 선다', /\[V\]\s*공동근로복지기금법인/.test(ig), ig.slice(0, 80));
+  /* ② 정관은 공동본·사내본 원본이 따로 있다 — 골라 올 뿐 말을 바꾸지 않는다 */
+  ok('charter — 사내 기금은 사내본 원본이 온다', draw('charter', N, SITES).indexOf('사내근로복지기금') >= 0);
+  ok('charter — 공동 기금은 공동본 원본이 온다', draw('charter', G, SITES).indexOf('공동근로복지기금') >= 0);
+  /* ③ 지원사업 서식은 공동 전용이다 — 사내로 열어도 제목을 바꾸지 않는다 */
+  ok('sub_checklist — 공동 전용 제목을 사내로 고쳐 쓰지 않는다',
+    draw('sub_checklist', N, SITES).indexOf('공동근로복지기금 지원사업') >= 0);
+  /* 기금 이름 뒤에 유형이 두 번 서던 자리 */
+  ok('ops_minutes_scope — 기금 이름 뒤 겹말이 사라졌다',
+    !/근로복지기금\s+(?:공동|사내)근로복지기금/.test(draw('ops_minutes_scope', G, SITES)));
+  /* ★ 기금 «이름»은 절대 고쳐 쓰지 않는다 — 이름이 「가나공동…」인 기금을 사내로 바꿨을 때
+       서식 속 이름까지 「가나사내…」가 되면 아무도 시키지 않은 개명이 관청에 나간다. */
+  const keep = Object.assign({}, F, { fund_type: '사내', name: '가나공동근로복지기금' });
+  ['agreement', 'minutes', 'ops_minutes_scope'].forEach((k) => {
+    const t = draw(k, keep, SITES);
+    ok(k + ' — 사내로 바꿔도 기금 이름은 그대로다', t.indexOf('가나공동근로복지기금') >= 0
+      && t.indexOf('가나사내근로복지기금') < 0, (t.match(/.{0,16}가나사내근로복지기금.{0,16}/) || [''])[0]);
+  });
 }
 
 console.log(bad ? '\nFAILURES ' + bad : '\nALL PASS (자료가 있는 자리는 서식에 선다, 없는 자리는 비어 있다)');
