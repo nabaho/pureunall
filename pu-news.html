@@ -45,6 +45,7 @@
 <script src="js/pu-ai-call.js?v=3"></script>
 <script src="js/pu-news-core.js?v=32"></script>
 <script src="js/pu-news-tpl.js?v=13"></script>
+<script src="js/pu-news-regional-sources.js?v=1"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -623,7 +624,7 @@ const FIREBASE_CONFIG = {
 const BULK_FN_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/sendBulkMail';
 const BULK_GAP_SEC = 15;
 
-const Core = window.PuNewsCore, Tpl = window.PuNewsTpl;
+const Core = window.PuNewsCore, Tpl = window.PuNewsTpl, 지역출처 = window.PuNewsRegionalSources;
 var db = null;
 var App = {
   me: null, isAdmin: false, tab: 'now',
@@ -1616,19 +1617,31 @@ function 지역뉴스관리(d){
     <button class="mini" onclick="지역뉴스담기()">＋ 지역뉴스 추가</button></h3>
     <div class="jarbody">${줄}</div><div class="pad hint">
     적용지역은 <b>전국</b>, <b>충남</b>, <b>충남/천안시</b>, <b>충남/서산시</b>처럼 적습니다.
-    업체 주소를 못 읽으면 전국 공통판만 보내며 다른 지역 소식은 섞지 않습니다.</div></div>`;
+    업체 주소를 못 읽으면 전국 공통판만 보내며 다른 지역 소식은 섞지 않습니다.<br>
+    공식 출처 ${지역출처.목록.length}곳 등록 · RSS ${지역출처.목록.filter(x=>x.방식==='rss').length}곳은 자동수집 연결 준비 ·
+    게시판 ${지역출처.목록.filter(x=>x.방식==='board').length}곳은 원문 확인 뒤 담습니다.</div></div>`;
+}
+function 공식출처고르기(지역){
+  const a = 지역출처.지역출처(지역);
+  const 안내 = a.map(function(x,i){
+    return (i+1) + '. [' + x.지역 + '] ' + x.기관 + ' · ' + x.이름
+      + (x.방식==='rss' ? ' (RSS)' : ' (게시판)');
+  }).join('\n');
+  const n = Number(prompt('공식 출처를 골라 주세요\n\n' + 안내, '1'));
+  return Number.isInteger(n) && n >= 1 && n <= a.length ? a[n-1] : null;
 }
 function 지역뉴스담기(){
   const 지역 = String(prompt('적용지역을 적어 주세요\n예: 전국, 충남, 충남/천안시, 충남/서산시', '충남') || '').trim();
   if(!지역) return;
+  const 공식출처 = 공식출처고르기(지역); if(!공식출처) return;
   const 제목 = String(prompt('관리용 원문 제목을 적어 주세요') || '').trim(); if(!제목) return;
-  const 링크 = String(prompt('공식 원문 링크를 적어 주세요') || '').trim();
-  const 출처 = String(prompt('출처 기관을 적어 주세요\n예: 서산시, 천안시, 고용노동부') || '').trim();
+  const 링크 = String(prompt('공식 원문 링크를 적어 주세요\n목록 주소가 아니라 해당 게시물 주소입니다.') || '').trim();
+  if(!지역출처.공식주소인가(링크)) return toast('공식 go.kr HTTPS 원문 링크만 등록할 수 있습니다', 8000);
   const 우리말 = String(prompt('뉴스레터에 실을 푸른노무법인의 설명을 적어 주세요\n원문 문장을 복사하지 마세요.') || '').trim();
   if(!우리말) return toast('푸른노무법인이 직접 쓴 설명이 없으면 지역뉴스에 넣지 않습니다', 8000);
   const d = 지금회차(); d.지역뉴스 = d.지역뉴스 || [];
   d.지역뉴스.push({ 지역:지역.slice(0,40), 제목:제목.slice(0,220), 링크:링크.slice(0,1000),
-    언론사:출처.slice(0,80), 우리말:우리말.slice(0,1200), 갈래:'지역기사' });
+    언론사:공식출처.기관, 출처Id:공식출처.id, 우리말:우리말.slice(0,1200), 갈래:'지역기사' });
   회차저장(d).then(render).catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||''),7000));
 }
 function 지역뉴스빼기(i){
