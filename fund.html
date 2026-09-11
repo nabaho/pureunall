@@ -6532,11 +6532,13 @@ function pickAlbumPhoto(id){
   if(_pick.wrep){
     var _ws=_pick.wrep, _wz=zid||'dz-siterep';
     var _wb=$('pk-body'); if(_wb) _wb.innerHTML=loadingHTML('원본을 가져와 판독하는 중…');
-    PuPhotoStore.loadFull(year,id,owner).then(function(src){
-      if(!src) throw new Error('원본을 찾지 못했습니다');
+    /* 까닭을 받아 오는 길로 간다 — 「원본을 찾지 못했습니다」만으로는 손 쓸 데가 없다.
+       열쇠를 안 넘긴 것인지·지워진 것인지를 저장 층이 알고 있으므로 그대로 적는다. */
+    PuPhotoStore.loadFullDetail(year,id,owner).then(function(got){
+      if(!got||!got.src) throw new Error((got&&got.why)||'원본을 찾지 못했습니다');
       closeM();
       saveWrepDocRef(fid,_ws,{owner:owner||'',year:year,id:id},true);
-      return _dataUrlToFile(src,'wrep.jpg');
+      return _dataUrlToFile(got.src,'wrep.jpg');
     }).then(function(file){
       if(S.fundId!==fid) return;                 // 그 사이 다른 기금으로 이동 → 버림
       _siteRepScope();
