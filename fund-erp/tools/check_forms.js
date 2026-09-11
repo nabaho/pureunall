@@ -50,6 +50,9 @@ global.funds = {};
   gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
   gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
   gF('partyNames'), gF('partyJoin'), gF('fillPartyList'), gF('fillPartyDates'),
+  /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다. 위와 같은 까닭이다. */
+  gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
+  gF('ftypeSkipDoc'), gS('FTYPE_PICK_SRC'), gF('_ftypeSwap'), gF('_ftypeWords'), gF('_isTypePickBox'), gF('fillFundTypeWords'),
   gF('fillDerived'), gF('fillFoundContribDoc'),
   gF('fillRoster'), gF('fillSubsidyDoc'), gF('hwpFormHTML')].join('\n'));
 

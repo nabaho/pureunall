@@ -1068,9 +1068,11 @@ function afterRename(fid,from,to){
     showModal(h);
   }).catch(function(){ toast('이름을 바꿨습니다'); });
 }
-function dropStaleDocEdits(fid){
-  var f=funds[fid]||{}, from='';
-  var hist=nameHistOf(f); if(hist.length) from=hist[0].from;
+/* 개별 저장본 지우기 — 이름을 바꿨을 때는 «옛 이름»이, 유형을 바꿨을 때는 «옛 유형의 말»이
+   글자로 박힌 저장본만 고른다. 찾을 말(needle)을 넘기지 않으면 옛 이름으로 본다. */
+function dropStaleDocEdits(fid,needle){
+  var f=funds[fid]||{}, from=String(needle||'');
+  if(!needle){ var hist=nameHistOf(f); if(hist.length) from=hist[0].from; }
   fbDb.ref(NS+'/doc_edits/'+fid).once('value').then(function(s){
     var de=s.val()||{}, up={}, n=0;
     Object.keys(de).forEach(function(k){
@@ -1083,6 +1085,29 @@ function dropStaleDocEdits(fid){
       if(S.view==='fund'&&S.fundId===fid) renderFund();
     });
   }).catch(function(e){ toast('지우지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+/* 유형(공동↔사내)을 바꾼 뒤 — 자동생성 서식은 이미 한꺼번에 바뀌었다.
+   손이 닿지 않는 곳은 «이 기금 전용으로 저장해 둔 서식»뿐이라, 그것만 세어 알린다. */
+function afterTypeChange(fid,from,to){
+  var old=(from==='사내')?'사내근로복지기금':'공동근로복지기금';
+  fbDb.ref(NS+'/doc_edits/'+fid).once('value').then(function(s){
+    var de=s.val()||{};
+    var stale=Object.keys(de).filter(function(k){ return String((de[k]||{}).html||'').indexOf(old)>=0; });
+    var h='<div class="row" style="margin:0 0 10px"><h2 style="margin:0">유형을 바꿨습니다</h2>'+hlp('ftype.words')+'</div>'
+      +'<p style="font-size:13px;margin:0 0 10px"><b>'+esc(from)+'</b> → <b>'+esc(to)+'</b></p>'
+      +'<div class="msg ok" style="font-size:12.5px">자동생성 서식은 <b>모두 함께</b> 「'+esc(to)+'근로복지기금」으로 바뀌었습니다.</div>';
+    if(stale.length){
+      h+='<div class="msg warn" style="font-size:12.5px">이 기금 전용으로 <b>저장해 둔 서식 '+stale.length+'종</b>에 「'+esc(old)+'」이 글자로 박혀 있습니다.'
+        +'<div class="muted" style="font-size:11.5px;margin-top:5px">'+esc(stale.map(docLabel).join(' · '))+'</div>'
+        +'<div class="muted" style="font-size:11.5px;margin-top:5px">지우면 <b>자동생성</b>으로 돌아가 새 유형으로 나옵니다. 손으로 고친 내용은 사라집니다.</div></div>'
+        +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">그대로 두기</button>'
+        +'<button class="primary" onclick="dropStaleDocEdits(\''+fid+'\',\''+old+'\')">저장본 '+stale.length+'종 지우기</button></div>';
+    } else {
+      h+='<p class="muted" style="font-size:12px">따로 손볼 곳은 없습니다.</p>'
+        +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="closeM()">닫기</button></div>';
+    }
+    showModal(h);
+  }).catch(function(){ toast('유형을 바꿨습니다'); });
 }
 /* 가칭 딱지 켜고 끄기 — 기금 머리의 딱지를 누른다 */
 function toggleTempName(fid){
@@ -2805,7 +2830,7 @@ function renderForms(){
   var phBar='<div class="tabbar">'+PH.map(function(p){return '<div class="tab'+(S.formPhase===p[0]?' on':'')+'" onclick="S.formPhase=\''+p[0]+'\';renderForms()">'+p[1]+'</div>';}).join('')+'</div>';
   var bulkBtn='<button class="primary" onclick="pickHwpBulk()" style="padding:4px 10px">📁 여러 .hwp 한번에 등록</button>';
   // 공동/사내 기본서식을 구분해 보여주는 표시
-  var typeChip='<span class="chip '+(isGong?'warn':'dg')+'" style="font-size:10.5px;margin-left:6px">'+esc(cur.fund_type||'?')+'기금 기본서식</span>';
+  var typeChip='<span class="chip '+(isGong?'warn':'dg')+'" style="font-size:10.5px;margin-left:6px">'+esc(cur.fund_type||'?')+'기금 기본서식</span>'+hlp('ftype.words');
   var hwpNote='';   // 설명은 제목 옆 ⓘ(forms.hwp)로 옮김 — 단계마다 반복 출력하던 3줄 안내 제거
   function opsRow(title,btns){ return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;min-width:180px;font-weight:600">'+title+'</span>'+btns+'</div>'; }
   var body;
@@ -4155,6 +4180,75 @@ function fillSubsidyDoc(root,f){
     }
   });
 }
+/* ── 공동/사내 말 고르기 ────────────────────────────────────────────────
+   원본 .hwp 들은 한 집에서 베껴 쓴 탓에 «제목은 공동인데 본문은 사내»라고 적힌 자리가
+   흩어져 있다(설립합의서 2곳, 설립준비위 회의록 4곳, 사업계획서 1곳 …). 그대로 내면
+   관청에 나가는 서류가 스스로 다른 말을 한다. 그래서 기금 «유형» 하나를 보고 서식 전체의
+   말을 한꺼번에 맞춘다 — 처음 만들 때 고른 유형이 곧 모든 서식의 말이 된다.
+
+   ⚠ 손대면 안 되는 자리가 셋 있다.
+     ① 정관 : 공동본(charter)·사내본(charter_sane) 원본이 «따로» 있다 — 위에서 골라 온다.
+     ② 설립인가신청서 : 「[ ] 사내 / [V] 공동」 둘 다 적어 놓고 «고르는» 칸이다. 표만 옮긴다.
+     ③ 지원사업 서식 : 공동기금 전용이라 사내 기금은 아예 오지 못한다(화면에서 이미 막는다).
+   ①②③ 밖에서도, 한 덩이 안에 두 유형이 «나란히» 적혀 있으면 고르는 칸으로 보고 비껴간다. */
+var FTYPE_SKIP={charter:1,charter_sane:1,inka:1,subsidy:1};
+function ftypeSkipDoc(kind){ return !!(FTYPE_SKIP[kind]||/^sub_/.test(String(kind||''))); }
+/* 두 갈래 모두 바꾸는 짝 — «긴 말부터» 본다(짧은 말이 먼저 먹으면 긴 말이 깨진다) */
+var FTYPE_PAIRS=[['공동근로복지기금협의회','사내근로복지기금협의회'],
+  ['공동근로복지기금법인','사내근로복지기금법인'],['공동근로복지기금','사내근로복지기금']];
+/* 공동 전용 줄임말 — 사내일 때만 «둘 다 맞는 말»로 되돌린다.
+   거꾸로(기금법인→공동기금법인)는 하지 않는다. 「기금법인」은 공동에서도 맞는 말이라,
+   굳이 바꾸면 「공동기금법인 대표자」처럼 원본에 없던 말이 늘어난다. */
+var FTYPE_GONG_ONLY=[['공동기금협의회','협의회'],['공동기금법인','기금법인'],['공동기금','기금']];
+function _ftypeSwap(t,ftype){
+  var i;
+  for(i=0;i<FTYPE_PAIRS.length;i++){
+    var g=FTYPE_PAIRS[i][0], s=FTYPE_PAIRS[i][1];
+    t=t.split(ftype==='사내'?g:s).join(ftype==='사내'?s:g);
+  }
+  if(ftype==='사내') for(i=0;i<FTYPE_GONG_ONLY.length;i++)
+    t=t.split(FTYPE_GONG_ONLY[i][0]).join(FTYPE_GONG_ONLY[i][1]);
+  return t;
+}
+/* ⚠ 기금 «이름»은 절대 건드리지 않는다. 이름이 「가나공동근로복지기금」인 기금을 사내로
+     바꾸면, 말 고르기가 서식 안의 이름까지 「가나사내근로복지기금」으로 고쳐 쓴다 —
+     아무도 시키지 않은 개명이 관청 서류에 나간다. 이름 자리는 잘라 두고 그 사이만 손댄다.
+     이름을 바꾸는 길은 renameFund 하나뿐이다. */
+function _ftypeWords(t,ftype,fname){
+  fname=String(fname||'').trim();
+  var out=(fname&&t.indexOf(fname)>=0)
+    ? t.split(fname).map(function(p){ return _ftypeSwap(p,ftype); }).join(fname)
+    : _ftypeSwap(t,ftype);
+  /* 기금 이름 뒤에 유형이 또 붙는 자리가 있다(「{{FUND}} 사내근로복지기금의 출연금」).
+     이름이 이미 「…근로복지기금」으로 끝나면 뒤엣것은 군더더기라 지운다. */
+  return out.replace(/(근로복지기금)\s+(?:공동|사내)근로복지기금/g,'$1');
+}
+/* 「고르는 칸」인지 가리기.
+   ⚠ 「두 유형이 다 적혀 있으면 고르는 칸」으로 보면 안 된다 — 기금 «이름»이 이미
+     「가나공동근로복지기금」이라, 그 이름이 든 칸은 모두 고르는 칸으로 잘못 보였다
+     (설립합의서·사업계획서·협의회 회의록이 통째로 안 바뀌었다).
+   그래서 «표 자리가 붙은» 두 갈래일 때만 고르는 칸으로 본다 — [ ]·[V]·□·■. */
+var FTYPE_PICK_SRC='(?:[\\[［(]\\s*[V√v]?\\s*[\\]］)]|[□■☑])\\s*(사내|공동)근로복지기금';
+function _isTypePickBox(t){
+  var re=new RegExp(FTYPE_PICK_SRC,'g'), m, g=0, s=0;
+  while((m=re.exec(String(t||'')))){ if(m[1]==='사내') s++; else g++; }
+  return g>0&&s>0;
+}
+function fillFundTypeWords(root,ftype,kind,fname){
+  if(ftypeSkipDoc(kind)) return;
+  var walk=function(el){
+    for(var i=0;i<el.childNodes.length;i++){
+      var n=el.childNodes[i];
+      if(n.nodeType===3){
+        /* 고르는 칸인지는 «덩이째» 봐야 안다 — <br>로 갈라진 마디만 보면 못 알아본다 */
+        if(_isTypePickBox(el.textContent||'')) continue;
+        var t=n.nodeValue||'', v=_ftypeWords(t,ftype,fname);
+        if(v!==t) n.nodeValue=v;
+      } else if(n.nodeType===1) walk(n);
+    }
+  };
+  walk(root);
+}
 function hwpFormHTML(kind,f,sites){
   var ftype=(f.fund_type==='사내')?'사내':'공동';
   var key=(kind==='charter'&&ftype==='사내')?'charter_sane':kind;   // 정관은 공동/사내 원본이 다름
@@ -4164,6 +4258,8 @@ function hwpFormHTML(kind,f,sites){
   if(ftype==='사내') html=html.replace(/\[ \] 사내근로복지기금법인/g,'[V] 사내근로복지기금법인')
                               .replace(/\[V\] 공동근로복지기금법인/g,'[ ] 공동근로복지기금법인');
   var d=document.createElement('div'); d.innerHTML=html;
+  /* 공동/사내 말을 «맨 먼저» 맞춘다 — 아래 채우기들이 모두 맞춰진 글 위에서 돌게 한다 */
+  fillFundTypeWords(d,ftype,kind,f.name);
   /* 남의 값을 «가장 먼저» 걷어낸다 — 걷어낸 자리가 곧 채울 자리가 된다 */
   /* ⚠ 차례가 중요하다. 지원신청서는 «박힌 값을 우리 값으로 바꾸는» 방식이라
        걷어내기보다 «먼저» 돌아야 한다. 나중에 돌리면 이미 밑줄로 바뀐 뒤라
@@ -7840,6 +7936,9 @@ function saveInfo(){
        저장하지 않는다 — 반만 저장되면 화면과 서버가 어긋난 채로 남는다. */
   var _newName = patch.hasOwnProperty('name') ? String(patch.name||'').trim() : null;
   if(_newName!==null) delete patch.name;
+  /* 유형이 바뀌면 서식 전체의 말이 함께 바뀐다 — 저장한 뒤에 «손볼 곳»을 세어 알린다 */
+  var _typeFrom=patch.hasOwnProperty('fund_type')?String(cur.fund_type||'공동'):'';
+  var _typeTo=patch.hasOwnProperty('fund_type')?String(patch.fund_type||'공동'):'';
   var _lbl=FIELDS.filter(function(c){ return patch.hasOwnProperty(c[0]); }).map(function(c){ return c[1]; });
   if(_newName!==null) _lbl.unshift('기금법인명');
   askIfNotMine(cur,'기금 정보 저장').then(function(ok){
@@ -7852,8 +7951,10 @@ function saveInfo(){
         if(funds[_fid]) Object.assign(funds[_fid],patch);
         _audit(_fid,'기금 정보 저장',_lbl.join(' · ')||Object.keys(patch).join(' · '));
         if(S.fundId===_fid){ clearDirty(); renderFund(); }
-        if(r.same){ toast(S.fundId===_fid?'저장되었습니다':'저장되었습니다 (이전 기금)'); }
-        else afterRename(_fid,r.from,r.to);      // 손봐야 할 곳을 세어 알려 준다
+        /* 이름과 유형을 한꺼번에 바꿨으면 «이름» 쪽 창을 띄운다 — 창은 겹쳐 뜨지 않는다 */
+        if(!r.same) afterRename(_fid,r.from,r.to);      // 손봐야 할 곳을 세어 알려 준다
+        else if(_typeFrom&&_typeFrom!==_typeTo) afterTypeChange(_fid,_typeFrom,_typeTo);
+        else toast(S.fundId===_fid?'저장되었습니다':'저장되었습니다 (이전 기금)');
       });
     }).catch(function(e){toast('저장 실패: '+((e&&e.message)||e),'err');});
   });
@@ -12988,6 +13089,10 @@ var HELP={
    +'<p><b>발급 회사</b>는 확인용으로만 보여 줍니다. 이 사업장 상호와 다르면 알려 주되 <b>막지는 않습니다</b> — 상호가 옛것으로 적힌 증명서가 흔합니다. 사업장 상호를 증명서 글자로 덮어쓰지도 않습니다.</p>'
    +'<p><b>회사마다 양식이 다릅니다.</b> 못 읽은 칸은 비워 둡니다 — 빈 칸이 틀린 이름보다 낫습니다. 왼쪽 원본을 보며 고친 뒤 [↓ 아래 칸에 반영]을 누르세요.</p>'
    +'<p>저장된 사업장이면 <b>원본도 함께 이어 둡니다</b>(별지 제7호 첨부서류 2번이 요구하는 신분 증명 서류입니다). 아직 저장 전이면 읽기만 되고, 저장한 뒤 다시 고르면 이어집니다.</p>'},
+ 'ftype.words':{t:'공동/사내 — 서식 말이 한꺼번에 바뀝니다',h:'<p>기금 <b>유형</b> 하나만 고르면 서식 <b>전부</b>가 그 말로 나옵니다. 서류마다 따로 고칠 일이 없습니다.</p>'
+   +'<p>원본 .hwp 들은 한 집에서 베껴 쓴 탓에 <b>제목은 공동인데 본문은 사내</b>라고 적힌 자리가 흩어져 있었습니다 — 설립합의서 2곳, 설립준비위 회의록 4곳, 사업계획서·등록면허세·임대차계약서·재산변동보고서·협의회 회의록에 각각. 이제 유형에 맞춰 자동으로 맞춥니다.</p>'
+   +'<p><b>손대지 않는 자리가 셋</b> 있습니다. ①정관은 공동본·사내본 <b>원본이 따로</b> 있어 골라 옵니다. ②설립인가신청서의 「[ ] 사내 / [V] 공동」은 <b>고르는 칸</b>이라 표만 옮깁니다. ③지원사업 서식은 공동기금 전용이라 사내 기금은 아예 오지 않습니다.</p>'
+   +'<p><b>유형을 나중에 바꿔도</b> 자동생성 서식은 모두 함께 바뀝니다. 손이 닿지 않는 것은 이 기금 전용으로 <b>저장해 둔 서식본</b>뿐이라, 바꿀 때 세어 알려 주고 지울지 물어봅니다.</p>'},
  'name.temp':{t:'가칭 (이름이 아직 확정되지 않음)',h:'<p>설립 중인 기금은 <b>이름부터</b> 정해지지 않습니다. 협의회가 정하고 노동청이 인가해야 확정됩니다.</p>'
    +'<p><b>가칭으로 표시해 두면</b> 서식을 뽑을 때 「이름이 확정되면 다시 뽑으세요」라고 알려 줍니다. 설립 서류에는 기금 이름이 <b>모든 장에</b> 들어갑니다.</p>'
    +'<p><b>서식 글자에 「(가칭)」을 붙이지는 않습니다.</b> 원본 서식에 우리가 글자를 더하는 일이라, 붙일지는 제출하는 사람이 정할 일입니다.</p>'
