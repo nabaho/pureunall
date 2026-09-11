@@ -35,6 +35,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const { panelDeps } = require('./lib-co-hist');
+
 const src = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').replace(/\r\n/g, '\n');
 const jsrc = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-file.js'), 'utf8');
 
@@ -333,7 +335,14 @@ function drawPanel(o){
      같은 까닭으로 «진짜»를 싣는다 — 대역을 넣으면 그 딱지가 터져도 이 검사가 모른다.
      Date·Math 도 함께 넣는다(남은 날을 센다). */
   ctx.Date = Date; ctx.Math = Math; ctx.isNaN = isNaN;
-  vm.runInContext('let _coInfoOpen = true;\n'   // 펼친 채로 봐야 값·출처 줄이 보인다
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 패널이 「숫자 세 칸 + 접기 카드」로 바뀌어
+     부르는 함수가 늘었다 — 위와 같은 까닭으로 «진짜»를 함께 싣는다
+     (tests/lib-co-hist.js 의 panelDeps). ErpMatch·_coHist 만 대역으로 준다. */
+  ctx.ErpMatch = { ready:false, byId:{} };
+  ctx._coHist = { o:null, data:null, pick:null };
+  ctx._coHistSum = null; ctx._coLeftDocsN = null;
+  ctx.coErpPinHtml = () => '';
+  vm.runInContext(panelDeps(src) + '\nlet _coInfoOpen = true;\n'   // 펼친 채로 봐야 값·출처 줄이 보인다
     + src.match(/^const CO_SRC_SHORT = \{[^}]*\};/m)[0].replace(/^const /, 'var ')
     + '\n' + fnBody('coSrcShort') + '\n'
     + fnBody('coVal') + '\n' + fnBody('coSrcOf') + '\n'

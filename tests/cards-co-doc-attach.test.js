@@ -192,8 +192,11 @@ test('★ 근거를 딱지에 적는다 — 조용히 붙이면 잘못 붙은 �
 test('붙은 서류를 사업 줄 «바로 아래»에 놓는다', () => {
   const body = slice('function coHistPaint(){', 'box.innerHTML = `<div class="pdsec"');
   /* 2026-08-26(3단계): 사업 줄을 «받는 자리»로 감쌌다 — 차례는 그대로다 */
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 붙은 서류가 «개수를 눌러야» 펴진다.
+     딱지를 그리는 함수(coCaseDocsHtml)와 그 «자리»(사업 줄 바로 아래)는 그대로다 —
+     접는 감싸개만 덧씌웠다. 지킬 것은 「사업 줄 뒤에 온다」는 차례다. */
   const rowAt = body.indexOf('+ erpHistRowHtml(r, grouped);');
-  const docAt = body.indexOf('list += coCaseDocsHtml(plan.byCase[r._i])');
+  const docAt = body.indexOf('coCaseDocsHtml(hits)');
   assert.ok(rowAt > 0 && docAt > rowAt, '사업 줄 뒤에 와야 한다');
   assert.match(body, /class=\"cohist-drop\"/, '받는 자리가 있어야 한다');
 });

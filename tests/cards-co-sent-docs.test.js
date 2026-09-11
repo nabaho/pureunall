@@ -202,7 +202,10 @@ test('★ 「보낸 것」 칸은 「받은 것」 «바로 아래»에 있다 �
   const body = slice('function coDetailPanelHtml(o){', 'function openCoDetailPanel(');
   const got = body.indexOf('coDocsHtml(o)');
   const sent = body.indexOf('id="coSentBox"');
-  const people = body.indexOf('이 회사 사람');
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 사람 목록이 «접기 카드»가 되며 제목이
+     「사람 N명」으로 바뀌었다. 지킬 것은 차례(받은 것 → 보낸 것 → 사람)이지
+     제목 글자가 아니다 — 겨누는 자리만 새 마크업에 맞췄다. */
+  const people = body.indexOf("coCardHtml('ppl'");
   assert.ok(got > 0 && sent > got, '보낸 것이 받은 것보다 위면 축이 뒤집힌다');
   assert.ok(people > sent, '사람 목록보다는 위다');
   assert.equal(body.split('id="coSentBox"').length - 1, 1, '칸이 둘이면 하나는 늘 비어 있다');

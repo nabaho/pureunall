@@ -205,7 +205,11 @@ test('지정·기억을 넘겨 준다', () => {
 
 test('★ 사업 줄이 «받는 자리»가 된다', () => {
   const body = slice('function coHistPaint(){', 'box.innerHTML = `<div class="pdsec"');
-  assert.match(body, /ondrop="coDocDrop\(event,'\$\{esc\(caseKeyOf\(r\)\)\}'\)"/);
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 사업 열쇠를 «한 번만» 짓고 변수(ck)로 나눠 쓴다
+     — 같은 줄에서 caseKeyOf 를 세 번 부르던 것을 줄였다. 지킬 것은 「사업 줄이 받는
+     자리가 된다」이지 열쇠를 어떻게 적는가가 아니다. */
+  assert.match(body, /const ck = caseKeyOf\(r\);/, '사업 열쇠를 안 짓는다');
+  assert.match(body, /ondrop="coDocDrop\(event,'\$\{esc\(ck\)\}'\)"/);
   assert.match(body, /ondragover="coDocDragOver\(event\)"/);
 });
 
