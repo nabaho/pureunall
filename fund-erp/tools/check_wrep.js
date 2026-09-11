@@ -28,7 +28,10 @@ function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음
 
 global.esc = v => String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 global.num = v => (v==null||v===''?'':Math.round(Number(String(v).replace(/[^0-9.-]/g,''))||0));
+/* 재직증명서 줄이 «읽는 길»을 갖게 되면서 쓰는 것이 늘었다(2026-09-11) */
+global.hlp = k => '<i>' + k + '</i>';
 (0, eval)(gF('_siteWrep'));
+(0, eval)(gF('dropZoneSlim'));
 (0, eval)(gF('_wrepDocRow'));
 
 const SITE = { _id:'S1', name:'가나기계(주)', ceo:'홍길동', biz_no:'000-00-00000',
@@ -64,23 +67,31 @@ if (!JSDOM) {
 } else {
   const doc = new JSDOM('<body><div id=x></div>').window.document;
   const put = (h) => { doc.getElementById('x').innerHTML = h; return doc.getElementById('x'); };
+  const all = (el) => [].slice.call(el.querySelectorAll('button,[onclick]'))
+    .map(b => b.getAttribute('onclick') || '');
   const on = put(_wrepDocRow('S1', SITE));
-  const btns = [].slice.call(on.querySelectorAll('button')).map(b => b.getAttribute('onclick') || '');
-  ok('이어 두면 [보기]가 있다', btns.some(x => /openWrepDoc\('S1'\)/.test(x)), btns.join(' | '));
-  ok('바꿀 수 있다', btns.some(x => /pickWrepDoc\('S1'\)/.test(x)), btns.join(' | '));
+  const btns = all(on);
+  ok('이어 두면 [원본]을 볼 수 있다', btns.some(x => /openWrepDoc\('S1'\)/.test(x)), btns.join(' | '));
   ok('연결을 끊을 수 있다', btns.some(x => /unlinkWrepDoc\('S1'\)/.test(x)), btns.join(' | '));
   ok('언제 이었는지 보인다', /2026-09-06/.test(on.textContent), on.textContent);
+  /* 2026-09-11 — 이 줄은 이제 «읽는» 줄이다. 이름을 손으로 치지 않게 하는 것이 알맹이다. */
+  ok('이어 둔 뒤에도 다시 읽을 수 있다', btns.some(x => /siteRepAlbum\(\)/.test(x)), btns.join(' | '));
+  ok('파일로도 읽을 수 있다', !!on.querySelector('#dz-siterep'));
 
   const off = put(_wrepDocRow('S1', Object.assign({}, SITE, { wrep_doc: null })));
-  const b2 = [].slice.call(off.querySelectorAll('button')).map(b => b.getAttribute('onclick') || '');
-  ok('없으면 「없음」이라 말한다', /없음/.test(off.textContent), off.textContent);
-  ok('없으면 [보기]를 안 준다 (누를 것이 없다)', !b2.some(x => /openWrepDoc/.test(x)), b2.join(' | '));
-  ok('없으면 고르는 단추만 준다', b2.some(x => /pickWrepDoc/.test(x)), b2.join(' | '));
+  const b2 = all(off);
+  ok('원본이 없으면 「원본 없음」이라 말한다', /원본 없음/.test(off.textContent), off.textContent);
+  ok('원본이 없으면 [원본]을 안 준다 (누를 것이 없다)', !b2.some(x => /openWrepDoc/.test(x)), b2.join(' | '));
+  ok('원본이 없어도 읽는 길은 준다', b2.some(x => /siteRepAlbum\(\)/.test(x)), b2.join(' | '));
 
-  /* 새 사업장은 아직 이을 자리(사업장 열쇠)가 없다 — 조용히 안 되는 단추를 주면 안 된다 */
+  /* 새 사업장은 아직 «이을» 자리(사업장 열쇠)가 없다 — 그래도 «읽기»는 된다.
+     조용히 안 되는 단추만 주지 않으면 된다. */
   const nw = put(_wrepDocRow('', {}));
-  ok('새 사업장에는 «저장한 뒤»라고 말해 준다', /저장한 뒤/.test(nw.textContent), nw.textContent);
-  ok('새 사업장에는 단추를 안 준다', nw.querySelectorAll('button').length === 0);
+  const b3 = all(nw);
+  ok('새 사업장도 읽을 수 있다', b3.some(x => /siteRepAlbum\(\)/.test(x)), b3.join(' | '));
+  ok('새 사업장에는 «저장하면 이어진다»고 말해 준다', /저장하면 원본도 이어집니다/.test(nw.textContent), nw.textContent);
+  ok('새 사업장에 안 되는 단추는 안 준다',
+    !b3.some(x => /openWrepDoc|unlinkWrepDoc/.test(x)), b3.join(' | '));
 }
 
 console.log('\n■ 저장해도 연결이 살아남나');
