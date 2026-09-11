@@ -209,6 +209,9 @@ function oldBlock(sync, oldState){
   vm.createContext(ctx);
   vm.runInContext(bare.match(/const MB_OLD_DAY = [^\n]*/)[0], ctx);
   vm.runInContext(bare.match(/const MB_OLD_ID = [^\n]*/)[0], ctx);
+  /* ⚠ 얼마나 깊이 채울지(3년)도 «진짜 값»을 태운다 — 가짜로 두면 목표가 바뀌어도
+       화면이 안 따라가는 것을 여기서 못 잡는다 */
+  vm.runInContext(bare.match(/const MB_OLD_GOAL = [^\n]*/)[0], ctx);
   ['mbOldSpans','mbOldCount','mbOldHtml'].forEach(n=>
     vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   return ctx.mbOldHtml();
@@ -245,20 +248,73 @@ test('★★ 아직 하나도 안 담겼어도 «시작」 단추가 나온다',
    ★ 그래서 «담아 둔» 상태(old/state.done)를 보고 말해야 한다. */
 
 const DONE_ST = { done:true, got:3316, days:365, oldest:1757203200000 };
+/* 3년치까지 다 찬 상태 — 더 갈 데가 없다 */
+const FULL_ST = { done:true, got:9800, days:1095, oldest:1694044800000 };
 
-test('★★★ 다 찼으면 «다 찼다고» 알린다 — 새로 열어도 남아야 한다', () => {
+test('★★★ 다 찼으면 «어디까지» 찼는지 알린다 — 새로 열어도 남아야 한다', () => {
   const h = oldBlock({}, DONE_ST);
-  assert.match(h, /다 채웠습니다/, '다 찼는데 아무 말이 없습니다 — 끝난 줄을 모르십니다');
+  assert.match(h, /까지 채웠습니다/, '다 찼는데 아무 말이 없습니다 — 끝난 줄을 모르십니다');
+  assert.match(h, /365일/, '며칠까지 채운 것인지 안 알려 줍니다');
   assert.match(h, /3,316/, '몇 통 담겼는지 안 알려 줍니다');
   assert.match(h, /2025-09-07/, '언제까지 거슬러 담았는지 안 알려 줍니다');
 });
 
-test('★★★ 다 찼으면 «더 누르라고 하지 않는다» — 눌러도 아무 일이 없다', () => {
+test('★★★ 「목표를 채웠다」를 「메일을 다 채웠다」로 적지 않는다 (대표 지적 2026-09-11)', () => {
+  /* ★ 「✅ 지난 메일을 다 채웠습니다 — 더 누르실 것이 없습니다」라고 적어 두었다.
+       그런데 «다»가 아니라 «목표한 365일까지»였다. 실측으로 2025-08월부터
+       달마다 483통이 152통으로 뚝 떨어져 있었다 — 대표께서 화면을 보시고
+       「메일 아직 다 못채웠는데」 하셨다. 그 둘은 다른 말이고, 같은 말로 적으면
+       거짓말이 된다. */
+  const h = oldBlock({}, DONE_ST);
+  assert.ok(!/더 누르실 것이 없습니다/.test(h),
+    '아직 더 채울 수 있는데 「더 누르실 것이 없습니다」라고 합니다');
+  assert.ok(!/지난 메일을 다 채웠습니다/.test(h),
+    '목표까지만 채우고 「다 채웠다」고 합니다');
+});
+
+test('★★★ 목표까지 찼으면 «이어서 채우기»는 안 그린다 — 눌러도 아무 일이 없다', () => {
   const h = oldBlock({}, DONE_ST);
   assert.ok(!/mbBackfillRun\(\)/.test(h),
-    '다 찼는데 채우기 단추가 그대로 있습니다 — 눌러도 아무 일이 없습니다');
+    '다 찼는데 이어서 채우기 단추가 그대로 있습니다 — 눌러도 아무 일이 없습니다');
   assert.ok(!/다시 눌러/.test(h),
     '다 찼는데 「다시 눌러 주십시오」가 그대로 있습니다');
+});
+
+/* ══════ ⑨-2 더 깊이 (대표 결정 2026-09-10 「3년치까지 채운다」) ══════ */
+
+test('★★★ 목표를 채웠어도 «더 깊이» 갈 자리가 남았으면 그 길을 준다', () => {
+  const h = oldBlock({}, DONE_ST);              /* 365일까지만 찼다 */
+  assert.match(h, /mbBackfillRun\(1095\)/,
+    '더 깊이 채울 길이 없습니다 — 998개 규칙을 판단할 근거가 1년에 묶입니다');
+  assert.match(h, /3년치까지 더 채우기/, '단추에 무엇을 하는 것인지 안 적혀 있습니다');
+  /* ⚠ 「또 처음부터 3만 통을 받나」가 가장 먼저 드는 걱정이다 — 미리 답한다 */
+  assert.match(h, /다시 안 받습니다/, '이미 담은 것을 또 받는지 안 알려 줍니다');
+});
+
+test('★★★ 그 깊이까지 다 찼으면 단추가 «아예» 없다 — 눌러도 아무 일이 없다', () => {
+  const h = oldBlock({}, FULL_ST);
+  assert.ok(!/mbBackfillRun\(/.test(h),
+    '3년치까지 찼는데 채우기 단추가 남아 있습니다');
+  assert.match(h, /1,095일/, '어디까지 채운 것인지 안 알려 줍니다');
+});
+
+test('★★★ 깊이를 늘리면 화면이 «따라간다» — 3년을 못 박아 두지 않았다', () => {
+  /* ⚠ 단추 글자와 보내는 값이 둘 다 MB_OLD_GOAL 에서 나와야 한다.
+       한쪽만 못 박아 두면 「5년치까지」라 적어 놓고 3년만 파는 단추가 된다. */
+  const src = bare.slice(bare.indexOf('function mbOldHtml('));
+  const at = src.indexOf('MB_OLD_GOAL');
+  assert.ok(at > 0 && at < 6000, '단추가 깊이를 안 보고 제 값을 적습니다');
+  const n = (src.slice(0, 6000).match(/MB_OLD_GOAL/g) || []).length;
+  assert.ok(n >= 3, 'MB_OLD_GOAL 을 ' + n + '곳에서만 봅니다 — 보내는 값·글자·판정 셋이어야 합니다');
+});
+
+test('★★★ 이어 채우기는 «정해 둔 깊이»로 이어 간다 — 1년으로 되돌아가지 않는다', () => {
+  /* ⚠ 여기가 365 로 못 박혀 있으면, 3년치를 누르고 중간에 끊긴 뒤 「이어서 채우기」를
+       누르는 순간 문턱이 1년으로 돌아가 그 자리에서 「다 됐습니다」가 된다. */
+  const f = sliceFn(app, 'function mbBackfillRun(').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.ok(!/days:\s*365/.test(f), '깊이를 365 로 못 박아 보냅니다');
+  assert.match(f, /_mbOldState\s*\|\|\s*\{\}\)\.days/, '이미 정해 둔 깊이를 안 봅니다');
+  assert.match(f, /again\s*:\s*true/, '이미 끝난 뒤에는 서버가 그냥 돌아섭니다');
 });
 
 test('★★ 아직 안 찼으면 단추가 «그대로 있어야» 한다 — 이것이 원래 길이다', () => {
@@ -267,14 +323,14 @@ test('★★ 아직 안 찼으면 단추가 «그대로 있어야» 한다 — �
   const h = oldBlock({}, { done:false, got:1478 });
   assert.match(h, /mbBackfillRun\(\)/, '아직 안 찼는데 채우기 단추가 없습니다');
   assert.match(h, /다시 눌러/, '아직 안 찼는데 다시 누르라는 말이 없습니다');
-  assert.ok(!/다 채웠습니다/.test(h), '아직 안 찼는데 다 찼다고 합니다');
+  assert.ok(!/까지 채웠습니다/.test(h), '아직 안 찼는데 다 찼다고 합니다');
 });
 
 test('★★★ done 이 서 있어도 «하나도 안 담겼으면» 믿지 않는다', () => {
   /* ⚠ 담긴 것이 0 인데 「다 채웠습니다」라고 하면 그것이 거짓이고,
        게다가 채울 길까지 사라져 대표께서 아무것도 못 하신다. */
   const h = oldBlock({}, { done:true, got:0 });
-  assert.ok(!/다 채웠습니다/.test(h), '하나도 없는데 다 찼다고 합니다');
+  assert.ok(!/까지 채웠습니다/.test(h), '하나도 없는데 다 찼다고 합니다');
   assert.match(h, /채우기 시작/, '채울 길이 사라졌습니다');
 });
 
@@ -282,10 +338,14 @@ test('★★★ 같은 칸에서 «누르실 수 있습니다»와 «더 누르�
   /* ⚠ 표가 아직 없을 때 나오는 「아래 채우기는 지금 바로 누르실 수 있습니다」가
        다 찬 뒤에도 그대로 남아 있었다. 그런데 그 아래 단추는 없다 —
        한 화면에서 서로 어긋나는 두 말이 나오면 어느 쪽도 못 믿는다. */
-  const h = oldBlock({}, DONE_ST);                 /* 표 없음 + 다 찼음 */
+  const h = oldBlock({}, FULL_ST);                 /* 표 없음 + 3년치까지 다 찼음 */
   assert.ok(!/누르실 수 있습니다/.test(h),
     '단추가 없는데 「누르실 수 있습니다」가 남아 있습니다');
-  assert.match(h, /더 누르실 것이 없습니다/, '다 찼다는 말이 없습니다');
+  assert.match(h, /까지 채웠습니다/, '다 찼다는 말이 없습니다');
+  /* ⚠ 뒤집힌 쪽도 본다 — 더 갈 데가 남아 단추가 «있을» 때는 그 말이 있어야 한다 */
+  const h3 = oldBlock({}, DONE_ST);
+  assert.match(h3, /누르실 수 있습니다/,
+    '더 채울 단추가 있는데 「누르실 수 있습니다」가 사라졌습니다');
   /* 아직 안 찼을 때는 그 말이 «있어야» 한다 — 표가 없어 빈 화면처럼 보이는 자리다 */
   const h2 = oldBlock({}, { done:false, got:10 });
   assert.match(h2, /누르실 수 있습니다/, '표가 없을 때 채울 수 있다는 말이 사라졌습니다');

@@ -439,18 +439,13 @@ async function runSync(deps, opts) {
               if (++w % WRITE_BATCH === 0) { await db.ref().update(batch); batch = {}; }
             }
             if (Object.keys(batch).length) await db.ref().update(batch);
-            /* ★ 이 칸이 «언제부터 언제까지»인가 (대표 화면 2026-09-06) ──
-               화면의 「📦 지난 메일」 표가 이 값을 쓴다. 앱은 칸마다 100통씩만 손에 드므로
-               «앱이 가진 줄»로 기간을 세면 늘 틀린다 — 실제로 「받은메일함 16일·100통」
-               으로 나왔다(진짜는 94일·438통). 적는 김에 여기서 함께 세어 둔다.
-               ⚠ 새로 읽어 오는 것이 «없다» — 방금 적은 줄에서 곧바로 센다.
-               ⚠ 날짜가 없는 줄(d=0)은 안 센다. 넣으면 1970년이 되어 기간이 55년이 된다. */
-            for (const g of held) {
-              const d = Number((g.row && g.row.d) || 0);
-              if (!d) continue;
-              if (!p.sync.oldest || d < Number(p.sync.oldest)) p.sync.oldest = d;
-              if (d > Number(p.sync.newest || 0)) p.sync.newest = d;
-            }
+            /* ⚠★ 여기서 «이 칸의 기간»을 재던 자리다 — 걷어냈다 (대표 지적 2026-09-11).
+                 held 는 «이번 회차에 받아온 줄»뿐이라, 새 메일 한 통만 온 칸은
+                 「담긴 기간 1일」이 되었다. 게다가 바로 아래 nextSync 가 새 그릇을
+                 돌려주면서 그 값을 «버리고», 적을 때는 update 라 옛 값이 그대로 남아
+                 무엇이 언제 적힌 값인지도 알 수 없었다.
+               ★ 진짜로 잴 수 있는 자리는 «폴더를 통째로 읽는» 정리 대목 하나뿐이다.
+                 그래서 그리로 옮겼다(위 p.sync.oldest/newest). */
 
             /* ── 끊겼을 때 표시를 어떻게 옮기나 ──
                IMAP 은 번호가 «작은 것부터» 온다. 그래서 중간에 끊기면 손에 있는 것은
@@ -513,6 +508,31 @@ async function runSync(deps, opts) {
                말하게 된다(목록에는 그보다 많이 보이는데). 여기서만 셀 수 있다 —
                폴더를 통째로 읽는 자리가 여기뿐이다. */
             p.sync.kept = Math.max(0, haveKeys.length - dead.length);
+            /* ★★ 이 칸이 «언제부터 언제까지»인가 — 여기서만 바르게 잴 수 있다.
+                 (대표 지적 2026-09-11 「메일 아직 다 못채웠는데」)
+               ⚠ 예전에는 «이번 회차에 받아온 줄»로 쟀다. 그래서 화면이
+                 Drafts 「1일」· 청구서 「1일」· 세금계산서 「2일」 이라고 적었다 —
+                 진짜는 5,352일 · 3,162일 · 603일이다. 「1년이면 약 146,730통」 같은
+                 어림도 그 1일에서 나온 것이라 통째로 헛수였고, 무엇보다 대표께
+                 «아직 하나도 안 찼다»고 거짓말을 했다(칸 17개 가운데 0개).
+               ⚠ 지울 줄(dead)은 빼고 센다 — 곧 없어질 줄로 기간을 재면 안 된다.
+               ⚠ 날짜가 없는 줄(d=0)은 안 센다. 넣으면 1970년이 되어 기간이 55년이 된다.
+               ⚠ 0 으로 두지 않고 «반드시» 적는다. 안 적으면 예전 값이 update 로 그대로
+                 남아, 고쳐 놓고도 화면은 옛 거짓말을 계속 보여 준다. */
+            {
+              const drop = {};
+              dead.forEach((k) => { drop[k] = 1; });
+              let lo = 0, hi = 0;
+              haveKeys.forEach((k) => {
+                if (drop[k]) return;
+                const t = Number((have[k] && have[k].d) || 0);
+                if (!t) return;
+                if (!lo || t < lo) lo = t;
+                if (t > hi) hi = t;
+              });
+              p.sync.oldest = lo;
+              p.sync.newest = hi;
+            }
             p.sync.n = p.uids.length;
             /* 이번에 «살아 있던 통수»를 적어 둔다 — 다음 회차에 이보다 줄었으면
                지운 것이 있다는 뜻이라 그때 다시 읽는다. */
