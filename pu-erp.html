@@ -18955,6 +18955,15 @@ function transferContract(contract){
         receiveDate: contract.signDate, dueDate: '', closeDate: '',
         jurisdiction: { org:'', officer:'', phone:'', email:'' },
         retainerFee: amount, retainerPaidDate: '',
+        /* ★★ 부가세 표시를 «함께» 들고 간다 (건의 2026-09-10 김보람 · 고침 2026-09-11).
+           빠져 있었다 — 계약에 「부가세 포함」을 체크하고 165만원으로 적어도, 이관된
+           사건은 표시를 잃어 «별도»로 읽혔다. 그러면 통장에 들어올 돈을 165만 × 1.1 =
+           181만 5천으로 셈해 거래내역에서 **165,000원 차액**이 났다.
+           ⚠ 컨설팅·기금·기타는 아래에서 이미 들고 가고 있었다(19042 줄) — 사건만 빠졌다.
+           ⚠ 두 칸 다 필요하다: 착수금은 contractFee…, 성공보수는 balanceFee… 를 본다
+             (erpUnpaidParts 의 cVat·bVat). 하나만 넣으면 반만 고쳐진다. */
+        contractFeeVatIncluded: !!contract.contractFeeVatIncluded,
+        balanceFeeVatIncluded: !!contract.balanceFeeVatIncluded,
         payerName: contract.payerName || '',      // 입금자(예금주) 승계
         successFee: contract.successFee || 0,
         successFeeType: contract.successFeeType || 'amount',
