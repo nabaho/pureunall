@@ -1,0 +1,163 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>「판독이 필요합니다」 풍선</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--line:#e2e8f0;--txt:#1e293b;--sub:#64748b;
+  --blue:#1e40af;--blue2:#2563eb;--amber:#854d0e;--amber1:#fffbeb;--amber2:#fde68a;
+  --red:#991b1b;--red1:#fef2f2;--red2:#fecaca;--dark:#1e293b}
+body{margin:0;padding:20px;background:var(--bg);color:var(--txt);
+  font:14px/1.6 'Malgun Gothic',system-ui,sans-serif;max-width:1000px}
+h1{font-size:19px;margin:0 0 4px}
+h2{font-size:15px;margin:28px 0 8px;padding-top:14px;border-top:2px solid var(--line)}
+h2 .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--blue);
+  color:#fff;align-items:center;justify-content:center;font-size:12px;margin-right:7px}
+p.sub{margin:0 0 12px;color:var(--sub);font-size:13px}
+.tag{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:2px 8px;margin-bottom:7px}
+.now{background:#e2e8f0;color:#475569}.ok{background:#dcfce7;color:#166534}
+.warn{background:var(--amber1);color:var(--amber)}.stop{background:var(--red1);color:var(--red)}
+
+/* 사진 크게 보기 — 검은 바탕에 도구줄 */
+.viewer{background:#0f172a;border-radius:12px;padding:14px;margin-bottom:6px}
+.bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;position:relative}
+.bar b.pg{color:#cbd5e1;font-size:12px;font-weight:700;margin-right:4px}
+.bar button{border:1px solid #475569;background:#1e293b;color:#e2e8f0;border-radius:7px;
+  padding:5px 9px;font-size:13px;font-family:inherit;line-height:1}
+.bar button.rd{border-color:#2563eb;background:#1e3a8a;color:#fff}
+.bar button.ok{border-color:#16a34a;background:#14532d;color:#fff}
+.sheet{background:#fff;border-radius:9px;padding:11px 13px;margin-top:11px;font-size:13px}
+.failbox{background:var(--red1);border:1.5px solid var(--red2);border-radius:8px;
+  padding:9px 11px;color:var(--red);font-size:12.5px}
+.failbox .en{color:#7f1d1d;opacity:.8;font-size:11.5px;word-break:break-all}
+
+/* ── 풍선 ── */
+.wrap{position:relative;display:inline-block}
+.balloon{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 9px);
+  background:var(--blue2);color:#fff;font-size:12.5px;font-weight:800;white-space:nowrap;
+  border-radius:9px;padding:6px 12px;box-shadow:0 6px 18px rgba(37,99,235,.45)}
+.balloon::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--blue2)}
+.balloon.amber{background:#d97706;box-shadow:0 6px 18px rgba(217,119,6,.45)}
+.balloon.amber::after{border-top-color:#d97706}
+.balloon.red{background:#dc2626;box-shadow:0 6px 18px rgba(220,38,38,.45)}
+.balloon.red::after{border-top-color:#dc2626}
+.pulse{animation:pl 1.6s ease-in-out 3}
+@keyframes pl{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-3px)}}
+
+.note{background:#fff;border-left:4px solid var(--blue2);padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.note b{color:var(--blue)}
+.warnbox{background:var(--amber1);border-left:4px solid #d97706;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;background:#fff;vertical-align:top}
+th{background:#f1f5f9;font-size:12px;color:var(--sub)}
+.ask{background:var(--blue);color:#fff;border-radius:10px;padding:13px 16px;margin-top:24px;font-size:13.5px}
+.ask b{font-size:15px}
+</style></head><body>
+
+<h1>「판독이 필요합니다」 — 누를 곳을 풍선으로 가리킵니다</h1>
+<p class="sub">대표 지시 2026-09-11 「판독이 필요한 경우 판독을 누르라고 하는 풍선 표시해줘 — 여기에 「판독이 필요합니다」 이렇게」</p>
+
+<h2><span class="n">①</span> 지금 — 단추는 있는데 «눌러야 한다»는 말이 없습니다</h2>
+<div class="viewer">
+  <div class="bar">
+    <b class="pg">1/2쪽</b>
+    <button>▶</button><button>↓</button><button>📋</button>
+    <button class="rd">🔤</button>
+    <button class="rd">🔒</button>
+    <button>🖍</button><button>📤</button>
+    <button class="ok">✓</button><button>🗑</button>
+  </div>
+</div>
+<p class="sub">🔤 가 판독인 줄 알아야 누릅니다. 아직 안 읽은 서류인지도 도구줄만 봐서는 모릅니다.</p>
+
+<h2><span class="n">②</span> 이렇게 — 아직 안 읽었을 때</h2>
+<span class="tag ok">한 번도 안 읽은 서류</span>
+<div class="viewer">
+  <div class="bar">
+    <b class="pg">1/2쪽</b>
+    <button>▶</button><button>↓</button><button>📋</button>
+    <span class="wrap">
+      <span class="balloon pulse">👆 판독이 필요합니다</span>
+      <button class="rd">🔤</button>
+    </span>
+    <button class="rd">🔒</button>
+    <button>🖍</button><button>📤</button>
+    <button class="ok">✓</button><button>🗑</button>
+  </div>
+</div>
+
+<span class="tag warn">읽었는데 «무엇인지 못 가린» 서류 (기타서류)</span>
+<div class="viewer">
+  <div class="bar">
+    <b class="pg">1/1쪽</b>
+    <button>▶</button><button>↓</button><button>📋</button>
+    <span class="wrap">
+      <span class="balloon amber">👆 다시 판독하면 좋아집니다</span>
+      <button class="rd">🔤</button>
+    </span>
+    <button class="rd">🔒</button>
+    <button>🖍</button><button>📤</button>
+    <button class="ok">✓</button><button>🗑</button>
+  </div>
+</div>
+
+<span class="tag stop">판독이 실패한 서류</span>
+<div class="viewer">
+  <div class="bar">
+    <b class="pg">1/2쪽</b>
+    <button>▶</button><button>↓</button><button>📋</button>
+    <span class="wrap">
+      <span class="balloon red">👆 다시 판독해 주세요</span>
+      <button class="rd">🔤</button>
+    </span>
+    <button class="rd">🔒</button>
+    <button>🖍</button><button>📤</button>
+    <button class="ok">✓</button><button>🗑</button>
+  </div>
+  <div class="sheet">
+    <div class="failbox"><b>판독 실패</b> — AI 판독 요금이 떨어졌습니다 · <b>대표님이 충전해야 합니다</b>
+      <div class="en" style="margin-top:5px">영어 원문은 마우스를 올리면 나옵니다(화면에 그대로 쏟지 않습니다)</div>
+    </div>
+  </div>
+</div>
+
+<span class="tag now">다 읽은 서류 · 회의·현장 사진 — 풍선이 «아예 없습니다»</span>
+<div class="viewer">
+  <div class="bar">
+    <b class="pg">1/1쪽</b>
+    <button>▶</button><button>↓</button><button>📋</button>
+    <button class="rd">🔤</button>
+    <button class="rd">🔒</button>
+    <button>🖍</button><button>📤</button>
+    <button class="ok">✓</button><button>🗑</button>
+  </div>
+</div>
+
+<div class="note">
+<b>왜 세 가지 색인가</b> — 할 일의 급함이 다릅니다.
+파랑은 «아직 안 읽음»(그냥 누르면 됩니다), 노랑은 «읽었는데 종류를 못 가림»(눌러도 되고 말아도 됩니다),
+빨강은 «실패»(눌러야 합니다). 색이 같으면 셋을 갈라 볼 수가 없습니다.
+</div>
+
+<div class="warnbox">
+<b>풍선이 뜨지 «않는» 때</b> — 늘 떠 있으면 곧 배경이 되어 아무도 안 봅니다.
+<br>· 이미 잘 읽은 서류 &nbsp;·&nbsp; 회의·현장 사진(읽을 글자가 없습니다)
+<br>· 남의 사진(눌러도 서버가 막습니다) &nbsp;·&nbsp; 오늘 한도를 다 썼을 때(눌러도 같은 답입니다)
+<br>· <b>세 번 살랑인 뒤에는 가만히 있습니다</b> — 계속 움직이면 글을 읽을 수가 없습니다.
+</div>
+
+<h2><span class="n">③</span> 무엇이 그대로이고 무엇이 늘어나나</h2>
+<table>
+<tr><th>그대로</th><th>늘어남</th></tr>
+<tr><td>도구줄 단추·자리·하는 일 — 하나도 안 바뀝니다</td><td>🔤 위에 풍선 하나</td></tr>
+<tr><td>칸(격자)의 「🔤 판독 필요」 딱지</td><td>실패 글월을 <b>한글로</b> 적습니다(영어 원문은 말풍선으로)</td></tr>
+<tr><td>누르면 하는 일</td><td>—</td></tr>
+</table>
+
+<div class="ask"><b>이대로 만들까요?</b><br>
+㉮ 이 목업 그대로(세 가지 색 + 세 번 살랑) &nbsp;·&nbsp;
+㉯ 색 하나로(파랑) · 말만 바뀜 &nbsp;·&nbsp;
+㉰ 살랑임 없이 가만히 &nbsp;·&nbsp; ㉱ 다시 손보기</div>
+
+</body></html>
