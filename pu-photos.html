@@ -5902,7 +5902,21 @@ function askPdfSplit(rows) {
     ok.disabled = false;
     /* 누르면 무슨 일이 나는지 이름에 적는다 — 여기서는 «올리기 전체»가 없던 일이 된다 */
     $('kindPopupCancel').textContent = '올리지 않기';
-    ok.onclick = function () { const p = _pdfAskPick; _pdfAskPick = null; closeKindPopup(); done(p); };
+    /* ⚠⚠ **취소 약속을 먼저 내려놓고** 창을 닫는다 (2026-09-11 고침).
+         closeKindPopup 은 「닫혔으면 올리지 않는다」를 지키려고 _pdfAskCancel 을
+         부른다. 그것을 안 내려놓고 닫으면 «이대로 올리기»를 눌렀는데도 그 안에서
+         done(null) 이 먼저 불려, 아래 done(p) 는 이미 끝난 약속이라 조용히 버려진다.
+         → 무엇을 고르든 「올리기를 취소했습니다」가 뜨고 한 장도 안 올라갔다.
+       ★ 2026-08-24 이 창이 생긴 날부터 그랬다 — **여러 쪽 PDF 는 그동안 한 번도
+         안 올라갔다.** 한 쪽짜리는 이 창을 안 거쳐 멀쩡했기에 아무도 못 알아챘다
+         (대표 물음 2026-09-10 「업로드해서 ocr 하려는데 계속 안 되나」). */
+    ok.onclick = function () {
+      const p = _pdfAskPick;
+      _pdfAskPick = null;
+      _pdfAskCancel = null;      // ← 이 줄이 없으면 닫는 순간 취소가 된다
+      closeKindPopup();
+      done(p);
+    };
     /* 취소·바깥 클릭·ESC 로 닫으면 **올리지 않는다** — 반쯤 올라가면 치우기가 더 일이다. */
     _pdfAskCancel = function () { _pdfAskPick = null; done(null); };
     showKindPopup();
