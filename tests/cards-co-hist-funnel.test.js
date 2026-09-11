@@ -18,6 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { cutFn } = require('./cut-fn');
+const { histDeps } = require('./lib-co-hist');
 
 const R = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(R, 'pu-cards.html'), 'utf8');
@@ -61,6 +62,9 @@ function load() {
     cutFn(app, 'function erpMgrName('),
     cutFn(app, 'function erpHistRowHtml('),
     'var _coHist = { o:null, data:null, pick:null };',
+    /* 2026-09-11(대표 결정, 목업 4번): 이력이 «해마다 접히고» 맨 위 숫자 칸을 다시
+       그린다 — 대역이 아니라 «진짜»를 함께 싣는다(tests/lib-co-hist.js). */
+    histDeps(app),
     cutFn(app, 'function coHistFresh('),
     cutFn(app, 'function renderCoErpHistory('),
     cutFn(app, 'function coHistSet('),
@@ -461,7 +465,10 @@ test('번호로 이은 것에는 그 표가 안 붙는다', () => {
 test('★ 해 머리줄에 그 해의 건수·금액을 적는다', () => {
   const c = load();
   const h = paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': ALL } });
-  assert.match(h, /class="cohist-yr"[\s\S]*?2026년[\s\S]*?3건 · 10,000,000원/,
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 해 머리줄이 «눌러서 접는 줄»이 되며 딱지가
+     늘었다(cohist-yr cofoldable on). 지킬 것은 「해마다 몇 건 얼마인지 적는다」이지
+     딱지가 몇 개인가가 아니다 — 그 뜻만 본다. */
+  assert.match(h, /class="cohist-yr[^"]*"[\s\S]*?2026년[\s\S]*?3건 · 10,000,000원/,
     '★ 해마다 몇 건 얼마인지 안 적으면 눈으로 세야 합니다');
 });
 

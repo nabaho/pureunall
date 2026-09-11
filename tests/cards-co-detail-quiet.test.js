@@ -148,7 +148,10 @@ test('★ 한 건뿐이면 «합계 줄»을 따로 안 그린다 — 그 줄 �
 test('★ 줄이 하나뿐이면 «해 묶음 머리»도 안 그린다 — 바로 밑 줄이 같은 말을 한다', () => {
   const i = SRC.indexOf('if(grouped && rows.length > 1 && r.year !== curY){');
   assert.ok(i > 0, '★ 해 묶음 머리가 줄 수와 상관없이 나온다 — 「해 모름 1건 300,000원」이 겹친다');
-  assert.equal(SRC.split('cohist-yr"><span class="n">').length - 1, 1, '그리는 자리가 둘이면 한쪽만 고쳐진다');
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 해 머리줄이 «눌러서 접는 줄»이 되며 딱지가
+     늘었다(cohist-yr cofoldable). 지킬 것은 「그리는 자리가 하나뿐」이라는 뜻이다 —
+     겨누는 글자만 새 마크업에 맞췄다. */
+  assert.equal(SRC.split('class="cohist-yr cofoldable').length - 1, 1, '그리는 자리가 둘이면 한쪽만 고쳐진다');
 });
 
 test('★★ 여러 건일 때는 «그대로» 둔다 — 조용하게 한다고 쓸모까지 없애면 안 된다', () => {

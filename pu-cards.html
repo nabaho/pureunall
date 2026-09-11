@@ -2758,6 +2758,57 @@ body.pc #pcDetail{display:flex}
 .coclash .cotake{margin-left:8px;font-size:11px;font-weight:700;color:#1e40af;background:#bfdbfe;
   border:none;border-radius:8px;padding:3px 9px;cursor:pointer;white-space:nowrap;font-family:inherit}
 .coclash .cotake:hover{background:#1e40af;color:#ffffff}
+/* ══════ 기업 상세 정리 — 「한눈 요약 + 접기」 (대표 결정 2026-09-11, 목업 4번) ══════
+   「캡쳐 3 영역 너무 정신없다 … 한줄씩 간단히 … 일부 정보는 접었다 펴서 …
+     부족한 정보는 간단히 부족하다는 정보만 … 사업들은 연도별로 … 직관적으로」
+   승인 목업: docs/mockups/2026-09-11-co-detail-pick.html (네 안 중 4번)
+
+   ⚠ 색은 팔레트 다섯 계열 안에서만 고른다 — tests/color-palette-apps.test.js 가 지킨다. */
+/* ── 숫자 세 칸 — 회사를 한눈에 ── */
+.cotiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0 4px}
+.cotile{border:1px solid #e2e8f0;border-radius:10px;padding:7px 4px;text-align:center;
+  cursor:pointer;background:#ffffff}
+.cotile:hover{background:#f8fafc}
+.cotile .k{font-size:10px;color:#94a3b8;font-weight:700}
+.cotile .v{font-size:16px;font-weight:800;margin-top:1px;font-variant-numeric:tabular-nums}
+.cotile .u{font-size:9.5px;color:#94a3b8}
+.cotile.warn{border-color:#fde68a;background:#fffbeb}
+.cotile.warn .v{color:#854d0e}
+/* ── 접기 카드 — 한 줄 요약 + 펴기 ── */
+.cocard{border:1px solid #e2e8f0;border-radius:11px;margin:0 0 7px;overflow:hidden}
+.cocard > .h{display:flex;align-items:center;gap:7px;padding:9px 11px;cursor:pointer;
+  font-size:12.5px;font-weight:700;color:#1e293b;user-select:none}
+.cocard > .h:hover{background:#f8fafc}
+.cocard > .h .cv{color:#94a3b8;font-size:10px;flex:none;transition:transform .15s}
+.cocard.on > .h .cv{transform:rotate(90deg)}
+/* ⚠ 접힌 줄의 «요약»이 이 정리의 핵심이다 — 펴지 않아도 무엇이 들었는지 알아야 한다 */
+.cocard > .h .s{font-weight:400;color:#94a3b8;font-size:11.5px;margin-left:auto;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:58%}
+.cocard > .b{padding:0 11px 11px;display:none}
+.cocard.on > .b{display:block}
+.cocard.warn{border-color:#fde68a}
+.cocard.warn > .h{color:#854d0e;background:#fffbeb}
+.cocard.warn > .h .s{color:#854d0e}
+/* ── 확인 필요 줄 — 「부족하다」만 한 줄씩 ── */
+.coneed{display:flex;align-items:center;gap:7px;padding:7px 1px;font-size:12px;
+  border-bottom:1px solid #f8fafc}
+.coneed:last-child{border-bottom:none}
+.coneed .t{flex:1;min-width:0}
+.coneed button{font-size:11px;font-weight:700;color:#1e40af;background:#eff6ff;
+  border:1px solid #bfdbfe;border-radius:8px;padding:3px 9px;cursor:pointer;flex:none;
+  font-family:inherit;white-space:nowrap}
+.coneed button:hover{background:#1e40af;color:#ffffff}
+/* ⚠ 확인 필요 안에서는 연결 줄의 바깥 여백을 없앤다 — 카드 안에 또 상자가 뜬다 */
+.cocard .coerppin{margin:0 0 6px}
+/* ── 해마다 접기 · 사업에 붙은 서류 접기 ── */
+.cofold{display:none}
+.cofold.on{display:block}
+.cohist-yr.cofoldable{cursor:pointer;user-select:none}
+.cohist-yr .cv{color:#94a3b8;font-size:10px;flex:none;transition:transform .15s}
+.cohist-yr.on .cv{transform:rotate(90deg)}
+.cohist-clip{margin-left:auto;font-size:10px;font-weight:700;color:#2563eb;background:#eff6ff;
+  border:1px solid #bfdbfe;border-radius:999px;padding:1px 7px;cursor:pointer;flex:none}
+.cohist-clip:hover{background:#2563eb;color:#ffffff}
 .coerppin{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px;
   color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
   padding:8px 10px;margin:0 0 10px;line-height:1.6}
@@ -25482,6 +25533,39 @@ function coRulesRecs(o){
 }
 /* 규정관리의 그 회차를 연다 — 대조표는 한 곳에서만 그린다 */
 function coOpenRuleRev(url){ try{ window.open(url, '_blank'); }catch(e){} }
+/* ── 해마다 접기 — 잣대 (대표 결정 2026-09-11) ──────────────────────────────
+   ⚠ 「가장 최근 해」는 «그 회사에 있는 해» 가운데 가장 큰 값이다. 올해(오늘 날짜)로
+     재면 안 된다 — 2024년에 끝난 회사는 펴진 해가 하나도 없어 빈 목록으로 보인다.
+   ⚠ 해를 모르는 줄(year 가 빈 값)은 «펴 둔다». 접어 두면 그 줄이 어디로 갔는지
+     아무도 못 찾는다. */
+function coYearNewest(rows){
+  let top = null;
+  (rows||[]).forEach(function(r){
+    const y = String((r && r.year) || '');
+    if(!y) return;
+    if(top === null || y > top) top = y;
+  });
+  return top;
+}
+function coYearIsOpen(year, newest){
+  const k = String(year == null ? '' : year);
+  if(k in _coYearOpen) return !!_coYearOpen[k];     /* 사람이 누른 뜻이 가장 세다 */
+  if(!k) return true;                               /* 해 모름은 펴 둔다 */
+  return k === String(newest == null ? '' : newest);
+}
+/* 눌렀을 때 — 이력 칸만 다시 그린다(패널을 통째로 그리면 구르던 자리가 튄다) */
+function coYearToggle(year){
+  const k = String(year == null ? '' : year);
+  const rows = (_coHist && _coHist.rows) || [];
+  _coYearOpen[k] = !coYearIsOpen(k, coYearNewest(rows));
+  coHistPaint();
+}
+function coRowDocsToggle(ck){
+  const k = String(ck == null ? '' : ck);
+  if(_coRowDocsOpen[k]) delete _coRowDocsOpen[k]; else _coRowDocsOpen[k] = true;
+  coHistPaint();
+}
+
 function coHistPaint(){
   const box = $('coErpHistBox'); if(!box) return;
   const o = _coHist.o, data = _coHist.data, pick = _coHist.pick || coHistFresh();
@@ -25496,7 +25580,9 @@ function coHistPaint(){
        회사 하나 보자고 통째로 받으면 안 된다. */
   const recs = erpHistRecsFor(data, o.bizno, o.name).concat(coRulesRecs(o));
   /* 기록이 없으면 칸 자체를 안 그린다 — 메모 없으면 메모 칸을 안 그리는 것과 같은 결 */
-  if(!recs.length){ box.innerHTML=''; return; }
+  /* ⚠ 그래도 숫자 칸에는 «0 이라고» 알려 준다. 안 알리면 「…(읽는 중)」에 영영 머물러
+     한 일이 없는 회사인지 아직 안 온 것인지 가릴 수가 없다. */
+  if(!recs.length){ box.innerHTML=''; _coHistSum = { n:0, fee:0, years:0 }; coHeadRepaint(); return; }
 
   /* ⚠ 여기서 거른다(erpHistVisible) — 이관된 계약·컨설팅에 따른 선택 계약·취소는
      사람이 칩을 안 켜도 안 나온다. all 은 합계·건수·칩의 바탕이라, 여기서 안 빼면
@@ -25517,6 +25603,10 @@ function coHistPaint(){
   coLeftDocsPaint(plan.left, docsAll.length);
   const rows = erpHistSort(erpHistPick(all, pick), pick.sort);
   const sumAll = erpHistSum(all), sumNow = erpHistSum(rows);
+  /* 숫자 칸이 읽을 자리에 받아 적는다 — 세는 것은 여전히 여기 한 곳뿐이다.
+     ⚠ 「모두」를 적는다(보이는 것이 아니라) — 깔때기를 걸어도 회사가 한 일의 수는 같다. */
+  _coHistSum = sumAll;
+  _coHist.rows = rows;              /* 해 접기가 「가장 최근 해」를 다시 셀 때 쓴다 */
   const counts = erpHistCounts(all);
   const filtered = rows.length !== all.length;
   const grouped = erpHistGrouped(pick.sort);
@@ -25546,30 +25636,59 @@ function coHistPaint(){
     list = `<div class="cohist-none">고른 조건에 맞는 기록이 없습니다.<br>
       <span style="font-size:11px">갈래·해·상태를 넓혀 보세요.</span></div>`;
   } else {
+    /* ── 해마다 접는다 (대표 결정 2026-09-11, 목업 4번) ──────────────────
+       「이미 수행했던 사업들은 추후에 연도별로 정리해서 볼 수 있게 해달라」
+       ⚠ 가장 최근 해만 펴 둔다. 해가 쌓일수록 이 칸만 끝없이 길어지던 자리다.
+       ⚠ 접힌 줄에 «건수·금액»이 그대로 남는다 — 펴지 않아도 그 해에 얼마였는지 안다.
+       ⚠ 사람이 한 번 누른 해는 그 뜻을 따른다(_coYearOpen). 안 누른 해만 이 잣대가 정한다. */
+    const newest = coYearNewest(rows);
     let curY = null;
+    let open = true;                 /* 묶음 머리가 없을 때(한 줄짜리)는 늘 보인다 */
     rows.forEach(r=>{
       /* ⚠ 줄이 «하나»뿐이면 해 묶음 머리를 안 그린다 (대표 화면 2026-09-03).
          「해 모름 · 1건 · 300,000원」 바로 밑에 그 한 줄이 또 「300,000원」을 말하고,
          위의 합계 줄도 같은 말을 한다 — 한 건짜리 회사에서 같은 값이 «세 번» 나왔다. */
       if(grouped && rows.length > 1 && r.year !== curY){
+        if(curY !== null) list += `</div>`;          /* 앞 해 묶음을 닫는다 */
         curY = r.year;
         const mine = rows.filter(x=>x.year===curY);
         const s = erpHistSum(mine);
-        list += `<div class="cohist-yr"><span class="n">${curY?curY+'년':'해 모름'}</span>`
-          + `<span class="ln"></span><span class="t">${s.n}건 · ${s.fee.toLocaleString()}원</span></div>`;
+        open = coYearIsOpen(curY, newest);
+        const yk = esc(String(curY == null ? '' : curY).replace(/'/g,"\\'"));
+        list += `<div class="cohist-yr cofoldable${open?' on':''}" onclick="coYearToggle('${yk}')"
+            title="눌러서 ${open?'접기':'펼치기'}">
+            <span class="cv">▸</span><span class="n">${curY?curY+'년':'해 모름'}</span>`
+          + `<span class="ln"></span><span class="t">${s.n}건 · ${s.fee.toLocaleString()}원</span></div>`
+          + `<div class="cofold${open?' on':''}" data-yr="${yk}">`;
       }
       /* 사업 줄을 «받는 자리»로 감싼다 — 안 붙은 서류를 여기 놓으면 붙는다.
          ⚠ erpHistRowHtml 은 그대로 둔다(검사 둘이 그 함수를 떠서 쓴다).
            감싸개만 씌워 끌어다 놓기를 얹는다. */
-      list += `<div class="cohist-drop" data-ck="${esc(caseKeyOf(r))}"
+      const ck = caseKeyOf(r);
+      list += `<div class="cohist-drop" data-ck="${esc(ck)}"
           ondragover="coDocDragOver(event)" ondragleave="coDocDragLeave(event)"
-          ondrop="coDocDrop(event,'${esc(caseKeyOf(r))}')">`
+          ondrop="coDocDrop(event,'${esc(ck)}')">`
         + erpHistRowHtml(r, grouped);
       /* 2단계 — 이름 대조로 붙은 서류를 그 사업 «바로 아래»에 놓는다.
          ⚠ r._i 는 all 안에서의 자리다(아래에서 심어 둔다). 걸러 보거나 정렬을
-           바꿔도 붙임새가 따라오게 하려면 «줄»이 아니라 «기록»을 열쇠로 써야 한다. */
-      list += coCaseDocsHtml(plan.byCase[r._i]) + `</div>`;
+           바꿔도 붙임새가 따라오게 하려면 «줄»이 아니라 «기록»을 열쇠로 써야 한다.
+         ── 붙은 서류는 «개수를 눌러야» 편다 (대표 결정 2026-09-11, 목업 4번) ──
+         ⚠ 서류 셋이 붙으면 딱지 줄이 사업 줄만큼 자리를 먹었다. 이제 사업 한 건이
+           늘 두 줄이고, 몇 장 붙었는지는 「📎 3」이 늘 말한다.
+         ⚠ 딱지를 그리는 함수(coCaseDocsHtml)는 그대로다 — 감싸개만 씌운다.
+           끌어다 놓기·떼기가 그 안에 들어 있어 손대면 그 길이 함께 끊긴다. */
+      const hits = plan.byCase[r._i];
+      if(hits && hits.length){
+        const rk = esc(String(ck).replace(/'/g,"\\'"));
+        const rOpen = !!_coRowDocsOpen[ck];
+        list += `<div class="cohist-cliprow" style="display:flex;justify-content:flex-end;margin-top:-4px">
+            <span class="cohist-clip" onclick="coRowDocsToggle('${rk}')"
+              title="이 사업에 붙은 서류 ${hits.length}건 — 눌러서 ${rOpen?'접기':'펼치기'}">📎 ${hits.length}</span></div>
+          <div class="cofold${rOpen?' on':''}" data-ck="${esc(ck)}">${coCaseDocsHtml(hits)}</div>`;
+      }
+      list += `</div>`;
     });
+    if(grouped && rows.length > 1 && curY !== null) list += `</div>`;   /* 마지막 해 묶음 */
   }
 
   /* ⚠ 한 건뿐이고 아무것도 안 걸렀으면 «합계 줄을 따로 안 그린다» (대표 화면 2026-09-03).
@@ -25595,6 +25714,8 @@ function coHistPaint(){
           ${filtered||pick.sort!=='newest'?`<button class="cohist-reset" onclick="coHistSet('reset')">되돌리기</button>`:''}
         </div></div>`)
     + list;
+  /* 이알피 기록이 «이제» 왔다 — 맨 위 숫자 칸을 그 수로 다시 적는다 */
+  coHeadRepaint();
 }
 
 /* 회사가 어떤 사업으로 들어왔는지 — 사진첩에서 서식을 보낼 때 그 서류이름이 딱지가 된다.
@@ -27023,6 +27144,14 @@ function coDocsHtml(o){
    ⚠ 붙은 것까지 여기 남기면 같은 서류가 두 곳에 보여 몇 건인지 세다 틀린다.
    ⚠ 하나도 안 남으면 칸을 비운다. 「아직 안 붙은 서류 0건」은 읽을 값이 없다. */
 function coLeftDocsPaint(left, total){
+  /* ⚠ 몇 건이 안 붙었는지를 «먼저» 받아 적는다 — 숫자 칸과 「확인 필요」가 이 값을 읽는다.
+     칸(#coDocsBox)을 못 찾아 돌아나가더라도 이 수는 맞아야 한다. */
+  _coLeftDocsN = (left || []).length;
+  coHeadRepaint();
+  /* 서류 카드의 접힌 줄에도 「안 붙음 N」이 적힌다 — 펴지 않아도 알아야 한다 */
+  const o = _coHist && _coHist.o;
+  const sm = $('coCard_docs'); if(sm && o){ const s = sm.querySelector('.s');
+    if(s) s.textContent = coDocsSummary(o); }
   const box = $('coDocsBox'); if(!box) return;
   if(!(total||0)){ box.innerHTML = ''; return; }
   box.innerHTML = coDocsListHtml(left, '아직 안 붙은 서류',
@@ -28721,52 +28850,196 @@ function loadCoSent(o, cb){
   loadCoSentDocs((o && o.key) || '', done);
   ids.forEach(id => loadSendLog(id, done));
 }
+/* ══════ 기업 상세 — 「한눈 요약 + 접기」 (대표 결정 2026-09-11, 목업 4번) ══════
+   대표 지시: 「캡쳐 3 영역 너무 정신없다. 한줄씩 간단히 정리하고 싶다.
+     일부 정보는 접었다 펴서 확인할 수 있게 하고, 부족한 정보는 간단히 부족하다는
+     정보만 관리할 수 있게 해달라. 이미 수행했던 사업들은 연도별로 정리해서 볼 수
+     있게. 최종적으로는 사업장 정보를 아주 보기 쉽고 직관적으로 관리할 수 있어야 한다」
+   네 안을 만들어 보여 드리고 «4번(한눈 요약 + 접기)»으로 정하셨다
+   — docs/mockups/2026-09-11-co-detail-pick.html
+
+   ■ 무엇이 문제였나
+   구획 열 가지(연결 안내·한 일·기업정보·값 다른 칸·서류·보낸 서류·사람)가 모두
+   펼쳐진 채 세로로 늘어서, 회사 하나를 열면 첫 화면에만 서른 줄 넘게 쌓였다.
+   정작 「이 회사가 어떤 곳인가」는 그 사이에 묻혔다.
+
+   ■ 어떻게 바꿨나
+   ① 숫자 세 칸(한 일·확인 필요·서류)을 맨 위에 둔다 — 회사를 한눈에.
+   ② 「부족한 것」은 한 칸에 모은다 — 없으면 그 칸이 «아예 안 뜬다».
+   ③ 사업은 해마다 접는다 — 가장 최근 해만 펴 둔다.
+   ④ 기업정보·서류·사람은 «한 줄 요약 + 접기».
+   ⚠ 접어 둔 자리는 회사를 옮겨도 «기억한다»(대표 결정 ⑥㉮) — 스무 곳을 같은 눈으로
+     훑을 때 한 번만 펴면 된다. 기업정보(_coInfoOpen)가 이미 그렇게 동작한다.
+   ⚠ 안쪽을 그리는 함수(coErpPinHtml·coConflictHtml·coDocsHtml·coSentHtml·
+     erpHistRowHtml·coInfoBoxHtml)는 «한 줄도 안 바꿨다». 바뀐 것은 «어디에 놓는가»다. */
+
+/* 접어 둔 자리 — 화면에만 쓰고 저장하지 않는다(_coInfoOpen 과 같은 결) */
+let _coCardOpen = { need:false, docs:false, ppl:false };
+/* 해마다 접기 — 해 → true/false. «없으면» 가장 최근 해만 펴진다 */
+let _coYearOpen = {};
+/* 사업 줄에 붙은 서류를 펴 둔 자리 — 사업열쇠 → true */
+let _coRowDocsOpen = {};
+/* 한 일 요약·안 붙은 서류 수 — 이알피 기록이 «늦게» 오므로 숫자 칸이 여기서 읽는다.
+   ⚠ 세는 곳은 여전히 한 곳이다(coHistPaint·coLeftDocsPaint) — 여기는 받아 적는 자리다. */
+var _coHistSum = null, _coLeftDocsN = null;
+
+function coCardToggle(which){
+  _coCardOpen[which] = !_coCardOpen[which];
+  const el = $('coCard_' + which); if(el) el.classList.toggle('on');
+}
+/* 접기 카드 한 장 — 머리(요약)와 몸으로 나뉜다.
+   ⚠ 몸 안의 누르기가 카드를 도로 접지 않게 event.stopPropagation 을 몸에 건다. */
+function coCardHtml(which, title, summary, body){
+  const on = !!_coCardOpen[which];
+  return `<div class="cocard${on?' on':''}" id="coCard_${which}">
+    <div class="h" onclick="coCardToggle('${which}')" title="눌러서 ${on?'접기':'펼치기'}">
+      <span class="cv">▸</span>${esc(title)}
+      <span class="s">${esc(summary||'')}</span></div>
+    <div class="b" onclick="event.stopPropagation()">${body}</div></div>`;
+}
+
+/* ── 부족한 것 — 「무엇이 모자라다」만 한 줄씩 (대표 지시 2026-09-11) ──
+   ⚠ 값이 어긋난 «내용»은 여기서 되풀이하지 않는다. 몇 개인지만 말하고, 자세한 것은
+     눌러서 본다 — 그것이 「부족하다는 정보만 관리」다.
+   ⚠ 하나도 없으면 빈 글자를 준다 → 카드 자체가 안 뜬다. 4,000곳 가운데 멀쩡한 곳까지
+     「확인 필요 0」이 붙으면 정작 급한 곳이 묻힌다. */
+function coNeedHtml(o){
+  const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
+  const nLeft = Number(_coLeftDocsN || 0);
+  /* 연결은 «확정됐으면» 부족한 것이 아니다 — 확정 전·끊김만 여기 온다 */
+  const linkBad = coErpPinState(o) !== 'pinned';
+  const n = (linkBad?1:0) + (nClash?1:0) + (nLeft?1:0);
+  if(!n) return '';
+  const key = esc(String(o.key).replace(/'/g,"\\'"));
+  const short = [ linkBad?'연결':'', nClash?('값 '+nClash):'', nLeft?('서류 '+nLeft):'' ]
+    .filter(Boolean).join(' · ');
+  let body = '';
+  if(linkBad) body += coErpPinHtml(o);
+  if(nClash){
+    body += `<div class="coneed"><span>⚠</span>
+      <span class="t">값이 다른 칸 ${nClash}개</span>
+      <button onclick="coNeedClashToggle()" title="어느 값이 어떻게 다른지 봅니다">보기</button></div>
+      <div class="cofold" id="coNeedClash">${coConflictHtml(o)}</div>`;
+  }
+  if(nLeft){
+    body += `<div class="coneed"><span>📎</span>
+      <span class="t">아직 안 붙은 서류 ${nLeft}건</span>
+      <button onclick="coNeedOpenDocs()" title="서류 칸을 펴서 보여 줍니다">보기</button></div>`;
+  }
+  return coCardHtml('need', '⚠ 확인 필요 ' + n + '가지', short, body);
+}
+function coNeedClashToggle(){ const b=$('coNeedClash'); if(b) b.classList.toggle('on'); }
+/* 확정해 둔 업체 줄 — 「🔗 확정 ▸」을 눌렀을 때만 편다(풀기·바꾸기가 그 안에 있다) */
+function coPinRowToggle(){ const b=$('coPinRow'); if(b) b.classList.toggle('on'); }
+/* 「안 붙은 서류 보기」 — 서류 카드를 펴고 그 자리로 데려간다.
+   ⚠ 이미 펴져 있으면 «접지 않는다». 보러 눌렀는데 닫히면 고장으로 읽힌다. */
+function coNeedOpenDocs(){
+  if(!_coCardOpen.docs) coCardToggle('docs');
+  const el = $('coCard_docs'); if(el) el.scrollIntoView({ block:'nearest' });
+}
+/* ── 숫자 세 칸 — 회사를 한눈에 ──
+   ⚠ 「한 일」은 이알피 기록이 온 뒤에야 셀 수 있다. 오기 전에는 «…»으로 두고,
+     coHistPaint 가 오면 이 칸만 다시 그린다 — 패널을 통째로 다시 그리지 않는다. */
+function coTilesHtml(o){
+  const s = (_coHist && _coHist.o === o) ? _coHistSum : null;
+  const docs = Object.keys((o.extra && o.extra.docs) || {}).length;
+  const nLeft = Number(_coLeftDocsN || 0);
+  const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
+  const linkBad = coErpPinState(o) !== 'pinned';
+  const need = (linkBad?1:0) + (nClash?1:0) + (nLeft?1:0);
+  const won = s ? erpHistShortWon(s.fee) : '';
+  return `<div class="cotiles">
+    <div class="cotile" onclick="coGoBox('coErpHistBox')" title="이 회사와 있었던 일로 갑니다">
+      <div class="k">한 일</div><div class="v">${s ? s.n : '…'}</div>
+      <div class="u">${s ? esc(won) : '읽는 중'}</div></div>
+    <div class="cotile${need?' warn':''}" onclick="${need?`coNeedGo()`:``}"
+      title="${need?'연결·값·서류 가운데 손볼 것이 있습니다':'손볼 것이 없습니다 👍'}">
+      <div class="k">확인 필요</div><div class="v">${need}</div>
+      <div class="u">${need ? '눌러서 보기' : '없음'}</div></div>
+    <div class="cotile" onclick="coNeedOpenDocs()" title="서류 칸을 폅니다">
+      <div class="k">서류</div><div class="v">${docs}</div>
+      <div class="u">${nLeft ? '안 붙음 '+nLeft : '다 붙음'}</div></div>
+  </div>`;
+}
+function coGoBox(id){ const el=$(id); if(el) el.scrollIntoView({ block:'nearest' }); }
+function coNeedGo(){
+  if(!_coCardOpen.need) coCardToggle('need');
+  coGoBox('coCard_need');
+}
+/* 이알피 기록·안 붙은 서류 수가 바뀐 뒤 숫자 칸과 확인 필요 칸만 다시 그린다 */
+function coHeadRepaint(){
+  const o = _coHist && _coHist.o; if(!o) return;
+  const t = $('coTiles'); if(t) t.innerHTML = coTilesHtml(o);
+  const n = $('coNeedBox'); if(n) n.innerHTML = coNeedHtml(o);
+}
+
 function coDetailPanelHtml(o){
   const folder = o.folder ? _coFolders[o.folder] : null;
+  /* ── 머리 한 줄 — 계약·폴더를 «한 줄»에 모은다 (넉 줄이 두 줄로) ──
+       ⚠ 계약 기간은 업체관리가 아는 것을 «읽기만» 한다. 고칠 수 있는 칸으로 두면
+         여기서 고친 날짜가 업체관리를 이기고 눌러앉아, 계약이 언제 끝나는지 두 앱이
+         다른 말을 하게 된다(점검 B2). */
+  const p = erpContractPeriod(o.erp, todayYmd());
+  const bits = [];
+  if(p) bits.push(`📄 계약 ${esc(p.text)}`
+    + (p.past ? ` <span class="ctold" title="종료일이 지났습니다. 계약해지와는 «다른 말»입니다 — 해지 여부는 🚪 가 따로 말합니다(자동 연장으로 계속 가는 곳이 있습니다)">종료일 지남</span>` : ''));
+  if(folder) bits.push(`📁 ${esc(folder.name)}`);
+  /* ── 이어져 있으면 «초록 한 마디»로 끝낸다 — 안 이어졌을 때만 ⚠ 확인 필요로 간다 ──
+     ⚠★ 그래도 «누를 수 있어야» 한다. 확정을 풀거나 다른 업체로 바꾸는 길이 여기뿐인데
+       글자만 적어 두면 그 길이 통째로 막힌다 — 확정해 둔 업체가 틀렸을 때 되돌릴
+       방법이 사라진다(줄이자고 기능을 없애면 안 된다). 눌러서 그 줄을 편다. */
+  const pinned = coErpPinState(o) === 'pinned';
+  if(pinned) bits.push(`<span onclick="coPinRowToggle()" title="눌러서 업체 확정을 풀거나 다른 업체로 바꿉니다"
+    style="color:#166534;font-weight:700;cursor:pointer">🔗 확정 ▸</span>`);
   return `
     ${/* 상호를 못 읽은 등록증은 번호가 제목이 된다 — 목록과 «같은 함수».
          여기가 바로 상호를 채워 넣는 자리이므로, 무엇이 비었는지 제목 옆에서 말한다. */''}
     <div class="pdname">${esc(coDisplayName(o))}${o.name?'':` <i class="miss">상호 못 읽음</i>`}${o.erp&&o.erp.type?` <span class="ty">${esc(o.erp.type)}</span>`:''}${
       o.erp&&o.erp.left?` <span class="mgq" title="업체관리에서 종료·해지·폐업으로 표시된 거래처 (계약해지)">🚪</span>`:''}</div>
-    ${/* ── 계약 기간 (점검 B2) — 업체관리가 아는 것을 «읽기만» 한다 ──
-         고칠 수 있는 칸으로 두지 않는다. 여기서 고친 날짜가 업체관리를 이기고
-         눌러앉으면, 계약이 언제 끝나는지 두 앱이 다른 말을 하게 된다. */''}
-    ${(function(){ const p = erpContractPeriod(o.erp, todayYmd()); if(!p) return '';
-        return `<div class="pdsub" title="푸른이알피 업체관리의 계약 시작일·종료일입니다 — 여기서는 고칠 수 없습니다">`
-          + `📄 계약 ${esc(p.text)}`
-          + (p.past ? ` <span class="ctold" title="종료일이 지났습니다. 계약해지와는 «다른 말»입니다 — 해지 여부는 🚪 가 따로 말합니다(자동 연장으로 계속 가는 곳이 있습니다)">종료일 지남</span>` : '')
-          + `</div>`; })()}
-    ${folder?`<div class="pdsub">📁 ${esc(folder.name)}</div>`:''}
-    ${/* ── 사업·사건을 «맨 위 축»으로 (대표 지시 2026-08-26, 1단계) ──
-         "기업의 정보와 기업이 수행했던 사업·사건 등을 관리하고…"
+    ${bits.length?`<div class="pdsub" title="계약 기간은 푸른이알피 업체관리의 값입니다 — 여기서는 고칠 수 없습니다">${bits.join(' · ')}</div>`:''}
+    ${/* 🔗 회사 열쇠 — 이 회사가 이알피의 «어느 업체»인지 확정해 두는 자리
+         (대표 지시 2026-09-02). 확정 «전»에는 ⚠ 확인 필요 안에, 확정 «뒤»에는
+         여기 접어 둔다 — 한 번에 한 곳에만 둔다(두 곳에 두면 어느 쪽을 눌렀는지 모른다). */''}
+    ${pinned?`<div class="cofold" id="coPinRow">${coErpPinHtml(o)}</div>`:''}
+    ${/* 숫자 세 칸 — 이알피 기록이 오면 coHeadRepaint 가 이 칸만 다시 그린다 */''}
+    <div id="coTiles">${coTilesHtml(o)}</div>
+    ${/* 부족한 것 — 하나도 없으면 빈 글자라 칸 자체가 안 뜬다 */''}
+    <div id="coNeedBox">${coNeedHtml(o)}</div>
+    ${/* ── 사업·사건이 «축»이다 (대표 지시 2026-08-26) ──
          이 회사에 «무슨 일을 했나»가 먼저다. 그것을 알고 나서 정보·서류를 본다.
-         예전에는 이 칸이 패널 «맨 아래»에 있어, 칸 값을 스물 넘게 지나야 나왔다 —
-         정작 축이 될 것이 곁가지처럼 놓여 있었다.
-         ⚠ 이 단계에서는 «화면만» 바꾼다. 서버에 아무것도 쓰지 않고, 읽는 자리도
-           그대로다(loadErpCaseCons 가 이미 읽고 있던 값이다).
-         ⚠ 칸은 비어 있고 loadErpCaseCons 가 나중에 채운다 — 자리만 위로 옮겼다. */''}
-    ${/* 🔗 회사 열쇠 — 이 회사가 이알피의 «어느 업체»인지 확정해 두는 자리.
-         확정 전에는 상호로 맞추므로 표기가 바뀌면 끊긴다(대표 지시 2026-09-02). */''}
-    <div id="coErpPinBox">${coErpPinHtml(o)}</div>
+         ⚠ 칸은 비어 있고 loadErpCaseCons 가 나중에 채운다 — 자리만 잡아 둔다. */''}
     <div id="coErpHistBox"></div>
     ${/* 기업정보는 접힌 채로 시작한다(대표 지시 2026-08-31) — #coInfoBox 한 칸에
          담아 펼침 단추가 «이 칸만» 다시 그리게 한다. */''}
     <div id="coInfoBox" style="margin-top:12px">${coInfoBoxHtml(o)}</div>
-    ${/* 어긋난 칸을 «서류 목록보다 위»에 둔다 — 사람이 판단해야 하는 것이 먼저다 */''}
-    ${coConflictHtml(o)}
-    ${coDocsHtml(o)}
-    ${/* 📤 보낸 서류 — 빈 칸으로 두고 loadCoSent 가 채운다(#coErpHistBox 와 «같은 결»).
-         여기서 그리면 패널이 뜨기 전에 서버를 기다려야 한다. */''}
-    <div id="coSentBox"></div>
-    ${o.cards.length?`<div class="pcsec" style="margin:16px 4px 8px">이 회사 사람 ${o.cards.length}명</div>
-      ${o.cards.map(c=>`<div class="cof" onclick="openDetail('${c.id}')" style="cursor:pointer">
-        <span>${esc(c.title||'')}</span><b>${esc(c.name||'')}</b></div>`).join('')}`:''}`;
+    ${/* 서류 — 「읽어 온 것·안 붙은 것·보낸 것·붙이기」를 한 카드에 담는다.
+         ⚠ 안쪽 자리(#coDocsBox·#coSentBox)는 그대로다. 늦게 오는 값이 그 자리를
+           찾아 채우므로, 카드가 접혀 있어도(감춰져 있을 뿐) 그대로 들어간다. */''}
+    ${coCardHtml('docs', '서류',
+        coDocsSummary(o),
+        coDocsHtml(o) + `<div id="coSentBox"></div>`)}
+    ${o.cards.length ? coCardHtml('ppl', '사람 ' + o.cards.length + '명',
+        o.cards.map(c=>c.name||'').filter(Boolean).slice(0,3).join(' · '),
+        o.cards.map(c=>`<div class="cof" onclick="openDetail('${c.id}')" style="cursor:pointer">
+          <span>${esc(c.title||'')}</span><b>${esc(c.name||'')}</b></div>`).join('')) : ''}`;
+}
+/* 서류 카드의 «접힌 줄»에 적는 한 마디 — 펴지 않아도 몇 건인지 안다 */
+function coDocsSummary(o){
+  const n = Object.keys((o.extra && o.extra.docs) || {}).length;
+  const left = Number(_coLeftDocsN || 0);
+  if(!n) return '없음';
+  return '읽어온 ' + n + '건' + (left ? ' · 안 붙음 ' + left : '');
 }
 /* ⚠ #coErpHistBox 는 빈 채로 둔다 — 이알피 이력은 Task 3 에서 loadErpCaseCons 로
    따로 불러온 뒤 이 칸에 채운다(패널을 열 때마다 이알피에 새로 안 물어보려면
    상세 내용과 이력 내용을 분리해 둬야 한다). */
 function openCoDetailPanel(key){
   const o = coList().find(x=>x.key===key); if(!o) return;
+  /* ⚠ 늦게 오는 값은 «회사마다» 다시 센다. 안 비우면 앞 회사의 「5건」이 잠깐 보인다
+     — 숫자 칸은 한눈에 믿고 보는 자리라 그 한 순간이 거짓말이 된다.
+     ⚠ 접어 둔 자리(_coCardOpen·_coYearOpen)는 «안 비운다» — 대표 결정 ⑥㉮ 로
+       회사를 옮겨도 기억한다. 비우는 것은 «센 값»뿐이다. */
+  _coHistSum = null; _coLeftDocsN = null; _coRowDocsOpen = {};
   $('pcDetail').innerHTML = `
     <div class="pdhead"><span class="ttl">기업 상세</span>
       <button class="x" onclick="closePcDetail()">✕</button></div>

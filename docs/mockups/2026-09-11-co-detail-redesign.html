@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>기업 상세 — 정리안 (대표 승인용 목업)</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;
+         background:#f1f5f9; color:#1e293b; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .lead { color:#64748b; font-size:13px; margin:0 0 22px; line-height:1.6; }
+  .lead b { color:#1e293b; }
+  .cols { display:grid; grid-template-columns: 1fr 1fr; gap:20px; align-items:start; }
+  .colhead { font-size:12.5px; font-weight:800; color:#64748b; margin-bottom:8px;
+             display:flex; align-items:center; gap:6px; }
+  .colhead .tag { font-size:10.5px; font-weight:800; border-radius:5px; padding:2px 7px; }
+  .colhead.before .tag { background:#fef2f2; color:#991b1b; }
+  .colhead.after .tag { background:#f0fdf4; color:#166534; }
+  .panel { background:#fff; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.08);
+           padding:16px; max-height: 900px; overflow:auto; }
+  .panel.before { opacity:.92; }
+
+  /* ── 실제 앱과 같은 토큰(팔레트 다섯 계열) ── */
+  .pdname { font-size:15px; font-weight:800; }
+  .ty { display:inline-block; font-size:10.5px; font-weight:800; color:#1e40af;
+        background:#eff6ff; border:1px solid #bfdbfe; border-radius:9px; padding:1px 8px; margin-left:4px; }
+  .pdsub { font-size:11.5px; color:#64748b; margin-top:2px; }
+  .pdsec { font-size:11.5px; font-weight:700; color:#94a3b8; letter-spacing:.5px; margin:14px 0 6px; }
+
+  /* before: 원래 있던 모양 그대로 재현 */
+  .coerppin { display:flex; align-items:center; gap:7px; flex-wrap:wrap; font-size:12px;
+    background:#fef2f2; border:1px solid #fecaca; border-radius:9px; padding:8px 10px; margin-top:10px; color:#991b1b; }
+  .coerppin button { font-size:11.5px; color:#1e40af; background:#bfdbfe; border:none;
+    border-radius:7px; padding:3px 9px; font-weight:700; cursor:pointer; }
+  .cohist-sum { display:flex; align-items:baseline; gap:7px; flex-wrap:wrap; background:#f8fafc;
+    border-radius:9px; padding:7px 10px; font-size:12px; color:#64748b; }
+  .cohist-sum b { font-size:15px; color:#1e293b; }
+  .cohist-yr { display:flex; align-items:center; gap:8px; margin:13px 2px 6px; }
+  .cohist-yr .n { font-size:12.5px; font-weight:800; }
+  .cohist-yr .ln { flex:1; height:1px; background:#e2e8f0; }
+  .cohist-yr .t { font-size:11px; color:#94a3b8; }
+  .cohist-row { border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px; margin-bottom:6px; }
+  .cohist-row .l1 { display:flex; align-items:center; gap:7px; }
+  .cohist-row .bd { font-size:10px; font-weight:800; border-radius:5px; padding:2px 6px;
+    white-space:nowrap; flex:none; background:#e2e8f0; color:#1e40af; }
+  .cohist-row .nm { font-size:12.5px; font-weight:700; flex:1; min-width:0; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .cohist-row .fee { font-size:12.5px; font-weight:800; white-space:nowrap; }
+  .cohist-row .l2 { display:flex; align-items:center; gap:6px; margin-top:4px; font-size:11px; color:#94a3b8; }
+  .cohist-row .sp { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cohist-row .st { font-size:10px; font-weight:800; border-radius:999px; padding:2px 7px;
+    white-space:nowrap; flex:none; background:#f8fafc; color:#854d0e; }
+  .cohist-docs { display:flex; flex-wrap:wrap; gap:5px; padding:4px 0 2px 4px; }
+  .codocchip { display:inline-flex; align-items:center; gap:3px; font-size:11px; color:#1e40af;
+    background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:2px 7px; cursor:pointer; }
+  .codocchip i { font-style:normal; color:#94a3b8; font-size:10px; }
+  .codocchip em { font-style:normal; color:#94a3b8; margin-left:3px; cursor:pointer; }
+  .coclash { border:1px solid #fde68a; background:#fff; border-radius:9px; padding:9px 11px; margin:0 0 7px; }
+  .coclash .ck { font-size:12px; font-weight:700; color:#854d0e; margin-bottom:4px; }
+  .coclash .cv { display:flex; flex-wrap:wrap; gap:6px; font-size:12.5px; }
+  .coclash .cnow { color:#64748b; }
+  .coclash .cnew { color:#1e293b; font-weight:700; }
+  .coclash .cotake { margin-left:8px; font-size:11px; font-weight:700; color:#1e40af; background:#bfdbfe;
+    border:none; border-radius:6px; padding:2px 8px; cursor:pointer; }
+  .coclash .cm { font-size:11.5px; color:#94a3b8; margin-top:5px; }
+  .codochint { font-size:11px; color:#94a3b8; margin:2px 0 6px; }
+  .docrow { display:flex; align-items:center; gap:6px; font-size:12px; padding:5px 0;
+    border-bottom:1px solid #f8fafc; }
+  .docrow .nm { flex:1; font-weight:600; }
+  .docrow .meta { color:#94a3b8; font-size:11px; }
+  .cof { display:flex; justify-content:space-between; font-size:12.5px; padding:5px 2px; cursor:pointer; }
+  .cof:hover { background:#f8fafc; }
+  .attach-btn { font-size:11.5px; color:#1e40af; background:#bfdbfe; border:none; border-radius:7px;
+    padding:3px 9px; font-weight:700; cursor:pointer; margin-top:6px; }
+
+  /* ── after: 새로 다듬은 요소 ── */
+  .card { border:1px solid #e2e8f0; border-radius:12px; margin-bottom:10px; overflow:hidden; }
+  .card > .head { display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer;
+    font-size:13px; font-weight:700; user-select:none; }
+  .card > .head:hover { background:#f8fafc; }
+  .card > .head .chev { color:#94a3b8; font-size:11px; transition:transform .15s; flex:none; }
+  .card.open > .head .chev { transform:rotate(90deg); }
+  .card > .head .sum { font-weight:400; color:#94a3b8; font-size:12px; margin-left:auto;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%; }
+  .card > .body { padding:0 12px 12px; display:none; }
+  .card.open > .body { display:block; }
+  .card.warn { border-color:#fde68a; }
+  .card.warn > .head { color:#854d0e; }
+  .card.warn > .head .sum { color:#b45309; }
+  .card.ok > .head { color:#166534; }
+
+  .needline { display:flex; align-items:center; gap:8px; padding:7px 4px; font-size:12.5px;
+    border-bottom:1px solid #f8fafc; }
+  .needline:last-child { border-bottom:none; }
+  .needline .ico { flex:none; }
+  .needline .txt { flex:1; }
+  .needline button { font-size:11px; font-weight:700; color:#1e40af; background:#eff6ff;
+    border:1px solid #bfdbfe; border-radius:7px; padding:3px 9px; cursor:pointer; flex:none; }
+
+  .yr-toggle { display:flex; align-items:center; gap:8px; margin:10px 2px 6px; cursor:pointer;
+    user-select:none; }
+  .yr-toggle .chev { color:#94a3b8; font-size:10px; transition:transform .15s; }
+  .yr-toggle.open .chev { transform:rotate(90deg); }
+  .yr-toggle .n { font-size:12.5px; font-weight:800; }
+  .yr-toggle .ln { flex:1; height:1px; background:#e2e8f0; }
+  .yr-toggle .t { font-size:11px; color:#94a3b8; }
+  .yr-body { display:none; }
+  .yr-body.open { display:block; }
+
+  .row-compact { border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px; margin-bottom:6px; }
+  .row-compact .l1 { display:flex; align-items:center; gap:7px; }
+  .row-compact .docn { margin-left:auto; font-size:10.5px; color:#2563eb; background:#eff6ff;
+    border-radius:999px; padding:1px 7px; cursor:pointer; flex:none; }
+  .row-docs { display:none; margin-top:6px; padding-left:2px; }
+  .row-docs.open { display:flex; flex-wrap:wrap; gap:5px; }
+
+  .toggle-note { font-size:11px; color:#94a3b8; margin:2px 4px 10px; }
+
+  .approve { margin-top:26px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px;
+    padding:14px 16px; font-size:13px; color:#1e40af; }
+  .approve b { display:block; margin-bottom:6px; font-size:13.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>기업 상세 — 정리안</h1>
+  <p class="lead">
+    지금은 <b>열 가지 구획</b>(연결 안내·한 일·기업정보·값 다른 칸·서류·보낸 서류·사람)이
+    모두 펼쳐진 채 위아래로 늘어서 있습니다. 오른쪽 «정리안»은 같은 자료를 쓰되
+    <b>①한 줄 요약 ②접었다 펴기 ③문제만 모아 한 곳 ④해마다 접기</b> 네 가지를 적용했습니다.
+    데이터는 두 회사(문제 없는 곳 / 문제 여러 개인 곳) 예시로 만들었습니다 — 실제 값이 아닙니다.
+    <b>회사 이름·문서 상자를 눌러 보시면 실제로 접히고 펴집니다.</b>
+  </p>
+
+  <div class="cols">
+    <div>
+      <div class="colhead before"><span class="tag">지금</span> 회사 A — 문제 없는 곳</div>
+      <div class="panel before">
+        <div class="pdname">가나테크놀로지 <span class="ty">자문</span></div>
+        <div class="pdsub">📄 계약 2025-03-01 ~ 2027-02-28</div>
+        <div class="pdsub">📁 1. 업체관리</div>
+        <div class="coerppin" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">
+          🔗 <b>가나테크놀로지(주)</b> 업체로 확정됨 <span style="color:#64748b">이름이 바뀌어도 안 끊깁니다</span>
+        </div>
+        <div class="pdsec">이 회사에서 한 일 · 3건 · 2개 해</div>
+        <div class="cohist-sum"><span>모두</span><b>8,900,000원</b><span>· 3건 · 2개 해</span></div>
+        <div class="cohist-yr"><span class="n">2026년</span><span class="ln"></span><span class="t">2건 · 7,900,000원</span></div>
+        <div class="cohist-row">
+          <div class="l1"><span class="bd">컨설팅</span><span class="nm">산업일자리전환컨설팅충남</span><span class="fee">7,000,000원</span></div>
+          <div class="l2"><span class="sp">06-21~ · 박재원 · 산업충남-2026-002</span><span class="st">대기</span></div>
+        </div>
+        <div class="cohist-row">
+          <div class="l1"><span class="bd">컨설팅</span><span class="nm">통합기술보호지원단</span><span class="fee">900,000원</span></div>
+          <div class="l2"><span class="sp">06-18~ · 권형하 · 기술보호-2026-004</span><span class="st">대기</span></div>
+        </div>
+        <div class="cohist-yr"><span class="n">2025년</span><span class="ln"></span><span class="t">1건 · 1,000,000원</span></div>
+        <div class="cohist-row">
+          <div class="l1"><span class="bd">컨설팅</span><span class="nm">일터혁신 상생컨설팅</span><span class="fee">1,000,000원</span></div>
+          <div class="l2"><span class="sp">03-02~ · 최기운 · 일터-2025-011</span><span class="st">완료</span></div>
+        </div>
+        <div class="pdsec">기업정보 ▸</div>
+        <div class="pdsub">3128613630 · 권종만 · 제조업 · 금속 가공제품 제조업</div>
+        <div class="pdsec">📥 읽어 온 서류 1건</div>
+        <div class="docrow"><span class="nm">📄 통합 기술보호지원단 반 신청서</span><span class="meta">2026.09.05 · 권형하</span></div>
+        <div class="attach-btn">📎 붙이기</div>
+        <div class="pdsec">📤 보낸 서류 0건</div>
+        <div class="codochint">아직 보낸 기록이 없습니다</div>
+        <div class="pdsec">이 회사 사람 2명</div>
+        <div class="cof"><span>대표이사</span><b>권종만</b></div>
+        <div class="cof"><span>부장</span><b>최일순</b></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="colhead after"><span class="tag">정리안</span> 회사 A — 같은 자료</div>
+      <div class="panel">
+        <div class="pdname">가나테크놀로지 <span class="ty">자문</span></div>
+        <div class="pdsub">📄 계약 2025-03-01 ~ 2027-02-28 · 📁 1. 업체관리 ·
+          <span style="color:#166534;font-weight:700">🔗 확정됨</span></div>
+
+        <div class="pdsec" style="margin-top:14px">이 회사에서 한 일 · 총 3건 · 8,900,000원</div>
+        <div class="yr-toggle open" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <span class="chev">▸</span><span class="n">2026년</span><span class="ln"></span><span class="t">2건 · 7,900,000원</span>
+        </div>
+        <div class="yr-body open">
+          <div class="cohist-row">
+            <div class="l1"><span class="bd">컨설팅</span><span class="nm">산업일자리전환컨설팅충남</span><span class="fee">7,000,000원</span></div>
+            <div class="l2"><span class="sp">06-21~ · 박재원 · 산업충남-2026-002</span><span class="st">대기</span></div>
+          </div>
+          <div class="cohist-row">
+            <div class="l1"><span class="bd">컨설팅</span><span class="nm">통합기술보호지원단</span><span class="fee">900,000원</span></div>
+            <div class="l2"><span class="sp">06-18~ · 권형하 · 기술보호-2026-004</span><span class="st">대기</span></div>
+          </div>
+        </div>
+        <div class="yr-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <span class="chev">▸</span><span class="n">2025년</span><span class="ln"></span><span class="t">1건 · 1,000,000원</span>
+        </div>
+        <div class="yr-body">
+          <div class="cohist-row">
+            <div class="l1"><span class="bd">컨설팅</span><span class="nm">일터혁신 상생컨설팅</span><span class="fee">1,000,000원</span></div>
+            <div class="l2"><span class="sp">03-02~ · 최기운 · 일터-2025-011</span><span class="st">완료</span></div>
+          </div>
+        </div>
+        <div class="toggle-note">지난 해는 접혀 있습니다 — 눌러서 폅니다. (지금 해는 자동으로 펴져 있습니다)</div>
+
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="head"><span class="chev">▸</span>기업정보
+            <span class="sum">3128613630 · 권종만 · 제조업 · 금속 가공제품 제조업</span></div>
+          <div class="body" onclick="event.stopPropagation()">
+            <div class="docrow"><span class="nm">대표자</span><span class="meta">권종만</span></div>
+            <div class="docrow"><span class="nm">업태 · 종목</span><span class="meta">제조업 · 금속 가공제품 제조업</span></div>
+            <div class="docrow"><span class="nm">소재지</span><span class="meta">충남 천안시 서북구 …</span></div>
+          </div>
+        </div>
+
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="head"><span class="chev">▸</span>서류 · 사람
+            <span class="sum">읽어온 것 1건 · 보낸 것 0건 · 사람 2명</span></div>
+          <div class="body" onclick="event.stopPropagation()">
+            <div class="docrow"><span class="nm">📄 통합 기술보호지원단 반 신청서</span><span class="meta">2026.09.05</span></div>
+            <div class="attach-btn">📎 붙이기</div>
+            <div class="pdsec" style="margin-top:10px">보낸 서류</div>
+            <div class="codochint">아직 없습니다</div>
+            <div class="pdsec" style="margin-top:10px">이 회사 사람</div>
+            <div class="cof"><span>대표이사</span><b>권종만</b></div>
+            <div class="cof"><span>부장</span><b>최일순</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols" style="margin-top:34px">
+    <div>
+      <div class="colhead before"><span class="tag">지금</span> 회사 B — 문제 여러 개인 곳</div>
+      <div class="panel before">
+        <div class="pdname">다라컨트롤</div>
+        <div class="coerppin">🔗 이알피 업체와 <b>안 이어져 있습니다</b> <button>업체 고르기</button></div>
+        <div class="pdsec">이 회사에서 한 일 · 1건 · 1개 해</div>
+        <div class="cohist-row">
+          <div class="l1"><span class="bd">컨설팅</span><span class="nm">통상변화대응기술경영혁신지원컨설팅</span><span class="fee">21,650,200원</span></div>
+          <div class="l2"><span class="sp">08-13~ · 권형하 · 통상경영-2026-001</span><span class="st">대기</span></div>
+          <div class="cohist-docs">
+            <span class="codocchip">📄 기술·경영 혁신 지원신청서<i>날짜</i><em>✕</em></span>
+            <span class="codocchip">📄 사업자등록증<i>날짜</i><em>✕</em></span>
+            <span class="codocchip">📄 서식<i>날짜</i><em>✕</em></span>
+          </div>
+        </div>
+        <div class="pdsec">기업정보 ▸</div>
+        <div class="pdsub">134-86-05772 · 조성환 · 제조 · 방판,가드레일,철구조물,조립식구조물,헬스,케이블트레이,차량충격흡수시설,농업 및 임업용 기계,태양광발전</div>
+        <div class="pdsec" style="color:#854d0e">⚠ 값이 다른 칸 3개</div>
+        <div class="coclash">
+          <div class="ck">소재지</div>
+          <div class="cv"><span class="cnow">지금 충남 천안시 서북구 입장면 도림길 89</span>
+            <span class="cnew">읽은 값 충청남도 천안시 서북구 입장면 도림길 89(신성컨트롤(주))</span>
+            <button class="cotake">이 값으로 바꾸기</button></div>
+          <div class="cm">사업자등록증 · 권형하 · 2026.08.29 <em>📷 원본 보기</em></div>
+        </div>
+        <div class="coclash">
+          <div class="ck">대표자</div>
+          <div class="cv"><span class="cnow">지금 조성환</span><span class="cnew">읽은 값 조성환, 조규현</span>
+            <button class="cotake">이 값으로 바꾸기</button></div>
+          <div class="cm">사업자등록증 · 권형하 · 2026.08.29 <em>📷 원본 보기</em></div>
+        </div>
+        <div class="coclash">
+          <div class="ck">서류이름</div>
+          <div class="cv"><span class="cnow">지금 사업자등록증</span><span class="cnew">읽은 값 기술·경영 혁신 지원신청서</span>
+            <button class="cotake">이 값으로 바꾸기</button></div>
+          <div class="cm">기술·경영 혁신 지원신청서 · 권형하 · 2026.09.08 <em>📷 원본 보기</em></div>
+        </div>
+        <div class="attach-btn">📎 붙이기</div>
+        <div class="pdsec">📤 보낸 서류 0건</div>
+        <div class="codochint">아직 보낸 기록이 없습니다</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="colhead after"><span class="tag">정리안</span> 회사 B — 같은 자료</div>
+      <div class="panel">
+        <div class="pdname">다라컨트롤</div>
+        <div class="pdsub">📁 폴더 없음</div>
+
+        <div class="card warn open" onclick="this.classList.toggle('open')">
+          <div class="head"><span class="chev">▸</span>⚠ 확인 필요 3가지</div>
+          <div class="body" onclick="event.stopPropagation()">
+            <div class="needline">
+              <span class="ico">🔗</span><span class="txt">이알피 업체와 안 이어져 있습니다</span>
+              <button>업체 고르기</button>
+            </div>
+            <div class="needline">
+              <span class="ico">⚠</span><span class="txt">값이 다른 칸 3개 — 소재지 · 대표자 · 서류이름</span>
+              <button onclick="event.stopPropagation();document.getElementById('b-clash').classList.toggle('open')">보기</button>
+            </div>
+            <div class="needline">
+              <span class="ico">📎</span><span class="txt">아직 안 붙은 서류는 없습니다</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="b-clash">
+          <div class="body open" style="padding-top:10px">
+            <div class="coclash">
+              <div class="ck">소재지</div>
+              <div class="cv"><span class="cnow">지금 충남 천안시 서북구 입장면 도림길 89</span>
+                <span class="cnew">읽은 값 충청남도 천안시 서북구 입장면 도림길 89(신성컨트롤(주))</span>
+                <button class="cotake">이 값으로 바꾸기</button></div>
+              <div class="cm">사업자등록증 · 권형하 · 2026.08.29 <em>📷 원본 보기</em></div>
+            </div>
+            <div class="coclash">
+              <div class="ck">대표자</div>
+              <div class="cv"><span class="cnow">지금 조성환</span><span class="cnew">읽은 값 조성환, 조규현</span>
+                <button class="cotake">이 값으로 바꾸기</button></div>
+              <div class="cm">사업자등록증 · 권형하 · 2026.08.29 <em>📷 원본 보기</em></div>
+            </div>
+            <div class="coclash">
+              <div class="ck">서류이름</div>
+              <div class="cv"><span class="cnow">지금 사업자등록증</span><span class="cnew">읽은 값 기술·경영 혁신 지원신청서</span>
+                <button class="cotake">이 값으로 바꾸기</button></div>
+              <div class="cm">기술·경영 혁신 지원신청서 · 권형하 · 2026.09.08 <em>📷 원본 보기</em></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pdsec" style="margin-top:14px">이 회사에서 한 일 · 총 1건 · 21,650,200원</div>
+        <div class="row-compact">
+          <div class="l1"><span class="bd">컨설팅</span><span class="nm">통상변화대응기술경영혁신지원컨설팅</span><span class="fee">21,650,200원</span>
+            <span class="docn" onclick="event.stopPropagation();this.closest('.row-compact').querySelector('.row-docs').classList.toggle('open')">📎 3</span></div>
+          <div class="l2"><span class="sp">08-13~ · 권형하 · 통상경영-2026-001</span><span class="st">대기</span></div>
+          <div class="row-docs">
+            <span class="codocchip">📄 기술·경영 혁신 지원신청서<i>날짜</i></span>
+            <span class="codocchip">📄 사업자등록증<i>날짜</i></span>
+            <span class="codocchip">📄 서식<i>날짜</i></span>
+          </div>
+        </div>
+        <div class="toggle-note">붙은 서류 3건은 «📎 3»을 눌러야 보입니다 — 사업 한 줄이 늘 한 줄로 남습니다.</div>
+
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="head"><span class="chev">▸</span>기업정보
+            <span class="sum">134-86-05772 · 조성환 · 제조업</span></div>
+          <div class="body" onclick="event.stopPropagation()">
+            <div class="docrow"><span class="nm">대표자</span><span class="meta">조성환</span></div>
+            <div class="docrow"><span class="nm">업태</span><span class="meta">제조</span></div>
+            <div class="docrow"><span class="nm">종목</span><span class="meta">방판,가드레일,철구조물 …</span></div>
+          </div>
+        </div>
+
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="head"><span class="chev">▸</span>서류 · 사람
+            <span class="sum">보낸 것 0건</span></div>
+          <div class="body" onclick="event.stopPropagation()">
+            <div class="codochint">붙일 서류를 사진첩에서 찾습니다</div>
+            <div class="attach-btn">📎 붙이기</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="approve">
+    <b>확인해 주세요</b>
+    ① 「⚠ 확인 필요」 한 칸에 <b>연결 안 됨 · 값 다른 칸 · 안 붙은 서류</b>를 모았습니다 —
+       문제가 하나도 없으면 이 칸 자체가 안 뜹니다.<br>
+    ② 「이 회사에서 한 일」은 <b>올해만 펴져 있고 지난 해는 접힙니다</b> — 눌러서 폅니다.<br>
+    ③ 사업 줄에 붙은 서류는 <b>「📎 개수」를 눌러야</b> 나옵니다 — 평소엔 한 줄입니다.<br>
+    ④ 「기업정보」·「서류·사람」은 <b>한 줄 요약 + 접기</b>로 묶었습니다.<br>
+    이대로 진행할까요, 아니면 순서·묶는 방식을 바꿀까요? (예: 사람 목록은 늘 펴 두고 싶다 등)
+  </div>
+</div>
+</body>
+</html>

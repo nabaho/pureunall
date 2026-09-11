@@ -7,6 +7,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const { histDeps } = require('./lib-co-hist');
+
 const source = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
 
 function loadHistBlock(){
@@ -33,7 +35,11 @@ function loadHistBlock(){
   const _pureEnd = source.indexOf('/* \u2550\u2550\u2550\u2550\u2550\u2550 \uc774\uc54c\ud53c \ucf54\ub4dc\ud45c \uc77d\uae30 \u2014 \ud654\uba74');
   assert.ok(_pureAt > 0 && _pureEnd > _pureAt, '\uc774\uc54c\ud53c \ucf54\ub4dc\ud45c \uc21c\uc218 \ub85c\uc9c1 \ubb36\uc74c\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4');
   const _pure = source.slice(_pureAt, _pureEnd);
-const code = _pure + '\n' + source.slice(nameAt, renderEnd);
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 이력이 «해마다 접히고» 맨 위 숫자 칸을 다시
+     그린다. 접기 잣대(coYearIsOpen 등)는 이 잘라낸 범위 «안»에 있지만, 숫자 칸을
+     다시 그리는 손(coHeadRepaint)과 기억하는 자리(_coYearOpen)는 밖에 있다 —
+     대역이 아니라 «진짜»를 함께 싣는다(tests/lib-co-hist.js). */
+const code = _pure + '\n' + histDeps(source) + '\n' + source.slice(nameAt, renderEnd);
 
   const calls = { boxHtml: '' };
   const ctx = {

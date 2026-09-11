@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>기업 상세 — 통째로 견주기 (1~4번 중 하나)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;
+       background:#f1f5f9;color:#1e293b;font-size:13px;line-height:1.5}
+  .wrap{max-width:1600px;margin:0 auto;padding:20px 22px 60px}
+  h1{font-size:19px;margin:0 0 6px}
+  .intro{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:13px 16px;margin:0 0 20px;
+         font-size:13px;color:#1e40af}
+  .intro b{color:#1e40af}
+
+  /* 네 개를 한 줄에 */
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start}
+  .col{min-width:0}
+  .cap{margin-bottom:9px}
+  .cap .n{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+          border-radius:9px;background:#1e293b;color:#fff;font-weight:800;font-size:14px;margin-right:7px}
+  .cap.rec .n{background:#1e40af}
+  .cap .nm{font-size:14px;font-weight:800}
+  .cap .rt{display:inline-block;font-size:10px;font-weight:800;background:#eff6ff;color:#1e40af;
+           border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px;margin-left:5px;vertical-align:2px}
+  .cap .rt.old{background:#e2e8f0;color:#64748b;border-color:#e2e8f0}
+  .cap .ds{font-size:11.5px;color:#64748b;margin-top:4px;min-height:32px}
+  .cap .ds b{color:#166534}
+
+  .panel{background:#fff;border-radius:13px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:13px;
+         height:690px;overflow:auto}
+  .panel.rec{box-shadow:0 0 0 2px #bfdbfe,0 1px 3px rgba(0,0,0,.08)}
+  .len{font-size:11px;color:#94a3b8;margin-top:7px;text-align:right}
+  .len b{color:#1e293b}
+
+  /* ── 실제 앱 토큰 ── */
+  .pdname{font-size:14.5px;font-weight:800}
+  .ty{display:inline-block;font-size:10px;font-weight:800;color:#1e40af;background:#eff6ff;
+      border:1px solid #bfdbfe;border-radius:9px;padding:1px 7px;margin-left:3px}
+  .pdsub{font-size:11px;color:#64748b;margin-top:2px}
+  .pdsec{font-size:10.5px;font-weight:700;color:#94a3b8;letter-spacing:.4px;margin:11px 0 5px}
+  .erp{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;background:#fef2f2;
+       border:1px solid #fecaca;border-radius:9px;padding:6px 8px;margin-top:7px;color:#991b1b}
+  .erp button,.mbtn{font-size:10.5px;color:#1e40af;background:#bfdbfe;border:none;border-radius:7px;
+       padding:2px 8px;font-weight:700;cursor:pointer}
+  .sum{display:flex;align-items:baseline;gap:5px;flex-wrap:wrap;background:#f8fafc;border-radius:9px;
+       padding:6px 8px;font-size:11px;color:#64748b}
+  .sum b{font-size:13.5px;color:#1e293b}
+  .yr{display:flex;align-items:center;gap:6px;margin:8px 1px 4px}
+  .yr .n{font-size:11.5px;font-weight:800}
+  .yr .ln{flex:1;height:1px;background:#e2e8f0}
+  .yr .t{font-size:10px;color:#94a3b8}
+  .row{border:1px solid #e2e8f0;border-radius:9px;padding:6px 8px;margin-bottom:4px}
+  .row .l1{display:flex;align-items:center;gap:5px}
+  .row .bd{font-size:9px;font-weight:800;border-radius:4px;padding:1px 5px;white-space:nowrap;flex:none;
+           background:#e2e8f0;color:#1e40af}
+  .row .nm{font-size:11.5px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .fee{font-size:11.5px;font-weight:800;white-space:nowrap}
+  .row .l2{display:flex;align-items:center;gap:4px;margin-top:3px;font-size:10px;color:#94a3b8}
+  .row .sp{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .st{font-size:9px;font-weight:800;border-radius:999px;padding:1px 6px;white-space:nowrap;flex:none;
+           background:#f8fafc;color:#854d0e}
+  .row .st.done{color:#64748b;background:#e2e8f0}
+  .clip{margin-left:auto;font-size:9.5px;color:#2563eb;background:#eff6ff;border-radius:999px;
+        padding:1px 6px;cursor:pointer;flex:none;font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+  .chip{display:inline-flex;align-items:center;gap:2px;font-size:10px;color:#1e40af;background:#eff6ff;
+        border:1px solid #bfdbfe;border-radius:7px;padding:1px 5px}
+  .chip i{font-style:normal;color:#94a3b8;font-size:9px}
+  .clash{border:1px solid #fde68a;border-radius:9px;padding:7px 9px;margin-bottom:5px}
+  .clash .ck{font-size:11px;font-weight:700;color:#854d0e;margin-bottom:2px}
+  .clash .cv{font-size:11px}
+  .clash .cnow{color:#64748b}
+  .clash .cnew{color:#1e293b;font-weight:700}
+  .clash .cm{font-size:10px;color:#94a3b8;margin-top:3px}
+  .take{font-size:10px;font-weight:700;color:#1e40af;background:#bfdbfe;border:none;border-radius:6px;
+        padding:1px 7px;cursor:pointer;margin-left:4px}
+  .dr{display:flex;align-items:center;gap:5px;font-size:11px;padding:4px 0;border-bottom:1px solid #f8fafc}
+  .dr .nm{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dr .meta{color:#94a3b8;font-size:10px;flex:none}
+  .cof{display:flex;justify-content:space-between;font-size:11px;padding:3px 1px}
+  .hint{font-size:10px;color:#94a3b8;margin:3px 1px}
+
+  /* 접기 카드 */
+  .card{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px;overflow:hidden}
+  .card > .h{display:flex;align-items:center;gap:6px;padding:7px 9px;cursor:pointer;font-size:12px;
+             font-weight:700;user-select:none}
+  .card > .h:hover{background:#f8fafc}
+  .card > .h .cv{color:#94a3b8;font-size:9px;transition:transform .15s;flex:none}
+  .card.open > .h .cv{transform:rotate(90deg)}
+  .card > .h .s{font-weight:400;color:#94a3b8;font-size:10.5px;margin-left:auto;overflow:hidden;
+                text-overflow:ellipsis;white-space:nowrap;max-width:56%}
+  .card > .b{padding:0 9px 9px;display:none}
+  .card.open > .b{display:block}
+  .card.warn{border-color:#fde68a}
+  .card.warn > .h{color:#854d0e;background:#fffbeb}
+  .needl{display:flex;align-items:center;gap:6px;padding:5px 1px;font-size:11px;border-bottom:1px solid #f8fafc}
+  .needl:last-child{border-bottom:none}
+  .needl .t{flex:1}
+  .needl button{font-size:10px;font-weight:700;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;
+                border-radius:6px;padding:1px 7px;cursor:pointer;flex:none}
+  .fold{display:none}
+  .fold.open{display:block}
+  .ytog{display:flex;align-items:center;gap:6px;margin:8px 1px 4px;cursor:pointer;user-select:none}
+  .ytog .cv{color:#94a3b8;font-size:9px;transition:transform .15s}
+  .ytog.open .cv{transform:rotate(90deg)}
+  .ytog .n{font-size:11.5px;font-weight:800}
+  .ytog .ln{flex:1;height:1px;background:#e2e8f0}
+  .ytog .t{font-size:10px;color:#94a3b8}
+
+  /* 2번 숫자 타일 */
+  .tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:9px 0 4px}
+  .tile{border:1px solid #e2e8f0;border-radius:9px;padding:6px 4px;text-align:center;cursor:pointer}
+  .tile:hover{background:#f8fafc}
+  .tile .k{font-size:9.5px;color:#94a3b8;font-weight:700}
+  .tile .v{font-size:14px;font-weight:800;margin-top:1px}
+  .tile .u{font-size:9px;color:#94a3b8}
+  .tile.warn{border-color:#fde68a;background:#fffbeb}
+  .tile.warn .v{color:#854d0e}
+
+  /* 3번 탭 */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid #e2e8f0;margin:10px 0 9px;overflow-x:auto}
+  .tab{font-size:11px;font-weight:700;color:#94a3b8;padding:6px 8px;cursor:pointer;
+       border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+  .tab.on{color:#1e40af;border-bottom-color:#1e40af}
+  .tab .b{font-size:9.5px;background:#e2e8f0;color:#64748b;border-radius:999px;padding:0 5px;margin-left:3px}
+  .tab.on .b{background:#eff6ff;color:#1e40af}
+  .tab.warn{color:#854d0e}
+  .tab.warn .b{background:#fffbeb;color:#854d0e}
+
+  .end{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:15px 17px;margin-top:22px;
+       font-size:13.5px;color:#166534}
+  .end b{display:block;margin-bottom:6px;font-size:14.5px}
+  .end .p{display:inline-block;background:#fff;border:1px solid #bbf7d0;border-radius:8px;padding:4px 12px;
+          font-weight:800;color:#1e293b;margin:3px 4px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>기업 상세 — 네 가지를 통째로 견주기</h1>
+  <div class="intro">
+    <b>같은 회사, 같은 자료</b>로 화면 전체를 네 가지로 만들었습니다 —
+    사업 5건(3개 해) · 확인할 것 3가지 · 서류 4건 · 사람 2명이 들어 있는 회사입니다.<br>
+    접기·펴기·탭이 <b>실제로 눌러집니다.</b> 눌러 보시고 <b>번호 하나만</b> 말씀해 주세요.
+  </div>
+
+  <div class="grid">
+
+    <!-- ══════ 1번 ══════ -->
+    <div class="col">
+      <div class="cap">
+        <span class="n">1</span><span class="nm">지금 이대로</span><span class="rt old">지금</span>
+        <div class="ds">바꾸지 않는 안. 다른 셋과 견주는 잣대입니다.</div>
+      </div>
+      <div class="panel">
+        <div class="pdname">다라컨트롤 <span class="ty">자문</span></div>
+        <div class="pdsub">📄 계약 2025-03-01 ~ 2027-02-28</div>
+        <div class="pdsub">📁 1. 업체관리</div>
+        <div class="erp">🔗 이알피 업체와 <b>안 이어져 있습니다</b> <button>업체 고르기</button></div>
+
+        <div class="pdsec">이 회사에서 한 일 · 5건 · 3개 해</div>
+        <div class="sum"><span>모두</span><b>10,900,000원</b><span>· 5건 · 3개 해</span></div>
+        <div class="yr"><span class="n">2026년</span><span class="ln"></span><span class="t">2건 · 7,900,000원</span></div>
+        <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">산업일자리전환컨설팅충남</span><span class="fee">7,000,000원</span></div>
+          <div class="l2"><span class="sp">06-21~ · 박재원 · 산업충남-2026-002</span><span class="st">대기</span></div>
+          <div class="chips"><span class="chip">📄 기술·경영 혁신 지원신청서<i>날짜</i></span>
+            <span class="chip">📄 사업자등록증<i>날짜</i></span><span class="chip">📄 서식<i>날짜</i></span></div></div>
+        <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">통합기술보호지원단</span><span class="fee">900,000원</span></div>
+          <div class="l2"><span class="sp">06-18~ · 권형하 · 기술보호-2026-004</span><span class="st">대기</span></div></div>
+        <div class="yr"><span class="n">2025년</span><span class="ln"></span><span class="t">2건 · 2,000,000원</span></div>
+        <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">일터혁신 상생컨설팅</span><span class="fee">1,000,000원</span></div>
+          <div class="l2"><span class="sp">03-02~ · 최기운</span><span class="st done">완료</span></div></div>
+        <div class="row"><div class="l1"><span class="bd">사건</span><span class="nm">부당해고 구제신청</span><span class="fee">1,000,000원</span></div>
+          <div class="l2"><span class="sp">07-11~ · 권형하</span><span class="st done">완료</span></div></div>
+        <div class="yr"><span class="n">2024년</span><span class="ln"></span><span class="t">1건 · 1,000,000원</span></div>
+        <div class="row"><div class="l1"><span class="bd">기금</span><span class="nm">사내근로복지기금 설립</span><span class="fee">1,000,000원</span></div>
+          <div class="l2"><span class="sp">05-02~ · 박은비</span><span class="st done">완료</span></div></div>
+
+        <div class="pdsec">기업정보 ▸</div>
+        <div class="pdsub">134-86-05772 · 조성환 · 제조 · 방판,가드레일,철구조물,조립식구조물,헬스</div>
+
+        <div class="pdsec" style="color:#854d0e">⚠ 값이 다른 칸 3개</div>
+        <div class="clash"><div class="ck">소재지</div>
+          <div class="cv"><span class="cnow">지금 충남 천안시 서북구 …</span> <span class="cnew">읽은 값 충청남도 천안시 …</span><button class="take">이 값으로</button></div>
+          <div class="cm">사업자등록증 · 권형하 · 2026.08.29</div></div>
+        <div class="clash"><div class="ck">대표자</div>
+          <div class="cv"><span class="cnow">지금 조성환</span> <span class="cnew">읽은 값 조성환, 조규현</span><button class="take">이 값으로</button></div>
+          <div class="cm">사업자등록증 · 권형하 · 2026.08.29</div></div>
+        <div class="clash"><div class="ck">서류이름</div>
+          <div class="cv"><span class="cnow">지금 사업자등록증</span> <span class="cnew">읽은 값 기술·경영 혁신 지원신청서</span><button class="take">이 값으로</button></div>
+          <div class="cm">기술·경영 혁신 지원신청서 · 2026.09.08</div></div>
+
+        <div class="pdsec">아직 안 붙은 서류 1건</div>
+        <div class="dr"><span class="nm">📄 사업자등록증명원</span><span class="meta">09.02</span></div>
+        <button class="mbtn" style="margin-top:5px">📎 붙이기</button>
+        <div class="pdsec">📤 보낸 서류 0건</div>
+        <div class="hint">아직 보낸 기록이 없습니다</div>
+        <div class="pdsec">이 회사 사람 2명</div>
+        <div class="cof"><span>대표이사</span><b>조성환</b></div>
+        <div class="cof"><span>부장</span><b>최일순</b></div>
+      </div>
+      <div class="len">첫 화면에 <b>보이는 줄 ≈ 34줄</b></div>
+    </div>
+
+    <!-- ══════ 2번 ══════ -->
+    <div class="col">
+      <div class="cap">
+        <span class="n">2</span><span class="nm">다 접기</span>
+        <div class="ds">전부 한 줄씩 접습니다. <b>가장 짧고 조용합니다.</b> 볼 것만 펴서 봅니다.</div>
+      </div>
+      <div class="panel">
+        <div class="pdname">다라컨트롤 <span class="ty">자문</span></div>
+        <div class="pdsub">📄 2025-03-01~2027-02-28 · 📁 1. 업체관리</div>
+
+        <div class="card warn" style="margin-top:10px" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>⚠ 확인 필요<span class="s">3가지</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="needl"><span>🔗</span><span class="t">이알피 연결 안 됨</span><button>고르기</button></div>
+            <div class="needl"><span>⚠</span><span class="t">값 다른 칸 3개</span><button>보기</button></div>
+            <div class="needl"><span>📎</span><span class="t">안 붙은 서류 1건</span><button>보기</button></div>
+          </div></div>
+
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>한 일<span class="s">5건 · 1,090만원 · 3개 해</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="ytog open" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+              <span class="cv">▸</span><span class="n">2026년</span><span class="ln"></span><span class="t">2건 · 790만원</span></div>
+            <div class="fold open">
+              <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">산업일자리전환</span><span class="fee">7,000,000원</span>
+                <span class="clip" onclick="event.stopPropagation();this.closest('.row').querySelector('.fold').classList.toggle('open')">📎 3</span></div>
+                <div class="l2"><span class="sp">06-21~ · 박재원</span><span class="st">대기</span></div>
+                <div class="fold"><div class="chips"><span class="chip">📄 기술·경영 혁신 지원신청서<i>날짜</i></span>
+                  <span class="chip">📄 사업자등록증<i>날짜</i></span><span class="chip">📄 서식<i>날짜</i></span></div></div></div>
+              <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">통합기술보호지원단</span><span class="fee">900,000원</span></div>
+                <div class="l2"><span class="sp">06-18~ · 권형하</span><span class="st">대기</span></div></div>
+            </div>
+            <div class="ytog" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+              <span class="cv">▸</span><span class="n">2025년</span><span class="ln"></span><span class="t">2건 · 200만원</span></div>
+            <div class="fold">
+              <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">일터혁신 상생컨설팅</span><span class="fee">1,000,000원</span></div>
+                <div class="l2"><span class="sp">03-02~ · 최기운</span><span class="st done">완료</span></div></div>
+              <div class="row"><div class="l1"><span class="bd">사건</span><span class="nm">부당해고 구제신청</span><span class="fee">1,000,000원</span></div>
+                <div class="l2"><span class="sp">07-11~ · 권형하</span><span class="st done">완료</span></div></div>
+            </div>
+            <div class="ytog" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+              <span class="cv">▸</span><span class="n">2024년</span><span class="ln"></span><span class="t">1건 · 100만원</span></div>
+            <div class="fold">
+              <div class="row"><div class="l1"><span class="bd">기금</span><span class="nm">사내근로복지기금 설립</span><span class="fee">1,000,000원</span></div>
+                <div class="l2"><span class="sp">05-02~ · 박은비</span><span class="st done">완료</span></div></div>
+            </div>
+          </div></div>
+
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>기업정보<span class="s">134-86-05772 · 조성환</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="dr"><span class="nm">대표자</span><span class="meta">조성환</span></div>
+            <div class="dr"><span class="nm">업태</span><span class="meta">제조</span></div>
+            <div class="dr"><span class="nm">종목</span><span class="meta">방판,가드레일,철구조물 …</span></div>
+          </div></div>
+
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>서류<span class="s">읽어온 4 · 보낸 0</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="dr"><span class="nm">📄 사업자등록증명원</span><span class="meta">09.02</span></div>
+            <button class="mbtn" style="margin-top:5px">📎 붙이기</button>
+          </div></div>
+
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>사람<span class="s">조성환 · 최일순</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="cof"><span>대표이사</span><b>조성환</b></div>
+            <div class="cof"><span>부장</span><b>최일순</b></div>
+          </div></div>
+      </div>
+      <div class="len">첫 화면에 <b>보이는 줄 ≈ 8줄</b></div>
+    </div>
+
+    <!-- ══════ 3번 ══════ -->
+    <div class="col">
+      <div class="cap">
+        <span class="n">3</span><span class="nm">탭으로 갈라 보기</span>
+        <div class="ds">위 탭에서 골라 봅니다. <b>화면 높이가 늘 같습니다.</b> 스크롤이 거의 없습니다.</div>
+      </div>
+      <div class="panel">
+        <div class="pdname">다라컨트롤 <span class="ty">자문</span></div>
+        <div class="pdsub">📄 2025-03-01~2027-02-28 · 📁 1. 업체관리</div>
+        <div class="tabs">
+          <span class="tab on" onclick="pick3(this,0)">한 일<span class="b">5</span></span>
+          <span class="tab warn" onclick="pick3(this,1)">확인<span class="b">3</span></span>
+          <span class="tab" onclick="pick3(this,2)">정보</span>
+          <span class="tab" onclick="pick3(this,3)">서류<span class="b">4</span></span>
+          <span class="tab" onclick="pick3(this,4)">사람<span class="b">2</span></span>
+        </div>
+        <div id="p3_0">
+          <div class="sum"><span>모두</span><b>10,900,000원</b><span>· 5건 · 3개 해</span></div>
+          <div class="yr"><span class="n">2026년</span><span class="ln"></span><span class="t">2건</span></div>
+          <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">산업일자리전환</span><span class="fee">7,000,000원</span></div>
+            <div class="l2"><span class="sp">06-21~ · 박재원</span><span class="st">대기</span></div></div>
+          <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">통합기술보호지원단</span><span class="fee">900,000원</span></div>
+            <div class="l2"><span class="sp">06-18~ · 권형하</span><span class="st">대기</span></div></div>
+          <div class="yr"><span class="n">2025년</span><span class="ln"></span><span class="t">2건</span></div>
+          <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">일터혁신 상생컨설팅</span><span class="fee">1,000,000원</span></div>
+            <div class="l2"><span class="sp">03-02~ · 최기운</span><span class="st done">완료</span></div></div>
+          <div class="row"><div class="l1"><span class="bd">사건</span><span class="nm">부당해고 구제신청</span><span class="fee">1,000,000원</span></div>
+            <div class="l2"><span class="sp">07-11~ · 권형하</span><span class="st done">완료</span></div></div>
+          <div class="yr"><span class="n">2024년</span><span class="ln"></span><span class="t">1건</span></div>
+          <div class="row"><div class="l1"><span class="bd">기금</span><span class="nm">사내근로복지기금 설립</span><span class="fee">1,000,000원</span></div>
+            <div class="l2"><span class="sp">05-02~ · 박은비</span><span class="st done">완료</span></div></div>
+        </div>
+        <div id="p3_1" style="display:none">
+          <div class="needl"><span>🔗</span><span class="t">이알피 연결 안 됨</span><button>고르기</button></div>
+          <div class="clash" style="margin-top:6px"><div class="ck">소재지</div>
+            <div class="cv"><span class="cnow">지금 충남 천안시 …</span> <span class="cnew">읽은 값 충청남도 천안시 …</span><button class="take">이 값으로</button></div>
+            <div class="cm">사업자등록증 · 2026.08.29</div></div>
+          <div class="clash"><div class="ck">대표자</div>
+            <div class="cv"><span class="cnow">지금 조성환</span> <span class="cnew">읽은 값 조성환, 조규현</span><button class="take">이 값으로</button></div>
+            <div class="cm">사업자등록증 · 2026.08.29</div></div>
+          <div class="clash"><div class="ck">서류이름</div>
+            <div class="cv"><span class="cnow">지금 사업자등록증</span> <span class="cnew">읽은 값 기술·경영 혁신 지원신청서</span><button class="take">이 값으로</button></div>
+            <div class="cm">2026.09.08</div></div>
+          <div class="needl"><span>📎</span><span class="t">안 붙은 서류 1건 — 사업자등록증명원</span><button>보기</button></div>
+        </div>
+        <div id="p3_2" style="display:none">
+          <div class="dr"><span class="nm">사업자번호</span><span class="meta">134-86-05772</span></div>
+          <div class="dr"><span class="nm">대표자</span><span class="meta">조성환</span></div>
+          <div class="dr"><span class="nm">업태</span><span class="meta">제조</span></div>
+          <div class="dr"><span class="nm">종목</span><span class="meta">방판,가드레일,철구조물 …</span></div>
+          <div class="dr"><span class="nm">소재지</span><span class="meta">충남 천안시 서북구 …</span></div>
+        </div>
+        <div id="p3_3" style="display:none">
+          <div class="pdsec">아직 안 붙은 서류 1건</div>
+          <div class="dr"><span class="nm">📄 사업자등록증명원</span><span class="meta">09.02</span></div>
+          <div class="pdsec">사업에 붙은 서류 3건</div>
+          <div class="dr"><span class="nm">📄 기술·경영 혁신 지원신청서</span><span class="meta">09.08</span></div>
+          <div class="dr"><span class="nm">📄 사업자등록증</span><span class="meta">08.29</span></div>
+          <div class="dr"><span class="nm">📄 서식</span><span class="meta">08.20</span></div>
+          <button class="mbtn" style="margin-top:6px">📎 붙이기</button>
+        </div>
+        <div id="p3_4" style="display:none">
+          <div class="cof"><span>대표이사</span><b>조성환</b></div>
+          <div class="cof"><span>부장</span><b>최일순</b></div>
+        </div>
+      </div>
+      <div class="len">첫 화면에 <b>보이는 줄 ≈ 14줄</b> (탭 하나 몫)</div>
+    </div>
+
+    <!-- ══════ 4번 ══════ -->
+    <div class="col">
+      <div class="cap rec">
+        <span class="n">4</span><span class="nm">한눈 요약 + 접기</span><span class="rt">권함</span>
+        <div class="ds">맨 위 <b>숫자 세 칸</b>으로 회사를 한눈에. 한 일만 펴 두고 나머지는 접습니다.</div>
+      </div>
+      <div class="panel rec">
+        <div class="pdname">다라컨트롤 <span class="ty">자문</span></div>
+        <div class="pdsub">📄 2025-03-01~2027-02-28 · 📁 1. 업체관리</div>
+
+        <div class="tiles">
+          <div class="tile" onclick="document.getElementById('p4hist').scrollIntoView({block:'nearest'})">
+            <div class="k">한 일</div><div class="v">5</div><div class="u">1,090만원</div></div>
+          <div class="tile warn" onclick="document.getElementById('p4need').classList.add('open')">
+            <div class="k">확인 필요</div><div class="v">3</div><div class="u">눌러서 보기</div></div>
+          <div class="tile" onclick="document.getElementById('p4doc').classList.add('open')">
+            <div class="k">서류</div><div class="v">4</div><div class="u">안 붙음 1</div></div>
+        </div>
+
+        <div class="card warn" id="p4need" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>⚠ 확인 필요<span class="s">연결 · 값 3 · 서류 1</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="needl"><span>🔗</span><span class="t">이알피 연결 안 됨</span><button>고르기</button></div>
+            <div class="needl"><span>⚠</span><span class="t">값 다른 칸 3개 — 소재지·대표자·서류이름</span><button>보기</button></div>
+            <div class="needl"><span>📎</span><span class="t">안 붙은 서류 1건</span><button>보기</button></div>
+          </div></div>
+
+        <div class="pdsec" id="p4hist">이 회사에서 한 일 · 5건 · 10,900,000원</div>
+        <div class="ytog open" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <span class="cv">▸</span><span class="n">2026년</span><span class="ln"></span><span class="t">2건 · 7,900,000원</span></div>
+        <div class="fold open">
+          <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">산업일자리전환컨설팅충남</span><span class="fee">7,000,000원</span>
+            <span class="clip" onclick="event.stopPropagation();this.closest('.row').querySelector('.fold').classList.toggle('open')">📎 3</span></div>
+            <div class="l2"><span class="sp">06-21~ · 박재원</span><span class="st">대기</span></div>
+            <div class="fold"><div class="chips"><span class="chip">📄 기술·경영 혁신 지원신청서<i>날짜</i></span>
+              <span class="chip">📄 사업자등록증<i>날짜</i></span><span class="chip">📄 서식<i>날짜</i></span></div></div></div>
+          <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">통합기술보호지원단</span><span class="fee">900,000원</span></div>
+            <div class="l2"><span class="sp">06-18~ · 권형하</span><span class="st">대기</span></div></div>
+        </div>
+        <div class="ytog" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <span class="cv">▸</span><span class="n">2025년</span><span class="ln"></span><span class="t">2건 · 2,000,000원</span></div>
+        <div class="fold">
+          <div class="row"><div class="l1"><span class="bd">컨설팅</span><span class="nm">일터혁신 상생컨설팅</span><span class="fee">1,000,000원</span></div>
+            <div class="l2"><span class="sp">03-02~ · 최기운</span><span class="st done">완료</span></div></div>
+          <div class="row"><div class="l1"><span class="bd">사건</span><span class="nm">부당해고 구제신청</span><span class="fee">1,000,000원</span></div>
+            <div class="l2"><span class="sp">07-11~ · 권형하</span><span class="st done">완료</span></div></div>
+        </div>
+        <div class="ytog" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <span class="cv">▸</span><span class="n">2024년</span><span class="ln"></span><span class="t">1건 · 1,000,000원</span></div>
+        <div class="fold">
+          <div class="row"><div class="l1"><span class="bd">기금</span><span class="nm">사내근로복지기금 설립</span><span class="fee">1,000,000원</span></div>
+            <div class="l2"><span class="sp">05-02~ · 박은비</span><span class="st done">완료</span></div></div>
+        </div>
+
+        <div class="card" style="margin-top:10px" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>기업정보<span class="s">134-86-05772 · 조성환 · 제조</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="dr"><span class="nm">대표자</span><span class="meta">조성환</span></div>
+            <div class="dr"><span class="nm">업태</span><span class="meta">제조</span></div>
+            <div class="dr"><span class="nm">종목</span><span class="meta">방판,가드레일 …</span></div>
+          </div></div>
+        <div class="card" id="p4doc" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>서류<span class="s">읽어온 4 · 보낸 0</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="dr"><span class="nm">📄 사업자등록증명원</span><span class="meta">09.02</span></div>
+            <button class="mbtn" style="margin-top:5px">📎 붙이기</button>
+          </div></div>
+        <div class="card" onclick="this.classList.toggle('open')">
+          <div class="h"><span class="cv">▸</span>사람<span class="s">조성환 · 최일순</span></div>
+          <div class="b" onclick="event.stopPropagation()">
+            <div class="cof"><span>대표이사</span><b>조성환</b></div>
+            <div class="cof"><span>부장</span><b>최일순</b></div>
+          </div></div>
+      </div>
+      <div class="len">첫 화면에 <b>보이는 줄 ≈ 15줄</b></div>
+    </div>
+
+  </div>
+
+  <div class="end">
+    <b>번호 하나만 골라 주세요</b>
+    <span class="p">1번 — 지금 이대로</span>
+    <span class="p">2번 — 다 접기</span>
+    <span class="p">3번 — 탭</span>
+    <span class="p">4번 — 한눈 요약 + 접기</span><br>
+    <span style="font-size:12.5px">
+      <b>2번</b>은 가장 짧지만 「무엇이 있는지」를 보려면 눌러야 합니다 ·
+      <b>3번</b>은 높이가 일정하지만 한 번에 하나만 보입니다 ·
+      <b>4번</b>은 숫자 세 칸으로 회사를 한눈에 보면서 사업은 바로 읽힙니다.<br>
+      섞어도 됩니다 — 「4번인데 사람은 늘 펴 둬라」처럼 말씀하셔도 그대로 만듭니다.
+    </span>
+  </div>
+</div>
+<script>
+  function pick3(el, i){
+    el.parentElement.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('on'); });
+    el.classList.add('on');
+    for(var k=0;k<5;k++){
+      var b = document.getElementById('p3_'+k);
+      if(b) b.style.display = (k===i) ? 'block' : 'none';
+    }
+  }
+</script>
+</body>
+</html>

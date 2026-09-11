@@ -261,7 +261,18 @@ test('★ 서식 칸(extra)을 두 번 읽지 않는다 — 4,158곳에서 두 �
   assert.equal(n, 1, '★ coEffectiveExtra 를 ' + n + '번 부릅니다 — 한 번 읽어 둘로 씁니다');
 });
 
-test('★ 기업 상세에 회사 열쇠 한 줄이 있다', () => {
-  assert.match(SRC, /<div id="coErpPinBox">/, '★ 확정할 자리가 화면에 없습니다');
+/* ⚠ 2026-09-11(대표 결정, 목업 4번): 상세 화면을 「한눈 요약 + 접기」로 정리하며
+   이 줄의 «자리»가 둘로 갈렸다 — 확정 «전»에는 「⚠ 확인 필요」 안에, 확정 «뒤»에는
+   머리줄의 「🔗 확정 ▸」을 눌러 펴는 자리에 둔다. 지킬 것은 자리 이름(옛 #coErpPinBox)이
+   아니라 **두 경우 모두 확정·풀기로 가는 길이 살아 있는가**다.
+   ★ 이것이 없으면 확정해 둔 업체가 틀렸을 때 되돌릴 방법이 통째로 사라진다. */
+test('★ 기업 상세에 회사 열쇠 한 줄이 있다 — 확정 전·후 «둘 다»', () => {
+  const panel = cutFn(SRC, 'function coDetailPanelHtml(');
+  const need = cutFn(SRC, 'function coNeedHtml(');
+  assert.match(need, /coErpPinHtml\(o\)/,
+    '★ 확정 «전»에 확정할 자리가 없습니다 — 「⚠ 확인 필요」에서 이어야 합니다');
+  assert.match(panel, /coErpPinHtml\(o\)/,
+    '★ 확정 «뒤»에 풀거나 바꿀 자리가 없습니다 — 잘못 확정하면 되돌릴 길이 사라집니다');
+  assert.match(panel, /coPinRowToggle\(\)/, '★ 그 줄을 펼 손잡이가 없습니다');
   assert.match(SRC, /id="coErpPickBg"/, '★ 업체 고르기 창 자리가 없습니다');
 });

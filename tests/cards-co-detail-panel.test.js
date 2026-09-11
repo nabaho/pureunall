@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const { panelDeps } = require('./lib-co-hist');
+
 const source = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
 /* ⚠ 2026-08-31(점검 B2): 상세에 계약 기간 한 줄이 붙었다. 그 둘은 패널 «앞»에
    있어 위 자르기에 안 들어온다 — 대역을 넣는 대신 «진짜»를 함께 실어 준다.
@@ -84,7 +86,14 @@ function loadPanelBlock(items){
   /* 2026-08-31: coDetailPanelHtml 이 #coInfoBox 를 coInfoBoxHtml 로 채운다
      (기업정보 접기/펼치기, 대표 지시). 그 함수는 coDetailPanelHtml «앞»에 있어
      panelAt~openEnd 자르기에 안 들어온다 — 대역이 아니라 «진짜»를 함께 싣는다. */
-  const code = 'let _coInfoOpen = false;\n'
+  /* 2026-09-11(대표 결정, 목업 4번): 패널이 「숫자 세 칸 + 접기 카드」로 바뀌며 부르는
+     함수가 늘었다 — 같은 까닭으로 «진짜»를 함께 싣는다(tests/lib-co-hist.js).
+     ErpMatch·_coHist 만 대역으로 준다(이 검사는 이알피 쪽을 안 본다). */
+  ctx.ErpMatch = { ready:false, byId:{} };
+  ctx._coHist = { o:null, data:null, pick:null };
+  ctx._coHistSum = null; ctx._coLeftDocsN = null;
+  ctx.Math = Math; ctx.Number = Number; ctx.Object = Object;
+  const code = 'let _coInfoOpen = false;\n' + panelDeps(source) + '\n'
     + fnBody2('coSmeDays') + '\n' + fnBody2('coSmeState') + '\n' + fnBody2('coSmeChipHtml') + '\n'
     + fnBody2('coInfoSummary') + '\n' + fnBody2('coInfoBoxHtml') + '\n'
     + fnBody2('erpContractPeriod') + String.fromCharCode(10) + fnBody2('todayYmd') + String.fromCharCode(10)
@@ -174,7 +183,14 @@ function loadPanelBlockAsync(items){
   /* 2026-08-31: coDetailPanelHtml 이 #coInfoBox 를 coInfoBoxHtml 로 채운다
      (기업정보 접기/펼치기, 대표 지시). 그 함수는 coDetailPanelHtml «앞»에 있어
      panelAt~openEnd 자르기에 안 들어온다 — 대역이 아니라 «진짜»를 함께 싣는다. */
-  const code = 'let _coInfoOpen = false;\n'
+  /* 2026-09-11(대표 결정, 목업 4번): 패널이 「숫자 세 칸 + 접기 카드」로 바뀌며 부르는
+     함수가 늘었다 — 같은 까닭으로 «진짜»를 함께 싣는다(tests/lib-co-hist.js).
+     ErpMatch·_coHist 만 대역으로 준다(이 검사는 이알피 쪽을 안 본다). */
+  ctx.ErpMatch = { ready:false, byId:{} };
+  ctx._coHist = { o:null, data:null, pick:null };
+  ctx._coHistSum = null; ctx._coLeftDocsN = null;
+  ctx.Math = Math; ctx.Number = Number; ctx.Object = Object;
+  const code = 'let _coInfoOpen = false;\n' + panelDeps(source) + '\n'
     + fnBody2('coSmeDays') + '\n' + fnBody2('coSmeState') + '\n' + fnBody2('coSmeChipHtml') + '\n'
     + fnBody2('coInfoSummary') + '\n' + fnBody2('coInfoBoxHtml') + '\n'
     + fnBody2('erpContractPeriod') + String.fromCharCode(10) + fnBody2('todayYmd') + String.fromCharCode(10)

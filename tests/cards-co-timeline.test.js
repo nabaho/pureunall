@@ -47,8 +47,14 @@ test('이력 칸이 이름·폴더 «아래»에는 있다 — 어느 회사인�
 test('서류 목록·사람 목록은 그대로 남는다 — 없애는 것이 아니라 차례를 바꾼 것이다', () => {
   const body = slice('function coDetailPanelHtml(o){', 'function openCoDetailPanel(');
   assert.match(body, /coDocsHtml\(o\)/, '서류 목록이 사라졌다');
-  assert.match(body, /coConflictHtml\(o\)/, '어긋난 칸 알림이 사라졌다');
-  assert.match(body, /이 회사 사람 \$\{o\.cards\.length\}명/, '사람 목록이 사라졌다');
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 어긋난 칸 알림이 「⚠ 확인 필요」 칸 «안»으로
+     들어갔다(부족한 것을 한 곳에 모은다). 지킬 것은 「알림이 사라지지 않았다」는
+     뜻이지 어느 함수가 그것을 부르는가가 아니다 — 부르는 자리를 따라 옮겼다. */
+  assert.match(slice('function coNeedHtml(o){', 'function coNeedClashToggle('),
+    /coConflictHtml\(o\)/, '어긋난 칸 알림이 사라졌다');
+  /* ⚠ 같은 정리로 사람 목록도 «접기 카드»가 되며 제목이 「사람 N명」이 되었다 */
+  assert.match(body, /coCardHtml\('ppl', '사람 ' \+ o\.cards\.length \+ '명'/,
+    '사람 목록이 사라졌다');
 });
 
 test('이력 칸은 «하나»뿐이다 — 두 곳에 두면 하나는 늘 비어 있다', () => {
@@ -130,5 +136,12 @@ test('네 갈래를 다 본다 — 컨설팅·사건·기금·기타', () => {
 
 test('기록이 없으면 칸을 안 그린다 — 빈 칸이 자리만 먹으면 안 된다', () => {
   const body = slice('function coHistPaint(){', 'function coFTabList(folder){');
-  assert.match(body, /if\(!recs\.length\)\{ box\.innerHTML=''; return; \}/);
+  /* ⚠ 2026-09-11(대표 결정, 목업 4번): 맨 위 숫자 칸이 생기면서, 기록이 없을 때도
+     «0 이라고 알려 주고» 돌아나간다 — 안 알리면 숫자 칸이 「…(읽는 중)」에 영영
+     머물러 「한 일이 없는 회사」와 「아직 안 온 것」을 가릴 수 없다.
+     지킬 것은 「빈 칸을 그리지 않는다」이므로 그 뜻만 본다. */
+  assert.match(body, /if\(!recs\.length\)\{ box\.innerHTML='';/,
+    '기록이 없는데 빈 칸을 그린다');
+  assert.match(body, /if\(!recs\.length\)\{ box\.innerHTML='';[\s\S]{0,160}?return; \}/,
+    '기록이 없으면 그리기를 멈춰야 한다');
 });
