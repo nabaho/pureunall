@@ -971,6 +971,134 @@ function nextFundId(){
   return 'FUND-'+(s.length>=4?s:('0000'+s).slice(-4));   // 9999 초과해도 자릿수 늘려 충돌 방지
 }
 var _normName=function(s){ return String(s||'').replace(/\s+/g,'').trim(); };   // 공백 무시 비교
+
+/* ══════════ 가칭 · 이름 바꾸기 ══════════ (2026-09-11)
+   대표 지시: 「기금법인 이름이 가칭으로 진행되어 추후에 변경될 수 있다 — 미리 준비해야 한다」
+
+   설립 중인 기금은 «이름부터» 정해지지 않는다. 협의회가 정하고 노동청이 인가해야 확정된다.
+   그런데 여태 이름은 그냥 덮어쓰는 칸이었고, 바꾸면 넷이 조용히 어긋났다:
+     ① name_locks 에 «옛 이름»이 영영 잠긴 채 남고 새 이름은 아무도 선점하지 않았다 —
+        다른 사람이 같은 이름으로 기금을 또 만들 수 있었다
+     ② 다른 기금과 «같은 이름»으로 바꾸는 것을 아무것도 막지 않았다(청구·기업정보함 짝짓기가
+        이름으로 붙으므로, 겹치면 둘 사이를 오간다)
+     ③ 언제 무엇에서 무엇으로 바뀌었는지 자취가 없었다 — 옛 이름으로는 찾을 수도 없었다
+     ④ 저장해 둔 서식본에는 «옛 이름이 글자로 박혀» 그대로 남았다
+
+   ⚠ 이름은 자료의 «열쇠가 아니다»(열쇠는 FUND-NNNN). 그래서 참여사업장·거래·연간일정은
+     그대로 따라온다. 손봐야 하는 것은 «이름이 글자로 박힌 곳»뿐이다.
+   ⚠ 정관 «옛 판»의 옛 이름은 고치지 않는다 — 그때의 정관이 그 이름이었던 것이 사실이다.
+     역사를 고치면 무엇이 언제 바뀌었는지 댈 수 없게 된다. */
+function _nameKey(s){ return _normName(s).replace(/[.#$/[\]]/g,'_'); }
+function isTempName(f){ return !!(f&&f.name_temp); }
+/* 이름이 바뀐 자취 — 새것이 위 */
+function nameHistOf(f){
+  var h=(f&&f.name_hist)||{};
+  return Object.keys(h).map(function(k){ return h[k]; })
+    .filter(function(x){ return x&&x.from; })
+    .sort(function(a,b){ return String(b.at||'').localeCompare(String(a.at||'')); });
+}
+/* 옛 이름으로도 찾아진다 — 가칭으로 알던 이름으로 찾는 일이 실제로 잦다 */
+function fundNameHit(f,q){
+  if(!q) return true;
+  if(String(f&&f.name||'').indexOf(q)>=0) return true;
+  if(String(f&&f.short_name||'').indexOf(q)>=0) return true;
+  return nameHistOf(f).some(function(x){ return String(x.from||'').indexOf(q)>=0; });
+}
+/* 이름 바꾸기 한 자리. 막을 것은 막고, 자물쇠를 옮기고, 자취를 남긴다.
+   ⚠ 옛 자물쇠는 «내 것일 때만» 푼다 — 남의 기금이 쥔 자물쇠를 풀면 그 이름이 통째로 풀린다. */
+function renameFund(fid,to){
+  var f=funds[fid]||{}, from=String(f.name||'').trim();
+  to=String(to||'').trim();
+  if(!to) return Promise.resolve({ok:false,why:'기금법인명이 비어 있습니다'});
+  if(_normName(to)===_normName(from)) return Promise.resolve({ok:true,same:true});
+  var dup=Object.keys(funds).filter(function(k){
+    return k!==fid && !isTrashed(funds[k]) && _normName(funds[k].name)===_normName(to); })[0];
+  if(dup) return Promise.resolve({ok:false,
+    why:'이미 같은 이름의 기금이 있습니다 — '+(funds[dup].short_name||funds[dup].name)});
+  var nk=_nameKey(to), okOld=_nameKey(from);
+  return new Promise(function(res){
+    fbDb.ref(NS+'/name_locks/'+nk).transaction(function(cur){
+      return cur===null ? {name:to,at:ymd(),fid:fid} : undefined;   // 있으면 건드리지 않는다
+    }, function(err,committed,snap){
+      if(err){ res({ok:false,why:err.message}); return; }
+      var v=snap&&snap.val();
+      /* 이미 내가 쥐고 있던 자물쇠면 통과 — 되돌렸다 다시 바꾸는 길이다 */
+      if(!committed && !(v&&v.fid===fid)){ res({ok:false,why:'같은 이름이 방금 다른 기금에 쓰였습니다'}); return; }
+      fbDb.ref(NS+'/funds/'+fid+'/name_hist').push().set({from:from,to:to,at:ymd(),by:(S.user||'')})
+        .catch(function(){})                                  // 자취는 곁다리 — 실패해도 이름은 바꾼다
+        .then(function(){ return fbDb.ref(NS+'/funds/'+fid+'/name').set(to); })
+        .then(function(){
+          if(funds[fid]) funds[fid].name=to;
+          _audit(fid,'기금명 변경',from+' → '+to);
+          if(okOld&&okOld!==nk){
+            fbDb.ref(NS+'/name_locks/'+okOld).once('value').then(function(s){
+              var o=s.val();
+              if(o&&(!o.fid||o.fid===fid)) fbDb.ref(NS+'/name_locks/'+okOld).remove();
+            }).catch(function(){});
+          }
+          res({ok:true,from:from,to:to});
+        }).catch(function(e){ res({ok:false,why:(e&&e.message)||String(e)}); });
+    });
+  });
+}
+/* 이름을 바꾼 뒤 «손봐야 할 곳»을 세어 알려 준다.
+   ⚠ 정관·거래·사업장은 손댈 것이 없다(열쇠로 붙어 있다). 남는 것은 이 기금 전용으로 저장해 둔
+     서식본뿐이다 — 그 안에는 옛 이름이 글자로 박혀 있어 새 서류에도 옛 이름이 찍힌다. */
+function afterRename(fid,from,to){
+  fbDb.ref(NS+'/doc_edits/'+fid).once('value').then(function(s){
+    var de=s.val()||{};
+    var stale=Object.keys(de).filter(function(k){ return String((de[k]||{}).html||'').indexOf(from)>=0; });
+    /* 푸른이알피 청구는 고유번호로 먼저 맞춘다 — 번호가 없는 기금만 «이름으로» 붙으므로 그때만 알린다 */
+    var noTax=!String((funds[fid]||{}).tax_id_no||'').trim();
+    /* 설명은 ⓘ 에 있다 — 창에는 «이번에 일어난 일»만 적는다(내 규칙이고 검사가 지킨다) */
+    var h='<div class="row" style="margin:0 0 10px"><h2 style="margin:0">이름을 바꿨습니다</h2>'+hlp('name.temp')+'</div>'
+      +'<p style="font-size:13px;margin:0 0 10px"><b>'+esc(from)+'</b> → <b>'+esc(to)+'</b></p>'
+      +'<div class="msg ok" style="font-size:12.5px">자료는 그대로 따라옵니다. <b>옛 이름으로도 찾을 수 있습니다.</b></div>'
+      +(noTax?'<div class="msg warn" style="font-size:12.5px">고유번호가 비어 있어 푸른이알피 청구가 <b>이름으로</b> 붙습니다 — 청구 관리에서 연결을 확인하세요.</div>':'');
+    if(stale.length){
+      h+='<div class="msg warn" style="font-size:12.5px">이 기금 전용으로 <b>저장해 둔 서식 '+stale.length+'종</b>에 옛 이름이 글자로 박혀 있습니다.'
+        +'<div class="muted" style="font-size:11.5px;margin-top:5px">'+esc(stale.map(docLabel).join(' · '))+'</div>'
+        +'<div class="muted" style="font-size:11.5px;margin-top:5px">지우면 <b>자동생성</b>으로 돌아가 새 이름으로 나옵니다. 손으로 고친 내용은 사라집니다.</div></div>'
+        +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">그대로 두기</button>'
+        +'<button class="primary" onclick="dropStaleDocEdits(\''+fid+'\')">저장본 '+stale.length+'종 지우기</button></div>';
+    } else {
+      h+='<p class="muted" style="font-size:12px">따로 손볼 곳은 없습니다.</p>'
+        +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="closeM()">닫기</button></div>';
+    }
+    showModal(h);
+  }).catch(function(){ toast('이름을 바꿨습니다'); });
+}
+function dropStaleDocEdits(fid){
+  var f=funds[fid]||{}, from='';
+  var hist=nameHistOf(f); if(hist.length) from=hist[0].from;
+  fbDb.ref(NS+'/doc_edits/'+fid).once('value').then(function(s){
+    var de=s.val()||{}, up={}, n=0;
+    Object.keys(de).forEach(function(k){
+      if(from && String((de[k]||{}).html||'').indexOf(from)<0) return;
+      up[k]=null; n++;
+    });
+    if(!n){ closeM(); toast('지울 저장본이 없습니다'); return; }
+    return fbDb.ref(NS+'/doc_edits/'+fid).update(up).then(function(){
+      S._dbEdits=undefined; closeM(); toast(n+'종을 자동생성으로 되돌렸습니다');
+      if(S.view==='fund'&&S.fundId===fid) renderFund();
+    });
+  }).catch(function(e){ toast('지우지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+/* 가칭 딱지 켜고 끄기 — 기금 머리의 딱지를 누른다 */
+function toggleTempName(fid){
+  var f=funds[fid]||{}, on=!isTempName(f);
+  var msg=on?'이 기금의 이름을 «가칭»으로 표시할까요?\n\n서식을 뽑을 때 「이름이 아직 확정되지 않았다」고 알려 줍니다.'
+            :'이름이 «확정»되었습니까?\n\n가칭 표시를 뗍니다.';
+  confirmM(msg,{ok:on?'가칭으로 표시':'확정으로 표시'}).then(function(ok){
+    if(!ok) return;
+    fbDb.ref(NS+'/funds/'+fid+'/name_temp').set(on?true:null).then(function(){
+      if(funds[fid]) funds[fid].name_temp=on?true:null;
+      _audit(fid,on?'가칭 표시':'이름 확정',(funds[fid]||{}).name||'');
+      if(S.view==='fund'&&S.fundId===fid) renderFund(); else renderHome();
+      toast(on?'가칭으로 표시했습니다':'이름 확정으로 표시했습니다');
+    }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+  });
+}
 /* 등록 창에 «칸이 없는» 기업정보함 값(고유번호·대표자 …). 등록되는 순간 함께 실려 간다 —
    버리면 등록하자마자 기금 정보에서 똑같은 것을 또 쳐야 한다. */
 var _nfCard=null;
@@ -991,6 +1119,11 @@ function newFund(pre){
     +'<div class="fld"><label>지역(지역공동만)</label><input id="nf-region" placeholder="예: 충남 / 경기 (개별·사내는 비움)"></div>'
     +'<div class="fld"><label>진행 구분</label><select id="nf-entry"><option value="new">신규(설립부터)</option><option value="existing">기존(운영부터)</option></select></div>'
     +'</div>'
+    /* 설립 중인 기금은 «이름부터» 정해지지 않는다 — 협의회가 정하고 노동청이 인가해야 확정된다.
+       신규일 때 기본으로 켠다. 나중에 기금 머리의 딱지로 끄면 된다. */
+    +'<label class="row" style="margin-top:10px;gap:7px;cursor:pointer;font-size:12.5px">'
+    +'<input type="checkbox" id="nf-temp" checked style="width:15px;height:15px">'
+    +'<span>이름이 아직 <b>확정되지 않았습니다</b> (가칭)</span>'+hlp('name.temp')+'</label>'
     +'<div class="fld" style="margin-top:10px"><label>주담당</label><div id="nf-mgrwrap"><select id="nf-mgr" disabled><option>재직자 불러오는 중…</option></select></div></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:16px"><button onclick="closeM()">취소</button><button class="primary" onclick="createFund()">등록</button></div>'
     ,{after:function(){
@@ -998,6 +1131,10 @@ function newFund(pre){
       var set=function(id,v){ var el=$(id); if(el&&v) el.value=v; };
       set('nf-name',pre.name); set('nf-short',pre.short_name); set('nf-type',pre.fund_type);
       set('nf-region',pre.region); set('nf-entry',pre.entry_mode);
+      var tc=$('nf-temp'); if(tc&&pre.hasOwnProperty('name_temp')) tc.checked=!!pre.name_temp;
+      /* 기존(운영부터) 기금은 이미 인가받은 이름이다 — 가칭이 기본이 아니다 */
+      var en=$('nf-entry'); if(en&&tc&&!pre.hasOwnProperty('name_temp')) tc.checked=(en.value!=='existing');
+      if(en&&tc) en.onchange=function(){ tc.checked=(en.value!=='existing'); };
     }});
   loadStaff().then(function(list){
     var w=$('nf-mgrwrap'); if(!w) return;
@@ -1028,6 +1165,8 @@ function createFund(){
   /* 기업정보함에서 함께 가져온 값 — 등록 창에 칸이 없을 뿐 버릴 값이 아니다 */
   if(_nfCard) NF_CARRY.forEach(function(k){ if(_nfCard[k]&&!rec[k]) rec[k]=_nfCard[k]; });
   if(entry==='new') rec.setup_stage='설립준비';   // 신규=설립 진행 표시
+  /* 가칭 — 이름이 아직 확정되지 않았다는 표시. 확정이면 칸 자체를 두지 않는다(없는 것이 정상) */
+  var tmp=$('nf-temp'); if(tmp&&tmp.checked) rec.name_temp=true;
   // 담당
   var sel=$('nf-mgr');
   if(sel&&sel.value){ var op=sel.options[sel.selectedIndex]; var nm=op.getAttribute('data-name')||op.text;
@@ -1350,7 +1489,8 @@ function renderHome(){
     +'</div>';
   // 검색 중이면 묶음 무시하고 결과만(종료기금 포함)
   if(S.q){
-    var q=S.q; var hit=all.filter(function(f){return (f.name||'').indexOf(q)>=0||(f.short_name||'').indexOf(q)>=0||mgrText(f).indexOf(q)>=0;}).sort(srt);
+    /* 옛 이름으로도 찾아진다(fundNameHit) — 가칭으로 알던 이름으로 찾는 일이 잦다 */
+    var q=S.q; var hit=all.filter(function(f){return fundNameHit(f,q)||mgrText(f).indexOf(q)>=0;}).sort(srt);
     $('app').innerHTML=todo+head+'<div class="panel"><div class="grp-h">🔎 검색 결과 <span class="cnt">'+hit.length+'개</span></div>'
       +(hit.length?'':'<div class="muted" style="padding:12px">일치하는 기금이 없습니다.</div>')+'</div>'
       +(hit.length?homeBody(hit,edit,''):'');   // 검색 결과에도 같은 보기 전환이 적용된다
@@ -5232,8 +5372,12 @@ function estabBundle(phase){
         +(b?' · 채울 자리 '+b+'곳':'')+'</div>'+body+'</div>';
     }).join('');
     var sum=$('bundleSum');
+    /* 이름이 가칭이면 «찍기 전에» 알린다 — 서류 전부에 기금 이름이 들어가므로, 확정되면
+       이 묶음을 다시 뽑아야 한다. 서식 글자에 「(가칭)」을 우리가 박지는 않는다(원본을 고치는 일이다). */
+    var tw=isTempName(funds[S.formFund])
+      ? '<span class="chip warn" style="font-size:10.5px">✎ 가칭 — 이름이 확정되면 다시 뽑으세요</span>' : '';
     if(sum) sum.innerHTML='<span class="stat">서류 '+lst.length+'종</span>'
-      +'<span class="stat"'+(tot?' style="color:var(--warn)"':'')+'>채울 자리 '+tot+'곳</span>'+chips.join('');
+      +'<span class="stat"'+(tot?' style="color:var(--warn)"':'')+'>채울 자리 '+tot+'곳</span>'+tw+chips.join('');
     _showDocHTML(inner);
   }).catch(function(e){ var w=$('docwrap'); if(w)w.innerHTML='<div class="msg err">'+esc(e.message)+'</div>'; });
 }
@@ -5729,6 +5873,12 @@ function renderFund(){
   var tags=f.fund_type==='사내'?'<span class="tag sanae">사내</span>':'<span class="tag gong">공동</span>';
   tags+=(isPast(f)?' '+lifeBadge(f):'');
   tags+=(f.setup_stage==='설립준비'?' <span class="chip warn">🏗 설립 진행</span>':'');
+  /* 가칭 딱지 — 누르면 켜고 끈다. 설립 중인 기금은 이름부터 정해지지 않는다.
+     확정된 기금에는 아무것도 안 붙인다(붙일 것이 없는 것이 정상이다). */
+  tags+=(isTempName(f)
+    ? ' <span class="chip warn" style="cursor:pointer" onclick="toggleTempName(\''+S.fundId+'\')" title="'+esc(NAME_TEMP_TIP)+' — 눌러서 확정으로 바꿉니다">✎ 가칭</span>'
+    : (f.setup_stage==='설립준비'
+       ? ' <span class="chip" style="cursor:pointer" onclick="toggleTempName(\''+S.fundId+'\')" title="이름이 아직 확정되지 않았다면 눌러 «가칭»으로 표시하세요">이름 확정</span>' : ''));
   var head=(isTrashed(f)?'<div class="panel" style="background:#fef2f2;border-left:3px solid var(--danger);padding:8px 12px;font-size:12.5px">🗑 이 기금은 <b>삭제 보관</b> 상태입니다'
       +(f.deleted_at?' ('+esc(f.deleted_at)+(f.deleted_by?' · '+esc(f.deleted_by):'')+')':'')
       +'. 목록·집계에서 제외되며 데이터는 보존됩니다. <a href="#" onclick="restoreFund(\''+S.fundId+'\');return false;">↩ 복원하기</a></div>':'')
@@ -6901,6 +7051,8 @@ function _readNewFundForm(){
   var g=function(id){ var el=$(id); return el?String(el.value||'').trim():''; };
   var o={ name:g('nf-name'), short_name:g('nf-short'), fund_type:g('nf-type'),
           region:g('nf-region'), entry_mode:g('nf-entry') };
+  /* 가칭 체크도 걷어 온다 — 기업정보함에 다녀오면 창을 다시 만들기 때문이다 */
+  var tc=$('nf-temp'); if(tc) o.name_temp=!!tc.checked;
   var sel=$('nf-mgr');
   if(sel&&sel.value){ var op=sel.options[sel.selectedIndex];
     o.mgr_sid=sel.value; o.mgr_name=op.getAttribute('data-name')||op.text; }
@@ -7363,9 +7515,17 @@ function openDocConfirm(kind){
   if(_docScope.pre==='se-'&&$('se-name')){ _siteDocGrab(); closeM(); }
   var LBL=_docLbl();
   var ks=Object.keys(_docFound).filter(function(k){ return _docFound[k]; });
+  /* 서류에 적힌 이름이 지금 이름과 «다르면» 눈에 띄게 한다 — 가칭으로 진행하다 인가증을 받으면
+     그때 진짜 이름이 정해진다. 그냥 칸에 넣어 두면 이름이 바뀌는 줄 모르고 지나간다.
+     ⚠ 바꾸는 것은 [반영] 뒤 [💾 저장]이다 — 여기서 바로 바꾸지 않는다. */
+  var _curName=(_docScope.pre==='fd-')?String((funds[S.fundId]||{}).name||'').trim():'';
   var rows=ks.length? ks.map(function(k){
+      var diff=(k==='name'&&_curName&&_normName(_docFound[k])!==_normName(_curName));
       return '<div class="fld"><label>'+esc(LBL[k]||k)+'</label>'
-        +'<input id="dcv-'+k+'" value="'+esc(_docFound[k])+'"></div>';
+        +'<input id="dcv-'+k+'" value="'+esc(_docFound[k])+'"'+(diff?' style="border-color:var(--warn);background:var(--warn-bg)"':'')+'>'
+        +(diff?'<div class="muted" style="font-size:11px;margin-top:3px;color:var(--warn)">지금 이름과 다릅니다 — 지금: <b>'+esc(_curName)+'</b>'
+          +'<br>반영하고 저장하면 <b>이름이 바뀌고</b> 옛 이름은 자취로 남습니다(옛 이름으로도 찾을 수 있습니다).</div>':'')
+        +'</div>';
     }).join('')
     : '<div class="msg warn" style="font-size:12px">글자는 읽었지만 <b>채울 항목을 못 찾았습니다</b>.'
       +'<br>[📄 원문 텍스트]로 무엇이 읽혔는지 보고, 아래 칸에 직접 넣어 주세요.</div>';
@@ -7588,15 +7748,27 @@ function saveInfo(){
   });
   if(!Object.keys(changed).length){ clearDirty(); toast('변경된 내용이 없습니다'); return; }
   patch=changed;
+  /* 이름은 그냥 덮어쓰지 않는다 — 자물쇠 옮기기·겹침 막기·자취 남기기가 딸린 일이다(renameFund).
+     ⚠ 여기서 빼 두고 아래에서 «먼저» 처리한다. 이름 바꾸기가 막히면(겹침 등) 나머지도
+       저장하지 않는다 — 반만 저장되면 화면과 서버가 어긋난 채로 남는다. */
+  var _newName = patch.hasOwnProperty('name') ? String(patch.name||'').trim() : null;
+  if(_newName!==null) delete patch.name;
   var _lbl=FIELDS.filter(function(c){ return patch.hasOwnProperty(c[0]); }).map(function(c){ return c[1]; });
+  if(_newName!==null) _lbl.unshift('기금법인명');
   askIfNotMine(cur,'기금 정보 저장').then(function(ok){
     if(!ok) return;
-    fbDb.ref(NS+'/funds/'+_fid).update(patch).then(function(){
-      if(funds[_fid]) Object.assign(funds[_fid],patch);
-      _audit(_fid,'기금 정보 저장',_lbl.join(' · ')||Object.keys(patch).join(' · '));
-      if(S.fundId===_fid){ clearDirty(); renderFund(); toast('저장되었습니다'); }
-      else toast('저장되었습니다 (이전 기금)');
-    }).catch(function(e){toast('저장 실패: '+e.message,'err');});
+    var pre = (_newName===null) ? Promise.resolve({ok:true,same:true}) : renameFund(_fid,_newName);
+    pre.then(function(r){
+      if(!r.ok){ toast('이름을 바꾸지 못했습니다 — '+r.why,'err'); renderFund(); return; }
+      var rest = Object.keys(patch).length ? fbDb.ref(NS+'/funds/'+_fid).update(patch) : Promise.resolve();
+      return rest.then(function(){
+        if(funds[_fid]) Object.assign(funds[_fid],patch);
+        _audit(_fid,'기금 정보 저장',_lbl.join(' · ')||Object.keys(patch).join(' · '));
+        if(S.fundId===_fid){ clearDirty(); renderFund(); }
+        if(r.same){ toast(S.fundId===_fid?'저장되었습니다':'저장되었습니다 (이전 기금)'); }
+        else afterRename(_fid,r.from,r.to);      // 손봐야 할 곳을 세어 알려 준다
+      });
+    }).catch(function(e){toast('저장 실패: '+((e&&e.message)||e),'err');});
   });
 }
 
@@ -12719,6 +12891,12 @@ var HELP={
    +'<p><b>출연금</b> — 그 해 이 사업장이 낸 금액<br><b>상시근로자</b> — 그 해 기준 인원<br><b>수혜자</b> — 그 해 복지혜택을 받은 인원</p>'
    +'<p>칸에서 벗어나면 자동 저장됩니다. 위 연도 선택으로 다른 해를 보고, [작년 값 불러오기]로 <b>비어 있는 칸만</b> 채울 수 있습니다(이미 넣은 값은 건드리지 않습니다).</p>'
    +'<p>별지15호 ⑨⑩ 근로자 수는 사업장 명부의 상시근로자와 협력 체크에서 나옵니다 — 여기 값은 연도별 추이·검증용입니다.</p>'},
+ 'name.temp':{t:'가칭 (이름이 아직 확정되지 않음)',h:'<p>설립 중인 기금은 <b>이름부터</b> 정해지지 않습니다. 협의회가 정하고 노동청이 인가해야 확정됩니다.</p>'
+   +'<p><b>가칭으로 표시해 두면</b> 서식을 뽑을 때 「이름이 확정되면 다시 뽑으세요」라고 알려 줍니다. 설립 서류에는 기금 이름이 <b>모든 장에</b> 들어갑니다.</p>'
+   +'<p><b>서식 글자에 「(가칭)」을 붙이지는 않습니다.</b> 원본 서식에 우리가 글자를 더하는 일이라, 붙일지는 제출하는 사람이 정할 일입니다.</p>'
+   +'<p>이름이 정해지면 기금 머리의 <b>✎ 가칭</b> 딱지를 눌러 확정으로 바꾸세요.</p>'
+   +'<p><b>이름을 바꿔도 자료는 따라옵니다.</b> 기금의 열쇠는 이름이 아니라 등록번호(FUND-NNNN)라서, 참여사업장·거래·연간일정·정관이 그대로 붙어 있습니다. <b>옛 이름으로도 계속 찾을 수 있습니다.</b></p>'
+   +'<p>손봐야 하는 것은 <b>이 기금 전용으로 저장해 둔 서식본</b>뿐입니다 — 그 안에는 옛 이름이 글자로 박혀 있어, 이름을 바꾸면 알려 주고 지울지 물어봅니다.</p>'},
  'estab.bundle':{t:'번호 차례대로 전부 (날인용)',h:'<p>그 단계의 서류를 <b>번호 차례대로</b> 한 화면에 세웁니다. 하나씩 열어 볼 필요가 없습니다.</p>'
    +'<p><b>맨 위의 「채울 자리 N곳」</b>이 이 화면의 알맹이입니다. <b>날인은 되돌릴 수 없습니다</b> — 도장을 찍기 <b>전</b>에 무엇이 비었는지 보세요. 서류마다 몇 곳인지도 딱지로 붙습니다.</p>'
    +'<p>이 수에는 <b>관청이 적는 칸</b>(접수번호·처리기간)과 <b>사람이 손으로 적어야 하는 칸</b>(주민등록번호·인감·계좌)도 함께 셉니다. 그래서 <b>0을 목표로 삼는 수가 아닙니다</b> — 「여기를 보라」는 뜻입니다.</p>'
