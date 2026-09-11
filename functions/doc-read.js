@@ -83,7 +83,9 @@ function validate(body) {
      아는 이름만 받는다. 모르면 'other' 다. 여기 걸러 두지 않으면 실시간DB 열쇠에
      못 쓰는 글자(. # $ / [ ])가 들어가 그 자리가 통째로 안 써진다.
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news"];
+/* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
+     한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";

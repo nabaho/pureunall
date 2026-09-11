@@ -798,6 +798,21 @@ body.portal-mode #moreFab{display:flex;}
    이미 pre-wrap 이 있었는데 목록 상세에만 빠져 있었다. */
 .sg-reply{background:#f8fafc;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:.8rem;line-height:1.6;white-space:pre-wrap;}
 .sg-reply b{color:#2563eb;}
+/* ── 🤖 AI 도움 (대표 지시 2026-09-11) ────────────────────────────────
+   답변을 «대신 쓰지 않는다» — 옆에 초안을 놓아 둘 뿐이다. 답변칸과 헷갈리면
+   「AI 가 이미 답한 줄」 알고 넘어가게 되므로 파란 울타리로 갈라 둔다. */
+.sg-assist{border:1px solid #bfdbfe;background:#eff6ff;border-radius:11px;padding:12px;margin:12px 0;}
+.sg-assist-hd{display:flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;color:#1e40af;margin-bottom:8px;}
+.sg-assist-go{margin-left:auto;padding:4px 10px;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;}
+.sg-assist-lb{font-size:.67rem;font-weight:700;color:#64748b;margin:9px 0 3px;}
+.sg-assist-val{font-size:.76rem;line-height:1.65;color:#1e293b;white-space:pre-wrap;}
+.sg-assist-kinds{display:flex;gap:5px;flex-wrap:wrap;}
+.sg-assist-kinds span{background:#fff;border:1px solid #bfdbfe;color:#1e40af;border-radius:5px;padding:2px 8px;font-size:.68rem;font-weight:700;}
+.sg-assist-guess{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 10px;font-size:.75rem;line-height:1.7;color:#854d0e;white-space:pre-wrap;}
+.sg-assist-draft{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:9px 10px;font-size:.76rem;line-height:1.7;background:#fff;min-height:96px;resize:vertical;font-family:inherit;color:#1e293b;}
+.sg-assist-foot{font-size:.65rem;color:#94a3b8;margin-top:8px;line-height:1.6;}
+.sg-assist-foot b{color:#16a34a;}
+.sg-assist-none{font-size:.73rem;line-height:1.65;color:#64748b;}
 .sg-empty{text-align:center;color:#cbd5e1;font-size:.85rem;padding:34px;}
 .sg-shot{width:100%;border-radius:8px;border:1px solid #e2e8f0;margin-top:8px;cursor:zoom-in;}
 .sg-back{display:inline-flex;align-items:center;gap:4px;border:0;background:none;color:#64748b;font-size:.76rem;font-weight:700;padding:0;margin:0 0 10px;cursor:pointer;}
@@ -3964,6 +3979,70 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
 
+  /* ══ 🤖 AI 답변 도움 (대표 지시 2026-09-11) ══════════════════════════════
+     건의가 올라오면 서버(suggestionAssist)가 요약·종류·짐작·답변 초안을 지어
+     suggestions_private/{id}/assist 에 적어 둔다.
+     ★★ 초안은 «게시되지 않는다» — 여기서 [답변란에 넣기] 를 눌러야 답변이 된다.
+        AI 가 쓴 글이 확인 없이 직원에게 가면 되돌릴 수 없다(대표 결정 2026-09-11).
+     ★ 보내기 전에 이름·사건번호·연락처를 가린다 — 무엇을 가렸는지 아래에 적는다.
+       「가렸습니다」만 적으면 믿을 근거가 없다.
+     ⚠ 못 지었을 때도 «왜» 를 보인다. 빈칸은 「고장인가」를 묻게 만든다. */
+  var SG_ASSIST_FN_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/suggestionAssistNow';
+  var SG_ASSIST_WHY = {
+    budget: '이번 달 AI 요금 한도를 넘었습니다 — 한도를 올리면 다시 지어집니다',
+    nokey:  'AI 열쇠가 설정되지 않았습니다',
+    ai:     'AI가 응답하지 않았습니다 — 잠시 뒤 [다시 쓰기] 를 눌러 보세요',
+    parse:  'AI 답을 읽지 못했습니다 — [다시 쓰기] 를 눌러 보세요'
+  };
+  function sgAssistHtml(a){
+    var asst = a || {};
+    var out = '<div class="sg-assist"><div class="sg-assist-hd">🤖 AI 도움'
+      + '<button type="button" class="sg-assist-go" id="sgAsstGo">'+(asst.ok?'다시 쓰기':'초안 쓰기')+'</button></div>';
+    if(asst.ok){
+      if(asst.summary) out += '<div class="sg-assist-lb">한 줄 요약</div><div class="sg-assist-val">'+sgEsc(asst.summary)+'</div>';
+      if(asst.kinds && asst.kinds.length) out += '<div class="sg-assist-lb">종류</div><div class="sg-assist-kinds">'
+        + asst.kinds.map(function(k){ return '<span>'+sgEsc(k)+'</span>'; }).join('')+'</div>';
+      if(asst.guess) out += '<div class="sg-assist-lb">짐작되는 까닭</div><div class="sg-assist-guess">'+sgEsc(asst.guess)+'</div>';
+      out += '<div class="sg-assist-lb">답변 초안 <span style="font-weight:400;color:#94a3b8">— 고쳐서 쓰세요</span></div>'
+        + '<textarea id="sgAsstDraft" class="sg-assist-draft">'+sgEsc(asst.draft||'')+'</textarea>'
+        + '<button type="button" class="sg-btn" id="sgAsstUse" style="margin-top:7px">답변란에 넣기</button>'
+        + '<div class="sg-assist-foot">'+(asst.at?sgFmt(asst.at)+' · ':'')+'Gemini · '
+        + ((asst.maskedKinds && asst.maskedKinds.length)
+            ? '<b>'+asst.maskedKinds.map(function(k){ return sgEsc(k); }).join('·')+'</b> 는 가리고 보냈습니다'
+            : '가릴 것이 없었습니다')
+        + '</div>';
+    } else if(asst.why){
+      out += '<div class="sg-assist-none">초안을 못 지었습니다 — '+sgEsc(SG_ASSIST_WHY[asst.why]||asst.note||asst.why)+'</div>';
+    } else {
+      out += '<div class="sg-assist-none">아직 초안이 없습니다. [초안 쓰기] 를 누르면 요약·짐작·답변 초안을 지어 줍니다.'
+        + '<br><span style="color:#94a3b8">보내기 전에 이름·사건번호·연락처는 가립니다. AI 판독과 같은 지갑(이번 달 요금 한도)을 씁니다.</span></div>';
+    }
+    return out + '</div>';
+  }
+  /* 손수 짓기 — 옛 건의에도 쓸 수 있다.
+     ⚠ 자동(onCreate)은 «방금 올라온 것»만 돕는다. 옛 건의를 옮기는 이사가 돌면
+       수백 건을 한꺼번에 태우기 때문이다. 사람이 한 건씩 누르는 이 길에는 그 사고가 없다. */
+  function sgAssistNow(id, btn){
+    var user = null;
+    try { user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser; } catch(_){}
+    if(!user){ alert('다시 로그인해 주세요.'); return; }
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = '짓는 중…';
+    user.getIdToken(true).then(function(token){
+      return window.fetch(SG_ASSIST_FN_URL, { method:'POST',
+        headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
+        body: JSON.stringify({ suggestionId: id }) });
+    }).then(function(r){
+      return r.json().catch(function(){ return { ok:false, error:'서버 응답을 확인할 수 없습니다.' }; });
+    }).then(function(b){
+      if(!b.ok && b.error) alert('초안을 못 지었습니다: ' + b.error);
+      sgViewDetail(id);                       // 지은 것을 그대로 다시 그린다
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      alert('초안을 못 지었습니다: ' + ((e && e.message) || e));
+    });
+  }
+
   function sgViewDetail(id){
     if(!sgIsAdmin()){ sgViewMemberHome(); return; }
     var bd = $('sgBody');
@@ -4012,6 +4091,7 @@ body.portal-mode #moreFab{display:flex;}
           + '<div class="sg-cats" id="sgStSel">'
           + Object.keys(SG_STATUS).map(function(k){ return '<span class="sg-cat'+(s.status===k?' on':'')+'" data-k="'+k+'">'+SG_STATUS[k].t+'</span>'; }).join('')
           + '</div>'
+          + sgAssistHtml(s.assist)
           + '<label style="color:#1e40af;font-size:.74rem;font-weight:700;display:block;margin:12px 0 5px">답변·처리 메모</label>'
           + '<textarea id="sgReplyIn" placeholder="확인 결과나 처리 상황을 적어주세요">'+sgEsc(s.reply||'')+'</textarea>'
           + '<details class="sg-attach"><summary>📎 해결 캡처 추가 <span style="font-weight:400">(선택)</span></summary><div class="sg-attach-body">'
@@ -4166,6 +4246,20 @@ body.portal-mode #moreFab{display:flex;}
         var newStatus = s.status || 'new';
         Array.prototype.forEach.call($('sgStSel').children, function(el){
           el.addEventListener('click', function(){ newStatus = el.dataset.k; Array.prototype.forEach.call($('sgStSel').children, function(x){ x.classList.toggle('on', x===el); }); });
+        });
+        /* 🤖 AI 도움 — 짓기 / 답변란에 넣기 (대표 지시 2026-09-11) */
+        var asstGo = $('sgAsstGo');
+        if(asstGo) asstGo.addEventListener('click', function(){ sgAssistNow(id, asstGo); });
+        var asstUse = $('sgAsstUse');
+        if(asstUse) asstUse.addEventListener('click', function(){
+          var d = $('sgAsstDraft'), t = $('sgReplyIn');
+          if(!d || !t) return;
+          /* ⚠ 쓰고 있던 답변을 «지우지 않는다» — 아래에 덧붙인다.
+             단추를 눌렀더니 쓰던 글이 사라지는 것이 가장 나쁜 일이다. */
+          t.value = t.value.trim() ? (t.value.replace(/\s+$/, '') + '\n\n' + d.value) : d.value;
+          t.focus();
+          asstUse.textContent = '답변란에 넣었습니다';
+          setTimeout(function(){ asstUse.textContent = '답변란에 넣기'; }, 1800);
         });
         $('sgSaveAdmin').addEventListener('click', function(){
           var btn = $('sgSaveAdmin'); btn.disabled = true; btn.textContent = '저장 중…';

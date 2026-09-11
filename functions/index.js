@@ -2116,6 +2116,121 @@ async function bumpReadTally(app, kind, howMany) {
   }
 }
 
+/* ══════════ 💬 건의 답변 도움 — 대표 지시 2026-09-11 ════════════════════════
+   「건의사항 자동화 해결방안 시스템 … 답변 자동으로 가능하게」
+
+   건의가 올라오면 AI 가 ㉠ 한 줄 요약 ㉡ 종류 ㉢ 짐작되는 까닭 ㉣ 답변 초안 을
+   지어 건의 옆(suggestions_private/{id}/assist)에 적어 둔다.
+
+   ★★ 게시는 «사람이» 한다. 초안은 대표가 「답변란에 넣기」를 눌러야 직원에게 간다
+      (대표 결정 2026-09-11). 틀린 답 한 번이 그 다음 건의를 막는다.
+   ★★ 보내기 «전에» 이름·사건번호·번호를 가린다(suggestion-assist.js maskPersonal) —
+      건의에는 의뢰인 실명이 흔히 들어 있다.
+   ⚠ **요금이 든다** (2026-09-10 부터 판독이 유료 등급). 그래서 판독과 «같은 지갑»을
+     쓴다 — 이번 달 한도를 넘었으면 짓지 않고 그 까닭을 적는다. 모르게 새는 길을
+     하나 더 내지 않는다.
+   ⚠ 셈은 'portal' 자리에 «갈라» 쌓는다 — 사진첩 판독과 한 숫자에 섞으면
+     어느 쪽이 태웠는지 영영 알 수 없다.
+   ⚠ 실패해도 조용히 넘어간다 — 건의 등록과 폰 알림은 그대로여야 한다.
+     대신 «왜 못 지었는지»를 적는다. 빈칸은 「고장인가」를 묻게 만든다. */
+const SA = require("./suggestion-assist");
+const SG_ASSIST_APP = "portal";
+
+async function writeAssist(id, value) {
+  try {
+    await getDatabase().ref("suggestions_private/" + id + "/assist").set(
+      Object.assign({ at: Date.now() }, value));
+  } catch (e) {
+    console.warn("건의 도움 적기 실패:", String((e && e.message) || e));
+  }
+}
+
+/* 실제로 짓는다. 자동(onCreate)과 손수(대표가 「다시 쓰기」)가 이 한 곳을 나눠 쓴다 —
+   두 곳에 적으면 한쪽만 고쳐져 화면마다 다른 초안이 나온다. */
+async function buildSuggestionAssist(id, record) {
+  const 지갑 = await aiMonthSpend();
+  if (지갑.over) {
+    await writeAssist(id, { ok: false, why: "budget",
+      note: "이번 달 AI 요금 한도(" + 지갑.limit.toLocaleString() + "원)를 넘어 초안을 짓지 않았습니다." });
+    return { ok: false, why: "budget" };
+  }
+  const key = await readGeminiKey();
+  if (!key) {
+    await writeAssist(id, { ok: false, why: "nokey", note: "AI 열쇠가 설정되지 않았습니다." });
+    return { ok: false, why: "nokey" };
+  }
+  const 보낼것 = SA.assistParts(record.title, record.content);
+  const r = await DR.callGemini(fetch, key, 보낼것.parts, null,
+    { temperature: 0.2, maxOutputTokens: 900 });
+  await bumpReadTally(SG_ASSIST_APP, r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+  if (!r.ok) {
+    await writeAssist(id, { ok: false, why: "ai", note: "AI가 응답하지 않았습니다.",
+      maskedKinds: 보낼것.maskedKinds });
+    return { ok: false, why: "ai" };
+  }
+  const 지은것 = SA.parseAssist(r.json);
+  if (!지은것) {
+    await writeAssist(id, { ok: false, why: "parse", note: "AI 답을 읽지 못했습니다.",
+      maskedKinds: 보낼것.maskedKinds });
+    return { ok: false, why: "parse" };
+  }
+  await writeAssist(id, Object.assign({ ok: true, maskedKinds: 보낼것.maskedKinds }, 지은것));
+  return { ok: true };
+}
+
+/* 새 건의가 올라오면 — notifySuggestion(폰 알림)과 «같은 자리»를 본다.
+   둘을 한 함수로 묶지 않는다: 알림이 실패했다고 초안까지 멎으면 안 되고,
+   그 반대도 마찬가지다. */
+exports.suggestionAssist = functions
+  .runWith({ timeoutSeconds: 120, memory: "256MB", secrets: ["GEMINI_KEY"] })
+  .database.ref("/suggestions_meta_private/{id}")
+  .onCreate(async (snap, context) => {
+    const id = context.params.id;
+    try {
+      const s = (await getDatabase().ref("suggestions_private/" + id).once("value")).val() || {};
+      const 볼까 = SA.shouldAssist(s, Date.now());
+      if (!볼까.ok) { console.log("건의 도움 건너뜀", { id: id, why: 볼까.why }); return null; }
+      const 결과 = await buildSuggestionAssist(id, s);
+      console.log("건의 도움", { id: id, ok: 결과.ok, why: 결과.why || "" });
+    } catch (e) {
+      console.warn("건의 도움 실패(건의는 그대로):", String((e && e.message) || e));
+    }
+    return null;
+  });
+
+/* 대표가 손수 부른다 — 「초안 쓰기 / 다시 쓰기」.
+   ★ 여기에는 «방금 올라온 것만» 문턱이 없다. 옛 건의에도 쓸 수 있어야 하기 때문이다.
+     자동 쪽 문턱(FRESH_MS)은 이사가 수백 건을 한꺼번에 태우는 것을 막는 장치이고,
+     사람이 한 건씩 누르는 이 길은 그 사고가 나지 않는다.
+   ⚠ 총괄관리자만. 건의는 직원이 대표께 올린 글이라 아무나 읽게 할 수 없다. */
+exports.suggestionAssistNow = functions
+  .runWith({ timeoutSeconds: 120, memory: "256MB", secrets: ["GEMINI_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    try {
+      const match = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ""));
+      if (!match) { res.status(401).json({ ok: false, error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(match[1], true);
+      const role = (await getDatabase().ref("uid_roles/" + decoded.uid).once("value")).val() || {};
+      if (role.isAdmin !== true) { res.status(403).json({ ok: false, error: "총괄관리자만 쓸 수 있습니다." }); return; }
+
+      const id = String((req.body && req.body.suggestionId) || "").replace(/[^A-Za-z0-9_-]/g, "");
+      if (!id) { res.status(400).json({ ok: false, error: "건의를 찾을 수 없습니다." }); return; }
+      const s = (await getDatabase().ref("suggestions_private/" + id).once("value")).val();
+      if (!s) { res.status(404).json({ ok: false, error: "건의를 찾을 수 없습니다." }); return; }
+      if (!SA.clean(s.title, 300) || !SA.clean(s.content, 4000)) {
+        res.status(400).json({ ok: false, error: "건의에 읽을 내용이 없습니다." }); return;
+      }
+      const 결과 = await buildSuggestionAssist(id, s);
+      const 지은것 = (await getDatabase().ref("suggestions_private/" + id + "/assist").once("value")).val() || {};
+      res.json({ ok: 결과.ok === true, why: 결과.why || "", assist: 지은것 });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String((e && e.message) || e) });
+    }
+  });
+
 // ══════════ 글자만 뽑는 판독 — Google Cloud Vision (2026-09-08) ══════════
 // 대표 물음 「OCR 을 무료로 쓸 수 있는 곳이 더 있나」
 //
