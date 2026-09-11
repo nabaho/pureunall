@@ -223,6 +223,124 @@ test('새로 쓴 ⓘ 열쇠가 HELP 에 등록돼 있다', () => {
   assert.ok(help.includes("'name.temp':{"), '등록되지 않은 도움말 열쇠다');
 });
 
+/* ══════════ 자물쇠를 «정말 돌려» 본다 ══════════
+   글자로 찾는 검사는 「주인 확인을 적었는가」까지만 본다. 정말 남의 자물쇠를 안 푸는지는
+   돌려 봐야 안다 — 여기가 이 작업에서 가장 위험한 자리다. */
+function runRename(world) {
+  const log = { set: {}, removed: [], pushed: [] };
+  const db = world.db;                       // {경로: 값}
+  function ref(p) {
+    return {
+      transaction(fn, done) {
+        const cur = p in db ? db[p] : null;
+        const next = fn(cur);
+        if (next === undefined) { done(null, false, { val: () => cur }); return; }
+        db[p] = next; done(null, true, { val: () => next });
+      },
+      set(v) { db[p] = v; log.set[p] = v; return Promise.resolve(); },
+      remove() { delete db[p]; log.removed.push(p); return Promise.resolve(); },
+      push() { return { set(v) { log.pushed.push({ p, v }); return Promise.resolve(); } }; },
+      once() { return Promise.resolve({ val: () => (p in db ? db[p] : null) }); },
+    };
+  }
+  const box = {};
+  const code = [
+    grabVarFn('_normName'), grabFn('_nameKey'),
+    'var NS="fund_erp";',
+    'var funds=W.funds, S={user:"검사"};',
+    'function isTrashed(f){ return !!(f&&f.deleted); }',
+    'function ymd(){ return "2026-09-11"; }',
+    'function _audit(){}',
+    'var fbDb={ref:W.ref};',
+    grabFn('renameFund'),
+    'this.run=renameFund;',
+  ].join('\n');
+  new Function('W', code).call(box, { funds: world.funds, ref });
+  return box.run(world.fid, world.to).then((r) => ({ r, log, db }));
+}
+
+test('★ 돌려 보기 — 이름이 바뀌고, 자취가 남고, 옛 자물쇠가 풀린다', async () => {
+  const { r, log, db } = await runRename({
+    fid: 'FUND-0001', to: '확정된이름공동근로복지기금',
+    funds: { 'FUND-0001': { name: '가칭첫이름공동근로복지기금' } },
+    db: { 'fund_erp/name_locks/가칭첫이름공동근로복지기금': { name: '가칭첫이름공동근로복지기금', fid: 'FUND-0001' } },
+  });
+  assert.equal(r.ok, true, r.why);
+  assert.equal(r.from, '가칭첫이름공동근로복지기금');
+  assert.equal(r.to, '확정된이름공동근로복지기금');
+  assert.equal(db['fund_erp/funds/FUND-0001/name'], '확정된이름공동근로복지기금', '이름이 안 바뀌었다');
+  assert.ok(db['fund_erp/name_locks/확정된이름공동근로복지기금'], '새 이름이 선점되지 않았다');
+  assert.equal(db['fund_erp/name_locks/확정된이름공동근로복지기금'].fid, 'FUND-0001');
+  assert.ok(log.removed.includes('fund_erp/name_locks/가칭첫이름공동근로복지기금'), '옛 자물쇠가 안 풀렸다');
+  assert.equal(log.pushed.length, 1, '자취가 안 남았다');
+  assert.equal(log.pushed[0].v.from, '가칭첫이름공동근로복지기금');
+});
+
+test('★★ 돌려 보기 — «남의» 옛 자물쇠는 절대 풀지 않는다', async () => {
+  /* 옛 이름의 자물쇠를 다른 기금이 쥐고 있는 경우(옛 이름을 남이 물려받았다).
+     주인 확인 없이 지우면 그 기금 이름이 통째로 풀린다. */
+  const { r, log, db } = await runRename({
+    fid: 'FUND-0001', to: '새이름공동근로복지기금',
+    funds: { 'FUND-0001': { name: '옛이름공동근로복지기금' } },
+    db: { 'fund_erp/name_locks/옛이름공동근로복지기금': { name: '옛이름공동근로복지기금', fid: 'FUND-0009' } },
+  });
+  assert.equal(r.ok, true, r.why);
+  assert.ok(!log.removed.includes('fund_erp/name_locks/옛이름공동근로복지기금'),
+    '남의 자물쇠를 풀었다 — 그 기금 이름이 통째로 풀린다');
+  assert.ok(db['fund_erp/name_locks/옛이름공동근로복지기금'], '남의 자물쇠가 사라졌다');
+});
+
+test('★ 돌려 보기 — 새 이름을 남이 쥐고 있으면 막는다', async () => {
+  const { r, db } = await runRename({
+    fid: 'FUND-0001', to: '남이쓰는이름공동근로복지기금',
+    funds: { 'FUND-0001': { name: '내이름공동근로복지기금' } },
+    db: { 'fund_erp/name_locks/남이쓰는이름공동근로복지기금': { name: '남이쓰는이름공동근로복지기금', fid: 'FUND-0009' } },
+  });
+  assert.equal(r.ok, false, '막지 않았다');
+  assert.equal(db['fund_erp/funds/FUND-0001/name'], undefined, '막혔는데 이름이 바뀌었다');
+});
+
+test('★ 돌려 보기 — 다른 기금과 같은 이름으로는 못 바꾼다', async () => {
+  const { r } = await runRename({
+    fid: 'FUND-0001', to: '가나다 공동근로복지기금',
+    funds: { 'FUND-0001': { name: '내이름' }, 'FUND-0002': { name: '가나다공동근로복지기금' } },
+    db: {},
+  });
+  assert.equal(r.ok, false, '겹치는 이름을 막지 않았다');
+  assert.match(r.why, /이미 같은 이름/);
+});
+
+test('돌려 보기 — 삭제 보관된 기금의 이름은 겹침으로 보지 않는다', async () => {
+  const { r } = await runRename({
+    fid: 'FUND-0001', to: '되살린이름공동근로복지기금',
+    funds: { 'FUND-0001': { name: '내이름' },
+             'FUND-0002': { name: '되살린이름공동근로복지기금', deleted: true } },
+    db: {},
+  });
+  assert.equal(r.ok, true, r.why);
+});
+
+test('돌려 보기 — 띄어쓰기만 바꾸면 방금 쥔 자물쇠를 도로 풀지 않는다', async () => {
+  const { r, log, db } = await runRename({
+    fid: 'FUND-0001', to: '가나다 공동근로복지기금',
+    funds: { 'FUND-0001': { name: '가나다공동근로복지기금' } },
+    db: { 'fund_erp/name_locks/가나다공동근로복지기금': { name: '가나다공동근로복지기금', fid: 'FUND-0001' } },
+  });
+  /* 열쇠는 공백을 무시하므로 같다 — 「같은 이름」으로 보고 그냥 지나간다 */
+  assert.equal(r.ok, true, r.why);
+  assert.equal(r.same, true, '공백만 다른 이름을 «바뀐 것»으로 다룬다');
+  assert.deepEqual(log.removed, [], '방금 쥔 자물쇠를 도로 풀었다');
+  assert.ok(db['fund_erp/name_locks/가나다공동근로복지기금'], '자물쇠가 사라졌다');
+});
+
+test('돌려 보기 — 빈 이름은 막는다', async () => {
+  const { r } = await runRename({
+    fid: 'FUND-0001', to: '   ',
+    funds: { 'FUND-0001': { name: '가나다' } }, db: {},
+  });
+  assert.equal(r.ok, false);
+});
+
 test('같은 이름 함수를 두 번 선언하지 않았다 — 나중 것이 이겨 조용히 깨진다', () => {
   const names = [...SRC.matchAll(/^function ([A-Za-z_$][\w$]*)\s*\(/gm)].map((m) => m[1]);
   const seen = new Set(), dup = new Set();
