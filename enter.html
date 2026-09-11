@@ -4099,13 +4099,14 @@ body.portal-mode #moreFab{display:flex;}
           + '<div class="sg-drop" id="sgReplyDrop">클릭해서 선택하거나 Ctrl+V로 붙여넣기</div>'
           + '<div class="sg-thumbs" id="sgReplyThumbs"></div><input type="file" id="sgReplyFile" accept="image/*" multiple style="display:none"></div></details>'
           + '<button class="sg-btn" id="sgSaveAdmin" style="margin-top:10px">처리 내용 저장</button></div></details>'
-          + '<details class="sg-section" id="sgDevBox"><summary>🤖 자동개발 <span class="sg-section-state">꺼둠</span></summary><div class="sg-section-body">'
-          /* 2026-08-13 대표 결정으로 서버 기능을 배포하지 않는다 — 눌러도 아무 일이 없으므로
-             왜 그런지 여기서 먼저 알려 준다 (버튼은 그대로 두어 켤 때 손댈 곳이 없게). */
-          + '<div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:9px;padding:9px;margin-bottom:9px;font-size:.72rem;line-height:1.6;color:#475569">'
-          + '<b style="color:#1e293b">지금은 꺼져 있습니다</b><br>'
-          + '건의를 AI가 직접 고치게 하는 기능입니다. 유료(OpenAI)라 켜지 않았습니다 — 필요하면 그때 켭니다.<br>'
-          + '<span style="color:#94a3b8">아래 버튼을 눌러도 동작하지 않습니다.</span></div>'
+          + '<details class="sg-section" id="sgDevBox"><summary>🤖 자동개발 <span class="sg-section-state">켜짐</span></summary><div class="sg-section-body">'
+          /* 2026-09-11 대표 지시 「자동개발도 켜달라」 — 2026-08-13 에 잠갔던 것을 열었다.
+             ★ 켜기 «전에» 새는 곳을 먼저 막았다(PR #1188) — 아래 초록 칸이 그 내용이다.
+             ⚠ 유료(OpenAI)다. 한 번 누르면 요금이 나간다 — 그 말을 먼저 적는다. */
+          + '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:9px;margin-bottom:9px;font-size:.72rem;line-height:1.6;color:#854d0e">'
+          + '<b>건의를 AI가 직접 고칩니다 · 유료</b><br>'
+          + '누르면 AI가 코드를 고쳐 <b>변경안(PR)</b>을 냅니다. 전체검사를 통과하지 못하면 병합되지 않습니다.<br>'
+          + '<span style="color:#d97706">한 번 누를 때마다 OpenAI 요금이 나갑니다.</span></div>'
           + '<div style="background:#fffbeb;border:1px solid #fffbeb;border-radius:9px;padding:9px;margin-bottom:9px;font-size:.72rem;line-height:1.55"><b>현재 상태: '+sgEsc(devStatus)+'</b>'
           + (issueUrl?' · <a href="'+sgEsc(issueUrl)+'" target="_blank" rel="noopener">GitHub 이슈</a>':'')
           + (prUrl?' · <a href="'+sgEsc(prUrl)+'" target="_blank" rel="noopener">변경안(PR)</a>':'')
@@ -4116,7 +4117,12 @@ body.portal-mode #moreFab{display:flex;}
           + '<div style="font-size:.67rem;color:#64748b;line-height:1.5;margin:5px 0 9px">선택한 캡처는 공개 GitHub 이슈에 넣지 않고 보호된 실행 과정에서만 AI에 전달합니다.</div>'
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0">'
           + '<label style="font-size:.7rem">안전등급<select id="sgDevRisk" style="display:block;width:100%;margin-top:4px;padding:7px;border:1px solid #e2e8f0;border-radius:7px"><option value="auto"'+(!automation.risk?' selected':'')+'>자동 판단</option><option value="low"'+(automation.risk==='low'?' selected':'')+'>낮음</option><option value="high"'+(automation.risk==='high'?' selected':'')+'>중요</option></select></label>'
-          + '<label style="font-size:.7rem;display:flex;align-items:center;gap:6px;padding-top:18px"><input type="checkbox" id="sgDevAutoDeploy"'+(automation.autoDeploy!==false?' checked':'')+'> 낮은 위험은 검사 후 자동배포</label></div>'
+          /* ★★ 기본값을 «꺼둠»으로 (대표 지시 2026-09-11 켜면서 함께 정함).
+             이것을 켜면 AI가 쓴 코드가 검사만 통과하면 «사람 눈 없이» 운영에 병합·배포된다
+             (.github/workflows/autodev-auto-merge.yml). 처음 얼마간은 사람이 한 번 보는 것이
+             낫다 — 끄고 시작해도 「검사 확인 후 운영 배포 승인」 단추 하나면 올라간다.
+             ⚠ 되돌리려면 automation.autoDeploy===true 조건을 !==false 로 바꾸면 된다. */
+          + '<label style="font-size:.7rem;display:flex;align-items:center;gap:6px;padding-top:18px"><input type="checkbox" id="sgDevAutoDeploy"'+(automation.autoDeploy===true?' checked':'')+'> 낮은 위험은 검사 후 자동배포</label></div>'
           /* ★★ 「개인정보 없음 확인」 체크를 없앴다 (대표 지시 2026-09-11).
              사람 눈에 기댄 방어였고, 실제 건의(의뢰인 실명·사건번호가 든 글)는
              그 체크를 할 수 없는 것이었다. 이제 «공개되는 글에 건의 내용이 아예
@@ -4215,12 +4221,14 @@ body.portal-mode #moreFab{display:flex;}
             }).then(function(){ sgViewDetail(id); }).catch(function(err){
               devBtn.disabled=false; devBtn.textContent='대표 승인 후 자동개발 실행';
               /* ⚠ 「Failed to fetch」 는 사람에게 아무 말도 안 해 준다 (대표 화면 2026-08-26).
-                 이 기능은 지금 «꺼져 있다» — 위 안내에도 그렇게 적혀 있는데, 눌렀을 때는
-                 브라우저의 날것 오류만 떠서 고장난 것처럼 보였다. 무엇이 일어났는지 적는다. */
+                 2026-09-11 에 자동개발을 켰지만, 서버 함수가 아직 안 올라갔거나 인터넷이
+                 끊겼을 때도 같은 오류가 난다 — 무엇을 해야 할지까지 적는다. */
               var _m = String((err&&err.message)||err||'');
               alert(/Failed to fetch|NetworkError|network/i.test(_m)
-                ? '자동개발이 아직 켜져 있지 않습니다 (유료 기능).\n\n'
-                  + '이 건은 개발자가 직접 고쳐 배포합니다 — 위 「대표 판단·개발 지시」에 적어 두시면 됩니다.\n\n'
+                ? '자동개발 서버에 닿지 못했습니다.\n\n'
+                  + '· 인터넷 연결을 확인해 주세요.\n'
+                  + '· 그래도 안 되면 서버 함수(developmentAutomation)가 아직 안 올라갔을 수 있습니다.\n\n'
+                  + '그동안 이 건은 「대표 판단·개발 지시」에 적어 두시면 개발자가 직접 고칩니다.\n\n'
                   + '(원인: ' + _m + ')'
                 : '자동개발 실행 실패: ' + _m);
             });
