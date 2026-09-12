@@ -138,7 +138,10 @@ def main():
 
     js = "// 자동생성 — 원본 .hwp 변환 법정서식(빈 양식). 재생성: python fund-erp/tools/build_forms.py\n"
     js += "window.HWP_FORMS = " + json.dumps(out, ensure_ascii=False, indent=0) + ";\n"
-    dest = r"C:\Users\fair0\Documents\pureunall\fund_forms.js"
+    # 이 파일이 있는 저장소에 쓴다 — 작업 공간(worktree)마다 제 것에 써야 한다.
+    # 예전에는 경로가 박혀 있어, 딴 공간에서 돌려도 늘 본 저장소를 덮었다.
+    dest = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__)))), 'fund_forms.js')
     open(dest, 'w', encoding='utf-8').write(js)
     print('=' * 78)
     print('서식 %d종 → %s (%d bytes)' % (len(out), dest, os.path.getsize(dest)))
