@@ -19,8 +19,15 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
-const 대목 = SRC.slice(SRC.indexOf('접속 시 자가진단'),
-                      SRC.indexOf('접속 시 자가진단') + 4200);
+/* ⚠ 예전에는 여기서 «4,200자»를 잘라 보았다. 2026-09-12 에 자가진단 안에 점검을
+   하나 더하자(«id 없는 기록») 「기다린횟수」가 창 밖으로 밀려 이 검사가 깨졌다 —
+   기능은 멀쩡한데 검사만 빨개진 것이다(CLAUDE.md 「지금 값이 아니라 규칙을 못 박는다」).
+   ★ 그래서 끝을 «표식»으로 잡는다 — 자가진단 구역은 음성 검색 앞에서 끝난다.
+     안에 무엇을 더 넣어도 안 깨지고, 구역 밖으로 새지도 않는다. */
+const _시작 = SRC.indexOf('접속 시 자가진단');
+const _끝 = SRC.indexOf('모바일 음성 검색', _시작);
+assert.ok(_시작 > 0 && _끝 > _시작, '자가진단 구역을 못 찾았습니다');
+const 대목 = SRC.slice(_시작, _끝);
 
 test('★★ 자가진단이 «동기화 완료»를 보고 센다 — 8초 붙박이로 세지 않는다', () => {
   assert.ok(/_fbSynced/.test(대목),
