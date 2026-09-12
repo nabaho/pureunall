@@ -11854,6 +11854,21 @@ function coBackToDetail(key){
   openCoDetailPanel(k);
 }
 
+/* 폰·브라우저 «뒤로가기» 한 걸음 (2026-09-12 실측으로 찾은 구멍).
+   뒤로가기는 지금까지 pu-back.js 의 「맨 위 덮개를 제 ✕ 로 닫는다」에만 기댔다.
+   그래서 기업 상세에서 연 명함은 ✕(closeDetail)로 «닫혀» 버렸다 — 화면에는 ◀뒤로가
+   있는데 뒤로가기는 회사까지 통째로 지웠다.
+   ★ 잣대는 coBackToDetail «한 곳»이다 — 단추와 뒤로가기가 같은 길을 탄다.
+   ⚠ 참(true)을 돌려줘야 pu-back 이 「우리가 처리했다」로 보고 앱을 안 나간다. */
+function coBackStep(){
+  const box = $('pcDetail');
+  if(!box || !box.classList.contains('open')) return false;
+  const k = String(box.dataset.backCo || '');
+  if(!k) return false;                    /* 목록에서 연 명함·기업 상세 = 그냥 닫는다 */
+  coBackToDetail(k);
+  return true;
+}
+
 /* ── PC 오른쪽 상세 패널 (리멤버식) ── */
 function openPcDetail(id, backCo){
   const it=state.items[id]; if(!it) return;
@@ -11954,6 +11969,12 @@ function openPcDetail(id, backCo){
   /* 지금 떠 있는 것은 «명함»이다 — 기업 상세가 새 값에 다시 그려질 때 이 창을
      밀어내지 않게 표를 지운다(coDetailRefresh). */
   delete $('pcDetail').dataset.coKey;
+  /* 폰·브라우저 «뒤로가기»도 ◀뒤로 단추와 «같은 걸음»을 밟게 온 자리를 적어 둔다
+     (2026-09-12 실측: 안 적으면 뒤로가기가 명함을 통째로 «닫아» 보던 기업 상세까지
+      함께 사라졌다 — 화면 단추와 말이 다르면 사람은 둘 다 안 믿는다).
+     ⚠ 칸을 «지우는» 쪽도 같이 둔다. 남겨 두면 목록에서 연 다음 명함이 지난번 회사로
+       데려간다 — 「◀ 뒤로가 없는데 뒤로가기는 어디론가 간다」가 된다. */
+  if(_back) $('pcDetail').dataset.backCo = _back; else delete $('pcDetail').dataset.backCo;
   $('pcDetail').classList.add('open');
   const ov=$('pcDetailOverlay'); if(ov) ov.style.display='block';
   /* ⚠ 원본(Store.getPhoto)을 여기서 «안» 받는다 (대표 보고 2026-08-30).
@@ -29197,6 +29218,7 @@ function openCoDetailPanel(key, keep){
      사람을 기업 상세로 끌어내지 않게 하는 잣대다(coDetailRefresh). */
   $('pcDetail').dataset.coKey = key;
   delete $('pcDetail').dataset.cardId;
+  delete $('pcDetail').dataset.backCo;   /* 기업 상세는 «돌아갈 곳»이 아니라 그 자리다 */
   $('pcDetail').classList.add('open');
   const ov=$('pcDetailOverlay'); if(ov) ov.style.display='block';
   /* ⚠ 최종 전체 리뷰(2026-08-14): 이 조회가 도는 동안 다른 회사 패널로 옮겨 갔으면,
@@ -31358,6 +31380,11 @@ function delMailBlock(email){
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
 <script src="js/pu-back.js?v=2"></script>
-<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<script>try{ PuBack.guard(function(){
+  /* ⚠ «한 걸음 물러서기»가 «닫기»보다 먼저다. 순서를 바꾸면 기업 상세에서 연 명함이
+     ✕ 로 닫혀 회사까지 사라진다(2026-09-12). */
+  if(coBackStep()) return true;
+  return PuBack.closeTopVisible();
+}); }catch(e){}</script>
 </body>
 </html>
