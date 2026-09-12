@@ -8499,7 +8499,7 @@ function sendWorker(id, year, job, opt) {
   if (!canSendWorker(read)) return Promise.resolve();
   const force = !!(opt && opt.force);
   const auto = !!(opt && opt.auto);
-  const yr = year || (it && it.meta && it.meta.__year) || gridYear;
+  const yr = year || (it && it.meta && it.meta.__year) || nowYear();
   /* 겹치는지 먼저 본다. 「둘 다 두기」로 밀고 갈 때(force)는 묻지 않는다. */
   if (!force && PuDocFile.findWorkerDupes) {
     const ff0 = readFields(read);
@@ -8594,7 +8594,7 @@ function dupReplace() {
         const ph = o.photo || {};
         if (!ph.id || !isMinePhoto(ph.id)) return null;
         const why = '겹침 — 새 ' + lb + '으로 바꿈';
-        return PuPhotoStore.deletePhoto(ph.year || gridYear, ph.id, why, photoOwner(ph.id))
+        return PuPhotoStore.deletePhoto(ph.year || photoYearOf(ph.id), ph.id, why, photoOwner(ph.id))
           .catch(function (e) { console.warn('[겹친 사진 치우기]', ph.id, e); return null; });
       }));
     })
@@ -9005,7 +9005,7 @@ function sendCoInfo(id, year, job) {
   const it = gridItems.find(function (x) { return x.id === id; });
   const read = (it && it.meta && it.meta.read) || (job && job._read);
   if (!canSendCoInfo(read)) return Promise.resolve();
-  const yr = year || (it && it.meta && it.meta.__year) || gridYear;
+  const yr = year || (it && it.meta && it.meta.__year) || nowYear();
   return coInfoFields(read).then(function (fields) {
     if (!fields) {
       /* 업체를 못 찾았다(없거나, 같은 이름이 둘이다). 조용히 넘기면 「보냈는데 없다」가
@@ -9240,7 +9240,8 @@ function coSweep() {
   const me = PuPhotoStore.myName() || '';
   return PuDocFile.sendToCompanyMany(wait.map(function (it) {
     return { kind: it.meta.read.kind, fields: it.meta.read.fields, byName: me,
-      photo: { id: it.id, year: gridYear, owner: photoOwner(it.id) } };
+      /* ⚠ 사진마다 제 해를 쓴다 — 「모든 해」로 보면 화면의 해가 자리가 아니다 */
+      photo: { id: it.id, year: photoYearOf(it.id), owner: photoOwner(it.id) } };
   })).then(function (res) {
     let n = 0;
     const saves = [];
@@ -9544,7 +9545,15 @@ function photoYearOf(id) {
   const it = gridItems.find(function (x) { return x.id === id; });
   const m = it && it.meta;
   const y = m && (m.__year || m.__sharedYear);
-  return y ? String(y) : gridYear;
+  return y ? String(y) : nowYear();
+}
+
+/* 화면의 해 — 쓰기에 쓸 때는 **반드시 이것**이다.
+   ⚠★ 「모든 해」(ALL_YEARS)는 «보는 방식»이지 자리가 아니다. 그대로 저장 층에
+     넘기면 `items/__all__` 이라는 없는 자리에 적는다 — 사진이 조용히 사라진다.
+     그래서 물러설 곳을 올해로 둔다(2026-09-12 에 「모든 해」를 만들며 함께 막았다). */
+function nowYear() {
+  return gridYear === ALL_YEARS ? String(new Date().getFullYear()) : gridYear;
 }
 
 /* 고른 사진에 손을 대도 되는가.
@@ -9653,7 +9662,9 @@ function refreshYears() {
   const call = gridOwner === ALL_OWNERS ? PuPhotoStore.listYearsAll() : PuPhotoStore.listYears(gridOwner);
   call.then(function (ys) {
     gridYears = ys;
-    if (gridYears.indexOf(gridYear) < 0) gridYears.unshift(gridYear);
+    /* ⚠ 「모든 해」는 해가 아니라 «보는 방식»이다 — 해 목록에 섞어 넣으면
+       listAllYears 가 그것을 해로 알고 두드리고, 고르개에도 두 번 나온다. */
+    if (gridYear !== ALL_YEARS && gridYears.indexOf(gridYear) < 0) gridYears.unshift(gridYear);
     renderYearSel();
     renderBackupBox();
   }).catch(function (e) { console.warn('[연도 목록]', e); });
@@ -9773,6 +9784,47 @@ function resetGridRenderLimit() { gridRenderLimit = isPhone() ? PHONE_PHOTO_BATC
      남의 것으로 덮으면 내 사진에 남의 주인이 붙어 저장 층이 엉뚱한 자리를 두드린다.
    ⚠ **공유 목록을 못 읽어도 내 사진은 보여야 한다.** 규칙이 막혀 있거나 연결이 끊겨도
      사진첩 자체가 안 열리면 안 된다 — 조용히 빈 목록으로 넘어간다. */
+/* ══ 「모든 해」 — 해를 가로질러 찾는다 (대표 결정 2026-09-12) ═══════════════════
+     「사진첩에서만 — 대신 모든 해를 한번에」
+
+   ★ 왜 필요한가 — 찾기는 늘 «고른 해» 안에서만 돌았다. 2025년에 올린 서류를
+     2026년 화면에서 치면 한 장도 안 나오고, 사람은 «없는 줄» 안다. 푸른이알피에
+     서류 찾기를 따로 두지 않기로 한 이상(대표 결정), 여기가 유일한 찾는 자리다.
+
+   ⚠ 사진 «본문»은 안 받는다 — 이 목록은 정보(meta)뿐이다. 미리보기는 격자가
+     보이는 칸만 따로 받아 온다(fillThumbs). 그래서 해를 다 합쳐도 무겁지 않다.
+   ⚠ 한 해가 막혀도(권한 등) 나머지는 보여 준다 — 한 해 때문에 통째로 빈 화면이
+     되면 「사진이 없어졌다」가 된다.
+   ⚠ 해가 섞이므로 **저장할 때는 사진에 새겨진 해**(__year)를 봐야 한다.
+     photoYearOf 가 이미 그렇게 되어 있다 — 화면의 해로 짐작하지 말 것. */
+const ALL_YEARS = '__all__';
+
+function listAllYears() {
+  const one = function (y) {
+    const call = gridOwner === ALL_OWNERS ? PuPhotoStore.listYearAll(y)
+      : gridOwner ? PuPhotoStore.listYear(y, gridOwner)
+        : listMineAndShared(y);
+    return call.catch(function (e) {
+      console.warn('[모든 해 · ' + y + ']', e && e.message);
+      return {};                      // 막힌 해는 조용히 비운다 — 나머지는 살린다
+    });
+  };
+  const years = (gridYears || []).filter(function (y) { return y && y !== ALL_YEARS; });
+  return Promise.all(years.map(one)).then(function (maps) {
+    const out = {};
+    maps.forEach(function (map, i) {
+      Object.keys(map || {}).forEach(function (id) {
+        if (out[id]) return;          // 같은 사진이 두 해에 잡히면 앞엣것을 둔다
+        const m = map[id] || {};
+        /* 해를 새겨 둔다 — 섞인 목록에서 「이 사진이 몇 해 것인가」를 잃으면
+           판독 결과를 엉뚱한 해에 적는다(photoYearOf 가 이 값을 본다). */
+        out[id] = m.__year ? m : Object.assign({}, m, { __year: years[i] });
+      });
+    });
+    return out;
+  });
+}
+
 function listMineAndShared(year) {
   return Promise.all([
     PuPhotoStore.listYear(year, null),
@@ -9891,13 +9943,16 @@ function loadGrid() {
 
   /* 전체 근로자 모드 — 판독·자동등록 대기열은 돌리지 않는다. 그건 '내가 올린
      것'을 처리하는 일이라, 남의 사진까지 자동으로 건드리면 안 된다. */
-  const call = gridOwner === SHARED_OWNER
-    ? PuPhotoStore.listSharedToMe().then(PuPhotoStore.fillSharedNames)
-    : gridOwner === ALL_OWNERS
-      ? PuPhotoStore.listYearAll(gridYear)
-      : gridOwner
-        ? PuPhotoStore.listYear(gridYear, gridOwner)
-        : listMineAndShared(gridYear);
+  /* ⚠ 「모든 해」가 맨 앞이다 — 뒤에 두면 gridOwner 갈래가 먼저 잡아채 한 해만 받는다 */
+  const call = gridYear === ALL_YEARS
+    ? listAllYears()
+    : gridOwner === SHARED_OWNER
+      ? PuPhotoStore.listSharedToMe().then(PuPhotoStore.fillSharedNames)
+      : gridOwner === ALL_OWNERS
+        ? PuPhotoStore.listYearAll(gridYear)
+        : gridOwner
+          ? PuPhotoStore.listYear(gridYear, gridOwner)
+          : listMineAndShared(gridYear);
   call.then(function (items) {
     /* ── 이미 받아 둔 미리보기를 «들고 넘어간다» (대표 보고 2026-08-30) ──
        "사진첩에서 가끔씩 사진이 다 안 보이는 부분이 몇 초간 발생한다"
@@ -9974,7 +10029,9 @@ function showGridError(why) {
 function addToGrid(job) {
   /* ⚠ 저장한 자리와 **같은 셈법**(올린 때 기준). 촬영 시각으로 세면 옛 사진을
      올린 뒤 화면에 안 뜨고, 새로고침해야 나타나 「안 올라갔나」 싶어진다. */
-  if (PuPhotoStore.photoYear(job.meta) !== gridYear) return; // 지난 연도는 다음 방문 때
+  /* ⚠ 「모든 해」로 보는 중이면 어느 해든 다 보여야 한다 — 안 그러면 방금 올린 것이
+     안 뜨고 「안 올라갔나」 싶어진다. */
+  if (gridYear !== ALL_YEARS && PuPhotoStore.photoYear(job.meta) !== gridYear) return;
   if (gridItems.some(it => it.id === job.id)) return;
   /* 주인·해를 지금 새겨 둔다. 이게 없으면 방금 올린 사진은 목록을 다시 읽기 전까지
      주인을 모른 채로 남고, 「전체 근로자」 화면(gridOwner='__all__')에서 열면
@@ -10351,16 +10408,21 @@ function fillThumbs() {
   /* 공유받은 사진은 사진 한 장마다 권한을 따지므로 묶음 읽기가 막힌다 */
   if (gridOwner === SHARED_OWNER || legacy.length > THUMB_BULK_MAX) return fillThumbsOneByOne(legacy);
 
+  /* ⚠ 주인«과 해»로 묶는다 — 「모든 해」로 보면 한 화면에 여러 해가 섞인다.
+     주인만 보고 화면의 해로 두드리면 다른 해 사진의 미리보기가 통째로 빈다
+     (칸이 까맣게 남는다 — 2026-08-13 에 «받은 사진»에서 똑같이 겪은 자리다). */
   const byOwner = {};
   legacy.forEach(function (it) {
-    const o = thumbOwnerOf(it) || '';
-    (byOwner[o] = byOwner[o] || []).push(it);
+    const k = (thumbOwnerOf(it) || '') + '|' + photoYearOf(it.id);
+    (byOwner[k] = byOwner[k] || []).push(it);
   });
   const year = gridYear;
-  Promise.all(Object.keys(byOwner).map(function (o) {
-    return PuPhotoStore.loadThumbsYear(year, o || null).then(function (map) {
+  Promise.all(Object.keys(byOwner).map(function (k) {
+    const o = k.slice(0, k.lastIndexOf('|'));
+    const y = k.slice(k.lastIndexOf('|') + 1);
+    return PuPhotoStore.loadThumbsYear(y, o || null).then(function (map) {
       if (year !== gridYear) return;           // 그 사이 해를 바꿨다 — 남의 해에 그리지 않는다
-      byOwner[o].forEach(function (it) {
+      byOwner[k].forEach(function (it) {
         const t = map && map[it.id];
         if (t) { it.thumb = t; paintThumb(it); }
       });
@@ -10389,14 +10451,16 @@ function fillThumbUrls(items) {
     if (!it) return Promise.resolve();
     if (year !== gridYear) return Promise.resolve();     // 그 사이 해를 바꿨다
     const owner = thumbOwnerOf(it);
-    return PuPhotoStore.thumbUrl(year, it.id, owner).then(function (url) {
+    /* ⚠ 해는 **사진마다** 본다 — 「모든 해」로 보면 화면의 해가 자리가 아니다 */
+    const y = photoYearOf(it.id);
+    return PuPhotoStore.thumbUrl(y, it.id, owner).then(function (url) {
       if (year !== gridYear) return;
       const u = safeSrc(url);
       if (!u) return;
       it.thumb = u;
       paintThumb(it);
       /* 적어 두기는 그리기를 막지 않는다 — 실패해도 화면에는 이미 나와 있다 */
-      PuPhotoStore.rememberThumbUrl(year, it.id, u, owner);
+      PuPhotoStore.rememberThumbUrl(y, it.id, u, owner);
     }).catch(function () { /* 한 장 실패해도 다음 장으로 */ })
       .then(worker);
   }
@@ -10470,7 +10534,8 @@ function dragRefOf(id) {
   return {
     app: 'pu-photos',
     kind: 'photo',
-    year: gridYear,
+    /* ⚠ 사진마다 제 해를 쓴다 — 「모든 해」로 보면 화면의 해가 자리가 아니다 */
+    year: photoYearOf(id),
     owner: photoOwner(id) || PuPhotoStore.myUid(),
     id: id,
     /* 날짜는 **올린 때**로 적는다 — 받는 앱의 목록에서도 사진첩과 같은 날에
@@ -11914,13 +11979,14 @@ function shareFolder(fid) {
   const nm = f.name || '이 폴더';
   const ids = folderItems(fid).map(function (it) { return it.id; });
   if (!ids.length) {
-    alert('「' + nm + '」에 ' + gridYear + '년 사진이 없습니다.\n\n' +
+    alert('「' + nm + '」에 ' + (gridYear === ALL_YEARS ? '' : gridYear + '년 ') +
+      '사진이 없습니다.\n\n' +
       '폴더에 사진을 담은 뒤 다시 눌러 주세요 — 담긴 사진을 한꺼번에 열어 드립니다.');
     return;
   }
   /* 넘길 수 없는 것이 섞여 있어도 나머지는 간다 — 거르는 셈은 openSharePeople 이
      이미 갖고 있다(2026-09-03). 여기서 또 거르면 두 벌이 된다. */
-  openSharePeople(ids, 'sharePickBox', { folder: nm, year: gridYear });
+  openSharePeople(ids, 'sharePickBox', { folder: nm, year: nowYear() });
 }
 
 function pickFolder(fid) {
@@ -11959,8 +12025,19 @@ function removeFolderAsk(fid) {
       + (f.parent ? '「' + ((FOLDERS[f.parent] || {}).name || '상위 폴더') + '」로 올라갑니다.' : '「전체」에 남습니다.')
       + '\n계속할까요?';
   if (!confirm(msg)) return;
-  const ids = mine.map(function (it) { return it.id; });
-  PuPhotoStore.moveFolderPhotos(gridYear, ids, f.parent || null)
+  /* ⚠ 「모든 해」로 보면 한 폴더에 여러 해 사진이 섞인다. 저장 층은 해마다
+     한 번씩 받으므로 **해별로 갈라서** 부른다 — 한 해로 뭉뚱그리면 다른 해 사진이
+     없는 자리에 적히고 폴더에서 조용히 사라진다(2026-09-12). */
+  const 해별 = {};
+  mine.forEach(function (it) {
+    const y = photoYearOf(it.id);
+    (해별[y] = 해별[y] || []).push(it.id);
+  });
+  Object.keys(해별).reduce(function (chain, y) {
+    return chain.then(function () {
+      return PuPhotoStore.moveFolderPhotos(y, 해별[y], f.parent || null);
+    });
+  }, Promise.resolve())
     .then(function () {
       mine.forEach(function (it) { it.meta = Object.assign({}, it.meta, { folder: f.parent || null }); });
       return PuPhotoStore.deleteFolder(fid);
@@ -13202,8 +13279,14 @@ function renderYearSel() {
   const sel = $('yearSel');
   if (!sel) return;
   const now = String(new Date().getFullYear());
-  sel.innerHTML = gridYears.map(function (y) {
-    const label = y === 'unknown' ? '날짜 모름' : (y + '년' + (y === now ? ' (올해)' : ''));
+  /* ★ 「모든 해」를 **맨 위에** 둔다 (대표 결정 2026-09-12) — 찾을 때 해를 하나씩
+     바꿔 가며 뒤지지 않게. 해가 하나뿐이면 넣지 않는다(가를 것이 없다). */
+  const 해들 = gridYears.slice();
+  if (해들.length > 1) 해들.unshift(ALL_YEARS);
+  sel.innerHTML = 해들.map(function (y) {
+    const label = y === ALL_YEARS ? '모든 해에서 찾기'
+      : y === 'unknown' ? '날짜 모름'
+        : (y + '년' + (y === now ? ' (올해)' : ''));
     return '<option value="' + esc(y) + '"' + (y === gridYear ? ' selected' : '') + '>' + esc(label) + '</option>';
   }).join('');
   /* 고를 해가 하나뿐이면 굳이 보여줄 것이 없다 */
@@ -13768,7 +13851,8 @@ function renderGridBar() {
   /* 지금 무엇을 보고 있는지 — 해와 찾는 말을 함께 적는다.
      예전에는 늘 '올해 사진'이라고 적어, 다른 해를 보고 있어도 올해라고 했다. */
   const now = String(new Date().getFullYear());
-  const yLabel = gridYear === 'unknown' ? '날짜 모름' : (gridYear === now ? '올해' : gridYear + '년');
+  const yLabel = gridYear === ALL_YEARS ? '모든 해'
+    : gridYear === 'unknown' ? '날짜 모름' : (gridYear === now ? '올해' : gridYear + '년');
   /* ⚠ 고른 것이 있으면 «장수와 푸는 길»을 한 덩이로 낸다(대표 지시 2026-08-30).
      예전에는 「1장 고름」과 「취소」가 단추 다섯 개를 사이에 두고 떨어져 있었다.
      ⚠ 예사 때는 아무 말도 안 적는다(2026-08-26) — 해는 옆의 해 고르개에, 장수는
@@ -14554,7 +14638,7 @@ function viewerDragOut(e) {
   try {
     if (window.PuDrag && viewerId && it) {
       PuDrag.set(dt, {
-        app: 'pu-photos', kind: 'photo', year: gridYear,
+        app: 'pu-photos', kind: 'photo', year: photoYearOf(viewerId),
         owner: photoOwner(id) || PuPhotoStore.myUid(),
         id: viewerId,
         name: it.meta.company || dayLabel(photoTime(it)) + ' 사진'
@@ -18241,7 +18325,8 @@ async function runPairsBackfill() {
   try {
     const r = await PuDocFile.backfillPairs(items.map(function (it) {
       return { fields: it.meta.read.fields,
-               photo: { id: it.id, year: gridYear, owner: photoOwner(it.id) } };
+               /* ⚠ 사진마다 제 해를 쓴다 — 「모든 해」로 보면 화면의 해가 자리가 아니다 */
+      photo: { id: it.id, year: photoYearOf(it.id), owner: photoOwner(it.id) } };
     }), function (done, total) {
       out.textContent = '채우는 중… 회사 ' + done + ' / ' + total;
     });
