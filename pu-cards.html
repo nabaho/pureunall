@@ -2343,6 +2343,13 @@ td.mgr .mgours{color:#94a3b8;font-size:11px}
 .comemoact button{font-size:12px;font-weight:700;color:#1e40af;background:#eff6ff;
   border:1px solid #bfdbfe;border-radius:8px;padding:5px 11px;cursor:pointer}
 .comemoact button:hover{background:#1e40af;color:#ffffff}
+/* 🔗 여기로 합쳐 둔 줄 — 되돌릴 수 있는 유일한 자리라 «눈에 띄어야» 한다 */
+.comerged{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0 0;padding:8px 11px;
+  border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;font-size:12px;color:#1e40af}
+.comerged .t{font-weight:700}
+.comerged button{font-size:11px;font-weight:700;color:#1e40af;background:#ffffff;
+  border:1px solid #bfdbfe;border-radius:7px;padding:3px 9px;cursor:pointer}
+.comerged button:hover{background:#1e40af;color:#ffffff}
 .cosmerow{padding:10px 11px;border-bottom:1px solid #f8fafc;cursor:pointer}
 .cosmerow:last-child{border-bottom:none}
 .cosmerow:hover{background:#f8fafc}
@@ -24578,10 +24585,28 @@ function coListBuild(){
   };
   /* 상호 → 사업자번호 열쇠. 명함에는 사업자번호가 거의 안 적혀 있어서, 이 다리가 없으면
      같은 회사가 「등록증 쪽」과 「명함 쪽」으로 갈라져 목록에 두 줄로 뜬다(실제로 그랬다). */
+  /* ── 🔗 사람이 「이 둘은 같은 곳」이라고 짚어 둔 것 (대표 지시 2026-09-12) ──
+     아래 nameIdx 다리가 (주)·주식회사·빈칸 차이는 이미 이어 준다(실측으로 확인했다).
+     남는 것은 «이름 자체가 다르게 적힌» 경우다 — 「가나」와 「가나상사」.
+     ⚠⚠ 그것은 **짐작으로 하면 안 된다.** 「천성」과 「천성전자」, 「화담원」과
+       「화담원 아산점」처럼 이름이 겹쳐도 다른 곳인 쌍이 실제로 있다(급여데이터함이
+       같은 자리에서 겪었다). 그래서 사람이 짚어 준 것만 따른다.
+     ⚠ 이 함수 «안»에 둔다 — 밖으로 빼면 이 함수를 떠서 돌리는 검사들이 함께 깨진다
+       (위 _coStamp·_coNewestFirst 와 같은 까닭). */
+  const _same = (k) => {
+    const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+    const to = String(((info[k] || {}).sameAs) || '').trim();
+    if(!to || to === k) return k;
+    /* ⚠ 한 걸음만 따라간다. 가→나·나→가로 서로 가리켜 두면 영영 돈다 —
+       그럴 때는 «아무 데도 안 간다»(둘 다 제자리). 조용히 한쪽을 고르면
+       다시 그릴 때마다 답이 달라진다. */
+    const back = String(((info[to] || {}).sameAs) || '').trim();
+    return (back === k) ? k : to;
+  };
   const nameIdx = {};
   /* ① 사업자등록증 — 회사의 뼈대 */
   _coNewestFirst(Object.values(allItems()).filter(it=>it.kind==='biz')).forEach(it=>{
-    const k = coKeyOf(it);
+    const k = _same(coKeyOf(it));
     /* ⚠ companyTel 을 여기 «안 넣어서» 3순위 「📋 정보부족」이 거짓말을 했다
        (검토 2026-08-27). 등록증에서 대표번호를 읽어 두고도(BIZ_FIELDS) 회사로 안
        올리니, coVal(o,'companyTel') 이 사진첩 서식이 준 값 아니면 늘 빈칸이었다 —
@@ -24608,8 +24633,8 @@ function coListBuild(){
   });
   /* ② 명함 — 그 회사 사람들. 회사가 사업자등록증 없이 명함만 있는 경우도 살린다. */
   _coNewestFirst(Object.values(allItems()).filter(it=>it.kind!=='biz' && (it.company||'').trim())).forEach(it=>{
-    const k = (digits(it.bizno||'').length>=10) ? coKeyOf(it)
-            : (nameIdx[_norm(it.company)] || coKeyOf(it));
+    const k = _same((digits(it.bizno||'').length>=10) ? coKeyOf(it)
+            : (nameIdx[_norm(it.company)] || coKeyOf(it)));
     /* ⚠ 명함에서 올리는 것은 «회사 것»뿐이다 — companyTel(회사 대표번호)과
        companyFax(회사 팩스) 둘. tel(직통전화)·mobile(휴대폰)·fax(개인팩스)·email 은
        그 «사람» 것이라 회사 값이 아니다 — 올려 버리면 그 사람이 퇴사한 뒤에도
@@ -28924,6 +28949,99 @@ function coMemoHtml(o){
   return coCardHtml('memo', '📝 메모', short, body);
 }
 
+/* ══════ 🔗 같은 곳인 두 줄을 «사람이 짚어» 합친다 (대표 지시 2026-09-12) ═══════════
+   검토 보고의 ②. 재 보니 앱에는 이미 «상호↔사업자번호 다리»가 있어서
+   「주식회사 가나」와 「가나」는 자동으로 한 줄이 된다. 남는 것은 이름 자체가 다르게
+   적힌 경우다 — 「가나상사」 등록증과 「가나」 명함.
+
+   ⚠⚠ 짐작으로 «안» 한다. 이름이 겹쳐도 다른 곳인 쌍이 실제로 있다
+     (「천성」/「천성전자」 · 「화담원」/「화담원 아산점」 — 급여데이터함이 같은 자리에서
+      겪었고, 그래서 그쪽도 짐작을 사람 손 아래에 두었다).
+   ★ 그래서 «후보를 지어내지 않는다». 사람이 상호나 번호를 적어 고르게 한다.
+   ⚠ 되돌릴 수 있어야 한다 — 합치면 한 줄이 사라지므로, 남은 줄에서 푸는 길을 둔다.
+     푸는 길이 없으면 잘못 합친 것을 영영 못 되돌린다. */
+function coMergedKeys(key){
+  const k = String(key || '');
+  const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+  return Object.keys(info).filter(x => String((info[x] || {}).sameAs || '') === k);
+}
+/* 합칠 «상대»를 찾는다 — 적은 글자로 상호·사업자번호를 훑는다.
+   ⚠ 자기 자신과, 이미 이 줄로 합쳐 둔 줄은 후보에서 뺀다(제자리를 가리키게 된다). */
+function coMergeFinds(key, q){
+  const k = String(key || '');
+  const s = String(q || '').trim().toLowerCase();
+  if(!s) return [];
+  const mine = coMergedKeys(k);
+  return (coList() || []).filter(function(o){
+    if(!o || o.key === k || mine.indexOf(o.key) >= 0) return false;
+    return (String(o.name || '') + ' ' + String(o.bizno || '')).toLowerCase().indexOf(s) >= 0;
+  }).slice(0, 30);
+}
+function coAskMerge(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const q = prompt('이 회사와 «같은 곳»인 줄을 찾습니다.\n상대 회사의 상호나 사업자번호를 적어 주세요.\n\n'
+    + '지금 줄: ' + (o.name || '(이름 없음)'), o.name || '');
+  if(q === null) return;
+  const hits = coMergeFinds(k, q);
+  if(!hits.length){ toast('그 말과 맞는 회사를 못 찾았습니다', 5000); return; }
+  showPanel(coMergePickHtml(o, hits));
+}
+function coMergePickHtml(o, hits){
+  const from = esc(String(o.key).replace(/'/g,"\\'"));
+  return `<div class="mhead"><b>🔗 「${esc(o.name || '(이름 없음)')}」를 어느 줄과 합칠까요</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 10px">고른 줄로 <b>이 줄의 명함·서류가 모두 옮겨갑니다.</b>
+      이 줄은 목록에서 사라지고, 남은 줄에서 <b>다시 풀 수 있습니다.</b>
+      <br>⚠ 이름이 비슷해도 <b>다른 사업장</b>일 수 있습니다 — 사업자번호를 함께 보고 고르세요.</p>
+    <div class="ablist">${hits.map(x=>`
+      <div class="cosmerow" onclick="dedupBg.classList.remove('open');coDoMerge('${from}','${esc(String(x.key).replace(/'/g,"\\'"))}')"
+          title="이 줄로 합칩니다">
+        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
+        <div class="sv"><span class="se">${x.bizno ? esc(fmtBizno(x.bizno)) : '사업자번호 없음'}</span>
+          <span class="se">명함 ${(x.cards||[]).length}장 · 서류 ${x.docs||0}건</span>
+          ${x.erp && x.erp.type ? `<span class="sm">${esc(x.erp.type)}</span>` : ''}</div>
+      </div>`).join('')}</div>`;
+}
+function coDoMerge(fromKey, toKey){
+  const from = String(fromKey || ''), to = String(toKey || '');
+  if(!from || !to || from === to) return;
+  const a = (coList() || []).find(x => x.key === from);
+  const b = (coList() || []).find(x => x.key === to);
+  if(!a || !b) return;
+  if(!confirm(`「${a.name || from}」를 「${b.name || to}」와 «같은 곳»으로 합칩니다.\n\n`
+    + `명함 ${(a.cards||[]).length}장 · 서류 ${a.docs||0}건이 그쪽 줄로 옮겨갑니다.\n`
+    + `나중에 남은 줄에서 다시 풀 수 있습니다.`)) return;
+  coSaveInfoField(from, 'sameAs', to, `🔗 「${b.name || to}」와 한 줄로 합쳤습니다`);
+  /* 합친 줄은 사라지므로 «남은 줄»을 연다 — 아무것도 안 열리면 사라진 것으로만 보인다 */
+  state.coPick = to;
+  setTimeout(()=>{ try{ openCoDetailPanel(to); }catch(_){} }, 300);
+}
+function coUnmerge(key){
+  const k = String(key || '');
+  if(!k) return;
+  coSaveInfoField(k, 'sameAs', '', '합친 것을 풀었습니다 — 다시 따로 선 줄이 됩니다');
+}
+/* 합치는 길과 되돌리는 길을 «한 줄»에 둔다.
+   ⚠ 「확인 필요」 카드에 넣지 «않는다» — 2026-09-12 에 넣어 봤다가 되돌렸다.
+     고유번호증 기관처럼 사업자번호가 «원래 없는» 곳이 있어, 그러면 그런 곳이 영영
+     「확인 필요」로 노래진다. 늘 노란 딱지는 눈이 배경으로 배운다.
+   ⚠ 합쳐진 쪽은 목록에서 사라진다 — 여기가 유일하게 되돌릴 수 있는 자리다. */
+function coMergeRowHtml(o){
+  if(!o) return '';
+  const keys = coMergedKeys(o.key);
+  const noBiz = !String(o.bizno || '').trim();
+  if(!keys.length && !noBiz) return '';
+  const key = esc(String(o.key).replace(/'/g,"\\'"));
+  const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+  const 합치기 = noBiz
+    ? `<span class="t">같은 곳이 따로 있나요?</span>
+       <button onclick="coAskMerge('${key}')" title="상대 회사를 찾아 한 줄로 합칩니다">합치기</button>` : '';
+  const 푸는줄 = keys.map(k=>`<button onclick="coUnmerge('${esc(String(k).replace(/'/g,"\\'"))}')"
+       title="다시 따로 선 줄로 되돌립니다">${esc((info[k]||{}).name || k)} 풀기</button>`).join('');
+  const 셈 = keys.length ? `<span class="t">여기로 합쳐 둔 줄 ${keys.length}개</span>` : '';
+  return `<div class="comerged"><span>🔗</span>${셈}${합치기}${푸는줄}</div>`;
+}
+
 function coInfoBoxHtml(o){
   const val = f => coVal(o, f);
   const rows = CO_FIELDS.filter(([f])=>val(f)).map(([f,label])=>
@@ -29277,12 +29395,26 @@ function coCardHtml(which, title, summary, body){
      눌러서 본다 — 그것이 「부족하다는 정보만 관리」다.
    ⚠ 하나도 없으면 빈 글자를 준다 → 카드 자체가 안 뜬다. 4,000곳 가운데 멀쩡한 곳까지
      「확인 필요 0」이 붙으면 정작 급한 곳이 묻힌다. */
-function coNeedHtml(o){
-  const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
+/* ⚠⚠ 「확인 필요 몇 가지」는 «여기 한 곳»에서 센다 (2026-09-12).
+   예전에는 카드(coNeedHtml)와 숫자 칸(coTilesHtml)이 똑같은 셈을 따로 적고 있었다 —
+   한쪽에 한 줄을 더하면 「숫자 칸은 2인데 카드에는 3줄」이 된다. 합치기 줄을 더하다
+   그럴 뻔해서 그때 모았다. */
+function coNeedCount(o){
+  const nClash = Object.keys((o && o.extra && o.extra.conflicts) || {}).length;
   const nLeft = Number(_coLeftDocsN || 0);
   /* 연결은 «확정됐으면» 부족한 것이 아니다 — 확정 전·끊김만 여기 온다 */
   const linkBad = coErpPinState(o) !== 'pinned';
-  const n = (linkBad?1:0) + (nClash?1:0) + (nLeft?1:0);
+  /* ⚠ 「사업자번호 없음」은 «여기 안 센다» (2026-09-12에 넣었다가 되돌렸다).
+     고유번호증 기관처럼 번호가 «원래 없는» 곳이 있어서, 넣으면 그런 곳이 영영
+     「확인 필요」로 노래진다 — 늘 노란 딱지는 눈이 배경으로 배운다.
+     합치는 길은 따로 둔다(coMergeRowHtml). */
+  return (linkBad?1:0) + (nClash?1:0) + (nLeft?1:0);
+}
+function coNeedHtml(o){
+  const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
+  const nLeft = Number(_coLeftDocsN || 0);
+  const linkBad = coErpPinState(o) !== 'pinned';
+  const n = coNeedCount(o);
   if(!n) return '';
   const key = esc(String(o.key).replace(/'/g,"\\'"));
   const short = [ linkBad?'연결':'', nClash?('값 '+nClash):'', nLeft?('서류 '+nLeft):'' ]
@@ -29320,9 +29452,7 @@ function coTilesHtml(o){
   /* «모름»과 «0건»은 다른 말이다 — null 을 0 으로 읽으면 화면이 단정해서 거짓말한다 */
   const leftKnown = _coLeftDocsN !== null && _coLeftDocsN !== undefined;
   const nLeft = Number(_coLeftDocsN || 0);
-  const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
-  const linkBad = coErpPinState(o) !== 'pinned';
-  const need = (linkBad?1:0) + (nClash?1:0) + (nLeft?1:0);
+  const need = coNeedCount(o);   /* ⚠ 카드와 «같은 셈»이다 — 따로 적으면 두 숫자가 어긋난다 */
   const won = s ? erpHistShortWon(s.fee) : '';
   return `<div class="cotiles">
     <div class="cotile" onclick="coGoBox('coErpHistBox')" title="이 회사와 있었던 일로 갑니다">
@@ -29397,6 +29527,9 @@ function coDetailPanelHtml(o){
     <div id="coTiles">${coTilesHtml(o)}</div>
     ${/* 부족한 것 — 하나도 없으면 빈 글자라 칸 자체가 안 뜬다 */''}
     <div id="coNeedBox">${coNeedHtml(o)}</div>
+    ${/* 🔗 여기로 합쳐 둔 줄 — 합쳐진 쪽은 목록에서 사라지므로, 되돌릴 수 있는 자리가
+         여기뿐이다. 없으면 빈 글자라 아무 자리도 안 먹는다. */''}
+    ${coMergeRowHtml(o)}
     ${/* ── 사업·사건이 «축»이다 (대표 지시 2026-08-26) ──
          이 회사에 «무슨 일을 했나»가 먼저다. 그것을 알고 나서 정보·서류를 본다.
          ⚠ 칸은 비어 있고 loadErpCaseCons 가 나중에 채운다 — 자리만 잡아 둔다. */''}
