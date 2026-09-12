@@ -18,6 +18,9 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { stripComments } = require('./strip-comments');
+/* 함수 «몸»을 중괄호로 세어 뽑는다 — 글자 수로 자르면 옆 함수가 딸려 와, 저쪽에 있는
+   글귀가 이쪽을 통과시킨다(실제로 시험발송 검사가 그렇게 헛돌았다 2026-09-12). */
+const { 함수몸 } = require('./helpers/strip-comments.js');
 const Tpl = require('../js/pu-news-tpl.js');
 const NV = require('../functions/news-view.js');
 
@@ -143,7 +146,10 @@ test('「우리 사업장은」 갈피표로 시작해도 그 표는 요약에 �
   const d = 회차({ 안: { news: [{ 갈래: '기사', 링크: 'https://example.com/a',
                                   우리말: '▸ 우리 사업장은 — 확인하십시오.' }] }, 우리글: '' });
   const 요 = 짓기(d, 설정(), { 요약: true, 지역: '전국' });
-  assert.ok(!/·\s*▸/.test(요.서식), '갈피표(▸)가 요약 줄머리에 남았다');
+  /* ⚠ 「· 다음에 ▸」로 보면 안 된다 — 둘 사이에 칸(<td>)이 끼어 있어 늘 통과한다.
+       요약 줄에서 ▸ 가 나올 자리는 여기뿐이므로 «있느냐»로 본다. */
+  assert.ok(!요.서식.includes('▸'), '갈피표(▸)가 요약 줄머리에 남았다');
+  assert.ok(요.서식.includes('우리 사업장은 — 확인하십시오.'), '요약 글이 아예 빠졌다');
 });
 
 /* ══════ ② 갈 곳이 없으면 요약판을 만들지 않는다 ══════ */
@@ -209,10 +215,10 @@ test('★ 전문을 못 담으면 «걸지 않는다» — 내용 빠진 편지�
 });
 
 test('시험 발송도 전문을 담는다 — 시험은 진짜와 같아야 시험이다', () => {
-  const i = news.indexOf('async function 시험발송');
-  assert.ok(i >= 0, '시험발송 을 못 찾았다');
-  const 본 = news.slice(i, i + 4000);
-  assert.ok(본.includes('전문담기('), '시험 발송이 전문을 안 담는다');
+  const 본 = 함수몸(news, '시험발송');
+  assert.ok(본, '시험발송 을 못 찾았다');
+  assert.match(본, /await 전문담기\(/,
+    '시험 발송이 전문을 안 담는다 — 시험 편지의 「자세히 보기」가 빈 쪽을 연다');
 });
 
 test('★ 전문은 «미리보기 꼴»로 짓는다 — 웹 쪽에는 추적열쇠가 없다', () => {
