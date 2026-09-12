@@ -690,6 +690,40 @@ function nasTidyWith(cfg, sid, folder, keep, log){
   });
 }
 
+/* ── NAS 가 «무엇인지» 묻는다 (대표 지시 2026-09-12 「나스 정보 이알피에 연결된거 찾아」) ──
+   모델·RAM·DSM 판은 코드 어디에도 없다 — NAS 만 안다. 연결 테스트 때 물어서 기록에 적고
+   pureun_v6_nas_info 에 남긴다(비밀이 아니다). AI 색인 설계(③)의 0단계가 이것이다.
+   ⚠ 한 조각을 못 받아도 나머지는 적는다 — 도커 목록은 관리자 권한이 없으면 막힌다(105).
+     그때 «못 봤다»고 적는다. 조용히 비우면 「도커 없음」으로 잘못 읽힌다.
+   ⚠ 이 함수는 절대 throw 하지 않는다 — 연결 테스트의 «성공»을 정보 조회 실패로 뒤집지 않는다. */
+function nasInfoWith(cfg, sid){
+  function ask(body, ms){
+    return fetchT(nasBaseOf(cfg)+'/webapi/entry.cgi', { method:'POST', credentials:'omit',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body+'&_sid='+encodeURIComponent(sid) }, ms||15000)
+      .then(function(r){ return r.json(); });
+  }
+  var info = { model:'', ram:'', dsm:'', docker:null, dockerWhy:'' };
+  return ask('api=SYNO.DSM.Info&version=2&method=getinfo')
+    .then(function(d){
+      var x = (d && d.success && d.data) || {};
+      info.model = String(x.model || '');
+      info.ram = x.ram ? (Number(x.ram) >= 1024 ? (Math.round(Number(x.ram)/1024*10)/10)+'GB' : x.ram+'MB') : '';
+      info.dsm = String(x.version_string || x.version || '');
+    }).catch(function(){ /* 모델을 못 봐도 아래 도커는 물어 본다 */ })
+    .then(function(){ return ask('api=SYNO.Core.Package&version=1&method=list'); })
+    .then(function(d){
+      if(!d || !d.success){ info.docker = null; info.dockerWhy = (d && d.error && d.error.code===105) ? '권한 없음(관리자 계정이 아닙니다)' : '못 봤습니다'; return info; }
+      var pk = (d.data && d.data.packages) || [];
+      info.docker = pk.some(function(q){ return /ContainerManager|^Docker$/i.test(String(q && q.id || '')); });
+      return info;
+    }).catch(function(){ info.docker = null; info.dockerWhy = '못 봤습니다'; return info; });
+}
+function nasInfoLine(info){
+  var i = info || {};
+  var 도커 = i.docker === true ? '있음' : i.docker === false ? '없음' : ('확인 못함 — '+(i.dockerWhy||''));
+  return '🖥 모델 '+(i.model||'?')+' · RAM '+(i.ram||'?')+' · DSM '+(i.dsm||'?')+' · Container Manager(도커) '+도커;
+}
+
 function fetchT(url, opts, ms){
   opts = opts || {};
   var wait = ms || FETCH_MS;
@@ -39312,6 +39346,29 @@ function NasBackupSettings(){
         showToast('NAS 복원 실패 — 아래 로그 확인');
         if(세션) nasLogout(세션);
       }).finally(function(){ setBusy(false); });
+  }
+  /* ⚠ 이 함수는 2026-09-10 ② 편집에서 **실수로 지워졌다** — 단추(onClick:doTest)는 남아 함수만 없었다.
+     tests/nas-info-and-buttons.test.js 가 «불리는데 없는 함수»를 기계로 막는다.
+     되살리면서 NAS 정보(모델·RAM·DSM·도커)를 함께 묻는다 — AI 색인 설계(③)의 0단계. */
+  function doTest(){
+    if(!cfg.user||!cfg.pass){ showToast('아이디/비밀번호 입력 필요'); return; }
+    setBusy(true);
+    addLog('NAS 연결 테스트 중...','info');
+    var 세션 = null;
+    nasLogin().then(function(sid){
+      세션 = sid;
+      addLog('✅ NAS 연결 성공! ('+getNasBase()+')','ok');
+      showToast('✅ NAS 연결 성공');
+      return nasInfoWith(cfg, sid);
+    }).then(function(info){
+      addLog(nasInfoLine(info),'info');
+      try{ localStorage.setItem('pureun_v6_nas_info', JSON.stringify(Object.assign({ at:Date.now() }, info))); }catch(e){}
+      return nasLogout(세션);
+    }).catch(function(err){
+      addLog('❌ 연결 실패: '+getNasErrMsg(err),'err');
+      showToast('연결 실패 — 아래 로그 확인');
+      if(세션) nasLogout(세션);
+    }).finally(function(){ setBusy(false); });
   }
   async function doUndo(){
     if(!cfg.user||!cfg.pass){ showToast('NAS 아이디/비밀번호를 입력하세요'); return; }
