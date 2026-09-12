@@ -34,9 +34,21 @@ class Snap {
   isNumber() { return typeof this.value === 'number'; }
   isBoolean() { return typeof this.value === 'boolean'; }
 }
-const ROLES = { ad: { isAdmin: true }, sub: { isSubAdmin: true }, fin: { fin: true }, st: {} };
+/* ★ 2026-09-12 — 「직원」의 뜻이 바뀌었다.
+   옛 규칙은 「비번으로 로그인했나」만 봤는데, 파이어베이스 가입이 열려 있어
+   «아무나» 계정을 만들 수 있었다(실측). 이제는 uid_roles 에 status:'active' 로
+   등록된 사람이라야 직원이다. 그래서 모형에도 status 를 적는다.
+   ⚠ `bad`(바깥 사람)는 «일부러» uid_roles 에 안 넣는다 — 스스로 가입만 한 사람이다. */
+const ROLES = {
+  ad:  { isAdmin: true,    status: 'active' },
+  sub: { isSubAdmin: true, status: 'active' },
+  fin: { fin: true,        status: 'active' },
+  st:  { status: 'active' },
+  ret: { status: 'retired' },                 /* 퇴사자 — 계정은 살아 있어도 안 열려야 한다 */
+};
 const TREE = {
   uid_roles: ROLES,
+  sid_roles: { 'A-001': { status: 'active', loginEmail: 'st@pureun.kr' } },
   backup_key: { v1: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' },
   paydata: { u: { st: { deputy: { ad: { to: 9e15 } } } } },
 };

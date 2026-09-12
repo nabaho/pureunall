@@ -28,13 +28,16 @@
 
 ────────────────────────────────────────────────────────────────
 "staff_colors": {
-  ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)",
+  ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
   ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
 },
 ────────────────────────────────────────────────────────────────
 
 ■ 뜻
-  · 읽기 — 로그인한 직원 누구나
+  · 읽기 — **등록된 재직 직원**만
+    ⚠ 2026-09-12 에 뜻이 바뀌었습니다. 전에는 「비번으로 로그인했나」만 봤는데,
+      파이어베이스 가입이 열려 있어 «아무나» 계정을 만들 수 있었습니다.
+      이제는 uid_roles 에 status:'active' 로 등록된 사람이라야 읽습니다.
     (어느 앱·어느 PC 에서나 같은 색이어야 하므로 모두가 읽어야 합니다)
   · 쓰기 — **총괄관리자·위임관리인만**
     (색은 법인대시보드 한 곳에서만 정합니다. 두 곳에서 정하면 언젠가 어긋나고,
