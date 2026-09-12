@@ -2336,7 +2336,12 @@ async function 시험발송(){
     const res = await fetch(시험즉시URL, {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token },
-      body: JSON.stringify({ to: 받을곳, toName: '시험',
+      /* ★★ 보내는 주소를 «시험에도» 싣는다 (대표 화면 2026-09-12 — 첫 시험 발송에서
+           「보낸 곳 370-6@daum.net」이 떴다. 진짜 발송은 hanmail 로 나가는데 시험만
+           계정 주소로 나가고 있었다). 받는 쪽이 «누구한테서 왔나»를 보는 자리이고
+           스팸 판정도 그것으로 하므로, 다르면 정작 봐야 할 것을 안 본 셈이 된다.
+         ⚠ 서버가 «조인다» — 사서함 이름이 계정과 같고 다음/한메일일 때만 통한다. */
+      body: JSON.stringify({ to: 받을곳, toName: '시험', from: 보내는주소(),
         subject: '[시험] ' + 편.제목, body: 편.본문, html: 서식,
         files: 첨.파일들 })
     });
