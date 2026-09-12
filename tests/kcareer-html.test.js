@@ -2054,8 +2054,13 @@ test('★★ 원본이 있으면 어느 화면이든 좌우 비교로 열린다 
   // 전에는 openEditDrawer 로 «켜 준» 화면만 비교가 떴다. 신분증·계좌·사용자 정의 화면은
   // 원본이 붙어 있어도 좁은 창만 나왔다(대표 지적 2026-08-30).
   const fn = funcSource('openForm');
-  assert.match(fn, /if\(showPrev!==false\) showPrev = !!\(editId && fileExists\(editId\)\)/,
-    '⚠ 부르는 쪽에 맡기면 화면마다 달라집니다');
+  /* ⚠ 2026-09-12: 잣대가 fileExists → hasOriginal 로 «넓어졌다»(느슨해진 것이 아니다).
+     fileExists 는 앱 안 첨부 창고만 본다 — 서류 폴더 경로로 붙인 줄은 원본이 폴더에
+     멀쩡히 있는데도 좁은 창만 떴다. hasOriginal 은 둘 다 본다. 되돌리지 말 것. */
+  assert.match(fn, /if\(showPrev!==false\) showPrev = !!\(editId && hasOriginal\(rec\)\)/,
+    '⚠ 부르는 쪽에 맡기면 화면마다 달라집니다 · 폴더 원본도 원본입니다');
+  assert.ok(!/fileExists\(editId\)/.test(fn),
+    '★ fileExists 로 판정하면 폴더 경로 원본이 «없는 것»이 됩니다');
   assert.match(fn, /classList\.toggle\('as-drawer', !!showPrev\)/, '모양도 같아야 합니다');
   // 옛 이름은 그냥 넘긴다
   assert.match(funcSource('openEditDrawer'), /openForm\(page,id\)/);
