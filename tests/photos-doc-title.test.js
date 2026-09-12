@@ -382,7 +382,9 @@ function runGridBar(over) {
   /* 2026-08-29: 「👥 공유」가 도구줄에서 «누구 사진 아래»로 내려갔고, 도구줄이 그 칸을
      함께 그린다(기준이 하나여야 하므로) — 안 주면 그 자리에서 멎는다 */
   vm.runInContext(fnOf(app, 'renderShareCard'), ctx);
-  vm.runInContext(fnOf(app, 'renderGridBar'), ctx);
+  /* ⚠ 2026-09-12 — 「모든 해」가 생기며 renderGridBar 가 이 상수를 본다 */
+  vm.runInContext(app.match(/^const ALL_YEARS = '[^']*';/m)[0].replace('const ', 'var ')
+    + '\n' + fnOf(app, 'renderGridBar'), ctx);
   ctx.renderGridBar();
   return el;
 }
