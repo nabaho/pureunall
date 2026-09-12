@@ -52,6 +52,11 @@ global.funds = {};
      여기 없으면 「fillFundTypeWords is not defined」로 이 검사가 통째로 죽는다. */
   gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
   gF('ftypeSkipDoc'), gS('FTYPE_PICK_SRC'), gF('_ftypeSwap'), gF('_ftypeWords'), gF('_isTypePickBox'), gF('fillFundTypeWords'),
+  /* 출연금 하나로 세우는 첫해 예산(2026-09-12) — fillBizplanDoc 이 부른다.
+     여기 없으면 「planBudget is not defined」로 이 검사가 통째로 죽는다. */
+  gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
+  gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
+  gF('isSetupFund'), gF('_bizFinZero'), gF('fillBizplanHead'),
   gF('fillDerived'), gF('fillFoundContribDoc'), gF('hwpFormHTML')].join('\n'));
 
 let bad = 0;
@@ -312,6 +317,56 @@ console.log('\n■ 공동/사내 — 서식 전부가 같은 말을 한다');
     ok(k + ' — 사내로 바꿔도 기금 이름은 그대로다', t.indexOf('가나공동근로복지기금') >= 0
       && t.indexOf('가나사내근로복지기금') < 0, (t.match(/.{0,16}가나사내근로복지기금.{0,16}/) || [''])[0]);
   });
+}
+
+/* ══ 사업계획서 — 출연예정금 «하나»로 표가 선다 ══ (2026-09-12)
+   예전에는 예산 칸이 비면 한 줄도 안 채웠다. 설립 중인 기금은 예산이 늘 비어 있으니
+   설립 첫해 사업계획서가 통째로 빈 종이로 나갔다(대표 화면이 그랬다). */
+console.log('\n■ 사업계획서 — 출연금 하나로 채워진다');
+{
+  /* 예산을 «한 칸도» 안 적은, 설립 중인 기금. 출연금은 참여사업장 약정액에서 온다. */
+  const N = { name: '가나공동근로복지기금', fund_type: '공동', setup_stage: '설립준비',
+    chairman: '홍길동', officers: F.officers, years: {} };
+  global.funds.X = N; global.S.f15Close = null;
+  const t = draw('bizplan', N, SITES);
+  /* 참여사업장 약정액 600만 + 400만 = «1,000만»(닫은 곳 900만은 안 센다).
+     공동이라 그해 쓸 몫 90% = 900만 · 기본재산 100만 · 이자 2% = 2만
+     목적사업 810만 · 관리비 45만 · 예비비 45만. 서식은 «천원» 단위다. */
+  ok('예산이 비어 있어도 표가 선다', /1\.사업수익/.test(t) && !/1\.사업수익 [＿_]/.test(t));
+  ok('목적사업비 8,100천원', /2\.고유목적사업비용 8,100/.test(t),
+    (t.match(/2\.고유목적사업비용[^가]{0,30}/) || [''])[0]);
+  ok('일반관리비 450천원', /4\.일반관리비 450/.test(t), (t.match(/4\.일반관리비[^5]{0,30}/) || [''])[0]);
+  /* 「가.이자수입」과 「나.대부이자수입」은 원본에서 «한 칸»에 들어 있다 — 라벨이 이어 붙는다 */
+  ok('이자수입 20천원', /가\.이자수입 나\.대부이자수입 0 20 20/.test(t),
+    (t.match(/가\.이자수입.{0,34}/) || [''])[0]);
+  ok('첫머리 「신규 출연기금」에 금액이 선다', /신규 출연기금 : 10,000,000원/.test(t),
+    (t.match(/신규 출연기금[^-]{0,40}/) || [''])[0]);
+  ok('한글 금액도 적는다', /\(일천만원\)/.test(t), (t.match(/신규 출연기금[^-]{0,50}/) || [''])[0]);
+  ok('기금예치 계획 금액 10,000천원', /00 은행 10,000/.test(t), (t.match(/00 은행[^2]{0,26}/) || [''])[0]);
+  /* 설립 첫해는 기초가 0 이라 추정재무상태표도 선다 — 자산총계 = 현금 1천만 + … */
+  ok('설립 첫해는 추정재무상태표도 채운다', !/자산총계 [＿_]+/.test(t), (t.match(/자산총계[^가]{0,30}/) || [''])[0]);
+  /* 손으로 적은 예산이 있으면 «그것»이 이긴다 */
+  const H = Object.assign({}, N, { years: { 2026: { budget: { exp_purpose: 7000000 } } } });
+  global.funds.X = H;
+  const t2 = draw('bizplan', H, SITES);
+  ok('협의회가 적은 예산이 짐작을 이긴다', /2\.고유목적사업비용 7,000/.test(t2) && t2.indexOf('8,100') < 0,
+    (t2.match(/2\.고유목적사업비용[^가]{0,30}/) || [''])[0]);
+  /* 출연금이 아예 없으면 «지어내지 않는다» */
+  global.funds.X = N;
+  const t0 = draw('bizplan', Object.assign({}, N), []);
+  ok('출연금이 없으면 빈 채로 둔다', t0.indexOf('8,100') < 0 && t0.indexOf('10,000,000원') < 0);
+  /* 사내 중소기업은 80% — 한도가 유형에 따라 갈린다. 1,000만 × 80% × 90% = 720만 */
+  const M = Object.assign({}, N, { fund_type: '사내', sme: '중소기업', name: '가나사내근로복지기금' });
+  global.funds.X = M;
+  const t3 = draw('bizplan', M, SITES);
+  ok('중소기업 사내기금은 80%를 쓴다 (목적사업 7,200천원)', /2\.고유목적사업비용 7,200/.test(t3),
+    (t3.match(/2\.고유목적사업비용[^가]{0,30}/) || [''])[0]);
+  /* 그냥 사내면 50% — 1,000만 × 50% × 90% = 450만 */
+  const M2 = Object.assign({}, M, { sme: '중소기업 아님' });
+  global.funds.X = M2;
+  ok('중소기업이 아닌 사내기금은 50%다 (목적사업 4,500천원)',
+    /2\.고유목적사업비용 4,500/.test(draw('bizplan', M2, SITES)));
+  global.funds.X = F; global.S.f15Close = null;
 }
 
 console.log(bad ? '\nFAILURES ' + bad : '\nALL PASS (자료가 있는 자리는 서식에 선다, 없는 자리는 비어 있다)');

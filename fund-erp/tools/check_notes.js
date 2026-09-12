@@ -23,7 +23,8 @@ global.funds = { X: { fund_type: '공동', years: { 2026: { opening: {}, reserve
 (0, eval)(['ACCT_CHART','PURPOSE_ACCTS','ADMIN_ACCTS','OPEN_ACCT','RESERVE_ACCTS','CF_INVEST',
   'CF_FINANCE','IE_TREE'].map(gV).join('\n') + '\n'
   + ['_openingOf','_splitsOf','_splitSum','_txnDone','expandSplits','journalOf','acctMoves','computeFin',
-     '_contribOf','_reserveRate','_rsvSwapOf','_rsvRoles','_reserveAcct','reserveAdjust','_reserveEntry',
+     // _reserveRate 는 useRate 와 한 줄기다(2026-09-12) — 빠지면 이 검사가 통째로 죽는다
+     '_contribOf','useRate','_reserveRate','_rsvSwapOf','_rsvRoles','_reserveAcct','reserveAdjust','_reserveEntry',
      '_reserveEntries','_openAssets','cashMoves','_retLabel','_retVal','stmtBS','stmtIS','stmtRE','stmtNotes'].map(gF).join('\n'));
 
 let bad = 0;
