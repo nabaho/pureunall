@@ -633,7 +633,19 @@ exports.sendMaterialMail = functions
 
     const db = getDatabase();
     const body = (req.body && typeof req.body === "object") ? req.body : {};
-    const from = await mailUserAsync();
+    // ★★ 부르는 쪽이 「이 주소로」를 바랄 수 있다 (대표 확인 2026-09-12).
+    //   뉴스레터 시험 발송이 그렇다 — 진짜 발송은 370-6@hanmail.net 으로 나가는데
+    //   시험만 계정 주소(370-6@daum.net)로 나가고 있었다. 그러면 «시험이 시험이 아니다»
+    //   ({추적열쇠}·링크들을 맞춘 것과 같은 까닭 — 2026-09-06).
+    // ⚠ 아무 주소나 받지 않는다. 대량 발송과 «같은 조이기»를 지난다 —
+    //   사서함 이름이 계정과 같고 도메인이 daum/hanmail 인 것만 통과하고,
+    //   아니면 조용히 계정 주소로 나간다(MB.보내는주소고르기).
+    // ⚠ 안 주면 예전 그대로다 — 자료 메일(기업정보함)은 아무 것도 안 바뀐다.
+    // ⚠ 여기서 부른다 — 위의 MB 는 이 함수보다 «아래»에서 선언된다. 요청 때는 이미
+    //   올라와 있지만, 보는 사람이 헷갈리지 않게 이 자리에서 가져온다(newsView 와 같은 결).
+    const MBhere = require("./mail-bulk");
+    const 계정주소 = await mailUserAsync();
+    const from = MBhere.보내는주소고르기(body.from, 계정주소);
 
     // ── 예약 발송 ──
     // 보내지 않고 자리에만 담아 둔다. 때가 되면 sendScheduledMail 이 꺼내 보낸다.
