@@ -68,14 +68,18 @@ function drawTools(state){
 /* 거르개 메뉴 — 옆줄에서 내려온 넷 (2026-08-31 대표 지시).
    메뉴를 «열어» 보고, 항목을 눌러 무슨 일이 일어나는지까지 본다. */
 function drawFilterMenu(state, counts){
-  const c = Object.assign({ closed:0, nobiz:0, lack:0, uid:0 }, counts||{});
+  const c = Object.assign({ closed:0, nobiz:0, lack:0, uid:0, sme:0 }, counts||{});
   const box = { style:{}, innerHTML:"" };
   const ctx = { console, Object, Array, String, Number,
     esc: s => String(s==null?"":s),
     state: Object.assign({ coOnlyClosed:false, coOnlyNoBiz:false,
-      coOnlyIncomplete:false, coOnlyUid:false, coPage:3 }, state||{}),
+      coOnlyIncomplete:false, coOnlyUid:false, coOnlySme:false, coPage:3 }, state||{}),
     coClosedCount: () => c.closed, coNoBizCount: () => c.nobiz,
     coIncompleteCount: () => c.lack, coUidCount: () => c.uid,
+    /* 2026-09-12: 거르개에 「확인서 갱신」 한 줄이 늘었다(대표 지시). 이 검사는 메뉴의
+       «짜임»을 보므로 세는 일은 대역으로 둔다 — 잣대 자체는 따로 본다
+       (tests/cards-co-sme-due.test.js). */
+    coSmeCount: () => c.sme,
     closeFolderMenu(){}, renderCoAny(){ ctx.drew = (ctx.drew||0) + 1; },
     setTimeout(){}, document: { addEventListener(){} },
     window: { innerWidth: 1600 },

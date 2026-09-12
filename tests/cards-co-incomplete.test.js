@@ -210,9 +210,13 @@ function drawTodo(lack, on){
   const box = { style:{}, innerHTML:"" };
   const ctx = { console, Object, Array, String, Number,
     esc: s => String(s==null?'':s),
-    state: { coOnlyClosed:false, coOnlyNoBiz:false, coOnlyIncomplete:!!on, coOnlyUid:false, coPage:0 },
+    state: { coOnlyClosed:false, coOnlyNoBiz:false, coOnlyIncomplete:!!on, coOnlyUid:false,
+             coOnlySme:false, coPage:0 },
     coClosedCount: () => 0, coNoBizCount: () => 0,
     coIncompleteCount: () => lack, coUidCount: () => 0,
+    /* 2026-09-12: 거르개에 「확인서 갱신」이 늘었다 — 이 검사는 「정보부족」 줄만 보므로
+       세는 일은 대역으로 둔다(잣대는 tests/cards-co-sme-due.test.js 가 본다). */
+    coSmeCount: () => 0,
     closeFolderMenu(){}, renderCoAny(){}, setTimeout(){},
     document: { addEventListener(){} }, window: { innerWidth: 1600 },
     $: () => box };
@@ -269,7 +273,7 @@ function drawRow(o){
     "function coMgrCell(){ return ''; }",
     "function coSizeSelHtml(){ return ''; }",
     "function coPagerHtml(){ return ''; }",
-    "function coOrphanBarHtml(){ return ''; }",
+    "function coOrphanBarHtml(){ return ''; } function coSmeBarHtml(){ return ''; }",
     /* 2026-08-30: 도구줄의 「자주 쓰는 폴더」 단추 — 이 검사는 안 본다 */
     "function coQuickFolderBtns(){ return ''; }"
   ].join('\n'), ctx);
