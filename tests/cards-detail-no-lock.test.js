@@ -168,7 +168,7 @@ test('말풍선에 명함·등록증·빠진 것이 다 담긴다', () => {
 });
 
 test('표가 좌우로 넘치지 않는다 — 다만 «남는 폭»을 굳이 아끼지도 않는다', () => {
-  const co = slice('return `${coOrphanBarHtml()}<table class="cotbl">', '<thead><tr>');
+  const co = slice('<table class="cotbl">', '<thead><tr>');
   const w = (co.match(/width:(\d+)px/g) || []).map(x => Number(x.match(/\d+/)[0]));
   /* ⚠ 예전에는 합을 «868 그대로»로 못 박았다. 그런데 재 보니 1700px 화면에서 표
      오른쪽에 **791px 이 빈 채로** 남아 있었다 — 마지막 <col> 이 남는 폭을 다 먹는다.

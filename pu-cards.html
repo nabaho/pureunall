@@ -2315,6 +2315,25 @@ td.selcell{cursor:cell}
 .coorph .osame{font-size:12px;color:#1e40af;margin-top:4px}
 .coorph .om{margin-top:4px}
 .coorph .om em{font-style:normal;color:#1e40af;font-size:11.5px;cursor:pointer}
+/* ── 🏅 중소기업 확인서 갱신 (대표 지시 2026-09-12) ────────────────────────
+   ⚠ 고아 정보 띠(.coorphbar)와 «같은 모양»을 쓴다 — 목록 위에 서는 알림은 하나의
+     결이어야 「또 새로운 것이 생겼나」로 읽히지 않는다.
+   ⚠ 색은 팔레트 안에서만(tests/color-palette-apps.test.js). */
+.cosmebar{margin:0 0 10px;padding:10px 13px;border:1px solid #fde68a;background:#ffffff;
+  border-radius:9px;font-size:12.5px;color:#854d0e;cursor:pointer}
+.cosmebar:hover{background:#f8fafc}
+.cosmebar b{color:#1e293b}
+.cosmebar em{font-style:normal;color:#1e40af;margin-left:4px}
+.cosmerow{padding:10px 11px;border-bottom:1px solid #f8fafc;cursor:pointer}
+.cosmerow:last-child{border-bottom:none}
+.cosmerow:hover{background:#f8fafc}
+.cosmerow .sk{font-size:13px;font-weight:700;color:#1e293b}
+.cosmerow .sv{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:4px;font-size:12px}
+.cosmerow .sd{font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.cosmerow .sd.gone{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.cosmerow .sd.soon{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
+.cosmerow .se{color:#64748b}
+.cosmerow .sm{color:#94a3b8;margin-left:auto}
 /* 기업 상세(데스크톱 표·폰 목록·상세 패널)에서도 같은 배지를 쓴다(대표 지시 2026-08-24) —
    자리마다 감싸는 칸 이름이 달라(.cotbl·상세 패널·느슨한 .row) 범위를 안 좁힌다.
    ⚠ 위의 #pcTable 것을 지우지 않는다 — 「계약해지 문패는 색을 갖는다」 검사가 그
@@ -25970,7 +25989,11 @@ function coFilters(){
     { k: 'coOnlyIncomplete', icon: '📋', label: '정보부족',   count: () => coIncompleteCount(),
       title: '대표자·소재지·대표번호 중 빠진 것이 있는 회사만 봅니다 — 계약서·신고서에 필요한 값입니다' },
     { k: 'coOnlyUid',        icon: '🏛', label: '고유번호증', count: () => coUidCount(),
-      title: '고유번호증으로 들어온 곳만 봅니다 — 비영리법인·국가기관 등' }
+      title: '고유번호증으로 들어온 곳만 봅니다 — 비영리법인·국가기관 등' },
+    /* 🏅 확인서 갱신 (대표 지시 2026-09-12) — 띠·창과 «같은 잣대»(coSmeNeeds)를 쓴다.
+       띠는 「몇 곳인가」를, 이 거르개는 「그 곳만 목록으로」를 맡는다. */
+    { k: 'coOnlySme',        icon: '🏅', label: '확인서 갱신', count: () => coSmeCount(),
+      title: '중소기업 확인서가 만료됐거나 30일 안에 만료될 회사만 봅니다 — 해마다 새로 받습니다' }
   ];
 }
 /* 세어서 늘어놓는다 — 메뉴를 «열 때» 한 번만 부른다 */
@@ -26442,6 +26465,11 @@ function coFilteredList(skipCol, skipCares, skipTodo){
      비영리법인·국가기관은 사업자등록증이 아니라 고유번호증을 받는다. 다루는 법은
      같지만 «따로 모아 봐야 할» 때가 있다(법인·단체만 골라 서식을 보낼 때). */
   if(state.coOnlyUid && !skipTodo) list = list.filter(coIsUid);
+  /* ── 🏅 확인서 갱신할 곳만 (대표 지시 2026-09-12) ──
+     중소기업 확인서는 «해마다» 새로 받는다. 만료된 것으로 지원사업에 넣으면 반려된다.
+     ⚠ 거르는 잣대는 coSmeNeeds «한 곳»이다 — 띠(coSmeBarHtml)·창(coSmeHtml)·상세 딱지가
+       모두 그것을 본다. 여기서 다시 재면 「띠는 3곳인데 목록은 5곳」이 된다. */
+  if(state.coOnlySme && !skipTodo) list = list.filter(o=>coSmeNeeds(o));
   /* ── 📤 이 갈래를 «못 받은» 곳만 (4걸음, 대표 지시 2026-09-03) ──
      ⚠ 계약해지(🚪)는 «여기서도» 뺀다. 배포할 때 애초에 안 보낸 곳이라(3걸음),
        빼지 않으면 끝난 곳이 죄다 「안 받은 곳」으로 올라와 목록이 못 쓰게 된다.
@@ -26533,8 +26561,12 @@ function pickCoNoFolder(){
    할 일이 켜져 있다는 표시가 «옆줄 한 줄이 진해지는 것»뿐이라, 폴더를 눌러도
    그 조건이 함께 걸려 텅 빈 목록이 나오는 까닭을 알 길이 없었다.
    ⚠ 명함 쪽은 2026-08-29 에 같은 것을 겪고 조건 띠로 고쳤다 — 같은 결로 맞춘다. */
+/* ⚠ 켤 수 있는 거르개는 «모두» 여기 이름이 있어야 한다 — 걸어 놓고 이름이 없으면
+     목록이 좁혀진 까닭을 화면이 아무 말도 안 한다(검사 cards-co-todo-band 가 지킨다).
+     2026-09-12 에 「🏅 확인서 갱신」을 늘리며 이 자리를 빠뜨렸다가 그 검사가 잡았다. */
 const CO_TODO_LABEL = { coOnlyClosed:'🚪 종료', coOnlyNoBiz:'🔢 번호 없음',
                         coOnlyIncomplete:'📋 정보부족', coOnlyUid:'🏛 고유번호증',
+                        coOnlySme:'🏅 확인서 갱신',
                         coNoFolder:'📂 아직 안 담음' };
 function clearCoTodo(k){ state[k] = false; state.coPage = 0; renderCoAny(); }
 /* ⚠ 띠 모양은 condChipHtml 한 곳에만 있다 (점검 A3) — 여기 다시 적으면 두 벌이 된다 */
@@ -26909,7 +26941,7 @@ function coListHtml(info){
        내려갔을 때 마지막 줄을 덮지 않는다.
      ⚠ 쪽넘김은 여기 «없다». renderCoPage 의 안 구르는 바닥(.cofoot)으로 옮겼다 —
        여기 두면 표와 함께 굴러가 200줄 아래로 숨는다(대표 지시 2026-08-26). */
-  return `${coOrphanBarHtml()}<table class="cotbl">
+  return `${coOrphanBarHtml()}${coSmeBarHtml()}<table class="cotbl">
     ${/* ⚠ 「가진 것」을 한 줄로 만들면서 그 칸을 170→215px 로 넓혔다. 늘린 만큼은
          상호(300→255)에서 덜어 온다 — 표 전체가 넓어지면 좌우로 넘친다. */''}
     ${/* ⚠ 폴더를 «제 열»로 뺐다 (대표 지시 2026-08-30 「열 정리해라 세로로 정렬해서」).
@@ -28573,6 +28605,71 @@ function coSmeState(txt, now){
   if(d <= 30) return { cls:'soon', text:'확인서 D-' + d + ' · ' + exp, why:'곧 만료됩니다 — 새로 발급받을 때입니다' };
   return { cls:'ok', text:'확인서 ' + exp + '까지', why:'유효한 중소기업 확인서입니다' };
 }
+/* ══════ 🏅 올해 «갱신할» 확인서만 한자리에 (대표 지시 2026-09-12) ══════════════
+   대표: 「3번 중소기업확인서 진행」 — 점검 보고의 ③ 「지금은 회사를 열어야 보인다.
+   올해 갱신할 곳을 한 번에 보는 목록이 있으면 매년 챙기기 쉽겠다」
+
+   ■ 무엇이 없었나
+   확인서 유효기간은 회사마다 «상세를 열어야» 보였다. 4,000곳 가운데 어디가 만료됐고
+   어디가 곧인지 알려면 한 곳씩 열어 보는 수밖에 없었다 — 해마다 하는 일인데 그렇다.
+
+   ★ 잣대는 «한 곳»이다 — coSmeState(만료·D-30)를 그대로 쓴다. 여기서 다시 재면
+     띠·창·상세가 서로 다른 말을 하게 된다.
+   ⚠ «아직 먼 것»은 안 담는다. 유효한 확인서까지 담으면 목록이 「전체 목록」이 되어
+     정작 갱신할 곳이 묻힌다.
+   ⚠ 날짜로 «못 읽은» 확인서도 안 담는다(별도 통지시까지 등). 모르는 것을 급하다고
+     하면 늑대 소년이 된다 — 그 값은 상세에 적힌 그대로 보인다. */
+function coSmeNeeds(o, now){
+  const st = coSmeState(coVal(o, 'smeExpiry'), now);
+  return !!st && (st.cls === 'gone' || st.cls === 'soon');
+}
+/* 급한 순으로 — 남은 날이 적을수록 앞. 지난 것은 음수라 저절로 맨 앞에 선다
+   (더 오래 지난 것이 더 급하다). */
+function coSmeList(now){
+  return (coList() || []).filter(o => coSmeNeeds(o, now)).map(function(o){
+    const exp = coVal(o, 'smeExpiry');
+    return { o:o, key:o.key, name:o.name || '', exp:exp,
+             cls:(coSmeState(exp, now) || {}).cls, days:coSmeDays(exp, now) };
+  }).sort((a,b) => (a.days - b.days) || String(a.name).localeCompare(String(b.name), 'ko'));
+}
+function coSmeCount(now){ return coSmeList(now).length; }
+/* 목록 위 알림 띠 — 0곳이면 «아무 것도 안 띄운다».
+   ⚠ 늘 뜨는 띠는 눈이 배경으로 배운다(고아 정보 띠에서 정한 규칙 그대로다). */
+function coSmeBarHtml(){
+  const list = coSmeList();
+  if(!list.length) return '';
+  const gone = list.filter(x => x.cls === 'gone').length;
+  const soon = list.length - gone;
+  const bits = [ gone ? `만료 <b>${gone.toLocaleString()}곳</b>` : '',
+                 soon ? `30일 안 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
+  return `<div class="cosmebar" onclick="openCoSme()"
+      title="중소기업 확인서는 해마다 새로 받습니다 — 만료됐거나 곧 만료될 곳입니다">
+      🏅 중소기업 확인서 ${bits}<em>— 눌러서 보기</em></div>`;
+}
+function openCoSme(){ showPanel(coSmeHtml()); }
+/* 창 — 급한 순으로 늘어놓고, 누르면 그 회사를 연다.
+   ⚠ 여기서 «고치지 않는다». 확인서는 바깥(중소기업현황정보시스템)에서 새로 받아
+     사진첩으로 들어오는 것이라, 이 창이 할 일은 「어디를 챙길 것인가」를 말하는 것뿐이다. */
+function coSmeHtml(){
+  const list = coSmeList();
+  if(!list.length) return `<div class="mhead"><b>🏅 중소기업 확인서</b>${_closeBtn()}</div>
+    <p class="cpnone" style="padding:16px 2px">갱신할 곳이 없습니다 👍</p>`;
+  return `<div class="mhead"><b>🏅 중소기업 확인서 — 갱신할 곳 ${list.length}곳</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 10px">확인서는 <b>해마다</b> 새로 받습니다.
+      만료된 것으로 지원사업에 넣으면 반려됩니다 — 급한 곳부터 놓았습니다.
+      회사를 누르면 그 회사 상세가 열립니다.</p>
+    <div class="ablist">${list.map(x=>`
+      ${/* ⚠ 창을 «먼저 닫고» 회사를 연다 — 안 닫으면 상세 패널이 이 창 뒤에 열려
+             눌렀는데 아무 일도 없는 것처럼 보인다. 닫는 길은 ✕ 와 «같은 것»을 쓴다. */''}
+      <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
+          title="${esc(x.name)} 상세를 엽니다">
+        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
+        <div class="sv"><span class="sd ${x.cls}">${x.days < 0 ? '만료 ' + (-x.days) + '일 지남' : 'D-' + x.days}</span>
+          <span class="se">${esc(x.exp)}까지</span>
+          ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
+      </div>`).join('')}</div>`;
+}
+
 function coSmeChipHtml(o){
   const st = coSmeState(coVal(o, 'smeExpiry'));
   if(!st) return '';
