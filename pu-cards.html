@@ -14407,7 +14407,7 @@ function renderPCSide(){
     <button class="${onCo?'on':''}" onclick="openCoPage()" title="회사 하나에 얽힌 것을 한자리에 — 사업자등록증·명함·푸른이알피">🏢<em>기업 상세</em><span>${coList().length.toLocaleString()}</span></button>
     ${/* 👷 근로자 정보함 (대표 지시 2026-09-01) — 회사가 아니라 «사람»을 가운데 놓는다.
          개수는 wkList() 한 곳에서 센다 — 옆줄과 목록이 따로 세면 두 숫자가 어긋난다. */''}
-    <button class="${onWk?'on':''}" onclick="openWkPage()" title="사건과 사진첩 서류를 «사람»으로 모아 봅니다 — 집단 진정은 한 줄로 접힙니다">👷<em>근로자</em><span>${wkList().length.toLocaleString()}</span></button>
+    <button class="${onWk?'on':''}" onclick="openWkPage()" title="사건과 사진첩 서류를 «사람»으로 모아 봅니다 — 집단 진정은 한 줄로 접힙니다">👷<em>근로자</em><span>${wkCountLabel()}</span></button>
   </div></div>`;
   /* ⚠ 갈래 줄의 끝(`</div></div>`)이 .pcside-top 까지 «같이» 닫는다. 메일 창은 위에서
      이미 갈라져 나갔으므로 여기서는 갈래 줄이 늘 그려진다 — 따로 닫을 일이 없다. */
@@ -24995,6 +24995,14 @@ function loadErpCaseCons(cb){
     _erpConsTypes = _erpHistTypes.consulting || [];
     _erpCaseCons = { byBiz, byName };
     _erpCaseConsLoading = false;
+    /* 사람 목록(wkList)은 이 자료로 만든다 — 새 자료가 왔으니 기억을 지우고 옆줄
+       딱지를 고쳐 그린다. ★ «누가 불렀든» 따라오게 여기 한 곳에서 한다
+       (2026-09-12: 예전에는 근로자 화면만 지워서, 기업 상세를 열어 이 자료를
+        받아 놓고도 옆줄은 「근로자 0」인 채였다).
+       ⚠ 기다리던 콜백보다 «먼저» 한다 — 안 그러면 그것들이 낡은 기억을 본다.
+       ⚠ 옆줄 딱지는 «부른 사람과 상관없이» 고쳐 그린다. 기업 상세를 열었을 뿐인데도
+         근로자 숫자가 제자리를 찾는다. 구르던 자리는 renderPCSide 가 지켜 준다. */
+    try{ wkListBust(); if(document.body.classList.contains('pc')) renderPCSide(); }catch(_){}
     const waiters = _erpCaseConsWaiters; _erpCaseConsWaiters = [];
     cb && cb(_erpCaseCons);
     waiters.forEach(w=>w(_erpCaseCons));
@@ -29431,10 +29439,24 @@ function wkListBuild(erp, info){
     .sort((a,b)=>(b.rank-a.rank) || String(a.name).localeCompare(String(b.name),'ko'));
 }
 
+/* 사람 목록을 «말할 수 있는가» — 이알피 사건이 아직 안 왔으면 아무 말도 못 한다.
+   ⚠ 이 잣대가 없으면 화면은 「모른다」와 「없다」를 같은 0 으로 적는다. 0명은 «없다»는
+     말이라 아무도 눌러 보지 않는다 — 사람이 40명 걸려 있어도 그렇다. */
+function wkListKnown(){ return !!((typeof _erpCaseCons !== 'undefined') && _erpCaseCons); }
+
+/* 옆줄 딱지에 적을 숫자 — 모르면 숫자를 «안 적는다» (2026-09-12 실측으로 찾은 구멍) */
+function wkCountLabel(){ return wkListKnown() ? wkList().length.toLocaleString() : '…'; }
+
 function wkList(){
   if(_wkListMemo) return _wkListMemo;
   const erp = (typeof _erpCaseCons !== 'undefined') ? _erpCaseCons : null;
-  return (_wkListMemo = wkListBuild(erp, _wkInfo));
+  const list = wkListBuild(erp, _wkInfo);
+  /* ⚠⚠ 아직 «안 온» 답은 기억하지 않는다 (2026-09-12 실측).
+     예전에는 빈 목록을 그대로 기억해 버렸다 — 옆줄 딱지는 명함 화면을 그릴 때
+     한 번 불리는데, 그때는 이알피를 아직 안 읽었으므로 0 이 «굳었다». 자료가
+     나중에 와도 기억이 앞을 막아, 근로자 화면을 직접 열기 전까지 영영 0명이었다. */
+  if(!erp) return list;
+  return (_wkListMemo = list);
 }
 
 /* ── 집단 진정을 «한 줄로 접는다» (검토안 ㉯, 대표 승인 2026-09-01) ──
@@ -29580,7 +29602,9 @@ function enterWkView(){
   render();
   loadWkInfo();
   /* 사람과 사건이 모두 이알피에서 온다 — 처음 열 때 한 번 읽는다 */
-  loadErpCaseCons(()=>{ wkListBust(); renderWkSoon(); });
+  /* ⚠ 기억을 지우는 것은 loadErpCaseCons 안에서 «이미» 한다 — 여기서 또 지우면
+     「어디서 지우나」가 두 곳이 되어, 다음에 한쪽만 고쳐진다. 여기서는 그리기만. */
+  loadErpCaseCons(()=>renderWkSoon());
 }
 function openWkPage(){ enterWkView(); try{ $('pcMain').scrollTop=0; }catch(_){} }
 
@@ -29773,7 +29797,10 @@ function wkFoldToggle(caseKey){
 function wkListHtml(){
   const list = wkVisible();
   if(!list.length){
-    const why = state.wkQ ? '찾는 말과 맞는 사람이 없습니다'
+    /* ⚠ 「없습니다」와 「아직 안 왔습니다」는 다른 말이다 — 읽는 중에 「없다」고 하면
+       사람은 그 말을 믿고 화면을 닫는다(2026-09-12). */
+    const why = !wkListKnown() ? '푸른이알피에서 사건을 불러오는 중입니다…'
+      : state.wkQ ? '찾는 말과 맞는 사람이 없습니다'
       : (state.wkFolder ? '이 갈래에 든 사람이 없습니다'
         : '아직 사람이 없습니다 — 푸른이알피 사건에 근로자(의뢰인)를 넣으면 여기 모입니다');
     return `<p class="conone">${esc(why)}</p>`;
@@ -29847,7 +29874,7 @@ function wkHeadHtml(){
   const grp = wkList().filter(p=>(p.cases||[]).some(c=>c.group)).length;
   const bill = state.wkView === 'bill';
   return `<div class="wkbar">
-    <b>${bill ? '🧾 처리 건' : '👷 근로자 ' + n.toLocaleString() + '명'}</b>
+    <b>${bill ? '🧾 처리 건' : '👷 근로자 ' + (wkListKnown() ? n.toLocaleString() + '명' : '…')}</b>
     ${(!bill && grp)?`<span class="wkchip wkgc" title="한 사건에 2명 이상 걸린 건입니다 — 목록에서 한 줄로 접혀 있습니다">집단 진정에 ${grp}명</span>`:''}
     <button class="wkvbtn${bill?' on':''}" onclick="wkToggleView()"
       title="업체 × 근로자 × 서류종류 = 1건으로 셉니다">${bill?'👷 사람으로':'🧾 처리 건'}</button>
