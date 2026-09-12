@@ -731,13 +731,17 @@ ok('신청 날짜와 신청인을 채운다', /\^20\\s\*년\\s\*월\\s\*일\$/.t
 /* ══ 사업계획서 손익예산 ══
    서식의 열 단계는 손익계산서와 같은 짜임새라, 예산만 있으면 나머지는 셈으로 나온다.
    제출본과 대조해 칸 하나까지 같은 것을 확인했다. */
-ok('사업계획서를 예산으로 채운다', src.includes('function bizplanRows(f,yr){')
-  && src.includes('function fillBizplanDoc(root,f){')
-  && src.includes("if(kind==='bizplan') fillBizplanDoc(d,f);"));
+/* 2026-09-12: 참여사업장을 함께 받는다 — 예산이 비면 «출연예정금»에서 세우기 때문이다 */
+ok('사업계획서를 예산으로 채운다', src.includes('function bizplanRows(f,yr,sites){')
+  && src.includes('function fillBizplanDoc(root,f,sites){')
+  && src.includes("if(kind==='bizplan') fillBizplanDoc(d,f,sites);"));
 /* ⚠ 이것은 «계획»이다 — 실적(computeFin)을 넣으면 내년 계획 자리에 올해 실적이 들어간다.
-   예산이 비면 «비운 채로» 둔다. */
-ok('예산이 없으면 안 채운다', src.includes('if(!_hasBudget(S.fundId,yr)) return null;')
-  && src.slice(src.indexOf('function bizplanRows'), src.indexOf('function fillBizplanDoc')).indexOf('computeFin') < 0);
+   예산도 출연금도 없으면 «비운 채로» 둔다. */
+ok('예산도 출연금도 없으면 안 채운다', /var b=planBudget\(f,sites,yr\);\s*\n\s*if\(!b\) return null;/.test(src)
+  && src.slice(src.indexOf('function bizplanRows'), src.indexOf('function bizplanBS')).indexOf('computeFin') < 0);
+/* 짐작이 협의회 의결을 덮으면 안 된다 — 적어 둔 예산이 언제나 먼저다 */
+ok('적어 둔 예산이 짐작을 이긴다',
+  /function planBudget\(f,sites,yr\)\{[\s\S]{0,240}if\(_hasBudget\(fid,yr\)\) return budgetOf\(fid,yr\)/.test(src));
 /* 목적사업 회계와 기금관리 회계가 «따로» 0 으로 맞물린다(제출본이 그렇게 짜여 있다) */
 ok('두 회계가 따로 맞물린다', src.includes('var pNonopExp=spare, pNonopRev=spare-pOp;')
   && src.includes('var fNonopExp=interest;'));
@@ -767,12 +771,17 @@ ok('스냅샷의 assets 를 읽는다', src.includes('function _bizFinOf(){')
   && src.includes('if(f.res1==null||f.res2==null||f.secu==null) return null;'));
 ok('스냅샷이 증권·준비금을 담는다', src.includes('secu:fin.secu, res1:fin.res1, res2:fin.res2,'));
 // 예산이 있나 하는 잣대는 «한 곳»에서 — 두 벌이면 서로 어긋난다
+/* 2026-09-12: 사업계획서 두 표가 예산을 따로 읽지 않는다 — planBudget 한 문으로 들어간다 */
 ok('예산 있나를 한 곳에서 본다', src.includes('function _hasBudget(fid,yr){')
   && src.includes('var BUDGET_KEYS=[')
-  && (src.match(/_hasBudget\(S\.fundId,yr\)/g)||[]).length===2);
+  /* 세 번 나온다 — 문을 «만드는» 곳 한 번 + 손익예산·추정재무상태표가 «들어가는» 곳 두 번.
+     예전처럼 두 표가 budgetOf 를 따로 읽으면 표끼리 어긋난다. */
+  && (src.match(/planBudget\(f,sites,yr\)/g)||[]).length===3
+  && src.includes('function planBudget(f,sites,yr){')
+  && src.indexOf('_hasBudget(S.fundId,yr)') < 0);
 
 /* ══ 추정재무상태표 ══ 올해 기말에 내년 계획을 얹는다 */
-ok('추정재무상태표를 셈한다', src.includes('function bizplanBS(f,yr,fin){')
+ok('추정재무상태표를 셈한다', src.includes('function bizplanBS(f,yr,fin,sites){')
   && src.includes('var BIZ_BS_ROWS=['));
 // 예비비도 «쓸 돈»으로 보아 현금에서 뺀다 — 안 빼면 그만큼 대차가 어긋난다
 ok('예비비를 현금에서 뺀다', src.includes('var cash=fin.cash+contrib+interest-pur-adm-spare;'));
@@ -1036,7 +1045,12 @@ ok('당기 출연금 집계', src.includes('function _contribOf'));
 // 증권·부동산 현물출연을 한도에 넣으면 기본재산이 붕괴한다(B공동 2022: 증권 72.6억 현물출연)
 ok('한도 기준은 현금 출연금만', src.includes('if(x.nocash) return;                                  // 현물출연·대체분개는 제외')
   && src.includes("if(!amt&&(x.debit==='현금성자산'||x.debit==='정기예금')) amt=num(x.amount)||0;"));
-ok('사용한도 비율(공동 90/사내 50)', /function _reserveRate\(fid\)\{ return \(\(funds\[fid\]\|\|\{\}\)\.fund_type==='사내'\)\?0\.5:0\.9; \}/.test(src));
+/* 한도는 «한 줄기»다 — 별지15호 ㉚ 과 설립 첫해 예산이 같은 값을 본다(2026-09-12).
+   대표 판단: 공동 90% · 사내 50% · «중소기업에 설치된» 사내 80% (시행령) */
+ok('사용한도가 한 줄기(_reserveRate → useRate)',
+  /function _reserveRate\(fid\)\{ return useRate\(funds\[fid\]\|\|\{\}\); \}/.test(src));
+ok('사용한도 비율(공동 90/사내 50/중소기업 사내 80)',
+  /function useRate\(f\)\{[\s\S]{0,200}!=='사내'\) return 0\.9;[\s\S]{0,120}sme==='중소기업'\) \? 0\.8 : 0\.5;/.test(src));
 ok('준비금2 설정 분개(기본재산 차변)', /if\(kind==='설정'\)/.test(src) && /debit:'기본재산', credit:acct/.test(src));
 // 기본재산은 대부사업에만 쓸 수 있다 — 복지사업에는 사용한도를 넘겨 쓸 수 없으므로
 // 모자라는 만큼은 손실금으로 남아 다음 회계연도로 이월된다(근로복지공단 실무 6.2)

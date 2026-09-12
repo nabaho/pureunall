@@ -40,6 +40,11 @@ global.funds = {};
   gF('_officersOf'), gF('_boss'), gF('_isBlankCell'), gF('_isLabelCell'), gF('_bakeText'),
   gF('_isRateRow'), gF('stripBaked'), gF('korWon'), gF('_docRok'),
   gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'), gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'),
+  /* 출연금 하나로 세우는 첫해 예산(2026-09-12) — bizplanRows·bizplanBS 가 부른다.
+     여기 없으면 「planBudget is not defined」로 이 검사가 통째로 죽는다. */
+  gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
+  gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
+  gF('isSetupFund'), gF('_bizFinZero'), gF('fillBizplanHead'),
   gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'), gF('fillCommittee'),
   /* hwpFormHTML 이 끝에서 fillDerived 를, 설립 출연확인서에서 fillFoundContribDoc 를 부른다(2026-09-07).
      여기 없으면 「fillDerived is not defined」로 이 검사가 통째로 죽는다 — 서식이 안 채워지는 게 아니라

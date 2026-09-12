@@ -46,7 +46,8 @@ global.funds = { X: { fund_type: '공동', years: {} } };
 (0, eval)(['ACCT_CHART', 'PURPOSE_ACCTS', 'ADMIN_ACCTS', 'OPEN_ACCT', 'RESERVE_ACCTS', 'F15_ROWS'].map(grabVar).join('\n') + '\n'
   + ['_openingOf', '_splitsOf', '_splitSum', '_txnDone', 'expandSplits', 'journalOf', 'acctMoves',
      // 준비금 1·2 배치는 기금마다 다르다 — 그것을 읽는 도우미도 함께 들여온다
-     'computeFin', '_contribOf', '_reserveRate', '_rsvSwapOf', '_rsvRoles', '_reserveAcct', 'reserveAdjust',
+     // _reserveRate 는 useRate 로 한 줄기를 이룬다(2026-09-12) — 빠지면 이 검사가 통째로 죽는다
+     'computeFin', '_contribOf', 'useRate', '_reserveRate', '_rsvSwapOf', '_rsvRoles', '_reserveAcct', 'reserveAdjust',
      '_reserveEntry', '_reserveEntries', 'finNegatives', '_retLabel', '_retVal',
      /* ⚠ buildF15 가 부르는 것은 모두 들여와야 한다 — 하나만 빠져도 이 검사가 «통째로» 죽고,
         167건이 도는 줄 알지만 실제로는 아무것도 안 돈다(bfMovesOf 가 빠져 그랬다).
