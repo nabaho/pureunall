@@ -50,7 +50,7 @@ test('② ★★ 문턱에 걸리면 «말한다» — 조용히 느려지지 �
   /* ⚠ 바로 위 «중복» 점검도 erpAlert 를 부른다 — 구역 전체에서 찾으면 내 것을
      통째로 빼도 통과한다(2026-09-12 되돌림 검사에서 드러났다).
      «id 없음을 센 자리부터» 잘라 보고, 그 말이 함께 있는지까지 본다. */
-  const 센자리 = 구역.indexOf('var _noId = 0;');
+  const 센자리 = 구역.indexOf('var _hasId = 0, _noId = 0;');
   assert.ok(센자리 > 0, 'id 없음 점검을 못 찾았습니다');
   const 말하는곳 = 구역.slice(센자리, 센자리 + 900);
   assert.match(말하는곳, /erpAlert\([^)]*id 없는 기록/,
@@ -61,8 +61,21 @@ test('② ★★ 문턱에 걸리면 «말한다» — 조용히 느려지지 �
     '★ 무엇이 문제인지(통째 저장) 안 알려 줍니다');
 });
 
+test('②-2 ★★ «섞였을 때»만 말한다 — 열쇠가 sid 인 표에 헛경보를 울리지 않는다', function () {
+  /* 실측 2026-09-12: 직원계정 32건은 «전부» id 가 없다 — 그 표는 sid 를 열쇠로 쓴다.
+     고장이 아니라 생김새다. 「하나라도 없으면 알림」으로 두었더니 32건이 떠서
+     고칠 것이 없는데 고치라고 안내했다. 틀린 안내는 없느니만 못하다.
+     진짜 고장의 모양은 «섞임»이다(자문수입 1,859 + 1). */
+  const from = bare.indexOf('var _hasId = 0, _noId = 0;');
+  assert.ok(from > 0, '★ id 있음/없음을 «함께» 세지 않습니다 — 섞였는지 알 수 없습니다');
+  const 구역 = bare.slice(from, from + 800);
+  assert.match(구역, /if\(_noId > 0 && _hasId > 0\)/,
+    '★★ 섞이지 않은 표(열쇠가 sid 인 직원계정 등)에도 알림이 뜹니다 — 헛경보입니다');
+  assert.match(구역, /_hasId/, '★ 나머지 몇 건에 id 가 있는지 안 알려 줍니다');
+});
+
 test('③ ★ 자동으로 지우지 않는다 — 돈이 걸린 자료다', function () {
-  const from = bare.indexOf('var _noId = 0;');
+  const from = bare.indexOf('var _hasId = 0, _noId = 0;');
   assert.ok(from > 0, 'id 없음 점검을 못 찾았습니다');
   const 구역 = bare.slice(from, from + 700);
   assert.ok(!/dbSet\(|filter\(function\(x\)\{ return x && x\.id/.test(구역),
@@ -83,6 +96,6 @@ test('⑤ ★ 중복 점검은 그대로 — 두 점검이 같은 자리에 나�
   /* ⚠ 「글자가 있나」만 보면 그 줄을 죽여도 통과한다 — «일하는 줄»을 본다 */
   assert.match(구역, /if\(dup>0\)\{/, '★★ 중복을 찾아 놓고 아무것도 안 합니다');
   assert.match(구역, /dbSet\(k, _cl\)/, '★★ 중복을 걷어내지 않습니다');
-  assert.ok(구역.indexOf('if(dup>0){') < 구역.indexOf('var _noId = 0;'),
+  assert.ok(구역.indexOf('if(dup>0){') < 구역.indexOf('var _hasId = 0, _noId = 0;'),
     '★ 점검 차례가 뒤바뀌었습니다 — 중복을 먼저 걷어야 id 없음이 정확히 세어집니다');
 });
