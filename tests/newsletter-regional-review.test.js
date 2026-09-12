@@ -44,6 +44,33 @@ test('같은 후보는 회차에 두 번 승인하지 않는다', () => {
   assert.equal(Review.승인뉴스(후보, '다시 담기', existing, 100), null);
 });
 
+test('수동 등록도 온톨로지 계약과 출처를 빠짐없이 갖는다', () => {
+  const x = Review.수동뉴스({ 지역:'충남/서산시', 제목:'서산 안내',
+    링크:'https://www.seosan.go.kr/a', 출처Id:'seosan-city', 언론사:'서산시', 우리말:'직접 쓴 설명' },
+    'admin@test', 1234);
+  assert.equal(x.id, 'manual-regional-1234');
+  assert.equal(x.entityType, 'Message');
+  assert.equal(x.schemaVersion, 1);
+  assert.equal(x.contractVersion, 1);
+  assert.equal(x.revision, 1);
+  assert.equal(x.sourceKind, 'regionalNewsSource');
+  assert.equal(x.sourceId, 'seosan-city');
+  assert.equal(x.상태, '활성');
+});
+
+test('지역뉴스 철회는 물리 삭제하지 않고 사유와 감사이력을 남긴다', () => {
+  const x = Review.승인뉴스(후보, '직접 쓴 설명', [], 100);
+  const y = Review.철회(x, '이번 회차와 맞지 않음', 'admin@test', 200);
+  assert.equal(y.상태, '철회');
+  assert.equal(y.revision, 2);
+  assert.equal(y.철회사유, '이번 회차와 맞지 않음');
+  assert.equal(y.철회자, 'admin@test');
+  assert.equal(y.철회일, 200);
+  assert.equal(y.링크, x.링크);
+  assert.equal(Review.활성인가(y), false);
+  assert.equal(Review.철회(y, '다시', 'other@test', 300), null);
+});
+
 test('화면에는 승인·제외 단추가 있고 트랜잭션으로 먼저 선점한다', () => {
   assert.match(화면, /지역후보승인\(/);
   assert.match(화면, /지역후보제외\(/);
@@ -59,4 +86,16 @@ test('승인 실패 시 자신이 선점한 후보만 검토대기로 복구한�
   assert.match(화면, /cur\.상태!=='승인처리중'\|\|cur\.검토자!==검토자/);
   assert.match(화면, /상태:'검토대기'/);
   assert.match(화면, /if\(회차저장완료\)/);
+});
+
+test('회차에서 빼기는 배열 삭제가 아니라 건별 트랜잭션 철회다', () => {
+  const i = 화면.indexOf('function 지역뉴스빼기');
+  const body = 화면.slice(i, i + 1800);
+  assert.match(body, /\/지역뉴스/);
+  assert.match(body, /\.transaction\(/);
+  assert.match(body, /지역검토\.철회/);
+  assert.doesNotMatch(body, /\.splice\(/);
+  assert.match(화면, /철회 이력/);
+  assert.match(화면, /철회사유/);
+  assert.match(화면, /철회자/);
 });

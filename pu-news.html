@@ -43,10 +43,10 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=32"></script>
+<script src="js/pu-news-core.js?v=33"></script>
 <script src="js/pu-news-tpl.js?v=13"></script>
 <script src="js/pu-news-regional-sources.js?v=1"></script>
-<script src="js/pu-news-review.js?v=1"></script>
+<script src="js/pu-news-review.js?v=2"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -1612,14 +1612,22 @@ function 손으로담기(칸){
    원문을 옮기지 않고 담당자가 직접 쓴 설명이 있어야 저장된다. */
 function 지역뉴스관리(d){
   const a = d.지역뉴스 || [];
+  const 활성 = a.map(function(x,i){ return {x:x,i:i}; })
+    .filter(function(v){ return 지역검토.활성인가(v.x); });
+  const 철회 = a.filter(function(x){ return x&&x.상태==='철회'; });
   const 후보 = Object.values(App.지역후보||{}).filter(x=>x&&x.상태==='검토대기')
     .sort((x,y)=>Number(y.수집일||0)-Number(x.수집일||0)).slice(0,20);
-  const 줄 = a.length ? a.map(function(x,i){
+  const 줄 = 활성.length ? 활성.map(function(v){ const x=v.x,i=v.i;
     return `<div class="item"><span class="pill">${esc(x.지역||'전국')}</span>
       <span class="t" title="${esc(x.제목||'')}">${esc(x.우리말||x.제목||'')}</span>
       <span class="src">${esc(x.언론사||x.기관||'')}</span>
-      <button class="x" title="지역뉴스에서 빼기" onclick="지역뉴스빼기(${i})">✕</button></div>`;
+      <button class="x" title="지역뉴스 철회" onclick="지역뉴스빼기(${i})">✕</button></div>`;
   }).join('') : '<div class="pad hint">아직 지역뉴스가 없습니다. 전국 공통 뉴스레터는 그대로 나갑니다.</div>';
+  const 철회줄 = 철회.map(function(x){
+    return `<div class="item"><span class="pill">철회 · ${esc(x.지역||'전국')}</span>
+      <span class="t">${esc(x.우리말||x.제목||'')}</span>
+      <span class="src" title="${esc(x.철회사유||'')}">${esc(x.철회사유||'사유 없음')} · ${esc(x.철회자||'')}</span></div>`;
+  }).join('');
   const 후보줄 = 후보.length ? 후보.map(function(x){
     return `<div class="item"><span class="pill">검토대기 · ${esc(x.지역||'전국')}</span>
       <span class="t" title="${esc(x.제목||'')}">${esc(x.제목||'')}</span>
@@ -1629,9 +1637,9 @@ function 지역뉴스관리(d){
       <button class="x" title="이 후보 제외" onclick="지역후보제외('${esc(x.id||'')}')">✕</button></div>`;
   }).join('') : '<div class="pad hint">새 검토후보가 없습니다. 공식 RSS는 매일 오전 7시 10분에 확인합니다.</div>';
   return `<div class="box" style="margin-top:12px"><h3>📍 주소에 맞춰 보내는 지역뉴스
-    <span class="cnt">${a.length}건</span><span class="sp"></span>
+    <span class="cnt">${활성.length}건</span><span class="sp"></span>
     <button class="mini" onclick="지역뉴스담기()">＋ 지역뉴스 추가</button></h3>
-    <div class="jarbody">${줄}</div><div class="pad hint">
+    <div class="jarbody">${줄}</div>${철회.length?'<details class="pad"><summary>철회 이력 '+철회.length+'건</summary><div class="jarbody">'+철회줄+'</div></details>':''}<div class="pad hint">
     적용지역은 <b>전국</b>, <b>충남</b>, <b>충남/천안시</b>, <b>충남/서산시</b>처럼 적습니다.
     업체 주소를 못 읽으면 전국 공통판만 보내며 다른 지역 소식은 섞지 않습니다.<br>
     공식 출처 ${지역출처.목록.length}곳 등록 · RSS ${지역출처.목록.filter(x=>x.방식==='rss').length}곳은 자동수집 연결 준비 ·
@@ -1723,13 +1731,30 @@ function 지역뉴스담기(){
   const 우리말 = String(prompt('뉴스레터에 실을 푸른노무법인의 설명을 적어 주세요\n원문 문장을 복사하지 마세요.') || '').trim();
   if(!우리말) return toast('푸른노무법인이 직접 쓴 설명이 없으면 지역뉴스에 넣지 않습니다', 8000);
   const d = 지금회차(); d.지역뉴스 = d.지역뉴스 || [];
-  d.지역뉴스.push({ 지역:지역.slice(0,40), 제목:제목.slice(0,220), 링크:링크.slice(0,1000),
-    언론사:공식출처.기관, 출처Id:공식출처.id, 우리말:우리말.slice(0,1200), 갈래:'지역기사' });
+  const 뉴스=지역검토.수동뉴스({ 지역:지역, 제목:제목, 링크:링크,
+    언론사:공식출처.기관, 출처Id:공식출처.id, 우리말:우리말 },
+    (App.me&&App.me.email)||'',Date.now());
+  if(!뉴스) return toast('온톨로지 저장계약에 맞지 않아 등록할 수 없습니다',8000);
+  d.지역뉴스.push(뉴스);
   회차저장(d).then(render).catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||''),7000));
 }
 function 지역뉴스빼기(i){
-  const d=지금회차(); if(!(d.지역뉴스||[])[i]) return;
-  d.지역뉴스.splice(i,1); 회차저장(d).then(render);
+  const d=지금회차(), x=(d.지역뉴스||[])[i]; if(!x||x.상태==='철회') return;
+  const 사유=String(prompt('철회 사유를 적어 주세요\n자료는 삭제하지 않고 이력으로 보존합니다.')||'').trim();
+  if(!사유) return;
+  const 검토자=(App.me&&App.me.email)||'';
+  const ref=db.ref('newsletter/issues/'+d.열쇠+'/지역뉴스');
+  ref.transaction(function(cur){
+    const 목록=Array.isArray(cur)?cur.slice():[];
+    const 지금=목록[i];
+    /* 옛 자료는 id가 없으므로 같은 배열 자리와 주요 원문 정보까지 견준다. */
+    if(!지금||지금.상태==='철회'||String(지금.id||지금.링크||'')!==String(x.id||x.링크||'')) return;
+    목록[i]=지역검토.철회(지금,사유,검토자,Date.now()); return 목록;
+  }).then(function(r){
+    if(!r.committed) return toast('다른 관리자가 먼저 변경했습니다',7000);
+    d.지역뉴스=r.snapshot.val()||[]; App.회차들[d.열쇠]=d; render();
+    toast('삭제하지 않고 철회 이력으로 보존했습니다');
+  }).catch(e=>toast('철회하지 못했습니다: '+((e&&e.message)||''),9000));
 }
 
 /* ══════ 길 ① 자동으로 담기 ══════ */

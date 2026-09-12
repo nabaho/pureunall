@@ -1168,7 +1168,7 @@
   function 지역뉴스고르기(뉴스들, 받는지역) {
     var 곳 = String(받는지역 || '전국').trim() || '전국';
     return (뉴스들 || []).filter(function (x) {
-      if (!x) return false;
+      if (!x || x.상태 === '철회') return false;
       var 적용 = String(x.지역 || '전국').trim() || '전국';
       return 적용 === '전국' || 곳 === 적용 || 곳.indexOf(적용 + '/') === 0;
     });
