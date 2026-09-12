@@ -155,7 +155,9 @@ test('★ 사진 길과 글자 길이 같은 뒤처리를 쓴다 — 두 벌이�
    ⚠ 그렇게 적어 놓고 정작 닫는 괄호까지 박아 두었다 — 2026-09-10 에 「사람이
      눌렀나」(opts)를 하나 더 받자 멀쩡한 고침에서 이 검사만 깨졌다. 이제 안 박는다. */
   assert.match(fnOf(readjs, 'read'), /return runDocParts\(parts, 'image'[,)]/);
-  assert.match(fnOf(readjs, 'readDocText'), /return runDocParts\(\[\{ text: /);
+  /* ⚠ 줄바꿈까지 박지 않는다 — 2026-09-12 에 여러 쪽 물음을 덧붙이며 이 부름이
+     여러 줄로 나뉘자 뜻은 그대로인데 깨졌다. 지킬 것은 「글자 한 덩이로 보내는가」다. */
+  assert.match(fnOf(readjs, 'readDocText'), /runDocParts\(\s*\[\{ text: /);
   assert.match(readjs, /function runDocParts\(parts, via[,)]/);
 });
 

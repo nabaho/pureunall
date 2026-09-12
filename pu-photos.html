@@ -36,7 +36,7 @@
      이 파일이 캐시에 묵으면 옛 지시로 읽어 제목이 안 생기는데, 화면(pu-photos.html)은
      새것이라 제목 자리만 비어 보인다 — 고친 것이 통째로 묻힌 것처럼 된다.
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
-<script src="js/pu-doc-read.js?v=39"></script>
+<script src="js/pu-doc-read.js?v=40"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-doc-file.js?v=30"></script>
@@ -14411,8 +14411,13 @@ function docNav(it) {
   const i = pages.findIndex(function (p) { return p.id === (it && it.id); });
   const at = i < 0 ? 0 : i;
   const nm = (it && it.meta && it.meta.doc && it.meta.doc.name) || '문서';
+  /* ⚠ 2026-09-12 — 「문서 통째로 한 번」이라 적어 두었는데, 이제 한 묶음 안에 서로
+     다른 서류가 있으면 **서류마다** 갈라 읽는다. 틀린 안내는 없는 것보다 나쁘다 —
+     그 말을 믿고 2쪽이 안 읽힌 것을 「원래 그런 것」으로 넘기게 된다.
+     ★ 부르는 횟수는 여전히 한 번이다(한 번 보내고 답만 나눠 받는다) — 그것도 적는다. */
+  const 갈렸나 = ((it && it.meta && it.meta.read && it.meta.read.docMap) || []).length > 1;
   return '<p class="note">📄 「' + esc(nm) + '」 ' + pages.length + '쪽 중 ' + (at + 1) + '쪽 ' +
-    '— 판독은 문서 통째로 한 번 합니다</p>';
+    (갈렸나 ? '— 서류마다 갈라서 읽었습니다' : '— 한 번에 읽고 서류마다 갈라 담습니다') + '</p>';
 }
 
 /* 이 문서의 쪽들을 어떻게 나눌지 — 크게 보기 안 단추 줄 */
