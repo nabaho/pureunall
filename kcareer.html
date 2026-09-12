@@ -1068,6 +1068,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
 <script src="js/kcareer-notices.js?v=1"></script>
+<!-- 「합치기」 안전장치 — 다른 서류를 합쳐 잃지 않게 막는다(kcareer-mergeguard.js) -->
+<script src="js/kcareer-mergeguard.js?v=1"></script>
 <script src="js/kcareer-overlay.js?v=2"></script>
 <!-- AI 판독 호출기 — 열쇠는 회사 서버가 든다(브라우저는 모른다) -->
 <script src="js/pu-ai-call.js?v=3"></script>
@@ -7050,7 +7052,12 @@ function renderDup(){ const page=_dupPage; const data=getDupData(page);
   var html=_dupAutoBar()+'<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">🔴 <b>중복</b> = 기관·내용·<b>시기까지 완전 일치</b>(합쳐도 되는 것) &nbsp; 🟡 <b>유사</b> = 기관·내용은 같지만 <b>시기가 달라 별개 문서</b>일 수 있음(확인용).</div>';
   if(dups.length){ html+='<div style="font-size:13px;font-weight:700;color:var(--red);margin:6px 0 8px">🔴 중복 (완전 일치) '+dups.length+'묶음</div>'
     + dups.map(function(g){ var label=(g[0].org||g[0].bank||'-')+' · '+(g[0].titleVal||g[0].title||g[0].kind||g[0].number||'-');
-      return '<div class="card" style="margin-bottom:12px;border-color:#fecaca"><div style="font-weight:600;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>'+escapeHtml(label)+' <span style="color:var(--red)">('+g.length+'건 완전일치)</span></span><button class="btn sm" style="margin-left:auto" onclick="dupDismiss(\''+_jsAttr(dupKey(g[0]))+'\')">✋ 중복 아님(제외)</button></div>'
+      /* ★ 누르기 «전»에 밝힌다 — 합치면 무엇을 잃는지 그 자리에서 보이게 */
+      var _gd=window.KcareerMergeGuard?KcareerMergeGuard.check(g):{ok:true};
+      var _gw=_gd.ok?'':'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:7px 9px;margin-bottom:8px;font-size:12px;color:#991b1b">'
+        +'⚠ <b>내용이 서로 다릅니다 — 합치면 한쪽이 사라집니다.</b><div style="margin-top:4px;white-space:pre-wrap;font-weight:400">'
+        +escapeHtml(KcareerMergeGuard.explain(_gd))+'</div></div>';
+      return '<div class="card" style="margin-bottom:12px;border-color:#fecaca"><div style="font-weight:600;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>'+escapeHtml(label)+' <span style="color:var(--red)">('+g.length+'건 완전일치)</span></span><button class="btn sm" style="margin-left:auto" onclick="dupDismiss(\''+_jsAttr(dupKey(g[0]))+'\')">✋ 중복 아님(제외)</button></div>'+_gw
         + g.map(_dupRow).join('')+'</div>'; }).join(''); }
   if(sims.length){ html+='<div style="font-size:13px;font-weight:700;color:#d97706;margin:16px 0 8px">🟡 유사 (기관·내용 같음 · 시기 다름) '+sims.length+'묶음 <span style="font-weight:400;font-size:11px;color:var(--text-mute)">— 대부분 별개 문서입니다. 필요할 때만 확인</span></div>'
     + sims.map(function(g){ var label=(g[0].org||g[0].bank||'-')+' · '+(g[0].titleVal||g[0].title||g[0].kind||g[0].number||'-'); var sk='sim:'+_dupLooseKey(g[0]);
@@ -7080,6 +7087,24 @@ async function mergeInto(primaryId){ const page=_dupPage, store=getDupStore(page
   const key=dupKey(prim), group=allData.filter(function(r){return dupKey(r)===key;});
   if(group.length<2){ toast('합칠 중복 없음'); return; }
   /* ⚠ 원본이 «없는» 쪽을 기준으로 고르면, 있는 쪽 것을 끌어와야 한다. 미리 알려 준다. */
+  /* ★★ 안전장치 — «정말 같은 서류인가»를 먼저 본다 (대표 제보 2026-09-12).
+     실제로 서로 다른 학교의 위촉장 둘을 합쳐 잃었다:
+       「학교 전담 노무사(삽교고등학교)」 ↔ 「학교 전담 노무사(한국식품마이스터고등학교)」
+     중복 열쇠(dupKey)가 이름을 «앞 6자»만 봐서 둘 다 「학교전담노」로 같아 보였고,
+     합치기는 기준 줄에 값이 있으면 다른 줄의 «다른 값»을 말없이 버린다.
+     ⚠ 실측: 스캔 뒤 「완전일치」 20묶음 중 «17묶음»이 서류를 잃을 참이었다.
+     ⚠ 막기만 하지 않는다 — 무엇이 어떻게 다른지 «값을 그대로» 보여 준다. */
+  if(window.KcareerMergeGuard){
+    var _g=KcareerMergeGuard.check(group);
+    if(!_g.ok){
+      alert('❌ 합치지 않았습니다 — 내용이 서로 다릅니다.\n\n'
+        + KcareerMergeGuard.explain(_g)
+        + '\n\n같은 서류가 아닐 수 있습니다. 두 줄을 눌러 내용을 견줘 보시고,'
+        + '\n· 정말 다른 서류라면 「✋ 중복 아님(제외)」을 누르세요.'
+        + '\n· 정말 같은 서류라면 한쪽을 「🗑 삭제」로 지우시면 됩니다.');
+      return;
+    }
+  }
   var primHas=hasOriginal(prim);
   var otherHas=group.filter(function(r){ return r.id!==primaryId && hasOriginal(r); }).length;
   var warn = (!primHas && otherHas)

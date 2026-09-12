@@ -562,6 +562,22 @@ function funcSource(name) {
   return m[0];
 }
 
+/* ⚠ mergeInto 는 «함수 전체»를 본다 — 예전엔 「앞 3000자」만 봤다.
+   2026-09-12 에 합치기 안전장치가 앞에 들어오자 뒷부분이 창 밖으로 밀려
+   검사가 «있어야 할 줄이 없는데도» 잡지 못할 뻔했다(실제로 빨갛게 떴다).
+   길이를 늘려 막는 대신 중괄호를 세어 함수가 끝나는 자리까지 본다. */
+function mergeIntoSource() {
+  const i = source.indexOf('async function mergeInto(');
+  assert.ok(i > 0, 'mergeInto 함수가 있어야 합니다');
+  let d = 0, started = false;
+  for (let p = i; p < source.length; p++) {
+    const c = source[p];
+    if (c === '{') { d++; started = true; }
+    else if (c === '}') { d--; if (started && d === 0) return source.slice(i, p + 1); }
+  }
+  assert.fail('mergeInto 의 끝을 못 찾았습니다');
+}
+
 test('fsCommitScan은 신규 필드를 붙여 저장한다', () => {
   const src = funcSource('fsCommitScan');
   assert.match(src, /src:\s*'fs'/);
@@ -2250,7 +2266,7 @@ test('★★ 합치기는 원본을 «진짜로» 읽는다 — getFile 은 Inde
        fileExists(배지) = 캐시 + 파일id목록(IndexedDB 반영) → 「원본 있음」
        getFile(합칠 때) = 캐시 + localStorage 만        → 캐시에 없으면 null
      그래서 「있다」고 해 놓고 못 옮긴 채 아래에서 지워 버렸다. */
-  const m = source.slice(source.indexOf('async function mergeInto('), source.indexOf('async function mergeInto(') + 3000);
+  const m = mergeIntoSource();
   assert.match(m, /await getFileAsync\(primaryId\)/, '기준 쪽을 비동기로 읽어야 합니다');
   assert.match(m, /await getFileAsync\(others\[i\]\.id\)/, '옮겨올 쪽도 비동기로 읽어야 합니다');
   assert.ok(!/getFile\(primaryId\)/.test(m), '⚠ 동기 getFile 로 되돌리면 원본이 사라집니다');
@@ -2258,7 +2274,7 @@ test('★★ 합치기는 원본을 «진짜로» 읽는다 — getFile 은 Inde
 });
 
 test('★★ 옮기지 못했으면 «아무것도 지우지 않는다»', () => {
-  const m = source.slice(source.indexOf('async function mergeInto('), source.indexOf('async function mergeInto(') + 3000);
+  const m = mergeIntoSource();
   /* ⚠ 2026-09-12: 폴더 경로 원본(src:'fs')은 «옮길 파일이 없다» — getFileAsync 가 늘 null 이라
      이 빗장이 합치기를 통째로 멈췄다(대표 제보). 그래서 !primIsFs 가 하나 늘었다.
      ⚠ 빗장 자체는 그대로여야 한다 — 앱 안 첨부를 못 옮겼는데 지우면 원본이 사라진다. */
@@ -2274,7 +2290,7 @@ test('★★ 옮기지 못했으면 «아무것도 지우지 않는다»', () =>
 });
 
 test('★★ 원본 없는 쪽을 기준으로 고르면 미리 알려 준다', () => {
-  const m = source.slice(source.indexOf('async function mergeInto('), source.indexOf('async function mergeInto(') + 3000);
+  const m = mergeIntoSource();
   assert.match(m, /var primHas=hasOriginal\(prim\)/);
   assert.match(m, /에는 원본이 «없고»/, '기준에 원본이 없으면 경고해야 합니다');
 });
