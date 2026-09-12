@@ -131,8 +131,10 @@ test('★ 어느 길로 읽었는지 결과에 남긴다 — 이것이 없으면
   assert.match(fnOf(readjs, 'read'), /runDocParts\(parts, 'image'[,)]/);
   assert.match(fnOf(readjs, 'readDocText'), /\], 'text'[,)]/);
   assert.match(readjs, /function runDocParts\(parts, via[,)]/);
-  /* 두 갈림길(대리인/열쇠) 모두 넘겨야 한다 — 한쪽만 넘기면 그 길에서 via 가 빈다. */
-  assert.equal((fnOf(readjs, 'runDocParts').match(/afterRead\(parsed, via\)/g) || []).length, 2,
+  /* 두 갈림길(대리인/열쇠) 모두 넘겨야 한다 — 한쪽만 넘기면 그 길에서 via 가 빈다.
+     ⚠ 2026-09-12 — 다듬는 함수 이름이 afterRead → afterReadDocs 로 바뀌었다
+       (한 묶음의 서류를 갈라 읽게 되면서). 이름을 박지 말고 «via 를 넘기는가»만 본다. */
+  assert.equal((fnOf(readjs, 'runDocParts').match(/afterRead\w*\(parsed, via\)/g) || []).length, 2,
     '★ 한쪽 길에서만 넘기면 그 길로 읽은 것이 늘 「그림」으로 남습니다');
 });
 

@@ -1,0 +1,176 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>쪽마다 갈라 읽기 · 쪽 찾기 쉽게</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--line:#e2e8f0;--txt:#1e293b;--sub:#64748b;
+  --blue:#1e40af;--blue2:#2563eb;--blue1:#eff6ff;--blue0:#bfdbfe;
+  --amber:#854d0e;--amber1:#fffbeb;--amber2:#fde68a;--green:#166534;--green1:#f0fdf4;--green2:#bbf7d0;
+  --red:#991b1b;--red1:#fef2f2}
+body{margin:0;padding:20px;background:var(--bg);color:var(--txt);
+  font:14px/1.6 'Malgun Gothic',system-ui,sans-serif;max-width:1060px}
+h1{font-size:19px;margin:0 0 4px}
+h2{font-size:15px;margin:28px 0 8px;padding-top:14px;border-top:2px solid var(--line)}
+h2 .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--blue);
+  color:#fff;align-items:center;justify-content:center;font-size:12px;margin-right:7px}
+p.sub{margin:0 0 12px;color:var(--sub);font-size:13px}
+.tag{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:2px 8px;margin-bottom:7px}
+.now{background:#e2e8f0;color:#475569}.ok{background:var(--green1);color:var(--green)}
+.bad{background:var(--red1);color:var(--red)}
+
+.viewer{background:#0f172a;border-radius:12px;padding:13px;margin-bottom:6px}
+.bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.bar b.pg{color:#cbd5e1;font-size:12px;font-weight:700;margin-right:4px}
+.bar button{border:1px solid #475569;background:#1e293b;color:#e2e8f0;border-radius:7px;
+  padding:5px 9px;font-size:13px;font-family:inherit;line-height:1}
+.bar button.rd{border-color:#2563eb;background:#1e3a8a;color:#fff}
+.tiny{color:#94a3b8;font-size:11px;margin:8px 0 0}
+
+/* ── 쪽 띠 (새로) ── */
+.pages{display:flex;gap:8px;align-items:stretch;margin-top:11px;overflow-x:auto;padding-bottom:3px}
+.pg1{flex:0 0 auto;width:96px;border:2px solid #334155;border-radius:9px;background:#fff;
+  padding:0;overflow:hidden;cursor:pointer;position:relative}
+.pg1.on{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.35)}
+.pg1 .thumb{height:62px;background:repeating-linear-gradient(#f1f5f9 0 3px,#fff 3px 7px);
+  border-bottom:1px solid var(--line)}
+.pg1 .cap{font-size:10.5px;font-weight:800;padding:4px 5px;color:var(--txt);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.pg1 .kd{font-size:9.5px;padding:0 5px 5px;color:var(--sub);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.pg1.on .cap{color:var(--blue)}
+
+.sheet{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-top:9px}
+.doc{border:1.5px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:10px}
+.doc.a{border-color:var(--blue0);background:var(--blue1)}
+.doc.b{border-color:var(--green2);background:var(--green1)}
+.doc h4{margin:0 0 7px;font-size:13.5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.chip{font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 8px;background:#fff;
+  border:1px solid var(--line);color:var(--sub)}
+.chip.p{background:var(--blue2);color:#fff;border-color:var(--blue2)}
+.chip.g{background:#16a34a;color:#fff;border-color:#16a34a}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+td{border-top:1px solid rgba(0,0,0,.06);padding:4px 6px;vertical-align:top}
+td.k{color:var(--sub);width:116px;white-space:nowrap}
+td.v{font-weight:700}
+.went{font-size:11.5px;color:var(--sub);margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)}
+.went b{color:var(--green)}
+.note{background:#fff;border-left:4px solid var(--blue2);padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.note b{color:var(--blue)}
+.warnbox{background:var(--amber1);border-left:4px solid #d97706;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.ask{background:var(--blue);color:#fff;border-radius:10px;padding:13px 16px;margin-top:24px;font-size:13.5px}
+.ask b{font-size:15px}
+.ask .q{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.25)}
+</style></head><body>
+
+<h1>2쪽을 찾기 쉽게 · 쪽마다 갈라 읽기</h1>
+<p class="sub">대표 지시 2026-09-12 「2쪽 찾는 게 어렵다 · 2번째 페이지는 OCR 된 것도 각각 보여야 된다 ·
+자동이체 OCR도 필요정보 모두 정리 · 푸른이알피에서 찾을 수 있게 · 기업정보함에도 정리」</p>
+
+<h2><span class="n">①</span> 지금 무엇이 잘못돼 있나 — 실측</h2>
+<div class="sheet">
+<table>
+<tr><td class="k">1쪽 자문계약서</td><td class="v">갈래 <b>contract</b> · 보수·기간·서명 다 읽힘 ✔</td></tr>
+<tr><td class="k">2쪽 자동이체</td><td class="v" style="color:var(--red)">갈래 <b>contract</b> ← 자동이체인데 · 은행·계좌·출금일 <b>전부 빈칸</b></td></tr>
+</table>
+<p class="tiny" style="color:var(--sub);margin-top:9px">
+「판독은 문서 통째로 한 번」이라 <b>한 벌의 답을 두 쪽에 그대로 복사</b>합니다.
+그래서 2쪽에만 있는 자동이체 정보가 통째로 사라집니다.</p>
+</div>
+<div class="warnbox">
+<b>자동이체 정리·기업정보함·푸른이알피 연결은 이미 만들어져 있습니다</b>(2026-08-28 · 09-03).
+<b>재료가 안 와서</b> 한 번도 안 돌았을 뿐입니다 — 2쪽을 갈라 읽기 시작하면 그 길들이 저절로 삽니다.
+</div>
+
+<h2><span class="n">②</span> 쪽 찾기 — 밑에 쪽 띠를 깝니다</h2>
+<span class="tag now">지금 — 「1/2쪽」 글씨와 작은 ◀ ▶ 뿐</span>
+<div class="viewer"><div class="bar">
+  <b class="pg">1/2쪽</b><button>◀</button><button>▶</button>
+  <button>↓</button><button>📋</button><button class="rd">🔤</button><button class="rd">🔒</button>
+  <button>🖍</button><button>📤</button><button>✓</button><button>🗑</button>
+</div></div>
+
+<div style="height:12px"></div>
+<span class="tag ok">이렇게 — 쪽이 «보입니다». 눌러서 넘깁니다</span>
+<div class="viewer">
+  <div class="bar">
+    <b class="pg">1/2쪽</b><button>◀</button><button>▶</button>
+    <button>↓</button><button>📋</button><button class="rd">🔤</button><button class="rd">🔒</button>
+    <button>🖍</button><button>📤</button><button>✓</button><button>🗑</button>
+  </div>
+  <div class="pages">
+    <div class="pg1 on"><div class="thumb"></div><div class="cap">1쪽</div><div class="kd">자문계약서</div></div>
+    <div class="pg1"><div class="thumb"></div><div class="cap">2쪽</div><div class="kd">자동이체 신청서</div></div>
+  </div>
+  <p class="tiny">← → 키로도 넘어갑니다 · 쪽이 한 장뿐이면 이 띠는 안 나옵니다</p>
+</div>
+<div class="note">
+<b>왜 글씨가 아니라 그림인가</b> — 「2/2쪽」은 <b>몇 쪽인지</b>만 알려 주고
+<b>무엇이 있는지</b>는 안 알려 줍니다. 쪽 띠에는 «자동이체 신청서»라고 적히니,
+찾기 전에 이미 어디로 갈지 압니다.
+</div>
+
+<h2><span class="n">③</span> 판독 결과 — 쪽마다 갈라서 보여 줍니다</h2>
+<div class="sheet">
+  <div class="doc a">
+    <h4>📄 1쪽 <span class="chip p">자문계약서</span> <span class="chip">기업정보함으로 감</span></h4>
+    <table>
+      <tr><td class="k">업체</td><td class="v">아이행복어린이집</td></tr>
+      <tr><td class="k">대표자</td><td class="v">양유정</td></tr>
+      <tr><td class="k">자문료</td><td class="v">월 200,000원 (부가세 포함)</td></tr>
+      <tr><td class="k">계약기간</td><td class="v">2026-09-01 ~ 2027-08-31 (1년·자동연장)</td></tr>
+      <tr><td class="k">작성일</td><td class="v">2026-08-28</td></tr>
+    </table>
+    <div class="went">→ <b>기업정보함</b> 「아이행복어린이집」 계약 칸에 담겼습니다</div>
+  </div>
+
+  <div class="doc b">
+    <h4>🏦 2쪽 <span class="chip g">자동이체 신청서</span> <span class="chip">기업정보함·푸른이알피로 감</span></h4>
+    <table>
+      <tr><td class="k">수납기관</td><td class="v">푸른노무법인</td></tr>
+      <tr><td class="k">신청 구분</td><td class="v">신규</td></tr>
+      <tr><td class="k">은행</td><td class="v">하나은행</td></tr>
+      <tr><td class="k">계좌번호</td><td class="v">6779100 1708204</td></tr>
+      <tr><td class="k">예금주</td><td class="v">양유정</td></tr>
+      <tr><td class="k">출금일</td><td class="v">매월 25일</td></tr>
+      <tr><td class="k">금액</td><td class="v">200,000원</td></tr>
+      <tr><td class="k">이체 개시</td><td class="v">2026년 10월</td></tr>
+      <tr><td class="k">사업자번호</td><td class="v">754-82-00554</td></tr>
+      <tr><td class="k">신청일</td><td class="v">2026-09-10</td></tr>
+    </table>
+    <div class="went">→ <b>기업정보함</b> 은행 칸에 담기고 <b>자동이체 ☑</b> 가 켜집니다
+      &nbsp;·&nbsp; → <b>푸른이알피</b> 에서 계좌로 찾을 수 있습니다</div>
+  </div>
+</div>
+
+<div class="warnbox">
+⚠ <b>주민번호는 읽지도 담지도 않습니다.</b> 이 서식에 「예금주 주민번호 앞 6자리」 칸이 있지만
+<b>통째로 건너뜁니다</b> — 지금도 그렇게 되어 있고 바꾸지 않습니다.
+<br>⚠ <b>계좌번호는 온전히 담습니다</b>(대표 결정 2026-08-28 「뒤 계좌 모두 보여야 한다」) — 가리지 않습니다.
+</div>
+
+<h2><span class="n">④</span> 어떻게 갈라 읽나 — 부르는 횟수는 «그대로»</h2>
+<div class="sheet">
+<table>
+<tr><td class="k">지금</td><td class="v">2쪽을 한 번에 보내고 → <b>한 벌</b>의 답을 받아 두 쪽에 복사</td></tr>
+<tr><td class="k">이렇게</td><td class="v">2쪽을 한 번에 보내고 → <b>「쪽마다 무슨 서류인지 갈라서」</b> 답을 받음</td></tr>
+</table>
+<p class="tiny" style="color:var(--sub);margin-top:9px">
+<b>판독 횟수는 늘지 않습니다</b> — 여전히 문서 통째로 한 번입니다. 답을 나눠 받을 뿐입니다.</p>
+</div>
+<div class="note">
+<b>한 서류가 여러 쪽일 때는 지금처럼 합칩니다.</b> 5쪽짜리 계약서는 보수가 2조, 기간이 6조,
+서명이 마지막 쪽에 흩어져 있어 <b>합쳐 읽어야</b> 채워집니다. 갈라 읽는 것은
+«서로 다른 서류»가 한 묶음에 들어 있을 때뿐입니다.
+</div>
+
+<div class="ask">
+<b>이대로 만들까요?</b>
+<div class="q">㉮ 이 목업 그대로 &nbsp;·&nbsp; ㉯ 쪽 띠는 빼고 판독만 갈라서 &nbsp;·&nbsp; ㉰ 다시 손보기</div>
+<div class="q"><b>「푸른이알피에서 찾을 수 있게」 — 어느 쪽을 뜻하셨나요?</b><br>
+㉠ <b>계좌·업체·금액 같은 «칸»으로</b> 찾기 (지금 만들어진 길을 살리는 것) <br>
+㉡ <b>서류 본문 글자로</b> 찾기 (「쌍용17길」을 치면 그 서류가 나오게) <br>
+㉢ 둘 다</div>
+</div>
+
+</body></html>

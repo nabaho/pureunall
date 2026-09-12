@@ -803,7 +803,9 @@ test('다시 판독해도 검증 통과분은 자동으로 기업정보함에 �
   // 예전에는 올릴 때만 자동이고 다시 판독하면 단추를 한 번 더 눌러야 했다.
   const fn = app.match(/function readPhoto\([\s\S]*?\n\}/);
   assert.ok(fn, 'readPhoto 본문을 찾을 수 없습니다');
-  assert.match(fn[0], /read\.auto && canSend\(read\)/, '다시 판독 후 자동 등록이 없습니다');
+  /* ⚠ 2026-09-12 — 변수 이름(read)까지 박아 두어, 서류마다 보내게 바꾸자 뜻은
+     그대로인데 이 검사가 깨졌다. 지킬 것은 «검증을 통과한 것만 보내는가»다. */
+  assert.match(fn[0], /\.auto && canSend\(/, '다시 판독 후 자동 등록이 없습니다');
   // 판독하는 길이 하나여야 두 길이 어긋나지 않는다
   /* ⚠ 고정 폭(400자)으로 잘랐다가 readAgain 에 「실패 셈 되돌리기」가 붙으며 창이
      못 닿았다(2026-08-24). 함수를 통째로 뽑는다 — 창 숫자를 키워 쫓아가지 않는다. */
@@ -1235,7 +1237,8 @@ test('등록 층을 불러오고, 기업정보함 구조는 화면이 모른다'
 test('검증을 통과한 것만 자동으로 보낸다', () => {
   const fn = app.match(/function startRead\([\s\S]*?\n\}/);
   assert.ok(fn, 'startRead 본문을 찾을 수 없습니다');
-  assert.match(fn[0], /read\.auto && canSend\(read\)/,
+  /* ⚠ 2026-09-12 — 변수 이름을 박지 않는다(위 「다시 판독」 검사와 같은 까닭) */
+  assert.match(fn[0], /\.auto && canSend\(/,
     '검증 결과를 보지 않고 보내고 있습니다');
 });
 
@@ -1617,9 +1620,10 @@ test('사업자등록증·중소기업확인서는 업체관리에도 보낸다'
 
 test('기업정보함 보내기와 업체관리 보내기를 따로 둔다', () => {
   // 한 줄로 묶으면 한쪽이 실패할 때 다른 쪽도 못 간다.
+  /* ⚠ 2026-09-12 — 변수 이름을 박지 않는다. 서류마다 보내게 바뀌며 read → r 이 됐다. */
   const s = fnBodyOf('startRead');
-  assert.match(s, /canSend\(read\)/);
-  assert.match(s, /canSendCo\(read\)/, '업체관리 자동 보내기가 없습니다');
+  assert.match(s, /canSend\(/);
+  assert.match(s, /canSendCo\(/, '업체관리 자동 보내기가 없습니다');
 });
 
 test('중소기업확인서가 아무 곳에도 안 들어가면 확인 필요로 잡는다', () => {

@@ -87,7 +87,10 @@ test('★★ 겹치면 «보내지 않고» 물음을 남긴다 — 조용히 �
 });
 
 test('★★ «뒤에서 도는 판독»은 묻지 않는다 — 스물여덟 번 묻고 아무도 못 본다', () => {
-  assert.match(app, /sendWorker\(sibs\[0\]\.id, year, sibs\[0\], \{ auto: true \}\)/,
+  /* ⚠ 2026-09-12 — 자리 이름(sibs[0])을 글자 그대로 박아 두어, 서류마다 보내게
+     바꾸자 뜻은 그대로인데 이 검사만 깨졌다. 지킬 것은 «auto:true 로 부르는가»다. */
+  assert.match(stripComments(cutFn(raw, 'function startRead(')),
+    /sendWorker\([^)]*\{ auto: true \}\)/,
     '★★ 자동 판독이 창을 띄우면 사람이 화면 앞에 없을 때 스물여덟 번 묻습니다.');
   const fn = stripComments(cutFn(raw, 'function sendWorker('));
   assert.match(fn, /if \(!auto\) toast\(/,
