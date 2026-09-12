@@ -283,8 +283,13 @@ test('포털 딱지는 관리자에게만 (사용액 딱지와 같은 규칙)', 
   assert.match(fn, /_aiStop/, '★ 계정이 바뀌어도 안 끄면 남의 금액이 남습니다');
 });
 
+/* ⚠ «줄머리»에서 찾는다. 그냥 '#aiChip{' 로 찾으면 딸린 규칙
+   (`#moneyBox[data-join="1"] #aiChip{` 같은 것)이 먼저 걸려, 창이 엉뚱한 데서 시작해
+   정작 볼 색 규칙을 못 보고 헛돈다 — 2026-09-12 에 실제로 그렇게 됐다. */
+const AI_CSS_AT = ENTER.indexOf('\n#aiChip{') + 1;
+
 test('★ 진행 막대(작대기)를 안 쓴다 (대표 지시 「작대기 필요없다」)', () => {
-  const css = ENTER.slice(ENTER.indexOf('#aiChip{'), ENTER.indexOf('#aiChip{') + 900);
+  const css = ENTER.slice(AI_CSS_AT, AI_CSS_AT + 900);
   assert.ok(!/progress|<\/?meter|barfill|\.bar\b/i.test(css),
     '★ 막대가 돌아왔습니다 — 색(파랑→노랑→빨강)이 그 일을 대신합니다');
   assert.match(css, /data-tone="warn"[\s\S]*data-tone="over"/,
@@ -292,8 +297,7 @@ test('★ 진행 막대(작대기)를 안 쓴다 (대표 지시 「작대기 필
 });
 
 test('세 상태가 «다른 색»이다 — 같은 색이면 갈라 놓은 뜻이 없다', () => {
-  const at = ENTER.indexOf('#aiChip{');
-  const css = ENTER.slice(at, at + 1200);
+  const css = ENTER.slice(AI_CSS_AT, AI_CSS_AT + 1200);
   const 색 = (css.match(/background:(#[0-9a-f]{6})/gi) || []).map((s) => s.toLowerCase());
   assert.ok(new Set(색).size >= 3, '★ 평소·경고·중단이 같은 색으로 보입니다');
 });

@@ -26,8 +26,10 @@ test('이름·사용액·바로가기가 «한 줄»에 앉는다', () => {
   assert.match(b, /\.pbar \.pmeta\{order:1;flex:1 1 auto/);
   /* ⚠ 고르개를 «글자 그대로» 박지 않는다 — 딱지가 하나 늘어 규칙을 함께 쓰게 되면
      (`.pbar #billChip,.pbar #aiChip{…`) 멀쩡한 화면에서 이 검사만 깨진다.
-     지켜야 할 것은 「사용액 딱지가 둘째 자리에 · 안 늘어나게 앉는가」다. */
-  assert.match(b, /\.pbar #billChip[^{]*\{order:2;flex:0 0 auto/);
+     지켜야 할 것은 「돈 딱지가 둘째 자리에 · 안 늘어나게 앉는가」다.
+     2026-09-12 부터 딱지 둘이 한 상자(#moneyBox)에 들어갔다 — .pbar 의 «자식»은
+     이제 상자이므로 자리잡기도 상자가 진다(딱지에 걸면 상자 안에서만 다툰다). */
+  assert.match(b, /\.pbar #(moneyBox|billChip)[^{]*\{order:2;flex:0 0 auto/);
   assert.match(b, /\.pbar #homeBar\{order:3;flex:0 1 auto/);
   /* ★ 640px 구간의 `.homebar{width:100%}` 가 살아 있어, width:auto 를 안 적으면
      바로가기가 제 줄을 통째로 차지한다(재어 보고 찾았다). */
@@ -59,14 +61,17 @@ test('사용액은 맨 윗줄(로그아웃 옆)로 올리지 않는다', () => {
   /* 거기서는 좁아 가려지고, 가려진 기능은 없는 기능이다
      — 지문 로그인 안내가 실제로 그렇게 사라졌던 적이 있다. */
   const b = phoneBlock();
-  const m = b.match(/\.pbar #billChip[^{]*\{order:(\d+)/);
+  /* 2026-09-12: 자리잡기는 딱지를 감싼 상자(#moneyBox)가 진다 — 위 풀이글 참고 */
+  const m = b.match(/\.pbar #(?:moneyBox|billChip)[^{]*\{order:(\d+)/);
   assert.ok(m && Number(m[1]) >= 2, '★ 사용액이 맨 윗줄로 올라가면 로그아웃에 가려집니다.');
 });
 
 test('연결 상태는 «잘 될 때만» 점으로 줄인다 — 끊기면 말이 그대로 나온다', () => {
   /* 「서버 연결됨」 여섯 글자가 이름 자리를 먹는데, 정작 읽어야 할 때는
      «끊겼을 때»다. 그때는 글자를 남긴다. */
-  assert.match(enter, /<span class="cs-lb">' \+ label \+ '<\/span>/,
+  /* 2026-09-12: 머리줄에서는 «잘 될 때만» 「연결됨」으로 줄여 넣는다(barLabel) —
+     끊겼거나 확인 중이면 긴 말(label) 그대로다. 감싸는 것 자체는 그대로여야 한다. */
+  assert.match(enter, /<span class="cs-lb">' \+ (barLabel|label) \+ '<\/span>/,
     '말을 감싸지 않으면 점만 남길 수가 없습니다.');
   const b = phoneBlock();
   assert.match(b, /\.connection-status\[data-state="online"\] \.cs-lb\{display:none;\}/);
