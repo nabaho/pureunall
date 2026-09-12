@@ -355,6 +355,24 @@ test('★★ 웹 쪽이 «한 건만 띄우는 창»을 갖는다', () => {
   assert.match(쪽, /\[data-pop\]\{cursor:pointer\}/, '누를 수 있다는 표시가 없다');
 });
 
+test('★★ 창이 뜨면 «한 건만» 보인다 — 뒤가 비치면 두 벌처럼 보인다', () => {
+  /* 대표 지시 2026-09-12: 「팝업인경우 1개의 사항만 나오면 된다.
+     뒤에 배경에 또 내용이 이중으로 있는것 처럼보인다」 */
+  const 쪽 = NV.쪽('제목', '<div id="n-news-0" data-pop="1">가</div>');
+  const 바탕 = /#pop\{[^}]*background:([^;]+);/.exec(쪽);
+  assert.ok(바탕, '창 바탕 규칙을 못 찾았다');
+  assert.ok(!/rgba|transparent/i.test(바탕[1]),
+    '창 바탕이 비친다(' + 바탕[1].trim() + ') — 뒤의 편지가 그대로 보여 두 벌처럼 읽힌다');
+});
+
+test('★ 창이 떠 있는 동안 «뒤가 안 굴러간다» · 닫으면 제자리로 돌아온다', () => {
+  const 글 = /<script>([\s\S]*?)<\/script>/.exec(NV.쪽('ㄱ', 'ㄴ'))[1];
+  assert.match(글, /overflow="hidden"/, '창 뒤가 그대로 굴러간다');
+  assert.match(글, /window\.scrollTo\(0,y\)/, '닫아도 보던 자리로 안 돌아온다');
+  assert.match(글, /scrollIntoView\(\);열기/,
+    '자리로 내려가기 «전»에 창을 연다 — 닫으면 맨 위로 튄다');
+});
+
 test('★ 창 스크립트가 «돌아가는 글»이다 — 깨진 채 나가면 아무 건도 안 열린다', () => {
   const 쪽 = NV.쪽('제목', '<div id="n-news-0" data-pop="1">가</div>');
   const m = /<script>([\s\S]*?)<\/script>/.exec(쪽);
@@ -377,7 +395,7 @@ test('★★ 칸 «안의 링크»는 그대로 통한다 — 안 그러면 내�
 test('★ 요약에서 온 자리(#n-…)면 «창까지» 연다 — 내려만 가면 뭐가 달라졌는지 모른다', () => {
   const 글 = /<script>([\s\S]*?)<\/script>/.exec(NV.쪽('ㄱ', 'ㄴ'))[1];
   assert.match(글, /hashchange/, '주소가 바뀌어도 창이 안 열린다');
-  assert.match(글, /indexOf\("n-"\)===0/, '자리표(n-)를 알아보지 못한다');
+  assert.match(글, /indexOf\("n-"\)/, '자리표(n-)를 알아보지 못한다');
 });
 
 test('닫으면 주소의 자리표도 지운다 — 안 지우면 새로 고칠 때 또 열린다', () => {

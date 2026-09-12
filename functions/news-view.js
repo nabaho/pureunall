@@ -78,7 +78,7 @@ function esc(s) {
 var 창스크립트 =
   '(function(){' +
   'var p=document.getElementById("pop"),b=document.getElementById("popb"),' +
-  't=document.getElementById("popt");' +
+  't=document.getElementById("popt"),y=0;' +
   'function 꼭지이름(el){var 가=document.querySelectorAll("[id^=\'g-\']"),n="";' +
   'for(var i=0;i<가.length;i++){' +
   'if(가[i].compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING){' +
@@ -86,8 +86,14 @@ var 창스크립트 =
   'function 열기(el){if(!el)return;b.innerHTML="";' +
   'var c=el.cloneNode(true);c.removeAttribute("id");c.removeAttribute("data-pop");' +
   'c.style.cursor="auto";b.appendChild(c);' +
-  't.textContent=꼭지이름(el)||"이 소식";p.className="on";}' +
-  'function 닫기(){p.className="";' +
+  't.textContent=꼭지이름(el)||"이 소식";p.className="on";' +
+  /* ⚠ 창이 떠 있는 동안 «뒤가 굴러가지» 않게 한다. 안 막으면 창 안에서 굴린 줄
+       알았는데 뒤의 편지가 움직여, 닫았을 때 엉뚱한 자리에 서 있게 된다.
+       ⚠ scrollY 를 적어 두고 닫을 때 되돌린다 — 안 되돌리면 맨 위로 튄다. */
+  'y=window.scrollY;document.documentElement.style.overflow="hidden";' +
+  'b.scrollTop=0;}' +
+  'function 닫기(){if(p.className!=="on")return;p.className="";' +
+  'document.documentElement.style.overflow="";window.scrollTo(0,y);' +
   'if(location.hash)history.replaceState(null,"",location.pathname+location.search);}' +
   'document.addEventListener("click",function(e){' +
   'if(e.target.closest&&e.target.closest("#pop")){' +
@@ -95,8 +101,11 @@ var 창스크립트 =
   'if(e.target.closest&&e.target.closest("a"))return;' +
   'var el=e.target.closest&&e.target.closest("[data-pop]");if(el){e.preventDefault();열기(el);}});' +
   'document.addEventListener("keydown",function(e){if(e.key==="Escape")닫기();});' +
+  /* ⚠ 자리로 «우리가» 내려간 뒤에 연다. 브라우저가 알아서 내려가기를 기다리면
+       그 전에 열려 버려, 닫았을 때 맨 위로 튄다(그때 적어 둔 자리가 0 이라서). */
   'function 해시로(){var h=location.hash.replace("#","");' +
-  'if(h.indexOf("n-")===0){var el=document.getElementById(h);if(el)열기(el);}}' +
+  'if(h.indexOf("n-")!==0)return;var el=document.getElementById(h);if(!el)return;' +
+  'el.scrollIntoView();열기(el);}' +
   'window.addEventListener("hashchange",해시로);해시로();' +
   '})();';
 
@@ -110,11 +119,15 @@ function 쪽(제목, 전문) {
     /* 누를 수 있다는 것을 손이 알게 한다 — 메일에는 이 규칙이 안 간다(<style> 은 지워진다) */
     + '[data-pop]{cursor:pointer}'
     + '[data-pop]:hover{outline:2px solid #8a6f57;outline-offset:3px}'
-    + '#pop{position:fixed;inset:0;background:rgba(36,26,19,.55);display:none;z-index:99}'
+    /* ⚠⚠ 바탕을 «비치게» 두지 말 것 (대표 지시 2026-09-12 「팝업인경우 1개의 사항만
+         나오면 된다. 뒤에 배경에 또 내용이 이중으로 있는것 처럼보인다」).
+       반투명으로 덮으면 뒤의 편지가 그대로 비쳐, 한 건만 보려고 열었는데
+       같은 내용이 두 벌 깔린 것처럼 보인다. 종이빛으로 «꽉» 덮는다. */
+    + '#pop{position:fixed;inset:0;background:#e9e7e3;display:none;z-index:99}'
     + '#pop.on{display:flex;align-items:flex-start;justify-content:center;padding:24px 12px}'
     + '#pop .in{background:#fff;width:min(660px,94vw);max-height:88vh;border-radius:10px;'
-    + 'display:flex;flex-direction:column;overflow:hidden;'
-    + 'box-shadow:0 14px 40px rgba(36,26,19,.35)}'
+    + 'display:flex;flex-direction:column;overflow:hidden;border:1px solid #ddd7cf;'
+    + 'box-shadow:0 10px 30px rgba(36,26,19,.18)}'
     + '#pop .hd{display:flex;align-items:center;gap:8px;padding:12px 15px;background:#f5f1ec;'
     + 'border-bottom:1px solid #e0dcd6;font:bold 14px \'Malgun Gothic\',sans-serif;color:#4a3c2e}'
     + '#pop .hd b{flex:1;min-width:0}'
