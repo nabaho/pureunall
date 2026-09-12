@@ -36,9 +36,20 @@ vm.createContext(ctx);
 vm.runInContext(cutBlock(SRC, 'function erpPhotoFilter(items, q){'), ctx);
 vm.runInContext(cutRange(SRC, "var ERP_DOC_KINDS =", '\n'), ctx);
 vm.runInContext(cutBlock(SRC, 'function erpContractDocKind(fields){'), ctx);
-vm.runInContext(cutBlock(SRC, 'function erpPhotoPick(items, q, kind, showUsed){'), ctx);
-vm.runInContext(cutBlock(SRC, 'function erpPhotoKindCounts(items, q, showUsed){'), ctx);
-const { erpContractDocKind: kindOf, erpPhotoPick: pick, erpPhotoKindCounts: counts } = ctx;
+/* 2026-09-12: 겹친 서류 접기(erpPhotoFold 무리)가 erpPhotoPick 안으로 들어왔다 —
+   함께 싣지 않으면 「erpPhotoFold is not defined」로 여기가 통째로 넘어진다. */
+vm.runInContext(cutBlock(SRC, 'function erpPhotoDocKey(it){'), ctx);
+vm.runInContext(cutBlock(SRC, 'function erpPhotoSameKey(it){'), ctx);
+vm.runInContext(cutBlock(SRC, 'function erpPhotoHeadCmp(a, b){'), ctx);
+vm.runInContext(cutBlock(SRC, 'function erpPhotoFoldOnce(묶음, keyOf, why){'), ctx);
+vm.runInContext(cutBlock(SRC, 'function erpPhotoFold(items){'), ctx);
+vm.runInContext(cutBlock(SRC, 'function erpPhotoPick(items, q, kind, showUsed, showDup){'), ctx);
+vm.runInContext(cutBlock(SRC, 'function erpPhotoKindCounts(items, q, showUsed, showDup){'), ctx);
+const { erpContractDocKind: kindOf, erpPhotoKindCounts: counts } = ctx;
+/* ⚠ 돌려받은 목록을 «이 쪽 realm 의 배열»로 옮겨 담는다. vm 안에서 만든 `[]` 는
+   바깥과 다른 Array 를 물고 나와, deepStrictEqual 이 「모양은 같은데 같은 것이 아니다」로
+   넘어진다(2026-09-12 접기가 들어오며 안에서 새 배열을 만들게 됐다). 값 비교가 목적이다. */
+const pick = function () { return Array.from(ctx.erpPhotoPick.apply(null, arguments)); };
 
 const IT = (id, docName, extra) =>
   Object.assign({ id: id, fields: { company: '회사' + id, docName: docName } }, extra || {});
@@ -123,8 +134,8 @@ test('★★ 「이미 썼다」 표를 목록까지 «들고 온다» (안 들�
 
 test('★ 창이 갈래·감추기 규칙을 «쓴다»', () => {
   const fn = bare(cutBlock(SRC, 'function PhotoContractPickerModal(props){'));
-  assert.ok(fn.indexOf('erpPhotoPick(all, q, kind, showUsed)') >= 0, '창이 새 규칙을 안 쓴다');
-  assert.ok(fn.indexOf('erpPhotoKindCounts(all, q, showUsed)') >= 0, '갈래 수를 안 센다');
+  assert.ok(fn.indexOf('erpPhotoPick(all, q, kind, showUsed, showDup)') >= 0, '창이 새 규칙을 안 쓴다');
+  assert.ok(fn.indexOf('erpPhotoKindCounts(all, q, showUsed, showDup)') >= 0, '갈래 수를 안 센다');
   assert.ok(fn.indexOf('erpPhotoFilter(all, q);') < 0, '옛 거르개가 남아 있다');
 });
 

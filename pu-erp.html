@@ -13686,6 +13686,10 @@ function erpLoadMyContractPhotos(cb){
             owner: meta.__ownerUid || '', ownerName: meta.__ownerName || '',
             /* 목록 미리보기를 부를 때 쓴다 — 창고에 없는 옛 사진을 헛되이 두드리지 않는다 */
             loc: meta.loc || '',
+            /* ★ «문서 묶음과 쪽». 여러 쪽짜리 계약서는 쪽마다 사진 한 장이라,
+               이것이 없으면 2쪽·3쪽이 저마다 «다른 계약서»로 한 줄씩 차지한다
+               (아이행복어린이집 건 — 대표 지시 2026-09-12). erpPhotoFold 가 쓴다. */
+            doc: meta.doc || null,
             /* ★ 「이미 증빙으로 썼다」 표 (2026-08-26 대표 지시).
                계약을 저장할 때 PuPhotoStore.markUsed 가 남기는 자국이다.
                ⚠ 이걸 안 들고 오면 찾기 창이 «이미 쓴 계약서를 매번 다시» 보여 준다. */
@@ -14886,18 +14890,85 @@ function erpContractDocKind(fields){
   if(/위임|약정|위탁/.test(s)) return '위임';
   return '기타';
 }
-/* 갈래·이미 쓴 것까지 함께 거른다 — 찾기 칸과 규칙이 갈리면 안 된다. */
-function erpPhotoPick(items, q, kind, showUsed){
+/* ══════ 똑같은 서류는 «한 줄»로 접는다 (대표 지시 2026-09-12) ══════
+   「아이행복 어린이집 ocr 여려번해서 3개나있다. 완전 동일서류는 중복 정리해라」
+
+   운영 자료로 세어 보니 그 셋은 «서로 다른 셋»이 아니었다:
+     ① 2026-08-28 올린 자문계약서 (1쪽짜리) — 이미 계약에 붙여 썼다
+     ② 2026-09-11 다시 올린 같은 계약서의 1쪽
+     ③ 그 계약서의 «2쪽»   ← 이것이 계약서로 한 줄을 통째로 차지하고 있었다
+
+   그래서 겹침은 두 갈래다.
+     ⓐ **쪽** — 한 파일 묶음(doc.group)의 2쪽·3쪽. 한 서류이니 1쪽만 보인다.
+     ⓑ **벌** — 같은 계약서를 다시 찍어 올린 것. 업체·문서명·계약일·기간·보수가
+        모두 같으면 같은 서류로 본다.
+     ⚠ 두 갈래를 «차례로» 접는다. 묶음부터 접지 않으면 ②③ 이 서로 다른 묶음인 ① 과
+       못 만난다(묶음 번호가 다르므로) — 셋이 그대로 셋으로 남는다.
+
+   ⚠⚠ **지우지 않는다.** 목록에서 접기만 한다 — 접힌 것은 스위치로 도로 나온다.
+      계약서는 증빙이고, 판독 글자가 틀려 엉뚱하게 묶였을 수도 있다.
+   ⚠ 열쇠를 만들 수 없으면(업체명도 문서명도 없다) **접지 않는다.**
+      억지로 묶으면 서로 다른 서류가 조용히 사라진다.
+   ⚠ 대표로 남길 것은 「이미 쓴 것」 > 「앞쪽」 > 「최근 것」 차례다. 이미 계약에 붙여
+      쓴 장을 접어 버리면 그 계약의 근거가 목록에서 사라진다. */
+function erpPhotoDocKey(it){
+  var d = it && it.doc;
+  return (d && d.group) ? 'g:' + d.group : '';
+}
+function erpPhotoSameKey(it){
+  var f = (it && it.fields) || {};
+  var 다듬 = function(v){ return String(v || '').replace(/\s+/g, ''); };
+  var co = 다듬(f.company), dn = 다듬(f.docName);
+  if(!co || !dn) return '';          /* 못 가르면 접지 않는다 */
+  return 'd:' + [co, dn, f.signDate || '', f.startDate || '', f.endDate || '', 다듬(f.fee)].join('|');
+}
+/* 작을수록 «대표». 이미 쓴 것 → 앞쪽 → 최근 것 */
+function erpPhotoHeadCmp(a, b){
+  var u = (!!(a.used && a.used.at) ? 0 : 1) - (!!(b.used && b.used.at) ? 0 : 1);
+  if(u) return u;
+  var p = ((a.doc && Number(a.doc.page)) || 1) - ((b.doc && Number(b.doc.page)) || 1);
+  if(p) return p;
+  return (b.at || 0) - (a.at || 0);
+}
+function erpPhotoFoldOnce(묶음, keyOf, why){
+  var out = [], at = {};
+  묶음.forEach(function(g){
+    g.all.sort(erpPhotoHeadCmp);      /* 열쇠는 «대표»로 낸다 — 두 번 접어도 답이 같게 */
+    var k = keyOf(g.all[0]);
+    if(!k){ out.push(g); return; }
+    if(at[k] === undefined){ at[k] = out.length; out.push(g); return; }
+    var t = out[at[k]];
+    t.all = t.all.concat(g.all);
+    t.why = why;
+  });
+  return out;
+}
+function erpPhotoFold(items){
+  var 묶음 = (items || []).map(function(it){ return { all:[it], why:'' }; });
+  묶음 = erpPhotoFoldOnce(묶음, erpPhotoDocKey, '쪽');
+  묶음 = erpPhotoFoldOnce(묶음, erpPhotoSameKey, '벌');
+  return 묶음.map(function(g){
+    g.all.sort(erpPhotoHeadCmp);
+    var head = g.all[0];
+    if(g.all.length === 1) return head;
+    return Object.assign({}, head, { folded: g.all.slice(1), foldWhy: g.why });
+  });
+}
+
+/* 갈래·이미 쓴 것까지 함께 거른다 — 찾기 칸과 규칙이 갈리면 안 된다.
+   ⚠ 접기는 **맨 끝**이다. 먼저 접으면, 대표가 「이미 쓴 것」이라는 이유로 묶음 전체가
+     사라진다 — 아직 안 쓴 나머지 벌까지 같이 감춰진다(아이행복 ②③ 이 그 경우다). */
+function erpPhotoPick(items, q, kind, showUsed, showDup){
   var out = erpPhotoFilter(items, q);
   if(kind && kind !== '전체'){
     out = out.filter(function(it){ return erpContractDocKind(it.fields) === kind; });
   }
   if(!showUsed) out = out.filter(function(it){ return !(it.used && it.used.at); });
-  return out;
+  return showDup ? out : erpPhotoFold(out);
 }
 /* 갈래마다 몇 장인지 — 「자문 0장」이면 눌러 보지 않아도 된다. */
-function erpPhotoKindCounts(items, q, showUsed){
-  var base = erpPhotoPick(items, q, '전체', showUsed);
+function erpPhotoKindCounts(items, q, showUsed, showDup){
+  var base = erpPhotoPick(items, q, '전체', showUsed, showDup);
   var c = { '전체': base.length };
   ERP_DOC_KINDS.forEach(function(k){ c[k] = 0; });
   base.forEach(function(it){ var k = erpContractDocKind(it.fields); c[k] = (c[k] || 0) + 1; });
@@ -14907,6 +14978,8 @@ try {
   window.erpContractDocKind = erpContractDocKind;
   window.erpPhotoPick = erpPhotoPick;
   window.erpPhotoKindCounts = erpPhotoKindCounts;
+  window.erpPhotoFold = erpPhotoFold;
+  window.erpPhotoSameKey = erpPhotoSameKey;
 } catch(_){ }
 
 /* ══════ 📷 사진첩에서 계약서 찾기 (대표 승인 목업 2026-08-26) ══════
@@ -14939,8 +15012,11 @@ function PhotoContractPickerModal(props){
      ⚠ 지우지 않고 감추기만 한다. 잘못 붙였거나 계약이 깨진 것도 있어
         다시 꺼내 쓸 일이 있다 — 스위치로 도로 보인다. */
   var us = useState(false); var showUsed = us[0]; var setShowUsed = us[1];
-  var rows = erpPhotoPick(all, q, kind, showUsed);
-  var kindCnt = erpPhotoKindCounts(all, q, showUsed);
+  /* ★ 똑같은 서류는 «기본으로 접는다» (대표 지시 2026-09-12 「완전 동일서류는 중복 정리해라」).
+     ⚠ 여기서도 지우지 않는다 — 스위치를 켜면 접힌 것이 그대로 다시 나온다. */
+  var ds = useState(false); var showDup = ds[0]; var setShowDup = ds[1];
+  var rows = erpPhotoPick(all, q, kind, showUsed, showDup);
+  var kindCnt = erpPhotoKindCounts(all, q, showUsed, showDup);
 
   /* 목록에 보이는 것만 미리보기를 받는다 — 한 장에 약 20KB 다 */
   useEffect(function(){
@@ -15052,7 +15128,22 @@ function PhotoContractPickerModal(props){
                           color:'#854d0e', border:'1px solid #fde68a', borderRadius:'8px',
                           padding:'0 5px', fontSize:'9.5px', fontWeight:700,
                           maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } },
-                        '📌 이미 씀' + (it.used.where ? (' · ' + it.used.where) : '')) : null)
+                        '📌 이미 씀' + (it.used.where ? (' · ' + it.used.where) : '')) : null,
+                      /* 📎 접은 것 — 몇 장을 이 줄이 대신하고 있는지 적는다.
+                         ⚠ 「접었다」를 안 적으면 사라진 것처럼 보인다. 몇 장인지·왜 접었는지를
+                           덧말에 적어, 아래 스위치로 도로 꺼낼 수 있음을 알린다. */
+                      (it.folded && it.folded.length) ? h('div', {
+                        title: '똑같은 서류 ' + (it.folded.length + 1) + '장을 한 줄로 묶었습니다'
+                          + (it.foldWhy === '쪽' ? ' — 한 문서의 여러 쪽입니다' : ' — 같은 계약서를 여러 번 올린 것입니다')
+                          + '\n\n' + it.folded.map(function(x){
+                              return '· ' + (x.at ? fmtDate(x.at).slice(0, 10) : '(날짜 모름)')
+                                + ((x.doc && x.doc.page) ? (' · ' + x.doc.page + '쪽') : '');
+                            }).join('\n')
+                          + '\n\n아래 「겹친 것도 보기」를 켜면 그대로 다시 나옵니다 (지우지 않았습니다).',
+                        style:{ marginTop:'2px', marginLeft:'4px', display:'inline-block',
+                          background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0',
+                          borderRadius:'8px', padding:'0 5px', fontSize:'9.5px', fontWeight:700 } },
+                        '📎 ' + (it.folded.length + 1) + (it.foldWhy === '쪽' ? '쪽' : '벌')) : null)
                   );
                 })
           )
@@ -15092,8 +15183,19 @@ function PhotoContractPickerModal(props){
           h('input', { type:'checkbox', checked:showUsed,
             onChange:function(){ setShowUsed(!showUsed); } }),
           '이미 쓴 것도 보기' + (function(){
-            var hid = erpPhotoPick(all, q, kind, true).length - rows.length;
+            var hid = erpPhotoPick(all, q, kind, true, showDup).length - rows.length;
             return (!showUsed && hid > 0) ? (' (' + hid + '장 감춤)') : '';
+          })()),
+        /* 겹친 것도 보기 — 접은 것이 몇 장인지 함께 적는다(위 스위치와 같은 규칙).
+           ⚠ 「없다」와 「접었다」가 같아 보이면 안 된다. */
+        h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'5px', fontSize:'11.5px',
+            color:'#475569', cursor:'pointer', whiteSpace:'nowrap', marginRight:'10px' },
+          title:'똑같은 서류(같은 문서의 여러 쪽 · 같은 계약서를 여러 번 올린 것)를 한 줄로 묶어 둡니다 — 지운 것이 아닙니다' },
+          h('input', { type:'checkbox', checked:showDup,
+            onChange:function(){ setShowDup(!showDup); } }),
+          '겹친 것도 보기' + (function(){
+            var hid = erpPhotoPick(all, q, kind, showUsed, true).length - rows.length;
+            return (!showDup && hid > 0) ? (' (' + hid + '장 접음)') : '';
           })()),
         h('span', { style:{ fontSize:'11.5px', color:'#64748b' } }, '고른 뒤 무엇이 바뀌는지 먼저 보여 드립니다'),
         h('div', { style:{ flex:1 } }),

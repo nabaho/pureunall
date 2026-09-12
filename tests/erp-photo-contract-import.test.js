@@ -282,10 +282,15 @@ const t = (name, got, want) => {
       '                     loadFull:function(){ return Promise.resolve(""); } };',
       'function render(p){ __i = 0; return PhotoContractPickerModal(p); }'
     ].join('\n'), c);
-    /* 2026-08-27: 창이 갈래(erpPhotoPick)·갈래 수(erpPhotoKindCounts)도 쓴다 — 함께 넣는다. */
+    /* 2026-08-27: 창이 갈래(erpPhotoPick)·갈래 수(erpPhotoKindCounts)도 쓴다 — 함께 넣는다.
+       2026-09-12: 겹친 서류 접기(erpPhotoFold 무리)도 erpPhotoPick 이 부른다 — 안 넣으면
+                   「erpPhotoFold is not defined」로 창이 통째로 안 그려진다. */
     vm.runInContext(fn('erpPhotoRowText') + '\n' + fn('erpPhotoFilter') + '\n' +
                     slice('var ERP_DOC_KINDS =', '\nfunction erpContractDocKind(') + '\n' +
-                    fn('erpContractDocKind') + '\n' + fn('erpPhotoPick') + '\n' +
+                    fn('erpContractDocKind') + '\n' +
+                    fn('erpPhotoDocKey') + '\n' + fn('erpPhotoSameKey') + '\n' +
+                    fn('erpPhotoHeadCmp') + '\n' + fn('erpPhotoFoldOnce') + '\n' +
+                    fn('erpPhotoFold') + '\n' + fn('erpPhotoPick') + '\n' +
                     fn('erpPhotoKindCounts') + '\n' +
                     fn('PhotoContractPickerModal'), c);
 
