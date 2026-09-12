@@ -1414,6 +1414,17 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 #gridBar button:disabled{opacity:.45}
 
 /* 겹치는 서류를 스스로 치웠다는 알림 — 그 자리에서 되살릴 수 있다 */
+/* 🧹 똑같은 사진 정리 — ⚙ 설정의 한 줄 (대표 지시 2026-09-12) */
+.duprow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--line)}
+.duprow:last-of-type{border-bottom:none}
+.duprow img{width:46px;height:34px;object-fit:cover;border-radius:5px;flex-shrink:0;background:var(--line)}
+.duprow .noimg{width:46px;height:34px;border-radius:5px;flex-shrink:0;background:var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--sub)}
+.duprow .d{min-width:0;flex:1}
+.duprow .d b{display:block;font-size:12.5px;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.duprow .d span{display:block;font-size:11.5px;color:var(--sub);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #dupBox{margin-bottom:10px;max-height:38vh;overflow-y:auto;border:1px solid #fbbf24;background:#f8fafc;border-radius:10px;padding:9px 11px;font-size:12.5px;color:#854d0e}
 #dupBox .dh{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:4px}
 #dupBox .dh .x{margin-left:auto;border:1px solid #fbbf24;background:#fff;color:#854d0e;border-radius:7px;padding:2px 8px;font-size:11.5px}
@@ -2247,6 +2258,20 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
          <button class="wide" id="retDone" onclick="markRetChecked()" style="background:#fff;color:var(--blue);border:1px solid var(--blue)">점검했음으로 기록</button>
          <div id="oldList"></div>
          <pre id="oldOut"></pre>
+       </div>
+
+       <!-- ── 🧹 똑같은 사진 (대표 지시 2026-09-12 「중복사진정리」) ──────────
+            같은 파일을 두 번 올린 것을 찾아 여벌만 휴지통으로 보낸다.
+            ⚠ **스스로 지우지 않는다** — 찾아서 보여 주고, 사람이 눌러야 치운다.
+              보유기간 카드(위)와 같은 태도다.
+            ⚠ 「완전 동일」은 어림이 아니다 — 후보의 미리보기를 실제로 받아 견준다. -->
+       <div class="card" id="setDup">
+         <div class="row" style="border:none"><span>🧹 똑같은 사진</span></div>
+         <p class="mignote">같은 파일을 두 번 올린 것을 찾습니다. 묶음마다 <b>한 장은 그대로 남고</b>
+           여벌만 휴지통으로 갑니다(<b>30일</b> 안에 되살릴 수 있습니다).
+           <b>증빙으로 쓴 사진은 남깁니다.</b></p>
+         <button class="wide" id="dupFindBtn" onclick="dupCleanFind()">똑같은 사진 찾기</button>
+         <div id="dupCleanBox"></div>
        </div>
 
        <!-- 연말 백업 — 서버가 없어 저절로 돌지 않는다. 해가 바뀌면 알려 준다. -->
@@ -19337,6 +19362,187 @@ function keepUntilText(meta) {
 /* 지우기 물음에 붙일 경고 — 증빙으로 쓴 사진이 섞였을 때만 나온다.
    ⚠ **막지는 않는다.** 잘못 붙였거나 계약이 취소된 사진도 있다 — 판단은 사람이 한다.
      막는 것이 아니라 «모르고 지우는 것»을 막는 것이 이 글의 일이다. */
+/* ══════ 🧹 똑같은 사진 정리 (대표 지시 2026-09-12 「중복사진정리」) ══════
+   운영 자료 937장을 세어 보니, **같은 파일을 두 번 올린 것**이 7쌍 있었다.
+   대부분 2026-08-11 09:03 과 09:04 — 사업자등록증을 올리다 한 번 더 누른 것이다.
+
+   ■ 무엇을 «똑같다»고 보나 — 두 단계로 본다
+     ① 값싼 1차: 같은 주인 · 같은 화소(w·h) · 같은 크기(size) · 같은 찍은 때(takenAt).
+        목록에 이미 있는 값이라 아무것도 새로 안 받는다.
+     ② 확인: 후보만 «미리보기(20KB)를 실제로 받아» 글자 하나까지 견준다.
+        대표 지시는 「완전 동일」이다 — 어림으로 지우면 안 된다.
+
+   ■ 무엇을 남기나 (작을수록 남긴다)
+     ① 증빙으로 쓴 것 — 계약·사건의 근거다. 절대 안 치운다.
+     ② 어디론가 보낸 것(기업정보함·근로자 정보함) — 그 기록이 이 사진을 가리킨다.
+     ③ 판독이 «쓸모 있는» 것 — bizreg 를 두고 other 를 치운다(실제로 그런 쌍이 있다).
+     ④ 먼저 올린 것 — 그 뒤의 것이 「한 번 더 누른」 것이다.
+
+   ⚠⚠ **스스로 지우지 않는다.** 찾아서 보여 주기만 하고, 사람이 눌러야 치운다.
+   ⚠⚠ 치우는 것은 «휴지통»이다(30일). 되살릴 수 있어야 이 일을 할 수 있다.
+   ⚠ 한 묶음에 «증빙으로 쓴 것이 둘 이상»이면 통째로 건너뛴다 — 어느 쪽이
+     어느 계약의 근거인지 화면은 모른다. 사람이 보고 정할 일이다.
+   ⚠ 값이 하나라도 비면(크기·화소·찍은 때) 후보로 안 낸다. 빈 값끼리 같아 보여
+     서로 다른 사진이 한 묶음이 되면 그것이 곧 사고다. */
+function dupKeyOf(it) {
+  const m = (it && it.meta) || {};
+  const w = Number(m.w) || 0, h = Number(m.h) || 0;
+  const size = Number(m.size) || 0, taken = Number(m.takenAt) || 0;
+  if (!w || !h || !size || !taken) return '';        /* 빈 값은 «같음»이 아니다 */
+  const own = m.__ownerUid || '나';
+  return [own, w, h, size, taken].join('|');
+}
+/* 남길 것이 앞으로 온다 */
+function dupKeepRank(it) {
+  const m = (it && it.meta) || {};
+  const r = m.read || {};
+  const 썼나 = isUsed(m) ? 0 : 1;
+  const 보냈나 = (r.filed && r.filed.id) || (r.filedWk && r.filedWk.at) || (r.filedCo && r.filedCo.at) ? 0 : 1;
+  const 쓸모 = (r.kind && r.kind !== 'other') ? 0 : 1;
+  return [썼나, 보냈나, 쓸모, Number(m.upAt) || Number(m.takenAt) || 0];
+}
+function dupRankCmp(a, b) {
+  const x = dupKeepRank(a), y = dupKeepRank(b);
+  for (let i = 0; i < x.length; i++) { if (x[i] !== y[i]) return x[i] - y[i]; }
+  return 0;
+}
+function dupPhotoGroups(items) {
+  const by = {};
+  (items || []).forEach(function (it) {
+    const k = dupKeyOf(it);
+    if (!k) return;
+    (by[k] = by[k] || []).push(it);
+  });
+  const out = [];
+  Object.keys(by).forEach(function (k) {
+    const list = by[k];
+    if (list.length < 2) return;
+    list.sort(dupRankCmp);
+    /* ⚠ 증빙으로 쓴 것이 둘 이상이면 손대지 않는다 — 어느 쪽이 어느 계약의
+       근거인지 화면은 모른다. 왜 건너뛰는지는 함께 내보낸다. */
+    const 쓴것 = list.filter(function (x) { return isUsed(x.meta); });
+    if (쓴것.length > 1) {
+      out.push({ key: k, keep: list[0], drop: [], skip: '증빙으로 쓴 사진이 ' + 쓴것.length + '장이라 건너뜁니다' });
+      return;
+    }
+    out.push({ key: k, keep: list[0], drop: list.slice(1), skip: '' });
+  });
+  return out;
+}
+try { window.dupPhotoGroups = dupPhotoGroups; window.dupKeyOf = dupKeyOf; } catch (_) {}
+
+/* 후보만 «실제로 견준다» — 미리보기(20KB)를 받아 글자 하나까지 같은지 본다.
+   ⚠ 1차(크기·화소·찍은 때)는 어림이다. 대표 지시는 「완전 동일」이라
+     어림으로 지우면 안 된다. 여기가 그 「완전」을 만드는 자리다.
+   ⚠ 못 받은 장은 «같다고 치지 않는다» — 모르는 것은 안 지운다.
+   ⚠ 후보만 받는다. 937장을 다 받으면 그것이 곧 요금이다(7쌍이면 14장). */
+function dupVerify(groups) {
+  const 받기 = function (it) {
+    return PuPhotoStore.loadThumb(photoYearOf(it.id), it.id,
+      (it.meta && it.meta.__ownerUid) || undefined, (it.meta && it.meta.loc) || undefined)
+      .then(function (src) { return src || ''; })
+      .catch(function () { return ''; });
+  };
+  return Promise.all(groups.map(function (g) {
+    if (g.skip || !g.drop.length) return Promise.resolve(g);
+    return Promise.all([받기(g.keep)].concat(g.drop.map(받기))).then(function (srcs) {
+      const 기준 = srcs[0];
+      if (!기준) return Object.assign({}, g, { drop: [], skip: '미리보기를 못 받아 견주지 못했습니다' });
+      const 같은것 = [], 다른것 = [];
+      g.drop.forEach(function (it, i) {
+        if (srcs[i + 1] && srcs[i + 1] === 기준) 같은것.push(it); else 다른것.push(it);
+      });
+      return Object.assign({}, g, { drop: 같은것, thumb: 기준,
+        skip: 같은것.length ? '' : (다른것.length ? '견줘 보니 서로 다른 사진이었습니다' : g.skip) });
+    });
+  }));
+}
+
+/* ⚙ 설정의 「🧹 똑같은 사진」 카드 — 찾기만 한다. 치우는 것은 사람이 누른다. */
+let dupFound = null;         /* null = 아직 안 찾음 */
+function renderDupClean() {
+  const el = $('dupCleanBox');
+  if (!el) return;
+  if (dupFound === null) { el.innerHTML = ''; return; }
+  const 칠것 = dupFound.filter(function (g) { return g.drop.length; });
+  const 건너뛴것 = dupFound.filter(function (g) { return g.skip; });
+  const n = 칠것.reduce(function (a, g) { return a + g.drop.length; }, 0);
+  if (!n) {
+    el.innerHTML = '<p class="mignote">✅ 똑같은 사진이 없습니다.'
+      + (건너뛴것.length ? ' (' + 건너뛴것.length + '묶음은 건너뛰었습니다 — ' + esc(건너뛴것[0].skip) + ')' : '')
+      + '</p>';
+    return;
+  }
+  el.innerHTML = 칠것.map(function (g) {
+    const k = g.keep.meta || {};
+    const 이름 = (k.read && k.read.fields && (k.read.fields.company || k.read.fields.name))
+      || readLabel(k.read) || '사진';
+    return '<div class="duprow">'
+      + (g.thumb ? '<img src="' + g.thumb + '" alt="">' : '<span class="noimg">—</span>')
+      + '<div class="d"><b>' + esc(이름) + '</b>'
+      + '<span>' + (g.drop.length + 1) + '장이 똑같습니다 — '
+      + esc(PuDocFile.whenText(k.upAt || k.takenAt || 0)) + ' 것을 남깁니다'
+      + (isUsed(k) ? ' · 📌 증빙으로 쓴 것' : '') + '</span></div></div>';
+  }).join('')
+    + (건너뛴것.length ? '<p class="mignote">⚠ ' + 건너뛴것.length + '묶음은 건너뜁니다 — '
+        + esc(건너뛴것.map(function (g) { return g.skip; }).filter(Boolean)[0] || '') + '</p>' : '')
+    + '<button class="wide" id="dupGo" onclick="dupCleanRun()" '
+    + 'style="background:#fff;color:#991b1b;border:1px solid #991b1b;margin-top:8px">'
+    + '여벌 ' + n + '장을 휴지통으로</button>';
+}
+
+function dupCleanFind() {
+  if (typeof PuPhotoStore === 'undefined') return;
+  const btn = $('dupFindBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '찾는 중…'; }
+  dupFound = null;
+  renderDupClean();
+  const groups = dupPhotoGroups(gridItems);
+  $('dupCleanBox').innerHTML = '<p class="mignote">후보 ' + groups.length + '묶음을 견주는 중…</p>';
+  dupVerify(groups).then(function (done) {
+    dupFound = done;
+    renderDupClean();
+  }).catch(function (e) {
+    console.warn('[똑같은 사진 찾기]', e);
+    $('dupCleanBox').innerHTML = '<p class="mignote">못 찾았습니다 — 잠시 뒤 다시 눌러 주세요.</p>';
+  }).then(function () {
+    if (btn) { btn.disabled = false; btn.textContent = '똑같은 사진 찾기'; }
+  });
+}
+
+/* 치우기 — 여기서만 실제로 손을 댄다. */
+function dupCleanRun() {
+  if (!dupFound) return;
+  const ids = [];
+  dupFound.forEach(function (g) { g.drop.forEach(function (it) { ids.push(it.id); }); });
+  if (!ids.length) return;
+  /* ⚠ 남의 사진은 총괄 관리자만 — 판정을 새로 만들지 않고 쓰던 것을 그대로 쓴다 */
+  if (blockedIfOther(ids)) return;
+  if (!confirm('똑같은 사진 ' + ids.length + '장을 휴지통으로 보냅니다.\n\n'
+    + '묶음마다 한 장은 그대로 남습니다 — 없어지는 것은 여벌뿐입니다.\n'
+    + '휴지통에서 ' + PuPhotoStore.TRASH_DAYS + '일 안에는 되살릴 수 있습니다.\n\n계속할까요?')) return;
+  const btn = $('dupGo');
+  if (btn) { btn.disabled = true; btn.textContent = '치우는 중… 0/' + ids.length; }
+  let done = 0;
+  ids.reduce(function (p, id) {
+    return p.then(function () {
+      return PuPhotoStore.deletePhoto(photoYearOf(id), id, '중복 — 똑같은 사진', photoOwner(id))
+        .then(function () {
+          done += 1;
+          gridItems = gridItems.filter(function (x) { return x.id !== id; });
+          if (btn) btn.textContent = '치우는 중… ' + done + '/' + ids.length;
+        })
+        .catch(function (e) { console.warn('[똑같은 사진 치우기]', id, e); });
+    });
+  }, Promise.resolve()).then(function () {
+    dupFound = null;
+    renderDupClean();
+    renderKindTabs(); renderGrid(); renderGridBar(); refreshTrashCount();
+    alert(done + '장을 휴지통으로 보냈습니다.'
+      + (done < ids.length ? '\n' + (ids.length - done) + '장은 치우지 못했습니다 — 잠시 뒤 다시 해 주세요.' : ''));
+  });
+}
+
 function usedWarnText(ids) {
   const used = ids.map(function (id) {
     return gridItems.find(function (x) { return x.id === id; });
