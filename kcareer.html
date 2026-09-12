@@ -1081,6 +1081,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-mergeguard.js?v=1"></script>
 <!-- 「잘못 붙은 원본 찾기」 — 기록 날짜와 붙은 파일 이름이 크게 어긋난 줄을 찾는다 -->
 <script src="js/kcareer-misattach.js?v=1"></script>
+<!-- 여러 장 PDF 를 «서류마다» 갈라 읽는다(kcareer-pagesplit.js) -->
+<script src="js/kcareer-pagesplit.js?v=1"></script>
 <script src="js/kcareer-overlay.js?v=2"></script>
 <!-- AI 판독 호출기 — 열쇠는 회사 서버가 든다(브라우저는 모른다) -->
 <script src="js/pu-ai-call.js?v=3"></script>
@@ -8475,9 +8477,9 @@ async function _pdfPageJpeg(pdf, no){
     return url.slice(url.indexOf(',')+1) || null;
   }catch(e){ console.warn('PDF 쪽', no, e && e.message); return null; }
 }
-async function _ocrPayload(b64,ext){
+async function _ocrPayload(b64,ext,max){
   if(ext!=='pdf') return {b64:b64, mt:(ext==='png'?'image/png':'image/jpeg'), asImage:true};
-  var pages=await _pdfPagesJpeg(b64);
+  var pages=await _pdfPagesJpeg(b64, max);
   if(pages && pages.length) return {b64:pages[0], pages:pages, mt:'image/jpeg', asImage:true, fromPdf:true};
   return {b64:b64, mt:'application/pdf', asImage:false};   /* 못 바꾸면 원래대로 */
 }
@@ -8757,13 +8759,28 @@ async function ocrDrop(files,page){ files=[...files]; if(!files.length) return;
     const buf=await file.arrayBuffer(), b64=abToB64(buf);
     /* ⚠ PDF 는 그림으로 바꿔 보낸다 — 그대로 보내면 읽히지 않는다(실측 2026-08-30).
        저장되는 원본은 그대로 PDF 다. */
-    const pay=await _ocrPayload(b64,ext);
+    /* ★★ 여러 장 묶음일 수 있으므로 쪽 뚜껑을 연다 (대표 지시 2026-09-12).
+       ⚠ 여기만 연다 — 「🔍 다시 읽기」는 «한 서류»를 읽는 자리라 4쪽 그대로다(요금·시간). */
+    const _maxPg=(window.KcareerPageSplit&&KcareerPageSplit.MAX_PAGES)||OCR_MAX_PAGES;
+    const pay=await _ocrPayload(b64,ext,_maxPg);
     /* PDF 를 그림으로 못 바꾸는 기기라면 한 번만 알려 준다 — 장마다 띄우면 시끄럽다 */
     if(ext==='pdf' && !pay.asImage && _pdfRaster===false && !window._pdfWarned){
       window._pdfWarned=true; toast('⚠ 이 기기에서는 PDF를 그림으로 바꾸지 못합니다 — PDF는 그대로 보냅니다', 5000);
     }
     const isPDF=!pay.asImage, mt=pay.mt, sendB64=pay.b64;
     const prompt=PAGE_OCR_PROMPT[page]||PAGE_OCR_PROMPT.wiccok; let parsed=null;
+    /* ★★★ 한 PDF 에 «서류가 여럿» 들어 있으면 서류마다 따로 담는다 (대표 지시 2026-09-12
+       「한번에 여러장 pdf를 넣어도 모두 인식할수있게해라」).
+       ⚠ 여태 한 건만 담긴 것은 고장이 아니라 «짜임»이었다 — 판독층은 여러 장을
+         「한 문서의 여러 쪽」으로 읽는다(2장짜리 경력증명서 때문에 그것이 맞다).
+         빠져 있던 것은 «이 묶음에 서류가 몇 개인가»를 묻는 일이었다.
+       ⚠ 판독은 «한 번만» 부른다 — 갈라 달라고 물은 답을 그대로 쓴다(두 번 부르면 요금 두 배).
+       ⚠ 못 알아들으면 옛 길 그대로 — 새 기능 때문에 되던 것이 멈추면 안 된다. */
+    if(ext==='pdf' && pay.pages && pay.pages.length>1 && window.KcareerPageSplit && aiReady()){
+      var _sp=await _ocrSplitPdf(page,file,pay,prompt,tally);
+      if(_sp && _sp.split) continue;               /* 서류마다 담았다 */
+      if(_sp && _sp.one) parsed=_sp.one;           /* 한 서류였다 — 아래 옛 길로(PDF 통째 첨부) */
+    }
     if(['hwp','hwpx'].includes(ext)){ const fb=quickParseFilename(file.name,page); if(fb){ tally(await saveOCRRecord(page,fb,file,ext,b64)); toast('📝 HWP는 OCR 불가 — 파일명 등록+첨부'); } else failed++; continue; }
     if(!parsed && aiReady()){ const gj=await _geminiOCR(prompt,sendB64,mt,pay.pages); if(gj){ if(gj.parsed) parsed=gj.parsed; else if(gj.err) apiErr=gj.err; } }
     if(gvKey&&!isPDF){ try{ const r=await kcFetch(`https://vision.googleapis.com/v1/images:annotate?key=${gvKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:[{image:{content:b64},features:[{type:'DOCUMENT_TEXT_DETECTION'}]}]})});
@@ -8788,6 +8805,52 @@ async function ocrDrop(files,page){ files=[...files]; if(!files.length) return;
   if(못담음) toast('⚠ '+못담음+'건은 읽었지만 이 화면에 담지 못했습니다 — 개발자에게 알려 주세요(page='+page+')', 7000);
   if(!done && failed) toast('❌ 한 건도 못 읽었습니다'+(apiErr?' — '+apiErr:' — 로그인·API 키를 확인해 주세요'), 6000);
   else toast(`OCR 완료: ${done}건${failed?' / 실패 '+failed:''}${apiErr?' · ⚠️ API 오류('+apiErr+') — 키·크레딧 확인 필요, 일부는 파일명으로만 등록됨':''}`); }
+
+/* ★★ 여러 장 PDF 를 서류마다 갈라 담는다.
+   돌려주는 것 = {split:true}  서류마다 담았다(부르는 쪽은 다음 파일로)
+               {one:필드}     서류가 하나였다(부르는 쪽이 예전처럼 담는다 — 원본 PDF 통째로)
+               null           못 알아들었다(부르는 쪽이 예전 길로)
+   ⚠ 서류가 하나면 «가르지 않는다» — 2쪽짜리 경력증명서를 두 건으로 만들면 더 나쁘다.
+   ⚠ 갈라 담을 때 원본은 «그 쪽의 그림»을 붙인다. 원본 PDF 를 모든 줄에 붙이면
+     한 파일이 여러 줄에 붙어 「잘못 붙은 원본 찾기」가 곧바로 경고한다(실제로 그렇다).
+   ⚠ 여러 쪽짜리 서류는 «첫 쪽»만 붙고 이름에 쪽 범위를 적는다 — 그렇다고 밝힌다. */
+async function _ocrSplitPdf(page,file,pay,basePrompt,tally){
+  var n=pay.pages.length;
+  var got=null;
+  try{
+    var gj=await _geminiOCR(KcareerPageSplit.buildPrompt(basePrompt,n), pay.pages[0], 'image/jpeg', pay.pages);
+    /* ⚠ 이 줄을 지워도 «지금은» 결과가 같다 — 빈 답은 아래 parseDocs 가 null 로 돌려주고
+       그 다음 줄이 걸러 낸다(고장넣기로 확인했다). 억지 검사를 지어 붙이지 않고 적어 둔다. */
+    if(!gj || !gj.parsed) return null;
+    got=KcareerPageSplit.parseDocs(gj.parsed, n);
+    if(!got) return null;
+  }catch(e){ console.warn('여러 장 가르기', e); return null; }
+
+  if(got.docs.length<2) return { one: got.docs[0].fields };
+
+  toast('📄 '+n+'쪽에서 «서류 '+got.docs.length+'건»을 찾았습니다 — 하나씩 담습니다', 5000);
+  var 담음=0;
+  for(var i=0;i<got.docs.length;i++){
+    var d=got.docs[i];
+    var b64=pay.pages[d.pages[0]-1];
+    if(!b64) continue;
+    var nm=_splitPageName(file.name, d.pages);
+    var res=await saveOCRRecord(page, d.fields, {name:nm, size:Math.round(b64.length*3/4)}, 'jpg', b64);
+    if(tally(res)) 담음++;
+  }
+  if(got.unused && got.unused.length)
+    toast('ℹ '+got.unused.length+'쪽은 서류가 아니라고 보아 건너뛰었습니다 ('+got.unused.join('·')+'쪽)', 5000);
+  if(n>=KcareerPageSplit.MAX_PAGES)
+    toast('⚠ 앞 '+KcareerPageSplit.MAX_PAGES+'쪽까지만 읽었습니다 — 더 있으면 나눠서 넣어 주세요', 7000);
+  return { split:true, made:담음 };
+}
+/* 갈라 담은 줄의 원본 이름 — «몇 쪽에서 나왔는지»를 남긴다.
+   ⚠ 이름을 안 남기면 나중에 어느 쪽인지 아무도 모른다. */
+function _splitPageName(orig,pages){
+  var base=String(orig||'문서').replace(/\.[^.]+$/,'');
+  var 쪽=(pages.length>1)?(pages[0]+'~'+pages[pages.length-1]):String(pages[0]);
+  return base+' ('+쪽+'쪽).jpg';
+}
 
 /* ===== 원본 일괄매칭 (기존 이식) ===== */
 let _bulkCtx=null;

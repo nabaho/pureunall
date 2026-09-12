@@ -2109,7 +2109,10 @@ test('★★ PDF 는 그림으로 바꿔 보낸다 — 그대로 보내면 읽�
   assert.match(p, /return \{b64:b64, mt:'application\/pdf', asImage:false\}/,
     '못 바꾸면 원래 PDF 로 되돌아가야 합니다');
   // 일괄 읽기·다시읽기 «둘 다» 같은 길을 써야 한다
-  assert.match(source, /const pay=await _ocrPayload\(b64,ext\)/, '일괄 읽기');
+  /* ⚠ 2026-09-12: 일괄 읽기는 쪽 뚜껑을 «열어» 부른다(여러 장 묶음을 서류마다 가르기 위해).
+     길은 여전히 하나다 — 쪽 수만 부르는 쪽이 정한다. 「다시 읽기」는 «한 서류»를 읽는
+     자리라 기본값(4쪽) 그대로여야 한다 — 열면 요금·시간이 셋 배가 된다. */
+  assert.match(source, /const pay=await _ocrPayload\(b64,ext,_maxPg\)/, '일괄 읽기');
   assert.match(source, /var pay=await _ocrPayload\(f\.base64,ext\)/, '편집창 다시읽기');
 });
 
