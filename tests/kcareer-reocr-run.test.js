@@ -18,6 +18,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+/* 함수를 «통째로» 뽑는다 — 고정 폭으로 자르면 함수가 자랄 때 뒤를 조용히 못 본다 */
+const { cutFn } = require('./cut-fn');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'kcareer.html'), 'utf8');
 
@@ -169,8 +171,10 @@ test('★ 못 읽으면 칸을 건드리지 않는다 — 반쯤 채우면 더 �
 
 test('★★ 원본을 «폴더에서도» 읽는다 — 첨부 창고만 뒤지지 않는다', async () => {
   /* _formFileAsync 하나로 앱 첨부·폴더 경로를 다 읽는다(2026-09-12). */
-  const i = SRC.indexOf('async function reOcrForm(');
-  const fn = SRC.slice(i, i + 2600);
+  /* ⚠ 고정 폭(2600자)으로 자르고 있었다 — 함수가 4,977자로 자라 «2,377자를 못 보고»
+       있었다. 「없어야 한다」를 보는 줄이 아래에 있어 조용히 통과할 자리였다.
+       tests/test-cut-truncation.test.js 가 이것을 잡아 배포까지 막았다(2026-09-12). */
+  const fn = cutFn(SRC, 'async function reOcrForm(');
   assert.match(fn, /await _formFileAsync\(\)/);
   assert.ok(!/await getFileAsync\(_formCtx\.editId\)/.test(fn));
 });
