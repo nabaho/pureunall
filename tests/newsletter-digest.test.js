@@ -262,6 +262,19 @@ test('★★ 웹 쪽은 «전문 한 칸만» 읽는다 — 회차 안에는 받
   assert.ok(!몸.includes('받는이'), 'newsView 가 받는이를 만진다');
 });
 
+test('★★ 「못 준다」는 답은 «굳히지 않는다» — 굳으면 담은 뒤에도 계속 없다고 한다', () => {
+  /* 실측 2026-09-12: 전문을 담기 «전»에 한 번 열어 봤더니 그 404 가 5분간 굳어,
+     담은 뒤에도 계속 「전문이 담겨 있지 않습니다」가 나왔다. */
+  const i = idx.indexOf('exports.newsView');
+  const 몸 = idx.slice(i, idx.indexOf('exports.', i + 10));
+  const 줄것 = 몸.indexOf('res.status(200)');
+  const 굳힘 = 몸.indexOf('public, max-age=');
+  assert.ok(굳힘 >= 0, '성공한 쪽에도 캐시가 아예 없다');
+  assert.ok(굳힘 < 줄것 && 굳힘 > 몸.indexOf('볼수있나'),
+    '캐시를 «판단보다 먼저» 걸고 있다 — 못 준다는 답까지 함께 굳는다');
+  assert.match(몸, /no-store/, '못 준다는 답을 안 굳히는 자리가 없다');
+});
+
 test('회차 열쇠를 «추적 쪽과 같은 잣대»로 씻는다 — 다르면 자리가 어긋난다', () => {
   const NT = require('../functions/news-track.js');
   ['a.b#c', '../x', 'a'.repeat(60)].forEach((v) => {

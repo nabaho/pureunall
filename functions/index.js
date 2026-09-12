@@ -2657,9 +2657,13 @@ exports.newsView = functions
   .https.onRequest(async (req, res) => {
     const NV = require("./news-view");
     res.set("Content-Type", "text/html; charset=utf-8");
-    /* 내용이 바뀔 일이 거의 없지만, 보낸 뒤 고칠 수도 있어 짧게만 둔다 */
-    res.set("Cache-Control", "public, max-age=300");
     res.set("X-Robots-Tag", "noindex");
+    /* ⚠⚠ «못 준다»는 답은 캐시하지 않는다 (2026-09-12 실측으로 겪었다).
+         전문을 담기 전에 한 번 누른 사람이 있으면 그 404 가 5분간 굳어, 전문을
+         담은 뒤에도 계속 「전문이 없습니다」가 나온다. 굳을 값이 아니다. */
+    const 굳히지말것 = () =>
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    굳히지말것();
     const q = NV.읽기(req.query);
     if (!q.ok) { res.status(404).send(NV.없는쪽("없음")); return; }
     try {
@@ -2672,6 +2676,8 @@ exports.newsView = functions
       const 판 = NV.볼수있나(상태.val(), 전문.val());
       if (!판.ok) { res.status(404).send(NV.없는쪽(판.까닭)); return; }
       const 제목 = (await db.ref(밑 + "제목").once("value")).val();
+      /* 줄 것이 있을 때만 잠깐 굳힌다 — 이미 나간 회차라 잘 안 바뀐다 */
+      res.set("Cache-Control", "public, max-age=300");
       res.status(200).send(NV.쪽(제목, String(전문.val())));
     } catch (e) {
       console.warn("newsView", (e && e.message) || e);
