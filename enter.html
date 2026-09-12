@@ -123,7 +123,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
-<script src="js/pu-billing.js?v=8"></script>
+<script src="js/pu-billing.js?v=9"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -2339,6 +2339,18 @@ body.portal-mode #moreFab{display:flex;}
     var won = window.PuBilling.fmtWon;
     /* 넘은 뒤에는 「/ 한도」 대신 «다 썼다»고 말한다 — 넘은 숫자 옆의 한도는
        읽는 사람이 한 번 더 빼 봐야 하는 짐이다. */
+    /* ★ 무료로 쓰는 중이면 «횟수만» 보인다 (대표 지시 2026-09-12 「무료는 횟수만 보이게」).
+       ⚠ ₩0 을 띄우면 「안 썼다」로 읽힌다 — 실제로는 썼고 돈이 안 들 뿐이다. */
+    if(s.free){
+      $('aiAmt').textContent = s.reads.toLocaleString('ko-KR') + '번';
+      $('aiOf').textContent = '무료';
+      chip.title = 'AI 판독 (이번 달)\n\n'
+        + '이번 달 판독 ' + s.reads.toLocaleString('ko-KR') + '번\n'
+        + '단가가 0 으로 되어 있어 «무료로 쓰는 중»입니다 — 금액은 안 보여 드립니다.\n\n'
+        + '유료로 바뀌면 사진첩 ⚙ 설정에서 단가를 채워 넣으세요.\n'
+        + '그때부터 금액과 한도가 다시 보입니다. 횟수는 무료일 때도 계속 쌓입니다.';
+      return;
+    }
     $('aiAmt').textContent = (s.over ? '🛑 ' : s.near ? '⚠ ' : '') + won(s.spent);
     $('aiOf').textContent = s.over ? '· 한도 다 씀'
       : (s.limit > 0 ? '/ ' + s.limit.toLocaleString('ko-KR') : '');

@@ -469,13 +469,19 @@
     var reads = (monthTally && monthTally._all) ? num(monthTally._all.n) : null;
     if (reads === null || reads < 0) {
       return { has: false, reads: null, spent: null, limit: b.limit, warn: b.warn,
-        wonPerRead: b.wonPerRead, over: false, near: false, tone: 'none' };
+        wonPerRead: b.wonPerRead, free: b.wonPerRead === 0, over: false, near: false, tone: 'none' };
     }
     var spent = Math.round(reads * b.wonPerRead);
     var over = b.limit > 0 && spent >= b.limit;
     var near = b.warn > 0 && spent >= b.warn;
+    /* ★ 단가가 0 이면 «무료로 쓰는 중»이다 — 그때는 금액을 그리지 않는다
+         (대표 지시 2026-09-12 「무료는 횟수만 보이게」).
+       ⚠ ₩0 을 띄우면 「안 썼다」로 읽힌다. 실제로는 썼고 «돈이 안 들 뿐»이다.
+         그래서 금액을 감추고 «몇 번 썼나»를 대신 보인다 — 셈은 그대로 쌓인다.
+       ⚠ 무료라고 셈을 멈추지 말 것. 유료로 바뀌는 날 단가만 채워 넣으면
+         그날부터 금액이 맞게 나온다(그때 지난 횟수도 근거가 된다). */
     return { has: true, reads: reads, spent: spent, limit: b.limit, warn: b.warn,
-      wonPerRead: b.wonPerRead, over: over, near: near,
+      wonPerRead: b.wonPerRead, free: b.wonPerRead === 0, over: over, near: near,
       tone: over ? 'over' : near ? 'warn' : 'ok' };
   }
 
