@@ -13,67 +13,418 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="푸른카메라">
 
-<!-- ══════════════════════════════════════════════════════════════════
-     푸른카메라 — 이제 **문패만 남은 껍데기**다 (대표 지시 2026-08-08)
+<!-- ══════════════════════════════════════════════════════════════════════════
+     푸른카메라 — «사진만 찍는» 가벼운 앱 (대표 지시 2026-09-12)
 
-     "카메라는 하나로 하고 알아서 자동으로 위치로 보내는 기능"
+       「별개의 앱으로 만들어서 사진만 찍는 앱 만들어 달라」
+       「사진 찍은 거 저장하는 거는 자동으로 사진첩으로 넘어가게」
+       「찍은 것만 확인할 수 있게」
+     목업 docs/mockups/pu-camera-standalone.html · 대표 승인 「가」
 
-     왜 이렇게 했나
-     ─────────────
-     촬영 코드가 두 벌이었다. 이 파일(525줄)과 사진첩 안 카메라가 각각
-     같은 일을 했고, 이 파일의 주석에도 "푸른카메라에서 검증된 순서를 그대로
-     가져왔다"고 적혀 있었다 — 복사본이라는 뜻이다. 한쪽만 고치는 사고가 난다.
+     ■ 2026-08-08 「카메라는 하나로」와 어긋나지 않는다
+     그때 없앤 것은 «가는 곳이 다른 둘째 카메라»다 — 옛 푸른카메라는 찍은 것을
+     기업정보함으로 **직행**시켰고 사진첩 카메라는 자동 분류를 태웠다. 같은 명함인데
+     어느 카메라로 찍었느냐에 따라 결과가 달랐다. 그것이 진짜 문제였다.
+     ★ 이 앱은 **저장을 사진첩과 «같은 층»(PuPhotoStore)으로** 한다.
+       새 저장 길을 만들지 않으므로 가는 곳이 갈릴 수가 없다.
+       ⚠⚠ 여기에 db.ref(…).set 이나 storage.ref(…).put 을 직접 쓰지 «말 것».
+         그 순간 둘째 저장 길이 생기고 2026-08-08 의 문제가 그대로 돌아온다.
+         tests/pu-camera-standalone.test.js 가 기계로 막는다.
 
-     더 큰 문제는 **가는 곳이 달랐다**는 것이다.
-       옛 푸른카메라 → 기업정보함으로 **직행** (자동 분류를 안 탐)
-       사진첩 카메라 → 사진첩에 담고 **자동 배송**
-                       (명함→기업정보함 / 사업자등록증→기업정보함+업체관리 / 나머지는 보관)
-     같은 명함인데 어느 카메라로 찍었느냐에 따라 결과가 달랐다.
+     ■ 왜 사진첩을 열지 않나 — 무게를 쟀다
+       사진첩(pu-photos.html) 1.2MB · 서비스워커가 **일부러 안 담는다**(새 버전
+       자동 적용과 싸워서) · 주소의 v= 가 10분마다 바뀐다.
+       → 아이콘을 누를 때마다 사실상 1.2MB 를 받고 나서야 카메라가 떴다.
+         급할 때 꺼내 쓰는 물건인데 검은 준비 화면이 길었다.
 
-     그래서 촬영 코드는 사진첩 것 하나만 남기고, 이 파일은 곧바로 넘긴다.
+     ■ 일부러 «안» 넣은 것 (대표께 미리 말씀드리고 승인받음)
+       · 명함·서류 모드 — 고화질·판독·가림·검토가 줄줄이 딸려 와 무거워진다. 서류는 사진첩 카메라로.
+       · 흔들림·초점 거르개, 세 장 중 고르기 — 명함 «글자»를 읽으려고 만든 장치다.
+       · 목록·검색·폴더·설정 — 그것이 사진첩이다. 여기는 카메라다.
+     ══════════════════════════════════════════════════════════════════════════ -->
 
-     ⚠ 이 파일을 **지우지 않는다.** 폰에 앱으로 설치한 분의 아이콘과
-       바로가기가 이 주소를 가리킨다. 지우면 그 아이콘이 깨진다.
-       설명 파일(pu-camera-manifest.json)도 그대로 둔다 — 앱 이름·아이콘이
-       바뀌면 홈 화면에서 못 찾는다.
-
-     ⚠ Firebase 를 싣지 않는다. 넘기기만 하는 문패라 실을 이유가 없다.
-       (tests/resilience-runtime.test.js 의 「Firebase 앱」 목록에서 뺐다)
-     ══════════════════════════════════════════════════════════════════ -->
-<script>
-  /* 이 파일은 모든 카메라 진입이 지나는 관문이다.
-     주소의 cam 값은 로그인·자동 업데이트 중 사라질 수 있으므로 sessionStorage에도
-     먼저 기록한다. 사진첩은 실제 촬영 화면을 연 뒤에만 이 기록을 지운다. */
-  (function () {
-    var params = new URLSearchParams(location.search || '');
-    var mode = params.get('mode') === 'card' ? 'card'
-      : (params.get('mode') === 'document' ? 'document' : 'photo');
-    var request = {
-      mode: mode,
-      quick: params.get('quick') === '1',
-      from: params.get('from') || '',
-      at: Date.now()
-    };
-    try { sessionStorage.setItem('pu_open_camera', JSON.stringify(request)); } catch (_) { }
-    params.set('cam', '1');
-    params.set('mode', mode);
-    location.replace('pu-photos.html?' + params.toString());
-  })();
+<!-- ══ 서류·명함으로 오는 길은 «넘긴다» ══════════════════════════════════════
+     이 앱은 **사진만** 찍는다. 명함·서류는 고화질·판독·주민번호 가림·검토가 줄줄이
+     딸려 오는 다른 일이라 사진첩 카메라가 맡는다(그쪽이 이미 다 갖췄다).
+     ⚠ 이 넘기기를 지우지 말 것 — 기업정보함·포털이 mode=card·document 로 이 주소를
+       부른다. 지우면 그 길이 통째로 끊긴다.
+     ⚠ **아래 무거운 것들보다 먼저** 둔다. 넘길 길이면 Firebase·저장 층을 받을 까닭이 없다. -->
+<script data-part="forward">
+(function () {
+  var params = new URLSearchParams(location.search || '');
+  var mode = params.get('mode');
+  if (mode !== 'card' && mode !== 'document') return;   // 사진 — 이 앱이 그대로 찍는다
+  var request = { mode: mode, quick: params.get('quick') === '1',
+    from: params.get('from') || '', at: Date.now() };
+  /* 주소의 cam 값은 로그인·자동 업데이트 중 사라질 수 있어 여기에도 적어 둔다.
+     사진첩은 실제 촬영 화면을 연 뒤에만 이 기록을 지운다. */
+  try { sessionStorage.setItem('pu_open_camera', JSON.stringify(request)); } catch (_) { }
+  params.set('cam', '1');
+  params.set('mode', mode);
+  location.replace('pu-photos.html?' + params.toString());
+})();
 </script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="js/pu-ontology.js?v=23"></script>
+<script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
+<script src="js/pu-photo-store.js?v=27"></script>
+<script src="js/pu-version.js?v=3"></script>
 <style>
-  body{margin:0;font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;
-    background:#101010;color:#fff;display:flex;align-items:center;justify-content:center;
-    height:100vh;text-align:center;padding:24px;line-height:1.7}
-  a{color:#8ab4ff}
+:root{ --ink:#e2e8f0; --sub:#94a3b8; --blue:#2563eb; }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#101010;color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  -webkit-text-size-adjust:100%;overscroll-behavior:none}
+button{font-family:inherit;cursor:pointer;color:inherit}
+#app{display:flex;flex-direction:column;height:100%}
+
+/* ── 머리줄 ── */
+#top{display:flex;align-items:center;gap:9px;flex:none;
+  padding:calc(env(safe-area-inset-top) + 9px) 13px 9px;font-size:13px}
+#top .nm{font-weight:800}
+#top .sp{flex:1}
+#top button{background:none;border:none;font-size:17px;padding:3px 5px;line-height:1}
+
+/* ── 미리보기 ── */
+#view{flex:1 1 auto;position:relative;background:#000;overflow:hidden;min-height:0}
+#vid{width:100%;height:100%;object-fit:cover;display:block}
+#hint{position:absolute;left:0;right:0;bottom:9px;text-align:center;color:var(--sub);font-size:11.5px;
+  padding:0 12px;line-height:1.5}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .18s}
+#flash.on{opacity:.75;transition:none}
+
+/* ── 촬영 줄 ── */
+#bar{flex:none;display:flex;align-items:center;justify-content:center;gap:26px;padding:13px 0}
+#shot{width:62px;height:62px;border-radius:50%;background:#fff;border:4px solid #94a3b8;padding:0}
+#shot:active{transform:scale(.94)}
+#shot[disabled]{opacity:.4}
+#bar .side{width:52px;text-align:center;font-size:11.5px;color:var(--sub)}
+#bar .side button{background:none;border:none;font-size:20px;padding:0}
+
+/* ── 방금 찍은 것 ── */
+#strip{flex:none;background:#fff;color:#1e293b;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);
+  display:none}
+#strip .hd{display:flex;align-items:center;font-size:11.5px;font-weight:800;color:#64748b;margin-bottom:6px}
+#strip .hd .r{margin-left:auto}
+#strip .row{display:flex;gap:9px;overflow-x:auto;padding:4px 4px 2px}
+#strip .row .one{position:relative;flex:none}
+#strip .row img{width:56px;height:56px;border-radius:7px;object-fit:cover;
+  border:1px solid #e2e8f0;display:block;background:#f1f5f9}
+#strip .row .t{position:absolute;left:0;right:0;bottom:0;font-size:9px;background:rgba(15,23,42,.62);
+  color:#fff;text-align:center;border-radius:0 0 6px 6px;font-weight:700;pointer-events:none}
+#strip .row .x{position:absolute;top:-5px;right:-5px;width:19px;height:19px;border-radius:50%;
+  border:none;background:#1e293b;color:#fff;font-size:11px;line-height:1;padding:0}
+#strip .row .one.up img{opacity:.45}
+#strip .row .one.bad img{border-color:#fecaca;box-shadow:0 0 0 2px #fef2f2}
+
+/* ── 알림 · 로그인 ── */
+#foot{flex:none;text-align:center;font-size:10.5px;color:var(--sub);padding:7px 10px}
+#toast{position:fixed;left:50%;bottom:106px;transform:translateX(-50%);background:rgba(15,23,42,.93);
+  color:#fff;font-size:12.5px;padding:8px 14px;border-radius:9px;display:none;z-index:9;max-width:88%;
+  text-align:center;line-height:1.5}
+#gate{position:fixed;inset:0;background:#101010;display:none;align-items:center;justify-content:center;
+  text-align:center;padding:26px;z-index:10;line-height:1.8}
+#gate a{color:#8ab4ff}
+#gate .em{font-size:2rem;display:block;margin-bottom:8px}
 </style>
 </head>
 <body>
-  <!-- 스크립트가 막혔거나 아주 오래된 브라우저에서만 보인다 -->
-  <div>
-    <div style="font-size:2rem;margin-bottom:10px">📷</div>
-    <b>푸른카메라</b><br>
-    카메라는 <b>푸른사진첩</b> 안으로 합쳐졌습니다.<br>
-    <a href="pu-photos.html?cam=1&mode=photo">카메라 열기 →</a>
+<div id="app">
+  <div id="top">
+    <span>📷</span><span class="nm">푸른카메라</span>
+    <span class="sp"></span>
+    <button id="torch" onclick="toggleTorch()" style="display:none" aria-label="손전등">⚡</button>
+    <button id="flip" onclick="flipCam()" style="display:none" aria-label="앞뒤 바꾸기">🔄</button>
   </div>
+
+  <div id="view">
+    <!-- playsinline: 아이폰이 영상을 전체화면으로 납치하는 것 방지 / muted: 자동재생 허용 조건 -->
+    <video id="vid" autoplay playsinline muted></video>
+    <div id="flash"></div>
+    <div id="hint">사진은 찍는 대로 푸른사진첩에 저장됩니다</div>
+  </div>
+
+  <div id="bar">
+    <span class="side" id="cnt"></span>
+    <button id="shot" onclick="shoot()" aria-label="촬영" disabled></button>
+    <span class="side"><button onclick="goPhotos()" title="푸른사진첩 열기" aria-label="사진첩">🖼</button></span>
+  </div>
+
+  <div id="strip">
+    <div class="hd">방금 찍은 것 <span class="r" id="stripNote"></span></div>
+    <div class="row" id="stripRow"></div>
+  </div>
+
+  <div id="foot"><span id="who"></span></div>
+</div>
+
+<div id="toast"></div>
+<div id="gate">
+  <div>
+    <span class="em">📷</span>
+    <b>푸른카메라</b><br>
+    푸른노무법인 앱은 <b>통합 포털</b>에서 로그인합니다.<br>
+    <a href="enter.html">포털에서 로그인 →</a><br>
+    <!-- 스크립트가 막힌 아주 오래된 브라우저에서도 카메라로는 갈 수 있게 -->
+    <a href="pu-photos.html?cam=1&mode=photo" style="font-size:.9em">사진첩 카메라로 열기 →</a>
+  </div>
+</div>
+
+<script data-part="app">
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g,
+    function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; });
+}
+
+/* ⚠ 사진첩과 **같은 설정**이다. 여기서 다른 프로젝트·다른 창고를 가리키면
+     찍은 사진이 사진첩에 안 보인다 — 「가는 곳이 하나」라는 약속이 깨진다. */
+var FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',
+  databaseURL: 'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'pureun-erp',
+  storageBucket: 'pureun-erp-hrphotos',
+  appId: '1:936817166182:web:9bd31f70d0afdf5fca2aa7',
+  messagingSenderId: '936817166182'
+};
+
+var stream = null, track = null, facing = 'environment', torchOn = false;
+var me = null;               // 로그인한 사람
+var shots = [];              // 이번에 찍은 것 — { id, thumb, at, up:'가는중'|'됨'|'실패' }
+var SHOT_KEEP = 12;          // 줄에 남겨 두는 장수(그 위는 밀려난다 — 사진은 사진첩에 있다)
+
+var toastTimer = null;
+function toast(msg, ms) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.style.display = 'none'; }, ms || 2200);
+}
+
+/* ══════ 카메라 ══════ */
+
+/* ⚠ 뒷면(environment)을 먼저 청한다 — 폰을 열었는데 제 얼굴이 뜨는 것만큼 쓸모없는 것이 없다.
+   ⚠ 실패해도 **말을 하고 멈춘다.** 조용히 검은 화면으로 두면 「고장났다」가 된다. */
+function startCam() {
+  stopCam();
+  $('shot').disabled = true;
+  return navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+    audio: false
+  }).then(function (s) {
+    stream = s;
+    $('vid').srcObject = s;
+    track = s.getVideoTracks()[0] || null;
+    $('shot').disabled = false;
+    $('hint').textContent = '사진은 찍는 대로 푸른사진첩에 저장됩니다';
+    /* 손전등·앞뒤 바꾸기는 «되는 기기에서만» 보인다 — 눌러도 안 되는 단추는 없느니만 못하다 */
+    var caps = {};
+    try { caps = (track && track.getCapabilities) ? track.getCapabilities() : {}; } catch (_) { caps = {}; }
+    $('torch').style.display = (caps && caps.torch) ? '' : 'none';
+    return navigator.mediaDevices.enumerateDevices().then(function (devs) {
+      var cams = devs.filter(function (d) { return d.kind === 'videoinput'; });
+      $('flip').style.display = cams.length > 1 ? '' : 'none';
+    }).catch(function () { /* 못 세도 그만 — 안 보이면 안 쓴다 */ });
+  }).catch(function (e) {
+    var why = (e && e.name === 'NotAllowedError')
+      ? '카메라를 못 씁니다 — 브라우저 설정에서 이 앱에 카메라를 허용해 주세요'
+      : '카메라를 열지 못했습니다: ' + ((e && e.message) || e);
+    $('hint').textContent = why;
+    toast(why, 5000);
+  });
+}
+
+function stopCam() {
+  try { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); } catch (_) { }
+  stream = null; track = null; torchOn = false;
+}
+
+function toggleTorch() {
+  if (!track) return;
+  torchOn = !torchOn;
+  track.applyConstraints({ advanced: [{ torch: torchOn }] }).catch(function () {
+    torchOn = false;
+    toast('이 기기는 손전등을 못 켭니다');
+  }).then(function () { $('torch').style.opacity = torchOn ? '1' : '.55'; });
+}
+
+function flipCam() {
+  facing = (facing === 'environment') ? 'user' : 'environment';
+  startCam();
+}
+
+/* ══════ 찍기 ══════ */
+
+/* 미리보기 화면을 그대로 한 장 뜬다.
+   ⚠ 기기가 내는 «사진»(ImageCapture)이 아니라 미리보기다 — 화소가 낮은 대신
+     어느 기기에서나 되고 빠르다. 현장 사진에는 이것으로 충분하다
+     (명함 글자를 읽어야 하는 일은 사진첩 카메라가 맡는다). */
+function grab() {
+  var v = $('vid');
+  var w = v.videoWidth, h = v.videoHeight;
+  if (!w || !h) return null;
+  var c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(v, 0, 0, w, h);
+  return { canvas: c, w: w, h: h };
+}
+
+/* 긴 변을 maxEdge 로 줄여 JPEG 로.
+   ⚠ 크기·화질 기준은 **저장 층이 정한다**(uploadSpec) — 여기서 숫자를 따로 적으면
+     사진첩과 다른 화질로 쌓이고, 나중에 「왜 이 사진만 흐린가」를 못 짚는다. */
+function shrink(src, maxEdge, quality) {
+  var scale = Math.min(1, maxEdge / Math.max(src.w, src.h));
+  var w = Math.max(1, Math.round(src.w * scale));
+  var h = Math.max(1, Math.round(src.h * scale));
+  var c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(src.canvas, 0, 0, w, h);
+  return { dataUrl: c.toDataURL('image/jpeg', quality), w: w, h: h };
+}
+
+var shooting = false;
+function shoot() {
+  if (shooting || !me) return;
+  var src = grab();
+  if (!src) { toast('아직 화면이 준비되지 않았습니다'); return; }
+  shooting = true;
+  $('shot').disabled = true;
+  try {
+    /* 눈으로 「찍혔다」를 알린다 — 셔터 소리를 못 내는 기기가 많다 */
+    var fl = $('flash');
+    fl.classList.add('on');
+    setTimeout(function () { fl.classList.remove('on'); }, 20);
+
+    var spec = PuPhotoStore.uploadSpec(false);     // false = 사진(서류 아님)
+    var full = shrink(src, spec.maxEdge, spec.quality);
+    var thumb = shrink(src, spec.thumbEdge, 0.85);
+    var id = PuPhotoStore.newId();
+    var at = Date.now();
+    /* ⚠ kind:'photo' — 이 앱은 **사진만** 찍는다. 서류로 담으면 판독 대기열에 들어가
+       AI 요금이 나가고, 「사진만 찍는 앱」이라는 약속이 깨진다(대표 결정 2026-09-12). */
+    var meta = {
+      takenAt: at, upAt: at, seq: 0,
+      by: me.uid, byName: PuPhotoStore.myName() || me.email || '',
+      kind: 'photo',
+      w: full.w, h: full.h, size: full.dataUrl.length,
+      /* 어디서 들어왔는지 — 화질 이야기가 나오면 이 값이 답한다(사진첩과 같은 규칙) */
+      via: 'pucam',
+      srcW: src.w, srcH: src.h
+    };
+    var shot = { id: id, thumb: thumb.dataUrl, at: at, up: '가는중' };
+    shots.push(shot);
+    if (shots.length > SHOT_KEEP) shots = shots.slice(-SHOT_KEEP);
+    renderStrip();
+
+    /* ⚠⚠ 저장은 **공용 층 하나**로만 한다 — 여기에 db/storage 를 직접 쓰면
+       둘째 저장 길이 생기고 2026-08-08 에 없앤 문제가 그대로 돌아온다. */
+    PuPhotoStore.savePhoto({ id: id, full: full.dataUrl, thumb: thumb.dataUrl, meta: meta })
+      .then(function () { shot.up = '됨'; renderStrip(); })
+      .catch(function (e) {
+        console.warn('[담기]', e);
+        shot.up = '실패';
+        renderStrip();
+        /* ⚠ 실패를 조용히 넘기지 않는다 — 찍은 줄 알고 지나가면 그 사진은 영영 없다 */
+        toast('저장하지 못했습니다 — 신호를 확인하고 다시 찍어 주세요', 4200);
+      });
+  } finally {
+    shooting = false;
+    $('shot').disabled = false;
+  }
+}
+
+/* 잘못 찍힌 것 지우기 — 이미 올라간 것은 사진첩에서도 치운다(휴지통으로 간다).
+   ⚠ 지우는 길도 **공용 층**이다. 여기서 직접 지우면 휴지통·되살리기를 건너뛴다. */
+function dropShot(id) {
+  var i = -1;
+  shots.forEach(function (s, k) { if (s.id === id) i = k; });
+  if (i < 0) return;
+  var s = shots[i];
+  if (!confirm('이 사진을 지울까요?\n\n사진첩에서도 없어집니다(휴지통으로 갑니다).')) return;
+  shots.splice(i, 1);
+  renderStrip();
+  if (s.up === '됨') {
+    PuPhotoStore.deletePhoto(PuPhotoStore.photoYear({ upAt: s.at }), s.id, '푸른카메라에서 바로 지움')
+      .catch(function (e) {
+        console.warn('[지우기]', e);
+        toast('지우지 못했습니다 — 사진첩에서 지워 주세요', 4000);
+      });
+  }
+}
+
+function agoText(ts) {
+  var m = Math.floor((Date.now() - (Number(ts) || 0)) / 60000);
+  if (m < 1) return '방금';
+  if (m < 60) return m + '분';
+  return Math.floor(m / 60) + '시간';
+}
+
+function renderStrip() {
+  var box = $('strip');
+  if (!shots.length) { box.style.display = 'none'; $('cnt').textContent = ''; return; }
+  box.style.display = 'block';
+  $('cnt').textContent = shots.length + '장';
+  var 가는중 = 0, 실패 = 0;
+  shots.forEach(function (s) { if (s.up === '가는중') 가는중++; if (s.up === '실패') 실패++; });
+  var note = $('stripNote');
+  note.textContent = 실패 ? '✖ ' + 실패 + '장 실패'
+    : 가는중 ? '보내는 중 ' + 가는중 + '장' : '모두 사진첩에 저장됨 ✓';
+  note.style.color = 실패 ? '#991b1b' : (가는중 ? '#854d0e' : '#16a34a');
+  /* 새로 찍은 것이 **왼쪽**에 온다 — 방금 것을 보려고 끝까지 밀지 않게 */
+  $('stripRow').innerHTML = shots.slice().reverse().map(function (s) {
+    return '<span class="one' + (s.up === '가는중' ? ' up' : '') + (s.up === '실패' ? ' bad' : '') + '">' +
+      '<img src="' + esc(s.thumb) + '" alt="방금 찍은 사진">' +
+      '<span class="t">' + esc(s.up === '실패' ? '실패' : agoText(s.at)) + '</span>' +
+      '<button class="x" onclick="dropShot(\'' + esc(s.id) + '\')" aria-label="지우기">✕</button>' +
+      '</span>';
+  }).join('');
+}
+/* 「방금」이 스스로 「3분」으로 바뀌게 — 찍어 놓고 한참 뒤에 봐도 말이 맞아야 한다 */
+setInterval(function () { if (shots.length) renderStrip(); }, 60000);
+
+function goPhotos() {
+  /* 사진첩은 «보고 싶을 때만» 연다 — 이 앱의 평소 화면은 카메라다 */
+  location.href = 'pu-photos.html?sso=1';
+}
+
+/* ══════ 시작 ══════ */
+firebase.initializeApp(FIREBASE_CONFIG);
+var db = firebase.database();
+var storage = null;
+try { storage = firebase.storage(); } catch (e) { storage = null; }
+/* ⚠ auth 를 넘긴다 — 저장 층이 「누구인지」를 알아야 제 자리에 담는다(사진첩과 같다) */
+PuPhotoStore.init({ db: db, storage: storage, auth: firebase.auth() });
+
+firebase.auth().onAuthStateChanged(function (u) {
+  var signedIn = !!(u && u.email);
+  $('gate').style.display = signedIn ? 'none' : 'flex';
+  if (!signedIn) { me = null; stopCam(); return; }
+  me = u;
+  /* 사진 자리가 사람별로 갈려 있어 **계정을 알기 전에는 담을 수 없다** —
+     사진첩과 같은 차례다(로그인 확인 → 계정 등록 → 그다음). */
+  PuPhotoStore.signIn(u.uid, u.email, u.displayName).then(function (who) {
+    $('who').textContent = ((who && who.name) || u.email || '') + ' · 푸른사진첩으로 자동 저장';
+    startCam();
+  }).catch(function (e) {
+    console.warn('[로그인]', e);
+    $('who').textContent = (u.email || '') + ' · 푸른사진첩으로 자동 저장';
+    startCam();
+  });
+});
+
+/* 탭을 덮거나 앱을 내리면 카메라를 놓는다 — 안 놓으면 렌즈 불이 켜진 채 남고
+   배터리를 먹는다. 돌아오면 다시 연다. */
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) stopCam();
+  else if (me) startCam();
+});
+window.addEventListener('pagehide', stopCam);
+</script>
 </body>
 </html>
