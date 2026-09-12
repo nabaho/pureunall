@@ -540,6 +540,87 @@ table.list tr:hover td{background:#fcfcfd}
   .wrap.now .pv{position:sticky;top:12px;height:auto;display:block}
   .wrap.now .pv .paper{max-height:70vh}
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   폰에서 보는 꼴 (대표 지시 2026-09-12 「폰화면에서 편하게 보게 깔끔히 정리해라」)
+   ══════════════════════════════════════════════════════════════════════════
+   375px 짜리 화면에서 재 보니 「이번 회차」 한 장이 2,058px 였다. 무엇이 먹고 있었나:
+     · 회차 단추 넷이 «세 줄» — 하나씩 제 줄을 차지했다
+     · 담는 법 단추 다섯이 «세 줄»
+     · 줄마다 ▲▼ 와 매체 이름이 가로를 먹어, 제목이 네 줄로 쏟아졌다
+     · 요약의 꼭지 칩이 «한 줄에 하나씩» — 이름표 칸(96px)이 자리를 다 먹어서다
+
+   ★ 고른 잣대: «누르는 것»은 손가락만큼 크게 두고, «읽는 것»은 폭을 다 준다.
+   ⚠ 아무것도 «감추지 않는다» — 감추면 폰에서만 할 수 없는 일이 생긴다.
+     자리를 바꾸거나(▲▼는 줄창으로), 줄을 옮기거나, 가로로 굴리게 할 뿐이다. */
+@media(max-width:560px){
+  .wrap{padding:10px}
+
+  /* ⚠⚠ 칸이 «안 줄어드는» 것부터 막는다. 바둑판(grid)의 칸은 기본이 min-width:auto 라,
+       안에 «안 접히는 줄»(아래 .ways 의 nowrap)이 하나만 있어도 그 줄의 온폭만큼
+       칸이 벌어진다. 그러면 375px 화면에서 칸이 665px 가 되어 오른쪽이 잘린다
+       — 겉으로는 가로 스크롤도 안 생겨서 «글이 짧아진 것»처럼 보인다(실측 2026-09-12). */
+  .cols>*{min-width:0}
+  .ways{min-width:0;max-width:100%}
+
+  /* ⓪ 탭 다섯이 469px 라 오른쪽 둘(보낸 결과·설정)이 화면 밖에 있었다.
+       굴려서 찾게 두지 말고 «다 보이게» 줄인다 — 폰에서는 가로로 굴릴 수 있다는 것이
+       눈에 안 띄어, 없는 탭으로 여기게 된다. */
+  #tabs{padding:0 3px;gap:0}
+  #tabs button{flex:1 1 0;min-width:0;padding:11px 3px;font-size:12px;white-space:nowrap}
+  #tabs button span{font-size:10px}
+  #bar{padding:10px 12px}
+  #bar .logo{font-size:16px}
+
+  /* ① 회차 머리 — 이름은 제 줄, 단추는 두 칸 바둑판.
+       ★ 「보내기」만 한 줄을 온전히 쓴다 — 되돌릴 수 없는 일이라 옆 단추와
+         나란히 두면 엄지로 잘못 누르기 쉽다. */
+  .hdbar{gap:7px;padding:11px 12px}
+  .hdbar>.no{flex:1 1 100%;font-size:17px}
+  .hdbar>.btn{flex:1 1 calc(50% - 4px);justify-content:center;text-align:center;
+    font-size:12.5px;padding:9px 6px}
+  .hdbar>.btn.pri{flex:1 1 100%}
+
+  /* ② 담는 법 · 꼭지 도구줄 — 단추를 작게 해 두 줄에 담는다.
+       ⚠ 가로로 굴리게 해 봤더니 끝 단추가 «잘린 채» 서서 고장난 것처럼 보였다.
+         폰에서는 굴릴 수 있다는 것이 눈에 안 띈다 — 작게 해서 다 보이는 편이 낫다. */
+  .ways,.jarhead{gap:5px;padding:8px 10px}
+  .ways>.btn,.jarhead .mini,.jarhead .btn{font-size:11.5px;padding:6px 9px}
+  .ways .sep{display:none}
+  .ways .lab{font-size:11px}
+  /* 「제목·원문 링크만 싣습니다」 꼬리말은 ⓘ 와 같은 말이라 폰에서는 접는다 */
+  .ways .tail{display:none}
+
+  /* ③ 꼭지 탭 — 두 칸 바둑판. 넷이 두 줄에 반듯하게 선다 */
+  .jartabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px}
+  .jartabs button{border:1px solid var(--line);border-radius:9px;padding:9px 7px;
+    font-size:12.5px;justify-content:center}
+
+  /* ④ 줄 — 바둑판으로 짜서 [ㅁ][제목][✕] 한 줄, 출처는 제목 아래로.
+       ⚠ ▲▼ 는 폰에서 감춘다 — 손가락보다 작아 눌러도 안 맞는다.
+         차례 바꾸기는 PC 에서 하거나, 줄을 눌러 여는 창에서 한다. */
+  .item{display:grid;grid-template-columns:auto 1fr auto;gap:3px 8px;
+    align-items:start;padding:10px 11px}
+  .item>.ck{grid-column:1;grid-row:1;margin-top:2px}
+  .item .mv{display:none}
+  .item .t{grid-column:2;grid-row:1;font-size:13px}
+  .item .x{grid-column:3;grid-row:1;padding:0 2px}
+  .item .src{grid-column:2;grid-row:2;padding-top:0}
+
+  /* ⑤ 요약 — 이름표를 «위»로 올려 값이 폭을 다 쓴다. 그래야 칩이 옆으로 선다 */
+  .sum .row{flex-wrap:wrap;gap:4px;padding:10px 12px}
+  .sum .row .k{width:100%;flex:1 1 100%;padding-top:0}
+  .sum .row .v{flex:1 1 100%}
+
+  /* ⑥ 표(받는 명단·보낸 결과) — 폰에서는 «옆으로 굴려» 본다.
+       ⚠ 그냥 두면 열 여덟 칸이 355px 에 밀려 들어가 회사 이름이 «한 글자씩 세로로»
+         쏟아진다(㈜/성/보/물/류). 실측 2026-09-12: 113줄짜리 명단이 23,345px 였다.
+       ★ 칸을 안 접게 하고(nowrap) 표에 제 폭을 준 뒤, 상자를 굴리게 한다.
+       ⚠ 「이번 회차」의 상자에는 표가 없어 이 규칙이 아무 일도 안 한다 — 해롭지 않다. */
+  .box{overflow-x:auto}
+  table.list{min-width:620px}
+  table.list th,table.list td{white-space:nowrap}
+}
 </style>
 </head>
 <body>
@@ -1389,7 +1470,7 @@ function 꼭지칸하나(d){
       <button class="mv" title="위로" onclick="옮기기('${g.키}',${i},-1)">▲</button>
       <button class="mv" title="아래로" onclick="옮기기('${g.키}',${i},1)">▼</button>
       <span class="t" title="눌러서 자세히 보고 «우리 말로» 씁니다"
-        style="cursor:pointer" onclick="줄창열기('${g.키}',${i})">${esc(x.제목||'')}${
+        style="cursor:pointer" onclick="줄창열기('${g.키}',${i})">${esc(x.한줄||x.제목||'')}${
         실?'':'<span class="offtag">안 실림</span>'}${딱지}${곁줄(g.키,x,i)}</span>
       <span class="src">${esc(꼬리표(x))}</span>
       <button class="x" title="목록에서 아예 빼기" onclick="빼기('${g.키}',${i})">✕</button>
