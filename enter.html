@@ -198,7 +198,21 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .nm b{font-size:.92rem;}
 .pbar .nm small{display:block;font-size:.64rem;color:var(--mute);letter-spacing:.14em;margin-top:-1px;}
 .pbar .pmeta{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:.8rem;color:var(--sub);}
+/* 권한 이름「(admin)」은 «늘» 접는다 (대표 결정 2026-09-12) — 직책이 이미 같은 말을 하고,
+   날마다 읽을 값이 아니다. 이름 칸에 마우스를 올리면 덧말로 그대로 나온다.
+   ⚠ 사번은 접지 않는다 — P005·A005 처럼 숫자가 같은 사번이 있다(userName 짓는 자리 풀이글). */
+.pbar .pmeta .un-role{display:none;}
 .pbar .logout{order:3;}
+/* ══ 💰 돈 자리 — 딱지 둘을 «붙여 세운다» (대표 결정 2026-09-12 「다」안) ══
+   목업 docs/mockups/portal-bar-tidy.html
+   「이번 달 ₩10,592」와 「AI 판독 ₩44」가 따로 떨어져 있어, 머리줄을 훑을 때마다
+   「₩10,592 인가 ₩44 인가」를 다시 읽어야 했다. 둘을 맞붙여 «돈 자리» 하나로 본다.
+   ⚠ 색은 그대로 둔다 — AI 딱지의 파랑→노랑→빨강이 「얼마나 썼나」를 말한다(#aiChip 참고).
+   ⚠ 한쪽만 떠 있을 때는 붙이지 «않는다»(data-join). 잘린 모서리가 홀로 서면 고장으로 보인다.
+   ⚠ 둘 다 감춰지면 상자째 감춘다 — 안 그러면 빈 테두리만 남는다(moneyBoxSync 가 한다). */
+#moneyBox{display:none;align-items:center;}
+#moneyBox[data-join="1"] #billChip{border-radius:9px 0 0 9px;border-right:none;}
+#moneyBox[data-join="1"] #aiChip{border-radius:0 9px 9px 0;}
 /* 💳 이번 달 파이어베이스 사용액 — 관리자에게만 (대표 지시 2026-08-17: 이알피 사이드바에서 포털로).
    머리줄에 얹어 세로 칸을 새로 쓰지 않는다. 눌러야 자세한 내역이 뜬다. */
 #billChip{display:none;align-items:center;gap:7px;background:#1e293b;border:1px solid #475569;
@@ -360,7 +374,10 @@ body.portal-mode #camFab{display:flex;}
      ⚠ 끊겼거나 확인 중일 때는 말을 그대로 남긴다. 그때가 정작 읽어야 할 때다. */
   .connection-status[data-state="online"] .cs-lb{display:none;}
   .pbar .pmeta .connection-status{flex:0 0 auto;}
-  .pbar #billChip,.pbar #aiChip{order:2;flex:0 0 auto;margin-top:7px;padding:4px 8px;font-size:.66rem;gap:5px;}
+  /* ⚠ 자리잡기(order·margin)는 «상자»가 진다 — 딱지에 걸어 두면 상자 안에서만
+     자리를 다투고 머리줄에서는 상자가 통째로 첫 줄에 끼어 이름을 밀어낸다. */
+  .pbar #moneyBox{order:2;flex:0 0 auto;margin-top:7px;}
+  .pbar #billChip,.pbar #aiChip{padding:4px 8px;font-size:.66rem;gap:5px;}
   /* ── 한 줄에 몰아 넣으려고 접는 것들 (대표 지시 2026-08-20 "최대 1줄") ──
      ⚠ 접는 것은 «다른 데 같은 말이 있는 것» 뿐이다.
        (admin)·직책 → 이름과 사번이면 「내 계정이 맞나」를 가린다. 직책은 아는 사실이다
@@ -397,6 +414,7 @@ body.portal-mode #camFab{display:flex;}
   .pbar{gap:0 6px;padding:8px 10px;}
   .pbar .pmeta{font-size:.66rem;min-width:78px;gap:5px;}
   .pbar #billChip,.pbar #aiChip{padding:3px 6px;font-size:.62rem;gap:4px;}
+  .pbar #moneyBox{max-width:100%;}
   .pbar #homeBar{gap:4px;}
   .pbar #homeBar select{min-width:50px;font-size:.66rem;padding:2px 4px;}
   /* ⚠ 열 수는 위 640px 구간에서 이미 못 박았다(minmax(0,1fr)). 여기서는 «간격만»
@@ -954,21 +972,26 @@ body.portal-mode #moreFab{display:flex;}
       <!-- 앱으로 깔기 — 폰에서, 아직 안 깔았을 때만 뜬다(JS 가 켠다) -->
       <button class="pcview appinst" id="appInstallBtn" type="button" hidden>📲 앱으로 깔기</button>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
-      <!-- 이번 달 사용액 — 관리자에게만 보인다(JS 가 display 를 켠다). 값이 없으면 끝까지 숨김. -->
-      <button id="billChip" type="button" title="눌러서 자세히 보기">
-        <span class="dot" id="billDot"></span>
-        <span class="lb">이번 달</span>
-        <span class="amt" id="billAmt">—</span>
-        <span class="ago" id="billAgo"></span>
-      </button>
-      <!-- 🤖 AI 판독 이번 달 한도 (대표 결정 2026-09-10) — 위 사용액과 같은 규칙으로
-           관리자에게만 보인다. 셈을 못 읽으면 끝까지 숨긴다(₩0 으로 적지 않는다). -->
-      <button id="aiChip" type="button" title="AI 판독 이번 달 한도">
-        <span class="dot" id="aiDot"></span>
-        <span class="lb">AI 판독</span>
-        <span class="amt" id="aiAmt">—</span>
-        <span class="of" id="aiOf"></span>
-      </button>
+      <!-- 💰 돈 자리 — 딱지 둘을 «붙여 세운다» (대표 결정 2026-09-12 「다」안).
+           ⚠ 상자 자체도 JS 가 켠다(moneyBoxSync) — 둘 다 감춰졌는데 상자만 남으면
+             빈 테두리가 머리줄에 덩그러니 선다. -->
+      <div id="moneyBox" data-join="0">
+        <!-- 이번 달 사용액 — 관리자에게만 보인다(JS 가 display 를 켠다). 값이 없으면 끝까지 숨김. -->
+        <button id="billChip" type="button" title="눌러서 자세히 보기">
+          <span class="dot" id="billDot"></span>
+          <span class="lb">이번 달</span>
+          <span class="amt" id="billAmt">—</span>
+          <span class="ago" id="billAgo"></span>
+        </button>
+        <!-- 🤖 AI 판독 이번 달 한도 (대표 결정 2026-09-10) — 위 사용액과 같은 규칙으로
+             관리자에게만 보인다. 셈을 못 읽으면 끝까지 숨긴다(₩0 으로 적지 않는다). -->
+        <button id="aiChip" type="button" title="AI 판독 이번 달 한도">
+          <span class="dot" id="aiDot"></span>
+          <span class="lb">AI 판독</span>
+          <span class="amt" id="aiAmt">—</span>
+          <span class="of" id="aiOf"></span>
+        </button>
+      </div>
       <div class="pmeta">
         <span id="statusDot" class="connection-status" data-state="checking" role="status" aria-live="polite">○ 연결 확인 중</span>
         <div class="avatar" id="userAvatar">·</div>
@@ -1397,6 +1420,12 @@ body.portal-mode #moreFab{display:flex;}
     var online = state === true;
     var offline = state === false;
     var label = online ? '서버 연결됨' : (offline ? '서버 연결 끊김' : '연결 확인 중');
+    /* ★ 머리줄에서는 잘 될 때 «한 마디»로 줄인다 (대표 결정 2026-09-12 「깔끔하게 정리」).
+       ⚠ 끊겼거나 확인 중일 때는 «긴 말 그대로» 둔다 — 그때가 정작 읽어야 할 때다.
+         잘 되는 것은 날마다 보는 말이라 짧을수록 좋고, 탈이 난 것은 눈에 걸려야 한다.
+       ⚠ 로그인 화면(topStatusText)은 그대로 «서버 연결됨»이다. 거기서는 줄이 넉넉하고,
+         아직 못 들어온 사람에게는 「무엇이」 연결됐는지가 중요하다. */
+    var barLabel = online ? '연결됨' : label;
     var stateName = online ? 'online' : (offline ? 'offline' : 'checking');
     var topText = $('topStatusText'), topDot = $('topStatusDot'), portalText = $('statusDot');
     if(topText) topText.textContent = label;
@@ -1404,7 +1433,8 @@ body.portal-mode #moreFab{display:flex;}
     if(portalText){
       /* 말을 span 으로 감싼다 — 폰에서 «잘 될 때» 는 점만 남기려고(아래 css).
          ⚠ label 은 우리가 만든 세 글귀뿐이라 innerHTML 로 넣어도 안전하다. */
-      portalText.innerHTML = (online ? '● ' : '○ ') + '<span class="cs-lb">' + label + '</span>';
+      portalText.innerHTML = (online ? '● ' : '○ ') + '<span class="cs-lb">' + barLabel + '</span>';
+      try { portalText.title = label; } catch(_){}
       portalText.dataset.state = stateName;
     }
   }
@@ -2102,7 +2132,13 @@ body.portal-mode #moreFab{display:flex;}
       + (title ? '<span class="un-title"> · ' + _e(title) + '</span>' : '')
       + ' <span class="un-role">(' + _e(role) + ')</span>'
       + (mySid ? ' · ' + _e(mySid.toUpperCase()) : '');
-    try { $('userName').title = '로그인 계정: ' + email; } catch(_e){}
+    /* ★ 권한 이름은 «덧말로» 옮긴다 (대표 결정 2026-09-12 「깔끔하게 정리」) —
+         화면에는 「권형하 · 대표노무사 · P-001」만 남는다. 직책이 이미 같은 말을 하고,
+         (admin)은 날마다 읽을 값이 아니다. 마우스를 올리면 그대로 나온다.
+       ⚠ **사번은 접지 않는다.** P005·A005 처럼 숫자가 같은 사번이 있어, 사번이 안 보이면
+         엉뚱한 계정으로 들어간 것을 알아챌 길이 없다(위 풀이글). */
+    try { $('userName').title = name + (title ? ' · ' + title : '') + ' (' + role + ')'
+      + (mySid ? ' · ' + mySid.toUpperCase() : '') + '\n로그인 계정: ' + email; } catch(_e){}
     $('userAvatar').textContent = name ? name.charAt(0) : '·';
 
     /* ── 신원 안내 띠 — 이상할 때는 크게, 자동 진입은 조용히 알린다 ── */
@@ -2278,6 +2314,22 @@ body.portal-mode #moreFab{display:flex;}
 
   function billIsAdmin(role){ return role === 'admin' || role === 'admin-delegate'; }
 
+  /* ══ 💰 돈 자리 여닫기 (대표 결정 2026-09-12 「다」안) ══
+     딱지 둘을 감싼 상자를 «둘의 형편에 맞춰» 여닫는다.
+     ⚠ 둘 다 감춰졌는데 상자만 남으면 빈 테두리가 머리줄에 덩그러니 선다.
+     ⚠ 한쪽만 떠 있으면 붙이지 «않는다»(data-join=0) — 한쪽 모서리만 각진 딱지가
+       홀로 서면 그리다 만 것으로 보인다.
+     ⚠ 딱지를 감추고 켜는 곳(billPaint·aiChipPaint)이 «돌아가는 길마다» 이것을 부른다.
+       한 군데만 빠져도 상자가 옛 모양으로 남는다. */
+  function moneyBoxSync(){
+    var box = $('moneyBox'), b = $('billChip'), a = $('aiChip');
+    if(!box) return;
+    var on = function(el){ return !!(el && el.style.display && el.style.display !== 'none'); };
+    var bOn = on(b), aOn = on(a);
+    box.style.display = (bOn || aOn) ? 'inline-flex' : 'none';
+    box.dataset.join = (bOn && aOn) ? '1' : '0';
+  }
+
   function billStart(role){
     // 역할이 바뀌어 다시 불릴 수 있다(로그아웃→다른 계정). 늘 먼저 정리한다.
     if(_billStop){ try { _billStop(); } catch(e){} _billStop = null; }
@@ -2288,7 +2340,7 @@ body.portal-mode #moreFab{display:flex;}
     /* ⚠ 아래 되돌아가기(return)보다 «먼저» 부른다 — 관리자였다가 아닌 계정으로
        바뀌면 여기서 되돌아가는데, 그때 AI 딱지를 안 끄면 남의 금액이 그대로 남는다. */
     aiChipStart(role);
-    if(!billIsAdmin(role) || !window.PuBilling || !db) return;
+    if(!billIsAdmin(role) || !window.PuBilling || !db){ moneyBoxSync(); return; }
     // 읽기는 pu-billing 한 곳으로 모은다 — 화면이 db.ref 를 직접 부르지 않는다.
     _billStop = window.PuBilling.watch(db,
       function(v){ _billCur = v; billPaint(); },
@@ -2325,7 +2377,7 @@ body.portal-mode #moreFab{display:flex;}
     if(_aiStop){ try { _aiStop(); } catch(e){} _aiStop = null; }
     var chip = $('aiChip');
     if(chip) chip.style.display = 'none';
-    if(!billIsAdmin(role) || !window.PuBilling || !window.PuBilling.watchAi || !db) return;
+    if(!billIsAdmin(role) || !window.PuBilling || !window.PuBilling.watchAi || !db){ moneyBoxSync(); return; }
     _aiStop = window.PuBilling.watchAi(db, Date.now(), aiChipPaint,
       function(){ aiChipPaint(null); });      // 규칙에 막히면 조용히 감춘다
   }
@@ -2333,8 +2385,9 @@ body.portal-mode #moreFab{display:flex;}
   function aiChipPaint(s){
     var chip = $('aiChip');
     if(!chip) return;
-    if(!s || !s.has){ chip.style.display = 'none'; return; }
+    if(!s || !s.has){ chip.style.display = 'none'; moneyBoxSync(); return; }
     chip.style.display = 'inline-flex';
+    moneyBoxSync();
     chip.dataset.tone = s.tone;
     var won = window.PuBilling.fmtWon;
     /* 넘은 뒤에는 「/ 한도」 대신 «다 썼다»고 말한다 — 넘은 숫자 옆의 한도는
@@ -2367,8 +2420,9 @@ body.portal-mode #moreFab{display:flex;}
     var chip = $('billChip');
     if(!chip || !window.PuBilling) return;
     var s = window.PuBilling.summarize(_billCur, Date.now(), _billHistBk);
-    if(!s.has){ chip.style.display = 'none'; return; }
+    if(!s.has){ chip.style.display = 'none'; moneyBoxSync(); return; }
     chip.style.display = 'inline-flex';
+    moneyBoxSync();
     /* 오늘 폭주 중이면 딱지부터 빨갛게 — 창을 열지 않아도 눈에 걸려야 한다 */
     var spike = billSpikeToday();
     $('billDot').style.background = spike ? BILL_DOT.over : (BILL_DOT[s.tone] || BILL_DOT.none);

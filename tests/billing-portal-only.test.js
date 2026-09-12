@@ -58,7 +58,12 @@ t('칸을 누르면 팝업이 열린다', /\$\('billChip'\)\.addEventListener\('
     const guard = body.indexOf('if(!billIsAdmin(role)');
     const watch = body.indexOf('PuBilling.watch');
     t('★ 관리자 확인이 구독보다 먼저다', guard >= 0 && watch > guard, true);
-    t('★ 관리자가 아니면 그 자리에서 되돌아 나간다', /if\(!billIsAdmin\(role\)[^)]*\)\s*return;/.test(body), true);
+    /* ⚠ 되돌아 나가기 «직전»에 화면 정리가 붙을 수 있다(2026-09-12 돈 상자 여닫기).
+       지켜야 할 것은 「관리자가 아니면 구독을 안 하고 그 자리에서 나간다」다 —
+       중간에 값을 «받아 오는» 일이 끼면 안 된다(아래 db·watch 없음으로 함께 본다). */
+    const 문 = /if\(!billIsAdmin\(role\)[\s\S]{0,60}?\)\s*\{?\s*([\s\S]{0,40}?)return;/.exec(body);
+    t('★ 관리자가 아니면 그 자리에서 되돌아 나간다', !!문, true);
+    t('★ 나가기 전에 값을 받아 오지 않는다', !!문 && !/watch|db\.ref/.test(문[1]), true);
   }
 }
 
