@@ -173,7 +173,12 @@ test('★ 남의 사진이면 주인을 함께 넘긴다 — 안 넘기면 내 �
 });
 
 test('★ 관리자면 전 직원, 아니면 내 것 — 규칙을 새로 만들지 않는다', () => {
-  const f = cutFn(ERP, 'function erpLoadMyContractPhotos(');
+  /* 2026-09-12: 훑는 일이 erpScanPhotos 한 곳으로 모였다 — 계약서 찾기와
+     근로자 서류 찾기가 «같은 규칙»을 쓰게 하려는 것이다. 규칙 자체는 그대로다.
+     ⚠ 그래서 여기를 보고, 계약서 찾기가 그 길을 «실제로 쓰는지»도 함께 본다. */
+  assert.match(cutFn(ERP, 'function erpLoadMyContractPhotos('), /erpScanPhotos\(/,
+    '★ 계약서 찾기가 공용 훑기를 안 씁니다 — 규칙이 두 벌이 됩니다');
+  const f = cutFn(ERP, 'function erpScanPhotos(');
   assert.match(f, /erpPhotoAdmin\(\)/, '★ 누구 것을 볼지 안 가립니다');
   assert.match(f, /listYearsAll/, '관리자가 전 직원 것을 못 봅니다');
   assert.match(f, /listYears\(\)/, '직원이 내 것을 못 봅니다');
@@ -189,7 +194,13 @@ test('★ 관리자면 전 직원, 아니면 내 것 — 규칙을 새로 만들
 function applyPatch() {
   const ctx = { String, Object, Array, Number, parseInt, console, BRIEF_MAX: 40 };
   vm.createContext(ctx);
-  vm.runInContext(cutFn(ERP, 'function erpVatTextToFlag(') + '\n' +
+  /* 2026-09-12: 계약서에서 CMS 자동이체를 읽는 길이 붙었다 — 함께 싣지 않으면
+     「erpCmsFromDoc is not defined」로 여기가 통째로 넘어진다. */
+  const cmsAt = ERP.indexOf('var ERP_CMS_WORDS =');
+  vm.runInContext(ERP.slice(cmsAt, ERP.indexOf('];', cmsAt) + 2) + '\n' +
+                  cutFn(ERP, 'function erpDocText(') + '\n' +
+                  cutFn(ERP, 'function erpCmsFromDoc(') + '\n' +
+                  cutFn(ERP, 'function erpVatTextToFlag(') + '\n' +
                   cutFn(ERP, 'function erpContractPhotoApplyPatch('), ctx);
   return ctx.erpContractPhotoApplyPatch;
 }
