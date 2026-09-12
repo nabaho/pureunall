@@ -738,6 +738,15 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
    표식(.is-off)은 낱말이 둘이라 폭 규칙을 이긴다. */
 .cv-toolbar.is-off{display:none!important}
 @media(max-width:780px){ .cv-pop{left:8px!important;right:8px!important;top:auto!important;bottom:8px!important;width:auto!important;max-height:48vh} }
+/* ⚠ 창이 열려 있는 동안에는 팔레트가 «비킨다» (점검 2026-09-12).
+   실측: 폰(375px)에서 팔레트는 아래쪽 띠(725~804)가 되는데, 긴 창이 열리면 그 창의
+   맨 아래 36px 을 덮었다 — 거기에 [저장] 같은 단추가 있으면 못 누른다.
+   ★ 층(z-index)을 내려서 고치지 «않는다». 팔레트는 아래쪽 탭 바(#groupTabs 60)와
+     붙여 둔 옆 미리보기(#sidePreview.pinned 70) 위에 있어야 한다 — 폰에서 팔레트가
+     붙는 자리가 바로 화면 아래쪽이라, 내리면 그것들이 팔레트를 덮어 이번에는
+     팔레트를 못 쓴다. 창이 떠 있는 «동안만» 비키는 것이 맞다.
+   ⚠ 팔레트를 켜 둔 것은 «기억된다» — 인라인 display 는 그대로라 창을 닫으면 돌아온다. */
+body:has(.modal-ov.open) .cv-pop{display:none!important}
 .cv-photo-picker{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:80;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
 .cv-pp-inner{background:#fff;border-radius:12px;padding:16px;max-width:560px;width:100%}
 .cv-pp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
