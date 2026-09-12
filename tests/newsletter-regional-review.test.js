@@ -99,3 +99,34 @@ test('회차에서 빼기는 배열 삭제가 아니라 건별 트랜잭션 철�
   assert.match(화면, /철회사유/);
   assert.match(화면, /철회자/);
 });
+
+test('중단된 승인이 회차에 있으면 승인 완료로 복구한다', () => {
+  const c = Review.검토변경(후보, '승인처리중', 'admin@test', 100, '');
+  const issues = { '2026-09-w2':{ 지역뉴스:[{ 후보Id:후보.id, 상태:'활성' }] } };
+  const x = Review.복구판정(c, issues, 1000000, 600000);
+  assert.equal(x.상태, '승인');
+  assert.equal(x.승인회차, '2026-09-w2');
+  assert.equal(x.revision, 3);
+  assert.equal(x.복구결과, '회차 저장 확인');
+});
+
+test('회차에 없는 오래된 승인 잠금만 검토대기로 복구한다', () => {
+  const c = Review.검토변경(후보, '승인처리중', 'admin@test', 100, '');
+  assert.equal(Review.복구판정(c, {}, 500000, 600000), null, '10분 전에는 건드리지 않는다');
+  const x = Review.복구판정(c, {}, 1000000, 600000);
+  assert.equal(x.상태, '검토대기');
+  assert.equal(x.검토자, '');
+  assert.equal(x.revision, 3);
+  assert.equal(x.복구결과, '회차 저장 없음 — 잠금 해제');
+});
+
+test('승인 중단 복구도 revision을 확인하는 건별 트랜잭션이다', () => {
+  const i = 화면.indexOf('function 지역후보복구');
+  const body = 화면.slice(i, i + 2300);
+  assert.match(body, /regionalCandidates/);
+  assert.match(body, /\.transaction\(/);
+  assert.match(body, /cur\.상태!=='승인처리중'/);
+  assert.match(body, /cur\.revision/);
+  assert.match(body, /10\*60\*1000/);
+  assert.ok(화면.indexOf('지역후보복구();') > 화면.indexOf('App.지역후보 ='));
+});

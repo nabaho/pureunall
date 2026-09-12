@@ -46,7 +46,7 @@
 <script src="js/pu-news-core.js?v=33"></script>
 <script src="js/pu-news-tpl.js?v=13"></script>
 <script src="js/pu-news-regional-sources.js?v=1"></script>
-<script src="js/pu-news-review.js?v=2"></script>
+<script src="js/pu-news-review.js?v=3"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -785,6 +785,7 @@ function 불러오기(){
       b.onclick = ()=>{ App.tab = b.dataset.t; render(); };
     });
     render();
+    지역후보복구();
     /* ★ 노무사회 창고를 «시작할 때» 읽는다 (2026-09-06).
        예전에는 그 서랍을 열 때만 읽었다. 그런데 이미 담아 둔 노무사회 칸을
        «자료로 올리려면» 창고가 있어야 한다 — 서랍을 안 여시면 영영 점 찍힌 줄이었다. */
@@ -1617,6 +1618,7 @@ function 지역뉴스관리(d){
   const 철회 = a.filter(function(x){ return x&&x.상태==='철회'; });
   const 후보 = Object.values(App.지역후보||{}).filter(x=>x&&x.상태==='검토대기')
     .sort((x,y)=>Number(y.수집일||0)-Number(x.수집일||0)).slice(0,20);
+  const 처리중 = Object.values(App.지역후보||{}).filter(x=>x&&x.상태==='승인처리중').length;
   const 줄 = 활성.length ? 활성.map(function(v){ const x=v.x,i=v.i;
     return `<div class="item"><span class="pill">${esc(x.지역||'전국')}</span>
       <span class="t" title="${esc(x.제목||'')}">${esc(x.우리말||x.제목||'')}</span>
@@ -1644,9 +1646,27 @@ function 지역뉴스관리(d){
     업체 주소를 못 읽으면 전국 공통판만 보내며 다른 지역 소식은 섞지 않습니다.<br>
     공식 출처 ${지역출처.목록.length}곳 등록 · RSS ${지역출처.목록.filter(x=>x.방식==='rss').length}곳은 자동수집 연결 준비 ·
     게시판 ${지역출처.목록.filter(x=>x.방식==='board').length}곳은 원문 확인 뒤 담습니다.</div></div>
-    <div class="box" style="margin-top:12px"><h3>🔎 공식 RSS 검토대기 <span class="cnt">${후보.length}건</span></h3>
+    <div class="box" style="margin-top:12px"><h3>🔎 공식 RSS 검토대기 <span class="cnt">${후보.length}건</span>
+      ${처리중?'<span class="pill">승인 확인 중 '+처리중+'건</span>':''}</h3>
       <div class="jarbody">${후보줄}</div><div class="pad hint">
       제목·날짜·공식 링크만 자동수집했습니다. 아직 어떤 뉴스레터에도 들어가지 않습니다.</div></div>`;
+}
+function 지역후보복구(){
+  const 대상=Object.values(App.지역후보||{}).filter(x=>x&&x.상태==='승인처리중');
+  if(!대상.length) return Promise.resolve(0);
+  let 고친수=0;
+  return Promise.all(대상.map(function(c){
+    const 예상=지역검토.복구판정(c,App.회차들,Date.now(),10*60*1000); if(!예상) return null;
+    return db.ref('newsletter/regionalCandidates/'+c.id).transaction(function(cur){
+      if(!cur||cur.상태!=='승인처리중'||Number(cur.revision||0)!==Number(c.revision||0)) return;
+      return 지역검토.복구판정(cur,App.회차들,Date.now(),10*60*1000)||undefined;
+    }).then(function(r){
+      if(r.committed){ App.지역후보[c.id]=r.snapshot.val(); 고친수++; }
+    }).catch(function(e){ console.warn('[지역뉴스 복구]',c.id,(e&&e.message)||e); });
+  })).then(function(){
+    if(고친수){ render(); toast('중단됐던 지역뉴스 승인 '+고친수+'건을 안전하게 정리했습니다',8000); }
+    return 고친수;
+  });
 }
 async function 지역후보제외(id){
   const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 다른 관리자가 검토한 후보입니다');
