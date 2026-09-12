@@ -275,44 +275,37 @@ test('환경설정에 반출 기록으로 가는 길이 있다 (관리자만)', 
     '환경설정에서 반출 기록을 열 수 없다');
 });
 
-/* ══════ 포털 배지 ══════ */
+/* ══════ 포털 배지 — 없앴다 (대표 지시 2026-09-12) ══════
+   「기업정보함 반출 표시 더이상 안나와도 된다」
+   실측: 1,000건을 넘긴 것은 «대표 본인의 전체 백업(6,657건)» 하나뿐이었다.
+   ★ 없앤 것은 딱지뿐이고, 사유 관문(EXPORT_BIG)과 기록은 그대로다 — 아래 검사들이 지킨다. */
 const portal = fs.readFileSync(path.join(R, 'enter.html'), 'utf8').replace(/\r\n/g, '\n');
-test('★ 포털 배지는 관리자에게만, 0건이면 아예 안 만든다', () => {
-  const init = code(fn('initPortalExpAlerts', portal));
-  assert.match(init, /role!=='admin'\s*\)\s*return/,
-    '★ 관리자가 아닌데도 반출 기록을 조회한다');
-  const paint = code(fn('portalExpPaintBadge', portal));
-  assert.match(paint, /if\(!items\.length\)\s*return/,
-    '0건인데 배지를 만든다 — 늘 켜진 등은 아무것도 알려 주지 못한다');
-  assert.match(paint, /data-key="cards"/, '기업정보함 타일이 아닌 곳에 붙는다');
+test('★★ 포털에 반출 딱지를 다시 짓지 않는다', () => {
+  ['portalExpPaintBadge', 'showPortalExpModal', 'pollPortalExpAlerts', 'EXPORT_ALERT_N']
+    .forEach(function (w) {
+      assert.equal(portal.indexOf(w), -1,
+        '★ 반출 딱지(' + w + ')가 되살아났습니다 — 없애기로 한 것입니다(2026-09-12). '
+        + '다시 필요하면 대표 결정을 받고 git 이력에서 꺼내세요.');
+    });
+  /* 남아 있던 딱지를 «지우는» 손은 남겨 둔다 — 지난 판에서 붙은 것이 화면에 남지 않게 */
+  assert.match(code(fn('initPortalExpAlerts', portal)), /portalExpBadge/,
+    '★ 옛 판에서 붙은 딱지가 화면에 남습니다');
 });
 
-/* ⚠ 2026-09-05 대표 결정 — 수가 «둘»이 됐다. 200 하나로 두 일을 겸하던 때는
-     사업자 354곳 전체처럼 업무상 늘 하는 내려받기마다 대표 타일에 딱지가 떠서,
-     매번 지우다 눈이 익어 버렸다(「매번 지우기 번거롭다」).
-       · EXPORT_BIG(200)    — 직원에게 «사유를 묻는» 기준. 억지력이라 낮게.
-       · EXPORT_ALERT(1000) — 대표 타일에 «딱지를 띄우는» 기준. 주의라 높게. */
-test('★★ 딱지 기준이 사유 기준보다 «낮으면» 안 된다 — 사유도 안 물은 것으로 대표를 부른다', () => {
-  const big   = Number((src.match(/const EXPORT_BIG\s*=\s*(\d+)/) || [])[1]);
-  const alert = Number((src.match(/const EXPORT_ALERT\s*=\s*(\d+)/) || [])[1]);
-  assert.ok(big > 0 && alert > 0, '두 수를 못 찾았다 (' + big + ' / ' + alert + ')');
-  assert.ok(alert >= big, '★ 딱지(' + alert + ')가 사유(' + big + ')보다 낮다');
+test('★★ 앱에도 딱지 기준이 남지 않는다 — 아무도 안 보는 수는 흔들린다', () => {
+  assert.equal(code(src).indexOf('EXPORT_ALERT'), -1,
+    '★ 쓰는 곳이 없는 EXPORT_ALERT 가 남았습니다 — 죽은 수는 나중에 잘못 되살아납니다');
 });
 
-test('★★ 포털 딱지 기준이 기업정보함의 «딱지» 기준과 같다', () => {
-  /* ⚠ 옛 이름을 «먼저» 본다 — 뒤에 두면 위 assert 가 먼저 터져 이 말이 안 나온다 */
+/* ⚠ 딱지는 없앴지만(2026-09-12) «사유를 묻는 관문»은 그대로다 —
+     그것이 진짜 억지력이고, 200~999 건도 기록에는 다 남는다. */
+test('★★ 사유를 묻는 기준은 «한 곳»에만 있다', () => {
+  const big = Number((src.match(/const EXPORT_BIG\s*=\s*(\d+)/) || [])[1]);
+  assert.ok(big > 0, '사유 기준을 못 찾았다');
+  const n = (code(src).match(/EXPORT_BIG\s*=/g) || []).length;
+  assert.equal(n, 1, '기준이 ' + n + '곳에 흩어져 있다 — 한쪽만 고치면 어긋난다');
   assert.equal(portal.indexOf('EXPORT_BIG_N'), -1,
     '★ 포털에 옛 이름(EXPORT_BIG_N)이 남았다 — 사유 기준과 헷갈린다');
-  const a = Number((src.match(/const EXPORT_ALERT\s*=\s*(\d+)/) || [])[1]);
-  const b = Number((portal.match(/EXPORT_ALERT_N\s*=\s*(\d+)/) || [])[1]);
-  assert.equal(a, b, '두 수가 어긋나면 앱이 말하는 기준과 딱지가 다르다 (' + a + ' vs ' + b + ')');
-});
-
-test('★★ 딱지 기준도 «한 곳»에만 있다', () => {
-  const n = (code(src).match(/EXPORT_ALERT\s*=/g) || []).length;
-  assert.equal(n, 1, '기준이 ' + n + '곳에 흩어져 있다 — 한쪽만 고치면 어긋난다');
-  const m = (portal.match(/EXPORT_ALERT_N\s*=/g) || []).length;
-  assert.equal(m, 1, '포털 쪽 기준이 ' + m + '곳이다');
 });
 
 test('★★ 200~999 건도 «기록은 남는다» — 딱지가 안 뜰 뿐이다', () => {
@@ -337,21 +330,18 @@ test('★★ 사유 기준은 200 이다 — 대표 결정 없이 못 올린다'
     + '올리고 사유는 200 그대로 두는 것이었다 — 바꾸려면 대표께 다시 여쭐 것');
 });
 
-test('★★ 딱지 기준은 1,000 이다 — 대표 결정 (2026-09-05 「매번 지우기 번거롭다」)', () => {
-  const alert = Number((src.match(/const EXPORT_ALERT\s*=\s*(\d+)/) || [])[1]);
-  assert.equal(alert, 1000, '★ 딱지 기준이 ' + alert + ' 이 됐다 — 대표 결정은 1,000 이다');
-});
+/* ⚠ 「딱지 기준은 1,000」·「포털 딱지가 기준 아래를 안 센다」 두 검사는 없앴다
+     (2026-09-12 대표 지시로 딱지 자체가 사라졌다). 지키던 것은 위
+     「포털에 반출 딱지를 다시 짓지 않는다」가 이어받는다. */
 
-test('★★ 포털 딱지가 «기준 아래» 것은 안 센다 — 안 거르면 모든 내려받기가 딱지가 된다', () => {
-  const poll = code(fn('pollPortalExpAlerts', portal));
-  assert.match(poll, /\(x\.n\s*\|\|\s*0\)\s*>=\s*EXPORT_ALERT_N/,
-    '★ 기준으로 거르지 않는다 — 1건짜리 내려받기까지 대표를 부른다');
-});
-
-test('★ 반출 기록 화면이 «두 수를 다» 말해 준다 — 하나만 적으면 나머지를 못 짐작한다', () => {
+test('★ 반출 기록 화면이 «사유 기준»을 말해 준다 — 안 적으면 왜 붉은지 모른다', () => {
   const body = fn('openExportLog');
   assert.match(body, /EXPORT_BIG\.toLocaleString\(\)/, '★ 사유 기준을 안 적는다');
-  assert.match(body, /EXPORT_ALERT\.toLocaleString\(\)/, '★ 딱지 기준을 안 적는다');
+  /* 딱지가 없어졌으니 「그보다 적은 것도 기록은 남는다」를 대신 말해야 한다 —
+     안 그러면 200건 미만은 안 남는 줄 안다 */
+  assert.match(body, /기록은 그대로 남습니다|기록은 남습니다/,
+    '★ 200건 미만도 기록이 남는다는 말이 없습니다 — 안 남는 줄 압니다');
+  assert.ok(body.indexOf('EXPORT_ALERT') < 0, '★ 없앤 딱지 기준을 아직 적고 있습니다');
 });
 
 /* ══════ 규칙 붙여넣기 글 ══════ */
