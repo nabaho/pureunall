@@ -2412,10 +2412,19 @@ body.pc .ditem .v a{color:#166534}
 body.pc .dname,body.pc .mhead b{color:#1e293b}
 body.pc .actrow a{background:#e2e8f0;color:#1e40af}
 body.pc #toast{background:#1e293b;border-color:#1e293b}
-/* PC 오른쪽 상세 패널 (리멤버식) */
+/* PC 오른쪽 상세 패널 (리멤버식)
+   ⚠⚠ 층 높이(z-index)는 «창(모달)보다 낮아야» 한다 — 이 앱의 창은 모두 100 이다.
+     2026-09-12 점검에서 실측: 패널이 120 이라 패널을 열어 둔 채 여는 창이 죄다
+     «패널 뒤»로 갔다.
+       · 폰 — 패널이 전체화면이라 창이 통째로 안 보였다. 사람 이름을 눌러도 명함이
+         열리는데 화면은 그대로여서 「아무 일도 안 난다」로 보였다(확인서 창·수정 창도 같다).
+       · PC — 창의 오른쪽 224px 이 잘려 ✕ 닫기 단추를 못 눌렀다(ESC 도 안 먹는다).
+     ★ 이 패널은 «화면의 한 자리»이지 창이 아니다. 창은 늘 그 위에 떠야 한다.
+     ⚠ 60(#pcSel 고른 것 띠)·70(.mck-dim)보다는 «위»여야 한다 — 그것들은 화면의
+       일부라 패널에 가려야 맞다. 그래서 90 이다(둘 사이에 아무것도 없다). */
 #pcDetail{position:fixed;top:0;right:0;width:420px;max-width:90vw;height:100vh;background:#fff;
   border-left:1px solid #e2e8f0;box-shadow:-8px 0 24px rgba(20,30,50,.08);
-  transform:translateX(100%);transition:transform .22s ease;z-index:120;overflow-y:auto;display:none;flex-direction:column}
+  transform:translateX(100%);transition:transform .22s ease;z-index:90;overflow-y:auto;display:none;flex-direction:column}
 body.pc #pcDetail{display:flex}
 #pcDetail.open{transform:translateX(0)}
 /* 폰 너비 — 옆에 붙는 패널이 아니라 전체화면 시트로 (대표 승인 A안, 2026-08-15).
