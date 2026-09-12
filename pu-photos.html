@@ -41,7 +41,7 @@
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-doc-file.js?v=30"></script>
 <script src="js/pu-drag.js?v=2"></script>
-<script src="js/pu-billing.js?v=8"></script>
+<script src="js/pu-billing.js?v=9"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
 <style>
@@ -7537,7 +7537,7 @@ let aiBudgetRaw = null;
    ⚠ 여기에 기본 한도를 적어 넣지 «말 것». 그러면 계산식이 도로 두 곳이 된다.
      화면이 못 막아도 서버가 막는다 — 화면은 «알리는 자리»일 뿐이다. */
 const AI_SPEND_NONE = { has: false, reads: null, spent: null, limit: 0, warn: 0,
-  wonPerRead: 0, over: false, near: false, tone: 'none' };
+  wonPerRead: 0, free: false, over: false, near: false, tone: 'none' };
 
 function aiBudgetNow() {
   return (window.PuBilling && PuBilling.aiBudgetOf)
@@ -7576,6 +7576,12 @@ function renderAiBudget() {
   const s = aiSpend();
   if (!s.has) {
     now.textContent = '아직 못 읽었습니다';
+    now.style.color = '';
+  } else if (s.free) {
+    /* ★ 단가가 0 이면 «무료로 쓰는 중» — 금액 대신 횟수를 보인다
+       (대표 지시 2026-09-12 「무료는 횟수만 보이게」).
+       ⚠ ₩0 이라 적으면 「안 썼다」로 읽힌다. 쓴 것은 맞고 돈이 안 들 뿐이다. */
+    now.textContent = s.reads.toLocaleString('ko-KR') + '번 (무료 — 단가 0)';
     now.style.color = '';
   } else {
     now.textContent = wonText(s.spent)
