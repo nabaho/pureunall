@@ -33586,27 +33586,10 @@ function AccessPolicySection(){
   );
 }
 
-// ============ 계약서 양식 파일 → 텍스트 추출 (PDF/HWP/HWPX/DOCX) ============
-function _decodeXmlEntities(s){
-  return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'")
-    .replace(/&#x([0-9a-fA-F]+);/g,function(_,h){return String.fromCodePoint(parseInt(h,16));})
-    .replace(/&#(\d+);/g,function(_,d){return String.fromCodePoint(parseInt(d,10));})
-    .replace(/&amp;/g,'&');
-}
-function _xmlExtract(xml, paraTag, textTag){
-  var paras = xml.split('</'+paraTag+'>');
-  var tRe = new RegExp('<'+textTag+'(?:\\s[^>]*)?>([\\s\\S]*?)<\\/'+textTag+'>','g');
-  var lines = [];
-  for(var i=0;i<paras.length;i++){
-    var buf=''; var m; tRe.lastIndex=0;
-    while((m=tRe.exec(paras[i]))!==null){ buf += m[1]; }
-    lines.push(_decodeXmlEntities(buf));
-  }
-  return lines.join('\n').replace(/\n{3,}/g,'\n\n').trim();
-}
+// ====== 계약서 양식 파일 → 텍스트 추출 (HWP·HWPX·DOCX·ODT·RTF·PDF) ======
 /* QR 만들개 — 앱 받는 주소를 폰 카메라로 찍게 한다.
    ⚠ 처음부터 받아 두지 않는다. 이 창을 여는 사람은 거의 없다 —
-     모두에게 짐을 지울 일이 아니다(fflate·PDF.js 와 같은 방식). */
+     모두에게 짐을 지울 일이 아니다(PDF.js 와 같은 방식). */
 function _ensureQrcode(cb){
   if(typeof QRCode!=='undefined'){ cb(null); return; }
   var s=document.createElement('script');
@@ -33625,14 +33608,6 @@ function hanaApkUrl(){
   }catch(_e){}
   return 'https://nabaho.github.io/pureunall/hana-bridge.apk';
 }
-function _ensureFflate(cb){
-  if(typeof fflate!=='undefined'){ cb(null); return; }
-  var s=document.createElement('script');
-  s.src='https://cdnjs.cloudflare.com/ajax/libs/fflate/0.8.2/umd/index.js';
-  s.onload=function(){ cb(null); };
-  s.onerror=function(){ cb('fflate(압축해제) 로드 실패'); };
-  document.head.appendChild(s);
-}
 function _ensurePdfjs2(cb){
   if(typeof pdfjsLib!=='undefined'){ cb(null); return; }
   var s=document.createElement('script');
@@ -33641,76 +33616,58 @@ function _ensurePdfjs2(cb){
   s.onerror=function(){ cb('PDF.js 로드 실패'); };
   document.head.appendChild(s);
 }
-// cb(text, err) — err 있으면 추출 실패(첨부만 저장)
+/* 한글·워드·PDF 에서 글자를 뽑는 «공용 읽개» — hwp_extract.js (2026-09-12).
+   ⚠ 취업규칙·급여데이터함·사진첩·기업정보함이 **이미 이것을 쓴다.** 알피만 제 것을
+     따로 들고 있었고, 그것이 아래 extractTemplateText 의 탈이었다.
+   ⚠ 처음부터 받아 두지 않는다 — 이 길로 오는 사람은 드물다(PDF.js 와 같은 방식).
+   ⚠ XLSX 는 이 화면이 처음부터 싣고 있다(엑셀 가져오기). 여기서는 안 받는다.
+   ⚠ PDF 는 «PDF 일 때만» pdf.js 를 받는다 — 한글 파일 하나 읽자고 1MB 를 받을 일이 아니다. */
+function _ensureDocText(needPdf, cb){
+  var one=function(src, has, next){
+    if(has()){ next(null); return; }
+    var s=document.createElement('script');
+    s.src=src;
+    s.onload=function(){ next(null); };
+    s.onerror=function(){ next(src+' 로드 실패'); };
+    document.head.appendChild(s);
+  };
+  one('vendor/pako.min.js', function(){ return window.pako; }, function(e){
+    if(e){ cb(e); return; }
+    one('hwp_extract.js?v=5', function(){ return window.extractDocText; }, function(e2){
+      if(e2){ cb(e2); return; }
+      if(!needPdf){ cb(null); return; }
+      _ensurePdfjs2(cb);
+    });
+  });
+}
+/* 파일 «속 표식»으로 PDF 인지 본다 — 이름이 아니라 내용으로.
+   .pdf 라고 적힌 한글 파일, 확장자 없는 파일이 실제로 들어온다. */
+function _looksPdf(buf){
+  var u=new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
+  return u[0]===0x25 && u[1]===0x50 && u[2]===0x44 && u[3]===0x46;   // "%PDF"
+}
+/* cb(text, err) — err 있으면 추출 실패(첨부만 저장)
+
+   ⚠⚠ 2026-09-12 에 **읽개를 바꿨다.** 그전에는 이 화면만 `.hwp` 를 「미리보기 글자」
+     (PrvText — 한글이 넣어 두는 맛보기)로 읽었다. 그래서 **같은 파일이 화면마다 다르게
+     읽혔다** — 취업규칙에 넣으면 본문이 다 나오고, 여기 계약 서식에 넣으면 조각만 나오거나
+     「미리보기 텍스트 없음」으로 빈손이 됐다. 조용히 틀리던 자리다.
+   ★ 이제 본문(BodyText)을 통째로 읽는다. 표 안 글자도 같이 온다.
+   ★ 확장자가 아니라 «파일 속 표식»으로 가린다 — `.doc` 로 저장된 RTF 가 실제로 흔한데,
+     예전에는 확장자만 보고 「미지원」으로 돌려보냈다. 이제 읽힌다. */
 function extractTemplateText(file, cb){
-  var ext=(file.name.split('.').pop()||'').toLowerCase();
-  var rdr=new FileReader();
-  rdr.onerror=function(){ cb('','파일 읽기 실패'); };
-  if(ext==='pdf'){
-    _ensurePdfjs2(function(e){
-      if(e){ cb('',e); return; }
-      rdr.onload=function(ev){
-        try{
-          var arr=new Uint8Array(ev.target.result);
-          pdfjsLib.getDocument({ isEvalSupported: false, data:arr}).promise.then(function(doc){
-            var pages=[]; var chain=Promise.resolve();
-            for(var p=1;p<=doc.numPages;p++){(function(pg){
-              chain=chain.then(function(){return doc.getPage(pg);})
-                .then(function(page){return page.getTextContent();})
-                .then(function(tc){ var s=''; tc.items.forEach(function(it){ s+=it.str; if(it.hasEOL) s+='\n'; }); pages.push(s); });
-            })(p);}
-            return chain.then(function(){ cb(pages.join('\n').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim(), null); });
-          }).catch(function(err){ cb('','PDF 추출 실패: '+err.message); });
-        }catch(err){ cb('','PDF 추출 실패: '+err.message); }
-      };
-      rdr.readAsArrayBuffer(file);
+  file.arrayBuffer().then(function(buf){
+    _ensureDocText(_looksPdf(buf), function(e){
+      if(e){ cb('', e); return; }
+      Promise.resolve(extractDocText(buf)).then(function(t){
+        var text=String(t||'').replace(/\n{3,}/g,'\n\n').trim();
+        cb(text, text?null:'본문 텍스트 없음');
+      }).catch(function(err){
+        /* 읽개가 «왜» 못 읽었는지 그대로 전한다 — 암호화·손상은 사람이 할 일이 다르다 */
+        cb('', (err && err.message) || '글자를 뽑지 못했습니다');
+      });
     });
-  } else if(ext==='hwpx'||ext==='docx'){
-    _ensureFflate(function(e){
-      if(e){ cb('',e); return; }
-      rdr.onload=function(ev){
-        try{
-          var u=new Uint8Array(ev.target.result);
-          var zip=fflate.unzipSync(u);
-          var dec=new TextDecoder('utf-8'); var text='';
-          if(ext==='hwpx'){
-            var keys=Object.keys(zip).filter(function(k){return /Contents\/section\d+\.xml$/i.test(k);}).sort();
-            if(!keys.length) keys=Object.keys(zip).filter(function(k){return /section\d+\.xml$/i.test(k);}).sort();
-            text=keys.map(function(k){ return _xmlExtract(dec.decode(zip[k]),'hp:p','hp:t'); }).join('\n');
-          } else {
-            var dx=zip['word/document.xml'];
-            text=dx?_xmlExtract(dec.decode(dx),'w:p','w:t'):'';
-          }
-          text=text.replace(/\n{3,}/g,'\n\n').trim();
-          cb(text, text?null:'본문 텍스트 없음');
-        }catch(err){ cb('',ext.toUpperCase()+' 추출 실패: '+err.message); }
-      };
-      rdr.readAsArrayBuffer(file);
-    });
-  } else if(ext==='hwp'){
-    rdr.onload=function(ev){
-      try{
-        if(typeof XLSX==='undefined'||!XLSX.CFB){ cb('','HWP 파서(XLSX.CFB) 없음'); return; }
-        var u=new Uint8Array(ev.target.result);
-        var cfb=XLSX.CFB.read(u,{type:'array'});
-        var ent=null;
-        for(var i=0;i<cfb.FileIndex.length;i++){
-          var nm=cfb.FileIndex[i].name||'';
-          if(nm==='PrvText'||/PrvText$/i.test(nm)){ ent=cfb.FileIndex[i]; break; }
-        }
-        if(!ent||!ent.content){ cb('','HWP 미리보기 텍스트 없음 (구버전/암호화 가능)'); return; }
-        var bytes=ent.content;
-        var ua=(bytes instanceof Uint8Array)?bytes:new Uint8Array(bytes);
-        var text=new TextDecoder('utf-16le').decode(ua).replace(/\u0000/g,'').replace(/\r/g,'').replace(/\n{3,}/g,'\n\n').trim();
-        cb(text, text?null:'HWP 텍스트 비어있음');
-      }catch(err){ cb('','HWP 추출 실패: '+err.message); }
-    };
-    rdr.readAsArrayBuffer(file);
-  } else if(ext==='doc'){
-    cb('','구버전 .doc 텍스트 추출 미지원 (첨부만 저장)');
-  } else {
-    cb('','지원하지 않는 형식');
-  }
+  }).catch(function(){ cb('','파일 읽기 실패'); });
 }
 
 // ============ rhwp (HWP/HWPX 정밀 텍스트 + 원본 SVG 미리보기) ============
