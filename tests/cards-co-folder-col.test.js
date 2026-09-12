@@ -46,7 +46,7 @@ function render(co, folders) {
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
     coCares: () => true, coMissing: () => [], coConflictN: () => 0,
     coDisplayName: o => o.name || '', coTagsOf: () => [], coArrow: () => '',
-    coOrphanBarHtml: () => '', coSmeBarHtml: () => '', coQuickFolderBtns: () => '', coSelAll: () => {},
+    coOrphanBarHtml: () => '', coSmeBarHtml: () => '', coCtBarHtml: () => '', coQuickFolderBtns: () => '', coSelAll: () => {},
     listNarrowed: () => false, fmtBizno: s => String(s || '')
   };
   if (folders) b._coFolders = folders;

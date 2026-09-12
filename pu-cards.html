@@ -2324,6 +2324,13 @@ td.selcell{cursor:cell}
 .cosmebar:hover{background:#f8fafc}
 .cosmebar b{color:#1e293b}
 .cosmebar em{font-style:normal;color:#1e40af;margin-left:4px}
+/* 📅 계약 종료 띠 — 확인서 띠와 «같은 결»로 둔다(다르게 그리면 「또 새것이 생겼나」가 된다).
+   ⚠ 테두리만 파랑이다. 둘이 나란히 뜰 때 어느 띠를 읽고 있는지 구별이 되어야 한다. */
+.coctbar{margin:0 0 10px;padding:10px 13px;border:1px solid #bfdbfe;background:#ffffff;
+  border-radius:9px;font-size:12.5px;color:#1e40af;cursor:pointer}
+.coctbar:hover{background:#f8fafc}
+.coctbar b{color:#1e293b}
+.coctbar em{font-style:normal;color:#1e40af;margin-left:4px}
 .cosmerow{padding:10px 11px;border-bottom:1px solid #f8fafc;cursor:pointer}
 .cosmerow:last-child{border-bottom:none}
 .cosmerow:hover{background:#f8fafc}
@@ -26031,7 +26038,10 @@ function coFilters(){
     /* 🏅 확인서 갱신 (대표 지시 2026-09-12) — 띠·창과 «같은 잣대»(coSmeNeeds)를 쓴다.
        띠는 「몇 곳인가」를, 이 거르개는 「그 곳만 목록으로」를 맡는다. */
     { k: 'coOnlySme',        icon: '🏅', label: '확인서 갱신', count: () => coSmeCount(),
-      title: '중소기업 확인서가 만료됐거나 30일 안에 만료될 회사만 봅니다 — 해마다 새로 받습니다' }
+      title: '중소기업 확인서가 만료됐거나 30일 안에 만료될 회사만 봅니다 — 해마다 새로 받습니다' },
+    /* ⚠ 「종료일 지남」은 계약해지(🚪)와 «다른 말»이다 — 해지로 표시된 곳은 안 담는다 */
+    { k: 'coOnlyCtOld',      icon: '📅', label: '계약 종료', count: () => coCtCount(),
+      title: '계약 종료일이 지났거나 30일 안에 끝나는 회사만 봅니다 — 계약해지(🚪)로 표시된 곳은 뺍니다' }
   ];
 }
 /* 세어서 늘어놓는다 — 메뉴를 «열 때» 한 번만 부른다 */
@@ -26508,6 +26518,11 @@ function coFilteredList(skipCol, skipCares, skipTodo){
      ⚠ 거르는 잣대는 coSmeNeeds «한 곳»이다 — 띠(coSmeBarHtml)·창(coSmeHtml)·상세 딱지가
        모두 그것을 본다. 여기서 다시 재면 「띠는 3곳인데 목록은 5곳」이 된다. */
   if(state.coOnlySme && !skipTodo) list = list.filter(o=>coSmeNeeds(o));
+  /* ── 📅 계약이 끝났거나 곧 끝나는 곳만 (대표 지시 2026-09-12) ──
+     ⚠ 거르는 잣대는 coCtNeeds «한 곳»이다 — 띠(coCtBarHtml)·창(coCtHtml)이 모두 그것을
+       본다. 여기서 다시 재면 「띠는 3곳인데 목록은 5곳」이 된다.
+     ⚠ 계약해지(🚪)를 빼는 것도 그 잣대 안에 들어 있다 — 여기서 또 빼지 않는다. */
+  if(state.coOnlyCtOld && !skipTodo) list = list.filter(o=>coCtNeeds(o));
   /* ── 📤 이 갈래를 «못 받은» 곳만 (4걸음, 대표 지시 2026-09-03) ──
      ⚠ 계약해지(🚪)는 «여기서도» 뺀다. 배포할 때 애초에 안 보낸 곳이라(3걸음),
        빼지 않으면 끝난 곳이 죄다 「안 받은 곳」으로 올라와 목록이 못 쓰게 된다.
@@ -26604,7 +26619,7 @@ function pickCoNoFolder(){
      2026-09-12 에 「🏅 확인서 갱신」을 늘리며 이 자리를 빠뜨렸다가 그 검사가 잡았다. */
 const CO_TODO_LABEL = { coOnlyClosed:'🚪 종료', coOnlyNoBiz:'🔢 번호 없음',
                         coOnlyIncomplete:'📋 정보부족', coOnlyUid:'🏛 고유번호증',
-                        coOnlySme:'🏅 확인서 갱신',
+                        coOnlySme:'🏅 확인서 갱신', coOnlyCtOld:'📅 계약 종료',
                         coNoFolder:'📂 아직 안 담음' };
 function clearCoTodo(k){ state[k] = false; state.coPage = 0; renderCoAny(); }
 /* ⚠ 띠 모양은 condChipHtml 한 곳에만 있다 (점검 A3) — 여기 다시 적으면 두 벌이 된다 */
@@ -26979,7 +26994,7 @@ function coListHtml(info){
        내려갔을 때 마지막 줄을 덮지 않는다.
      ⚠ 쪽넘김은 여기 «없다». renderCoPage 의 안 구르는 바닥(.cofoot)으로 옮겼다 —
        여기 두면 표와 함께 굴러가 200줄 아래로 숨는다(대표 지시 2026-08-26). */
-  return `${coOrphanBarHtml()}${coSmeBarHtml()}<table class="cotbl">
+  return `${coOrphanBarHtml()}${coSmeBarHtml()}${coCtBarHtml()}<table class="cotbl">
     ${/* ⚠ 「가진 것」을 한 줄로 만들면서 그 칸을 170→215px 로 넓혔다. 늘린 만큼은
          상호(300→255)에서 덜어 온다 — 표 전체가 넓어지면 좌우로 넘친다. */''}
     ${/* ⚠ 폴더를 «제 열»로 뺐다 (대표 지시 2026-08-30 「열 정리해라 세로로 정렬해서」).
@@ -28719,6 +28734,96 @@ function coSmeChipHtml(o){
   return `<span title="중소기업 확인서 — ${esc(st.why)}" style="font-size:11px;font-weight:700;
     border:1px solid;border-radius:9px;padding:1px 8px;white-space:nowrap;color:${color}">🏅 ${esc(st.text)}</span>`;
 }
+/* ══════ 📅 계약이 «끝났거나 곧 끝나는» 곳만 한자리에 (대표 지시 2026-09-12 「추천대로」) ══
+   점검 보고의 ① — 앱은 **이미** 계약 기간을 읽어 「종료일 지남」까지 판정하고 있었다
+   (erpContractPeriod). 그런데 «회사를 열어야» 보였다. 4,000곳 가운데 어디가 지났는지
+   알려면 한 곳씩 열어 보는 수밖에 없었다 — 확인서 갱신과 똑같은 자리였다.
+   그래서 확인서 갱신(coSme*)과 «같은 모양»으로 둔다: 띠 → 창 → 거르개.
+
+   ★ 잣대는 erpContractPeriod «한 곳»이다 — 상세 줄의 「종료일 지남」과 이 목록이
+     다른 말을 하면 어느 쪽을 믿어야 할지 알 수 없다.
+   ⚠⚠ 「종료일 지남」과 「계약해지(🚪)」는 **다른 말이다.** 자동 연장으로 계속 가는 곳이
+     있어 상세가 이미 둘을 갈라 놓았다(.ctold 의 말풍선). 그래서 **해지로 표시된 곳은
+     안 담는다** — 이미 끝난 일이라, 담으면 정작 챙길 곳이 그 속에 묻힌다.
+     ⚠ 뺀 곳은 «세어서» 화면에 적는다. 조용히 빼면 「우리 거래처가 이것뿐인가」가 된다.
+   ⚠ 날짜로 «못 읽은» 종료일은 안 담는다 — 모르는 것을 급하다 하면 늑대 소년이 된다.
+   ⚠ 종료일이 «아예 없는» 곳도 안 담는다 — 기간을 안 적은 것이지 끝난 것이 아니다.
+   ⚠ 남은 날은 coSmeDays 로 센다. 이름에 Sme 가 붙어 있지만 하는 일은 «글에서 날짜를
+     읽어 며칠 남았나»일 뿐이다 — 날짜 세는 곳을 두 벌로 만드는 것이 훨씬 위험하다
+     (이름을 고치면 그 함수를 떠서 돌리는 검사 여섯 벌이 함께 움직인다). */
+function coCtState(o, now){
+  const p = erpContractPeriod(o && o.erp, now == null ? todayYmd() : now);
+  if(!p || !p.to) return null;                    /* 기간을 안 적었다 — 끝난 것이 아니다 */
+  const d = coSmeDays(p.to, now);
+  if(d == null) return null;                      /* 날짜로 못 읽었다 */
+  if(d < 0)   return { cls:'gone', days:d, to:p.to, from:p.from };
+  if(d <= 30) return { cls:'soon', days:d, to:p.to, from:p.from };
+  return { cls:'ok', days:d, to:p.to, from:p.from };
+}
+/* 해지로 표시된 곳인가 — 「이미 끝낸 일」이다. o.erp.left 는 업체관리가 정한 값이라
+   여기서 다시 재지 않는다(🚪 딱지와 같은 잣대). */
+function coCtClosed(o){ return !!(o && o.erp && o.erp.left); }
+function coCtNeeds(o, now){
+  if(coCtClosed(o)) return false;
+  const st = coCtState(o, now);
+  return !!st && (st.cls === 'gone' || st.cls === 'soon');
+}
+/* 급한 순 — 남은 날이 적을수록 앞. 지난 것은 음수라 저절로 맨 앞에 선다. */
+function coCtList(now){
+  return (coList() || []).filter(o => coCtNeeds(o, now)).map(function(o){
+    const st = coCtState(o, now);
+    return { o:o, key:o.key, name:o.name || '', to:st.to, from:st.from,
+             cls:st.cls, days:st.days };
+  }).sort((a,b) => (a.days - b.days) || String(a.name).localeCompare(String(b.name), 'ko'));
+}
+function coCtCount(now){ return coCtList(now).length; }
+/* 해지라서 «뺀» 곳 — 화면이 그 사실을 말할 수 있게 따로 센다 */
+function coCtClosedCount(now){
+  return (coList() || []).filter(function(o){
+    if(!coCtClosed(o)) return false;
+    const st = coCtState(o, now);
+    return !!st && (st.cls === 'gone' || st.cls === 'soon');
+  }).length;
+}
+/* 목록 위 알림 띠 — 0곳이면 «아무 것도 안 띄운다»(확인서 띠와 같은 규칙) */
+function coCtBarHtml(){
+  const list = coCtList();
+  if(!list.length) return '';
+  const gone = list.filter(x => x.cls === 'gone').length;
+  const soon = list.length - gone;
+  const bits = [ gone ? `종료일 지남 <b>${gone.toLocaleString()}곳</b>` : '',
+                 soon ? `30일 안 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
+  return `<div class="coctbar" onclick="openCoCt()"
+      title="계약 종료일이 지났거나 곧 끝나는 곳입니다 — 계약해지(🚪)로 표시된 곳은 뺐습니다">
+      📅 계약 ${bits}<em>— 눌러서 보기</em></div>`;
+}
+function openCoCt(){ showPanel(coCtHtml()); }
+/* 창 — 급한 순으로 늘어놓고, 누르면 그 회사를 연다.
+   ⚠ 여기서 «고치지 않는다». 계약 기간은 업체관리가 가진 값이라, 이 창이 할 일은
+     「어디를 챙길 것인가」를 말하는 것뿐이다. */
+function coCtHtml(){
+  const list = coCtList();
+  const 뺀곳 = coCtClosedCount();
+  const 뺀말 = 뺀곳 ? `<br>계약해지(🚪)로 표시된 <b>${뺀곳.toLocaleString()}곳</b>은 뺐습니다 — 이미 끝낸 일입니다.` : '';
+  if(!list.length) return `<div class="mhead"><b>📅 계약 종료</b>${_closeBtn()}</div>
+    <p class="cpnone" style="padding:16px 2px">챙길 곳이 없습니다 👍</p>
+    ${뺀곳 ? `<p class="setnote" style="margin:10px 0 0">계약해지(🚪)로 표시된 ${뺀곳.toLocaleString()}곳은 뺐습니다.</p>` : ''}`;
+  return `<div class="mhead"><b>📅 계약 종료 — 챙길 곳 ${list.length}곳</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 10px">종료일이 지났거나 <b>30일 안</b>에 끝나는 곳입니다 — 급한 곳부터 놓았습니다.
+      <b>「종료일 지남」은 계약해지가 아닙니다</b> — 자동 연장으로 계속 가는 곳이 있습니다.${뺀말}
+      <br>회사를 누르면 그 회사 상세가 열립니다.</p>
+    <div class="ablist">${list.map(x=>`
+      ${/* ⚠ 창을 «먼저 닫고» 회사를 연다 — 확인서 창과 같은 까닭이다(안 닫으면 상세가
+             이 창 뒤에 열려 눌렀는데 아무 일도 없는 것처럼 보인다). */''}
+      <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
+          title="${esc(x.name)} 상세를 엽니다">
+        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
+        <div class="sv"><span class="sd ${x.cls}">${x.days < 0 ? '종료 ' + (-x.days) + '일 지남' : 'D-' + x.days}</span>
+          <span class="se">${esc(x.to)}까지</span>
+          ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
+      </div>`).join('')}</div>`;
+}
+
 function coInfoBoxHtml(o){
   const val = f => coVal(o, f);
   const rows = CO_FIELDS.filter(([f])=>val(f)).map(([f,label])=>

@@ -80,6 +80,9 @@ function drawFilterMenu(state, counts){
        «짜임»을 보므로 세는 일은 대역으로 둔다 — 잣대 자체는 따로 본다
        (tests/cards-co-sme-due.test.js). */
     coSmeCount: () => c.sme,
+    /* 2026-09-12: 「계약 종료」 한 줄이 또 늘었다 — 같은 까닭으로 세는 일만 대역이다
+       (잣대는 tests/cards-co-contract-due.test.js 가 따로 본다). */
+    coCtCount: () => c.ct || 0,
     closeFolderMenu(){}, renderCoAny(){ ctx.drew = (ctx.drew||0) + 1; },
     setTimeout(){}, document: { addEventListener(){} },
     window: { innerWidth: 1600 },
