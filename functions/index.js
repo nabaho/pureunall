@@ -2637,6 +2637,48 @@ exports.newsClick = functions
          받는 분이 눌러도 같은 일이 난다. 문(enter.html)으로 보낸다. */
     res.redirect(302, 갈곳 || "https://nabaho.github.io/pureunall/enter.html");
   });
+
+// ════════════════════════════════════════════════════════════════════════════
+// 뉴스레터 «전문 보기» 쪽 — newsView
+// ════════════════════════════════════════════════════════════════════════════
+// 대표 결정 2026-09-12: 편지는 «요약»만 보내고, 자세한 것은 이 쪽에서 본다.
+//
+// ★ 여기서 편지를 «다시 짓지 않는다». 보낼 때 앱이 지은 전문을 회차에 담아 두고
+//   (newsletter/issues/{회차}/전문) 그것을 꺼내 준다. 편지 짓는 층은 화면 쪽에 있어
+//   서버에 올라가지 않는다 — 베껴 두면 두 벌이 되어 반드시 어긋난다.
+//
+// ⚠⚠ «전문 한 칸만» 읽는다. 회차 안에는 받는 분들의 주소(받는이)가 들어 있다 —
+//   통째로 읽어 내주면 그것이 그대로 새 나간다. 이 쪽은 로그인이 없다.
+//
+// ⚠ 초안은 안 내준다. 회차 열쇠는 규칙이라 다음 주 것을 누구나 지어 볼 수 있다.
+exports.newsView = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 15, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    const NV = require("./news-view");
+    res.set("Content-Type", "text/html; charset=utf-8");
+    /* 내용이 바뀔 일이 거의 없지만, 보낸 뒤 고칠 수도 있어 짧게만 둔다 */
+    res.set("Cache-Control", "public, max-age=300");
+    res.set("X-Robots-Tag", "noindex");
+    const q = NV.읽기(req.query);
+    if (!q.ok) { res.status(404).send(NV.없는쪽("없음")); return; }
+    try {
+      const db = getDatabase();
+      const 밑 = "newsletter/issues/" + q.회차 + "/";
+      const [상태, 전문] = await Promise.all([
+        db.ref(밑 + "상태").once("value"),
+        db.ref(밑 + "전문").once("value"),
+      ]);
+      const 판 = NV.볼수있나(상태.val(), 전문.val());
+      if (!판.ok) { res.status(404).send(NV.없는쪽(판.까닭)); return; }
+      const 제목 = (await db.ref(밑 + "제목").once("value")).val();
+      res.status(200).send(NV.쪽(제목, String(전문.val())));
+    } catch (e) {
+      console.warn("newsView", (e && e.message) || e);
+      res.status(500).send(NV.없는쪽("없음"));
+    }
+  });
+
 exports.readHomepage = functions
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
   .https.onRequest(async (req, res) => {

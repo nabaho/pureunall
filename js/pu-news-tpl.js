@@ -160,7 +160,11 @@
 
   /* ── 꼭지 제목 (Best 딱지는 첫 꼭지에만) ────────────────────────────── */
   function 꼭지제목(g) {
-    var 이름 = '<span style="font-size:19px;font-weight:bold;color:' + 색.짙은갈 + ';'
+    /* ★ 자리표(anchor) — 요약판의 「자세히 보기 ↗」가 «그 꼭지로» 내려앉게 한다.
+       ⚠ 메일 안에서는 #자리이동이 안 먹지만, 여기 붙는 것은 «웹 쪽»이라 통한다.
+         메일에는 그냥 빈 a 태그라 아무 일도 안 한다 — 해롭지 않다. */
+    var 이름 = '<a id="g-' + esc(g.키 || '') + '"></a>'
+      + '<span style="font-size:19px;font-weight:bold;color:' + 색.짙은갈 + ';'
       + 'font-family:' + 폰트 + ';">' + esc(g.이름) + '</span>';
     if (!g.딱지) {
       return '<tr><td style="padding:22px 28px 0 28px;">' + 이름 + '</td></tr>';
@@ -465,6 +469,93 @@
     return out;
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     요약판 — 「한 화면에 요약만, 자세한 것은 눌러서」 (대표 지시 2026-09-12)
+     ══════════════════════════════════════════════════════════════════════
+     「전체적으로 한화면에 모든내용의 요약만 나오게 만들고 클릭하면 …
+       확인할 수 있게 해달라. 고용노동정책 판례등도 간략하게 핵심만 보게하고」
+
+     ⚠⚠ 메일에는 «팝업이 없다». 메일 프로그램이 자바스크립트를 통째로 지운다.
+       그래서 「눌러서 자세히」는 «우리 서버의 그 회차 쪽»을 여는 것으로 만든다
+       (functions/news-view.js 의 newsView). 대표 결정 2026-09-12.
+
+     ★ 한 꼭지에 링크 «하나»만 둔다. 줄마다 달면 열다섯 개가 되어 눈이 쉴 곳이 없고,
+       스팸 판정에도 불리하다.
+     ⚠ 요약은 «자르는 것»이지 새로 쓰는 것이 아니다 — 자른 자리에 「…」을 붙여
+       잘렸다는 것을 숨기지 않는다(판례 자를 때와 같은 규칙). */
+  var 요약한도 = 68;
+
+  /* 첫 문장까지만. 문장이 길면 한도에서 자른다. */
+  function _요약글(s) {
+    var t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    /* 「▸ 우리 사업장은」처럼 우리가 붙인 갈피표는 요약에서 뺀다 — 첫 줄만 쓰므로
+       거기까지 갈 일이 없지만, 우리말이 그 줄로 시작하는 경우를 막는다. */
+    t = t.replace(/^[▸▶·\-\s]+/, '');
+    var 끝 = t.search(/[.!?。](\s|$)/);
+    if (끝 > 0 && 끝 + 1 <= 요약한도) return t.slice(0, 끝 + 1);
+    if (t.length <= 요약한도) return t;
+    return t.slice(0, 요약한도).replace(/[\s·,]+$/, '') + '…';
+  }
+
+  /* 한 줄에 붙일 «곁말» — 어디서 온 것인지 (기관·언론사·인용) */
+  function _요약곁(x) {
+    return String(x.기관 || x.언론사 || x.인용 || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function 요약칸(항목들, 꼭지, 웹주소, 우리글) {
+    var g = 꼭지 || {};
+    var 줄 = [];
+    if (String(우리글 || '').trim()) {
+      줄.push({ 글: _요약글(우리글), 곁: '푸른노무법인' });
+    }
+    (항목들 || []).forEach(function (x) {
+      if (!x) return;
+      var 글 = _요약글(x.우리말 || x.제목);
+      if (!글) return;
+      줄.push({ 글: 글, 곁: _요약곁(x) });
+    });
+    if (!줄.length) return '';
+
+    var 몸 = 줄.map(function (r) {
+      return '<tr>'
+        + '<td valign="top" width="14" style="width:14px;padding:5px 0 5px 0;'
+        + 'font-size:14px;line-height:1.7;color:' + 색.딱지 + ';font-family:' + 폰트 + ';">·</td>'
+        + '<td style="padding:5px 0 5px 6px;font-size:14px;line-height:1.7;color:' + 색.글 + ';'
+        + 'font-family:' + 폰트 + ';word-break:keep-all;">' + esc(r.글)
+        + (r.곁 ? ' <span style="color:' + 색.흐린글 + ';font-size:12px;">· '
+            + esc(r.곁) + '</span>' : '')
+        + '</td></tr>';
+    }).join('');
+
+    var u = href(웹주소 ? 웹주소 + '#g-' + encodeURIComponent(g.키 || '') : '');
+    var 더 = u
+      ? '<tr><td colspan="2" align="right" style="text-align:right;padding:8px 0 0 0;">'
+        + '<a href="' + u + '" style="color:' + 색.남색 + ';font-size:12.5px;font-weight:bold;'
+        + 'text-decoration:none;font-family:' + 폰트 + ';">'
+        + esc(줄.length) + '건 자세히 보기 ↗</a></td></tr>'
+      : '';
+
+    return '<tr><td style="padding:10px 28px 0 28px;">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
+      + 몸 + 더 + '</table></td></tr>';
+  }
+
+  /* 맨 위 띠 — 「전문은 여기서」. 요약만 보고 끝내실 분도 있으니 한 번은 크게 말한다. */
+  function 전문보기띠(웹주소) {
+    var u = href(웹주소 || '');
+    if (!u) return '';
+    return '<tr><td style="padding:16px 28px 0 28px;">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+      + ' style="background-color:' + 색.상자 + ';border:1px solid ' + 색.줄 + ';">'
+      + '<tr><td style="padding:13px 16px;font-size:13px;line-height:1.7;color:' + 색.글 + ';'
+      + 'font-family:' + 폰트 + ';">'
+      + '아래는 <b>이번 주 요약</b>입니다. 자세한 내용과 자료 내려받기는 '
+      + '<a href="' + u + '" style="color:' + 색.남색 + ';font-weight:bold;">전문 보기 ↗</a>'
+      + ' 에서 보실 수 있습니다.'
+      + '</td></tr></table></td></tr>';
+  }
+
   /* ── 우리 글 꼭지 — 이 칸만 우리가 쓴다 ───────────────────────────── */
   function 우리글칸(글) {
     var t = String(글 == null ? '' : 글).trim();
@@ -580,9 +671,32 @@
     var 미리 = !!(옵션 && 옵션.미리보기);
     _추적 = (밑 && 회열 && !미리) ? { 밑주소: 밑, 회차: 회열, 링크들: [] } : null;
 
+    /* ══════════════════════════════════════════════════════════════════════
+       요약판인가 전문판인가 (대표 결정 2026-09-12)
+       ══════════════════════════════════════════════════════════════════════
+       ★ 나가는 편지는 «요약»이고, 「자세히 보기」가 여는 웹 쪽은 «전문»이다.
+       ⚠ 회차에 적어 둔 꼴(d.꼴)이 있으면 그것이 이긴다 — 범위를 다루는 방식과 같다.
+         이미 보낸 회차를 다시 그릴 때 «그때 나간 그대로»여야 하기 때문이다.
+         옛 회차에는 이 값이 없으니 전문으로 그려진다(그때는 전문만 있었다). */
+    var 요약 = (옵션 && 옵션.요약 != null) ? !!옵션.요약 : (d.꼴 === '요약');
+    /* 전문이 있는 자리 — 없으면 요약판을 만들지 않는다. 「자세히 보기」가 없는
+       요약은 그냥 «내용이 빠진 편지»다. */
+    var 웹주소 = (밑 && 회열) ? (밑 + '/newsView?i=' + encodeURIComponent(회열)) : '';
+    if (!웹주소) 요약 = false;
+
     var 속 = '';
     var 그린것 = 0;
+    if (요약) 속 += 전문보기띠(웹주소);
     Core.꼭지들.forEach(function (g) {
+      if (요약) {
+        var 것들요 = 안[g.키] || [];
+        var 글요 = (g.갈래 === '우리글') ? d.우리글 : '';
+        var 칸요 = 요약칸(것들요, g, 웹주소, 글요);
+        if (!칸요) return;
+        if (그린것) 속 += 줄긋기(18);
+        속 += 꼭지제목(g) + 칸요; 그린것++;
+        return;
+      }
       if (g.갈래 === '우리글') {
         /* ★ 우리 글 «그리고» 연구기관 자료 (대표 결정 2026-09-06 「우리 글 + 연구자료」).
              받으신 원본은 이 자리(Trend)에 경총·BOK 같은 연구 보고서를 실었다.
