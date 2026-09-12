@@ -30,10 +30,15 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8')
   .split('\r\n').join('\n');
 
 const 오늘 = '2026-09-12';
+const 기준시각 = new Date(2026, 8, 12, 15, 30).getTime();
+class 고정날짜 extends Date {
+  constructor(...args){ super(...(args.length ? args : [기준시각])); }
+  static now(){ return 기준시각; }
+}
 
 /* 잣대·목록·띠·창을 통째로 떠서 «돌린다» — 글자만 찾으면 조건이 뒤집혀도 통과한다 */
 function load(list) {
-  const ctx = { Object, Array, String, Number, Math, Date, JSON, isNaN, console,
+  const ctx = { Object, Array, String, Number, Math, Date:고정날짜, JSON, isNaN, console,
     esc: s => String(s == null ? '' : s),
     coList: () => list || [],
     todayYmd: () => 오늘,
