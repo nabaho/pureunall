@@ -37,6 +37,12 @@ function panelDeps(app) {
     cutFn(app, 'function erpHistShortWon('),
     cutFn(app, 'function coCardToggle('),
     cutFn(app, 'function coCardHtml('),
+    /* 2026-09-12: 「확인 필요 몇 가지」를 카드와 숫자 칸이 «한 곳»에서 세게 모았다 —
+       진짜를 싣는다(대역을 넣으면 두 숫자가 어긋나도 검사가 모른다). */
+    cutFn(app, 'function coNeedCount('),
+    /* 같은 곳인 두 줄을 «사람이 짚어» 합친 것 — 되돌리는 줄이 상세에 뜬다 */
+    cutFn(app, 'function coMergedKeys('),
+    cutFn(app, 'function coMergeRowHtml('),
     cutFn(app, 'function coNeedHtml('),
     cutFn(app, 'function coNeedClashToggle('),
     cutFn(app, 'function coPinRowToggle('),
