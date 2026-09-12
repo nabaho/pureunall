@@ -11932,6 +11932,9 @@ function openPcDetail(id, backCo){
       <div class="pddel"><button class="danger" onclick="delItem('${id}')">🗑 이 명함 삭제</button></div>
     </div>`;
   $('pcDetail').dataset.cardId = id;   /* 늦게 온 사진을 «이 명함» 창에만 넣으려고 */
+  /* 지금 떠 있는 것은 «명함»이다 — 기업 상세가 새 값에 다시 그려질 때 이 창을
+     밀어내지 않게 표를 지운다(coDetailRefresh). */
+  delete $('pcDetail').dataset.coKey;
   $('pcDetail').classList.add('open');
   const ov=$('pcDetailOverlay'); if(ov) ov.style.display='block';
   /* ⚠ 원본(Store.getPhoto)을 여기서 «안» 받는다 (대표 보고 2026-08-30).
@@ -28974,6 +28977,8 @@ function coNeedOpenDocs(){
 function coTilesHtml(o){
   const s = (_coHist && _coHist.o === o) ? _coHistSum : null;
   const docs = Object.keys((o.extra && o.extra.docs) || {}).length;
+  /* «모름»과 «0건»은 다른 말이다 — null 을 0 으로 읽으면 화면이 단정해서 거짓말한다 */
+  const leftKnown = _coLeftDocsN !== null && _coLeftDocsN !== undefined;
   const nLeft = Number(_coLeftDocsN || 0);
   const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
   const linkBad = coErpPinState(o) !== 'pinned';
@@ -28987,9 +28992,14 @@ function coTilesHtml(o){
       title="${need?'연결·값·서류 가운데 손볼 것이 있습니다':'손볼 것이 없습니다 👍'}">
       <div class="k">확인 필요</div><div class="v">${need}</div>
       <div class="u">${need ? '눌러서 보기' : '없음'}</div></div>
+    ${/* ⚠★ 「다 붙음」은 «세어 본 뒤»에만 말한다 (점검 2026-09-12).
+         붙임새는 이알피 기록이 와야 셈할 수 있다(coLeftDocsPaint). 오기 전에는
+         _coLeftDocsN 이 «모름»인데, 그것을 0 으로 읽어 「다 붙음」이라 적고 있었다 —
+         서류 두 장이 어디에도 안 붙은 회사가 「다 붙음」으로 보였다.
+         「한 일」 칸이 «…(읽는 중)»이라 말하는 것과 같은 잣대로 맞춘다. */''}
     <div class="cotile" onclick="coNeedOpenDocs()" title="서류 칸을 폅니다">
       <div class="k">서류</div><div class="v">${docs}</div>
-      <div class="u">${nLeft ? '안 붙음 '+nLeft : '다 붙음'}</div></div>
+      <div class="u">${!docs ? '' : (leftKnown ? (nLeft ? '안 붙음 '+nLeft : '다 붙음') : '읽는 중')}</div></div>
   </div>`;
 }
 function coGoBox(id){ const el=$(id); if(el) el.scrollIntoView({ block:'nearest' }); }
@@ -29071,17 +29081,25 @@ function coDocsSummary(o){
 /* ⚠ #coErpHistBox 는 빈 채로 둔다 — 이알피 이력은 Task 3 에서 loadErpCaseCons 로
    따로 불러온 뒤 이 칸에 채운다(패널을 열 때마다 이알피에 새로 안 물어보려면
    상세 내용과 이력 내용을 분리해 둬야 한다). */
-function openCoDetailPanel(key){
+function openCoDetailPanel(key, keep){
   const o = coList().find(x=>x.key===key); if(!o) return;
   /* ⚠ 늦게 오는 값은 «회사마다» 다시 센다. 안 비우면 앞 회사의 「5건」이 잠깐 보인다
      — 숫자 칸은 한눈에 믿고 보는 자리라 그 한 순간이 거짓말이 된다.
      ⚠ 접어 둔 자리(_coCardOpen·_coYearOpen)는 «안 비운다» — 대표 결정 ⑥㉮ 로
        회사를 옮겨도 기억한다. 비우는 것은 «센 값»뿐이다. */
-  _coHistSum = null; _coLeftDocsN = null; _coRowDocsOpen = {};
+  _coHistSum = null; _coLeftDocsN = null;
+  /* ⚠ 펴 둔 사업 서류는 «다른 회사로 갈 때»만 비운다. 같은 회사를 다시 그리는
+     것뿐이면(구독이 새 값을 줬다) 펴 둔 자리를 지킨다 — 보던 것이 접히면
+     무엇을 보고 있었는지 잃는다. */
+  if(!keep) _coRowDocsOpen = {};
   $('pcDetail').innerHTML = `
     <div class="pdhead"><span class="ttl">기업 상세</span>
       <button class="x" onclick="closePcDetail()">✕</button></div>
     <div class="pdbody">${coDetailPanelHtml(o)}</div>`;
+  /* 이 칸에 «지금 무엇이 떠 있나»를 적어 둔다 — 늦게 오는 값이 명함을 보고 있는
+     사람을 기업 상세로 끌어내지 않게 하는 잣대다(coDetailRefresh). */
+  $('pcDetail').dataset.coKey = key;
+  delete $('pcDetail').dataset.cardId;
   $('pcDetail').classList.add('open');
   const ov=$('pcDetailOverlay'); if(ov) ov.style.display='block';
   /* ⚠ 최종 전체 리뷰(2026-08-14): 이 조회가 도는 동안 다른 회사 패널로 옮겨 갔으면,
@@ -30465,6 +30483,34 @@ function renderCoAny(){
   if(state.view!=='co') return;
   if(document.body.classList.contains('pc')) renderPC();
   else renderCoMobileList();
+  coDetailRefresh();
+}
+/* ══════ 열어 둔 기업 상세도 «새 값으로» 다시 그린다 (점검 2026-09-12) ══════
+   ■ 무엇이 문제였나
+   자료가 바뀌면 목록(renderCoAny)만 다시 그렸다. 열어 둔 상세 패널은 «건드리지
+   않아서», 서류를 사업에 끌어다 붙여도 그 자리에 그대로 남아 있었고(「붙였습니다」
+   라고 알리면서도 화면은 안 바뀐다), 다른 사람이 고친 값도 안 들어왔다.
+   ⚠ 끌어다 붙이는 쪽(coDocDrop)은 「화면을 억지로 안 고친다 — 구독이 새 값을 주면
+     패널도 다시 그려진다」고 적어 두었는데, **그 길이 없었다.** 실측으로 확인했다
+     (목록은 새 이름으로 바뀌는데 패널은 옛 이름 그대로).
+
+   ★ 지켜야 할 것 넷
+     ① 명함을 보고 있으면 «건드리지 않는다» — 읽던 사람을 기업 상세로 끌어내면 안 된다.
+     ② 구르던 자리를 지킨다 — 새 값이 올 때마다 맨 위로 튀면 읽던 곳을 잃는다.
+     ③ 펴 둔 사업 서류도 지킨다 — 같은 회사를 다시 그리는 것뿐이다.
+     ④ 그새 사라진 회사면 닫는다 — 빈 패널이 남으면 「눌렀는데 없다」가 된다. */
+function coDetailRefresh(){
+  const k = String(state.coPick || '');
+  if(!k) return;
+  const box = $('pcDetail');
+  if(!box || !box.classList.contains('open')) return;
+  if(box.dataset.coKey !== k) return;              /* ① 명함을 보고 있다 — 그대로 둔다 */
+  if(!(coList()||[]).some(x => x.key === k)){ closePcDetail(); return; }   /* ④ */
+  const body = box.querySelector('.pdbody');
+  const top = body ? body.scrollTop : 0;           /* ② */
+  openCoDetailPanel(k, true);                      /* ③ keep */
+  const now = box.querySelector('.pdbody');
+  if(now && top) now.scrollTop = top;
 }
 /* ★ 최종 전체 리뷰(2026-08-16) M1 — 「고르기만 바뀌는」 자리(체크상자 토글·전체 고르기)는
    **목록만** 다시 그린다. Task 6 이 이 둘까지 renderCoAny() 로 묶으면서 PC 가 예전보다

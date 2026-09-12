@@ -20,7 +20,11 @@ function loadRenderAny(isPc){
     renderPC: () => calls.pc++
   };
   vm.createContext(ctx);
-  vm.runInContext(source.slice(at, end), ctx);
+  /* 2026-09-12 점검: 자료가 바뀌면 «열어 둔 상세»도 함께 고친다(coDetailRefresh).
+     대역이 아니라 진짜를 싣는다 — 이 검사에는 고른 회사가 없어 스스로 돌아나간다. */
+  const rAt = source.indexOf('function coDetailRefresh');
+  const rEnd = source.indexOf('\n}', rAt) + 2;
+  vm.runInContext(source.slice(rAt, rEnd) + '\n' + source.slice(at, end), ctx);
   ctx._calls = calls;
   return ctx;
 }

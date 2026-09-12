@@ -71,7 +71,7 @@ test('★ 1단계는 서버에 아무것도 쓰지 않는다', () => {
 });
 
 test('읽는 자리도 그대로다 — 이미 부르던 loadErpCaseCons 를 쓴다', () => {
-  const body = slice('function openCoDetailPanel(key){', 'function sortBy(key){');
+  const body = slice('function openCoDetailPanel(key, keep){', 'function sortBy(key){');
   assert.match(body, /loadErpCaseCons\(/, '새 읽기 길을 만들지 않았다');
   /* 늦게 온 답을 다른 회사 칸에 쓰지 않는다 — 이미 있던 안전장치를 지킨다.
      ⚠ 「state.coPick===key 라는 글자가 어딘가 있다」로는 부족하다. 이 함수는 그 값을
