@@ -55,6 +55,13 @@ test('매일 수집기는 검토대기함에만 쓰고 회차나 발송을 건�
   assert.doesNotMatch(body, /newsletter\/issues|sendBulkMail|weeklyReady/);
 });
 
+test('공공기관 RSS 기본 연결 실패 시 IPv4로 재시도하고 원인을 기록한다', () => {
+  assert.match(함수, /function IPv4로글자받기/);
+  assert.match(함수, /family:\s*4/);
+  assert.match(함수, /return await IPv4로글자받기\(url\)/);
+  assert.match(함수, /기본 연결:[\s\S]*IPv4 연결:/);
+});
+
 test('뉴스레터 화면은 검토대기 후보를 읽어 지역뉴스 화면에서 보여 준다', () => {
   assert.match(화면, /newsletter\/regionalCandidates/);
   assert.match(화면, /지역후보/);

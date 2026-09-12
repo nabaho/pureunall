@@ -46,6 +46,7 @@
 <script src="js/pu-news-core.js?v=32"></script>
 <script src="js/pu-news-tpl.js?v=13"></script>
 <script src="js/pu-news-regional-sources.js?v=1"></script>
+<script src="js/pu-news-review.js?v=1"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -624,7 +625,8 @@ const FIREBASE_CONFIG = {
 const BULK_FN_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/sendBulkMail';
 const BULK_GAP_SEC = 15;
 
-const Core = window.PuNewsCore, Tpl = window.PuNewsTpl, 지역출처 = window.PuNewsRegionalSources;
+const Core = window.PuNewsCore, Tpl = window.PuNewsTpl,
+  지역출처 = window.PuNewsRegionalSources, 지역검토 = window.PuNewsReview;
 var db = null;
 var App = {
   me: null, isAdmin: false, tab: 'now',
@@ -1622,7 +1624,9 @@ function 지역뉴스관리(d){
     return `<div class="item"><span class="pill">검토대기 · ${esc(x.지역||'전국')}</span>
       <span class="t" title="${esc(x.제목||'')}">${esc(x.제목||'')}</span>
       <span class="src">${esc(x.기관||'')}</span>
-      <a class="mini" href="${esc(x.링크||'#')}" target="_blank" rel="noopener">원문 ↗</a></div>`;
+      <a class="mini" href="${esc(x.링크||'#')}" target="_blank" rel="noopener">원문 ↗</a>
+      <button class="mini" onclick="지역후보승인('${esc(x.id||'')}')">승인</button>
+      <button class="x" title="이 후보 제외" onclick="지역후보제외('${esc(x.id||'')}')">✕</button></div>`;
   }).join('') : '<div class="pad hint">새 검토후보가 없습니다. 공식 RSS는 매일 오전 7시 10분에 확인합니다.</div>';
   return `<div class="box" style="margin-top:12px"><h3>📍 주소에 맞춰 보내는 지역뉴스
     <span class="cnt">${a.length}건</span><span class="sp"></span>
@@ -1635,6 +1639,70 @@ function 지역뉴스관리(d){
     <div class="box" style="margin-top:12px"><h3>🔎 공식 RSS 검토대기 <span class="cnt">${후보.length}건</span></h3>
       <div class="jarbody">${후보줄}</div><div class="pad hint">
       제목·날짜·공식 링크만 자동수집했습니다. 아직 어떤 뉴스레터에도 들어가지 않습니다.</div></div>`;
+}
+async function 지역후보제외(id){
+  const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 다른 관리자가 검토한 후보입니다');
+  const 사유=String(prompt('제외 사유를 적어 주세요\n다음 후보 선별을 개선하는 근거가 됩니다.')||'').trim();
+  if(!사유) return;
+  const 검토자=(App.me&&App.me.email)||'';
+  const ref=db.ref('newsletter/regionalCandidates/'+id);
+  try{
+    const r=await ref.transaction(function(cur){
+      const next=지역검토.검토변경(cur,'제외',검토자,Date.now(),사유); return next||undefined;
+    });
+    if(!r.committed) return toast('다른 관리자가 먼저 검토했습니다',7000);
+    App.지역후보[id]=r.snapshot.val(); render(); toast('검토대기함에서 제외했습니다');
+  }catch(e){ toast('제외하지 못했습니다: '+((e&&e.message)||''),9000); }
+}
+async function 지역후보승인(id){
+  const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 다른 관리자가 검토한 후보입니다');
+  const 우리말=String(prompt('뉴스레터에 실을 푸른노무법인의 설명을 적어 주세요\n원문 문장을 복사하지 마세요.')||'').trim();
+  if(!우리말) return toast('푸른이 직접 쓴 설명이 없으면 승인할 수 없습니다',8000);
+  const d=지금회차();
+  const 뉴스=지역검토.승인뉴스(c,우리말,d.지역뉴스||[],Date.now());
+  if(!뉴스) return toast('이미 이 회차에 담았거나 후보 정보가 올바르지 않습니다',8000);
+  if(!confirm('「'+c.제목+'」을\n'+뉴스.지역+' 지역뉴스로 이번 회차에 담을까요?')) return;
+
+  /* 먼저 후보 한 건을 선점한다. 두 관리자가 동시에 눌러도 transaction 중 한 명만
+     검토대기→승인처리중으로 바꿀 수 있다. */
+  const 검토자=(App.me&&App.me.email)||'';
+  const ref=db.ref('newsletter/regionalCandidates/'+id);
+  let 선점;
+  try{
+    선점=await ref.transaction(function(cur){
+      const next=지역검토.검토변경(cur,'승인처리중',검토자,Date.now(),''); return next||undefined;
+    });
+  }catch(e){ return toast('후보를 선점하지 못했습니다: '+((e&&e.message)||''),9000); }
+  if(!선점.committed) return toast('다른 관리자가 먼저 검토했습니다',7000);
+  let 회차저장완료=false;
+  try{
+    d.지역뉴스=d.지역뉴스||[]; d.지역뉴스.push(뉴스);
+    await 회차저장(d);
+    회차저장완료=true;
+    const 끝=await ref.transaction(function(cur){
+      if(!cur||cur.상태!=='승인처리중'||cur.검토자!==검토자) return;
+      return Object.assign({},cur,{ 상태:'승인', revision:(Number(cur.revision)||1)+1,
+        승인회차:d.열쇠, 승인일:Date.now() });
+    });
+    if(!끝.committed) throw new Error('후보 승인상태를 확정하지 못했습니다');
+    App.지역후보[id]=끝.snapshot.val(); render(); toast('이번 회차 지역뉴스에 담았습니다',7000);
+  }catch(e){
+    /* 회차 저장 전에 실패했을 때만 «내가 선점한 것»을 대기로 되돌린다.
+       회차 저장 뒤 상태확정만 실패했다면 되돌리지 않는다 — 이미 뉴스가 담겼으므로
+       대기로 풀면 다른 관리자가 다시 승인해 두 번 들어간다. */
+    if(회차저장완료){
+      App.지역후보[id]=선점.snapshot.val();
+      toast('지역뉴스에는 담겼지만 후보 표시를 확정하지 못했습니다 — 다시 승인하지 마세요: '
+        +((e&&e.message)||''),12000); render(); return;
+    }
+    const 복구=await ref.transaction(function(cur){
+      if(!cur||cur.상태!=='승인처리중'||cur.검토자!==검토자) return;
+      return Object.assign({},cur,{ 상태:'검토대기', revision:(Number(cur.revision)||1)+1,
+        검토자:'', 검토일:0 });
+    });
+    if(복구.committed) App.지역후보[id]=복구.snapshot.val();
+    toast('승인하지 못했습니다: '+((e&&e.message)||''),10000); render();
+  }
 }
 function 공식출처고르기(지역){
   const a = 지역출처.지역출처(지역);
