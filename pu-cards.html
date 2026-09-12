@@ -2331,6 +2331,18 @@ td.selcell{cursor:cell}
 .coctbar:hover{background:#f8fafc}
 .coctbar b{color:#1e293b}
 .coctbar em{font-style:normal;color:#1e40af;margin-left:4px}
+/* 👤 담당 · 📝 메모 — 사람이 «직접 적는» 자리 (2026-09-12).
+   ⚠ ✎ 는 「업체관리가 아니라 우리가 적은 값」이라는 표다 — 색만으로 구별하면 흑백
+     인쇄·색약에서 사라진다. */
+.comgr{cursor:pointer;border-bottom:1px dashed #bfdbfe;padding-bottom:1px}
+.comgr:hover{color:#1e40af;border-bottom-color:#1e40af}
+td.mgr .mgours{color:#94a3b8;font-size:11px}
+.comemo{font-size:12.5px;color:#1e293b;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.comemo i{color:#94a3b8;font-style:normal}
+.comemoact{margin-top:8px}
+.comemoact button{font-size:12px;font-weight:700;color:#1e40af;background:#eff6ff;
+  border:1px solid #bfdbfe;border-radius:8px;padding:5px 11px;cursor:pointer}
+.comemoact button:hover{background:#1e40af;color:#ffffff}
 .cosmerow{padding:10px 11px;border-bottom:1px solid #f8fafc;cursor:pointer}
 .cosmerow:last-child{border-bottom:none}
 .cosmerow:hover{background:#f8fafc}
@@ -26730,7 +26742,10 @@ const CO_SORT = {
   bizno: o => String(o.bizno||''),
   cards: o => o.cards.length,
   docs:  o => o.docs||0,
-  mgr:   o => String((o.erp && o.erp.main) || ''),
+  /* ⚠ 표 칸(coMgrCellHtml)과 «같은 잣대»다 — 업체관리 담당이 없으면 우리가 적어 둔
+     담당으로 선다. 여기서 erp.main 만 보면 「칸에는 이름이 있는데 정렬·거르개에서는
+     빈칸으로 묶인다」가 된다(2026-09-12). */
+  mgr:   o => coMgrOf(o),
   /* ⚠ «보이는 이름»으로 선다 — 화면에는 「등록증」인데 차례는 「사업자등록증」으로
      서면, 눈으로는 같은 딱지인데 서로 떨어져 앉는다(짧은 이름이 갈래를 합친다). */
   tag:   o => coTagShort(coTagsOf(o)[0] || ''),
@@ -27155,7 +27170,9 @@ function coListHtml(info){
              (대표 지시 2026-08-24, 3순위). */''}
         <span>${missTxt ? miss('✕ ' + missTxt) : ''}</span>
       </td>
-      <td class="mgr">${o.erp&&o.erp.main?esc(o.erp.main):''}</td>
+      ${/* ⚠ 표·정렬·거르개가 «같은 잣대»(coMgrOf)를 본다 — 여기서 따로 읽으면
+             「칸에는 이름이 있는데 그 이름으로 거르면 안 나온다」가 된다(2026-09-12). */''}
+      <td class="mgr">${coMgrCellHtml(o)}</td>
       <td></td>
     </tr>`;
   }).join('')}</tbody></table>${selbar}`;
@@ -28824,6 +28841,89 @@ function coCtHtml(){
       </div>`).join('')}</div>`;
 }
 
+/* ══════ 👤 담당 · 📝 메모 — 사람이 «직접 적는» 두 칸 (대표 지시 2026-09-12) ═══════
+   검토 보고의 ③④. 기업정보 26칸은 모두 «서류에서 읽어온» 값이라, 사람이 적을 자리가
+   기업정보함에 하나도 없었다.
+
+   ③ 담당 — 업체관리(푸른이알피)가 담당을 아는 곳은 거래처 300곳 남짓이다. 나머지
+      3,800여 곳은 담당 칸이 영영 빈칸이라 「이 사업장 누가 보나」를 화면이 말을 못 했다.
+   ④ 메모 — 명함·사업자등록증에는 메모가 있는데 회사에는 없었다.
+
+   ★ 업체관리가 아는 담당이 «이긴다» — 그쪽이 계약의 임자다. 여기 적는 것은 업체관리에
+     «없는» 곳을 위한 것이다.
+   ⚠⚠ 그래서 업체관리에 담당이 있는 회사에는 **아예 못 적게 막는다.** 적게 두면 그 값이
+     화면에 안 나오는데 저장은 되어, 「적었는데 왜 안 보이지」가 된다 — 보이지 않는
+     값을 쌓게 하는 것이 가장 나쁘다.
+   ⚠ 어디서 온 담당인지 화면이 «말한다». 안 그러면 「업체관리를 고쳤는데 왜 안 바뀌지」가 된다. */
+function coMgrOf(o){
+  const erp = String((o && o.erp && o.erp.main) || '').trim();
+  if(erp) return erp;
+  return String(coVal(o, 'owner') || '').trim();
+}
+/* 지금 보이는 담당이 «우리가 적은» 것인가 — 화면이 그 사실을 밝히는 잣대다 */
+function coMgrIsOurs(o){
+  return !String((o && o.erp && o.erp.main) || '').trim() && !!coMgrOf(o);
+}
+/* 목록 담당 칸 한 개 — 표와 정렬·거르개가 «같은 잣대»(coMgrOf)를 보게 여기 모은다 */
+function coMgrCellHtml(o){
+  const nm = coMgrOf(o);
+  if(!nm) return '';
+  return esc(nm) + (coMgrIsOurs(o)
+    ? ` <span class="mgours" title="업체관리에 담당이 없어 기업정보함에서 적어 둔 담당입니다">✎</span>` : '');
+}
+function coAskOwner(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const erp = String((o.erp && o.erp.main) || '').trim();
+  if(erp){
+    toast(`이 회사의 담당은 푸른이알피 업체관리가 정합니다(지금 「${erp}」) — 바꾸려면 그쪽에서 바꿔 주세요`, 7000);
+    return;
+  }
+  let names = [];
+  try{ names = ErpMatch.staffNames() || []; }catch(_){}
+  const v = prompt('이 사업장을 맡을 푸른 직원을 적어 주세요.\n(비우고 확인하면 담당을 뗍니다)'
+    + (names.length ? '\n\n푸른 직원 — ' + names.join(' · ') : ''), coVal(o, 'owner') || '');
+  if(v === null) return;                                   /* 취소 — 아무것도 안 쓴다 */
+  const next = String(v).trim();
+  if(next === String(coVal(o, 'owner') || '')) return;     /* 그대로면 서버를 안 만진다 */
+  coSaveInfoField(k, 'owner', next, next ? `👤 담당을 「${next}」으로 적었습니다` : '담당을 뗐습니다');
+}
+function coAskMemo(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const v = prompt('이 사업장에 남길 메모를 적어 주세요.\n(전 직원이 봅니다 — 비우고 확인하면 지웁니다)',
+                   coVal(o, 'memo') || '');
+  if(v === null) return;
+  const next = String(v).trim();
+  if(next === String(coVal(o, 'memo') || '')) return;
+  coSaveInfoField(k, 'memo', next, next ? '📝 메모를 적었습니다' : '메모를 지웠습니다');
+}
+/* coInfo 의 «한 칸»만 건드린다 — coErpPin 과 같은 길이다(통째로 쓰면 늦게 온 값이 날아간다).
+   ⚠ 빈 글자는 null 로 쓴다. ''를 남기면 「적었다가 지운 것」과 「원래 없는 것」이 갈려
+     나중에 세는 곳마다 둘을 따로 다뤄야 한다. */
+function coSaveInfoField(key, field, value, okMsg){
+  if(Store.mode !== 'firebase'){ toast('실시간DB 연결 상태에서만 적을 수 있습니다'); return; }
+  Store.db.ref(DB_ROOT).update({ ['coInfo/' + key + '/' + field]: value || null }).then(()=>{
+    coListBust(); renderCoSoon();
+    if(state.coPick === key) openCoDetailPanel(key, true);
+    toast(okMsg, 5000);
+  }).catch(e=>{ console.warn('[기업정보 적기]', e); toast('저장하지 못했습니다 — 쓰기 권한을 확인해 주세요', 6000); });
+}
+/* 📝 메모 카드 — 없으면 «적으라고» 말한다. 빈 카드를 숨기면 적을 길이 안 보인다.
+   ⚠ 확인 필요(coNeedHtml)와 규칙이 다르다. 그쪽은 «없는 것이 좋은 것»이라 0이면 숨기고,
+     메모는 «사람이 적는 자리»라 늘 있어야 한다. */
+function coMemoHtml(o){
+  const memo = coVal(o, 'memo');
+  const key = esc(String(o.key).replace(/'/g,"\\'"));
+  const body = `<div class="comemo">${memo
+      ? esc(memo).split('\n').join('<br>')
+      : '<i>아직 적어 둔 메모가 없습니다</i>'}</div>
+    <div class="comemoact"><button onclick="coAskMemo('${key}')"
+      title="전 직원이 보는 자리입니다">✏️ ${memo ? '고치기' : '메모 적기'}</button></div>`;
+  const short = memo ? String(memo).split('\n')[0].slice(0, 20) : '없음';
+  return coCardHtml('memo', '📝 메모', short, body);
+}
+
 function coInfoBoxHtml(o){
   const val = f => coVal(o, f);
   const rows = CO_FIELDS.filter(([f])=>val(f)).map(([f,label])=>
@@ -29148,7 +29248,7 @@ function loadCoSent(o, cb){
      erpHistRowHtml·coInfoBoxHtml)는 «한 줄도 안 바꿨다». 바뀐 것은 «어디에 놓는가»다. */
 
 /* 접어 둔 자리 — 화면에만 쓰고 저장하지 않는다(_coInfoOpen 과 같은 결) */
-let _coCardOpen = { need:false, docs:false, ppl:false };
+let _coCardOpen = { need:false, docs:false, ppl:false, memo:false };
 /* 해마다 접기 — 해 → true/false. «없으면» 가장 최근 해만 펴진다 */
 let _coYearOpen = {};
 /* 사업 줄에 붙은 서류를 펴 둔 자리 — 사업열쇠 → true */
@@ -29265,6 +29365,17 @@ function coDetailPanelHtml(o){
   if(p) bits.push(`📄 계약 ${esc(p.text)}`
     + (p.past ? ` <span class="ctold" title="종료일이 지났습니다. 계약해지와는 «다른 말»입니다 — 해지 여부는 🚪 가 따로 말합니다(자동 연장으로 계속 가는 곳이 있습니다)">종료일 지남</span>` : ''));
   if(folder) bits.push(`📁 ${esc(folder.name)}`);
+  /* ⚠ 담당은 «비어 있어도» 적는다 (명함 상세와 같은 규칙, 2026-08-30).
+     안 보이면 담당이 없는 것인지 화면이 빠뜨린 것인지 알 수 없다 — 눌러서 그 자리에서 적는다. */
+  (function(){
+    const nm = coMgrOf(o), ours = coMgrIsOurs(o);
+    const k = esc(String(o.key).replace(/'/g,"\\'"));
+    bits.push(`<span class="comgr" onclick="coAskOwner('${k}')"
+      title="${nm ? (ours ? '기업정보함에서 적어 둔 담당입니다 — 눌러서 고칩니다'
+                          : '푸른이알피 업체관리가 정한 담당입니다 — 바꾸려면 그쪽에서 바꿉니다')
+                  : '이 사업장을 맡을 푸른 직원을 적습니다'}"
+      >👤 ${nm ? esc(nm) : '담당 없음'}${ours ? ' ✎' : ''}</span>`);
+  })();
   /* ── 이어져 있으면 «초록 한 마디»로 끝낸다 — 안 이어졌을 때만 ⚠ 확인 필요로 간다 ──
      ⚠★ 그래도 «누를 수 있어야» 한다. 확정을 풀거나 다른 업체로 바꾸는 길이 여기뿐인데
        글자만 적어 두면 그 길이 통째로 막힌다 — 확정해 둔 업체가 틀렸을 때 되돌릴
@@ -29293,6 +29404,8 @@ function coDetailPanelHtml(o){
     ${/* 기업정보는 접힌 채로 시작한다(대표 지시 2026-08-31) — #coInfoBox 한 칸에
          담아 펼침 단추가 «이 칸만» 다시 그리게 한다. */''}
     <div id="coInfoBox" style="margin-top:12px">${coInfoBoxHtml(o)}</div>
+    ${/* 📝 메모 — 기업정보 «바로 아래». 서류에서 읽어온 값 다음에 사람이 적은 값이 온다. */''}
+    ${coMemoHtml(o)}
     ${/* 서류 — 「읽어 온 것·안 붙은 것·보낸 것·붙이기」를 한 카드에 담는다.
          ⚠ 안쪽 자리(#coDocsBox·#coSentBox)는 그대로다. 늦게 오는 값이 그 자리를
            찾아 채우므로, 카드가 접혀 있어도(감춰져 있을 뿐) 그대로 들어간다. */''}
