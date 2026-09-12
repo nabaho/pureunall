@@ -47,6 +47,27 @@ test('★★ 폰에서 탭 다섯이 «다 보인다» — 굴려서 찾게 두�
     '탭이 안 줄어든다 — 글자 폭만큼 벌어져 또 넘친다');
 });
 
+test('★★ 폰·태블릿에서 위가 «붙는다» — 붙일 것은 #tabs 가 아니라 #top', () => {
+  /* ⚠⚠ #tabs 에는 예전부터 position:sticky 가 있었는데 «폰에서는 안 붙었다».
+       붙는 것은 «제 부모의 상자 안»에서만이다 — 부모(#top)가 화면 밖으로 밀려 나가면
+       그 안의 붙임도 같이 나간다. 실측 2026-09-12: 900px 굴리니 탭이 -858px 였다.
+     ⚠ 981px 이상에는 걸지 않는다 — 거기서는 껍데기(flex)가 이미 얼린다. */
+  const i = news.lastIndexOf('@media(max-width:980px){');
+  assert.ok(i >= 0, '넓은 화면 밖에서 위를 붙이는 덩이가 없다');
+  let d = 0, k = news.indexOf('{', i);
+  for (; k < news.length; k++) {
+    if (news[k] === '{') d++;
+    else if (news[k] === '}') { d--; if (!d) break; }
+  }
+  const 덩이 = news.slice(i, k + 1);
+  assert.match(덩이, /#top\{[^}]*position:sticky/,
+    '#top 이 안 붙는다 — #tabs 만 붙여 두면 부모가 나갈 때 같이 나간다');
+  assert.match(덩이, /#top\{[^}]*top:0/, '붙는 자리가 맨 위가 아니다');
+  assert.match(덩이, /#top\{[^}]*z-index:\d+/, '겹침 차례가 없어 내용이 위를 덮는다');
+  assert.match(덩이, /#top\{[^}]*background:/,
+    '바탕이 없어 붙은 머리 뒤로 글이 비친다');
+});
+
 /* ══════ ② 줄 목록 ══════ */
 
 test('★★ 줄 목록이 «우리가 쓴 한 줄»을 보여 준다 — 매체 제목은 네 줄로 쏟아졌다', () => {
