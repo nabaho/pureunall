@@ -6257,6 +6257,22 @@ async function reOcrForm(){
     var resp=await kcFetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,messages:[{role:'user',content}]})});
     if(resp.ok){ var rd=await resp.json(); var raw=rd.content.map(function(c){return c.text||'';}).join('').replace(/```json|```/g,'').trim(); var m=raw.match(/\{[\s\S]*\}/); if(m) parsed=JSON.parse(m[0]); } else { err='Claude '+resp.status; } }catch(e){ console.warn('reOCR claude',e); } }
   if(!parsed){ toast('읽기 실패'+(err?' ('+err+')':'')+' — 키·크레딧 확인'); return; }
+  /* ★★ 읽은 것이 지금 기록과 «다른 해»면 «먼저 묻는다» (대표 제보 2026-09-12).
+     원본이 잘못 붙어 있을 수 있다 — 실측: 2024년 전담노무사 기록에 2025년 위촉장이 붙어 있었다.
+     그대로 채워 저장하면 2024년 기록이 2025년으로 «덮이고», 2025년 줄과 겹쳐 한 해가 사라진다.
+     ⚠ 막지는 않는다 — 정말로 고치려는 때가 있다. 묻고, 사람이 고르게 한다.
+     ⚠ 해를 «모르면» 묻지 않는다 — 모르는 것을 가로막으면 안 된다. */
+  var _oldV=(document.getElementById('ff-issueDate')||{}).value||'';
+  var _newV=String(parsed.issueDate||parsed.date||parsed.year||'');
+  var _oy=(_oldV.match(/(19|20)\d{2}/)||[])[0], _ny=(_newV.match(/(19|20)\d{2}/)||[])[0];
+  if(_oy && _ny && _oy!==_ny){
+    if(!confirm('⚠ 원본에서 읽은 것이 지금 기록과 «다른 해»입니다.\n\n'
+      +'  지금 기록   : '+_oy+'년  ('+_oldV+')\n'
+      +'  원본에서 읽음 : '+_ny+'년  ('+_newV+')\n\n'
+      +'원본이 «다른 해 서류»로 잘못 붙어 있을 수 있습니다.\n'
+      +'그대로 채워 저장하면 '+_oy+'년 기록이 '+_ny+'년으로 덮입니다.\n\n'
+      +'그래도 채울까요?')){ toast('그대로 두었습니다 — 원본이 맞는지 먼저 확인해 주세요'); return; }
+  }
   var setF=function(key,val){ if(val==null||val==='') return; var el=document.getElementById('ff-'+key); if(el) el.value=val; };
   setF('org',parsed.org); setF('issuer',parsed.issuer); setF('recipient',parsed.recipient); setF('titleVal',parsed.titleVal||parsed.title); setF('issueDate',parsed.issueDate||parsed.date);
   /* ⚠ 수료증의 hours 는 화면에 자기 칸이 없다 — 등록 때와 같은 셈으로 note 밑에 붙인다.
@@ -6270,8 +6286,20 @@ async function reOcrForm(){
   setF('topic',parsed.topic); setF('duration',parsed.duration); setF('participants',parsed.participants);
   setF('speaker',parsed.speaker); setF('content',parsed.content);
   setF('bank',parsed.bank); setF('number',parsed.number); setF('holder',parsed.holder); setF('name',parsed.name); setF('kind',parsed.kind); setF('expiry',parsed.expiry); setF('memo',parsed.memo);
-  if(parsed.period){ var pm=String(parsed.period).split(/~|—|-(?=\s*\d)/); var s=(pm[0]||'').trim(), e=(pm[1]||'').trim();
-    var es=document.getElementById('ff-periodStart'), ee=document.getElementById('ff-periodEnd'); if(es&&s) es.value=s; if(ee&&e) ee.value=e; }
+  /* ★ 위촉기간은 «등록할 때(saveOCRRecord)와 같은 셈»을 쓴다 (대표 제보 2026-09-12).
+     ⚠ 여기서만 따로 쪼개고 있었고 termYears(「임기는 2년으로 한다」)는 아예 버렸다 —
+       날짜가 안 적힌 위촉장은 「다시 읽기」로는 기간이 «영영» 안 채워졌다.
+     ⚠ 없는 기간을 만들어 넣지 않는다 — 문서에 적힌 것만 옮긴다. */
+  var _sp=splitPeriod(parsed.period||'');
+  var _ps=document.getElementById('ff-periodStart'), _pe=document.getElementById('ff-periodEnd');
+  if(_ps&&_sp[0]) _ps.value=_sp[0];
+  if(_pe&&_sp[1]) _pe.value=_sp[1];
+  var _ty=parseInt(String(parsed.termYears||'').replace(/[^0-9]/g,''),10);
+  var _iss=(document.getElementById('ff-issueDate')||{}).value||'';
+  if(_pe && !_pe.value && _ty>0 && _ty<=10 && _iss){
+    if(_ps && !_ps.value) _ps.value=_iss;
+    _pe.value=termEnd((_ps&&_ps.value)||_iss, _ty);
+  }
   var yv=document.getElementById('ff-year'); if(yv&&parsed.year) yv.value=parsed.year;
   toast('✅ 다시 읽었습니다 — 내용 확인 후 [저장] 하세요');
 }
