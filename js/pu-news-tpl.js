@@ -188,6 +188,16 @@
        우리 말이 없는 줄은 여기까지 오지 않는다(Core.편지에실릴까가 걸러 낸다).
      ⚠ 그래도 제목을 «되살리지 말 것». 우리 말이 없으면 그 줄은 안 나가는 것이 규칙이다.
      ⚠ 출처는 꼭지 아래에 한 줄로 밝힌다 — 참고한 것을 안 밝히면 그것이 더 나쁘다. */
+  /* ★ 한 건마다 붙는 «자리표» — 요약의 줄이 이 자리로 내려앉고, 웹 쪽에서는
+       이것을 눌러 그 건만 창으로 띄운다 (대표 지시 2026-09-12 「각각의 건에 대해
+       클릭하면 팝업으로」). 메일에서는 그냥 id 라 아무 일도 안 한다.
+     ⚠ 번호는 «꼭지 안의 차례»다(편지짓기에서 붙인다). 여기서 다시 세면 안 된다 —
+       전문은 갈래(자료·판례·기사)로 갈라 그리므로 차례가 어긋난다. */
+  function _자리표(x) {
+    var k = x && x._자리;
+    return k ? ' id="n-' + esc(k) + '" data-pop="1"' : '';
+  }
+
   function 기사줄(항목들, 그림) {
     var 것 = (항목들 || []);
     var 줄 = 것.map(function (x) {
@@ -204,9 +214,9 @@
         : '';
       /* 우리 글은 «단」이고, 옛 제목 줄은 «점 목록»이다 — 모양으로도 갈라 보인다 */
       return 내글
-        ? '<div style="padding:3px 0 9px 11px;border-left:3px solid ' + 색.바탕 + ';'
+        ? '<div' + _자리표(x) + ' style="padding:3px 0 9px 11px;border-left:3px solid ' + 색.바탕 + ';'
           + 'margin-bottom:7px;">' + 몸 + 링 + '</div>'
-        : '<div style="padding-bottom:2px;">·&nbsp;' + 몸
+        : '<div' + _자리표(x) + ' style="padding-bottom:2px;">·&nbsp;' + 몸
           + (x.언론사 ? ' <span style="color:' + 색.흐린글 + ';font-size:12px;">· '
               + esc(x.언론사) + '</span>' : '') + 링 + '</div>';
     }).join('');
@@ -348,7 +358,8 @@
         + '</a></div>'
       : '';
 
-    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+      + _자리표(x) + '><tr>'
       + '<td width="96" valign="top" style="width:96px;">' + 표지칸(x, 96) + '</td>'
       + '<td valign="top" style="padding-left:13px;">'
       + '<div style="font-size:13.5px;font-weight:bold;line-height:1.5;color:' + 색.짙은갈 + ';'
@@ -415,6 +426,7 @@
       : '';
 
     var 상자 = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+      + _자리표(x)
       + ' style="background-color:' + 색.갈 + ';"><tr><td style="padding:17px 19px;">'
       + '<div style="font-size:12.5px;font-weight:bold;color:#e8ddd2;font-family:' + 폰트 + ';">'
       + esc(x.딱지 || '[판례]') + '</div>'
@@ -503,42 +515,48 @@
     return String(x.기관 || x.언론사 || x.인용 || '').replace(/\s+/g, ' ').trim();
   }
 
+  /* ★★ 줄«마다» 제 건으로 간다 (대표 지시 2026-09-12
+       「각각의 건에 대해 클릭하면 팝업으로 … 몇건 자세히보기 이렇게 안본다」).
+     ⚠ 예전에는 꼭지 끝에 「N건 자세히 보기」 하나였다. 대표께서 그렇게는 안 보신다고
+       하셨다 — 읽다가 궁금한 «그 줄»을 누르시는 것이 사람의 손이다.
+     ⚠ 그래서 링크가 다섯 개에서 열대여섯 개로 는다. 그만큼 추적 목록(링크들)도 는다.
+       괜찮다 — 목록은 번호일 뿐이고, 어느 «건»을 눌렀는지 알게 되어 오히려 낫다. */
   function 요약칸(항목들, 꼭지, 웹주소, 우리글) {
     var g = 꼭지 || {};
     var 줄 = [];
     if (String(우리글 || '').trim()) {
-      줄.push({ 글: _요약글(우리글), 곁: '푸른노무법인' });
+      줄.push({ 글: _요약글(우리글), 곁: '푸른노무법인', 자리: 'hr-w' });
     }
     (항목들 || []).forEach(function (x) {
       if (!x) return;
       var 글 = _요약글(x.우리말 || x.제목);
       if (!글) return;
-      줄.push({ 글: 글, 곁: _요약곁(x) });
+      줄.push({ 글: 글, 곁: _요약곁(x), 자리: x._자리 || '' });
     });
     if (!줄.length) return '';
 
     var 몸 = 줄.map(function (r) {
+      var u = (웹주소 && r.자리) ? href(웹주소 + '#n-' + r.자리) : '';
+      /* 링크라도 «글처럼» 보이게 둔다 — 파랗게 밑줄 치면 열다섯 줄이 다 시끄럽다.
+         누를 수 있다는 것은 끝의 ↗ 하나로 알린다. */
+      var 속 = u
+        ? '<a href="' + u + '" style="color:' + 색.글 + ';text-decoration:none;">'
+          + esc(r.글) + ' <span style="color:' + 색.남색 + ';font-size:12px;'
+          + 'font-weight:bold;">↗</span></a>'
+        : esc(r.글);
       return '<tr>'
         + '<td valign="top" width="14" style="width:14px;padding:5px 0 5px 0;'
         + 'font-size:14px;line-height:1.7;color:' + 색.딱지 + ';font-family:' + 폰트 + ';">·</td>'
         + '<td style="padding:5px 0 5px 6px;font-size:14px;line-height:1.7;color:' + 색.글 + ';'
-        + 'font-family:' + 폰트 + ';word-break:keep-all;">' + esc(r.글)
+        + 'font-family:' + 폰트 + ';word-break:keep-all;">' + 속
         + (r.곁 ? ' <span style="color:' + 색.흐린글 + ';font-size:12px;">· '
             + esc(r.곁) + '</span>' : '')
         + '</td></tr>';
     }).join('');
 
-    var u = href(웹주소 ? 웹주소 + '#g-' + encodeURIComponent(g.키 || '') : '');
-    var 더 = u
-      ? '<tr><td colspan="2" align="right" style="text-align:right;padding:8px 0 0 0;">'
-        + '<a href="' + u + '" style="color:' + 색.남색 + ';font-size:12.5px;font-weight:bold;'
-        + 'text-decoration:none;font-family:' + 폰트 + ';">'
-        + esc(줄.length) + '건 자세히 보기 ↗</a></td></tr>'
-      : '';
-
     return '<tr><td style="padding:10px 28px 0 28px;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
-      + 몸 + 더 + '</table></td></tr>';
+      + 몸 + '</table></td></tr>';
   }
 
   /* 맨 위 띠 — 「전문은 여기서」. 요약만 보고 끝내실 분도 있으니 한 번은 크게 말한다. */
@@ -564,6 +582,7 @@
     var 몸 = esc(t).replace(/\r?\n/g, '<br>');
     return '<tr><td style="padding:14px 28px 0 28px;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+      + ' id="n-hr-w" data-pop="1"'
       + ' style="background-color:' + 색.상자 + ';">'
       + '<tr><td style="padding:16px 18px;font-size:14px;line-height:1.85;color:' + 색.글 + ';'
       + 'font-family:' + 폰트 + ';">' + 몸 + '</td></tr></table></td></tr>';
@@ -683,6 +702,21 @@
        요약은 그냥 «내용이 빠진 편지»다. */
     var 웹주소 = (밑 && 회열) ? (밑 + '/newsView?i=' + encodeURIComponent(회열)) : '';
     if (!웹주소) 요약 = false;
+
+    /* ★★ 건«마다» 자리표를 붙인다 — 요약의 줄과 전문의 그 건을 잇는 끈이다.
+       ⚠ «꼭지 안의 차례»로 번호를 매긴다. 전문은 갈래(자료·판례·기사)로 갈라
+         그리므로 그린 차례로 세면 요약의 셋째 줄이 전문의 첫 칸을 가리키게 된다.
+       ⚠ 원본을 «고치지 않는다» — 얕은 사본에 붙인다. 원본에 붙이면 그 값이
+         회차와 함께 서버에 저장되어, 자료에 없던 칸이 슬그머니 생긴다. */
+    Object.keys(안).forEach(function (키) {
+      var 목 = 안[키];
+      if (!Array.isArray(목)) return;
+      안[키] = 목.map(function (x, i) {
+        return (x && typeof x === 'object')
+          ? Object.assign({}, x, { _자리: 키 + '-' + i })
+          : x;
+      });
+    });
 
     var 속 = '';
     var 그린것 = 0;

@@ -63,14 +63,71 @@ function esc(s) {
    ⚠ transform:scale(calc(100vw/716)) 같은 것으로 줄이려 하지 말 것 —
      scale() 은 «수»를 받는데 calc(길이/수) 는 길이라 통째로 무시된다. 실제로 겪었다.
    ⚠ 편지 «안»을 손대지 않는다. 손대면 메일에서 보는 것과 달라진다. */
+/* ══════════════════════════════════════════════════════════════════════════
+   한 건만 띄우는 창 (대표 지시 2026-09-12)
+   ══════════════════════════════════════════════════════════════════════════
+   「각각의 건에 대해 클릭하면 팝업으로 각각의 기사 정책 판례등이 팝업으로 나오게
+     해달라. 몇건 자세히보기 이렇게 안본다」
+
+   ★ 편지에 붙여 둔 자리표(data-pop)를 그대로 쓴다 — 여기서 내용을 «다시 짓지 않고»
+     그 칸을 통째로 베껴 창에 넣는다. 편지와 창이 다를 수가 없다.
+   ★ 요약 편지의 줄은 …#n-news-2 로 온다. 그 자리로 내려가고 «창까지 열어» 준다 —
+     내려만 가면 「눌렀는데 뭐가 달라졌나」가 된다.
+   ⚠ 칸 안의 링크(원문·내려받기)는 «그대로 통하게» 둔다. 링크까지 창을 열면
+     내려받기를 누를 길이 없어진다. */
+var 창스크립트 =
+  '(function(){' +
+  'var p=document.getElementById("pop"),b=document.getElementById("popb"),' +
+  't=document.getElementById("popt");' +
+  'function 꼭지이름(el){var 가=document.querySelectorAll("[id^=\'g-\']"),n="";' +
+  'for(var i=0;i<가.length;i++){' +
+  'if(가[i].compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING){' +
+  'var s=가[i].nextElementSibling;n=s?s.textContent:n;}}return n;}' +
+  'function 열기(el){if(!el)return;b.innerHTML="";' +
+  'var c=el.cloneNode(true);c.removeAttribute("id");c.removeAttribute("data-pop");' +
+  'c.style.cursor="auto";b.appendChild(c);' +
+  't.textContent=꼭지이름(el)||"이 소식";p.className="on";}' +
+  'function 닫기(){p.className="";' +
+  'if(location.hash)history.replaceState(null,"",location.pathname+location.search);}' +
+  'document.addEventListener("click",function(e){' +
+  'if(e.target.closest&&e.target.closest("#pop")){' +
+  'if(e.target.id==="popx"||e.target===p)닫기();return;}' +
+  'if(e.target.closest&&e.target.closest("a"))return;' +
+  'var el=e.target.closest&&e.target.closest("[data-pop]");if(el){e.preventDefault();열기(el);}});' +
+  'document.addEventListener("keydown",function(e){if(e.key==="Escape")닫기();});' +
+  'function 해시로(){var h=location.hash.replace("#","");' +
+  'if(h.indexOf("n-")===0){var el=document.getElementById(h);if(el)열기(el);}}' +
+  'window.addEventListener("hashchange",해시로);해시로();' +
+  '})();';
+
 function 쪽(제목, 전문) {
   return '<!doctype html><html lang="ko"><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=700">'
     + '<title>' + esc(제목 || '푸른노무법인 주간뉴스레터') + '</title>'
     + '<meta name="robots" content="noindex">'
     + '<style>html,body{margin:0;padding:0;background:#e9e7e3}'
-    + '#wrap{width:700px;margin:0 auto}</style>'
-    + '</head><body><div id="wrap">' + 전문 + '</div></body></html>';
+    + '#wrap{width:700px;margin:0 auto}'
+    /* 누를 수 있다는 것을 손이 알게 한다 — 메일에는 이 규칙이 안 간다(<style> 은 지워진다) */
+    + '[data-pop]{cursor:pointer}'
+    + '[data-pop]:hover{outline:2px solid #8a6f57;outline-offset:3px}'
+    + '#pop{position:fixed;inset:0;background:rgba(36,26,19,.55);display:none;z-index:99}'
+    + '#pop.on{display:flex;align-items:flex-start;justify-content:center;padding:24px 12px}'
+    + '#pop .in{background:#fff;width:min(660px,94vw);max-height:88vh;border-radius:10px;'
+    + 'display:flex;flex-direction:column;overflow:hidden;'
+    + 'box-shadow:0 14px 40px rgba(36,26,19,.35)}'
+    + '#pop .hd{display:flex;align-items:center;gap:8px;padding:12px 15px;background:#f5f1ec;'
+    + 'border-bottom:1px solid #e0dcd6;font:bold 14px \'Malgun Gothic\',sans-serif;color:#4a3c2e}'
+    + '#pop .hd b{flex:1;min-width:0}'
+    + '#pop #popx{border:1px solid #e0dcd6;background:#fff;border-radius:6px;padding:5px 11px;'
+    + 'font:bold 12px \'Malgun Gothic\',sans-serif;color:#6f5a48;cursor:pointer}'
+    + '#pop .bd{overflow:auto;padding:18px 16px}'
+    + '</style>'
+    + '</head><body><div id="wrap">' + 전문 + '</div>'
+    + '<div id="pop"><div class="in">'
+    + '<div class="hd"><b id="popt">이 소식</b><button id="popx" type="button">닫기 ✕</button></div>'
+    + '<div class="bd" id="popb"></div></div></div>'
+    + '<script>' + 창스크립트 + '<\/script>'
+    + '</body></html>';
 }
 
 function 없는쪽(까닭) {
