@@ -51,12 +51,20 @@ test('★★★ contract 와 «가르는 말»이 있다 — 없으면 자문계
 });
 
 test('★★★ 「계약서 찾기」는 여전히 «우리 계약»만 모은다 — 여기가 갈래를 가른 까닭이다', () => {
+  /* 2026-09-12: 훑는 일은 erpScanPhotos 로 모았고, «받을 갈래»는 부를 때 적는다.
+     지켜야 할 것은 그대로다 — 자문계약 찾기가 담는 갈래는 contract 하나뿐이다. */
   const fn = /function erpLoadMyContractPhotos\([\s\S]*?\n\}/.exec(erp);
   assert.ok(fn, 'erpLoadMyContractPhotos 를 못 찾았습니다');
-  assert.match(fn[0], /read\.kind === 'contract'/,
+  assert.match(fn[0], /erpScanPhotos\(\{ contract:1 \}/,
     '★★★ 자문계약 찾기가 근로계약서까지 모으면 목록이 쓸 수 없게 됩니다');
   assert.ok(fn[0].indexOf('wcontract') < 0,
     '★★★ 자문계약 찾기에 근로계약서가 섞였습니다 — 갈래를 가른 뜻이 없어집니다');
+  /* 근로자 서류 찾기는 «그 반대»다 — 거기에 우리 계약(contract)이 섞이면
+     자문계약서가 근로자 줄을 채우게 된다. */
+  const wk = /var ERP_WK_DOC_KINDS = \{([^}]*)\}/.exec(erp);
+  assert.ok(wk, '근로자 서류 갈래 표를 못 찾았습니다');
+  assert.ok(!/\bcontract\s*:/.test(wk[1]),
+    '★★★ 근로자 서류 찾기에 «우리 계약»이 섞였습니다 — 갈래를 가른 뜻이 없어집니다');
 });
 
 /* ══════ ② 담지 않는 것 ══════ */

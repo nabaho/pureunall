@@ -13751,14 +13751,13 @@ function erpPhotoAdmin(){
   try { return !!(CURRENT_USER && (CURRENT_USER.isAdmin || isAdminByUser(CURRENT_USER))); }
   catch(_) { return false; }
 }
-function erpLoadMyContractPhotos(cb){
-  if(_erpMyContractPhotos){ cb && cb(_erpMyContractPhotos); return; }
-  if(_erpMyContractPhotosLoading){ if(cb) _erpMyContractPhotosWaiters.push(cb); return; }
-  if(typeof PuPhotoStore === 'undefined' || !fbAuthUid){ cb && cb([]); return; }
-  _erpMyContractPhotosLoading = true;
+/* 사진첩을 한 번 훑어 «고른 갈래»의 사진만 모은다 (2026-09-12 에 갈래를 받게 고쳤다).
+   ⚠ 계약서 찾기와 근로자 당겨오기가 이 한 길을 쓴다 — 훑는 규칙(관리자면 전 직원,
+     막히면 내 것으로 물러나기)이 두 벌이 되면 한쪽만 고쳐져 조용히 어긋난다.
+   wants: { contract:1 } 처럼 «받을 갈래»를 적은 표. */
+function erpScanPhotos(wants, done){
+  if(typeof PuPhotoStore === 'undefined' || !fbAuthUid){ done([]); return; }
   var all = erpPhotoAdmin() && PuPhotoStore.listYearsAll && PuPhotoStore.listYearAll;
-  /* 관리자면 전 직원, 아니면 내 것. 전 직원 읽기가 막히면(권한 등) 내 것으로 물러난다 —
-     못 읽었다고 「찾기」가 통째로 죽으면 안 된다. */
   var load = all
     ? PuPhotoStore.listYearsAll().then(function(years){
         return Promise.all(years.map(function(y){ return PuPhotoStore.listYearAll(y); }));
@@ -13774,38 +13773,145 @@ function erpLoadMyContractPhotos(cb){
     (yearMaps || []).forEach(function(map){
       Object.keys(map || {}).forEach(function(id){
         var meta = map[id];
-        if(meta && meta.read && meta.read.kind === 'contract'){
-          out.push({ id:id, year:meta.__year, fields:meta.read.fields || {},
-            at: meta.upAt || meta.takenAt || 0,
-            /* 누구 사진인지 — 남의 사진은 원본을 부를 때 주인을 함께 넘겨야 열린다.
-               내 것이면 __ownerUid 가 없다(그대로 빈 값으로 둔다). */
-            owner: meta.__ownerUid || '', ownerName: meta.__ownerName || '',
-            /* 목록 미리보기를 부를 때 쓴다 — 창고에 없는 옛 사진을 헛되이 두드리지 않는다 */
-            loc: meta.loc || '',
-            /* ★ «문서 묶음과 쪽». 여러 쪽짜리 계약서는 쪽마다 사진 한 장이라,
-               이것이 없으면 2쪽·3쪽이 저마다 «다른 계약서»로 한 줄씩 차지한다
-               (아이행복어린이집 건 — 대표 지시 2026-09-12). erpPhotoFold 가 쓴다. */
-            doc: meta.doc || null,
-            /* ★ 「이미 증빙으로 썼다」 표 (2026-08-26 대표 지시).
-               계약을 저장할 때 PuPhotoStore.markUsed 가 남기는 자국이다.
-               ⚠ 이걸 안 들고 오면 찾기 창이 «이미 쓴 계약서를 매번 다시» 보여 준다. */
-            used: (meta.used && meta.used.at) ? meta.used : null });
-        }
+        if(!meta || !meta.read || !wants[meta.read.kind]) return;
+        out.push({ id:id, year:meta.__year, kind:meta.read.kind, fields:meta.read.fields || {},
+          at: meta.upAt || meta.takenAt || 0,
+          /* 누구 사진인지 — 남의 사진은 원본을 부를 때 주인을 함께 넘겨야 열린다.
+             내 것이면 __ownerUid 가 없다(그대로 빈 값으로 둔다). */
+          owner: meta.__ownerUid || '', ownerName: meta.__ownerName || '',
+          /* 목록 미리보기를 부를 때 쓴다 — 창고에 없는 옛 사진을 헛되이 두드리지 않는다 */
+          loc: meta.loc || '',
+          /* ★ «문서 묶음과 쪽». 여러 쪽짜리는 쪽마다 사진 한 장이라, 이것이 없으면
+             2쪽·3쪽이 저마다 다른 서류로 한 줄씩 차지한다(erpPhotoFold 가 쓴다). */
+          doc: meta.doc || null,
+          /* ★ 「이미 증빙으로 썼다」 표 — 저장할 때 PuPhotoStore.markUsed 가 남긴다.
+             이걸 안 들고 오면 찾기 창이 «이미 쓴 것을 매번 다시» 보여 준다. */
+          used: (meta.used && meta.used.at) ? meta.used : null });
       });
     });
+    done(out);
+  }).catch(function(e){
+    window._erpErrLog && window._erpErrLog(e);
+    done([]);
+  });
+}
+
+function erpLoadMyContractPhotos(cb){
+  if(_erpMyContractPhotos){ cb && cb(_erpMyContractPhotos); return; }
+  if(_erpMyContractPhotosLoading){ if(cb) _erpMyContractPhotosWaiters.push(cb); return; }
+  _erpMyContractPhotosLoading = true;
+  erpScanPhotos({ contract:1 }, function(out){
     _erpMyContractPhotos = out;
     _erpMyContractPhotosLoading = false;
     var waiters = _erpMyContractPhotosWaiters; _erpMyContractPhotosWaiters = [];
     cb && cb(out);
     waiters.forEach(function(w){ w(out); });
-  }).catch(function(e){
-    window._erpErrLog && window._erpErrLog(e);
-    _erpMyContractPhotosLoading = false;
-    var waiters = _erpMyContractPhotosWaiters; _erpMyContractPhotosWaiters = [];
-    cb && cb([]);
-    waiters.forEach(function(w){ w([]); });
   });
 }
+
+/* ══════ 👤 근로자 서류 — 명함·근로계약서에서 당겨온다 (대표 지시 2026-09-12) ══════
+   「근로자의 명함 또는 계약의 경우 계약서 작성사항이 있다.
+     사진첩에 정리되면 내용을 읽어서 당겨오게 해달라」
+
+   여태 근로자 줄을 채우는 길은 «파일을 새로 올려 판독»하는 것뿐이었다(📇 근로자 명함).
+   이미 사진첩에 들어와 판독까지 끝난 서류가 있어도 다시 올려 다시 읽었다 —
+   판독 몫도 한 번 더 태우고, 같은 사진이 사진첩에 두 벌 쌓였다.
+
+   ⚠ 받는 갈래는 **둘뿐**이다 — 명함(card)과 근로계약서(wcontract).
+     이 둘은 이름·직책·연락처가 «그 사람 것»이라고 적혀 있는 서류다.
+     신분증·주민등록서류는 여기 «안 넣는다» — 그쪽은 판독기가 이름 말고는
+     애초에 안 읽고(2026-09-01 결정), 넣어 봐야 채울 값이 없다.
+   ⚠ 통장(bankbook)도 안 넣는다 — 계좌는 회사 것일 수 있어 사람에게 붙이면 안 된다
+     (근로자 정보함의 WORKER_DOC_KINDS 와 같은 까닭). */
+var _erpWkDocPhotos = null, _erpWkDocLoading = false, _erpWkDocWaiters = [];
+var ERP_WK_DOC_KINDS = { card:1, wcontract:1 };
+function erpLoadWorkerDocPhotos(cb){
+  if(_erpWkDocPhotos){ cb && cb(_erpWkDocPhotos); return; }
+  if(_erpWkDocLoading){ if(cb) _erpWkDocWaiters.push(cb); return; }
+  _erpWkDocLoading = true;
+  erpScanPhotos(ERP_WK_DOC_KINDS, function(out){
+    _erpWkDocPhotos = out;
+    _erpWkDocLoading = false;
+    var waiters = _erpWkDocWaiters; _erpWkDocWaiters = [];
+    cb && cb(out);
+    waiters.forEach(function(w){ w(out); });
+  });
+}
+
+/* 근로자 줄 한 칸 — 사진첩 서류에서 «빈 칸만» 채운다 (대표 지시 2026-09-12).
+   돌려주는 것: { patch:{…}, lines:[사람이 읽을 말], skipped:[안 채운 까닭] }
+
+   ⚠⚠ **주민번호는 어디서도 안 온다.** 명함에는 애초에 없고, 근로계약서에서도
+      판독기가 안 읽는다(2026-09-01 결정). 없는 것을 당길 수는 없다 —
+      채워진 것처럼 보이면 사람이 확인을 건너뛴다.
+   ⚠ **이미 적힌 칸은 안 덮는다.** 사람이 고쳐 둔 이름·연락처를 옛 명함이 되돌리면
+      바뀐 줄도 모르고 저장된다(계약서 판독이 업체 칸을 빈 칸일 때만 채우는 것과 같다).
+   ⚠ **회사 주소·회사 전화는 사람에게 안 붙인다.** 명함의 companyAddr·companyTel 은
+      회사 것이라, 근로자 주소·연락처 칸에 넣으면 그 사람 집이 회사가 된다.
+   ⚠ 근로계약서의 endDate 는 «계약이 끝나는 날»이지 «퇴사한 날»이 아니다.
+      퇴사일 칸에 넣으면 아직 다니는 사람이 나간 것으로 보인다 — 비고에만 적는다.
+   ⚠ 임금은 **적힌 그대로** 비고에 옮긴다. 숫자로 고치지 않는다 —
+      「월 100만원」을 1,000,000 으로 짐작하다 1만 배 틀린 전례가 있다. */
+function erpWorkerFromDoc(kind, fields, cur){
+  var f = fields || {}, c = cur || {};
+  var patch = {}, lines = [], skipped = [];
+  var 빈칸 = function(k){ return !String(c[k] == null ? '' : c[k]).trim(); };
+  var 채움 = function(k, v, 말){
+    var s = String(v == null ? '' : v).trim();
+    if(!s) return;
+    if(!빈칸(k)){ skipped.push(말 + ' — 이미 적혀 있어 그대로 둡니다'); return; }
+    patch[k] = s; lines.push(말 + ' ' + s);
+  };
+
+  if(kind === 'card'){
+    채움('name', f.name, '이름');
+    /* 직책이 없으면 부서라도 — 「영업팀」이 빈칸보다 낫다 */
+    채움('position', f.title || f.dept, '직책');
+    /* 휴대폰이 먼저다 — 그 사람에게 닿는 번호다. 회사 대표번호(companyTel)는 «안 쓴다». */
+    채움('phone', f.mobile || f.tel, '연락처');
+    채움('email', f.email, '이메일');
+    채움('address', f.address, '주소');       /* 개인 주소만. companyAddr 은 회사 것이다 */
+  } else if(kind === 'wcontract'){
+    채움('name', f.name, '이름');
+    채움('position', f.position, '직위');
+    채움('hireDate', f.hireDate, '입사일');
+    /* 임금·계약 종료 예정은 «비고»로 — 명부에 그 칸이 없고, 퇴사일도 아니다 */
+    var 메모 = [];
+    if(f.wage) 메모.push('임금 ' + [f.wageType, f.wage].filter(Boolean).join(' '));
+    if(f.endDate) 메모.push('근로계약 종료 예정 ' + f.endDate);
+    if(f.termType) 메모.push('기간의 정함 ' + f.termType);
+    if(메모.length) 채움('note', 메모.join(' · '), '비고');
+    if(f.endDate && 빈칸('leaveDate')){
+      skipped.push('퇴사일은 안 채웁니다 — 계약이 끝나는 날이지 나간 날이 아닙니다');
+    }
+  }
+  return { patch: patch, lines: lines, skipped: skipped };
+}
+/* 목록 한 줄을 사람이 읽는 말로 — 「누구 · 어느 회사 · 무슨 서류」 */
+function erpWorkerDocRowText(it){
+  var f = (it && it.fields) || {};
+  var 갈래 = (it && it.kind === 'wcontract') ? '근로계약서' : '명함';
+  return {
+    head: f.name || '(이름 미상)',
+    sub: [f.company, 갈래, (it && it.at) ? fmtDate(it.at).slice(0, 10) : '',
+          it && it.ownerName].filter(Boolean).join(' · ')
+  };
+}
+/* 이름·회사로 거른다 — 찾기 칸이 없으면 수백 장에서 한 사람을 못 찾는다 */
+function erpWorkerDocFilter(items, q){
+  var s = String(q || '').trim().toLowerCase();
+  if(!s) return items || [];
+  return (items || []).filter(function(it){
+    var f = it.fields || {};
+    return [f.name, f.company, f.title, f.dept, f.position, it.ownerName]
+      .filter(Boolean).join(' ').toLowerCase().indexOf(s) >= 0;
+  });
+}
+try {
+  window.erpWorkerFromDoc = erpWorkerFromDoc;
+  window.erpWorkerDocFilter = erpWorkerDocFilter;
+  window.erpWorkerDocRowText = erpWorkerDocRowText;
+} catch(_){ }
 
 /* ══════════════ 👷 근로자 정보함에서 당겨오기 (대표 지시 2026-09-02) ══════════════
    「일반근로자들의 계약서, CMS 등록 개인 주민등록증 및 신분증, 기타 위임장 등을 스캔해서
@@ -15078,6 +15184,120 @@ try {
   window.erpPhotoSameKey = erpPhotoSameKey;
 } catch(_){ }
 
+/* ══════ 📷 사진첩에서 근로자 서류 찾기 (대표 지시 2026-09-12) ══════
+   「근로자의 명함 또는 계약의 경우 계약서 작성사항이 있다.
+     사진첩에 정리되면 내용을 읽어서 당겨오게 해달라」
+
+   계약서 찾기(아래)와 달리 **원본 사진을 안 띄운다** — 여기서 고르는 것은
+   「이 사람이 맞나」이고, 그 답은 이름·회사·직책 넉 줄이면 난다.
+   원본까지 받으면 한 장에 1~2MB 를 골라 볼 때마다 내려받는다.
+   ⚠ 미리보기(20KB)는 받는다 — 명함은 생김새로 알아보는 서류다.
+   ⚠ **무엇이 안 오는지 먼저 말한다.** 주민번호가 안 온다는 것을 모르고 닫으면
+     「왜 비었지」를 겪고 이 길을 안 믿게 된다(근로자 정보함 창과 같은 태도). */
+function WorkerPhotoPickerModal(props){
+  useEscClose(props.onClose);
+  var all = props.items;                      /* null = 아직 읽는 중 */
+  var qs = useState(''); var q = qs[0]; var setQ = qs[1];
+  var ts = useState({}); var thumbs = ts[0]; var setThumbs = ts[1];
+
+  /* 지금 줄에 이름이 적혀 있으면 그 이름으로 먼저 찾아 둔다 — 서른 명 중 한 명을
+     고르는 자리라, 빈 목록에서 시작하면 이름을 또 쳐야 한다. */
+  var 첫찾기 = String(((props.hint || {}).name) || '').trim();
+  useEffect(function(){ if(첫찾기) setQ(첫찾기); }, []);
+
+  var rows = erpPhotoFold(erpWorkerDocFilter(all || [], q));
+
+  useEffect(function(){
+    var gone = false;
+    if(typeof PuPhotoStore === 'undefined') return;
+    rows.slice(0, 30).forEach(function(it){
+      if(thumbs[it.id] !== undefined) return;
+      PuPhotoStore.loadThumb(it.year, it.id, it.owner || undefined, it.loc || undefined)
+        .then(function(src){ if(!gone) setThumbs(function(p){ var n = Object.assign({}, p); n[it.id] = src || ''; return n; }); })
+        .catch(function(){ if(!gone) setThumbs(function(p){ var n = Object.assign({}, p); n[it.id] = ''; return n; }); });
+    });
+    return function(){ gone = true; };
+  }, [q, (all || []).length]);
+
+  return h('div', {
+    style:{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:220, display:'flex',
+      alignItems:'center', justifyContent:'center', padding:'16px' },
+    onClick:function(e){ e.stopPropagation(); if(e.target === e.currentTarget) props.onClose(); }
+  },
+    h('div', { style:{ background:'#fff', borderRadius:'10px', width:'540px', maxWidth:'96vw',
+      height:'520px', maxHeight:'88vh', display:'flex', flexDirection:'column', overflow:'hidden' } },
+      h('div', { style:{ padding:'12px 16px', borderBottom:'1px solid #e2e8f0', display:'flex',
+        alignItems:'center', gap:'10px', flexShrink:0 } },
+        h('div', { style:{ fontSize:'14px', fontWeight:700 } }, '📷 사진첩에서 근로자 서류 찾기'),
+        h('div', { style:{ fontSize:'11px', color:'#64748b' } },
+          all === null ? '불러오는 중…' : ('명함·근로계약서 ' + all.length + '장')),
+        h('div', { style:{ flex:1 } }),
+        h('button', { onClick:props.onClose, style:{ background:'none', border:'none',
+          fontSize:'18px', cursor:'pointer', color:'#64748b' } }, '×')
+      ),
+      /* ⚠ 무엇이 «안» 오는지 먼저 말한다 */
+      h('div', { style:{ padding:'8px 16px', background:'#fffbeb', borderBottom:'1px solid #fde68a',
+        fontSize:'10.5px', color:'#854d0e', lineHeight:1.6, flexShrink:0 } },
+        '주민번호는 안 들어옵니다 — 명함에는 없고, 근로계약서에서도 읽지 않습니다(개인정보). '
+        + '이미 적어 둔 칸은 그대로 두고 «빈 칸만» 채웁니다.'),
+      h('div', { style:{ padding:'10px 16px', borderBottom:'1px solid #e2e8f0', flexShrink:0 } },
+        h('input', { type:'search', value:q, onChange:function(e){ setQ(e.target.value); },
+          placeholder:'🔍 이름·회사·직책으로 찾기',
+          style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1',
+            borderRadius:'7px', fontSize:'12px', fontFamily:'inherit' } })),
+      h('div', { style:{ flex:1, overflow:'auto', padding:'6px' } },
+        all === null
+          ? h('div', { style:{ padding:'22px 12px', fontSize:'11.5px', color:'#94a3b8', textAlign:'center' } },
+              '사진첩을 읽는 중…')
+          : rows.length === 0
+            ? h('div', { style:{ padding:'22px 12px', fontSize:'11.5px', color:'#94a3b8',
+                textAlign:'center', lineHeight:1.8 } },
+                all.length === 0
+                  ? '사진첩에 명함·근로계약서로 읽힌 사진이 없습니다.\n사진첩에 올려 판독하면 여기에 나옵니다.'
+                  : '찾는 말에 맞는 서류가 없습니다.')
+            : rows.map(function(it){
+                var t = erpWorkerDocRowText(it);
+                var got = erpWorkerFromDoc(it.kind, it.fields, props.hint || {});
+                var th = thumbs[it.id];
+                return h('div', { key:it.id, onClick:function(){ props.onSelect(it); },
+                  title:'누르면 이 서류로 빈 칸을 채웁니다',
+                  style:{ display:'flex', gap:'9px', alignItems:'center', padding:'8px',
+                    borderRadius:'8px', cursor:'pointer', borderBottom:'1px solid #f8fafc' } },
+                  h('div', { style:{ width:'52px', height:'38px', flexShrink:0, borderRadius:'5px',
+                    overflow:'hidden', background:'#e2e8f0', display:'flex', alignItems:'center',
+                    justifyContent:'center' } },
+                    th ? h('img', { src:th, alt:'', style:{ width:'100%', height:'100%', objectFit:'cover' } })
+                       : h('span', { style:{ fontSize:'9px', color:'#94a3b8' } }, th === '' ? '—' : '…')),
+                  h('div', { style:{ minWidth:0, flex:1 } },
+                    h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#1e293b',
+                      whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, t.head),
+                    h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginTop:'2px',
+                      whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, t.sub),
+                    /* ★ «무엇이 들어오는지» 고르기 전에 보인다 — 눌러 보고 알면 늦다 */
+                    h('div', { style:{ fontSize:'10px', color: got.lines.length ? '#2563eb' : '#94a3b8',
+                      marginTop:'3px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
+                      got.lines.length ? ('→ ' + got.lines.join(' · ')) : '→ 채울 빈 칸이 없습니다')),
+                  (it.folded && it.folded.length) ? h('span', {
+                    title:'똑같은 서류 ' + (it.folded.length + 1) + '장을 한 줄로 묶었습니다',
+                    style:{ flexShrink:0, background:'#f8fafc', color:'#64748b',
+                      border:'1px solid #e2e8f0', borderRadius:'8px', padding:'0 5px',
+                      fontSize:'9.5px', fontWeight:700 } },
+                    '📎 ' + (it.folded.length + 1)) : null
+                );
+              })
+      ),
+      h('div', { style:{ padding:'10px 16px', borderTop:'1px solid #e2e8f0', display:'flex',
+        alignItems:'center', gap:'8px', flexShrink:0 } },
+        h('span', { style:{ fontSize:'11.5px', color:'#64748b' } },
+          '누르면 바로 채웁니다 — 빈 칸만 바뀌므로 되돌릴 것이 없습니다'),
+        h('div', { style:{ flex:1 } }),
+        h('button', { onClick:props.onClose,
+          style:{ padding:'7px 15px', border:'1px solid #cbd5e1', borderRadius:'7px',
+            background:'#fff', cursor:'pointer', fontSize:'12.5px', fontFamily:'inherit' } }, '닫기'))
+    )
+  );
+}
+
 /* ══════ 📷 사진첩에서 계약서 찾기 (대표 승인 목업 2026-08-26) ══════
    docs/mockups/erp-contract-photo-find.html
 
@@ -15714,6 +15934,14 @@ function ContractModal(props){
   var pm = useState([]); var photoMatches = pm[0]; var setPhotoMatches = pm[1];
   var ppo = useState(false); var photoPickerOpen = ppo[0]; var setPhotoPickerOpen = ppo[1];
   var ppv = useState(null); var photoPreview = ppv[0]; var setPhotoPreview = ppv[1];
+  /* 📷 근로자 줄을 사진첩 명함·근로계약서에서 채우기 (대표 지시 2026-09-12).
+     담는 것은 «몇째 줄인가» 하나다 — { idx } 또는 null. */
+  var wdp = useState(null); var wkDocPick = wdp[0]; var setWkDocPick = wdp[1];
+  var wdl = useState(null); var wkDocs = wdl[0]; var setWkDocs = wdl[1];   // null=아직 안 읽음
+  useEffect(function(){
+    if(!wkDocPick || wkDocs !== null) return;
+    erpLoadWorkerDocPhotos(function(list){ setWkDocs(list || []); });
+  }, [!!wkDocPick]);
   // 보수·계약금이 둘 다 읽혔을 때 사람이 고른 쪽('deposit'|'fee'). 빈 값이면 계약금(기본).
   var ppa = useState(''); var photoPickedAmt = ppa[0]; var setPhotoPickedAmt = ppa[1];
   // 📄 연결된 계약서 원본·판독 보기 창 (계약창 위에 겹쳐 뜨는 팝업)
@@ -17227,7 +17455,21 @@ function ContractModal(props){
                             }, style:{ display:'none' } })
                         )
                   );
-                })()
+                })(),
+                /* 📷 사진첩에서 당겨오기 (대표 지시 2026-09-12) —
+                   「근로자의 명함 또는 계약의 경우 계약서 작성사항이 있다.
+                     사진첩에 정리되면 내용을 읽어서 당겨오게 해달라」
+                   ⚠ 왼쪽의 파일 올리기와 «나란히» 둔다. 이미 사진첩에 들어와 판독까지
+                     끝난 서류를 다시 올려 다시 읽으면 판독 몫을 한 번 더 태우고
+                     같은 사진이 두 벌 쌓인다. */
+                h('button', { type:'button',
+                  onClick:function(){ setWkDocPick({ idx: idx }); },
+                  title:'사진첩에 이미 들어와 있는 명함·근로계약서에서 이 줄을 채웁니다',
+                  style:{ marginTop:'5px', width:'100%', display:'flex', alignItems:'center',
+                    justifyContent:'center', gap:'4px', border:'1px solid #bfdbfe', borderRadius:'5px',
+                    padding:'5px 8px', cursor:'pointer', background:'#eff6ff', fontSize:'10.5px',
+                    color:'#1e40af', fontWeight:600, fontFamily:'inherit' } },
+                  '📷 사진첩에서 찾기')
               ),
               // 입력 필드
               h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px' } },
@@ -18728,6 +18970,34 @@ function ContractModal(props){
          맞는 것만이라, 이름을 아직 안 쳤거나 조금 다르면 목록이 통째로 비어
          「찾기」를 눌러도 아무것도 없었다 — 찾기 창의 뜻이 없어진다.
          이름이 맞는 것은 창을 열 때 먼저 골라 둔다(아래 sel 초기값). */
+    /* 📷 근로자 줄 채우기 — 사진첩의 명함·근로계약서 (대표 지시 2026-09-12) */
+    wkDocPick && h(WorkerPhotoPickerModal, {
+      items: wkDocs,
+      hint: ((f.company && f.company.workers) || [])[wkDocPick.idx],
+      onClose: function(){ setWkDocPick(null); },
+      onSelect: function(it){
+        var idx = wkDocPick.idx;
+        setWkDocPick(null);
+        var cur = ((f.company && f.company.workers) || [])[idx] || {};
+        var got = erpWorkerFromDoc(it.kind, it.fields, cur);
+        var keys = Object.keys(got.patch);
+        if(!keys.length){
+          showToast('채울 칸이 없습니다 — ' + (got.skipped[0] || '읽힌 값이 없습니다'), 5000);
+          return;
+        }
+        setF(function(prev){
+          var ws = ((prev.company || {}).workers || []).slice();
+          if(!ws[idx]) return prev;
+          /* ⚠ 「어느 사진에서 왔는지」를 함께 남긴다 — 나중에 「이건 뭐지」에 답해야 한다 */
+          ws[idx] = Object.assign({}, ws[idx], got.patch, {
+            docFrom: { id: it.id, year: it.year, owner: it.owner || '', kind: it.kind, at: Date.now() }
+          });
+          return Object.assign({}, prev, { company: Object.assign({}, prev.company, { workers: ws }) });
+        });
+        showToast('✓ ' + got.lines.join(' · ')
+          + (got.skipped.length ? '  (' + got.skipped.length + '칸은 그대로 뒀습니다)' : ''), 6000);
+      }
+    }),
     photoPickerOpen && h(PhotoContractPickerModal, {
       items: (photoMatches.length ? photoMatches : []).concat(
         (_erpMyContractPhotos || []).filter(function(x){
