@@ -44,7 +44,7 @@
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
 <script src="js/pu-news-core.js?v=33"></script>
-<script src="js/pu-news-tpl.js?v=15"></script>
+<script src="js/pu-news-tpl.js?v=16"></script>
 <script src="js/pu-news-regional-sources.js?v=1"></script>
 <script src="js/pu-news-review.js?v=3"></script>
 <style>
@@ -1516,6 +1516,13 @@ function 줄창그리기(){
      ${esc([꼬리표(x), x.발행일 || x.선고글 || ''].filter(Boolean).join(' · '))}
      ${u ? ' · <a href="' + esc(u) + '" target="_blank" rel="noopener">원문 보기 ↗</a>' : ''}</div>
    </div>
+   ${기사인가 ? `
+   <label class="f">✎ 한 줄 제목 <span style="font-weight:400;color:var(--faint)">— 글 위에 굵게 뜹니다 · 요약에도 이 줄이 나갑니다</span></label>
+   <input id="rowH" type="text" maxlength="60"
+     placeholder="우리 말로 한 줄 (비우면 제목 없이 글만 나갑니다)"
+     value="${esc(x.한줄||'')}"
+     style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:7px;
+            font-size:14px;font-weight:700;margin-bottom:11px">` : ''}
    <label class="f">✎ 우리 말로 — 편지에는 <b>이 글만</b> 실립니다</label>
    <textarea id="rowW" rows="5" placeholder="${esc(기사인가
      ? '여기에 쓰시면 이 글이 편지에 실립니다. 비우면 이 줄은 안 나갑니다.'
@@ -1539,6 +1546,13 @@ function 우리말저장(){
   if(!x) return 줄창닫기();
   const v = String(($('rowW') && $('rowW').value) || '').trim();
   if(v){ x.우리말 = v; delete x.AI초안; } else delete x.우리말;
+  /* ★ 한 줄 제목도 «함께» 담는다 (대표 지시 2026-09-12).
+     ⚠ 칸이 없는 갈래(자료·판례)에서는 건드리지 않는다 — 없는 칸을 읽어 지우면
+       다른 갈래의 값이 조용히 날아간다. */
+  if($('rowH')){
+    const h = String($('rowH').value || '').trim();
+    if(h) x.한줄 = h; else delete x.한줄;
+  }
   회차저장(d)
     .then(function(){ 줄창닫기(); render();
       toast(v ? '✎ 우리 말로 담았습니다 — 편지에 이 글이 실립니다'
