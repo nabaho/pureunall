@@ -22,6 +22,9 @@ test('760px 이하에서 #pcDetail.open 은 전체화면으로 뜬다', () => {
 
 test('coDetailPanelHtml·openCoDetailPanel·closePcDetail 은 그대로다(내용은 안 건드림)', () => {
   assert.match(source, /function coDetailPanelHtml\(o\)/);
-  assert.match(source, /function openCoDetailPanel\(key\)/);
+  /* ⚠ 2026-09-12 점검: 구독이 새 값을 줄 때 «펴 둔 자리를 지키며» 다시 그리려고
+     둘째 인자(keep)가 붙었다. 지킬 것은 「이 함수가 그대로 있다」이지 인자 수가
+     아니다 — 이름만 본다. */
+  assert.match(source, /function openCoDetailPanel\(key/);
   assert.match(source, /function closePcDetail\(\)/);
 });
