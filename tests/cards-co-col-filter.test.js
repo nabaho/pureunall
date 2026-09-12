@@ -71,7 +71,23 @@ function loadColFilterBlock(items){
     renderCoPage: () => { calls.rendered = true; },
     setTimeout: (f) => f()
   };
-  const code = source.slice(sortAt, sortEnd) + '\n' + source.slice(cAt, cEnd) + '\n' + source.slice(oAt, oEnd);
+  /* 2026-09-12: 「담당」 잣대가 coMgrOf 로 바뀌었다 — 업체관리에 담당이 없으면
+     기업정보함에서 적어 둔 담당으로 선다(대표 지시 ③).
+     ⚠ 대역이 아니라 «진짜»를 싣는다. 이 검사가 보는 것이 바로 그 잣대라, 대역을 넣으면
+       「칸에는 이름이 있는데 거르개로는 안 나온다」를 못 잡는다. */
+  const mgrSrc = ['function coVal(', 'function coMgrOf(']
+    .map(function (head) {
+      const at = source.indexOf('\n' + head);
+      assert.ok(at > 0, head + ' 를 찾지 못했습니다');
+      const open = source.indexOf('{', at);
+      let d = 0;
+      for (let k = open; k < source.length; k++) {
+        if (source[k] === '{') d++;
+        else if (source[k] === '}') { d--; if (!d) return source.slice(at, k + 1); }
+      }
+      assert.fail(head + ' 의 끝을 찾지 못했습니다');
+    }).join('\n');
+  const code = mgrSrc + '\n' + source.slice(sortAt, sortEnd) + '\n' + source.slice(cAt, cEnd) + '\n' + source.slice(oAt, oEnd);
   vm.createContext(ctx);
   vm.runInContext(code, ctx);
   ctx._calls = calls;

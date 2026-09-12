@@ -273,7 +273,7 @@ function drawRow(o){
     "function coMgrCell(){ return ''; }",
     "function coSizeSelHtml(){ return ''; }",
     "function coPagerHtml(){ return ''; }",
-    "function coOrphanBarHtml(){ return ''; } function coSmeBarHtml(){ return ''; } function coCtBarHtml(){ return ''; }",
+    "function coOrphanBarHtml(){ return ''; } function coSmeBarHtml(){ return ''; } function coCtBarHtml(){ return ''; } function coMgrCellHtml(){ return ''; }",
     /* 2026-08-30: 도구줄의 「자주 쓰는 폴더」 단추 — 이 검사는 안 본다 */
     "function coQuickFolderBtns(){ return ''; }"
   ].join('\n'), ctx);

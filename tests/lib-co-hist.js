@@ -44,7 +44,17 @@ function panelDeps(app) {
     cutFn(app, 'function coTilesHtml('),
     cutFn(app, 'function coGoBox('),
     cutFn(app, 'function coNeedGo('),
-    cutFn(app, 'function coDocsSummary(')
+    cutFn(app, 'function coDocsSummary('),
+    /* 2026-09-12: 패널에 «사람이 적는» 두 칸이 붙었다(담당·메모, 대표 지시 ③④).
+       ⚠ 대역이 아니라 «진짜»를 싣는다 — 담당이 업체관리 것인지 우리가 적은 것인지
+         가르는 잣대라, 대역을 넣으면 그 가름이 틀려도 검사가 모른다.
+       ⚠ 여기 한 곳만 고치면 패널을 뜨는 검사 넷이 함께 따라온다. */
+    /* ⚠ coVal 도 «진짜»를 싣는다 — 담당·메모가 그것으로 값을 꺼낸다. 대역으로 두면
+       「다듬은 뒤에 고른다」(2026-08-24 에 고친 규칙)가 틀려도 검사가 모른다. */
+    cutFn(app, 'function coVal('),
+    cutFn(app, 'function coMgrOf('),
+    cutFn(app, 'function coMgrIsOurs('),
+    cutFn(app, 'function coMemoHtml(')
   ].join('\n');
 }
 

@@ -45,7 +45,7 @@ function render(co, folders) {
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
     coCares: () => true, coMissing: () => [], coConflictN: () => 0,
     coDisplayName: o => o.name || '', coTagsOf: () => [], coArrow: () => '',
-    coOrphanBarHtml: () => '', coSmeBarHtml: () => '', coCtBarHtml: () => '', coSelAll: () => {}, listNarrowed: () => false
+    coOrphanBarHtml: () => '', coSmeBarHtml: () => '', coCtBarHtml: () => '', coMgrCellHtml: () => '', coSelAll: () => {}, listNarrowed: () => false
   };
   if (folders) b._coFolders = folders;
   vm.createContext(b);
