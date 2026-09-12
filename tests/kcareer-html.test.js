@@ -2259,7 +2259,13 @@ test('★★ 합치기는 원본을 «진짜로» 읽는다 — getFile 은 Inde
 
 test('★★ 옮기지 못했으면 «아무것도 지우지 않는다»', () => {
   const m = source.slice(source.indexOf('async function mergeInto('), source.indexOf('async function mergeInto(') + 3000);
-  assert.match(m, /if\(!primFile && !moved && otherHas\)\{/, '옮기기 실패를 봐야 합니다');
+  /* ⚠ 2026-09-12: 폴더 경로 원본(src:'fs')은 «옮길 파일이 없다» — getFileAsync 가 늘 null 이라
+     이 빗장이 합치기를 통째로 멈췄다(대표 제보). 그래서 !primIsFs 가 하나 늘었다.
+     ⚠ 빗장 자체는 그대로여야 한다 — 앱 안 첨부를 못 옮겼는데 지우면 원본이 사라진다. */
+  assert.match(m, /if\(!primFile && !primIsFs && !moved && otherHas\)\{/,
+    '옮기기 실패를 봐야 하고, 폴더 원본은 빼 줘야 합니다');
+  assert.match(m, /var primIsFs=!!\(prim\.src==='fs' && prim\.relPath\)/,
+    '폴더 원본을 가려내지 않으면 합치기가 늘 멈춥니다');
   assert.match(m, /아무것도 지우지 않았습니다/, '멈췄다고 알려야 합니다');
   // 지우기는 «맨 마지막»에 와야 한다
   const delAt = m.indexOf('others.forEach(function(r){deleteFile(r.id);});');

@@ -3283,6 +3283,15 @@ async function openLocalOriginal(relPath){
     for(var i = 0; i < segs.length - 1; i++) dir = await dir.getDirectoryHandle(segs[i]);
     var fh = await dir.getFileHandle(segs[segs.length - 1]);
     var f = await fh.getFile();
+    /* ★★ 한글 문서는 브라우저가 못 연다 — 새 탭에 «날것»(PK…mimetypeapplication/hwp+zip)으로
+       뜬다(대표 제보 2026-09-12). 앱 안의 한글 뷰어로 보낸다.
+       ⚠ 여태 openOriginal 의 «앱 안 첨부» 갈래에만 이 판정이 있었다. 폴더 경로 갈래는
+         곧바로 새 탭을 열어 버려 판정을 한 번도 거치지 않았다.
+         원본을 모두 폴더 경로로 붙일 계획이라 한글 서류가 전부 깨져 보일 참이었다. */
+    if(_isHwpName(f.name) || _isHwpName(relPath)){
+      try{ openHwpViewer(await f.arrayBuffer(), f.name || '문서.hwpx'); return; }
+      catch(e2){ console.warn('한글 뷰어', e2); /* 못 열면 아래 옛 길로 */ }
+    }
     var url = URL.createObjectURL(f);
     window.open(url, '_blank');
     setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
@@ -6519,7 +6528,12 @@ function rowActions(id,store,label,page,rec){ const isFs=!!(rec&&rec.src==='fs'&
   }
   return '<span style="display:inline-flex;gap:3px">'+
 
-    (isFs?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openLocalOriginal('${_jsAttr(rec.relPath)}')" title="폴더에서 바로 열기">📄 원본</button>`
+    /* ★ 폴더 경로로 붙인 원본도 «고칠 수 있어야» 한다 (대표 지시 2026-09-12).
+       ⚠ 예전에는 「📄 원본」 하나만 그려서, 폴더로 붙인 줄은 기관·발급일을 고칠 길이 없었다.
+         앞으로 원본을 «모두» 폴더 경로로 붙일 계획이라 모든 줄이 그렇게 될 참이었다.
+       ⚠ 「⬇ 저장」은 일부러 안 붙인다 — 그 파일은 «이미 서류 폴더에 있다». 넣으면 죽은 단추가 된다.
+       ⚠ 편집 서랍(openForm)은 첨부와 상관없이 열린다 — 그래서 폴더 줄에도 안전하다. */
+    (isFs?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" onclick="openLocalOriginal('${_jsAttr(rec.relPath)}')" title="폴더에서 바로 열기">📄 원본</button>`
       :has?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" style="background:var(--teal);color:#fff;border-color:var(--teal)" onclick="downloadToFolder('${id}','${store}','${_jsAttr((rec&&rec.type)||'')}',_dlRec('${store}','${id}'))" title="서류 폴더의 제자리에 저장 (안 되면 내려받기 폴더로)">⬇ 저장</button><button class="btn sm" onclick="deleteAttach('${id}','${page}',this)" title="원본만 삭제 후 재업로드" style="color:var(--red);font-size:11px">🗑원본</button>`
         :`<button class="btn sm" onclick="attachRec('${id}','${store}','${page}')">📎 첨부</button>`)+
     (rec&&rec.puRef?`<button class="btn sm" onclick="openPuSource('${_jsAttr(rec.puRef)}')" title="pu-erp 현재 값 보기">🔎</button>`:'')+
@@ -7081,14 +7095,20 @@ async function mergeInto(primaryId){ const page=_dupPage, store=getDupStore(page
      ⚠ 반드시 getFileAsync 로 «진짜» 읽고, 옮긴 것을 확인한 뒤에만 지운다. */
   var moved=false;
   var primFile=await getFileAsync(primaryId);
-  if(!primFile){
+  /* ★★ 폴더 경로 원본(src:'fs')은 «앱 안에 파일이 없다» — getFileAsync 는 늘 null 이다.
+     그런데 hasOriginal 은 그것을 「원본 있음」이라 세므로, 아래 빗장이
+     「원본을 옮기지 못했다」며 합치기를 통째로 멈췄다(대표 제보 2026-09-12).
+     ⚠ 옮길 것이 애초에 없다 — 경로는 바로 위 «빈 칸 채우기»에서 이미 넘어왔다.
+       그러니 기준 줄이 폴더 원본을 갖게 되었으면 그것으로 «옮겨진 것»이다. */
+  var primIsFs=!!(prim.src==='fs' && prim.relPath);
+  if(!primFile && !primIsFs){
     for(var i=0;i<others.length;i++){
       var f=await getFileAsync(others[i].id);
       if(f&&f.base64){ await saveFileUnified(primaryId,Object.assign({},f,{id:primaryId})); moved=true; break; }
     }
   }
   /* 옮길 원본이 있었는데 못 옮겼다면 «지우지 않고» 멈춘다 — 지우면 되돌릴 수 없다 */
-  if(!primFile && !moved && otherHas){
+  if(!primFile && !primIsFs && !moved && otherHas){
     toast('❌ 원본을 옮기지 못해 합치기를 멈췄습니다 — 아무것도 지우지 않았습니다', 6000);
     return;
   }
