@@ -26,11 +26,38 @@
       contractVersion:1, revision:1, sourceKind:'regionalNewsCandidate', sourceId:clean(c.id, 100),
       지역:clean(c.지역, 40) || '전국', 제목:clean(c.제목, 220), 링크:clean(c.링크, 1000),
       언론사:clean(c.기관, 80), 출처Id:clean(c.출처Id || c.sourceId, 80),
-      후보Id:clean(c.id, 100), 우리말:own, 갈래:'지역기사', 승인일:Number(at)||Date.now()
+      후보Id:clean(c.id, 100), 우리말:own, 갈래:'지역기사', 상태:'활성', 승인일:Number(at)||Date.now()
     };
   }
 
-  var API = { 검토변경:검토변경, 승인뉴스:승인뉴스 };
+  function 수동뉴스(input, by, at) {
+    var x = input && typeof input === 'object' ? input : {};
+    var 시각 = Number(at) || Date.now();
+    var 출처 = clean(x.출처Id, 80), 링크 = clean(x.링크, 1000), 우리말 = clean(x.우리말, 1200);
+    if (!출처 || !우리말 || !/^https:\/\//.test(링크)) return null;
+    return {
+      id:'manual-regional-' + 시각, entityType:'Message', schemaVersion:1,
+      contractVersion:1, revision:1, sourceKind:'regionalNewsSource', sourceId:출처,
+      지역:clean(x.지역, 40) || '전국', 제목:clean(x.제목, 220), 링크:링크,
+      언론사:clean(x.언론사, 80), 출처Id:출처, 우리말:우리말,
+      갈래:'지역기사', 상태:'활성', 등록자:clean(by, 120), 등록일:시각
+    };
+  }
+
+  function 철회(news, reason, by, at) {
+    var x = news && typeof news === 'object' ? news : null;
+    var 왜 = clean(reason, 300);
+    if (!x || x.상태 === '철회' || !왜) return null;
+    return Object.assign({}, x, {
+      상태:'철회', revision:Math.max(1, Number(x.revision)||1) + 1,
+      철회사유:왜, 철회자:clean(by, 120), 철회일:Number(at)||Date.now()
+    });
+  }
+
+  function 활성인가(news) { return !!news && news.상태 !== '철회'; }
+
+  var API = { 검토변경:검토변경, 승인뉴스:승인뉴스, 수동뉴스:수동뉴스,
+    철회:철회, 활성인가:활성인가 };
   if (typeof module === 'object' && module.exports) module.exports = API;
   else global.PuNewsReview = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
