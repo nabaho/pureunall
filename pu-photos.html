@@ -39,7 +39,7 @@
 <script src="js/pu-doc-read.js?v=40"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
-<script src="js/pu-doc-file.js?v=30"></script>
+<script src="js/pu-doc-file.js?v=31"></script>
 <script src="js/pu-drag.js?v=2"></script>
 <script src="js/pu-billing.js?v=9"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -9080,9 +9080,13 @@ function autoCmsOn(read, fields) {
     toast('은행·계좌·예금주가 다 읽혀야 자동이체를 켭니다 — 값을 확인해 주세요');
     return;
   }
+  /* ★ 지정 출금일도 함께 넘긴다 (대표 지시 2026-09-12 「cms 자동이체도 날짜와 체크항목 자동으로」).
+     ⚠ 판독기는 이미 payDay 를 읽고 있었는데(js/pu-doc-read.js 의 kind=cms) 여기서 그것을
+       «버리고» 있었다 — 그래서 체크만 켜지고 「매월 __ 일」은 늘 빈 칸이었다.
+       신청서에 적힌 지정 출금일이 곧 이체일이다. 빈 칸일 때만 넣는 것은 담는 쪽이 한다. */
   return PuDocFile.setContractCms({
     bizNo: f.bizno || '', companyName: f.company || '',
-    bankName: bank, byName: PuPhotoStore.myName() || ''
+    bankName: bank, payDay: f.payDay || '', byName: PuPhotoStore.myName() || ''
   }).then(function (r) {
     toast((r && r.ok ? '🏦 ' : '⚠ ') + ((r && r.message) || '자동이체를 켜지 못했습니다'),
       (r && r.ok) ? 4500 : 8000);

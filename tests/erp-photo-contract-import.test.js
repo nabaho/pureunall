@@ -129,6 +129,12 @@ const t = (name, got, want) => {
 {
   const c = vm.createContext({});
   vm.runInContext(fn('erpVatTextToFlag'), c);
+  /* 2026-09-12: 계약서에서 CMS 자동이체를 읽는 길이 붙었다 — 함께 안 실으면
+     「erpCmsFromDoc is not defined」로 넘어진다. */
+  /* ⚠ slice 는 끝 표식을 «뺀다» — 그래서 다음 함수 머리까지 잘라 목록 전체를 담는다 */
+  vm.runInContext(slice('var ERP_CMS_WORDS =', '\nfunction erpDocText('), c);
+  vm.runInContext(fn('erpDocText'), c);
+  vm.runInContext(fn('erpCmsFromDoc'), c);
   vm.runInContext(fn('erpContractPhotoApplyPatch'), c);
 
   const baseF = {

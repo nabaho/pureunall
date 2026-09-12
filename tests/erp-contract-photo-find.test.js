@@ -189,7 +189,13 @@ test('★ 관리자면 전 직원, 아니면 내 것 — 규칙을 새로 만들
 function applyPatch() {
   const ctx = { String, Object, Array, Number, parseInt, console, BRIEF_MAX: 40 };
   vm.createContext(ctx);
-  vm.runInContext(cutFn(ERP, 'function erpVatTextToFlag(') + '\n' +
+  /* 2026-09-12: 계약서에서 CMS 자동이체를 읽는 길이 붙었다 — 함께 싣지 않으면
+     「erpCmsFromDoc is not defined」로 여기가 통째로 넘어진다. */
+  const cmsAt = ERP.indexOf('var ERP_CMS_WORDS =');
+  vm.runInContext(ERP.slice(cmsAt, ERP.indexOf('];', cmsAt) + 2) + '\n' +
+                  cutFn(ERP, 'function erpDocText(') + '\n' +
+                  cutFn(ERP, 'function erpCmsFromDoc(') + '\n' +
+                  cutFn(ERP, 'function erpVatTextToFlag(') + '\n' +
                   cutFn(ERP, 'function erpContractPhotoApplyPatch('), ctx);
   return ctx.erpContractPhotoApplyPatch;
 }
