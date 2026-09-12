@@ -8,6 +8,7 @@ const { getDatabase: getRawDatabase } = require("firebase-admin/database");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getStorage } = require("firebase-admin/storage");
 const crypto = require("crypto");   // 내려받기 토큰 발급용 (downloadUrl)
+const https = require("https");
 const { Resend } = require("resend");
 const {
   REPO,
@@ -2806,11 +2807,63 @@ const 브리핑샘 = {
 /* 한글이 깨지지 않게 «바이트로» 받아서 한 번에 푼다.
    ★ 글자로 이어 붙이면 여러 바이트짜리 한글이 조각 사이에서 잘려 깨진다
      (실제로 「소관부처명」이 「소관부처」로 깨져 왔다). */
+function IPv4로글자받기(url, 옮김횟수) {
+  const 횟수 = 옮김횟수 || 0;
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      family: 4,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; PureunNewsletter/1.0)",
+        Accept: "application/rss+xml, application/xml, text/xml, */*"
+      },
+      timeout: 15000
+    }, res => {
+      if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+        res.resume();
+        if (횟수 >= 3) return reject(new Error("주소 이동이 너무 많습니다"));
+        const 다음 = new URL(res.headers.location, url);
+        if (다음.protocol !== "https:") return reject(new Error("안전하지 않은 주소 이동입니다"));
+        return IPv4로글자받기(다음.href, 횟수 + 1).then(resolve, reject);
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        return reject(new Error(url + " IPv4 응답 " + res.statusCode));
+      }
+      const 조각 = [];
+      let 크기 = 0;
+      res.on("data", chunk => {
+        크기 += chunk.length;
+        if (크기 > 2 * 1024 * 1024) return req.destroy(new Error("응답이 2MB를 넘었습니다"));
+        조각.push(chunk);
+      });
+      res.on("end", () => resolve(Buffer.concat(조각).toString("utf8")));
+    });
+    req.on("timeout", () => req.destroy(new Error("IPv4 연결 제한시간 초과")));
+    req.on("error", reject);
+  });
+}
+
 async function 글자로받기(url) {
-  const r = await fetch(url, { headers: { "User-Agent": "pureun-erp-news-brief" } });
-  if (!r.ok) throw new Error(url + " 응답 " + r.status);
-  const buf = Buffer.from(await r.arrayBuffer());
-  return buf.toString("utf8");
+  try {
+    const r = await fetch(url, {
+      headers: { "User-Agent": "pureun-erp-news-brief" },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!r.ok) throw new Error(url + " 응답 " + r.status);
+    const buf = Buffer.from(await r.arrayBuffer());
+    return buf.toString("utf8");
+  } catch (첫오류) {
+    /* 일부 공공기관 RSS는 Cloud Functions의 기본(IPv6 우선) 연결을 끊는다.
+       첫 통신만 실패할 때 IPv4로 한 번 더 읽어 수집 전체가 비는 일을 막는다. */
+    try {
+      return await IPv4로글자받기(url);
+    } catch (둘째오류) {
+      const 첫원인 = 첫오류.cause && 첫오류.cause.code ? " [" + 첫오류.cause.code + "]" : "";
+      const 둘째원인 = 둘째오류.code ? " [" + 둘째오류.code + "]" : "";
+      throw new Error("기본 연결: " + 첫오류.message + 첫원인
+        + " / IPv4 연결: " + 둘째오류.message + 둘째원인);
+    }
+  }
 }
 
 /* 법령을 «몇 건까지» 가져올지 받는다.
