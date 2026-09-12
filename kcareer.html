@@ -1066,6 +1066,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-slotai.js?v=2"></script>
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
+<!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
+<script src="js/kcareer-notices.js?v=1"></script>
 <script src="js/kcareer-overlay.js?v=2"></script>
 <!-- AI 판독 호출기 — 열쇠는 회사 서버가 든다(브라우저는 모른다) -->
 <script src="js/pu-ai-call.js?v=3"></script>
@@ -1094,7 +1096,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
 </div>
 <div class="warn-banner" id="filenameWarn">⚠️ 파일명이 <b>kcareer.html</b>이 아니면 저장 데이터가 분리될 수 있습니다.</div>
-<div id="fbNotice" style="display:none;flex-shrink:0;background:#e2e8f0;color:#166534;border-bottom:1px solid #4ade80;padding:8px 14px;font-size:12.5px;text-align:center">☁ 다른 기기에서 저장된 더 최신 기록이 있습니다.<a href="#" onclick="fbPull();return false" style="font-weight:700;color:#166534;margin-left:8px">불러오기</a><a href="#" onclick="fbHideNotice();return false" style="color:#166534;margin-left:12px;opacity:.65">닫기</a></div>
+<div id="fbNotice" style="display:none;flex-shrink:0;background:#e2e8f0;color:#166534;border-bottom:1px solid #4ade80;padding:8px 14px;font-size:12.5px;text-align:center"><span id="fbNoticeMsg">☁ 다른 기기에서 저장된 더 최신 기록이 있습니다.</span><a href="#" onclick="fbPull();return false" style="font-weight:700;color:#166534;margin-left:8px">불러오기</a><a href="#" onclick="fbHideNotice(true);return false" style="color:#166534;margin-left:12px;opacity:.65">닫기</a></div>
 <!-- 이 기기 기록이 클라우드보다 크게 적을 때 — 브라우저 자료가 지워져 기본 데이터로 되돌아간 경우.
      여태 조용히 시드로 시작해 「자료가 사라졌다」로만 보였다(위촉장 197 → 79 사고). -->
 <div id="fbLossNotice" style="display:none;flex-shrink:0;background:#e2e8f0;color:#991b1b;border-bottom:1px solid #fecaca;padding:9px 14px;font-size:13px;text-align:center;font-weight:600">
@@ -12209,6 +12211,10 @@ var fbDb=null, fbUid=null;
 var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
              'id_docs','id_docs_enc','id_salt','api_key','gvision_key','gemini_key','staff_roster','pu_consult_cache','pu_case_cache','pu_fund_cache','pu_etc_cache','_idpin','_idmeta','_idsalt','kc_theme','_fbbase','_fbauto'];
 var _fbBase=null, _fbPushT=null, _fbWatching=false;
+/* ★ 「닫기」를 기억한다 — 예전에는 display:none 만 해서 PC 가 저장할 때마다(2.5초)
+   곧바로 되살아났다. 대표가 겪은 「자꾸」가 이것이다(2026-09-12).
+   ⚠ 이 기기 안에서만 기억한다(새로고침하면 다시 본다) — 영영 입을 막으면 안 된다. */
+var _fbDismissAt=null, _fbCloudAt=0;
 /* ===== 로그인 게이트: 통합시스템 로그아웃 시 경력관리도 잠금 ===== */
 function _authGateEl(){
   var g=document.getElementById('authGate');
@@ -12327,7 +12333,8 @@ function _fbCloudTotal(cb){
   if(!fbUid||!fbDb){ cb(null); return; }
   fbDb.ref('kcareer/'+fbUid+'/counts').once('value').then(function(s){
     var c=s.val();
-    if(c && typeof c.total==='number'){ cb(c.total); return; }
+    /* ⚠ 시각도 함께 준다 — 손실인지 «아직 안 받은 것»인지는 시각을 봐야 갈린다 */
+    if(c && typeof c.total==='number'){ if(c.at) _fbCloudAt=Math.max(_fbCloudAt, c.at); cb(c.total, c.at||0); return; }
     fbDb.ref('kcareer/'+fbUid+'/ls').once('value').then(function(s2){
       var ls=s2.val(); if(!ls){ cb(null); return; }
       var t=_fbCounts(ls).total;
@@ -12342,18 +12349,26 @@ function _fbCloudTotal(cb){
    여기서 잡아 한 번 눌러 되살릴 수 있게 한다. */
 function fbCheckLoss(){
   if(!fbUid||!fbDb) return;
-  _fbCloudTotal(function(cloudTotal){
+  _fbCloudTotal(function(cloudTotal, cloudAt){
     if(cloudTotal==null) return;
     var cloud={total:cloudTotal}, here=_fbCounts(null);
     /* ★★ 「내가 지운 것」은 손실이 아니다 (대표 지시 2026-09-03).
        예전에는 사람이 중복을 지울 때마다 이 띠가 떠서 「되살리기」를 누르게 만들었고,
-       되살리면 지운 중복이 그대로 돌아왔다 — 거짓 경보가 고리를 돌린 것이다. */
+       되살리면 지운 중복이 그대로 돌아왔다 — 거짓 경보가 고리를 돌린 것이다.
+       ★★ 2026-09-12 — 여기에 «하나 더» 있다: 폰처럼 «아직 한 번도 받아 오지 않은 기기»는
+       적은 것이 정상이다. 잣대는 KcareerNotices 한 곳에 모았다. */
     var del=tombCount();
-    if(cloud.total - del <= here.total + 5){
-      /* 차이가 «내가 지운 만큼»으로 설명된다 → 손실이 아니다. 대신 클라우드가 낡았다고 알린다. */
-      var el2=document.getElementById('fbLossNotice');
+    var base=(_fbBase!=null)?_fbBase:fbGetBase();
+    var d=window.KcareerNotices ? KcareerNotices.decide({
+            base:base, cloudAt:cloudAt||_fbCloudAt||0,
+            here:here.total, cloud:cloud.total, deleted:del, dismissedAt:_fbDismissAt })
+          : null;
+    var el2=document.getElementById('fbLossNotice');
+    if(d && !d.loss.show){
       if(el2) el2.style.display='none';
-      if(cloud.total > here.total + 5) _fbStaleCloud(cloud.total, here.total, del);
+      if(d.stale.show) _fbStaleCloud(cloud.total, here.total, del);
+      /* ★ 「잃은 것」이 아니라 「아직 안 받은 것」이면 그렇게만 알린다 — 겁주지 않는다 */
+      else if(d.newer.show) fbShowNotice(d.newer.kind);
       return;
     }
     var el=document.getElementById('fbLossNotice'), msg=document.getElementById('fbLossMsg');
@@ -12716,13 +12731,28 @@ function fbSetBase(at){ _fbBase=at; try{ localStorage.setItem(NS+'_fbbase', Stri
    ⚠ 화면 위에 «지금 안전 모드»라고 늘 띄운다 — 모르고 쓰다가 「저장이 안 된다」가 되면 안 된다. */
 function fbAutoOn(){ if(KC_SAFE) return false; try{ return localStorage.getItem(NS+'_fbauto')!=='0'; }catch(e){ return true; } }
 function fbSetAuto(on){ try{ localStorage.setItem(NS+'_fbauto', on?'1':'0'); }catch(e){} var c=document.getElementById('fbAutoChk'); if(c) c.checked=on; if(on&&fbUid){ fbWatch(); toast('자동 동기화 켜짐'); } else if(!on){ toast('자동 동기화 꺼짐'); } }
-function fbShowNotice(){ if(!fbAutoOn()) return; var n=document.getElementById('fbNotice'); if(n) n.style.display='block'; }
-function fbHideNotice(){ var n=document.getElementById('fbNotice'); if(n) n.style.display='none'; }
+/* kind: 'first' = 이 기기가 아직 한 번도 안 받아 왔다 · 'newer' = 받아 왔는데 뒤처졌다
+   ⚠ 「다른 기기에서 저장된…」은 처음 여는 폰에게는 뜻이 안 통한다 — 무엇을 할지 모른다. */
+function fbShowNotice(kind){ if(!fbAutoOn()) return;
+  var n=document.getElementById('fbNotice'); if(!n) return;
+  var m=document.getElementById('fbNoticeMsg');
+  if(m && window.KcareerNotices) m.textContent=KcareerNotices.newerText(kind||'newer');
+  n.style.display='block'; }
+/* ⚠ 사람이 «눌러» 닫은 것만 기억한다 — 저절로 사라지는 것(quiet)은 기억하지 않는다.
+   기억해 버리면 진짜 새 저장이 와도 안 알리게 된다. */
+function fbHideNotice(byUser){ var n=document.getElementById('fbNotice'); if(n) n.style.display='none';
+  if(byUser) _fbDismissAt=_fbCloudAt; }
 function fbWatch(){ if(!fbUid||!fbDb||_fbWatching) return; _fbWatching=true;
   fbDb.ref('kcareer/'+fbUid+'/at').on('value', function(s){ var at=s.val(); if(!at) return;
+    _fbCloudAt=at;
     var base=(_fbBase!=null)?_fbBase:fbGetBase();
-    if(base==null){ fbShowNotice(); return; }
-    if(at>base) fbShowNotice(); else fbHideNotice();
+    /* ★ 잣대는 KcareerNotices 한 곳에 있다 — 손실 띠와 이 띠가 갈라지면 안 된다.
+       ⚠ 예전에는 base 가 없으면 «무조건» 띄웠다. 폰은 base 가 없으므로
+         PC 가 저장할 때마다 영영 다시 떴다(2026-09-12 대표 제보). */
+    if(!window.KcareerNotices){ if(at>(base||0)) fbShowNotice(); return; }
+    var d=KcareerNotices.decide({ base:base, cloudAt:at, here:0, cloud:null,
+                                  dismissedAt:_fbDismissAt });
+    if(d.newer.show) fbShowNotice(d.newer.kind); else fbHideNotice();
   }); }
 /* ★ 직원 «보기 전용»에서는 클라우드로 «올리지 않는다» (대표 지시 2026-09-02).
    사본에서 읽은 대표 기록이 직원 자기 칸(kcareer/{직원uid})에 눌러앉으면,
@@ -12732,11 +12762,14 @@ function kcNoPush(){ return typeof kcStaffView==='function' && kcStaffView(); }
 function fbScheduleAuto(key){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fbDb||!fbAutoOn()) return; if(key&&FB_SKIP.indexOf(key)>=0) return; if(_fbPushT) clearTimeout(_fbPushT); _fbPushT=setTimeout(fbAutoPush, 2500); }
 function fbAutoPush(){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fbDb||!fbAutoOn()) return;
   fbDb.ref('kcareer/'+fbUid+'/at').once('value').then(function(s){ var cloudAt=s.val()||0;
-    if(_fbBase!=null && cloudAt>_fbBase){ fbShowNotice(); return; }
+    _fbCloudAt=Math.max(_fbCloudAt, cloudAt);
+    if(_fbBase!=null && cloudAt>_fbBase){ fbShowNotice('newer'); return; }
     /* ⚠ 이 기기에서 한 번도 저장·불러오기를 안 했는데(_fbBase==null) 클라우드에 이미 자료가 있으면
        자동으로 밀어넣지 않는다 — 폰에서 처음 열었을 때 시드 데이터가 PC 기록을 덮을 수 있었다.
        이 가드를 지우면 조용히 자료가 사라진다. 사람이 ☁ 저장/불러오기로 결정하게 둔다. */
-    if(_fbBase==null && cloudAt){ fbShowNotice(); return; }
+    /* ⚠ 여기 오는 기기는 «한 번도 받아 온 적이 없다» — 「다른 기기에서 저장된…」이라 하면
+       무엇을 해야 할지 모른다. 받아 오라고 또박또박 말한다(2026-09-12). */
+    if(_fbBase==null && cloudAt){ fbShowNotice('first'); return; }
     _fbDoPush(_fbCounts(null).total, true).then(function(){
       var b=document.getElementById('fbBtn'); if(b){ var t=b.textContent; b.textContent='☁ 저장됨'; setTimeout(function(){ if(b.textContent==='☁ 저장됨') b.textContent=t; },1500); }
     }).catch(function(){});

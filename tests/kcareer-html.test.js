@@ -903,8 +903,13 @@ test('전체 건수를 절대 숨기지 않는다 — 필터가 걸리면 전체
 
 test('한 번도 안 맞춘 기기가 클라우드를 조용히 덮지 않는다', () => {
   const src = funcSource('fbAutoPush');
-  assert.match(src, /if\(_fbBase==null && cloudAt\)\{ fbShowNotice\(\); return; \}/,
+  /* ⚠ 2026-09-12: 띠 «문구»가 갈렸다(처음인 기기에는 「받아 온 적이 없다」라고 말한다).
+     가드 자체는 그대로여야 한다 — 여기서 못박는 것은 «올리지 않고 돌아선다»는 것이다. */
+  assert.match(src, /if\(_fbBase==null && cloudAt\)\{ fbShowNotice\([^)]*\); return; \}/,
     '⚠ 이 가드를 지우면 폰의 시드 데이터가 PC 기록을 덮습니다');
+  /* ★ 그리고 «처음인 기기»라고 말해 주는지도 본다 — 무엇을 해야 할지 알려야 한다 */
+  assert.match(src, /fbShowNotice\('first'\)/,
+    '한 번도 안 받아 온 기기에는 「받아 오라」고 또박또박 말해야 합니다');
 });
 
 test('저장·불러오기 확인창이 기록 건수를 비교해 보여준다', () => {
@@ -957,9 +962,19 @@ test('브라우저 자료가 지워져 기본 데이터로 돌아가면 크게 �
   /* ⚠ 잫대가 바뀌었다(2026-09-03) — «내가 지운 것»을 림서 견다.
      예전 잫대(cloud.total <= here.total + 5)는 사람이 중복을 지울 때마다 이 띄를 띄워
      「되살리기」를 누르게 하고, 되살리면 지운 중복이 그대로 돌아왔다(실제 고리). */
-  assert.match(src, /cloud\.total - del <= here\.total \+ 5/,
-    '몇 건 차이로도, «내가 지운 만큼»으로도 겁주지 않아야 합니다');
+  /* ⚠ 2026-09-12: 그 셈은 js/kcareer-notices.js 로 옮겼다 — 폰처럼 «아직 안 받아 온 기기»도
+     함께 가려야 해서 한 곳으로 모았다. 겨누는 자리만 옮기고 뜻은 그대로 지킨다. */
+  assert.match(src, /KcareerNotices\.decide\(/,
+    '손실 판정을 제 잣대로 하면 폰에 거짓 경보가 다시 뜹니다');
+  assert.match(src, /deleted:del/, '«내가 지운 것»을 넘기지 않으면 지울 때마다 겁줍니다');
   assert.match(src, /var del=tombCount\(\)/, '지운 자리표 수를 반드시 밑에 놓고 견다');
+  /* ★ 그리고 «실제로» 그렇게 도는지 본다 — 글자만 보면 기능을 꺼도 통과한다 */
+  const _N = require('../js/kcareer-notices.js');
+  const 때 = 1789113407290;
+  assert.equal(_N.decide({ base:때, cloudAt:때, here:700, cloud:709, deleted:9 }).loss.show,
+    false, '«내가 지운 만큼»으로 설명되는데 손실이라 합니다');
+  assert.equal(_N.decide({ base:때, cloudAt:때, here:79, cloud:197, deleted:0 }).loss.show,
+    true, '★ 진짜 손실(위촉장 197→79)을 못 잡습니다');
   assert.match(src, /fbLossNotice/);
   // 로그인할 때 검사해야 의미가 있다
   assert.match(source, /if\(typeof fbCheckLoss==='function'\)\{ try\{ fbCheckLoss\(\); \}catch\(e\)\{\} \}/);

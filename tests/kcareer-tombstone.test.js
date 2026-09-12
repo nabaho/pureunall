@@ -106,8 +106,16 @@ test('★★ 「없어진 것만 되살리기」는 «내가 지운 것»을 켜
 test('★★ 손실 판정에서 «내가 지운 것»을 뺀다 — 거짓 경보가 고리를 돌렸다', () => {
   const fn = cutFn(bare, 'function fbCheckLoss()');
   assert.match(fn, /var del=tombCount\(\)/);
-  assert.match(fn, /cloud\.total - del <= here\.total \+ 5/,
-    '★ 이 줄이 없으면 중복을 지울 때마다 「자료가 지워졌을 수 있습니다」가 뜹니다');
+  /* ⚠ 2026-09-12: 셈은 js/kcareer-notices.js 로 옮겼다(폰 거짓 경보를 함께 가리려고).
+     넘기는지 보고, 실제로 그렇게 도는지도 본다. */
+  assert.match(fn, /deleted:del/,
+    '★ 지운 수를 안 넘기면 중복을 지울 때마다 「자료가 지워졌을 수 있습니다」가 뜹니다');
+  const N2 = require('../js/kcareer-notices.js');
+  const t = 1789113407290;
+  assert.equal(N2.decide({ base:t, cloudAt:t, here:700, cloud:709, deleted:9 }).loss.show, false,
+    '★ 내가 지운 것을 손실이라 합니다');
+  assert.equal(N2.decide({ base:t, cloudAt:t, here:700, cloud:709, deleted:0 }).loss.show, true,
+    '★ 지운 것이 없는데도 손실로 안 봅니다 — 빗장이 통째로 풀렸습니다');
 });
 
 test('★★ 낡은 클라우드에는 «되살리기»가 아니라 «올리기»를 권한다', () => {
