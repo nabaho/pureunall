@@ -429,7 +429,7 @@
      'other' 로 굳은 사진들이었다. 사람이 한 장씩 「다시 판독」을 눌러야만
      풀리는 상태는 자동 분류라고 할 수 없다.
      ⚠ 종류를 늘리거나 프롬프트를 고치면 이 번호를 반드시 올릴 것. */
-  var READ_VERSION = 16;  // …/ 11 = 글자 있는 PDF 는 글자로 판독(그림 왕복 없음) / 12 = 통장·계좌(bankbook) 갈래 추가 / 13 = 통장·근로자서류 다섯이 KINDS 에 빠져 other 로 굳던 것을 고침 + 급여명세서 이름 / 14 = 근로계약서(wcontract) 갈래 / 15 = 근로계약서의 임금(사람이 확인해야 산다)
+  var READ_VERSION = 17;  // …/ 11 = 글자 있는 PDF 는 글자로 판독(그림 왕복 없음) / 12 = 통장·계좌(bankbook) 갈래 추가 / 13 = 통장·근로자서류 다섯이 KINDS 에 빠져 other 로 굳던 것을 고침 + 급여명세서 이름 / 14 = 근로계약서(wcontract) 갈래 / 15 = 근로계약서의 임금(사람이 확인해야 산다) / 16 = … / 17 = 한 묶음 안의 «서로 다른 서류»를 쪽마다 갈라 읽는다(docs[])
 
   /* ── 「물음」이 바뀐 판 (대표 결정 2026-08-24) ──
      READ_VERSION 은 **판독기 전체**의 판이다 — 읽는 «길»이 바뀌어도 올라간다.
@@ -456,7 +456,7 @@
        contract 로 굳어 「사진첩에서 계약서 찾기」(자문계약 창)에 섞여 들어갔다.
        올려야 이미 굳은 것들이 스스로 제자리를 찾는다.
      ⚠ 다시 읽기는 화면을 열 때 세 장씩만 한다(AUTO_RESTALE_MAX). */
-  var PROMPT_VERSION = 16;
+  var PROMPT_VERSION = 17;
 
   function fail(message) {
     return { kind: 'other', fields: {}, bizNoOk: null, ntsChecked: false, ntsState: null, error: message };
@@ -579,10 +579,28 @@
   /* 여러 쪽을 한 번에 보낼 때 덧붙이는 말 (대표 결정 2026-08-10: "문서 통째로 한 번").
      계약서는 보수가 2조, 기간이 6조, 서명이 마지막 쪽에 흩어져 있다. 쪽마다 따로
      보면 아무도 문서 전체를 못 봐서 2쪽 이후는 죄다 빈칸으로 돌아온다. */
+  /* ⚠★ 2026-09-12 — 「한 벌만」에서 「서류마다 한 벌」로 넓혔다 (대표 지시).
+       한 묶음에 **서로 다른 서류**가 들어 있는 일이 흔하다. 실제로 겪은 것:
+       1쪽 자문계약서 + 2쪽 「계좌/신용카드 자동출금 이용신청서」를 한 파일로 스캔.
+       예전 규칙으로는 한 벌만 받아 두 쪽 다 contract 가 되었고, **2쪽의 은행·계좌·
+       출금일이 통째로 사라졌다**(실측: 그 칸들이 전부 빈 문자열이었다).
+     ★ 그래도 «한 서류가 여러 쪽»이면 반드시 합쳐 읽는다 — 그것이 위 2026-08-10
+       결정의 까닭이고, 가르면 2쪽 이후가 죄다 빈칸이 된다. 둘 다 지켜야 한다.
+     ⚠ 부르는 횟수는 늘지 않는다. 한 번 보내고 «답만» 나눠 받는다. */
   var MULTI_NOTE =
-    '\n\n이 그림들은 **한 문서의 여러 쪽**이며 쪽 순서대로 놓여 있습니다.' +
-    ' 쪽마다 따로 답하지 말고 **전체를 함께 읽어 한 벌의 JSON**만 주세요.' +
-    ' 항목이 여러 쪽에 흩어져 있으면 찾아서 채우고, 어느 쪽에도 없으면 빈 문자열로 두세요.';
+    '\n\n이 그림들은 한 묶음으로 스캔한 **여러 쪽**이며 쪽 순서대로 놓여 있습니다.' +
+    ' 첫 그림이 1쪽입니다.' +
+    '\n\n■ 쪽을 «서류 단위»로 묶어 주세요.' +
+    '\n· 여러 쪽이 **한 서류**이면(계약서처럼 조항이 이어지면) 반드시 **합쳐서 한 벌**로 읽으세요.' +
+    ' 항목이 여러 쪽에 흩어져 있으면 찾아서 채웁니다.' +
+    '\n· 한 묶음에 **서로 다른 서류**가 들어 있으면(예: 1쪽 자문계약서 + 2쪽 자동이체 신청서)' +
+    ' **서류마다 따로** 읽으세요.' +
+    '\n\n■ 답은 이 꼴로 주세요:' +
+    '\n{"docs":[{"pages":[1],"kind":"contract","fields":{…}},{"pages":[2],"kind":"cms","fields":{…}}]}' +
+    '\n· pages 는 그 서류가 걸친 쪽 번호입니다(1부터).' +
+    ' 모든 쪽이 한 서류면 docs 는 **한 칸**이고 pages 에 모든 쪽을 적습니다.' +
+    '\n· kind 와 fields 는 위에서 말한 규칙 그대로, 서류마다 따로 채웁니다.' +
+    '\n· 쪽을 빠뜨리지 마세요 — 모든 쪽이 어느 한 서류에는 들어가야 합니다.';
 
   /* ── 급여표 판독 (급여데이터함 전용) ──
      위 PROMPT_ALL 의 kind=payslip 은 사진첩·기업정보함·업체관리가 함께 쓰는 프롬프트라
@@ -1001,7 +1019,7 @@
       return askProxy(parts, opts).then(function (j) {
         var parsed = parseReply(j);
         if (!parsed) throw new Error('AI가 알아볼 수 없는 답을 보냈습니다');
-        return afterRead(parsed, via);
+        return afterReadDocs(parsed, via);
       }).catch(function (e) {
         return fail((e && e.message) || String(e));
       });
@@ -1021,7 +1039,7 @@
       }).then(function (j) {
         var parsed = parseReply(j);
         if (!parsed) throw new Error('AI가 알아볼 수 없는 답을 보냈습니다');
-        return afterRead(parsed, via);
+        return afterReadDocs(parsed, via);
       }).catch(function (e) {
         return fail((e && e.message) || String(e));
       });
@@ -1133,6 +1151,60 @@
       read.bizNoOk = bizNoValid(read.fields.bizno);
     }
     return filled;
+  }
+
+  /* ══ 한 묶음에 «서로 다른 서류»가 들어 있을 때 (대표 지시 2026-09-12) ══════════
+       AI 가 docs:[{pages,kind,fields},…] 로 갈라 주면 서류마다 따로 다듬는다.
+
+     ★ 왜 필요한가 — 1쪽 자문계약서 + 2쪽 자동이체 신청서를 한 파일로 스캔한 것이
+       두 쪽 다 contract 로 굳었고, **2쪽의 은행·계좌·출금일이 통째로 사라졌다**
+       (2026-09-11 실측). 자동이체를 기업정보함·푸른이알피로 보내는 길은 이미
+       만들어져 있었는데 «재료»가 안 와서 한 번도 안 돌았다.
+
+     ⚠ **한 벌만 올 때는 예전과 한 글자도 다르지 않게** 둔다 — docs 를 안 붙인다.
+       붙이면 한 쪽짜리 서류까지 새 길로 흘러 부르는 곳이 전부 흔들린다.
+     ⚠ 맨 앞 서류를 «대표»로 삼아 kind·fields 에 그대로 둔다. 이미 이 값을 보는
+       곳이 열 군데가 넘는다(기업정보함 보내기·갈래 탭·검색·다시 읽기 판정 …) —
+       그 자리를 비우면 그 모두가 조용히 멎는다. */
+  function afterReadDocs(parsed, via) {
+    var list = (parsed && Array.isArray(parsed.docs)) ? parsed.docs.filter(Boolean) : [];
+    if (list.length < 2) {
+      /* 한 서류다 — 옛 길 그대로. docs 안에 한 칸만 담겨 온 경우도 여기로 온다. */
+      return afterRead(list.length === 1 ? flatDoc(list[0]) : parsed, via);
+    }
+    return Promise.all(list.map(function (d) { return afterRead(flatDoc(d), via); }))
+      .then(function (outs) {
+        var head = outs[0];
+        head.docs = outs.map(function (o, i) {
+          return {
+            pages: pagesOf(list[i]),
+            kind: o.kind, fields: o.fields,
+            bizNoOk: o.bizNoOk, ntsChecked: o.ntsChecked, ntsState: o.ntsState
+          };
+        });
+        return head;
+      });
+  }
+  /* {pages,kind,fields} → afterRead 가 아는 납작한 꼴. pages 는 칸이 아니라 «자리»라 뺀다. */
+  function flatDoc(d) {
+    var o = { kind: (d && d.kind) || 'other' };
+    var f = (d && d.fields) || {};
+    for (var k in f) {
+      if (!Object.prototype.hasOwnProperty.call(f, k) || k === 'pages') continue;
+      o[k] = f[k];
+    }
+    return o;
+  }
+  /* 쪽 번호를 1부터의 숫자 배열로. 못 알아보면 빈 배열 — 화면이 「몇 쪽인지 모른다」로 본다. */
+  function pagesOf(d) {
+    var p = d && d.pages;
+    if (!Array.isArray(p)) p = (p === undefined || p === null || p === '') ? [] : [p];
+    var out = [];
+    p.forEach(function (n) {
+      var v = Math.round(Number(n));
+      if (isFinite(v) && v >= 1 && out.indexOf(v) < 0) out.push(v);
+    });
+    return out.sort(function (a, b) { return a - b; });
   }
 
   function afterRead(parsed, via) {
@@ -1833,6 +1905,6 @@
        ⚠ 예전에는 검사들이 이 함수의 «본문만 베어» 따로 돌렸다. 그러다 이 함수가
          옆 함수(fillFromPairs)를 부르기 시작하자, 코드는 멀쩡한데 검사 셋이
          한꺼번에 「없는 함수」로 넘어졌다(2026-08-26). 베지 말고 여기로 부른다. */
-    _afterReadForTest: function (parsed, via) { return afterRead(parsed, via); }
+    _afterReadForTest: function (parsed, via) { return afterReadDocs(parsed, via); }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

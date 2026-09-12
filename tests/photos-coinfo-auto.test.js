@@ -22,6 +22,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { cutFn } = require('./cut-fn.js');
+/* ⚠ 소스를 «글자로» 보는 검사는 주석을 먼저 걷는다(이 저장소 규칙) — 안 걷으면
+   설명 한 줄이 사이에 끼는 것만으로 「따로 두지 않았다」는 엉뚱한 말이 나온다. */
+const { stripJs } = require('./strip-comments.js');   // ⚠ 함수 «조각»에는 stripJs (stripComments 는 html 전체용이라 아무것도 안 걷는다)
 
 const R = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(R, 'pu-photos.html'), 'utf8');
@@ -160,31 +164,47 @@ test('해를 안 주면 사진에 새겨진 해를 쓰고, 그것도 없으면 �
 
 /* ══════ ③ 배선 — 두 길 다 ══════ */
 
+/* ⚠ 2026-09-12 — 예전에는 소스의 «한 줄»을 글자 그대로 찾았다(변수 이름까지).
+     한 묶음의 서류를 갈라 보내게 되면서 그 줄이 바뀌자 뜻은 그대로인데 검사가 깨졌다.
+     이제 «두 길이 다 부르는가 · 따로 부르는가»만 본다 — 그것이 지킬 규칙이다.
+   ★ 「두 길」은 ①올린 뒤 판독(startRead) ②다시 판독(readPhoto) 이다. */
+const 올린길 = stripJs(cutFn(app, 'function startRead('));
+const 다시길 = stripJs(cutFn(app, 'function readPhoto('));
+
 test('★ 올린 뒤 판독한 길에서 스스로 보낸다', () => {
-  const i = app.indexOf('if (read.auto && canSendCo(read)) return sendCompany(sibs[0].id, year, sibs[0]);');
-  assert.ok(i > 0, '업체관리 자동 보내기 자리를 찾지 못했습니다');
-  const seg = app.slice(i, i + 700);
-  assert.match(seg, /autoSendCoInfo\(read\)\) return sendCoInfo\(sibs\[0\]\.id, year, sibs\[0\]\)/,
-    '★ 안 부르면 자동이 아닙니다');
+  assert.match(올린길, /autoSendCoInfo\(/, '★ 안 부르면 자동이 아닙니다');
+  assert.match(올린길, /sendCoInfo\(/);
+  assert.match(올린길, /canSendCo\(/);
+  assert.match(올린길, /sendCompany\(/, '업체관리 자동 보내기 자리를 찾지 못했습니다');
 });
 
 test('★ 「다시 판독」 길에서도 스스로 보낸다 — 한쪽만 넣으면 「올릴 때는 되는데」가 된다', () => {
-  const i = app.indexOf('if (read.auto && canSendCo(read)) return sendCompany(pages[0].id, photoYearOf(pages[0].id), null);');
-  assert.ok(i > 0, '다시 판독 쪽 자리를 찾지 못했습니다');
-  const seg = app.slice(i, i + 700);
-  assert.match(seg, /autoSendCoInfo\(read\)\) return sendCoInfo\(pages\[0\]\.id, photoYearOf\(pages\[0\]\.id\), null\)/);
+  assert.match(다시길, /autoSendCoInfo\(/, '다시 판독 쪽 자리를 찾지 못했습니다');
+  assert.match(다시길, /sendCoInfo\(/);
+  assert.match(다시길, /canSendCo\(/);
+  assert.match(다시길, /sendCompany\(/);
 });
 
 test('★ 업체관리 보내기와 따로 둔다 — 한쪽이 실패해도 다른 쪽은 되어야 한다', () => {
   /* .then 을 나눠 달았는지 — 같은 then 안에 넣으면 앞엣것이 던지면 뒤가 안 돈다. */
-  const i = app.indexOf('sendCompany(sibs[0].id, year, sibs[0]);');
-  const seg = app.slice(i, i + 500);
-  assert.match(seg, /\}\)\.then\(function \(\) \{/, '★ 한 덩이에 넣으면 한쪽 실패가 다른 쪽을 삼킵니다');
+  [['올린 뒤', 올린길], ['다시 판독', 다시길]].forEach(function (x) {
+    const at = x[1].indexOf('sendCompany(');
+    assert.ok(at > 0, x[0] + ' 길에 업체관리 보내기가 없습니다');
+    assert.match(x[1].slice(at, at + 400), /\}\)?\s*\.then\(function \(\) \{/,
+      '★ ' + x[0] + ' 길에서 한 덩이에 넣으면 한쪽 실패가 다른 쪽을 삼킵니다');
+  });
 });
 
-test('★ 여러 쪽이어도 대표 쪽 하나만 — 쪽마다 보내면 같은 업체가 쪽수만큼 쌓인다', () => {
-  assert.ok(app.indexOf('sendCoInfo(sibs[0].id, year, sibs[0])') > 0);
-  assert.ok(app.indexOf('sendCoInfo(pages[0].id, photoYearOf(pages[0].id), null)') > 0);
+test('★ 여러 쪽이어도 «서류마다 하나»만 — 쪽마다 보내면 같은 업체가 쪽수만큼 쌓인다', () => {
+  /* ⚠ 2026-09-12 에 「대표 쪽 하나」에서 「서류마다 하나」로 넓혔다 — 한 묶음에
+     서류가 둘이면 맨 앞 하나만 보내서 2쪽 자동이체가 영영 안 갔다.
+     ★ 그래도 «쪽마다»는 아니다: 같은 서류의 여러 쪽은 한 번만 간다(docLeads 가 거른다). */
+  [['올린 뒤', 올린길], ['다시 판독', 다시길]].forEach(function (x) {
+    assert.match(x[1], /docLeads\(/,
+      '★★ ' + x[0] + ' 길이 서류마다 보내지 않습니다 — 2쪽 자동이체가 안 갑니다');
+    assert.doesNotMatch(x[1], /pages\.forEach\([\s\S]{0,200}sendCoInfo\(/,
+      '★★ 쪽마다 보내면 같은 업체가 쪽수만큼 쌓입니다');
+  });
 });
 
 test('이미 있는 값은 안 덮는다 — 자동이라 더욱 그래야 한다', async () => {

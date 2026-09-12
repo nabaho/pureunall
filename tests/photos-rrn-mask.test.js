@@ -154,6 +154,10 @@ function runReadPhoto(masked, opts) {
     cutFn(app, 'function freeReadTry('),
     cutFn(app, 'function freeReadAsk('),
     cutFn(app, 'function markFree('),
+    /* ⚠ 2026-09-12 — readPhoto 가 «서류마다» 답을 나눠 주게 되면서 이 둘을 부른다.
+       **원본 그대로** 싣는다 — 대역을 만들면 화면과 다른 규칙을 보게 된다. */
+    cutFn(app, 'function pageReads('),
+    cutFn(app, 'function docLeads('),
     cutFn(app, 'function readPhoto('),
     'var __p = readPhoto("p1", ' +
       (masked === undefined ? 'undefined' : JSON.stringify(masked)) + ');'
