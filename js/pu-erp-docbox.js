@@ -46,6 +46,7 @@
     if (o.sid !== undefined) deps.sid = String(o.sid || '');
     if (o.name !== undefined) deps.name = String(o.name || '');
     if (o.isAdmin !== undefined) deps.isAdmin = !!o.isAdmin;
+    forget();                      /* 사람이 바뀌면 들고 있던 목록은 남의 것이다 */
     return true;
   }
 
@@ -320,7 +321,7 @@
     if (t) u[TEXT_ROOT + '/' + rec.id] = {
       t: t.slice(0, TEXT_MAX), cut: t.length > TEXT_MAX, byUid: trim(rec.byUid)
     };
-    return deps.db.ref().update(u);
+    return deps.db.ref().update(u).then(function () { forget(); });
   }
 
   /* 새 서면 한 장을 짓는다 — 저장은 아직 안 한다. */
@@ -343,9 +344,18 @@
     };
   }
 
+  /* ── 한 번 읽은 목록은 «들고 있는다» (2026-09-13, 걸음 「다」) ──
+     사건 상세를 열 때마다 서면함을 통째로 다시 읽으면 그것이 곧 요금이다
+     (2026-08-16·08-26 에 두 번 겪었다). 담거나 다시 붙이면 버린다.
+     ⚠ 서면함 화면은 «일부러 보러 온 것»이라 늘 새로 읽는다(listMine(true)) —
+       그 사이에 동료가 담은 것이 안 보이면 안 된다. */
+  var _rows = null;
+  function forget() { _rows = null; }
+
   /* 내 목록 — 색인 한 자리만 읽는다. 관리자는 통째로 읽는다. */
-  function listMine() {
+  function listMine(force) {
     if (!deps.db) return Promise.resolve([]);
+    if (_rows && !force) return Promise.resolve(_rows);
     var where = deps.isAdmin ? IDX_ROOT : (IDX_ROOT + '/' + deps.uid);
     return deps.db.ref(where).once('value').then(function (snap) {
       var v = snap.val() || {}, out = [], seen = {};
@@ -359,7 +369,29 @@
       if (deps.isAdmin) Object.keys(v).forEach(function (uid) { eat(v[uid]); });
       else eat(v);
       out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+      _rows = out;
       return out;
+    });
+  }
+
+  /* 「이 사건(계약)의 서면」 — 사건·계약 상세가 부른다 (걸음 「다」).
+     ⚠ 서버에 다시 묻지 않는다. 내가 볼 수 있는 것은 이미 내 색인에 다 있다.
+     ⚠⚠ 종류(case/contract)를 «반드시» 함께 본다. 사건 번호와 계약 번호는 서로 다른
+       줄에서 매겨져 **같은 번호가 나올 수 있다** — id 만 보면 남의 계약 서면이
+       사건 상세에 들어앉는다.
+     ⚠ 차례는 여기서 «다시 정하지 않는다» — listMine 이 「늦게 담은 것이 위」로 이미
+       줄 세워 주고, 고르기(filter)는 그 차례를 지킨다. 두 곳에서 정하면 언젠가
+       어긋나고 그때 어느 쪽이 맞는지 아무도 모른다.
+     ★ 판 번호(ver)로 줄 세우지 «않는» 것도 뜻이 있다 — ver 은 「같은 종류 안에서만」
+       뜻이 있어서, 그것으로 세우면 어제 담은 이유서 v3 가 오늘 담은 답변서 v1 보다
+       위로 올라간다. */
+  function listFor(kind, id) {
+    var k = trim(kind), i = trim(id);
+    if (!k || !i) return Promise.resolve([]);
+    return listMine().then(function (rows) {
+      return (rows || []).filter(function (r) {
+        return trim(r.sourceKind) === k && trim(r.sourceId) === i;
+      });
     });
   }
 
@@ -392,7 +424,7 @@
     var u = {}, row = rowOf(next);
     u[ROOT + '/' + next.id] = next;
     Object.keys(next.who).forEach(function (uid) { u[IDX_ROOT + '/' + uid + '/' + next.id] = row; });
-    return deps.db.ref().update(u).then(function () { return next; });
+    return deps.db.ref().update(u).then(function () { forget(); return next; });
   }
 
   global.PuErpDocBox = {
@@ -405,7 +437,8 @@
     match: match, guessKind: guessKind,
     verKeyOf: verKeyOf, nextVer: nextVer, rowOf: rowOf, whoOf: whoOf,
     pathOf: pathOf, newId: newId,
-    build: build, upload: upload, save: save, listMine: listMine,
+    build: build, upload: upload, save: save,
+    listMine: listMine, listFor: listFor, forget: forget,
     read: read, readText: readText, reattach: reattach
   };
 })(typeof window !== 'undefined' ? window : this);

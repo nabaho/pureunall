@@ -408,3 +408,193 @@ test('㊳ 서면함 뿌리가 온톨로지 등록부에 적혀 있다', () => {
     assert.ok(ont.includes("'" + r + "'"), r + ' 가 없으면 온톨로지가 이 자료를 영영 못 본다');
   });
 });
+
+/* ══════════ 걸음 「다」 — 사건·계약 상세에 서면 붙여 보이기 ══════════ */
+
+/* 가짜 서버 하나 — «몇 번 물었는지»를 센다. 들고 있기(캐시)가 도는지는
+   그것 말고는 잴 길이 없다. */
+function 가짜DB(bag) {
+  const st = { 물은수: 0 };
+  st.db = {
+    ref(p) {
+      return {
+        once() { st.물은수++; return Promise.resolve({ val: () => bag }); },
+        update() { return Promise.resolve(); }
+      };
+    }
+  };
+  return st;
+}
+/* ⚠ 이 본보기는 «일부러» 두 군데가 얄궂다 —
+     ① d7 은 계약인데 번호가 사건 c1 과 «같다». 사건 번호와 계약 번호는 서로 다른
+        줄에서 매겨져 실제로 겹칠 수 있다. 종류를 안 보면 여기서 섞인다.
+     ② d6(답변서 v1)은 d2(이유서 v3)보다 «늦게» 담겼다. 판 번호로 먼저 줄 세우면
+        어제 담은 v3 가 오늘 담은 v1 보다 위로 올라간다. */
+const 색인 = {
+  d1: { kind:'이유서',   sourceKind:'case',     sourceId:'c1', ver:1, at:100, byName:'홍길동', ext:'HWP' },
+  d2: { kind:'이유서',   sourceKind:'case',     sourceId:'c1', ver:3, at:300, byName:'홍길동', ext:'HWP' },
+  d6: { kind:'답변서',   sourceKind:'case',     sourceId:'c1', ver:1, at:600, byName:'홍길동', ext:'HWP' },
+  d7: { kind:'남의계약서', sourceKind:'contract', sourceId:'c1', ver:1, at:700, byName:'임꺽정', ext:'PDF' },
+  d3: { kind:'체불진정서', sourceKind:'case',     sourceId:'c2', ver:1, at:200, byName:'임꺽정', ext:'HWP' },
+  d4: { kind:'자문의견서', sourceKind:'contract', sourceId:'k1', ver:1, at:400, byName:'임꺽정', ext:'DOCX' },
+  d5: { kind:'보관만',   sourceKind:'',         sourceId:'',   ver:1, at:500, byName:'홍길동', ext:'PDF' }
+};
+
+test('다① 「이 사건 서면」은 «늦게 담은 것»이 위로 온다', async () => {
+  const f = 가짜DB(색인);
+  D.init({ db: f.db, uid:'uidA', isAdmin:false });
+  const got = await D.listFor('case', 'c1');
+  assert.deepStrictEqual(Array.from(got).map(r => r.id), ['d6', 'd2', 'd1'],
+    '판 번호로 먼저 줄 세우면 어제 담은 이유서 v3 가 오늘 담은 답변서 v1 보다 위로 온다 — '
+    + 'ver 은 «같은 종류 안에서만» 뜻이 있다');
+});
+
+test('다② 번호가 같아도 «종류»가 다르면 안 섞인다', async () => {
+  const f = 가짜DB(색인);
+  D.init({ db: f.db, uid:'uidA', isAdmin:false });
+  const 사건 = Array.from(await D.listFor('case', 'c1')).map(r => r.id);
+  assert.ok(사건.indexOf('d7') < 0,
+    '사건 번호와 계약 번호는 서로 다른 줄에서 매겨져 겹칠 수 있다 — '
+    + '종류를 안 보면 남의 계약 서면이 사건 상세에 들어앉는다');
+  assert.deepStrictEqual(Array.from(await D.listFor('contract', 'c1')).map(r => r.id), ['d7']);
+});
+
+test('다③ 남의 사건·붙지 않은 것이 섞이지 않는다', async () => {
+  const f = 가짜DB(색인);
+  D.init({ db: f.db, uid:'uidA', isAdmin:false });
+  assert.deepStrictEqual(Array.from(await D.listFor('case', 'c2')).map(r => r.id), ['d3']);
+  assert.deepStrictEqual(Array.from(await D.listFor('contract', 'k1')).map(r => r.id), ['d4'],
+    '계약도 같은 길로 본다');
+  assert.strictEqual((await D.listFor('case', '없는사건')).length, 0);
+  assert.strictEqual((await D.listFor('', '')).length, 0, '무엇의 서면인지 모르면 묻지도 않는다');
+});
+
+test('다④ 상세를 열 때마다 서면함을 «다시 읽지 않는다»', async () => {
+  const f = 가짜DB(색인);
+  D.init({ db: f.db, uid:'uidA', isAdmin:false });
+  await D.listFor('case', 'c1');
+  await D.listFor('case', 'c2');
+  await D.listFor('contract', 'k1');
+  assert.strictEqual(f.물은수, 1,
+    '상세를 열 때마다 서면함을 통째로 다시 읽으면 그것이 곧 요금이다');
+});
+
+test('다⑤ 담거나 다시 붙이면 «들고 있던 것을 버린다»', async () => {
+  const f = 가짜DB(색인);
+  D.init({ db: f.db, uid:'uidA', isAdmin:false });
+  await D.listFor('case', 'c1');
+  assert.strictEqual(f.물은수, 1);
+  await D.save(D.build({ id:'d9', byUid:'uidA', kind:'새것' }), '');
+  await D.listFor('case', 'c1');
+  assert.strictEqual(f.물은수, 2, '담고 나서도 옛 목록을 보여 주면 방금 담은 것이 안 보인다');
+  await D.reattach(D.build({ id:'d9', byUid:'uidA' }), { sourceKind:'case', sourceId:'c1' });
+  await D.listFor('case', 'c1');
+  assert.strictEqual(f.물은수, 3, '다시 붙였는데 옛 자리에 그대로 보이면 안 된다');
+});
+
+test('다⑥ 사람이 바뀌면 들고 있던 목록을 버린다 — 남의 것이다', async () => {
+  const f = 가짜DB(색인);
+  D.init({ db: f.db, uid:'uidA', isAdmin:false });
+  await D.listFor('case', 'c1');
+  D.init({ uid:'uidB' });
+  await D.listFor('case', 'c1');
+  assert.strictEqual(f.물은수, 2, '로그인이 바뀌었는데 앞사람 목록을 보여 주면 안 된다');
+});
+
+test('다⑦ 서면함 화면은 «늘 새로» 읽는다 — 일부러 보러 온 자리다', () => {
+  const reload = cutFn(ERP, 'function reload()');
+  assert.match(reload, /listMine\(\s*true\s*\)/,
+    '들고 있던 것을 보여 주면 그 사이 동료가 담은 서면이 안 보인다');
+});
+
+test('다⑧ 사건 상세가 «무엇의 서면인지»를 넘겨 준다', () => {
+  const f = cutFn(ERP, 'function CaseDetailModal(props)');
+  assert.match(f, /docRef:\s*\{\s*kind:'case'/, '사건 상세에서 서면이 안 보인다');
+  const u = cutFn(ERP, 'function UnifiedDetailModal(props)');
+  assert.match(u, /props\.docRef\s*&&\s*h\(ItemDocsPanel/,
+    '줄 것이 없으면 안 그려야 한다 — 컨설팅·기금에 늘 「0건」이 뜨면 눈이 배경으로 배운다');
+});
+
+test('다⑨ 계약 보관함에도 그 계약 서면이 보인다', () => {
+  const f = cutFn(ERP, 'function ContractDocVault(props)');
+  assert.match(f, /h\(ItemDocsPanel,\s*\{\s*kind:'contract'/);
+});
+
+test('다⑩ 서면을 여는 길은 «한 곳»이다', () => {
+  const box = cutFn(ERP, 'function openDoc(row)');
+  assert.match(box, /erpDocOpen\(/, '서면함이 제 길을 따로 들고 있으면 두 벌이 된다');
+  assert.ok(!/window\.open\(/.test(box), '여는 일은 erpDocOpen 한 곳에서만 한다');
+  const panel = cutFn(ERP, 'function ItemDocsPanel(props)');
+  assert.match(panel, /erpDocOpen\(/);
+  assert.ok(!/window\.open\(/.test(panel));
+});
+
+/* ── 패널을 «진짜 자료 길로» 그려 본다 ─────────────────────────────────
+   useEffect 까지 돌린다 — 멈춘 그림만 보면 「불러오는 중」에서 안 넘어가는 것을 못 잡는다. */
+async function 패널그리기(bag, props) {
+  const cells = [];
+  let idx = 0;
+  const effects = [];
+  const h = (type, p, ...kids) => {
+    const flat = [];
+    const eat = k => { if (k == null || k === false) return;
+      if (Array.isArray(k)) k.forEach(eat); else flat.push(k); };
+    kids.forEach(eat);
+    return { type, props: p || {}, kids: flat };
+  };
+  const 글자 = n => {
+    if (n == null || n === false) return '';
+    if (typeof n !== 'object') return String(n);
+    if (Array.isArray(n)) return n.map(글자).join('');
+    const p = n.props || {};
+    return [p.title].filter(v => typeof v === 'string').join(' ') + n.kids.map(글자).join('');
+  };
+  const f = 가짜DB(bag);
+  const box = {
+    h,
+    useState: v => { const i = idx++; if (!(i in cells)) cells[i] = v;
+      return [cells[i], x => { cells[i] = typeof x === 'function' ? x(cells[i]) : x; }]; },
+    useEffect: fn => { effects.push(fn); },
+    console, Object, Array, String, Number, Math, Date, JSON, Promise, parseInt, isNaN,
+    showToast: () => {},
+    /* 서면함 채비는 이미 됐다고 친다 — 여기서 재는 것은 «목록이 그려지는가»다 */
+    erpDocBoxReady: () => Promise.resolve({}),
+    erpDocWhen: () => '9-11',
+    erpDocOpen: () => Promise.resolve()
+  };
+  box.window = box;
+  vm.createContext(box);
+  vm.runInContext(MOD_SRC, box);
+  vm.runInContext(cutFn(ERP, 'function ItemDocsPanel(props)'), box);
+  box.PuErpDocBox.init({ db: f.db, uid: 'uidA', isAdmin: false });
+
+  idx = 0; box.ItemDocsPanel(props);        /* 첫 그림 — 여기서 효과가 걸린다 */
+  effects.forEach(fn => fn());
+  await new Promise(r => setTimeout(r, 0));  /* 서버 답을 기다린다 */
+  idx = 0;
+  return 글자(box.ItemDocsPanel(props));     /* 답이 온 뒤의 그림 */
+}
+
+test('다⑪ 패널이 «불러오는 중»에서 끝나지 않고 그 사건 서면을 그린다', async () => {
+  const t = await 패널그리기(색인, { kind:'case', id:'c1', label:'이 사건 서면' });
+  assert.match(t, /이 사건 서면 3건/, '몇 건인지가 먼저다');
+  assert.match(t, /이유서/);
+  assert.ok(!/불러오는 중/.test(t), '답이 왔는데 「불러오는 중」에 멈춰 있다');
+  assert.ok(!/체불진정서/.test(t), '남의 사건 서면이 섞였다');
+  assert.ok(!/남의계약서/.test(t), '번호가 같은 «계약» 서면이 사건 상세에 들어앉았다');
+  assert.match(t, /v3/, '몇 판째인지 없으면 어느 것이 마지막인지 모른다');
+  assert.ok(t.indexOf('답변서') < t.indexOf('이유서'),
+    '늦게 담은 것이 위로 와야 한다 — 화면에서도 그 차례여야 뜻이 있다');
+});
+
+test('다⑫ 0건이어도 «한 줄»은 남긴다 — 없는 줄 알고 또 찾아다니지 않게', async () => {
+  const t = await 패널그리기(색인, { kind:'case', id:'없는사건' });
+  assert.match(t, /0건/);
+  assert.match(t, /서면함에 한글 파일을 올리면/, '어디서 올리는지 없으면 막다른 길이다');
+});
+
+test('다⑬ 「내가 볼 수 있는 것만」이라고 적는다 — 0건과 «없다»는 다른 말이다', async () => {
+  const t = await 패널그리기(색인, { kind:'case', id:'c1' });
+  assert.match(t, /내가 볼 수 있는 것만/,
+    '담당이 아니라 안 보이는 것과 정말 서면이 없는 것이 똑같아 보이면 안 된다');
+});
