@@ -963,7 +963,7 @@ function fundRow(f,no,mode,showReg){
     /* ⚠ nowrap·말줄임을 쓰지 «않는다» — 이름을 다 적기로 했으므로(대표 지시 2026-09-13)
          칸이 좁으면 «접어서» 보여야 한다. 말줄임으로 잘라 두면 「외 1」과 다를 것이 없다.
          한국말은 낱말째 접는다(keep-all) — break-word 는 「예산군」을 쪼갠다. */
-    +'<td class="ph" style="word-break:keep-all;line-height:1.35" title="'+esc(_gc.title)+'">'+_gc.t+'</td>'
+    +'<td class="ph" style="white-space:nowrap;line-height:1.35" title="'+esc(_gc.title)+'">'+_gc.t+'</td>'
     /* 이름은 «안 접는다» — 「김혜민」이 석 줄로 쌓이면 줄 키가 그만큼 는다(폰 실측) */
     +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td>'
     +'<td class="muted mo">'+(subn?esc(subn):'—')+'</td>'
@@ -983,7 +983,7 @@ function fundEditRow(f,no){   // 정보 채우기 모드 — 핵심 6필드 인�
   var n=nDone(f),chip=n===5?'ok':n>=3?'warn':'dg';
   var g=fundGovCell(f._id);
   return '<tr><td class="no">'+no+'</td><td style="font-weight:700">'+esc(f.short_name||f.name)+'</td>'
-    +'<td class="ph" style="word-break:keep-all;line-height:1.35" title="'+esc(g.title)+'">'+g.t+'</td>'+tds
+    +'<td class="ph" style="white-space:nowrap;line-height:1.35" title="'+esc(g.title)+'">'+g.t+'</td>'+tds
     +'<td><span class="chip '+chip+'" id="lc-'+f._id+'">'+n+'/5</span></td></tr>';
 }
 /* 칸 목록 하나에서 «머리와 폭»을 함께 만든다 — 따로 적으면 언젠가 어긋난다.
@@ -1006,7 +1006,7 @@ function fundTable(list,edit,mode){
          열여섯 줄 가운데 어느 것이 어디인지 매번 다시 짚어야 한다.
        ⚠ 기금명 «바로 오른쪽»에 둔다 — 목록 표와 같은 자리여야 눈이 안 옮겨 다닌다. */
     return '<div class="tblwrap"><table><thead><tr><th>번호</th><th>기금명</th>'
-      +'<th class="ph" style="width:204px" title="참여사업장 소재지에서 셈합니다">참여 지자체</th>'
+      +'<th class="ph" style="width:252px" title="참여사업장 소재지에서 셈합니다">참여 지자체</th>'
       +LED_COLS.map(function(c){return '<th>'+c[1]+'</th>';}).join('')+'<th>완성도</th></tr></thead><tbody>'
       +list.map(function(f,i){return fundEditRow(f,i+1);}).join('')+'</tbody></table></div>';
   }
@@ -1035,7 +1035,7 @@ function fundTable(list,edit,mode){
        표마다 제 내용에 맞춰 칸을 잡아 위아래 열이 어긋난다(이 표가 fixcol 인 까닭). */
   /* 폭은 «칸 셋»에 맞춘다(64px×3=192 + 여백=204px) — 지자체를 칸마다 나눠 세로로
      맞추므로(govCells), 폭이 칸 크기의 배수여야 넷째가 반쯤 걸쳐 서지 않는다. */
-  cols.push(['참여 지자체','ph','204px','참여사업장 소재지에서 셈합니다 — 올리면 몇 곳인지 보입니다']);
+  cols.push(['참여 지자체','ph','252px','참여사업장 소재지에서 셈합니다 — 올리면 몇 곳인지 보입니다']);
   cols.push(['주담당','','132px'],['부담당','mo','112px'],['대표자','mo','112px'],['정보','ph','104px']);
   if(showReg) cols.push(['분류','ph','120px','지역·묶음 분류 — 바꾸면 지역기금↔공동기금으로 옮겨집니다']);
   cols.push(['계약관계','','122px']);
@@ -1809,7 +1809,13 @@ function govShort(sites){
    ⚠ 폭을 고정한다(min-width 가 아니라 width) — min-width 면 긴 이름 하나가 뒤를 밀어
      정렬이 그 줄부터 어긋난다. 시·군·구 이름은 길어야 넉 자다(동두천시).
    ⚠ 가운데가 아니라 «왼쪽»으로 맞춘다 — 가운데면 글자 수가 다를 때 또 어긋난다. */
-var GOV_CELL_W=64;
+/* ⚠ 폭을 «재서» 정했다 (2026-09-13 「한줄로 길게」). 이 표는 table-layout:fixed 라
+     적어 둔 폭이 곧 전부이고, 칸 여백은 th,td{padding:8px 10px} = 좌우 20px 다.
+     처음에 칸 64px · 열 204px 로 두었더니 쓸 수 있는 폭이 184px 뿐이라
+     칸 셋(192px)이 «한 줄에 안 들어가» 접혔다 — 대표 화면이 두 줄이었다.
+     이제 칸 58px(넉 자 「동두천시」가 13px 로 ~52px) · 열 252px = 58×4 + 20.
+   ⚠ 열 폭을 고칠 때는 이 셈을 «함께» 고칠 것 — 한쪽만 고치면 다시 접힌다. */
+var GOV_CELL_W=58, GOV_CELL_PAD=20, GOV_COL_N=4;
 function govCells(names){
   return (names||[]).map(function(s){
     return '<span style="display:inline-block;width:'+GOV_CELL_W+'px;text-align:left;'

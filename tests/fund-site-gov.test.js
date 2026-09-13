@@ -345,14 +345,33 @@ test('★★ ㉑-4 지자체를 «칸마다 나눠» 같은 폭으로 세운다 
   assert.ok(h.indexOf('text-align:left') >= 0, '★ 가운데 맞추면 글자 수가 다를 때 또 어긋납니다.');
 });
 
-test('★★ ㉑-5 열 폭이 «칸 크기의 배수»다 — 아니면 넷째가 반쯤 걸쳐 선다', () => {
-  const b = load([grabDecl('GOV_CELL_W'), 'this.W=GOV_CELL_W;']);
+/* ★★★ 2026-09-13 실사고 — 대표 화면에서 지자체가 «두 줄»로 접혔다(「한줄로 길게」).
+   이 표는 table-layout:fixed 라 적어 둔 폭이 곧 전부이고, 칸 여백(padding 8px 10px)이
+   좌우 20px 를 먹는다. 칸 64px · 열 204px 이면 쓸 수 있는 폭이 184px 뿐이라
+   칸 셋(192px)이 «안 들어간다». 폭을 눈대중으로 정하면 이 일이 또 난다 — 셈으로 못 박는다. */
+test('★★★ ㉑-5 열 폭이 «칸 여백까지 셈해» 정해져 있다 — 눈대중이면 또 접힌다', () => {
+  const b = load([grabDecl('GOV_CELL_W'), 'this.W=GOV_CELL_W; this.PAD=GOV_CELL_PAD; this.N=GOV_COL_N;']);
+  assert.ok(b.PAD >= 20, '칸 여백(th,td padding 8px 10px = 좌우 20px)을 셈에 안 넣었습니다.');
+  const 있어야할폭 = b.W * b.N + b.PAD;
   const t = grabCode('fundTable');
   const m = /'참여 지자체','ph','(\d+)px'/.exec(t);
   assert.ok(m, '목록 열 폭을 못 찾았습니다.');
-  const 폭 = Number(m[1]);
-  assert.ok(폭 >= b.W * 3, '★ 칸 셋이 한 줄에 안 들어갑니다(' + 폭 + 'px < ' + (b.W * 3) + 'px).');
-  assert.ok(폭 - b.W * 3 < b.W, '★ 넉 자리만큼 넓어 빈 자리가 큽니다.');
+  assert.equal(Number(m[1]), 있어야할폭,
+    '★ 열 폭이 셈과 다릅니다 — 칸 ' + b.N + '개(' + b.W + 'px)와 여백 ' + b.PAD + 'px 를 더하면 '
+    + 있어야할폭 + 'px 여야 합니다. 모자라면 지자체가 두 줄로 접힙니다.');
+  /* 「정보 채우기」 표도 같은 폭이어야 한다 — 다르면 두 표의 열이 어긋난다 */
+  assert.ok(t.indexOf('width:' + 있어야할폭 + 'px') >= 0 || grabCode('fundTable').indexOf(String(있어야할폭)) >= 0,
+    '★ 정보 채우기 표의 폭이 다릅니다.');
+});
+
+test('★★★ ㉑-7 지자체가 «한 줄»로 선다 — 접히면 줄 키가 두 배가 된다', () => {
+  [grabCode('fundRow'), grabCode('fundEditRow')].forEach(function (fn, i) {
+    const 어디 = i ? '정보 채우기' : '목록';
+    assert.match(fn, /white-space:nowrap/,
+      '★ ' + 어디 + ' 줄에서 지자체가 접힙니다 — 「한 줄로」 두어야 합니다.');
+    assert.ok(fn.indexOf('word-break:keep-all') < 0,
+      '★ ' + 어디 + ' 줄이 아직 낱말째 접습니다 — nowrap 과 어긋납니다.');
+  });
 });
 
 test('★★ ㉑-6 목록 줄이 그 나눈 칸을 «정말 쓴다» — 따로 이어 붙이면 정렬이 헛돈다', () => {
@@ -368,12 +387,19 @@ test('★ ㉑-2 지자체가 많아도 «다» 적는다 — 몇 곳이든 줄�
   assert.equal(r.text, '예산군·공주시·보령시·아산시·천안시·서산시');
 });
 
-test('★★ ㉑-3 칸이 좁으면 «접어서» 보인다 — 말줄임으로 자르면 「외 n」과 다를 것이 없다', () => {
-  const row = grabFn('fundRow');
-  assert.ok(row.indexOf('text-overflow:ellipsis') < 0 || row.indexOf('참여 지자체') < 0,
-    '★ 지자체 칸을 말줄임으로 잘랐습니다 — 이름을 다 적기로 한 뜻이 사라집니다.');
-  assert.match(row, /word-break:keep-all/,
-    '★ 한국말을 낱말째 접지 않습니다 — 「예산군」이 「예산 / 군」으로 쪼개집니다.');
+/* ★ 2026-09-13 — 「한줄로 길게」로 방침이 바뀌었다.
+   처음에는 «좁으면 접는다»로 두었더니 대표 화면에서 두 줄이 되어 줄 키가 두 배가 됐다.
+   이제 한 줄로 두고, 대신 열 폭을 «칸 여백까지 셈해» 넉넉히 잡는다(㉑-5).
+   ⚠ 넘치면 조용히 사라지지 «않는다» — 이 표는 td 에 text-overflow:ellipsis 가 걸려 있어
+     「…」가 뜨고, 올림말에 전부와 곳 수가 들어 있다. */
+test('★★ ㉑-3 한 줄로 두되, 넘치면 «표가 말해 준다» — 조용히 사라지지 않는다', () => {
+  const row = grabCode('fundRow');
+  assert.match(row, /white-space:nowrap/, '★ 아직 접습니다 — 「한 줄로」여야 합니다.');
+  /* 넘쳤을 때 「…」가 뜨는 장치가 표에 걸려 있는가 */
+  assert.match(SRC, /table\.fixcol td\{overflow:hidden;text-overflow:ellipsis\}/,
+    '★ 넘친 것이 조용히 잘립니다 — 「…」가 떠야 줄인 줄 압니다.');
+  /* 올림말에 전부가 들어 있는가 — 줄어든 것을 볼 길이 있어야 한다 */
+  assert.match(row, /title="'\+esc\(_gc\.title\)\+'"/, '올림말에 전부를 안 담았습니다.');
 });
 
 test('㉒ 사업장이 없으면 «—», 주소를 다 못 읽으면 그렇다고 적는다', () => {
