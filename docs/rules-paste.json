@@ -308,6 +308,52 @@
       ".read": "auth != null",
       ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)"
     },
+    "erp_docs": {
+      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "$docId": {
+        ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)) && (data.child('who').child(auth.uid).exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)) && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (!data.exists() && newData.exists() && newData.child('byUid').val() === auth.uid) || (data.exists() && newData.exists() && data.child('who').child(auth.uid).exists()))",
+        ".validate": "!newData.exists() || newData.hasChildren(['id','byUid','who','at'])",
+        "byUid": {
+          ".validate": "newData.isString() && newData.val().length <= 60"
+        },
+        "who": {
+          ".validate": "newData.hasChildren()"
+        }
+      }
+    },
+    "erp_doc_idx": {
+      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "$uid": {
+        ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)) && (auth.uid === $uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        "$docId": {
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)",
+          ".validate": "!newData.exists() || (!newData.hasChild('url') && !newData.hasChild('path') && !newData.hasChild('t') && !newData.hasChild('text'))"
+        }
+      }
+    },
+    "erp_doc_text": {
+      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "$docId": {
+        ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)) && (root.child('erp_docs').child($docId).child('who').child(auth.uid).exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)) && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (newData.exists() && newData.child('byUid').val() === auth.uid) || (data.exists() && data.child('byUid').val() === auth.uid))",
+        "t": {
+          ".validate": "newData.isString() && newData.val().length <= 20000"
+        },
+        "cut": {
+          ".validate": "newData.isBoolean()"
+        },
+        "byUid": {
+          ".validate": "newData.isString() && newData.val().length <= 60"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "ontology": {
       "v1": {
         "current": {
