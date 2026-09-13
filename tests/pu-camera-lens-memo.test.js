@@ -162,6 +162,29 @@ test('★ 알이 «하나»뿐이면 그것도 안 그린다 — 고를 것이 �
   assert.equal(vm.runInContext('lenses.length', a.ctx), 0);
 });
 
+test('★ 앞면으로 바꿔도 알이 «하나»면 안 그린다 — 뒷렌즈 물러서기가 없는 자리다', async () => {
+  /* 뒤에서는 「배율이 하나면 뒷 카메라 목록으로 물러선다」가 알을 비워 주지만,
+     앞면에서는 그 길이 없다. 그래서 마지막 울타리를 여기서 본다. */
+  const a = 앱({ zoom: { min: 1, max: 1.5 }, cams: 뒷렌즈셋 });
+  await vm.runInContext('startCam()', a.ctx);
+  await 잠깐(); await 잠깐();
+  vm.runInContext('flipCam()', a.ctx);
+  await 잠깐(); await 잠깐();
+  assert.equal(vm.runInContext('facing', a.ctx), 'user');
+  assert.equal(vm.runInContext('lenses.length', a.ctx), 0,
+    '★ 알 하나를 그려 두면 눌러도 아무 일이 없습니다 — 고를 것이 없기 때문입니다');
+});
+
+test('★★ 배율을 «못 거는» 기기면 말을 한다 — 조용하면 눌렀는지도 모른다', async () => {
+  const a = 앱({ zoom: { min: 0.5, max: 8 }, applyFails: true });
+  await vm.runInContext('startCam()', a.ctx);
+  await 잠깐(); await 잠깐();
+  vm.runInContext('pickLens(0)', a.ctx);
+  await 잠깐(); await 잠깐();
+  assert.match(a.el.toast.textContent, /0\.5×/,
+    '★★ 화면이 그대로인데 아무 말도 없으면 「고장났다」가 됩니다');
+});
+
 test('★★ 배율을 못 받지만 뒷 카메라가 여럿인 폰 — 그 기기들을 알로', async () => {
   const a = 앱({ cams: 뒷렌즈셋 });
   await vm.runInContext('startCam()', a.ctx);
