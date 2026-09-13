@@ -29,6 +29,7 @@ const cp = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const 올릴것 = path.join(ROOT, 'docs', 'firebase-storage-전체(붙여넣기용).txt');
+const 승인길 = path.join(ROOT, 'docs', 'firebase-storage-보조함수-고침승인.txt');
 
 /* 규칙을 넣어야 하는 창고들 — 앱마다 창고가 다르다.
    ⚠ 이름을 «코드에서 확인한 것»으로 둔다(pu-photos.html · pu-cards.html · pu-paydata.html
@@ -86,6 +87,62 @@ function 최신기준() {
     .sort();
   if (!것들.length) return null;
   return path.join(dir, 것들[것들.length - 1]);
+}
+
+/* ── 보조 함수 «고침 승인» ─────────────────────────────────────────────
+   안전장치가 여태 «더하기»만 허락했다. 보조 함수를 한 글자라도 고치면 무조건
+   멈추므로, `isStaff()` 를 **조이는** 일조차 할 수가 없었다. 그러면 다음 사람이
+   결국 `--force` 를 만든다 — 이 파일이 스스로 「만들지 말라」고 적어 둔 그것이다.
+   그래서 우회로 대신 «적어 두고 지나가는» 길을 낸다.
+
+   ★★ 이것은 --force 가 아니다. **옛 몸도 새 몸도 «글자까지» 맞아야** 지나간다 —
+     승인한 그 고침 하나만 지나가고, 그 뒤의 어떤 흔들림도 다시 멈춘다.
+     그래서 승인 파일은 「한 번 열어 두는 문」이 아니라, 콘솔이 그 모양이 될 때까지
+     «지금 무엇을 바꾸는 중인가»를 적어 두는 자리다.
+
+   파일 모양 (docs/firebase-storage-보조함수-고침승인.txt):
+     [isStaff]
+     왜: 가입만 한 사람이 통과했다
+     옛: return …;
+     새: return …;
+*/
+function 승인읽기(글) {
+  const out = {};
+  let 이름 = null;
+  String(글 == null ? '' : 글).split(/\r?\n/).forEach(function (l) {
+    const t = l.trim();
+    if (!t || t.charAt(0) === '#') return;
+    const 머리 = /^\[([A-Za-z_$][\w$]*)\]$/.exec(t);
+    if (머리) { 이름 = 머리[1]; out[이름] = { 왜: '', 옛: '', 새: '' }; return; }
+    if (!이름) return;
+    const 칸 = /^(왜|옛|새)\s*:\s*([\s\S]*)$/.exec(t);
+    if (칸) out[이름][칸[1]] = 칸[2].replace(/\s+/g, ' ').trim();
+  });
+  return out;
+}
+
+/* 기준과 새것의 보조 함수를 견준다 — «멈출 까닭»과 «승인되어 지나간 것»을 돌려준다.
+   ⚠ 여기에 화면이 없다. 그래야 검사가 돈다(이 저장소 규칙). */
+function 함수바뀜(기준함수, 새것함수, 승인) {
+  const 멈출까 = [];
+  const 지나간것 = [];
+  const 기준 = 기준함수 || {}, 새것 = 새것함수 || {}, 표 = 승인 || {};
+  Object.keys(기준).forEach(function (f) {
+    if (새것[f] === undefined) { 멈출까.push('보조 함수가 사라집니다: ' + f + '()'); return; }
+    if (새것[f] === 기준[f]) return;                       /* 안 바뀌었다 */
+    const a = 표[f];
+    if (a && a.옛 === 기준[f] && a.새 === 새것[f]) {
+      지나간것.push({ 이름: f, 옛: a.옛, 새: a.새, 왜: a.왜 });
+      return;
+    }
+    멈출까.push('보조 함수가 «달라집니다»: ' + f + '()\n'
+      + '      기준: ' + 기준[f] + '\n      새것: ' + 새것[f] + '\n'
+      + (a ? '      ⚠ 승인 파일에 ' + f + ' 가 있지만 «글자가 안 맞습니다» —\n'
+           + '        승인 옛: ' + a.옛 + '\n        승인 새: ' + a.새
+          : '      → 조이는 고침이라면 docs/firebase-storage-보조함수-고침승인.txt 에\n'
+           + '        옛 몸과 새 몸을 그대로 적어 두세요. --force 를 만들지 마세요.'));
+  });
+  return { 멈출까: 멈출까, 지나간것: 지나간것 };
 }
 
 /* 주석을 걷는다 — 주석 안의 글귀가 「규칙이 있다」로 읽히면 안 된다
@@ -187,13 +244,24 @@ function main() {
       });
     });
 
-    Object.keys(기준.함수).forEach(function (f) {
-      if (새것.함수[f] === undefined) { 멈출까.push('보조 함수가 사라집니다: ' + f + '()'); return; }
-      if (새것.함수[f] !== 기준.함수[f]) {
-        멈출까.push('보조 함수가 «달라집니다»: ' + f + '()\n'
-          + '      기준: ' + 기준.함수[f] + '\n      새것: ' + 새것.함수[f]);
-      }
-    });
+    const 승인 = fs.existsSync(승인길) ? 승인읽기(fs.readFileSync(승인길, 'utf8')) : {};
+    const 함수결과 = 함수바뀜(기준.함수, 새것.함수, 승인);
+    함수결과.멈출까.forEach(function (x) { 멈출까.push(x); });
+
+    /* ★ 승인되어 지나간 고침은 «크게» 적는다. 조용히 지나가면 승인 파일이
+         곧 아무도 안 읽는 종이가 된다 — 그러면 --force 와 다를 것이 없다. */
+    if (함수결과.지나간것.length) {
+      console.log('');
+      console.log('★★ 승인된 «보조 함수 고침» ' + 함수결과.지나간것.length + '개 — 이대로 나갑니다');
+      함수결과.지나간것.forEach(function (x) {
+        console.log('   · ' + x.이름 + '()  ' + (x.왜 || ''));
+        console.log('       옛: ' + x.옛);
+        console.log('       새: ' + x.새);
+      });
+      console.log('   ⚠ 올린 뒤 콘솔 원문을 새 날짜 파일로 남기고, 이 승인 줄은 지우세요 —');
+      console.log('     그때부터는 새 몸이 «기준»이라, 남겨 두면 다음 사람이 헷갈립니다.');
+      console.log('');
+    }
 
     const 새칸 = Object.keys(새것.칸).filter(function (k) { return !기준.칸[k]; });
     console.log('■ 새로 생기는 칸 ' + 새칸.length + '개');
@@ -276,4 +344,5 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { 뜯기: 뜯기, 주석걷기: 주석걷기, 칸이맞나: 칸이맞나, BUCKETS: BUCKETS, 쓰는자리: 쓰는자리, 최신기준: 최신기준 };
+module.exports = { 뜯기: 뜯기, 주석걷기: 주석걷기, 칸이맞나: 칸이맞나, BUCKETS: BUCKETS,
+                   쓰는자리: 쓰는자리, 최신기준: 최신기준, 승인읽기: 승인읽기, 함수바뀜: 함수바뀜 };
