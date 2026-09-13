@@ -371,8 +371,25 @@ table.list th.n,table.list td.n{width:44px;text-align:right;padding-right:6px;
 /* 작은 딱지 — 「담당자/대표자」·「반송/자동회신」에 함께 쓴다 */
 .pill{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap}
 .ty{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap}
+/* ★★ 받는 곳 «한 줄» 칸 (대표 지시 2026-09-13 「셀1줄씩으로 넣어라 … 1줄로 해라」)
+   ⚠ 칸 안에서 div 를 쌓으면 줄 하나가 세 줄 높이가 된다 — 113곳이면 화면을 한참 내린다.
+   ⚠⚠ 주소에는 띄어쓰기가 없다. min-width:0 이 없으면 flex 칸이 «안 줄어들어»
+     주소가 표를 옆으로 밀어 버린다 — ellipsis 가 먹으려면 이 둘이 함께 있어야 한다. */
+.one{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.one>b{flex:0 0 auto}
+.one .t2{font-size:11.5px;color:var(--sub);flex:0 0 auto}
+.one .mail{font-size:12px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.one .sp1{flex:1 1 auto;min-width:4px}
+.one .mini{flex:0 0 auto;padding:3px 8px;font-size:11px}
 /* 유형 칩 줄 — 업체관리 도구줄과 같은 결 */
 .chips{display:flex;gap:5px;flex-wrap:wrap;margin:12px 0 10px}
+/* ★ 유형·누구 두 축을 «한 줄»에 (대표 지시 2026-09-13 「줄을 줄여라」).
+   두 축을 가르는 뜻은 그대로 두고, 칸막이(.cut)로만 나눈다. */
+.chips.tight{margin:8px 0 8px}
+.chips .cut{width:1px;align-self:stretch;background:var(--line);margin:0 6px}
+/* ⚠ .note 는 줄 사이를 1.8 로 벌려 둔다 — 여러 줄짜리 안내를 읽기 좋게 한 값이다.
+     한 줄로 줄인 안내에까지 그대로 두면 띠가 여전히 두껍다. 여기서만 좁힌다. */
+.note.one{margin-top:8px;padding:8px 14px;line-height:1.5}
 .chips .chip{padding:5px 11px;border-radius:20px;font-size:11.5px;font-weight:700;
   background:#fff;border:1px solid var(--line);color:var(--sub);white-space:nowrap}
 .chips .chip.on{background:var(--brown);border-color:var(--brown);color:#fff}
@@ -3090,23 +3107,31 @@ function 명단화면(){
            밝히지 않으면 「대표에게도 갔겠지」로 잘못 읽는다 — 실은 한 통이다. */
       ? ' <span class="pill" style="background:#fef3c7;color:#92400e">같은 메일</span>'
       : 출처딱지(x.출처);
-    return '<div><b>' + 글칸(x.name || x.대표자) + '</b>'
-      + (곁 ? ' <span style="font-size:11.5px;color:var(--sub)">' + 곁 + '</span>' : '')
-      + '</div>'
-      + '<div style="font-size:12px;word-break:break-all">' + esc(x.email||'') + 딱 + '</div>'
-      + '<div style="padding-top:3px">'
-      + '<button class="mini" onclick="수신거부넣기(\'' + esc(x.email) + '\')">수신거부</button> '
+    /* ★★ 「셀1줄씩으로 넣어라 … 수신거부 바꾸기도 1줄로」 (대표 지시 2026-09-13).
+       ⚠ 그 전에는 칸 «안»에서 다시 세 줄로 쌓았다 — 이름·주소·단추.
+         줄 하나가 세 줄 높이라 113곳을 보려면 화면을 한참 내려야 했다.
+       ⚠⚠ 주소에는 띄어쓰기가 없어 그냥 두면 칸을 넘겨 줄이 늘어난다.
+         예전에는 word-break 로 «접어서» 두 줄로 만들었다 — 그러면 한 줄이 아니다.
+         ★ 잘라 보여 주되 «전체는 title 로» 알려 준다. 안 그러면 확인할 길이 없다. */
+    const 주소글 = '<span class="mail" title="' + esc(x.email||'') + '">'
+      + esc(x.email||'') + '</span>';
+    return '<div class="one">'
+      + '<b>' + 글칸(x.name || x.대표자) + '</b>'
+      + (곁 ? '<span class="t2">' + 곁 + '</span>' : '')
+      + 주소글 + 딱
+      + '<span class="sp1"></span>'
+      + '<button class="mini" onclick="수신거부넣기(\'' + esc(x.email) + '\')">수신거부</button>'
       + '<button class="mini" onclick="사람바꾸기(\'' + esc(x.사업장) + '\',\''
         + esc(x.누구) + '\',\'' + esc(x.출처) + '\',\'' + esc(x.email) + '\')"'
       + ' title="사람이 바뀌었을 때 — 업체관리 자료를 함께 고칩니다">✎ 바꾸기</button>'
       + '</div>';
   };
-  /* 빈 자리 — 없다고만 하면 할 일이 안 보인다. 채우러 갈 길을 함께 둔다. */
+  /* 빈 자리 — 없다고만 하면 할 일이 안 보인다. 채우러 갈 길을 «같은 줄»에 둔다. */
   const 빈받는분칸 = function(회사, 누구){
-    return '<div style="color:var(--faint);font-size:12px">주소 없음</div>'
-      + '<div style="padding-top:3px">'
-      + '<button class="mini" onclick="기업정보함에서찾기(\'' + esc(회사) + '\')">📇 기업정보함</button>'
-      + '</div>';
+    return '<div class="one"><span style="color:var(--faint);font-size:12px">주소 없음</span>'
+      + '<span class="sp1"></span>'
+      + '<button class="mini" onclick="기업정보함에서찾기(\'' + esc(회사) + '\')"'
+      + ' title="기업정보함에서 이 회사를 찾습니다">📇 기업정보함</button></div>';
   };
 
   /* ★ 사업장으로 묶기 — 줄들을 사업장 열쇠로 모은다.
@@ -3187,8 +3212,7 @@ function 명단화면(){
   }).join('');
 
   /* 유형 칩 — 업체관리 도구줄과 «같은 결»이다. 눌린 것을 다시 누르면 전체로 돌아온다. */
-  const 칩 = '<div class="chips">'
-    + '<span style="font-size:11.5px;font-weight:800;color:var(--faint);width:40px">유형</span>'
+  const 칩 = ''
     + '<button class="chip' + (App.유형 ? '' : ' on') + '" onclick="유형칩누르기(\'\')">📊 전체 '
       + (r.전체||[]).length.toLocaleString() + '</button>'
     + Core.유형들.map(function(t){
@@ -3199,15 +3223,14 @@ function 명단화면(){
                   : (n ? ' style="color:' + t.빛 + '"' : ''))
           + ' onclick="유형칩누르기(\'' + t.키 + '\')" title="' + esc(t.키) + ' 업체만 봅니다">'
           + t.표시 + ' ' + esc(t.키) + ' ' + n + '</button>';
-      }).join('')
-    + '</div>';
+      }).join('');
 
   /* ★ 갈래 칩 — 유형과 «다른 축»이다 (대표 지시 2026-09-09 「대표자와 담당자 … 분리해라」).
-       두 줄로 두는 까닭: 한 줄에 섞으면 「급여 업체의 대표자만」을 고를 수 없다. */
+     ⚠ 2026-09-13 대표 지시 「줄을 줄여라」로 «한 줄»에 놓는다. 두 축을 가르는 뜻
+       (「급여 업체의 대표자만」)은 그대로다 — 칸막이로만 나눈다. */
   const 누구표시 = { 담당자:'🧑‍💼', 대표자:'👔', 더한분:'➕' };
   const 누구이름 = { 담당자:'담당자', 대표자:'대표자', 더한분:'따로 더한 분' };
-  const 누구칩 = '<div class="chips">'
-    + '<span style="font-size:11.5px;font-weight:800;color:var(--faint);width:40px">누구</span>'
+  const 누구칩 = ''
     + '<button class="chip' + (App.누구 ? '' : ' on') + '" onclick="누구칩누르기(\'\')">👥 전체 '
       + (r.전체||[]).length.toLocaleString() + '</button>'
     + Core.누구갈래.map(function(k){
@@ -3215,8 +3238,11 @@ function 명단화면(){
         return '<button class="chip' + (App.누구 === k ? ' on' : '') + '"'
           + ' onclick="누구칩누르기(\'' + k + '\')" title="' + esc(누구이름[k]) + '만 봅니다">'
           + 누구표시[k] + ' ' + esc(누구이름[k]) + ' ' + n + '</button>';
-      }).join('')
-    + '</div>';
+      }).join('');
+
+  /* 두 축을 한 줄로 — 칸막이로 가른다 */
+  const 칩묶음 = '<div class="chips tight">' + 칩
+    + '<span class="cut"></span>' + 누구칩 + '</div>';
 
   /* 주소가 없는 곳 — «기업정보함에 있나»를 함께 보여 준다. 없다고만 하면 할 일이 안 보인다. */
   const 후보있는곳 = {};
@@ -3252,8 +3278,7 @@ function 명단화면(){
       ${esc(App.설정.범위||'자문중')}${광고?' · (광고) 켜짐':''}</span>
   </div>
 
-  ${칩}
-  ${누구칩}
+  ${칩묶음}
 
   ${골랐수 ? `<div class="picked">
     <b>${골랐수}곳</b> 골랐습니다
@@ -3263,13 +3288,17 @@ function 명단화면(){
     <button class="mini" onclick="고름지우기()">✕ 선택 풀기</button>
    </div>` : ''}
 
-  ${후보 && (후보.대표자.length + 후보.담당자.length) ? `<div class="note">
-    <b>📇 기업정보함 명함에 «명단에 없는» 주소가 있습니다</b> —
-    대표자 <b>${후보.대표자.length}곳</b> · 담당자 <b>${후보.담당자.length}곳</b>.
-    회사 <b>이름</b>으로 맞춘 것이라 <b>저절로 담지 않습니다</b> — 한 곳씩 보고 고르십시오.
-    <span class="sp"></span>
-    <button class="mini" onclick="명함창열기('대표자')">👔 대표자 ${후보.대표자.length}곳 보기</button>
-    <button class="mini" onclick="명함창열기('담당자')">🧑‍💼 담당자 ${후보.담당자.length}곳 보기</button>
+  ${/* ★ 넉 줄이던 안내를 «한 줄»로 (대표 지시 2026-09-13 「줄을 줄여라」).
+        ⚠ 「저절로 담지 않는다」는 말은 남긴다 — 그것이 이 안내의 알맹이다.
+          긴 설명은 단추의 title 로 옮겼다. 뜻을 버린 것이 아니라 자리를 옮겼다. */''}
+  ${후보 && (후보.대표자.length + 후보.담당자.length) ? `<div class="note one">
+    <b>📇 명함에 «명단에 없는» 주소</b>
+    <span class="t2">회사 이름으로 맞춘 것이라 저절로 담지 않습니다</span>
+    <span class="sp1"></span>
+    <button class="mini" onclick="명함창열기('대표자')"
+      title="회사 이름으로 맞춘 것입니다 — 한 곳씩 보고 고르십시오">👔 대표자 ${후보.대표자.length}</button>
+    <button class="mini" onclick="명함창열기('담당자')"
+      title="회사 이름으로 맞춘 것입니다 — 한 곳씩 보고 고르십시오">🧑‍💼 담당자 ${후보.담당자.length}</button>
    </div>` : ''}
 
   <div class="whorest">
