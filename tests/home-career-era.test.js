@@ -103,8 +103,10 @@ function 편집상자(줄들) {
   vm.createContext(c);
   /* window 를 안 두면 부품이 globalThis(=이 상자)에 PuHomeCareer 를 건다 */
   vm.runInContext(careerJs, c);
+  /* ⚠ careerEra 가 careerSortEra 를 부른다(2026-09-13 「前 은 아래로」) —
+     안 넣으면 이 상자를 쓰는 검사가 «한꺼번에» 죽는다. */
   vm.runInContext(한줄상수('ERA_LIKELY') + '\n' + 떼기('eraInfoText') + '\n'
-    + 떼기('careerEdit') + '\n' + 떼기('careerEra'), c);
+    + 떼기('careerEdit') + '\n' + 떼기('careerSortEra') + '\n' + 떼기('careerEra'), c);
   return c;
 }
 
@@ -137,19 +139,40 @@ test('★ 딱지를 누르면 «저장 안 됨»이 켜진다 — 안 켜지면 
   assert.equal(c.App.dirty, true, '★ 딱지로 고친 것이 저장 안 된 채 화면을 떠납니다');
 });
 
-test('★★ 딱지를 눌러도 창을 «통째로 다시 그리지 않는다» — 굴린 자리가 맨 위로 튄다', () => {
-  /* 경력사항은 열여덟 줄이다. 다시 그리면 굴린 자리와 커서를 잃는다. */
-  const c = 편집상자(['現 가', '나']);
+test('★★ «자리가 안 바뀌면» 창을 통째로 다시 그리지 않는다 — 굴린 자리가 맨 위로 튄다', () => {
+  /* 경력사항은 열여덟 줄이다. 다시 그리면 굴린 자리와 커서를 잃는다.
+     ⚠ 2026-09-13 이 검사를 좁혔다. 원래는 「눌러도 절대 안 그린다」였는데,
+       대표 지시(「전으로 바뀌면 자동으로 아래로」)로 前 은 «옮겨 가게» 됐다 —
+       옮기는 것은 그 줄만 고쳐서는 안 된다. 옮길 일이 «없을 때»는 그대로 안 그린다. */
+  const c = 편집상자(['가', '나']);                 /* 둘 다 前 이 아니다 → 옮길 일이 없다 */
+  const 단추 = [{ className: '' }, { className: 'past' }];
+  const row = { querySelectorAll: () => 단추, classList: { toggle() {} } };
+  c.document = { getElementById: (id) => (id === 'careerBox'
+    ? { querySelectorAll: () => [row, row] } : null) };
+  c.App._그렸다 = false;
+  c.careerEra(0, 'now');                            /* 없음 → 現 : 자리가 안 바뀐다 */
+  assert.equal(c.App._그렸다, false,
+    '★★ 자리가 안 바뀌는데도 통째로 다시 그립니다 — 굴린 자리가 맨 위로 튑니다');
+  assert.equal(단추[0].className, 'on', '★ 딱지가 켜진 것으로 안 보입니다');
+  assert.equal(단추[1].className, 'past', '★ 앞서 켜져 있던 딱지가 안 꺼졌습니다');
+});
+
+test('★★ 前 으로 바꾸면 «아래로 옮기고» 통째로 다시 그린다', () => {
+  /* 대표 지시 2026-09-13 「전으로 바뀌면 자동으로 아래로 전만 자동으로 분류되어 정리」.
+     옮겨 놓고 그 줄만 고쳐 그리면 «자료만 바뀌고 화면은 그대로»다 — 가장 나쁜 짝이다. */
+  const c = 편집상자(['가', '나']);
   const 단추 = [{ className: '' }, { className: 'past' }];
   const row = { querySelectorAll: () => 단추, classList: { toggle() {} } };
   c.document = { getElementById: (id) => (id === 'careerBox'
     ? { querySelectorAll: () => [row, row] } : null) };
   c.App._그렸다 = false;
   c.careerEra(0, 'past');
-  assert.equal(c.App._그렸다, false,
-    '★★ 딱지 한 번에 화면을 통째로 다시 그립니다 — 굴린 자리가 맨 위로 튑니다');
-  assert.equal(단추[1].className, 'past on', '★ 딱지가 켜진 것으로 안 보입니다');
-  assert.equal(단추[0].className, '', '★ 앞서 켜져 있던 딱지가 안 꺼졌습니다');
+  /* ⚠ careerSortEra 가 «새 배열»을 만든다 — vm 안에서 만든 것이라 겉모습은 같아도
+     이 파일의 strict 판정에서는 다른 것으로 본다. 우리 쪽 배열로 옮겨 견준다. */
+  assert.deepEqual(Array.from(c.App.draft.careers), ['나', '前 가'],
+    '★★ 前 으로 바꿨는데 아래로 안 내려갑니다');
+  assert.equal(c.App._그렸다, true,
+    '★★ 자리를 옮겨 놓고 그 줄만 고쳐 그립니다 — 자료만 바뀌고 화면은 그대로입니다');
 });
 
 test('★ 줄을 못 찾으면 그때는 다시 그린다 — 조용히 아무 일도 안 하면 안 된다', () => {
