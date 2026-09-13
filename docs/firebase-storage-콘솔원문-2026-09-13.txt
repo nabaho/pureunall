@@ -1,0 +1,260 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════
+//  파일 창고(Storage) 규칙 — 2026-09-13
+//
+//  ★ 이 한 벌은 «어느 창고에 넣어도 안전»합니다.
+//     지금 쓰고 계신 규칙에서 «칸도 허락도» 하나도 빼지 않았습니다(기계로 견줬습니다).
+//     그 창고에 없는 자리는 규칙만 있고 쓰이지 않으므로 아무 일도 안 합니다.
+//
+//  ★★ 2026-09-13 에 «조인 것» 하나 — isStaff() (대표 결정 「도메인 잠그고 올린다」)
+//     전에는 「로그인했고 이메일이 있으면 직원」이었습니다. 파이어베이스
+//     «새 가입 막기»가 꺼져 있어서, 그 말은 곧 «아무 이메일로나 가입한 사람»이
+//     명함첩·급여데이터함·자문 증빙·서고 원본을 읽는다는 뜻이었습니다.
+//     이제 우리 도메인(@pureun.kr)만 통과합니다.
+//     ⓘ 계정 450개를 재어 「이메일 계정 12개 전부 @pureun.kr · 바깥 도메인 0개」를
+//       확인했습니다 — 지금 쓰시는 분 가운데 막히는 사람은 없습니다.
+//     ⚠ 만약 바깥 도메인 계정으로 쓰시는 분이 생기면 사진첩·급여데이터함이
+//       그날로 막힙니다. 그때는 그 계정을 @pureun.kr 로 옮기는 것이 맞습니다.
+//
+//  ▶ 2026-09-13 에 더한 것 — 서면함의 «원본 파일» 자리(erp_docs/…) 한 칸.
+//     직원이 한글로 쓴 서면(이유서·답변서·내용증명…)의 원본입니다.
+//
+//  ▶ 2026-09-07 에 더한 것 — 취업규칙 서고의 «원본 파일» 자리(casebook/…) 한 칸.
+//     서고에 담은 회차의 한글·PDF 원본을 함께 보관합니다.
+//     ★ 이 칸이 없으면 원본만 못 담깁니다 — 글·색인·검색·사례집·이력은 그대로 됩니다.
+//     ★ 서고는 «직원 전체»가 봅니다(설계서 §6) — 사진첩(본인만)과 다른 것은 의도된 차이입니다.
+//     ★★ 그리고 이 칸이 없으면 «㉢ 글자 읽기(OCR)»가 통째로 못 돕니다 —
+//       읽을 원본이 창고에 없기 때문입니다.
+//
+//  ▶ 2026-09-05 에 더한 것 — 사진첩의 «한글 원본» 자리(pu_photos/u/{uid}/origs) 한 칸.
+//     한글(.hwp/.hwpx)을 올리면 글자를 옮겨 담고 «원본 파일»도 함께 보관합니다.
+//     ★ 이 칸이 없으면 원본만 못 담깁니다 — 사진·판독은 그대로 됩니다.
+//
+//  ▶ 2026-08-31 에 더한 것 — «메일 첨부 임시 자리»(pucards/mailout) 한 칸.
+//     그래서 명함 창고가 이제 «꼭 넣어야 하는 곳»이 됐습니다.
+//
+//  ▶ 꼭 넣어야 하는 곳 (둘)
+//     ① pureun-erp-photos      (명함 · ★메일에 붙일 내 PC 파일)
+//     ② pureun-erp-hrphotos    (사진첩 · 증빙 사진 · ★서고 원본 · ★서면함 원본)
+//     콘솔 → Storage → 창고 이름 옆 ▾ → 그 창고 → 규칙 → 게시
+//
+//  ▶ 넣어도 되는 곳: pureun-erp.firebasestorage.app (급여자료)
+//     ⚠ isStaff() 를 조였으므로 «여기도 함께» 넣는 것이 맞습니다 —
+//       급여데이터함의 읽기가 그 함수에 매여 있습니다.
+//
+//  ▶ 손으로 안 넣으셔도 됩니다: `node scripts/storage-rules-deploy.js --deploy`
+//     가 세 창고에 한 번에 올립니다(사라지는 규칙이 있으면 스스로 멈춥니다).
+//     사람이 옮겨 적는 자리가 생기면 한 글자가 조용히 바뀌어도 게시는 그냥 됩니다.
+//
+//  ⚠ 나머지 보조 함수(signedIn·okImage·okPayFile)는 «지금 쓰시는 그대로»입니다.
+// ═══════════════════════════════════════════════════════════════════
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── 명함첩(pu-cards.html) ── 창고 pureun-erp-photos
+    match /pucards/photos/{photoId} {
+      allow read:   if isStaff();
+      allow write:  if isStaff() && okImage();
+      allow delete: if isStaff();
+    }
+
+    // ── 메일에 붙일 「💻 내 PC 파일」 임시 자리 ── 2026-08-31 추가
+    //    창고 pureun-erp-photos (명함과 같은 창고)
+    //
+    //    ★ 왜 생겼나 — 편지에 붙일 파일을 예전에는 «글자로 바꿔» 서버로 실어
+    //      보냈습니다. 그런데 보내는 함수가 요청 하나에 10MB 까지만 받고,
+    //      글자로 바꾸면 크기가 1.33배로 붑니다. 그래서 8MB 가 한도였습니다
+    //      (그 8MB 도 실려 갈 때 10.7MB 라 아슬아슬했습니다).
+    //      이제 브라우저가 여기에 먼저 올리고, 서버가 꺼내 붙인 뒤 «지웁니다» —
+    //      그 한도와 무관해져 다음메일이 주는 18MB 를 다 씁니다.
+    //
+    //    ⚠ 사람마다 «제 자리»만 — 서버도 「보낸 사람 제 자리인가」를 한 번 더
+    //      봅니다(mail-deliver.js 의 mailOutPathOk). 두 곳이 함께 막습니다.
+    //      한 곳만 믿으면 자리 글자만 바꿔 «남의 파일»을 첨부로 빼낼 수 있습니다.
+    //    ⚠ 사진만 받는 검사(okImage)를 걸지 않습니다 — PPT·한글·PDF 를 붙입니다.
+    //      엉뚱한 종류는 앱이 올리기 전에 막습니다.
+    //    ⚠ 20MB 는 앱의 18MB 보다 조금 넉넉하게 둔 것입니다.
+    //    ⚠ 이 칸이 없어도 «아무것도 안 깨집니다» — 앱이 예전 길로 되돌아가
+    //      6MB 이하는 그대로 붙고, 큰 파일만 「규칙이 올라가야 합니다」라고 알립니다.
+    match /pucards/mailout/{uid}/{file} {
+      allow read:   if signedIn() && request.auth.uid == uid;
+      allow write:  if signedIn() && request.auth.uid == uid
+                    && request.resource != null
+                    && request.resource.size < 20 * 1024 * 1024;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ── 옛 이름 자리 ──
+    //    코드가 부르는 자리는 아래 «pu_photos»(밑줄 있음)입니다.
+    //    이 줄은 지금 아무 일도 안 하지만, 혹시 남아 있는 파일이 있을 수 있어
+    //    지우지 않고 그대로 둡니다.
+    match /puphotos/u/{uid}/{allPaths=**} {
+      allow read:   if signedIn() && request.auth.uid == uid;
+      allow write:  if signedIn() && request.auth.uid == uid && okImage();
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ── 사진첩(pu-photos.html) ── 창고 pureun-erp-hrphotos ── 2026-08-27 바로잡음
+    //    ⚠ 코드가 실제로 쓰는 자리는 «pu_photos»(밑줄 있음)입니다.
+    //      위 puphotos 만 있으면 사진첩이 창고를 쓰기 시작할 때 통째로 막힙니다.
+    //    사람별 자리 — 본인만 읽고 쓴다.
+    //    ⚠ 총괄 관리자가 «남의 자리»에 손대는 것(이사 도구·남의 사진 영구삭제)은
+    //      이 규칙만으로 안 됩니다 — 창고 규칙은 실시간DB(uid_roles/isAdmin)를
+    //      읽을 수 없어 「이 사람이 관리자인가」를 여기서 판정할 수 없습니다.
+    //      남의 몫은 실패로 잡히고 사진은 실시간DB에 그대로 남습니다.
+    match /pu_photos/u/{uid}/{allPaths=**} {
+      allow read:   if signedIn() && request.auth.uid == uid;
+      allow write:  if signedIn() && request.auth.uid == uid && okImage();
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ── 사진첩의 «한글 원본» 자리 ── 2026-09-05 추가 (대표 지시 「보관」)
+    //    창고 pureun-erp-hrphotos
+    //
+    //    ★ 왜 생겼나 — 한글(.hwp/.hwpx)을 올리면 앱이 글자를 뽑아 «쪽 그림»으로
+    //      담습니다. 판독은 오히려 정확해지지만 표 줄·도장 같은 서식이 사라집니다.
+    //      그래서 «원본 파일»도 함께 둡니다 — 나중에 한글로 다시 엽니다.
+    //
+    //    ⚠ 사진만 받는 검사(okImage)를 걸지 않습니다. 한글 파일은 브라우저가
+    //      종류를 안 알려 주는 일이 흔해서, 종류로 묶으면 통째로 막힙니다
+    //      (급여데이터함에서 이미 겪은 것과 같은 까닭 — 아래 okPayFile 주석 참고).
+    //      대신 크기만 막습니다. 엉뚱한 종류는 앱이 올리기 전에 거릅니다.
+    //    ⚠ 범위는 위 «본인만»과 똑같습니다 — 더 열지 않습니다.
+    //      근로계약서에는 근로자 이름·임금이 들어 있습니다.
+    //    ⚠ 이 칸이 없어도 «아무것도 안 깨집니다» — 쪽 그림은 그대로 올라가고
+    //      판독도 됩니다. 원본만 못 담고, 앱이 그 사실을 이름을 대고 알립니다.
+    match /pu_photos/u/{uid}/origs/{allPaths=**} {
+      allow read:   if signedIn() && request.auth.uid == uid;
+      allow write:  if signedIn() && request.auth.uid == uid
+                    && request.resource != null
+                    && request.resource.size < 20 * 1024 * 1024;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // 창고 연결 점검 — 아주 짧은 글자 하나만 오갑니다.
+    // 사진이 아니라서 okImage 를 걸지 않습니다(걸면 점검 자체가 막힙니다).
+    match /pu_photos/_probe/{allPaths=**} {
+      allow read, write, delete: if signedIn();
+    }
+
+    // ── 정부사업일정 — 현장 사진(증빙) ── 2026-08-27 추가
+    //    증빙은 «법인 기록»입니다. 담당자가 바뀌거나 대표님이 확인하실 때
+    //    못 보면 안 되므로 로그인한 직원이면 «누구나» 읽고 씁니다.
+    //    ⚠ 사진첩(pu_photos)에 안 넣은 까닭이 이것입니다 — 사진첩은 위에서
+    //      보듯 «본인만» 읽어서 동료가 열면 안 보입니다.
+    //    ⚠ 자리는 gov_evidence/{일정번호}/{칸}.jpg 로 계산됩니다.
+    //      그래서 일정 기록에 가리키는 표를 따로 적지 않습니다.
+    //    ⚠ 지우기도 직원이 할 수 있습니다 — 앱이 「본인 컨설팅만」으로 이미
+    //      막고 있고, 창고 규칙은 그 판정을 할 수 없습니다.
+    match /gov_evidence/{sid}/{file} {
+      allow read:   if isStaff();
+      allow write:  if isStaff() && okImage();
+      allow delete: if isStaff();
+    }
+
+    // ── 취업규칙 서고 «원본 파일» ── 2026-09-07 추가 (설계서 §5-⑤ · §10-1)
+    //    창고 pureun-erp-hrphotos
+    //
+    //    ★ 왜 생겼나 — 서고는 지금 «글과 해시»만 담습니다. 검색·사례집·문안 은행·이력은
+    //      그것만으로 다 되지만, 표 줄·도장·서명이 있는 «원본 파일»은 못 봅니다.
+    //      제출 서류(신고서·의견청취·동의서)는 그 도장이 증빙 자체입니다.
+    //
+    //    ★ 왜 isStaff() 인가 — 서고는 «직원 전체»가 봅니다(설계서 §6). 사례집이 목적이라
+    //      그렇게 정했습니다. 사진첩(본인만)과 다른 것은 «의도된 차이»입니다.
+    //      정부사업일정 증빙(gov_evidence)과 같은 결입니다.
+    //
+    //    ⚠ 사진만 받는 검사(okImage)를 걸지 않습니다 — 한글(.hwp/.hwpx)·PDF 를 받습니다.
+    //      한글은 브라우저가 종류를 안 알려 주는 일이 흔해, 종류로 묶으면 통째로 막힙니다
+    //      (급여데이터함·사진첩 원본이 이미 겪은 것과 같은 까닭). 크기만 막습니다.
+    //    ⚠ 지우기도 직원이 할 수 있습니다 — 창고 규칙은 실시간DB(ownerUid)를 못 읽어
+    //      「올린 사람인가」를 여기서 판정할 수 없습니다. 그 판정은 앱과 실시간DB 규칙이 합니다.
+    //    ⚠ 이 칸이 없어도 «아무것도 안 깨집니다» — 글·색인·검색·사례집·이력은 그대로입니다.
+    //      원본 파일만 안 담기고, 앱이 그 사실을 이름을 대고 알립니다(설계서 §3 차선).
+    // ── 서면함 «원본 파일» ── 2026-09-13 추가 (대표 지시 2026-09-12)
+    //    창고 pureun-erp-hrphotos
+    //
+    //    ★ 무엇인가 — 직원이 한글로 쓴 서면(이유서·답변서·내용증명…)의 원본입니다.
+    //      실시간DB(erp_docs)에는 «무엇·누구·어디에 붙었나»만 적고 파일은 여기 둡니다.
+    //
+    //    ⚠⚠ 자리가 «올린 사람»으로 갈립니다. 창고 규칙은 실시간DB 를 못 읽어서
+    //      「이 사람이 그 사건 담당자인가」를 여기서 판정할 수가 없습니다.
+    //      그래서 담당자·관리자는 «레코드에 적힌 토큰 주소»로 엽니다 —
+    //      사진첩 공유와 같은 길입니다(서명 주소는 시간이 지나면 죽어서 안 씁니다).
+    //    ⚠ 그 대신 이 방식은 «주소를 이미 받아 간 사람»을 못 막습니다. 주소는 길고
+    //      임의라 찍어서 맞힐 수는 없지만, 담당에서 빠져도 그 주소는 살아 있습니다.
+    //      그것이 이 길의 값입니다 — 숨기지 않고 적어 둡니다.
+    //    ⚠ 사진만 받는 검사(okImage)를 걸지 않습니다 — 한글(.hwp/.hwpx)·워드·PDF 를
+    //      받습니다. 한글은 브라우저가 종류를 안 알려 주는 일이 흔해 종류로 묶으면
+    //      통째로 막힙니다(급여데이터함·사진첩 원본·서고가 이미 겪은 것과 같은 까닭).
+    //    ⚠ 이 칸이 없으면 «원본만» 못 담깁니다 — 목록·붙이기·찾기는 그대로 되고,
+    //      앱이 그 사실을 이름을 대고 알립니다.
+    match /erp_docs/{uid}/{docId}/{file} {
+      allow read:   if signedIn() && request.auth.uid == uid;
+      allow write:  if signedIn() && request.auth.uid == uid
+                    && request.resource != null
+                    && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /casebook/{siteKey}/{revId}/{file} {
+      allow read:   if isStaff();
+      allow write:  if isStaff()
+                    && request.resource != null
+                    && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if isStaff();
+    }
+
+    // ── 급여데이터함 (2026-08-13 추가) ──
+    //    사진첩과 두 군데가 다르다. 둘 다 일부러 그렇다.
+    //    ① 읽기가 전 직원이다 — 남의 자리를 이름 골라 볼 수 있어야 한다(대표 결정).
+    //       ⚠ 그래서 앱을 거치지 않고 주소를 아는 접근은 열람 기록이 안 남는다.
+    //    ② 사진만 받는 검사(okImage)를 걸지 않는다 — 엑셀·PDF를 받아야 한다.
+    //       엉뚱한 종류는 앱이 올리기 전에 막는다(exe·js·html 거절).
+    //       한글 파일(hwp)은 브라우저가 종류를 안 알려줘서 종류로 묶으면 통째로 막힌다.
+    //    쓰기는 올린 사람 자리만 — 창고 규칙은 실시간DB를 못 읽어 대리인 판정을
+    //    여기서 할 수 없다. 「누구 자리 소속인가」는 실시간DB 정보가 정한다.
+    match /pu_paydata/{uid}/{allPaths=**} {
+      allow read:   if isStaff();
+      allow write:  if signedIn() && request.auth.uid == uid && okPayFile();
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // 위에 없는 자리는 전부 막는다
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    // ★★ 「우리 직원인가」 — 2026-09-13 에 조였다 (대표 결정 「도메인 잠그고 올린다」).
+    //    전에는 «이메일이 있으면» 통과였다. 파이어베이스 「새 가입 막기」가 꺼져 있어
+    //    그 말은 곧 «아무 이메일로나 가입한 사람»이 명함첩·급여데이터함·자문 증빙·
+    //    서고 원본을 읽는다는 뜻이었다. 서고 원본에는 근로자 이름·서명·도장이 든다.
+    //    ⚠ 창고 규칙은 실시간DB 를 «못 읽는다» — uid_roles 의 「재직 중인가」를 여기서
+    //      볼 수가 없다(실시간DB 는 PR #1225 로 이미 갈랐다). 토큰에 있는 것으로만
+    //      판정해야 해서, 지금 쓸 수 있는 가장 좁은 잣대가 «우리 도메인»이다.
+    //    ⚠ 정규식의 함정 둘을 일부러 피했다 —
+    //      ① 점을 [.] 로 묶는다(안 묶으면 `pureunXkr` 도 맞는다).
+    //      ② ^…$ 로 끝을 박는다(안 박으면 `나@pureun.kr.남의집.com` 이 통과한다).
+    //    ▶ 더 단단하게 하려면 구름함수로 «직원이다»를 계정에 새기고(custom claim)
+    //      여기서 그것을 보면 된다. 지금은 그 표식이 저장소 어디에도 없다.
+    function isStaff() {
+      return request.auth != null
+          && request.auth.token.email != null
+          && request.auth.token.email.matches('^[^@]+@pureun[.]kr$');
+    }
+    function okImage() {
+      return request.resource != null
+          && request.resource.size < 10 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+    }
+    // 급여자료 — 종류는 묶지 않고 크기만 막는다(위 주석 ② 참고). 한 건 25MB.
+    function okPayFile() {
+      return request.resource != null
+          && request.resource.size < 25 * 1024 * 1024;
+    }
+  }
+}
