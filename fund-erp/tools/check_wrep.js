@@ -129,6 +129,9 @@ if (!JSDOM) {
   global.hwpFormHTML = () => '';
   (0, eval)(gF('dgV')); (0, eval)(gF('dgWon')); (0, eval)(gF('dgToday'));
   (0, eval)(gF('_officersOf'));
+  /* ★ 설립합의서 별첨 명부에 «사용자대표» 열이 생겼다(2026-09-13) — 안 실으면
+     CI 에서만 「_siteUrep is not defined」로 통째로 죽는다(jsdom 은 CI 에만 있다). */
+  (0, eval)(gF('_siteUrep'));
   /* 설립합의서 제3조 출연금은 «한 줄기»(foundContrib)에서 온다 — 2026-09-10 */
   (0, eval)(gF('estabSites')); (0, eval)(gF('siteContribOf'));
   (0, eval)(gF('foundContribOf')); (0, eval)(gF('foundContrib'));

@@ -232,6 +232,87 @@ test('★★ ⑱ 새 묶음이 저장과 「걷어 두기」에 «둘 다» 들�
   });
 });
 
+/* ══ ★★ 사용자대표가 «서식까지» 간다 ═══════════════════════════════
+   자료를 모아 두기만 하면 아무 소용이 없다. 사용자대표가 실제로 서식에 닿는 길은 둘이다.
+     ① 위원 고르기 → 임원 명부 → 위원 격자(별지 제7호)·회의록
+     ② 설립합의서 별첨 명부
+   ⚠ 이 둘이 끊기면 «조용히» 빈칸으로 관청에 나간다 — 화면은 멀쩡해 보인다. */
+
+/* ⚠ 글자로 세지 «않는다» — 후보 줄을 통째로 지워도 「_siteUrep(st) 이 있다」로 통과했다
+     (2026-09-13 되돌림이 그것을 잡았다). 후보를 «정말 만들어» 본다. */
+function cands() {
+  return load([grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('_sitePeopleCands'),
+    'this.f=_sitePeopleCands;']).f;
+}
+
+test('★★ ⑳ 위원 후보로 사용자측에 «사용자대표와 대표자 둘 다» 선다', () => {
+  const r = cands()({ name: '가나전자', ceo: '김대표', urep_name: '박공장', urep_title: '공장장', wrep_name: '이노측' });
+  const 사측 = r.filter((x) => x[0] === '사용자대표').map((x) => x[1]);
+  assert.deepEqual(사측, ['박공장', '김대표'],
+    '★ 사용자측 후보가 둘이 아닙니다 — 협의회에 나오는 사람이 빠지거나, 대표이사가 빠집니다.');
+  assert.equal(r.filter((x) => x[0] === '근로자대표').length, 1);
+  /* ★ 소속 회사를 함께 들려 보낸다 — 공동기금은 위원이 여러 회사에서 나온다 */
+  assert.deepEqual(r.map((x) => x[5]), ['가나전자', '가나전자', '가나전자'],
+    '★ 소속 회사가 안 실립니다 — 명부에서 어느 회사 사람인지 알 수 없습니다.');
+  /* 그 사업장에서 «어떤 자리»의 사람인지 화면에 적어 준다 */
+  assert.deepEqual(r.map((x) => x[4]), ['근로자대표', '사용자대표', '대표자']);
+});
+
+test('★★ ㉑ 대표자와 사용자대표가 «같은 사람»이면 한 번만 — 두 줄이면 명부에 두 번 찍힌다', () => {
+  const r = cands()({ ceo: '김대표', urep_name: '김대표', wrep_name: '이노측' });
+  assert.equal(r.filter((x) => x[1] === '김대표').length, 1);
+});
+
+test('㉒ 빈 사람은 후보에 안 세운다 — 빈 줄을 골라 명부에 넣게 두지 않는다', () => {
+  assert.deepEqual(cands()({}), []);
+  assert.deepEqual(cands()({ ceo: '  ' }), []);
+});
+
+test('★★ ㉓ 고르기 창이 그 후보 함수를 «정말 쓴다» — 따로 짜 두면 화면과 검사가 갈린다', () => {
+  assert.match(grabFn('openSitePeoplePick'), /_sitePeopleCands\(st\)/,
+    '★ 고르기 창이 후보를 따로 만들고 있습니다 — 여기서 고친 것이 화면에 안 나타납니다.');
+});
+
+test('★★ ㉔ 설립합의서 별첨 명부에 사용자대표 열이 선다 — 없으면 누가 회의에 나오는지 안 남는다', () => {
+  const b = load([
+    'function esc(s){ return String(s==null?"":s); }',
+    'function dgV(v,n){ return String(v||("＿".repeat(n||4))); }',
+    'function dgWon(n){ return String(n||0); }',
+    'function dgToday(){ return "2026. 9. 13."; }',
+    'function foundContrib(){ return 10000000; }',
+    'function _officersOf(){ return []; }',
+    'function hwpFormHTML(){ return ""; }',   /* 원본 .hwp 는 없다 — 자동생성 쪽을 잰다 */
+    grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('docBody'),
+    'this.f=docBody;']);
+  const html = b.f('agreement', { name: '가나공동근로복지기금', chairman: '홍길동', fund_type: '공동' },
+    [{ name: '가나전자', ceo: '김대표', biz_no: '111-11-11111', urep_name: '박공장', wrep_name: '이노측' }]);
+  assert.ok(html.indexOf('사용자대표') >= 0, '★ 별첨 명부에 사용자대표 열이 없습니다.');
+  ['김대표', '박공장', '이노측'].forEach((n) => {
+    assert.ok(html.indexOf(n) >= 0, '명부에 안 나옵니다: ' + n);
+  });
+  /* 대표자 열도 남아 있어야 한다 — 도장을 찍는 사람은 여전히 대표자다 */
+  assert.ok(html.indexOf('대표자') >= 0, '★ 대표자 열이 사라졌습니다 — 날인할 사람이 서류에서 빠집니다.');
+});
+
+test('★★ ㉕ 사용자대표가 비면 밑줄로 남는다 — 대표자를 끌어다 쓰지 않는다', () => {
+  const b = load([
+    'function esc(s){ return String(s==null?"":s); }',
+    'function dgV(v,n){ return v ? String(v) : "＿＿＿＿"; }',
+    'function dgWon(n){ return String(n||0); }',
+    'function dgToday(){ return "2026. 9. 13."; }',
+    'function foundContrib(){ return 10000000; }',
+    'function _officersOf(){ return []; }',
+    'function hwpFormHTML(){ return ""; }',   /* 원본 .hwp 는 없다 — 자동생성 쪽을 잰다 */
+    grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('docBody'),
+    'this.f=docBody;']);
+  const html = b.f('agreement', { name: '가나공동근로복지기금', fund_type: '공동' },
+    [{ name: '가나전자', ceo: '김대표', biz_no: '111-11-11111' }]);
+  /* 대표자 「김대표」가 «한 번만» 나와야 한다 — 두 번이면 사용자대표 칸에도 들어간 것이다 */
+  assert.equal((html.match(/김대표/g) || []).length, 1,
+    '★ 대표자를 사용자대표 칸에도 찍었습니다 — 아무도 정하지 않은 이름이 관청에 나갑니다.');
+  assert.ok(html.indexOf('＿＿＿＿') >= 0, '빈 사용자대표 자리가 밑줄로 남지 않았습니다.');
+});
+
 test('★★ ⑲ 판독한 값이 갈 칸을 «갈래»가 정한다 — 중소기업은 sm-, 사용자대표는 사업장 칸이 아니다', () => {
   const sme = grabFn('_siteSmeScope');
   assert.match(sme, /pre:'sm-'/, '중소기업 판독값이 엉뚱한 칸으로 갑니다.');
