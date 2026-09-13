@@ -8257,6 +8257,21 @@ window.popConfirm = function(msg, onYes, opts){
     fontFamily:"'Apple SD Gothic Neo','맑은 고딕',sans-serif",
     animation:'pe-pop 0.12s ease-out'
   });
+  /* ── 끌어서 옮기는 손잡이 (대표 지시 2026-09-13 「팝업창 마우스로 움직일 수 있게 해야된다」) ──
+     까닭: 이 물음창은 «마지막에 누른 자리» 옆에 뜬다. 저장 단추가 화면 오른쪽 아래에
+     있으면 창도 거기 뜨고, 거기엔 떠다니는 딱지(새 버전·백업·헬스)가 산다.
+     실제로 「계약-2026-031 (주)○○○ (점수 …)」의 뒷글자가 「새 버전 있음」 딱지에 가렸다.
+     열려 있는 동안 딱지는 감추지만(pe-ask-open), 그래도 가릴 것이 있으면 옮길 수 있어야 한다.
+     ⚠ 손잡이를 «따로» 둔다 — 글자 위에서 끌게 하면 글을 골라 복사할 수 없게 된다.
+       창 자신의 여백에서도 끌린다. 단추·입력칸 위에서는 «안» 끌린다(끌기가 누르기를 잡아먹으면 안 된다). */
+  var grip = document.createElement('div');
+  grip.className = 'pe-popconfirm-grip';
+  grip.textContent = '⠿';
+  grip.title = '끌어서 옮기기';
+  Object.assign(grip.style, { cursor:'move', color:'#cbd5e1', fontSize:'12px', lineHeight:'1',
+    letterSpacing:'2px', margin:'-2px -2px 6px', padding:'0 2px 5px',
+    borderBottom:'1px dashed #e2e8f0', userSelect:'none' });
+  box.appendChild(grip);
   // 메시지
   var msgEl = document.createElement('div');
   Object.assign(msgEl.style, { color:'#1e293b', marginBottom:'8px', lineHeight:'1.45', whiteSpace:'pre-line', wordBreak:'keep-all', maxHeight:'60vh', overflowY:'auto' });
@@ -8305,6 +8320,12 @@ window.popConfirm = function(msg, onYes, opts){
   /* ⚠ choices 를 준 곳에는 「확인」을 안 붙인다 — 고를 것이 다섯이 되면 무엇이 기본인지 흐려진다. */
   box.appendChild(btns);
   document.body.appendChild(box);
+  /* ⚠★ 떠다니는 딱지를 «묻는 동안만» 감춘다 (대표 제보 2026-09-13 「팝업창에 글자가 안보인다」).
+     딱지들은 z-index 가 21억대다(새 버전 2147483000 · 백업 …645 · 헬스 …646 · 회복 …647).
+     이 창은 10만이라 늘 아래로 깔린다. 그렇다고 창을 더 올릴 수도 없다 — 21억 6천만이
+     한계값이라 이미 꼭대기다. 그래서 «감춘다» — 사진첩이 카메라에서 쓰던 그 방법이다
+     (pu-photos 의 body.cam-open). 닫으면 그대로 돌아온다(감추기만 하고 지우지 않는다). */
+  try{ document.body.classList.add('pe-ask-open'); }catch(_bc){}
   // 위치 잡기 (anchor 아래, 화면 밖이면 위로 / 오른쪽 밖이면 안쪽으로)
   var br = box.getBoundingClientRect();
   var top = rect.bottom + 6;
@@ -8315,11 +8336,41 @@ window.popConfirm = function(msg, onYes, opts){
   box.style.top = top + 'px';
   box.style.left = left + 'px';
   ok.focus();
+  /* ── 끌어서 옮기기 ──
+     손잡이(⠿)와 창 «자신의 여백»에서만 끌린다. 단추·입력칸 위에서는 안 끌린다.
+     ⚠ 화면 밖으로는 못 나간다 — 나가면 취소·확인을 누를 수가 없다. */
+  var 끄는중 = null;
+  box.addEventListener('pointerdown', function(e){
+    if(e.button != null && e.button !== 0) return;
+    var t = e.target;
+    if(t !== box && t !== grip) return;
+    var r = box.getBoundingClientRect();
+    끄는중 = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    try{ box.setPointerCapture(e.pointerId); }catch(_p){}
+    e.preventDefault();
+  });
+  box.addEventListener('pointermove', function(e){
+    if(!끄는중) return;
+    var r = box.getBoundingClientRect();
+    var nx = Math.max(4, Math.min(e.clientX - 끄는중.dx, window.innerWidth  - r.width  - 4));
+    var ny = Math.max(4, Math.min(e.clientY - 끄는중.dy, window.innerHeight - r.height - 4));
+    box.style.left = nx + 'px';
+    box.style.top  = ny + 'px';
+  });
+  var 끌기끝 = function(e){
+    if(!끄는중) return; 끄는중 = null;
+    try{ box.releasePointerCapture(e.pointerId); }catch(_p){}
+  };
+  box.addEventListener('pointerup', 끌기끝);
+  box.addEventListener('pointercancel', 끌기끝);
   // 닫기
   var closed = false;
   var close = function(result){
     if(closed) return; closed = true;
     box.remove();
+    /* ⚠ 남은 물음창이 없을 때만 딱지를 되돌린다 — 물음이 겹쳐 뜬 자리에서
+       앞엣것이 닫혔다고 딱지가 돌아오면 뒤엣것을 또 가린다. */
+    try{ if(!document.querySelector('.pe-popconfirm')) document.body.classList.remove('pe-ask-open'); }catch(_bc2){}
     document.removeEventListener('mousedown', outside, true);
     document.removeEventListener('keydown', onKey, true);
     if(isCallback){
@@ -8344,7 +8395,18 @@ window.popConfirm = function(msg, onYes, opts){
   if(!document.getElementById('pe-popconfirm-kf')){
     var st = document.createElement('style');
     st.id = 'pe-popconfirm-kf';
-    st.textContent = '@keyframes pe-pop{from{opacity:0;transform:translateY(-4px) scale(0.96)}to{opacity:1;transform:translateY(0) scale(1)}}';
+    st.textContent = '@keyframes pe-pop{from{opacity:0;transform:translateY(-4px) scale(0.96)}to{opacity:1;transform:translateY(0) scale(1)}}'
+      /* ⚠ 묻는 동안만 떠다니는 딱지를 감춘다 — 감추기만 하고 지우지 않는다.
+         이 다섯은 전부 z-index 21억대라 이 창(10만) 위로 올라온다. 창을 더 올릴
+         길은 없다(21억 6천만이 한계값). 목록을 줄이지 말 것 — 하나만 빠져도
+         그 딱지가 다시 글자를 가린다. 새 딱지를 만들면 여기에도 이름을 더한다. */
+      + 'body.pe-ask-open #pu-version-fab,'
+      + 'body.pe-ask-open #pu-version-notice,'
+      + 'body.pe-ask-open #pu-health-admin-badge,'
+      + 'body.pe-ask-open #pu-resilience-badge,'
+      + 'body.pe-ask-open #pu-reload-banner,'
+      + 'body.pe-ask-open #puWhoamiBadge,'
+      + 'body.pe-ask-open #pu-backup-admin-button{display:none!important}';
     document.head.appendChild(st);
   }
   if(!isCallback) return _promise;
@@ -27831,7 +27893,15 @@ function CaseManagement(props){
                 colVis.retainerFee && h('td', { style:{ textAlign:'right', padding:'4px 8px' } },
                   c.retainerFee
                     ? h('div', null,
-                    h('div',{style:{display:'flex',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
+                    /* ⚠★ row-reverse — 합계 줄과 «열을 맞추는» 한 줄이다 (대표 지시 2026-09-13).
+                       칸에 textAlign:right 을 줘도 «안쪽이 flex 면 안 먹는다» — flex 항목은
+                       text-align 이 아니라 justify-content 를 따르고, 그 기본값이 왼쪽이다.
+                       그래서 금액이 칸 왼쪽에 붙고 합계만 오른끝에 서서 열이 어긋났다.
+                       ★ 실측(2026-09-13): 어긋남 80.4px·24.0px, 같은 열 안에서도 줄마다 7px씩 달랐다.
+                         row-reverse 로 «0.0px» 이 된다. 곁들이(✓입금일·일부입금)는 금액 왼쪽에 선다.
+                       ⚠ justify-content:flex-end 로는 부족하다 — 그러면 곁들이가 오른끝을 차지해
+                         금액이 다시 밀린다. 오른끝에 서야 하는 것은 «금액»이다. */
+                    h('div',{style:{display:'flex',flexDirection:'row-reverse',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
                         h('span', { style:{ fontFamily:'monospace', fontSize:'11.5px', fontWeight:600, color: retainerPaid ? '#16a34a' : '#1e293b' } },
                           fmtAmt(c.retainerFee, c)+(canSeeAmount(c)?'원':'')),
                         retainerPaid && canSeeAmount(c) && h('span', { style:{ fontSize:'10.5px', color:'#16a34a' } }, '✓ '+( c.retainerPaidDate||'입금완료')),
@@ -27944,13 +28014,15 @@ function CaseManagement(props){
           h('td', { colSpan:visBeforeFee, style:{ padding:'6px 10px', fontSize:'11.5px', color:'#475569', textAlign:'right' } },
             '합계 ' + filtered.filter(function(c){return canSeeAmount(c);}).length + '건'),
           colVis.retainerFee && h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:'#2563eb' } },
-            filtered.reduce(function(s,c){return s+(canSeeAmount(c)?(c.retainerFee||0):0);},0).toLocaleString()),
+            /* ⚠ 「원」을 붙인다 — 데이터 칸은 「400,000원」인데 합계만 「38,372,728」이면
+               오른끝은 맞아도 «자릿수»가 원 글자 너비만큼 어긋나 보인다. */
+            filtered.reduce(function(s,c){return s+(canSeeAmount(c)?(c.retainerFee||0):0);},0).toLocaleString()+'원'),
           colVis.successFee && h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:'#2563eb' } },
             filtered.reduce(function(s,c){
               if(!canSeeAmount(c)) return s;
               // % 모드는 예상금액(승소금액 × 요율) — 모달·목록·미입금 대기와 같은 함수를 쓴다
               return s + caseSuccessFeeAmount(c);
-            }, 0).toLocaleString()),
+            }, 0).toLocaleString()+'원'),
           h('td', { colSpan:(colVis.status?1:0)+(colVis.note?1:0)+1 })
         )
       )
@@ -67624,7 +67696,9 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                   colVis.contractFee && h('td', { className:'ar', style:{ padding:'4px 8px' } },
                     it.contractFee
                       ? h('div', null,
-                    h('div',{style:{display:'flex',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
+                    /* ⚠★ row-reverse — 합계 줄과 열을 맞춘다 (까닭은 사건관리 착수금 칸의 주석과 같다:
+                       .ar 의 text-align 은 flex 안에서 안 먹는다). 실측 어긋남 80.4px → 0.0px. */
+                    h('div',{style:{display:'flex',flexDirection:'row-reverse',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
                           h('span', { style:{ fontFamily:'monospace', fontWeight:600, fontSize:'11.5px', color: it.contractPaid ? '#16a34a' : '#1e293b' } },
                             fmtAmt(it.contractFee||0, it)+(canSeeAmount(it)?'원':'')),
                           canSeeAmount(it) && it.contractPaid && h('span', { style:{ fontSize:'10.5px', color:'#16a34a' } }, '✓ '+(it.contractPaidDate||'입금완료')),
@@ -67639,7 +67713,8 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                   colVis.balanceFee && h('td', { className:'ar', style:{ padding:'4px 8px' } },
                     it.balanceFee
                       ? h('div', null,
-                    h('div',{style:{display:'flex',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
+                    /* ⚠★ row-reverse — 계약금 칸과 같은 까닭. 실측 어긋남 24.0px → 0.0px. */
+                    h('div',{style:{display:'flex',flexDirection:'row-reverse',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
                           h('span', { style:{ fontFamily:'monospace', fontWeight:600, fontSize:'11.5px', color: it.balancePaid ? '#16a34a' : '#1e293b' } },
                             fmtAmt(it.balanceFee||0, it)+(canSeeAmount(it)?'원':'')),
                           canSeeAmount(it) && it.balancePaid && h('span', { style:{ fontSize:'10.5px', color:'#16a34a' } }, '✓ '+(it.balancePaidDate||'입금완료')),
@@ -67706,9 +67781,9 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
               h('td', { colSpan:leftCols, style:{ padding:'6px 10px', fontSize:'11.5px', color:'#475569', textAlign:'right' } },
                 '합계 ' + filtered.filter(function(c){return canSeeAmount(c);}).length + '건'),
               colVis.contractFee && h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:props.fgColor } },
-                filtered.reduce(function(s,c){return s+(canSeeAmount(c)?(c.contractFee||0):0);},0).toLocaleString()),
+                filtered.reduce(function(s,c){return s+(canSeeAmount(c)?(c.contractFee||0):0);},0).toLocaleString()+'원'),
               colVis.balanceFee && h('td', { className:'ar', style:{ padding:'6px 8px', fontFamily:'monospace', fontSize:'11.5px', color:props.fgColor } },
-                filtered.reduce(function(s,c){return s+(canSeeAmount(c)?(c.balanceFee||0):0);},0).toLocaleString()),
+                filtered.reduce(function(s,c){return s+(canSeeAmount(c)?(c.balanceFee||0):0);},0).toLocaleString()+'원'),
               h('td', { colSpan:rightCols })
             )
           );
