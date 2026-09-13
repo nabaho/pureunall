@@ -46,7 +46,7 @@
 <script src="js/pu-news-core.js?v=33"></script>
 <script src="js/pu-news-tpl.js?v=16"></script>
 <script src="js/pu-news-regional-sources.js?v=1"></script>
-<script src="js/pu-news-review.js?v=3"></script>
+<script src="js/pu-news-review.js?v=4"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -943,7 +943,7 @@ function 회차저장(자료){
   App.회차들[자료.열쇠] = 자료;
   return db.ref('newsletter/issues/' + 자료.열쇠).update({
     회차: 자료.회차, 상태: 자료.상태 || '초안', 안: 자료.안 || {},
-    우리글: 자료.우리글 || '', 지역뉴스: 자료.지역뉴스 || [],
+    우리글: 자료.우리글 || '',
     범위: 자료.범위 || App.설정.범위 || '자문중',
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
   });
@@ -1774,21 +1774,20 @@ function 지역뉴스관리(d){
       제목·날짜·공식 링크만 자동수집했습니다. 아직 어떤 뉴스레터에도 들어가지 않습니다.</div></div>`;
 }
 function 지역후보복구(){
-  const 대상=Object.values(App.지역후보||{}).filter(x=>x&&x.상태==='승인처리중');
-  if(!대상.length) return Promise.resolve(0);
-  let 고친수=0;
-  return Promise.all(대상.map(function(c){
-    const 예상=지역검토.복구판정(c,App.회차들,Date.now(),10*60*1000); if(!예상) return null;
-    return db.ref('newsletter/regionalCandidates/'+c.id).transaction(function(cur){
-      if(!cur||cur.상태!=='승인처리중'||Number(cur.revision||0)!==Number(c.revision||0)) return;
-      return 지역검토.복구판정(cur,App.회차들,Date.now(),10*60*1000)||undefined;
-    }).then(function(r){
-      if(r.committed){ App.지역후보[c.id]=r.snapshot.val(); 고친수++; }
-    }).catch(function(e){ console.warn('[지역뉴스 복구]',c.id,(e&&e.message)||e); });
-  })).then(function(){
-    if(고친수){ render(); toast('중단됐던 지역뉴스 승인 '+고친수+'건을 안전하게 정리했습니다',8000); }
-    return 고친수;
-  });
+  if(!Object.values(App.지역후보||{}).some(x=>x&&x.상태==='승인처리중')) return Promise.resolve();
+  // 후보와 회차를 같은 서버 스냅샷에서 확인한다. PC에 남은 회차는 복구 근거가 아니다.
+  const ref=db.ref('newsletter');
+  return ref.once('value').then(function(){ return ref.transaction(function(cur){
+    if(!cur) return;
+    const candidates=Object.assign({},cur.regionalCandidates||{}); let changed=false;
+    Object.keys(candidates).forEach(function(id){
+      const next=지역검토.복구판정(candidates[id],cur.issues||{},Date.now());
+      if(next){ candidates[id]=next; changed=true; }
+    });
+    if(changed) return Object.assign({},cur,{regionalCandidates:candidates});
+  },undefined,false); }).then(function(r){
+    if(r.committed){ App.지역후보=r.snapshot.val().regionalCandidates||{}; render(); }
+  }).catch(function(e){ console.warn('[지역뉴스 복구]',(e&&e.message)||e); });
 }
 async function 지역후보제외(id){
   const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 다른 관리자가 검토한 후보입니다');
@@ -1805,54 +1804,23 @@ async function 지역후보제외(id){
   }catch(e){ toast('제외하지 못했습니다: '+((e&&e.message)||''),9000); }
 }
 async function 지역후보승인(id){
-  const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 다른 관리자가 검토한 후보입니다');
+  const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 검토한 후보입니다');
   const 우리말=String(prompt('뉴스레터에 실을 푸른노무법인의 설명을 적어 주세요\n원문 문장을 복사하지 마세요.')||'').trim();
-  if(!우리말) return toast('푸른이 직접 쓴 설명이 없으면 승인할 수 없습니다',8000);
-  const d=지금회차();
-  const 뉴스=지역검토.승인뉴스(c,우리말,d.지역뉴스||[],Date.now());
-  if(!뉴스) return toast('이미 이 회차에 담았거나 후보 정보가 올바르지 않습니다',8000);
-  if(!confirm('「'+c.제목+'」을\n'+뉴스.지역+' 지역뉴스로 이번 회차에 담을까요?')) return;
-
-  /* 먼저 후보 한 건을 선점한다. 두 관리자가 동시에 눌러도 transaction 중 한 명만
-     검토대기→승인처리중으로 바꿀 수 있다. */
-  const 검토자=(App.me&&App.me.email)||'';
-  const ref=db.ref('newsletter/regionalCandidates/'+id);
-  let 선점;
+  if(!우리말) return;
+  const d=지금회차(), 검토자=(App.me&&App.me.email)||'', 시각=Date.now();
+  if(!confirm('「'+c.제목+'」을 이번 회차 지역뉴스에 담을까요?')) return;
   try{
-    선점=await ref.transaction(function(cur){
-      const next=지역검토.검토변경(cur,'승인처리중',검토자,Date.now(),''); return next||undefined;
-    });
-  }catch(e){ return toast('후보를 선점하지 못했습니다: '+((e&&e.message)||''),9000); }
-  if(!선점.committed) return toast('다른 관리자가 먼저 검토했습니다',7000);
-  let 회차저장완료=false;
-  try{
-    d.지역뉴스=d.지역뉴스||[]; d.지역뉴스.push(뉴스);
-    await 회차저장(d);
-    회차저장완료=true;
-    const 끝=await ref.transaction(function(cur){
-      if(!cur||cur.상태!=='승인처리중'||cur.검토자!==검토자) return;
-      return Object.assign({},cur,{ 상태:'승인', revision:(Number(cur.revision)||1)+1,
-        승인회차:d.열쇠, 승인일:Date.now() });
-    });
-    if(!끝.committed) throw new Error('후보 승인상태를 확정하지 못했습니다');
-    App.지역후보[id]=끝.snapshot.val(); render(); toast('이번 회차 지역뉴스에 담았습니다',7000);
-  }catch(e){
-    /* 회차 저장 전에 실패했을 때만 «내가 선점한 것»을 대기로 되돌린다.
-       회차 저장 뒤 상태확정만 실패했다면 되돌리지 않는다 — 이미 뉴스가 담겼으므로
-       대기로 풀면 다른 관리자가 다시 승인해 두 번 들어간다. */
-    if(회차저장완료){
-      App.지역후보[id]=선점.snapshot.val();
-      toast('지역뉴스에는 담겼지만 후보 표시를 확정하지 못했습니다 — 다시 승인하지 마세요: '
-        +((e&&e.message)||''),12000); render(); return;
-    }
-    const 복구=await ref.transaction(function(cur){
-      if(!cur||cur.상태!=='승인처리중'||cur.검토자!==검토자) return;
-      return Object.assign({},cur,{ 상태:'검토대기', revision:(Number(cur.revision)||1)+1,
-        검토자:'', 검토일:0 });
-    });
-    if(복구.committed) App.지역후보[id]=복구.snapshot.val();
-    toast('승인하지 못했습니다: '+((e&&e.message)||''),10000); render();
-  }
+    const ref=db.ref('newsletter');
+    await ref.once('value');
+    const r=await ref.transaction(function(cur){
+      return 지역검토.원자승인(cur,id,d,우리말,검토자,시각)||undefined;
+    },undefined,false);
+    if(!r.committed) return toast('이미 처리됐거나 발송된 회차입니다. 새로고침해 확인해 주세요.',8000);
+    const saved=r.snapshot.val();
+    App.지역후보=saved.regionalCandidates||{};
+    App.회차들[d.열쇠]=Object.assign({열쇠:d.열쇠},saved.issues[d.열쇠]);
+    render(); toast('이번 회차 지역뉴스에 담았습니다',7000);
+  }catch(e){ toast('승인 결과를 확인하지 못했습니다. 새로고침해 확인해 주세요: '+((e&&e.message)||''),10000); }
 }
 function 공식출처고르기(지역){
   const a = 지역출처.지역출처(지역);
@@ -1877,8 +1845,16 @@ function 지역뉴스담기(){
     언론사:공식출처.기관, 출처Id:공식출처.id, 우리말:우리말 },
     (App.me&&App.me.email)||'',Date.now());
   if(!뉴스) return toast('온톨로지 저장계약에 맞지 않아 등록할 수 없습니다',8000);
-  d.지역뉴스.push(뉴스);
-  회차저장(d).then(render).catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||''),7000));
+  // push 키는 서버에 쓰지 않고 발급만 한다. 같은 밀리초의 두 등록도 다른 ID다.
+  뉴스.id='manual-regional-'+db.ref('newsletter/issues').push().key;
+  const 검토자=(App.me&&App.me.email)||'', 시각=Date.now();
+  const ref=db.ref('newsletter/issues/'+d.열쇠);
+  ref.once('value').then(function(){ return ref.transaction(function(cur){
+    return 지역검토.회차추가(cur,뉴스,d,검토자,시각)||undefined;
+  },undefined,false); }).then(function(r){
+    if(!r.committed) return toast('이미 등록됐거나 발송된 회차입니다',8000);
+    App.회차들[d.열쇠]=Object.assign({열쇠:d.열쇠},r.snapshot.val()); render();
+  }).catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||''),7000));
 }
 function 지역뉴스빼기(i){
   const d=지금회차(), x=(d.지역뉴스||[])[i]; if(!x||x.상태==='철회') return;

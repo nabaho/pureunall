@@ -56,6 +56,38 @@
 
   function 활성인가(news) { return !!news && news.상태 !== '철회'; }
 
+  /* 재시도마다 서버가 준 최신 목록에 한 건만 더한다. 입력 객체는 고치지 않는다. */
+  function 회차추가(issue, news, draft, by, at) {
+    if (!news || !news.id) return null;
+    var cur = issue || { 회차:draft.회차, 상태:'초안' };
+    if (cur.상태 === '발송') return null;
+    var list = Array.isArray(cur.지역뉴스) ? cur.지역뉴스 : [];
+    if (list.some(function(x) { return x && (x.id === news.id ||
+      (news.후보Id && x.후보Id === news.후보Id)); })) return null;
+    return Object.assign({}, cur, { 지역뉴스:list.concat([news]),
+      고친이:by, 고친때:at, revision:(Number(cur.revision)||0)+1 });
+  }
+
+  /* 두 경로의 공통 부모 newsletter에서 승인과 회차 추가를 함께 확정한다. */
+  function 원자승인(root, id, draft, own, by, at) {
+    if (!root || !draft || !draft.열쇠) return null;
+    var c = (root.regionalCandidates || {})[id];
+    if (!c || c.id !== id || c.상태 !== '검토대기') return null;
+    var issues = root.issues || {};
+    if (승인된회차(id, issues)) return null;
+    var issue = issues[draft.열쇠];
+    var news = 승인뉴스(c, own, (issue || {}).지역뉴스 || [], at);
+    var next = 회차추가(issue, news, draft, by, at);
+    if (!next) return null;
+    return Object.assign({}, root, {
+      issues:Object.assign({}, issues, { [draft.열쇠]:next }),
+      regionalCandidates:Object.assign({}, root.regionalCandidates, { [id]:Object.assign({}, c, {
+        상태:'승인', 승인회차:draft.열쇠, 승인일:at, 검토자:by, 검토일:at,
+        revision:(Number(c.revision)||0)+1, updatedAt:at
+      }) })
+    });
+  }
+
   function 승인된회차(candidateId, issues) {
     var id = clean(candidateId, 100);
     var all = issues && typeof issues === 'object' ? issues : {};
@@ -65,26 +97,22 @@
     }) || '';
   }
 
-  /* 브라우저가 승인 도중 닫혀도 영구 잠금으로 두지 않는다.
-     회차에 들어갔으면 승인 완료, 안 들어간 채 10분 지난 것만 검토대기로 돌린다. */
+  /* 옛 화면의 저장 요청은 시간만으로 취소할 수 없다.
+     저장된 회차가 확인된 경우만 확정하고, 미확인 잠금은 자동 해제하지 않는다. */
   function 복구판정(candidate, issues, now, waitMs) {
     var c = candidate && typeof candidate === 'object' ? candidate : null;
     if (!c || c.상태 !== '승인처리중') return null;
     var 회차 = 승인된회차(c.id, issues);
     if (회차) return Object.assign({}, c, {
       상태:'승인', revision:Math.max(1, Number(c.revision)||1) + 1,
-      승인회차:회차, 승인일:Number(now)||Date.now(), 복구결과:'회차 저장 확인'
+      승인회차:회차, 승인일:Number(now)||Date.now(), 복구일:Number(now)||Date.now(), 복구결과:'회차 저장 확인'
     });
-    var 지금 = Number(now)||Date.now(), 기다림 = Math.max(60000, Number(waitMs)||600000);
-    if (!Number(c.검토일) || Number(c.검토일) > 지금 - 기다림) return null;
-    return Object.assign({}, c, {
-      상태:'검토대기', revision:Math.max(1, Number(c.revision)||1) + 1,
-      검토자:'', 검토일:0, 복구일:지금, 복구결과:'회차 저장 없음 — 잠금 해제'
-    });
+    return null;
   }
 
   var API = { 검토변경:검토변경, 승인뉴스:승인뉴스, 수동뉴스:수동뉴스,
-    철회:철회, 활성인가:활성인가, 승인된회차:승인된회차, 복구판정:복구판정 };
+    철회:철회, 활성인가:활성인가, 승인된회차:승인된회차, 복구판정:복구판정,
+    회차추가:회차추가, 원자승인:원자승인 };
   if (typeof module === 'object' && module.exports) module.exports = API;
   else global.PuNewsReview = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
