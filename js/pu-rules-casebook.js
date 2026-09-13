@@ -702,6 +702,52 @@
      안 걸리는 것보다 나쁘다(도장만 있는 장·너무 흐린 스캔이 이렇게 나온다).
      ★ 재는 것은 «한글 글자 수»다. 전체 길이로 재면 잡티가 만든 「| ! ' ,」 수천 개가
        통과한다(실제로 흔한 오독 모양이다). */
+  /* ── 원본 파일: 크기 한도와 «못 한 까닭» ────────────────────────────
+     ★★ 한도는 «서버 규칙과 같은 수»라야 한다. 창고 규칙의 서고 칸이
+       `request.resource.size < 25 * 1024 * 1024` 이고, 화면이 다른 수를 알고 있으면
+       조용히 어긋난다 — 검사(rules-casebook-orig-why)가 규칙 파일에서 직접 읽어 견준다.
+     ⚠ 규칙이 `<` 이므로 «딱 25MB»는 막힌다. 경계를 같은 쪽으로 둔다. */
+  var FILE_MAX = 25 * 1024 * 1024;
+
+  function mb(n) { return (Math.round(Number(n) / (1024 * 1024) * 10) / 10); }
+
+  /* 올리기 «전에» 본다. 25MB 를 다 올려 보고 거절당하면 시간과 통신이 버려지고,
+     무엇보다 그 실패가 `storage/unauthorized` 로 와서 «권한 탓»으로 읽힌다. */
+  function fileTooBig(size) {
+    var n = Number(size);
+    if (!isFinite(n) || n <= 0) return { ok: true, why: '' };   /* 모르면 안 막는다 */
+    if (n < FILE_MAX) return { ok: true, why: '' };
+    return { ok: false, why: '원본이 너무 큽니다 — 한 건 ' + mb(FILE_MAX) + 'MB 까지인데 '
+      + mb(n) + 'MB 입니다. 나누어 올리거나 스캔 해상도를 낮춰 주세요.' };
+  }
+
+  /* 원본을 못 담았을·못 열었을 때 «무엇이 잘못인지» 고른다 — 고르는 일은 여기 한 자리다.
+     ★★ 2026-09-13 전에는 `unauthorized` 를 무조건 「창고 규칙이 아직 올라가지 않아…」로
+       적었다. 그날 규칙이 콘솔에 올라갔으므로(PR #1258) 그 말은 이제 «틀린 안내»다 —
+       이미 올라간 것을 또 올리러 가게 만든다. 어긋난 안내는 없는 것보다 나쁘다.
+     ★ 규칙이 올라간 지금 `unauthorized` 의 진짜 까닭은 둘뿐이다.
+       ① 파일이 한도를 넘는다 ② 로그인 계정이 @pureun.kr 이 아니다(같은 날 조였다).
+       ①은 크기를 알면 «먼저» 짚는다 — 계정을 탓하면 엉뚱한 데를 고치게 된다. */
+  function origWhy(code, opts) {
+    var o = opts || {};
+    var c = String(code || '');
+    var 일 = txt(o.일) || '담기';
+    if (c.indexOf('unauthorized') >= 0 || c.indexOf('permission') >= 0) {
+      var 큼 = fileTooBig(o.size);
+      if (!큼.ok) return 큼.why;
+      return '창고가 이 계정을 받지 않았습니다 — 로그인 계정이 «@pureun.kr» 인지 확인해 주세요'
+        + ' (2026-09-13 부터 우리 도메인만 창고를 씁니다).';
+    }
+    if (c.indexOf('object-not-found') >= 0) {
+      return '원본 파일이 창고에 없습니다 — 담기지 않았거나 지워졌습니다.';
+    }
+    if (c.indexOf('retry-limit') >= 0 || c.indexOf('canceled') >= 0) {
+      return '통신이 끊겨 ' + 일 + '를 마치지 못했습니다 — 잠시 뒤 다시 눌러 주세요.';
+    }
+    var m = txt(o.message);
+    return '원본 ' + 일 + '에 실패했습니다' + (m ? ' — ' + m : (c ? ' — ' + c : '')) + '.';
+  }
+
   /* 본문 한도 — 서버 규칙(make-firebase-rules.js 의 casebook.text.t · casebook.ocr.t)과
      같은 수여야 한다. 세 곳에 흩어 두었더니 어긋날 판이라 여기 한 자리로 모았다
      (rules.html 의 CB_TEXT_MAX 가 이것을 받아 쓴다 · 검사가 서버 규칙과 견준다). */
@@ -1034,6 +1080,8 @@
     /* ㉢ 스캔뿐인 회차의 글자 읽기 (2026-09-07) */
     TEXT_MAX: TEXT_MAX, OCR_MIN_KO: OCR_MIN_KO,
     canOcr: canOcr, canScan: canScan, ocrWorth: ocrWorth,
+    /* 원본 파일 — 크기 한도와 «못 한 까닭» (2026-09-13) */
+    FILE_MAX: FILE_MAX, fileTooBig: fileTooBig, origWhy: origWhy,
     ocrRow: ocrRow, ocrMark: ocrMark, pickText: pickText
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

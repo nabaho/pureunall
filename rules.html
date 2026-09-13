@@ -20,7 +20,7 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-rules-history.js?v=3"></script>
-<script src="js/pu-rules-casebook.js?v=11"></script>
+<script src="js/pu-rules-casebook.js?v=12"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pako.min.js"></script>
 <script src="vendor/pdf.min.js"></script>
@@ -5572,18 +5572,22 @@ const CB_BUCKET='gs://pureun-erp-hrphotos';
 let CB_ORIG_WHY='';                    // 왜 못 담았는지 — 사람에게 그대로 보인다
 async function cbPutOrig(f,siteKey,revId,role,ext){
   if(!f)return null;
+  /* ★ 크기는 «올리기 전에» 본다 — 25MB 를 다 올려 보고 거절당하면 시간과 통신이
+     버려지고, 무엇보다 그 실패가 storage/unauthorized 로 와서 «권한 탓»으로 읽힌다. */
+  const 큼=CB.fileTooBig(f&&f.size);
+  if(!큼.ok){ if(!CB_ORIG_WHY)CB_ORIG_WHY=큼.why;
+    console.warn('서고 원본이 너무 큼(글·색인은 계속):',siteKey,revId,role,f&&f.size);
+    return null; }
   try{
     const st=firebase.app().storage(CB_BUCKET);
     const 자리=CB.paths.file(siteKey,revId,role,ext);
     await st.ref(자리).put(f);
     return 자리;
   }catch(e){
-    /* 규칙이 없을 때 흔한 값이 storage/unauthorized 다 — 그때는 «까닭»을 정확히 적는다 */
-    const code=String((e&&e.code)||'');
+    /* 까닭을 고르는 일은 «CB.origWhy 한 자리»다 — 세 곳에 흩뿌리면 또 어긋난다 */
     if(!CB_ORIG_WHY){
-      CB_ORIG_WHY=code.indexOf('unauthorized')>=0
-        ? '창고 규칙이 아직 올라가지 않아 원본을 못 담았습니다 (docs/firebase-storage-전체(붙여넣기용).txt 를 콘솔에 게시하면 담깁니다).'
-        : '원본을 못 담았습니다 — '+String((e&&e.message)||e);
+      CB_ORIG_WHY=CB.origWhy((e&&e.code)||'',
+        {일:'담기',size:f&&f.size,message:(e&&e.message)||''});
     }
     console.warn('서고 원본 담기 실패(글·색인은 계속):',siteKey,revId,role,e);
     return null;
@@ -5643,12 +5647,7 @@ async function cbOpenOrig(자리){
     const url=await firebase.app().storage(CB_BUCKET).ref(자리).getDownloadURL();
     window.open(url,'_blank','noopener');
   }catch(e){
-    const code=String((e&&e.code)||'');
-    alert(code.indexOf('unauthorized')>=0
-      ? '창고 규칙이 아직 올라가지 않아 원본을 열 수 없습니다.'
-      : (code.indexOf('object-not-found')>=0
-          ? '원본 파일이 창고에 없습니다 — 담기지 않았거나 지워졌습니다.'
-          : '원본을 열지 못했습니다 — '+String((e&&e.message)||e)));
+    alert(CB.origWhy((e&&e.code)||'',{일:'열기',message:(e&&e.message)||''}));
   }
 }
 /* ══════ ㉢ 스캔뿐인 회차의 «글자 읽기(OCR)» — 대표 결정 2026-09-07 ══════
@@ -5797,11 +5796,7 @@ async function cbOcrRun(revId,role){
     const code=String((err&&err.code)||"");
     const 자리2=ocrBox(revId)||자리;
     ocrSay(자리2,"<b>읽지 못했습니다.</b><br>"+escapeH(
-      code.indexOf("unauthorized")>=0
-        ? "창고 규칙이 아직 올라가지 않아 원본을 받을 수 없습니다 — 창고 규칙 붙여넣기가 먼저입니다."
-        : (code.indexOf("object-not-found")>=0
-            ? "원본 파일이 창고에 없습니다 — 담기지 않았거나 지워졌습니다."
-            : String((err&&err.message)||err))),null,"red");
+      CB.origWhy(code,{일:"받기",message:(err&&err.message)||""})),null,"red");
   }finally{ if(worker){ try{ await worker.terminate(); }catch(_){ } } }
 }
 /* 읽어낸 글 «그대로 보기» — 원문 보기와 색을 달리한다(같으면 원문으로 읽힌다) */
