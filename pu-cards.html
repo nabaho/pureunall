@@ -28730,8 +28730,8 @@ function coSmeList(now){
 function coSmeCount(now){ return coSmeList(now).length; }
 /* 목록 위 알림 띠 — 0곳이면 «아무 것도 안 띄운다».
    ⚠ 늘 뜨는 띠는 눈이 배경으로 배운다(고아 정보 띠에서 정한 규칙 그대로다). */
-function coSmeBarHtml(){
-  const list = coSmeList();
+function coSmeBarHtml(now){
+  const list = coSmeList(now);
   if(!list.length) return '';
   const gone = list.filter(x => x.cls === 'gone').length;
   const soon = list.length - gone;
@@ -28745,8 +28745,9 @@ function openCoSme(){ showPanel(coSmeHtml()); }
 /* 창 — 급한 순으로 늘어놓고, 누르면 그 회사를 연다.
    ⚠ 여기서 «고치지 않는다». 확인서는 바깥(중소기업현황정보시스템)에서 새로 받아
      사진첩으로 들어오는 것이라, 이 창이 할 일은 「어디를 챙길 것인가」를 말하는 것뿐이다. */
-function coSmeHtml(){
-  const list = coSmeList();
+function coSmeHtml(now){
+  /* ⚠ 「오늘」을 받는다 — 안 받으면 검사가 날짜를 정해 줘도 하루 지나면 답이 달라진다 */
+  const list = coSmeList(now);
   if(!list.length) return `<div class="mhead"><b>🏅 중소기업 확인서</b>${_closeBtn()}</div>
     <p class="cpnone" style="padding:16px 2px">갱신할 곳이 없습니다 👍</p>`;
   return `<div class="mhead"><b>🏅 중소기업 확인서 — 갱신할 곳 ${list.length}곳</b>${_closeBtn()}</div>
@@ -28763,6 +28764,85 @@ function coSmeHtml(){
           <span class="se">${esc(x.exp)}까지</span>
           ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
       </div>`).join('')}</div>`;
+}
+
+/* ══════ 🏛 국세청 사업자 상태 — «지금» 물어보고 «언제 물어봤는지»와 함께 적는다 ═══
+   (대표 지시 2026-09-13 — 기능 검토 보고의 ⑤)
+
+   ■ 알아보니 «이미 다 있었다»
+   국세청 조회는 이 저장소가 이미 하고 있다 — 사진첩이 등록증을 읽을 때
+   `js/pu-doc-read.js` 가 `api.odcloud.kr` 에 물어보고(`ntsState`), 「국세청 계속사업자」를
+   화면에 적는다. 열쇠 자리도 이미 있다(포털 환경설정 › 국세청 사업자번호 조회 키 ·
+   `data/app_config/ntsKey` · 무료).
+   **없던 것은 그 값이 기업정보함까지 오는 길뿐이었다** — 중소기업 확인서 때와 같은 자리다.
+
+   ★⚠ 「언제 확인했나」를 «반드시» 함께 적는다. 상태는 그때의 사실이지 지금의 사실이
+     아니다 — 날짜 없이 「폐업자」만 적어 두면, 반년 뒤에도 화면이 단정해서 거짓말을 한다.
+     (그래서 사진첩처럼 «읽을 때 자동으로 받아 두는» 길로 안 갔다. 그 값은 서류를 읽던
+      날의 것이라 언제 굳었는지 모른 채 눌러앉는다.)
+   ⚠ 못 물어봤으면 «물어본 척 안 한다» — pu-doc-read 가 지키는 규칙 그대로다.
+   ⚠ 우리가 정하지 않는다. 국세청이 준 말(b_stt)을 그대로 적는다. */
+const NTS_STATUS_URL = 'https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=';
+/* 국세청이 준 한 마디 — 없으면 세금 갈래 칸에 든 안내문이 그 자리를 대신한다
+   (등록되지 않은 번호는 b_stt 가 비고 tax_type 에 「…등록되지 않은 사업자등록번호입니다」가 온다). */
+function coNtsWord(row){
+  const st = String((row && row.b_stt) || '').trim();
+  if(st) return st;
+  return String((row && row.tax_type) || '').trim();
+}
+/* 무슨 빛으로 보일 것인가 — 화면과 검사가 «같은 답»을 보도록 따로 둔다 */
+function coNtsCls(word){
+  const w = String(word || '');
+  if(!w) return '';
+  if(w.indexOf('폐업') >= 0) return 'gone';
+  if(w.indexOf('휴업') >= 0) return 'soon';
+  if(w.indexOf('계속') >= 0) return 'ok';
+  return 'dim';                     /* 등록되지 않은 번호 등 — 좋지도 나쁘지도 않다 */
+}
+function coNtsChipHtml(o){
+  /* 사업자번호가 없으면 물어볼 길이 없다 — 눌러도 안 되는 단추를 두지 않는다 */
+  if(!o || digits(o.bizno || '').length < 10) return '';
+  const word = coVal(o, 'ntsState'), at = coVal(o, 'ntsAt');
+  const key = esc(String(o.key).replace(/'/g,"\\'"));
+  const color = { gone:'#991b1b;background:#fef2f2;border-color:#fecaca',
+                  soon:'#854d0e;background:#fffbeb;border-color:#fde68a',
+                  ok:'#1e40af;background:#eff6ff;border-color:#bfdbfe',
+                  dim:'#64748b;background:#f8fafc;border-color:#e2e8f0',
+                  '':'#64748b;background:#f8fafc;border-color:#e2e8f0' }[coNtsCls(word)];
+  const 글 = word
+    ? `🏛 ${esc(word)}${at ? ` · ${esc(at)} 확인` : ''}`
+    : '🏛 국세청 확인';
+  return `<span onclick="event.stopPropagation();coAskNts('${key}')"
+    title="${word ? '국세청에 물어본 그때의 상태입니다 — 눌러서 다시 확인합니다'
+                  : '국세청에 사업자 상태(계속·휴업·폐업)를 물어봅니다'}"
+    style="cursor:pointer;font-size:11px;font-weight:700;
+    border:1px solid;border-radius:9px;padding:1px 8px;white-space:nowrap;color:${color}">${글}</span>`;
+}
+async function coAskNts(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const no = digits(o.bizno || '');
+  if(no.length < 10){ toast('사업자번호가 없어 국세청에 물어볼 수 없습니다', 6000); return; }
+  const svc = String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim();
+  /* ⚠ 열쇠가 없으면 «어디서 넣는지»까지 말한다. 조용히 아무 일도 안 하면 고장으로 보인다. */
+  if(!svc){ toast('국세청 조회 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」를 넣어 주세요(공공데이터포털, 무료)', 10000); return; }
+  toast('국세청에 물어보는 중…', 3000);
+  let row = null;
+  try{
+    const r = await fetch(NTS_STATUS_URL + encodeURIComponent(svc), {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ b_no: [no] }) });
+    if(!r.ok) throw new Error('응답 ' + r.status);
+    const j = await r.json();
+    row = (j && j.data && j.data[0]) || null;
+  }catch(e){
+    /* 못 물어봤는데 «물어본 척» 하지 않는다 — 적어 둔 값도 안 건드린다 */
+    toast('국세청에 못 물어봤습니다 — ' + ((e && e.message) || '연결을 확인해 주세요'), 8000);
+    return;
+  }
+  const word = coNtsWord(row);
+  if(!word){ toast('국세청이 아무 말도 주지 않았습니다 — 번호를 다시 확인해 주세요', 7000); return; }
+  coSaveInfoPatch(k, { ntsState: word, ntsAt: todayYmd() }, `🏛 국세청 「${word}」 — 오늘 확인했습니다`);
 }
 
 function coSmeChipHtml(o){
@@ -28794,9 +28874,16 @@ function coSmeChipHtml(o){
      읽어 며칠 남았나»일 뿐이다 — 날짜 세는 곳을 두 벌로 만드는 것이 훨씬 위험하다
      (이름을 고치면 그 함수를 떠서 돌리는 검사 여섯 벌이 함께 움직인다). */
 function coCtState(o, now){
-  const p = erpContractPeriod(o && o.erp, now == null ? todayYmd() : now);
+  /* ⚠⚠ 「오늘」을 «한 번만» 정해 둘 다에 넘긴다 (2026-09-13에 검사가 잡았다).
+     처음에는 erpContractPeriod 에는 todayYmd() 를, coSmeDays 에는 now(=undefined)를
+     넘겼다 — 그러면 coSmeDays 가 «진짜 오늘»을 보아, 검사가 날짜를 정해 줘도 하루만
+     지나면 답이 달라졌다. 이 저장소가 erpContractPeriod 를 만들 때 못 박은 그 규칙
+     (「오늘 날짜를 받는다 — 안에서 new Date() 를 부르면 검사가 해마다 달라진다」)을
+     내가 바로 옆에서 어겼다. */
+  const today = (now == null ? todayYmd() : now);
+  const p = erpContractPeriod(o && o.erp, today);
   if(!p || !p.to) return null;                    /* 기간을 안 적었다 — 끝난 것이 아니다 */
-  const d = coSmeDays(p.to, now);
+  const d = coSmeDays(p.to, today);
   if(d == null) return null;                      /* 날짜로 못 읽었다 */
   if(d < 0)   return { cls:'gone', days:d, to:p.to, from:p.from };
   if(d <= 30) return { cls:'soon', days:d, to:p.to, from:p.from };
@@ -28828,8 +28915,8 @@ function coCtClosedCount(now){
   }).length;
 }
 /* 목록 위 알림 띠 — 0곳이면 «아무 것도 안 띄운다»(확인서 띠와 같은 규칙) */
-function coCtBarHtml(){
-  const list = coCtList();
+function coCtBarHtml(now){
+  const list = coCtList(now);
   if(!list.length) return '';
   const gone = list.filter(x => x.cls === 'gone').length;
   const soon = list.length - gone;
@@ -28843,9 +28930,10 @@ function openCoCt(){ showPanel(coCtHtml()); }
 /* 창 — 급한 순으로 늘어놓고, 누르면 그 회사를 연다.
    ⚠ 여기서 «고치지 않는다». 계약 기간은 업체관리가 가진 값이라, 이 창이 할 일은
      「어디를 챙길 것인가」를 말하는 것뿐이다. */
-function coCtHtml(){
-  const list = coCtList();
-  const 뺀곳 = coCtClosedCount();
+function coCtHtml(now){
+  /* ⚠ 「오늘」을 받는다 — 코SmeHtml 과 같은 까닭이다 */
+  const list = coCtList(now);
+  const 뺀곳 = coCtClosedCount(now);
   const 뺀말 = 뺀곳 ? `<br>계약해지(🚪)로 표시된 <b>${뺀곳.toLocaleString()}곳</b>은 뺐습니다 — 이미 끝낸 일입니다.` : '';
   if(!list.length) return `<div class="mhead"><b>📅 계약 종료</b>${_closeBtn()}</div>
     <p class="cpnone" style="padding:16px 2px">챙길 곳이 없습니다 👍</p>
@@ -28927,8 +29015,16 @@ function coAskMemo(key){
    ⚠ 빈 글자는 null 로 쓴다. ''를 남기면 「적었다가 지운 것」과 「원래 없는 것」이 갈려
      나중에 세는 곳마다 둘을 따로 다뤄야 한다. */
 function coSaveInfoField(key, field, value, okMsg){
+  const patch = {}; patch[field] = value;
+  return coSaveInfoPatch(key, patch, okMsg);
+}
+/* 칸 «여럿»을 한 번에 — 상태와 「언제 확인했나」처럼 둘이 늘 짝일 때 쓴다.
+   ⚠ 따로 쓰면 하나만 써지고 끊길 수 있다 — 그러면 날짜 없는 상태가 남아 화면이 거짓말한다. */
+function coSaveInfoPatch(key, patch, okMsg){
   if(Store.mode !== 'firebase'){ toast('실시간DB 연결 상태에서만 적을 수 있습니다'); return; }
-  Store.db.ref(DB_ROOT).update({ ['coInfo/' + key + '/' + field]: value || null }).then(()=>{
+  const upd = {};
+  Object.keys(patch || {}).forEach(f => { upd['coInfo/' + key + '/' + f] = patch[f] || null; });
+  return Store.db.ref(DB_ROOT).update(upd).then(()=>{
     coListBust(); renderCoSoon();
     if(state.coPick === key) openCoDetailPanel(key, true);
     toast(okMsg, 5000);
@@ -29052,6 +29148,9 @@ function coInfoBoxHtml(o){
       기업정보 <span class="chev">${_coInfoOpen?'▾':'▸'}</span>
       ${/* ⚠ 접었을 때도 «늘» 보인다 — 접힌 채 두는 것이 기본이라 여기 없으면 못 본다 */''}
       ${coSmeChipHtml(o)}
+      ${/* 🏛 국세청 상태 — 사업자번호가 있는 줄에만 뜬다. 값이 없으면 「국세청 확인」이라는
+           누를 수 있는 칩이다(빈 자리를 두면 물어볼 길이 있는 줄도 모른다). */''}
+      ${coNtsChipHtml(o)}
       ${_coInfoOpen?'':`<span style="font-weight:400;color:#94a3b8;font-size:12px">${esc(coInfoSummary(o))}</span>`}
     </div>
     ${_coInfoOpen?`<div class="pdgrid cogrid" style="margin-top:12px">

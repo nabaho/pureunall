@@ -60,7 +60,16 @@ function panelDeps(app) {
     cutFn(app, 'function coVal('),
     cutFn(app, 'function coMgrOf('),
     cutFn(app, 'function coMgrIsOurs('),
-    cutFn(app, 'function coMemoHtml(')
+    cutFn(app, 'function coMemoHtml('),
+    /* 2026-09-13: 기업정보 머리에 🏛 국세청 상태 칩이 붙었다(대표 지시 ⑤).
+       ⚠ «진짜»를 싣는다 — 무슨 빛으로 보일지(계속·휴업·폐업)를 가르는 잣대라
+         대역을 넣으면 그 가름이 틀려도 검사가 모른다. */
+    /* ⚠ digits 도 함께 — 칩이 「사업자번호가 있는 줄인가」를 그것으로 가린다.
+       화살표 한 줄이라 cutFn 으로는 못 뜬다(줄째로 뜬다). */
+    (app.match(/^const digits = [^\n]*;$/m) || [])[0] || '',
+    cutFn(app, 'function coNtsWord('),
+    cutFn(app, 'function coNtsCls('),
+    cutFn(app, 'function coNtsChipHtml(')
   ].join('\n');
 }
 

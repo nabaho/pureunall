@@ -95,14 +95,14 @@ test('★ 남은 날을 «함께» 들고 온다 — 화면이 그것으로 D-�
 
 test('★★★ 갱신할 곳이 없으면 띠를 «아예 안 띄운다»', () => {
   const c = load([ 회사('멀다','2027-03-31'), 회사('없음','') ]);
-  assert.equal(c.coSmeBarHtml(), '',
+  assert.equal(c.coSmeBarHtml(오늘), '',
     '★★★ 늘 뜨는 띠는 눈이 배경으로 배운다 — 정작 급할 때 안 읽힌다');
 });
 
 test('★★ 띠가 «만료 몇 곳 · 30일 안 몇 곳»을 갈라 말한다', () => {
   const c = load([ 회사('만료1','2026-03-31'), 회사('만료2','2026-08-01'),
                    회사('임박1','2026-10-01') ]);
-  const h = c.coSmeBarHtml();
+  const h = c.coSmeBarHtml(오늘);
   assert.match(h, /만료 <b>2곳<\/b>/, '★★ 몇 곳이 이미 지났는지가 가장 급한 값이다');
   assert.match(h, /30일 안 <b>1곳<\/b>/);
   assert.match(h, /openCoSme\(\)/, '★ 눌러서 볼 길이 없다');
@@ -110,7 +110,7 @@ test('★★ 띠가 «만료 몇 곳 · 30일 안 몇 곳»을 갈라 말한다'
 
 test('★ 한쪽이 0곳이면 그쪽은 «안 적는다» — 「만료 0곳」은 읽을 값이 없다', () => {
   const c = load([ 회사('임박','2026-10-01') ]);
-  const h = c.coSmeBarHtml();
+  const h = c.coSmeBarHtml(오늘);
   assert.ok(!/만료 <b>/.test(h), '★ 「만료 0곳」이 적혀 있다');
   assert.match(h, /30일 안 <b>1곳<\/b>/);
 });
@@ -119,7 +119,7 @@ test('★ 한쪽이 0곳이면 그쪽은 «안 적는다» — 「만료 0곳」
 
 test('★★★ 창이 회사마다 «언제까지»와 «얼마나 급한지»를 말한다', () => {
   const c = load([ 회사('만료회사','2026-09-02'), 회사('임박회사','2026-09-20') ]);
-  const h = c.coSmeHtml();
+  const h = c.coSmeHtml(오늘);
   assert.match(h, /갱신할 곳 2곳/, '★ 몇 곳인지 없다');
   assert.match(h, /만료 10일 지남/, '★★★ 얼마나 지났는지 없으면 급한 정도를 모른다');
   assert.match(h, /D-8/, '★★ 며칠 남았는지 없다');
@@ -128,7 +128,7 @@ test('★★★ 창이 회사마다 «언제까지»와 «얼마나 급한지»�
 
 test('★★ 회사를 누르면 «창을 닫고» 그 회사를 연다', () => {
   const c = load([ 회사('가나','2026-09-02') ]);
-  const h = c.coSmeHtml();
+  const h = c.coSmeHtml(오늘);
   assert.match(h, /pickCo\('가나'\)/, '★★ 눌러도 그 회사로 못 간다');
   assert.match(h, /dedupBg\.classList\.remove\('open'\)/,
     '★★ 창을 안 닫으면 상세가 창 뒤에 열려 아무 일도 없는 것처럼 보인다');
@@ -136,7 +136,7 @@ test('★★ 회사를 누르면 «창을 닫고» 그 회사를 연다', () => 
 
 test('★ 갱신할 곳이 없으면 창은 «없다»고 말한다 — 빈 목록은 고장으로 읽힌다', () => {
   const c = load([ 회사('멀다','2027-03-31') ]);
-  assert.match(c.coSmeHtml(), /없습니다/);
+  assert.match(c.coSmeHtml(오늘), /없습니다/);
 });
 
 /* ── ① 잣대가 «한 곳»인가 · ⑥ 이름표 ──────────────────────────────── */
