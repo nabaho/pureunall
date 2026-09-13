@@ -145,9 +145,18 @@ test('설립 서식이 읽는 값 열 가지가 모두 기금 정보에 «칸»�
 });
 
 test('저장·화면이 FIELDS 하나만 본다 — 칸을 늘리면 저절로 저장된다', () => {
-  const save = grabFn('saveInfo'), form = grabFn('infoForm');
-  assert.match(save, /FIELDS\.forEach/, 'saveInfo 가 FIELDS 를 돌아야 한다');
-  assert.match(form, /FIELDS\.map/, 'infoForm 이 FIELDS 를 그려야 한다');
+  assert.match(grabFn('saveInfo'), /FIELDS\.forEach/, 'saveInfo 가 FIELDS 를 돌아야 한다');
+  /* ⚠ 여기는 「infoForm 이 FIELDS.map 을 쓴다」는 «글자» 검사였다. 2026-09-13 에 묶음 접기를
+       넣으면서 infoGroups() 를 거치게 바뀌자, 뜻은 그대로인데 검사만 깨졌다 — 글자를 못 박고 있었다.
+       그래서 «정말 도는지»를 돌려서 본다: 묶음들을 도로 펴면 FIELDS 와 한 칸도 다르지 않아야 한다.
+       (첫 시도에서 lease_lessor 칸이 통째로 사라졌다 — 글자 검사로는 절대 못 잡았을 일이다.) */
+  const box = {};
+  new Function([grabDecl('FIELDS'), grabDecl('INFO_SECS'), grabDecl('INFO_FOLD'),
+    grabFn('infoGroups'), 'this.G=infoGroups(); this.F=FIELDS;'].join('\n')).call(box);
+  const 편것 = [].concat.apply([], box.G.map((g) => g.fields));
+  assert.deepEqual(편것, box.F,
+    '★ 묶음을 도로 펴면 FIELDS 와 달라진다 — 화면에서 칸이 빠지거나 두 번 그려진다');
+  assert.match(grabFn('infoForm'), /infoGroups\(\)\.map/, 'infoForm 이 묶음을 그려야 한다');
 });
 
 test('묶음 머리 「설립」이 실제 FIELDS 칸을 가리킨다', () => {

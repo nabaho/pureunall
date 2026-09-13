@@ -52,6 +52,9 @@ async function run(cardRow, formValues, sameFund, opts) {
     grabDecl('SITE_CARD_MAP'), grabDecl('CARD_TARGETS'), grabDecl('CARD_MAP'),
     grabDecl('CO_KEYMAP'), grabDecl('SITE_FIELDS'), grabDecl('CONTACT_FIELDS'),
     'var _cardIdx=IDX, _coCache={}, _nfCard=null, window={};',
+    /* 새 기금 창의 부담당 — 2026-09-13 에 생겼다. 안 실으면 _readNewFundForm 이
+       _nfSubs 를 못 찾아 통째로 터지고, 창이 다시 안 열려 치던 값이 다 날아간다. */
+    'var _staffCache=' + JSON.stringify(opts.staff || []) + ';',
     'var _cardPick={fid:"F1",key:"' + (opts.key || 'info') + '",sid:"' + (opts.sid || '') + '"};',
     'var _siteEditSid="' + (opts.sid || '') + '";',
     'var S={fundId:' + (sameFund === false ? '"F2"' : '"F1"') + '};',
@@ -71,7 +74,7 @@ async function run(cardRow, formValues, sameFund, opts) {
     grabFn('_cardNorm'), grabFn('cardEffective'), grabFn('_coNorm'), grabFn('cardCoKey'),
     grabFn('loadCardCo'), grabFn('cardFull'), grabFn('_primaryContact'), grabFn('_cardFn'),
     grabFn('_openNewFund'), grabFn('_openSiteEdit'),
-    grabFn('_readSiteForm'), grabFn('_readNewFundForm'),
+    grabFn('_readSiteForm'), grabFn('_nfSubs'), grabFn('_readNewFundForm'),
     grabFn('_cardIntoRec'), grabFn('_applyCardValues'), grabFn('applyCard'),
     /* 등록부는 이름만 담는다 — 브라우저에서 window 로 찾는 것과 같게 걸어 준다 */
     'window._readSiteForm=_readSiteForm; window._readNewFundForm=_readNewFundForm;',
@@ -303,7 +306,8 @@ test('부담당은 드롭다운으로 담고 ×로 뺀다 — 중복·주담당 
 });
 
 test('담당은 한 줄 — 부담당이 전폭 한 줄을 먹지 않는다', () => {
-  assert.match(SRC, /if\(c\[0\]==='manager'\) return sec\+'<div class="fld w3">/, '담당이 한 칸(w3)으로 합쳐지지 않았다');
+  /* 묶음 머리는 2026-09-13 부터 칸이 아니라 묶음 쪽에서 붙인다(접기 때문) — sec+ 는 사라졌다 */
+  assert.match(SRC, /if\(c\[0\]==='manager'\) return '<div class="fld w3">/, '담당이 한 칸(w3)으로 합쳐지지 않았다');
   assert.ok(!/<div class="fld full"><label>부담당/.test(SRC), '부담당이 다시 전폭 한 줄을 먹는다');
   assert.match(SRC, /class="mgrrow"/, '한 줄 상자가 없다');
   const sub = grabFn('mgrSubField');
@@ -587,10 +591,16 @@ test('사업장 편집 창은 저장된 값 위에 채운 값을 얹는다', () 
 test('새 기금 등록 — 이름은 창에, 칸 없는 값은 등록될 때 함께 간다', async () => {
   const card = { _id: 'c1', k: 'biz', c: '가짜공동근로복지기금', bz: '000-82-00000',
     ceo: '홍길동', ad: '○○로 1', ct: '000-000-0000', cno: '000000-0000000' };
+  /* 부담당 알약이 담긴 채로 기업정보함에 다녀오는 길 — 창을 다시 만드는 사이에 사라지면 안 된다 */
+  const 알약 = [{ getAttribute: () => 'P-002' }];
   const r = await run(card, { 'nf-name': '', 'nf-short': '○○ 9호' }, true,
-    { key: 'newfund', idx: [card] });
+    { key: 'newfund', idx: [card],
+      staff: [{ sid: 'P-001', name: '김주담당' }, { sid: 'P-002', name: '이부담당' }],
+      nodes: { 'nf-subchips': { querySelectorAll: () => 알약 } } });
   assert.ok(r.made[0] && r.made[0].newfund, '등록 창이 다시 안 열렸다');
   const pre = r.made[0].pre;
+  assert.deepEqual(pre.mgr_subs, [{ sid: 'P-002', name: '이부담당' }],
+    '★ 담아 둔 부담당이 기업정보함에 다녀오는 사이 사라졌다');
   assert.equal(pre.name, '가짜공동근로복지기금');
   assert.equal(pre.short_name, '○○ 9호', '치던 약칭이 사라졌다');
   assert.equal(pre.tax_id_no, '000-82-00000', '창에 칸이 없다고 버리면 등록 직후 또 쳐야 한다');
