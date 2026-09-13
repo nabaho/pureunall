@@ -127,6 +127,77 @@ test('끝나면 대조를 다시 돌려 딱지를 새로 붙인다', async () =>
     '내려놓고 딱지를 안 고치면 화면이 옛 상태로 남습니다');
 });
 
+/* ── 한 사람만 내리기 ── 전에는 다섯 걸음짜리 안내가 떴다 ─────────────── */
+function 한사람상자(옵) {
+  const o = Object.assign({ 예: true, 답: null, srl: 193, 손으로: false }, 옵 || {});
+  const 한것 = [];
+  const ctx = {
+    console: { warn() {}, log() {} },
+    esc: (s) => String(s == null ? '' : s),
+    App: { members: { a: { name: '홍길동', srl: o.srl } } },
+    checkHomepage() { 한것.push({ 무엇: 'checkHomepage' }); },
+    copyPrivate(k) { 한것.push({ 무엇: '손으로', key: k }); },
+    물은것: [],
+    say(t) { ctx.물은것.push(String(t)); return Promise.resolve(); },
+    askYes(t) {
+      ctx.물은것.push(String(t));
+      return Promise.resolve(/내리지 못했습니다/.test(String(t)) ? o.손으로 : o.예);
+    },
+    서버에게물어보기(방식, srl, 고칠것) {
+      한것.push({ 방식: 방식, srl: srl, 고칠것: 고칠것 });
+      if (typeof o.답 === 'function') return o.답();
+      if (o.답) return Promise.resolve(o.답);
+      return Promise.resolve({ ok: true, 저장됨: true, 바뀐것: [{ 이름: '홈페이지에서' }] });
+    }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fnSource('한사람내리기'), ctx);
+  return { ctx, 한것 };
+}
+
+test('★ 한 사람 내리기는 «안내»가 아니라 바로 서버로 간다', async () => {
+  const { ctx, 한것 } = 한사람상자();
+  await ctx.한사람내리기('a');
+  const 쓴것 = 한것.filter(x => x.방식 === '쓰기');
+  assert.equal(쓴것.length, 1, '서버로 안 갔습니다 — 옛 안내로 되돌아갔습니다');
+  assert.equal(쓴것[0].srl, 193);
+  assert.deepEqual(Object.assign({}, 쓴것[0].고칠것), { 비공개: true });
+});
+
+test('한 사람 내리기도 「예」 하기 전에는 안 보낸다', async () => {
+  const { ctx, 한것 } = 한사람상자({ 예: false });
+  await ctx.한사람내리기('a');
+  assert.deepEqual(한것, []);
+});
+
+test('★ 서버가 막히면 «왜»를 보이고, 손으로 하는 길을 그때 연다', async () => {
+  const { ctx, 한것 } = 한사람상자({
+    답: () => Promise.resolve({ ok: false, error: '안전하지 않습니다',
+                                걸린것: ['확인표가 없습니다'] }), 손으로: true });
+  await ctx.한사람내리기('a');
+  assert.ok(ctx.물은것.some(t => /내리지 못했습니다/.test(t)), '왜 안 됐는지 안 알렸습니다');
+  assert.ok(한것.some(x => x.무엇 === '손으로'), '손으로 하는 길이 사라졌습니다');
+});
+
+test('막혔을 때 «아니오» 하면 손으로 하는 창을 안 연다', async () => {
+  const { ctx, 한것 } = 한사람상자({
+    답: () => Promise.resolve({ ok: false, error: '안 됨', 걸린것: [] }), 손으로: false });
+  await ctx.한사람내리기('a');
+  assert.ok(!한것.some(x => x.무엇 === '손으로'));
+});
+
+test('글 번호가 없으면 서버를 안 부른다', async () => {
+  const { ctx, 한것 } = 한사람상자({ srl: 0 });
+  await ctx.한사람내리기('a');
+  assert.deepEqual(한것, []);
+});
+
+test('★ ⋯ 안의 「비공개로」 단추가 바로 내리는 쪽에 걸려 있다', () => {
+  assert.match(html, /onclick="한사람내리기\(/, '★ 단추가 바로 내리는 쪽에 안 걸려 있습니다');
+  assert.ok(!/onclick="copyPrivate\('/.test(html),
+    '★ 단추가 아직 옛 «다섯 걸음 안내»를 바로 엽니다 — 막혔을 때만 열려야 합니다');
+});
+
 test('★ 할 일 카드에서 한 번에 내리는 문이 보인다', () => {
   assert.match(html, /onclick="퇴사자한번에내리기\(\)"/,
     '★ 한 번에 내리는 단추가 어디에도 없습니다');
