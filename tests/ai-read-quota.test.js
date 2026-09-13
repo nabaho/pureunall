@@ -220,7 +220,10 @@ test('★★★ 셈을 적다 실패해도 «판독은 계속된다» — 세는
 });
 
 test('★ 성공·실패 «둘 다» 센다 — 성공만 세면 한도에 걸린 날이 「조용한 날」로 보인다', () => {
-  const i = IDX.indexOf('DR.callGemini(fetch, key, v.parts, null, v.cfg)');
+  /* ⚠ 넘기는 «변수 이름»으로 찾지 않는다 — 2026-09-13 에 「무료로 글자 먼저」가
+       들어오며 v.parts 가 parts 로 바뀌어, 기능은 멀쩡한데 이 검사가 깨졌다.
+       보는 것은 «부른 뒤에 세는가»이지 인자 이름이 아니다. */
+  const i = IDX.indexOf('DR.callGemini(fetch, key,');
   assert.ok(i > 0, '판독을 부르는 자리를 못 찾았습니다');
   const 몸 = IDX.slice(i, i + 700);
   assert.match(몸, /bumpReadTally\(/, '★ 부른 뒤 세지 않습니다');

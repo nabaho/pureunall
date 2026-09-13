@@ -264,6 +264,74 @@ async function callGemini(fetchFn, key, parts, waits, cfg) {
   return { ok: false, status: last.status, why: last.why };
 }
 
+/* ══ ⑪ 무료로 «글자»를 먼저 뽑아 사진 대신 보낸다 — 판단은 여기 한 곳 ═══════════
+     대표 지시 2026-09-13 「무료버전 먼저 사용하게 안 되나?」 → 「사진첩·기업정보함 켜라」
+     → 켜는 길 셋 가운데 **㉰ 서버가 맡는다**를 고르셨다.
+
+   ★ 왜 서버인가 — 부르는 층이 «둘»이다. 판독 층(js/pu-doc-read.js, 148KB)은
+     사진첩·경력관리·푸른이알피가 쓰고, 얇은 층(js/pu-ai-call.js, 4KB)은
+     기업정보함·뉴스레터·업무관리가 쓴다. 브라우저에서 하면 같은 규칙을 두 벌 두게 되고
+     한쪽만 고쳐지는 자리가 생긴다. 서버는 «모두가 지나는 문»이라 한 번에 덮인다.
+     round trip 도 하나 준다(브라우저→Vision→브라우저→Gemini 가 아니라 서버 안에서 끝난다).
+
+   ⚠⚠ 표가 «뜻»인 서류는 글자로 바꾸지 않는다. 글자만 보내면 칸의 자리가 풀려
+     어느 숫자가 어느 칸의 것인지 사라진다:
+       · 통장 — 계좌 한 자리가 틀리면 «딴 데로 돈이 간다»
+       · 급여명세서·임금대장 — 항목과 금액이 어긋나 엉뚱한 수당이 붙는다
+       · 근로계약서 — 근로시간·임금 칸이 서로 섞인다
+       · 원천징수·4대보험 — 숫자가 줄줄이 밀린다
+     ⚠ 넓게 잡는 편이 맞다. 잘못 켜서 틀린 값을 «자신 있게» 채우는 것보다
+       몇 장 더 비싸게 읽는 편이 싸다.
+   ⚠ 공백을 걷고 본다 — 판독기가 「급 여 명 세 서」처럼 글자마다 띄워 오는 일이 흔하다
+     (괘선·도장 때문에 글자 간격이 벌어져 그렇게 읽힌다). */
+const TABLE_DOC_WORDS = [
+  "통장", "예금거래", "거래내역", "입출금", "계좌번호",
+  "급여명세", "임금대장", "급여대장", "보수총액",
+  "근로계약", "연봉계약",
+  "원천징수", "지급명세", "4대보험", "보험료",
+  "재무제표", "손익계산", "대차대조", "잔액시산"
+];
+function tableLike(text) {
+  const flat = String(text == null ? "" : text).replace(/\s+/g, "");
+  for (let i = 0; i < TABLE_DOC_WORDS.length; i++) {
+    if (flat.indexOf(TABLE_DOC_WORDS[i].replace(/\s+/g, "")) >= 0) return true;
+  }
+  return false;
+}
+
+/* 사진 한 장당 이만큼은 나와야 글자 길로 간다.
+   ⚠ 흐린 사진·손글씨는 Vision 이 몇 글자만 준다. 그 몇 글자를 AI 에 보내면
+     사진을 봤으면 읽었을 것도 못 읽는다 — 아끼려다 판독을 버리는 꼴이다. */
+const FREE_MIN_CHARS_PER_IMG = 120;
+
+/* 뽑은 글자로 사진을 갈음해도 되는가 — 된다면 «바꾼 parts»를, 아니면 null 을 준다.
+   ⚠ 판단만 한다. Vision 을 부르는 일·몫을 세는 일은 부르는 쪽(index.js)이 한다 —
+     여기 두면 이 파일이 네트워크를 알게 되어 검사에서 떼어 보기 어려워진다. */
+function slimParts(parts, text) {
+  const list = Array.isArray(parts) ? parts : [];
+  let imgs = 0;
+  const texts = [];
+  for (const p of list) {
+    if (p && p.inline_data && p.inline_data.data) imgs++;
+    else if (p && typeof p.text === "string") texts.push(p.text);
+  }
+  if (!imgs) return null;                                   // 이미 글자뿐이다
+  const t = String(text == null ? "" : text).trim();
+  if (t.length < FREE_MIN_CHARS_PER_IMG * imgs) return null; // 너무 적다
+  if (tableLike(t)) return null;                             // 표가 뜻인 서류다
+  /* 물음(프롬프트)은 그대로 살린다 — 버리면 AI 가 무엇을 하라는지 모른다 */
+  const out = texts.map((x) => ({ text: x }));
+  out.push({ text: "[사진에서 뽑은 글자]\n" + t });
+  return out;
+}
+
+/* 사진만 뽑아 온다 — Vision 에 넘길 것 */
+function imagesOf(parts) {
+  return (Array.isArray(parts) ? parts : [])
+    .filter((p) => p && p.inline_data && p.inline_data.data)
+    .map((p) => p.inline_data.data);
+}
+
 module.exports = {
   MODELS, MAX_BODY_BYTES, MAX_OUTPUT_TOKENS,
   isTransient, validate, geminiBody, modelUrl, safeReason, callGemini, dailyQuotaGone,
@@ -271,5 +339,7 @@ module.exports = {
   /* AI 판독 이번 달 요금 한도 (대표 결정 2026-09-10) — 까닭은 AI_BUDGET_PATH 머리에 */
   AI_BUDGET_PATH, AI_BUDGET_DEFAULT, aiBudgetOf, aiSpentWon, aiMonthPath,
   /* 달 몫 문턱 — 까닭은 ymKST 머리에 */
-  ymKST, VISION_FREE_MONTH, visionMonthPath
+  ymKST, VISION_FREE_MONTH, visionMonthPath,
+  /* ⑪ 무료로 글자 먼저 — 까닭은 TABLE_DOC_WORDS 머리에 */
+  TABLE_DOC_WORDS, tableLike, FREE_MIN_CHARS_PER_IMG, slimParts, imagesOf
 };

@@ -623,90 +623,15 @@
       return cacheGet(fp);
     }).then(function (hit) {
       if (hit != null) { _saved++; return hit; }   // ★ 0원 — 서버를 아예 안 부른다
-      /* ★ 그래도 읽어야 한다면 — 사진 대신 «글자»를 보낼 수 있는지 먼저 본다(아래 ⑩) */
-      return slimByVision(parts, opts).then(function (slim) {
-        return askProxyNet(slim, opts).then(function (reply) {
-          /* ⚠ 지문은 «원래 보낼 것»으로 뜬다 — 글자로 바꿔 보냈어도 그렇다.
-               안 그러면 다음에 같은 사진이 와도 지문이 달라 또 읽는다. */
-          return cachePut(_fp, reply).then(function () { return reply; });
-        });
+      /* ★ 「무료로 글자 먼저」는 이제 «서버»가 한다 (대표 결정 2026-09-13 ㉰).
+           부르는 층이 둘(이 판독 층·얇은 pu-ai-call)이라, 브라우저에서 하면
+           같은 규칙이 두 벌이 되어 한쪽만 고쳐지는 자리가 생긴다.
+           서버는 모두가 지나는 문이라 한 번에 덮이고, 오가는 걸음도 하나 준다.
+         ⚠ 여기서 다시 만들지 말 것 — 켜고 끄는 것은 opts.freeFirst 로 서버에 전한다. */
+      return askProxyNet(parts, opts).then(function (reply) {
+        return cachePut(_fp, reply).then(function () { return reply; });
       });
     });
-  }
-
-  /* ══ ⑩ 무료로 «글자»를 먼저 뽑아, 사진 대신 글자를 보낸다 (대표 지시 2026-09-13) ══
-       「무료버전 먼저 사용하게 안 되나?」
-
-     ★ 왜 — 판독 요금은 «사진»이 비싸다. 같은 서류라도 글자로 보내면 훨씬 싸다.
-       Vision 의 글자 뽑기는 달마다 1,000장이 무료이고 Gemini 의 몫과 «따로» 돈다.
-       그래서 무료로 글자를 뽑아 그 글자를 AI 에 넘기면, **답의 정확도는 그대로 두고**
-       값만 내려간다. (칸 채우기는 지금처럼 AI 가 한다 — 규칙으로 짜지 않는다.)
-
-     ⚠⚠ **아무 서류에나 켜면 안 된다.** 글자만 보내면 표의 «자리»와 도장·서명이
-       사라진다. 급여명세서·근로계약서처럼 칸의 위치가 곧 뜻인 서류는 값이 엉킨다.
-       그래서 **부르는 쪽이 켜야만** 이 길로 간다(opts.freeFirst). 기본은 끔이다.
-       ⚠ 「기본을 켜면 다 좋아지지 않나」 — 아니다. 한 번 잘못 읽은 값은 그대로
-         기업 상세·경력카드로 나간다. 켜는 화면을 하나씩 늘리는 편이 맞다.
-
-     ⚠ 글자가 «충분할 때만» 바꾼다. 흐린 사진·손글씨는 Vision 이 몇 글자만 주는데,
-       그 몇 글자를 AI 에 보내면 사진을 봤으면 읽었을 것도 못 읽는다.
-     ⚠ Vision 이 실패하거나 무료 몫이 다 되면 **그냥 사진으로 간다** — 막지 않는다. */
-  var FREE_MIN_CHARS_PER_IMG = 120;   // 사진 한 장당 이만큼은 나와야 글자 길로 간다
-  var _freeSlimmed = 0;
-  function freeSlimCount() { return _freeSlimmed; }
-
-  /* ── 표가 «뜻»인 서류인가 — 그러면 글자로 바꾸지 않는다 (2026-09-13) ──────────
-     ★ 여기 적힌 서류는 «칸의 자리»가 값의 뜻을 정한다. 글자만 뽑아 보내면
-       표가 풀려 어느 숫자가 어느 칸의 것인지 사라진다:
-         · 통장·예금거래 — 계좌 한 자리가 틀리면 «딴 데로 돈이 간다»
-         · 급여명세서·임금대장 — 항목과 금액이 어긋나 엉뚱한 수당이 붙는다
-         · 근로계약서 — 근로시간·임금 칸이 서로 섞인다
-         · 원천징수·4대보험 — 숫자가 줄줄이 밀린다
-     ⚠ 넓게 잡는 편이 맞다. 잘못 켜서 틀린 값을 «자신 있게» 채우는 것보다,
-       몇 장 더 비싸게 읽는 편이 싸다.
-     ⚠ 공백을 걷고 본다 — 판독기가 「급 여 명 세 서」처럼 띄워 오는 일이 흔하다. */
-  var TABLE_DOC_WORDS = [
-    '통장', '예금거래', '거래내역', '입출금', '계좌번호',
-    '급여명세', '임금대장', '급여대장', '보수총액',
-    '근로계약', '연봉계약',
-    '원천징수', '지급명세', '４대보험', '4대보험', '보험료',
-    '재무제표', '손익계산', '대차대조', '잔액시산'
-  ];
-  function tableLike(text) {
-    var flat = String(text == null ? '' : text).replace(/\s+/g, '');
-    for (var i = 0; i < TABLE_DOC_WORDS.length; i++) {
-      if (flat.indexOf(TABLE_DOC_WORDS[i].replace(/\s+/g, '')) >= 0) return true;
-    }
-    return false;
-  }
-
-  function slimByVision(parts, opts) {
-    if (!(opts && opts.freeFirst)) return Promise.resolve(parts);
-    var list = Array.isArray(parts) ? parts : [];
-    var imgs = [], texts = [];
-    for (var i = 0; i < list.length; i++) {
-      var p = list[i] || {};
-      if (p.inline_data && p.inline_data.data) imgs.push(p.inline_data.data);
-      else if (typeof p.text === 'string') texts.push(p.text);
-    }
-    if (!imgs.length) return Promise.resolve(parts);   // 이미 글자뿐이면 할 일이 없다
-    return visionText(imgs).then(function (text) {
-      var t = String(text == null ? '' : text).trim();
-      if (t.length < FREE_MIN_CHARS_PER_IMG * imgs.length) return parts;   // 너무 적다
-      /* ★★ 뽑은 «글자를 보고» 표가 뜻인 서류면 사진으로 되돌린다 (2026-09-13)
-           대표 지시 「사진첩·기업정보함 켜라」로 넓히면서 넣었다.
-         ⚠ 사진첩은 판독 «전»에는 서류 종류를 모른다 — 종류를 알아내는 것이 판독이다.
-           그래서 무료로 뽑은 글자로 «먼저 가린다». 글자 뽑기는 무료라 값이 안 는다.
-         ⚠ 이 목록은 «칸의 자리가 곧 뜻»인 서류다. 글자만 보내면 표가 풀려
-           어느 숫자가 어느 칸의 것인지 사라진다 — 통장은 계좌 한 자리가 틀리면
-           딴 데로 돈이 가고, 급여명세서는 항목과 금액이 어긋난다. */
-      if (tableLike(t)) return parts;
-      _freeSlimmed++;
-      /* 물음(프롬프트)은 그대로 두고, 사진 자리에 뽑은 글자를 넣는다 */
-      var out = texts.map(function (x) { return { text: x }; });
-      out.push({ text: '[사진에서 뽑은 글자]\n' + t });
-      return out;
-    }).catch(function () { return parts; });           // 넘어지면 사진 그대로
   }
 
   function askProxyNet(parts, opts) {
@@ -718,8 +643,13 @@
         /* manual — «사람이 지금 기다리고 있다»는 표시(2026-09-10).
            서버가 이번 달 한도를 넘었을 때 «자동»만 막고 이것은 통과시킨다.
            ⚠ 안 실으면 자동으로 본다 — 모르면 막는 쪽이 맞다. */
+        /* freeFirst — 「무료로 글자 먼저」를 «끄는» 길 (2026-09-13).
+           서버 기본은 켬이다. 표가 뜻인 화면이 스스로 끌 수 있게 false 만 실어 보낸다.
+           ⚠ 안 실으면 서버가 켜진 것으로 본다 — 서버 안에 빗장(표 서류 가리기)이 있어
+             그쪽이 기본으로 맞다. 켜는 일을 화면마다 적어야 하면 또 빠뜨린다. */
         body: JSON.stringify({ parts: parts, app: appName(),
-          manual: !!(opts && opts.manual) })
+          manual: !!(opts && opts.manual),
+          freeFirst: !(opts && opts.freeFirst === false) })
       });
     }).then(function (r) {
       return (r && r.json ? r.json() : Promise.resolve(null)).catch(function () { return null; })
@@ -2135,13 +2065,6 @@
        판독이 틀렸을 때 「다시 읽기」로 기억을 건너뛸 수 있게 내보낸다. */
     readSavedCount: readSavedCount,
     resetSavedCount: resetSavedCount,
-    /* ⑩ 무료로 글자를 먼저 뽑아 «사진 대신» 보낸 수 (2026-09-13) */
-    freeSlimCount: freeSlimCount,
-    _slimByVisionForTest: slimByVision,
-    FREE_MIN_CHARS_PER_IMG: FREE_MIN_CHARS_PER_IMG,
-    /* 표가 «뜻»인 서류인가 — 켜는 화면을 늘릴 때 이 목록을 함께 본다 */
-    tableLike: tableLike,
-    TABLE_DOC_WORDS: TABLE_DOC_WORDS,
     _fingerprintForTest: partsFingerprint,
     _cacheGetForTest: cacheGet,
     _cachePutForTest: cachePut,
