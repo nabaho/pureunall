@@ -62,6 +62,10 @@ function load(open){
     coVal: (o, f) => (o.extra && o.extra[f]) || o[f] || ''
   };
   vm.createContext(ctx);
+  /* 2026-09-13: 기업정보 머리에 🏛 국세청 상태 칩이 붙었다(대표 지시 ⑤).
+     이 검사는 «접고 펴기»를 보므로 칩 자체는 대역으로 둔다 — 칩의 잣대는
+     tests/cards-co-nts.test.js 가 따로 본다. */
+  ctx.coNtsChipHtml = () => '';
   vm.runInContext(fnBody('coSmeDays') + '\n' + fnBody('coSmeState') + '\n'
     + fnBody('coSmeChipHtml') + '\n'
     + fnBody('coInfoSummary') + '\n' + fnBody('coInfoBoxHtml'), ctx);

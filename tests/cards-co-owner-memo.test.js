@@ -156,11 +156,16 @@ test('★★★ 메모는 «전 직원이 본다»고 말하고 적는다', () =
 });
 
 test('★★ 빈 글자는 «null» 로 쓴다 — 적었다 지운 것과 원래 없는 것을 가르면 안 된다', () => {
-  const fn = cutFn(SRC, 'function coSaveInfoField(');
-  assert.match(fn, /\]:\s*value \|\| null/,
+  /* ⚠ 2026-09-13: 국세청 상태와 확인일처럼 «늘 짝인» 두 칸을 한 번에 쓰려고
+     coSaveInfoPatch 로 모았다. coSaveInfoField 는 그리로 넘기는 한 줄이 되었다. */
+  const one = cutFn(SRC, 'function coSaveInfoField(');
+  assert.match(one, /coSaveInfoPatch\(key, patch, okMsg\)/,
+    '★★ 저장 길이 두 벌이 되면 한쪽만 고쳐진다');
+  const fn = cutFn(SRC, 'function coSaveInfoPatch(');
+  assert.match(fn, /patch\[f\] \|\| null/,
     '★★ \'\' 를 남기면 나중에 세는 곳마다 둘을 따로 다뤄야 한다');
-  assert.match(fn, /coInfo\/' \+ key \+ '\/' \+ field/,
-    '★★★ 통째로 쓰면 늦게 온 값이 날아간다 — 한 칸만 건드린다(coErpPin 과 같은 길)');
+  assert.match(fn, /'coInfo\/' \+ key \+ '\/' \+ f/,
+    '★★★ 통째로 쓰면 늦게 온 값이 날아간다 — 한 칸씩 건드린다(coErpPin 과 같은 길)');
   assert.match(fn, /Store\.mode !== 'firebase'/, '★ 연결 안 된 곳에서 조용히 실패한다');
 });
 

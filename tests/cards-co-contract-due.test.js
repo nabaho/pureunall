@@ -97,7 +97,7 @@ test('★★★ 그런데 «뺀 곳 수»는 말한다 — 조용히 빼면 화�
                    회사('해지2','2026-10-01',{ left:true }),
                    회사('살아있음','2026-03-31') ]);
   assert.equal(c.coCtClosedCount(), 2, '★★ 뺀 곳을 안 세고 있다');
-  const h = c.coCtHtml();
+  const h = c.coCtHtml(오늘);
   assert.match(h, /2곳<\/b>은 뺐습니다/,
     '★★★ 뺀 사실을 안 적으면 「우리 거래처가 이것뿐인가」로 읽힌다');
 });
@@ -129,14 +129,14 @@ test('★ 남은 날과 종료일을 «함께» 들고 온다 — 화면이 그�
 
 test('★★★ 챙길 곳이 없으면 띠를 «아예 안 띄운다»', () => {
   const c = load([ 회사('멀다','2027-03-31'), 회사('해지','2026-01-01',{ left:true }) ]);
-  assert.equal(c.coCtBarHtml(), '',
+  assert.equal(c.coCtBarHtml(오늘), '',
     '★★★ 늘 뜨는 띠는 눈이 배경으로 배운다 — 정작 급할 때 안 읽힌다');
 });
 
 test('★★ 띠가 «지남 몇 곳 · 30일 안 몇 곳»을 갈라 말한다', () => {
   const c = load([ 회사('지남1','2026-03-31'), 회사('지남2','2026-08-01'),
                    회사('임박1','2026-10-01') ]);
-  const h = c.coCtBarHtml();
+  const h = c.coCtBarHtml(오늘);
   assert.match(h, /종료일 지남 <b>2곳<\/b>/, '★★ 몇 곳이 이미 지났는지가 가장 급한 값이다');
   assert.match(h, /30일 안 <b>1곳<\/b>/);
   assert.match(h, /openCoCt\(\)/, '★ 눌러서 볼 길이 없다');
@@ -144,7 +144,7 @@ test('★★ 띠가 «지남 몇 곳 · 30일 안 몇 곳»을 갈라 말한다'
 
 test('★ 한쪽이 0곳이면 그쪽은 «안 적는다»', () => {
   const c = load([ 회사('임박','2026-10-01') ]);
-  const h = c.coCtBarHtml();
+  const h = c.coCtBarHtml(오늘);
   assert.ok(!/종료일 지남 <b>/.test(h), '★ 「지남 0곳」이 적혀 있다');
   assert.match(h, /30일 안 <b>1곳<\/b>/);
 });
@@ -153,7 +153,7 @@ test('★ 한쪽이 0곳이면 그쪽은 «안 적는다»', () => {
 
 test('★★★ 창이 회사마다 «언제까지»와 «얼마나 급한지»를 말한다', () => {
   const c = load([ 회사('지남회사','2026-09-02'), 회사('임박회사','2026-09-20') ]);
-  const h = c.coCtHtml();
+  const h = c.coCtHtml(오늘);
   assert.match(h, /챙길 곳 2곳/, '★ 몇 곳인지 없다');
   assert.match(h, /종료 10일 지남/, '★★★ 얼마나 지났는지 없으면 급한 정도를 모른다');
   assert.match(h, /D-8/, '★★ 며칠 남았는지 없다');
@@ -168,7 +168,7 @@ test('★★★ 창이 «해지가 아니다»라고 밝힌다 — 섞으면 멀
 
 test('★★ 회사를 누르면 «창을 닫고» 그 회사를 연다', () => {
   const c = load([ 회사('가나','2026-09-02') ]);
-  const h = c.coCtHtml();
+  const h = c.coCtHtml(오늘);
   assert.match(h, /pickCo\('가나'\)/, '★★ 눌러도 그 회사로 못 간다');
   assert.match(h, /dedupBg\.classList\.remove\('open'\)/,
     '★★ 창을 안 닫으면 상세가 창 뒤에 열려 아무 일도 없는 것처럼 보인다');
@@ -176,7 +176,7 @@ test('★★ 회사를 누르면 «창을 닫고» 그 회사를 연다', () => 
 
 test('★ 챙길 곳이 없으면 창은 «없다»고 말한다 — 빈 목록은 고장으로 읽힌다', () => {
   const c = load([ 회사('멀다','2027-03-31') ]);
-  assert.match(c.coCtHtml(), /없습니다/);
+  assert.match(c.coCtHtml(오늘), /없습니다/);
 });
 
 /* ── ①⑥ 잣대가 «한 곳»인가 · 이름표 ──────────────────────────────────── */
