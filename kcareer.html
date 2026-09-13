@@ -437,6 +437,12 @@ body.kc-staff .kc-staff-note{display:flex}
 .pglimit-btn:hover{background:var(--soft,#f8fafc)}
 .pglimit-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
 .pglimit-info{margin-left:6px}
+/* 표 «맨 아래»의 더 보기 줄 — 위 툴바의 「표시」는 한 번에 몇 건이고, 여기는 그 다음 판이다.
+   ⚠ 한 줄로 둔다(단추·단추·남은 건수) — 쌓으면 긴 표에서 밑이 그만큼 더 길어진다. */
+.more-rows{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+  margin:12px 0 2px;padding:10px 0;border-top:1px dashed var(--border);font-size:12px;color:var(--text-mute)}
+.more-rows .btn{font-weight:700}
+.more-rows .more-info{margin-left:4px}
 .nofile-bar{margin:0 0 10px;display:flex;align-items:center;flex-wrap:wrap}
 .nofile-btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 13px;font-size:12px;cursor:pointer;color:var(--text)}
 .nofile-btn:hover{background:var(--soft,#f8fafc)}
@@ -7341,7 +7347,12 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
     }
   }
   const box=sec.querySelector('.dt');
-  const raw=pageLimitOf(name); const limit=raw<0?rows.length:raw; const view=rows.slice(0,limit);
+  /* ★ 보이는 건수 = 「표시 개수」 × 「아래에서 더 펼친 판」.
+     ⚠ 「더 보기」가 표시 개수(raw)를 직접 늘리게 하지 말 것 — 늘리면 위 선택칸이
+        20·50·100·200 어디에도 안 맞아 «엉뚱한 값이 골라진 것»처럼 보인다. */
+  const raw=pageLimitOf(name);
+  const limit=pageViewCount(raw, pageStepOf(name), rows.length);
+  const view=rows.slice(0,limit);
   const label=(typeof FORM_DEFS!=='undefined'&&FORM_DEFS[name]&&FORM_DEFS[name].title)||'항목';
   if(!rows.length){ _tbExtra(sec, nofileBar); _ocrToToolbar(sec); _stickyTop(sec); box.innerHTML=(_noFileOnly[name]?'<div class="empty"><div class="emp-ico">✅</div>미첨부 항목이 없습니다 — 모든 원본이 첨부되어 있습니다.</div>':'<div class="empty"><div class="emp-ico">📭</div>아직 등록된 '+label+'이(가) 없습니다.<br><span style="font-size:12px">상단 <b>＋ 새 '+label+'</b> 버튼으로 첫 항목을 등록하세요.</span></div>')+exBar; return; }
   /* 툴바 한 줄에 들어가도록 짧게 — 「표시 개수 … 79건 중 20건 표시」는 너무 길었다 */
@@ -7349,6 +7360,10 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   const pgSel='<div class="pglimit-bar" style="justify-content:flex-end;margin:0">표시 <select class="tb-select" onchange="setPageLimit(\''+name+'\',parseInt(this.value,10))">'+[20,50,100,200].map(function(n){ return '<option value="'+n+'"'+(raw===n?' selected':'')+'>'+n+'</option>'; }).join('')+'<option value="-1"'+(raw<0?' selected':'')+'>전체(느림)</option></select>'
     /* ⚠ 다 보여 줄 때는 「137/137」이 왼쪽 「137건」과 같은 말이다 — 줄었을 때만 적는다 */
     +(limit<rows.length ? '<span class="pglimit-info">'+limit+'/'+rows.length+'</span>' : '')+'</div>';
+  /* ★ 표 «맨 아래» 더 보기 (대표 지시 2026-09-13 「개수가 넘어가면 추가로 더 볼 수 있게」)
+     목록 화면은 모두 이 함수 하나로 그려진다 — 여기 한 곳이 곧 모든 탭이다(회의·비용관리 포함).
+     ⚠ 끝까지 내려간 사람은 위 툴바로 되돌아가지 않는다. 그래서 «끝에» 둔다. */
+  const moreBar=moreRowsBar(name, raw, limit, rows.length);
   /* 원본없음 필터·표시개수는 툴바 한 줄로 올린다 — 표 위에 줄이 쌓이지 않게 */
   _tbExtra(sec, nofileBar+pgSel);
   _ocrToToolbar(sec);            /* OCR 자동등록 상자도 툴바 안 칩으로 — 한 줄 */
@@ -7364,7 +7379,7 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
     +'<button class="btn sm" style="color:#fff;background:var(--red);border-color:var(--red)" onclick="careerDelSelected(\''+name+'\',this)">🗑 선택 삭제</button></div>';
   /* ⚠ 이 조립문 중간에 다른 호출을 끼워 넣지 말 것 — 뒤(scroll-hint·exBar)가 잘린다(회귀테스트 있음) */
   box.innerHTML=selBar+'<table><thead><tr><th class="rownum-h"><input type="checkbox" onclick="careerSelAll(\''+name+'\',this.checked)" title="이 쪽 전체 선택"> №</th>'+cfg.cols.map((c,ci)=> c==='관리' ? `<th>${c}</th>` : `<th class="th-sort" onclick="sortCol('${name}',${ci})">${c}${ss&&ss.col===ci?(ss.dir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>'+view.map((r,i)=>cfg.row(r,name).replace(/<tr\b[^>]*>/, m=>m+'<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" data-id="'+_jsAttr(r.id)+'" onclick="careerSelSync(\''+name+'\')"><span>'+(i+1)+'</span></label></td>')).join('')+'</tbody></table>'
-    +'<div class="scroll-hint">← 좌우로 밀어 더 보기 →</div>'+exBar;
+    +'<div class="scroll-hint">← 좌우로 밀어 더 보기 →</div>'+moreBar+exBar;
   stampCellLabels(box);
   _stickyTop(sec);               /* 표 머리줄이 툴바 아래에 붙도록 높이를 알려준다 */
   careerSelSync(name);
@@ -7383,7 +7398,7 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   if(cfg.stores) renderFeeChips(sec, data, tp);
   if(_flashId){ box.querySelectorAll('tbody tr').forEach(tr=>{ if(tr.textContent.indexOf(_flashId)>=0) tr.classList.add('row-flash'); }); _flashId=null; }
 }
-var _flashId=null, _pageLimit={};
+var _flashId=null, _pageLimit={}, _pageStep={};
 var _noFileOnly={}, _sortState={};
 function toggleNoFile(name){ _noFileOnly[name]=!_noFileOnly[name]; renderCareer(name); }
 function sortCol(name,i){ const s=_sortState[name]; if(s&&s.col===i){ s.dir*=-1; } else { _sortState[name]={col:i,dir:1}; } renderCareer(name); }
@@ -7412,9 +7427,42 @@ function pageLimitOf(name){
 }
 function setPageLimit(name,n){
   _pageLimit[name]=n;
+  _pageStep[name]=1;        /* 한 번에 볼 개수를 새로 골랐으면 «펼친 판»은 처음으로 */
   try{ var o=_pgLimitLoad(); o[name]=n; LS.set(NS+_PGLIMIT_KEY, JSON.stringify(o)); }catch(e){}
   renderCareer(name);
 }
+/* ★ 아래쪽 「더 보기」 — 몇 판까지 펼쳤는지만 센다.
+   ⚠ 브라우저에 저장하지 «않는다». 새로 열면 다시 50건부터다 —
+     펼친 것까지 기억하면 자문·고문 375행이 여는 순간마다 그려져 굳은 것처럼 보인다
+     (2026-09-05 실측: 373행 300~500ms, 50행 수십 ms). 그것이 PAGE_LIMIT_DEFAULT 를 둔 까닭이다. */
+function pageStepOf(name){ var n=_pageStep[name]; return (typeof n==='number'&&n>0)?n:1; }
+/* 보이는 건수 = 「표시 개수」 × 「펼친 판」. 「전체(느림)」(raw<0)이면 전부다.
+   ⚠ 전체 건수를 넘겨 주지 말 것 — 「400/375」 같은 말이 나온다. */
+function pageViewCount(raw, step, total){
+  if(!(raw>0)) return total;
+  var n=raw*((step>0)?step:1);
+  return n>total ? total : n;
+}
+/* 표 맨 아래 더 보기 줄 — 남은 게 없으면 «아무것도» 그리지 않는다(다 본 자리에 죽은 단추가 남지 않게).
+   ⚠ 「전체 N건 보기」를 빼지 말 것 — 375건을 50씩 일곱 번 누르게 하면 안 된다. */
+function moreRowsBar(name, raw, limit, total){
+  var 남은=total-limit;
+  if(남은<=0) return '';
+  var 한판=(raw>0&&raw<남은)?raw:남은;
+  return '<div class="more-rows">'
+    +'<button class="btn" type="button" onclick="pageMore(\''+_jsAttr(name)+'\')">⬇ '+한판+'건 더 보기</button>'
+    +'<button class="btn sm" type="button" onclick="pageAllRows(\''+_jsAttr(name)+'\')">전체 '+total+'건 보기</button>'
+    +'<span class="more-info">'+limit+' / '+total+' · '+남은+'건 남음</span></div>';
+}
+/* ⚠ 다시 그리면 스크롤이 위로 튄다 — 방금 보던 자리를 되돌려 놓아야 «이어 보는» 느낌이 난다.
+   스크롤 상자는 .main 이다(body 는 overflow:hidden). */
+function _pageKeepScroll(fn){
+  var m=document.querySelector('.main'); var y=m?m.scrollTop:0;
+  fn();
+  if(m) try{ m.scrollTop=y; }catch(e){}
+}
+function pageMore(name){ _pageKeepScroll(function(){ _pageStep[name]=pageStepOf(name)+1; renderCareer(name); }); }
+function pageAllRows(name){ _pageKeepScroll(function(){ _pageStep[name]=Number.MAX_SAFE_INTEGER; renderCareer(name); }); }
 function sortTable(box,th,idx){
   const tb=box.querySelector('tbody'); if(!tb) return; const rows=[...tb.querySelectorAll('tr')]; if(rows.length<2&&rows[0]&&rows[0].querySelector('[colspan]')) return;
   const dir=th.dataset.dir==='asc'?'desc':'asc'; box.querySelectorAll('th').forEach(h=>{ h.dataset.dir=''; h.textContent=h.textContent.replace(/ [▲▼]$/,''); }); th.dataset.dir=dir;
