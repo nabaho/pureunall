@@ -48,13 +48,55 @@
     for (var i = 0; i < blocks.length; i++) {
       var b = blocks[i];
       var 새묶음 = /pageBreak\s*=\s*"1"/.test(openTag(b.text));
-      if (!out.length || 새묶음) out.push({ start: b.start, end: b.end, blocks: 0, head: '' });
+      if (!out.length || 새묶음) out.push({ start: b.start, end: b.end, blocks: 0, head: '', 줄: [] });
       var cur = out[out.length - 1];
       cur.end = b.end;
       cur.blocks++;
+      if (cur.줄.length < 8) {
+        var t = 보이는글자(b.text);
+        if (t) cur.줄.push(t);
+      }
       if (!cur.head) cur.head = 보이는글자(b.text).slice(0, 40);
     }
+    out.forEach(function (g) { g.title = 제목고르기(g.줄); delete g.줄; });
     return out;
+  }
+
+  /* ── 서류의 «제목» 고르기 ──────────────────────────────────────────────
+     (대표 지시 2026-09-13 「저장할 때 제목은 첨부 파일에서 찾아서 제목으로 만들고」)
+     기관 서식 한 덩이에 여러 서류가 들어 있다 — 모집공고문·지원서·수행계획서·동의서·평가기준표.
+     쪽마다 갈라 저장하려면 그 쪽이 «무슨 서류인지» 이름이 있어야 한다.
+
+     ⚠★ 첫 줄이 제목인 경우는 오히려 드물다. 실측(코레일 서식): 첫 줄은 「[붙임 1]」이고
+        진짜 제목은 «둘째 줄»이다. 그래서 몇 줄을 보고 «제목답지 않은 것»을 걸러 낸다.
+     ⚠ 못 고르면 빈 글자를 준다 — 지어내지 않는다. 그때는 사람이 적는다. */
+  var 버릴것 = [
+    /^[[［(（<《][^\]］)）>》]{0,12}[\]］)）>》]$/,   /* [붙임 1] · (별지 제1호) */
+    /^[○◯□■●▶※·*\-–—]/,                                    /* 항목 글머리 */
+    /^\d+[.)]/,                                              /* 1. 2) 같은 번호 */
+    /[:：]\s*$/,                                              /* 「담당자 :」 */
+    /^[\d\s.\-~년월일]+$/                                     /* 날짜·숫자만 */
+  ];
+  function 제목답나(s) {
+    var t = String(s || '').replace(/\s+/g, ' ').trim();
+    if (t.length < 4 || t.length > 60) return false;
+    for (var i = 0; i < 버릴것.length; i++) if (버릴것[i].test(t)) return false;
+    return true;
+  }
+  function 제목고르기(줄들) {
+    var 후보 = (줄들 || []).filter(제목답나);
+    return 후보.length ? String(후보[0]).replace(/\s+/g, ' ').trim() : '';
+  }
+  /* 서류 전체의 제목 — 맨 앞 묶음의 제목이 곧 그 서류의 이름이다 */
+  function docTitle(xml) {
+    var ps = pages(xml);
+    for (var i = 0; i < ps.length; i++) if (ps[i].title) return ps[i].title;
+    return '';
+  }
+  /* 파일 이름으로 쓸 수 있게 다듬는다 — 윈도가 싫어하는 글자를 뺀다 */
+  function safeName(s) {
+    return String(s || '').replace(/[\\/:*?"<>|\r\n\t]/g, ' ')
+      .replace(/\s+/g, ' ').trim().slice(0, 80);
   }
 
   /* 고른 묶음을 뺀다.
@@ -215,8 +257,20 @@
     return 새머리 + s.slice(i + 1);
   }
 
+  /* ── 쪽마다 갈라 저장 ─────────────────────────────────────────────────
+     (대표 지시 2026-09-13 「페이지 나누어서 저장하고 제목도 정할 수 있게」)
+     한 묶음만 남기고 나머지를 빼면 그 쪽 하나짜리 서류가 된다.
+     ⚠ 「전부 빼기」 빗장에 걸리지 않는다 — 하나는 늘 남기기 때문이다. */
+  function keepOnly(xml, 남길것) {
+    var ps = pages(xml);
+    var 뺄 = [];
+    for (var i = 0; i < ps.length; i++) if (i !== 남길것) 뺄.push(i);
+    return dropPages(xml, 뺄);
+  }
+
   var api = {
-    pages: pages, dropPages: dropPages,
+    pages: pages, dropPages: dropPages, keepOnly: keepOnly,
+    docTitle: docTitle, safeName: safeName,
     italicIds: italicIds, clearHints: clearHints,
     dropEmptyRows: dropEmptyRows,
     /* 검사가 같은 자를 쓰도록 내보낸다 */
