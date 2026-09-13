@@ -113,6 +113,9 @@ function rowDeps() {
          여기에도 반드시 한 줄 더할 것 — 안 하면 스무 개가 한꺼번에 붉어져서
          무엇이 고장인지 못 찾는다. */
     fnSource('offSiteOf'),
+    /* 직원(사무장·사무직)으로 가는 문 — 목록 머리가 이것을 지난다 (2026-09-13).
+       ⚠★ 이 상자에 «새 함수를 안 실어» 화면 검사가 통째로 죽은 것이 이번이 네 번째다. */
+    constLine('직원쪽'), fnSource('직원쪽있나'),
     fnSource('memberRows'), fnSource('pageIdsOf'), fnSource('pageRows'), fnSource('rowsOf'),
     fnSource('needsAttentionRow'), fnSource('statOf'),
     fnSource('statusChip'), fnSource('cardCount'), fnSource('dashHtml'),
