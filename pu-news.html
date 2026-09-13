@@ -43,7 +43,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=33"></script>
+<script src="js/pu-news-core.js?v=34"></script>
 <script src="js/pu-news-tpl.js?v=16"></script>
 <script src="js/pu-news-regional-sources.js?v=1"></script>
 <script src="js/pu-news-review.js?v=4"></script>
@@ -869,7 +869,10 @@ function 불러오기(){
     db.ref('newsletter/더한분들').once('value').catch(()=>({val:()=>({})})),
     /* 공식 RSS가 만든 것은 회차가 아니라 «검토 대기» 후보다. 사람이 승인하기 전에는
        편지짓기·발송 경로 어느 쪽에도 넣지 않는다. */
-    db.ref('newsletter/regionalCandidates').once('value').catch(()=>({val:()=>({})}))
+    db.ref('newsletter/regionalCandidates').once('value').catch(()=>({val:()=>({})})),
+    /* 월요일 자동발송 확정본 — 준비 뒤에 회차를 고치면 «고치기 전 것»이 나가므로,
+       화면이 지금 내용과 견줘 「다시 준비하세요」를 띄울 수 있어야 한다. */
+    db.ref('newsletter/weeklyReady').once('value').catch(()=>({val:()=>null}))
   ]).then(function(v){
     App.설정  = v[0].val() || {};
     App.회차들 = v[1].val() || {};
@@ -878,6 +881,7 @@ function 불러오기(){
     App.브리핑 = v[5].val() || {};   /* ⚠ 위 Promise.all 차례와 «번호가 맞아야» 한다 */
     App.더한분들 = v[6].val() || {};
     App.지역후보 = v[7].val() || {};
+    App.예약본 = v[8].val() || null;
     if(!App.설정.회사이름) App.설정.회사이름 = '푸른노무법인';
     if(!App.설정.회신주소) App.설정.회신주소 = '370-6@daum.net';
     if(!App.설정.범위)    App.설정.범위 = '자문중';
@@ -1016,6 +1020,32 @@ function 명단셈(){
   return d;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   확정본이 «준비한 그때 그대로»인가 — 단추 한 줄로 말한다 (2026-09-13)
+   ══════════════════════════════════════════════════════════════════════════
+   준비 뒤에 회차를 고치면 화면에는 고친 것이 보이는데 확정본은 봉인된 옛것이다.
+   예전에는 「고치면 다시 준비해야 합니다」라고 «준비할 때 한 번» 적어 두고 말았다 —
+   그 뒤로는 아무 데서도 안 보인다. 이제 서버가 낡은 확정본을 «안 보내므로»,
+   화면은 「이대로 두면 월요일에 안 나간다」를 말해 주어야 한다. */
+function 예약본상태(d){
+  const 기본 = { 꼴:'', 글:'📅 다음 월요일 자동발송 준비', 곁:'' };
+  const r = App.예약본;
+  if(!r || !r.상태) return 기본;
+  if(r.상태 === '어긋남')
+    return { 꼴:'warn', 글:'⚠ 확정본이 낡아 안 나갔습니다 — 다시 준비',
+             곁:String(r.오류 || '준비한 뒤에 내용이 바뀌었습니다') };
+  if(r.상태 !== '준비')
+    return Object.assign({}, 기본, { 곁:'지난 확정본 상태: ' + esc(String(r.상태)) });
+  if(String(r.회차열쇠||'') !== String(d.열쇠||''))
+    return Object.assign({}, 기본, { 곁:'준비된 확정본은 다른 회차입니다 (' + String(r.회차열쇠||'') + ')' });
+  const 봉인 = String(r.바탕도장 || '');
+  if(봉인 && 봉인 === Core.바탕도장(d))
+    return { 꼴:'', 글:'📅 ' + String(r.보낼날||'').slice(5) + ' 확정본 ✔',
+             곁:'준비돼 있습니다 — 다시 누르면 지금 내용으로 새로 준비합니다' };
+  return { 꼴:'warn', 글:'⚠ 확정본이 낡았습니다 — 다시 준비',
+           곁:'준비한 뒤에 내용이 바뀌었습니다. 이대로 두면 월요일에 안 나갑니다' };
+}
+
 function 이번회차화면(){
   const d = 지금회차();
   const r = 명단셈();
@@ -1026,6 +1056,7 @@ function 이번회차화면(){
        빈 뉴스레터가 그 숫자를 믿고 나간다. 담긴 수는 옆에 함께 적는다. */
   const 셈 = Core.실림셈(d.안, d.우리글);
   const 실린수 = 셈.총실림;
+  const 예약 = 예약본상태(d);
 
   /* ★★ 회차 줄을 «왼쪽 칸 안»에 넣는다 (대표 지시 2026-09-06
        「캡쳐3 행의 중간을 잘라서 오른쪽은 비우고 오른쪽 뉴스레터를 끌어올려서」)
@@ -1049,8 +1080,10 @@ function 이번회차화면(){
     <span style="width:8px"></span>
     <button class="btn" onclick="크게보기()">👁 크게 보기</button>
     <button class="btn warn" onclick="시험발송()" ${갈수있나.ok?'':'disabled'}>✉ 나에게 시험 발송</button>
-    <button class="btn" onclick="자동발송준비()" ${갈수있나.ok && App.isAdmin?'':'disabled'}>
-      📅 다음 월요일 자동발송 준비</button>
+    <!-- ★ 확정본이 낡았는지를 «이 단추 한 줄»로 말한다 (2026-09-13).
+         ⚠ 셋째 줄을 만들지 않는다 — 머리가 늘어나면 대표가 같은 것을 보려고 더 굴린다. -->
+    <button class="btn ${예약.꼴}" onclick="자동발송준비()" title="${esc(예약.곁||'')}"
+      ${갈수있나.ok && App.isAdmin?'':'disabled'}>${esc(예약.글)}</button>
     <button class="btn pri" onclick="진짜보내기()" ${갈수있나.ok && App.isAdmin?'':'disabled'}>
       📨 ${App.유형 ? esc(App.유형)+' ' : ''}${r.셈.보낼곳.toLocaleString()}곳에 보내기</button>
   </div>
@@ -2280,13 +2313,20 @@ async function 자동발송준비(){
     if(열){ 받는이[번호] = 열; 보냄표[열] = { 보냄:true }; }
     return Object.assign({}, x, { track:번호 });
   });
-  await db.ref('newsletter/weeklyReady').set({
+  /* ★★ «그때 바탕»의 도장을 함께 봉인한다 (2026-09-13).
+       이것이 없으면 준비 뒤에 회차를 고쳐도 월요일에 «고치기 전 편지»가 나간다.
+       서버가 보내기 직전에 지금 바탕으로 도장을 다시 찍어 견주고, 다르면 안 보낸다.
+     ⚠ 재는 것은 편지에 실리는 칸뿐이다 — 상태·고친때가 바뀌었다고 버리면
+       시험 한 통 보낸 것만으로 확정본이 날아간다. */
+  const 예약본 = {
     상태:'준비', 보낼날:날, 회차열쇠:d.열쇠, 준비한때:Date.now(),
     준비한이:(App.me&&App.me.email)||'', to:to,
     subject:편.제목, body:편.본문, html:편.서식, spacingSec:BULK_GAP_SEC,
     files:첨.파일들, 링크들:편.링크들||[], 받는이:받는이, 보냄표:보냄표,
-    from:보내는주소()
-  });
+    from:보내는주소(), 바탕도장:Core.바탕도장(d)
+  };
+  await db.ref('newsletter/weeklyReady').set(예약본);
+  App.예약본 = 예약본; render();
   toast('📅 ' + 날 + ' 자동발송 확정본을 준비했습니다 — 설정의 자동발송이 켜져 있어야 나갑니다', 12000);
 }
 
