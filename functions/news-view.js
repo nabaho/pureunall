@@ -109,6 +109,20 @@ var 창스크립트 =
   'window.addEventListener("hashchange",해시로);해시로();' +
   '})();';
 
+/* 꼬리에 적을 제목 — «법인 이름은 덜어 낸다».
+   ⚠⚠ 실측 2026-09-13(배포한 창을 열어 보고 알았다): 꼬리가
+     「푸른노무법인  푸른노무법인 2026년 09월 2주차 주간뉴스레터 입니다.」였다.
+     제목이 «편지 제목 그대로»라 법인 이름이 이미 들어 있었기 때문이다.
+   ★ 이름은 꼬리가 따로 굵게 적는다 — 여기서는 그것만 덜어 내고 회차는 남긴다.
+   ⚠ 덜어 내다 남는 것이 없으면 빈칸만 남는다 — 버팀말을 둔다. */
+function 꼬리제목(제목) {
+  const t = String(제목 == null ? '' : 제목)
+    .split('푸른노무법인').join(' ')
+    .replace(/\s*입니다\.?\s*$/, '')
+    .replace(/\s+/g, ' ').trim();
+  return t || '주간뉴스레터';
+}
+
 function 쪽(제목, 전문) {
   return '<!doctype html><html lang="ko"><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=700">'
@@ -166,7 +180,7 @@ function 쪽(제목, 전문) {
     + '<div class="acc"></div>'
     + '<div class="bd" id="popb"></div>'
     + '<div class="ft"><span class="nm">푸른노무법인</span>'
-    + '<span>' + esc(제목 || '주간뉴스레터') + '</span>'
+    + '<span>' + esc(꼬리제목(제목)) + '</span>'
     + '<span class="sp"></span><span>문의 041-556-0035</span></div>'
     + '</div></div>'
     + '<script>' + 창스크립트 + '<\/script>'
@@ -190,4 +204,4 @@ function 없는쪽(까닭) {
     + '</div></body></html>';
 }
 
-module.exports = { 회차열쇠, 읽기, 볼수있나, 쪽, 없는쪽, 까닭말 };
+module.exports = { 회차열쇠, 읽기, 볼수있나, 쪽, 없는쪽, 까닭말, 꼬리제목 };
