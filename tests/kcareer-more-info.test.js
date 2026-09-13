@@ -166,8 +166,21 @@ test('★ 사무실 번호가 «휴대폰이라고 단언»되지 않게 한 번
 });
 
 test('★ 집 주소를 안 적었으면 «오늘까지 되던 대로» 사무실 주소가 간다', () => {
-  const fn = cutFn(bare, 'function _cvFillData(');
-  assert.match(fn, /addr:집\|\|사무실/,
+  /* ⚠ 예전에는 «글자» /addr:집\|\|사무실/ 를 박아 두었다. 2026-09-13 에 사무소 주소를
+     이알피에서 가져오면서(집 → 이알피 → 환경설정 사무실) 이 검사가 «기능이 아니라 글자 때문에»
+     깨졌다. 못 박을 것은 순서라는 «규칙»이지 그때의 식이 아니다 — 실제로 돌려 본다. */
+  const vm2 = require('node:vm');
+  const 돌려 = (info) => {
+    const ctx = { String, Object, Array, Number, JSON, console,
+      getProfileInfo: () => info, get: () => [], workPeriod: () => '',
+      formatDate: (x) => x || '', isAwardType: () => false };
+    vm2.createContext(ctx);
+    vm2.runInContext(cutFn(bare, 'function _cvFillData('), ctx);
+    return vm2.runInContext('_cvFillData()', ctx).fields;
+  };
+  assert.equal(돌려({ addrHome: '가나도 사는곳 1', addr: '가나도 일터 2' }).addr, '가나도 사는곳 1',
+    '집을 적어 두셨으면 「현주소」는 집입니다');
+  assert.equal(돌려({ addr: '가나도 일터 2' }).addr, '가나도 일터 2',
     '비워 버리면 오늘까지 되던 것이 안 되는 뒷걸음질입니다');
 });
 
