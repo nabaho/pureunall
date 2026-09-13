@@ -507,9 +507,45 @@ var CONTACT_FIELDS=[['name','담당자명','text'],['position','직위','text'],
      사람 칸을 끼워 넣으면 이미 만들어 둔 붙여넣기 자료가 어긋난다. */
 var WREP_FIELDS=[['wrep_name','근로자대표 성명','text'],['wrep_title','직위','text'],
   ['wrep_mobile','휴대폰','text'],['wrep_birth','생년월일','date']];
+/* ── 참여사업장의 «사용자 대표» ── (대표 지시 2026-09-13)
+   「회의의 대표자와 사용자대표 근로자대표가 각각 다를수 있다 이부분은 좀 구분해야한다」
+
+   ★ 대표자(ceo)와 «다른 사람»이다. 대표자는 등기부·사업자등록증에 적힌 사람이고,
+     사용자대표는 협의회에 사용자측으로 «나오는» 사람이다(근로복지기본법 시행령상
+     사업주 또는 그 대리인). 열여섯 개사쯤 되면 대표이사가 다 나오지 못해
+     공장장·관리부장이 나오는 일이 흔하다.
+
+   ⚠ 비면 «대표자를 끌어다 쓰지 않는다»(대표 판단 2026-09-13). 관청에 나가는 서류라
+     아무도 시키지 않은 이름이 찍히면 안 된다 — 빈칸으로 두고 「확인 필요」라 말한다.
+   ⚠ SITE_FIELDS 에 섞지 않는다(WREP_FIELDS 와 같은 까닭) — 그 목록은 엑셀 붙여넣기의
+     «열 차례»라, 사람 칸을 끼우면 이미 만들어 둔 자료가 밀린다. */
+var UREP_FIELDS=[['urep_name','사용자대표 성명','text'],['urep_title','직위','text']];
+/* ── 중소기업확인서 ── (대표 지시 2026-09-13)
+   「중소기업확인서도 ocr에서 찾아서 중소기업 여부 체크와 기간도 표시되게」
+
+   ★ 기존 「기업규모(sme_type)」와 «따로» 둔다(대표 판단 2026-09-13). 그것은 기업정보함에서
+     온 값이라, 한 칸에 섞으면 그 숫자가 «확인서에서 온 것»인지 «기업정보함 짐작»인지
+     구분이 안 된다. 지원금 심사에 내는 것은 확인서 쪽이다.
+   ⚠ 유효기간이 있다 — 중소기업확인서는 해마다 새로 뗀다(보통 4/1~다음해 3/31).
+     지난 확인서를 그대로 내면 반려된다. 그래서 기간을 함께 적고 화면에서 지났는지 본다. */
+var SME_FIELDS=[['sme_cert','중소기업 여부','select'],['sme_from','유효기간 시작','date'],
+  ['sme_to','유효기간 끝','date']];
+/* ⚠ 확인서에 실제로 찍혀 나오는 말만 둔다. 「중소기업」과 「소기업」은 «다른 말»이다 —
+   소기업은 중소기업의 한 갈래라, 확인서에 소기업이라 적혀 있으면 그대로 적어야 한다.
+   빈 칸('')이 맨 앞이다 — 모르는 것을 「해당 없음」으로 적어 두면 안 된다. */
+var SME_OPTS=['','중소기업','소기업','중견기업','해당 없음'];
 /* 화면과 서식이 «같은 자리»를 읽게 한 곳에 모은다 */
 function _siteWrep(s){ s=s||{}; return {name:String(s.wrep_name||'').trim(), title:String(s.wrep_title||'').trim(),
   mobile:String(s.wrep_mobile||'').trim(), birth:String(s.wrep_birth||'').trim(), doc:s.wrep_doc||null}; }
+function _siteUrep(s){ s=s||{}; return {name:String(s.urep_name||'').trim(), title:String(s.urep_title||'').trim()}; }
+/* 중소기업확인서 — 「지났나」를 여기서 한 번만 셈한다(화면 여러 곳이 같은 답을 보게).
+   ⚠ 기준일은 «오늘»이다. 끝날이 없으면 지났는지 알 수 없다 — 모를 때는 「지났다」고 하지 않는다. */
+function _siteSme(s,today){
+  s=s||{};
+  var to=String(s.sme_to||'').trim(), t=String(today||'').trim()||new Date().toISOString().slice(0,10);
+  return { cert:String(s.sme_cert||'').trim(), from:String(s.sme_from||'').trim(), to:to,
+           doc:s.sme_doc||null, expired:!!(to&&to<t) };
+}
 
 /* ══════════ 설립 출연금은 «한 줄기»로 ══════════ (2026-09-10)
    여태 같은 출연금이 세 곳에서 따로 살았다:
@@ -2574,6 +2610,53 @@ function parseCorpReg(txt){
   m=flat.match(/관할등기소\s*([가-힣]+지방법원[가-힣]*\s*[가-힣]*등기소?)/); if(m) o.registry_office=m[1].replace(/\s+/g,' ').trim();
   return o;
 }
+/* 등기부를 «사업장 칸»으로 옮겨 읽는다 — 같은 종이, 다른 칸 이름 (2026-09-13)
+   기금: corp_reg_no · 사업장: corp_no. 판독기를 둘로 만들지 않고 이름만 바꾼다.
+   ⚠ 기금 전용 칸(reg_date·inka_date·registry_office)은 «버린다» — 사업장에는 그런 칸이
+     없어서, 넣어도 아무 데도 안 들어가면서 확인 창에는 「읽었다」고 뜬다. */
+function parseCorpRegSite(txt){
+  var g=parseCorpReg(txt), o={};
+  if(g.corp_reg_no) o.corp_no=g.corp_reg_no;
+  if(g.address) o.address=g.address;
+  return o;
+}
+/* ── 중소기업확인서 판독 ── (대표 지시 2026-09-13)
+   「중소기업확인서도 ocr에서 찾아서 중소기업 여부 체크와 기간도 표시되게」
+
+   확인서에 찍혀 나오는 모양(중소기업현황정보시스템 발급):
+     기 업 명 : ㈜○○      기업규모 : 중소기업(소기업)
+     유효기간 : 2026. 04. 01. ~ 2027. 03. 31.
+
+   ★ 「소기업」을 «중소기업으로 뭉개지 않는다» — 소기업은 중소기업의 한 갈래지만
+     확인서가 갈라 적어 주므로 그대로 받는다. 「중소기업(소기업)」처럼 괄호로 적히면
+     좁은 쪽(소기업)을 택한다.
+   ⚠ 「중소기업에 해당하지 아니함」도 찍혀 나온다 — 이것을 못 읽고 「중소기업」만 찾으면
+     ‘해당하지 아니함’ 속의 «중소기업» 네 글자에 걸려 거꾸로 읽는다. 아님을 «먼저» 본다.
+   ⚠ 유효기간이 없으면 지어내지 않는다 — 기간을 모르면 지났는지 알 수가 없고,
+     지난 확인서를 낸 것보다 빈칸이 낫다. */
+function parseSmeCert(txt){
+  var flat=_flat(txt), o={};
+  /* ⚠⚠ 「중소기업」 «안에» 「소기업」이 들어 있다. 소기업을 먼저 찾으면 중소기업확인서가
+     통째로 「소기업」으로 읽힌다(2026-09-13 검사가 잡았다 — 눈으로는 못 봤다).
+     그래서 «중소기업을 먼저 치운 뒤» 남은 소기업을 본다. */
+  var 남은=flat.replace(/중\s*소\s*기\s*업/g,'「중소」');
+  /* ① 아님을 먼저 — 「해당하지 아니」·「해당되지 않」. 이 문장 속에도 중소기업 네 글자가 있어
+     아님을 나중에 보면 거꾸로 읽는다. */
+  if(/해\s*당\s*(하|되)\s*지\s*(아니|않)/.test(flat)||/중소기업\s*아\s*님/.test(flat)) o.sme_cert='해당 없음';
+  else if(/소\s*기\s*업/.test(남은)) o.sme_cert='소기업';          /* 괄호 속 좁은 쪽이 이긴다 */
+  else if(/중\s*견\s*기\s*업/.test(flat)) o.sme_cert='중견기업';
+  else if(/「중소」/.test(남은)) o.sme_cert='중소기업';
+  /* ② 유효기간 — 「2026. 04. 01. ~ 2027. 03. 31.」·「2026-04-01 ~ 2027-03-31」 */
+  var m=flat.match(/유\s*효\s*기\s*간[^0-9]{0,6}(\d{4})\s*[.\-년]\s*(\d{1,2})\s*[.\-월]\s*(\d{1,2})\s*[.일]?\s*[~∼\-–]\s*(\d{4})\s*[.\-년]\s*(\d{1,2})\s*[.\-월]\s*(\d{1,2})/);
+  if(m){
+    o.sme_from=m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+    o.sme_to  =m[4]+'-'+('0'+m[5]).slice(-2)+'-'+('0'+m[6]).slice(-2);
+  }
+  /* ③ 상호 — 확인 창에서 「어느 회사 것인가」를 사람이 알아보게(빈 칸에만 들어간다) */
+  m=flat.match(new RegExp(_loose('기업명')+'[:：]?\\s*(.+?)(?=\\s*'+_loose('기업규모')+'|\\s*'+_loose('대표')+'|\\s*'+_loose('사업자')+'|$)'));
+  if(m){ var nm=_cleanName(m[1]); if(nm) o.name=nm; }
+  return o;
+}
 /* ── 고유번호증 판독 ──
    OCR 텍스트는 글자 사이에 잡음이 낀다("단 _ 체 . 명 :", "소 _ OX:") → 라벨을 느슨하게 매칭한다. */
 function _loose(s){ return s.split('').map(function(c){return c+'[\\s_.,:：]*';}).join(''); }
@@ -2685,6 +2768,12 @@ var DOC_PARSE={ inka:{label:'고용노동부 설립인가증',fn:parseInka},
                 bizreg:{label:'사업자등록증',fn:parseBizReg},
                 wrep:{label:'근로자대표 재직증명서',fn:parseWrepDoc},
                 corpreg:{label:'법인 등기사항전부증명서',fn:parseCorpReg},
+                /* ⚠ 사업장의 법인등록번호는 «칸 이름이 다르다» — 기금은 corp_reg_no,
+                     사업장은 corp_no 다. 그래서 같은 판독기를 쓰되 사업장 쪽은
+                     이름을 바꿔 주는 갈래를 따로 둔다(sitecorp). 안 그러면 읽히는데
+                     칸에 «안 들어간다» — 조용히 아무 일도 안 일어난다. */
+                sitecorp:{label:'법인 등기사항전부증명서',fn:parseCorpRegSite},
+                smecert:{label:'중소기업확인서',fn:parseSmeCert},
                 taxid:{label:'고유번호증',fn:parseTaxId},
                 /* 정관은 «칸을 채우는» 서류가 아니다 — 조문 전체가 내용이라 통째로 보관한다.
                    full:true 면 판독 결과를 칸에 나눠 넣지 않고 전문을 그대로 들고 간다.
@@ -6533,6 +6622,10 @@ var DOC_FIND={
   corpreg:{label:'법인 등기부등본', kw:['등기사항','등기부','등기사항전부증명']},
   taxid:{label:'고유번호증', kw:['고유번호']},
   charter:{label:'정관', kw:['정관']}
+  /* ⚠ 참여사업장 서류(사업자등록증·등기부·중소기업확인서·재직증명서)는 여기 «넣지 않는다».
+     이 표는 «기금 서류 자동 찾기»(완비 5항목) 전용이라, 여기 넣으면 docFindPick 이
+     넣을 끌어놓기 칸을 못 찾는다. 사업장 쪽은 openAlbumPick(zid,kind) 로 곧장 간다.
+     2026-09-13 에 넣었다가 검사(fund-doc-autofind)가 잡아 되돌렸다. */
 };
 /* 사진 한 장에서 «글자로 된 것»을 모은다 — 제목·직접분류·회사·메모·판독 칸 */
 function docFindText(it){
@@ -7059,7 +7152,10 @@ function unlinkScan(kind){
 function docZoneLabel(kind){ return ({inka:'설립인가증',corpreg:'법인 등기부등본',taxid:'고유번호증',charter:'정관',
   bizreg:'사업자등록증',
   sme:'중소기업확인서',reg:'등기부등본',bizno:'사업자등록증',
-  wrep:'근로자대표 재직증명서'})[kind]||kind; }   // 뒤 넷은 참여사업장 몫
+  /* 참여사업장 몫 — 사진첩 고르기 창의 제목이 된다.
+     ⚠ 여기 없으면 제목에 «sitecorp» 같은 열쇠말이 그대로 뜬다. */
+  sitecorp:'법인 등기부등본',smecert:'중소기업확인서',
+  wrep:'근로자대표 재직증명서'})[kind]||kind; }
 /* 드롭존 아래 한 줄 — 사진첩에서 고르기 / 이미 연결된 원본 보기 */
 /* ══ 푸른 기업정보함(기업정보함) 연동 ══
    사업자등록증 카드에 이미 들어 있는 값을 기금 정보로 당겨온다. 다시 칠 이유가 없다.
@@ -7085,6 +7181,10 @@ function _siteDocGrab(){
   var keep={};
   SITE_FIELDS.forEach(function(c){ var el=$('se-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
   WREP_FIELDS.forEach(function(c){ var el=$('sw-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
+  /* ⚠ 새로 늘린 묶음도 «반드시» 여기 넣는다 — 빠지면 사진첩에 다녀오는 사이
+     쳐 둔 사용자대표·중소기업 값이 «말없이 사라진다». 창이 갈렸다 다시 그려지기 때문이다. */
+  UREP_FIELDS.forEach(function(c){ var el=$('su-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
+  SME_FIELDS.forEach(function(c){ var el=$('sm-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
   if(Object.keys(keep).length) _siteDocKeep=keep;
 }
 /* 재직증명서는 «근로자대표 칸»(sw-)으로 간다 — 사업장 칸(se-)이 아니다.
@@ -7093,10 +7193,20 @@ function _siteRepScope(){
   _docScope={pre:'sw-', out:'siteDocOut', fields:WREP_FIELDS, keep:false};
   _docFound={}; _docOcr=false;
 }
+/* 중소기업확인서는 «중소기업 칸»(sm-)으로 간다 — 사업장 칸이 아니다.
+   ⚠ 상호(name)는 확인 창이 「어느 회사 것인가」를 보여 주는 데만 쓴다. 여기 fields 에
+     넣으면 sm-name 이라는 «없는 칸»을 찾아 조용히 버려진다. 그래서 안 넣는다. */
+function _siteSmeScope(){
+  _docScope={pre:'sm-', out:'siteDocOut', fields:SME_FIELDS, keep:false};
+  _docFound={}; _docOcr=false;
+}
 function bindSiteDocIntake(){
   _siteDocScope();
   _dzHandler['dz-sitebiz']=function(files){ _siteDocScope(); readDocInto('dz-sitebiz','bizreg',files[0]); };
   _dzHandler['dz-siterep']=function(files){ _siteRepScope(); readDocInto('dz-siterep','wrep',files[0]); };
+  /* 등기부는 사업장 칸(se-)으로 간다 — 법인등록번호·소재지가 거기 있다 */
+  _dzHandler['dz-sitecorp']=function(files){ _siteDocScope(); readDocInto('dz-sitecorp','sitecorp',files[0]); };
+  _dzHandler['dz-sitesme']=function(files){ _siteSmeScope(); readDocInto('dz-sitesme','smecert',files[0]); };
 }
 function siteDocAlbum(){ _siteDocGrab(); _siteDocScope(); closeM(); openAlbumPick('dz-sitebiz','bizreg'); }
 /* ══════════ 사업자등록증 «여러 장» → 참여사업장 여러 곳 ══════════ (2026-09-12)
@@ -7284,6 +7394,11 @@ function siteRepAlbum(){
   var sid=_siteEditSid||'';
   openAlbumPick('dz-siterep','wrep','','','',sid);
 }
+/* 등기부·중소기업확인서도 사진첩에서 읽는다 (2026-09-13)
+   ⚠ 갈래(scope)를 «먼저» 세운 뒤 창을 연다 — 순서가 바뀌면 읽은 값이 «직전 갈래»의
+     칸으로 들어간다(중소기업 여부가 사업장 칸으로 가면 아무 데도 안 들어가고 조용하다). */
+function siteCorpAlbum(){ _siteDocGrab(); _siteDocScope(); closeM(); openAlbumPick('dz-sitecorp','sitecorp'); }
+function siteSmeAlbum(){ _siteDocGrab(); _siteSmeScope(); closeM(); openAlbumPick('dz-sitesme','smecert'); }
 function loadCardIdx(){
   if(_cardIdx) return Promise.resolve(_cardIdx);
   return fbDb.ref('pucards/idx').once('value').then(function(s){
@@ -8276,6 +8391,38 @@ function num(v){ if(v==null||v==='')return ''; if(typeof v==='number')return Mat
   if(/^[+-]?\d*\.?\d+e[+-]?\d+$/i.test(plain)){ var sci=parseFloat(plain); return isNaN(sci)?'':Math.round(neg?-sci:sci); } // 1E+6 지수표기
   s=s.replace(/[^0-9.\-]/g,''); if(s===''||s==='-'||s==='.')return '';
   var n=Math.round(parseFloat(s)); if(isNaN(n))return ''; return neg?-Math.abs(n):n; }
+/* ══ 참여사업장 거르기 ══ (대표 지시 2026-09-13 「필터링 기능 넣어달라」)
+   열여섯 개사, 많으면 서른 개사다. 「누가 근로자대표가 없더라」·「그 회사 사업자번호가 뭐였지」를
+   눈으로 뒤지게 하지 않는다.
+
+   ★ 칸마다 거르는 칸을 두지 «않는다» — 열한 열에 입력칸 열한 개를 깔면 표가 두 배로 길어지고,
+     정작 쓰는 것은 한 번에 하나다. 찾는 말 하나 + 자주 쓰는 갈래 딱지 둘로 둔다.
+   ⚠ 찾는 말은 «보이는 칸 전부»를 본다 — 사람은 사업자번호로도, 담당자 이름으로도 찾는다.
+   ⚠ 번호(－·공백)를 지우고 견준다 — 명부는 412-81-12595, 손은 41281 로 친다. */
+var _siteQ='', _siteOnly='';
+function _siteHay(s){
+  var c=_siteContacts(s), w=_siteWrep(s), u=_siteUrep(s);
+  return [s.name,s.ceo,s.biz_no,s.corp_no,s.biz_type,s.biz_item,s.address,s.note,
+          c.name,c.mobile,c.email,w.name,w.title,u.name,u.title]
+    .map(function(x){return String(x==null?'':x);}).join(' ');
+}
+function _digitsOnly(s){ return String(s==null?'':s).replace(/[^0-9]/g,''); }
+function _siteFilter(arr){
+  var q=String(_siteQ||'').trim().toLowerCase(), qd=_digitsOnly(q);
+  return (arr||[]).filter(function(s){
+    if(_siteOnly==='partner'&&!s.partner) return false;
+    if(_siteOnly==='nowrep'&&_siteWrep(s).name) return false;
+    if(_siteOnly==='nourep'&&_siteUrep(s).name) return false;
+    if(_siteOnly==='smeold'&&!_siteSme(s).expired) return false;
+    if(!q) return true;
+    var hay=_siteHay(s);
+    if(hay.toLowerCase().indexOf(q)>=0) return true;
+    /* 숫자로 치면 숫자끼리 견준다 — 「41281」로 412-81-12595 를 찾을 수 있어야 한다 */
+    return !!(qd&&qd.length>=3&&_digitsOnly(hay).indexOf(qd)>=0);
+  });
+}
+function setSiteQ(v){ _siteQ=v; renderFund(); setTimeout(function(){ var el=$('siteQ'); if(el){ el.focus(); el.selectionStart=el.selectionEnd=el.value.length; } },0); }
+function setSiteOnly(v){ _siteOnly=(_siteOnly===v)?'':v; renderFund(); }
 function sitesTab(){
   if(S.sitesFor!==S.fundId){
     var _fid=S.fundId; S.sitesFor=_fid; S.sites=null;
@@ -8292,9 +8439,12 @@ function sitesTab(){
   arr.sort(bySize
     ? function(a,b){ return (num(b.company_size)||0)-(num(a.company_size)||0); }
     : function(a,b){ return String(a.seq_label||'').localeCompare(String(b.seq_label||''),'ko',{numeric:true}); });
+  /* 세는 수는 «거르기 전»의 전체다 — 거르고 세면 화면 위 숫자가 손을 댈 때마다 달라져
+     「우리 기금이 몇 개사인가」를 알 수가 없다. 거른 결과는 표 위에 따로 적는다. */
   var totalEmp=arr.reduce(function(s,x){return s+(num(x.company_size)||0);},0);
   var nPartner=arr.filter(function(x){return !!x.partner;}).length;
-  var maxEmp=arr.reduce(function(m,x){return Math.max(m,num(x.company_size)||0);},0);
+  var nAll=arr.length;
+  arr=_siteFilter(arr);
   var rows=arr.map(function(s,i){
     var c=_siteContacts(s);
     var contact=c.name?(esc(c.name)+(c.mobile?' · '+esc(c.mobile):'')):'—';
@@ -8304,13 +8454,10 @@ function sitesTab(){
         +(w.doc?' <span class="chip ok" style="font-size:9.5px" title="재직증명서가 연결되어 있습니다">재직</span>'
                :' <span class="chip dg" style="font-size:9.5px" title="재직증명서가 없습니다 — 별지 제7호 첨부서류">확인 필요</span>')
       : '—';
-    /* 규모 막대 — 숫자와 «같은 줄»에 놓는다(inline-block).
-       아래에 깔면 오십 줄짜리 표가 두 배로 길어진다. */
+    /* 상시근로자는 «숫자만» 둔다 (대표 지시 2026-09-13 「상시근로자 숫자만 있으면 된다」).
+       규모 막대를 깔았더니 칸이 넓어져 뒤 칸들이 밀렸다 — 숫자는 이미 오른쪽 정렬이라
+       크고 작은 것이 자릿수로 보인다. */
     var emp=num(s.company_size)||0;
-    var bar=(maxEmp&&emp)
-      ? '<span style="display:inline-block;vertical-align:middle;margin-right:5px;height:6px;border-radius:3px;'
-        +'background:var(--acc);opacity:.3;width:'+Math.max(3,Math.round(emp/maxEmp*44))+'px"></span>'
-      : '';
     /* 협력 체크를 «맨 앞»에 둔다 — 가운데 있으면 상호를 읽다 눈이 한 번 건너뛰어야 하고,
        여러 곳을 잇달아 켤 때 손이 좌우로 오간다. 켜고 끄는 칸은 줄머리에 모은다. */
     return '<tr onclick="editSite(\''+s._id+'\')">'
@@ -8321,7 +8468,7 @@ function sitesTab(){
       /* 업종은 «남긴다» — 넷만 남기면 411px 에 빈 자리가 생기는데(대표 지시 「빈공간이 많다」),
          한 기업을 한 줄로 알아보는 데 상호 다음으로 말이 많은 칸이 업종이다. */
       +'<td class="ph">'+esc(s.biz_no||'—')+'</td><td>'+esc(s.biz_type||'—')+'</td>'
-      +'<td style="text-align:right;white-space:nowrap">'+bar+(emp||'—')+'</td>'
+      +'<td style="text-align:right;white-space:nowrap">'+(emp||'—')+'</td>'
       +'<td class="ph">'+contact+'</td>'
       /* 근로자대표 — 대표자·담당자와 다른 사람인 경우가 많다.
          재직증명서가 붙었는지도 «같은 칸»에서 보인다. 두 줄로 나누면 표가 두 배로 길어진다. */
@@ -8337,11 +8484,32 @@ function sitesTab(){
      두 화면을 내려가야 해 해마다 하는 입력이 고역이었다 — 한 번에 하나만 보인다. */
   var isYr=(S.siteTab==='years');
   // 머리줄에 얹으므로 밑줄·바깥 여백을 뺀다(줄을 따로 차지하지 않게)
+  var isPpl=(S.siteTab==='people');
   var sub='<div class="tabbar" style="margin:0;border-bottom:none">'
-    +'<div class="tab'+(isYr?'':' on')+'" style="padding:4px 10px;margin-bottom:0" onclick="goSiteTab(\'list\')">📋 명부</div>'
+    +'<div class="tab'+(isYr||isPpl?'':' on')+'" style="padding:4px 10px;margin-bottom:0" onclick="goSiteTab(\'list\')">📋 명부</div>'
+    /* ★ 사람 보기 — 명부에 열을 더 붙이지 않는다(대표 판단 2026-09-13).
+         명부는 이미 열한 열이라, 사용자대표·근로자대표를 끼우면 소재지·이메일이 밀린다.
+         설립 때 한 번 몰아서 채우는 일이라 «그 일만 하는 화면»이 맞다. */
+    +'<div class="tab'+(isPpl?' on':'')+'" style="padding:4px 10px;margin-bottom:0" onclick="goSiteTab(\'people\')" title="대표자·담당자·사용자대표·근로자대표를 한 화면에서 채웁니다">👤 사람</div>'
     +'<div class="tab'+(isYr?' on':'')+'" style="padding:4px 10px;margin-bottom:0" onclick="goSiteTab(\'years\')">📅 연도별 기록</div></div>';
   /* 「한눈에」 스위치 — 같은 목록에 «순서만» 바꾼다. 열을 늘리거나 화면을 새로 만들지 않는다. */
-  var sortBar=isYr?'':'<div class="segbar" title="규모순으로 두면 큰 사업장이 위로 올라와 한눈에 들어옵니다">'
+  /* 거르는 줄 — 찾는 말 하나 + 자주 쓰는 갈래 딱지. 켜져 있으면 몇 개가 남았는지 적는다.
+     ⚠ 딱지는 «한 번에 하나»다(다시 누르면 꺼진다) — 여럿을 겹치면 무엇이 켜졌는지
+       알 수 없는 채로 「우리 사업장이 세 곳뿐이네」 하고 잘못 읽는다. */
+  var onChip=function(k,t,tip){ return '<button class="seg'+(_siteOnly===k?' on':'')+'" onclick="setSiteOnly(\''+k+'\')" title="'+tip+'">'+t+'</button>'; };
+  var filterBar=(isYr)?'':'<div class="row" style="gap:6px;align-items:center;flex-wrap:wrap">'
+    +'<input id="siteQ" value="'+esc(_siteQ)+'" oninput="setSiteQ(this.value)" placeholder="🔍 상호·대표자·사업자번호·담당자·소재지"'
+    +' style="width:210px;padding:3px 8px;font-size:11.5px" title="보이는 칸을 모두 뒤집니다. 숫자만 쳐도 사업자번호가 찾아집니다(41281 → 412-81-12595)">'
+    +'<div class="segbar">'+onChip('partner','협력','협력업체로 표시한 곳만')
+      +onChip('nourep','사용자대표 없음','사용자대표를 아직 안 적은 곳만')
+      +onChip('nowrep','근로자대표 없음','근로자대표를 아직 안 적은 곳만')
+      +onChip('smeold','확인서 지남','중소기업확인서 유효기간이 지난 곳만')+'</div>'
+    +((_siteQ||_siteOnly)
+      ? '<span class="chip '+(arr.length?'ok':'dg')+'" style="font-size:10.5px">'+arr.length+' / '+nAll+'개사</span>'
+        +'<button onclick="_siteQ=\'\';_siteOnly=\'\';renderFund()" style="padding:2px 8px;font-size:11px">지우기</button>'
+      : '')
+    +'</div>';
+  var sortBar=(isYr||isPpl)?'':'<div class="segbar" title="규모순으로 두면 큰 사업장이 위로 올라와 한눈에 들어옵니다">'
     +'<button class="seg'+(bySize?'':' on')+'" onclick="setSiteSort(\'seq\')">연번순</button>'
     +'<button class="seg'+(bySize?' on':'')+'" onclick="setSiteSort(\'size\')">규모순</button></div>';
   /* 머리를 한 줄로 — 종전에는 제목줄·탭줄·엑셀 드롭존이 각각 한 줄씩 세 줄이었다.
@@ -8351,6 +8519,7 @@ function sitesTab(){
     +'<span class="stat">'+arr.length+'개사</span><span class="stat">상시근로자 '+totalEmp.toLocaleString()+'명</span>'
     +(nPartner?'<span class="stat">협력 '+nPartner+'개사</span>':'')
     +sub+sortBar
+    +(isYr?'':filterBar)
     +(isYr?'':dropZoneSlim('dz-sites','엑셀 한번에','상호·대표자·사업자번호·상시근로자·소재지 열을 자동으로 찾습니다','.xlsx,.xls,.csv'))
     +'<span style="flex:1"></span>'
     +'<button onclick="openCardPick(\'site\')" title="푸른 기업정보함에서 사업장 하나를 골라 추가합니다">🏢 기업정보함에서</button>'
@@ -8358,8 +8527,63 @@ function sitesTab(){
     +'<button onclick="bizregBulkPick()" title="사진첩의 사업자등록증을 여러 장 골라 한꺼번에 읽고, 표로 확인한 뒤 참여사업장을 만듭니다">📚 사업자등록증 여러 장</button>'+hlp('site.bulkdoc')
     +'<button class="primary" onclick="editSite(\'\')">+ 사업장 추가</button>'
     +' <button onclick="importSites()" title="전체 기금 사업장 일괄 가져오기(담당자 포함)">📥 백업(JSON)</button></div>'
-    +(isYr ? sitesYearBody(arr) : '<div id="siteXlsxOut"></div>'+tbl)
+    +(isYr ? sitesYearBody(arr) : isPpl ? sitesPeopleBody(arr) : '<div id="siteXlsxOut"></div>'+tbl)
     +'</div>';
+}
+/* ══ 「사람」 보기 ══ (대표 지시 2026-09-13)
+   「참여사업장에는 대표자와 사업장 담당자가 있다 … 근로자 대표도 있는데 각각 모두 다른경우가 있다」
+   「회의의 대표자와 사용자대표 근로자대표가 각각 다를수 있다 이부분은 좀 구분해야한다」
+
+   한 사업장에 사람이 «넷» 나온다. 넷이 다 다른 사람인 일이 흔하다:
+     대표자(등기·사업자등록증에 적힌 사람) · 담당자(실무 연락)
+     사용자대표(협의회 사용자측) · 근로자대표(노사 합의에 서명)
+
+   ★ 여기서 «바로 고친다». 열여섯 곳을 창을 열었다 닫았다 하면 그 자체가 하루 일이다.
+   ⚠ 칸을 떠날 때(change) 저장한다 — 글자마다 저장하면 열여섯 곳 × 네 칸이 타이핑마다
+     파이어베이스로 날아간다.
+   ⚠ 대표자·담당자는 «보여만» 준다. 그 둘은 사업자등록증·명함에서 오는 값이라
+     여기서 고치면 어느 것이 원본인지 흐려진다 — 고치려면 줄을 눌러 편집 창으로 간다. */
+function sitesPeopleBody(arr){
+  if(!arr.length) return '<div class="muted" style="padding:20px 4px">보여 줄 사업장이 없습니다.</div>';
+  var nU=0,nW=0;
+  var rows=arr.map(function(s,i){
+    var c=_siteContacts(s), w=_siteWrep(s), u=_siteUrep(s);
+    if(u.name) nU++; if(w.name) nW++;
+    var inp=function(f,v,ph,wd){
+      return '<input value="'+esc(v||'')+'" placeholder="'+ph+'" onchange="saveSitePerson(\''+s._id+'\',\''+f+'\',this.value)"'
+        +' onclick="event.stopPropagation()" style="width:'+wd+';padding:2px 6px;font-size:11.5px">';
+    };
+    return '<tr>'
+      +'<td class="no">'+(i+1)+'</td>'
+      +'<td style="font-weight:700;cursor:pointer" onclick="editSite(\''+s._id+'\')" title="눌러서 사업장 편집">'+esc(s.name||'—')+'</td>'
+      +'<td class="ph muted">'+esc(s.ceo||'—')+'</td>'
+      +'<td class="ph muted">'+(c.name?esc(c.name)+(c.position?' · '+esc(c.position):''):'—')+'</td>'
+      +'<td>'+inp('urep_name',u.name,'성명','86px')+' '+inp('urep_title',u.title,'직위','78px')+'</td>'
+      +'<td>'+inp('wrep_name',w.name,'성명','86px')+' '+inp('wrep_title',w.title,'직위','78px')
+        +(w.name?(w.doc?' <span class="chip ok" style="font-size:9.5px" title="재직증명서가 연결되어 있습니다">재직</span>'
+                       :' <span class="chip dg" style="font-size:9.5px" title="재직증명서가 없습니다 — 별지 제7호 첨부서류">확인</span>'):'')
+        +'</td></tr>';
+  }).join('');
+  return '<div class="muted" style="font-size:11.5px;margin:8px 0 6px">'
+    +'대표자·담당자는 보여만 줍니다 — 고치려면 상호를 누르세요. '
+    +'사용자대표 <b>'+nU+'</b>/'+arr.length+' · 근로자대표 <b>'+nW+'</b>/'+arr.length+' 적혀 있습니다.</div>'
+    +'<div style="overflow-x:auto"><table><thead><tr><th>번호</th><th>상호</th>'
+    +'<th class="ph" title="등기부·사업자등록증에 적힌 사람">대표자</th>'
+    +'<th class="ph" title="실무 연락 담당자">담당자</th>'
+    +'<th title="협의회에 사용자측으로 나오는 사람 — 대표자가 아닐 수 있습니다">사용자대표</th>'
+    +'<th title="노사 합의에 서명하는 사람 — 재직증명서로 소속을 확인합니다">근로자대표</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+/* 한 칸만 고쳐 저장한다 — update 라 나머지 칸(재직증명서 연결 등)은 그대로 남는다 */
+function saveSitePerson(sid,field,val){
+  var ok=['urep_name','urep_title','wrep_name','wrep_title'];
+  if(ok.indexOf(field)<0) return;                    /* 아무 칸이나 쓰게 두지 않는다 */
+  var fid=S.fundId, o={}; o[field]=String(val||'').trim();
+  fbDb.ref(NS+'/sites/'+fid+'/'+sid).update(o).then(function(){
+    if(S.sitesFor===fid&&S.sites&&S.sites[sid]) S.sites[sid][field]=o[field];
+    toast('저장했습니다');
+    renderFund();                                    /* 위 「몇/몇 적혀 있다」를 다시 센다 */
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
 /* 하위 탭 이동 — 미저장 입력이 있으면 확인 후 옮긴다(지원금 탭과 같은 규칙). */
 function goSiteTab(t){ _leaveGuard().then(function(ok){ if(!ok)return; S.siteTab=t; renderFund(); }); }
@@ -8393,6 +8617,29 @@ function _wrepDocRow(sid,s){
             :'<span class="muted" style="font-size:11px">저장하면 원본도 이어집니다</span>'))
     +'</div>';
 }
+/* 중소기업확인서 줄 — 지원금 제출서류다. 원본까지 이어 두면 낼 때 다시 안 찾는다.
+   ⚠ 재직증명서 줄(_wrepDocRow)과 «같은 모양»으로 짠다 — 두 줄이 다르게 생기면
+     어느 쪽이 무엇을 하는지 매번 읽어야 한다. */
+/* 유효기간 딱지 — 화면 여러 곳이 같은 말을 쓰게 한 곳에서 만든다 */
+function _smeChip(s){
+  var m=_siteSme(s);
+  if(!m.from&&!m.to) return '';
+  return '<span class="chip '+(m.expired?'dg':'ok')+'" style="font-size:10.5px" title="'
+    +(m.expired?'유효기간이 지났습니다 — 새로 떼어야 합니다':'유효합니다')+'">'
+    +esc(m.from||'?')+' ~ '+esc(m.to||'?')+(m.expired?' · 지남':'')+'</span>';
+}
+/* 중소기업확인서 줄 — «읽어서 칸을 채우는» 길이다(사업자등록증과 같다).
+   ⚠ 원본을 기금에 매달지 않는다 — 확인서는 그 사업장 서류지 기금 서류가 아니다.
+     재직증명서만 원본을 잇는데, 그것은 별지 제7호가 «첨부하라»고 시키기 때문이다. */
+function _smeDocRow(sid,s){
+  return '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">'
+    +'<span style="font-size:12.5px;font-weight:700;white-space:nowrap">📥 중소기업확인서에서 채우기</span>'
+    +'<button class="primary" onclick="siteSmeAlbum()" style="padding:3px 10px;font-size:11.5px;white-space:nowrap" '
+    +'title="푸른사진첩에 올려 둔 중소기업확인서를 골라 읽습니다 — 기업규모와 유효기간이 위 칸에 들어갑니다">🖼 사진첩에서</button>'
+    +dropZoneSlim('dz-sitesme','파일로 올리기','중소기업확인서 PDF·사진에서 중소기업 여부와 유효기간을 읽습니다','.pdf,image/*')
+    +_smeChip(s)
+    +'</div>';
+}
 function editSite(sid,prefill){
   var isNew=!sid; if(isNew&&prefill){_sitePrefill=prefill;} else if(isNew){_sitePrefill=null;}
   _siteEditSid=sid||'';
@@ -8406,6 +8653,17 @@ function editSite(sid,prefill){
     +'<input id="sc-'+c[0]+'" type="'+c[2]+'" value="'+esc(pc[c[0]]||(c[0]==='mobile'?(pc.phone||''):''))+'"></div>';}).join('');
   var wflds=WREP_FIELDS.map(function(c){return '<div class="fld"><label>'+c[1]+'</label>'
     +'<input id="sw-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';}).join('');
+  var uflds=UREP_FIELDS.map(function(c){return '<div class="fld"><label>'+c[1]+'</label>'
+    +'<input id="su-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';}).join('');
+  /* ⚠ 중소기업 여부는 «고르는 칸»이다 — 손으로 치면 「중소」·「중소기업임」처럼 제각각 적혀
+     나중에 세어 볼 수가 없다. type 이 select 인 칸은 input 으로 그리면 안 된다. */
+  var sflds=SME_FIELDS.map(function(c){
+    if(c[2]!=='select') return '<div class="fld"><label>'+c[1]+'</label>'
+      +'<input id="sm-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';
+    return '<div class="fld"><label>'+c[1]+'</label><select id="sm-'+c[0]+'">'
+      +SME_OPTS.map(function(o){ return '<option'+(String(s[c[0]]||'')===o?' selected':'')+'>'+esc(o)+'</option>'; }).join('')
+      +'</select></div>';
+  }).join('');
   showModal('<div class="row" style="margin:0 0 10px"><h2 style="margin:0">'+(isNew?'사업장 추가':'사업장 편집')+'</h2>'
     +'<span style="flex:1"></span>'
     +'<button onclick="openCardPick(\'siteedit\')" title="푸른 기업정보함(사업자등록증·명함·기업 상세)에서 상호·대표자·사업자번호·법인등록번호·업종·상시근로자수·소재지·담당자를 빈 칸에만 채웁니다">🏢 기업정보함에서</button></div>'
@@ -8414,14 +8672,33 @@ function editSite(sid,prefill){
     +'<span style="font-size:12.5px;font-weight:700;white-space:nowrap">📥 사업자등록증에서 채우기</span>'+hlp('site.doc')
     +'<button class="primary" onclick="siteDocAlbum()" style="padding:3px 10px;font-size:11.5px;white-space:nowrap" title="푸른사진첩에 올려 둔 사업자등록증을 골라 읽습니다">🖼 사진첩에서</button>'
     +dropZoneSlim('dz-sitebiz','파일로 올리기','사업자등록증 PDF·사진에서 상호·대표자·사업자등록번호·법인등록번호·업태·종목·개업일·소재지를 읽습니다','.pdf,image/*')
+    +'</div>'
+    /* ★ 법인이면 사업자등록증에 법인등록번호가 «없는» 일이 많다 — 등기부에서 읽는다.
+         판독기는 기금 쪽에 이미 있었고, 사업장 칸 이름으로 옮기는 갈래만 새로 냈다. */
+    +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap;align-items:center">'
+    +'<span style="font-size:12.5px;font-weight:700;white-space:nowrap">📥 법인 등기부에서 채우기</span>'+hlp('site.corpdoc')
+    +'<button class="primary" onclick="siteCorpAlbum()" style="padding:3px 10px;font-size:11.5px;white-space:nowrap" '
+    +'title="푸른사진첩에 올려 둔 법인 등기사항전부증명서를 골라 읽습니다 — 법인등록번호·소재지가 위 칸에 들어갑니다">🖼 사진첩에서</button>'
+    +dropZoneSlim('dz-sitecorp','파일로 올리기','법인 등기사항전부증명서에서 법인등록번호·소재지를 읽습니다','.pdf,image/*')
     +'</div><div id="siteDocOut" style="margin:0 0 10px"></div>'
     +'<div class="grid">'+flds+'</div>'
-    +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">담당자 (대표 연락처)</div>'
+    +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">담당자 (대표 연락처)'
+      +' <span style="font-weight:400;font-size:11px">— 사업장 실무 담당자입니다(대표자·협의회 위원과 다릅니다)</span></div>'
     +'<div class="grid">'+cflds+'</div>'
+    /* ★ 사용자대표 — 대표자와 «다른 사람»이다. 협의회에 사용자측으로 나오는 사람. */
+    +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">사용자 대표'
+      +' <span style="font-weight:400;font-size:11px">— 협의회에 사용자측으로 나오는 사람(대표자가 아닐 수 있습니다)</span>'
+      +hlp('site.reps')+'</div>'
+    +'<div class="grid">'+uflds+'</div>'
     +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">근로자 대표'
       +' <span style="font-weight:400;font-size:11px">— 대표자·담당자와 다른 사람인 경우가 많습니다</span></div>'
     +'<div class="grid">'+wflds+'</div>'
     +_wrepDocRow(sid,s)
+    +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">중소기업확인서'
+      +' <span style="font-weight:400;font-size:11px">— 지원금 제출서류입니다. 해마다 새로 뗍니다</span>'
+      +hlp('site.smecert')+'</div>'
+    +'<div class="grid">'+sflds+'</div>'
+    +_smeDocRow(sid,s)
     +'<div class="row" style="justify-content:flex-end;margin-top:16px">'
     +(isNew?'':'<button onclick="delSite(\''+sid+'\')" style="margin-right:auto;color:var(--danger)">삭제</button>')
     +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>'
@@ -8432,6 +8709,8 @@ function saveSite(sid){
   var obj=Object.assign({}, base);
   SITE_FIELDS.forEach(function(c){var el=$('se-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
   WREP_FIELDS.forEach(function(c){var el=$('sw-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
+  UREP_FIELDS.forEach(function(c){var el=$('su-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
+  SME_FIELDS.forEach(function(c){var el=$('sm-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
   if(!obj.name){ toast('상호를 입력하세요','warn'); return; }
   // 담당자: 기존 contacts 배열 유지하되 대표 담당자 항목만 갱신(없으면 추가)
   var pc=_primaryContact(obj), cv={};
@@ -13453,6 +13732,20 @@ var HELP={
    +'<p><b>읽어 오는 칸</b> — 상호 · 대표자 · 사업자등록번호 · 법인등록번호 · 업태 · 종목 · 개업일 · 소재지</p>'
    +'<p><b>자동으로 넣지 않습니다.</b> 판독한 값을 <b>왼쪽 원본과 나란히</b> 보여 주고, 고칠 수 있게 한 뒤 [반영]을 눌러야 칸에 들어갑니다. 사업자등록번호 한 자리가 틀리면 서류 전부가 틀립니다.</p>'
    +'<p><b>기업정보함이 먼저입니다.</b> 이미 등록된 회사면 <b>[🏢 일괄 채우기]</b>가 더 빠르고 정확합니다 — 사진첩 판독은 기업정보함에 <b>없는</b> 회사에 쓰세요.</p>'},
+ 'site.reps':{t:'한 사업장에 나오는 사람 넷',h:'<p>설립 서류를 쓰려면 <b>네 사람</b>을 갈라 적어야 합니다. 넷이 다 다른 사람인 일이 흔합니다.</p>'
+   +'<p><b>대표자</b> — 등기부·사업자등록증에 적힌 사람입니다.<br><b>담당자</b> — 실무 연락처입니다.<br>'
+   +'<b>사용자대표</b> — 협의회에 <b>사용자측으로 나오는</b> 사람입니다. 대표이사가 다 나오지 못해 공장장·관리부장이 나오는 일이 많습니다.<br>'
+   +'<b>근로자대표</b> — 노사 합의에 서명하는 사람입니다.</p>'
+   +'<p><b>비워 두면 지어내지 않습니다.</b> 사용자대표가 비면 서식에도 빈칸으로 나갑니다 — 관청에 나가는 서류라, 아무도 정하지 않은 이름을 찍지 않습니다.</p>'
+   +'<p>열여섯 곳을 한 화면에서 채우려면 <b>[👤 사람]</b> 보기를 쓰세요.</p>'},
+ 'site.smecert':{t:'중소기업확인서',h:'<p>근로복지공단 지원사업 <b>제출서류</b>입니다. 중소기업확인서에 적힌 <b>기업규모</b>와 <b>유효기간</b>을 적어 둡니다.</p>'
+   +'<p><b>기업규모(위 칸)와 다릅니다.</b> 그것은 기업정보함에서 온 값이고, 이것은 <b>확인서에서 읽은</b> 값입니다. 심사에 내는 것은 확인서 쪽입니다.</p>'
+   +'<p><b>해마다 새로 뗍니다</b>(보통 4월 1일~다음해 3월 31일). 기간이 지나면 빨간 딱지가 붙습니다 — 지난 확인서를 내면 반려됩니다.</p>'
+   +'<p>명부에서 <b>[확인서 지남]</b>으로 거르면 다시 떼야 할 곳만 모아 볼 수 있습니다.</p>'},
+ 'site.corpdoc':{t:'법인 등기부에서 채우기',h:'<p><b>법인등록번호</b>는 사업자등록증에 <b>없는</b> 일이 많습니다. 등기사항전부증명서에서 읽습니다.</p>'
+   +'<p><b>읽어 오는 칸</b> — 법인등록번호 · 소재지</p>'
+   +'<p>⚠ 등기부는 노란 보안무늬 때문에 <b>법인등록번호를 자주 못 읽습니다.</b> 읽은 값을 나란히 보여 주니 <b>반드시 눈으로 견주고</b> [반영]을 누르세요.</p>'
+   +'<p>개인사업자는 법인등록번호가 없습니다 — 빈칸으로 둡니다.</p>'},
  'newfund':{t:'새 기금 등록',h:'<p><b>신규</b>(설립부터) 또는 <b>기존</b>(이미 설립·운영 중) 기금을 등록합니다.</p><p>담당은 푸른이알피 <b>재직자</b>에서 선택합니다.</p>'},
  'mgr':{t:'담당자 지정',h:'<p>푸른이알피 재직자 명단에서 선택합니다.</p><p><b>주담당 1명</b>, <b>부담당은 여러 명</b> 지정할 수 있습니다.</p>'}
 };
