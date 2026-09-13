@@ -39392,7 +39392,7 @@ function SystemMasters(){
 
 function CompanyInfoForm(){
   var init = dbGet('company_info', {
-    name:'푸른노무법인', bizno:'', ceo:'권형하',
+    name:'푸른노무법인', bizno:'', corpNo:'', ceo:'권형하',
     addr:'', tel:'', email:'', fax:'', web:'',
     contactName:'김보람', contactTitle:'과장', contactPhone:'041-556-0035',
     stampDataUrl:''
@@ -39474,6 +39474,10 @@ function CompanyInfoForm(){
     ),
     h('div', { className:'fld' }, h('label', null, '법인명'),    h('input', { type:'text', value:form.name,  onChange:set('name') })),
     h('div', { className:'fld' }, h('label', null, '사업자번호'), h('input', { type:'text', value:form.bizno, onChange:set('bizno'), placeholder:'000-00-00000', inputmode:'numeric' })),
+    /* ★ 법인등록번호 (2026-09-13) — 기관 서식의 「노무법인」 표가 사업자번호와 «따로» 묻는다.
+       여태 적어 둘 자리가 없어 그 칸은 늘 손으로 썼다. 여기 한 곳에 적어 두면
+       경력관리 서식 채우기가 그대로 가져간다. ⚠ 지사가 아니라 법인 것이라 위쪽(평탄)에 둔다. */
+    h('div', { className:'fld' }, h('label', null, '법인등록번호'), h('input', { type:'text', value:form.corpNo||'', onChange:set('corpNo'), placeholder:'000000-0000000', inputmode:'numeric' })),
     h('div', { className:'fld' }, h('label', null, '대표자'),    h('input', { type:'text', value:form.ceo,   onChange:set('ceo') })),
 
     // ── 지사 탭 ──
