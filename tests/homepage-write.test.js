@@ -258,6 +258,32 @@ test('비공개를 «안 준 때»는 건드리지 않는다', () => {
   assert.equal(새.칸.status, 'PUBLIC', '안 시켰는데 내렸다');
 });
 
+/* ── 정찰 ── 칸 «이름»만 본다. 값이 새면 안 된다 ────────────────────── */
+test('★★ 정찰은 값을 한 글자도 안 담는다', () => {
+  const r = W.정찰(화면());
+  const 전부 = JSON.stringify(r);
+  ['現 푸른노무법인대표', '홍길동', '공인노무사', 사진, 'la58UxFVPgFmF8ud']
+    .forEach(값 => assert.ok(전부.indexOf(값) < 0,
+      '★★ 정찰 답에 «값»이 들어 있습니다(' + 값.slice(0, 20) + ') — 화면과 기록에 샙니다'));
+});
+
+test('정찰이 사진(파일) 칸과 이름표 짝을 알려 준다', () => {
+  const r = W.정찰(화면());
+  assert.ok(r.파일칸.includes('extra_vars5'), '사진 넣을 칸을 못 찾았다');
+  /* 이름표는 다듬어져 온다(「메인 이미지」→「메인이미지」) — 띄어쓰기로 맞추지 않는다 */
+  assert.ok(r.이름표.some(t => /메인\s*이미지 → extra_vars5 \(파일\)/.test(t)),
+    '이름표와 칸을 못 이었다: ' + r.이름표.join(' | '));
+  assert.ok(r.넓은칸.includes('extra_vars4'));
+  assert.ok(r.숨은칸.includes('document_srl'));
+  assert.equal(r.확인표있나, true);
+});
+
+test('정찰의 고르개는 «보기 글자»를 담는다 — 그것이 칸의 뜻이다', () => {
+  const r = W.정찰(화면());
+  assert.ok(r.고르개.some(t => /status\[/.test(t) && /비공개/.test(t)),
+    '고르개의 뜻을 못 알려 준다: ' + r.고르개.join(' | '));
+});
+
 test('고치는 주소는 글 번호 하나만 받는다', () => {
   assert.ok(String(W.고치는주소(190)).includes('document_srl=190'));
   ['', null, -1, 1.5, '190 OR 1=1', 'abc'].forEach((못된것) => {

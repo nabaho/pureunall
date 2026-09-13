@@ -3012,7 +3012,10 @@ exports.homepageWrite = functions
       }
 
       const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
-      const 방식 = String(몸.mode || "보기") === "쓰기" ? "쓰기" : "보기";
+      /* 보기 = 무엇이 바뀌는지만 · 쓰기 = 진짜로 보낸다 · 정찰 = 칸 «이름»만 본다
+         ⚠ 정찰은 값을 한 글자도 안 돌려준다(homepage-write.정찰 참고). */
+      const 방식 = ["보기", "쓰기", "정찰"].indexOf(String(몸.mode || "보기")) >= 0
+        ? String(몸.mode || "보기") : "보기";
       const 주소 = HW.고치는주소(몸.srl);
       if (!주소) { res.status(400).json({ ok: false, error: "글 번호가 올바르지 않습니다." }); return; }
       const 고칠것 = (몸.고칠것 && typeof 몸.고칠것 === "object") ? 몸.고칠것 : {};
@@ -3033,6 +3036,14 @@ exports.homepageWrite = functions
       const g = await 홈부르기(주소, 그릇);
       const 화면 = await g.text();
       걸음.push({ 걸음: "③ 고치는 화면", 상태: g.status, 크기: 화면.length });
+
+      /* ★ 정찰 — 자물쇠보다 «먼저» 답한다. 자물쇠가 막는 까닭을 알아내려고
+           부르는 것인데 자물쇠 뒤에 두면 영영 못 본다. */
+      if (방식 === "정찰") {
+        res.json(Object.assign({ ok: true, 방식: "정찰", srl: Number(몸.srl),
+          저장됨: false, 걸음: 걸음 }, HW.정찰(화면)));
+        return;
+      }
 
       const 읽은것 = HW.칸읽기(화면);
       const 막 = HW.막을까(읽은것, Number(몸.srl));
