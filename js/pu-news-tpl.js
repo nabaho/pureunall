@@ -340,15 +340,26 @@
       ? '<a href="' + 상세 + '" style="color:' + 색.짙은갈 + ';text-decoration:none;">' + 제 + '</a>'
       : 제;
 
-    /* 목차 — 있으면 번호를 매겨 두세 줄. 없으면 «지어내지 않는다».
-       ⚠ 자료 목차를 기계가 지어내면 «책에 없는 차례»가 법인 이름으로 나간다. */
-    var 목 = (x && x.목차 || []).filter(Boolean).slice(0, 4);
-    var 목차칸 = 목.length
-      ? '<div style="padding-top:7px;font-size:12px;line-height:1.7;color:' + 색.갈 + ';'
-        + 'font-family:' + 폰트 + ';">'
-        + 목.map(function (t, i) { return (i + 1) + '. ' + esc(String(t).trim()); }).join('<br>')
-        + '</div>'
-      : '';
+    /* ★ 우리 글이 «맨 앞»이다 (대표 지시 2026-09-13 「우리글 니가 정리해서 달라」).
+       ⚠ 실측 2026-09-13: 자료 넷에 우리 설명을 달아 두었는데 편지에 한 줄도
+         안 나갔다. 카드가 그리는 것이 제목·목차·발행처·내려받기뿐이었다 —
+         달아 두고도 안 보이면 «없는 것»과 같다.
+       ★ 우리말이 있으면 목차는 접는다. 둘을 같이 그리면 카드가 두 배로 길어지고,
+         두 칸 나란히 놓인 살구색 판이 무너진다.
+       ⚠ 여기 나가는 것은 «우리가 쓴 글»(우리말)뿐이다 — 발행처가 보내 온 설명
+         (x.설명)은 남의 글이라 손대지 않는다. */
+    var 내말 = String((x && x.우리말) || '').trim();
+    var 목 = 내말 ? [] : (x && x.목차 || []).filter(Boolean).slice(0, 4);
+    var 목차칸 = 내말
+      ? '<div style="padding-top:7px;font-size:12px;line-height:1.75;color:' + 색.갈 + ';'
+        + 'font-family:' + 폰트 + ';word-break:keep-all;">'
+        + esc(내말).replace(/\r?\n/g, '<br>') + '</div>'
+      : (목.length
+        ? '<div style="padding-top:7px;font-size:12px;line-height:1.7;color:' + 색.갈 + ';'
+          + 'font-family:' + 폰트 + ';">'
+          + 목.map(function (t, i) { return (i + 1) + '. ' + esc(String(t).trim()); }).join('<br>')
+          + '</div>'
+        : '');
 
     var 밑줄 = [];
     if (x && x.발행처) 밑줄.push(esc(x.발행처));
