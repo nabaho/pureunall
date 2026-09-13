@@ -329,6 +329,11 @@ function pickList(idx, key) {
     'var funds={F1:{name:"가짜공동근로복지기금"}};',
     'var body={ set innerHTML(v){ OUT.html=v; } };',
     'function $(id){ return id==="cardbody"?body:(id==="cardq"?{value:Q}:null); }',
+    /* 거르기·여러 고르기가 붙었다(2026-09-13) — 그 조각들도 실어야 «정말 그려» 볼 수 있다 */
+    'var _cardOnly="";',
+    'var S={fundId:"F1",sitesFor:null,sites:null};',
+    'function bizDupOf(){ return null; }',
+    'var document={querySelectorAll:function(){ return []; }};',
     'function esc(s){ return String(s==null?"":s); }',
     grabFn('_cardNorm'), grabFn('cardEffective'), grabFn('renderCardPick'),
     'this.render=renderCardPick;'
@@ -382,7 +387,12 @@ test('회사 이름이 세로로 깨지지 않게 줄바꿈을 막는다', () =>
   // 소재지만 말줄임(나머지는 그대로 보여야 한다)
   assert.match(html, /text-overflow:ellipsis/, '긴 소재지를 말줄임하지 않으면 표가 넘친다');
   assert.match(SRC, /width:T\.width\|\|640/, '칸 많은 목록을 넓게 여는 설정이 없다');
-  assert.match(SRC, /need:'c', width:900/, '참여사업장 목록이 좁게 열린다');
+  /* ★ 2026-09-13 대표 지시 「팝업이 전부 안보인다 — 팝업에 내용을 확인해야 선택할 수 있다」.
+     900px 로는 칸 일곱(체크·종류·회사·담당자·사업자번호·대표자·소재지) 가운데 소재지가
+     화면 밖이었다. 보고 고르는 창이므로 «보이는 것»이 먼저다. */
+  const site = SRC.slice(SRC.indexOf('  site:{'), SRC.indexOf('  siteedit:{'));
+  const w = Number((/width:(\d+)/.exec(site) || [])[1]);
+  assert.ok(w >= 1100, '★ 참여사업장 목록이 좁게 열립니다(' + w + 'px) — 소재지가 화면 밖입니다.');
 });
 
 /* ── 미완비 일괄 채우기 ──
