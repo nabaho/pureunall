@@ -30,7 +30,15 @@ const 출처들 = [
   /* 서산은 «시»까지 좁힌다 — 5곳뿐이라 충남 전체에 보내면 나머지 95곳에게는 남의 일이다 */
   { id:"moel-seosan", 기관:"대전지방고용노동청 서산지청", 이름:"공지사항",
     지역:"충남/서산시", 방식:"board", 밑주소:"https://www.moel.go.kr",
-    목록주소:"https://www.moel.go.kr/local/seosan/news/notice/noticeList.do" }
+    목록주소:"https://www.moel.go.kr/local/seosan/news/notice/noticeList.do" },
+  /* ★ 경기 10곳(평택 5·용인 2·오산 1·안성 1·안양 1)을 «한 출처»로 덮는다.
+     ⚠ 평택·안양 두 지청을 다 넣으면 「4회차 신규 고용허가 신청」처럼 같은 공지가
+       두 번 올라와 검토함만 길어진다(실측 2026-09-13 로 둘 다 걸려 있었다).
+       받는 곳이 가장 많은 평택 하나만 둔다. 시가 아니라 «경기»로 다는 까닭은
+       고용허가·폭염 작업중지 같은 공지가 평택에만 해당하는 것이 아니어서다. */
+  { id:"moel-pyeongtaek", 기관:"경기지방고용노동청 평택지청", 이름:"공지사항",
+    지역:"경기", 방식:"board", 밑주소:"https://www.moel.go.kr",
+    목록주소:"https://www.moel.go.kr/local/pyeongtaek/news/notice/noticeList.do" }
 ];
 
 /* ⚠ 「폭염중대경보 발령 시 «작업중지» 이행계획서」가 걸러지고 있었다(실측 2026-09-13) —
@@ -53,7 +61,15 @@ function 공식링크인가(url) {
 
 function 쓸모있는가(title) {
   const t = String(title || "").trim();
-  return !!t && !제외말.some(w=>t.includes(w)) && 관련말.some(w=>t.includes(w));
+  /* ★ 제외말은 «괄호를 걷어 내고» 한 번 더 본다 (실측 2026-09-13).
+     ⚠ 제외말에 「기간제근로자 채용」을 두었는데도 관서 채용 공고가 새어 들었다 —
+       「기간제근로자(통계조사관) 채용 공고」처럼 사이에 직명이 끼어 글자가 안 맞았다.
+       괄호 안은 거의 늘 «직명·부서·단서»라 걷어 내도 뜻이 상하지 않는다.
+     ⚠ 관련말은 «원문»으로 본다 — 괄호 안에만 있는 낱말(「(50억 이상 건설현장)」)도
+       쓸모를 가리는 데 쓰이기 때문이다. */
+  const 민것 = t.replace(/[(（][^)）]{0,40}[)）]/g, "").replace(/\s+/g, " ").trim();
+  return !!t && !제외말.some(w=>t.includes(w) || 민것.includes(w))
+    && 관련말.some(w=>t.includes(w));
 }
 
 function 후보열쇠(sourceId, link) {
