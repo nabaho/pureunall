@@ -378,7 +378,14 @@ var KEY5=['inka_no','inka_date','corp_reg_no','reg_date','tax_id_no'];
    직위를 「근로자측 감사」처럼 한 낱말로 담는다. 이미 있는 읽는 쪽들이
    /이사|감사/ · /사용자/ · /근로자/ · /이사장/ 로 갈라 보고 있어서,
    측과 직위를 따로 담으면 그 자리들이 조용히 빗나간다. */
-var OFFICER_ROLES=['이사장','사용자측 이사','근로자측 이사','사용자측 감사','근로자측 감사'];
+/* ★ 「사용자대표·근로자대표」를 보기에 더했다(대표 지시 2026-09-13
+     「사용자 대표 근로자 대표 각각 넣을 수 있게 해달라」).
+   ⚠ 협의회에 나오는 사람이 늘 «등기 이사»인 것은 아니다. 여태 보기가 이사·감사뿐이라
+     이사가 아닌 위원을 적을 자리가 없었고, 그래서 「사용자측 이사」로 적어 두면
+     등기부에 없는 사람이 이사로 서식에 나갔다.
+   ⚠ 위원 격자를 채우는 자리(_prepCommittee·sideOf)가 이 이름을 «함께» 알아야 한다 —
+     한쪽만 고치면 새 보기로 적은 사람이 서식에서 조용히 빠진다. */
+var OFFICER_ROLES=['이사장','사용자측 이사','근로자측 이사','사용자대표','근로자대표','사용자측 감사','근로자측 감사'];
 function _officersOf(f){ return (Array.isArray(f&&f.officers)?f.officers:[]).filter(function(o){ return o&&(o.role||o.name); }); }
 /* 감사보고서는 감사가 **각자** 쓴다 — 노·사 감사가 한 장씩이다.
    명부에 측이 안 적힌 감사가 있으면 «측 없음»으로 한 장 낸다(빈 서류보다 낫다). */
@@ -3644,16 +3651,24 @@ var FORM_FILL=[
    ⚠ 감사는 위원이 아니라 따로 두는 기관이다. 이사장은 명부의 역할이 그냥 「이사장」이라
      노측인지 사측인지가 «자료에 없다» — 빈칸으로 두어 사람이 채우게 한다.
    ⚠ 서식 격자가 세 줄이므로 세 명까지만 세운다. */
+/* ★ 「사용자대표·근로자대표」도 위원이다(2026-09-13) — 협의회에 나오는 사람이 늘
+   등기 이사인 것은 아니다. 이사만 보면 그렇게 적은 위원이 서식에서 조용히 빠진다.
+   ⚠ 감사는 여전히 위원이 아니다 — 따로 두는 기관이다. */
+function _isCommittee(role){
+  var r=String(role||'');
+  if(/감사/.test(r)) return false;
+  return /이사/.test(r) || /대표/.test(r);
+}
 function _prepCommittee(f,side){
   return _officersOf(f).filter(function(o){
+    if(!_isCommittee(o.role)) return false;
     var r=String(o.role||'');
-    if(!/이사/.test(r)||/감사/.test(r)) return false;
     return side==='사용자측' ? /사용자/.test(r) : /근로자/.test(r);
   }).slice(0,3);
 }
 function fillCommittee(root,f){
   var sideOf=function(o){ var r=String(o.role||'');
-    if(!/이사/.test(r)||/감사/.test(r)) return '';        // 감사는 위원이 아니다
+    if(!_isCommittee(r)) return '';                       // 감사는 위원이 아니다
     return /사용자/.test(r)?'사용자측':(/근로자/.test(r)?'근로자측':''); };
   var pick=function(side){ return _officersOf(f).filter(function(o){ return sideOf(o)===side; }); };
   var trs=[].slice.call(root.querySelectorAll('tr'));
@@ -5131,11 +5146,15 @@ function docBody(kind,f,sites){
       +"<p class='center'>"+dgToday()+"</p>"
       +"<div class='sign'>참여사업장 대표 (별첨 명부와 같음) 각 (인)<br>근로자대표: ＿＿＿＿＿＿ (인)</div>"
       +"<h2>별첨: 참여사업장 명부 ("+sites.length+"개소)</h2>"
-      /* 설립합의서는 «노사» 합의다 — 사업장마다 사용자쪽(대표자)과 근로자쪽(근로자대표)이
-         함께 선다. 근로자대표 칸이 없으면 누가 근로자를 대신해 합의했는지 서류에 안 남는다. */
-      +"<table><tr><th style='width:40px'>번호</th><th>상호</th><th>대표자</th><th>근로자대표</th><th>사업자등록번호</th></tr>"
-      +sites.map(function(s,i){ var w=_siteWrep(s);
+      /* 설립합의서는 «노사» 합의다 — 사업장마다 사용자쪽과 근로자쪽이 함께 선다.
+         ★ 사용자쪽은 «둘»이다(2026-09-13): 서류에 도장을 찍는 사람은 대표자지만,
+           협의회에 나와 앉는 사람은 사용자대표다 — 같은 사람이 아닌 일이 흔하다.
+           둘 다 적어 두어야 누가 합의했고 누가 회의에 나오는지가 서류에 남는다.
+         ⚠ 빈 곳은 dgV 가 밑줄로 둔다 — 지어내지 않는다. */
+      +"<table><tr><th style='width:40px'>번호</th><th>상호</th><th>대표자</th><th>사용자대표</th><th>근로자대표</th><th>사업자등록번호</th></tr>"
+      +sites.map(function(s,i){ var w=_siteWrep(s), u=_siteUrep(s);
         return "<tr><td class='center'>"+(i+1)+"</td><td>"+esc(s.name||'')+"</td><td>"+dgV(s.ceo,4)+"</td>"
+          +"<td>"+dgV(u.name,4)+"</td>"
           +"<td>"+dgV(w.name,4)+"</td><td>"+dgV(s.biz_no,12)+"</td></tr>";}).join('')+"</table>";
   }
   if(kind==='inka'){
@@ -6452,14 +6471,20 @@ function officerPanel(f){
   var warn='';
   if(!rows.length) warn='<span class="chip dg" style="font-size:10px">비어 있음 — 감사보고서·회의록에 이름이 안 들어갑니다</span>';
   else if(aud.length<2) warn='<span class="chip warn" style="font-size:10px">감사가 '+aud.length+'명 — 정관은 노·사 각 1인입니다</span>';
-  return '<div class="panel"><div class="row"><h2 style="margin:0">👥 임원 명부</h2>'+warn+hlp('officers')+'</div>'
+  /* ★ 이름을 「등기임원 명부」로 바꿨다(대표 지시 2026-09-13). 여기 적는 것은 «등기부등본에
+       오르는 사람»이다 — 그냥 「임원」이라 하면 협의회 위원과 섞여 읽힌다. */
+  return '<div class="panel"><div class="row"><h2 style="margin:0">👥 등기임원 명부</h2>'+warn+hlp('officers')+'</div>'
     +'<p class="muted" style="font-size:11.5px;margin:6px 0 10px">등기부등본 「임원에 관한 사항」을 그대로 옮기세요. '
-    +'<b>감사보고서는 감사가 각자 한 장씩</b> 쓰므로 노·사 감사를 모두 넣어야 두 장이 나옵니다.</p>'
+    +'<b>감사보고서는 감사가 각자 한 장씩</b> 쓰므로 노·사 감사를 모두 넣어야 두 장이 나옵니다.<br>'
+    +'<b>사용자대표·근로자대표</b>는 직위에서 골라 넣고, <b>소속 회사</b>를 함께 적으세요 — '
+    +'공동기금은 위원이 <b>여러 회사에서</b> 나오므로 같은 회사일 수도, 다른 회사일 수도 있습니다.</p>'
     /* 생년월일·직책·주소는 «설립인가신청서(별지 제7호)»가 위원마다 요구하는 칸이다.
        여기 없으면 그 서식을 손으로 채워야 한다 — 그래서 사람 한 줄에 함께 담는다.
        ⚠ 개인정보다. 비워 두어도 되고, 채우면 서식에 자동으로 들어간다. */
     +'<div style="overflow-x:auto"><table><thead><tr><th style="width:150px">직위</th><th style="width:110px">성명</th>'
-    +'<th style="width:120px">생년월일</th><th style="width:120px">직책<span class="muted" style="font-weight:400;font-size:10px">(회사)</span></th>'
+    +'<th style="width:120px">생년월일</th>'
+    +'<th style="width:130px">소속 회사<span class="muted" style="font-weight:400;font-size:10px">(참여사업장)</span></th>'
+    +'<th style="width:110px">직책<span class="muted" style="font-weight:400;font-size:10px">(부장·과장)</span></th>'
     /* 주민등록번호 — 설립등기신청서·인감신고서·인감대지·인감카드·사업자등록신청서가 «전체 번호»를 묻는다.
        생년월일만으로는 그 다섯 서식이 늘 손으로 남았다(대표 결정 2026-09-07: 저장한다). */
     +'<th>주민등록번호<span class="muted" style="font-weight:400;font-size:10px">(등기·세무 서식)</span></th>'
@@ -6480,7 +6505,12 @@ function _offRow(o){
   return '<tr><td><select class="off-role" onchange="markDirty()">'+opts+'</select></td>'
     +'<td><input class="off-name" type="text" value="'+esc(o.name||'')+'" oninput="markDirty()"></td>'
     +'<td><input class="off-birth" type="text" placeholder="1980-01-01" value="'+esc(o.birth||'')+'" oninput="markDirty()"></td>'
-    +'<td><input class="off-title" type="text" placeholder="부장·대표이사" value="'+esc(o.title||'')+'" oninput="markDirty()"></td>'
+    /* ★ 소속 회사를 «직책과 갈랐다»(대표 지시 2026-09-13 「이 대표자들이 각각 같은회사일
+         수도 있고 다른 회사일 수도 있다」). 여태 「직책(회사)」 한 칸에 「부장·대표이사」처럼
+         섞어 적었는데, 그러면 «어느 회사 사람인가»를 기계가 알 수 없다 — 노·사 위원이
+         여러 회사에서 나오는 공동기금에서는 그것이 곧 위원 명부의 알맹이다. */
+    +'<td><input class="off-company" type="text" placeholder="소속 회사" value="'+esc(o.company||'')+'" oninput="markDirty()"></td>'
+    +'<td><input class="off-title" type="text" placeholder="부장·과장" value="'+esc(o.title||'')+'" oninput="markDirty()"></td>'
     +'<td><input class="off-rrn" type="text" placeholder="000000-0000000" value="'+esc(o.rrn||'')+'" oninput="markDirty()" autocomplete="off"></td>'
     +'<td><input class="off-addr" type="text" value="'+esc(o.addr||'')+'" oninput="markDirty()"></td>'
     +'<td><button onclick="this.closest(\'tr\').remove();markDirty()" title="이 줄 지우기">✕</button></td></tr>';
@@ -6493,6 +6523,28 @@ function addOfficerRow(){ var b=$('off-rows'); if(!b)return; b.insertAdjacentHTM
    ⚠ 자동으로 넣지 «않는다». 사업장이 열다섯이어도 위원은 노·사 각 1~3인이고,
      누가 위원인지는 «자료에 없다» — 골라야 한다. 지어내면 서식이 그럴듯하게 틀린다.
    ⚠ 이미 명부에 있는 이름은 다시 넣지 않는다(두 줄이 되면 서식에 두 번 찍힌다). */
+/* ★★ 한 사업장에서 «위원 후보»를 세운다 — 화면에서 떼어 낸다(2026-09-13).
+   화면 속에 파묻어 두면 검사가 이 판단을 «정말 돌려» 볼 수가 없어 글자만 세게 된다
+   (실제로 그랬다 — 후보 줄을 통째로 지워도 검사가 통과했다).
+
+   ★ 사용자측 후보가 «둘»이다 (대표 지시 「회의의 대표자와 사용자대표 … 각각 다를수 있다」).
+     여태 사용자측으로 «대표자»만 내놓았다. 그런데 협의회에 실제로 나오는 사람은
+     대표이사가 아니라 공장장·관리부장인 일이 흔하고, 그 사람이 곧 사용자대표다.
+   ⚠ 대표자를 빼지는 «않는다» — 작은 사업장은 대표이사가 직접 나온다.
+     둘을 나란히 내놓고 «사람이 고른다». 어느 쪽이 위원인지는 자료에 없다.
+   ⚠ 사용자대표를 «먼저» 둔다 — 적어 두었다는 것은 그 사람이 나온다는 뜻이다.
+   ⚠ 둘이 같은 사람이면 한 번만 내놓는다(두 줄이면 명부에 두 번 찍힌다). */
+/* ⚠ 직위를 «사용자대표·근로자대표»로 넣는다(2026-09-13) — 「사용자측 이사」로 넣으면
+     등기부에 없는 사람이 «이사»로 서식에 나간다. 이사인지는 등기부를 보고 사람이 고친다.
+   ⚠ 소속 회사를 함께 들려 보낸다 — 공동기금은 위원이 여러 회사에서 나온다. */
+function _sitePeopleCands(st){
+  st=st||{};
+  var w=_siteWrep(st), u=_siteUrep(st), co=String(st.name||'').trim(), out=[];
+  if(w.name) out.push(['근로자대표',w.name,w.title,w.birth,'근로자대표',co]);
+  if(u.name) out.push(['사용자대표',u.name,u.title,'','사용자대표',co]);
+  if(st.ceo && String(st.ceo).trim()!==u.name) out.push(['사용자대표',String(st.ceo).trim(),'대표자','','대표자',co]);
+  return out;
+}
 function openSitePeoplePick(){
   var fid=S.fundId, f=funds[fid]; if(!f){ toast('기금을 먼저 여세요','warn'); return; }
   showModal('<div class="row" style="margin:0 0 8px"><h2 style="margin:0">👥 참여사업장에서 위원 고르기</h2>'
@@ -6504,14 +6556,15 @@ function openSitePeoplePick(){
     var have={}; _officersOf(f).forEach(function(o){ if(o.name) have[String(o.name).trim()]=1; });
     var rows=[]; _spkList=[];
     arr.forEach(function(st){
-      var w=_siteWrep(st);
-      [['근로자측 이사',w.name,w.title,w.birth],['사용자측 이사',st.ceo,'대표자','']].forEach(function(t){
+      _sitePeopleCands(st).forEach(function(t){
         if(!t[1]) return;
         var i=_spkList.length;
-        _spkList.push({role:t[0],name:t[1],title:t[2]||'',birth:t[3]||'',site:st.name||''});
+        /* ★ company 로 담는다 — 명부의 «소속 회사» 칸이 그 이름을 읽는다(_offRow). */
+        _spkList.push({role:t[0],name:t[1],title:t[2]||'',birth:t[3]||'',company:t[5]||'',site:st.name||''});
         var dup=have[String(t[1]).trim()];
         rows.push('<tr><td style="text-align:center"><input type="checkbox" id="spk-'+i+'"'+(dup?' disabled':'')+'></td>'
-          +'<td>'+esc(st.name||'')+'</td><td>'+esc(t[0].replace(' 이사',''))+'</td>'
+          +'<td>'+esc(st.name||'')+'</td><td>'+esc(t[0])+'</td>'
+          +'<td class="muted" style="font-size:11px">'+esc(t[4]||'')+'</td>'
           +'<td style="font-weight:600">'+esc(t[1])+'</td><td class="muted">'+esc(t[2]||'')+'</td>'
           +'<td class="muted">'+esc(t[3]||'')+'</td>'
           +'<td>'+(dup?'<span class="chip ok" style="font-size:10px">이미 있음</span>':'')+'</td></tr>');
@@ -6520,12 +6573,13 @@ function openSitePeoplePick(){
     var b=$('spk-body'); if(!b) return;
     b.innerHTML = rows.length
       ? '<div style="max-height:56vh;overflow:auto"><table style="font-size:12.5px"><thead><tr>'
-        +'<th style="width:34px"></th><th>사업장</th><th>측</th><th>성명</th><th>직위</th><th>생년월일</th><th></th>'
+        +'<th style="width:34px"></th><th>사업장</th><th>측</th><th title="그 사업장에서 어떤 자리의 사람인가">자리</th>'
+        +'<th>성명</th><th>직위</th><th>생년월일</th><th></th>'
         +'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'
         +'<div class="row" style="justify-content:flex-end;margin-top:12px">'
         +'<button onclick="closeM()">취소</button>'
         +'<button class="primary" onclick="addPickedOfficers()">고른 사람을 명부에 넣기</button></div>'
-      : '<div class="msg warn">참여사업장에 대표자·근로자대표가 아직 없습니다 — 참여사업장에서 먼저 채워 주세요.</div>';
+      : '<div class="msg warn">참여사업장에 대표자·사용자대표·근로자대표가 아직 없습니다 — 참여사업장 › [👤 사람]에서 먼저 채워 주세요.</div>';
   };
   if(S.sitesFor===fid&&S.sites) done(S.sites);
   else fbDb.ref(NS+'/sites/'+fid).once('value').then(function(sn){ done(sn.val()||{}); })
@@ -6552,7 +6606,7 @@ function _readOfficers(){
     /* 빈 칸은 «키를 두지 않는다» — 빈 문자열을 넣으면 실시간DB 에 쓸모없는 칸이 쌓이고,
        나중에 «있는데 비었다»와 «아예 없다»가 구별되지 않는다. */
     var o={ role:(tr.querySelector('.off-role')||{}).value||'', name:g('.off-name') };
-    ['birth','title','rrn','addr'].forEach(function(k){ var v=g('.off-'+k); if(v) o[k]=v; });
+    ['birth','company','title','rrn','addr'].forEach(function(k){ var v=g('.off-'+k); if(v) o[k]=v; });
     return o;
   }).filter(function(o){ return o.name; });
 }

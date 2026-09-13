@@ -28,7 +28,7 @@ function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음
 
 global.esc = v => String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 (0, eval)(gF('_officersOf'));
-(0, eval)(gF('_prepCommittee'));
+(0, eval)(gF('_isCommittee')); (0, eval)(gF('_prepCommittee'));
 (0, eval)(gF('_siteWrep'));
 
 const F = { name: '가나공동근로복지기금', chairman: '홍길동', fund_type: '공동',
@@ -100,8 +100,15 @@ if (!JSDOM) {
 
 console.log('\n■ 참여사업장에서 «골라» 당겨온다');
 const pick = gF('openSitePeoplePick');
-ok('참여사업장의 근로자대표를 후보로 세운다', /_siteWrep\(st\)/.test(pick), pick.slice(0, 400));
-ok('참여사업장의 대표자도 후보로 세운다', /st\.ceo/.test(pick));
+/* ★ 2026-09-13 — 후보 만들기를 _sitePeopleCands 로 떼어 냈다(화면 속에 두면 글자만
+   세게 되어, 후보 줄을 통째로 지워도 통과했다 — 되돌림이 그것을 잡았다). 이제 정말 돌려 본다. */
+(0, eval)(gF('_siteUrep')); (0, eval)(gF('_sitePeopleCands'));
+const 후보 = _sitePeopleCands({ name:'가나전자', ceo:'김대표', urep_name:'박공장', wrep_name:'이노측' });
+ok('참여사업장의 근로자대표를 후보로 세운다', 후보.some(x => x[1]==='이노측' && x[0]==='근로자대표'), JSON.stringify(후보));
+ok('참여사업장의 사용자대표를 후보로 세운다', 후보.some(x => x[1]==='박공장' && x[0]==='사용자대표'), JSON.stringify(후보));
+ok('참여사업장의 대표자도 후보로 세운다', 후보.some(x => x[1]==='김대표'), JSON.stringify(후보));
+ok('소속 회사를 함께 들려 보낸다', 후보.every(x => x[5]==='가나전자'), JSON.stringify(후보));
+ok('고르기 창이 그 후보를 쓴다', /_sitePeopleCands\(st\)/.test(pick));
 ok('어느 사업장 사람인지 보여 준다', /esc\(st\.name\|\|''\)/.test(pick));
 /* ⚠ 자동으로 넣으면 안 된다 — 누가 위원인지는 자료에 없다 */
 ok('체크로 고르게 한다 (자동으로 안 넣는다)', /type="checkbox" id="spk-/.test(pick), pick.slice(0, 900));

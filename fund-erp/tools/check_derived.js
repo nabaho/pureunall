@@ -38,7 +38,7 @@ global.S = { fundId: 'X', year: 2026, f15Close: null };
 global.funds = {};
 (0, eval)([gV('OFFICER_ROLES'), gV('FORM_FILL'), gV('BIZ_BS_ROWS'), gV('BUDGET_KEYS'), gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'), gV('_K'),
   gF('_officersOf'), gF('_boss'), gF('_isBlankCell'), gF('_isLabelCell'), gF('_bakeText'), gF('_isRateRow'), gF('stripBaked'),
-  gF('korWon'), gF('_docRok'), gF('_siteWrep'), gF('_prepCommittee'), gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'),
+  gF('korWon'), gF('_docRok'), gF('_siteWrep'), gF('_isCommittee'), gF('_prepCommittee'), gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'),
   gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'), gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'),
   gF('fillCommittee'), gF('fillRoster'), gF('fillSubsidyDoc'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
   /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10).
@@ -175,7 +175,7 @@ console.log('\n■ (나) 사무소 임대차 — 기금 정보의 묶음에서 �
   ok('보증금·월세를 안 적었으면 원본 그대로 둔다', /2028\. 2\. 29\. 0원 0원/.test(draw('tax_bizreg', Lz0)));
   ok('기금 정보에 임대차 묶음이 있다', /\['lease_lessor','임대인\(상호·성명\)','text'\]/.test(src) && /lease_lessor:'사무소 임대차'/.test(src));
   ok('임대인 주민등록번호 칸은 두지 않는다 (남의 것)', !/lease_lessor_rrn|lease_rrn/.test(src));
-  ok('명부에 주민등록번호 칸이 있다', /class="off-rrn"/.test(gF('_offRow')) && /\['birth','title','rrn','addr'\]/.test(gF('_readOfficers')));
+  ok('명부에 주민등록번호 칸이 있다', /class="off-rrn"/.test(gF('_offRow')) && /\['birth','company','title','rrn','addr'\]/.test(gF('_readOfficers')));
   global.funds.X = F; }
 
 console.log('\n■ 밑줄이 «없는» 빈 칸 — 화면으로 보고서야 찾은 자리');
