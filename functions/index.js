@@ -2913,6 +2913,173 @@ exports.readHomepage = functions
     }
   });
 
+/* ── 홈페이지를 «서버가» 고친다 (대표 지시 2026-09-13) ─────────────────────
+   「붙여넣기 전혀 안 하고 싶다. 그냥 들어가서 고쳐라.」
+
+   하는 일은 단추가 하던 것과 똑같다 — 다만 사람 손 대신 서버가 한다.
+     ① 관리자로 들어간다   ② 고치는 화면을 «통째로» 받아 온다
+     ③ 이름을 아는 칸만 갈아 끼운다   ④ 나머지는 받은 그대로 도로 보낸다
+   ④ 때문에 얼굴 사진(숨은 칸 content)이 날아갈 길이 없다. 그래도 못 믿으므로
+   보내기 전에 homepage-write.막을까 가 한 번 더 막는다 — 어긋나면 아무것도 안 보낸다.
+
+   ★ 기본은 «보기»다. 무엇이 바뀌는지만 알려 주고 쓰지 않는다.
+     진짜 고치는 것은 mode:"쓰기" 를 받았을 때뿐이다.
+   ★ 아이디·비밀번호는 저장소에 없다. 대표님이 당신 터미널에서 한 번만 넣으신다:
+       firebase functions:secrets:set HOME_ADMIN_ID
+       firebase functions:secrets:set HOME_ADMIN_PW */
+const HW = require("./homepage-write");
+
+function 홈쿠키그릇() {
+  const 통 = {};
+  return {
+    담기(res) {
+      const 것 = (res.headers.getSetCookie ? res.headers.getSetCookie() : [])
+        .concat(res.headers.get("set-cookie") ? [res.headers.get("set-cookie")] : []);
+      것.forEach((줄) => {
+        const m = /^\s*([^=;]+)=([^;]*)/.exec(String(줄 || ""));
+        if (m) 통[m[1].trim()] = m[2];
+      });
+    },
+    글자() { return Object.keys(통).map((k) => k + "=" + 통[k]).join("; "); },
+    있나() { return Object.keys(통).length > 0; }
+  };
+}
+
+async function 홈부르기(주소, 그릇, 더할것) {
+  const 옵 = Object.assign({
+    redirect: "manual",
+    headers: Object.assign({
+      "User-Agent": HW.브라우저표시,
+      "Accept": "text/html,application/xhtml+xml,*/*",
+      "Accept-Language": "ko-KR,ko;q=0.9"
+    }, 그릇.있나() ? { Cookie: 그릇.글자() } : {})
+  }, 더할것 || {});
+  const res = await fetch(주소, 옵);
+  그릇.담기(res);
+  return res;
+}
+
+/* 관리자로 들어간다. 들어갔는지 «말»로 묻지 않는다 —
+   고치는 화면이 오는지로 판단한다(막을까 가 본다). 그게 가장 정직하다. */
+async function 홈로그인(아이디, 암호, 그릇) {
+  const 걸음 = [];
+  const a = await 홈부르기(HW.ORIGIN + "/index.php?mid=" + HW.BOARD, 그릇);
+  걸음.push({ 걸음: "① 쪽 열기", 상태: a.status });
+
+  const 몸 = new URLSearchParams({
+    module: "member", act: "procMemberLogin",
+    user_id: 아이디, password: 암호,
+    keep_signed: "N", success_return_url: HW.ORIGIN + "/index.php?mid=" + HW.BOARD
+  });
+  const b = await 홈부르기(HW.보낼주소(), 그릇, {
+    method: "POST",
+    body: 몸.toString(),
+    headers: {
+      "User-Agent": HW.브라우저표시,
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "Referer": HW.ORIGIN + "/index.php?mid=" + HW.BOARD,
+      "Cookie": 그릇.글자()
+    }
+  });
+  const 답 = await b.text();
+  걸음.push({ 걸음: "② 로그인", 상태: b.status, 답조각: 답.slice(0, 200) });
+  return 걸음;
+}
+
+exports.homepageWrite = functions
+  .runWith({ secrets: ["HOME_ADMIN_ID", "HOME_ADMIN_PW"], timeoutSeconds: 120, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    setAutomationCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+
+    try {
+      /* ⚠ 총괄관리자만 — 회사 홈페이지를 «바꾸는» 일이다.
+           대표 지시(2026-08-17): 홈페이지 수정은 오로지 관리자만. */
+      const match = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+      if (!match) { res.status(401).json({ ok: false, error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(match[1], true);
+      const 권 = (await getDatabase().ref("uid_roles/" + decoded.uid).once("value")).val() || {};
+      if (권.isAdmin !== true) {
+        res.status(403).json({ ok: false, error: "총괄관리자만 홈페이지를 고칠 수 있습니다." });
+        return;
+      }
+
+      const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
+      const 방식 = String(몸.mode || "보기") === "쓰기" ? "쓰기" : "보기";
+      const 주소 = HW.고치는주소(몸.srl);
+      if (!주소) { res.status(400).json({ ok: false, error: "글 번호가 올바르지 않습니다." }); return; }
+      const 고칠것 = (몸.고칠것 && typeof 몸.고칠것 === "object") ? 몸.고칠것 : {};
+
+      const 아이디 = process.env.HOME_ADMIN_ID, 암호 = process.env.HOME_ADMIN_PW;
+      if (!아이디 || !암호) {
+        res.status(400).json({ ok: false, error:
+          "홈페이지 관리자 아이디·비밀번호가 서버에 없습니다. 대표님이 한 번만 넣어 주세요:\n" +
+          "firebase functions:secrets:set HOME_ADMIN_ID\n" +
+          "firebase functions:secrets:set HOME_ADMIN_PW" });
+        return;
+      }
+
+      const 그릇 = 홈쿠키그릇();
+      const 걸음 = await 홈로그인(아이디, 암호, 그릇);
+
+      /* 고치는 화면을 통째로 받는다 */
+      const g = await 홈부르기(주소, 그릇);
+      const 화면 = await g.text();
+      걸음.push({ 걸음: "③ 고치는 화면", 상태: g.status, 크기: 화면.length });
+
+      const 읽은것 = HW.칸읽기(화면);
+      const 막 = HW.막을까(읽은것, Number(몸.srl));
+      if (!막.ok) {
+        res.status(409).json({ ok: false, 방식: 방식, 저장됨: false,
+          error: "안전하지 않아 «아무것도» 쓰지 않았습니다.",
+          걸린것: 막.걸린것, 걸음: 걸음 });
+        return;
+      }
+
+      const 새것 = HW.갈아끼우기(읽은것, 고칠것, 화면);
+      const 알림 = {
+        ok: true, 방식: 방식, srl: Number(몸.srl), 저장됨: false,
+        바뀐것: 새것.바뀐것.map((x) => ({ 이름: x.이름, 옛: x.옛, 새: x.새 })),
+        못찾은것: 새것.못찾은것, 걸음: 걸음
+      };
+
+      if (방식 === "보기" || !새것.바뀐것.length) { res.json(알림); return; }
+
+      /* ── 진짜 보낸다 ── 받은 칸을 하나도 안 빠뜨리고 그대로 실어서 */
+      const 칸 = Object.assign({}, 새것.칸, { act: HW.저장할act() });
+      const p = await 홈부르기(HW.보낼주소(), 그릇, {
+        method: "POST",
+        body: HW.몸통(칸, 읽은것.여럿),
+        headers: {
+          "User-Agent": HW.브라우저표시,
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "Referer": 주소,
+          "Cookie": 그릇.글자()
+        }
+      });
+      const p답 = await p.text();
+      const 잘됐나 = p.status >= 200 && p.status < 400 && !/<error>\s*-?[1-9]/.test(p답);
+      알림.저장됨 = 잘됐나;
+      알림.걸음.push({ 걸음: "④ 저장", 상태: p.status, 답조각: p답.slice(0, 200) });
+      if (!잘됐나) { 알림.ok = false; 알림.error = "홈페이지가 저장을 받아 주지 않았습니다."; }
+
+      /* 바뀐 기록에 남긴다 — 누가·언제·무엇을 (되돌릴 때 본다) */
+      try {
+        await getDatabase().ref("homepage/writeLog/" + Number(몸.srl)).push({
+          at: Date.now(), by: decoded.uid, 저장됨: 잘됐나,
+          바뀐것: 알림.바뀐것
+        });
+      } catch (e) { console.warn("homepageWrite log", (e && e.message) || e); }
+
+      res.status(잘됐나 ? 200 : 502).json(알림);
+    } catch (err) {
+      console.error("homepageWrite", (err && err.message) || err);
+      res.status(err.status || 500).json({ ok: false, 저장됨: false,
+        error: (err && err.message) || "홈페이지를 고치지 못했습니다." });
+    }
+  });
+
 const companyWebsiteMatch = require("./company-website-match");
 
 /* 업체 홈페이지 자동 찾기 (대표 지시 2026-09-02) — 업체관리에 홈페이지 URL이 없을 때
