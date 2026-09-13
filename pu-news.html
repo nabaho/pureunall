@@ -31,7 +31,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=24"></script>
+<script src="js/pu-ontology.js?v=25"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-version.js?v=3"></script>
 <script src="js/pu-gate.js?v=1"></script>
@@ -46,7 +46,7 @@
 <script src="js/pu-news-core.js?v=34"></script>
 <script src="js/pu-news-tpl.js?v=16"></script>
 <script src="js/pu-news-regional-sources.js?v=1"></script>
-<script src="js/pu-news-review.js?v=4"></script>
+<script src="js/pu-news-review.js?v=5"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -872,7 +872,10 @@ function 불러오기(){
     db.ref('newsletter/regionalCandidates').once('value').catch(()=>({val:()=>({})})),
     /* 월요일 자동발송 확정본 — 준비 뒤에 회차를 고치면 «고치기 전 것»이 나가므로,
        화면이 지금 내용과 견줘 「다시 준비하세요」를 띄울 수 있어야 한다. */
-    db.ref('newsletter/weeklyReady').once('value').catch(()=>({val:()=>null}))
+    db.ref('newsletter/weeklyReady').once('value').catch(()=>({val:()=>null})),
+    /* 지역뉴스 모으기 결과 — 「새 기사가 없는 것」과 「못 읽고 있는 것」을 가른다.
+       이것이 없으면 몇 주째 조용히 안 읽고 있어도 화면은 똑같아 보인다. */
+    db.ref('newsletter/regionalCollectMeta').once('value').catch(()=>({val:()=>({})}))
   ]).then(function(v){
     App.설정  = v[0].val() || {};
     App.회차들 = v[1].val() || {};
@@ -882,6 +885,7 @@ function 불러오기(){
     App.더한분들 = v[6].val() || {};
     App.지역후보 = v[7].val() || {};
     App.예약본 = v[8].val() || null;
+    App.수집결과 = v[9].val() || {};
     if(!App.설정.회사이름) App.설정.회사이름 = '푸른노무법인';
     if(!App.설정.회신주소) App.설정.회신주소 = '370-6@daum.net';
     if(!App.설정.범위)    App.설정.범위 = '자문중';
@@ -943,14 +947,66 @@ function 회차로부터(열쇠){
   return Core.회차(오늘());
 }
 
-function 회차저장(자료){
+/* ══════════════════════════════════════════════════════════════════════════
+   회차 저장 — 「마지막에 누른 사람이 이긴다」를 없앤다 (2026-09-13)
+   ══════════════════════════════════════════════════════════════════════════
+   회차저장 은 «안 을 통째로» 덮어쓴다. 화면이 들고 있는 안 은 읽어 온 그때 것이라,
+   그 사이에 다른 관리자가 기사 한 줄을 더했으면 내가 저장하는 순간 그 줄이 사라진다.
+   서로 «다른 기사»를 고쳐도 그렇다 — 아무도 덮어썼다는 것을 모른다.
+
+   ★ 그래서 회차마다 «판»(몇 번째 손질인가)을 두고, 내가 읽어 온 판일 때만 쓴다.
+     남이 먼저 고쳤으면 «덮어쓰지 않고» 멈춘 뒤 화면을 새로 읽는다 —
+     소리 없이 지우느니 「다시 넣어 주세요」가 낫다.
+   ⚠ 합치려 들지 않는다. 기사 두 줄을 기계가 섞으면 어느 쪽 글인지 아무도 모른다. */
+async function 판올리기(열쇠, 본판){
+  const ref = db.ref('newsletter/issues/' + 열쇠 + '/판');
+  /* ⚠⚠ 거래는 «찬 자리»에서 null 로 먼저 불린다 — 듣고 있지 않은 자리면 그 값이
+       null 이라 그냥 접힌다(서버에 묻지도 않는다). 그래서 먼저 읽어 데운다.
+       그래도 접혔으면 «진짜로» 남이 고친 것인지 한 번 더 확인하고 다시 해 본다 —
+       안 그러면 아무도 안 건드렸는데 「남이 고쳤습니다」가 뜬다. */
+  for(let 번 = 0; 번 < 2; 번++){
+    await ref.once('value');
+    const r = await ref.transaction(function(cur){
+      return Number(cur || 0) === 본판 ? 본판 + 1 : undefined;
+    }, undefined, false);
+    if(r.committed) return 본판 + 1;
+    const 지금 = Number((await ref.once('value')).val() || 0);
+    if(지금 !== 본판) return 0;   /* 진짜로 남이 먼저 고쳤다 */
+  }
+  return 0;
+}
+
+/* 서버에 있는 것으로 이 회차를 다시 읽는다.
+   ⚠ 회차를 통째로 읽지 않는다 — 안에 전문과 받는 분들 주소가 있다. */
+async function 회차다시읽기(열쇠){
+  const 칸 = ['회차','상태','안','우리글','범위','지역뉴스','판'];
+  const 값들 = await Promise.all(칸.map(k => db.ref('newsletter/issues/' + 열쇠 + '/' + k).once('value')));
+  const d = { 열쇠: 열쇠 };
+  칸.forEach((k, i) => { const v = 값들[i].val(); if(v != null) d[k] = v; });
+  App.회차들[열쇠] = d;
+  return d;
+}
+
+/* 저장됐으면 true. 남이 먼저 고쳤으면 «알리고» false — 부르는 쪽이 이어 가지 않게. */
+async function 회차저장(자료){
+  const 새판 = await 판올리기(자료.열쇠, Number(자료.판 || 0));
+  if(!새판){
+    await 회차다시읽기(자료.열쇠);
+    render();
+    toast('다른 관리자가 먼저 고쳤습니다 — 화면을 새로 읽었습니다. '
+        + '고치신 것을 다시 넣어 주세요(덮어쓰지 않았습니다)', 14000);
+    return false;
+  }
+  자료.판 = 새판;
   App.회차들[자료.열쇠] = 자료;
-  return db.ref('newsletter/issues/' + 자료.열쇠).update({
+  await db.ref('newsletter/issues/' + 자료.열쇠).update({
     회차: 자료.회차, 상태: 자료.상태 || '초안', 안: 자료.안 || {},
     우리글: 자료.우리글 || '',
     범위: 자료.범위 || App.설정.범위 || '자문중',
+    판: 새판,
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
   });
+  return true;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1310,7 +1366,7 @@ async function 창고자리채움(){
     const r = Core.칸자리채우기(d.안, [App.노무사회 || [], 자료]);
     if(!r.채운수) return;
     d.안 = r.안;
-    await 회차저장(d);
+    if(!(await 회차저장(d))) return;   /* 안 담겼는데 담았다고 말하지 않는다 */
     toast(`📎 이미 담긴 ${r.채운수}건에 «창고 자리»를 채웠습니다 — 이제 첨부로 붙습니다`, 10000);
   }catch(e){ /* 조용히 — 되짚기가 화면을 막으면 안 된다 */ }
 }
@@ -1337,7 +1393,7 @@ async function 노무사회칸올림(){
     const r = Core.노무사회칸올리기(d.안, App.노무사회 || []);
     if(!r.올린수) return;
     d.안 = r.안;
-    await 회차저장(d);
+    if(!(await 회차저장(d))) return;   /* 안 담겼는데 담았다고 말하지 않는다 */
     toast(`↑ 노무사회 자료 ${r.올린수}건을 «자료 칸»으로 올렸습니다 — 표지와 내려받기가 붙습니다`, 10000);
   }catch(e){ /* 조용히 — 올리기가 화면을 막으면 안 된다 */ }
 }
@@ -1372,7 +1428,7 @@ async function 노무사회담기(){
   });
   if(!담음) return toast(이미 ? `이미 담긴 것뿐입니다 (${이미}건)` : '담을 것이 없습니다', 7000);
   App.노무사회고른것 = {};
-  await 회차저장(d);
+  if(!(await 회차저장(d))) return;   /* 안 담겼는데 담았다고 말하지 않는다 */
   render();
   toast(`↧ ${담음}건을 꼭지에 담았습니다` + (이미 ? ` (이미 담긴 ${이미}건은 건너뜀)` : ''), 9000);
 }
@@ -1587,7 +1643,7 @@ async function AI초안짓기(){
       것[i].AI초안=t; n++;
     });
     if(!n) throw new Error('쓸 수 있는 AI 초안이 없습니다');
-    await 회차저장(d);
+    if(!(await 회차저장(d))) return;   /* 안 담겼는데 담았다고 말하지 않는다 */
     toast('✨ AI 초안 ' + n + '건을 만들었습니다 — 각 줄을 눌러 확인 후 저장해 주세요', 12000);
   }catch(e){
     toast('AI 초안을 만들지 못했습니다: ' + ((e&&e.message)||e), 12000);
@@ -1792,20 +1848,78 @@ function 지역뉴스관리(d){
       <a class="mini" href="${esc(x.링크||'#')}" target="_blank" rel="noopener">원문 ↗</a>
       <button class="mini" onclick="지역후보승인('${esc(x.id||'')}')">승인</button>
       <button class="x" title="이 후보 제외" onclick="지역후보제외('${esc(x.id||'')}')">✕</button></div>`;
-  }).join('') : '<div class="pad hint">새 검토후보가 없습니다. 공식 RSS는 매일 오전 7시 10분에 확인합니다.</div>';
+  }).join('') : `<div class="pad hint">${수집빈말()}</div>`;
+  const 수집줄 = 수집상태줄();
   return `<div class="box" style="margin-top:12px"><h3>📍 주소에 맞춰 보내는 지역뉴스
     <span class="cnt">${활성.length}건</span><span class="sp"></span>
     <button class="mini" onclick="지역뉴스담기()">＋ 지역뉴스 추가</button></h3>
     <div class="jarbody">${줄}</div>${철회.length?'<details class="pad"><summary>철회 이력 '+철회.length+'건</summary><div class="jarbody">'+철회줄+'</div></details>':''}<div class="pad hint">
     적용지역은 <b>전국</b>, <b>충남</b>, <b>충남/천안시</b>, <b>충남/서산시</b>처럼 적습니다.
-    업체 주소를 못 읽으면 전국 공통판만 보내며 다른 지역 소식은 섞지 않습니다.<br>
+    ${주소못읽은말()}<br>
     공식 출처 ${지역출처.목록.length}곳 등록 · RSS ${지역출처.목록.filter(x=>x.방식==='rss').length}곳은 자동수집 연결 준비 ·
     게시판 ${지역출처.목록.filter(x=>x.방식==='board').length}곳은 원문 확인 뒤 담습니다.</div></div>
     <div class="box" style="margin-top:12px"><h3>🔎 공식 RSS 검토대기 <span class="cnt">${후보.length}건</span>
-      ${처리중?'<span class="pill">승인 확인 중 '+처리중+'건</span>':''}</h3>
+      ${처리중?'<span class="pill">승인 확인 중 '+처리중+'건</span>':''}${수집줄.딱지}</h3>
+      ${수집줄.몸}
       <div class="jarbody">${후보줄}</div><div class="pad hint">
       제목·날짜·공식 링크만 자동수집했습니다. 아직 어떤 뉴스레터에도 들어가지 않습니다.</div></div>`;
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   모으기가 «돌고 있나» — 조용한 고장을 화면에 꺼내 놓는다 (2026-09-13)
+   ══════════════════════════════════════════════════════════════════════════
+   예전에는 「새 검토후보가 없습니다」 한 줄이었다. 그런데 그 말은 두 가지를 뜻한다 —
+   「새 기사가 없다」와 「몇 주째 못 읽고 있다」. 둘이 화면에서 똑같아 보이면
+   고장이 조용히 이어진다(2026-09-07 아침 모으개가 일곱 번 다 실패했는데
+   손으로 누르면 되는 바람에 아무도 몰랐다 — 같은 일이다).
+   ⚠ 실패해도 «마지막 성공»은 지워지지 않는다. 「언제부터」가 답이라서다. */
+function 며칠전(때){
+  const t = Number(때 || 0); if(!t) return '없음';
+  const 날 = Math.floor((Date.now() - t) / 86400000);
+  return 날 <= 0 ? '오늘' : 날 === 1 ? '어제' : 날 + '일 전';
+}
+function 수집상태줄(){
+  const m = App.수집결과 || {};
+  const 출처별 = m.출처별 || {};
+  const 목 = Object.keys(출처별).map(k => 출처별[k]);
+  if(!목.length) return { 딱지:'', 몸:'' };
+  const 막힌것 = 목.filter(x => x && x.됐나 === false);
+  if(!막힌것.length)
+    return { 딱지:`<span class="pill">모으기 ${esc(며칠전(m.마지막수집))} · ${목.length}곳 다 읽음</span>`, 몸:'' };
+  const 줄 = 막힌것.map(function(x){
+    return `<div class="item"><span class="pill">못 읽음 · ${esc(x.지역||'')}</span>
+      <span class="t" title="${esc(x.탈||'')}">${esc(x.이름||'')}</span>
+      <span class="src">${Number(x.연속실패||1)}번째 · 마지막 성공 ${esc(며칠전(x.마지막성공))}</span></div>`;
+  }).join('');
+  return {
+    딱지:`<span class="pill" style="background:#fee2e2;color:#991b1b">⚠ ${막힌것.length}곳 못 읽음</span>`,
+    몸:`<div class="jarbody">${줄}</div><div class="pad hint">
+        이 출처는 «새 기사가 없는 것이 아니라» 못 읽고 있습니다 —
+        그 지역 소식은 그동안 하나도 안 담깁니다.</div>`
+  };
+}
+/* ★ 「전국 N곳」에 섞여 안 보이던 것을 꺼낸다 (2026-09-13).
+     받는 곳의 지역은 «업체 주소»에서만 나온다(Core.지역코드). 주소가 비었거나
+     못 읽으면 조용히 「전국」이 된다 — 그래서 지역판을 만들어도 그 곳들은 영영
+     전국 공통판만 받는다. 몇 곳인지 보여야 기업정보함에서 주소를 채우실 수 있다. */
+function 주소못읽은말(){
+  const 명단 = (명단셈().ok) || [];
+  const 못읽음 = 명단.filter(x => String((x&&x.지역)||'전국') === '전국').length;
+  if(!못읽음) return '받는 곳의 주소를 모두 읽었습니다 — 저마다 자기 지역 소식을 받습니다.';
+  return `업체 주소를 못 읽은 <b>${못읽음.toLocaleString()}곳</b>은 전국 공통판만 받습니다 `
+    + '— 기업정보함에서 주소를 채우시면 그 지역 소식이 함께 나갑니다.';
+}
+
+/* 「없다」와 「못 읽었다」를 가려 말한다 */
+function 수집빈말(){
+  const m = App.수집결과 || {};
+  if(!m.마지막수집) return '아직 자동수집이 한 번도 안 돌았습니다. 공식 RSS는 매일 오전 7시 10분에 확인합니다.';
+  const 막힘 = Number(m.막힌출처 || 0);
+  if(막힘) return `새 검토후보가 없습니다 — 다만 ${막힘}곳을 못 읽고 있어, `
+    + '그 지역은 있어도 안 들어옵니다(위 목록).';
+  return `새 검토후보가 없습니다. ${esc(며칠전(m.마지막수집))} ${Number(m.읽은출처||0)}곳을 다 읽었으니 `
+    + '«새 기사가 없는 것»입니다.';
+}
+
 function 지역후보복구(){
   if(!Object.values(App.지역후보||{}).some(x=>x&&x.상태==='승인처리중')) return Promise.resolve();
   // 후보와 회차를 같은 서버 스냅샷에서 확인한다. PC에 남은 회차는 복구 근거가 아니다.
@@ -1881,12 +1995,18 @@ function 지역뉴스담기(){
   // push 키는 서버에 쓰지 않고 발급만 한다. 같은 밀리초의 두 등록도 다른 ID다.
   뉴스.id='manual-regional-'+db.ref('newsletter/issues').push().key;
   const 검토자=(App.me&&App.me.email)||'', 시각=Date.now();
-  const ref=db.ref('newsletter/issues/'+d.열쇠);
-  ref.once('value').then(function(){ return ref.transaction(function(cur){
-    return 지역검토.회차추가(cur,뉴스,d,검토자,시각)||undefined;
+  /* ★ 거래는 «지역뉴스 칸»에만 건다 — 회차 통째에 걸면 30,000자 전문까지 읽어
+       통째로 다시 쓴다(2026-09-13 실측: 회차 하나 47.8KB 중 전문이 30.3KB).
+     ⚠ 「이미 보낸 회차인가」는 칸 밖이라 따로 한 번 읽는다. */
+  const ref=db.ref('newsletter/issues/'+d.열쇠+'/지역뉴스');
+  db.ref('newsletter/issues/'+d.열쇠+'/상태').once('value').then(function(s){
+    if(s.val()==='발송') throw new Error('이미 보낸 회차입니다');
+    return ref.once('value');   /* 찬 자리에서 접히지 않게 데운다 */
+  }).then(function(){ return ref.transaction(function(cur){
+    return 지역검토.목록추가(cur,뉴스)||undefined;
   },undefined,false); }).then(function(r){
-    if(!r.committed) return toast('이미 등록됐거나 발송된 회차입니다',8000);
-    App.회차들[d.열쇠]=Object.assign({열쇠:d.열쇠},r.snapshot.val()); render();
+    if(!r.committed) return toast('이미 등록된 지역뉴스입니다',8000);
+    d.지역뉴스=r.snapshot.val()||[]; App.회차들[d.열쇠]=d; render();
   }).catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||''),7000));
 }
 function 지역뉴스빼기(i){
@@ -1895,13 +2015,15 @@ function 지역뉴스빼기(i){
   if(!사유) return;
   const 검토자=(App.me&&App.me.email)||'';
   const ref=db.ref('newsletter/issues/'+d.열쇠+'/지역뉴스');
-  ref.transaction(function(cur){
+  /* ⚠ 먼저 읽어 데운다 — 안 그러면 찬 자리에서 null 로 불려 그냥 접히고,
+       아무도 안 건드렸는데 「다른 관리자가 먼저 변경했습니다」가 뜬다. */
+  ref.once('value').then(function(){ return ref.transaction(function(cur){
     const 목록=Array.isArray(cur)?cur.slice():[];
     const 지금=목록[i];
     /* 옛 자료는 id가 없으므로 같은 배열 자리와 주요 원문 정보까지 견준다. */
     if(!지금||지금.상태==='철회'||String(지금.id||지금.링크||'')!==String(x.id||x.링크||'')) return;
     목록[i]=지역검토.철회(지금,사유,검토자,Date.now()); return 목록;
-  }).then(function(r){
+  },undefined,false); }).then(function(r){
     if(!r.committed) return toast('다른 관리자가 먼저 변경했습니다',7000);
     d.지역뉴스=r.snapshot.val()||[]; App.회차들[d.열쇠]=d; render();
     toast('삭제하지 않고 철회 이력으로 보존했습니다');
@@ -2449,6 +2571,13 @@ async function 진짜보내기(){
     /* 헛수고를 덜기 위한 살핌일 뿐 — 진짜로 두 벌을 막는 것은 서버의 잠금이다 */
     const 막힘 = await 보내는이있나(d.열쇠);
     if(막힘) throw new Error(막힘);
+    /* ★★ 「내가 본 것」과 「지금 것」이 같은지 본다 (2026-09-13).
+         화면은 회차를 읽어 온 그때 것을 들고 있다. 그 사이 다른 관리자가 기사를
+         고쳤으면, 대표가 확인하신 것과 «다른 편지»가 119곳에 나간다. 되돌릴 수 없다.
+         자동발송 확정본을 도장으로 지키는 것과 «같은 까닭»이다. */
+    const 서버판 = Number((await db.ref('newsletter/issues/' + d.열쇠 + '/판').once('value')).val() || 0);
+    if(서버판 !== Number(d.판 || 0))
+      throw new Error('다른 관리자가 먼저 고쳤습니다 — 화면을 새로 읽고 내용을 다시 확인해 주세요');
     /* ★ 「번호 → 주소」 대장을 «걸기 전에» 만들어 적는다
          (대표 지시 2026-09-03 「고쳐라」 — 추적 주소에 메일 주소를 싣지 않는다).
          편지에는 뜻 없는 번호만 실리고, 서버(newsOpen·newsClick)가 이 대장으로
