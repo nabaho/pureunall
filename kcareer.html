@@ -828,6 +828,10 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
    ⚠ 이 파일에는 공용 .hide 규칙이 없다. 없는 이름에 기대면 패널이 늘 보인다(실측). */
 #rhDraftPanel.hide{display:none}
 #rhDraftPanel .btn.sm{padding:3px 7px;font-size:11px}
+/* 📋 골라서 복사 — 칸·모양 고르는 칩 */
+.cp-chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:4px 11px;
+  font-size:11.5px;cursor:pointer;font-family:inherit;color:var(--text)}
+.cp-chip.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:700}
 /* ↩ 이어서 하기 딱지 — 따로 한 줄을 먹던 것을 올리기 줄 오른쪽 끝에 붙였다 */
 .rh-chip{display:inline-flex;align-items:center;gap:7px;background:#f8fafc;border:1px solid #fbbf24;
   border-radius:999px;padding:3px 10px;font-size:11.5px;color:#854d0e;max-width:230px;min-width:0}
@@ -2323,6 +2327,34 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <span style="font-size:11.5px;color:var(--text-mute);margin-right:auto" id="pasteFoot"></span>
       <button class="btn" type="button" onclick="closePasteIn()">닫기</button>
       <button class="btn primary" type="button" onclick="pasteSave()">넣기</button>
+    </div>
+  </div>
+</div>
+<!-- 📋 골라서 복사 (대표 지시 2026-09-13) -->
+<div class="modal-ov" id="modalCopyPick">
+  <div class="modal" style="width:660px">
+    <div class="modal-h">📋 골라서 복사<span id="cpWho" style="font-size:11.5px;font-weight:400;color:var(--text-mute);margin-left:8px"></span></div>
+    <div class="modal-b">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:9px">
+        <span style="font-size:11px;font-weight:700;color:var(--text-mute)">칸</span>
+        <span id="cpCols" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <span style="font-size:11px;font-weight:700;color:var(--text-mute)">모양</span>
+        <button type="button" class="cp-chip on" data-fmt="tab" onclick="copyPickFmt(this)">표 (엑셀에 붙음)</button>
+        <button type="button" class="cp-chip" data-fmt="line" onclick="copyPickFmt(this)">한 줄씩</button>
+        <button type="button" class="cp-chip" data-fmt="comma" onclick="copyPickFmt(this)">쉼표로</button>
+        <button type="button" class="cp-chip on" id="cpHead" onclick="copyPickHead(this)">머리줄 넣기</button>
+      </div>
+      <pre id="cpPrev" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-family:Consolas,'D2Coding',monospace;font-size:11.5px;line-height:1.8;overflow:auto;max-height:38vh;white-space:pre;margin:0"></pre>
+      <div style="font-size:11px;color:var(--text-mute);margin-top:7px;line-height:1.7">
+        한글에 붙일 때 <b>표 모양</b>은 «미리 만들어 둔 표»에 붙여야 칸이 갈라집니다. 엑셀은 그냥 붙으면 표가 됩니다.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span id="cpCnt" style="font-size:11.5px;color:var(--text-mute);margin-right:auto"></span>
+      <button class="btn" type="button" onclick="closeCopyPick()">닫기</button>
+      <button class="btn primary" type="button" onclick="copyPickDo()">📋 복사</button>
     </div>
   </div>
 </div>
@@ -6972,6 +7004,130 @@ function careerSelIds(name){
   return Array.prototype.slice.call(box.querySelectorAll('.row-chk'))
     .filter(function(c){ return c.checked; }).map(function(c){ return c.dataset.id; });
 }
+/* ═══ 📋 골라서 복사 (대표 지시 2026-09-13 「목업대로」) ═══════════════════
+   목록에서 줄을 고르면 할 수 있는 일이 «지우기뿐»이었다. 위촉인·발급일만 뽑아
+   한글·엑셀·메일에 붙이려면 CSV 를 내려받아 엑셀에서 다시 복사해야 했다.
+
+   ■ 얼개 — 표를 «보이는 대로» 읽는다
+     화면에 그려진 칸 글자를 그대로 집는다. 그래서
+       · 검색·연도·유형으로 거른 것이 «그대로» 따라온다(「특정 낱말 발췌」가 이 길이다)
+       · 화면마다 칸이 달라도 사전을 따로 둘 일이 없다
+     ⚠ 칸 사전을 따로 두지 말 것 — 화면이 늘거나 칸이 바뀌면 한쪽만 고쳐져 어긋난다.
+   ⚠ 「№」와 「관리」는 뺀다 — 번호는 화면용이고 관리는 단추다.
+   ⚠ 주민등록번호는 «목록에 없으므로» 복사에도 없다. 그 규칙을 여기서 다시 만들지 않는다. */
+var _cpName='', _cpFmt='tab', _cpHead=true, _cpOff={};
+
+function _cpKey(name){ return NS+'copypick_'+name; }
+/* 「끈 칸」만 기억한다 — 칸이 늘어나면 새 칸은 기본으로 켜진 채 나온다 */
+function _cpLoadOff(name){
+  try{ var a=JSON.parse(LS.get(_cpKey(name))||'[]');
+       var o={}; (Array.isArray(a)?a:[]).forEach(function(k){ o[k]=true; }); return o; }
+  catch(e){ return {}; }
+}
+function _cpSaveOff(name){
+  try{ LS.set(_cpKey(name), JSON.stringify(Object.keys(_cpOff).filter(function(k){ return _cpOff[k]; }))); }catch(e){}
+}
+
+/* 지금 화면의 표를 읽는다 — 칸 이름과 줄 글자 */
+function _cpGrid(name){
+  var box=_selBox(name); if(!box) return null;
+  var tbl=box.querySelector('table'); if(!tbl) return null;
+  var cols=[];
+  Array.prototype.forEach.call(tbl.querySelectorAll('thead th'), function(th,i){
+    var nm=(th.textContent||'').replace(/[▲▼]/g,'').trim();
+    if(!nm || nm==='№' || nm==='관리') return;
+    cols.push({ i:i, name:nm });
+  });
+  var 고른것=[], 모두=[];
+  Array.prototype.forEach.call(tbl.querySelectorAll('tbody tr'), function(tr){
+    var tds=tr.children;
+    var v=cols.map(function(c){
+      var td=tds[c.i];
+      return td ? String(td.textContent||'').replace(/\s+/g,' ').trim() : '';
+    });
+    모두.push(v);
+    var chk=tr.querySelector('.row-chk');
+    if(chk && chk.checked) 고른것.push(v);
+  });
+  /* ★ 고른 게 없으면 «보이는 것 전부» — 체크를 안 했다고 헛걸음이 되면 안 된다 */
+  return { cols:cols, rows:(고른것.length?고른것:모두), 고름:고른것.length>0, 전체:모두.length };
+}
+
+function copyPickOpen(name){
+  var g=_cpGrid(name);
+  if(!g){ toast('표를 찾지 못했습니다'); return; }
+  if(!g.rows.length){ toast('복사할 줄이 없습니다'); return; }
+  _cpName=name; _cpOff=_cpLoadOff(name);
+  var box=document.getElementById('cpCols');
+  if(box) box.innerHTML=g.cols.map(function(c,i){
+    return '<button type="button" class="cp-chip'+(_cpOff[c.name]?'':' on')
+      +'" onclick="copyPickCol('+i+',this)">'+escapeHtml(c.name)+'</button>';
+  }).join('');
+  document.getElementById('modalCopyPick').classList.add('open');
+  copyPickDraw();
+}
+function closeCopyPick(){ document.getElementById('modalCopyPick').classList.remove('open'); }
+function copyPickCol(i,el){
+  var g=_cpGrid(_cpName); if(!g||!g.cols[i]) return;
+  var nm=g.cols[i].name;
+  _cpOff[nm]=!_cpOff[nm];
+  el.classList.toggle('on', !_cpOff[nm]);
+  _cpSaveOff(_cpName);
+  copyPickDraw();
+}
+function copyPickFmt(el){
+  _cpFmt=el.dataset.fmt;
+  var ps=el.parentNode.querySelectorAll('.cp-chip[data-fmt]');
+  Array.prototype.forEach.call(ps,function(p){ p.classList.toggle('on', p===el); });
+  copyPickDraw();
+}
+function copyPickHead(el){ _cpHead=!_cpHead; el.classList.toggle('on',_cpHead); copyPickDraw(); }
+
+function copyPickText(){
+  var g=_cpGrid(_cpName); if(!g) return '';
+  var 쓸것=[]; g.cols.forEach(function(c,i){ if(!_cpOff[c.name]) 쓸것.push(i); });
+  if(!쓸것.length) return '';
+  var 벌=g.rows.map(function(r){ return 쓸것.map(function(i){ return r[i]; }); });
+  if(_cpFmt==='tab'){
+    var out=벌.map(function(a){ return a.join('\t'); });
+    if(_cpHead) out.unshift(쓸것.map(function(i){ return g.cols[i].name; }).join('\t'));
+    return out.join('\n');
+  }
+  /* 한 줄씩·쉼표는 «빈 칸을 빼고» 잇는다 — 「가나도 /  / 2026」처럼 빈 자리가 남으면 안 된다 */
+  if(_cpFmt==='line') return 벌.map(function(a){ return a.filter(Boolean).join(' / '); }).join('\n');
+  return 벌.map(function(a){ return a.filter(Boolean).join(' '); }).filter(Boolean).join(', ');
+}
+function copyPickDraw(){
+  var g=_cpGrid(_cpName); if(!g) return;
+  var 쓸것=g.cols.filter(function(c){ return !_cpOff[c.name]; }).length;
+  var t=copyPickText();
+  var who=document.getElementById('cpWho');
+  if(who) who.textContent=(g.고름?'고른 ':'보이는 것 전부 ')+g.rows.length+'건';
+  var pre=document.getElementById('cpPrev');
+  if(pre) pre.textContent=t||'칸을 하나는 골라 주세요';
+  var cnt=document.getElementById('cpCnt');
+  if(cnt) cnt.textContent=g.rows.length+'건 · 칸 '+쓸것+'개';
+}
+function copyPickDo(){
+  var t=copyPickText();
+  if(!t){ toast('칸을 하나는 골라 주세요'); return; }
+  var 끝=function(){ toast('📋 복사됨 — 붙여넣기(Ctrl+V) 하세요'); closeCopyPick(); };
+  /* ⚠ 클립보드가 막히는 자리가 있다(권한·옛 브라우저). 그때도 복사가 되게 예비 길을 둔다 —
+     안 두면 「눌렀는데 아무 일이 없다」가 된다. */
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(끝).catch(function(){ _cpFallback(t,끝); });
+  } else _cpFallback(t,끝);
+}
+function _cpFallback(text, 끝){
+  try{
+    var ta=document.createElement('textarea');
+    ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    끝();
+  }catch(e){ toast('복사하지 못했습니다 — 미리보기 글을 끌어서 복사해 주세요', 6000); }
+}
+
 function careerSelAll(name,on){
   var box=_selBox(name); if(!box) return;
   box.querySelectorAll('.row-chk').forEach(function(c){ c.checked=!!on; });
@@ -7202,6 +7358,9 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
     +'<button class="btn sm" onclick="careerSelAll(\''+name+'\',true)">전체 선택</button>'
     +'<button class="btn sm" onclick="careerSelAll(\''+name+'\',false)">선택 해제</button>'
     +'<div style="flex:1"></div>'
+    /* ★ 골라서 복사 (대표 지시 2026-09-13) — 고른 줄에 할 수 있는 일이 «지우기뿐»이었다.
+       ⚠ 여기 한 곳에 달면 경력관리 목록 전부와 회의·비용관리에 함께 달린다. */
+    +'<button class="btn sm" onclick="copyPickOpen(\''+name+'\')" title="고른 줄에서 원하는 칸만 뽑아 복사합니다">📋 골라서 복사</button>'
     +'<button class="btn sm" style="color:#fff;background:var(--red);border-color:var(--red)" onclick="careerDelSelected(\''+name+'\',this)">🗑 선택 삭제</button></div>';
   /* ⚠ 이 조립문 중간에 다른 호출을 끼워 넣지 말 것 — 뒤(scroll-hint·exBar)가 잘린다(회귀테스트 있음) */
   box.innerHTML=selBar+'<table><thead><tr><th class="rownum-h"><input type="checkbox" onclick="careerSelAll(\''+name+'\',this.checked)" title="이 쪽 전체 선택"> №</th>'+cfg.cols.map((c,ci)=> c==='관리' ? `<th>${c}</th>` : `<th class="th-sort" onclick="sortCol('${name}',${ci})">${c}${ss&&ss.col===ci?(ss.dir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>'+view.map((r,i)=>cfg.row(r,name).replace(/<tr\b[^>]*>/, m=>m+'<td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" data-id="'+_jsAttr(r.id)+'" onclick="careerSelSync(\''+name+'\')"><span>'+(i+1)+'</span></label></td>')).join('')+'</tbody></table>'
