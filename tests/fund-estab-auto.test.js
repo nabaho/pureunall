@@ -366,7 +366,10 @@ test('일괄 채우기 목록도 새 칸 넷을 함께 채운다 — 한쪽만 �
 
 test('새로 쓴 ⓘ 열쇠가 HELP 에 등록돼 있다', () => {
   const help = SRC.slice(SRC.indexOf('var HELP={'));
-  ['estab.bundle', 'site.doc'].forEach((k) => {
+  /* site.doc 은 뺐다 — 사업자등록증 «한 곳씩» 판독 줄이 편집 창에서 사라졌다
+     (대표 지시 2026-09-13 「사진첩 내용은 모두 빼라 기업정보함에서 바로 가지고 오면된다」).
+     여러 장 한꺼번에 읽는 길은 site.bulkdoc 으로 남아 있다. */
+  ['estab.bundle'].forEach((k) => {
     assert.ok(SRC.includes("hlp('" + k + "')"), '쓰는 곳이 없는 도움말: ' + k);
     assert.ok(help.includes("'" + k + "':{"), '등록되지 않은 도움말 열쇠: ' + k);
   });
@@ -417,12 +420,17 @@ test('묶음 화면 제목이 단계마다 다르다 — 어느 단계를 보는
   assert.match(renderBundle('없는단계'), /① 노동부 설립인가/);
 });
 
-test('사업장 편집 창을 «정말 그리면» 사업자등록증에서 채우기 줄이 성하게 나온다', () => {
+/* ★ 2026-09-13 대표 지시 「전체 화면을 좀 깔끔하게 … 사진첩 내용은 모두 빼라」 —
+   편집 창의 서류 판독 줄 넷을 걷어냈다. 이제 이 창은 «칸만» 있고, 채우는 길은
+   맨 위 [🏢 기업정보함에서] 하나다. 재직증명서·중소기업확인서를 읽는 길은
+   [👤 사람] 보기로 옮겼다(없앤 것이 아니다 — 기업정보함에 없는 자료라 길이 있어야 한다).
+   ⚠ 이 검사는 «판독 줄이 다시 들어오는 것»을 막는다 — 종전에는 거꾸로 그 줄을 지켰다. */
+test('사업장 편집 창을 «정말 그리면» 칸만 있고 서류 판독 줄이 없다', () => {
   const box = {}, out = { html: '' };
   const code = [
     grabDecl('SITE_FIELDS'), grabDecl('CONTACT_FIELDS'), grabDecl('WREP_FIELDS'),
   grabDecl('UREP_FIELDS'), grabDecl('SME_FIELDS'), grabDecl('SME_OPTS'),
-  grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'), grabFn('_smeDocRow'),
+  grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'),
     'var _sitePrefill=null, _siteEditSid="";',
     'var S={fundId:"F1",sites:{}};',
     'function $(id){ return null; }',
@@ -436,9 +444,18 @@ test('사업장 편집 창을 «정말 그리면» 사업자등록증에서 채�
   new Function('OUT', code).call(box, out);
   box.run('S1');
   const html = out.html;
-  assert.ok(html.includes('siteDocAlbum()'), '사진첩 단추가 없다');
-  assert.ok(html.includes('id="dz-sitebiz"'), '파일 올리는 자리가 없다');
-  assert.ok(html.includes('id="siteDocOut"'), '판독 결과 자리가 없다');
+  assert.ok(html.includes("openCardPick('siteedit')"), '★ 기업정보함에서 채우는 길이 없다 — 채울 방법이 사라졌다');
+  assert.ok(html.includes('id="siteDocOut"'), '판독 결과가 돌아와 앉을 자리가 없다');
+  ['dz-sitebiz', 'dz-sitecorp', 'siteDocAlbum(', 'siteCorpAlbum('].forEach((n) => {
+    assert.ok(!html.includes(n), '★ 걷어낸 서류 판독 줄이 다시 들어왔다: ' + n);
+  });
+  /* 사람 넷이 각각 제 묶음을 갖는가 — 여기가 흐려지면 서식에 엉뚱한 사람이 찍힌다 */
+  ['담당자', '사용자 대표', '근로자 대표'].forEach((t) => {
+    assert.ok(html.includes(t), '사람 묶음이 없다: ' + t);
+  });
+  /* 기업규모와 중소기업 여부가 «한 자리»에 모여 출처가 적혀 있는가 */
+  assert.ok(html.includes('기업정보함</span>') && html.includes('확인서</span>'),
+    '★ 같아 보이는 두 칸에 출처가 안 적혀 있다 — 무엇이 다른지 화면에서 알 수 없다');
   assert.ok(!/\+[A-Za-z_$][\w$]*\+/.test(html), '보간되지 않은 변수가 새어 나왔다');
   assert.ok(!/undefined/.test(html), 'undefined 가 샜다');
 });

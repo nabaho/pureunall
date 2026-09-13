@@ -652,7 +652,7 @@ function renderPanel(name, extra) {
   new Function('OUT', [
     grabDecl('SITE_FIELDS'), grabDecl('CONTACT_FIELDS'), grabDecl('WREP_FIELDS'),
   grabDecl('UREP_FIELDS'), grabDecl('SME_FIELDS'), grabDecl('SME_OPTS'),
-  grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'), grabFn('_smeDocRow'),
+  grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'),
     grabDecl('OFFICER_ROLES'), grabDecl('NF_CARRY'),
     'var _sitePrefill=null, _siteEditSid="", _nfCard=null;',
     'var S={fundId:"F1",sites:{}};',
