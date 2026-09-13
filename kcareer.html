@@ -1081,7 +1081,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      판독 층은 지우개가 없으면 글자 판독을 아예 막는다(그대로 보내면 주민번호가 AI 로 나간다).
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=4"></script>
-<script src="js/pu-doc-read.js?v=41"></script>
+<script src="js/pu-doc-read.js?v=42"></script>
 <script src="js/kcareer-hwpxfill.js?v=24"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=15"></script>
@@ -8987,8 +8987,17 @@ async function _geminiOCR(prompt,b64,mt,imgs){ if(!aiReady()) return null;
   var R=_kcReader();
   if(R){
     try{
+      /* ★ freeFirst — 무료로 «글자»를 먼저 뽑아 사진 대신 그 글자를 AI 에 넘긴다
+           (대표 지시 2026-09-13 「무료버전 먼저 사용하게 안 되나?」).
+         왜 여기부터인가: 2026-09-13 하루 판독 146번 가운데 «123번»이 경력관리였다.
+           그날 들어간 폴더 스캔이 위촉장 112건을 한꺼번에 읽은 값이다.
+         왜 켜도 되는가: 여기서 읽는 것은 자격증·학력·위촉장·표창·수료증처럼
+           «줄글» 서류다. 급여명세서·근로계약서와 달리 칸의 «자리»가 뜻을 지니지 않아
+           글자만으로도 AI 가 같은 답을 낸다.
+         ⚠ 글자가 모자라면 판독 층이 알아서 사진으로 되돌아간다 — 여기서 막지 않는다. */
       var got=await R.readWithPrompt(prompt,
-        여럿.map(function(x){ return 'data:'+(mt||'image/jpeg')+';base64,'+x; }), { mime: mt });
+        여럿.map(function(x){ return 'data:'+(mt||'image/jpeg')+';base64,'+x; }),
+        { mime: mt, freeFirst: true });
       if(got && got.ok) return {parsed:got.data};
       return {err:(got && got.why) || '판독하지 못했습니다'};
     }catch(e){ console.warn('판독 층', e); /* 아래 옛 길로 물러선다 */ }
