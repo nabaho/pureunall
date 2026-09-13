@@ -21,6 +21,7 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-labor-core.js?v=3"></script>
+<script src="js/pu-site-staff.js?v=1"></script>
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -242,12 +243,27 @@ function afterLogin(){
        올리기 전까지 화면이 통째로 빈다. */
     fbDb.ref(ROOT+'/payroll/sites').once('value'),
     /* 사람이 채운 설정값 — 카드 위에 겹쳐 본다. 아주 얇다(사업장당 두 칸). */
-    fbDb.ref(ROOT+'/site_card_edit').once('value')
+    fbDb.ref(ROOT+'/site_card_edit').once('value'),
+    /* ⚠ 근태·연차·퇴직·사업장설정은 **쓰기만 하고 읽지를 않았다**(2026-09-13 발견).
+       저장은 서버로 잘 갔는데 시작할 때 안 읽어, 새로고침하면 화면에서 사라졌다.
+       아직 아무도 안 넣어 잃은 자료는 없었지만, 쓰기 시작하면 바로 물릴 자리다.
+       넷 다 아주 얇다(사업장·사람당 몇 칸) — 얇은 것만 읽는 규칙에 어긋나지 않는다. */
+    fbDb.ref(ROOT+'/attend').once('value'),
+    fbDb.ref(ROOT+'/leave').once('value'),
+    fbDb.ref(ROOT+'/sever').once('value'),
+    fbDb.ref(ROOT+'/labor_policy').once('value'),
+    /* 사람이 확정한 «사업장 ↔ 업체» 짝 — 자동 짝맞추기(짐작)를 이긴다. */
+    fbDb.ref(ROOT+'/site_co_link').once('value')
   ]).then(function(r){
     cache.site_cards=r[0].val()||[];
     cache.payroll_locked=r[1].val()||{};
     cache.payslip_notice=r[3].val()||'';
     cache.site_card_edit=r[5].val()||{};
+    cache.attend=r[6].val()||{};
+    cache.leave=r[7].val()||{};
+    cache.sever=r[8].val()||{};
+    cache.labor_policy=r[9].val()||{};
+    cache.site_co_link=r[10].val()||{};
     payIdx=r[2].val()||null;
     payOld=r[4].val()||null;
     ready=true; navSeed(); render();
@@ -359,7 +375,7 @@ window.addEventListener('popstate',function(ev){
   // 시작점보다 더 뒤로 = 브라우저 기본(앱 이탈/포털) 허용
 });
 App.go=function(s){ navTo({screen:s,site:null,month:null,emp:null,day:null}); };  // 기존 호출부 호환(탭 이동)
-var NAV=[{id:'cards',label:'⚙️ 설정 카드'},{id:'inbox',label:'📥 수신함'},{id:'payroll',label:'💰 급여 처리'},{id:'attend',label:'🕒 근태'},{id:'leave',label:'🌴 연차·휴가'},{id:'sever',label:'🎓 퇴직'},{id:'slip',label:'📄 명세서'},{id:'report',label:'📑 신고'}];
+var NAV=[{id:'cards',label:'⚙️ 설정 카드'},{id:'inbox',label:'📥 수신함'},{id:'hub',label:'🏢 회사'},{id:'payroll',label:'💰 급여 처리'},{id:'attend',label:'🕒 근태'},{id:'leave',label:'🌴 연차·휴가'},{id:'sever',label:'🎓 퇴직'},{id:'slip',label:'📄 명세서'},{id:'report',label:'📑 신고'}];
 var SIG={green:'#166534',orange:'#d97706',red:'#dc2626',gray:'#94a3b8'};
 function won(n){ return (n==null)?'-':Number(n).toLocaleString(); }
 /* ── 표시용 중복 정리 ──
@@ -1749,6 +1765,146 @@ function laborEmpsReady(site, month) {
   return !!(rec && empsOf(rec));
 }
 function siteCardsList() { return paySites() || []; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   회사 한 장 (허브) + 담당자 잇기          — 대표 지시 2026-09-13
+   ──────────────────────────────────────────────────────────────────────
+   "담당자별로 정리하고, 각 기업별로 근태·휴가·퇴직·명세서를 하나의 플로어로."
+
+   왜 이렇게 만드나: 화면 여덟 개가 저마다 「사업장 고르기」로 시작한다. 한 회사를
+   처리하려면 같은 곳을 여덟 번 골라야 했다. 여기서 한 번 고르면 그 회사의 모든
+   일이 한 장에 뜨고, 눌러서 들어가면 **사업장이 이미 정해진 채로** 열린다
+   (모든 화면이 App.site 가 있으면 고르기를 건너뛰도록 이미 짜여 있다).
+
+   ⚠ 담당 배정은 여기서 만들지 않는다. 푸른이알피 업체관리(data/companies)의
+     주담당·부담당이 원본이다 — 이알피에서 담당을 바꾸면 여기도 따라 바뀐다.
+     급여데이터함도 같은 곳을 본다(js/pu-paydata-store.js 의 isMyCompany).
+   ⚠ data/* 는 **읽기만** 한다. 급여관리가 쓰는 곳은 payroll_os 뿐이라는
+     이 앱의 약속은 그대로다(사람이 확정한 짝도 payroll_os/site_co_link 에 담는다).
+   ⚠ 업체 명단은 374KB다 — 시작할 때 받지 않고, 이 화면을 열 때 한 번만 받는다.
+   ══════════════════════════════════════════════════════════════════════ */
+var coData=null, coBusy=false, coErr='';
+function ensureCo(){
+  if(coData||coBusy||!fbDb) return;
+  coBusy=true;
+  Promise.all([
+    fbDb.ref('data/companies/v').once('value'),
+    fbDb.ref('data/user_dir/v').once('value')
+  ]).then(function(r){
+    coData={companies:r[0].val()||[], dir:r[1].val()||[]};
+    coBusy=false; if(ready) render();
+  }).catch(function(e){
+    coBusy=false; coErr=(e&&e.code)||String(e); if(ready) render();
+  });
+}
+/* 사업장 한 곳의 담당 — 아직 명단을 못 받았으면 null(「불러오는 중」으로 그린다) */
+function staffOf(site){
+  if(!coData||!window.PuSiteStaff) return null;
+  return PuSiteStaff.staffFor(site,{companies:coData.companies,dir:coData.dir,links:lmap('site_co_link')});
+}
+
+/* ── 한 회사의 «지금 상태» — 직원 표를 받지 않고 셀 수 있는 것만 센다 ──
+   ⚠ 110곳 목록에서 직원 표를 받으면 화면이 안 열린다(이미 겪은 자리).
+     그래서 모르는 것은 「—」로 둔다. 모른다고 말하는 편이 지어내는 것보다 낫다. */
+function hubCounts(site){
+  var recs=payRecs(site)||[];
+  var lock=0, review=0;
+  recs.forEach(function(r){ if(isLocked(site,r.월)) lock++; else if(effSig(r)!=='green') review++; });
+  var pre=site+'|', at=0, lv=0, sv=0;
+  var A=lmap('attend'); Object.keys(A).forEach(function(k){ if(k.indexOf(pre)===0) at++; });
+  var L=lmap('leave');  Object.keys(L).forEach(function(k){ if(k.indexOf(pre)===0) lv++; });
+  var V=lmap('sever');  Object.keys(V).forEach(function(k){ if(k.indexOf(pre)===0&&V[k]&&V[k].퇴사일) sv++; });
+  return {months:recs.length, lock:lock, review:review, attend:at, leave:lv, sever:sv};
+}
+function hubRow(icon,label,state,tone,screen,site){
+  var c=tone==='warn'?'var(--warn)':(tone==='ok'?SIG.green:'var(--sub)');
+  return '<div onclick="navTo({screen:\''+screen+'\',site:\''+esc(site)+'\',month:null,emp:null,day:null})" '
+    +'style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer">'
+    +'<span style="width:22px;text-align:center">'+icon+'</span>'
+    +'<b style="width:96px;flex-shrink:0">'+label+'</b>'
+    +'<span style="flex:1;font-size:12.5px;color:'+c+'">'+state+'</span>'
+    +'<span style="font-size:12px;color:var(--sub)">\u203a</span></div>';
+}
+function screenHub(){
+  ensureCo();
+  if(!App.site) return hubPickHtml();
+  var site=App.site, c=hubCounts(site), st=staffOf(site);
+  var card=cardsView().filter(function(v){ return v.사업장===site; })[0]||null;
+  var mo=(new Date().getMonth()+1)+'월';
+  var came=arrivalFor(site,mo);
+  var h='<h1>'+site+'</h1>';
+  h+='<div class="sub"><a href="#" onclick="goBack();return false">\u2190 회사 목록</a> \u00b7 이 회사의 모든 일</div>';
+
+  /* 머리 — 담당·업체·급여일. 못 이은 곳은 «왜 못 이었는지»를 여기서 말해 준다. */
+  var who = st ? (st.담당?('담당 '+st.담당+(st.부담당&&st.부담당.length?(' \u00b7 부담당 '+st.부담당.join(', ')):'')):'담당 미확인')
+               : (coErr?('업체 명단을 못 읽었습니다: '+coErr):'담당 불러오는 중\u2026');
+  h+='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+    +'<div style="font-size:13px"><b>'+who+'</b>'
+    +(st&&st.업체?('<span style="color:var(--sub)"> \u00b7 업체관리 「'+st.업체+'」'+(st.확정?'':(st.짐작?' (짐작)':''))+'</span>'):'')
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--sub);margin-top:4px">급여일 '+((card&&card.급여일)||'미지정')+' \u00b7 산정기간 '+((card&&card.산정기간)||'미지정')+'</div>'
+    +(st&&st.경고?('<div style="font-size:12px;color:var(--warn);margin-top:6px">\u26a0 '+st.경고+'</div>'):'')
+    +(st&&st.짐작&&st.업체?('<div style="margin-top:8px"><button class="btn" onclick="linkCo(\''+esc(site)+'\')">이 업체가 맞습니다 \u2014 확정</button></div>'):'')
+    +'</div>';
+
+  /* 일곱 칸 — 순서는 실제로 일하는 차례다(자료가 와야 급여, 급여가 끝나야 명세서·신고) */
+  h+='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">';
+  h+=hubRow('\ud83d\udce5','자료 도착', came?(mo+' 자료 도착'):(mo+' 아직 안 왔습니다 \u2014 독촉은 급여데이터함에서'),
+            came?'ok':'warn','inbox',site);
+  h+=hubRow('\ud83d\udcb0','급여 처리', c.months?(c.months+'개월 \u00b7 확정 '+c.lock+' \u00b7 검토할 것 '+c.review+'건'):'자료 없음',
+            (c.months&&c.review===0)?'ok':(c.review?'warn':''),'payroll',site);
+  h+=hubRow('\ud83d\udd52','근태', c.attend?(c.attend+'명분 입력됨'):'아직 입력 없음', c.attend?'ok':'','attend',site);
+  h+=hubRow('\ud83c\udf34','연차\u00b7휴가', c.leave?(c.leave+'명분 기록됨'):'아직 기록 없음', c.leave?'ok':'','leave',site);
+  h+=hubRow('\ud83c\udf93','퇴직', c.sever?(c.sever+'명 퇴사일 등록'):'퇴사자 없음', c.sever?'warn':'','sever',site);
+  h+=hubRow('\ud83d\udcc4','명세서', c.lock?(c.lock+'개월분 발급 가능'):'확정된 달이 없습니다', c.lock?'ok':'','slip',site);
+  h+=hubRow('\ud83d\udcd1','신고', '일용 매월신고 \u00b7 취득상실 \u00b7 퇴직정산 \u00b7 연차', '', 'report', site);
+  h+='</div>';
+  return h;
+}
+/* 사람이 «이 업체가 맞다»고 못 박는다 — 짐작을 답으로 바꾸는 유일한 길 */
+function linkCo(site){
+  var st=staffOf(site);
+  if(!st||!st.업체){ alert('이을 업체를 아직 못 찾았습니다.'); return; }
+  if(!confirm(site+' 을(를) 업체관리 「'+st.업체+'」로 확정할까요?\n(담당 '+(st.담당||'미확인')+') \u2014 나중에 바꿀 수 있습니다.')) return;
+  var m=lmap('site_co_link'); m[site]={coName:st.업체, by:(me&&me.email)||'', at:Date.now()};
+  dbSet('site_co_link', m);
+}
+window.linkCo=linkCo;
+
+/* 회사 고르기 — 담당자별로 묶어서 보여 준다. 이것이 대표가 말한 「담당자별 정리」다. */
+function hubPickHtml(){
+  var sites=siteCardsList();
+  var h='<h1>회사</h1><div class="sub">담당자 \u2192 회사 \u2192 그 회사의 모든 일(자료\u00b7급여\u00b7근태\u00b7연차\u00b7퇴직\u00b7명세서\u00b7신고)</div>';
+  if(!sites.length) return h+'<div class="empty">급여 데이터가 없습니다. 급여 처리 화면에서 먼저 자료를 올리세요.</div>';
+  if(!coData){
+    h+='<div class="empty">'+(coErr?('업체 명단을 못 읽었습니다: '+coErr+' \u2014 담당자 묶기 없이 목록만 보여 줍니다.'):'담당자 명단을 불러오는 중\u2026')+'</div>';
+    h+='<div class="cards">'+sites.map(function(s){
+      return '<div class="c" style="cursor:pointer" onclick="navTo({site:\''+esc(s)+'\'})"><div class="t">'+s+'</div>'
+        +'<div class="m">'+((payRecs(s)||[]).length)+'개월</div></div>'; }).join('')+'</div>';
+    return h;
+  }
+  var groups=PuSiteStaff.groupByStaff(sites,{companies:coData.companies,dir:coData.dir,links:lmap('site_co_link')});
+  /* «업체관리에는 있는데 급여관리에 자료가 없는 곳»을 숨기지 않는다 —
+     담당자가 자기 업체 수와 견줘 볼 수 있어야 무엇이 빠졌는지 안다.
+     (2026-09-13 실측: 업체관리 급여 113곳 · 급여관리 자료 46곳) */
+  var coAll=PuSiteStaff.payrollCos(coData.companies||[]).length;
+  h+='<div style="font-size:12px;color:var(--sub);margin-bottom:4px">업체관리 급여 업체 '+coAll+'곳 중 급여관리에 자료가 있는 곳 '+sites.length+'곳</div>';
+  groups.forEach(function(g){
+    h+='<div style="margin:18px 0 8px;font-size:13.5px"><b>'+g.담당+'</b> <span style="color:var(--sub)">'+g.rows.length+'곳</span>'
+      +(g.미확인?' <span style="font-size:12px;color:var(--warn)">\u2014 업체관리에서 유형\u00b7담당을 고쳐야 이어집니다</span>':'')+'</div>';
+    h+='<div class="cards">';
+    g.rows.forEach(function(row){
+      var c=hubCounts(row.site);
+      h+='<div class="c" style="cursor:pointer" onclick="navTo({site:\''+esc(row.site)+'\'})">'
+        +'<div class="t">'+row.site+'</div>'
+        +'<div class="m">'+c.months+'개월 \u00b7 확정 '+c.lock+(c.review?(' \u00b7 <span style="color:var(--warn)">검토 '+c.review+'건</span>'):'')+'</div>'
+        +(row.staff.경고?('<div class="m" style="color:var(--warn)">\u26a0 '+row.staff.경고+'</div>'):'')
+        +'</div>';
+    });
+    h+='</div>';
+  });
+  return h;
+}
 function pickSiteHtml(title, sub) {
   var sites = siteCardsList();
   var h = '<h1>' + title + '</h1><div class="sub">' + sub + '</div>';
@@ -2314,6 +2470,7 @@ function render(){
   document.getElementById('nav').innerHTML=NAV.map(function(n){return '<button class="'+(App.screen===n.id?'on':'')+'" onclick="App.go(\''+n.id+'\')">'+n.label+'</button>';}).join('');
   var m=document.getElementById('main');
   if(App.screen==='cards') m.innerHTML=screenCards();
+  else if(App.screen==='hub') m.innerHTML=screenHub();
   else if(App.screen==='payroll') m.innerHTML=screenPayroll();
   else if(App.screen==='attend') m.innerHTML=screenAttend();
   else if(App.screen==='leave') m.innerHTML=screenLeave();
