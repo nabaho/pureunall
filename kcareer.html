@@ -458,6 +458,13 @@ body.kc-staff .kc-staff-note{display:flex}
 .td-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px;
   font-size:11.5px;color:#854d0e;margin-top:9px;line-height:1.6}
 .td-state{font-size:12px;color:var(--text-mute);margin-top:10px;line-height:1.6}
+/* 갈라 저장 — 쪽마다 한 줄(번호·제목칸) */
+.td-sp{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border-soft)}
+.td-sp:last-child{border-bottom:none}
+.td-sp .n{flex:0 0 38px;font-size:11.5px;color:var(--text-mute);text-align:center}
+.td-sp input{flex:1;min-width:0;padding:5px 9px;border:1px solid var(--border);border-radius:6px;
+  font-size:12.5px;font-family:inherit;color:var(--text)}
+.td-sp .pk{flex:0 0 auto;font-size:11.5px;color:var(--text-mute)}
 /* 표 «맨 아래»의 더 보기 줄 — 위 툴바의 「표시」는 한 번에 몇 건이고, 여기는 그 다음 판이다.
    ⚠ 한 줄로 둔다(단추·단추·남은 건수) — 쌓으면 긴 표에서 밑이 그만큼 더 길어진다. */
 .more-rows{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
@@ -1111,7 +1118,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-doc-read.js?v=44"></script>
 <script src="js/kcareer-hwpxfill.js?v=25"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
-<script src="js/kcareer-hwpxtidy.js?v=1"></script>
+<script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=16"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
@@ -2384,7 +2391,19 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
         <label class="td-chk"><input type="checkbox" id="tdRows" onchange="rhTidySet()"> <b>표 끝의 빈 줄까지</b><span id="tdRowsN" class="td-n"></span></label>
         <div class="td-warn">⚠ 「표 끝의 빈 줄」은 조심스럽습니다 — 기관이 「다섯 줄로 내라」고 한 서식이면 줄을 지우는 순간 어긋납니다. 그래서 <b>따로</b> 눌러야 합니다.</div>
       </div>
-      <!-- ③ 한글에서 고쳐 오기 -->
+      <!-- ③ 갈라 저장 (대표 지시 2026-09-13) -->
+      <div class="td-card">
+        <div class="td-h">📑 쪽마다 갈라 저장</div>
+        <div class="td-why">한 파일에 여러 서류가 들어 있을 때 — <b>공고문·지원서·수행계획서·동의서·평가기준표</b>처럼 —
+          쪽마다 따로 저장합니다. <b>제목은 서류에서 찾아 미리 적어 두었습니다</b>. 고치셔도 됩니다.</div>
+        <div id="tdSplit"></div>
+        <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn primary" type="button" onclick="rhSplitSave()">📑 갈라 저장</button>
+          <button class="btn" type="button" onclick="rhSplitTitlesReset()">↩ 제목 다시 찾기</button>
+        </div>
+        <div class="td-state" id="tdSplitState"></div>
+      </div>
+      <!-- ④ 한글에서 고쳐 오기 -->
       <div class="td-card">
         <div class="td-h">✍️ 한글에서 고친 뒤 이어서 쓰기</div>
         <div class="td-why">한글 프로그램을 이 화면에서 띄울 수는 없습니다(브라우저가 못 합니다). 대신 <b>파일 자리를 기억</b>해 두었다가, 고쳐 저장하시면 단추 하나로 다시 읽어옵니다.</div>
@@ -11557,7 +11576,10 @@ async function rhComposeBytes(){
    ⚠★ 여기서 «지우는» 것은 내보낼 사본뿐이다. _rhBase(원본)는 한 글자도 안 건드린다 —
       그래서 체크를 풀면 그 자리에서 도로 살아난다. 되돌릴 수 없는 지우기를 만들지 말 것. */
 var _rhTidy = { drop:{}, ph:false, italic:false, rows:false };
-function rhTidyReset(){ _rhTidy={ drop:{}, ph:false, italic:false, rows:false }; }
+function rhTidyReset(){
+  _rhTidy={ drop:{}, ph:false, italic:false, rows:false };
+  if(typeof rhSplitReset==='function') rhSplitReset();
+}
 async function rhTidyZip(zip){
   if(!window.KcareerHwpxTidy) return;
   var T=window.KcareerHwpxTidy;
@@ -11593,7 +11615,11 @@ async function rhTidyPages(){
   var out=[];
   for(const n of names){
     var xml=await zip.file(n).async('string');
-    KcareerHwpxTidy.pages(xml).forEach(function(p,i){ out.push({ sec:n, i:i, head:p.head }); });
+    /* ⚠ title 을 «반드시» 같이 싣는다 — 안 실으면 갈라 저장의 제목칸이 통째로 빈 채 뜬다
+       (2026-09-13 실측: 검사는 녹색인데 화면에서 넷 다 「못 찾음」이었다). */
+    KcareerHwpxTidy.pages(xml).forEach(function(p,i){
+      out.push({ sec:n, i:i, head:p.head, title:p.title||'' });
+    });
   }
   return out;
 }
@@ -11617,6 +11643,8 @@ async function openTidy(){
   rhTidyDraw();
   _safe(rhTidyCount);
 }
+/* 새 서식·바탕이 바뀌면 사람이 고쳐 적은 제목도 놓는다 — 남의 서류 제목이 따라오면 안 된다 */
+function rhSplitReset(){ _tdTitles={}; }
 function rhTidyDraw(){
   var box=document.getElementById('tdPages'), why=document.getElementById('tdPageWhy');
   if(!box) return;
@@ -11645,6 +11673,7 @@ function rhTidyDraw(){
     ? '🗑 <b>'+뺀수+'쪽을 뺐습니다</b> — 완성본은 <b>'+(_tdPages.length-뺀수)+'쪽</b>으로 나갑니다. '
       +'<button class="btn sm" type="button" onclick="rhTidyAllBack()">↩ 모두 되살리기</button>'
     : '<span style="color:var(--text-mute)">뺀 쪽이 없습니다 — 모두 '+_tdPages.length+'쪽이 나갑니다.</span>';
+  _safe(rhSplitDraw);          /* 뺀 쪽은 갈라 저장 목록에서도 빠져야 한다 */
 }
 function rhTidyToggle(i){
   var p=_tdPages[i]; if(!p) return;
@@ -11699,6 +11728,78 @@ async function rhTidyPreview(){
   toast('✅ 정리한 대로 그렸습니다 — 완성본·PDF 도 이대로 나갑니다');
 }
 
+/* ── 📑 쪽마다 갈라 저장 ─────────────────────────────────────────────────
+   대표 지시 2026-09-13 「저장할 때 제목은 첨부 파일에서 찾아서 제목으로 만들고,
+   페이지마다 저장해야 되면 페이지 나누어서 저장하고 제목도 정할 수 있게」.
+   ⚠★ 제목은 «서류에서 찾아» 미리 적어 둔다 — 첫 줄이 아니라 「제목다운 줄」이다.
+      실측(코레일 서식): 첫 줄은 「[붙임 1]」이고 진짜 제목은 둘째 줄이다.
+   ⚠ 못 찾으면 비워 둔다 — 지어내지 않는다. 그 줄은 사람이 적는다. */
+var _tdTitles = {};       /* {쪽번호: 사람이 고친 제목} */
+function rhSplitDraw(){
+  var box=document.getElementById('tdSplit'); if(!box) return;
+  var 남은=_tdPages.filter(function(p){ return (_rhTidy.drop[p.sec]||[]).indexOf(p.i)<0; });
+  if(!남은.length){ box.innerHTML='<div class="td-why" style="margin:0">갈라 저장할 쪽이 없습니다.</div>'; return; }
+  box.innerHTML=남은.map(function(p,n){
+    var key=p.sec+'#'+p.i;
+    var v=(_tdTitles[key]!=null)?_tdTitles[key]:(p.title||'');
+    return '<div class="td-sp"><span class="n">'+(n+1)+'쪽</span>'
+      +'<input type="text" value="'+_jsAttr(v)+'" placeholder="제목을 적으세요 — 서류에서 못 찾았습니다" '
+      +'oninput="rhSplitTitle(\''+_jsAttr(key)+'\',this.value)">'
+      +'<span class="pk">'+(p.title?'':'✎ 직접')+'</span></div>';
+  }).join('');
+  var s=document.getElementById('tdSplitState');
+  if(s) s.textContent='갈라 저장하면 '+남은.length+'개 파일이 됩니다 — 뺀 쪽은 들어가지 않습니다.';
+}
+function rhSplitTitle(key,v){ _tdTitles[key]=v; }
+/* 서류 전체의 제목 — 남아 있는 첫 쪽의 제목이 그 서류의 이름이다.
+   ⚠ 사람이 고쳐 적은 것이 먼저다. */
+async function rhDocTitle(){
+  if(!window.KcareerHwpxTidy) return '';
+  var 남은=_tdPages.filter(function(p){ return (_rhTidy.drop[p.sec]||[]).indexOf(p.i)<0; });
+  for(var i=0;i<남은.length;i++){
+    var key=남은[i].sec+'#'+남은[i].i;
+    var v=(_tdTitles[key]!=null?_tdTitles[key]:남은[i].title)||'';
+    if(String(v).trim()) return String(v).trim();
+  }
+  return '';
+}
+function rhSplitTitlesReset(){ _tdTitles={}; rhSplitDraw(); toast('서류에서 제목을 다시 찾았습니다'); }
+async function rhSplitSave(){
+  var base=_rhBase||_rhDoc;
+  if(!base||!base.bytes||!window.KcareerHwpxTidy){ toast('먼저 서식을 올려주세요'); return; }
+  var 남은=_tdPages.filter(function(p){ return (_rhTidy.drop[p.sec]||[]).indexOf(p.i)<0; });
+  if(!남은.length){ toast('갈라 저장할 쪽이 없습니다'); return; }
+  /* ⚠ 구역이 여럿인 서식은 한 구역만 남기는 길이 없다 — 못 한다고 그대로 말한다 */
+  var 구역={}; 남은.forEach(function(p){ 구역[p.sec]=1; });
+  if(Object.keys(구역).length>1){
+    toast('이 서식은 구역이 여럿이라 쪽마다 가를 수 없습니다 — 통째로 저장해 주세요'); return; }
+  toast('⏳ 갈라 저장하는 중…');
+  /* 친 값·정리까지 들어간 «내보낼 바이트»에서 가른다 — 화면에서 본 그대로 나가야 한다 */
+  var bytes=await rhComposeBytes();
+  if(!bytes){ toast('저장할 수 없습니다'); return; }
+  var T=KcareerHwpxTidy, zip=await JSZip.loadAsync(bytes);
+  var sec=남은[0].sec;
+  var 원문=await zip.file(sec).async('string');
+  /* 뺀 쪽이 이미 빠진 상태라 번호가 다시 매겨진다 — 여기서 새로 센다 */
+  var ps=T.pages(원문);
+  var 낸것=0;
+  for(var n=0;n<ps.length;n++){
+    var p=남은[n]||{};
+    var key=(p.sec||sec)+'#'+(p.i!=null?p.i:n);
+    var 제목=(_tdTitles[key]!=null?_tdTitles[key]:(ps[n].title||''));
+    제목=T.safeName(제목)||('쪽'+(n+1));
+    var one=T.keepOnly(원문,n);
+    if(one.refused) continue;
+    var z2=await JSZip.loadAsync(bytes);
+    z2.file(sec,one.xml);
+    var b2=await z2.generateAsync({type:'blob',mimeType:'application/hwp+zip'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(b2); a.download=제목+'.hwpx'; a.click();
+    낸것++;
+    await new Promise(function(r){ setTimeout(r,300); });   /* 한꺼번에 내리면 브라우저가 막는다 */
+  }
+  toast('📑 '+낸것+'개로 갈라 저장했습니다 — 내려받기 폴더를 보세요');
+}
 /* ── ✍️ 한글에서 고쳐 오기 ───────────────────────────────────────────────
    ⚠★ 한컴독스 같은 «웹 한글»을 팝업으로 띄우지 말 것 — 서류가 통째로 남의 서버로 올라간다.
       2026-09-05 에 같은 까닭으로 외부 편집기 길을 막았다. 이 길은 파일이 이 PC 를 안 떠난다. */
@@ -11716,7 +11817,13 @@ function rhHwpState(){
 async function rhHwpOut(){
   var bytes=await rhComposeBytes();
   if(!bytes||!bytes.length){ toast('내보낼 것이 없습니다'); return; }
+  /* ★ 이름은 «서류에서 찾은 제목»이 먼저다 (대표 지시 2026-09-13).
+     못 찾으면 지금까지처럼 올린 파일 이름을 쓴다 — 뒷걸음질하지 않는다. */
   var name=rhCleanName((_rhDoc&&_rhDoc.name)||'양식','_작성');
+  try{
+    var 제목=await rhDocTitle();
+    if(제목) name=KcareerHwpxTidy.safeName(제목)+'.hwpx';
+  }catch(e){ console.warn('제목 찾기',e); }
   if(window.showSaveFilePicker){
     try{
       var h=await window.showSaveFilePicker({ suggestedName:name,
