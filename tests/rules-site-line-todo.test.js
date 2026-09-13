@@ -94,59 +94,48 @@ test('빈 줄·모르는 갈래는 안 넣는다', () => {
 
 /* ── ② 집계는 전체를 그대로 ── */
 test('★★ 집계가 «전체 곳수»를 그대로 말한다 — 접었다고 개수까지 감추면 더 나쁘다', () => {
-  const fn = cut('function renderDash(');
-  assert.match(fn, /all\.length\+"곳"/,
-    '★★ 전체 곳수를 안 말합니다 — 접은 것이 아예 없는 것처럼 보입니다');
-  /* ⚠ 「할 일」이라는 낱말만 보면 안 된다 — 「할 일 없음」에도 그 낱말이 있어
-     숫자를 지워도 통과했다(고장넣기에서 확인). «몇 곳인지»를 못 박는다. */
-  assert.match(fn, /할 일 "\+todo\.length/, '할 일이 «몇 곳»인지 안 말합니다');
+  /* ⚠ 2026-09-13: 칩 띠를 걷고 단추 하나로 바꾸면서 «적는 자리»가 renderDash 에서
+     dashBtnFace 로 옮겨 갔다(대표 결정 「줄을 아예 없애고 단추 하나」).
+     지켜야 할 것은 그대로다 — 전체 곳수·할 일 수·갈래를 «다» 말한다. */
+  const fn = cut('function dashBtnFace(');
+  assert.match(fn, /전체\|\|0\)\+"곳"/, '★★ 전체 곳수를 안 말합니다');
+  assert.match(fn, /할 일 "\+n/, '할 일이 «몇 곳»인지 안 말합니다');
   assert.match(fn, /할 일 없음/, '할 일이 없을 때 그렇다고 안 말합니다');
   /* 갈래 집계(개정·검토·작성)는 «할 일»만 센다 — 그래야 「검토 15」가 안 나온다 */
-  assert.match(fn, /todo\.forEach\(r=>cnt\[r\.stage\.k\]\+\+\)/,
-    '★ 갈래 집계를 전체로 셉니다 — 남의 완료본이 「검토」에 섞입니다');
-  assert.ok(!/if\(cnt\.filed\)parts\.push/.test(fn),
-    '신고완료를 할 일 집계에 넣었습니다 — 그것은 할 일이 아닙니다');
+  assert.match(fn, /줄들\.forEach/, '★ 갈래를 할 일 밖에서 셉니다');
+  const 부르는곳 = cut('function renderDash(');
+  assert.match(부르는곳, /dashBtnFace\(all\.length,todo\)/,
+    '★ 전체 곳수와 «할 일»을 갈라 넘기지 않습니다 — 남의 완료본이 「검토」에 섞입니다');
 });
 
-/* ── ③④⑤ 접은 것을 말하는 단추 ── */
-test('★★ 접은 것이 있으면 «반드시» 말한다', () => {
-  const fn = cut('function renderDash(');
-  assert.match(fn, /접은수=all\.length-todo\.length/, '접은 수를 안 셉니다');
-  assert.match(fn, /＋'\+접은수\+'곳 더/,
-    '★★ 접었다는 말을 안 합니다 — 「내 사업장이 사라졌다」가 됩니다');
-  assert.match(fn, /display=접은수\?"":"none"/, '접은 것이 없어도 단추가 남습니다');
-});
-
-test('★★ 그 단추는 «구르는 줄 밖»이다 — 안에 두면 밀려 사라진다', () => {
-  /* 자리: #dash-list 는 overflow-x:auto 다. 단추는 그 «형제»여야 한다. */
-  const i = RAW.indexOf('id="dash-list"');
-  const j = RAW.indexOf('id="dash-more-wrap"');
-  const k = RAW.indexOf('id="dash-all"');
-  assert.ok(i > 0 && j > i, '★★ 단추 자리가 줄 밖에 없습니다');
-  assert.ok(j < k, '전체 보기보다 앞에 두어야 손이 가까이 옵니다');
-  /* 줄 자체는 여전히 구른다 — 그것을 없애면 높이가 늘어난다 */
-  assert.match(RAW.slice(i, i + 130), /overflow-x:auto/, '줄이 더 이상 구르지 않습니다');
-  /* 그리는 자리도 줄이 아니라 그 형제여야 한다 */
-  const fn = cut('function renderDash(');
-  assert.match(fn, /\$\("dash-more-wrap"\)/, '단추를 줄 안에 그립니다');
-  assert.ok(!/list\.innerHTML=[^;]*dash-more/.test(fn),
-    '★★ 단추를 구르는 줄 안에 넣었습니다 — 칩과 함께 밀려 사라집니다');
+/* ── ③④⑤ 칩 띠와 「＋N곳 더」는 2026-09-13 에 통째로 걷었다 ──
+   대표 결정 「줄을 아예 없애고 단추 하나」(목업 docs/mockups/2026-09-13-사업장줄-단추하나.html).
+   ★ 왜 여기 검사를 지우지 않고 «한 건»으로 바꿨나 — 다시 칩 띠를 들이면
+     같은 탈(가로로 밀려 못 찾음)이 되살아난다. 그 문을 이 한 줄이 막는다.
+   새 모양을 지키는 검사는 tests/rules-site-row-one-button.test.js 에 열일곱 건 있다. */
+test('★★ 칩 띠가 되살아나지 않는다 — 몇 곳이 되든 화면이 안 변해야 한다', () => {
+  /* ⚠ 주석을 먼저 걷는다 — 「칩 띠는 걷었다」고 적어 둔 주석의 글자가
+     「아직 있다」로 읽히면 멀쩡한 파일을 문다(저장소 규칙). */
+  const 코드 = RAW.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
+                  .replace(/^[ \t]*\/\/.*$/gm, '');
+  ['dash-list', 'dstrip', 'dchip', 'dash-more', 'dmore'].forEach(function (x) {
+    assert.ok(코드.indexOf(x) < 0,
+      '「' + x + '」가 돌아왔습니다 — 20곳이 되면 8곳이 다시 화면 밖으로 나갑니다');
+  });
 });
 
 test('★ 여는 길은 «이미 있는 전체 보기» 하나 — 새 창을 만들지 않는다', () => {
-  const fn = cut('function renderDash(');
-  assert.match(fn, /\$\("dash-all"\)[\s\S]{0,40}click\(\)/,
-    '★ 접은 것을 여는 길이 없거나 새 창을 만들었습니다');
-  assert.match(RAW, /id="dash-all"/, '전체 보기 단추가 사라졌습니다');
+  assert.match(RAW, /id="dash-all"/, '전체 보기로 가는 단추가 사라졌습니다');
+  assert.match(RAW, /\$\("dash-all"\)\.addEventListener\("click"/,
+    '★ 여는 손잡이가 없습니다');
+  assert.ok(!/id="ov-dash2"|id="ov-sites"/.test(RAW), '새 창을 만들었습니다');
 });
 
-test('단추에 «무엇이 접혔는지» 적는다 — 숫자만 있으면 무엇인지 모른다', () => {
-  const fn = cut('function renderDash(');
-  const i = fn.indexOf('dash-more');
-  const seg = fn.slice(i, i + 300);
-  ['신고완료', '미작성', '완료본'].forEach(function (w) {
-    assert.ok(seg.indexOf(w) >= 0, '접힌 것에 「' + w + '」이 있다고 안 알려 줍니다');
-  });
+test('★ 줄에 안 보이는 것이 «무엇인지» 말한다 — 숫자만 있으면 무엇인지 모른다', () => {
+  /* 예전에는 「＋N곳 더」 단추의 설명이 그 일을 했다. 지금은 단추 설명이 한다. */
+  const fn = cut('function dashBtnFace(');
+  assert.match(fn, /전체 "\+/, '전체가 몇 곳인지 안 말합니다');
+  assert.match(fn, /개정|검토|작성/, '갈래를 안 말합니다');
 });
 
 /* ── ⑥ 핀은 없다 ── */
@@ -168,8 +157,9 @@ test('★★ 접힌 사업장도 전체 보기에서는 그대로 보인다 — 
     '★★ 전체 보기까지 걸렀습니다 — 접힌 사업장을 여는 길이 아예 없어집니다');
 });
 
-test('줄이 고르는 것과 여는 것이 «같은 목록»을 본다 — 엉뚱한 곳이 열리면 안 된다', () => {
-  const fn = cut('function renderDash(');
-  assert.match(fn, /DASH_VIEW=todo/,
-    '보이는 것과 여는 것이 어긋납니다 — 칩을 눌러 다른 사업장이 열립니다');
+test('단추가 세는 것과 창이 보여 주는 것이 «같은 목록»을 본다', () => {
+  /* 칩이 없어져 「고르는 것」은 전체 보기 창 하나뿐이다. 두 자리가 같은 dashRows 를
+     봐야 「단추는 5라는데 창에는 3곳」 같은 어긋남이 안 생긴다. */
+  assert.match(cut('function renderDash('), /dashSorted\(dashRows\(\)\)/);
+  assert.match(cut('function renderDashModal('), /dashSorted\(dashRows\(\)\)/);
 });

@@ -72,14 +72,14 @@ test('★ 상태 줄이 ERP 배지를 오른쪽 끝으로 밀지 않는다', () 
     '상태 줄에 아직 늘어나는 여백이 있습니다 — 글과 배지가 화면 양 끝으로 갈립니다');
 });
 
-test('★ 사업장 줄의 칩 띠가 늘어나지 않는다 — 단추 셋이 칩 바로 뒤에 붙는다', () => {
-  const b = block('id="dash-list"', 'div');
-  const list = /<div id="dash-list"[^>]*>/.exec(b);
-  assert.ok(list, 'dash-list 를 찾지 못했습니다');
-  assert.ok(!/flex:\s*1[^-]/.test(list[0]),
-    '칩 띠가 아직 남는 자리를 다 차지합니다: ' + list[0]);
-  assert.match(list[0], /overflow-x:\s*auto|class="dstrip"/,
-    '늘리기를 뗀 대신 칩이 많을 때 좌우로 밀 수 있어야 합니다');
+test('★ 상태 줄의 단추가 오른쪽 끝으로 «안» 밀린다 — 눈이 화면을 가로지르면 안 된다', () => {
+  /* 2026-09-13: 칩 띠를 걷고 단추 하나로 바꿨다. 지켜야 할 것은 같다 —
+     글과 단추가 화면 양 끝으로 갈리면 한 줄을 읽는데 눈이 화면을 가로지른다. */
+  const at = src.indexOf('#statusbar .sb-push{');
+  assert.ok(at > 0, 'sb-push 규칙이 없습니다 — 단추 자리를 안 잡고 있습니다');
+  const body = src.slice(at, src.indexOf('}', at));
+  assert.match(body, /flex:\s*1 1 auto/, '미는 칸이 없습니다: ' + body);
+  assert.ok(!/id="dash-list"/.test(src), '칩 띠가 돌아왔습니다');
 });
 
 test('★ 결과 바닥 줄이 단추 셋을 오른쪽 끝으로 밀지 않는다', () => {
@@ -89,7 +89,7 @@ test('★ 결과 바닥 줄이 단추 셋을 오른쪽 끝으로 밀지 않는�
 });
 
 test('★ 왼쪽으로 몰았다고 단추가 사라지지는 않았다', () => {
-  ['dash-all', 'dash-new', 'dash-hide', 'mk-daejo', 'save', 'save-done',
+  ['dash-all', 'dash-new', 'mk-daejo', 'save', 'save-done',
     'rv-partial', 'rv-full', 'rv-renum'].forEach((id) =>
     assert.match(src, new RegExp('id="' + id + '"'), id + ' 가 없어졌습니다'));
 });
@@ -117,8 +117,10 @@ test('★ 일하는 판이 위로 올라온다 — 바깥 여백과 판 사이�
     '판 위 여백이 아직 큽니다: ' + cssNum('.grid', 'margin-top') + 'px');
 });
 
-test('설정 줄·사업장 줄은 그대로 있다 — 올렸다고 없앤 것이 아니다', () => {
-  ['setup', 'dash', 'statusbar', 'grid'].forEach((id) =>
+test('설정 줄·상태 줄은 그대로 있다 — 올렸다고 없앤 것이 아니다', () => {
+  /* ⚠ 'dash'(사업장 줄)는 2026-09-13 에 «일부러» 걷었다 — 대표 결정
+     「줄을 아예 없애고 단추 하나」. 나머지 셋은 그대로 있어야 한다. */
+  ['setup', 'statusbar', 'grid'].forEach((id) =>
     assert.match(src, new RegExp('id="' + id + '"'), id + ' 이 없어졌습니다'));
   ['site', 'upBtn', 'size', 'asof', 'run'].forEach((id) =>
     assert.match(src, new RegExp('id="' + id + '"'), id + ' 이 없어졌습니다'));

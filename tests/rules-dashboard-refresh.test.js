@@ -108,11 +108,14 @@ test('★ 보관함이 갱신되면 대시보드도 따라 그려진다', () => 
     '보관함 수만 고치고 대시보드를 안 그리면 「보관함 (5)」와 「0곳」이 또 어긋납니다.');
 });
 
-test('대시보드를 접어 두었으면 굳이 그리지 않는다', () => {
+test('★ 접기가 없어졌으므로 «늘» 그린다 (2026-09-13)', () => {
+  /* 대표 결정 「줄을 아예 없애고 단추 하나」로 접기 자체가 사라졌다.
+     예전에는 접혀 있으면 안 그렸는데, 이제 안 그리면 단추의 숫자가 낡은 채 남는다. */
   const c = boot({ uid: 'uidA', email: 'a@x.com' });
-  c.$ = (id) => (id === 'dash' ? { style: { display: 'none' } } : c.__badge);
   c.setLocal(RECS);
-  assert.equal(c.__painted.length, 0, '접힌 화면을 그리면 헛일입니다.');
+  assert.ok(c.__painted.length > 0, '보관함이 바뀌었는데 단추를 안 고칩니다.');
+  assert.ok(!/style\.display/.test(String(c.refreshDash)),
+    '아직 「보이나」를 묻고 있습니다 — 물을 줄이 없어졌습니다');
 });
 
 test('★ 보관함 쓰기는 setLocal 한 곳뿐이어야 한다 (두 숫자가 다시 어긋나지 않게)', () => {
