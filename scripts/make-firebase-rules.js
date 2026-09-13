@@ -18,7 +18,23 @@
 'use strict';
 
 /* ── 되풀이되는 조건에 이름을 붙인다 ───────────────────────────────────── */
-const LOGIN = "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)";
+
+/* ★★ 「로그인했다」와 「우리 직원이다」는 «다른 말»이다 (2026-09-12 보안 훑기)
+   ─────────────────────────────────────────────────────────────────────
+   옛 LOGIN 은 「비번 계정으로 들어왔나」만 봤다. 그런데 파이어베이스는 **가입이 열려
+   있어서**(Authentication › 가입 막기 = 꺼짐) 웹 열쇠만 있으면 **아무나** 계정을
+   만들 수 있다. 그 열쇠는 HTML 에 그대로 있다(원래 공개되는 것이라 그건 잘못이 아니다).
+
+   그래서 옛 LOGIN 이 걸린 232곳 — 고객사·계약·사건·명함첩·직원명부 — 이
+   «아무 이메일로 가입한 사람»에게 열려 있었다.
+   ⚠ 2026-09-12 실측: 이메일 계정 12개가 전부 @pureun.kr 이었다. 아직 아무도 안 들어왔다.
+
+   ★ 그래서 뜻을 바꾼다 — 「비번으로 들어왔고, **등록된 재직자**인가」.
+     등록은 uid_roles 에 있고, 그 자리는 아래에서 «스스로 못 쓰게» 묶는다.
+     둘이 함께 가야 한다 — 하나만 하면 스스로 재직자가 되어 버린다. */
+const 비번로그인 = "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)";
+const 재직자 = "root.child('uid_roles').child(auth.uid).child('status').val() === 'active'";
+const LOGIN = `${비번로그인} && ${재직자}`;
 const ADMIN = "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true";
 const SUB   = "root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true";
 const MGR   = `auth != null && (${ADMIN} || ${SUB})`;      // 관리자 또는 위임관리인
@@ -79,10 +95,41 @@ rules.ai_read_budget = {
 const roleGuard = {
   '.validate': `${ADMIN} || newData.val() === false || (data.exists() && newData.val() === data.val())`
 };
+/* ★★ 자기 자리를 «스스로» 쓰는 구멍을 막는다 (2026-09-12)
+   ─────────────────────────────────────────────────────────────────────
+   pu-erp.html 은 로그인할 때마다 uid_roles/<내uid> 를 «자기 손으로» 쓴다.
+   그 자체는 나쁘지 않다 — 새 직원이 처음 들어올 때 등록되는 길이라서다.
+   그런데 지켜지는 칸이 fin·isAdmin·isSubAdmin 셋뿐이라, **sid 와 status 는
+   아무 값이나 쓸 수 있었다.** 그래서 이런 일이 됐다:
+
+       ① 아무 이메일로 가입  →  ② uid_roles/<내uid> 에 {sid:'X-999', status:'active'}
+       →  ③ 「재직 직원」이 됨  →  메일함·명함첩·계약·사건이 열림
+
+   ⚠ 위에서 LOGIN 을 「재직자」로 바꾸는 것만으로는 **이걸 못 막는다** —
+     스스로 재직자가 될 수 있기 때문이다. 반드시 이 자리를 함께 막아야 한다.
+
+   ★ 무엇과 견주나 — sid_roles 다. 그 자리는 «관리자만» 쓴다(아래 rules.sid_roles).
+     즉 믿을 수 있는 명단이다. 거기에 「이 사번은 이 이메일의 것」을 적어 두고,
+     자기 칸을 쓸 때 그 둘이 맞는지 본다.
+
+   ⚠ 왜 이메일로 묶었나 — uid 로 묶으면 «닭과 달걀»이 된다. 새 직원의 uid 는
+     그 사람이 처음 로그인해야 생기는데, 관리자는 그 전에 명단을 적어 둬야 한다.
+     이메일은 미리 안다. 그래서 관리자가 사번+이메일만 넣어 두면
+     **그 사람이 처음 로그인할 때 저절로 등록된다** — 손이 더 가지 않는다.
+
+   ⚠ 쓰기 문에는 옛 조건(비번로그인)을 쓴다. 새 LOGIN 을 쓰면 «아직 등록 안 된»
+     새 직원이 자기 칸을 못 만들어 영영 못 들어온다(닭과 달걀). */
+const 명단맞춤 = `${ADMIN} || !newData.exists() || (`
+  + `newData.child('sid').isString()`
+  + ` && root.child('sid_roles').child(newData.child('sid').val()).child('loginEmail').val() === auth.token.email`
+  + ` && newData.child('status').val() === root.child('sid_roles').child(newData.child('sid').val()).child('status').val()`
+  + `)`;
+
 rules.uid_roles = {
   '.read': LOGIN,
   $uid: {
-    '.write': `(${LOGIN}) && (auth.uid == $uid || ${ADMIN})`,
+    '.write': `(${비번로그인}) && (auth.uid == $uid || ${ADMIN})`,
+    '.validate': 명단맞춤,
     fin: roleGuard, isAdmin: roleGuard, isSubAdmin: roleGuard
   }
 };

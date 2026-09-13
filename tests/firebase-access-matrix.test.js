@@ -35,13 +35,28 @@ class Snap {
   }
 }
 
+/* ★ 2026-09-12 — 「직원」의 뜻이 바뀌었다.
+   옛 규칙은 「비번으로 로그인했나」만 봤다. 그런데 파이어베이스 가입이 열려 있어
+   «아무나» 계정을 만들 수 있었다. 이제는 uid_roles 에 status:'active' 로
+   **등록된 사람**이라야 직원이다(scripts/make-firebase-rules.js 의 LOGIN).
+   그래서 이 모형에도 status 를 적는다 — 실제 재직자는 다 갖고 있는 칸이다. */
 const roleData = {
-  adminUid: { isAdmin: true, isSubAdmin: false },
-  subUid: { isAdmin: false, isSubAdmin: true },
-  staffUid: { isAdmin: false, isSubAdmin: false },
-  otherUid: { isAdmin: false, isSubAdmin: false },
+  adminUid: { isAdmin: true, isSubAdmin: false, status: 'active', sid: 'P-001' },
+  subUid: { isAdmin: false, isSubAdmin: true, status: 'active', sid: 'P-003' },
+  staffUid: { isAdmin: false, isSubAdmin: false, status: 'active', sid: 'A-001' },
+  otherUid: { isAdmin: false, isSubAdmin: false, status: 'active', sid: 'A-002' },
+  /* ★ 퇴사자 — 계정은 살아 있어도 자료는 안 열려야 한다 */
+  retiredUid: { isAdmin: false, isSubAdmin: false, status: 'retired', sid: 'P-002' },
+  /* ★ 바깥 사람 — 스스로 가입만 한 사람. uid_roles 에 «아예 없다» */
 };
-const root = new Snap({ uid_roles: roleData });
+const root = new Snap({
+  uid_roles: roleData,
+  /* 관리자만 쓰는 사번 명단 — uid_roles 를 스스로 못 쓰게 견주는 근거다 */
+  sid_roles: {
+    'P-001': { status: 'active', loginEmail: 'adminUid@pureun.kr' },
+    'A-001': { status: 'active', loginEmail: 'staffUid@pureun.kr' },
+  },
+});
 
 function auth(uid) {
   return {
