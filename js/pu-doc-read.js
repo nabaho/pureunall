@@ -510,11 +510,126 @@
     }).catch(function () { return ''; });
   }
 
+  /* ══ ⑨ 같은 서류를 두 번 읽지 않는다 — 지문 기억 (대표 지시 2026-09-13) ═════════
+       「중복해서 판독하는 경우도 정말 많은데 이 부분은 중복으로 안 읽게 할 수 없나?」
+
+     ★ 왜 — 판독 한 번이 약 4원이다. 2026-09-13 하루에 146번이 나갔고 그중 123번이
+       경력관리였다. 그날 들어간 「폴더 스캔」이 위촉장 112건을 한꺼번에 읽은 것이다.
+       같은 폴더를 두 번 스캔하면 224번이 된다 — 두 번째는 «한 글자도» 안 달라졌는데.
+
+     ★ 어떻게 — 보낼 내용의 지문을 떠서 그 지문으로 지난 결과를 찾는다.
+       사진이 한 픽셀이라도 다르면 지문이 달라져 다시 읽는다. 그래서 «틀릴 위험이 없다».
+
+     ⚠⚠ 기억은 **이 브라우저 안에만** 둔다(IndexedDB). 서버에 두면 판독 결과가
+       — 주민번호·계좌·이름이 든 그것이 — 새 자리에 한 벌 더 복제된다.
+       그 자리는 로그인한 직원이 다 읽는 자리다(data 밑이 그렇다). 아껴 보려다
+       개인정보를 흘리는 것은 밑지는 장사다. 기기마다 따로 기억하는 값은 감수한다.
+     ⚠ 프롬프트(묻는 말)도 지문에 넣는다 — 같은 사진이라도 «무엇을 묻는가»가 바뀌면
+       답이 달라야 한다. 사진만으로 지문을 뜨면 옛 답을 새 물음에 붙여 준다.
+     ⚠ 오래된 것은 버린다(90일). 안 버리면 브라우저 저장칸이 조용히 차오른다. */
+  var CACHE_DB = 'puDocRead', CACHE_STORE = 'reads', CACHE_DAYS = 90;
+  var _cacheDb = null;
+
+  function cacheOpen() {
+    if (_cacheDb) return Promise.resolve(_cacheDb);
+    var idb = null;
+    try { idb = global.indexedDB; } catch (_) { idb = null; }
+    if (!idb) return Promise.resolve(null);        // 못 쓰는 곳이면 조용히 없는 셈
+    return new Promise(function (done) {
+      var req;
+      try { req = idb.open(CACHE_DB, 1); } catch (_) { return done(null); }
+      req.onupgradeneeded = function () {
+        try { req.result.createObjectStore(CACHE_STORE, { keyPath: 'fp' }); } catch (_) {}
+      };
+      req.onsuccess = function () { _cacheDb = req.result; done(_cacheDb); };
+      req.onerror = function () { done(null); };
+    });
+  }
+  /* ⚠ 기억이 안 되는 것은 «고장이 아니다» — 판독은 그대로 돌아야 한다.
+       그래서 이 아래 모든 길은 넘어져도 조용히 null 을 준다. */
+  function cacheGet(fp) {
+    if (!fp) return Promise.resolve(null);
+    return cacheOpen().then(function (db) {
+      if (!db) return null;
+      return new Promise(function (done) {
+        var r;
+        try { r = db.transaction(CACHE_STORE, 'readonly').objectStore(CACHE_STORE).get(fp); }
+        catch (_) { return done(null); }
+        r.onsuccess = function () {
+          var v = r.result;
+          if (!v || !v.at) return done(null);
+          if (Date.now() - v.at > CACHE_DAYS * 864e5) return done(null);   // 너무 낡았다
+          done(v.reply);
+        };
+        r.onerror = function () { done(null); };
+      });
+    }).catch(function () { return null; });
+  }
+  function cachePut(fp, reply) {
+    if (!fp || reply == null) return Promise.resolve(false);
+    return cacheOpen().then(function (db) {
+      if (!db) return false;
+      try {
+        db.transaction(CACHE_STORE, 'readwrite').objectStore(CACHE_STORE)
+          .put({ fp: fp, reply: reply, at: Date.now() });
+      } catch (_) {}
+      return true;
+    }).catch(function () { return false; });
+  }
+
+  /* 보낼 내용의 지문. 사진(base64)과 물음(text)을 «있는 그대로» 이어 SHA-256 한다.
+     ⚠ 지문을 못 뜨면 빈 문자열을 준다 — 그러면 기억을 건너뛰고 그냥 판독한다.
+       (옛 브라우저나 http 에서는 crypto.subtle 이 없다. 거기서 판독이 멎으면 안 된다.) */
+  function partsFingerprint(parts) {
+    var list = Array.isArray(parts) ? parts : [];
+    var seed = '';
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i] || {};
+      if (p.inline_data && p.inline_data.data) seed += 'IMG:' + p.inline_data.data;
+      else if (typeof p.text === 'string') seed += 'TXT:' + p.text;
+    }
+    if (!seed) return Promise.resolve('');
+    var subtle = null;
+    try { subtle = global.crypto && global.crypto.subtle; } catch (_) { subtle = null; }
+    if (!subtle || typeof TextEncoder !== 'function') return Promise.resolve('');
+    return Promise.resolve()
+      .then(function () { return subtle.digest('SHA-256', new TextEncoder().encode(seed)); })
+      .then(function (buf) {
+        var b = new Uint8Array(buf), s = '';
+        for (var k = 0; k < b.length; k++) s += ('0' + b[k].toString(16)).slice(-2);
+        return s;
+      })
+      .catch(function () { return ''; });
+  }
+
+  /* 아낀 횟수 — 화면이 「이미 읽은 것 N장은 건너뛰었습니다(0원)」라고 말할 수 있게.
+     ⚠ 세기만 한다. 무엇을 읽었는지는 한 글자도 안 담는다. */
+  var _saved = 0;
+  function readSavedCount() { return _saved; }
+  function resetSavedCount() { _saved = 0; return 0; }
+
   /* ── 서버 대리인에게 맡긴다 (2026-08-17) ──
      브라우저는 열쇠를 모르고, 사진과 프롬프트만 보낸다. 모델 고르기·재시도는 서버가 한다.
      ⚠ 서버가 준 **상태 숫자를 그대로** 다시 세운다 — 위쪽 askAny 를 부르는 곳들이
-       이 숫자로 판단한다(429 면 잠시 뒤, 403 이면 곧바로 포기). 뭉개면 그 판단이 죽는다. */
+       이 숫자로 판단한다(429 면 잠시 뒤, 403 이면 곧바로 포기). 뭉개면 그 판단이 죽는다.
+     ★ 2026-09-13: 유료 판독으로 가는 «유일한 문»이라 지문 기억을 여기 둔다.
+       부르는 네 곳에 따로 달면 한 곳만 빠뜨려도 그 길은 계속 돈을 태운다. */
   function askProxy(parts, opts) {
+    var force = !!(opts && opts.fresh);          // 「다시 읽기」는 기억을 건너뛴다
+    var _fp = '';
+    return partsFingerprint(parts).then(function (fp) {
+      _fp = fp;
+      if (!fp || force) return null;
+      return cacheGet(fp);
+    }).then(function (hit) {
+      if (hit != null) { _saved++; return hit; }   // ★ 0원 — 서버를 아예 안 부른다
+      return askProxyNet(parts, opts).then(function (reply) {
+        return cachePut(_fp, reply).then(function () { return reply; });
+      });
+    });
+  }
+
+  function askProxyNet(parts, opts) {
     return Promise.resolve().then(deps.getToken).then(function (token) {
       if (!token) throw new Error('로그인을 확인해 주세요');
       return deps.fetch(deps.readDocUrl, {
@@ -1934,6 +2049,13 @@
     SUM_MAX: SUM_MAX,
     readChangeNotice: readChangeNotice,
     autoOk: autoOk,
+    /* ⑨ 지문 기억 (2026-09-13) — 화면이 「이미 읽은 것 N장 건너뜀(0원)」이라 말하고,
+       판독이 틀렸을 때 「다시 읽기」로 기억을 건너뛸 수 있게 내보낸다. */
+    readSavedCount: readSavedCount,
+    resetSavedCount: resetSavedCount,
+    _fingerprintForTest: partsFingerprint,
+    _cacheGetForTest: cacheGet,
+    _cachePutForTest: cachePut,
     /* 검사 전용 — 바깥 함수들은 실패를 한국어 글로 감싸 버려서, 서버가 준
        **상태 숫자**가 살아 있는지 확인할 길이 없다. 그 안쪽을 열어 둔다.
        ⚠ 앱에서 부르지 말 것. */
