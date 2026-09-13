@@ -655,6 +655,31 @@
   var _freeSlimmed = 0;
   function freeSlimCount() { return _freeSlimmed; }
 
+  /* ── 표가 «뜻»인 서류인가 — 그러면 글자로 바꾸지 않는다 (2026-09-13) ──────────
+     ★ 여기 적힌 서류는 «칸의 자리»가 값의 뜻을 정한다. 글자만 뽑아 보내면
+       표가 풀려 어느 숫자가 어느 칸의 것인지 사라진다:
+         · 통장·예금거래 — 계좌 한 자리가 틀리면 «딴 데로 돈이 간다»
+         · 급여명세서·임금대장 — 항목과 금액이 어긋나 엉뚱한 수당이 붙는다
+         · 근로계약서 — 근로시간·임금 칸이 서로 섞인다
+         · 원천징수·4대보험 — 숫자가 줄줄이 밀린다
+     ⚠ 넓게 잡는 편이 맞다. 잘못 켜서 틀린 값을 «자신 있게» 채우는 것보다,
+       몇 장 더 비싸게 읽는 편이 싸다.
+     ⚠ 공백을 걷고 본다 — 판독기가 「급 여 명 세 서」처럼 띄워 오는 일이 흔하다. */
+  var TABLE_DOC_WORDS = [
+    '통장', '예금거래', '거래내역', '입출금', '계좌번호',
+    '급여명세', '임금대장', '급여대장', '보수총액',
+    '근로계약', '연봉계약',
+    '원천징수', '지급명세', '４대보험', '4대보험', '보험료',
+    '재무제표', '손익계산', '대차대조', '잔액시산'
+  ];
+  function tableLike(text) {
+    var flat = String(text == null ? '' : text).replace(/\s+/g, '');
+    for (var i = 0; i < TABLE_DOC_WORDS.length; i++) {
+      if (flat.indexOf(TABLE_DOC_WORDS[i].replace(/\s+/g, '')) >= 0) return true;
+    }
+    return false;
+  }
+
   function slimByVision(parts, opts) {
     if (!(opts && opts.freeFirst)) return Promise.resolve(parts);
     var list = Array.isArray(parts) ? parts : [];
@@ -668,6 +693,14 @@
     return visionText(imgs).then(function (text) {
       var t = String(text == null ? '' : text).trim();
       if (t.length < FREE_MIN_CHARS_PER_IMG * imgs.length) return parts;   // 너무 적다
+      /* ★★ 뽑은 «글자를 보고» 표가 뜻인 서류면 사진으로 되돌린다 (2026-09-13)
+           대표 지시 「사진첩·기업정보함 켜라」로 넓히면서 넣었다.
+         ⚠ 사진첩은 판독 «전»에는 서류 종류를 모른다 — 종류를 알아내는 것이 판독이다.
+           그래서 무료로 뽑은 글자로 «먼저 가린다». 글자 뽑기는 무료라 값이 안 는다.
+         ⚠ 이 목록은 «칸의 자리가 곧 뜻»인 서류다. 글자만 보내면 표가 풀려
+           어느 숫자가 어느 칸의 것인지 사라진다 — 통장은 계좌 한 자리가 틀리면
+           딴 데로 돈이 가고, 급여명세서는 항목과 금액이 어긋난다. */
+      if (tableLike(t)) return parts;
       _freeSlimmed++;
       /* 물음(프롬프트)은 그대로 두고, 사진 자리에 뽑은 글자를 넣는다 */
       var out = texts.map(function (x) { return { text: x }; });
@@ -2106,6 +2139,9 @@
     freeSlimCount: freeSlimCount,
     _slimByVisionForTest: slimByVision,
     FREE_MIN_CHARS_PER_IMG: FREE_MIN_CHARS_PER_IMG,
+    /* 표가 «뜻»인 서류인가 — 켜는 화면을 늘릴 때 이 목록을 함께 본다 */
+    tableLike: tableLike,
+    TABLE_DOC_WORDS: TABLE_DOC_WORDS,
     _fingerprintForTest: partsFingerprint,
     _cacheGetForTest: cacheGet,
     _cachePutForTest: cachePut,
