@@ -161,17 +161,22 @@ function 쪽(제목, 전문) {
          닫으려다 안 닫히는 것으로만 겪게 된다.
        ⚠ 여기 적는 것은 코드가 «이미 아는 것»(이름·전화)뿐이다.
          주소·대표자 같은 것을 지어 넣으면 손님이 그것을 사실로 읽는다. */
+    /* ⚠ 가운데에 두면 카드 «뒤로 숨어» 넣은 뜻이 없어진다 — 위아래로 벌려 둔다. */
     + '#pop .bg{position:absolute;inset:0;display:flex;flex-direction:column;'
-    + 'align-items:center;justify-content:center;pointer-events:none;'
-    + '-webkit-user-select:none;user-select:none;overflow:hidden}'
+    + 'align-items:center;justify-content:space-between;padding:34px 0 20px;'
+    + 'pointer-events:none;-webkit-user-select:none;user-select:none;overflow:hidden}'
     + '#pop .bg .w{font:bold 96px Georgia,\'Times New Roman\',serif;letter-spacing:16px;'
     + 'color:#dedad4;line-height:1;white-space:nowrap}'
     + '#pop .bg .s{margin-top:10px;font:bold 15px \'Malgun Gothic\',sans-serif;'
     + 'letter-spacing:5px;color:#c8c2b9;white-space:nowrap}'
-    + '#pop .bg .t{position:absolute;bottom:20px;font:12.5px \'Malgun Gothic\',sans-serif;'
-    + 'color:#c8c2b9}'
+    + '#pop .bg .t{font:12.5px \'Malgun Gothic\',sans-serif;color:#c8c2b9}'
+    + '#pop .bg .top{display:flex;flex-direction:column;align-items:center}'
     /* ★ 글자를 키운 만큼 창도 넓힌다 — 안 그러면 줄만 잘게 쪼개진다 */
-    + '#pop .in{background:#fff;width:min(780px,94vw);max-height:88vh;border-radius:16px;'
+    /* ⚠⚠ position:relative + z-index 가 «반드시» 있어야 한다. 없으면 뒤에 둔 큰
+         글자(.bg 는 자리를 잡은 것이라 위로 온다)가 흰 카드를 «뚫고 나와»
+         본문 위에 겹쳐 찍힌다 — 배포하고 눈으로 보고서야 알았다(2026-09-13). */
+    + '#pop .in{position:relative;z-index:1;'
+    + 'background:#fff;width:min(780px,94vw);max-height:88vh;border-radius:16px;'
     + 'display:flex;flex-direction:column;overflow:hidden;border:1px solid #ddd7cf;'
     + 'box-shadow:0 18px 44px rgba(36,26,19,.22),0 2px 6px rgba(36,26,19,.08);'
     + 'animation:popup .18s ease-out}'
@@ -207,8 +212,8 @@ function 쪽(제목, 전문) {
     + '</head><body><div id="wrap">' + 전문 + '</div>'
     + '<div id="pop">'
     + '<div class="bg" aria-hidden="true">'
-    + '<div class="w">PUREUN</div>'
-    + '<div class="s">푸른노무법인 주간 노동뉴스레터</div>'
+    + '<div class="top"><div class="w">PUREUN</div>'
+    + '<div class="s">푸른노무법인 주간 노동뉴스레터</div></div>'
     + '<div class="t">문의 041-556-0035</div>'
     + '</div>'
     + '<div class="in">'
