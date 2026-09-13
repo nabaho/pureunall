@@ -137,8 +137,22 @@
     return n;
   }
 
-  function scan(sectionXml) {
+  /* ★★ 「아무 칸이나 고치기」 (대표 지시 2026-09-13 「필요하면 직접 타이핑이 가능해야 되는데
+     그건 왜 안 되나 … 불필요한 부분은 삭제하면 되는데 이게 왜 안 되나」)
+     ■ 왜 안 됐나 — 실측
+       글자가 든 칸은 «옆칸이나 윗칸이 우리가 아는 라벨일 때»만 고칠 자리로 잡았다(글자칸).
+       그래서 같은 표라도 말만 낯설면 칠 수 있는 칸이 8개에서 4개로 줄었다:
+         「성 명 | 홍길동」 → 홍길동을 고칠 수 있다   (성명을 안다)
+         「부르는 이름 | 홍길동」 → 못 고친다          (부르는 이름을 모른다)
+       즉 «사전이 모르는 서식일수록» 손으로 칠 길도 함께 막혔다 — 가장 필요한 때에.
+     ■ opts.all 을 주면 표의 «모든 칸»을 고칠 자리로 잡는다(kind '아무칸').
+     ⚠★ 기본값은 그대로다(꺼짐). 늘 켜 두면 서식 문구(「성 명」) 위에도 입력칸이 얹혀
+        서식을 읽을 수 없고, 실수로 기관 문구를 지우게 된다. 사람이 켤 때만 켠다.
+     ⚠★ 자동 채우기는 '아무칸'을 절대 안 건드린다(guess 가 늘 빈 열쇠를 준다) —
+        켜 두었다고 기관 문구가 덮이면 안 된다. */
+  function scan(sectionXml, opts) {
     var xmlAll = String(sectionXml || '');
+    var 모두 = !!(opts && opts.all);
     var slots = [], lists = [], warn = { textBoxes: 0, nested: 0 };
     var ti = -1;
     X.eachTable(xmlAll, function (tbl) {
@@ -224,6 +238,9 @@
           if (!kind && String(txt || '').trim() && !X.fieldKeyOf(txt) && (X.fieldKeyOf(왼) || 위)) {
             kind = '글자칸';
           }
+          /* ★ 사람이 「아무 칸이나 고치기」를 켰다 — 남은 칸도 모두 고칠 자리로 잡는다.
+             ⚠ 맨 뒤에 둔다. 앞의 판정들이 «먼저» 제 이름을 붙여야 자동 채우기가 그대로 돈다. */
+          if (!kind && 모두) kind = '아무칸';
           if (!kind) return;
           slots.push({ id: 't' + ti + 'r' + ri + 'c' + ci, tbl: ti, row: ri, col: ci,
                        /* 표에 적힌 «진짜 열 번호» — 숫자 칸 판정이 이것을 본다 */
@@ -264,7 +281,9 @@
     map.slots.forEach(function (s) {
       /* ★ 글자칸은 «자동으로는 절대» 안 채운다 — 사람이 눌러 고칠 때만 바뀐다.
          여기서 열쇠를 주면 기관이 적어 둔 안내문까지 덮어쓴다. */
-      if (s.kind === '글자칸') { s.guess = ''; return; }
+      /* ⚠ '아무칸'도 같다 — 사람이 켠 것뿐이지 「채워도 된다」는 뜻이 아니다.
+         여기서 열쇠를 주면 기관이 적어 둔 문구 위에 값이 박힌다. */
+      if (s.kind === '글자칸' || s.kind === '아무칸') { s.guess = ''; return; }
       /* ★ 자리표가 스스로 이름을 말하면 그것이 가장 확실하다 — [한자]·[영문]·(자택)( ) -
          왼쪽 칸만 보면 「[한자]의 왼쪽은 [한글]」이라 아무것도 못 알아본다
          (실측 2026-09-06: 성명 행에서 한자·영문이 통째로 빠졌다). */
@@ -384,6 +403,11 @@
     return byKey ? { parts: byKey } : null;
   }
 
+  /* «이미 글자가 들어 있는» 자리인가 — 넣을 때 끼우지 않고 통째로 바꿔야 하고,
+     빈 글자를 주면 지워 주어야 하는 자리다.
+     ⚠★ 이 판정은 «여기 한 곳»이다. 종류를 더할 때 이 함수만 고치면 된다. */
+  function 있던글자칸(kind) { return kind === '글자칸' || kind === '아무칸'; }
+
   /* 직접 친 글자를 칸에 넣는다. 빈 글자면 «비워 둔다»(지우개로도 쓴다). */
   function putTyped(xml, s, typed) {
     if (typed.parts) {
@@ -399,11 +423,12 @@
       return { ok: r.ok, xml: r.xml, shown: Object.keys(typed.parts).join('·') };
     }
     var v = typed.one;
-    /* ⚠ 글자칸은 «빈 글자»도 뜻이 있다 — 사람이 지운 것이다. 그대로 지워 준다.
-       다른 자리에서 빈 글자는 「비워 두기」라 손대지 않는다. */
-    if (v === '' && s.kind !== '글자칸') return { ok: false, empty: true };
+    /* ⚠ 「이미 글자가 든 칸」은 «빈 글자»도 뜻이 있다 — 사람이 지운 것이다. 그대로 지워 준다.
+       다른 자리에서 빈 글자는 「비워 두기」라 손대지 않는다.
+       ⚠★ 판정을 두 줄에 따로 적지 말 것 — 한쪽만 고치면 「지워지는데 안 바뀌는」 칸이 생긴다. */
+    if (v === '' && !있던글자칸(s.kind)) return { ok: false, empty: true };
     var r2 = eachCellAt(xml, s.tbl, s.row, s.col, function (tc) {
-      if (s.kind === '글자칸') return X.setCellText(tc, v);   /* 있던 글자를 바꾼다 */
+      if (있던글자칸(s.kind)) return X.setCellText(tc, v);   /* 있던 글자를 바꾼다(비우기도 포함) */
       return s.kind === '안내글뒤' ? appendAfter(tc, v) : X.fillCell(tc, v);
     });
     return { ok: r2.ok, xml: r2.xml, shown: v };
@@ -420,7 +445,12 @@
        ⚠ 고른 열쇠보다 «앞선다» — 사람이 고쳐 쓴 것이 최종이다. */
     var values = plan.values || {};
     var xml = String(sectionXml || ''), filled = [], failed = [];
-    var map = scan(xml);
+    /* ★★ 여기서는 «모든 칸»을 훑는다 (대표 지시 2026-09-13).
+       사람이 「✍ 아무 칸이나」로 친 값은 보통 때는 자리로 안 잡히는 칸에 들어 있다.
+       좁게 훑으면 그 이름표를 못 찾아 「그런 자리가 없습니다」로 값이 조용히 사라진다.
+       ⚠ 넓게 훑는다고 «더 채워지지는» 않는다 — 여기는 부르는 쪽이 준 picks·values 만
+         다룬다. 알아서 짐작해 넣는 일(guess)은 이 함수가 하지 않는다. */
+    var map = scan(xml, { all: true });
 
     /* 직접 친 자리도 채울 목록에 넣는다(고르지 않았어도) */
     var todo = {};
