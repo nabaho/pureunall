@@ -39,6 +39,14 @@ function grabFn(name) {
   throw new Error('함수 끝을 못 찾음: ' + name);
 }
 function load(parts) { const box = {}; new Function(parts.join('\n')).call(box); return box; }
+/* ★★ 소스를 «글자로» 볼 때는 주석을 먼저 걷는다 — 이 저장소의 규칙이다.
+   2026-09-13 하루에 «네 번» 걸렸다: 주석에 「render()」·「참여 지자체」·「탭을 한 번 열면」이라
+   적어 두었더니, 검사가 그 «글»을 코드로 읽고 있지도 않은 잘못을 잡았다.
+   한 곳에 모아 두어 다음 검사가 같은 덫을 밟지 않게 한다. */
+function 코드만(s) {
+  return String(s || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+}
+const grabCode = (n) => 코드만(grabFn(n));
 
 const GOV = () => load([grabDecl('_SIDO_ABBR'), grabFn('_addrParts'), grabFn('_siteGovs'),
   'this.f=_siteGovs;']).f;
@@ -202,7 +210,25 @@ test('★★ ⑬-3 고칠 수 있는 «칸»으로 보이지 않는다 — 셈�
 test('★★ ⑭ 참여사업장을 «아직 안 읽었을 때» 0곳이라 하지 않는다 — 모르는 것과 없는 것은 다르다', () => {
   const fn = grabFn('govField');
   assert.match(fn, /S\.sitesFor===S\.fundId && S\.sites/, '읽었는지를 안 봅니다.');
-  assert.match(fn, /탭을 한 번 열면/, '★ 안 읽었는데 「없다」고 말합니다.');
+  assert.match(fn, /읽는 중/, '★ 안 읽었는데 「없다」고 말합니다.');
+});
+
+/* ★★ 2026-09-13 — 「참여사업장이 왜 안나오나?」
+   목록 때문에 사업장을 «이미 전부» 읽어 두고도, 기금 정보는 그것을 안 보고
+   「[참여사업장] 탭을 한 번 열면 여기 섭니다」라고 말했다 — 읽어 둔 것을 안 쓰면서
+   사람에게 한 번 더 누르라고 한 셈이다. */
+test('★★ ⑭-2 이미 읽어 둔 전체 사업장을 «쓴다» — 탭을 또 열라고 하지 않는다', () => {
+  const fn = grabCode('govField');
+  assert.match(fn, /_allSites\[S\.fundId\]/,
+    '★ 목록이 읽어 둔 것을 안 씁니다 — 사람에게 탭을 한 번 더 누르라고 합니다.');
+  assert.ok(fn.indexOf('탭을 한 번 열면') < 0, '★ 아직 탭을 열라고 말합니다.');
+  assert.match(fn, /setTimeout\(loadAllSites/, '아직 안 읽었으면 읽어 오지 않습니다.');
+});
+
+test('★★ ⑭-3 읽고 나서 «보고 있는 쪽»을 다시 그린다 — 한쪽만 그리면 다른 쪽이 멈춘다', () => {
+  const fn = grabCode('loadAllSites');
+  assert.match(fn, /renderHome\(\)/, '목록을 다시 안 그립니다.');
+  assert.match(fn, /renderFund\(\)/, '★ 기금 정보를 다시 안 그립니다 — 「읽는 중…」에 멈춥니다.');
 });
 
 test('★★ ⑮ 손으로 적는 칸을 만들지 않았다 — 적어 두면 사업장과 어긋난 채 굳는다', () => {
@@ -298,10 +324,40 @@ const SHORT = () => load([grabDecl('_SIDO_ABBR'), grabFn('_addrParts'), grabFn('
    올림말을 열어 봐야 했다 — 한눈에 보려고 만든 칸인데 뜻이 없다. */
 test('★★ ㉑ 목록 칸에 지자체 이름을 «다» 적는다 — 「외 n」으로 줄이지 않는다', () => {
   const r = SHORT()(사업장);
-  assert.equal(r.text, '예산군·공주시·보령시');
+  assert.deepEqual(r.names, ['예산군', '공주시', '보령시']);
   assert.ok(r.text.indexOf('외 ') < 0, '★ 아직 「외 n」으로 줄입니다: ' + r.text);
   /* 곳 수는 올림말에 — 칸에 적으면 폭이 두 배가 된다 */
   assert.ok(r.title.indexOf('예산군 3') >= 0 && r.title.indexOf('보령시 1') >= 0, r.title);
+});
+
+/* ★★ 대표 지시 2026-09-13 「지역을 붙여넣지 말고 각각 나눠서 셀을 만들고 열을 정렬해라」 —
+   「예산군·공주시·보령시」처럼 이어 붙이면 줄마다 글자 수가 달라, 위아래로 훑을 때
+   둘째·셋째 지자체가 제각각 다른 자리에 선다. 같은 폭 칸에 하나씩 넣어 눈이 세로로 흐르게 한다. */
+test('★★ ㉑-4 지자체를 «칸마다 나눠» 같은 폭으로 세운다 — 이어 붙이지 않는다', () => {
+  const b = load(['function esc(s){ return String(s==null?"":s); }',
+    grabDecl('GOV_CELL_W'), grabFn('govCells'), 'this.f=govCells; this.W=GOV_CELL_W;']);
+  const h = b.f(['예산군', '공주시', '보령시']);
+  assert.equal((h.match(/<span/g) || []).length, 3, '★ 칸이 셋이 아닙니다 — 이어 붙였습니까?');
+  assert.ok(h.indexOf('·') < 0, '★ 가운뎃점으로 이어 붙였습니다.');
+  /* 폭이 «고정»이어야 세로로 맞는다 — min-width 면 긴 이름 하나가 뒤를 민다 */
+  assert.equal((h.match(new RegExp('width:' + b.W + 'px', 'g')) || []).length, 3);
+  assert.ok(h.indexOf('min-width') < 0, '★ min-width 면 긴 이름 한 줄부터 정렬이 어긋납니다.');
+  assert.ok(h.indexOf('text-align:left') >= 0, '★ 가운데 맞추면 글자 수가 다를 때 또 어긋납니다.');
+});
+
+test('★★ ㉑-5 열 폭이 «칸 크기의 배수»다 — 아니면 넷째가 반쯤 걸쳐 선다', () => {
+  const b = load([grabDecl('GOV_CELL_W'), 'this.W=GOV_CELL_W;']);
+  const t = grabCode('fundTable');
+  const m = /'참여 지자체','ph','(\d+)px'/.exec(t);
+  assert.ok(m, '목록 열 폭을 못 찾았습니다.');
+  const 폭 = Number(m[1]);
+  assert.ok(폭 >= b.W * 3, '★ 칸 셋이 한 줄에 안 들어갑니다(' + 폭 + 'px < ' + (b.W * 3) + 'px).');
+  assert.ok(폭 - b.W * 3 < b.W, '★ 넉 자리만큼 넓어 빈 자리가 큽니다.');
+});
+
+test('★★ ㉑-6 목록 줄이 그 나눈 칸을 «정말 쓴다» — 따로 이어 붙이면 정렬이 헛돈다', () => {
+  assert.match(grabFn('fundGovCell'), /govCells\(g\.names\)/,
+    '★ 줄이 칸 나눔을 안 씁니다 — 이어 붙인 글자가 그대로 나갑니다.');
 });
 
 test('★ ㉑-2 지자체가 많아도 «다» 적는다 — 몇 곳이든 줄이지 않는다', () => {
@@ -341,8 +397,7 @@ test('★★★ ㉓-2 읽고 나서 «정말 있는» 함수로 다시 그린다
   /* ⚠ 주석을 «먼저 걷는다» — 이 함수는 주석에 「처음에 render() 를 불렀는데」라고 적어
      두었고, 그냥 훑으면 그 글에 걸려 있지도 않은 잘못을 잡는다(2026-09-13 에 실제로 그랬다).
      저장소 규칙이기도 하다: 소스를 글자로 보는 검사는 주석을 먼저 걷는다. */
-  const fn = grabFn('loadAllSites')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+  const fn = grabCode('loadAllSites');
   const 부르는것 = [...fn.matchAll(/\b(render[A-Za-z]*)\s*\(/g)].map((m) => m[1]);
   assert.ok(부르는것.length, '★ 다시 그리지 않습니다 — 화면이 「…」에 멈춥니다.');
   부르는것.forEach((n) => {
@@ -364,8 +419,7 @@ test('★★ ㉓-3 못 읽으면 «다음에 한 번 더» 매단다 — 한 번
 test('★★ ㉓-4 「정보 채우기」 표에도 참여 지자체가 «기금명 오른쪽»에 선다', () => {
   /* ⚠ 주석을 먼저 걷는다 — 바로 위 주석이 「참여 지자체」를 말하고 있어,
      그냥 훑으면 그 글이 <th>기금명</th> 보다 앞에 있다고 잡힌다(2026-09-13). */
-  const t = grabFn('fundTable')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+  const t = grabCode('fundTable');
   const edit = t.slice(0, t.indexOf("if(mode==='trash')"));
   assert.ok(edit.indexOf('참여 지자체') >= 0, '★ 정보 채우기 표에 칸이 없습니다.');
   assert.ok(edit.indexOf('<th>기금명</th>') < edit.indexOf('참여 지자체'),
