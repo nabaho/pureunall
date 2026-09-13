@@ -623,10 +623,57 @@
       return cacheGet(fp);
     }).then(function (hit) {
       if (hit != null) { _saved++; return hit; }   // ★ 0원 — 서버를 아예 안 부른다
-      return askProxyNet(parts, opts).then(function (reply) {
-        return cachePut(_fp, reply).then(function () { return reply; });
+      /* ★ 그래도 읽어야 한다면 — 사진 대신 «글자»를 보낼 수 있는지 먼저 본다(아래 ⑩) */
+      return slimByVision(parts, opts).then(function (slim) {
+        return askProxyNet(slim, opts).then(function (reply) {
+          /* ⚠ 지문은 «원래 보낼 것»으로 뜬다 — 글자로 바꿔 보냈어도 그렇다.
+               안 그러면 다음에 같은 사진이 와도 지문이 달라 또 읽는다. */
+          return cachePut(_fp, reply).then(function () { return reply; });
+        });
       });
     });
+  }
+
+  /* ══ ⑩ 무료로 «글자»를 먼저 뽑아, 사진 대신 글자를 보낸다 (대표 지시 2026-09-13) ══
+       「무료버전 먼저 사용하게 안 되나?」
+
+     ★ 왜 — 판독 요금은 «사진»이 비싸다. 같은 서류라도 글자로 보내면 훨씬 싸다.
+       Vision 의 글자 뽑기는 달마다 1,000장이 무료이고 Gemini 의 몫과 «따로» 돈다.
+       그래서 무료로 글자를 뽑아 그 글자를 AI 에 넘기면, **답의 정확도는 그대로 두고**
+       값만 내려간다. (칸 채우기는 지금처럼 AI 가 한다 — 규칙으로 짜지 않는다.)
+
+     ⚠⚠ **아무 서류에나 켜면 안 된다.** 글자만 보내면 표의 «자리»와 도장·서명이
+       사라진다. 급여명세서·근로계약서처럼 칸의 위치가 곧 뜻인 서류는 값이 엉킨다.
+       그래서 **부르는 쪽이 켜야만** 이 길로 간다(opts.freeFirst). 기본은 끔이다.
+       ⚠ 「기본을 켜면 다 좋아지지 않나」 — 아니다. 한 번 잘못 읽은 값은 그대로
+         기업 상세·경력카드로 나간다. 켜는 화면을 하나씩 늘리는 편이 맞다.
+
+     ⚠ 글자가 «충분할 때만» 바꾼다. 흐린 사진·손글씨는 Vision 이 몇 글자만 주는데,
+       그 몇 글자를 AI 에 보내면 사진을 봤으면 읽었을 것도 못 읽는다.
+     ⚠ Vision 이 실패하거나 무료 몫이 다 되면 **그냥 사진으로 간다** — 막지 않는다. */
+  var FREE_MIN_CHARS_PER_IMG = 120;   // 사진 한 장당 이만큼은 나와야 글자 길로 간다
+  var _freeSlimmed = 0;
+  function freeSlimCount() { return _freeSlimmed; }
+
+  function slimByVision(parts, opts) {
+    if (!(opts && opts.freeFirst)) return Promise.resolve(parts);
+    var list = Array.isArray(parts) ? parts : [];
+    var imgs = [], texts = [];
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i] || {};
+      if (p.inline_data && p.inline_data.data) imgs.push(p.inline_data.data);
+      else if (typeof p.text === 'string') texts.push(p.text);
+    }
+    if (!imgs.length) return Promise.resolve(parts);   // 이미 글자뿐이면 할 일이 없다
+    return visionText(imgs).then(function (text) {
+      var t = String(text == null ? '' : text).trim();
+      if (t.length < FREE_MIN_CHARS_PER_IMG * imgs.length) return parts;   // 너무 적다
+      _freeSlimmed++;
+      /* 물음(프롬프트)은 그대로 두고, 사진 자리에 뽑은 글자를 넣는다 */
+      var out = texts.map(function (x) { return { text: x }; });
+      out.push({ text: '[사진에서 뽑은 글자]\n' + t });
+      return out;
+    }).catch(function () { return parts; });           // 넘어지면 사진 그대로
   }
 
   function askProxyNet(parts, opts) {
@@ -1117,21 +1164,23 @@
         parts.push({ inline_data: { mime_type: mt, data: b64 } });
       });
       if (parts.length < 2) return { ok: false, why: '읽을 것이 없습니다' };
-      return runRawParts(parts);
+      /* ⑩ opts 를 그대로 넘긴다 — 부르는 쪽의 freeFirst 가 여기서 끊기면
+           「무료 먼저」를 켤 길이 아예 없어진다(켜는 곳은 화면이다). */
+      return runRawParts(parts, opts);
     }).catch(function (e) {
       return { ok: false, why: (e && e.message) || String(e) };
     });
   }
 
   /* 답을 «그대로» 돌려주는 길 — runDocParts 와 달리 afterRead 를 안 탄다 */
-  function runRawParts(parts) {
+  function runRawParts(parts, opts) {
     var 마무리 = function (j) {
       var parsed = parseReply(j);
       if (!parsed) return { ok: false, why: 'AI 가 표 모양(JSON)으로 답하지 않았습니다' };
       return { ok: true, data: parsed };
     };
     if (useProxy()) {
-      return askProxy(parts).then(마무리).catch(function (e) {
+      return askProxy(parts, opts).then(마무리).catch(function (e) {
         return { ok: false, why: (e && e.message) || String(e) };
       });
     }
@@ -2053,6 +2102,10 @@
        판독이 틀렸을 때 「다시 읽기」로 기억을 건너뛸 수 있게 내보낸다. */
     readSavedCount: readSavedCount,
     resetSavedCount: resetSavedCount,
+    /* ⑩ 무료로 글자를 먼저 뽑아 «사진 대신» 보낸 수 (2026-09-13) */
+    freeSlimCount: freeSlimCount,
+    _slimByVisionForTest: slimByVision,
+    FREE_MIN_CHARS_PER_IMG: FREE_MIN_CHARS_PER_IMG,
     _fingerprintForTest: partsFingerprint,
     _cacheGetForTest: cacheGet,
     _cachePutForTest: cachePut,
