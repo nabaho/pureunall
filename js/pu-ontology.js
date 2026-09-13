@@ -97,13 +97,20 @@
     home:{ name:'홈페이지 관리', file:'pu-home.html', primaryRoots:['homepage'], sharedRoots:['kcareer/{uid}/ls'],
       entityTypes:['Person','Organization','Document'] },
     /* 뉴스레터 관리 — 주간뉴스레터를 짓고 보낸다.
-       소유: newsletter (설정·회차 초안·받는 명단).
-       빌려 읽는 곳: homepage/newsBrief(자동으로 담을 기사) · pucards/scheduled(보낸 결과)
-                   · mailbox(반송·자동회신을 찾는다 — 읽기만 한다).
-       ⚠ 명단은 «여기가 정본»이다 — 기업정보함 명함을 실시간으로 끌어오지 않는다.
-         끌어오면 명함 한 장이 바뀔 때 누구에게 갈지가 조용히 달라진다. */
+       소유: newsletter (설정·회차·확정본·지역뉴스 후보·따로 더한 분).
+       빌려 «읽는» 곳: data/companies(받는 명단) · homepage/newsBrief(자동으로 담을 기사)
+                     · pucards/scheduled(보낸 결과) · mailbox(반송·자동회신).
+       ⚠⚠ 받는 명단은 «여기에 사본을 두지 않는다» — 업체 자리(data/companies)를
+         그때그때 읽는다. 대표 지시 2026-09-03 「매주 실시간으로 확인하고 싶다.
+         사업장계약종료 또는 담당자 퇴사시에 더이상 보낼필요가 없을경우…」.
+         사본을 두면 붙여넣은 날에 멈춰, 계약이 끝나도 담당자가 그만두어도 계속 나간다.
+       ⚠ 예외가 하나 있다 — newsletter/더한분들(사업장에 딸리지 않은 분)만 사본이다.
+         그래서 «담은 날»을 함께 적어 두고 오래된 줄에 확인을 띄운다.
+       ★ 2026-09-13 바로잡음: 여기에 「명단은 여기가 정본이고 기업정보함을 실시간으로
+         끌어오지 않는다」고 «거꾸로» 적혀 있었다. 어긋난 안내는 없는 것보다 나쁘다 —
+         읽은 사람이 안심하고 틀린다. */
     news:{ name:'뉴스레터 관리', file:'pu-news.html', primaryRoots:['newsletter','ilabor'],
-      sharedRoots:['homepage/newsBrief','pucards/scheduled','mailbox'],
+      sharedRoots:['data/companies','homepage/newsBrief','pucards/scheduled','mailbox'],
       entityTypes:['Organization','Person','Message','Document'] }
   };
 

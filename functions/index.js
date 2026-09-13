@@ -3151,21 +3151,42 @@ exports.dailyRegionalNewsCollect = functions
     const db = getDatabase();
     const 자리 = db.ref("newsletter/regionalCandidates");
     const 있던것 = (await 자리.once("value")).val() || {};
+    /* 지난번 결과 — 「언제부터 못 읽나」를 이어 세려면 옛 기록이 있어야 한다 */
+    const 있던메타 = (await db.ref("newsletter/regionalCollectMeta").once("value")).val() || {};
     const patch = {};
     let 읽은출처 = 0, 새것 = 0;
+    /* ★★ 출처마다 «됐나 안 됐나»를 남긴다 (2026-09-13).
+         예전에는 「2/3 읽음」만 남고 어느 출처가 왜 막혔는지는 서버 기록에만 있었다.
+         그래서 지역뉴스가 없을 때 「새 기사가 없는 것」인지 「못 읽고 있는 것」인지
+         화면에서 가릴 수가 없었다 — 몇 주를 조용히 안 읽고 있어도 모른다.
+       ⚠ 실패해도 «마지막 성공»은 지우지 않는다. 「언제부터 못 읽나」가 답이다. */
+    const 출처별 = {};
+    const 지금 = Date.now();
     for (const 출처 of 지역뉴스부품.출처들) {
+      const 열 = String(출처.id || "").replace(/[.#$/[\]]/g, "_");
+      const 옛 = (있던메타.출처별 || {})[열] || {};
       try {
         const xml = await 글자로받기(출처.목록주소);
         읽은출처++;
+        let 이출처새것 = 0;
         지역뉴스부품.후보만들기(xml, 출처, Object.assign({}, 있던것, patch), Date.now())
-          .forEach(function(x){ patch[x.id] = x; 새것++; });
+          .forEach(function(x){ patch[x.id] = x; 새것++; 이출처새것++; });
+        출처별[열] = { 이름: String(출처.기관 || 출처.이름 || 출처.id || ""),
+          지역: String(출처.지역 || ""), 됐나: true, 마지막성공: 지금,
+          새후보: 이출처새것, 탈: "", 연속실패: 0 };
       } catch (e) {
-        console.warn("[지역뉴스] " + 출처.id + "를 못 읽었습니다", String(e.message || e));
+        const 탈 = String((e && e.message) || e).slice(0, 200);
+        console.warn("[지역뉴스] " + 출처.id + "를 못 읽었습니다", 탈);
+        출처별[열] = { 이름: String(출처.기관 || 출처.이름 || 출처.id || ""),
+          지역: String(출처.지역 || ""), 됐나: false, 마지막실패: 지금, 탈: 탈,
+          마지막성공: Number(옛.마지막성공 || 0),
+          연속실패: Number(옛.연속실패 || 0) + 1 };
       }
     }
     if (새것) await 자리.update(patch);
     await db.ref("newsletter/regionalCollectMeta").update({
-      마지막수집:Date.now(), 읽은출처:읽은출처, 전체출처:지역뉴스부품.출처들.length, 새후보:새것
+      마지막수집:지금, 읽은출처:읽은출처, 전체출처:지역뉴스부품.출처들.length, 새후보:새것,
+      막힌출처:지역뉴스부품.출처들.length - 읽은출처, 출처별:출처별
     });
     console.log("[지역뉴스] 출처 " + 읽은출처 + "/" + 지역뉴스부품.출처들.length
       + " · 새 검토후보 " + 새것 + "건");

@@ -56,15 +56,27 @@
 
   function 활성인가(news) { return !!news && news.상태 !== '철회'; }
 
+  /* 목록 하나에 한 건만 더한다 — 이미 있으면 null.
+     ★ 이 자만 따로 두면 «지역뉴스 칸 하나»에만 거래를 걸 수 있다. 회차 통째에
+       걸면 30,000자 전문까지 읽어 통째로 다시 쓴다(2026-09-13 실측: 회차 하나
+       47.8KB 중 전문이 30.3KB). 회차가 쌓일수록 그만큼 무거워진다.
+     ⚠ 빈 자리(null)에서도 «더한 목록»을 돌려준다 — 거래는 찬 자리에서 null 로
+       먼저 불리는데, 거기서 접으면 서버에 묻지도 않고 끝난다. */
+  function 목록추가(list, news) {
+    if (!news || !news.id) return null;
+    var l = Array.isArray(list) ? list : [];
+    if (l.some(function(x) { return x && (x.id === news.id ||
+      (news.후보Id && x.후보Id === news.후보Id)); })) return null;
+    return l.concat([news]);
+  }
+
   /* 재시도마다 서버가 준 최신 목록에 한 건만 더한다. 입력 객체는 고치지 않는다. */
   function 회차추가(issue, news, draft, by, at) {
-    if (!news || !news.id) return null;
     var cur = issue || { 회차:draft.회차, 상태:'초안' };
     if (cur.상태 === '발송') return null;
-    var list = Array.isArray(cur.지역뉴스) ? cur.지역뉴스 : [];
-    if (list.some(function(x) { return x && (x.id === news.id ||
-      (news.후보Id && x.후보Id === news.후보Id)); })) return null;
-    return Object.assign({}, cur, { 지역뉴스:list.concat([news]),
+    var next = 목록추가(cur.지역뉴스, news);
+    if (!next) return null;
+    return Object.assign({}, cur, { 지역뉴스:next,
       고친이:by, 고친때:at, revision:(Number(cur.revision)||0)+1 });
   }
 
@@ -110,7 +122,7 @@
     return null;
   }
 
-  var API = { 검토변경:검토변경, 승인뉴스:승인뉴스, 수동뉴스:수동뉴스,
+  var API = { 검토변경:검토변경, 승인뉴스:승인뉴스, 수동뉴스:수동뉴스, 목록추가:목록추가,
     철회:철회, 활성인가:활성인가, 승인된회차:승인된회차, 복구판정:복구판정,
     회차추가:회차추가, 원자승인:원자승인 };
   if (typeof module === 'object' && module.exports) module.exports = API;
