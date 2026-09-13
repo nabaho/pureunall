@@ -437,6 +437,27 @@ body.kc-staff .kc-staff-note{display:flex}
 .pglimit-btn:hover{background:var(--soft,#f8fafc)}
 .pglimit-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
 .pglimit-info{margin-left:6px}
+/* 🧹 서식 정리 (2026-09-13) */
+.td-card{border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:13px}
+.td-h{font-size:13.5px;font-weight:700;color:var(--navy);margin-bottom:3px}
+.td-why{font-size:12px;color:var(--text-mute);margin-bottom:11px;line-height:1.6}
+.td-pages{display:flex;gap:10px;flex-wrap:wrap}
+.td-pg{width:92px;border:2px solid var(--border);border-radius:8px;background:#fff;padding:6px;
+  position:relative;cursor:pointer;text-align:center}
+.td-pg .sheet{height:108px;background:#fff;border:1px solid var(--border);border-radius:3px;
+  padding:7px 6px;overflow:hidden;font-size:8.5px;color:var(--text-mute);text-align:left;line-height:1.45;word-break:break-all}
+.td-pg .no{font-size:11px;color:var(--text-mute);margin-top:5px}
+.td-pg.off{opacity:.45;border-color:var(--red);border-style:dashed}
+.td-pg.off .no{color:var(--red);font-weight:700;text-decoration:line-through}
+.td-pg .x{position:absolute;top:-7px;right:-7px;width:21px;height:21px;border-radius:50%;
+  border:none;background:var(--red);color:#fff;font-size:12px;font-weight:700;cursor:pointer;line-height:1}
+.td-pg.off .x{background:var(--teal)}
+.td-tally{margin-top:11px;font-size:12.5px;color:var(--text-sub)}
+.td-chk{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:4px 0;cursor:pointer}
+.td-n{color:var(--text-mute);font-size:11.5px}
+.td-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px;
+  font-size:11.5px;color:#854d0e;margin-top:9px;line-height:1.6}
+.td-state{font-size:12px;color:var(--text-mute);margin-top:10px;line-height:1.6}
 /* 표 «맨 아래»의 더 보기 줄 — 위 툴바의 「표시」는 한 번에 몇 건이고, 여기는 그 다음 판이다.
    ⚠ 한 줄로 둔다(단추·단추·남은 건수) — 쌓으면 긴 표에서 밑이 그만큼 더 길어진다. */
 .more-rows{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
@@ -1089,6 +1110,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-rrn-mask.js?v=4"></script>
 <script src="js/pu-doc-read.js?v=44"></script>
 <script src="js/kcareer-hwpxfill.js?v=25"></script>
+<!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
+<script src="js/kcareer-hwpxtidy.js?v=1"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=15"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
@@ -1376,6 +1399,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <button class="btn" id="rhUndoBtn" style="display:none" onclick="rhUndoFill()" title="채우기 전으로 되돌립니다">↩ 되돌리기</button>
                 <button class="btn" style="border-color:#fecaca;color:var(--red)" onclick="rhStampDoc()" title="★기본 도장을 「(인)」 자리에 찍습니다 — 글자를 다 확인한 뒤 마지막에">🖋 도장 찍기</button>
                 <button class="btn primary" onclick="rhSaveInput()" id="kfSaveBtn" title="입력판에 친 값을 원본 한글 서식의 그 칸에 넣습니다">💾 원본 한글에 넣기</button>
+                <button class="btn" onclick="openTidy()" id="rhTidyBtn" title="필요 없는 쪽을 빼고, 남은 자리표·예시 글자를 걷어 냅니다 — 한글에서 고쳐 온 파일을 바탕으로 갈아 끼우는 것도 여기입니다">🧹 서식 정리</button>
                 <button class="btn" onclick="rhOpenBigPopup()" id="rhBigBtn" title="올린 한글 서식을 큰 창으로 — 실제 A4 쪽 그대로 보입니다">🔍 큰 창으로 보기</button>
                 <button class="btn" onclick="rhToggleWide()" id="rhWideBtn" title="편집 화면을 넓게 — 아래가 잘려 안 보일 때">⛶ 넓게 보기</button>
                 <button class="btn" id="rcSaveBtn">💾 완성본 생성</button>
@@ -2333,6 +2357,46 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <span style="font-size:11.5px;color:var(--text-mute);margin-right:auto" id="pasteFoot"></span>
       <button class="btn" type="button" onclick="closePasteIn()">닫기</button>
       <button class="btn primary" type="button" onclick="pasteSave()">넣기</button>
+    </div>
+  </div>
+</div>
+<!-- 🧹 서식 정리 — 쪽 빼기 · 남은 글자 · 한글 왕복 (대표 지시 2026-09-13 「목업대로」) -->
+<div class="modal-ov" id="modalTidy">
+  <div class="modal" style="width:760px">
+    <div class="modal-h">🧹 서식 정리<span id="tdWho" style="font-size:11.5px;font-weight:400;color:var(--text-mute);margin-left:8px"></span></div>
+    <div class="modal-b">
+      <!-- ① 쪽 빼기 -->
+      <div class="td-card">
+        <div class="td-h">📄 필요 없는 쪽 빼기</div>
+        <div class="td-why" id="tdPageWhy">쪽을 눌러 빼 두면 완성본에서 통째로 빠집니다. 원본은 그대로라 언제든 되살립니다.</div>
+        <div class="td-pages" id="tdPages"></div>
+        <div class="td-tally" id="tdPageTally"></div>
+      </div>
+      <!-- ② 남은 글자 정리 -->
+      <div class="td-card">
+        <div class="td-h">🧹 안 채운 자리에 남은 글자</div>
+        <div class="td-why">채우고 남은 자리표(<b>____</b> · <b>년 월 ~ 년 월</b> · <b>○ ○ ○</b> 같은 빈 날짜·이름 자리)와
+          기관이 적어 둔 <b>기울임 예시</b>를 걷어 냅니다.</div>
+        <label class="td-chk"><input type="checkbox" id="tdPh" onchange="rhTidySet()"> <b>자리표 지우기</b><span id="tdPhN" class="td-n"></span></label>
+        <label class="td-chk"><input type="checkbox" id="tdIt" onchange="rhTidySet()"> <b>기울임으로 적힌 예시까지</b><span id="tdItN" class="td-n"></span></label>
+        <label class="td-chk"><input type="checkbox" id="tdRows" onchange="rhTidySet()"> <b>표 끝의 빈 줄까지</b><span id="tdRowsN" class="td-n"></span></label>
+        <div class="td-warn">⚠ 「표 끝의 빈 줄」은 조심스럽습니다 — 기관이 「다섯 줄로 내라」고 한 서식이면 줄을 지우는 순간 어긋납니다. 그래서 <b>따로</b> 눌러야 합니다.</div>
+      </div>
+      <!-- ③ 한글에서 고쳐 오기 -->
+      <div class="td-card">
+        <div class="td-h">✍️ 한글에서 고친 뒤 이어서 쓰기</div>
+        <div class="td-why">한글 프로그램을 이 화면에서 띄울 수는 없습니다(브라우저가 못 합니다). 대신 <b>파일 자리를 기억</b>해 두었다가, 고쳐 저장하시면 단추 하나로 다시 읽어옵니다.</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button class="btn primary" type="button" onclick="rhHwpOut()">📥 한글로 내보내기</button>
+          <button class="btn primary" type="button" onclick="rhHwpBack()">📤 고친 것 읽어오기</button>
+          <button class="btn" type="button" onclick="rhHwpRestore()" id="tdRestore" style="display:none">↩ 원래 서식으로</button>
+        </div>
+        <div class="td-state" id="tdHwpState"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" type="button" onclick="closeTidy()">닫기</button>
+      <button class="btn primary" type="button" onclick="rhTidyPreview()">🔄 다시 그려 보기</button>
     </div>
   </div>
 </div>
@@ -5240,7 +5304,10 @@ async function mountEditor(buffer,name,cfg){
            바꾸면 「이미 채워진 것」이 바탕이 되어 되돌려 넣을 때 값이 두 번 들어간다. */
         /* ⚠ 원본이 바뀌면 «담아 둔 표시»도 놓는다 — 안 놓으면 새 원본을 담지 않는다 */
         if(!_rhKeepBase){ _rhBase={ name:name, ext:ext, bytes:_u8 }; _rhListPlan=null; _rhVals={};
-                          _rhBaseSaved=''; }
+                          _rhBaseSaved='';
+                          /* 새 서식이면 쪽 번호도 뺀 자리도 남의 것이다 — 놓는다 */
+                          if(typeof rhTidyReset==='function') rhTidyReset();
+                          _rhOrig=null; _rhOutHandle=null; }
       }
     }catch(e){ console.warn('rhDoc',e); }
   }
@@ -11441,7 +11508,246 @@ async function rhComposeBytes(){
     var r=KcareerFormMap.apply(xml,{ values:vals, data:data, lists:lists||undefined });
     if(r.changed) zip.file(n,r.xml);
   }
+  /* ★ 정리(쪽 빼기·남은 글자·빈 줄)는 «내보내는 길» 한 곳에서만 한다 (대표 지시 2026-09-13).
+     ⚠ 입력판은 «바탕»을 그린다 — 거기서 정리하면 칸이 사라져 값을 못 친다.
+       정리는 늘 «마지막 걸음»이다. */
+  await rhTidyZip(zip);
   return new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+}
+
+/* ── 🧹 서식 정리 ────────────────────────────────────────────────────────
+   대표 지시 2026-09-13 「불필요한 페이지는 삭제하고 싶다 · 박스 정리 안 되는 것」.
+   ⚠★ 여기서 «지우는» 것은 내보낼 사본뿐이다. _rhBase(원본)는 한 글자도 안 건드린다 —
+      그래서 체크를 풀면 그 자리에서 도로 살아난다. 되돌릴 수 없는 지우기를 만들지 말 것. */
+var _rhTidy = { drop:{}, ph:false, italic:false, rows:false };
+function rhTidyReset(){ _rhTidy={ drop:{}, ph:false, italic:false, rows:false }; }
+async function rhTidyZip(zip){
+  if(!window.KcareerHwpxTidy) return;
+  var T=window.KcareerHwpxTidy;
+  var 쓸것=_rhTidy.ph||_rhTidy.italic||_rhTidy.rows||Object.keys(_rhTidy.drop||{}).length;
+  if(!쓸것) return;
+  var italic=null;
+  if(_rhTidy.italic){
+    /* 기울임 여부는 본문이 아니라 글자모양표(header.xml)에 있다.
+       ⚠ 못 읽으면 빈 목록 — 그러면 기울임 지우기가 «아무것도 안 한다»(안전한 쪽). */
+    try{ var hf=zip.file('Contents/header.xml'); if(hf) italic=T.italicIds(await hf.async('string')); }
+    catch(e){ italic=null; }
+  }
+  var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
+  for(const n of names){
+    var xml=await zip.file(n).async('string');
+    var 뺄=(_rhTidy.drop&&_rhTidy.drop[n])||null;
+    if(뺄&&뺄.length){ var d=T.dropPages(xml,뺄); xml=d.xml; }
+    if(_rhTidy.ph||_rhTidy.italic) xml=T.clearHints(xml,{ italic:italic }).xml;
+    if(_rhTidy.rows) xml=T.dropEmptyRows(xml).xml;
+    zip.file(n,xml);
+  }
+}
+/* 지금 바탕의 쪽 묶음을 읽어 온다 — 화면에 그리는 데 쓴다 */
+async function rhTidyPages(){
+  var base=_rhBase||_rhDoc;
+  if(!base||!base.bytes||!window.KcareerHwpxTidy) return [];
+  try{ await _ensureJSZip(); }catch(e){ return []; }
+  var src=null;
+  try{ src=await _rhToHwpx(base.bytes,base.name); }catch(e){ src=null; }
+  if(!src) return [];
+  var zip=await JSZip.loadAsync(src);
+  var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
+  var out=[];
+  for(const n of names){
+    var xml=await zip.file(n).async('string');
+    KcareerHwpxTidy.pages(xml).forEach(function(p,i){ out.push({ sec:n, i:i, head:p.head }); });
+  }
+  return out;
+}
+
+/* ── 🧹 서식 정리 창 ─────────────────────────────────────────────────── */
+var _tdPages=[];
+function closeTidy(){ var m=document.getElementById('modalTidy'); if(m) m.classList.remove('open'); }
+async function openTidy(){
+  var base=_rhBase||_rhDoc;
+  if(!base||!base.bytes){ toast('먼저 서식을 올려주세요'); return; }
+  var m=document.getElementById('modalTidy'); if(!m) return;
+  var who=document.getElementById('tdWho'); if(who) who.textContent=String(base.name||'');
+  document.getElementById('tdPh').checked=!!_rhTidy.ph;
+  document.getElementById('tdIt').checked=!!_rhTidy.italic;
+  document.getElementById('tdRows').checked=!!_rhTidy.rows;
+  m.classList.add('open');
+  rhHwpState();
+  var box=document.getElementById('tdPages');
+  if(box) box.innerHTML='<div class="rc-mute" style="font-size:12px">쪽을 세는 중…</div>';
+  _tdPages=await rhTidyPages();
+  rhTidyDraw();
+  _safe(rhTidyCount);
+}
+function rhTidyDraw(){
+  var box=document.getElementById('tdPages'), why=document.getElementById('tdPageWhy');
+  if(!box) return;
+  if(_tdPages.length<2){
+    /* ⚠★ 「쪽 나누기」가 없는 서식은 갈라진 자리가 파일 안에 없다. 글이 넘쳐 저절로
+       넘어간 쪽은 여기서 알 수 없다 — 못 한다고 «그대로 말한다». 억지로 자르면
+       엉뚱한 데서 끊긴 서류가 나간다. */
+    box.innerHTML='<div class="td-warn" style="margin:0">이 서식에는 <b>「쪽 나누기」가 없습니다.</b> '
+      +'쪽이 글 길이에 따라 저절로 넘어가는 서식이라, 어디서 갈리는지 파일 안에 적혀 있지 않습니다 — '
+      +'그래서 쪽 단위로 뺄 수 없습니다. 한글에서 「쪽 나누기」를 넣어 저장하시면 여기서 뺄 수 있습니다.</div>';
+    if(why) why.style.display='none';
+    var t0=document.getElementById('tdPageTally'); if(t0) t0.textContent='';
+    return;
+  }
+  if(why) why.style.display='';
+  box.innerHTML=_tdPages.map(function(p,i){
+    var off=((_rhTidy.drop[p.sec]||[]).indexOf(p.i)>=0);
+    return '<div class="td-pg'+(off?' off':'')+'" onclick="rhTidyToggle('+i+')">'
+      +'<button class="x" type="button" onclick="event.stopPropagation();rhTidyToggle('+i+')">'+(off?'↩':'✕')+'</button>'
+      +'<div class="sheet">'+escapeHtml(p.head||'(글자 없음)')+'</div>'
+      +'<div class="no">'+(i+1)+'쪽</div></div>';
+  }).join('');
+  var 뺀수=0; Object.keys(_rhTidy.drop).forEach(function(k){ 뺀수+=(_rhTidy.drop[k]||[]).length; });
+  var t=document.getElementById('tdPageTally');
+  if(t) t.innerHTML = 뺀수
+    ? '🗑 <b>'+뺀수+'쪽을 뺐습니다</b> — 완성본은 <b>'+(_tdPages.length-뺀수)+'쪽</b>으로 나갑니다. '
+      +'<button class="btn sm" type="button" onclick="rhTidyAllBack()">↩ 모두 되살리기</button>'
+    : '<span style="color:var(--text-mute)">뺀 쪽이 없습니다 — 모두 '+_tdPages.length+'쪽이 나갑니다.</span>';
+}
+function rhTidyToggle(i){
+  var p=_tdPages[i]; if(!p) return;
+  var arr=_rhTidy.drop[p.sec]||(_rhTidy.drop[p.sec]=[]);
+  var at=arr.indexOf(p.i);
+  if(at>=0) arr.splice(at,1); else arr.push(p.i);
+  /* ⚠ 한 구역을 통째로 빼려 하면 막는다 — 정리하는 자도 막지만, 여기서 «까닭»을 말해 준다 */
+  var 남은=_tdPages.filter(function(q){ return (_rhTidy.drop[q.sec]||[]).indexOf(q.i)<0; });
+  if(!남은.length){ arr.splice(arr.indexOf(p.i),1); toast('마지막 한 쪽은 남겨야 합니다 — 빈 서류가 나갑니다'); }
+  rhTidyDraw();
+}
+function rhTidyAllBack(){ _rhTidy.drop={}; rhTidyDraw(); }
+function rhTidySet(){
+  _rhTidy.ph=document.getElementById('tdPh').checked;
+  _rhTidy.italic=document.getElementById('tdIt').checked;
+  _rhTidy.rows=document.getElementById('tdRows').checked;
+  /* 기울임만 켜면 자리표도 함께 — 「예시까지」는 「자리표 + 예시」라는 뜻이다 */
+  if(_rhTidy.italic && !_rhTidy.ph){ _rhTidy.ph=true; document.getElementById('tdPh').checked=true; }
+  _safe(rhTidyCount);
+}
+/* 몇 곳이 지워질지 «미리» 센다 — 눌러 보고 나서 아는 것은 늦다 */
+async function rhTidyCount(){
+  var base=_rhBase||_rhDoc; if(!base||!base.bytes||!window.KcareerHwpxTidy) return;
+  var set=function(id,txt){ var e=document.getElementById(id); if(e) e.textContent=txt; };
+  try{ await _ensureJSZip(); }catch(e){ return; }
+  var src=null; try{ src=await _rhToHwpx(base.bytes,base.name); }catch(e){ src=null; }
+  if(!src) return;
+  var zip=await JSZip.loadAsync(src), T=KcareerHwpxTidy;
+  var italic=null;
+  try{ var hf=zip.file('Contents/header.xml'); if(hf) italic=T.italicIds(await hf.async('string')); }catch(e){}
+  var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
+  var ph=0, it=0, rows=0;
+  for(const n of names){
+    var xml=await zip.file(n).async('string');
+    var a=T.clearHints(xml,{}).cleared;
+    var b=T.clearHints(xml,{ italic:italic }).cleared;
+    ph+=a; it+=Math.max(0,b-a);
+    rows+=T.dropEmptyRows(xml).dropped;
+  }
+  set('tdPhN', ph?('— '+ph+'곳'):'— 없음');
+  set('tdItN', it?('— '+it+'곳 더'):'— 없음');
+  set('tdRowsN', rows?('— '+rows+'줄'):'— 없음');
+}
+/* 정리한 대로 다시 그려 눈으로 확인한다 */
+async function rhTidyPreview(){
+  toast('⏳ 다시 그리는 중…');
+  var bytes=await rhComposeBytes();
+  if(!bytes){ toast('다시 그릴 수 없습니다'); return; }
+  _rhDoc={ name:_rhDoc.name, ext:'hwpx', bytes:bytes };
+  closeTidy();
+  if(typeof rhSetMode==='function') rhSetMode('hwp'); else _safe(rhPreviewHwp);
+  toast('✅ 정리한 대로 그렸습니다 — 완성본·PDF 도 이대로 나갑니다');
+}
+
+/* ── ✍️ 한글에서 고쳐 오기 ───────────────────────────────────────────────
+   ⚠★ 한컴독스 같은 «웹 한글»을 팝업으로 띄우지 말 것 — 서류가 통째로 남의 서버로 올라간다.
+      2026-09-05 에 같은 까닭으로 외부 편집기 길을 막았다. 이 길은 파일이 이 PC 를 안 떠난다. */
+var _rhOutHandle=null;   /* 내보낸 파일의 «자리» — 다시 읽어올 때 파일을 또 고르지 않아도 된다 */
+var _rhOrig=null;        /* 처음 올린 서식 — 바탕을 갈아 끼워도 돌아갈 자리가 있어야 한다 */
+function rhHwpState(){
+  var e=document.getElementById('tdHwpState'); if(!e) return;
+  var r=document.getElementById('tdRestore'); if(r) r.style.display=_rhOrig?'':'none';
+  var 줄=[];
+  if(_rhOutHandle) 줄.push('📌 내보낸 자리를 기억하고 있습니다 — 한글에서 <b>고쳐 저장만</b> 하시고 「📤 고친 것 읽어오기」를 누르세요.');
+  else 줄.push('내보내면 그 파일 자리를 기억해, 다음에는 고르지 않아도 바로 읽어옵니다.');
+  if(_rhOrig) 줄.push('↩ 지금 바탕은 <b>한글에서 고쳐 온 파일</b>입니다. 처음 올리신 서식은 그대로 쥐고 있습니다.');
+  e.innerHTML=줄.join('<br>');
+}
+async function rhHwpOut(){
+  var bytes=await rhComposeBytes();
+  if(!bytes||!bytes.length){ toast('내보낼 것이 없습니다'); return; }
+  var name=rhCleanName((_rhDoc&&_rhDoc.name)||'양식','_작성');
+  if(window.showSaveFilePicker){
+    try{
+      var h=await window.showSaveFilePicker({ suggestedName:name,
+        types:[{ description:'한글 문서', accept:{ 'application/hwp+zip':['.hwpx'] } }] });
+      var w=await h.createWritable(); await w.write(bytes); await w.close();
+      _rhOutHandle=h; rhHwpState();
+      toast('✅ 저장했습니다 — 한글에서 고친 뒤 「📤 고친 것 읽어오기」를 누르세요');
+      return;
+    }catch(e){ if(e&&e.name==='AbortError') return; /* 못 쓰면 아래 예비 길로 */ }
+  }
+  /* 예비 길 — 이 브라우저가 「자리 기억」을 못 할 때는 그냥 내려받는다 */
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([bytes],{type:'application/hwp+zip'}));
+  a.download=name; a.click();
+  toast('⬇ 내려받았습니다 — 한글에서 고친 뒤 「📤 고친 것 읽어오기」로 그 파일을 고르세요');
+}
+function _rhPickOne(){
+  return new Promise(function(res){
+    var i=document.createElement('input'); i.type='file'; i.accept='.hwpx,.hwp';
+    i.onchange=function(){ res((i.files&&i.files[0])||null); };
+    i.click();
+  });
+}
+async function rhHwpBack(){
+  var file=null;
+  if(_rhOutHandle){
+    try{
+      if(_rhOutHandle.requestPermission){
+        var p=await _rhOutHandle.requestPermission({ mode:'read' });
+        if(p!=='granted') _rhOutHandle=null;
+      }
+      if(_rhOutHandle) file=await _rhOutHandle.getFile();
+    }catch(e){ _rhOutHandle=null; }
+  }
+  if(!file) file=await _rhPickOne();
+  if(!file) return;
+  await rhAdoptBase(file);
+}
+/* 고쳐 온 파일을 «바탕»으로 삼는다.
+   ⚠★ 친 값(_rhVals)을 비운다 — 그 값은 이미 그 파일 «안»에 들어가 있다.
+      안 비우면 다음에 저장할 때 같은 값이 한 번 더 들어가 두 번 적힌다. */
+async function rhAdoptBase(file){
+  toast('⏳ 바탕을 갈아 끼우는 중…');
+  var u8=new Uint8Array(await file.arrayBuffer());
+  var ext=(String(file.name).split('.').pop()||'hwpx').toLowerCase();
+  if(!_rhOrig && _rhBase) _rhOrig={ name:_rhBase.name, ext:_rhBase.ext, bytes:_rhBase.bytes };
+  _rhBase={ name:file.name, ext:ext, bytes:u8 };
+  _rhDoc={ name:file.name, ext:ext, bytes:u8 };
+  _rhVals={}; _rhPicks={}; _rhListPlan=null; _rhUndo=null; _rhBaseSaved='';
+  rhTidyReset();                     /* 쪽이 달라졌다 — 뺀 쪽 번호를 그대로 쓰면 엉뚱한 쪽이 빠진다 */
+  _tdPages=await rhTidyPages();
+  try{ await rhBuildMap(); }catch(e){ console.warn('adopt map',e); }
+  try{ await rhBuildInput(); }catch(e){ console.warn('adopt input',e); }
+  rhDraftSave(); rhTidyDraw(); rhHwpState(); _safe(rhTidyCount);
+  toast('✅ 고쳐 오신 파일이 이제 바탕입니다 — 이어서 치시면 됩니다');
+}
+async function rhHwpRestore(){
+  if(!_rhOrig){ toast('돌아갈 원래 서식이 없습니다'); return; }
+  if(!confirm('처음 올리신 서식으로 되돌립니다.\n\n한글에서 고쳐 오신 내용은 이 화면에서 빠집니다\n(그 파일 자체는 그대로 있습니다).\n\n계속할까요?')) return;
+  _rhBase={ name:_rhOrig.name, ext:_rhOrig.ext, bytes:_rhOrig.bytes };
+  _rhDoc={ name:_rhOrig.name, ext:_rhOrig.ext, bytes:_rhOrig.bytes };
+  _rhOrig=null; _rhVals={}; _rhPicks={}; _rhListPlan=null; _rhBaseSaved='';
+  rhTidyReset();
+  _tdPages=await rhTidyPages();
+  try{ await rhBuildMap(); }catch(e){}
+  try{ await rhBuildInput(); }catch(e){}
+  rhDraftSave(); rhTidyDraw(); rhHwpState(); _safe(rhTidyCount);
+  toast('↩ 원래 서식으로 되돌렸습니다');
 }
 
 /* 입력판에서 저장 — 원본 한글 파일에 값만 넣는다 */
