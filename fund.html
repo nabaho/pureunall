@@ -68,6 +68,13 @@
     border-bottom:1px solid var(--line);margin:0 0 12px;padding-top:2px}
   .fhead{display:flex;align-items:center;gap:10px;padding:7px 0 5px;min-width:0}
   .fhead h1{font-size:17px;margin:0;white-space:nowrap}
+  /* 기금 사이 이동 — 이름 «왼쪽»에 둔다. 책장을 넘기듯 읽히고, 오른쪽 끝(상태·담당)과 안 겹친다 */
+  .hop{display:flex;align-items:center;gap:1px;flex:none}
+  .hopb{padding:1px 7px;font-size:15px;line-height:1.1;border:1px solid var(--line);background:#fff;
+    border-radius:7px;cursor:pointer;color:var(--sub)}
+  .hopb:hover:not(:disabled){background:var(--acc-soft);color:var(--acc2);border-color:var(--acc)}
+  .hopb:disabled{color:#cbd5e1;cursor:default}
+  .hopn{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums;padding:0 3px;white-space:nowrap}
   /* 식별번호는 줄바꿈 대신 «옆으로» 넘긴다 — 줄이 늘면 붙여 둔 머리가 화면을 잡아먹는다 */
   .fhead .fid{display:flex;gap:14px;font-size:12px;color:var(--sub);white-space:nowrap;
     overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
@@ -660,16 +667,16 @@ function shell(){
     +'<div data-nav="1" id="nav-home-wrap">'
     +'<div class="sitem" id="nav-home" onclick="goHome()" title="드래그: 메뉴 순서 변경"><span class="gr">⋮⋮</span>'
     +'<span class="cx" id="nav-cx" onclick="event.stopPropagation();toggleNavSub()" title="묶음 접기·펴기">▾</span>'
-    +'🏛 기금 현황<span class="ncnt" id="nav-home-cnt"></span></div>'
+    +'기금 현황<span class="ncnt" id="nav-home-cnt"></span></div>'
     +'<div id="navsub"></div>'
     +'</div>'
-    +'<div class="sitem" data-nav="1" id="nav-billing" onclick="go(\'billing\')" title="드래그: 메뉴 순서 변경"><span class="gr">⋮⋮</span>💰 청구 관리</div>'
+    +'<div class="sitem" data-nav="1" id="nav-billing" onclick="go(\'billing\')" title="드래그: 메뉴 순서 변경"><span class="gr">⋮⋮</span>청구 관리</div>'
     /* 전체 백업은 여기 없다 — 메뉴가 아니라 «도구»라 상단 ⚙〈백업·복구〉로 옮겼다.
        메뉴 자리에 두면 기금 현황·청구 관리와 같은 층으로 보여, 「어느 화면으로 가는
        것인가」 하고 누르게 된다. 실제로는 화면 이동이 아니라 파일 내려받기다. */
     /* 서식 현황·결산 대장은 기금 현황과 같은 42개 목록이라 별도 메뉴를 없앴다.
        기금 현황의 [보기] 전환으로 들어간다(같은 목록, 열만 교체). */
-    +'<div class="sitem" data-nav="1" id="nav-forms" onclick="S.formsCtx=\'library\';S.formsHost=null;S._sideKind=null;go(\'forms\')" title="전사 표준서식 관리(견본 편집·원본 등록·공통 저장) · 드래그로 순서 변경"><span class="gr">⋮⋮</span>📚 서식 자료실</div>'
+    +'<div class="sitem" data-nav="1" id="nav-forms" onclick="S.formsCtx=\'library\';S.formsHost=null;S._sideKind=null;go(\'forms\')" title="전사 표준서식 관리(견본 편집·원본 등록·공통 저장) · 드래그로 순서 변경"><span class="gr">⋮⋮</span>서식 자료실</div>'
     +'</div>'
     +'<div style="margin-top:auto;font-size:11px;color:var(--faint);padding:8px">Firebase판 · 통합운영<br>서식 채움 지원</div>'
     +'</div>'
@@ -862,6 +869,55 @@ function _leaveGuard(){ if(!_dirty) return Promise.resolve(true);
 function go(v,id){ _leaveGuard().then(function(ok){ if(!ok)return; _go(v,id); }); }
 function _go(v,id){ closeSide(); S.view=v; if(id!==undefined)S.fundId=id; if(v==='fund')S.tab='info'; _pushHist(); route(); }
 function goTab(tab){ _leaveGuard().then(function(ok){ if(!ok)return; S.tab=tab; _pushHist(); renderFund(); }); }
+/* ★ 기금 사이 이동 (대표 지시 2026-09-13
+     「지역기금 체크하다가 다음기금으로 넘어가야되는데 이럴경우 계속 기금현황에 들어가서
+      다시 백해야된다 아주 귀찮다 쉽게 개선 부탁한다」)
+   ─ 보고 있던 «묶음»의 차례 그대로 옆 기금으로 간다. 묶음이 곧 훑는 순서다.
+   ─ 탭은 그대로 둔다. 지역기금을 확인할 때는 열 곳을 «같은 탭»으로 연달아 본다 —
+     기금이 바뀔 때마다 기금 정보로 돌아가면 다시 그 탭을 찾아 눌러야 한다. */
+function fundHopList(){
+  var B=homeBuckets();
+  var 든묶음=function(id){
+    var ks=['지역공동','개별공동','사내','setup','past','trash'];
+    for(var i=0;i<ks.length;i++){
+      if((B[ks[i]]||[]).some(function(f){ return f._id===id; })) return ks[i];
+    }
+    return '';
+  };
+  /* 보던 묶음에 이 기금이 없으면(검색·미완비로 바로 들어온 경우) 이 기금이 «든» 묶음을 쓴다 —
+     아니면 옆 기금이 엉뚱한 묶음의 것이 되어 훑던 차례가 끊긴다. */
+  var k=S.homeTab;
+  if(!k||!(B[k]||[]).some(function(f){ return f._id===S.fundId; })) k=든묶음(S.fundId);
+  var list=B[k]||[];
+  return {key:k, list:list, ids:list.map(function(f){ return f._id; })};
+}
+function fundHop(d){
+  if(S.view!=='fund') return;
+  var L=fundHopList(), i=L.ids.indexOf(S.fundId);
+  if(i<0) return;
+  var j=i+d; if(j<0||j>=L.ids.length) return;
+  _leaveGuard().then(function(ok){ if(!ok)return;
+    S.homeTab=L.key;              /* 다음 이동도 같은 묶음 안에서 이어진다 */
+    S.fundId=L.ids[j];            /* 탭(S.tab)은 일부러 그대로 둔다 */
+    _pushHist(); route();
+  });
+}
+function fundHopBtns(){
+  var L=fundHopList(), i=L.ids.indexOf(S.fundId);
+  if(i<0||L.ids.length<2) return '';
+  var 묶음=''; HOME_GROUPS.forEach(function(g){ if(g[0]===L.key) 묶음=g[1]; });
+  var 단추=function(d,글,말,끝말){
+    var j=i+d, 됨=(j>=0&&j<L.ids.length);
+    if(!됨) return '<button class="hopb" disabled title="'+esc(묶음)+'의 '+끝말+'입니다">'+글+'</button>';
+    var f=L.list[j];
+    return '<button class="hopb" onclick="fundHop('+d+')" title="'+말+': '
+      +esc(f.short_name||f.name)+' (Alt+'+(d<0?'←':'→')+')">'+글+'</button>';
+  };
+  return '<span class="hop">'+단추(-1,'‹','이전','처음')
+    +'<span class="hopn" title="'+esc(묶음)+' '+L.ids.length+'개 중 '+(i+1)+'번째">'
+    +(i+1)+'<span class="muted">/'+L.ids.length+'</span></span>'
+    +단추(1,'›','다음','마지막')+'</span>';
+}
 function goBack(){ _leaveGuard().then(function(ok){ if(!ok)return; if(history.length>1) history.back(); else _go('home'); }); }
 function _pushHist(){ try{ history.pushState({view:S.view,fundId:S.fundId,tab:S.tab,homeTab:S.homeTab}, ''); }catch(e){} }
 window.addEventListener('popstate', function(ev){
@@ -1524,12 +1580,15 @@ function homeBody(list,edit,mode,secFn){
 }
 /* 묶음 나누기 — 사이드바와 본문이 «같은 함수»에서 나온다.
    따로 세면 사이드바는 16, 본문은 15 처럼 어긋나고 어느 쪽이 맞는지 알 수 없게 된다. */
+/* ★ 아이콘을 뺐다 (대표 지시 2026-09-13 「아이콘 필요없다. 헤깔린다」) —
+     🏛 이 「기금 현황」과 「지역기금」 둘 다에 붙어 부모·자식이 같아 보였다.
+     묶음은 글자로 충분하고, 개수(ncnt)와 색이 이미 상태를 말한다. */
 var HOME_GROUPS=[
-  ['지역공동','🏛 지역기금'],['개별공동','🤝 공동기금'],['사내','🏢 사내기금'],
+  ['지역공동','지역기금'],['개별공동','공동기금'],['사내','사내기금'],
   /* 미완비는 «유형»이 아니라 «상태»라 셋 아래에 칸막이를 두고 따로 세운다.
      종전에는 「기금 현황」 줄에 '· 미완비 22'로 붙어 두 줄로 접히고 눌러 볼 수도 없었다. */
-  ['inc','⚠ 미완비'],
-  ['setup','🏗 설립중'],['past','🗂 종료기금'],['trash','🗑 삭제 보관']
+  ['inc','미완비'],
+  ['setup','설립중'],['past','종료기금'],['trash','삭제 보관']
 ];
 function homeBuckets(){
   var every=Object.keys(funds).map(function(k){var o=Object.assign({},funds[k]);o._id=k;return o;});
@@ -1572,8 +1631,10 @@ function renderNav(){
   var hc=$('nav-home-cnt');
   if(hc){
     /* 접혀 있으면 어느 묶음을 보고 있는지 여기서 말해 준다 — 안 그러면 단서가 사라진다 */
-    var lbl=''; HOME_GROUPS.forEach(function(g){ if(g[0]===cur) lbl=g[1].replace(/^\S+\s*/,''); });
-    /* 개수만 짧게 — 미완비는 아래 하위 줄(⚠ 미완비)로 옮겼다.
+    /* ⚠ 예전에는 여기서 g[1] 앞의 아이콘을 replace 로 떼어 냈다. 아이콘을 뺀 지금
+         그대로 두면 「지역기금」처럼 띄어쓰기 없는 이름이 통째로 지워진다(빈 이름). */
+    var lbl=''; HOME_GROUPS.forEach(function(g){ if(g[0]===cur) lbl=g[1]; });
+    /* 개수만 짧게 — 미완비는 아래 하위 줄(미완비)로 옮겼다.
        여기에 붙이면 「기금 현황  44 · 미완비 22」가 두 줄로 접혀 오히려 안 읽힌다. */
     hc.textContent=(!open&&lbl?lbl+' · ':'')+B._all.length;
     hc.title=incAll?'전체 '+B._all.length+'개 · 기본정보가 덜 채워진 기금 '+incAll+'개':'전체 '+B._all.length+'개';
@@ -6403,7 +6464,7 @@ function renderFund(){
     ;
   /* 기금 이름·식별번호를 «한 줄»로 모은다 — 종전에는 상자 안에 두 줄이라
      맨 위 상태줄까지 세 덩이가 화면 위쪽을 크게 차지했다. 이제 상태줄·이 줄·탭줄 셋뿐이다. */
-  var idline='<div class="fhead"><h1>'+esc(f.short_name||f.name)+'</h1>'+tags
+  var idline='<div class="fhead">'+fundHopBtns()+'<h1>'+esc(f.short_name||f.name)+'</h1>'+tags
     +'<span class="fid">'
     +'<span>인가 <b>'+esc(f.inka_no||'—')+'</b></span><span>법인 <b>'+esc(f.corp_reg_no||'—')+'</b></span>'
     +'<span>고유 <b>'+esc(f.tax_id_no||'—')+'</b></span><span>소재지 <b>'+esc(f.address||'—')+'</b></span></span>'
@@ -14258,6 +14319,14 @@ document.addEventListener('keydown',function(e){
     e.preventDefault();
     if($('modalbg')||$('confirmbg')) return;
     if(S.view!=='home') goBack();
+    return;
+  }
+  /* Alt+←/→ = 옆 기금으로. 맨 화살표는 칸 안에서 글자를 옮기는 키라 쓸 수 없다 */
+  if(e.altKey&&!e.ctrlKey&&!e.metaKey&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){
+    if($('modalbg')||$('confirmbg')) return;
+    if(S.view!=='fund') return;
+    e.preventDefault();
+    fundHop(e.key==='ArrowLeft'?-1:1);
     return;
   }
   if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')){
