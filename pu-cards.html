@@ -2331,6 +2331,19 @@ td.selcell{cursor:cell}
 .coctbar:hover{background:#f8fafc}
 .coctbar b{color:#1e293b}
 .coctbar em{font-style:normal;color:#1e40af;margin-left:4px}
+/* 🏛 국세청 폐업·휴업 띠 — 확인서·계약 띠와 «같은 결», 테두리만 붉다(가장 무거운 소식이다) */
+.contsbar{margin:0 0 10px;padding:10px 13px;border:1px solid #fecaca;background:#ffffff;
+  border-radius:9px;font-size:12.5px;color:#991b1b;cursor:pointer}
+.contsbar:hover{background:#f8fafc}
+.contsbar b{color:#1e293b}
+.contsbar em{font-style:normal;color:#1e40af;margin-left:4px}
+/* 훑는 «동안»의 진행 — 「그만」이 여기 있다(없으면 그만둘 길이 아예 없다) */
+.contsrun{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;
+  border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;font-size:12.5px;color:#1e40af}
+.contsrun span{color:#64748b}
+.contsrun button{margin-left:auto;font-size:12px;font-weight:700;color:#991b1b;background:#ffffff;
+  border:1px solid #fecaca;border-radius:8px;padding:4px 12px;cursor:pointer}
+.contsrun button:hover{background:#991b1b;color:#ffffff}
 /* 👤 담당 · 📝 메모 — 사람이 «직접 적는» 자리 (2026-09-12).
    ⚠ ✎ 는 「업체관리가 아니라 우리가 적은 값」이라는 표다 — 색만으로 구별하면 흑백
      인쇄·색약에서 사라진다. */
@@ -26078,7 +26091,10 @@ function coFilters(){
       title: '중소기업 확인서가 만료됐거나 30일 안에 만료될 회사만 봅니다 — 해마다 새로 받습니다' },
     /* ⚠ 「종료일 지남」은 계약해지(🚪)와 «다른 말»이다 — 해지로 표시된 곳은 안 담는다 */
     { k: 'coOnlyCtOld',      icon: '📅', label: '계약 종료', count: () => coCtCount(),
-      title: '계약 종료일이 지났거나 30일 안에 끝나는 회사만 봅니다 — 계약해지(🚪)로 표시된 곳은 뺍니다' }
+      title: '계약 종료일이 지났거나 30일 안에 끝나는 회사만 봅니다 — 계약해지(🚪)로 표시된 곳은 뺍니다' },
+    /* ⚠ 「물어본 그때」의 상태다 — 계약해지(🚪)와 다른 말이다 */
+    { k: 'coOnlyNtsBad',     icon: '🏛', label: '폐업·휴업', count: () => coNtsBadCount(),
+      title: '국세청에 물어본 결과가 폐업·휴업인 회사만 봅니다 — 물어본 그때의 상태입니다' }
   ];
 }
 /* 세어서 늘어놓는다 — 메뉴를 «열 때» 한 번만 부른다 */
@@ -26132,6 +26148,12 @@ function coFilterMenuPaint(r){
           <b style="float:right;color:#94a3b8;font-weight:700">${n.toLocaleString()}</b></div>`;
       }).join('');
   }
+  /* 🏛 국세청 훑기로 들어가는 «문» (대표 지시 2026-09-13).
+     ⚠ 띠는 폐업·휴업이 «나온 뒤에야» 뜬다 — 한 곳도 안 물어봤으면 띠가 없어 들어갈
+       길이 없다. 그래서 늘 있는 이 메뉴에 문을 하나 둔다.
+     ⚠ 거르개가 아니라 «창을 여는» 줄이다 — 켜고 끄는 것이 아니므로 ✓ 를 안 붙인다. */
+  h += `<div class="fmi" title="국세청에 사업자 상태를 물어봅니다 — 사업자번호가 밖으로 나갑니다"
+      onclick="closeFolderMenu();openCoNts()">🏛 국세청 훑기…</div>`;
   m.innerHTML = h;
   m.style.display='block';
   m.style.left = Math.max(8, Math.min(r.left, window.innerWidth-230)) + 'px';
@@ -26560,6 +26582,9 @@ function coFilteredList(skipCol, skipCares, skipTodo){
        본다. 여기서 다시 재면 「띠는 3곳인데 목록은 5곳」이 된다.
      ⚠ 계약해지(🚪)를 빼는 것도 그 잣대 안에 들어 있다 — 여기서 또 빼지 않는다. */
   if(state.coOnlyCtOld && !skipTodo) list = list.filter(o=>coCtNeeds(o));
+  /* ── 🏛 국세청이 폐업·휴업이라 한 곳만 (대표 지시 2026-09-13) ──
+     ⚠ 잣대는 coNtsNeeds 한 곳이다 — 띠·창·거르개가 모두 그것을 본다. */
+  if(state.coOnlyNtsBad && !skipTodo) list = list.filter(o=>coNtsNeeds(o));
   /* ── 📤 이 갈래를 «못 받은» 곳만 (4걸음, 대표 지시 2026-09-03) ──
      ⚠ 계약해지(🚪)는 «여기서도» 뺀다. 배포할 때 애초에 안 보낸 곳이라(3걸음),
        빼지 않으면 끝난 곳이 죄다 「안 받은 곳」으로 올라와 목록이 못 쓰게 된다.
@@ -26657,6 +26682,7 @@ function pickCoNoFolder(){
 const CO_TODO_LABEL = { coOnlyClosed:'🚪 종료', coOnlyNoBiz:'🔢 번호 없음',
                         coOnlyIncomplete:'📋 정보부족', coOnlyUid:'🏛 고유번호증',
                         coOnlySme:'🏅 확인서 갱신', coOnlyCtOld:'📅 계약 종료',
+                        coOnlyNtsBad:'🏛 폐업·휴업',
                         coNoFolder:'📂 아직 안 담음' };
 function clearCoTodo(k){ state[k] = false; state.coPage = 0; renderCoAny(); }
 /* ⚠ 띠 모양은 condChipHtml 한 곳에만 있다 (점검 A3) — 여기 다시 적으면 두 벌이 된다 */
@@ -27034,7 +27060,7 @@ function coListHtml(info){
        내려갔을 때 마지막 줄을 덮지 않는다.
      ⚠ 쪽넘김은 여기 «없다». renderCoPage 의 안 구르는 바닥(.cofoot)으로 옮겼다 —
        여기 두면 표와 함께 굴러가 200줄 아래로 숨는다(대표 지시 2026-08-26). */
-  return `${coOrphanBarHtml()}${coSmeBarHtml()}${coCtBarHtml()}<table class="cotbl">
+  return `${coOrphanBarHtml()}${coSmeBarHtml()}${coCtBarHtml()}${coNtsBarHtml()}<table class="cotbl">
     ${/* ⚠ 「가진 것」을 한 줄로 만들면서 그 칸을 170→215px 로 넓혔다. 늘린 만큼은
          상호(300→255)에서 덜어 온다 — 표 전체가 넓어지면 좌우로 넘친다. */''}
     ${/* ⚠ 폴더를 «제 열»로 뺐다 (대표 지시 2026-08-30 「열 정리해라 세로로 정렬해서」).
@@ -28843,6 +28869,201 @@ async function coAskNts(key){
   const word = coNtsWord(row);
   if(!word){ toast('국세청이 아무 말도 주지 않았습니다 — 번호를 다시 확인해 주세요', 7000); return; }
   coSaveInfoPatch(k, { ntsState: word, ntsAt: todayYmd() }, `🏛 국세청 「${word}」 — 오늘 확인했습니다`);
+}
+
+/* ══════ 🏛 국세청 «전체 훑기» — 4,000곳을 한 번에 (대표 지시 2026-09-13 「전체 훑기」) ══
+   ⚠⚠ **밖으로 나가는 일이다.** 사업자번호가 국세청으로 통째로 나간다 — 그래서
+     ① 묻기 전에 «몇 개가 어디로» 나가는지 숫자로 말하고
+     ② 최근에 물어본 곳은 «다시 안 묻는다»(안 그러면 누를 때마다 4,000개가 또 나간다)
+     ③ 언제든 «그만»둘 수 있고, 그때까지 받은 것은 살린다.
+   ⚠ 국세청 규격이 «한 번에 100개»다. 그보다 크게 묶으면 통째로 거절당한다.
+   ⚠ 쓰기는 200곳씩 모아 «한 통»으로 보낸다 — 2026-08-16 의 대량 쓰기 사고가 한 장씩
+     쓴 값이었다.
+   ★ 순수 로직(무엇을 훑나·어떻게 자르나·답을 어떻게 맞추나)을 따로 둔다 —
+     검사가 실데이터와 네트워크 없이 규칙을 본다. */
+const NTS_CHUNK = 100;        /* 국세청 한 번에 100개 */
+const NTS_SKIP_DAYS = 30;     /* 최근 30일 안에 물어본 곳은 건너뛴다 */
+
+/* 훑을 곳 — 번호가 있고, 최근에 안 물어본 곳.
+   ⚠ 번호가 없으면 애초에 물어볼 수 없다. 「모른다」를 물어보러 가지 않는다. */
+function coNtsTargets(now){
+  const today = (now == null ? todayYmd() : now);
+  return (coList() || []).filter(function(o){
+    if(digits(o.bizno || '').length < 10) return false;
+    const at = coVal(o, 'ntsAt');
+    if(!at) return true;                       /* 한 번도 안 물어봤다 */
+    const d = coSmeDays(at, today);
+    if(d == null) return true;                 /* 날짜를 못 읽었다 — 다시 묻는다 */
+    return (-d) >= NTS_SKIP_DAYS;
+  });
+}
+/* 100개씩 자른다 — 자르는 규칙을 한 곳에 둔다(세 곳에 박으면 어긋난다) */
+function coNtsChunks(list, size){
+  const n = Math.max(1, Math.floor(Number(size)) || NTS_CHUNK);
+  const out = [];
+  for(let i = 0; i < (list || []).length; i += n) out.push(list.slice(i, i + n));
+  return out;
+}
+/* 국세청 답을 «우리 줄»에 맞춘다.
+   ⚠⚠ 차례(index)로 맞추지 «않는다» — 국세청이 차례를 지킨다고 적혀 있어도, 하나라도
+     어긋나면 **남의 회사 상태가 이 회사에 앉는다.** 번호로 맞춘다.
+   ⚠ 같은 번호를 가진 줄이 둘일 수 있다(이름 열쇠 줄에 번호가 채워진 경우) — 둘 다 받는다.
+   ⚠ 우리가 안 물어본 번호가 답에 섞여 오면 «버린다». */
+function coNtsMatch(chunk, rows){
+  const byNo = {};
+  (chunk || []).forEach(function(o){
+    const no = digits(o.bizno || '');
+    (byNo[no] = byNo[no] || []).push(o.key);
+  });
+  const out = [];
+  (rows || []).forEach(function(r){
+    const no = digits((r && r.b_no) || '');
+    const word = coNtsWord(r);
+    if(!no || !word || !byNo[no]) return;
+    byNo[no].forEach(function(k){ out.push({ key:k, state:word }); });
+  });
+  return out;
+}
+/* 받은 것을 200곳씩 «한 통»으로 — 곳마다 두 칸(상태·확인일)이라 한 통에 400칸이다 */
+function coNtsWrites(hits, day, chunk){
+  const size = Math.max(1, Math.floor(Number(chunk)) || BULK_PATCH_CHUNK);
+  const out = [];
+  for(let i = 0; i < (hits || []).length; i += size){
+    const upd = {};
+    hits.slice(i, i + size).forEach(function(h){
+      upd['coInfo/' + h.key + '/ntsState'] = h.state;
+      upd['coInfo/' + h.key + '/ntsAt'] = day;
+    });
+    out.push(upd);
+  }
+  return out;
+}
+/* 훑은 뒤 «무엇이 나왔나» — 폐업·휴업만 추린다(계속사업자는 챙길 일이 없다) */
+function coNtsBadList(){
+  return (coList() || []).filter(function(o){
+    const c = coNtsCls(coVal(o, 'ntsState'));
+    return c === 'gone' || c === 'soon';
+  }).map(function(o){
+    return { o:o, key:o.key, name:o.name || '', state:coVal(o, 'ntsState'),
+             at:coVal(o, 'ntsAt'), cls:coNtsCls(coVal(o, 'ntsState')) };
+  }).sort(function(a,b){
+    /* 폐업이 휴업보다 앞 — 급한 순이다 */
+    if(a.cls !== b.cls) return a.cls === 'gone' ? -1 : 1;
+    return String(a.name).localeCompare(String(b.name), 'ko');
+  });
+}
+function coNtsBadCount(){ return coNtsBadList().length; }
+function coNtsNeeds(o){
+  const c = coNtsCls(coVal(o, 'ntsState'));
+  return c === 'gone' || c === 'soon';
+}
+/* 목록 위 알림 띠 — 0곳이면 «아예 안 띄운다»(확인서·계약 띠와 같은 규칙) */
+function coNtsBarHtml(){
+  const list = coNtsBadList();
+  if(!list.length) return '';
+  const gone = list.filter(x => x.cls === 'gone').length;
+  const soon = list.length - gone;
+  const bits = [ gone ? `폐업 <b>${gone.toLocaleString()}곳</b>` : '',
+                 soon ? `휴업 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
+  return `<div class="contsbar" onclick="openCoNts()"
+      title="국세청에 물어본 결과입니다 — 물어본 «그때»의 상태입니다">
+      🏛 국세청 ${bits}<em>— 눌러서 보기</em></div>`;
+}
+function openCoNts(){ showPanel(coNtsHtml()); }
+function coNtsHtml(){
+  const list = coNtsBadList();
+  const 남은 = coNtsTargets().length;
+  /* ⚠ 도는 «동안»에는 진행과 「그만」만 보인다. 이 자리가 없으면 그만둘 길이 아예 없다
+     (2026-09-13: 그만두는 함수를 만들어 놓고 «누를 자리»를 안 만들어 검사가 잡았다). */
+  const 훑기 = _coNtsRun
+    ? `<div class="contsrun"><b>🏛 국세청에 묻는 중 ${_coNtsRun.i}/${_coNtsRun.n}</b>
+        <span>지금까지 ${Number(_coNtsRun.got||0).toLocaleString()}곳${
+          _coNtsRun.fail ? ` · ${_coNtsRun.fail}묶음 못 받음` : ''}</span>
+        <button onclick="coNtsSweepStop()" title="그때까지 받은 것은 남습니다">그만</button></div>`
+    : `<p class="setnote" style="margin:0 0 10px">아직 안 물어봤거나 물어본 지
+      <b>${NTS_SKIP_DAYS}일</b>이 넘은 곳이 <b>${남은.toLocaleString()}곳</b> 있습니다.
+      ${남은 ? `<button class="conbask" onclick="coNtsSweepAsk()"
+        title="사업자번호를 국세청에 보내 상태를 받아 옵니다">🏛 전체 훑기</button>` : ''}</p>`;
+  if(!list.length) return `<div class="mhead"><b>🏛 국세청 사업자 상태</b>${_closeBtn()}</div>
+    ${훑기}<p class="cpnone" style="padding:16px 2px">폐업·휴업으로 나온 곳이 없습니다 👍</p>`;
+  return `<div class="mhead"><b>🏛 국세청 — 폐업·휴업 ${list.length}곳</b>${_closeBtn()}</div>
+    ${훑기}
+    <p class="setnote" style="margin:0 0 10px">⚠ <b>물어본 «그때»의 상태</b>입니다 — 날짜를 함께 보세요.
+      계약해지(🚪)와는 다른 말입니다.</p>
+    <div class="ablist">${list.map(x=>`
+      <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
+          title="${esc(x.name)} 상세를 엽니다">
+        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
+        <div class="sv"><span class="sd ${x.cls}">${esc(x.state)}</span>
+          <span class="se">${esc(x.at || '날짜 모름')} 확인</span>
+          ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
+      </div>`).join('')}</div>`;
+}
+/* ── 훑기 — 묻고, 자르고, 모아 쓰고, 그만둘 수 있다 ─────────────────────── */
+let _coNtsStop = false;
+/* 도는 «동안»의 진행 — 창이 이것을 보고 그린다. 안 돌 때는 null 이다. */
+let _coNtsRun = null;
+function coNtsSweepStop(){ _coNtsStop = true; toast('그만둡니다 — 지금까지 받은 것은 남습니다', 5000); }
+/* 창이 열려 있으면 그 자리를 다시 그린다 — 진행과 「그만」이 거기 있다 */
+function coNtsRepaint(){
+  try{ if($('dedupBg') && $('dedupBg').classList.contains('open')) showPanel(coNtsHtml()); }catch(_){}
+}
+async function coNtsSweepAsk(){
+  const svc = String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim();
+  if(!svc){ toast('국세청 조회 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」를 넣어 주세요(공공데이터포털, 무료)', 10000); return; }
+  const targets = coNtsTargets();
+  if(!targets.length){ toast('지금 물어볼 곳이 없습니다 — 모두 최근에 확인했습니다', 6000); return; }
+  const 묶음 = coNtsChunks(targets, NTS_CHUNK).length;
+  /* ⚠⚠ 묻기 전에 «몇 개가 어디로» 나가는지 숫자로 말한다. 밖으로 나가는 일이다. */
+  if(!confirm(`사업장 ${targets.length.toLocaleString()}곳의 «사업자등록번호»를\n`
+    + `국세청(공공데이터포털)에 보내 상태를 받아 옵니다.\n\n`
+    + `· 보내는 것: 사업자등록번호 ${targets.length.toLocaleString()}개 (${묶음}번에 나눠)\n`
+    + `· 상호·대표자·연락처는 보내지 않습니다\n`
+    + `· 최근 ${NTS_SKIP_DAYS}일 안에 확인한 곳은 뺐습니다\n`
+    + `· 도중에 그만둘 수 있고, 그때까지 받은 것은 남습니다\n\n`
+    + `진행할까요?`)) return;
+  _coNtsStop = false;
+  /* 창을 «먼저» 연다 — 진행과 「그만」이 거기 있다 */
+  openCoNts();
+  await coNtsSweepRun(targets, svc);
+}
+async function coNtsSweepRun(targets, svc){
+  const day = todayYmd();
+  const chunks = coNtsChunks(targets, NTS_CHUNK);
+  let 받음 = 0, 실패 = 0;
+  const hits = [];
+  for(let i = 0; i < chunks.length; i++){
+    if(_coNtsStop) break;
+    _coNtsRun = { i: i+1, n: chunks.length, got: 받음, fail: 실패 };
+    coNtsRepaint();
+    try{
+      const r = await fetch(NTS_STATUS_URL + encodeURIComponent(svc), {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ b_no: chunks[i].map(o => digits(o.bizno || '')) }) });
+      if(!r.ok) throw new Error('응답 ' + r.status);
+      const j = await r.json();
+      const got = coNtsMatch(chunks[i], (j && j.data) || []);
+      got.forEach(h => hits.push(h));
+      받음 += got.length;
+    }catch(e){
+      /* ⚠ 한 묶음이 막혔다고 통째로 그만두지 않는다 — 나머지는 받는다.
+         못 받은 것은 «안 적는다»(물어본 척하지 않는다). */
+      실패++;
+      console.warn('[국세청 훑기]', e && e.message);
+    }
+  }
+  _coNtsRun = null;                     /* 다 돌았다 — 창이 다시 「전체 훑기」를 보인다 */
+  if(hits.length){
+    try{
+      for(const upd of coNtsWrites(hits, day, BULK_PATCH_CHUNK)) await Store.db.ref(DB_ROOT).update(upd);
+    }catch(e){ coNtsRepaint(); toast('받아 왔지만 저장하지 못했습니다 — ' + ((e && e.message) || ''), 9000); return; }
+    coListBust(); renderCoSoon();
+  }
+  const 나쁜곳 = coNtsBadCount();
+  toast(`🏛 국세청 훑기 끝 — ${받음.toLocaleString()}곳 확인`
+    + (실패 ? ` · ${실패}묶음 못 받음` : '')
+    + (나쁜곳 ? ` · 폐업·휴업 ${나쁜곳.toLocaleString()}곳` : ' · 폐업·휴업 없음'), 12000);
+  coNtsRepaint();
 }
 
 function coSmeChipHtml(o){

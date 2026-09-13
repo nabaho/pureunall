@@ -82,7 +82,7 @@ function drawFilterMenu(state, counts){
     coSmeCount: () => c.sme,
     /* 2026-09-12: 「계약 종료」 한 줄이 또 늘었다 — 같은 까닭으로 세는 일만 대역이다
        (잣대는 tests/cards-co-contract-due.test.js 가 따로 본다). */
-    coCtCount: () => c.ct || 0,
+    coCtCount: () => c.ct || 0, coNtsBadCount: () => c.nts || 0,
     closeFolderMenu(){}, renderCoAny(){ ctx.drew = (ctx.drew||0) + 1; },
     setTimeout(){}, document: { addEventListener(){} },
     window: { innerWidth: 1600 },

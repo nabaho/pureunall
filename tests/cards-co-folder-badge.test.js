@@ -53,7 +53,7 @@ function render(co, folders) {
     coDisplayName: o => o.name || '',
     coTagsOf: () => [],
     coArrow: () => '',
-    coOrphanBarHtml: () => '', coSmeBarHtml: () => '', coCtBarHtml: () => '', coMgrCellHtml: () => '',
+    coOrphanBarHtml: () => '', coSmeBarHtml: () => '', coCtBarHtml: () => '', coNtsBarHtml: () => '', coMgrCellHtml: () => '',
     coSelAll: () => {},
     listNarrowed: () => false,
     coSelectAllMatching: () => {}
