@@ -10,13 +10,16 @@ const W = require('../functions/homepage-write');
 const 사진 = '<div class="photo"><img src="/files/attach/images/2026/01/20/abc.jpg"></div>';
 function 화면(고칠것) {
   const o = Object.assign({ srl: 190, 직책1: '대표', 직책2: '공인노무사',
-    경력: '現 푸른노무법인대표', content: 사진 }, 고칠것 || {});
+    경력: '現 푸른노무법인대표', content: 사진, 확인표: 'la58UxFVPgFmF8ud' }, 고칠것 || {});
+  /* ⚠★ 확인표는 «숨은 칸»이 아니라 쪽 머리의 meta 다 — 2026-09-13 실측.
+       처음엔 숨은 칸으로 흉내 냈고, 그래서 검사는 다 통과했는데 진짜 홈페이지에서는
+       「확인표가 없습니다」로 막혔다. 흉내가 진짜와 다르면 검사가 아무것도 안 지킨다. */
   return [
+    (o.확인표 === null ? '' : '<meta name="csrf-token" content="' + o.확인표 + '" />'),
     '<form action="/index.php" method="post">',
     '<input type="hidden" name="mid" value="people_board">',
     '<input type="hidden" name="act" value="procBoardInsertDocument">',
     '<input type="hidden" name="document_srl" value="' + o.srl + '">',
-    '<input type="hidden" name="_rx_csrf_token" value="tok-123">',
     '<table><tbody>',
     '<tr><th>제목<span>*</span></th><td><input type="text" name="title" value="홍길동"></td></tr>',
     '<tr><th>직책1</th><td><input type="text" name="extra_vars1" value="' + o.직책1 + '"></td></tr>',
@@ -50,8 +53,76 @@ test('보내는 몸통에 숨은 칸이 그대로 실린다', () => {
   const 몸 = W.몸통(r.칸, r.여럿);
   const p = new URLSearchParams(몸);
   assert.equal(p.get('content'), 사진, '몸통에서 사진이 빠졌다 — 이대로면 지워진다');
-  assert.equal(p.get('_rx_csrf_token'), 'tok-123');
   assert.equal(p.get('document_srl'), '190');
+});
+
+/* ── 확인표(CSRF) ── 2026-09-13 첫 시도가 막힌 바로 그 자리 ────────────── */
+test('★ 확인표는 쪽 머리의 meta 에서 뽑는다 — 숨은 칸이 아니다', () => {
+  assert.equal(W.확인표뽑기(화면()), 'la58UxFVPgFmF8ud');
+  assert.equal(W.확인표뽑기('<meta name="csrf-token" content="abc" />'), 'abc');
+  assert.equal(W.확인표뽑기('<html><body>아무것도 없음</body></html>'), '');
+});
+
+test('★ 확인표가 meta 에만 있어도 «막지 않는다»', () => {
+  const 막 = W.막을까(W.칸읽기(화면()), 190);
+  assert.equal(막.ok, true,
+    '멀쩡한 화면을 막았다(2026-09-13 실제로 그랬다): ' + 막.걸린것.join(' / '));
+});
+
+test('확인표가 아예 없으면 막는다 — 어차피 저장이 안 된다', () => {
+  const 막 = W.막을까(W.칸읽기(화면({ 확인표: null })), 190);
+  assert.equal(막.ok, false);
+  assert.ok(막.걸린것.join(' ').includes('확인표'));
+});
+
+/* ── 로그인 ── 아이디·비밀번호만 보내면 안 들어가진다 ─────────────────── */
+function 로그인쪽(고칠것) {
+  const o = Object.assign({ 확인표: 'tok-login', user_id: true }, 고칠것 || {});
+  return [
+    (o.확인표 === null ? '' : '<meta name="csrf-token" content="' + o.확인표 + '" />'),
+    '<form action="/index.php?act=dispBoardWrite"><input type="text" name="search_keyword"></form>',
+    '<form action="/index.php?act=procMemberLogin" method="post">',
+    '<input type="hidden" name="error_return_url" value="/index.php?mid=people_board">',
+    '<input type="hidden" name="mid" value="people_board">',
+    '<input type="hidden" name="ruleset" value="@login">',
+    '<input type="hidden" name="module" value="member">',
+    '<input type="hidden" name="act" value="procMemberLogin">',
+    '<input type="hidden" name="success_return_url" value="/index.php?mid=people_board">',
+    '<input type="hidden" name="xe_validator_id" value="modules/message/skins/default/">',
+    (o.user_id ? '<input type="text" name="user_id" value="">' : ''),
+    '<input type="password" name="password" value="">',
+    '</form>'
+  ].join('\n');
+}
+
+test('★ 로그인 몸통은 «받은 칸»을 그대로 쓴다 — ruleset 을 빠뜨리면 안 들어가진다', () => {
+  const r = W.로그인몸통(로그인쪽(), 'hong', 'pw1234');
+  assert.equal(r.ok, true, r.why);
+  const p = new URLSearchParams(r.몸통);
+  ['error_return_url', 'mid', 'ruleset', 'module', 'act', 'success_return_url', 'xe_validator_id']
+    .forEach((k) => assert.ok(p.get(k) !== null, '로그인에 ' + k + ' 이 빠졌다'));
+  assert.equal(p.get('ruleset'), '@login');
+  assert.equal(p.get('user_id'), 'hong');
+  assert.equal(p.get('password'), 'pw1234');
+  assert.equal(p.get('_rx_csrf_token'), 'tok-login', '확인표가 몸통에 안 실렸다');
+  assert.equal(r.확인표, 'tok-login');
+});
+
+test('★ 로그인 칸 밖의 «찾기 칸»이 섞여 들어가지 않는다', () => {
+  const p = new URLSearchParams(W.로그인몸통(로그인쪽(), 'hong', 'pw').몸통);
+  assert.equal(p.get('search_keyword'), null, '딴 폼의 칸을 함께 보냈다');
+});
+
+test('★ 비밀번호는 «남기는 기록»에 안 들어간다', () => {
+  const r = W.로그인몸통(로그인쪽(), 'hong', 'pw1234');
+  assert.ok(r.칸이름들.indexOf('password') < 0, '기록에 비밀번호 칸이 남는다');
+  assert.ok(r.칸이름들.indexOf('user_id') >= 0);
+  assert.ok(JSON.stringify(r.칸이름들).indexOf('pw1234') < 0, '기록에 비밀번호 값이 샜다');
+});
+
+test('로그인 칸이 아니면 «짐작해서» 밀어 넣지 않는다', () => {
+  const r = W.로그인몸통(로그인쪽({ user_id: false }), 'hong', 'pw');
+  assert.equal(r.ok, false);
 });
 
 test('숨은 칸이 안 오면 «아무것도» 안 보낸다', () => {

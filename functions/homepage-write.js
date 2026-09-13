@@ -34,6 +34,11 @@ function 고치는주소(srl) {
   return ORIGIN + "/index.php?mid=" + BOARD + "&act=dispBoardWrite&document_srl=" + n;
 }
 
+/* 로그인 화면 — 손님이 게시판을 열면 403 과 함께 «로그인 칸»이 같이 온다.
+   그 화면을 그대로 받아 아이디·비밀번호 둘만 채워 도로 보낸다. */
+function 로그인화면주소() { return ORIGIN + "/index.php?mid=" + BOARD; }
+function 로그인보내는곳() { return ORIGIN + "/index.php?act=procMemberLogin"; }
+
 /* ── 우리가 «이름을 아는» 칸 ───────────────────────────────────────────
    ⚠ 이름을 짐작하지 않는다. 경력사항만 정찰로 이름을 안다(extra_vars4).
      나머지는 화면에 «보이는 이름표»로 찾는다 — 못 찾으면 그 칸은 안 건드린다.
@@ -68,6 +73,37 @@ function 글자되돌리기(s) {
     .replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'")
     .replace(/&nbsp;/g, "\u00a0")
     .replace(/&amp;/g, "&");            /* ⚠ 맨 뒤여야 한다 — 먼저 하면 &amp;lt; 가 < 가 된다 */
+}
+
+/* ── 확인표(CSRF) ──────────────────────────────────────────────────────
+   ★ 2026-09-13 정찰로 알아낸 것 — 라이믹스는 확인표를 «숨은 칸»에 안 넣는다.
+     쪽 머리의 <meta name="csrf-token" content="…"> 에 붙여 두고, 보낼 때
+     X-CSRF-Token 머리글로 받는다. 숨은 칸 `_rx_csrf_token` 만 찾으면
+     **로그인이 멀쩡해도 「확인표가 없습니다」로 막힌다** — 첫 시도에 그랬다. */
+function 확인표뽑기(html) {
+  const 본문 = String(html || "");
+  const m = /<meta[^>]+name=["']csrf-token["'][^>]*>/i.exec(본문);
+  if (m) {
+    const v = /content\s*=\s*["']([^"']*)["']/i.exec(m[0]);
+    if (v && v[1]) return v[1];
+  }
+  /* 판이 바뀌어 숨은 칸으로 돌아올 수도 있다 — 그때도 찾는다 */
+  const h = /<input[^>]+name=["']_rx_csrf_token["'][^>]*>/i.exec(본문);
+  if (h) {
+    const v = /value\s*=\s*["']([^"']*)["']/i.exec(h[0]);
+    if (v && v[1]) return v[1];
+  }
+  return "";
+}
+
+/* <form> 한 덩이만 떼어 온다 — 쪽에는 찾기 칸·댓글 칸도 함께 있어서,
+   쪽 전체를 긁으면 로그인과 상관없는 칸이 섞여 들어간다. */
+function 폼떼기(html, 표시) {
+  const 본문 = String(html || "");
+  const re = /<form\b[\s\S]*?<\/form>/gi;
+  let m;
+  while ((m = re.exec(본문))) { if (m[0].indexOf(표시) >= 0) return m[0]; }
+  return "";
 }
 
 /* 고치는 화면 한 장에서 «보낼 칸»을 전부 긁는다.
@@ -122,7 +158,7 @@ function 칸읽기(html) {
     칸[이름] = 고름 === null ? (첫째 === null ? "" : 첫째) : 고름;
   }
 
-  return { 칸: 칸, 여럿: 여럿 };
+  return { 칸: 칸, 여럿: 여럿, 확인표: 확인표뽑기(본문) };
 }
 
 /* 화면에 «보이는 이름표»로 칸 이름을 찾는다.
@@ -179,9 +215,11 @@ function 막을까(읽은것, 글번호) {
   if (받은번호 !== String(글번호)) {
     걸린것.push("글 번호가 다릅니다(부른 것 " + 글번호 + " · 화면 " + (받은번호 || "없음") + ")");
   }
-  /* ④ 라이믹스 확인표가 없으면 어차피 저장이 안 된다 — 미리 멈춰 까닭을 알린다 */
-  const 확인표 = ["_rx_csrf_token", "xe_validator_id"]
-    .some((k) => Object.prototype.hasOwnProperty.call(칸, k));
+  /* ④ 라이믹스 확인표가 없으면 어차피 저장이 안 된다 — 미리 멈춰 까닭을 알린다.
+       ⚠ 확인표는 «숨은 칸»이 아니라 쪽 머리의 <meta name="csrf-token"> 에 있다.
+         2026-09-13 첫 시도에서 숨은 칸만 찾다가 멀쩡한 화면을 막았다. */
+  const 확인표 = String((읽은것 && 읽은것.확인표) || "")
+    || (Object.prototype.hasOwnProperty.call(칸, "_rx_csrf_token") ? String(칸._rx_csrf_token || "") : "");
   if (!확인표) 걸린것.push("확인표가 없습니다 — 관리자로 들어가지 못한 것 같습니다");
 
   return { ok: 걸린것.length === 0, 걸린것: 걸린것 };
@@ -235,10 +273,33 @@ function 몸통(칸, 여럿) {
 function 보낼주소() { return ORIGIN + "/index.php"; }
 function 저장할act() { return "procBoardInsertDocument"; }
 
+/* ── 로그인 몸통 ───────────────────────────────────────────────────────
+   ⚠ 아이디·비밀번호만 보내면 안 들어가진다. 라이믹스는 로그인 칸에 함께 붙여 둔
+     ruleset·mid·돌아갈 주소·xe_validator_id 를 «다 같이» 받아야 한다
+     (2026-09-13 정찰). 그래서 짐작해 만들지 않고 «받은 칸을 그대로» 쓰고
+     아이디·비밀번호 둘만 채운다 — 고치기와 같은 방식이다. */
+function 로그인몸통(로그인쪽, 아이디, 암호) {
+  const 폼 = 폼떼기(로그인쪽, "procMemberLogin");
+  const 읽은것 = 칸읽기(폼 || 로그인쪽);
+  const 칸 = Object.assign({}, 읽은것.칸);
+  /* 이 화면이 로그인 칸이 맞나 — 아니면 짐작으로 밀어 넣지 않는다 */
+  const 있나 = Object.prototype.hasOwnProperty.call(칸, "user_id")
+    && Object.prototype.hasOwnProperty.call(칸, "password");
+  if (!있나) return { ok: false, why: "로그인 칸을 찾지 못했습니다(홈페이지 화면이 바뀐 듯합니다)" };
+  칸.user_id = String(아이디 == null ? "" : 아이디);
+  칸.password = String(암호 == null ? "" : 암호);
+  칸.module = "member";
+  칸.act = "procMemberLogin";
+  const 확인표 = 확인표뽑기(로그인쪽);
+  if (확인표) 칸._rx_csrf_token = 확인표;
+  return { ok: true, 몸통: 몸통(칸, 읽은것.여럿), 확인표: 확인표,
+           칸이름들: Object.keys(칸).filter((k) => k !== "password") };
+}
+
 module.exports = {
   ORIGIN, BOARD, 브라우저표시,
-  고치는주소, 보낼주소, 저장할act,
+  고치는주소, 보낼주소, 저장할act, 로그인화면주소, 로그인보내는곳,
   경력칸, 이름표로찾을것, 손대지말것,
-  칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기,
-  막을까, 갈아끼우기, 몸통
+  칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기,
+  막을까, 갈아끼우기, 몸통, 로그인몸통
 };

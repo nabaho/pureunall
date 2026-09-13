@@ -2963,26 +2963,32 @@ async function 홈부르기(주소, 그릇, 더할것) {
    고치는 화면이 오는지로 판단한다(막을까 가 본다). 그게 가장 정직하다. */
 async function 홈로그인(아이디, 암호, 그릇) {
   const 걸음 = [];
-  const a = await 홈부르기(HW.ORIGIN + "/index.php?mid=" + HW.BOARD, 그릇);
-  걸음.push({ 걸음: "① 쪽 열기", 상태: a.status });
+  /* ① 로그인 칸을 «받아 온다». 손님이 게시판을 열면 403 과 함께 그 칸이 딸려 온다.
+       ⚠ 403 은 실패가 아니다 — 여기서 멈추면 안 된다. */
+  const a = await 홈부르기(HW.로그인화면주소(), 그릇);
+  const a답 = await a.text();
+  걸음.push({ 걸음: "① 로그인 칸 받기", 상태: a.status, 크기: a답.length });
 
-  const 몸 = new URLSearchParams({
-    module: "member", act: "procMemberLogin",
-    user_id: 아이디, password: 암호,
-    keep_signed: "N", success_return_url: HW.ORIGIN + "/index.php?mid=" + HW.BOARD
-  });
-  const b = await 홈부르기(HW.보낼주소(), 그릇, {
+  /* ② 받은 칸에 아이디·비밀번호 «둘만» 채워 도로 보낸다.
+       ⚠ 짐작해서 지어 보내면 안 들어가진다 — ruleset(@login)·mid·돌아갈 주소·
+         xe_validator_id 가 함께 가야 한다(2026-09-13 정찰). 고치기와 같은 방식이다. */
+  const 지음 = HW.로그인몸통(a답, 아이디, 암호);
+  if (!지음.ok) { 걸음.push({ 걸음: "② 로그인", 막힘: 지음.why }); return 걸음; }
+
+  const b = await 홈부르기(HW.로그인보내는곳(), 그릇, {
     method: "POST",
-    body: 몸.toString(),
-    headers: {
+    body: 지음.몸통,
+    headers: Object.assign({
       "User-Agent": HW.브라우저표시,
       "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "Referer": HW.ORIGIN + "/index.php?mid=" + HW.BOARD,
+      "Referer": HW.로그인화면주소(),
       "Cookie": 그릇.글자()
-    }
+    }, 지음.확인표 ? { "X-CSRF-Token": 지음.확인표 } : {})
   });
   const 답 = await b.text();
-  걸음.push({ 걸음: "② 로그인", 상태: b.status, 답조각: 답.slice(0, 200) });
+  /* ⚠ 보낸 «칸 이름»만 남기고 값은 안 남긴다 — 기록에 비밀번호가 새지 않게 */
+  걸음.push({ 걸음: "② 로그인", 상태: b.status, 보낸칸: 지음.칸이름들,
+              확인표붙음: !!지음.확인표, 답조각: 답.slice(0, 200) });
   return 걸음;
 }
 
@@ -3046,17 +3052,20 @@ exports.homepageWrite = functions
 
       if (방식 === "보기" || !새것.바뀐것.length) { res.json(알림); return; }
 
-      /* ── 진짜 보낸다 ── 받은 칸을 하나도 안 빠뜨리고 그대로 실어서 */
+      /* ── 진짜 보낸다 ── 받은 칸을 하나도 안 빠뜨리고 그대로 실어서.
+           ⚠ 확인표는 쪽 머리(meta)에 있다 — 몸통과 머리글 «둘 다»에 실어야 받아 준다. */
+      const 확인표 = String(읽은것.확인표 || "");
       const 칸 = Object.assign({}, 새것.칸, { act: HW.저장할act() });
+      if (확인표) 칸._rx_csrf_token = 확인표;
       const p = await 홈부르기(HW.보낼주소(), 그릇, {
         method: "POST",
         body: HW.몸통(칸, 읽은것.여럿),
-        headers: {
+        headers: Object.assign({
           "User-Agent": HW.브라우저표시,
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
           "Referer": 주소,
           "Cookie": 그릇.글자()
-        }
+        }, 확인표 ? { "X-CSRF-Token": 확인표 } : {})
       });
       const p답 = await p.text();
       const 잘됐나 = p.status >= 200 && p.status < 400 && !/<error>\s*-?[1-9]/.test(p답);
