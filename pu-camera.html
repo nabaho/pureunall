@@ -97,6 +97,23 @@ button{font-family:inherit;cursor:pointer;color:inherit}
 #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .18s}
 #flash.on{opacity:.75;transition:none}
 
+/* ── 렌즈 고르개 — «되는 기기에서만» 뜬다(그래서 display:none 으로 시작한다) ── */
+#lens{position:absolute;left:50%;transform:translateX(-50%);bottom:30px;display:none;
+  gap:6px;background:rgba(15,23,42,.62);border-radius:999px;padding:4px 6px}
+#lens button{min-width:36px;height:27px;border-radius:999px;border:none;background:none;
+  color:#cbd5e1;font-size:11.5px;font-weight:700;padding:0 8px;line-height:1}
+#lens button.on{background:#fff;color:#0f172a}
+
+/* ── 메모 걸이 — 한 번 적으면 그 뒤 찍는 것마다 붙는다 ── */
+#memoBar{flex:none;display:flex;align-items:center;gap:7px;background:#1e293b;
+  padding:7px 11px;font-size:11.5px}
+#memoBar .tag{background:var(--blue);color:#fff;border-radius:5px;padding:1px 6px;
+  font-weight:800;font-size:10px;flex:none}
+#memoBar .txt{flex:1;text-align:left;background:none;border:none;padding:0;color:#fff;
+  font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#memoBar .txt.off{color:#94a3b8;font-style:italic}
+#memoBar .x{background:none;border:none;color:#94a3b8;font-size:13px;padding:0 3px;line-height:1}
+
 /* ── 촬영 줄 ── */
 #bar{flex:none;display:flex;align-items:center;justify-content:center;gap:26px;padding:13px 0}
 #shot{width:62px;height:62px;border-radius:50%;background:#fff;border:4px solid #94a3b8;padding:0}
@@ -111,7 +128,9 @@ button{font-family:inherit;cursor:pointer;color:inherit}
 #strip .hd{display:flex;align-items:center;font-size:11.5px;font-weight:800;color:#64748b;margin-bottom:6px}
 #strip .hd .r{margin-left:auto}
 #strip .row{display:flex;gap:9px;overflow-x:auto;padding:4px 4px 2px}
-#strip .row .one{position:relative;flex:none}
+#strip .row .one{flex:none}
+/* 시각·✕ 는 «사진»에 붙는다 — 아래 메모 줄까지 늘어난 칸에 붙으면 자리가 어긋난다 */
+#strip .row .pic{position:relative;display:block}
 #strip .row img{width:56px;height:56px;border-radius:7px;object-fit:cover;
   border:1px solid #e2e8f0;display:block;background:#f1f5f9}
 #strip .row .t{position:absolute;left:0;right:0;bottom:0;font-size:9px;background:rgba(15,23,42,.62);
@@ -120,6 +139,10 @@ button{font-family:inherit;cursor:pointer;color:inherit}
   border:none;background:#1e293b;color:#fff;font-size:11px;line-height:1;padding:0}
 #strip .row .one.up img{opacity:.45}
 #strip .row .one.bad img{border-color:#fecaca;box-shadow:0 0 0 2px #fef2f2}
+/* 그 사진에 붙은 한 줄 — 한 칸은 «한 줄»이다(넘치면 … 로 자르고 전문은 title 에) */
+#strip .row .mm{display:block;width:56px;margin-top:3px;font-size:9.5px;line-height:1.35;
+  color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#strip .row .mm.none{color:#cbd5e1}
 
 /* ── 알림 · 로그인 ── */
 #foot{flex:none;text-align:center;font-size:10.5px;color:var(--sub);padding:7px 10px}
@@ -145,7 +168,16 @@ button{font-family:inherit;cursor:pointer;color:inherit}
     <!-- playsinline: 아이폰이 영상을 전체화면으로 납치하는 것 방지 / muted: 자동재생 허용 조건 -->
     <video id="vid" autoplay playsinline muted></video>
     <div id="flash"></div>
+    <!-- 렌즈 알 — 기기가 바꿀 수 있을 때만 채워 넣는다(빈 채로 두면 안 보인다) -->
+    <div id="lens" role="group" aria-label="렌즈"></div>
     <div id="hint">사진은 찍는 대로 푸른사진첩에 저장됩니다</div>
+  </div>
+
+  <!-- 한 번 적으면 그 뒤 찍는 것마다 붙는다 — 현장에서는 한 곳에서 열 장씩 찍는다 -->
+  <div id="memoBar">
+    <span class="tag">메모</span>
+    <button class="txt off" id="memoTxt" onclick="askMemo()">눌러서 한 줄 적기 (예: 가나상사 3층 작업장)</button>
+    <button class="x" id="memoX" onclick="clearMemo()" style="display:none" aria-label="메모 지우기">✕</button>
   </div>
 
   <div id="bar">
@@ -194,6 +226,8 @@ var FIREBASE_CONFIG = {
 };
 
 var stream = null, track = null, facing = 'environment', torchOn = false;
+var lenses = [], lensAt = 0, lensDev = '';   // 렌즈 알 · 지금 고른 것 · 고른 기기(있을 때)
+var memo = '';               // 걸어 둔 한 줄 — 찍는 것마다 붙는다
 var me = null;               // 로그인한 사람
 var shots = [];              // 이번에 찍은 것 — { id, thumb, at, up:'가는중'|'됨'|'실패' }
 var SHOT_KEEP = 12;          // 줄에 남겨 두는 장수(그 위는 밀려난다 — 사진은 사진첩에 있다)
@@ -214,8 +248,12 @@ function toast(msg, ms) {
 function startCam() {
   stopCam();
   $('shot').disabled = true;
+  /* 고른 렌즈가 «다른 기기»인 폰이면 그 기기를 짚어 연다. 아니면 평소대로 뒷면을 청한다. */
+  var want = lensDev
+    ? { deviceId: { exact: lensDev }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    : { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } };
   return navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+    video: want,
     audio: false
   }).then(function (s) {
     stream = s;
@@ -230,7 +268,8 @@ function startCam() {
     return navigator.mediaDevices.enumerateDevices().then(function (devs) {
       var cams = devs.filter(function (d) { return d.kind === 'videoinput'; });
       $('flip').style.display = cams.length > 1 ? '' : 'none';
-    }).catch(function () { /* 못 세도 그만 — 안 보이면 안 쓴다 */ });
+      buildLenses(caps, cams);
+    }).catch(function () { buildLenses(caps, []); });
   }).catch(function (e) {
     var why = (e && e.name === 'NotAllowedError')
       ? '카메라를 못 씁니다 — 브라우저 설정에서 이 앱에 카메라를 허용해 주세요'
@@ -256,7 +295,127 @@ function toggleTorch() {
 
 function flipCam() {
   facing = (facing === 'environment') ? 'user' : 'environment';
+  lensDev = '';    /* 앞뒤를 바꾸면 뒷면에서 고른 렌즈는 뜻이 없다 */
   startCam();
+}
+
+/* ══════ 렌즈 — «할 수 있는 기기»에서만 ══════════════════════════════════
+   ⚠ 폰마다 달린 렌즈가 다르다. 그래서 알을 **기기가 실제로 할 수 있는 것으로만** 만든다.
+     ① 배율(zoom)을 받는 기기 — 0.5× · 1× · 2× 중 되는 것만. 요즘 폰은 이때
+        브라우저가 알아서 초광각·망원으로 «렌즈를 바꿔» 준다.
+     ② 배율은 못 받지만 뒷면 카메라가 여럿인 기기 — 그 기기들을 렌즈1·2·3 으로.
+     ③ 둘 다 아니면 **아무것도 안 그린다.** 눌러도 안 되는 단추는 없느니만 못하다
+        (손전등 ⚡ · 앞뒤 🔄 와 같은 규칙이다). */
+
+/* 이름표는 기기마다 제멋대로다 — 넷 중 하나라도 걸리면 뒷면으로 본다.
+   ⚠ 권한을 주기 «전»에는 이름표가 빈 문자열이라 여기서 아무것도 안 걸린다. 그게 맞다 —
+     그때는 알을 안 그린다(어느 것이 어느 렌즈인지 알 길이 없다). */
+function backCams(cams) {
+  return (cams || []).filter(function (d) { return /back|rear|후면|환경/i.test(d.label || ''); });
+}
+
+function buildLenses(caps, cams) {
+  /* 고르신 것을 이름으로 기억해 둔다 — 화면을 덮었다 돌아와도 그대로 있게 */
+  var prev = (lenses[lensAt] || {}).label || '1×';
+  var z = caps && caps.zoom;
+  var list = [];
+  if (z && Number(z.max) > Number(z.min)) {
+    [0.5, 1, 2].forEach(function (v) {
+      if (v >= Number(z.min) && v <= Number(z.max)) list.push({ label: v + '×', zoom: v });
+    });
+  }
+  if (list.length < 2 && facing === 'environment') {
+    var back = backCams(cams);
+    list = back.length > 1
+      ? back.map(function (d, i) { return { label: '렌즈' + (i + 1), dev: d.deviceId }; })
+      : [];
+  }
+  /* 알이 하나뿐이면 고를 것이 없다 — 자리만 차지한다 */
+  lenses = list.length > 1 ? list : [];
+  lensAt = 0;
+  lenses.forEach(function (L, i) { if (L.label === prev) lensAt = i; });
+  renderLens();
+  applyZoom();
+}
+
+function renderLens() {
+  var box = $('lens');
+  if (lenses.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'flex';
+  box.innerHTML = lenses.map(function (L, i) {
+    return '<button type="button"' + (i === lensAt ? ' class="on"' : '') +
+      ' onclick="pickLens(' + i + ')">' + esc(L.label) + '</button>';
+  }).join('');
+}
+
+function pickLens(i) {
+  var L = lenses[i];
+  if (!L) return;
+  lensAt = i;
+  renderLens();
+  /* 기기가 다른 렌즈면 다시 열어야 한다. 배율이면 열어 둔 채로 바꾼다(훨씬 빠르다). */
+  if (L.dev) { lensDev = L.dev; startCam(); return; }
+  applyZoom();
+}
+
+function applyZoom() {
+  var L = lenses[lensAt];
+  if (!track || !L || !L.zoom) return;
+  try {
+    track.applyConstraints({ advanced: [{ zoom: L.zoom }] }).catch(function () {
+      toast('이 기기는 ' + L.label + ' 로 못 바꿉니다');
+    });
+  } catch (_) { /* 못 걸어도 화면은 그대로 살아 있다 */ }
+}
+
+/* ══════ 한 줄 메모 ══════════════════════════════════════════════════════
+   현장에서는 한 곳에서 열 장씩 찍는다 — 한 장마다 물으면 열 번 친다.
+   그렇다고 안 물으면 나중에 사진첩에서 「이게 어디였지」가 된다.
+   그래서 **한 번 적어 걸어 두고** 그 뒤 찍는 것마다 붙인다.
+   ⚠ 담기는 칸은 사진첩의 **「사람이 적는 한 줄」**(meta.note) 그대로다 — 새 칸을 안 만든다.
+     그래서 사진첩에서 바로 보이고 거기서 고칠 수도 있다. AI 가 읽은 것(read)과는
+     따로 있는 칸이라 나중에 판독해도 대표님이 적으신 것은 안 지워진다. */
+var MEMO_MAX = 60;          /* 한 칸은 «한 줄»이다 — 길면 사진첩 목록이 두 줄이 된다 */
+
+function setMemo(s) {
+  memo = String(s == null ? '' : s).trim().slice(0, MEMO_MAX);
+  var t = $('memoTxt');
+  t.textContent = memo || '눌러서 한 줄 적기 (예: 가나상사 3층 작업장)';
+  t.className = 'txt' + (memo ? '' : ' off');
+  t.title = memo;
+  $('memoX').style.display = memo ? '' : 'none';
+}
+
+function askMemo() {
+  var v = prompt('이 뒤로 찍는 사진에 붙일 한 줄\n(예: 가나상사 3층 작업장)', memo);
+  if (v === null) return;          /* 「취소」는 아무 일도 아니다 — 걸어 둔 것을 지우지 않는다 */
+  setMemo(v);
+}
+
+function clearMemo() { setMemo(''); }
+
+/* 이미 찍은 «그 한 장»만 고치기 — 줄에서 사진을 누르면 온다 */
+function editShot(id) {
+  var s = null;
+  shots.forEach(function (x) { if (x.id === id) s = x; });
+  if (!s) return;
+  var v = prompt('이 사진에 붙일 한 줄', s.note || '');
+  if (v === null) return;
+  s.note = String(v).trim().slice(0, MEMO_MAX);
+  renderStrip();
+  pushNote(s);
+}
+
+/* 적은 한 줄을 사진첩에 올린다.
+   ⚠ 아직 담기는 중이면 **기다린다** — 담기기 전에 적으면 뒤이어 저장되는 정보가 덮는다.
+     담긴 뒤에 savePhoto 의 then 이 이 함수를 다시 부른다. */
+function pushNote(shot) {
+  if (!shot || shot.up !== '됨') return;
+  PuPhotoStore.saveNote(PuPhotoStore.photoYear({ upAt: shot.at }), shot.id, { note: shot.note || '' })
+    .catch(function (e) {
+      console.warn('[메모]', e);
+      toast('메모를 저장하지 못했습니다 — 사진첩에서 적어 주세요', 4000);
+    });
 }
 
 /* ══════ 찍기 ══════ */
@@ -317,7 +476,9 @@ function shoot() {
       via: 'pucam',
       srcW: src.w, srcH: src.h
     };
-    var shot = { id: id, thumb: thumb.dataUrl, at: at, up: '가는중' };
+    /* 걸어 둔 한 줄이 있으면 **담을 때 함께** 간다 — 뒤에 따로 올리면 한 번 더 오간다 */
+    if (memo) meta.note = memo;
+    var shot = { id: id, thumb: thumb.dataUrl, at: at, up: '가는중', note: memo };
     shots.push(shot);
     if (shots.length > SHOT_KEEP) shots = shots.slice(-SHOT_KEEP);
     renderStrip();
@@ -325,7 +486,12 @@ function shoot() {
     /* ⚠⚠ 저장은 **공용 층 하나**로만 한다 — 여기에 db/storage 를 직접 쓰면
        둘째 저장 길이 생기고 2026-08-08 에 없앤 문제가 그대로 돌아온다. */
     PuPhotoStore.savePhoto({ id: id, full: full.dataUrl, thumb: thumb.dataUrl, meta: meta })
-      .then(function () { shot.up = '됨'; renderStrip(); })
+      .then(function () {
+        shot.up = '됨';
+        renderStrip();
+        /* 담기는 동안 한 줄을 고치셨으면 그것이 이긴다 — 이제야 올릴 수 있다 */
+        if ((shot.note || '') !== (meta.note || '')) pushNote(shot);
+      })
       .catch(function (e) {
         console.warn('[담기]', e);
         shot.up = '실패';
@@ -379,9 +545,15 @@ function renderStrip() {
   /* 새로 찍은 것이 **왼쪽**에 온다 — 방금 것을 보려고 끝까지 밀지 않게 */
   $('stripRow').innerHTML = shots.slice().reverse().map(function (s) {
     return '<span class="one' + (s.up === '가는중' ? ' up' : '') + (s.up === '실패' ? ' bad' : '') + '">' +
-      '<img src="' + esc(s.thumb) + '" alt="방금 찍은 사진">' +
+      '<span class="pic">' +
+      /* 사진을 누르면 그 한 장의 메모를 고친다 — 지우기는 모서리의 ✕ 로 갈라 둔다 */
+      '<img src="' + esc(s.thumb) + '" alt="방금 찍은 사진" title="눌러서 한 줄 적기"' +
+      ' onclick="editShot(\'' + esc(s.id) + '\')">' +
       '<span class="t">' + esc(s.up === '실패' ? '실패' : agoText(s.at)) + '</span>' +
       '<button class="x" onclick="dropShot(\'' + esc(s.id) + '\')" aria-label="지우기">✕</button>' +
+      '</span>' +
+      '<span class="mm' + (s.note ? '' : ' none') + '" title="' + esc(s.note || '') + '">' +
+      esc(s.note || '메모 없음') + '</span>' +
       '</span>';
   }).join('');
 }
