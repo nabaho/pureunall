@@ -29,7 +29,8 @@ function 화면(고칠것) {
     '<tr><th>메인 이미지</th><td><input type="file" name="extra_vars5"></td></tr>',
     '</tbody></table>',
     (o.content === null ? '' : '<textarea name="content">' + o.content + '</textarea>'),
-    '<select name="status"><option value="0">숨김</option><option value="1" selected>공개</option></select>',
+    '<select name="status"><option value="SECRET">비공개</option>'
+      + '<option value="PUBLIC" selected>공개</option></select>',
     '<input type="checkbox" name="notify" value="Y">',
     '<input type="submit" value="등록">',
     '</form>'
@@ -41,7 +42,7 @@ test('숨은 칸(content)까지 빠짐없이 읽는다 — 여기가 사진이 �
   assert.equal(r.칸.content, 사진, '사진이 든 숨은 칸을 못 읽었다');
   assert.equal(r.칸.extra_vars4, '現 푸른노무법인대표');
   assert.equal(r.칸.extra_vars3, '한 줄', 'textarea 를 못 읽었다');
-  assert.equal(r.칸.status, '1', 'select 는 «골라진» 것을 읽어야 한다');
+  assert.equal(r.칸.status, 'PUBLIC', 'select 는 «골라진» 것을 읽어야 한다');
   assert.ok(!Object.prototype.hasOwnProperty.call(r.칸, 'notify'),
     '안 켜진 체크상자를 보내면 안 켠 것이 켜진 채 저장된다');
   assert.ok(!Object.prototype.hasOwnProperty.call(r.칸, 'extra_vars5'),
@@ -182,6 +183,49 @@ test('&amp; 를 되돌려야 사진 주소가 안 깨진다', () => {
   assert.equal(r.칸.content, '<img src="/f.php?a=1&b=2">');
   /* &amp;lt; 를 먼저 풀면 < 가 되어 태그가 하나 생긴다 */
   assert.equal(W.글자되돌리기('&amp;lt;b&amp;gt;'), '&lt;b&gt;');
+});
+
+/* ── 퇴사자 내리기 ── 지우는 것이 아니라 «감추는» 것이다 ───────────────── */
+test('★ 「비공개」는 고르개의 «보이는 글자»로 찾는다 — 칸 이름을 짐작하지 않는다', () => {
+  const 자리 = W.비공개자리(화면());
+  assert.equal(자리.ok, true, 자리.why);
+  assert.equal(자리.이름, 'status');
+  assert.equal(자리.값, 'SECRET');
+});
+
+test('★ 내려도 얼굴 사진·경력은 그대로 둔다 — 지우는 것이 아니다', () => {
+  const h = 화면();
+  const 새 = W.갈아끼우기(W.칸읽기(h), { 비공개: true }, h);
+  assert.equal(새.칸.status, 'SECRET', '비공개로 안 바뀌었다');
+  assert.equal(새.칸.content, 사진, '내리면서 사진을 지웠다');
+  assert.equal(새.칸.extra_vars4, '現 푸른노무법인대표', '내리면서 경력을 지웠다');
+  assert.equal(새.바뀐것.length, 1);
+  assert.equal(새.바뀐것[0].새, '비공개');
+});
+
+test('「비공개」 자리를 못 찾으면 «아무것도» 안 건드린다', () => {
+  const h = 화면().replace(/<select[\s\S]*?<\/select>/, '');
+  const 새 = W.갈아끼우기(W.칸읽기(h), { 비공개: true }, h);
+  assert.equal(새.바뀐것.length, 0, '못 찾았는데 딴 칸을 건드렸다');
+  assert.ok(새.못찾은것.join(' ').includes('비공개'), '못 찾았다고 알려야 한다');
+});
+
+test('「비공개」 자리가 둘이면 단정하지 않는다', () => {
+  const h = 화면() + '<select name="x"><option value="9">비공개</option></select>';
+  assert.equal(W.비공개자리(h).ok, false, '어느 것인지 모르는데 골랐다');
+});
+
+test('이미 비공개면 «바뀐 것»에 안 넣는다', () => {
+  const h = 화면().replace('<option value="PUBLIC" selected>', '<option value="PUBLIC">')
+    .replace('<option value="SECRET">', '<option value="SECRET" selected>');
+  const 새 = W.갈아끼우기(W.칸읽기(h), { 비공개: true }, h);
+  assert.equal(새.바뀐것.length, 0);
+});
+
+test('비공개를 «안 준 때»는 건드리지 않는다', () => {
+  const h = 화면();
+  const 새 = W.갈아끼우기(W.칸읽기(h), { 경력사항: '現 새 자리' }, h);
+  assert.equal(새.칸.status, 'PUBLIC', '안 시켰는데 내렸다');
 });
 
 test('고치는 주소는 글 번호 하나만 받는다', () => {
