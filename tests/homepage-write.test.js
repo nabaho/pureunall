@@ -210,6 +210,36 @@ test('「비공개」 자리를 못 찾으면 «아무것도» 안 건드린다'
   assert.ok(새.못찾은것.join(' ').includes('비공개'), '못 찾았다고 알려야 한다');
 });
 
+/* ★ 2026-09-13 — 고르개가 없고 «비밀글 딸깍 칸»만 있는 화면에서 안 내려갔다.
+     즐겨찾기 단추는 딸깍 칸까지 보는데 서버는 고르개만 보고 멈춰 있었다. */
+test('★ 고르개가 없으면 «비밀글» 딸깍 칸을 본다', () => {
+  const h = 화면().replace(/<select[\s\S]*?<\/select>/, '')
+    + '<tr><th>비밀글</th><td><input type="checkbox" name="is_secret" value="Y"></td></tr>';
+  const 자리 = W.비공개자리(h);
+  assert.equal(자리.ok, true, 자리.why);
+  assert.equal(자리.이름, 'is_secret');
+  assert.equal(자리.값, 'Y');
+  const 새 = W.갈아끼우기(W.칸읽기(h), { 비공개: true }, h);
+  assert.equal(새.칸.is_secret, 'Y', '딸깍 칸에 표시가 안 됐다');
+  assert.equal(새.칸.content, 사진, '내리면서 사진을 지웠다');
+});
+
+test('딸깍 칸 이름이 secret 이 아니어도 «둘레 딱지»로 찾는다', () => {
+  const h = 화면().replace(/<select[\s\S]*?<\/select>/, '')
+    + '<tr><th>비공개</th><td><input type="checkbox" name="x_flag" value="1"></td></tr>';
+  assert.equal(W.비공개자리(h).이름, 'x_flag');
+});
+
+test('★ 못 찾았으면 «이 화면에 무엇이 있는지»를 함께 알려 준다', () => {
+  /* 「못 찾았습니다」 한 줄만 오면 무엇을 고쳐야 할지 알 길이 없다 */
+  const h = '<select name="lang"><option value="ko">한국어</option></select>'
+    + '<input type="checkbox" name="notify" value="Y">';
+  const 자리 = W.비공개자리(h);
+  assert.equal(자리.ok, false);
+  assert.match(자리.why, /lang/, '어떤 고르개가 있었는지 안 알려 준다');
+  assert.match(자리.why, /notify/, '어떤 딸깍 칸이 있었는지 안 알려 준다');
+});
+
 test('「비공개」 자리가 둘이면 단정하지 않는다', () => {
   const h = 화면() + '<select name="x"><option value="9">비공개</option></select>';
   assert.equal(W.비공개자리(h).ok, false, '어느 것인지 모르는데 골랐다');
