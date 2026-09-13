@@ -2861,10 +2861,19 @@ function renumberMap(){
 }
 /* 바로 앞에 법령 이름이 붙은 인용(근로기준법 제50조)은 건드리지 않는다 — 바꾸면 명백한 오류 */
 const LAW_BEFORE=/(법|령|규칙|법률|조례|협약|시행령|시행규칙)\s*$/;
+/* ⚠⚠ 그런데 「규칙」이 거기 들어 있어 **우리 취업규칙 제 조문 인용**까지 건너뛰었다
+   (2026-09-13 · 대표 물음 「신설하면 앞뒤 조문이 움직이지 않나」를 재다 잡았다).
+   「본 규칙 제26조 소정의 절차」·「이 규칙 제26조」는 우리 조문이라 번호를 다시 매기면
+   «같이» 고쳐야 한다. 안 고치면 옛 번호를 가리킨 채 노동청에 나간다 —
+   실제 파일 제4조에 그 문장이 있다.
+   ★ 가르는 잣대는 앞에 붙은 말이다. 「이·본·동·당 (취업)규칙」이면 우리 것이고,
+     「시행규칙·인사규칙·복무규칙」이면 딴 문서다. */
+const OUR_RULE_BEFORE=/(?:이|본|동|당)\s*(?:취업)?규칙\s*$/;
 function retargetRefs(text,map){
   let n=0;
   const out=String(text||"").replace(/제\s*(\d+)\s*조(?:\s*의\s*(\d+))?/g,(m,a,b,off,src)=>{
-    if(LAW_BEFORE.test(src.slice(Math.max(0,off-10),off)))return m;
+    const 앞=src.slice(Math.max(0,off-10),off);
+    if(LAW_BEFORE.test(앞)&&!OUR_RULE_BEFORE.test(앞))return m;
     const key="제"+(+a)+"조"+(b?"의"+(+b):"");
     if(!map[key])return m;
     n++; return map[key];
