@@ -90,6 +90,55 @@ test('④ ★ 새 기록은 id 없이 못 들어간다', function () {
   assert.match(pa, /대상 없음/, '★ 없는 id 를 고치라 하면 새로 만들어 버립니다');
 });
 
+/* ── 2026-09-13 대표 제보 「어떻게 해결해야하나 반복된다」 ──────────────────
+   ②의 알림은 잘 떴다. 그런데 딸린 안내가 «데이터 관리로 가라»였고, 그 자리에는
+   id 를 고칠 것이 아무것도 없었다. 가 봐도 할 일이 없으니 대표는 켤 때마다 같은
+   알림을 다시 봤다 — 「반복된다」는 말이 그 뜻이다.
+   ★ 실측(2026-09-13): 서버 data/finance_income 은 이미 1,785건 «전부 id 있음·객체형»
+     이었다. 껍데기는 «이 기기 사본»에만 남아 있었다. 즉 그때 할 일은 「자료를 고치기」
+     가 아니라 「사본을 서버 것으로 갈아 끼우기」 하나였는데, 안내는 그 말을 안 했다.
+   그래서 둘을 못 박는다:
+     ⑥ 알림이 «누를 것»을 함께 준다 (글자로만 가리키지 않는다)
+     ⑦ 서버 모양을 보고 안내를 «가른다» (할 일 없는 곳으로 보내지 않는다) */
+
+test('⑥ ★★ 알림이 «누를 것»을 함께 준다 — 글자로만 가리키지 않는다', function () {
+  const from = bare.indexOf('window.erpAlert=function(');
+  assert.ok(from > 0, 'erpAlert 를 못 찾았습니다');
+  const to = bare.indexOf('window.erpAlerts=function(', from);
+  const 알림 = bare.slice(from, to > from ? to : from + 3000);
+  assert.match(알림, /window\.erpAlert=function\(level, title, detail, advice, action\)/,
+    '★★ 알림이 «할 일»을 받지 못합니다 — 안내는 늘 글자뿐이 됩니다');
+  assert.match(알림, /typeof action\.run\s*===\s*'function'/,
+    '★★ 건네받은 할 일을 확인하지 않습니다');
+  assert.match(알림, /onclick\s*=\s*function\(\)\{[^}]{0,60}action\.run\(\)/,
+    '★★ 단추가 아무 일도 안 합니다 — 모양만 있습니다');
+  assert.match(알림, /appendChild\(act\)/, '★★ 만든 단추를 화면에 안 붙입니다');
+  assert.match(알림, /appendChild\(btn\)/, '★ 닫기 단추가 사라졌습니다');
+  /* ⚠ 알림 기록은 글자만 남는다 — 함수를 넣으면 JSON 으로 못 남고 조용히 깨진다 */
+  const 기록 = 알림.slice(알림.indexOf('logAlert('), 알림.indexOf('logAlert(') + 120);
+  assert.ok(!/action/.test(기록), '★★ 알림 기록에 함수를 넣습니다 — 저장이 조용히 깨집니다');
+});
+
+test('⑦ ★★ 어디가 고장인지 갈라 말한다 — 할 일 없는 곳으로 보내지 않는다', function () {
+  const from = bare.indexOf('var _hasId = 0, _noId = 0;');
+  assert.ok(from > 0, 'id 없음 점검을 못 찾았습니다');
+  const end = bare.indexOf("prev[k]==='number'", from);
+  const 구역 = bare.slice(from, end > from ? end : from + 2000);
+  /* 이 점검은 localStorage 만 센다 — 서버 모양을 함께 봐야 어디가 고장인지 안다 */
+  assert.match(구역, /_fbObjForm\[k\]\s*===\s*true/,
+    '★★ 서버 모양을 안 봅니다 — 이 기기 사본 탓인지 서버 자료 탓인지 못 가릅니다');
+  assert.match(구역, /_srvClean\s*\r?\n?\s*\?/,
+    '★★ 안내가 한 갈래뿐입니다 — 고칠 것이 없는 사람에게도 고치라고 합니다');
+  assert.match(구역, /label:\s*'[^']*다시 받기'/,
+    '★★ 누를 단추를 안 건넵니다 — 다시 글자로만 가리키게 됩니다');
+  assert.match(구역, /run:\s*function\(\)\{[^}]{0,80}erpPullFromServer\(\)/,
+    '★★ 단추가 사본을 갈아 끼우지 않습니다');
+  /* ⚠ 서버가 아직 배열형일 때는 그 단추를 주면 «안 된다» — 서버에도 껍데기가 있어
+     받아 봐야 그대로다. 고칠 것이 없는 단추는 틀린 안내와 같다. */
+  assert.match(구역, /_srvClean && typeof window\.erpPullFromServer/,
+    '★★ 서버가 아직 고장일 때도 「다시 받기」를 권합니다 — 눌러도 그대로입니다');
+});
+
 test('⑤ ★ 중복 점검은 그대로 — 두 점검이 같은 자리에 나란히 있다', function () {
   const from = bare.indexOf('var CHECK=[');
   const 구역 = bare.slice(from, from + 4500);
