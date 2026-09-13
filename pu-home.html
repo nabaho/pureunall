@@ -85,6 +85,10 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 /* 켜 둔 단추 — 미리보기처럼 «지금 켜져 있나»를 알려야 하는 것에 쓴다 */
 .btn.on{background:#bfdbfe;border-color:var(--navy);color:var(--navy);font-weight:800}
 .btn.sm{padding:3px 9px;font-size:11.5px;border-radius:7px}
+/* 「둘째 자리」 단추 — 이 띠에서 저장 다음으로 자주 누르는 것.
+   ⚠ 파란 «단추»로 만들지 말 것. 띠마다 파란 단추는 하나(저장·올리기)여야
+     「무엇을 먼저 누르나」가 흐려지지 않는다. 그래서 테두리만 파랗게 준다. */
+.btn.hot{border-color:var(--navy);color:var(--navy);font-weight:800}
 .btn.keep{border-color:#cbd5e1;background:var(--ok-bg);color:#166534}
 /* 내리는 단추 — 되돌릴 수 있는 일이지만 «홈페이지가 바뀌는» 일이라 결을 달리한다 */
 .btn.rm{border-color:#fecaca;background:var(--bad-bg);color:var(--bad);font-weight:800}
@@ -3868,9 +3872,16 @@ function appbarHtml() {
          「새」를 떼면 끝나도록 이름을 지었다 — 한 자리에서 끝난다.
        ★ 파란 단추는 이 띠에 «하나»다(올리기). 대조는 읽기만 하는 일이라 파랗지 않다 —
          전에는 대조가 파랗고 정작 저장이 회색이었다. */
+    /* ★ 2026-09-13 ㉮ — 「지금 홈페이지」를 «이름표로 한 번만» 적고, 단추는 할 일만 적는다.
+         까닭: 한 화면의 단추 여섯 가운데 다섯이 「지금 홈페이지…」로 시작해,
+         이름이 아니라 «꼬리말»을 읽어야 구분됐다(대표 지시 「너무 복잡하다」).
+       ⚠ 이름표를 떼고 단추 이름만 「대조」·「보기」로 두지 말 것 — 그러면 어느
+         홈페이지인지가 사라진다. 이름표와 단추는 «한 벌»이다. */
     + '<span class="sep"></span>'
-    + '<button class="btn" onclick="checkHomepage()"' + (App.checking ? ' disabled' : '') + '>'
-    + (App.checking ? '확인 중…' : '지금 홈페이지와 대조') + '</button>'
+    + '<span class="tag">지금 홈페이지</span>'
+    + '<button class="btn" onclick="checkHomepage()"' + (App.checking ? ' disabled' : '')
+    + ' title="살아 있는 홈페이지를 읽어 이 화면과 견줍니다">'
+    + (App.checking ? '확인 중…' : '대조') + '</button>'
     /* ★ 「홈페이지에 올리기」는 «구성원 갈래를 볼 때»만 보인다.
        늘 보이면 쪽·자문사를 보다가 눌러 구성원이 올라간다 —
        무엇이 올라가는지와 지금 보는 화면이 맞아야 사람이 안 헷갈린다. */
@@ -3882,27 +3893,38 @@ function appbarHtml() {
        실제로 2026-09-06 에 「자문사 고르기」가 위아래 두 곳에 생겼다.
        ★ 둘 다 목록 머리(listHtml)에 모여 있다. 여기로 되돌리지 말 것. */
     + '<a class="btn" style="text-decoration:none" href="' + esc(PuHomeExport.ORIGIN)
-    + '" target="_blank" rel="noopener">지금 홈페이지 보기</a>'
+    + '" target="_blank" rel="noopener" title="손님이 보는 홈페이지를 새 탭에 엽니다">보기</a>'
     /* ★ 「★ 푸른ERP 채우기」 단추를 넣는 문 (대표 지시 2026-09-13 「2번 하고 사용하게 해달라」).
        ⚠ 이 단추 하나가 «지금 홈페이지를 손 안 대고 고치는» 유일한 길인데, 넣는 자리가
          복사 안내문 «속 작은 글씨 링크»에만 있었다. 그래서 대표께서 몇 달을 못 찾으셨고,
          그동안 라이믹스 관리자 화면에 직접 들어가 고치셨다.
        ★ 자문사 고르기가 0곳이던 것과 «같은 병»이다 — 기능은 있는데 문이 안 보였다.
          기능을 만들었으면 «그 문이 보이는지»까지가 한 벌이다. */
+    /* ★ 2026-09-13 ㉮ — «한 달에 몇 번» 쓰는 것은 ⋯ 안으로 접는다.
+         ⚠ 없애는 것이 아니다. 「바로 고치기」가 막힌 날에 쓰는 두 번째 길이라
+           손이 닿는 곳에 있어야 한다 — 다만 늘 자리를 차지할 까닭이 없다. */
+    + '<span class="sep"></span>'
+    + '<details class="more"><summary class="btn" title="가끔 쓰는 것들">⋯</summary>'
+    + '<div class="morebox">'
     + '<button class="btn" onclick="openFillSetup()"'
     + ' title="지금 홈페이지를 관리자 화면에 안 들어가고 고치는 단추입니다 — 한 번만 넣으면 됩니다">'
-    + '⚙ 채우기 단추</button>'
+    + '⚙ 채우기 단추 넣기</button>'
     /* ★ 「바뀐 기록」 — 누가·언제·무엇을 전→후로 한 화면에서 본다 (2026-09-13 ㉮).
        ⚠ 머리띠에 둔다. 이것은 «화면 전체»에 대한 것이다 — 한 사람의 이력은
          그 사람 편집칸의 「되돌리기」가 이미 보여 준다. */
-    + '<span class="sep"></span>'
     + '<button class="btn" onclick="openChangeLog()"'
     + ' title="누가 언제 무엇을 고쳤는지 전→후로 봅니다">🕘 바뀐 기록</button>'
+    + '</div></details>'
+    /* ★ 「새 홈페이지」도 이름표를 달아 «지금»과 갈라 둔다.
+       ⚠ 둘은 서로 다른 홈페이지다 — 한 낱말로 합치면 엉뚱한 곳에 올라간다.
+         도메인을 옮기면 「새」가 「지금」이 된다. 그때 «지금» 쪽을 통째로 지우고
+         이 이름표만 떼면 끝나도록 지었다. */
     + (App.group === 'members'
         ? '<span class="sep"></span>'
+          + '<span class="tag">새 홈페이지</span>'
           + '<button class="btn pri" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '')
           + ' title="여기 자료로 «구성원 소개» 쪽을 다시 만들어 올립니다. 무엇이 올라가는지 먼저 보여드립니다.">'
-          + (App.publishing ? '올리는 중…' : '새 홈페이지에 올리기') + '</button>'
+          + (App.publishing ? '올리는 중…' : '올리기') + '</button>'
         : '')
     + '</div>';
 }
@@ -5138,6 +5160,19 @@ function memberEdit(d) {
      ★ 한 해에 몇 번 쓰는 것은 «⋯» 안으로 접는다(되돌리기·퇴사 경고 끄기·비공개로).
        늘 자리를 차지할 까닭이 없다. */
   const 더보기 = [];
+  /* ★ 2026-09-13 ㉮ — 「복사」와 「이 사람 글」을 ⋯ 안으로 접는다.
+       이 둘은 원래 «한 가지 일의 세 걸음»이었다(복사 → 글 열기 → 붙여넣기).
+       이제 「고치기」 하나가 그 셋을 대신하므로 늘 자리를 차지할 까닭이 없다.
+     ⚠ 없애지 않는다. 서버 비밀칸이 비었거나 홈페이지 화면이 바뀐 날의
+       «두 번째 길»이다 — 그날 이 길이 없으면 고칠 방법이 아예 사라진다. */
+  더보기.push('<button class="btn" onclick="openPaste()"' + (clash.length ? ' disabled' : '')
+    + ' title="즐겨찾기 「채우기」 단추에 넘길 쪽지를 복사합니다 — 바로 고치기가 막힐 때">'
+    + '지금 홈페이지용 복사</button>');
+  if (d.srl) {
+    더보기.push('<a class="btn" style="text-decoration:none" href="'
+      + esc(PuHomeExport.editUrl('member', d.srl))
+      + '" target="_blank" rel="noopener">지금 홈페이지에서 이 사람 글</a>');
+  }
   더보기.push('<button class="btn" onclick="openHistory()">되돌리기</button>');
   더보기.push(kept
     ? '<button class="btn keep" onclick="keepOnSiteClear()">퇴사 경고 되살리기</button>'
@@ -5153,17 +5188,12 @@ function memberEdit(d) {
     + '<button class="btn pri" onclick="saveDraft()">저장</button>'
     + '<span id="dirtyMark" style="color:var(--bad);font-size:12px;font-weight:700">' + (App.dirty ? '● 저장 안 됨' : '') + '</span>'
     + '<span class="sep"></span>'
-    /* ★ 2026-09-13 — 붙여넣기 없이 서버가 바로 고친다. 「복사」는 그 길이 막혔을 때
-         쓰는 «두 번째 길»로 남긴다(서버 비밀칸이 비어 있거나 홈페이지가 바뀐 날). */
-    + '<button class="btn" onclick="홈페이지바로고치기()"' + (clash.length ? ' disabled' : '')
+    /* ★ 2026-09-13 — 붙여넣기 없이 서버가 바로 고친다. 이것이 본길이다.
+       ★ 파란 «단추»는 이 띠에 하나(저장)다. 「고치기」는 파란 «테두리»로 둘째 자리를
+         준다 — 저장을 안 하고 고치기부터 누르면 화면에 있는 것이 안 나간다. */
+    + '<button class="btn hot" onclick="홈페이지바로고치기()"' + (clash.length ? ' disabled' : '')
     + ' title="붙여넣기 없이 홈페이지를 바로 고칩니다 — 무엇이 바뀌는지 먼저 보여 드립니다">'
-    + '지금 홈페이지 바로 고치기</button>'
-    + '<button class="btn" onclick="openPaste()"' + (clash.length ? ' disabled' : '')
-    + '>지금 홈페이지용 복사</button>'
-    + (d.srl ? '<a class="btn" style="text-decoration:none" href="'
-               + esc(PuHomeExport.editUrl('member', d.srl))
-               + '" target="_blank" rel="noopener">지금 홈페이지에서 이 사람 글</a>' : '')
-    + '<span class="sep"></span>'
+    + '지금 홈페이지에 고치기</button>'
     + '<details class="more"><summary class="btn">⋯</summary>'
     + '<div class="morebox">' + 더보기.join('') + '</div></details>'
     + '<span style="flex:1"></span>'
