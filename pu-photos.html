@@ -36,7 +36,7 @@
      이 파일이 캐시에 묵으면 옛 지시로 읽어 제목이 안 생기는데, 화면(pu-photos.html)은
      새것이라 제목 자리만 비어 보인다 — 고친 것이 통째로 묻힌 것처럼 된다.
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
-<script src="js/pu-doc-read.js?v=42"></script>
+<script src="js/pu-doc-read.js?v=43"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-doc-file.js?v=31"></script>
@@ -8189,12 +8189,20 @@ function textChunkMakers(items, opts) {
   });
 }
 function imgChunkMakers(imgs, opts) {
+  /* ★ freeFirst — 무료로 «글자»를 먼저 뽑아 사진 대신 그 글자를 AI 에 넘긴다
+       (대표 지시 2026-09-13 「사진첩·기업정보함 켜라」).
+     ⚠ 사진첩은 판독 «전»에 서류 종류를 모른다 — 종류를 알아내는 것이 판독이다.
+       그래서 판독 층이 «무료로 뽑은 글자를 보고» 통장·급여명세서·근로계약서처럼
+       칸의 자리가 뜻인 서류면 스스로 사진으로 되돌린다(PuDocRead.tableLike).
+       글자 뽑기는 무료라 그렇게 되돌려도 값이 더 들지 않는다.
+     ⚠ 글자가 모자라도(흐린 사진·손글씨) 판독 층이 사진으로 되돌린다. */
+  const o = Object.assign({}, opts || {}, { freeFirst: true });
   return chunkOf(imgs, READ_CHUNK_IMG).map(function (g, ci) {
     /* ⚠ 덩이 «첫 쪽»을 결과에 붙여 둔다 — 판독기는 덩이 안에서 1부터 세므로,
        합칠 때(mergeReads) 이만큼 밀어 주지 않으면 11쪽이 1쪽으로 겹친다. */
     const from = ci * READ_CHUNK_IMG;
     return function () {
-      return PuDocRead.read(g.length > 1 ? g : g[0], opts)
+      return PuDocRead.read(g.length > 1 ? g : g[0], o)
         .then(function (r) { if (r && from) r._pageFrom = from; return r; });
     };
   });
@@ -8361,7 +8369,9 @@ function readDocChunked(sibs, job) {
   return freeReadTry(text, imgs).then(function (free) {
     if (free) return free;
     if (text) return runReadChunks(textChunkMakers(list));
-    if (!imgs.length) return PuDocRead.read(job && job.full);
+    /* ★ 여기도 freeFirst — 위 imgChunkMakers 와 같은 까닭이다(2026-09-13).
+         한 장짜리라고 빠뜨리면 그 길만 계속 비싸게 읽는다. */
+    if (!imgs.length) return PuDocRead.read(job && job.full, { freeFirst: true });
     return runReadChunks(imgChunkMakers(imgs));
   });
 }
