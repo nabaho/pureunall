@@ -1113,7 +1113,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=1"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
-<script src="js/kcareer-formmap.js?v=15"></script>
+<script src="js/kcareer-formmap.js?v=16"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
@@ -1393,6 +1393,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <button class="kf-mode on" id="kfM1" onclick="rhSetMode('in')">✍ 입력판</button>
                 <button class="kf-mode" id="kfM2" onclick="rhSetMode('hwp')">📄 한글로 보기</button>
                 <button class="kf-mode" id="kfM3" onclick="rhSetMode('both')" title="입력판과 한글을 나란히 — 친 값이 실제로 어떻게 들어갔는지 바로 견줍니다">⇄ 나란히</button>
+                <!-- ★ 대표 지시 2026-09-13 「필요하면 직접 타이핑이 가능해야 되는데 그건 왜 안 되나」 -->
+                <button class="kf-mode" id="kfM4" onclick="rhToggleAnyCell()" title="표의 «모든 칸»에 입력칸을 얹습니다 — 서식 문구까지 고치거나 지울 수 있습니다. 기본은 꺼짐입니다(문구 위에 칸이 얹히면 서식을 읽을 수 없습니다)">✍ 아무 칸이나</button>
               </div>
               <div class="rc-actions">
                 <button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 양식 칸에 넣습니다">✨ 내 정보로 채우기</button>
@@ -5307,7 +5309,10 @@ async function mountEditor(buffer,name,cfg){
                           _rhBaseSaved='';
                           /* 새 서식이면 쪽 번호도 뺀 자리도 남의 것이다 — 놓는다 */
                           if(typeof rhTidyReset==='function') rhTidyReset();
-                          _rhOrig=null; _rhOutHandle=null; }
+                          _rhOrig=null; _rhOutHandle=null;
+                          /* 「아무 칸이나」는 서식마다 새로 켠다 — 남의 서식 설정이 따라오면
+                             기관 문구 위에 입력칸이 얹힌 채로 열린다 */
+                          _rhAnyCell=false; if(typeof rhAnyCellUI==='function') rhAnyCellUI(); }
       }
     }catch(e){ console.warn('rhDoc',e); }
   }
@@ -10949,6 +10954,28 @@ function rhToggleWide(){
    한 번 골라 준 짝은 서식 지문으로 기억해 두 번째부터는 확인만 하면 된다. */
 var _rhMap = null;        /* {slots,lists,warn,fp} */
 var _rhPicks = {};        /* {자리이름표: 열쇠} — 사람이 고른 것 */
+/* ★ 「✍ 아무 칸이나」 (대표 지시 2026-09-13 「직접 타이핑이 가능해야 되는데 그건 왜 안 되나」)
+   ⚠★ 기본은 «꺼짐»이다. 늘 켜 두면 서식 문구(「성 명」) 위에도 입력칸이 얹혀
+      서식을 읽을 수 없고, 실수로 기관 문구를 지운다. 사람이 켤 때만 켠다.
+   ⚠ 서식마다 새로 끈다 — 남의 서식에서 켜 둔 것이 따라오면 안 된다. */
+var _rhAnyCell = false;
+async function rhToggleAnyCell(){
+  if(!_rhDoc||!_rhDoc.bytes){ toast('먼저 서식을 올려주세요'); return; }
+  _rhAnyCell=!_rhAnyCell;
+  rhAnyCellUI();
+  toast(_rhAnyCell ? '⏳ 모든 칸에 입력칸을 얹는 중…' : '⏳ 알아본 칸만 다시 그리는 중…');
+  try{ await rhBuildMap(); }catch(e){ console.warn('anycell map',e); }
+  try{ await rhBuildInput(); }catch(e){ console.warn('anycell input',e); }
+  var n=(_rhMap&&_rhMap.slots)?_rhMap.slots.length:0;
+  toast(_rhAnyCell
+    ? '✍ 모든 칸을 켰습니다 — 칠 자리 '+n+'곳. 글자를 지우고 비워 두면 그 칸이 빕니다'
+    : '알아본 칸만 봅니다 — 칠 자리 '+n+'곳');
+}
+function rhAnyCellUI(){
+  var b=document.getElementById('kfM4'); if(!b) return;
+  b.classList.toggle('on', !!_rhAnyCell);
+  b.textContent=_rhAnyCell ? '✍ 아무 칸이나 ✔' : '✍ 아무 칸이나';
+}
 
 var RH_KEYS = [
   ['name','성명'],['nameHanja','한자 성명'],['nameEng','영문 성명'],
@@ -11019,7 +11046,7 @@ async function rhBuildMap(){
   var secs=[];
   for(const n of names){
     var xml=await zip.file(n).async('string');
-    var m=KcareerFormMap.guess(KcareerFormMap.scan(xml), data);
+    var m=KcareerFormMap.guess(KcareerFormMap.scan(xml,{all:_rhAnyCell}), data);
     m.slots.forEach(function(s){ s.sec=n; }); m.lists.forEach(function(l){ l.sec=n; });
     slots=slots.concat(m.slots); lists=lists.concat(m.lists);
     warn.textBoxes+=m.warn.textBoxes; warn.nested+=m.warn.nested;
@@ -11337,7 +11364,7 @@ async function rhBuildInput(){
   var probeZip=await JSZip.loadAsync(src), plans={};
   for(const n of names){
     var xml=await zip.file(n).async("string");
-    var m=KcareerFormMap.guess(KcareerFormMap.scan(xml), _cvFillData());
+    var m=KcareerFormMap.guess(KcareerFormMap.scan(xml,{all:_rhAnyCell}), _cvFillData());
     m.slots.forEach(function(sl){ sl.sec=n; }); m.lists.forEach(function(l){ l.sec=n; });
     warn.textBoxes+=m.warn.textBoxes; warn.nested+=m.warn.nested;
     _rhSlots=_rhSlots.concat(m.slots);
