@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>목록에서 골라 복사하기</title>
+<style>
+:root{
+  --navy:#1e293b; --teal:#166534; --red:#dc2626; --amber:#d97706;
+  --border:#e2e8f0; --text:#1e293b; --text-mute:#64748b; --bg:#f8fafc; --card:#fff;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;color:var(--text);background:var(--bg);padding:18px}
+h1{font-size:17px;margin-bottom:4px}
+.sub{font-size:12px;color:var(--text-mute);margin-bottom:16px;line-height:1.7}
+.blk{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:15px 16px;margin-bottom:18px}
+.blk>h2{font-size:14px;color:var(--navy);margin-bottom:3px}
+.blk>.d{font-size:11.5px;color:var(--text-mute);margin-bottom:13px;line-height:1.65}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--bg);color:var(--text-mute);font-size:11px;font-weight:700;text-align:left;
+  padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.btn{border:1px solid var(--border);background:#fff;border-radius:7px;padding:4px 10px;font-size:11.5px;
+  cursor:pointer;font-family:inherit;color:var(--text)}
+.btn:hover{background:var(--bg)}
+.btn.dark{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.teal{background:var(--teal);color:#fff;border-color:var(--teal)}
+.btn.red{background:var(--red);color:#fff;border-color:var(--red)}
+.selbar{display:flex;gap:7px;align-items:center;background:#f0fdf4;border:1px solid #bbf7d0;
+  border-radius:9px;padding:7px 11px;margin-bottom:9px;font-size:12px}
+.selbar b{color:#166534}
+.sp{flex:1}
+.ok{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:9px 11px;font-size:11.5px;color:#166534;line-height:1.65}
+.warn{background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:9px 11px;font-size:11.5px;color:#854d0e;line-height:1.65}
+.mini{font-size:11.5px;color:var(--text-mute);line-height:1.8;padding-left:16px}
+.mini b{color:var(--navy)}
+.row2{display:flex;gap:12px;flex-wrap:wrap}
+.row2>*{flex:1;min-width:240px}
+/* 창 */
+.modal{border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:0 6px 24px rgba(15,23,42,.10);overflow:hidden;margin-top:12px}
+.mhead{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);background:var(--bg)}
+.mhead b{font-size:13px}
+.mbody{padding:13px 14px}
+.mfoot{display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:4px 11px;font-size:11.5px;cursor:pointer;user-select:none}
+.chip.on{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+.lab{font-size:11px;font-weight:700;color:var(--text-mute);margin:2px 6px 0 0;align-self:center}
+pre{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 10px;
+  font-family:Consolas,"D2Coding",monospace;font-size:11.5px;line-height:1.8;overflow-x:auto;white-space:pre;margin:0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;
+  font-size:12.5px;padding:9px 16px;border-radius:9px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<h1>목록에서 «골라» 복사하기</h1>
+<div class="sub">
+  「특정 단어나 위촉인·발급일 등을 발췌해서 복사·붙여넣기 해야 할 수 있다」에 대한 답입니다.<br>
+  아래는 <b>실제로 눌러 볼 수 있습니다</b> — 줄을 고르고, 칸을 고르고, 모양을 바꿔 보세요.
+</div>
+
+<!-- ══════ 지금 ══════ -->
+<div class="blk">
+  <h2>지금은 이렇습니다</h2>
+  <div class="d">고를 수는 있는데, 할 수 있는 일이 <b>지우기 하나</b>뿐입니다.</div>
+  <div class="selbar"><b>3건 선택</b>
+    <button class="btn">전체 선택</button><button class="btn">선택 해제</button>
+    <div class="sp"></div><button class="btn red">🗑 선택 삭제</button></div>
+  <ul class="mini">
+    <li><b>CSV 내보내기</b>는 있습니다 — 다만 «파일»로 떨어집니다. 엑셀을 열어 다시 복사해야 합니다.</li>
+    <li>한글이나 메일에 <b>몇 줄만</b> 넣고 싶을 때 쓸 길이 없습니다.</li>
+  </ul>
+</div>
+
+<!-- ══════ 바뀌는 모습 ══════ -->
+<div class="blk">
+  <h2>이렇게 바뀝니다</h2>
+  <div class="d">선택 줄에 <b>「📋 골라서 복사」</b> 하나가 붙습니다. 검색으로 거른 뒤 눌러도 됩니다.</div>
+
+  <div class="selbar"><b id="selcnt">3건 선택</b>
+    <button class="btn" onclick="pickAll(true)">전체 선택</button>
+    <button class="btn" onclick="pickAll(false)">선택 해제</button>
+    <div class="sp"></div>
+    <button class="btn dark" onclick="openCopy()">📋 골라서 복사</button>
+    <button class="btn red">🗑 선택 삭제</button></div>
+
+  <table>
+    <thead><tr><th style="width:26px"></th><th>위촉내용(직책)</th><th>발급기관</th><th>위촉인</th><th>발급일</th><th>위촉시작</th><th>위촉종료</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div class="modal" id="copyWin" style="display:none">
+    <div class="mhead"><span>📋</span><b>골라서 복사</b>
+      <span style="font-size:11.5px;color:var(--text-mute)" id="winWho"></span>
+      <span class="sp"></span><span style="cursor:pointer;color:var(--text-mute)" onclick="closeCopy()">✕</span></div>
+    <div class="mbody">
+      <div class="chips"><span class="lab">칸</span><span id="colChips"></span></div>
+      <div class="chips"><span class="lab">모양</span>
+        <span class="chip on" data-fmt="tab" onclick="setFmt(this)">표 (엑셀·한글 표에 붙음)</span>
+        <span class="chip" data-fmt="line" onclick="setFmt(this)">한 줄씩</span>
+        <span class="chip" data-fmt="comma" onclick="setFmt(this)">쉼표로</span>
+        <span class="chip on" data-head="1" onclick="setHead(this)">머리줄 넣기</span>
+      </div>
+      <pre id="prev"></pre>
+    </div>
+    <div class="mfoot">
+      <span style="font-size:11.5px;color:var(--text-mute)" id="cnt"></span>
+      <span class="sp"></span>
+      <button class="btn" onclick="closeCopy()">닫기</button>
+      <button class="btn teal" onclick="doCopy()">📋 복사</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ 지키는 것 ══════ -->
+<div class="blk">
+  <h2>지키는 것</h2>
+  <div class="row2">
+    <div><div class="ok"><b>① 보이는 대로 복사한다</b><br>
+      검색·연도·유형으로 거른 뒤 「전체 선택」을 누르면 <b>거른 것만</b> 복사됩니다.
+      「특정 단어로 발췌」가 이 길입니다.</div></div>
+    <div><div class="ok"><b>② 고른 게 없으면 «보이는 것 전부»</b><br>
+      체크를 하나도 안 하고 눌러도 헛걸음이 아닙니다 — 지금 화면에 보이는 줄을 모두 담습니다.</div></div>
+    <div><div class="ok"><b>③ 칸 고른 것을 기억한다</b><br>
+      「위촉인·발급일만」을 자주 쓰시면 다음에 열 때도 그대로 켜져 있습니다.</div></div>
+    <div><div class="warn"><b>④ 주민등록번호는 복사 칸에 없다</b><br>
+      목록에 없는 값은 복사에도 없습니다. 실수로 문서에 붙는 일이 없게 합니다.</div></div>
+  </div>
+</div>
+
+<!-- ══════ 어디에 붙나 ══════ -->
+<div class="blk">
+  <h2>어디에 붙여 쓰나</h2>
+  <table>
+    <thead><tr><th style="width:150px">모양</th><th>붙이는 곳</th></tr></thead>
+    <tbody>
+      <tr><td><b>표 (탭)</b></td><td>엑셀 · 한글 표 — 칸이 그대로 갈라져 들어갑니다</td></tr>
+      <tr><td><b>한 줄씩</b></td><td>메일 · 메모 — 「가나도 / 가나도지사 / 2026.08.14」처럼 한 줄에</td></tr>
+      <tr><td><b>쉼표로</b></td><td>문장 안에 이어 쓸 때 — 「가나도, 가나시, 가나부」</td></tr>
+    </tbody>
+  </table>
+  <ul class="mini" style="margin-top:10px">
+    <li>지금 있는 <b>📤 CSV 내보내기</b>는 «그대로 둡니다» — 전부를 파일로 받을 때 쓰던 길입니다.</li>
+    <li>이 창은 <b>몇 줄만 · 몇 칸만</b> 빠르게 집어 갈 때의 길입니다.</li>
+  </ul>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var COLS=['위촉내용(직책)','발급기관','위촉인','발급일','위촉시작','위촉종료'];
+var ROWS=[
+  {v:['제3차 가나도 노동정책 기본계획 심의위원','가나도','가나도지사','2026.08.14','2026.08.14','2026.12.31'],on:true},
+  {v:['제5기 가나도 노사분쟁 조정위원','가나도','가나도지사','2026.07.30','2026.07.30','2028.07.29'],on:true},
+  {v:['컨설턴트','재단법인 가나경제진흥원','가나경제진흥원장','2026.04.29','2026.04.29','2026.11.30'],on:false},
+  {v:['지정노무사','가나전력공사','본부장','2026.04.01','2026.04.01','2028.03.31'],on:true},
+  {v:['형사조정위원회 위원','가나지방검찰청','지청장','2026.01.15','2025.12.01','2027.11.30'],on:false}
+];
+var 켠칸={0:true,1:true,2:true,3:true,4:false,5:false};
+var 모양='tab', 머리=true;
+
+function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('on');
+  setTimeout(function(){ t.classList.remove('on'); },2000); }
+function drawRows(){
+  document.getElementById('rows').innerHTML=ROWS.map(function(r,i){
+    return '<tr'+(r.on?' style="background:#f0fdf4"':'')+'>'
+      +'<td><input type="checkbox" '+(r.on?'checked':'')+' onchange="pick('+i+',this.checked)"></td>'
+      +r.v.map(function(c){ return '<td title="'+c.replace(/"/g,'&quot;')+'">'+c+'</td>'; }).join('')
+      +'</tr>';
+  }).join('');
+  var n=ROWS.filter(function(r){return r.on;}).length;
+  document.getElementById('selcnt').textContent=n+'건 선택';
+}
+function pick(i,on){ ROWS[i].on=on; drawRows(); if(document.getElementById('copyWin').style.display!=='none') draw(); }
+function pickAll(on){ ROWS.forEach(function(r){ r.on=on; }); drawRows(); if(document.getElementById('copyWin').style.display!=='none') draw(); }
+
+function openCopy(){
+  document.getElementById('copyWin').style.display='';
+  document.getElementById('colChips').innerHTML=COLS.map(function(c,i){
+    return '<span class="chip'+(켠칸[i]?' on':'')+'" onclick="toggleCol('+i+',this)">'+c+'</span>';
+  }).join(' ');
+  draw();
+}
+function closeCopy(){ document.getElementById('copyWin').style.display='none'; }
+function toggleCol(i,el){ 켠칸[i]=!켠칸[i]; el.classList.toggle('on',켠칸[i]); draw(); }
+function setFmt(el){
+  모양=el.dataset.fmt;
+  var ps=el.parentNode.querySelectorAll('.chip[data-fmt]');
+  Array.prototype.forEach.call(ps,function(p){ p.classList.toggle('on',p===el); });
+  draw();
+}
+function setHead(el){ 머리=!머리; el.classList.toggle('on',머리); draw(); }
+
+function 뽑기(){
+  var 줄=ROWS.filter(function(r){ return r.on; });
+  if(!줄.length) 줄=ROWS;                       /* 고른 게 없으면 보이는 것 전부 */
+  var 칸=[]; COLS.forEach(function(c,i){ if(켠칸[i]) 칸.push(i); });
+  return { 줄:줄, 칸:칸 };
+}
+function 글자(){
+  var g=뽑기(); if(!g.칸.length) return '';
+  var 벌=g.줄.map(function(r){ return g.칸.map(function(i){ return r.v[i]; }); });
+  if(모양==='tab'){
+    var out=벌.map(function(a){ return a.join('\t'); });
+    if(머리) out.unshift(g.칸.map(function(i){ return COLS[i]; }).join('\t'));
+    return out.join('\n');
+  }
+  if(모양==='line') return 벌.map(function(a){ return a.filter(Boolean).join(' / '); }).join('\n');
+  return 벌.map(function(a){ return a.filter(Boolean).join(' '); }).join(', ');
+}
+function draw(){
+  var g=뽑기(), t=글자();
+  document.getElementById('winWho').textContent
+    = ROWS.filter(function(r){return r.on;}).length ? '고른 '+g.줄.length+'건' : '보이는 것 전부 '+g.줄.length+'건';
+  document.getElementById('prev').textContent = t || '칸을 하나는 골라 주세요';
+  document.getElementById('cnt').textContent = g.줄.length+'건 · 칸 '+g.칸.length+'개';
+}
+function doCopy(){
+  var t=글자();
+  if(!t){ toast('칸을 하나는 골라 주세요'); return; }
+  try{ navigator.clipboard.writeText(t); }catch(e){}
+  toast('📋 복사됨 — 붙여넣기(Ctrl+V) 하세요');
+}
+drawRows();
+</script>
+</body>
+</html>
