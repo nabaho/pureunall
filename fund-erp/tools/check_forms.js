@@ -49,7 +49,7 @@ global.funds = {};
   /* hwpFormHTML 이 끝에서 fillDerived 를, 설립 출연확인서에서 fillFoundContribDoc 를 부른다(2026-09-07).
      여기 없으면 「fillDerived is not defined」로 이 검사가 통째로 죽는다 — 서식이 안 채워지는 게 아니라
      하네스가 낡은 것인데 그렇게 읽힌다. */
-  gV('_K'), gF('_siteWrep'), gF('_isCommittee'), gF('_prepCommittee'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
+  gV('_K'), gF('_siteWrep'), gF('_isCommittee'), gF('_prepCommittee'), gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
   /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10) — 위와 같은 까닭이다.
      ⚠ gV 는 {·[ 로 시작하는 값만 잡는다. 글자 하나짜리 상수는 줄째로 꺼낸다. */
   gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
