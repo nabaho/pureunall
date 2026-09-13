@@ -327,9 +327,15 @@ table.daejo thead th{position:sticky;top:-18px;z-index:3;
 #ref-drawer .hbtn:hover{background:#f8fafc}
 #ref-toggle #ref-cnt{color:var(--accent2);font-weight:700}
 /* 상태 한 줄 — 조용히 있다가 필요할 때만 눈에 띈다. 띠가 아니라 «줄»이다. */
+/* ★ 이 줄은 «늘» 보인다(2026-09-13) — 숨기면 「이어서 할 곳」 단추가 함께 사라져
+     다른 사업장으로 옮겨갈 길이 없어진다. 예전에는 적을 말이 없으면 접었다. */
 #statusbar{display:none;align-items:center;gap:8px;flex-wrap:wrap;
   padding:6px 16px;font-size:11.5px;color:var(--sub);border-bottom:1px solid var(--line)}
 #statusbar.on{display:flex}
+#statusbar #sb-text{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+/* 단추 앞까지만 민다 — 글과 단추가 화면 양 끝으로 갈리면 한 줄을 읽는데 눈이 가로지른다 */
+#statusbar .sb-push{flex:1 1 auto}
+#statusbar #sb-erp:empty{display:none}
 #statusbar .sb-p{color:var(--ink)}
 #statusbar .sb-sep{color:var(--mute)}
 #statusbar .sb-erp{border-radius:20px;padding:1px 8px;font-size:11px;white-space:nowrap}
@@ -458,23 +464,21 @@ table.daejo .rreason{color:var(--sub);font-size:11px}
 .artedit .ae-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:8px;align-items:center}
 .sample-banner{background:#fffbeb;border:1px solid #fbbf24;color:#854d0e;font-size:11.5px;font-weight:600;border-radius:8px;padding:7px 11px;margin-bottom:10px;line-height:1.55;white-space:normal}
 .panel-card{background:var(--card);border:1px solid var(--card-bd);border-radius:12px;padding:8px 12px;margin-bottom:10px;box-shadow:0 4px 16px rgba(30,58,138,.05)}
-/* 사업장 목록 — 한 줄 막대(넘치면 좌우로). 상태는 칩 앞 점 하나로 표시해 묶음 헤더를 없앴다 */
+/* 상태 점 — 이제 단추 앞과 전체 보기 목록에서 쓴다.
+   ★ 칩 띠(.dstrip/.dchip/＋N곳 더)는 2026-09-13 에 통째로 걷었다 — 대표 결정
+     「줄을 아예 없애고 단추 하나」. 사업장이 몇 곳이 되든 화면이 안 변해야 한다. */
 .dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:#94a3b8}
 .dot.amending{background:#fbbf24} .dot.reviewed{background:#16a34a}
 .dot.filed{background:#2563eb} .dot.draft{background:#60a5fa} .dot.none{background:#94a3b8}
-.dstrip{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;padding:2px 0 4px;scrollbar-width:thin;align-items:center}
-.dstrip::-webkit-scrollbar{height:7px}
-.dstrip::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
-.dchip{flex:0 0 auto;display:flex;align-items:baseline;gap:5px;border:1px solid var(--line);background:#fff;
-  border-radius:7px;padding:4px 9px;cursor:pointer;transition:border-color .12s,background .12s}
-.dchip:hover{border-color:var(--accent2);background:#f8fafc}
-/* ＋N곳 더 — 접힌 것을 «있다»고 말하는 단추. 구르는 줄 밖에 붙박이로 둔다(2026-09-07) */
-.dmore{flex:0 0 auto;height:24px;font-size:11px;padding:0 9px;white-space:nowrap;font-weight:700;
-  border:1px dashed var(--line);background:#f8fafc;color:var(--mute);border-radius:7px;cursor:pointer;
-  font-family:inherit}
-.dmore:hover{border-color:var(--accent2);color:var(--accent2);background:#fff}
-.dchip .dc-name{font-size:11.5px;font-weight:700;white-space:nowrap}
-.dchip .dc-n{font-size:10.5px;color:var(--mute);white-space:nowrap}
+/* 「이어서 할 곳 N」 단추 — 상태 줄 오른쪽 끝의 붙박이 둘 */
+.gobtn{display:inline-flex;align-items:center;gap:6px;height:24px;font-size:11.5px;font-weight:700;
+  padding:0 11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:var(--accent);
+  cursor:pointer;font-family:inherit;white-space:nowrap;flex:0 0 auto}
+.gobtn:hover{border-color:var(--accent2);background:#f8fafc}
+.gobtn .cnt{background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:0 6px;
+  font-size:10.5px;color:var(--accent2);font-weight:700}
+.gobtn.pri{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.gobtn.pri:hover{background:var(--accent);border-color:var(--accent)}
 /* 전체 보기 팝업 — 상태 필터 + 한 사업장 한 줄 */
 .dmfilt{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 10px}
 /* ── 조문 검색 결과 ── */
@@ -718,23 +722,6 @@ table.daejo td.dj2{padding:0}
     <div class="fld"><button class="btn" id="run">취업규칙 검토 ▶</button></div>
   </div>
 
-  <!-- 사업장 대시보드 — 작성→검토→개정→제출 4단계 진행 상태를 한눈에 -->
-  <div id="dash" class="panel-card" style="display:none;padding:9px 12px">
-    <div style="display:flex;align-items:center;gap:7px"
-         title="점 색: 주황=개정중, 초록=검토완료, 파랑=신고완료, 하늘=작성중. 사업장을 클릭하면 이어서 작업합니다.">
-      <b style="font-size:12.5px;white-space:nowrap">🏢 사업장</b>
-      <span id="dash-sum" style="font-size:11px;color:var(--mute);white-space:nowrap"></span>
-      <div id="dash-list" class="dstrip" style="flex:0 1 auto;min-width:0;overflow-x:auto"></div>
-      <!-- ⚠ 「＋N곳 더」는 «구르는 줄 밖»이다 (대표 승인 목업 2026-09-07 ㉡).
-           줄 안에 두니 칩과 함께 밀려 「나머지가 여기 있다」는 표시가 화면 밖으로
-           사라졌다 — 접었다는 사실 자체가 안 보이면 접기 전보다 나쁘다. -->
-      <span id="dash-more-wrap" style="flex:0 0 auto;display:none"></span>
-      <button class="btn ghost" id="dash-all" style="height:24px;font-size:11px;padding:0 9px;white-space:nowrap" title="전체 목록에서 검색·상태별로 골라 엽니다">전체 보기</button>
-      <button class="btn" id="dash-new" style="height:24px;font-size:11px;padding:0 9px;white-space:nowrap" title="표준 취업규칙으로 신규 사업장 규정 작성">＋ 신규</button>
-      <button class="btn ghost" id="dash-hide" style="height:24px;font-size:11px;padding:0 7px" title="접기">✕</button>
-    </div>
-  </div>
-
   <!-- 전체 사업장 목록 팝업 — 검색·상태 필터로 찾아 고른다 -->
   <div class="overlay" id="ov-dash"><div class="modal" style="max-width:640px">
     <h2>사업장 규정 현황 <span id="dashm-sum" style="font-size:12px;color:var(--mute);font-weight:400"></span><span class="x" data-close>×</span></h2>
@@ -770,10 +757,6 @@ table.daejo td.dj2{padding:0}
       <button class="btn" id="rn-apply">정리 적용</button>
     </div>
   </div></div>
-  <div id="dash-open-bar" style="display:none;margin-bottom:10px">
-    <button class="btn ghost" id="dash-show" style="height:30px;font-size:12px;padding:0 12px">🏢 사업장 규정 현황 열기</button>
-  </div>
-
   <!-- 작성 화면 — 표준 취업규칙 작성기를 규정관리 안에서 그대로 사용(화면 이동 없음) -->
   <div id="write-view" style="display:none">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
@@ -788,7 +771,18 @@ table.daejo td.dj2{padding:0}
 
   <!-- 상태 한 줄 — 사업장·규모·기준일·조문수·저장시각·ERP 를 한 자리에서 말한다.
        예전에는 이 셋이 색 다른 띠 셋으로 원본 미리보기 위를 먹었다(설계서 §5). -->
-  <div id="statusbar"></div>
+  <!-- ⚠ 단추 둘은 «붙박이»다 — renderStatusBar 가 다시 그리면 addEventListener 가
+       끊긴다. 글자만 고치고 자리는 여기 그대로 둔다.
+       ★ 「이어서 할 곳」을 도구줄이 아니라 «여기» 둔 까닭 — 도구줄은 ②비교로 가면
+         접힌다. 거기 뒀으면 그때 「다른 사업장으로 옮겨가기」가 사라진다. -->
+  <div id="statusbar" class="on">
+    <span id="sb-text"></span>
+    <span class="sb-push"></span>
+    <span id="sb-erp"></span>
+    <span class="sb-gap"></span>
+    <button type="button" class="gobtn" id="dash-all">사업장</button>
+    <button type="button" class="gobtn pri" id="dash-new" title="표준 취업규칙으로 신규 사업장 규정 작성">＋ 신규</button>
+  </div>
   <div class="grid" id="grid">
     <div class="pane">
       <h3>원본 미리보기 <span id="pv-site" style="font-size:13px;font-weight:700;color:var(--accent);margin-left:4px"></span> <span class="tag" id="pv-tag">— 조 0개</span>
@@ -4301,7 +4295,7 @@ function loadArch(){try{return JSON.parse(localStorage.getItem(ARCH_KEY))||[]}ca
    로그인 전에는 내 기록도 남의 것으로 걸러져(uid 가 아직 빈 값) 대시보드가 '0곳'으로 그려지는데,
    로그인이 끝난 뒤 다시 그리지 않으면 「보관함 (5)」와 「0곳」이 나란히 남는다. */
 function setLocal(a){localStorage.setItem(ARCH_KEY,JSON.stringify(a));updateArchCnt();refreshDash();}
-function refreshDash(){const d=$("dash");if(d&&d.style.display!=="none")renderDash();}
+function refreshDash(){renderDash();}
 /* ══════ 담당자(소유) 규칙 ══════
    검토한 사람만 그 사업장 규정을 고칠 수 있고, [검토 완료] 이후에만 남에게 보인다.
    담당자 정보가 없는 옛 기록은 잠기면 아무도 못 여니 '공용'으로 두고 여는 사람이 담당자가 된다.
@@ -4794,7 +4788,7 @@ function stepStateOf(s){
 /* 어느 단계에서 무엇이 보이나. 두 판은 ①②에서 늘 보인다 — 넣으면서 원본을 봐야 한다. */
 function stepShowsOf(n){
   const k=Number(n)||1;
-  return {setup:k===1,dash:k===1,grid:k<=2};
+  return {setup:k===1,grid:k<=2};
 }
 let FLOW_NOW=1;
 function flowFacts(){
@@ -4826,7 +4820,6 @@ function goFlowStep(n){
   FLOW_NOW=n;
   const v=stepShowsOf(n);
   if($("setup"))$("setup").classList.toggle("on",v.setup);
-  if(typeof showDash==="function")showDash(v.dash);
   renderStepBar(); renderStatusBar();
 }
 /* ── 상태 한 줄 ──
@@ -4861,11 +4854,20 @@ function renderStatusBar(){
     erpName:SITE_INFO?SITE_INFO.name:((LAST&&String(LAST.site||"").replace(/^[📄🏢]\s*/u,""))||"")
   });
   const bits=st.parts.map(p=>`<span class="sb-p">${escapeH(p)}</span>`).join('<span class="sb-sep">·</span>');
-  const erp=st.erp.kind==="none"?"":`<span class="sb-erp ${st.erp.kind}" title="${escapeH(st.erp.title)}">${escapeH(st.erp.text)}</span>`;
   /* ⚠ 늘어나는 여백을 두지 않는다. 화면이 1900px 로 넓어지면 글은 왼쪽 끝,
-     배지는 오른쪽 끝으로 갈려 한 줄을 읽는데 눈이 화면을 가로지른다. */
-  box.innerHTML=bits+(erp?'<span class="sb-gap"></span>'+erp:"");
-  box.classList.toggle("on",!!(bits||erp));
+     배지는 오른쪽 끝으로 갈려 한 줄을 읽는데 눈이 화면을 가로지른다.
+     ★ 그래서 «단추 앞»까지만 민다(sb-push 는 마크업에 붙박이로 있다). */
+  const t=$("sb-text"); if(t)t.innerHTML=bits;
+  const e=$("sb-erp");
+  if(e){
+    e.className=st.erp.kind==="none"?"":("sb-erp "+st.erp.kind);
+    e.textContent=st.erp.kind==="none"?"":st.erp.text;
+    e.title=st.erp.title||"";
+  }
+  /* ★★ 이 줄은 «늘» 보인다 — 숨기면 「이어서 할 곳」 단추가 함께 사라져
+     다른 사업장으로 옮겨갈 길이 없어진다. 예전에는 적을 말이 없으면 접었다. */
+  box.classList.add("on");
+  renderDash();
   /* 단계 막대도 같은 때에 다시 그린다 — 따로 그리면 둘이 어긋난다 */
   if(typeof renderStepBar==="function")renderStepBar();
 }
@@ -5146,7 +5148,7 @@ function dashMatch(r,q){
 }
 /* 상태 표시는 칩 앞의 점 하나로 — 묶음 헤더가 사업장보다 자리를 더 먹던 문제를 없앤다 */
 const DASH_ORDER=["amending","reviewed","draft","filed","none"];
-let DASH_VIEW=[], DASHM_FILT="";
+let DASHM_FILT="";
 const dashRank=k=>{const i=DASH_ORDER.indexOf(k);return i<0?9:i;};
 /* 급한 것(개정중) 먼저, 그 안에서는 오래 방치된 순 */
 function dashSorted(rows){
@@ -5187,41 +5189,37 @@ function dashTodo(r){
   return true;
 }
 /* ── 한 줄 막대 ── 사업장이 2곳이든 200곳이든 높이가 같다 */
+/* 단추에 적을 말 — 화면도 Firebase 도 없다. 검사가 이것만 돌린다.
+   ★ 할 일이 0이면 «전체 곳수»를 적는다 — 0을 감추면 「사업장이 없다」로 읽힌다.
+   ★ 전체 곳수와 갈래는 «자세히»(단추 설명)에 남긴다 — 접었다고 개수까지 감추면
+     접기 전보다 나쁘다(2026-09-07 에 세운 규칙을 여기서도 지킨다).
+   ★ 점 하나는 «가장 급한 갈래»다 — 칩 띠를 걷으며 잃는 「한눈에 훑기」의 최소 신호.
+   ⚠ 빈 줄·모르는 갈래가 섞여도 안 터진다 — 한 줄이 이상하다고 화면이 비면 안 된다. */
+function dashBtnFace(전체,할일){
+  const 줄들=(할일||[]);
+  const n=줄들.length;
+  if(!n)return {말:"사업장",셈:(전체||0)+"곳",점:"none",
+    자세히:(전체||0)+"곳 · 할 일 없음 — 눌러서 전체 목록을 봅니다"};
+  const cnt={};
+  줄들.forEach(r=>{ const k=r&&r.stage&&r.stage.k; if(k)cnt[k]=(cnt[k]||0)+1; });
+  const 이름={amending:"개정",reviewed:"검토",draft:"작성",filed:"신고",none:"미작성"};
+  const 갈래=DASH_ORDER.filter(k=>cnt[k]).map(k=>이름[k]+" "+cnt[k]).join(" · ");
+  const 급한=DASH_ORDER.filter(k=>cnt[k])[0]||"none";
+  return {말:"이어서 할 곳",셈:String(n),점:급한,
+    자세히:"전체 "+(전체||0)+"곳 · 할 일 "+n+(갈래?" ("+갈래+")":"")
+      +" — 눌러서 전체 목록을 봅니다"};
+}
+/* ── 단추 하나 ── 사업장이 2곳이든 200곳이든 화면이 한 획도 안 변한다.
+   ⚠ 단추를 «새로 그리지 않는다» — 마크업의 붙박이에 글자만 넣는다.
+     새로 그리면 붙여 둔 손잡이(addEventListener)가 끊겨 눌러도 아무 일이 안 난다. */
 function renderDash(){
-  const box=$("dash"); if(!box)return;
+  const btn=$("dash-all"); if(!btn)return;
   const all=dashSorted(dashRows());
   const todo=all.filter(dashTodo);
-  const cnt={none:0,draft:0,reviewed:0,amending:0,filed:0};
-  todo.forEach(r=>cnt[r.stage.k]++);          /* 집계 «갈래»는 할 일만 센다 */
-  const parts=[];
-  if(cnt.amending)parts.push("개정 "+cnt.amending); if(cnt.reviewed)parts.push("검토 "+cnt.reviewed);
-  if(cnt.draft)parts.push("작성 "+cnt.draft);
-  $("dash-sum").textContent=all.length+"곳"
-    +(todo.length?" · 할 일 "+todo.length+(parts.length?" ("+parts.join(" · ")+")":""):" · 할 일 없음");
-  DASH_VIEW=todo;
-  const list=$("dash-list");
-  if(!all.length){ list.innerHTML='<span style="font-size:11.5px;color:var(--mute)">등록된 사업장이 없습니다 — [＋ 신규]로 시작하세요.</span>'; return; }
-  const 접은수=all.length-todo.length;
-  /* ⚠ 접은 것이 있으면 «반드시» 말한다 — 조용히 줄이면 「내 사업장이 사라졌다」가 된다.
-     ⚠ 이 단추는 **구르는 줄 밖**(#dash-more-wrap)에 그린다. 줄 안에 두면 칩과 함께
-       밀려 「나머지가 여기 있다」는 표시가 화면 밖으로 사라진다(목업 ㉡). */
-  const wrap=$("dash-more-wrap");
-  if(wrap){
-    wrap.style.display=접은수?"":"none";
-    wrap.innerHTML=접은수?('<button type="button" class="dmore" id="dash-more"'
-      +' title="신고완료·미작성·다른 담당자의 완료본 '+접은수+'곳입니다 — 전체 보기에서 열 수 있습니다">'
-      +'＋'+접은수+'곳 더</button>'):"";
-  }
-  if(!todo.length){
-    list.innerHTML='<span style="font-size:11.5px;color:var(--mute)">이어서 할 곳이 없습니다 — 다 끝내셨습니다.</span>';
-  }else{
-    list.innerHTML=todo.map((r,i)=>`<div class="dchip" data-i="${i}" title="${escapeH(dashTip(r))}">
-      <span class="dot ${r.stage.k}"></span><span class="dc-name">${escapeH(shortSite(r.site))}</span>${r.arts!=="–"?`<span class="dc-n">${r.arts}조</span>`:""}</div>`).join("");
-  }
-  list.querySelectorAll(".dchip").forEach(el=>el.onclick=()=>dashOpen(DASH_VIEW[+el.dataset.i]));
-  /* 접은 것을 여는 길은 «이미 있는 전체 보기» 하나다 — 새 창을 만들지 않는다 */
-  const mb=$("dash-more");
-  if(mb)mb.onclick=()=>{ const b=$("dash-all"); if(b)b.click(); };
+  const face=dashBtnFace(all.length,todo);
+  btn.innerHTML='<span class="dot '+face.점+'"></span>'+escapeH(face.말)
+    +' <span class="cnt">'+escapeH(face.셈)+'</span>';
+  btn.title=face.자세히;
 }
 /* ── 전체 보기 팝업 ── 40곳 중에서 찾을 때는 좌우로 넘기기보다 한 줄씩 보는 편이 낫다 */
 function renderDashModal(){
@@ -5280,7 +5278,6 @@ function goWrite(site,bizno,docId){
 }
 function openWriteView(site){
   $("write-site").textContent=site?("🏢 "+site):"신규 작성";
-  $("dash").style.display="none"; $("dash-open-bar").style.display="none";
   $("grid").style.display="none"; $("write-view").style.display="block";
   const f=$("write-frame");
   f.src="chwieop.html?embed=1&t="+Date.now();   // 인계 키를 읽도록 새로 로드
@@ -5288,11 +5285,11 @@ function openWriteView(site){
 function closeWriteView(){
   $("write-view").style.display="none"; $("grid").style.display="";
   const f=$("write-frame"); if(f)f.src="about:blank";
-  showDash(true); loadDrafts(); renderDash();
+  loadDrafts(); renderDash();
 }
 /* 작성기 문서 목록 읽기(있으면) — 대시보드 '작성중' 표시용 */
 function loadDrafts(){
-  const done=()=>{ if($("dash").style.display!=="none")renderDash(); };
+  const done=()=>renderDash();
   try{ DASH_DRAFTS=JSON.parse(localStorage.getItem("chwieop_docs")||"{}"); }catch(e){ DASH_DRAFTS={}; }
   if(FBDB&&FBUSER){
     FBDB.ref("chwieop/docs").once("value").then(s=>{ const v=s.val()||{};
@@ -7514,14 +7511,6 @@ $("ae-apply").addEventListener("click",()=>{
 document.querySelectorAll(".summary .stat[data-fs]").forEach(el=>el.addEventListener("click",()=>setFindingFilter(el.dataset.fs)));
 $("fs-clear").addEventListener("click",()=>{FS_STATUS="";renderFindings();});
 $("fs-first").addEventListener("click",()=>{ if(DT_LIST.length)openDetail(0); else alert("해당 항목이 없습니다."); });
-/* ── 사업장 대시보드 ── */
-const DASH_PREF="pureun_rules_dash_open_v1";
-function showDash(on){
-  $("dash").style.display=on?"block":"none";
-  $("dash-open-bar").style.display=on?"none":"block";
-  try{localStorage.setItem(DASH_PREF,on?"1":"0");}catch(e){}
-  if(on){ loadDrafts(); renderDash(); }
-}
 $("write-back").addEventListener("click",closeWriteView);
 $("write-review").addEventListener("click",()=>{
   const f=$("write-frame");
@@ -7533,8 +7522,7 @@ $("write-review").addEventListener("click",()=>{
   setTimeout(async()=>{ $("write-view").style.display="none"; $("grid").style.display="";
     if(f)f.src="about:blank"; await takeHandoff(); }, 400);
 });
-$("dash-hide").addEventListener("click",()=>showDash(false));
-$("dash-show").addEventListener("click",()=>showDash(true));
+/* ── 사업장 대시보드 ── */
 /* 전체 보기 팝업 */
 $("dash-all").addEventListener("click",()=>{ DASHM_FILT=""; $("dashm-q").value=""; renderDashModal(); $("ov-dash").classList.add("on"); });
 $("dashm-q").addEventListener("input",renderDashModal);
@@ -7556,7 +7544,7 @@ goFlowStep(1);   /* 처음에는 ① 넣기 — 설정 줄을 펼친다 */
 addPopBtn("ov-docpv",()=>siteLabel()+" — "+(DOC_LABEL[PV_KEY]||"서식")+" (한글 모양)",".body",{w:1250,h:900});
 renderPreview();updateArchCnt();
 migrateWip();    // 옛 임시저장(WIP)이 남아 있으면 통합 저장으로 이관
-try{ showDash(localStorage.getItem("pureun_rules_dash_open_v1")!=="0"); }catch(e){ showDash(true); }
+renderDash();   /* 단추에 「이어서 할 곳 N」을 적는다 — 접기는 없앴다(2026-09-13) */
 /* 취업규칙 작성기(chwieop.html)에서 [검토로 넘기기]로 온 경우 — 그 문서를 바로 검토 */
 async function takeHandoff(){
   let h=null; try{ const raw=localStorage.getItem("pureun_rules_handoff_v1"); if(raw)h=JSON.parse(raw); }catch(e){}
