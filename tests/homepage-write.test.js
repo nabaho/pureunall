@@ -278,6 +278,26 @@ test('정찰이 사진(파일) 칸과 이름표 짝을 알려 준다', () => {
   assert.equal(r.확인표있나, true);
 });
 
+/* ★ 2026-09-13 — 구성원 게시판에는 「비공개」 칸이 «없다»(고르개 is_notice,
+     딸깍 title_bold 뿐). 그러면 내리는 길이 어디 있는지 찾아야 하는데,
+     그 답은 「이 화면에서 할 수 있는 일(act)」 목록에 있다. */
+test('★ 정찰이 «할 수 있는 일(act)» 이름을 모은다 — 부르지는 않는다', () => {
+  const h = 화면() + '<a href="/index.php?mid=x&act=dispBoardDelete&document_srl=1">삭제</a>'
+    + '<a href="/index.php?act=dispDocumentAdminList">문서 관리</a>';
+  const r = W.정찰(h);
+  assert.ok(r.행위들.includes('procBoardInsertDocument'));
+  assert.ok(r.행위들.includes('dispBoardDelete'));
+  assert.ok(r.행위들.includes('dispDocumentAdminList'));
+  /* 같은 이름이 여러 번 나와도 한 번만 */
+  assert.equal(r.행위들.filter(x => x === 'dispBoardDelete').length, 1);
+});
+
+test('읽는 주소도 글 번호 하나만 받는다', () => {
+  assert.ok(String(W.읽는주소(190)).includes('document_srl=190'));
+  ['', null, -1, 'abc', '1 OR 1=1'].forEach(못된것 =>
+    assert.equal(W.읽는주소(못된것), null, '못된 글 번호(' + 못된것 + ')를 받아 줬다'));
+});
+
 test('정찰의 고르개는 «보기 글자»를 담는다 — 그것이 칸의 뜻이다', () => {
   const r = W.정찰(화면());
   assert.ok(r.고르개.some(t => /status\[/.test(t) && /비공개/.test(t)),
