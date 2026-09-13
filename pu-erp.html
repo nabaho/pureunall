@@ -123,7 +123,7 @@
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=7">
+<link rel="stylesheet" href="css/pu-erp.css?v=8">
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=10"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -32235,7 +32235,11 @@ function PolicyCard(props){
       h('span', null, props.icon),
       h('span', null, props.title)
     ),
-    h('div', { style:{ padding:'10px 12px' } },
+    /* ★ pc-body 가 «설정 줄만» 골라 둘씩 놓는다 (대표 지시 2026-09-13
+       「나머지 탭도 같이 정리」). 칸이 열여섯인데 한 자리만 고치면 다 적용된다 —
+       칸마다 손으로 감싸면 새 칸이 생길 때마다 또 빠뜨린다.
+       ⚠ 경고 배너·안내문·단추는 그대로 «한 줄 통째»다(css 가 갈라 준다). */
+    h('div', { className:'pc-body', style:{ padding:'10px 12px' } },
       props.children
     )
   );
@@ -32243,7 +32247,10 @@ function PolicyCard(props){
 
 function PolicyRow(props){
   // props: label, hint, control
-  return h('div', { style:{ display:'grid', gridTemplateColumns:'150px 1fr', gap:'10px', alignItems:'start', padding:'7px 0', borderBottom:'1px solid #f8fafc' } },
+  /* ★ policy-row 표는 «둘씩 놓아도 되는 줄»이라는 뜻이다 (대표 지시 2026-09-13).
+     감싸는 칸(pc-body)이 이 표가 붙은 것만 골라 둘씩 놓는다 — 경고 배너·안내문처럼
+     표가 없는 것은 예전대로 한 줄을 통째로 쓴다. 판단은 css 한 곳에 있다. */
+  return h('div', { className:'policy-row', style:{ display:'grid', gridTemplateColumns:'150px 1fr', gap:'10px', alignItems:'start', padding:'7px 0', borderBottom:'1px solid #f8fafc' } },
     h('div', null,
       h('div', { style:{ fontSize:'11px', fontWeight:600, color:'#1e293b' } }, props.label),
       props.hint && h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'1px', lineHeight:1.4 } }, props.hint)
@@ -32251,15 +32258,6 @@ function PolicyRow(props){
     h('div', null, props.control)
   );
 }
-/* ── 설정 줄을 «둘씩» 놓는다 (대표 지시 2026-09-13 「한 줄씩 안 해도 된다」) ──────
-   설정 한 칸은 이름표 150px + 체크상자뿐인데 줄 하나를 통째로 쓴다.
-   1,600px 화면에서 오른쪽 1,100px 넘게가 내내 빈 채로 여덟 줄이 내려갔다.
-   ⚠ 칸 수를 손으로 못 박지 않는다 — 좁은 화면(노트북·태블릿)에서는 저절로 한 칸으로
-     돌아와야 한다. 그 판단은 css 의 .set-rows 한 곳에 있다(가로 1,100px 이 경계). */
-function PolicyGrid(props){
-  return h('div', { className:'set-rows' }, props.children);
-}
-
 function ToggleSwitch(props){
   return h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'8px', cursor:'pointer', userSelect:'none' } },
     h('input', { type:'checkbox', checked:!!props.checked, onChange:function(e){ props.onChange(e.target.checked); } }),
@@ -33586,8 +33584,8 @@ function AccessPolicySection(){
     h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'10px', padding:'8px 12px', background:'#fffbeb', borderRadius:'4px' } },
       '⚠️ 일반 직원(member)에게 적용되는 권한 제한. admin·admin-delegate는 항상 전체 권한.'
     ),
-    /* ★ 여덟 줄을 «둘씩» 놓는다 — 세로로만 쌓아 「메뉴 접근 권한 관리」가 화면 밖으로 밀렸다 */
-    h(PolicyGrid, null,
+    /* ★ 여덟 줄이 «둘씩» 놓인다 — 감싸는 칸(pc-body)이 알아서 갈라 준다.
+       (2026-09-13 아침엔 여기만 따로 감쌌지만, 칸이 열여섯이라 한 자리로 옮겼다) */
     h(PolicyRow, {
       label:'전체 사건 열람',
       hint:'꺼두면 본인 담당 사건만 표시',
@@ -33634,7 +33632,6 @@ function AccessPolicySection(){
         h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '분 ※ 변경 후 재로그인 시 적용')
       )
     })
-    )
   ),
   // ★ 메뉴 접근 권한 + 위임관리인 통합
   h('div', { style:{ marginTop:'16px' } },

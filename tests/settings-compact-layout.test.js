@@ -36,7 +36,7 @@ const bare = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
 /* ══════ ① 가르는 규칙 ══════ */
 
 test('★★ 좌우로 가르는 규칙이 CSS 한 곳에 있다', () => {
-  ['.set-2col', '.set-rows'].forEach(function(k){
+  ['.set-2col', '.pc-body'].forEach(function(k){
     const m = css.match(new RegExp('\\' + k + '\\s*\\{[^}]*\\}'));
     assert.ok(m, '★★ ' + k + ' 규칙이 없습니다 — 화면이 도로 세로로 쌓입니다');
     assert.match(m[0], /display:\s*grid/, '★ ' + k + ' 이 격자가 아닙니다');
@@ -70,25 +70,51 @@ test('★★ 좁은 화면(노트북·태블릿)에서는 한 칸으로 되돌�
   assert.ok(경계 >= 900 && 경계 <= 1400,
     '★ 되돌아오는 경계가 ' + 경계 + 'px 입니다 — 900~1400px 사이여야 합니다');
   assert.match(m[2], /\.set-2col/, '★★ 데이터 관리가 좁은 화면에서 안 되돌아옵니다');
-  assert.match(m[2], /\.set-rows/, '★★ 권한·정책이 좁은 화면에서 안 되돌아옵니다');
+  assert.match(m[2], /\.pc-body/, '★★ 설정 줄이 좁은 화면에서 안 되돌아옵니다');
   assert.match(m[2], /grid-template-columns:\s*1fr/, '★ 한 칸으로 돌아가야 합니다');
 });
 
 /* ══════ ③ 두 화면이 실제로 쓴다 ══════ */
 
-test('★★ 권한·정책 여덟 줄이 «둘씩» 놓인다', () => {
+test('★★ 설정 줄은 «어느 탭에서나» 둘씩 놓인다 — 한 자리가 열여섯 칸을 다 맡는다', () => {
+  /* ⚠ 칸마다 손으로 감싸면 새 칸이 생길 때 또 빠뜨린다(2026-09-13 아침에 권한·정책만
+       감쌌다가 「나머지 탭도」 지시를 받았다). 그래서 감싸는 쪽이 한 번에 맡는다. */
+  const PC = cutFn(src, 'function PolicyCard(props)');
+  assert.match(PC, /className:'pc-body'/,
+    '★★ 감싸는 칸이 설정 줄을 안 갈라 줍니다 — 탭마다 따로 감싸야 하는 자리로 돌아갔습니다');
+  const PR = cutFn(src, 'function PolicyRow(props)');
+  assert.match(PR, /className:'policy-row'/,
+    '★★ 설정 줄에 표가 없습니다 — CSS 가 「이것이 둘씩 놓아도 되는 줄」임을 알 길이 없습니다');
+  assert.doesNotMatch(PR, /gridTemplateColumns:'1fr 1fr'/,
+    '★★ 설정 줄이 제 손으로 칸을 적었습니다 — 좁은 화면에서 못 되돌아옵니다');
+
+  /* 기본은 «한 줄 통째»여야 한다 — 경고 배너·안내문이 반으로 갈리면 못 읽는다 */
+  const body = css.match(/\.pc-body\s*>\s*\*\s*\{[^}]*\}/);
+  assert.ok(body, '★★ 기본을 한 줄 통째로 두는 규칙이 없습니다');
+  assert.match(body[0], /grid-column:\s*1\s*\/\s*-1/,
+    '★★ 경고 배너·안내문까지 반으로 갈립니다');
+  const only = css.match(/\.pc-body\s*>\s*\.policy-row\s*\{[^}]*\}/);
+  assert.ok(only && /grid-column:\s*auto/.test(only[0]),
+    '★★ 설정 줄만 둘씩 놓는 예외가 없습니다 — 아무것도 안 갈립니다');
+
+  /* 권한·정책 여덟 줄이 실제로 그 안에 있다 */
   const at = bare.indexOf("title:'데이터 접근 정책'");
   assert.ok(at > 0, '데이터 접근 정책 칸을 못 찾았습니다');
   const 구역 = bare.slice(at, bare.indexOf('SecurityScope', at));
-  assert.match(구역, /h\(PolicyGrid,\s*null,/,
-    '★★ 설정 줄이 아직 한 줄에 하나씩입니다 — 오른쪽 1,100px 이 빈 채로 내려갑니다');
   const 줄수 = (구역.match(/h\(PolicyRow,\s*\{/g) || []).length;
   assert.ok(줄수 >= 8, '★ 설정 줄이 ' + 줄수 + '개뿐입니다 — 여덟 줄이 다 들어가야 합니다');
-  /* PolicyGrid 가 CSS 를 쓰는지(제 손으로 칸을 적지 않는지) */
-  const PG = cutFn(src, 'function PolicyGrid(props)');
-  assert.match(PG, /className:'set-rows'/, '★★ PolicyGrid 가 CSS 규칙을 안 씁니다');
-  assert.doesNotMatch(PG, /gridTemplateColumns/,
-    '★★ PolicyGrid 가 칸 너비를 직접 적었습니다 — 좁은 화면에서 못 되돌아옵니다');
+});
+
+test('★ 나머지 탭에도 설정 줄이 여럿 있다 — 이 한 자리가 그것들까지 맡는다', () => {
+  /* 열여섯 칸이 같은 부품을 쓰므로, 한 자리를 고치면 전부 따라온다.
+     ⚠ 「몇 개」를 못 박지 않는다(칸은 늘고 준다) — «여러 칸에 걸쳐 있다»만 본다. */
+  const 칸 = (bare.match(/h\(PolicyCard,\s*\{/g) || []).length;
+  const 줄 = (bare.match(/h\(PolicyRow,\s*\{/g) || []).length;
+  assert.ok(칸 >= 8, '★ 환경설정 칸이 ' + 칸 + '개뿐입니다 — 찾는 방식이 낡았는지 보십시오');
+  assert.ok(줄 >= 20, '★ 설정 줄이 ' + 줄 + '개뿐입니다 — 찾는 방식이 낡았는지 보십시오');
+  /* 옛 방식(칸마다 따로 감싸기)이 남아 있으면 두 곳에서 같은 일을 하게 된다 */
+  assert.equal(bare.indexOf('PolicyGrid'), -1,
+    '★★ 칸마다 따로 감싸는 옛 부품이 남아 있습니다 — 한쪽만 고쳐지는 자리가 다시 생깁니다');
 });
 
 test('★★ 데이터 관리 — 넓은 칸에 마이그레이션, 좁은 칸에 나머지 셋', () => {
@@ -142,6 +168,8 @@ test('★ 단추·숫자는 하나도 안 줄였다', () => {
 test('CSS 를 고쳤으니 캐시 번호가 올라가 있다', () => {
   const m = src.match(/css\/pu-erp\.css\?v=(\d+)/);
   assert.ok(m, '스타일 캐시 번호가 없습니다');
-  assert.ok(Number(m[1]) >= 7,   // 검사고정-허용: 이 변경이 들어간 판
+  /* ⚠ css/pu-erp.css 를 또 고치면 이 숫자도 함께 올릴 것 —
+       안 올리면 되돌림 검사에서 «캐시 번호를 안 올렸다»를 못 잡는다(2026-09-13 실제로 뚫렸다). */
+  assert.ok(Number(m[1]) >= 8,   // 검사고정-허용: 이 변경이 들어간 판
     '★★ 캐시 번호를 안 올리면 브라우저가 «옛 스타일»을 써서 화면은 그대로 세로로 쌓입니다');
 });
