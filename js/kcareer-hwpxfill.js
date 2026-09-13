@@ -44,7 +44,15 @@
     /* 주민등록번호는 «알아보되 채우지 않는다» — 자동으로 나가면 안 되는 정보다.
        열쇠를 rrn 으로 따로 두어, 칸 지도가 「무슨 칸인지는 알려 주고 값은 비워」 둘 수 있게 한다.
        ⚠ 여기에 값을 담는 자리(fields.rrn)를 만들지 말 것 — 담으면 언젠가 자동으로 나간다. */
-    { re: /^(주민등록번호|주민번호|생년월일주민등록번호)$/, key: 'rrn' }
+    { re: /^(주민등록번호|주민번호|생년월일주민등록번호)$/, key: 'rrn' },
+    /* ★ 병역·보훈·장애 (대표 결정 2026-09-13) — 담는 칸을 만들면서 «알아보는 말»도 함께.
+       ⚠ 「병역」 한 낱말이 병역구분을 뜻한다(서식이 대개 필/미필만 묻는다). */
+    { re: /^(병역|병역사항|병역구분|병역관계|군필여부|병역여부)$/, key: 'military' },
+    { re: /^(군별|군종|복무군)$/, key: 'militaryBranch' },
+    { re: /^(계급|전역계급|최종계급)$/, key: 'militaryRank' },
+    { re: /^(복무기간|군복무기간|복무년월|복무연월)$/, key: 'militaryPeriod' },
+    { re: /^(보훈대상|보훈|보훈여부|보훈대상여부|취업지원대상|국가유공자)$/, key: 'veteran' },
+    { re: /^(장애여부|장애|장애유무|장애인여부|장애등급|장애정도)$/, key: 'disability' }
   ];
   /* 칸 안에 「자택:______ 직장:______」처럼 라벨과 빈자리가 함께 있는 양식이 많다.
      이런 자리는 라벨 바로 뒤(밑줄·공백)를 값으로 바꾼다. */
@@ -73,14 +81,19 @@
      ⚠ 열쇠를 더할 때는 «채우는 쪽이 실제로 그 값을 갖고 있는지» 보고 더한다 —
        목록 줄의 값은 _cvFillData 의 edu·career 항목에서 온다. */
   /* 목록 표(학력·경력) 한 줄에 실제로 써 넣을 수 있는 열쇠 */
+  /* ⚠ grade(성적·등급)는 «없다» — 어학 점수를 담는 자료가 없어서다.
+     담게 되면 그때 더한다. 지금 더하면 빈 값이 들어가 자리만 차지한다. */
   var LIST_FILL_KEYS = ['period', 'school', 'major', 'area', 'degree',
-                        'org', 'dept', 'title', 'role'];
+                        'org', 'dept', 'title', 'role',
+                        'certName', 'gotAt', 'awardWhat', 'awardOrg'];
   /* 낱개 칸(인적사항)에 실제로 써 넣을 수 있는 열쇠.
      ⚠ rrn(주민등록번호)은 «없다» — 사람이 손으로 고를 때만 나간다(secrets). */
   var FIELD_FILL_KEYS = ['name', 'nameHanja', 'nameEng', 'birth', 'gender',
                          'phone', 'phoneWork', 'phoneHome', 'fax',
                          'email', 'emailWork', 'addr', 'addrWork',
-                         'org', 'dept', 'title', 'orgTitle', 'license'];
+                         'org', 'dept', 'title', 'orgTitle', 'license',
+                         'military', 'militaryBranch', 'militaryRank', 'militaryPeriod',
+                         'veteran', 'disability'];
 
   var COL_LABELS = [
     { re: /^(기간|연도|년도|재직기간|재학기간|활동기간|기간근무년수|근무기간|수행기간|위촉기간|참여기간|교육기간|근무연월|활동연도|기간년월)$/, key: 'period' },
@@ -450,6 +463,17 @@
     }
     return (head && head.map[i + (shift || 0)]) || '';
   }
+  /* ★★ 표에서 «n번째 줄»을 바꾼다.
+     ⚠ replaceOnce(글자로 찾기)를 쓰면 안 된다 — 빈 줄끼리는 XML 이 글자 하나까지 똑같아서
+       「9번째 줄」에 넣으라고 해도 «맨 앞의 빈 줄»이 바뀐다.
+       실측 2026-09-13: 자격 표와 경력 표의 빈 줄이 같은 모양이라, 경력이 자격 표 첫 줄에 박혔다.
+       칸에 대해서는 2026-09-06 에 replaceCellAt 으로 고쳤는데 «줄»에는 그대로 남아 있었다.
+     ⚠ 이 함수 하나로만 줄을 바꾼다 — 「자리」를 세는 곳이 둘이 되면 다시 어긋난다. */
+  function replaceRowAt(tbl, idx, newRow) {
+    var b = tagBlocks(String(tbl || ''), 'hp:tr');
+    if (!b[idx]) return tbl;
+    return tbl.slice(0, b[idx].start) + newRow + tbl.slice(b[idx].end);
+  }
   /* ★ 줄에서 «n번째 칸»을 바꾼다.
      ⚠ replaceOnce 로 칸을 바꾸면 안 된다 — 빈 칸끼리는 XML 이 글자 하나까지 똑같아서
        「3번째 칸」에 넣으라고 해도 «맨 앞의 빈 칸»이 바뀐다. 실측(2026-09-06)에서
@@ -557,7 +581,7 @@
     var rows = splitRows(tbl), newTbl = tbl;
     /* ★ 이 표에서만 쓰는 「이미 채운 열쇠」 — 표가 바뀌면 비워진다 */
     var used = {};
-    rows.forEach(function (tr) {
+    rows.forEach(function (tr, 줄번호) {
       var cells = splitCells(tr), newTr = tr;
       for (var i = 0; i < cells.length; i++) {
         /* 칸 안에 라벨과 빈자리가 함께 있는 모양(자택:___ 직장:___)을 먼저 처리한다 */
@@ -590,7 +614,8 @@
         used[key] = true;
         report.fields.push({ key: key, value: fields[key] });
       }
-      if (newTr !== tr) newTbl = replaceOnce(newTbl, tr, newTr);
+      /* ⚠ 글자로 찾지 않는다 — 같은 모양 줄이 둘 이상이면 맨 앞 것이 바뀐다(replaceRowAt 참고) */
+      if (newTr !== tr) newTbl = replaceRowAt(newTbl, 줄번호, newTr);
     });
     return newTbl;
   }
@@ -636,9 +661,22 @@
        자료 줄이 딱 그만큼 짧으면 그 라벨이 덮인 줄이라는 뜻이다(shiftOf 가 쓴다). */
     var lead = 0;
     while (lead < map.length && !map[lead]) lead++;
+    /* ★ 자격 및 면허 · 상벌 표 (대표 결정 2026-09-13).
+       ⚠ 자격 표와 어학 표는 첫 칸이 둘 다 「자격증명」이다 — «취득년월일이 있는가»로 가른다.
+         어학은 담는 자료가 없어 채우지 않는다(성적이 있으면 어학으로 본다).
+       ⚠ 한 머리줄에 자격과 상벌이 «함께» 오는 서식이 흔하다(대표 이력서가 그렇다).
+         그래서 갈래를 하나(certaward)로 두고, 값은 두 목록을 짝지어 보낸다. */
+    /* ⚠ 가르는 자는 «하나»다 — 성적(등급) 칸이 있으면 어학 표다.
+       처음에는 「자격은 취득년월일도 있어야」라는 빗장을 더 두었는데, 고장넣기에서
+       그것이 «있으나 마나»임이 드러났다(어차피 grade 가 가른다).
+       빗장이 둘이면 어느 것이 일하는지 알 수 없고 검사도 이빨을 못 가진다. */
+    var 어학 = map.indexOf('grade') >= 0;
+    var 자격 = map.indexOf('certName') >= 0;
+    var 상벌 = map.indexOf('awardWhat') >= 0;
     var kind = map.indexOf('school') >= 0 ? 'edu'
       : (map.indexOf('org') >= 0 && (map.indexOf('role') >= 0 || map.indexOf('title') >= 0
-          || map.indexOf('dept') >= 0 || map.indexOf('period') >= 0)) ? 'career' : '';
+          || map.indexOf('dept') >= 0 || map.indexOf('period') >= 0)) ? 'career'
+      : (!어학 && (자격 || 상벌)) ? 'certaward' : '';
     return kind ? { kind: kind, map: map, lead: lead, byCol: 있다 ? byCol : null } : null;
   }
   /* ── 여기서부터는 «남의 자리» ──
@@ -784,7 +822,8 @@
           newTr = replaceCellAt(newTr, c, filled);
           cells[c] = filled; ok = true;
         }
-        if (ok) { newTbl = replaceOnce(newTbl, rows[q], newTr); donePick[pick] = true; if (pick === put) put++; }
+        /* ⚠ 글자로 찾지 않는다 — 빈 줄끼리는 똑같아서 맨 앞 것이 바뀐다(위 replaceRowAt 참고) */
+        if (ok) { newTbl = replaceRowAt(newTbl, q, newTr); donePick[pick] = true; if (pick === put) put++; }
       }
       if (items.length) {
         var 넣은수 = Object.keys(donePick).length;
