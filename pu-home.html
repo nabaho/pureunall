@@ -2854,6 +2854,28 @@ function 바뀔것글자(바뀐것) {
     }).join('') + '</ul>';
 }
 
+/* 「비공개 자리가 없다」로 막혔을 때, 이 게시판이 «할 수 있는 일»을 그 자리에서 보인다.
+   ★ 다시 누르게 하지 않으려고 서버가 실패와 «함께» 실어 보낸 것이다.
+     이 목록에 내리는 길의 이름이 있으면 그걸로 만든다. */
+function 살펴본것글자(s) {
+  if (!s) return '';
+  if (s.막힘) return '<div class="sub" style="margin-top:8px">살펴보지 못했습니다: '
+    + esc(s.막힘) + '</div>';
+  const 줄 = (이름, 값) => ((값 || []).length
+    ? '<div style="margin-top:5px"><b>' + esc(이름) + '</b><br>'
+      + '<span style="font-family:ui-monospace,monospace;font-size:.85em">'
+      + esc((값 || []).join(' · ')) + '</span></div>'
+    : '');
+  return '<details style="margin-top:10px"><summary class="sub">'
+    + '이 게시판이 할 수 있는 일 (눌러서 펴기)</summary>'
+    + '<div style="font-size:.92em">'
+    + 줄('고치는 화면', s.쓰는화면)
+    + 줄('글 읽는 쪽', s.읽는화면)
+    + 줄('읽는 쪽 고르개', s.읽는화면고르개)
+    + 줄('읽는 쪽 딸깍', s.읽는화면딸깍)
+    + '</div></details>';
+}
+
 /* 서버가 «왜 안 썼는지»를 그대로 보여 준다 — 뭉뚱그리면 고칠 수가 없다 */
 function 걸린것글자(답) {
   const 줄 = (답 && 답.걸린것) || [];
@@ -2953,9 +2975,13 @@ async function 퇴사자한번에내리기() {
     '내리기')) return;
 
   const 됨 = [], 안됨 = [];
+  let 살펴본것 = null;
   for (const x of 사람) {
     try {
       const 답 = await 서버에게물어보기('쓰기', x.srl, { 비공개: true });
+      /* ★ 못 찾았을 때 서버가 «이 게시판이 할 수 있는 일»을 함께 보내 준다.
+           한 사람 것만 챙기면 된다 — 같은 게시판이라 둘이 똑같다. */
+      if (!살펴본것 && 답 && 답.살펴본것) 살펴본것 = 답.살펴본것;
       /* ⚠★ 「바뀐 것이 없다」를 «이미 내려가 있다»로 읽으면 안 된다.
            비공개 자리를 «못 찾았을 때»도 바뀐 것이 없다 — 2026-09-13 에 그 탓으로
            퇴사자가 안 내려갔는데 「내렸습니다」라고 말했다. 못 찾은 것을 먼저 본다. */
@@ -2975,6 +3001,9 @@ async function 퇴사자한번에내리기() {
     + (안됨.length ? '<div style="margin-top:8px;color:var(--bad)"><b>못 내림 '
       + 안됨.length + '명</b><ul style="margin:4px 0 0;padding-left:18px">'
       + 안됨.map(n => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' : '')
+    /* ★ 못 내렸으면 «이 게시판이 할 수 있는 일»을 그 자리에서 보여 준다 —
+         다시 누르게 하지 않으려고 서버가 함께 실어 보낸 것이다. */
+    + (살펴본것 ? 살펴본것글자(살펴본것) : '')
     + '<div style="margin-top:8px">홈페이지에서 한 번 눈으로 봐 주십시오.</div>');
   checkHomepage();
 }
@@ -3015,8 +3044,9 @@ async function 한사람내리기(key) {
   /* 못 했으면 «왜»를 보이고, 손으로 하는 길을 그때 연다 */
   const 까닭 = 탈 || 못함.join(' / ')
     || ((답 && (답.걸린것 || []).join(' / ')) || (답 && 답.error) || '까닭 모름');
+  const 살핌 = (답 && 답.살펴본것) ? 살펴본것글자(답.살펴본것) : '';
   if (await askYes('서버가 내리지 못했습니다',
-    '<div>' + esc(까닭) + '</div>'
+    '<div>' + esc(까닭) + '</div>' + 살핌
     + '<div style="margin-top:8px">손으로 내리는 길을 열어 드릴까요?</div>', '손으로 내리기')) {
     copyPrivate(key);
   }
