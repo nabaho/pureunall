@@ -181,6 +181,28 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   overflow: hidden;
   vertical-align: top;
 }
+/* ★★ 환경설정 — 「한 화면에 모두」 (대표 지시 2026-09-13)
+   ①「콤팩트하게 한 화면에 모두 정렬되게 해라. 아래로 안 나오게, 좌우로 배치해도 된다」
+   ②「권한·정책도 좌우로 화면 나누어서 정리해라. 한 줄씩 안 해도 된다」
+
+   실측(1,600px 화면): 시스템›데이터 관리가 세로 약 1,100px 인데 남는 높이는 약 620px 이라
+   콜드 스토리지가 두 번 스크롤해야 보였다. 권한·정책은 설정 한 칸이 이름표 150px +
+   체크상자뿐인데 줄 하나를 통째로 써서 오른쪽 1,100px 넘게가 내내 비어 있었다.
+
+   ⚠ 칸 수를 «코드에 손으로» 못 박지 말 것. 노트북·태블릿에서 두 칸이 서로 눌리면
+     좁아서 못 읽는다 — 그래서 경계(1,100px)를 여기 한 곳에만 둔다.
+   ⚠ set-2col 의 왼쪽이 넓다: 왼쪽은 «일하는» 자리(마이그레이션 마법사)이고
+     오른쪽은 누르고 끝나는 단추들이다. 1:1 로 두면 왼쪽 마법사가 눌린다. */
+.set-2col { display: grid; gap: 10px; align-items: start; grid-template-columns: 1.15fr 0.85fr; }
+.set-rows { display: grid; gap: 0 18px; grid-template-columns: 1fr 1fr; }
+.set-tiles { display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+@media (max-width: 1100px) {
+  .set-2col, .set-rows { grid-template-columns: 1fr; }
+}
+/* 읽고 나면 다시 안 읽는 설명은 «한 줄»로 접고, 온글은 말풍선에 남긴다.
+   ⚠ 지우는 것이 아니다 — title 을 빼면 그 설명은 어디서도 못 읽는다. */
+.set-1line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* ★★ 「표의 한 칸은 한 줄」 (대표 지시 2026-08-30 · 2026-09-06 「대표자와 계약시작일
    월 자문료를 한 줄로 나오게 해달라」).
    대표자 「이상균」이 «이상 / 균» 으로, 계약시작 「2007-03-01」이 «2007-03- / 01» 로
