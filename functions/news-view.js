@@ -118,27 +118,57 @@ function 쪽(제목, 전문) {
     + '#wrap{width:700px;margin:0 auto}'
     /* 누를 수 있다는 것을 손이 알게 한다 — 메일에는 이 규칙이 안 간다(<style> 은 지워진다) */
     + '[data-pop]{cursor:pointer}'
-    + '[data-pop]:hover{outline:2px solid #8a6f57;outline-offset:3px}'
+    + '[data-pop]{border-radius:6px;transition:outline-color .12s}'
+    + '[data-pop]:hover{outline:2px solid #c9b79b;outline-offset:3px}'
     /* ⚠⚠ 바탕을 «비치게» 두지 말 것 (대표 지시 2026-09-12 「팝업인경우 1개의 사항만
          나오면 된다. 뒤에 배경에 또 내용이 이중으로 있는것 처럼보인다」).
        반투명으로 덮으면 뒤의 편지가 그대로 비쳐, 한 건만 보려고 열었는데
-       같은 내용이 두 벌 깔린 것처럼 보인다. 종이빛으로 «꽉» 덮는다. */
+       같은 내용이 두 벌 깔린 것처럼 보인다. 종이빛으로 «꽉» 덮는다.
+       ⚠ 예쁘게 만들려고 그림자·그러데이션을 넣다가 여기를 반투명으로 바꾸기 쉽다.
+         검사(newsletter-view-look)가 그 자리를 지킨다. */
     + '#pop{position:fixed;inset:0;background:#e9e7e3;display:none;z-index:99}'
-    + '#pop.on{display:flex;align-items:flex-start;justify-content:center;padding:24px 12px}'
-    + '#pop .in{background:#fff;width:min(660px,94vw);max-height:88vh;border-radius:10px;'
+    /* ★ 가운데로 세운다 (대표 지시 2026-09-13 「너무 무미 건조하다」).
+       ⚠ 한 문단짜리가 화면 꼭대기에 붙고 아래가 통째로 비어 있었다 —
+         그것이 「무미건조」의 큰 몫이었다. */
+    + '#pop.on{display:flex;align-items:center;justify-content:center;padding:20px 12px}'
+    + '#pop .in{background:#fff;width:min(660px,94vw);max-height:88vh;border-radius:16px;'
     + 'display:flex;flex-direction:column;overflow:hidden;border:1px solid #ddd7cf;'
-    + 'box-shadow:0 10px 30px rgba(36,26,19,.18)}'
-    + '#pop .hd{display:flex;align-items:center;gap:8px;padding:12px 15px;background:#f5f1ec;'
-    + 'border-bottom:1px solid #e0dcd6;font:bold 14px \'Malgun Gothic\',sans-serif;color:#4a3c2e}'
-    + '#pop .hd b{flex:1;min-width:0}'
-    + '#pop #popx{border:1px solid #e0dcd6;background:#fff;border-radius:6px;padding:5px 11px;'
-    + 'font:bold 12px \'Malgun Gothic\',sans-serif;color:#6f5a48;cursor:pointer}'
-    + '#pop .bd{overflow:auto;padding:18px 16px}'
+    + 'box-shadow:0 18px 44px rgba(36,26,19,.22),0 2px 6px rgba(36,26,19,.08);'
+    + 'animation:popup .18s ease-out}'
+    + '@keyframes popup{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}'
+    /* ⚠ 어지럼을 타는 분이 있다. 브라우저 설정을 켜 두면 그것을 지킨다 —
+         안 지키면 예쁘게 만든 것이 누군가에게는 괴로움이 된다. */
+    + '@media (prefers-reduced-motion:reduce){#pop .in{animation:none}'
+    + '[data-pop]{transition:none}}'
+    /* ★ 머리 — 편지 띠와 «같은 갈색»이다. 편지와 창이 한 집으로 보이게. */
+    + '#pop .hd{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#6f5a48}'
+    + '#pop .hd .mark{font:bold 11px Georgia,\'Times New Roman\',serif;letter-spacing:2.5px;'
+    + 'color:#e2d3bd;white-space:nowrap}'
+    + '#pop .hd .bar{width:1px;align-self:stretch;background:#8a7563}'
+    + '#pop .hd b{flex:1;min-width:0;font:bold 15px \'Malgun Gothic\',sans-serif;color:#fff;'
+    + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '#pop #popx{border:1px solid #9d8a78;background:#7d6753;border-radius:8px;padding:6px 12px;'
+    + 'font:bold 12px \'Malgun Gothic\',sans-serif;color:#fff;cursor:pointer;white-space:nowrap}'
+    + '#pop #popx:hover{background:#8f7862}'
+    /* 살구빛 가는 띠 — 머리와 글 사이를 한 겹 띄운다 */
+    + '#pop .acc{height:5px;background:#fbf4ea;border-bottom:1px solid #efe7dc}'
+    + '#pop .bd{overflow:auto;padding:24px 26px}'
+    /* ★ 꼬리 — 누가 보낸 쪽인지, 궁금하면 어디로 물어야 하는지. 없던 자리다. */
+    + '#pop .ft{display:flex;align-items:center;gap:8px;padding:12px 18px;background:#faf8f5;'
+    + 'border-top:1px solid #eceae6;font:12px \'Malgun Gothic\',sans-serif;color:#9a938a}'
+    + '#pop .ft .nm{font-weight:bold;color:#6f5a48}'
+    + '#pop .ft .sp{flex:1}'
     + '</style>'
     + '</head><body><div id="wrap">' + 전문 + '</div>'
     + '<div id="pop"><div class="in">'
-    + '<div class="hd"><b id="popt">이 소식</b><button id="popx" type="button">닫기 ✕</button></div>'
-    + '<div class="bd" id="popb"></div></div></div>'
+    + '<div class="hd"><span class="mark">PUREUN</span><span class="bar"></span>'
+    + '<b id="popt">이 소식</b><button id="popx" type="button">닫기 ✕</button></div>'
+    + '<div class="acc"></div>'
+    + '<div class="bd" id="popb"></div>'
+    + '<div class="ft"><span class="nm">푸른노무법인</span>'
+    + '<span>' + esc(제목 || '주간뉴스레터') + '</span>'
+    + '<span class="sp"></span><span>문의 041-556-0035</span></div>'
+    + '</div></div>'
     + '<script>' + 창스크립트 + '<\/script>'
     + '</body></html>';
 }
