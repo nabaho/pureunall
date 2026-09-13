@@ -15,7 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { 뜯기, 최신기준 } = require('../scripts/storage-rules-deploy.js');
+const { 뜯기, 최신기준, 승인읽기 } = require('../scripts/storage-rules-deploy.js');
 
 const ROOT = path.join(__dirname, '..');
 const 올릴것 = path.join(ROOT, 'docs', 'firebase-storage-전체(붙여넣기용).txt');
@@ -73,19 +73,32 @@ test('⑦ isStaff() 를 쓰는 칸이 «여전히 여럿» 있다 (조건을 통
     'isStaff() 를 쓰는 칸이 ' + 쓰는칸.length + '개뿐입니다 — 조건이 통째로 빠졌습니까?');
 });
 
-test('⑧ 고침 승인 파일이 있고, 거기 적힌 «새 몸»이 규칙 파일과 글자까지 같다', () => {
+/* ★★ 아래 둘은 «어느 쪽 상태인가»를 먼저 본다.
+     올리기 전: 승인 줄이 있고 옛·새 몸이 양쪽과 글자까지 맞아야 한다.
+     올린 뒤:   기준(콘솔원문)이 새 몸이 되고 승인 줄은 지워진다.
+   ⚠ 한쪽 쌍만 적으면 «올리는 날» main 이 빨개진다 — 2026-09-13 에 실제로 그랬다. */
+const 기준길 = 최신기준();
+const 기준isStaff = 기준길 ? 뜯기(fs.readFileSync(기준길, 'utf8')).함수.isStaff : null;
+const 아직안올림 = 기준isStaff !== isStaff;
+
+test('⑧ 올리기 전이면 «승인 줄»이 있고, 옛·새 몸이 양쪽과 글자까지 같다', (t) => {
+  if (!아직안올림) return t.skip('이미 올라간 상태입니다 — ⑨ 가 그쪽을 잽니다');
   assert.ok(fs.existsSync(승인글), '승인 파일이 없습니다: ' + 승인글);
-  const 승인 = require('../scripts/storage-rules-deploy.js').승인읽기(fs.readFileSync(승인글, 'utf8'));
-  assert.ok(승인.isStaff, '승인 파일에 isStaff 가 없습니다.');
+  const 승인 = 승인읽기(fs.readFileSync(승인글, 'utf8'));
+  assert.ok(승인.isStaff, '승인 파일에 isStaff 가 없습니다 — 규칙만 고치고 승인을 안 적었습니까?');
   assert.equal(승인.isStaff.새, isStaff,
     '승인 파일의 «새 몸»과 규칙 파일이 어긋났습니다 — 한쪽만 고쳤습니까?');
+  assert.equal(승인.isStaff.옛, 기준isStaff,
+    '승인 파일의 «옛 몸»이 콘솔에 있는 것과 다릅니다 — 무엇을 바꾸는지 어긋났습니다.');
 });
 
-test('⑨ 승인 파일의 «옛 몸»이 최신 콘솔원문과 글자까지 같다 — 거기서부터 바꾸는 것이 맞다', () => {
-  const 기준길 = 최신기준();
-  assert.ok(기준길, '콘솔원문 기준 파일이 없습니다.');
-  const 기준 = 뜯기(fs.readFileSync(기준길, 'utf8'));
-  const 승인 = require('../scripts/storage-rules-deploy.js').승인읽기(fs.readFileSync(승인글, 'utf8'));
-  assert.equal(승인.isStaff.옛, 기준.함수.isStaff,
-    '승인 파일의 «옛 몸»이 콘솔에 있는 것과 다릅니다 — 무엇을 바꾸는지 어긋났습니다.');
+test('⑨ ★ 올린 뒤에는 «기준»이 도메인 잠금을 지킨다 — 조용히 헐거워지는 것을 막는다', (t) => {
+  if (아직안올림) return t.skip('아직 안 올린 상태입니다 — ⑧ 이 그쪽을 잽니다');
+  assert.ok(기준isStaff, '콘솔원문 기준 파일에 isStaff 가 없습니다.');
+  assert.match(기준isStaff, /pureun/,
+    '올라간 규칙의 isStaff() 가 우리 도메인을 안 봅니다 — 가입만 하면 창고가 열립니다.');
+  assert.match(기준isStaff, /matches\(/, '올라간 규칙의 isStaff() 가 도메인을 견주지 않습니다.');
+  const 승인 = fs.existsSync(승인글) ? 승인읽기(fs.readFileSync(승인글, 'utf8')) : {};
+  assert.ok(!승인.isStaff,
+    '올렸는데 승인 줄이 남아 있습니다 — 다음 사람이 «아직 안 올라간 고침»으로 읽습니다.');
 });
