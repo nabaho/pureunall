@@ -710,6 +710,8 @@ const MB = require("./mail-bulk");
 /* 뉴스레터 회차 잠금 판단 — 두 관리자가 같은 순간에 눌렀을 때의 잣대는
    검사가 실제로 만들어 볼 수 있도록 이 파일 밖(functions/news-lock.js)에 둔다. */
 const NL = require("./news-lock");
+/* 자동발송 확정본이 «준비한 그때 그대로»인지 재는 자 — 다르면 안 보낸다 */
+const NR = require("./news-ready");
 
 exports.sendBulkMail = functions
   .region(MAIL_REGION)
@@ -953,6 +955,25 @@ exports.weeklyNewsletterSend = functions
           상태: "오류", 오류때: Date.now(), 오류: "이미 보낸 회차입니다."
         });
         console.log("[뉴스레터 자동발송] 이미 보낸 회차");
+        return null;
+      }
+
+      /* ★★ 확정본이 «준비한 그때 그대로»인지 본다 (2026-09-13).
+           준비 뒤에 회차를 고치면 화면에는 고친 것이 보이는데 확정본은 그대로라
+           «고치기 전 편지»가 나간다. 되돌릴 수 없다 — 못 믿을 바에는 안 보낸다.
+         ⚠ 회차를 통째로 읽지 않는다 — 안에 25,000자 전문과 받는 분들 주소가 있다.
+           편지에 실리는 칸만 골라 읽어 도장을 다시 찍는다. */
+      const 바탕칸 = ["회차", "범위", "우리글", "안", "지역뉴스"];
+      const 바탕 = {};
+      (await Promise.all(바탕칸.map((k) => issueRef.child(k).once("value"))))
+        .forEach((s, i) => { 바탕[바탕칸[i]] = s.val(); });
+      const 볼까 = NR.내보낼까(ready, 바탕);
+      if (!볼까.ok) {
+        await db.ref("newsletter/weeklyReady").update({
+          상태: "어긋남", 어긋난때: Date.now(), 오류: 볼까.까닭,
+          봉인도장: 볼까.봉인 || "", 지금도장: 볼까.지금 || ""
+        });
+        console.log("[뉴스레터 자동발송] 보내지 않음 — " + 볼까.까닭);
         return null;
       }
       issueClaim = await issueRef.child("발송잠금").transaction(
