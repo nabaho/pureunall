@@ -101,8 +101,12 @@ test('★★ 자주 안 쓰는 것은 «⋯» 안으로 접되, 길이 사라지
   assert.match(s, /<details class="more">/, '★★ 접는 칸이 없습니다');
   /* 한 해에 몇 번 쓰는 셋이 그 안에 있다 */
   const 안 = s.slice(s.indexOf('const 더보기'), s.indexOf('class="eft"'));
-  ['openHistory()', 'keepOnSiteAsk()', 'copyPrivate('].forEach(f =>
+  /* ⚠ 2026-09-13 — 「비공개」 단추가 부르는 «함수 이름»을 박지 않는다.
+       옛 안내(copyPrivate) 대신 서버가 바로 내리도록 바뀌었다(한사람내리기).
+       지켜야 할 것은 «비공개로 가는 길이 ⋯ 안에 있나»이지 함수 이름이 아니다. */
+  ['openHistory()', 'keepOnSiteAsk()'].forEach(f =>
     assert.ok(안.indexOf(f) > 0, '★★ 「' + f + '」로 갈 길이 사라졌습니다'));
+  assert.match(안, /비공개/, '★★ 홈페이지에서 내리는(비공개) 길이 ⋯ 안에서 사라졌습니다');
   /* 접었다고 «없앤» 것이 아니다 — 늘 보이는 자리에는 안 둔다 */
   const 늘보임 = s.slice(s.indexOf('class="eft"'));
   assert.ok(늘보임.indexOf('openHistory()') < 0,
