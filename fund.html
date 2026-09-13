@@ -1252,7 +1252,17 @@ function newFund(pre){
     +'<label class="row" style="margin-top:10px;gap:7px;cursor:pointer;font-size:12.5px">'
     +'<input type="checkbox" id="nf-temp" checked style="width:15px;height:15px">'
     +'<span>이름이 아직 <b>확정되지 않았습니다</b> (가칭)</span>'+hlp('name.temp')+'</label>'
-    +'<div class="fld" style="margin-top:10px"><label>주담당</label><div id="nf-mgrwrap"><select id="nf-mgr" disabled><option>재직자 불러오는 중…</option></select></div></div>'
+    /* ★ 부담당도 «등록할 때» 정한다(대표 지시 2026-09-13 「주담당과 부담당 둘을 뒀으면」).
+         여태 등록 창에는 주담당만 있어, 부담당은 기금을 만든 뒤 기금 정보에서 또 열어야 했다.
+       ⚠ 주담당으로 고른 사람은 부담당에 또 못 넣는다 — 한 사람이 두 자리에 서면
+         「부담당 김혜민」이 기금 목록에 두 번 찍힌다. */
+    +'<div class="row" style="margin-top:10px;gap:12px;align-items:flex-start;flex-wrap:wrap">'
+    +'<div class="fld" style="min-width:200px"><label>주담당</label>'
+      +'<div id="nf-mgrwrap"><select id="nf-mgr" disabled><option>재직자 불러오는 중…</option></select></div></div>'
+    +'<div class="fld" style="min-width:260px"><label>부담당 <span class="muted" style="font-weight:400;font-size:10px">· 여러 명</span></label>'
+      +'<div id="nf-subwrap" class="row" style="gap:5px;flex-wrap:wrap;align-items:center">'
+      +'<span class="muted" style="font-size:11.5px">재직자 불러오는 중…</span></div></div>'
+    +'</div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:16px"><button onclick="closeM()">취소</button><button class="primary" onclick="createFund()">등록</button></div>'
     ,{after:function(){
       /* 기업정보함에 다녀오면 창을 «다시 만든» 것이라 치던 값이 비어 있다 — 되넣는다 */
@@ -1272,7 +1282,37 @@ function newFund(pre){
       +list.map(function(u){return '<option value="'+esc(u.sid)+'" data-name="'+esc(u.name)+'">'+esc(u.name)+(u.title?' · '+esc(u.title):'')+'</option>';}).join('')+'</select>';
     /* 명단은 늦게 온다 — 고르던 담당자는 «명단이 온 뒤»에야 되넣을 수 있다 */
     if(pre.mgr_sid){ var ms=$('nf-mgr'); if(ms) ms.value=pre.mgr_sid; }
+    /* ★ 부담당 — 기금 정보의 것과 «같은 딱지»(mgrSubChip)를 쓴다. 두 화면이 다르게 생기면
+         같은 일인 줄 모른다. 담는 자리 이름만 등록 창용(nf-subchips)으로 둔다. */
+    var sw=$('nf-subwrap');
+    if(sw){
+      sw.innerHTML='<select id="nf-sub-add" onchange="nfSubAdd(this.value);this.value=\'\'">'
+        +'<option value="">+ 부담당</option>'
+        +list.map(function(u){return '<option value="'+esc(u.sid)+'" data-name="'+esc(u.name)+'">'+esc(u.name)+(u.title?' · '+esc(u.title):'')+'</option>';}).join('')
+        +'</select><span id="nf-subchips" style="display:inline-flex;gap:4px;flex-wrap:wrap"></span>';
+      (pre.mgr_subs||[]).forEach(function(s){ if(s&&s.sid) nfSubAdd(s.sid); });
+    }
   }).catch(function(){});
+}
+/* 등록 창의 부담당 담기 — 기금 정보의 mgrSubAdd 와 «같은 규칙»이다.
+   ⚠ 주담당으로 고른 사람은 못 넣는다 — 한 사람이 두 자리에 서면 목록에 두 번 찍힌다. */
+/* 등록 창에 담긴 부담당을 읽는다 — 만들 때(createFund)와 기업정보함에 다녀올 때(_readNewFundForm)가 함께 쓴다 */
+function _nfSubs(){
+  var box=$('nf-subchips'); if(!box) return [];
+  return [].slice.call(box.querySelectorAll('[data-sid]')).map(function(el){
+    var sid=el.getAttribute('data-sid');
+    var u=(_staffCache||[]).filter(function(x){return x.sid===sid;})[0];
+    return {sid:sid, name:(u&&u.name)||''};
+  }).filter(function(s){ return s.sid&&s.name; });
+}
+function nfSubAdd(sid){
+  if(!sid) return;
+  var box=$('nf-subchips'); if(!box) return;
+  if(box.querySelector('[data-sid="'+sid+'"]')) return;               /* 이미 담겨 있음 */
+  var main=$('nf-mgr');
+  if(main&&main.value===sid){ toast('주담당으로 지정된 사람입니다','warn'); return; }
+  var u=(_staffCache||[]).filter(function(x){return x.sid===sid;})[0]; if(!u) return;
+  box.insertAdjacentHTML('beforeend',mgrSubChip(sid,u.name));
 }
 function createFund(){
   var name=($('nf-name')&&$('nf-name').value.trim())||'';
@@ -1300,6 +1340,10 @@ function createFund(){
   if(sel&&sel.value){ var op=sel.options[sel.selectedIndex]; var nm=op.getAttribute('data-name')||op.text;
     rec.mgr_main={sid:sel.value,name:nm}; rec.manager=nm; }
   else { var tx=$('nf-mgr-text'); if(tx&&tx.value.trim()){ rec.manager=tx.value.trim(); } }
+  /* ★ 부담당도 등록할 때 함께 담는다(2026-09-13) — 여태 만든 뒤 기금 정보에서 또 열어야 했다.
+     ⚠ 주담당과 같은 사람은 뺀다 — 목록에 두 번 찍힌다(담는 자리에서도 막지만, 여기서도 한 번 더). */
+  var subs=_nfSubs().filter(function(s){ return !(rec.mgr_main&&rec.mgr_main.sid===s.sid); });
+  if(subs.length) rec.mgr_subs=subs;
   /* 이름 예약 → ID 선점 두 단계.
      ①`name_locks/{정규화이름}`을 트랜잭션으로 선점해 **두 계정이 같은 이름을 동시에** 만드는 것을 막는다
        (기존엔 로컬 캐시만 봐서 서로 다른 FUND-xxxx로 둘 다 생성됐다).
@@ -6434,9 +6478,13 @@ function mgrSubAdd(sid){
   box.insertAdjacentHTML('beforeend',mgrSubChip(sid,u.name));
   markDirty();
 }
+/* ⚠ 두 화면이 «같은 딱지»를 쓴다 — 기금 정보(fd-mgr-subchips)와 새 기금 등록(nf-subchips).
+     한쪽 이름만 보면 등록 창에서 ×를 눌러도 아무 일도 안 일어난다(2026-09-13). */
 function mgrSubDel(sid){
-  var box=$('fd-mgr-subchips'); if(!box) return;
-  var el=box.querySelector('[data-sid="'+sid+'"]'); if(el){ el.remove(); markDirty(); }
+  var box=$('fd-mgr-subchips')||$('nf-subchips'); if(!box) return;
+  var el=box.querySelector('[data-sid="'+sid+'"]'); if(!el) return;
+  var 정보폼=!!$('fd-mgr-subchips');
+  el.remove(); if(정보폼) markDirty();
 }
 /* 주담당을 바꾸면 그 사람이 부담당에 남아 있지 않게 한다 — 저장 때는 걸러지지만
    화면에 둘 다 보이면 무엇이 저장될지 알 수 없다. */
@@ -6561,23 +6609,38 @@ function finishSetup(){ var _fid=S.fundId, f0=funds[_fid]; if(!f0) return;
    키가 여기 있으면 그 칸 «앞»에 묶음 이름 줄을 넣는다. */
 var INFO_SECS={name:'기본',manager:'담당',chairman:'인가·등기',tax_office:'관할·연락',lease_lessor:'사무소 임대차',
   contribution_total:'설립 (합의서·회의록·정관·등기·세무 서식이 읽는 값)'};
+/* ★ 접어 두는 묶음 (대표 지시 2026-09-13 「너무 정신 없는데 좀 깔끔하게 … 너무 복잡하다」)
+   스물다섯 칸이 한꺼번에 펼쳐져 있어 «지금 볼 것»이 묻혔다.
+   ⚠ 자료를 «지우는 것이 아니다» — 접어 둘 뿐이고, 값이 하나라도 들어 있으면 «펼친 채»로 연다.
+     빈 채로 접혀 있으면 채울 것이 있는 줄도 모른다.
+   ⚠ 「기본·담당·인가·등기·관할」은 안 접는다 — 늘 보는 칸이다. */
+var INFO_FOLD={lease_lessor:'사무소 임대차 — 임대차계약서·사업자등록신청서가 읽습니다',
+  contribution_total:'설립 — 설립 중인 기금에서만 씁니다'};
 var INFO_W2={tax_office:1,registry_office:1,labor_office:1};   // 안에 단추가 붙어 두 칸 폭이 필요한 칸
+/* 접힌 묶음을 펴고 접는다 — 화면만 바뀌고 자료는 그대로다(저장과 상관없다) */
+function toggleInfoSec(k){
+  var b=$('sec-'+k), h=$('sech-'+k); if(!b) return;
+  var 열림=(b.style.display!=='none');
+  b.style.display=열림?'none':'';
+  if(h) h.textContent=열림?'▸':'▾';
+}
+/* FIELDS 를 «묶음»으로 나눈다 — 접으려면 묶음이 하나의 덩이여야 한다.
+   ⚠ 글자를 잘라 <div> 를 여닫는 식으로 하면 칸 하나가 통째로 빠진다(2026-09-13 에 겪었다). */
+function infoGroups(){
+  var out=[], cur=null;
+  FIELDS.forEach(function(c){
+    if(INFO_SECS[c[0]]){ cur={key:c[0], label:INFO_SECS[c[0]], fold:INFO_FOLD[c[0]]||'', fields:[]}; out.push(cur); }
+    if(!cur){ cur={key:'_', label:'', fold:'', fields:[]}; out.push(cur); }
+    cur.fields.push(c);
+  });
+  return out;
+}
 function infoForm(f){
   var _first=true;
-  var flds=FIELDS.map(function(c){
-    var sec='';
-    if(INFO_SECS[c[0]]){
-      // 첫 묶음 머리 줄 오른쪽에 ⓘ·당겨오기를 얹는다(제목 줄을 따로 두지 않기 위해)
-      var tools=_first?('<span style="flex:1"></span>'
-        +'<button onclick="openAudit()" style="padding:2px 9px;font-size:11.5px" title="이 기금을 누가 언제 고쳤는지">🕘 변경 기록</button>'
-        +hlp('info.card')
-        +'<button onclick="openCardPick()" style="padding:2px 9px;font-size:11.5px;font-weight:600"'
-        +' title="푸른 기업정보함(사업자등록증)에서 기금법인명·고유번호·대표자·소재지를 당겨옵니다">🏢 기업정보함에서</button>'):'';
-      sec='<div class="sec'+(_first?' first':'')+'">'+INFO_SECS[c[0]]+tools+'</div>'; _first=false;
-    }
+  var 칸=function(c){
     /* 주담당·부담당을 한 줄에 — 종전에는 부담당이 전폭 한 줄을 통째로 먹었다 */
     // 묶음 머리가 이미 「담당」이므로 라벨에 또 쓰지 않는다
-    if(c[0]==='manager') return sec+'<div class="fld w3"><label>주담당 · 부담당</label>'
+    if(c[0]==='manager') return '<div class="fld w3"><label>주담당 · 부담당</label>'
       +'<div class="mgrrow">'+mgrMainField(f)+mgrSubField(f)+'</div></div>';
     var v=f[c[0]]||'', inp;
     if(c[2]==='select') inp='<select id="fd-'+c[0]+'">'+(SELECT_OPTS[c[0]]||['공동','사내']).map(function(o){return '<option'+(v===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
@@ -6591,8 +6654,35 @@ function infoForm(f){
     /* ★ 참여 지자체를 「지역」 «바로 옆»에 둔다(대표 지시 2026-09-13 「지역 옆에 넣어라 하나씩」).
          맨 아래 따로 두었더니 화면을 끝까지 내려야 보였다 — 지역과 나란히 있어야
          「충남의 어느 시·군이 함께 들어왔나」가 한눈에 읽힌다. */
-    return sec+'<div class="fld'+(c[0]==='address'?' full':'')+(INFO_W2[c[0]]?' w2':'')+'"><label>'+c[1]+'</label>'+inp+'</div>'
+    return '<div class="fld'+(c[0]==='address'?' full':'')+(INFO_W2[c[0]]?' w2':'')+'"><label>'+c[1]+'</label>'+inp+'</div>'
       +(c[0]==='region'?govField(f):'');
+  };
+  /* ★ 저장을 «맨 위»로 (대표 지시 2026-09-13 「저장버튼도 상단에 두고」) —
+       칸이 스물다섯이라 저장하려면 화면 끝까지 내려가야 했다. */
+  var tools='<span style="flex:1"></span>'
+    +'<button onclick="openAudit()" style="padding:2px 9px;font-size:11.5px" title="이 기금을 누가 언제 고쳤는지">🕘 변경 기록</button>'
+    +hlp('info.card')
+    +'<button onclick="openCardPick()" style="padding:2px 9px;font-size:11.5px;font-weight:600"'
+    +' title="푸른 기업정보함(사업자등록증)에서 기금법인명·고유번호·대표자·소재지를 당겨옵니다">🏢 기업정보함에서</button>'
+    +'<button class="primary" onclick="saveInfo()" style="padding:3px 12px;font-size:12px;font-weight:700" title="Ctrl+S 로도 저장됩니다">💾 저장</button>';
+  var flds=infoGroups().map(function(g){
+    var 몸='<div class="gridw">'+g.fields.map(칸).join('')+'</div>';
+    if(!g.fold){
+      var h=g.label?('<div class="sec'+(_first?' first':'')+'">'+g.label+(_first?tools:'')+'</div>'):'';
+      _first=false;
+      return h+몸;
+    }
+    /* 접는 묶음 — 값이 하나라도 있으면 «펼친 채»로 연다.
+       빈 채로 접혀 있으면 채울 것이 있는 줄도 모른다. */
+    var 열까=g.fields.some(function(c){ return String(f[c[0]]||'').trim(); });
+    var head='<div class="sec'+(_first?' first':'')+'" style="cursor:pointer" onclick="toggleInfoSec(\''+g.key+'\')" '
+      +'title="눌러서 펴고 접습니다 — 자료는 그대로입니다(저장과 상관없습니다)">'
+      +'<span id="sech-'+g.key+'" style="display:inline-block;width:14px">'+(열까?'▾':'▸')+'</span>'
+      +g.label+'<span style="font-weight:400;font-size:11px;color:var(--sub)"> · '+esc(g.fold)+'</span>'
+      +(열까?'':'<span class="muted" style="font-weight:400;font-size:11px"> · 비어 있음</span>')
+      +(_first?tools:'')+'</div>';
+    _first=false;
+    return head+'<div id="sec-'+g.key+'"'+(열까?'':' style="display:none"')+'>'+몸+'</div>';
   }).join('');
   setTimeout(bindDocIntake,0);   // 렌더 후 드롭존 핸들러 연결
   /* 한 줄로 줄인 서류 받는 곳 — 설명·상태·버튼을 칸 안으로 넣어 세로를 아꼈다.
@@ -6611,9 +6701,13 @@ function infoForm(f){
     /* 제목 「기금 정보」는 바로 위 탭에 이미 있다 — 두 번 쓰지 않는다.
        ⓘ·당겨오기 단추는 첫 묶음 머리(기본) 줄 오른쪽에 얹어 한 줄을 더 아낀다. */
     +'<div class="panel" style="padding:12px 14px">'
-    +'<div class="gridw" oninput="markDirty()" onchange="markDirty()">'+flds+'</div>'
-    +'<div class="row" style="margin-top:12px"><button class="primary" onclick="saveInfo()">💾 저장</button>'
-    +'<span class="muted mo" style="font-size:11px">Ctrl+S로도 저장</span></div></div>'
+    /* ⚠ 묶음마다 gridw 를 따로 두므로(접기 때문에) 여기는 감싸기만 한다.
+         고침 표시(markDirty)는 그대로 이 바깥에서 받는다 — 안쪽 묶음까지 다 올라온다. */
+    +'<div oninput="markDirty()" onchange="markDirty()">'+flds+'</div>'
+    /* 저장은 맨 위로 갔다. 아래에도 하나 두면 «따로 저장해야 하나» 하고 망설이게 된다 —
+       대신 화면이 길 때를 위해 «되돌아가는 길»만 한 줄 남긴다. */
+    +'<div class="row" style="margin-top:12px">'
+    +'<span class="muted" style="font-size:11px">저장은 <b>맨 위 [💾 저장]</b> · Ctrl+S 로도 됩니다</span></div></div>'
     +officerPanel(f);
 }
 /* ── 참여 지자체 줄 ── (대표 지시 2026-09-13)
@@ -7886,6 +7980,8 @@ function _readNewFundForm(){
   if(sel&&sel.value){ var op=sel.options[sel.selectedIndex];
     o.mgr_sid=sel.value; o.mgr_name=op.getAttribute('data-name')||op.text; }
   var tx=$('nf-mgr-text'); if(tx&&tx.value.trim()) o.mgr_text=tx.value.trim();
+  /* ⚠ 부담당도 걷어 온다 — 기업정보함에 다녀오면 창을 다시 만들기 때문에, 안 걷으면 사라진다 */
+  var subs=_nfSubs(); if(subs.length) o.mgr_subs=subs;
   /* 앞서 기업정보함에서 실어 둔 값(칸이 없는 것들)도 함께 넘긴다 — 두 번 골라도 안 잃는다 */
   if(_nfCard) Object.keys(_nfCard).forEach(function(k){ if(!o[k]) o[k]=_nfCard[k]; });
   return o;

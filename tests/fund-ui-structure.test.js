@@ -179,7 +179,12 @@ test('기금 정보 폼은 화면 폭을 다 쓴다 — 760px 2열에 갇히지 
   // max-width:none(폰에서 푸는 것)은 괜찮다 — 실제 «폭 제한»만 막는다
   assert.ok(!/\.gridw\{[^}]*max-width:\s*(?!none)/.test(SRC), '넓은 폼에 폭 제한을 걸면 다시 아래로 흘러내린다');
   // 여백은 바뀔 수 있다 — 「기금 정보 폼이 넓은 격자를 쓰는가」만 본다
-  assert.match(SRC, /class="gridw"[^>]*oninput="markDirty\(\)"/, '기금 정보가 넓은 격자를 쓰지 않는다');
+  /* 2026-09-13 묶음 접기 뒤로 격자는 «묶음마다» 하나씩이고, 고침 표시는 그 바깥에서 다 받는다.
+     한 태그에 둘이 같이 붙어 있는지를 보던 검사는 그 모양만 못 박고 있었다 — 둘을 따로 본다. */
+  const 폼 = SRC.slice(SRC.indexOf('function infoForm('), SRC.indexOf('function infoForm(') + 6000);
+  assert.match(폼, /'<div class="gridw">'\+g\.fields\.map/, '기금 정보가 넓은 격자를 쓰지 않는다');
+  assert.match(폼, /oninput="markDirty\(\)" onchange="markDirty\(\)">'\+flds/,
+    '고침 표시가 칸들을 감싸지 않는다 — 고쳐도 저장 대상으로 안 잡힌다');
   assert.ok(!/전기이월[\s\S]{0,400}class="grid" style="max-width:760px"/.test(SRC),
     '전기이월 칸이 다시 2열 760px 에 갇혔다');
   const box = {};
