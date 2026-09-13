@@ -4,6 +4,10 @@
    바깥 통신과 DB 쓰기는 index.js, 글자 판정은 이 파일에 둬 인터넷 없이 검사한다. */
 const crypto = require("crypto");
 const Brief = require("./news-brief");
+/* ★ 마감을 재는 자는 «한 곳»에만 둔다 (대표 지시 2026-09-13 「마감지남 거럼」).
+   ⚠ 여기에 또 하나 지으면 자료 쪽과 지역뉴스 쪽이 서로 다른 잣대를 갖는다 —
+     같은 공고가 한쪽에서는 살아 있고 한쪽에서는 죽은 것이 된다. */
+const Docs = require("./news-docs.js");
 
 /* 화면 등록부와 같은 RSS 부분이다. tests/newsletter-regional-candidates.test.js가
    ID와 주소를 맞춰 보므로 한쪽만 바뀌면 배포가 멈춘다. */
@@ -53,7 +57,7 @@ const 출처들 = [
          그래서 여는말로 아이디를 꺼내 상세길에 붙여 주소를 세운다. */
     여는말:"fn_search_detail",
     상세길:"https://www.cheonan.go.kr/bbs/BBSMSTR_000000000241/view.do?nttId=",
-    기업지원:true }
+    기업지원:true, 기한확인:true }
 ];
 
 /* ★ 기업지원 샘에서만 보는 말 — 대표가 이름 대어 말씀하신 것들이다(2026-09-13).
@@ -212,4 +216,6 @@ function 후보만들기(xml, source, existing, now) {
   }).filter(Boolean);
 }
 
-module.exports = { 출처들, 관련말, 제외말, 공식링크인가, 쓸모있는가, 후보열쇠, 후보만들기 };
+module.exports = { 출처들, 관련말, 제외말, 공식링크인가, 쓸모있는가, 후보열쇠, 후보만들기,
+  /* ★ 자료 쪽과 «같은 자»를 그대로 다시 내보낸다 — 여기서 새로 짓지 않는다 */
+  기한읽기: Docs.기한읽기, 마감지났나: Docs.마감지났나 };
