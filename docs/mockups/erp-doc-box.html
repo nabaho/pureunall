@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>서면함 — 목업</title>
+<style>
+  :root{--blue:#1e40af;--acc:#2563eb;--ink:#0f172a;--sub:#64748b;--mute:#94a3b8;--line:#e2e8f0;--bg:#f1f5f9}
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px 20px 70px;background:var(--bg);color:var(--ink);
+    font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;font-size:14px;line-height:1.7}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:1.35rem;margin:0 0 4px}
+  .lead{color:var(--sub);font-size:.9rem;margin:0 0 6px}
+  .rule{display:inline-block;background:#eff6ff;border:1px solid #bfdbfe;color:var(--blue);
+    border-radius:999px;padding:3px 12px;font-size:.76rem;font-weight:700;margin-bottom:20px}
+  h2{font-size:1rem;margin:34px 0 5px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .tag{font-size:.68rem;font-weight:800;border-radius:999px;padding:2px 10px}
+  .tag.n{background:#dbeafe;color:#1e40af}
+  .why{color:var(--sub);font-size:.85rem;margin:0 0 12px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .hd{padding:11px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .hd b{font-size:.94rem}
+  .hd .n{font-size:.76rem;color:var(--sub)}
+  .grow{flex:1}
+  .btn{border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:5px 12px;
+    font-size:.78rem;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .btn.p{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+  .btn.g{background:#f0fdf4;border-color:#bbf7d0;color:#166534;font-weight:700}
+  .drop{margin:13px 15px;border:2px dashed #bfdbfe;border-radius:11px;background:#f8fbff;
+    padding:17px;text-align:center;color:var(--blue);font-size:.84rem}
+  .drop small{display:block;color:var(--mute);font-size:.72rem;margin-top:4px}
+  .row{display:flex;align-items:center;gap:11px;padding:10px 15px;border-top:1px solid #f1f5f9}
+  .ic{width:34px;height:40px;border-radius:5px;background:#eff6ff;color:var(--blue);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;
+    border:1px solid #bfdbfe}
+  .ic.h{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+  .mid{min-width:0;flex:1}
+  .mid b{display:block;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mid span{display:block;font-size:.75rem;color:var(--sub);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pill{font-size:.66rem;font-weight:700;border-radius:999px;padding:1px 8px;white-space:nowrap}
+  .pill.k{background:#f1f5f9;color:#475569}
+  .pill.v{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+  .pill.w{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
+  .pill.l{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
+  .note{margin:12px 0 0;padding:10px 13px;border-left:3px solid #cbd5e1;background:#fff;
+    border-radius:0 9px 9px 0;font-size:.83rem;color:#334155}
+  .note.g{border-left-color:#4ade80}
+  .note.w{border-left-color:#fbbf24;background:#fffbeb}
+  .note.b{border-left-color:#f87171;background:#fef2f2}
+  table{border-collapse:collapse;width:100%;margin-top:12px;font-size:.83rem;background:#fff}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f8fafc;font-size:.77rem;color:#475569}
+  .kv{display:flex;gap:9px;padding:5px 0;font-size:.82rem;border-bottom:1px solid #f8fafc}
+  .kv b{min-width:74px;flex-shrink:0;color:var(--mute);font-weight:600;font-size:.76rem}
+  .kv.hit b{color:var(--acc)}
+  .kv.hit{background:#eff6ff;margin:0 -8px;padding:5px 8px;border-radius:5px}
+  .q{font-size:.76rem;color:var(--mute)}
+  code{background:#f1f5f9;border-radius:4px;padding:1px 5px;font-size:.78rem}
+</style></head><body><div class="wrap">
+
+<h1>📄 서면함</h1>
+<p class="lead">대표 지시 2026-09-12 「직원들이 한글로 서면 작성한 것들 모두 연결 관리하고 싶다」</p>
+<div class="rule">볼 수 있는 사람 — <b>담당자 + 관리자</b> (대표 결정 「나」)</div>
+
+<!-- ══════ ① 목록 ══════ -->
+<h2><span class="tag n">①</span> 서면함 — 쌓인 것을 본다</h2>
+<p class="why">푸른이알피 왼쪽 메뉴에 <b>「📄 서면함」</b>을 새로 답니다.</p>
+
+<div class="card">
+  <div class="hd">
+    <b>📄 서면함</b><span class="n">내가 볼 수 있는 서면 34건</span>
+    <div class="grow"></div>
+    <button class="btn">🔍 이름·업체·사건으로 찾기</button>
+    <button class="btn p">＋ 서면 올리기</button>
+  </div>
+
+  <div class="drop">📎 한글 파일을 여기에 끌어다 놓으세요
+    <small>.hwp · .hwpx · .docx · .pdf — 내용을 읽어 <b>어느 업체·어느 사건</b>인지 찾아 드립니다</small></div>
+
+  <div class="row">
+    <div class="ic h">HWP</div>
+    <div class="mid"><b>부당해고 구제신청 이유서</b>
+      <span>가나상사 · 부해등-2026-005 · 김보람 · 9-11 · <b>v3</b></span></div>
+    <span class="pill v">사건에 붙음</span>
+  </div>
+  <div class="row">
+    <div class="ic h">HWP</div>
+    <div class="mid"><b>내용증명 — 임금 지급 최고</b>
+      <span>다라산업 · 임금체불-2026-012 · 임꺽정 · 9-10 · v1</span></div>
+    <span class="pill v">사건에 붙음</span>
+  </div>
+  <div class="row">
+    <div class="ic">DOCX</div>
+    <div class="mid"><b>취업규칙 개정 의견서</b>
+      <span>마바텍 · 계약-2026-088 · 김보람 · 9-09 · v2</span></div>
+    <span class="pill v">계약에 붙음</span>
+  </div>
+  <div class="row">
+    <div class="ic h">HWP</div>
+    <div class="mid"><b>현장점검 결과보고서</b>
+      <span><b style="color:#854d0e">어느 업체인지 못 찾았습니다</b> · 홍길동 · 9-08 · v1</span></div>
+    <span class="pill w">붙일 곳 고르기</span>
+  </div>
+</div>
+
+<div class="note g"><b>한 줄에 넷이 보입니다</b> — 무슨 서면인가 · 어느 업체·사건인가 · 누가 언제 · 몇 판째.
+  이 넷이면 「그 답변서 어디 있지」가 끝납니다.</div>
+<div class="note w">⚠ <b>못 찾은 것을 숨기지 않습니다.</b> 업체를 못 짚으면 노란 딱지로 남겨
+  사람이 고르게 합니다. 조용히 아무 데나 붙이면 남의 사건에 남의 서면이 들어갑니다.</div>
+
+<!-- ══════ ② 올릴 때 ══════ -->
+<h2><span class="tag n">②</span> 끌어다 놓으면 — <b>붙이기 전에 먼저 보여 준다</b></h2>
+<p class="why">계약서 판독이 「적용」을 눌러야 채우는 것과 같은 태도입니다.</p>
+
+<div class="card">
+  <div class="hd"><b>📄 이 서면을 어디에 붙일까요?</b>
+    <div class="grow"></div><span class="n">부당해고_이유서_가나상사.hwp · 84KB</span></div>
+  <div style="padding:13px 15px">
+    <div class="kv hit"><b>서류 종류</b><span>부당해고 구제신청 <b>이유서</b> <span class="q">— 본문 첫 줄에서 읽음</span></span></div>
+    <div class="kv hit"><b>업체</b><span>가나상사 <span class="pill l">사업자번호로 맞음</span></span></div>
+    <div class="kv hit"><b>사건</b><span>부해등-2026-005 <span class="q">— 본문에 사건번호가 적혀 있었습니다</span></span></div>
+    <div class="kv"><b>쓴 사람</b><span>김보람 <span class="q">(올린 사람)</span></span></div>
+    <div class="kv"><b>판</b><span>v3 <span class="q">— 같은 사건에 같은 종류가 이미 2건 있습니다</span></span></div>
+    <div class="note w" style="margin-top:11px">⚠ 이 서면에 <b>주민등록번호가 들어 있습니다.</b>
+      담당자(김보람·권형하)와 관리자만 볼 수 있게 담깁니다.</div>
+    <div style="display:flex;gap:7px;margin-top:13px;flex-wrap:wrap">
+      <button class="btn p">✓ 이대로 붙이기</button>
+      <button class="btn">✎ 업체·사건 바꾸기</button>
+      <button class="btn">사건 없이 그냥 보관</button>
+      <div class="grow"></div><button class="btn">그만두기</button>
+    </div>
+  </div>
+</div>
+
+<div class="note"><b>어떻게 알아내나</b> — 1단계에서 고친 <b>공용 읽개</b>가 본문 글자를 뽑고,
+  거기서 ① 사건번호(<code>부해등-2026-005</code> 꼴) ② 사업자번호 ③ 업체 상호 차례로 찾습니다.
+  <b>사건번호가 가장 확실합니다</b> — 서면에는 거의 늘 적혀 있습니다.</div>
+
+<!-- ══════ ③ 사건 상세 ══════ -->
+<h2><span class="tag n">③</span> 사건을 열면 — 그 사건 서면이 <b>같이 보인다</b></h2>
+<p class="why">이게 「연결 관리」의 알맹이입니다. 서면함까지 찾아가지 않아도 됩니다.</p>
+
+<div class="card">
+  <div class="hd"><b>부해등-2026-005</b><span class="n">가나상사 · 주담당 김보람 · 부담당 권형하</span></div>
+  <div style="padding:11px 15px 3px;font-size:.8rem;color:var(--sub);font-weight:700">📄 이 사건 서면 3건</div>
+  <div class="row"><div class="ic h">HWP</div>
+    <div class="mid"><b>구제신청 이유서</b><span>김보람 · 9-11 · v3</span></div>
+    <button class="btn">열기</button></div>
+  <div class="row"><div class="ic h">HWP</div>
+    <div class="mid"><b>답변서</b><span>김보람 · 9-05 · v1</span></div>
+    <button class="btn">열기</button></div>
+  <div class="row"><div class="ic">PDF</div>
+    <div class="mid"><b>노동위원회 접수증</b><span>권형하 · 9-02 · v1</span></div>
+    <button class="btn">열기</button></div>
+</div>
+
+<!-- ══════ ④ 권한 ══════ -->
+<h2><span class="tag n">④</span> 누가 볼 수 있나 — <b>담당자 + 관리자</b></h2>
+
+<table>
+  <tr><th style="width:22%">누구</th><th>무엇이 보이나</th></tr>
+  <tr><td><b>주담당·부담당</b></td><td>자기가 맡은 사건·계약의 서면 <b>전부</b>. 올리고 고칠 수 있습니다.</td></tr>
+  <tr><td><b>총괄 관리자</b></td><td><b>전부</b>. 지울 수 있습니다.</td></tr>
+  <tr><td>그 밖의 직원</td><td><b>목록에 아예 안 뜹니다.</b> 「있는데 못 본다」가 아니라 없는 것처럼 보입니다.</td></tr>
+  <tr><td>사건 없이 보관한 것</td><td><b>올린 사람 + 관리자</b>만. 붙일 곳이 없으면 담당자도 없습니다.</td></tr>
+</table>
+
+<div class="note b">⚠⚠ <b>담당자가 바뀌면 어떻게 하나</b> — 이것이 이 설계에서 가장 조심할 자리입니다.<br>
+  서버 규칙은 서면 하나하나에 적힌 「볼 사람」 명단을 봅니다. 사건 담당자가 바뀌어도
+  <b>그 명단은 저절로 안 바뀝니다.</b> 그래서 <b>담당자를 바꿀 때 서면 명단도 함께 고치고</b>,
+  어긋난 것을 찾아 주는 「맞추기」를 함께 만듭니다. 이걸 빼면 <b>그만둔 직원이 계속 보게 됩니다.</b></div>
+
+<div class="note">원본 파일은 <b>창고</b>에 담고, 실시간DB에는 「무엇·누구·어디에 붙었나」만 적습니다.
+  본문 글자는 <b>찾기용으로만</b> 따로 담습니다 — 목록을 열 때마다 서면 전문을 내려받으면 그것이 곧 요금입니다.</div>
+
+<!-- ══════ ⑤ 안 하는 것 ══════ -->
+<h2><span class="tag n">⑤</span> 이번에 <b>안 하는</b> 것</h2>
+<table>
+  <tr><th style="width:34%">무엇</th><th>왜</th></tr>
+  <tr><td>화면에서 한글 <b>편집</b></td><td>웹에서 한글을 고칠 수는 없습니다. 내려받아 한글로 열고, 고친 것을 다시 올립니다(그러면 v4가 됩니다).</td></tr>
+  <tr><td>한글 프로그램과 <b>직접 연결</b></td><td>웹 화면은 PC 프로그램을 못 부릅니다. 직원 PC마다 별도 프로그램을 깔아야 하는데 권하지 않습니다.</td></tr>
+  <tr><td><b>글 내용으로 찾기</b></td><td>다음 단계입니다. 서면이 쌓여야 값어치가 납니다 — 지금은 담을 그릇부터.</td></tr>
+  <tr><td><b>AI가 서면 써 주기</b></td><td>따로 이야기할 일입니다. 서면함이 먼저 있어야 「지난 것처럼」 쓸 수 있습니다.</td></tr>
+</table>
+
+<h2>만드는 차례</h2>
+<table>
+  <tr><th style="width:9%">걸음</th><th>무엇</th><th style="width:16%">크기</th></tr>
+  <tr><td><b>가</b></td><td>담는 자리 + 서버 규칙(담당자+관리자) + 올리기·목록</td><td>중간</td></tr>
+  <tr><td><b>나</b></td><td>본문에서 사건번호·사업자번호·상호 찾아 붙이기 + 확인 창</td><td>중간</td></tr>
+  <tr><td><b>다</b></td><td>사건·계약 상세에 서면 붙여 보이기</td><td>작음</td></tr>
+  <tr><td><b>라</b></td><td>담당자 바뀔 때 명단 맞추기 + 어긋난 것 찾기</td><td>작음 — <b>빼면 안 됨</b></td></tr>
+</table>
+
+<p class="lead" style="margin-top:26px">이대로 만들까요? 고칠 곳이 있으면 말씀해 주십시오.</p>
+</div></body></html>

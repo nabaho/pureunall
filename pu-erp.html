@@ -146,7 +146,7 @@
 <script src="js/pu-billing.js?v=9"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=23"></script>
+<script src="js/pu-ontology.js?v=24"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=1"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
@@ -161,6 +161,8 @@
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
 <script src="js/pu-doc-read.js?v=40"></script>
+<!-- 서면함 층 — 서면이 «어디에 붙는가»를 아는 한 곳 (2026-09-13) -->
+<script src="js/pu-erp-docbox.js?v=1"></script>
 <script>
 (function(){
 'use strict';
@@ -808,6 +810,9 @@ var MENUS = [
     { id:'biz/contract',   icon:'📄', text:'계약관리' },
     { id:'biz/company',    icon:'🏢', text:'업체관리' },
     { id:'biz/case',       icon:'📁', text:'사건관리' },
+    /* 서면함 — 직원이 한글로 쓴 서면 (2026-09-13). 메뉴는 모두에게 보이고,
+       그 안에 «보이는 것»이 사람마다 다르다(담당자+관리자). */
+    { id:'biz/docs',       icon:'📄', text:'서면함' },
     { id:'biz/consulting', icon:'📊', text:'컨설팅관리' },
     { id:'biz/fund',       icon:'🏦', text:'기금관리' },
     { id:'biz/other',      icon:'📋', text:'기타사업' },
@@ -33704,6 +33709,448 @@ function extractTemplateText(file, cb){
   }).catch(function(){ cb('','파일 읽기 실패'); });
 }
 
+// ============ 서면함 — 직원이 한글로 쓴 서면 (2026-09-13) ============
+/* 대표 지시 2026-09-12 「각 직원들이 한글로 서면 작성한 것들 모두 연결 관리하고 싶다」
+   볼 수 있는 사람은 **담당자 + 관리자** 다 (대표 결정 2026-09-13 「나」).
+   목업: docs/mockups/erp-doc-box.html · 담는 자리와 규칙: js/pu-erp-docbox.js
+
+   ★ 이 화면이 하는 일은 셋뿐이다 — ① 파일을 받아 ② 어디에 붙일지 «물어보고»
+     ③ 목록을 보인다. «어디에 붙는가»의 판단은 pu-erp-docbox.js 가 하고,
+     글자 뽑기는 공용 읽개(hwp_extract.js)가 한다. 여기는 사람에게 묻는 자리다.
+
+   ⚠⚠ **저절로 붙이지 않는다.** 사건번호로 딱 맞아떨어져도 확인 창을 띄운다.
+     조용히 붙이면 «남의 사건에 남의 서면»이 들어가고, 그 서면에는 주민번호가 있다.
+     계약서 판독이 「적용」을 눌러야 채우는 것과 같은 태도다.
+   ⚠ 이름으로 찾은 것은 «약하다»고 화면에 적는다 — 「천성」과 「천성가축약품」은
+     다른 곳이고, 이 집은 이름·번호로 맞추다 두 번 데었다.
+   ⚠ 원본을 못 담아도 등록을 무르지 않는다. 「목록·붙이기·찾기는 됐고 원본만 못 담았다」를
+     이름을 대고 알린다 — 다 된 일을 통째로 되돌리는 것이 훨씬 나쁘다. */
+
+/* 창고 꾸러미는 «서면함을 열 때» 받는다 — 머리에 박으면 이 화면에 한 번도 안 오는
+   사람까지 늘 내려받는다(읽개·PDF.js 와 같은 방식). */
+function _ensureFbStorage(cb){
+  try{ if(window.firebase && firebase.app && firebase.app().storage){ cb(null); return; } }catch(_e){}
+  var s=document.createElement('script');
+  s.src='https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js';
+  s.onload=function(){ cb(null); };
+  s.onerror=function(){ cb('창고 꾸러미를 못 받았습니다'); };
+  document.head.appendChild(s);
+}
+
+var _docBoxReady = null;
+function erpDocBoxReady(){
+  if(_docBoxReady) return _docBoxReady;
+  _docBoxReady = new Promise(function(res, rej){
+    if(typeof PuErpDocBox === 'undefined'){ rej(new Error('서면함 층(js/pu-erp-docbox.js)이 안 실렸습니다')); return; }
+    _ensureFbStorage(function(e){
+      var au = null;
+      try{ au = (window.firebase && firebase.auth) ? firebase.auth().currentUser : null; }catch(_){}
+      if(!au){ rej(new Error('로그인 정보가 없습니다 — 다시 로그인해 주십시오')); return; }
+      PuErpDocBox.init({
+        db: (typeof fbDb !== 'undefined') ? fbDb : null,
+        uid: au.uid,
+        sid: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) || '',
+        name: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '',
+        isAdmin: !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.isAdmin)
+      });
+      /* 창고를 못 받아도 멈추지 않는다 — 원본만 못 담고 나머지는 다 된다 */
+      res({ warn: e || '' });
+    });
+  });
+  return _docBoxReady;
+}
+
+function erpDocExt(name){
+  var m = String(name||'').match(/\.([A-Za-z0-9]{1,5})$/);
+  return m ? m[1].toUpperCase() : '';
+}
+function erpDocWhen(ts){
+  var n = Number(ts||0); if(!n) return '-';
+  var d = new Date(n);
+  return (d.getMonth()+1) + '-' + ('0'+d.getDate()).slice(-2);
+}
+function erpDocSrcItem(kind, id){
+  var arr = (kind === 'case') ? (dbGet('cases', []) || [])
+          : (kind === 'contract') ? (dbGet('contracts', []) || []) : [];
+  for(var i=0;i<arr.length;i++){ if(arr[i] && String(arr[i].id) === String(id)) return arr[i]; }
+  return null;
+}
+/* 이 서면을 볼 사람 — 그 일의 «주담당·부담당» 이다.
+   ⚠ 관리자는 여기 안 적는다. 적어 두면 관리자가 바뀔 때 명단이 거짓이 된다 —
+     서버 규칙이 그때그때 uid_roles 를 보는 편이 늘 맞다.
+   ⚠ 한 번도 로그인한 적 없는 사람은 uid 가 없어 못 넣는다. 삼키지 말고 이름을 돌려준다
+     (사진 공유 erpSharePhotoWithMgrs 가 이미 같은 자리에서 겪은 것이다). */
+function erpDocWhoUids(kind, id){
+  var it = erpDocSrcItem(kind, id);
+  if(!it) return Promise.resolve({ uids:[], noAcct:[] });
+  var sids = erpMgrSids(it);
+  if(!sids.length) return Promise.resolve({ uids:[], noAcct:[] });
+  return erpUidBySid().then(function(map){
+    var uids = [], noAcct = [];
+    sids.forEach(function(sid){
+      var uid = (map||{})[sid];
+      if(uid){ if(uids.indexOf(uid) < 0) uids.push(uid); }
+      else noAcct.push((typeof sidName === 'function' && sidName(sid)) || sid);
+    });
+    return { uids:uids, noAcct:noAcct };
+  }).catch(function(){ return { uids:[], noAcct:[] }; });
+}
+/* 고를 거리 한 벌 — 사건과 계약을 한 줄로 눕혀 놓는다 */
+function erpDocPickList(q){
+  var out = [];
+  (dbGet('cases', []) || []).forEach(function(c){
+    if(!c || !c.id) return;
+    out.push({ kind:'case', id:String(c.id), no:String(c.caseNo||''),
+      coName:String(c.companyName||c.payee||''), title:String(c.title||''),
+      companyId:String(c.companyId||'') });
+  });
+  (dbGet('contracts', []) || []).forEach(function(c){
+    if(!c || !c.id) return;
+    out.push({ kind:'contract', id:String(c.id), no:String(c.contractNo||c.no||''),
+      coName:String(c.companyName||''), title:String(c.title||''),
+      companyId:String(c.companyId||'') });
+  });
+  var s = String(q||'').trim().toLowerCase();
+  if(!s) return out.slice(0, 40);
+  return out.filter(function(x){
+    return (x.no + ' ' + x.coName + ' ' + x.title).toLowerCase().indexOf(s) >= 0;
+  }).slice(0, 40);
+}
+
+/* ── 붙이기 «전에» 보여 주는 창 ──────────────────────────────────────────
+   props: { file, text, guess, kind, readErr, base, rows, onClose, onDone } */
+function DocAttachModal(props){
+  useEscClose(props.onClose);
+  var g = props.guess || {};
+  var ks = useState(props.kind || ''); var kind = ks[0]; var setKind = ks[1];
+  var ss = useState(g.sourceKind ? { kind:g.sourceKind, id:g.sourceId, no:g.caseNo,
+    coName:g.coName, companyId:g.companyId } : null);
+  var sel = ss[0]; var setSel = ss[1];
+  var os = useState(!g.sourceKind); var open = os[0]; var setOpen = os[1];
+  var qs = useState(''); var q = qs[0]; var setQ = qs[1];
+  var bs = useState(''); var busy = bs[0]; var setBusy = bs[1];
+  var es = useState(''); var err = es[0]; var setErr = es[1];
+
+  var hasRrn = (typeof PuErpDocBox !== 'undefined') && PuErpDocBox.hasRrn(props.text || '');
+  var ver = (typeof PuErpDocBox !== 'undefined')
+    ? PuErpDocBox.nextVer(props.rows || [], { sourceKind:(sel&&sel.kind)||'', sourceId:(sel&&sel.id)||'', kind:kind })
+    : 1;
+  var weak = g.linkBy === 'name';
+
+  function line(label, value, note, tone){
+    return h('div', { style:{ display:'flex', gap:'10px', alignItems:'baseline', padding:'5px 0',
+      borderBottom:'1px solid #f1f5f9' } },
+      h('span', { style:{ width:'62px', flexShrink:0, fontSize:'11px', color:'#64748b' } }, label),
+      h('span', { style:{ flex:1, minWidth:0, fontSize:'12.5px', fontWeight:600,
+        color: value ? '#1e293b' : '#94a3b8',
+        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }, title:value||'' }, value || '—'),
+      note ? h('span', { style:{ flexShrink:0, fontSize:'10.5px',
+        color: tone === 'warn' ? '#b45309' : '#2563eb' } }, note) : null);
+  }
+
+  function go(keep){
+    if(busy) return;
+    var target = keep ? null : sel;
+    if(!keep && !target){ setErr('붙일 곳을 고르거나 「사건 없이 그냥 보관」을 눌러 주십시오'); return; }
+    setBusy('담는 중…'); setErr('');
+    var whoP = target ? erpDocWhoUids(target.kind, target.id) : Promise.resolve({ uids:[], noAcct:[] });
+    whoP.then(function(w){
+      var o = {
+        sourceKind: target ? target.kind : '', sourceId: target ? target.id : '',
+        companyId: target ? (target.companyId||'') : '', coName: target ? (target.coName||'') : '',
+        caseNo: target ? (target.no||'') : '',
+        linkBy: (g.sourceKind && target && String(target.id) === String(g.sourceId)) ? (g.linkBy||'hand') : 'hand',
+        whoUids: w.uids, ver: ver
+      };
+      /* 이미 담긴 것을 «다시 붙이는» 길 — 파일은 그대로 두고 붙은 곳만 옮긴다 */
+      if(props.base){
+        return PuErpDocBox.reattach(props.base, o).then(function(rec){ props.onDone(rec, w.noAcct, ''); });
+      }
+      var docId = PuErpDocBox.newId();
+      return PuErpDocBox.upload(props.file, docId)
+        .catch(function(e){ return { path:'', url:'', size:(props.file&&props.file.size)||0,
+          fail:(e && e.message) || '원본을 못 담았습니다' }; })
+        .then(function(up){
+          var rec = PuErpDocBox.build(Object.assign({}, o, {
+            id: docId, kind: kind || props.file.name, fileName: props.file.name,
+            ext: erpDocExt(props.file.name), size: up.size, path: up.path, url: up.url,
+            hasRrn: hasRrn
+          }));
+          return PuErpDocBox.save(rec, props.text).then(function(){
+            props.onDone(rec, w.noAcct, up.fail || '');
+          });
+        });
+    }).catch(function(e){
+      setBusy('');
+      setErr((e && e.message) || '담지 못했습니다');
+    });
+  }
+
+  var picks = (g.picks && g.picks.length) ? g.picks : erpDocPickList(q);
+
+  return h('div', {
+    style:{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:230, display:'flex',
+      alignItems:'center', justifyContent:'center', padding:'16px' },
+    onClick:function(e){ if(e.target === e.currentTarget && !busy) props.onClose(); }
+  },
+    h('div', { style:{ background:'#fff', borderRadius:'10px', width:'560px', maxWidth:'96vw',
+      maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' } },
+      h('div', { style:{ padding:'12px 16px', borderBottom:'1px solid #e2e8f0', flexShrink:0 } },
+        h('div', { style:{ fontSize:'14px', fontWeight:700 } }, '📄 이 서면을 어디에 붙일까요?'),
+        h('div', { style:{ fontSize:'11px', color:'#64748b', marginTop:'3px',
+          whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
+          (props.base ? (props.base.fileName || '') : ((props.file && props.file.name) || ''))
+          + (props.file ? (' · ' + Math.max(1, Math.round(props.file.size/1024)) + 'KB') : ''))
+      ),
+      props.readErr ? h('div', { style:{ padding:'8px 16px', background:'#fef2f2',
+        borderBottom:'1px solid #fecaca', fontSize:'11px', color:'#b91c1c', lineHeight:1.6, flexShrink:0 } },
+        '본문을 못 읽었습니다 — ' + props.readErr
+        + '. 파일은 담기지만 업체·사건은 손으로 골라 주셔야 합니다.') : null,
+      hasRrn ? h('div', { style:{ padding:'8px 16px', background:'#fffbeb',
+        borderBottom:'1px solid #fde68a', fontSize:'11px', color:'#854d0e', lineHeight:1.6, flexShrink:0 } },
+        '⚠ 이 서면에 주민등록번호가 들어 있습니다. 담당자와 관리자만 볼 수 있게 담깁니다.') : null,
+      h('div', { style:{ padding:'10px 16px', overflow:'auto', flex:1 } },
+        h('div', { style:{ display:'flex', gap:'10px', alignItems:'center', padding:'5px 0',
+          borderBottom:'1px solid #f1f5f9' } },
+          h('span', { style:{ width:'62px', flexShrink:0, fontSize:'11px', color:'#64748b' } }, '서류 종류'),
+          h('input', { type:'text', value:kind, onChange:function(e){ setKind(e.target.value); },
+            placeholder:'예) 부당해고 구제신청 이유서',
+            style:{ flex:1, minWidth:0, padding:'5px 8px', border:'1px solid #cbd5e1',
+              borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } })),
+        line('업체', (sel && sel.coName) || g.coName || '',
+          weak ? '이름으로 찾음 — 꼭 확인' : (g.linkBy === 'bizno' ? '사업자번호로 맞음' : ''),
+          weak ? 'warn' : ''),
+        line(sel && sel.kind === 'contract' ? '계약' : '사건',
+          sel ? ((sel.no || '(번호 없음)') + (sel.title ? (' · ' + sel.title) : '')) : '',
+          (g.linkBy === 'no' && sel) ? '본문에 번호가 적혀 있었음' : '', ''),
+        line('쓴 사람', (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '', '올린 사람', ''),
+        line('판', 'v' + ver, ver > 1 ? '같은 곳에 같은 종류가 이미 있습니다' : '', ''),
+        h('div', { style:{ marginTop:'8px', fontSize:'11px', color: g.why ? '#475569' : '#94a3b8',
+          lineHeight:1.7 } }, g.why || ''),
+        h('div', { style:{ marginTop:'8px' } },
+          h('button', { onClick:function(){ setOpen(!open); },
+            style:{ padding:'5px 11px', border:'1px solid #cbd5e1', borderRadius:'7px',
+              background:'#fff', cursor:'pointer', fontSize:'11.5px', fontFamily:'inherit' } },
+            open ? '▴ 고르기 접기' : '✎ 업체·사건 바꾸기')),
+        open ? h('div', { style:{ marginTop:'8px', border:'1px solid #e2e8f0', borderRadius:'8px',
+          overflow:'hidden' } },
+          h('div', { style:{ padding:'7px 9px', borderBottom:'1px solid #e2e8f0' } },
+            h('input', { type:'search', value:q, onChange:function(e){ setQ(e.target.value); },
+              placeholder:'🔍 사건번호·계약번호·업체로 찾기',
+              style:{ width:'100%', padding:'5px 8px', border:'1px solid #cbd5e1',
+                borderRadius:'6px', fontSize:'12px', fontFamily:'inherit' } })),
+          h('div', { style:{ maxHeight:'190px', overflow:'auto' } },
+            picks.length === 0
+              ? h('div', { style:{ padding:'16px 10px', fontSize:'11.5px', color:'#94a3b8',
+                  textAlign:'center' } }, '맞는 사건·계약이 없습니다')
+              : picks.map(function(p){
+                  var on = sel && sel.kind === p.kind && String(sel.id) === String(p.id);
+                  return h('div', { key:p.kind+'/'+p.id,
+                    onClick:function(){ setSel({ kind:p.kind, id:p.id, no:p.no, coName:p.coName,
+                      title:p.title, companyId:p.companyId }); setErr(''); },
+                    style:{ display:'flex', gap:'8px', alignItems:'center', padding:'6px 9px',
+                      cursor:'pointer', background: on ? '#eff6ff' : 'transparent',
+                      borderBottom:'1px solid #f8fafc' } },
+                    h('span', { style:{ flexShrink:0, fontSize:'9.5px', fontWeight:700, borderRadius:'4px',
+                      padding:'1px 5px', color:'#fff',
+                      background: p.kind === 'case' ? '#dc2626' : '#1e40af' } },
+                      p.kind === 'case' ? '사건' : '계약'),
+                    h('span', { style:{ flex:1, minWidth:0, fontSize:'11.5px', whiteSpace:'nowrap',
+                      overflow:'hidden', textOverflow:'ellipsis' } },
+                      (p.no || '(번호 없음)') + ' · ' + (p.coName || '-')
+                      + (p.title ? (' · ' + p.title) : '')));
+                }))) : null
+      ),
+      err ? h('div', { style:{ padding:'7px 16px', background:'#fef2f2', fontSize:'11.5px',
+        color:'#b91c1c', flexShrink:0 } }, err) : null,
+      h('div', { style:{ padding:'10px 16px', borderTop:'1px solid #e2e8f0', display:'flex',
+        alignItems:'center', gap:'8px', flexShrink:0, flexWrap:'wrap' } },
+        h('button', { disabled:!!busy, onClick:function(){ go(false); },
+          style:{ padding:'7px 15px', border:'none', borderRadius:'7px', background:'#2563eb',
+            color:'#fff', cursor: busy ? 'default' : 'pointer', fontSize:'12.5px',
+            fontFamily:'inherit', opacity: busy ? 0.6 : 1 } }, busy || '✓ 이대로 붙이기'),
+        props.base ? null : h('button', { disabled:!!busy, onClick:function(){ go(true); },
+          style:{ padding:'7px 13px', border:'1px solid #cbd5e1', borderRadius:'7px',
+            background:'#fff', cursor:'pointer', fontSize:'12px', fontFamily:'inherit' } },
+          '사건 없이 그냥 보관'),
+        h('div', { style:{ flex:1 } }),
+        h('button', { disabled:!!busy, onClick:props.onClose,
+          style:{ padding:'7px 13px', border:'1px solid #cbd5e1', borderRadius:'7px',
+            background:'#fff', cursor:'pointer', fontSize:'12px', fontFamily:'inherit' } }, '그만두기'))
+    ));
+}
+
+/* ── 서면함 ────────────────────────────────────────────────────────────── */
+function DocBox(props){
+  var rs = useState(null); var rows = rs[0]; var setRows = rs[1];   /* null = 읽는 중 */
+  var es = useState(''); var err = es[0]; var setErr = es[1];
+  var qs = useState(''); var q = qs[0]; var setQ = qs[1];
+  var vs = useState(false); var over = vs[0]; var setOver = vs[1];
+  var ps = useState(null); var pend = ps[0]; var setPend = ps[1];
+  var bs = useState(''); var busy = bs[0]; var setBusy = bs[1];
+
+  function reload(){
+    erpDocBoxReady()
+      .then(function(r){
+        if(r && r.warn) setErr('창고를 못 받았습니다 — ' + r.warn + ' (원본 담기만 안 됩니다)');
+        return PuErpDocBox.listMine();
+      })
+      .then(function(v){ setRows(v || []); })
+      .catch(function(e){ setRows([]); setErr((e && e.message) || '서면함을 못 읽었습니다'); });
+  }
+  useEffect(function(){ reload(); }, []);
+
+  /* 파일 하나를 받아 «읽고 → 물어본다». 담는 것은 확인 창이 한다. */
+  function take(file){
+    if(!file) return;
+    if(typeof PuErpDocBox === 'undefined'){ setErr('서면함 층이 안 실렸습니다'); return; }
+    if(file.size > PuErpDocBox.MAX_BYTES){
+      showToast('⚠ ' + file.name + ' 은 25MB 를 넘어 못 담습니다', 6000); return;
+    }
+    setBusy('📄 ' + file.name + ' 을 읽는 중…');
+    extractTemplateText(file, function(text, e){
+      setBusy('');
+      var ctx = { cases: dbGet('cases', []) || [], contracts: dbGet('contracts', []) || [],
+        companies: dbGet('companies', []) || [] };
+      setPend({ file:file, text:text || '', guess: PuErpDocBox.match(text || '', ctx),
+        kind: PuErpDocBox.guessKind(text || '', file.name),
+        readErr: e ? String(e) : '', base:null });
+    });
+  }
+  function takeMany(list){
+    var arr = Array.prototype.slice.call(list || []);
+    if(!arr.length) return;
+    if(arr.length > 1) showToast('한 번에 한 장씩 확인합니다 — 첫 파일부터 엽니다', 5000);
+    take(arr[0]);
+  }
+
+  /* 붙일 곳을 못 찾아 남겨 둔 것을 다시 붙인다 — 파일은 그대로 두고 «붙은 곳»만 옮긴다 */
+  function reopen(row){
+    setBusy('불러오는 중…');
+    Promise.all([PuErpDocBox.read(row.id), PuErpDocBox.readText(row.id)])
+      .then(function(a){
+        setBusy('');
+        var rec = a[0], text = a[1] || '';
+        if(!rec){ setErr('그 서면을 못 읽었습니다'); return; }
+        var ctx = { cases: dbGet('cases', []) || [], contracts: dbGet('contracts', []) || [],
+          companies: dbGet('companies', []) || [] };
+        setPend({ file:null, text:text, guess: PuErpDocBox.match(text, ctx),
+          kind: rec.kind || '', readErr:'', base:rec });
+      })
+      .catch(function(e){ setBusy(''); setErr((e && e.message) || '못 불러왔습니다'); });
+  }
+
+  function openDoc(row){
+    setBusy('여는 중…');
+    PuErpDocBox.read(row.id).then(function(rec){
+      setBusy('');
+      if(!rec){ showToast('⚠ 그 서면을 못 읽었습니다', 6000); return; }
+      if(!rec.url){ showToast('⚠ 원본 파일이 안 담겨 있습니다 (목록에만 있습니다)', 7000); return; }
+      window.open(rec.url, '_blank', 'noopener');
+    }).catch(function(e){ setBusy(''); showToast('⚠ ' + ((e && e.message) || '못 열었습니다'), 6000); });
+  }
+
+  var shown = (rows || []).filter(function(r){
+    var s = String(q||'').trim().toLowerCase();
+    if(!s) return true;
+    return [r.kind, r.coName, r.caseNo, r.byName].join(' ').toLowerCase().indexOf(s) >= 0;
+  });
+
+  return h('div', { style:{ padding:'16px' } },
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' } },
+      h('h2', { style:{ margin:0, fontSize:'17px' } }, '📄 서면함'),
+      h('span', { style:{ fontSize:'11.5px', color:'#64748b' } },
+        rows === null ? '불러오는 중…' : ('내가 볼 수 있는 서면 ' + rows.length + '건')),
+      h('div', { style:{ flex:1 } }),
+      h('input', { type:'search', value:q, onChange:function(e){ setQ(e.target.value); },
+        placeholder:'🔍 이름·업체·사건으로 찾기',
+        style:{ width:'230px', maxWidth:'50vw', padding:'6px 10px', border:'1px solid #cbd5e1',
+          borderRadius:'7px', fontSize:'12px', fontFamily:'inherit' } }),
+      h('label', { style:{ padding:'6px 13px', borderRadius:'7px', background:'#2563eb',
+        color:'#fff', cursor:'pointer', fontSize:'12.5px' } }, '＋ 서면 올리기',
+        h('input', { type:'file', style:{ display:'none' },
+          accept:'.hwp,.hwpx,.docx,.doc,.odt,.rtf,.pdf',
+          onChange:function(e){ takeMany(e.target.files); e.target.value=''; } }))
+    ),
+    err ? h('div', { style:{ marginTop:'10px', padding:'8px 12px', background:'#fef2f2',
+      border:'1px solid #fecaca', borderRadius:'8px', fontSize:'11.5px', color:'#b91c1c' } }, err) : null,
+    busy ? h('div', { style:{ marginTop:'10px', fontSize:'11.5px', color:'#2563eb' } }, busy) : null,
+
+    h('div', {
+      onDragOver:function(e){ e.preventDefault(); setOver(true); },
+      onDragLeave:function(){ setOver(false); },
+      onDrop:function(e){ e.preventDefault(); setOver(false); takeMany(e.dataTransfer && e.dataTransfer.files); },
+      style:{ marginTop:'12px', padding:'22px 14px', textAlign:'center', borderRadius:'10px',
+        border:'2px dashed ' + (over ? '#2563eb' : '#cbd5e1'),
+        background: over ? '#eff6ff' : '#f8fafc' } },
+      h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#334155' } },
+        '📎 한글 파일을 여기에 끌어다 놓으세요'),
+      h('div', { style:{ fontSize:'11px', color:'#64748b', marginTop:'5px', lineHeight:1.7 } },
+        '.hwp · .hwpx · .docx · .pdf — 내용을 읽어 어느 업체·어느 사건인지 찾아 드립니다.'),
+      h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'3px' } },
+        '찾은 것은 «붙이기 전에» 보여 드립니다 — 저절로 붙지 않습니다.')
+    ),
+
+    h('div', { style:{ marginTop:'12px' } },
+      rows === null
+        ? h('div', { style:{ padding:'26px', textAlign:'center', fontSize:'12px', color:'#94a3b8' } }, '불러오는 중…')
+        : shown.length === 0
+          ? h('div', { style:{ padding:'26px', textAlign:'center', fontSize:'12px', color:'#94a3b8',
+              lineHeight:1.9 } },
+              (rows.length === 0)
+                ? '아직 담긴 서면이 없습니다. 위에 한글 파일을 끌어다 놓아 보십시오.'
+                : '찾는 말에 맞는 서면이 없습니다.')
+          : shown.map(function(r){
+              var orphan = !r.sourceId;
+              return h('div', { key:r.id,
+                style:{ display:'flex', gap:'10px', alignItems:'center', padding:'9px 10px',
+                  borderBottom:'1px solid #f1f5f9' } },
+                h('span', { style:{ flexShrink:0, width:'40px', textAlign:'center', fontSize:'9.5px',
+                  fontWeight:700, borderRadius:'4px', padding:'2px 0', background:'#e2e8f0',
+                  color:'#475569' } }, r.ext || '파일'),
+                h('div', { style:{ flex:1, minWidth:0 } },
+                  h('div', { style:{ display:'flex', gap:'6px', alignItems:'baseline' } },
+                    h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b',
+                      whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
+                      title:r.kind || '' }, r.kind || '(이름 없음)'),
+                    r.hasRrn ? h('span', { title:'주민등록번호가 들어 있습니다',
+                      style:{ flexShrink:0, fontSize:'9.5px', color:'#b45309' } }, '⚠ 주민번호') : null),
+                  h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginTop:'2px',
+                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
+                    orphan
+                      ? ('어느 업체인지 못 찾았습니다 · ' + (r.byName||'-') + ' · '
+                         + erpDocWhen(r.at) + ' · v' + (r.ver||1))
+                      : [r.coName || '-', r.caseNo || '', r.byName || '', erpDocWhen(r.at), 'v' + (r.ver||1)]
+                          .filter(Boolean).join(' · '))),
+                orphan
+                  ? h('button', { onClick:function(){ reopen(r); },
+                      style:{ flexShrink:0, padding:'4px 9px', border:'1px solid #fbbf24',
+                        borderRadius:'6px', background:'#fffbeb', color:'#92400e', cursor:'pointer',
+                        fontSize:'10.5px', fontFamily:'inherit' } }, '붙일 곳 고르기')
+                  : h('span', { style:{ flexShrink:0, fontSize:'10px', color:'#16a34a' } },
+                      r.sourceKind === 'contract' ? '계약에 붙음' : '사건에 붙음'),
+                h('button', { onClick:function(){ openDoc(r); },
+                  style:{ flexShrink:0, padding:'4px 9px', border:'1px solid #cbd5e1',
+                    borderRadius:'6px', background:'#fff', cursor:'pointer', fontSize:'10.5px',
+                    fontFamily:'inherit' } }, '열기'));
+            })),
+
+    pend ? h(DocAttachModal, {
+      file: pend.file, text: pend.text, guess: pend.guess, kind: pend.kind,
+      readErr: pend.readErr, base: pend.base, rows: rows || [],
+      onClose: function(){ setPend(null); },
+      onDone: function(rec, noAcct, fail){
+        setPend(null);
+        reload();
+        var tail = (noAcct && noAcct.length)
+          ? ' (' + noAcct.join('·') + '님은 아직 로그인한 적이 없어 못 열어 드렸습니다)' : '';
+        if(fail) showToast('⚠ 목록에는 담았지만 원본 파일은 못 담았습니다 — ' + fail + tail, 9000);
+        else showToast('✓ 서면을 담았습니다' + tail, tail ? 8000 : 4000);
+      }
+    }) : null
+  );
+}
+
 // ============ rhwp (HWP/HWPX 정밀 텍스트 + 원본 SVG 미리보기) ============
 // @rhwp/core (ESM+WASM) — jsDelivr CDN 동적 로드. 버전 고정 + 최신확인 버튼.
 /* 판 번호는 js/pu-hwp-engine.js 한 곳에서 정한다 — 두 곳에 적으면 반드시 어긋난다 */
@@ -35241,7 +35688,7 @@ function flatMenus(){
 // 역할 프리셋: 메뉴 ID 배열로 정의
 // 직원 기본: 대시보드 2개 + 사무관리 7개만 (총 9개)
 var DASH_MENUS = ['dash/corp','dash/ieum','dash/my'];
-var BIZ_MENUS  = ['biz/contract','biz/company','biz/case','biz/consulting','biz/fund','biz/other','biz/closed'];
+var BIZ_MENUS  = ['biz/contract','biz/company','biz/case','biz/docs','biz/consulting','biz/fund','biz/other','biz/closed'];
 var BIZ_DEFAULT_MENUS = DASH_MENUS.concat(BIZ_MENUS);
 
 
@@ -55035,6 +55482,7 @@ var SCREEN_GUIDE = {
   'biz/contract':   '계약관리 화면입니다. 좌측 탭(상담사항·업체계약·사건계약·컨설팅계약·기금·기타)으로 유형별 관리. 상단 + 계약 등록으로 신규 등록. 하위종류 필터로 세부 검색 가능.',
   'biz/company':    '업체관리 화면입니다. 상단 탭(전체활성·사무대행·자문·급여·노조·기금)으로 구분. 테이블 헤더의 업태·종목 드롭다운으로 필터링. 업체명 클릭 시 상세정보.',
   'biz/case':       '사건관리 화면입니다. 부당해고·임금체불·산재 등 노동위/법원 사건 관리. 착수금·성공보수 입력.',
+'biz/docs':       '서면함입니다. 한글로 쓴 이유서·답변서·내용증명을 올리면 본문을 읽어 어느 업체·사건인지 찾아 드립니다. 붙이기 전에 확인 창이 뜹니다. 담당자와 관리자만 봅니다.',
   'biz/consulting': '컨설팅관리 화면입니다. 종류별(기초컨설팅·일터상생·중장년 등) 탭으로 구분.',
   'biz/fund':       '기금관리 화면입니다. 공동근로복지기금 신청·운영 관리. 부가세 포함 여부 체크박스.',
   'biz/closed':     '종료관리 화면입니다. 구분(계약/업체/사건/컨설팅/기금)·업체명·담당자·금액 필터로 검색.',
@@ -83946,6 +84394,8 @@ function ERPMain(props){
     mainContent = h(CompanyManagement, null);
   } else if(current === 'biz/case'){
     mainContent = h(CaseManagement, { onNavigate:selectMenu });
+  } else if(current === 'biz/docs'){
+    mainContent = h(DocBox, { onNavigate:selectMenu });
   } else if(current === 'biz/closed'){
     mainContent = h(ClosedManagement, null);
   } else if(current === 'biz/consulting'){
