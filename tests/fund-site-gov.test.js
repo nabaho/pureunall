@@ -175,13 +175,32 @@ test('★ ⑫ 한 시·도뿐이면 시·도 딱지를 «안» 붙인다 — 늘
 /* ══ ★★ 배선 — 화면 두 곳이 «같은 셈»을 쓰는가 ══════════════════════ */
 
 test('★★ ⑬ 기금 정보와 참여사업장이 같은 셈을 쓴다 — 따로 짜면 두 숫자가 갈린다', () => {
-  assert.match(grabFn('govPanel'), /govChips\(/, '기금 정보가 딱지를 안 씁니다.');
-  assert.match(grabFn('infoForm'), /govPanel\(f\)/, '★ 기금 정보에 참여 지자체 줄이 안 붙었습니다.');
+  assert.match(grabFn('govField'), /govChips\(/, '기금 정보가 딱지를 안 씁니다.');
   assert.match(grabFn('sitesTab'), /_siteGovs\(arr\)/, '참여사업장 머리에 지자체 수가 없습니다.');
 });
 
+/* ★★ 대표 지시 2026-09-13 「참여지자체를 지역 옆에 넣어라 하나씩」 —
+   처음에는 맨 아래에 따로 두었더니 화면을 끝까지 내려야 보였다. 지역과 나란히 있어야
+   「충남의 어느 시·군이 함께 들어왔나」가 한눈에 읽힌다. */
+test('★★ ⑬-2 참여 지자체가 «지역 바로 옆»에 붙는다 — 맨 아래면 안 보인다', () => {
+  const fn = grabFn('infoForm');
+  assert.match(fn, /c\[0\]==='region'\?govField\(f\):''/,
+    '★ 「지역」 칸 옆이 아닙니다 — 화면을 끝까지 내려야 보입니다.');
+  /* 칸 묶음(gridw) «안»에 있어야 나란히 선다 — 밖에 두면 줄이 갈린다 */
+  const g = fn.indexOf('govField(f)'), grid = fn.indexOf('gridw');
+  assert.ok(g >= 0 && grid >= 0 && g < grid,
+    '★ 칸 묶음 밖에 있습니다 — 지역과 나란히 안 섭니다.');
+});
+
+test('★★ ⑬-3 고칠 수 있는 «칸»으로 보이지 않는다 — 셈한 값이라 손으로 못 고친다', () => {
+  const fn = grabFn('govField');
+  assert.ok(!/<input/.test(fn) && !/<select/.test(fn),
+    '★ 입력칸을 두었습니다 — 고칠 수 있는 줄 알고 쳐 넣으면 사업장과 어긋납니다.');
+  assert.match(fn, /사업장 소재지에서 셈/, '어디서 온 값인지 말해 주지 않습니다.');
+});
+
 test('★★ ⑭ 참여사업장을 «아직 안 읽었을 때» 0곳이라 하지 않는다 — 모르는 것과 없는 것은 다르다', () => {
-  const fn = grabFn('govPanel');
+  const fn = grabFn('govField');
   assert.match(fn, /S\.sitesFor===S\.fundId && S\.sites/, '읽었는지를 안 봅니다.');
   assert.match(fn, /탭을 한 번 열면/, '★ 안 읽었는데 「없다」고 말합니다.');
 });
@@ -274,11 +293,31 @@ test('★★ ⑳ 주소가 없으면 별첨 명부의 지자체는 «밑줄»로
 const SHORT = () => load([grabDecl('_SIDO_ABBR'), grabFn('_addrParts'), grabFn('_siteGovs'),
   grabFn('govShort'), 'this.f=govShort;']).f;
 
-test('★ ㉑ 목록 칸은 둘까지 적고 «외 n» 으로 줄이되, 올림말에 전부를 담는다', () => {
-  const r = SHORT()(사업장, 2);
-  assert.equal(r.text, '예산군·공주시 외 1');
-  assert.ok(r.title.indexOf('예산군 3') >= 0 && r.title.indexOf('보령시 1') >= 0,
-    '★ 줄인 것을 올림말에서도 못 봅니다: ' + r.title);
+/* ★★ 대표 지시 2026-09-13 「외 1 이렇게 하지 말고 모든 지자체 이름 바로 넣어라」 —
+   처음에는 둘까지만 적고 줄였다. 그러면 어느 지자체가 빠졌는지 목록에서 알 수가 없어
+   올림말을 열어 봐야 했다 — 한눈에 보려고 만든 칸인데 뜻이 없다. */
+test('★★ ㉑ 목록 칸에 지자체 이름을 «다» 적는다 — 「외 n」으로 줄이지 않는다', () => {
+  const r = SHORT()(사업장);
+  assert.equal(r.text, '예산군·공주시·보령시');
+  assert.ok(r.text.indexOf('외 ') < 0, '★ 아직 「외 n」으로 줄입니다: ' + r.text);
+  /* 곳 수는 올림말에 — 칸에 적으면 폭이 두 배가 된다 */
+  assert.ok(r.title.indexOf('예산군 3') >= 0 && r.title.indexOf('보령시 1') >= 0, r.title);
+});
+
+test('★ ㉑-2 지자체가 많아도 «다» 적는다 — 몇 곳이든 줄이지 않는다', () => {
+  const 많이 = ['예산군', '공주시', '보령시', '아산시', '천안시', '서산시'].map((s, i) => (
+    { name: '회사' + i, seq_label: '1-' + (i + 1), address: '충남 ' + s + ' 어딘가로 ' + i }));
+  const r = SHORT()(많이);
+  assert.equal(r.n, 6);
+  assert.equal(r.text, '예산군·공주시·보령시·아산시·천안시·서산시');
+});
+
+test('★★ ㉑-3 칸이 좁으면 «접어서» 보인다 — 말줄임으로 자르면 「외 n」과 다를 것이 없다', () => {
+  const row = grabFn('fundRow');
+  assert.ok(row.indexOf('text-overflow:ellipsis') < 0 || row.indexOf('참여 지자체') < 0,
+    '★ 지자체 칸을 말줄임으로 잘랐습니다 — 이름을 다 적기로 한 뜻이 사라집니다.');
+  assert.match(row, /word-break:keep-all/,
+    '★ 한국말을 낱말째 접지 않습니다 — 「예산군」이 「예산 / 군」으로 쪼개집니다.');
 });
 
 test('㉒ 사업장이 없으면 «—», 주소를 다 못 읽으면 그렇다고 적는다', () => {

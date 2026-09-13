@@ -939,7 +939,7 @@ function fundGovCell(fid){
   if(!_allSites){ setTimeout(loadAllSites,0);
     return {t:'<span class="muted">…</span>', title:'참여사업장을 읽는 중입니다'}; }
   var m=_allSites[fid]||{};
-  var g=govShort(Object.keys(m).map(function(k){ return m[k]; }),2);
+  var g=govShort(Object.keys(m).map(function(k){ return m[k]; }));
   return {t:(g.n?esc(g.text):'<span class="muted">'+esc(g.text)+'</span>'), title:g.title};
 }
 function fundRow(f,no,mode,showReg){
@@ -949,7 +949,10 @@ function fundRow(f,no,mode,showReg){
   var _gc=fundGovCell(f._id);
   return '<tr onclick="go(\'fund\',\''+f._id+'\')"><td class="no">'+no+'</td>'
     +'<td style="font-weight:700">'+esc(f.short_name||f.name)+setupB+'<div class="muted" style="font-weight:400;font-size:11.5px">'+esc(f.name||'')+'</div></td>'
-    +'<td class="ph" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(_gc.title)+'">'+_gc.t+'</td>'
+    /* ⚠ nowrap·말줄임을 쓰지 «않는다» — 이름을 다 적기로 했으므로(대표 지시 2026-09-13)
+         칸이 좁으면 «접어서» 보여야 한다. 말줄임으로 잘라 두면 「외 1」과 다를 것이 없다.
+         한국말은 낱말째 접는다(keep-all) — break-word 는 「예산군」을 쪼갠다. */
+    +'<td class="ph" style="word-break:keep-all;line-height:1.35" title="'+esc(_gc.title)+'">'+_gc.t+'</td>'
     /* 이름은 «안 접는다» — 「김혜민」이 석 줄로 쌓이면 줄 키가 그만큼 는다(폰 실측) */
     +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td>'
     +'<td class="muted mo">'+(subn?esc(subn):'—')+'</td>'
@@ -1012,7 +1015,8 @@ function fundTable(list,edit,mode){
        있는 지자체가 함께 참여하므로, 목록에서 한눈에 보여야 한다.
      ⚠ 폭을 못 박는다 — 묶음(충남·경기)마다 표를 따로 만들기 때문에, 폭이 없으면
        표마다 제 내용에 맞춰 칸을 잡아 위아래 열이 어긋난다(이 표가 fixcol 인 까닭). */
-  cols.push(['참여 지자체','ph','150px','참여사업장 소재지에서 셈합니다 — 올리면 몇 곳인지 보입니다']);
+  /* 폭을 넓혔다(150→190px) — 이름을 다 적기로 했으므로 세 곳쯤은 한 줄에 들어가야 한다 */
+  cols.push(['참여 지자체','ph','190px','참여사업장 소재지에서 셈합니다 — 올리면 몇 곳인지 보입니다']);
   cols.push(['주담당','','132px'],['부담당','mo','112px'],['대표자','mo','112px'],['정보','ph','104px']);
   if(showReg) cols.push(['분류','ph','120px','지역·묶음 분류 — 바꾸면 지역기금↔공동기금으로 옮겨집니다']);
   cols.push(['계약관계','','122px']);
@@ -1762,18 +1766,21 @@ function _siteGovs(sites,today){
   var sidos=[]; list.forEach(function(g){ if(sidos.indexOf(g.sido)<0) sidos.push(g.sido); });
   return { list:list, sidos:sidos, unknown:unknown, total:n };
 }
-/* 한 줄로 줄인 지자체 — 목록의 좁은 칸에 넣는다.
-   ⚠ 다 적으면 칸이 넘쳐 다른 열이 밀린다. 둘까지 적고 나머지는 「외 n」으로 줄이되,
-     올림말에는 «전부와 몇 곳인지»를 담는다 — 줄였다는 것을 숨기지 않는다. */
-function govShort(sites,max){
-  var g=_siteGovs(sites); max=max||2;
+/* 목록 칸에 넣을 지자체 — «이름을 다 적는다» (대표 지시 2026-09-13 「외 1 이렇게 하지 말고
+   모든 지자체 이름 바로 넣어라」).
+   ⚠ 처음에는 둘까지만 적고 「외 1」로 줄였다. 그러면 어느 지자체가 빠졌는지 목록에서
+     알 수가 없어, 올림말을 열어 봐야 했다 — 한눈에 보려고 만든 칸인데 뜻이 없다.
+   ⚠ 그래서 «줄바꿈»으로 받는다(줄여서 감추지 않는다). 한국말은 낱말째 접어야 하므로
+     keep-all 이다 — break-word 는 「예산군」을 「예산」/「군」으로 쪼갠다.
+   ⚠ 곳 수는 여전히 올림말에만 둔다 — 칸에 「예산군 7」까지 적으면 폭이 두 배가 된다. */
+function govShort(sites){
+  var g=_siteGovs(sites);
   if(!g.total) return {text:'—', title:'참여사업장이 없습니다', n:0};
   if(!g.list.length) return {text:'주소 모름', title:'참여사업장 '+g.total+'곳의 소재지를 못 읽었습니다', n:0};
-  var names=g.list.map(function(x){ return x.sgg; });
-  var 짧게=names.slice(0,max).join('·')+(names.length>max?' 외 '+(names.length-max):'');
   var 전부=g.list.map(function(x){ return x.sgg+' '+x.n+'곳'; }).join(' · ')
     +(g.unknown?'  |  주소 모름 '+g.unknown+'곳':'');
-  return {text:짧게, title:전부, n:names.length, unknown:g.unknown};
+  return {text:g.list.map(function(x){ return x.sgg; }).join('·'),
+          title:전부, n:g.list.length, unknown:g.unknown};
 }
 /* 화면에 내놓는 딱지 한 줄 — 기금 정보와 참여사업장이 «같은 말»을 쓰게 한 곳에서 만든다 */
 function govChips(sites){
@@ -6541,7 +6548,11 @@ function infoForm(f){
     else if(c[0]==='labor_office') inp='<div style="display:flex;gap:5px"><input id="fd-'+c[0]+'" type="text" value="'+esc(v)+'" placeholder="예: 대전지방고용노동청 천안지청" style="flex:1">'
       +'<button type="button" onclick="fillLabor()" title="소재지로 관할 지방고용노동청·지청 자동 추정(확인 필요)" style="white-space:nowrap;padding:0 10px;cursor:pointer">🔍 소재지로</button></div>';
     else inp='<input id="fd-'+c[0]+'" type="'+c[2]+'" value="'+esc(v)+'">';
-    return sec+'<div class="fld'+(c[0]==='address'?' full':'')+(INFO_W2[c[0]]?' w2':'')+'"><label>'+c[1]+'</label>'+inp+'</div>';
+    /* ★ 참여 지자체를 「지역」 «바로 옆»에 둔다(대표 지시 2026-09-13 「지역 옆에 넣어라 하나씩」).
+         맨 아래 따로 두었더니 화면을 끝까지 내려야 보였다 — 지역과 나란히 있어야
+         「충남의 어느 시·군이 함께 들어왔나」가 한눈에 읽힌다. */
+    return sec+'<div class="fld'+(c[0]==='address'?' full':'')+(INFO_W2[c[0]]?' w2':'')+'"><label>'+c[1]+'</label>'+inp+'</div>'
+      +(c[0]==='region'?govField(f):'');
   }).join('');
   setTimeout(bindDocIntake,0);   // 렌더 후 드롭존 핸들러 연결
   /* 한 줄로 줄인 서류 받는 곳 — 설명·상태·버튼을 칸 안으로 넣어 세로를 아꼈다.
@@ -6561,7 +6572,6 @@ function infoForm(f){
        ⓘ·당겨오기 단추는 첫 묶음 머리(기본) 줄 오른쪽에 얹어 한 줄을 더 아낀다. */
     +'<div class="panel" style="padding:12px 14px">'
     +'<div class="gridw" oninput="markDirty()" onchange="markDirty()">'+flds+'</div>'
-    +govPanel(f)
     +'<div class="row" style="margin-top:12px"><button class="primary" onclick="saveInfo()">💾 저장</button>'
     +'<span class="muted mo" style="font-size:11px">Ctrl+S로도 저장</span></div></div>'
     +officerPanel(f);
@@ -6570,16 +6580,17 @@ function infoForm(f){
    ★ 손으로 적는 칸이 «아니다» — 참여사업장 주소에서 셈한 것이다. 그래서 [저장]과 상관이
      없고, 사업장을 더하거나 빼면 저절로 달라진다. 화면에서도 그렇게 보이게 둔다.
    ⚠ 참여사업장을 아직 안 읽었으면 «0곳이라 말하지 않는다» — 모르는 것과 없는 것은 다르다. */
-function govPanel(f){
+function govField(f){
   var 읽었나=(S.sitesFor===S.fundId && S.sites);
   var arr=읽었나 ? Object.keys(S.sites).map(function(k){ return S.sites[k]; }) : null;
   var 몸 = arr ? govChips(arr)
     : '<span class="muted" style="font-size:11.5px">[참여사업장] 탭을 한 번 열면 여기 섭니다.</span>';
-  return '<div class="sec" style="margin-top:14px">참여 지자체'
-    +'<span style="font-weight:400;font-size:11px;color:var(--sub)">'
-    +' — 참여사업장 소재지에서 셈합니다(손으로 적는 칸이 아닙니다)</span>'
-    +hlp('gov.join')+'</div>'
-    +'<div class="row" style="gap:5px;flex-wrap:wrap;margin:2px 0 0">'+몸+'</div>';
+  /* ⚠ 칸(input)이 «아니다» — 손으로 적는 자리가 아니라 참여사업장에서 셈한 것이다.
+       네모 테두리를 두르면 고칠 수 있는 칸으로 읽히므로, 딱지만 늘어놓는다. */
+  return '<div class="fld w2"><label>참여 지자체'
+    +'<span style="font-weight:400;font-size:10px;color:var(--sub)"> · 사업장 소재지에서 셈</span>'
+    +hlp('gov.join')+'</label>'
+    +'<div class="row" style="gap:4px;flex-wrap:wrap;align-items:center;min-height:28px">'+몸+'</div></div>';
 }
 /* 등기임원 명부 — 감사보고서·협의회 회의록이 여기서 이름을 가져간다.
    이 칸이 비면 그 서류들이 «이름 없는 서류»로 나오므로, 비었을 때 그렇게 알린다. */
