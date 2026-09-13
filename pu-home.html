@@ -773,9 +773,17 @@ const FIREBASE_CONFIG = {
   messagingSenderId: '936817166182'
 };
 
-/* 홈페이지를 «읽기만» 하는 서버 함수. 쓰기 함수는 만들지 않았다. */
+/* 홈페이지를 «읽기만» 하는 서버 함수. */
 const READ_HOMEPAGE_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/readHomepage';
 
+/* 홈페이지를 «고치는» 서버 함수 (대표 지시 2026-09-13
+   「붙여넣기 전혀 안 하고 싶다. 그냥 들어가서 고쳐라」).
+   ★ 2026-08-30 에는 이 길을 접었었다 — 「서버가 경력사항만 보내면 얼굴 사진이
+     지워진다」가 까닭이었다. 지금 서버는 고치는 화면을 «통째로» 받아 우리가
+     이름을 아는 칸만 갈아 끼우고 나머지는 받은 그대로 되돌려 보낸다. 그래서
+     사진이 날아갈 길이 없고, 그래도 어긋나면 서버가 «아무것도» 안 쓰고 멈춘다.
+   ★ 아이디·비밀번호는 이 파일에도 저장소에도 없다 — 서버 비밀칸에만 있다. */
+const HOME_WRITE_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/homepageWrite';
 /* ── 새 홈페이지(우리가 만든 것) ────────────────────────────────────────
    대표 결정 2026-08-31: 홈페이지를 새로 만들고 푸른ERP 에서 고친다.
    ★ 「나」로 정했다 — 저절로 올라가지 않고 «단추를 누를 때만» 올린다.
@@ -2765,6 +2773,103 @@ function openPaste() {
   openModal(h);
 }
 window.openPaste = openPaste;
+
+/* ══════ 붙여넣기 없이 «서버가» 홈페이지를 고친다 ══════
+   대표 지시 2026-09-13 「붙여넣기 전혀 안 하고 싶다. 그냥 들어가서 고쳐라.」
+
+   두 걸음으로 나눈다 — 기계가 곧장 쓰면 잘못 채웠을 때 되돌릴 틈이 없다.
+     ① «보기»  서버가 들어가 화면을 받아 보고 «무엇이 바뀌는지»만 알려 준다. 안 쓴다.
+     ② «쓰기»  사람이 그 목록을 보고 「예」 했을 때만 보낸다.
+   ★ 사진이 든 숨은 칸은 서버가 받은 그대로 되돌려 보낸다. 어긋나면 서버가
+     아무것도 안 쓰고 멈추며 «왜» 멈췄는지 알려 준다. */
+async function 서버에게물어보기(방식, srl, 고칠것) {
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(HOME_WRITE_URL, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: 방식, srl: Number(srl), 고칠것: 고칠것 })
+  });
+  let 답 = null;
+  try { 답 = await res.json(); } catch (e) { 답 = null; }
+  if (!답) throw new Error('서버가 답을 주지 않았습니다(' + res.status + ').');
+  return 답;
+}
+
+/* 바뀔 것을 사람 말로 — 「경력사항: 26줄 → 27줄」처럼.
+   ⚠ 경력사항은 스물몇 줄이다. 그것을 통째로 보여 주면 정작 «무엇이 바뀌는지»가 묻힌다. */
+function 바뀔것글자(바뀐것) {
+  const 줄수 = (s) => String(s || '').split('\n').filter((t) => t.trim()).length;
+  return '<ul style="margin:6px 0 0;padding-left:18px">'
+    + (바뀐것 || []).map((x) => {
+      const 옛줄 = 줄수(x.옛), 새줄 = 줄수(x.새);
+      const 뜻 = (옛줄 > 1 || 새줄 > 1)
+        ? 옛줄 + '줄 → ' + 새줄 + '줄'
+        : (x.옛 || '(빈칸)') + ' → ' + (x.새 || '(빈칸)');
+      return '<li><b>' + esc(x.이름) + '</b> : ' + esc(뜻) + '</li>';
+    }).join('') + '</ul>';
+}
+
+/* 서버가 «왜 안 썼는지»를 그대로 보여 준다 — 뭉뚱그리면 고칠 수가 없다 */
+function 걸린것글자(답) {
+  const 줄 = (답 && 답.걸린것) || [];
+  return (답 && 답.error ? '<div>' + esc(답.error) + '</div>' : '')
+    + (줄.length ? '<ul style="margin:6px 0 0;padding-left:18px">'
+        + 줄.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul>' : '');
+}
+
+async function 홈페이지바로고치기() {
+  const d = App.draft;
+  if (!d) return;
+  const srl = Number(d.srl || 0);
+  if (!srl) {
+    await say('홈페이지 글 번호가 없습니다',
+      '이 구성원은 홈페이지에 아직 글이 없습니다. <b>글 번호</b> 칸에 번호를 적어 주세요.');
+    return;
+  }
+  if (App.dirty && !await askYes('저장하지 않은 것이 있습니다',
+    '지금 화면에 있는 내용으로 홈페이지를 고칩니다. 그래도 할까요?', '그대로 고치기')) return;
+
+  /* ⚠ 「지금 홈페이지용 복사」와 «똑같은 자리»에서 값을 만든다.
+       따로 만들면 복사한 것과 서버가 보낸 것이 조용히 달라진다. */
+  const 고칠것 = {
+    이름: d.name || '',
+    직책1: d.position1 || '',
+    직책2: d.position2 || '',
+    경력사항: PuHomeExport.careersText(d.careers, App.lineFormat)
+  };
+
+  try {
+    /* ① 보기 — 서버가 들어가 보기만 하고 «아무것도 안 쓴다» */
+    const 봄 = await 서버에게물어보기('보기', srl, 고칠것);
+    if (!봄.ok) { await say('고치지 않았습니다', 걸린것글자(봄)); return; }
+    if (!(봄.바뀐것 || []).length) {
+      await say('고칠 것이 없습니다', '홈페이지가 이미 이 화면과 같습니다.');
+      return;
+    }
+    const 못찾음 = (봄.못찾은것 || []).length
+      ? '<div style="margin-top:8px">※ 이 칸은 홈페이지에서 못 찾아 <b>안 건드립니다</b>: '
+        + esc(봄.못찾은것.join(', ')) + '</div>'
+      : '';
+    if (!await askYes('홈페이지를 이렇게 고칩니다',
+      바뀔것글자(봄.바뀐것)
+      + '<div style="margin-top:8px">얼굴 사진과 나머지 칸은 <b>그대로 둡니다</b>.</div>'
+      + 못찾음, '고치기')) return;
+
+    /* ② 쓰기 — 사람이 「예」 한 뒤에만 */
+    const 함 = await 서버에게물어보기('쓰기', srl, 고칠것);
+    if (함.ok && 함.저장됨) {
+      await say('홈페이지를 고쳤습니다',
+        바뀔것글자(함.바뀐것)
+        + '<div style="margin-top:8px">홈페이지에서 한 번 눈으로 봐 주십시오.</div>');
+      checkHomepage();
+    } else {
+      await say('고치지 못했습니다', 걸린것글자(함));
+    }
+  } catch (e) {
+    await say('고치지 못했습니다', esc((e && e.message) || String(e)));
+  }
+}
+window.홈페이지바로고치기 = 홈페이지바로고치기;
 
 /* ══════ 「★ 푸른ERP 채우기」 단추 넣기 — 한 번만 ══════
    대표 결정 2026-08-30: 서버가 대신 로그인해 쓰는 방식 대신 «단추» 로 간다.
@@ -5048,6 +5153,11 @@ function memberEdit(d) {
     + '<button class="btn pri" onclick="saveDraft()">저장</button>'
     + '<span id="dirtyMark" style="color:var(--bad);font-size:12px;font-weight:700">' + (App.dirty ? '● 저장 안 됨' : '') + '</span>'
     + '<span class="sep"></span>'
+    /* ★ 2026-09-13 — 붙여넣기 없이 서버가 바로 고친다. 「복사」는 그 길이 막혔을 때
+         쓰는 «두 번째 길»로 남긴다(서버 비밀칸이 비어 있거나 홈페이지가 바뀐 날). */
+    + '<button class="btn" onclick="홈페이지바로고치기()"' + (clash.length ? ' disabled' : '')
+    + ' title="붙여넣기 없이 홈페이지를 바로 고칩니다 — 무엇이 바뀌는지 먼저 보여 드립니다">'
+    + '지금 홈페이지 바로 고치기</button>'
     + '<button class="btn" onclick="openPaste()"' + (clash.length ? ' disabled' : '')
     + '>지금 홈페이지용 복사</button>'
     + (d.srl ? '<a class="btn" style="text-decoration:none" href="'
