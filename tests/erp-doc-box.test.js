@@ -327,7 +327,82 @@ test('㉞ 새로 지은 이름이 이 파일 안에서 겹치지 않는다', () 
   });
 });
 
-test('㉟ 서면함 뿌리가 온톨로지 등록부에 적혀 있다', () => {
+/* ── 화면을 «진짜로 그려» 본다 ────────────────────────────────────────────
+   ⚠ 위의 글자 검사들은 「그리다 넘어지는 것」을 못 잡는다 — 없는 함수를 부르거나
+     빈 값에서 터져도 글자는 파일에 그대로 있기 때문이다. 그래서 아주 작은 h() 를
+     쥐여 주고 실제로 돌려 본다. */
+function 그려본다(props, which) {
+  const 상태 = [];
+  const h = (type, p, ...kids) => {
+    const flat = [];
+    const eat = k => { if (k == null || k === false) return;
+      if (Array.isArray(k)) k.forEach(eat); else flat.push(k); };
+    kids.forEach(eat);
+    return { type, props: p || {}, kids: flat };
+  };
+  const 글자 = n => {
+    if (n == null || n === false) return '';
+    if (typeof n !== 'object') return String(n);
+    if (Array.isArray(n)) return n.map(글자).join('');
+    const p = n.props || {};
+    return [p.title, p.placeholder, p.value].filter(v => typeof v === 'string').join(' ')
+      + n.kids.map(글자).join('');
+  };
+  const box = {
+    h,
+    useState: v => { const i = 상태.length; 상태.push(v);
+      return [v, x => { 상태[i] = typeof x === 'function' ? x(상태[i]) : x; }]; },
+    useEffect: () => {}, useEscClose: () => {}, console,
+    Object, Array, String, Number, Math, Date, JSON, Promise, parseInt, isNaN,
+    showToast: () => {},
+    dbGet: k => ({ cases:사건들, contracts:계약들, companies:업체들 })[k] || [],
+    CURRENT_USER: { sid:'S1', name:'홍길동', isAdmin:false },
+    erpMgrSids: () => ['S1'], erpUidBySid: () => Promise.resolve({ S1:'uidA' }),
+    sidName: s => s, extractTemplateText: () => {}
+  };
+  box.window = box;
+  vm.createContext(box);
+  vm.runInContext(MOD_SRC, box);
+  vm.runInContext([
+    cutFn(ERP, 'function erpDocExt('), cutFn(ERP, 'function erpDocWhen('),
+    cutFn(ERP, 'function erpDocSrcItem('), cutFn(ERP, 'function erpDocWhoUids('),
+    cutFn(ERP, 'function erpDocPickList('),
+    cutFn(ERP, 'function DocAttachModal('), cutFn(ERP, 'function DocBox(')
+  ].join('\n'), box);
+  if (which === 'box') return 글자(box.DocBox({}));
+  const g = box.PuErpDocBox.match(props.text, CTX);
+  return 글자(box.DocAttachModal(Object.assign({ guess:g, rows:[], readErr:'', base:null,
+    onClose(){}, onDone(){} }, props)));
+}
+
+test('㉟ 서면함이 «넘어지지 않고» 그려진다', () => {
+  const t = 그려본다({}, 'box');
+  assert.match(t, /불러오는 중/);
+  assert.match(t, /끌어다 놓으세요/, '끌어다 놓을 자리가 없으면 올릴 길이 없다');
+});
+
+test('㊱ 확인 창이 «찾은 것·주민번호·몇 판째»를 다 보여 준다', () => {
+  const t = 그려본다({
+    file: { name:'이유서.hwp', size:84000 },
+    text: '부당해고 구제신청 이유서\n사건번호 부해-2026-003\n홍길동 800101-1234567',
+    kind: '부당해고 구제신청 이유서'
+  });
+  assert.match(t, /이 서면을 어디에 붙일까요/);
+  assert.match(t, /부해-2026-003/, '무엇으로 찾았는지 안 보이면 확인할 수가 없다');
+  assert.match(t, /주민등록번호가 들어 있습니다/, '무엇이 담기는지 먼저 말해야 한다');
+  assert.match(t, /이대로 붙이기/);
+  assert.match(t, /사건 없이 그냥 보관/);
+  assert.match(t, /v1/, '몇 판째인지 없으면 덮어쓰는 줄 안다');
+});
+
+test('㊲ 이름으로만 찾았으면 «꼭 확인»이라고 화면에 적는다', () => {
+  const t = 그려본다({ file:{ name:'보고서.hwp', size:12000 },
+    text:'가나상사 현장점검 결과보고서', kind:'현장점검 결과보고서' });
+  assert.match(t, /이름으로 찾음/,
+    '이름으로 맞춘 것을 번호로 맞춘 것과 똑같이 보여 주면 사람이 그냥 누른다');
+});
+
+test('㊳ 서면함 뿌리가 온톨로지 등록부에 적혀 있다', () => {
   const ont = fs.readFileSync(path.join(ROOT, 'js', 'pu-ontology.js'), 'utf8');
   ['erp_docs', 'erp_doc_idx', 'erp_doc_text'].forEach(r => {
     assert.ok(ont.includes("'" + r + "'"), r + ' 가 없으면 온톨로지가 이 자료를 영영 못 본다');
