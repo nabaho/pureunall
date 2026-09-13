@@ -1344,7 +1344,10 @@ function parseArticles(text){
     let body=text.slice(s,e).trim();
     // 다음 장(章)·절 제목이 앞 조문 본문 끝에 붙는 것을 잘라낸다 —
     // 그대로 두면 "제27조(최저임금)" 본문에 "제7장 퇴직·해고 및 정년"이 섞여 매칭이 엉킨다.
-    const cm=body.match(/\n[ \t]*제\s*\d+\s*[장절][^\n]*$/);
+    // ⚠ 2026-09-13: 「제4장 인사 / 제1절 총칙」처럼 «두 줄»인 문서가 있다. 예전 정규식은
+    //   맨 끝 한 줄만 떼어 「제4장 인사」가 본문에 남았다(실측 3곳) — 대표 제보
+    //   「제0장은 작은 글씨로 확인도 안 된다」가 그것이다. 이어진 것을 «다» 뗀다.
+    const cm=body.match(/(?:\n[ \t]*제\s*\d+\s*[장절][^\n]*)+$/);
     if(cm)body=body.slice(0,cm.index).trim();
     const tm=body.match(RE_TITLE);
     arts.push({num:ms[k].num,sub:ms[k].sub,label:"제"+ms[k].num+"조"+(ms[k].sub?"의"+ms[k].sub:""),title:tm?tm[1].trim():"",body,bodyNs:stripWs(body)});
@@ -3922,7 +3925,16 @@ function openFinal(){
   renderFinal(); $("ov-final").classList.add("on"); renderStepNav();
   finScan();      // 팝업이 보인 뒤 한 번 더 — 숨어 있을 때는 좌표가 0이다
 }
-/* ① 보관된 원본(기존) 취업규칙 */
+/* ① 보관된 원본(기존) 취업규칙
+   ★★★ 2026-09-13 에 크게 고쳤다 (대표 제보 「글자 빠지고 내용도 엉망이다」).
+     여기는 조 머리를 «줄 단위»로 지우고 있었다 — `replace(/^제\s*\d+\s*조[^\n]*\n?/,"")`.
+     한글에서 뽑은 글은 «보이는 줄바꿈»이 진짜 줄바꿈으로 들어와 조 머리와 본문 첫 줄이
+     같은 줄에 있다. 그 줄을 통째로 지우니 본문이 함께 사라졌다 —
+     실측 101개 조에서 **4,459자**(제22조는 49자 → 2자 「다.」).
+     ⚠ 다른 화면은 모두 `RE_HEAD_STRIP` 으로 «머리만» 뗀다. 잣대가 둘이었던 것이 뿌리다.
+   ★★ `.slice(0,400)` 도 걷었다 — 실측 8개 조가 말없이 잘리고 있었다.
+     여기는 **최종 확인** 창이다. 못 본 글을 「확인했다」로 처리하면 안 된다.
+     길면 창이 구른다(max-height:62vh;overflow:auto). */
 function finSec1(){
   const txt=(LAST&&LAST.key&&SAMPLES[LAST.key])||((loadOrigLocal()||{})[finSiteKey()]||{}).text||"";
   const arts=txt?parseArticles(txt):[];
@@ -3930,7 +3942,7 @@ function finSec1(){
     html:'<div style="font-size:12px;color:var(--mute);padding:8px 0">원본 텍스트가 없습니다. (보관함에서 열거나 파일을 업로드하면 표시됩니다)</div>'};
   return {meta:`조 ${arts.length}개`,
     html:arts.map(a=>`<div style="border-bottom:1px solid #f8fafc;padding:6px 0"><b style="font-size:12.5px">${escapeH(a.label)}${a.title?" ("+escapeH(a.title)+")":""}</b>
-      <div style="font-size:11.5px;color:var(--sub);line-height:1.6;white-space:pre-wrap">${escapeH(a.body.replace(/^제\s*\d+\s*조[^\n]*\n?/,"").trim().slice(0,400))}</div></div>`).join("")};
+      <div style="font-size:11.5px;color:var(--sub);line-height:1.6;white-space:pre-wrap">${escapeH(a.body.replace(RE_HEAD_STRIP,"").trim())}</div></div>`).join("")};
 }
 /* ② 비교대조표 — 항 단위로 변경 전/후 줄 위치를 맞춘 표 */
 function finSec2(){
@@ -3938,7 +3950,9 @@ function finSec2(){
   if(!rows.length)return {meta:"변경 없음",
     html:'<div style="font-size:12px;color:var(--mute);padding:8px 0">변경 항목이 없습니다.</div>'};
   const bw=RZ_NONE?42:31.5;
-  const cut=s=>String(s==null?"":s).slice(0,300);
+  /* ⚠ 2026-09-13: 예전에는 여기서 300자에서 잘랐다. 최종 확인은 «신고 서류를 만들기
+     직전»에 보는 창이라, 못 본 글을 「확인했다」로 처리하면 안 된다. 길면 창이 구른다. */
+  const cut=s=>String(s==null?"":s);
   return {meta:`변경 ${cnt}건 · ${REV_MODE==="partial"?"일부개정":"전부개정"}`,
     html:`<table class="daejo" style="font-size:11.5px"><thead><tr><th style="width:16%">변경조항</th><th style="width:${bw}%">변경 전</th><th style="width:${bw}%">변경 후</th>${RZ_NONE?"":'<th style="width:21%">변경이유</th>'}</tr></thead><tbody>`
       +rows.map(r=>{
@@ -3963,8 +3977,10 @@ function finSec3(){
     html:`<div style="background:#f8fafc;border:1px solid #eff6ff;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:11.5px;line-height:1.8">
        <b>제출 서류</b><br>${docs.map(d=>"· "+escapeH(d)).join("<br>")}
        ${hits.length?`<div style="color:#991b1b;margin-top:5px">⚠ 불이익 변경 가능성 ${hits.length}건 — 동의서 필요 여부를 확인하세요.</div>`:""}</div>`
-      +shown.slice(0,60).map(v=>`<div style="border-bottom:1px solid #f8fafc;padding:6px 0;font-size:11.5px;line-height:1.6;white-space:pre-wrap">${escapeH(v.it.del?(v.no+" 삭제"):articleText(v)).slice(0,500)}</div>`).join("")
-      +(shown.length>60?`<div style="font-size:11px;color:var(--mute);padding:6px 0">… 외 ${shown.length-60}개 조</div>`:"")
+      /* ⚠ 2026-09-13: 예전에는 조마다 500자에서 자르고 60개 조까지만 보였다.
+         101개 조짜리 문서에서 41개 조가 «안 보인 채» 확인되고 있었다. 여기는 곧
+         신고 서류가 될 전문이다 — 다 보여 준다. 길면 창이 구른다. */
+      +shown.map(v=>`<div style="border-bottom:1px solid #f8fafc;padding:6px 0;font-size:11.5px;line-height:1.6;white-space:pre-wrap">${escapeH(v.it.del?(v.no+" 삭제"):articleText(v))}</div>`).join("")
       +`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:11.5px"><b>부  칙</b><br>${escapeH(ad.lines.concat([ad.entry]).join("\n"))}</div>`};
 }
 function renderFinal(){
