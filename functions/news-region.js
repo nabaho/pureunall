@@ -38,8 +38,31 @@ const 출처들 = [
        고용허가·폭염 작업중지 같은 공지가 평택에만 해당하는 것이 아니어서다. */
   { id:"moel-pyeongtaek", 기관:"경기지방고용노동청 평택지청", 이름:"공지사항",
     지역:"경기", 방식:"board", 밑주소:"https://www.moel.go.kr",
-    목록주소:"https://www.moel.go.kr/local/pyeongtaek/news/notice/noticeList.do" }
+    목록주소:"https://www.moel.go.kr/local/pyeongtaek/news/notice/noticeList.do" },
+  /* ★★ 천안시 기업지원 — 대표 지시 2026-09-13 「꼭지를 넓히는 일 … 이것도 같이해라」.
+       중소기업 육성자금 이자 지원 · 농공단지 물류비 · 판로(전시·홍보판매관) 지원.
+     ★ 왜 정책 꼭지가 아니라 «여기»인가 — 정책 꼭지에는 지역을 가르는 장치가 없다.
+       거기 담으면 천안시 공고가 경기·대구 사업장에도 간다. 여기는 시까지 좁힌다.
+     ⚠ 천안시 판은 절반이 «지자체 행정»이다(공시송달·주민등록·민방위·건축위원회).
+       관련말·제외말이 그것을 거른다 — 안 거르면 검토함이 그것으로 찬다.
+     ⚠ 「노무」는 여기 없다. 그것은 천안지청(moel-cheonan) 몫이고 이미 읽고 있다. */
+  { id:"cheonan-company", 기관:"천안시", 이름:"기업지원 공고",
+    지역:"충남/천안시", 방식:"board", 밑주소:"https://www.cheonan.go.kr",
+    목록주소:"https://www.cheonan.go.kr/bbs/BBSMSTR_000000000241/list.do",
+    /* ⚠ 이 판에는 제목 «링크가 없다» — <button onclick="fn_search_detail('아이디')"> 다.
+         그래서 여는말로 아이디를 꺼내 상세길에 붙여 주소를 세운다. */
+    여는말:"fn_search_detail",
+    상세길:"https://www.cheonan.go.kr/bbs/BBSMSTR_000000000241/view.do?nttId=",
+    기업지원:true }
 ];
+
+/* ★ 기업지원 샘에서만 보는 말 — 대표가 이름 대어 말씀하신 것들이다(2026-09-13).
+   ⚠ 위 관련말(노무)에는 이런 말이 없어 「육성자금」·「물류비」가 통째로 걸러졌다. */
+var 기업지원말 = ["육성자금", "물류비", "지원사업", "지원계획", "보증", "융자", "지원금",
+  "참가기업", "판로", "수출", "시장개척", "전시회", "박람회", "창업", "중소기업", "소상공인"];
+/* ⚠ 지자체 판은 절반이 «행정»이다. 노무·기업지원 어느 쪽도 아니다 — 잘라 낸다. */
+var 지자체행정말 = ["공시송달", "주민등록", "민방위", "거주불명", "직권말소", "직권조치",
+  "건축위원회", "도시계획", "지적재조사", "체납", "납부 독촉", "반송"];
 
 /* ⚠ 「폭염중대경보 발령 시 «작업중지» 이행계획서」가 걸러지고 있었다(실측 2026-09-13) —
      사업장이 제일 챙길 공지인데 아래 말 가운데 하나도 안 들어 있었다.
@@ -52,15 +75,40 @@ const 관련말 = ["노동","근로","고용","사업장","노사","임금","퇴
 const 제외말 = ["공무원 채용","기간제근로자 채용","청년인턴 채용","인사발령","부고","입찰공고",
   "개인정보 목적 외","최종합격자","서류전형","면접심사","우선협상"];
 
+/* ★★★ «등록부에 적힌 집»만 연다 (대표 지시 2026-09-13 로 천안시를 들이면서).
+   ⚠⚠ go.kr 을 통째로 열고 싶은 마음이 들지만 그러면 안 된다 —
+     링크 하나만 잘못 긁어도 엉뚱한 기관 글이 «우리 법인 이름»으로 114곳에 나간다.
+   ★ 등록한 집만 열면, 새 집을 들이려면 등록부에 적어야 하니 저절로 검토를 거친다.
+     좁고, 스스로 지켜진다 — 잣대를 따로 손볼 일이 없다. */
+function 아는집들() {
+  const 곳 = {};
+  출처들.forEach(function (s) {
+    try { 곳[new URL(s.목록주소).hostname.toLowerCase()] = 1; } catch (_) { /* 넘어간다 */ }
+  });
+  return 곳;
+}
 function 공식링크인가(url) {
   try {
     const u = new URL(String(url || ""));
-    return u.protocol === "https:" && /(^|\.)moel\.go\.kr$/i.test(u.hostname);
+    if (u.protocol !== "https:") return false;
+    return !!아는집들()[u.hostname.toLowerCase()];
   } catch (_) { return false; }
 }
 
-function 쓸모있는가(title) {
+function 쓸모있는가(title, source) {
   const t = String(title || "").trim();
+  const src = source || {};
+  /* ★★ 지자체 «행정»은 어느 샘에서도 안 담는다 — 사업장이 챙길 일이 아니다.
+     ⚠ 관련말의 「과태료」가 「식품위생법 위반 과태료 체납 독촉 공시송달」을 잡는다.
+       여기서 먼저 잘라 내지 않으면 검토함이 그것으로 찬다. */
+  if (지자체행정말.some((w) => t.includes(w))) return false;
+  /* ★ 기업지원 샘은 «다른 잣대»로 본다 — 노무 말이 아니라 기업지원 말로 가린다
+       (대표 지시 2026-09-13 로 꼭지를 넓혔다). 제외말은 그대로 쓴다. */
+  if (src.기업지원) {
+    const 민것 = t.replace(/[(（][^)）]{0,40}[)）]/g, "").replace(/\s+/g, " ").trim();
+    if (제외말.some((w) => t.includes(w) || 민것.includes(w))) return false;
+    return !!t && 기업지원말.some((w) => t.includes(w));
+  }
   /* ★ 제외말은 «괄호를 걷어 내고» 한 번 더 본다 (실측 2026-09-13).
      ⚠ 제외말에 「기간제근로자 채용」을 두었는데도 관서 채용 공고가 새어 들었다 —
        「기간제근로자(통계조사관) 채용 공고」처럼 사이에 직명이 끼어 글자가 안 맞았다.
@@ -100,7 +148,26 @@ function 게시판줄들(html, src) {
   const 바탕 = String(src.목록주소 || src.밑주소 || "");
   const 본것 = new Set();
   const 것들 = [];
-  const re = /<a[^>]+href=["']([^"']*bbs_seq=\d+[^"']*)["'][^>]*>([\s\S]{0,400}?)<\/a>/gi;
+  /* ★ 제목에 «링크가 없는» 판이 있다 — 천안시는 <button onclick="fn_search_detail('아이디')"> 다.
+     ⚠⚠ href 만 찾으면 그런 판에서는 «0건»이 나온다. 화면에는 「읽음」으로 뜨는데
+       실은 아무것도 안 들어온다. 여는말이 있으면 아이디를 꺼내 상세길에 붙인다. */
+  if (src.여는말) {
+    const 여 = String(src.여는말).replace(/[^A-Za-z0-9_]/g, "");
+    const re2 = new RegExp('<(?:button|a)[^>]+onclick="[^"]*' + 여
+      + "\\('([^']{4,80})'\\)[\\s\\S]{0,800}?<\\/(?:button|a)>", "gi");
+    let m2;
+    while ((m2 = re2.exec(String(html || "")))) {
+      const 길2 = String(src.상세길 || "") + encodeURIComponent(m2[1]);
+      if (본것.has(길2)) continue;
+      본것.add(길2);
+      것들.push({ 제목: 글자만(m2[0].replace(/<(?:button|a)[^>]*>/i, "")), 링크: 길2, 게시일: "" });
+    }
+    return 것들;
+  }
+  /* ⚠ 글 번호를 부르는 말이 집마다 다르다 — 관서는 bbs_seq 다. */
+  const 번호말 = String(src.번호말 || "bbs_seq").replace(/[^A-Za-z0-9_]/g, "");
+  const re = new RegExp('<a[^>]+href=["\']([^"\']*' + 번호말
+    + '=\\d+[^"\']*)["\'][^>]*>([\\s\\S]{0,400}?)<\\/a>', "gi");
   let m;
   while ((m = re.exec(String(html || "")))) {
     const 적힌것 = 글자만(m[1]).replace(/&amp;/g, "&");
@@ -133,7 +200,7 @@ function 후보만들기(xml, source, existing, now) {
     const title = String(줄.제목 || "").slice(0, 220);
     const link = String(줄.링크 || "").slice(0, 1000);
     const publishedAt = 날짜(줄.게시일);
-    if (!쓸모있는가(title) || !공식링크인가(link) || seen.has(link)) return null;
+    if (!쓸모있는가(title, src) || !공식링크인가(link) || seen.has(link)) return null;
     seen.add(link);
     const id = 후보열쇠(src.id, link);
     return {
