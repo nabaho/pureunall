@@ -334,6 +334,48 @@ test('★★ ㉓ 목록이 사업장을 «한 번만» 읽는다 — 기금마�
   assert.match(cell, /…/, '읽는 중임을 보여 주지 않습니다.');
 });
 
+/* ★★★ 2026-09-13 실사고 — 읽고 나서 «다시 그리지» 않아 화면이 점 셋(…)에 영영 멈췄다.
+   render() 를 불렀는데 «그런 함수가 없었다». catch 가 그 오류를 삼켜 아무 말도 없었다.
+   목록을 그리는 것은 renderHome 이다. */
+test('★★★ ㉓-2 읽고 나서 «정말 있는» 함수로 다시 그린다 — 없는 이름을 부르면 점 셋에 멈춘다', () => {
+  /* ⚠ 주석을 «먼저 걷는다» — 이 함수는 주석에 「처음에 render() 를 불렀는데」라고 적어
+     두었고, 그냥 훑으면 그 글에 걸려 있지도 않은 잘못을 잡는다(2026-09-13 에 실제로 그랬다).
+     저장소 규칙이기도 하다: 소스를 글자로 보는 검사는 주석을 먼저 걷는다. */
+  const fn = grabFn('loadAllSites')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+  const 부르는것 = [...fn.matchAll(/\b(render[A-Za-z]*)\s*\(/g)].map((m) => m[1]);
+  assert.ok(부르는것.length, '★ 다시 그리지 않습니다 — 화면이 「…」에 멈춥니다.');
+  부르는것.forEach((n) => {
+    assert.ok(SRC.indexOf('function ' + n + '(') >= 0,
+      '★ fund.html 에 없는 함수를 부릅니다: ' + n + '() — 조용히 죽고 화면은 「…」입니다.');
+  });
+  assert.match(fn, /typeof renderHome==='function'/, '있는지 보고 부르지 않습니다.');
+});
+
+test('★★ ㉓-3 못 읽으면 «다음에 한 번 더» 매단다 — 한 번 실패로 영영 점 셋이면 안 된다', () => {
+  const fn = grabFn('loadAllSites');
+  assert.match(fn, /catch\(function\(e\)\{[\s\S]*_allSitesTried=false/,
+    '★ 한 번 실패하면 다시 안 읽습니다 — 화면이 영영 「…」입니다.');
+  assert.ok(!/catch\(function\(\)\{\}\)/.test(fn),
+    '★ 오류를 통째로 삼킵니다 — 이번 같은 일이 또 조용히 지나갑니다.');
+  assert.match(fn, /if\(!fbDb\) return;/, '파이어베이스가 안 붙었을 때 헛돕니다.');
+});
+
+test('★★ ㉓-4 「정보 채우기」 표에도 참여 지자체가 «기금명 오른쪽»에 선다', () => {
+  /* ⚠ 주석을 먼저 걷는다 — 바로 위 주석이 「참여 지자체」를 말하고 있어,
+     그냥 훑으면 그 글이 <th>기금명</th> 보다 앞에 있다고 잡힌다(2026-09-13). */
+  const t = grabFn('fundTable')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+  const edit = t.slice(0, t.indexOf("if(mode==='trash')"));
+  assert.ok(edit.indexOf('참여 지자체') >= 0, '★ 정보 채우기 표에 칸이 없습니다.');
+  assert.ok(edit.indexOf('<th>기금명</th>') < edit.indexOf('참여 지자체'),
+    '★ 기금명 오른쪽이 아닙니다.');
+  const row = grabFn('fundEditRow');
+  assert.match(row, /fundGovCell\(f\._id\)/, '줄에 값이 안 들어갔습니다.');
+  /* 머리와 몸통 칸 수가 맞는가 — 어긋나면 값이 옆으로 밀린다 */
+  assert.ok(row.indexOf("<td class=\"ph\"") >= 0, '몸통에 그 칸이 없습니다.');
+});
+
 test('★★ ㉔ 목록 열이 «기금명 바로 오른쪽»이고 폭이 못 박혀 있다 — 묶음마다 표가 따로다', () => {
   const fn = grabFn('fundTable');
   const i = fn.indexOf("['기금명','','']"), j = fn.indexOf("'참여 지자체'");
