@@ -162,7 +162,7 @@
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
 <script src="js/pu-doc-read.js?v=40"></script>
 <!-- 서면함 층 — 서면이 «어디에 붙는가»를 아는 한 곳 (2026-09-13) -->
-<script src="js/pu-erp-docbox.js?v=2"></script>
+<script src="js/pu-erp-docbox.js?v=3"></script>
 <script>
 (function(){
 'use strict';
@@ -28430,6 +28430,8 @@ function CaseDetailModal(props){
     cur: c,
     headerIcon: '⚖️',
     headerTitle: c.caseNo + ' - ' + c.companyName,
+    /* 이 사건에 붙은 서면을 상세 안에서 바로 보여 준다 (걸음 「다」) */
+    docRef: { kind:'case', id:c.id, label:'이 사건 서면' },
     extraSections: [moduleSection, feeSection].concat(jurSection ? [jurSection] : []),
     finIncomes: finIncomes,
     onEdit: props.onEdit,
@@ -28626,6 +28628,11 @@ function UnifiedDetailModal(props){
         c.note && h('div', { style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'4px', padding:'8px 12px', fontSize:'11.5px', color:'#475569' } },
           h('div', { style:{ fontWeight:700, marginBottom:'2px' } }, '📝 비고'),
           h('div', { style:{ whiteSpace:'pre-wrap' } }, c.note)),
+        /* 📄 이 일의 서면 (2026-09-13, 걸음 「다」) — 부르는 쪽이 «무엇의 서면인지»를 준다.
+           ⚠ 사건만 준다. 컨설팅·기금·기타는 아직 서면을 안 붙인다(붙이는 쪽이 case·contract 뿐).
+             줄 것이 없으면 그리지 않는다 — 늘 「0건」이 뜨면 눈이 그것을 배경으로 배운다. */
+        props.docRef && h(ItemDocsPanel, { kind: props.docRef.kind, id: props.docRef.id,
+          label: props.docRef.label }),
         // ★ #3 업무 메모 (히스토리)
         h(CaseMemoPanel, { caseId: c.id, caseNo: c.caseNo })
       ),
@@ -33817,6 +33824,85 @@ function erpDocPickList(q){
   }).slice(0, 40);
 }
 
+/* 서면 한 장을 연다 — 서면함과 사건·계약 상세가 «같은 길»을 쓴다.
+   ⚠ 목록 한 줄에는 주소가 없다(있으면 남의 목록에서 원본이 샌다). 그래서 열 때
+     본체를 한 번 읽는다 — 누를 때만 드는 값이라 목록을 그리는 값이 아니다. */
+function erpDocOpen(row, setBusy){
+  var 알림 = function(s){ if(typeof setBusy === 'function') setBusy(s); };
+  알림('여는 중…');
+  return PuErpDocBox.read(row.id).then(function(rec){
+    알림('');
+    if(!rec){ showToast('⚠ 그 서면을 못 읽었습니다', 6000); return; }
+    if(!rec.url){ showToast('⚠ 원본 파일이 안 담겨 있습니다 (목록에만 있습니다)', 7000); return; }
+    window.open(rec.url, '_blank', 'noopener');
+  }).catch(function(e){
+    알림('');
+    showToast('⚠ ' + ((e && e.message) || '못 열었습니다'), 6000);
+  });
+}
+
+/* ── 이 사건(계약)의 서면 ─────────────────────────────────────────────────
+   걸음 「다」 — 서면함까지 찾아가지 않아도 «일을 보는 자리»에서 바로 보이게 한다.
+   props: { kind:'case'|'contract', id, label }
+
+   ⚠ 서버에 다시 묻지 않는다 — 내가 볼 수 있는 것은 이미 내 색인에 다 있다.
+     상세를 열 때마다 서면함을 통째로 다시 읽으면 그것이 곧 요금이다.
+   ⚠ 0건이어도 «한 줄»은 남긴다. 아예 안 그리면 이 자리가 있는 줄을 모른다 —
+     그 대신 딱 한 줄이다(표 한 칸은 한 줄, CLAUDE.md).
+   ⚠ 「내가 볼 수 있는 것만」이라고 적는다. 담당이 아닌 사람에게 0건으로 보이는 것과
+     정말 서면이 없는 것은 «다른 말»인데, 안 적으면 둘이 똑같아 보인다. */
+function ItemDocsPanel(props){
+  var rs = useState(null); var rows = rs[0]; var setRows = rs[1];
+  var es = useState(''); var err = es[0]; var setErr = es[1];
+  var bs = useState(''); var busy = bs[0]; var setBusy = bs[1];
+
+  useEffect(function(){
+    var 갔다 = false;
+    if(!props || !props.id){ setRows([]); return; }
+    erpDocBoxReady()
+      .then(function(){ return PuErpDocBox.listFor(props.kind, props.id); })
+      .then(function(v){ if(!갔다) setRows(v || []); })
+      .catch(function(e){ if(!갔다){ setRows([]); setErr((e && e.message) || '서면을 못 읽었습니다'); } });
+    return function(){ 갔다 = true; };
+  }, [props.kind, props.id]);
+
+  var 몇 = (rows || []).length;
+  return h('div', { style:{ marginBottom:'14px' } },
+    h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:'#475569',
+      marginBottom:'6px', borderBottom:'2px solid #94a3b8', paddingBottom:'4px',
+      display:'flex', alignItems:'center', gap:'8px' } },
+      h('span', null, '📄 ' + (props.label || '이 사건 서면')
+        + (rows === null ? '' : (' ' + 몇 + '건'))),
+      h('span', { style:{ fontSize:'10.5px', fontWeight:400, color:'#94a3b8' } },
+        '내가 볼 수 있는 것만'),
+      busy ? h('span', { style:{ fontSize:'10.5px', fontWeight:400, color:'#2563eb' } }, busy) : null),
+    err ? h('div', { style:{ fontSize:'11px', color:'#991b1b' } }, err) : null,
+    rows === null
+      ? h('div', { style:{ fontSize:'11px', color:'#94a3b8' } }, '불러오는 중…')
+      : 몇 === 0
+        ? h('div', { style:{ fontSize:'11px', color:'#94a3b8' } },
+            '아직 없습니다 — 서면함에 한글 파일을 올리면 여기에 붙습니다.')
+        : rows.map(function(r){
+            return h('div', { key:r.id, style:{ display:'flex', gap:'8px', alignItems:'center',
+              padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0',
+              borderRadius:'4px', marginBottom:'4px' } },
+              h('span', { style:{ flexShrink:0, width:'38px', textAlign:'center', fontSize:'9.5px',
+                fontWeight:700, color:'#475569' } }, r.ext || '파일'),
+              h('span', { style:{ flex:1, minWidth:0, fontSize:'11.5px', fontWeight:700,
+                color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
+                title:r.kind || '' }, r.kind || '(이름 없음)'),
+              r.hasRrn ? h('span', { title:'주민등록번호가 들어 있습니다',
+                style:{ flexShrink:0, fontSize:'9.5px', color:'#d97706' } }, '⚠') : null,
+              h('span', { style:{ flexShrink:0, fontSize:'10.5px', color:'#64748b' } },
+                [r.byName || '', erpDocWhen(r.at), 'v' + (r.ver || 1)].filter(Boolean).join(' · ')),
+              h('button', { onClick:function(){ erpDocOpen(r, setBusy); },
+                style:{ flexShrink:0, padding:'3px 9px', border:'1px solid #cbd5e1',
+                  borderRadius:'5px', background:'#fff', cursor:'pointer', fontSize:'10.5px',
+                  fontFamily:'inherit' } }, '열기'));
+          })
+  );
+}
+
 /* ── 붙이기 «전에» 보여 주는 창 ──────────────────────────────────────────
    props: { file, text, guess, kind, readErr, base, rows, onClose, onDone } */
 function DocAttachModal(props){
@@ -33993,7 +34079,9 @@ function DocBox(props){
     erpDocBoxReady()
       .then(function(r){
         if(r && r.warn) setErr('창고를 못 받았습니다 — ' + r.warn + ' (원본 담기만 안 됩니다)');
-        return PuErpDocBox.listMine();
+        /* 여기는 «일부러 보러 온 자리»라 늘 새로 읽는다 — 들고 있던 것을 보여 주면
+           그 사이에 동료가 담은 서면이 안 보인다(사건 상세는 반대로 들고 있는 것을 쓴다). */
+        return PuErpDocBox.listMine(true);
       })
       .then(function(v){ setRows(v || []); })
       .catch(function(e){ setRows([]); setErr((e && e.message) || '서면함을 못 읽었습니다'); });
@@ -34040,15 +34128,7 @@ function DocBox(props){
       .catch(function(e){ setBusy(''); setErr((e && e.message) || '못 불러왔습니다'); });
   }
 
-  function openDoc(row){
-    setBusy('여는 중…');
-    PuErpDocBox.read(row.id).then(function(rec){
-      setBusy('');
-      if(!rec){ showToast('⚠ 그 서면을 못 읽었습니다', 6000); return; }
-      if(!rec.url){ showToast('⚠ 원본 파일이 안 담겨 있습니다 (목록에만 있습니다)', 7000); return; }
-      window.open(rec.url, '_blank', 'noopener');
-    }).catch(function(e){ setBusy(''); showToast('⚠ ' + ((e && e.message) || '못 열었습니다'), 6000); });
-  }
+  function openDoc(row){ erpDocOpen(row, setBusy); }
 
   var shown = (rows || []).filter(function(r){
     var s = String(q||'').trim().toLowerCase();
@@ -34851,6 +34931,10 @@ function ContractDocVault(props){
                 );
               })
             ),
+        /* 📄 서면함에 담긴 이 계약의 서면 (2026-09-13, 걸음 「다」)
+           ⚠ 위의 NAS 링크와 «다른 것»이다 — 저쪽은 주소만, 이쪽은 파일이 우리 창고에 있다.
+             한 창에 같이 두는 까닭은 사람이 찾는 곳이 여기 하나이기 때문이다. */
+        h(ItemDocsPanel, { kind:'contract', id:cid, label:'서면함에 담긴 이 계약 서면' }),
         h('div', { style:{ borderTop:'1px solid #e2e8f0', paddingTop:'12px' } },
           h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'6px' } }, '+ 계약서 링크 추가'),
           h('input', { value:newName, onChange:function(e){ setNewName(e.target.value); },
