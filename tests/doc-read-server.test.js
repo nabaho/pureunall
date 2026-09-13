@@ -361,7 +361,10 @@ test('앱 배선', async (t) => {
     /* validate 가 cfg 를 받아 두어도 callGemini 에 안 넘기면 그냥 버려진다 —
        경력관리의 긴 증명서가 조용히 잘린다. */
     const idx = fs.readFileSync(path.join(R, 'functions', 'index.js'), 'utf8');
-    assert.match(idx, /callGemini\(fetch, key, v\.parts, null, v\.cfg\)/,
+    /* ⚠ 보내는 것의 «변수 이름»은 보지 않는다 — 2026-09-13 에 「무료로 글자 먼저」가
+         들어오며 v.parts 가 parts 로 바뀌었다(사진을 글자로 갈음할 수 있어서다).
+         여기서 지킬 것은 «cfg 를 끝까지 넘기는가» 하나다. */
+    assert.match(idx, /callGemini\(fetch, key, [A-Za-z.]+, null, v\.cfg\)/,
       '받아 둔 답 길이를 구글에 안 넘깁니다.');
   });
 });

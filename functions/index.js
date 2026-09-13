@@ -2153,9 +2153,43 @@ async function readGeminiKey() {
    ⚠ 실시간DB 갈래(readGeminiKey 안)는 **아직 남겨 둔다.** 금고가 실제로 도는 것을
      사람이 확인하기 전에 지우면, 어긋났을 때 판독이 통째로 멈춘다.
      확인 뒤에 DB 의 열쇠와 그 갈래를 함께 지운다. */
+/* ⑪ 사진을 «무료로 뽑은 글자»로 갈음해 본다. 되면 바꾼 parts 를, 아니면 null 을 준다.
+   ⚠⚠ 이 함수는 **한 번도 던지지 않는다.** 넘어지면 null 이고, 부르는 쪽은 사진 그대로
+     보낸다 — 무료는 «덤»이지 판독의 조건이 아니다. 여기서 던지면 아끼려다
+     판독을 통째로 세운다.
+   ⚠ Vision 몫이 모자라면 부르지 않는다(readVision 과 «같은 판단»이다) — 넘겨서 부르면
+     화면이 「0원」이라 적는 그 말이 거짓이 된다. */
+async function freeFirstSlim(parts, app) {
+  try {
+    const imgs = DR.imagesOf(parts);
+    if (!imgs.length) return null;                       // 이미 글자뿐이다
+
+    const 남은것 = await visionMonthLeft();
+    if (남은것.left < imgs.length) return null;          // 몫이 모자라다(모를 때도 안 부른다)
+
+    let auth = null;
+    const vkey = readVisionKey();
+    if (vkey) auth = { key: vkey };
+    else auth = { token: await VR.fetchSaToken(fetch) };
+
+    const r = await VR.callVision(fetch, auth, imgs, null);
+    if (!r.ok) return null;
+    /* ⑤ 실제로 읽어낸 «쪽 수»만큼 센다 — Vision 은 장 수로 값을 받는다 */
+    await bumpReadTally(app, "vision", r.pages || 1);
+
+    /* 글자가 모자라거나 «표가 뜻»인 서류면 slimParts 가 null 을 준다 */
+    return DR.slimParts(parts, VR.textOf(r.json));
+  } catch (e) {
+    console.warn("무료 글자 먼저 — 못 했다(사진 그대로 간다):", String((e && e.message) || e));
+    return null;
+  }
+}
+
 exports.readDoc = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 120, memory: "512MB", secrets: ["GEMINI_KEY"] })
+  /* ⚠ VISION_KEY 를 함께 받는다(2026-09-13) — 안 받으면 무료 글자 뽑기가 «늘» 넘어져
+       조용히 옛날처럼 사진만 보낸다(값은 그대로인데 아낀 줄 안다). */
+  .runWith({ timeoutSeconds: 120, memory: "512MB", secrets: ["GEMINI_KEY", "VISION_KEY"] })
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
@@ -2197,8 +2231,18 @@ exports.readDoc = functions
     const key = await readGeminiKey();
     if (!key) { res.status(503).json({ ok: false, error: "AI 키가 설정되지 않았습니다 — 관리자에게 알려 주세요." }); return; }
 
+    /* ⑪ 무료로 «글자»를 먼저 뽑아 사진 대신 보낸다 (대표 지시 2026-09-13 「㉰ 서버가 맡는다」).
+       ★ 여기가 «모두가 지나는 문»이라, 부르는 층이 둘이어도 한 번에 덮인다.
+       ⚠ 넘어지면 «사진 그대로» 간다 — 무료는 덤이지 판독의 조건이 아니다.
+       ⚠ freeFirst:false 를 보내면 안 한다(표가 뜻인 화면이 스스로 끌 수 있게). */
+    let parts = v.parts;
+    if (body.freeFirst !== false) {
+      const 줄인것 = await freeFirstSlim(v.parts, v.app);
+      if (줄인것) parts = 줄인것;
+    }
+
     // cfg = 부르는 쪽이 정한 값(온도·최대 길이). 걸러진 것만 넘어온다.
-    const r = await DR.callGemini(fetch, key, v.parts, null, v.cfg);
+    const r = await DR.callGemini(fetch, key, parts, null, v.cfg);
     // ⑤ 한 번 불렀다 — 세어 둔다(대표 물음 2026-09-08). 숫자만 담는다.
     await bumpReadTally(v.app, r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
     if (!r.ok) {
