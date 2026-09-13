@@ -481,6 +481,19 @@ table.daejo .rreason{color:var(--sub);font-size:11px}
 .gobtn.pri:hover{background:var(--accent);border-color:var(--accent)}
 /* 전체 보기 팝업 — 상태 필터 + 한 사업장 한 줄 */
 .dmfilt{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 10px}
+/* ⏎ 줄 정리 — 한 줄에 앞뒤 글과 고를 단추 셋 */
+.ljrow{border-bottom:1px solid #f8fafc;padding:9px 2px}
+.ljrow:last-child{border-bottom:0}
+.ljctx{font-size:11.5px;color:var(--sub);line-height:1.7}
+.ljbrk{display:inline-block;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;
+  border-radius:4px;padding:0 3px;font-size:10.5px;font-weight:700;margin:0 2px}
+.ljbtns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.ljb{font-size:11.5px;padding:4px 11px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;
+  color:var(--sub);cursor:pointer;font-family:inherit;white-space:nowrap}
+.ljb:hover{border-color:var(--accent2);color:var(--accent2)}
+.ljb.rec{border-color:var(--accent2);color:var(--accent);font-weight:700}
+.ljb.on{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:700}
+.ljb i{font-style:normal;font-size:10px;opacity:.75;margin-left:4px}
 /* ── 조문 검색 결과 ── */
 .artrow{border:1px solid var(--line);border-radius:9px;padding:8px 11px;margin-bottom:6px;cursor:pointer;background:#fff}
 .artrow:hover{border-color:#cbd5e1;background:#f8fafc}
@@ -729,6 +742,17 @@ table.daejo td.dj2{padding:0}
     <div class="fld"><button class="btn" id="run">취업규칙 검토 ▶</button></div>
   </div>
 
+  <!-- ⏎ 줄 정리 — 낱말 한가운데서 끊긴 줄을 사람이 한 번 훑는다 -->
+  <div class="overlay" id="ov-lj"><div class="modal" style="max-width:720px">
+    <h2>⏎ 줄 정리 <span id="lj-sum" style="font-size:12px;color:var(--mute);font-weight:400"></span><span class="x" data-close>×</span></h2>
+    <div class="body" style="max-height:66vh">
+      <div id="lj-head" style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:12px"></div>
+      <div id="lj-body"></div>
+    </div>
+    <div class="foot"><button class="btn" id="lj-go">이대로 정리하기</button>
+      <button class="btn ghost" data-close>닫기</button></div>
+  </div></div>
+
   <!-- 전체 사업장 목록 팝업 — 검색·상태 필터로 찾아 고른다 -->
   <div class="overlay" id="ov-dash"><div class="modal" style="max-width:640px">
     <h2>사업장 규정 현황 <span id="dashm-sum" style="font-size:12px;color:var(--mute);font-weight:400"></span><span class="x" data-close>×</span></h2>
@@ -795,7 +819,8 @@ table.daejo td.dj2{padding:0}
       <h3>원본 미리보기 <span id="pv-site" style="font-size:13px;font-weight:700;color:var(--accent);margin-left:4px"></span> <span class="tag" id="pv-tag">— 조 0개</span>
         <button class="btn ghost" id="pv-full" style="float:right;padding:3px 10px;font-size:11.5px" onclick="openFullPreview()">⛶ 전체보기</button>
         <button class="btn ghost" id="pv-pick" style="float:right;padding:3px 10px;font-size:11.5px;margin-right:6px">✎ 조문 선택</button>
-        <button class="btn ghost" id="pv-view" style="float:right;padding:3px 10px;font-size:11.5px;margin-right:6px">📄 원문 보기</button></h3>
+        <button class="btn ghost" id="pv-view" style="float:right;padding:3px 10px;font-size:11.5px;margin-right:6px">📄 원문 보기</button>
+        <button class="btn ghost" id="line-join" style="float:right;padding:3px 10px;font-size:11.5px;margin-right:6px" title="한글에서 뽑을 때 낱말 한가운데서 끊긴 줄을 잇습니다 — 표와 부칙은 안 건드립니다">⏎ 줄 정리</button></h3>
       <div id="work-badge" style="display:none;margin:0 0 10px;padding:8px 12px;background:#fffbeb;border:1px solid #fbbf24;border-radius:9px;font-size:12px;color:#854d0e;align-items:center;gap:8px;flex-wrap:wrap">
         <span id="work-badge-txt">💾 임시저장됨 — 이 브라우저에만 보관, 저장 전이라 새로고침해도 유지됩니다</span>
         <button class="stbtn on-adopt" id="work-new" style="margin-left:auto" title="지금 작업을 보관함에 저장한 뒤 다른 취업규칙을 새로 시작합니다">＋ 다른 취업규칙 시작</button>
@@ -1329,6 +1354,130 @@ function stripToc(text){
   let hits=0; lines.forEach(l=>{ RE_TOC_LINE.lastIndex=0; if(RE_TOC_LINE.test(l))hits++; });
   if(hits<8)return text;                       // 목차라고 볼 만큼 많지 않으면 손대지 않는다
   return lines.filter(l=>{ RE_TOC_LINE.lastIndex=0; return !RE_TOC_LINE.test(l); }).join("\n");
+}
+/* ══════ 낱말 한가운데서 끊긴 줄 잇기 (대표 승인 목업 2026-09-13-줄잇기.html) ══════
+   한글에서 글자를 뽑으면 «눈에 보이는 줄바꿈»이 진짜 줄바꿈으로 딸려 들어온다.
+   한글은 낱말 한가운데서도 줄을 끊으므로 「배포·게⏎시」·「배상하여야 한⏎다」가 된다.
+   ★★ 화면만의 일이 아니다 — 그대로 신구대조표·전문에 실려 노동청에 내는 서류에도
+     낱말이 잘려 나간다. 실측(101조·24,014자) 206곳.
+
+   ★★★ 잣대는 «문서 자신»이다 — 바깥 사전을 안 쓴다.
+     한글이 줄을 끊는 자리는 둘뿐이다. 낱말 «한가운데»서 끊었으면 붙여야 하고,
+     낱말 «사이»에서 끊었으면 띄어야 한다. 어느 쪽인지는 그 문서가 같은 말을
+     딴 곳에서 어떻게 썼는지 세면 안다.
+       ㉠ 붙인다  「근로조건」이 있고 「근」이 혼자 쓰인 적이 없다   (실측 54곳)
+       ㉡ 띄운다  「외출로」가 혼자 쓰이는 완성된 낱말이다          (실측 105곳)
+       ㉢ 묻는다  둘 다 쓰여 문서가 답을 안 준다                   (실측 47곳)
+
+   ⚠⚠ 조문 구역 «밖»은 안 건드린다 — 표지의 개정이력 표와 부칙이 거기 있다.
+     「001 2011 년 10 ⏎ 월 01 일 제정」을 이으면 표가 한 줄로 뭉친다(대표가 걱정하신 그것).
+   ⚠ 모르면 «그대로» 둔다 — 사람이 안 보면 한 글자도 안 바뀐다. */
+
+/* 줄바꿈 하나하나를 어떻게 할지 정한다 — 화면도 Firebase 도 없다. 검사가 이것만 돌린다.
+   돌려주는 것: [{줄, 뜻:'그대로'|'붙임'|'띄움'|'물음', 앞, 뒤, 앞말, 뒷말, 추천}] */
+function lineJoinMarks(text,참고글){
+  /* ⚠ 이 셋은 함수 «안»에 둔다 — 밖에 두면 검사가 함수만 떼어 돌릴 때
+     `LJ_MARK is not defined` 로 죽는다(여기서 한 번 걸렸다). */
+  /* ⚠⚠ 목 번호 「가. 나. 다.」와 낱말 꼬리 「다.」는 생김새가 같다.
+     「배상하여야 한 ⏎ 다.」의 아랫줄이 목 번호로 읽혀 안 이어졌다(여기서 한 번 걸렸다).
+     ★ 가르는 것은 «뒤에 내용이 따라오는가»다 — 목은 「가. 무단결근」처럼 내용이
+       따라오고, 꼬리는 「다.」 그것뿐이다. 그래서 가-하 에만 \s*\S 를 붙인다.
+     ⚠ 「다. 무단결근한 경우」 같은 꼬리는 목으로 읽혀 «그대로» 남는다 —
+       안전한 쪽이다(안 고칠 뿐, 망치지 않는다). */
+  var LJ_MARK=/^\s*(?:[\u2460-\u2473]|\d+\s*[.)]|[가-하]\s*[.)]\s*\S|제\s*\d+\s*[조장절]|부\s*칙|附\s*則)/;
+  var LJ_END=/[.。!?」』]\s*$/;
+  var t=String(text==null?"":text).replace(/\r\n?/g,"\n");
+  var 줄=t.split("\n"), out=[];
+  if(줄.length<2)return out;
+  /* 조문 구역 — 첫 조부터 부칙 앞까지. 그 밖은 손도 안 댄다. */
+  var 첫=t.search(/^[ \t]*제\s*\d+\s*조/m);
+  var 부=t.search(/^[ \t]*(?:부\s*칙|附\s*則)/m);
+  if(첫<0)return out;                                  /* 조문이 없으면 통째로 안 건드린다 */
+  var 시작=t.slice(0,첫).split("\n").length-1;
+  var 끝=부>첫?t.slice(0,부).split("\n").length-1:줄.length;
+  /* 문서 자신에게 물을 때 쓸 두 벌 — 붙여 본 글과 띄워 본 글 */
+  var 붙임글=t.replace(/\n/g,""), 띔글=t.replace(/\n/g," ");
+  /* ★ 문서가 답을 못 줄 때 물어볼 «둘째 증인» — 고용노동부 표준취업규칙(std_2026.js).
+     같은 갈래의 글이고 맞춤법이 바르다. 없으면 없는 대로 돈다(검사는 참고글 없이 돌린다). */
+  var 참고=String(참고글==null?"":참고글);
+  /* ⚠ 여기는 «한글만» 온다([가-힣]+ 로 떼어 왔다) — 정규식 특수문자가 올 수 없어
+     따로 감쌀 것이 없다. 감싸는 줄을 넣었다가 역슬래시가 깨져 한 번 죽었다.
+     ⚠⚠ 오른쪽 경계는 «갈라 쓴다» — 한국어는 낱말 뒤에 조사가 붙는다.
+       「근로조건」은 문서에 거의 늘 「근로조건에·근로조건을」로 나오므로,
+       오른쪽까지 막으면 한 번도 못 찾고 죄다 물음으로 밀린다(여기서 한 번 걸렸다).
+       · 붙은 꼴을 셀 때 : 왼쪽 경계만 본다 (뒤에 조사가 와도 같은 낱말이다)
+       · 앞말이 «혼자 섰나»를 볼 때 : 양쪽을 다 본다 (그것이 완성된 낱말이라는 뜻이다) */
+  function 몇번(글,말,오른쪽도){
+    if(!말||말.length<2)return 0;
+    var re=new RegExp("(?<![가-힣])"+말+(오른쪽도?"(?![가-힣])":""),"g");
+    return (글.match(re)||[]).length;
+  }
+  /* 답이 갈릴 때 «권하는» 쪽 — 정하는 것이 아니라 사람이 고를 때 손이 가까운 쪽이다.
+     ★ 한글이 낱말 «한가운데»를 끊으면 대개 한쪽이 아주 짧다(회⏎사 · 여⏎성인 · 한⏎다).
+       양쪽이 다 두 글자 넘게 온전하면 «낱말 사이»에서 끊긴 것으로 본다(외출로⏎간주한다). */
+  function 권함(a,b){ return (a.length>=2&&b.length>=2)?"띄움":"붙임"; }
+  for(var i=0;i<줄.length-1;i++){
+    var 앞=줄[i].replace(/\s+$/,""), 뒤=줄[i+1];
+    var 한칸={줄:i,앞:앞,뒤:뒤,뜻:"그대로",앞말:"",뒷말:"",추천:""};
+    if(i<시작||i>=끝-1||!앞||!뒤.trim()){ out.push(한칸); continue; }
+    if(LJ_MARK.test(뒤)||LJ_END.test(앞)){ out.push(한칸); continue; }
+    var ma=/[가-힣]+$/.exec(앞), mb=/^[가-힣]+/.exec(뒤.replace(/^\s+/,""));
+    if(!ma||!mb){ out.push(한칸); continue; }
+    var a=ma[0], b=mb[0];
+    한칸.앞말=a; 한칸.뒷말=b;
+    /* ⚠⚠ 지금 정하려는 «그 자리»를 양쪽에서 다 빼야 한다.
+       붙임글에는 이 자리가 «붙은 것»으로, 띔글에는 «혼자 선 것»으로 들어가 있다.
+       한쪽만 빼면 앞말이 늘 「혼자 쓰이는 낱말」로 보여 죄다 물음으로 밀린다
+       (여기서 한 번 걸렸다 — 근⏎로조건 이 안 붙었다). */
+    var 붙은수=몇번(붙임글,a+b,false)-1;
+    var 홀로수=몇번(띔글,a,true)-1;
+    /* ⚠ 제 몫을 뺐으므로 «0보다 작을 수» 있다(한 글자 앞말은 아예 안 센다).
+       ===0 으로 두었다가 근⏎로조건 이 −1 에 걸려 죄다 물음으로 밀렸다. */
+    if(붙은수>0&&홀로수<=0){ 한칸.뜻="붙임"; }
+    else if(홀로수>0&&붙은수<=0){ 한칸.뜻="띄움"; }
+    else if(붙은수>0&&홀로수>0){
+      if(붙은수>=홀로수*2)한칸.뜻="붙임";
+      else if(홀로수>=붙은수*2)한칸.뜻="띄움";
+      else { 한칸.뜻="물음"; 한칸.추천=권함(a,b); }
+    }else if(참고){
+      /* ★ 이 문서가 답을 못 줬다 — 표준취업규칙에 같은 말이 있나 본다.
+         ⚠ 여기서는 뺄 제 몫이 없다(우리 글이 아니다). */
+      var 붙은2=몇번(참고,a+b,false), 홀로2=몇번(참고,a,true);
+      if(붙은2>0&&홀로2<=0){ 한칸.뜻="붙임"; }
+      else if(홀로2>0&&붙은2<=0){ 한칸.뜻="띄움"; }
+      else { 한칸.뜻="물음"; 한칸.추천=권함(a,b); }
+    }else{
+      /* 아무 자취도 없다 */
+      한칸.뜻="물음"; 한칸.추천=권함(a,b);
+    }
+    out.push(한칸);
+  }
+  return out;
+}
+
+/* 정한 대로 다시 붙인다.
+   ⚠ 「물음」은 «그대로»다 — 사람이 답을 넣어 뜻을 바꾸면 그때 따른다. */
+function lineJoinApply(text,marks){
+  var t=String(text==null?"":text).replace(/\r\n?/g,"\n");
+  var 줄=t.split("\n");
+  if(줄.length<2)return t;
+  var 표={};
+  (marks||[]).forEach(function(m){ if(m&&typeof m.줄==="number")표[m.줄]=m.뜻; });
+  var out=줄[0];
+  for(var i=1;i<줄.length;i++){
+    var 뜻=표[i-1];
+    if(뜻==="붙임")out+=줄[i].replace(/^\s+/,"");
+    else if(뜻==="띄움")out+=" "+줄[i].replace(/^\s+/,"");
+    else out+="\n"+줄[i];
+  }
+  return out;
+}
+
+/* 몇 곳을 어떻게 했나 — 조용히 고치면 아무도 확인 못 한다 */
+function lineJoinCount(marks){
+  var c={붙임:0,띄움:0,물음:0,그대로:0};
+  (marks||[]).forEach(function(m){ if(m&&c[m.뜻]!==undefined)c[m.뜻]++; });
+  return c;
 }
 function parseArticles(text){
   text=stripToc(String(text||"").replace(/\r\n?/g,"\n"));
@@ -2049,6 +2198,16 @@ async function loadFile(file){
       text=new TextDecoder("utf-8",{fatal:true}).decode(raw);
     }else{ alert("지원 형식: HWP · HWPX · DOCX · ODT · RTF · PDF · TXT\n(옛 .doc 이진 형식은 워드에서 .docx로 저장해 올려 주세요)"); return; }
     const key="U"+(++upSeq);
+    /* ⏎ 낱말 한가운데서 끊긴 줄을 «담기기 전»에 잇는다 (대표 승인 목업 2026-09-13-줄잇기).
+       한글에서 뽑은 글은 보이는 줄바꿈이 딸려 들어와 「배포·게⏎시」가 된다. 담긴 뒤에
+       고치면 이미 신구대조표·전문에 실려 나간 뒤다.
+       ⚠ 답이 갈리는 자리는 «안 건드린다» — [⏎ 줄 정리]에서 사람이 본다. */
+    try{
+      const 줄표=lineJoinMarks(text,ljStd());
+      const 셈=lineJoinCount(줄표);
+      if(셈.붙임||셈.띄움)text=lineJoinApply(text,줄표);
+      LJ_LEFT=셈.물음;
+    }catch(e){ console.warn("줄 정리 건너뜀:",e); }
     const site=detectSiteName(text);   // 본문에서 사업장명 인식
     SAMPLES[key]=text; SITE_MAP[key]=(site?"🏢 "+site:"📄 "+name); SITE_BIZNO[key]="";
     SITE_FILE[key]=name; SITE_NAME[key]=site;
@@ -3924,6 +4083,80 @@ function openFinal(){
   if(!CUR_ITEMS.length){ alert("먼저 조문 검토·편집을 생성하세요."); return; }
   renderFinal(); $("ov-final").classList.add("on"); renderStepNav();
   finScan();      // 팝업이 보인 뒤 한 번 더 — 숨어 있을 때는 좌표가 0이다
+}
+/* ══════ ⏎ 줄 정리 — 사람이 한 번 훑는 자리 (대표 승인 목업 2026-09-13-줄잇기) ══════
+   ★ 판정(lineJoinMarks)은 위에 있고, 여기는 «보여 주고 받아 적는» 일만 한다.
+   ⚠ 표는 손이 안 닿는다 — 판정이 조문 구역 밖을 아예 안 건드린다.
+   ⚠⚠ 정한 것을 «한꺼번에» 붙인다. 하나씩 붙이면 줄 번호가 밀려 다음 것이 엉뚱한
+     자리에 붙는다. 그래서 표는 한 벌만 두고 마지막에 한 번 적용한다. */
+let LJ_MARKS=[], LJ_KEY="", LJ_LEFT=0;
+function ljStd(){ try{ return (typeof STD_2026!=="undefined"&&STD_2026&&STD_2026.text)||""; }catch(e){ return ""; } }
+function ljScan(txt){ return lineJoinMarks(txt,ljStd()); }
+function ljOpen(){
+  const key=siteSel.value, txt=SAMPLES[key]||"";
+  if(!txt){ alert("먼저 취업규칙 파일을 올리거나 보관함에서 열어 주세요."); return; }
+  LJ_KEY=key; LJ_MARKS=ljScan(txt);
+  const c=lineJoinCount(LJ_MARKS);
+  if(!c.붙임&&!c.띄움&&!c.물음){ alert("낱말 한가운데서 끊긴 줄이 없습니다 — 정리할 것이 없습니다."); return; }
+  ljRender(); $("ov-lj").classList.add("on");
+}
+function ljRender(){
+  const c=lineJoinCount(LJ_MARKS);
+  const 물음=LJ_MARKS.filter(m=>m.뜻==="물음"||m.고름);
+  $("lj-sum").textContent=`문서가 스스로 답한 곳 ${c.붙임+c.띄움}곳 · 사람이 볼 곳 ${c.물음}곳`;
+  $("lj-head").innerHTML=
+    `<div style="font-size:12px;line-height:1.85;color:var(--sub)">`
+    +`한글에서 글자를 뽑을 때 «눈에 보이는 줄바꿈»이 딸려 들어옵니다. 한글은 낱말 한가운데서도 줄을 끊습니다.<br>`
+    +`<b>붙임 ${c.붙임}곳 · 띄움 ${c.띄움}곳</b> 은 이 문서(와 고용노동부 표준취업규칙)가 같은 말을 어떻게 썼는지 보고 스스로 정한 것입니다.<br>`
+    +`<b style="color:#854d0e">사람이 볼 곳 ${c.물음}곳</b> 은 둘 다 쓰여 답이 갈립니다 — 굵은 쪽이 추천입니다.<br>`
+    +`⚠ 항(①②③)·호·목·조·장, 문장이 끝난 줄, 그리고 <b>표지의 개정이력 표와 부칙</b>은 손대지 않습니다(${c.그대로}곳).`
+    +`</div>`;
+  $("lj-body").innerHTML=물음.length
+    ? 물음.map((m,i)=>{
+        const 고른=m.고름||"";
+        const b=(값,글,힌트)=>`<button type="button" class="ljb${고른===값?" on":(!고른&&m.추천===값?" rec":"")}" data-lj="${i}" data-v="${escapeH(값)}">${escapeH(글)}${힌트?`<i>${escapeH(힌트)}</i>`:""}</button>`;
+        return `<div class="ljrow"><div class="ljctx">…${escapeH(m.앞.slice(-26))}<span class="ljbrk">⏎</span>${escapeH(m.뒤.slice(0,26))}…</div>`
+          +`<div class="ljbtns">${b("붙임",m.앞말+m.뒷말,"붙임")}${b("띄움",m.앞말+" "+m.뒷말,"띄움")}${b("그대로","그대로","")}</div></div>`;
+      }).join("")
+    : `<div style="font-size:12px;color:var(--mute);padding:12px 2px">사람이 볼 곳이 없습니다 — 문서가 다 답했습니다.</div>`;
+  $("lj-body").querySelectorAll("[data-lj]").forEach(el=>el.onclick=()=>{
+    const m=물음[+el.dataset.lj]; if(!m)return;
+    m.고름=el.dataset.v; m.뜻=(el.dataset.v==="그대로"?"물음":el.dataset.v);
+    ljRender();
+  });
+  const 고른수=물음.filter(m=>m.고름&&m.고름!=="그대로").length;
+  $("lj-go").textContent=`이대로 정리하기 — ${c.붙임+c.띄움+고른수}곳`;
+}
+/* 정한 대로 «한꺼번에» 고치고 담는다 */
+function ljGo(){
+  const txt=SAMPLES[LJ_KEY]||"";
+  const 쓸것=LJ_MARKS.map(m=>({줄:m.줄,뜻:(m.뜻==="물음"?"그대로":m.뜻)}));
+  const 새글=lineJoinApply(txt,쓸것);
+  if(새글===txt){ alert("바뀐 것이 없습니다."); return; }
+  if(!confirm(`원본 글의 줄만 정리합니다.\n\n`
+    +`· 이미 검토·편집한 내용은 «그대로» 둡니다 — 다시 검토하면 정리된 글로 새로 만들어집니다.\n`
+    +`· 서고에 담은 한글 «원본 파일»은 손대지 않습니다.\n`
+    +`· 표지의 개정이력 표와 부칙은 안 건드립니다.`))return;
+  SAMPLES[LJ_KEY]=새글;
+  ljSave();
+  $("ov-lj").classList.remove("on");
+  renderPreview();
+  const c=lineJoinCount(쓸것);
+  alert(`줄을 정리했습니다 — ${c.붙임}곳 붙이고 ${c.띄움}곳 띄웠습니다.\n`
+    +(c.물음?`아직 ${c.물음}곳이 남아 있습니다([⏎ 줄 정리]로 다시 볼 수 있습니다).`:""));
+}
+/* 담는 자리 — 이 브라우저의 작업본과 보관함. 지금 보고 있는 문서일 때만 만진다. */
+function ljSave(){
+  if(siteSel.value===LJ_KEY){
+    try{
+      const raw=localStorage.getItem(WORK_KEY);
+      if(raw){ const w=JSON.parse(raw);
+        if(w&&w.orig){ w.orig.text=SAMPLES[LJ_KEY]||""; w.savedAt=new Date().toISOString();
+          localStorage.setItem(WORK_KEY,JSON.stringify(w)); } }
+    }catch(e){ console.warn("줄 정리 보관 실패:",e); }
+    if(typeof pushWorkToCloud==="function")try{ pushWorkToCloud(true); }catch(e){}
+  }
+  if(typeof autoSaveArchive==="function")try{ autoSaveArchive("줄 정리"); }catch(e){}
 }
 /* ① 보관된 원본(기존) 취업규칙
    ★★★ 2026-09-13 에 크게 고쳤다 (대표 제보 「글자 빠지고 내용도 엉망이다」).
@@ -7577,6 +7810,8 @@ $("write-review").addEventListener("click",()=>{
 });
 /* ── 사업장 대시보드 ── */
 /* 전체 보기 팝업 */
+$("line-join").addEventListener("click",ljOpen);
+$("lj-go").addEventListener("click",ljGo);
 $("dash-all").addEventListener("click",()=>{ DASHM_FILT=""; $("dashm-q").value=""; renderDashModal(); $("ov-dash").classList.add("on"); });
 $("dashm-q").addEventListener("input",renderDashModal);
 $("dash-new").addEventListener("click",()=>{
