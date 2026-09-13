@@ -54,8 +54,12 @@
     /* ⚠ 소유 저장뿌리는 «코드가 쓰는 자리»를 다 적는다 — 하나라도 빠지면
        그 자료는 온톨로지가 영영 못 본다. tests/ontology-registry.test.js 가
        앱·서버가 실제로 쓰는 뿌리를 훑어 여기와 맞춘다. */
-    erp:{ name:'푸른이알피', file:'pu-erp.html', primaryRoots:['data','improve_requests','hanaSmsBridge','ieum_public'],
-      entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy'] },
+    /* erp_docs·erp_doc_idx·erp_doc_text 는 «서면함»이다 (2026-09-13).
+       data 밑이 아니라 뿌리로 가른 까닭은 규칙 만들개에 적어 두었다 —
+       data 는 맨 위가 재무 권한이라 그 밑에 두면 서면이 통째로 열린다. */
+    erp:{ name:'푸른이알피', file:'pu-erp.html',
+      primaryRoots:['data','improve_requests','hanaSmsBridge','ieum_public','erp_docs','erp_doc_idx','erp_doc_text'],
+      entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
     consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting'],
       sharedRoots:['data/consultings','puphotos'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp'], sharedRoots:['data','pucards/idx'],

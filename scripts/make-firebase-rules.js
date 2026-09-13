@@ -242,6 +242,84 @@ rules.improve_requests = workspace({ '.indexOn': ['authorSid', 'done'] });
 
 rules.ieum_public = { '.read': 'auth != null', '.write': LOGIN };
 
+/* ══ 서면함 — 직원이 한글로 쓴 서면 (대표 지시 2026-09-12) ═══════════════════
+   「각 직원들이 한글로 서면 작성한 것들 모두 연결 관리하고 싶다」
+   볼 수 있는 사람은 **담당자 + 관리자** 다 (대표 결정 2026-09-13 「나」).
+
+   ★★ 왜 `data` 밑에 안 두는가 — `data` 는 맨 위가 `.read: FIN` 이다. 그리고 이 파일
+     머리에 적어 둔 대로 **위에서 허용하면 아래에서 못 막는다.** data 밑에 두면
+     재무 권한자가 **모든 서면을 통째로** 읽는다. 대표가 고른 것은 「담당자+관리자」였다 —
+     그래서 자리를 뿌리로 가른다. 뿌리에는 이름 없는 자리($other)가 없어 기본이 «닫힘»이다.
+
+   ★ 자리를 셋으로 가른 까닭
+     erp_docs      본체 — 누가·무엇·어디에 붙었나 + «볼 사람 명단(who)»
+     erp_doc_idx   사람별 «내 목록» — 한 줄 그릴 것만 베껴 둔다. 이것이 없으면
+                   목록 한 번 그리려고 서면을 하나씩 두드려야 한다
+                   (사진첩의 sharedTo 와 같은 얼개다 — 거기서 이미 겪고 만든 길이다).
+     erp_doc_text  찾기용 본문 — 따로 담고 길이를 자른다. 목록을 열 때마다 서면 전문을
+                   내려받으면 그것이 곧 요금이다(2026-08-16·08-26 에 두 번 겪었다).
+
+   ⚠⚠ 명단(who)은 «그때 찍어 둔 사진»이다. 사건 담당자를 바꿔도 저절로 안 바뀐다.
+     담당자를 바꿀 때 명단도 함께 고치는 일(「라」 걸음)을 빼면
+     **그만둔 직원이 옛 사건 서면을 계속 본다.**
+   ⚠ 관리자는 명단에 «안 적는다». 적어 두면 관리자가 바뀔 때 명단이 거짓이 된다 —
+     규칙이 그때그때 uid_roles 를 보는 편이 늘 맞다.
+   ⚠ 지우는 것은 관리자만이다(이 집의 업무 칸 규칙과 같다). 담당자는 올리고 고칠 수
+     있지만 없앨 수는 없다 — 서면은 실수로 지우면 되돌릴 데가 없다.
+   ⚠ 창고(Storage) 규칙은 실시간DB 를 못 읽는다. 그래서 「담당자인가」를 창고에서
+     판정할 수 없다 — 원본은 올린 사람 자리에만 담고, 남들은 레코드에 적힌
+     토큰 주소로 연다(docs 의 storage-rules-token-urls 와 같은 길). */
+const DOC_SEEN = "data.child('who').child(auth.uid).exists()";
+rules.erp_docs = {
+  '.read':  `auth != null && ${ADMIN}`,
+  '.write': `auth != null && ${ADMIN}`,
+  $docId: {
+    '.read':  `(${LOGIN}) && (${DOC_SEEN} || ${ADMIN})`,
+    /* 새로 올리기 = «내 이름으로만». 고치기 = 명단에 있는 사람. 지우기 = 관리자만.
+       ⚠ 남의 이름으로 올리는 길을 막는다 — 그러면 「누가 올렸나」가 꾸며진다. */
+    '.write': `(${LOGIN}) && (${ADMIN}`
+      + ` || (!data.exists() && newData.exists() && newData.child('byUid').val() === auth.uid)`
+      + ` || (data.exists() && newData.exists() && ${DOC_SEEN}))`,
+    '.validate': "!newData.exists() || newData.hasChildren(['id','byUid','who','at'])",
+    byUid: { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    who:   { '.validate': 'newData.hasChildren()' }
+  }
+};
+rules.erp_doc_idx = {
+  '.read':  `auth != null && ${ADMIN}`,
+  '.write': `auth != null && ${ADMIN}`,
+  $uid: {
+    '.read': `(${LOGIN}) && (auth.uid === $uid || ${ADMIN})`,
+    /* ⚠ 색인은 «가리키는 표»일 뿐이고 진짜 문은 위 erp_docs 다. 그래서 쓰기를
+         직원 전체에 연다 — 올린 사람이 «담당자들 자리»에 한 줄씩 적어야 하는데,
+         그 담당자가 누구인지 규칙이 미리 알 수 없다.
+       ⚠⚠ 그 대신 «본문·주소»를 여기 못 적게 막는다. 적히면 남의 목록 한 줄에서
+         서면 원본 주소가 통째로 새어 나간다 — 색인을 연 값이 거기서 사라진다. */
+    $docId: {
+      '.write': LOGIN,
+      '.validate': "!newData.exists() || (!newData.hasChild('url') && !newData.hasChild('path')"
+        + " && !newData.hasChild('t') && !newData.hasChild('text'))"
+    }
+  }
+};
+rules.erp_doc_text = {
+  '.read':  `auth != null && ${ADMIN}`,
+  '.write': `auth != null && ${ADMIN}`,
+  $docId: {
+    '.read': `(${LOGIN}) && (root.child('erp_docs').child($docId).child('who').child(auth.uid).exists() || ${ADMIN})`,
+    /* ⚠ 쓸 때는 «이 자리에 적힌 byUid» 로 본다. 위 erp_docs 를 보고 판정하면
+         **처음 올리는 순간에 막힌다** — 규칙의 root 는 «쓰기 전» 모습이라
+         한 번에 보내는 update 안에서는 erp_docs 가 아직 없기 때문이다. */
+    '.write': `(${LOGIN}) && (${ADMIN}`
+      + ` || (newData.exists() && newData.child('byUid').val() === auth.uid)`
+      + ` || (data.exists() && data.child('byUid').val() === auth.uid))`,
+    t:     { '.validate': 'newData.isString() && newData.val().length <= 20000' },
+    cut:   { '.validate': 'newData.isBoolean()' },
+    byUid: { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    $other: { '.validate': false }
+  }
+};
+
 /* ── 파생 관계망(온톨로지) ── 2026-09-04, 6단계 ㉡
    ★ 이것은 «사본»이다. 원본을 대신하지 않고, 언제든 원본에서 다시 만든다.
      그래서 지워져도 자료를 잃지 않는다 — 다시 올리면 된다.
