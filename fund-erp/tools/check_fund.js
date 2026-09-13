@@ -347,7 +347,8 @@ ok('아는 시도일 때만 중복을 지운다',
    축이 다른 둘이 한 층으로 보였다. 사이드바로 옮기고 본문 세 줄을 두 줄로 줄였다. */
 ok('묶음 정의가 한 곳에 있다', src.includes('var HOME_GROUPS=[')
   && ['지역공동', '개별공동', '사내', 'setup', 'past', 'trash'].every(k => new RegExp("\\['" + k + "',").test(src)));
-ok('「지난 기금」이 아니라 「종료기금」', src.includes("['past','🗂 종료기금']") && !src.includes("🗂 지난 기금"));
+/* 아이콘은 2026-09-13 에 뺐다(대표 지시 「아이콘 필요없다. 헤깔린다」) — 여기서 보는 것은 «말»이다 */
+ok('「지난 기금」이 아니라 「종료기금」', src.includes("['past','종료기금']") && !/\['past','[^']*지난/.test(src));
 /* 사이드바와 본문이 «같은 함수»에서 나와야 한다 — 따로 세면 16 vs 15 처럼 어긋나고
    어느 쪽이 맞는지 알 수 없다 */
 ok('묶음 나누기는 homeBuckets 한 곳', src.includes('function homeBuckets(')
