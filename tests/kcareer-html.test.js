@@ -588,7 +588,9 @@ test('fsCommitScan은 신규 필드를 붙여 저장한다', () => {
 test('fsCommitScan은 스토어별로 한 번만 쓴다 — 레코드마다 set을 부르지 않는다', () => {
   const src = funcSource('fsCommitScan');
   // 레코드 반복문 안에서 set()을 부르면 수백 번 재저장 + Firebase 반복 푸시가 된다
-  ['r.promotions.forEach', 'picked.forEach', 'r.submissions.forEach'].forEach((head) => {
+  /* ⚠ 2026-09-13: 승격은 이제 «고른 화면의 것»만 돈다(_쓸것) — 이름만 바뀌었고
+     보는 것(반복문 안에서 set 을 부르지 않는다)은 그대로다. */
+  ['_쓸것.forEach', 'picked.forEach', 'r.submissions.forEach'].forEach((head) => {
     const i = src.indexOf(head);
     assert.ok(i >= 0, head + ' 반복문이 있어야 합니다');
     const end = src.indexOf('\n  });', i);
