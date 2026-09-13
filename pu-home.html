@@ -2735,7 +2735,7 @@ function openPaste() {
     + '</ol><div class="sub" style="margin-top:5px">4번까지 하면 딱지가 「안 올라감」에서 「같음」으로 바뀝니다. '
     + '안 바뀌면 등록이 안 된 것입니다.</div>'
     + '<div class="sub" style="margin-top:6px">단추를 아직 안 넣으셨으면 '
-    + '<b><a href="#" onclick="openFillSetup();return false;">여기에서 한 번만</a></b> 넣으시면 됩니다. '
+    + '<button class="btn sm" onclick="openFillSetup()">⚙ 채우기 단추 넣기</button> 넣으시면 됩니다. '
     + '넣지 않으시면 <span class="kbd">Ctrl+A</span> → <span class="kbd">Ctrl+V</span> 로 직접 붙여넣으셔도 됩니다 '
     + '(<b>경력사항 «칸 하나»</b>입니다. 글 전체가 아닙니다).</div></div>';
 
@@ -3535,6 +3535,15 @@ function appbarHtml() {
        ★ 둘 다 목록 머리(listHtml)에 모여 있다. 여기로 되돌리지 말 것. */
     + '<a class="btn" style="text-decoration:none" href="' + esc(PuHomeExport.ORIGIN)
     + '" target="_blank" rel="noopener">지금 홈페이지 보기</a>'
+    /* ★ 「★ 푸른ERP 채우기」 단추를 넣는 문 (대표 지시 2026-09-13 「2번 하고 사용하게 해달라」).
+       ⚠ 이 단추 하나가 «지금 홈페이지를 손 안 대고 고치는» 유일한 길인데, 넣는 자리가
+         복사 안내문 «속 작은 글씨 링크»에만 있었다. 그래서 대표께서 몇 달을 못 찾으셨고,
+         그동안 라이믹스 관리자 화면에 직접 들어가 고치셨다.
+       ★ 자문사 고르기가 0곳이던 것과 «같은 병»이다 — 기능은 있는데 문이 안 보였다.
+         기능을 만들었으면 «그 문이 보이는지»까지가 한 벌이다. */
+    + '<button class="btn" onclick="openFillSetup()"'
+    + ' title="지금 홈페이지를 관리자 화면에 안 들어가고 고치는 단추입니다 — 한 번만 넣으면 됩니다">'
+    + '⚙ 채우기 단추</button>'
     + (App.group === 'members'
         ? '<span class="sep"></span>'
           + '<button class="btn pri" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '')
@@ -4535,7 +4544,7 @@ async function copyPrivate(key) {
     + '<li>「이대로 저장할까요?」에 <b>확인</b> <span class="sub">(저장해야 홈페이지에서 내려갑니다)</span></li>'
     + '<li>통합시스템으로 돌아와 <b>홈페이지 다시 확인</b></li>'
     + '</ol><div class="sub" style="margin-top:5px">'
-    + '단추가 아직 없으면 <b><a href="#" onclick="openFillSetup();return false;">여기에서 한 번만</a></b> 넣으십시오. '
+    + '단추가 아직 없으면 한 번만 넣으십시오 — <button class="btn sm" onclick="openFillSetup()">⚙ 채우기 단추 넣기</button> '
     + '비공개로 바꾸는 자리를 못 찾으면 <b>아무것도 하지 않고 멈춥니다</b> — 엉뚱한 것을 건드리지 않기 위해서입니다.</div></div>';
   h += '<div style="margin-top:10px;display:flex;gap:7px">'
     + '<a class="btn pri" style="text-decoration:none" href="' + esc(url)
@@ -5668,7 +5677,7 @@ async function copyPageFix(mid) {
     + '<li>눈으로 확인하고 <b>저장</b>을 누른다 <span class="sub">(저장은 사람이 합니다)</span></li>'
     + '<li>통합시스템으로 돌아와 <b>이 쪽 다시 읽기</b> → <b>대조 기준 저장</b> → <b>홈페이지 다시 확인</b></li>'
     + '</ol><div class="sub" style="margin-top:5px">'
-    + '단추가 아직 없으면 <b><a href="#" onclick="openFillSetup();return false;">여기에서 한 번만</a></b> 넣으십시오. '
+    + '단추가 아직 없으면 한 번만 넣으십시오 — <button class="btn sm" onclick="openFillSetup()">⚙ 채우기 단추 넣기</button> '
     + '원래 글을 못 찾은 줄은 <b>건너뛰고 무엇을 건너뛰었는지 알려 줍니다</b> — '
     + '그 사이 남이 고친 글을 덮지 않기 위해서입니다.</div></div>';
   h += '<div style="margin-top:10px;display:flex;gap:7px">'
