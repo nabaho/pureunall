@@ -154,7 +154,24 @@ function 쪽(제목, 전문) {
        ⚠ 한 문단짜리가 화면 꼭대기에 붙고 아래가 통째로 비어 있었다 —
          그것이 「무미건조」의 큰 몫이었다. */
     + '#pop.on{display:flex;align-items:center;justify-content:center;padding:20px 12px}'
-    + '#pop .in{background:#fff;width:min(660px,94vw);max-height:88vh;border-radius:16px;'
+    /* ★★ 창 «뒤»에 우리 얼굴을 둔다 (대표 지시 2026-09-13
+         「팝업창 뒤 배경에 좀 뭔가를 넣고 싶다 … 너무 무미 건조하다」).
+       ⚠⚠ pointer-events:none 이 없으면 «바깥 누르기»가 통째로 죽는다.
+         닫는 길은 셋(단추·바깥·Esc)인데, 화면은 멀쩡해 보이면서 하나가 사라진다 —
+         닫으려다 안 닫히는 것으로만 겪게 된다.
+       ⚠ 여기 적는 것은 코드가 «이미 아는 것»(이름·전화)뿐이다.
+         주소·대표자 같은 것을 지어 넣으면 손님이 그것을 사실로 읽는다. */
+    + '#pop .bg{position:absolute;inset:0;display:flex;flex-direction:column;'
+    + 'align-items:center;justify-content:center;pointer-events:none;'
+    + '-webkit-user-select:none;user-select:none;overflow:hidden}'
+    + '#pop .bg .w{font:bold 96px Georgia,\'Times New Roman\',serif;letter-spacing:16px;'
+    + 'color:#dedad4;line-height:1;white-space:nowrap}'
+    + '#pop .bg .s{margin-top:10px;font:bold 15px \'Malgun Gothic\',sans-serif;'
+    + 'letter-spacing:5px;color:#c8c2b9;white-space:nowrap}'
+    + '#pop .bg .t{position:absolute;bottom:20px;font:12.5px \'Malgun Gothic\',sans-serif;'
+    + 'color:#c8c2b9}'
+    /* ★ 글자를 키운 만큼 창도 넓힌다 — 안 그러면 줄만 잘게 쪼개진다 */
+    + '#pop .in{background:#fff;width:min(780px,94vw);max-height:88vh;border-radius:16px;'
     + 'display:flex;flex-direction:column;overflow:hidden;border:1px solid #ddd7cf;'
     + 'box-shadow:0 18px 44px rgba(36,26,19,.22),0 2px 6px rgba(36,26,19,.08);'
     + 'animation:popup .18s ease-out}'
@@ -175,7 +192,12 @@ function 쪽(제목, 전문) {
     + '#pop #popx:hover{background:#8f7862}'
     /* 살구빛 가는 띠 — 머리와 글 사이를 한 겹 띄운다 */
     + '#pop .acc{height:5px;background:#fbf4ea;border-bottom:1px solid #efe7dc}'
-    + '#pop .bd{overflow:auto;padding:24px 26px}'
+    /* ★★ 글자를 «돋보기»로 키운다 (대표 지시 2026-09-13
+         「글자를 좀더 많이 크게해서 쉽게 한번에 눈에 들어오게」).
+       ⚠⚠ 제목·본문·곁말을 하나씩 키우면 편지와 창이 «서로 다른 글»이 된다.
+         비율만 키우면 편지가 정한 결(제목이 본문보다 얼마나 큰가)이 그대로 산다 —
+         편지를 손대지 않고 크게 보는 유일한 길이다. */
+    + '#pop .bd{overflow:auto;padding:26px 28px;zoom:1.22}'
     /* ★ 꼬리 — 누가 보낸 쪽인지, 궁금하면 어디로 물어야 하는지. 없던 자리다. */
     + '#pop .ft{display:flex;align-items:center;gap:8px;padding:12px 18px;background:#faf8f5;'
     + 'border-top:1px solid #eceae6;font:12px \'Malgun Gothic\',sans-serif;color:#9a938a}'
@@ -183,7 +205,13 @@ function 쪽(제목, 전문) {
     + '#pop .ft .sp{flex:1}'
     + '</style>'
     + '</head><body><div id="wrap">' + 전문 + '</div>'
-    + '<div id="pop"><div class="in">'
+    + '<div id="pop">'
+    + '<div class="bg" aria-hidden="true">'
+    + '<div class="w">PUREUN</div>'
+    + '<div class="s">푸른노무법인 주간 노동뉴스레터</div>'
+    + '<div class="t">문의 041-556-0035</div>'
+    + '</div>'
+    + '<div class="in">'
     + '<div class="hd"><span class="mark">PUREUN</span><span class="bar"></span>'
     + '<b id="popt">이 소식</b><button id="popx" type="button">닫기 ✕</button></div>'
     + '<div class="acc"></div>'
