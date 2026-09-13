@@ -124,24 +124,59 @@ test('⑥ ★★ 알림이 «누를 것»을 함께 준다 — 글자로만 가�
   assert.ok(!/action/.test(기록), '★★ 알림 기록에 함수를 넣습니다 — 저장이 조용히 깨집니다');
 });
 
-test('⑦ ★★ 어디가 고장인지 갈라 말한다 — 할 일 없는 곳으로 보내지 않는다', function () {
+test('⑦ ★★ 모르는 것을 아는 척하지 않는다 — 대신 «해 볼 수 있는 단추»를 준다', function () {
+  /* ⚠⚠ 2026-09-13 하루에 «같은 실수를 세 번» 했다. 이것이 세 번째다.
+       ㉠ 안내가 할 일 없는 화면을 가리켰다(데이터 관리)
+       ㉡ 고치면서 또 틀린 화면을 가리켰다(역시 데이터 관리) → 검사 ⑧ 이 생겼다
+       ㉢ 「서버가 깨끗한지」를 window._fbObjForm 으로 판단했다 — 그 이름은 «함수 안»에
+          선언돼 있어 window 에는 없다. 늘 undefined 라 «늘» 「서버에도 껍데기가 있다」로
+          떨어졌다. 실제 서버는 1,785건 전부 id 가 있는 객체형이었다(실측).
+          틀린 말을 하면서, 단추도 안 줬다.
+     ★ 배운 것: 이 점검은 «이 기기 사본»만 센다. 서버가 어떤지는 여기서 알 수 없다.
+       알 수 없는 것은 말하지 않는다. 대신 어느 쪽이든 안전한 «해 볼 일»을 준다 —
+       사본을 서버 것으로 갈아 끼워 보는 것. 서버도 같으면 알림이 다시 뜰 뿐이다. */
   const from = bare.indexOf('var _hasId = 0, _noId = 0;');
   assert.ok(from > 0, 'id 없음 점검을 못 찾았습니다');
   const end = bare.indexOf("prev[k]==='number'", from);
   const 구역 = bare.slice(from, end > from ? end : from + 2000);
-  /* 이 점검은 localStorage 만 센다 — 서버 모양을 함께 봐야 어디가 고장인지 안다 */
-  assert.match(구역, /_fbObjForm\[k\]\s*===\s*true/,
-    '★★ 서버 모양을 안 봅니다 — 이 기기 사본 탓인지 서버 자료 탓인지 못 가릅니다');
-  assert.match(구역, /_srvClean\s*\r?\n?\s*\?/,
-    '★★ 안내가 한 갈래뿐입니다 — 고칠 것이 없는 사람에게도 고치라고 합니다');
+
   assert.match(구역, /label:\s*'[^']*다시 받기'/,
     '★★ 누를 단추를 안 건넵니다 — 다시 글자로만 가리키게 됩니다');
   assert.match(구역, /run:\s*function\(\)\{[^}]{0,80}erpPullFromServer\(\)/,
     '★★ 단추가 사본을 갈아 끼우지 않습니다');
-  /* ⚠ 서버가 아직 배열형일 때는 그 단추를 주면 «안 된다» — 서버에도 껍데기가 있어
-     받아 봐야 그대로다. 고칠 것이 없는 단추는 틀린 안내와 같다. */
-  assert.match(구역, /_srvClean && typeof window\.erpPullFromServer/,
-    '★★ 서버가 아직 고장일 때도 「다시 받기」를 권합니다 — 눌러도 그대로입니다');
+
+  /* ⚠ 함수 안 이름을 window 에서 찾으면 «늘 undefined» 다 — 늘 틀린 쪽으로 안내한다 */
+  assert.ok(!/window\._fbObjForm/.test(구역),
+    '★★ window._fbObjForm 로 서버 상태를 판단합니다. 그 이름은 «함수 안»에 선언돼 있어\n' +
+    '   window 에는 없습니다(늘 undefined) — 그래서 «늘» 한쪽으로만 안내하게 됩니다.');
+  assert.ok(!/서버 자료는 이미 깨끗합니다|서버 자료에도 껍데기가 남아 있습니다/.test(구역),
+    '★★ 서버가 어떤지 «단정»합니다. 이 점검은 이 기기 사본(localStorage)만 셉니다 —\n' +
+    '   서버 상태는 여기서 알 수 없습니다. 알 수 없는 것을 말하면 안 됩니다.');
+});
+
+test('⑦-2 ★★ 자기점검이 «window 에 없는 이름»을 window 에서 찾지 않는다', function () {
+  /* ⑦㉢ 을 기계로 막는다. 부팅 점검은 한 번 틀리면 «늘» 틀리므로 값이 비싸다.
+     규칙: 자기점검이 window.X 로 읽는 이름은, 어딘가에서 window.X 로 «놓인» 것이어야 한다.
+     파일 어딘가에 var X 가 있을 뿐이면 그것은 그 함수 안의 이름이지 window 의 것이 아니다. */
+  const from = bare.indexOf("var CHECK=['companies'");
+  assert.ok(from > 0, '자기점검 구역을 못 찾았습니다');
+  const end = bare.indexOf('localStorage.setItem(SNAPK', from);
+  const 구역 = bare.slice(from, end > from ? end : from + 6000);
+
+  const 읽는이름 = [];
+  const re = /window\.([A-Za-z_$][\w$]*)/g;
+  let m;
+  while ((m = re.exec(구역))) { if (읽는이름.indexOf(m[1]) < 0) 읽는이름.push(m[1]); }
+  assert.ok(읽는이름.length > 0, '★ window 에서 읽는 이름이 하나도 없습니다 — 구역을 잘못 잘랐습니다');
+
+  const 없는것 = 읽는이름.filter(function (n) {
+    /* 어딘가에서 window 에 «놓아 준» 적이 있으면 참된 전역이다 */
+    return bare.indexOf('window.' + n + ' =') < 0 && bare.indexOf('window.' + n + '=') < 0;
+  });
+  assert.deepStrictEqual(없는것, [],
+    '★★ 자기점검이 window 에 «없는» 이름을 읽습니다: ' + 없는것.join(', ') + '\n' +
+    '   파일에 var 로 있더라도 함수 안이면 window 에는 없습니다 — 늘 undefined 로 읽혀\n' +
+    '   부팅 점검이 «늘» 같은 쪽으로 틀립니다. window.X = … 로 내놓거나, 읽지 마세요.');
 });
 
 test('⑧ ★★ 안내가 가리킨 화면에 그 단추가 «실제로» 있다', function () {
