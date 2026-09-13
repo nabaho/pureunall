@@ -30,15 +30,28 @@
       지역:'충남/서산시', 방식:'board', 밑주소:'https://www.moel.go.kr',
       목록주소:'https://www.moel.go.kr/local/seosan/news/notice/noticeList.do',
       공공누리:'출처표시 확인' },
+    { id:'moel-pyeongtaek', 기관:'경기지방고용노동청 평택지청', 이름:'공지사항',
+      지역:'경기', 방식:'board', 밑주소:'https://www.moel.go.kr',
+      목록주소:'https://www.moel.go.kr/local/pyeongtaek/news/notice/noticeList.do',
+      공공누리:'출처표시 확인' },
+    /* ── 아래 셋은 «사람이 보는» 자리다. 서버는 안 읽는다. ─────────────────
+       ⚠ 2026-09-13 에 셋을 실제로 두드려 본 결과를 «적어 둔다». 적어 두지 않으면
+         다음에 또 「읽개만 만들면 되겠네」로 시작해 같은 길을 걷는다.
+       ★ 읽개를 안 만든 까닭은 게을러서가 아니라 «들어올 것이 없어서»다.
+         읽으려면 공식링크 잣대를 go.kr 로 넓혀야 하는데(지금은 moel.go.kr 만),
+         그 값을 치르고 얻는 것이 아래와 같다. */
     { id:'chungnam-press', 기관:'충청남도', 이름:'보도자료', 지역:'충남', 방식:'board',
       목록주소:'https://www.chungnam.go.kr/cnportal/bbs/B0000417/list.do?menuNo=500498',
-      공공누리:'게시물별 유형 확인' },
+      공공누리:'게시물별 유형 확인',
+      살핌:'2026-09-13 실측 — 200 이지만 목록이 「조회 데이터가 없습니다」로 비어서 온다(주소가 낡음)' },
     { id:'seosan-company', 기관:'서산시', 이름:'기업지원 새소식', 지역:'충남/서산시', 방식:'board',
       목록주소:'https://www.seosan.go.kr/company/selectBbsNttList.do?bbsNo=2824&key=9456',
-      공공누리:'게시물별 유형 확인' },
+      공공누리:'게시물별 유형 확인',
+      살핌:'2026-09-13 실측 — 살아 있으나 글이 2건뿐' },
     { id:'cheonan-company', 기관:'천안시', 이름:'일자리·기업지원 사전정보', 지역:'충남/천안시', 방식:'board',
       목록주소:'https://www.cheonan.go.kr/prog/ioCateData/kor/sub03_01_02/list.do?cate_b_cd=b01&cate_cd=0111',
-      공공누리:'게시물별 유형 확인' }
+      공공누리:'게시물별 유형 확인',
+      살핌:'2026-09-13 실측 — 404. 주소를 새로 찾아야 한다' }
   ];
 
   var 저작권 = {
