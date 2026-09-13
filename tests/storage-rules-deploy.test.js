@@ -21,6 +21,7 @@ const cp = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const S = require(path.join(ROOT, 'scripts', 'storage-rules-deploy.js'));
 const 올릴것 = path.join(ROOT, 'docs', 'firebase-storage-전체(붙여넣기용).txt');
+const 승인길 = path.join(ROOT, 'docs', 'firebase-storage-보조함수-고침승인.txt');
 
 /* ══════ ③ 뜯기가 중첩을 제대로 읽는가 ═══════════════════════════════
    ⚠⚠ 처음에 정규식 하나로 잡았더니 겉 칸(`/b/{bucket}/o {`)이 게으른 짝짓기로
@@ -108,11 +109,17 @@ test('★★★ 올릴 파일이 기준(콘솔 원문)의 칸·허락·함수를
       assert.ok(새것.칸[k].indexOf(a) >= 0, '★★★ 허락이 사라집니다: ' + k + ' — ' + a);
     });
   });
-  Object.keys(기준.함수).forEach(function (f) {
-    assert.equal(새것.함수[f], 기준.함수[f],
-      '★★★ 보조 함수가 사라지거나 달라집니다: ' + f + '()'
-      + ' — 조이면 급여데이터함·명함첩이 막힐 수 있습니다');
-  });
+  /* 보조 함수는 «사라지면» 무조건 탈이고, «달라지면» 승인 파일에 옛·새가 글자까지
+     적혀 있을 때만 봐준다(2026-09-13). 조이는 고침을 아예 못 하게 두면 다음 사람이
+     결국 --force 를 만든다 — 그것이 이 파일이 막으려는 바로 그것이다.
+     ⚠ 승인은 «그 고침 하나»다. 한 글자만 흔들려도 다시 걸린다
+       (tests/storage-rules-deploy-approval.test.js 가 그 이빨을 따로 확인한다). */
+  const 승인 = fs.existsSync(승인길) ? S.승인읽기(fs.readFileSync(승인길, 'utf8')) : {};
+  const 함수결과 = S.함수바뀜(기준.함수, 새것.함수, 승인);
+  assert.deepEqual(함수결과.멈출까, [],
+    '★★★ 보조 함수가 사라지거나 «승인 없이» 달라집니다 —'
+    + ' 조이면 급여데이터함·명함첩이 막힐 수 있습니다.'
+    + ' 조이는 고침이라면 docs/firebase-storage-보조함수-고침승인.txt 에 옛·새를 적으세요');
 });
 
 /* ══════ ② 앱이 쓰는 자리가 덮이는가 ═════════════════════════════ */
