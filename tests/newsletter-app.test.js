@@ -19,6 +19,7 @@ const ROOT = path.join(__dirname, '..');
 const 읽기 = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 
 const news = stripComments(읽기('pu-news.html'));
+const functionsIndex = stripComments(읽기('functions/index.js'));
 const enter = stripComments(읽기('enter.html'));
 const appbar = stripComments(읽기('js/pu-appbar.js'));
 
@@ -136,7 +137,12 @@ test('화면이 관리자를 «못 읽었을 때» 열지 않는다', () => {
 });
 
 test('이미 보낸 회차를 두 번 보내지 않는다 — 상태를 자리에 적는다', () => {
-  assert.ok(/상태\s*:\s*'발송'/.test(news), '보낸 뒤 상태를 안 적으면 두 번 보낸다');
+  const send = functionsIndex.slice(functionsIndex.indexOf('exports.sendBulkMail'),
+    functionsIndex.indexOf('exports.sendScheduledMail'));
+  assert.ok(/upd\[issue \+ "상태"\]\s*=\s*"발송"/.test(send),
+    '서버가 대기열과 함께 회차 발송 상태를 안 적으면 두 번 보낼 수 있다');
+  assert.ok(/await db\.ref\(\)\.update\(upd\)/.test(send),
+    '대기열과 발송 상태를 한 번에 확정하지 않는다');
 });
 
 /* ══════ ⑦ 걸리는 시간을 화면이 스스로 셈하지 않는다 ══════ */

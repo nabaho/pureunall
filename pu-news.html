@@ -31,7 +31,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=23"></script>
+<script src="js/pu-ontology.js?v=25"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-version.js?v=3"></script>
 <script src="js/pu-gate.js?v=1"></script>
@@ -43,10 +43,10 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=33"></script>
-<script src="js/pu-news-tpl.js?v=13"></script>
+<script src="js/pu-news-core.js?v=34"></script>
+<script src="js/pu-news-tpl.js?v=16"></script>
 <script src="js/pu-news-regional-sources.js?v=1"></script>
-<script src="js/pu-news-review.js?v=3"></script>
+<script src="js/pu-news-review.js?v=5"></script>
 <style>
 :root{
   --navy:#1e40af; --ink:#1e293b; --sub:#64748b; --faint:#94a3b8;
@@ -439,8 +439,15 @@ table.list tr:hover td{background:#fcfcfd}
 #ilbox .in h4 .sp{flex:1}
 #ilbox .bd{overflow:auto;flex:1;min-height:0}
 #big.on{display:flex;align-items:center;justify-content:center}
-#big .in{background:#fff;border-radius:14px;width:min(680px,96vw);max-height:92vh;
+/* ⚠ 680 → 780 (대표 지시 2026-09-12 「팝업화면에 좌우에 잘리는 내용 없이 다 보이게」).
+     편지는 700px 고정 폭 표다(pu-news-tpl.js 의 넓이). 창이 680 이면 안쪽 여백을 빼고
+     624px 밖에 안 남아 «오른쪽이 잘렸다» — 눈으로는 「글이 좀 짧네」로 보인다.
+     780 = 700 + .bd 여백 28 + 넉넉히 52. 이보다 좁은 화면에서는 아래 편지창채우기 가
+     통째로 줄여서 «잘리는 대신 작아지게» 한다. */
+#big .in{background:#fff;border-radius:14px;width:min(780px,96vw);max-height:92vh;
   display:flex;flex-direction:column;overflow:hidden}
+/* 줄여 그릴 때 쓰는 감싸개 — transform 은 «자리»를 안 줄이므로 높이를 우리가 맞춘다 */
+#big .ltrwrap{margin:0 auto;overflow:hidden}
 #big .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
   display:flex;align-items:center;gap:8px}
 #big .in h4 .sp{flex:1}
@@ -532,6 +539,107 @@ table.list tr:hover td{background:#fcfcfd}
   .colL{overflow:visible;padding-right:0}
   .wrap.now .pv{position:sticky;top:12px;height:auto;display:block}
   .wrap.now .pv .paper{max-height:70vh}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   위를 붙여 둔다 — 넓은 화면 «밖»에서도 (대표 지시 2026-09-12 「상단 틀고정」)
+   ══════════════════════════════════════════════════════════════════════════
+   ⚠⚠ #tabs 에는 예전부터 position:sticky 가 있었는데 «폰에서는 안 붙었다».
+     붙는 것(sticky)은 «제 부모의 상자 안»에서만이다 — 부모(#top)가 화면 밖으로
+     밀려 나가면 그 안의 붙임도 같이 나간다. 실측 2026-09-12: 600px 굴리니
+     탭이 -558px 로 사라졌다. 그래서 붙일 것은 #tabs 가 아니라 «#top» 이다.
+
+   ⚠ 981px 이상에서는 껍데기(flex)가 이미 위를 얼린다 — 거기서는 이 규칙이 필요 없고,
+     걸면 얼린 머리 위에 또 붙는 머리가 생긴다. 그래서 그 아래에서만 건다.
+
+   ★ 앱바까지 «함께» 붙인다. 탭만 붙이려면 앱바 높이만큼 음수 top 을 줘야 하는데,
+     그 숫자는 글자 크기·줄바꿈이 바뀌면 어긋난다 — 자리를 px 로 박지 않는다는
+     이 파일의 규칙(맨 아래 얼리기 주석)과 같은 결이다. */
+@media(max-width:980px){
+  #top{position:sticky;top:0;z-index:30;background:#fff;
+    box-shadow:0 2px 8px rgba(15,23,42,.07)}
+  #tabs{box-shadow:none}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   폰에서 보는 꼴 (대표 지시 2026-09-12 「폰화면에서 편하게 보게 깔끔히 정리해라」)
+   ══════════════════════════════════════════════════════════════════════════
+   375px 짜리 화면에서 재 보니 「이번 회차」 한 장이 2,058px 였다. 무엇이 먹고 있었나:
+     · 회차 단추 넷이 «세 줄» — 하나씩 제 줄을 차지했다
+     · 담는 법 단추 다섯이 «세 줄»
+     · 줄마다 ▲▼ 와 매체 이름이 가로를 먹어, 제목이 네 줄로 쏟아졌다
+     · 요약의 꼭지 칩이 «한 줄에 하나씩» — 이름표 칸(96px)이 자리를 다 먹어서다
+
+   ★ 고른 잣대: «누르는 것»은 손가락만큼 크게 두고, «읽는 것»은 폭을 다 준다.
+   ⚠ 아무것도 «감추지 않는다» — 감추면 폰에서만 할 수 없는 일이 생긴다.
+     자리를 바꾸거나(▲▼는 줄창으로), 줄을 옮기거나, 가로로 굴리게 할 뿐이다. */
+@media(max-width:560px){
+  .wrap{padding:10px}
+
+  /* ⚠⚠ 칸이 «안 줄어드는» 것부터 막는다. 바둑판(grid)의 칸은 기본이 min-width:auto 라,
+       안에 «안 접히는 줄»(아래 .ways 의 nowrap)이 하나만 있어도 그 줄의 온폭만큼
+       칸이 벌어진다. 그러면 375px 화면에서 칸이 665px 가 되어 오른쪽이 잘린다
+       — 겉으로는 가로 스크롤도 안 생겨서 «글이 짧아진 것»처럼 보인다(실측 2026-09-12). */
+  .cols>*{min-width:0}
+  .ways{min-width:0;max-width:100%}
+
+  /* ⓪ 탭 다섯이 469px 라 오른쪽 둘(보낸 결과·설정)이 화면 밖에 있었다.
+       굴려서 찾게 두지 말고 «다 보이게» 줄인다 — 폰에서는 가로로 굴릴 수 있다는 것이
+       눈에 안 띄어, 없는 탭으로 여기게 된다. */
+  #tabs{padding:0 3px;gap:0}
+  #tabs button{flex:1 1 0;min-width:0;padding:11px 3px;font-size:12px;white-space:nowrap}
+  #tabs button span{font-size:10px}
+  #bar{padding:10px 12px}
+  #bar .logo{font-size:16px}
+
+  /* ① 회차 머리 — 이름은 제 줄, 단추는 두 칸 바둑판.
+       ★ 「보내기」만 한 줄을 온전히 쓴다 — 되돌릴 수 없는 일이라 옆 단추와
+         나란히 두면 엄지로 잘못 누르기 쉽다. */
+  .hdbar{gap:7px;padding:11px 12px}
+  .hdbar>.no{flex:1 1 100%;font-size:17px}
+  .hdbar>.btn{flex:1 1 calc(50% - 4px);justify-content:center;text-align:center;
+    font-size:12.5px;padding:9px 6px}
+  .hdbar>.btn.pri{flex:1 1 100%}
+
+  /* ② 담는 법 · 꼭지 도구줄 — 단추를 작게 해 두 줄에 담는다.
+       ⚠ 가로로 굴리게 해 봤더니 끝 단추가 «잘린 채» 서서 고장난 것처럼 보였다.
+         폰에서는 굴릴 수 있다는 것이 눈에 안 띈다 — 작게 해서 다 보이는 편이 낫다. */
+  .ways,.jarhead{gap:5px;padding:8px 10px}
+  .ways>.btn,.jarhead .mini,.jarhead .btn{font-size:11.5px;padding:6px 9px}
+  .ways .sep{display:none}
+  .ways .lab{font-size:11px}
+  /* 「제목·원문 링크만 싣습니다」 꼬리말은 ⓘ 와 같은 말이라 폰에서는 접는다 */
+  .ways .tail{display:none}
+
+  /* ③ 꼭지 탭 — 두 칸 바둑판. 넷이 두 줄에 반듯하게 선다 */
+  .jartabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px}
+  .jartabs button{border:1px solid var(--line);border-radius:9px;padding:9px 7px;
+    font-size:12.5px;justify-content:center}
+
+  /* ④ 줄 — 바둑판으로 짜서 [ㅁ][제목][✕] 한 줄, 출처는 제목 아래로.
+       ⚠ ▲▼ 는 폰에서 감춘다 — 손가락보다 작아 눌러도 안 맞는다.
+         차례 바꾸기는 PC 에서 하거나, 줄을 눌러 여는 창에서 한다. */
+  .item{display:grid;grid-template-columns:auto 1fr auto;gap:3px 8px;
+    align-items:start;padding:10px 11px}
+  .item>.ck{grid-column:1;grid-row:1;margin-top:2px}
+  .item .mv{display:none}
+  .item .t{grid-column:2;grid-row:1;font-size:13px}
+  .item .x{grid-column:3;grid-row:1;padding:0 2px}
+  .item .src{grid-column:2;grid-row:2;padding-top:0}
+
+  /* ⑤ 요약 — 이름표를 «위»로 올려 값이 폭을 다 쓴다. 그래야 칩이 옆으로 선다 */
+  .sum .row{flex-wrap:wrap;gap:4px;padding:10px 12px}
+  .sum .row .k{width:100%;flex:1 1 100%;padding-top:0}
+  .sum .row .v{flex:1 1 100%}
+
+  /* ⑥ 표(받는 명단·보낸 결과) — 폰에서는 «옆으로 굴려» 본다.
+       ⚠ 그냥 두면 열 여덟 칸이 355px 에 밀려 들어가 회사 이름이 «한 글자씩 세로로»
+         쏟아진다(㈜/성/보/물/류). 실측 2026-09-12: 113줄짜리 명단이 23,345px 였다.
+       ★ 칸을 안 접게 하고(nowrap) 표에 제 폭을 준 뒤, 상자를 굴리게 한다.
+       ⚠ 「이번 회차」의 상자에는 표가 없어 이 규칙이 아무 일도 안 한다 — 해롭지 않다. */
+  .box{overflow-x:auto}
+  table.list{min-width:620px}
+  table.list th,table.list td{white-space:nowrap}
 }
 </style>
 </head>
@@ -761,7 +869,13 @@ function 불러오기(){
     db.ref('newsletter/더한분들').once('value').catch(()=>({val:()=>({})})),
     /* 공식 RSS가 만든 것은 회차가 아니라 «검토 대기» 후보다. 사람이 승인하기 전에는
        편지짓기·발송 경로 어느 쪽에도 넣지 않는다. */
-    db.ref('newsletter/regionalCandidates').once('value').catch(()=>({val:()=>({})}))
+    db.ref('newsletter/regionalCandidates').once('value').catch(()=>({val:()=>({})})),
+    /* 월요일 자동발송 확정본 — 준비 뒤에 회차를 고치면 «고치기 전 것»이 나가므로,
+       화면이 지금 내용과 견줘 「다시 준비하세요」를 띄울 수 있어야 한다. */
+    db.ref('newsletter/weeklyReady').once('value').catch(()=>({val:()=>null})),
+    /* 지역뉴스 모으기 결과 — 「새 기사가 없는 것」과 「못 읽고 있는 것」을 가른다.
+       이것이 없으면 몇 주째 조용히 안 읽고 있어도 화면은 똑같아 보인다. */
+    db.ref('newsletter/regionalCollectMeta').once('value').catch(()=>({val:()=>({})}))
   ]).then(function(v){
     App.설정  = v[0].val() || {};
     App.회차들 = v[1].val() || {};
@@ -770,6 +884,8 @@ function 불러오기(){
     App.브리핑 = v[5].val() || {};   /* ⚠ 위 Promise.all 차례와 «번호가 맞아야» 한다 */
     App.더한분들 = v[6].val() || {};
     App.지역후보 = v[7].val() || {};
+    App.예약본 = v[8].val() || null;
+    App.수집결과 = v[9].val() || {};
     if(!App.설정.회사이름) App.설정.회사이름 = '푸른노무법인';
     if(!App.설정.회신주소) App.설정.회신주소 = '370-6@daum.net';
     if(!App.설정.범위)    App.설정.범위 = '자문중';
@@ -831,14 +947,66 @@ function 회차로부터(열쇠){
   return Core.회차(오늘());
 }
 
-function 회차저장(자료){
+/* ══════════════════════════════════════════════════════════════════════════
+   회차 저장 — 「마지막에 누른 사람이 이긴다」를 없앤다 (2026-09-13)
+   ══════════════════════════════════════════════════════════════════════════
+   회차저장 은 «안 을 통째로» 덮어쓴다. 화면이 들고 있는 안 은 읽어 온 그때 것이라,
+   그 사이에 다른 관리자가 기사 한 줄을 더했으면 내가 저장하는 순간 그 줄이 사라진다.
+   서로 «다른 기사»를 고쳐도 그렇다 — 아무도 덮어썼다는 것을 모른다.
+
+   ★ 그래서 회차마다 «판»(몇 번째 손질인가)을 두고, 내가 읽어 온 판일 때만 쓴다.
+     남이 먼저 고쳤으면 «덮어쓰지 않고» 멈춘 뒤 화면을 새로 읽는다 —
+     소리 없이 지우느니 「다시 넣어 주세요」가 낫다.
+   ⚠ 합치려 들지 않는다. 기사 두 줄을 기계가 섞으면 어느 쪽 글인지 아무도 모른다. */
+async function 판올리기(열쇠, 본판){
+  const ref = db.ref('newsletter/issues/' + 열쇠 + '/판');
+  /* ⚠⚠ 거래는 «찬 자리»에서 null 로 먼저 불린다 — 듣고 있지 않은 자리면 그 값이
+       null 이라 그냥 접힌다(서버에 묻지도 않는다). 그래서 먼저 읽어 데운다.
+       그래도 접혔으면 «진짜로» 남이 고친 것인지 한 번 더 확인하고 다시 해 본다 —
+       안 그러면 아무도 안 건드렸는데 「남이 고쳤습니다」가 뜬다. */
+  for(let 번 = 0; 번 < 2; 번++){
+    await ref.once('value');
+    const r = await ref.transaction(function(cur){
+      return Number(cur || 0) === 본판 ? 본판 + 1 : undefined;
+    }, undefined, false);
+    if(r.committed) return 본판 + 1;
+    const 지금 = Number((await ref.once('value')).val() || 0);
+    if(지금 !== 본판) return 0;   /* 진짜로 남이 먼저 고쳤다 */
+  }
+  return 0;
+}
+
+/* 서버에 있는 것으로 이 회차를 다시 읽는다.
+   ⚠ 회차를 통째로 읽지 않는다 — 안에 전문과 받는 분들 주소가 있다. */
+async function 회차다시읽기(열쇠){
+  const 칸 = ['회차','상태','안','우리글','범위','지역뉴스','판'];
+  const 값들 = await Promise.all(칸.map(k => db.ref('newsletter/issues/' + 열쇠 + '/' + k).once('value')));
+  const d = { 열쇠: 열쇠 };
+  칸.forEach((k, i) => { const v = 값들[i].val(); if(v != null) d[k] = v; });
+  App.회차들[열쇠] = d;
+  return d;
+}
+
+/* 저장됐으면 true. 남이 먼저 고쳤으면 «알리고» false — 부르는 쪽이 이어 가지 않게. */
+async function 회차저장(자료){
+  const 새판 = await 판올리기(자료.열쇠, Number(자료.판 || 0));
+  if(!새판){
+    await 회차다시읽기(자료.열쇠);
+    render();
+    toast('다른 관리자가 먼저 고쳤습니다 — 화면을 새로 읽었습니다. '
+        + '고치신 것을 다시 넣어 주세요(덮어쓰지 않았습니다)', 14000);
+    return false;
+  }
+  자료.판 = 새판;
   App.회차들[자료.열쇠] = 자료;
-  return db.ref('newsletter/issues/' + 자료.열쇠).update({
+  await db.ref('newsletter/issues/' + 자료.열쇠).update({
     회차: 자료.회차, 상태: 자료.상태 || '초안', 안: 자료.안 || {},
-    우리글: 자료.우리글 || '', 지역뉴스: 자료.지역뉴스 || [],
+    우리글: 자료.우리글 || '',
     범위: 자료.범위 || App.설정.범위 || '자문중',
+    판: 새판,
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
   });
+  return true;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -908,6 +1076,32 @@ function 명단셈(){
   return d;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   확정본이 «준비한 그때 그대로»인가 — 단추 한 줄로 말한다 (2026-09-13)
+   ══════════════════════════════════════════════════════════════════════════
+   준비 뒤에 회차를 고치면 화면에는 고친 것이 보이는데 확정본은 봉인된 옛것이다.
+   예전에는 「고치면 다시 준비해야 합니다」라고 «준비할 때 한 번» 적어 두고 말았다 —
+   그 뒤로는 아무 데서도 안 보인다. 이제 서버가 낡은 확정본을 «안 보내므로»,
+   화면은 「이대로 두면 월요일에 안 나간다」를 말해 주어야 한다. */
+function 예약본상태(d){
+  const 기본 = { 꼴:'', 글:'📅 다음 월요일 자동발송 준비', 곁:'' };
+  const r = App.예약본;
+  if(!r || !r.상태) return 기본;
+  if(r.상태 === '어긋남')
+    return { 꼴:'warn', 글:'⚠ 확정본이 낡아 안 나갔습니다 — 다시 준비',
+             곁:String(r.오류 || '준비한 뒤에 내용이 바뀌었습니다') };
+  if(r.상태 !== '준비')
+    return Object.assign({}, 기본, { 곁:'지난 확정본 상태: ' + esc(String(r.상태)) });
+  if(String(r.회차열쇠||'') !== String(d.열쇠||''))
+    return Object.assign({}, 기본, { 곁:'준비된 확정본은 다른 회차입니다 (' + String(r.회차열쇠||'') + ')' });
+  const 봉인 = String(r.바탕도장 || '');
+  if(봉인 && 봉인 === Core.바탕도장(d))
+    return { 꼴:'', 글:'📅 ' + String(r.보낼날||'').slice(5) + ' 확정본 ✔',
+             곁:'준비돼 있습니다 — 다시 누르면 지금 내용으로 새로 준비합니다' };
+  return { 꼴:'warn', 글:'⚠ 확정본이 낡았습니다 — 다시 준비',
+           곁:'준비한 뒤에 내용이 바뀌었습니다. 이대로 두면 월요일에 안 나갑니다' };
+}
+
 function 이번회차화면(){
   const d = 지금회차();
   const r = 명단셈();
@@ -918,6 +1112,7 @@ function 이번회차화면(){
        빈 뉴스레터가 그 숫자를 믿고 나간다. 담긴 수는 옆에 함께 적는다. */
   const 셈 = Core.실림셈(d.안, d.우리글);
   const 실린수 = 셈.총실림;
+  const 예약 = 예약본상태(d);
 
   /* ★★ 회차 줄을 «왼쪽 칸 안»에 넣는다 (대표 지시 2026-09-06
        「캡쳐3 행의 중간을 잘라서 오른쪽은 비우고 오른쪽 뉴스레터를 끌어올려서」)
@@ -941,8 +1136,10 @@ function 이번회차화면(){
     <span style="width:8px"></span>
     <button class="btn" onclick="크게보기()">👁 크게 보기</button>
     <button class="btn warn" onclick="시험발송()" ${갈수있나.ok?'':'disabled'}>✉ 나에게 시험 발송</button>
-    <button class="btn" onclick="자동발송준비()" ${갈수있나.ok && App.isAdmin?'':'disabled'}>
-      📅 다음 월요일 자동발송 준비</button>
+    <!-- ★ 확정본이 낡았는지를 «이 단추 한 줄»로 말한다 (2026-09-13).
+         ⚠ 셋째 줄을 만들지 않는다 — 머리가 늘어나면 대표가 같은 것을 보려고 더 굴린다. -->
+    <button class="btn ${예약.꼴}" onclick="자동발송준비()" title="${esc(예약.곁||'')}"
+      ${갈수있나.ok && App.isAdmin?'':'disabled'}>${esc(예약.글)}</button>
     <button class="btn pri" onclick="진짜보내기()" ${갈수있나.ok && App.isAdmin?'':'disabled'}>
       📨 ${App.유형 ? esc(App.유형)+' ' : ''}${r.셈.보낼곳.toLocaleString()}곳에 보내기</button>
   </div>
@@ -1169,7 +1366,7 @@ async function 창고자리채움(){
     const r = Core.칸자리채우기(d.안, [App.노무사회 || [], 자료]);
     if(!r.채운수) return;
     d.안 = r.안;
-    await 회차저장(d);
+    if(!(await 회차저장(d))) return;   /* 안 담겼는데 담았다고 말하지 않는다 */
     toast(`📎 이미 담긴 ${r.채운수}건에 «창고 자리»를 채웠습니다 — 이제 첨부로 붙습니다`, 10000);
   }catch(e){ /* 조용히 — 되짚기가 화면을 막으면 안 된다 */ }
 }
@@ -1196,7 +1393,7 @@ async function 노무사회칸올림(){
     const r = Core.노무사회칸올리기(d.안, App.노무사회 || []);
     if(!r.올린수) return;
     d.안 = r.안;
-    await 회차저장(d);
+    if(!(await 회차저장(d))) return;   /* 안 담겼는데 담았다고 말하지 않는다 */
     toast(`↑ 노무사회 자료 ${r.올린수}건을 «자료 칸»으로 올렸습니다 — 표지와 내려받기가 붙습니다`, 10000);
   }catch(e){ /* 조용히 — 올리기가 화면을 막으면 안 된다 */ }
 }
@@ -1231,7 +1428,7 @@ async function 노무사회담기(){
   });
   if(!담음) return toast(이미 ? `이미 담긴 것뿐입니다 (${이미}건)` : '담을 것이 없습니다', 7000);
   App.노무사회고른것 = {};
-  await 회차저장(d);
+  if(!(await 회차저장(d))) return;   /* 안 담겼는데 담았다고 말하지 않는다 */
   render();
   toast(`↧ ${담음}건을 꼭지에 담았습니다` + (이미 ? ` (이미 담긴 ${이미}건은 건너뜀)` : ''), 9000);
 }
@@ -1382,7 +1579,7 @@ function 꼭지칸하나(d){
       <button class="mv" title="위로" onclick="옮기기('${g.키}',${i},-1)">▲</button>
       <button class="mv" title="아래로" onclick="옮기기('${g.키}',${i},1)">▼</button>
       <span class="t" title="눌러서 자세히 보고 «우리 말로» 씁니다"
-        style="cursor:pointer" onclick="줄창열기('${g.키}',${i})">${esc(x.제목||'')}${
+        style="cursor:pointer" onclick="줄창열기('${g.키}',${i})">${esc(x.한줄||x.제목||'')}${
         실?'':'<span class="offtag">안 실림</span>'}${딱지}${곁줄(g.키,x,i)}</span>
       <span class="src">${esc(꼬리표(x))}</span>
       <button class="x" title="목록에서 아예 빼기" onclick="빼기('${g.키}',${i})">✕</button>
@@ -1446,7 +1643,7 @@ async function AI초안짓기(){
       것[i].AI초안=t; n++;
     });
     if(!n) throw new Error('쓸 수 있는 AI 초안이 없습니다');
-    await 회차저장(d);
+    if(!(await 회차저장(d))) return;   /* 안 담겼는데 담았다고 말하지 않는다 */
     toast('✨ AI 초안 ' + n + '건을 만들었습니다 — 각 줄을 눌러 확인 후 저장해 주세요', 12000);
   }catch(e){
     toast('AI 초안을 만들지 못했습니다: ' + ((e&&e.message)||e), 12000);
@@ -1509,6 +1706,13 @@ function 줄창그리기(){
      ${esc([꼬리표(x), x.발행일 || x.선고글 || ''].filter(Boolean).join(' · '))}
      ${u ? ' · <a href="' + esc(u) + '" target="_blank" rel="noopener">원문 보기 ↗</a>' : ''}</div>
    </div>
+   ${기사인가 ? `
+   <label class="f">✎ 한 줄 제목 <span style="font-weight:400;color:var(--faint)">— 글 위에 굵게 뜹니다 · 요약에도 이 줄이 나갑니다</span></label>
+   <input id="rowH" type="text" maxlength="60"
+     placeholder="우리 말로 한 줄 (비우면 제목 없이 글만 나갑니다)"
+     value="${esc(x.한줄||'')}"
+     style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:7px;
+            font-size:14px;font-weight:700;margin-bottom:11px">` : ''}
    <label class="f">✎ 우리 말로 — 편지에는 <b>이 글만</b> 실립니다</label>
    <textarea id="rowW" rows="5" placeholder="${esc(기사인가
      ? '여기에 쓰시면 이 글이 편지에 실립니다. 비우면 이 줄은 안 나갑니다.'
@@ -1532,6 +1736,13 @@ function 우리말저장(){
   if(!x) return 줄창닫기();
   const v = String(($('rowW') && $('rowW').value) || '').trim();
   if(v){ x.우리말 = v; delete x.AI초안; } else delete x.우리말;
+  /* ★ 한 줄 제목도 «함께» 담는다 (대표 지시 2026-09-12).
+     ⚠ 칸이 없는 갈래(자료·판례)에서는 건드리지 않는다 — 없는 칸을 읽어 지우면
+       다른 갈래의 값이 조용히 날아간다. */
+  if($('rowH')){
+    const h = String($('rowH').value || '').trim();
+    if(h) x.한줄 = h; else delete x.한줄;
+  }
   회차저장(d)
     .then(function(){ 줄창닫기(); render();
       toast(v ? '✎ 우리 말로 담았습니다 — 편지에 이 글이 실립니다'
@@ -1637,36 +1848,93 @@ function 지역뉴스관리(d){
       <a class="mini" href="${esc(x.링크||'#')}" target="_blank" rel="noopener">원문 ↗</a>
       <button class="mini" onclick="지역후보승인('${esc(x.id||'')}')">승인</button>
       <button class="x" title="이 후보 제외" onclick="지역후보제외('${esc(x.id||'')}')">✕</button></div>`;
-  }).join('') : '<div class="pad hint">새 검토후보가 없습니다. 공식 RSS는 매일 오전 7시 10분에 확인합니다.</div>';
+  }).join('') : `<div class="pad hint">${수집빈말()}</div>`;
+  const 수집줄 = 수집상태줄();
   return `<div class="box" style="margin-top:12px"><h3>📍 주소에 맞춰 보내는 지역뉴스
     <span class="cnt">${활성.length}건</span><span class="sp"></span>
     <button class="mini" onclick="지역뉴스담기()">＋ 지역뉴스 추가</button></h3>
     <div class="jarbody">${줄}</div>${철회.length?'<details class="pad"><summary>철회 이력 '+철회.length+'건</summary><div class="jarbody">'+철회줄+'</div></details>':''}<div class="pad hint">
     적용지역은 <b>전국</b>, <b>충남</b>, <b>충남/천안시</b>, <b>충남/서산시</b>처럼 적습니다.
-    업체 주소를 못 읽으면 전국 공통판만 보내며 다른 지역 소식은 섞지 않습니다.<br>
+    ${주소못읽은말()}<br>
     공식 출처 ${지역출처.목록.length}곳 등록 · RSS ${지역출처.목록.filter(x=>x.방식==='rss').length}곳은 자동수집 연결 준비 ·
     게시판 ${지역출처.목록.filter(x=>x.방식==='board').length}곳은 원문 확인 뒤 담습니다.</div></div>
     <div class="box" style="margin-top:12px"><h3>🔎 공식 RSS 검토대기 <span class="cnt">${후보.length}건</span>
-      ${처리중?'<span class="pill">승인 확인 중 '+처리중+'건</span>':''}</h3>
+      ${처리중?'<span class="pill">승인 확인 중 '+처리중+'건</span>':''}${수집줄.딱지}</h3>
+      ${수집줄.몸}
       <div class="jarbody">${후보줄}</div><div class="pad hint">
       제목·날짜·공식 링크만 자동수집했습니다. 아직 어떤 뉴스레터에도 들어가지 않습니다.</div></div>`;
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   모으기가 «돌고 있나» — 조용한 고장을 화면에 꺼내 놓는다 (2026-09-13)
+   ══════════════════════════════════════════════════════════════════════════
+   예전에는 「새 검토후보가 없습니다」 한 줄이었다. 그런데 그 말은 두 가지를 뜻한다 —
+   「새 기사가 없다」와 「몇 주째 못 읽고 있다」. 둘이 화면에서 똑같아 보이면
+   고장이 조용히 이어진다(2026-09-07 아침 모으개가 일곱 번 다 실패했는데
+   손으로 누르면 되는 바람에 아무도 몰랐다 — 같은 일이다).
+   ⚠ 실패해도 «마지막 성공»은 지워지지 않는다. 「언제부터」가 답이라서다. */
+function 며칠전(때){
+  const t = Number(때 || 0); if(!t) return '없음';
+  const 날 = Math.floor((Date.now() - t) / 86400000);
+  return 날 <= 0 ? '오늘' : 날 === 1 ? '어제' : 날 + '일 전';
+}
+function 수집상태줄(){
+  const m = App.수집결과 || {};
+  const 출처별 = m.출처별 || {};
+  const 목 = Object.keys(출처별).map(k => 출처별[k]);
+  if(!목.length) return { 딱지:'', 몸:'' };
+  const 막힌것 = 목.filter(x => x && x.됐나 === false);
+  if(!막힌것.length)
+    return { 딱지:`<span class="pill">모으기 ${esc(며칠전(m.마지막수집))} · ${목.length}곳 다 읽음</span>`, 몸:'' };
+  const 줄 = 막힌것.map(function(x){
+    return `<div class="item"><span class="pill">못 읽음 · ${esc(x.지역||'')}</span>
+      <span class="t" title="${esc(x.탈||'')}">${esc(x.이름||'')}</span>
+      <span class="src">${Number(x.연속실패||1)}번째 · 마지막 성공 ${esc(며칠전(x.마지막성공))}</span></div>`;
+  }).join('');
+  return {
+    딱지:`<span class="pill" style="background:#fee2e2;color:#991b1b">⚠ ${막힌것.length}곳 못 읽음</span>`,
+    몸:`<div class="jarbody">${줄}</div><div class="pad hint">
+        이 출처는 «새 기사가 없는 것이 아니라» 못 읽고 있습니다 —
+        그 지역 소식은 그동안 하나도 안 담깁니다.</div>`
+  };
+}
+/* ★ 「전국 N곳」에 섞여 안 보이던 것을 꺼낸다 (2026-09-13).
+     받는 곳의 지역은 «업체 주소»에서만 나온다(Core.지역코드). 주소가 비었거나
+     못 읽으면 조용히 「전국」이 된다 — 그래서 지역판을 만들어도 그 곳들은 영영
+     전국 공통판만 받는다. 몇 곳인지 보여야 기업정보함에서 주소를 채우실 수 있다. */
+function 주소못읽은말(){
+  const 명단 = (명단셈().ok) || [];
+  const 못읽음 = 명단.filter(x => String((x&&x.지역)||'전국') === '전국').length;
+  if(!못읽음) return '받는 곳의 주소를 모두 읽었습니다 — 저마다 자기 지역 소식을 받습니다.';
+  return `업체 주소를 못 읽은 <b>${못읽음.toLocaleString()}곳</b>은 전국 공통판만 받습니다 `
+    + '— 기업정보함에서 주소를 채우시면 그 지역 소식이 함께 나갑니다.';
+}
+
+/* 「없다」와 「못 읽었다」를 가려 말한다 */
+function 수집빈말(){
+  const m = App.수집결과 || {};
+  if(!m.마지막수집) return '아직 자동수집이 한 번도 안 돌았습니다. 공식 RSS는 매일 오전 7시 10분에 확인합니다.';
+  const 막힘 = Number(m.막힌출처 || 0);
+  if(막힘) return `새 검토후보가 없습니다 — 다만 ${막힘}곳을 못 읽고 있어, `
+    + '그 지역은 있어도 안 들어옵니다(위 목록).';
+  return `새 검토후보가 없습니다. ${esc(며칠전(m.마지막수집))} ${Number(m.읽은출처||0)}곳을 다 읽었으니 `
+    + '«새 기사가 없는 것»입니다.';
+}
+
 function 지역후보복구(){
-  const 대상=Object.values(App.지역후보||{}).filter(x=>x&&x.상태==='승인처리중');
-  if(!대상.length) return Promise.resolve(0);
-  let 고친수=0;
-  return Promise.all(대상.map(function(c){
-    const 예상=지역검토.복구판정(c,App.회차들,Date.now(),10*60*1000); if(!예상) return null;
-    return db.ref('newsletter/regionalCandidates/'+c.id).transaction(function(cur){
-      if(!cur||cur.상태!=='승인처리중'||Number(cur.revision||0)!==Number(c.revision||0)) return;
-      return 지역검토.복구판정(cur,App.회차들,Date.now(),10*60*1000)||undefined;
-    }).then(function(r){
-      if(r.committed){ App.지역후보[c.id]=r.snapshot.val(); 고친수++; }
-    }).catch(function(e){ console.warn('[지역뉴스 복구]',c.id,(e&&e.message)||e); });
-  })).then(function(){
-    if(고친수){ render(); toast('중단됐던 지역뉴스 승인 '+고친수+'건을 안전하게 정리했습니다',8000); }
-    return 고친수;
-  });
+  if(!Object.values(App.지역후보||{}).some(x=>x&&x.상태==='승인처리중')) return Promise.resolve();
+  // 후보와 회차를 같은 서버 스냅샷에서 확인한다. PC에 남은 회차는 복구 근거가 아니다.
+  const ref=db.ref('newsletter');
+  return ref.once('value').then(function(){ return ref.transaction(function(cur){
+    if(!cur) return;
+    const candidates=Object.assign({},cur.regionalCandidates||{}); let changed=false;
+    Object.keys(candidates).forEach(function(id){
+      const next=지역검토.복구판정(candidates[id],cur.issues||{},Date.now());
+      if(next){ candidates[id]=next; changed=true; }
+    });
+    if(changed) return Object.assign({},cur,{regionalCandidates:candidates});
+  },undefined,false); }).then(function(r){
+    if(r.committed){ App.지역후보=r.snapshot.val().regionalCandidates||{}; render(); }
+  }).catch(function(e){ console.warn('[지역뉴스 복구]',(e&&e.message)||e); });
 }
 async function 지역후보제외(id){
   const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 다른 관리자가 검토한 후보입니다');
@@ -1683,54 +1951,23 @@ async function 지역후보제외(id){
   }catch(e){ toast('제외하지 못했습니다: '+((e&&e.message)||''),9000); }
 }
 async function 지역후보승인(id){
-  const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 다른 관리자가 검토한 후보입니다');
+  const c=(App.지역후보||{})[id]; if(!c||c.상태!=='검토대기') return toast('이미 검토한 후보입니다');
   const 우리말=String(prompt('뉴스레터에 실을 푸른노무법인의 설명을 적어 주세요\n원문 문장을 복사하지 마세요.')||'').trim();
-  if(!우리말) return toast('푸른이 직접 쓴 설명이 없으면 승인할 수 없습니다',8000);
-  const d=지금회차();
-  const 뉴스=지역검토.승인뉴스(c,우리말,d.지역뉴스||[],Date.now());
-  if(!뉴스) return toast('이미 이 회차에 담았거나 후보 정보가 올바르지 않습니다',8000);
-  if(!confirm('「'+c.제목+'」을\n'+뉴스.지역+' 지역뉴스로 이번 회차에 담을까요?')) return;
-
-  /* 먼저 후보 한 건을 선점한다. 두 관리자가 동시에 눌러도 transaction 중 한 명만
-     검토대기→승인처리중으로 바꿀 수 있다. */
-  const 검토자=(App.me&&App.me.email)||'';
-  const ref=db.ref('newsletter/regionalCandidates/'+id);
-  let 선점;
+  if(!우리말) return;
+  const d=지금회차(), 검토자=(App.me&&App.me.email)||'', 시각=Date.now();
+  if(!confirm('「'+c.제목+'」을 이번 회차 지역뉴스에 담을까요?')) return;
   try{
-    선점=await ref.transaction(function(cur){
-      const next=지역검토.검토변경(cur,'승인처리중',검토자,Date.now(),''); return next||undefined;
-    });
-  }catch(e){ return toast('후보를 선점하지 못했습니다: '+((e&&e.message)||''),9000); }
-  if(!선점.committed) return toast('다른 관리자가 먼저 검토했습니다',7000);
-  let 회차저장완료=false;
-  try{
-    d.지역뉴스=d.지역뉴스||[]; d.지역뉴스.push(뉴스);
-    await 회차저장(d);
-    회차저장완료=true;
-    const 끝=await ref.transaction(function(cur){
-      if(!cur||cur.상태!=='승인처리중'||cur.검토자!==검토자) return;
-      return Object.assign({},cur,{ 상태:'승인', revision:(Number(cur.revision)||1)+1,
-        승인회차:d.열쇠, 승인일:Date.now() });
-    });
-    if(!끝.committed) throw new Error('후보 승인상태를 확정하지 못했습니다');
-    App.지역후보[id]=끝.snapshot.val(); render(); toast('이번 회차 지역뉴스에 담았습니다',7000);
-  }catch(e){
-    /* 회차 저장 전에 실패했을 때만 «내가 선점한 것»을 대기로 되돌린다.
-       회차 저장 뒤 상태확정만 실패했다면 되돌리지 않는다 — 이미 뉴스가 담겼으므로
-       대기로 풀면 다른 관리자가 다시 승인해 두 번 들어간다. */
-    if(회차저장완료){
-      App.지역후보[id]=선점.snapshot.val();
-      toast('지역뉴스에는 담겼지만 후보 표시를 확정하지 못했습니다 — 다시 승인하지 마세요: '
-        +((e&&e.message)||''),12000); render(); return;
-    }
-    const 복구=await ref.transaction(function(cur){
-      if(!cur||cur.상태!=='승인처리중'||cur.검토자!==검토자) return;
-      return Object.assign({},cur,{ 상태:'검토대기', revision:(Number(cur.revision)||1)+1,
-        검토자:'', 검토일:0 });
-    });
-    if(복구.committed) App.지역후보[id]=복구.snapshot.val();
-    toast('승인하지 못했습니다: '+((e&&e.message)||''),10000); render();
-  }
+    const ref=db.ref('newsletter');
+    await ref.once('value');
+    const r=await ref.transaction(function(cur){
+      return 지역검토.원자승인(cur,id,d,우리말,검토자,시각)||undefined;
+    },undefined,false);
+    if(!r.committed) return toast('이미 처리됐거나 발송된 회차입니다. 새로고침해 확인해 주세요.',8000);
+    const saved=r.snapshot.val();
+    App.지역후보=saved.regionalCandidates||{};
+    App.회차들[d.열쇠]=Object.assign({열쇠:d.열쇠},saved.issues[d.열쇠]);
+    render(); toast('이번 회차 지역뉴스에 담았습니다',7000);
+  }catch(e){ toast('승인 결과를 확인하지 못했습니다. 새로고침해 확인해 주세요: '+((e&&e.message)||''),10000); }
 }
 function 공식출처고르기(지역){
   const a = 지역출처.지역출처(지역);
@@ -1755,8 +1992,22 @@ function 지역뉴스담기(){
     언론사:공식출처.기관, 출처Id:공식출처.id, 우리말:우리말 },
     (App.me&&App.me.email)||'',Date.now());
   if(!뉴스) return toast('온톨로지 저장계약에 맞지 않아 등록할 수 없습니다',8000);
-  d.지역뉴스.push(뉴스);
-  회차저장(d).then(render).catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||''),7000));
+  // push 키는 서버에 쓰지 않고 발급만 한다. 같은 밀리초의 두 등록도 다른 ID다.
+  뉴스.id='manual-regional-'+db.ref('newsletter/issues').push().key;
+  const 검토자=(App.me&&App.me.email)||'', 시각=Date.now();
+  /* ★ 거래는 «지역뉴스 칸»에만 건다 — 회차 통째에 걸면 30,000자 전문까지 읽어
+       통째로 다시 쓴다(2026-09-13 실측: 회차 하나 47.8KB 중 전문이 30.3KB).
+     ⚠ 「이미 보낸 회차인가」는 칸 밖이라 따로 한 번 읽는다. */
+  const ref=db.ref('newsletter/issues/'+d.열쇠+'/지역뉴스');
+  db.ref('newsletter/issues/'+d.열쇠+'/상태').once('value').then(function(s){
+    if(s.val()==='발송') throw new Error('이미 보낸 회차입니다');
+    return ref.once('value');   /* 찬 자리에서 접히지 않게 데운다 */
+  }).then(function(){ return ref.transaction(function(cur){
+    return 지역검토.목록추가(cur,뉴스)||undefined;
+  },undefined,false); }).then(function(r){
+    if(!r.committed) return toast('이미 등록된 지역뉴스입니다',8000);
+    d.지역뉴스=r.snapshot.val()||[]; App.회차들[d.열쇠]=d; render();
+  }).catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||''),7000));
 }
 function 지역뉴스빼기(i){
   const d=지금회차(), x=(d.지역뉴스||[])[i]; if(!x||x.상태==='철회') return;
@@ -1764,13 +2015,15 @@ function 지역뉴스빼기(i){
   if(!사유) return;
   const 검토자=(App.me&&App.me.email)||'';
   const ref=db.ref('newsletter/issues/'+d.열쇠+'/지역뉴스');
-  ref.transaction(function(cur){
+  /* ⚠ 먼저 읽어 데운다 — 안 그러면 찬 자리에서 null 로 불려 그냥 접히고,
+       아무도 안 건드렸는데 「다른 관리자가 먼저 변경했습니다」가 뜬다. */
+  ref.once('value').then(function(){ return ref.transaction(function(cur){
     const 목록=Array.isArray(cur)?cur.slice():[];
     const 지금=목록[i];
     /* 옛 자료는 id가 없으므로 같은 배열 자리와 주요 원문 정보까지 견준다. */
     if(!지금||지금.상태==='철회'||String(지금.id||지금.링크||'')!==String(x.id||x.링크||'')) return;
     목록[i]=지역검토.철회(지금,사유,검토자,Date.now()); return 목록;
-  }).then(function(r){
+  },undefined,false); }).then(function(r){
     if(!r.committed) return toast('다른 관리자가 먼저 변경했습니다',7000);
     d.지역뉴스=r.snapshot.val()||[]; App.회차들[d.열쇠]=d; render();
     toast('삭제하지 않고 철회 이력으로 보존했습니다');
@@ -1805,6 +2058,22 @@ function 연습채우기(){
 
 /* 모아 둔 것(열쇠→칸)에서 «최근 모은 것»부터 몇 개.
    ⚠ Object.keys 차례를 믿지 않는다 — 파이어베이스가 주는 차례는 열쇠 순이지 날짜 순이 아니다. */
+/* 자료 줄 세우기 — «값어치 먼저, 그 다음 최근».
+   ★ 값어치는 모으는 쪽이 매겨 record 에 적어 둔다(functions/news-docs.js).
+   ⚠ 옛 자료에는 그 칸이 없다 — 그때는 0 으로 본다. 보도자료(-1)보다는 위,
+     가이드(4)보다는 아래다. 새로 모으면 저절로 제자리를 찾는다.
+   ⚠ 값어치가 같으면 최근 것이 위다 — 같은 값어치끼리는 새것이 낫다. */
+function 값어치순(모아둔것, 몇개){
+  const 값 = x => { const v = Number(x && x.값어치); return isFinite(v) ? v : 0; };
+  return Object.keys(모아둔것 || {})
+    .map(k => (모아둔것||{})[k])
+    .filter(Boolean)
+    .sort((a,b) => (값(b) - 값(a))
+      || String(b.모은날||'').localeCompare(String(a.모은날||''))
+      || String(b.발행일||'').localeCompare(String(a.발행일||'')))
+    .slice(0, 몇개 || 8);
+}
+
 function 최근것(모아둔것, 몇개){
   return Object.keys(모아둔것 || {})
     .map(k => (모아둔것||{})[k])
@@ -1827,7 +2096,16 @@ function 자동담기(){
   ])
     .then(function(v){
       const 법령 = v[0].val() || [];
-      const 자료 = 최근것(v[1].val(), 8);
+      /* ★★ 자료는 «값어치 먼저, 그 다음 최근» (2026-09-13 대표 화면에서 드러났다)
+         ═══════════════════════════════════════════════════════════════════════
+         모은 날로만 줄을 세웠더니, 날마다 열 건씩 올라오는 «보도자료»가 앞을 다 먹고
+         값어치 4점짜리 「난임치료휴가 활용가이드」·「마트배송 표준계약서」가
+         여덟 칸 안에 «들지도 못했다». 고용·노동정책 넷이 전부 홍보성 글이었다:
+           고용24 통합경력증명서 1만 4천 건 발급 · 우수사례 경진대회 개최 …
+         ⚠ 모으는 쪽은 값어치를 매겨 두는데(functions/news-docs.js 자료값어치)
+           화면이 그것을 통째로 버리고 있었다. 값을 매겨 놓고 안 쓰면 없는 것과 같다.
+         ★ 판례는 그대로 «최근 순»이다 — 거기는 값어치 잣대가 없고, 새 판결이 곧 값이다. */
+      const 자료 = 값어치순(v[1].val(), 8);
       const 판례 = 최근것(v[2].val(), 6);
       App.판례거리 = 판례;                       /* 무엇이 밀렸는지 알림·요약에서 쓴다 */
       const 새것 = Core.자동으로담기(App.브리핑, {
@@ -1890,12 +2168,39 @@ function 붙여넣기옮기기(더하기){
 }
 
 /* ══════ 미리보기 ══════ */
+/* ★★ 나가는 편지는 «요약»이다 (대표 결정 2026-09-12 「한화면에 요약만 … 클릭하면 확인」).
+     자세한 것은 「자세히 보기 ↗」가 여는 웹 쪽(newsView)이 보여 준다.
+   ⚠ 미리보기도 «요약»으로 그린다 — 보내기 전에 보시는 것이 실제로 나갈 모습이라야
+     시험이 시험이 된다(시험 발송에서 겪은 것과 같은 까닭). */
 function 지금편지(미리보기, 받는지역){
   const d = 지금회차();
   /* ⚠ 「따로 더한 분」을 함께 넘긴다 — 사전 동의를 못 받은 줄이 있으면 (광고)가 켜진다.
        지난 회차에는 안 넘긴다(아래 회차크게·지난미리보기) — 그때 나간 그대로여야 한다. */
   return Tpl.편지짓기(Object.assign({}, d, { 범위: App.설정.범위, 더한분들: App.더한분들 }),
-                      App.설정, { 미리보기: 미리보기 === true, 지역: 받는지역 || '' });
+                      App.설정, { 미리보기: 미리보기 === true, 지역: 받는지역 || '',
+                                   요약: true });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   「자세히 보기」가 열 쪽 — 보내기 «전»에 전문을 회차에 담아 둔다
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 서버(newsView)는 편지를 다시 짓지 않는다. 편지 짓는 층이 화면 쪽에 있어
+     서버에 올라가지 않기 때문이다 — 베껴 두면 두 벌이 되어 반드시 어긋난다.
+   ★ 그래서 여기서 «전문»을 지어 회차에 적어 둔다. 받는 분이 누르면 그것이 열린다.
+   ⚠ «보내기 전»에 적어야 한다. 보낸 뒤에 적으면 먼저 열어 보신 분에게 빈 쪽이 뜬다.
+   ⚠ 전문은 «미리보기 꼴»로 짓는다 — 열람 그림도, 클릭 감싸기도 넣지 않는다.
+     웹 쪽에는 추적열쇠가 없어 감싼 링크가 모두 대문으로 튕긴다.
+   ⚠ 꼴을 회차에 적어 둔다 — 지난 회차를 다시 그릴 때 «그때 나간 그대로»여야 한다. */
+async function 전문담기(열쇠){
+  const d = 지금회차();
+  const 전 = Tpl.편지짓기(
+    Object.assign({}, d, { 범위: App.설정.범위, 더한분들: App.더한분들 }),
+    App.설정, { 미리보기: true, 지역: '전국', 요약: false });
+  if(!전) return false;
+  await db.ref('newsletter/issues/' + 열쇠).update({
+    전문: 전.서식, 제목: 전.제목, 꼴: '요약'
+  });
+  return true;
 }
 
 /* 같은 공통 편지를 쓰되, 지역조각만 업체마다 달리 싣는다. 주소 원문은 보내지 않고
@@ -1941,17 +2246,59 @@ function 지역판요약(명단){
      남겨 두면 다음 사람이 「미리보기가 왜 안 나오나」를 이 함수에서 찾는다.
    ★ 같은 일을 하는 자리는 크게보기() 다 — 「미리보기는 원문 링크 그대로」라는 규칙도
      거기서 지킨다(tests/newsletter-preview-link.test.js). */
+/* ══════════════════════════════════════════════════════════════════════════
+   편지를 창 안에 «잘리지 않게» 그린다 (대표 지시 2026-09-12)
+   ══════════════════════════════════════════════════════════════════════════
+   「팝업화면에 좌우 에 잘리는 내용 없이 다 보이게 해라」
+
+   ★ 편지는 700px «고정 폭» 표다(pu-news-tpl.js 의 넓이 = 700). 메일 프로그램이
+     견디는 폭으로 맞춰 둔 값이라 창에 맞춰 줄일 수 없다.
+   ★ 그래서 창이 좁으면 «통째로 축소»한다 — 잘라 내는 대신 작아진다.
+     잘리면 글이 있는지조차 모르지만, 작아지면 있다는 것은 보인다.
+   ⚠ transform 은 «차지하는 자리»를 안 줄인다. 감싼 칸의 높이·너비를 우리가
+     맞춰 주지 않으면 창 아래쪽에 빈 자리가 그만큼 남는다.
+   ⚠ 예전에는 이 일을 «세 곳»이 따로 했다(크게보기·회차크게·지난미리보기).
+     한 곳으로 모았다 — 따로 두면 한 군데만 고쳐져 어떤 창은 잘린 채 남는다. */
+const 편지폭 = 700;
+let _편지맞추기 = null;
+function 편지창채우기(자리, 서식){
+  const el = $(자리); if(!el) return;
+  el.innerHTML = '<div class="ltrwrap"><iframe class="ltrf" title="미리보기"'
+    + ' style="width:' + 편지폭 + 'px;border:0;background:#fff;display:block;'
+    + 'transform-origin:top left"></iframe></div>';
+  const f = el.querySelector('.ltrf');
+  const wrap = f.parentNode;
+  function 맞추기(){
+    /* 쓸 수 있는 폭 — ⚠ clientWidth 는 «안쪽 여백을 품는다». 그대로 쓰면 여백만큼
+         넓게 그려 가로 스크롤이 28px 생긴다(실측 2026-09-12). 여백을 빼야 딱 맞는다. */
+    const cs = getComputedStyle(el);
+    const 쓸폭 = el.clientWidth
+      - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    if(!(쓸폭 > 0)) return;
+    const k = Math.min(1, 쓸폭 / 편지폭);
+    f.style.transform = k < 1 ? 'scale(' + k + ')' : '';
+    const h = parseFloat(f.style.height) || 0;
+    wrap.style.width  = Math.ceil(편지폭 * k) + 'px';
+    wrap.style.height = Math.ceil(h * k) + 'px';
+  }
+  f.srcdoc = '<!doctype html><meta charset="utf-8"><base target="_blank"><body style="margin:0">' + 서식;
+  f.onload = function(){
+    try{ f.style.height = (f.contentDocument.body.scrollHeight + 8) + 'px'; }catch(_){}
+    맞추기();
+  };
+  _편지맞추기 = 맞추기;
+}
+/* 창을 열어 둔 채 화면 크기를 바꿔도 다시 맞춘다 — 안 맞추면 그때부터 다시 잘린다 */
+window.addEventListener('resize', function(){ if(_편지맞추기) _편지맞추기(); });
+
 function 크게보기(){
   const 편 = 지금편지(true);
   if(!편) return toast('실을 것이 없습니다');
   $('bigT').textContent = 편.제목;
-  $('bigB').innerHTML = '<iframe id="bigF" style="width:100%;border:0;background:#fff" title="미리보기"></iframe>';
-  const f = $('bigF');
-  f.srcdoc = '<!doctype html><meta charset="utf-8"><base target="_blank"><body style="margin:0">' + 편.서식;
-  f.onload = function(){ try{ f.style.height = (f.contentDocument.body.scrollHeight + 8) + 'px'; }catch(_){} };
+  편지창채우기('bigB', 편.서식);
   $('big').classList.add('on');
 }
-function closeBig(){ $('big').classList.remove('on'); }
+function closeBig(){ $('big').classList.remove('on'); _편지맞추기 = null; }
 
 /* ── 노무사회 자료 서랍 (떠 있는 창) ── */
 function 서랍열기(){ App.서랍 = true; render(); }
@@ -1994,6 +2341,32 @@ async function 걸기(payload){
   let j=null; try{ j = await res.json(); }catch(_){}
   if(!res.ok || !j || !j.ok) throw new Error((j&&j.error) || ('서버 응답 ' + res.status));
   return j;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   두 관리자가 같은 회차를 두 번 보내지 않게 — 잠금은 «서버에 하나»뿐이다
+   ══════════════════════════════════════════════════════════════════════════
+   App.보내는중 은 «그 PC 안»에서만 산다 — 관리자가 둘이면 서로를 못 본다.
+   ★ 잠금을 화면에도 두면 두 벌이 되고, 두 벌은 서로 어긋난다. 두 사람이 반드시
+     만나는 곳은 서버 하나뿐이라, 찜하는 일은 서버(sendBulkMail)가 혼자 한다.
+   ★ 화면이 하는 일은 «이 누름을 알아볼 번호» 하나를 만들어 함께 보내는 것뿐이다.
+     그물이 끊겨 같은 요청을 다시 보내도 서버가 같은 번호를 알아보고
+     두 번 걸지 않는다(그때 그 결과를 그대로 돌려준다). */
+function 발송요청번호(){
+  return String(db.ref('newsletter/sendRequests').push().key || '');
+}
+
+/* 누르기 «전»에 한 번 살펴본다 — 막는 힘은 없고, 헛수고를 덜어 줄 뿐이다.
+   ⚠ 이것을 잠금으로 여기지 말 것. 진짜로 막는 것은 서버다. */
+async function 보내는이있나(회차열쇠){
+  try{
+    const s = await db.ref('newsletter/issues/' + 회차열쇠 + '/발송잠금').once('value');
+    const 잠 = s.val(); if(!잠) return '';
+    if(잠.상태 === '완료') return '이미 보낸 회차입니다';
+    if(잠.상태 === '거는중' && Date.now() - Number(잠.서버시작때 || 잠.요청한때 || 0) < 15*60*1000)
+      return '다른 관리자가 지금 이 회차를 보내는 중입니다 (' + (잠.요청한이 || '') + ')';
+    return '';
+  }catch(_){ return ''; /* 못 읽었다고 발송을 막지는 않는다 — 서버가 막는다 */ }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2087,13 +2460,20 @@ async function 자동발송준비(){
     if(열){ 받는이[번호] = 열; 보냄표[열] = { 보냄:true }; }
     return Object.assign({}, x, { track:번호 });
   });
-  await db.ref('newsletter/weeklyReady').set({
+  /* ★★ «그때 바탕»의 도장을 함께 봉인한다 (2026-09-13).
+       이것이 없으면 준비 뒤에 회차를 고쳐도 월요일에 «고치기 전 편지»가 나간다.
+       서버가 보내기 직전에 지금 바탕으로 도장을 다시 찍어 견주고, 다르면 안 보낸다.
+     ⚠ 재는 것은 편지에 실리는 칸뿐이다 — 상태·고친때가 바뀌었다고 버리면
+       시험 한 통 보낸 것만으로 확정본이 날아간다. */
+  const 예약본 = {
     상태:'준비', 보낼날:날, 회차열쇠:d.열쇠, 준비한때:Date.now(),
     준비한이:(App.me&&App.me.email)||'', to:to,
     subject:편.제목, body:편.본문, html:편.서식, spacingSec:BULK_GAP_SEC,
     files:첨.파일들, 링크들:편.링크들||[], 받는이:받는이, 보냄표:보냄표,
-    from:보내는주소()
-  });
+    from:보내는주소(), 바탕도장:Core.바탕도장(d)
+  };
+  await db.ref('newsletter/weeklyReady').set(예약본);
+  App.예약본 = 예약본; render();
   toast('📅 ' + 날 + ' 자동발송 확정본을 준비했습니다 — 설정의 자동발송이 켜져 있어야 나갑니다', 12000);
 }
 
@@ -2135,11 +2515,22 @@ async function 시험발송(){
       toast('⚠ 링크 목록을 못 적었습니다 — 시험 편지의 링크가 대문으로 튕깁니다: '
             + ((e&&e.message)||''), 12000);
     }
+    /* ★ 「자세히 보기 ↗」가 열 전문을 «보내기 전»에 담는다 — 시험도 진짜와 같아야 한다 */
+    try{ await 전문담기(d0.열쇠); }
+    catch(e){
+      toast('⚠ 전문을 못 담았습니다 — 시험 편지의 「자세히 보기」가 빈 쪽을 엽니다: '
+            + ((e&&e.message)||''), 12000);
+    }
 
     const res = await fetch(시험즉시URL, {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token },
-      body: JSON.stringify({ to: 받을곳, toName: '시험',
+      /* ★★ 보내는 주소를 «시험에도» 싣는다 (대표 화면 2026-09-12 — 첫 시험 발송에서
+           「보낸 곳 370-6@daum.net」이 떴다. 진짜 발송은 hanmail 로 나가는데 시험만
+           계정 주소로 나가고 있었다). 받는 쪽이 «누구한테서 왔나»를 보는 자리이고
+           스팸 판정도 그것으로 하므로, 다르면 정작 봐야 할 것을 안 본 셈이 된다.
+         ⚠ 서버가 «조인다» — 사서함 이름이 계정과 같고 다음/한메일일 때만 통한다. */
+      body: JSON.stringify({ to: 받을곳, toName: '시험', from: 보내는주소(),
         subject: '[시험] ' + 편.제목, body: 편.본문, html: 서식,
         files: 첨.파일들 })
     });
@@ -2200,7 +2591,18 @@ async function 진짜보내기(){
     + `창을 닫아도 서버가 계속 보냅니다.\n\n보낼까요?`)) return;
 
   App.보내는중 = true; render();
+  const 발송요청 = 발송요청번호();
   try{
+    /* 헛수고를 덜기 위한 살핌일 뿐 — 진짜로 두 벌을 막는 것은 서버의 잠금이다 */
+    const 막힘 = await 보내는이있나(d.열쇠);
+    if(막힘) throw new Error(막힘);
+    /* ★★ 「내가 본 것」과 「지금 것」이 같은지 본다 (2026-09-13).
+         화면은 회차를 읽어 온 그때 것을 들고 있다. 그 사이 다른 관리자가 기사를
+         고쳤으면, 대표가 확인하신 것과 «다른 편지»가 119곳에 나간다. 되돌릴 수 없다.
+         자동발송 확정본을 도장으로 지키는 것과 «같은 까닭»이다. */
+    const 서버판 = Number((await db.ref('newsletter/issues/' + d.열쇠 + '/판').once('value')).val() || 0);
+    if(서버판 !== Number(d.판 || 0))
+      throw new Error('다른 관리자가 먼저 고쳤습니다 — 화면을 새로 읽고 내용을 다시 확인해 주세요');
     /* ★ 「번호 → 주소」 대장을 «걸기 전에» 만들어 적는다
          (대표 지시 2026-09-03 「고쳐라」 — 추적 주소에 메일 주소를 싣지 않는다).
          편지에는 뜻 없는 번호만 실리고, 서버(newsOpen·newsClick)가 이 대장으로
@@ -2222,35 +2624,30 @@ async function 진짜보내기(){
       await db.ref('newsletter/issues/' + d.열쇠 + '/받는이').update(대장);
     }
 
+    /* ★★ 「자세히 보기 ↗」가 열 전문을 «걸기 전»에 담는다 (대표 결정 2026-09-12).
+         ⚠ 걸고 나서 담으면, 먼저 열어 보신 분이 빈 쪽을 본다. 대장을 먼저 적는 것과
+           «같은 까닭»이다 — 나간 편지가 가리키는 자리는 이미 있어야 한다.
+         ⚠ 못 담으면 «걸지 않는다». 요약만 실린 편지가 나가고 자세한 것이 없으면,
+           그 주 편지는 내용이 통째로 빠진 셈이 된다. */
+    if(!(await 전문담기(d.열쇠))) throw new Error('전문을 담지 못했습니다 — 보내지 않았습니다');
+
     const j = await 걸기({ to:보낼명단, subject:편.제목, body:편.본문, html:편.서식,
-                           spacingSec: BULK_GAP_SEC, files: 첨.파일들 });
-    d.상태 = '발송'; d.보낸때 = Date.now(); d.받는수 = r.ok.length; d.batchId = j.batchId || '';
+                           spacingSec: BULK_GAP_SEC, files: 첨.파일들,
+                           newsletterSend:{ issueKey:d.열쇠, requestId:발송요청,
+                             links:편.링크들 || [] } });
+    d.상태 = '발송'; d.보낸때 = Number(j.sentAt || Date.now());
+    d.받는수 = Number(j.n || r.ok.length); d.batchId = j.batchId || '';
     d.보낸이 = (App.me && App.me.email) || '';
-    /* ★ 링크 목록을 회차에 «함께» 적는다 — 서버(newsClick)가 번호로 이것을 찾는다.
-         ⚠ 안 적으면 클릭이 우리 홈페이지로 튕긴다(목록에 없는 번호는 안 보내는 규칙).
-       ★ 「보냄」 표를 통마다 적는다 — 미열람 셈이 «보낸 회차»만 세기 때문이다.
-         ⚠ 안 적으면 이 회차가 셈에서 아예 빠져 미열람이 영영 안 쌓인다.
-         한 번의 update 로 담는다 — 110번 나눠 쓰면 중간에 끊겨 절반만 남는다. */
-    const 보냄표 = {};
-    r.ok.forEach(function(x){
-      const 열 = String(x.email||'').trim().toLowerCase().replace(/[.#$/[\]]/g,'_');
-      if(열) 보냄표[열 + '/보냄'] = true;
-    });
-    await db.ref('newsletter/issues/' + d.열쇠).update({
-      상태:'발송', 보낸때:d.보낸때, 받는수:d.받는수, batchId:d.batchId, 보낸이:d.보낸이,
-      링크들: 편.링크들 || []
-    });
-    if(Object.keys(보냄표).length){
-      try{ await db.ref('newsletter/opens/' + d.열쇠).update(보냄표); }
-      catch(e){ toast('보냄 표를 못 적었습니다 — 열람 셈이 이 회차를 빠뜨립니다: '
-                      + ((e&&e.message)||''), 12000); }
-    }
+    /* 대기열·발송 상태·링크·받는이·보냄 표는 서버가 한 번의 root update 로 함께 적었다.
+       여기서 다시 쓰면 서버 성공 뒤 화면 통신만 실패했을 때 «안 보냈다»고 거짓말하게 된다. */
     App.회차들[d.열쇠] = d;
     /* 보냈으니 «다음 회차»로 넘어간다 — 같은 회차를 두 번 보내지 않는다 */
     const 보냄 = {}; Object.keys(App.회차들).forEach(k=>{ if((App.회차들[k]||{}).상태==='발송') 보냄[k]=1; });
     App.지금열쇠 = Core.이번회차(오늘(), 보냄).열쇠;
     toast(`📨 ${(j.n||r.ok.length).toLocaleString()}곳에 걸었습니다 (${j.eta||걸림})`, 12000);
   }catch(e){
+    /* 잠금은 서버가 걸고 서버가 푼다 — 화면이 임의로 풀면, 서버가 이미 대기열을
+       만든 뒤에 풀어 버려 두 번 보내는 길이 열린다. */
     toast('걸지 못했습니다: ' + ((e&&e.message)||''), 12000);
   }finally{ App.보내는중 = false; render(); }
 }
@@ -2596,10 +2993,7 @@ function 회차크게(k){
     App.설정, { 미리보기: true });
   if(!편) return toast('이 회차에는 실린 것이 없습니다');
   $('bigT').textContent = 편.제목;
-  $('bigB').innerHTML = '<iframe id="bigF" style="width:100%;border:0;background:#fff" title="미리보기"></iframe>';
-  const f = $('bigF');
-  f.srcdoc = '<!doctype html><meta charset="utf-8"><base target="_blank"><body style="margin:0">' + 편.서식;
-  f.onload = function(){ try{ f.style.height = (f.contentDocument.body.scrollHeight + 8) + 'px'; }catch(_){} };
+  편지창채우기('bigB', 편.서식);
   $('big').classList.add('on');
 }
 function 회차열기(k){ App.지금열쇠 = k; App.tab='now'; render(); }

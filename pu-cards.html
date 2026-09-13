@@ -41,7 +41,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=23"></script>
+<script src="js/pu-ontology.js?v=25"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=2"></script>
 <script src="js/pu-health.js?v=3"></script>
@@ -2315,6 +2315,64 @@ td.selcell{cursor:cell}
 .coorph .osame{font-size:12px;color:#1e40af;margin-top:4px}
 .coorph .om{margin-top:4px}
 .coorph .om em{font-style:normal;color:#1e40af;font-size:11.5px;cursor:pointer}
+/* ── 🏅 중소기업 확인서 갱신 (대표 지시 2026-09-12) ────────────────────────
+   ⚠ 고아 정보 띠(.coorphbar)와 «같은 모양»을 쓴다 — 목록 위에 서는 알림은 하나의
+     결이어야 「또 새로운 것이 생겼나」로 읽히지 않는다.
+   ⚠ 색은 팔레트 안에서만(tests/color-palette-apps.test.js). */
+.cosmebar{margin:0 0 10px;padding:10px 13px;border:1px solid #fde68a;background:#ffffff;
+  border-radius:9px;font-size:12.5px;color:#854d0e;cursor:pointer}
+.cosmebar:hover{background:#f8fafc}
+.cosmebar b{color:#1e293b}
+.cosmebar em{font-style:normal;color:#1e40af;margin-left:4px}
+/* 📅 계약 종료 띠 — 확인서 띠와 «같은 결»로 둔다(다르게 그리면 「또 새것이 생겼나」가 된다).
+   ⚠ 테두리만 파랑이다. 둘이 나란히 뜰 때 어느 띠를 읽고 있는지 구별이 되어야 한다. */
+.coctbar{margin:0 0 10px;padding:10px 13px;border:1px solid #bfdbfe;background:#ffffff;
+  border-radius:9px;font-size:12.5px;color:#1e40af;cursor:pointer}
+.coctbar:hover{background:#f8fafc}
+.coctbar b{color:#1e293b}
+.coctbar em{font-style:normal;color:#1e40af;margin-left:4px}
+/* 🏛 국세청 폐업·휴업 띠 — 확인서·계약 띠와 «같은 결», 테두리만 붉다(가장 무거운 소식이다) */
+.contsbar{margin:0 0 10px;padding:10px 13px;border:1px solid #fecaca;background:#ffffff;
+  border-radius:9px;font-size:12.5px;color:#991b1b;cursor:pointer}
+.contsbar:hover{background:#f8fafc}
+.contsbar b{color:#1e293b}
+.contsbar em{font-style:normal;color:#1e40af;margin-left:4px}
+/* 훑는 «동안»의 진행 — 「그만」이 여기 있다(없으면 그만둘 길이 아예 없다) */
+.contsrun{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;
+  border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;font-size:12.5px;color:#1e40af}
+.contsrun span{color:#64748b}
+.contsrun button{margin-left:auto;font-size:12px;font-weight:700;color:#991b1b;background:#ffffff;
+  border:1px solid #fecaca;border-radius:8px;padding:4px 12px;cursor:pointer}
+.contsrun button:hover{background:#991b1b;color:#ffffff}
+/* 👤 담당 · 📝 메모 — 사람이 «직접 적는» 자리 (2026-09-12).
+   ⚠ ✎ 는 「업체관리가 아니라 우리가 적은 값」이라는 표다 — 색만으로 구별하면 흑백
+     인쇄·색약에서 사라진다. */
+.comgr{cursor:pointer;border-bottom:1px dashed #bfdbfe;padding-bottom:1px}
+.comgr:hover{color:#1e40af;border-bottom-color:#1e40af}
+td.mgr .mgours{color:#94a3b8;font-size:11px}
+.comemo{font-size:12.5px;color:#1e293b;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.comemo i{color:#94a3b8;font-style:normal}
+.comemoact{margin-top:8px}
+.comemoact button{font-size:12px;font-weight:700;color:#1e40af;background:#eff6ff;
+  border:1px solid #bfdbfe;border-radius:8px;padding:5px 11px;cursor:pointer}
+.comemoact button:hover{background:#1e40af;color:#ffffff}
+/* 🔗 여기로 합쳐 둔 줄 — 되돌릴 수 있는 유일한 자리라 «눈에 띄어야» 한다 */
+.comerged{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0 0;padding:8px 11px;
+  border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;font-size:12px;color:#1e40af}
+.comerged .t{font-weight:700}
+.comerged button{font-size:11px;font-weight:700;color:#1e40af;background:#ffffff;
+  border:1px solid #bfdbfe;border-radius:7px;padding:3px 9px;cursor:pointer}
+.comerged button:hover{background:#1e40af;color:#ffffff}
+.cosmerow{padding:10px 11px;border-bottom:1px solid #f8fafc;cursor:pointer}
+.cosmerow:last-child{border-bottom:none}
+.cosmerow:hover{background:#f8fafc}
+.cosmerow .sk{font-size:13px;font-weight:700;color:#1e293b}
+.cosmerow .sv{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:4px;font-size:12px}
+.cosmerow .sd{font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.cosmerow .sd.gone{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.cosmerow .sd.soon{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
+.cosmerow .se{color:#64748b}
+.cosmerow .sm{color:#94a3b8;margin-left:auto}
 /* 기업 상세(데스크톱 표·폰 목록·상세 패널)에서도 같은 배지를 쓴다(대표 지시 2026-08-24) —
    자리마다 감싸는 칸 이름이 달라(.cotbl·상세 패널·느슨한 .row) 범위를 안 좁힌다.
    ⚠ 위의 #pcTable 것을 지우지 않는다 — 「계약해지 문패는 색을 갖는다」 검사가 그
@@ -2393,10 +2451,19 @@ body.pc .ditem .v a{color:#166534}
 body.pc .dname,body.pc .mhead b{color:#1e293b}
 body.pc .actrow a{background:#e2e8f0;color:#1e40af}
 body.pc #toast{background:#1e293b;border-color:#1e293b}
-/* PC 오른쪽 상세 패널 (리멤버식) */
+/* PC 오른쪽 상세 패널 (리멤버식)
+   ⚠⚠ 층 높이(z-index)는 «창(모달)보다 낮아야» 한다 — 이 앱의 창은 모두 100 이다.
+     2026-09-12 점검에서 실측: 패널이 120 이라 패널을 열어 둔 채 여는 창이 죄다
+     «패널 뒤»로 갔다.
+       · 폰 — 패널이 전체화면이라 창이 통째로 안 보였다. 사람 이름을 눌러도 명함이
+         열리는데 화면은 그대로여서 「아무 일도 안 난다」로 보였다(확인서 창·수정 창도 같다).
+       · PC — 창의 오른쪽 224px 이 잘려 ✕ 닫기 단추를 못 눌렀다(ESC 도 안 먹는다).
+     ★ 이 패널은 «화면의 한 자리»이지 창이 아니다. 창은 늘 그 위에 떠야 한다.
+     ⚠ 60(#pcSel 고른 것 띠)·70(.mck-dim)보다는 «위»여야 한다 — 그것들은 화면의
+       일부라 패널에 가려야 맞다. 그래서 90 이다(둘 사이에 아무것도 없다). */
 #pcDetail{position:fixed;top:0;right:0;width:420px;max-width:90vw;height:100vh;background:#fff;
   border-left:1px solid #e2e8f0;box-shadow:-8px 0 24px rgba(20,30,50,.08);
-  transform:translateX(100%);transition:transform .22s ease;z-index:120;overflow-y:auto;display:none;flex-direction:column}
+  transform:translateX(100%);transition:transform .22s ease;z-index:90;overflow-y:auto;display:none;flex-direction:column}
 body.pc #pcDetail{display:flex}
 #pcDetail.open{transform:translateX(0)}
 /* 폰 너비 — 옆에 붙는 패널이 아니라 전체화면 시트로 (대표 승인 A안, 2026-08-15).
@@ -11835,6 +11902,21 @@ function coBackToDetail(key){
   openCoDetailPanel(k);
 }
 
+/* 폰·브라우저 «뒤로가기» 한 걸음 (2026-09-12 실측으로 찾은 구멍).
+   뒤로가기는 지금까지 pu-back.js 의 「맨 위 덮개를 제 ✕ 로 닫는다」에만 기댔다.
+   그래서 기업 상세에서 연 명함은 ✕(closeDetail)로 «닫혀» 버렸다 — 화면에는 ◀뒤로가
+   있는데 뒤로가기는 회사까지 통째로 지웠다.
+   ★ 잣대는 coBackToDetail «한 곳»이다 — 단추와 뒤로가기가 같은 길을 탄다.
+   ⚠ 참(true)을 돌려줘야 pu-back 이 「우리가 처리했다」로 보고 앱을 안 나간다. */
+function coBackStep(){
+  const box = $('pcDetail');
+  if(!box || !box.classList.contains('open')) return false;
+  const k = String(box.dataset.backCo || '');
+  if(!k) return false;                    /* 목록에서 연 명함·기업 상세 = 그냥 닫는다 */
+  coBackToDetail(k);
+  return true;
+}
+
 /* ── PC 오른쪽 상세 패널 (리멤버식) ── */
 function openPcDetail(id, backCo){
   const it=state.items[id]; if(!it) return;
@@ -11932,6 +12014,15 @@ function openPcDetail(id, backCo){
       <div class="pddel"><button class="danger" onclick="delItem('${id}')">🗑 이 명함 삭제</button></div>
     </div>`;
   $('pcDetail').dataset.cardId = id;   /* 늦게 온 사진을 «이 명함» 창에만 넣으려고 */
+  /* 지금 떠 있는 것은 «명함»이다 — 기업 상세가 새 값에 다시 그려질 때 이 창을
+     밀어내지 않게 표를 지운다(coDetailRefresh). */
+  delete $('pcDetail').dataset.coKey;
+  /* 폰·브라우저 «뒤로가기»도 ◀뒤로 단추와 «같은 걸음»을 밟게 온 자리를 적어 둔다
+     (2026-09-12 실측: 안 적으면 뒤로가기가 명함을 통째로 «닫아» 보던 기업 상세까지
+      함께 사라졌다 — 화면 단추와 말이 다르면 사람은 둘 다 안 믿는다).
+     ⚠ 칸을 «지우는» 쪽도 같이 둔다. 남겨 두면 목록에서 연 다음 명함이 지난번 회사로
+       데려간다 — 「◀ 뒤로가 없는데 뒤로가기는 어디론가 간다」가 된다. */
+  if(_back) $('pcDetail').dataset.backCo = _back; else delete $('pcDetail').dataset.backCo;
   $('pcDetail').classList.add('open');
   const ov=$('pcDetailOverlay'); if(ov) ov.style.display='block';
   /* ⚠ 원본(Store.getPhoto)을 여기서 «안» 받는다 (대표 보고 2026-08-30).
@@ -14364,7 +14455,7 @@ function renderPCSide(){
     <button class="${onCo?'on':''}" onclick="openCoPage()" title="회사 하나에 얽힌 것을 한자리에 — 사업자등록증·명함·푸른이알피">🏢<em>기업 상세</em><span>${coList().length.toLocaleString()}</span></button>
     ${/* 👷 근로자 정보함 (대표 지시 2026-09-01) — 회사가 아니라 «사람»을 가운데 놓는다.
          개수는 wkList() 한 곳에서 센다 — 옆줄과 목록이 따로 세면 두 숫자가 어긋난다. */''}
-    <button class="${onWk?'on':''}" onclick="openWkPage()" title="사건과 사진첩 서류를 «사람»으로 모아 봅니다 — 집단 진정은 한 줄로 접힙니다">👷<em>근로자</em><span>${wkList().length.toLocaleString()}</span></button>
+    <button class="${onWk?'on':''}" onclick="openWkPage()" title="사건과 사진첩 서류를 «사람»으로 모아 봅니다 — 집단 진정은 한 줄로 접힙니다">👷<em>근로자</em><span>${wkCountLabel()}</span></button>
   </div></div>`;
   /* ⚠ 갈래 줄의 끝(`</div></div>`)이 .pcside-top 까지 «같이» 닫는다. 메일 창은 위에서
      이미 갈라져 나갔으므로 여기서는 갈래 줄이 늘 그려진다 — 따로 닫을 일이 없다. */
@@ -24507,10 +24598,28 @@ function coListBuild(){
   };
   /* 상호 → 사업자번호 열쇠. 명함에는 사업자번호가 거의 안 적혀 있어서, 이 다리가 없으면
      같은 회사가 「등록증 쪽」과 「명함 쪽」으로 갈라져 목록에 두 줄로 뜬다(실제로 그랬다). */
+  /* ── 🔗 사람이 「이 둘은 같은 곳」이라고 짚어 둔 것 (대표 지시 2026-09-12) ──
+     아래 nameIdx 다리가 (주)·주식회사·빈칸 차이는 이미 이어 준다(실측으로 확인했다).
+     남는 것은 «이름 자체가 다르게 적힌» 경우다 — 「가나」와 「가나상사」.
+     ⚠⚠ 그것은 **짐작으로 하면 안 된다.** 「천성」과 「천성전자」, 「화담원」과
+       「화담원 아산점」처럼 이름이 겹쳐도 다른 곳인 쌍이 실제로 있다(급여데이터함이
+       같은 자리에서 겪었다). 그래서 사람이 짚어 준 것만 따른다.
+     ⚠ 이 함수 «안»에 둔다 — 밖으로 빼면 이 함수를 떠서 돌리는 검사들이 함께 깨진다
+       (위 _coStamp·_coNewestFirst 와 같은 까닭). */
+  const _same = (k) => {
+    const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+    const to = String(((info[k] || {}).sameAs) || '').trim();
+    if(!to || to === k) return k;
+    /* ⚠ 한 걸음만 따라간다. 가→나·나→가로 서로 가리켜 두면 영영 돈다 —
+       그럴 때는 «아무 데도 안 간다»(둘 다 제자리). 조용히 한쪽을 고르면
+       다시 그릴 때마다 답이 달라진다. */
+    const back = String(((info[to] || {}).sameAs) || '').trim();
+    return (back === k) ? k : to;
+  };
   const nameIdx = {};
   /* ① 사업자등록증 — 회사의 뼈대 */
   _coNewestFirst(Object.values(allItems()).filter(it=>it.kind==='biz')).forEach(it=>{
-    const k = coKeyOf(it);
+    const k = _same(coKeyOf(it));
     /* ⚠ companyTel 을 여기 «안 넣어서» 3순위 「📋 정보부족」이 거짓말을 했다
        (검토 2026-08-27). 등록증에서 대표번호를 읽어 두고도(BIZ_FIELDS) 회사로 안
        올리니, coVal(o,'companyTel') 이 사진첩 서식이 준 값 아니면 늘 빈칸이었다 —
@@ -24537,8 +24646,8 @@ function coListBuild(){
   });
   /* ② 명함 — 그 회사 사람들. 회사가 사업자등록증 없이 명함만 있는 경우도 살린다. */
   _coNewestFirst(Object.values(allItems()).filter(it=>it.kind!=='biz' && (it.company||'').trim())).forEach(it=>{
-    const k = (digits(it.bizno||'').length>=10) ? coKeyOf(it)
-            : (nameIdx[_norm(it.company)] || coKeyOf(it));
+    const k = _same((digits(it.bizno||'').length>=10) ? coKeyOf(it)
+            : (nameIdx[_norm(it.company)] || coKeyOf(it)));
     /* ⚠ 명함에서 올리는 것은 «회사 것»뿐이다 — companyTel(회사 대표번호)과
        companyFax(회사 팩스) 둘. tel(직통전화)·mobile(휴대폰)·fax(개인팩스)·email 은
        그 «사람» 것이라 회사 값이 아니다 — 올려 버리면 그 사람이 퇴사한 뒤에도
@@ -24952,6 +25061,14 @@ function loadErpCaseCons(cb){
     _erpConsTypes = _erpHistTypes.consulting || [];
     _erpCaseCons = { byBiz, byName };
     _erpCaseConsLoading = false;
+    /* 사람 목록(wkList)은 이 자료로 만든다 — 새 자료가 왔으니 기억을 지우고 옆줄
+       딱지를 고쳐 그린다. ★ «누가 불렀든» 따라오게 여기 한 곳에서 한다
+       (2026-09-12: 예전에는 근로자 화면만 지워서, 기업 상세를 열어 이 자료를
+        받아 놓고도 옆줄은 「근로자 0」인 채였다).
+       ⚠ 기다리던 콜백보다 «먼저» 한다 — 안 그러면 그것들이 낡은 기억을 본다.
+       ⚠ 옆줄 딱지는 «부른 사람과 상관없이» 고쳐 그린다. 기업 상세를 열었을 뿐인데도
+         근로자 숫자가 제자리를 찾는다. 구르던 자리는 renderPCSide 가 지켜 준다. */
+    try{ wkListBust(); if(document.body.classList.contains('pc')) renderPCSide(); }catch(_){}
     const waiters = _erpCaseConsWaiters; _erpCaseConsWaiters = [];
     cb && cb(_erpCaseCons);
     waiters.forEach(w=>w(_erpCaseCons));
@@ -25967,7 +26084,17 @@ function coFilters(){
     { k: 'coOnlyIncomplete', icon: '📋', label: '정보부족',   count: () => coIncompleteCount(),
       title: '대표자·소재지·대표번호 중 빠진 것이 있는 회사만 봅니다 — 계약서·신고서에 필요한 값입니다' },
     { k: 'coOnlyUid',        icon: '🏛', label: '고유번호증', count: () => coUidCount(),
-      title: '고유번호증으로 들어온 곳만 봅니다 — 비영리법인·국가기관 등' }
+      title: '고유번호증으로 들어온 곳만 봅니다 — 비영리법인·국가기관 등' },
+    /* 🏅 확인서 갱신 (대표 지시 2026-09-12) — 띠·창과 «같은 잣대»(coSmeNeeds)를 쓴다.
+       띠는 「몇 곳인가」를, 이 거르개는 「그 곳만 목록으로」를 맡는다. */
+    { k: 'coOnlySme',        icon: '🏅', label: '확인서 갱신', count: () => coSmeCount(),
+      title: '중소기업 확인서가 만료됐거나 30일 안에 만료될 회사만 봅니다 — 해마다 새로 받습니다' },
+    /* ⚠ 「종료일 지남」은 계약해지(🚪)와 «다른 말»이다 — 해지로 표시된 곳은 안 담는다 */
+    { k: 'coOnlyCtOld',      icon: '📅', label: '계약 종료', count: () => coCtCount(),
+      title: '계약 종료일이 지났거나 30일 안에 끝나는 회사만 봅니다 — 계약해지(🚪)로 표시된 곳은 뺍니다' },
+    /* ⚠ 「물어본 그때」의 상태다 — 계약해지(🚪)와 다른 말이다 */
+    { k: 'coOnlyNtsBad',     icon: '🏛', label: '폐업·휴업', count: () => coNtsBadCount(),
+      title: '국세청에 물어본 결과가 폐업·휴업인 회사만 봅니다 — 물어본 그때의 상태입니다' }
   ];
 }
 /* 세어서 늘어놓는다 — 메뉴를 «열 때» 한 번만 부른다 */
@@ -26021,6 +26148,12 @@ function coFilterMenuPaint(r){
           <b style="float:right;color:#94a3b8;font-weight:700">${n.toLocaleString()}</b></div>`;
       }).join('');
   }
+  /* 🏛 국세청 훑기로 들어가는 «문» (대표 지시 2026-09-13).
+     ⚠ 띠는 폐업·휴업이 «나온 뒤에야» 뜬다 — 한 곳도 안 물어봤으면 띠가 없어 들어갈
+       길이 없다. 그래서 늘 있는 이 메뉴에 문을 하나 둔다.
+     ⚠ 거르개가 아니라 «창을 여는» 줄이다 — 켜고 끄는 것이 아니므로 ✓ 를 안 붙인다. */
+  h += `<div class="fmi" title="국세청에 사업자 상태를 물어봅니다 — 사업자번호가 밖으로 나갑니다"
+      onclick="closeFolderMenu();openCoNts()">🏛 국세청 훑기…</div>`;
   m.innerHTML = h;
   m.style.display='block';
   m.style.left = Math.max(8, Math.min(r.left, window.innerWidth-230)) + 'px';
@@ -26439,6 +26572,19 @@ function coFilteredList(skipCol, skipCares, skipTodo){
      비영리법인·국가기관은 사업자등록증이 아니라 고유번호증을 받는다. 다루는 법은
      같지만 «따로 모아 봐야 할» 때가 있다(법인·단체만 골라 서식을 보낼 때). */
   if(state.coOnlyUid && !skipTodo) list = list.filter(coIsUid);
+  /* ── 🏅 확인서 갱신할 곳만 (대표 지시 2026-09-12) ──
+     중소기업 확인서는 «해마다» 새로 받는다. 만료된 것으로 지원사업에 넣으면 반려된다.
+     ⚠ 거르는 잣대는 coSmeNeeds «한 곳»이다 — 띠(coSmeBarHtml)·창(coSmeHtml)·상세 딱지가
+       모두 그것을 본다. 여기서 다시 재면 「띠는 3곳인데 목록은 5곳」이 된다. */
+  if(state.coOnlySme && !skipTodo) list = list.filter(o=>coSmeNeeds(o));
+  /* ── 📅 계약이 끝났거나 곧 끝나는 곳만 (대표 지시 2026-09-12) ──
+     ⚠ 거르는 잣대는 coCtNeeds «한 곳»이다 — 띠(coCtBarHtml)·창(coCtHtml)이 모두 그것을
+       본다. 여기서 다시 재면 「띠는 3곳인데 목록은 5곳」이 된다.
+     ⚠ 계약해지(🚪)를 빼는 것도 그 잣대 안에 들어 있다 — 여기서 또 빼지 않는다. */
+  if(state.coOnlyCtOld && !skipTodo) list = list.filter(o=>coCtNeeds(o));
+  /* ── 🏛 국세청이 폐업·휴업이라 한 곳만 (대표 지시 2026-09-13) ──
+     ⚠ 잣대는 coNtsNeeds 한 곳이다 — 띠·창·거르개가 모두 그것을 본다. */
+  if(state.coOnlyNtsBad && !skipTodo) list = list.filter(o=>coNtsNeeds(o));
   /* ── 📤 이 갈래를 «못 받은» 곳만 (4걸음, 대표 지시 2026-09-03) ──
      ⚠ 계약해지(🚪)는 «여기서도» 뺀다. 배포할 때 애초에 안 보낸 곳이라(3걸음),
        빼지 않으면 끝난 곳이 죄다 「안 받은 곳」으로 올라와 목록이 못 쓰게 된다.
@@ -26530,8 +26676,13 @@ function pickCoNoFolder(){
    할 일이 켜져 있다는 표시가 «옆줄 한 줄이 진해지는 것»뿐이라, 폴더를 눌러도
    그 조건이 함께 걸려 텅 빈 목록이 나오는 까닭을 알 길이 없었다.
    ⚠ 명함 쪽은 2026-08-29 에 같은 것을 겪고 조건 띠로 고쳤다 — 같은 결로 맞춘다. */
+/* ⚠ 켤 수 있는 거르개는 «모두» 여기 이름이 있어야 한다 — 걸어 놓고 이름이 없으면
+     목록이 좁혀진 까닭을 화면이 아무 말도 안 한다(검사 cards-co-todo-band 가 지킨다).
+     2026-09-12 에 「🏅 확인서 갱신」을 늘리며 이 자리를 빠뜨렸다가 그 검사가 잡았다. */
 const CO_TODO_LABEL = { coOnlyClosed:'🚪 종료', coOnlyNoBiz:'🔢 번호 없음',
                         coOnlyIncomplete:'📋 정보부족', coOnlyUid:'🏛 고유번호증',
+                        coOnlySme:'🏅 확인서 갱신', coOnlyCtOld:'📅 계약 종료',
+                        coOnlyNtsBad:'🏛 폐업·휴업',
                         coNoFolder:'📂 아직 안 담음' };
 function clearCoTodo(k){ state[k] = false; state.coPage = 0; renderCoAny(); }
 /* ⚠ 띠 모양은 condChipHtml 한 곳에만 있다 (점검 A3) — 여기 다시 적으면 두 벌이 된다 */
@@ -26642,7 +26793,10 @@ const CO_SORT = {
   bizno: o => String(o.bizno||''),
   cards: o => o.cards.length,
   docs:  o => o.docs||0,
-  mgr:   o => String((o.erp && o.erp.main) || ''),
+  /* ⚠ 표 칸(coMgrCellHtml)과 «같은 잣대»다 — 업체관리 담당이 없으면 우리가 적어 둔
+     담당으로 선다. 여기서 erp.main 만 보면 「칸에는 이름이 있는데 정렬·거르개에서는
+     빈칸으로 묶인다」가 된다(2026-09-12). */
+  mgr:   o => coMgrOf(o),
   /* ⚠ «보이는 이름»으로 선다 — 화면에는 「등록증」인데 차례는 「사업자등록증」으로
      서면, 눈으로는 같은 딱지인데 서로 떨어져 앉는다(짧은 이름이 갈래를 합친다). */
   tag:   o => coTagShort(coTagsOf(o)[0] || ''),
@@ -26906,7 +27060,7 @@ function coListHtml(info){
        내려갔을 때 마지막 줄을 덮지 않는다.
      ⚠ 쪽넘김은 여기 «없다». renderCoPage 의 안 구르는 바닥(.cofoot)으로 옮겼다 —
        여기 두면 표와 함께 굴러가 200줄 아래로 숨는다(대표 지시 2026-08-26). */
-  return `${coOrphanBarHtml()}<table class="cotbl">
+  return `${coOrphanBarHtml()}${coSmeBarHtml()}${coCtBarHtml()}${coNtsBarHtml()}<table class="cotbl">
     ${/* ⚠ 「가진 것」을 한 줄로 만들면서 그 칸을 170→215px 로 넓혔다. 늘린 만큼은
          상호(300→255)에서 덜어 온다 — 표 전체가 넓어지면 좌우로 넘친다. */''}
     ${/* ⚠ 폴더를 «제 열»로 뺐다 (대표 지시 2026-08-30 「열 정리해라 세로로 정렬해서」).
@@ -27067,7 +27221,9 @@ function coListHtml(info){
              (대표 지시 2026-08-24, 3순위). */''}
         <span>${missTxt ? miss('✕ ' + missTxt) : ''}</span>
       </td>
-      <td class="mgr">${o.erp&&o.erp.main?esc(o.erp.main):''}</td>
+      ${/* ⚠ 표·정렬·거르개가 «같은 잣대»(coMgrOf)를 본다 — 여기서 따로 읽으면
+             「칸에는 이름이 있는데 그 이름으로 거르면 안 나온다」가 된다(2026-09-12). */''}
+      <td class="mgr">${coMgrCellHtml(o)}</td>
       <td></td>
     </tr>`;
   }).join('')}</tbody></table>${selbar}`;
@@ -28570,6 +28726,346 @@ function coSmeState(txt, now){
   if(d <= 30) return { cls:'soon', text:'확인서 D-' + d + ' · ' + exp, why:'곧 만료됩니다 — 새로 발급받을 때입니다' };
   return { cls:'ok', text:'확인서 ' + exp + '까지', why:'유효한 중소기업 확인서입니다' };
 }
+/* ══════ 🏅 올해 «갱신할» 확인서만 한자리에 (대표 지시 2026-09-12) ══════════════
+   대표: 「3번 중소기업확인서 진행」 — 점검 보고의 ③ 「지금은 회사를 열어야 보인다.
+   올해 갱신할 곳을 한 번에 보는 목록이 있으면 매년 챙기기 쉽겠다」
+
+   ■ 무엇이 없었나
+   확인서 유효기간은 회사마다 «상세를 열어야» 보였다. 4,000곳 가운데 어디가 만료됐고
+   어디가 곧인지 알려면 한 곳씩 열어 보는 수밖에 없었다 — 해마다 하는 일인데 그렇다.
+
+   ★ 잣대는 «한 곳»이다 — coSmeState(만료·D-30)를 그대로 쓴다. 여기서 다시 재면
+     띠·창·상세가 서로 다른 말을 하게 된다.
+   ⚠ «아직 먼 것»은 안 담는다. 유효한 확인서까지 담으면 목록이 「전체 목록」이 되어
+     정작 갱신할 곳이 묻힌다.
+   ⚠ 날짜로 «못 읽은» 확인서도 안 담는다(별도 통지시까지 등). 모르는 것을 급하다고
+     하면 늑대 소년이 된다 — 그 값은 상세에 적힌 그대로 보인다. */
+function coSmeNeeds(o, now){
+  const st = coSmeState(coVal(o, 'smeExpiry'), now);
+  return !!st && (st.cls === 'gone' || st.cls === 'soon');
+}
+/* 급한 순으로 — 남은 날이 적을수록 앞. 지난 것은 음수라 저절로 맨 앞에 선다
+   (더 오래 지난 것이 더 급하다). */
+function coSmeList(now){
+  return (coList() || []).filter(o => coSmeNeeds(o, now)).map(function(o){
+    const exp = coVal(o, 'smeExpiry');
+    return { o:o, key:o.key, name:o.name || '', exp:exp,
+             cls:(coSmeState(exp, now) || {}).cls, days:coSmeDays(exp, now) };
+  }).sort((a,b) => (a.days - b.days) || String(a.name).localeCompare(String(b.name), 'ko'));
+}
+function coSmeCount(now){ return coSmeList(now).length; }
+/* 목록 위 알림 띠 — 0곳이면 «아무 것도 안 띄운다».
+   ⚠ 늘 뜨는 띠는 눈이 배경으로 배운다(고아 정보 띠에서 정한 규칙 그대로다). */
+function coSmeBarHtml(now){
+  const list = coSmeList(now);
+  if(!list.length) return '';
+  const gone = list.filter(x => x.cls === 'gone').length;
+  const soon = list.length - gone;
+  const bits = [ gone ? `만료 <b>${gone.toLocaleString()}곳</b>` : '',
+                 soon ? `30일 안 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
+  return `<div class="cosmebar" onclick="openCoSme()"
+      title="중소기업 확인서는 해마다 새로 받습니다 — 만료됐거나 곧 만료될 곳입니다">
+      🏅 중소기업 확인서 ${bits}<em>— 눌러서 보기</em></div>`;
+}
+function openCoSme(){ showPanel(coSmeHtml()); }
+/* 창 — 급한 순으로 늘어놓고, 누르면 그 회사를 연다.
+   ⚠ 여기서 «고치지 않는다». 확인서는 바깥(중소기업현황정보시스템)에서 새로 받아
+     사진첩으로 들어오는 것이라, 이 창이 할 일은 「어디를 챙길 것인가」를 말하는 것뿐이다. */
+function coSmeHtml(now){
+  /* ⚠ 「오늘」을 받는다 — 안 받으면 검사가 날짜를 정해 줘도 하루 지나면 답이 달라진다 */
+  const list = coSmeList(now);
+  if(!list.length) return `<div class="mhead"><b>🏅 중소기업 확인서</b>${_closeBtn()}</div>
+    <p class="cpnone" style="padding:16px 2px">갱신할 곳이 없습니다 👍</p>`;
+  return `<div class="mhead"><b>🏅 중소기업 확인서 — 갱신할 곳 ${list.length}곳</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 10px">확인서는 <b>해마다</b> 새로 받습니다.
+      만료된 것으로 지원사업에 넣으면 반려됩니다 — 급한 곳부터 놓았습니다.
+      회사를 누르면 그 회사 상세가 열립니다.</p>
+    <div class="ablist">${list.map(x=>`
+      ${/* ⚠ 창을 «먼저 닫고» 회사를 연다 — 안 닫으면 상세 패널이 이 창 뒤에 열려
+             눌렀는데 아무 일도 없는 것처럼 보인다. 닫는 길은 ✕ 와 «같은 것»을 쓴다. */''}
+      <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
+          title="${esc(x.name)} 상세를 엽니다">
+        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
+        <div class="sv"><span class="sd ${x.cls}">${x.days < 0 ? '만료 ' + (-x.days) + '일 지남' : 'D-' + x.days}</span>
+          <span class="se">${esc(x.exp)}까지</span>
+          ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
+      </div>`).join('')}</div>`;
+}
+
+/* ══════ 🏛 국세청 사업자 상태 — «지금» 물어보고 «언제 물어봤는지»와 함께 적는다 ═══
+   (대표 지시 2026-09-13 — 기능 검토 보고의 ⑤)
+
+   ■ 알아보니 «이미 다 있었다»
+   국세청 조회는 이 저장소가 이미 하고 있다 — 사진첩이 등록증을 읽을 때
+   `js/pu-doc-read.js` 가 `api.odcloud.kr` 에 물어보고(`ntsState`), 「국세청 계속사업자」를
+   화면에 적는다. 열쇠 자리도 이미 있다(포털 환경설정 › 국세청 사업자번호 조회 키 ·
+   `data/app_config/ntsKey` · 무료).
+   **없던 것은 그 값이 기업정보함까지 오는 길뿐이었다** — 중소기업 확인서 때와 같은 자리다.
+
+   ★⚠ 「언제 확인했나」를 «반드시» 함께 적는다. 상태는 그때의 사실이지 지금의 사실이
+     아니다 — 날짜 없이 「폐업자」만 적어 두면, 반년 뒤에도 화면이 단정해서 거짓말을 한다.
+     (그래서 사진첩처럼 «읽을 때 자동으로 받아 두는» 길로 안 갔다. 그 값은 서류를 읽던
+      날의 것이라 언제 굳었는지 모른 채 눌러앉는다.)
+   ⚠ 못 물어봤으면 «물어본 척 안 한다» — pu-doc-read 가 지키는 규칙 그대로다.
+   ⚠ 우리가 정하지 않는다. 국세청이 준 말(b_stt)을 그대로 적는다. */
+const NTS_STATUS_URL = 'https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=';
+/* 국세청이 준 한 마디 — 없으면 세금 갈래 칸에 든 안내문이 그 자리를 대신한다
+   (등록되지 않은 번호는 b_stt 가 비고 tax_type 에 「…등록되지 않은 사업자등록번호입니다」가 온다). */
+function coNtsWord(row){
+  const st = String((row && row.b_stt) || '').trim();
+  if(st) return st;
+  return String((row && row.tax_type) || '').trim();
+}
+/* 무슨 빛으로 보일 것인가 — 화면과 검사가 «같은 답»을 보도록 따로 둔다 */
+function coNtsCls(word){
+  const w = String(word || '');
+  if(!w) return '';
+  if(w.indexOf('폐업') >= 0) return 'gone';
+  if(w.indexOf('휴업') >= 0) return 'soon';
+  if(w.indexOf('계속') >= 0) return 'ok';
+  return 'dim';                     /* 등록되지 않은 번호 등 — 좋지도 나쁘지도 않다 */
+}
+function coNtsChipHtml(o){
+  /* 사업자번호가 없으면 물어볼 길이 없다 — 눌러도 안 되는 단추를 두지 않는다 */
+  if(!o || digits(o.bizno || '').length < 10) return '';
+  const word = coVal(o, 'ntsState'), at = coVal(o, 'ntsAt');
+  const key = esc(String(o.key).replace(/'/g,"\\'"));
+  const color = { gone:'#991b1b;background:#fef2f2;border-color:#fecaca',
+                  soon:'#854d0e;background:#fffbeb;border-color:#fde68a',
+                  ok:'#1e40af;background:#eff6ff;border-color:#bfdbfe',
+                  dim:'#64748b;background:#f8fafc;border-color:#e2e8f0',
+                  '':'#64748b;background:#f8fafc;border-color:#e2e8f0' }[coNtsCls(word)];
+  const 글 = word
+    ? `🏛 ${esc(word)}${at ? ` · ${esc(at)} 확인` : ''}`
+    : '🏛 국세청 확인';
+  return `<span onclick="event.stopPropagation();coAskNts('${key}')"
+    title="${word ? '국세청에 물어본 그때의 상태입니다 — 눌러서 다시 확인합니다'
+                  : '국세청에 사업자 상태(계속·휴업·폐업)를 물어봅니다'}"
+    style="cursor:pointer;font-size:11px;font-weight:700;
+    border:1px solid;border-radius:9px;padding:1px 8px;white-space:nowrap;color:${color}">${글}</span>`;
+}
+async function coAskNts(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const no = digits(o.bizno || '');
+  if(no.length < 10){ toast('사업자번호가 없어 국세청에 물어볼 수 없습니다', 6000); return; }
+  const svc = String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim();
+  /* ⚠ 열쇠가 없으면 «어디서 넣는지»까지 말한다. 조용히 아무 일도 안 하면 고장으로 보인다. */
+  if(!svc){ toast('국세청 조회 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」를 넣어 주세요(공공데이터포털, 무료)', 10000); return; }
+  toast('국세청에 물어보는 중…', 3000);
+  let row = null;
+  try{
+    const r = await fetch(NTS_STATUS_URL + encodeURIComponent(svc), {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ b_no: [no] }) });
+    if(!r.ok) throw new Error('응답 ' + r.status);
+    const j = await r.json();
+    row = (j && j.data && j.data[0]) || null;
+  }catch(e){
+    /* 못 물어봤는데 «물어본 척» 하지 않는다 — 적어 둔 값도 안 건드린다 */
+    toast('국세청에 못 물어봤습니다 — ' + ((e && e.message) || '연결을 확인해 주세요'), 8000);
+    return;
+  }
+  const word = coNtsWord(row);
+  if(!word){ toast('국세청이 아무 말도 주지 않았습니다 — 번호를 다시 확인해 주세요', 7000); return; }
+  coSaveInfoPatch(k, { ntsState: word, ntsAt: todayYmd() }, `🏛 국세청 「${word}」 — 오늘 확인했습니다`);
+}
+
+/* ══════ 🏛 국세청 «전체 훑기» — 4,000곳을 한 번에 (대표 지시 2026-09-13 「전체 훑기」) ══
+   ⚠⚠ **밖으로 나가는 일이다.** 사업자번호가 국세청으로 통째로 나간다 — 그래서
+     ① 묻기 전에 «몇 개가 어디로» 나가는지 숫자로 말하고
+     ② 최근에 물어본 곳은 «다시 안 묻는다»(안 그러면 누를 때마다 4,000개가 또 나간다)
+     ③ 언제든 «그만»둘 수 있고, 그때까지 받은 것은 살린다.
+   ⚠ 국세청 규격이 «한 번에 100개»다. 그보다 크게 묶으면 통째로 거절당한다.
+   ⚠ 쓰기는 200곳씩 모아 «한 통»으로 보낸다 — 2026-08-16 의 대량 쓰기 사고가 한 장씩
+     쓴 값이었다.
+   ★ 순수 로직(무엇을 훑나·어떻게 자르나·답을 어떻게 맞추나)을 따로 둔다 —
+     검사가 실데이터와 네트워크 없이 규칙을 본다. */
+const NTS_CHUNK = 100;        /* 국세청 한 번에 100개 */
+const NTS_SKIP_DAYS = 30;     /* 최근 30일 안에 물어본 곳은 건너뛴다 */
+
+/* 훑을 곳 — 번호가 있고, 최근에 안 물어본 곳.
+   ⚠ 번호가 없으면 애초에 물어볼 수 없다. 「모른다」를 물어보러 가지 않는다. */
+function coNtsTargets(now){
+  const today = (now == null ? todayYmd() : now);
+  return (coList() || []).filter(function(o){
+    if(digits(o.bizno || '').length < 10) return false;
+    const at = coVal(o, 'ntsAt');
+    if(!at) return true;                       /* 한 번도 안 물어봤다 */
+    const d = coSmeDays(at, today);
+    if(d == null) return true;                 /* 날짜를 못 읽었다 — 다시 묻는다 */
+    return (-d) >= NTS_SKIP_DAYS;
+  });
+}
+/* 100개씩 자른다 — 자르는 규칙을 한 곳에 둔다(세 곳에 박으면 어긋난다) */
+function coNtsChunks(list, size){
+  const n = Math.max(1, Math.floor(Number(size)) || NTS_CHUNK);
+  const out = [];
+  for(let i = 0; i < (list || []).length; i += n) out.push(list.slice(i, i + n));
+  return out;
+}
+/* 국세청 답을 «우리 줄»에 맞춘다.
+   ⚠⚠ 차례(index)로 맞추지 «않는다» — 국세청이 차례를 지킨다고 적혀 있어도, 하나라도
+     어긋나면 **남의 회사 상태가 이 회사에 앉는다.** 번호로 맞춘다.
+   ⚠ 같은 번호를 가진 줄이 둘일 수 있다(이름 열쇠 줄에 번호가 채워진 경우) — 둘 다 받는다.
+   ⚠ 우리가 안 물어본 번호가 답에 섞여 오면 «버린다». */
+function coNtsMatch(chunk, rows){
+  const byNo = {};
+  (chunk || []).forEach(function(o){
+    const no = digits(o.bizno || '');
+    (byNo[no] = byNo[no] || []).push(o.key);
+  });
+  const out = [];
+  (rows || []).forEach(function(r){
+    const no = digits((r && r.b_no) || '');
+    const word = coNtsWord(r);
+    if(!no || !word || !byNo[no]) return;
+    byNo[no].forEach(function(k){ out.push({ key:k, state:word }); });
+  });
+  return out;
+}
+/* 받은 것을 200곳씩 «한 통»으로 — 곳마다 두 칸(상태·확인일)이라 한 통에 400칸이다 */
+function coNtsWrites(hits, day, chunk){
+  const size = Math.max(1, Math.floor(Number(chunk)) || BULK_PATCH_CHUNK);
+  const out = [];
+  for(let i = 0; i < (hits || []).length; i += size){
+    const upd = {};
+    hits.slice(i, i + size).forEach(function(h){
+      upd['coInfo/' + h.key + '/ntsState'] = h.state;
+      upd['coInfo/' + h.key + '/ntsAt'] = day;
+    });
+    out.push(upd);
+  }
+  return out;
+}
+/* 훑은 뒤 «무엇이 나왔나» — 폐업·휴업만 추린다(계속사업자는 챙길 일이 없다) */
+function coNtsBadList(){
+  return (coList() || []).filter(function(o){
+    const c = coNtsCls(coVal(o, 'ntsState'));
+    return c === 'gone' || c === 'soon';
+  }).map(function(o){
+    return { o:o, key:o.key, name:o.name || '', state:coVal(o, 'ntsState'),
+             at:coVal(o, 'ntsAt'), cls:coNtsCls(coVal(o, 'ntsState')) };
+  }).sort(function(a,b){
+    /* 폐업이 휴업보다 앞 — 급한 순이다 */
+    if(a.cls !== b.cls) return a.cls === 'gone' ? -1 : 1;
+    return String(a.name).localeCompare(String(b.name), 'ko');
+  });
+}
+function coNtsBadCount(){ return coNtsBadList().length; }
+function coNtsNeeds(o){
+  const c = coNtsCls(coVal(o, 'ntsState'));
+  return c === 'gone' || c === 'soon';
+}
+/* 목록 위 알림 띠 — 0곳이면 «아예 안 띄운다»(확인서·계약 띠와 같은 규칙) */
+function coNtsBarHtml(){
+  const list = coNtsBadList();
+  if(!list.length) return '';
+  const gone = list.filter(x => x.cls === 'gone').length;
+  const soon = list.length - gone;
+  const bits = [ gone ? `폐업 <b>${gone.toLocaleString()}곳</b>` : '',
+                 soon ? `휴업 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
+  return `<div class="contsbar" onclick="openCoNts()"
+      title="국세청에 물어본 결과입니다 — 물어본 «그때»의 상태입니다">
+      🏛 국세청 ${bits}<em>— 눌러서 보기</em></div>`;
+}
+function openCoNts(){ showPanel(coNtsHtml()); }
+function coNtsHtml(){
+  const list = coNtsBadList();
+  const 남은 = coNtsTargets().length;
+  /* ⚠ 도는 «동안»에는 진행과 「그만」만 보인다. 이 자리가 없으면 그만둘 길이 아예 없다
+     (2026-09-13: 그만두는 함수를 만들어 놓고 «누를 자리»를 안 만들어 검사가 잡았다). */
+  const 훑기 = _coNtsRun
+    ? `<div class="contsrun"><b>🏛 국세청에 묻는 중 ${_coNtsRun.i}/${_coNtsRun.n}</b>
+        <span>지금까지 ${Number(_coNtsRun.got||0).toLocaleString()}곳${
+          _coNtsRun.fail ? ` · ${_coNtsRun.fail}묶음 못 받음` : ''}</span>
+        <button onclick="coNtsSweepStop()" title="그때까지 받은 것은 남습니다">그만</button></div>`
+    : `<p class="setnote" style="margin:0 0 10px">아직 안 물어봤거나 물어본 지
+      <b>${NTS_SKIP_DAYS}일</b>이 넘은 곳이 <b>${남은.toLocaleString()}곳</b> 있습니다.
+      ${남은 ? `<button class="conbask" onclick="coNtsSweepAsk()"
+        title="사업자번호를 국세청에 보내 상태를 받아 옵니다">🏛 전체 훑기</button>` : ''}</p>`;
+  if(!list.length) return `<div class="mhead"><b>🏛 국세청 사업자 상태</b>${_closeBtn()}</div>
+    ${훑기}<p class="cpnone" style="padding:16px 2px">폐업·휴업으로 나온 곳이 없습니다 👍</p>`;
+  return `<div class="mhead"><b>🏛 국세청 — 폐업·휴업 ${list.length}곳</b>${_closeBtn()}</div>
+    ${훑기}
+    <p class="setnote" style="margin:0 0 10px">⚠ <b>물어본 «그때»의 상태</b>입니다 — 날짜를 함께 보세요.
+      계약해지(🚪)와는 다른 말입니다.</p>
+    <div class="ablist">${list.map(x=>`
+      <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
+          title="${esc(x.name)} 상세를 엽니다">
+        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
+        <div class="sv"><span class="sd ${x.cls}">${esc(x.state)}</span>
+          <span class="se">${esc(x.at || '날짜 모름')} 확인</span>
+          ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
+      </div>`).join('')}</div>`;
+}
+/* ── 훑기 — 묻고, 자르고, 모아 쓰고, 그만둘 수 있다 ─────────────────────── */
+let _coNtsStop = false;
+/* 도는 «동안»의 진행 — 창이 이것을 보고 그린다. 안 돌 때는 null 이다. */
+let _coNtsRun = null;
+function coNtsSweepStop(){ _coNtsStop = true; toast('그만둡니다 — 지금까지 받은 것은 남습니다', 5000); }
+/* 창이 열려 있으면 그 자리를 다시 그린다 — 진행과 「그만」이 거기 있다 */
+function coNtsRepaint(){
+  try{ if($('dedupBg') && $('dedupBg').classList.contains('open')) showPanel(coNtsHtml()); }catch(_){}
+}
+async function coNtsSweepAsk(){
+  const svc = String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim();
+  if(!svc){ toast('국세청 조회 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」를 넣어 주세요(공공데이터포털, 무료)', 10000); return; }
+  const targets = coNtsTargets();
+  if(!targets.length){ toast('지금 물어볼 곳이 없습니다 — 모두 최근에 확인했습니다', 6000); return; }
+  const 묶음 = coNtsChunks(targets, NTS_CHUNK).length;
+  /* ⚠⚠ 묻기 전에 «몇 개가 어디로» 나가는지 숫자로 말한다. 밖으로 나가는 일이다. */
+  if(!confirm(`사업장 ${targets.length.toLocaleString()}곳의 «사업자등록번호»를\n`
+    + `국세청(공공데이터포털)에 보내 상태를 받아 옵니다.\n\n`
+    + `· 보내는 것: 사업자등록번호 ${targets.length.toLocaleString()}개 (${묶음}번에 나눠)\n`
+    + `· 상호·대표자·연락처는 보내지 않습니다\n`
+    + `· 최근 ${NTS_SKIP_DAYS}일 안에 확인한 곳은 뺐습니다\n`
+    + `· 도중에 그만둘 수 있고, 그때까지 받은 것은 남습니다\n\n`
+    + `진행할까요?`)) return;
+  _coNtsStop = false;
+  /* 창을 «먼저» 연다 — 진행과 「그만」이 거기 있다 */
+  openCoNts();
+  await coNtsSweepRun(targets, svc);
+}
+async function coNtsSweepRun(targets, svc){
+  const day = todayYmd();
+  const chunks = coNtsChunks(targets, NTS_CHUNK);
+  let 받음 = 0, 실패 = 0;
+  const hits = [];
+  for(let i = 0; i < chunks.length; i++){
+    if(_coNtsStop) break;
+    _coNtsRun = { i: i+1, n: chunks.length, got: 받음, fail: 실패 };
+    coNtsRepaint();
+    try{
+      const r = await fetch(NTS_STATUS_URL + encodeURIComponent(svc), {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ b_no: chunks[i].map(o => digits(o.bizno || '')) }) });
+      if(!r.ok) throw new Error('응답 ' + r.status);
+      const j = await r.json();
+      const got = coNtsMatch(chunks[i], (j && j.data) || []);
+      got.forEach(h => hits.push(h));
+      받음 += got.length;
+    }catch(e){
+      /* ⚠ 한 묶음이 막혔다고 통째로 그만두지 않는다 — 나머지는 받는다.
+         못 받은 것은 «안 적는다»(물어본 척하지 않는다). */
+      실패++;
+      console.warn('[국세청 훑기]', e && e.message);
+    }
+  }
+  _coNtsRun = null;                     /* 다 돌았다 — 창이 다시 「전체 훑기」를 보인다 */
+  if(hits.length){
+    try{
+      for(const upd of coNtsWrites(hits, day, BULK_PATCH_CHUNK)) await Store.db.ref(DB_ROOT).update(upd);
+    }catch(e){ coNtsRepaint(); toast('받아 왔지만 저장하지 못했습니다 — ' + ((e && e.message) || ''), 9000); return; }
+    coListBust(); renderCoSoon();
+  }
+  const 나쁜곳 = coNtsBadCount();
+  toast(`🏛 국세청 훑기 끝 — ${받음.toLocaleString()}곳 확인`
+    + (실패 ? ` · ${실패}묶음 못 받음` : '')
+    + (나쁜곳 ? ` · 폐업·휴업 ${나쁜곳.toLocaleString()}곳` : ' · 폐업·휴업 없음'), 12000);
+  coNtsRepaint();
+}
+
 function coSmeChipHtml(o){
   const st = coSmeState(coVal(o, 'smeExpiry'));
   if(!st) return '';
@@ -28581,6 +29077,288 @@ function coSmeChipHtml(o){
   return `<span title="중소기업 확인서 — ${esc(st.why)}" style="font-size:11px;font-weight:700;
     border:1px solid;border-radius:9px;padding:1px 8px;white-space:nowrap;color:${color}">🏅 ${esc(st.text)}</span>`;
 }
+/* ══════ 📅 계약이 «끝났거나 곧 끝나는» 곳만 한자리에 (대표 지시 2026-09-12 「추천대로」) ══
+   점검 보고의 ① — 앱은 **이미** 계약 기간을 읽어 「종료일 지남」까지 판정하고 있었다
+   (erpContractPeriod). 그런데 «회사를 열어야» 보였다. 4,000곳 가운데 어디가 지났는지
+   알려면 한 곳씩 열어 보는 수밖에 없었다 — 확인서 갱신과 똑같은 자리였다.
+   그래서 확인서 갱신(coSme*)과 «같은 모양»으로 둔다: 띠 → 창 → 거르개.
+
+   ★ 잣대는 erpContractPeriod «한 곳»이다 — 상세 줄의 「종료일 지남」과 이 목록이
+     다른 말을 하면 어느 쪽을 믿어야 할지 알 수 없다.
+   ⚠⚠ 「종료일 지남」과 「계약해지(🚪)」는 **다른 말이다.** 자동 연장으로 계속 가는 곳이
+     있어 상세가 이미 둘을 갈라 놓았다(.ctold 의 말풍선). 그래서 **해지로 표시된 곳은
+     안 담는다** — 이미 끝난 일이라, 담으면 정작 챙길 곳이 그 속에 묻힌다.
+     ⚠ 뺀 곳은 «세어서» 화면에 적는다. 조용히 빼면 「우리 거래처가 이것뿐인가」가 된다.
+   ⚠ 날짜로 «못 읽은» 종료일은 안 담는다 — 모르는 것을 급하다 하면 늑대 소년이 된다.
+   ⚠ 종료일이 «아예 없는» 곳도 안 담는다 — 기간을 안 적은 것이지 끝난 것이 아니다.
+   ⚠ 남은 날은 coSmeDays 로 센다. 이름에 Sme 가 붙어 있지만 하는 일은 «글에서 날짜를
+     읽어 며칠 남았나»일 뿐이다 — 날짜 세는 곳을 두 벌로 만드는 것이 훨씬 위험하다
+     (이름을 고치면 그 함수를 떠서 돌리는 검사 여섯 벌이 함께 움직인다). */
+function coCtState(o, now){
+  /* ⚠⚠ 「오늘」을 «한 번만» 정해 둘 다에 넘긴다 (2026-09-13에 검사가 잡았다).
+     처음에는 erpContractPeriod 에는 todayYmd() 를, coSmeDays 에는 now(=undefined)를
+     넘겼다 — 그러면 coSmeDays 가 «진짜 오늘»을 보아, 검사가 날짜를 정해 줘도 하루만
+     지나면 답이 달라졌다. 이 저장소가 erpContractPeriod 를 만들 때 못 박은 그 규칙
+     (「오늘 날짜를 받는다 — 안에서 new Date() 를 부르면 검사가 해마다 달라진다」)을
+     내가 바로 옆에서 어겼다. */
+  const today = (now == null ? todayYmd() : now);
+  const p = erpContractPeriod(o && o.erp, today);
+  if(!p || !p.to) return null;                    /* 기간을 안 적었다 — 끝난 것이 아니다 */
+  const d = coSmeDays(p.to, today);
+  if(d == null) return null;                      /* 날짜로 못 읽었다 */
+  if(d < 0)   return { cls:'gone', days:d, to:p.to, from:p.from };
+  if(d <= 30) return { cls:'soon', days:d, to:p.to, from:p.from };
+  return { cls:'ok', days:d, to:p.to, from:p.from };
+}
+/* 해지로 표시된 곳인가 — 「이미 끝낸 일」이다. o.erp.left 는 업체관리가 정한 값이라
+   여기서 다시 재지 않는다(🚪 딱지와 같은 잣대). */
+function coCtClosed(o){ return !!(o && o.erp && o.erp.left); }
+function coCtNeeds(o, now){
+  if(coCtClosed(o)) return false;
+  const st = coCtState(o, now);
+  return !!st && (st.cls === 'gone' || st.cls === 'soon');
+}
+/* 급한 순 — 남은 날이 적을수록 앞. 지난 것은 음수라 저절로 맨 앞에 선다. */
+function coCtList(now){
+  return (coList() || []).filter(o => coCtNeeds(o, now)).map(function(o){
+    const st = coCtState(o, now);
+    return { o:o, key:o.key, name:o.name || '', to:st.to, from:st.from,
+             cls:st.cls, days:st.days };
+  }).sort((a,b) => (a.days - b.days) || String(a.name).localeCompare(String(b.name), 'ko'));
+}
+function coCtCount(now){ return coCtList(now).length; }
+/* 해지라서 «뺀» 곳 — 화면이 그 사실을 말할 수 있게 따로 센다 */
+function coCtClosedCount(now){
+  return (coList() || []).filter(function(o){
+    if(!coCtClosed(o)) return false;
+    const st = coCtState(o, now);
+    return !!st && (st.cls === 'gone' || st.cls === 'soon');
+  }).length;
+}
+/* 목록 위 알림 띠 — 0곳이면 «아무 것도 안 띄운다»(확인서 띠와 같은 규칙) */
+function coCtBarHtml(now){
+  const list = coCtList(now);
+  if(!list.length) return '';
+  const gone = list.filter(x => x.cls === 'gone').length;
+  const soon = list.length - gone;
+  const bits = [ gone ? `종료일 지남 <b>${gone.toLocaleString()}곳</b>` : '',
+                 soon ? `30일 안 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
+  return `<div class="coctbar" onclick="openCoCt()"
+      title="계약 종료일이 지났거나 곧 끝나는 곳입니다 — 계약해지(🚪)로 표시된 곳은 뺐습니다">
+      📅 계약 ${bits}<em>— 눌러서 보기</em></div>`;
+}
+function openCoCt(){ showPanel(coCtHtml()); }
+/* 창 — 급한 순으로 늘어놓고, 누르면 그 회사를 연다.
+   ⚠ 여기서 «고치지 않는다». 계약 기간은 업체관리가 가진 값이라, 이 창이 할 일은
+     「어디를 챙길 것인가」를 말하는 것뿐이다. */
+function coCtHtml(now){
+  /* ⚠ 「오늘」을 받는다 — 코SmeHtml 과 같은 까닭이다 */
+  const list = coCtList(now);
+  const 뺀곳 = coCtClosedCount(now);
+  const 뺀말 = 뺀곳 ? `<br>계약해지(🚪)로 표시된 <b>${뺀곳.toLocaleString()}곳</b>은 뺐습니다 — 이미 끝낸 일입니다.` : '';
+  if(!list.length) return `<div class="mhead"><b>📅 계약 종료</b>${_closeBtn()}</div>
+    <p class="cpnone" style="padding:16px 2px">챙길 곳이 없습니다 👍</p>
+    ${뺀곳 ? `<p class="setnote" style="margin:10px 0 0">계약해지(🚪)로 표시된 ${뺀곳.toLocaleString()}곳은 뺐습니다.</p>` : ''}`;
+  return `<div class="mhead"><b>📅 계약 종료 — 챙길 곳 ${list.length}곳</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 10px">종료일이 지났거나 <b>30일 안</b>에 끝나는 곳입니다 — 급한 곳부터 놓았습니다.
+      <b>「종료일 지남」은 계약해지가 아닙니다</b> — 자동 연장으로 계속 가는 곳이 있습니다.${뺀말}
+      <br>회사를 누르면 그 회사 상세가 열립니다.</p>
+    <div class="ablist">${list.map(x=>`
+      ${/* ⚠ 창을 «먼저 닫고» 회사를 연다 — 확인서 창과 같은 까닭이다(안 닫으면 상세가
+             이 창 뒤에 열려 눌렀는데 아무 일도 없는 것처럼 보인다). */''}
+      <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
+          title="${esc(x.name)} 상세를 엽니다">
+        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
+        <div class="sv"><span class="sd ${x.cls}">${x.days < 0 ? '종료 ' + (-x.days) + '일 지남' : 'D-' + x.days}</span>
+          <span class="se">${esc(x.to)}까지</span>
+          ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
+      </div>`).join('')}</div>`;
+}
+
+/* ══════ 👤 담당 · 📝 메모 — 사람이 «직접 적는» 두 칸 (대표 지시 2026-09-12) ═══════
+   검토 보고의 ③④. 기업정보 26칸은 모두 «서류에서 읽어온» 값이라, 사람이 적을 자리가
+   기업정보함에 하나도 없었다.
+
+   ③ 담당 — 업체관리(푸른이알피)가 담당을 아는 곳은 거래처 300곳 남짓이다. 나머지
+      3,800여 곳은 담당 칸이 영영 빈칸이라 「이 사업장 누가 보나」를 화면이 말을 못 했다.
+   ④ 메모 — 명함·사업자등록증에는 메모가 있는데 회사에는 없었다.
+
+   ★ 업체관리가 아는 담당이 «이긴다» — 그쪽이 계약의 임자다. 여기 적는 것은 업체관리에
+     «없는» 곳을 위한 것이다.
+   ⚠⚠ 그래서 업체관리에 담당이 있는 회사에는 **아예 못 적게 막는다.** 적게 두면 그 값이
+     화면에 안 나오는데 저장은 되어, 「적었는데 왜 안 보이지」가 된다 — 보이지 않는
+     값을 쌓게 하는 것이 가장 나쁘다.
+   ⚠ 어디서 온 담당인지 화면이 «말한다». 안 그러면 「업체관리를 고쳤는데 왜 안 바뀌지」가 된다. */
+function coMgrOf(o){
+  const erp = String((o && o.erp && o.erp.main) || '').trim();
+  if(erp) return erp;
+  return String(coVal(o, 'owner') || '').trim();
+}
+/* 지금 보이는 담당이 «우리가 적은» 것인가 — 화면이 그 사실을 밝히는 잣대다 */
+function coMgrIsOurs(o){
+  return !String((o && o.erp && o.erp.main) || '').trim() && !!coMgrOf(o);
+}
+/* 목록 담당 칸 한 개 — 표와 정렬·거르개가 «같은 잣대»(coMgrOf)를 보게 여기 모은다 */
+function coMgrCellHtml(o){
+  const nm = coMgrOf(o);
+  if(!nm) return '';
+  return esc(nm) + (coMgrIsOurs(o)
+    ? ` <span class="mgours" title="업체관리에 담당이 없어 기업정보함에서 적어 둔 담당입니다">✎</span>` : '');
+}
+function coAskOwner(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const erp = String((o.erp && o.erp.main) || '').trim();
+  if(erp){
+    toast(`이 회사의 담당은 푸른이알피 업체관리가 정합니다(지금 「${erp}」) — 바꾸려면 그쪽에서 바꿔 주세요`, 7000);
+    return;
+  }
+  let names = [];
+  try{ names = ErpMatch.staffNames() || []; }catch(_){}
+  const v = prompt('이 사업장을 맡을 푸른 직원을 적어 주세요.\n(비우고 확인하면 담당을 뗍니다)'
+    + (names.length ? '\n\n푸른 직원 — ' + names.join(' · ') : ''), coVal(o, 'owner') || '');
+  if(v === null) return;                                   /* 취소 — 아무것도 안 쓴다 */
+  const next = String(v).trim();
+  if(next === String(coVal(o, 'owner') || '')) return;     /* 그대로면 서버를 안 만진다 */
+  coSaveInfoField(k, 'owner', next, next ? `👤 담당을 「${next}」으로 적었습니다` : '담당을 뗐습니다');
+}
+function coAskMemo(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const v = prompt('이 사업장에 남길 메모를 적어 주세요.\n(전 직원이 봅니다 — 비우고 확인하면 지웁니다)',
+                   coVal(o, 'memo') || '');
+  if(v === null) return;
+  const next = String(v).trim();
+  if(next === String(coVal(o, 'memo') || '')) return;
+  coSaveInfoField(k, 'memo', next, next ? '📝 메모를 적었습니다' : '메모를 지웠습니다');
+}
+/* coInfo 의 «한 칸»만 건드린다 — coErpPin 과 같은 길이다(통째로 쓰면 늦게 온 값이 날아간다).
+   ⚠ 빈 글자는 null 로 쓴다. ''를 남기면 「적었다가 지운 것」과 「원래 없는 것」이 갈려
+     나중에 세는 곳마다 둘을 따로 다뤄야 한다. */
+function coSaveInfoField(key, field, value, okMsg){
+  const patch = {}; patch[field] = value;
+  return coSaveInfoPatch(key, patch, okMsg);
+}
+/* 칸 «여럿»을 한 번에 — 상태와 「언제 확인했나」처럼 둘이 늘 짝일 때 쓴다.
+   ⚠ 따로 쓰면 하나만 써지고 끊길 수 있다 — 그러면 날짜 없는 상태가 남아 화면이 거짓말한다. */
+function coSaveInfoPatch(key, patch, okMsg){
+  if(Store.mode !== 'firebase'){ toast('실시간DB 연결 상태에서만 적을 수 있습니다'); return; }
+  const upd = {};
+  Object.keys(patch || {}).forEach(f => { upd['coInfo/' + key + '/' + f] = patch[f] || null; });
+  return Store.db.ref(DB_ROOT).update(upd).then(()=>{
+    coListBust(); renderCoSoon();
+    if(state.coPick === key) openCoDetailPanel(key, true);
+    toast(okMsg, 5000);
+  }).catch(e=>{ console.warn('[기업정보 적기]', e); toast('저장하지 못했습니다 — 쓰기 권한을 확인해 주세요', 6000); });
+}
+/* 📝 메모 카드 — 없으면 «적으라고» 말한다. 빈 카드를 숨기면 적을 길이 안 보인다.
+   ⚠ 확인 필요(coNeedHtml)와 규칙이 다르다. 그쪽은 «없는 것이 좋은 것»이라 0이면 숨기고,
+     메모는 «사람이 적는 자리»라 늘 있어야 한다. */
+function coMemoHtml(o){
+  const memo = coVal(o, 'memo');
+  const key = esc(String(o.key).replace(/'/g,"\\'"));
+  const body = `<div class="comemo">${memo
+      ? esc(memo).split('\n').join('<br>')
+      : '<i>아직 적어 둔 메모가 없습니다</i>'}</div>
+    <div class="comemoact"><button onclick="coAskMemo('${key}')"
+      title="전 직원이 보는 자리입니다">✏️ ${memo ? '고치기' : '메모 적기'}</button></div>`;
+  const short = memo ? String(memo).split('\n')[0].slice(0, 20) : '없음';
+  return coCardHtml('memo', '📝 메모', short, body);
+}
+
+/* ══════ 🔗 같은 곳인 두 줄을 «사람이 짚어» 합친다 (대표 지시 2026-09-12) ═══════════
+   검토 보고의 ②. 재 보니 앱에는 이미 «상호↔사업자번호 다리»가 있어서
+   「주식회사 가나」와 「가나」는 자동으로 한 줄이 된다. 남는 것은 이름 자체가 다르게
+   적힌 경우다 — 「가나상사」 등록증과 「가나」 명함.
+
+   ⚠⚠ 짐작으로 «안» 한다. 이름이 겹쳐도 다른 곳인 쌍이 실제로 있다
+     (「천성」/「천성전자」 · 「화담원」/「화담원 아산점」 — 급여데이터함이 같은 자리에서
+      겪었고, 그래서 그쪽도 짐작을 사람 손 아래에 두었다).
+   ★ 그래서 «후보를 지어내지 않는다». 사람이 상호나 번호를 적어 고르게 한다.
+   ⚠ 되돌릴 수 있어야 한다 — 합치면 한 줄이 사라지므로, 남은 줄에서 푸는 길을 둔다.
+     푸는 길이 없으면 잘못 합친 것을 영영 못 되돌린다. */
+function coMergedKeys(key){
+  const k = String(key || '');
+  const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+  return Object.keys(info).filter(x => String((info[x] || {}).sameAs || '') === k);
+}
+/* 합칠 «상대»를 찾는다 — 적은 글자로 상호·사업자번호를 훑는다.
+   ⚠ 자기 자신과, 이미 이 줄로 합쳐 둔 줄은 후보에서 뺀다(제자리를 가리키게 된다). */
+function coMergeFinds(key, q){
+  const k = String(key || '');
+  const s = String(q || '').trim().toLowerCase();
+  if(!s) return [];
+  const mine = coMergedKeys(k);
+  return (coList() || []).filter(function(o){
+    if(!o || o.key === k || mine.indexOf(o.key) >= 0) return false;
+    return (String(o.name || '') + ' ' + String(o.bizno || '')).toLowerCase().indexOf(s) >= 0;
+  }).slice(0, 30);
+}
+function coAskMerge(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const q = prompt('이 회사와 «같은 곳»인 줄을 찾습니다.\n상대 회사의 상호나 사업자번호를 적어 주세요.\n\n'
+    + '지금 줄: ' + (o.name || '(이름 없음)'), o.name || '');
+  if(q === null) return;
+  const hits = coMergeFinds(k, q);
+  if(!hits.length){ toast('그 말과 맞는 회사를 못 찾았습니다', 5000); return; }
+  showPanel(coMergePickHtml(o, hits));
+}
+function coMergePickHtml(o, hits){
+  const from = esc(String(o.key).replace(/'/g,"\\'"));
+  return `<div class="mhead"><b>🔗 「${esc(o.name || '(이름 없음)')}」를 어느 줄과 합칠까요</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 10px">고른 줄로 <b>이 줄의 명함·서류가 모두 옮겨갑니다.</b>
+      이 줄은 목록에서 사라지고, 남은 줄에서 <b>다시 풀 수 있습니다.</b>
+      <br>⚠ 이름이 비슷해도 <b>다른 사업장</b>일 수 있습니다 — 사업자번호를 함께 보고 고르세요.</p>
+    <div class="ablist">${hits.map(x=>`
+      <div class="cosmerow" onclick="dedupBg.classList.remove('open');coDoMerge('${from}','${esc(String(x.key).replace(/'/g,"\\'"))}')"
+          title="이 줄로 합칩니다">
+        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
+        <div class="sv"><span class="se">${x.bizno ? esc(fmtBizno(x.bizno)) : '사업자번호 없음'}</span>
+          <span class="se">명함 ${(x.cards||[]).length}장 · 서류 ${x.docs||0}건</span>
+          ${x.erp && x.erp.type ? `<span class="sm">${esc(x.erp.type)}</span>` : ''}</div>
+      </div>`).join('')}</div>`;
+}
+function coDoMerge(fromKey, toKey){
+  const from = String(fromKey || ''), to = String(toKey || '');
+  if(!from || !to || from === to) return;
+  const a = (coList() || []).find(x => x.key === from);
+  const b = (coList() || []).find(x => x.key === to);
+  if(!a || !b) return;
+  if(!confirm(`「${a.name || from}」를 「${b.name || to}」와 «같은 곳»으로 합칩니다.\n\n`
+    + `명함 ${(a.cards||[]).length}장 · 서류 ${a.docs||0}건이 그쪽 줄로 옮겨갑니다.\n`
+    + `나중에 남은 줄에서 다시 풀 수 있습니다.`)) return;
+  coSaveInfoField(from, 'sameAs', to, `🔗 「${b.name || to}」와 한 줄로 합쳤습니다`);
+  /* 합친 줄은 사라지므로 «남은 줄»을 연다 — 아무것도 안 열리면 사라진 것으로만 보인다 */
+  state.coPick = to;
+  setTimeout(()=>{ try{ openCoDetailPanel(to); }catch(_){} }, 300);
+}
+function coUnmerge(key){
+  const k = String(key || '');
+  if(!k) return;
+  coSaveInfoField(k, 'sameAs', '', '합친 것을 풀었습니다 — 다시 따로 선 줄이 됩니다');
+}
+/* 합치는 길과 되돌리는 길을 «한 줄»에 둔다.
+   ⚠ 「확인 필요」 카드에 넣지 «않는다» — 2026-09-12 에 넣어 봤다가 되돌렸다.
+     고유번호증 기관처럼 사업자번호가 «원래 없는» 곳이 있어, 그러면 그런 곳이 영영
+     「확인 필요」로 노래진다. 늘 노란 딱지는 눈이 배경으로 배운다.
+   ⚠ 합쳐진 쪽은 목록에서 사라진다 — 여기가 유일하게 되돌릴 수 있는 자리다. */
+function coMergeRowHtml(o){
+  if(!o) return '';
+  const keys = coMergedKeys(o.key);
+  const noBiz = !String(o.bizno || '').trim();
+  if(!keys.length && !noBiz) return '';
+  const key = esc(String(o.key).replace(/'/g,"\\'"));
+  const info = (typeof _coInfo !== 'undefined' && _coInfo) || {};
+  const 합치기 = noBiz
+    ? `<span class="t">같은 곳이 따로 있나요?</span>
+       <button onclick="coAskMerge('${key}')" title="상대 회사를 찾아 한 줄로 합칩니다">합치기</button>` : '';
+  const 푸는줄 = keys.map(k=>`<button onclick="coUnmerge('${esc(String(k).replace(/'/g,"\\'"))}')"
+       title="다시 따로 선 줄로 되돌립니다">${esc((info[k]||{}).name || k)} 풀기</button>`).join('');
+  const 셈 = keys.length ? `<span class="t">여기로 합쳐 둔 줄 ${keys.length}개</span>` : '';
+  return `<div class="comerged"><span>🔗</span>${셈}${합치기}${푸는줄}</div>`;
+}
+
 function coInfoBoxHtml(o){
   const val = f => coVal(o, f);
   const rows = CO_FIELDS.filter(([f])=>val(f)).map(([f,label])=>
@@ -28591,6 +29369,9 @@ function coInfoBoxHtml(o){
       기업정보 <span class="chev">${_coInfoOpen?'▾':'▸'}</span>
       ${/* ⚠ 접었을 때도 «늘» 보인다 — 접힌 채 두는 것이 기본이라 여기 없으면 못 본다 */''}
       ${coSmeChipHtml(o)}
+      ${/* 🏛 국세청 상태 — 사업자번호가 있는 줄에만 뜬다. 값이 없으면 「국세청 확인」이라는
+           누를 수 있는 칩이다(빈 자리를 두면 물어볼 길이 있는 줄도 모른다). */''}
+      ${coNtsChipHtml(o)}
       ${_coInfoOpen?'':`<span style="font-weight:400;color:#94a3b8;font-size:12px">${esc(coInfoSummary(o))}</span>`}
     </div>
     ${_coInfoOpen?`<div class="pdgrid cogrid" style="margin-top:12px">
@@ -28905,7 +29686,7 @@ function loadCoSent(o, cb){
      erpHistRowHtml·coInfoBoxHtml)는 «한 줄도 안 바꿨다». 바뀐 것은 «어디에 놓는가»다. */
 
 /* 접어 둔 자리 — 화면에만 쓰고 저장하지 않는다(_coInfoOpen 과 같은 결) */
-let _coCardOpen = { need:false, docs:false, ppl:false };
+let _coCardOpen = { need:false, docs:false, ppl:false, memo:false };
 /* 해마다 접기 — 해 → true/false. «없으면» 가장 최근 해만 펴진다 */
 let _coYearOpen = {};
 /* 사업 줄에 붙은 서류를 펴 둔 자리 — 사업열쇠 → true */
@@ -28934,12 +29715,26 @@ function coCardHtml(which, title, summary, body){
      눌러서 본다 — 그것이 「부족하다는 정보만 관리」다.
    ⚠ 하나도 없으면 빈 글자를 준다 → 카드 자체가 안 뜬다. 4,000곳 가운데 멀쩡한 곳까지
      「확인 필요 0」이 붙으면 정작 급한 곳이 묻힌다. */
-function coNeedHtml(o){
-  const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
+/* ⚠⚠ 「확인 필요 몇 가지」는 «여기 한 곳»에서 센다 (2026-09-12).
+   예전에는 카드(coNeedHtml)와 숫자 칸(coTilesHtml)이 똑같은 셈을 따로 적고 있었다 —
+   한쪽에 한 줄을 더하면 「숫자 칸은 2인데 카드에는 3줄」이 된다. 합치기 줄을 더하다
+   그럴 뻔해서 그때 모았다. */
+function coNeedCount(o){
+  const nClash = Object.keys((o && o.extra && o.extra.conflicts) || {}).length;
   const nLeft = Number(_coLeftDocsN || 0);
   /* 연결은 «확정됐으면» 부족한 것이 아니다 — 확정 전·끊김만 여기 온다 */
   const linkBad = coErpPinState(o) !== 'pinned';
-  const n = (linkBad?1:0) + (nClash?1:0) + (nLeft?1:0);
+  /* ⚠ 「사업자번호 없음」은 «여기 안 센다» (2026-09-12에 넣었다가 되돌렸다).
+     고유번호증 기관처럼 번호가 «원래 없는» 곳이 있어서, 넣으면 그런 곳이 영영
+     「확인 필요」로 노래진다 — 늘 노란 딱지는 눈이 배경으로 배운다.
+     합치는 길은 따로 둔다(coMergeRowHtml). */
+  return (linkBad?1:0) + (nClash?1:0) + (nLeft?1:0);
+}
+function coNeedHtml(o){
+  const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
+  const nLeft = Number(_coLeftDocsN || 0);
+  const linkBad = coErpPinState(o) !== 'pinned';
+  const n = coNeedCount(o);
   if(!n) return '';
   const key = esc(String(o.key).replace(/'/g,"\\'"));
   const short = [ linkBad?'연결':'', nClash?('값 '+nClash):'', nLeft?('서류 '+nLeft):'' ]
@@ -28974,10 +29769,10 @@ function coNeedOpenDocs(){
 function coTilesHtml(o){
   const s = (_coHist && _coHist.o === o) ? _coHistSum : null;
   const docs = Object.keys((o.extra && o.extra.docs) || {}).length;
+  /* «모름»과 «0건»은 다른 말이다 — null 을 0 으로 읽으면 화면이 단정해서 거짓말한다 */
+  const leftKnown = _coLeftDocsN !== null && _coLeftDocsN !== undefined;
   const nLeft = Number(_coLeftDocsN || 0);
-  const nClash = Object.keys((o.extra && o.extra.conflicts) || {}).length;
-  const linkBad = coErpPinState(o) !== 'pinned';
-  const need = (linkBad?1:0) + (nClash?1:0) + (nLeft?1:0);
+  const need = coNeedCount(o);   /* ⚠ 카드와 «같은 셈»이다 — 따로 적으면 두 숫자가 어긋난다 */
   const won = s ? erpHistShortWon(s.fee) : '';
   return `<div class="cotiles">
     <div class="cotile" onclick="coGoBox('coErpHistBox')" title="이 회사와 있었던 일로 갑니다">
@@ -28987,9 +29782,14 @@ function coTilesHtml(o){
       title="${need?'연결·값·서류 가운데 손볼 것이 있습니다':'손볼 것이 없습니다 👍'}">
       <div class="k">확인 필요</div><div class="v">${need}</div>
       <div class="u">${need ? '눌러서 보기' : '없음'}</div></div>
+    ${/* ⚠★ 「다 붙음」은 «세어 본 뒤»에만 말한다 (점검 2026-09-12).
+         붙임새는 이알피 기록이 와야 셈할 수 있다(coLeftDocsPaint). 오기 전에는
+         _coLeftDocsN 이 «모름»인데, 그것을 0 으로 읽어 「다 붙음」이라 적고 있었다 —
+         서류 두 장이 어디에도 안 붙은 회사가 「다 붙음」으로 보였다.
+         「한 일」 칸이 «…(읽는 중)»이라 말하는 것과 같은 잣대로 맞춘다. */''}
     <div class="cotile" onclick="coNeedOpenDocs()" title="서류 칸을 폅니다">
       <div class="k">서류</div><div class="v">${docs}</div>
-      <div class="u">${nLeft ? '안 붙음 '+nLeft : '다 붙음'}</div></div>
+      <div class="u">${!docs ? '' : (leftKnown ? (nLeft ? '안 붙음 '+nLeft : '다 붙음') : '읽는 중')}</div></div>
   </div>`;
 }
 function coGoBox(id){ const el=$(id); if(el) el.scrollIntoView({ block:'nearest' }); }
@@ -29015,6 +29815,17 @@ function coDetailPanelHtml(o){
   if(p) bits.push(`📄 계약 ${esc(p.text)}`
     + (p.past ? ` <span class="ctold" title="종료일이 지났습니다. 계약해지와는 «다른 말»입니다 — 해지 여부는 🚪 가 따로 말합니다(자동 연장으로 계속 가는 곳이 있습니다)">종료일 지남</span>` : ''));
   if(folder) bits.push(`📁 ${esc(folder.name)}`);
+  /* ⚠ 담당은 «비어 있어도» 적는다 (명함 상세와 같은 규칙, 2026-08-30).
+     안 보이면 담당이 없는 것인지 화면이 빠뜨린 것인지 알 수 없다 — 눌러서 그 자리에서 적는다. */
+  (function(){
+    const nm = coMgrOf(o), ours = coMgrIsOurs(o);
+    const k = esc(String(o.key).replace(/'/g,"\\'"));
+    bits.push(`<span class="comgr" onclick="coAskOwner('${k}')"
+      title="${nm ? (ours ? '기업정보함에서 적어 둔 담당입니다 — 눌러서 고칩니다'
+                          : '푸른이알피 업체관리가 정한 담당입니다 — 바꾸려면 그쪽에서 바꿉니다')
+                  : '이 사업장을 맡을 푸른 직원을 적습니다'}"
+      >👤 ${nm ? esc(nm) : '담당 없음'}${ours ? ' ✎' : ''}</span>`);
+  })();
   /* ── 이어져 있으면 «초록 한 마디»로 끝낸다 — 안 이어졌을 때만 ⚠ 확인 필요로 간다 ──
      ⚠★ 그래도 «누를 수 있어야» 한다. 확정을 풀거나 다른 업체로 바꾸는 길이 여기뿐인데
        글자만 적어 두면 그 길이 통째로 막힌다 — 확정해 둔 업체가 틀렸을 때 되돌릴
@@ -29036,6 +29847,9 @@ function coDetailPanelHtml(o){
     <div id="coTiles">${coTilesHtml(o)}</div>
     ${/* 부족한 것 — 하나도 없으면 빈 글자라 칸 자체가 안 뜬다 */''}
     <div id="coNeedBox">${coNeedHtml(o)}</div>
+    ${/* 🔗 여기로 합쳐 둔 줄 — 합쳐진 쪽은 목록에서 사라지므로, 되돌릴 수 있는 자리가
+         여기뿐이다. 없으면 빈 글자라 아무 자리도 안 먹는다. */''}
+    ${coMergeRowHtml(o)}
     ${/* ── 사업·사건이 «축»이다 (대표 지시 2026-08-26) ──
          이 회사에 «무슨 일을 했나»가 먼저다. 그것을 알고 나서 정보·서류를 본다.
          ⚠ 칸은 비어 있고 loadErpCaseCons 가 나중에 채운다 — 자리만 잡아 둔다. */''}
@@ -29043,6 +29857,8 @@ function coDetailPanelHtml(o){
     ${/* 기업정보는 접힌 채로 시작한다(대표 지시 2026-08-31) — #coInfoBox 한 칸에
          담아 펼침 단추가 «이 칸만» 다시 그리게 한다. */''}
     <div id="coInfoBox" style="margin-top:12px">${coInfoBoxHtml(o)}</div>
+    ${/* 📝 메모 — 기업정보 «바로 아래». 서류에서 읽어온 값 다음에 사람이 적은 값이 온다. */''}
+    ${coMemoHtml(o)}
     ${/* 서류 — 「읽어 온 것·안 붙은 것·보낸 것·붙이기」를 한 카드에 담는다.
          ⚠ 안쪽 자리(#coDocsBox·#coSentBox)는 그대로다. 늦게 오는 값이 그 자리를
            찾아 채우므로, 카드가 접혀 있어도(감춰져 있을 뿐) 그대로 들어간다. */''}
@@ -29071,17 +29887,26 @@ function coDocsSummary(o){
 /* ⚠ #coErpHistBox 는 빈 채로 둔다 — 이알피 이력은 Task 3 에서 loadErpCaseCons 로
    따로 불러온 뒤 이 칸에 채운다(패널을 열 때마다 이알피에 새로 안 물어보려면
    상세 내용과 이력 내용을 분리해 둬야 한다). */
-function openCoDetailPanel(key){
+function openCoDetailPanel(key, keep){
   const o = coList().find(x=>x.key===key); if(!o) return;
   /* ⚠ 늦게 오는 값은 «회사마다» 다시 센다. 안 비우면 앞 회사의 「5건」이 잠깐 보인다
      — 숫자 칸은 한눈에 믿고 보는 자리라 그 한 순간이 거짓말이 된다.
      ⚠ 접어 둔 자리(_coCardOpen·_coYearOpen)는 «안 비운다» — 대표 결정 ⑥㉮ 로
        회사를 옮겨도 기억한다. 비우는 것은 «센 값»뿐이다. */
-  _coHistSum = null; _coLeftDocsN = null; _coRowDocsOpen = {};
+  _coHistSum = null; _coLeftDocsN = null;
+  /* ⚠ 펴 둔 사업 서류는 «다른 회사로 갈 때»만 비운다. 같은 회사를 다시 그리는
+     것뿐이면(구독이 새 값을 줬다) 펴 둔 자리를 지킨다 — 보던 것이 접히면
+     무엇을 보고 있었는지 잃는다. */
+  if(!keep) _coRowDocsOpen = {};
   $('pcDetail').innerHTML = `
     <div class="pdhead"><span class="ttl">기업 상세</span>
       <button class="x" onclick="closePcDetail()">✕</button></div>
     <div class="pdbody">${coDetailPanelHtml(o)}</div>`;
+  /* 이 칸에 «지금 무엇이 떠 있나»를 적어 둔다 — 늦게 오는 값이 명함을 보고 있는
+     사람을 기업 상세로 끌어내지 않게 하는 잣대다(coDetailRefresh). */
+  $('pcDetail').dataset.coKey = key;
+  delete $('pcDetail').dataset.cardId;
+  delete $('pcDetail').dataset.backCo;   /* 기업 상세는 «돌아갈 곳»이 아니라 그 자리다 */
   $('pcDetail').classList.add('open');
   const ov=$('pcDetailOverlay'); if(ov) ov.style.display='block';
   /* ⚠ 최종 전체 리뷰(2026-08-14): 이 조회가 도는 동안 다른 회사 패널로 옮겨 갔으면,
@@ -29294,10 +30119,24 @@ function wkListBuild(erp, info){
     .sort((a,b)=>(b.rank-a.rank) || String(a.name).localeCompare(String(b.name),'ko'));
 }
 
+/* 사람 목록을 «말할 수 있는가» — 이알피 사건이 아직 안 왔으면 아무 말도 못 한다.
+   ⚠ 이 잣대가 없으면 화면은 「모른다」와 「없다」를 같은 0 으로 적는다. 0명은 «없다»는
+     말이라 아무도 눌러 보지 않는다 — 사람이 40명 걸려 있어도 그렇다. */
+function wkListKnown(){ return !!((typeof _erpCaseCons !== 'undefined') && _erpCaseCons); }
+
+/* 옆줄 딱지에 적을 숫자 — 모르면 숫자를 «안 적는다» (2026-09-12 실측으로 찾은 구멍) */
+function wkCountLabel(){ return wkListKnown() ? wkList().length.toLocaleString() : '…'; }
+
 function wkList(){
   if(_wkListMemo) return _wkListMemo;
   const erp = (typeof _erpCaseCons !== 'undefined') ? _erpCaseCons : null;
-  return (_wkListMemo = wkListBuild(erp, _wkInfo));
+  const list = wkListBuild(erp, _wkInfo);
+  /* ⚠⚠ 아직 «안 온» 답은 기억하지 않는다 (2026-09-12 실측).
+     예전에는 빈 목록을 그대로 기억해 버렸다 — 옆줄 딱지는 명함 화면을 그릴 때
+     한 번 불리는데, 그때는 이알피를 아직 안 읽었으므로 0 이 «굳었다». 자료가
+     나중에 와도 기억이 앞을 막아, 근로자 화면을 직접 열기 전까지 영영 0명이었다. */
+  if(!erp) return list;
+  return (_wkListMemo = list);
 }
 
 /* ── 집단 진정을 «한 줄로 접는다» (검토안 ㉯, 대표 승인 2026-09-01) ──
@@ -29443,7 +30282,9 @@ function enterWkView(){
   render();
   loadWkInfo();
   /* 사람과 사건이 모두 이알피에서 온다 — 처음 열 때 한 번 읽는다 */
-  loadErpCaseCons(()=>{ wkListBust(); renderWkSoon(); });
+  /* ⚠ 기억을 지우는 것은 loadErpCaseCons 안에서 «이미» 한다 — 여기서 또 지우면
+     「어디서 지우나」가 두 곳이 되어, 다음에 한쪽만 고쳐진다. 여기서는 그리기만. */
+  loadErpCaseCons(()=>renderWkSoon());
 }
 function openWkPage(){ enterWkView(); try{ $('pcMain').scrollTop=0; }catch(_){} }
 
@@ -29636,7 +30477,10 @@ function wkFoldToggle(caseKey){
 function wkListHtml(){
   const list = wkVisible();
   if(!list.length){
-    const why = state.wkQ ? '찾는 말과 맞는 사람이 없습니다'
+    /* ⚠ 「없습니다」와 「아직 안 왔습니다」는 다른 말이다 — 읽는 중에 「없다」고 하면
+       사람은 그 말을 믿고 화면을 닫는다(2026-09-12). */
+    const why = !wkListKnown() ? '푸른이알피에서 사건을 불러오는 중입니다…'
+      : state.wkQ ? '찾는 말과 맞는 사람이 없습니다'
       : (state.wkFolder ? '이 갈래에 든 사람이 없습니다'
         : '아직 사람이 없습니다 — 푸른이알피 사건에 근로자(의뢰인)를 넣으면 여기 모입니다');
     return `<p class="conone">${esc(why)}</p>`;
@@ -29710,7 +30554,7 @@ function wkHeadHtml(){
   const grp = wkList().filter(p=>(p.cases||[]).some(c=>c.group)).length;
   const bill = state.wkView === 'bill';
   return `<div class="wkbar">
-    <b>${bill ? '🧾 처리 건' : '👷 근로자 ' + n.toLocaleString() + '명'}</b>
+    <b>${bill ? '🧾 처리 건' : '👷 근로자 ' + (wkListKnown() ? n.toLocaleString() + '명' : '…')}</b>
     ${(!bill && grp)?`<span class="wkchip wkgc" title="한 사건에 2명 이상 걸린 건입니다 — 목록에서 한 줄로 접혀 있습니다">집단 진정에 ${grp}명</span>`:''}
     <button class="wkvbtn${bill?' on':''}" onclick="wkToggleView()"
       title="업체 × 근로자 × 서류종류 = 1건으로 셉니다">${bill?'👷 사람으로':'🧾 처리 건'}</button>
@@ -30465,6 +31309,34 @@ function renderCoAny(){
   if(state.view!=='co') return;
   if(document.body.classList.contains('pc')) renderPC();
   else renderCoMobileList();
+  coDetailRefresh();
+}
+/* ══════ 열어 둔 기업 상세도 «새 값으로» 다시 그린다 (점검 2026-09-12) ══════
+   ■ 무엇이 문제였나
+   자료가 바뀌면 목록(renderCoAny)만 다시 그렸다. 열어 둔 상세 패널은 «건드리지
+   않아서», 서류를 사업에 끌어다 붙여도 그 자리에 그대로 남아 있었고(「붙였습니다」
+   라고 알리면서도 화면은 안 바뀐다), 다른 사람이 고친 값도 안 들어왔다.
+   ⚠ 끌어다 붙이는 쪽(coDocDrop)은 「화면을 억지로 안 고친다 — 구독이 새 값을 주면
+     패널도 다시 그려진다」고 적어 두었는데, **그 길이 없었다.** 실측으로 확인했다
+     (목록은 새 이름으로 바뀌는데 패널은 옛 이름 그대로).
+
+   ★ 지켜야 할 것 넷
+     ① 명함을 보고 있으면 «건드리지 않는다» — 읽던 사람을 기업 상세로 끌어내면 안 된다.
+     ② 구르던 자리를 지킨다 — 새 값이 올 때마다 맨 위로 튀면 읽던 곳을 잃는다.
+     ③ 펴 둔 사업 서류도 지킨다 — 같은 회사를 다시 그리는 것뿐이다.
+     ④ 그새 사라진 회사면 닫는다 — 빈 패널이 남으면 「눌렀는데 없다」가 된다. */
+function coDetailRefresh(){
+  const k = String(state.coPick || '');
+  if(!k) return;
+  const box = $('pcDetail');
+  if(!box || !box.classList.contains('open')) return;
+  if(box.dataset.coKey !== k) return;              /* ① 명함을 보고 있다 — 그대로 둔다 */
+  if(!(coList()||[]).some(x => x.key === k)){ closePcDetail(); return; }   /* ④ */
+  const body = box.querySelector('.pdbody');
+  const top = body ? body.scrollTop : 0;           /* ② */
+  openCoDetailPanel(k, true);                      /* ③ keep */
+  const now = box.querySelector('.pdbody');
+  if(now && top) now.scrollTop = top;
 }
 /* ★ 최종 전체 리뷰(2026-08-16) M1 — 「고르기만 바뀌는」 자리(체크상자 토글·전체 고르기)는
    **목록만** 다시 그린다. Task 6 이 이 둘까지 renderCoAny() 로 묶으면서 PC 가 예전보다
@@ -31215,6 +32087,11 @@ function delMailBlock(email){
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
 <script src="js/pu-back.js?v=2"></script>
-<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<script>try{ PuBack.guard(function(){
+  /* ⚠ «한 걸음 물러서기»가 «닫기»보다 먼저다. 순서를 바꾸면 기업 상세에서 연 명함이
+     ✕ 로 닫혀 회사까지 사라진다(2026-09-12). */
+  if(coBackStep()) return true;
+  return PuBack.closeTopVisible();
+}); }catch(e){}</script>
 </body>
 </html>

@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="푸른사진첩">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=23"></script>
+<script src="js/pu-ontology.js?v=25"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=2"></script>
@@ -36,10 +36,10 @@
      이 파일이 캐시에 묵으면 옛 지시로 읽어 제목이 안 생기는데, 화면(pu-photos.html)은
      새것이라 제목 자리만 비어 보인다 — 고친 것이 통째로 묻힌 것처럼 된다.
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
-<script src="js/pu-doc-read.js?v=39"></script>
+<script src="js/pu-doc-read.js?v=40"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
-<script src="js/pu-doc-file.js?v=30"></script>
+<script src="js/pu-doc-file.js?v=31"></script>
 <script src="js/pu-drag.js?v=2"></script>
 <script src="js/pu-billing.js?v=9"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -1210,6 +1210,11 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 #camShip .shrow{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:12.5px;
   border-top:1px solid #f8fafc;color:var(--ink)}
 #camShip .shrow .ic{width:18px;flex:none;text-align:center}
+/* 줄 앞의 «그 사진» (대표 지시 2026-09-12 「찍은 것만 확인할 수 있게」).
+   ⚠ 아이콘 자리보다 크다 — 작으면 무엇을 찍었는지 안 보여 붙인 뜻이 없다.
+     그렇다고 더 키우면 폰에서 줄이 다섯 개도 안 들어간다(최근 다섯 줄이 규칙이다). */
+#camShip .shrow .th{width:38px;height:38px;flex:none;border-radius:6px;object-fit:cover;
+  border:1px solid var(--line);background:var(--bg);cursor:pointer}
 #camShip .shrow .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #camShip .shrow .to{font-size:11.5px;color:var(--blue);font-weight:800;flex:none}
 #camShip .shrow .ok{color:#16a34a;font-weight:800;flex:none}
@@ -1414,6 +1419,17 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 #gridBar button:disabled{opacity:.45}
 
 /* 겹치는 서류를 스스로 치웠다는 알림 — 그 자리에서 되살릴 수 있다 */
+/* 🧹 똑같은 사진 정리 — ⚙ 설정의 한 줄 (대표 지시 2026-09-12) */
+.duprow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--line)}
+.duprow:last-of-type{border-bottom:none}
+.duprow img{width:46px;height:34px;object-fit:cover;border-radius:5px;flex-shrink:0;background:var(--line)}
+.duprow .noimg{width:46px;height:34px;border-radius:5px;flex-shrink:0;background:var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--sub)}
+.duprow .d{min-width:0;flex:1}
+.duprow .d b{display:block;font-size:12.5px;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.duprow .d span{display:block;font-size:11.5px;color:var(--sub);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #dupBox{margin-bottom:10px;max-height:38vh;overflow-y:auto;border:1px solid #fbbf24;background:#f8fafc;border-radius:10px;padding:9px 11px;font-size:12.5px;color:#854d0e}
 #dupBox .dh{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:4px}
 #dupBox .dh .x{margin-left:auto;border:1px solid #fbbf24;background:#fff;color:#854d0e;border-radius:7px;padding:2px 8px;font-size:11.5px}
@@ -2247,6 +2263,20 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
          <button class="wide" id="retDone" onclick="markRetChecked()" style="background:#fff;color:var(--blue);border:1px solid var(--blue)">점검했음으로 기록</button>
          <div id="oldList"></div>
          <pre id="oldOut"></pre>
+       </div>
+
+       <!-- ── 🧹 똑같은 사진 (대표 지시 2026-09-12 「중복사진정리」) ──────────
+            같은 파일을 두 번 올린 것을 찾아 여벌만 휴지통으로 보낸다.
+            ⚠ **스스로 지우지 않는다** — 찾아서 보여 주고, 사람이 눌러야 치운다.
+              보유기간 카드(위)와 같은 태도다.
+            ⚠ 「완전 동일」은 어림이 아니다 — 후보의 미리보기를 실제로 받아 견준다. -->
+       <div class="card" id="setDup">
+         <div class="row" style="border:none"><span>🧹 똑같은 사진</span></div>
+         <p class="mignote">같은 파일을 두 번 올린 것을 찾습니다. 묶음마다 <b>한 장은 그대로 남고</b>
+           여벌만 휴지통으로 갑니다(<b>30일</b> 안에 되살릴 수 있습니다).
+           <b>증빙으로 쓴 사진은 남깁니다.</b></p>
+         <button class="wide" id="dupFindBtn" onclick="dupCleanFind()">똑같은 사진 찾기</button>
+         <div id="dupCleanBox"></div>
        </div>
 
        <!-- 연말 백업 — 서버가 없어 저절로 돌지 않는다. 해가 바뀌면 알려 준다. -->
@@ -7498,6 +7528,10 @@ function readTallyLine() {
 function aiSpendChip() {
   const s = aiSpend();
   if (!s.near || s.over) return '';
+  /* ★ 관리자가 아니면 금액을 안 적는다 (대표 지시 2026-09-12 — moneyOpen 참고).
+     ⚠ 경고선은 «아직 되는» 상태다. 금액을 뺀 경고는 남는 말이 「조심하세요」뿐이라
+       할 수 있는 일이 없다 — 그래서 조각을 통째로 뺀다. 정말 멈추면 띠가 알린다. */
+  if (!moneyOpen()) return '';
   return '<span class="tly warnmoney" title="이번 달 판독 ' + s.reads + '번 · 약 '
     + wonText(s.spent) + '\n한도 ' + wonText(s.limit) + ' 을 넘으면 자동 판독이 멈춥니다.'
     + '\n다음 달 1일에 저절로 풀립니다.">· ⚠ 이번 달 <b>' + wonText(s.spent) + '</b> / '
@@ -7550,6 +7584,26 @@ function aiSpend() {
 }
 function wonText(n) { return '₩' + Math.round(Number(n) || 0).toLocaleString('ko-KR'); }
 
+/* ══════ 돈은 «관리자만» 본다 (대표 지시 2026-09-12) ═══════════════════════════
+     「다른직원들은 비용나가는것 못보고 관리자만 볼수 있게 해줄수 있나」
+     (2026-08-17 「금액사용은 관리자만 볼 수 있고 나머지는 안 보는 게 좋겠다」의 이어짐)
+
+   포털 딱지(enter.html)는 처음부터 관리자에게만 떴다. **새고 있던 자리는 사진첩**이다 —
+   ⚙ 설정의 「이번 달 요금」 줄과 판독 띠·물음창이 직원 누구에게나 ₩ 를 적고 있었다.
+   사진첩은 전 직원이 쓰는 앱이라 그 줄이 사실상 모두에게 보인다.
+
+   ⚠ **감추는 것은 «얼마»뿐이다.** 「한도를 다 써서 자동 판독이 멈췄다」는 사실은
+     여전히 모두에게 알린다 — 그것까지 감추면 사진을 올려 두고 왜 안 읽히는지
+     알 길이 없어진다. 감출 것은 금액이고, 알릴 것은 «멈췄다»이다.
+   ⚠ 대신 **횟수는 보인다.** 몇 번 읽혔는지는 돈이 아니라 일의 양이고,
+     아껴 써 달라는 말이 닿으려면 그 숫자가 있어야 한다(무료 표시와 같은 모양이다).
+   ⚠ 서버 규칙으로는 못 막는다 — ai_read_tally·ai_read_budget 은 직원이 읽어야
+     띠가 뜬다(규칙 만들개에 그 까닭을 적어 두었다). 여기서 정하는 것은 «보임»이다.
+     진짜 요금(billing/*)은 예전부터 규칙이 관리자만 읽게 막고 있다. */
+function moneyOpen() {
+  try { return !!PuPhotoStore.amAdmin(); } catch (_) { return false; }
+}
+
 /* 한도를 넘었을 때 «사람이 누른» 판독을 한 번 확인한다 (대표 결정 ⓵㉮).
    ⚠ 넘지 않았으면 아무것도 묻지 않는다 — 늘 묻는 창은 곧 아무도 안 읽는다.
    ⚠ 몇 장에 얼마가 더 드는지 **숫자로** 적는다. 「요금이 듭니다」만으로는 사람이
@@ -7558,9 +7612,15 @@ function okOverBudget(n) {
   const s = aiSpend();
   if (!s.over) return true;
   const 더 = Math.round((Number(n) || 1) * s.wonPerRead);
+  /* ★ 금액은 관리자에게만 (대표 지시 2026-09-12 — moneyOpen 참고).
+     ⚠ 물음 자체는 «그대로 묻는다». 한도를 넘은 뒤의 판독은 누가 누르든 돈이 드는
+       일이라, 모르고 지나가는 것보다 한 번 멈춰 세우는 편이 낫다. */
   return confirm('🛑 이번 달 AI 판독 한도를 넘었습니다\n\n'
-    + '지금까지 약 ' + wonText(s.spent) + ' 을 썼습니다(한도 ' + wonText(s.limit) + ').\n'
-    + '그래도 ' + (Number(n) || 1) + '장을 읽으면 약 ' + wonText(더) + ' 이 더 듭니다.\n\n'
+    + (moneyOpen()
+        ? ('지금까지 약 ' + wonText(s.spent) + ' 을 썼습니다(한도 ' + wonText(s.limit) + ').\n'
+           + '그래도 ' + (Number(n) || 1) + '장을 읽으면 약 ' + wonText(더) + ' 이 더 듭니다.\n\n')
+        : ('이번 달 ' + s.reads.toLocaleString('ko-KR') + '번을 읽어 한도에 닿았습니다.\n'
+           + '그래도 ' + (Number(n) || 1) + '장을 더 읽을까요? — 요금이 더 듭니다.\n\n'))
     + '다음 달 1일에 저절로 풀립니다.');
 }
 
@@ -7583,6 +7643,11 @@ function renderAiBudget() {
        ⚠ ₩0 이라 적으면 「안 썼다」로 읽힌다. 쓴 것은 맞고 돈이 안 들 뿐이다. */
     now.textContent = s.reads.toLocaleString('ko-KR') + '번 (무료 — 단가 0)';
     now.style.color = '';
+  } else if (!moneyOpen()) {
+    /* ★ 관리자가 아니면 «횟수만» — 금액은 안 보인다(moneyOpen 에 까닭을 적었다).
+       ⚠ 「—」로 비우지 «말 것». 고장인지 안 쓴 것인지 알 수 없는 자리가 하나 는다. */
+    now.textContent = s.reads.toLocaleString('ko-KR') + '번';
+    now.style.color = s.over ? '#991b1b' : s.near ? '#854d0e' : '';
   } else {
     now.textContent = wonText(s.spent)
       + (s.limit > 0 ? ' / ' + wonText(s.limit) : ' (한도 없음)')
@@ -7665,14 +7730,19 @@ function renderReadAsk() {
   if (돈.over) {
     el.className = 'out';
     el.style.display = 'flex';
+    /* ★ 금액은 관리자에게만 (대표 지시 2026-09-12 — moneyOpen 참고).
+       ⚠ **띠 자체는 모두에게 그대로 뜬다.** 「멈췄다」를 감추면 사진을 올려 두고
+         왜 안 읽히는지 알 길이 없다 — 감추는 것은 «얼마»뿐이다. */
+    const 돈줄 = moneyOpen()
+      ? ('약 ' + wonText(돈.spent) + ' / ' + wonText(돈.limit))
+      : ('이번 달 ' + 돈.reads.toLocaleString('ko-KR') + '번');
     el.innerHTML = '<span class="t">🛑 이번 달 AI 판독 한도를 다 썼습니다</span>' +
-      '<span class="d" title="이번 달 판독 ' + 돈.reads + '번 · 약 ' + wonText(돈.spent) +
-      ' (한도 ' + wonText(돈.limit) + ')\n' +
+      '<span class="d" title="이번 달 판독 ' + 돈.reads + '번' +
+      (moneyOpen() ? (' · 약 ' + wonText(돈.spent) + ' (한도 ' + wonText(돈.limit) + ')') : '') + '\n' +
       '자동 판독을 멈췄습니다 — 다음 달 1일에 저절로 풀립니다.\n' +
       '사진은 그대로 다 올라가 있습니다(판독만 안 된 것입니다).\n' +
-      '급한 것은 눌러서 읽을 수 있습니다 — 얼마가 더 드는지 먼저 알려 드립니다.">' +
-      '약 ' + wonText(돈.spent) + ' / ' + wonText(돈.limit) +
-      ' · 자동만 멈췄습니다 · <b>급한 것은 눌러서 읽습니다</b></span>' +
+      '급한 것은 눌러서 읽을 수 있습니다.">' +
+      돈줄 + ' · 자동만 멈췄습니다 · <b>급한 것은 눌러서 읽습니다</b></span>' +
       '<button onclick="readWaitRun()">🔤 그래도 읽기</button>';
     return;
   }
@@ -8499,7 +8569,7 @@ function sendWorker(id, year, job, opt) {
   if (!canSendWorker(read)) return Promise.resolve();
   const force = !!(opt && opt.force);
   const auto = !!(opt && opt.auto);
-  const yr = year || (it && it.meta && it.meta.__year) || gridYear;
+  const yr = year || (it && it.meta && it.meta.__year) || nowYear();
   /* 겹치는지 먼저 본다. 「둘 다 두기」로 밀고 갈 때(force)는 묻지 않는다. */
   if (!force && PuDocFile.findWorkerDupes) {
     const ff0 = readFields(read);
@@ -8594,7 +8664,7 @@ function dupReplace() {
         const ph = o.photo || {};
         if (!ph.id || !isMinePhoto(ph.id)) return null;
         const why = '겹침 — 새 ' + lb + '으로 바꿈';
-        return PuPhotoStore.deletePhoto(ph.year || gridYear, ph.id, why, photoOwner(ph.id))
+        return PuPhotoStore.deletePhoto(ph.year || photoYearOf(ph.id), ph.id, why, photoOwner(ph.id))
           .catch(function (e) { console.warn('[겹친 사진 치우기]', ph.id, e); return null; });
       }));
     })
@@ -9005,7 +9075,7 @@ function sendCoInfo(id, year, job) {
   const it = gridItems.find(function (x) { return x.id === id; });
   const read = (it && it.meta && it.meta.read) || (job && job._read);
   if (!canSendCoInfo(read)) return Promise.resolve();
-  const yr = year || (it && it.meta && it.meta.__year) || gridYear;
+  const yr = year || (it && it.meta && it.meta.__year) || nowYear();
   return coInfoFields(read).then(function (fields) {
     if (!fields) {
       /* 업체를 못 찾았다(없거나, 같은 이름이 둘이다). 조용히 넘기면 「보냈는데 없다」가
@@ -9040,9 +9110,13 @@ function autoCmsOn(read, fields) {
     toast('은행·계좌·예금주가 다 읽혀야 자동이체를 켭니다 — 값을 확인해 주세요');
     return;
   }
+  /* ★ 지정 출금일도 함께 넘긴다 (대표 지시 2026-09-12 「cms 자동이체도 날짜와 체크항목 자동으로」).
+     ⚠ 판독기는 이미 payDay 를 읽고 있었는데(js/pu-doc-read.js 의 kind=cms) 여기서 그것을
+       «버리고» 있었다 — 그래서 체크만 켜지고 「매월 __ 일」은 늘 빈 칸이었다.
+       신청서에 적힌 지정 출금일이 곧 이체일이다. 빈 칸일 때만 넣는 것은 담는 쪽이 한다. */
   return PuDocFile.setContractCms({
     bizNo: f.bizno || '', companyName: f.company || '',
-    bankName: bank, byName: PuPhotoStore.myName() || ''
+    bankName: bank, payDay: f.payDay || '', byName: PuPhotoStore.myName() || ''
   }).then(function (r) {
     toast((r && r.ok ? '🏦 ' : '⚠ ') + ((r && r.message) || '자동이체를 켜지 못했습니다'),
       (r && r.ok) ? 4500 : 8000);
@@ -9240,7 +9314,8 @@ function coSweep() {
   const me = PuPhotoStore.myName() || '';
   return PuDocFile.sendToCompanyMany(wait.map(function (it) {
     return { kind: it.meta.read.kind, fields: it.meta.read.fields, byName: me,
-      photo: { id: it.id, year: gridYear, owner: photoOwner(it.id) } };
+      /* ⚠ 사진마다 제 해를 쓴다 — 「모든 해」로 보면 화면의 해가 자리가 아니다 */
+      photo: { id: it.id, year: photoYearOf(it.id), owner: photoOwner(it.id) } };
   })).then(function (res) {
     let n = 0;
     const saves = [];
@@ -9428,6 +9503,22 @@ function shipRowOf(j) {
   return { ic: '⚠', tx: who || readLabel(r), to: '확인 필요', cls: 'warn', btn: '보기', act: 'shipOpen' };
 }
 
+/* 찍은 지 얼마나 됐나 — 「방금 · 3분 전」. 여러 장을 이어 찍으면 **차례가 유일한 실마리**라
+   갈래 이름만으로는 어느 것이 어느 것인지 알 수 없다(현장 사진 셋이 다 같은 말이다).
+   ⚠ 시각을 못 믿을 때는 빈 문자열 — 「1970년」 같은 말을 적느니 아무 말도 안 하는 것이 낫다. */
+function shotAgo(ts) {
+  const t = Number(ts) || 0;
+  if (!t) return '';
+  /* ⚠ 음수를 따로 막지 «않는다» — 기기 시계가 앞서 있으면 m 이 음수인데,
+     아래 「1분 미만이면 방금」이 그것까지 받는다. 따로 막으면 아무 일도 안 하는
+     줄이 하나 느는 것뿐이다(되돌림 검사에서 그 사실이 드러났다). */
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return '방금';
+  if (m < 60) return m + '분 전';
+  const h = Math.floor(m / 60);
+  return h < 24 ? h + '시간 전' : Math.floor(h / 24) + '일 전';
+}
+
 function renderShip() {
   const box = $('camShip'); if (!box) return;
   /* 카메라가 꺼져 있으면 그릴 것도 없다 */
@@ -9437,17 +9528,30 @@ function renderShip() {
   if (!mine.length) { box.style.display = 'none'; return; }
   const rows = mine.slice(-SHIP_MAX).reverse();
   box.style.display = 'block';
+  /* ★ 제목이 「보낸 곳」에서 「방금 찍은 것」으로 바뀌었다 (대표 지시 2026-09-12
+     「카메라 찍은 거 찍은 것만 확인할 수 있게」). 「보낸 곳」은 **결과**만 말한다 —
+     대표께서 찾으신 것은 «내가 무엇을 찍었나»다. 어디로 갔는지는 줄 오른쪽에 그대로 있다. */
   box.innerHTML =
-    '<div class="shhd">보낸 곳' +
+    '<div class="shhd">방금 찍은 것' +
       '<button class="done" onclick="closeCam()">끝내기 ' + mine.length + '장</button></div>' +
     rows.map(function (j) {
       const r = shipRowOf(j);
       const btn = r.btn
         ? '<button class="btn" onclick="' + r.act + '(\'' + esc(j.id) + '\')">' + esc(r.btn) + '</button>'
         : (r.ok ? '<span class="ok">✓</span>' : '');
-      return '<div class="shrow ' + (r.cls || '') + '">' +
-        '<span class="ic">' + r.ic + '</span>' +
-        '<span class="tx">' + esc(r.tx) + '</span>' +
+      /* ★ 그 사진을 줄 앞에 붙인다 — 갈래 이름만으로는 현장 사진 셋이 똑같이 보이고,
+         흐리게 찍힌 것도 못 알아챈다. 누르면 그 사진이 열린다(「보기」와 같은 길).
+         ⚠ 미리보기가 아직 없으면(준비 중) 옛 아이콘으로 물러선다 — 빈 칸을 그리면
+           줄이 어긋나 보이고, 「사진이 안 찍혔나」로 읽힌다. */
+      const th = safeSrc(j.thumb);
+      const head = th
+        ? '<img class="th" src="' + esc(th) + '" alt="찍은 사진 — 눌러서 보기"' +
+          ' onclick="shipOpen(\'' + esc(j.id) + '\')">'
+        : '<span class="ic">' + r.ic + '</span>';
+      /* 언제 찍었는지를 갈래 앞에 적는다 — 차례가 보여야 어느 것인지 가릴 수 있다 */
+      const ago = shotAgo(j.takenAt);
+      return '<div class="shrow ' + (r.cls || '') + '">' + head +
+        '<span class="tx">' + esc(ago ? ago + ' · ' + r.tx : r.tx) + '</span>' +
         (r.to ? '<span class="to">' + esc(r.to) + '</span>' : '') + btn + '</div>';
     }).join('');
 }
@@ -9544,7 +9648,15 @@ function photoYearOf(id) {
   const it = gridItems.find(function (x) { return x.id === id; });
   const m = it && it.meta;
   const y = m && (m.__year || m.__sharedYear);
-  return y ? String(y) : gridYear;
+  return y ? String(y) : nowYear();
+}
+
+/* 화면의 해 — 쓰기에 쓸 때는 **반드시 이것**이다.
+   ⚠★ 「모든 해」(ALL_YEARS)는 «보는 방식»이지 자리가 아니다. 그대로 저장 층에
+     넘기면 `items/__all__` 이라는 없는 자리에 적는다 — 사진이 조용히 사라진다.
+     그래서 물러설 곳을 올해로 둔다(2026-09-12 에 「모든 해」를 만들며 함께 막았다). */
+function nowYear() {
+  return gridYear === ALL_YEARS ? String(new Date().getFullYear()) : gridYear;
 }
 
 /* 고른 사진에 손을 대도 되는가.
@@ -9653,7 +9765,9 @@ function refreshYears() {
   const call = gridOwner === ALL_OWNERS ? PuPhotoStore.listYearsAll() : PuPhotoStore.listYears(gridOwner);
   call.then(function (ys) {
     gridYears = ys;
-    if (gridYears.indexOf(gridYear) < 0) gridYears.unshift(gridYear);
+    /* ⚠ 「모든 해」는 해가 아니라 «보는 방식»이다 — 해 목록에 섞어 넣으면
+       listAllYears 가 그것을 해로 알고 두드리고, 고르개에도 두 번 나온다. */
+    if (gridYear !== ALL_YEARS && gridYears.indexOf(gridYear) < 0) gridYears.unshift(gridYear);
     renderYearSel();
     renderBackupBox();
   }).catch(function (e) { console.warn('[연도 목록]', e); });
@@ -9773,6 +9887,47 @@ function resetGridRenderLimit() { gridRenderLimit = isPhone() ? PHONE_PHOTO_BATC
      남의 것으로 덮으면 내 사진에 남의 주인이 붙어 저장 층이 엉뚱한 자리를 두드린다.
    ⚠ **공유 목록을 못 읽어도 내 사진은 보여야 한다.** 규칙이 막혀 있거나 연결이 끊겨도
      사진첩 자체가 안 열리면 안 된다 — 조용히 빈 목록으로 넘어간다. */
+/* ══ 「모든 해」 — 해를 가로질러 찾는다 (대표 결정 2026-09-12) ═══════════════════
+     「사진첩에서만 — 대신 모든 해를 한번에」
+
+   ★ 왜 필요한가 — 찾기는 늘 «고른 해» 안에서만 돌았다. 2025년에 올린 서류를
+     2026년 화면에서 치면 한 장도 안 나오고, 사람은 «없는 줄» 안다. 푸른이알피에
+     서류 찾기를 따로 두지 않기로 한 이상(대표 결정), 여기가 유일한 찾는 자리다.
+
+   ⚠ 사진 «본문»은 안 받는다 — 이 목록은 정보(meta)뿐이다. 미리보기는 격자가
+     보이는 칸만 따로 받아 온다(fillThumbs). 그래서 해를 다 합쳐도 무겁지 않다.
+   ⚠ 한 해가 막혀도(권한 등) 나머지는 보여 준다 — 한 해 때문에 통째로 빈 화면이
+     되면 「사진이 없어졌다」가 된다.
+   ⚠ 해가 섞이므로 **저장할 때는 사진에 새겨진 해**(__year)를 봐야 한다.
+     photoYearOf 가 이미 그렇게 되어 있다 — 화면의 해로 짐작하지 말 것. */
+const ALL_YEARS = '__all__';
+
+function listAllYears() {
+  const one = function (y) {
+    const call = gridOwner === ALL_OWNERS ? PuPhotoStore.listYearAll(y)
+      : gridOwner ? PuPhotoStore.listYear(y, gridOwner)
+        : listMineAndShared(y);
+    return call.catch(function (e) {
+      console.warn('[모든 해 · ' + y + ']', e && e.message);
+      return {};                      // 막힌 해는 조용히 비운다 — 나머지는 살린다
+    });
+  };
+  const years = (gridYears || []).filter(function (y) { return y && y !== ALL_YEARS; });
+  return Promise.all(years.map(one)).then(function (maps) {
+    const out = {};
+    maps.forEach(function (map, i) {
+      Object.keys(map || {}).forEach(function (id) {
+        if (out[id]) return;          // 같은 사진이 두 해에 잡히면 앞엣것을 둔다
+        const m = map[id] || {};
+        /* 해를 새겨 둔다 — 섞인 목록에서 「이 사진이 몇 해 것인가」를 잃으면
+           판독 결과를 엉뚱한 해에 적는다(photoYearOf 가 이 값을 본다). */
+        out[id] = m.__year ? m : Object.assign({}, m, { __year: years[i] });
+      });
+    });
+    return out;
+  });
+}
+
 function listMineAndShared(year) {
   return Promise.all([
     PuPhotoStore.listYear(year, null),
@@ -9891,13 +10046,16 @@ function loadGrid() {
 
   /* 전체 근로자 모드 — 판독·자동등록 대기열은 돌리지 않는다. 그건 '내가 올린
      것'을 처리하는 일이라, 남의 사진까지 자동으로 건드리면 안 된다. */
-  const call = gridOwner === SHARED_OWNER
-    ? PuPhotoStore.listSharedToMe().then(PuPhotoStore.fillSharedNames)
-    : gridOwner === ALL_OWNERS
-      ? PuPhotoStore.listYearAll(gridYear)
-      : gridOwner
-        ? PuPhotoStore.listYear(gridYear, gridOwner)
-        : listMineAndShared(gridYear);
+  /* ⚠ 「모든 해」가 맨 앞이다 — 뒤에 두면 gridOwner 갈래가 먼저 잡아채 한 해만 받는다 */
+  const call = gridYear === ALL_YEARS
+    ? listAllYears()
+    : gridOwner === SHARED_OWNER
+      ? PuPhotoStore.listSharedToMe().then(PuPhotoStore.fillSharedNames)
+      : gridOwner === ALL_OWNERS
+        ? PuPhotoStore.listYearAll(gridYear)
+        : gridOwner
+          ? PuPhotoStore.listYear(gridYear, gridOwner)
+          : listMineAndShared(gridYear);
   call.then(function (items) {
     /* ── 이미 받아 둔 미리보기를 «들고 넘어간다» (대표 보고 2026-08-30) ──
        "사진첩에서 가끔씩 사진이 다 안 보이는 부분이 몇 초간 발생한다"
@@ -9974,7 +10132,9 @@ function showGridError(why) {
 function addToGrid(job) {
   /* ⚠ 저장한 자리와 **같은 셈법**(올린 때 기준). 촬영 시각으로 세면 옛 사진을
      올린 뒤 화면에 안 뜨고, 새로고침해야 나타나 「안 올라갔나」 싶어진다. */
-  if (PuPhotoStore.photoYear(job.meta) !== gridYear) return; // 지난 연도는 다음 방문 때
+  /* ⚠ 「모든 해」로 보는 중이면 어느 해든 다 보여야 한다 — 안 그러면 방금 올린 것이
+     안 뜨고 「안 올라갔나」 싶어진다. */
+  if (gridYear !== ALL_YEARS && PuPhotoStore.photoYear(job.meta) !== gridYear) return;
   if (gridItems.some(it => it.id === job.id)) return;
   /* 주인·해를 지금 새겨 둔다. 이게 없으면 방금 올린 사진은 목록을 다시 읽기 전까지
      주인을 모른 채로 남고, 「전체 근로자」 화면(gridOwner='__all__')에서 열면
@@ -10351,16 +10511,21 @@ function fillThumbs() {
   /* 공유받은 사진은 사진 한 장마다 권한을 따지므로 묶음 읽기가 막힌다 */
   if (gridOwner === SHARED_OWNER || legacy.length > THUMB_BULK_MAX) return fillThumbsOneByOne(legacy);
 
+  /* ⚠ 주인«과 해»로 묶는다 — 「모든 해」로 보면 한 화면에 여러 해가 섞인다.
+     주인만 보고 화면의 해로 두드리면 다른 해 사진의 미리보기가 통째로 빈다
+     (칸이 까맣게 남는다 — 2026-08-13 에 «받은 사진»에서 똑같이 겪은 자리다). */
   const byOwner = {};
   legacy.forEach(function (it) {
-    const o = thumbOwnerOf(it) || '';
-    (byOwner[o] = byOwner[o] || []).push(it);
+    const k = (thumbOwnerOf(it) || '') + '|' + photoYearOf(it.id);
+    (byOwner[k] = byOwner[k] || []).push(it);
   });
   const year = gridYear;
-  Promise.all(Object.keys(byOwner).map(function (o) {
-    return PuPhotoStore.loadThumbsYear(year, o || null).then(function (map) {
+  Promise.all(Object.keys(byOwner).map(function (k) {
+    const o = k.slice(0, k.lastIndexOf('|'));
+    const y = k.slice(k.lastIndexOf('|') + 1);
+    return PuPhotoStore.loadThumbsYear(y, o || null).then(function (map) {
       if (year !== gridYear) return;           // 그 사이 해를 바꿨다 — 남의 해에 그리지 않는다
-      byOwner[o].forEach(function (it) {
+      byOwner[k].forEach(function (it) {
         const t = map && map[it.id];
         if (t) { it.thumb = t; paintThumb(it); }
       });
@@ -10389,14 +10554,16 @@ function fillThumbUrls(items) {
     if (!it) return Promise.resolve();
     if (year !== gridYear) return Promise.resolve();     // 그 사이 해를 바꿨다
     const owner = thumbOwnerOf(it);
-    return PuPhotoStore.thumbUrl(year, it.id, owner).then(function (url) {
+    /* ⚠ 해는 **사진마다** 본다 — 「모든 해」로 보면 화면의 해가 자리가 아니다 */
+    const y = photoYearOf(it.id);
+    return PuPhotoStore.thumbUrl(y, it.id, owner).then(function (url) {
       if (year !== gridYear) return;
       const u = safeSrc(url);
       if (!u) return;
       it.thumb = u;
       paintThumb(it);
       /* 적어 두기는 그리기를 막지 않는다 — 실패해도 화면에는 이미 나와 있다 */
-      PuPhotoStore.rememberThumbUrl(year, it.id, u, owner);
+      PuPhotoStore.rememberThumbUrl(y, it.id, u, owner);
     }).catch(function () { /* 한 장 실패해도 다음 장으로 */ })
       .then(worker);
   }
@@ -10470,7 +10637,8 @@ function dragRefOf(id) {
   return {
     app: 'pu-photos',
     kind: 'photo',
-    year: gridYear,
+    /* ⚠ 사진마다 제 해를 쓴다 — 「모든 해」로 보면 화면의 해가 자리가 아니다 */
+    year: photoYearOf(id),
     owner: photoOwner(id) || PuPhotoStore.myUid(),
     id: id,
     /* 날짜는 **올린 때**로 적는다 — 받는 앱의 목록에서도 사진첩과 같은 날에
@@ -11914,13 +12082,14 @@ function shareFolder(fid) {
   const nm = f.name || '이 폴더';
   const ids = folderItems(fid).map(function (it) { return it.id; });
   if (!ids.length) {
-    alert('「' + nm + '」에 ' + gridYear + '년 사진이 없습니다.\n\n' +
+    alert('「' + nm + '」에 ' + (gridYear === ALL_YEARS ? '' : gridYear + '년 ') +
+      '사진이 없습니다.\n\n' +
       '폴더에 사진을 담은 뒤 다시 눌러 주세요 — 담긴 사진을 한꺼번에 열어 드립니다.');
     return;
   }
   /* 넘길 수 없는 것이 섞여 있어도 나머지는 간다 — 거르는 셈은 openSharePeople 이
      이미 갖고 있다(2026-09-03). 여기서 또 거르면 두 벌이 된다. */
-  openSharePeople(ids, 'sharePickBox', { folder: nm, year: gridYear });
+  openSharePeople(ids, 'sharePickBox', { folder: nm, year: nowYear() });
 }
 
 function pickFolder(fid) {
@@ -11959,8 +12128,19 @@ function removeFolderAsk(fid) {
       + (f.parent ? '「' + ((FOLDERS[f.parent] || {}).name || '상위 폴더') + '」로 올라갑니다.' : '「전체」에 남습니다.')
       + '\n계속할까요?';
   if (!confirm(msg)) return;
-  const ids = mine.map(function (it) { return it.id; });
-  PuPhotoStore.moveFolderPhotos(gridYear, ids, f.parent || null)
+  /* ⚠ 「모든 해」로 보면 한 폴더에 여러 해 사진이 섞인다. 저장 층은 해마다
+     한 번씩 받으므로 **해별로 갈라서** 부른다 — 한 해로 뭉뚱그리면 다른 해 사진이
+     없는 자리에 적히고 폴더에서 조용히 사라진다(2026-09-12). */
+  const 해별 = {};
+  mine.forEach(function (it) {
+    const y = photoYearOf(it.id);
+    (해별[y] = 해별[y] || []).push(it.id);
+  });
+  Object.keys(해별).reduce(function (chain, y) {
+    return chain.then(function () {
+      return PuPhotoStore.moveFolderPhotos(y, 해별[y], f.parent || null);
+    });
+  }, Promise.resolve())
     .then(function () {
       mine.forEach(function (it) { it.meta = Object.assign({}, it.meta, { folder: f.parent || null }); });
       return PuPhotoStore.deleteFolder(fid);
@@ -13202,8 +13382,14 @@ function renderYearSel() {
   const sel = $('yearSel');
   if (!sel) return;
   const now = String(new Date().getFullYear());
-  sel.innerHTML = gridYears.map(function (y) {
-    const label = y === 'unknown' ? '날짜 모름' : (y + '년' + (y === now ? ' (올해)' : ''));
+  /* ★ 「모든 해」를 **맨 위에** 둔다 (대표 결정 2026-09-12) — 찾을 때 해를 하나씩
+     바꿔 가며 뒤지지 않게. 해가 하나뿐이면 넣지 않는다(가를 것이 없다). */
+  const 해들 = gridYears.slice();
+  if (해들.length > 1) 해들.unshift(ALL_YEARS);
+  sel.innerHTML = 해들.map(function (y) {
+    const label = y === ALL_YEARS ? '모든 해에서 찾기'
+      : y === 'unknown' ? '날짜 모름'
+        : (y + '년' + (y === now ? ' (올해)' : ''));
     return '<option value="' + esc(y) + '"' + (y === gridYear ? ' selected' : '') + '>' + esc(label) + '</option>';
   }).join('');
   /* 고를 해가 하나뿐이면 굳이 보여줄 것이 없다 */
@@ -13768,7 +13954,8 @@ function renderGridBar() {
   /* 지금 무엇을 보고 있는지 — 해와 찾는 말을 함께 적는다.
      예전에는 늘 '올해 사진'이라고 적어, 다른 해를 보고 있어도 올해라고 했다. */
   const now = String(new Date().getFullYear());
-  const yLabel = gridYear === 'unknown' ? '날짜 모름' : (gridYear === now ? '올해' : gridYear + '년');
+  const yLabel = gridYear === ALL_YEARS ? '모든 해'
+    : gridYear === 'unknown' ? '날짜 모름' : (gridYear === now ? '올해' : gridYear + '년');
   /* ⚠ 고른 것이 있으면 «장수와 푸는 길»을 한 덩이로 낸다(대표 지시 2026-08-30).
      예전에는 「1장 고름」과 「취소」가 단추 다섯 개를 사이에 두고 떨어져 있었다.
      ⚠ 예사 때는 아무 말도 안 적는다(2026-08-26) — 해는 옆의 해 고르개에, 장수는
@@ -14287,8 +14474,13 @@ function docNav(it) {
   const i = pages.findIndex(function (p) { return p.id === (it && it.id); });
   const at = i < 0 ? 0 : i;
   const nm = (it && it.meta && it.meta.doc && it.meta.doc.name) || '문서';
+  /* ⚠ 2026-09-12 — 「문서 통째로 한 번」이라 적어 두었는데, 이제 한 묶음 안에 서로
+     다른 서류가 있으면 **서류마다** 갈라 읽는다. 틀린 안내는 없는 것보다 나쁘다 —
+     그 말을 믿고 2쪽이 안 읽힌 것을 「원래 그런 것」으로 넘기게 된다.
+     ★ 부르는 횟수는 여전히 한 번이다(한 번 보내고 답만 나눠 받는다) — 그것도 적는다. */
+  const 갈렸나 = ((it && it.meta && it.meta.read && it.meta.read.docMap) || []).length > 1;
   return '<p class="note">📄 「' + esc(nm) + '」 ' + pages.length + '쪽 중 ' + (at + 1) + '쪽 ' +
-    '— 판독은 문서 통째로 한 번 합니다</p>';
+    (갈렸나 ? '— 서류마다 갈라서 읽었습니다' : '— 한 번에 읽고 서류마다 갈라 담습니다') + '</p>';
 }
 
 /* 이 문서의 쪽들을 어떻게 나눌지 — 크게 보기 안 단추 줄 */
@@ -14554,7 +14746,7 @@ function viewerDragOut(e) {
   try {
     if (window.PuDrag && viewerId && it) {
       PuDrag.set(dt, {
-        app: 'pu-photos', kind: 'photo', year: gridYear,
+        app: 'pu-photos', kind: 'photo', year: photoYearOf(viewerId),
         owner: photoOwner(id) || PuPhotoStore.myUid(),
         id: viewerId,
         name: it.meta.company || dayLabel(photoTime(it)) + ' 사진'
@@ -18241,7 +18433,8 @@ async function runPairsBackfill() {
   try {
     const r = await PuDocFile.backfillPairs(items.map(function (it) {
       return { fields: it.meta.read.fields,
-               photo: { id: it.id, year: gridYear, owner: photoOwner(it.id) } };
+               /* ⚠ 사진마다 제 해를 쓴다 — 「모든 해」로 보면 화면의 해가 자리가 아니다 */
+      photo: { id: it.id, year: photoYearOf(it.id), owner: photoOwner(it.id) } };
     }), function (done, total) {
       out.textContent = '채우는 중… 회사 ' + done + ' / ' + total;
     });
@@ -19203,6 +19396,187 @@ function keepUntilText(meta) {
 /* 지우기 물음에 붙일 경고 — 증빙으로 쓴 사진이 섞였을 때만 나온다.
    ⚠ **막지는 않는다.** 잘못 붙였거나 계약이 취소된 사진도 있다 — 판단은 사람이 한다.
      막는 것이 아니라 «모르고 지우는 것»을 막는 것이 이 글의 일이다. */
+/* ══════ 🧹 똑같은 사진 정리 (대표 지시 2026-09-12 「중복사진정리」) ══════
+   운영 자료 937장을 세어 보니, **같은 파일을 두 번 올린 것**이 7쌍 있었다.
+   대부분 2026-08-11 09:03 과 09:04 — 사업자등록증을 올리다 한 번 더 누른 것이다.
+
+   ■ 무엇을 «똑같다»고 보나 — 두 단계로 본다
+     ① 값싼 1차: 같은 주인 · 같은 화소(w·h) · 같은 크기(size) · 같은 찍은 때(takenAt).
+        목록에 이미 있는 값이라 아무것도 새로 안 받는다.
+     ② 확인: 후보만 «미리보기(20KB)를 실제로 받아» 글자 하나까지 견준다.
+        대표 지시는 「완전 동일」이다 — 어림으로 지우면 안 된다.
+
+   ■ 무엇을 남기나 (작을수록 남긴다)
+     ① 증빙으로 쓴 것 — 계약·사건의 근거다. 절대 안 치운다.
+     ② 어디론가 보낸 것(기업정보함·근로자 정보함) — 그 기록이 이 사진을 가리킨다.
+     ③ 판독이 «쓸모 있는» 것 — bizreg 를 두고 other 를 치운다(실제로 그런 쌍이 있다).
+     ④ 먼저 올린 것 — 그 뒤의 것이 「한 번 더 누른」 것이다.
+
+   ⚠⚠ **스스로 지우지 않는다.** 찾아서 보여 주기만 하고, 사람이 눌러야 치운다.
+   ⚠⚠ 치우는 것은 «휴지통»이다(30일). 되살릴 수 있어야 이 일을 할 수 있다.
+   ⚠ 한 묶음에 «증빙으로 쓴 것이 둘 이상»이면 통째로 건너뛴다 — 어느 쪽이
+     어느 계약의 근거인지 화면은 모른다. 사람이 보고 정할 일이다.
+   ⚠ 값이 하나라도 비면(크기·화소·찍은 때) 후보로 안 낸다. 빈 값끼리 같아 보여
+     서로 다른 사진이 한 묶음이 되면 그것이 곧 사고다. */
+function dupKeyOf(it) {
+  const m = (it && it.meta) || {};
+  const w = Number(m.w) || 0, h = Number(m.h) || 0;
+  const size = Number(m.size) || 0, taken = Number(m.takenAt) || 0;
+  if (!w || !h || !size || !taken) return '';        /* 빈 값은 «같음»이 아니다 */
+  const own = m.__ownerUid || '나';
+  return [own, w, h, size, taken].join('|');
+}
+/* 남길 것이 앞으로 온다 */
+function dupKeepRank(it) {
+  const m = (it && it.meta) || {};
+  const r = m.read || {};
+  const 썼나 = isUsed(m) ? 0 : 1;
+  const 보냈나 = (r.filed && r.filed.id) || (r.filedWk && r.filedWk.at) || (r.filedCo && r.filedCo.at) ? 0 : 1;
+  const 쓸모 = (r.kind && r.kind !== 'other') ? 0 : 1;
+  return [썼나, 보냈나, 쓸모, Number(m.upAt) || Number(m.takenAt) || 0];
+}
+function dupRankCmp(a, b) {
+  const x = dupKeepRank(a), y = dupKeepRank(b);
+  for (let i = 0; i < x.length; i++) { if (x[i] !== y[i]) return x[i] - y[i]; }
+  return 0;
+}
+function dupPhotoGroups(items) {
+  const by = {};
+  (items || []).forEach(function (it) {
+    const k = dupKeyOf(it);
+    if (!k) return;
+    (by[k] = by[k] || []).push(it);
+  });
+  const out = [];
+  Object.keys(by).forEach(function (k) {
+    const list = by[k];
+    if (list.length < 2) return;
+    list.sort(dupRankCmp);
+    /* ⚠ 증빙으로 쓴 것이 둘 이상이면 손대지 않는다 — 어느 쪽이 어느 계약의
+       근거인지 화면은 모른다. 왜 건너뛰는지는 함께 내보낸다. */
+    const 쓴것 = list.filter(function (x) { return isUsed(x.meta); });
+    if (쓴것.length > 1) {
+      out.push({ key: k, keep: list[0], drop: [], skip: '증빙으로 쓴 사진이 ' + 쓴것.length + '장이라 건너뜁니다' });
+      return;
+    }
+    out.push({ key: k, keep: list[0], drop: list.slice(1), skip: '' });
+  });
+  return out;
+}
+try { window.dupPhotoGroups = dupPhotoGroups; window.dupKeyOf = dupKeyOf; } catch (_) {}
+
+/* 후보만 «실제로 견준다» — 미리보기(20KB)를 받아 글자 하나까지 같은지 본다.
+   ⚠ 1차(크기·화소·찍은 때)는 어림이다. 대표 지시는 「완전 동일」이라
+     어림으로 지우면 안 된다. 여기가 그 「완전」을 만드는 자리다.
+   ⚠ 못 받은 장은 «같다고 치지 않는다» — 모르는 것은 안 지운다.
+   ⚠ 후보만 받는다. 937장을 다 받으면 그것이 곧 요금이다(7쌍이면 14장). */
+function dupVerify(groups) {
+  const 받기 = function (it) {
+    return PuPhotoStore.loadThumb(photoYearOf(it.id), it.id,
+      (it.meta && it.meta.__ownerUid) || undefined, (it.meta && it.meta.loc) || undefined)
+      .then(function (src) { return src || ''; })
+      .catch(function () { return ''; });
+  };
+  return Promise.all(groups.map(function (g) {
+    if (g.skip || !g.drop.length) return Promise.resolve(g);
+    return Promise.all([받기(g.keep)].concat(g.drop.map(받기))).then(function (srcs) {
+      const 기준 = srcs[0];
+      if (!기준) return Object.assign({}, g, { drop: [], skip: '미리보기를 못 받아 견주지 못했습니다' });
+      const 같은것 = [], 다른것 = [];
+      g.drop.forEach(function (it, i) {
+        if (srcs[i + 1] && srcs[i + 1] === 기준) 같은것.push(it); else 다른것.push(it);
+      });
+      return Object.assign({}, g, { drop: 같은것, thumb: 기준,
+        skip: 같은것.length ? '' : (다른것.length ? '견줘 보니 서로 다른 사진이었습니다' : g.skip) });
+    });
+  }));
+}
+
+/* ⚙ 설정의 「🧹 똑같은 사진」 카드 — 찾기만 한다. 치우는 것은 사람이 누른다. */
+let dupFound = null;         /* null = 아직 안 찾음 */
+function renderDupClean() {
+  const el = $('dupCleanBox');
+  if (!el) return;
+  if (dupFound === null) { el.innerHTML = ''; return; }
+  const 칠것 = dupFound.filter(function (g) { return g.drop.length; });
+  const 건너뛴것 = dupFound.filter(function (g) { return g.skip; });
+  const n = 칠것.reduce(function (a, g) { return a + g.drop.length; }, 0);
+  if (!n) {
+    el.innerHTML = '<p class="mignote">✅ 똑같은 사진이 없습니다.'
+      + (건너뛴것.length ? ' (' + 건너뛴것.length + '묶음은 건너뛰었습니다 — ' + esc(건너뛴것[0].skip) + ')' : '')
+      + '</p>';
+    return;
+  }
+  el.innerHTML = 칠것.map(function (g) {
+    const k = g.keep.meta || {};
+    const 이름 = (k.read && k.read.fields && (k.read.fields.company || k.read.fields.name))
+      || readLabel(k.read) || '사진';
+    return '<div class="duprow">'
+      + (g.thumb ? '<img src="' + g.thumb + '" alt="">' : '<span class="noimg">—</span>')
+      + '<div class="d"><b>' + esc(이름) + '</b>'
+      + '<span>' + (g.drop.length + 1) + '장이 똑같습니다 — '
+      + esc(PuDocFile.whenText(k.upAt || k.takenAt || 0)) + ' 것을 남깁니다'
+      + (isUsed(k) ? ' · 📌 증빙으로 쓴 것' : '') + '</span></div></div>';
+  }).join('')
+    + (건너뛴것.length ? '<p class="mignote">⚠ ' + 건너뛴것.length + '묶음은 건너뜁니다 — '
+        + esc(건너뛴것.map(function (g) { return g.skip; }).filter(Boolean)[0] || '') + '</p>' : '')
+    + '<button class="wide" id="dupGo" onclick="dupCleanRun()" '
+    + 'style="background:#fff;color:#991b1b;border:1px solid #991b1b;margin-top:8px">'
+    + '여벌 ' + n + '장을 휴지통으로</button>';
+}
+
+function dupCleanFind() {
+  if (typeof PuPhotoStore === 'undefined') return;
+  const btn = $('dupFindBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '찾는 중…'; }
+  dupFound = null;
+  renderDupClean();
+  const groups = dupPhotoGroups(gridItems);
+  $('dupCleanBox').innerHTML = '<p class="mignote">후보 ' + groups.length + '묶음을 견주는 중…</p>';
+  dupVerify(groups).then(function (done) {
+    dupFound = done;
+    renderDupClean();
+  }).catch(function (e) {
+    console.warn('[똑같은 사진 찾기]', e);
+    $('dupCleanBox').innerHTML = '<p class="mignote">못 찾았습니다 — 잠시 뒤 다시 눌러 주세요.</p>';
+  }).then(function () {
+    if (btn) { btn.disabled = false; btn.textContent = '똑같은 사진 찾기'; }
+  });
+}
+
+/* 치우기 — 여기서만 실제로 손을 댄다. */
+function dupCleanRun() {
+  if (!dupFound) return;
+  const ids = [];
+  dupFound.forEach(function (g) { g.drop.forEach(function (it) { ids.push(it.id); }); });
+  if (!ids.length) return;
+  /* ⚠ 남의 사진은 총괄 관리자만 — 판정을 새로 만들지 않고 쓰던 것을 그대로 쓴다 */
+  if (blockedIfOther(ids)) return;
+  if (!confirm('똑같은 사진 ' + ids.length + '장을 휴지통으로 보냅니다.\n\n'
+    + '묶음마다 한 장은 그대로 남습니다 — 없어지는 것은 여벌뿐입니다.\n'
+    + '휴지통에서 ' + PuPhotoStore.TRASH_DAYS + '일 안에는 되살릴 수 있습니다.\n\n계속할까요?')) return;
+  const btn = $('dupGo');
+  if (btn) { btn.disabled = true; btn.textContent = '치우는 중… 0/' + ids.length; }
+  let done = 0;
+  ids.reduce(function (p, id) {
+    return p.then(function () {
+      return PuPhotoStore.deletePhoto(photoYearOf(id), id, '중복 — 똑같은 사진', photoOwner(id))
+        .then(function () {
+          done += 1;
+          gridItems = gridItems.filter(function (x) { return x.id !== id; });
+          if (btn) btn.textContent = '치우는 중… ' + done + '/' + ids.length;
+        })
+        .catch(function (e) { console.warn('[똑같은 사진 치우기]', id, e); });
+    });
+  }, Promise.resolve()).then(function () {
+    dupFound = null;
+    renderDupClean();
+    renderKindTabs(); renderGrid(); renderGridBar(); refreshTrashCount();
+    alert(done + '장을 휴지통으로 보냈습니다.'
+      + (done < ids.length ? '\n' + (ids.length - done) + '장은 치우지 못했습니다 — 잠시 뒤 다시 해 주세요.' : ''));
+  });
+}
+
 function usedWarnText(ids) {
   const used = ids.map(function (id) {
     return gridItems.find(function (x) { return x.id === id; });

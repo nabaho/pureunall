@@ -5,26 +5,44 @@
      옛 푸른카메라 → 기업정보함 직행 (자동 분류를 안 탐)
      사진첩 카메라 → 사진첩에 담고 자동 배송
    같은 명함인데 어느 카메라로 찍었느냐로 결과가 갈렸다.
-   이제 촬영 코드는 사진첩 하나뿐이고, pu-camera.html 은 문패만 남아 넘긴다. */
+   ══ 2026-09-12 다시 겨눔 — 못 박을 것은 「가는 곳」이지 「촬영 코드」가 아니었다 ══
+   대표 지시 「별개의 앱으로 만들어서 사진만 찍는 앱 만들어 달라」로 푸른카메라는
+   문패가 아니라 «사진만 찍는» 제 앱이 되었다. 촬영 코드가 두 곳에 있게 됐지만
+   2026-08-08 에 실제로 아팠던 것은 그것이 아니라 **가는 곳이 달랐던 것**이다.
+   그래서 이제 여기서 못 박는 것은 둘이다 —
+     ① 저장은 공용 층(PuPhotoStore) 하나로만 간다
+     ② 명함·서류로 부르면 사진첩 카메라로 넘긴다(그쪽만 판독·가림·검토를 갖췄다)
+   앱 속내(찍기·담기·지우기)는 tests/pu-camera-standalone.test.js 가 실제로 돌려서 본다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { stripComments } = require('./strip-comments.js');
 
 const R = path.join(__dirname, '..');
 const cam = fs.readFileSync(path.join(R, 'pu-camera.html'), 'utf8');
 const photos = fs.readFileSync(path.join(R, 'pu-photos.html'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(R, 'pu-camera-manifest.json'), 'utf8'));
 
-/* ── 촬영 코드가 하나만 남았는가 ── */
-test('★ 푸른카메라에 촬영 코드가 남아 있지 않다', () => {
-  /* 두 벌이면 한쪽만 고치는 사고가 난다 — 실제로 주석에 "푸른카메라에서
-     검증된 순서를 그대로 가져왔다"고 적혀 있었다(복사본이라는 뜻). */
-  for (const s of ['getUserMedia', 'ImageCapture', '<video', 'canvas']) {
-    assert.ok(!cam.includes(s), '문패에 촬영 코드가 남아 있습니다: ' + s);
-  }
-  assert.ok(cam.length < 4000, '문패가 ' + cam.length + '자입니다 — 넘기기만 해야 합니다.');
+/* ── ★ 가는 곳이 하나인가 ── */
+test('★ 푸른카메라가 제 저장 길을 만들지 않는다 — 가는 곳은 하나다', () => {
+  const 몸통 = stripComments(cam);
+  assert.ok(!/\bdb\.ref\s*\(|\bstorage\.ref\s*\(/.test(몸통),
+    '★ 실시간DB·창고를 직접 쓰고 있습니다 — 둘째 저장 길입니다.\n' +
+    '  옛 푸른카메라가 기업정보함으로 직행해서, 같은 명함이 어느 카메라로 찍었느냐에 따라\n' +
+    '  다른 곳으로 갔습니다. 저장은 반드시 PuPhotoStore 를 지나야 합니다.');
+  assert.match(몸통, /PuPhotoStore\./,
+    '★ 공용 저장 층을 아예 안 쓰고 있습니다 — 사진첩과 다른 곳에 쌓입니다.');
+});
+
+test('★ 명함·서류로 부르면 사진첩 카메라로 넘긴다', () => {
+  /* 이 앱은 «사진만» 찍는다. 명함·서류는 고화질·판독·주민번호 가림·검토가 딸려 오는
+     다른 일이라 사진첩 카메라가 맡는다 — 그쪽이 이미 다 갖췄다. */
+  assert.match(cam, /mode !== 'card' && mode !== 'document'/,
+    '★ 명함·서류를 이 앱이 그대로 찍으면 판독도 가림도 없이 담깁니다.');
+  assert.match(cam, /location\.replace\('pu-photos\.html\?' \+ params\.toString\(\)\)/,
+    '★ 넘기는 길이 없습니다.');
 });
 
 test('사진첩에는 촬영 코드가 그대로 있다', () => {
@@ -33,9 +51,9 @@ test('사진첩에는 촬영 코드가 그대로 있다', () => {
 });
 
 /* ── 넘기기 ── */
-test('★ 문패는 사진첩 카메라로 곧바로 넘긴다', () => {
+test('★ 넘길 때는 replace 로 — 뒤로 가기가 넘긴 자리로 되돌아오지 않게', () => {
   assert.ok(/location\.replace\(/.test(cam),
-    'replace 가 아니면 뒤로 가기가 빈 문패로 돌아옵니다.');
+    'replace 가 아니면 뒤로 가기가 넘기는 자리로 돌아와 되풀이됩니다.');
   assert.ok(/pu-photos\.html\?cam=1/.test(cam));
 });
 
@@ -45,13 +63,13 @@ test('원래 붙어 있던 로그인 값을 잃지 않는다', () => {
   assert.match(cam, /params\.set\('mode', mode\)/);
 });
 
-test('붙은 값이 없어도 일반사진 모드로 넘긴다', () => {
+test('넘길 때 종류를 그대로 달아 보낸다', () => {
   assert.match(cam, /params\.set\('cam', '1'\)/);
   assert.match(cam, /params\.set\('mode', mode\)/);
   assert.match(cam, /location\.replace\('pu-photos\.html\?' \+ params\.toString\(\)\)/);
 });
 
-test('스크립트가 막혀도 일반사진 촬영화면으로 갈 수 있다', () => {
+test('스크립트가 막혀도 사진첩 카메라로 갈 길이 남아 있다', () => {
   assert.match(cam, /<a href="pu-photos\.html\?cam=1&mode=photo"/);
 });
 

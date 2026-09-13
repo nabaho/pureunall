@@ -237,7 +237,7 @@ test('★ 보여 주는 자리는 서버에 «쓰지» 않는다 — 읽기만 �
 });
 
 test('★ 회사를 바꾸면 늦게 온 답을 «다른 회사» 칸에 안 쓴다', () => {
-  const body = slice('function openCoDetailPanel(key){', '\nfunction ');
+  const body = slice('function openCoDetailPanel(key, keep){', '\nfunction ');
   assert.match(body, /loadCoSent\(o, \(\)=>\{ if\(state\.coPick===key\)/,
     '안전장치가 콜백 «안»에 걸려 있어야 한다 — 함수 어딘가에 그 글자가 있다로는 부족하다');
 });

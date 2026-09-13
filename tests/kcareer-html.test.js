@@ -562,6 +562,22 @@ function funcSource(name) {
   return m[0];
 }
 
+/* ⚠ mergeInto 는 «함수 전체»를 본다 — 예전엔 「앞 3000자」만 봤다.
+   2026-09-12 에 합치기 안전장치가 앞에 들어오자 뒷부분이 창 밖으로 밀려
+   검사가 «있어야 할 줄이 없는데도» 잡지 못할 뻔했다(실제로 빨갛게 떴다).
+   길이를 늘려 막는 대신 중괄호를 세어 함수가 끝나는 자리까지 본다. */
+function mergeIntoSource() {
+  const i = source.indexOf('async function mergeInto(');
+  assert.ok(i > 0, 'mergeInto 함수가 있어야 합니다');
+  let d = 0, started = false;
+  for (let p = i; p < source.length; p++) {
+    const c = source[p];
+    if (c === '{') { d++; started = true; }
+    else if (c === '}') { d--; if (started && d === 0) return source.slice(i, p + 1); }
+  }
+  assert.fail('mergeInto 의 끝을 못 찾았습니다');
+}
+
 test('fsCommitScan은 신규 필드를 붙여 저장한다', () => {
   const src = funcSource('fsCommitScan');
   assert.match(src, /src:\s*'fs'/);
@@ -572,7 +588,9 @@ test('fsCommitScan은 신규 필드를 붙여 저장한다', () => {
 test('fsCommitScan은 스토어별로 한 번만 쓴다 — 레코드마다 set을 부르지 않는다', () => {
   const src = funcSource('fsCommitScan');
   // 레코드 반복문 안에서 set()을 부르면 수백 번 재저장 + Firebase 반복 푸시가 된다
-  ['r.promotions.forEach', 'picked.forEach', 'r.submissions.forEach'].forEach((head) => {
+  /* ⚠ 2026-09-13: 승격은 이제 «고른 화면의 것»만 돈다(_쓸것) — 이름만 바뀌었고
+     보는 것(반복문 안에서 set 을 부르지 않는다)은 그대로다. */
+  ['_쓸것.forEach', 'picked.forEach', 'r.submissions.forEach'].forEach((head) => {
     const i = src.indexOf(head);
     assert.ok(i >= 0, head + ' 반복문이 있어야 합니다');
     const end = src.indexOf('\n  });', i);
@@ -2038,8 +2056,13 @@ test('★★ 원본이 있으면 어느 화면이든 좌우 비교로 열린다 
   // 전에는 openEditDrawer 로 «켜 준» 화면만 비교가 떴다. 신분증·계좌·사용자 정의 화면은
   // 원본이 붙어 있어도 좁은 창만 나왔다(대표 지적 2026-08-30).
   const fn = funcSource('openForm');
-  assert.match(fn, /if\(showPrev!==false\) showPrev = !!\(editId && fileExists\(editId\)\)/,
-    '⚠ 부르는 쪽에 맡기면 화면마다 달라집니다');
+  /* ⚠ 2026-09-12: 잣대가 fileExists → hasOriginal 로 «넓어졌다»(느슨해진 것이 아니다).
+     fileExists 는 앱 안 첨부 창고만 본다 — 서류 폴더 경로로 붙인 줄은 원본이 폴더에
+     멀쩡히 있는데도 좁은 창만 떴다. hasOriginal 은 둘 다 본다. 되돌리지 말 것. */
+  assert.match(fn, /if\(showPrev!==false\) showPrev = !!\(editId && hasOriginal\(rec\)\)/,
+    '⚠ 부르는 쪽에 맡기면 화면마다 달라집니다 · 폴더 원본도 원본입니다');
+  assert.ok(!/fileExists\(editId\)/.test(fn),
+    '★ fileExists 로 판정하면 폴더 경로 원본이 «없는 것»이 됩니다');
   assert.match(fn, /classList\.toggle\('as-drawer', !!showPrev\)/, '모양도 같아야 합니다');
   // 옛 이름은 그냥 넘긴다
   assert.match(funcSource('openEditDrawer'), /openForm\(page,id\)/);
@@ -2088,7 +2111,10 @@ test('★★ PDF 는 그림으로 바꿔 보낸다 — 그대로 보내면 읽�
   assert.match(p, /return \{b64:b64, mt:'application\/pdf', asImage:false\}/,
     '못 바꾸면 원래 PDF 로 되돌아가야 합니다');
   // 일괄 읽기·다시읽기 «둘 다» 같은 길을 써야 한다
-  assert.match(source, /const pay=await _ocrPayload\(b64,ext\)/, '일괄 읽기');
+  /* ⚠ 2026-09-12: 일괄 읽기는 쪽 뚜껑을 «열어» 부른다(여러 장 묶음을 서류마다 가르기 위해).
+     길은 여전히 하나다 — 쪽 수만 부르는 쪽이 정한다. 「다시 읽기」는 «한 서류»를 읽는
+     자리라 기본값(4쪽) 그대로여야 한다 — 열면 요금·시간이 셋 배가 된다. */
+  assert.match(source, /const pay=await _ocrPayload\(b64,ext,_maxPg\)/, '일괄 읽기');
   assert.match(source, /var pay=await _ocrPayload\(f\.base64,ext\)/, '편집창 다시읽기');
 });
 
@@ -2250,7 +2276,7 @@ test('★★ 합치기는 원본을 «진짜로» 읽는다 — getFile 은 Inde
        fileExists(배지) = 캐시 + 파일id목록(IndexedDB 반영) → 「원본 있음」
        getFile(합칠 때) = 캐시 + localStorage 만        → 캐시에 없으면 null
      그래서 「있다」고 해 놓고 못 옮긴 채 아래에서 지워 버렸다. */
-  const m = source.slice(source.indexOf('async function mergeInto('), source.indexOf('async function mergeInto(') + 3000);
+  const m = mergeIntoSource();
   assert.match(m, /await getFileAsync\(primaryId\)/, '기준 쪽을 비동기로 읽어야 합니다');
   assert.match(m, /await getFileAsync\(others\[i\]\.id\)/, '옮겨올 쪽도 비동기로 읽어야 합니다');
   assert.ok(!/getFile\(primaryId\)/.test(m), '⚠ 동기 getFile 로 되돌리면 원본이 사라집니다');
@@ -2258,8 +2284,14 @@ test('★★ 합치기는 원본을 «진짜로» 읽는다 — getFile 은 Inde
 });
 
 test('★★ 옮기지 못했으면 «아무것도 지우지 않는다»', () => {
-  const m = source.slice(source.indexOf('async function mergeInto('), source.indexOf('async function mergeInto(') + 3000);
-  assert.match(m, /if\(!primFile && !moved && otherHas\)\{/, '옮기기 실패를 봐야 합니다');
+  const m = mergeIntoSource();
+  /* ⚠ 2026-09-12: 폴더 경로 원본(src:'fs')은 «옮길 파일이 없다» — getFileAsync 가 늘 null 이라
+     이 빗장이 합치기를 통째로 멈췄다(대표 제보). 그래서 !primIsFs 가 하나 늘었다.
+     ⚠ 빗장 자체는 그대로여야 한다 — 앱 안 첨부를 못 옮겼는데 지우면 원본이 사라진다. */
+  assert.match(m, /if\(!primFile && !primIsFs && !moved && otherHas\)\{/,
+    '옮기기 실패를 봐야 하고, 폴더 원본은 빼 줘야 합니다');
+  assert.match(m, /var primIsFs=!!\(prim\.src==='fs' && prim\.relPath\)/,
+    '폴더 원본을 가려내지 않으면 합치기가 늘 멈춥니다');
   assert.match(m, /아무것도 지우지 않았습니다/, '멈췄다고 알려야 합니다');
   // 지우기는 «맨 마지막»에 와야 한다
   const delAt = m.indexOf('others.forEach(function(r){deleteFile(r.id);});');
@@ -2268,7 +2300,7 @@ test('★★ 옮기지 못했으면 «아무것도 지우지 않는다»', () =>
 });
 
 test('★★ 원본 없는 쪽을 기준으로 고르면 미리 알려 준다', () => {
-  const m = source.slice(source.indexOf('async function mergeInto('), source.indexOf('async function mergeInto(') + 3000);
+  const m = mergeIntoSource();
   assert.match(m, /var primHas=hasOriginal\(prim\)/);
   assert.match(m, /에는 원본이 «없고»/, '기준에 원본이 없으면 경고해야 합니다');
 });
@@ -2368,13 +2400,18 @@ test('★★ 표시 개수는 «50건»이 기본이고, 고르면 기억한다'
 });
 
 test('★★ 체크를 누른 채 끌면 지나간 줄이 모두 같은 상태가 된다', () => {
-  const dg = funcSource('careerDragSel');
+  /* ⚠ 2026-09-13: 끌기 얼개가 «공용» bindDragSel 로 옮겨졌다(휴지통도 같은 것을 쓴다).
+     느슨해진 것이 아니라 «얼개가 하나인지»까지 함께 못박는다 — 두 벌이 되면
+     「여기선 끌리는데 저기선 안 끌린다」가 된다. */
+  const dg = funcSource('bindDragSel');
   assert.match(dg, /addEventListener\('mousedown'/, '누를 때 시작합니다');
   assert.match(dg, /addEventListener\('mouseover'/, '끌면서 칠합니다');
   // ⚠ 누른 «뒤»의 값으로 칠해야 켜며 끌면 켜지고 끄며 끌면 꺼진다
-  assert.match(dg, /setTimeout\(function\(\)\{ _dragSel=\{name:name, on:c\.checked\}/,
+  assert.match(dg, /setTimeout\(function\(\)\{ _dragSel=\{sync:sync, on:c\.checked\}/,
     '⚠ 누르기 «전» 값으로 칠하면 반대로 동작합니다');
   assert.match(dg, /document\.body\.style\.userSelect='none'/, '끌 때 글자가 잡히지 않게 합니다');
+  assert.match(funcSource('careerDragSel'), /bindDragSel\(/,
+    '★★ 목록 화면이 제 나름의 끌기를 쓰면 안 됩니다 — 얼개는 하나입니다');
   assert.match(source, /document\.addEventListener\('mouseup'/, '손을 떼면 끝나야 합니다');
   // 표를 다시 그릴 때마다 새로 묶는다
   assert.match(source, /_safe\(function\(\)\{ careerDragSel\(name\); \}\)/, '그릴 때마다 묶어야 합니다');

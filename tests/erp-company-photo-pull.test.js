@@ -192,10 +192,17 @@ test('채울 것이 하나도 없는 서류는 «목록에 안 띄운다»', () 
 
 /* ── ⑤ 계약서 찾기를 안 건드렸나 ── */
 test('★★★ 「계약서 찾기」는 여전히 자문계약만 모은다 — 별도 로더를 만든 까닭이다', () => {
+  /* 2026-09-12: 훑는 일을 erpScanPhotos 한 곳으로 모으면서, 갈래는 «부를 때» 정한다.
+     지켜야 할 것은 그대로다 — 계약서 찾기가 담는 갈래는 contract 하나뿐이다. */
   const ct = cutFn(ERP, 'function erpLoadMyContractPhotos(');
-  assert.match(ct, /read\.kind === 'contract'/, '★★★ 자문계약 찾기의 갈래가 바뀌었습니다');
-  assert.ok(ct.indexOf('bizreg') < 0 && ct.indexOf('sme') < 0,
-    '★★★ 자문계약 찾기에 사업자등록증이 섞였습니다 — 그 목록이 못 쓰게 됩니다');
+  assert.match(ct, /erpScanPhotos\(\{ contract:1 \}/,
+    '★★★ 자문계약 찾기의 갈래가 바뀌었습니다');
+  assert.ok(ct.indexOf('bizreg') < 0 && ct.indexOf('sme') < 0 && ct.indexOf('wcontract') < 0,
+    '★★★ 자문계약 찾기에 다른 서류가 섞였습니다 — 그 목록이 못 쓰게 됩니다');
+  /* 훑는 층이 «적어 준 갈래만» 담는지도 함께 본다 — 여기가 뚫리면 위 확인이 헛돈다 */
+  const scan = cutFn(ERP, 'function erpScanPhotos(');
+  assert.match(scan, /!wants\[meta\.read\.kind\]\) return;/,
+    '★★★ 훑는 층이 갈래를 안 가립니다 — 모든 사진이 모든 목록에 들어옵니다');
 
   const co = cutFn(ERP, 'function erpLoadCoDocPhotos(');
   assert.match(co, /'bizreg'/, '회사 서류 로더가 사업자등록증을 안 담습니다');

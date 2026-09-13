@@ -55,6 +55,9 @@ function load(over){
     coList: () => o.cos || [],
     /* 👷 근로자 정보함 (2026-09-01) — 옆줄 단추가 사람 수를 센다 */
     wkList: () => o.wks || [],
+    /* 2026-09-12: 딱지가 「모른다(…)」와 「없다(0)」를 가린다. 그 잣대는 «진짜»를
+       싣는다(아래) — 여기서는 이알피를 «다 읽은 뒤»로 둔다. */
+    _erpCaseCons: { byBiz: {}, byName: {} },
     coTagList: () => o.coTags || [],
     coFTabCounts: () => ({ all: 0, byTab: {} }),
     coFTabList: () => o.coFTabs || [],
@@ -80,6 +83,8 @@ function load(over){
       : null)
   };
   vm.createContext(ctx);
+  /* wkListKnown · wkCountLabel — 옆줄 딱지가 부르는 잣대다. 이 덩어리보다 «먼저» 싣는다 */
+  vm.runInContext(cut('function wkListKnown(', '\nfunction wkList('), ctx);
   vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
   ctx._held = held;
   return ctx;

@@ -99,6 +99,8 @@ function bar(over) {
        시늉이 아니라 **진짜를 함께 띄운다** — 시늉으로 두면 도구줄이 그것을 안 불러도 통과한다. */
     cutFn(app, 'function shareableSel(') + '\n' +
     cutFn(app, 'function renderShareCard(') + '\n' +
+    /* ⚠ 2026-09-12 — 「모든 해」가 생기며 renderGridBar 가 이 상수를 본다 */
+    app.match(/^const ALL_YEARS = '[^']*';/m)[0].replace('const ', 'var ') + '\n' +
     cutFn(app, 'function renderGridBar('), ctx);
   ctx.renderGridBar();
   return el;

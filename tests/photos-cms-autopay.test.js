@@ -313,6 +313,51 @@ test('★ 업체를 못 가리면 «계약 목록도 안 읽는다» — 헛되�
     '★ 어느 업체인지도 모르면서 계약 목록을 내려받았습니다 — 그 한 번이 계약 수백 건입니다');
 });
 
+/* ══════ ⑥-2 지정 출금일도 함께 넣는다 (대표 지시 2026-09-12) ══════
+   「사진첩에 cms 자동이체도 «날짜와» 체크항목 자동으로 되게 해라」
+   판독기는 payDay 를 진작부터 읽고 있었는데 아무도 안 받아, 체크만 켜지고
+   계약창의 「매월 __ 일」은 늘 빈 칸이었다. */
+
+test('★★ 신청서의 출금일이 계약의 이체일이 된다', async () => {
+  const c = ctCtx([{ id: 'k1', bizNo: '312-81-12345', status: 'active' }]);
+  const r = await c.setContractCms({ bizNo: '312-81-12345', payDay: '25' });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(c._u['data/contracts/v/0/cmsPayDay'], '25', '★★ 이체일이 안 들어갑니다');
+  assert.equal(c._u['data/contracts/v/0/taxInvoicePaymentDay'], '25일',
+    '★ 계약창이 두 칸을 한 칸으로 보여 줍니다 — 한쪽만 적으면 화면과 저장값이 어긋납니다');
+  assert.match(r.message, /매월 25일/, '★ 무엇을 넣었는지 안 알려 줍니다');
+});
+
+test('★★ 사람이 넣어 둔 이체일은 «안 덮는다»', async () => {
+  const c = ctCtx([{ id: 'k1', bizNo: '312-81-12345', status: 'active', cmsPayDay: '5' }]);
+  await c.setContractCms({ bizNo: '312-81-12345', payDay: '25' });
+  assert.equal(c._u['data/contracts/v/0/cmsPayDay'], undefined,
+    '★★ 사람이 정한 이체일을 옛 신청서가 되돌렸습니다');
+});
+
+test('★★ 1~31 밖의 날은 버린다 — 없는 날에 알림이 울린다', async () => {
+  for (const bad of ['35', '0', '', 'abc', null]) {
+    const c = ctCtx([{ id: 'k1', bizNo: '312-81-12345', status: 'active' }]);
+    await c.setContractCms({ bizNo: '312-81-12345', payDay: bad });
+    assert.equal(c._u['data/contracts/v/0/cmsPayDay'], undefined,
+      '★★ 「' + bad + '」을 이체일로 넣었습니다');
+  }
+});
+
+test('★ 이미 켜져 있어도 «이체일만» 채워 넣는다 — 체크는 켰는데 날짜가 빈 계약이 실제로 있다', async () => {
+  const c = ctCtx([{ id: 'k1', bizNo: '312-81-12345', status: 'active', isCMS: true }]);
+  const r = await c.setContractCms({ bizNo: '312-81-12345', payDay: '25' });
+  assert.equal(r.ok, true);
+  assert.equal(c._u && c._u['data/contracts/v/0/cmsPayDay'], '25',
+    '★ 「이미 켜져 있습니다」로 끝내 버려 날짜가 영영 안 들어갑니다');
+});
+
+test('★ 사진첩이 출금일을 «넘긴다» — 안 넘기면 담는 쪽이 아무리 받아도 빈 칸이다', () => {
+  const fn = cutFn(photos, 'function autoCmsOn(');
+  assert.match(fn, /payDay: f\.payDay/,
+    '★★ 판독기가 읽은 출금일을 여기서 버리고 있습니다');
+});
+
 /* ══════ ⑦ 배선 ══════ */
 
 test('★ 기업 상세에 «넣은 뒤에» 자동이체를 켠다 — 값도 없이 체크만 켜지면 안 된다', () => {

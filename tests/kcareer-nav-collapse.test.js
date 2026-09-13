@@ -105,8 +105,10 @@ function 태우기(옵션) {
   };
   vm.createContext(ctx);
   /* 필요한 함수만 떼어 태운다 — 파일 전체를 돌리면 파이어베이스까지 붙는다 */
+  /* ⚠ navPaintCounts 는 buildNav 가 «실제로 부르는» 함수다(2026-09-13 — 숫자를 칠하는 곳을
+     한 곳으로 모았다). 느슨하게 고친 것이 아니라, 안 태우면 buildNav 가 터진다. */
   for (const 이름 of ['navState', 'setNavState', 'favState', 'mkItem', 'navItemsOf',
-    'navPicked', 'navPick', 'navCount', 'navGroupCount', 'buildNav', 'initGroupDrag']) {
+    'navPicked', 'navPick', 'navCount', 'navGroupCount', 'navPaintCounts', 'buildNav', 'initGroupDrag']) {
     const i = source.indexOf('\nfunction ' + 이름 + '(');
     assert.ok(i > 0, 이름 + ' 를 찾지 못했습니다');
     const j = source.indexOf('\n}', i);

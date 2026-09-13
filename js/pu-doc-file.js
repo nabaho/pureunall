@@ -1060,12 +1060,30 @@
           message: '계약이 ' + hits.length + '건이라 어느 것인지 알 수 없습니다 — 계약관리에서 골라 켜 주세요' };
       }
       var hit = hits[0];
-      if (hit.rec.isCMS === true) {
+      /* ★ 지정 출금일 — 신청서에 적힌 그 날이 곧 이체일이다 (대표 지시 2026-09-12
+         「cms 자동이체도 날짜와 체크항목 자동으로 되게 해라」).
+         판독기는 payDay 를 이미 읽고 있었는데 여태 아무도 안 받아, 체크만 켜지고
+         계약창의 「매월 __ 일」은 늘 빈 칸이었다.
+         ⚠ **빈 칸일 때만 넣는다.** 사람이 넣어 둔 이체일을 신청서가 덮으면
+           나중에 바꾼 약속이 옛 서식으로 되돌아간다.
+         ⚠ 1~31 밖은 버린다 — 없는 날에 알림이 울린다.
+         ⚠ cmsPayDay 와 taxInvoicePaymentDay 를 «함께» 적는다. 계약창이 둘을 한 칸으로
+           보여 주므로(pu-erp.html 의 cmsBlock), 한쪽만 적으면 화면과 저장값이 어긋난다. */
+      var 이미있는날 = String(hit.rec.cmsPayDay || hit.rec.taxInvoicePaymentDay || '').replace(/[^0-9]/g, '');
+      var 읽은날 = parseInt(String(o.payDay == null ? '' : o.payDay).replace(/[^0-9]/g, ''), 10);
+      var 넣을날 = (!이미있는날 && 읽은날 >= 1 && 읽은날 <= 31) ? String(읽은날) : '';
+
+      /* 이미 켜져 있고 넣을 날짜도 없으면 정말 할 일이 없다 */
+      if (hit.rec.isCMS === true && !넣을날) {
         return { ok: true, already: true, id: hit.id, message: '이미 자동이체로 되어 있었습니다' };
       }
       var now = Date.now();
       var u = {}, path = ERP_CT + '/v/' + hit.at + '/';
       u[path + 'isCMS'] = true;
+      if (넣을날) {
+        u[path + 'cmsPayDay'] = 넣을날;
+        u[path + 'taxInvoicePaymentDay'] = 넣을날 + '일';
+      }
       /* 어디서 켰는지 남긴다 — 나중에 「이거 누가 켰지」에 답해야 한다 */
       u[path + 'cmsFrom'] = 'CMS 신청서' + (o.bankName ? ' (' + o.bankName + ')' : '');
       u[path + 'cmsAt'] = now;
@@ -1074,8 +1092,9 @@
       /* 갱신시각 — 푸른이알피가 이걸 보고 다시 읽는다. 안 쓰면 화면에 안 나타난다. */
       u[ERP_CT + '/u'] = now;
       return deps.db.ref().update(u).then(function () {
-        return { ok: true, id: hit.id,
-          message: '「' + (hit.rec.companyName || hit.rec.company || '') + '」 계약에 자동이체를 켰습니다' };
+        return { ok: true, id: hit.id, payDay: 넣을날 || null,
+          message: '「' + (hit.rec.companyName || hit.rec.company || '') + '」 계약에 자동이체를 켰습니다'
+            + (넣을날 ? ' (매월 ' + 넣을날 + '일)' : '') };
       });
     });
   }

@@ -77,7 +77,11 @@ function loadPanelBlock(items){
     loadErpCaseCons: cb => cb && cb(null),
     renderCoErpHistory: () => {},
     $: id => {
+      /* ⚠ 2026-09-12: 패널이 «지금 무엇이 떠 있나»를 dataset 에 적어 둔다(기업 상세인지
+         명함인지) — 진짜 요소에는 늘 있는 자리라 대역에도 둔다. 없으면 대역 때문에
+         제품이 터진다. */
       if(id==='pcDetail') return { set innerHTML(v){ calls.panelHtml=v; }, get innerHTML(){ return calls.panelHtml; },
+        dataset: (calls.dataset = calls.dataset || {}),
         classList: { add(){ calls.panelOpen=true; }, remove(){ calls.panelOpen=false; } } };
       if(id==='pcDetailOverlay') return { style:{ set display(v){ calls.overlayOn = (v==='block'); } } };
       return null;
@@ -174,7 +178,11 @@ function loadPanelBlockAsync(items){
     loadErpCaseCons: cb => { pendingCbs.push(cb); },
     renderCoErpHistory: (o, data) => { calls.histCalls.push({ name:o.name, data }); },
     $: id => {
+      /* ⚠ 2026-09-12: 패널이 «지금 무엇이 떠 있나»를 dataset 에 적어 둔다(기업 상세인지
+         명함인지) — 진짜 요소에는 늘 있는 자리라 대역에도 둔다. 없으면 대역 때문에
+         제품이 터진다. */
       if(id==='pcDetail') return { set innerHTML(v){ calls.panelHtml=v; }, get innerHTML(){ return calls.panelHtml; },
+        dataset: (calls.dataset = calls.dataset || {}),
         classList: { add(){ calls.panelOpen=true; }, remove(){ calls.panelOpen=false; } } };
       if(id==='pcDetailOverlay') return { style:{ set display(v){ calls.overlayOn = (v==='block'); } } };
       return null;

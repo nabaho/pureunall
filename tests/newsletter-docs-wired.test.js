@@ -141,6 +141,38 @@ test('★ 화면이 읽는 자리와 서버가 담는 자리가 «같다»', () 
   });
 });
 
+test('★★ 화면이 자료를 «값어치 순»으로 줄 세운다 — 모은 날로만 세우지 않는다', () => {
+  /* ⚠⚠ 2026-09-13 대표 화면: 고용·노동정책 넷이 전부 홍보성 보도자료였다.
+       보도자료는 날마다 열 건씩 올라오는데 「모은 날」로만 줄을 세우니
+       값어치 4점짜리 활용가이드가 여덟 칸 «안에 들지도» 못했다.
+     ★ 모으는 쪽은 값어치를 매겨 둔다 — 화면이 그것을 써야 뜻이 있다. */
+  const i = news.indexOf('function 자동담기(');
+  assert.ok(i > 0, '자동담기 를 못 찾음');
+  const fn = news.slice(i, i + 2400);
+  assert.ok(fn.indexOf('값어치순(') >= 0,
+    '★★ 자료를 값어치로 안 세운다 — 홍보성 보도자료가 가이드를 밀어낸다');
+  assert.ok(news.indexOf('function 값어치순(') >= 0, '값어치순 이 없다');
+  /* 판례는 그대로 최근 순 — 거기는 값어치 잣대가 없고 새 판결이 곧 값이다 */
+  assert.ok(/판례 = 최근것\(/.test(fn), '판례까지 값어치로 세우고 있다');
+});
+
+test('★ 값어치를 «적어 두는» 쪽이 있다 — 화면만 고치면 늘 0 이 된다', () => {
+  assert.ok(idx.indexOf('async function 자료거리모으기(') >= 0, '모으는 자리가 없다');
+  const d = fs.readFileSync(path.join(ROOT, 'functions/news-docs.js'), 'utf8');
+  assert.ok(d.indexOf('값어치: 자료값어치(') >= 0,
+    '★ 자료에 값어치를 안 적어 둔다 — 화면이 셀 것이 없다');
+});
+
+test('값어치가 없는 «옛 자료»도 줄에서 빠지지 않는다', () => {
+  /* ⚠ 0 으로 보아 보도자료(-1)보다는 위, 가이드(4)보다는 아래에 선다.
+       빼 버리면 새로 모으기 전까지 창고의 절반이 안 보인다. */
+  const i = news.indexOf('function 값어치순(');
+  const 끝 = news.indexOf(String.fromCharCode(10) + '}', i);
+  const fn = news.slice(i, 끝 > i ? 끝 : i + 800);
+  assert.ok(/isFinite\(v\) \? v : 0/.test(fn), '옛 자료를 0 으로 안 본다');
+  assert.ok(fn.indexOf('.filter(Boolean)') >= 0, '빈 칸을 안 거른다');
+});
+
 test('★ 「이 주차로 채우기」가 자료·판례를 «함께» 넘긴다', () => {
   const i = news.indexOf('function 자동담기(');
   assert.ok(i > 0, '자동담기 를 못 찾음');

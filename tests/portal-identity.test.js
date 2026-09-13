@@ -74,7 +74,13 @@ t('★ 머리에 사번을 함께 적는다', (function(){
   return /\bname\b/.test(line) && /\btitle\b/.test(line)
       && /\brole\b/.test(line) && /mySid[\s\S]*toUpperCase\(\)/.test(line);
 })(), true);
-t('마우스를 올리면 로그인 이메일이 보인다', /\.title = '로그인 계정: ' \+ email;/.test(src), true);
+/* ⚠ 덧말을 «글자 그대로» 박지 않는다 — 2026-09-12 에 (admin)을 머리줄에서 접고
+   덧말로 옮기면서 앞에 이름·직책·권한이 붙었다. 지켜야 할 것은
+   「마우스를 올리면 로그인 계정을 알 수 있다」이고, 그 값은 email 이다. */
+t('마우스를 올리면 로그인 이메일이 보인다',
+  /\.title = [\s\S]{0,220}?로그인 계정: ' \+ email;/.test(src), true);
+/* 접은 것은 덧말에 «반드시» 남는다 — 안 그러면 권한을 확인할 길이 없어진다 */
+t('접은 (admin) 도 덧말에 남는다', /\$\('userName'\)\.title = [\s\S]{0,200}?role/.test(src), true);
 t('명부에 없어도 이메일에서 사번을 만들어 보여준다', /var mySid = acct \? String\(acct\.sid \|\| ''\) : puEmailToSid\(email\);/.test(src), true);
 
 console.log('\n[④ 신원 안내 띠 — 이상할 때는 크게 말한다]');

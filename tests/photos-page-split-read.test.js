@@ -109,13 +109,78 @@ test('쪽 번호가 이상해도 안 죽는다 — 못 알아보면 빈 자리�
   assert.deepEqual(Array.from(r.docs[1].pages), [2, 3], '겹친 쪽은 하나로, 글자는 숫자로');
 });
 
-test('★ 물음에 «서류마다 갈라 달라»는 말과 «한 서류면 합치라»는 말이 둘 다 있다', () => {
-  const note = cutFn(READ_SRC, 'function read(').length ? READ_SRC : READ_SRC;
-  const at = note.indexOf('var MULTI_NOTE');
-  const 글 = note.slice(at, at + 1400);
-  assert.match(글, /docs/, '★ 갈라 달라는 꼴을 안 알려 주면 예전처럼 한 벌만 옵니다');
-  assert.match(글, /한 서류/, '★★ 「한 서류면 합치라」가 빠지면 계약서 2쪽 이후가 죄다 빈칸이 됩니다');
-  assert.match(글, /서로 다른 서류/);
+/* ══ 물음이 «실제로 보내는 글»을 본다 — 글자를 눈으로 견주지 않고 돌려서 ══════════
+   ⚠★ 2026-09-12 실측 — 첫 판은 「갈라 주세요」라고 **권하기만** 해서 안 먹혔다.
+     같은 문서(1쪽 자문계약서 + 2쪽 자동출금 이용신청서)를 두 번 읽혔더니
+       첫 번째 → 두 쪽 다 contract (은행·계좌가 통째로 사라짐)
+       두 번째 → 두 쪽 다 cms      (계약기간·자문료가 통째로 사라짐)
+     **갈리지 않고 한쪽이 늘 사라졌다.** 위 PROMPT_ALL 이 첫 줄부터 「이 이미지가
+     어떤 서류인지」로 시작해 내내 «한 장·한 벌»을 전제로 쓰여 있어서다 —
+     맨 끝 한 문단이 그 전체를 못 이긴다.
+   ★ 그래서 **꼴을 못 박았는지**를 본다. 「갈라 달라」는 말이 있는가가 아니다. */
+function 보낸글(고른길) {
+  const box = { window: undefined, console, setTimeout, clearTimeout };
+  box.globalThis = box;
+  /* ⚠ 진짜 지우개는 {text,…} 를 돌려준다 — 글자만 돌려주는 대역을 쓰면 body 가
+     undefined 가 되어 «물음이 안 붙은 것처럼» 보인다(그렇게 헛다리를 짚었다). */
+  box.PuRrnMask = { maskRrnInText: function (s) { return { text: s }; } };
+  vm.createContext(box);
+  vm.runInContext(READ_SRC, box);
+  let 본것 = null;
+  box.PuDocRead.init({
+    fetch: function (u, i) {
+      본것 = JSON.parse(i.body);
+      return Promise.resolve({ ok: true, status: 200, json: function () {
+        return Promise.resolve({ ok: true, reply: { candidates: [{ content: { parts: [
+          { text: '{"docs":[{"pages":[1],"kind":"contract","fields":{}}]}' }] } }] } });
+      } });
+    },
+    readDocUrl: 'http://x', getToken: function () { return Promise.resolve('T'); }, app: 'photos'
+  });
+  return 고른길(box.PuDocRead).then(function () {
+    return 본것 ? 본것.parts[본것.parts.length - 1].text : '';
+  });
+}
+const 여러쪽글 = '--- 1쪽 ---\n자문계약서 제1조\n\n--- 2쪽 ---\n계좌/신용카드 자동출금 이용신청서';
+
+test('★★★ 여러 쪽이면 답의 «꼴»을 못 박는다 — 권하기만 하면 안 먹힌다(실측)', async () => {
+  const t = await 보낸글(function (D) { return D.readDocText(여러쪽글); });
+  assert.match(t, /반드시 이 꼴/,
+    '★★★ 「이런 꼴로 주세요」라고 권하기만 하면, 더 길고 더 자주 되풀이된 위 설명을 따릅니다.\n' +
+    '  실제로 같은 문서가 두 번 다 «한 벌»로 와서 한쪽이 통째로 사라졌습니다.');
+  assert.match(t, /맨 바깥에 kind/,
+    '★★★ «틀린 꼴»을 콕 집어 막지 않으면 그 꼴로 답합니다 — 그것이 예전 꼴입니다');
+  assert.match(t, /이 규칙이 이깁니다/,
+    '★★ 위 설명과 어긋날 때 어느 쪽이 이기는지 안 적으면 모델이 고릅니다');
+});
+
+test('★★ 한 서류여도 docs 배열 — 꼴이 하나뿐이어야 흔들리지 않는다', async () => {
+  const t = await 보낸글(function (D) { return D.readDocText(여러쪽글); });
+  assert.match(t, /서류가 하나뿐이어도 docs 배열/,
+    '★★ 「여럿일 때만 docs」로 두면 모델이 매번 «몇 개인지»를 먼저 판단해야 합니다 —\n' +
+    '  그 판단이 흔들리면 꼴이 흔들리고, 우리 쪽 갈래도 함께 흔들립니다');
+});
+
+test('★★ «한 서류가 여러 쪽»이면 합치라는 말이 남아 있다', async () => {
+  const t = await 보낸글(function (D) { return D.readDocText(여러쪽글); });
+  assert.match(t, /한 서류[\s\S]{0,120}한 칸/,
+    '★★ 이 말이 빠지면 계약서 3쪽이 세 서류로 갈려 2쪽 이후가 죄다 빈칸이 됩니다');
+  assert.match(t, /다른 서류의 값을 섞지/,
+    '★ 섞지 말라고 안 하면 계약서 칸에 은행·계좌가 들어옵니다');
+});
+
+test('★★★ 한 쪽짜리에는 그 말을 «안» 붙인다 — 없는 쪽을 지어낸다', async () => {
+  const t = await 보낸글(function (D) { return D.readDocText('자문계약서 제1조 갑은 을을'); });
+  assert.doesNotMatch(t, /반드시 이 꼴/,
+    '★★★ 한 쪽인데 「여러 쪽」이라고 하면 AI 가 없는 쪽을 지어냅니다');
+});
+
+test('★★ 그림 길과 글자 길이 «같은 규칙»을 보낸다 — 두 벌이면 한쪽이 옛 규칙으로 남는다', () => {
+  const src = stripJs(READ_SRC);
+  assert.match(src, /TEXT_MULTI_NOTE = MULTI_NOTE/,
+    '★★ 글자 길이 제 말을 따로 쓰면, 그림 길만 고쳐 놓고 글자 길은 옛 규칙으로 남습니다');
+  assert.ok(!/한 벌의 JSON/.test(src),
+    '★★ 옛 말(「한 벌의 JSON 만 주세요」)이 남아 있으면 새 규칙과 정면으로 부딪힙니다');
 });
 
 /* ══════ ② 화면 — 쪽마다 제 서류의 답을 준다 ═══════════════════════════════ */

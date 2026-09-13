@@ -1,0 +1,134 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른이알피 — 서류 본문으로 찾기</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--line:#e2e8f0;--txt:#1e293b;--sub:#64748b;
+  --blue:#1e40af;--blue2:#2563eb;--blue1:#eff6ff;--blue0:#bfdbfe;
+  --amber:#854d0e;--amber1:#fffbeb;--green:#166534;--green1:#f0fdf4;--green2:#bbf7d0}
+body{margin:0;padding:20px;background:var(--bg);color:var(--txt);
+  font:14px/1.6 'Malgun Gothic',system-ui,sans-serif;max-width:1040px}
+h1{font-size:19px;margin:0 0 4px}
+h2{font-size:15px;margin:26px 0 8px;padding-top:13px;border-top:2px solid var(--line)}
+h2 .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--blue);
+  color:#fff;align-items:center;justify-content:center;font-size:12px;margin-right:7px}
+p.sub{margin:0 0 12px;color:var(--sub);font-size:13px}
+.tag{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:2px 8px;margin-bottom:6px}
+.ok{background:var(--green1);color:var(--green)}.now{background:#e2e8f0;color:#475569}
+
+/* 왼쪽 메뉴 */
+.app{display:flex;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.side{width:178px;flex:0 0 auto;background:#f1f5f9;border-right:1px solid var(--line);padding:9px 0}
+.side .g{font-size:10.5px;font-weight:800;color:var(--sub);padding:8px 12px 3px}
+.side .i{display:flex;align-items:center;gap:7px;padding:6px 12px;font-size:12.5px}
+.side .i.on{background:var(--blue1);color:var(--blue);font-weight:800;
+  box-shadow:inset 3px 0 0 var(--blue2)}
+.side .i.newone{background:#fff;border:1px dashed var(--blue2);border-radius:7px;
+  margin:3px 8px;color:var(--blue);font-weight:800}
+.main{flex:1 1 auto;padding:14px 16px;min-width:0}
+
+.row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.row input{flex:1 1 auto;min-width:0;font:inherit;font-size:13px;border:1px solid var(--line);
+  border-radius:8px;padding:8px 11px}
+.row .btn{font-size:12.5px;font-weight:700;border:1px solid var(--blue2);background:var(--blue2);
+  color:#fff;border-radius:8px;padding:8px 13px;white-space:nowrap}
+.hit{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:9px;background:#fff}
+.hit .h{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px;font-weight:800}
+.chip{font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 8px;
+  background:var(--blue1);color:var(--blue);border:1px solid var(--blue0)}
+.chip.g{background:var(--green1);color:var(--green);border-color:var(--green2)}
+.hit .w{font-size:12px;color:var(--sub);margin-top:4px}
+.hit .w b{background:#fde68a;color:var(--amber);border-radius:3px;padding:0 2px}
+.hit .go{font-size:11.5px;color:var(--blue);margin-top:5px}
+.note{background:#fff;border-left:4px solid var(--blue2);padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.note b{color:var(--blue)}
+.warnbox{background:var(--amber1);border-left:4px solid #d97706;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;background:#fff;vertical-align:top}
+th{background:#f1f5f9;font-size:12px;color:var(--sub)}
+.ask{background:var(--blue);color:#fff;border-radius:10px;padding:13px 16px;margin-top:22px;font-size:13.5px}
+.ask b{font-size:15px}
+.ask .q{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.25)}
+</style></head><body>
+
+<h1>푸른이알피에서 «서류 본문»으로 찾기</h1>
+<p class="sub">대표 지시 2026-09-12 「이런 정보로 푸른이알피에서 내용 찾을 수 있게 해달라」 → ㉡ 본문 글자로</p>
+
+<h2><span class="n">①</span> 어디에 두나 — 사무관리 아래 한 줄</h2>
+<div class="app">
+  <div class="side">
+    <div class="g">📊 대시보드</div>
+    <div class="i">🏛️ 법인 대시보드</div>
+    <div class="i">🤝 이음센터</div>
+    <div class="g">💼 사무관리</div>
+    <div class="i">📄 계약관리</div>
+    <div class="i">🏢 업체관리</div>
+    <div class="i">📁 사건관리</div>
+    <div class="i newone on">🔎 서류 찾기</div>
+    <div class="g">👥 인사관리</div>
+    <div class="i">👤 근로자명부</div>
+  </div>
+  <div class="main">
+    <div class="row">
+      <input value="쌍용17길">
+      <span class="btn">🔎 찾기</span>
+    </div>
+    <p class="sub" style="margin:8px 0 0">사진첩에 담긴 서류 <b>929장</b>을 글자까지 훑습니다 · <b>3장</b> 찾음</p>
+
+    <div class="hit">
+      <div class="h">아이행복어린이집 <span class="chip">자문계약서</span>
+        <span class="chip g">2쪽 중 1쪽</span></div>
+      <div class="w">주소 … 충청남도 천안시 서북구 <b>쌍용17길</b> 25 일성능수아파트 307동 106호</div>
+      <div class="go">→ 눌러서 사진첩에서 열기 · 2026-09-11 · 권형하</div>
+    </div>
+    <div class="hit">
+      <div class="h">아이행복어린이집 <span class="chip">자동이체 신청서</span>
+        <span class="chip g">2쪽 중 2쪽</span></div>
+      <div class="w">주 소 … 서북구 쌍용동 <b>쌍용17길</b> 25 307동 106호 · 하나은행 6779100 1708204</div>
+      <div class="go">→ 눌러서 사진첩에서 열기 · 2026-09-11 · 권형하</div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+<b>사무관리 아래에 두는 까닭</b> — 계약관리·업체관리를 보다가 「그 서류 어디 있더라」 할 때
+쓰는 것이라, 그 옆에 있어야 손이 갑니다.
+</div>
+
+<h2><span class="n">②</span> ★ 본문을 «옮겨 담지 않습니다»</h2>
+<table>
+<tr><th>안 하는 것</th><th>하는 것</th></tr>
+<tr><td>서류 본문을 푸른이알피에 복사해 두기</td><td>찾을 때마다 <b>사진첩을 그 자리에서 읽습니다</b></td></tr>
+<tr><td>관계망(온톨로지)에 본문 색인 만들기</td><td>찾은 글자는 <b>화면에만</b> 잠깐 있습니다</td></tr>
+<tr><td>결과를 푸른이알피에 저장하기</td><td>누르면 <b>사진첩으로 건너가</b> 원본을 엽니다</td></tr>
+</table>
+<p class="sub" style="margin-top:8px">
+푸른이알피는 이미 이 방식으로 사진첩을 읽고 있습니다 — 계약추가 창의 「계약서 찾기」와
+사건 명부의 「통장에서 계좌 채우기」가 같은 길입니다. <b>새 길을 내는 것이 아니라 넓히는 것</b>입니다.</p>
+
+<div class="warnbox">
+<b>보이는 범위는 «지금 권한 그대로»입니다.</b>
+관리자는 전 직원 사진첩을, 직원은 자기 것과 공유받은 것만 찾습니다 —
+여기서 새 규칙을 만들지 않습니다(막힌 것은 조용히 빠집니다).
+<br>⚠ <b>주민번호는 애초에 안 읽혀 있어</b> 찾을 수도 없습니다. 계좌번호는 담겨 있으므로 찾아집니다.
+</div>
+
+<h2><span class="n">③</span> 무엇으로 찾아지나</h2>
+<table>
+<tr><th>찾아짐</th><th>예</th></tr>
+<tr><td>서류에서 읽어낸 <b>모든 칸</b></td><td>업체명·대표자·주소·사업자번호·금액·계좌·기간</td></tr>
+<tr><td>표의 <b>칸 이름과 값</b></td><td>「지정 출금일」·「예금주」·「수납기관명」</td></tr>
+<tr><td>사람이 적어 둔 것</td><td>업체명·메모·스캔 파일 이름</td></tr>
+<tr><td>갈래·올린 사람·날짜</td><td>「자동이체 신청서」·「권형하」·「9월 11일」</td></tr>
+</table>
+<p class="sub" style="margin-top:8px">
+띄어쓰기로 여러 낱말을 넣으면 <b>모두 든 것</b>만 남습니다 — 「아이행복 하나은행」처럼 좁힐 수 있습니다.</p>
+
+<div class="ask">
+<b>이대로 만들까요?</b>
+<div class="q">㉮ 이 목업 그대로(사무관리 아래 「🔎 서류 찾기」) &nbsp;·&nbsp;
+㉯ 대시보드 쪽에 &nbsp;·&nbsp; ㉰ 위쪽 검색창으로(메뉴 말고) &nbsp;·&nbsp; ㉱ 다시 손보기</div>
+</div>
+
+</body></html>

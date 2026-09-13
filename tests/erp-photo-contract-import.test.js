@@ -129,6 +129,12 @@ const t = (name, got, want) => {
 {
   const c = vm.createContext({});
   vm.runInContext(fn('erpVatTextToFlag'), c);
+  /* 2026-09-12: 계약서에서 CMS 자동이체를 읽는 길이 붙었다 — 함께 안 실으면
+     「erpCmsFromDoc is not defined」로 넘어진다. */
+  /* ⚠ slice 는 끝 표식을 «뺀다» — 그래서 다음 함수 머리까지 잘라 목록 전체를 담는다 */
+  vm.runInContext(slice('var ERP_CMS_WORDS =', '\nfunction erpDocText('), c);
+  vm.runInContext(fn('erpDocText'), c);
+  vm.runInContext(fn('erpCmsFromDoc'), c);
   vm.runInContext(fn('erpContractPhotoApplyPatch'), c);
 
   const baseF = {
@@ -282,10 +288,15 @@ const t = (name, got, want) => {
       '                     loadFull:function(){ return Promise.resolve(""); } };',
       'function render(p){ __i = 0; return PhotoContractPickerModal(p); }'
     ].join('\n'), c);
-    /* 2026-08-27: 창이 갈래(erpPhotoPick)·갈래 수(erpPhotoKindCounts)도 쓴다 — 함께 넣는다. */
+    /* 2026-08-27: 창이 갈래(erpPhotoPick)·갈래 수(erpPhotoKindCounts)도 쓴다 — 함께 넣는다.
+       2026-09-12: 겹친 서류 접기(erpPhotoFold 무리)도 erpPhotoPick 이 부른다 — 안 넣으면
+                   「erpPhotoFold is not defined」로 창이 통째로 안 그려진다. */
     vm.runInContext(fn('erpPhotoRowText') + '\n' + fn('erpPhotoFilter') + '\n' +
                     slice('var ERP_DOC_KINDS =', '\nfunction erpContractDocKind(') + '\n' +
-                    fn('erpContractDocKind') + '\n' + fn('erpPhotoPick') + '\n' +
+                    fn('erpContractDocKind') + '\n' +
+                    fn('erpPhotoDocKey') + '\n' + fn('erpPhotoSameKey') + '\n' +
+                    fn('erpPhotoHeadCmp') + '\n' + fn('erpPhotoFoldOnce') + '\n' +
+                    fn('erpPhotoFold') + '\n' + fn('erpPhotoPick') + '\n' +
                     fn('erpPhotoKindCounts') + '\n' +
                     fn('PhotoContractPickerModal'), c);
 

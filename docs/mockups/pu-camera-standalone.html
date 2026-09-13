@@ -1,0 +1,126 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른카메라 — 사진만 찍는 별개 앱</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--line:#e2e8f0;--txt:#1e293b;--sub:#64748b;
+  --blue:#1e40af;--blue2:#2563eb;--blue1:#eff6ff;--blue0:#bfdbfe;
+  --amber:#854d0e;--amber1:#fffbeb;--green:#166534;--green1:#f0fdf4;--green2:#bbf7d0;
+  --red:#991b1b;--red1:#fef2f2}
+body{margin:0;padding:20px;background:var(--bg);color:var(--txt);
+  font:14px/1.6 'Malgun Gothic',system-ui,sans-serif;max-width:1000px}
+h1{font-size:19px;margin:0 0 4px}
+h2{font-size:15px;margin:26px 0 8px;padding-top:13px;border-top:2px solid var(--line)}
+h2 .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--blue);
+  color:#fff;align-items:center;justify-content:center;font-size:12px;margin-right:7px}
+p.sub{margin:0 0 12px;color:var(--sub);font-size:13px}
+.tag{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:2px 8px;margin-bottom:6px}
+.now{background:#e2e8f0;color:#475569}.ok{background:var(--green1);color:var(--green)}
+
+.phone{width:300px;border:10px solid #1e293b;border-radius:26px;overflow:hidden;background:#101010;
+  display:inline-block;vertical-align:top;margin:0 16px 10px 0}
+.ctop{display:flex;align-items:center;gap:8px;padding:10px 12px;color:#e2e8f0;font-size:12.5px}
+.ctop b{font-weight:800}.ctop .sp{flex:1}
+.view{height:230px;background:linear-gradient(160deg,#334155,#0f172a);position:relative}
+.view::after{content:'';position:absolute;inset:34px 30px;border:2px dashed rgba(255,255,255,.22);border-radius:10px}
+.view .hint{position:absolute;left:0;right:0;bottom:9px;text-align:center;color:#cbd5e1;font-size:11px}
+.bar{display:flex;align-items:center;justify-content:center;gap:26px;padding:13px 0;background:#101010}
+.bar .sh{width:54px;height:54px;border-radius:50%;background:#fff;border:4px solid #94a3b8}
+.bar .sm{width:42px;text-align:center;color:#cbd5e1;font-size:11px}
+.strip{background:#fff;padding:8px 10px}
+.strip .hd{font-size:11.5px;font-weight:800;color:var(--sub);margin-bottom:6px;display:flex}
+.strip .hd .r{margin-left:auto;color:var(--blue);font-weight:800}
+.strip .row{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px}
+.strip .row .th{width:54px;height:54px;flex:none;border-radius:7px;border:1px solid var(--line);
+  background:repeating-linear-gradient(#f1f5f9 0 3px,#fff 3px 7px);position:relative}
+.strip .row .th b{position:absolute;left:0;right:0;bottom:0;font-size:9px;background:rgba(15,23,42,.65);
+  color:#fff;text-align:center;border-radius:0 0 6px 6px;font-weight:700}
+.strip .row .th.warn{border-color:#fde68a;box-shadow:0 0 0 2px #fffbeb}
+.foot{background:#0f172a;color:#94a3b8;font-size:10.5px;text-align:center;padding:7px}
+
+.note{background:#fff;border-left:4px solid var(--blue2);padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.note b{color:var(--blue)}
+.warnbox{background:var(--amber1);border-left:4px solid #d97706;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;background:#fff;vertical-align:top}
+th{background:#f1f5f9;font-size:12px;color:var(--sub)}
+.big{font-size:17px;font-weight:800;color:var(--blue)}
+.ask{background:var(--blue);color:#fff;border-radius:10px;padding:13px 16px;margin-top:22px;font-size:13.5px}
+.ask b{font-size:15px}
+.side{display:inline-block;vertical-align:top;max-width:560px}
+</style></head><body>
+
+<h1>푸른카메라 — «사진만 찍는» 별개 앱</h1>
+<p class="sub">대표 지시 2026-09-12 「별개의 앱으로 만들어서 사진만 찍는 앱 만들어 달라」</p>
+
+<h2><span class="n">①</span> 왜 지금 것으로는 안 되나 — 숫자</h2>
+<table>
+<tr><th></th><th>지금 (아이콘 → 사진첩)</th><th>사진만 찍는 앱</th></tr>
+<tr><td>열 때 받는 것</td><td class="big" style="color:var(--red)">1.2 MB</td><td class="big">약 150 KB</td></tr>
+<tr><td>받아 두고 쓰나</td><td>❌ <b>일부러 안 담는다</b> — 새 버전 자동 적용과 싸워서</td><td>같음</td></tr>
+<tr><td>주소가 바뀌는 주기</td><td><b>10분</b>마다 (그때마다 다시 받는다)</td><td>같음</td></tr>
+<tr><td>열면 보이는 것</td><td>사진첩 전체 (닫으면 목록·메뉴·설정)</td><td><b>카메라뿐</b></td></tr>
+</table>
+<p class="sub" style="margin-top:8px">
+지금은 아이콘을 눌러도 <b>사진첩 앱이 통째로 뜨고</b> 그 위에 카메라가 얹힙니다.
+급할 때 꺼내 쓰는 물건인데 <b>검은 준비 화면이 깁니다</b>(코드 주석에도 그 기록이 있습니다).</p>
+
+<h2><span class="n">②</span> 이렇게 — 열면 바로 카메라, 그것뿐</h2>
+
+<div class="phone">
+  <div class="ctop">📷 <b>푸른카메라</b><span class="sp"></span>⚡ 🔄</div>
+  <div class="view"><div class="hint">눌러서 초점 · 아래 단추로 촬영</div></div>
+  <div class="bar"><span class="sm">3장</span><span class="sh"></span><span class="sm">🖼</span></div>
+  <div class="strip">
+    <div class="hd">방금 찍은 것 <span class="r">모두 사진첩에 저장됨 ✓</span></div>
+    <div class="row">
+      <span class="th"><b>방금</b></span>
+      <span class="th"><b>1분</b></span>
+      <span class="th warn"><b>흐림?</b></span>
+    </div>
+  </div>
+  <div class="foot">권형하 · 사진은 푸른사진첩으로 자동 저장됩니다</div>
+</div>
+
+<div class="side">
+<p class="sub"><b>하는 일이 넷뿐입니다.</b></p>
+<table>
+<tr><td>① 열면 <b>바로 카메라</b></td><td>고를 것도 누를 것도 없다</td></tr>
+<tr><td>② 찍으면 <b>자동 저장</b></td><td>「올리기」를 안 누른다 — 찍는 대로 사진첩으로</td></tr>
+<tr><td>③ <b>방금 찍은 것</b>이 아래에</td><td>그림으로 · 흐린 것은 테두리로 알린다</td></tr>
+<tr><td>④ 🖼 를 누르면 사진첩</td><td>보고 싶을 때만. 평소엔 안 뜬다</td></tr>
+</table>
+<p class="sub" style="margin-top:9px">
+목록·검색·폴더·판독·설정 — <b>아무것도 없습니다.</b> 그것이 「사진만 찍는 앱」입니다.</p>
+</div>
+
+<h2><span class="n">③</span> ⚠ 지켜야 할 것 — 「가는 곳」은 하나여야 한다</h2>
+<div class="warnbox">
+2026-08-08 에 대표님이 「카메라는 하나로」라고 정하신 까닭은 <b>가는 곳이 달랐기 때문</b>입니다 —
+옛 푸른카메라는 기업정보함 직행, 사진첩 카메라는 자동 분류. 같은 명함인데 결과가 달랐습니다.
+<br><br>
+<b>이번 앱은 그 함정을 피합니다</b> — 저장을 <b>지금 쓰는 같은 층</b>(`PuPhotoStore`)으로 합니다.
+새 저장 길을 만들지 않으므로 <b>가는 곳이 갈릴 수가 없습니다.</b>
+검사로 못 박아 두겠습니다(새 앱이 제 저장 길을 만들면 그 자리에서 걸리게).
+</div>
+
+<h2><span class="n">④</span> 솔직히 — 처음엔 «빠지는 것»이 있습니다</h2>
+<table>
+<tr><th>사진첩 카메라에 있고 이 앱엔 없는 것</th><th>왜 괜찮나</th></tr>
+<tr><td>▣ 명함·서류 모드 (고화질·판독)</td><td>「사진만 찍는 앱」이라 하셨습니다. 서류는 사진첩 카메라로</td></tr>
+<tr><td>흔들림·초점 거르개, 세 장 중 좋은 것 고르기</td><td>명함 글자를 읽으려고 만든 장치입니다. 현장 사진에는 과합니다</td></tr>
+<tr><td>여러 장 검토·골라서 올리기</td><td>찍는 대로 저장하고, 잘못 찍힌 것은 아래 줄에서 지웁니다</td></tr>
+<tr><td>렌즈 바꾸기 · 손전등</td><td>⚡ 손전등은 넣습니다. 렌즈는 나중에 필요하시면</td></tr>
+</table>
+<p class="sub" style="margin-top:8px">
+<b>넣으려면 넣을 수 있습니다</b> — 다만 넣을수록 무거워져서 「가볍게」라는 애초 뜻이 사라집니다.
+쓰시다가 아쉬운 것이 생기면 그때 하나씩 옮기는 편이 낫습니다.</p>
+
+<div class="ask">
+<b>이대로 만들까요?</b><br>
+㉮ 이 목업 그대로 — 사진 전용 · 가벼운 별개 앱 &nbsp;·&nbsp;
+㉯ 명함·서류 모드도 넣어서 &nbsp;·&nbsp; ㉰ 다시 손보기
+</div>
+
+</body></html>

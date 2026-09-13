@@ -1,0 +1,163 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른카메라 — 렌즈 바꾸기 · 사진 한 줄 메모</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--line:#e2e8f0;--txt:#1e293b;--sub:#64748b;
+  --blue:#1e40af;--blue2:#2563eb;--blue1:#eff6ff;--blue0:#bfdbfe;
+  --amber:#854d0e;--amber1:#fffbeb;--green:#166534;--green1:#f0fdf4;--green2:#bbf7d0;
+  --red:#991b1b;--red1:#fef2f2}
+body{margin:0;padding:20px;background:var(--bg);color:var(--txt);
+  font:14px/1.6 'Malgun Gothic',system-ui,sans-serif;max-width:1040px}
+h1{font-size:19px;margin:0 0 4px}
+h2{font-size:15px;margin:26px 0 8px;padding-top:13px;border-top:2px solid var(--line)}
+h2 .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--blue);
+  color:#fff;align-items:center;justify-content:center;font-size:12px;margin-right:7px}
+p.sub{margin:0 0 12px;color:var(--sub);font-size:13px}
+
+.phone{width:300px;border:10px solid #1e293b;border-radius:26px;overflow:hidden;background:#101010;
+  display:inline-block;vertical-align:top;margin:0 16px 10px 0}
+.ctop{display:flex;align-items:center;gap:8px;padding:10px 12px;color:#e2e8f0;font-size:12.5px}
+.ctop b{font-weight:800}.ctop .sp{flex:1}
+.view{height:196px;background:linear-gradient(160deg,#334155,#0f172a);position:relative}
+.view::after{content:'';position:absolute;inset:26px 26px;border:2px dashed rgba(255,255,255,.18);border-radius:10px}
+.view .hint{position:absolute;left:0;right:0;bottom:8px;text-align:center;color:#cbd5e1;font-size:10.5px}
+
+/* 렌즈 고르개 */
+.lens{position:absolute;left:50%;transform:translateX(-50%);bottom:30px;display:flex;gap:6px;
+  background:rgba(15,23,42,.62);border-radius:999px;padding:4px 6px}
+.lens span{width:34px;height:26px;border-radius:999px;color:#cbd5e1;font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+.lens span.on{background:#fff;color:#0f172a}
+
+/* 메모 걸이 */
+.memo{display:flex;align-items:center;gap:7px;background:#1e293b;color:#e2e8f0;
+  padding:7px 11px;font-size:11.5px}
+.memo .tag{background:var(--blue2);color:#fff;border-radius:5px;padding:1px 6px;font-weight:800;font-size:10px}
+.memo .txt{flex:1;color:#fff}
+.memo .txt.off{color:#64748b;font-style:italic}
+.memo .x{color:#94a3b8}
+
+.bar{display:flex;align-items:center;justify-content:center;gap:26px;padding:11px 0;background:#101010}
+.bar .sh{width:54px;height:54px;border-radius:50%;background:#fff;border:4px solid #94a3b8}
+.bar .sm{width:42px;text-align:center;color:#cbd5e1;font-size:11px}
+.strip{background:#fff;padding:8px 10px}
+.strip .hd{font-size:11.5px;font-weight:800;color:var(--sub);margin-bottom:6px;display:flex}
+.strip .hd .r{margin-left:auto;color:#16a34a;font-weight:800}
+.strip .row{display:flex;gap:9px;overflow-x:auto;padding-bottom:2px}
+.strip .row .th{width:56px;flex:none}
+.strip .row .th i{display:block;height:56px;border-radius:7px;border:1px solid var(--line);
+  background:repeating-linear-gradient(#f1f5f9 0 3px,#fff 3px 7px);position:relative}
+.strip .row .th i b{position:absolute;left:0;right:0;bottom:0;font-size:9px;background:rgba(15,23,42,.62);
+  color:#fff;text-align:center;border-radius:0 0 6px 6px;font-weight:700}
+.strip .row .th em{display:block;font-style:normal;font-size:9.5px;color:var(--sub);
+  margin-top:3px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.strip .row .th em.none{color:#cbd5e1}
+.foot{background:#0f172a;color:#94a3b8;font-size:10.5px;text-align:center;padding:7px}
+
+.side{display:inline-block;vertical-align:top;max-width:600px}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;background:#fff;vertical-align:top}
+th{background:#f1f5f9;font-size:12px;color:var(--sub)}
+.note{background:#fff;border-left:4px solid var(--blue2);padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.note b{color:var(--blue)}
+.warnbox{background:var(--amber1);border-left:4px solid #d97706;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.okbox{background:var(--green1);border-left:4px solid #16a34a;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.ask{background:var(--blue);color:#fff;border-radius:10px;padding:13px 16px;margin-top:22px;font-size:13.5px}
+.ask b{font-size:15px}
+.k{display:inline-block;background:#f1f5f9;border:1px solid var(--line);border-radius:5px;
+  padding:0 5px;font-size:12px}
+</style></head><body>
+
+<h1>푸른카메라 — 마저 채우기</h1>
+<p class="sub">대표 지시 2026-09-13 「푸른카메라 마저 채우기」 ·
+어제 만든 앱에서 <b>일부러 빼 두었던 둘</b>입니다 — ① 렌즈 바꾸기 ② 사진 한 줄 메모</p>
+
+<h2><span class="n">①</span> 렌즈 바꾸기 — 넓게 / 보통 / 멀리</h2>
+
+<div class="phone">
+  <div class="ctop">📷 <b>푸른카메라</b><span class="sp"></span>⚡ 🔄</div>
+  <div class="view">
+    <div class="lens"><span>0.5×</span><span class="on">1×</span><span>2×</span></div>
+    <div class="hint">사진은 찍는 대로 푸른사진첩에 저장됩니다</div>
+  </div>
+  <div class="bar"><span class="sm">3장</span><span class="sh"></span><span class="sm">🖼</span></div>
+  <div class="foot">권형하 · 푸른사진첩으로 자동 저장</div>
+</div>
+
+<div class="side">
+<p class="sub">화면 아래에 <b>0.5× · 1× · 2×</b> 세 알만 뜹니다. 누르면 그 렌즈로 바뀝니다.</p>
+<table>
+<tr><th>언제 쓰나</th><th></th></tr>
+<tr><td><b>0.5×</b> 넓게</td><td>좁은 사무실·작업장에서 <b>뒤로 못 물러설 때</b>. 한 장에 다 담긴다</td></tr>
+<tr><td><b>1×</b> 보통</td><td>평소. 화질이 가장 좋다</td></tr>
+<tr><td><b>2×</b> 멀리</td><td>높은 곳의 표지판·게시물처럼 <b>가까이 못 갈 때</b></td></tr>
+</table>
+
+<div class="warnbox">
+<b>⚠ 폰마다 있는 렌즈가 다릅니다.</b> 그래서 <b>있는 것만 뜹니다</b> —
+렌즈가 하나뿐인 폰에서는 이 줄이 <b>아예 안 보입니다</b>.<br>
+(지금도 손전등 ⚡ 과 앞뒤 🔄 를 그렇게 하고 있습니다. 눌러도 아무 일 없는 단추는 없느니만 못합니다)
+</div>
+<p class="sub">대표님 폰에 무엇이 있는지는 <b>앱이 열릴 때 스스로 물어봅니다</b> — 제가 미리 정하지 않습니다.
+못 바꾸는 폰이면 어제와 똑같이 보입니다.</p>
+</div>
+
+<h2><span class="n">②</span> 사진 한 줄 메모 — 「어디서 찍은 건지」</h2>
+
+<div class="phone">
+  <div class="ctop">📷 <b>푸른카메라</b><span class="sp"></span>⚡ 🔄</div>
+  <div class="view"><div class="hint">사진은 찍는 대로 푸른사진첩에 저장됩니다</div></div>
+  <div class="memo"><span class="tag">메모</span>
+    <span class="txt">가나상사 3층 작업장</span><span class="x">✕</span></div>
+  <div class="bar"><span class="sm">3장</span><span class="sh"></span><span class="sm">🖼</span></div>
+  <div class="strip">
+    <div class="hd">방금 찍은 것 <span class="r">모두 사진첩에 저장됨 ✓</span></div>
+    <div class="row">
+      <span class="th"><i><b>방금</b></i><em>가나상사 3층 작업장</em></span>
+      <span class="th"><i><b>1분</b></i><em>가나상사 3층 작업장</em></span>
+      <span class="th"><i><b>4분</b></i><em class="none">메모 없음</em></span>
+    </div>
+  </div>
+  <div class="foot">권형하 · 푸른사진첩으로 자동 저장</div>
+</div>
+
+<div class="side">
+<p class="sub"><b>한 번 적으면 그 뒤로 찍는 것마다 그대로 붙습니다.</b></p>
+<table>
+<tr><td>① <span class="k">메모</span> 칸을 누른다</td><td>「가나상사 3층 작업장」이라고 한 번 적는다</td></tr>
+<tr><td>② 그대로 열 장을 찍는다</td><td><b>열 장 모두에</b> 그 한 줄이 붙는다 — 다시 안 적는다</td></tr>
+<tr><td>③ 다른 곳으로 옮기면 ✕</td><td>지우거나 고쳐 적는다. 메모 없이도 그냥 찍힌다</td></tr>
+<tr><td>④ 한 장만 고치려면</td><td>아래 줄에서 <b>그 사진을 누른다</b></td></tr>
+</table>
+
+<div class="okbox">
+<b>★ 새 칸을 안 만듭니다.</b> 이 한 줄은 사진첩에 이미 있는
+<b>「사람이 적는 한 줄」</b> 그 칸에 그대로 들어갑니다.<br>
+그래서 <b>사진첩에서 바로 보이고, 사진첩에서 고칠 수도 있습니다.</b>
+AI 가 읽은 것과는 따로 있는 칸이라, 나중에 판독해도 대표님이 적으신 것은 안 지워집니다.
+</div>
+
+<p class="sub"><b>왜 「걸어 두는」 방식인가</b> — 현장에서는 한 곳에서 열 장씩 찍습니다.
+한 장마다 물으면 열 번 칩니다. 반대로 <b>안 물으면</b> 나중에 사진첩에서
+「이게 어디였지」가 됩니다. 한 번 적고 계속 찍는 것이 그 둘 사이입니다.</p>
+</div>
+
+<h2><span class="n">③</span> 안 바뀌는 것</h2>
+<table>
+<tr><td>아이콘·주소·이름</td><td>그대로. 깔아 두신 아이콘이 깨지지 않습니다</td></tr>
+<tr><td>담기는 곳</td><td>그대로 <b>푸른사진첩 한 곳</b>. 저장 길을 새로 만들지 않습니다</td></tr>
+<tr><td>여전히 <b>사진만</b></td><td>명함·서류는 지금처럼 사진첩 카메라로 넘깁니다(판독·가림이 그쪽에 있습니다)</td></tr>
+<tr><td>무게</td><td>21KB → 약 <b>24KB</b>. 사진첩(1.2MB)과 견주면 그대로 가볍습니다</td></tr>
+</table>
+
+<div class="ask">
+<b>이대로 만들까요?</b><br>
+㉮ 이 목업 그대로 — 렌즈 알 + 걸어 두는 메모 &nbsp;·&nbsp;
+㉯ 메모는 <b>찍은 뒤 그 한 장만</b> 고치는 것으로(걸어 두기 없이) &nbsp;·&nbsp;
+㉰ 렌즈만 먼저 &nbsp;·&nbsp; ㉱ 다시 손보기
+</div>
+
+</body></html>

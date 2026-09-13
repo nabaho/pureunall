@@ -58,6 +58,8 @@ function loadCtx(over) {
   }, over || {});
   vm.createContext(ctx);
   vm.runInContext('var _gridLoadToken = 0; var _gridSeeded = false;', ctx);
+  /* ⚠ 2026-09-12 — 「모든 해」가 생기며 loadGrid 가 이 상수를 본다. 원본 그대로 싣는다. */
+  vm.runInContext(app.match(/^const ALL_YEARS = '[^']*';/m)[0].replace('const ', 'var '), ctx);
   /* 목록을 만드는 «같은 손»을 그대로 쓴다 — 대역을 넣으면 화면과 다른 것을 보게 된다 */
   vm.runInContext(cutFn(app, 'function itemsToGrid('), ctx);
   vm.runInContext(cutFn(app, 'function loadGrid('), ctx);

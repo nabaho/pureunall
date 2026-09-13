@@ -129,7 +129,8 @@ test('★ 어느 길로 읽었는지 결과에 남긴다 — 이것이 없으면
   /* ⚠ 인자 «개수»는 안 박는다 — 지킬 것은 「어느 길로 읽었나(via)를 넘기는가」다.
      2026-09-10 에 「사람이 눌렀나」(opts)가 하나 더 붙었다. */
   assert.match(fnOf(readjs, 'read'), /runDocParts\(parts, 'image'[,)]/);
-  assert.match(fnOf(readjs, 'readDocText'), /\], 'text'[,)]/);
+  /* ⚠ 줄바꿈까지 박지 않는다(2026-09-12 — 여러 쪽 물음이 붙으며 줄이 나뉘었다) */
+  assert.match(fnOf(readjs, 'readDocText'), /\],\s*'text'[,)]/);
   assert.match(readjs, /function runDocParts\(parts, via[,)]/);
   /* 두 갈림길(대리인/열쇠) 모두 넘겨야 한다 — 한쪽만 넘기면 그 길에서 via 가 빈다.
      ⚠ 2026-09-12 — 다듬는 함수 이름이 afterRead → afterReadDocs 로 바뀌었다

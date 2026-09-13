@@ -16,6 +16,7 @@ const path = require('path');
 const assert = require('assert');
 const vm = require('vm');
 const { test } = require('node:test');
+const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
 
@@ -71,9 +72,9 @@ test('⑤ ★★ 포털 딱지가 무료일 때 «횟수»를 그린다 — ₩0
 });
 
 test('⑥ ★ 사진첩 설정 카드도 같은 규칙이다 — 두 화면이 다른 말을 하면 안 된다', function () {
-  const at = PHOTOS.indexOf('function renderAiBudget(');
-  assert.ok(at > 0, '사진첩 카드 자리를 못 찾았습니다');
-  const 구역 = PHOTOS.slice(at, at + 1400);
+  /* ⚠ 자릿수로 잘라 보지 «말 것» — 함수가 길어지면 창 밖으로 밀려나 헛도는 검사가 된다
+     (2026-09-12 에 실제로 그렇게 됐다). 중괄호를 세어 함수 전체를 그대로 본다. */
+  const 구역 = cutFn(PHOTOS, 'function renderAiBudget(');
   assert.match(구역, /else if \(s\.free\)/, '★★ 사진첩은 아직 ₩0 이라 적습니다');
   assert.match(구역, /무료/, '★ 무료라는 말이 없습니다');
 });
@@ -83,6 +84,6 @@ test('⑦ ★ 셈은 «한 곳»에만 — 화면이 제 나름대로 무료를 
   const 포털 = ENTER.slice(ENTER.indexOf('function aiChipPaint('), ENTER.indexOf('function aiChipPaint(') + 2200);
   assert.ok(!/wonPerRead\s*===\s*0/.test(포털),
     '★ 포털이 무료 여부를 제 나름대로 셉니다 — pu-billing 의 s.free 만 볼 것');
-  const 사진 = PHOTOS.slice(PHOTOS.indexOf('function renderAiBudget('), PHOTOS.indexOf('function renderAiBudget(') + 1400);
+  const 사진 = cutFn(PHOTOS, 'function renderAiBudget(');
   assert.ok(!/wonPerRead\s*===\s*0/.test(사진), '★ 사진첩이 무료 여부를 제 나름대로 셉니다');
 });

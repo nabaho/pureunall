@@ -633,7 +633,19 @@ exports.sendMaterialMail = functions
 
     const db = getDatabase();
     const body = (req.body && typeof req.body === "object") ? req.body : {};
-    const from = await mailUserAsync();
+    // ★★ 부르는 쪽이 「이 주소로」를 바랄 수 있다 (대표 확인 2026-09-12).
+    //   뉴스레터 시험 발송이 그렇다 — 진짜 발송은 370-6@hanmail.net 으로 나가는데
+    //   시험만 계정 주소(370-6@daum.net)로 나가고 있었다. 그러면 «시험이 시험이 아니다»
+    //   ({추적열쇠}·링크들을 맞춘 것과 같은 까닭 — 2026-09-06).
+    // ⚠ 아무 주소나 받지 않는다. 대량 발송과 «같은 조이기»를 지난다 —
+    //   사서함 이름이 계정과 같고 도메인이 daum/hanmail 인 것만 통과하고,
+    //   아니면 조용히 계정 주소로 나간다(MB.보내는주소고르기).
+    // ⚠ 안 주면 예전 그대로다 — 자료 메일(기업정보함)은 아무 것도 안 바뀐다.
+    // ⚠ 여기서 부른다 — 위의 MB 는 이 함수보다 «아래»에서 선언된다. 요청 때는 이미
+    //   올라와 있지만, 보는 사람이 헷갈리지 않게 이 자리에서 가져온다(newsView 와 같은 결).
+    const MBhere = require("./mail-bulk");
+    const 계정주소 = await mailUserAsync();
+    const from = MBhere.보내는주소고르기(body.from, 계정주소);
 
     // ── 예약 발송 ──
     // 보내지 않고 자리에만 담아 둔다. 때가 되면 sendScheduledMail 이 꺼내 보낸다.
@@ -695,6 +707,11 @@ exports.sendMaterialMail = functions
 // ⚠ 한꺼번에 쏟지 않는 것이 이 기능의 핵심이다 — 다음메일은 대량 발송용 계정이
 //   아니라 몰아 보내면 막히고, 막히면 평소 자료 발송까지 멈춘다.
 const MB = require("./mail-bulk");
+/* 뉴스레터 회차 잠금 판단 — 두 관리자가 같은 순간에 눌렀을 때의 잣대는
+   검사가 실제로 만들어 볼 수 있도록 이 파일 밖(functions/news-lock.js)에 둔다. */
+const NL = require("./news-lock");
+/* 자동발송 확정본이 «준비한 그때 그대로»인지 재는 자 — 다르면 안 보낸다 */
+const NR = require("./news-ready");
 
 exports.sendBulkMail = functions
   .region(MAIL_REGION)
@@ -719,6 +736,57 @@ exports.sendBulkMail = functions
 
     const db = getDatabase();
     const now = Date.now();
+    const newsletterSend = body.newsletterSend && typeof body.newsletterSend === "object"
+      ? body.newsletterSend : null;
+    let newsletterIssueKey = "", newsletterRequestId = "", newsletterClaim = null;
+    if (newsletterSend) {
+      const role = (await db.ref("uid_roles/" + sender.uid).once("value")).val() || {};
+      if (role.isAdmin !== true) {
+        res.status(403).json({ ok: false, error: "총괄관리자만 뉴스레터를 발송할 수 있습니다." });
+        return;
+      }
+      newsletterIssueKey = String(newsletterSend.issueKey || "");
+      newsletterRequestId = String(newsletterSend.requestId || "");
+      if (!/^\d{4}-\d{2}-w\d{1,2}$/.test(newsletterIssueKey)
+          || !/^[A-Za-z0-9_-]{8,120}$/.test(newsletterRequestId)) {
+        res.status(400).json({ ok: false, error: "뉴스레터 발송 요청 번호가 올바르지 않습니다." });
+        return;
+      }
+      /* ★ 잠금은 «회차 한 칸»에만 건다 — 회차 통째에 걸면 25,000자 전문과
+           받는 분 주소까지 읽어 통째로 다시 쓴다. 잠금 한 칸 때문에.
+         ★ 「이미 보낸 회차인가」는 잠금이 생기기 전에 나간 옛 회차까지 보려고
+           따로 한 번 읽는다(옛 회차에는 발송잠금이 아예 없다). */
+      const issueRef = db.ref("newsletter/issues/" + newsletterIssueKey);
+      const lockRef = issueRef.child("발송잠금");
+      const 이미상태 = (await issueRef.child("상태").once("value")).val();
+      const 이미잠금 = (await lockRef.once("value")).val();
+      const 마친내요청 = NL.이미마친내요청인가(이미잠금, newsletterRequestId);
+      if (이미상태 === "발송" || 마친내요청) {
+        /* 그물이 끊겨 화면이 같은 요청을 다시 물은 것이면 «그때 그 결과»를 준다.
+           다시 걸면 119곳이 두 통을 받는다. */
+        if (마친내요청) {
+          /* ⚠ 회차를 «통째로» 읽지 않는다 — 안에 받는 분들의 주소와 25,000자 전문이
+               들어 있다. 돌려줄 세 칸만 읽는다. */
+          const [받는수, 보낸때] = await Promise.all([
+            issueRef.child("받는수").once("value"), issueRef.child("보낸때").once("value"),
+          ]);
+          const n = Number(받는수.val() || 0);
+          res.json({ ok: true, n: n, batchId: String(이미잠금.batchId || ""),
+            sentAt: Number(보낸때.val() || 0),
+            eta: MB.etaText(n, v.gapMs), duplicate: true });
+          return;
+        }
+        res.status(409).json({ ok: false, error: "이미 보낸 회차입니다." });
+        return;
+      }
+      newsletterClaim = await lockRef.transaction(
+        (cur) => NL.잠글까(cur, newsletterRequestId, Date.now(), sender.email || "") || undefined,
+        undefined, false);
+      if (!newsletterClaim.committed) {
+        res.status(409).json({ ok: false, error: "다른 관리자가 이미 이 회차를 발송하고 있습니다." });
+        return;
+      }
+    }
     const batchId = "b" + now.toString(36) + Math.random().toString(36).slice(2, 6);
     const rows = MB.buildQueue(v, now, sender.email || "", batchId);
 
@@ -727,16 +795,53 @@ exports.sendBulkMail = functions
       const upd = {};
       rows.forEach((row) => {
         const key = db.ref(MD.CARDS_ROOT + "/scheduled").push().key;
-        upd[key] = row;
+        upd[newsletterSend ? (MD.CARDS_ROOT + "/scheduled/" + key) : key] = row;
       });
-      await db.ref(MD.CARDS_ROOT + "/scheduled").update(upd);
+      if (newsletterSend) {
+        const issue = "newsletter/issues/" + newsletterIssueKey + "/";
+        upd[issue + "상태"] = "발송";
+        upd[issue + "보낸때"] = now;
+        upd[issue + "받는수"] = rows.length;
+        upd[issue + "batchId"] = batchId;
+        upd[issue + "보낸이"] = sender.email || "";
+        /* ⚠ 링크 목록은 «자리 번호»로 찾는다(news-track 링크찾기) — 걸러 내면 번호가
+             밀려 엉뚱한 곳으로 간다. 그래서 버리지 않고 자리만 지킨 채 옮긴다.
+           ⚠ 앞의 100개만 옮기면 나머지 링크는 «말없이» 튕긴다. 자리 수를 넉넉히 둔다. */
+        upd[issue + "링크들"] = Array.isArray(newsletterSend.links)
+          ? newsletterSend.links.slice(0, 1000)
+            .map((u) => String(u == null ? "" : u).slice(0, 2000)) : [];
+        upd[issue + "발송잠금"] = NL.마쳤다(newsletterClaim.snapshot.val(), now, batchId);
+        /* ★ 「보냄」 표 — 미열람 셈이 «보낸 회차»만 세기 때문에 이것이 없으면
+             이 회차가 셈에서 통째로 빠진다.
+           ⚠⚠ 자리 이름은 반드시 NT.주소열쇠 를 지나야 한다(소문자로 바꾸고 . 을 _ 로).
+             손으로 다시 씻으면 대문자 한 글자에 그분이 셈에서 영영 빠진다 —
+             열람을 적는 newsOpen 은 씻은 이름으로 찾는다.
+           ⚠ 「번호 → 주소」 대장(받는이)은 여기서 «안 쓴다» — 화면이 걸기 «전»에
+             이미 적었다. 편지가 나간 뒤에 적으면 먼저 열어 본 분의 표가 버려진다. */
+        v.targets.forEach((target) => {
+          const 주소 = NT.주소열쇠(target.email);
+          if (주소) upd[NT.보냄표(newsletterIssueKey, target.email)] = true;
+        });
+        await db.ref().update(upd);
+      } else {
+        await db.ref(MD.CARDS_ROOT + "/scheduled").update(upd);
+      }
       res.json({
-        ok: true, n: rows.length, batchId: batchId,
+        ok: true, n: rows.length, batchId: batchId, sentAt: now,
         skipped: v.skipped,
         firstAt: rows[0].at, lastAt: rows[rows.length - 1].at,
         eta: MB.etaText(rows.length, v.gapMs),
       });
     } catch (e) {
+      /* 걸다 터졌으면 잠금을 «오류»로 바꿔 바로 다시 누를 수 있게 한다.
+         ⚠ 여기서 못 바꿔도 15분 뒤에는 저절로 풀린다 — 그래서 삼키고 원래 오류를 보인다. */
+      if (newsletterSend) {
+        const lockRef2 = db.ref("newsletter/issues/" + newsletterIssueKey + "/발송잠금");
+        await lockRef2.once("value").then(() => lockRef2.transaction((lock) => {
+          if (!lock || lock.요청열쇠 !== newsletterRequestId || lock.상태 !== "거는중") return undefined;
+          return NL.틀어졌다(lock, Date.now(), (e && e.message) || e);
+        }, undefined, false)).catch(() => null);
+      }
       res.status(500).json({ ok: false, error: "예약을 걸지 못했습니다: " + String((e && e.message) || e) });
     }
   });
@@ -837,7 +942,51 @@ exports.weeklyNewsletterSend = functions
       return null;
     }
 
+    let issueClaim = null;
+    const weeklyRequestId = "weekly-" + String(ready.준비한때 || Date.now()).replace(/\D/g, "");
     try {
+      /* weeklyReady 잠금은 자동 함수끼리만 막는다. 같은 순간 관리자가 «지금 보내기»를
+         누를 수도 있으므로 회차 자체도 «손누름과 같은 잠금»으로 찜해야 두 벌이 안 생긴다.
+         ⚠ 잠금은 회차 한 칸에만 건다 — 회차 통째에 걸면 전문까지 통째로 다시 쓴다. */
+      const issueRef = db.ref("newsletter/issues/" + ready.회차열쇠);
+      const 이미보냈나 = (await issueRef.child("상태").once("value")).val() === "발송";
+      if (이미보냈나) {
+        await db.ref("newsletter/weeklyReady").update({
+          상태: "오류", 오류때: Date.now(), 오류: "이미 보낸 회차입니다."
+        });
+        console.log("[뉴스레터 자동발송] 이미 보낸 회차");
+        return null;
+      }
+
+      /* ★★ 확정본이 «준비한 그때 그대로»인지 본다 (2026-09-13).
+           준비 뒤에 회차를 고치면 화면에는 고친 것이 보이는데 확정본은 그대로라
+           «고치기 전 편지»가 나간다. 되돌릴 수 없다 — 못 믿을 바에는 안 보낸다.
+         ⚠ 회차를 통째로 읽지 않는다 — 안에 25,000자 전문과 받는 분들 주소가 있다.
+           편지에 실리는 칸만 골라 읽어 도장을 다시 찍는다. */
+      const 바탕칸 = ["회차", "범위", "우리글", "안", "지역뉴스"];
+      const 바탕 = {};
+      (await Promise.all(바탕칸.map((k) => issueRef.child(k).once("value"))))
+        .forEach((s, i) => { 바탕[바탕칸[i]] = s.val(); });
+      const 볼까 = NR.내보낼까(ready, 바탕);
+      if (!볼까.ok) {
+        await db.ref("newsletter/weeklyReady").update({
+          상태: "어긋남", 어긋난때: Date.now(), 오류: 볼까.까닭,
+          봉인도장: 볼까.봉인 || "", 지금도장: 볼까.지금 || ""
+        });
+        console.log("[뉴스레터 자동발송] 보내지 않음 — " + 볼까.까닭);
+        return null;
+      }
+      issueClaim = await issueRef.child("발송잠금").transaction(
+        (cur) => NL.잠글까(cur, weeklyRequestId, Date.now(), "weeklyNewsletterSend") || undefined,
+        undefined, false);
+      if (!issueClaim.committed) {
+        await db.ref("newsletter/weeklyReady").update({
+          상태: "오류", 오류때: Date.now(), 오류: "회차가 이미 발송됐거나 다른 관리자가 발송 중입니다."
+        });
+        console.log("[뉴스레터 자동발송] 회차 발송잠금 실패");
+        return null;
+      }
+
       const v = MB.validateBulk(ready);
       if (!v.ok) throw new Error(v.error);
       const now = Date.now();
@@ -855,6 +1004,7 @@ exports.weeklyNewsletterSend = functions
       upd[issue + "batchId"] = batchId;
       upd[issue + "보낸이"] = "weeklyNewsletterSend";
       upd[issue + "링크들"] = ready.링크들 || [];
+      upd[issue + "발송잠금"] = NL.마쳤다(issueClaim.snapshot.val(), now, batchId);
       Object.keys(ready.받는이 || {}).forEach((k) => {
         upd[issue + "받는이/" + k] = ready.받는이[k];
       });
@@ -870,6 +1020,10 @@ exports.weeklyNewsletterSend = functions
       console.log("[뉴스레터 자동발송] " + rows.length + "곳 예약 완료");
       return null;
     } catch (e) {
+      if (issueClaim && issueClaim.committed) await db.ref("newsletter/issues/" + ready.회차열쇠 + "/발송잠금").transaction((v) => {
+        if (!v || v.요청열쇠 !== weeklyRequestId || v.상태 !== "거는중") return undefined;
+        return NL.틀어졌다(v, Date.now(), (e && e.message) || e);
+      }, undefined, false).catch(() => null);
       await db.ref("newsletter/weeklyReady").update({
         상태: "오류", 오류때: Date.now(), 오류: String((e && e.message) || e).slice(0, 300)
       });
@@ -2637,6 +2791,54 @@ exports.newsClick = functions
          받는 분이 눌러도 같은 일이 난다. 문(enter.html)으로 보낸다. */
     res.redirect(302, 갈곳 || "https://nabaho.github.io/pureunall/enter.html");
   });
+
+// ════════════════════════════════════════════════════════════════════════════
+// 뉴스레터 «전문 보기» 쪽 — newsView
+// ════════════════════════════════════════════════════════════════════════════
+// 대표 결정 2026-09-12: 편지는 «요약»만 보내고, 자세한 것은 이 쪽에서 본다.
+//
+// ★ 여기서 편지를 «다시 짓지 않는다». 보낼 때 앱이 지은 전문을 회차에 담아 두고
+//   (newsletter/issues/{회차}/전문) 그것을 꺼내 준다. 편지 짓는 층은 화면 쪽에 있어
+//   서버에 올라가지 않는다 — 베껴 두면 두 벌이 되어 반드시 어긋난다.
+//
+// ⚠⚠ «전문 한 칸만» 읽는다. 회차 안에는 받는 분들의 주소(받는이)가 들어 있다 —
+//   통째로 읽어 내주면 그것이 그대로 새 나간다. 이 쪽은 로그인이 없다.
+//
+// ⚠ 초안은 안 내준다. 회차 열쇠는 규칙이라 다음 주 것을 누구나 지어 볼 수 있다.
+exports.newsView = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 15, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    const NV = require("./news-view");
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.set("X-Robots-Tag", "noindex");
+    /* ⚠⚠ «못 준다»는 답은 캐시하지 않는다 (2026-09-12 실측으로 겪었다).
+         전문을 담기 전에 한 번 누른 사람이 있으면 그 404 가 5분간 굳어, 전문을
+         담은 뒤에도 계속 「전문이 없습니다」가 나온다. 굳을 값이 아니다. */
+    const 굳히지말것 = () =>
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    굳히지말것();
+    const q = NV.읽기(req.query);
+    if (!q.ok) { res.status(404).send(NV.없는쪽("없음")); return; }
+    try {
+      const db = getDatabase();
+      const 밑 = "newsletter/issues/" + q.회차 + "/";
+      const [상태, 전문] = await Promise.all([
+        db.ref(밑 + "상태").once("value"),
+        db.ref(밑 + "전문").once("value"),
+      ]);
+      const 판 = NV.볼수있나(상태.val(), 전문.val());
+      if (!판.ok) { res.status(404).send(NV.없는쪽(판.까닭)); return; }
+      const 제목 = (await db.ref(밑 + "제목").once("value")).val();
+      /* 줄 것이 있을 때만 잠깐 굳힌다 — 이미 나간 회차라 잘 안 바뀐다 */
+      res.set("Cache-Control", "public, max-age=300");
+      res.status(200).send(NV.쪽(제목, String(전문.val())));
+    } catch (e) {
+      console.warn("newsView", (e && e.message) || e);
+      res.status(500).send(NV.없는쪽("없음"));
+    }
+  });
+
 exports.readHomepage = functions
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
   .https.onRequest(async (req, res) => {
@@ -2949,21 +3151,42 @@ exports.dailyRegionalNewsCollect = functions
     const db = getDatabase();
     const 자리 = db.ref("newsletter/regionalCandidates");
     const 있던것 = (await 자리.once("value")).val() || {};
+    /* 지난번 결과 — 「언제부터 못 읽나」를 이어 세려면 옛 기록이 있어야 한다 */
+    const 있던메타 = (await db.ref("newsletter/regionalCollectMeta").once("value")).val() || {};
     const patch = {};
     let 읽은출처 = 0, 새것 = 0;
+    /* ★★ 출처마다 «됐나 안 됐나»를 남긴다 (2026-09-13).
+         예전에는 「2/3 읽음」만 남고 어느 출처가 왜 막혔는지는 서버 기록에만 있었다.
+         그래서 지역뉴스가 없을 때 「새 기사가 없는 것」인지 「못 읽고 있는 것」인지
+         화면에서 가릴 수가 없었다 — 몇 주를 조용히 안 읽고 있어도 모른다.
+       ⚠ 실패해도 «마지막 성공»은 지우지 않는다. 「언제부터 못 읽나」가 답이다. */
+    const 출처별 = {};
+    const 지금 = Date.now();
     for (const 출처 of 지역뉴스부품.출처들) {
+      const 열 = String(출처.id || "").replace(/[.#$/[\]]/g, "_");
+      const 옛 = (있던메타.출처별 || {})[열] || {};
       try {
         const xml = await 글자로받기(출처.목록주소);
         읽은출처++;
+        let 이출처새것 = 0;
         지역뉴스부품.후보만들기(xml, 출처, Object.assign({}, 있던것, patch), Date.now())
-          .forEach(function(x){ patch[x.id] = x; 새것++; });
+          .forEach(function(x){ patch[x.id] = x; 새것++; 이출처새것++; });
+        출처별[열] = { 이름: String(출처.기관 || 출처.이름 || 출처.id || ""),
+          지역: String(출처.지역 || ""), 됐나: true, 마지막성공: 지금,
+          새후보: 이출처새것, 탈: "", 연속실패: 0 };
       } catch (e) {
-        console.warn("[지역뉴스] " + 출처.id + "를 못 읽었습니다", String(e.message || e));
+        const 탈 = String((e && e.message) || e).slice(0, 200);
+        console.warn("[지역뉴스] " + 출처.id + "를 못 읽었습니다", 탈);
+        출처별[열] = { 이름: String(출처.기관 || 출처.이름 || 출처.id || ""),
+          지역: String(출처.지역 || ""), 됐나: false, 마지막실패: 지금, 탈: 탈,
+          마지막성공: Number(옛.마지막성공 || 0),
+          연속실패: Number(옛.연속실패 || 0) + 1 };
       }
     }
     if (새것) await 자리.update(patch);
     await db.ref("newsletter/regionalCollectMeta").update({
-      마지막수집:Date.now(), 읽은출처:읽은출처, 전체출처:지역뉴스부품.출처들.length, 새후보:새것
+      마지막수집:지금, 읽은출처:읽은출처, 전체출처:지역뉴스부품.출처들.length, 새후보:새것,
+      막힌출처:지역뉴스부품.출처들.length - 읽은출처, 출처별:출처별
     });
     console.log("[지역뉴스] 출처 " + 읽은출처 + "/" + 지역뉴스부품.출처들.length
       + " · 새 검토후보 " + 새것 + "건");
