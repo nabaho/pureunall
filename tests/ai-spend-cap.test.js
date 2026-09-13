@@ -176,10 +176,12 @@ test('★ 사람이 누른 것(manual)은 «막지 않는다» — 급한 서류
   const fn = cutExport(IDX, 'readDoc');
   assert.match(fn, /!\s*body\.manual/,
     '★ 사람이 눌러도 막고 있습니다 — 대표 결정은 「알려 주고 그대로 해 준다」였습니다');
-  /* 「사람이 눌렀다」가 실제로 몸통에 실려야 서버가 가릴 수 있다 */
-  const 물음 = cutFn(fs.readFileSync(path.join(R, 'js', 'pu-doc-read.js'), 'utf8'),
-    'function askProxy(');
-  assert.match(물음, /manual/,
+  /* 「사람이 눌렀다」가 실제로 «서버로 보내는 몸통»에 실려야 서버가 가릴 수 있다.
+     ⚠ 함수 «이름»으로 찾지 않는다 — 2026-09-13 에 askProxy 를 둘로 쪼개(지문 기억을
+       앞에 두느라) 이 검사가 기능은 멀쩡한데 깨졌다. 보는 것은 「몸통에 실리는가」다. */
+  const 판독층 = fs.readFileSync(path.join(R, 'js', 'pu-doc-read.js'), 'utf8');
+  const 몸통 = 판독층.match(/body:\s*JSON\.stringify\(\{[^]{0,400}?\}\)/g) || [];
+  assert.ok(몸통.some(function (b) { return /manual:/.test(b) && /parts:/.test(b); }),
     '★ 화면이 「사람이 눌렀다」를 안 보냅니다 — 서버는 전부 자동으로 봅니다');
 });
 
