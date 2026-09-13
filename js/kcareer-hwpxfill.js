@@ -410,19 +410,35 @@
     var m = /<hp:cellAddr[^>]*\bcolAddr="(\d+)"/.exec(String(tc == null ? '' : tc));
     return m ? parseInt(m[1], 10) : -1;
   }
-  /* 줄의 «모양» — 칸 수와 첫 칸의 열 번호. 열 번호가 없으면 빈 글자(이 잣대를 쓰지 않는다) */
+  /* 줄의 «모양» — 칸 수와 첫 칸의 열 번호.
+     ⚠★ 열 번호가 없으면 예전에는 빈 글자를 주어 이 잣대를 «아예 안 썼다». 그런데
+       밀림이 나는 서식이 바로 그 경우다 — 빗장이 없으니 학력이 자격·상벌 빈 줄까지
+       흘러 들어갔다(대표 제보 2026-09-13, 실측으로 되풀이했다).
+       열 번호가 없으면 «칸 수»만으로라도 모양을 본다. 칸 수가 달라지면 남의 자리다.
+     ⚠ 덜 채우는 쪽으로 멈춘다 — 남의 표에 박는 것보다 덜 나쁘다. */
   function rowShape(cells) {
     if (!cells || !cells.length) return '';
     var a = colAddrOf(cells[0]);
-    return a < 0 ? '' : (cells.length + ':' + a);
+    return a < 0 ? ('n' + cells.length) : (cells.length + ':' + a);
   }
-  /* 이 칸이 어느 열인가 — 열 번호가 있으면 그것으로, 없으면 칸 순서로(옛 서식) */
-  function keyAt(head, tc, i) {
+  /* 자료 줄이 머리줄보다 «몇 칸 짧은가» — 세로로 합친 라벨 칸이 덮인 줄에는 없기 때문이다.
+     ⚠ 머리줄 앞쪽의 «열쇠 없는 칸» 수와 «딱 맞을 때만» 민다. 어림짐작으로 밀면
+       멀쩡한 서식이 한 칸씩 어긋난다 — 안 미느니만 못하다.
+     ⚠ 열 번호가 있으면 밀지 않는다 — 그쪽이 더 정확하다(keyAt 이 열 번호로 간다). */
+  function shiftOf(head, cells) {
+    if (!head || head.byCol || !cells) return 0;
+    var d = head.map.length - cells.length;
+    return (d > 0 && d === head.lead) ? d : 0;
+  }
+  /* 이 칸이 어느 열인가 — 열 번호가 있으면 그것으로, 없으면 칸 순서로(옛 서식).
+     ⚠ 옛 서식에서는 세로 라벨만큼 «밀어서» 본다(shiftOf). 안 밀면 기간이 학교명 칸으로
+       들어가고, 「고등학교」가 적힌 줄은 급을 못 찾아 통째로 건너뛴다(실측 2026-09-13). */
+  function keyAt(head, tc, i, shift) {
     if (head && head.byCol) {
       var ca = colAddrOf(tc);
       if (ca >= 0) return head.byCol[ca] || '';
     }
-    return (head && head.map[i]) || '';
+    return (head && head.map[i + (shift || 0)]) || '';
   }
   /* ★ 줄에서 «n번째 칸»을 바꾼다.
      ⚠ replaceOnce 로 칸을 바꾸면 안 된다 — 빈 칸끼리는 XML 이 글자 하나까지 똑같아서
@@ -606,10 +622,14 @@
       if (ca < 0) { 있다 = false; break; }
       if (map[i]) byCol[ca] = map[i];
     }
+    /* 머리줄 «맨 앞»의 열쇠 없는 칸 수 — 세로 라벨(「학력사항」)이 거기 있다.
+       자료 줄이 딱 그만큼 짧으면 그 라벨이 덮인 줄이라는 뜻이다(shiftOf 가 쓴다). */
+    var lead = 0;
+    while (lead < map.length && !map[lead]) lead++;
     var kind = map.indexOf('school') >= 0 ? 'edu'
       : (map.indexOf('org') >= 0 && (map.indexOf('role') >= 0 || map.indexOf('title') >= 0
           || map.indexOf('dept') >= 0 || map.indexOf('period') >= 0)) ? 'career' : '';
-    return kind ? { kind: kind, map: map, byCol: 있다 ? byCol : null } : null;
+    return kind ? { kind: kind, map: map, lead: lead, byCol: 있다 ? byCol : null } : null;
   }
   /* ── 여기서부터는 «남의 자리» ──
      ① 다음 머리행 — 열 이름이 둘 이상 잡히면 새 목록 표가 시작된 것이다
@@ -698,8 +718,11 @@
         }
         /* 이 줄의 «칸마다 어느 열인지»를 먼저 정해 둔다 — 채우는 중에 칸이 바뀌므로 */
         var keys = [];
+        var 밀림 = shiftOf(head, cells);
+        /* ⚠ 여기서 밀림을 또 빼지 않는다 — 빼 보았지만 결과가 하나도 달라지지 않았다
+           (고장넣기에서 걸렸다). 넘어가는 자리는 keyAt 이 빈 열쇠를 주어 그냥 지나간다. */
         var lim = head.byCol ? cells.length : Math.min(cells.length, head.map.length);
-        for (var kk = 0; kk < lim; kk++) keys.push(keyAt(head, cells[kk], kk));
+        for (var kk = 0; kk < lim; kk++) keys.push(keyAt(head, cells[kk], kk, 밀림));
         /* 「고등학교」처럼 급만 박힌 줄 — 그 급의 학교를 골라 넣는다.
            ⚠ 이 줄은 rowIsEmpty 가 거짓이다(글자가 있으므로). 그래서 따로 본다. */
         var 급 = '', 급칸 = -1;
@@ -906,7 +929,7 @@
     /* ⚠ 목록 줄 판정은 «이 하나»를 쓴다 — 칸 지도(kcareer-formmap)도 같은 자를 쓴다.
        두 곳에 따로 두면 「지도엔 빈 줄인데 안 채워지는」 어긋남이 생긴다. */
     isRowBlank: isRowBlank, bracketKey: bracketKey,
-    colAddrOf: colAddrOf, rowShape: rowShape,
+    colAddrOf: colAddrOf, rowShape: rowShape, shiftOf: shiftOf,
     incellFill: function (tc, fields) {
       /* 검사용 — 칸 하나에 칸 안 라벨을 채워 본다 */
       var rep = { fields: [], lists: [], kept: [] };
