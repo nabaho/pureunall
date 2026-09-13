@@ -123,7 +123,7 @@
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=6">
+<link rel="stylesheet" href="css/pu-erp.css?v=7">
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=10"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -32251,6 +32251,14 @@ function PolicyRow(props){
     h('div', null, props.control)
   );
 }
+/* ── 설정 줄을 «둘씩» 놓는다 (대표 지시 2026-09-13 「한 줄씩 안 해도 된다」) ──────
+   설정 한 칸은 이름표 150px + 체크상자뿐인데 줄 하나를 통째로 쓴다.
+   1,600px 화면에서 오른쪽 1,100px 넘게가 내내 빈 채로 여덟 줄이 내려갔다.
+   ⚠ 칸 수를 손으로 못 박지 않는다 — 좁은 화면(노트북·태블릿)에서는 저절로 한 칸으로
+     돌아와야 한다. 그 판단은 css 의 .set-rows 한 곳에 있다(가로 1,100px 이 경계). */
+function PolicyGrid(props){
+  return h('div', { className:'set-rows' }, props.children);
+}
 
 function ToggleSwitch(props){
   return h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'8px', cursor:'pointer', userSelect:'none' } },
@@ -33578,6 +33586,8 @@ function AccessPolicySection(){
     h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'10px', padding:'8px 12px', background:'#fffbeb', borderRadius:'4px' } },
       '⚠️ 일반 직원(member)에게 적용되는 권한 제한. admin·admin-delegate는 항상 전체 권한.'
     ),
+    /* ★ 여덟 줄을 «둘씩» 놓는다 — 세로로만 쌓아 「메뉴 접근 권한 관리」가 화면 밖으로 밀렸다 */
+    h(PolicyGrid, null,
     h(PolicyRow, {
       label:'전체 사건 열람',
       hint:'꺼두면 본인 담당 사건만 표시',
@@ -33624,6 +33634,7 @@ function AccessPolicySection(){
         h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '분 ※ 변경 후 재로그인 시 적용')
       )
     })
+    )
   ),
   // ★ 메뉴 접근 권한 + 위임관리인 통합
   h('div', { style:{ marginTop:'16px' } },
@@ -38366,69 +38377,51 @@ function DataManagementSection(){
     );
   }
 
+  /* ★★ 좌우 두 칸 (대표 지시 2026-09-13 「한 화면에 모두, 아래로 안 나오게」).
+     왼쪽은 «일하는» 자리(마이그레이션 마법사), 오른쪽은 누르고 끝나는 것 셋이다.
+     네 덩어리를 세로로만 쌓아 약 1,100px 이 되는 바람에 콜드 스토리지가
+     두 번 스크롤해야 보였다(남는 높이 약 620px). 칸 나누기는 css 의 .set-2col. */
   return h(PolicyCard, { title:'데이터 관리', icon:'💾', headBg:'#fffbeb', headFg:'#854d0e', collapseId:'sys_data', defaultOpen:false },
-
-    // ★ 중복 데이터 제거
-    h(DuplicateCleanerSection, null),
-
-    // ── Firebase 전체 업로드 (모바일 동기화용) ──
-    h('div', { style:{ background: fbUpState==='done' ? '#f0fdf4' : fbUpState==='error' ? '#fef2f2' : '#eff6ff',
-      border: '1px solid ' + (fbUpState==='done' ? '#bbf7d0' : fbUpState==='error' ? '#fecaca' : '#bfdbfe'),
-      borderRadius:'8px', padding:'14px 16px', marginBottom:'16px' } },
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
-        h('span', { style:{ fontSize:'18px' } }, '☁️'),
-        h('div', null,
-          h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e40af' } }, 'Firebase 전체 업로드'),
-          h('div', { style:{ fontSize:'11.5px', color:'#64748b' } }, 'PC 데이터를 클라우드에 올려 스마트폰·다른 기기에서 동일하게 사용')
-        )
-      ),
-      fbUpMsg && h('div', { style:{ fontSize:'12px', color: fbUpState==='error' ? '#dc2626' : fbUpState==='done' ? '#16a34a' : '#1e40af',
-        background: fbUpState==='done' ? '#f0fdf4' : fbUpState==='error' ? '#fef2f2' : '#eff6ff',
-        padding:'8px 12px', borderRadius:'5px', marginBottom:'10px', lineHeight:1.5 } }, fbUpMsg),
-      h('button', {
-        onClick: doFbUpload,
-        disabled: fbUpState === 'loading',
-        style:{ padding:'9px 20px', background: fbUpState==='loading' ? '#94a3b8' : '#2563eb',
-          color:'#fff', border:'none', borderRadius:'6px', fontSize:'13px', fontWeight:700,
-          cursor: fbUpState==='loading' ? 'not-allowed' : 'pointer' } },
-        fbUpState === 'loading' ? '⏳ 업로드 중...' : fbUpState === 'done' ? '✅ 완료 (다시 업로드)' : '☁️ 지금 업로드')
-    ),
-    // 마이그레이션 4단계
-    h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', padding:'14px', marginBottom:'14px' } },
+   h('div', { className:'set-2col' },
+    h('div', null,
+    // 마이그레이션 4단계 — 왼쪽(넓은 칸)
+    h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', padding:'14px' } },
       h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#854d0e', marginBottom:'10px' } },
         '📥 10년치 과거 데이터 일괄 업로드 (마이그레이션)'),
       stepHeader(),
       step === 1 && h('div', null,
-        h('div', { style:{ background:'#fff', border:'1px dashed #fbbf24', borderRadius:'6px', padding:'14px', marginBottom:'12px', fontSize:'11.5px', color:'#854d0e', lineHeight:1.7 } },
-          h('div', null, '📌 이 도구는 연도별 엑셀 파일을 받아 안전하게 업로드합니다.'),
-          h('div', null, '• 업로드 전 자동 백업 (롤백 가능)'),
-          h('div', null, '• 컬럼 자동 매핑 (업체명/회사명/거래처명 → companyName)'),
-          h('div', null, '• 담당자·유형·날짜 자동 정규화'),
-          h('div', null, '• 중복/오류 사전 검증 후 승인 시에만 저장'),
-          h('div', null, '• 감사 로그 자동 기록')
-        ),
-        h('div', { style:{ marginBottom:'10px' } },
-          h('div', { style:{ fontSize:'12px', fontWeight:600, color:'#475569', marginBottom:'6px' } }, '📂 업로드 대상 저장소'),
+        /* ★ 다섯 줄짜리 안내를 «한 줄»로 접었다 — 읽고 나면 다시 안 읽는 설명이다.
+           ⚠ 지운 것이 아니다. 말풍선(title)에 다섯 줄이 그대로 들어 있다. */
+        h('div', { className:'set-1line', title:'업로드 전 자동 백업(롤백 가능) · 컬럼 자동 매핑(업체명/회사명/거래처명 → companyName) · 담당자·유형·날짜 자동 정규화 · 중복/오류 사전 검증 후 승인 시에만 저장 · 감사 로그 자동 기록',
+          style:{ background:'#fff', border:'1px dashed #fbbf24', borderRadius:'6px', padding:'8px 12px', marginBottom:'10px', fontSize:'11.5px', color:'#854d0e' } },
+          '📌 연도별 엑셀을 받아 백업 → 매핑 → 검증 → 승인 뒤에만 저장합니다 ⓘ'),
+        h('div', { style:{ marginBottom:'8px' } },
+          h('div', { style:{ fontSize:'12px', fontWeight:600, color:'#475569', marginBottom:'5px' } }, '📂 업로드 대상 저장소'),
           h('select', { value:target, onChange:function(e){ setTarget(e.target.value); },
-            style:{ width:'100%', padding:'10px 12px', border:'1px solid #fbbf24', borderRadius:'4px', fontSize:'13px', background:'#fff', fontFamily:'inherit' } },
+            style:{ width:'100%', padding:'8px 12px', border:'1px solid #fbbf24', borderRadius:'4px', fontSize:'13px', background:'#fff', fontFamily:'inherit' } },
             TARGETS.map(function(t){
               return h('option', { key:t.v, value:t.v }, t.icon + ' ' + t.label);
             }))
         ),
-        h('div', { style:{ background:'#fff', border:'1px solid #fde68a', borderRadius:'4px', padding:'10px 14px', marginBottom:'12px', fontSize:'11.5px', color:'#854d0e' } },
-          h('div', null, h('strong', null, '필수 필드: '), curTarget.required),
-          h('div', null, h('strong', null, '선택 필드: '), curTarget.optional)
-        ),
+        /* 필수·선택 필드도 한 줄 — 넘치면 … 로 자르고 온글은 말풍선에 */
+        h('div', { className:'set-1line', title:'필수 필드: ' + curTarget.required + '\n선택 필드: ' + curTarget.optional,
+          style:{ background:'#fff', border:'1px solid #fde68a', borderRadius:'4px', padding:'7px 12px', marginBottom:'10px', fontSize:'11.5px', color:'#854d0e' } },
+          h('strong', null, '필수 '), curTarget.required, '　|　', h('strong', null, '선택 '), curTarget.optional),
         h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' } },
           h('button', { onClick:downloadBackup,
-            style:{ background:'#166534', color:'#fff', padding:'12px', borderRadius:'4px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } },
-            '💾 1단계: 전체 백업 먼저 다운로드'),
+            style:{ background:'#166534', color:'#fff', padding:'11px', borderRadius:'4px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } },
+            /* ⚠ 이 이름에 «가운뎃점 + 「전체」 + 빈칸»을 쓰지 말 것.
+                 tests/office-help-text.test.js 가 그 글자를 «파일 전체»에서 세어
+                 「필터 배너 줄이 아직 남았다」로 읽는다 — 엉뚱한 이 자리가 빨강이 된다.
+                 ⚠ 주석에 적어도 걸린다(2026-09-13 에 주석 때문에 두 번 걸렸다). */
+            '💾 1단계 · 백업 먼저'),
           h('label', {
             onDrop:function(e){ e.preventDefault(); e.stopPropagation(); if(e.dataTransfer.files&&e.dataTransfer.files.length) selectFile({target:{files:e.dataTransfer.files}}); },
             onDragOver:function(e){ e.preventDefault(); e.currentTarget.style.outline='3px solid #fbbf24'; },
             onDragLeave:function(e){ e.currentTarget.style.outline='none'; },
-            style:{ background:'#d97706', color:'#fff', padding:'12px', borderRadius:'4px', fontSize:'12.5px', fontWeight:700, cursor:'pointer', textAlign:'center' } },
-            '📁 2단계: 엑셀 파일 선택 (여러 개 · 드래그 가능)',
+            title:'여러 개를 한 번에 고르거나 여기로 끌어다 놓을 수 있습니다',
+            style:{ background:'#d97706', color:'#fff', padding:'11px', borderRadius:'4px', fontSize:'12.5px', fontWeight:700, cursor:'pointer', textAlign:'center' } },
+            '📁 2단계 · 엑셀 선택',
             h('input', { type:'file', accept:'.xlsx,.xls,.csv', multiple:true, onChange:selectFile, style:{ display:'none' } })
           )
         )
@@ -38475,37 +38468,68 @@ function DataManagementSection(){
         ),
         h('button', { onClick:reset, style:{ background:'#854d0e', color:'#fff', padding:'10px 20px', borderRadius:'4px', fontSize:'12.5px', fontWeight:700, cursor:'pointer', width:'100%' } }, '새 마이그레이션 시작')
       )
+    )
+    ),
+    // ── 오른쪽(좁은 칸): 누르고 끝나는 것 셋 ──
+    h('div', null,
+
+    // ★ 중복 데이터 제거
+    h(DuplicateCleanerSection, null),
+
+    // ── Firebase 전체 업로드 (모바일 동기화용) ──
+    h('div', { style:{ background: fbUpState==='done' ? '#f0fdf4' : fbUpState==='error' ? '#fef2f2' : '#eff6ff',
+      border: '1px solid ' + (fbUpState==='done' ? '#bbf7d0' : fbUpState==='error' ? '#fecaca' : '#bfdbfe'),
+      borderRadius:'8px', padding:'14px 16px', marginBottom:'16px' } },
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
+        h('span', { style:{ fontSize:'18px' } }, '☁️'),
+        h('div', null,
+          h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e40af' } }, 'Firebase 전체 업로드'),
+          h('div', { style:{ fontSize:'11.5px', color:'#64748b' } }, 'PC 데이터를 클라우드에 올려 스마트폰·다른 기기에서 동일하게 사용')
+        )
+      ),
+      fbUpMsg && h('div', { style:{ fontSize:'12px', color: fbUpState==='error' ? '#dc2626' : fbUpState==='done' ? '#16a34a' : '#1e40af',
+        background: fbUpState==='done' ? '#f0fdf4' : fbUpState==='error' ? '#fef2f2' : '#eff6ff',
+        padding:'8px 12px', borderRadius:'5px', marginBottom:'10px', lineHeight:1.5 } }, fbUpMsg),
+      h('button', {
+        onClick: doFbUpload,
+        disabled: fbUpState === 'loading',
+        style:{ padding:'9px 20px', background: fbUpState==='loading' ? '#94a3b8' : '#2563eb',
+          color:'#fff', border:'none', borderRadius:'6px', fontSize:'13px', fontWeight:700,
+          cursor: fbUpState==='loading' ? 'not-allowed' : 'pointer' } },
+        fbUpState === 'loading' ? '⏳ 업로드 중...' : fbUpState === 'done' ? '✅ 완료 (다시 업로드)' : '☁️ 지금 업로드')
     ),
     // 콜드 스토리지
     h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'14px' } },
-      h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e40af', marginBottom:'10px' } },
+      h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e40af', marginBottom:'9px' } },
         '❄️ 콜드 스토리지 (대용량 데이터 성능 관리)'),
-      h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'8px', marginBottom:'12px' } },
-        h('div', { style:{ background:'#fff', padding:'10px 14px', borderRadius:'4px', border:'1px solid #bfdbfe' } },
+      /* ★ 좁은 칸이라 넉 줄로 못 편다 — 자리에 맞춰 저절로 접힌다(css .set-tiles) */
+      h('div', { className:'set-tiles', style:{ marginBottom:'9px' } },
+        h('div', { style:{ background:'#fff', padding:'8px 11px', borderRadius:'4px', border:'1px solid #bfdbfe' } },
           h('div', { style:{ fontSize:'10.5px', color:'#475569' } }, '활성 아카이브'),
           h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e40af' } }, rt.count + '건')),
-        h('div', { style:{ background:'#fff', padding:'10px 14px', borderRadius:'4px', border:'1px solid #bfdbfe' } },
+        h('div', { style:{ background:'#fff', padding:'8px 11px', borderRadius:'4px', border:'1px solid #bfdbfe' } },
           h('div', { style:{ fontSize:'10.5px', color:'#475569' } }, '활성 크기'),
           h('div', { style:{ fontSize:'18px', fontWeight:700, color:'#1e40af' } }, fmtBytes(rt.size))),
-        h('div', { style:{ background:'#fff', padding:'10px 14px', borderRadius:'4px', border:'1px solid #bfdbfe' } },
+        h('div', { style:{ background:'#fff', padding:'8px 11px', borderRadius:'4px', border:'1px solid #bfdbfe' } },
           h('div', { style:{ fontSize:'10.5px', color:'#475569' } }, '콜드 아카이브'),
           h('div', { style:{ fontSize:'18px', fontWeight:700, color:'#475569' } }, coldStats.archiveCount + '건')),
-        h('div', { style:{ background:'#fff', padding:'10px 14px', borderRadius:'4px', border:'1px solid #bfdbfe' } },
+        h('div', { style:{ background:'#fff', padding:'8px 11px', borderRadius:'4px', border:'1px solid #bfdbfe' } },
           h('div', { style:{ fontSize:'10.5px', color:'#475569' } }, '콜드 크기'),
           h('div', { style:{ fontSize:'18px', fontWeight:700, color:'#475569' } }, fmtBytes(coldStats.archiveSize)))
       ),
-      h('div', { style:{ background:'#fff', borderRadius:'4px', padding:'10px 14px', marginBottom:'12px', fontSize:'11.5px', color:'#1e40af', lineHeight:1.7 } },
-        h('div', null, '• 2년 이상 경과한 종료 업무를 별도 저장 영역으로 이동하여 평소 조회 속도를 개선합니다'),
-        h('div', null, '• 종료관리 모듈에서는 콜드 데이터도 자동 포함하여 조회됩니다 (속도는 최적화됨)'),
-        h('div', null, '• 복원 시 즉시 활성 영역으로 되돌릴 수 있습니다')
-      ),
+      /* ★ 석 줄짜리 안내를 한 줄로 — 온글은 말풍선에 그대로 있다 */
+      h('div', { className:'set-1line', title:'2년 이상 경과한 종료 업무를 별도 저장 영역으로 이동하여 평소 조회 속도를 개선합니다\n종료관리 모듈에서는 콜드 데이터도 자동 포함하여 조회됩니다 (속도는 최적화됨)\n복원 시 즉시 활성 영역으로 되돌릴 수 있습니다',
+        style:{ background:'#fff', borderRadius:'4px', padding:'7px 11px', marginBottom:'9px', fontSize:'11.5px', color:'#1e40af' } },
+        '• 2년 지난 종료 건을 옮겨 조회를 빠르게 ⓘ'),
       h('div', { style:{ display:'flex', gap:'8px' } },
         h('button', { onClick:moveToCold, style:{ flex:1, background:'#1e40af', color:'#fff', padding:'10px', borderRadius:'4px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } },
-          '❄️ 콜드 이전 (2년 이상 종료 건)'),
+          '❄️ 콜드 이전 (2년 이상)'),
         coldStats.archiveCount > 0 && h('button', { onClick:restoreAll,
           style:{ background:'#fff', color:'#1e40af', border:'1px solid #1e40af', padding:'10px 16px', borderRadius:'4px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } }, '↻ 전체 복원')
       )
     )
+    )
+   )
   );
 }
 
