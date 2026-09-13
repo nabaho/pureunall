@@ -48,9 +48,9 @@ function 상자(옵) {
     esc: (s) => String(s == null ? '' : s),
     App: { members: members, check: { members: chk }, filt() {} },
     checkHomepage() { 보낸것.push({ 무엇: 'checkHomepage' }); },
-    말한것: [],
-    say(t) { ctx.말한것.push(String(t)); return Promise.resolve(); },
-    askYes(t) { ctx.말한것.push(String(t)); return Promise.resolve(o.예); },
+    말한것: [], 마지막몸말: '',
+    say(t, b) { ctx.말한것.push(String(t)); ctx.마지막몸말 = String(b || ''); return Promise.resolve(); },
+    askYes(t, b) { ctx.말한것.push(String(t)); ctx.마지막몸말 = String(b || ''); return Promise.resolve(o.예); },
     서버에게물어보기(방식, srl, 고칠것) {
       보낸것.push({ 방식: 방식, srl: srl, 고칠것: 고칠것 });
       const 답 = typeof o.답 === 'function' ? o.답(srl) : o.답;
@@ -60,7 +60,8 @@ function 상자(옵) {
     }
   };
   vm.createContext(ctx);
-  vm.runInContext([fnSource('내릴사람들'), fnSource('퇴사자한번에내리기')].join('\n'), ctx);
+  vm.runInContext([fnSource('살펴본것글자'), fnSource('내릴사람들'),
+    fnSource('퇴사자한번에내리기')].join('\n'), ctx);
   return { ctx, 보낸것 };
 }
 
@@ -118,6 +119,22 @@ test('★★ 「못 찾았다」를 «이미 내려가 있다»로 읽지 않는
   await ctx.퇴사자한번에내리기();
   assert.ok(ctx.말한것.some(t => /일부만/.test(t)),
     '★★ 한 명도 못 내렸는데 «내렸습니다»라고 했습니다 — 조용한 실패입니다');
+});
+
+/* ★ 2026-09-13 — 「비공개 자리가 없다」로 막혔을 때, 대표께서 «다시 누르실» 일이
+     없게 서버가 «이 게시판이 할 수 있는 일»을 실패와 함께 실어 보낸다.
+     화면이 그것을 버리면 한 번 더 누르게 된다. */
+test('★★ 못 내렸을 때 서버가 보낸 «살펴본 것»을 버리지 않는다', async () => {
+  const { ctx } = 상자({ 예: true,
+    답: () => ({ ok: true, 저장됨: false, 바뀐것: [],
+                 못찾은것: ['비공개(자리를 찾지 못했습니다)'],
+                 살펴본것: { 쓰는화면: ['procBoardInsertDocument'],
+                            읽는화면: ['dispBoardDelete', 'dispDocumentManageDocument'] } }) });
+  await ctx.퇴사자한번에내리기();
+  const 끝말 = ctx.말한것.join(' ');
+  assert.ok(/일부만/.test(끝말), '못 내렸는데 됐다고 했습니다');
+  assert.ok(ctx.마지막몸말 && /dispDocumentManageDocument/.test(ctx.마지막몸말),
+    '★★ 서버가 보낸 «할 수 있는 일»을 화면이 버렸습니다 — 다시 누르게 됩니다');
 });
 
 test('다 되면 «일부만»이라고 하지 않는다', async () => {
