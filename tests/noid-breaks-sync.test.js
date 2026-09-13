@@ -90,6 +90,88 @@ test('④ ★ 새 기록은 id 없이 못 들어간다', function () {
   assert.match(pa, /대상 없음/, '★ 없는 id 를 고치라 하면 새로 만들어 버립니다');
 });
 
+/* ── 2026-09-13 대표 제보 「어떻게 해결해야하나 반복된다」 ──────────────────
+   ②의 알림은 잘 떴다. 그런데 딸린 안내가 «데이터 관리로 가라»였고, 그 자리에는
+   id 를 고칠 것이 아무것도 없었다. 가 봐도 할 일이 없으니 대표는 켤 때마다 같은
+   알림을 다시 봤다 — 「반복된다」는 말이 그 뜻이다.
+   ★ 실측(2026-09-13): 서버 data/finance_income 은 이미 1,785건 «전부 id 있음·객체형»
+     이었다. 껍데기는 «이 기기 사본»에만 남아 있었다. 즉 그때 할 일은 「자료를 고치기」
+     가 아니라 「사본을 서버 것으로 갈아 끼우기」 하나였는데, 안내는 그 말을 안 했다.
+   그래서 셋을 못 박는다:
+     ⑥ 알림이 «누를 것»을 함께 준다 (글자로만 가리키지 않는다)
+     ⑦ 서버 모양을 보고 안내를 «가른다» (할 일 없는 곳으로 보내지 않는다)
+     ⑧ 안내가 «가리킨 화면»에 그 단추가 실제로 있다
+
+   ⚠★ ⑧ 은 고치는 도중 내가 «또» 밟아서 넣었다. 새 안내에 「데이터 관리로 가라」고
+     적었는데, 그 단추는 「JSON 수동 백업」 안에 있었다 — 고치면서 같은 고장을 다시
+     만든 것이다. 사람 눈으로는 두 번 다 놓쳤다. 그래서 기계가 맞춰 보게 한다. */
+
+test('⑥ ★★ 알림이 «누를 것»을 함께 준다 — 글자로만 가리키지 않는다', function () {
+  const from = bare.indexOf('window.erpAlert=function(');
+  assert.ok(from > 0, 'erpAlert 를 못 찾았습니다');
+  const to = bare.indexOf('window.erpAlerts=function(', from);
+  const 알림 = bare.slice(from, to > from ? to : from + 3000);
+  assert.match(알림, /window\.erpAlert=function\(level, title, detail, advice, action\)/,
+    '★★ 알림이 «할 일»을 받지 못합니다 — 안내는 늘 글자뿐이 됩니다');
+  assert.match(알림, /typeof action\.run\s*===\s*'function'/,
+    '★★ 건네받은 할 일을 확인하지 않습니다');
+  assert.match(알림, /onclick\s*=\s*function\(\)\{[^}]{0,60}action\.run\(\)/,
+    '★★ 단추가 아무 일도 안 합니다 — 모양만 있습니다');
+  assert.match(알림, /appendChild\(act\)/, '★★ 만든 단추를 화면에 안 붙입니다');
+  assert.match(알림, /appendChild\(btn\)/, '★ 닫기 단추가 사라졌습니다');
+  /* ⚠ 알림 기록은 글자만 남는다 — 함수를 넣으면 JSON 으로 못 남고 조용히 깨진다 */
+  const 기록 = 알림.slice(알림.indexOf('logAlert('), 알림.indexOf('logAlert(') + 120);
+  assert.ok(!/action/.test(기록), '★★ 알림 기록에 함수를 넣습니다 — 저장이 조용히 깨집니다');
+});
+
+test('⑦ ★★ 어디가 고장인지 갈라 말한다 — 할 일 없는 곳으로 보내지 않는다', function () {
+  const from = bare.indexOf('var _hasId = 0, _noId = 0;');
+  assert.ok(from > 0, 'id 없음 점검을 못 찾았습니다');
+  const end = bare.indexOf("prev[k]==='number'", from);
+  const 구역 = bare.slice(from, end > from ? end : from + 2000);
+  /* 이 점검은 localStorage 만 센다 — 서버 모양을 함께 봐야 어디가 고장인지 안다 */
+  assert.match(구역, /_fbObjForm\[k\]\s*===\s*true/,
+    '★★ 서버 모양을 안 봅니다 — 이 기기 사본 탓인지 서버 자료 탓인지 못 가릅니다');
+  assert.match(구역, /_srvClean\s*\r?\n?\s*\?/,
+    '★★ 안내가 한 갈래뿐입니다 — 고칠 것이 없는 사람에게도 고치라고 합니다');
+  assert.match(구역, /label:\s*'[^']*다시 받기'/,
+    '★★ 누를 단추를 안 건넵니다 — 다시 글자로만 가리키게 됩니다');
+  assert.match(구역, /run:\s*function\(\)\{[^}]{0,80}erpPullFromServer\(\)/,
+    '★★ 단추가 사본을 갈아 끼우지 않습니다');
+  /* ⚠ 서버가 아직 배열형일 때는 그 단추를 주면 «안 된다» — 서버에도 껍데기가 있어
+     받아 봐야 그대로다. 고칠 것이 없는 단추는 틀린 안내와 같다. */
+  assert.match(구역, /_srvClean && typeof window\.erpPullFromServer/,
+    '★★ 서버가 아직 고장일 때도 「다시 받기」를 권합니다 — 눌러도 그대로입니다');
+});
+
+test('⑧ ★★ 안내가 가리킨 화면에 그 단추가 «실제로» 있다', function () {
+  /* 이 PR 이 고친 고장의 본체가 바로 이것이다 — 안내는 또렷한데 그 자리에 할 일이 없었다.
+     사람이 눈으로 맞춰 보면 두 번 다 놓친다(실제로 놓쳤다). 기계가 맞춘다:
+       ㉠ 「서버에서 다시 받기」 단추가 «어느 구역 함수» 안에 있나
+       ㉡ 그 구역이 환경설정의 «어느 갈피»에 달렸나
+       ㉢ 자기점검 안내가 그 갈피 이름을 부르고 있나 */
+  const 단추자리 = src.indexOf('if(window.erpPullFromServer) window.erpPullFromServer();');
+  assert.ok(단추자리 > 0, '★ 「서버에서 다시 받기」 단추를 못 찾았습니다');
+
+  /* ㉠ 그 앞의 «맨 왼쪽» 함수가 감싼 구역이다 (안쪽 도우미 함수에 속지 않게 줄머리만 본다) */
+  const 앞 = src.slice(0, 단추자리);
+  const 구역들 = 앞.match(/^function\s+([A-Za-z_$][\w$]*)\s*\(/gm) || [];
+  assert.ok(구역들.length > 0, '★ 단추를 감싼 구역 함수를 못 찾았습니다');
+  const 구역이름 = /^function\s+([A-Za-z_$][\w$]*)\s*\(/.exec(구역들[구역들.length - 1])[1];
+
+  /* ㉡ 그 구역이 달린 갈피 이름 */
+  const 갈피 = new RegExp("label:'([^']+)'[^}]*comp:\\s*" + 구역이름 + "\\b").exec(src);
+  assert.ok(갈피, '★★ 「' + 구역이름 + '」 구역이 환경설정 갈피에 안 달렸습니다');
+  const 씻기 = function (s) { return String(s).replace(/[^가-힣A-Za-z0-9]/g, ''); };
+
+  /* ㉢ 안내가 그 갈피를 부르는가 — 이모지·화살표·띄어쓰기는 걷고 «이름»만 견준다 */
+  const from = bare.indexOf('var _hasId = 0, _noId = 0;');
+  const end = bare.indexOf("prev[k]==='number'", from);
+  const 안내 = bare.slice(from, end > from ? end : from + 2000);
+  assert.ok(씻기(안내).indexOf(씻기(갈피[1])) >= 0,
+    '★★ 안내가 「' + 갈피[1] + '」 아닌 곳을 가리킵니다 — 가 봐도 누를 것이 없습니다');
+});
+
 test('⑤ ★ 중복 점검은 그대로 — 두 점검이 같은 자리에 나란히 있다', function () {
   const from = bare.indexOf('var CHECK=[');
   const 구역 = bare.slice(from, from + 4500);

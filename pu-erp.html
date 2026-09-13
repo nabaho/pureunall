@@ -227,7 +227,7 @@ var Component = React.Component;
     }catch(_){}
   }
   var _lastByTitle={};
-  window.erpAlert=function(level, title, detail, advice){
+  window.erpAlert=function(level, title, detail, advice, action){
     try{
       var now=Date.now();
       if(_lastByTitle[title] && now-_lastByTitle[title]<30000) return; // 30초 내 같은 알림 중복 억제
@@ -247,10 +247,24 @@ var Component = React.Component;
       if(detail){ var de=document.createElement('div'); de.style.cssText='margin-top:4px;opacity:.95;'; de.textContent=detail; d.appendChild(de); }
       if(advice){ var ad=document.createElement('div'); ad.style.cssText='margin-top:6px;padding:7px 9px;background:rgba(255,255,255,.14);border-radius:6px;'; ad.textContent='👉 '+advice; d.appendChild(ad); }
       var tm=document.createElement('div'); tm.style.cssText='margin-top:4px;font-size:11px;opacity:.7;'; tm.textContent=new Date(now).toLocaleString(); d.appendChild(tm);
+      /* ★ 「할 일」을 알림 «안»에 둔다 (2026-09-13).
+         까닭: 안내가 «어디로 가라»는 글자뿐이면, 그 자리에 갔을 때 누를 것이 없는
+         일이 생긴다. 실제로 「자문수입에 id 없는 기록」 알림은 데이터 관리를
+         가리켰지만 거기엔 id 를 고칠 자리가 없었다 — 그래서 같은 알림이 켤 때마다
+         되풀이됐다. 고칠 길이 있으면 그 길을 여기에 «붙인다».
+         ⚠ 알림 기록(logAlert)에는 함수를 안 넣는다 — 남는 것은 글자뿐이다. */
+      var bar=document.createElement('div'); bar.style.cssText='margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;';
+      if(action && action.label && typeof action.run==='function'){
+        var act=document.createElement('button'); act.textContent=action.label;
+        act.style.cssText='background:#16a34a;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:12px;';
+        act.onclick=function(){ try{ action.run(); }catch(_a){} };
+        bar.appendChild(act);
+      }
       var btn=document.createElement('button'); btn.textContent='닫기';
-      btn.style.cssText='margin-top:8px;background:#fff;color:'+bg+';border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:12px;';
+      btn.style.cssText='background:#fff;color:'+bg+';border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:12px;';
       btn.onclick=function(){ d.remove(); };
-      d.appendChild(btn);
+      bar.appendChild(btn);
+      d.appendChild(bar);
       wrap.appendChild(d);
       if(level!=='danger'){ setTimeout(function(){ try{ d.remove(); }catch(_){}}, 60000); } // 주의 등급은 60초 후 자동 닫힘
     }catch(_){}
@@ -336,9 +350,28 @@ var BUILD_SEQ = 151;
         arr.forEach(function(x){ if(x && x.id) _hasId++; else _noId++; });
         if(_noId > 0 && _hasId > 0){
           try{ console.warn('[id없음] '+k+': '+_noId+'건 — 이 표는 통째 저장으로 떨어져 있습니다'); }catch(_c2){}
+          /* ★★ 어디가 고장인지 «갈라» 말한다 (2026-09-13 대표 제보 「어떻게 해결해야하나 반복된다」).
+             이 점검은 서버가 아니라 «이 기기 사본»(localStorage)만 센다. 그래서
+             껍데기가 어디 있는지는 세어서는 알 수 없다 — 서버 모양을 함께 봐야 한다.
+               · 서버가 객체형(_fbObjForm[k]===true) = 서버에는 id 없는 것이 «없다»
+                 → 남은 껍데기는 이 기기 사본에만 있다. 고칠 자료가 없다.
+                   할 일은 «사본을 서버 것으로 갈아 끼우는 것» 하나뿐이다.
+               · 서버가 배열형 = 서버 자료에 껍데기가 남아 있다 → 자료를 고쳐야 한다.
+             ⚠ 예전 안내는 둘을 가리지 않고 늘 「데이터 관리에서 확인해 주세요」였다.
+               거기엔 id 를 고칠 자리가 없어서, 대표가 가 봐도 할 일이 없었다 —
+               그래서 켤 때마다 같은 알림이 되풀이됐다. 틀린 안내는 없느니만 못하다.
+             ⚠ 자동으로 갈아 끼우지 «않는다» — 돈이 걸린 자료다(2026-09-12 규칙 그대로).
+               단추를 붙여 주되, 누르는 것은 사람이다. */
+          var _srvClean = false;
+          try{ _srvClean = (window._fbObjForm && window._fbObjForm[k] === true); }catch(_c3){}
           window.erpAlert && erpAlert('warn', LABEL[k]+'에 id 없는 기록 '+_noId+'건',
             '나머지 '+_hasId+'건에는 id 가 있습니다. 이 표는 저장할 때마다 «통째로» 주고받고 있습니다 — 화면이 멈추는 원인입니다.',
-            '그 '+_noId+'건만 고치면 칸별 저장이 켜져 훨씬 빨라집니다. 환경설정 → 시스템 → 데이터 관리에서 확인해 주세요.');
+            _srvClean
+              ? '서버 자료는 이미 깨끗합니다 — 옛것은 이 기기 사본뿐입니다. 아래 단추를 누르면 서버 것으로 갈아 끼우고 끝납니다. (걱정되시면 환경설정 → 시스템 → 💾 JSON 수동 백업 → 🗄️ 서버 백업 보관함에서 [⬇ 전체 백업 다운로드]를 먼저 받아 두세요.)'
+              : '서버 자료에도 껍데기가 남아 있습니다 — 그 '+_noId+'건을 고쳐야 칸별 저장이 켜집니다. 환경설정 → 시스템 → 💾 JSON 수동 백업 → 🗄️ 서버 백업 보관함에서 [⬇ 전체 백업 다운로드]로 먼저 사본을 받아 두세요.',
+            (_srvClean && typeof window.erpPullFromServer === 'function')
+              ? { label:'🔄 서버에서 다시 받기', run:function(){ window.erpPullFromServer(); } }
+              : null);
         }
         // 2) 지난 접속 대비 급감 점검 (10건 이상 → 절반 미만)
         if(typeof prev[k]==='number' && prev[k]>=10 && arr.length < prev[k]*0.5){
