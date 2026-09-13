@@ -421,6 +421,8 @@ test('사업장 편집 창을 «정말 그리면» 사업자등록증에서 채�
   const box = {}, out = { html: '' };
   const code = [
     grabDecl('SITE_FIELDS'), grabDecl('CONTACT_FIELDS'), grabDecl('WREP_FIELDS'),
+  grabDecl('UREP_FIELDS'), grabDecl('SME_FIELDS'), grabDecl('SME_OPTS'),
+  grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'), grabFn('_smeDocRow'),
     'var _sitePrefill=null, _siteEditSid="";',
     'var S={fundId:"F1",sites:{}};',
     'function $(id){ return null; }',
