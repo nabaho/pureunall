@@ -309,6 +309,21 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .rows .grp:first-child{border-top:0}
 .rows .gn{color:var(--navy);font-weight:800;font-size:12.5px;font-variant-numeric:tabular-nums}
 .rows .gt{font-weight:700;font-size:12.5px;color:var(--ink)}
+/* ── 바뀐 기록 한 줄 (대표 지시 2026-09-13 ㉮) ──
+   ⚠ 한 칸은 «한 줄»이다 — 언제·누가·갈래·무엇이 한 줄에 선다.
+     세로로 쌓으면 백 줄짜리 기록이 삼백 줄이 된다(저장소 규칙). */
+.logwhen{flex:none;color:var(--faint);font-size:11.5px;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.logwho{flex:none;color:var(--sub);font-size:11.5px;white-space:nowrap}
+.logkind{flex:none;font-size:11px;font-weight:800;padding:0 5px;border-radius:4px;
+  white-space:nowrap;border:1px solid transparent}
+.logkind.k1{background:var(--info-bg);color:var(--navy);border-color:var(--navy)}
+.logkind.k3{background:var(--line-soft);color:var(--sub);border-color:var(--line)}
+.logfld{color:var(--sub);font-size:11.5px}
+/* 전은 «지운 글», 후는 «남는 글» — 색과 줄 하나로 가른다 */
+.logfrom{color:var(--bad);text-decoration:line-through;opacity:.85}
+.logto{color:var(--ok);font-weight:700}
+.logarrow{color:var(--faint);font-size:11.5px}
 .rows .l:hover{background:#f8fafc}
 .rows .n{width:20px;flex:none;text-align:right;color:var(--faint);font-size:11.5px;font-weight:800;
   font-variant-numeric:tabular-nums}
@@ -2858,6 +2873,232 @@ function openHistory() {
 }
 window.openHistory = openHistory;
 
+/* ══════ 바뀐 기록 — 한 화면 (대표 지시 2026-09-13 ㉮) ══════════════════════
+   「변경 전후 기록도 남았으면 좋겠다. 퇴사자 기록 기업 기록 업무기록 등 다양하게
+    관리했던것 저장해서 관리할 수 도 있으면 좋겠다」
+   승인 목업: docs/mockups/home-change-log.html
+
+   ★ 기록은 «이미» 남고 있다 — saveRecord 가 고치기 전 값(before)과 누가를 남긴다.
+     없던 것은 «한눈에 보는 화면»이다. 지금은 그 사람·그 쪽을 먼저 고르고 되돌리기를
+     눌러야 보인다 — 아홉 명 × 여섯 쪽을 하나씩 눌러야 한 주를 훑는다.
+   ★ 그래서 ㉮ 는 «보이게만» 한다. 저장하는 자리는 한 글자도 안 건드린다
+     (자문사 표시·로고·올린 일을 새로 남기는 것은 ㉯ 다 — 대표 판단 대기).
+   ⚠ 목업은 왼쪽 갈래로 그렸지만 «넓은 덧창»으로 만든다. 왼쪽 목록은 «홈페이지의 쪽»이
+     늘어선 자리다 — 기록은 쪽이 아니다. 자문사 고르기와 같은 꼴이라 손버릇도 같다. */
+const Log = { open: false, rows: null, err: '', kind: '', q: '', 더: 0 };
+
+/* 한 칸이 어떻게 불리는가 — 자료 이름이 그대로 뜨면 사람이 못 읽는다 */
+const LOG_FIELD = {
+  name: '이름', position1: '직책1', position2: '직책2', intro: '메인 설명',
+  srl: '글 번호', careers: '경력사항', duties: '담당 업무', mkind: '구분',
+  offSite: '새 홈페이지에', keepOnSite: '퇴사 경고', text: '대조 기준 글자'
+};
+/* 보기 좋은 값으로 — true/false 가 그대로 뜨면 무슨 말인지 모른다 */
+function logVal(칸, v) {
+  if (v === undefined || v === null || v === '') return '(비어 있음)';
+  if (칸 === 'offSite') return v ? '빼기' : '넣기';
+  if (칸 === 'keepOnSite') return (v && v.why) ? ('끔 — ' + v.why) : (v ? '끔' : '켬');
+  if (Array.isArray(v)) return v.length + '줄';
+  return String(v);
+}
+
+/* ── 두 값을 견줘 «바뀐 칸»만 뽑는다 ──
+   ★ 목록(경력·담당 업무)은 줄 수만 적지 않는다 — 18줄이 18줄로 그대로여도 «글자»가
+     바뀔 수 있다. 그때는 바뀐 첫 줄을 보여 주고 나머지는 「외 N곳」으로 적는다.
+   ★ 모르는 칸은 안 본다. LOG_FIELD 에 이름이 있는 것만 사람에게 보여 줄 수 있다. */
+function logDiff(전, 후) {
+  const a = 전 || {}, b = 후 || {};
+  const out = [];
+  Object.keys(LOG_FIELD).forEach((칸) => {
+    const x = a[칸], y = b[칸];
+    if (Array.isArray(x) || Array.isArray(y)) {
+      const 가 = Array.isArray(x) ? x : [], 나 = Array.isArray(y) ? y : [];
+      if (가.length === 나.length && 가.every((v, i) => v === 나[i])) return;
+      if (가.length !== 나.length) {
+        out.push({ 칸: 칸, 전: 가.length + '줄', 후: 나.length + '줄' });
+        return;
+      }
+      const 다른자리 = [];
+      가.forEach((v, i) => { if (v !== 나[i]) 다른자리.push(i); });
+      if (!다른자리.length) return;
+      const i = 다른자리[0];
+      out.push({ 칸: 칸, 전: String(가[i]), 후: String(나[i]),
+                 더: 다른자리.length - 1 });
+      return;
+    }
+    /* keepOnSite 는 덩어리다 — 사유까지 견줘야 「사유만 고친 것」이 안 묻힌다 */
+    const 같나 = (칸 === 'keepOnSite')
+      ? JSON.stringify(x || null) === JSON.stringify(y || null)
+      : String(x == null ? '' : x) === String(y == null ? '' : y);
+    if (같나) return;
+    out.push({ 칸: 칸, 전: logVal(칸, x), 후: logVal(칸, y) });
+  });
+  return out;
+}
+
+/* ── 한 자리(사람 하나·쪽 하나)의 이력을 «줄»로 편다 ──
+   ⚠ 이력에는 «고치기 전 값»만 있다. 「후」는 «그 다음 이력의 전» 이고,
+     가장 최근 것의 「후」는 «지금 값» 이다. 이 이음이 틀리면 전후가 한 칸씩 밀린다. */
+function logRowsOf(kind, key, 이름, 이력, 지금) {
+  const 열쇠들 = Object.keys(이력 || {})
+    .sort((a, b) => (histTs(a) - histTs(b)) || String(a).localeCompare(String(b)));
+  const out = [];
+  열쇠들.forEach((t, i) => {
+    const 이번 = (이력[t] || {});
+    const 전 = 이번.before || {};
+    const 다음열쇠 = 열쇠들[i + 1];
+    const 후 = 다음열쇠 ? ((이력[다음열쇠] || {}).before || {}) : (지금 || {});
+    logDiff(전, 후).forEach((d) => {
+      out.push({ when: histTs(t), who: 이번.updatedBy || '', kind: kind,
+                 key: key, 이름: 이름, histKey: (kind === 'member' ? key : 'page:' + key),
+                 ts: t, 칸: d.칸, 전: d.전, 후: d.후, 더: d.더 || 0 });
+    });
+  });
+  return out;
+}
+window.logDiff = logDiff; window.logRowsOf = logRowsOf;
+
+/* 한 자리당 몇 개까지 읽나 — 화면이 거는 한도다(자료에는 다 있다).
+   ⚠ 「homepage/history 를 통째로」 읽지 않는다. 한 자리가 아니라 저장통 전체라,
+     해가 갈수록 한 번에 수백 KB 를 받게 되고 파이어베이스 값도 그만큼 나간다. */
+const LOG_PER_KEY = 50;
+
+async function 기록읽기() {
+  const 자리 = [];
+  Object.keys(App.members || {}).forEach((k) => {
+    자리.push({ kind: 'member', key: k, 이름: (App.members[k] || {}).name || k,
+                histKey: k, 지금: App.members[k] });
+  });
+  /* 쪽은 «관리 중인 것 전부» — 갈래(주요업무·오시는길·인사말)를 가리지 않는다.
+     기록은 한 화면에서 다 보는 것이 뜻이다. */
+  PAGE_IDS.forEach((k) => {
+    자리.push({ kind: 'page', key: k, 이름: PAGE_LABEL[k] || k,
+                histKey: 'page:' + k, 지금: (App.pages || {})[k] });
+  });
+  const 뭉치 = await Promise.all(자리.map((z) =>
+    db.ref('homepage/history/' + z.histKey).limitToLast(LOG_PER_KEY).once('value')
+      .then((s) => s.val() || {})
+      .catch(() => ({}))));      /* 한 자리를 못 읽어도 나머지는 보여 준다 */
+  const rows = [];
+  자리.forEach((z, i) => {
+    logRowsOf(z.kind, z.key, z.이름, 뭉치[i], z.지금).forEach((r) => rows.push(r));
+  });
+  rows.sort((a, b) => b.when - a.when);
+  return rows;
+}
+
+async function openChangeLog() {
+  Log.open = true; Log.rows = null; Log.err = ''; Log.kind = ''; Log.q = ''; Log.더 = 0;
+  renderChangeLog();
+  try {
+    Log.rows = await 기록읽기();
+  } catch (e) {
+    console.warn('[바뀐 기록]', e);
+    Log.err = (e && e.message) || String(e);
+  }
+  if (Log.open) renderChangeLog();
+}
+window.openChangeLog = openChangeLog;
+
+function logKind(v) { Log.kind = v; renderChangeLog(); }
+function logFind(v) { Log.q = v; logRefresh(); }
+function logMore() { Log.더 += 200; logRefresh(); }
+window.logKind = logKind; window.logFind = logFind; window.logMore = logMore;
+
+/* 한 번에 몇 줄까지 그리나 — 다 그리면 화면이 멎는다 */
+const LOG_PAGE = 200;
+
+function logVisible() {
+  const q = String(Log.q || '').trim().toLowerCase();
+  return (Log.rows || []).filter((r) => {
+    if (Log.kind && r.kind !== Log.kind) return false;
+    if (!q) return true;
+    return (String(r.이름) + ' ' + String(r.who) + ' ' + (LOG_FIELD[r.칸] || '')
+      + ' ' + String(r.전) + ' ' + String(r.후)).toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+function logRowsHtml() {
+  const 다 = logVisible();
+  if (!다.length) {
+    return '<div class="empty">' + ((Log.q || Log.kind) ? '찾는 기록이 없습니다.'
+      : '아직 바뀐 기록이 없습니다 — 한 번도 덮어쓴 적이 없습니다.') + '</div>';
+  }
+  const 끝 = Math.min(다.length, LOG_PAGE + Log.더);
+  let h = '<div class="rows">' + 다.slice(0, 끝).map((r) =>
+    '<div class="l">'
+    + '<span class="logwhen">' + esc(stampShort(r.when)) + '</span>'
+    + '<span class="logwho">' + esc(r.who || '') + '</span>'
+    + '<span class="logkind ' + (r.kind === 'member' ? 'k1' : 'k3') + '">'
+    + (r.kind === 'member' ? '구성원' : '업무') + '</span>'
+    + '<span class="t"><b>' + esc(r.이름) + '</b> '
+    + '<span class="logfld">' + esc(LOG_FIELD[r.칸] || r.칸) + '</span> '
+    + '<span class="logfrom">' + esc(r.전) + '</span> '
+    + '<span class="logarrow">→</span> '
+    + '<span class="logto">' + esc(r.후) + '</span>'
+    + (r.더 ? ' <span class="logfld">외 ' + r.더 + '곳</span>' : '')
+    + '</span>'
+    + '<button class="btn sm" onclick="logGo(\'' + esc(r.kind) + '\',\'' + esc(r.key) + '\')"'
+    + ' title="이 사람·이 쪽으로 가서 되돌릴 수 있습니다">보러 가기</button>'
+    + '</div>').join('') + '</div>';
+  if (끝 < 다.length) {
+    h += '<div class="add" onclick="logMore()">더 보기 (' + (다.length - 끝) + '줄 남음)</div>';
+  }
+  return h;
+}
+
+/* 그 자리로 가서 되돌린다 — 되돌리기는 «있던 길»을 그대로 쓴다.
+   ⚠ 여기서 직접 되살리지 않는다. 되살리기는 저장이라 이력이 또 남고, 그 규칙이
+     한 곳(restoreFrom)에만 있어야 두 벌이 안 된다. */
+async function logGo(kind, key) {
+  closeModal();
+  await App.jump(kind === 'member' ? 'members' : 'work', key);
+  openHistory();
+}
+window.logGo = logGo;
+
+function logRefresh() {
+  const box = $('logRows'), cnt = $('logCount');
+  if (!box) { renderChangeLog(); return; }
+  box.innerHTML = logRowsHtml();
+  if (cnt) cnt.innerHTML = logCountHtml();
+}
+function logCountHtml() {
+  if (!Log.rows) return '읽는 중…';
+  const 다 = logVisible();
+  return '<b>' + 다.length + '건</b>'
+    + (다.length !== Log.rows.length ? ' <span class="sub">· 전체 ' + Log.rows.length + '건</span>' : '');
+}
+
+function renderChangeLog() {
+  let h = '<div class="pickhd">';
+  h += '<div class="fldbar" style="margin:0"><h2>바뀐 기록</h2>'
+    + '<span style="flex:1"></span>'
+    + '<span id="logCount" class="sub">' + logCountHtml() + '</span>'
+    + '<button class="btn" onclick="closeModal()">닫기</button></div>';
+  h += '<div class="sub" style="margin-top:2px">고칠 때마다 <b>고치기 전 값</b>과 '
+    + '<b>누가 고쳤는지</b>를 남겨 둔 것입니다. 한 줄이 «한 가지 바뀜»입니다.</div>';
+  if (Log.err) h += '<div class="bar bad" style="margin-top:9px">기록을 읽지 못했습니다 — ' + esc(Log.err) + '</div>';
+
+  const 셈 = (k) => (Log.rows || []).filter((r) => !k || r.kind === k).length;
+  h += '<div class="fldbar" style="margin:9px 0 0;flex-wrap:wrap">'
+    + '<input class="find" style="min-width:11rem" placeholder="이름·회사·글자로 찾기"'
+    + ' value="' + esc(Log.q) + '" oninput="logFind(this.value)">'
+    + [['', '전체'], ['member', '구성원'], ['page', '업무']].map(([k, label]) =>
+        '<button class="chip' + (Log.kind === k ? ' on' : '') + '" onclick="logKind(\'' + k + '\')">'
+        + label + '<span class="c">' + 셈(k) + '</span></button>').join('')
+    + '</div>';
+  /* ⚠ 아직 기록이 «안 남는» 것을 숨기지 않는다 — 없는 것을 없다고 말해야
+     「자문사를 고쳤는데 왜 기록에 없나」로 헤매지 않는다. */
+  h += '<div class="sub" style="margin-top:6px">자문사 표시·로고 차례·홈페이지에 올린 일은 '
+    + '<b>아직 기록이 안 남습니다</b> — 그것까지 남기는 것은 다음 걸음입니다.</div>';
+  h += '</div>';
+  h += '<div class="pickbody"><div id="logRows">'
+    + (Log.rows ? logRowsHtml() : '<div class="empty">기록을 읽고 있습니다…</div>')
+    + '</div></div>';
+  openModal(h, true);
+}
+
 async function restoreFrom(histKey, ts) {
   const d = App.draft;
   if (!d) return;
@@ -3443,6 +3684,8 @@ function closeModal() {
   App.logoPasteOn = false; App.logoPick = null;
   /* 자문사 고르기도 닫힌 것으로 둔다 — 안 끄면 저장이 끝난 뒤 없는 창을 다시 그린다 */
   Pick.open = false;
+  /* 바뀐 기록도 같다 — 읽기가 끝난 뒤 닫힌 창을 다시 그리지 않게 */
+  Log.open = false;
 }
 function modalBackdrop(e) { if (e.target === $('modal')) closeModal(); }
 function modalFoot(note) {
@@ -3544,6 +3787,12 @@ function appbarHtml() {
     + '<button class="btn" onclick="openFillSetup()"'
     + ' title="지금 홈페이지를 관리자 화면에 안 들어가고 고치는 단추입니다 — 한 번만 넣으면 됩니다">'
     + '⚙ 채우기 단추</button>'
+    /* ★ 「바뀐 기록」 — 누가·언제·무엇을 전→후로 한 화면에서 본다 (2026-09-13 ㉮).
+       ⚠ 머리띠에 둔다. 이것은 «화면 전체»에 대한 것이다 — 한 사람의 이력은
+         그 사람 편집칸의 「되돌리기」가 이미 보여 준다. */
+    + '<span class="sep"></span>'
+    + '<button class="btn" onclick="openChangeLog()"'
+    + ' title="누가 언제 무엇을 고쳤는지 전→후로 봅니다">🕘 바뀐 기록</button>'
     + (App.group === 'members'
         ? '<span class="sep"></span>'
           + '<button class="btn pri" onclick="publishPeople()"' + (App.publishing ? ' disabled' : '')
