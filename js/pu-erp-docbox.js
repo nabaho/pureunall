@@ -23,10 +23,15 @@
 (function (global) {
   'use strict';
 
-  /* ── 담는 자리 ── */
-  var ROOT      = 'data/erp_docs';        /* 본체 — 무엇·누구·어디에 붙었나 */
-  var IDX_ROOT  = 'data/erp_doc_idx';     /* 사람별 목록 — 한 줄 그릴 것만 */
-  var TEXT_ROOT = 'data/erp_doc_text';    /* 찾기용 본문 — 따로, 잘라서 */
+  /* ── 담는 자리 ──
+     ⚠⚠ **`data/` 밑이 아니다.** `data` 는 맨 위가 재무 권한 읽기(.read: FIN)이고,
+       실시간DB 규칙은 위에서 허용하면 아래에서 못 막는다. 게다가 `data` 밑의
+       이름 없는 자리는 «재직 직원 누구나» 읽고 쓴다($other).
+       그러니 여기에 'data/' 를 붙이는 순간 서면이 통째로 열린다 —
+       실제로 한 번 그렇게 적었다가 tests/rules-data-named.test.js 가 잡았다. */
+  var ROOT      = 'erp_docs';        /* 본체 — 무엇·누구·어디에 붙었나 */
+  var IDX_ROOT  = 'erp_doc_idx';     /* 사람별 목록 — 한 줄 그릴 것만 */
+  var TEXT_ROOT = 'erp_doc_text';    /* 찾기용 본문 — 따로, 잘라서 */
   var BUCKET    = 'gs://pureun-erp-hrphotos';   /* 사진첩·서고 원본과 같은 창고 */
   var DIR       = 'erp_docs';
   var MAX_BYTES = 25 * 1024 * 1024;       /* 창고 규칙과 같은 수 */

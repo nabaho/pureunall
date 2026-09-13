@@ -156,7 +156,7 @@ test('⑭ 담는 것은 «한 번의 update» 다 — 반쯤 담겨 유령이 �
   await D.save(rec, '본문');
   assert.strictEqual(쓴것.length, 1, '따로 쓰면 목록에는 뜨는데 본체가 없는 유령이 남는다');
   const u = 쓴것[0];
-  assert.ok(u['data/erp_docs/d9'] || u[D.ROOT + '/d9']);
+  assert.ok(u[D.ROOT + '/d9']);
   assert.ok(u[D.IDX_ROOT + '/uidA/d9'] && u[D.IDX_ROOT + '/uidB/d9'], '명단에 든 사람마다 한 줄씩');
   assert.ok(u[D.TEXT_ROOT + '/d9']);
 });
@@ -197,6 +197,13 @@ test('⑱ 창고 자리는 «사람별»로 갈린다 — 창고 규칙이 볼 �
 /* ── 서버 규칙 (실시간DB) ─────────────────────────────────────────────── */
 
 test('⑲ 서면은 data 밑에 «없다» — data 는 맨 위가 재무라 통째로 열린다', () => {
+  /* ★ 규칙만 보면 헛돈다. 앱이 실제로 «어디에 쓰는지»를 함께 본다 —
+       처음에 자리 이름을 'data/erp_docs' 로 적어 두고 규칙만 뿌리에 만들어
+       서면이 통째로 열릴 뻔했다(rules-data-named 검사가 잡았다). */
+  [D.ROOT, D.IDX_ROOT, D.TEXT_ROOT].forEach(p => {
+    assert.ok(!/^data\//.test(p), p + ' 는 data 밑이다 — 거기 이름 없는 자리는 직원 누구나 읽고 쓴다');
+    assert.ok(RULES[p], p + ' 에 규칙이 없다 — 뿌리는 기본이 «닫힘»이라 앱이 통째로 막힌다');
+  });
   assert.ok(RULES.erp_docs, '서면 자리가 없다');
   assert.ok(!RULES.data.erp_docs, 'data 밑에 두면 재무 권한자가 모든 서면을 읽는다');
   assert.ok(!RULES.data.erp_doc_idx);
@@ -299,9 +306,17 @@ test('㉜ 창고 꾸러미를 «머리에 박지» 않는다 — 안 오는 사�
 
 test('㉝ 원본을 못 담아도 등록을 무르지 않는다', () => {
   const go = cutFn(stripJs(ERP_SRC), 'function go(keep)');
-  assert.match(go, /\.upload\([\s\S]*?\.catch\(/,
-    '창고가 막혔다고 다 된 등록을 통째로 되돌리는 것이 훨씬 나쁘다');
-  assert.match(go, /\.save\(/, '막혀도 목록에는 담아야 한다');
+  /* ⚠ 「어딘가에 .catch 가 있다」로는 못 잡는다 — 이 함수 끝에도 .catch 가 하나 있어서
+       되받는 자리를 통째로 지워도 그것이 대신 걸렸다(이빨 확인에서 찾은 구멍이다).
+       그래서 «올리기 바로 뒤»에 되받는 자리가 있는지를 차례로 본다. */
+  const up = go.slice(go.indexOf('.upload('));
+  const iCatch = up.indexOf('.catch(');
+  const iThen = up.indexOf('.then(');
+  assert.ok(iCatch >= 0 && iThen >= 0 && iCatch < iThen,
+    '창고가 막혔다고 다 된 등록을 통째로 되돌리는 것이 훨씬 나쁘다 — 되받는 자리가 올리기 바로 뒤에 없다');
+  assert.match(up.slice(iCatch, iThen), /fail\s*:/,
+    '되받아도 «왜 못 담았는지»를 들고 가야 사람에게 이름을 대고 알릴 수 있다');
+  assert.match(up.slice(iThen), /\.save\(/, '막혀도 목록에는 담아야 한다');
 });
 
 test('㉞ 새로 지은 이름이 이 파일 안에서 겹치지 않는다', () => {

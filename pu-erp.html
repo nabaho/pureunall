@@ -162,7 +162,7 @@
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
 <script src="js/pu-doc-read.js?v=40"></script>
 <!-- 서면함 층 — 서면이 «어디에 붙는가»를 아는 한 곳 (2026-09-13) -->
-<script src="js/pu-erp-docbox.js?v=1"></script>
+<script src="js/pu-erp-docbox.js?v=2"></script>
 <script>
 (function(){
 'use strict';
@@ -33839,13 +33839,13 @@ function DocAttachModal(props){
 
   function line(label, value, note, tone){
     return h('div', { style:{ display:'flex', gap:'10px', alignItems:'baseline', padding:'5px 0',
-      borderBottom:'1px solid #f1f5f9' } },
+      borderBottom:'1px solid #f8fafc' } },
       h('span', { style:{ width:'62px', flexShrink:0, fontSize:'11px', color:'#64748b' } }, label),
       h('span', { style:{ flex:1, minWidth:0, fontSize:'12.5px', fontWeight:600,
         color: value ? '#1e293b' : '#94a3b8',
         whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }, title:value||'' }, value || '—'),
       note ? h('span', { style:{ flexShrink:0, fontSize:'10.5px',
-        color: tone === 'warn' ? '#b45309' : '#2563eb' } }, note) : null);
+        color: tone === 'warn' ? '#d97706' : '#2563eb' } }, note) : null);
   }
 
   function go(keep){
@@ -33903,7 +33903,7 @@ function DocAttachModal(props){
           + (props.file ? (' · ' + Math.max(1, Math.round(props.file.size/1024)) + 'KB') : ''))
       ),
       props.readErr ? h('div', { style:{ padding:'8px 16px', background:'#fef2f2',
-        borderBottom:'1px solid #fecaca', fontSize:'11px', color:'#b91c1c', lineHeight:1.6, flexShrink:0 } },
+        borderBottom:'1px solid #fecaca', fontSize:'11px', color:'#991b1b', lineHeight:1.6, flexShrink:0 } },
         '본문을 못 읽었습니다 — ' + props.readErr
         + '. 파일은 담기지만 업체·사건은 손으로 골라 주셔야 합니다.') : null,
       hasRrn ? h('div', { style:{ padding:'8px 16px', background:'#fffbeb',
@@ -33911,7 +33911,7 @@ function DocAttachModal(props){
         '⚠ 이 서면에 주민등록번호가 들어 있습니다. 담당자와 관리자만 볼 수 있게 담깁니다.') : null,
       h('div', { style:{ padding:'10px 16px', overflow:'auto', flex:1 } },
         h('div', { style:{ display:'flex', gap:'10px', alignItems:'center', padding:'5px 0',
-          borderBottom:'1px solid #f1f5f9' } },
+          borderBottom:'1px solid #f8fafc' } },
           h('span', { style:{ width:'62px', flexShrink:0, fontSize:'11px', color:'#64748b' } }, '서류 종류'),
           h('input', { type:'text', value:kind, onChange:function(e){ setKind(e.target.value); },
             placeholder:'예) 부당해고 구제신청 이유서',
@@ -33962,7 +33962,7 @@ function DocAttachModal(props){
                 }))) : null
       ),
       err ? h('div', { style:{ padding:'7px 16px', background:'#fef2f2', fontSize:'11.5px',
-        color:'#b91c1c', flexShrink:0 } }, err) : null,
+        color:'#991b1b', flexShrink:0 } }, err) : null,
       h('div', { style:{ padding:'10px 16px', borderTop:'1px solid #e2e8f0', display:'flex',
         alignItems:'center', gap:'8px', flexShrink:0, flexWrap:'wrap' } },
         h('button', { disabled:!!busy, onClick:function(){ go(false); },
@@ -34073,7 +34073,7 @@ function DocBox(props){
           onChange:function(e){ takeMany(e.target.files); e.target.value=''; } }))
     ),
     err ? h('div', { style:{ marginTop:'10px', padding:'8px 12px', background:'#fef2f2',
-      border:'1px solid #fecaca', borderRadius:'8px', fontSize:'11.5px', color:'#b91c1c' } }, err) : null,
+      border:'1px solid #fecaca', borderRadius:'8px', fontSize:'11.5px', color:'#991b1b' } }, err) : null,
     busy ? h('div', { style:{ marginTop:'10px', fontSize:'11.5px', color:'#2563eb' } }, busy) : null,
 
     h('div', {
@@ -34083,7 +34083,7 @@ function DocBox(props){
       style:{ marginTop:'12px', padding:'22px 14px', textAlign:'center', borderRadius:'10px',
         border:'2px dashed ' + (over ? '#2563eb' : '#cbd5e1'),
         background: over ? '#eff6ff' : '#f8fafc' } },
-      h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#334155' } },
+      h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#475569' } },
         '📎 한글 파일을 여기에 끌어다 놓으세요'),
       h('div', { style:{ fontSize:'11px', color:'#64748b', marginTop:'5px', lineHeight:1.7 } },
         '.hwp · .hwpx · .docx · .pdf — 내용을 읽어 어느 업체·어느 사건인지 찾아 드립니다.'),
@@ -34104,7 +34104,7 @@ function DocBox(props){
               var orphan = !r.sourceId;
               return h('div', { key:r.id,
                 style:{ display:'flex', gap:'10px', alignItems:'center', padding:'9px 10px',
-                  borderBottom:'1px solid #f1f5f9' } },
+                  borderBottom:'1px solid #f8fafc' } },
                 h('span', { style:{ flexShrink:0, width:'40px', textAlign:'center', fontSize:'9.5px',
                   fontWeight:700, borderRadius:'4px', padding:'2px 0', background:'#e2e8f0',
                   color:'#475569' } }, r.ext || '파일'),
@@ -34114,7 +34114,7 @@ function DocBox(props){
                       whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
                       title:r.kind || '' }, r.kind || '(이름 없음)'),
                     r.hasRrn ? h('span', { title:'주민등록번호가 들어 있습니다',
-                      style:{ flexShrink:0, fontSize:'9.5px', color:'#b45309' } }, '⚠ 주민번호') : null),
+                      style:{ flexShrink:0, fontSize:'9.5px', color:'#d97706' } }, '⚠ 주민번호') : null),
                   h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginTop:'2px',
                     whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
                     orphan
@@ -34125,7 +34125,7 @@ function DocBox(props){
                 orphan
                   ? h('button', { onClick:function(){ reopen(r); },
                       style:{ flexShrink:0, padding:'4px 9px', border:'1px solid #fbbf24',
-                        borderRadius:'6px', background:'#fffbeb', color:'#92400e', cursor:'pointer',
+                        borderRadius:'6px', background:'#fffbeb', color:'#854d0e', cursor:'pointer',
                         fontSize:'10.5px', fontFamily:'inherit' } }, '붙일 곳 고르기')
                   : h('span', { style:{ flexShrink:0, fontSize:'10px', color:'#16a34a' } },
                       r.sourceKind === 'contract' ? '계약에 붙음' : '사건에 붙음'),
