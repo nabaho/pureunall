@@ -152,7 +152,11 @@
         + 'font-weight:bold;color:' + 색.글 + ';font-family:' + 폰트 + ';">'
         + esc(g.이름) + '</td>';
     }).join('');
-    return '<tr><td style="padding:20px 28px 0 28px;">'
+    /* ★ data-stick — 웹 전문 보기 쪽에서 이 줄을 «틀고정»한다
+         (대표 지시 2026-09-13 「이부분 틀고정 해라」).
+       ⚠ 메일에서는 그냥 뜻 없는 표시라 아무 일도 안 한다 — 해롭지 않다.
+         붙잡는 규칙은 functions/news-view.js 에 있다(거기서만 통한다). */
+    return '<tr data-stick="1"><td style="padding:20px 28px 10px 28px;background-color:#ffffff;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + ' style="border-top:1px solid ' + 색.줄 + ';border-bottom:1px solid ' + 색.줄 + ';">'
       + '<tr>' + 칸 + '</tr></table></td></tr>';
@@ -582,6 +586,40 @@
       + 몸 + '</table></td></tr>';
   }
 
+  /* ★★ 요약 꼭지를 «둘씩 나란히» 놓는다 (대표 지시 2026-09-13
+       「캡쳐4 너무 아래로 길게 내려온다 차라리 좌우로 나누어서 한화면에 모두 나올 수
+        있게 해달라」).
+     ⚠ 그 전에는 꼭지 넷을 «세로로 줄줄이» 놓아 화면을 한참 내려야 했다.
+     ⚠ 메일에서 두 칸을 만드는 길은 «표»뿐이다 — div 로 하면 아웃룩에서 무너진다.
+     ⚠ valign="top" 이 없으면 줄 수가 다를 때 짧은 쪽이 «가운데로 떠» 보인다.
+     ⚠ 홀수면 마지막 줄 오른쪽이 빈다 — 빈 칸을 «명시로» 둔다(&nbsp;).
+       비워 두면 표가 무너지는 메일 프로그램이 있다. */
+  function 요약두칸(칸들) {
+    var 것 = (칸들 || []).filter(Boolean);
+    if (!것.length) return '';
+    var 줄 = '';
+    for (var i = 0; i < 것.length; i += 2) {
+      var 위 = i === 0 ? '' : 'padding-top:20px;';
+      줄 += '<tr>'
+        + '<td width="50%" valign="top" style="width:50%;padding-right:12px;' + 위 + '">'
+        + 것[i] + '</td>'
+        + '<td width="50%" valign="top" style="width:50%;padding-left:12px;' + 위 + '">'
+        + (것[i + 1] || '&nbsp;') + '</td>'
+        + '</tr>';
+    }
+    return '<tr><td style="padding:14px 28px 0 28px;">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
+      + 줄 + '</table></td></tr>';
+  }
+
+  /* 한 꼭지를 «칸 하나»로 — 딱지·이름·줄들을 tr 껍데기 없이 묶는다.
+     ⚠ 요약칸·꼭지제목 은 바깥 700px 표에 바로 붙는 <tr> 을 돌려준다. 두 칸 안에
+       넣으려면 껍데기가 없어야 한다 — 그래서 여기서 벗겨 낸다. */
+  function _칸벗기기(조각) {
+    var m = /^<tr><td[^>]*>([\s\S]*)<\/td><\/tr>$/.exec(String(조각 || '').trim());
+    return m ? m[1] : String(조각 || '');
+  }
+
   /* 맨 위 띠 — 「전문은 여기서」. 요약만 보고 끝내실 분도 있으니 한 번은 크게 말한다. */
   function 전문보기띠(웹주소) {
     var u = href(웹주소 || '');
@@ -744,14 +782,17 @@
     var 속 = '';
     var 그린것 = 0;
     if (요약) 속 += 전문보기띠(웹주소);
+    /* ★ 요약판은 꼭지를 «모아 두었다가» 둘씩 나란히 놓는다(대표 지시 2026-09-13).
+         그래서 한 바퀴 돌며 칸만 만들고, 그리는 것은 아래에서 한 번에 한다. */
+    var 요약칸들 = [];
     Core.꼭지들.forEach(function (g) {
       if (요약) {
         var 것들요 = 안[g.키] || [];
         var 글요 = (g.갈래 === '우리글') ? d.우리글 : '';
         var 칸요 = 요약칸(것들요, g, 웹주소, 글요);
         if (!칸요) return;
-        if (그린것) 속 += 줄긋기(18);
-        속 += 꼭지제목(g) + 칸요; 그린것++;
+        요약칸들.push(_칸벗기기(꼭지제목(g)) + _칸벗기기(칸요));
+        그린것++;
         return;
       }
       if (g.갈래 === '우리글') {
@@ -774,6 +815,7 @@
       속 += 꼭지제목(g) + 꼭지그리기(것, g, 설);
       그린것++;
     });
+    if (요약) 속 += 요약두칸(요약칸들);
 
     /* ★ 실을 것이 하나도 없으면 «만들지 않는다». 빈 뉴스레터를 보내면
        그 주 한 통이 통째로 빈 껍데기가 된다 — 안 보내느니만 못하다. */

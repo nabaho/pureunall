@@ -130,6 +130,15 @@ function 쪽(제목, 전문) {
     + '<meta name="robots" content="noindex">'
     + '<style>html,body{margin:0;padding:0;background:#e9e7e3}'
     + '#wrap{width:700px;margin:0 auto}'
+    /* ★★ 차림표를 «틀고정» — 굴러도 따라온다 (대표 지시 2026-09-13 「이부분 틀고정 해라」).
+       ★ 편지는 표로 짜여 있다. 차림표 칸(꼭지 넷이 든 tr)에 자리표를 붙여 두고
+         여기서 그 줄만 붙잡는다 — 편지 «속 글자»는 손대지 않는다.
+       ⚠ 메일 프로그램은 position 을 대개 무시한다 — 거기서는 옛날처럼 그냥 붙어 있다.
+         해롭지 않다. 통하는 곳(이 웹 쪽)에서만 따라오면 된다.
+       ⚠ z-index 가 없으면 따라오는 띠 «밑으로» 글이 지나가며 겹쳐 읽힌다.
+       ⚠ 바탕을 안 깔면 뒤 글자가 그대로 비친다. */
+    + '#wrap [data-stick]{position:sticky;top:0;z-index:5;background:#ffffff;'
+    + 'box-shadow:0 2px 6px rgba(36,26,19,.06)}'
     /* 누를 수 있다는 것을 손이 알게 한다 — 메일에는 이 규칙이 안 간다(<style> 은 지워진다) */
     + '[data-pop]{cursor:pointer}'
     + '[data-pop]{border-radius:6px;transition:outline-color .12s}'
