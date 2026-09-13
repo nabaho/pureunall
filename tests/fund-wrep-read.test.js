@@ -181,11 +181,24 @@ test('★ 이을 때 편집 창을 다시 열지 않는다 — 창은 겹쳐 뜨
     'keepOpen 인데 편집 창을 다시 열면 확인 창이 뒤 창을 지운다');
 });
 
-test('아직 저장 전인 사업장도 «읽기»는 된다 — 이을 자리만 없다', () => {
+/* ★ 2026-09-13 — 읽는 길이 편집 창에서 [👤 사람] 보기로 «옮겨졌다»(대표 지시 「깔끔하게」).
+   편집 창의 줄에는 «별지 제7호가 첨부하라는 원본»의 상태만 남는다 — 붙었나·보기·해제.
+   ⚠ 읽는 길 자체는 «없어지면 안 된다» — 없으면 인가신청서 첨부서류를 못 만든다.
+     그래서 옮겨 간 자리(pplRepDoc)가 살아 있는지를 여기서 함께 지킨다. */
+test('★ 재직증명서를 읽는 길이 «어딘가에는» 있다 — 없으면 별지 제7호를 못 낸다', () => {
+  const ppl = grabFn('pplRepDoc');
+  assert.match(ppl, /_siteRepScope\(\)/, '읽을 갈래를 안 세운다 — 값이 엉뚱한 칸으로 간다');
+  assert.match(ppl, /openAlbumPick\('dz-siterep','wrep'/, '사진첩을 열지 않는다');
+  assert.match(ppl, /_siteEditSid\s*=/, '★ 어느 사업장인지 안 적는다 — 읽고 나면 빈 사업장이 열린다');
+  /* 사람 보기에서 그 단추를 실제로 부르는가 */
+  assert.match(grabFn('sitesPeopleBody'), /pplRepDoc\(/, '사람 보기에 단추가 없다');
+});
+
+test('편집 창의 줄은 «원본 첨부»만 다룬다 — 저장 전이면 이을 자리가 없다고 말한다', () => {
   const fn = grabFn('_wrepDocRow');
-  assert.doesNotMatch(fn, /if\(!sid\) return/, '저장 전이면 아예 못 읽게 막는다');
-  assert.match(fn, /siteRepAlbum\(\)/);
-  assert.match(fn, /dz-siterep/);
+  assert.doesNotMatch(fn, /siteRepAlbum\(\)/, '판독 줄이 편집 창에 다시 들어왔다');
+  assert.match(fn, /openWrepDoc|unlinkWrepDoc/, '연결된 원본을 보거나 끊을 길이 없다');
+  assert.match(fn, /사람/, '어디서 이어야 하는지 말해 주지 않는다');
 });
 
 test('발급 회사가 이 사업장과 다르면 알리되 «막지는 않는다»', () => {
@@ -220,7 +233,7 @@ test('사업장 편집 창을 정말 그리면 재직증명서 줄이 성하게 
   new Function('OUT', [
     grabDecl('SITE_FIELDS'), grabDecl('CONTACT_FIELDS'), grabDecl('WREP_FIELDS'),
   grabDecl('UREP_FIELDS'), grabDecl('SME_FIELDS'), grabDecl('SME_OPTS'),
-  grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'), grabFn('_smeDocRow'),
+  grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'),
     'var _sitePrefill=null, _siteEditSid="";',
     'var S={fundId:"F1",sites:{}};',
     'function $(id){ return null; }',
@@ -235,9 +248,12 @@ test('사업장 편집 창을 정말 그리면 재직증명서 줄이 성하게 
     out.html = '';
     box.run(sid);
     const h = out.html;
-    assert.ok(h.includes('siteRepAlbum()'), sid + ': 사진첩 단추가 없다');
-    assert.ok(h.includes('id="dz-siterep"'), sid + ': 파일 올리는 자리가 없다');
+    /* 판독 줄은 [👤 사람] 보기로 옮겼다 — 편집 창에는 칸과 «원본 상태»만 남는다 */
+    assert.ok(!h.includes('siteRepAlbum()'), sid + ': 걷어낸 판독 줄이 다시 들어왔다');
+    assert.ok(!h.includes('id="dz-siterep"'), sid + ': 걷어낸 파일 올리는 자리가 다시 들어왔다');
     assert.ok(h.includes('id="sw-wrep_name"'), sid + ': 근로자대표 이름 칸이 없다');
+    assert.ok(h.includes('id="su-urep_name"'), sid + ': 사용자대표 이름 칸이 없다');
+    assert.ok(h.includes('재직증명서 원본'), sid + ': 원본 첨부 상태를 안 보여 준다');
     assert.ok(!/\+[A-Za-z_$][\w$]*\+/.test(h), sid + ': 보간되지 않은 변수가 새어 나왔다');
     assert.ok(!/undefined/.test(h), sid + ': undefined 가 샜다');
   });

@@ -125,17 +125,19 @@ test('⑩ 고르는 칸의 보기에 빈 값이 «맨 앞»이다 — 모르는 
   assert.ok(b.O.indexOf('중소기업') > 0 && b.O.indexOf('소기업') > 0);
 });
 
-/* ══ 등기부를 «사업장 칸»으로 ═══════════════════════════════════════ */
-
-test('★★ ⑪ 등기부의 법인등록번호가 «사업장 칸 이름»으로 옮겨진다 (corp_reg_no → corp_no)', () => {
-  const b = load([grabFn('_flat'), grabFn('parseCorpReg'), grabFn('parseCorpRegSite'),
-    'this.f=parseCorpRegSite;']);
-  const o = b.f('등록번호 164971-0007036  법인성립연월일 2021 년 3 월 2 일  주사무소 충남 예산군 응봉면 예당로 1703-38 목 적');
-  assert.equal(o.corp_no, '164971-0007036',
-    '★ 사업장 칸(corp_no)에 안 들어갑니다 — 읽히는데 «아무 데도 안 들어가면» 조용히 아무 일도 안 일어납니다.');
-  assert.ok(!('corp_reg_no' in o), '기금 칸 이름이 그대로 남았습니다.');
-  assert.ok(!('reg_date' in o) && !('inka_date' in o),
-    '사업장에 «없는 칸»을 넣었습니다 — 확인 창은 「읽었다」고 하는데 아무 데도 안 들어갑니다.');
+/* ══ 법인등록번호는 «기업정보함»에서 온다 ═══════════════════════════
+   ★ 2026-09-13 대표 지시 「사업자등록증과 법인등기부등은 차라리 사진첩내용은 모두 빼라
+     기업정보함에서 바로 가지고 오면된다」 — 등기부 «한 곳씩» 판독을 걷어냈다.
+   ⚠ 걷어냈으면 «대신 오는 길»이 반드시 있어야 한다. 없으면 법인등록번호를 넣을 방법이
+     통째로 사라진다 — 그것이 조용히 빈칸으로 등기신청서에 나간다. */
+test('★★ ⑪ 등기부 판독을 뺀 자리에 «기업정보함 길»이 살아 있다 — 법인등록번호를 넣을 방법', () => {
+  assert.ok(SRC.indexOf("['cno','corp_no']") >= 0,
+    '★ 기업정보함 → 사업장 짝짓기에 법인등록번호가 없습니다.');
+  assert.ok(SRC.indexOf("['corp_no','법인등록번호']") >= 0,
+    '★ 일괄 채우기에 법인등록번호가 없습니다 — 열여섯 곳을 한꺼번에 채울 수 없습니다.');
+  /* 걷어낸 길이 정말 사라졌는가(죽은 코드가 남으면 다음 사람이 살아 있는 줄 안다) */
+  ['parseCorpRegSite', 'siteCorpAlbum', 'dz-sitecorp', 'siteDocAlbum', 'dz-sitebiz']
+    .forEach((n) => assert.ok(SRC.indexOf(n) < 0, '걷어낸 것이 남아 있습니다: ' + n));
 });
 
 /* ══ 거르기 ════════════════════════════════════════════════════════ */
@@ -190,7 +192,7 @@ test('★★ ⑯ 사람 보기를 정말 그리면 네 사람이 각각 제 칸�
   const b = load([
     'function esc(s){ return String(s==null?"":s); }',
     'function _siteContacts(s){ return (s&&s._c)||{}; }',
-    grabFn('_siteWrep'), grabFn('_siteUrep'),
+    grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'),
     grabFn('sitesPeopleBody'),
     'this.f=sitesPeopleBody;']);
   const html = b.f([{ _id: 'S1', name: '한국벤토나이트', ceo: '신동현',
@@ -203,6 +205,12 @@ test('★★ ⑯ 사람 보기를 정말 그리면 네 사람이 각각 제 칸�
   ['urep_name', 'urep_title', 'wrep_name', 'wrep_title']
     .forEach((f) => assert.ok(html.indexOf(f) >= 0, '고칠 칸이 없습니다: ' + f));
   assert.ok(html.indexOf("saveSitePerson('S1','ceo'") < 0, '대표자를 여기서 고치게 두었습니다.');
+  /* ★ 서류를 읽는 길이 여기로 옮겨 왔다(편집 창에서 뺐으므로) — 없으면 읽을 방법이 없다 */
+  assert.ok(html.indexOf("pplRepDoc('S1')") >= 0, '★ 재직증명서를 읽을 길이 없습니다.');
+  assert.ok(html.indexOf("pplSmeDoc('S1')") >= 0, '★ 중소기업확인서를 읽을 길이 없습니다.');
+  /* 줄을 눌러 창이 열리는 것과 «겹치지» 않아야 한다 — 단추가 줄 클릭을 삼켜야 한다 */
+  assert.ok(html.indexOf('event.stopPropagation();pplRepDoc') >= 0,
+    '★ 단추를 누르면 편집 창도 함께 열립니다 — 창이 겹쳐 뜹니다.');
 });
 
 test('★★ ⑰ 한 칸 저장이 «정해진 네 칸»만 받는다 — 아무 칸이나 쓰게 두지 않는다', () => {
@@ -230,6 +238,12 @@ test('★★ ⑲ 판독한 값이 갈 칸을 «갈래»가 정한다 — 중소�
   assert.match(sme, /fields:SME_FIELDS/);
   const bind = grabFn('bindSiteDocIntake');
   assert.match(bind, /dz-sitesme/, '중소기업확인서 끌어놓기 칸이 안 이어졌습니다.');
-  assert.match(bind, /dz-sitecorp/, '등기부 끌어놓기 칸이 안 이어졌습니다.');
-  assert.match(bind, /'sitecorp'/, '등기부를 사업장 칸 이름으로 옮기는 갈래를 안 씁니다.');
+  assert.match(bind, /dz-siterep/, '재직증명서 끌어놓기 칸이 안 이어졌습니다.');
+  /* ★ [👤 사람] 보기에서 여는 두 길도 «갈래를 먼저» 세워야 한다 —
+     안 세우면 직전 갈래의 칸으로 값이 가서 조용히 아무 일도 안 일어난다. */
+  assert.match(grabFn('pplSmeDoc'), /_siteSmeScope\(\)[\s\S]*openAlbumPick/, '사람 보기의 확인서 길이 갈래를 안 세웁니다.');
+  assert.match(grabFn('pplRepDoc'), /_siteRepScope\(\)[\s\S]*openAlbumPick/, '사람 보기의 재직증명서 길이 갈래를 안 세웁니다.');
+  /* 걷어 둔 값을 비운다 — 안 비우면 «직전 사업장»의 값이 딸려 들어간다 */
+  assert.match(grabFn('pplSmeDoc'), /_siteDocKeep\s*=\s*null/, '★ 직전 사업장 값이 딸려 들어갑니다.');
+  assert.match(grabFn('pplRepDoc'), /_siteDocKeep\s*=\s*null/, '★ 직전 사업장 값이 딸려 들어갑니다.');
 });

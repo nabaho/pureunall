@@ -75,21 +75,24 @@ if (!JSDOM) {
   ok('연결을 끊을 수 있다', btns.some(x => /unlinkWrepDoc\('S1'\)/.test(x)), btns.join(' | '));
   ok('언제 이었는지 보인다', /2026-09-06/.test(on.textContent), on.textContent);
   /* 2026-09-11 — 이 줄은 이제 «읽는» 줄이다. 이름을 손으로 치지 않게 하는 것이 알맹이다. */
-  ok('이어 둔 뒤에도 다시 읽을 수 있다', btns.some(x => /siteRepAlbum\(\)/.test(x)), btns.join(' | '));
-  ok('파일로도 읽을 수 있다', !!on.querySelector('#dz-siterep'));
+  /* ★ 2026-09-13 — 읽는 길은 [👤 사람] 보기로 «옮겼다»(대표 지시 「깔끔하게」). 이 줄에는
+     별지 제7호가 첨부하라는 «원본»의 상태만 남는다. 옮긴 것과 없앤 것은 다르다 —
+     읽는 길이 살아 있는지는 아래 「사람 보기에서 읽는다」가 따로 지킨다. */
+  ok('판독 줄이 편집 창에 다시 안 들어왔다', !btns.some(x => /siteRepAlbum\(\)/.test(x)), btns.join(' | '));
+  ok('파일 올리는 자리도 편집 창에서 빠졌다', !on.querySelector('#dz-siterep'));
 
   const off = put(_wrepDocRow('S1', Object.assign({}, SITE, { wrep_doc: null })));
   const b2 = all(off);
-  ok('원본이 없으면 「원본 없음」이라 말한다', /원본 없음/.test(off.textContent), off.textContent);
+  ok('원본이 없으면 「없음」이라 말한다', /없음/.test(off.textContent), off.textContent);
   ok('원본이 없으면 [원본]을 안 준다 (누를 것이 없다)', !b2.some(x => /openWrepDoc/.test(x)), b2.join(' | '));
-  ok('원본이 없어도 읽는 길은 준다', b2.some(x => /siteRepAlbum\(\)/.test(x)), b2.join(' | '));
+  ok('어디서 이어야 하는지 말해 준다', /사람/.test(off.textContent), off.textContent);
 
   /* 새 사업장은 아직 «이을» 자리(사업장 열쇠)가 없다 — 그래도 «읽기»는 된다.
      조용히 안 되는 단추만 주지 않으면 된다. */
   const nw = put(_wrepDocRow('', {}));
   const b3 = all(nw);
-  ok('새 사업장도 읽을 수 있다', b3.some(x => /siteRepAlbum\(\)/.test(x)), b3.join(' | '));
-  ok('새 사업장에는 «저장하면 이어진다»고 말해 준다', /저장하면 원본도 이어집니다/.test(nw.textContent), nw.textContent);
+  ok('새 사업장에 안 되는 단추를 안 준다', !b3.some(x => /openWrepDoc|unlinkWrepDoc/.test(x)), b3.join(' | '));
+  ok('새 사업장에는 «저장한 뒤 이어진다»고 말해 준다', /저장한 뒤/.test(nw.textContent), nw.textContent);
   ok('새 사업장에 안 되는 단추는 안 준다',
     !b3.some(x => /openWrepDoc|unlinkWrepDoc/.test(x)), b3.join(' | '));
 }
