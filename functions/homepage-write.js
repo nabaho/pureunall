@@ -225,7 +225,67 @@ function 비공개자리(html) {
     return { ok: false, why: "「비공개」를 고를 곳이 " + 찾음.length
       + "군데라 어느 것인지 단정할 수 없습니다" };
   }
-  return { ok: false, why: "이 화면에서 «비공개로 바꾸는 자리»를 찾지 못했습니다" };
+
+  /* ★ 고르개가 없으면 «딸깍 칸»을 본다 — 라이믹스 게시판은 대개 「비밀글」 체크상자다.
+       (즐겨찾기 단추 setPrivate 도 같은 차례로 본다. 서버만 고르개까지 보고 멈춰
+        있어서 2026-09-13 에 퇴사자가 안 내려갔다.) */
+  const 비밀말 = /비공개|비밀글|비밀|secret/i;
+  const bre = /<input\b[^>]*>/gi;
+  const 이름맞음 = [], 딱지맞음 = [];
+  let b;
+  while ((b = bre.exec(본문))) {
+    const 태그 = b[0];
+    if ((속성(태그, "type") || "").toLowerCase() !== "checkbox") continue;
+    const 이름 = 속성(태그, "name");
+    if (!이름) continue;
+    const 것 = { 이름: 이름, 값: 속성(태그, "value") || "Y" };
+    /* ① 칸 이름 자체가 말해 주면 그게 가장 확실하다 (is_secret 따위) */
+    if (비밀말.test(이름)) { 이름맞음.push(것); continue; }
+    /* ② 아니면 «바로 앞» 딱지를 본다. 뒤는 안 본다 — 뒤를 보면 다음 줄의 딱지가
+         엉뚱한 칸에 붙는다(2026-09-13 에 「알림」 칸이 그렇게 걸렸다).
+       ⚠ 사이에 다른 <input 이 끼어 있으면 그 딱지는 이 칸 것이 아니다. */
+    const 앞 = 본문.slice(Math.max(0, b.index - 120), b.index);
+    const 끊을곳 = 앞.lastIndexOf("<input");
+    const 내딱지 = (끊을곳 >= 0 ? 앞.slice(끊을곳) : 앞).replace(/<[^>]*>/g, " ");
+    if (비밀말.test(내딱지)) 딱지맞음.push(것);
+  }
+  const 딸깍 = 이름맞음.length ? 이름맞음 : 딱지맞음;
+  if (딸깍.length === 1) {
+    return { ok: true, 이름: 딸깍[0].이름, 값: 딸깍[0].값,
+             어떻게: "「비밀글」에 표시합니다" };
+  }
+  if (딸깍.length > 1) {
+    return { ok: false, why: "「비밀글」 칸이 " + 딸깍.length + "군데라 단정할 수 없습니다 ("
+      + 딸깍.map(x => x.이름).join(", ") + ")" };
+  }
+
+  /* ⚠ 못 찾았으면 «이 화면에 무엇이 있는지»를 함께 돌려준다.
+       「못 찾았습니다」 한 줄만 오면 무엇을 고쳐야 할지 알 길이 없다. */
+  const 고르개들 = [];
+  const s2 = /<select\b([^>]*)>([\s\S]*?)<\/select>/gi;
+  let q;
+  while ((q = s2.exec(본문))) {
+    const 이름 = 속성("<s " + q[1] + ">", "name");
+    if (!이름) continue;
+    const 글자들 = [];
+    const o2 = /<option\b[^>]*>([\s\S]*?)<\/option>/gi;
+    let r;
+    while ((r = o2.exec(q[2]))) 글자들.push(이름다듬기(글자되돌리기(r[1])));
+    고르개들.push(이름 + "[" + 글자들.slice(0, 6).join("/") + "]");
+  }
+  const 딸깍이름 = [];
+  const b2 = /<input\b[^>]*>/gi;
+  let c;
+  while ((c = b2.exec(본문))) {
+    if ((속성(c[0], "type") || "").toLowerCase() !== "checkbox") continue;
+    const n = 속성(c[0], "name");
+    if (n) 딸깍이름.push(n);
+  }
+  return { ok: false,
+    why: "이 화면에서 «비공개로 바꾸는 자리»를 찾지 못했습니다"
+      + " · 고르개: " + (고르개들.join(", ") || "없음")
+      + " · 딸깍: " + (딸깍이름.join(", ") || "없음"),
+    고르개들: 고르개들, 딸깍들: 딸깍이름 };
 }
 
 /* ── 자물쇠 ────────────────────────────────────────────────────────────

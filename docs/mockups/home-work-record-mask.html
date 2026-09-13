@@ -1,0 +1,180 @@
+<title>실적 가져오기 — 회사명은 지우고</title>
+<style>
+  :root{
+    --w:#fff; --panel:#f8fafc; --rule:#cbd5e1; --rule2:#e2e8f0;
+    --ink:#1e293b; --muted:#475569;
+    --blue:#1e40af; --blue-l:#bfdbfe;
+    --green:#166534; --green-l:#dcfce7; --red:#991b1b; --red-l:#fecaca;
+    --amber:#92400e; --amber-l:#fef3c7;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --w:#0f172a; --panel:#162032; --rule:#334155; --rule2:#1e293b;
+      --ink:#e2e8f0; --muted:#94a3b8; --blue:#60a5fa; --blue-l:#1e3a5f;
+      --green:#4ade80; --green-l:#14321f; --red:#fca5a5; --red-l:#4c1d1d;
+      --amber:#fcd34d; --amber-l:#3a2f0b;
+    }
+  }
+  :root[data-theme="dark"]{
+    --w:#0f172a; --panel:#162032; --rule:#334155; --rule2:#1e293b;
+    --ink:#e2e8f0; --muted:#94a3b8; --blue:#60a5fa; --blue-l:#1e3a5f;
+    --green:#4ade80; --green-l:#14321f; --red:#fca5a5; --red-l:#4c1d1d;
+    --amber:#fcd34d; --amber-l:#3a2f0b;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--panel);color:var(--ink);
+    font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;font-size:14px;line-height:1.6}
+  .wrap{max-width:62rem;margin:0 auto;padding:1.7rem 1rem 4rem}
+  h1{font-size:1.28rem;margin:0 0 .3rem}
+  .sub{color:var(--muted);margin:0 0 1.3rem;max-width:47rem}
+  h2{font-size:1.02rem;margin:2rem 0 .5rem;padding-bottom:.32rem;border-bottom:1px solid var(--rule)}
+  h2:first-of-type{margin-top:1rem}
+  p{margin:0 0 .75rem;max-width:47rem}
+  b{font-weight:600}
+  .note{color:var(--muted);font-size:.9rem}
+
+  .pop{border:2px solid var(--blue);border-radius:10px;background:var(--w);overflow:hidden;margin:.7rem 0}
+  .pop > .hd{background:var(--blue);color:#fff;font-weight:600;padding:.45rem .8rem;font-size:.92rem}
+  .bar{display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;padding:.45rem .7rem;
+    border-bottom:1px solid var(--rule2)}
+  .bar.foot{border-bottom:0;border-top:1px solid var(--rule2);background:var(--panel)}
+  .btn{border:1px solid var(--rule);background:var(--w);color:var(--ink);
+    border-radius:7px;padding:.22rem .52rem;font:inherit;font-size:.81rem;cursor:default;white-space:nowrap}
+  .btn.p{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+  .btn.on{background:var(--blue-l);border-color:var(--blue);color:var(--blue);font-weight:700}
+  .grow{flex:1}
+  select.mini{font:inherit;font-size:.78rem;padding:.05rem .25rem;border:1px solid var(--rule);
+    border-radius:5px;background:var(--w);color:var(--ink)}
+
+  table{border-collapse:collapse;width:100%;font-size:.86rem;background:var(--w)}
+  th,td{text-align:left;padding:.38rem .6rem;border-bottom:1px solid var(--rule2);vertical-align:middle}
+  th{background:var(--panel);font-weight:600;white-space:nowrap;font-size:.8rem;color:var(--muted)}
+  tr:last-child td{border-bottom:0}
+  .box{display:inline-grid;place-items:center;width:1rem;height:1rem;border:1.5px solid var(--rule);
+    border-radius:3px;font-size:.7rem;color:transparent;background:var(--w);vertical-align:-2px}
+  .box.on{background:var(--blue);border-color:var(--blue);color:#fff}
+  .real{color:var(--muted);text-decoration:line-through}
+  .mask{font-weight:700;color:var(--blue)}
+  .out{font-family:ui-monospace,monospace;font-size:.84em;background:var(--panel);
+    border:1px solid var(--rule2);border-radius:6px;padding:.3rem .5rem;display:block;margin:.15rem 0}
+  .cut{background:var(--red-l);color:var(--red);border-radius:3px;padding:0 .15rem;font-weight:700}
+  .kept{background:var(--green-l);color:var(--green);border-radius:3px;padding:0 .15rem;font-weight:700}
+
+  .warn{border:1px solid var(--red);background:var(--red-l);color:var(--red);
+    border-radius:8px;padding:.55rem .75rem;margin:.7rem 0;font-size:.88rem}
+  .ok{border:1px solid var(--green);color:var(--green);background:transparent;
+    border-radius:8px;padding:.55rem .75rem;margin:.7rem 0;font-size:.88rem}
+  .hold{border:1px solid var(--amber);background:var(--amber-l);color:var(--amber);
+    border-radius:8px;padding:.55rem .75rem;margin:.7rem 0;font-size:.88rem}
+  ul{margin:.3rem 0 0;padding-left:1.15rem} li{margin-bottom:.22rem}
+  .scroll{overflow-x:auto}
+</style>
+
+<div class="wrap">
+  <h1>실적 가져오기 — 고른 것만, 회사명은 지우고</h1>
+  <p class="sub">대표 결정 2026-09-13 「나」 — 체크한 것만 넣고, 회사 이름은 자동으로 지워
+  「제조업 A사」처럼 만든다.</p>
+
+  <div class="warn">
+    <b>실적에는 의뢰인 이름이 들어 있습니다.</b> 한 번 홈페이지에 나가면 되돌릴 수 없습니다.
+    그래서 이 화면은 <b>회사명을 지우는 것이 기본</b>이고, 지우지 못한 줄은 <b>아예 안 나갑니다</b>.
+  </div>
+
+  <h2>화면 — 「실적」 탭이 늘어납니다</h2>
+  <div class="pop">
+    <div class="hd">권형하 — 경력관리에서 가져오기</div>
+    <div class="bar">
+      <button class="btn">위촉장 12</button><button class="btn">자격증 3</button>
+      <button class="btn">학력 2</button><button class="btn">수료증 8</button>
+      <button class="btn">강의 41</button>
+      <span style="width:1px;height:1.1rem;background:var(--rule2);margin:0 .25rem"></span>
+      <button class="btn on">사건 120</button><button class="btn">컨설팅 45</button>
+      <button class="btn">기금 30</button><button class="btn">기타 7</button>
+    </div>
+    <div class="bar">
+      <input style="font:inherit;font-size:.82rem;padding:.2rem .4rem;border:1px solid var(--rule);
+        border-radius:6px;background:var(--w);color:var(--ink);min-width:12rem"
+        placeholder="🔍 유형·내용·연도로 찾기">
+      <button class="btn on">완료만</button><button class="btn">고른 것 3</button>
+      <span class="grow"></span>
+      <span class="note">회사명은 <b>늘</b> 지웁니다</span>
+    </div>
+    <div class="scroll"><table>
+      <tr><th style="width:2rem"></th><th>유형</th><th>어느 회사 (지워집니다)</th>
+        <th>업종</th><th>내용</th><th>연도</th></tr>
+      <tr>
+        <td><span class="box on">✓</span></td>
+        <td>부당해고</td>
+        <td><span class="real">가나정밀㈜</span> → <span class="mask">제조업 A사</span></td>
+        <td><select class="mini"><option>제조업</option><option>건설업</option></select></td>
+        <td>원직복직 판정</td><td>2025</td>
+      </tr>
+      <tr>
+        <td><span class="box on">✓</span></td>
+        <td>직장내괴롭힘</td>
+        <td><span class="real">다라병원</span> → <span class="mask">의료·복지 B사</span></td>
+        <td><select class="mini"><option>의료·복지</option></select></td>
+        <td>조사 및 개선안</td><td>2025</td>
+      </tr>
+      <tr>
+        <td><span class="box on">✓</span></td>
+        <td>임금체불</td>
+        <td><span class="real">가나정밀㈜</span> → <span class="mask">제조업 A사</span></td>
+        <td><span class="note">— 같은 회사</span></td>
+        <td>체불액 전액 지급</td><td>2024</td>
+      </tr>
+      <tr>
+        <td><span class="box"></span></td>
+        <td>산재</td>
+        <td><span class="real">마바산업</span> → <span class="mask">제조업 C사</span></td>
+        <td><select class="mini"><option>제조업</option></select></td>
+        <td>요양승인</td><td>2024</td>
+      </tr>
+    </table></div>
+    <div class="bar foot">
+      <button class="btn p">체크한 3건 넣기</button>
+      <button class="btn">닫기</button>
+      <span class="grow"></span>
+      <span class="note">같은 회사는 <b>늘 같은 글자</b>입니다 — A사가 다음에도 A사입니다</span>
+    </div>
+  </div>
+
+  <h2>넣으면 경력사항에 이렇게 들어갑니다</h2>
+  <span class="out">現  제조업 A사 부당해고 원직복직 판정 (2025)</span>
+  <span class="out">現  의료·복지 B사 직장내괴롭힘 조사 및 개선안 (2025)</span>
+  <span class="out">前  제조업 A사 임금체불 체불액 전액 지급 (2024)</span>
+  <p class="note">넣은 뒤에는 <b>여느 경력 줄과 똑같이</b> 손으로 고치실 수 있습니다 —
+  順서 바꾸기·現/前 딱지·지우기 다 됩니다.</p>
+
+  <h2>★ 회사명이 «내용»에도 숨어 있습니다 — 거기까지 지웁니다</h2>
+  <p>실적의 「내용」 칸에 회사 이름이 다시 적혀 있는 일이 흔합니다. 문장을 만든 뒤
+  <b>줄 전체</b>를 훑어 회사명을 지웁니다. ㈜·(주)·주식회사를 떼고도 찾습니다.</p>
+  <div class="scroll"><table>
+    <tr><th>경력관리에 있는 것</th><th>나가는 줄</th></tr>
+    <tr>
+      <td>내용: <b>가나정밀</b> 취업규칙 전면 정비</td>
+      <td><span class="kept">제조업 A사</span> 취업규칙 전면 정비 <span class="note">← 내용 속 이름도 바뀜</span></td>
+    </tr>
+    <tr>
+      <td>내용: 대표이사 <b>홍길동</b> 면담 후 합의</td>
+      <td><span class="cut">이 줄은 안 나갑니다</span> <span class="note">← 사람 이름이 남아 못 지움</span></td>
+    </tr>
+  </table></div>
+
+  <div class="hold">
+    <b>지우지 못한 줄은 «안 넣습니다».</b> 넣기를 누르면 이렇게 말합니다 —
+    「3건 넣었습니다. <b>1건은 이름이 남아 있어 안 넣었습니다</b> (마바산업 건).
+    경력관리에서 내용을 고치신 뒤 다시 해 주십시오.」<br>
+    <span style="font-size:.85rem">조용히 빼지 않습니다. 빠진 줄을 모르면 「왜 안 들어왔지」로 끝납니다.</span>
+  </div>
+
+  <div class="ok">
+    <b>기계가 한 번 더 봅니다.</b> 만들어진 줄에 원래 회사명이 <b>한 글자라도</b> 남아 있으면
+    그 줄은 못 나갑니다 — 사람이 체크를 잘못해도 이름은 안 새어 나갑니다.
+  </div>
+
+  <h2>여쭐 것 하나 — 업종 목록</h2>
+  <p>고르개에 넣을 업종입니다. 이대로 할까요, 빼거나 더할 것이 있으십니까?</p>
+  <p><b>제조업 · 건설업 · 도소매 · 운수 · 의료·복지 · 교육 · 공공기관 · 금융 · 서비스업 · 기타</b>
+  <br><span class="note">「업종 없이」도 고를 수 있습니다 — 그러면 그냥 「A사」로 나갑니다.</span></p>
+</div>
