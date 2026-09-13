@@ -1700,6 +1700,46 @@ function _addrParts(address){
   if(m2 && abbrs.indexOf(m2[1])>=0) return {sido:m2[1], sgg:m2[2], gu:(m2[3]||'')};
   return null;
 }
+/* ══ 참여 지자체 ══ (대표 지시 2026-09-13)
+   「지역기금은 각기업들의 지자체가 같이 참여한다 … 기업주소가 있는 지자체가 같이 참여한 것이다」
+
+   ★ 따로 적어 두지 «않는다» — 참여사업장 주소에서 그때그때 센다. 사업장이 들고 나면
+     지자체도 함께 달라지는데, 손으로 적어 두면 둘이 어긋난 채 굳는다.
+   ⚠ 주소를 못 읽은 곳은 «모름»으로 세어 드러낸다. 조용히 빼면 「우리 기금은 세 곳」이라
+     잘못 읽는다 — 열여섯 곳 중 셋을 못 읽었으면 그렇다고 말해야 한다.
+   ⚠ 광역(시·도)도 함께 돌려준다. 지자체 참여는 기초(시·군·구)가 하지만,
+     여러 시·도에 걸친 기금인지는 광역을 봐야 안다. */
+function _siteGovs(sites,today){
+  var map={}, unknown=0, n=0;
+  (sites||[]).forEach(function(s){
+    if(!s || s.status==='closed') return;             /* 탈퇴한 곳은 참여 지자체가 아니다 */
+    n++;
+    var p=_addrParts(s.address);
+    if(!p||!p.sgg){ unknown++; return; }
+    /* 「청주시 흥덕구」처럼 구까지 갈리는 곳은 시 단위로 묶는다 — 지자체 참여는 시가 한다 */
+    var key=p.sido+' '+p.sgg;
+    if(!map[key]) map[key]={key:key, sido:p.sido, sgg:p.sgg, n:0, sites:[]};
+    map[key].n++; if(s.name) map[key].sites.push(String(s.name));
+  });
+  var list=Object.keys(map).map(function(k){ return map[k]; })
+    .sort(function(a,b){ return (b.n-a.n) || a.key.localeCompare(b.key,'ko'); });
+  var sidos=[]; list.forEach(function(g){ if(sidos.indexOf(g.sido)<0) sidos.push(g.sido); });
+  return { list:list, sidos:sidos, unknown:unknown, total:n };
+}
+/* 화면에 내놓는 딱지 한 줄 — 기금 정보와 참여사업장이 «같은 말»을 쓰게 한 곳에서 만든다 */
+function govChips(sites){
+  var g=_siteGovs(sites);
+  if(!g.total) return '<span class="muted" style="font-size:11.5px">참여사업장이 아직 없습니다.</span>';
+  var chips=g.list.map(function(x){
+    return '<span class="chip ok" style="font-size:10.5px" title="'+esc(x.sites.slice(0,8).join(', '))
+      +(x.sites.length>8?' 외 '+(x.sites.length-8)+'곳':'')+'">'+esc(x.sgg)+' '+x.n+'</span>';
+  }).join(' ');
+  var more = g.unknown
+    ? ' <span class="chip dg" style="font-size:10.5px" title="소재지를 못 읽었습니다 — 참여사업장에서 주소를 채우면 여기 섭니다">주소 모름 '+g.unknown+'</span>'
+    : '';
+  return chips+more
+    +(g.sidos.length>1?' <span class="chip warn" style="font-size:10.5px" title="여러 시·도에 걸쳐 있습니다">'+esc(g.sidos.join('·'))+'</span>':'');
+}
 function guessRegistry(address){
   var p=_addrParts(address); if(!p) return '';
   return REGISTRY_MAP[p.sido+' '+p.sgg]||'';
@@ -6459,11 +6499,27 @@ function infoForm(f){
        ⓘ·당겨오기 단추는 첫 묶음 머리(기본) 줄 오른쪽에 얹어 한 줄을 더 아낀다. */
     +'<div class="panel" style="padding:12px 14px">'
     +'<div class="gridw" oninput="markDirty()" onchange="markDirty()">'+flds+'</div>'
+    +govPanel(f)
     +'<div class="row" style="margin-top:12px"><button class="primary" onclick="saveInfo()">💾 저장</button>'
     +'<span class="muted mo" style="font-size:11px">Ctrl+S로도 저장</span></div></div>'
     +officerPanel(f);
 }
-/* 임원 명부 — 감사보고서·협의회 회의록이 여기서 이름을 가져간다.
+/* ── 참여 지자체 줄 ── (대표 지시 2026-09-13)
+   ★ 손으로 적는 칸이 «아니다» — 참여사업장 주소에서 셈한 것이다. 그래서 [저장]과 상관이
+     없고, 사업장을 더하거나 빼면 저절로 달라진다. 화면에서도 그렇게 보이게 둔다.
+   ⚠ 참여사업장을 아직 안 읽었으면 «0곳이라 말하지 않는다» — 모르는 것과 없는 것은 다르다. */
+function govPanel(f){
+  var 읽었나=(S.sitesFor===S.fundId && S.sites);
+  var arr=읽었나 ? Object.keys(S.sites).map(function(k){ return S.sites[k]; }) : null;
+  var 몸 = arr ? govChips(arr)
+    : '<span class="muted" style="font-size:11.5px">[참여사업장] 탭을 한 번 열면 여기 섭니다.</span>';
+  return '<div class="sec" style="margin-top:14px">참여 지자체'
+    +'<span style="font-weight:400;font-size:11px;color:var(--sub)">'
+    +' — 참여사업장 소재지에서 셈합니다(손으로 적는 칸이 아닙니다)</span>'
+    +hlp('gov.join')+'</div>'
+    +'<div class="row" style="gap:5px;flex-wrap:wrap;margin:2px 0 0">'+몸+'</div>';
+}
+/* 등기임원 명부 — 감사보고서·협의회 회의록이 여기서 이름을 가져간다.
    이 칸이 비면 그 서류들이 «이름 없는 서류»로 나오므로, 비었을 때 그렇게 알린다. */
 function officerPanel(f){
   var rows=_officersOf(f);
@@ -8568,6 +8624,9 @@ function sitesTab(){
     +'<h2 style="font-size:15px;margin:0">참여사업장</h2>'
     +'<span class="stat">'+arr.length+'개사</span><span class="stat">상시근로자 '+totalEmp.toLocaleString()+'명</span>'
     +(nPartner?'<span class="stat">협력 '+nPartner+'개사</span>':'')
+    /* ★ 지자체는 «여기»가 원천이다 — 사업장 소재지에서 셈한다(대표 지시 2026-09-13).
+         기금 정보에도 같은 줄이 서는데, 둘 다 govChips 하나를 쓴다. */
+    +'<span class="stat" title="참여사업장 소재지에서 셈한 참여 지자체입니다">지자체 '+_siteGovs(arr).list.length+'</span>'
     +sub+sortBar
     +(isYr?'':filterBar)
     +(isYr?'':dropZoneSlim('dz-sites','엑셀 한번에','상호·대표자·사업자번호·상시근로자·소재지 열을 자동으로 찾습니다','.xlsx,.xls,.csv'))
@@ -13790,6 +13849,12 @@ var HELP={
    +'<p><b>기업규모(위 칸)와 다릅니다.</b> 그것은 기업정보함에서 온 값이고, 이것은 <b>확인서에서 읽은</b> 값입니다. 심사에 내는 것은 확인서 쪽입니다.</p>'
    +'<p><b>해마다 새로 뗍니다</b>(보통 4월 1일~다음해 3월 31일). 기간이 지나면 빨간 딱지가 붙습니다 — 지난 확인서를 내면 반려됩니다.</p>'
    +'<p>명부에서 <b>[확인서 지남]</b>으로 거르면 다시 떼야 할 곳만 모아 볼 수 있습니다.</p>'},
+ 'gov.join':{t:'참여 지자체',h:'<p><b>지역기금은 기업만 참여하는 것이 아닙니다.</b> 참여사업장이 있는 <b>지자체가 함께</b> 참여합니다.</p>'
+   +'<p>그래서 여기에 손으로 적을 칸을 두지 않았습니다 — <b>참여사업장의 소재지에서 셈합니다.</b> 사업장이 들어오거나 빠지면 지자체도 저절로 달라집니다.</p>'
+   +'<p><b>딱지에 붙은 숫자</b>는 그 지자체에 있는 사업장 수입니다. 딱지에 마우스를 올리면 어느 회사인지 보입니다.</p>'
+   +'<p><b>「주소 모름」</b>이 뜨면 그만큼 소재지를 못 읽은 것입니다 — 조용히 빼지 않고 세어 보여 줍니다. 참여사업장에서 주소를 채우면 사라집니다.</p>'
+   +'<p>여러 시·도에 걸쳐 있으면 <b>시·도 딱지</b>가 함께 뜹니다.</p>'
+   +'<p>⚠ 이 값은 <b>서식에 자동으로 찍지 않습니다.</b> 관청에 내는 서류의 지자체·관할은 원본 서류를 보고 넣어야 합니다.</p>'},
  'newfund':{t:'새 기금 등록',h:'<p><b>신규</b>(설립부터) 또는 <b>기존</b>(이미 설립·운영 중) 기금을 등록합니다.</p><p>담당은 푸른이알피 <b>재직자</b>에서 선택합니다.</p>'},
  'mgr':{t:'담당자 지정',h:'<p>푸른이알피 재직자 명단에서 선택합니다.</p><p><b>주담당 1명</b>, <b>부담당은 여러 명</b> 지정할 수 있습니다.</p>'}
 };
