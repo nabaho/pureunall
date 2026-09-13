@@ -502,6 +502,13 @@ table.daejo .rreason{color:var(--sub);font-size:11px}
 .dmrow:hover{background:#f8fafc}
 .dmrow .dm-name{font-weight:700;width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dmrow .dm-meta{color:var(--mute);white-space:nowrap;min-width:38px}
+/* 날짜 한 칸 — 연-월-일(10글자) + 무슨 날짜인지. 자리를 안 주면 사업장 이름이 잘린다 */
+.dmrow .dm-when{color:var(--mute);white-space:nowrap;min-width:96px;display:inline-flex;
+  align-items:baseline;gap:4px}
+/* ⚠ 글자가 바탕에 묻히면 안 된다 — #94a3b8 은 #f8fafc 위에서 2.5:1 로 안 읽혔다
+   (color-palette-apps 검사가 그 자리에서 잡았다). --sub 는 7.5:1 이다. */
+.dmrow .dm-when .dm-what{font-size:10px;color:var(--sub);background:#f8fafc;
+  border:1px solid var(--line);border-radius:20px;padding:0 5px}
 .dmrow .dm-next{margin-left:auto;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
 .dashrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;cursor:pointer;font-size:11.5px;border-bottom:1px solid #f8fafc}
 .dashrow:hover{background:#f8fafc}
@@ -5126,8 +5133,14 @@ function dashRows(){
   return Object.keys(byKey).map(k=>{
     const v=byKey[k], st=dashStage(v.rec,v.draft);
     const arts=v.rec?(v.rec.items||[]).filter(it=>it.orig!=="").length:(v.draft?"–":"–");
+    /* ⚠ 날짜를 «셋 다» 들고 온다 — 예전에는 savedAt 하나만 담아 와서, 화면이
+       「검토완료일」이라 읽히는 자리에 «마지막 저장 시각»을 적고 있었다
+       (대표 지적 2026-09-13). 담아 오지 않으면 고를 수가 없다. */
     return {key:k,site:v.site,bizno:v.bizno,rec:v.rec,draft:v.draft,stage:st,arts,
-      at:(v.rec&&v.rec.savedAt)||(v.draft&&v.draft.savedAt)||""};
+      at:(v.rec&&v.rec.savedAt)||(v.draft&&v.draft.savedAt)||"",
+      saved:(v.rec&&v.rec.savedAt)||(v.draft&&v.draft.savedAt)||"",
+      done:(v.rec&&v.rec.doneAt)||"",
+      filed:(v.rec&&v.rec.filedAt)||""};
   // 묶음 안에서는 오래 방치된 사업장을 앞에 — 손 안 댄 건이 뒤로 밀려 누락되지 않게
   }).sort((a,b)=>(a.stage.step-b.stage.step)||String(a.at).localeCompare(String(b.at)));
 }
@@ -5155,8 +5168,31 @@ function dashSorted(rows){
   return rows.slice().sort((a,b)=>dashRank(a.stage.k)-dashRank(b.stage.k)
     ||String(a.at).localeCompare(String(b.at)));
 }
+/* 목록에 적을 «날짜 한 칸» — 갈래에 맞는 날짜를 고르고, 무슨 날짜인지 이름을 붙인다.
+   (대표 지시 2026-09-13 「년도 월 일 모두 포함되어야 기록이 명확하다」)
+
+   ★★ 예전에는 어느 갈래든 «마지막 저장 시각»을 월-일만 적었다. 취업규칙은 몇 해에
+     걸친 기록이라 연도가 빠지면 2024년 것과 2026년 것이 같아 보이고, 무엇보다
+     그 날짜는 「검토를 언제 마쳤나」가 아니었다(검토완료일 doneAt 은 따로 있다).
+   ★ 이름을 «함께» 물린다 — 검토완료일이 없어 저장일로 물러날 때 「검토」라고 적으면
+     그것이 거짓말이 된다. 기록을 밝히려고 붙인 이름이 오히려 사람을 속인다.
+   ⚠ 시각(HH:MM)은 목록에 안 쓴다 — 한 줄이 길어져 사업장 이름이 잘린다. 자세히에만.
+   ⚠ 줄이 이상해도 안 터진다 — 한 줄 때문에 목록 전체가 비면 안 된다. */
+function dashWhen(r){
+  const 날=v=>String(v||"").slice(0,10);
+  const k=(r&&r.stage&&r.stage.k)||"";
+  const done=(r&&r.done)||"", filed=(r&&r.filed)||"", saved=(r&&r.saved)||(r&&r.at)||"";
+  const 자세히=[filed?"신고 "+filed:"",done?"검토 완료 "+done:"",saved?"저장 "+saved:""]
+    .filter(Boolean).join(" · ");
+  if(k==="filed"&&filed)return {날짜:날(filed),뜻:"신고",자세히:자세히};
+  if((k==="reviewed"||k==="amending")&&done)return {날짜:날(done),뜻:"검토",자세히:자세히};
+  if(saved)return {날짜:날(saved),뜻:"저장",자세히:자세히};
+  return {날짜:"–",뜻:"",자세히:자세히};
+}
 function dashTip(r){
-  return [shortSite(r.site),r.stage.t,r.bizno,r.arts!=="–"?r.arts+"조":"",(r.at||"").slice(0,10),"→ "+r.stage.next]
+  const w=dashWhen(r);
+  return [shortSite(r.site),r.stage.t,r.bizno,r.arts!=="–"?r.arts+"조":"",
+          w.자세히||(w.날짜!=="–"?w.날짜:""),"→ "+r.stage.next]
     .filter(Boolean).join(" · ");
 }
 /* ══════ 줄에는 «내가 이어서 할 곳»만 (대표 지시·결정 2026-09-07) ══════
@@ -5240,7 +5276,8 @@ function renderDashModal(){
       <span class="dm-name">${escapeH(shortSite(r.site))}</span>
       <span class="stg ${r.stage.k}">${r.stage.t}</span>
       <span class="dm-meta">${r.arts!=="–"?r.arts+"조":"–"}</span>
-      <span class="dm-meta">${escapeH((r.at||"").slice(5,10)||"–")}</span>
+      <span class="dm-when" title="${escapeH(dashWhen(r).자세히)}">${escapeH(dashWhen(r).날짜)}${
+        dashWhen(r).뜻?`<span class="dm-what">${escapeH(dashWhen(r).뜻)}</span>`:""}</span>
       <span class="dm-next">${escapeH(r.stage.next)}</span>
     </div>`).join("")
     :'<div style="font-size:12px;color:var(--mute);padding:14px 2px">'+(q?"검색 결과 없음":"해당 상태의 사업장이 없습니다.")+'</div>';
