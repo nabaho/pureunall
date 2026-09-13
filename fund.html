@@ -918,12 +918,38 @@ function lifeSelect(f){
   return '<select onclick="event.stopPropagation()" onchange="setLifecycleQuick(\''+f._id+'\',this.value)" style="padding:3px 6px;border:1px solid '+(v==='운영'?'var(--line)':'#f87171')+';border-radius:6px;font-size:11.5px;background:'+(v==='운영'?'#fff':'#f8fafc')+'">'
     +o('운영')+o('계약종료')+o('기록보관')+'</select>';
 }
+/* ══ 목록에 세울 참여 지자체 ══ (대표 지시 2026-09-13)
+   기금 마흔셋의 사업장을 «한 번에» 읽는다. 기금마다 읽으면 마흔세 번 오간다.
+   ⚠ 다 읽기 전에는 「…」으로 둔다 — 0곳이라 하면 «없는 것»으로 잘못 읽는다.
+   ⚠ 한 번만 읽고 한 번만 다시 그린다. 못 읽어도 다시 매달리지 않는다 —
+     매번 다시 시도하면 화면을 그릴 때마다 통신이 나간다. */
+var _allSites=null, _allSitesTried=false;
+function loadAllSites(){
+  if(_allSites||_allSitesTried) return;
+  _allSitesTried=true;
+  fbDb.ref(NS+'/sites').once('value').then(function(s){
+    _allSites=s.val()||{};
+    if(S.view!=='fund') render();          /* 목록을 보고 있을 때만 다시 그린다 */
+  }).catch(function(){});
+}
+/* ⚠ «칸(<td>) 은 줄에 드러내 둔다» — 여기서 통째로 돌려주면, 머리와 몸통의 칸 수를
+     글자로 세는 검사(fund-phone-compact ②)가 이 칸을 못 보고 「한 칸 모자란다」고 한다.
+     그 검사는 값이 옆으로 밀리는 것을 막는 것이라 눈을 감기면 안 된다. 속만 돌려준다. */
+function fundGovCell(fid){
+  if(!_allSites){ setTimeout(loadAllSites,0);
+    return {t:'<span class="muted">…</span>', title:'참여사업장을 읽는 중입니다'}; }
+  var m=_allSites[fid]||{};
+  var g=govShort(Object.keys(m).map(function(k){ return m[k]; }),2);
+  return {t:(g.n?esc(g.text):'<span class="muted">'+esc(g.text)+'</span>'), title:g.title};
+}
 function fundRow(f,no,mode,showReg){
   var n=nDone(f); var chip=n===5?'<span class="chip ok">정보 완비</span>':n>=3?'<span class="chip warn">정보 '+n+'/5</span>':'<span class="chip dg">정보 '+n+'/5</span>';
   var subn=mgrSubNames(f);
   var setupB=(f.setup_stage==='설립준비')?' <span class="chip warn" style="font-size:10px">🏗 설립중</span>':'';
+  var _gc=fundGovCell(f._id);
   return '<tr onclick="go(\'fund\',\''+f._id+'\')"><td class="no">'+no+'</td>'
     +'<td style="font-weight:700">'+esc(f.short_name||f.name)+setupB+'<div class="muted" style="font-weight:400;font-size:11.5px">'+esc(f.name||'')+'</div></td>'
+    +'<td class="ph" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(_gc.title)+'">'+_gc.t+'</td>'
     /* 이름은 «안 접는다» — 「김혜민」이 석 줄로 쌓이면 줄 키가 그만큼 는다(폰 실측) */
     +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td>'
     +'<td class="muted mo">'+(subn?esc(subn):'—')+'</td>'
@@ -982,6 +1008,11 @@ function fundTable(list,edit,mode){
      칸을 잡아, 충남과 경기의 열이 어긋난 채로 위아래에 놓인다 — 한 목록으로 보이지 않는다.
      그래서 «칸 목록 하나»에서 폭·머리를 함께 만들고 자리를 못 박는다(_colsHTML). */
   var cols=[['번호','no','46px'],['기금명','','']];
+  /* ★ 참여 지자체 — 기금명 «바로 오른쪽»(대표 지시 2026-09-13). 지역기금은 그 회사들이
+       있는 지자체가 함께 참여하므로, 목록에서 한눈에 보여야 한다.
+     ⚠ 폭을 못 박는다 — 묶음(충남·경기)마다 표를 따로 만들기 때문에, 폭이 없으면
+       표마다 제 내용에 맞춰 칸을 잡아 위아래 열이 어긋난다(이 표가 fixcol 인 까닭). */
+  cols.push(['참여 지자체','ph','150px','참여사업장 소재지에서 셈합니다 — 올리면 몇 곳인지 보입니다']);
   cols.push(['주담당','','132px'],['부담당','mo','112px'],['대표자','mo','112px'],['정보','ph','104px']);
   if(showReg) cols.push(['분류','ph','120px','지역·묶음 분류 — 바꾸면 지역기금↔공동기금으로 옮겨집니다']);
   cols.push(['계약관계','','122px']);
@@ -1710,21 +1741,39 @@ function _addrParts(address){
    ⚠ 광역(시·도)도 함께 돌려준다. 지자체 참여는 기초(시·군·구)가 하지만,
      여러 시·도에 걸친 기금인지는 광역을 봐야 안다. */
 function _siteGovs(sites,today){
-  var map={}, unknown=0, n=0;
-  (sites||[]).forEach(function(s){
+  var map={}, order=[], unknown=0, n=0;
+  /* ★ «명부 차례»로 센다 (대표 확인 2026-09-13 「1호기금은 예산군 공주시 보령시 참여이다」).
+       곳 수가 많은 순으로 냈더니 예산군·보령시·공주시가 되어, 대표님이 명부를 보고 부르는
+       차례(예산군·공주시·보령시)와 어긋났다. 서류를 명부와 맞대 보는 사람이 바로 짚을 수
+       있어야 하므로 «연번 차례»를 따른다. 곳 수는 딱지와 올림말에 그대로 적는다. */
+  (sites||[]).slice().sort(function(a,b){
+    return String((a&&a.seq_label)||'').localeCompare(String((b&&b.seq_label)||''),'ko',{numeric:true});
+  }).forEach(function(s){
     if(!s || s.status==='closed') return;             /* 탈퇴한 곳은 참여 지자체가 아니다 */
     n++;
     var p=_addrParts(s.address);
     if(!p||!p.sgg){ unknown++; return; }
     /* 「청주시 흥덕구」처럼 구까지 갈리는 곳은 시 단위로 묶는다 — 지자체 참여는 시가 한다 */
     var key=p.sido+' '+p.sgg;
-    if(!map[key]) map[key]={key:key, sido:p.sido, sgg:p.sgg, n:0, sites:[]};
+    if(!map[key]){ map[key]={key:key, sido:p.sido, sgg:p.sgg, n:0, sites:[]}; order.push(key); }
     map[key].n++; if(s.name) map[key].sites.push(String(s.name));
   });
-  var list=Object.keys(map).map(function(k){ return map[k]; })
-    .sort(function(a,b){ return (b.n-a.n) || a.key.localeCompare(b.key,'ko'); });
+  var list=order.map(function(k){ return map[k]; });
   var sidos=[]; list.forEach(function(g){ if(sidos.indexOf(g.sido)<0) sidos.push(g.sido); });
   return { list:list, sidos:sidos, unknown:unknown, total:n };
+}
+/* 한 줄로 줄인 지자체 — 목록의 좁은 칸에 넣는다.
+   ⚠ 다 적으면 칸이 넘쳐 다른 열이 밀린다. 둘까지 적고 나머지는 「외 n」으로 줄이되,
+     올림말에는 «전부와 몇 곳인지»를 담는다 — 줄였다는 것을 숨기지 않는다. */
+function govShort(sites,max){
+  var g=_siteGovs(sites); max=max||2;
+  if(!g.total) return {text:'—', title:'참여사업장이 없습니다', n:0};
+  if(!g.list.length) return {text:'주소 모름', title:'참여사업장 '+g.total+'곳의 소재지를 못 읽었습니다', n:0};
+  var names=g.list.map(function(x){ return x.sgg; });
+  var 짧게=names.slice(0,max).join('·')+(names.length>max?' 외 '+(names.length-max):'');
+  var 전부=g.list.map(function(x){ return x.sgg+' '+x.n+'곳'; }).join(' · ')
+    +(g.unknown?'  |  주소 모름 '+g.unknown+'곳':'');
+  return {text:짧게, title:전부, n:names.length, unknown:g.unknown};
 }
 /* 화면에 내놓는 딱지 한 줄 — 기금 정보와 참여사업장이 «같은 말»을 쓰게 한 곳에서 만든다 */
 function govChips(sites){
@@ -4269,7 +4318,16 @@ function fillChecklistDoc(root,f,sites){
     var uniq=cat.filter(function(v,i){ return cat.indexOf(v)===i; });
     var won=function(v){ return v?Number(v).toLocaleString():''; };
     var VAL={
-      '지역':          f.region||'',
+      /* ★ 지역은 시·도만으로는 모자란다(대표 지시 2026-09-13 「지자체도 서식 자동 들어가게」).
+           지역기금은 «참여사업장이 있는 지자체»가 함께 참여하므로, 공단이 보는 「지역」은
+           충남이 아니라 「충남 예산군·보령시·공주시」다.
+         ⚠ 주소를 못 읽은 곳이 있으면 시·도만 적는다 — 반쪽짜리 목록을 «전부인 양» 내지 않는다. */
+      '지역':          (function(){
+        var sd=f.region||'', g=_siteGovs(act);
+        if(!g.list.length||g.unknown) return sd;
+        var 군=g.list.map(function(x){ return x.sgg; }).join('·');
+        return sd?(sd+' '+군):군;
+      })(),
       '공동기금법인명': f.name||'',
       '공동기금참여회사': act.map(function(x){ return x.name; }).filter(Boolean).join(', '),
       '기금인가번호(인가일자)': f.inka_no?(f.inka_no+(f.inka_date?' ('+_dotDate(f.inka_date)+')':'')):'',
@@ -5191,9 +5249,13 @@ function docBody(kind,f,sites){
            협의회에 나와 앉는 사람은 사용자대표다 — 같은 사람이 아닌 일이 흔하다.
            둘 다 적어 두어야 누가 합의했고 누가 회의에 나오는지가 서류에 남는다.
          ⚠ 빈 곳은 dgV 가 밑줄로 둔다 — 지어내지 않는다. */
-      +"<table><tr><th style='width:40px'>번호</th><th>상호</th><th>대표자</th><th>사용자대표</th><th>근로자대표</th><th>사업자등록번호</th></tr>"
-      +sites.map(function(s,i){ var w=_siteWrep(s), u=_siteUrep(s);
-        return "<tr><td class='center'>"+(i+1)+"</td><td>"+esc(s.name||'')+"</td><td>"+dgV(s.ceo,4)+"</td>"
+      /* ★ 지자체 열(2026-09-13) — 지역기금은 그 회사들이 있는 지자체가 함께 참여한다.
+           별첨 명부가 「어느 지자체가 함께 들어왔는지」를 보여 주는 자리다. */
+      +"<table><tr><th style='width:40px'>번호</th><th>상호</th><th>지자체</th><th>대표자</th><th>사용자대표</th><th>근로자대표</th><th>사업자등록번호</th></tr>"
+      +sites.map(function(s,i){ var w=_siteWrep(s), u=_siteUrep(s), p=_addrParts(s.address);
+        return "<tr><td class='center'>"+(i+1)+"</td><td>"+esc(s.name||'')+"</td>"
+          +"<td>"+dgV(p&&p.sgg?(p.sido+' '+p.sgg):'',6)+"</td>"
+          +"<td>"+dgV(s.ceo,4)+"</td>"
           +"<td>"+dgV(u.name,4)+"</td>"
           +"<td>"+dgV(w.name,4)+"</td><td>"+dgV(s.biz_no,12)+"</td></tr>";}).join('')+"</table>";
   }
@@ -13854,7 +13916,9 @@ var HELP={
    +'<p><b>딱지에 붙은 숫자</b>는 그 지자체에 있는 사업장 수입니다. 딱지에 마우스를 올리면 어느 회사인지 보입니다.</p>'
    +'<p><b>「주소 모름」</b>이 뜨면 그만큼 소재지를 못 읽은 것입니다 — 조용히 빼지 않고 세어 보여 줍니다. 참여사업장에서 주소를 채우면 사라집니다.</p>'
    +'<p>여러 시·도에 걸쳐 있으면 <b>시·도 딱지</b>가 함께 뜹니다.</p>'
-   +'<p>⚠ 이 값은 <b>서식에 자동으로 찍지 않습니다.</b> 관청에 내는 서류의 지자체·관할은 원본 서류를 보고 넣어야 합니다.</p>'},
+   +'<p><b>서식에도 들어갑니다</b>(2026-09-13) — <b>지원사업 자율체크리스트</b>의 「지역」 칸과 <b>설립합의서 별첨 명부</b>의 지자체 열입니다.</p>'
+   +'<p>⚠ <b>주소를 못 읽은 곳이 하나라도 있으면 체크리스트에는 시·도만</b> 적습니다. 반쪽짜리 목록을 전부인 양 낼 수 없기 때문입니다 — 「주소 모름」을 없애면 시·군까지 들어갑니다.</p>'
+   +'<p>⚠ <b>관할</b>(세무서·등기소·노동청)은 이것과 <b>다릅니다.</b> 관할은 원본 서류를 보고 넣으세요.</p>'},
  'newfund':{t:'새 기금 등록',h:'<p><b>신규</b>(설립부터) 또는 <b>기존</b>(이미 설립·운영 중) 기금을 등록합니다.</p><p>담당은 푸른이알피 <b>재직자</b>에서 선택합니다.</p>'},
  'mgr':{t:'담당자 지정',h:'<p>푸른이알피 재직자 명단에서 선택합니다.</p><p><b>주담당 1명</b>, <b>부담당은 여러 명</b> 지정할 수 있습니다.</p>'}
 };

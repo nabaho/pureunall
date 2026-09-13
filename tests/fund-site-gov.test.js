@@ -53,12 +53,44 @@ const 사업장 = [
   { name: '바사레미콘', address: '충남 보령시 오천면 교성리 산 221-46' },
 ];
 
-test('① 같은 지자체끼리 묶어 세고, 많은 곳부터 내놓는다', () => {
+test('① 같은 지자체끼리 묶어 센다', () => {
   const g = GOV()(사업장);
   assert.deepEqual(g.list.map((x) => x.sgg), ['예산군', '공주시', '보령시']);
   assert.deepEqual(g.list.map((x) => x.n), [3, 2, 1]);
   assert.equal(g.total, 6);
   assert.equal(g.unknown, 0);
+});
+
+/* ★★ 차례는 «명부 차례»다 — 대표 확인 2026-09-13:
+     「예를 들어 1호기금은 예산군 공주시 보령시 참여이다. 이부분 확인하면 된다.」
+   처음에는 «곳 수가 많은 순»으로 냈다. 그러면 충남 1호가 예산군7·보령시6·공주시3 이 되어
+   대표님이 명부를 보고 부르는 차례와 어긋난다. 서류를 명부와 맞대 보는 사람이 바로
+   짚을 수 있어야 하므로 연번을 따른다.
+   ⚠ 아래 자료는 «곳 수 차례와 명부 차례가 다르게» 짰다 — 같으면 이 검사가 헛돈다. */
+test('★★ ①-2 차례는 «명부(연번) 차례»다 — 곳 수가 많은 순이 아니다', () => {
+  const 충남1호 = [
+    { name: 'ㄱ', seq_label: '1-1', address: '충남 예산군 응봉면 1' },
+    { name: 'ㄴ', seq_label: '1-2', address: '충남 예산군 삽교읍 2' },
+    { name: 'ㄷ', seq_label: '1-3', address: '충남 예산군 고덕면 3' },
+    { name: 'ㄹ', seq_label: '1-4', address: '충남 공주시 정안면 4' },
+    { name: 'ㅁ', seq_label: '1-5', address: '충남 보령시 청소면 5' },
+    { name: 'ㅂ', seq_label: '1-6', address: '충남 보령시 오천면 6' },
+    { name: 'ㅅ', seq_label: '1-7', address: '충남 보령시 주교면 7' },
+    { name: 'ㅇ', seq_label: '1-8', address: '충남 보령시 웅천읍 8' },
+  ];
+  const g = GOV()(충남1호);
+  assert.deepEqual(g.list.map((x) => x.sgg), ['예산군', '공주시', '보령시'],
+    '★ 명부 차례가 아닙니다 — 곳 수 순이면 보령시(4)가 예산군(3)보다 앞에 옵니다.');
+  assert.deepEqual(g.list.map((x) => x.n), [3, 1, 4], '곳 수는 그대로 세야 합니다.');
+});
+
+test('★ ①-3 연번이 뒤죽박죽 들어와도 «연번 차례»로 센다 — 부르는 쪽 순서에 기대지 않는다', () => {
+  const 뒤섞 = [
+    { name: 'ㅁ', seq_label: '1-5', address: '충남 보령시 1' },
+    { name: 'ㄱ', seq_label: '1-1', address: '충남 예산군 2' },
+    { name: 'ㄹ', seq_label: '1-4', address: '충남 공주시 3' },
+  ];
+  assert.deepEqual(GOV()(뒤섞).list.map((x) => x.sgg), ['예산군', '공주시', '보령시']);
 });
 
 test('② 어느 회사가 그 지자체에 있는지 들고 있다 — 딱지에 올려 보여 준다', () => {
@@ -164,7 +196,110 @@ test('⑯ 새로 쓴 ⓘ 열쇠가 HELP 에 등록돼 있다', () => {
   const help = SRC.slice(SRC.indexOf('var HELP={'));
   assert.ok(SRC.includes("hlp('gov.join')"), '쓰는 곳이 없는 도움말입니다');
   assert.ok(help.includes("'gov.join':{"), '등록되지 않은 도움말 열쇠입니다');
-  /* ⚠ 서식에 자동으로 찍지 않는다고 «적어 두었는가» — 관할은 원본 서류를 봐야 한다 */
-  assert.ok(help.slice(help.indexOf("'gov.join':{")).indexOf('서식에 자동으로 찍지 않습니다') >= 0,
-    '★ 서식에 안 들어간다는 말이 없습니다 — 사람이 그런 줄 알고 관할을 안 확인합니다.');
+  /* ★ 2026-09-13 대표 지시 「지자체도 서식 자동 들어가게」 — 하루 전 규칙을 뒤집었다.
+     ⚠ 그래도 «관할»(세무서·등기소·노동청)은 다르다고 적어 두어야 한다. 참여 지자체와
+       관할은 다른 것인데, 하나가 자동으로 들어가면 다른 것도 그런 줄 안다. */
+  const 내것 = help.slice(help.indexOf("'gov.join':{"));
+  assert.ok(내것.indexOf('서식에도 들어갑니다') >= 0, '어느 서식에 들어가는지 말해 주지 않습니다.');
+  assert.ok(내것.indexOf('관할') >= 0 && 내것.indexOf('다릅니다') >= 0,
+    '★ 관할은 다르다는 말이 없습니다 — 사람이 관할까지 자동인 줄 알고 확인을 건너뜁니다.');
+});
+
+/* ══ ★★ 서식에 «정말» 들어가는가 ═══════════════════════════════════
+   대표 지시 2026-09-13 「지자체도 서식 자동 들어가게」.
+   ⚠ 서식에 지자체를 묻는 자리는 «둘뿐»이다 — 정관·사내정관의 「국가, 지방자치단체가
+     발행하는 유가증권」은 법조문이라 채우는 자리가 아니다(찾아서 확인했다). */
+
+test('★★ ⑰ 지원사업 체크리스트의 「지역」에 시·군까지 들어간다', () => {
+  const fn = grabFn('fillChecklistDoc');
+  assert.match(fn, /_siteGovs\(act\)/, '★ 지역 칸이 아직 시·도만 적습니다.');
+  assert.match(fn, /f\.region/, '시·도를 빼면 안 됩니다 — 「예산군」만으로는 어디인지 모릅니다.');
+});
+
+test('★★ ⑱ 주소를 못 읽은 곳이 있으면 체크리스트에는 «시·도만» — 반쪽을 전부인 양 내지 않는다', () => {
+  const b = load([grabDecl('_SIDO_ABBR'), grabFn('_addrParts'), grabFn('_siteGovs'),
+    /* 서식 채우기에서 「지역」을 셈하는 그 식만 떼어 와 돌린다 */
+    'function 지역(f,act){ var sd=f.region||"", g=_siteGovs(act);' +
+    ' if(!g.list.length||g.unknown) return sd;' +
+    ' var 군=g.list.map(function(x){ return x.sgg; }).join("·");' +
+    ' return sd?(sd+" "+군):군; }',
+    'this.f=지역;']);
+  /* 예산군 둘·공주시 하나 — 많은 곳부터 적히는지도 함께 본다(같은 수면 이름순) */
+  const 온전 = [{ name: 'ㄱ', address: '충남 예산군 응봉면 1' }, { name: 'ㄴ', address: '충남 공주시 1' },
+                { name: 'ㄷ', address: '충남 예산군 삽교읍 2' }];
+  assert.equal(b.f({ region: '충남' }, 온전), '충남 예산군·공주시');
+  const 모름 = 온전.concat([{ name: 'ㄷ', address: '' }]);
+  assert.equal(b.f({ region: '충남' }, 모름), '충남',
+    '★ 못 읽은 곳이 있는데 시·군 목록을 전부인 양 냈습니다.');
+  /* 소스의 식과 여기 식이 «같은지» — 다르면 이 검사가 헛돕니다 */
+  assert.match(grabFn('fillChecklistDoc'), /if\(!g\.list\.length\|\|g\.unknown\) return sd;/,
+    '★ 서식 쪽 식이 달라졌습니다 — 이 검사가 딴 것을 재고 있습니다.');
+});
+
+test('★★ ⑲ 설립합의서 별첨 명부에 지자체 열이 선다', () => {
+  const b = load([
+    'function esc(s){ return String(s==null?"":s); }',
+    'function dgV(v,n){ return v ? String(v) : "＿＿＿＿"; }',
+    'function dgWon(n){ return String(n||0); }',
+    'function dgToday(){ return "2026. 9. 13."; }',
+    'function foundContrib(){ return 10000000; }',
+    'function _officersOf(){ return []; }',
+    'function hwpFormHTML(){ return ""; }',
+    grabDecl('_SIDO_ABBR'), grabFn('_addrParts'),
+    grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('docBody'), 'this.f=docBody;']);
+  const html = b.f('agreement', { name: '가나공동근로복지기금', fund_type: '공동' },
+    [{ name: '가나전자', ceo: '김대표', biz_no: '111-11-11111', address: '충남 예산군 응봉면 1' }]);
+  assert.ok(html.indexOf('<th>지자체</th>') >= 0, '★ 지자체 열이 없습니다.');
+  assert.ok(html.indexOf('충남 예산군') >= 0, '★ 지자체가 안 찍혔습니다.');
+});
+
+test('★★ ⑳ 주소가 없으면 별첨 명부의 지자체는 «밑줄»로 남는다 — 지어내지 않는다', () => {
+  const b = load([
+    'function esc(s){ return String(s==null?"":s); }',
+    'function dgV(v,n){ return v ? String(v) : "＿＿＿＿"; }',
+    'function dgWon(n){ return String(n||0); }',
+    'function dgToday(){ return "2026. 9. 13."; }',
+    'function foundContrib(){ return 10000000; }',
+    'function _officersOf(){ return []; }',
+    'function hwpFormHTML(){ return ""; }',
+    grabDecl('_SIDO_ABBR'), grabFn('_addrParts'),
+    grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('docBody'), 'this.f=docBody;']);
+  const html = b.f('agreement', { name: '가나공동근로복지기금', fund_type: '공동' },
+    [{ name: '가나전자', ceo: '김대표', biz_no: '111-11-11111' }]);
+  assert.ok(html.indexOf('＿＿＿＿') >= 0, '빈 지자체 자리가 밑줄로 안 남았습니다.');
+});
+
+/* ══ 목록의 지자체 열 ═══════════════════════════════════════════════ */
+
+const SHORT = () => load([grabDecl('_SIDO_ABBR'), grabFn('_addrParts'), grabFn('_siteGovs'),
+  grabFn('govShort'), 'this.f=govShort;']).f;
+
+test('★ ㉑ 목록 칸은 둘까지 적고 «외 n» 으로 줄이되, 올림말에 전부를 담는다', () => {
+  const r = SHORT()(사업장, 2);
+  assert.equal(r.text, '예산군·공주시 외 1');
+  assert.ok(r.title.indexOf('예산군 3') >= 0 && r.title.indexOf('보령시 1') >= 0,
+    '★ 줄인 것을 올림말에서도 못 봅니다: ' + r.title);
+});
+
+test('㉒ 사업장이 없으면 «—», 주소를 다 못 읽으면 그렇다고 적는다', () => {
+  assert.equal(SHORT()([]).text, '—');
+  assert.equal(SHORT()([{ name: 'ㄱ', address: '' }]).text, '주소 모름');
+});
+
+test('★★ ㉓ 목록이 사업장을 «한 번만» 읽는다 — 기금마다 읽으면 마흔세 번 오간다', () => {
+  const fn = grabFn('loadAllSites');
+  assert.match(fn, /_allSitesTried/, '★ 못 읽었을 때 매번 다시 매답니다 — 그릴 때마다 통신이 나갑니다.');
+  assert.match(fn, /NS\+'\/sites'/, '전체를 한 번에 읽지 않습니다.');
+  const cell = grabFn('fundGovCell');
+  assert.match(cell, /if\(!_allSites\)/, '★ 다 읽기 전에 0곳이라 말합니다.');
+  assert.match(cell, /…/, '읽는 중임을 보여 주지 않습니다.');
+});
+
+test('★★ ㉔ 목록 열이 «기금명 바로 오른쪽»이고 폭이 못 박혀 있다 — 묶음마다 표가 따로다', () => {
+  const fn = grabFn('fundTable');
+  const i = fn.indexOf("['기금명','','']"), j = fn.indexOf("'참여 지자체'");
+  assert.ok(i >= 0 && j > i, '★ 참여 지자체가 기금명 오른쪽에 없습니다.');
+  assert.ok(fn.indexOf("['주담당','','132px']") > j, '★ 주담당보다 뒤에 있습니다.');
+  assert.match(fn, /'참여 지자체','ph','\d+px'/, '★ 폭이 없습니다 — 충남 표와 경기 표의 열이 어긋납니다.');
+  assert.match(grabFn('fundRow'), /fundGovCell\(f\._id\)/, '줄에 칸이 안 들어갔습니다.');
 });

@@ -282,6 +282,7 @@ test('★★ ㉔ 설립합의서 별첨 명부에 사용자대표 열이 선다 
     'function foundContrib(){ return 10000000; }',
     'function _officersOf(){ return []; }',
     'function hwpFormHTML(){ return ""; }',   /* 원본 .hwp 는 없다 — 자동생성 쪽을 잰다 */
+    grabDecl('_SIDO_ABBR'), grabFn('_addrParts'),
     grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('docBody'),
     'this.f=docBody;']);
   const html = b.f('agreement', { name: '가나공동근로복지기금', chairman: '홍길동', fund_type: '공동' },
@@ -303,6 +304,7 @@ test('★★ ㉕ 사용자대표가 비면 밑줄로 남는다 — 대표자를 
     'function foundContrib(){ return 10000000; }',
     'function _officersOf(){ return []; }',
     'function hwpFormHTML(){ return ""; }',   /* 원본 .hwp 는 없다 — 자동생성 쪽을 잰다 */
+    grabDecl('_SIDO_ABBR'), grabFn('_addrParts'),
     grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('docBody'),
     'this.f=docBody;']);
   const html = b.f('agreement', { name: '가나공동근로복지기금', fund_type: '공동' },

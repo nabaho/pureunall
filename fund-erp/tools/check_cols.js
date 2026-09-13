@@ -71,7 +71,8 @@ ok('폭을 머리 칸에 준다 (colgroup 아님)',
   && /style="width:/.test(fundTable([{ fund_type:'공동' }], false, '')));
 ok('부담당·대표자는 접히는 칸(mo)', 충남.filter(c=>c.cls==='mo').map(c=>c.name).join() === '부담당,대표자',
    충남.filter(c=>c.cls==='mo').map(c=>c.name).join());
-ok('정보·분류는 더 좁을 때 접힌다(ph)', 충남.filter(c=>/ph/.test(c.cls)).map(c=>c.name).join() === '정보,분류',
+/* 참여 지자체는 곁들이는 칸이라 좁은 화면에서 접는다(2026-09-13) — 기금명·담당이 먼저다 */
+ok('참여 지자체·정보·분류는 더 좁을 때 접힌다(ph)', 충남.filter(c=>/ph/.test(c.cls)).map(c=>c.name).join() === '참여 지자체,정보,분류',
    충남.filter(c=>/ph/.test(c.cls)).map(c=>c.name).join());
 
 console.log('\n■ 칸 수가 달라지는 경우');

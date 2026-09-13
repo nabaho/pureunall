@@ -25,6 +25,11 @@ let bad = 0;
 const ok = (n, c, w) => { if (c) console.log('  · ' + n); else { bad++; console.log('  ✗ ' + n + (w ? '  — ' + w : '')); } };
 function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음 '+n);let d=0;
   for(let k=src.indexOf('{',i);k<src.length;k++){if(src[k]==='{')d++;else if(src[k]==='}'){d--;if(!d)return src.slice(i,k+1);}}}
+/* 상수도 실어야 한다 — 별첨 명부의 지자체 열이 _SIDO_ABBR 를 본다(2026-09-13) */
+function gV(n){const i=src.indexOf('var '+n+'=');if(i<0)throw Error('없음 '+n);
+  let d=0,on=false;for(let j=src.indexOf('=',i);j<src.length;j++){const c=src[j];
+    if(c==='{'||c==='['){d++;on=true;}else if(c==='}'||c===']'){d--;if(on&&!d)return src.slice(i,j+1)+';';}}
+  throw Error('끝 못 찾음 '+n);}
 
 global.esc = v => String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 global.num = v => (v==null||v===''?'':Math.round(Number(String(v).replace(/[^0-9.-]/g,''))||0));
@@ -132,6 +137,8 @@ if (!JSDOM) {
   /* ★ 설립합의서 별첨 명부에 «사용자대표» 열이 생겼다(2026-09-13) — 안 실으면
      CI 에서만 「_siteUrep is not defined」로 통째로 죽는다(jsdom 은 CI 에만 있다). */
   (0, eval)(gF('_siteUrep'));
+  /* 별첨 명부에 지자체 열이 생겼다(2026-09-13) */
+  (0, eval)(gV('_SIDO_ABBR')); (0, eval)(gF('_addrParts'));
   /* 설립합의서 제3조 출연금은 «한 줄기»(foundContrib)에서 온다 — 2026-09-10 */
   (0, eval)(gF('estabSites')); (0, eval)(gF('siteContribOf'));
   (0, eval)(gF('foundContribOf')); (0, eval)(gF('foundContrib'));

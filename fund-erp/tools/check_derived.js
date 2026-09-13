@@ -38,7 +38,7 @@ global.S = { fundId: 'X', year: 2026, f15Close: null };
 global.funds = {};
 (0, eval)([gV('OFFICER_ROLES'), gV('FORM_FILL'), gV('BIZ_BS_ROWS'), gV('BUDGET_KEYS'), gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'), gV('_K'),
   gF('_officersOf'), gF('_boss'), gF('_isBlankCell'), gF('_isLabelCell'), gF('_bakeText'), gF('_isRateRow'), gF('stripBaked'),
-  gF('korWon'), gF('_docRok'), gF('_siteWrep'), gF('_isCommittee'), gF('_prepCommittee'), gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'),
+  gF('korWon'), gF('_docRok'), gF('_siteWrep'), gF('_isCommittee'), gF('_prepCommittee'), gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'),
   gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'), gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'),
   gF('fillCommittee'), gF('fillRoster'), gF('fillSubsidyDoc'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
   /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10).
