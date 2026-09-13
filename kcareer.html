@@ -2034,6 +2034,10 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
             <div class="stick-bar" id="trashStick">
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <span id="trashInfo" style="font-size:12px;color:var(--text-mute)"></span>
+                <!-- ★ 종류·내용으로 걸러 본다 — 「표창」이라 치면 표창만 남는다 -->
+                <input id="trashQ" class="tb-input" placeholder="종류·내용으로 찾기 (예: 표창)"
+                  oninput="trashFilter()" style="min-width:210px">
+                <span id="trashFiltInfo" style="font-size:11.5px;color:var(--text-mute)"></span>
                 <span style="flex:1"></span>
                 <button class="btn sm" onclick="trashSweepNow()">🧹 30일 지난 것 비우기</button>
                 <button class="btn sm" style="color:var(--red);border-color:#fecaca" onclick="trashEmptyAll(this)">전부 비우기</button>
@@ -2041,7 +2045,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
               <!-- ★ 고른 것이 있을 때만 나온다 — 목록 화면의 .sel-bar 와 «같은 옷»을 입는다 -->
               <div class="sel-bar" id="trashSelBar" style="display:none;margin-top:8px">
                 <b id="trashSelCnt">0건 선택</b>
-                <button class="btn sm" onclick="trashSelAll(true)">전체 선택</button>
+                <span style="font-size:11px;color:var(--text-mute)">체크를 누른 채 <b>끌면</b> 여러 줄이 한 번에 골라집니다</span>
+                <button class="btn sm" onclick="trashSelAll(true)" title="지금 «보이는» 줄을 모두 고릅니다">전체 선택</button>
                 <button class="btn sm" onclick="trashSelAll(false)">선택 해제</button>
                 <span style="flex:1"></span>
                 <button class="btn sm" style="background:var(--teal);color:#fff;border-color:var(--teal)" onclick="trashRestoreSel(this)">↩ 선택 되살리기</button>
@@ -6900,23 +6905,32 @@ function careerSelAll(name,on){
    ⚠ 표를 다시 그릴 때마다 새로 묶는다(renderCareer 가 innerHTML 을 갈아 끼우므로).
    ⚠ 끌기 중에는 글자가 잡히지 않게 막는다 — 파랗게 번지면 지저분하다. */
 var _dragSel=null;
-function careerDragSel(name){
-  var box=document.querySelector('#page-'+name+' .dt'); if(!box) return;
+/* ★★ 끌기 얼개는 «한 곳»이다 — 목록 화면과 휴지통이 같은 것을 쓴다 (대표 지시 2026-09-13
+   「마우스로 클릭 하나씩 안하고 드레그로 선택가능하게」).
+   ⚠ 화면마다 따로 만들면 한쪽만 고쳐져 「여기선 끌리는데 저기선 안 끌린다」가 된다.
+   ⚠ «한 번만» 묶는다(dragBound) — 다시 그릴 때마다 묶으면 지나간 줄이 여러 번 뒤집힌다.
+     칸(.dt·#trashBody)은 안쪽만 갈릴 뿐 그대로 있으므로 한 번이면 된다. */
+function bindDragSel(box, sync){
+  if(!box || box.dataset.dragBound) return;
+  box.dataset.dragBound='1';
   box.addEventListener('mousedown', function(e){
     var c=e.target.closest('.row-chk'); if(!c) return;
     /* 이 시점의 checked 는 «누르기 전» 값 — 눌린 뒤 값으로 칠해야 한다 */
-    setTimeout(function(){ _dragSel={name:name, on:c.checked}; }, 0);
+    setTimeout(function(){ _dragSel={sync:sync, on:c.checked}; }, 0);
     document.body.style.userSelect='none';
   });
   box.addEventListener('mouseover', function(e){
-    if(!_dragSel || _dragSel.name!==name) return;
+    if(!_dragSel) return;
     var c=e.target.closest('.row-chk'); if(!c) return;
-    if(c.checked!==_dragSel.on){ c.checked=_dragSel.on; careerSelSync(name); }
+    if(c.checked!==_dragSel.on){ c.checked=_dragSel.on; try{ _dragSel.sync(); }catch(err){} }
   });
 }
+function careerDragSel(name){
+  bindDragSel(document.querySelector('#page-'+name+' .dt'), function(){ careerSelSync(name); });
+}
 document.addEventListener('mouseup', function(){
-  if(_dragSel){ var n=_dragSel.name; _dragSel=null; document.body.style.userSelect='';
-    try{ careerSelSync(n); }catch(e){} }
+  if(_dragSel){ var f=_dragSel.sync; _dragSel=null; document.body.style.userSelect='';
+    try{ f(); }catch(e){} }
 });
 function careerSelSync(name){
   var box=_selBox(name); if(!box) return;
@@ -7874,7 +7888,11 @@ function renderTrash(){
       : ((e.files||[]).some(function(id){ return fileExists(id); })
         ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:999px;background:#f0fdf4;color:#166534">있음</span>'
         : '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:999px;background:#fef2f2;color:#991b1b">없음</span>');
-    return '<tr'+(급함?' style="background:#fffbeb"':'')+'>'
+    /* ★ 종류를 보여 준다 — 내용만으로는 「표창」인지 알 수 없다(내용에 그 낱말이 없다).
+       찾기칸도 이 글자를 본다. */
+    var 종류=_trashKind(e);
+    var 찾을글=(종류+' '+(e.label||'')+' '+(e.what||'')+' '+(e.store||'')).toLowerCase();
+    return '<tr data-q="'+escapeHtml(찾을글)+'"'+(급함?' style="background:#fffbeb"':'')+'>'
       +'<td style="padding:7px 8px;border-top:1px solid var(--border);width:34px">'
         +'<input type="checkbox" class="row-chk" data-id="'+_jsAttr(e.tid)+'"></td>'
       +'<td style="padding:7px 8px;border-top:1px solid var(--border);white-space:nowrap">'+날+'</td>'
@@ -7882,6 +7900,8 @@ function renderTrash(){
         +(급함?';color:var(--red);font-weight:700':'')+'">D-'+left+'</td>'
       +'<td style="padding:7px 8px;border-top:1px solid var(--border);white-space:nowrap;font-size:11.5px;color:var(--text-mute)">'
         +escapeHtml(e.what||'')+'</td>'
+      +'<td style="padding:7px 8px;border-top:1px solid var(--border);white-space:nowrap">'
+        +(종류?'<span class="tag" style="font-size:10px">'+escapeHtml(종류)+'</span>':'')+'</td>'
       +'<td style="padding:7px 8px;border-top:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px" title="'
         +escapeHtml(e.label||'')+'">'+escapeHtml(e.label||'')+'</td>'
       +'<td style="padding:7px 8px;border-top:1px solid var(--border);white-space:nowrap">'+원본+'</td>'
@@ -7893,7 +7913,7 @@ function renderTrash(){
     +'<thead><tr>'
     +'<th style="padding:7px 8px;background:var(--bg);width:34px">'
       +'<input type="checkbox" id="trashChkAll" onclick="trashSelAll(this.checked)" title="전체 선택"></th>'
-    +['지운 날','남은 기간','어디서','내용','원본','되살리기'].map(function(h){
+    +['지운 날','남은 기간','어디서','종류','내용','원본','되살리기'].map(function(h){
       return '<th style="padding:7px 8px;background:var(--bg);color:var(--text-mute);font-size:11.5px;text-align:left;white-space:nowrap">'+h+'</th>'; }).join('')
     +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
   /* 표를 새로 그렸으니 체크 상태와 고정 높이를 다시 맞춘다.
@@ -7905,8 +7925,25 @@ function renderTrash(){
       if(ev.target && ev.target.classList && ev.target.classList.contains('row-chk')) trashSelSync();
     });
   }
-  trashSelSync();
+  bindDragSel(box, trashSelSync);
+  trashFilter();          /* 걸러 둔 글자가 있으면 그대로 다시 적용하고, 안이면 그냥 맞춘다 */
   _trashSticky();
+}
+
+/* 이 줄이 «무슨 종류»인가 — 기록의 type 이 있으면 그것, 없으면 창고 이름을 사람 말로.
+   ⚠ 내용(label)에는 「표창」이라는 낱말이 없다(수여 사유만 적힌다) — 종류를 따로 보여
+     주지 않으면 130줄에서 표창 7건을 눈으로 골라낼 수가 없다. */
+var TRASH_KIND={wiccok:'위촉·표창', cert:'자격·수료', edu:'학력', work:'기업경력',
+  certdoc:'경력증명서', resume:'이력서', profile:'프로필', consult:'컨설팅', 'case':'사건',
+  fund:'기금', etc:'기타실적', lecture:'강의', meetfee:'회의비', etcfee:'기타비용',
+  submission:'제출서류', personal:'개인서류', account:'계좌', id_docs:'신분증',
+  gallery:'사진', stamps:'도장', cvforms:'이력서 양식'};
+function _trashKind(e){
+  if(!e) return '';
+  if(e.fileOnly) return '원본만';
+  var t=e.rec && e.rec.type;
+  if(t) return String(t);
+  return TRASH_KIND[e.store] || String(e.store||'');
 }
 
 /* ═══ 휴지통 — 골라서 한꺼번에 (대표 지시 2026-09-13 「ㅁ 넣어서 선택해서 되살리기」) ═══
@@ -7917,15 +7954,42 @@ function _trashChks(){
   var box=document.getElementById('trashBody');
   return box ? Array.prototype.slice.call(box.querySelectorAll('.row-chk')) : [];
 }
+/* 지금 «보이는» 줄의 체크칸만 — 거르개를 켜면 안 보이는 줄은 아예 다루지 않는다 */
+function _trashShown(){
+  return _trashChks().filter(function(c){
+    var tr=c.closest('tr'); return !tr || tr.style.display!=='none';
+  });
+}
 function trashSelIds(){
   return _trashChks().filter(function(c){ return c.checked; }).map(function(c){ return c.dataset.id; });
 }
+/* ⚠ 「전체 선택」은 «보이는 것»만 고른다 — 걸러 놓고 눌렀는데 안 보이는 것까지 딸려 오면
+     무엇을 되살렸는지 알 수 없다. */
 function trashSelAll(on){
-  _trashChks().forEach(function(c){ c.checked=!!on; });
+  _trashShown().forEach(function(c){ c.checked=!!on; });
+  trashSelSync();
+}
+/* ★ 종류·내용으로 걸러 본다 (대표 지시 2026-09-13 「표창건 모두 살리고」).
+   ⚠★ 안 보이게 된 줄은 «체크를 푼다» — 고른 채 숨으면 보이지도 않는 것이 함께 되살아난다.
+     「보이는 것만 고른다」를 어기면 사람이 무엇을 한 것인지 알 수 없다. */
+function trashFilter(){
+  var box=document.getElementById('trashBody'); if(!box) return;
+  var inp=document.getElementById('trashQ');
+  var q=String((inp&&inp.value)||'').trim().toLowerCase();
+  var 보임=0, 전부=0;
+  box.querySelectorAll('tbody tr').forEach(function(tr){
+    전부++;
+    var ok = !q || String(tr.dataset.q||'').indexOf(q)>=0;
+    tr.style.display = ok ? '' : 'none';
+    if(ok) 보임++;
+    else { var c=tr.querySelector('.row-chk'); if(c) c.checked=false; }
+  });
+  var info=document.getElementById('trashFiltInfo');
+  if(info) info.textContent = q ? ('「'+q+'」 '+보임+'건 보임 / 전체 '+전부+'건') : '';
   trashSelSync();
 }
 function trashSelSync(){
-  var ids=trashSelIds(), all=_trashChks();
+  var ids=trashSelIds(), all=_trashShown();
   all.forEach(function(c){ var tr=c.closest('tr'); if(tr) tr.classList.toggle('sel-on', c.checked); });
   var bar=document.getElementById('trashSelBar'), cnt=document.getElementById('trashSelCnt');
   if(bar) bar.style.display=ids.length?'flex':'none';

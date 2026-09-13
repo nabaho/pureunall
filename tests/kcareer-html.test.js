@@ -2398,13 +2398,18 @@ test('★★ 표시 개수는 «50건»이 기본이고, 고르면 기억한다'
 });
 
 test('★★ 체크를 누른 채 끌면 지나간 줄이 모두 같은 상태가 된다', () => {
-  const dg = funcSource('careerDragSel');
+  /* ⚠ 2026-09-13: 끌기 얼개가 «공용» bindDragSel 로 옮겨졌다(휴지통도 같은 것을 쓴다).
+     느슨해진 것이 아니라 «얼개가 하나인지»까지 함께 못박는다 — 두 벌이 되면
+     「여기선 끌리는데 저기선 안 끌린다」가 된다. */
+  const dg = funcSource('bindDragSel');
   assert.match(dg, /addEventListener\('mousedown'/, '누를 때 시작합니다');
   assert.match(dg, /addEventListener\('mouseover'/, '끌면서 칠합니다');
   // ⚠ 누른 «뒤»의 값으로 칠해야 켜며 끌면 켜지고 끄며 끌면 꺼진다
-  assert.match(dg, /setTimeout\(function\(\)\{ _dragSel=\{name:name, on:c\.checked\}/,
+  assert.match(dg, /setTimeout\(function\(\)\{ _dragSel=\{sync:sync, on:c\.checked\}/,
     '⚠ 누르기 «전» 값으로 칠하면 반대로 동작합니다');
   assert.match(dg, /document\.body\.style\.userSelect='none'/, '끌 때 글자가 잡히지 않게 합니다');
+  assert.match(funcSource('careerDragSel'), /bindDragSel\(/,
+    '★★ 목록 화면이 제 나름의 끌기를 쓰면 안 됩니다 — 얼개는 하나입니다');
   assert.match(source, /document\.addEventListener\('mouseup'/, '손을 떼면 끝나야 합니다');
   // 표를 다시 그릴 때마다 새로 묶는다
   assert.match(source, /_safe\(function\(\)\{ careerDragSel\(name\); \}\)/, '그릴 때마다 묶어야 합니다');
