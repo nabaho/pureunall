@@ -1078,7 +1078,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=4"></script>
 <script src="js/pu-doc-read.js?v=40"></script>
-<script src="js/kcareer-hwpxfill.js?v=23"></script>
+<script src="js/kcareer-hwpxfill.js?v=24"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=15"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
@@ -1926,8 +1926,18 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <!-- 한 화면에 다 보이게 두 줄로 나눈다(대표 요청 2026-08-29).
                세로로 길게 늘어놓으면 사진·도장을 보려고 매번 스크롤해야 한다. -->
           <div class="pi-two">
+          <div>
           <div class="card"><div class="rc-h">기본정보</div><div class="field-grid" id="piGrid"></div>
             <button class="btn primary" id="piSave" style="margin-top:10px">기본정보 저장</button></div>
+          <!-- 🎓 학력 — 여기서 «바로» 넣는다 (대표 결정 2026-09-13 「가)」).
+               ⚠ 자료는 학력 목록 한 곳에만 담긴다. 여기는 입구일 뿐이다 —
+                 두 곳에 적으면 어느 쪽이 맞는지 아무도 모르게 된다. -->
+          <div class="card" id="piEduCard" style="margin-top:12px">
+            <div class="rc-h">🎓 학력<span style="font-size:11px;font-weight:400;color:var(--text-mute)">— 이력서의 학력 표를 채웁니다 · 고등학교부터 넣어 두세요</span></div>
+            <div id="piEduList" style="font-size:12px"></div>
+            <button class="btn primary" type="button" style="margin-top:10px" onclick="piEduAdd()">+ 학력 추가</button>
+          </div>
+          </div>
           <div class="pi-side">
           <div class="card" id="galleryCard"><div class="rc-h">📷 사진 보관함<span style="font-size:11px;font-weight:400;color:var(--text-mute)">— 이력서·프로필에서 불러와 쓸 개인 사진</span></div>
             <div class="ocr-zone" id="galleryDrop" style="margin-bottom:10px">📷 사진을 끌어놓거나 클릭해서 업로드 (JPG·PNG·WEBP, 여러 장 가능)</div>
@@ -6722,7 +6732,11 @@ function saveForm(){ if(!_formCtx) return; const {page,editId}=_formCtx; const d
   else { let id; if(page==='wiccok'||page==='award'){ const yr=data.year||(data.issueDate||'').slice(0,4)||String(new Date().getFullYear()); data.year=yr; id=wiccokId(data.type,yr); }
     else id=nextId(def.prefix||page.slice(0,2).toUpperCase(), def.store);
     db.unshift({id,...data,savedAt:new Date().toISOString()}); set(def.store,db); _flashId=id; if(page==='personal_doc') renderPersonalDocs(); if(page==='account') renderAccounts(); if(page==='id_doc') renderIDDocs(); toast('등록 완료: '+id); }
-  closeForm(); if(typeof CAREER_CFG!=='undefined'&&CAREER_CFG[page]) renderCareer(page); if(page==='personal_doc') renderPersonalDocs(); if(page==='account') renderAccounts(); if(page==='id_doc') renderIDDocs();
+  closeForm(); if(typeof CAREER_CFG!=='undefined'&&CAREER_CFG[page]) renderCareer(page);
+  /* ⚠ 환경설정의 학력 카드는 «학력 목록을 비추는 것»이다 — 목록이 바뀌면 같이 바뀌어야
+     「넣었는데 안 보인다」가 없다 */
+  if(page==='edu') _safe(renderPiEdu);
+  if(page==='personal_doc') renderPersonalDocs(); if(page==='account') renderAccounts(); if(page==='id_doc') renderIDDocs();
 }
 
 /* ===== 경력관리 테이블 엔진 (기존 이식) ===== */
@@ -9546,7 +9560,15 @@ const PI_GROUPS=[
   ['주소','지원서는 집을, 위촉 서류는 사무실을 묻는다', [
     ['addrHome','집 주소'],['addr','사무실 주소']]],
   ['일','「푸른노무법인 대표」가 한 칸에 뭉쳐 있었다', [
-    ['org','소속'],['dept','부서'],['title','직위'],['license','자격']]]
+    ['org','소속'],['dept','부서'],['title','직위'],['license','자격']]],
+  /* ★ 병역·보훈·장애 (대표 결정 2026-09-13) — 지원서가 거의 늘 묻는데 담을 데가 없었다.
+     ⚠ 칸만 늘리면 뜻이 없다. 서식이 그 칸을 알아보는 말(FIELD_LABELS)과
+       내보내는 값(_cvFillData)을 «함께» 넣어야 채워진다 — 2026-08-30 에 배운 것이다. */
+  ['병역','지원서가 거의 늘 묻는다', [
+    ['military','병역구분'],['militaryBranch','군별'],
+    ['militaryRank','계급'],['militaryPeriod','복무기간']]],
+  ['그 밖에','위촉·자문 서류가 묻는다', [
+    ['veteran','보훈대상'],['disability','장애여부']]]
 ];
 const PI_FIELDS=PI_GROUPS.reduce((a,g)=>a.concat(g[2]),[]);
 /* ⚠ 주민등록번호는 «자동으로 나가지 않는다». 담아는 두되, 사람이 그 자리에 직접
@@ -9600,7 +9622,7 @@ function renderPersonal(){ const g=document.getElementById('piGrid'); if(!g) ret
         +`<div style="display:flex;gap:6px"><input id="pi-${k}" type="password" autocomplete="off" value="${v}" style="flex:1">`
         +`<button type="button" class="btn sm" onclick="piPeek('${k}',this)" title="잠깐 보기">보기</button></div></div>`;
     }).join('')+`</div></div>`).join('');
-  renderPersonalDocs(); }
+  renderPersonalDocs(); renderPiEdu(); }
 /* ===== 한자 성명 고르기 =====
    ⚠ 후보를 «고르게만» 한다. 같은 소리에 한자가 여럿이고 어느 것이 본인 이름인지는
       본인만 안다 — 지어서 넣으면 위촉 서류에 틀린 이름이 박힌다.
@@ -9661,6 +9683,32 @@ function hjApply(){
 /* 가린 칸을 잠깐 보여 준다 — 다시 누르면 가린다 */
 function piPeek(k,btn){ var el=document.getElementById('pi-'+k); if(!el) return;
   var show=el.type==='password'; el.type=show?'text':'password'; if(btn) btn.textContent=show?'가리기':'보기'; }
+/* 🎓 환경설정의 학력 카드 — «학력 목록»을 그대로 비춘다.
+   ⚠ 여기서 따로 담지 않는다. 담는 곳은 학력 목록 하나다(자료가 두 곳이면 어긋난다). */
+function renderPiEdu(){
+  var box=document.getElementById('piEduList'); if(!box) return;
+  var arr=get('edu')||[];
+  if(!arr.length){
+    box.innerHTML='<div class="rc-mute" style="font-size:12px">아직 넣은 학력이 없습니다 — '
+      +'이력서의 「고등학교·대학교」 줄이 그래서 빈 채로 나갑니다.</div>';
+    return;
+  }
+  /* ⚠ 한 줄에 한 건 — 자리가 넓다고 두 줄로 만들지 않는다(대표 지시 2026-08-30) */
+  box.innerHTML=arr.map(function(r){
+    var 옆=[r.major, r.degree, r.graduated].filter(Boolean).join(' · ');
+    return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">'
+      +'<b style="font-size:12px;color:var(--navy);min-width:104px">'+escapeHtml(r.school||'(학교 없음)')+'</b>'
+      +'<span style="font-size:11.5px;color:var(--text-mute);white-space:nowrap">'+escapeHtml(r.period||'')+'</span>'
+      +'<span style="flex:1;min-width:0;font-size:11.5px;color:var(--text-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(옆)+'">'+escapeHtml(옆)+'</span>'
+      +'<button class="btn sm" type="button" onclick="piEduEdit(\''+_jsAttr(r.id)+'\')">고치기</button>'
+      +'</div>';
+  }).join('');
+}
+/* ⚠ 학력을 넣는 창은 «이미 있는 것»을 쓴다(openForm). 새로 만들면 칸이 두 벌이 되어
+   한쪽만 고쳐질 때 조용히 어긋난다. */
+function piEduAdd(){ openForm('edu'); setTimeout(renderPiEdu, 300); }
+function piEduEdit(id){ openForm('edu', id); setTimeout(renderPiEdu, 300); }
+
 function savePersonalInfo(){ const o=piObj();
   PI_FIELDS.forEach(([k])=>{ const el=document.getElementById('pi-'+k); if(el) o[k]=el.value.trim(); });
   set('profile_info',o); toast('기본정보 저장됨'); }
@@ -11666,6 +11714,22 @@ function _cvFillData(){
      dept·title 을 함께 내보낸다 — 이력서 경력 표는 근무부서·직위 칸이 따로 있다. */
   const work=get('work').map(function(r){ return { period:workPeriod(r), org:r.org||'',
     dept:r.dept||'', title:r.title||'', role:r.role||'' }; });
+  /* ★ 자격 및 면허 · 상벌 표 (대표 결정 2026-09-13 「채워라」)
+     ⚠ 한 머리줄에 «두 목록»이 들어간다 — 왼쪽은 자격, 오른쪽은 상벌.
+       그래서 줄 번호로 짝지어 «한 벌»로 만든다. 자격이 셋이고 상벌이 하나면
+       첫 줄만 상벌이 차고 나머지 두 줄의 상벌 칸은 빈다 — 그것이 맞다.
+     ⚠ 수료증은 «자격이 아니다» — 자격 표에 넣지 않는다(목록 화면도 그렇게 가른다).
+     ⚠ 징계는 담는 자료가 없다. 상벌 표의 징계 칸은 빈 채로 둔다 — 지어내지 않는다. */
+  const 자격목록=get('cert').filter(function(r){ return !/수료|이수/.test(r.title||''); })
+    .slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); })
+    .map(function(r){ return { certName:r.title||'', gotAt:formatDate(r.date)||'' }; });
+  const 상벌목록=get('wiccok').filter(function(r){ return typeof isAwardType==='function' && isAwardType(r.type); })
+    .slice().sort(function(a,b){ return String(b.issueDate||'').localeCompare(String(a.issueDate||'')); })
+    .map(function(r){ return { awardWhat:r.titleVal||r.type||'', awardOrg:r.org||'' }; });
+  const certaward=[];
+  for(var ci=0; ci<Math.max(자격목록.length, 상벌목록.length); ci++){
+    certaward.push(Object.assign({}, 자격목록[ci]||{}, 상벌목록[ci]||{}));
+  }
   const wic=get('wiccok').map(function(r){ return { period:r.period||r.issueDate||r.year||'',
     org:r.org||'', role:(r.type||'')+(r.titleVal?' '+r.titleVal:'') }; });
   const acts=[].concat(
@@ -11693,7 +11757,13 @@ function _cvFillData(){
              /* ★ 「소속·직위」처럼 «둘을 묶어» 묻는 칸이 있다 — 사람이 쓰듯 이어 쓴다.
                 ⚠ 한쪽만 넣으면 서류에 직위가 빠진 채로 나간다.
                 ⚠ 하나만 있으면 그 하나만 — 「푸른노무법인 」처럼 꼬리가 남으면 안 된다. */
-             orgTitle:[info.org||'', info.title||''].filter(Boolean).join(' ') },
+             orgTitle:[info.org||'', info.title||''].filter(Boolean).join(' '),
+             /* ★ 병역·보훈·장애 — 담는 칸(PI_GROUPS)·알아보는 말(FIELD_LABELS)과 «세 곳이 짝»이다.
+                ⚠ 하나라도 빠지면 담아 두고도 영영 안 채워진다(2026-08-30 에 배운 것). */
+             military:info.military||'', militaryBranch:info.militaryBranch||'',
+             militaryRank:info.militaryRank||'', militaryPeriod:info.militaryPeriod||'',
+             veteran:info.veteran||'', disability:info.disability||'' },
+    certaward:certaward,
     /* ★ 주민등록번호는 fields 에 «담지 않는다» — 담으면 자동 채우기가 알아서 써 낸다.
        사람이 칸 지도에서 그 자리에 「주민등록번호」를 직접 고를 때만 여기서 꺼내 간다.
        (대표 지시 2026-08-30 「넣어라」 + 「누를 때만 꺼내 쓰는 방식으로」) */
