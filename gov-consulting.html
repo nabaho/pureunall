@@ -434,6 +434,46 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 /* 「일정관리에서 진행」 스위치 — 이음과 진행은 다른 것이다(대표 지시 2026-09-06) */
 /* 「사업장을 직접 넣으려 할 때」 경고 (대표 지시 2026-09-06)
    ⚠ 막지 않는다 — 알리기만 한다. 막으면 급할 때 우회할 길이 없다. */
+/* 타임라인에서 사업장을 눌러 «크게» 보는 창 (대표 지시 2026-09-14)
+   ★ 「한 번에 볼 수 있게」가 알맹이다 — 한 회차를 두 줄로 쌓지 않는다(CLAUDE.md). */
+.tz-head{padding:12px 16px 10px;border-bottom:1px solid var(--border);}
+.tz-h1{font-size:19px;font-weight:900;color:var(--text);letter-spacing:-.3px;}
+.tz-h2{margin-top:4px;font-size:12px;font-weight:700;color:var(--t2);display:flex;align-items:center;gap:6px;}
+.tz-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.tz-h3{margin-top:7px;display:flex;gap:4px;flex-wrap:wrap;}
+.tz-sum{display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--sf2);
+  border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.tz-big{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:900;color:var(--text);line-height:1;}
+.tz-big span{font-size:13px;margin-left:1px;}
+.tz-big i{font-size:13px;font-weight:700;color:var(--t2);font-style:normal;margin-left:5px;}
+.tz-bar{flex:1;min-width:80px;height:8px;border-radius:5px;background:var(--border);overflow:hidden;}
+.tz-bar div{height:100%;border-radius:5px;}
+.tz-pct{font-size:13px;font-weight:900;color:var(--t2);font-family:'JetBrains Mono',monospace;}
+.tz-mix{font-size:12px;font-weight:700;color:var(--t2);white-space:nowrap;}
+.tz-dl{font-size:11.5px;font-weight:800;color:var(--danger);white-space:nowrap;}
+.tz-dl.end{color:var(--t2);}
+/* 한 회차 = 한 줄. 칸을 그리드로 갈라 글자 수가 달라도 자리가 안 흔들린다 */
+.tz-row{display:grid;grid-template-columns:44px 1fr 92px 96px 26px;gap:10px;align-items:center;
+  padding:9px 16px;border-bottom:1px solid var(--sf2);cursor:pointer;}
+.tz-row:hover{background:var(--sf2);}
+.tz-row.past{background:#f8fafc;}
+.tz-no{width:38px;height:38px;border-radius:11px;color:#fff;font-family:'JetBrains Mono',monospace;
+  font-size:17px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tz-date{display:flex;align-items:baseline;gap:7px;min-width:0;}
+.tz-d{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.5px;}
+.tz-w{font-size:14px;font-weight:900;color:var(--t2);}
+.tz-w.we{color:var(--danger);}
+.tz-y{font-size:11px;color:var(--t2);font-weight:700;}
+.tz-hol{font-size:10.5px;font-weight:800;color:var(--danger);white-space:nowrap;}
+.tz-where{font-size:12.5px;font-weight:800;white-space:nowrap;}
+.tz-where.field{color:#1e40af;}
+.tz-where.office{color:var(--t2);}
+.tz-att{min-width:0;display:flex;gap:3px;flex-wrap:nowrap;overflow:hidden;}
+.tz-ph{font-size:14px;text-align:center;}
+.tz-next{padding:10px 16px;font-size:12.5px;font-weight:700;color:var(--t2);background:#f8fafc;}
+/* 타임라인 왼쪽 칸이 «눌리는 것»임을 보여 준다 */
+.gantt-info{cursor:pointer;}
+.gantt-info:hover .gantt-co{text-decoration:underline;}
 .co-warn{display:none;background:#fffbeb;border:1px solid #fbbf24;border-radius:10px;
   padding:10px 12px;margin-bottom:14px;}
 .co-warn.on{display:block;}
@@ -1598,26 +1638,17 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
     </div>
   </div>
 </div>
-<!-- 중복 사업장 합치기 (대표 지시 2026-09-06) — 미리 보이고 나서 합친다 -->
-<div class="mb" id="mbMerge">
-  <div class="modal md" style="max-height:86vh;display:flex;flex-direction:column;">
-    <div class="mhead" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);">
-      <div>
-        <div style="font-size:15px;font-weight:800;">🧹 중복 사업장 합치기</div>
-        <div style="font-size:11px;color:var(--t2);margin-top:2px;">같은 회사가 여러 줄로 갈라져 있으면 하나로 모읍니다</div>
-      </div>
-      <button class="mclose" onclick="closeModal('mbMerge')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);">✕</button>
+<!-- 타임라인 「사업장 크게 보기」 (대표 지시 2026-09-14)
+     「날짜·요일과 방문 횟수를 크게 해서 한 번에」 — 한 회차는 «한 줄»이다. -->
+<div class="mb" id="mbTlZoom">
+  <div class="modal md" style="max-height:88vh;display:flex;flex-direction:column;padding:0;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+      <div id="tzHead" style="flex:1;min-width:0;"></div>
+      <button class="mclose" onclick="closeModal('mbTlZoom')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);padding:12px 14px;">✕</button>
     </div>
-    <div style="padding:7px 16px;background:#fffbeb;font-size:11px;color:#854d0e;line-height:1.6;">
-      없어지는 쪽은 <b>지우지 않고</b> 「합쳐짐」 표시만 합니다 — 되돌릴 수 있습니다.
-      일정·종류·담당자는 모두 남는 쪽으로 옮깁니다.
-    </div>
-    <div id="mergeBody" style="overflow:auto;flex:1;min-height:140px;"></div>
-    <div style="padding:9px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;">
-      <span id="mergeCount" style="font-size:11px;color:var(--t2);"></span>
-      <button class="btn btn-s" style="margin-left:auto;font-size:11.5px;padding:5px 11px;" onclick="closeModal('mbMerge')">닫기</button>
-      <button class="btn btn-p" id="mergeGo" style="font-size:11.5px;padding:5px 13px;" onclick="mergeApplyAll()">합치기</button>
-    </div>
+    <div id="tzSum"></div>
+    <div id="tzList" style="overflow:auto;flex:1;min-height:80px;"></div>
+    <div id="tzFoot"></div>
   </div>
 </div>
 <div class="mb" id="mbNewAssign">
@@ -6656,6 +6687,89 @@ function tlRowHasAtt(co,done,attId){
   if(co.defAtt===attId||getCoAtts(co).includes(attId))return true;
   return done.some(s=>s.attId===attId||getCoAtts(s).includes(attId));
 }
+/* ══ 타임라인 「사업장 크게 보기」 (대표 지시 2026-09-14) ═══════════════════════
+   「특정사업장의 일정을 확대해서 보고 싶다 — 날짜·요일과 방문 횟수를 크게 해서
+    한 번에 볼 수 있게」
+   ★ 알맹이는 «한 번에»다. 그래서 한 회차를 두 줄로 쌓지 않고 한 줄에 담는다
+     (CLAUDE.md 「표의 한 칸은 한 줄」 — 두 줄이 되면 열두 회차가 스물넷이 된다).  */
+const TZ_DOW=['일','월','화','수','목','금','토'];
+/* 요일 — 날짜만 있고 요일이 없으면 「수요일마다 간다」 같은 결이 안 보인다 */
+function tzDow(ds){
+  const d=new Date(String(ds||'')+'T00:00:00');
+  return isNaN(d)?'':TZ_DOW[d.getDay()];
+}
+let _tzKey=null;   // 지금 크게 보고 있는 {coId,tid}
+function openTlZoom(coId,tid){
+  _tzKey={coId,tid};
+  renderTlZoom();
+  q('#mbTlZoom').classList.add('open');
+}
+function renderTlZoom(){
+  if(!_tzKey)return;
+  const co=getCos().find(c=>c.id===_tzKey.coId);
+  const t=getTypes().find(x=>x.id===_tzKey.tid);
+  if(!co||!t){ closeModal('mbTlZoom'); return; }
+  const staff=getStaff();
+  const an=(id)=>(staff.find(a=>a.id===id)||{}).name||"";
+  const ac=(id)=>staffColor(staff.find(a=>a.id===id));
+  const done=getScheds().filter(s=>s.coId===co.id&&s.typeId===t.id)
+    .sort((a,b)=>a.date>b.date?1:-1);
+  const maxR=getCoMaxRounds(co.id,t.id);
+  const fieldN=done.filter(s=>s.isField).length;
+  const officeN=done.length-fieldN;
+  /* 진척은 본컨설팅만 센다 — 사전진단을 섞으면 100% 를 넘겨 버린다 */
+  const progN=mainPhaseScheds(done,t.id).length;
+  const pct=maxR>0?Math.round(progN/maxR*100):null;
+  const dl=(co.deadlines||{})[t.id]||'';
+  const ended=(co.endedTypes||{})[t.id]||'';
+  const subs=coAttStaffList(co);
+
+  q('#tzHead').innerHTML=`<div class="tz-head">
+    <div class="tz-h1">${escAttr(co.name)}</div>
+    <div class="tz-h2"><span class="tz-dot" style="background:${t.color}"></span>
+      ${escAttr(t.fullName||t.name)}${t.agency?' · '+escAttr(t.agency):''}</div>
+    <div class="tz-h3">
+      <span class="att-label" style="background:${ac(co.defAtt)}" title="주담당">${escAttr(an(co.defAtt))}</span>
+      ${subs.map(x=>`<span class="att-label" style="background:${staffColor(x)}99;border:1px solid ${staffColor(x)};" title="부담당(협업)">+${escAttr(x.name)}</span>`).join('')}
+    </div></div>`;
+
+  const pctCol=pct===null?'var(--accent)':pct>=100?'var(--danger)':pct>=70?'var(--ok)':'var(--accent)';
+  q('#tzSum').innerHTML=`<div class="tz-sum">
+    <div class="tz-big">${done.length}<span>회</span>${maxR>0?`<i>/ ${maxR}회</i>`:''}</div>
+    ${pct!==null?`<div class="tz-bar"><div style="width:${Math.min(100,pct)}%;background:${pctCol}"></div></div>
+      <div class="tz-pct" style="color:${pctCol}">${pct}%</div>`:''}
+    <div class="tz-mix">📍 방문 <b>${fieldN}</b> · 🏢 사무실 <b>${officeN}</b></div>
+    ${dl?`<div class="tz-dl">종료일 ${dl}</div>`:''}
+    ${ended?`<div class="tz-dl end">종료됨 ${ended}</div>`:''}
+  </div>`;
+
+  const today=todayStr();
+  q('#tzList').innerHTML=done.length?done.map(sc=>{
+    const wd=tzDow(sc.date);
+    const hol=typeof getHoliday==='function'?getHoliday(sc.date):'';
+    const we=wd==='토'||wd==='일';
+    const scAtt=staff.find(a=>a.id===sc.attId)||staff.find(a=>a.id===co.defAtt);
+    const scEnd=endedDateForSchedule(sc);
+    return `<div class="tz-row${sc.date<today?' past':''}" data-sid="${sc.id}">
+      <div class="tz-no" style="background:${scEnd?'var(--t2)':t.color}">${scEnd?'종':sc.round}</div>
+      <div class="tz-date">
+        <span class="tz-d">${sc.date.slice(5).replace('-','. ')}</span>
+        <span class="tz-w${we?' we':''}">${wd}</span>
+        <span class="tz-y">${sc.date.slice(0,4)}</span>
+        ${hol?`<span class="tz-hol">${escAttr(hol)}</span>`:''}
+      </div>
+      <div class="tz-where ${sc.isField?'field':'office'}">${schedulePlaceLabel(sc)}</div>
+      <div class="tz-att"><span class="att-label" style="background:${staffColor(scAtt)}">${escAttr((scAtt||{}).name||'')}</span></div>
+      <div class="tz-ph">${schedHasPhoto(sc.id)?'📷':''}</div>
+    </div>`;}).join(''):
+    `<div style="padding:30px;text-align:center;color:var(--t2);font-size:13px;">아직 잡힌 일정이 없습니다</div>`;
+
+  q('#tzFoot').innerHTML=ended?'':
+    `<div class="tz-next">다음 <b>${nextRound(co.id,t.id)}회차</b> — 아직 안 잡혔습니다</div>`;
+
+  /* 회차 줄을 누르면 그 일정 고치기로 — 크게 보다가 바로 손댈 수 있어야 한다 */
+  qa('#tzList .tz-row').forEach(r=>{ r.onclick=()=>{ closeModal('mbTlZoom'); openEditModal(r.dataset.sid); }; });
+}
 function renderTimeline(){
   const tlAtt=q('#tlAttFilter')?.value||'';
   const tlStatus=S.tlStatus||'active';
@@ -6793,7 +6907,7 @@ function renderTimeline(){
     const statusText=ended?(co.deleted?'종료·삭제':'종료'):'';
     const metaTitle=`${t.fullName||t.name} · ${attName} · ${roundSummary}${statusText?' · '+statusText:''}${deadline?' · 종료일 '+deadline:''}`;
     return `<div class="gantt-row${ended?' ended-row-g':''}">
-      <div class="gantt-info">
+      <div class="gantt-info" data-zoomco="${co.id}" data-zoomtid="${tid}" title="누르면 이 사업장 일정을 크게 봅니다">
         <div class="gantt-co" title="${co.name}">${co.name}</div>
         <div class="gantt-type gantt-meta-line" title="${escAttr(metaTitle)}">
           <span class="gantt-type-dot" style="background:${t.color};"></span>
@@ -6818,6 +6932,12 @@ function renderTimeline(){
     ${rowsHtml}
   </div>`;
   qa('#tlBody .gantt-dot').forEach(d=>d.onclick=e=>{e.stopPropagation();openEditModal(d.dataset.sid);});
+  /* 왼쪽 사업장 칸 = 크게 보기, 오른쪽 회차 동그라미 = 그 일정 고치기.
+     두 길이 서로 다른 칸에 있어 겹치지 않는다. */
+  qa('#tlBody .gantt-info').forEach(el=>{
+    if(!el.dataset.zoomco)return;
+    el.onclick=()=>openTlZoom(el.dataset.zoomco,el.dataset.zoomtid);
+  });
 }
 
 function renderCal(){
