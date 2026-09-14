@@ -4183,13 +4183,81 @@ function partyJoin(list){
   if(a.length===1) return a[0];
   return a.slice(0,-1).join(', ')+' 및 '+a[a.length-1];
 }
-var PARTY_ONE_SRC='(?:○○|XX)\\s*(?:주식회사|회사)';
+/* ══ 원본 한글의 «줄맞춤 자국» 걷어내기 ══ (대표 지시 2026-09-14 「정관안에 줄칸 등 모두 정렬해달라」)
+   원본 .hwp 를 쓴 사람이 줄 끝을 맞추려고 낱말 사이에 공백을 여러 칸 넣어 두었다.
+   한글에서는 그 자리가 마침 줄바꿈이라 안 보이지만, 폭이 다른 화면에서는 문장 한가운데
+   구멍이 난다 — 「각 1인의 위원으로 구    성한다」 처럼.
+
+   ⚠ 제목의 «자간 벌림»(「차      변」·「의  결  주  문」·「경     과    보     고」)은
+     건드리면 안 된다. 그건 한글 문서가 일부러 벌려 쓴 것이다. 재어 보니 자간 벌림은
+     «짧은 칸·짧은 제목»에만 있고 줄맞춤 자국은 «긴 본문 문단» 안에 있었다.
+     그래서 긴 문단(FLOW_MIN 자 이상)의 <p> 만 손댄다. 표 칸(td)은 아예 안 본다.
+   ⚠ 앞 토막이 «한 글자»면 낱말이 쪼개진 것이라 붙인다(구+성한다 → 구성한다).
+     뒤 토막이 «어미 조각 한 음절»이면 그것도 붙인다(의결한+다. → 의결한다.).
+     ⚠⚠ 「된다」·「한다」까지 붙이면 안 된다 — 그건 온전한 서술어라 앞말과 띄어 쓴다
+       (「의장이 된다」를 「의장이된다」로 만들었다). 한 음절짜리만 붙인다.
+     그 밖에는 «한 칸»으로만 줄인다 — 어절 사이였는지 아닌지는 알 수 없다. */
+var FLOW_MIN=40;
+var FLOW_KEEP=8;                 // 이보다 넓은 공백은 «두 단 벌림»이라 그대로 둔다
+var FLOW_TAIL=/^(?:다|함|임|됨)[.,)]?$/;
+function _flowText(t){
+  t=String(t||'');
+  /* ⚠ 연속 공백은 «통째로» 잡는다. 예전에 { 2,8 } 로 토막내 잡았더니 열아홉 칸이
+       8+8+3 으로 갈려 사이에 빈 조각이 생기고, 서명란의 두 단 벌림이 통째로 붙었다
+       (「근로자측 위 원각 참여회사 사용자측 위원」). */
+  var parts=t.split(/( {2,})/);
+  if(parts.length<3) return t;
+  var out=parts[0];
+  for(var i=1;i<parts.length;i+=2){
+    var gap=parts[i], next=parts[i+1]||'';
+    if(gap.length>FLOW_KEEP){ out+=gap+next; continue; }   // 두 단 벌림 — 손대지 않는다
+    var lastTok=(out.match(/\S+$/)||[''])[0];
+    var firstTok=(next.match(/^\S+/)||[''])[0];
+    var glue=(lastTok.length===1&&/[가-힣]/.test(lastTok))||FLOW_TAIL.test(firstTok);
+    out+=(glue?'':' ')+next;
+  }
+  return out;
+}
+function fillFlowText(root){
+  [].slice.call(root.querySelectorAll('p')).forEach(function(p){
+    if(p.querySelector&&p.querySelector('table,td')) return;
+    if(String(p.textContent||'').length<FLOW_MIN) return;
+    for(var i=0;i<p.childNodes.length;i++){
+      var nd=p.childNodes[i]; if(nd.nodeType!==3) continue;
+      var t=nd.nodeValue||'', v=_flowText(t);
+      if(v!==t) nd.nodeValue=v;
+    }
+  });
+}
+/* 회사 자리표 — 서식마다 모양이 다르다. 정관 서명란은 둘째 줄이 「□□주식회사」라
+   ○○ 만 보던 종전 규칙에 한 번도 안 걸렸다(대표 화면 2026-09-14). */
+var PARTY_ONE_SRC='(?:○○|□□|XX|xx)\\s*(?:주식회사|회사)';
 var PARTY_RUN_SRC=PARTY_ONE_SRC+'(?:\\s*(?:및|와|과|,)\\s*'+PARTY_ONE_SRC+')+';
+/* 사람 이름 자리표 — 설립합의서는 「× × ×」, 정관은 「○○○」 이다.
+   ⚠ ○ 이 넷 이상이면 사람 이름 자리가 아니다(○○○○지청 같은 곳). */
+var PARTY_WHO_SRC='×\\s*×\\s*×|○○○(?!○)';
+/* 서명란의 이름 자리표 둘을 채운다 — 앞은 «근로자측», 뒤는 «사용자측».
+   대표 지시 2026-09-14: 「참여사업장의 근로자대표·사용자대표에 모두 연결되어 동기화」.
+
+   ⚠ 오른쪽은 «서식이 부른 이름»을 따른다. 「대표이사」라 적힌 자리는 회사 대표자가
+     서명하는 자리고, 「사용자측대표」라 적힌 자리는 협의회에 나오는 사용자대표다 —
+     늘 같은 사람이 아니다(그래서 사업장에 칸이 따로 있다).
+   ⚠ 이름이 «다음 줄»인 서식(설립합의서)은 그 줄에 라벨이 없다. 그래서 회사 줄의
+     글귀(lbl)를 함께 받는다 — 안 받으면 늘 사용자대표 쪽으로 기운다.
+   ⚠ 모르는 이름은 자리표 그대로 둔다 — 관청에 나가는 서류에 이름을 지어낼 수 없다. */
+function _fillWho(t,s,lbl){
+  var w=_siteWrep(s), u=_siteUrep(s), ceo=String((s||{}).ceo||'').trim();
+  var L=String(lbl||t);
+  var right=/대표이사|대표자/.test(L) ? (ceo||u.name) : (u.name||ceo);
+  var who=[w.name||'', right||''], i=0;
+  return String(t).replace(new RegExp(PARTY_WHO_SRC,'g'),function(m){ var x=who[i++]; return x||m; });
+}
 function fillPartyList(root,f,sites){
   var list=estabSites(sites); if(!list.length) return 0;
   var names=list.map(function(s){ return String(s.name||'').trim(); }).filter(Boolean);
   if(!names.length) return 0;
-  var joined=partyJoin(names), n=0, sigAt=0, sigHost=null, last=null;
+  var joined=partyJoin(names), n=0, sigAt=0, sigHost=null, last=null, dropRows=[];
+  var sigTpl='', sigTpl2='', sigLbl='';   // 서식이 쓴 서명 줄 글귀 — 줄을 늘릴 때 그대로 베낀다
   var reAny=new RegExp(PARTY_ONE_SRC);
   var mark=function(x){ var p=x.parentNode; if(p&&p.setAttribute) p.setAttribute('data-kept','1'); };
   var walk=document.createTreeWalker(root,4/*TEXT*/,null,false), tn, nodes=[];
@@ -4206,10 +4274,20 @@ function fillPartyList(root,f,sites){
         }).join(', ')+'”');
       }
       /* ② 서명란 — 한 줄이 한 회사다(그 회사 근로자측대표와 대표이사가 나란히 선다).
-         회사마다 날인을 받아야 하므로 줄마다 «다른» 회사를 세운다. */
-      else if(/근로자측\s*대표|근로자\s*대표/.test(t) && /대표이사|사용자측\s*대표/.test(t)){
+         회사마다 날인을 받아야 하므로 줄마다 «다른» 회사를 세운다.
+         ⚠ 정관은 이름 자리표가 «같은 줄»에 있다(「○○주식회사 노동조합대표자 ○○○ (인)」).
+           설립합의서는 이름이 «다음 줄»이라 아래 ④가 맡는다. 두 꼴을 다 받는다.
+         ⚠ 서식의 줄이 참여사업장보다 많으면 남는 줄은 «지운다» — 자리표가 그대로
+           찍혀 나가면 있지도 않은 회사의 날인란이 관청에 간다. */
+      else if(/근로자측\s*대표|근로자\s*대표|노동조합\s*대표자/.test(t) && /대표이사|사용자측\s*대표/.test(t)){
         var s0=list[sigAt], nm=s0?String(s0.name||'').trim():'';
-        if(nm){ v=t.replace(new RegExp(PARTY_ONE_SRC,'g'),nm); sigAt++; last=s0; sigHost=x.parentNode; }
+        if(nm){
+          if(!sigTpl) sigTpl=t;                   // 자리표가 든 «원래» 글귀를 베껴 둔다
+          v=t.replace(new RegExp(PARTY_ONE_SRC,'g'),nm);
+          v=_fillWho(v,s0,t);                     // 같은 줄에 이름 자리가 있으면 함께 채운다
+          sigLbl=t;
+          sigAt++; last=s0; sigHost=x.parentNode;
+        } else if(sigAt>=list.length){ dropRows.push(x); }
       }
       /* ③ 그 밖 — 이어진 자리표 뭉치는 목록 전체로, 홀로 선 자리표는 첫 회사로.
          「A 및 B와 A 및 B 근로자측은」처럼 사용자측·근로자측이 잇달아 오는 자리는 둘 다 채운다. */
@@ -4219,29 +4297,44 @@ function fillPartyList(root,f,sites){
            .replace(new RegExp(PARTY_ONE_SRC,'g'), names[0]);
       }
     }
-    /* ④ 서명 줄 바로 아래의 이름 자리표(× × ×) — 앞은 근로자대표, 뒤는 대표자.
+    /* ④ 서명 줄 바로 «아래»의 이름 자리표 — 앞은 근로자대표, 뒤는 대표자(사용자측).
        모르는 이름은 자리표 그대로 둔다(지어내지 않는다). */
-    else if(last && /×\s*×\s*×/.test(t)){
-      var w=_siteWrep(last), who=[w.name||'', String(last.ceo||'').trim()], i=0;
-      v=t.replace(/×\s*×\s*×/g,function(m){ var s=who[i++]; return s||m; });
-      last=null;
+    else if(last && new RegExp(PARTY_WHO_SRC).test(t)){
+      if(!sigTpl2) sigTpl2=t;
+      v=_fillWho(t,last,sigLbl); last=null;
+    }
+    /* ⑤ 회사가 다 떨어진 뒤에 남은 이름 자리표 줄 — 위 ②가 지울 줄의 «짝»이다 */
+    else if(!last && sigHost && sigAt>=list.length && new RegExp('^[\\s()인×○]*(?:'+PARTY_WHO_SRC+')[\\s()인×○]*$').test(t)){
+      dropRows.push(x);
     }
     if(v!==t){ x.nodeValue=v; mark(x); n++; }
   });
   /* 서명란이 서식에 두 쌍뿐인데 참여사업장이 더 많으면 줄을 «늘린다» —
-     날인은 회사마다 받아야 해서, 두 쌍만 찍혀 나가면 나머지는 손으로 그려야 한다. */
-  if(sigHost && sigAt<list.length){
+     날인은 회사마다 받아야 해서, 두 쌍만 찍혀 나가면 나머지는 손으로 그려야 한다.
+     ⚠ 글귀는 «서식이 쓴 그대로» 베낀다(sigTpl). 정관은 「노동조합대표자」, 설립합의서는
+       「근로자측대표」다 — 한 가지로 박아 두면 정관에 없는 말이 찍혀 나간다. */
+  if(sigHost && sigTpl && sigAt<list.length){
     for(var k=sigAt;k<list.length;k++){
-      var s2=list[k], w2=_siteWrep(s2), nm2=String(s2.name||'').trim();
+      var s2=list[k], nm2=String(s2.name||'').trim();
+      var line=_fillWho(sigTpl.replace(new RegExp(PARTY_ONE_SRC,'g'),nm2),s2,sigTpl);
       sigHost.appendChild(document.createElement('br'));
-      sigHost.appendChild(document.createTextNode(nm2+' 근로자측대표                '+nm2+' 대표이사'));
-      sigHost.appendChild(document.createElement('br'));
-      sigHost.appendChild(document.createTextNode((w2.name||'× × ×')+'   ( 인 )                     '
-        +(String(s2.ceo||'').trim()||'× × ×')+'   ( 인 )'));
+      sigHost.appendChild(document.createTextNode(line));
+      if(sigTpl2){                       // 이름이 «다음 줄»인 서식(설립합의서)
+        sigHost.appendChild(document.createElement('br'));
+        sigHost.appendChild(document.createTextNode(_fillWho(sigTpl2,s2,sigTpl)));
+      }
       n++;
     }
     if(sigHost.setAttribute) sigHost.setAttribute('data-kept','1');
   }
+  /* 서식의 줄이 참여사업장보다 «많으면» 남는 자리표 줄을 지운다 —
+     그대로 두면 있지도 않은 회사의 날인란이 관청에 나간다. */
+  dropRows.forEach(function(tn){
+    var p=tn.parentNode; if(!p) return;
+    tn.nodeValue='';
+    if(!String(p.textContent||'').replace(/[\s()인×○]/g,'') && p.parentNode) p.parentNode.removeChild(p);
+    n++;
+  });
   return n;
 }
 /* 자리표로 남은 날짜 — 「○○○○. ○○. ○○」(협의회 개최일)·「20  년 ○○월 ○○일」(작성일).
@@ -4828,6 +4921,9 @@ function hwpFormHTML(kind,f,sites){
   /* 정관·설립합의서의 「○○주식회사」 자리표에 참여사업장을 넣는다 — 걷어내기보다 «먼저» 돈다.
      뒤에 돌면 자리표가 이미 ＿＿＿ 로 바뀌어 바꿀 것을 못 찾는다. */
   if(kind==='charter'||kind==='agreement'){ fillPartyList(d,f,sites); fillPartyDates(d,f); }
+  /* 줄맞춤 자국 걷어내기는 «자리표를 채운 뒤»에 돈다 — 먼저 돌면 서명란의 두 단 벌림이
+     아직 자리표 상태라 길이가 짧아, 본문으로 오해받을 수 있다. */
+  fillFlowText(d);
   stripBaked(d);
   /* 위원 격자를 «먼저» 채운다 — 그 줄에 표를 남겨야 아래 라벨 채우기가 비껴간다 */
   fillCommittee(d,f,sites);
@@ -5078,23 +5174,39 @@ function fillDerived(root,f,sites,kind){
 function fillFoundContribDoc(root,f,sites){
   /* 금액은 siteContribOf 하나로 셈한다 — 엑셀본(fillContribXls)이 여태 «사람수 × 단가»를
      따로 셈해, 같은 확인서인데 어느 길로 뽑느냐에 따라 금액이 달랐다(2026-09-10 고침). */
-  var list=estabSites(sites).filter(function(x){ return siteContribOf(x,f)>0; });
+  /* ★ 금액이 없어도 «사업장마다 한 장» 만든다 (대표 화면 2026-09-14).
+     종전에는 약정액이 적힌 곳만 골라서, 열여섯 곳이 등록돼 있어도 금액을 안 넣었으면
+     빈 한 장만 나갔다. 회사 이름·대표자는 이미 아는 값이니 그것만이라도 찍어 주고
+     금액 자리만 밑줄로 둔다 — 손으로 채울 자리가 한 칸이면 될 일이었다.
+     ⚠ 금액은 여전히 지어내지 않는다. siteContribOf 하나로만 셈한다(엑셀본과 같은 값). */
+  var list=estabSites(sites);
+  var noAmt=list.filter(function(x){ return siteContribOf(x,f)<=0; }).length;
   var today=new Date(), dt=today.getFullYear()+'. '+(today.getMonth()+1)+'. '+today.getDate()+'.';
   var one=function(c){
     var d=document.createElement('p'); d.setAttribute('data-kept','1');
     var a=c?siteContribOf(c,f):0;
+    var u=c?_siteUrep(c):{name:''};
+    /* 서명은 «대표이사»가 한다 — 회사 대표자다. 사용자대표는 협의회에 나오는 사람이라
+       늘 같지 않다. 대표자가 비어 있을 때만 사용자대표로 갈음한다. */
+    var who=(c&&String(c.ceo||'').trim())||u.name||'';
     d.innerHTML='기 금 출 연 확 인 서<br>금&nbsp; 액 : &nbsp;'
       +(a?esc(korWon(a))+'원정(￦ '+Number(a).toLocaleString()+')':BAKE_BLANK+'(￦ '+BAKE_BLANK+')')
       +'<br>상기 금액은 '+esc(f.name||'')+'법인이 고용노동부 인가를 득하여 설립등기 후 예금계좌를 개설할 경우, 10일 이내에 '
       +esc(f.name||'')+'에 출연할 것을 확인함.<br>'+dt+'<br>'
-      +(c&&c.name?esc(c.name):BAKE_BLANK)+' 대표이사 '+(c&&c.ceo?esc(c.ceo):BAKE_BLANK)+' (인)';
+      +(c&&c.name?esc(c.name):BAKE_BLANK)+' 대표이사 '+(who?esc(who):BAKE_BLANK)+' (인)';
     return d;
   };
   var made=list.length?list.map(one):[one(null)];
   while(root.firstChild) root.removeChild(root.firstChild);
-  if(!list.length){ var w=document.createElement('p'); w.className='note';
-    w.textContent='※ 출연 약정액이 적힌 참여사업장이 없어 금액을 채우지 못했습니다 — 참여사업장의 기본 출연금을 넣거나, 기금 정보 › 설립의 1인당 출연단가를 넣으면 사업장마다 한 장씩 만들어집니다.';
-    root.appendChild(w); }
+  var w=document.createElement('p'); w.className='note';
+  if(!list.length){
+    w.textContent='※ 참여사업장이 없어 확인서를 만들지 못했습니다 — 참여사업장을 먼저 등록하세요.';
+    root.appendChild(w);
+  } else if(noAmt){
+    w.textContent='※ '+list.length+'곳 중 '+noAmt+'곳은 출연 약정액이 적혀 있지 않아 금액 자리를 비워 두었습니다 — '
+      +'참여사업장의 기본 출연금을 넣거나, 기금 정보 › 설립의 1인당 출연단가를 넣으면 금액까지 채워집니다.';
+    root.appendChild(w);
+  }
   made.forEach(function(x){ root.appendChild(x); });
 }
 /* 감사 대상 회계연도 — 첫해는 «설립인가일부터»다(T공동 2019: 2019.08.14.~12.31.).
