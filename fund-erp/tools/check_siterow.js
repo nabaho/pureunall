@@ -81,7 +81,10 @@ const cell = n => { const k = ths.indexOf(n); return k < 0 ? '(칸 없음)' : (t
 ok('첫 칸이 체크상자', !!tds[0].querySelector('input[type=checkbox]'), tds[0].innerHTML.slice(0, 40));
 ok('켜져 있으면 체크됨', tds[0].querySelector('input').hasAttribute('checked'));
 ok('번호 = 1', cell('번호') === '1', cell('번호'));
-ok('상호', cell('상호') === '가나기계(주)', cell('상호'));
+/* 2026-09-14: 상호 앞에 대표사업장 별(★/☆)이 붙는다 — «누르는 것»이지 이름의 일부가 아니다.
+   별이 제대로 서는지는 fund-site-lead.test.js 가 따로 본다. 여기서는 이름만 견준다. */
+ok('상호', cell('상호').replace(/^[★☆]\s*/, '') === '가나기계(주)', cell('상호'));
+ok('상호 앞에 대표사업장 별이 있다', /^[★☆]/.test(cell('상호')), cell('상호'));
 ok('대표자', cell('대표자') === '홍길동', cell('대표자'));
 ok('사업자번호', cell('사업자번호') === '000-00-00000', cell('사업자번호'));
 ok('업종', cell('업종') === '제조(시험)', cell('업종'));

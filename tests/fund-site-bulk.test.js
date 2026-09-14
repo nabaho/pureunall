@@ -159,7 +159,12 @@ test('담당자를 넣을 때 기존 연락처 목록을 통째로 지우지 않
 
 /* ══════ 화면 배선 ══════ */
 test('명부에 일괄 단추가 있고 ⓘ 가 붙어 있다', () => {
-  assert.ok(SRC.includes('onclick="bulkSiteCards()"'), '일괄 채우기 단추가 없다');
+  /* 2026-09-14: 가끔 쓰는 입구 넷은 [⋯ 도구] 서랍 안으로 들어갔다(대표 지시 「너무 복잡하다」).
+     단추가 «있는가»가 아니라 «서랍에서 닿는가»를 본다 — 서랍째 빠지면 여기서 걸린다. */
+  assert.match(SRC, /function siteToolsMenu\(\)/, '도구 서랍이 없다');
+  assert.match(SRC, /줄\('bulkSiteCards\(\)'/, '일괄 채우기 단추가 없다');
+  assert.match(SRC, /function sitesTab\(\)[\s\S]{0,12000}?\+siteToolsMenu\(\)/,
+    '참여사업장 화면이 도구 서랍을 안 단다 — 단추가 어디에서도 안 닿는다');
   assert.ok(SRC.includes("'bulk.site':{t:"), 'ⓘ 설명이 등록되지 않았다');
   /* 하나씩 고르는 길(기업정보함에서 추가)도 그대로 있어야 한다 */
   assert.ok(SRC.includes("openCardPick('site')") || SRC.includes("openCardPick(\\'site\\')"),

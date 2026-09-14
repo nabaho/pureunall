@@ -75,6 +75,24 @@
   .hopb:hover:not(:disabled){background:var(--acc-soft);color:var(--acc2);border-color:var(--acc)}
   .hopb:disabled{color:#cbd5e1;cursor:default}
   .hopn{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums;padding:0 3px;white-space:nowrap}
+  /* 도구 서랍 — 가끔 쓰는 입구를 한 단추 뒤로. <details> 라 여닫는 상태를 브라우저가 갖는다 */
+  .tmenu{position:relative;display:inline-block}
+  .tmenu>summary{list-style:none;cursor:pointer;font-size:13px;padding:7px 11px;border:1px solid var(--line);
+    background:#fff;border-radius:8px;color:var(--ink);user-select:none;white-space:nowrap}
+  .tmenu>summary::-webkit-details-marker{display:none}
+  .tmenu[open]>summary{background:var(--acc-soft);border-color:var(--acc);color:var(--acc2)}
+  .tmlist{position:absolute;right:0;top:calc(100% + 4px);z-index:14;background:#fff;border:1px solid var(--line);
+    border-radius:10px;box-shadow:0 10px 28px rgba(15,23,42,.14);padding:5px;min-width:236px;display:flex;flex-direction:column}
+  .tmlist .mi{border:none;background:none;text-align:left;padding:7px 10px;border-radius:7px;font-size:12.5px;white-space:nowrap}
+  .tmlist .mi:hover{background:var(--acc-soft);color:var(--acc2)}
+  .tmsep{height:1px;background:var(--line);margin:4px 6px}
+  /* 대표사업장 별 — 평소엔 흐린 ☆, 지정되면 진한 ★ */
+  /* 대표사업장 별 — 평소엔 흐린 ☆, 지정되면 진한 ★.
+     ⚠ 색은 팔레트 안에서만 쓴다(tests/color-palette-apps) — 금색을 새로 들이지 않고 warn 을 쓴다 */
+  .leadb{cursor:pointer;margin-right:5px;color:var(--faint);font-size:13px}
+  .leadb:hover{color:var(--warn)}
+  .leadb.on{color:var(--warn)}
+  .stat.lead{background:var(--warn-bg);border-color:var(--warn);color:var(--warn);font-weight:700}
   /* 식별번호는 줄바꿈 대신 «옆으로» 넘긴다 — 줄이 늘면 붙여 둔 머리가 화면을 잡아먹는다 */
   .fhead .fid{display:flex;gap:14px;font-size:12px;color:var(--sub);white-space:nowrap;
     overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
@@ -8936,6 +8954,10 @@ function sitesTab(){
   var totalEmp=arr.reduce(function(s,x){return s+(num(x.company_size)||0);},0);
   var nPartner=arr.filter(function(x){return !!x.partner;}).length;
   var nAll=arr.length;
+  /* ⚠ 위 주석대로 «거르기 전» 것을 따로 들고 있어야 한다 — 종전에는 상시근로자·협력만
+       거르기 전이고 개사·지자체는 거른 뒤라서, 딱지 하나만 눌러도 「16개사·지자체 3」이
+       「3개사·지자체 1」로 바뀌었다. 우리 기금이 몇 개사인지가 손 댈 때마다 달라졌다. */
+  var 전체=arr;
   arr=_siteFilter(arr);
   var rows=arr.map(function(s,i){
     var c=_siteContacts(s);
@@ -8952,11 +8974,16 @@ function sitesTab(){
     var emp=num(s.company_size)||0;
     /* 협력 체크를 «맨 앞»에 둔다 — 가운데 있으면 상호를 읽다 눈이 한 번 건너뛰어야 하고,
        여러 곳을 잇달아 켤 때 손이 좌우로 오간다. 켜고 끄는 칸은 줄머리에 모은다. */
+    /* 대표사업장 — 상호 «바로 앞»에 별을 둔다. 협력 체크 옆에 또 체크상자를 세우면
+       줄머리에 네모가 둘이라 어느 것이 무엇인지 매번 마우스를 올려 봐야 한다. */
+    var 별=s.lead?'★':'☆';
     return '<tr onclick="editSite(\''+s._id+'\')">'
       +'<td onclick="event.stopPropagation()" style="text-align:center"><input type="checkbox"'+(s.partner?' checked':'')
         +' onchange="setSitePartner(\''+s._id+'\',this.checked)" title="협력업체로 표시 — 별지15호 ⑩ 협력업체 근로자 수에 합산"></td>'
       +'<td class="no">'+(i+1)+'</td>'
-      +'<td style="font-weight:700">'+esc(s.name||'—')+'</td><td class="ph">'+esc(s.ceo||'—')+'</td>'
+      +'<td style="font-weight:700"><span class="leadb'+(s.lead?' on':'')+'" onclick="event.stopPropagation();setSiteLead(\''+s._id+'\','+(s.lead?'false':'true')+')" '
+        +'title="'+(s.lead?'이 기금의 대표사업장입니다 — 눌러서 해제':'대표사업장으로 지정 (기금에 한 곳)')+'">'+별+'</span>'
+      +esc(s.name||'—')+'</td><td class="ph">'+esc(s.ceo||'—')+'</td>'
       /* 업종은 «남긴다» — 넷만 남기면 411px 에 빈 자리가 생기는데(대표 지시 「빈공간이 많다」),
          한 기업을 한 줄로 알아보는 데 상호 다음으로 말이 많은 칸이 업종이다. */
       +'<td class="ph">'+esc(s.biz_no||'—')+'</td><td>'+esc(s.biz_type||'—')+'</td>'
@@ -8989,8 +9016,7 @@ function sitesTab(){
      ⚠ 딱지는 «한 번에 하나»다(다시 누르면 꺼진다) — 여럿을 겹치면 무엇이 켜졌는지
        알 수 없는 채로 「우리 사업장이 세 곳뿐이네」 하고 잘못 읽는다. */
   var onChip=function(k,t,tip){ return '<button class="seg'+(_siteOnly===k?' on':'')+'" onclick="setSiteOnly(\''+k+'\')" title="'+tip+'">'+t+'</button>'; };
-  var filterBar=(isYr)?'':'<div class="row" style="gap:6px;align-items:center;flex-wrap:wrap">'
-    +'<input id="siteQ" value="'+esc(_siteQ)+'" oninput="setSiteQ(this.value)" placeholder="🔍 상호·대표자·사업자번호·담당자·소재지"'
+  var 찾기딱지='<input id="siteQ" value="'+esc(_siteQ)+'" oninput="setSiteQ(this.value)" placeholder="🔍 상호·대표자·사업자번호·담당자·소재지"'
     +' style="width:210px;padding:3px 8px;font-size:11.5px" title="보이는 칸을 모두 뒤집니다. 숫자만 쳐도 사업자번호가 찾아집니다(41281 → 412-81-12595)">'
     +'<div class="segbar">'+onChip('partner','협력','협력업체로 표시한 곳만')
       +onChip('nourep','사용자대표 없음','사용자대표를 아직 안 적은 곳만')
@@ -8999,31 +9025,70 @@ function sitesTab(){
     +((_siteQ||_siteOnly)
       ? '<span class="chip '+(arr.length?'ok':'dg')+'" style="font-size:10.5px">'+arr.length+' / '+nAll+'개사</span>'
         +'<button onclick="_siteQ=\'\';_siteOnly=\'\';renderFund()" style="padding:2px 8px;font-size:11px">지우기</button>'
-      : '')
-    +'</div>';
-  var sortBar=(isYr||isPpl)?'':'<div class="segbar" title="규모순으로 두면 큰 사업장이 위로 올라와 한눈에 들어옵니다">'
+      : '');
+  var sortBar=(isPpl)?'':'<div class="segbar" title="규모순으로 두면 큰 사업장이 위로 올라와 한눈에 들어옵니다">'
     +'<button class="seg'+(bySize?'':' on')+'" onclick="setSiteSort(\'seq\')">연번순</button>'
     +'<button class="seg'+(bySize?' on':'')+'" onclick="setSiteSort(\'size\')">규모순</button></div>';
-  /* 머리를 한 줄로 — 종전에는 제목줄·탭줄·엑셀 드롭존이 각각 한 줄씩 세 줄이었다.
-     탭(명부/연도별)과 엑셀 받는 칸을 같은 줄에 얹는다. 제목은 위 탭에 이미 있다. */
-  return '<div class="panel" style="padding:10px 14px"><div class="row" style="gap:8px;flex-wrap:wrap">'
+  var 엑셀=dropZoneSlim('dz-sites','엑셀 한번에','상호·대표자·사업자번호·상시근로자·소재지 열을 자동으로 찾습니다','.xlsx,.xls,.csv');
+  /* ★ 머리 정리 (대표 지시 2026-09-13 「좀 정리해달라 너무 혼란스럽다」)
+       종전에는 제목·배지 넷·보기 탭 셋·정렬 둘·찾기·딱지 넷·엑셀 띠·단추 다섯,
+       열여덟 가지가 한 줄에 들어가 줄바꿈으로 흩어졌다. 무엇이 무엇의 짝인지 안 보였다.
+     ─ 두 층으로 나눈다:
+         ① 무엇을 보고 있나 — 제목·배지·보기 탭, 그리고 늘 쓰는 [+ 사업장 추가]
+         ② 어떻게 추리나   — 찾기·정렬·딱지·엑셀 (사업장이 있을 때만)
+     ─ 가끔 쓰는 입구 넷(기업정보함·일괄 채우기·등록증 여러 장·백업)은 [⋯ 도구] 안으로.
+     ⚠ 사업장이 하나도 없으면 ②를 아예 안 그린다 — 거를 것이 없는데 딱지 넷이 서 있으면
+       「무엇을 눌러야 시작되나」가 그 속에 묻힌다(대표가 본 화면이 바로 그 상태였다). */
+  var 있음=nAll>0, lead=_leadSite(전체);
+  var 머리='<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">'
     +'<h2 style="font-size:15px;margin:0">참여사업장</h2>'
-    +'<span class="stat">'+arr.length+'개사</span><span class="stat">상시근로자 '+totalEmp.toLocaleString()+'명</span>'
+    +'<span class="stat">'+nAll+'개사</span><span class="stat">상시근로자 '+totalEmp.toLocaleString()+'명</span>'
     +(nPartner?'<span class="stat">협력 '+nPartner+'개사</span>':'')
     /* ★ 지자체는 «여기»가 원천이다 — 사업장 소재지에서 셈한다(대표 지시 2026-09-13).
          기금 정보에도 같은 줄이 서는데, 둘 다 govChips 하나를 쓴다. */
-    +'<span class="stat" title="참여사업장 소재지에서 셈한 참여 지자체입니다">지자체 '+_siteGovs(arr).list.length+'</span>'
-    +sub+sortBar
-    +(isYr?'':filterBar)
-    +(isYr?'':dropZoneSlim('dz-sites','엑셀 한번에','상호·대표자·사업자번호·상시근로자·소재지 열을 자동으로 찾습니다','.xlsx,.xls,.csv'))
+    +'<span class="stat" title="참여사업장 소재지에서 셈한 참여 지자체입니다">지자체 '+_siteGovs(전체).list.length+'</span>'
+    /* ★ 대표사업장을 «맨 위»에 늘 보인다 — 표를 스무 줄 내려가며 별을 찾지 않게.
+         거르기를 걸어도 그대로다(거르기 전 전체에서 찾는다). */
+    +(lead?'<span class="stat lead" title="이 기금의 대표사업장입니다 — 명부에서 상호 앞 ★ 로 바꿉니다">★ 대표 '+esc(lead.name||'')+'</span>'
+          :(있음?'<span class="stat" style="color:var(--faint)" title="명부에서 상호 앞의 ☆ 를 눌러 지정합니다">대표사업장 미지정</span>':''))
+    +sub
     +'<span style="flex:1"></span>'
-    +'<button onclick="openCardPick(\'site\')" title="푸른 기업정보함에서 사업장 하나를 골라 추가합니다">🏢 기업정보함에서</button>'
-    +'<button onclick="bulkSiteCards()" title="참여사업장 전체를 기업정보함과 맞춰 빈 칸만 한꺼번에 채웁니다">🏢 일괄 채우기</button>'
-    +'<button onclick="bizregBulkPick()" title="사진첩의 사업자등록증을 여러 장 골라 한꺼번에 읽고, 표로 확인한 뒤 참여사업장을 만듭니다">📚 사업자등록증 여러 장</button>'+hlp('site.bulkdoc')
     +'<button class="primary" onclick="editSite(\'\')">+ 사업장 추가</button>'
-    +' <button onclick="importSites()" title="전체 기금 사업장 일괄 가져오기(담당자 포함)">📥 백업(JSON)</button></div>'
-    +(isYr ? sitesYearBody(arr) : isPpl ? sitesPeopleBody(arr) : '<div id="siteXlsxOut"></div>'+tbl)
+    +siteToolsMenu()+'</div>';
+  var 고르는줄=(!있음||isYr)?''
+    : '<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">'
+      +찾기딱지+sortBar+'<span style="flex:1"></span>'+엑셀+'</div>';
+  /* 아무것도 없을 때는 «시작하는 길 셋»만 크게 보인다 — 도구 서랍을 열어 보라고 하지 않는다 */
+  var 빈안내='<div style="padding:26px 4px;text-align:center">'
+    +'<div class="muted" style="font-size:13px;margin-bottom:12px">등록된 참여사업장이 없습니다. 세 가지 길 중 하나로 시작하세요.</div>'
+    +'<div class="row" style="gap:8px;justify-content:center;flex-wrap:wrap">'
+    +'<button class="primary" onclick="editSite(\'\')">+ 한 곳씩 직접</button>'
+    +'<button onclick="openCardPick(\'site\')" title="푸른 기업정보함에서 여러 곳을 한 번에 고릅니다">🏢 기업정보함에서</button>'
+    +엑셀+'</div></div>';
+  return '<div class="panel" style="padding:10px 14px">'+머리+고르는줄
+    +(isYr ? sitesYearBody(arr) : isPpl ? sitesPeopleBody(arr)
+      : (있음 ? '<div id="siteXlsxOut"></div>'+tbl : 빈안내))
     +'</div>';
+}
+/* 도구 서랍 — 가끔 쓰는 입구 넷을 한 단추 뒤로 넣는다(대표 지시 「너무 혼란스럽다」).
+   <details> 를 쓰는 까닭: 열고 닫는 상태를 브라우저가 들고 있어 renderFund 가 다시
+   그려도 챙길 것이 없고, 키보드로도 열린다 — 바깥 클릭을 잡는 코드가 필요 없다. */
+function tmClose(el){ var d=el&&el.closest&&el.closest('details'); if(d) d.open=false; }
+function siteToolsMenu(){
+  var 줄=function(on,글,tip){
+    return '<button class="mi" onclick="tmClose(this);'+on+'" title="'+esc(tip)+'">'+글+'</button>';
+  };
+  return '<details class="tmenu"><summary title="가끔 쓰는 가져오기·맞추기 도구">⋯ 도구</summary>'
+    +'<div class="tmlist">'
+    +줄("openCardPick('site')",'🏢 기업정보함에서 고르기','푸른 기업정보함에서 여러 곳을 한 번에 골라 추가합니다')
+    +줄('bulkSiteCards()','🏢 빈 칸 일괄 채우기','참여사업장 전체를 기업정보함과 맞춰 빈 칸만 한꺼번에 채웁니다')
+    /* ⓘ 는 «서랍 안에» 함께 둔다 — 딸린 설명이라 단추와 떨어지면 무엇의 설명인지 모른다 */
+    +'<div style="display:flex;align-items:center">'
+    +줄('bizregBulkPick()','📚 사업자등록증 여러 장','사진첩의 사업자등록증을 여러 장 읽고, 표로 확인한 뒤 참여사업장을 만듭니다')
+    +hlp('site.bulkdoc')+'</div>'
+    +'<div class="tmsep"></div>'
+    +줄('importSites()','📥 백업(JSON) 가져오기','전체 기금 사업장 일괄 가져오기(담당자 포함)')
+    +'</div></details>';
 }
 /* ══ 「사람」 보기 ══ (대표 지시 2026-09-13)
    「참여사업장에는 대표자와 사업장 담당자가 있다 … 근로자 대표도 있는데 각각 모두 다른경우가 있다」
@@ -9310,6 +9375,28 @@ function sitesYearBody(arr){
       :'<div class="muted" style="padding:10px">사업장을 먼저 등록하세요.</div>');
 }
 /* 협력업체 표시 — 별지15호 ⑩ 집계용. 그 사업장 1건만 건드린다(형제 필드 보존) */
+/* ★ 대표사업장 (대표 지시 2026-09-13 「지역공동기금의 경우 대표사업장이 있다
+     어떤사업장이 대표사업장인지 체크될 수 있게 해달라」)
+   ─ 한 기금에 «하나»다. 새로 켜면 다른 곳은 저절로 꺼진다 — 둘이 켜져 있으면
+     설립합의서·회의록에 어느 상호를 쓸지 사람이 다시 골라야 한다.
+   ─ 이미 켜진 곳을 다시 누르면 꺼진다(잘못 누른 것을 되돌릴 길).
+   ⚠ 여러 칸을 한 번에 바꾸므로 update() 한 번으로 보낸다 — 하나씩 보내면
+     중간에 끊겼을 때 «둘 다 켜진» 상태가 남는다. */
+function setSiteLead(sid,on){
+  var _fid=S.fundId, sites=S.sites||{};
+  var 고침={};
+  Object.keys(sites).forEach(function(k){
+    var 될것=(on&&k===sid)?true:null;
+    if((sites[k].lead?true:null)!==될것) 고침[k+'/lead']=될것;
+  });
+  if(!Object.keys(고침).length) return;
+  fbDb.ref(NS+'/sites/'+_fid).update(고침).then(function(){
+    S.sitesFor=null;
+    if(S.fundId===_fid) renderFund();
+    toast(on?('대표사업장: '+((sites[sid]||{}).name||'')):'대표사업장 표시 해제');
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
+function _leadSite(arr){ return (arr||[]).filter(function(s){ return !!s.lead; })[0]||null; }
 function setSitePartner(sid,on){
   var _fid=S.fundId;
   fbDb.ref(NS+'/sites/'+_fid+'/'+sid+'/partner').set(on?true:null).then(function(){
