@@ -198,7 +198,22 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .photorow{align-items:center}
 .pf{font-size:11.5px;max-width:210px}
 .pthumb{width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid var(--line);
-  vertical-align:middle;margin-right:6px}
+  vertical-align:middle;margin-right:6px;cursor:pointer}
+.pthumb:hover{border-color:var(--navy)}
+/* 끌어다 놓는 자리 — 놓을 수 있다는 것이 «보여야» 쓴다 */
+.pdrop{border:1px dashed var(--line);border-radius:8px}
+.pdrop.over{border-color:var(--navy);background:#eff6ff}
+.pdrop .dropsay{font-size:10.5px;margin-left:6px}
+.pdropbig{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;
+  color:var(--sub);font-size:12.5px;margin-bottom:10px}
+.pdropbig.over{border-color:var(--navy);background:#eff6ff;color:var(--navy)}
+.pdropbig b{color:var(--ink)}
+/* 사진 짝 맞추기 표 */
+.ptab{width:100%;border-collapse:collapse;font-size:12.5px}
+.ptab th,.ptab td{text-align:left;padding:5px 7px;border-bottom:1px solid var(--line);vertical-align:middle}
+.ptab th{color:var(--sub);font-weight:600;font-size:11.5px}
+.ptab tr.bad td{background:var(--bad-bg)}
+.ptab select{max-width:170px}
 /* 쪽 차례 바꾸기 ▲▼ — 줄 안에 조용히 있다가 그 줄에 마우스를 올리면 진해진다 */
 .ord{display:flex;flex-direction:column;gap:1px;flex:none;margin-right:4px}
 .ob{border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:4px;
@@ -3200,22 +3215,82 @@ const 사진품질 = 0.85;
 function 사진칸Html(d) {
   if (!d || !d.srl) return '';
   const 고른것 = (App.사진 && App.사진.key === d.key) ? App.사진 : null;
+  /* ★ 올린 뒤 «확인» (대표 지시 2026-09-14 「사진 올라가면 간단하게 사진 확인 가능하게」).
+       올린 사진을 그 자리에 남겨 둔다 — 홈페이지를 열어 보지 않아도 무엇이 올라갔는지 안다.
+     ⚠ 「방금 올린 사진」이라고 적는다. 「지금 홈페이지 사진」이라 하면 거짓말이다 —
+       우리가 보낸 것을 보여 줄 뿐, 홈페이지에서 다시 읽어 온 것이 아니다. */
+  const 올린것 = (App.올린사진 || {})[d.key];
   return '<div class="two photorow">'
-    + '<div class="inl" style="flex:0 0 auto"><b>얼굴 사진'
+    /* 끌어다 놓기 — 파일 고르개는 작고 눌러 들어가는 걸음이 길다 (대표 지시 2026-09-14) */
+    + '<div class="inl pdrop" style="flex:0 0 auto"'
+    + ' ondragover="사진끌기(event)" ondragleave="사진끌기끝(event)" ondrop="사진놓기(event)">'
+    + '<b>얼굴 사진'
     + '<span class="tip" title="지금 홈페이지의 «메인 이미지» 칸으로 바로 갑니다 — 저장과 다른 길입니다">?</span></b>'
     + '<input type="file" accept="image/jpeg,image/png,image/webp" class="pf"'
-    + ' onchange="사진고르기(this)"></div>'
+    + ' onchange="사진고르기(this)">'
+    + '<span class="sub dropsay">여기로 끌어다 놓아도 됩니다</span></div>'
     + (고른것
         ? '<div class="inl" style="flex:0 0 auto">'
-          + '<img class="pthumb" src="' + esc(고른것.미리) + '" alt="고른 사진">'
+          + '<img class="pthumb" src="' + esc(고른것.미리) + '" alt="고른 사진"'
+          + ' onclick="사진크게(\'' + esc(d.key) + '\',\'고른\')" title="눌러서 크게 보기">'
           + '<span class="sub">' + esc(고른것.크기말) + '</span>'
           + '<button class="btn sm hot" onclick="사진넣기()">이 사진으로 바꾸기</button>'
           + '<button class="btn sm" onclick="사진버리기()">취소</button>'
           + '</div>'
-        : '<div class="inl" style="flex:1"><span class="sub">'
-          + '고르면 미리 보여 드리고, 누르셔야 홈페이지에 올라갑니다.</span></div>')
+        : 올린것
+          ? '<div class="inl" style="flex:1">'
+            + '<img class="pthumb" src="' + esc(올린것.미리) + '" alt="방금 올린 사진"'
+            + ' onclick="사진크게(\'' + esc(d.key) + '\',\'올린\')" title="눌러서 크게 보기">'
+            + '<span class="sub">방금 올린 사진 · ' + esc(올린것.언제) + '</span>'
+            + '<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="'
+            + esc(PuHomeExport.ORIGIN) + '/people">홈페이지에서 보기</a>'
+            + '</div>'
+          : '<div class="inl" style="flex:1"><span class="sub">'
+            + '고르면 미리 보여 드리고, 누르셔야 홈페이지에 올라갑니다.</span></div>')
     + '</div>';
 }
+
+/* 미리보기를 크게 — 작은 네모로는 얼굴이 제대로 나왔는지 알기 어렵다 */
+function 사진크게(key, 어느것) {
+  const 것 = 어느것 === '올린' ? (App.올린사진 || {})[key]
+    : ((App.사진 && App.사진.key === key) ? App.사진 : null);
+  if (!것) return;
+  const 이름 = ((App.members || {})[key] || {}).name || '';
+  openModal('<h2>' + esc(이름) + ' — ' + (어느것 === '올린' ? '방금 올린 사진' : '고른 사진') + '</h2>'
+    + '<div style="text-align:center;padding:6px 0">'
+    + '<img src="' + esc(것.미리) + '" style="max-width:100%;max-height:62vh;border-radius:10px;'
+    + 'border:1px solid var(--line)"></div>'
+    + '<div class="sub" style="text-align:center">' + esc(것.크기말 || '') + '</div>'
+    + modalFoot(어느것 === '올린'
+        ? '홈페이지에서 실제로 어떻게 보이는지는 「홈페이지에서 보기」로 확인하십시오.' : ''));
+}
+window.사진크게 = 사진크게;
+
+/* ── 끌어다 놓기 ── 파일 고르개를 안 눌러도 된다 (대표 지시 2026-09-14) ── */
+function 사진끌기(e) {
+  e.preventDefault(); e.stopPropagation();
+  if (e.currentTarget && e.currentTarget.classList) e.currentTarget.classList.add('over');
+}
+function 사진끌기끝(e) {
+  if (e.currentTarget && e.currentTarget.classList) e.currentTarget.classList.remove('over');
+}
+window.사진끌기 = 사진끌기; window.사진끌기끝 = 사진끌기끝;
+
+function 사진놓기(e) {
+  e.preventDefault(); e.stopPropagation();
+  사진끌기끝(e);
+  const 파일들 = (e.dataTransfer && e.dataTransfer.files) || [];
+  if (!파일들.length) return;
+  /* 여러 장을 한 사람 칸에 놓으면 «여러 명 창»이 맞다 — 한 장만 조용히 받지 않는다 */
+  if (파일들.length > 1) {
+    say('사진이 ' + 파일들.length + '장입니다',
+      '이 칸은 <b>한 분</b>의 사진 자리입니다. 여러 장은 '
+      + '<b>「사진 여러 장」</b>에서 이름별로 나눠 올리십시오.');
+    return;
+  }
+  사진고르기({ files: 파일들, value: '' });
+}
+window.사진놓기 = 사진놓기;
 
 /* 고른 그림을 줄여 담는다. 원본을 그대로 보내지 않는다. */
 function 사진고르기(el) {
@@ -3277,10 +3352,16 @@ async function 사진넣기() {
 
     const 함 = await 서버에게물어보기('쓰기', Number(d.srl), 보낼것);
     if (함.ok && 함.저장됨) {
+      /* 올린 것을 그 자리에 남긴다 — 홈페이지를 안 열어도 무엇이 올라갔는지 보인다 */
+      App.올린사진 = App.올린사진 || {};
+      App.올린사진[d.key] = { 미리: 고른것.미리, 크기말: 고른것.크기말, 언제: stampShort(Date.now()) };
       App.사진 = null;
       await say('사진을 바꿨습니다',
-        '홈페이지에서 한 번 눈으로 봐 주십시오. '
-        + '<span class="sub">(그림이 바로 안 바뀌면 Ctrl+F5 로 새로 고쳐 보십시오.)</span>');
+        '<div style="text-align:center;margin-bottom:8px">'
+        + '<img src="' + esc(고른것.미리) + '" style="max-width:180px;border-radius:10px;'
+        + 'border:1px solid var(--line)"></div>'
+        + '올린 사진은 편집칸에 <b>「방금 올린 사진」</b>으로 남아 있습니다 — 눌러서 크게 보실 수 있습니다.'
+        + '<div class="sub" style="margin-top:6px">홈페이지 그림이 바로 안 바뀌면 Ctrl+F5 로 새로 고쳐 보십시오.</div>');
       checkHomepage();
     } else {
       await say('사진을 넣지 못했습니다', 걸린것글자(함));
@@ -3290,6 +3371,219 @@ async function 사진넣기() {
   }
 }
 window.사진넣기 = 사진넣기;
+
+/* ══════ 사진 여러 장 한 번에 (대표 지시 2026-09-14 「여러 명도」) ══════
+   ★ 사진은 «사람마다 다르다» — 한 장을 여럿에게 붙이는 일이 아니라, 여러 장을
+     각자 주인에게 나눠 주는 일이다. 그래서 «파일 이름»으로 짝을 맞춘다
+     (대개 「권형하.jpg」처럼 이름으로 저장해 두신다).
+   ⚠⚠ 짝이 흐릿하면 «짐작하지 않는다». 한 사람으로 안 좁혀지면 비워 두고
+     사람이 고르게 한다 — 잘못 맞추면 남의 얼굴이 올라가고, 그건 되돌리기 어렵다. */
+const 사진짝 = { open: false, 줄: [], 보내는중: false, 끝남: null };
+
+/* 이름 다듬기 — 확장자·띄어쓰기·번호·괄호를 걷고 한글·영문·숫자만 남긴다.
+   「권형하 (1).JPG」·「권형하_대표.png」 이 다 「권형하」로 좁혀지게. */
+function 사진이름다듬기(s) {
+  return String(s == null ? '' : s)
+    .replace(/\.[A-Za-z0-9]{2,5}$/, '')          // 확장자
+    .replace(/[^0-9A-Za-z가-힣]+/g, '')          // 띄어쓰기·괄호·밑줄·점
+    .toLowerCase();
+}
+
+/* 파일 이름으로 주인을 찾는다. 못 찾거나 둘 이상이면 «비워 둔다». */
+function 사진주인찾기(파일이름, 사람들) {
+  const 이름 = 사진이름다듬기(파일이름);
+  if (!이름) return '';
+  const 쓸수있는 = (사람들 || []).filter(p => p.name && p.srl);
+  /* ① 똑같은 이름 — 가장 믿을 만하다 */
+  const 딱 = 쓸수있는.filter(p => 사진이름다듬기(p.name) === 이름);
+  if (딱.length === 1) return 딱[0].key;
+  if (딱.length > 1) return '';                  // 동명이인 — 사람이 고른다
+  /* ② 파일 이름 «안»에 이름이 들어 있다 — 한 사람으로 좁혀질 때만 */
+  const 든것 = 쓸수있는.filter(p => {
+    const n = 사진이름다듬기(p.name);
+    return n.length >= 2 && 이름.indexOf(n) >= 0;
+  });
+  return 든것.length === 1 ? 든것[0].key : '';
+}
+
+/* 사진을 넣을 수 있는 사람 — 글 번호가 있어야 보낼 자리가 있다 */
+function 사진받을사람들() {
+  return Object.keys(App.members || {})
+    .map(k => ({ key: k, name: (App.members[k] || {}).name || k,
+                 srl: Number((App.members[k] || {}).srl || 0) }))
+    .filter(p => p.srl > 0);
+}
+
+function 사진여럿열기() {
+  사진짝.open = true; 사진짝.줄 = []; 사진짝.보내는중 = false; 사진짝.끝남 = null;
+  사진여럿그리기();
+}
+window.사진여럿열기 = 사진여럿열기;
+
+/* 고른 파일들을 차례로 줄여 담는다. 한 장이 잘못돼도 나머지는 계속 담는다. */
+function 사진여럿고르기(el) {
+  const 파일들 = Array.prototype.slice.call((el && el.files) || []);
+  if (!파일들.length) return;
+  const 사람들 = 사진받을사람들();
+  let 남음 = 파일들.length;
+  파일들.forEach(f => {
+    사진줄이기(f, function (된것, 탈) {
+      사진짝.줄.push(된것
+        ? Object.assign({ 파일: f.name, 주인: 사진주인찾기(f.name, 사람들) }, 된것)
+        : { 파일: f.name, 주인: '', 막힘: 탈 || '읽지 못했습니다' });
+      if (--남음 === 0) { 사진짝.줄.sort((a, b) => String(a.파일).localeCompare(String(b.파일), 'ko')); 사진여럿그리기(); }
+    });
+  });
+  el.value = '';
+}
+window.사진여럿고르기 = 사진여럿고르기;
+
+function 사진여럿놓기(e) {
+  e.preventDefault(); e.stopPropagation();
+  사진끌기끝(e);
+  const 파일들 = (e.dataTransfer && e.dataTransfer.files) || [];
+  if (파일들.length) 사진여럿고르기({ files: 파일들, value: '' });
+}
+window.사진여럿놓기 = 사진여럿놓기;
+
+/* 그림 한 장을 줄인다 — 한 사람 것과 여러 장이 «같은 규칙»을 쓰게 한 자리에 둔다 */
+function 사진줄이기(f, 끝나면) {
+  if (!/^image\/(jpeg|png|webp)$/i.test(String((f && f.type) || ''))) {
+    끝나면(null, '그림 파일이 아닙니다'); return;
+  }
+  const 읽개 = new FileReader();
+  읽개.onload = function () {
+    const im = new Image();
+    im.onload = function () {
+      const 배 = Math.min(1, 사진긴쪽 / Math.max(im.width, im.height));
+      const w = Math.max(1, Math.round(im.width * 배)), h = Math.max(1, Math.round(im.height * 배));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+      g.drawImage(im, 0, 0, w, h);
+      const 미리 = c.toDataURL('image/jpeg', 사진품질);
+      const 바이트64 = 미리.slice(미리.indexOf(',') + 1);
+      끝나면({ 종류: 'image/jpeg', 바이트64: 바이트64, 미리: 미리,
+               크기말: w + '×' + h + ' · ' + Math.round(바이트64.length * 3 / 4 / 1024) + 'KB' });
+    };
+    im.onerror = function () { 끝나면(null, '그림을 읽지 못했습니다'); };
+    im.src = String(읽개.result || '');
+  };
+  읽개.onerror = function () { 끝나면(null, '파일을 읽지 못했습니다'); };
+  읽개.readAsDataURL(f);
+}
+
+function 사진짝고르기(i, key) { if (사진짝.줄[i]) { 사진짝.줄[i].주인 = String(key || ''); 사진여럿그리기(); } }
+window.사진짝고르기 = 사진짝고르기;
+function 사진짝빼기(i) { 사진짝.줄.splice(i, 1); 사진여럿그리기(); }
+window.사진짝빼기 = 사진짝빼기;
+
+function 사진여럿그리기() {
+  if (!사진짝.open) return;
+  const 사람들 = 사진받을사람들();
+  const 갈수있는 = 사진짝.줄.filter(r => !r.막힘 && r.주인);
+  let h = '<div class="pickhd"><div class="fldbar" style="margin:0">'
+    + '<h2>얼굴 사진 여러 장 한 번에</h2><span style="flex:1"></span>'
+    + '<span class="sub">' + 갈수있는.length + '장 보낼 수 있음</span>'
+    + '<button class="btn pri" onclick="사진여럿보내기()"'
+    + (갈수있는.length && !사진짝.보내는중 ? '' : ' disabled') + '>'
+    + (사진짝.보내는중 ? '보내는 중…' : '이 ' + 갈수있는.length + '장 올리기') + '</button>'
+    + '<button class="btn" onclick="closeModal()">닫기</button>'
+    + '</div></div>';
+
+  h += '<div class="pickbody" style="padding:12px 16px 16px">';
+  h += '<div class="bar ok" style="margin-bottom:10px">'
+    + '파일 이름으로 주인을 찾아 둡니다 — <b>「권형하.jpg」</b>처럼 이름으로 저장해 두시면 저절로 맞습니다.<br>'
+    + '<b>못 찾은 줄은 비워 둡니다.</b> 짐작해서 올리면 남의 얼굴이 올라갑니다 — 직접 골라 주십시오.</div>';
+  /* 끌어다 놓기 — 사진첩에서 여러 장을 통째로 끌어 오는 것이 가장 빠르다 */
+  h += '<div class="pdropbig" ondragover="사진끌기(event)" ondragleave="사진끌기끝(event)"'
+    + ' ondrop="사진여럿놓기(event)">'
+    + '<b>사진을 여기로 끌어다 놓으십시오</b> — 여러 장을 한 번에 놓으셔도 됩니다<br>'
+    + '<input type="file" multiple accept="image/jpeg,image/png,image/webp"'
+    + ' onchange="사진여럿고르기(this)" style="margin-top:8px">'
+    + '</div>';
+
+  if (!사진짝.줄.length) {
+    h += '<div class="empty">아직 고른 사진이 없습니다. 위에서 여러 장을 한 번에 고르십시오.</div>';
+  } else {
+    h += '<table class="ptab"><tr><th>사진</th><th>파일</th><th>누구</th><th></th></tr>';
+    사진짝.줄.forEach((r, i) => {
+      h += '<tr' + (r.막힘 ? ' class="bad"' : '') + '>'
+        + '<td>' + (r.미리 ? '<img class="pthumb" src="' + esc(r.미리) + '">' : '—') + '</td>'
+        + '<td><div>' + esc(r.파일) + '</div><span class="sub">'
+        + esc(r.막힘 || r.크기말 || '') + '</span></td>'
+        + '<td>' + (r.막힘 ? '<span class="sub">—</span>'
+            : '<select onchange="사진짝고르기(' + i + ',this.value)">'
+              + '<option value=""' + (r.주인 ? '' : ' selected') + '>— 고르십시오 —</option>'
+              + 사람들.map(p => '<option value="' + esc(p.key) + '"'
+                  + (p.key === r.주인 ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('')
+              + '</select>')
+        + '</td>'
+        + '<td><button class="btn sm" onclick="사진짝빼기(' + i + ')">빼기</button></td>'
+        + '</tr>';
+    });
+    h += '</table>';
+  }
+  if (사진짝.끝남) h += 사진짝.끝남;
+  h += '</div>';
+  openModal(h, true);
+}
+
+async function 사진여럿보내기() {
+  const 갈것 = 사진짝.줄.filter(r => !r.막힘 && r.주인);
+  if (!갈것.length || 사진짝.보내는중) return;
+  const 사람들 = 사진받을사람들();
+  const 이름of = (k) => (사람들.filter(p => p.key === k)[0] || {}).name || k;
+
+  /* 같은 사람에게 두 장을 보내면 뒤엣것이 이긴다 — 미리 막고 알린다 */
+  const 겹침 = {};
+  갈것.forEach(r => { 겹침[r.주인] = (겹침[r.주인] || 0) + 1; });
+  const 겹친이름 = Object.keys(겹침).filter(k => 겹침[k] > 1).map(이름of);
+  if (겹친이름.length) {
+    await say('한 분에게 두 장이 갑니다',
+      esc(겹친이름.join(', ')) + ' — 한 분에게는 <b>한 장만</b> 보낼 수 있습니다. '
+      + '나머지는 「빼기」로 지워 주십시오.');
+    return;
+  }
+
+  if (!await askYes('얼굴 사진 ' + 갈것.length + '장을 올립니다',
+    '<ul style="margin:6px 0 0;padding-left:18px">'
+    + 갈것.map(r => '<li><b>' + esc(이름of(r.주인)) + '</b> ← ' + esc(r.파일) + '</li>').join('')
+    + '</ul><div style="margin-top:8px">이름·직책·경력은 <b>그대로 둡니다</b>.</div>',
+    '올리기')) return;
+
+  사진짝.보내는중 = true; 사진짝.끝남 = null; 사진여럿그리기();
+  const 됨 = [], 안됨 = [];
+  for (const r of 갈것) {
+    const p = 사람들.filter(x => x.key === r.주인)[0];
+    try {
+      const 답 = await 서버에게물어보기('쓰기', p.srl,
+        { 사진: { 종류: r.종류, 바이트64: r.바이트64 } });
+      if (답.ok && 답.저장됨) {
+        됨.push(p.name);
+        /* 올린 것을 그 사람 편집칸에도 남긴다 — 한 사람 것과 «같은 자리»에 보인다 */
+        App.올린사진 = App.올린사진 || {};
+        App.올린사진[p.key] = { 미리: r.미리, 크기말: r.크기말, 언제: stampShort(Date.now()) };
+      }
+      else 안됨.push(p.name + ' — ' + ((답.걸린것 || []).join(' / ') || 답.error || '까닭 모름'));
+    } catch (e) {
+      안됨.push(p.name + ' — ' + ((e && e.message) || e));
+    }
+  }
+  사진짝.보내는중 = false;
+  /* 올라간 줄은 목록에서 뺀다 — 남겨 두면 또 올리게 된다 */
+  사진짝.줄 = 사진짝.줄.filter(r => !(r.주인 && 됨.indexOf(이름of(r.주인)) >= 0));
+  사진짝.끝남 = '<div class="bar ' + (안됨.length ? 'warn' : 'ok') + '" style="margin-top:10px">'
+    + (됨.length ? '<b>올림 ' + 됨.length + '장</b> — ' + esc(됨.join(', ')) : '')
+    + (안됨.length ? '<div style="margin-top:6px"><b>못 올림 ' + 안됨.length + '장</b><ul '
+        + 'style="margin:4px 0 0;padding-left:18px">'
+        + 안됨.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul></div>' : '')
+    + '</div>';
+  사진여럿그리기();
+  checkHomepage();
+}
+window.사진여럿보내기 = 사진여럿보내기;
 
 /* ══════ 「★ 푸른ERP 채우기」 단추 넣기 — 한 번만 ══════
    대표 결정 2026-08-30: 서버가 대신 로그인해 쓰는 방식 대신 «단추» 로 간다.
@@ -4942,6 +5236,13 @@ function listHtml() {
   h += '<div class="lh"><span id="listCount">' + listCountHtml() + '</span>'
     + '<span style="flex:1"></span>'
     + (App.group === 'members' ? '<button class="btn sm" onclick="addMember()">＋ 새 구성원</button>' : '')
+    /* ★ 사진 여러 장 (대표 지시 2026-09-14 「여러 명도」) — 여러 사람 일이라
+         한 사람 편집칸이 아니라 «목록 머리»가 제자리다. */
+    + (App.group === 'members'
+        ? '<button class="btn sm" onclick="사진여럿열기()"'
+          + ' title="사진 여러 장을 한 번에 올립니다 — 파일 이름으로 주인을 찾아 드립니다">'
+          + '📷 사진 여러 장</button>'
+        : '')
     + (App.group === 'work' ? '<button class="btn sm" onclick="addPage()">＋ 쪽 추가</button>' : '')
     /* ★ 자문사는 여기서 회사를 «만들지 않는다». 이름·업종·거래 여부는 푸른ERP 업체관리에서
        고친다 — 두 곳에서 만들 수 있게 하면 어느 쪽이 진짜인지 알 수 없게 된다.
