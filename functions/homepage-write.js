@@ -46,6 +46,12 @@ function 읽는주소(srl) {
   if (!Number.isInteger(n) || n <= 0) return null;
   return ORIGIN + "/index.php?mid=" + BOARD + "&document_srl=" + n;
 }
+
+/* 관리자의 «문서 관리» 화면 — 글 상태(공개·비공개·임시·휴지통)를 다루는 자리가
+   있다면 여기다. 읽기만 하고 «할 수 있는 일»의 이름만 모은다. */
+function 문서관리주소() {
+  return ORIGIN + "/index.php?module=admin&act=dispDocumentAdminList&module_srl=&search_target=title&search_keyword=";
+}
 function 로그인보내는곳() { return ORIGIN + "/index.php?act=procMemberLogin"; }
 
 /* ── 우리가 «이름을 아는» 칸 ───────────────────────────────────────────
@@ -487,7 +493,7 @@ function 로그인몸통(로그인쪽, 아이디, 암호) {
 
 module.exports = {
   ORIGIN, BOARD, 브라우저표시,
-  고치는주소, 보낼주소, 저장할act, 로그인화면주소, 로그인보내는곳, 읽는주소,
+  고치는주소, 보낼주소, 저장할act, 로그인화면주소, 로그인보내는곳, 읽는주소, 문서관리주소,
   경력칸, 이름표로찾을것, 손대지말것,
   칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기, 비공개자리, 정찰,
   막을까, 갈아끼우기, 몸통, 로그인몸통

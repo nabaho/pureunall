@@ -80,7 +80,12 @@ function box(extra) {
        더하지 않고 «여기 한 자리»에 싣는다 — 다음에 딱지 함수가 늘어도 여기만 고친다. */
   vm.runInContext([noConst(constLine('ERA_LIKELY')), noConst(constLine('ERA_AUTO_KINDS')),
     fnSource('eraPickHtml'), fnSource('eraInfoText'),
-    fnSource('pullAutoEra'), fnSource('pullEraOf')].join('\n'), ctx);
+    fnSource('pullAutoEra'), fnSource('pullEraOf'),
+    /* ── 「일반직원 수정」 탭 재료 (2026-09-14) ──
+       loadDraft·visibleRows·pageIdsOf·leftoverGoBtns 가 «모두» 이것을 지난다.
+       ⚠★ 상자 하나에만 실으면 다른 상자 열 개가 한꺼번에 죽는다(이번이 다섯 번째).
+         그래서 모든 상자의 밑둥인 «여기»에 싣는다. */
+    noConst(constLine('직원쪽')), fnSource('직원줄'), fnSource('쪽으로가기')].join('\n'), ctx);
   return ctx;
 }
 function run(ctx, code) { vm.runInContext(code, ctx); return ctx; }
@@ -115,7 +120,7 @@ function rowDeps() {
     fnSource('offSiteOf'),
     /* 직원(사무장·사무직)으로 가는 문 — 목록 머리가 이것을 지난다 (2026-09-13).
        ⚠★ 이 상자에 «새 함수를 안 실어» 화면 검사가 통째로 죽은 것이 이번이 네 번째다. */
-    constLine('직원쪽'), fnSource('직원쪽있나'),
+    noConst(constLine('직원쪽')), fnSource('직원쪽있나'),
     fnSource('memberRows'), fnSource('pageIdsOf'), fnSource('pageRows'), fnSource('rowsOf'),
     fnSource('needsAttentionRow'), fnSource('statOf'),
     fnSource('statusChip'), fnSource('cardCount'), fnSource('dashHtml'),
