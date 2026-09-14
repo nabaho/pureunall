@@ -38364,6 +38364,124 @@ function DuplicateCleanerSection(){
   );
 }
 
+/* ══════ 부가세 표시 바로잡기 — 이관하면서 잃어버린 것 ══════════════════════
+   건의 2026-09-10 김보람 「계약관리에 부가세포함으로 등록했는데 이관되면 별도로 바뀝니다」
+
+   ■ 무슨 일이었나
+     계약에 「부가세 포함」을 체크하고 165만원으로 적어도, 이관된 사건·컨설팅은 그
+     «표시»를 잃어 별도로 읽혔다. 그러면 통장에 들어올 돈을 165만 × 1.1 = 181만 5천으로
+     셈해, 거래내역 매칭에서 165,000원 차액이 났다.
+   ■ 코드는 2026-09-11 에 고쳤다(transferContract 가 두 표시를 함께 들고 간다).
+     그런데 «이미 이관된» 기록은 스스로 안 고쳐진다 — 그래서 이 단추를 만든다.
+   ★ 실측 2026-09-14: 어긋난 칸 10개 · 거래내역 차액 합계 1,715,500원.
+
+   ⚠⚠ 금액은 «건드리지 않는다». 바꾸는 것은 참/거짓 표시 한 칸뿐이고, 그것도
+     계약이 「포함」일 때 이관 기록을 「포함」으로 맞추는 «한 방향»뿐이다.
+     반대로 지우는 일은 없다 — 사람이 일부러 별도로 바꿔 둔 것을 되돌리면 안 된다.
+   ⚠★ 잇는 열쇠는 sourceContractNo · sourceContractId 다.
+     srcContractId·contractId 로 이으면 «0건»이 나온다(2026-09-12 에 실제로 그랬다) —
+     0건은 「고칠 것이 없다」로 읽혀서, 틀린 안심을 준다.
+   ⚠ 성공보수가 %(요율)면 뺀다 — 그 숫자는 금액이 아니라 비율이라 부가세가 없다.
+   ⚠ 0원도 뺀다 — 어긋날 돈이 없다. */
+var VAT_FIX_STORES = [
+  { k:'cases',          label:'사건',   fee:['retainerFee','contractFee'], bal:['successFee','balanceFee'], no:['caseNo','no'] },
+  { k:'consultings',    label:'컨설팅', fee:['contractFee','retainerFee'], bal:['balanceFee','successFee'], no:['no','caseNo'] },
+  { k:'funds',          label:'기금',   fee:['contractFee','retainerFee'], bal:['balanceFee','successFee'], no:['no','caseNo'] },
+  { k:'other_projects', label:'기타',   fee:['contractFee','retainerFee'], bal:['balanceFee','successFee'], no:['no','caseNo'] }
+];
+function erpVatCarryScan(){
+  var contracts = dbGet('contracts', []) || [];
+  var byNo = {}, byId = {};
+  contracts.forEach(function(c){ if(!c) return; if(c.contractNo) byNo[c.contractNo] = c; if(c.id) byId[c.id] = c; });
+  var rows = [];
+  VAT_FIX_STORES.forEach(function(S){
+    (dbGet(S.k, []) || []).forEach(function(it){
+      if(!it || !it.id) return;
+      var c = (it.sourceContractNo && byNo[it.sourceContractNo]) || (it.sourceContractId && byId[it.sourceContractId]);
+      if(!c) return;
+      [['착수금·계약금', 'contractFeeVatIncluded', S.fee, false],
+       ['성공보수·잔금', 'balanceFeeVatIncluded',  S.bal, true]].forEach(function(칸){
+        var 이름 = 칸[0], flag = 칸[1], 금액칸 = 칸[2], isBal = 칸[3];
+        if(!c[flag]) return;                                   // 계약이 «포함»이 아니면 볼 것이 없다
+        if(it[flag]) return;                                   // 이관 기록도 이미 «포함»이면 맞다
+        if(isBal && it.successFeeType === 'percent') return;    // %는 금액이 아니다
+        var amt = 0;
+        금액칸.forEach(function(f){ if(!amt && Number(it[f])) amt = Number(it[f]); });
+        if(!amt) return;                                        // 0원은 어긋날 것이 없다
+        var no = '';
+        S.no.forEach(function(f){ if(!no && it[f]) no = it[f]; });
+        rows.push({ store:S.k, label:S.label, id:it.id, no:no || it.id, flag:flag, 칸:이름,
+                    company: it.companyName || c.companyName || '', contractNo: c.contractNo || '',
+                    amount: amt, gap: Math.round(amt * 0.1) });
+      });
+    });
+  });
+  return rows;
+}
+function VatCarryFixSection(){
+  var r = useState(null); var rows = r[0]; var setRows = r[1];
+  var d = useState(''); var done = d[0]; var setDone = d[1];
+  /* 돈이 걸린 자리라 관리자만 본다 */
+  if(!(CURRENT_USER && (CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin))) return null;
+  function scan(){ setDone(''); setRows(erpVatCarryScan()); }
+  async function fix(){
+    if(!rows || !rows.length) return;
+    var sum = rows.reduce(function(s, x){ return s + x.gap; }, 0);
+    if(!(await popConfirm('이관된 ' + rows.length + '칸의 「부가세 포함」 표시를 계약과 같게 되살립니다.\n\n'
+      + '· 금액은 건드리지 않습니다 — 표시 한 칸만 바꿉니다.\n'
+      + '· 거래내역에서 어긋나던 ' + sum.toLocaleString() + '원이 맞아떨어집니다.\n\n계속할까요?'))) return;
+    var ok = 0, ng = 0;
+    rows.forEach(function(x){
+      var p = {}; p[x.flag] = true;
+      if(dbPatch(x.store, x.id, p)) ok++; else ng++;
+    });
+    setDone('✅ ' + ok + '칸 바로잡았습니다' + (ng ? (' · ' + ng + '칸은 대상을 못 찾았습니다') : '')
+      + ' — 각 화면을 새로고침하면 반영됩니다.');
+    setRows(erpVatCarryScan());
+    try{ showToast('🧾 부가세 표시 ' + ok + '칸 바로잡음'); }catch(_t){}
+  }
+  var sum = rows ? rows.reduce(function(s, x){ return s + x.gap; }, 0) : 0;
+  return h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', padding:'14px 16px', marginBottom:'16px' } },
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
+      h('span', { style:{ fontSize:'18px' } }, '🧾'),
+      h('div', null,
+        h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#854d0e' } }, '부가세 표시 바로잡기 (이관된 기록)'),
+        h('div', { style:{ fontSize:'11.5px', color:'#64748b' } }, '계약은 「부가세 포함」인데 이관된 사건·컨설팅이 「별도」로 남은 칸을 찾습니다')
+      ),
+      h('button', { onClick:scan,
+        style:{ marginLeft:'auto', padding:'7px 16px', background:'#854d0e', color:'#fff',
+          border:'none', borderRadius:'6px', fontSize:'12px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } }, '🔍 지금 검사')
+    ),
+    done && h('div', { style:{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'5px', padding:'8px 12px', fontSize:'12px', color:'#166534', marginBottom:'8px' } }, done),
+    rows && (rows.length === 0
+      ? h('div', { style:{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'5px', padding:'10px 14px', fontSize:'12px', color:'#166534', fontWeight:700 } },
+          '✅ 어긋난 칸 없음 — 이관된 기록이 모두 계약과 같습니다.')
+      : h('div', null,
+          h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'5px', padding:'8px 12px', fontSize:'12px', color:'#854d0e', marginBottom:'8px', fontWeight:700 } },
+            '⚠️ ' + rows.length + '칸 어긋남 · 거래내역 차액 합계 ' + sum.toLocaleString() + '원'),
+          h('div', { style:{ maxHeight:'240px', overflowY:'auto', marginBottom:'8px' } },
+            rows.map(function(x, i){
+              return h('div', { key:x.store + x.id + x.flag, style:{ marginBottom:'4px', background:'#fff', borderRadius:'5px', padding:'7px 10px', border:'1px solid #fde68a' } },
+                h('div', { style:{ display:'flex', alignItems:'baseline', gap:'6px', whiteSpace:'nowrap', minWidth:0, fontSize:'11.5px' } },
+                  h('span', { style:{ fontWeight:700, color:'#854d0e' } }, x.label + ' ' + x.no),
+                  h('span', { style:{ color:'#64748b' } }, '← ' + x.contractNo),
+                  h('span', { style:{ color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis' } }, x.company),
+                  h('span', { style:{ flex:1 } }),
+                  h('span', { style:{ color:'#64748b' } }, x.칸),
+                  h('span', { style:{ fontFamily:'monospace', fontWeight:600 } }, Number(x.amount).toLocaleString() + '원'),
+                  h('span', { style:{ fontFamily:'monospace', color:'#dc2626', fontWeight:700 } }, '차액 ' + x.gap.toLocaleString())
+                )
+              );
+            })
+          ),
+          h('button', { onClick:fix,
+            style:{ padding:'8px 18px', background:'#854d0e', color:'#fff', border:'none', borderRadius:'6px',
+              fontSize:'12.5px', fontWeight:700, cursor:'pointer' } },
+            '🧾 ' + rows.length + '칸 바로잡기 (금액은 그대로)')
+        ))
+  );
+}
+
 function DataManagementSection(){
   var s = useState(1); var step = s[0]; var setStep = s[1];
   var t = useState('cases'); var target = t[0]; var setTarget = t[1];
@@ -38586,6 +38704,9 @@ function DataManagementSection(){
 
     // ★ 중복 데이터 제거
     h(DuplicateCleanerSection, null),
+
+    // ★ 부가세 표시 바로잡기 (이관하면서 잃은 것) — 건의 2026-09-10 김보람
+    h(VatCarryFixSection, null),
 
     // ── Firebase 전체 업로드 (모바일 동기화용) ──
     h('div', { style:{ background: fbUpState==='done' ? '#f0fdf4' : fbUpState==='error' ? '#fef2f2' : '#eff6ff',
