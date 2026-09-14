@@ -84,7 +84,7 @@ function sendCtx(kind) {
     safeSrc: function (v) { return v || ''; },
     canSendCards: function () { return true; },
     renderReadPanel: function () {}, renderUp: function () {},
-    dropRedundant: function () { return Promise.resolve(); },
+    noteRedundant: function () { return Promise.resolve(); },
     firebase: { auth: function () { return { currentUser: { email: 'a@b' } }; } },
     PuDocFile: {
       sendToCards: function () { return Promise.resolve({ id: 'c1', message: 'ok' }); },

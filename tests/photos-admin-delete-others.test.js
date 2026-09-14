@@ -64,7 +64,7 @@ test('★ 부르는 쪽이 주인을 실제로 넘긴다 — 안 넘기면 아�
   assert.ok(calls.length >= 4, '지우는 곳을 다 찾지 못했습니다 (' + calls.length + '곳).');
   const bare = calls.filter(function (c) { return !/photoOwner\(/.test(c); });
   /* 스스로 치우는 중복 정리 한 곳만 예외다 — 거기는 내 사진만 다룬다
-     (dropRedundant 가 isMinePhoto 로 먼저 거른다). */
+     (noteRedundant 가 isMinePhoto 로 먼저 거른다). */
   assert.ok(bare.length <= 1,
     '주인을 안 넘기는 곳이 ' + bare.length + '곳 있습니다: ' + bare.join(' / '));
 });
