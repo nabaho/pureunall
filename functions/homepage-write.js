@@ -208,6 +208,83 @@ function 이름표로칸찾기(html, 보이는이름) {
   return "";
 }
 
+/* ── 사진 넣기 ─────────────────────────────────────────────────────────
+   ★ 2026-09-14 정찰로 확인 — 얼굴 사진 칸은 이름표 「메인 이미지」의 «파일 칸»이다
+     (extra_vars5). 파일 칸은 글자로 못 보낸다. 브라우저가 파일을 고르면 폼 전체가
+     multipart/form-data 로 바뀌는데, 그때 «글자 칸도 전부 함께» 실린다.
+   ⚠⚠ 그래서 사진을 보낼 때도 «받은 칸을 하나도 빠뜨리지 않고» 같이 싣는다.
+     하나라도 빼면 그 칸이 빈 채로 저장된다 — 경력이 통째로 날아간다.
+   ★ 글자만 고치는 길(몸통)은 «그대로 둔다». 잘 돌고 있는 길을 사진 때문에
+     multipart 로 바꾸지 않는다 — 한 길이 무너지면 둘 다 못 쓴다. */
+
+/* 파일 칸을 이름표로 찾는다. 이름표로칸찾기 는 파일 칸을 «일부러» 건너뛰므로 따로 둔다. */
+function 파일칸찾기(html, 보이는이름) {
+  const 본문 = String(html || "");
+  const 찾을것 = 이름다듬기(보이는이름);
+  if (!찾을것) return "";
+  const rre = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
+  let m;
+  while ((m = rre.exec(본문))) {
+    const 줄 = m[1];
+    const 머리 = /<(th|td|label)\b[^>]*>([\s\S]*?)<\/\1>/i.exec(줄);
+    if (!머리 || 이름다듬기(머리[2]) !== 찾을것) continue;
+    const ire = /<input\b[^>]*>/gi;
+    let x;
+    while ((x = ire.exec(줄))) {
+      if ((속성(x[0], "type") || "").toLowerCase() !== "file") continue;
+      const 이름 = 속성(x[0], "name");
+      if (이름) return 이름;
+    }
+  }
+  return "";
+}
+
+/* 받을 수 있는 사진 — 얼굴 사진이다. 그림이 아닌 것은 받지 않는다. */
+const 사진종류 = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+const 사진최대 = 4 * 1024 * 1024;   /* 4MB — 화면에서 줄여 보내므로 넉넉하다 */
+
+function 사진받을까(종류, 바이트수) {
+  if (!사진종류[String(종류 || "").toLowerCase()]) {
+    return { ok: false, why: "그림 파일만 넣을 수 있습니다(jpg·png·webp)" };
+  }
+  const n = Number(바이트수);
+  if (!isFinite(n) || n <= 0) return { ok: false, why: "사진이 비어 있습니다" };
+  if (n > 사진최대) {
+    return { ok: false, why: "사진이 너무 큽니다(" + Math.round(n / 1024) + "KB) — "
+      + Math.round(사진최대 / 1024 / 1024) + "MB 까지입니다" };
+  }
+  return { ok: true };
+}
+
+/* multipart 한 덩이를 짓는다. 브라우저가 파일 고른 폼을 보낼 때와 «같은 모양»이다.
+   ⚠ 글자 칸을 하나도 빼지 않는다 — 빠진 칸은 빈 값으로 저장된다. */
+function 사진몸통(칸, 여럿, 파일칸이름, 파일) {
+  const 경계 = "----pureun" + Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+  const 조각 = [];
+  const 글 = (s) => Buffer.from(String(s), "utf8");
+
+  Object.keys(칸 || {}).forEach((k) => {
+    const 값들 = Array.isArray((여럿 || {})[k]) ? 여럿[k] : [칸[k]];
+    값들.forEach((v) => {
+      조각.push(글("--" + 경계 + "\r\n"
+        + 'Content-Disposition: form-data; name="' + k + '"\r\n\r\n'
+        + String(v == null ? "" : v) + "\r\n"));
+    });
+  });
+
+  /* 사진 — 파일 이름은 «우리가» 짓는다. 사람이 올린 이름을 그대로 쓰면
+     한글·공백·따옴표가 섞여 헤더가 깨진다. */
+  const 확장 = 사진종류[String(파일.종류 || "").toLowerCase()] || "jpg";
+  const 이름 = "photo-" + Date.now() + "." + 확장;
+  조각.push(글("--" + 경계 + "\r\n"
+    + 'Content-Disposition: form-data; name="' + 파일칸이름 + '"; filename="' + 이름 + '"\r\n'
+    + "Content-Type: " + String(파일.종류).toLowerCase() + "\r\n\r\n"));
+  조각.push(Buffer.isBuffer(파일.바이트) ? 파일.바이트 : Buffer.from(파일.바이트 || []));
+  조각.push(글("\r\n--" + 경계 + "--\r\n"));
+
+  return { 경계: 경계, 몸통: Buffer.concat(조각), 파일이름: 이름 };
+}
+
 /* ── 휴지통으로 내리기 ─────────────────────────────────────────────────
    ★ 2026-09-14 정찰로 확인한 것 — 이 게시판에는 「비공개」로 바꾸는 자리가 «없다».
      고치는 화면에도(고르개 is_notice·딸깍 title_bold 뿐), 문서 관리 화면에도 없다.
@@ -549,5 +626,6 @@ module.exports = {
   경력칸, 이름표로찾을것, 손대지말것,
   칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기, 비공개자리, 정찰, 번호값들,
   내리는type, 절대안쓰는type, 휴지통몸통, 문서관리보낼주소,
+  파일칸찾기, 사진종류, 사진최대, 사진받을까, 사진몸통,
   막을까, 갈아끼우기, 몸통, 로그인몸통
 };

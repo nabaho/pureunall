@@ -194,6 +194,11 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   font-weight:800;color:var(--sub);cursor:pointer;font-family:inherit}
 .chip:hover{border-color:#cbd5e1}
 .chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+/* 얼굴 사진 줄 — 고르개와 미리보기가 «한 줄»에 선다 (표 한 칸은 한 줄) */
+.photorow{align-items:center}
+.pf{font-size:11.5px;max-width:210px}
+.pthumb{width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid var(--line);
+  vertical-align:middle;margin-right:6px}
 /* 쪽 차례 바꾸기 ▲▼ — 줄 안에 조용히 있다가 그 줄에 마우스를 올리면 진해진다 */
 .ord{display:flex;flex-direction:column;gap:1px;flex:none;margin-right:4px}
 .ob{border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:4px;
@@ -3182,6 +3187,110 @@ async function 홈페이지칸살펴보기() {
 }
 window.홈페이지칸살펴보기 = 홈페이지칸살펴보기;
 
+/* ══════ 얼굴 사진 넣기 (대표 지시 2026-09-14) ══════
+   ★ 사진은 «파일 칸»이라 글자와 보내는 길이 다르다(multipart). 그래서 「저장」에
+     묻히지 않고 제 단추로 보낸다 — 저장은 우리 자료를, 이 단추는 홈페이지를 고친다.
+   ★ 보내기 전에 «화면에서 줄인다». 폰 사진은 5MB 가 넘는데, 홈페이지 카드에 쓰는
+     크기는 긴 쪽 900px 이면 넉넉하다. 줄이면 올리기도 빠르고 서버도 가볍다.
+   ⚠ 고른 사진은 App.사진 에 «한 사람 것만» 담는다. 다른 사람으로 옮기면 지운다 —
+     안 지우면 김씨 사진을 고르고 이씨 화면에서 눌러 이씨 얼굴이 바뀐다. */
+const 사진긴쪽 = 900;
+const 사진품질 = 0.85;
+
+function 사진칸Html(d) {
+  if (!d || !d.srl) return '';
+  const 고른것 = (App.사진 && App.사진.key === d.key) ? App.사진 : null;
+  return '<div class="two photorow">'
+    + '<div class="inl" style="flex:0 0 auto"><b>얼굴 사진'
+    + '<span class="tip" title="지금 홈페이지의 «메인 이미지» 칸으로 바로 갑니다 — 저장과 다른 길입니다">?</span></b>'
+    + '<input type="file" accept="image/jpeg,image/png,image/webp" class="pf"'
+    + ' onchange="사진고르기(this)"></div>'
+    + (고른것
+        ? '<div class="inl" style="flex:0 0 auto">'
+          + '<img class="pthumb" src="' + esc(고른것.미리) + '" alt="고른 사진">'
+          + '<span class="sub">' + esc(고른것.크기말) + '</span>'
+          + '<button class="btn sm hot" onclick="사진넣기()">이 사진으로 바꾸기</button>'
+          + '<button class="btn sm" onclick="사진버리기()">취소</button>'
+          + '</div>'
+        : '<div class="inl" style="flex:1"><span class="sub">'
+          + '고르면 미리 보여 드리고, 누르셔야 홈페이지에 올라갑니다.</span></div>')
+    + '</div>';
+}
+
+/* 고른 그림을 줄여 담는다. 원본을 그대로 보내지 않는다. */
+function 사진고르기(el) {
+  const f = el && el.files && el.files[0];
+  if (!f) return;
+  const d = App.draft;
+  if (!d || !d.srl) { say('글 번호가 없습니다', '먼저 <b>글 번호</b>를 적어 주십시오.'); return; }
+  if (!/^image\/(jpeg|png|webp)$/i.test(String(f.type || ''))) {
+    say('그림 파일만 됩니다', 'jpg·png·webp 만 넣을 수 있습니다.');
+    el.value = '';
+    return;
+  }
+  const 읽개 = new FileReader();
+  읽개.onload = function () {
+    const im = new Image();
+    im.onload = function () {
+      /* 긴 쪽을 900px 로 — 작은 그림은 «키우지 않는다»(억지로 키우면 뭉개진다) */
+      const 배 = Math.min(1, 사진긴쪽 / Math.max(im.width, im.height));
+      const w = Math.max(1, Math.round(im.width * 배)), h = Math.max(1, Math.round(im.height * 배));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      /* 흰 바탕을 깔아 준다 — 투명 png 를 jpg 로 바꾸면 검게 나온다 */
+      g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+      g.drawImage(im, 0, 0, w, h);
+      const 미리 = c.toDataURL('image/jpeg', 사진품질);
+      const 바이트64 = 미리.slice(미리.indexOf(',') + 1);
+      const 바이트수 = Math.round(바이트64.length * 3 / 4);
+      App.사진 = { key: d.key, srl: d.srl, 종류: 'image/jpeg', 바이트64: 바이트64,
+                    미리: 미리, 크기말: w + '×' + h + ' · ' + Math.round(바이트수 / 1024) + 'KB' };
+      App.render();
+    };
+    im.onerror = function () { say('그림을 읽지 못했습니다', '다른 파일로 해 보십시오.'); };
+    im.src = String(읽개.result || '');
+  };
+  읽개.onerror = function () { say('파일을 읽지 못했습니다', '다시 골라 주십시오.'); };
+  읽개.readAsDataURL(f);
+}
+window.사진고르기 = 사진고르기;
+
+function 사진버리기() { App.사진 = null; App.render(); }
+window.사진버리기 = 사진버리기;
+
+async function 사진넣기() {
+  const d = App.draft, 고른것 = App.사진;
+  if (!d || !고른것 || 고른것.key !== d.key) {
+    await say('고른 사진이 없습니다', '사진을 먼저 골라 주십시오.');
+    return;
+  }
+  const 보낼것 = { 사진: { 종류: 고른것.종류, 바이트64: 고른것.바이트64 } };
+  try {
+    const 봄 = await 서버에게물어보기('보기', Number(d.srl), 보낼것);
+    if (!봄.ok) { await say('사진을 넣지 않았습니다', 걸린것글자(봄)); return; }
+    if (!await askYes(esc(d.name || '이 사람') + ' 님 얼굴 사진을 바꿉니다',
+      '<div style="margin-bottom:6px"><img src="' + esc(고른것.미리)
+      + '" style="max-width:150px;border-radius:8px;border:1px solid var(--line)"></div>'
+      + '<div>지금 홈페이지의 <b>메인 이미지</b>가 이 사진으로 바뀝니다. '
+      + '이름·직책·경력은 <b>그대로 둡니다</b>.</div>', '바꾸기')) return;
+
+    const 함 = await 서버에게물어보기('쓰기', Number(d.srl), 보낼것);
+    if (함.ok && 함.저장됨) {
+      App.사진 = null;
+      await say('사진을 바꿨습니다',
+        '홈페이지에서 한 번 눈으로 봐 주십시오. '
+        + '<span class="sub">(그림이 바로 안 바뀌면 Ctrl+F5 로 새로 고쳐 보십시오.)</span>');
+      checkHomepage();
+    } else {
+      await say('사진을 넣지 못했습니다', 걸린것글자(함));
+    }
+  } catch (e) {
+    await say('사진을 넣지 못했습니다', esc((e && e.message) || String(e)));
+  }
+}
+window.사진넣기 = 사진넣기;
+
 /* ══════ 「★ 푸른ERP 채우기」 단추 넣기 — 한 번만 ══════
    대표 결정 2026-08-30: 서버가 대신 로그인해 쓰는 방식 대신 «단추» 로 간다.
    ★ 왜 — 얼굴 사진이 «숨은 칸» 안에 있어서, 서버가 경력사항만 보내면 사진이
@@ -5399,6 +5508,11 @@ function memberEdit(d) {
     + '<span class="tip" title="홈페이지 글의 번호입니다 — 이 번호로 홈페이지 글과 짝지어집니다">?</span></b>'
     + '<input value="' + esc(d.srl) + '" oninput="fieldEdit(\'srl\',this.value)"></div>'
     + '</div>';
+  /* ★ 얼굴 사진 (대표 지시 2026-09-14 「화면에서 바꿀 수 있게 사진 넣기 해달라」).
+       ⚠ 이 칸은 «지금 홈페이지»의 파일 칸(메인 이미지)으로 바로 간다 — 저장과 다른 길이다.
+         그래서 「저장」이 아니라 제 단추로 보낸다. 무엇이 바뀌는지 먼저 보여 준다.
+       ⚠ 글 번호가 없으면 보낼 자리가 없다 — 아예 안 그린다. */
+  붙은칸 += 사진칸Html(d);
   /* ⚠ 붙은 칸은 여기서 끝나지 «않는다» — 대표 지시 2026-09-03 「이 부분 전체 틀고정해야
      한다」로 경력 목록 «위 전부»(구분·이름줄·메인 설명·담당 업무·경력사항 이름줄)를
      붙였다. 붙는 것은 모두 «붙은칸» 에 담긴다 — 담기지 않은 것은 구른다.

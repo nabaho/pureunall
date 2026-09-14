@@ -85,7 +85,10 @@ function box(extra) {
        loadDraft·visibleRows·pageIdsOf·leftoverGoBtns 가 «모두» 이것을 지난다.
        ⚠★ 상자 하나에만 실으면 다른 상자 열 개가 한꺼번에 죽는다(이번이 다섯 번째).
          그래서 모든 상자의 밑둥인 «여기»에 싣는다. */
-    noConst(constLine('직원쪽')), fnSource('직원줄'), fnSource('쪽으로가기')].join('\n'), ctx);
+    noConst(constLine('직원쪽')), fnSource('직원줄'), fnSource('쪽으로가기'),
+    /* 얼굴 사진 칸 — 편집칸(memberEdit)의 «붙은 칸»이 이것을 지난다 (2026-09-14).
+       ⚠★ 상자에 새 함수를 안 실어 검사가 한꺼번에 죽은 것이 이번이 여섯 번째다. */
+    fnSource('사진칸Html')].join('\n'), ctx);
   return ctx;
 }
 function run(ctx, code) { vm.runInContext(code, ctx); return ctx; }
