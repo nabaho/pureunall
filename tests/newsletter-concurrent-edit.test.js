@@ -27,20 +27,50 @@ const 서버 = 읽기('functions/index.js');
 
 /* ══════ ① 동시 손질 — 남의 글을 조용히 지우지 않는다 ══════ */
 
-test('★★ 저장은 «내가 읽어 온 판»일 때만 통과한다', () => {
-  /* 판올리기 를 꺼내 두 관리자가 같은 판에서 저장하는 상황을 만든다 */
-  const 자리 = { 판: 3 };
-  const 짐 = { db: { ref: () => ({
-    once: async () => ({ val: () => 자리.판 }),
+/* ══════════════════════════════════════════════════════════════════════════
+   파이어베이스 «거래»를 있는 그대로 흉내 낸다 (2026-09-14)
+   ══════════════════════════════════════════════════════════════════════════
+   ⚠⚠ 앞선 흉내는 «첫 부름부터 진짜 값»을 줬다. 그래서 아무것도 못 잡았고,
+     대표 화면에서 하루 동안 저장이 통째로 막힌 뒤에야 드러났다.
+   진짜 차례는 이렇다:
+     ① «지금 손안에 있는 값»으로 먼저 부른다 — 그 자리를 듣고 있지 않으면 null 이다.
+     ② 거기서 undefined 를 돌려주면 «서버에 묻지도 않고» 끝난다.
+     ③ 값을 주면 서버로 보내고, 서버 값이 달랐으면 «진짜 값»으로 다시 부른다.
+   ★ 이 흉내가 규칙이다. 더 너그럽게 고치지 말 것 — 너그러운 흉내가 이 고장을 놓쳤다. */
+function 거래흉내(시작값) {
+  const 상자 = { 값: 시작값 };
+  const ref = {
+    상자: 상자,
+    once: async () => ({ val: () => 상자.값 }),
     transaction: async (fn) => {
-      const 다음 = fn(자리.판);
-      if (다음 === undefined) return { committed: false };
-      자리.판 = 다음; return { committed: true };
+      const 접힘 = { committed: false, snapshot: { val: () => 상자.값 } };
+      if (fn(null) === undefined) return 접힘;          /* ①② 찬 자리에서 접었다 */
+      const 답 = fn(상자.값);                            /* ③ 진짜 값으로 다시 */
+      if (답 === undefined) return 접힘;
+      상자.값 = 답;
+      return { committed: true, snapshot: { val: () => 답 } };
     },
-  }) } };
+  };
+  return { db: { ref: () => ref }, _상자: 상자 };
+}
+
+test('★★★ «찬 자리»에서 접지 않는다 — 여기서 접으면 저장이 영영 막힌다', () => {
+  /* 2026-09-14 대표 화면: ㅁ 를 눌러도 「다른 관리자가 계속 고치고 있습니다」만 떴다.
+     아무도 없었다. 서버의 판은 1 에서 멈춰 있었고 마지막 저장은 25시간 전이었다 —
+     판이 0 일 때만 통했다(null → 0 이라 우연히 맞았다). 그 뒤로는 전부 접혔다. */
+  const 짐 = 거래흉내(1);
   vm.createContext(짐);
   vm.runInContext(cutFn(화면, 'async function 판올리기('), 짐);
+  return vm.runInContext('판올리기("k", 1)', 짐).then(function (r) {
+    assert.equal(r, 2, '찬 자리에서 접는다 — 아무도 안 건드렸는데 저장이 영영 막힌다');
+    assert.equal(짐._상자.값, 2, '판이 안 올랐다');
+  });
+});
 
+test('★★ 저장은 «내가 읽어 온 판»일 때만 통과한다', () => {
+  const 짐 = 거래흉내(3);
+  vm.createContext(짐);
+  vm.runInContext(cutFn(화면, 'async function 판올리기('), 짐);
   return (async () => {
     const 갑 = await vm.runInContext('판올리기("k", 3)', 짐);
     assert.equal(갑, 4, '먼저 저장한 쪽이 막혔다');
@@ -51,31 +81,31 @@ test('★★ 저장은 «내가 읽어 온 판»일 때만 통과한다', () => 
   })();
 });
 
-test('★★ 찬 자리에서 «헛되이» 막지 않는다 — 한 번 더 확인한다', () => {
-  /* 거래는 지금 손안에 있는 값으로 먼저 불린다. 그 값이 아직 안 와서 접혔을 뿐인데
-     「남이 고쳤습니다」를 띄우면, 아무도 안 건드렸는데 저장이 막힌다. */
-  let 부른수 = 0;
-  const 짐 = { db: { ref: () => ({
-    once: async () => ({ val: () => 0 }),
-    transaction: async (fn) => {
-      부른수++;
-      /* 첫 번은 «찬 자리»(null) 흉내 — 접힌다. 두 번째는 제대로 온다. */
-      const 값 = 부른수 === 1 ? null : 0;
-      const 다음 = fn(값);
-      return { committed: 다음 !== undefined && 부른수 > 1 };
-    },
-  }) } };
+test('★★ 아직 판이 없는 «새 회차»도 저장된다', () => {
+  const 짐 = 거래흉내(null);
   vm.createContext(짐);
   vm.runInContext(cutFn(화면, 'async function 판올리기('), 짐);
   return vm.runInContext('판올리기("k", 0)', 짐).then(function (r) {
-    assert.equal(r, 1, '한 번 접혔다고 포기한다 — 멀쩡한 저장이 막힌다');
+    assert.equal(r, 1, '새 회차의 첫 저장이 막힌다');
   });
+});
+
+test('★★ «읽어 데우는 것»에 기대지 않는다', () => {
+  /* once 로 데워도 듣기를 놓는 순간 그 값이 다시 사라진다 — 그래서 한 번 해 봤다가
+     또 막혔다. 흉내는 데워도 늘 null 을 주고, 그래도 통과해야 한다. */
+  const 몸 = cutFn(화면, 'async function 판올리기(');
+  assert.match(몸, /if\(cur == null\) return 본판 \+ 1;/,
+    '찬 자리를 «해 보는» 쪽으로 안 다룬다');
 });
 
 test('★★ 막혔을 때 «덮어쓰지 않았다»고 말하고 화면을 새로 읽는다', () => {
   const 몸 = cutFn(화면, 'async function 회차저장(');
   assert.match(몸, /회차다시읽기\(/, '막히고도 옛 화면을 그대로 둔다');
   assert.match(몸, /덮어쓰지 않았습니다/, '무슨 일이 일어났는지 안 말한다');
+  /* ★★ 「남이 고쳤다」와 「고장이다」를 가려 말한다 — 혼자 쓰시는 분에게 「다른
+     관리자가」는 「내 탓인가」로 읽힌다. 2026-09-14 그래서 하루를 잃었다. */
+  assert.match(몸, /서버판 === 내판/, '판이 그대로인데도 「남이 고쳤다」고 한다');
+  assert.ok(/고장이니/.test(몸), '고장일 때 «고장이라고» 말하지 않는다');
   assert.match(몸, /return false/, '막혔는데 저장된 것처럼 돌려준다');
   assert.match(몸, /판:\s*새판/, '올린 판을 안 적는다 — 다음 저장이 또 막힌다');
 });
