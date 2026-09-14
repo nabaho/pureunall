@@ -784,12 +784,14 @@
      ⚠ 촬영일은 여전히 **보유기간을 센다**(docs/사진-개인정보-보유기준.md 5번).
         그래서 지우는 것이 아니라 그대로 담아 둔다. */
   function setTakenAt(year, id, ts, owner) {
-    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
     var n = Number(ts);
     if (!Number.isFinite(n) || n <= 0) return Promise.reject(new Error('날짜가 올바르지 않습니다'));
-    var u = {};
-    u[metaPath(year, id, owner) + '/takenAt'] = n;
-    return deps.db.ref().update(u).then(function () { return String(year); });
+    /* ⚠ 지워진 사진에는 안 쓴다 — 유령이 되살아난다(updateAlive 참고) */
+    return updateAlive(year, id, owner, function (path) {
+      var u = {};
+      u[path + '/takenAt'] = n;
+      return u;
+    }).then(function () { return String(year); });
   }
 
   /* ── 돌린 사진 저장 · 본문 다시 올리기 ──
@@ -857,12 +859,14 @@
        **눈으로 안 보이는 고침**뿐이다.
      ⚠ 이 표가 실패해도 사진 고치기를 되돌리지 않는다 — 자국이 없을 뿐이다. */
   function markEdited(year, id, how, owner) {
-    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
-    var u = {};
-    u[metaPath(year, id, owner) + '/edited'] = {
-      at: Date.now(), by: deps.name || '', how: String(how || 'ai').slice(0, 20)
-    };
-    return deps.db.ref().update(u);
+    /* ⚠ 지워진 사진에는 안 쓴다 — 유령이 되살아난다(updateAlive 참고) */
+    return updateAlive(year, id, owner, function (path) {
+      var u = {};
+      u[path + '/edited'] = {
+        at: Date.now(), by: deps.name || '', how: String(how || 'ai').slice(0, 20)
+      };
+      return u;
+    });
   }
 
   /* 같이 볼 사람을 정한다 — 넘긴 목록이 그대로 최종본이다(빠진 사람은 풀린다).
@@ -1047,15 +1051,40 @@
      정해지므로, 「올릴 때 안 적는다」로는 못 막는다 — 올릴 때는 서류인지까지만 안다.
      주소를 남겨 두면 만료도 없고 로그인도 필요 없는 링크가 그대로 남아,
      공유를 풀어도 열린다. */
-  function saveRead(year, id, read, owner) {
+  /* ══ 사라진 사진에는 «한 글자도» 안 쓴다 (대표 지시 2026-09-14 「제대로 저장 안된다」) ══
+
+     실시간DB 는 **없는 자리에 써도 그 자리를 만든다.** 그래서 사진을 지운 뒤에
+     늦게 끝난 일(판독 결과·증빙 표시·공유 표시)이 도착하면, 그 한 칸만 든
+     **«유령 사진»이 되살아난다** — 격자에는 그림도 날짜도 올린이도 없는 빈 칸으로 뜬다.
+     사람 눈에는 그것이 곧 「저장이 제대로 안 됐다」이다.
+
+     ■ 실측 (2026-09-14, 운영 사진 806장)
+     그런 유령이 **14장** 있었다. 든 칸이 `read` 하나, `read·used`, `shareBy·shareWith·used`
+     — 전부 「사진이 없는데 표시만 남은」 모양이다.
+
+     ■ 왜 생겼나 — **한 곳만 고쳐 두었다**
+     saveRead 에는 「살아 있으면 쓴다」가 이미 있었는데, **같은 자리에 쓰는 형제 열한 곳**
+     (markUsed·setFolder·setCustomKind·setTakenAt·markEdited·rememberThumbUrl…)에는 없었다.
+     이 저장소가 되풀이해 밟은 「막는 쪽과 쓰는 쪽의 기준이 다르다」와 같은 모양이다.
+
+     ⚠ 그래서 판정을 **이 한 함수로** 모은다. 새 writer 를 만들 때도 이것을 쓴다.
+     ⚠ 이미 있는 유령 14장은 «그대로 둔다» — 치우는 것은 2026-08-15 에 안 하기로 정했다.
+       여기서 막는 것은 «새로 생기는 것»이다. */
+  function updateAlive(year, id, owner, build) {
     if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
     var path = metaPath(year, id, owner);
     return readOnce(path).then(function (meta) {
-      if (!meta) return null;
+      if (!meta) return null;          // 지워진 사진 — 되살리지 않는다
+      return deps.db.ref().update(build(path, meta));
+    });
+  }
+
+  function saveRead(year, id, read, owner) {
+    return updateAlive(year, id, owner, function (path) {
       var u = {};
       u[path + '/read'] = read;
       if (isSensitiveRead(read)) u[path + '/fullUrl'] = null;
-      return deps.db.ref().update(u);
+      return u;
     });
   }
 
@@ -1335,20 +1364,24 @@
   /* 사진 하나를 폴더에 넣거나(folderId) 뺀다(folderId 없이 호출).
      ⚠ 한 사진은 폴더 하나에만 — 여러 곳에 겹치면 「어디에 뒀더라」가 된다. */
   function setFolder(year, id, folderId, owner) {
-    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
-    var u = {};
-    u[metaPath(year, id, owner) + '/folder'] = folderId || null;
-    return deps.db.ref().update(u);
+    /* ⚠ 지워진 사진에는 안 쓴다 — 유령이 되살아난다(updateAlive 참고) */
+    return updateAlive(year, id, owner, function (path) {
+      var u = {};
+      u[path + '/folder'] = folderId || null;
+      return u;
+    });
   }
 
   /* 사진 하나에 분류를 붙이거나(kindId) 뗀다(kindId 없이 호출).
      AI 종류(read.kind)와 별도 칸에 둔다 — "더하는 것이지 기타서류에서
      빼앗지 않는다"(대표 승인 목업)를 지키려면 서로 안 건드려야 한다. */
   function setCustomKind(year, id, kindId, owner) {
-    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
-    var u = {};
-    u[metaPath(year, id, owner) + '/customKind'] = kindId || null;
-    return deps.db.ref().update(u);
+    /* ⚠ 지워진 사진에는 안 쓴다 — 유령이 되살아난다(updateAlive 참고) */
+    return updateAlive(year, id, owner, function (path) {
+      var u = {};
+      u[path + '/customKind'] = kindId || null;
+      return u;
+    });
   }
 
   /* ── 문서 묶음 고치기 (대표 지시 2026-08-13) ──
@@ -1468,14 +1501,17 @@
      남의 사진을 쓸 때(관리자)는 그 사람 자리에 적히므로 owner 를 함께 넘긴다. */
   function markUsed(year, id, where, owner) {
     if (!year || !id) return Promise.reject(new Error('표시할 사진을 알 수 없습니다'));
-    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
-    var u = {};
-    u[metaPath(year, id, owner) + '/used'] = {
-      at: Date.now(),
-      where: String(where || '').slice(0, 120),
-      by: deps.uid || ''
-    };
-    return deps.db.ref().update(u);
+    /* ⚠ 지워진 사진에는 안 쓴다 — 안 그러면 「증빙으로 썼다」 한 칸만 든 유령이 남는다
+         (updateAlive 참고). 컨설팅이 가져간 뒤 사람이 지우면 실제로 그 차례가 온다. */
+    return updateAlive(year, id, owner, function (path) {
+      var u = {};
+      u[path + '/used'] = {
+        at: Date.now(),
+        where: String(where || '').slice(0, 120),
+        by: deps.uid || ''
+      };
+      return u;
+    });
   }
 
   /* ── 담긴 양 ──
@@ -1686,9 +1722,12 @@
         사진이 안 보이면 안 된다. */
   function rememberThumbUrl(year, id, url, owner) {
     if (!deps.db || !url) return Promise.resolve();
-    var u = {};
-    u[metaPath(year, id, owner) + '/thumbUrl'] = url;
-    return deps.db.ref().update(u).catch(function () { });
+    /* ⚠ 지워진 사진에는 안 쓴다 — 격자를 그리는 중에 지우면 그 차례가 온다 */
+    return updateAlive(year, id, owner, function (path) {
+      var u = {};
+      u[path + '/thumbUrl'] = url;
+      return u;
+    }).catch(function () { });
   }
 
   /* 적어 둔 주소가 못 쓰게 됐을 때(토큰을 새로 발급한 경우 등) 지운다 —

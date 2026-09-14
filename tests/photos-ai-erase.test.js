@@ -229,9 +229,14 @@ test('★★ 「손댐」 자국을 남긴다 — 눈에 안 보이는 고침이
   assert.match(fn, /edited: \{ at: Date\.now\(\), how: photoEd\.done\.how \|\| 'ai'/,
     '★ 증빙 사진에 자국 없이 손대면 나중에 「이 사진 손댔나」에 아무도 답 못 합니다');
   assert.match(fn, /editedFrom: photoEd\.id/, '★ 어느 사진에서 나왔는지 안 적습니다');
-  /* 저장 층에도 자국 자리가 그대로 있어야 한다(다른 길에서 쓴다) */
+  /* 저장 층에도 자국 자리가 그대로 있어야 한다(다른 길에서 쓴다)
+     ⚠ 2026-09-14 — 자리를 짓는 일이 updateAlive 안으로 들어갔다(지워진 사진에는 안 쓴다 —
+       안 그러면 「손댐」 한 칸만 든 유령이 되살아난다). 그래서 «경로 글자 그대로»가 아니라
+       **어느 칸에, 누구 자리에** 적는가를 본다. 지킬 것은 그것이지 줄 모양이 아니다. */
   const m = cutFn(store, 'function markEdited(');
-  assert.match(m, /metaPath\(year, id, owner\) \+ '\/edited'/, '주인 자리에 적어야 남습니다');
+  assert.match(m, /\+ '\/edited'\]/, '★ edited 칸에 안 적습니다');
+  assert.match(m, /updateAlive\(year, id, owner/,
+    '★ 주인 자리(owner)를 안 넘기면 남의 사진에 적을 수 없습니다');
 });
 
 test('★ 남의 사진은 못 고친다 — 「내 사진」에 공유받은 것이 섞여 있다', () => {

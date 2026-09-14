@@ -20,7 +20,11 @@ function loadStore(uid) {
   const writes = {};
   const reads = {};
   const ref = (p) => ({
-    once: () => Promise.resolve({ val: () => (p in reads ? reads[p] : null) }),
+    /* ⚠ 2026-09-14 — 저장 층이 쓰기 전에 「사진이 살아 있나」를 본다(updateAlive).
+       안 씨워 둔 사진 자리는 «살아 있는» 것으로 답한다 — 지워진 사진에 안 쓰는지는
+       tests/photo-store-no-ghost.test.js 가 따로 본다. */
+    once: () => Promise.resolve({ val: () => (p in reads ? reads[p]
+      : (/\/items\/\d{4}\/[^/]+$/.test(p) ? { by: uid || 'me1', upAt: 1 } : null)) }),
     push: () => ({ key: 'newfold1' }),
     update: (u) => { Object.assign(writes, u); return Promise.resolve(); }
   });

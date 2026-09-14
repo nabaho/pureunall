@@ -49,7 +49,13 @@ test('★ 표시는 사진 옆 한 칸(used)만 건드린다 — 사진도 판�
   vm.runInContext(STORE, ctx);
   ctx.PuPhotoStore.init({
     uid: 'ME',
-    db: { ref: function () { return { update: function (u) { wrote = u; return Promise.resolve(); } }; } }
+    /* ⚠ 2026-09-14 — 표시는 이제 «사진이 살아 있을 때만» 쓴다(updateAlive).
+       그래서 가짜 실시간DB 도 «읽기»에 답해야 한다 — 여기서는 살아 있는 사진으로 둔다.
+       (지워진 사진에 안 쓰는지는 tests/photo-store-no-ghost.test.js 가 본다) */
+    db: { ref: function () { return {
+      update: function (u) { wrote = u; return Promise.resolve(); },
+      once: function () { return Promise.resolve({ val: function () { return { by: 'ME', upAt: 1 }; } }); }
+    }; } }
   });
   await ctx.PuPhotoStore.markUsed('2026', 'p1', '푸른이알피 계약 — 가야엔지니어링', 'U9');
   const keys = Object.keys(wrote || {});

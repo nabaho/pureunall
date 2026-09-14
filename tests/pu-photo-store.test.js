@@ -1913,7 +1913,10 @@ test('빈 이름은 거절한다', async () => {
 
 test('사진에 분류를 붙인다 — read.kind 와 다른 칸에 둔다', async () => {
   const S = loadStore();
-  const db = fakeDbFor({});
+  /* ⚠ 2026-09-14 — 저장 층이 쓰기 전에 「사진이 살아 있나」를 본다(updateAlive).
+     지워진 사진에 쓰면 그 한 칸만 든 «유령»이 되살아나기 때문이다.
+     분류는 살아 있는 사진에 붙이는 것이므로 그 자리를 씌워 준다. */
+  const db = fakeDbFor({ 'puphotos/u/U1/items/2026/p1': { by: 'U1', upAt: 1 } });
   S.init({ uid: 'U1', db: db });
   await S.setCustomKind('2026', 'p1', 'k1');
   const u = db.updates[0];
@@ -1936,7 +1939,7 @@ test('고정 분류로 옮길 때 이전 직접분류를 한 번에 해제한다
 
 test('분류를 뗄 수 있다', async () => {
   const S = loadStore();
-  const db = fakeDbFor({});
+  const db = fakeDbFor({ 'puphotos/u/U1/items/2026/p1': { by: 'U1', upAt: 1 } });
   S.init({ uid: 'U1', db: db });
   await S.setCustomKind('2026', 'p1', null);
   const u = db.updates[0];
@@ -1945,7 +1948,8 @@ test('분류를 뗄 수 있다', async () => {
 
 test('관리자가 남의 사진에 분류를 붙일 때는 그 사람 자리를 쓴다', async () => {
   const S = loadStore();
-  const db = fakeDbFor({});
+  /* 살아 있는지 보는 것도 «그 사람 자리»여야 한다 — 내 자리를 보면 늘 없다고 나온다 */
+  const db = fakeDbFor({ 'puphotos/u/U2/items/2026/p1': { by: 'U2', upAt: 1 } });
   S.init({ uid: 'ADMIN', db: db, isAdmin: true });
   await S.setCustomKind('2026', 'p1', 'k1', 'U2');
   const u = db.updates[0];
