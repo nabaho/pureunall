@@ -117,18 +117,26 @@ test('★ 빈 목록·없는 목록에도 터지지 않는다', () => {
 /* ⚠ 2026-09-09 — 「담당 전체」 드롭다운(#pcMgrFilter)을 없앴다(대표 지시, 열 제목
    클릭 정렬로 대신한다). 그 드롭다운을 채우던 «고르개»(nonRetiredPicks 호출)는
    renderPCTable 에서 함께 사라졌다 — 사라진 화면의 코드까지 남아 있으면 그게 죽은
-   코드다. 남아야 할 것은 셋이다: ① 목록에서 빠진 퇴사자를 세는 일(_mgrGone,
-   이어받기 띠가 쓴다) ② 옆줄 「담당자별」 고르개(바로 아래 검사) ③ 퇴사 판정 자체
-   (mbRetired). 여기서는 ①을 못 박는다. */
+   코드다. 남아야 할 것은 셋이다: ① 목록에서 빠진 퇴사자를 «세는 일» ② 옆줄
+   「담당자별」 고르개(바로 아래 검사) ③ 퇴사 판정 자체(mbRetired).
+   여기서는 ①을 못 박는다.
+
+   ⚠ 2026-09-14 — ①이 세는 «자리»가 옮겨졌다(대표 지시 「이어받기 작동 안한다」).
+     renderPCTable 안에서 명함을 훑어 세던 것(_mgrGone)이, 이어받기 화면과 «같은 셈»
+     (mbSuccTodo → mbSuccPending)으로 바뀌었다. 예전 셈은 화면이 못 다루는 사람까지
+     세어 「5명」이라 말했고, 눌러 가면 할 일이 하나도 없었다.
+     ★ 그러니 여기서 지킬 것은 «어디서 세는가»가 아니라 «세는 일이 살아 있는가»다. */
 test('★★★ 「담당 전체」 드롭다운은 없앴다 — 그래도 퇴사자를 세는 일은 남는다', () => {
   const fn = fnBody('renderPCTable');
   assert.ok(!/const mgrs = /.test(fn),
     '★ 사라진 드롭다운을 채우던 코드가 남아 있다 — 죽은 코드다');
   assert.ok(!/mgrSel/.test(fn),
     '★ #pcMgrFilter 를 다루던 코드가 남아 있다 — 그 요소는 이제 없다');
-  const at = fn.indexOf('const _allMgrs = ');
-  assert.ok(at > 0, '★ 담당 이름을 모으는 자리를 못 찾았다');
-  assert.match(fn.slice(at), /_mgrGone = _allMgrs\.filter\(mbRetired\)/,
+  /* 띠는 그대로 그린다 */
+  assert.match(fn, /mgrGoneChipHtml\(\)/,
+    '★★★ 「🚪 이어받기」 띠를 아예 안 그린다 — 빠진 퇴사자를 알 길이 없다');
+  /* 그리고 그 띠는 «이어받기 화면과 같은 셈»을 쓴다 */
+  assert.match(fnBody('mbSuccTodo'), /mbSuccPending\(\)/,
     '★★★ 퇴사자를 가르는 셈이 사라졌다 — 「🚪 이어받기」 띠가 늘 0명이 된다');
 });
 
