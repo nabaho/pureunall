@@ -56,7 +56,7 @@ const 쓰는자리 = [
   ['pucards/mailout/UID/F.pdf', '메일에 붙일 내 PC 파일'],
   ['pu_paydata/UID/202608/F.pdf', '급여데이터함'],
   ['casebook/site_X/2019/after.hwp', '취업규칙 서고 원본'],
-  ['erp_docs/UID/D123/reason.hwp', '서면함 원본 (js/pu-erp-docbox.js DIR)'],
+  ['erp_docs/UID/D123/reason.hwp', '옛 서면함 자리 — 화면은 2026-09-14 에 뺐고 규칙만 남겼다'],
   ['gov_evidence/SID/F.png', '자문관리 증빙']
 ];
 
