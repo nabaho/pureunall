@@ -28,7 +28,10 @@ function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음
 
 global.esc = v => String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 (0, eval)(gF('_officersOf'));
-(0, eval)(gF('_isCommittee')); (0, eval)(gF('_prepCommittee'));
+(0, eval)(gF('_isCommittee'));
+/* 2026-09-14: 참여사업장에 적은 사용자대표·근로자대표도 그대로 위원이다 */
+(0, eval)(gF('_siteUrep')); (0, eval)(gF('_siteCommittee'));
+(0, eval)(gF('_prepCommittee'));
 /* 2026-09-14: 위원이 예순을 넘는 일이 흔하다 — 격자(세 줄)를 넘으면 이름을 별지로 뺀다.
    ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
 (0, eval)((/var COMMITTEE_ROWS=\d+;/.exec(src) || ['var COMMITTEE_ROWS=0;'])[0]);
@@ -83,7 +86,14 @@ console.log('\n■ 죽은 칸을 읽던 곳이 남아 있지 않다');
 ok('worker_committee·emp_committee 를 읽는 곳이 없다',
    !/f\.worker_committee|f\.emp_committee/.test(src),
    (src.match(/f\.(worker|emp)_committee/g) || []).join(','));
-ok('원본 .hwp 채우기도 같은 곳을 본다 (fillCommittee)', /_officersOf\(f\)/.test(gF('fillCommittee')));
+/* 2026-09-14: 종전에는 fillCommittee 가 «따로» 측을 갈랐다(sideOf). 참여사업장의
+   사용자대표·근로자대표가 위원이 되면서 두 길이 서로 다른 명단을 보게 됐다 —
+   원본 .hwp 에는 사업장 대표가 안 들어가고 초안에만 들어가는 꼴이었다.
+   이제 둘 다 _prepCommittee 하나만 본다. */
+ok('원본 .hwp 채우기도 같은 곳을 본다 (fillCommittee)', /_prepCommittee\(f,side,sites\)/.test(gF('fillCommittee')));
+/* ⚠ 주석을 먼저 걷는다 — 「sideOf 를 없앴다」고 적은 «주석»이 코드로 읽힌다(여러 번 겪었다) */
+const 코드만 = (t) => String(t || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+ok('따로 갈라 보던 길(sideOf)이 남아 있지 않다', !/sideOf/.test(코드만(gF('fillCommittee'))));
 
 if (!JSDOM) {
   console.log('SKIP: jsdom 이 없어 «그린 서식» 확인은 건너뜁니다 (npm i jsdom --no-save)');

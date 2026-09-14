@@ -551,7 +551,11 @@ var WREP_FIELDS=[['wrep_name','근로자대표 성명','text'],['wrep_title','�
      아무도 시키지 않은 이름이 찍히면 안 된다 — 빈칸으로 두고 「확인 필요」라 말한다.
    ⚠ SITE_FIELDS 에 섞지 않는다(WREP_FIELDS 와 같은 까닭) — 그 목록은 엑셀 붙여넣기의
      «열 차례»라, 사람 칸을 끼우면 이미 만들어 둔 자료가 밀린다. */
-var UREP_FIELDS=[['urep_name','사용자대표 성명','text'],['urep_title','직위','text']];
+/* ★ 근로자대표와 «같은 차례»로 둔다 (대표 지시 2026-09-14
+     「사용자대표직위 휴대폰 생년월일, 근로자대표와 같은 순서로 셀이 있어야한다」) —
+     두 묶음이 나란히 서는데 칸 차례가 다르면 눈이 매번 다시 읽어야 한다. */
+var UREP_FIELDS=[['urep_name','사용자대표 성명','text'],['urep_title','직위','text'],
+  ['urep_mobile','휴대폰','text'],['urep_birth','생년월일','date']];
 /* ── 중소기업확인서 ── (대표 지시 2026-09-13)
    「중소기업확인서도 ocr에서 찾아서 중소기업 여부 체크와 기간도 표시되게」
 
@@ -569,7 +573,20 @@ var SME_OPTS=['','중소기업','소기업','중견기업','해당 없음'];
 /* 화면과 서식이 «같은 자리»를 읽게 한 곳에 모은다 */
 function _siteWrep(s){ s=s||{}; return {name:String(s.wrep_name||'').trim(), title:String(s.wrep_title||'').trim(),
   mobile:String(s.wrep_mobile||'').trim(), birth:String(s.wrep_birth||'').trim(), doc:s.wrep_doc||null}; }
-function _siteUrep(s){ s=s||{}; return {name:String(s.urep_name||'').trim(), title:String(s.urep_title||'').trim()}; }
+/* ★ 「회사 대표자와 같은 사람」 체크 (대표 지시 2026-09-14
+     「사용자 대표가 회사의 대표와 일치하는경우 … 체크란을 만들어라」)
+   ⚠ 이름을 «베껴 두지 않는다» — urep_same 만 남기고 이름은 그때그때 대표자(ceo)에서 읽는다.
+     베껴 두면 대표자가 바뀌었을 때 사용자대표란에 옛 사람이 남아 서식에 그대로 나간다.
+     진실은 한 곳(대표자 칸)에만 둔다. */
+function _siteUrep(s){
+  s=s||{};
+  var same=!!s.urep_same;
+  return {same:same,
+    name: same ? String(s.ceo||'').trim() : String(s.urep_name||'').trim(),
+    /* 직위는 지어내지 않는다 — 대표자의 직위가 「대표이사」인지 「사장」인지는 자료에 없다 */
+    title:String(s.urep_title||'').trim(),
+    mobile:String(s.urep_mobile||'').trim(), birth:String(s.urep_birth||'').trim()};
+}
 /* 중소기업확인서 — 「지났나」를 여기서 한 번만 셈한다(화면 여러 곳이 같은 답을 보게).
    ⚠ 기준일은 «오늘»이다. 끝날이 없으면 지났는지 알 수 없다 — 모를 때는 「지났다」고 하지 않는다. */
 function _siteSme(s,today){
@@ -3933,24 +3950,47 @@ var COMMITTEE_ROWS=3;
      ① 위원이 예순이어도 서식에는 셋만 나가고 나머지가 «말없이» 빠졌고
      ② 회의록의 「이사 선임 : 각 ○ 명」도 늘 3으로 찍혔다.
    자르는 일은 «그리는 쪽»이 한다 — 세는 쪽·별지를 만드는 쪽은 전부를 봐야 한다. */
-function _prepCommittee(f,side){
-  return _officersOf(f).filter(function(o){
+/* ★ 참여사업장에 적은 «사용자대표·근로자대표»도 그대로 위원이다
+     (대표 지시 2026-09-14 「사용자대표와 근로자 대표를 입력하면 자동으로 서류작성에서
+      이 사람들의 이름이 자동으로 동기화되게 해라」).
+   ─ 종전에는 등기임원명부에만 있는 사람이 위원이었다. 사업장마다 대표를 적어 두고도
+     명부에 «또» 옮겨 적어야 서식에 나왔다 — 열여섯 곳이면 서른두 번이다.
+   ⚠ 같은 사람이 두 곳에 다 있으면 한 번만 센다. 이름이 두 줄이면 위원 수가 부풀어
+     「이사 선임 : 각 ○ 명」이 틀린 채로 나간다.
+   ⚠ 이름이 빈 곳은 세지 않는다 — 안 적은 것은 «없는 것»이지 빈 위원이 아니다. */
+function _siteCommittee(sites,side){
+  return (sites||[]).filter(function(s){ return s && s.status!=='closed'; }).map(function(s){
+    var p=(side==='사용자측')?_siteUrep(s):_siteWrep(s);
+    if(!p.name) return null;
+    return {role:side+' 대표', name:p.name, title:p.title||'', birth:p.birth||'',
+      company:s.name||'', _from:'site'};
+  }).filter(Boolean);
+}
+function _prepCommittee(f,side,sites){
+  var 명부=_officersOf(f).filter(function(o){
     if(!_isCommittee(o.role)) return false;
     var r=String(o.role||'');
     return side==='사용자측' ? /사용자/.test(r) : /근로자/.test(r);
   });
+  var 본것={}, out=[];
+  명부.concat(_siteCommittee(sites,side)).forEach(function(o){
+    var k=String(o.name||'').replace(/\s/g,'');
+    if(!k || 본것[k]) return;                 /* 빈 이름·겹치는 사람은 한 번만 */
+    본것[k]=1; out.push(o);
+  });
+  return out;
 }
 /* 이 측이 격자에 안 들어가는가 */
-function _cmOver(f,side){ return _prepCommittee(f,side).length>COMMITTEE_ROWS; }
-function _cmAnnexNeeded(f){ return _cmOver(f,'근로자측')||_cmOver(f,'사용자측'); }
+function _cmOver(f,side,sites){ return _prepCommittee(f,side,sites).length>COMMITTEE_ROWS; }
+function _cmAnnexNeeded(f,sites){ return _cmOver(f,'근로자측',sites)||_cmOver(f,'사용자측',sites); }
 /* 격자에 적을 한 줄 — 「별지 명단과 같음(근로자측 62명)」 */
-function _cmSeeAnnex(f,side){ return '별지 명단과 같음('+side+' '+_prepCommittee(f,side).length+'명)'; }
+function _cmSeeAnnex(f,side,sites){ return '별지 명단과 같음('+side+' '+_prepCommittee(f,side,sites).length+'명)'; }
 /* [별지] 설립준비위원회 위원 명단 — 측마다 번호를 새로 매긴다(관청이 측별로 센다).
    ⚠ 생년월일은 명부에 없을 수 있다(개인정보라 안 담는 곳이 있다) — 비면 빈칸으로 둔다.
      지어내지 않는다. 이 명단이 그대로 노동청에 나간다. */
-function committeeAnnexHTML(f){
+function committeeAnnexHTML(f,sites){
   var 줄=function(side){
-    var list=_prepCommittee(f,side);
+    var list=_prepCommittee(f,side,sites);
     if(!list.length) return "<tr><td class='center'>"+side+"</td><td class='center'>—</td>"
       +"<td colspan='4' class='muted'>명부에 등록된 위원이 없습니다</td></tr>";
     return list.map(function(o,i){
@@ -3965,13 +4005,14 @@ function committeeAnnexHTML(f){
     +"<th style='width:110px'>생년월일</th><th style='width:110px'>직책</th><th>소속 사업장</th></tr>"
     +줄('근로자측')+줄('사용자측')+"</table>"
     +"<p class='note'>※ 「설립인가신청서(별지 제7호)」의 설립준비위원회 위원란에 갈음하여 붙입니다. "
-    +"근로자측 "+_prepCommittee(f,'근로자측').length+"명 · 사용자측 "+_prepCommittee(f,'사용자측').length+"명.</p>";
+    +"근로자측 "+_prepCommittee(f,'근로자측',sites).length+"명 · 사용자측 "+_prepCommittee(f,'사용자측',sites).length+"명.</p>";
 }
-function fillCommittee(root,f){
-  var sideOf=function(o){ var r=String(o.role||'');
-    if(!_isCommittee(r)) return '';                       // 감사는 위원이 아니다
-    return /사용자/.test(r)?'사용자측':(/근로자/.test(r)?'근로자측':''); };
-  var pick=function(side){ return _officersOf(f).filter(function(o){ return sideOf(o)===side; }); };
+function fillCommittee(root,f,sites){
+  /* ⚠ 예전에는 여기서 «따로» 측을 갈랐다(sideOf). 2026-09-14 에 참여사업장의
+       사용자대표·근로자대표도 위원이 되면서, 두 길이 서로 다른 명단을 보게 됐다 —
+       원본 .hwp 에는 사업장 대표가 안 들어가고 초안에만 들어가는 꼴이었다.
+       _prepCommittee 하나만 본다. */
+  var pick=function(side){ return _prepCommittee(f,side,sites); };
   var trs=[].slice.call(root.querySelectorAll('tr'));
   ['근로자측','사용자측'].forEach(function(side){
     var at=-1;
@@ -3992,7 +4033,7 @@ function fillCommittee(root,f){
       tr.setAttribute('data-cm','1');
       var blanks=[].slice.call(tr.children).filter(function(c){ return !(c.textContent||'').trim(); });
       if(넘침){
-        if(k===0 && blanks.length) blanks[0].textContent=_cmSeeAnnex(f,side);
+        if(k===0 && blanks.length) blanks[0].textContent=_cmSeeAnnex(f,side,sites);
         continue;                                  /* 둘째·셋째 줄은 비워 둔다 */
       }
       var o=list[k]; if(!o) break;
@@ -4003,10 +4044,10 @@ function fillCommittee(root,f){
     }
   });
   /* 별지를 «뒷장»에 붙인다 — data-newpage 가 있으면 쪽 나누기가 새 장에서 시작한다 */
-  if(_cmAnnexNeeded(f)){
+  if(_cmAnnexNeeded(f,sites)){
     var ax=document.createElement('div');
     ax.setAttribute('data-newpage','1'); ax.setAttribute('data-kept','1');
-    ax.innerHTML=committeeAnnexHTML(f);
+    ax.innerHTML=committeeAnnexHTML(f,sites);
     root.appendChild(ax);
   }
 }
@@ -4789,7 +4830,7 @@ function hwpFormHTML(kind,f,sites){
   if(kind==='charter'||kind==='agreement'){ fillPartyList(d,f,sites); fillPartyDates(d,f); }
   stripBaked(d);
   /* 위원 격자를 «먼저» 채운다 — 그 줄에 표를 남겨야 아래 라벨 채우기가 비껴간다 */
-  fillCommittee(d,f);
+  fillCommittee(d,f,sites);
   if(kind==='bizplan') fillBizplanDoc(d,f,sites);
   if(kind==='reg_roster') fillRoster(d,f);
   /* 사람이 읽듯 «지금 어느 칸 아래인지»를 따라간다.
@@ -4886,7 +4927,7 @@ function fillDerived(root,f,sites,kind){
        보통 공백으로 찍은 규칙은 눈으로는 같아 보여도 «하나도» 안 맞았다(실제로 그랬다).
        규칙의 공백을 모두 \s* 로 바꿔 어느 쪽이든 맞게 한다. */
   var _rx=function(p){ return new RegExp(String(p).replace(/ /g,'\\s*')); };
-  var nSide=function(side){ return _prepCommittee(f,side).length; };
+  var nSide=function(side){ return _prepCommittee(f,side,sites).length; };
   var wk=nSide('근로자측'), er=nSide('사용자측');
   var tot=(kind==='minutes')?_bizTotals(f):null;
   var pur=num((budgetOf(S.fundId,yr)||{}).exp_purpose)||0;
@@ -5119,9 +5160,9 @@ function docBody(kind,f,sites){
       /* ★ 위원이 예순이면 이름을 한 줄로 늘어놓을 수 없다 — 명수만 적고 명단은 별지로
            보낸다(대표 지시 2026-09-14). 열 명 안쪽이면 종전처럼 이름을 그대로 적는다. */
       +"<tr><th>참석</th><td>"+['사용자측','근로자측'].map(function(side){
-        var L=_prepCommittee(f,side);
+        var L=_prepCommittee(f,side,sites);
         return side+' 위원 '+(L.length>COMMITTEE_ROWS
-          ? L.length+'명('+esc(_cmSeeAnnex(f,side))+')'
+          ? L.length+'명('+esc(_cmSeeAnnex(f,side,sites))+')'
           : dgV(L.map(function(o){return o.name;}).join(', '),10));
       }).join(' / ')+"</td></tr></table>"
       +"<h2>안건</h2><p>1. "+fname+" 설립에 관한 사항<br>2. 정관 제정에 관한 사항<br>3. 임원 선출에 관한 사항<br>4. 기금출연 확정에 관한 사항<br>5. 기타 설립 관련 사항</p>"
@@ -5505,12 +5546,12 @@ function docBody(kind,f,sites){
          이름은 뒷장 별지로 뺀다(대표 지시 2026-09-14). */
     function wrows(side,list){
       if(list.length>COMMITTEE_ROWS)
-        return "<tr><td class='center'>"+side+"</td><td colspan='3'>"+esc(_cmSeeAnnex(f,side))+"</td></tr>";
+        return "<tr><td class='center'>"+side+"</td><td colspan='3'>"+esc(_cmSeeAnnex(f,side,sites))+"</td></tr>";
       if(!list.length)list=[{}];
       return list.map(function(o,i){
       return "<tr><td class='center'>"+(i===0?side:'')+"</td><td>"+dgV(o.name,6)+"</td>"
         +"<td>"+dgV(o.birth,12)+"</td><td>"+dgV(o.title,8)+"</td></tr>";}).join(''); }
-    var wk=_prepCommittee(f,'근로자측'), er=_prepCommittee(f,'사용자측');
+    var wk=_prepCommittee(f,'근로자측',sites), er=_prepCommittee(f,'사용자측',sites);
     return note+"<p class='right'>■ 근로복지기본법 시행규칙 [별지 제7호서식]</p>"
       +"<h1>"+cs+" 사내근로복지기금법인 &nbsp; "+cg+" 공동근로복지기금법인<br>설립인가신청서</h1>"
       +"<table><tr><th colspan='4' style='background:#e2e8f0'>기금법인</th></tr>"
@@ -5525,9 +5566,9 @@ function docBody(kind,f,sites){
       +"<p class='center'>"+dgToday()+"</p><div class='sign'>신청인 대표: "+dgV(chairman)+" (서명 또는 인)</div>"
       +"<p>"+dgV(f.labor_office||'○○지방고용노동청(○○지청)',10)+"장 귀하</p>"
       +"<h2>첨부서류</h2><p>1. 정관 1부<br>2. 설립준비위원 재직증명 등 1부<br>3. 출연확인서 또는 재산목록 1부<br>4. 사업계획서 및 예산서 1부"
-      +(_cmAnnexNeeded(f)?"<br>5. 설립준비위원회 위원 명단 1부(별지)":"")+"</p>"
+      +(_cmAnnexNeeded(f,sites)?"<br>5. 설립준비위원회 위원 명단 1부(별지)":"")+"</p>"
       /* 별지는 «뒷장»이다 — data-newpage 가 쪽 나누기에 새 장을 열게 한다 */
-      +(_cmAnnexNeeded(f)?"<div data-newpage='1'>"+committeeAnnexHTML(f)+"</div>":"");
+      +(_cmAnnexNeeded(f,sites)?"<div data-newpage='1'>"+committeeAnnexHTML(f,sites)+"</div>":"");
   }
   if(kind==='contrib'){
     var target=(ftype==='공동'&&sites.length)?sites:[{name:repOrg(f,sites),ceo:'',biz_no:'',address:''}];
@@ -6374,8 +6415,8 @@ function fillSetup(wb,f,sites){
   var ws=wb.getWorksheet('기금법인정보'); if(!ws) throw new Error('기금법인정보 시트를 찾을 수 없습니다');
   /* 위원은 «임원 명부»에서 읽는다 — 예전에는 쓰는 곳이 없는 칸을 읽어 늘 비어 나갔다.
      원본 .hwp 를 채우는 길(fillCommittee)은 처음부터 명부를 보고 있었다. 한 곳으로 모은다. */
-  var wk=_prepCommittee(f,'근로자측').map(function(o){return o.name;});
-  var er=_prepCommittee(f,'사용자측').map(function(o){return o.name;});
+  var wk=_prepCommittee(f,'근로자측',sites).map(function(o){return o.name;});
+  var er=_prepCommittee(f,'사용자측',sites).map(function(o){return o.name;});
   var repSite=repOrg(f,sites)||(sites[0]&&sites[0].name)||'';
   setC(ws,'B3',repSite); setC(ws,'C3',f.name||''); setC(ws,'D3',f.chairman||''); setC(ws,'E3',f.address||'');
   setC(ws,'F3',f.inka_date||''); setC(ws,'G3',f.worker_rep||wk[0]||''); setC(ws,'H3',wk[0]||''); setC(ws,'I3',er[0]||'');
@@ -9202,7 +9243,13 @@ function sitesPeopleBody(arr){
       +'<td style="font-weight:700;cursor:pointer" onclick="editSite(\''+s._id+'\')" title="눌러서 사업장 편집">'+esc(s.name||'—')+'</td>'
       +'<td class="ph muted">'+esc(s.ceo||'—')+'</td>'
       +'<td class="ph muted">'+(c.name?esc(c.name)+(c.position?' · '+esc(c.position):''):'—')+'</td>'
-      +'<td>'+inp('urep_name',u.name,'성명','86px')+' '+inp('urep_title',u.title,'직위','78px')+'</td>'
+      /* ★ 「대표자와 같음」이 켜져 있으면 «따라가는 값»이라 여기서 고치게 두지 않는다 —
+           여기서 고치면 대표자와 갈라져 어느 쪽이 맞는지 알 수 없게 된다(바꾸려면 편집 창에서 끈다). */
+      +'<td>'+(u.same
+        ? '<span title="회사 대표자와 같은 사람으로 켜 두었습니다 — 바꾸려면 상호를 눌러 편집 창에서 체크를 끄세요">'
+          +'<span class="chip ok" style="font-size:9.5px">대표자와 같음</span> '+esc(u.name||'—')+'</span> '
+        : inp('urep_name',u.name,'성명','86px')+' ')
+      +inp('urep_title',u.title,'직위','78px')+'</td>'
       +'<td>'+inp('wrep_name',w.name,'성명','86px')+' '+inp('wrep_title',w.title,'직위','78px')+'</td>'
       /* ★ 서류에서 읽는 길을 여기로 모았다 — 편집 창은 칸만 남기고(대표 지시 2026-09-13),
            읽기는 「그 사업장 한 줄」에서 시작한다. 읽고 나면 편집 창이 값과 함께 열린다. */
@@ -9300,8 +9347,22 @@ function editSite(sid,prefill){
     +'<input id="sc-'+c[0]+'" type="'+c[2]+'" value="'+esc(pc[c[0]]||(c[0]==='mobile'?(pc.phone||''):''))+'"></div>';}).join('');
   var wflds=WREP_FIELDS.map(function(c){return '<div class="fld"><label>'+c[1]+'</label>'
     +'<input id="sw-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';}).join('');
-  var uflds=UREP_FIELDS.map(function(c){return '<div class="fld"><label>'+c[1]+'</label>'
-    +'<input id="su-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';}).join('');
+  /* ★ 「회사 대표자와 같은 사람」 — 체크하면 성명 칸을 잠그고 대표자 칸을 따라간다
+       (대표 지시 2026-09-14). 이름을 베껴 넣지 않는다: 대표자가 바뀌면 저절로 따라가야 한다. */
+  var _u=_siteUrep(s);
+  var uflds=UREP_FIELDS.map(function(c){
+    if(c[0]==='urep_name') return '<div class="fld"><label>'+c[1]+'</label>'
+      +'<input id="su-'+c[0]+'" type="text" value="'+esc(_u.same?_u.name:(s.urep_name||''))+'"'
+      +(_u.same?' readonly title="대표자 칸을 따라갑니다 — 체크를 끄면 따로 적을 수 있습니다" style="background:var(--bg);color:var(--sub)"':'')
+      +'></div>';
+    return '<div class="fld"><label>'+c[1]+'</label>'
+      +'<input id="su-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';
+  }).join('');
+  var usame='<div class="fld full" style="margin:-2px 0 2px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400">'
+    +'<input type="checkbox" id="su-urep_same"'+(_u.same?' checked':'')+' onchange="urepSameToggle(this.checked)">'
+    +'<span>회사 <b>대표자와 같은 사람</b>입니다'
+    +'<span class="muted" style="font-size:11px"> — 켜면 위 <b>대표자</b> 칸을 그대로 씁니다(대표자가 바뀌면 따라갑니다)</span></span>'
+    +'</label></div>';
   /* ⚠ 중소기업 여부는 «고르는 칸»이다 — 손으로 치면 「중소」·「중소기업임」처럼 제각각 적혀
      나중에 세어 볼 수가 없다. type 이 select 인 칸은 input 으로 그리면 안 된다. */
   /* ★ 두 칸이 «같아 보이던» 것을 한 자리에 모으고 «출처»를 적는다(대표 지시 2026-09-13).
@@ -9337,7 +9398,7 @@ function editSite(sid,prefill){
     +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">사용자 대표'
       +' <span style="font-weight:400;font-size:11px">— 협의회에 사용자측으로 나오는 사람(대표자가 아닐 수 있습니다)</span>'
       +hlp('site.reps')+'</div>'
-    +'<div class="grid">'+uflds+'</div>'
+    +'<div class="grid">'+usame+uflds+'</div>'
     +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">근로자 대표'
       +' <span style="font-weight:400;font-size:11px">— 대표자·담당자와 다른 사람인 경우가 많습니다</span></div>'
     +'<div class="grid">'+wflds+'</div>'
@@ -9351,12 +9412,29 @@ function editSite(sid,prefill){
     +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>'
     ,{after:bindSiteDocIntake});
 }
+/* 「대표자와 같은 사람」을 켜고 끌 때 성명 칸을 즉시 맞춘다 — 저장해 봐야 아는 것이 아니라
+   켠 순간 무엇이 들어가는지 보여야 한다. 끄면 손으로 적을 수 있게 도로 연다. */
+function urepSameToggle(on){
+  var nm=$('su-urep_name'); if(!nm) return;
+  if(on){
+    var ceo=$('se-ceo');
+    nm.value=ceo?String(ceo.value||'').trim():'';
+    nm.readOnly=true; nm.style.background='var(--bg)'; nm.style.color='var(--sub)';
+    nm.title='대표자 칸을 따라갑니다 — 체크를 끄면 따로 적을 수 있습니다';
+  }else{
+    nm.readOnly=false; nm.style.background=''; nm.style.color=''; nm.title='';
+  }
+}
 function saveSite(sid){
   var base = sid ? ((S.sites&&S.sites[sid])||{}) : Object.assign({status:'active'}, _sitePrefill||{});  // 신규는 연결 프리필(puerp_co_id 등) 보존
   var obj=Object.assign({}, base);
   SITE_FIELDS.forEach(function(c){var el=$('se-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
   WREP_FIELDS.forEach(function(c){var el=$('sw-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
   UREP_FIELDS.forEach(function(c){var el=$('su-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
+  /* ★ 「대표자와 같은 사람」 — 켰으면 이름을 «비워» 둔다. 베껴 두면 대표자가 바뀌었을 때
+       옛 사람이 남아 서식에 그대로 나간다. 읽을 때 _siteUrep 이 대표자에서 가져온다. */
+  var _us=$('su-urep_same');
+  if(_us&&_us.checked){ obj.urep_same=true; obj.urep_name=''; } else { delete obj.urep_same; }
   SME_FIELDS.forEach(function(c){var el=$('sm-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
   if(!obj.name){ toast('상호를 입력하세요','warn'); return; }
   // 담당자: 기존 contacts 배열 유지하되 대표 담당자 항목만 갱신(없으면 추가)

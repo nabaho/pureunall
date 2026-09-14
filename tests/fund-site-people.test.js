@@ -47,10 +47,67 @@ function load(parts) {
 
 /* ══ 사람 넷을 가른다 ═══════════════════════════════════════════════ */
 
-test('① 사용자대표 칸이 있고, 성명과 직위를 따로 받는다', () => {
-  const b = load([grabDecl('UREP_FIELDS'), 'this.F=UREP_FIELDS;']);
-  const keys = b.F.map((c) => c[0]);
-  assert.deepEqual(keys, ['urep_name', 'urep_title']);
+test('① 사용자대표 칸이 근로자대표와 «같은 차례»다 — 나란히 선 두 묶음이 어긋나면 눈이 헤맨다', () => {
+  /* 대표 지시 2026-09-14: 「사용자대표직위 휴대폰 생년월일, 근로자대표와 같은 순서로 셀이 있어야한다」 */
+  const b = load([grabDecl('UREP_FIELDS'), grabDecl('WREP_FIELDS'),
+    'this.U=UREP_FIELDS; this.W=WREP_FIELDS;']);
+  assert.deepEqual(b.U.map((c) => c[0]),
+    ['urep_name', 'urep_title', 'urep_mobile', 'urep_birth']);
+  /* 「앞가지만 빼면 같은 차례」인지 — 한쪽에만 칸을 더하면 여기서 걸린다 */
+  const 꼬리 = (F, p) => F.map((c) => c[0].replace(p, ''));
+  assert.deepEqual(꼬리(b.U, 'urep_'), 꼬리(b.W, 'wrep_'),
+    '★ 두 묶음의 칸 차례가 다릅니다 — 나란히 놓으면 매번 다시 읽어야 합니다.');
+  /* 칸 종류도 같아야 한다 — 한쪽만 date 면 달력이 한쪽에만 뜬다 */
+  assert.deepEqual(b.U.map((c) => c[2]), b.W.map((c) => c[2]), '★ 칸 종류가 어긋납니다.');
+});
+
+/* ══ 「회사 대표자와 같은 사람」 체크 (대표 지시 2026-09-14) ══════════
+   「만약 사용자 대표가 회사의 대표와 일치하는경우 사용자 대표에 ㅁ표시해서
+    사용자와 일치하는 체크란을 만들어라」 */
+
+test('★★ ①-A 체크를 켜면 대표자 칸을 «따라간다» — 대표자가 바뀌면 같이 바뀐다', () => {
+  const b = load([grabFn('_siteUrep'), 'this.f=_siteUrep;']);
+  const s = { ceo: '홍길동', urep_same: true, urep_title: '대표이사' };
+  assert.equal(b.f(s).name, '홍길동');
+  assert.equal(b.f(s).same, true);
+  /* 대표자가 바뀌면 저절로 따라간다 — 이름을 베껴 두지 않았다는 뜻이다 */
+  assert.equal(b.f(Object.assign({}, s, { ceo: '김철수' })).name, '김철수',
+    '★ 옛 사람이 남습니다 — 대표자가 바뀌어도 서식에는 지난 이름이 나갑니다.');
+  /* 켜 두면 따로 적어 둔 이름은 «쓰지 않는다» — 두 값이 갈리면 어느 쪽이 맞는지 모른다 */
+  assert.equal(b.f(Object.assign({}, s, { urep_name: '딴사람' })).name, '홍길동',
+    '★ 켜 두었는데 따로 적은 이름이 이깁니다.');
+});
+
+test('★★ ①-B 직위는 «지어내지 않는다» — 대표이사인지 사장인지는 자료에 없다', () => {
+  const b = load([grabFn('_siteUrep'), 'this.f=_siteUrep;']);
+  assert.equal(b.f({ ceo: '홍길동', urep_same: true }).title, '',
+    '★ 직위를 지어냈습니다 — 그대로 관청에 나갑니다.');
+});
+
+test('★★ ①-C 저장할 때 이름을 «비워» 둔다 — 베껴 두면 옛 사람이 남는다', () => {
+  const fn = grabFn('saveSite');
+  assert.match(fn, /if\(_us&&_us\.checked\)\{ obj\.urep_same=true; obj\.urep_name=''; \}/,
+    '★ 체크를 켜고 이름까지 베껴 넣습니다.');
+  assert.match(fn, /else \{ delete obj\.urep_same; \}/, '★ 체크를 꺼도 표시가 남습니다.');
+});
+
+test('★★ ①-D 켜고 끄면 화면이 «바로» 맞춰진다 — 저장해 봐야 아는 것이 아니다', () => {
+  const box = {}, 칸 = { value: '', readOnly: false, style: {}, title: '' };
+  new Function('NM', 'CEO', [
+    'function $(id){ return id==="su-urep_name"?NM:(id==="se-ceo"?CEO:null); }',
+    grabFn('urepSameToggle'), 'this.t=urepSameToggle;'
+  ].join('\n')).call(box, 칸, { value: ' 홍길동 ' });
+  box.t(true);
+  assert.equal(칸.value, '홍길동', '★ 켜도 이름이 안 채워집니다.');
+  assert.equal(칸.readOnly, true, '★ 켜 두었는데 손으로 고칠 수 있습니다 — 대표자와 갈라집니다.');
+  box.t(false);
+  assert.equal(칸.readOnly, false, '★ 끄고도 못 고칩니다.');
+});
+
+test('★ ①-E [사람] 보기에서는 «따라가는 값»을 고치게 두지 않는다', () => {
+  const fn = grabFn('sitesPeopleBody');
+  assert.match(fn, /u\.same\s*\n?\s*\?/, '★ 대표자와 같음을 가리지 않습니다.');
+  assert.match(fn, /대표자와 같음/, '★ 왜 못 고치는지 말하지 않습니다.');
 });
 
 test('★ ② 사용자대표는 SITE_FIELDS 에 «섞이지 않는다» — 엑셀 붙여넣기 열 차례가 밀린다', () => {
