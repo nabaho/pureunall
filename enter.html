@@ -1528,10 +1528,12 @@ body.portal-mode #moreFab{display:flex;}
      저절로 들어온 것이면 그렇게 말해 줘야 한다 — 전 사람 세션이 남은 폰에서
      포털이 말없이 열리면, 본인은 자기가 로그인한 줄 안다. */
   var _freshLogin = false;
+  window._puAuthAt = 0;   // 이 탭이 마지막으로 로그인한 사람을 본 때 — 다른 탭의 «지금 나갔다»와 견준다 (스코프에 안 매이게 window 에)
   function _rmBootSplash(){ try { var s=document.getElementById('pu-boot-splash'); if(s) s.remove(); } catch(_e){} }
   _persistenceReady.then(function(){
     auth.onAuthStateChanged(function(user){
       if(user && user.email){
+        window._puAuthAt = Date.now();
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
         if(!_handled){ _handled = true; enterPortal(user); }
       } else if(_handled){
@@ -3046,12 +3048,37 @@ body.portal-mode #moreFab{display:flex;}
   }
 
   // ── 로그아웃 ──
+  /* ★ «전체» 로그아웃 (대표 보고 2026-09-14 「로그아웃 했는데 전체로그아웃이 잘 안되고 다시 로그인 되어 있다」)
+     종전에는 auth.signOut() 하나였다. 파이어베이스는 끊기지만
+       · 이알피가 따로 들고 있는 자동 로그인 열쇠(pureun_v6_autologin_sid)가 남았고
+       · 폰이 «얼려» 둔 뒤의 탭(이알피·기업정보함)은 끊긴 신호를 놓쳐, 깨어난 뒤에도 메모리의 사용자로
+         그대로 로그인된 채 돌았다.
+     이제 «지금 나갔다» 시각을 localStorage 에 적는다 — 모든 앱 탭이 storage 신호로 즉시, 잠든 탭은 깨어날 때
+     그 시각을 보고 스스로 끊는다(js/pu-authsync.js). 포털은 authsync 를 안 싣으므로 같은 열쇠를 직접 적는다.
+     ⚠ 열쇠 이름은 pu-authsync.js 의 LOGOUT_KEY 와 «같아야» 한다 — tests/authsync-global-logout.test.js 가 견준다. */
+  function broadcastLogout(){
+    try {
+      localStorage.setItem('pu_auth_logout_at', String(Date.now()));
+      localStorage.removeItem('pu_auth_uid');
+      localStorage.removeItem('pureun_v6_autologin_sid');
+      sessionStorage.removeItem('pureun_v6_session_sid');
+    } catch(e){}
+  }
   $('logoutBtn').addEventListener('click', function(){
     /* 같은 탭에서 다시 로그인하면 반드시 포털 선택 화면에 머문다. */
     stopPortalHanaAlerts();
     try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(e){}
+    broadcastLogout();
     auth.signOut().then(function(){ location.reload(); });
   });
+  /* 포털 탭도 얼어 있다 깨어날 수 있다 — 다른 탭(이알피 등)에서 나간 뒤면 여기도 끊는다 */
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden) return;
+    try {
+      var t = Number(localStorage.getItem('pu_auth_logout_at') || 0);
+      if(t && window._puAuthAt && t > window._puAuthAt && auth.currentUser){ auth.signOut(); }
+    } catch(e){}
+  }, { passive:true });
 
   // ── 유휴 자동 로그아웃 (ERP와 동일한 공유 타이머 'pu_last_active', 60분) ──
   (function(){
@@ -3083,7 +3110,7 @@ body.portal-mode #moreFab{display:flex;}
       var last = 0;
       try{ last = parseInt(localStorage.getItem(AKEY)||'0', 10); }catch(e){}
       if(!last){ mark(); return; }
-      if(Date.now() - last >= LIMIT){ auth.signOut(); }
+      if(Date.now() - last >= LIMIT){ broadcastLogout(); auth.signOut(); }   // 유휴 로그아웃도 «전체»다
     }, 30000);
   })();
 
