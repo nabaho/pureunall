@@ -15837,6 +15837,44 @@ function erpDropDeadCoLink(form, companies){
   if(live) return f;
   return Object.assign({}, f, { company:Object.assign({}, f.company||{}, { companyId:'' }) });
 }
+/* ══════ 업체관리에 «없는» 업체로 지난 계약을 넣을 때 — 막고 끝내지 않는다 ══════
+   건의 2026-09-10 김보람 「업체연결 기능으로 인해 계약관리에 지난 계약이 저장되지 않습니다」
+     (26/1/30 신솔이엔에스 컨설팅 대금 440,000원 입금을 처리하려고 26/1/27 자 지난 계약을
+      넣으려 했는데 저장이 안 됨)
+
+   ■ 무엇이 막았나
+     업체 연결 검증이 「업체를 선택하거나 신규·미확정 업체는 연결 보류를 선택하세요」로 막는다.
+     그 «연결 보류»는 기업정보 탭 아래쪽 작은 체크칸에 있다 — 저장 단추를 누른 사람에게는
+     그 자리가 안 보인다. 그래서 토스트만 뜨고 길이 없는 것처럼 느껴진다.
+   ★ 실측 2026-09-14: 신솔이엔에스는 업체관리에 «없다»(0건).
+     그리고 이것은 한 곳 얘기가 아니다 — 컨설팅 92건 가운데 69곳의 업체가 업체관리에 없다.
+     그 업체로 계약을 넣으려 할 때마다 같은 자리에서 막힌다.
+
+   ■ 고친 방식 — 문턱은 그대로 두고 «길»을 그 자리에 둔다
+     막힐 상황이면 저장 순간에 물어본다: 「연결 보류로 저장」 / 「업체 고르기」.
+     ⚠ 문턱을 «푸는» 것이 아니다. 이름이 같다고 업체 ID 를 채우는 일은 여전히 없다
+       (그것이 이 검증의 존재 이유다 — 사업자번호가 같다는 이유로 자문 계약이 기금 업체에
+        들어간 적이 있다). 연결 보류는 «ID 를 안 채운다»고 사람이 밝히는 것이라 그 위험이 없다.
+     ⚠ 검증 함수(erpValidateContractCompany)는 «안 건드린다» — 이관·저장직전 재검사도
+       같은 문을 쓴다. 묻는 일은 사람이 저장 단추를 누른 «그 자리»에서만 한다. */
+async function erpAskDeferCompanyLink(form){
+  var O=window.PuOntology;
+  if(!form || !O || typeof O.validateCompanyLink!=='function') return form;
+  if(form.clientType==='worker') return form;                 // 근로자 의뢰는 업체가 없는 게 정상
+  if(form.companyLinkStatus==='pending') return form;         // 이미 보류로 고른 것
+  var _cos=dbGet('companies',[]);
+  var checked=O.validateCompanyLink(erpDropDeadCoLink(form,_cos),_cos);
+  if(checked.ok || checked.code!=='company_selection_required') return form;
+  var nm=String(form.companyName || (form.company&&form.company.name) || '').trim();
+  var yes=await popConfirm('「'+(nm||'이 업체')+'」는 업체관리에 없습니다.\n\n'
+    + '지난 계약을 그대로 남기시려면 「연결 보류」로 저장하면 됩니다.\n'
+    + '업체정보에는 쓰지 않고, 나중에 업체를 만들면 그때 이어 붙일 수 있습니다.\n\n'
+    + '연결 보류로 저장할까요?',
+    { okText:'연결 보류로 저장', cancelText:'업체 고르기', danger:false });
+  if(!yes) return form;   // 「업체 고르기」 — 그대로 두면 아래 검증이 막고 안내한다
+  return Object.assign({},form,{ companyId:'', companyLinkStatus:'pending',
+    company:Object.assign({},form.company||{},{ companyId:'' }) });
+}
 function erpValidateContractCompany(form){
   var O=window.PuOntology;
   if(!O||typeof O.validateCompanyLink!=='function'){showToast('업체 연결 검증을 불러오지 못했습니다. 새로고침 후 저장하세요.');return null;}
@@ -20254,6 +20292,9 @@ function ContractManagement(props){
   function openEdit(cur){ setModal({ mode:'edit', cur:cur }); }
   function close(){ setModal(null); }
   async function save(form){
+    /* ⚠★ 막기 전에 «길»을 준다 (건의 2026-09-10 김보람) — 업체관리에 없는 업체면
+       여기서 「연결 보류로 저장」을 고를 수 있다. 문턱 자체는 그대로다. */
+    form=await erpAskDeferCompanyLink(form);
     form=erpValidateContractCompany(form);
     if(!form)return false;
     if(!erpValidateWorkReferences('contracts',form))return false;
