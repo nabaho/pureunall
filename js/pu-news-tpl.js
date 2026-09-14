@@ -147,10 +147,12 @@
      ⚠ 링크로 만들지 않는다. 메일 프로그램은 같은 편지 안 자리이동(#앵커)을
        대개 무시한다 — 누르면 헛일이 되는 손잡이는 두지 않는다. */
   function 차림표() {
+    /* ★ 짧은 이름·한 줄 (대표 지시 2026-09-14 「디자인 이렇게」) — 긴 꼭지 이름이 한 칸에서
+         두 줄로 꺾여 차림표가 울퉁불퉁했다. 원본은 한 줄에 큼직한 글자다. */
     var 칸 = Core.꼭지들.map(function (g) {
-      return '<td align="center" width="25%" style="padding:17px 4px;font-size:15px;'
-        + 'font-weight:bold;color:' + 색.글 + ';font-family:' + 폰트 + ';">'
-        + esc(g.이름) + '</td>';
+      return '<td align="center" width="25%" style="padding:18px 2px;font-size:16px;white-space:nowrap;'
+        + 'font-weight:bold;color:' + 색.갈 + ';letter-spacing:-0.2px;font-family:' + 폰트 + ';">'
+        + esc(g.차림표이름 || g.이름) + '</td>';
     }).join('');
     /* ★ data-stick — 웹 전문 보기 쪽에서 이 줄을 «틀고정»한다
          (대표 지시 2026-09-13 「이부분 틀고정 해라」).
@@ -173,13 +175,18 @@
     if (!g.딱지) {
       return '<tr><td style="padding:22px 28px 0 28px;">' + 이름 + '</td></tr>';
     }
-    return '<tr><td style="padding:26px 28px 0 28px;">'
+    /* 원본은 딱지+제목 아래에 «가는 줄»이 한 폭 그어져 있다 — 꼭지가 어디서 시작하는지 눈이 잡는다 */
+    return '<tr><td style="padding:30px 28px 0 28px;">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+      + ' style="border-bottom:1px solid ' + 색.줄 + ';"><tr>'
+      + '<td style="padding:0 0 12px 0;">'
       + '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
-      + '<td style="background-color:' + 색.딱지 + ';padding:5px 13px;">'
+      + '<td style="background-color:' + 색.딱지 + ';padding:6px 14px;border-radius:14px;">'
       + '<span style="font-size:12px;font-weight:bold;color:#ffffff;font-family:' + 폰트 + ';">'
       + esc(g.딱지) + '</span>'
-      + '</td><td style="padding-left:11px;">' + 이름 + '</td>'
-      + '</tr></table></td></tr>';
+      + '</td><td style="padding-left:12px;">' + 이름 + '</td>'
+      + '</tr></table>'
+      + '</td></tr></table></td></tr>';
   }
 
   /* ── 기사 — «우리가 쓴 글»을 싣는다 (대표 지시 2026-09-08) ─────────────
@@ -227,9 +234,11 @@
           + 'text-decoration:none;font-weight:bold;">원문 ↗</a>'
         : '';
       /* 우리 글은 «단」이고, 옛 제목 줄은 «점 목록»이다 — 모양으로도 갈라 보인다 */
+      /* «·» 점 목록 (2026-09-14) — 원본의 주간뉴스는 점으로 시작하는 짧은 줄들이다.
+         왼쪽 띠 대신 점, 줄 사이는 가는 줄 하나. */
       return 내글
-        ? '<div' + _자리표(x) + ' style="padding:3px 0 9px 11px;border-left:3px solid ' + 색.바탕 + ';'
-          + 'margin-bottom:7px;">' + 몸 + 링 + '</div>'
+        ? '<div' + _자리표(x) + ' style="padding:6px 0 8px 0;border-bottom:1px solid ' + 색.가는줄 + ';">'
+          + '<span style="color:' + 색.갈 + ';font-weight:bold;">·</span>&nbsp; ' + 몸 + 링 + '</div>'
         : '<div' + _자리표(x) + ' style="padding-bottom:2px;">·&nbsp;' + 몸
           + (x.언론사 ? ' <span style="color:' + 색.흐린글 + ';font-size:12px;">· '
               + esc(x.언론사) + '</span>' : '') + 링 + '</div>';
@@ -314,14 +323,20 @@
     /* ⚠ 28자에서 자른다. 안 자르면 표지가 글자 수만큼 «길어져» 두 칸 높이가 어긋난다
          (미리보기에서 왼쪽 표지만 20px 더 길었다). 표지는 책등이지 본문이 아니다. */
     var 짧 = 제.length > 28 ? 제.slice(0, 28) + '…' : 제;
+    /* ★ «종이 표지»처럼 (대표 지시 2026-09-14) — 베이지 상자에 글자만 얹으면 «칸»으로 보이고,
+         원본의 보고서 표지들은 «흰 종이 위 제목 + 아래 발행처»다. 위에 가는 띠, 흰 바탕,
+         제목 가운데, 발행처는 맨 아래 — 그림이 와도 같은 자리(표지칸)에 그대로 들어간다. */
     return '<table role="presentation" width="' + w + '" cellpadding="0" cellspacing="0" border="0"'
-      + ' style="width:' + w + 'px;background-color:' + 색.표지바탕 + ';border:1px solid ' + 색.표지테 + ';">'
-      + '<tr><td height="132" align="center" valign="middle"'
-      + ' style="height:132px;padding:10px 9px;">'
-      + '<div style="font-size:11px;line-height:1.5;font-weight:bold;color:' + 색.갈 + ';'
+      + ' style="width:' + w + 'px;background-color:#ffffff;border:1px solid ' + 색.표지테 + ';'
+      + 'border-bottom:3px solid ' + 색.표지테 + ';">'
+      + '<tr><td style="height:5px;line-height:5px;font-size:1px;background-color:' + 색.갈 + ';">&nbsp;</td></tr>'
+      + '<tr><td height="98" align="center" valign="middle" style="height:98px;padding:8px 8px 4px 8px;">'
+      + '<div style="font-size:11px;line-height:1.5;font-weight:bold;color:' + 색.짙은갈 + ';'
       + 'font-family:' + 폰트 + ';word-break:keep-all;">' + esc(짧) + '</div>'
-      + '<div style="height:9px;line-height:9px;font-size:1px;">&nbsp;</div>'
-      + '<div style="font-size:9.5px;color:' + 색.흐린글 + ';font-family:' + 폰트 + ';">'
+      + '</td></tr>'
+      + '<tr><td align="center" valign="bottom" style="padding:0 6px 9px 6px;">'
+      + '<div style="font-size:9px;line-height:1.3;color:' + 색.흐린글 + ';font-family:' + 폰트 + ';'
+      + 'border-top:1px solid ' + 색.가는줄 + ';padding-top:6px;">'
       + esc((x && x.발행처) || '') + '</div>'
       + '</td></tr></table>';
   }
@@ -374,12 +389,14 @@
       : '';
 
     var 파일 = href(x && x.파일);
+    /* 단추를 «가볍게» (2026-09-14) — 짙은 갈색 덩이 여섯 개가 자료 칸을 무겁게 했다.
+         테두리만 있는 작은 단추로. ⚠ 글귀는 「내려받기」로 시작한다 — 검사와 평문이 그 낱말을 찾는다. */
     var 받기 = 파일
       ? '<div style="padding-top:9px;">'
-        + '<a href="' + 파일 + '" style="display:inline-block;background-color:' + 색.갈 + ';'
-        + 'color:#ffffff;font-size:11.5px;font-weight:bold;text-decoration:none;padding:6px 14px;'
-        + 'font-family:' + 폰트 + ';">내려받기'
-        + (파일글(x) ? ' <span style="font-weight:normal;">(' + esc(파일글(x)) + ')</span>' : '')
+        + '<a href="' + 파일 + '" style="display:inline-block;border:1px solid ' + 색.갈 + ';'
+        + 'color:' + 색.갈 + ';font-size:11px;font-weight:bold;text-decoration:none;padding:4px 10px;'
+        + 'border-radius:3px;font-family:' + 폰트 + ';">내려받기 ↓'
+        + (파일글(x) ? ' <span style="font-weight:normal;color:' + 색.흐린글 + ';">' + esc(파일글(x)) + '</span>' : '')
         + '</a></div>'
       : '';
 
@@ -400,10 +417,10 @@
     var 줄 = '';
     for (var i = 0; i < 것.length; i += 2) {
       var 첫줄 = i === 0;
-      var 테 = 첫줄 ? '' : 'border-top:1px solid #efe7dc;';
+      var 테 = 첫줄 ? '' : 'border-top:1px solid ' + 색.가는줄 + ';';
       줄 += '<tr>'
         + '<td width="50%" valign="top" style="width:50%;padding:16px 15px;' + 테
-        + 'border-right:1px solid #efe7dc;">' + 자료카드(것[i]) + '</td>'
+        + 'border-right:1px solid ' + 색.줄 + ';">' + 자료카드(것[i]) + '</td>'
         + '<td width="50%" valign="top" style="width:50%;padding:16px 15px;' + 테 + '">'
         + (것[i + 1] ? 자료카드(것[i + 1]) : '&nbsp;') + '</td>'
         + '</tr>';
@@ -440,23 +457,28 @@
     /* ⚠ 「전문 보기」라고 «적어» 준다. 인용만 밑줄 쳐 두면 그것이 누를 수 있는
          것인지, 무엇이 열리는지 알 수 없다 — 요지를 뺀 뒤로는 더 그렇다. */
     var 인용칸 = 인
-      ? '<div style="height:12px;line-height:12px;font-size:1px;">&nbsp;</div>'
-        + '<div align="right" style="text-align:right;">'
-        + (u ? '<a href="' + u + '" style="color:#ffffff;text-decoration:underline;'
-              + 'font-size:12.5px;font-weight:bold;font-family:' + 폰트 + ';">' + 인
-              + ' · 전문 보기 ↗</a>'
-            : '<span style="color:#ffffff;font-size:12.5px;font-weight:bold;'
-              + 'font-family:' + 폰트 + ';">' + 인 + '</span>')
+      ? '<div style="padding-top:4px;font-size:12px;font-family:' + 폰트 + ';color:' + 색.흐린글 + ';">'
+        + (u ? 인 + ' · <a href="' + u + '" style="color:' + 색.남색 + ';text-decoration:none;'
+              + 'font-weight:bold;">전문 보기 ↗</a>'
+            : 인)
         + '</div>'
       : '';
 
+    /* ★ 「딱지 상자 + 한 줄 + 점선」 (대표 지시 2026-09-14 「디자인 이렇게」)
+       종전에는 «짙은 갈색 상자» 세 덩이였다 — 편지 한복판에 어두운 벽이 섰다.
+       원본은 왼쪽에 테두리만 있는 딱지(판례 · 행정해석), 오른쪽에 제목 한 줄, 줄 사이 점선이다.
+       ⚠ 딱지 글자는 [ ] 를 벗겨 적는다 — 상자가 이미 괄호 노릇을 한다. */
+    var 딱지글 = String(x.딱지 || '[판례]').replace(/^\[|\]$/g, '').trim() || '판례';
     var 상자 = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
-      + _자리표(x)
-      + ' style="background-color:' + 색.갈 + ';"><tr><td style="padding:17px 19px;">'
-      + '<div style="font-size:12.5px;font-weight:bold;color:#e8ddd2;font-family:' + 폰트 + ';">'
-      + esc(x.딱지 || '[판례]') + '</div>'
-      + '<div style="height:7px;line-height:7px;font-size:1px;">&nbsp;</div>'
-      + '<div style="font-size:14.5px;font-weight:bold;line-height:1.65;color:#ffffff;'
+      + _자리표(x) + '><tr>'
+      + '<td width="74" valign="top" style="width:74px;padding:2px 0 0 0;">'
+      + '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
+      /* data-tag — 검사·웹 쪽이 «어느 딱지인가»를 이것으로 본다(괄호 글자를 박지 않게). 메일에서는 뜻 없는 표시다. */
+      + '<td align="center" data-tag="' + esc(딱지글) + '" style="border:1px solid ' + 색.갈 + ';padding:4px 0;width:66px;">'
+      + '<span style="font-size:11.5px;font-weight:bold;color:' + 색.갈 + ';font-family:' + 폰트 + ';">'
+      + esc(딱지글) + '</span></td></tr></table></td>'
+      + '<td valign="top" style="padding-left:12px;">'
+      + '<div style="font-size:14px;font-weight:bold;line-height:1.6;color:' + 색.짙은갈 + ';'
       + 'font-family:' + 폰트 + ';word-break:keep-all;">' + 제 + '</div>'
       + 인용칸
       + '</td></tr></table>';
@@ -474,13 +496,20 @@
          잘못 적어 두면 다음 사람이 엉뚱한 데까지 지운다.
        ★ 전문은 「전문 보기」 링크로 간다 — 필요한 분은 한 번 눌러 다 보신다.
        ⚠ 요지·참조조문·사건종류를 «되살리지 말 것». 되살리면 편지가 다시 다섯 배가 된다. */
-    return '<tr><td style="padding:16px 28px 0 28px;">' + 상자 + '</td></tr>';
+    return 상자;
   }
 
+  /* 줄 사이는 «점선» — 원본이 그렇다. 마지막 줄 아래는 안 긋는다. */
   function 판례칸(항목들) {
-    return (항목들 || [])
-      .filter(function (x) { return x && x.갈래 === '판례'; })
-      .map(판례한칸).join('');
+    var 것 = (항목들 || []).filter(function (x) { return x && x.갈래 === '판례'; });
+    if (!것.length) return '';
+    var 줄 = 것.map(function (x, i) {
+      var 테 = (i < 것.length - 1) ? 'border-bottom:1px dashed ' + 색.줄 + ';' : '';
+      return '<tr><td style="padding:13px 0;' + 테 + '">' + 판례한칸(x) + '</td></tr>';
+    }).join('');
+    return '<tr><td style="padding:6px 28px 0 28px;">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' + 줄 + '</table>'
+      + '</td></tr>';
   }
 
   /* ── 한 꼭지 그리기 — 칸마다 «제 갈래»로 ───────────────────────────────
@@ -492,7 +521,8 @@
     var g = 꼭지 || {};
     var s = 설정 || {};
     var out = '';
-    out += 자료칸(것.filter(function (x) { return x && x.갈래 === '자료'; }));
+    /* Trend(인사·노무관리)는 «흰 바탕 + 세로 나눔선» — 원본이 그렇다. ISSUE 만 살구 판이다. */
+    out += 자료칸(것.filter(function (x) { return x && x.갈래 === '자료'; }), g.키 === 'hr' ? '#ffffff' : '');
     out += 판례칸(것.filter(function (x) { return x && x.갈래 === '판례'; }));
     var 법 = 법령줄(것);
     if (법) {
