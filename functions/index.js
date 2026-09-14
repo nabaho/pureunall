@@ -3068,6 +3068,55 @@ exports.homepageWrite = functions
         return;
       }
 
+      /* ── 내리기 ── 이 게시판에는 「비공개」 자리가 «없다»(2026-09-14 정찰로 확인).
+           그래서 문서 관리의 «휴지통»으로 옮긴다 — 홈페이지에서 사라지고, 글·사진·
+           경력은 그대로 남고, 관리자 휴지통에서 되살릴 수 있다 (대표 승인 2026-09-14).
+         ⚠ 지우는 것이 아니다. 보내는 type 은 homepage-write 의 상수 하나뿐이고
+           여기서 고를 수 없다 — 한 글자가 «되살릴 수 없음»을 가른다.
+         ★ 고치기(경력·직책)와 «다른 길»이다. 글을 고치는 것이 아니라 옮기는 것이라
+           칸을 되돌려 보낼 일이 없다. 그래서 여기서 끝낸다. */
+      if (고칠것.비공개 === true) {
+        const 확인표 = String(읽은것.확인표 || "");
+        const 지음 = HW.휴지통몸통([Number(몸.srl)], 확인표);
+        if (!지음.ok) {
+          res.status(400).json({ ok: false, 방식: 방식, 저장됨: false,
+            error: 지음.why, 걸음: 걸음 });
+          return;
+        }
+        const 알림2 = {
+          ok: true, 방식: 방식, srl: Number(몸.srl), 저장됨: false, 못찾은것: [],
+          바뀐것: [{ 이름: "홈페이지에서", 옛: "보임", 새: "휴지통 (되살릴 수 있음)" }],
+          걸음: 걸음
+        };
+        if (방식 === "보기") { res.json(알림2); return; }
+
+        const t = await 홈부르기(HW.문서관리보낼주소(), 그릇, {
+          method: "POST",
+          body: 지음.몸통,
+          headers: Object.assign({
+            "User-Agent": HW.브라우저표시,
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Referer": HW.문서관리주소(),
+            "Cookie": 그릇.글자()
+          }, 확인표 ? { "X-CSRF-Token": 확인표 } : {})
+        });
+        const t답 = await t.text();
+        /* ⚠ 「받았다」와 「됐다」는 다르다 — 라이믹스는 200 으로 오류를 싣는다.
+             <error>0</error> 이 아니면 실패로 본다. */
+        const 됐나 = t.status >= 200 && t.status < 400 && !/<error>\s*-?[1-9]/.test(t답);
+        알림2.저장됨 = 됐나;
+        알림2.걸음.push({ 걸음: "④ 휴지통", 상태: t.status, 보낸type: HW.내리는type,
+                          답조각: t답.slice(0, 200) });
+        if (!됐나) { 알림2.ok = false; 알림2.error = "홈페이지가 내리기를 받아 주지 않았습니다."; }
+        try {
+          await getDatabase().ref("homepage/writeLog/" + Number(몸.srl)).push({
+            at: Date.now(), by: decoded.uid, 저장됨: 됐나, 바뀐것: 알림2.바뀐것
+          });
+        } catch (e) { console.warn("homepageWrite log", (e && e.message) || e); }
+        res.status(됐나 ? 200 : 502).json(알림2);
+        return;
+      }
+
       const 새것 = HW.갈아끼우기(읽은것, 고칠것, 화면);
       const 알림 = {
         ok: true, 방식: 방식, srl: Number(몸.srl), 저장됨: false,
