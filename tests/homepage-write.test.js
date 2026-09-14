@@ -3,6 +3,8 @@
    그래서 이 검사는 «사진이 실린 숨은 칸»을 끝까지 따라간다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const W = require('../functions/homepage-write');
 
 /* 진짜 고치는 화면을 닮게 만든 한 장 — 캡처(2026-09-13)의 그 모양이다.
@@ -302,6 +304,52 @@ test('정찰의 고르개는 «보기 글자»를 담는다 — 그것이 칸의
   const r = W.정찰(화면());
   assert.ok(r.고르개.some(t => /status\[/.test(t) && /비공개/.test(t)),
     '고르개의 뜻을 못 알려 준다: ' + r.고르개.join(' | '));
+});
+
+/* ── 휴지통으로 내리기 ── 2026-09-14 정찰로 확인한 뒤 지은 길 ─────────────
+   이 게시판에는 「비공개」 자리가 없다. procDocumentManageCheckedDocument 가
+   할 수 있는 것은 이동·복사·삭제·휴지통 넷이고, 그중 «휴지통»만 쓴다. */
+test('★★★ 나가는 type 은 «trash» 하나다 — delete 가 섞이면 되살릴 수 없다', () => {
+  assert.equal(W.내리는type, 'trash');
+  const r = W.휴지통몸통([193], 'tok');
+  const p = new URLSearchParams(r.몸통);
+  assert.equal(p.get('type'), 'trash', '★★★ 지우는 쪽으로 갔다');
+  /* 몸통 어디에도 delete·move·copy 라는 글자가 없어야 한다 */
+  W.절대안쓰는type.forEach((못된것) => assert.ok(r.몸통.indexOf(못된것) < 0,
+    '★★★ 몸통에 「' + 못된것 + '」이 들어 있다: ' + r.몸통));
+});
+
+test('★★★ 「delete」를 들고 있는 줄은 «막는 목록» 하나뿐이다', () => {
+  /* 주석을 걷고 «줄 단위»로 본다 — 잘 쓴 주석이 검사를 통과시키면 안 되고,
+     한 파일에 delete 가 두 자리에 있으면 언젠가 그중 하나가 보내진다. */
+  const 소스 = fs.readFileSync(path.join(__dirname, '..', 'functions', 'homepage-write.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+  const 든줄 = 소스.split(/\r?\n/).filter(줄 => /["']delete["']/.test(줄));
+  assert.equal(든줄.length, 1, '★★★ 「delete」가 여러 자리에 있습니다:\n' + 든줄.join('\n'));
+  assert.match(든줄[0], /절대안쓰는type/,
+    '★★★ 「delete」가 «막는 목록»이 아닌 곳에 있습니다 — 한 글자가 되살림을 가릅니다: ' + 든줄[0]);
+});
+
+test('내릴 글 번호를 cart 에 담는다 — 문서 관리 화면의 체크상자 이름이다', () => {
+  const p = new URLSearchParams(W.휴지통몸통([193, 281], 'tok').몸통);
+  assert.deepEqual(p.getAll('cart'), ['193', '281']);
+  assert.equal(p.get('module'), 'document');
+  assert.equal(p.get('act'), 'procDocumentManageCheckedDocument');
+  assert.equal(p.get('_rx_csrf_token'), 'tok');
+});
+
+test('★ 못된 글 번호는 «거른다» — 하나도 안 남으면 보내지 않는다', () => {
+  const r = W.휴지통몸통([193, 'abc', -1, 0, 1.5, '2 OR 1=1'], 'tok');
+  assert.deepEqual(new URLSearchParams(r.몸통).getAll('cart'), ['193'],
+    '못된 번호가 섞여 들어갔다');
+  assert.equal(W.휴지통몸통([], 'tok').ok, false, '빈 목록인데 보내려 했다');
+  assert.equal(W.휴지통몸통(['abc'], 'tok').ok, false);
+});
+
+test('확인표가 없어도 몸통은 짓는다 — 머리글로도 보내기 때문이다', () => {
+  const r = W.휴지통몸통([193], '');
+  assert.equal(r.ok, true);
+  assert.equal(new URLSearchParams(r.몸통).get('_rx_csrf_token'), null);
 });
 
 test('고치는 주소는 글 번호 하나만 받는다', () => {
