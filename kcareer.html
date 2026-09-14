@@ -1137,6 +1137,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-misattach.js?v=1"></script>
 <!-- 여러 장 PDF 를 «서류마다» 갈라 읽는다(kcareer-pagesplit.js) -->
 <script src="js/kcareer-pagesplit.js?v=1"></script>
+<!-- 「필요 없는 쪽 빼기」 — 공고문·평가표를 빼고 낼 것만 남긴다(kcareer-hwpxpages.js) -->
+<script src="js/kcareer-hwpxpages.js?v=1"></script>
 <script src="js/kcareer-overlay.js?v=2"></script>
 <!-- AI 판독 호출기 — 열쇠는 회사 서버가 든다(브라우저는 모른다) -->
 <script src="js/pu-ai-call.js?v=3"></script>
@@ -1408,6 +1410,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
               <div class="rc-actions">
                 <button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 양식 칸에 넣습니다">✨ 내 정보로 채우기</button>
                 <button class="btn" id="rhUndoBtn" style="display:none" onclick="rhUndoFill()" title="채우기 전으로 되돌립니다">↩ 되돌리기</button>
+                <button class="btn" onclick="rhPagesOpen()" title="공고문·평가표처럼 «내지 않을» 쪽을 빼고 낼 것만 남깁니다 — 언제든 모두 되살릴 수 있습니다">✂ 필요 없는 쪽 빼기</button>
                 <button class="btn" style="border-color:#fecaca;color:var(--red)" onclick="rhStampDoc()" title="★기본 도장을 「(인)」 자리에 찍습니다 — 글자를 다 확인한 뒤 마지막에">🖋 도장 찍기</button>
                 <button class="btn primary" onclick="rhSaveInput()" id="kfSaveBtn" title="입력판에 친 값을 원본 한글 서식의 그 칸에 넣습니다">💾 원본 한글에 넣기</button>
                 <button class="btn" onclick="openTidy()" id="rhTidyBtn" title="필요 없는 쪽을 빼고, 남은 자리표·예시 글자를 걷어 냅니다 — 한글에서 고쳐 온 파일을 바탕으로 갈아 끼우는 것도 여기입니다">🧹 서식 정리</button>
@@ -2196,6 +2199,22 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     <div class="modal-h">📎 원본 없는 것 채우기 — 이미 있는 것은 건드리지 않습니다</div>
     <div class="modal-b" id="bulkBody"></div>
     <div class="modal-foot"><button class="btn" id="bulkCancel">닫기</button><button class="btn primary" id="bulkSave" style="display:none">매칭 저장</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="modalPages">
+  <div class="modal" style="width:min(880px,96vw)">
+    <div class="modal-h">✂ 필요 없는 쪽 빼기 — 낼 것만 남깁니다</div>
+    <div class="modal-b">
+      <div class="desc" style="margin-bottom:10px">기관 양식은 <b>공고문 + 지원서 + 동의서 + 평가표</b>가 한 파일에 붙어 옵니다.
+        내지 않을 것을 빼고 <b>낼 것만</b> 남깁니다.
+        <b>원본은 그대로 두고</b> 새로 만드는 것이라 <b>언제든 모두 되살릴 수 있습니다</b>.</div>
+      <div id="rhPagesBody"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="rhPagesClose()">닫기</button>
+      <button class="btn" id="rhPagesUndoBtn" onclick="rhPagesRestore()" style="display:none">↩ 모든 쪽 되살리기</button>
+      <button class="btn primary" id="rhPagesApplyBtn" onclick="rhPagesApply()">✂ 고른 대로 만들기</button>
+    </div>
   </div>
 </div>
 <div class="modal-ov" id="modalMisattach">
@@ -12105,6 +12124,131 @@ function rhMemoryLoad(fp){
   if(!m) return null;
   toast('전에 정한 대로 채울 곳을 맞춰 두었습니다 — 확인만 하시면 됩니다');
   return Object.assign({}, m.picks||{});
+}
+
+/* ═══ ✂ 필요 없는 쪽 빼기 (대표 지시 2026-09-14
+     「필요없는 페이지 삭제하는 기능 만들 수 있나 · 삭제 후 실수인 경우 복귀도 가능하게 ·
+       필요한 페이지만 자동화해서 정리하고 싶다」) ═══
+
+   ⚠★ 「쪽」은 한글 파일에 «담겨 있지 않다» — 그려 낼 때 계산되는 결과다.
+     그래서 「3쪽을 지워라」는 곧바로 할 수 없다. 대신 «하드 쪽나눔으로 갈린 묶음»을 뺀다.
+     실측(대표님 실물, 10쪽): 구역은 1개뿐이고 쪽 묶음이 7개였는데, 그 7개가
+     서류 경계(공고/결과발표/체크리스트/지원서/전문분야/동의서/평가표)와 «정확히» 맞았다.
+   ⚠★ 되돌리기는 «원본에서 다시 만드는» 것이다 — _rhBase(처음 올린 원본)를 이미 들고 있다.
+     그래서 몇 번을 빼도 한 번에 전부 돌아온다.
+   ⚠ 판정은 js/kcareer-hwpxpages.js 한 곳에서 한다 — 여기서 다시 적지 말 것. */
+var _rhPages=null;     /* { xml, name, chunks, keep:{}, secName } */
+
+async function rhPagesOpen(){
+  if(!window.KcareerHwpxPages){ toast('부품을 불러오지 못했습니다 — 새로고침해 주세요'); return; }
+  var base=(typeof _rhBase!=='undefined' && _rhBase) || _rhDoc;
+  if(!base || !base.bytes){ toast('먼저 기관 양식을 올려 주세요'); return; }
+  toast('⏳ 쪽을 살펴보는 중…');
+  try{
+    await _ensureJSZip();
+    var src=await _rhToHwpx(base.bytes, base.name);
+    if(!src){ toast('한글 서식을 열지 못했습니다'); return; }
+    var zip=await JSZip.loadAsync(src);
+    var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
+    if(!names.length){ toast('이 파일에서는 쪽을 가를 수 없습니다'); return; }
+    var xml=await zip.file(names[0]).async('string');
+    var cs=KcareerHwpxPages.chunks(xml);
+    if(cs.length<2){
+      toast('이 서식은 쪽 묶음이 하나뿐이라 나눌 수 없습니다 — 한글에서 쪽나눔을 넣은 파일이어야 합니다', 7000);
+      return;
+    }
+    var sg=KcareerHwpxPages.suggest(cs), keep={};
+    cs.forEach(function(c,i){ keep[c.i]=!sg[i].drop; });
+    _rhPages={ xml:xml, secName:names[0], chunks:cs, suggest:sg, keep:keep, zipSrc:src };
+    $('modalPages').classList.add('open');
+    rhPagesRender();
+  }catch(e){ console.warn('쪽 빼기', e); toast('쪽을 살펴보지 못했습니다 — '+(e&&e.message||'')); }
+}
+function rhPagesClose(){ var o=$('modalPages'); if(o) o.classList.remove('open'); }
+
+function rhPagesRender(){
+  var box=document.getElementById('rhPagesBody'); if(!box||!_rhPages) return;
+  var cs=_rhPages.chunks, sg=_rhPages.suggest, keep=_rhPages.keep;
+  var 남길=cs.filter(function(c){ return keep[c.i]; }).length;
+  var 뺄=cs.length-남길;
+  var 뺀적=(typeof _rhDropped!=='undefined' && _rhDropped && _rhDropped.length)?_rhDropped.length:0;
+  var ub=$('rhPagesUndoBtn'); if(ub) ub.style.display=뺀적?'':'none';
+  var 값있음=(typeof _rhVals!=='undefined' && _rhVals) ? Object.keys(_rhVals).filter(function(k){ return _rhVals[k]; }).length : 0;
+
+  var h='<div style="font-size:13px;margin-bottom:8px">쪽 묶음 <b>'+cs.length+'개</b> 가운데 '
+    +'<b style="color:var(--teal)">'+남길+'개를 남기고</b> <b style="color:var(--red)">'+뺄+'개를 뺍니다</b>.</div>';
+  if(뺄) h+='<div style="font-size:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px 9px;margin-bottom:10px;color:#166534">'
+    +'🤖 «안 낼 것»으로 보이는 '+뺄+'개를 미리 꺼 두었습니다 — <b>맞는지 확인해 주세요.</b> 저절로 지우지 않습니다.</div>';
+  /* ⚠ 값을 이미 쳤으면 먼저 알린다 — 쪽을 빼면 칸 자리가 바뀐다 */
+  if(값있음) h+='<div style="font-size:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 9px;margin-bottom:10px;color:#92400e">'
+    +'⚠ 이미 <b>'+값있음+'칸</b>을 치셨습니다. 쪽을 빼면 칸 자리가 바뀌니 <b>쪽 정리를 먼저 하고</b> 값을 채우시는 것이 좋습니다.</div>';
+
+  h+='<div style="max-height:52vh;overflow:auto"><table class="dt" style="width:100%;font-size:12px"><thead><tr>'
+    +'<th style="width:64px">남길까</th><th style="width:52px">묶음</th><th>첫머리</th>'
+    +'<th style="width:64px">채울 칸</th><th>판단</th></tr></thead><tbody>';
+  cs.forEach(function(c,i){
+    var on=!!keep[c.i], why=sg[i].why;
+    h+='<tr'+(on?'':' style="background:#fef2f2"')+'>'
+      +'<td><label style="display:flex;gap:5px;align-items:center;white-space:nowrap">'
+        +'<input type="checkbox" class="rhpg-chk" data-i="'+c.i+'"'+(on?' checked':'')+'>'
+        +'<span>'+(on?'남김':'<b style="color:var(--red)">뺌</b>')+'</span></label></td>'
+      +'<td style="white-space:nowrap;color:var(--text-mute)">'+(i+1)+'/'+cs.length+'</td>'
+      +'<td style="word-break:break-all">'+escapeHtml(c.이름)+'</td>'
+      +'<td style="white-space:nowrap;text-align:right">'+(c.빈칸+c.자리표)+'</td>'
+      +'<td style="color:var(--text-mute)">'+escapeHtml(why||(c.빈칸+c.자리표?'채울 칸이 있습니다':''))+'</td></tr>';
+  });
+  h+='</tbody></table></div>'
+    +'<div style="font-size:12px;color:var(--text-mute);margin-top:10px;line-height:1.7">'
+    +'⚠ 「쪽 묶음」은 한글의 <b>쪽나눔</b>으로 갈린 덩어리입니다 — 한 묶음이 두 쪽일 수도 있어 «쪽»이라 부르지 않습니다.<br>'
+    +'⚠ <b>원본은 건드리지 않습니다.</b> 만든 뒤에도 <b>↩ 모든 쪽 되살리기</b>로 한 번에 돌아옵니다.</div>';
+  box.innerHTML=h;
+  box.querySelectorAll('.rhpg-chk').forEach(function(cb){
+    cb.onchange=function(){ _rhPages.keep[Number(cb.dataset.i)]=cb.checked; rhPagesRender(); };
+  });
+}
+
+/* 고른 대로 새 문서를 만든다. ⚠ 원본(_rhBase)은 그대로 둔다 — 되돌리기의 바탕이다. */
+var _rhDropped=null;
+async function rhPagesApply(){
+  if(!_rhPages) return;
+  var 뺄것=_rhPages.chunks.filter(function(c){ return !_rhPages.keep[c.i]; }).map(function(c){ return c.i; });
+  if(!뺄것.length){ toast('뺄 것이 없습니다 — 뺄 묶음의 체크를 꺼 주세요'); return; }
+  if(뺄것.length>=_rhPages.chunks.length){ toast('모두 뺄 수는 없습니다 — 남길 것을 하나 이상 켜 주세요'); return; }
+  var btn=$('rhPagesApplyBtn'); if(btn){ btn.disabled=true; btn.textContent='✂ 만드는 중…'; }
+  try{
+    var zip=await JSZip.loadAsync(_rhPages.zipSrc);
+    var 새xml=KcareerHwpxPages.remove(_rhPages.xml, 뺄것);
+    zip.file(_rhPages.secName, 새xml);
+    var bytes=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+    _rhDropped=뺄것.slice();
+    _rhDoc={ name:rhCleanName((_rhDoc&&_rhDoc.name)||'양식.hwpx','_필요한쪽'), ext:'hwpx', bytes:bytes };
+    rhDraftSave();
+    /* ⚠★ 처음 올린 원본(_rhBase)을 «지키며» 다시 그린다 — mountEditor 는 새 서식이 온 것으로
+       보고 바탕을 갈아 끼운다. 갈리면 「↩ 모든 쪽 되살리기」가 «뺀 것»으로 되돌아간다.
+       ⚠ finally 에서 반드시 푼다 — 안 풀면 다음 양식이 바탕을 못 잡는다(2026-09-07 과 같은 덫). */
+    _rhKeepBase=true;
+    try{ await mountEditor(bytes.buffer.slice(0), _rhDoc.name); }
+    finally{ _rhKeepBase=false; }
+    rhPagesClose();
+    toast('✂ '+뺄것.length+'묶음을 뺐습니다 — 마음에 안 들면 「✂ 필요 없는 쪽 빼기 › ↩ 모든 쪽 되살리기」', 7000);
+  }catch(e){ console.warn('쪽 빼기 적용', e); toast('만들지 못했습니다 — '+(e&&e.message||'')); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='✂ 고른 대로 만들기'; } }
+}
+
+/* ↩ 되돌리기 — «원본에서 다시» 만든다. 몇 번을 뺐든 한 번에 전부 돌아온다. */
+async function rhPagesRestore(){
+  var base=(typeof _rhBase!=='undefined' && _rhBase) || null;
+  if(!base || !base.bytes){ toast('처음 올린 원본이 없습니다 — 양식을 다시 올려 주세요'); return; }
+  if(!confirm('↩ 뺀 쪽을 «모두» 되살립니다.\n\n처음 올리신 원본 그대로 돌아갑니다.\n'
+    +'⚠ 그 뒤에 치신 값은 지워집니다(칸 자리가 원래대로 돌아가기 때문입니다).\n\n계속할까요?')) return;
+  try{
+    _rhDoc={ name:base.name, ext:base.ext||'hwpx', bytes:base.bytes };
+    rhDraftSave();
+    await mountEditor(base.bytes.buffer.slice(0), base.name);   /* 바탕을 원본으로 되돌린다 */
+    _rhDropped=null; _rhPages=null;
+    rhPagesClose();
+    toast('↩ 모든 쪽을 되살렸습니다 — 처음 올리신 그대로입니다');
+  }catch(e){ console.warn('쪽 되살리기', e); toast('되살리지 못했습니다 — '+(e&&e.message||'')); }
 }
 
 /* ── 도장 찍기 ──
