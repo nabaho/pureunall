@@ -1338,43 +1338,50 @@ test('지운 기록을 보여 준다 — 완전히 지운 뒤에도', () => {
   assert.match(app, /PuPhotoStore\.listDelLog\(/);
   assert.match(app, /완전히 지움/);
 });
-/* ── 겹치는 서류 스스로 치우기 ──
-   스스로 지우는 기능은 잘못 만들면 사람 자료를 없앤다. 세 가지를 못 박는다. */
+/* ── 겹치는 서류 — «치우는 것은 사람이 누른다» (대표 지시 2026-09-14) ──
+   "삼성검수 데이터 갑자기 사라졌다 … 중복서류도 아닌데 갑자기 계속 사라진다"
 
-test('더한 것이 없을 때만 치운다 — 빈 칸을 채웠으면 두어야 한다', () => {
-  /* ⚠ 2026-09-03 — 종전에는 «파일에서 첫 .then(function (res)» 부터 훑었다.
-     그 앞에 다른 .then(function (res) 가 하나 생기자(겹치는 서류 보내기) 그쪽을
-     잡아 헛짚었다 — 기능은 멀쩡한데 검사만 울었다.
-     **부르는 자리에서 거꾸로 짚는다** — 그 줄이 곧 이 규칙이 사는 곳이다. */
-  const j = app.indexOf('dropRedundant(id, year, res)');
-  assert.ok(j > 0, '중복 치우기를 부르는 곳을 찾을 수 없습니다');
+   2026-08-06 부터 여기는 스스로 휴지통으로 보냈다. 그런데 「겹친다」의 판정이
+   «기업정보함 기록에 새로 채울 칸이 있었나»였다 — 그것은 서류가 겹쳤는지를 묻는
+   물음이 아니다. 겹침 열쇠가 휴대폰·사업자번호라서 **같은 사람이 낸 다른 서식**,
+   **같은 회사의 다른 서류**가 서로 겹친 것이 되고, 그 사람이 기업정보함에 이미
+   온전히 들어 있으면 채울 칸이 없어 **사진이 사라졌다.**
+   실측 2026-09-14: 그렇게 사라진 사진 **179장**(사업자등록증 113·명함 65·사진 1),
+   직원 넷 모두에게서, 그중 44장은 몇 달 전 기록과 겹쳤다는 이유였다.
+   되살려진 것은 **한 장도 없었다** — 사라진 줄을 몰랐기 때문이다. */
+
+test('★★ 겹친다고 «스스로» 지우지 않는다 — 179장이 그렇게 사라졌다', () => {
+  const fn = fnBody('noteRedundant');
+  assert.ok(!/deletePhoto\(/.test(fn),
+    '★★ 겹침을 알아낸 자리에서 곧바로 지우고 있습니다.\n' +
+    '  「겹친다」의 판정은 «기업정보함 기록에 채울 칸이 있나»지 «서류가 같은가»가 아닙니다 —\n' +
+    '  같은 사람이 낸 다른 서식, 같은 회사의 다른 서류가 그 판정에 걸립니다.');
+  /* 부르는 자리도 함께 본다 — 자동 길에서 지우기로 되돌아가면 안 된다 */
+  const j = app.indexOf('noteRedundant(id, year, res)');
+  assert.ok(j > 0, '겹침을 알리는 곳을 찾을 수 없습니다');
   const near = app.slice(Math.max(0, j - 600), j);
-  assert.match(near, /res\.redundant/, 'redundant 아닌 것도 치울 수 있습니다');
+  assert.match(near, /res\.redundant/, '겹치지도 않은 것까지 알립니다');
 });
 
-test('치우기 전에 판독 결과를 먼저 남긴다 — 순서가 바뀌면 고리가 끊긴다', () => {
-  /* 인자 개수를 못 박지 않는다 — 주인(owner)이 붙는 등 늘어날 수 있다.
-     여기서 볼 것은 **순서**뿐이다. */
-  const i = app.indexOf('saveRead(year, id, read');
-  const j = app.indexOf('dropRedundant(id, year, res)');
-  assert.ok(i > 0 && j > i, '기록보다 치우기가 먼저입니다');
+test('★★ 치우는 길은 «사람이 누르는» 단추 하나뿐이다 — 휴지통으로, 까닭과 함께', () => {
+  const fn = fnBody('dropDup');
+  assert.match(fn, /PuPhotoStore\.deletePhoto\(/, '휴지통을 거치지 않고 지웁니다');
+  assert.match(fn, /겹침 —/, '왜 치웠는지 기록에 남기지 않습니다');
+  assert.match(app, /onclick="dropDup\(/, '사람이 누를 단추가 없습니다');
+  /* ⚠ 자동 길이 이 함수를 부르면 결국 같은 일이 된다 */
+  assert.ok(!/noteRedundant[\s\S]{0,400}dropDup\(/.test(app),
+    '★★ 알리는 함수가 곧바로 치우기를 부르면 이름만 바뀐 자동 삭제입니다.');
 });
 
-test('휴지통으로 보낸다 — 스스로 한 일은 되돌릴 수 있어야 한다', () => {
-  const fn = app.match(/function dropRedundant\([\s\S]*?\n\}/);
-  assert.ok(fn, 'dropRedundant 본문을 찾을 수 없습니다');
-  assert.match(fn[0], /PuPhotoStore\.deletePhoto\(/, '휴지통을 거치지 않고 지웁니다');
-  assert.match(fn[0], /중복/, '왜 치웠는지 기록에 남기지 않습니다');
-  assert.match(app, /function undoDup\(/, '되살리는 길이 없습니다');
-  assert.match(app, /PuPhotoStore\.restorePhoto\(/);
-});
-
-test('말없이 치우지 않는다 — 언제 겹친 것인지 화면에 남는다', () => {
+test('★★ 안 한 일을 했다고 적지 않는다 — 「휴지통으로 보냈습니다」는 이제 거짓말이다', () => {
   assert.match(app, /id="dupBox"/);
-  assert.match(app, /function renderDupBox\(/);
-  const fn = app.match(/function renderDupBox\([\s\S]*?\n\}/);
-  assert.match(fn[0], /PuDocFile\.whenText\(/, '언제 저장된 것과 겹쳤는지 안 보여줍니다');
-  assert.match(fn[0], /되살리기/);
+  const fn = fnBody('renderDupBox');
+  assert.match(fn, /PuDocFile\.whenText\(/, '언제 저장된 것과 겹쳤는지 안 보여줍니다');
+  assert.match(fn, /사진은 그대로 둡니다/,
+    '★ 그대로 두었다는 말이 없으면 사람이 사진을 찾으러 휴지통에 갑니다');
+  assert.ok(!/장을 휴지통으로 보냈습니다/.test(fn),
+    '★★ 안 보냈는데 보냈다고 적고 있습니다 — 옛 글월이 남아 있습니다.');
+  assert.match(fn, /휴지통으로<\/button>|>휴지통으로</, '치우는 단추가 없습니다');
 });
 
 test('지우기 확인 문구가 휴지통을 알린다 — 되돌릴 수 없다는 말은 거짓이다', () => {
@@ -2346,12 +2353,12 @@ test('기업정보함 보내기도 사진 주인 자리를 본다', () => {
   assert.match(fn, /saveRead\([^)]*owner/, '보낸 표시가 내 자리에 저장됩니다');
 });
 
-test('남의 사진은 중복이어도 스스로 치우지 않는다', () => {
+test('남의 사진은 겹쳐도 «치우기 단추조차» 안 띄운다', () => {
   /* 남의 사진을 말없이 휴지통에 넣으면 그 사람은 왜 없어졌는지 알 수 없다.
      내 사진일 때만 치운다 — 판독 잠금을 푸는 대가로 반드시 함께 있어야 한다. */
-  const fn = fnBody('dropRedundant');
+  const fn = fnBody('noteRedundant');
   assert.match(fn, /isMinePhoto\(/, '남의 사진까지 치울 수 있습니다');
   /* 걸러내기가 deletePhoto **앞**에 있어야 한다 — 뒤면 이미 지운 뒤다 */
-  assert.ok(fn.indexOf('isMinePhoto(') < fn.indexOf('deletePhoto('),
-    '지운 다음에 내 것인지 봅니다');
+  assert.ok(fn.indexOf('isMinePhoto(') < fn.indexOf('dupNotes.push('),
+    '알린 다음에 내 것인지 봅니다');
 });

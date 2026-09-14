@@ -36,7 +36,7 @@
      이 파일이 캐시에 묵으면 옛 지시로 읽어 제목이 안 생기는데, 화면(pu-photos.html)은
      새것이라 제목 자리만 비어 보인다 — 고친 것이 통째로 묻힌 것처럼 된다.
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
-<script src="js/pu-doc-read.js?v=44"></script>
+<script src="js/pu-doc-read.js?v=45"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-doc-file.js?v=31"></script>
@@ -8655,7 +8655,7 @@ function sendWorkerNow() {
    ⚠ 지우지 않고 휴지통이다(30일 안에 되살린다). 스스로 하는 일은 사람이
      되돌릴 수 있어야 한다 — 겹치는 명함을 치울 때 이미 정해 둔 규칙이다.
    ⚠ 옛 사진이 «남의 것»이면 안 치운다. 내 화면에서 남의 사진이 말없이 사라지면
-     그 사람은 왜 없어졌는지 알 길이 없다(dropRedundant 와 같은 원칙). */
+     그 사람은 왜 없어졌는지 알 길이 없다(noteRedundant 와 같은 원칙). */
 function dupReplace() {
   const id = viewerId;
   if (!id) return;
@@ -8904,10 +8904,16 @@ function sendCards(id, year, job) {
     markFiledUsed(id, year, '기업정보함 — ' +
       ((read.fields && read.fields.company) || res.coFilled ||
        (read.fields && read.fields.name) || '업체 미상'));
-    /* 기록을 먼저 남기고 나서 치운다 — 순서가 바뀌면 휴지통에 담긴 사본에
-       '기업정보함 어디로 갔는지'가 빠져 되살려도 고리가 끊긴다. */
+    /* 판독 결과를 먼저 남기고 나서 알린다 — 순서가 바뀌면 「기업정보함 어디로 갔는지」가
+       빠져, 나중에 사람이 치우기로 했을 때 휴지통 사본의 고리가 끊긴다. */
     return PuPhotoStore.saveRead(year, id, read, owner).then(function () {
-      if (res.redundant) return dropRedundant(id, year, res);
+      /* ⚠⚠ 「겹친다」고 말할 수 있는 것은 **명함뿐**이다 (대표 지시 2026-09-14).
+         등록 층이 주는 redundant 는 «기업정보함 기록에 새로 채울 칸이 없었다»는 뜻이다.
+         서식·사업자등록증은 그 사람·그 회사가 이미 기업정보함에 들어 있는 것이 **정상**이라,
+         그 뜻을 「겹치는 서류」로 읽으면 **새 서류를 낼 때마다 겹쳤다고 말한다** —
+         그렇게 사업자등록증 113장이 사라졌다(실측 2026-09-14).
+         명함만 남긴다 — 같은 명함을 다시 찍은 경우라 그나마 물어볼 값이 있다. */
+      if (res.redundant && read.kind === 'card') return noteRedundant(id, year, res);
     });
   }).catch(function (e) {
     console.warn('[기업정보함 보내기]', e);
@@ -8917,39 +8923,59 @@ function sendCards(id, year, job) {
   });
 }
 
-/* ══════ 중복 서류 스스로 치우기 ══════
-   같은 명함·사업자등록증이 이미 기업정보함에 있고, 이 사진이 더한 것이 하나도
-   없을 때만 치운다(대표 지시: "특별히 내용이 없으면 자동 삭제").
+/* ══════ 겹치는 서류 — «치울지 사람이 고른다» (대표 지시 2026-09-14) ══════
+   "삼성검수 데이터 갑자기 사라졌다 … 중복서류도 아닌데 갑자기 계속 사라진다"
 
-   ⚠ 지키는 것 세 가지
-   1. **휴지통으로** 보낸다 — 30일 안에 되살릴 수 있다. 스스로 하는 일은
-      사람이 되돌릴 수 있어야 한다.
-   2. **왜 치웠는지 남긴다** — 지운 기록에 '중복'이 적힌다. 안 적으면
-      "내 사진이 왜 없어졌지"에 아무도 답할 수 없다.
-   3. **말없이 하지 않는다** — 언제 저장된 것과 겹쳤는지 화면에 남기고,
-      그 자리에서 되살릴 수 있게 한다. */
+   ■ 무엇이 잘못돼 있었나 — «서류»를 «사람 기록»으로 판정했다
+   여기는 예전에 스스로 휴지통으로 보냈다(대표 지시 2026-08-06 "특별히 내용이 없으면
+   자동 삭제"). 그런데 「내용이 없다」의 판정이 **기업정보함 기록에 새로 채울 칸이
+   있었나**였다. 그것은 «서류»가 겹쳤는지를 묻는 물음이 **아니다.**
+     · 겹침 열쇠는 명함·서식은 «휴대폰 번호», 사업자등록증은 «사업자번호»다.
+       그래서 **같은 사람이 낸 다른 서식**, **같은 회사의 다른 서류**가 서로 겹친 것이 된다.
+     · 그 사람·그 회사가 기업정보함에 이미 온전히 들어 있으면 새로 채울 칸이 없다 →
+       「더한 것이 없다」 → **사진이 사라진다.** 서류는 아무 잘못이 없다.
+   실측(2026-09-14): 이렇게 사라진 사진이 **179장**이다 —
+   사업자등록증 113 · 명함 65 · 사진 1, 직원 넷 모두에게서. 그중 44장은 **사흘도 아닌
+   몇 달 전 기록**과 겹쳤다는 이유였다. 증빙은 5년 보관인데 그것이 말없이 지워졌다.
+
+   ■ 이제 하는 일
+   **스스로 지우지 않는다.** 겹친다는 것만 알리고, 치우는 것은 사람이 누른다.
+   이 저장소가 이미 같은 결론을 두 번 냈다 — 근로자 겹치는 서류는 «물어보고»
+   (2026-09-03 안 ㉯), 똑같은 사진 정리는 «대표가 누른다»(설정의 🧹).
+   여기만 옛 길로 남아 있었다.
+   ⚠ 되돌릴 수 있으니 괜찮다는 말은 안 통한다 — **사라진 것을 알아채야** 되돌린다.
+     179장 중 되살려진 것은 한 장도 없었다. */
 let dupNotes = [];
 
-function dropRedundant(id, year, res) {
-  /* ⚠ **남의 사진은 치우지 않는다**(2026-08-10). 판독을 남의 사진에도 열었으니,
-     이 줄이 없으면 관리자가 화면을 여는 것만으로 다른 직원의 사진이 말없이
-     휴지통에 들어간다. 그 사람은 왜 없어졌는지 알 길이 없다.
-     기업정보함에는 이미 들어갔고 화면에는 「이미 기업정보함에 있는 명함」이 남으므로,
-     사진을 그냥 두어도 잃는 것은 없다 — 주인이 보고 지우면 된다. */
+function noteRedundant(id, year, res) {
+  /* ⚠ **남의 사진은 건드리지 않는다**(2026-08-10). 관리자가 화면을 여는 것만으로
+     다른 직원의 사진이 없어지면 그 사람은 까닭을 알 길이 없다. 치우는 단추도
+     주인에게만 뜬다 — 기업정보함에는 이미 들어갔으니 그냥 두어도 잃는 것이 없다. */
   if (!isMinePhoto(id)) return Promise.resolve();
-  const why = '중복 — ' + (res.dupAt ? PuDocFile.whenText(res.dupAt) + '에 ' : '') +
-    '기업정보함에 이미 있었음';
-  return PuPhotoStore.deletePhoto(year, id, why).then(function () {
-    gridItems = gridItems.filter(function (x) { return x.id !== id; });
-    if (viewerId === id) closeViewer();
-    dupNotes.push({ id: id, year: year, at: res.dupAt || 0, who: res.dupWho || '', back: false });
+  dupNotes.push({ id: id, year: year, at: res.dupAt || 0, who: res.dupWho || '', gone: false });
+  renderDupBox();
+  renderGridBar();
+  renderGrid();
+  return Promise.resolve();
+}
+
+/* 사람이 「휴지통으로」를 눌렀을 때만 치운다 — 까닭을 함께 적는다. */
+function dropDup(i) {
+  const d = dupNotes[i];
+  if (!d || d.gone) return;
+  const why = '겹침 — ' + (d.at ? PuDocFile.whenText(d.at) + '에 ' : '') +
+    '기업정보함에 이미 있어 사람이 치움';
+  PuPhotoStore.deletePhoto(d.year, d.id, why).then(function () {
+    gridItems = gridItems.filter(function (x) { return x.id !== d.id; });
+    if (viewerId === d.id) closeViewer();
+    d.gone = true;
     renderDupBox();
     renderGridBar();
     renderGrid();
     refreshTrashCount();
   }).catch(function (e) {
-    /* 못 치웠으면 그냥 둔다 — 사진이 남는 것이 사라지는 것보다 낫다. */
-    console.warn('[중복 치우기]', id, e);
+    console.warn('[겹침 치우기]', d.id, e);
+    alert('치우지 못했습니다 — ' + ((e && e.message) || e));
   });
 }
 
@@ -8957,35 +8983,25 @@ function renderDupBox() {
   const el = $('dupBox');
   if (!dupNotes.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'block';
+  /* ⚠ 글월이 **사실 그대로**여야 한다. 예전에는 「휴지통으로 보냈습니다」였는데
+     그때는 정말 보낸 뒤였다. 이제는 «안 보냈다» — 안 한 일을 했다고 적으면
+     사람이 사진을 찾으러 휴지통에 간다. */
   el.innerHTML =
-    '<div class="dh">겹치는 서류 ' + dupNotes.length + '장을 휴지통으로 보냈습니다' +
+    '<div class="dh">📄 겹치는 것이 있는 서류 ' + dupNotes.length + '장 — <b>사진은 그대로 둡니다</b>' +
     '<button class="x" onclick="closeDupBox()">닫기</button></div>' +
     dupNotes.map(function (d, i) {
       const when = d.at ? PuDocFile.whenText(d.at) + '에 저장된 것' : '먼저 저장된 것';
       return '<div class="dr">' +
-        '<span>' + esc(when) + (d.who ? ' (' + esc(d.who) + ')' : '') + '과 같아서 치웠습니다</span>' +
-        (d.back
-          ? '<b>되살렸습니다</b>'
-          : '<button onclick="undoDup(' + i + ')">되살리기</button>') +
+        '<span>' + esc(when) + (d.who ? ' (' + esc(d.who) + ')' : '') +
+        '과 겹칩니다 — 기업정보함에는 이미 들어가 있습니다</span>' +
+        (d.gone
+          ? '<b>휴지통으로 보냈습니다</b>'
+          : '<button onclick="dropDup(' + i + ')">휴지통으로</button>') +
         '</div>';
     }).join('');
 }
 
 function closeDupBox() { dupNotes = []; renderDupBox(); }
-
-/* 「되살리기」 — 자동 판단이 틀렸을 때 사람이 곧바로 되돌린다. */
-function undoDup(i) {
-  const d = dupNotes[i];
-  if (!d || d.back) return;
-  PuPhotoStore.restorePhoto(d.year, d.id).then(function () {
-    d.back = true;
-    renderDupBox();
-    refreshTrashCount();
-    loadGrid();
-  }).catch(function (e) {
-    alert('되살리지 못했습니다: ' + ((e && e.message) || e));
-  });
-}
 
 /* ══════ 업체관리(푸른이알피)로 보내기 ══════
    사업자등록증·중소기업확인서는 기업정보함과 **별도로** 업체관리에도 간다.
