@@ -452,24 +452,31 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .tz-mix{font-size:12px;font-weight:700;color:var(--t2);white-space:nowrap;}
 .tz-dl{font-size:11.5px;font-weight:800;color:var(--danger);white-space:nowrap;}
 .tz-dl.end{color:var(--t2);}
-/* 한 회차 = 한 줄. 칸을 그리드로 갈라 글자 수가 달라도 자리가 안 흔들린다 */
-.tz-row{display:grid;grid-template-columns:44px 1fr 92px 96px 26px;gap:10px;align-items:center;
-  padding:9px 16px;border-bottom:1px solid var(--sf2);cursor:pointer;}
-.tz-row:hover{background:var(--sf2);}
-.tz-row.past{background:#f8fafc;}
-.tz-no{width:38px;height:38px;border-radius:11px;color:#fff;font-family:'JetBrains Mono',monospace;
-  font-size:17px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.tz-date{display:flex;align-items:baseline;gap:7px;min-width:0;}
-.tz-d{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.5px;}
-.tz-w{font-size:14px;font-weight:900;color:var(--t2);}
-.tz-w.we{color:var(--danger);}
-.tz-y{font-size:11px;color:var(--t2);font-weight:700;}
-.tz-hol{font-size:10.5px;font-weight:800;color:var(--danger);white-space:nowrap;}
-.tz-where{font-size:12.5px;font-weight:800;white-space:nowrap;}
-.tz-where.field{color:#1e40af;}
-.tz-where.office{color:var(--t2);}
-.tz-att{min-width:0;display:flex;gap:3px;flex-wrap:nowrap;overflow:hidden;}
-.tz-ph{font-size:14px;text-align:center;}
+/* ★★ 회차는 «가로»로 흐른다 (대표 지시 2026-09-14)
+   「세로로 길게 나오면 날짜가 넘어가면 못 찾는다」 —
+   열두 회차를 세로로 쌓으면 스크롤에 묻힌다. 가로로 흘리면 한 화면에 들어온다. */
+.tz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
+  gap:7px;padding:12px 16px;}
+.tzc{border:1.5px solid var(--border);border-radius:11px;padding:8px 6px 7px;text-align:center;
+  cursor:pointer;background:var(--surface);position:relative;}
+.tzc:hover{border-color:var(--accent);}
+.tzc.past{background:#f8fafc;}
+.tzc.field{border-color:#bfdbfe;}
+/* 회차 번호는 칸 «모서리»에 — 가운데 자리는 날짜가 쓴다 */
+.tzc-no{position:absolute;top:-7px;left:-5px;min-width:21px;height:21px;padding:0 5px;
+  border-radius:8px;color:#fff;font-family:'JetBrains Mono',monospace;font-size:12px;
+  font-weight:900;display:flex;align-items:center;justify-content:center;}
+.tzc-md{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:900;color:var(--text);
+  letter-spacing:-.6px;line-height:1.15;}
+.tzc-w{font-size:13px;font-weight:900;color:var(--t2);line-height:1.2;}
+.tzc-w.we{color:var(--danger);}
+.tzc-p{margin-top:2px;font-size:10.5px;font-weight:800;color:var(--t2);}
+.tzc.field .tzc-p{color:#1e40af;}
+/* 주담당과 «다른» 사람이 간 회차만 이름을 붙인다 — 같으면 머리에 이미 있다 */
+.tzc-a{margin-top:4px;display:inline-block;padding:1px 6px;border-radius:8px;color:#fff;
+  font-size:9.5px;font-weight:800;}
+.tzc-hol{margin-top:2px;font-size:9.5px;font-weight:800;color:var(--danger);}
+.tz-copy{font-size:11px;padding:5px 10px;white-space:nowrap;}
 .tz-next{padding:10px 16px;font-size:12.5px;font-weight:700;color:var(--t2);background:#f8fafc;}
 /* 타임라인 왼쪽 칸이 «눌리는 것»임을 보여 준다 */
 .gantt-info{cursor:pointer;}
@@ -6704,6 +6711,45 @@ function openTlZoom(coId,tid){
   renderTlZoom();
   q('#mbTlZoom').classList.add('open');
 }
+/* 「년월일요일을 복사할 수 있는 기능 — 다른 곳에 붙여넣게」 (대표 지시 2026-09-14)
+   ★ 붙여넣는 곳이 메일·보고서라 «글자»로 만든다. 표가 아니라 줄글이어야
+     어디에 넣어도 모양이 안 깨진다.
+   ⚠ 머리에 사업장·사업 이름을 함께 넣는다 — 날짜만 붙여넣으면 나중에
+     그것이 «무엇의» 날짜였는지 아무도 모른다.                                  */
+function tlZoomCopyText(co,t,done){
+  const head=`${co.name} · ${t.fullName||t.name}`;
+  const lines=done.map(sc=>{
+    const wd=tzDow(sc.date);
+    const place=sc.isField?'현장방문':'사무실';
+    return `${String(sc.round).padStart(2,' ')}회  ${sc.date} (${wd})  ${place}`;
+  });
+  return [head].concat(lines).join('\n');
+}
+/* 클립보드에 담는다.
+   ⚠ navigator.clipboard 는 https 와 «사람이 누른 순간»에만 된다 —
+     막히면 조용히 실패하지 말고 옛 방식으로 한 번 더 해 본다. */
+async function tlZoomCopy(){
+  if(!_tzKey)return;
+  const co=getCos().find(c=>c.id===_tzKey.coId);
+  const t=getTypes().find(x=>x.id===_tzKey.tid);
+  if(!co||!t)return;
+  const done=getScheds().filter(x=>x.coId===co.id&&x.typeId===t.id)
+    .sort((a,b)=>a.date>b.date?1:-1);
+  if(!done.length){ toast('복사할 날짜가 없습니다','err'); return; }
+  const text=tlZoomCopyText(co,t,done);
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    ta.style.position='fixed'; ta.style.left='-9999px';
+    document.body.appendChild(ta); ta.select();
+    let ok=false; try{ ok=document.execCommand('copy'); }catch(e2){}
+    document.body.removeChild(ta);
+    if(!ok){ toast('복사가 막혔습니다 — 화면에서 직접 끌어 복사해 주세요','err'); return; }
+  }
+  toast(`날짜 ${done.length}건을 복사했습니다 — 붙여넣기(Ctrl+V) 하세요`);
+}
 function renderTlZoom(){
   if(!_tzKey)return;
   const co=getCos().find(c=>c.id===_tzKey.coId);
@@ -6741,34 +6787,36 @@ function renderTlZoom(){
     <div class="tz-mix">📍 방문 <b>${fieldN}</b> · 🏢 사무실 <b>${officeN}</b></div>
     ${dl?`<div class="tz-dl">종료일 ${dl}</div>`:''}
     ${ended?`<div class="tz-dl end">종료됨 ${ended}</div>`:''}
+    <button type="button" class="btn btn-s tz-copy" id="tzCopyBtn"
+      title="회차별 년월일과 요일을 글자로 복사합니다 — 메일·보고서에 붙여넣으세요">📋 날짜 복사</button>
   </div>`;
 
   const today=todayStr();
-  q('#tzList').innerHTML=done.length?done.map(sc=>{
+  q('#tzList').innerHTML=done.length?`<div class="tz-grid">`+done.map(sc=>{
     const wd=tzDow(sc.date);
     const hol=typeof getHoliday==='function'?getHoliday(sc.date):'';
     const we=wd==='토'||wd==='일';
-    const scAtt=staff.find(a=>a.id===sc.attId)||staff.find(a=>a.id===co.defAtt);
     const scEnd=endedDateForSchedule(sc);
-    return `<div class="tz-row${sc.date<today?' past':''}" data-sid="${sc.id}">
-      <div class="tz-no" style="background:${scEnd?'var(--t2)':t.color}">${scEnd?'종':sc.round}</div>
-      <div class="tz-date">
-        <span class="tz-d">${sc.date.slice(5).replace('-','. ')}</span>
-        <span class="tz-w${we?' we':''}">${wd}</span>
-        <span class="tz-y">${sc.date.slice(0,4)}</span>
-        ${hol?`<span class="tz-hol">${escAttr(hol)}</span>`:''}
-      </div>
-      <div class="tz-where ${sc.isField?'field':'office'}">${schedulePlaceLabel(sc)}</div>
-      <div class="tz-att"><span class="att-label" style="background:${staffColor(scAtt)}">${escAttr((scAtt||{}).name||'')}</span></div>
-      <div class="tz-ph">${schedHasPhoto(sc.id)?'📷':''}</div>
-    </div>`;}).join(''):
+    /* 주담당과 «다른» 사람이 간 회차만 이름을 붙인다 —
+       같으면 머리에 이미 있고, 칸마다 붙이면 좁은 칸이 이름으로 가득 찬다. */
+    const other=(sc.attId&&sc.attId!==co.defAtt)?staff.find(a=>a.id===sc.attId):null;
+    return `<div class="tzc${sc.date<today?' past':''}${sc.isField?' field':''}" data-sid="${sc.id}"
+      title="${escAttr(sc.date+' ('+wd+') '+schedulePlaceLabel(sc)+(schedHasPhoto(sc.id)?' · 사진':''))}">
+      <div class="tzc-no" style="background:${scEnd?'var(--t2)':t.color}">${scEnd?'종':sc.round}</div>
+      <div class="tzc-md">${sc.date.slice(5).replace('-','.')}</div>
+      <div class="tzc-w${we?' we':''}">${wd}</div>
+      <div class="tzc-p">${sc.isField?'방문':'사무실'}${schedHasPhoto(sc.id)?' 📷':''}</div>
+      ${hol?`<div class="tzc-hol">${escAttr(hol)}</div>`:''}
+      ${other?`<div class="tzc-a" style="background:${staffColor(other)}">${escAttr(other.name)}</div>`:''}
+    </div>`;}).join('')+`</div>`:
     `<div style="padding:30px;text-align:center;color:var(--t2);font-size:13px;">아직 잡힌 일정이 없습니다</div>`;
 
   q('#tzFoot').innerHTML=ended?'':
     `<div class="tz-next">다음 <b>${nextRound(co.id,t.id)}회차</b> — 아직 안 잡혔습니다</div>`;
 
   /* 회차 줄을 누르면 그 일정 고치기로 — 크게 보다가 바로 손댈 수 있어야 한다 */
-  qa('#tzList .tz-row').forEach(r=>{ r.onclick=()=>{ closeModal('mbTlZoom'); openEditModal(r.dataset.sid); }; });
+  qa('#tzList .tzc').forEach(r=>{ r.onclick=()=>{ closeModal('mbTlZoom'); openEditModal(r.dataset.sid); }; });
+  { const b=q('#tzCopyBtn'); if(b)b.onclick=tlZoomCopy; }
 }
 function renderTimeline(){
   const tlAtt=q('#tlAttFilter')?.value||'';
