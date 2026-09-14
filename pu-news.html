@@ -1054,16 +1054,23 @@ function 회차로부터(열쇠){
    ⚠ 합치려 들지 않는다. 기사 두 줄을 기계가 섞으면 어느 쪽 글인지 아무도 모른다. */
 async function 판올리기(열쇠, 본판){
   const ref = db.ref('newsletter/issues/' + 열쇠 + '/판');
-  /* ⚠⚠ 거래는 «찬 자리»에서 null 로 먼저 불린다 — 듣고 있지 않은 자리면 그 값이
-       null 이라 그냥 접힌다(서버에 묻지도 않는다). 그래서 먼저 읽어 데운다.
-       그래도 접혔으면 «진짜로» 남이 고친 것인지 한 번 더 확인하고 다시 해 본다 —
-       안 그러면 아무도 안 건드렸는데 「남이 고쳤습니다」가 뜬다. */
-  for(let 번 = 0; 번 < 2; 번++){
-    await ref.once('value');
+  /* ⚠⚠⚠ 여기서 «접으면» 안 된다 — 2026-09-14 대표 화면으로 드러난 일이다.
+       거래의 첫 부름은 «지금 손안에 있는 값»으로 온다. 그 자리를 듣고 있지 않으면
+       그 값이 null 이고, 거기서 undefined 를 돌려주면 서버에 묻지도 않고 끝난다.
+       앞선 판은 그 자리에서 접었다 — 그래서 판이 0→1 한 번만 오르고 «영영» 막혔다.
+       하루 동안 ㅁ·우리글·목차 어느 것도 저장되지 않았는데 화면은 「다른 관리자가
+       고치고 있습니다」라고만 했다. 아무도 없었다.
+     ★ null 이면 «해 본다». 서버 값이 다르면 파이어베이스가 진짜 값으로 한 번 더
+       부르고, 그때 아래 잣대가 제대로 판단한다 — 그것이 거래를 쓰는 까닭이다.
+     ⚠ 앞에 once('value') 를 붙여 «데우는» 것으로는 못 막는다. 그것도 해 봤고 막혔다.
+       읽고 나서 듣기를 놓는 순간 그 값이 다시 사라진다. */
+  for(let 번 = 0; 번 < 3; 번++){
     const r = await ref.transaction(function(cur){
-      return Number(cur || 0) === 본판 ? 본판 + 1 : undefined;
+      if(cur == null) return 본판 + 1;
+      return Number(cur) === 본판 ? 본판 + 1 : undefined;
     }, undefined, false);
-    if(r.committed) return 본판 + 1;
+    if(r.committed) return Number(r.snapshot.val() || (본판 + 1));
+    /* 접혔다 — 진짜로 남이 고쳤나, 아니면 찬 자리였나를 «읽어서» 가른다 */
     const 지금 = Number((await ref.once('value')).val() || 0);
     if(지금 !== 본판) return 0;   /* 진짜로 남이 먼저 고쳤다 */
   }
@@ -1085,9 +1092,18 @@ async function 회차다시읽기(열쇠){
 async function 회차저장(자료){
   const 새판 = await 판올리기(자료.열쇠, Number(자료.판 || 0));
   if(!새판){
-    await 회차다시읽기(자료.열쇠);
+    const 다시 = await 회차다시읽기(자료.열쇠);
     render();
-    toast('다른 관리자가 먼저 고쳤습니다 — 화면을 새로 읽었습니다. '
+    /* ★★ 「남이 고쳤다」와 「고장이다」를 «가려» 말한다 (2026-09-14).
+         2026-09-13~14 하루 동안 저장이 통째로 막혔는데 화면은 「다른 관리자가
+         고치고 있습니다」라고만 했다 — 아무도 없었다. 혼자 쓰시는 분에게 그 말은
+         「내 탓인가」로 읽히고, 그래서 하루를 잃었다.
+       ⚠ 판이 «그대로»인데 막혔다면 그것은 다툼이 아니라 고장이다. 그렇게 말해야 한다. */
+    const 내판 = Number(자료.판 || 0), 서버판 = Number(다시.판 || 0);
+    toast(서버판 === 내판
+      ? `저장이 막혔습니다 — 남이 고친 것이 «아닙니다»(판 ${내판} 그대로). `
+        + '고장이니 이 말을 그대로 알려 주세요'
+      : `다른 관리자가 먼저 고쳤습니다(판 ${내판}→${서버판}) — 화면을 새로 읽었습니다. `
         + '고치신 것을 다시 넣어 주세요(덮어쓰지 않았습니다)', 14000);
     return false;
   }
@@ -1928,8 +1944,10 @@ function 꼭지모두(키, 켬){
   const 것들 = d.안[키] || [];
   if(!것들.length) return;
   것들.forEach(function(x){ if(켬) delete x.안실음; else x.안실음 = true; });
+  /* ⚠ 회차저장 은 «막혔을 때 false» 를 준다(던지지 않는다). 결과를 안 보면
+       하나도 안 담겼는데 「모두 싣습니다」가 떠 버린다 — 가장 나쁜 거짓말이다. */
   회차저장(d)
-    .then(function(){ render();
+    .then(function(됐나){ render(); if(!됐나) return;
       toast(켬 ? `☑ ${것들.length}건을 모두 싣습니다`
                : `☐ ${것들.length}건을 이번 편지에서 뺐습니다 — 목록에는 그대로 있습니다`, 8000); })
     .catch(e=>toast('바꾸지 못했습니다: ' + ((e&&e.message)||''), 7000));
@@ -2089,7 +2107,10 @@ function 지역후보복구(){
   if(!Object.values(App.지역후보||{}).some(x=>x&&x.상태==='승인처리중')) return Promise.resolve();
   // 후보와 회차를 같은 서버 스냅샷에서 확인한다. PC에 남은 회차는 복구 근거가 아니다.
   const ref=db.ref('newsletter');
-  return ref.once('value').then(function(){ return ref.transaction(function(cur){
+  /* ⚠⚠ 찬 자리면 «방금 읽은 것»을 바탕으로 — 접으면 서버에 묻지도 않고 끝난다 */
+  return ref.once('value').then(function(s){ const 읽은것=s.val();
+    return ref.transaction(function(c){
+    const cur = (c == null) ? 읽은것 : c;
     if(!cur) return;
     const candidates=Object.assign({},cur.regionalCandidates||{}); let changed=false;
     Object.keys(candidates).forEach(function(id){
@@ -2123,9 +2144,11 @@ async function 지역후보승인(id){
   if(!confirm('「'+c.제목+'」을 이번 회차 지역뉴스에 담을까요?')) return;
   try{
     const ref=db.ref('newsletter');
-    await ref.once('value');
+    /* ⚠⚠ 찬 자리면 «방금 읽은 것»을 바탕으로 삼는다 — 거기서 접으면 서버에 묻지도
+         않고 끝난다. 읽어 데우는 것만으로는 못 막는다(2026-09-14 판올리기와 같은 덫). */
+    const 읽은것=(await ref.once('value')).val();
     const r=await ref.transaction(function(cur){
-      return 지역검토.원자승인(cur,id,d,우리말,검토자,시각)||undefined;
+      return 지역검토.원자승인(cur==null?읽은것:cur,id,d,우리말,검토자,시각)||undefined;
     },undefined,false);
     if(!r.committed) return toast('이미 처리됐거나 발송된 회차입니다. 새로고침해 확인해 주세요.',8000);
     const saved=r.snapshot.val();
@@ -2180,10 +2203,13 @@ function 지역뉴스빼기(i){
   if(!사유) return;
   const 검토자=(App.me&&App.me.email)||'';
   const ref=db.ref('newsletter/issues/'+d.열쇠+'/지역뉴스');
-  /* ⚠ 먼저 읽어 데운다 — 안 그러면 찬 자리에서 null 로 불려 그냥 접히고,
-       아무도 안 건드렸는데 「다른 관리자가 먼저 변경했습니다」가 뜬다. */
-  ref.once('value').then(function(){ return ref.transaction(function(cur){
-    const 목록=Array.isArray(cur)?cur.slice():[];
+  /* ⚠⚠ 찬 자리면 «방금 읽은 것»을 바탕으로 삼는다 — 거기서 접으면 서버에 묻지도
+       않고 끝나 영영 막힌다(2026-09-14 판올리기가 그래서 하루를 먹었다).
+       읽어 «데우는» 것만으로는 못 막는다 — 듣기를 놓는 순간 그 값이 다시 사라진다.
+       바탕이 서버와 다르면 파이어베이스가 진짜 값으로 한 번 더 부른다. */
+  ref.once('value').then(function(s){ const 읽은것=s.val();
+    return ref.transaction(function(cur){
+    const 목록=Array.isArray(cur==null?읽은것:cur)?(cur==null?읽은것:cur).slice():[];
     const 지금=목록[i];
     /* 옛 자료는 id가 없으므로 같은 배열 자리와 주요 원문 정보까지 견준다. */
     if(!지금||지금.상태==='철회'||String(지금.id||지금.링크||'')!==String(x.id||x.링크||'')) return;
