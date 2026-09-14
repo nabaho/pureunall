@@ -570,6 +570,23 @@
     return String(x.기관 || x.언론사 || x.인용 || '').replace(/\s+/g, ' ').trim();
   }
 
+  /* ★★ 곁말을 «안 끊기는 덩이»로 나눈다 (대표 지시 2026-09-14
+       「판례나 첨부 참조등은 깔끔하게 위치등을 정렬해라」)
+     ⚠ 전에는 곁말이 문장 «뒤에 붙어» 흘렀다. 줄 끝에 남은 자리가 좁으면 거기서
+       끊겨 「매일노 / 동뉴스」, 「대법원 2018다296229 (20 / 24. 12. 10.)」처럼
+       한 이름과 한 날짜가 두 동강 났다. 좌우 두 칸이라 자리가 더 좁다.
+     ★ 덩이 «사이»에서만 끊기게 한다 — 대법원 / 2018다296229 / (2026. 5. 21.)
+       괄호 안 날짜는 빈칸이 있어도 한 덩이다. */
+  function _곁덩이(s) {
+    var t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    var 표 = '';
+    t = t.replace(/\([^)]*\)/g, function (m) { return m.replace(/ /g, 표); });
+    return t.split(' ').map(function (w) {
+      return '<span style="white-space:nowrap;">' + esc(w.split(표).join(' ')) + '</span>';
+    }).join(' ');
+  }
+
   /* ★★ 줄«마다» 제 건으로 간다 (대표 지시 2026-09-12
        「각각의 건에 대해 클릭하면 팝업으로 … 몇건 자세히보기 이렇게 안본다」).
      ⚠ 예전에는 꼭지 끝에 「N건 자세히 보기」 하나였다. 대표께서 그렇게는 안 보신다고
@@ -612,14 +629,22 @@
         + 'font-size:14px;line-height:1.7;color:' + 색.딱지 + ';font-family:' + 폰트 + ';">·</td>'
         + '<td style="padding:5px 0 5px 6px;font-size:14px;line-height:1.7;color:' + 색.글 + ';'
         + 'font-family:' + 폰트 + ';word-break:keep-all;">' + 속
-        /* ⚠⚠ 표시는 «표시»일 뿐, 링크로 만들지 않는다. 한 줄에 링크가 둘이면
+        /* ★★ 곁말은 «제 줄»로 내린다 (대표 지시 2026-09-14 「깔끔하게 … 정렬해라」).
+             문장 뒤에 붙여 흘리면 줄마다 끝나는 자리가 달라 곁말이 여기저기 흩어지고,
+             남은 자리가 좁으면 이름과 날짜가 두 동강 난다. 제 줄로 내리면 줄마다
+             «같은 자리»에서 시작해 눈이 한 줄로 훑는다.
+           ⚠⚠ 표시는 «표시»일 뿐, 링크로 만들지 않는다. 한 줄에 링크가 둘이면
              어느 것을 눌렀는지도, 어디로 가는지도 흐려지고 추적이 한 건을 두 번 센다.
              가는 곳은 여전히 그 건의 «자세히 보기» 하나다 — 거기에 진짜 단추가 있다.
            ⚠ 진짜 단추는 「내려받기 ↓」, 이 표시는 「⬇ 내려받기」 — 생김새로 갈라 둔다. */
-        + (r.받기 ? ' <span style="color:' + 색.갈 + ';font-size:11px;font-weight:bold;'
-            + 'white-space:nowrap;">⬇ 내려받기</span>' : '')
-        + (r.곁 ? ' <span style="color:' + 색.흐린글 + ';font-size:12px;">· '
-            + esc(r.곁) + '</span>' : '')
+        + ((r.곁 || r.받기)
+            ? '<div style="margin-top:1px;font-size:12px;line-height:1.5;color:'
+              + 색.흐린글 + ';font-family:' + 폰트 + ';">'
+              + (r.곁 ? _곁덩이(r.곁) : '')
+              + (r.받기 ? (r.곁 ? ' · ' : '') + '<span style="color:' + 색.갈
+                  + ';font-weight:bold;white-space:nowrap;">⬇ 내려받기</span>' : '')
+              + '</div>'
+            : '')
         + '</td></tr>';
     }).join('');
 
