@@ -688,11 +688,14 @@ ok('등기임원 명부가 생년월일·소속 회사·직책·주민등록번�
   && src.includes("class=\"off-title\"") && src.includes("class=\"off-addr\"")
   && /\['birth','company','title','rrn','addr'\]\.forEach/.test(src));
 /* 반복 줄(근로자측 3줄·사용자측 3줄)은 «라벨 다음 칸» 방식으로 못 채운다 */
-ok('위원 격자를 따로 채운다', src.includes('function fillCommittee(root,f){')
+/* 2026-09-14: 참여사업장의 사용자대표·근로자대표도 위원이라 sites 를 함께 받는다 */
+ok('위원 격자를 따로 채운다', src.includes('function fillCommittee(root,f,sites){')
   && src.includes("['근로자측','사용자측'].forEach"));
+ok('위원 명단이 참여사업장도 본다', /fillCommittee\(d,f,sites\);/.test(src)
+  && src.includes('function _siteCommittee(sites,side){'));
 /* 위원 격자를 «먼저» 채우고 표를 남겨야, 뒤이은 라벨 채우기가 덮어쓰지 않는다.
    「생년월일」·「직책」 라벨이 대표자란에도 있어서 실제로 덮어썼다. */
-ok('위원 격자를 먼저 채우고 표를 남긴다', /stripBaked\(d\);[\s\S]{0,200}?fillCommittee\(d,f\);/.test(src)
+ok('위원 격자를 먼저 채우고 표를 남긴다', /stripBaked\(d\);[\s\S]{0,200}?fillCommittee\(d,f,sites\);/.test(src)
   && src.includes("tr.setAttribute('data-cm','1');")
   && src.includes("if(tr.getAttribute('data-cm')) return;"));
 {
@@ -805,7 +808,7 @@ ok('한 글줄짜리 라벨도 채운다', src.includes("el.textContent=m[1]+' :
 ok('남의 값을 걷어낸다', src.includes('function stripBaked(root){')
   && src.includes('function _bakeText(s){') && src.includes('stripBaked(d);'));
 // 걷어내기가 «가장 먼저» 돌아야, 걷어낸 자리가 곧 채울 자리가 된다
-ok('걷어낸 뒤에 채운다', /stripBaked\(d\);[\s\S]{0,200}?fillCommittee\(d,f\);/.test(src));
+ok('걷어낸 뒤에 채운다', /stripBaked\(d\);[\s\S]{0,200}?fillCommittee\(d,f,sites\);/.test(src));
 /* ⚠ 다 지우면 서식이 망가진다 — 이것들은 «서식의 일부»다 */
 ok('법령 개정일은 남긴다', src.includes("return /개정|시행|신설|제정|전문개정/.test(pre) ? m : pre+BAKE_BLANK;"));
 /* 구간(미만·이상)은 «윗줄», 금액은 «아랫줄»에 따로 있는 요율표가 있다 —

@@ -36,10 +36,12 @@ function 상자() {
     'function esc(s){ return String(s==null?"":s); }',
     'function _officersOf(f){ return (f&&f.officers)||[]; }',
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
-    grabFn('_isCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
+    grabFn('_siteWrep'), grabFn('_siteUrep'),
+    grabFn('_isCommittee'), grabFn('_siteCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
     grabFn('_cmAnnexNeeded'), grabFn('_cmSeeAnnex'), grabFn('committeeAnnexHTML'),
     'this.prep=_prepCommittee; this.over=_cmOver; this.need=_cmAnnexNeeded;',
-    'this.see=_cmSeeAnnex; this.annex=committeeAnnexHTML; this.ROWS=COMMITTEE_ROWS;'
+    'this.see=_cmSeeAnnex; this.annex=committeeAnnexHTML; this.ROWS=COMMITTEE_ROWS;',
+    'this.fromSites=_siteCommittee; this.urep=_siteUrep;'
   ].join('\n')).call(box);
   return box;
 }
@@ -86,6 +88,80 @@ test('★ ③ 넘치는지 아는 길이 하나다', () => {
   assert.equal(b.need({}), false, '★ 명부가 없는데 별지를 붙입니다.');
 });
 
+/* ══ ①-2 참여사업장의 대표가 그대로 위원이다 (대표 지시 2026-09-14) ══════
+   「사용자대표와 근로자 대표를 입력하면 자동으로 서류작성에서 이 사람들의 이름이
+    자동으로 동기화되게 해라」
+   ★ 종전에는 등기임원명부에만 있는 사람이 위원이었다 — 사업장마다 대표를 적어 두고도
+     명부에 «또» 옮겨 적어야 서식에 나왔다(열여섯 곳이면 서른두 번이다). */
+
+const 사업장들 = [
+  { name: '가나산업', ceo: '홍길동', urep_name: '사용자가', urep_title: '상무',
+    wrep_name: '근로자가', wrep_title: '대리', wrep_birth: '1980-01-01' },
+  { name: '다라전자', ceo: '김철수', urep_same: true, urep_title: '대표이사',
+    wrep_name: '근로자나', wrep_title: '과장' },
+  { name: '마바디자인', ceo: '이영희', wrep_name: '', urep_name: '' },       /* 안 적은 곳 */
+  { name: '나간회사', ceo: '박대표', status: 'closed', urep_name: '나간사람', wrep_name: '나간노측' }
+];
+
+test('★★ ①-2 사업장에 적은 사용자대표·근로자대표가 그대로 위원이 된다', () => {
+  const b = 상자();
+  const u = b.prep({}, '사용자측', 사업장들).map((o) => o.name);
+  const w = b.prep({}, '근로자측', 사업장들).map((o) => o.name);
+  assert.deepEqual(u, ['사용자가', '김철수'],
+    '★ 사업장 대표가 서식에 안 들어갑니다 — 명부에 또 옮겨 적어야 합니다.');
+  assert.deepEqual(w, ['근로자가', '근로자나']);
+  /* 「대표자와 같음」을 켜 둔 곳은 대표자 이름이 들어간다 */
+  assert.equal(b.urep(사업장들[1]).name, '김철수', '★ 대표자와 같음이 안 따라갑니다.');
+});
+
+test('★★ ①-3 안 적은 곳·나간 곳은 «세지 않는다» — 빈 위원이 생기면 명수가 틀린다', () => {
+  const b = 상자();
+  assert.ok(!b.prep({}, '사용자측', 사업장들).some((o) => !o.name), '★ 이름 없는 위원이 생겼습니다.');
+  assert.ok(!b.prep({}, '사용자측', 사업장들).some((o) => o.name === '나간사람'),
+    '★ 탈퇴한 사업장 사람이 위원으로 들어갑니다.');
+  assert.ok(!b.prep({}, '근로자측', 사업장들).some((o) => o.name === '나간노측'));
+  assert.equal(b.fromSites(null, '사용자측').length, 0, '★ 사업장이 없으면 터집니다.');
+  /* ⚠ 「_prepCommittee 가 어차피 거른다」에 기대지 않는다 — _siteCommittee 자체가
+     빈 사람을 내놓으면, 이것을 따로 쓰는 다음 자리에서 빈 줄이 생긴다. */
+  assert.ok(!b.fromSites(사업장들, '사용자측').some((o) => !o.name),
+    '★ 이름 없는 사람을 내놓습니다.');
+  assert.equal(b.fromSites(사업장들, '사용자측').length, 2);
+  assert.equal(b.fromSites(사업장들, '근로자측').length, 2);
+});
+
+test('★★ ①-4 명부와 사업장에 «다 있는» 사람은 한 번만 센다 — 두 줄이면 명수가 부푼다', () => {
+  const b = 상자();
+  const f = { officers: [{ role: '근로자측 이사', name: '근로자가', title: '대리' },
+    { role: '근로자측 이사', name: '따로적은이', title: '차장' }] };
+  const w = b.prep(f, '근로자측', 사업장들).map((o) => o.name);
+  assert.deepEqual(w, ['근로자가', '따로적은이', '근로자나'],
+    '★ 같은 사람이 두 번 셉니다 — 「이사 선임 : 각 ○ 명」이 틀린 채로 나갑니다.');
+  /* 빈칸이 섞인 이름도 같은 사람으로 본다 */
+  assert.equal(b.prep({ officers: [{ role: '근로자측 이사', name: '근로 자가' }] },
+    '근로자측', 사업장들).length, 2, '★ 빈칸 하나로 같은 사람이 둘이 됩니다.');
+});
+
+test('★★ ①-5 별지에 «어느 사업장 사람»인지 적는다 — 예순 명이면 소속 없이는 못 가린다', () => {
+  const ax = 상자().annex({ name: 'x' }, 사업장들);
+  assert.ok(ax.indexOf('가나산업') >= 0 && ax.indexOf('다라전자') >= 0, '★ 소속이 빠졌습니다.');
+  assert.match(ax, /근로자측 2명 · 사용자측 2명/, '★ 명수가 틀립니다.');
+});
+
+test('★★ ①-6 서식을 채우는 자리가 «모두» 사업장을 함께 본다 — 한 곳만 빠져도 그 서식만 비뚤어진다', () => {
+  const 코드 = 코드만(SRC);
+  const 남은 = (코드.match(/_prepCommittee\(f,[^,)]+\)/g) || [])
+    .concat(코드.match(/_cmAnnexNeeded\(f\)/g) || [])
+    .concat(코드.match(/_cmSeeAnnex\(f,side\)/g) || [])
+    .concat(코드.match(/committeeAnnexHTML\(f\)/g) || []);
+  assert.deepEqual(남은, [],
+    '★ 사업장을 안 넘기는 자리가 남았습니다: ' + 남은.join(' · '));
+  /* ⚠ «빈 것을 넘기는» 것도 안 넘기는 것과 같다 — 원본 .hwp 길만 사업장을 못 보면
+     초안에는 사업장 대표가 들어가고 정작 제출본에는 안 들어간다. */
+  assert.match(코드, /fillCommittee\(d,f,sites\);/, '★ 원본 .hwp 길이 사업장을 못 봅니다.');
+  assert.ok(!/fillCommittee\(d,f,\[\]\)/.test(코드), '★ 빈 목록을 넘깁니다.');
+  assert.ok(!/_prepCommittee\(f,side,\[\]\)/.test(코드), '★ 세는 자리가 빈 목록을 넘깁니다.');
+});
+
 /* ══ ② 별지 ══════════════════════════════════════════════════════ */
 
 test('★★ ④ 별지에 «한 사람도 빠짐없이» 나온다 — 여기가 진짜 명단이다', () => {
@@ -130,10 +206,11 @@ function 격자채우기(f) {
     'function esc(s){ return String(s==null?"":s); }',
     'function _officersOf(x){ return (x&&x.officers)||[]; }',
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
-    grabFn('_isCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
+    grabFn('_siteWrep'), grabFn('_siteUrep'),
+    grabFn('_isCommittee'), grabFn('_siteCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
     grabFn('_cmAnnexNeeded'), grabFn('_cmSeeAnnex'), grabFn('committeeAnnexHTML'),
     grabFn('fillCommittee'),
-    'fillCommittee(root,f);'
+    'fillCommittee(root,f,(f&&f._sites)||[]);'
   ].join('\n')).call(box, doc, root, f);
   return { root, 줄들: [].slice.call(root.querySelectorAll('tr')) };
 }
@@ -176,7 +253,7 @@ test('★★ ⑥-2 격자에 «들어가는» 수면 종전처럼 이름을 그�
 
 test('★★ ⑦ 별지를 «뒷장»에 붙인다 — 앞장 꼬리에 붙으면 별지가 아니다', () => {
   const fn = 코드만(grabFn('fillCommittee'));
-  assert.match(fn, /if\(_cmAnnexNeeded\(f\)\)\{/, '★ 원본 서식 길에 별지가 안 붙습니다.');
+  assert.match(fn, /if\(_cmAnnexNeeded\(f,sites\)\)\{/, '★ 원본 서식 길에 별지가 안 붙습니다.');
   assert.match(fn, /setAttribute\('data-newpage','1'\)/, '★ 새 장에서 시작하지 않습니다.');
   assert.match(fn, /setAttribute\('data-kept','1'\)/,
     '★ 걷어내기가 별지를 도로 지울 수 있습니다.');
@@ -196,28 +273,22 @@ test('★★ ⑨ 초안(자동생성본)도 같게 — 첨부서류에 별지를
   const fn = 코드만(grabFn('docBody'));
   assert.match(fn, /5\. 설립준비위원회 위원 명단 1부\(별지\)/,
     '★ 첨부서류에 안 적습니다 — 붙여 놓고 말하지 않으면 빠뜨립니다.');
-  assert.match(fn, /<div data-newpage='1'>"\+committeeAnnexHTML\(f\)/, '★ 초안에 별지가 안 붙습니다.');
+  assert.match(fn, /<div data-newpage='1'>"\+committeeAnnexHTML\(f,sites\)/, '★ 초안에 별지가 안 붙습니다.');
   /* 안 넘치면 별지도 첨부서류 줄도 없다 */
-  assert.match(fn, /_cmAnnexNeeded\(f\)\?"<br>5\./, '★ 두 명뿐인 기금에도 별지를 적습니다.');
+  assert.match(fn, /_cmAnnexNeeded\(f,sites\)\?"<br>5\./, '★ 두 명뿐인 기금에도 별지를 적습니다.');
 });
 
 test('★★ ⑩ 회의록은 이름 대신 «명수»를 적는다 — 예순 명을 한 줄로 늘어놓을 수 없다', () => {
   const fn = 코드만(grabFn('docBody'));
   assert.match(fn, /L\.length>COMMITTEE_ROWS/, '★ 회의록이 넘침을 안 봅니다.');
-  assert.match(fn, /L\.length\+'명\('\+esc\(_cmSeeAnnex\(f,side\)\)\+'\)'/,
+  assert.match(fn, /L\.length\+'명\('\+esc\(_cmSeeAnnex\(f,side,sites\)\)\+'\)'/,
     '★ 회의록에 이름 예순 개가 한 줄로 들어갑니다.');
 });
 
 test('★★ ⑪ 「이사 선임 : 각 ○ 명」이 진짜 명수로 찍힌다 — 늘 3이었다', () => {
-  const box = {};
-  new Function([
-    'function _officersOf(f){ return (f&&f.officers)||[]; }',
-    grabFn('_isCommittee'), grabFn('_prepCommittee'),
-    'this.n=function(f,side){ return _prepCommittee(f,side).length; };'
-  ].join('\n')).call(box);
-  assert.equal(box.n(많은기금, '근로자측'), 62,
+  assert.equal(상자().prep(많은기금, '근로자측').length, 62,
     '★ 회의록의 「각 ○ 명」이 또 3으로 찍힙니다.');
-  /* 세는 자리가 _prepCommittee 를 쓰는지 */
+  /* 세는 자리가 _prepCommittee 를 쓰는지 — 참여사업장까지 함께 세야 한다 */
   const fill = 코드만(SRC.slice(SRC.indexOf('var nSide=function(side)'), SRC.indexOf('var nSide=function(side)') + 260));
-  assert.match(fill, /_prepCommittee\(f,side\)\.length/, '★ 다른 곳에서 따로 셉니다.');
+  assert.match(fill, /_prepCommittee\(f,side,sites\)\.length/, '★ 다른 곳에서 따로 셉니다.');
 });

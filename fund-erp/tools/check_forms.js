@@ -49,7 +49,9 @@ global.funds = {};
   /* hwpFormHTML 이 끝에서 fillDerived 를, 설립 출연확인서에서 fillFoundContribDoc 를 부른다(2026-09-07).
      여기 없으면 「fillDerived is not defined」로 이 검사가 통째로 죽는다 — 서식이 안 채워지는 게 아니라
      하네스가 낡은 것인데 그렇게 읽힌다. */
-  gV('_K'), gF('_siteWrep'), gF('_isCommittee'), gF('_prepCommittee'),
+  gV('_K'), gF('_siteWrep'), gF('_isCommittee'),
+ /* 2026-09-14: 참여사업장의 사용자대표·근로자대표도 위원이다 — 그 길도 실어야 채움이 돈다 */
+ gF('_siteUrep'), gF('_siteCommittee'), gF('_prepCommittee'),
  /* 2026-09-14: 위원이 격자(세 줄)보다 많으면 이름을 별지로 뺀다 — 그 길도 실어야 채움이 돈다.
     ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
  (/var COMMITTEE_ROWS=\d+;/.exec(src) || [''])[0],
