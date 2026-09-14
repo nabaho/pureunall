@@ -75,7 +75,10 @@ function Book(names) {
 global.num = (v) => (v == null || v === '' ? '' : Math.round(Number(String(v).replace(/[^0-9.-]/g, '')) || 0));
 global.S = { year: 2026 };
 /* 설립 엑셀의 출연금액(F13)도 «한 줄기»(foundContrib)에서 온다 — 2026-09-10 */
-['estabSites', 'siteContribOf', 'foundContribOf', 'foundContrib',
+/* 2026-09-14: 설립·신청 엑셀이 「대표회사·사무국」을 repOrg 하나에서 가져간다
+   (명부의 ★ 대표사업장 → 손으로 적은 칸) — 그 길도 실어야 채움이 돈다 */
+['isRegionFund', '_leadSite', 'repOrg',
+ 'estabSites', 'siteContribOf', 'foundContribOf', 'foundContrib',
  'setC', 'clearRange', 'fillSetup', '_officersOf', '_prepCommittee',
  '_xlsColN', '_xlsPlain', '_xlsRef', '_xlsVlookup', '_xlsJoin', '_xlsRecalc',
  '_xlsPx', '_xlsHTML'].forEach((n) => (0, eval)(gF(n)));

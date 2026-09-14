@@ -212,10 +212,28 @@ test('★★ ⑬-3 고칠 수 있는 «칸»으로 보이지 않는다 — 셈�
   assert.match(fn, /사업장 소재지에서 셈/, '어디서 온 값인지 말해 주지 않습니다.');
 });
 
+/* 사업장을 어디서 찾는지는 2026-09-14 에 _fundSites 하나로 모았다 — 참여 지자체와
+   대표사업장 안내가 «같은 자리»를 봐야 한다. 글자로 훑지 말고 네 경우를 돌려서 본다. */
+function 찾기(S, allSites) {
+  const box = {}, 부른것 = [];
+  new Function('S', 'ALL', 'CALLED', [
+    'var _allSites=ALL;',
+    'function loadAllSites(){ CALLED.push(1); }',
+    'var setTimeout=function(f){ f(); };',
+    grabFn('_fundSites'), 'this.f=_fundSites;'
+  ].join('\n')).call(box, S, allSites, 부른것);
+  return { 결과: box.f(S.fundId), 부른것 };
+}
+
 test('★★ ⑭ 참여사업장을 «아직 안 읽었을 때» 0곳이라 하지 않는다 — 모르는 것과 없는 것은 다르다', () => {
-  const fn = grabFn('govField');
-  assert.match(fn, /S\.sitesFor===S\.fundId && S\.sites/, '읽었는지를 안 봅니다.');
-  assert.match(fn, /읽는 중/, '★ 안 읽었는데 「없다」고 말합니다.');
+  /* 아직 안 읽음 → null(모른다). 「0곳」이 아니다 */
+  const 모름 = 찾기({ fundId: 'F1', sitesFor: null, sites: null }, null);
+  assert.equal(모름.결과, null, '★ 안 읽었는데 「없다(0곳)」고 합니다.');
+  assert.equal(모름.부른것.length, 1, '★ 읽어 오지도 않습니다 — 영영 「읽는 중」입니다.');
+  /* 다 읽었는데 이 기금 것이 없다 → 정말로 0곳 */
+  assert.deepEqual(찾기({ fundId: 'F1', sitesFor: null, sites: null }, { F2: {} }).결과, [],
+    '★ 다 읽고도 「모른다」고 합니다.');
+  assert.match(grabFn('govField'), /참여사업장을 읽는 중/, '★ 안 읽었는데 「없다」고 말합니다.');
 });
 
 /* ★★ 2026-09-13 — 「참여사업장이 왜 안나오나?」
@@ -223,11 +241,18 @@ test('★★ ⑭ 참여사업장을 «아직 안 읽었을 때» 0곳이라 하�
    「[참여사업장] 탭을 한 번 열면 여기 섭니다」라고 말했다 — 읽어 둔 것을 안 쓰면서
    사람에게 한 번 더 누르라고 한 셈이다. */
 test('★★ ⑭-2 이미 읽어 둔 전체 사업장을 «쓴다» — 탭을 또 열라고 하지 않는다', () => {
-  const fn = grabCode('govField');
-  assert.match(fn, /_allSites\[S\.fundId\]/,
+  /* 탭을 한 번도 안 열었어도(S.sites 없음) 목록이 읽어 둔 것에서 나와야 한다 */
+  const r = 찾기({ fundId: 'F1', sitesFor: null, sites: null },
+    { F1: { s1: { name: '가나' }, s2: { name: '다라' } } });
+  assert.deepEqual(r.결과.map((x) => x.name), ['가나', '다라'],
     '★ 목록이 읽어 둔 것을 안 씁니다 — 사람에게 탭을 한 번 더 누르라고 합니다.');
-  assert.ok(fn.indexOf('탭을 한 번 열면') < 0, '★ 아직 탭을 열라고 말합니다.');
-  assert.match(fn, /setTimeout\(loadAllSites/, '아직 안 읽었으면 읽어 오지 않습니다.');
+  assert.equal(r.부른것.length, 0, '★ 이미 있는데 또 읽으러 갑니다.');
+  /* 탭을 열어 둔 것이 있으면 «그쪽»이 이긴다 — 가장 새것이다 */
+  assert.deepEqual(찾기({ fundId: 'F1', sitesFor: 'F1', sites: { s9: { name: '새로넣은곳' } } },
+    { F1: { s1: { name: '가나' } } }).결과.map((x) => x.name), ['새로넣은곳'],
+    '★ 방금 넣은 사업장이 안 보입니다 — 옛 값을 씁니다.');
+  assert.ok(grabCode('govField').indexOf('탭을 한 번 열면') < 0, '★ 아직 탭을 열라고 말합니다.');
+  assert.match(grabCode('govField'), /_fundSites\(S\.fundId\)/, '★ 같은 자리를 안 봅니다.');
 });
 
 test('★★ ⑭-3 읽고 나서 «보고 있는 쪽»을 다시 그린다 — 한쪽만 그리면 다른 쪽이 멈춘다', () => {

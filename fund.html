@@ -3784,7 +3784,7 @@ function charterGong(f,sites){
 // 표준 정관 — 사내근로복지기금(F사내 인가본 기준, 5장 37조)
 function charterSane(f,sites){
   var fn=esc(f.name||''), addr=dgV(f.address,18), ch=dgV(f.chairman);
-  var co=dgV(f.rep_org||f.company,10);
+  var co=dgV(repOrg(f,sites)||f.company,10);
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:f.chairman||''}];
   var P=[];
   P.push("<h1>"+fn+" 정관</h1>");
@@ -5458,7 +5458,7 @@ function docBody(kind,f,sites){
       +"<h2>첨부서류</h2><p>1. 정관 1부<br>2. 설립준비위원 재직증명 등 1부<br>3. 출연확인서 또는 재산목록 1부<br>4. 사업계획서 및 예산서 1부</p>";
   }
   if(kind==='contrib'){
-    var target=(ftype==='공동'&&sites.length)?sites:[{name:f.rep_org||'',ceo:'',biz_no:'',address:''}];
+    var target=(ftype==='공동'&&sites.length)?sites:[{name:repOrg(f,sites),ceo:'',biz_no:'',address:''}];
     return note+target.map(function(s){
       return "<h1>기금출연확인서</h1><table>"
         +"<tr><th style='width:130px'>출연 사업장</th><td>"+dgV(s.name,14)+"</td></tr>"
@@ -5510,7 +5510,7 @@ function docBody(kind,f,sites){
       +"<tr><th>법인등록번호</th><td>"+dgV(f.corp_reg_no,14)+"</td></tr>"
       +"<tr><th>고유번호</th><td>"+dgV(f.tax_id_no,12)+"</td></tr>"
       +"<tr><th>소재지</th><td>"+dgV(f.address,20)+"</td></tr>"
-      +"<tr><th>사무국(대표회사)</th><td>"+dgV(f.rep_org,12)+"</td></tr>"
+      +"<tr><th>사무국(대표회사)</th><td>"+dgV(repOrg(f,sites),12)+"</td></tr>"
       +"<tr><th>지원 사업연도</th><td>"+S.year+"년</td></tr></table>"
       +"<h2>신청 규모 (자동 집계)</h2><table>"
       +"<tr><th>참여사업장 수</th><td>"+sites.length+"개소</td></tr>"
@@ -6304,7 +6304,7 @@ function fillSetup(wb,f,sites){
      원본 .hwp 를 채우는 길(fillCommittee)은 처음부터 명부를 보고 있었다. 한 곳으로 모은다. */
   var wk=_prepCommittee(f,'근로자측').map(function(o){return o.name;});
   var er=_prepCommittee(f,'사용자측').map(function(o){return o.name;});
-  var repSite=f.rep_org||(sites[0]&&sites[0].name)||'';
+  var repSite=repOrg(f,sites)||(sites[0]&&sites[0].name)||'';
   setC(ws,'B3',repSite); setC(ws,'C3',f.name||''); setC(ws,'D3',f.chairman||''); setC(ws,'E3',f.address||'');
   setC(ws,'F3',f.inka_date||''); setC(ws,'G3',f.worker_rep||wk[0]||''); setC(ws,'H3',wk[0]||''); setC(ws,'I3',er[0]||'');
   setC(ws,'J3',f.phone||''); ['K3','L3','M3','N3'].forEach(function(a){setC(ws,a,'');});
@@ -6391,7 +6391,7 @@ function fillSubsidy(wb,f,sites){
   setC(info,'A2',1); setC(info,'B2',f.name||''); setC(info,'C2',f.chairman||''); setC(info,'D2',f.address||'');
   setC(info,'E2',f.phone||''); setC(info,'F2',f.inka_no||''); setC(info,'G2',f.corp_reg_no||''); setC(info,'H2',f.tax_id_no||'');
   setC(info,'I2',f.reg_date||f.inka_date||''); setC(info,'J2',sites.length||''); setC(info,'K2',workerTotal);
-  setC(info,'L2',contribution); setC(info,'N2',applyAmt); setC(info,'S2',f.rep_org||''); setC(info,'T2',sub.author||f.manager||'');
+  setC(info,'L2',contribution); setC(info,'N2',applyAmt); setC(info,'S2',repOrg(f,sites)); setC(info,'T2',sub.author||f.manager||'');
   ['P2','Q2','R2'].forEach(function(a){setC(info,a,'');});
   clearRange(info,3,8,2,20);   // 다른 기금 샘플행 B~T
   var parts=wb.getWorksheet('참여사업장정보'); if(parts){
@@ -6733,7 +6733,17 @@ function infoForm(f){
     /* ★ 참여 지자체를 「지역」 «바로 옆»에 둔다(대표 지시 2026-09-13 「지역 옆에 넣어라 하나씩」).
          맨 아래 따로 두었더니 화면을 끝까지 내려야 보였다 — 지역과 나란히 있어야
          「충남의 어느 시·군이 함께 들어왔나」가 한눈에 읽힌다. */
-    return '<div class="fld'+(c[0]==='address'?' full':'')+(INFO_W2[c[0]]?' w2':'')+'"><label>'+c[1]+'</label>'+inp+'</div>'
+    /* ★ 「대표회사·사무국」 — 명부에서 ★ 로 지정했으면 그것이 서식에 들어간다(2026-09-14).
+         배관 양 끝을 보이게 한다: 이 칸에 다른 상호를 적어 두고 왜 서식에는 딴 이름이
+         나오는지 몰라 헤매는 일이 없도록, 무엇이 들어가는지 여기서 말한다. */
+    var 덧말='';
+    if(c[0]==='rep_org' && isRegionFund(f)){
+      var _ss=_fundSites(S.fundId), _ld=_ss?_leadSite(_ss.filter(function(x){ return x&&x.status!=='closed'; })):null;
+      if(_ld&&_ld.name) 덧말='<div class="muted" style="font-size:10.5px;margin-top:3px">명부에서 <b>★ '+esc(_ld.name)+'</b> 를 대표사업장으로 지정했습니다 — 서식에는 이 이름이 들어갑니다'
+        +(String(v||'').trim()&&String(v).trim()!==_ld.name?' <b style="color:var(--warn)">(이 칸은 쓰이지 않습니다)</b>':'')+'</div>';
+      else if(_ss) 덧말='<div class="muted" style="font-size:10.5px;margin-top:3px">참여사업장 명부에서 <b>☆</b> 를 눌러 대표사업장을 지정하면 이 칸 대신 그 상호가 서식에 들어갑니다</div>';
+    }
+    return '<div class="fld'+(c[0]==='address'?' full':'')+(INFO_W2[c[0]]?' w2':'')+'"><label>'+c[1]+'</label>'+inp+덧말+'</div>'
       +(c[0]==='region'?govField(f):'');
   };
   /* ★ 저장을 «맨 위»로 (대표 지시 2026-09-13 「저장버튼도 상단에 두고」) —
@@ -6799,12 +6809,8 @@ function govField(f){
        ② _allSites — 목록 때문에 «이미 전부» 읽어 둔 것.
      ②가 있는데도 ①만 보느라 「탭을 한 번 열면 여기 섭니다」라고 말하고 있었다.
      읽어 둔 것을 안 쓰면서 사람에게 한 번 더 누르라고 한 셈이다. */
-  var arr=null;
-  if(S.sitesFor===S.fundId && S.sites) arr=Object.keys(S.sites).map(function(k){ return S.sites[k]; });
-  else if(_allSites && _allSites[S.fundId]) { var m=_allSites[S.fundId];
-    arr=Object.keys(m).map(function(k){ return m[k]; }); }
-  else if(_allSites) arr=[];                 /* 다 읽었는데 이 기금 것이 없다 = 사업장이 없다 */
-  else setTimeout(loadAllSites,0);           /* 아직 안 읽었으면 읽어 오고 다시 그린다 */
+  /* 그 찾는 일은 _fundSites 하나로 모았다 — 대표사업장 안내도 같은 자리를 본다 */
+  var arr=_fundSites(S.fundId);
   var 몸 = arr ? govChips(arr)
     : '<span class="muted" style="font-size:11.5px">참여사업장을 읽는 중…</span>';
   /* ⚠ 칸(input)이 «아니다» — 손으로 적는 자리가 아니라 참여사업장에서 셈한 것이다.
@@ -8959,6 +8965,8 @@ function sitesTab(){
        「3개사·지자체 1」로 바뀌었다. 우리 기금이 몇 개사인지가 손 댈 때마다 달라졌다. */
   var 전체=arr;
   arr=_siteFilter(arr);
+  /* ★ 대표사업장은 지역기금에만 있다(대표 지시 2026-09-14 「2 지역기금만 별」) */
+  var 별쓰나=isRegionFund(funds[S.fundId]||{});
   var rows=arr.map(function(s,i){
     var c=_siteContacts(s);
     var contact=c.name?(esc(c.name)+(c.mobile?' · '+esc(c.mobile):'')):'—';
@@ -8975,15 +8983,17 @@ function sitesTab(){
     /* 협력 체크를 «맨 앞»에 둔다 — 가운데 있으면 상호를 읽다 눈이 한 번 건너뛰어야 하고,
        여러 곳을 잇달아 켤 때 손이 좌우로 오간다. 켜고 끄는 칸은 줄머리에 모은다. */
     /* 대표사업장 — 상호 «바로 앞»에 별을 둔다. 협력 체크 옆에 또 체크상자를 세우면
-       줄머리에 네모가 둘이라 어느 것이 무엇인지 매번 마우스를 올려 봐야 한다. */
-    var 별=s.lead?'★':'☆';
+       줄머리에 네모가 둘이라 어느 것이 무엇인지 매번 마우스를 올려 봐야 한다.
+       ★ 지역기금에만 선다(대표 지시 2026-09-14) — 사내·개별공동에는 대표사업장이 없다. */
+    var 별칸=별쓰나
+      ? '<span class="leadb'+(s.lead?' on':'')+'" onclick="event.stopPropagation();setSiteLead(\''+s._id+'\','+(s.lead?'false':'true')+')" '
+        +'title="'+(s.lead?'이 기금의 대표사업장입니다 — 눌러서 해제':'대표사업장으로 지정 (기금에 한 곳) · 설립합의서·지원신청서의 「대표회사·사무국」에 들어갑니다')+'">'+(s.lead?'★':'☆')+'</span>'
+      : '';
     return '<tr onclick="editSite(\''+s._id+'\')">'
       +'<td onclick="event.stopPropagation()" style="text-align:center"><input type="checkbox"'+(s.partner?' checked':'')
         +' onchange="setSitePartner(\''+s._id+'\',this.checked)" title="협력업체로 표시 — 별지15호 ⑩ 협력업체 근로자 수에 합산"></td>'
       +'<td class="no">'+(i+1)+'</td>'
-      +'<td style="font-weight:700"><span class="leadb'+(s.lead?' on':'')+'" onclick="event.stopPropagation();setSiteLead(\''+s._id+'\','+(s.lead?'false':'true')+')" '
-        +'title="'+(s.lead?'이 기금의 대표사업장입니다 — 눌러서 해제':'대표사업장으로 지정 (기금에 한 곳)')+'">'+별+'</span>'
-      +esc(s.name||'—')+'</td><td class="ph">'+esc(s.ceo||'—')+'</td>'
+      +'<td style="font-weight:700">'+별칸+esc(s.name||'—')+'</td><td class="ph">'+esc(s.ceo||'—')+'</td>'
       /* 업종은 «남긴다» — 넷만 남기면 411px 에 빈 자리가 생기는데(대표 지시 「빈공간이 많다」),
          한 기업을 한 줄로 알아보는 데 상호 다음으로 말이 많은 칸이 업종이다. */
       +'<td class="ph">'+esc(s.biz_no||'—')+'</td><td>'+esc(s.biz_type||'—')+'</td>'
@@ -9049,8 +9059,10 @@ function sitesTab(){
     +'<span class="stat" title="참여사업장 소재지에서 셈한 참여 지자체입니다">지자체 '+_siteGovs(전체).list.length+'</span>'
     /* ★ 대표사업장을 «맨 위»에 늘 보인다 — 표를 스무 줄 내려가며 별을 찾지 않게.
          거르기를 걸어도 그대로다(거르기 전 전체에서 찾는다). */
-    +(lead?'<span class="stat lead" title="이 기금의 대표사업장입니다 — 명부에서 상호 앞 ★ 로 바꿉니다">★ 대표 '+esc(lead.name||'')+'</span>'
-          :(있음?'<span class="stat" style="color:var(--faint)" title="명부에서 상호 앞의 ☆ 를 눌러 지정합니다">대표사업장 미지정</span>':''))
+    /* ⚠ 지역기금이 아니면 아무 말도 하지 않는다 — 사내·개별공동에는 대표사업장이 없다 */
+    +(!별쓰나?''
+      :lead?'<span class="stat lead" title="이 기금의 대표사업장입니다 — 설립합의서·지원신청서의 「대표회사·사무국」에 들어갑니다. 명부에서 상호 앞 ★ 로 바꿉니다">★ 대표 '+esc(lead.name||'')+'</span>'
+      :(있음?'<span class="stat" style="color:var(--faint)" title="명부에서 상호 앞의 ☆ 를 눌러 지정하면 서식의 「대표회사·사무국」이 채워집니다">대표사업장 미지정</span>':''))
     +sub
     +'<span style="flex:1"></span>'
     +'<button class="primary" onclick="editSite(\'\')">+ 사업장 추가</button>'
@@ -9397,6 +9409,34 @@ function setSiteLead(sid,on){
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
 function _leadSite(arr){ return (arr||[]).filter(function(s){ return !!s.lead; })[0]||null; }
+/* ★ 별은 «지역기금에만» 세운다 (대표 지시 2026-09-14 「2 지역기금만 별」).
+   홈 묶음을 나누는 grp() 와 «같은 잣대»를 쓴다 — 두 곳이 갈리면 목록에서는 지역기금인데
+   명부에는 별이 없는 기금이 생긴다. */
+function isRegionFund(f){ return !!f && f.fund_type!=='사내' && !!f.region; }
+/* ★ 「대표회사·사무국」의 «하나뿐인» 출처 (대표 지시 2026-09-14 「1 서식넣어라」).
+   ─ 지역기금이면 명부에서 ★ 로 지정한 사업장이 이긴다. 손으로 적은 칸은 그 다음.
+   ─ 지역기금이 아니면 종전 그대로 손으로 적은 칸만 쓴다 — 별이 안 보이는 기금에서
+     보이지 않는 값이 서식을 움직이면 안 된다.
+   ⚠ 서식 다섯 곳이 f.rep_org 를 따로따로 읽고 있었다. 한 곳으로 모은다 —
+     따로 두면 어떤 서식에는 ★ 가 들어가고 어떤 서식에는 안 들어간다. */
+function repOrg(f,sites){
+  if(isRegionFund(f)){
+    var L=_leadSite((sites||[]).filter(function(s){ return s&&s.status!=='closed'; }));
+    if(L&&L.name) return L.name;
+  }
+  return (f&&f.rep_org)||'';
+}
+/* 이 기금의 사업장을 «두 곳»에서 찾는다 — 지금 열어 둔 것(S.sites)과 목록 때문에
+   이미 다 읽어 둔 것(_allSites). 아직 못 읽었으면 null 을 주고 읽어 오게 한다.
+   ⚠ govField 안에만 있던 것을 꺼냈다 — 대표사업장 안내도 같은 자리를 봐야 한다. */
+function _fundSites(fid){
+  if(S.sitesFor===fid && S.sites) return Object.keys(S.sites).map(function(k){ return S.sites[k]; });
+  if(_allSites && _allSites[fid]){ var m=_allSites[fid];
+    return Object.keys(m).map(function(k){ return m[k]; }); }
+  if(_allSites) return [];                 /* 다 읽었는데 이 기금 것이 없다 = 사업장이 없다 */
+  setTimeout(loadAllSites,0);              /* 아직 안 읽었으면 읽어 오고 다시 그린다 */
+  return null;
+}
 function setSitePartner(sid,on){
   var _fid=S.fundId;
   fbDb.ref(NS+'/sites/'+_fid+'/'+sid+'/partner').set(on?true:null).then(function(){

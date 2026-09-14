@@ -25,6 +25,17 @@ function grabFn(name) {
   }
   throw new Error('함수 끝을 못 찾음: ' + name);
 }
+function grabDecl(name) {
+  const i = SRC.indexOf('var ' + name + '=');
+  assert.ok(i >= 0, 'fund.html 에 상수가 없다: ' + name);
+  let d = 0, on = false;
+  for (let j = SRC.indexOf('=', i); j < SRC.length; j++) {
+    const c = SRC[j];
+    if (c === '{' || c === '[') { d++; on = true; }
+    else if (c === '}' || c === ']') { d--; if (on && !d) return SRC.slice(i, j + 1) + ';'; }
+  }
+  throw new Error('상수 끝을 못 찾음: ' + name);
+}
 /* ⚠ 글자로 훑을 때는 주석을 먼저 걷는다 — 이 파일 주석이 지시를 그대로 인용하고 있다 */
 const 코드만 = (s) => String(s || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
 
@@ -86,18 +97,69 @@ test('★★ ⑤ 다시 읽게 해 둔다 — 안 그러면 별이 옛 자리에
 
 /* ══ ② 명부의 별 ══════════════════════════════════════════════════ */
 
+/* 명부 한 줄을 «정말 그려» 본다 — 글자로 훑으면 별이 어느 칸에 붙었는지 알 수 없다 */
+function 줄그리기(site, 별쓰나) {
+  const from = SRC.indexOf('var rows=arr.map(function(s,i){');
+  let d = 0, end = -1;
+  for (let k = SRC.indexOf('{', from + 20); k < SRC.length; k++) {
+    if (SRC[k] === '{') d++; else if (SRC[k] === '}') { d--; if (!d) { end = k; break; } }
+  }
+  const body = SRC.slice(SRC.indexOf('{', from + 20) + 1, end);
+  const box = {};
+  new Function('S', 'LEAD', [
+    'function esc(v){ return String(v==null?"":v); }',
+    'function num(v){ return Number(v)||0; }',
+    'function _siteContacts(){ return {name:"",mobile:"",email:""}; }',
+    'function _siteWrep(){ return {name:""}; }',
+    'var 별쓰나=LEAD;',
+    'this.row=function(s,i){ ' + body + ' };'
+  ].join('\n')).call(box, null, 별쓰나);
+  return box.row(site, 0);
+}
+const 사업장 = { _id: 'S1', name: '가나산업', ceo: '홍길동', biz_no: '000-00-00000',
+  biz_type: '제조', company_size: 12, address: '어딘가 1' };
+
 test('★★ ⑥ 상호 앞에 별이 서고, 켜진 곳은 «끄는» 쪽으로 눌린다', () => {
-  const 몸통 = SRC.slice(SRC.indexOf('var rows=arr.map(function(s,i){'),
-    SRC.indexOf('var tbl = arr.length'));
-  assert.match(몸통, /var 별=s\.lead\?'★':'☆';/, '★ 별이 없다.');
-  assert.match(몸통, /setSiteLead\(\\'\'\+s\._id\+\'\\',\'\+\(s\.lead\?'false':'true'\)\+\'\)/,
-    '★ 켜진 곳을 다시 눌러도 켜기로 간다 — 되돌릴 수가 없다.');
-  assert.match(몸통, /event\.stopPropagation\(\);setSiteLead/,
-    '★ 별을 누르면 편집 창까지 열린다.');
-  assert.match(몸통, /class="leadb'\+\(s\.lead\?' on':''\)/, '★ 켜진 별이 표시가 안 난다.');
+  const 꺼짐 = 줄그리기(사업장, true);
+  const 켜짐 = 줄그리기(Object.assign({}, 사업장, { lead: true }), true);
+  assert.match(꺼짐, /☆/, '★ 별이 없다.');
+  assert.match(켜짐, /★/, '★ 지정된 곳이 빈 별이다.');
+  assert.match(켜짐, /class="leadb on"/, '★ 켜진 별이 표시가 안 난다.');
+  /* 켜진 것을 누르면 «끄기»로 가야 한다 */
+  assert.match(켜짐, /setSiteLead\('S1',false\)/, '★ 켜진 곳을 다시 눌러도 켜기로 간다 — 되돌릴 수가 없다.');
+  assert.match(꺼짐, /setSiteLead\('S1',true\)/, '★ 꺼진 곳을 눌러도 안 켜진다.');
+  assert.match(켜짐, /event\.stopPropagation\(\);setSiteLead/, '★ 별을 누르면 편집 창까지 열린다.');
+  /* 별은 «상호 칸 안»에 있어야 한다 — 따로 칸을 만들면 칸 수가 어긋나 값이 옆으로 밀린다 */
+  const 칸들 = 켜짐.split('<td').slice(1);
+  const 상호칸 = 칸들.filter((t) => t.indexOf('가나산업') >= 0)[0];
+  assert.ok(상호칸 && 상호칸.indexOf('★') >= 0, '★ 별이 상호 칸 밖에 있다.');
   /* 줄머리에 네모를 하나 더 세우지 않았는지 — 협력 체크 하나뿐이어야 한다 */
-  assert.equal((몸통.match(/type="checkbox"/g) || []).length, 1,
+  assert.equal((켜짐.match(/type="checkbox"/g) || []).length, 1,
     '★ 줄머리에 체크상자가 둘이다 — 어느 것이 무엇인지 매번 마우스를 올려야 한다.');
+});
+
+test('★★ ⑥-2 지역기금이 «아니면» 별이 아예 안 선다 — 칸 수는 그대로', () => {
+  const 지역 = 줄그리기(사업장, true), 아님 = 줄그리기(사업장, false);
+  assert.ok(!/[★☆]/.test(아님), '★ 대표사업장이 없는 기금에 빈 별이 섰다 — 눌러도 되는 줄 안다.');
+  assert.ok(!/setSiteLead/.test(아님), '★ 안 보이는데 눌리는 자리가 남았다.');
+  assert.equal(아님.split('<td').length, 지역.split('<td').length,
+    '★ 별을 빼면서 칸이 하나 사라졌다 — 값이 옆으로 밀린다.');
+});
+
+test('★★ ⑥-3 별을 세울지는 홈 묶음과 «같은 잣대»로 가른다', () => {
+  const box = {};
+  new Function(grabFn('isRegionFund') + ';this.f=isRegionFund;').call(box);
+  assert.equal(box.f({ fund_type: '공동', region: '충남' }), true, '지역기금');
+  assert.equal(box.f({ fund_type: '공동', region: '' }), false, '지역이 없으면 개별공동');
+  assert.equal(box.f({ fund_type: '사내', region: '충남' }), false, '사내기금은 대표사업장이 없다');
+  assert.equal(box.f(null), false, '기금이 없으면 터지면 안 된다');
+  /* grp() 와 같은 잣대인지 — 갈리면 목록은 지역기금인데 명부에 별이 없는 기금이 생긴다 */
+  const g = {};
+  new Function(grabFn('grp') + ';this.g=grp;').call(g);
+  [{ fund_type: '공동', region: '충남' }, { fund_type: '공동', region: '' },
+   { fund_type: '사내', region: '충남' }].forEach((f) => {
+    assert.equal(box.f(f), g.g(f) === '지역공동', '★ 홈 묶음과 잣대가 다르다: ' + JSON.stringify(f));
+  });
 });
 
 test('★★ ⑦ 대표사업장이 «맨 위»에 늘 보인다 — 스무 줄을 내려가며 별을 찾지 않게', () => {
@@ -107,6 +169,65 @@ test('★★ ⑦ 대표사업장이 «맨 위»에 늘 보인다 — 스무 줄�
   assert.match(st, /lead\?'<span class="stat lead"/, '★ 머리에 대표사업장이 없다.');
   assert.match(st, /대표사업장 미지정/, '★ 안 정했을 때 아무 말이 없다 — 정해야 하는 줄 모른다.');
   assert.match(SRC, /\.stat\.lead\{/, '★ 대표 딱지가 다른 배지와 구별이 안 된다.');
+});
+
+/* ══ ②-2 서식으로 가는 길 (대표 지시 2026-09-14 「1 서식넣어라」) ══════ */
+
+function 대표회사(f, sites) {
+  const box = {};
+  new Function('F', 'SITES', [
+    grabFn('isRegionFund'), grabFn('_leadSite'), grabFn('repOrg'),
+    'this.v=repOrg(F,SITES);'
+  ].join('\n')).call(box, f, sites);
+  return box.v;
+}
+const 지역기금 = { fund_type: '공동', region: '충남' };
+
+test('★★ ⑭ 명부에서 ★ 로 지정한 곳이 「대표회사·사무국」이 된다', () => {
+  assert.equal(대표회사(지역기금, [{ name: '가나산업' }, { name: '다라전자', lead: true }]), '다라전자');
+});
+
+test('★★ ⑮ ★ 가 손으로 적은 칸을 «이긴다» — 두 값이 다르면 사람이 마지막에 고른 쪽이 맞다', () => {
+  assert.equal(대표회사(Object.assign({ rep_org: '손으로적은곳' }, 지역기금),
+    [{ name: '다라전자', lead: true }]), '다라전자');
+  /* ★ 가 없으면 손으로 적은 칸 그대로 */
+  assert.equal(대표회사(Object.assign({ rep_org: '손으로적은곳' }, 지역기금),
+    [{ name: '가나산업' }]), '손으로적은곳');
+  assert.equal(대표회사(지역기금, []), '', '★ 둘 다 없는데 뭔가를 지어낸다.');
+});
+
+test('★★ ⑯ 탈퇴한 사업장은 대표가 못 된다 — 나간 회사 이름이 서식에 찍힌다', () => {
+  assert.equal(대표회사(Object.assign({ rep_org: '남은곳' }, 지역기금),
+    [{ name: '나간곳', lead: true, status: 'closed' }]), '남은곳');
+});
+
+test('★★ ⑰ 지역기금이 아니면 ★ 를 «안 본다» — 안 보이는 값이 서식을 움직이면 안 된다', () => {
+  const 사내 = { fund_type: '사내', region: '충남', rep_org: '손으로적은곳' };
+  assert.equal(대표회사(사내, [{ name: '다라전자', lead: true }]), '손으로적은곳');
+  const 개별 = { fund_type: '공동', region: '', rep_org: '손으로적은곳' };
+  assert.equal(대표회사(개별, [{ name: '다라전자', lead: true }]), '손으로적은곳');
+});
+
+test('★★ ⑱ 서식 다섯 곳이 «모두» 한 길로 간다 — 따로 두면 어떤 서식만 ★ 가 들어간다', () => {
+  assert.ok(!/\bf\.rep_org\b/.test(코드만(SRC).replace(grabFn('repOrg'), '')),
+    '★ 아직 f.rep_org 를 직접 읽는 곳이 남았다 — 그 서식에는 ★ 가 안 들어간다.');
+  ['charterSane', 'docBody', 'fillSetup', 'fillSubsidy'].forEach((n) => {
+    const fn = 코드만(grabFn(n));
+    if (fn.indexOf('rep_org') >= 0 || fn.indexOf('repOrg') >= 0) {
+      assert.match(fn, /repOrg\(f,sites\)/, '★ ' + n + ' 이 제 길로 안 간다.');
+    }
+  });
+  /* 「대표회사·사무국」 칸 자체는 그대로 있어야 한다 — ★ 를 안 쓰는 기금이 쓴다 */
+  assert.match(grabDecl('FIELDS'), /\['rep_org','대표회사·사무국','text'\]/, '★ 칸이 사라졌다.');
+});
+
+test('★★ ⑲ 기금 정보의 그 칸이 «무엇이 들어가는지» 말해 준다 — 배관 양 끝', () => {
+  const fn = 코드만(grabFn('infoForm'));
+  assert.match(fn, /c\[0\]==='rep_org' && isRegionFund\(f\)/, '★ 아무 말도 하지 않는다.');
+  assert.match(fn, /서식에는 이 이름이 들어갑니다/,
+    '★ 이 칸에 다른 상호를 적어 두고 왜 서식에 딴 이름이 나오는지 모른 채 헤매게 된다.');
+  assert.match(fn, /이 칸은 쓰이지 않습니다/, '★ 적어 둔 값이 무시되는 것을 말하지 않는다.');
+  assert.match(fn, /_fundSites\(S\.fundId\)/, '★ 참여 지자체와 다른 자리를 본다.');
 });
 
 /* ══ ③ 머리 정리 ══════════════════════════════════════════════════ */

@@ -35,6 +35,8 @@ function build() {
     grabFn('dgV'), grabFn('dgWon'), grabFn('dgToday'),
     /* 정관 제8조의 설립 출연금은 «한 줄기»(foundContrib)에서 온다 — 2026-09-10 */
     grabFn('estabSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'),
+    /* 2026-09-14: 정관이 「대표회사」를 repOrg 하나에서 가져간다(명부의 ★ → 손으로 적은 칸) */
+    grabFn('isRegionFund'), grabFn('_leadSite'), grabFn('repOrg'),
     grabFn('charterGong'), grabFn('charterSane'),
     'this.charterGong=charterGong; this.charterSane=charterSane;',
   ].join('\n');
