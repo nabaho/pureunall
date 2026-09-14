@@ -194,6 +194,9 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   font-weight:800;color:var(--sub);cursor:pointer;font-family:inherit}
 .chip:hover{border-color:#cbd5e1}
 .chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+/* 「일반직원 수정」 — 걸러 보기가 아니라 «탭»이다. 딱지 줄 오른끝에 떼어 두고 결을 달리한다 */
+.chip.staff{margin-left:auto;border-style:dashed;font-weight:700}
+.chip.staff.on{border-style:solid}
 .chip .c{opacity:.65;margin-left:3px}
 /* 이름으로 찾기 — 업체가 수백 개라 찾을 길이 없으면 회사별로 고를 수 없다 */
 .chips .find{flex:1;min-width:120px;border:1px solid #cbd5e1;border-radius:8px;padding:4px 9px;
@@ -1851,35 +1854,42 @@ window.addPage = addPage;
      관리 목록에 넣어 준다. 한 번만 누르면 그 뒤로는 왼쪽 목록에 늘 있다.
    ⚠ 사람이 이름·번호를 짐작해 치게 하지 않는다 — people 은 우리가 실측으로 아는 이름이다. */
 const 직원쪽 = 'people';
-const 직원쪽이름 = '직원 이름·직급';
+const 직원쪽이름 = '일반직원';
 
 function 직원쪽있나() { return !!(App.pageConfig && App.pageConfig[직원쪽]); }
 
-async function 직원쪽만들기() {
-  if (refuseIfPageConfigUnread()) return;
-  if (직원쪽있나()) { App.group = 'work'; App.pick = 직원쪽; loadDraft(); App.render(); return; }
-  if (!await askYes('직원 이름을 고칠 자리를 만듭니다',
-    '홈페이지에서 <b>직원</b>(사무장·사무직)은 노무사와 달리 <b>게시판 글이 아니라 '
-    + '쪽에 박힌 글자</b>입니다. 그래서 구성원 목록에 안 나옵니다.<br><br>'
-    + '「주요업무」와 같은 방식으로 <b>줄 단위로</b> 고칠 수 있게 목록에 넣겠습니다. '
-    + '홈페이지는 아무것도 안 바뀝니다 — 우리 목록에만 넣습니다.', '자리 만들기')) return;
-
-  const orders = Object.keys(App.pageConfig || {}).map(k => Number((App.pageConfig[k] || {}).order) || 0);
-  const next = Object.assign({}, App.pageConfig);
-  next[직원쪽] = { label: 직원쪽이름, order: (orders.length ? Math.max.apply(null, orders) : 0) + 1 };
-  try {
-    await savePageConfig(next);
-    App.group = 'work'; App.pick = 직원쪽;
-    loadDraft(); App.render();
-    await say('자리를 만들었습니다',
-      '왼쪽 <b>주요업무</b> 안에 <b>' + esc(직원쪽이름) + '</b>이 생겼습니다.<br>'
-      + '위의 <b>「지금 홈페이지」 대조</b>를 한 번 누르시면 지금 홈페이지 글자를 읽어 와 '
-      + '줄마다 고치실 수 있습니다.');
-  } catch (e) {
-    await say('자리를 만들지 못했습니다', esc((e && e.message) || e));
-  }
+/* 「일반직원 수정」 탭이 세우는 «한 줄». 구성원 줄과 같은 칸(name·desc·status)을 채운다. */
+function 직원줄() {
+  const s = ((App.check && App.check.pages) || {})[직원쪽] || {};
+  const p = App.pages[직원쪽] || {};
+  const note = (s.status === 'unknown') ? ' · 홈페이지에서 못 읽음'
+    : (s.status === 'noBase') ? ' · 기준 없음 — 읽어온 내용을 기준으로 삼으십시오'
+    : (p.text ? '' : ' · 아직 내용 없음');
+  return { key: 직원쪽, name: '일반직원 (사무장·사무직)', kind: 'page',
+           desc: '/' + 직원쪽 + ' · 쪽에 박힌 글자' + note, status: s.status || '' };
 }
-window.직원쪽만들기 = 직원쪽만들기;
+
+/* ★ 「일반직원 수정」 탭 (대표 지시 2026-09-14 「구성원소개에 일반직원 수정으로 두고
+     탭변경으로 해라」). 묻지 않는다 — 탭을 누르면 그 자리가 열린다.
+   관리 목록(homepage/config/pages)에 people 이 없으면 «조용히» 넣는다. 홈페이지는
+   아무것도 안 바뀐다 — 우리 목록에만 들어간다. 그 뒤로는 대조가 이 쪽도 함께 본다. */
+async function 직원탭열기() {
+  if (!(await leaveDraft())) return;
+  if (!직원쪽있나() && !refuseIfPageConfigUnread()) {
+    const orders = Object.keys(App.pageConfig || {}).map(k => Number((App.pageConfig[k] || {}).order) || 0);
+    const next = Object.assign({}, App.pageConfig);
+    next[직원쪽] = { label: 직원쪽이름, order: (orders.length ? Math.max.apply(null, orders) : 0) + 1 };
+    try { await savePageConfig(next); }
+    catch (e) { await say('자리를 만들지 못했습니다', esc((e && e.message) || e)); return; }
+  }
+  App.group = 'members';
+  App.filter = 'staff';
+  App.pick = 직원쪽;
+  loadDraft();
+  쪽자동읽기();   // 쪽을 고르면 저절로 읽어온다
+  App.render();
+}
+window.직원탭열기 = 직원탭열기;
 
 /* 오시는길·인사말은 왼쪽에서 «자기 갈래»를 하나씩 차지한다 — 분리하면 그 갈래가 통째로
    비어 버리고, 목록이 아예 비면 기본 8쪽이 되살아나 분리한 것이 없던 일이 된다. */
@@ -1988,7 +1998,16 @@ function memberRows() {
 function pageIdsOf(group) {
   if (group === 'inquiry' || group === 'greeting') return PAGE_IDS.filter(m => m === group);
   if (group !== 'work') return [];
-  return PAGE_IDS.filter(m => m !== 'inquiry' && m !== 'greeting');
+  /* ★ people(일반직원)은 주요업무가 아니다 — 구성원 소개의 「일반직원 수정」 탭이 맡는다
+       (대표 지시 2026-09-14 「주요업무로 보냈는데 구성원소개에 두고 탭변경으로 해라」). */
+  return PAGE_IDS.filter(m => m !== 'inquiry' && m !== 'greeting' && m !== 직원쪽);
+}
+
+/* 쪽 이름 → 그 쪽을 여는 갈래. people 은 구성원 갈래의 탭이라 갈래 이름이 아니다. */
+function 쪽으로가기(mid) {
+  if (mid === 직원쪽) return '직원탭열기()';
+  const g = (mid === 'inquiry' || mid === 'greeting') ? mid : 'work';
+  return 'App.jump(\'' + esc(g) + '\',\'' + esc(mid) + '\')';
 }
 
 function pageRows(group) {
@@ -2032,6 +2051,15 @@ function loadDraft() {
   App.dirty = false;
   if (!App.pick) { App.draft = null; return; }
   if (App.group === 'members') {
+    /* ★ 「일반직원 수정」 탭 (대표 지시 2026-09-14 「구성원소개에 일반직원 수정으로 두고
+         탭변경으로 해라」) — 구성원 갈래 안에서 people «쪽»을 고친다.
+       직원은 게시판 글이 아니라 쪽 글자라 구성원 자료(App.members)에 없다.
+       그래서 여기서만 쪽 초안을 만든다 — 편집칸은 pageEdit 가 그대로 그린다. */
+    if (App.pick === 직원쪽) {
+      const p = App.pages[직원쪽] || {};
+      App.draft = { kind: 'page', key: 직원쪽, text: p.text || '' };
+      return;
+    }
     const m = App.members[App.pick];
     if (!m) { App.draft = null; return; }   // 「홈페이지에만」 줄은 고칠 우리 자료가 없다
     App.draft = {
@@ -2866,13 +2894,18 @@ function 살펴본것글자(s) {
       + '<span style="font-family:ui-monospace,monospace;font-size:.85em">'
       + esc((값 || []).join(' · ')) + '</span></div>'
     : '');
-  return '<details style="margin-top:10px"><summary class="sub">'
-    + '이 게시판이 할 수 있는 일 (눌러서 펴기)</summary>'
+  /* ★ 펴진 채로 보인다 (2026-09-14). 접어 두었더니 캡처에 안 담겨 한 번 더 누르셔야 했다 —
+       «다시 누르게 하지 않는다»가 이 칸의 존재 이유다. */
+  return '<details open style="margin-top:10px"><summary class="sub">'
+    + '이 게시판이 할 수 있는 일</summary>'
     + '<div style="font-size:.92em">'
     + 줄('고치는 화면', s.쓰는화면)
     + 줄('글 읽는 쪽', s.읽는화면)
     + 줄('읽는 쪽 고르개', s.읽는화면고르개)
     + 줄('읽는 쪽 딸깍', s.읽는화면딸깍)
+    + 줄('문서 관리 화면', s.문서관리)
+    + 줄('문서 관리 고르개', s.문서관리고르개)
+    + 줄('문서 관리 딸깍', s.문서관리딸깍)
     + '</div></details>';
 }
 
@@ -3005,6 +3038,7 @@ async function 퇴사자한번에내리기() {
          다시 누르게 하지 않으려고 서버가 함께 실어 보낸 것이다. */
     + (살펴본것 ? 살펴본것글자(살펴본것) : '')
     + '<div style="margin-top:8px">홈페이지에서 한 번 눈으로 봐 주십시오.</div>');
+  /* 못 내린 사람이 있으면 그 자료는 접힌 채 두지 않는다 — 다음 걸음이 거기 달려 있다 */
   checkHomepage();
 }
 window.퇴사자한번에내리기 = 퇴사자한번에내리기;
@@ -4300,8 +4334,10 @@ function jobsOf() {
   const noBase = rowsWith(r => r.status === 'noBase');
   if (noBase.length) {
     add({ cls: 'info', t: '대조 기준이 없는 쪽', n: noBase.length, who: someNames(noBase),
-      go: noBase.map(x => '<button class="btn sm" onclick="App.jump(\'' + esc(x.g) + '\',\''
-          + esc(x.key) + '\')">' + esc(x.name) + ' 열기</button>').join(''),
+      go: noBase.map(x => '<button class="btn sm" onclick="'
+          + (x.g === 'members' || x.key === 직원쪽 ? 쪽으로가기(x.key)
+             : 'App.jump(\'' + esc(x.g) + '\',\'' + esc(x.key) + '\')')
+          + '">' + esc(x.name) + ' 열기</button>').join(''),
       why: '기준이 없으면 「같음/안 올라감」을 말할 수 없습니다. 그 쪽을 열어 '
          + '<b>홈페이지 줄 모양으로 나누기</b> → <b>대조 기준 저장</b>을 한 번 해 두십시오.' });
   }
@@ -4353,8 +4389,7 @@ function leftoverGoBtns(left) {
   Object.keys(left).forEach(n => (left[n] || []).forEach(x => {
     if (seen[x.path]) return;
     seen[x.path] = true;
-    const g = (x.path === 'inquiry' || x.path === 'greeting') ? x.path : 'work';
-    out.push('<button class="btn sm" onclick="App.jump(\'' + esc(g) + '\',\'' + esc(x.path) + '\')">'
+    out.push('<button class="btn sm" onclick="' + 쪽으로가기(x.path) + '">'
       + esc(PAGE_LABEL[x.path] || x.path) + ' 열기</button>');
   }));
   return out.join('');
@@ -4578,6 +4613,8 @@ function visibleRows(group) {
     if (!App.filter && !q) all = all.filter(r => r.posted !== '');
   }
   const f = App.filter;
+  /* ★ 「일반직원 수정」 탭 — 구성원 줄이 아니라 people «쪽» 한 줄만 세운다 */
+  if (group === 'members' && f === 'staff') return [직원줄()];
   if (!f) return all;
   if (f === 'closed') return all.filter(r => r.closed);
   if (f === 'suboffice') return all.filter(r => r.subOffice);
@@ -4659,10 +4696,21 @@ function chipsHtml() {
       if (n) defs.push({ k: st, label: STATUS_TEXT[st], n: n });
     });
   }
-  return '<div class="chips">' + defs.map(d =>
+  /* ⚠ 딱지 줄은 «여기서» 만든다 — defs 가 다 찬 뒤다. 앞에서 만들면 자문사의
+       「거래 종료·사무대행·아직 안 고름」과 대조 딱지가 빠진다(2026-09-14 검사가 잡았다). */
+  const 딱지들 = defs.map(d =>
     '<button class="chip' + (App.filter === d.k ? ' on' : '') + '"'
     + ' onclick="App.filt(\'' + esc(d.k) + '\')">' + esc(pillShort(d.label))
-    + '<span class="c">' + d.n + '</span></button>').join('')
+    + '<span class="c">' + d.n + '</span></button>');
+  /* ★ 「일반직원 수정」 탭 (대표 지시 2026-09-14). 사무장·사무직은 게시판 글이 아니라
+       쪽에 박힌 글자라 구성원 줄로는 못 세운다 — 그래서 같은 딱지 줄에 «탭»으로 둔다.
+       ⚠ 다른 화면(주요업무)으로 넘기지 말 것. 「어디서 고치나」를 찾다 몇 달 헤매셨다. */
+  if (App.group === 'members') {
+    딱지들.push('<button class="chip staff' + (App.filter === 'staff' ? ' on' : '') + '"'
+      + ' onclick="직원탭열기()" title="사무장·사무직 이름과 직급 — 쪽 글자를 줄마다 고칩니다">'
+      + '일반직원 수정</button>');
+  }
+  return '<div class="chips">' + 딱지들.join('')
     + (App.group === 'partner'
         ? '<span class="sub">홈페이지는 로고 «그림»이라 대조를 못 합니다 — 올림 표시는 사람이 합니다</span>'
         : (App.check ? '' : '<span class="sub">확인을 누르면 대조 딱지로도 걸러집니다</span>'))
@@ -4675,6 +4723,9 @@ function chipsHtml() {
 function listCountHtml() {
   const all = rowsOf(App.group), rows = visibleRows(App.group);
   if (App.group === 'members') {
+    if (App.filter === 'staff') {
+      return '<b>일반직원</b> <span class="sub">· 사무장·사무직 — 쪽에 박힌 글자를 줄마다 고칩니다</span>';
+    }
     // 명부상 퇴사가 몇 명인지 — 「남김」으로 둔 사람도 명부상 퇴사자다
     const left = all.filter(r => r.roster && r.roster.kind === 'left').length;
     return '구성원 <b>' + all.length + '명</b>' + (left ? ' · <b class="hot">퇴사 ' + left + '</b>' : '')
@@ -4705,14 +4756,6 @@ function listHtml() {
   h += '<div class="lh"><span id="listCount">' + listCountHtml() + '</span>'
     + '<span style="flex:1"></span>'
     + (App.group === 'members' ? '<button class="btn sm" onclick="addMember()">＋ 새 구성원</button>' : '')
-    /* ★ 2026-09-13 — 직원을 찾는 분이 «여기» 를 본다. 직원은 이 목록에 못 들어가므로
-         (게시판 글이 아니라 쪽 글자라서) 그 사실과 «가는 길»을 이 자리에 둔다.
-       ⚠ 안내문 속 작은 글씨로 두지 말 것 — 채우기 단추가 그래서 몇 달 안 보였다. */
-    + (App.group === 'members'
-        ? '<button class="btn sm" onclick="직원쪽만들기()"'
-          + ' title="직원(사무장·사무직)은 게시판 글이 아니라 쪽에 박힌 글자입니다 — 쪽으로 고칩니다">'
-          + (직원쪽있나() ? '직원 이름 고치기' : '직원은 어디서?') + '</button>'
-        : '')
     + (App.group === 'work' ? '<button class="btn sm" onclick="addPage()">＋ 쪽 추가</button>' : '')
     /* ★ 자문사는 여기서 회사를 «만들지 않는다». 이름·업종·거래 여부는 푸른ERP 업체관리에서
        고친다 — 두 곳에서 만들 수 있게 하면 어느 쪽이 진짜인지 알 수 없게 된다.
