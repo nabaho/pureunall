@@ -3068,6 +3068,67 @@ exports.homepageWrite = functions
         return;
       }
 
+      /* ── 사진 넣기 ── 얼굴 사진 칸은 «파일 칸»이라 글자로 못 보낸다.
+           브라우저가 파일을 고른 폼을 보낼 때처럼 multipart 로 보낸다 — 그때
+           글자 칸도 «전부 함께» 실린다(안 실으면 그 칸이 빈 채로 저장된다).
+         ★ 글자만 고치는 길은 아래 그대로 둔다. 잘 도는 길을 사진 때문에 안 바꾼다. */
+      if (고칠것.사진 && typeof 고칠것.사진 === "object") {
+        const 사진 = 고칠것.사진;
+        const 파일칸 = HW.파일칸찾기(화면, "메인 이미지");
+        if (!파일칸) {
+          res.status(409).json({ ok: false, 방식: 방식, 저장됨: false,
+            error: "사진을 넣을 칸을 찾지 못했습니다 — 홈페이지 화면이 바뀐 것 같습니다.",
+            걸음: 걸음 });
+          return;
+        }
+        let 바이트 = null;
+        try { 바이트 = Buffer.from(String(사진.바이트64 || ""), "base64"); }
+        catch (e) { 바이트 = null; }
+        const 받을까 = HW.사진받을까(사진.종류, 바이트 ? 바이트.length : 0);
+        if (!받을까.ok) {
+          res.status(400).json({ ok: false, 방식: 방식, 저장됨: false,
+            error: 받을까.why, 걸음: 걸음 });
+          return;
+        }
+        const 알림3 = {
+          ok: true, 방식: 방식, srl: Number(몸.srl), 저장됨: false, 못찾은것: [],
+          바뀐것: [{ 이름: "얼굴 사진", 옛: "지금 것",
+                     새: "새 사진 (" + Math.round(바이트.length / 1024) + "KB)" }],
+          걸음: 걸음
+        };
+        if (방식 === "보기") { res.json(알림3); return; }
+
+        const 확인표 = String(읽은것.확인표 || "");
+        const 칸 = Object.assign({}, 읽은것.칸, { act: HW.저장할act() });
+        if (확인표) 칸._rx_csrf_token = 확인표;
+        const 지음 = HW.사진몸통(칸, 읽은것.여럿, 파일칸,
+          { 종류: 사진.종류, 바이트: 바이트 });
+        const f = await 홈부르기(HW.보낼주소(), 그릇, {
+          method: "POST",
+          body: 지음.몸통,
+          headers: Object.assign({
+            "User-Agent": HW.브라우저표시,
+            "Content-Type": "multipart/form-data; boundary=" + 지음.경계,
+            "Content-Length": String(지음.몸통.length),
+            "Referer": 주소,
+            "Cookie": 그릇.글자()
+          }, 확인표 ? { "X-CSRF-Token": 확인표 } : {})
+        });
+        const f답 = await f.text();
+        const 됐나 = f.status >= 200 && f.status < 400 && !/<error>\s*-?[1-9]/.test(f답);
+        알림3.저장됨 = 됐나;
+        알림3.걸음.push({ 걸음: "④ 사진", 상태: f.status, 칸: 파일칸,
+                          크기: 지음.몸통.length, 답조각: f답.slice(0, 200) });
+        if (!됐나) { 알림3.ok = false; 알림3.error = "홈페이지가 사진을 받아 주지 않았습니다."; }
+        try {
+          await getDatabase().ref("homepage/writeLog/" + Number(몸.srl)).push({
+            at: Date.now(), by: decoded.uid, 저장됨: 됐나, 바뀐것: 알림3.바뀐것
+          });
+        } catch (e) { console.warn("homepageWrite log", (e && e.message) || e); }
+        res.status(됐나 ? 200 : 502).json(알림3);
+        return;
+      }
+
       /* ── 내리기 ── 이 게시판에는 「비공개」 자리가 «없다»(2026-09-14 정찰로 확인).
            그래서 문서 관리의 «휴지통»으로 옮긴다 — 홈페이지에서 사라지고, 글·사진·
            경력은 그대로 남고, 관리자 휴지통에서 되살릴 수 있다 (대표 승인 2026-09-14).

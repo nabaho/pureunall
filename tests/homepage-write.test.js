@@ -352,6 +352,96 @@ test('확인표가 없어도 몸통은 짓는다 — 머리글로도 보내기 �
   assert.equal(new URLSearchParams(r.몸통).get('_rx_csrf_token'), null);
 });
 
+/* ── 사진 넣기 ── 2026-09-14. 파일 칸은 글자로 못 보내므로 multipart 로 간다 ── */
+/* 보낸 multipart 를 도로 풀어 본다 — 「보냈다」가 아니라 «무엇이 실렸나»를 본다 */
+function 풀기(경계, 몸통) {
+  const s = 몸통.toString('binary');
+  const 조각 = s.split('--' + 경계).slice(1, -1);
+  const 칸 = {}, 파일 = [];
+  조각.forEach((t) => {
+    const 끝 = t.indexOf('\r\n\r\n');
+    const 머리 = t.slice(0, 끝);
+    const 몸 = t.slice(끝 + 4, t.length - 2);
+    const 이름 = (/name="([^"]*)"/.exec(머리) || [])[1];
+    const 파일이름 = (/filename="([^"]*)"/.exec(머리) || [])[1];
+    if (파일이름 !== undefined) {
+      파일.push({ 이름: 이름, 파일이름: 파일이름,
+                  종류: (/Content-Type:\s*([^\r\n]+)/i.exec(머리) || [])[1],
+                  크기: Buffer.from(몸, 'binary').length });
+    } else {
+      (칸[이름] = 칸[이름] || []).push(Buffer.from(몸, 'binary').toString('utf8'));
+    }
+  });
+  return { 칸: 칸, 파일: 파일 };
+}
+
+test('★ 사진 칸은 이름표 「메인 이미지」의 «파일 칸»으로 찾는다', () => {
+  assert.equal(W.파일칸찾기(화면(), '메인 이미지'), 'extra_vars5');
+  /* 글자 칸 이름표로는 안 나온다 — 파일 칸만 본다 */
+  assert.equal(W.파일칸찾기(화면(), '경력사항'), '');
+  assert.equal(W.파일칸찾기(화면(), '없는이름표'), '');
+});
+
+test('★★★ 사진을 보낼 때도 «글자 칸을 하나도 안 빠뜨린다»', () => {
+  const r = W.칸읽기(화면());
+  const 지음 = W.사진몸통(r.칸, r.여럿, 'extra_vars5',
+    { 종류: 'image/jpeg', 바이트: Buffer.from([1, 2, 3, 4, 5]) });
+  const 푼것 = 풀기(지음.경계, 지음.몸통);
+  /* 받은 칸이 전부 실렸나 — 하나라도 빠지면 그 칸이 빈 채로 저장된다 */
+  Object.keys(r.칸).forEach((k) => assert.ok(푼것.칸[k],
+    '★★★ 「' + k + '」 칸이 안 실렸습니다 — 그 칸이 빈 채로 저장됩니다'));
+  assert.equal(푼것.칸.content[0], 사진, '★★★ 사진을 넣다가 숨은 칸을 잃었습니다');
+  assert.equal(푼것.칸.extra_vars4[0], '現 푸른노무법인대표', '★★★ 경력을 잃었습니다');
+});
+
+test('★★ 사진은 «파일»로 실린다 — 글자로 보내면 붙어 있던 사진이 떨어진다', () => {
+  const r = W.칸읽기(화면());
+  const 바이트 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+  const 지음 = W.사진몸통(r.칸, r.여럿, 'extra_vars5', { 종류: 'image/jpeg', 바이트: 바이트 });
+  const 푼것 = 풀기(지음.경계, 지음.몸통);
+  assert.equal(푼것.파일.length, 1, '★★ 파일 조각이 하나가 아닙니다');
+  assert.equal(푼것.파일[0].이름, 'extra_vars5');
+  assert.equal(푼것.파일[0].종류, 'image/jpeg');
+  assert.equal(푼것.파일[0].크기, 바이트.length, '★★ 사진 바이트가 바뀌었습니다');
+  assert.ok(!푼것.칸.extra_vars5, '★★ 사진 칸이 «글자»로도 실렸습니다');
+});
+
+test('★ 파일 이름은 «우리가» 짓는다 — 한글·따옴표가 머리글을 깨뜨린다', () => {
+  const r = W.칸읽기(화면());
+  const 지음 = W.사진몸통(r.칸, r.여럿, 'extra_vars5',
+    { 종류: 'image/png', 바이트: Buffer.from([1]), 이름: '내 사진".png' });
+  assert.match(지음.파일이름, /^photo-\d+\.png$/, '올린 이름을 그대로 썼습니다: ' + 지음.파일이름);
+  assert.ok(지음.몸통.toString('utf8').indexOf('내 사진') < 0);
+});
+
+test('★ 경계 글자가 몸통 안에 없다 — 있으면 조각이 엉뚱하게 갈린다', () => {
+  const r = W.칸읽기(화면());
+  const 지음 = W.사진몸통(r.칸, r.여럿, 'extra_vars5',
+    { 종류: 'image/jpeg', 바이트: Buffer.from([1, 2, 3]) });
+  const 본문 = 지음.몸통.toString('binary');
+  /* 경계는 «조각을 가르는 자리»에만 나온다 — 칸 값 안에 섞여 있으면 안 된다 */
+  const 나온수 = 본문.split('--' + 지음.경계).length - 1;
+  const 칸수 = Object.keys(r.칸).length;
+  assert.equal(나온수, 칸수 + 2, '경계 수가 조각 수와 안 맞습니다');
+});
+
+test('★★ 그림이 아닌 것은 받지 않는다', () => {
+  assert.equal(W.사진받을까('image/jpeg', 1000).ok, true);
+  assert.equal(W.사진받을까('image/png', 1000).ok, true);
+  assert.equal(W.사진받을까('image/webp', 1000).ok, true);
+  ['application/pdf', 'text/html', 'application/x-msdownload', '', null]
+    .forEach((못된것) => assert.equal(W.사진받을까(못된것, 1000).ok, false,
+      '★★ 그림이 아닌 것을 받았습니다: ' + 못된것));
+});
+
+test('★ 너무 크거나 빈 사진은 받지 않는다 — 까닭도 말한다', () => {
+  const 큰것 = W.사진받을까('image/jpeg', W.사진최대 + 1);
+  assert.equal(큰것.ok, false);
+  assert.match(큰것.why, /너무 큽니다/);
+  assert.equal(W.사진받을까('image/jpeg', 0).ok, false);
+  assert.equal(W.사진받을까('image/jpeg', W.사진최대).ok, true, '한도 «까지»는 받아야 합니다');
+});
+
 test('고치는 주소는 글 번호 하나만 받는다', () => {
   assert.ok(String(W.고치는주소(190)).includes('document_srl=190'));
   ['', null, -1, 1.5, '190 OR 1=1', 'abc'].forEach((못된것) => {
