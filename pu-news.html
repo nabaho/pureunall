@@ -399,6 +399,62 @@ table.list th.n,table.list td.n{width:44px;text-align:right;padding-right:6px;
 .one .mail{font-size:12px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis}
 .one .sp1{flex:1 1 auto;min-width:4px}
 .one .mini{flex:0 0 auto;padding:3px 8px;font-size:11px}
+
+/* ★★★ 받는 곳 칸을 «열로 맞춘다» (대표 지시 2026-09-14 「이름 직책 메일 연락처 등 열맞춰라」)
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠⚠ flex 로는 못 맞춘다. flex 는 «앞의 것이 끝난 자리»에서 다음 것이 시작하므로,
+     「홍순석, 홍준표」와 「이태준」이 한 열에 있으면 그 뒤의 직책·메일이 저마다
+     다른 자리에서 시작한다. 눈이 줄마다 새로 찾는다 — 113곳이면 113번이다.
+   ★ 바둑판으로 «같은 너비의 칸»을 준다. 칸마다 제 바둑판이지만 표의 한 열에 있어
+     담는 너비가 같으므로, 줄과 줄이 저절로 맞는다.
+   ⚠⚠ auto 를 쓰면 안 된다 — auto 는 «그 줄의 내용만큼»이라 고친 것이 없어진다.
+     «마지막» 단추 열까지 정해야 한다. 안 그러면 단추가 둘인 줄과 하나인 줄
+     (「주소 없음」)의 너비가 달라지고, 그만큼 메일 열의 오른쪽 끝이 줄마다 밀린다.
+   ⚠ minmax(0,Npx) 로 둔다. 그냥 Npx 면 좁은 창에서 안 줄어들어 표를 옆으로 민다.
+     minmax 면 줄어들 수 있고, 담는 너비가 모든 줄에서 같으니 «똑같이» 줄어든다.
+   ⚠ .one 자체가 아니라 .one.tidy 에만 건다 — .one 은 명함 안내 띠도 쓴다.
+     거기까지 바둑판이 되면 띠가 세로로 쌓여 넉 줄이 된다(줄이던 일을 되돌린다).
+   ⚠⚠ 너비는 «재서» 넣었다 (2026-09-14, 표본을 그려 놓고 max-content 를 쟀다):
+     이름 93(「홍순석, 홍준표」처럼 두 분이 한 칸에 있는 줄이 가장 길다) · 직책 28
+     · 연락처 97 · 딱지 62(「같은 메일」) · 단추 둘 145.
+     ⚠ 처음에 단추를 128 로 어림했더니 145 짜리가 «칸 밖으로 넘쳤다».
+       열을 정할 때는 어림하지 말고 재야 한다 — 남는 폭은 그대로 메일이 쓴다.
+   ⚠⚠ 메일 열에 «바닥»을 준다(120px). 다 minmax(0,…) 로 두었더니 1180px 창에서
+       메일 열이 «0 으로 짜부라져» 주소가 통째로 사라졌다(실측). 맞추려다 정작
+       봐야 할 것을 없앤 꼴이다 — 좁아지면 이름·직책·연락처가 먼저 양보한다.
+   ⚠⚠ 단추 열은 «줄지 않는다»(146px 고정). 줄어들 수 있게 두면, 단추가 둘인 줄과
+     하나인 줄(「주소 없음」)이 저마다 다르게 줄어 단추가 다시 어긋난다.
+     누르는 것은 좁혀서도 안 된다.
+   ⚠⚠ 「줄어들 수 있게」만 두면 1180px 창에서 이름이 «홍…» 한 글자로 뭉개지고
+     「같은 메일」 딱지가 반만 잘려 고장난 것처럼 보였다(실측). 그래서:
+       · 이름   바닥 54 — 두세 글자는 남는다(전체는 title 로 본다)
+       · 연락처·딱지 고정 — 전화번호와 딱지는 «반쪽이면 아무 쓸모가 없다».
+                          자리가 없으면 차라리 표를 옆으로 굴려 본다.
+       · 직책   바닥 0 — 다섯 가운데 가장 덜 아쉬운 것이라 마지막에 양보한다 */
+.one.tidy{display:grid;align-items:center;column-gap:6px;
+  grid-template-columns:minmax(54px,94px) minmax(0,44px) minmax(120px,1fr)
+    98px 64px 146px}
+/* ⚠ 대표자에는 연락처가 «늘 없다» — 기업정보함에 그 칸이 없어서다.
+     빈 열을 두면 98px 이 놀면서 대표자 메일만 그만큼 잘린다. */
+.one.tidy.ceo{grid-template-columns:minmax(54px,94px) minmax(0,44px) minmax(120px,1fr)
+    64px 146px}
+/* ⚠⚠ 이름을 .empty 로 두었다가 부딪쳤다 (2026-09-14, 재 보고 알았다).
+     이 파일에는 이미 .empty{padding:16px 15px} 가 있다(「비었습니다」 안내 자리).
+     그 여백이 그대로 걸려, 빈 칸만 단추가 «15px 왼쪽»에 서고 줄이 21px 높아졌다.
+     검사는 푸른데 눈으로는 어긋나 보이는, 알아채기 어려운 자리다.
+   ★ 덧이름은 «이 파일에서 한 번만» 쓰이는 것이라야 한다. */
+.one.tidy.noaddr{grid-template-columns:minmax(120px,1fr) 146px}
+/* ⚠ 회사 이름을 «접지 않는다» — 위 주석 참고. 좁으면 표가 옆으로 굴러간다
+     (.whorest 가 세로로 구르므로 가로도 저절로 굴러간다). */
+table.list td.co{white-space:nowrap}
+/* 칸 안에서 넘치면 잘린다 — 안 그러면 긴 이름 하나가 열을 통째로 밀어낸다 */
+.one.tidy>*{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.one.tidy .jt{font-size:11.5px;color:var(--sub)}
+.one.tidy .ph{font-size:11.5px}
+.one.tidy .no{font-size:12px;color:var(--faint)}
+.one.tidy .why{font-size:11px;color:var(--sub)}
+/* 단추는 «오른쪽 끝»에 붙여 둔다 — 열 끝이 한 줄로 서야 눈이 한 번만 찾는다 */
+.one.tidy .act{display:flex;gap:5px;justify-content:flex-end;overflow:visible}
 /* 유형 칩 줄 — 업체관리 도구줄과 같은 결 */
 .chips{display:flex;gap:5px;flex-wrap:wrap;margin:12px 0 10px}
 /* ★ 유형·누구 두 축을 «한 줄»에 (대표 지시 2026-09-13 「줄을 줄여라」).
@@ -3182,13 +3238,15 @@ function 명단화면(){
      ★ 담당자가 여럿인 집이 있다 — 한 칸 안에 여러 줄로 쌓는다. */
   const 받는분칸 = function(x, 같은메일){
     if(!x) return '<span style="color:var(--faint)">—</span>';
-    /* 이름 · 직책 · (담당자면) 연락처 · 주소 · 손잡이 둘
-       ⚠ 2026-09-03 에는 연락처를 «제 열»로 갈라 세로를 맞췄다. 한 줄로 합치면서
-         그 열이 사라졌다 — 한 집에 담당자가 여럿일 수 있어 열로는 못 맞춘다.
-         대신 이름 «옆»에 두고(아래가 아니다) tel 글꼴을 그대로 쓴다. */
+    /* ★★★ 이름 · 직책 · 메일 · 연락처를 «열로 맞춘다» (대표 지시 2026-09-14
+         「이름 직책 메일 연락처 등 열맞춰라」)
+       ⚠⚠ 2026-09-13 에 한 줄로 합치면서 직책과 전화를 「직 · 전」 한 덩이로 이어 붙였다.
+         그러면 직책이 있는 줄과 없는 줄에서 전화가 «다른 자리»에 선다 —
+         바둑판을 깔아도 한 칸에 둘이 들어 있으면 맞출 길이 없다.
+       ★ 하나씩 «제 칸»에 넣는다. 꾸밈(.one.tidy)이 칸 너비를 정한다. */
     const 직 = String(x.title||'').trim() ? esc(x.title) : '';
     const 전 = (x.누구 === '담당자' && String(x.전화||'').trim()) ? 전화칸(x.전화) : '';
-    const 곁 = [직, 전].filter(Boolean).join(' · ');
+    const 이름 = 글칸(x.name || x.대표자);
     const 딱 = 같은메일
       /* ★ 대표자 주소와 담당자 주소가 «한 주소»인 집 (대표 지시 2026-09-13).
            밝히지 않으면 「대표에게도 갔겠지」로 잘못 읽는다 — 실은 한 통이다. */
@@ -3202,23 +3260,31 @@ function 명단화면(){
          ★ 잘라 보여 주되 «전체는 title 로» 알려 준다. 안 그러면 확인할 길이 없다. */
     const 주소글 = '<span class="mail" title="' + esc(x.email||'') + '">'
       + esc(x.email||'') + '</span>';
-    return '<div class="one">'
-      + '<b>' + 글칸(x.name || x.대표자) + '</b>'
-      + (곁 ? '<span class="t2">' + 곁 + '</span>' : '')
-      + 주소글 + 딱
-      + '<span class="sp1"></span>'
+    /* ⚠ 이름도 잘린다 — 「홍순석, 홍준표」처럼 두 분이 한 칸에 있는 줄이 있다.
+         주소와 같은 까닭으로 «전체는 title 로» 알려 준다. */
+    return '<div class="one tidy' + (x.누구 === '대표자' ? ' ceo' : '') + '">'
+      + '<b class="nm" title="' + esc(String(x.name || x.대표자 || '')) + '">' + 이름 + '</b>'
+      + '<span class="jt">' + 직 + '</span>'
+      + 주소글
+      + (x.누구 === '대표자' ? ''
+          : '<span class="ph" title="' + esc(String(x.전화 || '')) + '">' + 전 + '</span>')
+      + '<span class="tag">' + 딱 + '</span>'
+      + '<span class="act">'
       + '<button class="mini" onclick="수신거부넣기(\'' + esc(x.email) + '\')">수신거부</button>'
       + '<button class="mini" onclick="사람바꾸기(\'' + esc(x.사업장) + '\',\''
         + esc(x.누구) + '\',\'' + esc(x.출처) + '\',\'' + esc(x.email) + '\')"'
       + ' title="사람이 바뀌었을 때 — 업체관리 자료를 함께 고칩니다">✎ 바꾸기</button>'
-      + '</div>';
+      + '</span></div>';
   };
-  /* 빈 자리 — 없다고만 하면 할 일이 안 보인다. 채우러 갈 길을 «같은 줄»에 둔다. */
+  /* 빈 자리 — 없다고만 하면 할 일이 안 보인다. 채우러 갈 길을 «같은 줄»에 둔다.
+     ★ 같은 바둑판(.one.tidy.noaddr)을 쓴다 — 단추가 다른 줄과 «같은 자리»에 서야
+       눈이 오른쪽 끝을 한 번만 찾는다. */
   const 빈받는분칸 = function(회사, 누구){
-    return '<div class="one"><span style="color:var(--faint);font-size:12px">주소 없음</span>'
-      + '<span class="sp1"></span>'
+    return '<div class="one tidy noaddr">'
+      + '<span class="no">주소 없음</span>'
+      + '<span class="act">'
       + '<button class="mini" onclick="기업정보함에서찾기(\'' + esc(회사) + '\')"'
-      + ' title="기업정보함에서 이 회사를 찾습니다">📇 기업정보함</button></div>';
+      + ' title="기업정보함에서 이 회사를 찾습니다">📇 기업정보함</button></span></div>';
   };
 
   /* ★ 사업장으로 묶기 — 줄들을 사업장 열쇠로 모은다.
@@ -3258,10 +3324,18 @@ function 명단화면(){
     const 대표몫 = 집.대표
       ? 받는분칸(집.대표, 집.같은메일)
       : (집.같은메일
-          /* 대표 주소가 담당자와 같아 «줄이 눌린» 집 — 빈 칸으로 두면 거짓말이 된다 */
-          ? '<div style="font-size:12px">' + esc(집.대표주소)
-            + ' <span class="pill" style="background:#fef3c7;color:#92400e">같은 메일</span></div>'
-            + '<div style="font-size:11.5px;color:var(--sub)">담당자와 한 통으로 갑니다</div>'
+          /* 대표 주소가 담당자와 같아 «줄이 눌린» 집 — 빈 칸으로 두면 거짓말이 된다.
+             ⚠ 이 줄도 «같은 바둑판»으로 그린다. 혼자 다른 짜임이면 그 줄에서만
+               메일이 딴 자리에서 시작해, 맞춰 놓은 열이 눈에 걸린다.
+             ⚠ 긴 말(「담당자와 한 통으로 갑니다」)은 title 로 옮긴다 —
+               마지막 칸은 너비가 정해져 있어 그대로 넣으면 잘린다. 뜻을 버린 것이 아니다. */
+          ? '<div class="one tidy ceo"><b class="nm">—</b><span class="jt"></span>'
+            + '<span class="mail" title="' + esc(집.대표주소) + '">' + esc(집.대표주소) + '</span>'
+            + '<span class="tag"><span class="pill" style="background:#fef3c7;color:#92400e">'
+            + '같은 메일</span></span>'
+            + '<span class="act"><span class="why"'
+            + ' title="대표자 주소가 담당자와 같아 두 통이 아니라 한 통만 갑니다">한 통으로</span>'
+            + '</span></div>'
           : 빈받는분칸(집.회사, '대표자'));
     const 담당몫 = 집.담당.length
       ? 집.담당.map(function(d){ return 받는분칸(d, 집.같은메일); }).join(
@@ -3271,7 +3345,10 @@ function 명단화면(){
     return '<tr>' + (첫줄 ? 체크칸(첫줄) : '<td class="ck"></td>')
       + '<td class="n">' + (i+1) + '</td>'
       + (첫줄 ? 유형칸(첫줄) : '<td></td>')
-      + '<td><b>' + esc(집.회사||'') + '</b></td>'
+      /* ⚠ 회사 이름은 «접지 않는다». 사람 칸에 바닥을 주자(2026-09-14) 좁은 창에서
+           표가 회사 열을 대신 짜부라뜨려, 「㈜보기좋은회사」가 한 글자씩 세로로
+           여섯 줄이 되었다(실측 1180px). 그럴 바에는 표를 옆으로 굴려 보는 편이 낫다. */
+      + '<td class="co"><b>' + esc(집.회사||'') + '</b></td>'
       + (대표볼까 ? '<td>' + 대표몫 + '</td>' : '')
       + (담당볼까 ? '<td>' + 담당몫 + '</td>' : '')
       + '</tr>';
