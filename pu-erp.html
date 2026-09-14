@@ -277,8 +277,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 마무리 — 앞뒤에 붙은 것도 걷고, 기금·기타·사업사건·업무항목까지 같은 손잡이로';
-var BUILD_SEQ = 151;
+var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-14 컨설팅·기금·기타 목록 멈춤 완화 — 기본 20행·담당자와 유형 색인 조회';
+var BUILD_SEQ = 152;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -67290,8 +67290,13 @@ function ProjectManagementShared(props){
 
   var users = getActiveUsers();
   var types = dbGet(props.typesKey, props.seedTypes);
-  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : sid; }
-  function typeName(code){ var t = types.find(function(x){return x.code===code;}); return t ? t.name : code; }
+  /* 한 화면에 수십 행을 그릴 때 셀마다 같은 명단을 다시 훑지 않는다. */
+  var _projUserBySid = {};
+  users.forEach(function(u){ if(u && u.sid) _projUserBySid[u.sid] = u; });
+  var _projTypeByCode = {};
+  types.forEach(function(t){ if(t && t.code) _projTypeByCode[t.code] = t; });
+  function userName(sid){ var u = _projUserBySid[sid]; return u ? u.name : sid; }
+  function typeName(code){ var t = _projTypeByCode[code]; return t ? t.name : code; }
   // ── Phase 3: 건별 저장 (과거회귀 방지) — 그 건만 서버 반영 ──
   function refreshItems(){
     var fresh = dbGet(props.storageKey, []).slice();
@@ -67397,7 +67402,7 @@ function ProjectManagementShared(props){
   if(mgrFilter !== 'all') _activeFilters.push('담당 ' + ((typeof sidToName === 'function' && sidToName(mgrFilter)) || mgrFilter));
   if(subMgrFilter !== 'all') _activeFilters.push('부담당 ' + ((typeof sidToName === 'function' && sidToName(subMgrFilter)) || subMgrFilter));
   if(typeFilter !== 'all'){
-    var _tfObj = types.find(function(t){ return t.code === typeFilter; });
+    var _tfObj = _projTypeByCode[typeFilter];
     _activeFilters.push('유형 ' + ((_tfObj && _tfObj.name) || typeFilter));
   }
   if(monthOnly) _activeFilters.push('이번 달만');
@@ -67488,7 +67493,9 @@ function ProjectManagementShared(props){
     });
   }
 
-  var ppsS = useState(50); var projPageSize = ppsS[0]; var setProjPageSize = ppsS[1];
+  /* 50행은 약 2천 개 화면 요소를 한꺼번에 만들어 실시간 갱신·GC와 겹치면 멈춤이
+     커진다. 기본은 20행으로 낮추고 50/100/전체 선택은 그대로 제공한다. */
+  var ppsS = useState(20); var projPageSize = ppsS[0]; var setProjPageSize = ppsS[1];
   var pgConsult = usePagination(filtered, projPageSize);
   var totalCount = items.filter(function(c){return c.status!=='closed' && c.status!=='cancelled' && !c.closedDate;}).length;
   var pendingCount = items.filter(function(c){return c.status==='pending';}).length;
@@ -67686,12 +67693,12 @@ function ProjectManagementShared(props){
           ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'40px', fontSize:'12px' } },
               items.length === 0 ? '계약관리에서 이관된 데이터 없음' : '검색 결과가 없습니다')
           : pgConsult.paged.map(function(it, idx){
-              var t = types.find(function(x){return x.code===it.typeCode;});
+              var t = _projTypeByCode[it.typeCode];
               var typeLabel = t ? t.name : (it.typeCode||'');
-              var mgrU = users.find(function(u){ return u.sid===it.mgrMain||u.sid===it.managerMain; });
+              var mgrU = _projUserBySid[it.mgrMain || it.managerMain];
               var mgrName = mgrU ? mgrU.name : (it.mgrMain||it.managerMain||'');
               var subSids = it.mgrSubs||it.managerSubs||[];
-              var subNames = subSids.map(function(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:sid; }).filter(Boolean);
+              var subNames = subSids.map(function(sid){ var u=_projUserBySid[sid]; return u?u.name:sid; }).filter(Boolean);
               var contractFee = it.contractFee||it.fee||0;
               var balanceFee = it.balanceFee||0;
               var totalFee = contractFee + balanceFee;
@@ -67756,7 +67763,7 @@ function ProjectManagementShared(props){
             ? h('tr', null, h('td', { colSpan:16, className:'ac', style:{ color:'#94a3b8', padding:'40px' } },
                 items.length === 0 ? '계약관리에서 이관된 데이터 없음' : '검색 결과가 없습니다'))
             : pgConsult.paged.map(function(it, idx){
-                var t = types.find(function(x){return x.code===it.typeCode;});
+                var t = _projTypeByCode[it.typeCode];
                 var _row = h('tr', { key:it.id, draggable:true,
                   onDragStart:function(ev){
                     var txt = [it.no||'', (t?t.name:''), it.companyName||'', userName(it.managerMain), (it.managerSubs||[]).map(userName).join(','), it.receiveDate||'', it.dueDate||'', it.note||''].join('\t');
@@ -67783,7 +67790,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                           value: it.typeCode || '',
                           onChange:function(e){
                             var newCode = e.target.value;
-                            var nt = types.find(function(x){return x.code===newCode;});
+                            var nt = _projTypeByCode[newCode];
                             var newNo = it.no;
                             if(nt){
                               var year = (String(it.no||'').match(/\d{4}/) || [String(new Date().getFullYear())])[0];
