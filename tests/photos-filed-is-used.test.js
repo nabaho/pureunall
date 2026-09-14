@@ -163,8 +163,14 @@ test('★ 표가 붙으면 5년, 없으면 1년 — 이 갈림이 이 결정의 
 });
 
 test('저장 층이 주인 자리를 실제로 받는다 — 넘겨도 안 받으면 소용없다', () => {
-  assert.match(cutFn(store, 'function markUsed('), /function markUsed\(year, id, where, owner\)/);
-  assert.match(cutFn(store, 'function markUsed('), /metaPath\(year, id, owner\)/);
+  const fn = cutFn(store, 'function markUsed(');
+  assert.match(fn, /function markUsed\(year, id, where, owner\)/);
+  /* ⚠ 2026-09-14 — 자리를 짓는 일이 updateAlive 안으로 들어갔다(지워진 사진에는 안 쓴다 —
+     안 그러면 「증빙으로 썼다」 한 칸만 든 «유령 사진»이 되살아난다).
+     지킬 것은 그대로다: **주인 자리를 그대로 들고 간다.** 줄 모양이 아니라 그것을 본다. */
+  assert.match(fn, /updateAlive\(year, id, owner/,
+    '★ 주인 자리(owner)를 안 들고 가면 남의 사진에 표시를 못 남깁니다');
+  assert.match(fn, /\+ '\/used'\]/, '★ used 칸이 아닌 곳에 적고 있습니다');
 });
 
 /* ══════ ④ 복사 — 초점을 잃어도 되게 ══════ */

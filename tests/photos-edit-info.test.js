@@ -35,8 +35,11 @@ test('★ 같은 해 안에서 고치면 정보 한 줄만 바꾼다', async () 
     readOnce: () => Promise.resolve({ takenAt: 1 }),
     loadFull: () => Promise.resolve('FULL'),
     loadThumb: () => Promise.resolve('THUMB'),
-    deps: { db: { ref: () => ({ update: (u) => { wrote.push(u); return Promise.resolve(); } }) } }
+    deps: { db: { ref: () => ({ once: () => Promise.resolve({ val: () => ({ by: 'ME', upAt: 1 }) }), update: (u) => { wrote.push(u); return Promise.resolve(); } }) } }
   };
+  /* ⚠ 2026-09-14 — setTakenAt 이 updateAlive 를 거친다(지워진 사진에 안 쓴다).
+     그 함수를 **원본 그대로** 함께 싣는다 — 대역을 만들면 그 규칙을 안 재게 된다. */
+  fnFrom(store, 'updateAlive', ctx, '  ');
   const setTakenAt = fnFrom(store, 'setTakenAt', ctx, '  ');
   const ts = new Date(2026, 4, 3, 10, 0, 0).getTime();
   await setTakenAt('2026', 'p1', ts);
@@ -58,11 +61,16 @@ test('★ 해가 바뀌어도 사진을 옮기지 않는다 — 날짜 한 줄�
     metaPath: (y, id) => 'm/' + y + '/' + id,
     blobPath: (y, id) => 'b/' + y + '/' + id,
     thumbPath: (y, id) => 't/' + y + '/' + id,
-    readOnce: () => { moved = true; return Promise.resolve({ takenAt: 1, byName: '홍길동' }); },
+    /* ⚠ 2026-09-14 — updateAlive 가 «정보»를 한 번 읽는다. 그것은 사진을 나르는 것이
+       아니다 — 여기서 재는 것은 «본문»(loadFull/loadThumb)을 읽어 나르는가이다. */
+    readOnce: () => Promise.resolve({ takenAt: 1, byName: '홍길동' }),
     loadFull: () => { moved = true; return Promise.resolve('FULL'); },
     loadThumb: () => { moved = true; return Promise.resolve('THUMB'); },
-    deps: { db: { ref: () => ({ update: (u) => { wrote.push(u); return Promise.resolve(); } }) } }
+    deps: { db: { ref: () => ({ once: () => Promise.resolve({ val: () => ({ by: 'ME', upAt: 1 }) }), update: (u) => { wrote.push(u); return Promise.resolve(); } }) } }
   };
+  /* ⚠ 2026-09-14 — setTakenAt 이 updateAlive 를 거친다(지워진 사진에 안 쓴다).
+     그 함수를 **원본 그대로** 함께 싣는다 — 대역을 만들면 그 규칙을 안 재게 된다. */
+  fnFrom(store, 'updateAlive', ctx, '  ');
   const setTakenAt = fnFrom(store, 'setTakenAt', ctx, '  ');
   const ts = new Date(2025, 11, 20, 9, 0, 0).getTime();
   const to = await setTakenAt('2026', 'p1', ts);
@@ -78,7 +86,10 @@ test('이상한 날짜는 받지 않는다', async () => {
   const ctx = { Number, Promise, String, yearOf: () => '2026', metaPath: () => 'm',
     blobPath: () => 'b', thumbPath: () => 't', readOnce: () => Promise.resolve({}),
     loadFull: () => Promise.resolve(''), loadThumb: () => Promise.resolve(''),
-    deps: { db: { ref: () => ({ update: () => Promise.resolve() }) } } };
+    deps: { db: { ref: () => ({ once: () => Promise.resolve({ val: () => ({ by: 'ME', upAt: 1 }) }), update: () => Promise.resolve() }) } } };
+  /* ⚠ 2026-09-14 — setTakenAt 이 updateAlive 를 거친다(지워진 사진에 안 쓴다).
+     그 함수를 **원본 그대로** 함께 싣는다 — 대역을 만들면 그 규칙을 안 재게 된다. */
+  fnFrom(store, 'updateAlive', ctx, '  ');
   const setTakenAt = fnFrom(store, 'setTakenAt', ctx, '  ');
   await assert.rejects(() => setTakenAt('2026', 'p1', NaN));
   await assert.rejects(() => setTakenAt('2026', 'p1', 0));
@@ -87,9 +98,13 @@ test('이상한 날짜는 받지 않는다', async () => {
 test('저장이 막히면 화면에도 안 고쳐진 것으로 알린다', async () => {
   const ctx = { Number, Promise, String,
     yearOf: () => '2025', metaPath: (y, id) => 'm/' + y, blobPath: (y) => 'b/' + y,
-    thumbPath: (y) => 't/' + y, readOnce: () => Promise.resolve(null),
+    /* ⚠ 사진은 «살아 있고» 쓰기가 막히는 경우다 — 없는 사진이면 애초에 안 쓴다(updateAlive) */
+    thumbPath: (y) => 't/' + y, readOnce: () => Promise.resolve({ takenAt: 1 }),
     loadFull: () => Promise.resolve('F'), loadThumb: () => Promise.resolve('T'),
-    deps: { db: { ref: () => ({ update: () => Promise.reject(new Error('막힘')) }) } } };
+    deps: { db: { ref: () => ({ once: () => Promise.resolve({ val: () => ({ by: 'ME', upAt: 1 }) }), update: () => Promise.reject(new Error('막힘')) }) } } };
+  /* ⚠ 2026-09-14 — setTakenAt 이 updateAlive 를 거친다(지워진 사진에 안 쓴다).
+     그 함수를 **원본 그대로** 함께 싣는다 — 대역을 만들면 그 규칙을 안 재게 된다. */
+  fnFrom(store, 'updateAlive', ctx, '  ');
   const setTakenAt = fnFrom(store, 'setTakenAt', ctx, '  ');
   // 조용히 성공한 척하면 사람은 고쳐진 줄 알고 화면을 닫는다
   await assert.rejects(() => setTakenAt('2026', 'p1', Date.now()), /막힘/);
@@ -100,7 +115,7 @@ test('★ 빈 값은 지운다 (빈 글자를 남기지 않는다)', async () =>
   const wrote = [];
   const ctx = { String, Object, Promise,
     metaPath: () => 'm/p1',
-    deps: { db: { ref: () => ({ update: (u) => { wrote.push(u); return Promise.resolve(); } }) } } };
+    deps: { db: { ref: () => ({ once: () => Promise.resolve({ val: () => ({ by: 'ME', upAt: 1 }) }), update: (u) => { wrote.push(u); return Promise.resolve(); } }) } } };
   const saveNote = fnFrom(store, 'saveNote', ctx, '  ');
   await saveNote('2026', 'p1', { company: '  ', note: '현장' });
   assert.equal(wrote[0]['m/p1/company'], null, '빈 값을 남기면 「적었는데 비었음」과 구분이 안 됩니다.');
@@ -110,7 +125,7 @@ test('★ 빈 값은 지운다 (빈 글자를 남기지 않는다)', async () =>
 test('안 넘긴 칸은 건드리지 않는다', async () => {
   const wrote = [];
   const ctx = { String, Object, Promise, metaPath: () => 'm/p1',
-    deps: { db: { ref: () => ({ update: (u) => { wrote.push(u); return Promise.resolve(); } }) } } };
+    deps: { db: { ref: () => ({ once: () => Promise.resolve({ val: () => ({ by: 'ME', upAt: 1 }) }), update: (u) => { wrote.push(u); return Promise.resolve(); } }) } } };
   const saveNote = fnFrom(store, 'saveNote', ctx, '  ');
   await saveNote('2026', 'p1', { note: 'x' });
   assert.deepEqual(Object.keys(wrote[0]), ['m/p1/note'], '업체를 안 넘겼는데 지우면 안 됩니다.');
@@ -121,7 +136,7 @@ test('★ 사진과 미리보기를 함께 바꾼다 (실시간DB 방식)', asyn
   const wrote = [];
   const ctx = { Promise, blobPath: (y, id) => 'b/' + id, thumbPath: (y, id) => 't/' + id,
     mode: 'rtdb', // ★ storage 분기를 안 타야 이 검사가 예전처럼 실시간DB만 본다
-    deps: { db: { ref: () => ({ update: (u) => { wrote.push(u); return Promise.resolve(); } }) } } };
+    deps: { db: { ref: () => ({ once: () => Promise.resolve({ val: () => ({ by: 'ME', upAt: 1 }) }), update: (u) => { wrote.push(u); return Promise.resolve(); } }) } } };
   ctx.replaceImageRtdb = fnFrom(store, 'replaceImageRtdb', ctx, '  ');
   const replaceImage = fnFrom(store, 'replaceImage', ctx, '  ');
   await replaceImage('2026', 'p1', 'F2', 'T2');
