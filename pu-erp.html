@@ -5925,6 +5925,74 @@ function erpIsClinicItem(cand){
   } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return false; }
 }
 
+/* ══════ 「이미 받음으로 적힌 건」 찾기 — 후보가 하나도 없을 때만 ══════════════
+   건의 2026-09-10 김보람 「2025년도 수임 사건 2026년도에 보수 이체되었을 경우 매칭이 안됩니다」
+   대표 지시 2026-09-14 「넣어」
+
+   ■ 무엇이 문제였나 — 고장이 아니라 «아무 말도 안 해 준» 것이다
+     거래내역 매칭 후보는 erpUnpaidParts 가 고르는데, 거기서는
+       if(it[flagKey] || it[dateKey]) return true;   // 날짜만 찍혀도 «다 받은 것»
+     이다. 지난 건을 넣을 때는 이미 받은 돈이라 입금일을 «함께» 적게 되고,
+     그 순간 그 건은 후보에서 사라진다.
+   ★ 실측 2026-09-14 (임금체불-2025-001 · 성공보수 6,000,000 · 신유정):
+       지금 그대로 → 후보 []        성공보수 입금일만 빼고 → 후보 ["성공보수 6,000,000원"]
+     통장 줄(2026-02-02 18:42:48 · 6,000,000)은 «있었다». 그런데 화면은 후보도 없고
+     🔁 표시(자문수입에 «확정된» 기록을 보는 것)도 없었다 — 그 기록은 아직 안 만들어졌으니까.
+     그래서 「왜 안 되지」만 남았다.
+
+   ■ 그래서 이 안내를 둔다
+     후보가 «하나도 없을 때»만, 같은 금액·가까운 날짜로 «이미 받음»이라 적힌 건을 찾아
+     그 자리에 적어 준다. 무엇을 하면 되는지까지 함께 적는다(처리됨으로 표시).
+   ⚠ 안내만 한다 — 자료는 건드리지 않는다. 이미 받은 것을 또 확정하면 돈이 두 번 잡힌다.
+   ⚠ 후보가 있을 때는 «안» 띄운다 — 진짜 후보를 밀어내면 안 된다.
+   ⚠ 성공보수가 %(요율)면 뺀다 — 그 숫자는 금액이 아니다.
+   ⚠ 부가세 별도면 받을 돈은 ×1.1 이다. 둘 다 견줘 본다(어느 쪽으로 적어 뒀는지 모른다). */
+var ERP_PAID_PARTS = [
+  ['착수금',   'retainerFee', 'retainerPaid', 'retainerPaidDate', 'contractFeeVatIncluded'],
+  ['성공보수', 'successFee',  'successPaid',  'successPaidDate',  'balanceFeeVatIncluded'],
+  ['계약금',   'contractFee', 'contractPaid', 'contractPaidDate', 'contractFeeVatIncluded'],
+  ['잔금',     'balanceFee',  'balancePaid',  'balancePaidDate',  'balanceFeeVatIncluded']
+];
+var ERP_PAID_STORES = [['cases','사건','caseNo'],['consultings','컨설팅','no'],
+                       ['funds','기금','no'],['other_projects','기타','no']];
+function erpPaidAlreadyHint(txn, dayWindow){
+  try {
+    var amt = parseInt(txn && txn.amount, 10) || 0;
+    if(amt <= 0) return null;
+    var win = (dayWindow === undefined || dayWindow === null) ? 10 : dayWindow;
+    var tT = new Date(String((txn && txn.date) || '')).getTime();
+    var best = null;
+    ERP_PAID_STORES.forEach(function(S){
+      (dbGet(S[0], []) || []).forEach(function(it){
+        if(!it || it._deleted) return;
+        ERP_PAID_PARTS.forEach(function(P){
+          var 이름 = P[0], feeKey = P[1], flagKey = P[2], dateKey = P[3], vatKey = P[4];
+          if(!(it[flagKey] || it[dateKey])) return;              // «이미 받음»으로 적힌 것만
+          if(이름 === '성공보수' && it.successFeeType === 'percent') return;
+          var fee = parseInt(it[feeKey], 10) || 0;
+          if(fee <= 0) return;
+          var 셈 = it[vatKey] ? fee : Math.round(fee * 1.1);
+          if(fee !== amt && 셈 !== amt) return;
+          var pd = String(it[dateKey] || '').slice(0, 10);
+          if(!pd) return;
+          var gap = null;
+          if(!isNaN(tT)){
+            var rT = new Date(pd).getTime();
+            if(!isNaN(rT)) gap = Math.abs(Math.round((tT - rT) / 86400000));
+          }
+          if(gap === null || gap > win) return;
+          if(!best || gap < best.gap){
+            best = { gap:gap, store:S[0], storeLabel:S[1], part:이름, fee:fee, date:pd,
+                     no:(it[S[2]] || it.no || it.caseNo || it.id || ''),
+                     company:(it.companyName || ''), id:(it.id || '') };
+          }
+        });
+      });
+    });
+    return best;
+  } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return null; }
+}
+
 // ── 이력 기반 금액 지문 ──
 // 월 고정 자문료는 적요가 엉뚱해도 "업체 + 같은 금액 반복"이 곧 신원이다.
 // finance_income 전건 스캔은 행×후보마다 하면 O(n²)이라 색인을 만들어 캐시한다.
@@ -42872,7 +42940,7 @@ function erpSugSig(incAll, pending, tab, invReady){
      「추천 다시 계산 2179ms + 화면 멈춤 3782ms」 로 찍힌 그것이다.
      25행씩 끊어 숨 쉴 틈(setTimeout)을 주면 합계 시간은 같아도 멈춤이 없다. */
 function erpBuildSugInit(){
-  return { incByK:{}, isCmsMemo:{}, incSug:{}, incDone:{}, ctHint:{}, invSug:{} };
+  return { incByK:{}, isCmsMemo:{}, incSug:{}, incDone:{}, ctHint:{}, invSug:{}, paidHint:{} };
 }
 function erpBuildSugChunk(incAll, pending, from, to, out){
   for(var _i=from; _i<to && _i<incAll.length; _i++){
@@ -42888,6 +42956,9 @@ function erpBuildSugChunk(incAll, pending, from, to, out){
     out.incDone[row._k] = erpAlreadyConfirmed({date:row.date, amount:row.amount}, 10);
     // 맞는 후보가 없을 때만 — 아직 이관 안 된 계약이 있는지 본다
     if(!_sg.length) out.ctHint[row._k] = erpContractHint({memo:_memo});
+    /* 후보가 «하나도 없을 때»만 — 이미 받음으로 적힌 건이 있는지 본다 (건의 2026-09-10 김보람).
+       후보가 있으면 «안» 본다: 진짜 후보를 밀어내면 안 된다. */
+    if(!_sg.length) out.paidHint[row._k] = erpPaidAlreadyHint({date:row.date, amount:row.amount}, 10);
     // 계산서를 따로 한 칸에 보여주므로 추천 신뢰도와 상관없이 항상 찾는다
     var _iv = erpInvoiceSuggest({date:row.date, amount:row.amount}, 1);
     if(_iv.length) out.invSug[row._k] = _iv[0];
@@ -45293,6 +45364,7 @@ function FinanceLedger(props){
   var isCmsMemo = {};
   var incDone = {};         // 행별 「이미 확정된 건」 (입금관리에서 곧바로 확정한 분)
   var ctHint  = {};         // 행별 「아직 이관 안 된 계약」 (후보가 없을 때만)
+  var paidHint = {};        // 행별 「이미 받음으로 적힌 건」 (후보가 없을 때만 · 2026-09-14)
   var invSug = {};          // 행별 세금계산서 후보 1건 (고신뢰 추천이 없는 행만)
   var invNone = {};         // 행별 '계산서 미발급?' 의심
   var incByK = {};          // _k → row (자동 정리 미리보기에서 행을 되찾기 위함)
@@ -45461,6 +45533,7 @@ function FinanceLedger(props){
   if(_sug){
     incByK = _sug.incByK; isCmsMemo = _sug.isCmsMemo; incSug = _sug.incSug;
     incDone = _sug.incDone; ctHint = _sug.ctHint; invSug = _sug.invSug;
+    paidHint = _sug.paidHint || {};
   }
   /* 사용자가 고른 매칭(inMatch)에 걸리는 것만 매번 다시 본다 — 전부 값싼 조회다.
      캐시 안에 넣으면 클릭할 때마다 위 비싼 계산까지 다시 돌아 고치는 뜻이 없어진다. */
@@ -47181,6 +47254,8 @@ function FinanceLedger(props){
               var _why=(_st.state==='none' && !isCms && !_rec) ? whyNone(row) : null;
               var _cm=(_st.state==='none' && !isCms && !_rec) ? erpConsultMatch(row,_intakes) : null;
               var _ct=(_st.state==='none' && !isCms && !_cm) ? (ctHint[row._k]||null) : null;
+              /* 「이미 받음으로 적힌 건」 — 후보가 없을 때만 계산돼 있다 (건의 2026-09-10 김보람) */
+              var _pd=(_st.state==='none' && !isCms) ? (paidHint[row._k]||null) : null;
               var _done=(incDone[row._k]||[]).length>0;
               /* CMS 합계 줄이면 나이스빌 명세를 미리 찾아 «누르기 전에» 보여준다.
                  전에는 눌러 봐야 몇 곳인지 알 수 있었다. */
@@ -47335,6 +47410,17 @@ function FinanceLedger(props){
                           title:'적요의 이름으로 업체관리를 찾지 못했습니다.\n'
                                +'새 업체이거나 상호가 다를 수 있습니다 — 「찾기」로 직접 고르거나 「등록」하세요.'},
                           '등록된 업체가 아닙니다')
+                      /* ★ 「이미 받음으로 적힌 건」 — 후보가 하나도 없을 때 여기까지 온다.
+                         이름만 닮은 ctHint 보다 앞에 둔다: 이쪽은 «금액과 날짜»가 맞은 것이라 더 세다.
+                         ⚠ 안내만 한다 — 다시 확정하면 돈이 두 번 잡힌다. 할 일까지 함께 적는다. */
+                      : _pd ? h('span',{style:{color:'#166534',fontWeight:700},
+                          title:'같은 금액·가까운 날짜로 「이미 받음」이라 적힌 건이 있습니다.\n'
+                               +_pd.storeLabel+' '+_pd.no+' · '+_pd.part+' '+_pd.fee.toLocaleString()+'원 · 입금일 '+_pd.date
+                               +(_pd.company ? ('\n'+_pd.company) : '')
+                               +'\n\n지난 건을 넣으면서 입금일까지 적으면 후보에서 빠집니다 — 고장이 아닙니다.\n'
+                               +'같은 건이면 다시 확정하지 마세요(돈이 두 번 잡힙니다).\n'
+                               +'이 줄은 「처리됨」으로 표시하시면 목록에서 빠집니다.'},
+                          '✅ 이미 받음으로 적힌 건 — '+_pd.storeLabel+' '+_pd.no+' '+_pd.part)
                       : h('span',{style:{color:'#94a3b8'}},
                           _cm ? ('상담료? · 상담접수 '+String(_cm.date).slice(5))
                               : (isCms
