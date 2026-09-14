@@ -151,8 +151,13 @@ test('★ 폰에도 그대로 있다 — 한쪽만 고치면 기기에 따라 �
   assert.match(src, /coThreadHtml\(\)/);
 });
 
-test('나갔다 들어와도 사업장별로 돌아온다', () => {
-  assert.match(HTML, /s\.mail === 'co'/, '되돌아오는 길이 없습니다');
+test('사업장별로 «돌아오는 길»은 주소다 — ?view=mail&mail=co (기업정보함 문으로는 되살리지 않는다)', () => {
+  /* ⚠ 예전엔 restoreLastScreen 의 `s.mail === 'co'` 글자를 박았다 — 그 갈래는 «기업정보함 문» 아래 있던
+     것이고, 2026-09-14 대표 지시로 없앴다(문이 세상을 정한다 — tests/cards-door-decides-screen.test.js).
+     사업장별로 건너오는 길은 주소(mailCoFromUrl)로 남아 있다 — 업무관리 「이 사업장과 오간 것」이 그 길이다. */
+  const r = cut('restoreLastScreen');
+  assert.match(r, /mailCoFromUrl\(\)/, '주소로 사업장별에 건너오는 길이 없습니다');
+  assert.match(r.slice(r.indexOf('mailCoFromUrl()')), /openCoThread\(/, '주소가 사업장별을 가리켜도 열지 않습니다');
 });
 
 test('★ 화면이 모으는 셈을 스스로 하지 않는다 — 갈래가 늘 때 화면을 고치게 된다', () => {
