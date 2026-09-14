@@ -221,7 +221,13 @@ test('폰 갈래줄에도 그대로 있다 — 한쪽만 고치면 안 된다', 
   assert.match(src, /inboxBoxHtml\(\)/);
 });
 
-test('나갔다 들어와도 받은 메일로 돌아온다', () => {
-  assert.match(HTML, /s\.mail === 'inbox'/, '되돌아오는 길이 없습니다');
+test('받은 메일을 보고 나갔다는 것을 «적는다» — 메일 문으로 들어오면 받은메일함이 열린다', () => {
+  /* ⚠ 예전엔 restoreLastScreen 의 `s.mail === 'inbox'` 글자를 박았다 — 그 갈래는 «기업정보함 문»
+     아래 있던 것이고, 2026-09-14 대표 지시(「기업정보함을 터치하면 무조건 메일로 넘어간다 — 반드시 고쳐 달라」)로
+     없앴다. 문이 세상을 정한다(tests/cards-door-decides-screen.test.js). 메일 문(view=mail)은 openMailBox 를
+     지나고, 칸을 안 넘기면 mbNow() 가 받은메일함을 골라 준다. 여기서는 «적는 쪽»이 어느 화면인지 잃지 않는지 본다. */
+  assert.match(cut('saveLastScreen'), /state\.mailSent/, '어느 메일 화면을 보고 나갔는지 적지 않습니다');
+  const r = cut('restoreLastScreen'); const d = r.indexOf('urlWantsMail()');
+  assert.ok(d > 0 && /openMailBox\(/.test(r.slice(d)), '메일 문이 메일함을 안 엽니다');
 });
 

@@ -5,7 +5,16 @@
 
    ⚠ 이 기능에서 가장 위험한 것은 **남의 화면이 열리는 것**이다.
      한 PC를 여러 사람이 쓴다 — 열쇠에 계정이 안 들어가면 앞사람이 보던 화면이
-     뒷사람에게 열리고, 그것이 「보낸 메일」이면 남의 일까지 보인다. */
+     뒷사람에게 열리고, 그것이 「보낸 메일」이면 남의 일까지 보인다.
+
+   ★★ 2026-09-14 규칙이 하나 더 생겼다 — **문이 세상을 정한다.**
+     「기업정보함을 터치하면 무조건 메일로 넘어간다 — 반드시 고쳐 달라」(대표).
+     포털의 「기업정보함」과 「푸른 메일」은 같은 파일의 두 문이다(주소 view=mail 이 가른다).
+     마지막 화면이 메일이었으면 기업정보함 문으로 들어와도 메일을 되살렸다 — 폰에서 메일을
+     마지막으로 쓴 사람은 기업정보함을 눌러도 «늘» 메일이었다.
+     이제 기업정보함 문에서는 **명함 쪽 화면만** 되살린다. 메일 쪽 화면은 메일 문이 정한다.
+     그래서 이 파일의 옛 사례들(보통 주소로 들어와 메일이 열린다)을 그 규칙으로 바꿨다 —
+     전용 검사는 tests/cards-door-decides-screen.test.js. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -75,7 +84,7 @@ function boot(who) {
 /* ── 사람마다 따로 (가장 중요) ── */
 test('★ 사람마다 자기 화면만 기억한다 — 앞사람 화면이 열리면 안 된다', () => {
   const a = boot('uid-A');
-  a.state.view = 'mail'; a.state.mailSent = true;   // 갑이 「보낸 메일」을 보고 나감
+  a.state.view = 'mat';                              // 갑이 「자료함」을 보고 나감
   a.saveLastScreen();
 
   /* 같은 PC 에 을이 로그인 — 갑의 자리를 그대로 물려받으면 안 된다 */
@@ -89,7 +98,7 @@ test('★ 사람마다 자기 화면만 기억한다 — 앞사람 화면이 열
   const a2 = boot('uid-A');
   Object.keys(a.__store).forEach(k => { a2.__store[k] = a.__store[k]; });
   a2.restoreLastScreen();
-  assert.deepEqual(Array.from(a2.opened), ['sent'], '자기 화면으로 안 돌아옵니다');
+  assert.deepEqual(Array.from(a2.opened), ['mat'], '자기 화면으로 안 돌아옵니다');
 });
 
 test('★ 누구인지 모르는 동안에는 적지 않는다', () => {
@@ -128,10 +137,8 @@ test('★ 열쇠에 계정이 들어간다', () => {
 test('★ 화면마다 제자리로 돌아온다', () => {
   const cases = [
     [{ view: 'mat' }, 'mat'],
-    /* 2026-08-30 — «빈» 쓰기 화면은 메일함으로 돌아온다(아래 전용 검사 참고).
-       쓰다 만 편지가 있을 때만 쓰기로 돌아온다. */
-    [{ view: 'mail', mailSent: true }, 'sent'],
-    [{ view: 'mail', mailSent: 'sched' }, 'sched'],
+    /* ⚠ 메일 화면(sent·sched·box)은 여기 없다 — 2026-09-14 부터 기업정보함 문으로는
+       메일을 되살리지 않는다(문이 세상을 정한다). 메일 문은 제 첫 화면을 스스로 정한다. */
     [{ view: 'list', tab: 'biz' }, 'tab:biz']
   ];
   cases.forEach(function (c) {
@@ -233,30 +240,31 @@ test('★ 주소가 메일이면 저장된 화면을 이긴다 — 아이콘을 
   assert.deepEqual(back.opened, ['box:'], '★ 메일 아이콘을 눌렀으면 메일함이 열려야 합니다.');
 });
 
-test('보통 주소로 들어오면 예전 그대로 — 마지막 보던 화면이 열린다', () => {
+test('★★ 기업정보함 문(보통 주소)으로 들어오면 마지막이 메일이었어도 메일을 열지 않는다', () => {
+  /* 2026-09-14 대표 「기업정보함을 터치하면 무조건 메일로 넘어간다」 — 바로 이 자리였다.
+     예전 이 검사는 반대로 ['sent'] 를 기대했다. 규칙이 뒤집혔으니 검사도 뒤집는다. */
   const c = boot('uid-B');
   c.state.view = 'mail'; c.state.mailSent = true;
   c.saveLastScreen();
   const back = boot('uid-B');
   back.__store[back.lastScreenKey()] = c.__store[c.lastScreenKey()];
   back.restoreLastScreen();
-  assert.deepEqual(back.opened, ['sent']);
+  assert.deepEqual(Array.from(back.opened), [],
+    '★★ 기업정보함을 눌렀는데 메일이 열립니다: ' + JSON.stringify(back.opened));
 });
 
 /* ══════ 다음메일함 (2026-08-24) ══════ */
 
-test('★ 메일함을 보다 나갔다 들어오면 «그 칸»으로 돌아온다 — 「보낸 메일」이 열리면 안 된다', () => {
-  /* mailSent 가 'box' 인데 restoreLastScreen 의 "else if (s.mail)" 이 먼저 걸려
-     보낸 메일이 열렸다. 값이 있으면 참이 되는 자리라, 갈래를 더할 때마다 이 함정이
-     다시 생긴다 — 그래서 이 검사를 둔다. */
+test('★ 메일함의 «어느 칸»을 보고 나갔는지 적는다 — 「보낸 메일」로 적히면 안 된다', () => {
+  /* 예전엔 되살리기까지 봤다(기업정보함 문으로 들어와 box:INBOX 가 열리는지). 2026-09-14 부터
+     그 문으로는 메일을 되살리지 않으므로, 여기서는 «적는 쪽»이 칸을 잃지 않는지만 본다.
+     ⚠ 값이 있으면 참이 되는 자리(mailSent)가 'box' 를 «보낸 메일»로 뭉개지 않아야 한다. */
   const c = boot('uid-M');
   c.state.view = 'mail'; c.state.mailSent = 'box'; c.state.mbBox = 'INBOX-abc12345';
   c.saveLastScreen();
-  const back = boot('uid-M');
-  back.__store[back.lastScreenKey()] = c.__store[c.lastScreenKey()];
-  back.restoreLastScreen();
-  assert.deepEqual(back.opened, ['box:INBOX-abc12345'],
-    '메일함이 아니라 딴 화면이 열립니다: ' + JSON.stringify(back.opened));
+  const rec = JSON.parse(c.__store[c.lastScreenKey()]);
+  assert.equal(rec.mail, 'box', '메일함을 보다 나갔는데 「보낸 메일」로 적혔습니다');
+  assert.equal(rec.box, 'INBOX-abc12345', '어느 칸인지를 잃었습니다');
 });
 
 /* ══════ 「누른 것도 아닌데 자꾸 메일 쓰기 창이 열린다」 (대표 2026-08-30) ══════
@@ -269,11 +277,9 @@ test('★ «빈» 쓰기 화면은 기억하지 않는다 — 한 번 잘못 열
   c.state.view = 'mail'; c.state.mailSent = false;   // 빈 편지창 (_compose 는 null)
   c.state.mbBox = 'INBOX-abc12345';                  // 그 전에 보던 칸
   c.saveLastScreen();
-  const back = boot('uid-N');
-  back.__store[back.lastScreenKey()] = c.__store[c.lastScreenKey()];
-  back.restoreLastScreen();
-  assert.deepEqual(back.opened, ['box:INBOX-abc12345'],
-    '빈 편지창을 기억해 들어올 때마다 쓰기가 열립니다: ' + JSON.stringify(back.opened));
+  const rec = JSON.parse(c.__store[c.lastScreenKey()]);
+  assert.equal(rec.mail, 'box', '빈 편지창을 «하던 일»로 적었습니다 — 들어올 때마다 쓰기가 열립니다');
+  assert.equal(rec.box, 'INBOX-abc12345', '그 전에 보던 칸을 잃었습니다');
 });
 
 test('★ 쓰다 «만» 편지는 예전 그대로 기억한다 — 돌아갈 자리가 진짜로 있다', () => {
@@ -281,11 +287,8 @@ test('★ 쓰다 «만» 편지는 예전 그대로 기억한다 — 돌아갈 �
   c.state.view = 'mail'; c.state.mailSent = false;
   c._compose = { to: 'kim@example.com', base: {} };   // 받는 곳을 적어 두었다
   c.saveLastScreen();
-  const back = boot('uid-N2');
-  back.__store[back.lastScreenKey()] = c.__store[c.lastScreenKey()];
-  back.restoreLastScreen();
-  assert.deepEqual(back.opened, ['mail'],
-    '쓰다 만 편지가 있는데 쓰기로 안 돌아옵니다: ' + JSON.stringify(back.opened));
+  const rec = JSON.parse(c.__store[c.lastScreenKey()]);
+  assert.equal(rec.mail, false, '쓰다 만 편지가 있는데 메일함으로 적었습니다 — 돌아갈 자리를 잃습니다');
 });
 
 test('제목·본문만 건드린 편지도 기억한다 (받는 곳이 아직 비어 있어도)', () => {
@@ -293,8 +296,6 @@ test('제목·본문만 건드린 편지도 기억한다 (받는 곳이 아직 �
   c.state.view = 'mail'; c.state.mailSent = false;
   c._compose = { to: '', subject: '급여자료 요청', base: { subject: '' } };
   c.saveLastScreen();
-  const back = boot('uid-N3');
-  back.__store[back.lastScreenKey()] = c.__store[c.lastScreenKey()];
-  back.restoreLastScreen();
-  assert.deepEqual(back.opened, ['mail']);
+  const rec = JSON.parse(c.__store[c.lastScreenKey()]);
+  assert.equal(rec.mail, false);
 });

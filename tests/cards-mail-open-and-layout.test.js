@@ -79,9 +79,15 @@ test('머리(<head>)의 판단과 «같은 조건»을 쓴다 — 한쪽만 고�
 
 test('메일 화면으로 열려도 자료함·보낸 메일을 읽어 온다', () => {
   /* 화면만 메일로 두고 끝내면 자료 서랍이 빈 채로 열린다 —
-     사람이 누르는 것과 같은 함수(openMailPage)를 반드시 지나야 한다. */
-  assert.match(fnBody('restoreLastScreen'), /openMailPage\(\)/,
-    '★ openMailPage 를 안 지나면 자료함·보낸 메일이 안 읽힌다');
+     사람이 누르는 것과 같은 함수를 반드시 지나야 한다.
+     ⚠ 2026-09-14 부터 메일은 «메일 문»(view=mail)에서만 열린다(문이 세상을 정한다 —
+       tests/cards-door-decides-screen.test.js). 그 문은 openMailBox 를 지난다. 예전엔
+       openMailPage() 글자를 박아 두었는데, 그것은 기업정보함 문 아래의 옛 갈래였다. */
+  const body = fnBody('restoreLastScreen');
+  const door = body.indexOf('urlWantsMail()');
+  assert.ok(door > 0, '★ 메일 문을 가르는 자리가 없다');
+  assert.match(body.slice(door), /openMailBox\(/,
+    '★ 메일 문이 사람이 누르는 것과 같은 함수(openMailBox)를 안 지나면 자료함·보낸 메일이 안 읽힌다');
 });
 
 /* ══════ ② 본문 여백 ══════ */

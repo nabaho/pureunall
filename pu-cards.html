@@ -9935,6 +9935,18 @@ function restoreLastScreen(){
   let s = null;
   try{ s = JSON.parse(localStorage.getItem(lastScreenKey()) || 'null'); }catch(_){}
   if(!s || !s.view) return;            // 처음 오신 분 — 기본 화면 그대로
+  /* ★★ 문이 세상을 정한다 (대표 지시 2026-09-14 「기업정보함을 터치하면 무조건 메일로 넘어간다 — 반드시 고쳐 달라」)
+     여기까지 왔으면 «기업정보함 문»(주소에 view=mail 이 없다)으로 들어온 것이다. 그런데 마지막 화면이
+     메일이면 그대로 메일을 되살렸다 — 폰에서 메일을 마지막으로 쓴 사람은 기업정보함을 눌러도 «늘» 메일이
+     열렸다. 기기에만 적는 값이라 그 폰에서는 «무조건»이었다.
+     메일로 들어오는 문은 따로 있다(?view=mail — 포털의 「푸른 메일」 타일·홈 화면 아이콘). 그 문은 위에서
+     제 첫 화면을 스스로 정한다. 그러니 이 문에서는 **명함 쪽 화면만** 되살린다. 마지막 화면이 메일이었으면
+     명함 목록의 마지막 탭으로 간다 — 메일 갈래는 아래에 남기지 않는다(남기면 이 흠이 되살아난다).
+     ⚠ tests/cards-door-decides-screen.test.js 가 못 박는다. */
+  if(s.view === 'mail'){
+    if(s.tab && s.tab !== state.tab) switchTab(s.tab);
+    return;
+  }
   if(s.view === 'mat'){ openMatPage(); return; }
   /* 기업 상세 — 폰에만 갈래를 둔다(최종 전체 리뷰 M7). 이 화면은 이번 브랜치에서 처음
      생겨 갈래가 없었고, 그래서 폰에서 기업 상세를 보다 나갔다 들어오면 명함으로 열렸다.
@@ -9942,18 +9954,6 @@ function restoreLastScreen(){
   if(s.view === 'co'){
     let isPc = false; try{ isPc = document.body.classList.contains('pc'); }catch(_){}
     if(!isPc){ openCoMobile(); return; }
-  }
-  if(s.view === 'mail'){
-    /* ⚠ 'box'(다음메일함 목록)를 «맨 앞에» 둔다. 아래 `else if(s.mail)` 은 값이 있으면
-       참이라, 이 줄이 없으면 메일함을 보다 나갔다 들어올 때 「보낸 메일」이 열린다
-       (2026-08-24 에 그랬다). 갈래를 더할 때 이 자리를 함께 고쳐야 한다. */
-    if(s.mail === 'box') openMailBox(s.box || '');
-    else if(s.mail === 'inbox') openInbox();
-    else if(s.mail === 'co') openCoThread(s.co || '');
-    else if(s.mail === 'sched') openSchedBox();
-    else if(s.mail) openSentBox();
-    else openMailPage();
-    return;
   }
   /* 목록 — 명함/사업자 중 마지막에 보던 쪽 */
   if(s.tab && s.tab !== state.tab) switchTab(s.tab);
