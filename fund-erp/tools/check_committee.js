@@ -29,6 +29,10 @@ function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음
 global.esc = v => String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 (0, eval)(gF('_officersOf'));
 (0, eval)(gF('_isCommittee')); (0, eval)(gF('_prepCommittee'));
+/* 2026-09-14: 위원이 예순을 넘는 일이 흔하다 — 격자(세 줄)를 넘으면 이름을 별지로 뺀다.
+   ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
+(0, eval)((/var COMMITTEE_ROWS=\d+;/.exec(src) || ['var COMMITTEE_ROWS=0;'])[0]);
+['_cmOver', '_cmAnnexNeeded', '_cmSeeAnnex', 'committeeAnnexHTML'].forEach((n) => (0, eval)(gF(n)));
 (0, eval)(gF('_siteWrep'));
 
 const F = { name: '가나공동근로복지기금', chairman: '홍길동', fund_type: '공동',
@@ -53,8 +57,25 @@ ok('감사는 위원이 아니다 (「이사 겸 감사」도 뺀다)',
    !wk.concat(er).some(o => /감사/.test(o.name)), wk.concat(er).map(o => o.name).join(','));
 /* 이사장도 이사이므로 위원이 맞지만, 명부에 «측»이 없다 — 한쪽에 밀어 넣으면 틀린 서식이 나간다 */
 ok('이사장은 측이 없어 넣지 않는다', !wk.concat(er).some(o => o.name === '홍길동'));
-ok('서식 격자가 세 줄이라 셋까지만', _prepCommittee({ officers: Array.from({ length: 5 },
-  (_, i) => ({ role: '근로자측 이사', name: '노' + i })) }, '근로자측').length === 3);
+/* ⚠⚠ 여기는 2026-09-14 이전에 「셋까지만」을 못 박고 있었다. 그 탓에
+     ① 위원이 예순이어도 서식에는 «셋만» 나가고 나머지가 말없이 빠졌고
+     ② 회의록의 「이사 선임 : 각 ○ 명」도 늘 3으로 찍혔다.
+   검사를 지우지 않고 «뒤집어» 둔다 — 다음 사람이 .slice(0,3) 을 도로 넣으면 여기서 걸린다.
+   (대표 지시: 「설립준비위원회 위원이 60명 이상 … 성명을 별도의 페이지로 분리할 필요가 있다」) */
+const 예순 = { officers: Array.from({ length: 62 }, (_, i) => ({ role: '근로자측 이사', name: '노' + i })) };
+ok('세는 쪽은 «전부»를 본다 (자르는 일은 그리는 쪽이 한다)',
+  _prepCommittee(예순, '근로자측').length === 62, String(_prepCommittee(예순, '근로자측').length));
+ok('격자 줄 수는 한 곳에 적혀 있다', COMMITTEE_ROWS === 3, String(COMMITTEE_ROWS));
+ok('격자를 넘치는지 안다', _cmOver(예순, '근로자측') === true && _cmOver({ officers: [] }, '근로자측') === false);
+ok('앞장에는 「별지 명단과 같음」과 명수만', /별지 명단과 같음\(근로자측 62명\)/.test(_cmSeeAnnex(예순, '근로자측')),
+  _cmSeeAnnex(예순, '근로자측'));
+(() => {
+  const ax = committeeAnnexHTML(Object.assign({ name: '가짜기금' }, 예순));
+  const 줄수 = (ax.match(/<tr>/g) || []).length - 1;          // 머리줄 제외
+  ok('별지에는 예순두 명이 «전부» 나온다', 줄수 >= 62, String(줄수));
+  ok('별지에 첫 사람과 끝 사람이 다 있다', ax.includes('>노0<') && ax.includes('>노61<'));
+  ok('별지가 몇 명인지 적는다', /근로자측 62명/.test(ax));
+})();
 ok('명부가 없어도 안 터진다', (function () { try { return _prepCommittee({}, '근로자측').length === 0; } catch (e) { return false; } })());
 
 console.log('\n■ 죽은 칸을 읽던 곳이 남아 있지 않다');

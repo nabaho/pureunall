@@ -3646,6 +3646,12 @@ function paginateDoc(rawHTML){
     while(queue.length && ++guard<4000){
       var nd=queue.shift();
       if(nd.nodeType===3 && !String(nd.nodeValue||'').trim()) continue;    // 공백 텍스트 무시
+      /* ★ 「여기서부터 새 장」 표시 — 별지(설립준비위원회 위원 명단)가 앞장 꼬리에
+           붙어 버리면 «별지»가 아니다. 이미 빈 장이면 그 장을 쓴다(빈 장을 안 만든다). */
+      if(nd.nodeType===1 && nd.getAttribute && nd.getAttribute('data-newpage') && body.childNodes.length){
+        no++; page=_a4Page(no); ed.appendChild(page); pages.push(page);
+        body=page.querySelector('.a4b'); limit=body.clientHeight;
+      }
       body.appendChild(nd);
       if(!(limit>0 && body.scrollHeight>limit)) continue;                  // 들어갔다
       // 넘쳤다 → ① 표면 행 단위로 잘라 이 장을 채우고 남은 행은 다음 장으로
@@ -3918,12 +3924,48 @@ function _isCommittee(role){
   if(/감사/.test(r)) return false;
   return /이사/.test(r) || /대표/.test(r);
 }
+/* 원본 별지 제7호의 위원 격자는 «측마다 세 줄»뿐이다. 위원이 그보다 많으면
+   앞장에는 「별지 명단과 같음」만 적고 이름은 별지로 뺀다(대표 지시 2026-09-14:
+   「설립준비위원회 위원이 60명 이상 근로자 사용자로 되는경우가 많다. 따라서 성명을
+    별도의 페이지로 분리할 필요가 있다」). */
+var COMMITTEE_ROWS=3;
+/* ⚠ 예전에는 여기서 .slice(0,3) 을 했다. 격자가 세 줄이라는 이유였는데, 그 바람에
+     ① 위원이 예순이어도 서식에는 셋만 나가고 나머지가 «말없이» 빠졌고
+     ② 회의록의 「이사 선임 : 각 ○ 명」도 늘 3으로 찍혔다.
+   자르는 일은 «그리는 쪽»이 한다 — 세는 쪽·별지를 만드는 쪽은 전부를 봐야 한다. */
 function _prepCommittee(f,side){
   return _officersOf(f).filter(function(o){
     if(!_isCommittee(o.role)) return false;
     var r=String(o.role||'');
     return side==='사용자측' ? /사용자/.test(r) : /근로자/.test(r);
-  }).slice(0,3);
+  });
+}
+/* 이 측이 격자에 안 들어가는가 */
+function _cmOver(f,side){ return _prepCommittee(f,side).length>COMMITTEE_ROWS; }
+function _cmAnnexNeeded(f){ return _cmOver(f,'근로자측')||_cmOver(f,'사용자측'); }
+/* 격자에 적을 한 줄 — 「별지 명단과 같음(근로자측 62명)」 */
+function _cmSeeAnnex(f,side){ return '별지 명단과 같음('+side+' '+_prepCommittee(f,side).length+'명)'; }
+/* [별지] 설립준비위원회 위원 명단 — 측마다 번호를 새로 매긴다(관청이 측별로 센다).
+   ⚠ 생년월일은 명부에 없을 수 있다(개인정보라 안 담는 곳이 있다) — 비면 빈칸으로 둔다.
+     지어내지 않는다. 이 명단이 그대로 노동청에 나간다. */
+function committeeAnnexHTML(f){
+  var 줄=function(side){
+    var list=_prepCommittee(f,side);
+    if(!list.length) return "<tr><td class='center'>"+side+"</td><td class='center'>—</td>"
+      +"<td colspan='4' class='muted'>명부에 등록된 위원이 없습니다</td></tr>";
+    return list.map(function(o,i){
+      return "<tr><td class='center'>"+(i===0?side:'')+"</td><td class='center'>"+(i+1)+"</td>"
+        +"<td>"+esc(o.name||'')+"</td><td>"+esc(o.birth||'')+"</td>"
+        +"<td>"+esc(o.title||'')+"</td><td>"+esc(o.company||'')+"</td></tr>";
+    }).join('');
+  };
+  return "<h1>[별지] 기금법인 설립준비위원회 위원 명단</h1>"
+    +"<p>기금법인 명칭: <b>"+esc(f.name||'')+"</b></p>"
+    +"<table><tr><th style='width:70px'>구분</th><th style='width:44px'>번호</th><th>성명</th>"
+    +"<th style='width:110px'>생년월일</th><th style='width:110px'>직책</th><th>소속 사업장</th></tr>"
+    +줄('근로자측')+줄('사용자측')+"</table>"
+    +"<p class='note'>※ 「설립인가신청서(별지 제7호)」의 설립준비위원회 위원란에 갈음하여 붙입니다. "
+    +"근로자측 "+_prepCommittee(f,'근로자측').length+"명 · 사용자측 "+_prepCommittee(f,'사용자측').length+"명.</p>";
 }
 function fillCommittee(root,f){
   var sideOf=function(o){ var r=String(o.role||'');
@@ -3939,19 +3981,34 @@ function fillCommittee(root,f){
     }
     if(at<0) return;
     var list=pick(side);
-    for(var k=0;k<3;k++){
+    /* ★ 격자보다 많으면 «이름을 앞장에 흘리지 않는다» — 예순 명 중 셋만 찍히면
+         서식이 다 찬 것처럼 보인 채로 관청에 나간다. 첫 줄에 「별지 명단과 같음」만 적고
+         나머지 줄은 비워 둔다(뒷장의 별지가 진짜 명단이다). */
+    var 넘침=list.length>COMMITTEE_ROWS;
+    for(var k=0;k<COMMITTEE_ROWS;k++){
       var tr=trs[at+k]; if(!tr) break;
       /* 이 줄은 위원 격자다 — 아래 라벨 채우기가 손대면 안 된다.
          「생년월일」·「직책」 라벨이 대표자란에도 있어, 표시가 없으면 서로 덮어쓴다. */
       tr.setAttribute('data-cm','1');
+      var blanks=[].slice.call(tr.children).filter(function(c){ return !(c.textContent||'').trim(); });
+      if(넘침){
+        if(k===0 && blanks.length) blanks[0].textContent=_cmSeeAnnex(f,side);
+        continue;                                  /* 둘째·셋째 줄은 비워 둔다 */
+      }
       var o=list[k]; if(!o) break;
       // 그 줄의 «빈 칸»만 골라 성명·생년월일·직책 차례로 넣는다
-      var blanks=[].slice.call(tr.children).filter(function(c){ return !(c.textContent||'').trim(); });
       if(blanks.length<3) continue;
       var v=[o.name||'', o.birth||'', o.title||''];
       for(var j=0;j<3;j++) if(v[j]) blanks[j].textContent=v[j];
     }
   });
+  /* 별지를 «뒷장»에 붙인다 — data-newpage 가 있으면 쪽 나누기가 새 장에서 시작한다 */
+  if(_cmAnnexNeeded(f)){
+    var ax=document.createElement('div');
+    ax.setAttribute('data-newpage','1'); ax.setAttribute('data-kept','1');
+    ax.innerHTML=committeeAnnexHTML(f);
+    root.appendChild(ax);
+  }
 }
 /* ══ 박혀 있는 «남의 값» 걷어내기 ══
    변환한 원본 .hwp 가 어느 기금이 실제로 낸 서류라, 금액·날짜·계좌번호가 그대로 남았다.
@@ -5059,8 +5116,14 @@ function docBody(kind,f,sites){
       +"<table><tr><th style='width:120px'>일시</th><td>"+dgV(f.meeting_date,12)+"</td></tr>"
       +"<tr><th>장소</th><td>"+dgV(f.meeting_place||f.address,18)+"</td></tr>"
       /* 위원은 «임원 명부»에서 읽는다 — emp_committee·worker_committee 는 쓰는 곳이 없어 늘 비었다 */
-      +"<tr><th>참석</th><td>사용자측 위원 "+dgV(_prepCommittee(f,'사용자측').map(function(o){return o.name;}).join(', '),10)
-      +" / 근로자측 위원 "+dgV(_prepCommittee(f,'근로자측').map(function(o){return o.name;}).join(', '),10)+"</td></tr></table>"
+      /* ★ 위원이 예순이면 이름을 한 줄로 늘어놓을 수 없다 — 명수만 적고 명단은 별지로
+           보낸다(대표 지시 2026-09-14). 열 명 안쪽이면 종전처럼 이름을 그대로 적는다. */
+      +"<tr><th>참석</th><td>"+['사용자측','근로자측'].map(function(side){
+        var L=_prepCommittee(f,side);
+        return side+' 위원 '+(L.length>COMMITTEE_ROWS
+          ? L.length+'명('+esc(_cmSeeAnnex(f,side))+')'
+          : dgV(L.map(function(o){return o.name;}).join(', '),10));
+      }).join(' / ')+"</td></tr></table>"
       +"<h2>안건</h2><p>1. "+fname+" 설립에 관한 사항<br>2. 정관 제정에 관한 사항<br>3. 임원 선출에 관한 사항<br>4. 기금출연 확정에 관한 사항<br>5. 기타 설립 관련 사항</p>"
       +"<h2>심의 결과</h2><p>제1호: 위원 전원 찬성으로 \""+fname+"\" 설립을 의결하였다.<br>"
       +"제2호: 정관(안)을 원안대로 의결하였다.<br>제3호: 이사장에 "+dgV(chairman)+"을(를) 선출하였다.<br>"
@@ -5438,7 +5501,13 @@ function docBody(kind,f,sites){
          두 길이 서로 다른 곳을 보고 있던 것이라, 명부 한 곳으로 모은다.
        ⚠ 감사는 위원이 아니다. 이사장은 명부에 «측»이 안 적혀 있어 넣지 않는다 —
          한쪽에 밀어 넣으면 서식이 그럴듯하게 틀린 채로 관청에 간다. */
-    function wrows(side,list){ if(!list.length)list=[{}]; return list.map(function(o,i){
+    /* ★ 위원이 격자(세 줄)보다 많으면 앞장에는 「별지 명단과 같음」만 적는다 —
+         이름은 뒷장 별지로 뺀다(대표 지시 2026-09-14). */
+    function wrows(side,list){
+      if(list.length>COMMITTEE_ROWS)
+        return "<tr><td class='center'>"+side+"</td><td colspan='3'>"+esc(_cmSeeAnnex(f,side))+"</td></tr>";
+      if(!list.length)list=[{}];
+      return list.map(function(o,i){
       return "<tr><td class='center'>"+(i===0?side:'')+"</td><td>"+dgV(o.name,6)+"</td>"
         +"<td>"+dgV(o.birth,12)+"</td><td>"+dgV(o.title,8)+"</td></tr>";}).join(''); }
     var wk=_prepCommittee(f,'근로자측'), er=_prepCommittee(f,'사용자측');
@@ -5455,7 +5524,10 @@ function docBody(kind,f,sites){
       +"<p>「근로복지기본법」 제52조제5항ㆍ제86조의15 및 같은 법 시행규칙 제20조에 따라 위와 같이 설립인가를 신청합니다.</p>"
       +"<p class='center'>"+dgToday()+"</p><div class='sign'>신청인 대표: "+dgV(chairman)+" (서명 또는 인)</div>"
       +"<p>"+dgV(f.labor_office||'○○지방고용노동청(○○지청)',10)+"장 귀하</p>"
-      +"<h2>첨부서류</h2><p>1. 정관 1부<br>2. 설립준비위원 재직증명 등 1부<br>3. 출연확인서 또는 재산목록 1부<br>4. 사업계획서 및 예산서 1부</p>";
+      +"<h2>첨부서류</h2><p>1. 정관 1부<br>2. 설립준비위원 재직증명 등 1부<br>3. 출연확인서 또는 재산목록 1부<br>4. 사업계획서 및 예산서 1부"
+      +(_cmAnnexNeeded(f)?"<br>5. 설립준비위원회 위원 명단 1부(별지)":"")+"</p>"
+      /* 별지는 «뒷장»이다 — data-newpage 가 쪽 나누기에 새 장을 열게 한다 */
+      +(_cmAnnexNeeded(f)?"<div data-newpage='1'>"+committeeAnnexHTML(f)+"</div>":"");
   }
   if(kind==='contrib'){
     var target=(ftype==='공동'&&sites.length)?sites:[{name:repOrg(f,sites),ceo:'',biz_no:'',address:''}];
