@@ -144,7 +144,10 @@ function rowDeps() {
          (keepBox() 에도 같은 목록이 있다 — «둘 다» 넣어야 한다.) */
     fnSource('pickRows'), fnSource('pickTypes'),
     /* 거르개가 «종류(자문·급여)»에서 «자문료»로 바뀌었다 (2026-09-06) —
-       업체관리 딱지가 실제 거래를 안 따라가서다(자문료 182 / 「자문」 딱지 84). */
+       업체관리 딱지가 실제 거래를 안 따라가서다(자문료 182 / 「자문」 딱지 84).
+       ⚠ 2026-09-14 부터 푸른이알피 유형(자문·급여·노조·기금)도 «함께» 거른다 —
+         ERP_TYPES·typeMatch 를 안 실으면 feeMatch 가 그 자리에서 죽는다. */
+    constLine('ERP_TYPES'), fnSource('typeMatch'),
     constLine('FEE_FILTERS'), fnSource('feeMatch'), fnSource('feeCounts'),
     fnSource('defaultFilterOf'), fnSource('listCountHtml'), fnSource('rowsHtml')
   ].map(noConst).join('\n') + '\n';

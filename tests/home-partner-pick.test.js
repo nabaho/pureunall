@@ -58,7 +58,9 @@ function 상자(회사들, 표시들) {
      그래서 최상위 const 는 var 로 바꿔 싣는다 — 두 번 나와도 괜찮다.
      (pu-home-screen.test.js 의 noConst 가 같은 일을 한다.) */
   const 콘스트풀기 = (s) => s.replace(/(^|\n)const /g, '$1var ');
-  ['partnerMark', 'postedOf', 'partnerRows', 'feeMatch', 'feeCounts',
+  /* ⚠ typeMatch 는 feeMatch 가 부른다 (2026-09-14 푸른이알피 유형 거르기).
+       안 실으면 「typeMatch is not defined」로 그 자리에서 죽는다. */
+  ['partnerMark', 'postedOf', 'partnerRows', 'typeMatch', 'feeMatch', 'feeCounts',
    'pickRows', 'pickVisible', 'pickTypes',
    'pickChanges', 'openPartnerPick'].forEach(n => vm.runInContext(콘스트풀기(함수(n)), ctx));
   /* openPartnerPick 은 그리기까지 부른다 — 셈만 볼 것이므로 그리기는 삼킨다 */
@@ -170,11 +172,35 @@ test('★★ 거르개가 «종류»가 아니라 «자문료»다 — 종류 �
   assert.deepEqual(ctx.pickVisible().map(r => r.name), ['세종정밀'], '★ 이름 찾기가 안 된다');
   ctx.Pick.q = '';
 
-  /* 갈래 셈에 거래 끝난 곳·사무대행이 안 섞인다 */
+  /* 갈래 셈에 거래 끝난 곳·사무대행이 안 섞인다.
+     ⚠ 2026-09-14 부터 푸른이알피 유형(자문·급여·노조·기금)도 «함께» 나온다 —
+       갈래 목록을 통째로 못 박지 말고, 자문료 갈래가 «살아 있는지»만 본다. */
   const 갈래 = ctx.pickTypes();
-  assert.deepEqual(갈래.map(t => t.k).sort(), ['fee', 'nofee'],
-    '★ 거르개 갈래가 자문료 기준이 아니다');
+  ['fee', 'nofee'].forEach(k => assert.ok(갈래.some(t => t.k === k),
+    '★ 자문료 갈래(' + k + ')가 사라졌다 — 「급여」 딱지인 자문사를 놓친다'));
   assert.equal((갈래.find(t => t.k === 'fee') || {}).n, 2, '★ 자문료 셈이 틀렸다');
+});
+
+test('★★ 푸른이알피 유형(자문·급여·노조·기금)으로도 걸러진다', () => {
+  /* 대표 지시 2026-09-14 「푸른이알피 구분한 것으로 연결해서 구분해라」.
+     업체관리 화면의 유형 칩과 «같은 값»(typeCode)으로 거른다. */
+  const ctx = 상자(회사들, 표시들);
+  ctx.Pick.q = '';
+  /* 「급여」 딱지 둘 — 세종정밀(자문료 있음)·한빛식품(없음). 딱지로 고르면 둘 다 나온다 */
+  ctx.Pick.type = '급여';
+  assert.deepEqual(ctx.pickVisible().map(r => r.name).sort(), ['세종정밀', '한빛식품'].sort(),
+    '★★ 업체관리 유형으로 안 걸러집니다');
+  /* 「자문」 딱지 둘 — 삼정테크는 거래 끝나 안 나오고, 사무대행도 빠진다 */
+  ctx.Pick.type = '자문';
+  assert.deepEqual(ctx.pickVisible().map(r => r.name).sort(), ['가온전자', '대성물류'].sort(),
+    '★★ 「자문」이 안 걸러집니다');
+  /* 푸른이알피 유형이 «먼저» 나온다 — 업체관리에서 보시던 차례다 */
+  const 갈래 = ctx.pickTypes();
+  assert.equal(갈래[0].k, '자문',
+    '★ 업체관리 유형이 앞에 안 섭니다: ' + 갈래.map(t => t.k).join(','));
+  assert.equal((갈래.find(t => t.k === '급여') || {}).n, 2);
+  /* 0건인 유형(노조·기금)은 안 낸다 — 눌러 봐야 빈 화면이다 */
+  assert.ok(!갈래.some(t => t.k === '노조'), '0건짜리 갈래가 나왔습니다');
 });
 
 test('★★ 「보이는 것 전부 고르기」는 «걸러진 것만» 건드린다', () => {
@@ -428,12 +454,31 @@ test('★★ 사무대행은 «올림으로 표시돼 있어도» 홈페이지�
     '★ 사무대행이 고르는 창에 있습니다');
 });
 
-test('★★ 종류 딱지 대신 «자문료»를 화면에 적는다 — 못 믿는 것을 앞세우지 않는다', () => {
+test('★★ 줄에 «푸른이알피 유형»과 «자문료»를 함께 적는다', () => {
+  /* 2026-09-14 대표 지시로 유형을 앞에 함께 적는다 — 전에는 마우스를 올려야 보였다.
+     ⚠ 자문료를 빼지 말 것. 종류 딱지는 실제 거래를 안 따라간다(2026-09-06). */
   const g = 함수('pickGridHtml');
-  assert.match(g, /r\.advFee \? '자문료'/,
-    '★★ 자문료를 안 적습니다 — 못 믿는 종류 딱지가 앞에 섭니다');
-  /* 종류를 «없애지는» 않는다 — 마우스를 올리면 보인다 */
-  assert.match(g, /업체관리 종류/, '★ 업체관리 종류를 아예 지웠습니다');
+  /* ⚠ 「r.typeCode 가 어딘가 쓰였나」로 보면 안 된다 — 마우스 설명(title)에도 있어서,
+       «보이는 칸»에서 떼어 내도 통과한다(2026-09-14 되돌림 검사가 잡았다).
+     오른쪽 칸(class="ty") «안»에 둘 다 있는지를 본다. */
+  const 오른칸 = /class="ty"[\s\S]{0,320}?<\/span>'/.exec(g);
+  assert.ok(오른칸, '★ 오른쪽 칸을 못 찾았습니다');
+  assert.match(오른칸[0], /r\.advFee/, '★★ 자문료를 안 적습니다 — 못 믿는 딱지만 남습니다');
+  /* ⚠ «그려지는» 자리를 본다 — r.typeCode 는 띄어쓰기를 정하는 삼항에도 나와서,
+       정작 값을 그리는 줄을 빼도 「r.typeCode 가 있나」로는 안 걸린다. */
+  assert.match(오른칸[0], /esc\(r\.typeCode\)/,
+    '★★ 푸른이알피 유형을 «그리지» 않습니다');
+});
+
+test('★★ 유형은 «똑같아야» 맞다 — 비슷하면 안 된다', () => {
+  const ctx = 상자(회사들, 표시들);
+  assert.equal(ctx.typeMatch({ typeCode: '자문' }, '자문'), true);
+  assert.equal(ctx.typeMatch({ typeCode: '급여' }, '자문'), false);
+  /* 「자문」이 «들어 있기만» 한 것을 맞다고 하면 엉뚱한 업체가 딸려 온다 */
+  assert.equal(ctx.typeMatch({ typeCode: '자문컨설팅' }, '자문'), false,
+    '★★ 비슷한 이름을 맞다고 합니다 — 엉뚱한 업체가 딸려 옵니다');
+  assert.equal(ctx.typeMatch({}, '자문'), false);
+  assert.equal(ctx.typeMatch({ typeCode: '자문' }, ''), true, '거르개를 풀면 다 나와야 합니다');
 });
 
 /* ══════ 붙은 머리 (2026-09-06 「상단 틀고정과 저장·닫기도 상단에」) ══════ */

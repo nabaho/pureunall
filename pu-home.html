@@ -1543,15 +1543,34 @@ function pickRows() {
      「급여」 딱지인데 자문료만 받는 곳 41.
    종류로 고르면 자문사 100곳쯤을 놓친다. */
 const FEE_FILTERS = [{ k: 'fee', label: '자문료 받는 곳' }, { k: 'nofee', label: '자문료 없는 곳' }];
+
+/* ★ 푸른이알피가 «이미 가른 것»으로도 거른다 (대표 지시 2026-09-14
+     「푸른이알피 구분한 것으로 연결해서 구분해라」).
+   업체관리는 typeCode 에 자문·급여·노조·기금 넷을 담고, 그 화면의 유형 칩이
+   그대로 이 넷이다(pu-erp.html 의 COMPANY_TYPE_FILTERS·SOURCE_LIST 와 같은 값).
+   ⚠ 이름을 우리가 새로 짓지 않는다 — 업체관리에서 부르는 이름 그대로여야
+     두 화면을 오갈 때 같은 것을 가리키는지 알 수 있다.
+   ⚠ 자문료 거르개를 «없애지 않는다». 2026-09-06 에 세어 보니 딱지가 실제 거래를
+     안 따라갔다(거래 중 206곳 중 자문료 182 / 「자문」 딱지 84 / 「급여」인데
+     자문료만 41). 종류로만 고르면 자문사 백 곳쯤을 놓친다 — 둘 다 둔다. */
+const ERP_TYPES = ['자문', '급여', '노조', '기금'];
+function typeMatch(r, k) {
+  if (!k) return true;
+  return String((r && r.typeCode) || '') === k;
+}
 function feeMatch(r, k) {
   if (!k) return true;
+  /* 푸른이알피 유형이면 그것으로, 아니면 자문료로 — 거르개 하나가 두 기준을 다 받는다 */
+  if (ERP_TYPES.indexOf(k) >= 0) return typeMatch(r, k);
   return k === 'fee' ? !!r.advFee : !r.advFee;
 }
-/* 갈래마다 몇인지 — 0건짜리는 안 낸다(눌러 봐야 빈 화면이다) */
+/* 갈래마다 몇인지 — 0건짜리는 안 낸다(눌러 봐야 빈 화면이다).
+   푸른이알피 유형을 «먼저» 낸다 — 대표께서 그 화면에서 보시던 차례와 같다. */
 function feeCounts(rows) {
-  return FEE_FILTERS
-    .map(f => ({ k: f.k, label: f.label, n: (rows || []).filter(r => feeMatch(r, f.k)).length }))
-    .filter(f => f.n);
+  const 것 = ERP_TYPES.map(t => ({ k: t, label: t, n: (rows || []).filter(r => typeMatch(r, t)).length }))
+    .concat(FEE_FILTERS.map(f => ({ k: f.k, label: f.label,
+      n: (rows || []).filter(r => feeMatch(r, f.k)).length })));
+  return 것.filter(f => f.n);
 }
 
 /* 찾기와 종류로 걸러 «지금 보이는» 것. 「보이는 것 전부 고르기」가 무엇을 고르는지가
@@ -1670,7 +1689,10 @@ function pickNoteHtml() {
      「업체 종류로 자동으로 고르지 않습니다」라고 말하고 있다. 체크만 되고 저장은
      사람이 누르므로 그 말과 어긋나지 않는다 — 그 사실을 여기 적어 어긋남을 막는다. */
   if (!Pick.type) return '';
-  const 이름 = (FEE_FILTERS.find(f => f.k === Pick.type) || {}).label || Pick.type;
+  /* 푸른이알피 유형이면 그 이름 그대로, 아니면 자문료 이름 */
+  const 이름 = ERP_TYPES.indexOf(Pick.type) >= 0
+    ? ('업체관리 ' + Pick.type)
+    : ((FEE_FILTERS.find(f => f.k === Pick.type) || {}).label || Pick.type);
   return '<div class="sub" style="margin-top:6px">「' + esc(이름) + '」만 보고 있습니다 — '
     + '<b>체크만 될 뿐 저장은 눌러야 됩니다.</b> 올리지 않을 곳은 눈으로 보고 풀어 주십시오.</div>';
 }
@@ -1684,9 +1706,14 @@ function pickGridHtml() {
     + ' onchange="pickToggle(\'' + esc(r.key) + '\')">'
     + '<span class="nm" title="' + esc(r.name) + (r.typeCode ? ' · 업체관리 종류 ' + esc(r.typeCode) : '')
     + '">' + esc(r.name) + '</span>'
-    /* ★ 오른쪽에는 «자문료를 받는가»를 적는다 — 종류 딱지는 못 믿는다(2026-09-06).
-       종류는 마우스를 올리면 이름 옆에 뜬다. */
-    + '<span class="ty">' + (r.advFee ? '자문료' : esc(r.typeCode || '')) + '</span>'
+    /* ★ 오른쪽에 «푸른이알피 유형»과 «자문료»를 함께 적는다 (대표 지시 2026-09-14).
+       전에는 자문료만 적고 유형은 마우스를 올려야 보였다 — 업체관리에서 유형으로
+       보시던 분이 여기서 같은 것을 못 찾으셨다. 둘 다 짧게 적는다.
+       ⚠ 종류 딱지는 실제 거래를 안 따라간다(2026-09-06) — 그래서 «자문료»를 함께 남긴다. */
+    + '<span class="ty">'
+    + (r.typeCode ? '<b>' + esc(r.typeCode) + '</b>' : '')
+    + (r.advFee ? (r.typeCode ? ' ' : '') + '자문료' : '')
+    + '</span>'
     + '</label>').join('') + '</div>';
 }
 /* 붙은 머리의 «오른쪽» — 셈과 저장·닫기. 굴려도 늘 여기 있다.
@@ -5349,7 +5376,7 @@ function listHtml() {
           const 갈래 = pickTypes();
           if (!갈래.length) return '';
           return '<select onchange="App.setType(this.value)"'
-            + ' title="업체관리의 «자문·급여» 딱지는 실제 거래를 안 따라갑니다 — 자문료로 거릅니다">'
+            + ' title="앞쪽은 푸른ERP 업체관리의 유형(자문·급여·노조·기금), 뒤쪽은 실제 자문료입니다">'
             + '<option value=""' + (App.coType ? '' : ' selected') + '>전체</option>'
             + 갈래.map(t => '<option value="' + esc(t.k) + '"'
                 + (App.coType === t.k ? ' selected' : '') + '>'
