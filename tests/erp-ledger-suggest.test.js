@@ -28,6 +28,9 @@ function load(hooks) {
     erpIsCmsMemo: () => false,
     erpAlreadyConfirmed: () => [],
     erpContractHint: () => null,
+    /* 「이미 받음으로 적힌 건」 안내 (2026-09-14) — 후보가 없을 때만 불린다.
+       여기 없으면 그 자리에서 죽어 이 파일의 검사가 통째로 빨개진다. */
+    erpPaidAlreadyHint: () => null,
     erpInvoiceSuggest: () => []
   }, hooks || {});
   vm.createContext(sandbox);
