@@ -470,6 +470,34 @@ test('★★ 줄에 «푸른이알피 유형»과 «자문료»를 함께 적는
     '★★ 푸른이알피 유형을 «그리지» 않습니다');
 });
 
+test('★★ 체크 앞에 «지금 보이는 차례» 번호가 붙는다 (대표 지시 2026-09-14)', () => {
+  /* 글자로만(「\+ 1」이 있나) 보면 번호가 셈과 안 맞아도 통과한다.
+     실제로 pickGridHtml 을 돌려 몇 번째 줄에 몇 번이 찍히는지 잰다.
+     ⚠ pickRows 를 떼어 오면 그 사이에 낀 FEE_FILTERS·ERP_TYPES 도 함께 실려
+       feeMatch·typeMatch 가 죽지 않는다 (위 상자() 주석과 같은 까닭). */
+  const ctx = { Pick: { sel: {}, q: '', type: '' }, esc: x => String(x) };
+  vm.createContext(ctx);
+  const 콘스트풀기 = (s) => s.replace(/(^|\n)const /g, '$1var ');
+  ['pickRows', 'typeMatch', 'feeMatch', 'pickVisible', 'pickGridHtml']
+    .forEach(n => vm.runInContext(콘스트풀기(함수(n)), ctx));
+  ctx.pickRows = () => [
+    { key: 'c1', name: '가나상사', advFee: true },
+    { key: 'c2', name: '홍길동컴퍼니', advFee: false },
+    { key: 'c3', name: '다라상사', advFee: true }
+  ];
+  const html = ctx.pickGridHtml();
+  const 번호들 = [...html.matchAll(/class="no">(\d+)</g)].map(m => Number(m[1]));
+  assert.deepEqual(번호들, [1, 2, 3], '★★ 보이는 차례대로 1부터 매겨지지 않습니다');
+
+  ctx.Pick.q = '상사';   // 찾기로 걸러도(가나상사·다라상사만 남아도) 다시 1부터
+  const html2 = ctx.pickGridHtml();
+  assert.ok(html2.indexOf('가나상사') > 0 && html2.indexOf('홍길동컴퍼니') < 0,
+    '★ 찾기가 안 걸러졌습니다(검사 준비가 틀렸습니다)');
+  const 번호들2 = [...html2.matchAll(/class="no">(\d+)</g)].map(m => Number(m[1]));
+  assert.deepEqual(번호들2, [1, 2],
+    '★★ 찾기로 걸러 두 곳만 남았는데 번호가 걸러지기 전 자리(1·3)를 그대로 씁니다');
+});
+
 test('★★ 유형은 «똑같아야» 맞다 — 비슷하면 안 된다', () => {
   const ctx = 상자(회사들, 표시들);
   assert.equal(ctx.typeMatch({ typeCode: '자문' }, '자문'), true);

@@ -603,6 +603,7 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   border:1px solid var(--line-soft);border-radius:8px;overflow:hidden;margin-top:8px}
 .pcel{display:flex;align-items:center;gap:7px;padding:4px 8px;font-size:12.5px;min-width:0;
   border-bottom:1px solid var(--line-soft);cursor:pointer}
+.pcel .no{color:var(--sub);font-size:11px;flex:none;min-width:1.8em;text-align:right}
 .pcel .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pcel .ty{color:var(--sub);font-size:11px;flex:none}
 .pcel input{margin:0;flex:none}
@@ -1701,8 +1702,9 @@ function pickGridHtml() {
   if (!보임.length) {
     return '<div class="empty">' + ((Pick.q || Pick.type) ? '찾는 회사가 없습니다.' : '고를 업체가 없습니다.') + '</div>';
   }
-  return '<div class="pgrid">' + 보임.map(r =>
-    '<label class="pcel"><input type="checkbox" ' + (Pick.sel[r.key] ? 'checked' : '')
+  return '<div class="pgrid">' + 보임.map((r, i) =>
+    '<label class="pcel"><span class="no">' + (i + 1) + '</span>'
+    + '<input type="checkbox" ' + (Pick.sel[r.key] ? 'checked' : '')
     + ' onchange="pickToggle(\'' + esc(r.key) + '\')">'
     + '<span class="nm" title="' + esc(r.name) + (r.typeCode ? ' · 업체관리 종류 ' + esc(r.typeCode) : '')
     + '">' + esc(r.name) + '</span>'
