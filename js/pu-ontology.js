@@ -54,11 +54,13 @@
     /* ⚠ 소유 저장뿌리는 «코드가 쓰는 자리»를 다 적는다 — 하나라도 빠지면
        그 자료는 온톨로지가 영영 못 본다. tests/ontology-registry.test.js 가
        앱·서버가 실제로 쓰는 뿌리를 훑어 여기와 맞춘다. */
-    /* erp_docs·erp_doc_idx·erp_doc_text 는 «서면함»이다 (2026-09-13).
-       data 밑이 아니라 뿌리로 가른 까닭은 규칙 만들개에 적어 두었다 —
-       data 는 맨 위가 재무 권한이라 그 밑에 두면 서면이 통째로 열린다. */
+    /* ⚠ erp_docs·erp_doc_idx·erp_doc_text(서면함)는 2026-09-14 에 뺐다 —
+       대표 지시 「서면함 필요없다 삭제해라」. 코드가 그 자리를 더는 안 쓴다.
+       ★ 서버의 세 자리는 «비어 있고»(2026-09-14 확인) 규칙만 남아 있다.
+         규칙은 일부러 안 건드렸다 — 규칙 지우기는 안전장치를 건드리는 별개의 일이다.
+         다시 만들 일이 없다고 정해지면 그때 scripts/make-firebase-rules.js 에서 함께 뺀다. */
     erp:{ name:'푸른이알피', file:'pu-erp.html',
-      primaryRoots:['data','improve_requests','hanaSmsBridge','ieum_public','erp_docs','erp_doc_idx','erp_doc_text'],
+      primaryRoots:['data','improve_requests','hanaSmsBridge','ieum_public'],
       entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
     consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting'],
       sharedRoots:['data/consultings','puphotos'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
