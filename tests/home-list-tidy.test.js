@@ -108,6 +108,20 @@ test('뺀 것이 없으면 첫 딱지는 그대로 「전체」다', () => {
   assert.match(첫딱지[1], /전체/);
 });
 
+test('★★ 뺀 뒤에는 번호를 «다시 매긴다» — 1,3,4,5,7… 로 비어 있으면 안 된다', () => {
+  const 보임 = 줄상자(아홉).visibleRows('members');
+  assert.deepEqual(보임.map(r => r._no), [1, 2, 3],
+    '★★ 번호에 빈자리가 있습니다 — 「내가 뭘 놓쳤나」 싶어집니다: ' + 보임.map(r => r._no).join(','));
+});
+
+test('딱지로 걸러 볼 때도 번호는 그 목록 기준이다', () => {
+  const ctx = 줄상자(아홉);
+  ctx.App.filter = 'done';
+  const 번호 = ctx.visibleRows('members').map(r => r._no);
+  assert.equal(번호.length, 2);
+  assert.ok(번호.every(n => n > 0), '번호가 비었습니다');
+});
+
 test('★ 목록 머리가 «뺐다»고 말한다 — 조용히 빼면 목록을 의심한다', () => {
   const ctx = 줄상자(아홉);
   const 머리 = ctx.listCountHtml();
