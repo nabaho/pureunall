@@ -19,7 +19,7 @@
 <script src="js/pu-ontology.js?v=25"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=2"></script>
-<script src="js/pu-gate.js?v=1"></script>
+<script src="js/pu-gate.js?v=2"></script>
 <script src="js/pu-health.js?v=3"></script>
 <script src="js/pu-version.js?v=3"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
@@ -1288,7 +1288,7 @@ try{
   } else { gate(); } });
 }catch(e){ $('root').innerHTML='<div class="gate">초기화 실패: '+esc(e.message)+'</div>'; }
 /* 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (js/pu-gate.js) */
-function gate(){ PuGate.show({ name:'업무관리', desc:'푸른노무법인 · 업무·일정' }); }
+function gate(){ PuGate.show(); }
 
 /* 큰 목록은 value 로 지켜보지 않는다. value 는 항목 하나만 바뀌어도 목록 전체를
    모든 열린 화면으로 다시 내려보낸다. 최초에는 child_added 로 한 번 채우고,

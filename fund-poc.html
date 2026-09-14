@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-resilience.js?v=2"></script>
-<script src="js/pu-gate.js?v=1"></script>
+<script src="js/pu-gate.js?v=2"></script>
 <script src="js/pu-health.js?v=3"></script>
 <script src="js/pu-version.js?v=3"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
@@ -118,7 +118,7 @@ try {
 } catch(e){ $('app').innerHTML='<div class="gate">Firebase 초기화 실패: '+esc(e.message)+'</div>'; }
 
 function gate(){
-  PuGate.show({ name:'기금관리(실험)', desc:'푸른노무법인 · 근로복지기금' });
+  PuGate.show();
 }
 
 function boot(){

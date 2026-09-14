@@ -677,6 +677,8 @@ table.daejo td.dj2{padding:0}
   [contenteditable]{outline:none!important;background:none!important}
 }
 </style>
+  <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
+  <script src="js/pu-gate.js?v=2"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=10"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -4907,6 +4909,10 @@ try{if(window.firebase){firebase.initializeApp(FB_CONFIG);FBDB=firebase.database
     try{ window.dispatchEvent(new CustomEvent("pu-cfg",{detail:window.PU_CFG})); }catch(_){}
   }).catch(function(){}); }catch(e){}
   firebase.auth().onAuthStateChanged(u=>{FBUSER=u;FBNAME=null;updateWho();
+    /* ⚠★ 로그아웃 화면이 «아예 없었다» (대표 지시 2026-09-14 실측으로 드러남).
+       구독만 끊고 화면은 그대로 두니, 로그아웃한 줄 모르고 빈 표를 들여다보게 된다.
+       이제 모든 앱과 같은 자물쇠 화면을 보인다. */
+    try{ if(u) PuGate.hide(); else PuGate.show(); }catch(_g){}
     if(u){subscribeArch();subscribeMfix();resolveUserName();loadErpCompanies();pullDecisions();
       loadDrafts();               // 로그인 전 호출은 FBUSER 가 없어 클라우드 문서를 못 읽었다 — 여기서 한 번 더
       checkCloudWorkSession();   // 재로그인 시 계정에 남은 작업 세션 이어받기

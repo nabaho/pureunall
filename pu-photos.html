@@ -1761,6 +1761,8 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 #probeOut{margin:12px 0 0;font-size:12.5px;line-height:1.6;white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px;min-height:20px}
 #probeOut:empty{display:none}
 </style>
+  <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
+  <script src="js/pu-gate.js?v=2"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=10"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -2905,7 +2907,10 @@ firebase.auth().onAuthStateChanged(u => {
   if (photoBootTimer) { clearTimeout(photoBootTimer); photoBootTimer = null; }
   const signedIn = !!(u && u.email);
   $('who').textContent = signedIn ? (u.displayName || u.email) : '';
-  $('login').style.display = signedIn ? 'none' : 'flex';
+  /* ⚠★ 로그아웃 화면은 «모든 앱이 같은 것»을 쓴다 (대표 지시 2026-09-14 「모두 캡쳐1의 모습으로」).
+     제 화면(#login)은 그대로 두되 «안 띄운다» — 지우면 안에 딸린 것들이 함께 죽는다. */
+  $('login').style.display = 'none';
+  try { if (signedIn) PuGate.hide(); else PuGate.show(); } catch (_g) {}
   $('home').style.display = signedIn ? 'flex' : 'none';
   /* ⚙️(설정·창고 점검)는 대시보드 맨 아래에 있고, 대시보드는 로그인 뒤에만 뜬다.
      로그아웃 상태로 점검하면 권한 거부가 나서 "규칙 문제"로 잘못 보고되므로

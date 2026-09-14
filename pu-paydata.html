@@ -27,7 +27,7 @@
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=2"></script>
-<script src="js/pu-gate.js?v=1"></script>
+<script src="js/pu-gate.js?v=2"></script>
 <script src="js/pu-health.js?v=3"></script>
 <script src="js/pu-version.js?v=3"></script>
 <script src="js/pu-paydata-store.js?v=10"></script>
@@ -872,12 +872,9 @@ try { store = firebase.storage(); } catch (e) { store = null; }
 
 firebase.auth().onAuthStateChanged(function (user) {
   if (user) { App.me = user; afterLogin(); return; }
-  /* 로그인은 통합 포털 한 곳에서만 한다 — 앱마다 두면 계정 문제를 앱 수만큼 겪는다. */
-  if (!/[?&]login=1/.test(location.search) && location.protocol !== 'file:') {
-    location.replace('enter.html?v=' + Math.floor(Date.now() / 600000));
-    return;
-  }
-  PuGate.show({ name:'급여데이터함', desc:'푸른노무법인 · 급여 자료' });
+  /* 로그인은 통합 포털 한 곳에서만 한다 — 앱마다 두면 계정 문제를 앱 수만큼 겪는다.
+     ⚠★ 포털로 «튕기지» 않는다 (대표 지시 2026-09-14) — 자물쇠 화면을 보이고 누르게 한다 */
+  PuGate.show();
 });
 
 function afterLogin() {

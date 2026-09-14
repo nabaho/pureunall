@@ -34,7 +34,7 @@
 <script src="js/pu-ontology.js?v=25"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-version.js?v=3"></script>
-<script src="js/pu-gate.js?v=1"></script>
+<script src="js/pu-gate.js?v=2"></script>
 <script src="js/pu-whoami.js?v=1"></script>
 <script src="js/pu-appbar.js?v=10"></script>
 <script>
@@ -835,10 +835,8 @@ db = firebase.database();
 
 firebase.auth().onAuthStateChanged(function(user){
   if(user){ App.me = user; afterLogin(); return; }
-  if(!/[?&]login=1/.test(location.search) && location.protocol !== 'file:'){
-    location.replace('enter.html?v=' + Math.floor(Date.now()/600000)); return;
-  }
-  PuGate.show({ name:'뉴스레터 관리', desc:'푸른노무법인 · 주간뉴스레터' });
+  /* ⚠★ 포털로 «튕기지» 않는다 (대표 지시 2026-09-14) — 자물쇠 화면을 보이고 누르게 한다 */
+  PuGate.show();
 });
 
 function afterLogin(){
