@@ -2309,7 +2309,14 @@ function fbSeedAllowed(){ return !fbDb || _fbSynced; }  // 오프라인이거나
 // '동기화 충돌 의심' 경고가 잘못 뜨기도 한다. (co_merge_skip 은 "다른 회사임" 판단이라 공유한다)
 // co_link_log 도 같은 이유 — 업체 연결 되돌리기 기록. (co_link_skip 은 "아님" 판단이라 공유한다)
 // co_vat_log 도 같은 이유 — 부가세 일괄 지정 되돌리기 기록.
-var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log'];
+/* backup_history 도 같은 성격이다 — «이 PC 에서 내려받은 백업 파일»의 기록이다 (2026-09-14).
+   ⚠ 왜 뺐나: 표를 통째로 덮어쓰는 자리라, 16번 받은 PC 와 1번 받은 PC 가 서로를 지웠다.
+     그때마다 「데이터 급감 차단: backup_history 16건 → 1건」 창이 떠서 대표가 매번 골라야 했다.
+     («자료»가 아니라 «그 PC 의 기록»이라 서로 지우는 것이 당연하다 — 공유할 것이 아니었다.)
+   ★ 실측 2026-09-14: 대표 PC 16건 · 다른 PC 1건. 둘 다 맞는 값이다.
+   ⚠ 백업 알림(erpBackupCheck)은 이제 «이 PC 기준»으로 센다 — 그것이 옳다.
+     백업은 PC 마다 제 파일을 내려받는 일이고, 남이 받았다고 내 PC 에 파일이 생기지 않는다. */
+var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history'];
 function fbShouldSync(k){
   if(!k) return false;
   for(var i=0; i<FB_EXCLUDE.length; i++){ if(k.indexOf(FB_EXCLUDE[i])===0) return false; }
@@ -4975,6 +4982,28 @@ function dbPatch(k, id, fields){
     Object.keys(fields).forEach(function(f){ cp[id+'/'+f] = (fields[f] === undefined ? null : fields[f]); });
     cp[id+'/updatedAt'] = merged.updatedAt;
     if(merged.updatedBy) cp[id+'/updatedBy'] = merged.updatedBy;
+    /* ★★★ id 를 «늘» 함께 보낸다 — 이 한 줄이 「id 없는 기록」을 만드는 구멍을 막는다.
+       (대표 제보 2026-09-14 「계속 나온다, 근본적으로 안 나오게 고쳐라」)
+
+       ■ 무엇이 있었나
+         여기서 보내는 것은 «칸 하나»씩이다(data/{표}/v/{id}/{칸}). 그런데 실시간DB 의
+         update 는 «없는 자리에 쓰면 만들어 준다». 그래서 이 기기에는 있고 서버에는 없는
+         기록에 칸을 쓰면, 서버에 그 칸들만 든 «껍데기»가 생긴다 — 본문에 id 가 없다.
+         지도 열쇠에는 id 가 있지만, 배열로 펼 때(normalizeFbValue) 열쇠는 버려진다.
+       ★ 실측 2026-09-14: 자문수입에 그런 껍데기가 5건 있었다. 칸이
+         undoneBy·undoneDate·updatedAt·updatedBy 넷뿐이고, 모두 2026-08-13 16:19:07 —
+         입금확정 되돌리기(erpUndoIncome) 한 묶음이 남긴 것이다.
+       ■ 그 한 건이 무엇을 망가뜨리나
+         id 없는 항목이 하나라도 있으면 안전 병합(_canMerge)과 객체형 변환이 꺼진다.
+         그 표는 영영 «통째 저장»이 되어, 한 번 고칠 때마다 1MB 를 주고받는다.
+         「화면이 멈춘다」와 「id 없는 기록」 알림이 되풀이된 뿌리가 이것이다.
+       ■ 이 줄이 하는 일
+         껍데기가 생기더라도 «누구인지»는 남는다. 그러면 병합·정규화가 그것을 버리지 않고,
+         표가 통째 저장으로 떨어지지도 않는다.
+       ⚠ dbUpsert 쪽에는 이 그물이 «이미» 있었다(_recFieldPaths 의 out[item.id+'/id']).
+         고치는 길 다섯 가운데 dbPatch 하나만 빠져 있었다 — 그래서 아무도 못 봤다.
+       ⚠ 지우지 말 것. tests/patch-sends-id.test.js 가 기계로 지킨다. */
+    cp[id+'/id'] = id;
     _recServerWrite(k, cp);
     return true;
   }
