@@ -69,6 +69,57 @@ test('③ ★★ 두 칸은 «따로» 쓰인다 — 하나만 넣으면 반만 
   assert.match(미납, /'successPaidAmount',\s*bVat/, '★ 성공보수가 보는 표시가 바뀌었습니다');
 });
 
+/* ── ⑤⑥⑦ 지난 기록 바로잡기 (2026-09-14) ──────────────────────────────
+   코드는 2026-09-11 에 고쳤지만 «이미 이관된» 기록은 스스로 안 고쳐진다.
+   ★ 실측 2026-09-14: 어긋난 칸 10개 · 거래내역 차액 합계 1,715,500원
+     (건의에 적힌 부해등-2026-005 ← 계약-2026-131 이 그 중 하나다).
+   그래서 환경설정 → 시스템 → 데이터 관리에 «바로잡기» 단추를 만들었다.
+   운영 자료를 고치는 단추라 지켜야 할 것이 많다. */
+
+test('⑤ ★★ 바로잡기는 «금액을 건드리지 않는다» — 표시 한 칸만 바꾼다', function () {
+  const 고침 = stripComments('<script>' + cutFn(src, 'function VatCarryFixSection(') + '</script>');
+  /* 쓰는 것은 dbPatch 한 곳이고, 넣는 것은 참/거짓 한 칸뿐이어야 한다 */
+  assert.match(고침, /var p = \{\};\s*p\[x\.flag\] = true;/,
+    '★★ 표시 말고 다른 것을 씁니다 — 금액이 바뀌면 돈이 틀어집니다');
+  assert.match(고침, /dbPatch\(x\.store, x\.id, p\)/, '★ 기록을 고치는 자리가 바뀌었습니다');
+  /* ⚠ 금액 칸 이름이 쓰기 쪽에 나타나면 안 된다 */
+  const 쓰는곳 = 고침.slice(고침.indexOf('async function fix'), 고침.indexOf('async function fix') + 900);
+  assert.ok(!/retainerFee|successFee|contractFee\b|balanceFee\b/.test(쓰는곳),
+    '★★ 고치는 자리에 «금액 칸»이 들어왔습니다 — 표시만 바꿔야 합니다');
+  /* 한 방향뿐 — 「포함」으로 맞추기만 하고, 지우지 않는다 */
+  assert.ok(!/=\s*false/.test(쓰는곳),
+    '★★ 표시를 «지우는» 길이 생겼습니다 — 사람이 일부러 별도로 둔 것을 되돌리면 안 됩니다');
+});
+
+test('⑥ ★★ 잇는 열쇠가 sourceContractNo · sourceContractId 다', function () {
+  const 훑기 = stripComments('<script>' + cutFn(src, 'function erpVatCarryScan(') + '</script>');
+  /* ⚠ srcContractId·contractId 로 이으면 «0건»이 나온다(2026-09-12 에 실제로 그랬다).
+     0건은 「고칠 것이 없다」로 읽혀서 틀린 안심을 준다 — 그래서 열쇠를 못 박는다. */
+  assert.match(훑기, /it\.sourceContractNo && byNo\[it\.sourceContractNo\]/,
+    '★★ 계약번호로 안 잇습니다 — 0건이 나와 「고칠 것이 없다」로 읽힙니다');
+  assert.match(훑기, /it\.sourceContractId && byId\[it\.sourceContractId\]/,
+    '★★ 계약 id 로 안 잇습니다');
+  assert.ok(!/srcContractId/.test(훑기), '★★ 없는 이름(srcContractId)으로 잇습니다 — 0건이 됩니다');
+});
+
+test('⑦ ★ 셈에서 빼야 할 것을 뺀다 — %·0원·이미 맞는 것', function () {
+  const 훑기 = stripComments('<script>' + cutFn(src, 'function erpVatCarryScan(') + '</script>');
+  assert.match(훑기, /if\(!c\[flag\]\) return;/, '★★ 계약이 «포함»인지 안 보고 고칩니다');
+  assert.match(훑기, /if\(it\[flag\]\) return;/, '★ 이미 맞는 칸도 고치려 듭니다');
+  assert.match(훑기, /successFeeType === 'percent'/,
+    '★★ 성공보수 %(요율)를 금액으로 셉니다 — 요율에는 부가세가 없습니다');
+  assert.match(훑기, /if\(!amt\) return;/, '★ 0원도 어긋났다고 셉니다');
+  /* 돈이 걸린 자리 — 관리자만 본다 */
+  const 화면 = stripComments('<script>' + cutFn(src, 'function VatCarryFixSection(') + '</script>');
+  assert.match(화면, /CURRENT_USER\.isAdmin \|\| CURRENT_USER\.isSubAdmin/,
+    '★★ 아무나 돈 기록을 고칠 수 있습니다');
+  /* ⚠ 「popConfirm 이라는 글자가 있나」로는 부족하다 — if(false && await popConfirm(…))
+     처럼 «묻기만 하고 막지 않는» 자리에도 그 글자는 그대로 남는다(되돌림 검사에서 드러났다).
+     묻고 «아니면 돌아서는지»를 본다. */
+  assert.match(화면, /if\(!\(await popConfirm\(/,
+    '★★ 묻기는 해도 «아니오»에서 안 돌아섭니다 — 묻지도 않고 고치는 것과 같습니다');
+});
+
 test('④ ★ 「부가세 포함」이면 그대로, 아니면 ×1.1 — 셈은 한 곳에서만', function () {
   const 셈 = stripComments('<script>' + cutFn(src, 'function erpExpectAmount(') + '</script>');
   assert.match(셈, /taxType\s*\?\s*f\s*:\s*Math\.round\(f\s*\*\s*1\.1\)/,
