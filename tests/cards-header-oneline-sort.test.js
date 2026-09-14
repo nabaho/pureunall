@@ -73,12 +73,15 @@ test('★★★ 「담당 전체」·「등록일」 드롭다운은 «없다»'
   assert.match(SRC, /id="pcPageSize"/, '★ 「100개」 드롭다운까지 지워졌다 — 요청 범위 밖이다');
 });
 
-test('★★ 고르기(배지)·거르는 셈(_mgrGone)은 드롭다운 없이도 그대로다', () => {
+test('★★ 고르기(배지)·퇴사자를 세는 일은 드롭다운 없이도 그대로다', () => {
   /* 담당 배지를 누르면 여전히 filterErpMgr 로 거른다 — 드롭다운만 없앴지
      「담당으로 고르는 길」 자체를 없앤 것이 아니다. */
   assert.match(SRC, /filterErpMgr\(/, '★ 배지로 거르는 길이 사라졌다');
-  assert.match(fnBody('renderPCTable'), /_mgrGone = _allMgrs\.filter\(mbRetired\)/,
-    '★★ 이어받기 띠의 셈이 사라졌다');
+  /* ⚠ 2026-09-14 — 퇴사자를 세는 자리가 «이어받기 화면과 한 곳»으로 옮겨졌다
+       (mbSuccTodo → mbSuccPending). 예전 셈(_mgrGone)은 화면이 못 다루는 사람까지
+       세어 「5명」이라 말했다(대표 지시 「이어받기 작동 안한다」). */
+  assert.match(fnBody('renderPCTable'), /mgrGoneChipHtml\(\)/, '★ 이어받기 띠가 사라졌다');
+  assert.match(fnBody('mbSuccTodo'), /mbSuccPending\(\)/, '★★ 이어받기 띠의 셈이 사라졌다');
 });
 
 /* ══════ ②③ 담당 열 — 실제로 정렬해 본다 ══════ */

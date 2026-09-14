@@ -119,10 +119,14 @@ test('담당자 선택 «드롭다운»은 없앴다 — 고르기는 배지로,
   assert.ok(!/id="pcSort"/.test(app),
     '★ 정렬 순서 드롭다운이 되살아났다 — 열 제목 클릭으로 대신하기로 했다');
   const fn = fnBody('renderPCTable');
-  /* 드롭다운은 없어졌지만, 그 목록을 «세는 일»은 남아야 한다 — 안 그러면
-     「🚪 퇴사한 담당 — 이어받기」 띠가 늘 0명이 된다(mgrGoneChipHtml 이 이 값을 쓴다). */
-  assert.match(fn, /ErpMatch\.mgrs\(it\)/, '담당 이름을 모으는 일이 사라졌다');
-  assert.match(fn, /_mgrGone = _allMgrs\.filter\(mbRetired\)/,
+  /* 드롭다운은 없어졌지만, 빠진 퇴사자를 «세는 일»은 남아야 한다 — 안 그러면
+     「🚪 퇴사한 담당 — 이어받기」 띠가 늘 0명이 된다.
+     ⚠ 2026-09-14 — 그 셈이 «이어받기 화면과 한 자리»로 옮겨졌다(mbSuccTodo →
+       mbSuccPending). 예전에는 renderPCTable 이 명함을 따로 훑어 세었는데, 그 셈은
+       화면이 못 다루는 사람까지 세어 「5명」이라 말했고 눌러 가면 할 일이 없었다
+       (대표 지시 「이어받기 작동 안한다」). */
+  assert.match(fn, /mgrGoneChipHtml\(\)/, '★ 이어받기 띠를 아예 안 그린다');
+  assert.match(fnBody('mbSuccTodo'), /mbSuccPending\(\)/,
     '퇴사자를 가르는 셈이 사라졌다 — 이어받기 띠가 늘 0명이 된다');
 });
 

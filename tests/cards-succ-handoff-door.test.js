@@ -47,11 +47,29 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
 
 /* ══════ ① 띠 ══════ */
 
-function chip(gone) {
-  const ctx = { console, Object, String, Number, Array, esc, _mgrGone: gone };
+/* 띠를 그려 본다. 이제 띠는 «이어받기 화면이 정할 수 있는 사람»만 센다(mbSuccTodo).
+   ⚠ 2026-09-14 이전에는 _mgrGone(명함에 붙은 퇴사자 전부)을 세어, 화면이 못 다루는
+     사람까지 「5명」이라 말했다. 눌러 가면 할 일이 하나도 없었다. */
+function chip(todo, opt) {
+  const o = opt || {};
+  const ctx = {
+    console, Object, String, Number, Array, esc,
+    mbSuccTodo: () => todo,
+    mbEnsureBins: (cb) => { ctx._ensured = (ctx._ensured || 0) + 1; if (o.thenLoad && cb) cb(); },
+    renderPCTable: () => { ctx._redrew = (ctx._redrew || 0) + 1; },
+  };
   vm.createContext(ctx);
   vm.runInContext(fnBody('mgrGoneChipHtml'), ctx);
-  return ctx.mgrGoneChipHtml();
+  const html = ctx.mgrGoneChipHtml();
+  return o.ctx ? { html, ctx } : html;
+}
+
+/* mbSuccTodo 자체 — «화면과 같은 잣대»인지 본다 */
+function todoOf(pend, succ) {
+  const ctx = { console, Object, String, Array, _mbSucc: succ, mbSuccPending: () => pend };
+  vm.createContext(ctx);
+  vm.runInContext(fnBody('mbSuccTodo'), ctx);
+  return ctx.mbSuccTodo();
 }
 
 test('★★★ 빠진 퇴사자가 있으면 «몇 명인지와 갈 곳»을 보여 준다', () => {
@@ -75,27 +93,59 @@ test('★★ 많으면 «셋까지»만 이름을 적고 나머지는 수로 —
   assert.match(h, /<b>5<\/b>명/, '★ 수는 «전부»여야 한다');
 });
 
-/* ══════ ② 한 번만 센다 ══════ */
+/* ══════ ② 띠와 이어받기 화면이 «같은 것»을 센다 (대표 지시 2026-09-14) ══════
+   「이어받기 작동 안한다」
 
-/* ⚠ 2026-09-09 — 「담당 전체」 드롭다운(#pcMgrFilter)을 없앴다(대표 지시).
-   그 드롭다운을 채우던 고르개(nonRetiredPicks)도 함께 사라졌다 — 이 자리에 남을
-   일이 아니다(옆줄 「담당자별」에는 그대로 있다, cards-mgr-pick-no-retired.test.js
-   가 지킨다). 여기서 못 박을 것은 «퇴사자를 세는 셈»이 한 번의 훑기 안에서 되는가다. */
-test('★★★ 담당 이름을 모으며 «함께» 퇴사자를 가른다 — 따로 세면 6,315장을 두 벌 훑는다', () => {
-  const fn = fnBody('renderPCTable');
-  assert.ok(!/nonRetiredPicks\(/.test(fn),
-    '★ 사라진 드롭다운의 고르개가 남아 있다 — 죽은 코드다');
-  const at = fn.indexOf('const _allMgrs = ');
-  assert.ok(at > 0, '★ 담당 이름을 모으는 자리를 못 찾았다');
-  const seg = fn.slice(at, fn.indexOf('/* 지역 드롭다운은', at));
-  assert.match(seg, /_mgrGone = _allMgrs\.filter\(mbRetired\)/,
-    '★★★ 빠진 퇴사자를 안 가른다 — 띠가 늘 0명이 된다');
-  /* 두 번 훑지 않는다 — allItems 를 여기서 한 번만 부른다 */
-  assert.equal((seg.match(/allItems\(\)/g) || []).length, 1,
-    '★★ 목록을 두 번 훑는다 — 폴더를 열 때마다 그만큼 멈춘다');
+   ⚠ 무엇이었나 — 두 자리가 서로 다른 것을 세고 있었다.
+     · 띠   : 명함이 붙은 업체의 담당이기만 하면 퇴사자를 센다        → 5명
+     · 화면 : 그 가운데 «안 끝난» 업체의 주담당만 보여 준다            → 1명
+     「5명 — 이어받기 ›」를 눌러 가면 그 다섯은 한 명도 없고, 이미 정해 둔 한 명만
+     있어 아무것도 할 게 없었다. 띠가 거짓말을 한 것이다.
+   ⚠ 실측 2026-09-14: 담당으로 남은 퇴사자 여섯 가운데 «안 끝난» 업체를 맡은 사람은
+     임혜미 한 명뿐이고(충원종합관리㈜), 나머지 다섯(박성수 14곳·김동근 5곳·김정현
+     2곳·박지호 2곳·장한돌 1곳)은 모두 끝난 업체뿐이다 — 자문종료 칸이 가져간다. */
+
+test('★★★ 띠는 이어받기 화면과 «같은 자리»에서 센다 — 두 벌로 세면 또 어긋난다', () => {
+  const todo = fnBody('mbSuccTodo');
+  assert.match(todo, /mbSuccPending\(\)/,
+    '★★★ 화면이 쓰는 셈을 안 쓴다 — 숫자가 또 갈라진다');
+  /* 옛 셈이 되살아나지 않는다 */
+  const src = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.ok(!/_mgrGone/.test(src), '★★ 옛 셈(_mgrGone)이 남아 있다 — 두 벌이 된다');
+  assert.ok(!/_allMgrs/.test(src),
+    '★ 띠가 안 쓰는데도 명함 6,300여 장을 매번 훑는 셈이 남아 있다');
   /* 띠는 조건 딱지와 «같은 자리»에 붙는다 (따로 내면 서로를 지운다) */
-  assert.match(fn, /condChipsHtml\(\) \+ mgrGoneChipHtml\(\)/,
+  assert.match(fnBody('renderPCTable'), /condChipsHtml\(\) \+ mgrGoneChipHtml\(\)/,
     '★★ 띠를 다른 자리에 그린다 — 담당 띠가 걸릴 때 서로 지운다');
+});
+
+test('★★★ 「끝난 업체만」 맡은 퇴사자는 안 센다 — 그건 이어받기가 아니라 종료다', () => {
+  /* 화면(mbSuccPending)이 이미 걸러 주므로 띠에는 애초에 안 온다.
+     대표 화면의 그 상황을 그대로 넣어 본다 — 임혜미만 남고 이미 정해져 있었다. */
+  const pend = [{ name: '임혜미', to: '박한별' }];
+  assert.deepEqual(todoOf(pend, { 'P-006': 'P-003' }), [],
+    '★★★ 다 정해졌는데도 할 일이 있다고 말한다 — 눌러 봐야 빈 화면이다');
+  assert.equal(chip(todoOf(pend, { 'P-006': 'P-003' })), '',
+    '★★★ 할 일이 없는데 띠가 뜬다 — 이것이 「작동 안한다」의 정체였다');
+});
+
+test('★★ 아직 «안 정한» 사람만 센다 — 정해 둔 사람까지 세면 띠가 안 사라진다', () => {
+  const pend = [{ name: '임혜미', to: '박한별' }, { name: '김동근', to: '' }];
+  assert.deepEqual(todoOf(pend, {}), ['김동근'], '★★ 이미 정한 사람을 또 센다');
+  assert.match(chip(todoOf(pend, {})), /<b>1<\/b>명/);
+});
+
+test('★★★ 승계표를 «못 읽었으면» 숫자를 안 낸다 — 모르면서 세면 거짓말을 되풀이한다', () => {
+  assert.equal(todoOf([{ name: '임혜미', to: '박한별' }], null), null,
+    '★★★ 못 읽은 채로 「0명」이라 말한다 — 이미 정한 사람이 할 일로 둔갑한다');
+  const got = chip(null, { ctx: true });
+  assert.equal(got.html, '', '★★ 모르는 채로 띠를 그렸다');
+  assert.equal(got.ctx._ensured, 1, '★★★ 읽으러 가지 않는다 — 띠가 영영 안 뜬다');
+});
+
+test('★★ 읽고 나면 «다시 그린다» — 안 그리면 새로고침해야 보인다', () => {
+  const got = chip(null, { ctx: true, thenLoad: true });
+  assert.equal(got.ctx._redrew, 1, '★★ 읽어 놓고 화면을 다시 안 그린다');
 });
 
 /* ══════ ③④⑤ 창 ══════ */
