@@ -129,7 +129,7 @@
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=10"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=1"></script>
+  <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=1"></script>
   <script>
@@ -84989,6 +84989,8 @@ function App(){
     try { if(typeof clearPresence === 'function') clearPresence(); } catch(_){}
     clearSession();
     clearAutoLogin();
+    /* «지금 나갔다»를 모든 탭에 — 잠든 기업정보함·포털 탭도 깨어날 때 스스로 끊는다(2026-09-14) */
+    try { if(window.PuAuthSync && PuAuthSync.broadcastLogout) PuAuthSync.broadcastLogout(); } catch(_){}
     // [포털 연동] 포털(이메일) 세션도 함께 종료 — 안 끊으면 재로그인 화면 없이 즉시 자동 로그인됨
     var _hadPortal = false;
     try {

@@ -178,8 +178,10 @@ test('로그인이 필요한 프로그램에는 모두 실려 있다', () => {
 test('로그인 화면과 공개 화면에는 싣지 않는다', () => {
   /* ★ 로그인 화면에서 끊으면 로그인 자체를 못 하고,
      공개 화면(전자서명·공유보기)에서 끊으면 로그인 없이 보는 사람을 쫓아낸다 */
+  /* ⚠ «싣는다»는 <script src=…> 다 — 주석이 파일 이름을 «말하는» 것은 싣는 게 아니다.
+     (2026-09-14 포털 로그아웃 주석이 pu-authsync.js 의 열쇠 이름을 언급하자 이 검사가 잘못 걸렸다) */
   const wrong = MUSTNOT.filter(function (f) {
-    return /pu-authsync\.js/.test(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+    return /<script[^>]*\bsrc=["'][^"']*pu-authsync\.js/.test(fs.readFileSync(path.join(ROOT, f), 'utf8'));
   });
   assert.deepStrictEqual(wrong, [], '실리면 안 되는데 실린 화면: ' + wrong.join(', '));
 });

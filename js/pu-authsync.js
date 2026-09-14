@@ -33,6 +33,15 @@
   /* 모든 탭·모든 앱이 같은 값을 본다. sessionStorage 가 아니라 localStorage 여야 한다 —
      탭마다 따로면 옆 탭이 바뀐 것을 영영 모른다(이번 사고의 뿌리다). */
   var KEY = 'pu_auth_uid';
+  /* «지금 나갔다» 신호 (대표 보고 2026-09-14 「로그아웃 했는데 다시 로그인 되어 있다」).
+     ★ 왜 하나 더 두나 — 폰은 뒤에 있는 탭을 «얼려» 둔다. 얼어 있던 이알피·기업정보함 탭은 포털이
+       파이어베이스를 끊은 신호(onAuthStateChanged)를 놓칠 수 있고, 그러면 깨어난 뒤에도 메모리에
+       남은 사용자로 «그대로 로그인된 채» 돈다. 그래서 포털이 로그아웃할 때 localStorage 에 시각을
+       적고, 앱은 ① storage 신호로 즉시 ② 깨어날 때(visibilitychange·focus·pageshow) 다시 확인해
+       그 시각이 «내가 마지막으로 사람을 본 때»보다 뒤면 스스로 끊는다.
+     ⚠ 포털(enter.html)은 이 파일을 안 싣는다 — 신호를 «적는» 쪽은 포털이 직접 한다(같은 열쇠). */
+  var LOGOUT_KEY = 'pu_auth_logout_at';
+  var lastAuthAt = 0;      // 이 탭이 마지막으로 «사람»을 본 때 — 0 이면 한 번도 안 봤다(공개 화면·부팅 중)
 
   /* 부팅 직후 「없음」을 기다려 보는 시간. 검사에서는 짧게 바꿔 쓴다. */
   var GRACE_MS = (typeof global.PU_AUTHSYNC_GRACE_MS === 'number') ? global.PU_AUTHSYNC_GRACE_MS : 2500;
@@ -70,6 +79,27 @@
     SESSION_KEYS.forEach(function (k) { try { sessionStorage.removeItem(k); } catch (e) { } });
     LOCAL_KEYS.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) { } });
   }
+  /* 「지금 나갔다」를 모든 탭에 알린다 — 로그아웃하는 쪽(이알피 등)이 부른다. 포털은 같은 열쇠를 직접 적는다. */
+  function broadcastLogout() {
+    lsSet(LOGOUT_KEY, String(Date.now()));
+    lsSet(KEY, '');
+    wipeLocalSession();
+  }
+  /* 다른 데서 나간 뒤인가 — 그 시각이 내가 마지막으로 사람을 본 때보다 뒤여야 한다.
+     (나간 «뒤에» 새로 로그인한 탭은 lastAuthAt 이 더 늦으므로 안 끊긴다.) */
+  function loggedOutSince() {
+    var t = Number(lsGet(LOGOUT_KEY) || 0);
+    return !!(t && lastAuthAt && t > lastAuthAt);
+  }
+  /* 이 탭의 파이어베이스도 끊고 나간다 — 메모리에 남은 사용자가 토큰을 계속 새로 받지 않게 */
+  function forceOut() {
+    try { var a = global.firebase && global.firebase.auth && global.firebase.auth(); if (a && a.signOut) a.signOut(); } catch (e) { }
+    return kick('signedout');
+  }
+  function onWake() {
+    if (kicked) return;
+    if (loggedOutSince()) forceOut();
+  }
 
   /* 끊는다. 두 번 부르지 않는다 — 여러 신호가 겹쳐 와도 화면이 한 번만 넘어가게. */
   function kick(why) {
@@ -104,6 +134,7 @@
     if (now) {
       // 다른 사람으로 바뀌었다 — 이 화면은 앞사람 것이다
       if (was && was !== now) { kick('switched'); return; }
+      lastAuthAt = Date.now();
       lsSet(KEY, now);
       return;
     }
@@ -119,7 +150,13 @@
 
   /* 다른 탭이 바꾼 것 — 파이어베이스 신호가 늦거나 막혀도 이걸로 안다 */
   function onStorage(ev) {
-    if (!ev || ev.key !== KEY) return;
+    if (!ev) return;
+    /* 포털(또는 다른 앱)이 «지금 나갔다»고 적었다 — 사람을 본 적 있는 탭이면 즉시 끊는다 */
+    if (ev.key === LOGOUT_KEY) {
+      if (ev.newValue && (curUid() || lastAuthAt)) forceOut();
+      return;
+    }
+    if (ev.key !== KEY) return;
     var nv = ev.newValue || '';
     var mine = curUid();
     if (nv && mine && nv !== mine) { kick('switched'); return; }
@@ -136,6 +173,13 @@
       if (a && a.onAuthStateChanged) a.onAuthStateChanged(onAuth);
     } catch (e) { }
     try { global.addEventListener('storage', onStorage); } catch (e) { }
+    /* 얼어 있다 깨어나는 순간 — 놓친 신호가 있으면 여기서 잡는다 */
+    try { global.addEventListener('focus', onWake); } catch (e) { }
+    try { global.addEventListener('pageshow', onWake); } catch (e) { }
+    try {
+      var d = global.document;
+      if (d && d.addEventListener) d.addEventListener('visibilitychange', function () { if (!d.hidden) onWake(); });
+    } catch (e) { }
     return true;
   }
 
@@ -143,6 +187,10 @@
     start: start,
     /* 앱이 제 뒷정리를 더 하고 싶을 때 (없어도 위 열쇠들은 지워진다) */
     onKick: function (fn) { if (typeof fn === 'function') handlers.push(fn); },
+    /* 로그아웃하는 쪽이 부른다 — 모든 탭(잠든 탭 포함)에 «지금 나갔다»를 남긴다 */
+    broadcastLogout: broadcastLogout,
+    _logoutKey: LOGOUT_KEY,
+    _onWake: onWake,
     // 검사용
     _onAuth: onAuth,
     _onStorage: onStorage,
