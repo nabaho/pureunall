@@ -8,6 +8,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
+<script src="js/pu-gate.js?v=2"></script>
 <script src="js/pu-ontology.js?v=25"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=2"></script>
@@ -584,15 +586,11 @@ function exportWord(){
 
 /* ══════ 통합 로그인(공유 SSO) ══════ */
 function _rmSplash(){ var b=$('pu-boot-splash'); if(b) b.remove(); }
-function authGate(){
-  _rmSplash();
-  var g=$('authGate'); if(!g){ g=document.createElement('div'); g.id='authGate';
-    g.style.cssText='position:fixed;inset:0;z-index:99999;background:#fff;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
-    g.innerHTML='<div><div style="font-size:52px;margin-bottom:14px">🔒</div><div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:8px">통합시스템 로그인이 필요합니다</div><div style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:20px">푸른 통합시스템에서 로그인한 뒤 이용하세요.</div><a href="enter.html" style="display:inline-block;text-decoration:none;background:#166534;color:#fff;padding:11px 24px;border-radius:8px;font-size:14px;font-weight:600">🏠 통합시스템으로 이동</a></div>';
-    document.body.appendChild(g);
-  } g.style.display='flex';
-}
-function authOk(){ _rmSplash(); var g=$('authGate'); if(g) g.style.display='none'; }
+/* ⚠★ 사본을 걷었다 (대표 지시 2026-09-14) — 여기 것은 「로그아웃되었거나 세션이
+   만료되었습니다」 한 줄이 «빠져» 있었다. 사본이 갈라진다는 말이 바로 이것이다.
+   이제 모든 앱이 js/pu-gate.js 하나를 쓴다. */
+function authGate(){ _rmSplash(); try{ PuGate.show(); }catch(e){} }
+function authOk(){ _rmSplash(); try{ PuGate.hide(); }catch(e){} }
 function fbInit(){
   if(location.protocol==='file:'){ _rmSplash(); return; }  /* 로컬 파일: 오프라인 편집 허용 */
   if(typeof firebase==='undefined'||!firebase.initializeApp){ _rmSplash(); return; }

@@ -1141,6 +1141,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- AI 판독 호출기 — 열쇠는 회사 서버가 든다(브라우저는 모른다) -->
 <script src="js/pu-ai-call.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
+  <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
+  <script src="js/pu-gate.js?v=2"></script>
   <script src="js/pu-appbar.js?v=10"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=1"></script>
@@ -13663,21 +13665,13 @@ var _fbBase=null, _fbPushT=null, _fbWatching=false;
    ⚠ 이 기기 안에서만 기억한다(새로고침하면 다시 본다) — 영영 입을 막으면 안 된다. */
 var _fbDismissAt=null, _fbCloudAt=0;
 /* ===== 로그인 게이트: 통합시스템 로그아웃 시 경력관리도 잠금 ===== */
-function _authGateEl(){
-  var g=document.getElementById('authGate');
-  if(!g){ g=document.createElement('div'); g.id='authGate';
-    g.style.cssText='position:fixed;inset:0;z-index:99999;background:var(--card,#fff);display:none;align-items:center;justify-content:center;text-align:center;padding:24px';
-    g.innerHTML='<div><div style="font-size:52px;margin-bottom:14px">🔒</div>'
-      +'<div style="font-size:18px;font-weight:700;color:var(--navy,#1e293b);margin-bottom:8px">통합시스템 로그인이 필요합니다</div>'
-      +'<div style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:20px">로그아웃되었거나 세션이 만료되었습니다.<br>푸른 통합시스템에서 로그인한 뒤 이용하세요.</div>'
-      +'<a href="enter.html" style="display:inline-block;text-decoration:none;background:var(--teal,#166534);color:#fff;padding:11px 24px;border-radius:8px;font-size:14px;font-weight:600">🏠 통합시스템으로 이동</a></div>';
-    (document.body||document.documentElement).appendChild(g);
-  }
-  return g;
-}
+/* ⚠★ 이 화면이 «원본»이었다 — 대표가 2026-09-14 에 「모두 이 모습으로」 고르신 것이다.
+   그래서 여기 있던 것을 js/pu-gate.js 로 옮기고, 이제는 그것을 부르기만 한다.
+   사본을 남겨 두면 한쪽만 고쳐져 또 갈라진다(실제로 취업규칙본에는 「로그아웃되었거나
+   세션이 만료되었습니다」 한 줄이 빠져 있었다). */
 function authGate(show){
   try{ var b=document.getElementById('pu-boot-splash'); if(b) b.remove(); }catch(e){}   // 인증 판정 완료 → 스플래시 종료
-  try{ _authGateEl().style.display=show?'flex':'none'; }catch(e){}
+  try{ if(show) PuGate.show(); else PuGate.hide(); }catch(e){}
 }
 /* 인증 확인 중: 잠금창 대신 '푸' 부팅 스플래시 유지 (통합 로그인창 번쩍임 방지) */
 function _bootHold(){

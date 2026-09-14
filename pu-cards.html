@@ -2992,6 +2992,8 @@ body.pc #pcDetail{display:flex}
 .wkmob{padding:10px 8px 40px}
 .wkmob .tblbox{overflow-x:auto}
 </style>
+  <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
+  <script src="js/pu-gate.js?v=2"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=10"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -4747,8 +4749,11 @@ const $ = id => document.getElementById(id);
 const _canon = s => String(s||'').replace(/^\s*\d+\s*[.)\-]?\s*/,'').replace(/\s/g,'');
 
 /* ══════ 통합 이메일 로그인 ══════ */
-function showCardsLogin(){ const el=$('cardsLogin'); if(el) el.style.display='flex'; }
-function hideCardsLogin(){ const el=$('cardsLogin'); if(el) el.style.display='none'; }
+/* ⚠★ 로그아웃 화면은 «모든 앱이 같은 것»을 쓴다 (대표 지시 2026-09-14 「모두 캡쳐1의 모습으로」).
+   여기가 그 카드 모양의 «원본»이었는데, 대표가 고르신 것은 경력관리의 자물쇠 화면이다.
+   제 화면(#cardsLogin)은 그대로 두되 «안 띄운다» — 지우면 안에 딸린 것들이 함께 죽는다. */
+function showCardsLogin(){ const el=$('cardsLogin'); if(el) el.style.display='none'; PuGate.show(); }
+function hideCardsLogin(){ const el=$('cardsLogin'); if(el) el.style.display='none'; PuGate.hide(); }
 function doLogoutCards(){
   try{ firebase.auth().signOut().finally(()=>location.replace('enter.html?v='+Date.now())); }
   catch(e){ location.replace('enter.html'); }
