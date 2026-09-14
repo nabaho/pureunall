@@ -194,6 +194,12 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   font-weight:800;color:var(--sub);cursor:pointer;font-family:inherit}
 .chip:hover{border-color:#cbd5e1}
 .chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+/* 쪽 차례 바꾸기 ▲▼ — 줄 안에 조용히 있다가 그 줄에 마우스를 올리면 진해진다 */
+.ord{display:flex;flex-direction:column;gap:1px;flex:none;margin-right:4px}
+.ob{border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:4px;
+  width:20px;height:13px;line-height:1;font-size:8px;padding:0;cursor:pointer}
+.ob:hover:not([disabled]){border-color:var(--navy);color:var(--navy)}
+.ob[disabled]{opacity:.25;cursor:default}
 /* 「일반직원 수정」 — 걸러 보기가 아니라 «탭»이다. 딱지 줄 오른끝에 떼어 두고 결을 달리한다 */
 .chip.staff{margin-left:auto;border-style:dashed;font-weight:700}
 .chip.staff.on{border-style:solid}
@@ -1782,6 +1788,43 @@ function syncPageConfig(cfg) {
 function savePageConfig(next) {
   return db.ref('homepage/config/pages').set(next).then(() => { syncPageConfig(next); });
 }
+
+/* ══════ 쪽 차례 바꾸기 (대표 지시 2026-09-14 「주요업무 순서를 바꿀 수 있게, 쉽게」) ══════
+   ★ 줄마다 ▲▼ 하나씩이다. 끌어다 놓기(drag)로 하지 않는다 — 여섯 줄에는 과하고,
+     손이 미끄러지면 엉뚱한 자리에 놓인 것을 되돌릴 길이 없다. 화살표는 한 칸씩만 움직인다.
+   ★ 차례는 «자료»에 저장한다(homepage/config/pages/{mid}.order). 화면에서만 바꾸면
+     새로 고치는 순간 되돌아간다.
+   ⚠ 차례를 다시 매길 때 «보이는 순서 그대로» 1,2,3… 으로 고쳐 적는다. 두 줄만 맞바꾸면
+     옛 자료의 order 가 비었거나 겹쳐 있을 때(기본값 9999) 엉뚱하게 튄다. */
+function 쪽차례(mid, 걸음) {
+  if (refuseIfPageConfigUnread()) return Promise.resolve(false);
+  const 지금 = pageIdsOf('work');
+  const i = 지금.indexOf(mid);
+  const j = i + Number(걸음);
+  if (i < 0 || j < 0 || j >= 지금.length) return Promise.resolve(false);
+  const 새 = 지금.slice();
+  새[i] = 지금[j]; 새[j] = 지금[i];
+
+  /* 주요업무가 아닌 쪽(오시는길·인사말·일반직원)은 «건드리지 않는다» —
+     제 갈래를 차지하거나 탭이라 차례가 뜻이 없고, 지우면 목록에서 사라진다. */
+  const next = Object.assign({}, App.pageConfig);
+  새.forEach((k, n) => {
+    next[k] = Object.assign({}, next[k] || {}, { order: n + 1 });
+  });
+  const 뒤 = 새.length;
+  Object.keys(next).forEach(k => {
+    if (새.indexOf(k) >= 0) return;
+    const o = Number((next[k] || {}).order);
+    if (!isFinite(o) || o <= 뒤) next[k] = Object.assign({}, next[k], { order: 뒤 + 1 });
+  });
+
+  return savePageConfig(next).then(() => { App.render(); return true; })
+    .catch(e => { say('차례를 저장하지 못했습니다', esc((e && e.message) || e)); return false; });
+}
+function 쪽위로(mid) { return 쪽차례(mid, -1); }
+function 쪽아래로(mid) { return 쪽차례(mid, 1); }
+window.쪽위로 = 쪽위로;
+window.쪽아래로 = 쪽아래로;
 
 /* 쪽 목록을 못 읽은 채로 저장하면(=set) 사장님이 이미 저장해 둔 분리·추가가 통째로
    지워진다(못 읽음 → syncPageConfig 가 기본 8쪽으로 채움 → 그 위에 한 줄 보태 덮어씀).
@@ -4629,6 +4672,13 @@ function visibleRows(group) {
   const f = App.filter;
   /* ★ 「일반직원 수정」 탭 — 구성원 줄이 아니라 people «쪽» 한 줄만 세운다 */
   if (group === 'members' && f === 'staff') return [직원줄()];
+  /* ★ 홈페이지에서 «내려간» 퇴사자는 명단에서 자동으로 뺀다
+       (대표 지시 2026-09-14 「퇴사 내려가면 모든 이름 다 보일 필요 없을 것 같다」).
+     자문사의 「거래 종료」와 같은 규칙이다 — 할 일이 끝난 줄이 자리를 차지하면
+     정작 손댈 사람이 묻힌다.
+     ⚠ 감추는 것이 아니다. 「내려감」 딱지를 누르면 그대로 다 나온다.
+     ⚠ «내려간» 사람만이다(status==='done'). 아직 「내릴 것」인 사람은 할 일이라 남는다. */
+  if (group === 'members' && !f) all = all.filter(r => r.status !== 'done');
   if (!f) return all;
   if (f === 'closed') return all.filter(r => r.closed);
   if (f === 'suboffice') return all.filter(r => r.subOffice);
@@ -4667,8 +4717,16 @@ function chipsHtml() {
   /* 살아있는 = 거래 중이고 «사무대행이 아닌» 곳 — 기본 목록이 세우는 것과 같다 */
   const 살아있는 = App.group === 'partner'
     ? all.filter(r => !r.closed && !r.subOffice) : all;
-  const base = App.group === 'partner' ? 살아있는.filter(r => r.posted !== '') : all;
-  const defs = [{ k: '', label: App.group === 'partner' ? '고른 것' : '전체', n: base.length }];
+  /* ★ 구성원도 기본에서 «내려간 사람»을 뺀다 (2026-09-14) — visibleRows 와 같은 규칙이라야
+       「전체 9」라 적혀 있는데 눌러 보니 7줄인 일이 없다.
+     ⚠ 이름도 바꾼다. 뺀 것이 있는데 「전체」라고 적으면 그것은 거짓말이다 —
+       자문사에서 「전체」를 「고른 것」으로 바꾼 것과 같은 까닭이다. */
+  const 내려간수 = App.group === 'members' ? all.filter(r => r.status === 'done').length : 0;
+  const base = App.group === 'partner' ? 살아있는.filter(r => r.posted !== '')
+    : (내려간수 ? all.filter(r => r.status !== 'done') : all);
+  const defs = [{ k: '',
+    label: App.group === 'partner' ? '고른 것' : (내려간수 ? '내려감 빼고' : '전체'),
+    n: base.length }];
   if (s.hot) defs.push({ k: 'todo', label: '손댈 것', n: s.hot });
   Object.keys(s.own).forEach(k => {
     defs.push({ k: 'own:' + (k === 'nobase' ? 'nobase' : k), label: OWN_LABEL[k] || k, n: s.own[k] });
@@ -4742,7 +4800,12 @@ function listCountHtml() {
     }
     // 명부상 퇴사가 몇 명인지 — 「남김」으로 둔 사람도 명부상 퇴사자다
     const left = all.filter(r => r.roster && r.roster.kind === 'left').length;
+    /* ★ 기본에서 뺀 수를 «말한다» (2026-09-14). 조용히 빼면 아홉 명이 일곱 줄로 보여
+       사람이 목록을 의심한다 — 자문사에서 「거래 종료 101곳은 뺐음」이라 적는 것과 같다. */
+    const 내려간수 = all.filter(r => r.status === 'done').length;
     return '구성원 <b>' + all.length + '명</b>' + (left ? ' · <b class="hot">퇴사 ' + left + '</b>' : '')
+      + (내려간수 && !App.filter
+          ? ' <span class="sub">· 내려간 ' + 내려간수 + '명은 뺐음</span>' : '')
       + (App.filter ? ' <span class="sub">· 걸러서 ' + rows.length + '건</span>' : '');
   }
   if (App.group === 'work') {
@@ -4856,6 +4919,16 @@ function rowsHtml() {
       /* 딱지 둘 — 위가 명부 딱지(늘 붙는다), 아래가 대조 딱지(확인을 누를 때만 새로 붙는다).
          ★ 자문사 줄은 대조 딱지 자리에 «사람이 표시한 값»이 온다. 「확인 전」이라고 적으면
            언젠가 대조가 될 것처럼 들린다 — 그 갈래는 대조를 «못 한다». */
+      /* ★ 주요업무는 줄마다 ▲▼ 로 차례를 바꾼다 (2026-09-14).
+           줄을 고르는 것과 섞이지 않게 onclick 을 여기서 멈춘다(stopPropagation). */
+      + (App.group === 'work'
+          ? '<span class="ord">'
+            + '<button class="ob" title="위로" onclick="event.stopPropagation();쪽위로(\''
+              + esc(r.key) + '\')"' + (i === 0 ? ' disabled' : '') + '>▲</button>'
+            + '<button class="ob" title="아래로" onclick="event.stopPropagation();쪽아래로(\''
+              + esc(r.key) + '\')"' + (i === rows.length - 1 ? ' disabled' : '') + '>▼</button>'
+            + '</span>'
+          : '')
       + '<span class="tags">' + rosterPillHtml(r)
       /* ★ 「안 올림」이면 대조 딱지 자리에 그것을 적는다 — 안 올릴 사람에게
          「새로 올릴 것」이 붙어 있으면 할 일인 줄 읽는다. 딱지를 셋 두면 너무 넓다. */
