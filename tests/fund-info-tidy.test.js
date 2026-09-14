@@ -43,11 +43,16 @@ const 코드만 = (s) => String(s || '').replace(/\/\*[\s\S]*?\*\//g, ' ').repla
 
 /* ══ ① 기금 정보 폼을 «정말 그려» 본다 ════════════════════════════ */
 
-function 폼그리기(f) {
+function 폼그리기(f, sites) {
   const box = {};
-  new Function('F', [
+  new Function('F', 'SITES', [
     grabDecl('FIELDS'), grabDecl('INFO_SECS'), grabDecl('INFO_FOLD'),
     grabDecl('INFO_W2'), grabDecl('SELECT_OPTS'),
+    /* 대표사업장 안내(2026-09-14)가 사업장을 찾아본다 — 그 길도 실어야 «정말 그려» 진다 */
+    'var S={fundId:"F1",sitesFor:"F1",sites:SITES};',
+    'var _allSites={F1:SITES||{}};',
+    'function loadAllSites(){}',
+    grabFn('isRegionFund'), grabFn('_leadSite'), grabFn('_fundSites'),
     'function esc(s){ return String(s==null?"":s); }',
     'function hlp(){ return "<i>ⓘ</i>"; }',
     'function govField(){ return ""; }',
@@ -60,7 +65,7 @@ function 폼그리기(f) {
     'var setTimeout=function(){};',
     grabFn('infoGroups'), grabFn('infoForm'),
     'this.html=infoForm(F); this.groups=infoGroups();'
-  ].join('\n')).call(box, f);
+  ].join('\n')).call(box, f, sites || {});
   return box;
 }
 /* 값이 하나도 없는 기금(막 만든 것)과, 임대차·설립까지 다 채운 기금 */

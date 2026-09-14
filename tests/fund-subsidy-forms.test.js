@@ -141,6 +141,8 @@ function doc(kind, opts) {
     grabFn('korWon'), grabFn('subAmounts'), grabFn('_docRok'), grabFn('_docWait'),
     grabFn('guessBfKind'), grabFn('bfMovesOf'), grabFn('bfDays'), grabFn('bfReason'),
     'function hwpFormHTML(){return null;} function charterSane(){return "";} function charterGong(){return "";}',
+    /* 2026-09-14: 서식이 「대표회사·사무국」을 repOrg 하나에서 가져간다(명부의 ★ → 손으로 적은 칸) */
+    grabFn('isRegionFund'), grabFn('_leadSite'), grabFn('repOrg'),
     'function _fyRange(){return {start:"",end:""};} function _officersOf(){return [];}',
     'function _auditorsOf(){return [];} function _closeFigures(){return "";}',
     grabFn('docBody'),

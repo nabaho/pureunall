@@ -51,6 +51,9 @@ global.num = v => (v==null||v===''?'':Math.round(Number(String(v).replace(/[^0-9
 (0, eval)(gF('_siteContacts'));
 (0, eval)(gF('_siteWrep'));
 global.maxEmp = 20;
+/* 2026-09-14: 대표사업장 별은 «지역기금에만» 선다. 줄을 그리는 쪽은 이 값만 본다 —
+   여기서는 켠 채로 그려 별이 제자리에 서는지 보고, 아래에서 끈 채로 한 번 더 그린다. */
+global.별쓰나 = true;
 const makeRow = new Function('s', 'i', body);
 
 const SITE = { _id:'S1', name:'가나기계(주)', ceo:'홍길동', biz_no:'000-00-00000',
@@ -85,6 +88,16 @@ ok('번호 = 1', cell('번호') === '1', cell('번호'));
    별이 제대로 서는지는 fund-site-lead.test.js 가 따로 본다. 여기서는 이름만 견준다. */
 ok('상호', cell('상호').replace(/^[★☆]\s*/, '') === '가나기계(주)', cell('상호'));
 ok('상호 앞에 대표사업장 별이 있다', /^[★☆]/.test(cell('상호')), cell('상호'));
+/* 지역기금이 아니면 별이 «아예» 안 선다 — 대표사업장이 없는 기금에 빈 별을 세우면
+   눌러도 되는 줄 알고 누른다. 칸 수는 그대로여야 한다(값이 옆으로 밀리면 안 된다). */
+(() => {
+  global.별쓰나 = false;
+  const t2 = draw(SITE);
+  global.별쓰나 = true;
+  ok('지역기금이 아니면 별이 없다', !/[★☆]/.test((t2[ths.indexOf('상호')].textContent || '')),
+    (t2[ths.indexOf('상호')].textContent || '').trim());
+  ok('별을 빼도 칸 수는 그대로', t2.length === tds.length, t2.length + ' vs ' + tds.length);
+})();
 ok('대표자', cell('대표자') === '홍길동', cell('대표자'));
 ok('사업자번호', cell('사업자번호') === '000-00-00000', cell('사업자번호'));
 ok('업종', cell('업종') === '제조(시험)', cell('업종'));
