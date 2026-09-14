@@ -44,7 +44,7 @@
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
 <script src="js/pu-news-core.js?v=38"></script>
-<script src="js/pu-news-tpl.js?v=19"></script>
+<script src="js/pu-news-tpl.js?v=20"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -1151,7 +1151,29 @@ function render(){
        무엇을 더해도 같은 일이 되풀이된다 — 그래서 칸에서 «떼어» 냈다. */
   서랍그리기();
   줄창그리기();
+  글칸맞추기();
   if(App.tab==='past') 지난미리보기그리기();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   글 쓰는 칸은 «쓴 만큼» 늘어난다 (대표 지시 2026-09-14)
+   ══════════════════════════════════════════════════════════════════════════
+   「인사노무관리 내용은 모두 보여야 확인한다 한번에 보이게 해라」
+
+   rows="4" 로 묶여 있어 긴 글이 칸 «안에서» 잘렸다. 확인하려면 안에서 굴려야 했고,
+   굴려서 보는 글은 한눈에 안 들어온다 — 어디가 어색한지, 무엇이 빠졌는지를 못 찾는다.
+   ⚠ 위쪽 한도를 두지 않는다. 한도를 두면 «긴 글일수록» 도로 잘린다 —
+     길수록 더 봐야 하는데 그 반대가 된다.
+   ⚠ 다시 그릴 때마다 부른다 — 화면이 새로 그려지면 칸도 새로 생긴다. */
+function 글칸맞추기(){
+  document.querySelectorAll('textarea.grow').forEach(function(el){
+    el.style.height = 'auto';            /* 먼저 풀어야 «줄어들 때»도 맞는다 */
+    const cs = getComputedStyle(el);
+    el.style.height = (cs.boxSizing === 'border-box'
+      ? el.scrollHeight + (el.offsetHeight - el.clientHeight)   /* 테두리까지 */
+      : el.scrollHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+    ) + 'px';
+  });
 }
 
 function 명단셈(){
@@ -1673,7 +1695,7 @@ function 꼭지칸하나(d){
   const 것 = d.안[g.키] || [];
   const 셈 = Core.실림셈(d.안, d.우리글).표[g.키] || { 실림:0, 담김:0 };
   const 글칸 = g.갈래==='우리글' ? `<div class="pad" style="border-bottom:1px solid var(--line)">
-     <textarea id="myWrite" rows="4" oninput="우리글바뀜(this.value)"
+     <textarea id="myWrite" class="grow" rows="4" oninput="우리글바뀜(this.value)"
        placeholder="이번 주 한마디 — 이 칸만 우리가 씁니다.">${esc(d.우리글||'')}</textarea>
      <div class="hint" style="margin-top:6px">나머지 세 꼭지는 <b>제목과 원문 링크</b>만 싣습니다.
        기사 본문은 남의 글이라 옮기지 않습니다.</div></div>` : '';
@@ -1843,7 +1865,7 @@ function 줄창그리기(){
      style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:7px;
             font-size:14px;font-weight:700;margin-bottom:11px">` : ''}
    <label class="f">✎ 우리 말로 — 편지에는 <b>이 글만</b> 실립니다</label>
-   <textarea id="rowW" rows="5" placeholder="${esc(기사인가
+   <textarea id="rowW" class="grow" rows="5" placeholder="${esc(기사인가
      ? '여기에 쓰시면 이 글이 편지에 실립니다. 비우면 이 줄은 안 나갑니다.'
      : '한 줄로 고쳐 쓰시면 그것이 제목으로 나갑니다. 비우면 원래 제목이 나갑니다.')}">${esc(x.우리말||x.AI초안||'')}</textarea>
    <div class="note" style="margin-top:11px"><b>이렇게 쓰면 됩니다</b><br>
@@ -1981,6 +2003,7 @@ function 길바꾸기(v){
 function 우리글바뀜(v){
   const d = 지금회차(); d.우리글 = v;
   App.회차들[d.열쇠] = d;
+  글칸맞추기();          /* 치는 동안에도 «쓴 만큼» 늘어난다 — 700ms 를 기다리지 않는다 */
   clearTimeout(우리글바뀜._t);
   /* ⚠ 저장만 하고 다시 그린다 — 요약의 「우리 글이 비었다」 경고가 함께 사라져야 한다 */
   우리글바뀜._t = setTimeout(()=>{ 회차저장(d).then(render).catch(()=>{}); }, 700);
