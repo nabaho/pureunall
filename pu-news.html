@@ -43,7 +43,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=37"></script>
+<script src="js/pu-news-core.js?v=38"></script>
 <script src="js/pu-news-tpl.js?v=18"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
@@ -124,7 +124,25 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px;
   align-items:start}
 /* 회차 줄이 왼쪽 칸의 «첫 줄»이 되었다 — .cols 가 이미 위 여백을 주므로 겹치지 않게 */
-.colL>.hdbar{margin-top:0;margin-bottom:10px}
+.colL .hdbar{margin-top:0;margin-bottom:10px}
+
+/* ★★★ 회차 머리 + 담는 법을 «붙여 둔다» (대표 지시 2026-09-14 「이부분 틀고정 해라」)
+   ═══════════════════════════════════════════════════════════════════════════
+   꼭지를 훑어 내려가는 동안 «몇 주차를 짓고 있나»와 «어떻게 담나»가 사라지면,
+   확인하려고 맨 위까지 다시 굴려 올라갔다 내려와야 한다.
+
+   ⚠⚠ 붙을 자리(top)를 숫자로 «박지 않는다». 980px 아래에서는 앱바+탭(#top)이
+     이미 위에 붙어 있어, 그 높이만큼 내려 붙이지 않으면 이 덩이가 #top «뒤로»
+     들어가 통째로 안 보인다 — 굴려도 안 나오니 「사라졌다」로 겪는다.
+     그 높이는 글자 크기·탭 줄바꿈에 따라 달라진다. 화면이 «재서» --tophi 에 넣는다
+     (위높이재기). #top 이 안 붙는 넓은 화면에서는 0 이라 헛자리가 안 생긴다.
+   ⚠ 바탕을 «꼭» 준다. 회차 머리와 담는 법은 저마다 흰 상자지만 사이가 벌어져 있어,
+     바탕이 없으면 그 틈으로 아래 기사 제목이 지나가는 것이 보인다(글자가 두 겹).
+   ⚠ 층은 앱바(#top, 30)보다 «아래»여야 한다 — 위면 앱바를 덮는다.
+   ⚠ flex:0 0 auto — 넓은 화면에서 .colL 은 flex 칸이다. 없으면 덩이가 늘어나
+     꼭지 자리를 빼앗는다. */
+.colL>.nowtop{position:sticky;top:var(--tophi,0px);z-index:12;
+  flex:0 0 auto;background:var(--paper)}
 /* ★★★ 꼭지를 «탭»으로 (대표 지시 2026-09-08)
    ═══════════════════════════════════════════════════════════════════════════
    「주간, 고용, 판례 인사 등 각각의 화면으로 각각의 내용을 선택할 수 있게
@@ -518,7 +536,9 @@ table.list tr:hover td{background:#fcfcfd}
   /* ★ 왼쪽 칸을 flex 로 짠다 — 담는 법 띠는 제 키만 쓰고,
      꼭지 넷이 «남은 자리를 다 나눠» 갖는다(구르는 것은 꼭지 안으로). */
   .colL{overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;min-height:0}
-  .colL>.ways,.colL>.note,.colL>.box,.colL>.hdbar{flex:0 0 auto}
+  /* ⚠ 회차 머리와 담는 법은 이제 .nowtop 안이라 «손자»다 — 여기서 안 걸린다.
+       덩이 쪽에 flex:0 0 auto 를 걸어 두었다(위 .colL>.nowtop). */
+  .colL>.note,.colL>.box{flex:0 0 auto}
   /* ★★ minmax(0,1fr) 이라야 «줄어든다» (대표 화면 2026-09-06 「화면아래 잘렸는데
        내려가서 확인할 방법도 없다」)
      ═══════════════════════════════════════════════════════════════════════
@@ -554,6 +574,9 @@ table.list tr:hover td{background:#fcfcfd}
   #shell>.wrap,#shell>.wrap.now,#shell>.wrap.who{overflow:visible;display:block;flex:none}
   .wrap.who>.whorest{overflow:visible;padding-right:0}
   .colL{overflow:visible;padding-right:0}
+  /* ⚠ 낮은 창에서는 얼린 머리가 화면을 거의 다 먹는다 — 붙이기를 «푼다».
+       머리만 보이고 정작 꼭지를 못 보는 것보다, 예전처럼 굴러가는 편이 낫다. */
+  .colL>.nowtop{position:static}
   .wrap.now .pv{position:sticky;top:12px;height:auto;display:block}
   .wrap.now .pv .paper{max-height:70vh}
 }
@@ -1143,6 +1166,11 @@ function 이번회차화면(){
   return `
   <div class="cols">
    <div class="colL">
+  <!-- ★★ 회차 머리와 담는 법을 «한 덩이»로 묶어 붙여 둔다
+       (대표 지시 2026-09-14 「이부분 틀고정 해라」).
+     ⚠ 따로따로 붙이면 둘째 것(담는 법)의 top 을 첫째 것의 «높이»로 줘야 한다.
+       그 높이는 단추가 두 줄로 접히면 달라져, 창을 좁히면 겹치거나 뜬다. -->
+  <div class="nowtop">
   <div class="hdbar">
     <span class="no">${esc(d.회차.이름)}</span>
     <span class="badge ${상태딱지}">${esc(d.상태)}</span>
@@ -1197,6 +1225,7 @@ function 이번회차화면(){
     <span class="tail">ⓘ 제목·원문 링크만 싣습니다 ·
       <a onclick="길바꾸기('fwd')">받은 것 그대로 전달</a></span>
   </div>
+  </div><!-- /nowtop — 여기까지가 «붙어 있는» 덩이다 -->
 
   <!-- ★★ 셋째 줄을 없앴다 (대표 지시 2026-09-08 「최대한 내용 간략하게 2줄로」)
        ═══════════════════════════════════════════════════════════════════════
@@ -2319,7 +2348,32 @@ function 편지창채우기(자리, 서식){
   _편지맞추기 = 맞추기;
 }
 /* 창을 열어 둔 채 화면 크기를 바꿔도 다시 맞춘다 — 안 맞추면 그때부터 다시 잘린다 */
-window.addEventListener('resize', function(){ if(_편지맞추기) _편지맞추기(); });
+window.addEventListener('resize', function(){ if(_편지맞추기) _편지맞추기(); 위높이재기(); });
+
+/* ★★ 붙여 둔 덩이(.nowtop)가 «어디부터» 붙을지를 잰다
+   ═══════════════════════════════════════════════════════════════════════════
+   대표 지시 2026-09-14 「이부분 틀고정 해라」.
+   ⚠⚠ 980px 아래에서는 앱바+탭(#top)이 이미 위에 붙어 있다. 덩이를 top:0 으로 붙이면
+     #top «뒤로» 들어가 통째로 안 보인다 — 굴려도 안 나오니 「사라졌다」로 겪는다.
+   ⚠ 그 높이를 숫자로 박으면 안 된다. 앱바 글자 크기·탭 줄바꿈·폰 가로세로에 따라
+     달라진다. 이 파일의 오랜 규칙이다 — «자리를 px 로 박지 않는다».
+   ★ #top 이 «지금 붙어 있나»를 보고 넣는다. 넓은 화면에서는 안 붙으므로 0 이다 —
+     0 을 안 넣으면 덩이 위에 앱바 높이만큼 빈 자리가 생긴다. */
+function 위높이재기(){
+  try{
+    const t = document.getElementById('top');
+    const 붙었나 = !!t && getComputedStyle(t).position === 'sticky';
+    const h = 붙었나 ? Math.round(t.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty('--tophi', h + 'px');
+  }catch(_){ /* 재다 넘어져도 화면은 살아 있어야 한다 — 0 이면 예전 그대로다 */ }
+}
+window.addEventListener('load', 위높이재기);
+/* ⚠ 탭 글자가 늘거나(숫자가 붙는다) 창이 좁아져 앱바가 두 줄이 되면 높이가 바뀐다.
+     그때 다시 재지 않으면 덩이가 앱바에 물리거나 뜬 채로 남는다. */
+if(window.ResizeObserver){
+  const t = document.getElementById('top');
+  if(t) new ResizeObserver(위높이재기).observe(t);
+}
 
 function 크게보기(){
   const 편 = 지금편지(true);

@@ -3245,9 +3245,10 @@ exports.findCompanyWebsite = functions
      · 이번 주 것이 이미 있으면 두 번 올리지 않는다(lastWeek)
      · 자료에 스위치를 둔다(homepage/newsBrief/off = true 면 둘 다 안 돈다)
    ★ 「사람이 보는 홈페이지」에 먼저, 우리 사본에 나중에 — publishSite 와 같은 차례다. */
+/* ⚠ 신문사 목록은 여기가 아니라 news-brief.js «뉴스샘들»에 있다 (2026-09-14).
+     검사가 그 목록을 곧바로 볼 수 있어야 하는데, index.js 의 export 는
+     파이어베이스가 «함수»로 여긴다 — 목록 하나 내보내려다 없는 함수가 배포된다. */
 const 브리핑샘 = {
-  뉴스: "https://www.labortoday.co.kr/rss/allArticle.xml",
-  뉴스이름: "매일노동뉴스",
   법령말: ["근로", "노동", "산업안전", "고용", "임금", "퇴직급여"]
 };
 
@@ -3319,9 +3320,15 @@ async function 글자로받기(url) {
 async function 브리핑거리모으기(법령몇) {
   const 몇 = 법령몇 || 5;
   let 뉴스 = [], 법령 = [];
-  try {
-    뉴스 = 브리핑부품.뉴스읽기(await 글자로받기(브리핑샘.뉴스), 브리핑샘.뉴스이름);
-  } catch (e) { console.warn("[브리핑] 뉴스를 못 읽었습니다", e.message); }
+  /* ★★ 신문사를 «하나씩» 돈다 (대표 지시 2026-09-14 「다양한 노동관련 뉴스」).
+     ⚠⚠ try 를 고리 «바깥»에 두면 첫 신문사가 멎는 순간 나머지가 통째로 안 읽힌다.
+       그 주 뉴스레터가 비는데 기록에는 「못 읽었습니다」 한 줄뿐이라 까닭을 모른다.
+       한 곳이 안 열리는 일은 흔하다 — 그때 나머지 셋은 읽어야 한다. */
+  for (const S of 브리핑부품.뉴스샘들) {
+    try {
+      뉴스 = 뉴스.concat(브리핑부품.뉴스읽기(await 글자로받기(S.주소), S.이름));
+    } catch (e) { console.warn("[브리핑] " + S.이름 + " 을(를) 못 읽었습니다", e.message); }
+  }
   for (const w of 브리핑샘.법령말) {
     try {
       const xml = await 글자로받기("https://www.law.go.kr/DRF/lawSearch.do?OC=test"
