@@ -50,6 +50,23 @@
     }
   }catch(e){}
 })();
+// [저장공간 응급 여유] Firebase SDK도 연결 상태 한 줄을 localStorage에 기록한다.
+// 업무자료가 한도 끝까지 차면 그 한 줄조차 실패해 연결 재시도와 Script error가 반복된다.
+// 동기화되는 업무자료는 절대 지우지 않고, 다시 만들어도 되는 기기 내 로그·서명만 비운다.
+(function(){
+  try{
+    var probe='pu_storage_headroom_probe';
+    try{
+      localStorage.setItem(probe, new Array(32769).join('x'));
+      localStorage.removeItem(probe);
+      return;
+    }catch(_full){ try{ localStorage.removeItem(probe); }catch(_){} }
+    ['pureun_v6_error_log','pureun_v6_session_alert_log','pureun_v6_recent_sig',
+     'firebase:previous_websocket_failure'].forEach(function(k){ try{ localStorage.removeItem(k); }catch(_){} });
+    // 정리 성공 여부를 다시 확인하되 표식은 남기지 않는다.
+    try{ localStorage.setItem(probe,'ok'); localStorage.removeItem(probe); }catch(_){}
+  }catch(_){}
+})();
 </script>
 <title>푸른이알피</title>
 <!-- SheetJS: 엑셀(xls/xlsx) 파싱용 (아카이브 import) -->
@@ -275,8 +292,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-14 목록 멈춤 및 서버 연결 오경보 완화';
-var BUILD_SEQ = 153;
+var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-15 로그인 멈춤·저장공간 포화·자문수입 ID 누락 복구';
+var BUILD_SEQ = 154;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
