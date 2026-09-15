@@ -292,8 +292,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-15 전체 멈춤 근본복구(저장공간 분리·자문수입 ID 자동교정)';
-var BUILD_SEQ = 155;
+var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-16 멈춤 뿌리 — 번호 없는 항목이 표를 통째 저장에 가두던 것을 끊었다(열쇠를 번호로 되살림 · 같은 자국은 한 벌로)';
+var BUILD_SEQ = 156;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -2836,6 +2836,17 @@ function arrayToIdMap(arr){
   arr.forEach(function(x){ if(x && x.id) map[x.id] = x; });
   return map;
 }
+/* 번호 없는 항목에 «내용으로부터» 한결같은 번호를 지어 준다 (2026-09-16).
+   ★ 같은 내용이면 «늘 같은 번호»가 나온다 — 그래서 같은 자국이 여러 벌 들어와도
+     아래 겹침 걷기에서 한 벌로 접힌다. 시각이나 무작위를 섞으면 접히지 않고 불어난다.
+     실제로 자문수입에서 똑같은 자국 5건이 17건까지 불었다(2026-08-13 ~ 09-16). */
+function _fbStableId(x){
+  var s;
+  try { s = JSON.stringify(x); } catch(_e){ s = String(x); }
+  var h = 0;
+  for(var j = 0; j < s.length; j++){ h = ((h << 5) - h + s.charCodeAt(j)) | 0; }
+  return 'noid-' + (h >>> 0).toString(36) + '-' + s.length.toString(36);
+}
 function normalizeFbValue(v){
   var arr;
   if(Array.isArray(v)){ arr = v; }  // 마이그레이션 전: 배열
@@ -2847,11 +2858,62 @@ function normalizeFbValue(v){
     // {0,1,2,...} 연속 숫자 키 = 배열이 Firebase에서 객체화된 것 → 배열로 되돌림
     var _isArrayLike = _ks.length === 0 || _ks.every(function(k, i){ return k === String(i); });
     // 항목의 .id 또는 .code가 키와 일치 = arrayToIdMap/code-map → 배열로 되돌림 (companies, biz_*_types 등)
-    var _isSelfMap = _ks.length > 0 && _ks.every(function(id){ var x = v[id]; return x == null || (typeof x === 'object' && ((x.id != null && String(x.id) === id) || (x.code != null && String(x.code) === id))); });
+    /* ★★ 본문에 번호가 «없는» 항목도 이 지도의 식구로 친다 (2026-09-16).
+       ── 무엇이 있었나
+         dbPatch 가 칸만 보내면(data/{표}/v/{번호}/{칸}) 서버에 그 칸들만 든 자국이 생긴다.
+         열쇠에는 번호가 있는데 «본문에는 없다». 예전에는 그 하나 때문에 이 지도가
+         「이름-열쇠 지도」로 잘못 읽혀 통째로 되돌아갔고(아래 return v), 그러면 화면은
+         배열을 기대하는데 객체를 받는다. 그 뒤 배열로 펴는 순간 열쇠가 버려져
+         번호가 «영영» 사라졌다.
+       ── 그 하나가 무엇을 망가뜨리나
+         번호 없는 항목이 하나라도 있으면 지도형 전환(arrayToIdMap)과 안전 병합(_canMerge)이
+         꺼진다. 그 표는 영영 «통째 저장»이 되어 한 번 고칠 때마다 0.95MB 를 주고받는다 —
+         화면이 멈추던 뿌리가 이것이고, 병합이 꺼져 두 기기가 서로를 덮었다.
+       ★ 그래서 «열쇠를 번호로 되살린다». 아무것도 지우지 않는다.
+       ⚠ 다만 «번호가 있는데 열쇠와 다른» 항목이 하나라도 있으면 이름-열쇠 지도다
+         (사번키 mgr_rates·연도키 insurance_rates…) — 그때는 손대지 않고 그대로 둔다.
+       ⚠ 열쇠가 번호임을 «증명하는» 항목이 하나도 없으면(_idHits===0) 역시 손대지 않는다.
+         안 그러면 값이 객체인 이름-열쇠 지도가 통째로 배열이 돼 열쇠를 잃는다. */
+    var _idHits = 0, _mapOk = _ks.length > 0;
+    _ks.forEach(function(id){
+      var x = v[id];
+      if(x == null) return;
+      if(typeof x !== 'object' || Array.isArray(x)){ _mapOk = false; return; }
+      if((x.id != null && String(x.id) === id) || (x.code != null && String(x.code) === id)){ _idHits++; return; }
+      if(x.id == null && x.code == null) return;      /* 번호 없는 자국 — 열쇠로 되살린다 */
+      _mapOk = false;                                  /* 번호가 있는데 열쇠와 다르다 → 이름-열쇠 지도 */
+    });
+    var _isSelfMap = _mapOk && _idHits > 0;
     // 그 외(사번키 mgr_rates/security_perms, 연도키 insurance_rates, 납작 min_wage/company_info 등)는 이름-키 객체 → 그대로 보존
     if(!(_isArrayLike || _isSelfMap)) return v;
-    arr = _ks.map(function(id){ return v[id]; }).filter(function(x){ return x != null; });
+    arr = _ks.map(function(id){
+      var x = v[id];
+      /* 열쇠를 번호로 되살린다 — 「0,1,2…」 꼴은 자리번호일 뿐이라 되살리지 않는다 */
+      if(!_isArrayLike && x && typeof x === 'object' && !Array.isArray(x) && x.id == null){
+        x = Object.assign({}, x, { id: String(id) });
+      }
+      return x;
+    }).filter(function(x){ return x != null; });
   } else { return v; }  // 스칼라/널 등은 그대로
+  /* ★★ 되살릴 열쇠가 «없는» 것 — 이미 배열로 펴진 뒤라 번호를 잃은 자국들 (2026-09-16).
+     내용으로 한결같은 번호를 지어 붙인다. 아무것도 지우지 않는다.
+     ⚠ «섞였을 때만» 한다 — 번호를 원래 안 쓰는 표(직원계정은 사번이 열쇠다)에
+       억지로 번호를 붙이면 그 표의 생김새를 바꿔 버린다. 그 표는 32건 «전부»
+       번호가 없으므로 여기 안 걸린다.
+     ★ 이것이 켜지는 순간 그 표는 모든 항목이 번호를 갖게 되고, 다음 저장에서
+       지도형으로 올라가 칸별 저장과 안전 병합이 «함께» 켜진다 — 멈춤이 끝난다. */
+  if(Array.isArray(arr)){
+    var _anyId = false, _anyNo = false;
+    arr.forEach(function(x){ if(x && x.id) _anyId = true; else if(x && typeof x === 'object') _anyNo = true; });
+    if(_anyId && _anyNo){
+      arr = arr.map(function(x){
+        if(x && typeof x === 'object' && !Array.isArray(x) && !x.id){
+          return Object.assign({}, x, { id: _fbStableId(x) });
+        }
+        return x;
+      });
+    }
+  }
   // 동기화로 들어온 데이터에 같은 id가 두 번 이상이면 첫 항목만 유지 (dbSet 쓰기 규칙과 동일) — 재로그인 시 중복 재발 방지
   var _seen = {};
   return arr.filter(function(x){
