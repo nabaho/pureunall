@@ -26156,8 +26156,8 @@ function coFilters(){
     { k: 'coOnlySme',        icon: '🏅', label: '확인서 갱신', count: () => coSmeCount(),
       title: '중소기업 확인서가 만료됐거나 30일 안에 만료될 회사만 봅니다 — 해마다 새로 받습니다' },
     /* ⚠ 「종료일 지남」은 계약해지(🚪)와 «다른 말»이다 — 해지로 표시된 곳은 안 담는다 */
-    { k: 'coOnlyCtOld',      icon: '📅', label: '계약 종료', count: () => coCtCount(),
-      title: '계약 종료일이 지났거나 30일 안에 끝나는 회사만 봅니다 — 계약해지(🚪)로 표시된 곳은 뺍니다' },
+    { k: 'coOnlyCtOld',      icon: '📅', label: '계약 갱신', count: () => coCtCount(),
+      title: '30일 안에 끝나거나 막 지난(30일 안) 회사만 봅니다 — 오래 지난 곳(자동 연장)과 계약해지(🚪)는 뺍니다' },
     /* ⚠ 「물어본 그때」의 상태다 — 계약해지(🚪)와 다른 말이다 */
     { k: 'coOnlyNtsBad',     icon: '🏛', label: '폐업·휴업', count: () => coNtsBadCount(),
       title: '국세청에 물어본 결과가 폐업·휴업인 회사만 봅니다 — 물어본 그때의 상태입니다' }
@@ -26747,7 +26747,7 @@ function pickCoNoFolder(){
      2026-09-12 에 「🏅 확인서 갱신」을 늘리며 이 자리를 빠뜨렸다가 그 검사가 잡았다. */
 const CO_TODO_LABEL = { coOnlyClosed:'🚪 종료', coOnlyNoBiz:'🔢 번호 없음',
                         coOnlyIncomplete:'📋 정보부족', coOnlyUid:'🏛 고유번호증',
-                        coOnlySme:'🏅 확인서 갱신', coOnlyCtOld:'📅 계약 종료',
+                        coOnlySme:'🏅 확인서 갱신', coOnlyCtOld:'📅 계약 갱신',
                         coOnlyNtsBad:'🏛 폐업·휴업',
                         coNoFolder:'📂 아직 안 담음' };
 function clearCoTodo(k){ state[k] = false; state.coPage = 0; renderCoAny(); }
@@ -29316,10 +29316,42 @@ function coCtState(o, now){
 /* 해지로 표시된 곳인가 — 「이미 끝낸 일」이다. o.erp.left 는 업체관리가 정한 값이라
    여기서 다시 재지 않는다(🚪 딱지와 같은 잣대). */
 function coCtClosed(o){ return !!(o && o.erp && o.erp.left); }
+/* ⚠⚠ 「종료일이 지났다」는 그 자체로는 알림거리가 «아니다» (대표 지시 2026-09-15
+     「계약종료일 지났어도 특별한 상황이 없으면 표시 안 되게 해라」).
+   실측: 대표 화면에 「종료일 지남 91곳 · 30일 안 1곳」이 떴다. 91곳은 거의 다
+   **자동 연장으로 계속 가는 곳**이다 — 상세 화면이 이미 그 말을 하고 있었는데
+   (「계약해지와는 다른 말입니다」), 띠는 그것을 세어 올려 91이라는 숫자로 겁을 줬다.
+   늘 뜨는 큰 숫자는 눈이 배경으로 배운다 — 정작 1곳이 묻힌다.
+
+   ★ 그래서 «챙길 일이 있는 때»만 담는다:
+     ㉠ 곧 끝난다(30일 안) — 지금이 갱신 협의할 때다
+     ㉡ 막 지났다(지난 지 30일 안) — 아직 갱신 협의가 살아 있다
+   ⚠ 오래 지난 곳은 «안 담는다». 자동 연장으로 굴러가는 중이라 할 일이 없다.
+     그래도 **세어서 말한다**(coCtOldCount) — 조용히 빼면 화면이 거짓말을 한다.
+   ⚠ 상세 화면의 「종료일 지남」 딱지는 «그대로» 둔다. 그것은 날짜 사실이고,
+     회사를 열어 본 사람에게는 알려 줘야 한다. 여기서 좁히는 것은 «목록 알림»뿐이다. */
+const CT_RECENT_DAYS = 30;
+/* 「지금 챙길 때인가」 — 날짜만 보는 잣대다(해지 여부는 안 본다).
+   ⚠ 이것을 한 곳에 둔다. coCtNeeds 와 「뺀 곳」 셈이 각자 재면, 「뺐습니다」 숫자를
+     더했을 때 전체와 안 맞아 화면이 스스로를 못 설명한다. */
+function coCtInWindow(st){
+  if(!st) return false;
+  if(st.cls === 'soon') return true;                        /* 곧 끝난다 */
+  return st.cls === 'gone' && (-st.days) <= CT_RECENT_DAYS; /* 막 지났다 */
+}
 function coCtNeeds(o, now){
   if(coCtClosed(o)) return false;
-  const st = coCtState(o, now);
-  return !!st && (st.cls === 'gone' || st.cls === 'soon');
+  return coCtInWindow(coCtState(o, now));
+}
+/* 종료일이 «오래» 지난 곳 — 자동 연장으로 보고 알림에서 뺀 곳이다.
+   ⚠ 해지(🚪)는 여기 안 센다 — 그것은 따로 세어 말한다(coCtClosedCount).
+     두 곳에 겹쳐 세면 「뺐습니다」 숫자를 더했을 때 전체와 안 맞는다. */
+function coCtOldCount(now){
+  return (coList() || []).filter(function(o){
+    if(coCtClosed(o)) return false;
+    const st = coCtState(o, now);
+    return !!st && st.cls === 'gone' && (-st.days) > CT_RECENT_DAYS;
+  }).length;
 }
 /* 급한 순 — 남은 날이 적을수록 앞. 지난 것은 음수라 저절로 맨 앞에 선다. */
 function coCtList(now){
@@ -29334,8 +29366,9 @@ function coCtCount(now){ return coCtList(now).length; }
 function coCtClosedCount(now){
   return (coList() || []).filter(function(o){
     if(!coCtClosed(o)) return false;
-    const st = coCtState(o, now);
-    return !!st && (st.cls === 'gone' || st.cls === 'soon');
+    /* ⚠ coCtNeeds 와 «같은 창»으로 잰다 — 해지가 아니었다면 목록에 올랐을 곳만 센다.
+       오래 지난 해지는 애초에 챙길 것이 아니라 「뺐습니다」에 넣으면 숫자가 뜻을 잃는다. */
+    return coCtInWindow(coCtState(o, now));
   }).length;
 }
 /* 목록 위 알림 띠 — 0곳이면 «아무 것도 안 띄운다»(확인서 띠와 같은 규칙) */
@@ -29344,11 +29377,11 @@ function coCtBarHtml(now){
   if(!list.length) return '';
   const gone = list.filter(x => x.cls === 'gone').length;
   const soon = list.length - gone;
-  const bits = [ gone ? `종료일 지남 <b>${gone.toLocaleString()}곳</b>` : '',
-                 soon ? `30일 안 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
+  const bits = [ gone ? `막 지남 <b>${gone.toLocaleString()}곳</b>` : '',
+                 soon ? `곧 끝남 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
   return `<div class="coctbar" onclick="openCoCt()"
-      title="계약 종료일이 지났거나 곧 끝나는 곳입니다 — 계약해지(🚪)로 표시된 곳은 뺐습니다">
-      📅 계약 ${bits}<em>— 눌러서 보기</em></div>`;
+      title="지금 갱신을 챙길 곳입니다 — 종료일이 오래 지난 곳(자동 연장)과 계약해지(🚪)는 뺐습니다">
+      📅 계약 갱신 ${bits}<em>— 눌러서 보기</em></div>`;
 }
 function openCoCt(){ showPanel(coCtHtml()); }
 /* 창 — 급한 순으로 늘어놓고, 누르면 그 회사를 연다.
@@ -29357,13 +29390,19 @@ function openCoCt(){ showPanel(coCtHtml()); }
 function coCtHtml(now){
   /* ⚠ 「오늘」을 받는다 — 코SmeHtml 과 같은 까닭이다 */
   const list = coCtList(now);
-  const 뺀곳 = coCtClosedCount(now);
-  const 뺀말 = 뺀곳 ? `<br>계약해지(🚪)로 표시된 <b>${뺀곳.toLocaleString()}곳</b>은 뺐습니다 — 이미 끝낸 일입니다.` : '';
-  if(!list.length) return `<div class="mhead"><b>📅 계약 종료</b>${_closeBtn()}</div>
-    <p class="cpnone" style="padding:16px 2px">챙길 곳이 없습니다 👍</p>
-    ${뺀곳 ? `<p class="setnote" style="margin:10px 0 0">계약해지(🚪)로 표시된 ${뺀곳.toLocaleString()}곳은 뺐습니다.</p>` : ''}`;
-  return `<div class="mhead"><b>📅 계약 종료 — 챙길 곳 ${list.length}곳</b>${_closeBtn()}</div>
-    <p class="setnote" style="margin:0 0 10px">종료일이 지났거나 <b>30일 안</b>에 끝나는 곳입니다 — 급한 곳부터 놓았습니다.
+  const 해지 = coCtClosedCount(now), 오래 = coCtOldCount(now);
+  /* ⚠ 뺀 것은 «세어서» 말한다 — 조용히 빼면 「우리 거래처가 이것뿐인가」가 된다.
+     둘을 갈라 말한다: 해지는 «끝낸 일», 오래 지남은 «자동 연장으로 굴러가는 중»이다. */
+  const 뺀말 = [
+    오래 ? `종료일이 <b>${CT_RECENT_DAYS}일</b>보다 오래 지난 <b>${오래.toLocaleString()}곳</b>은 뺐습니다 — 자동 연장으로 계속 가는 곳입니다.` : '',
+    해지 ? `계약해지(🚪)로 표시된 <b>${해지.toLocaleString()}곳</b>은 뺐습니다 — 이미 끝낸 일입니다.` : ''
+  ].filter(Boolean).map(s => '<br>' + s).join('');
+  if(!list.length) return `<div class="mhead"><b>📅 계약 갱신</b>${_closeBtn()}</div>
+    <p class="cpnone" style="padding:16px 2px">지금 챙길 곳이 없습니다 👍</p>
+    ${뺀말 ? `<p class="setnote" style="margin:10px 0 0">${뺀말.replace(/^<br>/, '')}</p>` : ''}`;
+  return `<div class="mhead"><b>📅 계약 갱신 — 챙길 곳 ${list.length}곳</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 10px"><b>${CT_RECENT_DAYS}일 안</b>에 끝나거나
+      <b>막 지난</b>(${CT_RECENT_DAYS}일 안) 곳입니다 — 지금이 갱신을 챙길 때입니다.
       <b>「종료일 지남」은 계약해지가 아닙니다</b> — 자동 연장으로 계속 가는 곳이 있습니다.${뺀말}
       <br>회사를 누르면 그 회사 상세가 열립니다.</p>
     <div class="ablist">${list.map(x=>`
