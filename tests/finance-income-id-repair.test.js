@@ -11,7 +11,7 @@ test('자문수입 id 누락 경고에 실제 복구 단추를 연결한다', ()
 });
 
 test('ID 복구는 서버 최신값 transaction 안에서만 수행한다', () => {
-  const at = src.indexOf('window.erpRepairFinanceIncomeIds = function()');
+  const at = src.indexOf('window.erpRepairFinanceIncomeIds = function(opts)');
   assert.ok(at > 0, '복구 함수가 없다');
   const fn = src.slice(at, src.indexOf('\n};', at) + 3);
   assert.match(fn, /ref\.transaction\(/, '통째 set이면 동시 저장 자료를 덮을 수 있다');
@@ -21,7 +21,7 @@ test('ID 복구는 서버 최신값 transaction 안에서만 수행한다', () =
 });
 
 test('ID 복구는 동기화 완료 전 실행되지 않는다', () => {
-  const at = src.indexOf('window.erpRepairFinanceIncomeIds = function()');
+  const at = src.indexOf('window.erpRepairFinanceIncomeIds = function(opts)');
   const fn = src.slice(at, src.indexOf('\n};', at) + 3);
   assert.match(fn, /if\(!_fbSynced\)/);
 });

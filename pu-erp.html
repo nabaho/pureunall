@@ -292,8 +292,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-15 로그인 멈춤·저장공간 포화·자문수입 ID 누락 복구';
-var BUILD_SEQ = 154;
+var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-15 전체 멈춤 근본복구(저장공간 분리·자문수입 ID 자동교정)';
+var BUILD_SEQ = 155;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -324,7 +324,7 @@ var BUILD_SEQ = 154;
       var prev={}; try{ prev=JSON.parse(localStorage.getItem(SNAPK)||'{}'); }catch(_){ prev={}; }
       var cur={};
       CHECK.forEach(function(k){
-        var arr; try{ arr=JSON.parse(localStorage.getItem(KEYP+k)||'null'); }catch(_){ arr=null; }
+        var arr; try{ arr=JSON.parse((typeof _erpStoreGet==='function' ? _erpStoreGet(k) : localStorage.getItem(KEYP+k))||'null'); }catch(_){ arr=null; }
         if(!Array.isArray(arr)) return;
         cur[k]=arr.length;
         // 1) 중복 id 점검
@@ -367,6 +367,11 @@ var BUILD_SEQ = 154;
         arr.forEach(function(x){ if(x && x.id) _hasId++; else _noId++; });
         if(_noId > 0 && _hasId > 0){
           try{ console.warn('[id없음] '+k+': '+_noId+'건 — 이 표는 통째 저장으로 떨어져 있습니다'); }catch(_c2){}
+          // 자문수입은 서버 transaction으로 내용 손대지 않고 자동 복구한다.
+          // 경고 단추를 기다리는 동안 다른 저장이 또 레거시 배열을 밀지 않게 즉시 시작한다.
+          if(k==='finance_income' && typeof window.erpRepairFinanceIncomeIds==='function'){
+            setTimeout(function(){ window.erpRepairFinanceIncomeIds({auto:true}); },0);
+          }
           /* ★★ 어디가 고장인지 «갈라» 말한다 (2026-09-13 대표 제보 「어떻게 해결해야하나 반복된다」).
              이 점검은 서버가 아니라 «이 기기 사본»(localStorage)만 센다. 그래서
              껍데기가 어디 있는지는 세어서는 알 수 없다 — 서버 모양을 함께 봐야 한다.
@@ -1774,6 +1779,33 @@ function openAddressSearch(onComplete, prefill){
 
 // ============ 저장소 (localStorage 래퍼 + Firebase RTDB 동기화) ============
 var KEY = 'pureun_v6_';
+// 자문수입은 2천 건을 넘어 localStorage 5MB 한도를 밀어낸다. 이 표의 영구 원본은
+// Firebase이고, 현재 탭에서는 동기식으로 읽을 수 있는 sessionStorage에 둔다.
+// 나머지 표와 메타데이터는 기존 localStorage를 그대로 쓴다.
+function _erpStoreGet(k){
+  try{
+    if(k==='finance_income'){
+      var sv=sessionStorage.getItem(KEY+k);
+      if(sv!==null) return sv;
+      var lv=localStorage.getItem(KEY+k);
+      if(lv!==null){ sessionStorage.setItem(KEY+k,lv); localStorage.removeItem(KEY+k); }
+      return lv;
+    }
+    return localStorage.getItem(KEY+k);
+  }catch(_){ return null; }
+}
+function _erpStoreSet(k,v){
+  if(k==='finance_income'){
+    sessionStorage.setItem(KEY+k,v);
+    try{ localStorage.removeItem(KEY+k); }catch(_){}
+    return;
+  }
+  localStorage.setItem(KEY+k,v);
+}
+function _erpStoreRemove(k){
+  try{ sessionStorage.removeItem(KEY+k); }catch(_){}
+  try{ localStorage.removeItem(KEY+k); }catch(_){}
+}
 
 // ============================================================
 // === 다중 탭 쓰기 가드 — 한 탭만 저장(쓰기) 허용 ===
@@ -2531,7 +2563,7 @@ function dbGet(k, def){
     try {
       // 캐시에 없을 때만 온다 — 큰 열쇠는 여기서 몇 백 ms 가 걸릴 수 있다
       var _t0 = (window.performance && performance.now) ? performance.now() : 0;
-      var v = localStorage.getItem(KEY+k);
+      var v = (typeof _erpStoreGet==='function') ? _erpStoreGet(k) : localStorage.getItem(KEY+k);
       var parsed = v ? JSON.parse(v) : def;
       if(parsed == null) parsed = def;
       _dbCache[k] = parsed;
@@ -2845,7 +2877,7 @@ function scheduleAutoSnap(){
     try {
       var snap = { ts: Date.now(), ym: todayYM(), data: {} };
       _SNAP_KEYS.forEach(function(k){
-        var raw = localStorage.getItem(KEY+k);
+        var raw = _erpStoreGet(k);
         if(raw) snap.data[k] = raw;
       });
       // 최근 3개 스냅샷만 보관
@@ -2869,7 +2901,7 @@ window.erpRestore = function(snapIndex){
     console.log('복원할 키:', Object.keys(snap.data).join(', '));
     if(!confirm('이 스냅샷으로 복원하시겠습니까?\n시각: '+new Date(snap.ts).toLocaleString())) return;
     Object.keys(snap.data).forEach(function(k){
-      localStorage.setItem(KEY+k, snap.data[k]);
+      _erpStoreSet(k, snap.data[k]);
     });
     console.log('✅ 복원 완료. F5로 새로고침하세요.');
   } catch(e){ console.log('❌ 복원 실패:', e.message); }
@@ -2899,7 +2931,7 @@ window.erpBackup = function(){
     ];
     var backup = { exportedAt: new Date().toISOString(), version: 'v6', data: {} };
     BACKUP_KEYS.forEach(function(k){
-      var raw = localStorage.getItem(KEY+k);
+      var raw = _erpStoreGet(k);
       if(raw) try { backup.data[k] = JSON.parse(raw); } catch(e){}
     });
     var blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
@@ -2923,7 +2955,7 @@ window.erpBackupFull = function(){
     var backup = { exportedAt: new Date().toISOString(), version: 'v6-full', keyCount: 0, data: {} };
     var n = 0;
     KEYS.forEach(function(k){
-      var raw = localStorage.getItem(KEY+k);
+      var raw = _erpStoreGet(k);
       if(raw){ try { backup.data[k] = JSON.parse(raw); n++; } catch(e){} }
     });
     backup.keyCount = n;
@@ -2993,7 +3025,7 @@ window.erpSyncNow = function(){
   var updates = {};
   var ts = Date.now();
   SYNC_KEYS2.forEach(function(k){
-    var raw = localStorage.getItem(KEY+k);
+    var raw = (typeof _erpStoreGet==='function') ? _erpStoreGet(k) : localStorage.getItem(KEY+k);
     if(!raw) return;
     try { updates['data/'+k] = { v: JSON.parse(raw), u: ts }; } catch(e){}
   });
@@ -3009,7 +3041,7 @@ window.erpDiag = function(){
     'payroll_monthly','consult_logs','user_accounts','finance_expense','my_todos'];
   DIAG_KEYS.forEach(function(k){
     try {
-      var raw = localStorage.getItem(KEY+k);
+      var raw = _erpStoreGet(k);
       if(!raw){ console.log('⚠️ '+k+': 없음'); return; }
       var arr = JSON.parse(raw);
       console.log('✅ '+k+': '+(Array.isArray(arr)?arr.length+'건':typeof arr));
@@ -4179,7 +4211,7 @@ window.erpPullFromServer = function(){
       var rec = remote[k];
       var sv = (rec && rec.v !== undefined) ? normalizeFbValue(rec.v) : [];
       var sN = Array.isArray(sv) ? sv.length : 0;
-      var lN = 0; try { var la = JSON.parse(localStorage.getItem(KEY+k)||'[]'); lN = Array.isArray(la)?la.length:0; } catch(e){}
+      var lN = 0; try { var la = JSON.parse(_erpStoreGet(k)||'[]'); lN = Array.isArray(la)?la.length:0; } catch(e){}
       if(lN >= 10 && sN < lN * 0.5) shrink.push('· '+k+': 이 기기 '+lN+'건 → 서버 '+sN+'건');
     });
     if(shrink.length && !confirm('⚠ 서버 데이터가 이 기기보다 훨씬 적습니다:\n'+shrink.join('\n')+'\n\n받아오면 이 기기 데이터가 줄어듭니다. 그래도 받으시겠어요?')) return;
@@ -4190,7 +4222,7 @@ window.erpPullFromServer = function(){
         var rec = remote[k];
         if(!rec || rec.v === undefined) return;
         var val = normalizeFbValue(rec.v);
-        localStorage.setItem(KEY+k, JSON.stringify(val));
+        _erpStoreSet(k, JSON.stringify(val));
         localStorage.setItem(KEY+'_meta_'+k, String(rec.u || Date.now()));
         if(typeof _dbCache !== 'undefined') _dbCache[k] = val;
         n++;
@@ -4208,10 +4240,13 @@ window.erpPullFromServer = function(){
 // ── 자문수입 레거시 ID 복구 ───────────────────────────────────────────────
 // 서버 최신값 안에서 transaction으로 처리한다. 다른 기기가 동시에 추가해도 그 자료를
 // 덮어쓰지 않으며, 기존 기록의 내용·순서·금액은 바꾸지 않고 빈 id만 채운다.
-window.erpRepairFinanceIncomeIds = function(){
+window.erpRepairFinanceIncomeIds = function(opts){
+  opts=opts||{};
+  if(window._erpIdRepairRunning) return;
   if(typeof fbDb === 'undefined' || !fbDb){ try{ showToast('서버에 연결된 뒤 다시 눌러 주세요'); }catch(_){} return; }
   if(!_fbSynced){ try{ showToast('서버 자료를 받는 중입니다. 잠시 뒤 다시 눌러 주세요'); }catch(_){} return; }
-  if(!confirm('자문수입의 ID 없는 기록만 복구합니다.\n내용·날짜·금액은 바뀌지 않습니다. 계속할까요?')) return;
+  if(!opts.auto && !confirm('자문수입의 ID 없는 기록만 복구합니다.\n내용·날짜·금액은 바뀌지 않습니다. 계속할까요?')) return;
+  window._erpIdRepairRunning=true;
   var ref = fbDb.ref('data/finance_income');
   var repaired = 0, finalRows = null;
   function hashText(s){
@@ -4237,13 +4272,14 @@ window.erpRepairFinanceIncomeIds = function(){
     if(!count) return cur;
     return {v:arrayToIdMap(fixed), u:Date.now()};
   }, function(err, committed, snap){
+    window._erpIdRepairRunning=false;
     if(err){ try{ showToast('ID 복구 실패 — 서버 연결을 확인해 주세요'); }catch(_){} return; }
     var saved=snap&&snap.val(), rows=null;
     try{ rows=normalizeFbValue(saved&&saved.v); }catch(_){}
     if(Array.isArray(rows)){
-      try{ localStorage.setItem(KEY+'finance_income',JSON.stringify(rows)); localStorage.setItem(KEY+'_meta_finance_income',String((saved&&saved.u)||Date.now())); _dbCache.finance_income=rows; }catch(_){}
+      try{ _erpStoreSet('finance_income',JSON.stringify(rows)); localStorage.setItem(KEY+'_meta_finance_income',String((saved&&saved.u)||Date.now())); _dbCache.finance_income=rows; }catch(_){}
     } else if(finalRows){
-      try{ localStorage.setItem(KEY+'finance_income',JSON.stringify(finalRows)); _dbCache.finance_income=finalRows; }catch(_){}
+      try{ _erpStoreSet('finance_income',JSON.stringify(finalRows)); _dbCache.finance_income=finalRows; }catch(_){}
     }
     _fbObjForm.finance_income=true;
     try{ showToast(repaired ? ('✅ ID '+repaired+'건 복구 완료 — 화면을 다시 엽니다') : '✅ 이미 복구되어 있습니다'); }catch(_){}
@@ -4291,7 +4327,7 @@ function dbSet(k, v){
   catch(e){ if(window._erpErrLog) window._erpErrLog(e); }   /* 못 읽으면 원래 것으로 */
 
   var oldJson = null;
-  try { oldJson = localStorage.getItem(KEY+k); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+  try { oldJson = _erpStoreGet(k); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
   if(oldJson === newJson){ _dbCache[k] = v; return true; }  // 변경 없음 → 통신 생략
 
   // 이전 값 파싱 (Diff 비교용)
@@ -4319,7 +4355,7 @@ function dbSet(k, v){
     } catch(e){ window._erpErrLog && window._erpErrLog(e); }
   }
 
-  try { localStorage.setItem(KEY+k, newJson); }
+  try { _erpStoreSet(k, newJson); }
   catch(e){
     window._erpErrLog && window._erpErrLog(e);
     var _quota = e && (e.name === 'QuotaExceededError' || e.code === 22 || /quota|exceeded/i.test(e.message||''));
@@ -4524,7 +4560,7 @@ var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','pay
                       // 서버가 더 최신 → 서버값 수신(로컬 변경은 재확인 필요)
                       try {
                         var _g2 = normalizeFbValue(sv.v);
-                        localStorage.setItem(KEY+k, JSON.stringify(_g2));
+                        _erpStoreSet(k, JSON.stringify(_g2));
                         localStorage.setItem(KEY+'_meta_'+k, String(_srvU));
                         _dbCache[k] = _g2;
                         _fbObjForm[k] = !!(sv.v && typeof sv.v==='object' && !Array.isArray(sv.v));
@@ -4541,7 +4577,7 @@ var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','pay
                   try {
                     var _sval = snap.val() || {};
                     var _okArr = normalizeFbValue(_sval.v);
-                    localStorage.setItem(KEY+k, JSON.stringify(_okArr));
+                    _erpStoreSet(k, JSON.stringify(_okArr));
                     localStorage.setItem(KEY+'_meta_'+k, String(typeof _sval.u === 'number' ? _sval.u : Date.now()));
                     _dbCache[k] = _okArr;
                     _fbObjForm[k] = !!(_sval.v && typeof _sval.v === 'object' && !Array.isArray(_sval.v));
@@ -4555,7 +4591,7 @@ var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','pay
             if(_srvNewer){
               try {
                 var _good = normalizeFbValue(sv.v);
-                localStorage.setItem(KEY+k, JSON.stringify(_good));
+                _erpStoreSet(k, JSON.stringify(_good));
                 localStorage.setItem(KEY+'_meta_'+k, String(_srvU));
                 _dbCache[k] = _good;
                 _fbObjForm[k] = !!(sv.v && typeof sv.v==='object' && !Array.isArray(sv.v));
@@ -4627,7 +4663,7 @@ var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','pay
             }
             try {
               var _sv3 = snap.val() || {};
-              localStorage.setItem(KEY+k, JSON.stringify(_sv3.v === undefined ? {} : _sv3.v));
+              _erpStoreSet(k, JSON.stringify(_sv3.v === undefined ? {} : _sv3.v));
               localStorage.setItem(KEY+'_meta_'+k, String(typeof _sv3.u === 'number' ? _sv3.u : Date.now()));
               _dbCache[k] = (_sv3.v === undefined ? {} : _sv3.v);
               if(typeof _scheduleFbChanged === 'function') _scheduleFbChanged(k);
@@ -4641,7 +4677,7 @@ var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','pay
             if(srvU2 > _preMeta){
               console.warn('[되돌림방지] '+k+': 서버('+srvU2+')가 이 기기 기준('+_preMeta+')보다 최신 — 설정 덮어쓰기 차단, 서버 원본 수신');
               try {
-                localStorage.setItem(KEY+k, JSON.stringify(sv2.v));
+                _erpStoreSet(k, JSON.stringify(sv2.v));
                 localStorage.setItem(KEY+'_meta_'+k, String(srvU2));
                 _dbCache[k] = sv2.v;
                 try { if(typeof _scheduleFbChanged === 'function') _scheduleFbChanged(k); } catch(_){}
@@ -4894,7 +4930,7 @@ function _conflictNet(k, item, stored){
 }
 
 function _recLocalSave(k, arr){
-  try { localStorage.setItem(KEY+k, JSON.stringify(arr)); }
+  try { _erpStoreSet(k, JSON.stringify(arr)); }
   catch(e){
     window._erpErrLog && window._erpErrLog(e);
     try { showToast('⚠ 저장 실패 — 변경사항이 저장되지 않았습니다'); } catch(_){}
@@ -8877,7 +8913,7 @@ function fbUploadAll(onProgress, onDone){
   var ts = Date.now();
   var count = 0;
   SYNC_KEYS.forEach(function(k){
-    var raw = localStorage.getItem(KEY+k);
+    var raw = _erpStoreGet(k);
     if(!raw) return;
     try {
       var v = JSON.parse(raw);
@@ -8908,7 +8944,8 @@ function _fbApplyRecord(k, v, opts){
   _fbObjForm[k] = !!(v.v && typeof v.v==='object' && !Array.isArray(v.v));
   var localTime = parseInt(localStorage.getItem(KEY+'_meta_'+k) || '0', 10);
   function _write(arrValue, u, notify){
-    localStorage.setItem(KEY+k, JSON.stringify(arrValue));
+    if(typeof _erpStoreSet==='function') _erpStoreSet(k, JSON.stringify(arrValue));
+    else localStorage.setItem(KEY+k, JSON.stringify(arrValue));
     localStorage.setItem(KEY+'_meta_'+k, String(u));
     _dbCache[k] = arrValue; // 캐시 갱신
     if(notify){ try { _scheduleFbChanged(k); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }
@@ -8964,9 +9001,10 @@ function _fbApplyRecord(k, v, opts){
     try {
       var _nv = normalizeFbValue(v.v);
       if(!Array.isArray(_nv)){
-        var _lraw = localStorage.getItem(KEY+k);
+        var _lraw = (typeof _erpStoreGet==='function') ? _erpStoreGet(k) : localStorage.getItem(KEY+k);
         if(_lraw && _lraw.charAt(0) === '['){
-          localStorage.setItem(KEY+k, JSON.stringify(_nv));
+          if(typeof _erpStoreSet==='function') _erpStoreSet(k, JSON.stringify(_nv));
+          else localStorage.setItem(KEY+k, JSON.stringify(_nv));
           localStorage.setItem(KEY+'_meta_'+k, String(v.u || Date.now()));
           _dbCache[k] = _nv;
           console.log('[자가치유] '+k+': 뭉개진 로컬 설정을 서버 원본(객체)으로 복구');
@@ -9137,7 +9175,7 @@ function _fbLocalU(k){
   try { return parseInt(localStorage.getItem(KEY + '_meta_' + k) || '0', 10) || 0; } catch(_){ return 0; }
 }
 function _fbHasLocal(k){
-  try { return localStorage.getItem(KEY + k) !== null; } catch(_){ return false; }
+  try { return ((typeof _erpStoreGet==='function') ? _erpStoreGet(k) : localStorage.getItem(KEY+k)) !== null; } catch(_){ return false; }
 }
 
 /* 표 전체 구독으로 올린다. 첫 값이 그 표의 받기.
@@ -9164,13 +9202,16 @@ function _fbIsRecordKey(k){ return FB_RECORD_KEYS.indexOf(k) >= 0; }
 function _fbLocalArr(k){
   if(Array.isArray(_dbCache[k])) return _dbCache[k].slice();
   try {
-    var raw = localStorage.getItem(KEY + k);
+    var raw = (typeof _erpStoreGet==='function') ? _erpStoreGet(k) : localStorage.getItem(KEY+k);
     var a = raw ? JSON.parse(raw) : [];
     return Array.isArray(a) ? a : [];
   } catch(_e){ return []; }
 }
 function _fbWriteArr(k, arr, u){
-  try { localStorage.setItem(KEY + k, JSON.stringify(arr)); } catch(_e){}
+  try {
+    if(typeof _erpStoreSet==='function') _erpStoreSet(k, JSON.stringify(arr));
+    else localStorage.setItem(KEY+k, JSON.stringify(arr));
+  } catch(_e){}
   if(typeof u === 'number'){ try { localStorage.setItem(KEY + '_meta_' + k, String(u)); } catch(_e2){} }
   _dbCache[k] = arr;
   try { _scheduleFbChanged(k); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
@@ -9505,7 +9546,7 @@ var _shrinkKeep = {}; // k -> '유지' 결정 만료시각 (TTL 내엔 조용히
 function _healServerKey(k){
   try {
     if(!fbDb || !fbShouldSync(k)) return;
-    var raw = localStorage.getItem(KEY+k);
+    var raw = _erpStoreGet(k);
     if(!raw) return;
     var val = JSON.parse(raw);
     var ts = Date.now();
@@ -9524,7 +9565,7 @@ function _fbLocalCountForShrink(k){
   try {
     var cached = _dbCache[k];
     if(Array.isArray(cached)) return cached.length;
-    var v = JSON.parse(localStorage.getItem(KEY+k) || 'null');
+    var v = JSON.parse(_erpStoreGet(k) || 'null');
     return Array.isArray(v) ? v.length : null;
   } catch(_){ return null; }
 }
@@ -9702,11 +9743,11 @@ if(fbDb){
       keys.forEach(function(k){
         try {
           if(!fbShouldSync(k)) return;
-          var raw = localStorage.getItem(KEY+k);
+          var raw = _erpStoreGet(k);
           var val = raw ? JSON.parse(raw) : null;
           if(val == null) return;
           _dbCache[k] = val;
-          localStorage.removeItem(KEY+k);       // dbSet의 oldJson===newJson 스킵 회피
+          _erpStoreRemove(k);                   // dbSet의 oldJson===newJson 스킵 회피
           dbSet(k, val);                        // 모든 보호로직 통과 후에만 서버 반영
           console.log('[동기화보호] 보류됐던 '+k+' 재저장 (보호로직 경유)');
         } catch(e){ window._erpErrLog && window._erpErrLog(e); }
@@ -84679,7 +84720,7 @@ function App(){
     var hasFin = mine.some(function(id){ return String(id).indexOf('fin/')===0 || String(id).indexOf('hr/')===0; });
     if(hasFin) return;                                 // 환경설정에서 재무·인사 권한 받은 직원도 유지
     FB_FIN_KEYS.forEach(function(k){
-      try { localStorage.removeItem(KEY+k); localStorage.removeItem(KEY+'_meta_'+k); delete _dbCache[k]; } catch(_){}
+      try { _erpStoreRemove(k); localStorage.removeItem(KEY+'_meta_'+k); delete _dbCache[k]; } catch(_){}
     });
   }
 
