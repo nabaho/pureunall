@@ -5379,6 +5379,30 @@ function erpAliasFind(memo){
   } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return null; }
 }
 
+/* ── 별칭을 «증거로» 써도 되나 ─────────────────────────────────────
+   ★★ 2026-09-15 건의(김보람 노무사) — 「거래내역 자동매칭 기능 오류(CMS한정)」
+     「더빌이체3572 라는 적요명으로 입금되는 cms 이체내역에 대하여, 자동매칭기능이
+      엉뚱한 업체를 금액만 맞춰 입금처리하는 오류가 있습니다. 3/19 더빌이체3572 로
+      입금된 110,000원은 천안세브란스의원 입금건이나, 충남천막산업의 자문료로
+      자동 매치되어 있습니다.」
+
+   ★ 뿌리 — CMS 적요는 «업체 이름이 아니라 걷어 온 통로»다. 같은 「더빌이체3572」가
+     달마다 «다른 업체»의 돈을 싣고 온다. 그런데 한 번 손으로 확정하면 그것이
+     입금자 별칭으로 배워졌고, 두 번째부터는 신뢰(erpAliasTrusted)가 되어 이름점수
+     100점을 받았다 — 그때부터 금액만 맞으면 그 업체로 저절로 찍혔다.
+   ⚠ 2026-08-18 에 「닮지 않은 별칭은 두 번 확정돼야 규칙」으로 막았는데, CMS 적요는
+     **몇 번을 확정해도 규칙이 될 수 없다** — 매번 주인이 바뀌기 때문이다. 횟수로 풀 일이 아니다.
+   ★ 그래서 «배우지도 않고, 이미 배운 것도 증거로 안 쓴다». 지우는 길(erpAliasFind)은
+     그대로 둔다 — 화면에서 옛 별칭을 찾아 지울 수 있어야 한다.
+   ⚠ 쓰는 쪽이 둘이다(erpMatchScore·erpAutoTidyOk). 이 하나를 «같이» 쓴다 —
+     두 벌로 두면 한쪽만 고쳐진다. tests/cms-alias-not-a-name.test.js 가 못 박는다. */
+function erpAliasEvidence(memo){
+  try {
+    if(erpIsCmsMemo(memo)) return null;      // CMS 적요는 업체를 가리키지 않는다
+    return erpAliasFind(memo);
+  } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return null; }
+}
+
 /* ── 별칭을 «한 번에» 규칙으로 삼아도 되나 ──────────────────────────
    ★ 2026-08-18 대표 제보의 뿌리. 8월 8일에 «한 번» 잘못 확정한 것이 곧바로 규칙이 되어
      그 뒤로 계속 같은 곳에 붙었다:
@@ -5425,6 +5449,15 @@ function erpLearnPayerAlias(memo, cand){
     if(!coName) return false;
     var key = erpNormName(raw);
     if(!key) return false;
+    /* ★★ CMS 일괄이체 적요로는 «아무것도 배우지 않는다» (2026-09-15 건의).
+         「더빌이체3572」는 걷어 온 통로이지 업체가 아니다 — 달마다 주인이 바뀐다.
+       ⚠ 이미 잘못 배워 둔 것이 있으면 여기서 지운다. 안 지우면 그 폰·그 PC 에서는
+         고쳐 잡아도 다음 달에 또 같은 곳으로 끌려간다(2026-08-13 과 같은 구멍). */
+    if(erpIsCmsMemo(raw)){
+      erpForgetPayerAlias(key);
+      try { var _ck = erpNormName(erpCleanMemo(raw)); if(_ck && _ck !== key) erpForgetPayerAlias(_ck); } catch(_fe){ }
+      return false;
+    }
     if(key === erpNormName(coName)){
       /* 적요=업체명이면 새로 배울 것은 없다. 그런데 «전에 잘못 배운 것» 은 지워야 한다.
          2026-08-13 김보람 제보의 「(자)천안청화공사 → 웅천새마을금고」 가 이 구멍이었다.
@@ -6749,7 +6782,7 @@ function erpMatchScore(txn, cand){
   if(tn || tnc){
     var _al = null, _alKey = '';
     try {
-      var _af = erpAliasFind(txn.memo);
+      var _af = erpAliasEvidence(txn.memo);   /* CMS 적요면 null — 통로는 이름이 아니다(2026-09-15) */
       if(_af){ _al = _af.entry; _alKey = _af.key; }
     } catch(_e){ _al = null; }
     if(_al && _al.companyName && cn && erpNormName(_al.companyName) === cn){
@@ -7001,7 +7034,9 @@ function erpAutoTidyOk(sug, memo, txnAmt){
     var amt = (txnAmt === undefined || txnAmt === null) ? sug.txnAmount : txnAmt;
     if(!erpAmountExact(amt, sug.cand.expect || sug.cand.amount)) return false;
     // ① 같은 업체로 3회 이상 학습된 적요
-    var al = erpAliasCompany(memo) || erpAliasCompany(erpCleanMemo(memo));
+    /* ⚠ CMS 적요는 증거가 못 된다(2026-09-15 건의) — erpAliasEvidence 가 한 곳에서 가른다 */
+    var _ae = erpAliasEvidence(memo);
+    var al = _ae && _ae.entry;
     if(!al || !al.companyName) return false;
     if((parseInt(al.count, 10) || 0) < 3) return false;
     if(erpNormName(al.companyName) !== erpNormName(sug.cand.companyName)) return false;
@@ -7033,6 +7068,21 @@ function erpAutoMarkCompanyIncome(txns, year, companies){
     if(String(t.date).slice(0,4) !== yStr) return;
     var month = parseInt(String(t.date).slice(5,7), 10);
     if(!month) return;
+
+    /* ★★ CMS 일괄이체는 «한 업체의 입금이 아니다» (2026-09-15 건의 · 김보람 노무사).
+         한 줄에 여러 업체의 자문료가 합쳐져 들어온다(합계가 한 곳과 우연히 같을 수도 있다).
+         그래서 여기서 «하나를 골라» 찍으면 반드시 남의 돈이 된다 —
+         3/19 「더빌이체3572」 110,000원이 천안세브란스의원 것인데 충남천막산업으로 찍힌 것이 그것이다.
+       ★ 골라 주지 않는다. 대신 «왜 못 하는지»와 «어디서 하면 되는지»를 적어 검토로 넘긴다 —
+         조용히 빠뜨리면 그 입금이 통째로 잊힌다.
+       ⚠ 후보를 함께 넘기지 «않는다». 그 후보는 금액만 맞춰 뽑은 것이라, 보여 주면
+         사람이 그중 하나를 고르게 된다 — 이 흠이 바로 그렇게 생겼다. */
+    if(erpIsCmsMemo(t.memo)){
+      res.review.push({ txnId:t.id||'', date:t.date, amount:t.amount, memo:t.memo||'', month:month,
+                        cms:true, candidates:[],
+                        why:'CMS 일괄이체 — 여러 업체가 합쳐진 입금입니다. 거래내역에서 이 줄을 눌러 «어느 업체들인지» 골라 주세요' });
+      return;
+    }
 
     var cands = [];
     pool.forEach(function(co){
@@ -53228,7 +53278,7 @@ function IncomeCompanyTab(){
         // 확인 필요 (읽기 전용)
         autoMarkModal.review.length>0 && h('div',null,
           h('div',{style:{fontSize:'12px',fontWeight:700,color:'#d97706',marginBottom:'5px'}},
-            '⚠️ 확인 필요 '+autoMarkModal.review.length+'건 (후보가 여러 개거나 신뢰도 부족 — 수동 처리)'),
+            '⚠️ 확인 필요 '+autoMarkModal.review.length+'건 (CMS 일괄이체이거나, 후보가 여러 개거나 신뢰도 부족 — 수동 처리)'),
           h('div',{style:{border:'1px solid #fde68a',borderRadius:'6px',overflow:'auto',maxHeight:'180px',marginBottom:'12px'}},
             h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'}},
               h('thead',null,h('tr',{style:{background:'#fffbeb'}},
@@ -53242,8 +53292,10 @@ function IncomeCompanyTab(){
                   h('td',{style:{padding:'3px 6px',textAlign:'center',fontFamily:'monospace'}},r.date),
                   h('td',{style:{padding:'3px 6px',textAlign:'right',fontFamily:'monospace'}},(r.amount||0).toLocaleString()+'원'),
                   h('td',{style:{padding:'3px 6px',color:'#475569'}},r.memo||'-'),
+                  /* ⚠ 까닭(why)이 있으면 그것을 «먼저» 보인다 — CMS 는 후보를 일부러 안 넘긴다(2026-09-15).
+                       「-」만 있으면 사람은 「왜 아무것도 없지」로 읽고, 결국 금액으로 짐작하게 된다. */
                   h('td',{style:{padding:'3px 6px',color:'#854d0e',fontSize:'10.5px'}},
-                    (r.candidates||[]).map(function(c){return c.name+' '+c.score+'%';}).join(', ')||'-')
+                    r.why || (r.candidates||[]).map(function(c){return c.name+' '+c.score+'%';}).join(', ')||'-')
                 );
               }))
             )
