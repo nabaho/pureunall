@@ -137,8 +137,22 @@ test('알림에 「새로고침」 단추가 있고 한 번만 뜬다', () => {
 
 test('재접속 신호에 감지가 걸려 있다 — 함수만 있고 안 부르면 소용없다', () => {
   const at = src.indexOf('function bindApp(');
-  const fn = src.slice(at, at + 700);
+  const fn = src.slice(at, at + 1600);
   assert.match(fn, /noteReconnect\(now\)/);
   assert.match(fn, /isFlapping\(now/);
   assert.match(fn, /showReloadBanner\(\)/);
+});
+
+test('첫 정상 연결은 재접속으로 세지 않는다', () => {
+  const fn = cutFn(src, 'function bindApp(');
+  assert.match(fn, /if \(sawConnected && disconnectedWhileVisible\)/,
+    '첫 true까지 재접속으로 세면 앱을 여는 것만으로 경고 기준에 가까워집니다');
+  assert.ok(fn.indexOf('if (sawConnected && disconnectedWhileVisible)') < fn.indexOf('noteReconnect(now)'),
+    '재접속 기록보다 실제 단절 확인이 먼저여야 합니다');
+});
+
+test('숨은 탭이 절전 후 복귀한 것은 연결 폭주로 세지 않는다', () => {
+  const fn = cutFn(src, 'function bindApp(');
+  assert.match(fn, /!window\.document\.hidden/,
+    '백그라운드 탭 절전까지 세면 탭을 자주 바꾸는 사람에게 거짓 경고가 뜹니다');
 });

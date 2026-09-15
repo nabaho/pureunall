@@ -72,7 +72,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-resilience.js?v=2"></script>
+<script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=3"></script>
 <script src="js/pu-version.js?v=3"></script>
@@ -275,8 +275,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-14 컨설팅·기금·기타 목록 멈춤 완화 — 기본 20행·담당자와 유형 색인 조회';
-var BUILD_SEQ = 152;
+var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-14 목록 멈춤 및 서버 연결 오경보 완화';
+var BUILD_SEQ = 153;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -375,8 +375,12 @@ var BUILD_SEQ = 152;
              ⚠ 여전히 자동으로 갈아 끼우지 «않는다» — 돈이 걸린 자료다. 누르는 것은 사람이다. */
           window.erpAlert && erpAlert('warn', LABEL[k]+'에 id 없는 기록 '+_noId+'건',
             '나머지 '+_hasId+'건에는 id 가 있습니다. 이 표는 저장할 때마다 «통째로» 주고받고 있습니다 — 화면이 멈추는 원인입니다.',
-            '이 기기 사본이 옛것일 수 있습니다. 아래 단추로 서버 것을 받아 보세요 — 서버에도 같은 껍데기가 있으면 이 알림이 다시 뜹니다. (걱정되시면 환경설정 → 시스템 → 💾 JSON 수동 백업 → 🗄️ 서버 백업 보관함에서 [⬇ 전체 백업 다운로드]로 먼저 사본을 받아 두세요.)',
-            (typeof window.erpPullFromServer === 'function')
+            k==='finance_income'
+              ? '아래 단추는 최신 서버 자료에서 내용·금액은 그대로 두고, 빠진 ID만 채웁니다. 걱정되시면 먼저 환경설정 → 시스템 → 💾 JSON 수동 백업에서 사본을 받아 두세요. 복구는 한 번만 전체 저장하고, 그 뒤부터는 변경된 한 건만 저장합니다.'
+              : '이 기기 사본이 옛것일 수 있습니다. 아래 단추로 서버 것을 받아 보세요 — 서버에도 같은 껍데기가 있으면 이 알림이 다시 뜹니다.',
+            (k==='finance_income' && typeof window.erpRepairFinanceIncomeIds === 'function')
+              ? { label:'🛠 ID '+_noId+'건 안전 복구', run:function(){ window.erpRepairFinanceIncomeIds(); } }
+              : (typeof window.erpPullFromServer === 'function')
               ? { label:'🔄 서버에서 다시 받기', run:function(){ window.erpPullFromServer(); } }
               : null);
         }
@@ -4182,6 +4186,52 @@ window.erpPullFromServer = function(){
     if(/permission|PERMISSION_DENIED/i.test(m)){ try{ showToast('서버 인증 필요 — 다시 로그인하세요'); }catch(_){} }
     else { try{ showToast('받기 실패: '+m); }catch(_){ alert('받기 실패: '+m); } }
   });
+};
+
+// ── 자문수입 레거시 ID 복구 ───────────────────────────────────────────────
+// 서버 최신값 안에서 transaction으로 처리한다. 다른 기기가 동시에 추가해도 그 자료를
+// 덮어쓰지 않으며, 기존 기록의 내용·순서·금액은 바꾸지 않고 빈 id만 채운다.
+window.erpRepairFinanceIncomeIds = function(){
+  if(typeof fbDb === 'undefined' || !fbDb){ try{ showToast('서버에 연결된 뒤 다시 눌러 주세요'); }catch(_){} return; }
+  if(!_fbSynced){ try{ showToast('서버 자료를 받는 중입니다. 잠시 뒤 다시 눌러 주세요'); }catch(_){} return; }
+  if(!confirm('자문수입의 ID 없는 기록만 복구합니다.\n내용·날짜·금액은 바뀌지 않습니다. 계속할까요?')) return;
+  var ref = fbDb.ref('data/finance_income');
+  var repaired = 0, finalRows = null;
+  function hashText(s){
+    var h=2166136261;
+    for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
+    return (h>>>0).toString(36);
+  }
+  try{ showToast('ID를 안전하게 복구하는 중…'); }catch(_){}
+  ref.transaction(function(cur){
+    if(!cur || cur.v === undefined) return;
+    var rows; try{ rows=normalizeFbValue(cur.v); }catch(_){ rows=null; }
+    if(!Array.isArray(rows)) return;
+    var used={}; rows.forEach(function(x){ if(x&&x.id) used[String(x.id)]=1; });
+    var count=0;
+    var fixed=rows.map(function(x, idx){
+      if(x && x.id) return x;
+      var item=(x && typeof x==='object') ? Object.assign({},x) : {legacyValue:x};
+      var base='fi-repair-'+hashText(JSON.stringify(item))+'-'+idx.toString(36), id=base, n=1;
+      while(used[id]) id=base+'-'+(n++).toString(36);
+      used[id]=1; item.id=id; count++; return item;
+    });
+    repaired=count; finalRows=fixed;
+    if(!count) return cur;
+    return {v:arrayToIdMap(fixed), u:Date.now()};
+  }, function(err, committed, snap){
+    if(err){ try{ showToast('ID 복구 실패 — 서버 연결을 확인해 주세요'); }catch(_){} return; }
+    var saved=snap&&snap.val(), rows=null;
+    try{ rows=normalizeFbValue(saved&&saved.v); }catch(_){}
+    if(Array.isArray(rows)){
+      try{ localStorage.setItem(KEY+'finance_income',JSON.stringify(rows)); localStorage.setItem(KEY+'_meta_finance_income',String((saved&&saved.u)||Date.now())); _dbCache.finance_income=rows; }catch(_){}
+    } else if(finalRows){
+      try{ localStorage.setItem(KEY+'finance_income',JSON.stringify(finalRows)); _dbCache.finance_income=finalRows; }catch(_){}
+    }
+    _fbObjForm.finance_income=true;
+    try{ showToast(repaired ? ('✅ ID '+repaired+'건 복구 완료 — 화면을 다시 엽니다') : '✅ 이미 복구되어 있습니다'); }catch(_){}
+    setTimeout(function(){ location.reload(); },700);
+  }, false);
 };
 
 function dbSet(k, v){

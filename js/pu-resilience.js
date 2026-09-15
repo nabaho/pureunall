@@ -345,13 +345,27 @@
   function bindApp(app) {
     if (!app || app.__puResilienceBound) return;
     app.__puResilienceBound = true;
+    /* .info/connected 의 첫 true 는 「재접속」이 아니라 정상적인 첫 연결이다.
+       또한 Chrome 이 숨은 탭의 소켓을 쉬게 했다가 탭 복귀 때 다시 붙이는 것은
+       서버 폭주가 아니다. 실제로 보이는 동안 끊김(false)을 본 뒤 다시 붙은
+       경우만 흔들림으로 센다. */
+    var sawConnected = false;
+    var disconnectedWhileVisible = false;
     try {
       if (app.auth) app.auth().onAuthStateChanged(function (user) { if (user) replayQueue(app); });
       app.database().ref('.info/connected').on('value', function (snapshot) {
-        if (snapshot.val() !== true) return;
+        var connected = snapshot.val() === true;
+        if (!connected) {
+          if (sawConnected && (!window.document || !window.document.hidden)) disconnectedWhileVisible = true;
+          return;
+        }
         var now = Date.now();
-        noteReconnect(now);
-        if (isFlapping(now, FLAP_WINDOW_MS, FLAP_LIMIT)) showReloadBanner();
+        if (sawConnected && disconnectedWhileVisible) {
+          noteReconnect(now);
+          if (isFlapping(now, FLAP_WINDOW_MS, FLAP_LIMIT)) showReloadBanner();
+        }
+        sawConnected = true;
+        disconnectedWhileVisible = false;
         replayQueue(app);
       });
     } catch (_) {}
