@@ -164,6 +164,8 @@ test('★★★ 거르개를 켜면 «무엇으로 걸렀는지» 딱지가 말�
 });
 
 test('★★ 띠를 목록 위에 «실제로» 내보낸다 — 만들어 놓고 안 붙이면 소용없다', () => {
-  assert.match(cutFn(SRC, 'function coListHtml('), /coSmeBarHtml\(\)/,
+  /* ⚠ 2026-09-15 다시 겨눔 — 띠를 부르는 자리가 coBarsHtml 한 곳으로 모였다.
+     못 박을 것은 «띠가 목록 위에 선다»는 것이지 어느 함수 안에 적혔는가가 아니다. */
+  assert.match(cutFn(SRC, 'function coBarsHtml('), /coSmeBarHtml\(\)/,
     '★★★ 띠를 그리는 자리가 없다');
 });

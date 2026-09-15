@@ -229,6 +229,8 @@ test('「번호 없음」 토글이 옆줄 「할 일」에 있다', () => {
 });
 
 test('회사 목록 위에 고아 알림 띠가 걸려 있다', () => {
-  assert.match(fnBody('coListHtml'), /coOrphanBarHtml\(\)/,
+  /* ⚠ 2026-09-15 다시 겨눔 — 띠를 부르는 자리가 coBarsHtml 한 곳으로 모였다.
+     못 박을 것은 «고아 띠가 목록 위에 선다»는 것이지 어느 함수 안에 적혔는가가 아니다. */
+  assert.match(fnBody('coBarsHtml'), /coOrphanBarHtml\(\)/,
     '★ 만들어 놓고 아무 데서도 안 부르면 영영 안 보인다');
 });

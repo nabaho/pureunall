@@ -114,7 +114,10 @@ test('★ 단추 모양이 CSS 에 있다 — 없으면 글자가 바탕에 묻�
 
 function run(opt) {
   const o = Object.assign({ yes: true, conflicts: null, pick: 'k1' }, opt || {});
+  /* ⚠ 2026-09-15 — 「고침」이 목록 갈무리를 지우고 다시 그린다(coListBust).
+     대역이 없으면 쓰기까지 다 해 놓고 그 줄에서 멎어, 안 바뀐 것처럼 보인다. */
   const ctx = {
+    coListBust: () => {},
     console, Object, String, Number, Array, Date, Math,
     esc: v => String(v == null ? '' : v),
     state: { coPick: o.pick },
@@ -138,7 +141,11 @@ function run(opt) {
     SRC.slice(SRC.indexOf('const CO_FIELDS = ['), SRC.indexOf('];', SRC.indexOf('const CO_FIELDS = [')) + 2)
       .replace('const CO_FIELDS', 'var CO_FIELDS') + '\n'
     + fnBody('coAttachDocKey') + '\n'
-    + fnBody('coTakeNew') + '\n;globalThis.__take = coTakeNew;', ctx);
+    /* ⚠ 2026-09-15 — coTakeNew 는 얇은 껍데기가 되고 알맹이는 coTakeNewFor 로 갔다
+       (모아 보는 창이 여러 회사를 다루느라 회사를 «받는» 꼴이 필요했다).
+       둘을 함께 실어야 «실제로 돌려서» 보는 이 검사가 산다. */
+    + fnBody('coTakeNewFor') + '\n' + fnBody('coTakeNew')
+    + '\n;globalThis.__take = coTakeNew;', ctx);
   return ctx;
 }
 

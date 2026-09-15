@@ -45,7 +45,9 @@ function render(co, folders) {
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
     coCares: () => true, coMissing: () => [], coConflictN: () => 0,
     coDisplayName: o => o.name || '', coTagsOf: () => [], coArrow: () => '',
-    coOrphanBarHtml: () => '', coSmeBarHtml: () => '', coCtBarHtml: () => '', coNtsBarHtml: () => '', coMgrCellHtml: () => '', coSelAll: () => {}, listNarrowed: () => false
+    /* ⚠ 목록 위 알림 띠는 coBarsHtml 한 곳으로 모았다 (2026-09-15) — 띠가 늘어도
+       이 대역 한 줄이면 된다(전에는 띠마다 한 줄씩 적어 새 띠마다 여기가 깨졌다). */
+    coBarsHtml: () => '', coMgrCellHtml: () => '', coSelAll: () => {}, listNarrowed: () => false
   };
   if (folders) b._coFolders = folders;
   vm.createContext(b);

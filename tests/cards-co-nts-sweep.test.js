@@ -168,7 +168,9 @@ test('★★ 띠·거르개가 «같은 잣대»(coNtsNeeds)를 본다', () => {
 });
 
 test('★★ 띠를 목록 위에 «실제로» 내보내고, 0곳이면 안 띄운다', () => {
-  assert.match(cutFn(SRC, 'function coListHtml('), /coNtsBarHtml\(\)/);
+  /* ⚠ 2026-09-15 다시 겨눔 — 띠를 부르는 자리가 coBarsHtml 한 곳으로 모였다.
+     못 박을 것은 «띠가 목록 위에 선다»는 것이지 어느 함수 안에 적혔는가가 아니다. */
+  assert.match(cutFn(SRC, 'function coBarsHtml('), /coNtsBarHtml\(\)/);
   assert.match(cutFn(SRC, 'function coNtsBarHtml('), /if\(!list\.length\) return '';/);
 });
 
