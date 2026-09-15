@@ -273,7 +273,11 @@ function drawRow(o){
     "function coMgrCell(){ return ''; }",
     "function coSizeSelHtml(){ return ''; }",
     "function coPagerHtml(){ return ''; }",
-    "function coOrphanBarHtml(){ return ''; } function coSmeBarHtml(){ return ''; } function coCtBarHtml(){ return ''; } function coNtsBarHtml(){ return ''; } function coMgrCellHtml(){ return ''; }",
+    /* ⚠ 여기는 소스를 «토막»으로 떠 오므로, 그 토막 «안»에 있는 것은 대역을 줘도
+       딸려 온 진짜가 덮어쓴다. 그래서 두 갈래로 나눠 준다 (2026-09-15) —
+         · 토막 «밖»의 띠(coOrphan·coSme·coCt·coNts) → 대역을 준다
+         · 토막 «안»의 coClashBarHtml → 대역이 안 먹으므로 그것이 보는 coList 를 준다 */
+    "function coOrphanBarHtml(){ return ''; } function coSmeBarHtml(){ return ''; } function coCtBarHtml(){ return ''; } function coNtsBarHtml(){ return ''; } function coMgrCellHtml(){ return ''; } function coList(){ return []; }",
     /* 2026-08-30: 도구줄의 「자주 쓰는 폴더」 단추 — 이 검사는 안 본다 */
     "function coQuickFolderBtns(){ return ''; }"
   ].join('\n'), ctx);

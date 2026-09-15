@@ -1,0 +1,226 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>재판독한 값이 기업정보함에 안 들어가는 까닭 — 정리안</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--line:#e2e8f0;--txt:#1e293b;--sub:#64748b;
+  --blue:#1e40af;--blue2:#2563eb;--blue1:#eff6ff;--blue0:#bfdbfe;
+  --amber:#854d0e;--amber1:#fffbeb;--amber0:#fde68a;
+  --green:#166534;--green1:#f0fdf4;--green2:#bbf7d0;
+  --red:#991b1b;--red1:#fef2f2;--red0:#fecaca}
+body{margin:0;padding:20px;background:var(--bg);color:var(--txt);
+  font:14px/1.6 'Malgun Gothic',system-ui,sans-serif;max-width:1060px}
+h1{font-size:19px;margin:0 0 4px}
+h2{font-size:15px;margin:26px 0 8px;padding-top:13px;border-top:2px solid var(--line)}
+h2 .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--blue);
+  color:#fff;align-items:center;justify-content:center;font-size:12px;margin-right:7px}
+p.sub{margin:0 0 12px;color:var(--sub);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;background:#fff;vertical-align:top}
+th{background:#f1f5f9;font-size:12px;color:var(--sub)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.bad{color:var(--red);font-weight:700}
+.good{color:var(--green);font-weight:700}
+.mut{color:var(--sub)}
+code{background:#f1f5f9;border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:12px}
+
+.box{background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px 15px;margin:11px 0}
+.note{background:#fff;border-left:4px solid var(--blue2);padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.note b{color:var(--blue)}
+.warnbox{background:var(--amber1);border-left:4px solid #d97706;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.okbox{background:var(--green1);border-left:4px solid #16a34a;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+.redbox{background:var(--red1);border-left:4px solid #dc2626;padding:10px 13px;margin:11px 0;
+  font-size:13px;border-radius:0 8px 8px 0}
+
+/* 화면 그림 */
+.scr{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;margin:12px 0}
+.scr .hd{background:#f1f5f9;padding:8px 12px;font-size:12px;font-weight:800;color:var(--sub);
+  border-bottom:1px solid var(--line);display:flex;align-items:center}
+.scr .hd .r{margin-left:auto;font-weight:700;color:var(--blue)}
+.scr .bd{padding:11px 12px}
+.corow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #f1f5f9}
+.corow:last-child{border-bottom:none}
+.corow .co{width:190px;font-weight:700;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.corow .fd{width:78px;flex:none;color:var(--sub);font-size:12px}
+.corow .vv{flex:1;display:flex;gap:8px;align-items:center;min-width:0}
+.corow .vv .now{color:var(--red);text-decoration:line-through;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;max-width:46%}
+.corow .vv .arw{color:#cbd5e1;flex:none}
+.corow .vv .new{color:var(--green);font-weight:700;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;max-width:46%}
+.corow .bt{flex:none;display:flex;gap:5px}
+.corow .bt button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 9px;
+  font-size:11.5px;font-family:inherit;color:var(--txt)}
+.corow .bt button.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.grp{background:#f8fafc;padding:6px 10px;font-size:11.5px;font-weight:800;color:var(--sub);
+  border-bottom:1px solid var(--line);border-top:1px solid var(--line)}
+.grp.same{background:var(--green1);color:var(--green)}
+.grp.other{background:var(--amber1);color:var(--amber)}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:5px;padding:1px 7px}
+.tag.same{background:var(--green2);color:var(--green)}
+.tag.other{background:var(--amber0);color:var(--amber)}
+.tag.hand{background:var(--blue0);color:var(--blue)}
+
+.ask{background:var(--blue);color:#fff;border-radius:10px;padding:13px 16px;margin-top:22px;font-size:13.5px}
+.ask b{font-size:15px}
+.ask .o{display:block;margin-top:7px}
+</style></head><body>
+
+<h1>「재판독했는데 기업정보함은 그대로다」 — 무엇이 일어났고 어떻게 정리하나</h1>
+<p class="sub">대표 지시 2026-09-15 「ocr 인식이 잘못되어 다시 인식시켰는데 기업정보함에 기존 정보로
+잘못 올라가거나 변경되는 경우가 종종 있다」 · <b>추측이 아니라 살아 있는 자료를 재어 적었습니다.</b></p>
+
+<h2><span class="n">①</span> 지금 그 회사가 실제로 어떻게 들어 있나</h2>
+
+<p class="sub">보내 주신 등록증(삼성검수주식회사 · 316-81-03842)으로 서버를 직접 읽었습니다.</p>
+
+<table>
+<tr><th>칸</th><th>사업자 탭에 있는 값</th><th>기업 상세에 있는 값</th><th>⚠ 에 갇혀 있는 값</th></tr>
+<tr><td>상호</td><td class="good">삼성검수주식회사</td>
+    <td class="bad">삼성검수주식회사<b>표자</b></td><td class="good">삼성검수주식회사</td></tr>
+<tr><td>대표자</td><td class="good">안용운</td>
+    <td class="bad">변경</td><td class="good">안용운</td></tr>
+</table>
+
+<div class="redbox">
+<b>① 판독이 처음에 두 군데를 잘못 읽었습니다.</b><br>
+「법인명(단체명): 삼성검수주식회사」 아래 줄의 <b>「대<u>표자</u>」</b> 두 글자가 상호에 붙었고,
+「발급사유: 대표자 <b>변경</b>」의 <b>「변경」</b>이 대표자 이름 자리에 앉았습니다.
+<br><br>
+<b>② 대표님이 9월 14일 오후 6시 45분에 다시 읽히셨고, 그때는 «제대로» 읽었습니다.</b><br>
+그런데 그 맞는 값이 기업 상세에 들어가지 <b>못하고</b> ⚠ 자리에 대기 중입니다.
+화면에는 여전히 「삼성검수주식회사표자 / 변경」이 보입니다.
+</div>
+
+<h2><span class="n">②</span> 왜 안 들어갔나 — 규칙 하나가 «두 가지 일»을 구별하지 못한다</h2>
+
+<div class="box">
+2026년 7월에 자동입력이 사람이 적어 둔 값을 지운 사고가 있었습니다. 그래서
+<b>「빈 칸만 채운다 · 이미 있는 값은 절대 덮지 않는다」</b>를 못 박아 두었습니다.
+<b>그 규칙 자체는 옳습니다.</b>
+<br><br>
+문제는 이것입니다 — 그 규칙은 아래 둘을 <b>똑같이</b> 다룹니다.
+</div>
+
+<table>
+<tr><th style="width:50%">㉠ 같은 서류를 «다시» 읽은 것</th><th>㉡ 다른 서류가 다른 말을 하는 것</th></tr>
+<tr>
+<td><b>= 대표님이 「이거 틀렸으니 고쳐라」 하신 것</b><br>
+같은 사진, 다시 판독. 새 값이 <b>이겨야 합니다</b> — 그게 다시 읽히신 까닭입니다.</td>
+<td><b>= 사람이 봐야 하는 것</b><br>
+등록증에는 A, 컨설팅 신청서에는 B. 어느 쪽이 맞는지는 <b>기계가 못 정합니다.</b>
+지금처럼 두 값을 나란히 보여 주고 사람이 고르는 것이 맞습니다.</td>
+</tr>
+</table>
+
+<h2><span class="n">③</span> 얼마나 쌓였나 — 전부 세어 봤습니다</h2>
+
+<p class="sub">기업 상세가 있는 <b>206곳</b> 가운데 값이 어긋난 곳은 <b>6곳 · 칸 21개</b>입니다.
+그 21칸을 위 ㉠㉡으로 갈라 보면:</p>
+
+<table>
+<tr><th>갈래</th><th class="num">칸</th><th>어떻게 해야 하나</th></tr>
+<tr><td><span class="tag same">㉠ 같은 서류 재판독</span></td><td class="num"><b>2</b></td>
+    <td class="good">기계가 알아볼 수 있다 → <b>자동으로 새 값이 이기게</b></td></tr>
+<tr><td><span class="tag other">㉡ 다른 서류</span></td><td class="num"><b>16</b></td>
+    <td>사람이 골라야 한다 → <b>한자리에 모아 보여 드린다</b></td></tr>
+<tr><td class="mut">㉢ 출처를 알 수 없음(옛 기록)</td><td class="num">3</td>
+    <td>사람이 골라야 한다 → 위와 같은 자리에</td></tr>
+</table>
+
+<div class="warnbox">
+<b>⚠ 이 실측이 제 첫 생각을 뒤집었습니다.</b> 처음엔 「무조건 새 값이 이기게」 하면 된다고
+보았는데, <b>21칸 중 16칸은 다른 서류에서 온 값</b>이었습니다.<br>
+예를 들어 태양농산은 지금 업태·종목이
+「고추가루/농산물,수산물/마늘탈피업/빵및과자/무역업…」으로 <b>자세히</b> 들어 있는데,
+컨설팅 신청서 한 장이 「천연 및 혼합조제 조미료 제조업」 한 줄로 바꾸려 합니다.
+<b>무조건 새것이 이기게 하면 멀쩡한 자료가 지워집니다.</b>
+</div>
+
+<h2><span class="n">④</span> 고치는 법 — 셋입니다</h2>
+
+<div class="okbox">
+<b>㉠ 같은 서류를 다시 읽으면 새 값이 이긴다 (자동)</b><br>
+기업 상세는 칸마다 <b>「이 값이 어느 사진에서 왔는지」</b>를 이미 적어 두고 있습니다.
+새로 온 값이 <b>바로 그 사진</b>에서 왔다면 「다시 읽은 것」입니다 — 그때만 덮습니다.
+다른 사진에서 왔으면 지금처럼 ⚠ 로 남깁니다. <b>기계가 헷갈릴 자리가 없습니다.</b>
+</div>
+
+<div class="okbox">
+<b>㉡ 사람이 고친 칸에는 «사람 도장»을 찍는다</b><br>
+⚠ 지금은 사람이 손으로 고쳐도 그 칸에 <b>옛 사진 번호가 그대로</b> 남아 있습니다.
+그 상태로 ㉠을 켜면, 같은 사진을 다시 읽는 순간 <b>대표님이 고쳐 두신 값이 조용히 지워집니다.</b>
+그래서 ㉠과 ㉡은 <b>반드시 함께</b> 갑니다 — 사람이 적은 칸은 기계가 영영 안 덮습니다.
+</div>
+
+<div class="okbox">
+<b>㉢ 「값이 다른 칸」을 한자리에 모아 본다</b><br>
+지금도 고치는 단추는 <b>있습니다</b>. 다만 <b>회사를 하나씩 열어야</b> 보입니다 —
+4,169곳 가운데 어디가 어긋났는지 알 길이 없으니 사실상 못 씁니다.
+</div>
+
+<h2><span class="n">⑤</span> 모아 보는 화면 — 이렇게</h2>
+
+<div class="scr">
+  <div class="hd">⚠ 값이 다른 칸 — 6곳 · 21개<span class="r">기업 상세 ▸ 맨 위</span></div>
+  <div class="grp same">★ 같은 서류를 다시 읽은 것 2개 — 새로 읽은 값이 맞습니다</div>
+  <div class="bd" style="padding:0 12px">
+    <div class="corow"><span class="co">삼성검수주식회사</span><span class="fd">상호</span>
+      <span class="vv"><span class="now">삼성검수주식회사표자</span><span class="arw">→</span>
+        <span class="new">삼성검수주식회사</span></span>
+      <span class="bt"><button class="go">바꾸기</button><button>그냥 둠</button></span></div>
+    <div class="corow"><span class="co">삼성검수주식회사</span><span class="fd">대표자</span>
+      <span class="vv"><span class="now">변경</span><span class="arw">→</span>
+        <span class="new">안용운</span></span>
+      <span class="bt"><button class="go">바꾸기</button><button>그냥 둠</button></span></div>
+  </div>
+  <div class="grp other">다른 서류가 다른 말을 하는 것 19개 — 어느 쪽이 맞는지 봐 주십시오</div>
+  <div class="bd" style="padding:0 12px">
+    <div class="corow"><span class="co">태양농산 주식회사</span><span class="fd">업태</span>
+      <span class="vv"><span class="now">제조,도소매/도소매/…</span><span class="arw">→</span>
+        <span class="new">천연 및 혼합조제 조미료 제조업</span></span>
+      <span class="bt"><button>바꾸기</button><button>그냥 둠</button></span></div>
+    <div class="corow"><span class="co">태양농산 주식회사</span><span class="fd">전화</span>
+      <span class="vv"><span class="now">043-649-2224</span><span class="arw">→</span>
+        <span class="new">043-652-8944</span></span>
+      <span class="bt"><button>바꾸기</button><button>그냥 둠</button></span></div>
+    <div class="corow"><span class="co">신성컨트롤(주)</span><span class="fd">대표자</span>
+      <span class="vv"><span class="now">조성환</span><span class="arw">→</span>
+        <span class="new">조성환, 조규현</span></span>
+      <span class="bt"><button>바꾸기</button><button>그냥 둠</button></span></div>
+    <div class="corow" style="color:#94a3b8"><span class="co">…</span><span class="fd"></span>
+      <span class="vv">나머지 16줄</span><span class="bt"></span></div>
+  </div>
+</div>
+
+<div class="note">
+<b>한 줄에 한 칸</b>입니다 — 회사·칸·지금 값·읽은 값·단추가 <b>한 줄</b>에 섭니다.
+<b>「그냥 둠」</b>은 지금 값이 맞다는 뜻이고, 누르면 그 줄이 사라져 다시 안 묻습니다
+(원본 서류 기록은 그대로 남습니다).
+<br>
+<b>📷 원본 보기</b>는 지금처럼 각 줄에서 그 서류 사진을 엽니다 — 눈으로 확인하고 누르실 수 있게.
+</div>
+
+<h2><span class="n">⑥</span> 안 하는 것</h2>
+<table>
+<tr><td><b>제가 스스로 안 바꿉니다</b></td>
+    <td>21칸 모두 <b>대표님이 누르셔야</b> 바뀝니다. 「다시 읽으면 이긴다」(㉠)도
+        <b>앞으로 찍는 것</b>부터이고, 이미 쌓인 2칸도 화면에서 누르시는 것입니다</td></tr>
+<tr><td><b>명함(등록증)은 안 건드립니다</b></td>
+    <td>등록증은 그때 발급된 «사실»입니다. 바뀌는 것은 「이 회사는 지금 이렇다」를 담는
+        기업 상세 칸 하나뿐입니다</td></tr>
+<tr><td><b>사진첩 원본도 그대로</b></td>
+    <td>사진과 판독 기록은 손대지 않습니다</td></tr>
+</table>
+
+<div class="ask">
+<b>어떻게 할까요?</b>
+<span class="o">㉮ <b>셋 다</b> — 재판독은 자동으로 이기게(㉠) + 사람 도장(㉡) + 모아 보는 화면(㉢) <b>〈권합니다〉</b></span>
+<span class="o">㉯ 모아 보는 화면만 — 자동은 안 켜고 21칸을 눈으로 보고 누르겠다</span>
+<span class="o">㉰ 재판독 자동만 — 화면은 나중에</span>
+<span class="o">㉱ 다시 손보기</span>
+</div>
+
+</body></html>

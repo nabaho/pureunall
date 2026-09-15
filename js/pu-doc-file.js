@@ -16,6 +16,15 @@
 
   var CARDS_ROOT = 'pucards';
 
+  /* ★ 「사람이 적었다」 도장 (대표 결정 2026-09-15)
+     기업 상세는 칸마다 «그 값이 어느 사진에서 왔는지»를 src/{칸} 에 적어 둔다.
+     그 자리에 이 도장이 있으면 **기계는 그 칸을 영영 안 덮는다.**
+     ⚠ 사진 열쇠(해_사진번호)와 절대 겹치지 않는 글자라야 한다 — 겹치면 사람이 적은 칸을
+       「같은 서류를 다시 읽은 것」으로 잘못 보고 덮는다.
+     ⚠ 도장을 찍는 쪽은 화면(pu-cards.html)이다. 그래서 «여기서 내보낸다» —
+       글자를 두 벌로 적어 두면 한쪽만 고쳐지고, 그 순간 도장이 아무것도 안 막는다. */
+  var HAND = 'hand';
+
   var deps = { db: null, storage: null };
   function init(o) {
     o = o || {};
@@ -721,7 +730,7 @@
     var ref = deps.db.ref(CARDS_ROOT + '/coInfo/' + key);
     return ref.once('value').then(function (s) {
       var cur = s.val() || {};
-      var add = {}, filled = [], clash = [];
+      var add = {}, filled = [], clash = [], redone = [];
       var ph0 = o.photo || {};
       /* 이 서류의 열쇠. 아래 docs/ 와 «같은 열쇠»를 쓴다 — 칸마다 이것 하나만 가리켜
          「이 값이 어디서 왔나」에 답한다(대표 지시 2026-08-24, 4순위).
@@ -748,6 +757,38 @@
              ⚠ 칸 이름이 열쇠다 — 같은 칸을 다시 보내면 한 줄을 덮어쓴다. 쌓이면
                줄이 끝없이 는다. */
           if (had !== got) {
+            /* ★★ 「같은 서류를 «다시» 읽은 것」이면 새 값이 이긴다 (대표 결정 2026-09-15)
+               ── 왜 이 하나만 예외인가 ──────────────────────────────────────────
+               대표: 「ocr 인식이 잘못되어 다시 인식시켰는데 기업정보함에 기존 정보로
+                     잘못 올라가거나 변경되는 경우가 종종 있다」
+               다시 읽히시는 것은 **「이 값이 틀렸으니 고쳐라」는 사람의 뜻**이다.
+               그런데 「빈 칸만 채운다」가 그것까지 막아, 고친 값이 conflicts 에 갇힌 채
+               틀린 값이 화면에 남았다 — 실측(2026-09-15): 삼성검수주식회사가
+               「삼성검수주식회사표자 / 변경」으로 들어 있었고, 맞게 읽은
+               「삼성검수주식회사 / 안용운」은 ⚠ 에서 하루를 기다리고 있었다.
+
+               ★ 판별은 추측이 아니다 — 지금 값이 «바로 이 사진»에서 온 것일 때만이다.
+                 그때 덮는 것은 남의 값이 아니라 **같은 사진의 옛 판독 결과**다.
+               ⚠⚠ 사람이 적은 칸(HAND)은 **절대** 덮지 않는다. 이 둘은 늘 짝이다 —
+                 도장 없이 이 예외만 켜면 대표님이 고쳐 두신 값이 조용히 지워진다.
+               ⚠ 다른 사진에서 온 값이면 여전히 안 덮는다. 실측 21칸 가운데 16칸이
+                 그 경우였다(등록증 vs 컨설팅 신청서). 거기서 새것이 이기게 하면
+                 자세히 적힌 업태가 한 줄짜리로 지워진다 — 사람이 봐야 한다. */
+            var from = String((cur.src || {})[k] || '');
+            /* ⚠ 사람 도장(HAND)은 여기서 저절로 걸러진다 — 도장 글자는 사진 열쇠
+               (해_사진번호) 꼴이 아니라서 from === dk 가 결코 참이 될 수 없다.
+               그 «겹치지 않음»이 사람 도장을 지키는 유일한 근거라, 검사가 바로
+               그것을 못 박는다(coinfo-reread-wins 의 「도장 글자가 사진 열쇠와
+               헷갈릴 모양이 아니다」). 여기에 from !== HAND 를 한 번 더 적어 두면
+               닿을 수 없는 줄이 되어, 도장이 깨져도 그 줄은 아무 말을 못 한다. */
+            if (dk && from && from === dk) {
+              add[k] = got;
+              add['src/' + k] = dk;
+              add['conflicts/' + k] = null;      /* 앞서 남겨 둔 어긋남이 있으면 치운다 */
+              filled.push(k);
+              redone.push(k);
+              return;
+            }
             /* ⚠ 발급일을 함께 남긴다 (2026-09-07) — 「지금 값」과 「읽은 값」만으로는
                  어느 쪽이 최신인지 알 수 없다. 대표자가 바뀌는 공공기관에서는 그것이
                  곧 판단 근거다. 없으면 빈 문자열로 두고 화면이 「모름」이라 말한다. */
@@ -826,8 +867,15 @@
       add.by = o.byName || '';
       return ref.update(add).then(function () {
         var msg = filled.length ? filled.length + '개 칸을 기업 상세에 넣었습니다' : '';
+        /* ★ 「다시 읽어 고친 것」은 «따로» 말한다 — 「넣었습니다」에 묻히면 대표님이
+           고쳐졌는지 모르신 채 또 판독을 누르신다(그 헛걸음이 이 일의 시작이었다). */
+        if (redone.length) {
+          var 고친말 = '다시 읽어 ' + redone.length + '개 칸을 고쳤습니다 ('
+            + redone.map(function (k) { return FIELD_LABEL[k] || CO_LABEL[k] || k; }).join('·') + ')';
+          msg = msg ? (msg + '\n' + 고친말) : 고친말;
+        }
         if (clashMsg) msg = msg ? (msg + '\n' + clashMsg) : clashMsg;
-        return { ok: true, filled: filled, conflicts: clash.length, message: msg };
+        return { ok: true, filled: filled, redone: redone, conflicts: clash.length, message: msg };
       });
     });
   }
@@ -1476,6 +1524,7 @@
   }
 
   global.PuDocFile = {
+    HAND: HAND,
     init: init,
     MAIL_MAX_BYTES: MAIL_MAX_BYTES,
     pickMailPeople: pickMailPeople,
