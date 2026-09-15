@@ -264,6 +264,10 @@ html.mailview #tabs,html.mailview #subbar{display:none}
 .modalbg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;
   align-items:flex-end;justify-content:center;z-index:100}
 .modalbg.open{display:flex}
+/* ⚠ 「값이 다른 칸」 창만 넓다 — 한 줄에 회사·칸·두 값·단추가 서는 «표»라 560px 로는
+   값에 70px 밖에 안 간다(2026-09-15 실측). 좁은 화면에서는 96vw 까지만 — 화면을 넘지 않는다.
+   ⚠ 다른 창까지 넓히지 «않는다». 창이 넓으면 눈이 좌우로 흔들려 읽기 힘들다. */
+.modal.wide{max-width:min(880px, 96vw)}
 .modal{background:#1e293b;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;
   border-radius:20px 20px 0 0;padding:18px 18px 30px;border:1px solid #1e293b}
 @media(min-width:761px){.modalbg{align-items:center}.modal{border-radius:20px}}
@@ -2347,16 +2351,29 @@ td.selcell{cursor:cell}
 .coclashrow{display:flex;align-items:center;gap:9px;padding:8px 6px;
   border-bottom:1px solid #f8fafc;font-size:12.5px}
 .coclashrow:last-child{border-bottom:none}
-.coclashrow .cc{width:180px;flex:none;font-weight:700;color:#1e293b;cursor:pointer;
+/* ⚠⚠ 고정 폭이 «값»을 굶겼다 (대표 보고 2026-09-15 「값이 어떻게 다른지 모르겠다」).
+   실측: 창 560px 에서 회사 180 + 칸 74 + 단추 159 + 사이 27 = 440 이 고정이라
+   값 칸에 70px 밖에 안 갔다 — 두 값이 23px·22px, 곧 «두 글자»다.
+   ★ 회사·칸은 «줄어들 수 있게», 값은 «안 자르고 두 줄까지» 보이게 한다.
+   ⚠ 값에 max-width 를 도로 걸지 말 것 — 그것이 값을 굶긴 바로 그 줄이다. */
+.coclashrow .cc{flex:0 1 160px;min-width:76px;font-weight:700;color:#1e293b;cursor:pointer;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .coclashrow .cc:hover{color:#1e40af;text-decoration:underline}
-.coclashrow .cf{width:74px;flex:none;color:#64748b;font-size:12px}
-.coclashrow .cv{flex:1;display:flex;align-items:center;gap:7px;min-width:0}
-.coclashrow .cv .now{color:#991b1b;text-decoration:line-through;max-width:46%;
+.coclashrow .cf{flex:0 1 74px;min-width:44px;color:#64748b;font-size:12px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.coclashrow .cv{flex:1 1 auto;display:flex;align-items:center;gap:7px;min-width:0}
+/* 두 값이 자리를 «나눠» 갖는다. 길면 두 줄까지 보이고 그 뒤로만 자른다 —
+   한 줄로 자르면 정작 다른 자리가 … 뒤로 숨는다. */
+.coclashrow .cv .now,.coclashrow .cv .new{flex:1 1 0;min-width:0;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;word-break:break-all;line-height:1.35}
+.coclashrow .cv .now{color:#991b1b;text-decoration:line-through}
 .coclashrow .cv .arw{color:#cbd5e1;flex:none}
-.coclashrow .cv .new{color:#166534;font-weight:700;max-width:46%;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.coclashrow .cv .new{color:#166534}
+/* 다른 «가운데»만 굵다 — 같은 부분은 흐리게 두어 눈이 다른 곳으로 간다 */
+.coclashrow .cv .now b,.coclashrow .cv .new b{font-weight:800;background:#fffbeb;
+  border-radius:3px;padding:0 2px}
+.coclashrow .cv .new b{background:#f0fdf4}
 .coclashrow .cb{flex:none;display:flex;gap:5px}
 .coclashrow .cb button{border:1px solid #e2e8f0;background:#fff;color:#1e293b;border-radius:6px;
   padding:3px 9px;font-size:11.5px;cursor:pointer;font-family:inherit}
@@ -23478,7 +23495,14 @@ function showPanel(html){
     if(el){ el.innerHTML = html; return; }
   }
   $('dedupM').innerHTML=html; $('dedupBg').classList.add('open');
+  /* ⚠ 넓은 창은 «부른 쪽»이 정한다. 여기서 글귀를 보고 짐작하면(「값이 다른」이 들어 있나)
+       다음에 글귀를 다듬는 순간 조용히 좁아진다 — 표를 그리는 창이 스스로 밝힌다. */
+  $('dedupM').classList.toggle('wide', _panelWide);
+  _panelWide = false;                 /* 한 번 쓰고 되돌린다 — 다음 창까지 넓어지면 안 된다 */
 }
+/* 다음에 열 창을 «넓게» 연다. showPanel 바로 앞에서 켠다. */
+let _panelWide = false;
+function showWidePanel(html){ _panelWide = true; showPanel(html); }
 function setSub(s){ state.setSub=s||''; renderSettingsPage(); }
 /* 정리 작업 뒤 화면 갱신 — 환경설정 안이면 인라인을 다시 그리고, 목록에서면 팝업을 다시 연다 */
 /* ⚠ 정리를 하고 나면 «다시 센다» — 안 버리면 방금 치운 것이 띠에 그대로 떠 있다.
@@ -27464,7 +27488,9 @@ function coClashBarHtml(){
       title="사진첩이 읽은 값이 기업 상세의 값과 다른 칸입니다 — 한자리에서 고칩니다">
       ⚠ 값이 다른 칸 ${bits}<em>— 눌러서 보기</em></div>`;
 }
-function openCoClash(){ showPanel(coClashHtml()); }
+/* ⚠ 넓은 창으로 연다 — 한 줄에 회사·칸·두 값·단추가 서는 표라, 보통 폭(560px)에서는
+   값에 70px 밖에 안 간다(2026-09-15 실측: 두 글자만 보였다). */
+function openCoClash(){ showWidePanel(coClashHtml()); }
 
 /* ══════ 목록 위 알림 띠 — «한 곳»에서 모은다 (2026-09-15) ══════════════════
    ⚠ 예전에는 표를 그리는 글귀 안에 띠 함수 이름이 하나씩 박혀 있었다. 띠를 하나
@@ -27475,6 +27501,81 @@ function openCoClash(){ showPanel(coClashHtml()); }
      나가는 일이라 고아 정보 바로 다음에 둔다. */
 function coBarsHtml(){
   return `${coOrphanBarHtml()}${coClashBarHtml()}${coSmeBarHtml()}${coCtBarHtml()}${coNtsBarHtml()}`;
+}
+/* ══════ 「값이 어떻게 다른지 모르겠다」 (대표 보고 2026-09-15) ═══════════════════
+   실측: 창 560px 에서 회사 180 + 칸 74 + 단추 159 + 사이 27 = 440 이 «고정»이라,
+   정작 이 창의 전부인 «값»에 **70px** 밖에 안 갔다. 두 값이 각각 23px·22px —
+   「변. → 안.」 처럼 **두 글자**만 보였다. 무엇이 다른지 알 수가 없다.
+
+   ★ 셋을 함께 고친다. 하나만으로는 모자란다:
+     ㉠ 창을 넓힌다(이 창만) — 값이 설 자리를 만든다
+     ㉡ 회사·칸이 «줄어들 수 있게» 한다 — 고정 폭이 값을 굶긴다
+     ㉢⚠ **다른 자리를 굵게 짚는다.** 자리가 넓어져도 「충청남도 천안시 동남구…」와
+        「충남 천안시 동남구…」를 눈으로 견주는 것은 여전히 일이다. 앞뒤로 같은 부분을
+        빼고 «다른 가운데»만 굵게 하면 한눈에 보인다. */
+function coDiffParts(a, b){
+  const A = String(a == null ? '' : a), B = String(b == null ? '' : b);
+  let p = 0;
+  while(p < A.length && p < B.length && A[p] === B[p]) p++;
+  let s = 0;
+  /* ⚠ 앞에서 이미 센 자리를 뒤에서 또 세지 않는다 — 「가」와 「가가」에서 겹치면
+     가운데가 음수 길이가 되어 글자가 통째로 사라진다. */
+  while(s < A.length - p && s < B.length - p &&
+        A[A.length - 1 - s] === B[B.length - 1 - s]) s++;
+  return { pre: A.slice(0, p), aMid: A.slice(p, A.length - s),
+           bMid: B.slice(p, B.length - s), post: A.slice(A.length - s) };
+}
+/* ⚠⚠ 앞뒤만 깎는 것으로는 모자란다 (2026-09-15 실측).
+     「충청남도 천안시 동남구 병천면 야운대로 123」 ↔ 「충남 천안시 … 123-4」 는
+     앞이 「충」 한 글자, 뒤가 0 글자라 **거의 전부가 굵어졌다** — 굵은 것이 전부면
+     아무것도 안 짚은 것과 같다.
+   ★ «낱말»로 먼저 맞춘다. 같은 낱말(천안시·동남구…)은 흐리게 두고, 달라진 낱말만
+     굵게 한다. 그리고 **한 낱말 대 한 낱말**로 달라진 자리는 그 안에서 앞뒤를 또 깎는다
+     (9,876,54**3,21**0 ↔ 9,876,54**0,00**0). */
+function coDiffTokens(s){ return String(s == null ? '' : s).split(/(\s+)/).filter(t => t !== ''); }
+/* 두 낱말 줄을 맞춘다 — 같은 토막과 다른 토막의 차례를 돌려준다.
+   ⚠ 긴 글이 와도 토막은 수십 개다(주소·상호). 그대로 재도 된다. */
+function coDiffAlign(A, B){
+  const n = A.length, m = B.length;
+  const L = [];
+  for(let i = 0; i <= n; i++) L.push(new Array(m + 1).fill(0));
+  for(let i = n - 1; i >= 0; i--) for(let j = m - 1; j >= 0; j--)
+    L[i][j] = (A[i] === B[j]) ? L[i+1][j+1] + 1 : Math.max(L[i+1][j], L[i][j+1]);
+  const out = [];
+  const push = (same, a, b) => {
+    const last = out[out.length - 1];
+    if(last && last.same === same){ last.a += a; last.b += b; }
+    else out.push({ same: same, a: a, b: b });
+  };
+  let i = 0, j = 0;
+  while(i < n && j < m){
+    if(A[i] === B[j]){ push(true, A[i], B[j]); i++; j++; }
+    else if(L[i+1][j] >= L[i][j+1]){ push(false, A[i], ''); i++; }
+    else { push(false, '', B[j]); j++; }
+  }
+  while(i < n){ push(false, A[i], ''); i++; }
+  while(j < m){ push(false, '', B[j]); j++; }
+  return out;
+}
+/* 두 값을 「같은 곳은 흐리게 · 다른 곳은 굵게」로 그린다.
+   ⚠ esc 를 조각마다 한다. 통째로 하면 <b> 가 글자로 보인다. */
+function coDiffMark(a, b){
+  const parts = coDiffAlign(coDiffTokens(a), coDiffTokens(b));
+  let ah = '', bh = '';
+  parts.forEach(function(p){
+    if(p.same){ ah += esc(p.a); bh += esc(p.b); return; }
+    /* 한 토막 대 한 토막이면 그 «안»에서 또 깎는다 — 숫자·긴 낱말에서 이것이 크다 */
+    if(p.a && p.b && !/\s/.test(p.a) && !/\s/.test(p.b)){
+      const d = coDiffParts(p.a, p.b);
+      ah += esc(d.pre) + (d.aMid ? '<b>' + esc(d.aMid) + '</b>' : '') + esc(d.post);
+      bh += esc(d.pre) + (d.bMid ? '<b>' + esc(d.bMid) + '</b>' : '') + esc(d.post);
+      return;
+    }
+    if(p.a) ah += '<b>' + esc(p.a) + '</b>';
+    if(p.b) bh += '<b>' + esc(p.b) + '</b>';
+  });
+  return { a: ah || esc(String(a == null ? '' : a)) || '(비어 있음)',
+           b: bh || esc(String(b == null ? '' : b)) };
 }
 function coClashRowHtml(x){
   const label = (CO_FIELDS.find(f => f[0] === x.f) || [x.f, x.f])[1];
@@ -27487,10 +27588,14 @@ function coClashRowHtml(x){
     <span class="cc" title="${esc(x.name)}"
       onclick="dedupBg.classList.remove('open');pickCo('${kq}')">${esc(x.name || '(이름 없음)')}</span>
     <span class="cf">${esc(label)}</span>
-    <span class="cv">
-      <span class="now" title="${esc(c.had || '')}">${esc(c.had || '(비어 있음)')}</span>
+    ${/* ⚠ 다른 «가운데»만 굵다 — 자리가 넓어도 눈으로 견주는 것은 여전히 일이다 */''}
+    ${(function(){
+      const d = coDiffMark(c.had || '', c.got || '');
+      return `<span class="cv">
+      <span class="now" title="${esc(c.had || '')}">${d.a}</span>
       <span class="arw">→</span>
-      <span class="new" title="${esc(c.got || '')}">${esc(c.got || '')}</span></span>
+      <span class="new" title="${esc(c.got || '')}">${d.b}</span></span>`;
+    })()}
     <span class="cb">
       <button class="${x.same ? 'go' : ''}" onclick="coTakeNewFor('${kq}','${fq}',{back:'clash'})"
         title="이 회사의 값을 「읽은 값」으로 바꿉니다 — 사진첩 원본과 명함은 그대로입니다">바꾸기</button>

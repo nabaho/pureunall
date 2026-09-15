@@ -246,8 +246,16 @@ test('★ 한 줄에 한 칸이다 — 21줄이 42줄이 되면 한 화면에 �
   const css = CARDS.match(/\.coclashrow\{[^}]*\}/);
   assert.ok(css, '.coclashrow 모양이 없습니다');
   assert.match(css[0], /display:flex/, '★ 세로로 쌓으면 표가 두 배로 길어집니다(2026-08-30 대표 지시)');
-  assert.match(CARDS, /\.coclashrow \.cv \.now\{[^}]*text-overflow:ellipsis/,
-    '★ 넘치는 값을 안 자르면 한 줄이 무너집니다');
+  /* ⚠ 2026-09-15 대표 보고 「값이 어떻게 다른지 모르겠다」로 «자르는 법»이 바뀌었다.
+     한 줄로 자르니(text-overflow:ellipsis) 창 560px 에서 값에 70px 밖에 안 가
+     「변. → 안.」 처럼 두 글자만 보였다 — 정작 다른 자리가 … 뒤로 숨은 것이다.
+     이제 창을 넓히고(.modal.wide) 두 줄까지 보인 뒤 자른다.
+     ★ 못 박는 «뜻»은 그대로다: 값이 줄을 무한정 늘리면 안 된다.
+       (자세한 것은 tests/coinfo-clash-readable.test.js) */
+  assert.match(CARDS, /\.coclashrow \.cv \.now,\.coclashrow \.cv \.new\{[^}]*-webkit-line-clamp:2/,
+    '★ 값을 안 묶어 두면 긴 주소 하나가 줄을 통째로 늘립니다');
+  assert.match(CARDS, /\.coclashrow \.cv \.now,\.coclashrow \.cv \.new\{[^}]*overflow:hidden/,
+    '★ 두 줄 뒤로는 잘려야 합니다');
 });
 
 test('★ 줄에서 그 서류 «원본»을 열 수 있다 — 눈으로 보고 누르셔야 한다', () => {
