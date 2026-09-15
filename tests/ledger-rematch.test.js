@@ -92,7 +92,18 @@ vm.runInContext(`
   function dbSet(k, v){ _st[k] = v; return true; }
   function erpNormName(s){ return String(s||'').replace(/[\\s()（）㈜(주)주식회사]/g, '').toLowerCase(); }
 `, ctx);
+/* ⚠ 2026-09-15 부터 erpLearnPayerAlias 는 «CMS 적요인가»를 먼저 본다(건의: CMS 자동매칭 오류).
+     그 판별기를 안 실어 주면 함수 안에서 ReferenceError 가 나고, 바깥 try 가 그것을 삼켜
+     «아무것도 안 배운 채 false» 가 된다 — 실제로 이 검사가 그렇게 깨졌다.
+   ⚠ erpIsCmsMemo 는 erpCleanMemo 를 try 안에서만 부르므로 여기선 없어도 된다. */
+vm.runInContext(grab('var CMS_MEMO_MARKERS =', '\n// ── CMS 입금액 → 업체 자문료 부분집합 탐색 ──'), ctx);
 vm.runInContext(grab('var PAYER_ALIAS_KEY =', '\n// ── 출금 적요 → 카테고리 학습 ──'), ctx);
+
+/* ★ CMS 적요는 배우지 않는다 — 여기서도 한 줄 확인한다(건의 2026-09-15).
+     전용 검사는 tests/cms-alias-not-a-name.test.js 에 있다. */
+ctx.erpLearnPayerAlias('더빌이체3572', { companyName:'충남천막산업' });
+t('★ CMS 적요(더빌이체3572)는 업체 이름으로 안 배운다',
+  ctx.erpAliasCompany('더빌이체3572'), null);
 
 // ① 「이현아」 → 상대방미정 으로 잘못 배운 상태
 ctx.erpLearnPayerAlias('이현아', { companyName:'상대방미정' });
