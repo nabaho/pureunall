@@ -69,6 +69,16 @@ t('★ 그 반대도', P.check({ id:'d', updatedAt:'엊그제' }, { id:'d', upda
 t('빈 글자도 마찬가지', P.check({ id:'d', updatedAt:'' }, { id:'d', updatedAt:'' }, {}), null);
 t('한쪽만 시각이 있으면 판단하지 않는다', P.check({ id:'d', updatedAt:2000 }, { id:'d' }, {}), null);
 
+/* ★ «실제로 저장하는 줄»이 어디인가 — 한 곳에서 찾는다.
+   저장 길이 바뀔 수 있으므로(2026-09-15 localStorage.setItem → _erpStoreSet) 여기
+   한 곳만 고치면 된다. ⚠ 못 찾으면 -1 이 아니라 «멈춘다» — -1 은 «맨 앞»으로 읽혀
+   차례를 보는 검사가 조용히 통과해 버린다(그게 이 검사가 지키는 것을 없앤다). */
+function 저장자리(blk){
+  const m = /(?:_erpStoreSet\(k|localStorage\.setItem\(KEY\s*\+\s*k), newJson\)/.exec(blk);
+  if(!m){ console.log('  FAIL ★ dbSet 안에서 «저장하는 줄»을 못 찾았다 — 저장 길이 바뀌었다면 이 검사의 저장자리()를 함께 고칠 것'); fail++; return 1e9; }
+  return m.index;
+}
+
 console.log('\n[⑤ 통째 저장(dbSet)에 그물이 걸려 있다]');
 const DBSET = src.slice(src.indexOf('function dbSet(k, v){'), src.indexOf('// ── 성과%(mgr_rates) 구조 복구'));
 t('구역을 잘라냈다', DBSET.length > 2000, true);
@@ -79,10 +89,17 @@ t('겹친 것을 모은다', /var _ch = _conflictFind\(k, it, _cPrev\[it\.id\]\)
 /* ★ 열 건이 겹쳤다고 열 번 띄우면 아무도 안 읽는다 — 한 번만, 몇 건인지 붙여서 */
 t('★ 여러 건이 겹쳐도 알림은 한 번만', /if\(_cHits\.length\) _conflictTell\(k, _cHits\[0\], _cHits\.length\);/.test(DBSET), true);
 t('★ 새로 들어온 건은 견줄 상대가 없다 (헛경고 안 뜬다)', /if\(!it \|\| !it\.id \|\| !_cPrev\[it\.id\]\) return;/.test(DBSET), true);
-/* ★ 그물이 넘어져 저장 자체가 막히면 본말전도다 */
-t('★ 그물이 넘어져도 저장은 계속된다', /\} catch\(e\)\{ window\._erpErrLog && window\._erpErrLog\(e\); \}\r?\n  \}\r?\n\r?\n  try \{ localStorage\.setItem\(KEY\+k, newJson\);/.test(src + '\n'), true);
+/* ★ 그물이 넘어져 저장 자체가 막히면 본말전도다.
+   ⚠ 2026-09-15 다시 겨눔 — 옛 검사는 「그물 catch 바로 뒤에 localStorage.setItem(
+     KEY+k, newJson) 이 온다」를 글자 그대로 박아 두었다. 저장 호출이 _erpStoreSet 으로
+     바뀌자 기능은 멀쩡한데 검사가 깨져 **모든 PR 의 CI 가 막혔다.**
+     못 박을 것은 «저장이 그물 밖에 있는가»이지 저장을 어느 함수로 하는가가 아니다. */
+t('★ 그물을 try 로 감쌌다 (넘어져도 저장까지 안 끌고 간다)',
+  /if\(_cHits\.length\) _conflictTell\([\s\S]{0,120}?\} catch\(e\)\{[^}]*_erpErrLog[^}]*\}/.test(DBSET), true);
+t('★ 저장은 그물 «밖»에 있다 (그물 catch 를 지난 뒤에 저장한다)',
+  DBSET.indexOf('catch(e){ window._erpErrLog && window._erpErrLog(e); }') < 저장자리(DBSET), true);
 /* ★ 시각을 찍기 전에 봐야 한다 — 찍은 뒤에는 「내가 읽어온 판」을 알 수 없다 */
-t('★ 저장하기 전에 본다', DBSET.indexOf('_conflictTell(k, _cHits[0]') < DBSET.indexOf('localStorage.setItem(KEY+k, newJson)'), true);
+t('★ 저장하기 전에 본다', DBSET.indexOf('_conflictTell(k, _cHits[0]') < 저장자리(DBSET), true);
 
 console.log('\n[⑥ 세 길에 모두 그물이 있다]');
 t('한 건 저장', /if\(_prevRec\) _conflictNet\(k, item, _prevRec\);/.test(src), true);
