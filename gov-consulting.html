@@ -6560,6 +6560,24 @@ function renderDash(){
       openSingleModal(row.dataset.coid,row.dataset.typeid);
     };
     row.ondragstart=e=>{
+      /* ★★ 바깥 «카드»로 새어 나가지 않게 막는다 (대표 제보 2026-09-16
+         「컨설팅 드래그앤드롭이 되지 않습니다」).
+
+         ■ 무엇이 있었나
+           2026-09-09 에 사업장 카드에 «순서 바꾸기» 끌기가 붙었다(card.draggable=true).
+           그 카드 핸들러는 손잡이(.dcard-grip)에서 시작한 끌기가 아니면
+           preventDefault() 로 «취소»한다 — 카드가 통째로 끌려다니지 않게 하려던 것이다.
+           그런데 컨설팅 줄(.drow)은 그 카드 «안»에 있고(dcard-rows), dragstart 는
+           **버블한다**. 그래서 줄에서 끌기를 시작하면
+             ① 이 핸들러가 먼저 돌아 dragItem 을 채우고
+             ② 곧바로 카드 핸들러가 버블로 받아 preventDefault() 를 부른다
+           → 끌기가 그 자리에서 «취소»되어, 달력으로 끌어다 놓을 수가 없었다.
+           (브라우저에서 재현해 확인했다: 고치기 전 defaultPrevented=true, 고친 뒤 false.)
+
+         ⚠ 카드 쪽은 «안 건드린다» — 손잡이 끌기는 멀쩡히 돌고 있다.
+           안쪽 끌기가 바깥으로 새지 않게 막는 것이 옳은 자리다.
+           일정 칩(bindChipDrag)도 같은 까닭으로 이미 이렇게 한다. */
+      e.stopPropagation();
       isDragging=true;
       dragItem={coId:row.dataset.coid,typeId:row.dataset.typeid,round:nextRound(row.dataset.coid,row.dataset.typeid),isField:getFieldState(row.dataset.coid,row.dataset.typeid)};
       e.dataTransfer.effectAllowed='copy';

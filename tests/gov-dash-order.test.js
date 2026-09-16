@@ -186,6 +186,116 @@ test('저장은 «더하기»(update) — set 을 쓰면 다른 묶음 차례를
   assert.doesNotMatch(fn, /\.set\(map\)/, '★ set 을 쓰면 다른 묶음의 차례가 사라집니다');
 });
 
+/* ══════ 카드 끌기가 «안쪽 컨설팅 줄 끌기»를 잡아먹지 않는다 ══════
+   대표 제보 2026-09-16 「컨설팅 드래그앤드롭이 되지 않습니다」
+
+   ■ 무엇이 있었나 — 이 파일이 만든 기능이 옆 기능을 죽였다
+     위 「끌어서 순서 바꾸기」(2026-09-09)가 카드에 card.draggable=true 와
+     ondragstart 를 붙였다. 그 핸들러는 손잡이(.dcard-grip)에서 시작한 끌기가
+     아니면 preventDefault() 로 «취소»한다.
+     그런데 컨설팅 줄(.drow)은 그 카드 «안»에 있고(dcard-rows) dragstart 는 버블한다.
+     → 줄에서 끌기를 시작하면 카드 핸들러가 버블로 받아 통째로 취소했다.
+     달력으로 끌어다 놓는 길이 그날부터 막혀 있었다.
+
+   ★ 여기서 못 박는 것 — «안쪽 끌기는 바깥으로 새지 않는다».
+     글자만 보지 않고, 가짜 DOM 에서 버블을 실제로 돌려 defaultPrevented 를 잰다. */
+
+function blockFrom(head) {
+  const start = SRC.indexOf(head);
+  assert.ok(start >= 0, '★ 코드를 찾을 수 없습니다: ' + head);
+  let i = SRC.indexOf('{', start), d = 0, k = i;
+  while (k < SRC.length) {
+    if (SRC[k] === '{') d++;
+    else if (SRC[k] === '}') { d--; if (!d) break; }
+    k++;
+  }
+  /* ⚠ 중괄호까지만 자르면 `qa(…).forEach(row=>{ … }` 가 되어 «닫는 괄호»가 없다.
+     글자로만 견주던 옛 검사는 몰랐지만, 돌려 보는 검사는 그 자리에서 구문 오류가 난다. */
+  return SRC.slice(start, k + 1) + ');';
+}
+
+/* 아주 작은 가짜 DOM — 버블과 preventDefault/stopPropagation 만 흉내낸다 */
+function el(cls, parent) {
+  const e = {
+    className: cls, dataset: {}, parentNode: parent || null, kids: [],
+    draggable: false, ondragstart: null, onclick: null, ondragend: null,
+    ondragover: null, ondrop: null, ondragleave: null,
+    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+    closest(sel) {
+      const want = sel.replace(/^\./, '');
+      let p = e;
+      while (p) { if ((' ' + p.className + ' ').indexOf(' ' + want + ' ') >= 0) return p; p = p.parentNode; }
+      return null;
+    },
+    querySelector(sel) {
+      const want = sel.replace(/^\./, '');
+      for (const k of e.kids) {
+        if ((' ' + k.className + ' ').indexOf(' ' + want + ' ') >= 0) return k;
+        const deep = k.querySelector(sel); if (deep) return deep;
+      }
+      return null;
+    },
+  };
+  if (parent) parent.kids.push(e);
+  return e;
+}
+function fireDragStart(target) {
+  const ev = {
+    type: 'dragstart', target, defaultPrevented: false, _stopped: false,
+    preventDefault() { this.defaultPrevented = true; },
+    stopPropagation() { this._stopped = true; },
+    dataTransfer: { effectAllowed: '', setData() {}, getData() { return ''; } },
+  };
+  let node = target;
+  while (node) {
+    if (typeof node.ondragstart === 'function') node.ondragstart(ev);
+    if (ev._stopped) break;
+    node = node.parentNode;
+  }
+  return ev;
+}
+
+/* 진짜 DOM 모양 그대로: .dcard > .dcard-rows > .drow, 그리고 .dcard > .dcard-grip */
+function wire() {
+  const card = el('dcard');            card.dataset.coid = 'CO1';
+  const grip = el('dcard-grip', card);
+  const rows = el('dcard-rows', card);
+  const row = el('drow', rows);        row.dataset.coid = 'CO1'; row.dataset.typeid = 'T1';
+  const ctx = {
+    console, Object, Array, String, Number, Math, Date, JSON,
+    qa: (sel) => (sel.indexOf('.drow') >= 0 ? [row] : sel.indexOf('.dcard') >= 0 ? [card] : []),
+    q: () => null,
+    dragItem: null,
+    nextRound: () => 1, getFieldState: () => false, openSingleModal() {}, saveDashOrder() {},
+  };
+  vm.createContext(ctx);
+  vm.runInContext(blockFrom("qa('#dashList .drow').forEach(row=>{"), ctx);
+  vm.runInContext(blockFrom("qa('#dashList .dcard').forEach(card=>{"), ctx);
+  return { card, grip, row, ctx };
+}
+
+test('★★ 컨설팅 줄을 끌면 «취소되지 않는다» — 카드 끌기가 잡아먹던 것', () => {
+  const w = wire();
+  const ev = fireDragStart(w.row);
+  assert.equal(ev.defaultPrevented, false,
+    '★★ 줄에서 시작한 끌기를 바깥 카드가 preventDefault() 로 취소했습니다 —\n'
+    + '   컨설팅을 달력으로 끌어다 놓을 수 없습니다(대표 제보 2026-09-16).\n'
+    + '   안쪽 핸들러에서 e.stopPropagation() 으로 막으십시오.');
+  assert.ok(w.ctx.dragItem && w.ctx.dragItem.coId === 'CO1',
+    '★ 무엇을 끄는지(dragItem)가 안 담겼습니다 — 놓아도 받을 것이 없습니다');
+});
+
+test('★ 카드 «순서 바꾸기»는 그대로 살아 있다 — 고치다 옆 기능을 죽이지 않았는가', () => {
+  const w = wire();
+  assert.equal(w.card.draggable, true, '★ 카드가 끌리지 않습니다');
+  assert.ok(typeof w.card.ondragstart === 'function', '★ 카드 끌기 핸들러가 없어졌습니다');
+  /* 손잡이가 아닌 «카드 빈 자리»에서 시작한 끌기는 여전히 막아야 한다 —
+     그래야 카드가 아무 데나 잡혀 끌려다니지 않는다. */
+  const ev = fireDragStart(w.card);
+  assert.equal(ev.defaultPrevented, true,
+    '★ 손잡이 밖에서 시작한 카드 끌기를 안 막습니다 — 카드가 아무 데서나 잡힙니다');
+});
+
 /* ══════ 사람마다 따로 (②㉮) ══════ */
 
 test('★ 서버에는 «내 uid» 밑에만 쓰고 읽는다', () => {
