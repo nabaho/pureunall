@@ -12,7 +12,7 @@
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=2"></script>
-<script src="js/pu-health.js?v=3"></script>
+<script src="js/pu-health.js?v=4"></script>
 <script src="js/pu-version.js?v=3"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
@@ -6534,10 +6534,21 @@ function fillSubsidy(wb,f,sites){
       36px 틈이 벌어져 그 사이로 본문이 지나가는 것을 미리보기에서 확인했다.
    그래서 크기가 «바뀔 때마다» 따라가게 한다. */
 var _topbarRO=null;
+/* 재어 둔 값이 «바뀌었을 때만» 적는다 (2026-09-16, 대표 제보 「계속 깜빡이며 경고가 반복된다」).
+   같은 값을 매번 다시 적으면 브라우저가 그때마다 다시 그리고, 그 다시 그림이 크기 감시를
+   또 깨워 「ResizeObserver loop …」 잔소리가 10분마다 장애 알림으로 쌓였다(69건).
+   값이 같으면 손대지 않는다 — 고리가 거기서 끊긴다. */
+var _cssVarLast={};
+function _setCssVar(name,val){
+  if(_cssVarLast[name]===val) return false;
+  _cssVarLast[name]=val;
+  document.documentElement.style.setProperty(name,val);
+  return true;
+}
 function _syncTopbarH(again){
   var t=$('topbar'); if(!t) return;
   var h=Math.round(t.getBoundingClientRect().height);
-  if(h>0) document.documentElement.style.setProperty('--topbar-h',h+'px');
+  if(h>0) _setCssVar('--topbar-h',h+'px');
   if(!_topbarRO && window.ResizeObserver){
     _topbarRO=new ResizeObserver(function(){ _syncTopbarH(); });
     _topbarRO.observe(t);
@@ -6552,16 +6563,28 @@ window.addEventListener('load',function(){ _syncTopbarH(); });   // 글꼴이 �
 /* ══ 틀 고정 ══ 목록 머리줄(#homehead)을 상단바 «아래»에 붙이고, 표 머리줄은 그 아래에 붙인다.
    머리줄 높이는 좁은 화면에서 접히고 「정보 채우기」를 켜면 한 줄 더 늘어 «그때그때 다르다» —
    상단바와 같은 방식으로 재어서 --homehead-h 로 넘긴다. */
-var _homeheadRO=null;
+var _homeheadRO=null, _homeheadWatched=null;
 function _syncHomeheadH(){
   var e=$('homehead');
-  if(!e){ document.documentElement.style.setProperty('--homehead-h','0px'); return; }
+  if(!e){ _setCssVar('--homehead-h','0px'); _homeheadWatched=null; return; }
   var h=Math.round(e.getBoundingClientRect().height);
-  if(h>0) document.documentElement.style.setProperty('--homehead-h',h+'px');
+  if(h>0) _setCssVar('--homehead-h',h+'px');
   if(!_homeheadRO && window.ResizeObserver){
-    _homeheadRO=new ResizeObserver(function(){ _syncHomeheadH(); _syncTblScroll(); });
+    /* ⚠⚠ 감시 콜백 «안에서» 표 스크롤을 켜고 끄면 안 된다 — 스크롤을 켜는 순간 폭이
+       달라져 머리줄 크기가 또 바뀌고, 그 변화가 같은 칸 안에서 이 콜백을 다시 깨운다.
+       크롬은 그것을 「ResizeObserver loop completed with undelivered notifications」로
+       알리고, 오류 그물이 그것을 장애로 올려 관리자 배지가 깜빡였다.
+       그래서 표 스크롤 손질은 «다음 칸»(requestAnimationFrame)으로 미룬다. */
+    _homeheadRO=new ResizeObserver(function(){
+      _syncHomeheadH();
+      if(window.requestAnimationFrame) requestAnimationFrame(_syncTblScroll); else _syncTblScroll();
+    });
   }
-  if(_homeheadRO){ try{ _homeheadRO.disconnect(); _homeheadRO.observe(e); }catch(err){} }
+  /* ⚠ 콜백 안에서 disconnect()·observe() 를 되풀이하면 observe 가 «첫 알림»을 새로 낳아
+     그 자체로 고리가 된다. 지켜보는 대상이 «바뀌었을 때만» 다시 건다. */
+  if(_homeheadRO && _homeheadWatched!==e){
+    try{ if(_homeheadWatched) _homeheadRO.unobserve(_homeheadWatched); _homeheadRO.observe(e); _homeheadWatched=e; }catch(err){}
+  }
 }
 /* 표 머리줄은 감싼 상자가 «스크롤 상자»면 안 붙는다 — overflow-x:auto 를 주면 세로도 auto 로
    따라 계산되기 때문이다(CSS 규칙). 그래서 «가로로 넘칠 때만» 스크롤을 켠다.

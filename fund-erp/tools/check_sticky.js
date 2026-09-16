@@ -57,8 +57,11 @@ ok('창 크기가 바뀌면 다시 잰다',
 /* 「정보 채우기」를 켜면 머리줄이 한 줄 늘어난다 — 그때도 따라가야 한다 */
 ok('머리줄이 커지면 따라간다 (ResizeObserver)',
   src.includes('_homeheadRO=new ResizeObserver('));
+/* ⚠ 「어떻게 적는지」가 아니라 「0 으로 되돌리는지」를 본다 (2026-09-16).
+   전에는 setProperty 한 줄을 글자 그대로 박아 두어, 같은 값을 다시 안 적는
+   _setCssVar 로 바꾸자(ResizeObserver 고리 끊기) 멀쩡한 개선에 걸렸다. */
 ok('머리줄이 없는 화면에서는 0 으로 되돌린다',
-  src.includes("document.documentElement.style.setProperty('--homehead-h','0px')"));
+  /(_setCssVar|style\.setProperty)\('--homehead-h','0px'\)/.test(src));
 
 console.log(bad ? '\nFAILURES ' + bad : '\nALL PASS (틀 고정 배선)');
 process.exit(bad ? 1 : 0);
