@@ -165,7 +165,9 @@ test('⑤ 남의 일정은 못 고친다 — 담당·협업·총괄관리자만'
   let ME = 'me', ADMIN = false;
   const box = run([fnSrc('getCoAtts'), fnSrc('canEdit')], {
     isAdmin: () => ADMIN,
-    myId: () => ME
+    myId: () => ME,
+    /* 사업장 배정까지 본다(아래 ⑤-2) — 여기서는 사업장이 없는 셈이므로 빈 목록 */
+    getCos: () => []
   });
 
   assert.equal(box.canEdit({ attId: 'me' }), true, '내 일정을 못 고칩니다');
@@ -183,4 +185,49 @@ test('⑤ 남의 일정은 못 고친다 — 담당·협업·총괄관리자만'
   ADMIN = false; ME = '';
   assert.equal(box.canEdit({ attId: 'other' }), false, '★ 로그인 없이 열립니다');
   assert.equal(box.canEdit({ attId: '' }), false, '★ 담당자 없는 일정이 아무에게나 열립니다');
+});
+
+/* ★★ 사업장 담당인데 «그 사업장 일정»은 못 옮기던 것 (대표 제보 2026-09-16
+   「박재원노무사 사업 드레그앤 드랍이 안된다」).
+
+   ■ 무엇이 어긋나 있었나
+     부담당(협업)은 사업장에 «나중에» 배정되는 일이 흔하다. 그때 이미 만들어져
+     있던 일정 줄에는 그 이름이 안 적힌다(일정은 만들 때의 명단을 베껴 둔다).
+     그런데 권한을 «일정 줄»만 보고 판정해서, 화면은 「내 사업장」이라 보여 주면서
+     달력에서는 그 일정이 잡히지도 않았다(draggable=false · cursor:not-allowed).
+     실측 2026-09-16: 그런 일정이 14건(박재원 5 · 권형하 9).
+   ■ 왜 열어도 되는가 — 이미 «만드는 것»은 열려 있었다.
+     사업장 담당이면 대시보드에서 그 사업장 줄을 달력에 끌어다 새 일정을 만들 수
+     있다(handleDrop 은 canEdit 을 보지 않는다). 만들 수는 있는데 옮길 수는 없는
+     것이 앞뒤가 안 맞았다. 넓히는 것이 아니라 «어긋난 것을 맞추는» 고침이다.
+   ⚠ 넓히는 범위는 «사업장 배정(주담당·부담당)»까지다. coIsMine 처럼 「그 사업장
+     일정 한 건에 끼어 있으면」까지 넓히면, 한 회차만 같이 간 사람이 그 사업장의
+     모든 일정을 고치게 된다. */
+test('★ 사업장 담당은 그 사업장 일정도 고칠 수 있다 — 일정 줄에 내 이름이 없어도', () => {
+  let ME = 'me', ADMIN = false;
+  const COS = [
+    { id: 'co1', defAtt: 'other', defCoAtts: ['me'] },  // 내가 «부담당»인 사업장
+    { id: 'co2', defAtt: 'me' },                        // 내가 «주담당»인 사업장
+    { id: 'co3', defAtt: 'other', defCoAtts: ['x'] }    // 나와 상관없는 사업장
+  ];
+  const box = run([fnSrc('getCoAtts'), fnSrc('canEdit')], {
+    isAdmin: () => ADMIN, myId: () => ME, getCos: () => COS
+  });
+
+  /* 일정 줄에는 내 이름이 «없다» — 배정이 나중에 붙은 실제 모양 그대로다 */
+  assert.equal(box.canEdit({ coId: 'co1', attId: 'other' }), true,
+    '★ 내가 부담당인 사업장인데 그 일정을 못 고칩니다 — 달력에서 잡히지도 않습니다');
+  assert.equal(box.canEdit({ coId: 'co2', attId: 'other' }), true,
+    '★ 내가 주담당인 사업장인데 그 일정을 못 고칩니다');
+
+  /* ★ 여기가 뚫리면 남의 사업장까지 열린다 */
+  assert.equal(box.canEdit({ coId: 'co3', attId: 'other' }), false,
+    '★ 남의 사업장 일정이 열립니다');
+  assert.equal(box.canEdit({ coId: '없는사업장', attId: 'other' }), false,
+    '★ 사업장을 못 찾았는데 열립니다');
+
+  /* 로그인 정보가 비면 사업장 배정이 있어도 못 고친다(2026-08-29 규칙 유지) */
+  ME = '';
+  assert.equal(box.canEdit({ coId: 'co1', attId: 'other' }), false,
+    '★ 로그인 없이 열립니다');
 });
