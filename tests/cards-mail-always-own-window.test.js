@@ -225,7 +225,11 @@ test('★★★ asked 면 안 묻고, 아니면 «묻는다»', () => {
        「묻지 않고 넘어가는 길」이 asked 하나로만 갈리는지 «글귀로» 못 박는다. */
   assert.match(fn, /if\(!\(opt && opt\.asked\)\s*\n?\s*&& !confirm\(/,
     '★★★ 묻는 자리가 바뀌었다 — 늘 묻거나 늘 안 묻게 되면 한쪽이 놀란다');
-  /* 설정을 읽고 다시 들어올 때 갈래를 «들고» 가야 한다 */
-  assert.match(fn, /loadMaterials\(\(\)=>openSendMaterials\(id, opt\)\)/,
+  /* 설정을 읽고 다시 들어올 때 갈래를 «들고» 가야 한다.
+     ⚠ 여기 「loadMaterials(()=>…)」 라고 글귀를 박아 두었다가 2026-09-16 에 깨졌다 —
+       늦게 온 되부름이 화면을 빼앗는 흠을 고치며 matLater 로 감쌌을 뿐인데,
+       기능은 그대로인데 검사만 깨졌다(CLAUDE.md 「지금 값이 아니라 규칙을」).
+     ★ 지킬 것은 «무엇으로 감싸느냐»가 아니라 «opt 를 들고 다시 들어가느냐»다. */
+  assert.match(fn, /(matLater|loadMaterials)\(\s*\(\s*\)\s*=>\s*openSendMaterials\(\s*id\s*,\s*opt\s*\)\s*\)/,
     '★★ 다시 들어올 때 갈래를 잃는다 — 딴 창에서도 다시 묻게 된다');
 });
