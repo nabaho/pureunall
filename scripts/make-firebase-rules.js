@@ -273,6 +273,26 @@ rules.data = {
       + ' && (!data.exists() || newData.val() > data.val())'
   },
 
+  /* 전달함 — 관리자가 «남이 넣은» 기록을 고쳤을 때 그 사람에게 남기는 한마디
+     (대표 지시 2026-09-16 「로그인 때 이 부분 어떻게 해야 되는지 자동으로 알림 만들어줘」).
+     자리는 data/handoff_notes/{받는사람 사번}/{키} — 사람마다 따로다.
+
+     ⚠★ 받는 사람 «본인»과 관리자만 본다. 남의 쪽지는 안 보인다 —
+       「○○님이 또 틀렸다」가 온 사무실에 보이면 안 된다. 쪽지는 일을 바로잡자는 것이지
+       흠을 남기자는 것이 아니다.
+     ⚠ 쓰기도 같은 조건이다: 관리자가 넣고(보내기), 받는 사람이 「확인했습니다」를 적는다.
+     ⚠ 부모 자리를 관리자에게 열어 두는 까닭은 portal_prefs_uid 와 같다 —
+       백업이 통째로 읽고 복원이 통째로 되쓴다(자식 규칙만 두면 둘 다 조용히 멈춘다).
+     ⚠ 그래도 앱은 쪽지에 «금액·주민번호를 안 담는다»(pu-erp.html 의 HANDOFF_NAME_FIELDS).
+       규칙은 자리를 지키지만, 관리자는 모든 쪽지를 본다 — 애초에 안 담는 것이 한 겹 더다. */
+  handoff_notes: {
+    '.read': MGR, '.write': MGR,
+    $sid: {
+      '.read':  `${LOGIN} && (root.child('uid_roles').child(auth.uid).child('sid').val() === $sid || ${MGR})`,
+      '.write': `${LOGIN} && (root.child('uid_roles').child(auth.uid).child('sid').val() === $sid || ${MGR})`
+    }
+  },
+
   /* ⚠ 여기 이름이 없는 자리는 아래로 떨어져 «재직 직원 누구나» 읽고 쓴다.
      새 자리를 만들 때는 권한을 정해 위에 이름을 적을 것 —
      tests/rules-data-named.test.js 가 이름 없는 자리를 잡는다. */
