@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=3.0, user-scalable=yes">
 <meta name="theme-color" content="#1e40af">
 <link rel="manifest" href="pu-erp-manifest.json">
+<!-- ⚠ apple- 쪽만 두면 크롬이 켤 때마다 「deprecated」 경고를 찍는다. 둘 다 둔다(아이폰은 apple- 를 본다). -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="푸른 ERP">
@@ -292,8 +294,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-16 전달함 — 관리자가 남이 넣은 것을 고치면 그 사람이 로그인할 때 «무엇을 해야 하는지»가 뜬다(확인 누를 때까지 남는다) · 충돌 뿌리(번호 없는 항목은 저장 전에 번호를 받는다) · 깜빡임 뿌리(남은시간 배지를 떠 있는 배지로)';
-var BUILD_SEQ = 159;
+var ERP_BUILD = '2026-09-16 콘솔 잔소리 걷기 — 직원 색표를 «구글 색표가 오기 전»에 올리려다 켤 때마다 세 줄 찍고 서버에 헛쓰기하던 것을 끊었다(되돌아갈 색이 진짜 색을 덮을 위험도 함께) · 전달함 · 충돌 뿌리 · 깜빡임 뿌리';
+var BUILD_SEQ = 160;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -61761,7 +61763,20 @@ function CorpDashboard(props){
          조용히 실패하면 콘솔만 붉어지고 아무도 모른다 — 아예 안 쓴다. */
       if(!(CURRENT_USER && CURRENT_USER.isAdmin)) return;
       if(!Object.keys(staffColorMap).length) return;
+      /* ★★ 서버 것을 «받기 전»에는 올리지 않는다 (대표 제보 2026-09-16 「계속 문제가 발생한다」).
+         받기 전에 쓰면 dbSet 이 「초기 동기화 완료 전 — 서버 쓰기 보류」로 막아 두고,
+         그 보류분이 동기화가 끝난 뒤 _flushPendingLocalNewer 로 «그대로 서버에 밀린다».
+         그래서 켤 때마다 콘솔에 세 줄(보류 둘 · 재저장 하나)이 찍히고,
+         쓸 일이 없는 서버 쓰기가 한 번씩 더 나갔다. */
+      if(!_fbSynced) return;
       var was = dbGet('staff_colors', {}) || {};
+      /* ★★ 구글 색표가 «아직 안 왔으면» 이미 올라가 있는 것을 덮지 않는다.
+         지금 손에 있는 STAFF_COLORS 는 색표가 오기 전에만 쓰는 «되돌아갈 색»이다(위 61728줄대).
+         그것을 올리면 서버의 진짜 색을 덮는다 — 게다가 컨설팅일정도 이 자리를 읽으므로
+         (data/staff_colors 가 사람 색을 «정하는 한 곳»이다) 두 앱의 색이 함께 틀어진다.
+         ⚠ 아직 아무것도 안 올라가 있으면 되돌아갈 색이라도 올린다 — 없는 것보다 낫다. */
+      var _palReady = (typeof gcalPalette === 'function') && !!gcalPalette();
+      if(!_palReady && Object.keys(was).length) return;
       if(JSON.stringify(was) === JSON.stringify(staffColorMap)) return;
       dbSet('staff_colors', staffColorMap);
     }catch(e){ window._erpErrLog && window._erpErrLog(e); }

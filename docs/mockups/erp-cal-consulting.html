@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>목업 — 이알피 달력에 컨설팅 올리기</title>
+<style>
+:root{--ink:#1e293b;--dim:#475569;--faint:#94a3b8;--line:#e2e8f0;--ground:#f1f5f9;
+ --blue:#2563eb;--blue-bg:#eff6ff;--blue-line:#bfdbfe;--blue-ink:#1e40af;
+ --amber-bg:#fffbeb;--amber-line:#fde68a;--amber-ink:#854d0e;
+ --red:#dc2626;--red-bg:#fef2f2;--red-line:#fecaca;--green:#16a34a;--green-bg:#f0fdf4;--green-line:#bbf7d0;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:14px/1.6 "Malgun Gothic","맑은 고딕",system-ui,sans-serif;padding:22px 16px 60px}
+.wrap{max-width:1100px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px;letter-spacing:-.3px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 14px}
+.quote{background:#fff;border-left:3px solid var(--blue);padding:9px 13px;margin:0 0 22px;border-radius:0 6px 6px 0;color:var(--dim);font-size:12.5px}
+h2{font-size:15px;margin:26px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+.note{font-size:12.5px;color:var(--dim);margin:6px 0 0;line-height:1.6}
+.cols{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.col{flex:1 1 320px;min-width:0}
+
+/* 달력 */
+.cal{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px}
+.cal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-hd .t{font-size:13px;font-weight:800}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.dow{font-size:10.5px;color:var(--faint);text-align:center;font-weight:700;padding:2px 0}
+.cell{min-height:62px;border:1px solid var(--line);border-radius:5px;padding:3px;background:#fff}
+.cell .d{font-size:10.5px;color:var(--dim);font-weight:700}
+.cell.drop{border:2px dashed var(--blue);background:var(--blue-bg)}
+.chip{display:block;font-size:9.5px;border-radius:4px;padding:2px 4px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.c-case{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.c-cons{background:var(--blue-bg);color:var(--blue-ink);border:1px solid var(--blue-line);cursor:grab}
+.c-cons.ghost{opacity:.35}
+.c-sch{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.arrow{font-size:20px;color:var(--blue);align-self:center;font-weight:900}
+
+/* 고르는 표 */
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.5px}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#f8fafc;font-size:11.5px;color:var(--dim);font-weight:800}
+tr:last-child td{border-bottom:0}
+.pick{font-weight:800;color:var(--blue-ink)}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:1px 8px;white-space:nowrap}
+.t-rec{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.t-no{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.t-mid{background:var(--amber-bg);color:var(--amber-ink);border:1px solid var(--amber-line)}
+
+/* 입력 자리 */
+.form{background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px}
+.form .lbl{font-size:11.5px;font-weight:800;color:var(--dim);margin-bottom:4px}
+.row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.inp{border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;font-size:12px;background:#fff}
+.btn{font:inherit;font-size:11.5px;font-weight:700;border-radius:5px;padding:5px 11px;border:1px solid var(--line);background:#fff;color:var(--dim)}
+.btn.go{background:var(--blue);border-color:var(--blue);color:#fff}
+.del{color:var(--faint);border:0;background:none;font-size:14px}
+.warn{background:var(--amber-bg);border:1px solid var(--amber-line);border-radius:8px;padding:11px 13px;font-size:12.5px;color:var(--amber-ink);line-height:1.6}
+</style></head><body><div class="wrap">
+
+<h1>이알피 달력에 «컨설팅»을 올리고, 끌어서 날짜를 바꾼다</h1>
+<p class="sub">목업 — 아직 안 만들었습니다. 무엇을 올릴지 골라 주십시오.</p>
+<div class="quote">「ERP 일정표 컨설팅 드래그앤드롭이 되지 않습니다!」 → 「ERP의 달력 쪽이었다」</div>
+
+<div class="warn">
+<b>⚠ 먼저 짚을 것 — 컨설팅에는 «끌어서 옮길 날짜»가 지금 없습니다.</b><br>
+사건은 <b>마감일 목록</b>(여러 개, 이름 붙여 관리)을 갖고 있어 달력에 올릴 것이 있습니다.
+컨설팅이 가진 날짜는 <b>시작일(계약일)</b>과 <b>종료일</b>뿐인데, 종료일은 «종료 처리»할 때 찍는 실제 날짜라
+달력에서 끌어 옮길 성격이 아닙니다. <b>그래서 칸을 하나 만들어야 합니다.</b>
+</div>
+
+<h2>① 무엇을 달력에 올릴까 — 세 가지 길</h2>
+<table>
+<tr><th style="width:130px">길</th><th>어떤 것</th><th style="width:150px">치러야 하는 것</th><th style="width:90px">추천</th></tr>
+<tr>
+  <td class="pick">㉮ 마감일 목록<br><span style="font-weight:500;color:var(--dim)">(사건과 똑같이)</span></td>
+  <td>컨설팅 한 건에 마감일을 <b>여러 개</b> 이름 붙여 넣는다 — 「진단보고 제출」 「1차 방문」 「최종보고」.
+      달력에 각각 올라가고, 끌면 그 날짜가 바뀐다.</td>
+  <td>컨설팅관리 화면에 마감일 넣는 자리가 생긴다(사건에 이미 있는 것과 같은 모양).</td>
+  <td><span class="tag t-rec">추천</span></td>
+</tr>
+<tr>
+  <td class="pick">㉯ 종료 예정일<br><span style="font-weight:500;color:var(--dim)">(한 칸만)</span></td>
+  <td>컨설팅마다 「언제까지」 한 칸. 달력에 한 개 올라가고 끌면 바뀐다.</td>
+  <td>가장 간단하다. 대신 중간 일정은 못 적는다.</td>
+  <td><span class="tag t-mid">간단</span></td>
+</tr>
+<tr>
+  <td class="pick">㉰ 시작일(계약일)</td>
+  <td>이미 있는 칸이라 새로 만들 것이 없다.</td>
+  <td><b>계약일이 바뀐다</b> — 정렬·수수료·회계가 그 날짜를 본다. 끌다가 잘못 놓으면 조용히 틀어진다.</td>
+  <td><span class="tag t-no">비추천</span></td>
+</tr>
+</table>
+
+<h2>② 어떻게 보이나 (㉮ 기준)</h2>
+<div class="cols">
+  <div class="col">
+    <div class="cal">
+      <div class="cal-hd"><span class="t">📅 2026년 9월</span><span style="font-size:10.5px;color:var(--faint)">법인 대시보드</span></div>
+      <div class="grid">
+        <div class="dow">일</div><div class="dow">월</div><div class="dow">화</div><div class="dow">수</div><div class="dow">목</div><div class="dow">금</div><div class="dow">토</div>
+        <div class="cell"><div class="d">14</div></div>
+        <div class="cell"><div class="d">15</div><span class="chip c-sch">📅 팀회의</span></div>
+        <div class="cell"><div class="d">16</div>
+          <span class="chip c-case">⚖️ 홍길동 사건 마감</span>
+          <span class="chip c-cons ghost">📊 가나상사 진단보고</span></div>
+        <div class="cell"><div class="d">17</div></div>
+        <div class="cell drop"><div class="d">18</div><span class="chip c-cons">📊 가나상사 진단보고</span></div>
+        <div class="cell"><div class="d">19</div></div>
+        <div class="cell"><div class="d">20</div></div>
+      </div>
+    </div>
+    <p class="note"><b>파란 알약이 컨설팅</b>입니다(빨강=사건, 초록=내 일정). 잡아서 다른 날에 놓으면 그 마감일이 바뀝니다.
+    놓을 자리는 파란 테두리로 보여 줍니다.</p>
+  </div>
+  <div class="arrow">→</div>
+  <div class="col">
+    <div class="form">
+      <div style="font-size:13px;font-weight:800;margin-bottom:9px">📊 컨설팅관리 — 가나상사</div>
+      <div class="lbl">마감일 (여러 개 넣을 수 있습니다)</div>
+      <div class="row"><input class="inp" style="width:112px" value="2026-09-18"><input class="inp" style="flex:1" value="진단보고 제출"><button class="del">×</button></div>
+      <div class="row"><input class="inp" style="width:112px" value="2026-10-02"><input class="inp" style="flex:1" value="최종보고"><button class="del">×</button></div>
+      <div class="row"><button class="btn">+ 마감일 추가</button><span style="flex:1"></span><button class="btn go">저장</button></div>
+      <p class="note" style="margin-top:9px">사건에 이미 있는 것과 <b>같은 모양</b>입니다 — 새로 배우실 것이 없습니다.</p>
+    </div>
+  </div>
+</div>
+
+<h2>③ 곁들여 정할 것</h2>
+<table>
+<tr><th style="width:190px">물음</th><th>설명</th></tr>
+<tr><td class="pick">어느 달력에?</td>
+    <td><b>법인 대시보드 달력</b>에는 이미 사건 마감이 올라갑니다 — 컨설팅도 그 옆에 놓는 것이 자연스럽습니다.<br>
+        「나의 업무」의 <b>📅 내 캘린더</b>는 <b>일부러</b> 사건·컨설팅을 빼 두었습니다(직접 넣은 일정만 보이게).
+        거기까지 올리려면 그 결정을 되돌리는 것이라 따로 여쭙습니다.</td></tr>
+<tr><td class="pick">사건 마감도 끌 수 있게?</td>
+    <td>지금 사건 마감은 달력에 <b>보이기만</b> 하고 못 끕니다. 컨설팅만 끌리면 두 알약이 서로 다르게 굴어 헷갈립니다.
+        같이 풀지 여쭙습니다. (⚠ 법정 기한에서 «계산된» 단계 기한은 그대로 못 끌게 둡니다 — 사람이 바꿀 값이 아닙니다.)</td></tr>
+<tr><td class="pick">누가 끌 수 있나?</td>
+    <td>그 건의 <b>담당자와 관리자</b>만. 남의 건은 보이되 안 잡히게 합니다(컨설팅일정 앱과 같은 규칙).</td></tr>
+</table>
+
+</div></body></html>

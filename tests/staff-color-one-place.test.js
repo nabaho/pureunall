@@ -135,8 +135,13 @@ test('★ 푸른이알피는 «다 푼 색»을 올린다 — 읽는 쪽이 순�
   const at = ERP.indexOf("dbSet('staff_colors'");
   assert.ok(at > 0, '★ 색표를 안 올립니다');
   /* ⚠ «올리는 그 덩이 안»만 본다 — 이 글귀는 파일 곳곳에 열여덟 번 나와서,
-     그냥 찾으면 지켜 주는 것이 하나도 없다(2026-08-30 이빨 확인에서 잡았다). */
-  const blk = ERP.slice(Math.max(0, at - 900), at);
+     그냥 찾으면 지켜 주는 것이 하나도 없다(2026-08-30 이빨 확인에서 잡았다).
+     ⚠★ 예전에는 「앞 900자」로 끊었다. 2026-09-16 에 그 자리에 주석이 늘자
+       지키던 줄이 창 밖으로 밀려나, 코드는 멀쩡한데 검사가 깨졌다.
+       글자 수는 «규칙»이 아니다 — 그것을 감싼 useEffect 가 진짜 경계다. */
+  const blkStart = ERP.lastIndexOf('useEffect(function(){', at);
+  assert.ok(blkStart > 0, '★ 색표를 올리는 useEffect 를 못 찾았습니다');
+  const blk = ERP.slice(blkStart, at);
   assert.match(blk, /CURRENT_USER && CURRENT_USER\.isAdmin/, '★ 쓸 수 없는 사람도 씁니다');
   /* 같으면 안 쓴다 — 화면을 그릴 때마다 부르는 자리다 */
   assert.match(blk, /JSON\.stringify\(was\) === JSON\.stringify\(staffColorMap\)/,
