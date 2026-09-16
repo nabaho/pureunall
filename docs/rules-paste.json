@@ -236,6 +236,14 @@
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".validate": "newData.isNumber() && newData.val() >= 10001 && newData.val() <= 99999 && (!data.exists() || newData.val() > data.val())"
       },
+      "handoff_notes": {
+        ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)",
+        ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)",
+        "$sid": {
+          ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && (root.child('uid_roles').child(auth.uid).child('sid').val() === $sid || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true))",
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && (root.child('uid_roles').child(auth.uid).child('sid').val() === $sid || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true))"
+        }
+      },
       "$other": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"

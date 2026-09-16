@@ -292,8 +292,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-16 충돌 뿌리 — 번호 없는 항목은 저장 «전»에 번호를 받는다(표가 통째 저장·나중 사람이 이기는 길로 떨어지는 것을 쓰는 쪽에서 막음) · 깜빡임 뿌리(남은시간 배지를 떠 있는 배지로) · 멈춤 뿌리(읽는 쪽 번호 되살림)';
-var BUILD_SEQ = 158;
+var ERP_BUILD = '2026-09-16 전달함 — 관리자가 남이 넣은 것을 고치면 그 사람이 로그인할 때 «무엇을 해야 하는지»가 뜬다(확인 누를 때까지 남는다) · 충돌 뿌리(번호 없는 항목은 저장 전에 번호를 받는다) · 깜빡임 뿌리(남은시간 배지를 떠 있는 배지로)';
+var BUILD_SEQ = 159;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -2364,7 +2364,12 @@ function fbSeedAllowed(){ return !fbDb || _fbSynced; }  // 오프라인이거나
    ★ 실측 2026-09-14: 대표 PC 16건 · 다른 PC 1건. 둘 다 맞는 값이다.
    ⚠ 백업 알림(erpBackupCheck)은 이제 «이 PC 기준»으로 센다 — 그것이 옳다.
      백업은 PC 마다 제 파일을 내려받는 일이고, 남이 받았다고 내 PC 에 파일이 생기지 않는다. */
-var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history'];
+/* ⚠★ handoff_notes(전달함)를 여기 넣은 까닭 — 이것은 «표»가 아니다.
+   부팅 계획(_bootKeyPlan)은 data 아래 이름을 통째로 훑어(shallow) 나온 것을 «전부 표로 보고»
+   받는다 — 새 이름이 생기면 저절로 포함되게 만들어 두었다. 전달함은 표가 아니라 사람별 쪽지함이라
+   그 길로 들어오면 온 직원이 남의 쪽지까지 매번 내려받는다. 여기 넣으면 fbShouldSync 가 걸러 준다.
+   전달함은 자기 몫만 따로 구독한다(_handoffWatch). */
+var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes'];
 function fbShouldSync(k){
   if(!k) return false;
   for(var i=0; i<FB_EXCLUDE.length; i++){ if(k.indexOf(FB_EXCLUDE[i])===0) return false; }
@@ -4435,10 +4440,17 @@ function dbSet(k, v){
       var _cPrev = {};
       prev.forEach(function(x){ if(x && x.id) _cPrev[x.id] = x; });
       var _cHits = [];
+      /* 전달함 — 관리자일 때만 훑는다. 표가 2천 줄인 곳이 있어, 아닐 때 견주면 저장이 느려진다.
+         ⚠ «처음 걸린 한 건»에서 멈춘다 — 띠는 하나만 뜨면 되고, 한 번 저장에 여러 줄이
+           바뀌어도 띠를 겹겹이 쌓지 않는다. */
+      var _hoScan = (typeof _handoffCanSpot === 'function') && _handoffCanSpot();
       v.forEach(function(it){
         if(!it || !it.id || !_cPrev[it.id]) return;
         var _ch = _conflictFind(k, it, _cPrev[it.id]);
         if(_ch) _cHits.push(_ch);
+        if(_hoScan && JSON.stringify(it) !== JSON.stringify(_cPrev[it.id])){
+          if(_handoffSpot(k, it, _cPrev[it.id])) _hoScan = false;
+        }
       });
       if(_cHits.length) _conflictTell(k, _cHits[0], _cHits.length);
     } catch(e){ window._erpErrLog && window._erpErrLog(e); }
@@ -5018,6 +5030,241 @@ function _conflictNet(k, item, stored){
   if(hit) _conflictTell(k, hit, 1);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   전달함 — 고친 뒤 «그것을 넣은 사람»에게 무엇을 해야 하는지 알린다
+   ─────────────────────────────────────────────────────────────────────────
+   대표 지시 2026-09-16 「내가 고치고 난 이후에 데이터 입력자가 수정·변경 등이
+   필요한 경우 로그인 때 이 부분 어떻게 해야 되는지 자동으로 알림 만들어줘」
+
+   ■ 어떻게 도는가
+     ① 관리자가 «남이 넣은» 기록을 고쳐 저장한다 → 저장 층이 알아챈다(_handoffSpot)
+     ② 화면 아래에 띠가 잠깐 뜬다 — 누르면 한마디 창(일하는 것을 안 막는다)
+     ③ 그 사람이 다음에 로그인하면 창이 뜬다. «확인»을 누를 때까지 남는다.
+
+   ■ 어디에 담는가 — data/handoff_notes/{받는사람 사번}/{키}
+   ⚠★ 최상위(handoff_notes)에 담으면 «서버가 거부한다». 살아 있는 규칙의 최상위에는
+     이름 없는 자리($other)가 없다 — 63자리가 모두 이름으로 적혀 있다. data 아래에는
+     $other 가 있어 새 자리가 곧바로 산다.
+   ⚠★ «받는 사람별»로 나눈 까닭 — 그래야 각자 자기 몫만 구독한다. 한 자리에 몰아 두고
+     orderByChild('toSid') 로 고르려면 색인(.indexOn)이 있어야 하고, 색인 없는 고르기는
+     «전부 내려받아» 브라우저에서 거른다 — 온 직원이 남의 쪽지를 다 받게 된다.
+     자리를 나누면 색인이 아예 필요 없고, 서버 규칙으로 «본인만» 막기도 쉽다.
+   ★ 서버 규칙은 2026-09-16 에 올렸다(scripts/make-firebase-rules.js 의 data.handoff_notes) —
+     받는 사람 «본인»과 관리자만 읽고 쓴다.
+   ⚠ 그래도 돈·주민번호는 담지 말 것 — 관리자는 모든 쪽지를 본다.
+     «무엇을 해야 하는지»와 «어느 건인지»만 적는다(HANDOFF_NAME_FIELDS).
+   ══════════════════════════════════════════════════════════════════════════ */
+var HANDOFF_PATH = 'data/handoff_notes';
+/* 어느 건인지 가리키는 데 쓰는 칸 — «이름표» 칸만 쓴다.
+   ⚠ 금액·지급액 같은 돈 칸을 여기 넣지 말 것. 쪽지는 서버에 남고 백업에도 들어간다. */
+var HANDOFF_NAME_FIELDS = ['companyName','title','name','caseNo','workerName','subject','projectName'];
+function _handoffLabel(k, item){
+  var what = (typeof conflictWhat === 'function') ? conflictWhat(k) : '자료';
+  var who = '';
+  for(var i=0; i<HANDOFF_NAME_FIELDS.length; i++){
+    var vv = item && item[HANDOFF_NAME_FIELDS[i]];
+    if(typeof vv === 'string' && vv.trim()){ who = vv.trim(); break; }
+  }
+  if(who.length > 30) who = who.slice(0, 30) + '…';
+  return who ? (what + ' · ' + who) : what;
+}
+/* 기록에 찍히는 것은 «이름»이다(_recStamp 가 CURRENT_USER.name 을 적는다).
+   쪽지는 사번으로 보내야 하니 이름을 사번으로 바꾼다.
+   ⚠ 같은 이름이 둘이면 «안 보낸다» — 엉뚱한 사람에게 가느니 안 가는 것이 낫다.
+   ⚠ 재직 중인 사람만 — 퇴직한 사람 앞으로 쌓아 봐야 아무도 안 읽는다. */
+function _handoffSidByName(name){
+  if(!name || typeof name !== 'string') return '';
+  var users = [];
+  try { users = dbGet('user_accounts', []) || []; } catch(_){ return ''; }
+  if(!Array.isArray(users)) return '';
+  var hit = users.filter(function(u){ return u && u.name === name && u.status === 'active'; });
+  return (hit.length === 1 && hit[0].sid) ? hit[0].sid : '';
+}
+// 지금 내가 이 그물을 돌릴 처지인가 — 저장마다 사람 명단을 훑지 않도록 먼저 본다.
+function _handoffCanSpot(){
+  try {
+    if(typeof fbDb === 'undefined' || !fbDb) return false;
+    if(!(CURRENT_USER && CURRENT_USER.isAdmin)) return false;   // 고치는 쪽이 관리자일 때만
+    return !!CURRENT_USER.name;
+  } catch(_){ return false; }
+}
+/* 저장 층에서 부른다. 알릴 만한 상대를 찾으면 띠를 띄우고 true 를 돌려준다.
+   ⚠ 여기서 «보내지» 않는다 — 무엇을 해야 하는지는 사람이 적어야 한다.
+     「대표가 고쳤습니다」만 가는 알림은 두 번째부터 아무도 안 읽는다. */
+function _handoffSpot(k, item, prev){
+  try {
+    if(!_handoffCanSpot()) return false;
+    if(!item || !item.id || !prev) return false;
+    var by = prev.updatedBy;
+    if(!by || by === CURRENT_USER.name) return false;           // 내가 넣은 것은 나에게 안 알린다
+    var toSid = _handoffSidByName(by);
+    if(!toSid || toSid === CURRENT_USER.sid) return false;
+    var cand = { k:k, id:item.id, toSid:toSid, toName:by, label:_handoffLabel(k, item), at:Date.now() };
+    /* 같은 건을 잇달아 고칠 때 띠가 겹겹이 쌓이지 않게 — 마지막 것 하나만 든다 */
+    window._handoffCand = cand;
+    if(typeof _handoffStrip === 'function') _handoffStrip(cand);
+    return true;
+  } catch(e){ window._erpErrLog && window._erpErrLog(e); return false; }
+}
+// 쪽지를 실제로 보낸다. 한마디가 비면 안 보낸다.
+function handoffSend(cand, text){
+  var t = String(text || '').trim();
+  if(!cand || !cand.toSid || !t) return Promise.resolve(false);
+  var note = {
+    toName: cand.toName || '', fromName: (CURRENT_USER && CURRENT_USER.name) || '',
+    fromSid: (CURRENT_USER && CURRENT_USER.sid) || '',
+    text: t.slice(0, 500), at: Date.now(),
+    srcKey: cand.k || '', srcId: cand.id || '', srcLabel: cand.label || '',
+    seen: false
+  };
+  return fbDb.ref(HANDOFF_PATH + '/' + cand.toSid).push(note).then(function(){ return true; });
+}
+
+/* ── 띠와 한마디 창 (관리자 쪽) ────────────────────────────────────────────
+   ⚠★ 둘 다 body 에 «떠 있는» 것으로 만든다. Preact 가 그리는 자리에 날것 DOM 을
+     끼우면 다시 그려질 때 밀려나고 다음 틱에 다시 끼워진다 — 2026-09-16 에
+     남은시간 배지가 헤더를 깜빡이게 한 것이 바로 그것이었다(#1374).
+   ⚠ 일을 «막지» 않는다. 저장하자마자 창을 띄우면 사소한 수정마다 걸린다 —
+     띠는 20초 뒤 스스로 사라지고, 누른 사람에게만 창이 열린다. */
+var _HANDOFF_PRESETS = ['다시 확인해 주세요', '다시 입력해 주세요', '앞으로 이렇게 넣어 주세요'];
+var _hoStripEl = null, _hoStripTimer = null, _hoPanelEl = null;
+function _handoffStrip(cand){
+  try {
+    if(_hoPanelEl) return;                       // 이미 한마디 창이 열려 있다
+    if(!_hoStripEl || !document.body.contains(_hoStripEl)){
+      _hoStripEl = document.createElement('div');
+      _hoStripEl.id = 'pu-handoff-strip';
+      _hoStripEl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:9200;'
+        + 'max-width:min(520px, calc(100vw - 24px));display:flex;align-items:center;gap:10px;'
+        + 'background:#1e293b;color:#fff;border-radius:10px;padding:10px 12px;font-size:12.5px;'
+        + 'box-shadow:0 10px 30px rgba(15,23,42,.35);line-height:1.45';
+      document.body.appendChild(_hoStripEl);
+    }
+    _hoStripEl.textContent = '';
+    var msg = document.createElement('span');
+    msg.style.cssText = 'flex:1;min-width:0';
+    msg.appendChild(document.createTextNode('✋ 이 건은 '));
+    var nm = document.createElement('b'); nm.textContent = cand.toName; nm.style.color = '#fbbf24';
+    msg.appendChild(nm);
+    msg.appendChild(document.createTextNode(' 님이 넣었습니다 — 한마디 남기시겠습니까?'));
+    var go = document.createElement('button');
+    go.textContent = '한마디 남기기';
+    go.style.cssText = 'flex:0 0 auto;font:inherit;font-size:12px;font-weight:700;cursor:pointer;'
+      + 'background:#2563eb;color:#fff;border:0;border-radius:6px;padding:6px 12px';
+    go.onclick = function(){ _handoffHideStrip(); _handoffPanel(cand); };
+    var x = document.createElement('button');
+    x.textContent = '×'; x.title = '안 보냄';
+    x.style.cssText = 'flex:0 0 auto;font:inherit;font-size:16px;line-height:1;cursor:pointer;'
+      + 'background:transparent;color:#94a3b8;border:0;padding:2px 4px';
+    x.onclick = _handoffHideStrip;
+    _hoStripEl.appendChild(msg); _hoStripEl.appendChild(go); _hoStripEl.appendChild(x);
+    _hoStripEl.style.display = 'flex';
+    if(_hoStripTimer) clearTimeout(_hoStripTimer);
+    _hoStripTimer = setTimeout(_handoffHideStrip, 20000);
+  } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+}
+function _handoffHideStrip(){
+  if(_hoStripTimer){ clearTimeout(_hoStripTimer); _hoStripTimer = null; }
+  if(_hoStripEl) _hoStripEl.style.display = 'none';
+}
+function _handoffPanel(cand){
+  try {
+    _handoffClosePanel();
+    var wrap = document.createElement('div');
+    wrap.id = 'pu-handoff-panel';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:9300;background:rgba(15,23,42,.45);'
+      + 'display:flex;align-items:center;justify-content:center;padding:16px';
+    var card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border-radius:11px;width:100%;max-width:400px;overflow:hidden;'
+      + 'box-shadow:0 18px 50px rgba(0,0,0,.35);color:#1e293b;font-size:13px';
+    var hd = document.createElement('div');
+    hd.style.cssText = 'background:#eff6ff;border-bottom:1px solid #bfdbfe;padding:12px 14px';
+    hd.innerHTML = '';
+    var t = document.createElement('div');
+    t.style.cssText = 'font-size:14px;font-weight:800;color:#1e40af';
+    t.textContent = '✋ ' + cand.toName + ' 님에게 한마디';
+    var s = document.createElement('div');
+    s.style.cssText = 'font-size:11.5px;color:#475569;margin-top:2px';
+    s.textContent = '📍 ' + cand.label;
+    hd.appendChild(t); hd.appendChild(s);
+    var body = document.createElement('div');
+    body.style.cssText = 'padding:13px 14px';
+    var chips = document.createElement('div');
+    chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px';
+    var ta = document.createElement('textarea');
+    ta.rows = 3;
+    ta.placeholder = '무엇을 해야 하는지 적어 주세요. (예: 부가세 칸도 함께 넣어 주세요)';
+    ta.style.cssText = 'width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:6px;'
+      + 'padding:8px 9px;font:inherit;font-size:12.5px;resize:vertical;color:#1e293b;background:#fff';
+    _HANDOFF_PRESETS.forEach(function(p){
+      var c = document.createElement('button');
+      c.textContent = p; c.type = 'button';
+      c.style.cssText = 'font:inherit;font-size:11px;font-weight:700;cursor:pointer;background:#fff;'
+        + 'border:1px solid #bfdbfe;color:#1e40af;border-radius:99px;padding:3px 10px';
+      c.onclick = function(){ ta.value = ta.value.trim() ? (p + ' — ' + ta.value.trim()) : (p + ' '); ta.focus(); };
+      chips.appendChild(c);
+    });
+    var warn = document.createElement('div');
+    warn.style.cssText = 'font-size:11px;color:#94a3b8;margin:7px 0 10px;line-height:1.5';
+    warn.textContent = '⚠ 금액·주민번호는 적지 마세요. 어느 건인지는 위에 이미 적혀 있고, 받는 분은 눌러서 그 화면으로 갑니다.';
+    var btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;gap:6px;justify-content:flex-end';
+    var no = document.createElement('button');
+    no.textContent = '안 보냄';
+    no.style.cssText = 'font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;background:#fff;'
+      + 'border:1px solid #e2e8f0;color:#475569;border-radius:6px;padding:7px 14px';
+    no.onclick = _handoffClosePanel;
+    var send = document.createElement('button');
+    send.textContent = '보내기';
+    send.style.cssText = 'font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;background:#2563eb;'
+      + 'border:1px solid #2563eb;color:#fff;border-radius:6px;padding:7px 16px';
+    send.onclick = function(){
+      var txt = ta.value.trim();
+      if(!txt){ try{ showToast('무엇을 해야 하는지 한 줄만 적어 주세요'); }catch(_){} ta.focus(); return; }
+      send.disabled = true; send.textContent = '보내는 중…';
+      handoffSend(cand, txt).then(function(ok){
+        _handoffClosePanel();
+        try{ showToast(ok ? ('✅ ' + cand.toName + ' 님에게 전달됩니다 — 다음 로그인 때 보입니다') : '보내지 못했습니다'); }catch(_){}
+      }).catch(function(){
+        send.disabled = false; send.textContent = '보내기';
+        try{ showToast('보내지 못했습니다 — 연결을 확인하고 다시 눌러 주세요'); }catch(_){}
+      });
+    };
+    btns.appendChild(no); btns.appendChild(send);
+    body.appendChild(chips); body.appendChild(ta); body.appendChild(warn); body.appendChild(btns);
+    card.appendChild(hd); card.appendChild(body);
+    wrap.appendChild(card);
+    wrap.onclick = function(e){ if(e.target === wrap) _handoffClosePanel(); };
+    document.body.appendChild(wrap);
+    _hoPanelEl = wrap;
+    setTimeout(function(){ try{ ta.focus(); }catch(_){} }, 30);
+  } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+}
+function _handoffClosePanel(){
+  if(_hoPanelEl){ try{ _hoPanelEl.parentNode.removeChild(_hoPanelEl); }catch(_){} _hoPanelEl = null; }
+}
+// 받은 사람이 「확인했습니다」를 눌렀다.
+function handoffSeen(sid, key){
+  if(!sid || !key) return Promise.resolve(false);
+  return fbDb.ref(HANDOFF_PATH + '/' + sid + '/' + key).update({ seen:true, seenAt:Date.now() })
+    .then(function(){ return true; });
+}
+/* 「그 건으로 가기」 — 표 이름에서 화면을 찾는다(MENUS 의 id).
+   ⚠ 아는 것만 적는다. 모르는 표는 단추를 «안 만든다» — 엉뚱한 화면으로 보내면
+     찾아다니는 것보다 나쁘다. 적어 둔 이름표(📍)는 그대로 보이므로 손해가 없다. */
+var HANDOFF_SCREEN = {
+  contracts:'biz/contract', companies:'biz/company', cases:'biz/case',
+  consultings:'biz/consulting', funds:'biz/fund', other_projects:'biz/other',
+  finance_income:'fin/income', finance_expense:'fin/expense', finance_invoice:'fin/invoice',
+  ledger_batches:'fin/ledger', cms_ledger:'fin/ledger',
+  payroll_monthly:'hr/pay', payroll_irregular:'hr/pay',
+  attendance_records:'hr/attend', overtime_records:'hr/attend', comp_leave_records:'hr/attend',
+  leave_grants:'hr/leave', leave_of_absence:'hr/leave',
+  retirement_settlements:'hr/severance',
+  user_accounts:'hr/staff', external_staff:'hr/staff'
+};
+function handoffScreen(k){ return HANDOFF_SCREEN[k] || ''; }
+
 function _recLocalSave(k, arr){
   try { _erpStoreSet(k, JSON.stringify(arr)); }
   catch(e){
@@ -5133,6 +5380,10 @@ function dbUpsert(k, item){
   var _prevRec = null;
   for(var _pi=0; _pi<arr.length; _pi++){ if(arr[_pi] && arr[_pi].id === item.id){ _prevRec = arr[_pi]; break; } }
   if(_prevRec) _conflictNet(k, item, _prevRec);
+  /* 전달함 — 남이 넣은 것을 관리자가 고쳤으면 그 사람에게 한마디 남길 길을 띄운다.
+     ⚠ _recStamp «앞»이어야 한다. 시각을 찍는 순간 updatedBy 가 나로 바뀌어,
+       「누가 넣었는지」를 알 길이 없어진다. */
+  if(_prevRec && typeof _handoffSpot === 'function') _handoffSpot(k, item, _prevRec);
   _recStamp(item);
   var found = false;
   var next = arr.map(function(x){ if(x && x.id === item.id){ found = true; return item; } return x; });
@@ -5159,6 +5410,10 @@ function dbPatch(k, id, fields){
   var cur = null;
   for(var i=0; i<arr.length; i++){ if(arr[i] && arr[i].id === id){ cur = arr[i]; break; } }
   if(!cur){ console.warn('[dbPatch] '+k+'/'+id+': 대상 없음'); return false; }
+  /* 전달함 — _recStamp 앞에서 본다(dbUpsert 와 같은 까닭: 찍고 나면 updatedBy 가 나다)
+     ⚠ typeof 로 감싼 까닭 — 검사들이 이 함수만 «잘라내» 따로 돌린다(tests/month-close 등).
+       그때 전달함은 없으므로, 안 감싸면 멀쩡한 검사가 ReferenceError 로 죽는다. */
+  if(typeof _handoffSpot === 'function') _handoffSpot(k, Object.assign({ id:id }, cur, fields), cur);
   var merged = _recStamp(Object.assign({}, cur, fields));
   var next = arr.map(function(x){ return (x && x.id === id) ? merged : x; });
   var _fieldsBad = _REC_BADKEY.test(id);
@@ -11627,6 +11882,98 @@ function ImproveInboxModal(props){
   );
 }
 
+/* ── 전달함 창 (받는 사람 쪽) ───────────────────────────────────────────────
+   ⚠ 이것은 Preact 가 «직접 그리는» 창이다 — 관리자 쪽 띠와 달리 날것 DOM 이 아니다.
+     Preact 나무 안에 밖에서 끼워 넣는 것이 금지지, Preact 가 그리는 것은 옳은 길이다. */
+function HandoffModal(props){
+  var list = props.list || [];
+  var bs = useState({}); var busy = bs[0]; var setBusy = bs[1];
+  function seen(n){
+    if(busy[n._key]) return;
+    var nb = Object.assign({}, busy); nb[n._key] = true; setBusy(nb);
+    handoffSeen(props.mySid, n._key).then(function(){
+      /* 목록은 서버 구독이 스스로 줄인다 — 마지막 한 건이면 창을 닫는다 */
+      if(list.length <= 1) props.onClose();
+    }).catch(function(){
+      var nb2 = Object.assign({}, busy); nb2[n._key] = false; setBusy(nb2);
+      try{ showToast('확인 표시를 못 했습니다 — 연결을 확인하고 다시 눌러 주세요'); }catch(_){}
+    });
+  }
+  return h('div', { className:'modal-bg', onClick:props.onClose },
+    h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ maxWidth:'420px' } },
+      h('div', { className:'modal-h', style:{ background:'#fffbeb', borderBottom:'1px solid #fde68a' } },
+        h('div', { className:'t', style:{ color:'#854d0e' } },
+          '📌 확인해 주실 것이 ' + list.length + '건 있습니다'),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ maxHeight:'70vh', overflowY:'auto' } },
+        list.map(function(n){
+          var scr = handoffScreen(n.srcKey);
+          return h('div', { key:n._key,
+            style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'7px',
+              padding:'11px 12px', marginBottom:'9px' } },
+            h('div', { style:{ fontSize:'11px', color:'#94a3b8', marginBottom:'5px' } },
+              (n.fromName || '관리자') + (n.at ? (' · ' + improveDateStr(n.at)) : '')),
+            h('div', { style:{ fontSize:'13.5px', fontWeight:700, lineHeight:1.45, marginBottom:'7px',
+              whiteSpace:'pre-wrap', wordBreak:'break-word' } }, n.text || ''),
+            n.srcLabel && h('button', {
+              onClick:function(){ if(scr && props.onGo){ props.onClose(); props.onGo(scr); } },
+              disabled: !scr,
+              title: scr ? '그 화면으로 갑니다' : '',
+              style:{ display:'flex', alignItems:'center', gap:'6px', width:'100%', textAlign:'left',
+                fontSize:'11.5px', color:'#475569', background:'#fff', border:'1px solid #e2e8f0',
+                borderRadius:'5px', padding:'5px 8px', marginBottom:'8px', font:'inherit',
+                cursor: scr ? 'pointer' : 'default' } },
+              '📍', h('span', null, n.srcLabel), scr && h('span', { style:{ marginLeft:'auto', color:'#2563eb', fontWeight:700 } }, '가기 →')),
+            h('button', { onClick:function(){ seen(n); }, disabled: !!busy[n._key],
+              style:{ width:'100%', padding:'8px 0', fontSize:'12.5px', fontWeight:700, cursor:'pointer',
+                background:'#16a34a', border:'1px solid #16a34a', color:'#fff', borderRadius:'6px' } },
+              busy[n._key] ? '처리 중…' : '확인했습니다')
+          );
+        }),
+        h('div', { style:{ fontSize:'11px', color:'#94a3b8', textAlign:'center', marginTop:'4px', lineHeight:1.55 } },
+          '「확인했습니다」를 누르기 전에는 로그인할 때마다 다시 보입니다.')
+      )
+    )
+  );
+}
+
+/* ── 보낸 것이 어떻게 됐나 (관리자 쪽) ─────────────────────────────────────
+   ⚠ 「아직 확인 안 한 것」이 하나도 없으면 단추 자체가 안 보인다 —
+     늘 떠 있는 단추는 며칠 만에 «배경»이 되어 아무도 안 누른다. */
+function HandoffSentModal(props){
+  var list = props.list || [];
+  return h('div', { className:'modal-bg', onClick:props.onClose },
+    h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ maxWidth:'420px' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '📤 내가 보낸 전달 사항'),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ maxHeight:'70vh', overflowY:'auto' } },
+        list.length === 0 && h('div', { style:{ color:'#94a3b8', fontSize:'12.5px', textAlign:'center', padding:'18px 0' } }, '보낸 것이 없습니다'),
+        list.map(function(n){
+          var done = !!n.seen;
+          return h('div', { key:n._sid + '/' + n._key,
+            style:{ display:'flex', gap:'10px', alignItems:'flex-start',
+              padding:'9px 0', borderBottom:'1px solid #e2e8f0' } },
+            h('div', { style:{ flex:1, minWidth:0 } },
+              h('div', { style:{ fontSize:'12px', fontWeight:700, marginBottom:'2px' } },
+                (n.toName || n._sid) + (n.srcLabel ? (' · ' + n.srcLabel) : '')),
+              h('div', { style:{ fontSize:'11.5px', color:'#475569', lineHeight:1.45,
+                overflow:'hidden', textOverflow:'ellipsis', display:'-webkit-box',
+                WebkitLineClamp:2, WebkitBoxOrient:'vertical' }, title:n.text || '' }, n.text || ''),
+              h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'2px' } },
+                improveDateStr(n.at) + (done && n.seenAt ? (' → ' + improveDateStr(n.seenAt) + ' 확인') : ''))),
+            h('span', { style:{ flexShrink:0, fontSize:'11px', fontWeight:800, borderRadius:'999px',
+              padding:'2px 9px', whiteSpace:'nowrap',
+              color: done ? '#16a34a' : '#854d0e',
+              background: done ? '#f0fdf4' : '#fffbeb',
+              border: '1px solid ' + (done ? '#bbf7d0' : '#fde68a') } }, done ? '확인함' : '아직')
+          );
+        })
+      )
+    )
+  );
+}
+
 function Header(props){
   var title = props.title;
   var month = props.month;
@@ -11648,6 +11995,10 @@ function Header(props){
   var ibS = useState(false); var showInbox = ibS[0]; var setShowInbox = ibS[1];
   var pcS = useState(0); var pendingCnt = pcS[0]; var setPendingCnt = pcS[1];      // 대표: 미처리 개선요청 수 (Q2)
   var mdS = useState(0); var myDoneUnseen = mdS[0]; var setMyDoneUnseen = mdS[1];   // 요청자: 내 완료 미확인 수 (Q3)
+  var hoS = useState([]); var hoList = hoS[0]; var setHoList = hoS[1];               // 전달함: 나에게 온 것 중 «아직 확인 안 한» 것
+  var hoOS = useState(false); var hoOpen = hoOS[0]; var setHoOpen = hoOS[1];
+  var hsS = useState([]); var hoSent = hsS[0]; var setHoSent = hsS[1];               // 전달함: 내가 보낸 것(관리자만)
+  var hsOS = useState(false); var hoSentOpen = hsOS[0]; var setHoSentOpen = hsOS[1];
   function openImprove(){
     setImproveCap('');
     try{
@@ -11679,6 +12030,52 @@ function Header(props){
         subs.push([q1, cb1]);
       }
     }catch(_){}
+    /* 전달함 — «내 몫만» 구독한다(data/handoff_notes/{내 사번}).
+       ⚠ 한 자리에 몰아 두고 고르지 않는 까닭은 HANDOFF_PATH 설명에 적어 두었다.
+       ⚠ 로그인하고 «처음» 받았을 때 한 번 저절로 연다. 그 뒤로는 배지로만 남는다 —
+         화면을 옮길 때마다 다시 뜨면 일을 못 한다. 확인을 안 누르면 다음 로그인에 또 열린다. */
+    try{
+      var _hoSid = (CURRENT_USER && CURRENT_USER.sid) || '';
+      if(_hoSid){
+        var q3 = fbDb.ref(HANDOFF_PATH + '/' + _hoSid);
+        var cb3 = q3.on('value', function(snap){
+          var v = snap.val() || {};
+          var arr = Object.keys(v).map(function(kk){ return Object.assign({ _key:kk }, v[kk]); })
+                      .filter(function(n){ return n && !n.seen && n.text; });
+          arr.sort(function(a,b){ return (b.at||0) - (a.at||0); });
+          setHoList(arr);
+          if(arr.length){
+            var first = true;
+            try{
+              if(sessionStorage.getItem('pu_handoff_opened')) first = false;
+              else sessionStorage.setItem('pu_handoff_opened', '1');
+            }catch(_){}
+            if(first) setHoOpen(true);
+          }
+        }, function(){});
+        subs.push([q3, cb3]);
+      }
+    }catch(_){}
+    /* 전달함 — 내가 보낸 것이 읽혔나(관리자만). 쪽지는 글 몇 줄이라 통째로 봐도 가볍다.
+       ⚠ 사람별로 나뉘어 있으므로 한 겹 펴서 «내가 보낸 것»만 고른다. */
+    try{
+      if(CURRENT_USER && CURRENT_USER.isAdmin){
+        var q4 = fbDb.ref(HANDOFF_PATH);
+        var cb4 = q4.on('value', function(snap){
+          var v = snap.val() || {}; var out = [];
+          Object.keys(v).forEach(function(sid){
+            var box = v[sid] || {};
+            Object.keys(box).forEach(function(kk){
+              var n = box[kk];
+              if(n && n.fromSid === CURRENT_USER.sid) out.push(Object.assign({ _sid:sid, _key:kk }, n));
+            });
+          });
+          out.sort(function(a,b){ return (b.at||0) - (a.at||0); });
+          setHoSent(out);
+        }, function(){});
+        subs.push([q4, cb4]);
+      }
+    }catch(_){}
     // 대표 배지: 전체 미처리 수 (done=false 만)
     try{
       if(CURRENT_USER && CURRENT_USER.isOwner){
@@ -11692,6 +12089,22 @@ function Header(props){
 
   return h('header', { className:'hd' },
     h('button', { className:'hd-burger erp-tip tip-down', onClick:onBurger, 'data-tip':'메뉴 접기/펼치기 — 접으면 화면을 넓게 쓸 수 있어요' }, '☰'),
+    /* 전달함 배지 — 머리줄 «맨 왼쪽»에 둔다. 오른쪽 묶음은 폰에서 화면 밖으로 밀려
+       통째로 안 보인 적이 있다(2026-08-24). 확인해야 할 것은 안 보이면 없는 것이다. */
+    hoList.length > 0 && h('button', { onClick:function(){ setHoOpen(true); }, title:'확인해 주실 전달 사항',
+      style:{ marginLeft:'4px', padding:'4px 11px', fontSize:'12px', fontWeight:800, cursor:'pointer',
+        flexShrink:0, whiteSpace:'nowrap', background:'#dc2626', border:'1px solid #dc2626',
+        color:'#fff', borderRadius:'999px', display:'inline-flex', alignItems:'center', gap:'3px',
+        boxShadow:'0 2px 8px rgba(220,38,38,.35)' } }, '📌 ' + hoList.length),
+    /* 내가 보낸 것 중 «아직 안 읽힌» 것이 있을 때만 보인다 — 늘 떠 있으면 배경이 된다 */
+    (function(){
+      var un = hoSent.filter(function(n){ return !n.seen; }).length;
+      return un > 0 && h('button', { onClick:function(){ setHoSentOpen(true); }, title:'내가 보낸 전달 사항 — 아직 확인 안 한 것',
+        style:{ marginLeft:'4px', padding:'4px 10px', fontSize:'11.5px', fontWeight:700, cursor:'pointer',
+          flexShrink:0, whiteSpace:'nowrap', background:'#fffbeb', border:'1px solid #fde68a',
+          color:'#854d0e', borderRadius:'999px', display:'inline-flex', alignItems:'center', gap:'3px' } },
+        '📤 ' + un);
+    })(),
     false && h('button', { onClick:openImprove, title:'개선요청·건의 (지금 이 화면을 캡처해서 함께 보냅니다)',
       style:{ marginLeft:'4px', padding:'4px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
         background:'#fffbeb', border:'1.5px solid #fbbf24', borderRadius:'6px', color:'#854d0e', display:'inline-flex', alignItems:'center', gap:'3px' } }, '✋ 개선요청',
@@ -11796,7 +12209,13 @@ function Header(props){
       }
     }),
     showImprove && h(ImproveRequestModal, { capture:improveCap, screen:props.title||'', onClose:function(){ setShowImprove(false); setImproveCap(''); } }),
-    showInbox && h(ImproveInboxModal, { onClose:function(){ setShowInbox(false); } })
+    showInbox && h(ImproveInboxModal, { onClose:function(){ setShowInbox(false); } }),
+    (hoOpen && hoList.length > 0) && h(HandoffModal, {
+      list: hoList, mySid: (CURRENT_USER && CURRENT_USER.sid) || '',
+      onClose: function(){ setHoOpen(false); },
+      onGo: function(scr){ if(onNavigate) onNavigate(scr); }
+    }),
+    hoSentOpen && h(HandoffSentModal, { list: hoSent, onClose:function(){ setHoSentOpen(false); } })
   );
 }
 
