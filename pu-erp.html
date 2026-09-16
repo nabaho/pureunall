@@ -292,8 +292,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-08-30 나의 업무 제목칸에서 회사명 중복 제거 · 2026-09-16 멈춤 뿌리 — 번호 없는 항목이 표를 통째 저장에 가두던 것을 끊었다(열쇠를 번호로 되살림 · 같은 자국은 한 벌로)';
-var BUILD_SEQ = 156;
+var ERP_BUILD = '2026-09-16 멈춤 뿌리(번호 없는 항목→통째 저장) 끊음 · 깜빡임 뿌리 — 남은시간 배지를 헤더 안에 끼우던 것을 떠 있는 배지로(Preact 나무를 안 건드린다) · 마우스마다 저장하던 것을 5초에 한 번으로';
+var BUILD_SEQ = 157;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -85254,7 +85254,17 @@ document.addEventListener('keydown', function(e){
   function loggedIn(){ try{ return !!(sessionStorage.getItem('pureun_v6_session_sid')); }catch(e){ return false; } }
   function now(){ return Date.now(); }
   function getLast(){ try{ var v=parseInt(localStorage.getItem(AKEY)||'0',10); return v>0?v:now(); }catch(e){ return now(); } }
-  function markActive(){ try{ localStorage.setItem(AKEY, String(now())); }catch(e){} warned=false; hideWarn(); }
+  /* 활동 시각은 «묶어서» 적는다 (2026-09-16). mousemove 는 초에 수십 번 온다 —
+     그때마다 localStorage 에 쓰면 한 획마다 동기 저장이 돈다. 5초 안에 또 오면 건너뛴다.
+     ⚠ 경고 띠는 즉시 걷는다 — 이건 사람이 움직였다는 대답이라 늦으면 안 된다. */
+  var _lastMark = 0;
+  function markActive(){
+    warned=false; hideWarn();
+    var t = now();
+    if(t - _lastMark < 5000) return;
+    _lastMark = t;
+    try{ localStorage.setItem(AKEY, String(t)); }catch(e){}
+  }
   function resumeAutoSession(){ if(persistentAutoLogin()) markActive(); }
   function fmt(ms){ if(ms<0)ms=0; var s=Math.floor(ms/1000); return ('0'+Math.floor(s/60)).slice(-2)+':'+('0'+(s%60)).slice(-2); }
   function doAutoLogout(){
@@ -85266,15 +85276,45 @@ document.addEventListener('keydown', function(e){
       setTimeout(function(){ location.replace(hadPortal ? ('enter.html?v='+now()) : (location.pathname+'?v='+now())); }, 200);
     }catch(_){ location.reload(); }
   }
+  /* ★★ 배지는 헤더 «안에» 끼우지 않는다 (2026-09-16, 대표 제보 「계속 깜빡인다」).
+     ── 무엇이 있었나
+       매초 로그아웃 단추를 찾아 그 «앞에» 이 span 을 insertBefore 했다. 그런데 헤더는
+       Preact 가 그리는 자리다 — 개선요청 수·연결 상태가 바뀌어 헤더가 다시 그려질 때마다
+       Preact 가 제 자식 차례를 맞추면서 이 이물질을 밀어냈고, 다음 초에 다시 만들어
+       끼워 넣었다. 그것이 «계속 깜빡임»이었다. 로그아웃 단추까지 함께 자리를 바꿨다.
+     ── 그래서
+       몸(body)에 «떠 있는(fixed)» 배지 하나를 두고, 매초 로그아웃 단추의 자리만 재어
+       그 왼쪽에 맞춰 놓는다(알림 배지 #erp-alert-badge 가 이미 쓰는 방식). Preact 의
+       나무는 한 글자도 건드리지 않는다 — 다시 그려도 아무것도 안 밀린다.
+     ⚠ 단추를 못 찾으면(폰에서 접힘·로그인 전) 배지를 «숨긴다» — 아무 데나 띄우지 않는다. */
+  var _lo = null;
+  function findLogout(){
+    if(_lo && document.body.contains(_lo)) return _lo;
+    _lo = null;
+    var btns=document.querySelectorAll('button');
+    for(var i=0;i<btns.length;i++){ if(/로그아웃/.test(btns[i].textContent||'')){ _lo=btns[i]; break; } }
+    return _lo;
+  }
   function ensureBadge(){
     if(badge && document.body.contains(badge)) return;
-    var btns=document.querySelectorAll('button'), lo=null;
-    for(var i=0;i<btns.length;i++){ if(/로그아웃/.test(btns[i].textContent||'')){ lo=btns[i]; break; } }
-    if(!lo) return;
     badge=document.createElement('span'); badge.id='pu-autologout-badge';
     var _mb = !!window.IS_MOBILE;
-    badge.style.cssText='display:inline-flex;align-items:center;gap:2px;margin-right:'+(_mb?'3px':'6px')+';padding:'+(_mb?'2px 5px':'3px 8px')+';font-size:'+(_mb?'9.5px':'11px')+';font-weight:700;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;white-space:nowrap;vertical-align:middle;';
-    lo.parentNode.insertBefore(badge, lo);
+    badge.style.cssText='position:fixed;z-index:9000;display:none;align-items:center;gap:2px;padding:'+(_mb?'2px 5px':'3px 8px')+';font-size:'+(_mb?'9.5px':'11px')+';font-weight:700;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;white-space:nowrap;pointer-events:none;';
+    document.body.appendChild(badge);
+  }
+  /* 로그아웃 단추 «왼쪽»에 맞춘다. 단추가 화면에 없으면 숨긴다. */
+  function placeBadge(){
+    if(!badge) return false;
+    var lo = findLogout();
+    var r = lo ? lo.getBoundingClientRect() : null;
+    if(!r || r.width === 0 || r.bottom < 0 || r.top > window.innerHeight){ badge.style.display='none'; return false; }
+    var gap = window.IS_MOBILE ? 3 : 6;
+    var right = Math.round(window.innerWidth - r.left + gap);
+    var bh = badge.offsetHeight || 22;
+    var top = Math.round(r.top + (r.height - bh)/2);
+    if(badge.style.right !== right+'px') badge.style.right = right+'px';
+    if(badge.style.top !== top+'px') badge.style.top = top+'px';
+    return true;
   }
   function showWarn(remMs){
     if(!warnBox){
@@ -85305,7 +85345,12 @@ document.addEventListener('keydown', function(e){
     if(shouldPauseIdle()) return;
     ensureBadge();
     var rem = LIMIT - (now()-getLast());
-    if(badge){ badge.style.display='inline-flex'; badge.textContent=(window.IS_MOBILE?'⏱':'⏱ ')+fmt(rem); }
+    if(badge){
+      /* 글자가 바뀌었을 때만 적는다 — 같은 글자를 매초 다시 적으면 그것도 다시 그림이다 */
+      var txt=(window.IS_MOBILE?'⏱':'⏱ ')+fmt(rem);
+      if(badge.textContent !== txt) badge.textContent = txt;
+      if(placeBadge()) badge.style.display='inline-flex';
+    }
     if(rem <= 0){ clearInterval(tick); doAutoLogout(); return; }
     if(rem <= WARN){ showWarn(rem); } else { hideWarn(); }
   }, 1000);
