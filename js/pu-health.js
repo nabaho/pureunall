@@ -30,9 +30,32 @@
     return (hash >>> 0).toString(36);
   }
 
+  /* ── 장애가 «아닌» 잔소리 (2026-09-16, 대표 제보 「계속 깜빡이며 경고가 반복된다」) ──
+     ★ 무슨 일이 있었나 — 대표 화면의 빨간 「장애 알림 7」이 켤 때마다 다시 켜졌다.
+       열린 7건을 서버에서 읽어 보니 «전부» 기금 화면이 10분마다 올린
+       「ResizeObserver loop completed with undelivered notifications.」였다(누적 69건).
+       이것은 크롬이 «이번 칸에 그림을 한 번 더 그린다»고 알려 주는 말이지 고장이 아니다.
+       그런데 오류 그물(window.error)이 이것을 장애로 세어 10분마다 새 건을 만들었고,
+       새 건이 생길 때마다 배지를 다시 칠해 «깜빡였다».
+     ★ 「Script error.」도 같다 — 다른 출처의 스크립트가 낸 오류를 브라우저가 «내용 없이»
+       알려 주는 말이다(37건). 무엇이 났는지 알 길이 없어 처리할 것도 없다.
+     ⚠ 두 곳에서 «함께» 거른다 — 새로 올릴 때(enqueue)와 읽어 셀 때(flattenAlerts).
+       올릴 때만 거르면 이미 서버에 쌓인 것이 계속 배지를 켠다. 읽을 때만 거르면
+       서버에는 영영 쌓인다. */
+  var NOISE = [
+    /ResizeObserver loop/i,
+    /^Script error\.?$/i
+  ];
+  function isNoise(message) {
+    var m = String(message == null ? '' : message).trim();
+    for (var i = 0; i < NOISE.length; i++) { if (NOISE[i].test(m)) return true; }
+    return false;
+  }
+
   function enqueue(kind, error, extra) {
     extra = extra || {};
     var message = safeText(error && (error.message || error.reason) || error || '알 수 없는 오류');
+    if (isNoise(message)) return false;           /* 잔소리는 장애가 아니다 — 세지도 올리지도 않는다 */
     var page = window.location.pathname.split('/').pop() || 'enter.html';
     var id = fingerprint(kind, message, page);
     var dedupe = readJson(DEDUPE_KEY, {});
@@ -96,7 +119,9 @@
     Object.keys(value || {}).forEach(function (uid) {
       Object.keys(value[uid] || {}).forEach(function (id) {
         var item = value[uid][id] || {};
-        if (item.status === 'new') list.push(Object.assign({ uid: uid, id: id }, item));
+        if (item.status !== 'new') return;
+        if (isNoise(item.message)) return;        /* 예전에 쌓인 잔소리도 세지 않는다 — 배지가 그것으로 켜졌다 */
+        list.push(Object.assign({ uid: uid, id: id }, item));
       });
     });
     return list.sort(function (a, b) { return Number(b.createdAt || 0) - Number(a.createdAt || 0); });
@@ -282,6 +307,6 @@
 
   /* openAdminPanel — 늘 떠 있는 단추 없이도 관리자가 들여다볼 수 있는 유일한 문.
      포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄이 이것을 부른다. */
-  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _flattenAlerts: flattenAlerts };
+  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _flattenAlerts: flattenAlerts, _isNoise: isNoise };
   install();
 })(typeof window !== 'undefined' ? window : null);
