@@ -292,8 +292,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-16 멈춤 뿌리(번호 없는 항목→통째 저장) 끊음 · 깜빡임 뿌리 — 남은시간 배지를 헤더 안에 끼우던 것을 떠 있는 배지로(Preact 나무를 안 건드린다) · 마우스마다 저장하던 것을 5초에 한 번으로';
-var BUILD_SEQ = 157;
+var ERP_BUILD = '2026-09-16 충돌 뿌리 — 번호 없는 항목은 저장 «전»에 번호를 받는다(표가 통째 저장·나중 사람이 이기는 길로 떨어지는 것을 쓰는 쪽에서 막음) · 깜빡임 뿌리(남은시간 배지를 떠 있는 배지로) · 멈춤 뿌리(읽는 쪽 번호 되살림)';
+var BUILD_SEQ = 158;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -4349,7 +4349,34 @@ window.erpRepairFinanceIncomeIds = function(opts){
   }, false);
 };
 
+/* 건별 저장 표 목록 — dbSet «밖»에 둔다 (2026-09-16).
+   전에는 dbSet 안 4486줄대에 있었다. var 는 끌어올려지지만 값은 그 줄에 가서야 들어가므로,
+   그 줄 «앞»에서는 undefined 였다 — 아래 번호 붙이기 그물이 쓸 수 없었다. */
+var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches'];
 function dbSet(k, v){
+  /* ★★ 번호 없는 항목에는 저장 «전»에 번호를 붙인다 (2026-09-16 대표 「데이터가 들어갈 때마다·
+     다른 직원이 넣을 때마다 충돌 — 해결책까지 전체 검토」).
+     ■ 무엇이 있었나
+       건별 저장 표(DIFF_KEYS)에 번호 없는 항목이 «하나라도» 있으면 이 함수 아래쪽에서
+       ① 칸 단위 저장이 꺼지고(_fbObjForm) ② 병합 거래가 꺼지고(_canMerge)
+       ③ 서버에 배열(옛 꼴)로 «통째» 덮어쓴다 — 나중 사람이 앞사람 것을 지운다.
+       #1371 은 «읽는 쪽»(normalizeFbValue)만 고쳤다. 어느 화면이 번호 없는 항목을
+       dbSet 으로 밀어 넣으면(부르는 곳이 230군데다) 같은 일이 다시 시작된다.
+     ■ 이 그물이 하는 일
+       저장에 들어온 배열에서 번호 없는 항목마다 uid 로 번호를 «한 번» 붙인다.
+       이 기기 사본에도, 서버에도 같은 번호가 남으니 다음 저장부터는 칸 단위·병합이 산다.
+     ⚠ 내용으로 지은 번호(_fbStableId)를 쓰지 말 것 — 내용이 같은 두 줄이 한 줄로 접힌다.
+       그것은 «읽는 쪽»에서 서버의 껍데기를 접을 때만 옳다. 여기서는 사람이 넣은 줄이다.
+     ⚠ 배열만 본다 — leave_grants 처럼 사번으로 묶은 표(객체)는 그대로 둔다.
+     ⚠ newJson 을 만들기 «전»이어야 한다 — 뒤면 이 기기 사본에는 번호가 없고 서버에만 있다. */
+  if(Array.isArray(v) && DIFF_KEYS.indexOf(k) >= 0){
+    var _noId = 0;
+    v = v.map(function(x){
+      if(x && typeof x === 'object' && !Array.isArray(x) && (x.id == null || x.id === '')){ _noId++; return Object.assign({}, x, { id: uid(k) }); }
+      return x;
+    });
+    if(_noId) console.warn('[번호붙임] ' + k + ': 번호 없는 항목 ' + _noId + '건에 번호를 붙여 저장');
+  }
   // 데이터보호: 배열 내 동일 id 중복 자동 제거 (id가 문자열인 항목만 대상)
   if(Array.isArray(v) && v.length > 1){
     var _ids = {}; var _hadDup = false;
@@ -4482,8 +4509,8 @@ function dbSet(k, v){
       // #4 Tier 3: id 키 기반 부분 업데이트 (인덱스 충돌 제거) — 삭제도 가능
       /* ledger_batches 를 넣는 까닭 — 이 목록에 있어야 서버가 «묶음마다 따로»(객체형) 담고,
    dbUpsert 가 그 묶음 자리만 고쳐 쓴다. 없으면 통째로 덮어써서
-   A와 B가 동시에 올릴 때 나중 사람이 앞사람 묶음을 지운다. */
-var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches'];
+   A와 B가 동시에 올릴 때 나중 사람이 앞사람 묶음을 지운다.
+   ⚠ 목록(DIFF_KEYS)은 dbSet 바로 위에 있다 — 함수 첫머리의 번호 붙이기 그물이 쓴다. */
       var diffApplied = false;
       if(DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v) && Array.isArray(prev)){
         var diff = computeArrayDiff(prev, v);
