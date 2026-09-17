@@ -4464,10 +4464,10 @@ window.erpRepairFinanceIncomeIds = function(opts){
       var rows;
       if(cur == null || cur.v === undefined){ rows = base; }          // 찬 자리 — 바탕으로 해 본다(접지 않는다)
       else { try{ rows=normalizeFbValue(cur.v); }catch(_){ rows=null; } if(!Array.isArray(rows)) return; }
-      var r = fixRows(rows);
-      repaired=r.count; finalRows=r.fixed;
+      var r = fixRows(rows), fixed = r.fixed;
+      repaired=r.count; finalRows=fixed;
       if(!r.count) return (cur == null) ? undefined : cur;           // 고칠 것이 없다 — 있는 그대로
-      return {v:arrayToIdMap(r.fixed), u:Date.now()};
+      return {v:arrayToIdMap(fixed), u:Date.now()};
     }, function(err, committed, snap){
       window._erpIdRepairRunning=false;
       if(err){ say('ID 복구 실패 — 서버 연결을 확인해 주세요'); return; }
