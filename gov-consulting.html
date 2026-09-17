@@ -9038,6 +9038,40 @@ function erpSyncClosedDown(){
   try{ renderDash();renderCal(); }catch(e){}
   return touched.length;
 }
+/* 이알피 부담당 사번 → 우리 담당자 id. 없으면 «명단에 넣어서라도» 돌려준다.
+   (대표 제보 2026-09-17 「대흥중공업 부담당은 최기운인데 왜 부담당 이름이 없나 —
+    이알피에는 있고 정부사업일정에는 없다」 · 대표 결정 「자동으로 넣고 붙인다」)
+
+   ■ 무엇이 있었나 — 내려받기가 `if(gid&&…)` 한 줄로 «명단에 없는 사람»을 말없이 버렸다.
+     이알피에는 부담당이 적혀 있는데 이 화면에는 아무것도 안 뜨니, 빠진 줄도 모른다.
+     실측 2026-09-17: 그렇게 사라진 것이 5건(최기운 4 · 김보람 1).
+   ■ 왜 넣어도 되는가 — 이알피 계정이 있는 사람은 **이미 이 화면에 들어올 수 있다**
+     (명단에 없으면 「열람자」로 로그인된다). 명단에 넣는 것은 새 문을 여는 것이 아니라
+     열람자를 «담당자»로 올리는 일이고, 이알피가 이미 그 사람을 부담당으로 적어 두었다.
+   ⚠ 울타리 셋 — 이 셋이 없으면 사람을 지어내게 된다.
+     ① 사번이 이알피 명부에 있을 것 ② 재직 중일 것
+     ③ «이름으로는 새로 만들지 않는다» — 동명이인에게 남의 컨설팅이 붙는다.
+   ⚠ staff 는 부른 쪽이 들고 있는 «그 배열»을 그대로 고친다. getStaff() 는 부를 때마다
+     새 배열을 만들어 주므로, 여기서 따로 부르면 방금 넣은 사람이 안 보인다. */
+function erpSubStaffId(sid,staff,made){
+  if(!sid)return '';
+  const bySid=staff.find(a=>a&&a.erpSid===sid);
+  if(bySid)return bySid.id;
+  const nm=erpSidName(sid);
+  const n=String(nm||'').replace(/\s/g,'');
+  if(n){
+    const byNm=staff.find(a=>String(a.name||'').replace(/\s/g,'')===n);
+    if(byNm)return byNm.id;
+  }
+  const u=(ERP.dir||[]).find(x=>x&&x.sid===sid);
+  if(!u||!u.name)return '';                       // ① 명부에 없는 사번 — 누구인지 모른다
+  if(u.status&&u.status!=='active')return '';     // ② 퇴사·휴직자는 새로 안 만든다
+  const rec={id:uid(),name:u.name,
+    color:STAFF_COLORS[staff.length%STAFF_COLORS.length],erpSid:sid};
+  staff.push(rec);
+  made.push(`${u.name}(${sid})`);
+  return rec.id;
+}
 function erpSyncSubsDown(){
   if(!ERP.loaded||!myId())return 0;
   if(!ERP.consultings.length)return 0;        // 덜 읽힌 판으로 지우지 않는다
@@ -9049,14 +9083,15 @@ function erpSyncSubsDown(){
   const one=id=>staff.find(a=>a&&a.id===id);
   const cos=getCos(),scheds=getScheds(),today=todayStr();
   let coChanged=false,scChanged=false;
-  const touched=[],seedUp=[];
+  const touched=[],seedUp=[],madeStaff=[];
   coIds.forEach(coId=>{
     const co=cos.find(c=>c&&c.id===coId);
     if(!co||co.deleted)return;
     const want=[];
     byCo[coId].forEach(c=>{
       (c.managerSubs||[]).forEach(sid=>{
-        const gid=govStaffIdByErp(sid,erpSidName(sid));
+        /* 명단에 없으면 «넣어서라도» 받아 온다 — 예전에는 여기서 말없이 버렸다 */
+        const gid=erpSubStaffId(sid,staff,madeStaff);
         if(gid&&gid!==co.defAtt&&want.indexOf(gid)<0)want.push(gid);
       });
     });
@@ -9092,6 +9127,12 @@ function erpSyncSubsDown(){
     }
     touched.push(co.name);
   });
+  /* 사람을 먼저 저장한다 — 사업장이 가리키는 id 가 명단에 있어야 이름이 뜬다 */
+  if(madeStaff.length){
+    setStaff(staff);
+    try{ refreshStaffDropdowns(); }catch(e){}
+    toast(`🔗 담당자 명단에 더했습니다 — ${madeStaff.join(' · ')} (푸른이알피에서 부담당을 맡고 있습니다)`);
+  }
   if(coChanged)setCos(cos);
   if(scChanged)setScheds(scheds);
   if(seeding){
