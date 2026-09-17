@@ -304,8 +304,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-17 「계속 돈이 새고 있다」 재검증 — 배포 1시간 뒤에도 부팅 8번/3분이 그대로여서(탭 눈만으로는 문이 안 닫힘: 부팅마다 새 탭이면 sessionStorage 가 빈다) 감지기에 «이 기기·이 화면» 눈을 더했다(3분 안 5번). 폭풍이면 이알피는 사람이 누를 때까지 자료 받기를 멈춘다';
-var BUILD_SEQ = 163;
+var ERP_BUILD = '2026-09-17 「계속 깜빡인다·돈이 샌다」 뿌리 확정 — 우리 코드였다: 자문수입 id 자동복구가 찬 거래에서 접히고도 무조건 location.reload() 를 걸어 탭이 20초마다 스스로 다시 켜졌다. 이제 실제로 고친 것이 있을 때만·탭에 한 번만 새로 열고, 자동 길은 탭에 한 번만 돈다. 폭풍 문도 「계속」을 눌러도 3번 더 이어지면 다시 묻는다';
+var BUILD_SEQ = 164;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -4380,11 +4380,37 @@ window.erpPullFromServer = function(){
 // ── 자문수입 레거시 ID 복구 ───────────────────────────────────────────────
 // 서버 최신값 안에서 transaction으로 처리한다. 다른 기기가 동시에 추가해도 그 자료를
 // 덮어쓰지 않으며, 기존 기록의 내용·순서·금액은 바꾸지 않고 빈 id만 채운다.
+/* ★★★ 「계속 깜빡인다」·「계속 돈이 새고 있다」의 뿌리가 여기였다 (2026-09-17 저녁, 대표 화면 캡처로 확정).
+   ── 무엇이 있었나
+     부팅 12초 뒤 _fbSynced 가 강제로 참이 되고(10278줄) → 자가점검(잰다)이 이 기기 사본에서
+     «id 없는 기록이 섞였다»고 보면 → 이 함수를 auto 로 부른다 → 거래(transaction)는 구독이 없는
+     «찬 자리»라 처음에 null 로 불리고, 옛 코드는 거기서 접었다(return) → 서버에 묻지도 않고
+     committed:false → 그런데 완료 갈무리는 err 만 보고 «무조건 location.reload()» 를 걸었다.
+     사본의 껍데기는 sessionStorage 에 그대로라 다음 부팅도 똑같이 → 탭이 «약 20초마다» 스스로
+     다시 켜지며 매번 서버 자료를 통째로 다시 받았다. 대표 화면의 「3분 안 8번, reload」가 이것이다.
+     (부팅 폭풍 감지기가 「브라우저·확장이 새로고침」이라 적은 것도 틀렸다 — 우리 코드였다.)
+   ── 고친 규칙
+     ① 새로고침은 «실제로 고친 것이 있을 때만», 그것도 탭 세션에 «한 번만».
+        committed 가 아니면 절대 새로 열지 않는다.
+     ② 자동 길(auto)은 탭 세션에 한 번만 돈다 — 안 고쳐지면 다음 부팅에 또 도는 것이 고리다.
+     ③ 거래 전에 서버 자료를 한 번 읽어 «바탕»으로 둔다. 서버가 이미 온전하면(껍데기는 이 기기
+        사본에만) 서버는 건드리지 않고 사본만 서버 것으로 맞춘다 — 새로고침 없이 끝.
+        서버에도 껍데기가 있으면 거래에 들어가되, 찬 자리(null)에서는 바탕으로 «해 본다» —
+        진짜 값이 다르면 파이어베이스가 그 값으로 다시 부른다(rtdb-transaction-cold-abort).
+   ⚠ 여전히 자동으로 «지우지» 않는다 — 돈이 걸린 자료다. 하는 일은 빠진 id 채우기와 사본 맞추기뿐. */
+var FI_REPAIR_AUTO_ONCE = 'pu_fi_repair_auto_v1';
+var FI_REPAIR_RELOADED = 'pu_fi_repair_reloaded_v1';
 window.erpRepairFinanceIncomeIds = function(opts){
   opts=opts||{};
   if(window._erpIdRepairRunning) return;
-  if(typeof fbDb === 'undefined' || !fbDb){ try{ showToast('서버에 연결된 뒤 다시 눌러 주세요'); }catch(_){} return; }
-  if(!_fbSynced){ try{ showToast('서버 자료를 받는 중입니다. 잠시 뒤 다시 눌러 주세요'); }catch(_){} return; }
+  if(typeof fbDb === 'undefined' || !fbDb){ if(!opts.auto){ try{ showToast('서버에 연결된 뒤 다시 눌러 주세요'); }catch(_){} } return; }
+  if(!_fbSynced){ if(!opts.auto){ try{ showToast('서버 자료를 받는 중입니다. 잠시 뒤 다시 눌러 주세요'); }catch(_){} } return; }
+  if(opts.auto){
+    try {
+      if(sessionStorage.getItem(FI_REPAIR_AUTO_ONCE) === '1'){ console.info('[자문수입 id복구] 이 탭에서 이미 한 번 해 봤다 — 자동으로는 다시 안 한다(되풀이 새로고침 고리 방지)'); return; }
+      sessionStorage.setItem(FI_REPAIR_AUTO_ONCE, '1');
+    } catch(_){}
+  }
   if(!opts.auto && !confirm('자문수입의 ID 없는 기록만 복구합니다.\n내용·날짜·금액은 바뀌지 않습니다. 계속할까요?')) return;
   window._erpIdRepairRunning=true;
   var ref = fbDb.ref('data/finance_income');
@@ -4394,11 +4420,17 @@ window.erpRepairFinanceIncomeIds = function(opts){
     for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
     return (h>>>0).toString(36);
   }
-  try{ showToast('ID를 안전하게 복구하는 중…'); }catch(_){}
-  ref.transaction(function(cur){
-    if(!cur || cur.v === undefined) return;
-    var rows; try{ rows=normalizeFbValue(cur.v); }catch(_){ rows=null; }
-    if(!Array.isArray(rows)) return;
+  function say(m){ try{ showToast(m); }catch(_){} }
+  function keepLocal(rows, u){
+    try{ _erpStoreSet('finance_income',JSON.stringify(rows)); localStorage.setItem(KEY+'_meta_finance_income',String(u||Date.now())); _dbCache.finance_income=rows; }catch(_){}
+    _fbObjForm.finance_income=true;
+  }
+  function reloadOnce(){
+    try { if(sessionStorage.getItem(FI_REPAIR_RELOADED) === '1') return false; sessionStorage.setItem(FI_REPAIR_RELOADED, '1'); } catch(_){}
+    setTimeout(function(){ location.reload(); },700);
+    return true;
+  }
+  function fixRows(rows){
     var used={}; rows.forEach(function(x){ if(x&&x.id) used[String(x.id)]=1; });
     var count=0;
     var fixed=rows.map(function(x, idx){
@@ -4408,23 +4440,53 @@ window.erpRepairFinanceIncomeIds = function(opts){
       while(used[id]) id=base+'-'+(n++).toString(36);
       used[id]=1; item.id=id; count++; return item;
     });
-    repaired=count; finalRows=fixed;
-    if(!count) return cur;
-    return {v:arrayToIdMap(fixed), u:Date.now()};
-  }, function(err, committed, snap){
-    window._erpIdRepairRunning=false;
-    if(err){ try{ showToast('ID 복구 실패 — 서버 연결을 확인해 주세요'); }catch(_){} return; }
-    var saved=snap&&snap.val(), rows=null;
-    try{ rows=normalizeFbValue(saved&&saved.v); }catch(_){}
-    if(Array.isArray(rows)){
-      try{ _erpStoreSet('finance_income',JSON.stringify(rows)); localStorage.setItem(KEY+'_meta_finance_income',String((saved&&saved.u)||Date.now())); _dbCache.finance_income=rows; }catch(_){}
-    } else if(finalRows){
-      try{ _erpStoreSet('finance_income',JSON.stringify(finalRows)); _dbCache.finance_income=finalRows; }catch(_){}
+    return { count: count, fixed: fixed };
+  }
+  if(!opts.auto) say('ID를 안전하게 복구하는 중…');
+  ref.once('value').then(function(snap0){
+    var saved0 = snap0 && snap0.val(), base = null;
+    try{ base = normalizeFbValue(saved0 && saved0.v); }catch(_){ base = null; }
+    if(!Array.isArray(base)){
+      window._erpIdRepairRunning=false;
+      if(!opts.auto) say('서버의 자문수입을 읽지 못했습니다 — 잠시 뒤 다시 눌러 주세요');
+      return;
     }
-    _fbObjForm.finance_income=true;
-    try{ showToast(repaired ? ('✅ ID '+repaired+'건 복구 완료 — 화면을 다시 엽니다') : '✅ 이미 복구되어 있습니다'); }catch(_){}
-    setTimeout(function(){ location.reload(); },700);
-  }, false);
+    var dirty = base.filter(function(x){ return !(x && x.id); }).length;
+    if(!dirty){
+      /* 서버는 온전하다 — 껍데기는 이 기기 사본에만 있다. 서버는 손대지 않고 사본만 맞춘다. 새로고침 없음. */
+      keepLocal(base, saved0 && saved0.u);
+      window._erpIdRepairRunning=false;
+      try{ console.info('[자문수입 id복구] 서버는 이미 온전(' + base.length + '건 모두 id 있음) — 이 기기 사본을 서버 것으로 맞췄다. 새로고침하지 않는다.'); }catch(_){}
+      say(opts.auto ? '자문수입 사본을 서버 것으로 맞췄습니다' : '✅ 서버 자료는 이미 온전합니다 — 이 기기 사본을 서버 것으로 맞췄습니다');
+      return;
+    }
+    ref.transaction(function(cur){
+      var rows;
+      if(cur == null || cur.v === undefined){ rows = base; }          // 찬 자리 — 바탕으로 해 본다(접지 않는다)
+      else { try{ rows=normalizeFbValue(cur.v); }catch(_){ rows=null; } if(!Array.isArray(rows)) return; }
+      var r = fixRows(rows), fixed = r.fixed;
+      repaired=r.count; finalRows=fixed;
+      if(!r.count) return (cur == null) ? undefined : cur;           // 고칠 것이 없다 — 있는 그대로
+      return {v:arrayToIdMap(fixed), u:Date.now()};
+    }, function(err, committed, snap){
+      window._erpIdRepairRunning=false;
+      if(err){ say('ID 복구 실패 — 서버 연결을 확인해 주세요'); return; }
+      if(!committed || !repaired){
+        /* ★ 여기서 새로 열지 않는다 — 옛 코드는 여기서 location.reload() 를 걸어 20초 고리를 만들었다 */
+        try{ console.info('[자문수입 id복구] 적용된 것이 없다(committed=' + !!committed + ', 고친 건수=' + repaired + ') — 새로고침하지 않는다'); }catch(_){}
+        if(!opts.auto) say(committed ? '✅ 이미 복구되어 있습니다' : '복구를 적용하지 못했습니다 — 잠시 뒤 다시 눌러 주세요');
+        return;
+      }
+      var saved=snap&&snap.val(), rows=null;
+      try{ rows=normalizeFbValue(saved&&saved.v); }catch(_){}
+      keepLocal(Array.isArray(rows) ? rows : finalRows, saved && saved.u);
+      var again = reloadOnce();
+      say('✅ ID '+repaired+'건 복구 완료' + (again ? ' — 화면을 다시 엽니다' : ''));
+    }, false);
+  }).catch(function(){
+    window._erpIdRepairRunning=false;
+    if(!opts.auto) say('서버 연결을 확인해 주세요');
+  });
 };
 
 /* 건별 저장 표 목록 — dbSet «밖»에 둔다 (2026-09-16).
@@ -9535,8 +9597,19 @@ function _erpBootStormGate(){
   try {
     var b = window.PU_BOOT;
     if(!b || !b.storm) return null;
-    if(sessionStorage.getItem('pu_boot_storm_ok') === '1') return null;
     if(_bootStormGateShown) return null;
+    /* ★ 「자료 받기 계속」을 한 번 눌렀다고 영영 열어 두지 않는다 (2026-09-17 저녁 재검증).
+       눌러도 탭이 계속 다시 켜지면(3번 더) 여전히 폭풍이다 — 그때는 다시 묻는다.
+       안 그러면 한 번 누른 뒤의 되풀이 부팅이 매번 통째로 받아 요금이 그대로 샌다.
+       ⚠ PU_BOOT.count 는 3분 창 안의 수라 줄어들 수 있어 «폭풍 부팅을 본 횟수»를 따로 센다(단조 증가). */
+    var seen = 0;
+    try { seen = (Number(sessionStorage.getItem('pu_boot_storm_seen')) || 0) + 1; sessionStorage.setItem('pu_boot_storm_seen', String(seen)); } catch(_){}
+    window._bootStormSeen = seen;
+    if(sessionStorage.getItem('pu_boot_storm_ok') === '1'){
+      var okAt = Number(sessionStorage.getItem('pu_boot_storm_ok_seen')) || 0;
+      if(seen - okAt < 3) return null;                 // 누른 뒤 두 번까지는 봐준다
+      try { console.warn('[동기화보호] 「자료 받기 계속」을 누른 뒤에도 폭풍이 ' + (seen - okAt) + '번 더 이어졌습니다 — 다시 묻습니다'); } catch(_){}
+    }
     _bootStormGateShown = true;
   } catch(_){ return null; }
   return new Promise(function(res){
@@ -9560,7 +9633,7 @@ function _erpBootStormGate(){
       go.textContent = '자료 받기 계속';
       go.style.cssText = 'font:inherit;font-weight:800;background:#1e40af;color:#fff;border:0;border-radius:8px;padding:9px 18px;cursor:pointer';
       go.onclick = function(){
-        try { sessionStorage.setItem('pu_boot_storm_ok', '1'); } catch(_){}
+        try { sessionStorage.setItem('pu_boot_storm_ok', '1'); sessionStorage.setItem('pu_boot_storm_ok_seen', String(window._bootStormSeen || 0)); } catch(_){}
         try { ov.parentNode.removeChild(ov); } catch(_){}
         res();
       };
