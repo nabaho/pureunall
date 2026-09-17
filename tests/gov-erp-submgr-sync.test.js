@@ -44,7 +44,7 @@ function loadEngine(over) {
 
   const st = {
     cos: [], scheds: [], staff: [], ls: {},
-    toasts: [], cloud: [], today: '2026-08-29', me: 'a1',
+    toasts: [], cloud: [], today: '2026-08-29', me: 'a1', uidN: 0,
   };
   const ctx = {
     console, JSON, Object, Array, String, Number, Date, Set, Math, Promise, RegExp,
@@ -67,6 +67,11 @@ function loadEngine(over) {
     getScheds: () => JSON.parse(JSON.stringify(st.scheds)),
     setScheds: (v) => { st.scheds = JSON.parse(JSON.stringify(v)); },
     getStaff: () => JSON.parse(JSON.stringify(st.staff)),
+    /* 명단에 없는 ERP 부담당을 «넣어» 줄 수 있어야 한다(2026-09-17) — 그 자리의 흉내 */
+    setStaff: (v) => { st.staff = JSON.parse(JSON.stringify(v)); },
+    uid: () => 'n' + (++st.uidN),
+    STAFF_COLORS: ['#d97706', '#2563eb', '#16a34a'],
+    refreshStaffDropdowns: () => {},
     /* 사업장별 짝짓기가 이음표를 읽는다 — 이 검사에선 이을 것이 없어 빈 표로 둔다
        (빈 표면 findCoForErp 가 종류를 못 받아 예전처럼 첫 것을 집는다). */
     getErpTypeMap: () => ({}),
@@ -111,6 +116,90 @@ function board(over) {
   ctx._formVal = 'E1';                                // 이알피가 건별 칸으로 저장돼 있다
   return ctx;
 }
+
+/* ══════ ⓪ 명단에 없는 부담당 — «조용히 버리지 않는다» (대표 지시 2026-09-17) ══════
+
+   대표 제보 「대흥중공업 부담당은 최기운인데 왜 부담당 이름이 없나. 이알피에는 있고
+   정부사업일정에는 없다」의 뿌리 — 내려받을 때 우리 직원 명단에 없는 사람을 말없이
+   버리고 있었다(실측: 최기운 4건 · 김보람 1건이 그렇게 사라져 있었다).
+   대표 결정 2026-09-17: **사번이 맞는 재직자면 명단에 넣고 붙인다.**
+
+   ⚠ 「넣는다」는 판단이 필요한 일이라 울타리를 셋 둔다 —
+     사번이 명부에 있을 것 · 재직 중일 것 · 이름으로는 절대 새로 만들지 않을 것
+     (이름으로 만들면 동명이인에게 남의 컨설팅이 붙는다). */
+
+test('★ 명단에 없는 ERP 부담당은 «명단에 넣고» 부담당으로 붙인다 — 조용히 버리지 않는다', () => {
+  const ctx = board(); const st = ctx._st;
+  st.ls['p_subSyncSeeded'] = '2026-08-01';
+  ctx.ERP.dir.push({ sid: 'A9', name: '최기운' });          // 이알피 재직자인데 여기 명단엔 없다
+  ctx.ERP.consultings[0].managerSubs = ['S2', 'A9'];
+
+  ctx.erpSyncSubsDown();
+
+  const made = st.staff.find((s) => s.name === '최기운');
+  assert.ok(made, '★ 이알피 부담당이 명단에 없다고 조용히 사라집니다');
+  assert.strictEqual(made.erpSid, 'A9', '★ 사번을 안 이어 두면 다음에 또 새로 만듭니다');
+  assert.ok(st.cos[0].defCoAtts.includes(made.id), '★ 명단에 넣고도 부담당으로 안 붙였습니다');
+  assert.ok(st.toasts.join(' ').includes('최기운'), '★ 사람을 늘려 놓고 말해 주지 않습니다');
+});
+
+test('★ 퇴사·휴직자는 새로 만들지 않는다', () => {
+  for (const status of ['retired', 'leave']) {
+    const ctx = board(); const st = ctx._st;
+    st.ls['p_subSyncSeeded'] = '2026-08-01';
+    ctx.ERP.dir.push({ sid: 'A9', name: '최기운', status });
+    ctx.ERP.consultings[0].managerSubs = ['S2', 'A9'];
+    ctx.erpSyncSubsDown();
+    assert.ok(!st.staff.some((s) => s.name === '최기운'),
+      `★ ${status} 인 사람을 담당자로 새로 만듭니다`);
+  }
+});
+
+test('★ 명부에 없는 사번은 만들지 않는다 — 모르는 사람을 지어내지 않는다', () => {
+  const ctx = board(); const st = ctx._st;
+  st.ls['p_subSyncSeeded'] = '2026-08-01';
+  ctx.ERP.consultings[0].managerSubs = ['S2', 'ZZ9'];       // 명부에 없는 사번
+  const before = st.staff.length;
+  ctx.erpSyncSubsDown();
+  assert.strictEqual(st.staff.length, before, '★ 누구인지도 모르는 사번으로 사람을 만듭니다');
+});
+
+test('같은 사람이 여러 사업장에 있어도 «한 번만» 만든다', () => {
+  const ctx = board(); const st = ctx._st;
+  st.ls['p_subSyncSeeded'] = '2026-08-01';
+  ctx.ERP.dir.push({ sid: 'A9', name: '최기운' });
+  st.cos.push({ id: 'c2', name: '사아정밀', defAtt: 'a1', defCoAtts: [], types: ['t1'], erpId: 'E2' });
+  ctx.ERP.consultings.push({ id: 'E2', companyName: '사아정밀', managerMain: 'S1', managerSubs: ['A9'] });
+  ctx.ERP.consultings[0].managerSubs = ['A9'];
+  ctx.erpSyncSubsDown();
+  assert.strictEqual(st.staff.filter((s) => s.name === '최기운').length, 1,
+    '★ 같은 사람을 사업장마다 새로 만듭니다 — 명단이 중복으로 불어납니다');
+});
+
+test('★ 사번으로 «먼저» 찾는다 — 이알피에서 이름이 바뀌어도 같은 사람으로 이어진다', () => {
+  const ctx = board(); const st = ctx._st;
+  st.ls['p_subSyncSeeded'] = '2026-08-01';
+  /* 이 사람은 사번으로만 알아볼 수 있다 — 이름이 서로 다르다(개명·오타) */
+  st.staff.push({ id: 'a8', name: '최기운', erpSid: 'A9' });
+  ctx.ERP.dir.push({ sid: 'A9', name: '최기운(개명)' });
+  ctx.ERP.consultings[0].managerSubs = ['A9'];
+  ctx.erpSyncSubsDown();
+  assert.strictEqual(st.staff.length, 5,
+    '★ 이름이 달라졌다고 같은 사람을 하나 더 만듭니다 — 사번으로 먼저 찾아야 합니다');
+  assert.ok(st.cos[0].defCoAtts.includes('a8'), '사번으로 이어진 사람으로 붙어야 한다');
+});
+
+test('이미 명단에 있는 사람은 새로 만들지 않는다 (사번이 없어 이름으로 걸리는 경우도)', () => {
+  const ctx = board(); const st = ctx._st;
+  st.ls['p_subSyncSeeded'] = '2026-08-01';
+  st.staff.push({ id: 'a8', name: '최기운' });               // 사번 없이 손으로 넣어 둔 사람
+  ctx.ERP.dir.push({ sid: 'A9', name: '최기운' });
+  ctx.ERP.consultings[0].managerSubs = ['A9'];
+  ctx.erpSyncSubsDown();
+  assert.strictEqual(st.staff.filter((s) => s.name === '최기운').length, 1,
+    '★ 이름으로 이미 있는 사람을 또 만듭니다');
+  assert.ok(st.cos[0].defCoAtts.includes('a8'), '이미 있던 사람으로 붙어야 한다');
+});
 
 /* ══════ ① 진동 — 이 검사가 이 기능의 심장이다 ══════ */
 
