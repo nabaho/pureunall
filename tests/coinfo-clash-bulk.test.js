@@ -238,6 +238,50 @@ test('★★ 묶음째 고르는 단추가 화면에 «실제로» 있다', () =
   assert.ok(h.indexOf("coClashPickGroup('other')") > 0, '★★ 「다른 서류」 묶음 고르기가 없다');
 });
 
+/* ══ ☑ 전체 한 번에 고르기 (대표 지시 2026-09-17) ══════════════════════════
+   묶음이 둘이라 「전체」를 고르려면 묶음 단추를 «두 번» 눌러야 했다. */
+
+test('★★★ 「전체 고르기」가 «늘» 서 있다 — 0개일 때 쓰라고 있는 단추다', () => {
+  const x = 그려보기({ list: 자료 });
+  const h = x.coClashHtml();
+  assert.ok(h.indexOf("coClashPickGroup('all')") > 0,
+    '★★★ 고른 것이 0개일 때 안 보이면, 정작 쓸 그때 없는 단추가 된다');
+  assert.ok(h.indexOf('전체 3개 고르기') > 0, '★★ 몇 개를 고르게 되는지 안 적혀 있다');
+  /* ⚠ 띠(고른 뒤에만 뜬다) 안에 넣으면 처음에 안 보인다 — 자리가 달라야 한다 */
+  assert.ok(h.indexOf('coclashall') > 0, '★★ 띠와 같은 자리에 들어가면 처음에 안 보인다');
+});
+
+test('★★★ 한 번 눌러 «두 묶음을 통틀어» 다 골라진다', () => {
+  const x = 그려보기({ list: 자료.concat([
+    Object.assign({}, 자료[0], { key:'k9', name:'다시읽음', extra:{
+      conflicts:{ ceo: c('가','나','p9') }, src:{ ceo: '2026_p9' } } })]) });
+  const 전체 = x.coClashList().length;
+  x.coClashPickGroup('all');
+  assert.equal(x.coClashPicked().length, 전체,
+    '★★★ 묶음이 둘인데 한쪽만 골라지면 「전체」가 아니다');
+  assert.equal((x.coClashHtml().match(/checkbox[^>]*checked/g) || []).length, 전체,
+    '★★ 표만 찼고 화면의 네모는 안 켜졌다');
+});
+
+test('★★★ 다 골라져 있으면 같은 자리가 «푸는» 단추가 된다', () => {
+  const x = 그려보기({ list: 자료 });
+  x.coClashPickGroup('all');
+  const h = x.coClashHtml();
+  assert.ok(h.indexOf('전체 고르기 풀기') > 0,
+    '★★★ 스물여섯 개를 고른 뒤 무르려고 또 다른 단추를 찾아 헤매게 된다');
+  assert.ok(h.indexOf('전체 3개 고르기') < 0, '★★ 다 골랐는데 아직 「고르기」라고 적혀 있다');
+  x.coClashPickGroup('all');
+  assert.equal(x.coClashPicked().length, 0, '★★★ 다시 눌러도 안 풀린다');
+});
+
+test('★★ 「전체 고르기」는 고르기만 한다 — 여기서도 한 글자도 안 바뀐다', () => {
+  const x = 그려보기({ list: 자료 });
+  x.coClashPickGroup('all');
+  assert.equal(x._calls.wrote.length, 0,
+    '★★★ 고르는 동안 서버에 쓰면 「우선 먼저 확인」이 아니다');
+  assert.equal(x._calls.asked, 0, '★★ 묻지도 않았는데 물음창이 떴다');
+});
+
 test('★★★ 줄의 네모가 «골랐을 때만» 켜져 있다 — 화면과 표가 어긋나면 안 된다', () => {
   const x = 그려보기({ list: 자료 });
   assert.equal((x.coClashHtml().match(/checkbox[^>]*checked/g) || []).length, 0,
