@@ -194,6 +194,29 @@ test('⑬ 이알피 덮개 — 기기 눈만 걸린 폭풍(새 탭)이면 「1�
   assert.ok(!/1번/.test(texts), '★★ 「3분 안에 1번 다시 켜졌습니다」는 거짓말이다');
 });
 
+test('⑭★ 「자료 받기 계속」을 눌러도 폭풍이 3번 더 이어지면 다시 묻는다 — 한 번 누른 탭이 영영 통째로 받던 구멍', async () => {
+  const gate = cutFn(ERP, 'function _erpBootStormGate(');
+  const sess = {};
+  let clicked = null;
+  const body = { kids: [], appendChild(c) { body.kids.push(c); return c; } };
+  const ctx = {
+    window: { PU_BOOT: { storm: true, tabStorm: true, count: 8, since: 20, type: 'reload' } },
+    sessionStorage: { getItem: k => (k in sess ? sess[k] : null), setItem: (k, v) => { sess[k] = String(v); } },
+    document: { body, createElement: t => ({ type: '', style: {}, id: '', textContent: '', kids: [], appendChild(c) { this.kids.push(c); return c; }, set onclick(f) { clicked = f; }, get onclick() { return clicked; }, parentNode: body }) },
+    console: { warn() {} }, Promise, Date, Math, Number, String,
+  };
+  vm.createContext(ctx);
+  vm.runInContext('var _bootStormGateShown = false;\n' + gate, ctx);
+  const boot = () => { ctx._bootStormGateShown = false; return ctx._erpBootStormGate(); };
+  assert.ok(boot(), '1번째 폭풍 부팅 — 문');
+  clicked();                                                   // 사람이 「계속」
+  assert.equal(boot(), null, '누른 직후 다음 부팅은 봐준다');
+  assert.equal(boot(), null, '그 다음도 봐준다');
+  assert.ok(boot(), '★★ 눌러도 부팅이 3번 더 이어졌다 = 여전히 폭풍 — 다시 물어야 한다. 옛 코드는 영영 열어 두어 요금이 그대로 샜다');
+  clicked();
+  assert.equal(boot(), null, '다시 누르면 또 봐준다');
+});
+
 test('⑫ 첫 눈(탭)은 여전히 sessionStorage 만 본다 — 기기 눈은 딴 함수에 있다', () => {
   assert.ok(!/localStorage/.test(cutFn(VER, 'function noteBoot(')), '★ 탭 눈에 localStorage 가 섞이면 탭 열 개를 열기만 해도 폭풍이 된다');
   assert.match(cutFn(VER, 'function noteBootDevice('), /localStorage/, '★ 기기 눈은 localStorage 여야 새 탭을 가로질러 센다');
