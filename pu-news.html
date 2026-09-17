@@ -44,7 +44,7 @@
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
 <script src="js/pu-news-core.js?v=38"></script>
-<script src="js/pu-news-tpl.js?v=21"></script>
+<script src="js/pu-news-tpl.js?v=22"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -4018,7 +4018,9 @@ async function 수신거부넣기(주소){
    ⚠ 로고는 «일부러» 비워 두는 값이다(글자 방패가 그림보다 낫다 — 메일이 그림을
      막아도 보인다). 그래서 다 채우는 것이 목표가 아니다 — 세어 보이기만 한다. */
 function 그림칸셈(s){
-  const 칸 = ['로고그림','배너그림','뉴스그림','추적밑주소'];
+  /* ⚠ 「배너그림」은 2026-09-17 에 걷었다(큰 사진 띠를 없앴다) — 여기 남겨 두면
+       「4칸 중 2칸」처럼 «채울 것이 남은 것처럼» 세어 보인다. */
+  const 칸 = ['로고그림','뉴스그림','추적밑주소'];
   const n = 칸.filter(k => String((s||{})[k] || '').trim()).length;
   return `${칸.length}칸 중 ${n}칸 넣음`;
 }
@@ -4127,16 +4129,16 @@ function 설정화면(){
         <span class="num">${그림칸셈(s)}</span>
         <span class="act"></span></summary>
        <div class="in">
-        <div>
-         <label class="f">로고 그림 <span style="font-weight:400">(비우면 「푸」)</span></label>
-         <input type="text" id="cfgLogo" value="${esc(s.로고그림||'')}" onchange="설정저장()">
-        </div>
-        <div>
-         <label class="f">배너 그림 주소 <span style="font-weight:400">(비우면 색칸)</span> ${도움(
-           '⚠ <b>우리 홈페이지에 올린 그림만</b> 나갑니다 (nabaho.github.io/pureunall/).<br>'
+        <!-- ⚠ 「배너 그림 주소」 칸은 2026-09-17 에 걷었다 — 큰 사진 띠를 없애면서
+               그 주소를 읽는 곳이 사라졌다. 안 읽는 칸을 남겨 두면 채워 넣으시고
+               「왜 안 보이나」 하시게 된다. -->
+        <div class="w2">
+         <label class="f">로고 그림 <span style="font-weight:400">(비우면 이름만)</span> ${도움(
+           '편지 머리의 법인 이름 «앞»에 작게 들어갑니다.<br>'
+           + '⚠ <b>우리 홈페이지에 올린 그림만</b> 나갑니다 (nabaho.github.io/pureunall/).<br>'
            + '남의 서버 그림은 발송기가 버립니다 — 받는 쪽이 열 때 '
            + '「언제 읽었나」가 새 나가는 것을 막습니다.')}</label>
-         <input type="text" id="cfgBanner" value="${esc(s.배너그림||'')}"
+         <input type="text" id="cfgLogo" value="${esc(s.로고그림||'')}"
            placeholder="https://nabaho.github.io/pureunall/img/…" onchange="설정저장()">
         </div>
         <div class="w2">
@@ -4320,7 +4322,6 @@ function 설정저장(){
     자동발송: g('cfgAuto') === 'y',
     추적밑주소: g('cfgTrack'),
     뉴스그림: g('cfgNews'),
-    배너그림: g('cfgBanner'),
     로고그림: g('cfgLogo')
   });
   db.ref('newsletter/config').update(App.설정)

@@ -642,8 +642,11 @@ test('★ 좌우 두 칸이 «폰에서는 위아래»가 된다', () => {
 });
 
 test('★★ 좌우로 나누면서 칸을 «하나도» 잃지 않았다', () => {
+  /* ⚠ cfgBanner(배너 그림 주소)는 2026-09-17 에 «일부러» 걷었다 — 큰 사진 띠를
+       없애면서 그 주소를 읽는 곳이 사라졌다. 안 읽는 칸을 남겨 두면 채워 넣으시고
+       「왜 안 보이나」 하시게 된다. 되살리지 말 것. */
   ['cfgScope', 'cfgFrom', 'cfgReply', 'cfgTestTo', 'cfgName', 'cfgFoot', 'cfgTrack',
-   'cfgCeo', 'cfgTel', 'cfgAddr', 'cfgLogo', 'cfgBanner', 'cfgNews'].forEach(function (id) {
+   'cfgCeo', 'cfgTel', 'cfgAddr', 'cfgLogo', 'cfgNews'].forEach(function (id) {
     assert.ok(설정본.indexOf('id="' + id + '"') >= 0, '★ 설정 칸이 사라졌다: ' + id);
   });
 });
@@ -679,23 +682,25 @@ test('★★ 접힌 채로도 «안에 넣을 것이 남았는지» 알려 준�
   assert.match(설정본, /그림칸셈\(/, '★ 접힌 줄이 안쪽 상태를 말하지 않는다');
   const 셈 = 함수몸(news, '그림칸셈');
   assert.ok(셈, '그림칸셈 함수가 없다');
-  /* ⚠ 네 칸을 «다» 세야 한다 — 하나를 빼먹으면 「3칸 중 …」으로 조용히 틀린다 */
-  ['로고그림', '배너그림', '뉴스그림', '추적밑주소'].forEach(function (k) {
+  /* ⚠ 있는 칸을 «다» 세야 한다 — 하나를 빼먹으면 「2칸 중 …」으로 조용히 틀린다.
+     ⚠ 배너그림은 2026-09-17 에 걷었다 — 세면 «채울 것이 남은 것처럼» 보인다. */
+  ['로고그림', '뉴스그림', '추적밑주소'].forEach(function (k) {
     assert.ok(셈.indexOf(k) >= 0, '★ ' + k + ' 을 세지 않는다 — 숫자가 조용히 틀린다');
   });
-  /* 접힌 칸 «안»에 그 네 칸이 실제로 있는지도 함께 본다(세는 것과 든 것이 어긋나면 안 된다) */
+  assert.ok(셈.indexOf('배너그림') < 0, '★ 걷어 낸 칸을 아직 센다 — 숫자가 조용히 틀린다');
+  /* 접힌 칸 «안»에 그 칸들이 실제로 있는지도 함께 본다(세는 것과 든 것이 어긋나면 안 된다) */
   const 접 = /<details class="fold">[\s\S]*?<\/details>/.exec(설정본);
   assert.ok(접, '접는 칸이 없다');
-  ['cfgLogo', 'cfgBanner', 'cfgNews', 'cfgTrack'].forEach(function (id) {
+  ['cfgLogo', 'cfgNews', 'cfgTrack'].forEach(function (id) {
     assert.ok(접[0].indexOf('id="' + id + '"') >= 0,
       '★ 세는 칸과 접힌 칸이 어긋난다: ' + id);
   });
 });
 
-test('★ 접은 넷은 «접은 것»이지 지운 것이 아니다', () => {
+test('★ 접은 것은 «접은 것»이지 지운 것이 아니다', () => {
   const 접 = /<details class="fold">[\s\S]*?<\/details>/.exec(설정본);
   assert.ok(접, '★ 접는 칸이 없다');
-  ['cfgLogo', 'cfgBanner', 'cfgNews', 'cfgTrack'].forEach(function (id) {
+  ['cfgLogo', 'cfgNews', 'cfgTrack'].forEach(function (id) {
     assert.ok(접[0].indexOf('id="' + id + '"') >= 0,
       '★ ' + id + ' 이 접는 칸 밖에 있다 — 자리를 반 폭에 그대로 먹는다');
   });
