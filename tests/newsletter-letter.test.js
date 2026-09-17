@@ -7,6 +7,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+const ROOT = path.join(__dirname, '..');
 const C = require('../js/pu-news-core.js');
 const T = require('../js/pu-news-tpl.js');
 const MS = require('../functions/mail-send.js');
@@ -38,17 +41,19 @@ function 회차자료(더할것) {
 
 /* ══════ ① 편지 뼈대 ══════ */
 
-test('받으신 뉴스레터의 뼈대가 그대로 있다', () => {
+test('편지의 뼈대가 그대로 있다', () => {
+  /* ⚠ 2026-09-17 머리를 「신문」으로 바꿨다(대표 지시 「전문보기도 맞춰라」).
+       WEEKLY NEWS LETTER 사진 띠와 갈색 알약 딱지는 걷었다 — 요약과 전문이
+       «같은 머리»를 써야 「자세히 보기」로 넘어갈 때 같은 편지로 보인다. */
   const 편 = T.편지짓기(회차자료(), 설정);
   const h = 편.서식;
-  assert.ok(h.indexOf('WEEKLY NEWS LETTER') >= 0, '배너 글자가 없다');
-  /* ⚠ 「08월」이다 — 달을 «두 자리»로. 받으신 원본 띠가 그렇다.
-     2026-09-05 까지 이 검사가 「8월」을 못 박고 있었고, 그래서 배너만
-     원본과 다르게 나가는 것을 «검사가 지켜 주고» 있었다. 값이 아니라
-     규칙(원본과 같은 꼴)을 못 박는다. */
-  assert.ok(h.indexOf('2026년 08월 5주차') >= 0, '회차가 배너에 없다');
-  assert.ok(h.indexOf('2026년 8월 5주차') < 0, '달이 한 자리로 나갔다 — 원본은 08월이다');
-  assert.ok(h.indexOf('>Best<') >= 0, 'Best 딱지가 없다');
+  assert.ok(h.indexOf('주간 노무 브리핑') >= 0, '신문 머리가 없다');
+  assert.ok(h.indexOf('WEEKLY NEWS LETTER') < 0, '걷어 낸 사진 띠가 되살아났다');
+  /* ⚠ 「08월」이다 — 달을 «두 자리»로. 2026-09-05 까지 이 검사가 「8월」을 못 박고
+     있었고, 그래서 머리만 다르게 나가는 것을 «검사가 지켜 주고» 있었다. */
+  assert.ok(h.indexOf('2026년 08월 5주차') >= 0, '회차가 머리에 없다');
+  assert.ok(h.indexOf('2026년 8월 5주차') < 0, '달이 한 자리로 나갔다');
+  assert.ok(h.indexOf('>BEST</div>') >= 0, '첫 꼭지의 영문 표시가 없다');
   C.꼭지들.forEach((g) => {
     assert.ok(h.indexOf(g.이름) >= 0, '차림표에 «' + g.이름 + '» 이 없다');
   });
@@ -59,18 +64,16 @@ test('제목은 회차 이름을 그대로 쓴다 — 거래처가 회차로 찾
   assert.equal(편.제목, '푸른노무법인 2026년 08월 5주차 주간뉴스레터 입니다.');
 });
 
-test('★ 표지는 메일 안전한 «왼쪽 제목 · 오른쪽 그림» 두 칸 구조다', () => {
-  const 편 = T.편지짓기(회차자료(), Object.assign({}, 설정, {
-    배너그림: 'https://nabaho.github.io/pureunall/img/news-banner.png'
-  }));
-  assert.match(편.서식, /width="53%"[^>]*valign="middle"/);
-  assert.match(편.서식, /width="47%"[\s\S]*?news-banner\.png/);
-  assert.ok(!/background-image|position:absolute/.test(편.서식));
+test('★★ 머리는 «글자»다 — 배경 그림·겹쳐 놓기를 쓰지 않는다', () => {
+  /* 아웃룩은 배경 그림과 겹쳐 놓기(position)를 못 그린다. 글자로 세운 머리는
+     그림이 안 떠도 그대로 읽힌다 — 2026-09-17 사진 띠를 걷은 까닭의 절반이다. */
+  const h = T.편지짓기(회차자료(), 설정).서식;
+  assert.ok(!/background-image|position:absolute/.test(h));
+  assert.match(h, /주간 노무 브리핑/, '머리 글자가 없다');
 });
 
-test('★ 그림 주소를 비워도 푸른 기본 표지와 뉴스 사진이 나온다', () => {
+test('★ 그림 주소를 비워도 뉴스 사진은 나온다', () => {
   const h = T.편지짓기(회차자료(), 설정).서식;
-  assert.match(h, /img\/news-banner\.png/, '기본 표지가 없습니다');
   assert.match(h, /img\/news-side\.png/, '주간뉴스 옆 기본 사진이 없습니다');
 });
 
@@ -108,9 +111,9 @@ test('빈 꼭지는 «아예 안 그린다» — 제목만 덩그러니 남으�
   const 자료 = 회차자료();
   자료.안.case = [];
   const h = T.편지짓기(자료, 설정).서식;
-  /* 차림표에는 남지만(늘 넷이다), 꼭지 «제목 덩이»로는 안 그려진다 */
-  const 큰제목 = new RegExp('font-size:19px[^>]*>판례·재결례');
-  assert.ok(!큰제목.test(h), '빈 꼭지가 제목만 남기고 그려졌다');
+  /* 차림표에는 남지만(늘 넷이다), 꼭지 «제목 덩이»로는 안 그려진다.
+     ⚠ 글자 크기를 못 박지 않는다 — 제목 덩이는 div, 차림표는 td 라 그것으로 가른다. */
+  assert.ok(h.indexOf('>판례·재결례·행정해석</div>') < 0, '빈 꼭지가 제목만 남기고 그려졌다');
   assert.ok(h.indexOf('판례·재결례') >= 0, '차림표에서는 사라지면 안 된다');
 });
 
@@ -168,10 +171,11 @@ test('★ 지은 편지가 발송기를 지나도 뼈대가 남는다', () => {
 
   assert.ok(씻긴것.indexOf('<table') >= 0, '표가 버려졌다 — 편지가 줄글 뭉치로 도착한다');
   assert.ok(씻긴것.indexOf('<td') >= 0, '칸이 버려졌다');
-  assert.ok(씻긴것.indexOf('WEEKLY NEWS LETTER') >= 0);
+  assert.ok(씻긴것.indexOf('주간 노무 브리핑') >= 0, '머리 글자가 버려졌다');
   assert.ok(씻긴것.indexOf('2026년 08월 5주차') >= 0);
-  assert.ok(씻긴것.indexOf('>Best<') >= 0);
-  assert.ok(씻긴것.indexOf('background-color:#6f5a48') >= 0, '배너 빛깔이 버려졌다');
+  assert.ok(씻긴것.indexOf('>BEST</div>') >= 0);
+  /* ⚠ 가는 줄은 «칸에 색을 깔아» 만든다 — 발송기가 색을 버리면 줄이 통째로 사라진다 */
+  assert.ok(씻긴것.indexOf('background-color:#241a13') >= 0, '머리·꼭지의 가는 줄 빛깔이 버려졌다');
   assert.ok(/padding:\s*\d/.test(씻긴것), '여백이 버려졌다 — 글자가 서로 붙는다');
   assert.ok(씻긴것.indexOf('border-top:1px solid') >= 0, '테두리가 버려졌다');
   assert.ok(씻긴것.indexOf('https://n.kr/a') >= 0, '기사 링크가 버려졌다');
@@ -202,21 +206,53 @@ test('수신거부 길은 «언제나» 꼬리에 있다', () => {
   });
 });
 
-/* ══════ ⑤ 배너 그림 — 넣으면 나가고, 남의 것이면 안 나간다 ══════ */
+/* ══════ ⑤ 설정으로 넣는 그림 — 우리 것은 나가고, 남의 것은 안 나간다 ══════
+   ⚠⚠ 2026-09-17 배너를 걷으면서 이 검사가 붙잡을 것이 없어질 뻔했다. 그러면
+     「남의 서버 그림은 안 나간다」가 조용히 «아무것도 안 지키는» 검사가 된다 —
+     설정으로 그림을 넣는 길이 하나라도 남아 있으면 그 길로 붙잡는다.
+     지금 남은 길은 «로고 그림»이다(요약머리가 이름 앞에 그린다). */
 
-test('우리 홈페이지 배너 그림은 발송기를 통과한다', () => {
+test('우리 홈페이지 그림은 발송기를 통과한다', () => {
   const 설 = Object.assign({}, 설정, {
-    배너그림: 'https://nabaho.github.io/pureunall/img/newsletter-banner.png'
+    로고그림: 'https://nabaho.github.io/pureunall/img/newsletter-logo.png'
   });
   const 씻긴것 = MS.sanitizeHtml(T.편지짓기(회차자료(), 설).서식);
-  assert.ok(씻긴것.indexOf('newsletter-banner.png') >= 0, '우리 배너 그림이 버려졌다');
+  assert.ok(씻긴것.indexOf('newsletter-logo.png') >= 0, '우리 그림이 버려졌다');
   assert.ok(/<img[^>]*width=/.test(씻긴것), '그림 크기가 버려지면 편지 폭을 넘는다');
 });
 
-test('남의 서버 그림은 넣어도 안 나간다 — 열람 시각이 새 나간다', () => {
-  const 설 = Object.assign({}, 설정, { 배너그림: 'https://남의서버.example.com/b.png' });
-  const 씻긴것 = MS.sanitizeHtml(T.편지짓기(회차자료(), 설).서식);
-  assert.ok(씻긴것.indexOf('example.com') < 0, '바깥 그림이 편지에 남았다');
+test('★★ 남의 서버 그림은 넣어도 안 나간다 — 열람 시각이 새 나간다', () => {
+  const 설 = Object.assign({}, 설정, { 로고그림: 'https://남의서버.example.com/b.png' });
+  const 지은것 = T.편지짓기(회차자료(), 설).서식;
+  /* ★★ 문이 «둘»이다. 발송기만 믿으면, 편지를 그대로 웹으로 내보내는 길
+       (전문 보기)에서는 아무도 안 막는다 — 그래서 짓는 쪽에서도 막는다. */
+  assert.ok(지은것.indexOf('example.com') < 0,
+    '★ 편지를 «지을 때» 바깥 그림이 실렸다 — 웹 전문 보기로 그대로 나간다');
+  assert.ok(MS.sanitizeHtml(지은것).indexOf('example.com') < 0, '바깥 그림이 편지에 남았다');
+});
+
+test('★★★ 「우리 집 그림만」 목록이 편지짓기와 발송기에서 «같다»', () => {
+  /* 두 벌이라 어긋날 수 있다. 발송기가 더 좁으면 우리 그림이 메일에서만 사라지고,
+     편지짓기가 더 좁으면 추적 그림이 안 나가 열람이 영영 안 찍힌다. */
+  const 뽑기 = (글, 이름) => {
+    const m = new RegExp('(?:var|const) ' + 이름 + '\\s*=\\s*\\[([\\s\\S]*?)\\]').exec(글);
+    assert.ok(m, 이름 + ' 목록을 못 찾았다');
+    return (m[1].match(/'[^']+'/g) || []).map((s) => s.slice(1, -1)).sort();
+  };
+  const 편지쪽 = 뽑기(fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8'), '그림집');
+  const 발송쪽 = 뽑기(fs.readFileSync(path.join(ROOT, 'functions/mail-send.js'), 'utf8'), 'IMG_HOST_OK');
+  assert.deepEqual(편지쪽, 발송쪽, '두 목록이 어긋난다');
+  assert.ok(편지쪽.length >= 2, '목록이 비었다 — 아무 그림도 안 나간다');
+});
+
+test('★★ 설정으로 그림을 넣는 길이 «적어도 하나»는 살아 있다', () => {
+  /* 이 길이 다 막히면 위 두 검사가 아무것도 안 지키면서 통과한다 */
+  const 설 = Object.assign({}, 설정, {
+    로고그림: 'https://nabaho.github.io/pureunall/img/newsletter-logo.png'
+  });
+  const 넣은것 = T.편지짓기(회차자료(), 설).서식;
+  assert.ok(넣은것.indexOf('newsletter-logo.png') >= 0,
+    '설정 그림이 편지에 아예 안 실린다 — 허용 목록 검사가 헛돈다');
 });
 
 /* ══════ 꼬리 — 원본에 있던 주소·전화 ══════ */
