@@ -437,7 +437,8 @@
      ⚠ 0 은 «끔»이다. 한도 0 이면 아무것도 안 막는다(경고선도 같다). */
   var AI_TALLY_ROOT = 'ai_read_tally';
   var AI_BUDGET_ROOT = 'ai_read_budget';
-  var AI_BUDGET_DEFAULT = { limit: 30000, warn: 25000, wonPerRead: 4 };
+  /* 2026-09-17 대표 「5만원으로 재조정」 — 서버(functions/doc-read.js)와 «똑같아야» 한다 */
+  var AI_BUDGET_DEFAULT = { limit: 50000, warn: 45000, wonPerRead: 4 };
 
   /* 한국 달 이름(2026-09) — 서버(doc-read.js 의 ymKST)와 «같은 칸»을 봐야 숫자가 맞는다.
      ⚠ 브라우저 시간대를 믿지 않는다. 해외에서 열어도 회사 달로 세야 한다. */

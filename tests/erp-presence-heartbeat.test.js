@@ -58,8 +58,19 @@ test('★ 달라진 게 없으면 lastSeen 한 칸만 쓴다 — 이것이 새�
   assert.equal(calls.set.length, 1,
     '★ 심장박동마다 기록 전체를 다시 써 모든 기기로 퍼집니다');
   assert.equal(calls.update.length, 3, '가볍게 쓰기가 안 걸렸습니다');
-  assert.deepEqual(Object.keys(calls.update[0]), ['lastSeen'],
-    '★ lastSeen 말고 다른 칸까지 쓰면 가볍게 쓴 뜻이 없습니다');
+  /* ★★ 가볍게 쓰되 «누구인지»는 늘 함께 보낸다 (대표 제보 2026-09-17 「갑자기 이름없음이 뜬다」).
+     ■ 무엇이 있었나 — 예전에는 lastSeen «한 칸만» 보내도록 여기서 못 박아 두었다.
+       그런데 연결이 끊기면 서버가 onDisconnect 로 내 자리를 «지운다». 다시 붙은 뒤
+       한 칸만 쓰면 실시간DB 의 update 가 «없는 자리를 만들어» 이름도 사번도 없는
+       껍데기가 생긴다 — 화면에 「(이름없음) 접속」으로 보인다.
+       (실측 2026-09-17: presence/…__A-003 에 lastSeen 한 칸만 있었다.)
+     ■ dbPatch 가 「id 를 늘 함께 보낸다」로 막은 것과 «같은 고장»이다.
+     ⚠ 그래도 «통째로»는 아니다 — device·loginAt 까지 보내면 가볍게 쓴 뜻이 없다. */
+  const 칸 = Object.keys(calls.update[0]).sort();
+  assert.deepEqual(칸, ['lastSeen', 'name', 'sid'],
+    '★★ 가볍게 쓰는 길에는 «누구인지»(sid·name)가 반드시 함께 가야 합니다 —\n'
+    + '   빠지면 끊겼다 붙을 때 「(이름없음)」 껍데기가 생깁니다.\n'
+    + '   그렇다고 device·loginAt 까지 보내면 통째로 쓰는 것과 같아집니다.');
 });
 
 test('★ 이름이 뒤늦게 잡히면 통째로 다시 쓴다 — 자가복구는 살아 있어야 한다', () => {

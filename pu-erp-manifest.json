@@ -10,6 +10,33 @@
   "theme_color": "#1e3a8a",
   "orientation": "portrait-primary",
   "lang": "ko-KR",
+  "_related_주석": "자기 자신을 적어 두면 navigator.getInstalledRelatedApps() 로 「진짜 앱으로 깔렸는지」를 알 수 있다. 홈 화면 «바로가기»도 주소줄 없이 열려 눈으로는 구별이 안 되는데, 바로가기는 공유 목록에 안 뜬다 — 그 구별이 꼭 필요하다(사진첩과 같은 얼개).",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://nabaho.github.io/pureunall/pu-erp-manifest.json"
+    }
+  ],
+  "prefer_related_applications": false,
+  "_share_target_주석": "대표 지시 2026-09-17 「이알피에도 공유받기 붙여라」. 폰에서 사진을 「공유 → 푸른이알피」로 보낼 수 있게 한다. 안드로이드 전용이고 «진짜 앱»으로 깔려 있어야 뜬다(애플은 막아 두었다). 받은 사진은 pu-erp-sw.js 가 사진첩의 받은 함에 넣고 사진첩 확인 화면으로 넘긴다 — 이알피에는 사진이 들어갈 자리가 없고(사진은 사건·업체에 붙는 것이라 어느 건인지 모르면 넣을 데가 없다), 사진첩에는 명함 판독까지 이어지는 길이 이미 있다.",
+  "share_target": {
+    "action": "./pu-erp.html",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "files": [
+        {
+          "name": "photos",
+          "accept": [
+            "image/*",
+            "application/pdf"
+          ]
+        }
+      ]
+    }
+  },
   "icons": [
     {
       "src": "icon-erp-192.png",
