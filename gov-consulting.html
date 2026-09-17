@@ -928,7 +928,32 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .bulk-cell{text-align:center;padding:7px 2px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;}
 .bulk-cell:hover:not(.dis):not(.taken){background:rgba(21,101,192,.1);border-color:var(--accent);}
 .bulk-cell.dis{color:var(--border);cursor:default;}
-.bulk-cell.taken{color:#94a3b8;cursor:default;text-decoration:line-through;}
+/* ══ 이미 쓴 날 — «몇 회차였는지·방문인지 사무실인지»가 칸에서 바로 보인다
+   (대표 지시 2026-09-17 「회색으로 표시했는데 구분이 잘 안 된다 … 이미 몇 회차로
+    사용되었는지 눈에 보이게」, 목업 docs/mockups/cal-used-days.html 「㉮」 승인).
+   ⚠ 취소선을 뺐다 — 취소선은 「취소된 것」처럼 보이는데 실제로는 「이미 한 것」이다.
+   ⚠ 바탕색으로 방문·사무실을 가른다. 색만으로 못 가리는 분을 위해 사무실은
+     «점선 테두리»도 함께 준다(색 하나에만 기대지 않는다). */
+.bulk-cell.taken{cursor:default;text-decoration:none;color:#475569;padding:4px 2px 3px;}
+.bulk-cell.taken .ud{display:block;font-weight:800;line-height:1.15;}
+.bulk-cell.taken .ur{display:block;font-size:9px;font-weight:900;line-height:1.2;margin-top:1px;}
+.bulk-cell.taken.uf{background:#bfdbfe;color:#1e40af;}
+.bulk-cell.taken.uf .ur{color:var(--accent);}
+.bulk-cell.taken.uo{background:#e2e8f0;border:2px dashed #cbd5e1;}
+.bulk-cell.taken.uo .ur{color:#64748b;}
+/* 마우스를 올리면 짧게 — 「9월 15일 · 14회차 · 🏢 사무실」 (대표 지시 2026-09-17).
+   ⚠ 공용 [data-tip] 은 칸 «아래»에 뜬다 — 달력 마지막 줄에서는 창 밖으로 나간다.
+     그래서 여기서는 «위»로 띄우고, top/border 를 되돌려 둘이 겹치지 않게 한다. */
+/* 요약 줄의 방문·사무실 셈 (대표 지시 2026-09-17 ②) */
+.hist-cnt{display:inline-block;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:1px 7px;font-weight:800;margin-right:3px;}
+.bulk-cell[data-tip]{position:relative;}
+.bulk-cell[data-tip]::after{top:auto;bottom:calc(100% + 7px);z-index:20;}
+.bulk-cell[data-tip]::before{top:auto;bottom:calc(100% + 2px);
+  border-bottom-color:transparent;border-top-color:#1e293b;z-index:20;}
+/* 양 끝 칸은 쪽지가 창 밖으로 나가지 않게 모서리에 붙인다 */
+.bulk-cell.tip-r[data-tip]::after{left:auto;right:0;transform:none;}
+.bulk-cell.tip-l[data-tip]::after{left:0;right:auto;transform:none;}
 .bulk-cell.sel-field{background:var(--accent);color:#fff;border-color:var(--accent);}
 .bulk-cell.sel-office{background:#fff;color:var(--info);border:2px solid var(--info);}
 
@@ -4663,7 +4688,12 @@ async function openSingleModal(coId,typeId){
     const last=ex[ex.length-1];
     const lastR=getScheds().find(s=>s.id===last.id)?.round||ex.length;
     const lf=last.isField?'📍방문':'🏢사무실';
-    hEl.innerHTML=`${phLbl}기존 <b style="color:var(--accent);">${ex.length}회</b> 등록됨 · 마지막 <b>${lastR}회차</b> (${last.date} ${lf})${cap>0?` · 최대 ${cap}회`:''} → <b style="color:var(--accent);">다음 ${phLbl}${nr}회차</b>`;
+    /* 방문·사무실이 각각 몇 번이었나 (대표 지시 2026-09-17 ②).
+       ⚠ 위 「기존 N회」와 «같은 묶음»(이 단계의 일정)으로 센다 — 둘을 더하면 N 이 되어야
+         읽는 사람이 헷갈리지 않는다. 다른 기준으로 세면 숫자가 안 맞아 보인다. */
+    const fN=ex.filter(s=>s.isField).length, oN=ex.length-fN;
+    hEl.innerHTML=`${phLbl}기존 <b style="color:var(--accent);">${ex.length}회</b> 등록됨 · 마지막 <b>${lastR}회차</b> (${last.date} ${lf})${cap>0?` · 최대 ${cap}회`:''} → <b style="color:var(--accent);">다음 ${phLbl}${nr}회차</b>`
+      +`<div style="margin-top:4px;">이 사업 <span class="hist-cnt">📍 방문 ${fN}</span> <span class="hist-cnt">🏢 사무실 ${oN}</span></div>`;
   })();
   qa('#mSingleField .topt').forEach(o=>o.classList.toggle('on',(o.dataset.f==='1')===single.isField));
   q('#mSingleMulti').checked=false;q('#mDragPalette').style.display='none';
@@ -4673,10 +4703,29 @@ async function openSingleModal(coId,typeId){
   q('#mbSingle').classList.add('open');
 }
 
+/* 이미 쓴 날 칸에 적을 «짧은 회차» — 칸이 한 뼘뿐이라 글자를 아낀다.
+   ⚠ 사전진단은 회차를 1부터 다시 센다 — 「사」를 붙여 본컨설팅 회차와 안 겹치게 한다.
+     안 붙이면 한 달에 「1회」가 두 개 보여 어느 것이 무엇인지 알 수 없다.
+     전문(사전진단 2회차)은 마우스를 올리면 나온다. */
+function usedRoundShort(sc){
+  const r=(sc&&sc.round)||'?';
+  return schedPhase(sc)==='pre'?`사${r}`:`${r}회`;
+}
+/* 마우스를 올렸을 때 짧게 — 「9월 15일 · 14회차 · 🏢 사무실」 (대표 지시 2026-09-17
+   「날짜에 마우스를 올릴 경우 짧게 방문 사무실 몇 회 등이 나오면 훨씬 편할 것 같다」). */
+function usedDayTip(sc,m,d){
+  const ph=schedPhase(sc)==='pre'?'사전진단 ':'';
+  const r=(sc&&sc.round)||'?';
+  return `${m+1}월 ${d}일 · ${ph}${r}회차 · ${sc&&sc.isField?'📍 방문':'🏢 사무실'}`;
+}
 function renderSingleCal(){
   const y=single.calY,m=single.calM,today=todayStr();
   q('#mSingleMonth').textContent=`${y}년 ${m+1}월`;
-  const taken=new Set(getScheds().filter(s=>s.coId===single.coId&&s.typeId===single.typeId).map(s=>s.date));
+  /* ⚠ 날짜 → «그 일정 자체»를 들고 있는다(예전에는 날짜만 모았다) —
+     몇 회차였는지·방문이었는지를 칸에 적어야 하기 때문이다(대표 지시 2026-09-17).
+     ⚠ 단계를 가리지 않고 모두 담는다 — 같은 날 두 번 넣는 것은 단계와 상관없이 막힌다. */
+  const taken=new Map();
+  getScheds().filter(s=>s.coId===single.coId&&s.typeId===single.typeId).forEach(s=>taken.set(s.date,s));
   const first=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate();
   const HNAMES=['일','월','화','수','목','금','토'];
   let h=`<div class="bulk-grid">${HNAMES.map((n,i)=>`<div class="bulk-hc ${i===0?'s0':''}">${n}</div>`).join('')}`;
@@ -4686,9 +4735,13 @@ function renderSingleCal(){
     /* 여기는 «사업이 정해진» 고르개다 — 그 사업 규칙 그대로 본다 */
     const blocked=!!isBlocked(ds,single.typeId);
     const pick=single.multi?single.picks.find(x=>x.date===ds):null;
-    const isTaken=taken.has(ds),isSel=single.multi?!!pick:(single.selDate===ds),isToday=ds===today;
+    const used=taken.get(ds);
+    const isTaken=!!used,isSel=single.multi?!!pick:(single.selDate===ds),isToday=ds===today;
     let cls='bulk-cell';
-    if(blocked||isTaken)cls+=blocked?' dis':' dis taken';
+    /* ⚠ 쓴 날에는 dis 를 안 붙인다 — dis 는 글자를 거의 안 보이게 만든다.
+       못 고르는 것은 onclick 을 안 주는 것으로 이미 막혀 있다(색으로 막는 게 아니다). */
+    if(blocked)cls+=' dis';
+    else if(isTaken)cls+=' taken '+(used.isField?'uf':'uo');
     else if(isSel)cls+=(pick?pick.isField:single.isField)?' sel-field':' sel-office';
     else if(isToday)cls+=' today';
     const clk=(!blocked&&!isTaken)?`onclick="pickSingleDate('${ds}')"`:'';
@@ -4696,7 +4749,14 @@ function renderSingleCal(){
     const droppable=(single.multi&&!blocked&&!isTaken)
       ? ` ondragover="event.preventDefault();this.classList.add('drop-hover');" ondragleave="this.classList.remove('drop-hover');" ondrop="onDropDate(event,'${ds}')"`
       : '';
-    h+=`<div class="${cls}" ${clk}${droppable}>${icon||d}</div>`;
+    let inner=icon||d,tipAttr='';
+    if(isTaken){
+      const col=(first+d-1)%7;
+      if(col>=5)cls+=' tip-r'; else if(col<=1)cls+=' tip-l';
+      inner=`<span class="ud">${d}</span><span class="ur">${usedRoundShort(used)}</span>`;
+      tipAttr=` data-tip="${escAttr(usedDayTip(used,m,d))}"`;
+    }
+    h+=`<div class="${cls}" ${clk}${droppable}${tipAttr}>${inner}</div>`;
   }
   q('#mSingleCal').innerHTML=h+`</div>`;
 }
