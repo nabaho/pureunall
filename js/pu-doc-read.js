@@ -406,6 +406,34 @@
 
   var NTS_URL = 'https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=';
 
+  /* ══ 국세청이 준 한 줄을 어떻게 읽는가 (대표 지시 2026-09-17) ═══════════════════
+     ★★ 여태 `b_stt` «하나만» 봤다. 그런데 국세청은 **없는 번호**에 대해
+       `b_stt` 를 **비우고** `tax_type` 에 「국세청에 등록되지 않은 사업자등록번호입니다.」를
+       담아 준다. 그래서 없는 번호가 「물어봤는데 아무 말도 없더라」가 되어
+       **자동 입력 문이 그냥 열렸다.**
+
+     ⚠ 체크섬으로는 못 막는다. 실제로 당했다 — `587-86-01913` 은 검산을 «통과한다»
+       (앞 아홉 자리 가중합 137 → 검사자리 3, 적힌 것도 3). 그런데 국세청에는 없는
+       번호다. 오직 국세청만 이것을 가려낼 수 있는데, 그 답을 우리가 안 읽고 있었다.
+       그 값이 기업정보함까지 들어와 대표께서 「캡쳐3은 오류로 잘못 입력된 것」이라
+       짚어 주셨다.
+
+     ⚠ 기업정보함(pu-cards 의 coNtsWord)과 «같은 규칙»이다 — 두 곳이 같은 응답을
+       다르게 읽으면 한쪽만 막는 구멍이 다시 생긴다. */
+  function ntsWord(row) {
+    var st = String((row && row.b_stt) || '').trim();
+    if (st) return st;
+    return String((row && row.tax_type) || '').trim();
+  }
+  /* 국세청에 «있는» 번호인가 — true 있다 / false 없다 / null 국세청이 안 가려 줬다.
+     ⚠ null 을 false 로 뭉개지 «않는다». 모르는 것을 「없다」로 단정하면 멀쩡한
+       등록증이 죄다 「확인 필요」로 쌓여, 치울 수 없는 할 일이 목록을 못 믿게 만든다. */
+  function ntsFound(row) {
+    if (String((row && row.b_stt) || '').trim()) return true;
+    if (String((row && row.tax_type) || '').indexOf('등록되지 않은') >= 0) return false;
+    return null;
+  }
+
   /* ⚠⚠ 이 목록은 «담아도 되는 갈래»다 — afterRead 가 여기 없는 갈래를 통째로
      'other' 로 떨어뜨린다. 그리고 민감 여부는 **갈래로** 가린다
      (js/pu-photo-store.js 의 SENSITIVE_KINDS · functions/photo-view.js).
@@ -459,7 +487,8 @@
   var PROMPT_VERSION = 18;
 
   function fail(message) {
-    return { kind: 'other', fields: {}, bizNoOk: null, ntsChecked: false, ntsState: null, error: message };
+    return { kind: 'other', fields: {}, bizNoOk: null, ntsChecked: false, ntsState: null,
+             ntsFound: null, error: message };
   }
 
   /* ── 일시적 실패는 스스로 다시 시도한다 ──
@@ -1343,7 +1372,8 @@
           return {
             pages: pagesOf(list[i]),
             kind: o.kind, fields: o.fields,
-            bizNoOk: o.bizNoOk, ntsChecked: o.ntsChecked, ntsState: o.ntsState
+            bizNoOk: o.bizNoOk, ntsChecked: o.ntsChecked, ntsState: o.ntsState,
+            ntsFound: o.ntsFound
           };
         });
         return head;
@@ -1385,7 +1415,7 @@
     fillFromPairs(kind, fields);
 
     var out = { kind: kind, fields: fields, bizNoOk: null, ntsChecked: false, ntsState: null,
-                error: null, via: (via === 'text' ? 'text' : 'image') };
+                ntsFound: null, error: null, via: (via === 'text' ? 'text' : 'image') };
 
     /* 명함에는 사업자번호가 없다 → 검증 대상이 아니므로 null 로 둔다.
        false 로 두면 화면이 '검증 실패'로 오해해 멀쩡한 명함을 사람에게 물어본다. */
@@ -1421,11 +1451,14 @@
           var row = j && j.data && j.data[0];
           if (!row) throw new Error('국세청에 자료가 없습니다');
           out.ntsChecked = true;
-          out.ntsState = row.b_stt || null;
+          /* ⚠ b_stt 만 보면 «없는 번호»가 조용히 통과한다 — 위 ntsWord 의 설명을 볼 것 */
+          out.ntsState = ntsWord(row) || null;
+          out.ntsFound = ntsFound(row);
           return out;
         }).catch(function () {
           /* 조회 못 했는데 했다고 하면 안 된다 — 판독 결과는 그대로 살린다. */
           out.ntsChecked = false;
+          out.ntsFound = null;
           return out;
         });
       });
@@ -2029,6 +2062,20 @@
 
     if (r.kind === 'bizreg' || r.kind === 'sme') {
       if (!r.bizNoOk) return { auto: false, why: '사업자등록번호를 확실히 읽지 못했습니다 — 번호를 확인해 주세요' };
+      /* ⚠⚠ 이미 읽어 둔 «옛» 결과에는 ntsFound 가 아예 없다(오늘 생긴 칸이다).
+         없다고 「모른다」로 두면 지난주에 읽어 둔 「폐업자」가 오늘 갑자기 자동으로
+         통과한다 — 고치려던 것보다 더 나쁜 일이다. 그래서 없으면 상태말을 보고 가린다. */
+      var found = (r.ntsFound === true || r.ntsFound === false) ? r.ntsFound
+        : (String(r.ntsState || '').indexOf('등록되지 않은') >= 0 ? false : null);
+      /* ★★ 국세청에 «없는» 번호는 여기서 막는다 — 체크섬은 통과하기 때문이다.
+         이 문이 없어서 587-86-01913 이 기업정보함까지 들어갔다(2026-09-15 대표 보고).
+         ⚠ 「없다」와 「못 물어봤다」는 다르다 — false 일 때만 막는다(null 은 안 막는다).
+         ⚠ 국세청이 준 안내문을 상태말인 양 끼워 넣지 «않는다» —
+           「국세청에 국세청에 등록되지 않은…로 나옵니다」가 된다. */
+      if (r.ntsChecked && found === false) {
+        return { auto: false, why: '국세청에 없는 사업자등록번호입니다 — 번호를 다시 확인해 주세요' };
+      }
+      /* 있기는 한데 계속사업자가 아니다(휴업·폐업) — 국세청이 준 말을 그대로 옮긴다 */
       if (r.ntsChecked && r.ntsState && r.ntsState.indexOf('계속') < 0) {
         return { auto: false, why: '국세청에 ' + r.ntsState + '로 나옵니다 — 확인이 필요합니다' };
       }
@@ -2130,6 +2177,9 @@
     SUM_MAX: SUM_MAX,
     readChangeNotice: readChangeNotice,
     autoOk: autoOk,
+    /* 국세청 응답 한 줄 읽기 (2026-09-17) — 기업정보함(coNtsWord)과 «같은 규칙»인지
+       검사가 두 곳을 나란히 놓고 견줄 수 있어야 해서 내보낸다. */
+    ntsWord: ntsWord, ntsFound: ntsFound,
     /* ⑨ 지문 기억 (2026-09-13) — 화면이 「이미 읽은 것 N장 건너뜀(0원)」이라 말하고,
        판독이 틀렸을 때 「다시 읽기」로 기억을 건너뛸 수 있게 내보낸다. */
     readSavedCount: readSavedCount,
