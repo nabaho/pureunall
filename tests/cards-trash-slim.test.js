@@ -26,7 +26,7 @@ function method(name, head) {
 }
 
 function store(over) {
-  const calls = { set: [], remove: [], putPhoto: [], delPhoto: [], delThumb: [], update: [] };
+  const calls = { tomb: [], set: [], remove: [], putPhoto: [], delPhoto: [], delThumb: [], update: [] };
   const ref = function (p) {
     return {
       set: function (v) { calls.set.push({ path: p, val: v }); return Promise.resolve(); },
@@ -48,6 +48,8 @@ function store(over) {
     privRoot: function () { return 'pucards_private'; },
     state: { items: { c1: { id: 'c1', name: '홍길동', thumb: '' } }, priv: null, trash: {} },
     removeIdx: function () {},
+    /* 지운 자국 — 「바뀐 것만」 받는 기기가 이 자국으로 지운 명함을 걷는다 (2026-09-18) */
+    cardTomb: function (id) { calls.tomb.push(id); },
     render: function () {},
     localStorage: { getItem: function () { return null; }, setItem: function () {} }
   };

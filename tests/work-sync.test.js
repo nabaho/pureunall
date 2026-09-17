@@ -116,7 +116,7 @@ ok('기준선만 찍고 돌아가는 분기보다 앞에 둔다',
 ok('기업정보함 본문을 먼저 읽는다 (색인은 저장할 때만 갱신된다)',
   grab('cardLoad').indexOf("'pucards/items'") < grab('cardLoad').indexOf("'pucards/idx'"));
 ok('기업정보함은 읽기만 한다', !/\.set\(|\.update\(|\.remove\(/.test(grab('cardLoad')));
-ok('기업정보함 본문이 pucards/items 에 있다', C.indexOf("watchCardMap(this.db.ref(DB_ROOT+'/items')") > 0);
+ok('기업정보함 본문이 pucards/items 에 있다', C.indexOf("const _itemsRef = this.db.ref(DB_ROOT+'/items');") > 0);
 ok("'개인'으로 숨긴 사람은 내보내지 않는다", grab('_cardRow').indexOf("r.sc==='private'") > 0);
 ok('사업자등록증은 사람이 아니라 뺀다', grab('_cardRow').indexOf("r.k==='biz'") > 0);
 const CF = grab('cardFind');

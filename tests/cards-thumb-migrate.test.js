@@ -21,6 +21,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+/* ⚠ 2026-09-18 — 이제 «칸만 고치는 길»도 updatedAt 을 함께 올린다(명함을 「바뀐 것만」
+   받게 되면서). 그 도장은 시각이라 값을 못 박을 수 없고, 이 검사가 지키려는 것도 아니다.
+   그래서 견주기 전에 도장만 떼어 낸다 — 도장이 «있는지»는 아래 따로 본 문단에서 본다. */
+function noStamp(o) {
+  const c = JSON.parse(JSON.stringify(o));
+  Object.keys(c).forEach(k => { if (/\/updatedAt$/.test(k)) delete c[k]; });
+  return c;
+}
+const noStampKeys = o => Object.keys(noStamp(o)).sort();
+
 /* 줄바꿈을 하나로 맞춘다 — 파일은 CRLF 라 '\n' 로 찾으면 안 걸린다 */
 const src = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').replace(/\r\n/g, '\n');
 
@@ -112,7 +122,7 @@ test('★ 계획도 똑같이 뺀다 — 세는 것과 하는 일이 같아야 �
   const items = { a:{ id:'a', thumb:'AAA' }, b:{ id:'b', thumb:'BBBBB' } };
   const plan = C.thumbMigrationPlan(items, shared, 50);
   assert.equal(plan.length, 1);
-  assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(plan[0]))).sort(),
+  assert.deepEqual(noStampKeys(plan[0]),
     ['pucards/items/a/thumb', 'pucards/thumbs/a'],
     '이미 밖에 있는 b 를 또 옮기면 헛일이고, 셈과도 어긋난다');
 });
@@ -124,7 +134,7 @@ test('★ 앞뒤를 따로 가른다 — 뒷면 캐시 열쇠는 <id>_b 다', ()
   assert.equal(r.n, 1, '앞면이 아직 안에 있으니 한 장은 남았다');
   assert.equal(r.bytes, 1, '뒷면(이미 밖에 있는 것)까지 크기에 넣으면 안 된다');
   const upd = C.thumbMigrationPlan({ a: it }, shared, 50)[0];
-  assert.deepEqual(JSON.parse(JSON.stringify(upd)), {
+  assert.deepEqual(noStamp(upd), {
     'pucards/thumbs/a':      'F',
     'pucards/items/a/thumb': null
   }, '뒷면은 이미 밖에 있는데 또 쓰려 든다');
@@ -177,7 +187,7 @@ test('★ 앞뒤 그림 한 장도 넣기·비우기가 통째로 한 묶음이�
   const C = load();
   const plan = C.thumbMigrationPlan({ a:{ id:'a', thumb:'F', thumb2:'B' } }, shared, 50);
   assert.equal(plan.length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(plan[0])), {
+  assert.deepEqual(noStamp(plan[0]), {
     'pucards/thumbs/a':        'F',
     'pucards/items/a/thumb':   null,
     'pucards/thumbs/a_b':      'B',
@@ -221,7 +231,11 @@ test('★ items/<id> 를 통째로 쓰는 경로가 하나도 없다', () => {
     Object.keys(upd).forEach(k => {
       assert.ok(!/\/items\/[^/]+$/.test(k), '명함을 통째로 쓴다: ' + k);
       const tail = k.split('/items/')[1];
-      if (tail) assert.ok(/^[^/]+\/(thumb|thumb2)$/.test(tail), '썸네일 칸 말고 다른 칸을 건드린다: ' + k);
+      /* ⚠ updatedAt 은 «내용»이 아니라 고친 시각 도장이다 (2026-09-18). 명함을 「바뀐 것만」
+         받게 되면서 칸만 고치는 길도 이 도장을 찍는다 — 안 찍으면 이 고침이 다른 기기에
+         영영 안 간다. 지켜야 할 규칙(이름·전화 같은 «내용»을 안 건드린다)은 그대로다. */
+      if (tail) assert.ok(/^[^/]+\/(thumb|thumb2|updatedAt)$/.test(tail),
+        '썸네일 칸 말고 다른 칸을 건드린다: ' + k);
     });
   });
 });
@@ -229,7 +243,7 @@ test('★ items/<id> 를 통째로 쓰는 경로가 하나도 없다', () => {
 test('이름·전화 같은 다른 칸은 계획에 아예 안 들어간다', () => {
   const C = load();
   const upd = C.thumbMigrationPlan({ a:{ id:'a', name:'홍길동', mobile:'010', thumb:'F' } }, shared, 50)[0];
-  const blob = JSON.stringify(JSON.parse(JSON.stringify(upd)));
+  const blob = JSON.stringify(noStamp(upd));
   assert.ok(blob.indexOf('홍길동') < 0, '이름이 실렸다');
   assert.ok(blob.indexOf('010') < 0, '전화가 실렸다');
 });
@@ -245,7 +259,7 @@ test('빈 문자열 썸네일은 계획에 안 들어간다 — 「사진 없음
 test('앞면은 비었고 뒷면만 있으면 뒷면만 옮긴다 — 앞면의 「사진 없음」은 그대로 둔다', () => {
   const C = load();
   const upd = C.thumbMigrationPlan({ a:{ id:'a', thumb:'', thumb2:'B' } }, shared, 50)[0];
-  assert.deepEqual(JSON.parse(JSON.stringify(upd)), {
+  assert.deepEqual(noStamp(upd), {
     'pucards/thumbs/a_b':     'B',
     'pucards/items/a/thumb2': null
   });
@@ -261,7 +275,7 @@ test('id 가 없거나 그림이 글자가 아니면 조용히 건너뛴다', ()
   const plan = C.thumbMigrationPlan(
     [null, { thumb:'A' }, { id:'x', thumb:{} }, { id:'y', thumb:1 }, { id:'ok', thumb:'A' }], shared, 50);
   assert.equal(plan.length, 1);
-  assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(plan[0]))).sort(),
+  assert.deepEqual(noStampKeys(plan[0]),
     ['pucards/items/ok/thumb', 'pucards/thumbs/ok']);
 });
 
@@ -469,7 +483,7 @@ test('★ 화면이 되꽂아 둔 그림은 단추를 눌러도 서버에 안 �
   const r = await C.migrateInlineThumbs();
   assert.match(C.askedMsg(), /1장/, '대표에게 물을 때부터 진짜 남은 수를 보여야 한다');
   assert.equal(C.calls.length, 1, '이미 나간 것까지 또 쓰고 있다');
-  assert.deepEqual(Object.keys(C.calls[0]).sort(), ['pucards/items/c2/thumb', 'pucards/thumbs/c2']);
+  assert.deepEqual(noStampKeys(C.calls[0]), ['pucards/items/c2/thumb', 'pucards/thumbs/c2']);
   assert.equal(r.done, 1);
   assert.equal(r.total, 1, '「1 / 3장」처럼 끝나지 않는 셈을 보여주면 안 된다');
 });

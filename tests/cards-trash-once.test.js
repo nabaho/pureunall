@@ -45,7 +45,10 @@ test('★ 읽기가 실패해도 기업정보함이 멎지 않는다', () => {
 });
 
 test('명함 목록은 여전히 실시간이다 — 휴지통과 헷갈려 같이 끊으면 안 된다', () => {
-  assert.match(src, /watchCardMap\(this\.db\.ref\(DB_ROOT\+'\/items'\)/,
+  /* ⚠ 2026-09-18 — 명함은 이제 «바뀐 것만» 받는다(_ref). 구독을 «한다»는 사실만 본다. */
+  assert.match(src, /const _itemsRef = this\.db\.ref\(DB_ROOT\+'\/items'\);/,
+    '★ 명함 자리가 없습니다.');
+  assert.match(src, /watchCardMap\(_ref,/,
     '★ 명함 목록까지 끊으면 동료가 넣은 명함이 안 보입니다.');
   assert.doesNotMatch(src, /ref\(DB_ROOT\+'\/items'\)\.on\('value'/,
     '★ 명함 한 장이 바뀌 때 전체 목록을 다시 받으면 요금이 다시 늘어납니다.');

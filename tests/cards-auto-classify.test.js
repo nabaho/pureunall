@@ -160,9 +160,16 @@ test('★ 나눠서 «한 번의 update»로 보낸다 — 한 장씩 수천 번
   for (let i = 0; i < 450; i++) moves.push({ id: 'x' + i, gid: 'g2' });
   const ch = ctx.autoClsChunks(moves, 200);
   assert.strictEqual(ch.length, 3, '200·200·50 세 꾸러미');
-  assert.strictEqual(Object.keys(ch[0]).length, 200);
-  assert.strictEqual(Object.keys(ch[2]).length, 50);
+  /* ⚠ «열쇠 수»로 세지 않는다 (2026-09-18) — 한 장마다 group 말고 updatedAt 도 함께 쓰므로
+     열쇠는 장 수의 두 배다. 지켜야 할 것은 «한 꾸러미에 몇 장이 실리는가»다. */
+  const cards = u => Object.keys(u).filter(k => /\/group$/.test(k)).length;
+  assert.strictEqual(cards(ch[0]), 200);
+  assert.strictEqual(cards(ch[2]), 50);
   assert.strictEqual(ch[0]['items/x0/group'], 'g2', '쓰는 자리는 items/{id}/group');
+  /* ★ 폴더만 옮겨도 updatedAt 을 함께 올린다 — 안 올리면 「바뀐 것만」 받는 다른 기기가
+     이 옮김을 영영 못 본다(옛 폴더로 계속 보인다). 2026-09-18 */
+  assert.strictEqual(typeof ch[0]['items/x0/updatedAt'], 'number',
+    '★ 자동 폴더 옮기기가 updatedAt 을 안 올립니다');
 });
 
 test('빈 것·망가진 것은 쓰지 않는다', () => {
@@ -245,9 +252,11 @@ test('모르는 규칙·망가진 tabs 에 안 넘어진다', () => {
 /* ── 걸어 놓은 자리 ── */
 
 test('표시는 꾸러미가 «올 때 바로» 한다 — 미루면 새 명함이 새어 나간다', () => {
-  const at = HTML.indexOf("watchCardMap(this.db.ref(DB_ROOT+'/items')");
-  assert.ok(at > 0);
-  const near = HTML.slice(at, at + 1600);
+  /* ⚠ 2026-09-18 자리 이름이 바뀌었다 — 명함은 이제 «바뀐 것만» 받으므로 구독 대상이
+     _ref(추린 것 또는 통째)다. 붙잡는 곳을 그 위의 «명함 자리»로 옮긴다. */
+  const at = HTML.indexOf("const _itemsRef = this.db.ref(DB_ROOT+'/items');");
+  assert.ok(at > 0, '명함 구독 자리를 찾지 못했습니다');
+  const near = HTML.slice(at, at + 2600);
   assert.match(near, /autoClsMark\(\);/, '표시를 그 자리에서 해야 한다');
   assert.match(near, /autoClsSoon\(\);/, '옮기기는 미룬다');
   assert.ok(!/setTimeout\(autoClassifyOnArrive/.test(near),

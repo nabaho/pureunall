@@ -196,9 +196,10 @@ test('★ 화면이 바뀔 때마다 적는다', () => {
 
 test('★ 명함이 도착한 뒤에 옮긴다', () => {
   /* 먼저 옮기면 빈 화면이 잠깐 보이고, 자료함·보낸 메일은 아직 읽히지도 않았다. */
-  const i = app.indexOf("watchCardMap(this.db.ref(DB_ROOT+'/items')");
+  const i = app.indexOf("const _itemsRef = this.db.ref(DB_ROOT+'/items');");
   assert.ok(i > 0, '명함 구독을 찾을 수 없습니다');
-  assert.match(app.slice(i, i + 400), /restoreLastScreen\(\)/,
+  /* 2026-09-18 명함 자리에 「바뀐 것만 받기」 머리글이 붙어 창이 길어졌다 */
+  assert.match(app.slice(i, i + 1600), /restoreLastScreen\(\)/,
     '자료가 오기 전에 화면을 옮깁니다');
 });
 

@@ -517,9 +517,21 @@ rules.backup_key = {
 };
 
 /* ══ 기업정보함·사진첩·급여데이터함 ════════════════════════════════════ */
+/* ⚠ items·tomb 를 «이름으로» 적는 까닭은 색인(.indexOn) 하나뿐이다 (2026-09-18).
+     ★ 왜 색인이 필요한가 — 기업정보함은 이제 명함을 «바뀐 것만» 받는다
+       (orderByChild('updatedAt').startAt(ckpt)). 색인이 없으면 파이어베이스가
+       **6,600장을 통째로 내려받아 브라우저에서 줄을 세운다** — 줄이려고 만든 것이
+       도리어 다 받는 길이 된다. 색인이 이 고침의 전제다.
+     ★ tomb(지운 자국)은 값(시각)으로 추리므로 '.value' 색인이다.
+   ⚠⚠ 이름으로 적는 순간 그 칸은 더 이상 아래 $k 에 안 걸린다 — 그래서 $k 가 주던
+       쓰기 허락을 **글자 그대로 옮겨 적는다**. 안 옮기면 명함 저장이 통째로 막힌다
+       (허락은 위에서 아래로 흐르지만, $k 는 «이름 없는 칸»에만 걸린다). */
+const pucardsWrite = `(${MAIL}) && (newData.exists() || ${ADMIN})`;
 rules.pucards = {
   '.read': MAIL, '.write': ADMIN,
-  $k: { '.write': `(${MAIL}) && (newData.exists() || ${ADMIN})`, $k2: { '.write': MAIL } }
+  items: { '.write': pucardsWrite, '.indexOn': ['updatedAt'], $k2: { '.write': MAIL } },
+  tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': MAIL } },
+  $k: { '.write': pucardsWrite, $k2: { '.write': MAIL } }
 };
 rules.pucards_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
 
