@@ -7,6 +7,16 @@
 <link rel="manifest" href="pu-erp-manifest.json">
 <!-- ⚠ apple- 쪽만 두면 크롬이 켤 때마다 「deprecated」 경고를 찍는다. 둘 다 둔다(아이폰은 apple- 를 본다). -->
 <meta name="mobile-web-app-capable" content="yes">
+<script>
+/* 폰 「공유 → 푸른이알피」를 받는 일꾼 (대표 지시 2026-09-17).
+   ⚠ 이 일꾼은 아무것도 캐시하지 않는다 — 공유 POST 말고는 손도 안 댄다(pu-erp-sw.js 머리 참고).
+   ⚠ https 에서만 된다. 깃허브 페이지는 https 다. */
+if('serviceWorker' in navigator && location.protocol === 'https:'){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('pu-erp-sw.js')['catch'](function(){});
+  });
+}
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="푸른 ERP">
@@ -164,7 +174,7 @@
 <div id="root"></div>
 <script src="js/utils.js?v=2"></script>
 <script src="js/pu-photo-store.js?v=28"></script>
-<script src="js/pu-billing.js?v=9"></script>
+<script src="js/pu-billing.js?v=10"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
 <script src="js/pu-ontology.js?v=26"></script>
@@ -294,8 +304,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-16 콘솔 잔소리 걷기 — 직원 색표를 «구글 색표가 오기 전»에 올리려다 켤 때마다 세 줄 찍고 서버에 헛쓰기하던 것을 끊었다(되돌아갈 색이 진짜 색을 덮을 위험도 함께) · 전달함 · 충돌 뿌리 · 깜빡임 뿌리';
-var BUILD_SEQ = 160;
+var ERP_BUILD = '2026-09-17 「이름없음 접속」의 뿌리 — 연결이 끊기면 서버가 내 자리를 지우는데 심장박동이 한 칸만 써서 «껍데기»로 되살리던 것을 끊었다(다시 붙으면 통째로 다시 쓰고 자동삭제도 다시 건다) · 끊길 때마다 「접속했습니다」가 되풀이 뜨던 것 · 화면 멈춤에 «어느 표인지» 이름표 · 폰 공유받기 · AI 한도 5만원';
+var BUILD_SEQ = 161;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -1848,6 +1858,15 @@ var DEVICE_ID = (function(){
   try {
     var k = 'pureun_v6_device_id';
     var v = localStorage.getItem(k);
+    /* ★ 언젠가 «따옴표째» 저장된 자국이 있다 — 이 값은 날것으로 읽으므로 그대로 딸려 온다.
+       실측 2026-09-17: 접속표시 열쇠가 "mqn5ak…"__P-001 꼴이고 기기 이름이 PC (b8s") 로 깨져 있었다
+       (이름을 뒤 네 글자로 만드는데 그 안에 따옴표가 들어간 것이다).
+       ⚠ 벗기면 기기 번호가 바뀌어 접속표시 자리가 하나 새로 생긴다 — 옛 자리는 6분 뒤 사라진다.
+         한 번만 겪으면 되는 일이고, 그대로 두면 이름이 영영 깨진 채로 남는다. */
+    if(v && v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"'){
+      v = v.slice(1, -1);
+      try { localStorage.setItem(k, v); } catch(_q){}
+    }
     if(!v){ v = (Date.now().toString(36) + Math.random().toString(36).slice(2,10)); localStorage.setItem(k, v); }
     return v;
   } catch(_){ return (Date.now().toString(36) + Math.random().toString(36).slice(2,10)); }
@@ -1895,7 +1914,13 @@ var PRESENCE_STALE_MS = 6 * 60 * 1000;
 var PRESENCE_DEAD_MS = 24 * 60 * 60 * 1000;
 var _presencePruned = false;   // 유령 치우기는 세션당 한 번만
 var _presenceList = [];        // 구독 결과(원본 배열)
-var _presenceAnnounced = {};   // 이미 알림 띄운 다른 기기 devId 모음 (세션 동안 1회만 알림)
+/* 이미 알림 띄운 다른 기기 — devId → «알린 시각».
+   ⚠ 예전에는 true/삭제였고, 자리가 사라지면 함께 지웠다. 그래서 연결이 한 번 끊겼다
+     붙을 때마다 「🟢 ○○○ 님이 접속했습니다」가 되풀이해 떴다(대표 제보 2026-09-17 「계속 깜빡인다」).
+     시각으로 남겨, 한참(아래 시간) 지난 뒤 진짜로 다시 들어왔을 때만 한 번 더 알린다. */
+var _presenceAnnounced = {};
+var PRESENCE_REANNOUNCE_MS = 30 * 60 * 1000;   // 30분 — 이보다 짧은 끊김은 «다시 접속»으로 안 본다
+var _presenceConnBound = false;                // .info/connected 듣기는 한 번만
 var _presenceHbTimer = null;
 var _presenceRef = null;       // 내 presence 경로 ref (onDisconnect 취소용)
 var _presenceKey = null;       // 내 presence 키 = 기기ID + 계정(sid) → 같은 PC라도 계정 다르면 각각 표시
@@ -1962,7 +1987,16 @@ function _writePresence(full){
     && _presenceLastFull.loginAt === loginAt;
   _markPresenceHour(sid, name);
   if(!full && same){
-    _presenceRef.update({ lastSeen: Date.now() }).catch(function(){});
+    /* ★★ 가볍게 쓰되 «누구인지»는 늘 함께 보낸다 (대표 제보 2026-09-17 「갑자기 이름없음이 뜬다」).
+       ■ 무엇이 있었나
+         연결이 끊기면 서버가 onDisconnect 로 내 자리를 «지운다». 다시 붙은 뒤 이 심장박동이
+         lastSeen 한 칸만 쓰면, 실시간DB 의 update 는 «없는 자리에 쓰면 만들어 주므로»
+         이름도 사번도 없는 «껍데기»가 생긴다 — 그것이 화면의 「(이름없음) 접속」이다.
+         (실측 2026-09-17: presence/…__A-003 에 lastSeen 한 칸만 있었다.)
+       ⚠ 이것은 dbPatch 가 「id 를 늘 함께 보낸다」로 막은 것과 «같은 고장»이다.
+         칸만 보내는 길에는 반드시 «누구인지»를 얹는다.
+       ⚠ 그래도 가볍다 — sid·name 은 수십 바이트다. 통째로 쓰는 것(device·loginAt 까지)과 다르다. */
+    _presenceRef.update({ lastSeen: Date.now(), sid: sid, name: name }).catch(function(){});
     return;
   }
   _presenceLastFull = { sid:sid, name:name, device:DEVICE_NAME, loginAt:loginAt };
@@ -2006,9 +2040,17 @@ function _schedulePresencePublish(){
     try {
       var nowT = Date.now();
       var fresh = arr.filter(function(p){
-        return p.devId !== _presenceKey && p.lastSeen && (nowT - p.lastSeen) < PRESENCE_STALE_MS && !_presenceAnnounced[p.devId];
+        if(p.devId === _presenceKey) return false;
+        if(!p.lastSeen || (nowT - p.lastSeen) >= PRESENCE_STALE_MS) return false;
+        /* ⚠ 사번 없는 «껍데기»는 알리지 않는다 — 「(이름없음) 님이 접속했습니다」는
+           아무 뜻이 없고, 끊김이 잦으면 그것만 되풀이해 뜬다.
+           ⚠ 이름으로 가리지 않는다 — 그리는 쪽에서 «없으면 (이름없음)»을 채워 넣어(위 publish)
+             이름은 늘 있는 것처럼 보인다. 빈 것은 사번이다. */
+        if(!p.sid) return false;
+        var 알린때 = _presenceAnnounced[p.devId];
+        return !알린때 || (nowT - 알린때) > PRESENCE_REANNOUNCE_MS;
       });
-      fresh.forEach(function(p){ _presenceAnnounced[p.devId] = true; });
+      fresh.forEach(function(p){ _presenceAnnounced[p.devId] = nowT; });
       if(fresh.length && typeof showToast === 'function'){
         var names = fresh.map(function(p){ return ((p.device && p.device.indexOf('폰') >= 0) ? '📱 폰 ' : '💻 PC ') + _presenceName(p); });
         showToast('🟢 ' + (fresh.length === 1 ? names[0] + ' 님이 ERP에 접속했습니다.' : '현재 접속 중: ' + names.join(', ')));
@@ -2018,7 +2060,15 @@ function _schedulePresencePublish(){
 }
 function presenceListLive(){
   var now = Date.now();
-  return _presenceList.filter(function(p){ return p && p.lastSeen && (now - p.lastSeen) < PRESENCE_STALE_MS; });
+  return _presenceList.filter(function(p){
+    if(!p || !p.lastSeen || (now - p.lastSeen) >= PRESENCE_STALE_MS) return false;
+    /* ★ 사번 없는 «껍데기»는 사람이 아니다 — 세지도, 보이지도 않는다
+       (대표 제보 2026-09-17 「갑자기 이름없음이 뜬다」).
+       ⚠ 만드는 쪽은 위에서 막았지만, 낡은 판을 켜 둔 다른 기기가 당분간 더 만든다.
+         그것까지 안 보이게 여기서도 막는다 — 고침이 «퍼지기 전»에도 화면은 멀쩡해야 한다. */
+    if(!p.sid) return false;
+    return true;
+  });
 }
 // 대시보드 위에 떠있는 작은 패널(body 레벨 고정) — 마우스/터치로 드래그 이동 가능. 시작 위치 = 좌측 상단(사이드바 영역).
 var _panelPos = null;   // 현재 위치. null이면 저장된 위치(개인별) → 없으면 기본(좌측 하단). 드래그 시 개인별로 저장.
@@ -2116,6 +2166,23 @@ function initPresence(sid, name){
     _presenceRef = fbDb.ref('presence/' + _presenceKey);
     _writePresence(true);                   // 즉시 1회 — 처음은 반드시 통째로
     _presenceRef.onDisconnect().remove();    // 닫힘/새로고침/크래시 시 서버가 자동 삭제
+    /* ★★ 끊겼다 다시 붙으면 «둘»을 되살려야 한다 (대표 제보 2026-09-17).
+       ① 서버가 onDisconnect 로 내 자리를 이미 «지웠다». 그대로 두면 심장박동이
+          껍데기를 만든다 → 「(이름없음)」. 그래서 붙는 즉시 «통째로» 다시 쓴다.
+       ② onDisconnect 예약은 «한 번 쓰이면 사라진다». 다시 걸지 않으면 이 탭을 닫아도
+          자리가 안 지워져 남의 화면에 유령으로 남는다(6분 뒤에야 숨는다).
+       ⚠ 뒤로가기 캐시(bfcache)로 들어갔다 나오면 이 끊김이 «자주» 일어난다 —
+         콘솔의 「Page entered Back-Forward Cache」가 그 신호다. */
+    if(!_presenceConnBound){
+      _presenceConnBound = true;
+      try {
+        fbDb.ref('.info/connected').on('value', function(s){
+          if(!s || !s.val() || !_presenceRef) return;
+          try { _presenceRef.onDisconnect().remove(); } catch(_c){}
+          _writePresence(true);
+        });
+      } catch(_c2){}
+    }
     if(_presenceHbTimer) clearInterval(_presenceHbTimer);
     /* 2분 하트비트. 백그라운드 탭에서는 쓰지 않고 다시 보일 때 한 번만 갱신한다.
        ⚠ _writePresence 를 그대로 넘기지 않는다 — 넘기면 타이머가
@@ -2132,7 +2199,11 @@ function initPresence(sid, name){
       _presenceHandlers = {
         add:function(s){ _presenceMap[s.key] = s.val() || {}; _schedulePresencePublish(); },
         change:function(s){ _presenceMap[s.key] = s.val() || {}; _schedulePresencePublish(); },
-        remove:function(s){ delete _presenceMap[s.key]; delete _presenceAnnounced[s.key]; _schedulePresencePublish(); }
+        /* ⚠★ 자리가 사라졌다고 «알림 기록»까지 지우지 않는다 (대표 제보 2026-09-17 「계속 깜빡인다」).
+           지우면, 연결이 한 번 끊겼다 붙을 때마다 그 사람이 «새로 접속한 것»으로 보여
+           「🟢 ○○○ 님이 접속했습니다」 알림이 되풀이해 뜬다 — 그것이 깜빡임이다.
+           대신 «언제 알렸는지»를 남겨, 한참 뒤 진짜로 다시 들어왔을 때만 한 번 더 알린다. */
+        remove:function(s){ delete _presenceMap[s.key]; _schedulePresencePublish(); }
       };
       _presenceRootRef.on('child_added', _presenceHandlers.add);
       _presenceRootRef.on('child_changed', _presenceHandlers.change);
@@ -9333,7 +9404,36 @@ function fbUploadAll(onProgress, onDone){
 //   opts.selfHeal: 서버는 정상 객체인데 로컬이 (옛 코드가 뭉갠) 배열이면 서버 원본으로 복구 — 초기동기화 전용.
 //   opts.deferGate: 급감 게이트를 즉시 모달로 띄우지 않고 보류 큐에 모아 동기화 완료 후 일괄 처리 — 로그인 직후 모달폭탄 방지.
 //   반환: 로컬에 실제로 값을 쓴 경우 true (초기동기화 pulled 카운트용). 게이트 보류/스킵은 false.
+/* ★★ 「화면 멈춤 200ms — 무엇인지 못 잡음」의 이름표 (대표 제보 2026-09-17 「깜빡임이 계속된다」)
+   ─────────────────────────────────────────────────────────────────────────
+   맨 앞의 느림 감시기는 «타이머»에만 이름표를 단다(setTimeout·setInterval).
+   그런데 서버 자료가 도착해 처리되는 이 길은 파이어베이스 콜백이라 «타이머가 아니다» —
+   그래서 0.2초씩 얼어붙는데도 콘솔이 「이름표가 안 붙은 일감」이라고만 했다.
+   여기서 «어느 표가·몇 밀리초·몇 글자» 인지 찍는다. 느릴 때만 찍고 그 밖에는 아무것도 안 한다.
+   ⚠ 이 줄을 지우지 말 것 — 지우면 다음에 또 「무엇인지 못 잡음」으로 돌아간다. */
+var _FB_SLOW_MS = 120;
+var _fbSlowLast = {};
 function _fbApplyRecord(k, v, opts){
+  var _t0 = (window.performance && performance.now) ? performance.now() : 0;
+  var _out = _fbApplyRecordInner(k, v, opts);
+  try {
+    if(_t0){
+      var _d = performance.now() - _t0;
+      if(_d >= _FB_SLOW_MS){
+        var _now = Date.now();
+        if(!_fbSlowLast[k] || _now - _fbSlowLast[k] > 5000){      // 같은 표는 5초에 한 줄
+          _fbSlowLast[k] = _now;
+          var _n = '?';
+          try { _n = Array.isArray(v.v) ? v.v.length : (v.v && typeof v.v === 'object' ? Object.keys(v.v).length : 1); } catch(_c){}
+          console.warn('🐌 화면 멈춤 ' + Math.round(_d) + 'ms — 서버 자료 «' + k + '» 를 받아 적용하는 중'
+            + ' (' + _n + '건)  ← 이것이 깜빡임의 정체입니다');
+        }
+      }
+    }
+  } catch(_e){}
+  return _out;
+}
+function _fbApplyRecordInner(k, v, opts){
   opts = opts || {};
   if(!fbShouldSync(k)) return false;
   if(!v || v.v === undefined) return false;

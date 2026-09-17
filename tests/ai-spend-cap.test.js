@@ -4,6 +4,8 @@
 
      「한도금액제한을 두게 할 수 있나 그리고 일정금액 얼만큼 사용되고 있는지
        여기 화면에 보이게 할 수 있나」 → 「3만원으로 하고 만약 25000원 넘으면 경고」
+     2026-09-17 「3만원 금액은 적은 것 같다. 5만원으로 재조정해달라」 → 한도 5만.
+       경고선은 «한도까지 ₩5,000 남았을 때»라는 처음 뜻을 지켜 4만5천으로 옮겼다.
 
    ★ 이 기능의 급소는 «어긋남»이다 —
      화면이 「아직 남았습니다」라고 적는데 서버가 막으면, 누른 사람은 자기가 뭘
@@ -11,7 +13,7 @@
      그래서 셈은 **한 곳**(js/pu-billing.js 의 aiSummarize)에 두고, 서버
      (functions/doc-read.js)와 «나란히 세워» 같은 답인지 여기서 견준다.
 
-   ⚠ 30,000 · 25,000 · 4 는 «값 자체가 규칙»이다 — 대표가 정한 금액이다
+   ⚠ 50,000 · 45,000 · 4 는 «값 자체가 규칙»이다 — 대표가 정한 금액이다
      (검사고정-허용). 바꾸려면 대표에게 다시 물어야 한다.
    ⚠ 0 은 «끔»이다. 한도 0 을 「0원까지만 쓴다」로 읽어 통째로 막으면 안 된다. */
 const test = require('node:test');
@@ -61,8 +63,8 @@ function cutExport(src, name) {
 
 /* ══════ ① 대표가 정한 숫자 ═════════════════════════════════════════════ */
 
-test('한도 ₩30,000 · 경고 ₩25,000 (검사고정-허용 — 대표가 정한 금액)', () => {
-  assert.deepEqual(DR.AI_BUDGET_DEFAULT, { limit: 30000, warn: 25000, wonPerRead: 4 });
+test('한도 ₩50,000 · 경고 ₩45,000 (검사고정-허용 — 대표가 정한 금액)', () => {
+  assert.deepEqual(DR.AI_BUDGET_DEFAULT, { limit: 50000, warn: 45000, wonPerRead: 4 });
   같은설정(PB.AI_BUDGET_DEFAULT, DR.AI_BUDGET_DEFAULT,
     '★ 서버와 화면의 기본 한도가 다릅니다 — 설정을 안 만든 회사에서 둘이 딴말을 합니다');
 });
@@ -85,23 +87,30 @@ test('★ 서버·화면이 «같은 금액»을 낸다 (0장부터 한도 언�
 
 test('★ 막는 «문턱»도 같다 — 같은 부등호(>=)를 써야 한 장 차이로 안 어긋난다', () => {
   const b = DR.aiBudgetOf(null);
-  [6250, 7499, 7500, 7501].forEach((n) => {
+  /* ⚠★ 판독 «횟수»(6250·7500…)를 박아 두지 않는다 — 그 숫자는 옛 금액(3만·2만5천)을
+     단가로 나눈 값이라, 대표가 금액을 바꾸면(2026-09-17 「5만원으로 재조정」) 통째로
+     달라져 **멀쩡한 코드에서 검사가 깨진다**(실제로 깨졌다). 금액에서 되짚어 센다. */
+  const 장 = (won) => Math.round(won / b.wonPerRead);
+  [장(b.warn), 장(b.limit) - 1, 장(b.limit), 장(b.limit) + 1].forEach((n) => {
     const 서버막나 = b.limit > 0 && DR.aiSpentWon(n, b.wonPerRead) >= b.limit;
     const 화면막나 = PB.aiSummarize(null, 셈(n)).over;
     assert.equal(화면막나, 서버막나,
       '★ 판독 ' + n + '번에서 막는 판단이 갈라집니다');
   });
-  /* 딱 맞아떨어지는 자리(₩30,000)는 «막는 쪽»이다 — 넘어야 막으면 한도가 한 장씩 샌다 */
-  assert.equal(PB.aiSummarize(null, 셈(7500)).over, true,
+  /* 딱 맞아떨어지는 자리(한도와 같은 금액)는 «막는 쪽»이다 — 넘어야 막으면 한도가 한 장씩 샌다 */
+  assert.equal(PB.aiSummarize(null, 셈(장(b.limit))).over, true,
     '★ 딱 한도에 닿은 순간을 안 막고 있습니다');
 });
 
 test('세 갈래(평소·경고·중단)가 대표가 말한 자리에서 갈린다', () => {
+  /* ⚠ 여기도 금액에서 되짚어 센다 — 위 검사와 같은 까닭이다 */
+  const b = DR.aiBudgetOf(null);
+  const 장 = (won) => Math.round(won / b.wonPerRead);
   const 상태 = (n) => PB.aiSummarize(null, 셈(n)).tone;
-  assert.equal(상태(6249), 'ok');       // ₩24,996
-  assert.equal(상태(6250), 'warn');     // ₩25,000 — 경고
-  assert.equal(상태(7499), 'warn');     // ₩29,996
-  assert.equal(상태(7500), 'over');     // ₩30,000 — 중단
+  assert.equal(상태(장(b.warn) - 1), 'ok');      // 경고선 바로 아래
+  assert.equal(상태(장(b.warn)), 'warn');        // 경고선에 닿는 순간
+  assert.equal(상태(장(b.limit) - 1), 'warn');   // 한도 바로 아래
+  assert.equal(상태(장(b.limit)), 'over');       // 한도에 닿는 순간 — 중단
 });
 
 /* ══════ ③ 「모른다」와 「0원」을 가른다 ═════════════════════════════════ */

@@ -119,8 +119,11 @@ function ymKST(now) { return ymdKST(now).slice(0, 7); }
 const VISION_FREE_MONTH = 1000;
 function visionMonthPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all/vision"; }
 
-/* ── AI 판독 «이번 달 요금» 한도 (대표 결정 2026-09-10) ──────────────────────
-     목업 docs/mockups/ai-spend-cap.html · 한도 ₩30,000 · 경고 ₩25,000
+/* ── AI 판독 «이번 달 요금» 한도 (대표 결정 2026-09-10 → 2026-09-17 올림) ─────
+     목업 docs/mockups/ai-spend-cap.html · 한도 ₩50,000 · 경고 ₩45,000
+   ★ 2026-09-17 대표 「3만원 금액은 적은 것 같다. 5만원으로 재조정해달라」
+     → 한도 3만 → 5만. 경고선은 대표가 따로 말씀하지 않으셨으므로 «한도까지 ₩5,000 남았을 때»
+       라는 처음의 뜻을 그대로 지켜 2만5천 → 4만5천으로 옮겼다(₩5,000 이면 판독 1,250번 여유다).
 
    ★ 왜 — 2026-09-10 부터 판독이 «유료 등급»으로 돈다. 하루 500번 한도가 풀린 대신
      부른 만큼 요금이 붙는다. 평상시는 월 ₩1,000~3,500(실측)이지만, 뭔가 잘못 돌아
@@ -133,7 +136,7 @@ function visionMonthPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all/vi
    ⚠ Vision 은 이 셈에 «안» 넣는다 — 그쪽은 제 문턱(달마다 1,000장)이 따로 돌아
      유료 구간에 안 들어간다. 한 숫자에 섞으면 어느 쪽이 남았는지 알 수 없게 된다. */
 const AI_BUDGET_PATH = "ai_read_budget";
-const AI_BUDGET_DEFAULT = { limit: 30000, warn: 25000, wonPerRead: 4 };
+const AI_BUDGET_DEFAULT = { limit: 50000, warn: 45000, wonPerRead: 4 };
 
 /* 화면·서버가 «같은 답»을 내야 하므로 계산을 여기 한 곳에 둔다.
    ⚠ 두 곳에 적으면 화면은 「남았다」는데 서버가 막는 일이 생긴다. */
