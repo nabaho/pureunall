@@ -104,7 +104,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=4"></script>
-<script src="js/pu-version.js?v=5"></script>
+<script src="js/pu-version.js?v=6"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 // CommonJS/AMD 환경 가드 (모바일 WebView 호환)
@@ -304,8 +304,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-17 「계속 깜빡인다·돈이 샌다」 뿌리 확정 — 우리 코드였다: 자문수입 id 자동복구가 찬 거래에서 접히고도 무조건 location.reload() 를 걸어 탭이 20초마다 스스로 다시 켜졌다. 이제 실제로 고친 것이 있을 때만·탭에 한 번만 새로 열고, 자동 길은 탭에 한 번만 돈다. 폭풍 문도 「계속」을 눌러도 3번 더 이어지면 다시 묻는다';
-var BUILD_SEQ = 164;
+var ERP_BUILD = '2026-09-17 부팅 폭풍 감지기의 거짓 경보를 바로잡음 — 같은 탭에서 로그아웃→포털→로그인→이알피 흐름의 포털 부팅까지 이알피 부팅으로 세어 「3번, 주소로 다시 열림」 띠와 문이 떴다. 이제 탭 눈도 화면 경로별로 센다(서버 기록에는 되풀이 부팅이 없었다)';
+var BUILD_SEQ = 165;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
