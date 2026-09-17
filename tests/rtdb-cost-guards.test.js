@@ -25,7 +25,10 @@ test('기업정보함 본문과 ERP 명함색인은 전체 value 구독을 하�
   const erp = read('pu-erp.html');
   assert.doesNotMatch(cards, /ref\(DB_ROOT\+'\/items'\)\.on\('value'/);
   assert.doesNotMatch(erp, /ref\('pucards\/idx'\)\.on\('value'/);
-  assert.match(cards, /watchCardMap\(this\.db\.ref\(DB_ROOT\+'\/items'/);
+  /* ⚠ 2026-09-18 — 명함은 «바뀐 것만» 받는다(_ref = 추린 것 또는 통째).
+     지켜야 할 규칙은 그대로다: 항목 단위 구독이지 value 통째 구독이 아니다. */
+  assert.match(cards, /const _itemsRef = this\.db\.ref\(DB_ROOT\+'\/items'\);/);
+  assert.match(cards, /watchCardMap\(_ref,/);
   assert.match(erp, /watchPucardsIndexByChild\(/);
 });
 

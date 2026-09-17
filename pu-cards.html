@@ -3703,13 +3703,19 @@ const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', e
    ⚠ 씨앗에는 «그 사이 지워진 명함»이 남아 있을 수 있다. 서버는 제가 가진 것만
      child_added 로 주므로, 첫 스트림이 끝났을 때(settled 직전) 서버가 끝내 안 준
      열쇠를 걷어낸다 — 안 걷으면 지운 명함이 유령으로 영영 남는다. */
-function watchCardMap(ref, assign, settled, denied, seed){
+/* ⚠⚠ opts.partial — 이 구독이 «바뀐 것만» 받는 것인가 (2026-09-18)
+   씨앗의 유령 걷기(아래 firstSettle)는 「서버가 끝내 안 준 열쇠 = 지워진 것」이라는
+   셈에 기댄다. 그 셈은 **스트림이 전부일 때만** 참이다.
+   바뀐 것만 받는 구독에 이 걷기를 그대로 두면 **안 바뀐 명함 6,600장이 통째로 사라진다.**
+   그래서 partial 이면 걷지 않고, 지워진 것은 «지운 자국»(tomb)으로 따로 걷는다. */
+function watchCardMap(ref, assign, settled, denied, seed, opts){
   const map={}; let timer=null;
+  const partial = !!(opts && opts.partial);
   const pend={};                        /* 씨앗인데 아직 서버가 확인 안 해 준 열쇠 */
   let firstSettle = false;
   if(seed && typeof seed==='object'){
-    Object.keys(seed).forEach(k=>{ map[k]=seed[k]; pend[k]=1; });
-    firstSettle = true;
+    Object.keys(seed).forEach(k=>{ map[k]=seed[k]; if(!partial) pend[k]=1; });
+    firstSettle = !partial;
     assign(map);                        /* 즉시 한 번 — 화면이 바로 선다 */
   }
   const publish=()=>{
@@ -3748,7 +3754,16 @@ function watchCardMap(ref, assign, settled, denied, seed){
      로그인 화면 뒤에서 명함이 먼저 보이면 안 된다.
    ⚠ 기기에 담긴 것은 브라우저 프로필을 여는 사람이 읽을 수 있다. 회사 PC 에서
      쓰는 앱이라 두기로 한다 — 지우려면 브라우저 「사이트 데이터 삭제」다. */
+/* ★★ 씨앗에 «어디까지 받았는지»(ckpt)를 함께 담는다 (대표 지시 2026-09-18 「기업정보함도 줄여라」)
+   ── 왜
+     씨앗은 화면을 빨리 세워 줄 뿐, **내려받는 양은 그대로 3.07MB** 였다. 켤 때마다 6,600장을
+     통째로 다시 받아 놓고 거의 전부를 「씨앗과 같다」며 버렸다.
+     ckpt 가 있으면 «그 뒤에 바뀐 것만» 물어볼 수 있다(updatedAt 으로 추린 구독).
+   ⚠ ckpt 는 담은 «시각»에서 넉넉히 물러선 값이다 — updatedAt 은 각 PC 의 시계로 찍히므로
+     시계가 조금씩 어긋난다. 한 시간 물러서면 그 사이 것을 몇 장 더 받을 뿐 빠뜨리지 않는다.
+   ⚠ 옛 씨앗(ckpt 없음)은 그대로 읽힌다 — 그때는 예전처럼 통째로 받는다(한 번만). */
 const CARD_CACHE_KEY = 'items-v1';
+const CKPT_BACK_MS = 60*60*1000;        /* 시계 어긋남 여유 — 한 시간 */
 function cardCacheGet(cb){
   let done=false; const fin=v=>{ if(!done){ done=true; cb(v); } };
   try{
@@ -3758,7 +3773,11 @@ function cardCacheGet(cb){
       try{
         const db = e.target.result;
         const g = db.transaction('kv','readonly').objectStore('kv').get(CARD_CACHE_KEY);
-        g.onsuccess = ()=>{ fin(g.result && g.result.items ? g.result.items : null); try{ db.close(); }catch(_){ } };
+        /* {items, ckpt} 를 돌려준다 — 옛 씨앗은 ckpt 가 없어 통째로 받는 길로 간다 */
+        g.onsuccess = ()=>{ const r = g.result;
+          fin(r && r.items ? { items:r.items, ckpt:Number(r.ckpt)||0, at:Number(r.at)||0,
+                               fullAt:Number(r.fullAt)||0 } : null);
+          try{ db.close(); }catch(_){ } };
         g.onerror = ()=>{ fin(null); try{ db.close(); }catch(_){ } };
       }catch(_){ fin(null); }
     };
@@ -3774,13 +3793,31 @@ function cardCachePut(items){
       try{
         const db = e.target.result;
         db.transaction('kv','readwrite').objectStore('kv')
-          .put({ at: Date.now(), items: items }, CARD_CACHE_KEY);
+          .put({ at: Date.now(), items: items, ckpt: Date.now() - CKPT_BACK_MS,
+                 fullAt: Number(_lastFullAt)||0 }, CARD_CACHE_KEY);
         setTimeout(()=>{ try{ db.close(); }catch(_){ } }, 800);
       }catch(_){ }
     };
   }catch(_){ }
 }
 let _cardSeedUsed = false;   /* 씨앗으로 그렸고 아직 최신본이 다 안 왔다 — 저장을 막는 표 */
+/* 마지막으로 «통째로» 받아 본 때. 사흘에 한 번은 통째로 받아 스스로 낫는다 —
+   어느 저장 길이 updatedAt 을 안 올리는 실수를 해도 사흘 안에 제자리로 돌아온다. */
+let _lastFullAt = 0;
+const FULL_EVERY_MS = 3*24*3600*1000;
+/* 지운 자국 — 「바뀐 것만」 구독은 지워진 것을 안 알려 준다. 지울 때 여기에 시각을 남긴다. */
+const TOMB = '/tomb';
+const TOMB_KEEP_MS = 30*24*3600*1000;
+function cardTomb(ids){
+  try{
+    if(Store.mode!=='firebase' || !Store.db) return;
+    const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
+    if(!list.length) return;
+    const now = Date.now(), upd = {};
+    list.forEach(id=>{ upd[String(id)] = now; });
+    Store.db.ref(DB_ROOT+TOMB).update(upd).catch(()=>{});
+  }catch(_){ }
+}
 
 const Store = {
   mode:'local', db:null,
@@ -3800,8 +3837,25 @@ const Store = {
       this.mode = 'firebase';
       modeBadge.textContent='실시간 공유'; modeBadge.classList.add('live');
       modeBadge.title='전 직원 실시간 공유 중';
-      const subscribe = (seed) => {
-        watchCardMap(this.db.ref(DB_ROOT+'/items'), value => { state.items = value||{}; mbCardsRevBump(); }, () => { coListBust(); renderSoon();
+      const subscribe = (seed, ckpt) => {
+        /* ★★ «바뀐 것만» 받는다 (대표 지시 2026-09-18 「기업정보함도 줄여라」)
+           ── 무엇이 있었나
+             씨앗이 있어도 켤 때마다 명함 6,600장 3.07MB 를 통째로 다시 받았다.
+             거의 전부가 씨앗과 같은 값인데도 받아 놓고 버렸다.
+           ── 어떻게
+             ckpt(씨앗을 담은 시각에서 한 시간 물러선 값) 뒤에 고쳐진 것만 물어본다.
+             updatedAt 으로 추려 받으므로 바뀐 몇 장이면 몇 KB 다.
+           ⚠ 지워진 것은 이 구독으로 «안 온다» — 뒤에 남은 자국(tomb)으로 따로 걷는다.
+           ⚠ 유령 걷기도 끄고 간다(partial) — 켜 두면 안 바뀐 6,600장이 통째로 사라진다.
+           ⚠ ckpt 가 없거나(첫 로그인·옛 씨앗) 너무 오래됐으면 예전처럼 통째로 받는다. */
+        const _itemsRef = this.db.ref(DB_ROOT+'/items');
+        const _partial = !!(seed && ckpt);
+        const _ref = _partial ? _itemsRef.orderByChild('updatedAt').startAt(ckpt) : _itemsRef;
+        /* ⚠ «통째로» 받는 길은 어디로 들어오든 여기 하나다 — 그때 시각을 여기서 찍는다.
+           부르는 쪽마다 찍으면 한 곳을 빠뜨려 영영 통째로만 받게 된다(실제로 그럴 뻔했다). */
+        if(!_partial) _lastFullAt = Date.now();
+        if(_partial) console.log('[명함] 바뀐 것만 받습니다 — ' + new Date(ckpt).toLocaleString() + ' 뒤');
+        watchCardMap(_ref, value => { state.items = value||{}; mbCardsRevBump(); }, () => { coListBust(); renderSoon();
           /* 명함이 도착한 **뒤에** 마지막 보던 화면으로 옮긴다(대표 지시 2026-08-10).
              먼저 옮기면 빈 화면이 잠깐 보이고, 자료함·보낸 메일은 아직 읽히지도 않았다. */
           if(!Store._itemsReady){
@@ -3823,7 +3877,7 @@ const Store = {
           autoClsMark();
           autoClsSoon();
         },
-          e => { if(isDenied(e)) itemsDeniedTell(e); }, seed);
+          e => { if(isDenied(e)) itemsDeniedTell(e); }, seed, { partial: _partial });
         watchCardMap(this.db.ref(DB_ROOT+'/groups'), value => { state.groups = value||{}; }, () => { renderSoon();
           if(!Store._bizSeedDone){ Store._bizSeedDone=true; setTimeout(seedBizFolders, 3000); }
           /* 직업별 탭은 «폴더가 손에 들어온 뒤»에 심는다 — 탭이 폴더에 딸리기 때문이다.
@@ -3873,16 +3927,43 @@ const Store = {
             /* ⚠ 「한 번만」 표는 이 로그인 «건»의 지역 변수다 — Store 에 두면 로그아웃
                뒤 다시 로그인했을 때 구독이 영영 안 붙는다. */
             let _subT = null, _subKicked = false;
-            const goSub = (seed)=>{
+            const goSub = (seed, ckpt)=>{
               if(_subKicked) return; _subKicked = true; clearTimeout(_subT);
               if(seed && !Store._itemsReady){
                 _cardSeedUsed = true;
-                subscribe(seed);
+                subscribe(seed, ckpt);
                 restoreLastScreen();       /* 씨앗이 곧 명함이다 — 마지막 화면을 바로 연다 */
               } else subscribe();
             };
             _subT = setTimeout(()=>goSub(null), 400);
-            cardCacheGet(items=>goSub(items));
+            /* ★★ 씨앗이 싱싱하면 «바뀐 것만» 받는다 (대표 지시 2026-09-18) ────────────
+               ⚠ 통째로 받는 길로 물러서는 때를 넉넉히 둔다 — 조용히 틀리느니 조금 더 받는다:
+                 ⑴ 씨앗이 없다(첫 로그인)            ⑵ 옛 씨앗이라 ckpt 가 없다
+                 ⑶ 통째로 받은 지 사흘이 넘었다(스스로 낫기)  ⑷ 지운 자국을 못 읽었다
+               ⚠ 「지운 자국」을 먼저 걷고 나서 구독한다. 안 걷으면 남이 지운 명함이
+                 이 기기에만 유령으로 남는다(씨앗에는 아직 있다).
+               ⚠ 자국 읽기가 늦어도 문이 잠기지 않게 800ms 만 기다린다 — 넘으면 통째로. */
+            cardCacheGet(snap=>{
+              if(_subKicked) return;
+              if(!snap){ goSub(null); return; }
+              const _seed = snap.items, _ckpt = Number(snap.ckpt)||0;
+              _lastFullAt = Number(snap.fullAt)||0;
+              const _needFull = !_ckpt || !_lastFullAt || (Date.now() - _lastFullAt) > FULL_EVERY_MS;
+              if(_needFull){ _lastFullAt = Date.now(); goSub(_seed); return; }   /* 씨앗은 그리되 통째로 받는다 */
+              let _tombDone = false;
+              const _tombT = setTimeout(()=>{ if(!_tombDone){ _tombDone = true; _lastFullAt = Date.now(); goSub(_seed); } }, 800);
+              this.db.ref(DB_ROOT+TOMB).orderByValue().startAt(_ckpt).once('value').then(s=>{
+                if(_tombDone) return; _tombDone = true; clearTimeout(_tombT);
+                const gone = s.val() || {};
+                let n = 0;
+                Object.keys(gone).forEach(id=>{ if(_seed[id]){ delete _seed[id]; n++; } });
+                if(n) console.log('[명함] 그 사이 지워진 '+n+'장을 걷었습니다');
+                goSub(_seed, _ckpt);
+              }).catch(()=>{
+                if(_tombDone) return; _tombDone = true; clearTimeout(_tombT);
+                _lastFullAt = Date.now(); goSub(_seed);      /* 자국을 못 읽으면 통째로 — 조용히 틀리지 않는다 */
+              });
+            });
             /* ── 메일 문으로 들어왔으면 «지금» 연다 (대표 보고 2026-08-29 「로그인이 늦다」) ──
                ⚠ 마지막 화면 복원(restoreLastScreen)은 기업정보함 명함이 «다 도착한 뒤»에
                  돈다(아래 subscribe 의 items 구독이 부른다). 명함은 실측 2.9MB 라, 메일
@@ -3973,7 +4054,9 @@ const Store = {
       await this.db.ref(`${R}/trash/${id}`).set(rec);
       /* ⚠ 사진·썸네일은 **안 지운다**. 지우면 휴지통에서 복원해도 빈 사진이 온다. */
       this.db.ref(`${R}/items/${id}`).remove();
-      if (!priv) removeIdx(id, it);  /* 개인 명함은 애초에 검색목록에 없다 */
+      if (!priv){ removeIdx(id, it);  /* 개인 명함은 애초에 검색목록에 없다 */
+        /* 지운 자국 — 「바뀐 것만」 받는 기기는 이 자국이 없으면 지운 명함을 계속 들고 있다 */
+        cardTomb(id); }
     } else {
       const t=JSON.parse(localStorage.getItem('pucards_local_trash')||'{}'); t[id]=rec;
       try{ localStorage.setItem('pucards_local_trash', JSON.stringify(t)); }catch(e){}
@@ -4772,8 +4855,12 @@ function thumbMigrationPlan(items, rootOf, chunk, cache){
     for(let i=0;i<arr.length;i+=size){
       const upd = {};
       arr.slice(i, i+size).forEach(c=>{
-        if(c.t1){ upd[`${R}/thumbs/${c.id}`]    = c.t1; upd[`${R}/items/${c.id}/thumb`]  = null; }
-        if(c.t2){ upd[`${R}/thumbs/${c.id}_b`]  = c.t2; upd[`${R}/items/${c.id}/thumb2`] = null; }
+        /* ⚠ 칸만 고치는 길도 updatedAt 을 올린다 (2026-09-18) — 안 올리면
+           「바뀐 것만」 받는 다른 기기가 이 고침을 영영 못 본다(썸네일이 남는다). */
+        if(c.t1){ upd[`${R}/thumbs/${c.id}`]    = c.t1; upd[`${R}/items/${c.id}/thumb`]  = null;
+                  upd[`${R}/items/${c.id}/updatedAt`] = Date.now(); }
+        if(c.t2){ upd[`${R}/thumbs/${c.id}_b`]  = c.t2; upd[`${R}/items/${c.id}/thumb2`] = null;
+                  upd[`${R}/items/${c.id}/updatedAt`] = Date.now(); }
       });
       out.push(upd);
     }
@@ -10576,6 +10663,8 @@ window.pucardsMoveThumbs = async function(){
       jobs.slice(i,i+50).forEach(j=>{
         u[`${DB_ROOT}/thumbs/${j.tid}`] = j.v;
         u[`${DB_ROOT}/items/${j.id}/${j.field}`] = null;
+        /* ⚠ 칸만 고쳐도 updatedAt 을 올린다 — 「바뀐 것만」 구독이 이 고침을 보게 (2026-09-18) */
+        u[`${DB_ROOT}/items/${j.id}/updatedAt`] = Date.now();
       });
       await Store.db.ref().update(u);
       done += Object.keys(u).length/2;
@@ -11958,6 +12047,12 @@ function cardPrivPaths(id, on){
   out[`${DB_ROOT}/thumbs/${id}`] = on ? null : 1;
   /* 색인은 «지우기»만 넣는다 — 되돌아올 때 값은 Store.put 이 다시 적는다 */
   out[`${DB_ROOT}/idx/${id}`] = on ? null : 1;
+  /* ★ 개인으로 «옮기면» 공유에서는 지워진 것과 같다 — 자국을 남긴다 (2026-09-18).
+     남기지 않으면 「바뀐 것만」 받는 다른 기기에 그 명함이 그대로 남아,
+     대표가 숨긴 것이 남의 화면에서는 계속 보인다.
+     ⚠ 되돌아올 때(on=false)는 자국이 필요 없다 — Store.put 이 updatedAt 을 새로 찍어
+       「바뀐 것」 구독에 정상으로 실려 온다. */
+  if(on) out[`${DB_ROOT}${TOMB}/${id}`] = Date.now();
   return out;
 }
 async function toggleScope(id){
@@ -12612,6 +12707,23 @@ function purgeTrash(){
     if(n) console.log(`휴지통 자동 정리: ${n}건`);
   }catch(e){ console.error('휴지통 정리 실패', e); }
   slimTrashPhotos();
+  purgeTombs();
+}
+/* 지운 자국은 30일만 둔다 — 그만큼만 있으면 된다 (2026-09-18)
+   씨앗이 사흘에 한 번은 통째로 새로 받히므로(FULL_EVERY_MS) 30일이면 넉넉하다.
+   ⚠ 안 걷으면 이 칸이 끝없이 불어 «지우려고 만든 것»이 새 요금이 된다. */
+function purgeTombs(){
+  try{
+    if(Store.mode!=='firebase' || !Store.db) return;
+    const cut = Date.now() - TOMB_KEEP_MS;
+    Store.db.ref(DB_ROOT+TOMB).orderByValue().endAt(cut).limitToFirst(500).once('value').then(s=>{
+      const old = s.val() || {}; const ids = Object.keys(old);
+      if(!ids.length) return;
+      const upd = {}; ids.forEach(id=>{ upd[id] = null; });
+      return Store.db.ref(DB_ROOT+TOMB).update(upd)
+        .then(()=>console.log('[명함] 오래된 지운 자국 '+ids.length+'건 정리'));
+    }).catch(()=>{});
+  }catch(_){ }
 }
 
 /* ── 옛 휴지통 기록에서 원본 사진을 빼낸다 (2026-08-13 비용 조사) ──
@@ -12729,7 +12841,8 @@ async function wipeAll(){
       const chunk={}, thChunk={};
       ids.slice(s,s+200).forEach(id=>{ chunk[id]=null; thChunk[id]=null; thChunk[id+'_b']=null; });
       try { await Store.db.ref(DB_ROOT+'/items').update(chunk);
-            await Store.db.ref(DB_ROOT+'/thumbs').update(thChunk); }
+            await Store.db.ref(DB_ROOT+'/thumbs').update(thChunk);
+            cardTomb(Object.keys(chunk)); }   /* 지운 자국 — 없으면 남의 기기에 유령으로 남는다 */
       catch(e){ console.error('삭제 실패 묶음', e); }
       await new Promise(r=>setTimeout(r,100));
     }
@@ -13785,6 +13898,7 @@ async function openMojibakeCleanup(){
       chunk.forEach(it=>{ trashUpd[it.id]={...it,_deletedAt:now,_photo:'',_photo2:''}; itemUpd[it.id]=null; removeIdx(it.id, it); });
       try{ await Store.db.ref(DB_ROOT+'/trash').update(trashUpd);
            await Store.db.ref(DB_ROOT+'/items').update(itemUpd);
+           cardTomb(Object.keys(itemUpd));    /* 지운 자국 */
            chunk.forEach(it=>{ Store.delPhoto(it.id); Store.delPhoto(it.id+'_b');
                                Store.delThumb(it.id); Store.delThumb(it.id+'_b'); });
       }catch(e){ console.warn('[mojibake]', e&&e.message); }
@@ -23785,7 +23899,10 @@ function autoClsChunks(moves, chunk){
   for(let i=0;i<(moves||[]).length;i+=size){
     const upd = {};
     moves.slice(i, i+size).forEach(function(m){
-      if(m && m.id && m.gid) upd['items/' + m.id + '/group'] = m.gid;
+      /* ⚠ 폴더만 옮겨도 updatedAt 을 올린다 (2026-09-18) — 이 길은 «자주» 돈다
+         (새 명함이 들어올 때마다). 안 올리면 다른 기기는 옛 폴더로 계속 본다. */
+      if(m && m.id && m.gid){ upd['items/' + m.id + '/group'] = m.gid;
+                              upd['items/' + m.id + '/updatedAt'] = Date.now(); }
     });
     if(Object.keys(upd).length) out.push(upd);
   }

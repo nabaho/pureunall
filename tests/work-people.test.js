@@ -184,7 +184,7 @@ ok('기업정보함은 읽기만 한다 (명함은 기업정보함에서 고친�
 ok('본문을 먼저 읽는다 (색인은 저장할 때만 갱신돼 빠진 사람이 생긴다)',
   grab('cardLoad').indexOf("'pucards/items'") < grab('cardLoad').indexOf("'pucards/idx'"));
 ok('기업정보함 본문이 pucards/items 에 있고 지운 것은 trash 로 간다',
-  C.indexOf("watchCardMap(this.db.ref(DB_ROOT+'/items')") > 0 && C.indexOf('`${DB_ROOT}/trash/${id}`') > 0);
+  C.indexOf("const _itemsRef = this.db.ref(DB_ROOT+'/items');") > 0 && C.indexOf('`${DB_ROOT}/trash/${id}`') > 0);
 
 /* ── 담당 표시: 주담당·부담당 ── */
 const IT = { mgr_main: { sid: 'P-001', name: '권형하' },

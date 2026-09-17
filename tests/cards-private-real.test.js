@@ -85,7 +85,8 @@ test('잠긴 폴더는 예전대로 빠진다 — 있던 규칙을 안 건드렸
 
 /* ── ② 개인 창고로 «옮긴다» ─────────────────────────────────────── */
 test('★ 개인으로 하면 공유 창고에서 «빠지고» 개인 창고로 들어간다', () => {
-  const b = { privRoot: () => 'pucards_private/u1', DB_ROOT: 'pucards' };
+  /* TOMB — 개인으로 옮기면 공유에서는 «지워진 것»이라 자국을 남긴다 (2026-09-18) */
+  const b = { privRoot: () => 'pucards_private/u1', DB_ROOT: 'pucards', TOMB: '/tomb', Date };
   vm.createContext(b);
   vm.runInContext(fn('cardPrivPaths'), b);
   const u = JSON.parse(JSON.stringify(vm.runInContext("cardPrivPaths('c1', true)", b)));
@@ -95,7 +96,8 @@ test('★ 개인으로 하면 공유 창고에서 «빠지고» 개인 창고로
 });
 
 test('★ 공용으로 되돌리면 반대로 돌아온다 — 사진·썸네일까지', () => {
-  const b = { privRoot: () => 'pucards_private/u1', DB_ROOT: 'pucards' };
+  /* TOMB — 개인으로 옮기면 공유에서는 «지워진 것»이라 자국을 남긴다 (2026-09-18) */
+  const b = { privRoot: () => 'pucards_private/u1', DB_ROOT: 'pucards', TOMB: '/tomb', Date };
   vm.createContext(b);
   vm.runInContext(fn('cardPrivPaths'), b);
   const u = JSON.parse(JSON.stringify(vm.runInContext("cardPrivPaths('c1', false)", b)));
@@ -109,7 +111,8 @@ test('★ 공용으로 되돌리면 반대로 돌아온다 — 사진·썸네일
 });
 
 test('사진도 함께 옮긴다 — 사진만 남으면 그것으로 알아본다', () => {
-  const b = { privRoot: () => 'pucards_private/u1', DB_ROOT: 'pucards' };
+  /* TOMB — 개인으로 옮기면 공유에서는 «지워진 것»이라 자국을 남긴다 (2026-09-18) */
+  const b = { privRoot: () => 'pucards_private/u1', DB_ROOT: 'pucards', TOMB: '/tomb', Date };
   vm.createContext(b);
   vm.runInContext(fn('cardPrivPaths'), b);
   const u = JSON.parse(JSON.stringify(vm.runInContext("cardPrivPaths('c1', true)", b)));

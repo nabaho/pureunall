@@ -822,6 +822,22 @@
     "pucards": {
       ".read": "auth != null && auth.token.email != null",
       ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "items": {
+        ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".indexOn": [
+          "updatedAt"
+        ],
+        "$k2": {
+          ".write": "auth != null && auth.token.email != null"
+        }
+      },
+      "tomb": {
+        ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".indexOn": ".value",
+        "$k2": {
+          ".write": "auth != null && auth.token.email != null"
+        }
+      },
       "$k": {
         ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         "$k2": {
