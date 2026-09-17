@@ -2348,6 +2348,25 @@ td.selcell{cursor:cell}
   border-radius:7px;background:#f8fafc;color:#64748b}
 .coclashgrp.same{background:#f0fdf4;color:#166534}
 .coclashgrp.other{background:#fffbeb;color:#854d0e}
+/* ☑ 고른 것 띠 (대표 지시 2026-09-17) — «맨 위에 붙어» 있다.
+   ⚠ 스무 줄을 고르고 나서 맨 아래까지 내려가 눌러야 하면 고르는 일 자체가 벌이 된다. */
+.coclashpick{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:9px;
+  flex-wrap:wrap;margin:0 0 8px;padding:9px 12px;border:1px solid #bfdbfe;
+  background:#eff6ff;border-radius:9px;font-size:12.5px;color:#1e40af}
+.coclashpick b{color:#1e293b}
+.coclashpick span{color:#64748b}
+.coclashpick button{margin-left:auto;font-size:12px;font-weight:700;color:#1e40af;
+  background:#ffffff;border:1px solid #bfdbfe;border-radius:8px;padding:4px 11px;
+  cursor:pointer;font-family:inherit}
+.coclashpick button + button{margin-left:0}
+.coclashpick button.go{background:#1e40af;color:#ffffff;border-color:#1e40af}
+.coclashpick button:hover{background:#1e40af;color:#ffffff}
+.coclashgrp .pickgrp{float:right;font-size:11px;font-weight:700;color:#1e40af;
+  background:#ffffff;border:1px solid #bfdbfe;border-radius:7px;padding:2px 8px;
+  cursor:pointer;font-family:inherit}
+.coclashgrp .pickgrp:hover{background:#1e40af;color:#ffffff}
+.coclashrow .ck{flex:none;width:15px;height:15px;cursor:pointer;accent-color:#1e40af}
+.coclashrow.on{background:#eff6ff}
 .coclashrow{display:flex;align-items:center;gap:9px;padding:8px 6px;
   border-bottom:1px solid #f8fafc;font-size:12.5px}
 .coclashrow:last-child{border-bottom:none}
@@ -27606,6 +27625,84 @@ function coDiffMark(a, b){
   return { a: ah || esc(String(a == null ? '' : a)) || '(비어 있음)',
            b: bh || esc(String(b == null ? '' : b)) };
 }
+/* ══════ ☑ 골라서 «한 번에» 바꾸기 (대표 지시 2026-09-17) ═══════════════════════
+   「여러 개인데 ㅁ표시하고 한번에 바꾸기 기능도 만들어 달라.
+     우선 먼저 확인 후 한번에 모두 바꾸는게 좋다」
+
+   ★ 「먼저 확인」이 이 일의 뜻이다 — 고르는 동안에는 «한 글자도» 안 바뀐다.
+     체크가 곧 확인이고, 마지막에 한 번 묻고 그때 통째로 쓴다.
+   ⚠ 처음에 «아무것도 안 고른다». 미리 켜 두면 「확인 후」가 아니라 「확인 전」이 된다.
+   ⚠ 고른 표는 열쇠와 칸을 함께 묶는다(회사|칸) — 한 회사에 어긋난 칸이 여럿이라
+     회사 열쇠만으로는 어느 칸을 고른 것인지 가릴 수 없다. */
+const CLASH_CHUNK = 100;      /* 한 통에 100줄 — 줄마다 서너 칸이라 300~400칸이다 */
+function coClashId(x){ return String(x.key) + '|' + String(x.f); }
+/* 고른 줄 — «지금 목록에 있는 것»만 돌려준다.
+   ⚠ 골라 둔 사이에 남이 그 칸을 정리했을 수 있다. 사라진 것을 그대로 쓰면
+     이미 끝난 일을 되살린다. */
+function coClashPicked(){
+  const sel = state.coClashSel || {};
+  return coClashList().filter(x => !!sel[coClashId(x)]);
+}
+function coClashToggle(id){
+  const s = state.coClashSel || (state.coClashSel = {});
+  if(s[id]) delete s[id]; else s[id] = 1;
+  openCoClash();
+}
+/* 묶음째 고르기·풀기 — 「★ 다시 읽은 것」은 답이 나와 있어 묶음으로 고를 값이 크다 */
+function coClashPickGroup(which){
+  const s = state.coClashSel || (state.coClashSel = {});
+  const rows = coClashList().filter(x => which === 'all' ? true
+    : which === 'same' ? x.same : !x.same);
+  const 다골랐나 = rows.length && rows.every(x => !!s[coClashId(x)]);
+  rows.forEach(x => { if(다골랐나) delete s[coClashId(x)]; else s[coClashId(x)] = 1; });
+  openCoClash();
+}
+function coClashClear(){ state.coClashSel = {}; openCoClash(); }
+/* 고른 줄을 «한 통씩» 쓸 계획으로 바꾼다 — 순수 로직이라 검사가 그대로 본다.
+   ⚠ 한 줄씩 보내면 2026-08-16 대량 쓰기 사고가 다시 난다.
+   ⚠ 줄마다 쓰는 칸은 낱개 바꾸기(coTakeNewFor)와 «같아야» 한다 — 여기서 하나라도
+     빠뜨리면 「한 번에 바꾼 것」과 「하나씩 바꾼 것」이 서로 다른 자국을 남긴다. */
+function coClashTakeWrites(rows, now, by, chunk){
+  const size = Math.max(1, Math.floor(Number(chunk)) || CLASH_CHUNK);
+  const out = [];
+  for(let i = 0; i < (rows || []).length; i += size){
+    const upd = {};
+    rows.slice(i, i + size).forEach(function(x){
+      const c = x.c || {};
+      upd['coInfo/' + x.key + '/' + x.f] = c.got;
+      upd['coInfo/' + x.key + '/conflicts/' + x.f] = null;
+      const dk = c.photoId ? coAttachDocKey(c.photoYear || '', c.photoId) : '';
+      if(dk) upd['coInfo/' + x.key + '/src/' + x.f] = dk;
+      upd['coInfo/' + x.key + '/at'] = now;
+      upd['coInfo/' + x.key + '/by'] = by || '';
+    });
+    out.push(upd);
+  }
+  return out;
+}
+/* 고른 것을 한 번에 바꾼다 — «묻고 나서» 쓴다 */
+async function coClashTakeMany(){
+  const rows = coClashPicked();
+  if(!rows.length){ toast('고른 줄이 없습니다 — 바꿀 줄의 네모를 먼저 눌러 주세요', 6000); return; }
+  const cos = new Set(rows.map(x => x.key)).size;
+  const 보기 = rows.slice(0, 5).map(x => {
+    const label = (CO_FIELDS.find(f => f[0] === x.f) || [x.f, x.f])[1];
+    return '  · ' + (x.name || x.key) + ' — ' + label;
+  }).join('\n');
+  if(!confirm(`고른 ${rows.length}개 칸(${cos}곳)을 «읽은 값»으로 한 번에 바꿉니다.\n\n`
+    + 보기 + (rows.length > 5 ? `\n  · … 그 밖 ${rows.length - 5}개\n` : '\n')
+    + `\n· 사진첩 원본과 명함(등록증)은 «그대로» 둡니다\n`
+    + `· 고르지 «않은» 줄은 한 글자도 안 바뀝니다\n`
+    + `· 되돌리려면 그 회사 상세에서 값을 고쳐 주셔야 합니다`)) return;
+  const plans = coClashTakeWrites(rows, Date.now(), myEmail || '', CLASH_CHUNK);
+  try{
+    for(const upd of plans) await Store.db.ref(DB_ROOT).update(upd);
+  }catch(e){ toast('바꾸지 못했습니다: ' + ((e && e.message) || ''), 9000); return; }
+  state.coClashSel = {};
+  coListBust();
+  toast(`${rows.length}개 칸(${cos}곳)을 바꿨습니다`, 8000);
+  openCoClash();
+}
 function coClashRowHtml(x){
   const label = (CO_FIELDS.find(f => f[0] === x.f) || [x.f, x.f])[1];
   const kq = esc(String(x.key).replace(/'/g,"\\'"));
@@ -27613,7 +27710,12 @@ function coClashRowHtml(x){
   const c = x.c || {};
   /* ⚠ 한 줄에 한 칸이다 — 회사·칸·두 값·단추가 «한 줄»에 선다(2026-08-30 대표 지시).
        넘치는 값은 … 로 자르고 전문은 title 에 둔다. */
-  return `<div class="coclashrow">
+  const id = esc(coClashId(x).replace(/'/g,"\\'"));
+  const on = !!(state.coClashSel || {})[coClashId(x)];
+  return `<div class="coclashrow${on ? ' on' : ''}">
+    ${/* ☑ 고르기 — 여기서는 «한 글자도» 안 바뀐다. 마지막에 한 번 묻고 통째로 쓴다. */''}
+    <input type="checkbox" class="ck"${on ? ' checked' : ''}
+      onchange="coClashToggle('${id}')" title="한 번에 바꿀 줄로 고릅니다">
     <span class="cc" title="${esc(x.name)}"
       onclick="dedupBg.classList.remove('open');pickCo('${kq}')">${esc(x.name || '(이름 없음)')}</span>
     <span class="cf">${esc(label)}</span>
@@ -27640,14 +27742,29 @@ function coClashHtml(){
     <p class="cpnone" style="padding:16px 2px">어긋난 칸이 없습니다 👍</p>`;
   const same = list.filter(x=>x.same), other = list.filter(x=>!x.same);
   const cos = new Set(list.map(x=>x.key)).size;
+  const 고른것 = coClashPicked();
+  /* ⚠ 고른 것이 있을 때만 띠가 선다 — 늘 뜨는 띠는 줄 하나를 늘 먹는다.
+     ⚠ 띠는 «맨 위에 붙어» 있다. 스무 줄을 고르고 나서 맨 아래까지 내려가 눌러야 하면
+       고르는 일 자체가 벌이 된다. */
+  const 띠 = 고른것.length ? `<div class="coclashpick">
+      <b>${고른것.length}개 고름</b>
+      <span>${new Set(고른것.map(x=>x.key)).size}곳</span>
+      <button class="go" onclick="coClashTakeMany()"
+        title="고른 줄을 모두 「읽은 값」으로 바꿉니다 — 묻고 나서 바꿉니다">☑ 고른 것 한 번에 바꾸기</button>
+      <button onclick="coClashClear()" title="고른 것을 모두 풉니다">고르기 풀기</button>
+    </div>` : '';
+  const 묶음단추 = (which, n) => n ? `<button class="pickgrp" onclick="coClashPickGroup('${which}')"
+      title="이 묶음을 모두 고르거나 모두 풉니다">☑ 이 묶음 ${n}개</button>` : '';
   return `<div class="mhead"><b>⚠ 값이 다른 칸 — ${list.length}개 · ${cos}곳</b>${_closeBtn()}</div>
     <p class="setnote" style="margin:0 0 10px">사진첩이 읽은 값이 기업 상세의 값과 다릅니다.
-      <b>값은 아직 하나도 안 바뀌었습니다</b> — 줄마다 눌러 주셔야 바뀝니다.
+      <b>값은 아직 하나도 안 바뀌었습니다</b> — 줄마다 눌러 주시거나,
+      <b>네모로 골라 한 번에</b> 바꾸실 수 있습니다.
       <br>회사 이름을 누르면 그 회사 상세가 열립니다.</p>
+    ${띠}
     ${same.length ? `<div class="coclashgrp same">★ 같은 서류를 다시 읽은 것 ${same.length}개
-      — 읽은 값이 맞습니다</div>${same.map(coClashRowHtml).join('')}` : ''}
+      — 읽은 값이 맞습니다 ${묶음단추('same', same.length)}</div>${same.map(coClashRowHtml).join('')}` : ''}
     ${other.length ? `<div class="coclashgrp other">다른 서류가 다른 말을 하는 것 ${other.length}개
-      — 어느 쪽이 맞는지 봐 주십시오</div>${other.map(coClashRowHtml).join('')}` : ''}`;
+      — 어느 쪽이 맞는지 봐 주십시오 ${묶음단추('other', other.length)}</div>${other.map(coClashRowHtml).join('')}` : ''}`;
 }
 function coDocsHtml(o){
   /* ⚠ 「📎 붙이기」 단추는 목록 «밖»에 둔다 — 서류가 0건이면 coDocsListHtml 이 빈
