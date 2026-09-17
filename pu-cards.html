@@ -3575,20 +3575,52 @@ function seedBizFolders(){
     try{ render(); }catch(_){}
   }catch(e){ console.warn('[seedBizFolders]', e&&e.message); }
 }
+/* ★★ 「세려고」 1.36MB 를 통째로 받던 것 (대표 지시 2026-09-18 「기업정보함도 줄여라」)
+   ── 무엇이 있었나
+     이 함수는 색인이 이미 채워져 있는지 보려고 `idx` 를 **통째로**(1.36MB) 받아
+     열쇠 수만 세고 거의 언제나 그냥 돌아섰다. 채우기는 2026-08 에 끝난 일인데,
+     그 뒤로 **기업정보함을 켤 때마다 1.36MB** 를 세기 위해서만 받고 있었다.
+   ── 어떻게 했나
+     채운 뒤 «몇 개였는지»를 `idx_meta` 한 칸에 적어 둔다(수십 바이트). 다음부터는
+     그 한 칸만 읽어 견준다. 명함이 그때보다 25% 넘게 늘었거나 적어 둔 지 30일이
+     넘었으면 그때만 예전처럼 통째로 받아 다시 센다 — 스스로 낫는 길을 남겨 둔다.
+   ⚠ 색인 자체는 명함을 저장할 때마다 writeIdx 가 «한 건씩» 따라 고친다 — 이 함수는
+     «처음 한 벌 채우기»일 뿐이라, 안 돌아도 색인이 낡지 않는다. */
+const IDX_META = '/idx_meta';
+const IDX_RECHECK_MS = 30*24*3600*1000;
 function backfillIdx(){
   try{
     if(Store.mode!=='firebase' || Store._idxDone) return;
     Store._idxDone=true;
     const items=Object.values(state.items||{}); if(!items.length){ Store._idxDone=false; return; }
-    Store.db.ref(DB_ROOT+'/idx').once('value').then(s=>{
-      const existCount=Object.keys(s.val()||{}).length;
-      if(existCount >= items.length*0.9) return;   /* 이미 대부분 있으면 스킵 */
+    const mine = items.length;
+    function stamp(n){
+      return Store.db.ref(DB_ROOT+IDX_META).set({ n:n, items:mine, at:Date.now() }).catch(()=>{});
+    }
+    function fill(){
       const all={};
       items.forEach(it=>{ if(it&&it.id&&!inLockedGroup(it)){ const r=idxRecord(it); if(r) all[it.id]=r; } });
-      Store.db.ref(DB_ROOT+'/idx').set(all)
-        .then(()=>console.log('[idx] 백필 완료', Object.keys(all).length))
+      const n = Object.keys(all).length;
+      return Store.db.ref(DB_ROOT+'/idx').set(all)
+        .then(()=>{ console.log('[idx] 백필 완료', n); return stamp(n); })
         .catch(e=>console.warn('[idx] 백필 실패', e&&e.message));
-    }).catch(()=>{});
+    }
+    /* 통째로 받아 세고 그 수를 적어 둔다 — 다음 부팅부터는 안 받아도 된다 */
+    function countThenMaybeFill(){
+      return Store.db.ref(DB_ROOT+'/idx').once('value').then(s=>{
+        const existCount=Object.keys(s.val()||{}).length;
+        if(existCount >= mine*0.9) return stamp(existCount);   /* 이미 대부분 있으면 스킵 */
+        return fill();
+      }).catch(()=>{});
+    }
+    Store.db.ref(DB_ROOT+IDX_META).once('value').then(s=>{
+      const m = s.val();
+      const fresh = m && Number(m.n) > 0 && Number(m.at) > 0
+        && (Date.now() - Number(m.at)) < IDX_RECHECK_MS
+        && mine <= Number(m.items || m.n) * 1.25;
+      if(fresh) return;                              /* 이미 채워져 있다 — 1.36MB 를 안 받는다 */
+      return countThenMaybeFill();
+    }).catch(()=>countThenMaybeFill());
   }catch(_){}
 }
 

@@ -304,8 +304,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-17 CMS 일괄이체 — 「금액만 맞춘 조합」을 더는 미리 체크해 두지 않는다(김보람 노무사 건의). 자문료 합계가 맞는 조합은 여러 가지인데 맨 앞 하나를 골라 두어 남의 돈이 엉뚱한 업체로 찍혔다. 이제 명세가 있으면 명세대로, 없으면 «몇 가지인지»를 적어 보여만 주고 사람이 고른다 · 기록에 근거가 남는다';
-var BUILD_SEQ = 166;
+var ERP_BUILD = '2026-09-18 기업정보함 검색색인 1.36MB 를 «쓸 때» 받는다 — 부팅 때가 아니다(대표 지시). 계약창을 한 번도 안 열어도 이알피를 켤 때마다 받고 있었다. 기업정보함도 「이미 채워졌나」를 세려고 통째로 받던 것을 한 칸 읽기로 바꿨다';
+var BUILD_SEQ = 167;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -2521,16 +2521,49 @@ var FB_APPCHECK_KEY = '6Ldu1hEtAAAAABB9lH9EMEyd7uBLEy9H5HxJoua_';
 var FB_APPCHECK_ON = false;
 /* ERP를 켜 두기만 해도 명함 한 장 수정 때 검색색인 전체가 다시 내려오던 구조를
    항목 단위로 바꾼다. 처음에는 같은 색인을 한 번 채우고 이후에는 변경 한 건만 받는다. */
+/* ★★ 「쓸 때」 받는다 — 부팅 때가 아니다 (대표 지시 2026-09-18 「기업정보함도 줄여라」)
+   ── 무엇이 있었나
+     이 색인은 1.36MB 다. 그런데 로그인이 끝나자마자 무조건 받았다 — 이알피를 켜는
+     모든 사람이, 하루에 켜는 모든 번, 계약창을 한 번도 안 열어도 1.36MB.
+     서버 통신 기록에서 「/pucards/idx 10.89MB ×8」이 이것이었다(부팅 8번 × 1.36MB).
+   ── 쓰는 자리는 여덟 곳인데 «전부 사람이 창을 열거나 누를 때»만 돈다
+     계약창 회사 자동완성 · 기업정보함에서 회사/담당자 찾기 · 담당자 새로고침 · 통합조회.
+     부팅 때 미리 받아 둘 까닭이 없다.
+   ── 어떻게 했나 — «읽는 순간» 받기 시작한다(게터)
+     window.pucardsIdx 를 처음 읽는 그때 구독을 건다. 그래서 여덟 자리를 하나하나
+     고칠 필요가 없고, 나중에 새로 생기는 자리도 저절로 따라온다.
+     ⚠ 첫 읽기는 «빈 것»을 받는다 — 곧 도착하면 'pucards-idx' 를 쏘아 화면이 다시 그린다.
+       (찾기 창은 어차피 글자를 칠 때마다 다시 그린다.)
+   ⚠ 이름(watchPucardsIndexByChild)은 그대로 둔다 — tests/rtdb-cost-guards.test.js 가 못 박았다. */
+var _pcIdx = {};
+var _pcIdxTimer = null;
 function watchPucardsIndexByChild(){
   if(!fbDb || window._pcIdxHooked) return;
-  window._pcIdxHooked=true; window.pucardsIdx={};
+  window._pcIdxHooked=true;
   var ref=fbDb.ref('pucards/idx');
-  function put(s){ window.pucardsIdx[s.key]=s.val(); }
-  function drop(s){ delete window.pucardsIdx[s.key]; }
+  function ping(){
+    if(_pcIdxTimer) return;                       // 6,600건이 한 장씩 오므로 한 번으로 모은다
+    _pcIdxTimer = setTimeout(function(){
+      _pcIdxTimer = null;
+      try { window.dispatchEvent(new CustomEvent('pucards-idx', { detail:Object.keys(_pcIdx).length })); } catch(_){}
+    }, 200);
+  }
+  function put(s){ _pcIdx[s.key]=s.val(); ping(); }
+  function drop(s){ delete _pcIdx[s.key]; ping(); }
   ref.on('child_added',put);
   ref.on('child_changed',put);
   ref.on('child_removed',drop);
 }
+/* 읽는 순간 받기 시작한다. 쓰기(= 검사에서 가짜 색인을 끼우는 것)도 그대로 된다. */
+try {
+  Object.defineProperty(window, 'pucardsIdx', {
+    configurable: true,
+    get: function(){ try { watchPucardsIndexByChild(); } catch(_){} return _pcIdx; },
+    set: function(v){ _pcIdx = v || {}; }
+  });
+} catch(_){ window.pucardsIdx = _pcIdx; }
+/* 색인이 필요하다고 «미리» 알리는 길 — 창을 열 때 불러 두면 글자를 치기 전에 도착한다 */
+function ensurePucardsIdx(){ try { watchPucardsIndexByChild(); } catch(_){} return _pcIdx; }
 try {
   if(typeof firebase !== 'undefined' && firebase.initializeApp){
     firebase.initializeApp(FB_CONFIG);
@@ -2584,8 +2617,9 @@ try {
                저장 층이 이 값으로 전 직원 읽기를 가린다(listYearAll). */
             try { if(typeof PuPhotoStore !== 'undefined') PuPhotoStore.init({ db: fbDb, uid: user.uid,
               auth: firebase.auth(), isAdmin: erpPhotoAdmin() }); } catch(_){}
-            // 기업정보함 경량 검색 인덱스(pucards/idx) 로드 — 계약창 "과거 회사 불러오기"에서 기업정보함 검색용
-            try { watchPucardsIndexByChild(); } catch(_){}
+            /* ★ 기업정보함 색인(pucards/idx, 1.36MB)은 여기서 «안 받는다» (2026-09-18).
+               쓰는 자리가 모두 사람이 창을 열 때라, 처음 읽는 그 순간 받는다(위 게터).
+               부팅마다 1.36MB 를 받던 것이 이알피 요금의 가장 큰 몫이었다. */
           } else {
             fbAuthUid = null;
             fbAuthReady = false;
@@ -14239,8 +14273,21 @@ function searchPucardsPeople(query){
   out.sort(function(a,b){ return (a.c||'').localeCompare(b.c||''); });
   return out;
 }
+/* 기업정보함 색인이 «도착하면» 창을 다시 그린다 (2026-09-18).
+   색인은 이제 부팅 때가 아니라 쓸 때 받는다 — 창을 연 그 순간에는 아직 비어 있을 수 있어,
+   도착 신호를 받아 한 번 더 그려 주지 않으면 「0건에서 검색」이 그대로 남는다. */
+function usePucardsIdxReady(){
+  var s = useState(0);
+  useEffect(function(){
+    ensurePucardsIdx();
+    function on(){ s[1](function(n){ return n + 1; }); }
+    window.addEventListener('pucards-idx', on);
+    return function(){ window.removeEventListener('pucards-idx', on); };
+  }, []);
+}
 function PucardsContactPickerModal(props){
   useEscClose(props.onClose);
+  usePucardsIdxReady();
   var qs = useState(props.initialQuery || ''); var query = qs[0]; var setQuery = qs[1];
   var results = searchPucardsPeople(query);
   return h('div', {
@@ -14535,6 +14582,7 @@ function pcTopUpBiz(row, apply){
 }
 function PucardsCompanyPickerModal(props){
   useEscClose(props.onClose);
+  usePucardsIdxReady();
   var qs = useState(props.initialQuery || ''); var query = qs[0]; var setQuery = qs[1];
   var results = searchPucardsCompanies(query);
   return h('div', {
