@@ -5,6 +5,10 @@
   "id": "/pureunall/pu-cards.html",
   "start_url": "./pu-cards.html",
   "scope": "./",
+  "_왜_navigate_existing": "아이콘을 누르면 «언제나 이 문의 start_url 로 다시 들어간다». 기업정보함과 푸른 메일은 같은 파일(pu-cards.html)의 두 문이라, 창을 그냥 «되살리면»(focus-existing) 그 창이 마지막에 보던 화면이 그대로 뜬다 — 기업정보함 아이콘을 눌렀는데 메일이 열리는 길이 이것이다. 폰에서만 보인다: 홈 화면 앱 창은 며칠씩 최근 목록에 살아 있고, PC 는 탭을 그때그때 닫는다. (대표 지시 2026-09-14·2026-09-17 「기업정보함을 터치하면 무조건 메일로 넘어간다」)",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "display": "standalone",
   "background_color": "#101010",
   "theme_color": "#101010",
