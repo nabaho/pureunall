@@ -34,7 +34,12 @@
        않게 전부 try 로 감싼다.
      ⚠ navigation type 이 'reload' 면 브라우저·확장이 새로고침한 것, 'navigate' 인데 온 곳이
        우리 화면이면 앱 코드가 다시 연 것이다 — 이 한 글자가 원인의 «안팎»을 가른다. */
-  var BOOT_KEY = 'pu_boot_log_v1';
+  /* ★ 탭 눈도 «화면 경로별»로 센다 (2026-09-17 저녁, 대표 화면 캡처 둘째 장).
+     v1 은 탭 하나에 목록 하나였다 — 그런데 sessionStorage 는 같은 탭 안에서 «화면이 바뀌어도» 이어진다.
+     그래서 「이알피 탭에서 로그아웃 → 포털(부팅) → 포털이 새로고침(부팅) → 로그인 → 이알피(부팅)」
+     이 정상 흐름이 3분 안 3번으로 세어져 «폭풍»이 됐고, 문까지 닫혔다(「주소로 다시 열림, 10초 전」).
+     서버 기록에는 되풀이 부팅이 없었다 — 감지기의 거짓 경보였다. 포털 부팅은 이알피 수에 안 넣는다. */
+  var BOOT_KEY = 'pu_boot_log_v2';
   var BOOT_STORM_N = 3, BOOT_STORM_MS = 3 * 60 * 1000;
   /* ★ 두 번째 눈 — «이 기기·이 화면» 단위 (2026-09-17 저녁, 재검증에서 잡힘)
      첫 눈(같은 탭, sessionStorage)만 두었더니 배포 1시간 뒤 기록에서도 부팅 8번/165초가
@@ -70,13 +75,16 @@
   }
   function noteBoot() {
     try {
-      var now = Date.now(), arr = [];
-      try { arr = JSON.parse(window.sessionStorage.getItem(BOOT_KEY) || '[]'); } catch (_) { arr = []; }
-      if (!Array.isArray(arr)) arr = [];
+      var now = Date.now(), all = {}, arr = [];
+      var p = String(window.location.pathname || '/');
+      try { all = JSON.parse(window.sessionStorage.getItem(BOOT_KEY) || '{}'); } catch (_) { all = {}; }
+      if (!all || typeof all !== 'object' || Array.isArray(all)) all = {};
+      arr = Array.isArray(all[p]) ? all[p] : [];
       arr = arr.filter(function (t) { return typeof t === 'number' && now - t < BOOT_STORM_MS; });
       var prev = arr.length ? arr[arr.length - 1] : 0;
       arr.push(now);
-      try { window.sessionStorage.setItem(BOOT_KEY, JSON.stringify(arr.slice(-12))); } catch (_) {}
+      all[p] = arr.slice(-12);
+      try { window.sessionStorage.setItem(BOOT_KEY, JSON.stringify(all)); } catch (_) {}
       var nav = bootNavType();
       var since = prev ? Math.round((now - prev) / 1000) : null;
       var from = '';

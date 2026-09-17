@@ -217,6 +217,20 @@ test('⑭★ 「자료 받기 계속」을 눌러도 폭풍이 3번 더 이어�
   assert.equal(boot(), null, '다시 누르면 또 봐준다');
 });
 
+test('⑮★ 탭 눈도 «화면 경로별» — 로그아웃→포털→포털 새로고침→로그인→이알피 는 폭풍이 아니다 (거짓 경보였다)', () => {
+  const sess = {};
+  boot({ session: sess, now: 1000000, pathname: '/pureunall/enter.html', navType: 'navigate' });          // 로그아웃 → 포털
+  boot({ session: sess, now: 1000000 + 3000, pathname: '/pureunall/enter.html', navType: 'reload' });     // 포털이 스스로 새로고침
+  const erp = boot({ session: sess, now: 1000000 + 12000, pathname: '/pureunall/pu-erp.html', navType: 'navigate', referrer: 'https://x.test/pureunall/enter.html' });
+  assert.equal(erp.win.PU_BOOT.count, 1, '★★ 같은 탭의 포털 부팅을 이알피 부팅으로 세면 정상 로그인 흐름이 폭풍이 된다(2026-09-17 대표 화면 「3번, 주소로 다시 열림」)');
+  assert.equal(erp.win.PU_BOOT.storm, false);
+  assert.equal(erp.banner, null, '★ 거짓 경보 띠 — 이알피 문까지 닫혀 대표가 「다시 이렇게 나온다」고 했다');
+  /* 같은 화면이 3번이면 여전히 폭풍이다 — 눈이 먼 것이 아니다 */
+  boot({ session: sess, now: 1000000 + 20000, pathname: '/pureunall/pu-erp.html' });
+  const third = boot({ session: sess, now: 1000000 + 40000, pathname: '/pureunall/pu-erp.html' });
+  assert.equal(third.win.PU_BOOT.count, 3); assert.equal(third.win.PU_BOOT.storm, true);
+});
+
 test('⑫ 첫 눈(탭)은 여전히 sessionStorage 만 본다 — 기기 눈은 딴 함수에 있다', () => {
   assert.ok(!/localStorage/.test(cutFn(VER, 'function noteBoot(')), '★ 탭 눈에 localStorage 가 섞이면 탭 열 개를 열기만 해도 폭풍이 된다');
   assert.match(cutFn(VER, 'function noteBootDevice('), /localStorage/, '★ 기기 눈은 localStorage 여야 새 탭을 가로질러 센다');
