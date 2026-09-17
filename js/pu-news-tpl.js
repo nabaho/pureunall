@@ -38,6 +38,12 @@
     살구: '#fbf4ea', 표지테: '#d9d2c8', 표지바탕: '#ffffff'
   };
   var 폰트 = "'Malgun Gothic',sans-serif";
+  /* 요약판 제목에 쓰는 명조 — 「신문 안」(대표 결정 2026-09-17).
+     ⚠ 웹폰트를 쓰지 않는다. 메일 프로그램이 못 받아 오면 글자가 통째로 바뀐다. */
+  var 세리프 = "Georgia,'Times New Roman',serif";
+  /* 요약판 바깥 여백 — 28 → 22. 좌우 두 칸이라 6px 이 «줄 하나»를 좌우한다
+     (대표 지시 2026-09-17 「줄칸등을 좀더 넓게 사용해서」). */
+  var 요약여백 = 22;
   /* ⚠ 600 → 700 (2026-09-05). 자료 칸이 «두 줄 나란히»라 600 에서는
        표지 옆 글자가 152px 밖에 안 남아 제목이 예닐곱 줄로 쏟아졌다.
        받으신 원본도 600 보다 넓다. 700 은 메일 프로그램이 다 견디는 폭이다. */
@@ -108,6 +114,55 @@
       + 'letter-spacing:-0.5px;font-family:' + 폰트 + ';">'
       + esc(s.회사이름 || '푸른노무법인') + '</div></td>'
       + '</tr></table></td></tr>';
+  }
+
+  /* ── 요약판 머리 — 「신문」 (대표 결정 2026-09-17) ───────────────────────
+     ⚠ 요약판«만» 이것을 쓴다. 전문 보기 쪽은 큰 표지와 차림표를 그대로 둔다 —
+       거기서는 차림표가 «붙잡히는 줄»이라 실제로 일을 한다(news-view.js).
+
+     ★ 왜 바꿨나 — 대표 지시 2026-09-17 「좀더 세련되게 … 화면을 너무 아래로 안
+       내려오게」. 재 보니 내용이 시작되기 «전에» 400px 을 쓰고 있었다:
+         큰 사진 띠 184 + 차림표 85 + 머리·안내 134.
+       그중 차림표는 메일에서 «눌러도 아무 데도 안 간다»(#자리이동을 무시한다).
+       장식 하나가 한 화면의 1/8 을 먹고 있었다.
+     ⚠ 3px·2px 줄은 «칸에 색을 깔아» 만든다. div 테두리는 아웃룩에서 사라진다. */
+  function _줄띠(높이, 빛깔) {
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
+      + '<tr><td style="height:' + 높이 + 'px;line-height:' + 높이 + 'px;font-size:1px;'
+      + 'background-color:' + 빛깔 + ';">&nbsp;</td></tr></table>';
+  }
+
+  function 요약머리(회차한벌, 설정) {
+    var s = 설정 || {};
+    var 회 = 회차한벌 || {};
+    return '<tr><td style="padding:24px ' + 요약여백 + 'px 0 ' + 요약여백 + 'px;">'
+      + _줄띠(3, 색.짙은갈)
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+      + ' style="border-bottom:1px solid ' + 색.줄 + ';"><tr>'
+      + '<td style="padding:12px 0;">'
+      + '<div style="font-size:24px;font-weight:bold;color:' + 색.짙은갈 + ';'
+      + 'letter-spacing:-0.5px;line-height:1.25;font-family:' + 세리프 + ';">'
+      + esc(s.회사이름 || '푸른노무법인')
+      + ' <span style="color:' + 색.갈 + ';">' + esc(s.요약머리말 || '주간 노무 브리핑')
+      + '</span></div></td>'
+      + '<td align="right" valign="bottom" style="padding:0 0 14px 0;">'
+      + '<span style="font-size:12px;color:' + 색.흐린글 + ';letter-spacing:1px;'
+      + 'white-space:nowrap;font-family:' + 세리프 + ';">' + esc(회.이름 || '') + '</span></td>'
+      + '</tr></table></td></tr>';
+  }
+
+  /* 요약판 꼭지 머리 — 딱지를 걷고 «글자»로 세운다.
+     ⚠ 껍데기(<tr><td>) 없이 돌려준다. 두 칸 안에 바로 들어가기 때문이다. */
+  function 요약꼭지제목(g) {
+    var 딱 = String(g.딱지 || '').toUpperCase();
+    return '<a id="g-' + esc(g.키 || '') + '"></a>'
+      + (딱 ? '<div style="font-size:11px;font-weight:bold;color:' + 색.딱지 + ';'
+        + 'letter-spacing:2px;line-height:1.4;font-family:' + 폰트 + ';">' + esc(딱) + '</div>' : '')
+      + '<div style="font-size:17px;font-weight:bold;color:' + 색.짙은갈 + ';line-height:1.4;'
+      + 'font-family:' + 폰트 + ';">' + esc(g.이름) + '</div>'
+      + '<div style="height:7px;line-height:7px;font-size:1px;">&nbsp;</div>'
+      + _줄띠(2, 색.짙은갈)
+      + '<div style="height:5px;line-height:5px;font-size:1px;">&nbsp;</div>';
   }
 
   /* ── 배너 — WEEKLY NEWS LETTER + 회차 ─────────────────────────────── */
@@ -624,10 +679,12 @@
           + esc(r.글) + ' <span style="color:' + 색.남색 + ';font-size:12px;'
           + 'font-weight:bold;">↗</span></a>'
         : esc(r.글);
+      /* ★ 점을 「—」로 (대표 결정 2026-09-17 「신문 안」). 가는 가로줄이 글줄과 같은
+           결이라 목록이 조용해지고, 줄 간격을 1.7 → 1.6 으로 좁혀도 안 답답하다. */
       return '<tr>'
-        + '<td valign="top" width="14" style="width:14px;padding:5px 0 5px 0;'
-        + 'font-size:14px;line-height:1.7;color:' + 색.딱지 + ';font-family:' + 폰트 + ';">·</td>'
-        + '<td style="padding:5px 0 5px 6px;font-size:14px;line-height:1.7;color:' + 색.글 + ';'
+        + '<td valign="top" width="12" style="width:12px;padding:5px 0 5px 0;'
+        + 'font-size:14px;line-height:1.6;color:#c9bfb2;font-family:' + 폰트 + ';">&#8212;</td>'
+        + '<td style="padding:5px 0 5px 6px;font-size:14px;line-height:1.6;color:' + 색.글 + ';'
         + 'font-family:' + 폰트 + ';word-break:keep-all;">' + 속
         /* ★★ 곁말은 «제 줄»로 내린다 (대표 지시 2026-09-14 「깔끔하게 … 정렬해라」).
              문장 뒤에 붙여 흘리면 줄마다 끝나는 자리가 달라 곁말이 여기저기 흩어지고,
@@ -666,7 +723,7 @@
     if (!것.length) return '';
     var 줄 = '';
     for (var i = 0; i < 것.length; i += 2) {
-      var 위 = i === 0 ? '' : 'padding-top:20px;';
+      var 위 = i === 0 ? '' : 'padding-top:22px;';
       줄 += '<tr>'
         + '<td width="50%" valign="top" style="width:50%;padding-right:12px;' + 위 + '">'
         + 것[i] + '</td>'
@@ -674,7 +731,7 @@
         + (것[i + 1] || '&nbsp;') + '</td>'
         + '</tr>';
     }
-    return '<tr><td style="padding:14px 28px 0 28px;">'
+    return '<tr><td style="padding:18px ' + 요약여백 + 'px 0 ' + 요약여백 + 'px;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
       + 줄 + '</table></td></tr>';
   }
@@ -687,19 +744,18 @@
     return m ? m[1] : String(조각 || '');
   }
 
-  /* 맨 위 띠 — 「전문은 여기서」. 요약만 보고 끝내실 분도 있으니 한 번은 크게 말한다. */
+  /* 맨 위 띠 — 「전문은 여기서」.
+     ★ 상자를 걷고 «한 줄»로 (대표 결정 2026-09-17 「신문 안」). 상자가 60px 을 먹었는데,
+       말하는 것은 한 줄이다. 요약만 보고 끝내실 분께도 이 한 줄이면 닿는다. */
   function 전문보기띠(웹주소) {
     var u = href(웹주소 || '');
     if (!u) return '';
-    return '<tr><td style="padding:16px 28px 0 28px;">'
-      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
-      + ' style="background-color:' + 색.상자 + ';border:1px solid ' + 색.줄 + ';">'
-      + '<tr><td style="padding:13px 16px;font-size:13px;line-height:1.7;color:' + 색.글 + ';'
+    return '<tr><td style="padding:10px ' + 요약여백 + 'px 0 ' + 요약여백 + 'px;">'
+      + '<div style="font-size:12px;line-height:1.6;color:' + 색.흐린글 + ';'
       + 'font-family:' + 폰트 + ';">'
-      + '아래는 <b>이번 주 요약</b>입니다. 자세한 내용과 자료 내려받기는 '
+      + '한 줄 요약입니다. 원문과 자료 내려받기는 '
       + '<a href="' + u + '" style="color:' + 색.남색 + ';font-weight:bold;">전문 보기 ↗</a>'
-      + ' 에서 보실 수 있습니다.'
-      + '</td></tr></table></td></tr>';
+      + '</div></td></tr>';
   }
 
   /* ── 우리 글 꼭지 — 이 칸만 우리가 쓴다 ───────────────────────────── */
@@ -752,7 +808,10 @@
   /* ── 꼬리 ────────────────────────────────────────────────────────────
      ⚠ (광고) 표기와 수신거부 안내는 «명단 범위»가 정한다 —
        사람이 잊어도 기계가 켠다(Core.광고표기필요한가). */
-  function 꼬리(설정, 범위, 더한것) {
+  /* ⚠ 여백은 몸통과 «같아야» 한다 — 요약판은 22, 전문은 28. 다르면 꼬리만
+       안쪽으로 밀려 들어가 눈에 띈다(대표 지시 2026-09-17 「깔끔하게 정렬」). */
+  function 꼬리(설정, 범위, 더한것, 여백) {
+    var 옆 = Number(여백) > 0 ? Number(여백) : 28;
     var s = 설정 || {};
     var 거부주소 = String(s.수신거부주소 || s.회신주소 || '').trim();
     var 거부 = 거부주소
@@ -765,7 +824,7 @@
       ? '이 메일은 <b>광고성 정보</b>가 포함될 수 있습니다. 수신에 동의하신 분께 보내 드립니다.'
       : '이 메일은 푸른노무법인과 자문 관계에 있는 곳에 보내 드립니다.';
 
-    return '<tr><td style="padding:30px 28px 0 28px;">'
+    return '<tr><td style="padding:30px ' + 옆 + 'px 0 ' + 옆 + 'px;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + ' style="border-top:2px solid ' + 색.갈 + ';">'
       + '<tr><td style="padding:18px 0 0 0;font-size:12px;line-height:1.9;color:#8a837a;'
@@ -858,7 +917,7 @@
         var 글요 = (g.갈래 === '우리글') ? d.우리글 : '';
         var 칸요 = 요약칸(것들요, g, 웹주소, 글요);
         if (!칸요) return;
-        요약칸들.push(_칸벗기기(꼭지제목(g)) + _칸벗기기(칸요));
+        요약칸들.push(요약꼭지제목(g) + _칸벗기기(칸요));
         그린것++;
         return;
       }
@@ -897,7 +956,11 @@
       + ' style="background-color:' + 색.바탕 + ';"><tr><td align="center" style="padding:0;">'
       + '<table role="presentation" width="' + 넓이 + '" cellpadding="0" cellspacing="0" border="0"'
       + ' style="width:' + 넓이 + 'px;background-color:#ffffff;">'
-      + 머리(설) + 배너(회, 설) + 차림표() + 속 + 지역칸 + 꼬리(설, 범위, 더한것)
+      /* ★ 요약판은 «신문 머리» 하나로 연다 (대표 결정 2026-09-17).
+           큰 사진 띠(184px)와 차림표(85px)는 요약에서 걷었다 — 차림표는 메일에서
+           눌러도 아무 데도 안 간다. 전문 보기 쪽은 그대로 둔다(거기서는 붙잡히는 줄이다). */
+      + (요약 ? 요약머리(회, 설) : (머리(설) + 배너(회, 설) + 차림표()))
+      + 속 + 지역칸 + 꼬리(설, 범위, 더한것, 요약 ? 요약여백 : 28)
       + '</table></td></tr></table>';
 
     /* ★ 열람 그림 — 보이지 않는 1×1. 받는 쪽이 편지를 열면 우리 서버가 그것을 내주고

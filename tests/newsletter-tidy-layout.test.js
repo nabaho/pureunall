@@ -144,5 +144,82 @@ test('★ 파일이 «없으면» 내려받기 표시를 안 붙인다', () => {
 test('★ 캐시 번호를 올렸다', () => {
   const 원본 = fs.readFileSync(path.join(ROOT, 'pu-news.html'), 'utf8');
   const m = /js\/pu-news-tpl\.js\?v=(\d+)/.exec(원본);
-  assert.ok(m && Number(m[1]) >= 20, '편지 서식을 고치고 캐시 번호를 안 올렸다');
+  assert.ok(m && Number(m[1]) >= 21, '편지 서식을 고치고 캐시 번호를 안 올렸다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ③ 요약판은 «신문 머리» 하나로 연다 (대표 결정 2026-09-17)
+   ══════════════════════════════════════════════════════════════════════════
+   「좀더 세련되게 … 줄칸등을 좀더 넓게 사용해서 화면을 너무 아래로 안 내려오게」
+   재 보니 내용이 시작되기 «전에» 400px 을 썼다 — 큰 사진 띠 184 + 차림표 85 +
+   머리·안내 134. 그중 차림표는 메일에서 «눌러도 아무 데도 안 간다». */
+
+function 편지(요약) {
+  const d = {
+    열쇠: '2026-09-w2', 상태: '초안', 범위: '자문중', 회차: Core.회차('2026-09-10'),
+    우리글: '', 지역뉴스: [],
+    안: { news: [], policy: [{ 갈래: '자료', 한줄: '난임치료휴가는 연 6일입니다.',
+      링크: 'https://moel.go.kr/p1', 기관: '고용노동부' }], case: [], hr: [] },
+  };
+  const 설 = { 회사이름: '푸른노무법인' };
+  if (요약) 설.추적밑주소 = 'https://example.kr';
+  const 편 = Tpl.편지짓기(d, 설, { 요약: !!요약, 미리보기: true });
+  /* ⚠ 요약판은 «전문이 있는 자리»가 있어야 켜진다 — 안 주면 조용히 전문으로 그려져
+       「고쳤는데 그대로」인 검사가 된다. 그린 것을 믿기 전에 확인한다. */
+  if (요약) assert.ok(편.서식.indexOf('newsView?i=') >= 0, '요약판이 안 켜졌다');
+  return 편.서식;
+}
+
+test('★★★ 요약판에서 «큰 사진 띠»와 «차림표»를 걷었다', () => {
+  const h = 편지(true);
+  assert.ok(h.indexOf('height:184px') < 0, '큰 사진 띠가 남아 있다 — 그것만 184px 이다');
+  assert.ok(h.indexOf('data-stick') < 0,
+    '차림표가 남아 있다 — 메일에서는 눌러도 아무 데도 안 가면서 85px 을 먹는다');
+  assert.match(h, /주간 노무 브리핑/, '신문 머리가 없다');
+});
+
+test('★★★ 전문 보기 쪽은 «그대로» 둔다', () => {
+  /* 요약만 고쳤는데 전문이 함께 흔들리면, 자세히 보러 가신 분이 다른 편지를 본다.
+     ⚠ 차림표는 전문(웹)에서 «붙잡히는 줄»이라 실제로 일을 한다(news-view.js). */
+  const h = 편지(false);
+  assert.match(h, /WEEKLY NEWS LETTER/, '전문에서 배너가 사라졌다');
+  assert.match(h, /data-stick/, '전문에서 차림표가 사라졌다 — 붙잡히는 줄이 없어진다');
+  assert.ok(h.indexOf('주간 노무 브리핑') < 0, '전문에 요약 머리가 섞였다');
+});
+
+test('★★ 가는 줄은 «칸에 색을 깔아» 만든다 — div 테두리는 아웃룩에서 사라진다', () => {
+  const 몸 = stripComments(fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8'));
+  const i = 몸.indexOf('function _줄띠(');
+  assert.ok(i > 0, '줄 긋는 자를 못 찾았다');
+  const f = 몸.slice(i, 몸.indexOf('\n  function ', i + 10));
+  assert.match(f, /background-color/, '색을 안 깔고 테두리로 그린다');
+  assert.ok(!/border-top|border-bottom/.test(f), '테두리로 그린다 — 아웃룩에서 사라진다');
+});
+
+test('★★ 꼬리 여백이 몸통과 «같다»', () => {
+  /* 다르면 꼬리만 안쪽으로 밀려 들어가 눈에 띈다 */
+  const h = 편지(true);
+  const 몸여백 = /padding:18px (\d+)px 0 \1px;/.exec(h);
+  const 꼬리여백 = /padding:30px (\d+)px 0 \1px;/.exec(h);
+  assert.ok(몸여백 && 꼬리여백, '여백을 못 읽었다');
+  assert.equal(꼬리여백[1], 몸여백[1],
+    '꼬리(' + 꼬리여백[1] + ')와 몸통(' + 몸여백[1] + ')의 여백이 다르다');
+});
+
+test('★★ 요약판은 전문보다 «여백이 좁다» — 줄칸을 넓게 쓴다', () => {
+  /* 대표 지시 2026-09-17 「줄칸등을 좀더 넓게 사용해서」. 좌우 두 칸이라 여백 6px 이
+     칸 하나에서 «줄 하나»를 좌우한다 — 줄이 덜 꺾이면 편지가 그만큼 짧아진다.
+     ⚠ 몸통과 꼬리가 «같은지»만 보면, 둘 다 28 로 되돌려도 안 걸린다. */
+  const m = /padding:18px (\d+)px 0 \1px;/.exec(편지(true));
+  assert.ok(m, '요약 몸통 여백을 못 읽었다');
+  assert.ok(Number(m[1]) < 28,
+    '요약 여백이 ' + m[1] + ' — 전문(28)과 같거나 더 넓다. 줄칸을 넓게 쓰지 않는다');
+});
+
+test('★ 명조는 «웹폰트가 아니다» — 못 받아 오면 글자가 통째로 바뀐다', () => {
+  const 몸 = stripComments(fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8'));
+  const m = /var 세리프 = "([^"]+)"/.exec(몸);
+  assert.ok(m, '명조를 못 찾았다');
+  assert.ok(!/http|@import|fonts\./.test(m[1]), '웹폰트를 쓴다');
+  assert.match(m[1], /serif/, '마지막 기댈 곳(serif)이 없다');
 });
