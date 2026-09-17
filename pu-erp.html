@@ -104,7 +104,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=4"></script>
-<script src="js/pu-version.js?v=4"></script>
+<script src="js/pu-version.js?v=5"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 // CommonJS/AMD 환경 가드 (모바일 WebView 호환)
@@ -304,8 +304,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-17 「계속 돈이 새고 있다」 — 서버 통신 기록으로 잡음: 한 PC 의 탭들이 20초마다 처음부터 다시 켜지며 큰 표를 통째로 다시 받았다. 부팅 폭풍 감지기(모든 앱)·이알피는 폭풍이면 사람이 누를 때까지 자료 받기를 멈춘다 · 「이름없음 접속」 뿌리 · 화면 멈춤 이름표 · 폰 공유받기 · AI 한도 5만원';
-var BUILD_SEQ = 162;
+var ERP_BUILD = '2026-09-17 「계속 돈이 새고 있다」 재검증 — 배포 1시간 뒤에도 부팅 8번/3분이 그대로여서(탭 눈만으로는 문이 안 닫힘: 부팅마다 새 탭이면 sessionStorage 가 빈다) 감지기에 «이 기기·이 화면» 눈을 더했다(3분 안 5번). 폭풍이면 이알피는 사람이 누를 때까지 자료 받기를 멈춘다';
+var BUILD_SEQ = 163;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -9548,9 +9548,13 @@ function _erpBootStormGate(){
       var card = document.createElement('div');
       card.style.cssText = 'background:#fff;border-radius:12px;max-width:440px;width:100%;padding:18px 20px;font:13.5px/1.6 system-ui,sans-serif;color:#1e293b;box-shadow:0 20px 60px rgba(0,0,0,.4)';
       var t = document.createElement('div'); t.style.cssText = 'font-size:15px;font-weight:800;color:#991b1b;margin-bottom:8px';
-      t.textContent = '⚠ 이 탭이 계속 다시 켜지고 있어 자료 받기를 멈췄습니다';
+      /* 재검증(2026-09-17 저녁): 탭 눈은 못 보고 기기 눈만 걸린 폭풍 = 부팅마다 «새 탭». 그때 count 는 1이라
+         「1번 다시 켜졌습니다」가 되어 거짓말이 된다 — 기기 수를 쓰고 「새 탭으로」라고 말한다. */
+      var _devOnly = !window.PU_BOOT.tabStorm && !!window.PU_BOOT.devStorm;
+      var _n = Math.max(window.PU_BOOT.count || 0, window.PU_BOOT.devCount || 0) || 3;
+      t.textContent = _devOnly ? '⚠ 이 화면이 매번 새 탭으로 계속 열리고 있어 자료 받기를 멈췄습니다' : '⚠ 이 탭이 계속 다시 켜지고 있어 자료 받기를 멈췄습니다';
       var p = document.createElement('div'); p.style.cssText = 'color:#475569;margin-bottom:14px';
-      p.textContent = '3분 안에 ' + (window.PU_BOOT.count || 3) + '번 다시 켜졌습니다' + (window.PU_BOOT.since != null ? ' (마지막은 ' + window.PU_BOOT.since + '초 전' + (window.PU_BOOT.type === 'reload' ? ' · 브라우저·확장이 새로고침' : '') + ')' : '') +
+      p.textContent = '3분 안에 ' + _n + '번 ' + (_devOnly ? '이 기기에서 새 탭으로 열렸습니다' : '다시 켜졌습니다') + (window.PU_BOOT.since != null ? ' (마지막은 ' + window.PU_BOOT.since + '초 전' + (window.PU_BOOT.type === 'reload' ? ' · 브라우저·확장이 새로고침' : '') + ')' : '') +
         '. 켤 때마다 서버 자료를 전부 다시 받아 요금이 나갑니다. 브라우저의 자동 새로고침 확장이나 탭 돌리기를 끄신 뒤 아래를 눌러 주세요. 화면은 이 기기의 지난 사본으로 그대로 보입니다.';
       var go = document.createElement('button'); go.type = 'button';
       go.textContent = '자료 받기 계속';
