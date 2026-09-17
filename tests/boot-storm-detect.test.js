@@ -30,6 +30,7 @@ const ERP = stripJs(fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8'));
 function boot(opts) {
   opts = opts || {};
   const sess = opts.session || {};
+  const local = opts.local || {};
   const logs = { info: [], warn: [] };
   const body = { kids: [], appendChild(c) { this.kids.push(c); return c; } };
   function el(tag) { return { tagName: tag, style: {}, kids: [], attrs: {}, textContent: '', id: '', tabIndex: 0,
@@ -42,7 +43,8 @@ function boot(opts) {
       querySelector: () => null, scripts: [], addEventListener() {}
     },
     sessionStorage: { getItem: k => (k in sess ? sess[k] : null), setItem: (k, v) => { sess[k] = String(v); }, removeItem: k => { delete sess[k]; } },
-    location: { href: 'https://x.test/pureunall/pu-erp.html', origin: 'https://x.test' },
+    localStorage: { getItem: k => (k in local ? local[k] : null), setItem: (k, v) => { local[k] = String(v); }, removeItem: k => { delete local[k]; } },
+    location: { href: 'https://x.test/pureunall/pu-erp.html', origin: 'https://x.test', pathname: opts.pathname || '/pureunall/pu-erp.html' },
     performance: { getEntriesByType: () => [{ type: opts.navType || 'reload' }] },
     console: { info: m => logs.info.push(m), warn: m => logs.warn.push(m), log() {}, error() {} },
     setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, addEventListener() {},
@@ -130,6 +132,71 @@ test('⑥ 이알피는 폭풍이면 초기 동기화를 «사람이 누를 때�
   /* 폭풍이 아니면 문이 없다 */
   ctx.window.PU_BOOT = { storm: false }; delete sess['pu_boot_storm_ok']; ctx._bootStormGateShown = false;
   assert.equal(ctx._erpBootStormGate(), null);
+});
+
+/* ══ 두 번째 눈 — 부팅마다 «새 탭»이 열리면 sessionStorage 는 매번 빈다 (2026-09-17 저녁 재검증) ══
+   배포 1시간 뒤 기록에서도 부팅 8번/165초가 그대로였다 — 첫 눈(탭)만으로는 문이 한 번도 안 닫혔다. */
+test('⑧★ 탭은 매번 새것이어도 «이 기기·이 화면» 3분 안 5번째부터는 폭풍', () => {
+  const local = {};
+  let last = null;
+  for (let i = 0; i < 5; i++) last = boot({ session: {}, local, now: 1000000 + i * 20000 });   // 매번 빈 sessionStorage = 새 탭
+  assert.equal(last.win.PU_BOOT.count, 1, '탭으로는 늘 첫 부팅이다 — 그래서 첫 눈은 못 본다');
+  assert.equal(last.win.PU_BOOT.devCount, 5);
+  assert.equal(last.win.PU_BOOT.storm, true, '★★ 새 탭으로 되풀이 열리는 폭풍을 놓치면 문이 영영 안 닫힌다(재검증에서 실제로 그랬다)');
+  assert.equal(last.win.PU_BOOT.tabStorm, false); assert.equal(last.win.PU_BOOT.devStorm, true);
+  assert.ok(last.banner, '★ 띠가 없다');
+  assert.match(last.banner.kids[0].textContent, /매번 새 탭으로 열림/, '★ 어떻게 열리는지(새 탭)를 말해야 사람이 원인을 찾는다');
+});
+
+test('⑨ 기기 눈은 4번까지는 참는다 — 포털이 앱을 여는 것·F5 몇 번은 폭풍이 아니다', () => {
+  const local = {};
+  let last = null;
+  for (let i = 0; i < 4; i++) last = boot({ session: {}, local, now: 1000000 + i * 20000 });
+  assert.equal(last.win.PU_BOOT.devCount, 4);
+  assert.equal(last.win.PU_BOOT.storm, false, '★ 넷에 폭풍이라 하면 F5 몇 번 누른 사람을 막는다');
+});
+
+test('⑩ 기기 눈은 «화면 경로별»로 센다 — 앱 여러 개를 연달아 여는 것은 정상이다', () => {
+  const local = {};
+  boot({ session: {}, local, now: 1000000, pathname: '/pureunall/pu-erp.html' });
+  boot({ session: {}, local, now: 1000000 + 1000, pathname: '/pureunall/pu-cards.html' });
+  boot({ session: {}, local, now: 1000000 + 2000, pathname: '/pureunall/work.html' });
+  boot({ session: {}, local, now: 1000000 + 3000, pathname: '/pureunall/enter.html' });
+  const e = boot({ session: {}, local, now: 1000000 + 4000, pathname: '/pureunall/pu-photos.html' });
+  assert.equal(e.win.PU_BOOT.devCount, 1, '★★ 화면을 가르지 않으면 포털이 앱 넷을 여는 순간 다섯째 앱이 폭풍이 된다');
+  assert.equal(e.win.PU_BOOT.storm, false);
+});
+
+test('⑪ 기기 눈도 3분 넘은 것은 걷어낸다', () => {
+  const local = {};
+  for (let i = 0; i < 4; i++) boot({ session: {}, local, now: 1000000 + i * 1000 });
+  const late = boot({ session: {}, local, now: 1000000 + 4 * 60 * 1000 });
+  assert.equal(late.win.PU_BOOT.devCount, 1);
+});
+
+test('⑬ 이알피 덮개 — 기기 눈만 걸린 폭풍(새 탭)이면 「1번 다시 켜졌다」는 거짓말 대신 기기 수와 «새 탭»을 말한다', () => {
+  const gate = cutFn(ERP, 'function _erpBootStormGate(');
+  const body = { kids: [], appendChild(c) { body.kids.push(c); return c; } };
+  const ctx = {
+    window: { PU_BOOT: { storm: true, tabStorm: false, devStorm: true, count: 1, devCount: 6, since: 19, type: 'navigate' } },
+    sessionStorage: { getItem: () => null, setItem() {} },
+    document: { body, createElement: t => ({ type: '', style: {}, id: '', textContent: '', kids: [], appendChild(c) { this.kids.push(c); return c; }, set onclick(f) {}, parentNode: body }) },
+    console: { warn() {} }, Promise, Date, Math,
+  };
+  vm.createContext(ctx);
+  vm.runInContext('var _bootStormGateShown = false;\n' + gate, ctx);
+  const g = ctx._erpBootStormGate();
+  assert.ok(g, '★ 기기 눈만 걸린 폭풍에 문이 안 닫힌다 — 바로 이것이 재검증에서 새던 자리다');
+  const gather = n => (n.textContent || '') + ' ' + (n.kids || []).map(gather).join(' ');   // parentNode 가 body 를 가리켜 JSON 으로는 못 뽑는다(순환)
+  const texts = body.kids.map(gather).join(' ');
+  assert.match(texts, /새 탭/, '★ 새 탭으로 열리는 폭풍인데 「이 탭이 다시 켜진다」고 하면 사람이 엉뚱한 곳을 본다');
+  assert.match(texts, /6번/, '★ 탭 수(1)가 아니라 기기 수(6)를 말해야 한다');
+  assert.ok(!/1번/.test(texts), '★★ 「3분 안에 1번 다시 켜졌습니다」는 거짓말이다');
+});
+
+test('⑫ 첫 눈(탭)은 여전히 sessionStorage 만 본다 — 기기 눈은 딴 함수에 있다', () => {
+  assert.ok(!/localStorage/.test(cutFn(VER, 'function noteBoot(')), '★ 탭 눈에 localStorage 가 섞이면 탭 열 개를 열기만 해도 폭풍이 된다');
+  assert.match(cutFn(VER, 'function noteBootDevice('), /localStorage/, '★ 기기 눈은 localStorage 여야 새 탭을 가로질러 센다');
 });
 
 test('⑦ 검사에 걸리지 않게 — 띠에 <button 태그 글자를 쓰지 않는다(deployment-gate 가 막는다)', () => {

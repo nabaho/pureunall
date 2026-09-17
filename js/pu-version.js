@@ -36,6 +36,35 @@
        우리 화면이면 앱 코드가 다시 연 것이다 — 이 한 글자가 원인의 «안팎»을 가른다. */
   var BOOT_KEY = 'pu_boot_log_v1';
   var BOOT_STORM_N = 3, BOOT_STORM_MS = 3 * 60 * 1000;
+  /* ★ 두 번째 눈 — «이 기기·이 화면» 단위 (2026-09-17 저녁, 재검증에서 잡힘)
+     첫 눈(같은 탭, sessionStorage)만 두었더니 배포 1시간 뒤 기록에서도 부팅 8번/165초가
+     그대로였다 — 문이 한 번도 안 닫혔다. 부팅마다 «새 탭»이 열리면 sessionStorage 는 매번
+     비어 감지기가 늘 「첫 부팅」만 본다. 그래서 localStorage 에 «화면 경로별» 부팅 시각을 함께
+     남겨 3분 안 5번부터 폭풍으로 본다(탭이 새로 열려도 기기는 같다).
+     ⚠ 문턱을 5로 둔 까닭 — 포털이 앱 셋을 열거나 사람이 F5 를 몇 번 누르는 것은 폭풍이 아니다.
+     ⚠ 화면 «경로별»로 가른다 — 앱 여러 개를 연달아 여는 것은 정상이다. */
+  var BOOT_DEV_KEY = 'pu_boot_dev_v1';
+  var BOOT_DEV_STORM_N = 5;
+  function noteBootDevice(now) {
+    try {
+      var all = {};
+      try { all = JSON.parse(window.localStorage.getItem(BOOT_DEV_KEY) || '{}'); } catch (_) { all = {}; }
+      if (!all || typeof all !== 'object') all = {};
+      var p = String(window.location.pathname || '/');
+      var arr = Array.isArray(all[p]) ? all[p] : [];
+      arr = arr.filter(function (t) { return typeof t === 'number' && now - t < BOOT_STORM_MS; });
+      arr.push(now);
+      all[p] = arr.slice(-12);
+      /* 다른 화면의 낡은 기록은 걷어 둔다 — 한 열쇠가 끝없이 불지 않게 */
+      Object.keys(all).forEach(function (k) {
+        if (k === p) return;
+        var a = Array.isArray(all[k]) ? all[k].filter(function (t) { return typeof t === 'number' && now - t < BOOT_STORM_MS; }) : [];
+        if (a.length) all[k] = a; else delete all[k];
+      });
+      try { window.localStorage.setItem(BOOT_DEV_KEY, JSON.stringify(all)); } catch (_) {}
+      return arr.length;
+    } catch (_) { return 0; }
+  }
   function bootNavType() {
     try { var e = window.performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]; return (e && e.type) || ''; } catch (_) { return ''; }
   }
@@ -52,22 +81,28 @@
       var since = prev ? Math.round((now - prev) / 1000) : null;
       var from = '';
       try { from = window.document.referrer ? window.document.referrer.replace(window.location.origin, '') : ''; } catch (_) {}
-      var storm = arr.length >= BOOT_STORM_N;
-      window.PU_BOOT = { count: arr.length, since: since, type: nav, from: from, storm: storm };
+      var devCount = noteBootDevice(now);
+      var tabStorm = arr.length >= BOOT_STORM_N;
+      var devStorm = devCount >= BOOT_DEV_STORM_N;
+      var storm = tabStorm || devStorm;
+      window.PU_BOOT = { count: arr.length, devCount: devCount, since: since, type: nav, from: from, storm: storm, tabStorm: tabStorm, devStorm: devStorm };
       if (window.console && console.info) {
         console.info('[부팅] ' + (nav || '?') + (since != null ? ' · 직전 부팅에서 ' + since + '초' : ' · 이 탭의 첫 부팅')
-          + ' · 이 탭에서 3분 안 ' + arr.length + '번' + (from ? ' · 온 곳 ' + from : ''));
+          + ' · 이 탭에서 3분 안 ' + arr.length + '번 · 이 기기의 이 화면 3분 안 ' + devCount + '번' + (from ? ' · 온 곳 ' + from : ''));
       }
       if (storm) {
+        /* 탭은 「첫 부팅」인데 기기로는 다섯 번째 = 부팅마다 «새 탭»이 열리고 있다 — 그 말을 그대로 적는다 */
+        var how = (!tabStorm && devStorm) ? '매번 새 탭으로 열림' : (nav === 'reload' ? '브라우저·확장이 새로고침' : nav === 'navigate' ? '주소로 다시 열림' : (nav || '종류 모름'));
+        var n = tabStorm ? arr.length : devCount;
         if (window.console && console.warn) {
-          console.warn('★★ 이 탭이 3분 안에 ' + arr.length + '번 다시 켜졌습니다 (' + (nav === 'reload' ? '브라우저·확장이 새로고침' : nav === 'navigate' ? '주소로 다시 열림' : nav || '종류 모름') + ').'
+          console.warn('★★ 이 ' + (tabStorm ? '탭' : '기기의 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 (' + how + ').'
             + ' 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다 — 자동 새로고침 확장·탭 돌리기를 확인하세요.');
         }
-        mountStormBanner(arr.length, since, nav);
+        mountStormBanner(n, since, how, tabStorm);
       }
     } catch (_) {}
   }
-  function mountStormBanner(n, since, nav) {
+  function mountStormBanner(n, since, how, tabStorm) {
     function mount() {
       try {
         if (!window.document.body || window.document.getElementById('pu-boot-storm')) return;
@@ -78,7 +113,7 @@
           'padding:9px 14px;font:700 13px/1.45 system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
         var msg = window.document.createElement('span');
         msg.style.cssText = 'flex:1;min-width:0';
-        msg.textContent = '⚠ 이 탭이 3분 안에 ' + n + '번 다시 켜졌습니다' + (since != null ? ' (마지막은 ' + since + '초 전, ' + (nav === 'reload' ? '브라우저·확장이 새로고침' : '주소로 다시 열림') + ')' : '') +
+        msg.textContent = '⚠ 이 ' + (tabStorm ? '탭' : '기기에서 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 (' + how + (since != null && tabStorm ? ', 마지막은 ' + since + '초 전' : '') + ')' +
           '. 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다 — 브라우저의 자동 새로고침 확장이나 탭 돌리기를 꺼 주세요.';
         var x = window.document.createElement('span');
         x.setAttribute('role', 'button'); x.tabIndex = 0;
