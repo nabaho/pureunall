@@ -1,21 +1,23 @@
-/* ══════ 📅 계약이 «끝났거나 곧 끝나는» 곳만 한자리에 (대표 지시 2026-09-12) ═══════
-   대표: 「추천대로 해라」 — 기능 검토 보고의 ①
+/* ══════ 📅 계약 갱신은 «스스로 말 걸지 않는다» (대표 지시 2026-09-17) ═══════════
+   「계약갱신은 특별한 문제가 없으면 자동으로 갱신한다 — 일부러 표시할 필요없다」
 
-   ■ 무엇이 없었나
-   앱은 **이미** 계약 기간을 읽어 「종료일 지남」까지 판정하고 있었다(erpContractPeriod).
-   그런데 그 값이 «회사 상세를 열어야» 보였다 — 4,000곳 가운데 어디가 지났는지 알려면
-   한 곳씩 열어 보는 수밖에 없었다. 중소기업 확인서와 똑같은 자리였다.
+   ■ 두 번에 걸쳐 좁히다가, 결국 «없애는 것»이 답이었다
+     2026-09-12 «만들었다» — 계약 기간은 회사 상세를 열어야만 보였다. 목록 위 띠와
+       창을 만들어 「어디를 챙길 것인가」를 한자리에 모았다.
+     2026-09-15 «좁혔다» — 「종료일 지났어도 특별한 상황이 없으면 표시 안 되게 해라」.
+       91곳이던 것을 30일 창으로 줄여 5곳으로 만들었다.
+     2026-09-17 «없앴다» — 그 5곳도 대표 화면에 떴다. 보시니 「종료 16일 지남」 셋과
+       「D-14」 하나 — 모두 그냥 자동 연장될 곳이었다.
+       숫자를 줄인 것이지 **띄울 까닭을 만든 것이 아니었다.**
 
-   ★ 못 박는 것
-     ① 잣대는 erpContractPeriod «한 곳»이다 — 상세 줄과 목록이 다른 말을 하면 안 된다.
-     ②⚠⚠ **「종료일 지남」과 「계약해지(🚪)」는 다른 말이다.** 자동 연장으로 계속 가는
-        곳이 있다. 해지로 «표시된» 곳은 이미 끝낸 일이라 안 담는다 — 담으면 정작
-        챙길 곳이 묻힌다. 그리고 **뺀 곳은 세어서 말한다**(조용히 빼면 화면이 거짓말을 한다).
-     ③ 날짜로 «못 읽은» 종료일과 «아예 없는» 종료일은 안 담는다 — 기간을 안 적은 것이지
-        끝난 것이 아니다.
-     ④ 급한 순이다 — 지난 것이 먼저, 더 오래 지난 것이 더 앞.
-     ⑤ 0곳이면 띠를 «아예 안 띄운다».
-     ⑥ 켤 수 있는 거르개는 이름표가 있어야 한다.
+   ★★ 이 일의 참뜻: 계약 갱신에는 «특별한 문제»라는 신호가 데이터에 없다.
+     날짜가 지났다는 것은 사실일 뿐 문제가 아니다. 진짜 문제인 곳은 이미 다른 이름으로
+     서 있다 — 계약해지(🚪)는 종료 탭에, 폐업·휴업은 국세청 딱지에.
+
+   ★ 그래서 이 검사가 지키는 것은 둘이다
+     ㉠ 목록 위에 계약 갱신 띠가 **없다**(그리고 다시 생기지 않는다)
+     ㉡ 그렇다고 «기능이 사라진 것은 아니다» — 🔎 거르개 › 📅 계약 갱신 으로
+        대표가 «골라서» 보실 수 있고, 그 잣대는 예전과 똑같다
 
    node --test tests/cards-co-contract-due.test.js */
 'use strict';
@@ -36,26 +38,21 @@ class 고정날짜 extends Date {
   static now(){ return 기준시각; }
 }
 
-/* 잣대·목록·띠·창을 통째로 떠서 «돌린다» — 글자만 찾으면 조건이 뒤집혀도 통과한다 */
+/* 잣대와 목록을 통째로 떠서 «돌린다» — 글자만 찾으면 조건이 뒤집혀도 통과한다 */
 function load(list) {
   const ctx = { Object, Array, String, Number, Math, Date:고정날짜, JSON, isNaN, console,
     esc: s => String(s == null ? '' : s),
     coList: () => list || [],
-    todayYmd: () => 오늘,
-    _closeBtn: () => '<x>',
-    _panelShown: null,
-    showPanel(h){ ctx._panelShown = h; } };
+    todayYmd: () => 오늘 };
   vm.createContext(ctx);
   vm.runInContext([
     /* ⚠ 진짜를 싣는다 — erpContractPeriod 를 대역으로 바꾸면 「종료일 지남」 판정이
        틀려도 이 검사가 모른다. coSmeDays 도 마찬가지(날짜 세기를 여기서 베끼면 두 벌이 된다). */
     cutFn(SRC, 'function erpContractPeriod('), cutFn(SRC, 'function coSmeDays('),
     cutFn(SRC, 'function coCtState('), cutFn(SRC, 'function coCtClosed('),
-    cutFn(SRC, 'function coCtInWindow('), cutFn(SRC, 'function coCtNeeds('), cutFn(SRC, 'function coCtList('),
-    cutFn(SRC, 'function coCtCount('), cutFn(SRC, 'function coCtClosedCount('),
     SRC.match(/^const CT_RECENT_DAYS = [^\n]*$/m)[0].replace('const ', 'var '),
-    cutFn(SRC, 'function coCtOldCount('),
-    cutFn(SRC, 'function coCtBarHtml('), cutFn(SRC, 'function coCtHtml(')
+    cutFn(SRC, 'function coCtInWindow('), cutFn(SRC, 'function coCtNeeds('),
+    cutFn(SRC, 'function coCtList('), cutFn(SRC, 'function coCtCount(')
   ].join('\n'), ctx);
   return ctx;
 }
@@ -63,13 +60,66 @@ function load(list) {
 const 회사 = (name, to, extra) => ({ key:name, name:name,
   erp: Object.assign({ type:'자문', ctFrom:'2025-01-01', ctTo:to }, extra || {}) });
 
-/* ── ①③ 무엇을 담는가 ────────────────────────────────────────────────── */
+/* ══ ㉠ 목록 위에 계약 갱신 띠가 «없다» ══════════════════════════════════ */
+
+test('★★★ 목록 위 띠 줄에 계약 갱신이 «안» 낀다 — 실제로 그려서 본다', () => {
+  /* ⚠ 「coCtBarHtml 글자가 없다」로 보지 «않는다». 띠 줄을 실제로 그려, 나온 것이
+     넷뿐인지 본다 — 이름을 바꿔 도로 끼워 넣어도 이 검사가 잡는다. */
+  const ctx = { console };
+  vm.createContext(ctx);
+  vm.runInContext([
+    "function coOrphanBarHtml(){ return '<ORPHAN>'; }",
+    "function coClashBarHtml(){ return '<CLASH>'; }",
+    "function coSmeBarHtml(){ return '<SME>'; }",
+    "function coNtsBarHtml(){ return '<NTS>'; }",
+    cutFn(SRC, 'function coBarsHtml(')
+  ].join('\n'), ctx);
+  const h = ctx.coBarsHtml();
+  assert.equal(h, '<ORPHAN><CLASH><SME><NTS>',
+    '★★★ 계약 갱신 띠가 도로 끼었습니다 — 자동 갱신될 곳을 띄우면 늘 뜨는 띠가 된다: ' + h);
+  assert.ok(h.indexOf('계약') < 0, '★★★ 띠 줄에 계약 이야기가 남아 있다: ' + h);
+});
+
+test('★★★ 띠와 창을 그리던 함수가 «아예 없다» — 남겨 두면 언젠가 다시 불린다', () => {
+  ['function coCtBarHtml(', 'function coCtHtml(', 'function openCoCt(',
+   'function coCtOldCount(', 'function coCtClosedCount('].forEach(function (f) {
+    assert.ok(SRC.indexOf(f) < 0,
+      '★★★ ' + f + ' 가 되살아났습니다 — 두 번 겪고 지운 길입니다');
+  });
+  assert.ok(SRC.indexOf('.coctbar{') < 0, '★★ 띠 모양(.coctbar)이 도로 생겼습니다');
+});
+
+/* ══ ㉡ 그렇다고 기능이 사라진 것은 «아니다» ════════════════════════════ */
+
+test('★★★ 🔎 거르개로 «골라서» 보실 수 있다 — 이것이 남은 유일한 길이다', () => {
+  assert.match(cutFn(SRC, 'function coFilters('), /k: 'coOnlyCtOld'/,
+    '★★★ 띠도 없고 거르개도 없으면 계약 갱신을 볼 길이 통째로 사라진다');
+  const filt = cutFn(SRC, 'function coFilteredList(');
+  assert.match(filt, /state\.coOnlyCtOld && !skipTodo\) list = list\.filter\(o=>coCtNeeds\(o\)\)/,
+    '★★★ 거르개가 제 잣대를 따로 두면 거르개와 셈이 다른 말을 한다');
+});
+
+test('★★ 거르개를 켜면 «무엇으로 걸렀는지» 딱지가 말한다', () => {
+  const lab = SRC.slice(SRC.indexOf('const CO_TODO_LABEL'), SRC.indexOf('function clearCoTodo'));
+  assert.match(lab, /coOnlyCtOld:/, '★★ 걸어 놓고 아무 말이 없으면 되돌릴 길도 안 보인다');
+});
+
+test('★★★ 상세의 「종료일 지남」 딱지는 «그대로» 둔다 — 날짜 사실은 알려 줘야 한다', () => {
+  const c = load();
+  const st = c.coCtState(회사('오래지남','2026-03-31'), 오늘);
+  assert.equal(st.cls, 'gone',
+    '★★★ 없앤 것은 «목록 알림»뿐이다 — 회사를 연 사람에게는 사실대로 말한다');
+  assert.match(cutFn(SRC, 'function coDetailPanelHtml('), /종료일 지남/,
+    '★★ 상세에서 그 말이 사라졌다');
+});
+
+/* ══ 잣대 — 거르개가 이것을 쓴다 ═══════════════════════════════════════ */
 
 test('★★★ 끝난 곳과 곧 끝나는 곳만 담는다', () => {
   const c = load([ 회사('막지남','2026-08-20'), 회사('곧끝남','2026-10-01'),
                    회사('오래지남','2026-03-31'), 회사('아직멀다','2027-03-31') ]);
   assert.deepEqual(c.coCtList().map(x => x.name), ['막지남','곧끝남'],
-    '★★★ 살아 있는 계약까지 담으면 「전체 목록」이 되어 챙길 곳이 묻힌다');
+    '★★★ 살아 있는 계약까지 담으면 거르개가 「전체 목록」이 된다');
 });
 
 test('★★★ 종료일이 «아예 없는» 곳은 담지 않는다 — 기간을 안 적은 것이지 끝난 것이 아니다', () => {
@@ -85,16 +135,11 @@ test('★★ 날짜로 «못 읽은» 종료일은 담지 않는다 — 늑대 �
     '★★ 모르는 것을 급하다고 하면, 진짜 급한 것도 안 믿게 된다');
 });
 
-/* ── ⑦ 오래 지난 곳은 «알림거리가 아니다» (대표 지시 2026-09-15) ───────────
-   「계약종료일 지났어도 특별한 상황이 없으면 표시 안 되게 해라」
-   실측: 대표 화면에 「종료일 지남 91곳 · 30일 안 1곳」이 떴다. 91곳은 거의 다
-   자동 연장으로 계속 가는 곳이라, 정작 챙길 1곳이 그 속에 묻혔다. */
-
 test('★★★ 종료일이 «오래» 지난 곳은 안 담는다 — 자동 연장으로 굴러가는 중이다', () => {
   const c = load([ 회사('오래지남','2026-03-31'), 회사('작년에지남','2025-01-31'),
                    회사('막지남','2026-08-20') ]);
   assert.deepEqual(c.coCtList().map(x => x.name), ['막지남'],
-    '★★★ 91곳이 뜨면 눈이 배경으로 배운다 — 정작 챙길 곳이 묻힌다');
+    '★★★ 자동 연장으로 굴러가는 곳은 챙길 일이 없다');
 });
 
 test('★★ 「막 지남」의 끝은 30일이다 — 딱 30일째까지는 담고, 31일째는 뺀다', () => {
@@ -103,57 +148,12 @@ test('★★ 「막 지남」의 끝은 30일이다 — 딱 30일째까지는 �
   assert.equal(load([ 회사('31일','2026-08-12') ]).coCtList().length, 0, '★★ 31일째를 담았다');
 });
 
-test('★★★ 그런데 «오래 지난 곳 수»는 말한다 — 조용히 빼면 화면이 거짓말을 한다', () => {
-  const c = load([ 회사('오래1','2026-03-31'), 회사('오래2','2025-01-31'),
-                   회사('막지남','2026-08-20') ]);
-  assert.equal(c.coCtOldCount(오늘), 2, '★★ 뺀 곳을 안 세고 있다');
-  const h = c.coCtHtml(오늘);
-  assert.match(h, /2곳<\/b>은 뺐습니다 — 자동 연장/,
-    '★★★ 뺀 사실을 안 적으면 「우리 거래처가 이것뿐인가」가 된다');
-});
-
-test('★★ 해지와 «오래 지남»을 겹쳐 세지 않는다 — 더했을 때 전체와 안 맞는다', () => {
-  const c = load([ 회사('해지고오래','2026-03-31',{ left:true }) ]);
-  assert.equal(c.coCtOldCount(오늘), 0, '★★ 해지된 곳을 「오래 지남」으로도 세면 두 번 센 것이다');
-  assert.equal(c.coCtClosedCount(오늘), 0,
-    '★ 해지 셈은 «챙길 날짜»인 곳만 센다 — 오래 지난 해지는 애초에 챙길 것이 아니다');
-});
-
-test('★★★ 상세의 「종료일 지남」 딱지는 «그대로» 둔다 — 날짜 사실은 알려 줘야 한다', () => {
-  const c = load();
-  const st = c.coCtState(회사('오래지남','2026-03-31'), 오늘);
-  assert.equal(st.cls, 'gone',
-    '★★★ 잣대를 좁힌 것은 «목록 알림»뿐이다 — 회사를 연 사람에게는 사실대로 말한다');
-  const panel = cutFn(SRC, 'function coDetailPanelHtml(');
-  assert.match(panel, /종료일 지남/, '★★ 상세에서 그 말이 사라졌다');
-});
-
-/* ── ② 해지와 «다른 말»이다 ───────────────────────────────────────────── */
-
 test('★★★ 계약해지(🚪)로 표시된 곳은 «안 담는다» — 이미 끝낸 일이다', () => {
   const c = load([ 회사('해지됨','2026-08-20',{ left:true }),
                    회사('살아있음','2026-08-20') ]);
   assert.deepEqual(c.coCtList().map(x => x.name), ['살아있음'],
     '★★★ 끝낸 곳이 섞이면 정작 챙길 곳이 그 속에 묻힌다');
 });
-
-test('★★★ 그런데 «뺀 곳 수»는 말한다 — 조용히 빼면 화면이 거짓말을 한다', () => {
-  const c = load([ 회사('해지1','2026-08-20',{ left:true }),
-                   회사('해지2','2026-10-01',{ left:true }),
-                   회사('살아있음','2026-08-20') ]);
-  assert.equal(c.coCtClosedCount(), 2, '★★ 뺀 곳을 안 세고 있다');
-  const h = c.coCtHtml(오늘);
-  assert.match(h, /2곳<\/b>은 뺐습니다/,
-    '★★★ 뺀 사실을 안 적으면 「우리 거래처가 이것뿐인가」로 읽힌다');
-});
-
-test('★★ 해지된 곳이어도 «날짜가 멀면» 뺀 곳으로도 안 센다', () => {
-  const c = load([ 회사('해지인데멀다','2027-03-31',{ left:true }) ]);
-  assert.equal(c.coCtClosedCount(), 0,
-    '★★ 애초에 챙길 날짜가 아닌 곳까지 「뺐습니다」에 세면 그 숫자가 뜻을 잃는다');
-});
-
-/* ── ④ 급한 순 ────────────────────────────────────────────────────────── */
 
 test('★★★ 급한 순으로 선다 — 지난 것이 먼저, 더 오래 지난 것이 더 앞', () => {
   const c = load([ 회사('임박15','2026-09-27'), 회사('더지남','2026-08-20'),
@@ -163,89 +163,18 @@ test('★★★ 급한 순으로 선다 — 지난 것이 먼저, 더 오래 지
     '★★★ 차례가 급한 순이 아니면 맨 위부터 처리할 수가 없다');
 });
 
-test('★ 남은 날과 종료일을 «함께» 들고 온다 — 화면이 그것으로 D-날짜를 적는다', () => {
+test('★ 남은 날과 종료일을 «함께» 들고 온다 — 거르개 목록이 그것으로 딱지를 적는다', () => {
   const c = load([ 회사('막지남','2026-09-02'), 회사('임박','2026-09-20') ]);
   const [a, b] = c.coCtList();
   assert.equal(a.days, -10); assert.equal(a.cls, 'gone'); assert.equal(a.to, '2026-09-02');
   assert.equal(b.days, 8);   assert.equal(b.cls, 'soon');
 });
 
-/* ── ⑤ 띠 ─────────────────────────────────────────────────────────────── */
-
-test('★★★ 챙길 곳이 없으면 띠를 «아예 안 띄운다»', () => {
-  const c = load([ 회사('멀다','2027-03-31'), 회사('해지','2026-09-01',{ left:true }),
-                   회사('오래지남','2026-03-31') ]);
-  assert.equal(c.coCtBarHtml(오늘), '',
-    '★★★ 늘 뜨는 띠는 눈이 배경으로 배운다 — 정작 급할 때 안 읽힌다');
-});
-
-test('★★ 띠가 «지남 몇 곳 · 30일 안 몇 곳»을 갈라 말한다', () => {
-  const c = load([ 회사('막지남1','2026-09-01'), 회사('막지남2','2026-08-20'),
-                   회사('곧끝남1','2026-10-01') ]);
-  const h = c.coCtBarHtml(오늘);
-  assert.match(h, /막 지남 <b>2곳<\/b>/, '★★ 몇 곳이 막 지났는지가 가장 급한 값이다');
-  assert.match(h, /곧 끝남 <b>1곳<\/b>/);
-  assert.match(h, /openCoCt\(\)/, '★ 눌러서 볼 길이 없다');
-});
-
-test('★ 한쪽이 0곳이면 그쪽은 «안 적는다»', () => {
-  const c = load([ 회사('임박','2026-10-01') ]);
-  const h = c.coCtBarHtml(오늘);
-  assert.ok(!/막 지남 <b>/.test(h), '★ 「막 지남 0곳」이 적혀 있다');
-  assert.match(h, /곧 끝남 <b>1곳<\/b>/);
-});
-
-/* ── 창 ───────────────────────────────────────────────────────────────── */
-
-test('★★★ 창이 회사마다 «언제까지»와 «얼마나 급한지»를 말한다', () => {
-  const c = load([ 회사('막지남회사','2026-09-02'), 회사('임박회사','2026-09-20') ]);
-  const h = c.coCtHtml(오늘);
-  assert.match(h, /챙길 곳 2곳/, '★ 몇 곳인지 없다');
-  assert.match(h, /종료 10일 지남/, '★★★ 얼마나 지났는지 없으면 급한 정도를 모른다');
-  assert.match(h, /D-8/, '★★ 며칠 남았는지 없다');
-  assert.match(h, /2026-09-02까지/, '★★ 언제까지인지 없으면 무엇을 갱신할지 모른다');
-});
-
-test('★★★ 창이 «해지가 아니다»라고 밝힌다 — 섞으면 멀쩡한 거래처를 끝난 곳으로 읽는다', () => {
-  const c = load([ 회사('막지남','2026-09-02') ]);
-  assert.match(c.coCtHtml(오늘), /계약해지가 아닙니다/,
-    '★★★ 자동 연장으로 계속 가는 곳이 있다 — 그 말이 없으면 해지로 읽고 정리해 버린다');
-});
-
-test('★★ 회사를 누르면 «창을 닫고» 그 회사를 연다', () => {
-  const c = load([ 회사('가나','2026-09-02') ]);
-  const h = c.coCtHtml(오늘);
-  assert.match(h, /pickCo\('가나'\)/, '★★ 눌러도 그 회사로 못 간다');
-  assert.match(h, /dedupBg\.classList\.remove\('open'\)/,
-    '★★ 창을 안 닫으면 상세가 창 뒤에 열려 아무 일도 없는 것처럼 보인다');
-});
-
-test('★ 챙길 곳이 없으면 창은 «없다»고 말한다 — 빈 목록은 고장으로 읽힌다', () => {
-  const c = load([ 회사('멀다','2027-03-31') ]);
-  assert.match(c.coCtHtml(오늘), /없습니다/);
-});
-
-/* ── ①⑥ 잣대가 «한 곳»인가 · 이름표 ──────────────────────────────────── */
-
-test('★★★ 띠·창·거르개가 모두 «같은 잣대»(coCtNeeds)를 본다', () => {
+test('★★ 세는 곳과 거르는 곳이 «같은 잣대»(coCtNeeds)를 본다', () => {
+  const c = load([ 회사('막지남','2026-08-20'), 회사('멀다','2027-03-31') ]);
+  assert.equal(c.coCtCount(), 1, '★★ 거르개에 붙는 수가 목록과 다르면 화면이 스스로를 못 설명한다');
   assert.match(cutFn(SRC, 'function coCtList('), /coCtNeeds\(o, now\)/,
-    '★★ 목록이 제 잣대를 따로 두면 띠와 어긋난다');
+    '★★ 목록이 제 잣대를 따로 두면 셈과 어긋난다');
   assert.match(cutFn(SRC, 'function coCtState('), /erpContractPeriod\(/,
     '★★★ 계약 기간을 여기서 다시 읽으면 상세 줄과 목록이 다른 말을 한다');
-  const filt = cutFn(SRC, 'function coFilteredList(');
-  assert.match(filt, /state\.coOnlyCtOld && !skipTodo\) list = list\.filter\(o=>coCtNeeds\(o\)\)/,
-    '★★★ 거르개가 제 잣대를 따로 두면 「띠는 3곳인데 목록은 5곳」이 된다');
-});
-
-test('★★★ 거르개를 켜면 «무엇으로 걸렀는지» 딱지가 말한다', () => {
-  const lab = SRC.slice(SRC.indexOf('const CO_TODO_LABEL'), SRC.indexOf('function clearCoTodo'));
-  assert.match(lab, /coOnlyCtOld:/, '★★★ 걸어 놓고 아무 말이 없으면 되돌릴 길도 안 보인다');
-  assert.match(cutFn(SRC, 'function coFilters('), /k: 'coOnlyCtOld'/, '★★ 거르개 메뉴에 없다');
-});
-
-test('★★ 띠를 목록 위에 «실제로» 내보낸다 — 만들어 놓고 안 붙이면 소용없다', () => {
-  /* ⚠ 2026-09-15 다시 겨눔 — 띠를 부르는 자리가 coBarsHtml 한 곳으로 모였다.
-     못 박을 것은 «띠가 목록 위에 선다»는 것이지 어느 함수 안에 적혔는가가 아니다. */
-  assert.match(cutFn(SRC, 'function coBarsHtml('), /coCtBarHtml\(\)/,
-    '★★★ 띠를 그리는 자리가 없다');
 });

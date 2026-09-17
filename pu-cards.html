@@ -2328,13 +2328,9 @@ td.selcell{cursor:cell}
 .cosmebar:hover{background:#f8fafc}
 .cosmebar b{color:#1e293b}
 .cosmebar em{font-style:normal;color:#1e40af;margin-left:4px}
-/* 📅 계약 종료 띠 — 확인서 띠와 «같은 결»로 둔다(다르게 그리면 「또 새것이 생겼나」가 된다).
-   ⚠ 테두리만 파랑이다. 둘이 나란히 뜰 때 어느 띠를 읽고 있는지 구별이 되어야 한다. */
-.coctbar{margin:0 0 10px;padding:10px 13px;border:1px solid #bfdbfe;background:#ffffff;
-  border-radius:9px;font-size:12.5px;color:#1e40af;cursor:pointer}
-.coctbar:hover{background:#f8fafc}
-.coctbar b{color:#1e293b}
-.coctbar em{font-style:normal;color:#1e40af;margin-left:4px}
+/* ⚠ 📅 계약 갱신 띠는 «없앴다» (대표 지시 2026-09-17
+     「계약갱신은 특별한 문제가 없으면 자동으로 갱신한다 — 일부러 표시할 필요없다」).
+   까닭은 coCtNeeds 머리에 적어 두었다. 여기에 띠 모양을 도로 만들지 말 것. */
 /* ⚠ 값이 다른 칸 띠 (대표 결정 2026-09-15 「셋 다」) — 확인서·계약 띠와 «같은 결».
    ⚠ 색은 팔레트 안에서만(tests/color-palette-apps.test.js). */
 .coclashbar{margin:0 0 10px;padding:10px 13px;border:1px solid #fde68a;background:#ffffff;
@@ -2365,6 +2361,13 @@ td.selcell{cursor:cell}
   background:#ffffff;border:1px solid #bfdbfe;border-radius:7px;padding:2px 8px;
   cursor:pointer;font-family:inherit}
 .coclashgrp .pickgrp:hover{background:#1e40af;color:#ffffff}
+/* ☑ 전체 한 번에 고르기 (대표 지시 2026-09-17) — 묶음 단추와 «같은 결»로 둔다.
+   ⚠ 고른 것이 0개일 때 쓰는 단추라 늘 서 있다. 그래서 눈에 안 거슬리게 옅게 둔다. */
+.coclashall{margin:0 0 8px;text-align:right}
+.coclashall .pickall{font-size:12px;font-weight:700;color:#1e40af;background:#ffffff;
+  border:1px solid #bfdbfe;border-radius:8px;padding:4px 11px;cursor:pointer;font-family:inherit}
+.coclashall .pickall.on{background:#1e40af;color:#ffffff}
+.coclashall .pickall:hover{background:#1e40af;color:#ffffff}
 .coclashrow .ck{flex:none;width:15px;height:15px;cursor:pointer;accent-color:#1e40af}
 .coclashrow.on{background:#eff6ff}
 .coclashrow{display:flex;align-items:center;gap:9px;padding:8px 6px;
@@ -26716,9 +26719,10 @@ function coFilteredList(skipCol, skipCares, skipTodo){
        모두 그것을 본다. 여기서 다시 재면 「띠는 3곳인데 목록은 5곳」이 된다. */
   if(state.coOnlySme && !skipTodo) list = list.filter(o=>coSmeNeeds(o));
   /* ── 📅 계약이 끝났거나 곧 끝나는 곳만 (대표 지시 2026-09-12) ──
-     ⚠ 거르는 잣대는 coCtNeeds «한 곳»이다 — 띠(coCtBarHtml)·창(coCtHtml)이 모두 그것을
-       본다. 여기서 다시 재면 「띠는 3곳인데 목록은 5곳」이 된다.
-     ⚠ 계약해지(🚪)를 빼는 것도 그 잣대 안에 들어 있다 — 여기서 또 빼지 않는다. */
+     ★ 2026-09-17부터 이것이 계약 갱신을 보는 «유일한 길»이다 — 띠와 창은 지웠다
+       (「특별한 문제가 없으면 자동으로 갱신한다 — 일부러 표시할 필요없다」).
+       거르개는 대표가 «골라서» 여는 자리라 말을 걸지 않는다. coCtNeeds 머리를 볼 것.
+     ⚠ 계약해지(🚪)를 빼는 것은 coCtNeeds 안에 들어 있다 — 여기서 또 빼지 않는다. */
   if(state.coOnlyCtOld && !skipTodo) list = list.filter(o=>coCtNeeds(o));
   /* ── 🏛 국세청이 폐업·휴업이라 한 곳만 (대표 지시 2026-09-13) ──
      ⚠ 잣대는 coNtsNeeds 한 곳이다 — 띠·창·거르개가 모두 그것을 본다. */
@@ -27547,8 +27551,11 @@ function openCoClash(){ showWidePanel(coClashHtml()); }
      않아서다. 다음 띠에서 또 그러지 않도록 여기 모은다(검사는 이 하나만 대역으로 준다).
    ⚠ 차례가 뜻이다 — 위에서부터 «먼저 챙길 것»이다. 어긋난 값은 잘못된 값이 계약서로
      나가는 일이라 고아 정보 바로 다음에 둔다. */
+/* ⚠ 📅 계약 갱신 띠는 여기에 «없다» (대표 지시 2026-09-17). 계약은 특별한 문제가
+     없으면 자동으로 갱신되므로 일부러 띄울 것이 아니다 — coCtNeeds 머리를 볼 것.
+     보고 싶을 때는 🔎 거르개 › 📅 계약 갱신 으로 «대표가 골라» 보신다. */
 function coBarsHtml(){
-  return `${coOrphanBarHtml()}${coClashBarHtml()}${coSmeBarHtml()}${coCtBarHtml()}${coNtsBarHtml()}`;
+  return `${coOrphanBarHtml()}${coClashBarHtml()}${coSmeBarHtml()}${coNtsBarHtml()}`;
 }
 /* ══════ 「값이 어떻게 다른지 모르겠다」 (대표 보고 2026-09-15) ═══════════════════
    실측: 창 560px 에서 회사 180 + 칸 74 + 단추 159 + 사이 27 = 440 이 «고정»이라,
@@ -27755,11 +27762,25 @@ function coClashHtml(){
     </div>` : '';
   const 묶음단추 = (which, n) => n ? `<button class="pickgrp" onclick="coClashPickGroup('${which}')"
       title="이 묶음을 모두 고르거나 모두 풉니다">☑ 이 묶음 ${n}개</button>` : '';
+  /* ══ ☑ 전체 한 번에 고르기 (대표 지시 2026-09-17) ══════════════════════════
+     묶음이 둘이라 「전체」를 고르려면 묶음 단추를 «두 번» 눌러야 했다.
+     ⚠ 이 단추는 «늘» 서 있다 — 고른 것이 0개일 때 쓰라고 있는 단추이므로,
+       고른 것 띠(고른 뒤에만 뜬다) 안에 넣으면 정작 처음에 안 보인다.
+     ⚠ 다 골라져 있으면 «푸는» 단추가 된다. 같은 자리가 고르기도 풀기도 하지 않으면
+       스물여섯 개를 고른 뒤 무르려고 또 다른 단추를 찾아 헤매게 된다.
+     ⚠ 여기서도 «한 글자도 안 바뀐다» — 고르는 것은 확인일 뿐이다. */
+  const 다골랐나 = 고른것.length === list.length;
+  const 전체단추 = `<div class="coclashall">
+      <button class="pickall${다골랐나 ? ' on' : ''}" onclick="coClashPickGroup('all')"
+        title="${다골랐나 ? '고른 것을 모두 풉니다' : '두 묶음을 통틀어 모두 고릅니다 — 고르기만 할 뿐 아직 안 바뀝니다'}"
+        >${다골랐나 ? '전체 고르기 풀기' : `☑ 전체 ${list.length}개 고르기`}</button>
+    </div>`;
   return `<div class="mhead"><b>⚠ 값이 다른 칸 — ${list.length}개 · ${cos}곳</b>${_closeBtn()}</div>
     <p class="setnote" style="margin:0 0 10px">사진첩이 읽은 값이 기업 상세의 값과 다릅니다.
       <b>값은 아직 하나도 안 바뀌었습니다</b> — 줄마다 눌러 주시거나,
       <b>네모로 골라 한 번에</b> 바꾸실 수 있습니다.
       <br>회사 이름을 누르면 그 회사 상세가 열립니다.</p>
+    ${전체단추}
     ${띠}
     ${same.length ? `<div class="coclashgrp same">★ 같은 서류를 다시 읽은 것 ${same.length}개
       — 읽은 값이 맞습니다 ${묶음단추('same', same.length)}</div>${same.map(coClashRowHtml).join('')}` : ''}
@@ -29567,20 +29588,29 @@ function coCtState(o, now){
 /* 해지로 표시된 곳인가 — 「이미 끝낸 일」이다. o.erp.left 는 업체관리가 정한 값이라
    여기서 다시 재지 않는다(🚪 딱지와 같은 잣대). */
 function coCtClosed(o){ return !!(o && o.erp && o.erp.left); }
-/* ⚠⚠ 「종료일이 지났다」는 그 자체로는 알림거리가 «아니다» (대표 지시 2026-09-15
-     「계약종료일 지났어도 특별한 상황이 없으면 표시 안 되게 해라」).
-   실측: 대표 화면에 「종료일 지남 91곳 · 30일 안 1곳」이 떴다. 91곳은 거의 다
-   **자동 연장으로 계속 가는 곳**이다 — 상세 화면이 이미 그 말을 하고 있었는데
-   (「계약해지와는 다른 말입니다」), 띠는 그것을 세어 올려 91이라는 숫자로 겁을 줬다.
-   늘 뜨는 큰 숫자는 눈이 배경으로 배운다 — 정작 1곳이 묻힌다.
+/* ══════ ⚠⚠ 계약 갱신은 «스스로 말 걸지 않는다» (대표 지시 2026-09-17) ══════════
+   「계약갱신은 특별한 문제가 없으면 자동으로 갱신한다 — 일부러 표시할 필요없다」
 
-   ★ 그래서 «챙길 일이 있는 때»만 담는다:
-     ㉠ 곧 끝난다(30일 안) — 지금이 갱신 협의할 때다
-     ㉡ 막 지났다(지난 지 30일 안) — 아직 갱신 협의가 살아 있다
-   ⚠ 오래 지난 곳은 «안 담는다». 자동 연장으로 굴러가는 중이라 할 일이 없다.
-     그래도 **세어서 말한다**(coCtOldCount) — 조용히 빼면 화면이 거짓말을 한다.
-   ⚠ 상세 화면의 「종료일 지남」 딱지는 «그대로» 둔다. 그것은 날짜 사실이고,
-     회사를 열어 본 사람에게는 알려 줘야 한다. 여기서 좁히는 것은 «목록 알림»뿐이다. */
+   ★ 두 번에 걸쳐 좁히다가, 결국 «없애는 것»이 답이었다.
+     2026-09-15 «좁혔다» — 「종료일 지났어도 특별한 상황이 없으면 표시 안 되게 해라」.
+       91곳이던 것을 30일 창으로 줄여 5곳으로 만들었다.
+     2026-09-17 «없앴다» — 그 5곳도 대표 화면에 떴다. 보시니 「종료 16일 지남」 셋과
+       「D-14」 하나 — 모두 **그냥 자동 연장될 곳**이었다. 숫자를 줄인 것이지
+       **띄울 까닭을 만든 것이 아니었다.**
+
+   ★★ 이 일의 참뜻: 계약 갱신에는 «특별한 문제»라는 신호가 데이터에 없다.
+     날짜가 지났다는 것은 사실일 뿐 문제가 아니다. 진짜 문제인 곳은 이미 다른 이름으로
+     서 있다 — 계약해지(🚪)는 종료 탭에, 폐업·휴업은 국세청 딱지에.
+     그래서 **띄울 것이 남지 않는다.** 남은 것을 억지로 띄우면 늘 뜨는 띠가 되고,
+     늘 뜨는 띠는 눈이 배경으로 배워 «정작 급한 띠»까지 함께 안 보이게 만든다.
+
+   ⚠ 그래서 목록 위 띠(coCtBarHtml)와 그 창(coCtHtml)을 지웠다.
+     ⚠ 기능을 없앤 것이 «아니다» — 보고 싶을 때 보는 길은 남겨 두었다:
+       🔎 거르개 › 📅 계약 갱신. 그것은 대표가 «골라서» 여는 자리라 말을 걸지 않는다.
+     ⚠ 상세 화면의 「종료일 지남」 딱지도 «그대로» 둔다. 그것은 날짜 사실이고,
+       그 회사를 열어 본 사람에게는 알려 줘야 한다.
+     ⚠ 띠를 도로 만들지 말 것. 다음에 「챙길 곳이 보이면 좋겠다」는 생각이 들면,
+       그것은 이미 두 번 겪고 지운 길이다. */
 const CT_RECENT_DAYS = 30;
 /* 「지금 챙길 때인가」 — 날짜만 보는 잣대다(해지 여부는 안 본다).
    ⚠ 이것을 한 곳에 둔다. coCtNeeds 와 「뺀 곳」 셈이 각자 재면, 「뺐습니다」 숫자를
@@ -29594,17 +29624,8 @@ function coCtNeeds(o, now){
   if(coCtClosed(o)) return false;
   return coCtInWindow(coCtState(o, now));
 }
-/* 종료일이 «오래» 지난 곳 — 자동 연장으로 보고 알림에서 뺀 곳이다.
-   ⚠ 해지(🚪)는 여기 안 센다 — 그것은 따로 세어 말한다(coCtClosedCount).
-     두 곳에 겹쳐 세면 「뺐습니다」 숫자를 더했을 때 전체와 안 맞는다. */
-function coCtOldCount(now){
-  return (coList() || []).filter(function(o){
-    if(coCtClosed(o)) return false;
-    const st = coCtState(o, now);
-    return !!st && st.cls === 'gone' && (-st.days) > CT_RECENT_DAYS;
-  }).length;
-}
-/* 급한 순 — 남은 날이 적을수록 앞. 지난 것은 음수라 저절로 맨 앞에 선다. */
+/* 급한 순 — 남은 날이 적을수록 앞. 지난 것은 음수라 저절로 맨 앞에 선다.
+   ⚠ 이제 이 목록을 쓰는 곳은 🔎 거르개 «하나»다(띠와 창은 2026-09-17에 지웠다). */
 function coCtList(now){
   return (coList() || []).filter(o => coCtNeeds(o, now)).map(function(o){
     const st = coCtState(o, now);
@@ -29612,61 +29633,8 @@ function coCtList(now){
              cls:st.cls, days:st.days };
   }).sort((a,b) => (a.days - b.days) || String(a.name).localeCompare(String(b.name), 'ko'));
 }
+/* 🔎 거르개 › 📅 계약 갱신 에 붙는 수 */
 function coCtCount(now){ return coCtList(now).length; }
-/* 해지라서 «뺀» 곳 — 화면이 그 사실을 말할 수 있게 따로 센다 */
-function coCtClosedCount(now){
-  return (coList() || []).filter(function(o){
-    if(!coCtClosed(o)) return false;
-    /* ⚠ coCtNeeds 와 «같은 창»으로 잰다 — 해지가 아니었다면 목록에 올랐을 곳만 센다.
-       오래 지난 해지는 애초에 챙길 것이 아니라 「뺐습니다」에 넣으면 숫자가 뜻을 잃는다. */
-    return coCtInWindow(coCtState(o, now));
-  }).length;
-}
-/* 목록 위 알림 띠 — 0곳이면 «아무 것도 안 띄운다»(확인서 띠와 같은 규칙) */
-function coCtBarHtml(now){
-  const list = coCtList(now);
-  if(!list.length) return '';
-  const gone = list.filter(x => x.cls === 'gone').length;
-  const soon = list.length - gone;
-  const bits = [ gone ? `막 지남 <b>${gone.toLocaleString()}곳</b>` : '',
-                 soon ? `곧 끝남 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
-  return `<div class="coctbar" onclick="openCoCt()"
-      title="지금 갱신을 챙길 곳입니다 — 종료일이 오래 지난 곳(자동 연장)과 계약해지(🚪)는 뺐습니다">
-      📅 계약 갱신 ${bits}<em>— 눌러서 보기</em></div>`;
-}
-function openCoCt(){ showPanel(coCtHtml()); }
-/* 창 — 급한 순으로 늘어놓고, 누르면 그 회사를 연다.
-   ⚠ 여기서 «고치지 않는다». 계약 기간은 업체관리가 가진 값이라, 이 창이 할 일은
-     「어디를 챙길 것인가」를 말하는 것뿐이다. */
-function coCtHtml(now){
-  /* ⚠ 「오늘」을 받는다 — 코SmeHtml 과 같은 까닭이다 */
-  const list = coCtList(now);
-  const 해지 = coCtClosedCount(now), 오래 = coCtOldCount(now);
-  /* ⚠ 뺀 것은 «세어서» 말한다 — 조용히 빼면 「우리 거래처가 이것뿐인가」가 된다.
-     둘을 갈라 말한다: 해지는 «끝낸 일», 오래 지남은 «자동 연장으로 굴러가는 중»이다. */
-  const 뺀말 = [
-    오래 ? `종료일이 <b>${CT_RECENT_DAYS}일</b>보다 오래 지난 <b>${오래.toLocaleString()}곳</b>은 뺐습니다 — 자동 연장으로 계속 가는 곳입니다.` : '',
-    해지 ? `계약해지(🚪)로 표시된 <b>${해지.toLocaleString()}곳</b>은 뺐습니다 — 이미 끝낸 일입니다.` : ''
-  ].filter(Boolean).map(s => '<br>' + s).join('');
-  if(!list.length) return `<div class="mhead"><b>📅 계약 갱신</b>${_closeBtn()}</div>
-    <p class="cpnone" style="padding:16px 2px">지금 챙길 곳이 없습니다 👍</p>
-    ${뺀말 ? `<p class="setnote" style="margin:10px 0 0">${뺀말.replace(/^<br>/, '')}</p>` : ''}`;
-  return `<div class="mhead"><b>📅 계약 갱신 — 챙길 곳 ${list.length}곳</b>${_closeBtn()}</div>
-    <p class="setnote" style="margin:0 0 10px"><b>${CT_RECENT_DAYS}일 안</b>에 끝나거나
-      <b>막 지난</b>(${CT_RECENT_DAYS}일 안) 곳입니다 — 지금이 갱신을 챙길 때입니다.
-      <b>「종료일 지남」은 계약해지가 아닙니다</b> — 자동 연장으로 계속 가는 곳이 있습니다.${뺀말}
-      <br>회사를 누르면 그 회사 상세가 열립니다.</p>
-    <div class="ablist">${list.map(x=>`
-      ${/* ⚠ 창을 «먼저 닫고» 회사를 연다 — 확인서 창과 같은 까닭이다(안 닫으면 상세가
-             이 창 뒤에 열려 눌렀는데 아무 일도 없는 것처럼 보인다). */''}
-      <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
-          title="${esc(x.name)} 상세를 엽니다">
-        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
-        <div class="sv"><span class="sd ${x.cls}">${x.days < 0 ? '종료 ' + (-x.days) + '일 지남' : 'D-' + x.days}</span>
-          <span class="se">${esc(x.to)}까지</span>
-          ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
-      </div>`).join('')}</div>`;
-}
 
 /* ══════ 👤 담당 · 📝 메모 — 사람이 «직접 적는» 두 칸 (대표 지시 2026-09-12) ═══════
    검토 보고의 ③④. 기업정보 26칸은 모두 «서류에서 읽어온» 값이라, 사람이 적을 자리가
