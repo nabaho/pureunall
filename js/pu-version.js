@@ -17,6 +17,82 @@
   var lastActivity = Date.now();
   var saveBlocked = false;
 
+  /* ══ 부팅 폭풍 감지 (대표 제보 2026-09-17 「계속 돈이 새고 있다」) ══════════════════
+     ■ 무엇이 있었나
+       서버 통신 기록(database:profile 165초)에 이알피 8번·기업정보함 9번·업무관리 8번이
+       «처음부터 다시 켜진» 자국이 있었다 — 한 PC, 약 20초마다. 켤 때마다 자문수입 917KB·
+       명함 색인 1.2MB·업무 3.3MB 를 전부 다시 받으니 시간당 500MB(≈₩700)가 나갔고,
+       화면은 그때마다 얼어붙어 «깜빡임»으로 보였다. 새벽에도 같은 자국이 있었다.
+       서버 쪽 판 표식(version.json·ETag·pu-release)은 모두 안정이었다 — 즉 «바깥»에서
+       탭을 되풀이 새로고침하는 무언가(확장·탭 돌리기·자동 새로고침)가 있을 가능성이 크다.
+     ■ 여기서 하는 일 — 추측하지 않고 «앱이 스스로 말하게» 한다
+       같은 탭에서 이어지는 sessionStorage 에 부팅 시각을 남겨, 3분 안에 3번 넘게 켜지면
+       ① 콘솔에 «직전 부팅에서 몇 초·새로고침 종류(reload/navigate)·어디서 왔나»를 찍고
+       ② 화면 위에 띠를 띄워 사람에게 알린다(원인이 바깥이면 사람만 끌 수 있다)
+       ③ window.PU_BOOT.storm 을 세워 앱이 «무거운 받기를 멈출» 근거로 쓴다(이알피가 쓴다).
+     ⚠ 이 파일은 모든 앱이 싣는다 — 여기 한 곳에 두면 전부에 붙는다. 실패해도 앱을 세우지
+       않게 전부 try 로 감싼다.
+     ⚠ navigation type 이 'reload' 면 브라우저·확장이 새로고침한 것, 'navigate' 인데 온 곳이
+       우리 화면이면 앱 코드가 다시 연 것이다 — 이 한 글자가 원인의 «안팎»을 가른다. */
+  var BOOT_KEY = 'pu_boot_log_v1';
+  var BOOT_STORM_N = 3, BOOT_STORM_MS = 3 * 60 * 1000;
+  function bootNavType() {
+    try { var e = window.performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]; return (e && e.type) || ''; } catch (_) { return ''; }
+  }
+  function noteBoot() {
+    try {
+      var now = Date.now(), arr = [];
+      try { arr = JSON.parse(window.sessionStorage.getItem(BOOT_KEY) || '[]'); } catch (_) { arr = []; }
+      if (!Array.isArray(arr)) arr = [];
+      arr = arr.filter(function (t) { return typeof t === 'number' && now - t < BOOT_STORM_MS; });
+      var prev = arr.length ? arr[arr.length - 1] : 0;
+      arr.push(now);
+      try { window.sessionStorage.setItem(BOOT_KEY, JSON.stringify(arr.slice(-12))); } catch (_) {}
+      var nav = bootNavType();
+      var since = prev ? Math.round((now - prev) / 1000) : null;
+      var from = '';
+      try { from = window.document.referrer ? window.document.referrer.replace(window.location.origin, '') : ''; } catch (_) {}
+      var storm = arr.length >= BOOT_STORM_N;
+      window.PU_BOOT = { count: arr.length, since: since, type: nav, from: from, storm: storm };
+      if (window.console && console.info) {
+        console.info('[부팅] ' + (nav || '?') + (since != null ? ' · 직전 부팅에서 ' + since + '초' : ' · 이 탭의 첫 부팅')
+          + ' · 이 탭에서 3분 안 ' + arr.length + '번' + (from ? ' · 온 곳 ' + from : ''));
+      }
+      if (storm) {
+        if (window.console && console.warn) {
+          console.warn('★★ 이 탭이 3분 안에 ' + arr.length + '번 다시 켜졌습니다 (' + (nav === 'reload' ? '브라우저·확장이 새로고침' : nav === 'navigate' ? '주소로 다시 열림' : nav || '종류 모름') + ').'
+            + ' 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다 — 자동 새로고침 확장·탭 돌리기를 확인하세요.');
+        }
+        mountStormBanner(arr.length, since, nav);
+      }
+    } catch (_) {}
+  }
+  function mountStormBanner(n, since, nav) {
+    function mount() {
+      try {
+        if (!window.document.body || window.document.getElementById('pu-boot-storm')) return;
+        var bar = window.document.createElement('div');
+        bar.id = 'pu-boot-storm';
+        bar.setAttribute('role', 'alert');
+        bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483646;background:#991b1b;color:#fff;' +
+          'padding:9px 14px;font:700 13px/1.45 system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
+        var msg = window.document.createElement('span');
+        msg.style.cssText = 'flex:1;min-width:0';
+        msg.textContent = '⚠ 이 탭이 3분 안에 ' + n + '번 다시 켜졌습니다' + (since != null ? ' (마지막은 ' + since + '초 전, ' + (nav === 'reload' ? '브라우저·확장이 새로고침' : '주소로 다시 열림') + ')' : '') +
+          '. 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다 — 브라우저의 자동 새로고침 확장이나 탭 돌리기를 꺼 주세요.';
+        var x = window.document.createElement('span');
+        x.setAttribute('role', 'button'); x.tabIndex = 0;
+        x.textContent = '닫기';
+        x.style.cssText = 'flex:none;cursor:pointer;background:rgba(255,255,255,.18);border-radius:6px;padding:4px 10px;';
+        x.addEventListener('click', function () { if (bar.parentNode) bar.parentNode.removeChild(bar); });
+        bar.appendChild(msg); bar.appendChild(x);
+        window.document.body.appendChild(bar);
+      } catch (_) {}
+    }
+    if (window.document.readyState === 'loading') window.document.addEventListener('DOMContentLoaded', mount, { once: true });
+    else mount();
+  }
+
   /* 배포할 때 scripts/write-version.js 가 <head> 에 찍어 둔다. 로컬에는 없다. */
   function docRelease() {
     try {
@@ -269,7 +345,8 @@
     } else mountFab();
   }
 
-  window.PUVersion = { check: check, applyNow: applyNow, _url: versionUrl };
+  window.PUVersion = { check: check, applyNow: applyNow, _url: versionUrl, _noteBoot: noteBoot };
+  noteBoot();
   showUpdatedNotice();
   mountWhenReady();
   /* 저절로 새 버전을 찾았을 때도 단추가 알려 준다 — 누르지 않아도 눈에 띈다 */
