@@ -42,7 +42,7 @@ const biz = o => Object.assign({ kind:'biz' }, o);
 const card = o => Object.assign({ kind:'card' }, o);
 
 /* 대표가 짚으신 그 두 줄 */
-const 남경테크 = () => biz({ company:'남경테크', ceo:'임위빈', bizno:'750-81-00443',
+const 남경테크 = () => biz({ company:'남경테크', ceo:'임위빈', bizno:'123-81-20458',
   bizType:'제조업', bizItem:'금속 가공제품 제조업; 기계 및 …',
   address:'31416 충남 아산시 음봉면 월산로 192-150' });
 
@@ -73,8 +73,8 @@ test('★★★ ㉡ 한쪽만 «비어» 있으면 그 갈래가 아니다 — �
 
 test('★★ 잣대는 합치기와 «같다» — 소문자·공백·붙임표는 같은 값으로 본다', () => {
   const c = load();
-  const a = biz({ company:'가나상사', bizno:'220-81-62517', ceo:'홍길동' });
-  const b = biz({ company:'가나 상사', bizno:'2208162517', ceo:'홍길동' });
+  const a = biz({ company:'가나상사', bizno:'123-81-20031', ceo:'홍길동' });
+  const b = biz({ company:'가나 상사', bizno:'1238120031', ceo:'홍길동' });
   assert.equal(c.dupAllSame([a, b]), true,
     '★★ 여기서 더 깐깐하게 재면, 합쳐도 아무 일 없을 묶음이 「봐야 할 것」에 남는다');
   /* ⚠ mergeGroup 이 값을 견줄 때 쓰는 규칙과 한 글자도 안 달라야 한다 */
@@ -85,8 +85,8 @@ test('★★ 잣대는 합치기와 «같다» — 소문자·공백·붙임표�
 
 test('★★ 빈 칸끼리는 같다 — 둘 다 안 적은 칸이 묶음을 갈라놓으면 안 된다', () => {
   const c = load();
-  const a = biz({ company:'가나상사', bizno:'2208162517' });          /* 나머지 칸 없음 */
-  const b = biz({ company:'가나상사', bizno:'2208162517', memo:'' }); /* 빈 글자 */
+  const a = biz({ company:'가나상사', bizno:'1238120031' });          /* 나머지 칸 없음 */
+  const b = biz({ company:'가나상사', bizno:'1238120031', memo:'' }); /* 빈 글자 */
   assert.equal(c.dupAllSame([a, b]), true,
     '★★ undefined 와 빈 글자를 다르게 세면 거의 모든 묶음이 「다르다」가 된다');
 });
@@ -98,8 +98,8 @@ test('★★ 명함은 «명함 칸»으로, 등록증은 «등록증 칸»으�
   const b = card({ name:'홍길동', company:'가나', mobile:'01011112222',  title:'과장' });
   assert.equal(c.dupAllSame([a, b]), false, '★★ 직책이 다른데 같다고 하면 안 된다');
   /* 등록증에 없는 칸(직책)은 등록증 셈에 안 든다 */
-  const x = biz({ company:'가나상사', bizno:'2208162517', title:'대리' });
-  const y = biz({ company:'가나상사', bizno:'2208162517', title:'과장' });
+  const x = biz({ company:'가나상사', bizno:'1238120031', title:'대리' });
+  const y = biz({ company:'가나상사', bizno:'1238120031', title:'과장' });
   assert.equal(c.dupAllSame([x, y]), true,
     '★★ 등록증에 없는 칸까지 보면, 쓰지도 않는 값이 묶음을 갈라놓는다');
 });

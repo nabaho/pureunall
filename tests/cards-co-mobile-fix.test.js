@@ -108,7 +108,7 @@ test('★ C1 — openCoMobile() 은 화면도 한 번 그린다(자료만 부르
    남은 알맹이(공용 진입로가 고른 회사를 비운다)만 지킨다. */
 test('★ C1 — openCoMobile() 도 state.coPick 을 비운다', () => {
   const c = loadEntryChain();
-  c.state.coPick = '312-81-49225';
+  c.state.coPick = '123-81-20012';
   c.openCoMobile();
   assert.equal(c.state.coPick, '', '예전에 고른 회사가 남으면 엉뚱한 회사 상세가 열립니다');
   assert.equal('coErpOnly' in c.state, false, '없앤 「거래처만」 상태를 되살리면 안 됩니다');
@@ -330,7 +330,7 @@ function loadCoMobileList(list, folders){
 const CO = (key, name, folder) => ({ key, name, bizno:'', erp:null, folder: folder||'', cards:[], docs:0, tags:{} });
 
 test('★ I3 — 보던 폴더가 다른 기기에서 지워졌으면 「전체 (0)」이라 거짓말하지 않는다', () => {
-  const c = loadCoMobileList([CO('k1','대명크라샤'), CO('k2','미래산업')], {});
+  const c = loadCoMobileList([CO('k1','나라크라샤'), CO('k2','미래산업')], {});
   c.state.coFolder = 'dead-folder';        /* 폴더는 이미 사라졌다 */
   c.renderCoMobileList();
   assert.equal(c.state.coFolder, '', '사라진 폴더를 붙들고 있으면 안 됩니다');
@@ -340,7 +340,7 @@ test('★ I3 — 보던 폴더가 다른 기기에서 지워졌으면 「전체 
 });
 
 test('★ I3 — 살아 있는 폴더는 그대로 그 이름과 개수를 보여준다', () => {
-  const c = loadCoMobileList([CO('k1','대명크라샤','f1'), CO('k2','미래산업')],
+  const c = loadCoMobileList([CO('k1','나라크라샤','f1'), CO('k2','미래산업')],
                              { f1:{ id:'f1', name:'현장클리닉' } });
   c.state.coFolder = 'f1';
   c.renderCoMobileList();

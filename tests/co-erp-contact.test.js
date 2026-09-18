@@ -64,42 +64,42 @@ function buildErp(cos){
   vm.runInContext(src.slice(a, b) + '\nvar OUT = { byBiz:byBiz, byName:byName };', ctx);
   return ctx.OUT;
 }
-const CO = { name:'가나테크', bizNo:'134-86-05772', ceo:'나성환', typeCode:'자문',
+const CO = { name:'가나테크', bizNo:'123-86-20021', ceo:'고길동', typeCode:'자문',
              status:'active', managerMain:'s1',
              phone:'041-556-0035', address:'충남 천안시 서북구 1',
              primaryContactName:'박대리', primaryContactPhone:'010-9999-8888' };
 
 test('★ 푸른이알피가 가진 회사 전화를 꺼내 둔다 — 이미 받아 둔 값을 안 읽고 있었다', () => {
-  const r = buildErp([CO]).byBiz['1348605772'];
+  const r = buildErp([CO]).byBiz['1238620021'];
   assert.ok(r, '업체를 못 찾았다');
   assert.equal(r.phone, '041-556-0035');
 });
 
 test('★ 회사 주소도 함께 꺼낸다', () => {
-  assert.equal(buildErp([CO]).byBiz['1348605772'].address, '충남 천안시 서북구 1');
+  assert.equal(buildErp([CO]).byBiz['1238620021'].address, '충남 천안시 서북구 1');
 });
 
 test('★ «담당자» 연락처를 회사 대표번호로 쓰지 않는다 — 그 사람 휴대폰이다', () => {
   const noPhone = Object.assign({}, CO, { phone:'' });
-  const r = buildErp([noPhone]).byBiz['1348605772'];
+  const r = buildErp([noPhone]).byBiz['1238620021'];
   assert.ok(!r.phone,
     '★ 담당자 휴대폰이 계약서의 회사 대표번호로 나가면 안 된다');
   assert.equal(r.contact, '박대리', '담당자 이름은 하던 대로 남아야 한다');
 });
 
 test('전화·주소가 없는 업체도 터지지 않는다', () => {
-  const bare = { name:'다라산업', bizNo:'505-86-00987', ceo:'김철수', typeCode:'급여' };
-  const r = buildErp([bare]).byBiz['5058600987'];
+  const bare = { name:'다라산업', bizNo:'123-86-20100', ceo:'김철수', typeCode:'급여' };
+  const r = buildErp([bare]).byBiz['1238620100'];
   assert.equal(r.phone, '');
   assert.equal(r.address, '');
 });
 
 test('하던 일이 그대로다 — 담당·유형·종료·대표자', () => {
-  const r = buildErp([Object.assign({}, CO, { status:'terminated' })]).byBiz['1348605772'];
+  const r = buildErp([Object.assign({}, CO, { status:'terminated' })]).byBiz['1238620021'];
   assert.equal(r.main, '권형하');
   assert.equal(r.type, '자문');
   assert.equal(r.left, true);
-  assert.equal(r.ceoRaw, '나성환');
+  assert.equal(r.ceoRaw, '고길동');
 });
 
 /* ══════ ③④⑤ 회사로 올라오는가 — coListBuild 를 세워서 본다 ══════ */
@@ -135,9 +135,9 @@ function loadMiss(){
   return ctx;
 }
 /* 전화가 «안 찍힌» 사업자등록증 — 한국에서 흔한 경우다 */
-const BIZ_NO_TEL = { kind:'biz', company:'가나테크', bizno:'134-86-05772',
-                     ceo:'나성환', address:'충남 천안시 서북구 1' };
-const ERP = { type:'자문', ceoRaw:'나성환', phone:'041-556-0035',
+const BIZ_NO_TEL = { kind:'biz', company:'가나테크', bizno:'123-86-20021',
+                     ceo:'고길동', address:'충남 천안시 서북구 1' };
+const ERP = { type:'자문', ceoRaw:'고길동', phone:'041-556-0035',
               address:'충남 천안시 서북구 1', left:false };
 
 test('★ 등록증에 전화가 없으면 푸른이알피가 채운다 — 이게 이 고침의 전부다', () => {
@@ -162,7 +162,7 @@ test('★ 등록증에 전화가 있으면 그것이 이긴다 — 빈 칸만 �
 });
 
 test('★ 명함에 회사 대표번호가 있으면 그것이 푸른이알피보다 앞선다', () => {
-  const items = [BIZ_NO_TEL, { kind:'card', company:'가나테크', bizno:'134-86-05772',
+  const items = [BIZ_NO_TEL, { kind:'card', company:'가나테크', bizno:'123-86-20021',
                                name:'박대리', companyTel:'02-777-1234' }];
   const o = buildList(items, ERP)[0];
   assert.equal(o.companyTel, '02-777-1234');
@@ -170,7 +170,7 @@ test('★ 명함에 회사 대표번호가 있으면 그것이 푸른이알피�
 });
 
 test('★ 주소도 같은 방식으로 채운다', () => {
-  const noAddr = { kind:'biz', company:'마바물산', bizno:'120-81-04455', ceo:'홍길동' };
+  const noAddr = { kind:'biz', company:'마바물산', bizno:'123-81-20181', ceo:'홍길동' };
   const o = buildList([noAddr], ERP)[0];
   assert.equal(o.address, '충남 천안시 서북구 1');
   assert.equal(o.srcOf.address, '푸른이알피');
@@ -184,7 +184,7 @@ test('★ 등록증 주소를 «덮지 않는다» — 등록증이 법적 원�
 
 test('★ 푸른이알피에 없으면 그대로 없다 — 지어내지 않는다', () => {
   const C = loadMiss();
-  const o = buildList([BIZ_NO_TEL], { type:'자문', ceoRaw:'나성환', left:false })[0];
+  const o = buildList([BIZ_NO_TEL], { type:'자문', ceoRaw:'고길동', left:false })[0];
   assert.ok(!o.companyTel);
   assert.deepEqual(plain(C.coMissing(o)), ['대표번호'],
     '진짜 없는 곳까지 없다고 안 하면 이 단추를 만든 뜻이 없다');
@@ -206,9 +206,9 @@ test('거래처가 아닌 회사는 푸른이알피 값이 아예 안 온다', (
 });
 
 test('대표자 채우기는 하던 대로다 — 함께 고치다 망가지면 안 된다', () => {
-  const noCeo = { kind:'biz', company:'사아기업', bizno:'120-81-04455' };
+  const noCeo = { kind:'biz', company:'사아기업', bizno:'123-81-20181' };
   const o = buildList([noCeo], ERP)[0];
-  assert.equal(o.ceo, '나성환');
+  assert.equal(o.ceo, '고길동');
   assert.equal(o.srcOf.ceo, '푸른이알피');
 });
 

@@ -142,7 +142,7 @@ function photoCtx(hit) {
     cutFn(photos, 'function formTodo('), ctx);
   return ctx;
 }
-const CMS = { kind: 'cms', fields: { company: '아이행복어린이집', bankName: '국민은행',
+const CMS = { kind: 'cms', fields: { company: '나라어린이집', bankName: '국민은행',
   bankAcct: '123456-04-567890', bankHolder: '양유정', payDay: '25', applyType: '신규' } };
 
 test('★ 사업자번호가 없어도 CMS 는 보낼 수 있다 — 그 서식엔 사업자번호 칸이 없다', () => {
@@ -153,10 +153,10 @@ test('★ 사업자번호가 없어도 CMS 는 보낼 수 있다 — 그 서식�
        「상호를 적어 주세요」라고 말했다(CO_FIX_KINDS 에 form 이 있다). 적으라고
        해 놓고 안 받던 자리다. 이제 셋 다 같은 규칙을 쓴다.
        ⚠ 스스로 가지는 «않는다» — 그것은 photos-coinfo-auto 가 지킨다. */
-  assert.equal(c.canSendCoInfo({ kind: 'form', fields: { company: '아이행복' } }), true,
+  assert.equal(c.canSendCoInfo({ kind: 'form', fields: { company: '나라' } }), true,
     '★ 서식에 상호를 적어도 안 받는다 — 적으라고 해 놓고 안 받는 자리다');
-  assert.equal(c.canSendCoInfo({ kind: 'bankbook', fields: { company: '아이행복' } }), true);
-  assert.equal(c.canSendCoInfo({ kind: 'payslip', fields: { company: '아이행복' } }), false,
+  assert.equal(c.canSendCoInfo({ kind: 'bankbook', fields: { company: '나라' } }), true);
+  assert.equal(c.canSendCoInfo({ kind: 'payslip', fields: { company: '나라' } }), false,
     '★ 상호를 «묻지 않는» 갈래까지 상호로 받으면 안 된다 — 급여명세서로 회사가 생긴다');
   assert.equal(c.canSendCoInfo({ kind: 'cms', fields: {} }), false, '업체명도 없으면 못 보낸다');
   assert.equal(c.canSendCoInfo({ kind: 'cms', fields: { company: 'x' }, filedInfo: { at: 1 } }), false,
@@ -164,7 +164,7 @@ test('★ 사업자번호가 없어도 CMS 는 보낼 수 있다 — 그 서식�
 });
 
 test('★ 업체명으로 사업자번호를 찾아 채운다', async () => {
-  const c = photoCtx({ rec: { name: '아이행복어린이집', bizNo: '312-81-12345' } });
+  const c = photoCtx({ rec: { name: '나라어린이집', bizNo: '312-81-12345' } });
   const f = await c.coInfoFields(CMS);
   assert.ok(f, '★ 못 찾으면 계좌가 어디에도 안 담깁니다');
   assert.equal(f.bizno, '312-81-12345');
@@ -190,7 +190,7 @@ test('★ 은행·계좌·예금주가 다 읽히면 켠다 (대표 결정 ③�
   await c.autoCmsOn(CMS, CMS.fields);
   const sent = c._calls.find(x => x && x.bankName);
   assert.ok(sent, '★ 자동이체를 안 켰습니다');
-  assert.equal(sent.companyName, '아이행복어린이집');
+  assert.equal(sent.companyName, '나라어린이집');
   assert.match(c._calls.join(' '), /켰습니다/, '켠 결과를 안 알려 줍니다');
 });
 
@@ -244,7 +244,7 @@ function ctCtx(contracts) {
 }
 
 test('★ 계약이 하나면 그 계약의 자동이체를 켠다', async () => {
-  const c = ctCtx([{ id: 'k1', companyName: '아이행복어린이집', bizNo: '312-81-12345', status: 'active' }]);
+  const c = ctCtx([{ id: 'k1', companyName: '나라어린이집', bizNo: '312-81-12345', status: 'active' }]);
   const r = await c.setContractCms({ bizNo: '312-81-12345', byName: '권형하', bankName: '국민은행' });
   assert.equal(r.ok, true, r.message);
   assert.equal(c._u['data/contracts/v/0/isCMS'], true, '★ 자동이체를 안 켰습니다');
@@ -299,8 +299,8 @@ test('★ 계약 레코드를 «통째로» 쓰지 않는다 — 그 사이 남�
 });
 
 test('업체명으로도 찾는다 — 사업자번호가 없는 신청서를 위해', async () => {
-  const c = ctCtx([{ id: 'k1', companyName: '(주)아이행복어린이집', status: 'active' }]);
-  const r = await c.setContractCms({ companyName: '아이행복어린이집' });
+  const c = ctCtx([{ id: 'k1', companyName: '(주)나라어린이집', status: 'active' }]);
+  const r = await c.setContractCms({ companyName: '나라어린이집' });
   assert.equal(r.ok, true, r.message);
 });
 

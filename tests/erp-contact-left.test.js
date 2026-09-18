@@ -20,7 +20,7 @@
 
    ■ 사람을 어떻게 가리나 — «이름으로 맞추지 않는다»
      이름만으로 맞추면 동명이인이 서로를 덮는다. 2026-08-28 에 회사 이름으로 맞추다
-     「주식회사 행복한단홍갈비」와 「행복한 단홍갈비」가 섞인 사고를 겪었다.
+     「주식회사 다라갈비」와 「다라 갈비」가 섞인 사고를 겪었다.
      이메일(다듬은 것) 또는 휴대폰 숫자 — 둘 다 사람마다 하나뿐인 값이다.
 
    ★ 여기서 못 박는 것
@@ -70,28 +70,28 @@ function loadErp(byBiz, byName){
   return ctx.ErpMatch;
 }
 /* 업체 기록 — people 은 담당자 줄을 사람 가리기에 쓸 만큼만 담은 것 */
-const rec = (people) => ({ company:'가나테크', bizNo:'134-86-05772', main:'박성수',
+const rec = (people) => ({ company:'가나테크', bizNo:'123-86-20021', main:'박성수',
   type:'자문', status:'active', left:false, people: people || [] });
 const card = (o) => Object.assign({ name:'박대리', company:'가나테크',
-  bizno:'134-86-05772', mobile:'', email:'' }, o || {});
+  bizno:'123-86-20021', mobile:'', email:'' }, o || {});
 
 /* ══════ ① 퇴사 표시를 읽어 온다 ══════ */
 
 test('★ 담당자가 퇴사로 표시돼 있으면 그렇다고 답한다', () => {
-  const E = loadErp({ '1348605772': rec([
+  const E = loadErp({ '1238620021': rec([
     { name:'박대리', email:'park@gana.co.kr', phone:'010-1111-2222', left:true } ]) }, {});
   assert.equal(E.leftOfCard(card({ email:'park@gana.co.kr' })), true);
 });
 
 test('★ 표시가 없으면 «재직»으로 본다 — 모르면 빼지 않는다', () => {
-  const E = loadErp({ '1348605772': rec([
+  const E = loadErp({ '1238620021': rec([
     { name:'박대리', email:'park@gana.co.kr', phone:'010-1111-2222' } ]) }, {});
   assert.equal(E.leftOfCard(card({ email:'park@gana.co.kr' })), false,
     '★ 모른다고 빼 버리면 멀쩡한 담당자에게 메일이 안 간다');
 });
 
 test('그 회사에 담당자 줄이 아예 없으면 재직으로 본다', () => {
-  const E = loadErp({ '1348605772': rec([]) }, {});
+  const E = loadErp({ '1238620021': rec([]) }, {});
   assert.equal(E.leftOfCard(card({ email:'park@gana.co.kr' })), false);
 });
 
@@ -103,7 +103,7 @@ test('푸른이알피에 없는 회사면 재직으로 본다', () => {
 /* ══════ ② 이메일·전화 숫자로만 가린다 ══════ */
 
 test('★ 휴대폰 숫자로도 가린다 — 적는 꼴이 달라도 같은 사람이다', () => {
-  const E = loadErp({ '1348605772': rec([
+  const E = loadErp({ '1238620021': rec([
     { name:'박대리', phone:'01011112222', left:true } ]) }, {});
   assert.equal(E.leftOfCard(card({ mobile:'010-1111-2222' })), true,
     '★ 「-」 유무로 다른 사람이 되면 안 된다');
@@ -112,7 +112,7 @@ test('★ 휴대폰 숫자로도 가린다 — 적는 꼴이 달라도 같은 �
 test('★ «이름만» 같은 사람은 안 가린다 — 동명이인이 서로를 덮는다', () => {
   /* 2026-08-28 에 회사 이름으로 맞추다 겪은 사고와 같은 결이다.
      이름은 사람이 적는 글자고, 이메일·휴대폰은 사람마다 하나뿐인 값이다. */
-  const E = loadErp({ '1348605772': rec([
+  const E = loadErp({ '1238620021': rec([
     { name:'박대리', email:'park@gana.co.kr', left:true } ]) }, {});
   assert.equal(E.leftOfCard(card({ name:'박대리', email:'other@gana.co.kr' })), false,
     '★ 이름이 같다고 남의 퇴사를 물려받으면 멀쩡한 사람이 메일에서 빠진다');
@@ -121,13 +121,13 @@ test('★ «이름만» 같은 사람은 안 가린다 — 동명이인이 서�
 });
 
 test('이메일은 대소문자·앞뒤 빈칸을 무시하고 견준다', () => {
-  const E = loadErp({ '1348605772': rec([
+  const E = loadErp({ '1238620021': rec([
     { name:'박대리', email:'Park@Gana.co.kr', left:true } ]) }, {});
   assert.equal(E.leftOfCard(card({ email:'  park@gana.co.kr ' })), true);
 });
 
 test('회사 전화(bizPhone)로도 가린다 — 담당자 줄에 그쪽만 적힌 곳이 있다', () => {
-  const E = loadErp({ '1348605772': rec([
+  const E = loadErp({ '1238620021': rec([
     { name:'박대리', bizPhone:'041-556-0035', left:true } ]) }, {});
   assert.equal(E.leftOfCard(card({ tel:'041-556-0035' })), true);
 });
@@ -136,19 +136,19 @@ test('회사 전화(bizPhone)로도 가린다 — 담당자 줄에 그쪽만 적
 
 test('★ «그 회사» 담당자 안에서만 찾는다 — 남의 회사 동명이인에 안 걸린다', () => {
   const 가나 = rec([{ name:'박대리', email:'park@gana.co.kr' }]);
-  const 다라 = { company:'다라산업', bizNo:'505-86-00987', main:'김보람', left:false,
+  const 다라 = { company:'다라산업', bizNo:'123-86-20100', main:'김보람', left:false,
     people:[{ name:'박대리', email:'park@gana.co.kr', left:true }] };
-  const E = loadErp({ '1348605772': 가나, '5058600987': 다라 }, {});
+  const E = loadErp({ '1238620021': 가나, '1238620100': 다라 }, {});
   assert.equal(E.leftOfCard(card({ email:'park@gana.co.kr' })), false,
     '★ 다른 회사 사람의 퇴사가 넘어오면 안 된다');
-  assert.equal(E.leftOfCard(card({ bizno:'505-86-00987', company:'다라산업',
+  assert.equal(E.leftOfCard(card({ bizno:'123-86-20100', company:'다라산업',
     email:'park@gana.co.kr' })), true);
 });
 
 /* ══════ ④ 안전장치 ══════ */
 
 test('푸른이알피가 아직 안 실렸으면 재직으로 본다', () => {
-  const E = loadErp({ '1348605772': rec([{ email:'park@gana.co.kr', left:true }]) }, {});
+  const E = loadErp({ '1238620021': rec([{ email:'park@gana.co.kr', left:true }]) }, {});
   E.ready = false;
   assert.equal(E.leftOfCard(card({ email:'park@gana.co.kr' })), false);
 });
@@ -166,7 +166,7 @@ test('★ 업체를 훑을 때 담당자 줄을 실어 둔다 — 서버를 더 
   const b = src.indexOf('      ErpMatch.byBiz=byBiz;');
   assert.ok(a > 0 && b > a, '업체 훑는 자리를 찾지 못했습니다');
   const ctx = { console, Object, String, Number, Array,
-    cos: [{ name:'가나테크', bizNo:'134-86-05772', ceo:'나성환', typeCode:'자문',
+    cos: [{ name:'가나테크', bizNo:'123-86-20021', ceo:'고길동', typeCode:'자문',
             status:'active', managerMain:'s1',
             contacts:[{ name:'박대리', email:'park@gana.co.kr', phone:'010-1111-2222',
                         bizPhone:'041-556-0035', left:true }] }],
@@ -175,7 +175,7 @@ test('★ 업체를 훑을 때 담당자 줄을 실어 둔다 — 서버를 더 
                 _digits: v => String(v||'').replace(/\D/g,'') } };
   vm.createContext(ctx);
   vm.runInContext(src.slice(a, b) + '\nvar OUT = byBiz;', ctx);
-  const r = ctx.OUT['1348605772'];
+  const r = ctx.OUT['1238620021'];
   assert.ok(r && r.people && r.people.length === 1, '★ 담당자 줄을 안 실으면 가릴 길이 없다');
   assert.equal(r.people[0].left, true);
   assert.equal(r.people[0].email, 'park@gana.co.kr');
@@ -185,13 +185,13 @@ test('담당자에 퇴사 표시가 없는 곳도 터지지 않는다', () => {
   const a = src.indexOf('      const byBiz={}, byName={}');
   const b = src.indexOf('      ErpMatch.byBiz=byBiz;');
   const ctx = { console, Object, String, Number, Array,
-    cos: [{ name:'다라산업', bizNo:'505-86-00987', typeCode:'급여', status:'active' }],
+    cos: [{ name:'다라산업', bizNo:'123-86-20100', typeCode:'급여', status:'active' }],
     nameBySid: {},
     ErpMatch: { _norm: v => String(v||'').replace(/\s+/g,''),
                 _digits: v => String(v||'').replace(/\D/g,'') } };
   vm.createContext(ctx);
   vm.runInContext(src.slice(a, b) + '\nvar OUT = byBiz;', ctx);
-  assert.deepEqual(JSON.parse(JSON.stringify(ctx.OUT['5058600987'].people)), []);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.OUT['1238620100'].people)), []);
 });
 
 /* ══════ ⑥ 메일이 퇴사자를 뺀다 ══════ */

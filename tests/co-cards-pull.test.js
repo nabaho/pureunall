@@ -45,8 +45,8 @@ test('주소가 없으면 빈손 — 자료가 없어도 안 터진다', () => {
 });
 
 test('사업자번호는 앞 10자리만 본다 — 종사업장 꼬리가 붙어 온다', () => {
-  assert.equal(P.cardBizNo({ bizno: '314-86-59404' }), '3148659404');
-  assert.equal(P.cardBizNo({ bizno: '314-86-59404-0' }), '3148659404');
+  assert.equal(P.cardBizNo({ bizno: '123-86-20128' }), '1238620128');
+  assert.equal(P.cardBizNo({ bizno: '123-86-20128-0' }), '1238620128');
   assert.equal(P.cardBizNo({ bizno: '12-345' }), '');
 });
 

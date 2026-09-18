@@ -53,7 +53,7 @@ const J = (function () {
 })();
 const rd = function (o) {
   return Object.assign({ kind: 'form', auto: false, bizNoOk: true,
-    fields: { bizno: '312-81-28123', company: '남양인텍' } }, o || {});
+    fields: { bizno: '123-81-20119', company: '아자인텍' } }, o || {});
 };
 
 test('★ 번호를 검산한 서식은 스스로 간다 — 이 지시가 가리키는 것이 서식 캡처다', () => {
@@ -74,7 +74,7 @@ test('그래도 «사람이 누르는 길»은 남는다 — 사람이 보고 �
 });
 
 test('번호가 없거나 짧으면 어느 길로도 안 간다 — 어느 회사인지 모른다', () => {
-  assert.equal(J.autoSendCoInfo(rd({ fields: { company: '남양인텍' } })), false);
+  assert.equal(J.autoSendCoInfo(rd({ fields: { company: '아자인텍' } })), false);
   assert.equal(J.autoSendCoInfo(rd({ fields: { bizno: '312-81' } })), false);
 });
 
@@ -233,7 +233,7 @@ test('이미 있는 값은 안 덮는다 — 자동이라 더욱 그래야 한�
   };
   vm.createContext(ctx);
   vm.runInContext(file.slice(i, j), ctx);
-  await ctx.sendToCoInfo({ fields: { bizno: '134-86-05772', ceo: '기계가 읽은 대표자' } });
+  await ctx.sendToCoInfo({ fields: { bizno: '123-86-20021', ceo: '기계가 읽은 대표자' } });
   const wrote = writes[0] || {};
   assert.equal(wrote.ceo, undefined,
     '★ 자동으로 보내면서 덮어쓰면 사람이 고쳐 둔 값이 조용히 지워집니다');

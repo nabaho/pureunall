@@ -2,7 +2,7 @@
 /* 업체 이관 — 막이(ⓒ)와 되돌리기(ⓑ)   (2026-09-07)
 
    ■ 무슨 일이 있었나
-   계약-2026-121 「주식회사 나래산업 · 자문」이 「나래사내근로복지기금 · 기금」 안으로 들어갔다.
+   계약-2026-121 「주식회사 새롬산업 · 자문」이 「새롬사내근로복지기금 · 기금」 안으로 들어갔다.
    계약서는 맞았고 이관할 때 고른 업체가 틀렸다. 그런데 그 기금은 이미 있던 업체라
    «지우지 않고 빈 칸 14개를 채웠다» — 한 업체 안에 두 회사가 섞였다.
 
@@ -14,7 +14,7 @@
    ■ 이 검사가 지키는 것 — «규칙»이지 지금 값이 아니다
      ① 이름이나 유형이 다르면 이관 전에 멈춘다 (번호가 같아도)
      ② ㈜·주식회사 차이로는 안 멈춘다 (매번 뜨는 경고는 눈에서 지워진다)
-     ③ 이관은 «되돌릴 자리»를 남긴다 (없으면 되돌릴 길이 없다 — 나래가 그랬다)
+     ③ 이관은 «되돌릴 자리»를 남긴다 (없으면 되돌릴 길이 없다 — 새롬가 그랬다)
      ④ 「이음」을 되돌릴 때 업체를 «지우지 않는다» (애먼 업체가 사라진다)
      ⑤ 되돌리기는 계약을 «새로 만들지 않는다» (번호가 두 벌 된다 — 080·081 이 실제로 그렇다)
      ⑥ 이관 뒤에 사람이 고친 칸은 «건드리지 않는다»
@@ -61,8 +61,8 @@ test('① 이름이 다르면 멈춘다 — 사업자번호가 같아도 (valida
   load(ctx, ['function erpCoTransferGap(']);
   const gap = vm.runInContext(
     'erpCoTransferGap(' +
-    JSON.stringify({ companyName: '주식회사 나래산업', bizNo: '125-86-09231', typeCodes: { company: '자문' } }) + ',' +
-    JSON.stringify({ name: '나래사내근로복지기금', bizNo: '125-86-09231', typeCode: '기금' }) + ')', ctx);
+    JSON.stringify({ companyName: '주식회사 새롬산업', bizNo: '123-86-20278', typeCodes: { company: '자문' } }) + ',' +
+    JSON.stringify({ name: '새롬사내근로복지기금', bizNo: '123-86-20278', typeCode: '기금' }) + ')', ctx);
   assert.equal(gap.nameGap, true, '★ 이름이 다른데 안 잡았습니다');
   assert.equal(gap.typeGap, true, '★ 유형이 다른데 안 잡았습니다');
   assert.equal(gap.differs, true);
@@ -72,8 +72,8 @@ test('② ㈜·주식회사 차이만으로는 안 멈춘다 — 매번 뜨는 �
   const ctx = realm({ window: { PuOntology: loadOntology() } });
   load(ctx, ['function erpCoTransferGap(']);
   const call = (ct, co) => vm.runInContext('erpCoTransferGap(' + JSON.stringify(ct) + ',' + JSON.stringify(co) + ')', ctx);
-  const same = call({ companyName: '주식회사 나래산업', typeCodes: { company: '자문' } },
-                    { name: '㈜나래산업', typeCode: '자문' });
+  const same = call({ companyName: '주식회사 새롬산업', typeCodes: { company: '자문' } },
+                    { name: '㈜새롬산업', typeCode: '자문' });
   assert.equal(same.differs, false, '★ ㈜ 차이로 멈추면 사람이 경고를 안 읽게 됩니다');
   const spaced = call({ companyName: '(주) 해담솔', typeCodes: { company: '급여' } },
                       { name: '주식회사해담솔', typeCode: '급여' });
@@ -104,7 +104,7 @@ test('④ 한쪽이 비었으면 멈추지 않는다 — 「빈 칸」은 「다
 
 // ══════════════════════════════════════════════════════════════════
 const UNDO_CO = {
-  id: 'co-1', name: '나래사내근로복지기금', typeCode: '기금',
+  id: 'co-1', name: '새롬사내근로복지기금', typeCode: '기금',
   ceo: '전영범', phone: '031-686-5247', monthlyAdvisoryFee: 300000, managerMain: 'P-003',
   sourceContractNo: '계약-2026-121', sourceKind: 'contract',
   note: '발급사유: 종된사업장 추가\n계약(계약-2026-121) 이관 — 빈 칸 4개를 채웠습니다',
@@ -117,7 +117,7 @@ const UNDO_CO = {
     noteBefore: '발급사유: 종된사업장 추가'
   }
 };
-const CONTRACTS = [{ id: 'ct-1', contractNo: '계약-2026-121', status: 'transferred', companyName: '주식회사 나래산업' }];
+const CONTRACTS = [{ id: 'ct-1', contractNo: '계약-2026-121', status: 'transferred', companyName: '주식회사 새롬산업' }];
 
 function planCtx() {
   const ctx = realm({});
@@ -216,7 +216,7 @@ test('⑨ 원본 계약을 못 찾으면 계획에 계약이 없다 — 부르�
 });
 
 test('⑩ 새로 만든 업체는 되돌리는 법이 다르다', function () {
-  const created = { id: 'co-2', name: '주식회사 나래산업',
+  const created = { id: 'co-2', name: '주식회사 새롬산업',
     xferUndo: { mode: 'created', contractNo: '계약-2026-121', contractId: 'ct-1', keys: [], before: {}, after: {} } };
   const p = plan(created);
   assert.equal(p.mode, 'created', '★ 두 갈래가 갈리지 않으면 애먼 업체가 사라집니다');
@@ -243,7 +243,7 @@ test('⑫ ★★ 「이음」을 되돌릴 때 업체를 지우지 않는다 —
   const created = UNDO_BARE.slice(UNDO_BARE.indexOf("if(plan.mode === 'created')"), UNDO_BARE.indexOf('} else {'));
   const merged = UNDO_BARE.slice(UNDO_BARE.indexOf('} else {'));
   assert.match(created, /dbRemove\('companies'/, '새로 만든 업체는 목록에서 빼야 합니다');
-  assert.ok(!/dbRemove\('companies'/.test(merged), '★ 얹은 갈래에서 업체를 지우고 있습니다 — 나래 기금이 사라집니다');
+  assert.ok(!/dbRemove\('companies'/.test(merged), '★ 얹은 갈래에서 업체를 지우고 있습니다 — 새롬 기금이 사라집니다');
   assert.match(created, /dbSet\('trash_bin'/, '★ 지우지 말고 휴지통으로 — 회계기록은 옮긴다');
 });
 

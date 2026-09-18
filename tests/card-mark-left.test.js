@@ -96,10 +96,10 @@ function load(companies){
   vm.runInContext(fnBody('cardMarkLeft'), ctx);
   return ctx;
 }
-const co = (contacts) => ({ id:'c1', name:'가나테크', bizNo:'134-86-05772',
+const co = (contacts) => ({ id:'c1', name:'가나테크', bizNo:'123-86-20021',
   status:'active', typeCode:'자문', contacts: contacts || [] });
 const card = (o) => Object.assign({ name:'박대리', company:'가나테크',
-  bizno:'134-86-05772', mobile:'', email:'' }, o || {});
+  bizno:'123-86-20021', mobile:'', email:'' }, o || {});
 
 /* ══════ ① 담당자 줄에 쓴다 ══════ */
 
@@ -194,7 +194,7 @@ test('★ 다시 누르면 «푼다»', () => {
 test('★ 업체관리에 없는 회사면 아무것도 안 쓰고 그렇게 말한다', () => {
   /* 번호도 이름도 «둘 다» 업체관리에 없어야 진짜 없는 회사다 */
   const C = load([ co([]) ]);
-  return C.cardMarkLeft(card({ company:'없는회사', bizno:'505-86-00987',
+  return C.cardMarkLeft(card({ company:'없는회사', bizno:'123-86-20100',
     email:'park@x.kr' }), true).then(r => {
     assert.equal(r.ok, false);
     assert.equal(C._writes.length, 0, '★ 없는 업체를 만들면 업체관리에 유령이 쌓인다');
@@ -250,7 +250,7 @@ test('★ 그 업체의 다른 칸을 안 건드린다', () => {
 });
 
 test('다른 업체는 손대지 않는다', () => {
-  const other = { id:'c2', name:'다라산업', bizNo:'505-86-00987', contacts:[] };
+  const other = { id:'c2', name:'다라산업', bizNo:'123-86-20100', contacts:[] };
   const C = load([ co([{ id:'p1', email:'park@gana.co.kr' }]), other ]);
   return C.cardMarkLeft(card({ email:'park@gana.co.kr' }), true).then(() => {
     assert.equal(C._writes[0]['data/companies/v/c2'], undefined);

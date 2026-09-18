@@ -116,7 +116,7 @@ test('★★★ 못 물어봤으면 «막지 않는다» — 모르는 것을 �
 
 test('★★ 열쇠가 없어 아예 안 물어본 때도 그대로 자동이다', async () => {
   const R = loadRead();
-  const f = 가짜서버('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}', 없는번호답);
+  const f = 가짜서버('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}', 없는번호답);
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(f.seen.nts, 0, '열쇠가 없으면 부를 수 없다');
@@ -164,7 +164,7 @@ test('★★ 안내문만 남아 있는 옛 결과도 «글을 보고» 막는�
 /* ── 멀쩡한 번호는 건드리지 않는다 ───────────────────────────────────── */
 
 test('★★ 계속사업자는 그대로 자동으로 들어간다', async () => {
-  const { R, r } = await 등록증읽기('220-81-62517',
+  const { R, r } = await 등록증읽기('123-81-20031',
     { data: [{ b_stt: '계속사업자', tax_type: '부가가치세 일반과세자' }] });
   assert.equal(r.ntsState, '계속사업자', '★★ 세금 갈래가 상태말을 밀어내면 안 된다');
   assert.equal(r.ntsFound, true);
@@ -172,7 +172,7 @@ test('★★ 계속사업자는 그대로 자동으로 들어간다', async () =
 });
 
 test('★ 휴업자는 국세청이 준 말 그대로 사람에게 보인다', async () => {
-  const { R, r } = await 등록증읽기('220-81-62517', { data: [{ b_stt: '휴업자' }] });
+  const { R, r } = await 등록증읽기('123-81-20031', { data: [{ b_stt: '휴업자' }] });
   const v = R.autoOk(r);
   assert.equal(v.auto, false);
   assert.match(v.why, /휴업자/);

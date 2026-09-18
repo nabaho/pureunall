@@ -227,14 +227,14 @@ t('금액 0원 비정규직을 지적', irrIss.some(x => /금액이 0원인 비�
 // 계약 — 금액은 c.amounts[종류] 에 있다
 ctx.__reset({ contracts:[
   { id:'c1', signDate:'2026-07-05', companyName:'유원에프앤비', managerMain:'권형하', amounts:{ consult:500000 } },
-  { id:'c2', signDate:'2026-07-06', companyName:'가야엔지니어링', managerMain:'',      amounts:{ consult:300000 } },
-  { id:'c3', signDate:'2026-07-07', companyName:'남양인텍',      managerMain:'권형하', amounts:{} },
+  { id:'c2', signDate:'2026-07-06', companyName:'카타엔지니어링', managerMain:'',      amounts:{ consult:300000 } },
+  { id:'c3', signDate:'2026-07-07', companyName:'아자인텍',      managerMain:'권형하', amounts:{} },
   { id:'c4', signDate:'2026-07-08', companyName:'옛계약',        managerMain:'권형하', contractAmount:900000 },
   { id:'c5', signDate:'2026-06-30', companyName:'지난달',        managerMain:'',       amounts:{} }
 ]});
 const ctIss = ctx.monthCloseIssues('contract', YM);
 t('★ 계약금액을 amounts 에서 읽는다', ctIss.some(x => /계약금액이 0원인 계약 1건/.test(x)), true);
-t('금액 없는 계약 이름', ctIss.some(x => /남양인텍/.test(x)), true);
+t('금액 없는 계약 이름', ctIss.some(x => /아자인텍/.test(x)), true);
 t('옛 계약의 contractAmount 도 인정', ctIss.some(x => /옛계약/.test(x)), false);
 t('담당자 빈 계약을 지적', ctIss.some(x => /담당자가 비어 있는 계약 1건/.test(x)), true);
 t('★ 지난달 계약은 세지 않는다', ctIss.some(x => /지난달/.test(x)), false);

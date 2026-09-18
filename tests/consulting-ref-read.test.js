@@ -65,7 +65,7 @@ function load(opts) {
   return ctx;
 }
 
-const OK_READ = { kind: 'form', fields: { bizno: '312-81-49225', company: '(주) 대명크라샤',
+const OK_READ = { kind: 'form', fields: { bizno: '123-81-20012', company: '(주) 나라크라샤',
                   sales: '4821000000', workers: '37', docName: '사업장 정보' },
                   bizNoOk: true, ntsChecked: true, ntsState: '계속사업자', via: 'image' };
 
@@ -157,7 +157,7 @@ test('★ 사업자번호를 «기계가 검산한 것만» 스스로 보낸다'
   const c = load({ r: OK_READ });
   await c.refCapRead('2026', 'p1', 'u1', '김혜민', 'data:image/jpeg;base64,CAP');
   assert.equal(c._got.sent.length, 1, '검산을 통과했는데 안 보냈습니다');
-  assert.equal(c._got.sent[0].fields.bizno, '312-81-49225');
+  assert.equal(c._got.sent[0].fields.bizno, '123-81-20012');
   assert.equal(c._got.sent[0].byName, '김혜민', '누가 보낸 것인지 안 남깁니다');
   assert.equal(c._got.sent[0].photo.id, 'p1',
     '★ 어느 서류에서 온 값인지 안 남기면 「이 숫자 어디서 봤더라」에 답할 수 없습니다');

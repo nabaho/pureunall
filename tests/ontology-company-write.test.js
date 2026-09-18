@@ -6,7 +6,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const O=require('../js/pu-ontology.js');
 const erp=fs.readFileSync(path.join(__dirname,'..','pu-erp.html'),'utf8');
-const masters=[{id:'A',name:'동명이업체',bizNo:'111-22-33333'},{id:'B',name:'동명이업체',bizNo:'222-33-44444'}];
+const masters=[{id:'A',name:'동명이업체',bizNo:'111-22-33333'},{id:'B',name:'동명이업체',bizNo:'123-33-20481'}];
 
 test('이름이 같아도 업체를 자동 선택하지 않는다 — 보류는 명시적으로 선택해야 한다',()=>{
   const form={companyName:'동명이업체'};
@@ -38,7 +38,7 @@ test('실제 업체 ID·사업자번호만 통과하며 틀린 ID·충돌·삭�
   assert.equal(O.validateCompanyLink({companyId:'C'},masters).code,'orphan_company');
   assert.equal(O.validateCompanyLink(form,[{...masters[0],_deleted:true}]).ok,false);
   assert.equal(O.validateCompanyLink(form,[masters[0],masters[0]]).code,'duplicate_company_id');
-  assert.equal(O.validateCompanyLink({...form,company:{name:'동명이업체',bizNo:'2223344444'}},masters).code,'company_business_mismatch');
+  assert.equal(O.validateCompanyLink({...form,company:{name:'동명이업체',bizNo:'1233320481'}},masters).code,'company_business_mismatch');
   assert.equal(O.validateCompanyLink({companyId:'A',companyName:'다른기업'},masters).code,'company_name_mismatch');
   assert.equal(O.validateCompanyLink(form,null).code,'companies_unavailable');
   assert.equal(O.validateCompanyLink({...form,companyLinkStatus:'pending'},masters).ok,false);

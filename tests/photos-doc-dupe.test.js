@@ -201,7 +201,7 @@ function loadWhy() {
 }
 const W = loadWhy();
 const wkPhoto = extra => ({ meta: { w: 2600, h: 1800, read: Object.assign(
-  { kind: 'idcard', auto: false, fields: { name: '김철수', company: '해찬솔에프쓰리' } }, extra) } });
+  { kind: 'idcard', auto: false, fields: { name: '김철수', company: '다온솔에프쓰리' } }, extra) } });
 
 test('★★★ 「보내지 않기」를 고른 뒤에는 «할 일이 아니다» — 가리키는 단추가 없는 ⚠ 가 된다', () => {
   const it = wkPhoto({ dupSkip: { at: 1, by: '권형하' } });

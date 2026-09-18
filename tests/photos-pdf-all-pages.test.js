@@ -174,9 +174,9 @@ test('★ 사업자번호 검산은 «그 번호를 준 덩이»의 것을 쓴�
      것인데 「검증 못 함」으로 남아 멀쩡한 서류가 확인필요로 간다. */
   const r = M.mergeReads([
     chunk({ docName: '계약서' }, { bizNoOk: null, ntsChecked: false }),
-    chunk({ bizno: '312-81-28123' }, { bizNoOk: true, ntsChecked: true, ntsState: '계속사업자' })
+    chunk({ bizno: '123-81-20119' }, { bizNoOk: true, ntsChecked: true, ntsState: '계속사업자' })
   ]);
-  assert.equal(r.fields.bizno, '312-81-28123');
+  assert.equal(r.fields.bizno, '123-81-20119');
   assert.equal(r.bizNoOk, true, '★ 번호는 받아 놓고 검산 결과는 안 받았습니다');
   assert.equal(r.ntsChecked, true);
   assert.equal(r.ntsState, '계속사업자');

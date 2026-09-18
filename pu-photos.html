@@ -9116,7 +9116,7 @@ function sendCards(id, year, job) {
 }
 
 /* ══════ 겹치는 서류 — «치울지 사람이 고른다» (대표 지시 2026-09-14) ══════
-   "삼성검수 데이터 갑자기 사라졌다 … 중복서류도 아닌데 갑자기 계속 사라진다"
+   "차카검수 데이터 갑자기 사라졌다 … 중복서류도 아닌데 갑자기 계속 사라진다"
 
    ■ 무엇이 잘못돼 있었나 — «서류»를 «사람 기록»으로 판정했다
    여기는 예전에 스스로 휴지통으로 보냈다(대표 지시 2026-08-06 "특별히 내용이 없으면
@@ -13591,7 +13591,7 @@ function hayOf(it) {
   if (Array.isArray(f.rows)) {
     f.rows.forEach(function (row) { if (row && row.name) bits.push(String(row.name)); });
   }
-  /* 서식의 칸 이름·값도 — 「매출액」이나 「가야엔지니어링」으로 찾아진다 */
+  /* 서식의 칸 이름·값도 — 「매출액」이나 「카타엔지니어링」으로 찾아진다 */
   if (Array.isArray(f.pairs)) {
     f.pairs.forEach(function (p) {
       if (!p) return;
@@ -20195,7 +20195,7 @@ function isUsed(meta) {
 function usedWhere(meta) {
   return isUsed(meta) ? String((meta.used && meta.used.where) || '').trim() : '';
 }
-/* 「푸른이알피 계약 — 가야엔지니어링」처럼 길다. 칸·제목줄에는 줄여 넣는다. */
+/* 「푸른이알피 계약 — 카타엔지니어링」처럼 길다. 칸·제목줄에는 줄여 넣는다. */
 function usedWhereShort(meta, n) {
   const s = usedWhere(meta);
   const max = n || 34;

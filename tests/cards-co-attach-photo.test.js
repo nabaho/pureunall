@@ -132,17 +132,17 @@ test('★★ 최근 것부터 세운다 — 방금 찍은 것을 스무 줄 아�
 test('★★★ 값(회사 칸)을 «한 글자도» 안 건드린다 — 사람이 고쳐 둔 값을 덮으면 안 된다', () => {
   const c = load();
   const row = c.coAttachRow('2026', 'a', ITEM());
-  const upd = c.coAttachWrites('3128149225', row, '나');
+  const upd = c.coAttachWrites('1238120012', row, '나');
   const keys = Object.keys(upd).sort();
   assert.equal(keys.join('\n'), [
-    'coInfo/3128149225/at',
-    'coInfo/3128149225/by',
-    'coInfo/3128149225/docs/2026_a',
-    'coInfo/3128149225/tags/고용안정 지원금 신청서'
+    'coInfo/1238120012/at',
+    'coInfo/1238120012/by',
+    'coInfo/1238120012/docs/2026_a',
+    'coInfo/1238120012/tags/고용안정 지원금 신청서'
   ].join('\n'), '★ 서류·갈래·손댄 때 말고 다른 자리를 쓴다');
   /* 사진첩이 채우는 회사 칸(KEEP) 가운데 하나도 없어야 한다 */
   ['company', 'ceo', 'addr', 'bizno', 'tel', 'fax', 'bankAcct', 'email']
-    .forEach(k => assert.ok(keys.indexOf('coInfo/3128149225/' + k) < 0,
+    .forEach(k => assert.ok(keys.indexOf('coInfo/1238120012/' + k) < 0,
       '★ 회사 칸 ' + k + ' 을 건드린다 — 값 채우기는 사진첩 「보내기」 몫이다'));
   /* 갈등 자리(conflicts)도 안 만든다 — 값을 안 보니 어긋날 것도 없다 */
   assert.ok(keys.every(k => k.indexOf('/conflicts/') < 0), '★ conflicts 를 만든다');

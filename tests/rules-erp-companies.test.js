@@ -48,7 +48,7 @@ function line(re, what) {
 const WRAPPED = {
   v: {
     c1: { id: 'c1', name: '씨티에스㈜', bizNo: '123-45-67890', ceo: '홍길동' },
-    c2: { id: 'c2', name: '주식회사 한빛산업', bizNo: '2223344556' },
+    c2: { id: 'c2', name: '주식회사 한빛산업', bizNo: '1233320517' },
     c3: { id: 'c3', name: '㈜미래테크', bizNo: '' }
   },
   u: 1725000000000
@@ -114,12 +114,12 @@ test('★ 씨티에스㈜를 상호로 찾는다 — 화면에서 못 찾던 바
 test('★ 사업자번호로도 찾는다 — 하이픈 표기가 달라도', () => {
   const c = ctxFind(WRAPPED);
   assert.equal((c.findErpCompany('', '1234567890') || {}).name, '씨티에스㈜');
-  assert.equal((c.findErpCompany('', '222-33-44556') || {}).name, '주식회사 한빛산업');
+  assert.equal((c.findErpCompany('', '123-33-20517') || {}).name, '주식회사 한빛산업');
 });
 
 test('법인격 표기가 달라도 맞춘다 — 「한빛산업」 ↔ 「주식회사 한빛산업」', () => {
   const c = ctxFind(WRAPPED);
-  assert.equal((c.findErpCompany('한빛산업', '') || {}).bizNo, '2223344556');
+  assert.equal((c.findErpCompany('한빛산업', '') || {}).bizNo, '1233320517');
 });
 
 test('★ 옛 방식이 왜 실패했는지 남겨 둔다 — [지도 통째, 숫자] 로는 아무도 못 찾는다', () => {

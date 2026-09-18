@@ -34,14 +34,14 @@ const 건의 = {
   suggestionId: 'abc_123',
   title: '2025년 수임 사건, 2026년에 보수가 들어오면 매칭이 안 됩니다',
   content: '25/12/12 수임한 홍길동 님 임금체불사건(사건번호 임금체불-2025-001) 성공보수가 '
-    + '26/02/02 입금됐는데 ㈜나래산업 거래내역에서 후보로 안 뜹니다. 010-9876-5432',
+    + '26/02/02 입금됐는데 ㈜새롬산업 거래내역에서 후보로 안 뜹니다. 010-9876-5432',
   instruction: '홍길동 님 건처럼 해가 바뀐 성공보수가 후보에 뜨게 고쳐 주세요',
 };
 
 test('① ★★ 공개 이슈에 건의 내용이 «한 조각도» 없다', function () {
   const issue = S.buildIssue(Object.assign({ risk: 'auto', autoDeploy: false, imageIndexes: [], imageCount: 0 }, 건의));
   const 공개 = issue.title + '\n' + issue.body;
-  ['홍길동', '나래산업', '임금체불-2025-001', '010-9876-5432', '성공보수', '거래내역']
+  ['홍길동', '새롬산업', '임금체불-2025-001', '010-9876-5432', '성공보수', '거래내역']
     .forEach(function (w) {
       assert.ok(공개.indexOf(w) < 0, '★★ 「' + w + '」 이 공개 이슈에 그대로 실립니다');
     });
@@ -91,7 +91,7 @@ test('④ ★★ 돈 세는 말이 「낮은 위험」으로 새지 않는다', 
 
 test('⑤ ★★ 건의에서 온 낱말이 코드에 섞이면 멈춘다', function () {
   const secrets = G.extractSecrets([건의.title, 건의.content, 건의.instruction].join('\n'));
-  ['홍길동', '나래산업', '임금체불-2025-001', '010-9876-5432'].forEach(function (w) {
+  ['홍길동', '새롬산업', '임금체불-2025-001', '010-9876-5432'].forEach(function (w) {
     assert.ok(secrets.indexOf(w) >= 0, '★★ 「' + w + '」 을 비밀로 안 챙깁니다');
   });
   const diff = '+  /* 홍길동 님 사건처럼 해가 바뀐 건 */\n+  var x = 1;';
@@ -107,15 +107,15 @@ test('⑥ ★ 흔한 말을 비밀로 삼지 않는다 — 그러면 모든 바�
 });
 
 test('⑦ ★★ 이미 저장소에 있던 낱말은 통과시킨다 — 새로 새는 것만 막는다', function () {
-  const diff = '+  var 업체 = "나래산업";';
-  assert.equal(G.scanDiff(diff, ['나래산업'], function () { return true; }).ok, true,
+  const diff = '+  var 업체 = "새롬산업";';
+  assert.equal(G.scanDiff(diff, ['새롬산업'], function () { return true; }).ok, true,
     '★★ 이미 있던 낱말까지 막습니다 — 검문이 늘 걸리면 사람이 꺼 버립니다');
-  assert.equal(G.scanDiff(diff, ['나래산업'], function () { return false; }).ok, false,
+  assert.equal(G.scanDiff(diff, ['새롬산업'], function () { return false; }).ok, false,
     '★ 새로 들어온 낱말을 안 막습니다');
 });
 
 test('⑧ ★ 꼴이 분명한 것은 건의와 상관없이 막는다', function () {
-  const r = G.scanDiff('+  var a = "880304-2019283", b = "041-556-3656";', []);
+  const r = G.scanDiff('+  var a = "880304-2234567", b = "041-556-3656";', []);
   assert.equal(r.ok, false, '★★ 주민번호·전화번호를 그냥 올립니다');
   assert.deepEqual(r.hits.map(function (h) { return h.kind; }).sort(), ['전화번호', '주민번호'],
     '무엇에 걸렸는지 안 알려 줍니다');
@@ -131,7 +131,7 @@ test('⑨ ★ 빈 서식값은 통과한다 — 검사 자료를 못 쓰게 만�
 
 test('⑩ ★ 더한 줄만 본다 — 원래 있던 줄까지 보면 첫 검문에서 통째로 걸린다', function () {
   assert.deepEqual(G.addedLines('+++ b/x.js\n+새 줄\n-지운 줄\n 그대로'), ['새 줄']);
-  assert.equal(G.scanDiff('-  var a = "880304-2019283";', []).ok, true, '★ 지운 줄에 걸립니다');
+  assert.equal(G.scanDiff('-  var a = "880304-2234567";', []).ok, true, '★ 지운 줄에 걸립니다');
 });
 
 /* ── 배선 — 만들어만 두고 «안 부르는» 일이 없게 ─────────────────────────── */

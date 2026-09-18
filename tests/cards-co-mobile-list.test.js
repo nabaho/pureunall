@@ -55,30 +55,30 @@ test('회사가 없으면 안내문구를 보여준다', () => {
 });
 
 test('회사마다 상호·유형·사업자번호·담당을 카드로 그린다', () => {
-  const c = loadBlock([{ key:'k1', name:'대명크라샤', bizno:'312-81-49225', erp:{ type:'자문', main:'김보람' }, folder:'', cards:[], docs:0, tags:{} }]);
+  const c = loadBlock([{ key:'k1', name:'나라크라샤', bizno:'123-81-20012', erp:{ type:'자문', main:'김보람' }, folder:'', cards:[], docs:0, tags:{} }]);
   c.renderCoMobileList();
   assert.match(c._calls.html, /class="row"/);
-  assert.match(c._calls.html, /대명크라샤/);
+  assert.match(c._calls.html, /나라크라샤/);
   assert.match(c._calls.html, /자문/);
-  assert.match(c._calls.html, /312-81-49225/);
+  assert.match(c._calls.html, /123-81-20012/);
   assert.match(c._calls.html, /김보람/);
 });
 
 test('폴더에 든 회사는 카드에 폴더 이름이 보인다', () => {
-  const c = loadBlock([{ key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'f1', cards:[], docs:0, tags:{} }]);
+  const c = loadBlock([{ key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'f1', cards:[], docs:0, tags:{} }]);
   c._coFolders = { f1:{ id:'f1', name:'현장클리닉' } };
   c.renderCoMobileList();
   assert.match(c._calls.html, /현장클리닉/);
 });
 
 test('카드를 누르면 pickCo(key) 를 부른다', () => {
-  const c = loadBlock([{ key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
+  const c = loadBlock([{ key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
   c.renderCoMobileList();
   assert.match(c._calls.html, /onclick="pickCo\('k1'\)"/);
 });
 
 test('선택 모드일 때는 체크 표시를 그리고, 누르면 coToggle 을 부른다', () => {
-  const c = loadBlock([{ key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
+  const c = loadBlock([{ key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
   c.state.selMode = true;
   c.renderCoMobileList();
   assert.match(c._calls.html, /onclick="coToggle\('k1'\)"/);
@@ -87,14 +87,14 @@ test('선택 모드일 때는 체크 표시를 그리고, 누르면 coToggle 을
 
 test('선택된 회사는 체크 표시가 켜진다', () => {
   const c = loadBlock([
-    { key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} },
+    { key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} },
     { key:'k2', name:'미래산업', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }
   ]);
   c.state.selMode = true; c.state.coSel = { k1:1 };
   c.renderCoMobileList();
-  /* 체크 표시가 '어딘가에' 있는지가 아니라, 선택된 k1(대명크라샤) 카드 자신에 붙었는지를
+  /* 체크 표시가 '어딘가에' 있는지가 아니라, 선택된 k1(나라크라샤) 카드 자신에 붙었는지를
      확인한다 — 다른 회사(k2, 미래산업) 카드에 잘못 켜져도 통과해버리는 약한 검증을 막는다. */
-  assert.match(c._calls.html, /<div class="selmark">✅<\/div>\s*<div class="rowmain"><div class="nm">대명크라샤<\/div>/,
+  assert.match(c._calls.html, /<div class="selmark">✅<\/div>\s*<div class="rowmain"><div class="nm">나라크라샤<\/div>/,
     '선택된 k1 카드에 체크 표시(✅)가 붙어야 합니다');
   assert.match(c._calls.html, /<div class="selmark">⚪<\/div>\s*<div class="rowmain"><div class="nm">미래산업<\/div>/,
     '선택되지 않은 k2 카드는 빈 동그라미(⚪)여야 합니다');
@@ -129,7 +129,7 @@ test('회사 키에 작은따옴표가 있어도 onclick 인자가 깨지지 않
    명함 탭의 마지막 값(예: "전체 (6,271)")이 기업 상세 화면에서도 그대로 굳어 붙는다. */
 test('groupBtn — 아무것도 안 골랐으면 "전체"와 지금 목록 개수를 보여준다', () => {
   const list = [
-    { key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} },
+    { key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} },
     { key:'k2', name:'미래산업', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }
   ];
   const c = loadBlock(list);
@@ -141,21 +141,21 @@ test('groupBtn — 아무것도 안 골랐으면 "전체"와 지금 목록 개�
    없어졌다("거래처만 삭제해라. 내가 새로 폴더 만들어서 관리하겠다").
    대신 옛 상태를 억지로 켜도 이름표가 그것을 따라가지 않는지를 본다. */
 test('groupBtn — 없앤 「거래처만」 상태를 억지로 켜도 이름표가 안 바뀐다', () => {
-  const c = loadBlock([{ key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
+  const c = loadBlock([{ key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
   c.state.coErpOnly = true;                 /* 옛 기기에 남아 있을 수 있는 찌꺼기 */
   c.renderCoMobileList();
   assert.match(c._calls.groupBtnHtml, /^전체 \(1\)/, '없앤 거르개가 이름표에 되살아났다');
 });
 
 test('groupBtn — 태그를 골랐으면 그 태그 이름을 보여준다', () => {
-  const c = loadBlock([{ key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
+  const c = loadBlock([{ key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
   c.state.coTag = '일터상생혁신';
   c.renderCoMobileList();
   assert.match(c._calls.groupBtnHtml, /^일터상생혁신 \(1\)/);
 });
 
 test('groupBtn — 폴더를 골랐으면 그 폴더 이름을 보여준다', () => {
-  const c = loadBlock([{ key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'f1', cards:[], docs:0, tags:{} }]);
+  const c = loadBlock([{ key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'f1', cards:[], docs:0, tags:{} }]);
   c._coFolders = { f1:{ id:'f1', name:'현장클리닉' } };
   c.state.coFolder = 'f1';
   c.renderCoMobileList();

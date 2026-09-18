@@ -1,6 +1,6 @@
 'use strict';
 /* ══════ 기업 상세의 「할 일」이 화면을 조용히 걸러 놓던 것 (대표 보고 2026-08-30) ══════
-   대표님: 「메디움 등 사업장 업체관리로 이동시켰는데 이상하게 나온다 이동 안 하고
+   대표님: 「타파메디 등 사업장 업체관리로 이동시켰는데 이상하게 나온다 이동 안 하고
    남아있다. 올드밀 충주시설관리공단은 계약해지사업장으로 보냈는데 안 간다」
 
    ■ 옮기기는 «되고 있었다»
@@ -53,10 +53,10 @@ function topConst(name) {
 
 /* 회사 넷: 번호없음+종료 / 번호없음만 / 종료만 / 아무것도 아님 */
 const COS = [
-  { key: 'n메디움', name: '메디움', bizno: '', erp: { left: true }, folder: '' },
+  { key: 'n타파메디', name: '타파메디', bizno: '', erp: { left: true }, folder: '' },
   { key: 'n올드밀', name: '올드밀', bizno: '', erp: null, folder: '' },
   { key: '1112233333', name: '가나', bizno: '111-22-33333', erp: { left: true }, folder: '' },
-  { key: '4445566666', name: '다라', bizno: '444-55-66666', erp: null, folder: '' }
+  { key: '1235520431', name: '다라', bizno: '123-55-20431', erp: null, folder: '' }
 ];
 
 function ctx(extra) {
@@ -116,7 +116,7 @@ test('★ 「종료」를 켜도 번호 없음 수가 안 붙는다', () => {
 });
 
 test('폴더·검색은 그대로 지킨다 — 그 안에서 셀 뜻이 있다', () => {
-  const b = ctx({ coQ: '메디움' });
+  const b = ctx({ coQ: '타파메디' });
   ['coClosedCount', 'coNoBizCount'].forEach(n => vm.runInContext(fn(n), b));
   assert.equal(vm.runInContext('coNoBizCount()', b), 1,
     '검색까지 무시하면 「지금 보는 것 안에서 몇 곳인가」를 알 수 없다');

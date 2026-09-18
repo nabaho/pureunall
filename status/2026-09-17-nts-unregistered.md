@@ -79,7 +79,7 @@ out.ntsState = row.b_stt || null;     // ← b_stt «하나만» 봤다
 - 브라우저에서 실측(노드가 아니라 진짜 브라우저에 `js/pu-doc-read.js` 를 올려 돌림):
   `123-45-67891` → 체크섬 통과 · `ntsFound=false` · **auto=false** ·
   「국세청에 없는 사업자등록번호입니다 — 번호를 다시 확인해 주세요」
-  `220-81-62517` → `ntsFound=true` · `ntsState='계속사업자'` · auto=true
+  `123-81-20031` → `ntsFound=true` · `ntsState='계속사업자'` · auto=true
 
 ⚠ 국세청 응답 꼴은 **PR #1239 때 진짜 응답으로 확인해 둔 것**을 그대로 썼다
 (그 꼴이 `pu-cards.html` 의 `coNtsWord` 주석과 `tests/cards-co-nts.test.js` 에 박혀 있다).

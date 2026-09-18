@@ -34,7 +34,7 @@ function fn(name) {
   throw new Error(name + ' 의 끝을 찾지 못했다');
 }
 
-const CO = { key: 'n메디움', name: '메디움', bizno: '312-81-49225', folder: 'f2',
+const CO = { key: 'n타파메디', name: '타파메디', bizno: '123-81-20012', folder: 'f2',
              cards: [], bizs: [], docs: 1, erp: { type: '자문' }, extra: {} };
 const FOLDERS = { f1: { id: 'f1', name: '1. 업체관리' },
                   f2: { id: 'f2', name: '2. 계약해지사업장' } };

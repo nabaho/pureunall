@@ -43,7 +43,7 @@ const B = load();
 
 const 통장 = (o) => Object.assign({
   id: 'p1', year: '2026', owner: '', bankName: '중소기업은행',
-  bankAcct: '547-000000-00-000', bankAcctAlt: '', bankHolder: '김도경',
+  bankAcct: '547-000000-00-000', bankAcctAlt: '', bankHolder: '오정훈',
   acctType: '기업자유예금', company: '', at: 100
 }, o || {});
 
@@ -51,10 +51,10 @@ const 통장 = (o) => Object.assign({
 
 test('★★★ 예금주 이름이 맞는 것만 후보다 — 회사만 맞으면 «사업장 통장»이 들어온다', () => {
   const list = [
-    통장({ id: 'a', bankHolder: '김도경', company: '가나상사' }),
+    통장({ id: 'a', bankHolder: '오정훈', company: '가나상사' }),
     통장({ id: 'b', bankHolder: '가나상사', company: '가나상사' })   // 법인 통장
   ];
-  const out = B.erpBankPickFor(list, '김도경', '가나상사');
+  const out = B.erpBankPickFor(list, '오정훈', '가나상사');
   assert.equal(out.length, 1, '★★★ 사업장 통장이 근로자 계좌 자리에 들어옵니다 — 그 돈은 사람에게 안 갑니다');
   assert.equal(out[0].id, 'a');
 });
@@ -65,9 +65,9 @@ test('★★★ 이름을 «아직 안 적었으면» 아무것도 안 내놓는
   assert.deepEqual(Array.prototype.slice.call(B.erpBankPickFor(list, '   ', '')), []);
 });
 
-test('★ 띄어쓰기가 달라도 같은 사람이다 — 「김 도경」·「김도경」', () => {
-  const list = [통장({ bankHolder: '김 도경' })];
-  assert.equal(B.erpBankPickFor(list, '김도경', '').length, 1);
+test('★ 띄어쓰기가 달라도 같은 사람이다 — 「오 정훈」·「오정훈」', () => {
+  const list = [통장({ bankHolder: '오 정훈' })];
+  assert.equal(B.erpBankPickFor(list, '오정훈', '').length, 1);
 });
 
 test('★★ 같은 사업장 통장이 «먼저» 온다 — 동명이인이면 그것이 가르는 실마리다', () => {
@@ -75,7 +75,7 @@ test('★★ 같은 사업장 통장이 «먼저» 온다 — 동명이인이면
     통장({ id: 'old', company: '딴회사', at: 900 }),
     통장({ id: 'same', company: '(주)가나상사', at: 100 })
   ];
-  const out = B.erpBankPickFor(list, '김도경', '가나상사');
+  const out = B.erpBankPickFor(list, '오정훈', '가나상사');
   assert.equal(out[0].id, 'same', '★★ 최근 것만 보면 딴 회사 통장이 맨 위에 옵니다');
   assert.equal(out[0].sameCo, true);
   assert.equal(out[1].sameCo, false);
@@ -83,7 +83,7 @@ test('★★ 같은 사업장 통장이 «먼저» 온다 — 동명이인이면
 
 test('★ 같은 무리 안에서는 최근 것이 먼저다', () => {
   const list = [통장({ id: 'old', at: 100 }), 통장({ id: 'new', at: 900 })];
-  assert.equal(B.erpBankPickFor(list, '김도경', '')[0].id, 'new');
+  assert.equal(B.erpBankPickFor(list, '오정훈', '')[0].id, 'new');
 });
 
 /* ══════ ② 채우는 값 ══════ */

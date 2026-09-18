@@ -101,7 +101,7 @@ test('★★ 그 업체의 번호를 들고 온다 — 담당자·오간 메일�
 });
 
 test('다른 갈래의 co_id 는 예전 그대로 companyId 를 본다', () => {
-  const c = candBox({ case: [{ id: 'k1', companyName: '나래', companyId: 'co-9', managerMain: 'P-003' }] })
+  const c = candBox({ case: [{ id: 'k1', companyName: '새롬', companyId: 'co-9', managerMain: 'P-003' }] })
     .puerpCandidates();
   assert.equal(c[0].co_id, 'co-9');
 });

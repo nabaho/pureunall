@@ -78,7 +78,7 @@ test('판정에 쓰이는 칸이 바뀌면 다시 센다 — 틀린 딱지가 �
   /* itemKeys/rowKeys 가 보는 칸: 휴대폰·이메일·이름·상호(명함), 사업자번호(사업자) */
   const fields = [
     ['name', '박은비'], ['company', '대성물산(주)'], ['mobile', '010-9999-8888'],
-    ['email', 'z@z.kr'], ['bizno', '214-82-05236'], ['kind', 'biz']
+    ['email', 'z@z.kr'], ['bizno', '123-82-20440'], ['kind', 'biz']
   ];
   fields.forEach(([f, v]) => {
     const C = load();

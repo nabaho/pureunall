@@ -48,7 +48,7 @@ function load(){
 test('★★ 뒷자리 첫 숫자로 «어느 100년»인지 가른다', () => {
   const { birthFromRrn } = load();
   /* 검사고정-허용: 주민등록번호 규칙이다 — 값이 곧 규칙인 자리 */
-  assert.equal(birthFromRrn('960429-2419110'), '1996-04-29', '1·2 는 1900년대(내국인)');
+  assert.equal(birthFromRrn('960429-2234567'), '1996-04-29', '1·2 는 1900년대(내국인)');
   assert.equal(birthFromRrn('900101-1000000'), '1990-01-01');
   assert.equal(birthFromRrn('050101-3000000'), '2005-01-01', '3·4 는 2000년대(내국인)');
   assert.equal(birthFromRrn('101231-4000000'), '2010-12-31');
@@ -83,12 +83,12 @@ test('★★ 열세 자리가 아니면 아예 안 본다 — 사업자번호를
   const { birthFromRrn } = load();
   /* 실측(2026-09-06): 주민번호를 가진 25명이 «모두» 열세 자리다.
      길이를 안 보면 아래 사업자번호에서 「2007-87-03」 이 튀어나와 증명서에 박힌다. */
-  assert.equal(birthFromRrn('207-87-03540'), '',
+  assert.equal(birthFromRrn('123-87-20237'), '',
     '★★ 사업자번호에서 생년월일을 지어냈습니다');
   assert.equal(birthFromRrn('9604292'), '',
     '★★ 앞 일곱 자리만으로 날짜를 지어냈습니다 — 빈칸으로 두고 사람에게 물어야 합니다');
   assert.equal(birthFromRrn('96042924191100'), '', '열네 자리도 안 본다');
-  assert.equal(birthFromRrn('960429-2419110'), '1996-04-29', '★ 제대로 된 것은 그대로 읽는다');
+  assert.equal(birthFromRrn('960429-2234567'), '1996-04-29', '★ 제대로 된 것은 그대로 읽는다');
 });
 
 test('붙임표가 없어도, 빈칸이 섞여도 읽는다', () => {
@@ -101,11 +101,11 @@ test('붙임표가 없어도, 빈칸이 섞여도 읽는다', () => {
 
 test('★★ 적어 둔 생년월일이 «먼저»다 — 주민번호는 없을 때만 본다', () => {
   const { certBirthOf } = load();
-  assert.equal(certBirthOf({ birthDate: '1990-05-05', rrn: '960429-2419110' }), '1990-05-05',
+  assert.equal(certBirthOf({ birthDate: '1990-05-05', rrn: '960429-2234567' }), '1990-05-05',
     '★★ 사람이 적어 둔 값을 주민번호가 덮었습니다');
-  assert.equal(certBirthOf({ birthDate: '', rrn: '960429-2419110' }), '1996-04-29',
+  assert.equal(certBirthOf({ birthDate: '', rrn: '960429-2234567' }), '1996-04-29',
     '★★ 주민번호가 있는데도 안 뽑았습니다 — 퇴사자 14명이 여기서 채워집니다');
-  assert.equal(certBirthOf({ birthDate: '   ', rrn: '960429-2419110' }), '1996-04-29',
+  assert.equal(certBirthOf({ birthDate: '   ', rrn: '960429-2234567' }), '1996-04-29',
     '빈칸만 든 값은 «없는 것»으로 본다');
   assert.equal(certBirthOf({}), '', '둘 다 없으면 지어내지 않는다');
   assert.equal(certBirthOf(null), '');

@@ -47,10 +47,10 @@ const IT = (o) => Object.assign({ id: 'p1', year: '2026', at: 0, fields: {} }, o
 test('★ 한 줄에 어느 회사·무슨 서류·언제·누가 가 담긴다', () => {
   const c = load();
   const t = c.erpPhotoRowText(IT({
-    fields: { company: '가야엔지니어링', docName: '위임계약서', signDate: '2026-08-13' },
+    fields: { company: '카타엔지니어링', docName: '위임계약서', signDate: '2026-08-13' },
     ownerName: '김보람'
   }));
-  assert.equal(t.head, '가야엔지니어링', '무슨 회사인지가 먼저 보여야 훑을 수 있습니다');
+  assert.equal(t.head, '카타엔지니어링', '무슨 회사인지가 먼저 보여야 훑을 수 있습니다');
   assert.match(t.sub, /위임계약서/);
   assert.match(t.sub, /2026-08-13/);
   assert.match(t.sub, /김보람/, '누구 사진인지 안 보이면 전 직원 목록에서 헤맵니다');
@@ -72,15 +72,15 @@ test('업체명과 문서명이 같으면 두 번 적지 않는다', () => {
 /* ── 찾기 ── */
 
 const LIST = [
-  IT({ id: 'a', fields: { company: '가야엔지니어링', docName: '위임계약서', signDate: '2026-08-13' }, ownerName: '권형하' }),
+  IT({ id: 'a', fields: { company: '카타엔지니어링', docName: '위임계약서', signDate: '2026-08-13' }, ownerName: '권형하' }),
   IT({ id: 'b', fields: { company: '수성산업', docName: '용역계약서', signDate: '2026-08-11' }, ownerName: '김보람' }),
-  IT({ id: 'c', fields: { company: '맛찬들동탄점', docName: '자문계약서', ceo: '신욱임' }, ownerName: '김보람' })
+  IT({ id: 'c', fields: { company: '가온들동탄점', docName: '자문계약서', ceo: '신욱임' }, ownerName: '김보람' })
 ];
 
 test('★ 업체명·문서명·날짜·올린 사람 어디에 걸려도 찾아진다', () => {
   const c = load();
   const ids = (q) => c.erpPhotoFilter(LIST, q).map(function (x) { return x.id; }).join(',');
-  assert.equal(ids('가야'), 'a', '업체명으로 못 찾습니다');
+  assert.equal(ids('카타'), 'a', '업체명으로 못 찾습니다');
   assert.equal(ids('용역'), 'b', '문서명으로 못 찾습니다');
   assert.equal(ids('08-11'), 'b', '날짜로 못 찾습니다');
   assert.equal(ids('김보람'), 'b,c', '올린 사람으로 못 찾습니다');

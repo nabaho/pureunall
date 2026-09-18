@@ -68,7 +68,7 @@ function load(){
   return ctx;
 }
 const 계약 = (x) => Object.assign({ _kind:'contract', id:'ct-1',
-  contractNo:'계약-2026-001', companyName:'가나테크', bizNo:'134-86-05772',
+  contractNo:'계약-2026-001', companyName:'가나테크', bizNo:'123-86-20021',
   kind:'advisory', managerMain:'권형하', startDate:'2026-03-01', endDate:'2027-02-28',
   contractFee: 1200000 }, x || {});
 

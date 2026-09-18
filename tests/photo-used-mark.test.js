@@ -57,7 +57,7 @@ test('★ 표시는 사진 옆 한 칸(used)만 건드린다 — 사진도 판�
       once: function () { return Promise.resolve({ val: function () { return { by: 'ME', upAt: 1 }; } }); }
     }; } }
   });
-  await ctx.PuPhotoStore.markUsed('2026', 'p1', '푸른이알피 계약 — 가야엔지니어링', 'U9');
+  await ctx.PuPhotoStore.markUsed('2026', 'p1', '푸른이알피 계약 — 카타엔지니어링', 'U9');
   const keys = Object.keys(wrote || {});
   assert.equal(keys.length, 1, '한 칸만 건드려야 합니다: ' + keys.join(', '));
   assert.match(keys[0], /\/items\/2026\/p1\/used$/,
@@ -65,7 +65,7 @@ test('★ 표시는 사진 옆 한 칸(used)만 건드린다 — 사진도 판�
   assert.ok(keys[0].indexOf('U9') > 0, '남의 사진이면 그 사람 자리에 적어야 합니다: ' + keys[0]);
   const v = wrote[keys[0]];
   assert.ok(v.at > 0, '언제 썼는지가 없으면 5년을 셀 수 없습니다');
-  assert.equal(v.where, '푸른이알피 계약 — 가야엔지니어링', '어디에 썼는지를 안 남겼습니다');
+  assert.equal(v.where, '푸른이알피 계약 — 카타엔지니어링', '어디에 썼는지를 안 남겼습니다');
   assert.equal(v.by, 'ME');
 });
 

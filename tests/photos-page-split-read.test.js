@@ -41,7 +41,7 @@ const D = 판독기();
 const 두서류 = {
   docs: [
     { pages: [1], kind: 'contract',
-      fields: { company: '아이행복어린이집', ceo: '양유정', fee: '200000' } },
+      fields: { company: '나라어린이집', ceo: '양유정', fee: '200000' } },
     { pages: [2], kind: 'cms',
       fields: { bankName: '하나은행', bankAcct: '6779100 1708204',
                 bankHolder: '양유정', payDay: '25', amount: '200000' } }
@@ -66,7 +66,7 @@ test('★★★ 서류가 둘이면 «갈라서» 준다 — 2쪽의 은행·계
      그것을 안 걸러 내면 화면에 「pages: 1」이 한 칸으로 뜨고 기업정보함까지 실려 간다. */
 test('★★ 쪽 번호가 «칸»으로 새지 않는다 — pages 는 자리이지 서류 내용이 아니다', async () => {
   const r = await D._afterReadForTest({ docs: [
-    { pages: [1], kind: 'contract', fields: { pages: [1], company: '아이행복어린이집' } },
+    { pages: [1], kind: 'contract', fields: { pages: [1], company: '나라어린이집' } },
     { pages: [2], kind: 'cms', fields: { pages: '2', bankName: '하나은행' } }
   ] }, 'image');
   r.docs.forEach(function (d, i) {
@@ -80,7 +80,7 @@ test('★★ 쪽 번호가 «칸»으로 새지 않는다 — pages 는 자리�
 test('★★ 맨 앞 서류를 «대표»로 그대로 둔다 — 이 값을 보는 곳이 열 군데가 넘는다', async () => {
   const r = await D._afterReadForTest(두서류, 'image');
   assert.equal(r.kind, 'contract', '★★ 대표 갈래가 비면 갈래 탭·보내기·다시읽기가 다 멎습니다');
-  assert.equal(r.fields.company, '아이행복어린이집');
+  assert.equal(r.fields.company, '나라어린이집');
 });
 
 test('★★★ 서류가 «하나»면 예전과 한 글자도 다르지 않다 — docs 를 안 붙인다', async () => {
@@ -198,9 +198,9 @@ function 화면() {
 const S = 화면();
 const 쪽들 = [{ id: 'p1' }, { id: 'p2' }];
 const 읽음 = {
-  kind: 'contract', fields: { company: '아이행복어린이집' }, auto: true, at: 1,
+  kind: 'contract', fields: { company: '나라어린이집' }, auto: true, at: 1,
   docs: [
-    { pages: [1], kind: 'contract', fields: { company: '아이행복어린이집' } },
+    { pages: [1], kind: 'contract', fields: { company: '나라어린이집' } },
     { pages: [2], kind: 'cms', fields: { bankName: '하나은행', bankAcct: '6779100 1708204' } }
   ]
 };

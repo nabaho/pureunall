@@ -142,7 +142,7 @@ const S = load();
 function capture(extra, w, h) {
   return { meta: { w: w || 1525, h: h || 977,
     read: Object.assign({ kind: 'form', auto: false, bizNoOk: true,
-      fields: { docName: '통합 기술보호지원반 신청서', company: '남양인텍', bizno: '312-81-28123' } },
+      fields: { docName: '통합 기술보호지원반 신청서', company: '아자인텍', bizno: '123-81-20119' } },
       extra || {}) } };
 }
 

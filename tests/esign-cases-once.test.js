@@ -119,17 +119,17 @@ test('★ loadCases 가 프라미스를 돌려준다 — 안 돌려주면 아무
 });
 
 test('★ 사건 목록은 once 로만 받는다 — .on() 이면 안 된다', async () => {
-  const w = loadWiring({ serverCases: { c1: { meta: { title: '가야', company: '가야엔지니어링' } } } });
+  const w = loadWiring({ serverCases: { c1: { meta: { title: '가야', company: '카타엔지니어링' } } } });
   await w.loadCases();
   assert.equal(w._calls.once, 1);
-  assert.match(w._cells.caseRows, /가야엔지니어링/);
+  assert.match(w._cells.caseRows, /카타엔지니어링/);
 });
 
 test('제출 개수는 세지만 제출 내용은 화면에 안 낸다', async () => {
   const w = loadWiring({
     serverCases: {
       c1: {
-        meta: { title: '가야', company: '가야엔지니어링' },
+        meta: { title: '가야', company: '카타엔지니어링' },
         submissions: { s1: { enc: 'SECRET_BLOB_1' }, s2: { enc: 'SECRET_BLOB_2' } }
       }
     }

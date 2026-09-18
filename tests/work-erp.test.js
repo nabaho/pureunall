@@ -71,7 +71,7 @@ ok('기한이 없으면 빈 문자열', _peDue({}) === '' && _peDue({ deadlines:
 peTypes.case = [{ code: 'case-a', name: '부당해고' }];
 peMaster = {
   case: [
-    { id: 'c1', companyName: '나래산업', caseNo: '사건-2026-001', managerMain: 'u1',
+    { id: 'c1', companyName: '새롬산업', caseNo: '사건-2026-001', managerMain: 'u1',
       typeCodes: { case: 'case-a' }, payee: '홍길동', companyId: 'CO1',
       judgment: { org: '천안지청', officer: '강감독관', phone: '041-1', email: 'a@b' },
       status: 'progress', managerSubs: ['u2'], brief: '요약' },
@@ -82,7 +82,7 @@ let cand = puerpCandidates();
 ok('미종료 건만 후보로 올린다', cand.length === 1 && cand[0].ref.id === 'c1');
 const c1 = cand[0];
 ok('연동에 필요한 값이 모두 담긴다',
-  c1.cat === '사건' && c1.ptype === '부당해고' && c1.company === '나래산업'
+  c1.cat === '사건' && c1.ptype === '부당해고' && c1.company === '새롬산업'
   && c1.no === '사건-2026-001' && c1.client === '홍길동' && c1.co_id === 'CO1'
   && c1.officer === '강감독관' && c1.jur_org === '천안지청' && c1.brief === '요약'
   && c1.mgr === '김동현' && c1.subs.join() === '권형하'
@@ -90,7 +90,7 @@ ok('연동에 필요한 값이 모두 담긴다',
 ok('마스터를 한 유형도 못 읽으면 null (빈 목록으로 오해하면 안 된다)', (function () {
   peMaster = {};
   const r = puerpCandidates();
-  peMaster = { case: [{ id: 'c1', companyName: '나래산업', managerMain: 'u1' }] };
+  peMaster = { case: [{ id: 'c1', companyName: '새롬산업', managerMain: 'u1' }] };
   return r === null;
 })());
 
@@ -110,34 +110,34 @@ ok('주담당이 없으면 전 직원 목록에도 안 넣는다', peAllUnlinked
 /* ── 짝짓기: 기업명이 같은 것만, 점수순 최대 3개 ── */
 peMaster = {
   case: [
-    { id: 'p1', companyName: '나래산업', caseNo: '사건-2026-001', managerMain: 'u1', title: '부당해고 구제신청' },
-    { id: 'p2', companyName: '(주)나래산업', caseNo: '사건-2026-002', managerMain: 'u1', title: '임금체불' },
+    { id: 'p1', companyName: '새롬산업', caseNo: '사건-2026-001', managerMain: 'u1', title: '부당해고 구제신청' },
+    { id: 'p2', companyName: '(주)새롬산업', caseNo: '사건-2026-002', managerMain: 'u1', title: '임금체불' },
     { id: 'p3', companyName: '다른곳', caseNo: '사건-2026-003', managerMain: 'u1' }
   ]
 };
-items = { W1: { src: 'excel', company: '나래산업', title: '부당해고 구제신청', mgr_main: { name: '김동현' } } };
+items = { W1: { src: 'excel', company: '새롬산업', title: '부당해고 구제신청', mgr_main: { name: '김동현' } } };
 let pairs = matchPairs();
 ok('기업명이 같은 것만 후보 ((주)·공백 무시)',
   pairs.length === 1 && pairs[0].hits.length === 2
   && pairs[0].hits.every(h => h.c.ref.id !== 'p3'));
 ok('업무명까지 같은 것이 맨 앞', pairs[0].hits[0].c.ref.id === 'p1');
 ok('점수가 높을수록 확실한 짝', pairs[0].hits[0].s > pairs[0].hits[1].s);
-items = { W1: { src: 'puerp', ref: { type: 'case', id: 'p1' }, company: '나래산업' } };
+items = { W1: { src: 'puerp', ref: { type: 'case', id: 'p1' }, company: '새롬산업' } };
 ok('이미 연동된 업무는 짝짓기 대상이 아니다', matchPairs().length === 0);
 items = {
-  W1: { src: 'excel', company: '나래산업', mgr_main: { name: '김동현' } },
+  W1: { src: 'excel', company: '새롬산업', mgr_main: { name: '김동현' } },
   W2: { src: 'puerp', ref: { type: 'case', id: 'p1' } }      // p1 은 이미 W2 가 쓰고 있다
 };
 pairs = matchPairs();
 ok('이미 다른 업무가 쓰고 있는 건은 후보에서 빠진다',
   pairs.length === 1 && pairs[0].hits.length === 1 && pairs[0].hits[0].c.ref.id === 'p2');
 items = {
-  W1: { src: 'excel', company: '나래산업', mgr_main: { name: '김동현' } },
+  W1: { src: 'excel', company: '새롬산업', mgr_main: { name: '김동현' } },
   W2: { src: 'puerp', ref: { type: 'case', id: 'p1' } },
   W3: { src: 'puerp', ref: { type: 'case', id: 'p2' } }
 };
 ok('쓸 수 있는 짝이 하나도 없으면 목록에 안 나온다', matchPairs().length === 0);
-items = { W1: { src: 'excel', company: '나래산업', state: 'done', mgr_main: { name: '김동현' } } };
+items = { W1: { src: 'excel', company: '새롬산업', state: 'done', mgr_main: { name: '김동현' } } };
 ok('종료된 업무는 짝짓기 대상이 아니다', matchPairs().length === 0);
 items = { W1: { src: 'excel', company: '전혀다른곳', mgr_main: { name: '김동현' } } };
 ok('후보가 없는 업무는 목록에 안 나온다', matchPairs().length === 0);

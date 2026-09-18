@@ -34,7 +34,7 @@ function fn(name) {
 }
 const bare = s => String(s).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
-const CO = { key: 'n메디움', name: '메디움', bizno: '', folder: 'f1',
+const CO = { key: 'n타파메디', name: '타파메디', bizno: '', folder: 'f1',
              cards: [], bizs: [], docs: 0, erp: null, extra: {} };
 const FOLDERS = { f1: { id: 'f1', name: '1. 업체관리' }, f2: { id: 'f2', name: '2. 계약해지사업장' } };
 

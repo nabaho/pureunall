@@ -65,7 +65,7 @@ function ok(name, cond, hintTxt) {
 const CO_A = { id: 'co-1', name: '주식회사코엘이엔지', taxEmail: 'tax@hansol-tax.kr',
                taxOfficeName: '한솔세무회계', taxContact: '', taxPhone: '' };
 const CO_B = { id: 'co-2', name: '보문사', taxEmail: '', taxOfficeName: '', taxContact: '', taxPhone: '' };
-const CO_C = { id: 'co-3', name: '텃골영농조합법인(용인)', taxEmail: '', taxOfficeName: '', taxContact: '', taxPhone: '' };
+const CO_C = { id: 'co-3', name: '가온영농조합법인(가나시)', taxEmail: '', taxOfficeName: '', taxContact: '', taxPhone: '' };
 const CO_D = { id: 'co-4', name: '주식회사세창이엔지', taxEmail: 'tax@hansol-tax.kr',
                taxOfficeName: '한솔세무회계', taxContact: '', taxPhone: '' };
 
@@ -94,14 +94,14 @@ console.log('[① 아는 주소]');
 }
 
 console.log('\n[② 우리 직원 메일에는 참견 안 한다]');
-ok('직원 메일은 지나간다', hint('p001@pureun.kr', '권형하', '주식회사코엘이엔지 건', '텃골영농조합법인(용인)') === null,
+ok('직원 메일은 지나간다', hint('p001@pureun.kr', '권형하', '주식회사코엘이엔지 건', '가온영농조합법인(가나시)') === null,
    '우리끼리 주고받는 메일에 띠가 뜨면 성가시다');
 
 console.log('\n[④⑤ 모르는 주소 — 본문에서 업체 찾기]');
 {
   const r = hint('park@daehan-tax.co.kr', '박회계', '4대보험 문의',
-                 '텃골영농조합법인(용인) 담당하고 있는 대한세무법인 박회계입니다.');
-  ok('본문에 업체 이름이 보이면 묻는다', r && r.kind === 'ask' && r.co.coName === '텃골영농조합법인(용인)',
+                 '가온영농조합법인(가나시) 담당하고 있는 대한세무법인 박회계입니다.');
+  ok('본문에 업체 이름이 보이면 묻는다', r && r.kind === 'ask' && r.co.coName === '가온영농조합법인(가나시)',
      JSON.stringify(r));
 }
 ok('짧은 이름(보문사)으로는 안 걸린다',
@@ -119,7 +119,7 @@ ok('업체 이름이 안 보이면 아무 말 안 한다',
 console.log('\n[③ 「아니오」 한 주소]');
 skipAdd('park@daehan-tax.co.kr');
 ok('다시 안 묻는다',
-   hint('park@daehan-tax.co.kr', '박회계', '4대보험 문의', '텃골영농조합법인(용인) 담당입니다') === null,
+   hint('park@daehan-tax.co.kr', '박회계', '4대보험 문의', '가온영농조합법인(가나시) 담당입니다') === null,
    '같은 것을 매번 물으면 곧 안 보게 된다');
 ok('그래도 «아는 주소»는 계속 알아본다',
    (function () { skipAdd('tax@hansol-tax.kr');

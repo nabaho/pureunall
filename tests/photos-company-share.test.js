@@ -54,7 +54,7 @@ test('★ 표기가 달라도 같은 업체로 잡는다 — 사람이 치는 �
 });
 
 test('★ 이름으로 그 업체를 찾는다', async () => {
-  const c = coCtx([{ id: 'c1', name: '가야엔지니어링' }, { id: 'c2', name: '(주)마바텍라인' }]);
+  const c = coCtx([{ id: 'c1', name: '카타엔지니어링' }, { id: 'c2', name: '(주)마바텍라인' }]);
   const hit = await c.findCompanyByName('마바텍라인');
   assert.ok(hit, '★ 못 찾으면 담당자를 알 수 없습니다');
   assert.equal(hit.rec.id, 'c2');
@@ -67,7 +67,7 @@ test('★ 같은 이름이 둘이면 «아무것도 안 한다» — 남의 업�
 });
 
 test('없는 업체·빈 이름은 조용히 빈손', async () => {
-  const c = coCtx([{ id: 'c1', name: '가야엔지니어링' }]);
+  const c = coCtx([{ id: 'c1', name: '카타엔지니어링' }]);
   assert.equal(await c.findCompanyByName('마바텍라인'), null);
   assert.equal(await c.findCompanyByName(''), null);
   assert.equal(await c.findCompanyByName(null), null);
@@ -103,8 +103,8 @@ function photoCtx(items) {
 test('★ 사람이 적은 업체가 먼저, 없으면 판독이 읽은 상호', () => {
   const c = photoCtx([]);
   assert.equal(c.coNameOf({ meta: { company: '마바텍라인' } }), '마바텍라인');
-  assert.equal(c.coNameOf({ meta: { read: { fields: { company: '가야엔지니어링' } } } }),
-    '가야엔지니어링', '★ 서류는 판독이 읽은 상호로 저절로 걸려야 합니다');
+  assert.equal(c.coNameOf({ meta: { read: { fields: { company: '카타엔지니어링' } } } }),
+    '카타엔지니어링', '★ 서류는 판독이 읽은 상호로 저절로 걸려야 합니다');
   assert.equal(c.coNameOf({ meta: { company: '손으로', read: { fields: { company: '판독' } } } }),
     '손으로', '사람이 적은 것이 판독보다 먼저다');
   assert.equal(c.coNameOf({ meta: {} }), '', '회의사진은 업체가 없다');
@@ -115,7 +115,7 @@ test('★ 고른 것이 여러 업체면 «섞였다»고 본다 — 엉뚱한 �
   const c = photoCtx([
     { id: 'a', meta: { company: '마바텍라인' } },
     { id: 'b', meta: { company: '마바텍라인' } },
-    { id: 'c', meta: { company: '가야엔지니어링' } },
+    { id: 'c', meta: { company: '카타엔지니어링' } },
     { id: 'd', meta: {} }
   ]);
   assert.equal(c.oneCoOf(['a', 'b']), '마바텍라인');

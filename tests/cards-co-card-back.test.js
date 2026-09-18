@@ -50,10 +50,10 @@ function head(backCo) {
 }
 
 test('★★★ 기업 상세에서 연 명함에는 「◀ 뒤로」가 있다', () => {
-  const h = head('1348605772');
+  const h = head('1238620021');
   assert.match(h, /◀ 뒤로/,
     '★★★ 돌아갈 길이 없으면 회사를 목록에서 다시 찾아야 한다 — 대표가 지적한 그 화면이다');
-  assert.match(h, /coBackToDetail\('1348605772'\)/, '★★ 어느 회사로 돌아갈지 안 심었다');
+  assert.match(h, /coBackToDetail\('1238620021'\)/, '★★ 어느 회사로 돌아갈지 안 심었다');
 });
 
 test('★★★ 목록에서 연 명함에는 «없다» — 눌러도 갈 곳이 없는 단추는 고장이다', () => {
@@ -63,7 +63,7 @@ test('★★★ 목록에서 연 명함에는 «없다» — 눌러도 갈 곳�
 });
 
 test('★★ ✕(닫기)는 그대로 남는다 — 나가려는 손이 갈 곳을 잃으면 안 된다', () => {
-  const h = head('1348605772');
+  const h = head('1238620021');
   assert.match(h, /class="x" onclick="closeDetail\(\)"/,
     '★★ 「뒤로」와 「닫기」를 한 단추로 합치면 닫으려다 회사가 열린다');
 });
@@ -100,10 +100,10 @@ function back(list) {
 }
 
 test('★★★ 돌아가면 그 회사 상세가 «다시 열린다»', () => {
-  const c = back([{ key:'1348605772' }]);
-  c.coBackToDetail('1348605772');
-  assert.equal(c._opened, '1348605772', '★★★ 눌러도 회사가 안 열린다');
-  assert.equal(c.state.coPick, '1348605772',
+  const c = back([{ key:'1238620021' }]);
+  c.coBackToDetail('1238620021');
+  assert.equal(c._opened, '1238620021', '★★★ 눌러도 회사가 안 열린다');
+  assert.equal(c.state.coPick, '1238620021',
     '★★ 고른 회사 표를 안 되돌리면 목록에서 그 줄이 골라진 채로 안 보인다');
 });
 
@@ -155,8 +155,8 @@ function 명함열기(backCo) {
 }
 
 test('★★★ ⑥㉮ 기업 상세에서 연 명함은 «온 자리»를 패널 칸에 적는다', () => {
-  const el = 명함열기('1348605772');
-  assert.equal(el.dataset.backCo, '1348605772',
+  const el = 명함열기('1238620021');
+  assert.equal(el.dataset.backCo, '1238620021',
     '★★★ 뒤로가기는 단추의 onclick 글자를 못 읽는다 — 칸에 안 적으면 갈 곳을 모른다');
 });
 
@@ -166,27 +166,27 @@ test('★★★ ⑥㉯ 목록에서 연 명함에는 그 칸이 «없다»', () 
       '★★★ 갈 곳이 없는데 칸이 남으면 뒤로가기만 엉뚱한 회사로 간다 (' + String(v) + ')');
   });
   /* 앞 명함이 남긴 칸을 «지우는지»까지 본다 — 같은 자리를 갈아 끼우는 패널이다 */
-  const el = 명함열기('1348605772');
-  assert.equal(el.dataset.backCo, '1348605772');
+  const el = 명함열기('1238620021');
+  assert.equal(el.dataset.backCo, '1238620021');
 });
 
 test('★★★ ⑥㉯ 기업 상세를 열면 그 칸을 지운다 — 상세는 «돌아갈 곳»이 아니라 그 자리다', () => {
   const el = 대역패널();
-  el.dataset.backCo = '1348605772';   /* 명함을 보다가 회사로 돌아온 참이다 */
+  el.dataset.backCo = '1238620021';   /* 명함을 보다가 회사로 돌아온 참이다 */
   const ctx = { String, Object, Array, console,
     $: id => (id === 'pcDetail' ? el : null),
-    coList: () => [{ key:'1348605772', name:'신성컨트롤' }],
+    coList: () => [{ key:'1238620021', name:'신성컨트롤' }],
     coDetailPanelHtml: () => '<i>몸통</i>',
-    state: { coPick: '1348605772' },
+    state: { coPick: '1238620021' },
     loadErpCaseCons: () => {}, renderCoErpHistory: () => {},
     loadCoSent: () => {}, coSentHtml: () => '', coHeadRepaint: () => {} };
   vm.createContext(ctx);
   vm.runInContext('var _coHistSum=null,_coLeftDocsN=null,_coRowDocsOpen={};\n'
     + cutFn(SRC, 'function openCoDetailPanel('), ctx);
-  ctx.openCoDetailPanel('1348605772');
+  ctx.openCoDetailPanel('1238620021');
   assert.equal(el.dataset.backCo, undefined,
     '★★★ 안 지우면 회사 상세에서 뒤로가기를 눌러 «제자리»로 돌아가는 맴돌이가 된다');
-  assert.equal(el.dataset.coKey, '1348605772');
+  assert.equal(el.dataset.coKey, '1238620021');
 });
 
 function 걸음(dataset, open) {
@@ -201,8 +201,8 @@ function 걸음(dataset, open) {
 }
 
 test('★★★ ⑥㉰ 뒤로가기가 «그 회사로» 돌아간다 — 단추와 같은 길이다', () => {
-  const r = 걸음({ backCo: '1348605772', cardId: 'c1' });
-  assert.equal(r.간곳, '1348605772', '★★★ 뒤로가기가 명함을 닫아 버리면 회사까지 사라진다');
+  const r = 걸음({ backCo: '1238620021', cardId: 'c1' });
+  assert.equal(r.간곳, '1238620021', '★★★ 뒤로가기가 명함을 닫아 버리면 회사까지 사라진다');
   assert.equal(r.잡았나, true,
     '★★★ 참을 안 돌려주면 pu-back 이 「아무도 안 잡았다」로 보고 앱을 통째로 나간다');
 });
@@ -210,9 +210,9 @@ test('★★★ ⑥㉰ 뒤로가기가 «그 회사로» 돌아간다 — 단추
 test('★★ ⑥㉰ 돌아갈 곳이 없으면 «비켜선다» — 그래야 그 다음 잣대(닫기)가 돈다', () => {
   assert.deepEqual(걸음({ cardId: 'c1' }), { 잡았나: false, 간곳: null },
     '★★ 목록에서 연 명함까지 붙잡으면 뒤로가기가 아무 일도 안 하는 단추가 된다');
-  assert.deepEqual(걸음({ coKey: '1348605772' }), { 잡았나: false, 간곳: null },
+  assert.deepEqual(걸음({ coKey: '1238620021' }), { 잡았나: false, 간곳: null },
     '★★ 기업 상세를 붙잡으면 제자리로 돌아가는 맴돌이가 된다');
-  assert.deepEqual(걸음({ backCo: '1348605772' }, false), { 잡았나: false, 간곳: null },
+  assert.deepEqual(걸음({ backCo: '1238620021' }, false), { 잡았나: false, 간곳: null },
     '★★★ 닫힌 패널까지 붙잡으면 아무것도 안 열린 화면에서 뒤로가기가 안 나간다');
 });
 
@@ -228,11 +228,11 @@ test('★★★ ⑥㉱ 「물러서기」를 「닫기」보다 «먼저» 묻�
 
 test('★★ 그새 사라진 회사면 조용히 닫는다 — 빈 패널을 띄우면 「눌렀는데 없다」가 된다', () => {
   const c = back([{ key:'9999999999' }]);
-  c.coBackToDetail('1348605772');
+  c.coBackToDetail('1238620021');
   assert.equal(c._opened, null, '★★ 없는 회사를 열었다');
   assert.equal(c._closed, 1, '★ 아무 일도 안 일어나면 눌러도 반응이 없는 것처럼 보인다');
   /* 열쇠가 아예 비어 있어도 같다 */
-  const c2 = back([{ key:'1348605772' }]);
+  const c2 = back([{ key:'1238620021' }]);
   c2.coBackToDetail('');
   assert.equal(c2._closed, 1);
 });

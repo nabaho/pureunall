@@ -42,8 +42,8 @@ const cut = n => cutFn(SRC, 'function ' + n + '(');
 
 /* 사건 하나 — 이알피에 저장되는 꼴 그대로(workers 가 맨 위에 있다) */
 const 사건 = ws => ({ id:'C1', typeName:'임금체불 진정', status:'run', year:2026,
-  companyName:'해찬솔에프쓰리', bizNo:'312-81-49225', _kind:'case', workers:ws });
-const 이알피 = ws => ({ byBiz: { '3128149225': [사건(ws)] }, byName: {} });
+  companyName:'다온솔에프쓰리', bizNo:'123-81-20012', _kind:'case', workers:ws });
+const 이알피 = ws => ({ byBiz: { '1238120012': [사건(ws)] }, byName: {} });
 
 /* 사람 목록을 만드는 «진짜» 함수를 떠서 돌린다 */
 function load() {

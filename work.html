@@ -1012,7 +1012,7 @@
     .panel.tbl thead th{font-size:10px}
     .panel.tbl .badge{font-size:9.5px;padding:1px 6px}
     /* ★ 열이 예닐곱인 표를 412px 에 우겨 넣으면 칸마다 글자가 세로로 쌓여
-       (「주식/회사/나래/산업」) 한 줄이 79px 이 된다 — 읽을 수가 없다.
+       (「주식/회사/새롬/산업」) 한 줄이 79px 이 된다 — 읽을 수가 없다.
        표에 제 너비를 주고 **옆으로 밀어** 본다. 그러면 한 줄이 제 높이로 돌아온다.
        ⚠ .panel.tbl 은 이미 overflow:auto 라 미는 것은 표 안에서만 일어난다 —
          쪽 전체가 좌우로 흔들리지 않는다. */
@@ -1053,7 +1053,7 @@
      「담당자 진행업무 과정 확인이 중요하다 내용찾기 어렵다」
 
      2026-08-20 에 «옆으로 밀어 보게» 한 것은 그때로서는 옳았다 — 아홉 칸을 412px 에
-     우겨 넣으면 「주식/회사/나래/산업」처럼 글자가 세로로 쌓여 한 줄이 79px 이 됐다.
+     우겨 넣으면 「주식/회사/새롬/산업」처럼 글자가 세로로 쌓여 한 줄이 79px 이 됐다.
      그러나 밀어 두면 «기업명과 담당자가 동시에 안 보인다» — 둘 다 봐야 판단이 되는데,
      대표 화면에서 기업명이 왼쪽으로 잘려 나가 있었다.
 
@@ -1431,7 +1431,7 @@ function shell(){
     +'<div id="app">'+loadingHTML()+'</div></div>'
     +'<div id="qwrap" style="display:none"><div id="qvpop" class="vobox"></div><div id="qsug"></div>'
     +'<div id="qbar"><span class="zap" id="qgrip" title="여기를 잡고 끌면 옮길 수 있습니다">⚡</span>'
-    +'<input id="qb" placeholder="빠른 기록 — 기업명·업무명 몇 글자 + 한 일  (예: 나래 설문 정리)" autocomplete="off">'
+    +'<input id="qb" placeholder="빠른 기록 — 기업명·업무명 몇 글자 + 한 일  (예: 새롬 설문 정리)" autocomplete="off">'
     +'<span class="k mic" onclick="qvStart()" title="말로 기록 — 여러 업무를 이어서 말해도 업무별로 갈라 담습니다">🎤 말로</span>'
     +'<span class="k home" onclick="qbarReset()" title="원래 자리(화면 아래)로 되돌립니다">⤺ 제자리</span>'
     +'<span class="k" onclick="keysModal()" title="단축키 보기">/ 기록 · ? 단축키</span></div></div>';
@@ -3904,11 +3904,11 @@ function dSentRowHTML(r,id,up){
        5통 그 밖
    앞의 둘은 «사람만» 정할 수 있고, 셋째는 «치워야» 한다.
 
-   ⚠⚠ 제목 이름 맞추기를 느슨하게 풀어 자동으로 붙이지 않는다. 「해찬솔F3」과
-     「해찬솔에프쓰리」를 기계가 같게 보게 하면, 이 저장소가 2026-08-28 에 한 번 겪은
+   ⚠⚠ 제목 이름 맞추기를 느슨하게 풀어 자동으로 붙이지 않는다. 「다온솔F3」과
+     「다온솔에프쓰리」를 기계가 같게 보게 하면, 이 저장소가 2026-08-28 에 한 번 겪은
      «남의 회사에 자료가 붙는» 사고로 돌아간다. 느슨한 맞추기는 사람에게 보여 줄
      «제안»에만 쓰고(mlkSuggest), 붙이는 것은 사람이 누른다.
-     실제로 「늘봄반찬」은 배방점·모종점 둘, 「맛찬들왕소금구이」는 인덕원점·당진점 둘,
+     실제로 「늘봄반찬」은 배방점·모종점 둘, 「가온들왕소금구이」는 인덕원점·당진점 둘,
      「유원에프앤비」는 본점·롤링파스타 둘이다 — 기계는 못 고르고 담당자는 안다.
    ⚠ 치우는 길이 «반드시» 있어야 한다. 받은메일함을 열었으니 사업장 메일이 아닌 것도
      들어온다 — 치울 수 없으면 목록에 쌓여 정작 짚어야 할 것이 묻힌다.
@@ -7887,7 +7887,7 @@ function itemModal(editId){
       +'<div class="grid2">'
       +'<div class="fld"><label>구분 *</label><select id="if-cat">'+catList().map(function(c){return '<option'+(it&&it.cat===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select></div>'
       +'<div class="fld"><label>기한 (선택)</label><input id="if-due" type="date" value="'+esc(it&&it.due||'')+'"></div>'
-      +'<div class="fld full"><label>기업명 — 푸른이알피 업체 자동완성 + 자유입력</label><input id="if-co" list="co-list" value="'+esc(it&&it.company||'')+'" placeholder="예: 나래산업"></div>'
+      +'<div class="fld full"><label>기업명 — 푸른이알피 업체 자동완성 + 자유입력</label><input id="if-co" list="co-list" value="'+esc(it&&it.company||'')+'" placeholder="예: 새롬산업"></div>'
       +'<div class="fld"><label>의뢰인 / 연락처</label><input id="if-client" value="'+esc(it&&it.client||'')+'" placeholder="예: 홍길동 010-…"></div>'
       +'<div class="fld"><label>상대기관 담당 (감독관 등)</label><input id="if-officer" value="'+esc(it&&it.officer||'')+'" placeholder="예: 강진형 감독관"></div>'
       +'<div class="fld full"><label>업무명 *</label><input id="if-title" value="'+esc(it&&it.title||'')+'" placeholder="예: 산재(어깨) — 요양급여 신청"></div>'
@@ -10944,7 +10944,7 @@ function _pullModal(){
   showModal('<h2 style="margin:0 0 4px">🔗 푸른이알피에서 가져오기</h2>'
     +'<p class="muted" style="font-size:12px;margin:0 0 10px">사업장 이름·업무명·관리번호로 찾습니다. '
     +'<b>남이 맡은 건</b>은 주담당을 그대로 두고 <b>나를 부담당</b>으로 붙입니다.</p>'
-    +'<input id="pull-q" value="'+esc(q)+'" placeholder="🔍 사업장 이름 (예: 나래)" '
+    +'<input id="pull-q" value="'+esc(q)+'" placeholder="🔍 사업장 이름 (예: 새롬)" '
     +'oninput="onPullQ(this.value)" style="width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px">'
     +'<div style="max-height:340px;overflow-y:auto;margin-top:10px">'
     +'<div class="phd">● 내 담당 '+r.mine.length+'건</div>'

@@ -79,7 +79,7 @@ function loadMiss(){
     + fnBody('coCares') + '\n' + fnBody('coLacks'), ctx);
   return ctx;
 }
-const BIZ = { kind:'biz', company:'가나테크', bizno:'134-86-05772', ceo:'나성환',
+const BIZ = { kind:'biz', company:'가나테크', bizno:'123-86-20021', ceo:'고길동',
               address:'충남 천안시 서북구 1', companyTel:'041-556-0035' };
 
 test('★ 등록증의 대표번호가 회사에 올라온다 — 이게 없어서 거래처가 죄다 「번호 없음」이었다', () => {
@@ -98,7 +98,7 @@ test('★ 등록증에서 온 회사는 이제 「정보부족」이 아니다',
 });
 
 test('★ 등록증에 번호가 없으면 명함의 «회사 대표번호»가 채운다', () => {
-  const items = [{ kind:'biz', company:'다라산업', bizno:'505-86-00987', ceo:'김철수' },
+  const items = [{ kind:'biz', company:'다라산업', bizno:'123-86-20100', ceo:'김철수' },
                  { kind:'card', company:'다라산업', bizno:'', name:'박대리',
                    companyTel:'02-777-1234' }];
   const o = buildList(items)[0];
@@ -118,7 +118,7 @@ test('★ 시각이 같으면 등록증이 명함보다 앞선다', () => {
   /* ⚠ 2026-08-31 규칙이 바뀌었다(대표 결정 「최근 이김」).
      이제 승부는 «올린 시각»으로 갈린다 — 갈래 차례는 끼지 않는다.
      시각이 «같거나 없을 때»만 먼저 온 것(등록증)이 남는다. 아래 두 검사가 새 규칙이다. */
-  const items = [BIZ, { kind:'card', company:'가나테크', bizno:'134-86-05772',
+  const items = [BIZ, { kind:'card', company:'가나테크', bizno:'123-86-20021',
                         name:'박대리', companyTel:'02-777-1234' }];
   assert.equal(buildList(items)[0].companyTel, '041-556-0035');
 });
@@ -126,7 +126,7 @@ test('★ 시각이 같으면 등록증이 명함보다 앞선다', () => {
 test('★★ 명함이 «더 최근»이면 등록증을 덮는다 (대표 결정 2026-08-31 「최근 이김」)', () => {
   const items = [
     Object.assign({}, BIZ, { createdAt: 1000 }),
-    { kind:'card', company:'가나테크', bizno:'134-86-05772',
+    { kind:'card', company:'가나테크', bizno:'123-86-20021',
       name:'박대리', companyTel:'02-777-1234', createdAt: 2000 }
   ];
   assert.equal(buildList(items)[0].companyTel, '02-777-1234',
@@ -136,7 +136,7 @@ test('★★ 명함이 «더 최근»이면 등록증을 덮는다 (대표 결�
 test('★★ 등록증이 «더 최근»이면 명함이 못 덮는다 — 시각으로만 겨룬다', () => {
   const items = [
     Object.assign({}, BIZ, { createdAt: 3000 }),
-    { kind:'card', company:'가나테크', bizno:'134-86-05772',
+    { kind:'card', company:'가나테크', bizno:'123-86-20021',
       name:'박대리', companyTel:'02-777-1234', createdAt: 1000 }
   ];
   assert.equal(buildList(items)[0].companyTel, '041-556-0035');
@@ -146,7 +146,7 @@ test('★★ 「최근 이김」이 «개인» 번호를 회사 칸으로 끌어
   /* 대표께 짚은 걱정이 여기서 막힌다 — 명함이 회사로 올리는 것은 companyTel·companyFax 뿐이다 */
   const items = [
     Object.assign({}, BIZ, { createdAt: 1000 }),
-    { kind:'card', company:'가나테크', bizno:'134-86-05772', name:'박대리',
+    { kind:'card', company:'가나테크', bizno:'123-86-20021', name:'박대리',
       tel:'02-333-4444', mobile:'010-5555-6666', fax:'02-333-4445',
       email:'park@example.com', createdAt: 9000 }
   ];
@@ -157,7 +157,7 @@ test('★★ 「최근 이김」이 «개인» 번호를 회사 칸으로 끌어
 
 test('번호가 아무 데도 없으면 그대로 「대표번호 없음」이다', () => {
   const C = loadMiss();
-  const o = buildList([{ kind:'biz', company:'사아기업', bizno:'120-81-04455',
+  const o = buildList([{ kind:'biz', company:'사아기업', bizno:'123-81-20181',
                          ceo:'홍길동', address:'서울' }], { type:'유지' })[0];
   assert.deepEqual(plain(C.coMissing(o)), ['대표번호'],
     '진짜 없는 곳까지 없다고 안 하면 이 단추를 만든 뜻이 없다');
@@ -180,9 +180,9 @@ test('★ 옛 열쇠의 「값이 다른 칸」이 사라지지 않는다', () =
   /* 1순위의 존재 이유가 「어긋난 값을 조용히 버리지 않는다」다.
      합치기에서 날려 버리면 바로 그 실패가 되살아난다. */
   const fn = loadMerge();
-  const r = fn('1348605772', '가나테크', {
-    'n가나테크':  { conflicts:{ ceo:{ got:'나성환', had:'김철수' } } },
-    '1348605772': { conflicts:{ address:{ got:'충남', had:'서울' } } }
+  const r = fn('1238620021', '가나테크', {
+    'n가나테크':  { conflicts:{ ceo:{ got:'고길동', had:'김철수' } } },
+    '1238620021': { conflicts:{ address:{ got:'충남', had:'서울' } } }
   });
   assert.deepEqual(Object.keys(plain(r.conflicts)).sort(), ['address','ceo'],
     '★ 옛 열쇠에 남아 있던 어긋남이 통째로 날아갔다 — 아무도 눈치 못 챈다');
@@ -190,18 +190,18 @@ test('★ 옛 열쇠의 「값이 다른 칸」이 사라지지 않는다', () =
 
 test('★ 옛 열쇠의 출처(src)도 사라지지 않는다', () => {
   const fn = loadMerge();
-  const r = fn('1348605772', '가나테크', {
+  const r = fn('1238620021', '가나테크', {
     'n가나테크':  { src:{ sales:'2026_p1' } },
-    '1348605772': { src:{ workers:'2026_p9' } }
+    '1238620021': { src:{ workers:'2026_p9' } }
   });
   assert.deepEqual(plain(r.src), { sales:'2026_p1', workers:'2026_p9' });
 });
 
 test('같은 칸이 양쪽에 있으면 새 열쇠가 이긴다 — tags·folder 와 같은 결', () => {
   const fn = loadMerge();
-  const r = fn('1348605772', '가나테크', {
+  const r = fn('1238620021', '가나테크', {
     'n가나테크':  { conflicts:{ ceo:{ had:'옛것' } }, src:{ sales:'옛서류' } },
-    '1348605772': { conflicts:{ ceo:{ had:'새것' } }, src:{ sales:'새서류' } }
+    '1238620021': { conflicts:{ ceo:{ had:'새것' } }, src:{ sales:'새서류' } }
   });
   assert.equal(plain(r.conflicts).ceo.had, '새것');
   assert.equal(r.src.sales, '새서류');
@@ -209,9 +209,9 @@ test('같은 칸이 양쪽에 있으면 새 열쇠가 이긴다 — tags·folder
 
 test('한쪽에만 있으면 그것을 그대로 쓴다', () => {
   const fn = loadMerge();
-  const r = fn('1348605772', '가나테크', {
+  const r = fn('1238620021', '가나테크', {
     'n가나테크':  { conflicts:{ ceo:{ had:'옛것' } } },
-    '1348605772': { docName:'사업자등록증' }
+    '1238620021': { docName:'사업자등록증' }
   });
   assert.equal(plain(r.conflicts).ceo.had, '옛것');
   assert.equal(r.docName, '사업자등록증', '새 열쇠 값도 그대로 있어야 한다');
@@ -219,8 +219,8 @@ test('한쪽에만 있으면 그것을 그대로 쓴다', () => {
 
 test('둘 다 없어도 터지지 않는다', () => {
   const fn = loadMerge();
-  const r = fn('1348605772', '가나테크', {
-    'n가나테크': { folder:'f1' }, '1348605772': { folder:'f2' }
+  const r = fn('1238620021', '가나테크', {
+    'n가나테크': { folder:'f1' }, '1238620021': { folder:'f2' }
   });
   assert.deepEqual(plain(r.conflicts || {}), {});
   assert.deepEqual(plain(r.src || {}), {});

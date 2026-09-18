@@ -81,9 +81,9 @@ function load(over) {
 /* 사건 하나 — 이알피에 저장되는 꼴 그대로(workers 가 맨 위에 있다) */
 function caseRec(o) {
   return Object.assign({ id: 'C1', typeName: '임금체불 진정', status: 'run', year: 2026,
-    companyName: '해찬솔에프쓰리', bizNo: '312-81-49225', _kind: 'case', workers: [] }, o);
+    companyName: '다온솔에프쓰리', bizNo: '123-81-20012', _kind: 'case', workers: [] }, o);
 }
-function erp(recs) { return { byBiz: { '3128149225': recs }, byName: {} }; }
+function erp(recs) { return { byBiz: { '1238120012': recs }, byName: {} }; }
 const W = (name, x) => Object.assign({ name: name }, x || {});
 
 /* ══════════ ① 열쇠 규칙이 사진첩 쪽과 같다 ══════════ */
@@ -100,7 +100,7 @@ test('★★★ 사람 열쇠 규칙이 사진첩 쪽(js/pu-doc-file.js)과 «�
      (2026-09-02 되돌림 검사에서 실제로 안 걸렸다). */
   const COS = ['(주)가나', '가나', '가나㈜', '주식회사 가나', '  가나  ', '한서정공',
     '(유)대성', '유한회사 대성', '유한책임회사 대성', '농업회사법인 한들', '㈲대성',
-    '(주) 대명크라샤', '에스오에스종합관리', 'ABC Corp', '가나.다'];
+    '(주) 나라크라샤', '에스오에스종합관리', 'ABC Corp', '가나.다'];
   NAMES.forEach(function (n) {
     COS.forEach(function (co) {
       assert.equal(c.wkKeyOf(n, co), fctx.PuDocFile.workerKey(n, co),
@@ -120,9 +120,9 @@ test('★ 회사나 이름이 비면 열쇠를 안 만든다 — 빈 것끼리 �
 
 test('★ 사건의 근로자와 사진첩 서류가 «같은 사람»으로 합쳐진다', () => {
   const c = load();
-  const key = c.wkKeyOf('강석', '해찬솔에프쓰리');
+  const key = c.wkKeyOf('강석', '다온솔에프쓰리');
   const list = c.wkListBuild(erp([caseRec({ workers: [W('강석', { phone: '010-1' })] })]),
-    (function () { const o = {}; o[key] = { name: '강석', company: '해찬솔에프쓰리',
+    (function () { const o = {}; o[key] = { name: '강석', company: '다온솔에프쓰리',
       docs: { d1: { kind: 'idcard', at: 100, docName: '주민등록증' } } }; return o; })());
   assert.equal(list.length, 1, '한 사람이어야 합니다: ' + JSON.stringify(list.map(x => x.key)));
   assert.equal(list[0].cases.length, 1, '사건이 안 붙었습니다');

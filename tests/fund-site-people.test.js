@@ -121,10 +121,10 @@ test('★ ② 사용자대표는 SITE_FIELDS 에 «섞이지 않는다» — 엑
 
 test('★★ ③ 사용자대표가 비면 «대표자를 끌어다 쓰지 않는다» — 아무도 정하지 않은 이름이 관청에 나간다', () => {
   const b = load([grabFn('_siteUrep'), 'this.f=_siteUrep;']);
-  const 빈것 = b.f({ ceo: '신동현', name: '한국벤토나이트' });
+  const 빈것 = b.f({ ceo: '장준영', name: '가나벤토나이트' });
   assert.equal(빈것.name, '', '★ 대표자를 사용자대표로 끌어다 썼습니다.');
   assert.equal(빈것.title, '');
-  const 적은것 = b.f({ ceo: '신동현', urep_name: '박공장', urep_title: '공장장' });
+  const 적은것 = b.f({ ceo: '장준영', urep_name: '박공장', urep_title: '공장장' });
   assert.equal(적은것.name, '박공장');
   assert.equal(적은것.title, '공장장');
 });
@@ -209,33 +209,33 @@ function filterBox() {
     'this.f=_siteFilter;']);
 }
 const 보기 = [
-  { name: '한국벤토나이트', ceo: '신동현', biz_no: '412-81-12595', _c: { name: '이미정' }, partner: true },
-  { name: '바이켐', ceo: '이선화', biz_no: '134-81-03880', _c: { name: '강동순' }, wrep_name: '김근로' },
-  { name: '수양캠텍', ceo: '박범호', biz_no: '215-86-44206', _c: { name: '마지영' }, urep_name: '박공장',
+  { name: '가나벤토나이트', ceo: '장준영', biz_no: '123-81-20098', _c: { name: '윤서연' }, partner: true },
+  { name: '차카켐', ceo: '오정훈', biz_no: '123-81-20313', _c: { name: '문가람' }, wrep_name: '김근로' },
+  { name: '타파캠텍', ceo: '서동일', biz_no: '123-86-20472', _c: { name: '한지우' }, urep_name: '박공장',
     sme_to: '2020-03-31' }
 ];
 
 test('⑫ 상호·대표자·담당자 어느 것으로도 찾아진다', () => {
   const b = filterBox();
-  b.set('바이켐', ''); assert.equal(b.f(보기).length, 1);
-  b.set('박범호', ''); assert.equal(b.f(보기)[0].name, '수양캠텍');
-  b.set('이미정', ''); assert.equal(b.f(보기)[0].name, '한국벤토나이트');
+  b.set('차카켐', ''); assert.equal(b.f(보기).length, 1);
+  b.set('서동일', ''); assert.equal(b.f(보기)[0].name, '타파캠텍');
+  b.set('윤서연', ''); assert.equal(b.f(보기)[0].name, '가나벤토나이트');
 });
 
-test('★ ⑬ 숫자만 쳐도 사업자번호가 찾아진다 — 명부는 412-81-12595, 손은 41281 로 친다', () => {
+test('★ ⑬ 숫자만 쳐도 사업자번호가 찾아진다 — 명부는 123-81-20098, 손은 1238120098 로 친다', () => {
   const b = filterBox();
-  b.set('41281', '');
+  b.set('1238120098', '');
   const r = b.f(보기);
   assert.equal(r.length, 1, '★ 붙임표를 빼고 친 번호를 못 찾습니다.');
-  assert.equal(r[0].name, '한국벤토나이트');
+  assert.equal(r[0].name, '가나벤토나이트');
 });
 
 test('⑭ 갈래 딱지 — 협력만 · 사용자대표 없음 · 근로자대표 없음 · 확인서 지남', () => {
   const b = filterBox();
-  b.set('', 'partner'); assert.deepEqual(b.f(보기).map((x) => x.name), ['한국벤토나이트']);
-  b.set('', 'nowrep');  assert.deepEqual(b.f(보기).map((x) => x.name), ['한국벤토나이트', '수양캠텍']);
-  b.set('', 'nourep');  assert.deepEqual(b.f(보기).map((x) => x.name), ['한국벤토나이트', '바이켐']);
-  b.set('', 'smeold');  assert.deepEqual(b.f(보기).map((x) => x.name), ['수양캠텍']);
+  b.set('', 'partner'); assert.deepEqual(b.f(보기).map((x) => x.name), ['가나벤토나이트']);
+  b.set('', 'nowrep');  assert.deepEqual(b.f(보기).map((x) => x.name), ['가나벤토나이트', '타파캠텍']);
+  b.set('', 'nourep');  assert.deepEqual(b.f(보기).map((x) => x.name), ['가나벤토나이트', '차카켐']);
+  b.set('', 'smeold');  assert.deepEqual(b.f(보기).map((x) => x.name), ['타파캠텍']);
 });
 
 test('⑮ 아무것도 안 걸면 다 보인다 — 거르기가 «기본으로 숨기지» 않는다', () => {
@@ -252,10 +252,10 @@ test('★★ ⑯ 사람 보기를 정말 그리면 네 사람이 각각 제 칸�
     grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'),
     grabFn('sitesPeopleBody'),
     'this.f=sitesPeopleBody;']);
-  const html = b.f([{ _id: 'S1', name: '한국벤토나이트', ceo: '신동현',
-    _c: { name: '이미정', position: '부장' }, urep_name: '박공장', urep_title: '공장장',
+  const html = b.f([{ _id: 'S1', name: '가나벤토나이트', ceo: '장준영',
+    _c: { name: '윤서연', position: '부장' }, urep_name: '박공장', urep_title: '공장장',
     wrep_name: '김근로', wrep_title: '반장' }]);
-  ['한국벤토나이트', '신동현', '이미정', '박공장', '공장장', '김근로', '반장']
+  ['가나벤토나이트', '장준영', '윤서연', '박공장', '공장장', '김근로', '반장']
     .forEach((t) => assert.ok(html.indexOf(t) >= 0, '화면에 안 나옵니다: ' + t));
   assert.ok(html.indexOf('사용자대표') >= 0 && html.indexOf('근로자대표') >= 0);
   /* 고치는 칸은 사용자대표·근로자대표뿐 — 대표자·담당자는 보여만 준다 */

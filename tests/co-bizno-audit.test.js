@@ -23,17 +23,17 @@ const bizFieldKind = loadFromScreen();
 test('열 자리 + 검증숫자가 맞으면 사업자번호로 본다', () => {
   /* 검사고정-허용: 사업자등록번호 검증식은 국세청이 정한 «규칙»이다(가중치 1,3,7,1,3,7,1,3,5).
      아래 두 값은 그 규칙을 만족하는 번호라서 값 자체가 규칙 확인이다. */
-  assert.equal(bizFieldKind('220-81-62517'), 'ok');
-  assert.equal(bizFieldKind('2208162517'), 'ok', '하이픈이 없어도 같게 봐야 한다');
+  assert.equal(bizFieldKind('123-81-20031'), 'ok');
+  assert.equal(bizFieldKind('1238120031'), 'ok', '하이픈이 없어도 같게 봐야 한다');
 });
 
 test('열한 자리 이상은 사업자번호일 수 없다 — 공단 관리번호로 본다', () => {
-  assert.equal(bizFieldKind('41512345670'), 'mgmt');
-  assert.equal(bizFieldKind('415-12-34567-0'), 'mgmt', '공단 관리번호 표기도 같게 봐야 한다');
+  assert.equal(bizFieldKind('12312204670'), 'mgmt');
+  assert.equal(bizFieldKind('123-12-20467-0'), 'mgmt', '공단 관리번호 표기도 같게 봐야 한다');
 });
 
 test('열 자리인데 검증숫자가 틀리면 오타로 본다', () => {
-  assert.equal(bizFieldKind('220-81-62518'), 'bad', '끝자리 하나만 틀려도 걸러야 한다');
+  assert.equal(bizFieldKind('123-81-20177'), 'bad', '끝자리 하나만 틀려도 걸러야 한다');
 });
 
 test('덜 적힌 값과 빈 칸을 가른다', () => {

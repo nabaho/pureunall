@@ -56,7 +56,7 @@ function 판() {
 
 const 등록증 = (over) => Object.assign({
   id: 'p1', year: '2026', kind: 'bizreg', at: 2000,
-  fields: { bizno: '128-81-39938', company: '맛찬들왕소금구이', ceo: '김도경',
+  fields: { bizno: '123-81-20046', company: '가온들왕소금구이', ceo: '오정훈',
     bizType: '도소매', bizItem: '식품', companyFax: '041-546-0192', address: '충남 천안시' }
 }, over || {});
 
@@ -66,32 +66,32 @@ test('★★ 번호가 있으면 «번호로만» 맞춘다 — 이름이 같아
   const docs = [등록증({ id: 'same', fields: Object.assign({}, 등록증().fields, { bizno: '111-11-11111' }) })];
   /* 이름은 똑같다. 그래도 번호가 다르면 남의 서류다 —
      「천성」과 「천성가축약품」이 붙던 그 사고를 여기서 막는다. */
-  const got = c.erpCoPullCandidates(docs, { bizNo: '128-81-39938', name: '맛찬들왕소금구이' });
+  const got = c.erpCoPullCandidates(docs, { bizNo: '123-81-20046', name: '가온들왕소금구이' });
   assert.equal(got.length, 0, '★★ 번호가 다른 서류가 붙었습니다 — 남의 회사 값이 들어갑니다');
 });
 
 test('번호가 같으면 이름이 달라도 붙는다 — 상호는 바뀐다', () => {
   const c = 판();
-  const got = c.erpCoPullCandidates([등록증()], { bizNo: '128-81-39938', name: '옛상호' });
+  const got = c.erpCoPullCandidates([등록증()], { bizNo: '123-81-20046', name: '옛상호' });
   assert.equal(got.length, 1, '같은 번호인데 안 붙었습니다');
   assert.equal(got[0].needBizNo, '', '번호가 이미 있으면 다시 물을 것이 없습니다');
 });
 
-test('번호 꼴이 달라도 같은 번호로 본다 — 「128-81-39938」과 「1288139938」', () => {
+test('번호 꼴이 달라도 같은 번호로 본다 — 「123-81-20046」과 「1238120046」', () => {
   const c = 판();
-  const got = c.erpCoPullCandidates([등록증()], { bizNo: '1288139938', name: '아무개' });
+  const got = c.erpCoPullCandidates([등록증()], { bizNo: '1238120046', name: '아무개' });
   assert.equal(got.length, 1, '줄표가 있고 없고로 갈렸습니다');
   /* 열 자리가 아니면 열쇠로 안 쓴다 — 전화번호가 섞인다 */
   assert.equal(c.erpCoBizKey('02-123-4567'), '');
-  assert.equal(c.erpCoBizKey('128-81-39938'), '1288139938');
+  assert.equal(c.erpCoBizKey('123-81-20046'), '1238120046');
 });
 
 /* ── ② 번호가 없을 때 ── */
 test('★ 번호가 없으면 이름으로 «찾아만» 주고, 적을지 먼저 묻게 표를 세운다', () => {
   const c = 판();
-  const got = c.erpCoPullCandidates([등록증()], { bizNo: '', name: '㈜ 맛찬들왕소금구이' });
+  const got = c.erpCoPullCandidates([등록증()], { bizNo: '', name: '㈜ 가온들왕소금구이' });
   assert.equal(got.length, 1, '이름으로도 못 찾았습니다 — ①번 구멍이 그대로입니다');
-  assert.equal(got[0].needBizNo, '1288139938',
+  assert.equal(got[0].needBizNo, '1238120046',
     '★ 번호를 적을지 물을 표가 없습니다 — 이름만으로 이어 붙이게 됩니다');
 });
 
@@ -104,8 +104,8 @@ test('번호도 이름도 없으면 아무것도 안 붙인다 — 전부 붙는
 /* ── ③④ 무엇을 채우고 무엇을 안 건드리나 ── */
 test('★★ 서류에 없는 칸은 «건드리지 않는다» — 빈 값으로 덮으면 있던 값이 사라진다', () => {
   const c = 판();
-  const 얇은 = 등록증({ fields: { bizno: '128-81-39938', ceo: '김도경' } });
-  const got = c.erpCoPullCandidates([얇은], { bizNo: '128-81-39938', address: '충남 천안시', phone: '041-546-0191' });
+  const 얇은 = 등록증({ fields: { bizno: '123-81-20046', ceo: '오정훈' } });
+  const got = c.erpCoPullCandidates([얇은], { bizNo: '123-81-20046', address: '충남 천안시', phone: '041-546-0191' });
   const ks = got[0].rows.map(function (r) { return r.k; });
   assert.ok(ks.indexOf('address') < 0, '★★ 서류에 없는 주소를 빈 값으로 덮으려 합니다');
   assert.ok(ks.indexOf('phone') < 0, '★★ 서류에 없는 전화를 빈 값으로 덮으려 합니다');
@@ -114,8 +114,8 @@ test('★★ 서류에 없는 칸은 «건드리지 않는다» — 빈 값으�
 test('★ 빈 칸 채움 / 지금 값과 같음 / 지금 값과 다름 을 갈라낸다', () => {
   const c = 판();
   const got = c.erpCoPullCandidates([등록증()], {
-    bizNo: '128-81-39938',
-    ceo: '김도경',          // 같음
+    bizNo: '123-81-20046',
+    ceo: '오정훈',          // 같음
     bizType: '제조',        // 다름
     bizCategory: ''         // 빈 칸
   });
@@ -129,7 +129,7 @@ test('★ 빈 칸 채움 / 지금 값과 같음 / 지금 값과 다름 을 갈�
 
 test('★★ 「같음」은 안 담고, 「다름」은 짚어야만 담는다', () => {
   const c = 판();
-  const cands = c.erpCoPullCandidates([등록증()], { bizNo: '128-81-39938', ceo: '김도경', bizType: '제조' });
+  const cands = c.erpCoPullCandidates([등록증()], { bizNo: '123-81-20046', ceo: '오정훈', bizType: '제조' });
   const id = cands[0].id;
   const pick = {}; pick[id] = true;
 
@@ -148,7 +148,7 @@ test('★★ 「같음」은 안 담고, 「다름」은 짚어야만 담는다'
 
 test('고르지 않은 후보는 아무것도 안 낸다', () => {
   const c = 판();
-  const cands = c.erpCoPullCandidates([등록증()], { bizNo: '128-81-39938' });
+  const cands = c.erpCoPullCandidates([등록증()], { bizNo: '123-81-20046' });
   /* ⚠ vm 안에서 만든 객체라 deepEqual 은 «다른 세상»이라며 어긋난다 — 칸 수로 본다 */
   assert.equal(Object.keys(c.erpCoPullApply(cands, {}, {}).patch).length, 0, '안 골랐는데 채웁니다');
 });
@@ -157,7 +157,7 @@ test('여러 장을 고르면 «앞엣것»이 이긴다 — 최근 판독이 �
   const c = 판();
   const 옛것 = 등록증({ id: 'old', at: 1000, fields: Object.assign({}, 등록증().fields, { ceo: '옛대표' }) });
   const 새것 = 등록증({ id: 'new', at: 3000, fields: Object.assign({}, 등록증().fields, { ceo: '새대표' }) });
-  const cands = c.erpCoPullCandidates([옛것, 새것], { bizNo: '128-81-39938' });
+  const cands = c.erpCoPullCandidates([옛것, 새것], { bizNo: '123-81-20046' });
   assert.equal(cands[0].id, 'new', '최근 판독이 앞에 안 옵니다');
   const pick = { old: true, new: true };
   assert.equal(c.erpCoPullApply(cands, pick, {}).patch.ceo, '새대표', '옛 서류가 새 서류를 이겼습니다');
@@ -166,9 +166,9 @@ test('여러 장을 고르면 «앞엣것»이 이긴다 — 최근 판독이 �
 test('중소기업확인서는 규모·업종·만료일을 준다 — 등록증에 없는 칸이다', () => {
   const c = 판();
   const sme = { id: 's1', year: '2026', kind: 'sme', at: 500,
-    fields: { bizno: '128-81-39938', company: '맛찬들', smeType: '소기업',
+    fields: { bizno: '123-81-20046', company: '사아', smeType: '소기업',
       industry: '음식점업', expiry: '2026-12-31' } };
-  const got = c.erpCoPullCandidates([sme], { bizNo: '128-81-39938' });
+  const got = c.erpCoPullCandidates([sme], { bizNo: '123-81-20046' });
   const by = {}; got[0].rows.forEach(function (r) { by[r.k] = r; });
   assert.equal(by.companySize.val, '소기업', '규모를 안 가져옵니다');
   assert.equal(by.industry.val, '음식점업', '업종을 안 가져옵니다');
@@ -178,15 +178,15 @@ test('중소기업확인서는 규모·업종·만료일을 준다 — 등록증
 test('채울 것이 하나도 없는 서류는 «목록에 안 띄운다»', () => {
   const c = 판();
   const got = c.erpCoPullCandidates([등록증()], {
-    bizNo: '128-81-39938', name: '맛찬들왕소금구이', ceo: '김도경',
+    bizNo: '123-81-20046', name: '가온들왕소금구이', ceo: '오정훈',
     bizType: '도소매', bizCategory: '식품', fax: '041-546-0192', address: '충남 천안시'
   });
   /* 전부 같은 값이면 골라 봐야 바뀌는 것이 없다 */
   const 쓸모 = got.filter(function (x) { return x.rows.some(function (r) { return r.state !== 'same'; }); });
   assert.equal(쓸모.length, 0, '바뀔 것이 없는데 고르라고 내밉니다');
   /* 겹치는 칸이 «하나도» 없는 서류는 아예 목록에서 뺀다 — 빈 줄을 고르라고 하면 안 된다 */
-  const 빈것 = c.erpCoPullCandidates([등록증({ fields: { bizno: '128-81-39938' } })],
-    { bizNo: '128-81-39938' });
+  const 빈것 = c.erpCoPullCandidates([등록증({ fields: { bizno: '123-81-20046' } })],
+    { bizNo: '123-81-20046' });
   assert.equal(빈것.length, 0, '★ 채울 것이 하나도 없는 서류를 목록에 띄웁니다');
 });
 
@@ -231,7 +231,7 @@ test('★ 두 번 불러도 사진첩을 «한 번만» 훑는다 — 다시 훑
     listYear: function () {
       훑음++;
       return Promise.resolve({
-        a1: { read: { kind: 'bizreg', fields: { bizno: '128-81-39938' } }, __year: '2026', upAt: 1 },
+        a1: { read: { kind: 'bizreg', fields: { bizno: '123-81-20046' } }, __year: '2026', upAt: 1 },
         a2: { read: { kind: 'card', fields: {} }, __year: '2026' },          // 명함은 빠져야 한다
         /* ★ 2026-09-06 부터 계약서는 «담는다» (대표 지시).
            계약기간·월 자문료·부가세의 실제 출처가 여기다 — 업체 373곳 중 계약관리에
@@ -314,8 +314,8 @@ test('★ 번호가 없던 업체는 «번호를 적는 것»부터 확인받는
 
 test('사업자번호는 000-00-00000 꼴로 적는다', () => {
   const c = 판();
-  assert.equal(c.erpFmtBizNo('1288139938'), '128-81-39938');
-  assert.equal(c.erpFmtBizNo('128-81-39938'), '128-81-39938');
+  assert.equal(c.erpFmtBizNo('1238120046'), '123-81-20046');
+  assert.equal(c.erpFmtBizNo('123-81-20046'), '123-81-20046');
   assert.equal(c.erpFmtBizNo(''), '', '빈 값에 줄표를 지어내면 안 됩니다');
 });
 

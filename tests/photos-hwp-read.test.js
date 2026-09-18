@@ -138,7 +138,7 @@ test('읽개(hwp_extract.js)는 취업규칙·급여데이터함과 같은 것�
 test('진짜 hwpx 를 지어 읽으면 글자가 그대로 나온다', () => {
   const HWPX = require(path.join(ROOT, 'hwpx_gen.js'));
   const api = require(path.join(ROOT, 'hwp_extract.js'));
-  const 줄 = ['근 로 계 약 서', '사업장: 푸른물산', '사업자등록번호: 128-81-39938',
+  const 줄 = ['근 로 계 약 서', '사업장: 푸른물산', '사업자등록번호: 123-81-20046',
     '근로자: 김푸른', '임금: 월 2,500,000원', '계약기간: 2026-09-01 ~ 2027-08-31'];
   const xml = 줄.map(function (t) { return HWPX.para(t); }).join('');
   const u8 = HWPX.build(xml);

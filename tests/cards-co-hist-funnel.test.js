@@ -138,8 +138,8 @@ function loadIndexer(fixtures) {
 const idx = (fixtures) => new Promise(res => loadIndexer(fixtures).loadErpCaseCons(res));
 
 test('★ 사업자번호가 있는 기록은 번호 색인에 담는다', async () => {
-  const got = await idx({ 'data/consultings/v': { k1: { bizNo:'312-81-49225', companyName:'가나기업' } } });
-  assert.equal((got.byBiz['3128149225'] || []).length, 1);
+  const got = await idx({ 'data/consultings/v': { k1: { bizNo:'123-81-20012', companyName:'가나기업' } } });
+  assert.equal((got.byBiz['1238120012'] || []).length, 1);
   assert.equal(Object.keys(got.byName).length, 0, '번호가 있으면 이름 색인에는 안 담습니다');
 });
 
@@ -173,12 +173,12 @@ test('이름도 번호도 없는 기록은 어느 색인에도 안 담는다', a
 
 test('★ 넷을 다 읽고, 갈래 표를 제대로 붙인다', async () => {
   const got = await idx({
-    'data/consultings/v': { a: { bizNo:'312-81-49225' } },
-    'data/cases/v':       { b: { bizNo:'312-81-49225' } },
-    'data/funds/v':       { c: { bizNo:'312-81-49225' } },
-    'data/other_projects/v': { d: { bizNo:'312-81-49225' } }
+    'data/consultings/v': { a: { bizNo:'123-81-20012' } },
+    'data/cases/v':       { b: { bizNo:'123-81-20012' } },
+    'data/funds/v':       { c: { bizNo:'123-81-20012' } },
+    'data/other_projects/v': { d: { bizNo:'123-81-20012' } }
   });
-  const kinds = (got.byBiz['3128149225'] || []).map(r => r._kind).sort();
+  const kinds = (got.byBiz['1238120012'] || []).map(r => r._kind).sort();
   same(kinds, ['case', 'consulting', 'fund', 'other']);
 });
 
@@ -210,8 +210,8 @@ test('★ 다섯과 사전 셋, 여덟 자리를 읽는다 — 그 밖은 안 �
 
 test('★ 사업자번호가 맞으면 그 회사 기록만 붙인다', () => {
   const c = load();
-  const rows = c.erpHistRecsFor({ byBiz: { '3128149225': [REC.clinic] },
-                                  byName: { '가나기업': [REC.ilteo] } }, '312-81-49225', '가나기업');
+  const rows = c.erpHistRecsFor({ byBiz: { '1238120012': [REC.clinic] },
+                                  byName: { '가나기업': [REC.ilteo] } }, '123-81-20012', '가나기업');
   assert.equal(rows.length, 1, '★ 번호가 회사를 딱 가리키는데 이름 쪽까지 섞으면 남의 금액이 합계에 듭니다');
   assert.equal(rows[0], REC.clinic);
 });
@@ -219,7 +219,7 @@ test('★ 사업자번호가 맞으면 그 회사 기록만 붙인다', () => {
 test('★ 사업자번호로 못 찾으면 «이름으로» 잇는다 — 이력이 하나도 안 나온 까닭', () => {
   const c = load();
   const rows = c.erpHistRecsFor({ byBiz: {}, byName: { '가나기업': [REC.ilteo, REC.fund] } },
-                                '312-81-49225', '(주) 가나기업');
+                                '123-81-20012', '(주) 가나기업');
   assert.equal(rows.length, 2,
     '★ 컨설팅 건에 사업자번호를 안 적는 일이 흔합니다 — 버리면 이력이 통째로 안 붙습니다');
 });
@@ -233,12 +233,12 @@ test('이름 다듬기는 업체관리 맞추기와 같은 규칙이다 — ㈜�
 test('이름도 번호도 없으면 아무것도 안 붙인다 — 남의 기록을 끌어오면 안 된다', () => {
   const c = load();
   assert.equal(c.erpHistRecsFor({ byBiz: {}, byName: { '가나': [REC.ilteo] } }, '', '').length, 0);
-  assert.equal(c.erpHistRecsFor(null, '312-81-49225', '가나').length, 0);
+  assert.equal(c.erpHistRecsFor(null, '123-81-20012', '가나').length, 0);
 });
 
 test('byName 이 없는 옛 꼴로 와도 터지지 않는다', () => {
   const c = load();
-  assert.equal(c.erpHistRecsFor({ byBiz: {} }, '312-81-49225', '가나').length, 0);
+  assert.equal(c.erpHistRecsFor({ byBiz: {} }, '123-81-20012', '가나').length, 0);
 });
 
 /* ══════ ② 넷을 함께 ══════ */
@@ -433,14 +433,14 @@ test('큰 금액은 짧게 적는다', () => {
 
 test('★ 기록이 없으면 칸 자체를 안 그린다 — 메모 없으면 메모 칸을 안 그리는 것과 같다', () => {
   const c = load();
-  assert.equal(paint(c, { bizno: '312-81-49225', name: '가나' }, null), '');
-  assert.equal(paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: {}, byName: {} }), '');
+  assert.equal(paint(c, { bizno: '123-81-20012', name: '가나' }, null), '');
+  assert.equal(paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: {}, byName: {} }), '');
 });
 
 test('★ 줄 하나에 두 층 — 윗층은 갈래·이름·금액, 아랫층은 기간·담당·번호·상태', () => {
   const c = load();
   c.ErpMatch.nameByEmail = { 'p001@pureun.kr': '김혜민' };
-  const h = paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': [REC.clinic] } });
+  const h = paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': [REC.clinic] } });
   assert.match(h, /class="bd k-consulting">컨설팅</, '갈래 배지가 없습니다');
   assert.match(h, /class="nm">현장클리닉</, '이름이 코드로 나옵니다');
   assert.match(h, /class="fee">3,300,000원</, '금액이 안 나옵니다');
@@ -458,13 +458,13 @@ test('★ 이름으로 이은 것은 그 사실을 밝힌다 — 같은 이름 �
 
 test('번호로 이은 것에는 그 표가 안 붙는다', () => {
   const c = load();
-  const h = paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': [REC.clinic] } });
+  const h = paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': [REC.clinic] } });
   assert.ok(h.indexOf('cohist-byname') < 0, '번호로 이었는데 「이름」 표가 붙습니다');
 });
 
 test('★ 해 머리줄에 그 해의 건수·금액을 적는다', () => {
   const c = load();
-  const h = paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': ALL } });
+  const h = paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': ALL } });
   /* ⚠ 2026-09-11(대표 결정, 목업 4번): 해 머리줄이 «눌러서 접는 줄»이 되며 딱지가
      늘었다(cohist-yr cofoldable on). 지킬 것은 「해마다 몇 건 얼마인지 적는다」이지
      딱지가 몇 개인가가 아니다 — 그 뜻만 본다. */
@@ -474,7 +474,7 @@ test('★ 해 머리줄에 그 해의 건수·금액을 적는다', () => {
 
 test('★ 걸러면 합계가 함께 따라오고, 전체값도 곁에 남는다', () => {
   const c = load();
-  paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': ALL } });
+  paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': ALL } });
   assert.match(c._box.html, /모두<\/span><b>19,900,000원<\/b>/, '안 걸렀을 때는 「모두」입니다');
   c.coHistSet('kind', 'fund');
   assert.match(c._box.html, /보이는 것<\/span><b>3,300,000원<\/b>/,
@@ -484,8 +484,8 @@ test('★ 걸러면 합계가 함께 따라오고, 전체값도 곁에 남는다
 
 test('★ 0건인 갈래는 칩을 아예 안 만든다 — 눌러도 안 되는 단추는 고장으로 읽힌다', () => {
   const c = load();
-  const h = paint(c, { bizno: '312-81-49225', name: '가나' },
-    { byBiz: { '3128149225': [REC.clinic, REC.ilteo, REC.fund] } });
+  const h = paint(c, { bizno: '123-81-20012', name: '가나' },
+    { byBiz: { '1238120012': [REC.clinic, REC.ilteo, REC.fund] } });
   assert.match(h, /coHistSet\('kind','consulting'\)/);
   assert.match(h, /coHistSet\('kind','fund'\)/);
   assert.ok(h.indexOf("coHistSet('kind','case')") < 0, '★ 사건이 0건인데 사건 칩이 있습니다');
@@ -494,16 +494,16 @@ test('★ 0건인 갈래는 칩을 아예 안 만든다 — 눌러도 안 되는
 
 test('★ 건이 셋보다 적으면 깔때기를 아예 안 보인다 — 조작줄 두 줄이 자리만 먹는다', () => {
   const c = load();
-  const h2 = paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': [REC.clinic, REC.fund] } });
+  const h2 = paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': [REC.clinic, REC.fund] } });
   assert.ok(h2.indexOf('cohist-funnel') < 0, '★ 두 건 앞에 깔때기를 펴고 있습니다');
   assert.match(h2, /현장클리닉/, '깔때기는 접어도 목록은 나와야 합니다');
-  const h3 = paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': ALL } });
+  const h3 = paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': ALL } });
   assert.match(h3, /cohist-funnel/, '여섯 건인데 깔때기가 없습니다');
 });
 
 test('★ 고른 것이 없으면 왜 없는지 말하고 넓힐 길을 알려 준다', () => {
   const c = load();
-  paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': ALL } });
+  paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': ALL } });
   c.coHistSet('year', '2026');
   c.coHistSet('stat', 'done');
   assert.match(c._box.html, /class="cohist-none"/, '★ 빈 화면만 남으면 고장으로 읽힙니다');
@@ -513,7 +513,7 @@ test('★ 고른 것이 없으면 왜 없는지 말하고 넓힐 길을 알려 �
 
 test('★ 「전체」 칩은 갈래 고르기를 통째로 푼다', () => {
   const c = load();
-  paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': ALL } });
+  paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': ALL } });
   c.coHistSet('kind', 'fund');
   c.coHistSet('kind', 'case');
   assert.equal(Object.keys(c._coHist.pick.kinds).filter(k => c._coHist.pick.kinds[k]).length, 2);
@@ -524,7 +524,7 @@ test('★ 「전체」 칩은 갈래 고르기를 통째로 푼다', () => {
 
 test('같은 칩을 두 번 누르면 꺼진다', () => {
   const c = load();
-  paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': ALL } });
+  paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': ALL } });
   c.coHistSet('kind', 'fund');
   assert.equal(c.erpHistPick(rows(c), c._coHist.pick).length, 1);
   c.coHistSet('kind', 'fund');
@@ -533,7 +533,7 @@ test('같은 칩을 두 번 누르면 꺼진다', () => {
 
 test('되돌리기는 갈래·해·상태·정렬을 모두 처음으로', () => {
   const c = load();
-  paint(c, { bizno: '312-81-49225', name: '가나' }, { byBiz: { '3128149225': ALL } });
+  paint(c, { bizno: '123-81-20012', name: '가나' }, { byBiz: { '1238120012': ALL } });
   c.coHistSet('kind', 'fund'); c.coHistSet('year', '2025');
   c.coHistSet('stat', 'done'); c.coHistSet('sort', 'fee');
   c.coHistSet('reset');
@@ -542,11 +542,11 @@ test('되돌리기는 갈래·해·상태·정렬을 모두 처음으로', () =>
 
 test('★ 다른 회사를 열면 깔때기가 처음 상태로 돌아간다 — 걸어 둔 조건 때문에 「기록 없다」로 읽힌다', () => {
   const c = load();
-  const data = { byBiz: { '3128149225': ALL, '2218802146': [REC.fund] } };
-  paint(c, { bizno: '312-81-49225', name: '가나' }, data);
+  const data = { byBiz: { '1238120012': ALL, '1238820248': [REC.fund] } };
+  paint(c, { bizno: '123-81-20012', name: '가나' }, data);
   c.coHistSet('kind', 'case');
   c.coHistSet('sort', 'fee');
-  paint(c, { bizno: '221-88-02146', name: '다라' }, data);
+  paint(c, { bizno: '123-88-20248', name: '다라' }, data);
   same(c._coHist.pick, { kinds: {}, year: 'all', stat: 'all', sort: 'newest' });
   assert.match(c._box.html, /복지기금 설립/,
     '★ 사건만 걸어 둔 채로 다른 회사를 열면 기금 한 건이 안 보여 「기록 없다」가 됩니다');

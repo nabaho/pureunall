@@ -28,7 +28,7 @@ const DIR = [
   { sid:'P-001', name:'권형하', sortOrder:10,  role:'admin',  title:'대표노무사', status:'active'  },
   { sid:'P-002', name:'하윤서', sortOrder:20,  role:'member', title:'노무사',     status:'active'  },
   { sid:'P-003', name:'김석우', sortOrder:30,  role:'member', title:'노무사',     status:'leave'   },
-  { sid:'A-001', name:'나래',   sortOrder:100, role:'staff',  title:'과장',       status:'active'  },
+  { sid:'A-001', name:'새롬',   sortOrder:100, role:'staff',  title:'과장',       status:'active'  },
   /* ⚠ 퇴사자가 «담당으로 적힌 채» 남아 있다 — 실제로 그래서 목록에 나왔다 */
   { sid:'P-009', name:'박성수', sortOrder:40,  role:'member', title:'노무사',     status:'retired' },
   { sid:'A-009', name:'김정현', sortOrder:110, role:'staff',  title:'대리',       status:'retired' },
@@ -184,19 +184,19 @@ test('★★ 휴직자는 «남는다» — 옆줄에 칸이 서 있는데 고�
 });
 
 test('★★ 아직 아무것도 안 맡은 재직자도 «고를 수 있다» — 새로 온 사람', () => {
-  /* 나래는 어느 주소도 안 맡고 있다. 예전 목록은 「맡은 사람」만 세어 못 골랐다. */
+  /* 새롬는 어느 주소도 안 맡고 있다. 예전 목록은 「맡은 사람」만 세어 못 골랐다. */
   const c = load();
   const idx = c.mbWhoIndex();
-  assert.ok(Object.keys(idx.byAddr).map(k=>idx.byAddr[k]).indexOf('나래') < 0,
-    '밑그림이 틀렸습니다 — 나래는 아무것도 안 맡아야 합니다');
-  assert.ok(c.mbWhoNames().indexOf('나래') >= 0, '새로 온 사람을 고를 수 없습니다');
+  assert.ok(Object.keys(idx.byAddr).map(k=>idx.byAddr[k]).indexOf('새롬') < 0,
+    '밑그림이 틀렸습니다 — 새롬는 아무것도 안 맡아야 합니다');
+  assert.ok(c.mbWhoNames().indexOf('새롬') >= 0, '새로 온 사람을 고를 수 없습니다');
 });
 
 test('★ 차례는 옆줄과 «같은 사번 순»이다 — 여기만 이름순이면 눈이 두 번 익힌다', () => {
   const c = load();
   const ns = c.mbWhoNames();
   assert.ok(ns.indexOf('권형하') < ns.indexOf('하윤서'), '사번 순이 아닙니다: ' + ns.join(' · '));
-  assert.ok(ns.indexOf('하윤서') < ns.indexOf('나래'), '사번 순이 아닙니다: ' + ns.join(' · '));
+  assert.ok(ns.indexOf('하윤서') < ns.indexOf('새롬'), '사번 순이 아닙니다: ' + ns.join(' · '));
 });
 
 test('★★ 명부가 «아직 안 왔으면» 목록을 비우지 않는다 — 빈 목록이 그대로 굳는다', () => {

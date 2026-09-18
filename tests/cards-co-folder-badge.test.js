@@ -37,7 +37,7 @@ function fn(name) {
   throw new Error(name + ' 의 끝을 찾지 못했다');
 }
 
-const CO = { key: 'n메디움', name: '메디움', bizno: '', folder: 'f1',
+const CO = { key: 'n타파메디', name: '타파메디', bizno: '', folder: 'f1',
              cards: [], bizs: [], docs: 0, erp: null, extra: {} };
 
 /* coListHtml 을 진짜로 돌려 «만들어진 글»을 본다 — 소스를 글자로 보면

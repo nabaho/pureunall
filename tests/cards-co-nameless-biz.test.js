@@ -95,9 +95,9 @@ function loadName(){
 }
 
 /* 번호는 또렷한데 상호가 흐려 못 읽은 등록증 — 실제로 겪는 모습 그대로 */
-const NO_NAME = { id:'b1', kind:'biz', company:'', bizno:'312-86-30570',
+const NO_NAME = { id:'b1', kind:'biz', company:'', bizno:'123-86-20259',
                   ceo:'', address:'' };
-const NAMED   = { id:'b2', kind:'biz', company:'가나테크', bizno:'134-86-05772' };
+const NAMED   = { id:'b2', kind:'biz', company:'가나테크', bizno:'123-86-20021' };
 
 /* ══════ ① 남는가 ══════ */
 
@@ -120,7 +120,7 @@ test('★ 이름 없는 회사끼리 한 줄로 뭉치지 않는다 — 열쇠�
   const rows = buildList([NO_NAME, other]);
   assert.equal(rows.length, 2,
     '★ 이름으로 묶으면 상호 못 읽은 등록증이 전부 «빈 이름» 한 회사로 뭉친다');
-  assert.deepEqual(rows.map(o => o.key).sort(), ['1234567890', '3128630570']);
+  assert.deepEqual(rows.map(o => o.key).sort(), ['1234567890', '1238620259']);
 });
 
 /* ══════ ③ 빈 줄은 안 만든다 ══════ */
@@ -149,13 +149,13 @@ test('★ o.name 에 번호를 집어넣지 않는다 — 푸른이알피가 이
 
 test('★ 보여줄 이름은 사업자번호로 만든다', () => {
   const N = loadName();
-  const shown = N.coDisplayName({ name:'', bizno:'312-86-30570' });
-  assert.match(shown, /312/, '★ 사람이 어느 등록증인지 가릴 실마리는 번호뿐이다');
+  const shown = N.coDisplayName({ name:'', bizno:'123-86-20259' });
+  assert.match(shown, /123/, '★ 사람이 어느 등록증인지 가릴 실마리는 번호뿐이다');
 });
 
 test('상호가 있으면 보여줄 이름도 상호다', () => {
   const N = loadName();
-  assert.equal(N.coDisplayName({ name:'가나테크', bizno:'134-86-05772' }), '가나테크');
+  assert.equal(N.coDisplayName({ name:'가나테크', bizno:'123-86-20021' }), '가나테크');
 });
 
 /* ══════ ⑥⑦ 화면 ══════ */

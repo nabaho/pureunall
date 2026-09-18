@@ -46,11 +46,11 @@ test('옛 번호로 찾아도 같은 몸통이 나온다 — 머리는 버린다
 });
 
 test('사업자번호를 고유번호로 읽지 않는다', () => {
-  /* 왜 검사하나: 처음에 「끝에 붙은 다섯 자리」로 뽑았더니 312-81-95374 의
+  /* 왜 검사하나: 처음에 「끝에 붙은 다섯 자리」로 뽑았더니 123-81-20079 의
      95374 를 고유번호로 읽어 엉뚱한 업체를 열었다(2026-09-03). */
-  assert.equal(O.parseCompanyNumber('312-81-95374'), 0);
-  assert.equal(O.parseCompanyNumber('3128195374'), 0);
-  assert.equal(O.parseCompanyNumber('41512345670'), 0, '공단 관리번호(열한 자리)도 아니다');
+  assert.equal(O.parseCompanyNumber('123-81-20079'), 0);
+  assert.equal(O.parseCompanyNumber('1238120079'), 0);
+  assert.equal(O.parseCompanyNumber('12312204670'), 0, '공단 관리번호(열한 자리)도 아니다');
   assert.equal(O.parseCompanyNumber('00123'), 0, '범위 밖은 아니다');
   assert.equal(O.parseCompanyNumber(''), 0);
 });
