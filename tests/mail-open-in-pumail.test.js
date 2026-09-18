@@ -150,8 +150,10 @@ test('앞뒤 빈칸은 떼어 낸다', () => {
 test('★★ 들어오는 문이 그 값을 실제로 쓴다 — 주소는 저장된 마지막 화면보다 앞선다', () => {
   const R = code(grab(PC, 'restoreLastScreen'));
   assert.match(R, /const _mc = mailCoFromUrl\(\);\s*if\(_mc !== null\)\{ openCoThread\(_mc\); return; \}/);
-  /* 받은메일함으로 새기 «전»이어야 한다 */
-  assert.ok(R.indexOf('mailCoFromUrl()') < R.indexOf("openMailBox('')"), '받은메일함이 먼저 열린다');
+  /* 메일함으로 새기 «전»이어야 한다.
+     ⚠ 여는 칸 이름은 안 박는다 — 2026-09-18 에 첫 화면이 전체메일로 바뀌며 깨졌다.
+       지킬 것은 «차례»이지 어느 칸인가가 아니다. */
+  assert.ok(R.indexOf('mailCoFromUrl()') < R.indexOf('openMailBox('), '메일함이 먼저 열린다');
 });
 
 test('urlWantsMail 안에 있다 — view=mail 이 아닌 길에서는 안 본다', () => {
