@@ -151,7 +151,11 @@ function 핸들러만들기(옵션) {
           ip: (req.headers && (req.headers['x-forwarded-for'] || req.headers['X-Forwarded-For'])) || null,
           ua: (req.headers && req.headers['user-agent']) || null,
         });
-      } catch (_) {}
+      } catch (e) {
+        /* ⚠ 흔적을 못 남겨도 자료는 준다 — 다만 «조용히» 넘기지는 않는다.
+           Cloud Functions 기록에 남겨야 「흔적이 왜 없지」를 다음 사람이 안 헤맨다. */
+        console.error('[나스백업] 흔적을 못 남겼습니다:', (e && e.message) || e);
+      }
 
       res.set('Content-Type', 'application/json; charset=utf-8');
       res.set('Cache-Control', 'no-store');
