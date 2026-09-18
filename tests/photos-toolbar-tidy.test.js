@@ -88,6 +88,9 @@ function bar(over) {
     /* 2026-08-29: 내 사진에 공유받은 것이 섞인다 — 칩·거르기가 이 셋을 쓴다 */
     isSharedItem() { return false; }, sharedByName() { return ''; }, sharedOnly: false,
     ALL_OWNERS: '__all__', gridOwner: null, renderPayNote() {},
+    /* ⚠ 2026-09-18 — renderGridBar 가 «고른 사진 미리 받기»를 깨운다(끌어내기 채비).
+       안 주면 그 자리에서 멎는다. 이 파일이 재는 것은 도구줄이라 받을 것이 없다고 둔다. */
+    warmSelected() {},
     $: mk
   }, o.ctx || {});
   vm.createContext(ctx);
