@@ -39,8 +39,8 @@ function gather(stores, bizNo, coInfo, idx) {
   return ctx.erpCoSheetGather(bizNo, coInfo || null);
 }
 
-const A = '314-86-59404';      // 2026-09-18 서버에 실제로 있는 번호
-const B = '312-86-42324';
+const A = '123-86-20128';      // 2026-09-18 서버에 실제로 있는 번호
+const B = '123-86-20389';
 
 test('①★ 번호로만 모은다 — 이름이 같아도 번호가 다르면 «안» 끌어온다', () => {
   const g = gather({
@@ -56,7 +56,7 @@ test('①★ 번호로만 모은다 — 이름이 같아도 번호가 다르면 
 });
 
 test('② 붙임표·열세 자리가 달라도 같은 회사로 본다', () => {
-  const g = gather({ contracts: [{ contractNo: 'C1', bizNo: '3148659404' }] }, '314-86-59404');
+  const g = gather({ contracts: [{ contractNo: 'C1', bizNo: '1238620128' }] }, '123-86-20128');
   assert.equal(g.rows.length, 1, '같은 번호를 다르게 적어도 이어진다');
 });
 
