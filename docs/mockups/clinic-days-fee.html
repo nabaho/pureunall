@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>현장클리닉 일수 설계</title>
+<style>
+  :root{
+    --g0:#f8fafc; --g1:#e2e8f0; --g2:#cbd5e1; --g3:#94a3b8; --g4:#64748b; --g5:#475569; --g6:#1e293b;
+    --b0:#eff6ff; --b1:#bfdbfe; --b2:#60a5fa; --b3:#2563eb; --b4:#1e40af;
+    --n0:#f0fdf4; --n1:#bbf7d0; --n3:#16a34a; --n4:#166534;
+    --y0:#fffbeb; --y1:#fde68a; --y3:#d97706; --y4:#854d0e;
+    --r0:#fef2f2; --r1:#fecaca; --r3:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--g0);color:var(--g6);
+    font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;
+    font-size:13px;line-height:1.6}
+  .wrap{max-width:980px;margin:0 auto;padding:24px 16px 64px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--g4);font-size:12.5px;margin:0 0 24px}
+  .sec{background:#fff;border:1px solid var(--g1);border-radius:10px;padding:18px;margin-bottom:20px}
+  .sec > h2{font-size:15px;margin:0 0 3px;display:flex;align-items:center;gap:8px}
+  .sec > .why{color:var(--g4);font-size:12px;margin:0 0 14px}
+  .tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;
+    background:var(--b0);color:var(--b3);border:1px solid var(--b1)}
+  .tag.new{background:var(--n0);color:var(--n4);border-color:var(--n1)}
+  .tag.ask{background:var(--y0);color:var(--y4);border-color:var(--y1)}
+
+  /* ── 계약 창 흉내 ── */
+  .modal{border:1px solid var(--g2);border-radius:8px;overflow:hidden;background:#fff}
+  .modal .bar{background:var(--g0);border-bottom:1px solid var(--g1);padding:9px 14px;font-weight:700;font-size:13px}
+  .modal .body{padding:14px}
+  .box{background:var(--g0);border:1px solid var(--g1);border-radius:6px;padding:12px;margin-bottom:12px}
+  .box .cap{font-size:12px;font-weight:700;color:var(--g5);margin-bottom:8px}
+  .grid{display:grid;grid-template-columns:86px 1fr 52px 116px 20px auto;align-items:center;
+    column-gap:8px;row-gap:6px;padding:8px 0;border-bottom:1px dashed var(--g1)}
+  .grid .lbl{font-size:12px;font-weight:700;color:var(--b3)}
+  .grid .amtlbl{font-size:10.5px;color:var(--g4);font-weight:600;text-align:right}
+  select,input{font-family:inherit;font-size:12px;padding:7px 9px;border:1px solid var(--g2);
+    border-radius:6px;width:100%;background:#fff;color:var(--g6)}
+  input.num{font-family:ui-monospace,Menlo,Consolas,monospace;text-align:right}
+  .unit{font-size:11px;color:var(--g4)}
+  .chk{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--g4);white-space:nowrap}
+  .chk input{width:13px;height:13px;padding:0;margin:0}
+
+  /* 새로 생기는 것 강조 */
+  .isnew{outline:2px solid var(--n3);outline-offset:2px;border-radius:6px}
+  .callout{display:flex;gap:8px;align-items:flex-start;background:var(--n0);border:1px solid var(--n1);
+    border-radius:6px;padding:9px 11px;font-size:11.5px;color:var(--n4);margin:8px 0}
+  .callout.info{background:var(--b0);border-color:var(--b1);color:var(--b4)}
+  .callout.warn{background:var(--y0);border-color:var(--y1);color:var(--y4)}
+  .callout b{font-weight:700}
+  .calcline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--b0);border:1px solid var(--b1);border-radius:6px;padding:8px 11px;margin:8px 0 0}
+  .calcline .eq{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--b4)}
+  .calcline .big{font-size:14px;font-weight:700;color:var(--b4)}
+  button.act{font-family:inherit;background:var(--b3);color:#fff;border:0;border-radius:6px;
+    padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+  button.ghost{background:#fff;color:var(--b3);border:1px solid var(--b1)}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{padding:7px 9px;border-bottom:1px solid var(--g1);text-align:left;vertical-align:top}
+  th{background:var(--g0);color:var(--g5);font-weight:700;font-size:11.5px;white-space:nowrap}
+  td.n{font-family:ui-monospace,Menlo,Consolas,monospace;text-align:right;white-space:nowrap}
+  .muted{color:var(--g4)}
+  .no{color:var(--r3);font-weight:700}
+  .yes{color:var(--n3);font-weight:700}
+
+  /* 일정 칸 */
+  .rounds{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .round{border:1px dashed var(--b1);background:var(--b0);border-radius:7px;padding:8px 12px;min-width:104px}
+  .round .r1{font-size:10.5px;color:var(--b3);font-weight:700}
+  .round .r2{font-size:12px;color:var(--g4);margin-top:2px}
+  .round.filled{border-style:solid;background:#fff;border-color:var(--g2)}
+  .round.filled .r2{color:var(--g6);font-weight:600}
+
+  .steps{counter-reset:s;list-style:none;padding:0;margin:0}
+  .steps li{position:relative;padding:0 0 12px 30px;margin:0}
+  .steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:1px;
+    width:20px;height:20px;border-radius:50%;background:var(--b3);color:#fff;
+    font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .steps li b{display:block;font-size:12.5px}
+  .steps li span{font-size:11.5px;color:var(--g4)}
+
+  .q{background:var(--y0);border:1px solid var(--y1);border-radius:8px;padding:14px 16px}
+  .q h2{color:var(--y4)}
+  .q ol{margin:0;padding-left:20px}
+  .q li{margin-bottom:9px;font-size:12.5px}
+  @media (max-width:640px){
+    .grid{grid-template-columns:1fr 1fr;row-gap:4px}
+    .grid .lbl{grid-column:1/-1}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>현장클리닉 — 일수를 넣으면 금액과 일정이 따라온다</h1>
+  <p class="sub">대표 지시 2026-09-18 · 설계안(목업) · 아직 코딩 안 했습니다</p>
+
+  <!-- ══════ 1 ══════ -->
+  <section class="sec">
+    <h2>① 계약 추가 — 일수 칸 하나가 는다 <span class="tag new">새로</span></h2>
+    <p class="why">「3일」만 치면 잔금 1,155,000원이 부가세포함으로 들어갑니다.</p>
+
+    <div class="modal">
+      <div class="bar">계약 추가</div>
+      <div class="body">
+        <div class="box">
+          <div class="cap">📋 종류별 세부설정</div>
+
+          <div class="grid">
+            <span class="lbl">📊 컨설팅계약</span>
+            <select><option>[현클] 현장클리닉</option><option>[일터] 일터상생혁신컨설팅</option></select>
+            <span class="amtlbl">계약금</span>
+            <input class="num" value="0">
+            <span class="unit">원</span>
+            <span></span>
+
+            <span></span><span></span><span></span>
+            <label class="chk"><input type="checkbox"> 🧾 부가세포함</label>
+            <span></span><span></span>
+
+            <!-- 새 줄 -->
+            <span class="amtlbl" style="grid-column:1/3;text-align:left;color:var(--n4);font-weight:700">🏥 컨설팅 일수</span>
+            <span class="amtlbl">일수</span>
+            <span class="isnew"><input class="num" value="3" style="border-color:var(--n3)"></span>
+            <span class="unit">일</span>
+            <span class="muted" style="font-size:10.5px">1일 350,000원</span>
+
+            <span style="grid-column:1/-1">
+              <div class="calcline">
+                <span class="eq">3일 × 350,000 = 1,050,000 &nbsp;+&nbsp; 부가세 105,000</span>
+                <span class="big">= 1,155,000원</span>
+                <button class="act">잔금에 넣기</button>
+              </div>
+            </span>
+
+            <span></span>
+            <input value="예) 취업규칙 정비 + 관리자 교육 2회" style="color:var(--g3)">
+            <span class="amtlbl">잔금</span>
+            <span class="isnew"><input class="num" value="1,155,000" style="border-color:var(--n3);font-weight:700"></span>
+            <span class="unit">원</span>
+            <span></span>
+
+            <span></span><span></span><span></span>
+            <label class="chk"><input type="checkbox" checked> 🧾 부가세포함</label>
+            <span></span><span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span>✅</span><span><b>이미 적은 금액은 절대 안 덮습니다.</b>
+      잔금이 비었거나 «직전에 이 계산이 넣어 둔 값 그대로»일 때만 바뀝니다.
+      대표님이 손으로 고쳐 두셨으면 띠만 뜨고 「잔금에 넣기」를 누르셔야 들어갑니다.</span>
+    </div>
+    <div class="callout info">
+      <span>🧾</span><span><b>부가세는 원 미만 버림</b>입니다(세금계산서와 같은 셈법).
+      350,000 × 3 = 1,050,000 → 부가세 105,000 → 합계 1,155,000.
+      「부가세포함」도 함께 켜집니다 — 칸에 든 숫자가 세금까지 든 값이라는 뜻입니다.</span>
+    </div>
+    <div class="callout warn">
+      <span>🔎</span><span><b>어떻게 나온 숫자인지 남깁니다.</b>
+      계약에 <code>일수 3 · 1일 350,000 · 부가세포함</code>을 함께 적어 둡니다.
+      나중에 「이 1,155,000이 어디서 왔나」에 답할 수 있어야 합니다.</span>
+    </div>
+  </section>
+
+  <!-- ══════ 2 ══════ -->
+  <section class="sec">
+    <h2>② 1일 단가는 어디에 두나 <span class="tag">설정 한 번</span></h2>
+    <p class="why">유형마다 다르고 해마다 바뀝니다. 코드에 박으면 대표님이 못 고칩니다.</p>
+
+    <p style="font-size:12.5px;margin:0 0 8px"><b>업무유형 관리</b> 화면의 컨설팅 유형 표에 칸 하나를 늘립니다.</p>
+    <table>
+      <tr><th>유형</th><th>약어</th><th>기관</th><th>1일 단가 <span class="tag new">새로</span></th><th>부가세</th></tr>
+      <tr><td>현장클리닉</td><td>현클</td><td>경영지도사회</td><td class="n" style="background:var(--n0)"><b>350,000</b></td><td>별도(+10%)</td></tr>
+      <tr><td>기술보호울타리</td><td>기보</td><td class="muted">—</td><td class="n muted">비움</td><td class="muted">—</td></tr>
+      <tr><td>일터상생혁신</td><td>일터</td><td>노사발전재단</td><td class="n muted">비움</td><td class="muted">—</td></tr>
+    </table>
+    <div class="callout info">
+      <span>💡</span><span><b>비워 두면 일수 칸이 아예 안 보입니다.</b>
+      단가가 없는 유형에 빈 칸을 띄우면 「왜 안 되지」가 됩니다.
+      지금은 현장클리닉 한 곳만 채우면 됩니다.</span>
+    </div>
+    <div class="callout warn">
+      <span>⚠</span><span><b>단가를 고쳐도 지난 계약은 안 바뀝니다.</b>
+      이미 맺은 계약의 금액을 나중에 소급해 바꾸면 그게 사고입니다.
+      새로 넣는 계약부터 새 단가를 씁니다.</span>
+    </div>
+  </section>
+
+  <!-- ══════ 3 ══════ -->
+  <section class="sec">
+    <h2>③ 3일 → 정부사업일정에 3일치 자리 <span class="tag new">새로</span></h2>
+    <p class="why">이미 이어져 있는 길을 씁니다 — 정부사업일정은 지금도 이알피 컨설팅을 읽고 있습니다.</p>
+
+    <div class="modal">
+      <div class="bar">정부사업일정 · 가나상사 · 현장클리닉</div>
+      <div class="body">
+        <div class="callout" style="margin-top:0">
+          <span>📥</span><span><b>이알피 계약에 「3일」이라고 적혀 있습니다.</b>
+          지금 이 사업장은 3회차로 잡혀 있습니다 — 그대로면 손댈 것이 없습니다.
+          <button class="ghost act" style="margin-left:6px">3회차로 맞추기</button></span>
+        </div>
+        <div class="rounds">
+          <div class="round filled"><div class="r1">1일차 · 방문</div><div class="r2">10/07 (화)</div></div>
+          <div class="round"><div class="r1">2일차 · 방문</div><div class="r2">날짜 비었음</div></div>
+          <div class="round"><div class="r1">3일차</div><div class="r2">날짜 비었음</div></div>
+        </div>
+      </div>
+    </div>
+
+    <ol class="steps" style="margin-top:14px">
+      <li><b>계약에 일수를 넣는다</b><span>이알피 컨설팅 기록에 «일수 3»이 함께 넘어갑니다.</span></li>
+      <li><b>정부사업일정이 그 숫자를 읽는다</b><span>사업장↔컨설팅 짝짓기는 이미 돌고 있습니다(erpConsByCo). 새로 만들 것이 없습니다.</span></li>
+      <li><b>다르면 띠로 알린다</b><span>같으면 아무것도 안 뜹니다. 다를 때만 「3회차로 맞추기」가 뜹니다.</span></li>
+      <li><b>사업장이 아직 없으면</b><span>「이 컨설팅으로 사업장 만들기(3일)」를 띄웁니다 — 이름·담당자까지 채운 채로.</span></li>
+    </ol>
+
+    <div class="callout warn">
+      <span>⚠</span><span><b>자동으로 회차를 바꾸지 않습니다.</b>
+      일정에는 이미 잡힌 날짜와 사진이 붙어 있습니다.
+      회차를 말없이 줄이면 잡아 둔 날이 사라집니다 — <b>누르셔야 바뀝니다.</b></span>
+    </div>
+  </section>
+
+  <!-- ══════ 4 ══════ -->
+  <section class="sec">
+    <h2>④ 사진첩 → 기업정보함 → 계약관리 <span class="tag">반쯤 이미 있음</span></h2>
+    <p class="why">신청서 캡처를 읽어 기업정보함에 담는 길은 이미 돕니다. 빠진 것은 <b>계약 쪽에서 되받는</b> 자리입니다.</p>
+
+    <table>
+      <tr><th>단계</th><th>지금</th><th>할 일</th></tr>
+      <tr><td>사진첩·정부사업일정에 신청 캡처를 올린다</td><td class="yes">있음</td><td class="muted">—</td></tr>
+      <tr><td>캡처를 읽어 사업자번호·대표·주소·매출액·상시근로자수를 뽑는다</td><td class="yes">있음</td><td class="muted">—</td></tr>
+      <tr><td>사업자번호를 열쇠로 기업정보함 기업상세에 담는다</td><td class="yes">있음</td><td class="muted">—</td></tr>
+      <tr><td>계약 추가에서 기업정보함 정보를 가져온다</td><td class="yes">있음 <span class="muted">(단추를 찾아 눌러야)</span></td><td>눈앞에 띄운다</td></tr>
+      <tr><td><b>신청서 한 장에서 계약을 시작한다</b></td><td class="no">없음</td><td><b>새로 만든다</b></td></tr>
+    </table>
+
+    <div class="modal" style="margin-top:14px">
+      <div class="bar">계약 추가 · 기업정보</div>
+      <div class="body">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <span style="font-size:11.5px;font-weight:700;color:var(--g5)">회사명</span>
+          <input value="가나상사" style="max-width:220px">
+          <button class="ghost act">📷 계약서 찾기</button>
+          <span class="isnew"><button class="act" style="background:var(--n3)">🏥 현장클리닉 신청서에서 시작</button></span>
+        </div>
+        <div class="callout">
+          <span>📇</span><span><b>기업정보함에 「가나상사」 정보가 있습니다</b> —
+          사업자번호·대표·주소·업태·종목·매출액·상시근로자수.
+          <button class="ghost act" style="margin-left:6px">빈 칸 채우기</button></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <span>🔑</span><span><b>사업자번호로 찾은 것은 그 자리에서 채웁니다.</b>
+      번호는 틀릴 수가 없습니다. <b>이름으로만 찾은 것은 띠만 띄우고 누르셔야 들어갑니다</b> —
+      「가나상사」가 두 곳일 수 있습니다. 오늘 CMS에서 «금액만 같아서» 엉뚱한 곳에 붙은 것과 같은 함정입니다.</span>
+    </div>
+    <div class="callout">
+      <span>✅</span><span><b>빈 칸만 채웁니다.</b> 사람이 적어 둔 값은 안 지웁니다.
+      무엇이 채워졌는지 한 줄로 알려 드립니다.</span>
+    </div>
+  </section>
+
+  <!-- ══════ 물음 ══════ -->
+  <section class="sec q">
+    <h2>대표님께 여쭐 것 <span class="tag ask">셋</span></h2>
+    <ol>
+      <li><b>「3일」이 정부사업일정의 「3회차」와 같은 말입니까?</b><br>
+        지금 현장클리닉은 3회차로 잡혀 있고 그중 2번이 방문입니다.
+        출장비는 <b>방문한 날</b>에 붙는 것 같은데, 3일 105만원이면 3번 다 나가시는 것으로 읽힙니다.
+        <span class="muted">— 다르면 「방문일수」와 「회차」를 따로 세야 합니다.</span></li>
+      <li><b>계약금 없이 전액 잔금이 맞습니까?</b><br>
+        현장클리닉은 끝나고 한 번에 받는 것으로 보고 <b>잔금</b>에 넣었습니다.
+        <span class="muted">— 나눠 받는 곳이 있으면 유형 설정에서 고를 수 있게 하겠습니다.</span></li>
+      <li><b>1일 350,000원이 «부가세 별도»가 맞습니까?</b><br>
+        3일 105만 + 부가세 10.5만 = 115.5만으로 계산했습니다.
+        <span class="muted">— 350,000이 이미 세금 포함이면 3일이 105만 그대로입니다.</span></li>
+    </ol>
+  </section>
+
+</div>
+</body>
+</html>

@@ -72,6 +72,12 @@ function gridCtx(kindV, opts){
     setSimple(){ return function(){}; },
     setBriefFor(){ return function(){}; },
     setF(){}, vatIncludedHint(){},
+    /* 🏥 하루 단위 컨설팅 — 이 검사는 «부가세·업무요약·CMS» 를 본다.
+       단가를 0 으로 두면 일수 줄은 안 그려지므로 열 세기가 예전 그대로다
+       (일수 줄 자체는 tests/clinic-days-fee.test.js 가 본다). */
+    consTypeDayFee(){ return 0; },
+    consDayAmount(){ return null; },
+    consDayMayFill(){ return true; },
     // 아래쪽 종류(기금·업체·상담)는 아직 옛 briefRow 를 쓴다 — 전체폭 한 줄이라 열 계산에서 빼고 센다
     briefRow(){ return { tag:'div', props:{ style:{ gridColumn:'1 / -1' } }, kids:[] }; },
     h(tag, props){

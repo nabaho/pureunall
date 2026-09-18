@@ -429,6 +429,14 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .co-setting-input:focus{border-color:var(--accent);}
 .co-setting-note{margin-top:7px;font-size:10px;font-weight:800;color:var(--t2);}
 .co-setting-note strong{color:var(--accent);}
+/* 🏥 이알피 계약의 일수와 회차가 다를 때만 뜨는 한 줄 (대표 지시 2026-09-18) */
+.erp-days-note{margin-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;
+  font-size:11px;font-weight:700;color:#1e40af;}
+.erp-days-note b{color:#1e40af;}
+.erp-days-btn{font-family:inherit;background:#2563eb;color:#fff;border:0;border-radius:6px;
+  padding:4px 11px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.erp-days-btn:hover{background:#1e40af;}
 @media(max-width:620px){.co-setting-grid{grid-template-columns:1fr;}}
 /* 회차 손으로 정하기 (건의함 김동현 2026-09-03) */
 /* 「일정관리에서 진행」 스위치 — 이음과 진행은 다른 것이다(대표 지시 2026-09-06) */
@@ -8075,6 +8083,43 @@ async function openCoModal(editId=null){
   q('#mbCo').classList.add('open');
 }
 
+/* ══ 🏥 이알피 계약에 적힌 «일수» 를 읽는다 (대표 지시 2026-09-18) ═══════════
+   「3일 컨설팅이면 정부사업일정에도 3일로 잡혀서 넣을 수 있으면 좋겠다」
+   대표 확인: 현장클리닉은 «3일 = 3회차» 다.
+
+   ⚠ 읽기만 한다. 회차를 저절로 바꾸지 «않는다» — 일정에는 이미 잡아 둔 날짜와
+     사진이 붙어 있어서, 말없이 줄이면 잡아 둔 날이 사라진다. 사람이 누른다.
+   ⚠ 이 사업장에 이어진 컨설팅 가운데 «이 종류» 것만 본다. 한 사업장이 여러 사업을
+     하는데 종류를 안 가리면 일터혁신 일수를 현장클리닉 칸에 들이민다.
+   ⚠ 여러 건이면 가장 큰 값을 쓴다 — 회차는 «최대»라서 모자라면 못 넣는다. */
+function erpDaysForCoType(coId, tid){
+  if(!ERP.loaded || !coId || !tid) return 0;
+  let linked = [];
+  try { linked = erpConsByCo()[coId] || []; } catch(e){ return 0; }
+  if(!linked.length) return 0;
+  const tmap = getErpTypeMap();
+  let best = 0;
+  linked.forEach(c=>{
+    const code = erpConsCode(c);
+    if(!code || tmap[code] !== tid) return;
+    const d = parseInt(c && c.consultDays, 10) || 0;
+    if(d > best) best = d;
+  });
+  return best;
+}
+
+/* 회차 칸 밑 한 줄 — 이알피 계약의 일수와 «다를 때만» 뜬다.
+   ⚠ 같으면 아무것도 안 뜬다. 맞는데도 띠가 떠 있으면 사람이 곧 안 읽는다.
+   ⚠ 새 사업장(co_editId 없음)에는 안 뜬다 — 아직 이알피와 이어질 자리가 없다. */
+function erpDaysNote(tid, appliedRounds){
+  const d = erpDaysForCoType(co_editId, tid);
+  if(!d || d === appliedRounds) return '';
+  return `<div class="erp-days-note">
+    📥 푸른이알피 계약에 <b>${d}일</b>이라고 적혀 있습니다 — 지금 이 사업장은 ${appliedRounds>0?appliedRounds+'회차':'무제한'}입니다.
+    <button type="button" class="erp-days-btn" onclick="co_rounds['${tid}']=${d};renderCoTypes();">${d}회차로 맞추기</button>
+  </div>`;
+}
+
 function renderCoTypes(){
   const types=getTypes().filter(t=>t.active!==false);
   q('#mCoTypes').innerHTML=types.map(t=>{
@@ -8126,6 +8171,7 @@ function renderCoTypes(){
         </label>
       </div>
       <div class="co-setting-note">적용값: <strong>최대 ${applyRoundText}</strong> · <strong>의무방문 ${applyMandatory}회</strong>${dlVal?` · 종료일 ${dlVal}`:''}</div>
+      ${erpDaysNote(tid,appliedRounds)}
     </div>`;
   }).join('');
 }
