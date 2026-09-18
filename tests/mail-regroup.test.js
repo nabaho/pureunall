@@ -44,7 +44,7 @@ test('모양이 다른 글은 빈칸을 준다 — 억지로 읽으면 엉뚱한
 
 const COS = { v: {
   a: { id: 'co_a', name: '가나글로벌아산공장', managerMain: 'A-001', primaryContactEmail: 'cust22@ganaglobal.com' },
-  b: { id: 'co_b', name: '정일제지', managerMain: 'A-002', taxEmail: 'cust01@hanmail.net' }
+  b: { id: 'co_b', name: '가온제지', managerMain: 'A-002', taxEmail: 'cust01@hanmail.net' }
 } };
 const OWNERS = {
   uid1: { email: 'a001@pureun.kr', name: '주민정' },

@@ -69,8 +69,8 @@ test('classify 확실: 이름 끝이 결과물 단어이고 원본 확장자면 
 });
 
 test('certKindOf: 외부기관 발급과 본인 경력증명을 가른다', () => {
-  assert.equal(KS.certKindOf('2024 구조혁신지원사업 컨설팅 수행실적 증명서_성문전자(주)_권형하'), 'ext');
-  assert.equal(KS.certKindOf('실적증명서_(주)선진테크_권'), 'ext');
+  assert.equal(KS.certKindOf('2024 구조혁신지원사업 컨설팅 수행실적 증명서_라온전자(주)_권형하'), 'ext');
+  assert.equal(KS.certKindOf('실적증명서_(주)라온테크_권'), 'ext');
   assert.equal(KS.certKindOf('2.공인노무사회 정부위탁사업 참여확인서_권형하노무사'), 'ext');
   assert.equal(KS.certKindOf('2025년 산업·일자리전환 지원 컨설팅 수행 확인(푸른노무법인)'), 'ext');
   assert.equal(KS.certKindOf('경력증명서-푸른'), 'own');
@@ -80,7 +80,7 @@ test('certKindOf: 외부기관 발급과 본인 경력증명을 가른다', () =
 
 test('classify: 증명서 낱말은 이름 끝이 아니어도 승격한다 (실사용 190건 누락)', () => {
   // 증명서 파일명은 '증명서_대상_본인이름' 꼴이 흔해 '이름 끝' 규칙으로는 전부 놓쳤다
-  assert.deepEqual(KS.classify('2024 구조혁신지원사업 컨설팅 수행실적 증명서_(주)코시노인터네셔널_권형하.pdf'),
+  assert.deepEqual(KS.classify('2024 구조혁신지원사업 컨설팅 수행실적 증명서_(주)다라인터네셔널_권형하.pdf'),
     { level: 'sure', store: 'certdoc', type: '', titleHint: '', certKind: 'ext' });
   assert.deepEqual(KS.classify('경력증명서-푸른.pdf'),
     { level: 'sure', store: 'certdoc', type: '', titleHint: '', certKind: 'own' });
@@ -88,7 +88,7 @@ test('classify: 증명서 낱말은 이름 끝이 아니어도 승격한다 (실
     { level: 'sure', store: 'certdoc', type: '', titleHint: '', certKind: 'own' });
   assert.deepEqual(KS.classify('실적증명서- 중소벤처기업부 비즈니스지원단.pdf'),
     { level: 'sure', store: 'certdoc', type: '', titleHint: '', certKind: 'ext' });
-  assert.deepEqual(KS.classify('실적증명서_(주)영도_권.jpg'),
+  assert.deepEqual(KS.classify('실적증명서_(주)가온_권.jpg'),
     { level: 'sure', store: 'certdoc', type: '', titleHint: '', certKind: 'ext' });
   assert.deepEqual(KS.classify('2025년 산업·일자리전환 지원 컨설팅 수행 확인(푸른노무법인).pdf'),
     { level: 'sure', store: 'certdoc', type: '', titleHint: '', certKind: 'ext' });

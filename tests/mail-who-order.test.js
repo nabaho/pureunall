@@ -39,7 +39,7 @@ const DIR = [
   { sid:'A-001', name:'새롬',   sortOrder:100, role:'staff',  title:'과장',     status:'active' },
 ];
 const BYNAME = {
-  '하윤사': { company:'하윤사', main:'하윤서', subs:[], left:false },
+  '가람사': { company:'가람사', main:'하윤서', subs:[], left:false },
   '가온사': { company:'가온사', main:'가온',   subs:[], left:false },
   '새롬사': { company:'새롬사', main:'새롬',   subs:[], left:false },
   '대표사': { company:'대표사', main:'권형하', subs:[], left:false },
@@ -47,7 +47,7 @@ const BYNAME = {
   '끝난사': { company:'끝난사', main:'하윤서', subs:[], left:true },
 };
 const ITEMS = {
-  i1:{ id:'i1', email:'a@hy.kr', company:'하윤사' },
+  i1:{ id:'i1', email:'a@hy.kr', company:'가람사' },
   i2:{ id:'i2', email:'b@ga.kr', company:'가온사' },
   i3:{ id:'i3', email:'c@nr.kr', company:'새롬사' },
   i4:{ id:'i4', email:'d@dp.kr', company:'대표사' },

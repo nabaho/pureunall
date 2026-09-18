@@ -49,7 +49,7 @@ function loadApp(appState, opts) {
       pick: {}, companies: [], pending: {}, arrivals: {}, trash: {},
       folders: {}, folderPick: 'all', folderEdit: { mode: '', fid: '', value: '' },
       staffList: [], deputies: {}, month: '2026-08', kind: 'attend',
-      companyId: 'co_1', companyName: '화담원',
+      companyId: 'co_1', companyName: '다온원',
       viewingUid: '', viewingName: '', viewingDeputy: false,
       handoffBusy: false
     }, appState)) + ';',
@@ -131,7 +131,7 @@ test('★ 확인하면 급여관리 수신함과 handoff_log 에 저장되고 �
   const logKeys = Object.keys(saved).filter(k => k.startsWith('paydata/handoff_log/'));
   assert.equal(inboxKeys.length, 1);
   assert.equal(logKeys.length, 1);
-  assert.equal(saved[inboxKeys[0]].사업장, '화담원');
+  assert.equal(saved[inboxKeys[0]].사업장, '다온원');
   assert.equal(saved[inboxKeys[0]].월, '2026-08');
   assert.equal(saved[logKeys[0]].companyId, 'co_1');
   assert.match(calls.alerts[0], /넘겼습니다/);
@@ -142,7 +142,7 @@ test('확인 문구에 업체명·월·건수가 들어간다', async () => {
   const { W, calls } = loadApp({ itemsMonth: ITEMS_MONTH, itemsKeep: {}, values: 값한줄 },
     { isAdmin: true, db: makeDb(값한줄, saved) });
   await W.handoffMonth();
-  assert.match(calls.confirms[0], /화담원/);
+  assert.match(calls.confirms[0], /다온원/);
   assert.match(calls.confirms[0], /2026-08/);
   assert.match(calls.confirms[0], /1줄/, '급여관리가 보는 것은 서류 장수가 아니라 값 줄 수입니다');
 });
@@ -154,20 +154,20 @@ test('확인 문구에 업체명·월·건수가 들어간다', async () => {
    준비됐다」를 아는 유일한 신호가 거짓이 된다. */
 
 test('★ 앞 업체 값 표를 보고 온 뒤 눌러도 그 업체 줄 수를 알리지 않는다', async () => {
-  const 화담원12 = {};
+  const 다온원12 = {};
   for (let i = 0; i < 12; i++) {
-    화담원12['v' + i] = { companyId: 'co_1', name: '화담원사람' + i, at: i,
+    다온원12['v' + i] = { companyId: 'co_1', name: '다온원사람' + i, at: i,
       pairs: [{ item: '유급일수', value: '3일' }] };
   }
   const saved = {};
-  // 화면에는 앞서 본 화담원(co_1) 값 12줄이 그대로 남아 있고, 지금 열린 업체는 co_2 다.
+  // 화면에는 앞서 본 다온원(co_1) 값 12줄이 그대로 남아 있고, 지금 열린 업체는 co_2 다.
   // 실시간DB 의 co_2 자리에는 값이 하나도 없다.
   const { W, calls } = loadApp({
-    companyId: 'co_2', companyName: '푸른상사', itemsMonth: {}, itemsKeep: {}, values: 화담원12
-  }, { isAdmin: true, db: makeDb(화담원12, saved), confirmReturn: true });
+    companyId: 'co_2', companyName: '푸른상사', itemsMonth: {}, itemsKeep: {}, values: 다온원12
+  }, { isAdmin: true, db: makeDb(다온원12, saved), confirmReturn: true });
   await W.handoffMonth();
   assert.equal(calls.confirms.length, 0,
-    '앞 업체(화담원) 값 12줄을 이 업체 것으로 세어 물었습니다 — 급여관리에 거짓이 올라갑니다');
+    '앞 업체(다온원) 값 12줄을 이 업체 것으로 세어 물었습니다 — 급여관리에 거짓이 올라갑니다');
   assert.match(calls.alerts[0], /없습니다/);
   assert.equal(Object.keys(saved).length, 0, '남의 업체 줄 수가 급여관리 수신함에 적혔습니다');
 });

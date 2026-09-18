@@ -62,11 +62,11 @@ function ok(name, cond, hintTxt) {
 }
 
 /* 업체 자료 — 실제 모양대로 */
-const CO_A = { id: 'co-1', name: '주식회사코엘이엔지', taxEmail: 'tax@hansol-tax.kr',
+const CO_A = { id: 'co-1', name: '주식회사다라이엔지', taxEmail: 'tax@hansol-tax.kr',
                taxOfficeName: '한솔세무회계', taxContact: '', taxPhone: '' };
-const CO_B = { id: 'co-2', name: '보문사', taxEmail: '', taxOfficeName: '', taxContact: '', taxPhone: '' };
+const CO_B = { id: 'co-2', name: '나루사', taxEmail: '', taxOfficeName: '', taxContact: '', taxPhone: '' };
 const CO_C = { id: 'co-3', name: '가온영농조합법인(가나시)', taxEmail: '', taxOfficeName: '', taxContact: '', taxPhone: '' };
-const CO_D = { id: 'co-4', name: '주식회사세창이엔지', taxEmail: 'tax@hansol-tax.kr',
+const CO_D = { id: 'co-4', name: '주식회사마바이엔지', taxEmail: 'tax@hansol-tax.kr',
                taxOfficeName: '한솔세무회계', taxContact: '', taxPhone: '' };
 
 box.ErpMatch = {
@@ -74,8 +74,8 @@ box.ErpMatch = {
   nameByEmail: { 'p001@pureun.kr': '권형하' },
   byTaxEmail: {
     'tax@hansol-tax.kr': [
-      { id: 'co-1', coName: '주식회사코엘이엔지', taxOfficeName: '한솔세무회계' },
-      { id: 'co-4', coName: '주식회사세창이엔지', taxOfficeName: '한솔세무회계' }
+      { id: 'co-1', coName: '주식회사다라이엔지', taxOfficeName: '한솔세무회계' },
+      { id: 'co-4', coName: '주식회사마바이엔지', taxOfficeName: '한솔세무회계' }
     ]
   },
   companies: [CO_A, CO_B, CO_C, CO_D]
@@ -94,7 +94,7 @@ console.log('[① 아는 주소]');
 }
 
 console.log('\n[② 우리 직원 메일에는 참견 안 한다]');
-ok('직원 메일은 지나간다', hint('p001@pureun.kr', '권형하', '주식회사코엘이엔지 건', '가온영농조합법인(가나시)') === null,
+ok('직원 메일은 지나간다', hint('p001@pureun.kr', '권형하', '주식회사다라이엔지 건', '가온영농조합법인(가나시)') === null,
    '우리끼리 주고받는 메일에 띠가 뜨면 성가시다');
 
 console.log('\n[④⑤ 모르는 주소 — 본문에서 업체 찾기]');
@@ -104,13 +104,13 @@ console.log('\n[④⑤ 모르는 주소 — 본문에서 업체 찾기]');
   ok('본문에 업체 이름이 보이면 묻는다', r && r.kind === 'ask' && r.co.coName === '가온영농조합법인(가나시)',
      JSON.stringify(r));
 }
-ok('짧은 이름(보문사)으로는 안 걸린다',
-   hint('who@x.kr', '아무개', '보문사 앞에서 만나요', '보문사 근처입니다') === null,
+ok('짧은 이름(나루사)으로는 안 걸린다',
+   hint('who@x.kr', '아무개', '나루사 앞에서 만나요', '나루사 근처입니다') === null,
    '세 글자 이름이 아무 문장에나 걸리면 헛물만 켠다');
 ok('이미 세무사무실이 적힌 업체는 안 묻는다',
    (function () {
-     const r = hint('other@x.kr', '아무개', '주식회사코엘이엔지 건', '주식회사코엘이엔지 관련');
-     return !r || r.co.coName !== '주식회사코엘이엔지';
+     const r = hint('other@x.kr', '아무개', '주식회사다라이엔지 건', '주식회사다라이엔지 관련');
+     return !r || r.co.coName !== '주식회사다라이엔지';
    })(),
    '이미 적힌 곳을 또 물으면 성가시다');
 ok('업체 이름이 안 보이면 아무 말 안 한다',

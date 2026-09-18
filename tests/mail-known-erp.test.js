@@ -6,7 +6,7 @@
  * 그런데 받은메일함은 «아는 주소»만 담는다(광고가 들어오는 곳이라). 그 명단을
  * 업체관리(data/companies)에서만 만들고 있었다 — 실측 185개.
  * 컨설팅·계약·사건 레코드에는 업체관리에 «없는» 담당자 주소가 71개 더 있었고,
- * 엠비프라텍 윤충희(cust09@daum.net)가 그 하나였다.
+ * 우람프라텍 윤충희(cust09@daum.net)가 그 하나였다.
  * 그 사람들 메일은 받은메일함을 켜도 「모르는 주소」로 버려진다 — 켠 보람이 없다.
  *
  * 이 검사가 지키는 것
@@ -26,7 +26,7 @@ const MR = require(path.join(ROOT, 'functions', 'mail-receive.js'));
 
 const 업체 = { v: [{ id: 'co-1', name: '가나', contacts: [{ email: 'kim@gana.co.kr' }] }] };
 const 컨설팅 = { v: [{
-  id: 'cs-1', companyName: '엠비프라텍', companyId: 'co-9',
+  id: 'cs-1', companyName: '우람프라텍', companyId: 'co-9',
   email: 'main@mbpr.co.kr', primaryContactEmail: 'primary@mbpr.co.kr',
   note: '옆 사무실 spam@ad.example.com 이 자꾸 보냄',
   updatedBy: 'p001@pureun.kr',

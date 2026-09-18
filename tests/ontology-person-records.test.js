@@ -28,7 +28,7 @@ const O = require('../js/pu-ontology.js');
 function 자료() {
   return {
     user_accounts: [{ sid: 'P-001', name: '권형하' }, { sid: 'P-007', name: '김혜민' }],
-    companies: [{ id: 'co1', name: '천성가축약품', bizNo: '123-45-67890' }],
+    companies: [{ id: 'co1', name: '두레가축약품', bizNo: '123-45-67890' }],
     employment_contracts: [{ id: 'ec-P-007-1', sid: 'P-007', name: '김혜민', type: '근로계약서' }],
     attendance_records: [{ id: 'att-1', sid: 'P-007', date: '2026-08-01', type: 'work' }],
     leave_of_absence: [{ id: 'loa-1', sid: 'P-001', from: '2026-07-01' }],

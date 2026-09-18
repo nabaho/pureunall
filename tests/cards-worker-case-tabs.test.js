@@ -129,24 +129,24 @@ test('★ 탭 수는 «그 사건에 걸린 사람 수»다 — 화면에 보이
      이름만 늘어놓으면 어느 것을 고르는지 알 수 없다. */
 
 test('★★ 사업장이 있으면 사업장으로 가른다 — 사람 이름은 «안» 붙인다', () => {
-  const c = load({ people: [P('강미향', [C('k1', { company: '중원대학교' })])] });
+  const c = load({ people: [P('강미향', [C('k1', { company: '가나대학교' })])] });
   const w = c.wkCaseWhich(c.wkCaseOf('k1'));
-  assert.ok(w.indexOf('중원대학교') >= 0, '★ 사업장을 안 붙인다: ' + w);
+  assert.ok(w.indexOf('가나대학교') >= 0, '★ 사업장을 안 붙인다: ' + w);
   assert.ok(w.indexOf('1명') > 0, '★ 사람 수를 안 붙인다: ' + w);
   /* 둘 다 붙이면 탭 곁줄이 길어져 잘린다 — 가려 주는 것 «하나»면 된다 */
   assert.ok(w.indexOf('강미향') < 0, '★ 사업장이 있는데 사람 이름까지 붙였다: ' + w);
 });
 
 test('★ 같은 사람이 한 사건에 두 번 적혀 있어도 이름은 «한 번»만 — 이알피에 실제로 있다', () => {
-  const c = load({ people: [P('심진숙', [C('k1', { company: '' }), C('k1', { company: '' })])] });
+  const c = load({ people: [P('한소담', [C('k1', { company: '' }), C('k1', { company: '' })])] });
   const w = c.wkCaseWhich(c.wkCaseOf('k1'));
-  assert.equal(w.indexOf('심진숙 · 심진숙'), -1, '★ 같은 이름이 두 번 적힌다: ' + w);
+  assert.equal(w.indexOf('한소담 · 한소담'), -1, '★ 같은 이름이 두 번 적힌다: ' + w);
 });
 
 test('★★ 사업장이 «비었으면» 사람 이름으로 가른다 — 실제로 그런 사건이 많다', () => {
-  const c = load({ people: [P('심진숙', [C('k1', { company: '', caseNo: '산재등-2026-001' })])] });
+  const c = load({ people: [P('한소담', [C('k1', { company: '', caseNo: '산재등-2026-001' })])] });
   const w = c.wkCaseWhich(c.wkCaseOf('k1'));
-  assert.ok(w.indexOf('심진숙') >= 0, '★ 「산업재해등사건대리」 둘을 가릴 길이 없다: ' + w);
+  assert.ok(w.indexOf('한소담') >= 0, '★ 「산업재해등사건대리」 둘을 가릴 길이 없다: ' + w);
   assert.ok(w.indexOf('산재등-2026-001') > 0, '★ 사건번호도 없으면 정말 못 가른다: ' + w);
 });
 
@@ -161,21 +161,21 @@ test('★ 이름 셋까지만 적고 나머지는 「외」 — 집단 진정은
 
 test('★★ 고르는 창이 «같은 이름» 사건을 갈라 보여 준다 — 안 그러면 아무거나 누른다', () => {
   const c = load({ people: [P('故 권상석', [C('k1', { title: '산업재해등사건대리', company: '상대방미정' })]),
-                            P('심진숙',   [C('k2', { title: '산업재해등사건대리', company: '' })])] });
+                            P('한소담',   [C('k2', { title: '산업재해등사건대리', company: '' })])] });
   c.wkTabAdd();
   assert.equal(c._panel.split('산업재해등사건대리').length - 1, 2, '★ 두 건이 다 안 나온다');
   /* ⚠ 말풍선(title=)에만 있으면 «보이지 않는다» — 눈에 보이는 곁줄(.sdesc)을 본다.
        말풍선까지 세면, 곁줄을 통째로 지워도 초록이 된다(2026-09-05 에 실제로 샜다). */
   const 곁줄 = (c._panel.match(/<span class="sdesc">([^<]*)<\/span>/g) || []).join(' ');
-  assert.ok(곁줄.indexOf('상대방미정') > 0 && 곁줄.indexOf('심진숙') > 0,
+  assert.ok(곁줄.indexOf('상대방미정') > 0 && 곁줄.indexOf('한소담') > 0,
     '★ 이름이 같은 두 사건을 «화면에서» 가릴 길이 없다 — 아무거나 누르게 된다: ' + 곁줄);
 });
 
 test('★★ 탭 이름 기본값도 «다르게» 나온다 — 같은 이름 탭이 둘이면 못 가른다', () => {
-  const c = load({ people: [P('심진숙', [C('k1', { title: '산업재해등사건대리', company: '' })])] });
-  c._answer = '심진숙 산업재해등사건대리';        /* 사람이 그대로 눌렀다고 본다 */
+  const c = load({ people: [P('한소담', [C('k1', { title: '산업재해등사건대리', company: '' })])] });
+  c._answer = '한소담 산업재해등사건대리';        /* 사람이 그대로 눌렀다고 본다 */
   c.wkTabMake('k1');
-  assert.equal(c._put[0].name, '심진숙 산업재해등사건대리');
+  assert.equal(c._put[0].name, '한소담 산업재해등사건대리');
   /* 기본값을 «무엇으로 내미는지»가 알맹이다 — prompt 의 둘째 값이다 */
   const seg = SRC.slice(SRC.indexOf('function wkTabMake(caseKey){'),
                         SRC.indexOf('/* ── 고치기·지우기 ── */'));

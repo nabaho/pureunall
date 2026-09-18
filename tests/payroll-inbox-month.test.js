@@ -89,38 +89,38 @@ test('월이 될 수 없는 수는 안 받는다', () => {
 /* ══════ 도착 판정 ══════ */
 
 const HANDOFF = {
-  m1: { ts: 1, filename: '화담원 2026-08 값', 사업장: '화담원', 월: '2026-08',
+  m1: { ts: 1, filename: '다온원 2026-08 값', 사업장: '다온원', 월: '2026-08',
     종류: '급여데이터함 값', 상태: '대기', 출처: '급여데이터함' }
 };
 
 test('★ 급여데이터함에서 넘긴 자료가 「도착」으로 잡힌다', () => {
-  const { arrivalFor } = load(HANDOFF, ['화담원']);
-  assert.equal(arrivalFor('화담원', '8월'), true);
+  const { arrivalFor } = load(HANDOFF, ['다온원']);
+  assert.equal(arrivalFor('다온원', '8월'), true);
 });
 
 test('★ 다른 달을 보고 있으면 「도착」이 아니다', () => {
-  const { arrivalFor } = load(HANDOFF, ['화담원']);
-  assert.equal(arrivalFor('화담원', '7월'), false);
+  const { arrivalFor } = load(HANDOFF, ['다온원']);
+  assert.equal(arrivalFor('다온원', '7월'), false);
 });
 
 test('★ ㈜·괄호·빈칸 차이로 어긋나지 않는다', () => {
-  const inbox = { m1: Object.assign({}, HANDOFF.m1, { 사업장: '㈜ 화담원' }) };
-  const { arrivalFor } = load(inbox, ['화담원(아산)']);
-  assert.equal(arrivalFor('화담원(아산)', '8월'), true);
+  const inbox = { m1: Object.assign({}, HANDOFF.m1, { 사업장: '㈜ 다온원' }) };
+  const { arrivalFor } = load(inbox, ['다온원(아산)']);
+  assert.equal(arrivalFor('다온원(아산)', '8월'), true);
 });
 
 test('이름이 아예 다른 사업장을 「도착」으로 속이지 않는다', () => {
   // 앞글자만 같은 다른 업체를 도착으로 읽으면, 안 온 자료를 안 재촉한다
-  const { arrivalFor } = load(HANDOFF, ['화담원물류']);
-  assert.equal(arrivalFor('화담원물류', '8월'), false);
+  const { arrivalFor } = load(HANDOFF, ['다온원물류']);
+  assert.equal(arrivalFor('다온원물류', '8월'), false);
 });
 
 test('기준 월을 못 읽으면 달을 안 가린다 (예전 그대로)', () => {
-  const { arrivalFor } = load(HANDOFF, ['화담원']);
-  assert.equal(arrivalFor('화담원', '아무말'), true);
+  const { arrivalFor } = load(HANDOFF, ['다온원']);
+  assert.equal(arrivalFor('다온원', '아무말'), true);
 });
 
 test('수신 기록이 없으면 미도착이다', () => {
-  const { arrivalFor } = load({}, ['화담원']);
-  assert.equal(arrivalFor('화담원', '8월'), false);
+  const { arrivalFor } = load({}, ['다온원']);
+  assert.equal(arrivalFor('다온원', '8월'), false);
 });

@@ -24,7 +24,7 @@ function loadApp(appState) {
   new vm.Script([
     'const S = window.PuPaydataStore; S.init({uid:"U1"});',
     'const App = ' + JSON.stringify(Object.assign({
-      companyId: 'co_1', companyName: '화담원', month: '2026-08', values: {}
+      companyId: 'co_1', companyName: '다온원', month: '2026-08', values: {}
     }, appState)) + ';',
     /* 값 표가 서류 목록(판독 취소)까지 그리므로 그쪽이 쓰는 것도 함께 싣는다.
        findRow 는 서랍을 뒤져 원본을 찾는다 — 여기서는 자료가 없어 늘 못 찾는다
@@ -183,7 +183,7 @@ function loadOut(companyName) {
   new vm.Script([
     'const S = window.PuPaydataStore; S.init({uid:"U1"});',
     'const App = ' + JSON.stringify({
-      companyId: 'co_1', companyName: companyName || '화담원', month: '2026-08',
+      companyId: 'co_1', companyName: companyName || '다온원', month: '2026-08',
       values: {
         v1: { companyId: 'co_1', name: '배영승', sourceId: 'a1',
               pairs: [{ item: '유급일수', value: '3일' }, { item: '비고', value: '가,나' }] }
@@ -227,7 +227,7 @@ test('★ 엑셀에서 한글이 안 깨진다 (BOM)', () => {
   const b = W.__blob();
   assert.ok(b, '내려받지 않았습니다');
   assert.match(b.parts[0], /^﻿/, 'BOM 이 없으면 엑셀에서 한글이 깨집니다');
-  assert.match(W.__name(), /화담원/);
+  assert.match(W.__name(), /다온원/);
   assert.match(W.__name(), /\.csv$/);
 });
 

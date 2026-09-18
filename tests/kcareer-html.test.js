@@ -302,8 +302,8 @@ test('_cdGuessIssuer는 폴더 경로에서 먼저 찾고 파일명으로 보완
   };
   vm.runInNewContext(funcSource('_cdGuessIssuer'), ctx);
   assert.equal(ctx._cdGuessIssuer({
-    name: '2024 구조혁신지원사업 컨설팅 수행실적 증명서_성문전자(주)_권형하.pdf',
-    relPath: '6. 컨설팅 실적증명/구조혁신(능률협회)/2024/2024 구조혁신지원사업 컨설팅 수행실적 증명서_성문전자(주)_권형하.pdf'
+    name: '2024 구조혁신지원사업 컨설팅 수행실적 증명서_라온전자(주)_권형하.pdf',
+    relPath: '6. 컨설팅 실적증명/구조혁신(능률협회)/2024/2024 구조혁신지원사업 컨설팅 수행실적 증명서_라온전자(주)_권형하.pdf'
   }), '능률협회');
   assert.equal(ctx._cdGuessIssuer({
     name: '2.공인노무사회 정부위탁사업 참여확인서_권형하노무사.pdf',

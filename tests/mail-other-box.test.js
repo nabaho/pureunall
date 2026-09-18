@@ -30,7 +30,7 @@ function cut(from, to){
 }
 
 /* ── 밑그림 ──
-   하윤사   a@hy.kr    자문사 · 담당 하윤서   → 담당자 칸
+   가람사   a@hy.kr    자문사 · 담당 하윤서   → 담당자 칸
    노동청   labor@moel.go.kr  「자문사 아님」  → 그 밖
    공단     kcomwel@comwel.or.kr 「자문사 아님」 → 그 밖
    모르는곳 who@nowhere.kr   아무것도 아님     → 담당 모름
@@ -40,7 +40,7 @@ const DIR = [
   { sid:'P-002', name:'하윤서', sortOrder:20, role:'member', title:'노무사',     status:'active' },
 ];
 const COS = [
-  { id:'c1', name:'하윤사', bizNo:'1', typeCode:'자문', status:'active',
+  { id:'c1', name:'가람사', bizNo:'1', typeCode:'자문', status:'active',
     managerMain:'P-002', email:'a@hy.kr', contacts:[] },
 ];
 const FOLDERS = { B1:{ path:'1.칸', name:'1.칸', kind:'custom', order:1, total:9, unseen:5 } };

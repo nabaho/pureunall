@@ -33,7 +33,7 @@ function cut(from, to){
 
 /* ── 업체 셋 ── */
 const COS = [
-  { id:'c1', name:'씨티에스(주)', bizNo:'1', typeCode:'자문', status:'active',
+  { id:'c1', name:'열음에스(주)', bizNo:'1', typeCode:'자문', status:'active',
     managerMain:'P-002', email:'', primaryContactEmail:'lmk@ctstech.co.kr',
     primaryContactName:'이미경', primaryContactPhone:'041-555-1234',
     /* ⚠ 주소가 «둘» 이어야 도메인 짚기를 잴 수 있다 — 하나면 자기 자신뿐이라
@@ -157,7 +157,7 @@ const hint = c => c.mbNewCoHint(c.__row());
 test('★★ 도메인이 같으면 «그 업체»로 짚는다', () => {
   const h = hint(load());
   assert.ok(h, '처음 보는 주소를 못 짚었습니다');
-  assert.equal(h.co.name, '씨티에스(주)', '엉뚱한 업체를 짚었습니다: ' + h.co.name);
+  assert.equal(h.co.name, '열음에스(주)', '엉뚱한 업체를 짚었습니다: ' + h.co.name);
   assert.equal(h.why, '도메인', '무엇으로 짚었는지가 틀렸습니다: ' + h.why);
 });
 
@@ -177,15 +177,15 @@ test('★★ 무료메일은 «도메인으로» 안 짚는다 — 하나를 이
 });
 
 test('★★ 짧은 업체 이름으로는 안 짚는다 — 아무 데나 걸린다', () => {
-  /* 「보문」은 두 글자다. 본문의 「보문사에 다녀왔습니다」에 걸리면 안 된다 */
-  const c = load({ row:{ e:'someone@nowhere.kr' }, body:'주말에 보문사에 다녀왔습니다' });
+  /* 「보문」은 두 글자다. 본문의 「나루사에 다녀왔습니다」에 걸리면 안 된다 */
+  const c = load({ row:{ e:'someone@nowhere.kr' }, body:'주말에 나루사에 다녀왔습니다' });
   assert.equal(hint(c), null, '짧은 이름에 걸렸습니다');
 });
 
 /* ══════ ④ 안 묻는 자리 ══════ */
 
 test('★★ 이미 아는 주소는 «안 묻는다»', () => {
-  /* ⚠ 씨티에스에 주소가 둘이라, 가드를 떼면 도메인으로 짚혀 버린다 — 그래야 잰다. */
+  /* ⚠ 열음에스에 주소가 둘이라, 가드를 떼면 도메인으로 짚혀 버린다 — 그래야 잰다. */
   const c = load({ row:{ e:'lmk@ctstech.co.kr' } });   /* 이미 적힌 담당자 */
   assert.equal(hint(c), null, '이미 아는 주소를 또 물었습니다');
 });
@@ -215,7 +215,7 @@ test('★★ 메일 읽기 화면에 «묻는 띠»가 뜬다', () => {
   const c = load();
   const h = c.mbNewStripHtml(c.__row());
   assert.ok(h.indexOf('처음 보는 주소') >= 0, '묻는 띠가 없습니다');
-  assert.ok(h.indexOf('씨티에스(주)') >= 0, '어느 업체인지 안 적혀 있습니다');
+  assert.ok(h.indexOf('열음에스(주)') >= 0, '어느 업체인지 안 적혀 있습니다');
   assert.ok(/mbNewOpen\(/.test(h) && /mbNewNo\(/.test(h), '등록·아니오 단추가 없습니다');
 });
 
@@ -270,7 +270,7 @@ test('★★ 「늘었습니다」를 고르면 전임자에게 «표를 안 붙
   assert.ok(old && !old.left, '늘어난 것인데 전임자를 떠났다고 표시했습니다');
   /* ⚠ 수를 못 박지 않는다 — 밑그림에 담당자를 더하면 그때마다 깨진다.
        지킬 것은 「전임자가 하나도 안 떠났고, 한 분이 늘었다」이다. */
-  const before = 2;                                  /* 밑그림의 씨티에스 담당자 수 */
+  const before = 2;                                  /* 밑그림의 열음에스 담당자 수 */
   const left = (rec.contacts||[]).filter(x => x.left).length;
   assert.equal(left, 0, '늘어난 것인데 떠났다고 표시된 분이 있습니다 (' + left + '명)');
   assert.equal((rec.contacts||[]).length, before + 1, '한 분만 늘어야 합니다');

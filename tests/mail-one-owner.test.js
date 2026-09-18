@@ -36,7 +36,7 @@ const DIR = [
   { sid:'P-003', name:'김보람', sortOrder:30, role:'member', title:'노무사',     status:'active' },
 ];
 const COS = [
-  { id:'c1', name:'하윤사', bizNo:'1', typeCode:'자문', status:'active',
+  { id:'c1', name:'가람사', bizNo:'1', typeCode:'자문', status:'active',
     managerMain:'P-002', email:'a@hy.kr', contacts:[] },
 ];
 const FOLDERS = { B1:{ path:'1.칸', name:'1.칸', kind:'custom', order:1, total:9, unseen:0 } };

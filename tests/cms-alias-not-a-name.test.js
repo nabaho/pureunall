@@ -3,8 +3,8 @@
    건의 그대로 옮기면 —
      「더빌이체3572 라는 적요명으로 입금되는 cms 이체내역에 대하여, 자동매칭기능이
       엉뚱한 업체를 금액만 맞춰 입금처리하는 오류가 있습니다.
-      3/19 더빌이체3572 로 입금된 110,000원은 천안세브란스의원 입금건이나,
-      충남천막산업의 자문료로 자동 매치되어 있습니다.」
+      3/19 더빌이체3572 로 입금된 110,000원은 가나메디의원 입금건이나,
+      나루천막산업의 자문료로 자동 매치되어 있습니다.」
 
    ── 뿌리 ─────────────────────────────────────────────────────
    CMS 적요는 «걷어 온 통로»다. 같은 「더빌이체3572」가 달마다 «다른 업체»의 돈을 싣고 온다.
@@ -81,14 +81,14 @@ const CMS_MEMOS = ['더빌이체3572', '더빌이체', '나이스빌', '효성�
 test('★ 전제 — 「더빌이체3572」를 CMS 로 알아본다', () => {
   const c = boot();
   CMS_MEMOS.forEach((m) => assert.equal(c.erpIsCmsMemo(m), true, '★ «' + m + '» 을 CMS 로 못 알아본다'));
-  assert.equal(c.erpIsCmsMemo('충남천막산업'), false, '평범한 업체명을 CMS 로 본다');
+  assert.equal(c.erpIsCmsMemo('나루천막산업'), false, '평범한 업체명을 CMS 로 본다');
 });
 
 /* ══════ ① 배우지 않는다 ══════ */
 test('★★ CMS 적요로는 별칭을 «배우지 않는다»', () => {
   const c = boot();
   CMS_MEMOS.forEach((m) => {
-    assert.equal(c.erpLearnPayerAlias(m, { companyName: '충남천막산업' }), false,
+    assert.equal(c.erpLearnPayerAlias(m, { companyName: '나루천막산업' }), false,
       '★★ «' + m + '» 을 업체 이름으로 배웠습니다 — 그 통로는 달마다 주인이 바뀝니다');
   });
   assert.deepEqual(Object.keys(c.__store.payer_aliases || {}), [], '★★ 배운 것이 남았습니다');
@@ -98,17 +98,17 @@ test('★★ 이미 잘못 배워 둔 CMS 별칭은 «그때 지운다» — 안
   const c = boot();
   /* 옛 자료를 흉내 낸다 — 두 번 확정돼 «신뢰»가 된 상태(이 흠이 굳은 모습) */
   c.__store.payer_aliases = {
-    [c.erpNormName('더빌이체3572')]: { companyName: '충남천막산업', count: 2, weak: true },
-    [c.erpNormName(c.erpCleanMemo('더빌이체3572'))]: { companyName: '충남천막산업', count: 2, weak: true }
+    [c.erpNormName('더빌이체3572')]: { companyName: '나루천막산업', count: 2, weak: true },
+    [c.erpNormName(c.erpCleanMemo('더빌이체3572'))]: { companyName: '나루천막산업', count: 2, weak: true }
   };
-  c.erpLearnPayerAlias('더빌이체3572', { companyName: '천안세브란스의원' });
+  c.erpLearnPayerAlias('더빌이체3572', { companyName: '가나메디의원' });
   const 남은 = Object.keys(c.__store.payer_aliases || {});
   assert.deepEqual(남은, [], '★★ 잘못 배운 CMS 별칭이 남았습니다: ' + 남은.join(', '));
 });
 
 test('★ 평범한 적요는 «예전 그대로» 배운다 — 넓게 막으면 자동매칭이 통째로 죽는다', () => {
   const c = boot();
-  assert.equal(c.erpLearnPayerAlias('최건(아우어베이커리)', { companyName: '아우어베이커리' }), true,
+  assert.equal(c.erpLearnPayerAlias('최건(마루베이커리)', { companyName: '마루베이커리' }), true,
     '★ 보통 적요까지 못 배우게 됐습니다');
   assert.ok(Object.keys(c.__store.payer_aliases || {}).length >= 1);
 });
@@ -117,19 +117,19 @@ test('★ 평범한 적요는 «예전 그대로» 배운다 — 넓게 막으�
 test('★★ 이미 배워 둔 CMS 별칭은 «증거로 안 쓴다» — 옛 자료가 스스로 낫는다', () => {
   const c = boot();
   c.__store.payer_aliases = {
-    [c.erpNormName('더빌이체3572')]: { companyName: '충남천막산업', count: 9, weak: true }
+    [c.erpNormName('더빌이체3572')]: { companyName: '나루천막산업', count: 9, weak: true }
   };
   assert.ok(c.erpAliasFind('더빌이체3572'), '★ 전제 — 지우려면 찾을 수는 있어야 한다');
   assert.equal(c.erpAliasEvidence('더빌이체3572'), null,
     '★★ CMS 적요의 별칭을 증거로 씁니다 — 이름점수 100점이 되어 저절로 찍힙니다');
-  assert.ok(c.erpAliasEvidence('최건(아우어베이커리)') === null || true);   // 보통 적요는 아래 검사에서
+  assert.ok(c.erpAliasEvidence('최건(마루베이커리)') === null || true);   // 보통 적요는 아래 검사에서
 });
 
 test('★ 보통 적요의 별칭은 그대로 증거다', () => {
   const c = boot();
-  c.erpLearnPayerAlias('디와이엠', { companyName: '디와이엠솔루션' });
+  c.erpLearnPayerAlias('디와이엠', { companyName: '라온엠솔루션' });
   const e = c.erpAliasEvidence('디와이엠');
-  assert.ok(e && e.entry && e.entry.companyName === '디와이엠솔루션', '★ 보통 별칭까지 막혔습니다');
+  assert.ok(e && e.entry && e.entry.companyName === '라온엠솔루션', '★ 보통 별칭까지 막혔습니다');
 });
 
 test('★★ 쓰는 쪽 둘이 «같은 하나»를 쓴다 — 두 벌이면 한쪽만 고쳐진다', () => {
@@ -149,7 +149,7 @@ function autoMark(memo, amount) {
   const c = boot({});
   vm.runInContext('function erpMatchScore(t, cand){ return { score:100, nameScore:100, amountScore:100, reasons:["금액 일치"] }; }', c);
   const txns = [{ id: 'T1', date: '2026-03-19', type: 'income', amount: amount, memo: memo }];
-  const pool = [{ name: '충남천막산업', fee: amount, payDay: '19' }];
+  const pool = [{ name: '나루천막산업', fee: amount, payDay: '19' }];
   return c.erpAutoMarkCompanyIncome(txns, 2026, pool);
 }
 
@@ -179,9 +179,9 @@ test('★★ 후보를 «안 넘긴다» — 금액만 맞춘 후보를 보이�
 });
 
 test('★ 보통 입금은 «예전 그대로» 저절로 찍힌다', () => {
-  const r = autoMark('충남천막산업', 110000);
+  const r = autoMark('나루천막산업', 110000);
   assert.equal(r.applied.length, 1, '★ 보통 입금까지 안 찍힙니다 — 자동매칭이 통째로 죽었습니다');
-  assert.equal(r.applied[0].co.name, '충남천막산업');
+  assert.equal(r.applied[0].co.name, '나루천막산업');
 });
 
 test('★ 검토 목록이 그 까닭을 «화면에» 보인다', () => {

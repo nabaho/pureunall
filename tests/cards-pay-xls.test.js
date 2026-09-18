@@ -72,7 +72,7 @@ test('★★ 「메일 없음」처럼 «글로 적어 둔 빈칸»을 값으로
      그대로 두면 그 글자가 명함의 메일 주소가 된다. */
   const grid = [
     ['연번', '사업장명', '담당자 성명', '담당자연락처', '이메일주소', '세무대리인명', '세무담당자연락처', '세무담당자 이메일주소'],
-    ['1', '천성가축약품', '송향숙 실장', '010-1200-0019', '메일 없음', 'x', '-', '없음'],
+    ['1', '두레가축약품', '송향숙 실장', '010-1200-0019', '메일 없음', 'x', '-', '없음'],
   ];
   const r = X.parseGrid(grid).rows[0];
   assert.equal(r.cMail, '', '★ 「메일 없음」이 메일 주소로 들어갑니다');
@@ -95,10 +95,10 @@ test('★ 진짜 이름은 안 지운다 — 「없음」이 든 이름도 있�
 
 const GRID = [
   ['연번', '사업장명', '담당자 성명', '담당자연락처', '이메일주소', '세무대리인명', '세무담당자연락처', '세무담당자 이메일주소'],
-  ['1', '(주)위드유', '김영식 대표', '010-1200-0016', 'a@x.com', '', '', ''],
+  ['1', '(주)나루유', '김영식 대표', '010-1200-0016', 'a@x.com', '', '', ''],
   ['', '', '김안아 과장', '010-1200-0002', 'b@x.com', '', '', ''],
-  ['2', '늘봄반찬(모종점)', '정수연 담당자', '010-1200-0017', 'c@x.com', '세무법인 온', '041-547-2100', 't@x.com'],
-  ['3', '늘봄반찬(배방점)', '', '', '', '', '', ''],
+  ['2', '새별반찬(모종점)', '정수연 담당자', '010-1200-0017', 'c@x.com', '세무법인 온', '041-547-2100', 't@x.com'],
+  ['3', '새별반찬(배방점)', '', '', '', '', '', ''],
 ];
 
 test('★★ 사업장명이 빈 줄은 «윗줄의 둘째 담당자» — 켜면 살린다', () => {
@@ -107,7 +107,7 @@ test('★★ 사업장명이 빈 줄은 «윗줄의 둘째 담당자» — 켜�
   assert.ok(names.indexOf('김안아 과장') >= 0,
     '★ 둘째 담당자가 버려집니다 — 네 파일에서 5명이 이렇게 사라졌습니다');
   const second = on.rows.find((r) => r.cName === '김안아 과장');
-  assert.equal(second.site, '(주)위드유', '★ 윗줄 사업장을 안 물려받았습니다');
+  assert.equal(second.site, '(주)나루유', '★ 윗줄 사업장을 안 물려받았습니다');
   assert.equal(second.second, 1, '둘째 담당자라는 표가 없습니다');
 });
 
@@ -123,7 +123,7 @@ test('★ 기업정보함 «가져오기»가 쓰는 줄 모양으로 돌려준�
   const rows = X.cardRows(X.parseGrid(GRID, { keepSecondContacts: true }).rows, '김보람');
   const kim = rows.find((r) => r.name === '김영식');
   assert.ok(kim, '★ 사람을 못 만들었습니다');
-  assert.equal(kim.company, '(주)위드유');
+  assert.equal(kim.company, '(주)나루유');
   assert.equal(kim.title, '대표');
   assert.equal(kim.mobile, '010-1200-0016', '★ 휴대폰이 mobile 칸에 안 들어갔습니다');
   assert.equal(kim.email, 'a@x.com');
@@ -132,19 +132,19 @@ test('★ 기업정보함 «가져오기»가 쓰는 줄 모양으로 돌려준�
 });
 
 test('★ 집전화는 tel 로, 휴대폰은 mobile 로 — 뒤바뀌면 문자·전화가 엉킨다', () => {
-  const rows = X.cardRows([{ site: '서브텍', cName: '남유라주임', cPhone: '041-546-0722', cMail: 'w@x.com' }], '주민정');
+  const rows = X.cardRows([{ site: '새별텍', cName: '남유라주임', cPhone: '041-546-0722', cMail: 'w@x.com' }], '주민정');
   assert.equal(rows[0].tel, '041-546-0722');
   assert.equal(rows[0].mobile, '');
 });
 
 test('★★ 담당자 이름이 없는 줄은 명함이 안 된다 — 사업장만 적힌 줄이다', () => {
   const rows = X.cardRows(X.parseGrid(GRID, { keepSecondContacts: true }).rows, '김보람');
-  assert.ok(!rows.some((r) => r.company === '늘봄반찬(배방점)'),
+  assert.ok(!rows.some((r) => r.company === '새별반찬(배방점)'),
     '★ 사람 없는 줄로 빈 명함을 만들었습니다');
 });
 
 test('★★ fillDown 을 쓰지 않는다 — 쓰면 같은 사람이 지점 수만큼 생긴다', () => {
-  /* 「늘봄반찬(모종점)」의 정수연이 「(배방점)」에도 복사되면 같은 분 명함이 둘이 된다 */
+  /* 「새별반찬(모종점)」의 정수연이 「(배방점)」에도 복사되면 같은 분 명함이 둘이 된다 */
   const rows = X.cardRows(X.fillDown(X.parseGrid(GRID, { keepSecondContacts: true }).rows), '김보람');
   const 정 = rows.filter((r) => r.name === '정수연');
   assert.equal(정.length, 2, '(전제) fillDown 을 쓰면 둘이 된다');

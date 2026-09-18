@@ -69,8 +69,8 @@ test('★ 업무에 적힌 업체 번호로 건너간다', () => {
 });
 
 test('업무에 번호가 없으면 업체 목록에서 찾아 쓴다 — 상호가 조금 달라도 이어진다', () => {
-  const b = wbox({ co: { id: 'C-88', name: '한서정공' } });
-  assert.equal(b.mbCoId({ company: '(주)한서정공' }), 'C-88');
+  const b = wbox({ co: { id: 'C-88', name: '마루정공' } });
+  assert.equal(b.mbCoId({ company: '(주)마루정공' }), 'C-88');
 });
 
 test('★★ 업체를 못 찾으면 단추를 «안 그린다» — 눌러서 엉뚱한 곳이 열리면 고장으로 보인다', () => {

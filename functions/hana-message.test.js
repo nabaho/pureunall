@@ -37,7 +37,7 @@ test("날짜·시간이 없는 알림은 추측 저장하지 않는다", () => {
 });
 
 test("같은 문자는 같은 중복방지 번호를 만든다", () => {
-  const s = "하나9541 승인 권*하 100,000원 일시불 08/18 21:37 (주)월드홀딩스";
+  const s = "하나9541 승인 권*하 100,000원 일시불 08/18 21:37 (주)카타홀딩스";
   const a = HM.parseHanaMessage(s, { now: NOW });
   const b = HM.parseHanaMessage(s, { now: NOW });
   assert.equal(a.transaction.id, b.transaction.id);
@@ -85,7 +85,7 @@ test("★★ 은행 짧은 꼴 — 출금", () => {
 
 /* 「가능액」이 가게 이름에 붙어 남던 것 (2026-08-29 대표 화면) */
 test("★★ 「누적가능액」이 가게 이름에 안 붙는다", () => {
-  const r = HM.parseHanaMessage("[Web발신] 하나9950 승인 권*하 52,200원 일시불 07/31 11:48 롯데리아천 누적가능액 1,234,567원", { now: NOW });
+  const r = HM.parseHanaMessage("[Web발신] 하나9950 승인 권*하 52,200원 일시불 07/31 11:48 나비리아천 누적가능액 1,234,567원", { now: NOW });
   assert.equal(r.ok, true);
-  assert.equal(r.transaction.memo, "롯데리아천");
+  assert.equal(r.transaction.memo, "나비리아천");
 });

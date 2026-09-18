@@ -20,7 +20,7 @@ const USERS = [{ sid:'u1', name:'권형하' }, { sid:'u2', name:'박한별' }, {
 const UID = { u1:'AUID1', u2:'AUID2' };            // u3 는 로그인한 적 없음
 
 function it(o){ return Object.assign({ fiId:'f1', category:'matched', amount:100000, pct:20, role:'주담당',
-  date:'2026-08-03', sourceKind:'case', sourceId:'c1', companyName:'㈜신흥', kind:'부당해고',
+  date:'2026-08-03', sourceKind:'case', sourceId:'c1', companyName:'㈜새힘', kind:'부당해고',
   baseAmount:500000, grossAmount:550000 }, o); }
 
 /* ── 0원·미반영은 안 나간다 ── */

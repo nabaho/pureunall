@@ -39,7 +39,7 @@ eq('비즈사업비3건', erpIsClinicPayer('비즈사업비3건'), true);
 eq('비즈사업비 (숫자 없이)', erpIsClinicPayer('비즈사업비'), true);
 eq('한국생산성본부', erpIsClinicPayer('한국생산성본부'), true);
 eq('생산성본부 (앞말 없이)', erpIsClinicPayer('생산성본부'), true);
-eq('(주)이피아 는 아니다', erpIsClinicPayer('(주)이피아'), false);
+eq('(주)아름 는 아니다', erpIsClinicPayer('(주)아름'), false);
 eq('노동권익과 는 아니다', erpIsClinicPayer('노동권익과'), false);
 eq('빈 적요', erpIsClinicPayer(''), false);
 
@@ -65,16 +65,16 @@ console.log('\n[갈래가 바뀌는가 — 비즈사업비면 이름 대신 현�
     return { clinic, hit, other };
   }
   const sugs = [
-    { cand:{ companyName:'청아미즈산부인과', item:{typeCode:'cons-clinic'} },   nameScore:0 },
-    { cand:{ companyName:'(주)토탈방재',     item:{typeCode:'cons-clinic'} },   nameScore:0 },
-    { cand:{ companyName:'바다림영어조합법인', item:{typeCode:'cons-clinic'} }, nameScore:0 },
-    { cand:{ companyName:'충남사회서비스원',  item:{typeCode:'case-other'} },   nameScore:0 },
-    { cand:{ companyName:'중원대학교',       item:{typeCode:'case-other'} },    nameScore:0 },
+    { cand:{ companyName:'나루미즈산부인과', item:{typeCode:'cons-clinic'} },   nameScore:0 },
+    { cand:{ companyName:'(주)마루방재',     item:{typeCode:'cons-clinic'} },   nameScore:0 },
+    { cand:{ companyName:'사아림영어조합법인', item:{typeCode:'cons-clinic'} }, nameScore:0 },
+    { cand:{ companyName:'가나사회서비스원',  item:{typeCode:'case-other'} },   nameScore:0 },
+    { cand:{ companyName:'가나대학교',       item:{typeCode:'case-other'} },    nameScore:0 },
   ];
   const r = split('비즈사업비3건', sugs);
   eq('비즈사업비면 현장클리닉 모드', r.clinic, true);
   eq('현장클리닉 3곳이 먼저 보인다', r.hit.map(s => s.cand.companyName),
-     ['청아미즈산부인과','(주)토탈방재','바다림영어조합법인']);
+     ['나루미즈산부인과','(주)마루방재','사아림영어조합법인']);
   eq('나머지 2건은 접힌다', r.other.length, 2);
 
   // 예전 규칙(이름 점수)이었다면 하나도 못 찾았다
@@ -82,12 +82,12 @@ console.log('\n[갈래가 바뀌는가 — 비즈사업비면 이름 대신 현�
   eq('이름 점수로는 하나도 못 찾았다 (그래서 필요했다)', old.length, 0);
 
   // 일반 적요는 예전대로 이름으로 고른다
-  const r2 = split('(주)이피아', [
-    { cand:{ companyName:'이피아', item:{typeCode:'cons-hr'} }, nameScore:100 },
-    { cand:{ companyName:'맥스텍', item:{typeCode:'cons-clinic'} }, nameScore:0 },
+  const r2 = split('(주)아름', [
+    { cand:{ companyName:'아름', item:{typeCode:'cons-hr'} }, nameScore:100 },
+    { cand:{ companyName:'우람텍', item:{typeCode:'cons-clinic'} }, nameScore:0 },
   ]);
   eq('일반 적요는 현장클리닉 모드가 아니다', r2.clinic, false);
-  eq('이름 맞는 것만 먼저', r2.hit.map(s => s.cand.companyName), ['이피아']);
+  eq('이름 맞는 것만 먼저', r2.hit.map(s => s.cand.companyName), ['아름']);
 }
 
 console.log('\n[🔖 이름 기억 — 고르면 그 자리에서 배운다]');

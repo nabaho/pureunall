@@ -28,10 +28,10 @@ function loadCoEffectiveExtra(){
 test('이름 열쇠와 사업자번호 열쇠가 같은 회사면 옛 기록을 합친다', () => {
   const fn = loadCoEffectiveExtra();
   const map = {
-    'n한서정공': { tags:{'2026 통합기술보호지원반':true}, folder:'f1' },
+    'n마루정공': { tags:{'2026 통합기술보호지원반':true}, folder:'f1' },
     '3128100001': { docName:'사업자등록증' }
   };
-  const r = fn('3128100001', '한서정공', map);
+  const r = fn('3128100001', '마루정공', map);
   assert.equal(r.folder, 'f1', '옛 열쇠의 폴더가 안 보인다');
   /* r.tags 는 vm 컨텍스트 안에서 만든 객체라 원형(prototype)이 달라 deepEqual 이
      그대로는 실패한다 — JSON 을 거쳐 원형을 지우고 견준다. */
@@ -43,47 +43,47 @@ test('새 열쇠에도 같은 이름의 값이 있으면 새 열쇠가 이긴다
   /* 사람이 새 열쇠에서 폴더를 다시 정했으면 그것을 따라야 한다 */
   const fn = loadCoEffectiveExtra();
   const map = {
-    'n한서정공': { folder:'f1' },
+    'n마루정공': { folder:'f1' },
     '3128100001': { folder:'f2' }
   };
-  const r = fn('3128100001', '한서정공', map);
+  const r = fn('3128100001', '마루정공', map);
   assert.equal(r.folder, 'f2');
 });
 
 test('탭은 옛 열쇠·새 열쇠 것을 모두 합친다', () => {
   const fn = loadCoEffectiveExtra();
   const map = {
-    'n한서정공': { tags:{'옛탭':true} },
+    'n마루정공': { tags:{'옛탭':true} },
     '3128100001': { tags:{'새탭':true} }
   };
-  const r = fn('3128100001', '한서정공', map);
+  const r = fn('3128100001', '마루정공', map);
   assert.deepEqual(JSON.parse(JSON.stringify(r.tags)), {'옛탭':true, '새탭':true});
 });
 
 test('지금 열쇠가 이미 이름 열쇠면 그대로 돌려준다 — 합칠 상대가 없다', () => {
   const fn = loadCoEffectiveExtra();
-  const map = { 'n한서정공': { folder:'f1' } };
-  const r = fn('n한서정공', '한서정공', map);
+  const map = { 'n마루정공': { folder:'f1' } };
+  const r = fn('n마루정공', '마루정공', map);
   assert.equal(r.folder, 'f1');
 });
 
 test('둘 다 없으면 null', () => {
   const fn = loadCoEffectiveExtra();
-  assert.equal(fn('3128100001', '한서정공', {}), null);
+  assert.equal(fn('3128100001', '마루정공', {}), null);
 });
 
 test('옛 열쇠만 있고 새 열쇠는 없으면 옛 열쇠 것을 그대로', () => {
   const fn = loadCoEffectiveExtra();
-  const map = { 'n한서정공': { folder:'f1', docName:'서식' } };
-  const r = fn('3128100001', '한서정공', map);
+  const map = { 'n마루정공': { folder:'f1', docName:'서식' } };
+  const r = fn('3128100001', '마루정공', map);
   assert.equal(r.folder, 'f1');
   assert.equal(r.docName, '서식');
 });
 
 test('상호에 (주)·띄어쓰기가 있어도 같은 이름 열쇠로 찾는다', () => {
   const fn = loadCoEffectiveExtra();
-  const map = { 'n한서정공': { folder:'f1' } };
-  const r = fn('3128100001', '(주) 한서정공', map);
+  const map = { 'n마루정공': { folder:'f1' } };
+  const r = fn('3128100001', '(주) 마루정공', map);
   assert.equal(r.folder, 'f1', '_norm 을 안 거쳐 못 찾았다');
 });
 
@@ -116,8 +116,8 @@ test('회사 이름에 DB 열쇠가 못 쓰는 글자(. # $ [ ] /)가 있으면 
   assert.doesNotMatch(coKeyOf({ company:'A#B 지원' }), /#/);
   assert.doesNotMatch(coKeyOf({ company:'C$D 상사' }), /\$/);
   assert.doesNotMatch(coKeyOf({ company:'[대표] 이엔지' }), /[\[\]]/);
-  assert.doesNotMatch(coKeyOf({ company:'대한산업 서울/경기' }), /\//,
-    '슬래시가 남으면 딴 경로(coInfo/n대한산업서울/경기/folder)로 새 버린다');
+  assert.doesNotMatch(coKeyOf({ company:'마루산업 서울/경기' }), /\//,
+    '슬래시가 남으면 딴 경로(coInfo/n마루산업서울/경기/folder)로 새 버린다');
 });
 
 /* 최종 전체 리뷰 재검토 2026-08-14: loadCoInfo 의 on('value',...) 콜백이 실제로

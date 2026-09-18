@@ -73,7 +73,7 @@ function 상자(회사들, 표시들) {
     「급여」 딱지인데 자문료만 받는 곳 41). 세종정밀이 그 41곳을 대신한다. */
 const 회사들 = [
   { id: 'c1', name: '가온전자', typeCode: '자문', status: 'active', monthlyAdvisoryFee: 300000 },
-  { id: 'c2', name: '대성물류', typeCode: '자문', status: 'active' },   // 자문 딱지인데 자문료 없음
+  { id: 'c2', name: '다온물류', typeCode: '자문', status: 'active' },   // 자문 딱지인데 자문료 없음
   { id: 'c3', name: '세종정밀', typeCode: '급여', status: 'active', monthlyAdvisoryFee: 200000 }, // 급여 딱지인데 자문료 있음
   { id: 'c4', name: '삼정테크', typeCode: '자문', status: 'closed', closedDate: '2026-03-31' },
   { id: 'c5', name: '한빛식품', typeCode: '급여', status: 'active' },
@@ -148,7 +148,7 @@ test('★★ 사무대행은 고르는 창에 안 나온다 — 자문사가 아
   const ctx = 상자(회사들, 표시들);
   const 이름들 = ctx.pickRows().map(r => r.name);
   assert.ok(이름들.indexOf('푸른사무대행') < 0, '★★ 사무대행이 자문사 고르기에 있다');
-  assert.deepEqual(이름들.slice().sort(), ['가온전자', '대성물류', '세종정밀', '한빛식품'].sort(),
+  assert.deepEqual(이름들.slice().sort(), ['가온전자', '다온물류', '세종정밀', '한빛식품'].sort(),
     '★ 거래 중인 «자문사 후보»만 나와야 한다');
 });
 
@@ -164,7 +164,7 @@ test('★★ 거르개가 «종류»가 아니라 «자문료»다 — 종류 �
     '★★ 자문료로 안 걸러진다 — 「급여」 딱지인 자문사를 놓친다');
 
   ctx.Pick.type = 'nofee';
-  assert.deepEqual(ctx.pickVisible().map(r => r.name).sort(), ['대성물류', '한빛식품'].sort(),
+  assert.deepEqual(ctx.pickVisible().map(r => r.name).sort(), ['다온물류', '한빛식품'].sort(),
     '★ 자문료 없는 곳이 안 갈라진다');
 
   ctx.Pick.type = '';
@@ -192,7 +192,7 @@ test('★★ 푸른이알피 유형(자문·급여·노조·기금)으로도 걸
     '★★ 업체관리 유형으로 안 걸러집니다');
   /* 「자문」 딱지 둘 — 삼정테크는 거래 끝나 안 나오고, 사무대행도 빠진다 */
   ctx.Pick.type = '자문';
-  assert.deepEqual(ctx.pickVisible().map(r => r.name).sort(), ['가온전자', '대성물류'].sort(),
+  assert.deepEqual(ctx.pickVisible().map(r => r.name).sort(), ['가온전자', '다온물류'].sort(),
     '★★ 「자문」이 안 걸러집니다');
   /* 푸른이알피 유형이 «먼저» 나온다 — 업체관리에서 보시던 차례다 */
   const 갈래 = ctx.pickTypes();

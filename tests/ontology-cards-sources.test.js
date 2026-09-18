@@ -34,7 +34,7 @@ const SRC = fs.readFileSync(path.join(R, 'js', 'pu-ontology.js'), 'utf8');
 const DATA = {
   companies: [
     { id: 'co-1', name: '(주)나라크라샤', bizNo: '123-81-20012' },
-    { id: 'co-2', name: '한서정공', bizNo: '111-11-11111' }
+    { id: 'co-2', name: '마루정공', bizNo: '111-11-11111' }
   ],
   user_dir: [{ sid: 'p001', name: '권형하' }]
 };
@@ -47,8 +47,8 @@ const COINFO = {
     bizType: '제조', workers: '42',
     docs: { '2026_-Oa': { kind: 'bizreg', docName: '사업자등록증', at: 100 } }
   },
-  'n한서정공': {
-    company: '한서정공',                   /* 확정 안 함 — 이름으로만 */
+  'n마루정공': {
+    company: '마루정공',                   /* 확정 안 함 — 이름으로만 */
     docs: { '2026_-Ob': { kind: 'form', docName: '기술보호지원반 신청서', at: 200 } }
   }
 };

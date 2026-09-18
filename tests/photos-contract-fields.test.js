@@ -96,14 +96,14 @@ test('★ 계약서 판독이 상대 업체를 담는지 — 실제로 돌려 �
   vm.runInContext(lib, ctx);
   /* 대표 화면의 위임계약서를 그대로 흉내 낸다 */
   const out = await ctx.PuDocRead._afterReadForTest({
-    kind: 'contract', company: '㈜맥스텍', ceo: '양명헌',
+    kind: 'contract', company: '㈜우람텍', ceo: '양명헌',
     address: '충남 천안시 서북구 2공단 2로 95, 402호 508호', companyTel: '041-557-7600',
     docName: '위임계약서', scope: '인사노무진단(RBA 점검)',
     signDate: '2026-07-16', startDate: '2026-07-16', endDate: '2026-07-31',
     fee: '500,000원', vat: '별도'
   });
   assert.equal(out.kind, 'contract');
-  assert.equal(out.fields.company, '㈜맥스텍', '상대 업체가 아니라 우리 사무소가 담겼습니다');
+  assert.equal(out.fields.company, '㈜우람텍', '상대 업체가 아니라 우리 사무소가 담겼습니다');
   assert.equal(out.fields.ceo, '양명헌');
   assert.equal(out.fields.scope, '인사노무진단(RBA 점검)');
   assert.equal(out.fields.vat, '별도');

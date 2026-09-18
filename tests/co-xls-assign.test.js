@@ -20,19 +20,19 @@ const P = X && X.plan ? X : global.PuCoXls;
 /* ══════ 이름 다듬기 ══════ */
 
 test('★ ㈜ · (주) · 주식회사는 같은 곳으로 본다 — 표기만 다르다', () => {
-  const a = P.normName('㈜경보엔지니어링');
-  assert.equal(P.normName('(주)경보엔지니어링'), a);
-  assert.equal(P.normName('주식회사 경보엔지니어링'), a);
-  assert.equal(P.normName('  경보 엔지니어링 '), a);
+  const a = P.normName('㈜아자엔지니어링');
+  assert.equal(P.normName('(주)아자엔지니어링'), a);
+  assert.equal(P.normName('주식회사 아자엔지니어링'), a);
+  assert.equal(P.normName('  아자 엔지니어링 '), a);
 });
 
 test('★ 괄호 안 지점말은 지우지 않는다 — 모종점과 배방점은 다른 사업장이다', () => {
-  assert.notEqual(P.normName('늘봄반찬(모종점)'), P.normName('늘봄반찬(배방점)'));
+  assert.notEqual(P.normName('새별반찬(모종점)'), P.normName('새별반찬(배방점)'));
 });
 
 test('앞머리는 괄호 앞까지 — 딸린 사업장의 본 업체를 찾는 데 쓴다', () => {
-  assert.equal(P.stemName('와이앤케이(안산-늘푸른요양센터)'), P.normName('와이앤케이'));
-  assert.equal(P.stemName('㈜유원에프앤비(롤링파스타)'), P.normName('유원에프앤비'));
+  assert.equal(P.stemName('다온케이(가나-새롬요양센터)'), P.normName('다온케이'));
+  assert.equal(P.stemName('㈜자차에프앤비(롤링파스타)'), P.normName('자차에프앤비'));
 });
 
 test('★ 파일 이름에서 담당자를 읽는다 — 시트 안에는 담당자가 없다', () => {
@@ -46,10 +46,10 @@ test('★ 파일 이름에서 담당자를 읽는다 — 시트 안에는 담당
 const GRID = [
   ['', '사업장명', '담당자성명', '담당자연락처', '이메일주소', '세무대리인명', '세무담당자연락처', '세무 이메일주소'],
   [1, '가람떡집', '나은석', '010-1200-0008', 'a@naver.com', '세화회계법인', '041-553-9595', 'tax@hanmail.net'],
-  [2, '서브텍', '남유라주임', '041-546-0722', 'b@naver.com', 'x', 'x', 'x'],
+  [2, '새별텍', '남유라주임', '041-546-0722', 'b@naver.com', 'x', 'x', 'x'],
   [3, '', '', '', '', '', '', ''],
-  [4, '늘봄반찬(모종점)', '정수연', '010-1200-0017', 'c@naver.com', '세무법인 온', '041-547-2100', 'on@naver.com'],
-  [5, '늘봄반찬(배방점)', '', '', '', '', '', '']
+  [4, '새별반찬(모종점)', '정수연', '010-1200-0017', 'c@naver.com', '세무법인 온', '041-547-2100', 'on@naver.com'],
+  [5, '새별반찬(배방점)', '', '', '', '', '', '']
 ];
 
 test('★ 머리줄을 「사업장명」으로 찾는다', () => {
@@ -83,16 +83,16 @@ test('머리줄이 없으면 까닭을 말한다', () => {
 
 test('★ 이름 앞머리가 같으면 위 줄과 같은 사람으로 본다', () => {
   const rows = P.fillDown(P.parseGrid(GRID).rows);
-  const 배방 = rows.filter(r => r.site === '늘봄반찬(배방점)')[0];
+  const 배방 = rows.filter(r => r.site === '새별반찬(배방점)')[0];
   assert.equal(배방.cName, '정수연');
   assert.equal(배방.cMail, 'c@naver.com');
-  assert.equal(배방.inherited, '늘봄반찬(모종점)', '어디서 물려받았는지 남겨야 합니다');
+  assert.equal(배방.inherited, '새별반찬(모종점)', '어디서 물려받았는지 남겨야 합니다');
 });
 
-test('★ 이름이 다르면 물려받지 않는다 — 「대건정밀」 뒤의 「세창이엔지」', () => {
+test('★ 이름이 다르면 물려받지 않는다 — 「라온정밀」 뒤의 「마바이엔지」', () => {
   const rows = P.fillDown([
-    { site: '대건정밀', cName: '김세훈', cPhone: '010-0000-0000', cMail: 'k@hanmail.net' },
-    { site: '주식회사세창이엔지', cName: '', cPhone: '', cMail: '' }
+    { site: '라온정밀', cName: '김세훈', cPhone: '010-0000-0000', cMail: 'k@hanmail.net' },
+    { site: '주식회사마바이엔지', cName: '', cPhone: '', cMail: '' }
   ]);
   assert.equal(rows[1].cMail, '', '남의 연락처가 붙었습니다');
   assert.equal(rows[1].inherited, undefined);
@@ -100,9 +100,9 @@ test('★ 이름이 다르면 물려받지 않는다 — 「대건정밀」 뒤�
 
 test('물려받은 줄이 또 물려주지 않고 끊기지도 않는다 — 지점이 셋 넷 이어진다', () => {
   const rows = P.fillDown([
-    { site: '㈜유원에프앤비', cName: '김나리', cMail: 'u@naver.com' },
-    { site: '㈜유원에프앤비(롤링파스타)', cName: '', cMail: '' },
-    { site: '㈜유원에프앤비(짚신매운갈비)', cName: '', cMail: '' }
+    { site: '㈜자차에프앤비', cName: '김나리', cMail: 'u@naver.com' },
+    { site: '㈜자차에프앤비(롤링파스타)', cName: '', cMail: '' },
+    { site: '㈜자차에프앤비(짚신매운갈비)', cName: '', cMail: '' }
   ]);
   assert.equal(rows[1].cMail, 'u@naver.com');
   assert.equal(rows[2].cMail, 'u@naver.com', '셋째 줄에서 끊겼습니다');
@@ -114,8 +114,8 @@ const USERS = [{ sid: 'A-004', name: '주민정' }, { sid: 'A-005', name: '박�
 const COS = [
   { id: 'c1', name: '가람떡집', typeCode: '급여' },
   { id: 'c2', name: '주식회사 가나글로벌아산공장', typeCode: '자문' },
-  { id: 'c3', name: '와이앤케이', typeCode: '급여' },
-  { id: 'c4', name: '늘봄반찬(모종점)', typeCode: '급여' }
+  { id: 'c3', name: '다온케이', typeCode: '급여' },
+  { id: 'c4', name: '새별반찬(모종점)', typeCode: '급여' }
 ];
 
 test('★ 이름이 맞고 유형도 급여면 그대로 넣는다', () => {
@@ -132,14 +132,14 @@ test('★ 유형이 급여가 아니면 「type」 — 지금은 급여데이터
 });
 
 test('★ 업체관리에 없으면 본 업체에 붙인다 (대표 결정 ①)', () => {
-  const it = P.plan([{ who: '주민정', rows: [{ site: '와이앤케이(안산-늘푸른요양센터)', cMail: 'y@n.kr' }] }], COS, USERS)[0];
+  const it = P.plan([{ who: '주민정', rows: [{ site: '다온케이(가나-새롬요양센터)', cMail: 'y@n.kr' }] }], COS, USERS)[0];
   assert.equal(it.kind, 'attach');
   assert.equal(it.coId, 'c3');
-  assert.equal(it.coName, '와이앤케이');
+  assert.equal(it.coName, '다온케이');
 });
 
 test('★ 본 업체도 없으면 아무것도 안 한다 — 몰래 새 업체를 만들지 않는다', () => {
-  const it = P.plan([{ who: '주민정', rows: [{ site: '니쿠미야', cMail: 'n@n.kr' }] }], COS, USERS)[0];
+  const it = P.plan([{ who: '주민정', rows: [{ site: '나비미야', cMail: 'n@n.kr' }] }], COS, USERS)[0];
   assert.equal(it.kind, 'none');
   assert.equal(it.coId, '');
 });
@@ -194,7 +194,7 @@ test('★ 여러 담당에 걸린 세무 이메일도 넣는다 — 배달 규�
 
 test('한 담당에만 걸린 세무 이메일은 군말 없이 넣는다', () => {
   const its = [{ kind: 'ok', sid: 'A-002', who: '신욱임', tName: '세무법인 삼륭', tMail: 'cust07@daum.net' }];
-  const r = P.patchFor({ id: 'c9', name: '평해식품', typeCode: '급여' }, its,
+  const r = P.patchFor({ id: 'c9', name: '마루식품', typeCode: '급여' }, its,
     { taxSafe: { 'cust07@daum.net': true } });
   assert.equal(r.patch.taxEmail, 'cust07@daum.net');
   assert.equal(r.why.some(w => /여러 담당/.test(w)), false);
@@ -225,18 +225,18 @@ test('★ 사람이 손으로 적어 둔 것을 덮지 않는다 — 빈칸만 �
 });
 
 test('★ 딸린 사업장에서 온 사람은 어느 사업장인지 적어 둔다', () => {
-  const its = [{ kind: 'attach', sid: 'A-004', who: '주민정', site: '와이앤케이(안산-늘푸른요양센터)', cName: '김담당', cMail: 'y@n.kr' }];
-  const r = P.patchFor({ id: 'c3', name: '와이앤케이', typeCode: '급여' }, its, {});
-  assert.equal(r.patch.contacts[0].position, '와이앤케이(안산-늘푸른요양센터)');
+  const its = [{ kind: 'attach', sid: 'A-004', who: '주민정', site: '다온케이(가나-새롬요양센터)', cName: '김담당', cMail: 'y@n.kr' }];
+  const r = P.patchFor({ id: 'c3', name: '다온케이', typeCode: '급여' }, its, {});
+  assert.equal(r.patch.contacts[0].position, '다온케이(가나-새롬요양센터)');
 });
 
 test('★ 딸린 사업장 사람을 대표 담당자로 올리지 않는다 — 본 업체의 담당자가 밀린다', () => {
   const co = {
-    id: 'c3', name: '와이앤케이', typeCode: '급여',
+    id: 'c3', name: '다온케이', typeCode: '급여',
     contacts: [{ name: '본사담당', email: 'main@n.kr', isPrimary: true }],
     primaryContactName: '본사담당'
   };
-  const its = [{ kind: 'attach', sid: 'A-004', who: '주민정', site: '와이앤케이(지점)', cName: '지점담당', cMail: 'br@n.kr' }];
+  const its = [{ kind: 'attach', sid: 'A-004', who: '주민정', site: '다온케이(지점)', cName: '지점담당', cMail: 'br@n.kr' }];
   const r = P.patchFor(co, its, {});
   assert.equal(r.patch.primaryContactName, '본사담당');
 });
@@ -268,8 +268,8 @@ test('셈이 갈래별로 맞는다', () => {
   const items = P.plan([{ who: '주민정', rows: [
     { site: '가람떡집', cMail: 'a@n.kr' },
     { site: '주식회사 가나글로벌아산공장', cMail: 'h@n.kr' },
-    { site: '와이앤케이(지점)', cMail: 'y@n.kr' },
-    { site: '니쿠미야', cMail: 'n@n.kr' }
+    { site: '다온케이(지점)', cMail: 'y@n.kr' },
+    { site: '나비미야', cMail: 'n@n.kr' }
   ] }], COS, USERS);
   const c = P.counts(items);
   assert.equal(c.all, 4);
@@ -280,10 +280,10 @@ test('셈이 갈래별로 맞는다', () => {
 /* ══════ 미리보기에서 잡은 것들 (진짜 엑셀 97줄을 돌려 봤다) ══════ */
 
 test('★ 같은 사람이 두 줄로 들어가지 않는다 — 이미 있던 줄에 메일이 없을 때 그랬다', () => {
-  /* 대건정밀: 업체관리에 「김세훈 대표」가 전화만 있고 메일이 없었다.
+  /* 라온정밀: 업체관리에 「김세훈 대표」가 전화만 있고 메일이 없었다.
      메일로만 견주니 엑셀의 김세훈이 딴 사람으로 붙었다. */
   const co = {
-    id: 'c1', name: '대건정밀', typeCode: '급여',
+    id: 'c1', name: '라온정밀', typeCode: '급여',
     contacts: [{ name: '김세훈 대표', phone: '010-1200-0014', email: '', isPrimary: true }]
   };
   const its = [{ kind: 'ok', sid: 'A-005', who: '박은비', cName: '김세훈 대표',
@@ -295,10 +295,10 @@ test('★ 같은 사람이 두 줄로 들어가지 않는다 — 이미 있던 �
 });
 
 test('★ 이름만 적힌 자리표가 대표 담당자 자리를 지키지 않는다', () => {
-  /* 늘봄반찬: 업체관리의 대표 담당자가 「급여 담당자」(자리표, 메일 없음)였다.
+  /* 새별반찬: 업체관리의 대표 담당자가 「급여 담당자」(자리표, 메일 없음)였다.
      정작 메일 있는 「정수연」이 아래로 밀려 화면에 안 보였다. */
   const co = {
-    id: 'c4', name: '늘봄반찬(모종점)', typeCode: '급여',
+    id: 'c4', name: '새별반찬(모종점)', typeCode: '급여',
     contacts: [{ name: '급여 담당자', phone: '010-1200-0017', email: '', isPrimary: true }],
     primaryContactName: '급여 담당자'
   };

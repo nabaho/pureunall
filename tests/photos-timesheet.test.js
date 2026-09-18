@@ -125,7 +125,7 @@ function boxCtx() {
   return ctx;
 }
 const SAMPLE = { id: 'p1', meta: { read: { kind: 'timesheet', rv: 5, fields: {
-  company: '애플미르 정육식당', period: '5월',
+  company: '벼리미르 정육식당', period: '5월',
   rows: [
     { name: '배영승', paid: [1, 5, 25], off: [11, 19, 28], adj: '+4일', note: '' },
     { name: '이옥자', paid: [1, 5, 25], off: [6, 7, 13, 22, 27], adj: '+2일', note: '일부 판독 불확실' },
@@ -254,7 +254,7 @@ test('★ 표에 개수 열이 함께 나간다', () => {
   assert.equal(row[0], '배영승');
   assert.equal(row[2], 3, '유급 일수가 세어져 나가야 엑셀에서 다시 안 셉니다');
   assert.equal(row[4], 3, '휴무 일수도');
-  assert.match(JSON.parse(JSON.stringify(t.title)).join(''), /애플미르/, '어느 사업장 몇 월인지 파일에 적혀야 합니다');
+  assert.match(JSON.parse(JSON.stringify(t.title)).join(''), /벼리미르/, '어느 사업장 몇 월인지 파일에 적혀야 합니다');
 });
 
 test('★ 근태표 사람 이름이 찾기에 걸린다', () => {

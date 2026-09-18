@@ -19,9 +19,9 @@ function cut(name) {
 }
 
 const COS = [
-  { id: 'co_1', name: '화담원', typeCode: '급여', managerMain: 'p-001', managerSubs: [],
+  { id: 'co_1', name: '다온원', typeCode: '급여', managerMain: 'p-001', managerSubs: [],
     담당자메일: 'hr@hwadam.co.kr' },
-  { id: 'co_2', name: '늘봄반찬(배방점)', typeCode: '급여', managerMain: 'p-002', managerSubs: [],
+  { id: 'co_2', name: '새별반찬(배방점)', typeCode: '급여', managerMain: 'p-002', managerSubs: [],
     email: 'acct@nbb.kr' }
 ];
 const DIR = [{ sid: 'p-001', name: '김보람' }, { sid: 'p-002', name: '박은비' }];
@@ -89,7 +89,7 @@ test('★ 칸 이름이 무엇이든 주소를 찾아낸다', () => {
 test('★ 파일 이름을 못 알아봐도 보낸 주소로 업체를 안다', () => {
   const W = load({ mail: { m1: mailRec({ filename: 'IMG_2841.jpg', mailFrom: 'hr@hwadam.co.kr' }) } });
   const r = W.mailRows(W.App.mail, W.mailCtx())[0];
-  assert.equal(r.companyName, '화담원');
+  assert.equal(r.companyName, '다온원');
   assert.equal(r.sure, true, '주소로 찾은 것은 확실합니다');
 });
 
@@ -97,12 +97,12 @@ test('★ 파일 이름을 못 알아봐도 보낸 주소로 업체를 안다', 
 test('★ 주소로 찾은 것과 이름으로 캔 것을 갈라 둔다', () => {
   const W = load({ mail: {
     m1: mailRec({ filename: 'a.jpg', mailFrom: 'hr@hwadam.co.kr' }),          // 주소로 = 확실
-    m2: mailRec({ filename: '화담원 근태.jpg', mailFrom: 'someone@else.kr' })  // 이름으로 = 짐작
+    m2: mailRec({ filename: '다온원 근태.jpg', mailFrom: 'someone@else.kr' })  // 이름으로 = 짐작
   } });
   const rows = W.mailRows(W.App.mail, W.mailCtx());
   const by = {}; rows.forEach(r => { by[r.id] = r; });
   assert.equal(by.m1.sure, true);
-  assert.equal(by.m2.companyName, '화담원', '이름으로라도 알아내야 합니다');
+  assert.equal(by.m2.companyName, '다온원', '이름으로라도 알아내야 합니다');
   assert.equal(by.m2.sure, false, '★ 짐작을 확실로 세면 안 됩니다');
 });
 
@@ -290,7 +290,7 @@ test('★ 서버가 알아낸 사업장을 화면이 버리지 않는다', () =>
   assert.equal(r.companyId, 'co_2');
   /* 이름은 **업체관리 명단** 것을 쓴다 — 서버가 적어 둔 이름이 낡았을 수 있다
      (업체 이름이 바뀌면 화면에는 새 이름이 떠야 한다). */
-  assert.equal(r.companyName, '늘봄반찬(배방점)');
+  assert.equal(r.companyName, '새별반찬(배방점)');
 });
 
 test('까닭이 없던 옛 줄도 그대로 그려진다', () => {

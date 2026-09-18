@@ -18,10 +18,10 @@ function cut(name) {
 }
 
 const COS = [
-  { id: 'co_1', name: '화담원', typeCode: '급여', managerMain: 'p-001', managerSubs: [] },
-  { id: 'co_2', name: '늘봄반찬', typeCode: '급여', managerMain: 'p-001', managerSubs: [] },
-  { id: 'co_3', name: '보문사', typeCode: '급여', managerMain: 'p-001', managerSubs: [] },
-  { id: 'co_4', name: '세창이엔지', typeCode: '급여', managerMain: 'p-001', managerSubs: [] }
+  { id: 'co_1', name: '다온원', typeCode: '급여', managerMain: 'p-001', managerSubs: [] },
+  { id: 'co_2', name: '새별반찬', typeCode: '급여', managerMain: 'p-001', managerSubs: [] },
+  { id: 'co_3', name: '나루사', typeCode: '급여', managerMain: 'p-001', managerSubs: [] },
+  { id: 'co_4', name: '마바이엔지', typeCode: '급여', managerMain: 'p-001', managerSubs: [] }
 ];
 
 function load(app) {
@@ -55,8 +55,8 @@ const rowOf = (W, id) => W.sideListModel('mine', W.sideCtx(), {}).rows.filter(r 
    것인지 알 수 없었다. 「들어온 것을 정확하게 확인」이 안 되던 첫째 까닭이다. */
 test('★ 대기 칸에 와 있는 자료가 그 사업장 줄에 잡힌다', () => {
   const W = load({ pending: {
-    p1: { filename: '화담원 2026-08 근태.jpg' },
-    p2: { filename: '화담원 근무표.jpg' }
+    p1: { filename: '다온원 2026-08 근태.jpg' },
+    p2: { filename: '다온원 근무표.jpg' }
   } });
   const r = rowOf(W, 'co_1');
   assert.equal(r.pend, 2, '왔는데도 「미도착」이라 하면 다시 달라고 하게 됩니다');
@@ -66,7 +66,7 @@ test('★ 대기 칸에 와 있는 자료가 그 사업장 줄에 잡힌다', ()
 
 /* ⚠ 짐작을 확정처럼 세면, 고치려던 거짓말을 색만 바꿔 되풀이하는 것이다. */
 test('★ 대기(짐작)와 담김(확정)을 절대 같이 세지 않는다', () => {
-  const W = load({ pending: { p1: { filename: '화담원 근태.jpg' } } });
+  const W = load({ pending: { p1: { filename: '다온원 근태.jpg' } } });
   const r = rowOf(W, 'co_1');
   assert.equal(r.arrived, false, '★ 짐작을 도착으로 세면 안 됩니다');
   assert.equal(r.count, 0, '★ 장수에 섞이면 안 됩니다');
@@ -76,8 +76,8 @@ test('★ 대기(짐작)와 담김(확정)을 절대 같이 세지 않는다', (
 /* 6월 자료를 8월 줄에 세면 그 줄이 또 거짓말을 한다. */
 test('★ 짐작한 달이 다르면 이 달 줄에 안 붙인다', () => {
   const W = load({ month: '2026-08', pending: {
-    p1: { filename: '화담원 2026-06 근태.jpg' },   // 6월 것
-    p2: { filename: '화담원 근태.jpg' }             // 달을 모름
+    p1: { filename: '다온원 2026-06 근태.jpg' },   // 6월 것
+    p2: { filename: '다온원 근태.jpg' }             // 달을 모름
   } });
   const r = rowOf(W, 'co_1');
   assert.equal(r.pend, 1, '다른 달 것까지 세면 이 달 줄이 거짓이 됩니다');

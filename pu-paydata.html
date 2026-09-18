@@ -1242,7 +1242,7 @@ function sideListModel(view, ctx, opt) {
   else if (f === 'no') rows = rows.filter(r => !r.arrived);
 
   /* 찾기 — 사업장 이름으로. 담당자가 붙는 목록(전체·미도착)에서는 **사람 이름으로도**
-     찾힌다(대표 결정 2026-08-17 "사람·업체 둘 다"). 「화담원」을 치면 그 업체가,
+     찾힌다(대표 결정 2026-08-17 "사람·업체 둘 다"). 「다온원」을 치면 그 업체가,
      「박노무」를 치면 그 사람 업체가 나온다. */
   const q = String(opt.q || '').trim().toLowerCase();
   if (q) {
@@ -2492,7 +2492,7 @@ function handHtml() {
     + '◻ 공용 칸으로 되돌리기 (임자를 모르겠을 때)</option>'
     + '</select></div>'
     + '<div class="fxr"><label>까닭</label>'
-    + '<input type="text" value="' + esc(f.why) + '" placeholder="예) 유원에프앤비는 김보람 담당입니다"'
+    + '<input type="text" value="' + esc(f.why) + '" placeholder="예) 자차에프앤비는 김보람 담당입니다"'
     + ' oninput="if(App.hand)App.hand.why=this.value"></div>'
     + (f.err ? '<div class="fxerr">' + esc(f.err) + '</div>' : '')
     + '<div class="fxa">'
@@ -3598,7 +3598,7 @@ function handoffMonth() {
   /* ⚠ 값을 **여기서 새로 읽는다** — 화면이 들고 있는 App.values 를 세면 안 된다.
      App.values 는 「이 달 값 보기」에 들어갈 때만 채워진다. 업체를 바꿔 들어오거나
      기준 월을 바꾸거나 남의 자리로 옮기는 길에는 채워지지도, 비워지지도 않는다.
-     그래서 화담원 값 표(12줄)를 본 뒤 다른 업체로 와서 이 단추를 누르면
+     그래서 다온원 값 표(12줄)를 본 뒤 다른 업체로 와서 이 단추를 누르면
      「그 업체 … 12줄」이라 묻고, 급여관리 수신함에도 그 업체가 12줄 정리된 것으로
      적힌다. 급여관리 담당자가 「이 달 준비됐다」를 아는 유일한 신호가 거짓이 된다.
      반대로 값 표를 한 번도 안 연 사람에게는 다 정리된 달을 「값이 없습니다」라고 한다. */

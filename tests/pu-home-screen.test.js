@@ -2117,7 +2117,7 @@ function partnerBox() {
     /* ★ 자문료(monthlyAdvisoryFee)를 넣어 둔다 — 거르개가 «종류»가 아니라 «자문료»다
        (2026-09-06). 업체관리의 자문·급여 딱지가 실제 거래를 안 따라간다. */
     { id: 'co-1', name: '(주)가온전자', typeCode: '자문', status: 'active', ceo: '김가온', monthlyAdvisoryFee: 300000 },
-    { id: 'co-2', name: '대성물류(주)', typeCode: '자문', status: 'active' },
+    { id: 'co-2', name: '다온물류(주)', typeCode: '자문', status: 'active' },
     { id: 'co-3', name: '세종정밀', typeCode: '자문', status: 'active', monthlyAdvisoryFee: 150000 },
     { id: 'co-4', name: '삼정테크', typeCode: '자문', status: 'closed', closedDate: '2026-03-31' },
     { id: 'co-5', name: '한빛식품', typeCode: '급여', status: 'active' },
@@ -2177,8 +2177,8 @@ test('★ 자문사 목록은 업체관리가 기준이다 — 지운 업체는 
       '★★ 「아직 안 고름」 딱지로도 못 봅니다 — 빼는 것이 아니라 감춘 것이 됩니다: ' + c.name));
 
   /* ★ 이름으로 «찾을 때»는 안 고른 곳도 나와야 한다 — 안 그러면 업체관리에 없는 줄 안다 */
-  ctx.App.q = '대성';
-  assert.deepEqual(ctx.visibleRows('partner').map(r => r.name), ['대성물류(주)'],
+  ctx.App.q = '다온';
+  assert.deepEqual(ctx.visibleRows('partner').map(r => r.name), ['다온물류(주)'],
     '★★ 안 고른 회사를 이름으로 못 찾습니다 — 없는 회사인 줄 알게 됩니다');
   ctx.App.q = '';
   /* 여기서 회사를 만들 수 있으면 어느 쪽이 진짜인지 알 수 없게 된다 */
@@ -2227,7 +2227,7 @@ test('★★ 업체 종류로 «실제로» 좁혀진다 — 목록도 딱지 �
   ctx.App.coType = 'nofee';
   ctx.App.filter = 'posted:none';               // 아직 안 고른 것 중에서
   const 이름들 = ctx.visibleRows('partner').map(r => r.name).sort();
-  assert.deepEqual(이름들, ['대성물류(주)', '한빛식품'].sort(),
+  assert.deepEqual(이름들, ['다온물류(주)', '한빛식품'].sort(),
     '★★ 자문료로 안 좁혀집니다: ' + 이름들.join(', '));
 
   /* 딱지에 적힌 수 = 실제로 보이는 줄 수 (거르개를 걸어도) */
@@ -2272,12 +2272,12 @@ test('★★ 사무대행은 «빼되 볼 수 있고», 셈에도 안 섞인다'
 test('★ 표시 안 한 회사는 할 일이 아니다 — 「자문 종료」만 손댈 것이다', () => {
   const ctx = partnerBox();
   const rows = ctx.visibleRows('partner');
-  /* ★ 대성물류는 «아직 안 고른» 곳이라 2026-09-06 부터 기본 목록에 없다 —
+  /* ★ 다온물류는 «아직 안 고른» 곳이라 2026-09-06 부터 기본 목록에 없다 —
      딱지로 꺼내 본다. 목록에 없다고 할 일 판단이 달라지면 안 된다. */
   ctx.App.filter = 'posted:none';
-  const 대성 = ctx.visibleRows('partner').find(r => r.name === '대성물류(주)');
+  const 다온 = ctx.visibleRows('partner').find(r => r.name === '다온물류(주)');
   ctx.App.filter = '';
-  assert.ok(대성, '「아직 안 고름」 딱지로도 볼 수 없습니다');
+  assert.ok(다온, '「아직 안 고름」 딱지로도 볼 수 없습니다');
   /* ★ 삼정테크는 «거래가 끝나» 기본 목록에서 빠졌다 (2026-09-03 대표 지시).
      그래도 할 일에는 남아야 한다 — 지금 홈페이지에는 로고가 그대로 걸려 있다.
      그래서 「거래 종료」 딱지로 꺼내 본다. */
@@ -2287,8 +2287,8 @@ test('★ 표시 안 한 회사는 할 일이 아니다 — 「자문 종료」�
   assert.ok(삼정, '「거래 종료」 딱지로도 볼 수 없습니다 — 자동으로 빼되 «숨기지는» 않는다');
   assert.ok(rows.every(r => r.name !== '삼정테크'),
     '거래가 끝난 곳이 기본 목록에 남았습니다 — 자동으로 빠져야 합니다');
-  assert.equal(대성.posted, '', '표시 안 한 회사를 다른 값으로 읽습니다');
-  assert.equal(ctx.needsAttentionRow(대성), false, '표시 안 한 회사가 할 일로 새어 나옵니다');
+  assert.equal(다온.posted, '', '표시 안 한 회사를 다른 값으로 읽습니다');
+  assert.equal(ctx.needsAttentionRow(다온), false, '표시 안 한 회사가 할 일로 새어 나옵니다');
   assert.ok(삼정.roster && 삼정.roster.kind === 'ended',
     '올림으로 표시했는데 거래가 끝난 곳을 안 알립니다');
   assert.equal(ctx.needsAttentionRow(삼정), true, '자문 종료가 손댈 것에서 빠졌습니다');
@@ -2299,7 +2299,7 @@ test('★ 안 올린 회사는 붙여넣을 회사명 목록에 안 든다', () 
   const ctx = partnerBox();
   const names = ctx.postedNames();
   assert.ok(names.indexOf('세종정밀') < 0, '「안 올림」으로 표시한 회사가 목록에 들어갔습니다');
-  assert.ok(names.indexOf('대성물류(주)') < 0, '표시 안 한 회사가 목록에 들어갔습니다');
+  assert.ok(names.indexOf('다온물류(주)') < 0, '표시 안 한 회사가 목록에 들어갔습니다');
   /* ★ 2026-09-03 「업체 종료된 곳은 모두 자동으로 명단 빼라」 —
      삼정테크는 「올림」으로 표시돼 있지만 거래가 끝나 «자동으로» 빠진다.
      이 한 줄이 지시의 핵심이다: 사람이 표시를 안 고쳐도 명단에서 나간다. */

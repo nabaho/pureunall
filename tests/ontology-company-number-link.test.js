@@ -31,7 +31,7 @@ assert.ok(O, 'PuOntology 를 못 읽었습니다');
 /* 업체 둘 — 하나는 번호 있음, 하나는 아직 없음 */
 const DATA = {
   companies: [
-    { id: 'co-a', name: '㈜상원화성', typeCode: '자문', puNo: 10001, puNoHead: '자문' },
+    { id: 'co-a', name: '㈜열음화성', typeCode: '자문', puNo: 10001, puNoHead: '자문' },
     { id: 'co-b', name: '번호없는곳', typeCode: '급여' },
   ],
 };
@@ -76,7 +76,7 @@ test('★★ 이름표는 여전히 안 실린다 (원본 payload 복제 금지)
     const box = (snap.partitions[vis] || {}).entities || {};
     Object.keys(box).forEach((k) => {
       assert.ok(!('label' in box[k]), vis + '/' + k + ' 에 이름표가 실렸습니다');
-      assert.ok(!/상원화성|번호없는곳/.test(JSON.stringify(box[k])), vis + '/' + k + ' 에 업체 이름이 새어 들어갔습니다');
+      assert.ok(!/열음화성|번호없는곳/.test(JSON.stringify(box[k])), vis + '/' + k + ' 에 업체 이름이 새어 들어갔습니다');
     });
   });
 });

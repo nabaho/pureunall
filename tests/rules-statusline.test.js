@@ -2,9 +2,9 @@
 /* 규정관리 상태 한 줄 — 배너 세 겹을 한 줄로 (설계서 §5)
 
    지금은 원본 미리보기 위에 색 다른 띠 셋이 쌓인다:
-     ① 💾 자동 저장됨 — 씨티에스㈜ (…pdf) · 편집 36건 · 20:55 기준 · 보관함에도 자동 반영 (…)
+     ① 💾 자동 저장됨 — 열음에스㈜ (…pdf) · 편집 36건 · 20:55 기준 · 보관함에도 자동 반영 (…)
      ② ↺ 이전 작업이 복원되었습니다 — …
-     ③ 🏢 ERP 업체관리에서 '씨티에스㈜'을(를) 찾지 못했습니다 — …
+     ③ 🏢 ERP 업체관리에서 '열음에스㈜'을(를) 찾지 못했습니다 — …
    셋 다 「지금 상태」 한 가지를 말하는데 세 목소리다. 첫 화면의 큰 자리를 먹는다.
 
    ⚠ 없애는 것이 아니다(설계서 §0). 세 가지 정보는 다 남고 자리와 크기만 바뀐다.
@@ -48,13 +48,13 @@ function ctx() {
 }
 
 const FULL = {
-  site: '씨티에스㈜', size: '10~29인', asof: '2026-07-21',
-  arts: 101, savedAt: '2026-09-05T20:55:00', erp: 'miss', erpName: '씨티에스㈜'
+  site: '열음에스㈜', size: '10~29인', asof: '2026-07-21',
+  arts: 101, savedAt: '2026-09-05T20:55:00', erp: 'miss', erpName: '열음에스㈜'
 };
 
 test('★ 한 줄에 여섯 가지가 차례대로 담긴다', () => {
   const s = ctx().statusLineOf(FULL);
-  eqArr(s.parts, ['씨티에스㈜', '10~29인', '2026-07-21', '101조', '20:55 저장']);
+  eqArr(s.parts, ['열음에스㈜', '10~29인', '2026-07-21', '101조', '20:55 저장']);
   assert.equal(s.erp.kind, 'warn');
 });
 
@@ -87,14 +87,14 @@ test('★ 조문 수는 0 이면 안 적는다 — 「0조」는 아무 말도 �
 
 /* ── ERP 상태 — 세 갈래 ── */
 test('★ ERP 를 찾았으면 업체 이름을 보인다', () => {
-  const e = ctx().statusLineOf({ erp: 'ok', erpName: '씨티에스 주식회사' }).erp;
+  const e = ctx().statusLineOf({ erp: 'ok', erpName: '열음에스 주식회사' }).erp;
   assert.equal(e.kind, 'ok');
   assert.ok(e.text.length <= 20, '칩은 상태 줄에 들어갈 길이여야 합니다: ' + e.text);
-  assert.match(e.title, /씨티에스 주식회사/, '어느 업체와 이어졌는지는 귀띔으로 확인할 수 있어야 합니다');
+  assert.match(e.title, /열음에스 주식회사/, '어느 업체와 이어졌는지는 귀띔으로 확인할 수 있어야 합니다');
 });
 
 test('★ 못 찾았으면 왜인지 알 수 있게 짧게 — 신고서에 영향이 있다', () => {
-  const e = ctx().statusLineOf({ erp: 'miss', erpName: '씨티에스㈜' }).erp;
+  const e = ctx().statusLineOf({ erp: 'miss', erpName: '열음에스㈜' }).erp;
   assert.equal(e.kind, 'warn');
   assert.match(e.text, /ERP/);
   assert.ok(e.text.length <= 20, '상태 줄에 들어갈 길이여야 합니다: ' + e.text.length + '자 — ' + e.text);

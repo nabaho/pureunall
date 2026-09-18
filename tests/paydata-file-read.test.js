@@ -155,7 +155,7 @@ function fakeFetch(reply) {
 }
 
 const REPLY = JSON.stringify({
-  company: '화담원', period: '2026-08', docName: '근태표',
+  company: '다온원', period: '2026-08', docName: '근태표',
   rows: [{ name: '김철수', pairs: [{ item: '근무일수', value: '22' }] }]
 });
 
@@ -172,7 +172,7 @@ test('★ 글자를 보내면 사람별 값으로 돌아온다', async () => {
   D.init({ fetch: f, getKey: () => Promise.resolve('KEY') });
   const r = await D.readTableText('성명\t근무일수\n김철수\t22');
   assert.equal(r.ok, true);
-  assert.equal(r.company, '화담원');
+  assert.equal(r.company, '다온원');
   assert.equal(r.rows[0].name, '김철수');
   assert.equal(r.rows[0].pairs[0].value, '22');
 });

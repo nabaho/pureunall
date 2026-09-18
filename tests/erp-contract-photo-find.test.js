@@ -73,7 +73,7 @@ test('업체명과 문서명이 같으면 두 번 적지 않는다', () => {
 
 const LIST = [
   IT({ id: 'a', fields: { company: '카타엔지니어링', docName: '위임계약서', signDate: '2026-08-13' }, ownerName: '권형하' }),
-  IT({ id: 'b', fields: { company: '수성산업', docName: '용역계약서', signDate: '2026-08-11' }, ownerName: '김보람' }),
+  IT({ id: 'b', fields: { company: '라온산업', docName: '용역계약서', signDate: '2026-08-11' }, ownerName: '김보람' }),
   IT({ id: 'c', fields: { company: '가온들동탄점', docName: '자문계약서', ceo: '신욱임' }, ownerName: '김보람' })
 ];
 

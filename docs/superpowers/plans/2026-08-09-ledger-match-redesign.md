@@ -191,15 +191,15 @@ vm.runInContext(slice('function erpGroupPendByCompany(', '\nfunction FinanceLedg
 
 const S = (co, ym, id, amt) => ({ cand:{ id:id, companyName:co, kind:'advisory', ym:ym,
                                           expect:amt, amount:amt, label:'자문료' }, score:95 });
-const g1 = gctx.erpGroupPendByCompany([S('크레오','2026-07','a',220000),
-                                       S('크레오','2026-05','b',220000),
-                                       S('크레오','2026-06','c',220000),
-                                       S('신흥','2026-06','d',220000)]);
+const g1 = gctx.erpGroupPendByCompany([S('차카','2026-07','a',220000),
+                                       S('차카','2026-05','b',220000),
+                                       S('차카','2026-06','c',220000),
+                                       S('새힘','2026-06','d',220000)]);
 t('업체 수만큼 줄이 된다', g1.length, 2);
 t('세 달이 한 줄로 묶인다', g1[0].n, 3);
 t('오래된 달이 먼저 충당된다', g1[0].head.cand.id, 'b');
 t('묶인 달이 오름차순이다', g1[0].months, ['2026-05','2026-06','2026-07']);
-t('다른 업체는 안 섞인다', g1[1].company, '신흥');
+t('다른 업체는 안 섞인다', g1[1].company, '새힘');
 t('빈 목록도 안 터진다', gctx.erpGroupPendByCompany(null).length, 0);
 ```
 
@@ -217,7 +217,7 @@ node tests/ledger-match-gate.test.js
 
 ```js
 /* ── 후보를 업체 한 줄로 묶기 ──
-   크레오에스지가 5·6·7월 세 달 밀리면 지금은 세 줄이 뜬다. 사람이 보기에 그것은
+   차카에스지가 5·6·7월 세 달 밀리면 지금은 세 줄이 뜬다. 사람이 보기에 그것은
    «한 업체가 세 달 밀린 것» 한 가지 사실이다. 업체로 묶고 달은 안에 접는다.
    먼저 충당할 곳(head)은 «가장 오래된 달» — 회계 관행(오래된 미수부터)과 같다. */
 function erpGroupPendByCompany(sugList){
@@ -635,7 +635,7 @@ vm.createContext(octx);
 vm.runInContext(slice('function erpOverpayPlan(', '\nfunction FinanceLedger('), octx);
 
 const R = { amount:400000, date:'2026-07-18' };
-const C = { id:'c1', companyName:'한엘', expect:330000, kind:'advisory', ym:'2026-07' };
+const C = { id:'c1', companyName:'벼리', expect:330000, kind:'advisory', ym:'2026-07' };
 
 const p1 = octx.erpOverpayPlan(R, C, 'prepay');
 t('미리 받으면 두 조각', p1.length, 2);

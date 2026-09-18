@@ -36,7 +36,7 @@ test('판독 층에 readChangeNotice 가 붙는다', () => {
 test('★ 입사 알림에서 누가·언제부터를 뽑는다', async () => {
   const R = loadRead();
   R.init({ fetch: fakeFetch(JSON.stringify({
-    company: '화담원', period: '2026-08', docName: '입사 통보',
+    company: '다온원', period: '2026-08', docName: '입사 통보',
     rows: [{ name: '김신입', pairs: [{ item: '입사일', value: '2026-08-12' }] }]
   })), getKey: () => Promise.resolve('KEY') });
   const r = await R.readChangeNotice(IMG);

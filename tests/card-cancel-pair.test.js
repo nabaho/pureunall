@@ -47,15 +47,15 @@ const CX = (k, date, amount, memo, extra) =>
   Object.assign({ _k: k, src: 'card', cancel: true, date: date, amount: amount, memo: memo }, extra || {});
 
 test('★★ 앞선 승인 하나를 찾아 준다', () => {
-  const rows = [OK('a1', '2026-08-25', 71700, '(주)루나'), CX('c1', '2026-08-26', 71700, '[취소] (주)루나')];
+  const rows = [OK('a1', '2026-08-25', 71700, '(주)소담'), CX('c1', '2026-08-26', 71700, '[취소] (주)소담')];
   const r = match(rows[1], rows);
   assert.strictEqual(r.state, 'one');
   assert.strictEqual(r.row._k, 'a1');
 });
 
 test('★★ 후보가 «여럿»이면 고르지 않는다 (찍으면 지우면 안 될 지출이 지워진다)', () => {
-  const rows = [OK('a1', '2026-08-20', 71700, '(주)루나'), OK('a2', '2026-08-25', 71700, '(주)루나'),
-    CX('c1', '2026-08-26', 71700, '[취소] (주)루나')];
+  const rows = [OK('a1', '2026-08-20', 71700, '(주)소담'), OK('a2', '2026-08-25', 71700, '(주)소담'),
+    CX('c1', '2026-08-26', 71700, '[취소] (주)소담')];
   const r = match(rows[2], rows);
   assert.strictEqual(r.state, 'many', '하나를 찍어 골랐다');
   assert.strictEqual(r.row, null);
@@ -63,55 +63,55 @@ test('★★ 후보가 «여럿»이면 고르지 않는다 (찍으면 지우면
 });
 
 test('★★ 금액이 다르면 짝이 아니다', () => {
-  const rows = [OK('a1', '2026-08-25', 71000, '(주)루나'), CX('c1', '2026-08-26', 71700, '[취소] (주)루나')];
+  const rows = [OK('a1', '2026-08-25', 71000, '(주)소담'), CX('c1', '2026-08-26', 71700, '[취소] (주)소담')];
   assert.strictEqual(match(rows[1], rows).state, 'none');
 });
 
 test('★★ 가게 이름이 다르면 짝이 아니다', () => {
-  const rows = [OK('a1', '2026-08-25', 71700, '스타벅스'), CX('c1', '2026-08-26', 71700, '[취소] (주)루나')];
+  const rows = [OK('a1', '2026-08-25', 71700, '스타벅스'), CX('c1', '2026-08-26', 71700, '[취소] (주)소담')];
   assert.strictEqual(match(rows[1], rows).state, 'none');
 });
 
 test('★★ 취소보다 «뒤»에 있는 승인은 짝이 아니다', () => {
-  const rows = [OK('a1', '2026-08-27', 71700, '(주)루나'), CX('c1', '2026-08-26', 71700, '[취소] (주)루나')];
+  const rows = [OK('a1', '2026-08-27', 71700, '(주)소담'), CX('c1', '2026-08-26', 71700, '[취소] (주)소담')];
   assert.strictEqual(match(rows[1], rows).state, 'none', '나중 승인을 되돌릴 수는 없다');
 });
 
 test('★ 같은 날 승인·취소는 짝이 된다 (같은 날 취소가 흔하다)', () => {
-  const rows = [OK('a1', '2026-08-26', 71700, '(주)루나'), CX('c1', '2026-08-26', 71700, '[취소] (주)루나')];
+  const rows = [OK('a1', '2026-08-26', 71700, '(주)소담'), CX('c1', '2026-08-26', 71700, '[취소] (주)소담')];
   assert.strictEqual(match(rows[1], rows).state, 'one');
 });
 
 test('★★ 90일보다 오래된 승인은 짝이 아니다', () => {
-  const rows = [OK('a1', '2026-05-01', 71700, '(주)루나'), CX('c1', '2026-08-26', 71700, '[취소] (주)루나')];
+  const rows = [OK('a1', '2026-05-01', 71700, '(주)소담'), CX('c1', '2026-08-26', 71700, '[취소] (주)소담')];
   assert.strictEqual(match(rows[1], rows).state, 'none');
-  const near = [OK('a2', '2026-06-01', 71700, '(주)루나'), CX('c2', '2026-08-26', 71700, '[취소] (주)루나')];
+  const near = [OK('a2', '2026-06-01', 71700, '(주)소담'), CX('c2', '2026-08-26', 71700, '[취소] (주)소담')];
   assert.strictEqual(match(near[1], near).state, 'one', '90일 안은 짝이어야 한다');
 });
 
 test('★★ 한 승인이 두 취소를 갚을 수는 없다', () => {
-  const rows = [OK('a1', '2026-08-25', 71700, '(주)루나'),
-    CX('c1', '2026-08-26', 71700, '[취소] (주)루나', { pairedWith: 'a1' }),
-    CX('c2', '2026-08-27', 71700, '[취소] (주)루나')];
+  const rows = [OK('a1', '2026-08-25', 71700, '(주)소담'),
+    CX('c1', '2026-08-26', 71700, '[취소] (주)소담', { pairedWith: 'a1' }),
+    CX('c2', '2026-08-27', 71700, '[취소] (주)소담')];
   assert.strictEqual(match(rows[2], rows).state, 'none', '이미 갚은 승인을 또 쓴다');
   assert.strictEqual(match(rows[1], rows).state, 'one', '자기가 이어 둔 승인은 그대로 보여야 한다');
 });
 
 test('★ 「[취소]」 머리를 떼고 이름을 견준다', () => {
-  assert.strictEqual(ctx.erpCardCancelKey('[취소] (주)루나'), ctx.erpCardCancelKey('(주)루나'));
-  assert.strictEqual(ctx.erpCardCancelKey('[취소] 합자회사 루나'), ctx.erpCardCancelKey('(자)루나'));
+  assert.strictEqual(ctx.erpCardCancelKey('[취소] (주)소담'), ctx.erpCardCancelKey('(주)소담'));
+  assert.strictEqual(ctx.erpCardCancelKey('[취소] 합자회사 소담'), ctx.erpCardCancelKey('(자)소담'));
 });
 
 test('★★ 취소가 아니거나 카드가 아니면 아예 안 찾는다', () => {
-  const rows = [OK('a1', '2026-08-25', 71700, '(주)루나')];
-  assert.strictEqual(match(OK('x', '2026-08-26', 71700, '(주)루나'), rows).state, 'none');
-  assert.strictEqual(match(CX('x', '2026-08-26', 71700, '(주)루나', { src: 'bank' }), rows).state, 'none');
+  const rows = [OK('a1', '2026-08-25', 71700, '(주)소담')];
+  assert.strictEqual(match(OK('x', '2026-08-26', 71700, '(주)소담'), rows).state, 'none');
+  assert.strictEqual(match(CX('x', '2026-08-26', 71700, '(주)소담', { src: 'bank' }), rows).state, 'none');
 });
 
 test('빠진 값에도 죽지 않는다', () => {
   assert.strictEqual(match(null, []).state, 'none');
   assert.strictEqual(match(CX('c', '', 0, ''), []).state, 'none');
-  assert.strictEqual(match(CX('c', '2026-08-26', 71700, '(주)루나'), null).state, 'none');
+  assert.strictEqual(match(CX('c', '2026-08-26', 71700, '(주)소담'), null).state, 'none');
 });
 
 /* ── 화면 ── */

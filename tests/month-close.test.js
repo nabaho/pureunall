@@ -226,7 +226,7 @@ t('금액 0원 비정규직을 지적', irrIss.some(x => /금액이 0원인 비�
 
 // 계약 — 금액은 c.amounts[종류] 에 있다
 ctx.__reset({ contracts:[
-  { id:'c1', signDate:'2026-07-05', companyName:'유원에프앤비', managerMain:'권형하', amounts:{ consult:500000 } },
+  { id:'c1', signDate:'2026-07-05', companyName:'자차에프앤비', managerMain:'권형하', amounts:{ consult:500000 } },
   { id:'c2', signDate:'2026-07-06', companyName:'카타엔지니어링', managerMain:'',      amounts:{ consult:300000 } },
   { id:'c3', signDate:'2026-07-07', companyName:'아자인텍',      managerMain:'권형하', amounts:{} },
   { id:'c4', signDate:'2026-07-08', companyName:'옛계약',        managerMain:'권형하', contractAmount:900000 },
@@ -244,16 +244,16 @@ t('성공보수가 있으면 0원으로 지적하지 않는다', ctx.monthCloseI
 
 // 입금
 ctx.__reset({ finance_income:[
-  { id:'i1', date:'2026-07-01', amount:100000, companyName:'유원에프앤비' },
+  { id:'i1', date:'2026-07-01', amount:100000, companyName:'자차에프앤비' },
   { id:'i2', date:'2026-07-02', amount:50000,  companyName:'' }
 ]});
 t('업체 빈 입금을 지적', ctx.monthCloseIssues('income', YM).some(x => /업체가 비어 있는 입금 1건/.test(x)), true);
 
 // 보류함(가수금) — 달로 자르지 않고 잔량 전체로 경고한다
-ctx.__reset({ finance_income:[ { id:'i1', date:'2026-07-01', amount:100000, companyName:'유원에프앤비' } ],
+ctx.__reset({ finance_income:[ { id:'i1', date:'2026-07-01', amount:100000, companyName:'자차에프앤비' } ],
   ledger_held:[ { k:'h1', amount:30000, date:'2026-06-20' } ] });
 t('★ 보류함에 남은 입금을 지적', ctx.monthCloseIssues('income', YM).some(x => /보류함에 남아 있는 입금 1건/.test(x)), true);
-ctx.__reset({ finance_income:[ { id:'i1', date:'2026-07-01', amount:100000, companyName:'유원에프앤비' } ], ledger_held:[] });
+ctx.__reset({ finance_income:[ { id:'i1', date:'2026-07-01', amount:100000, companyName:'자차에프앤비' } ], ledger_held:[] });
 t('보류함이 비었으면 지적하지 않는다', ctx.monthCloseIssues('income', YM).some(x => /보류함/.test(x)), false);
 
 // 출금

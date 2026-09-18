@@ -45,21 +45,21 @@ const drop = (form, cos) => {
   return vm.runInContext('erpDropDeadCoLink(' + JSON.stringify(form) + ',' + JSON.stringify(cos) + ')', ctx);
 };
 
-const LIVE_A = { id: 'co-real-097', name: '삼화케미칼㈜' };
-const LIVE_B = { id: 'co-s73', name: '㈜유원에프앤비' };
+const LIVE_A = { id: 'co-real-097', name: '하람케미칼㈜' };
+const LIVE_B = { id: 'co-s73', name: '㈜자차에프앤비' };
 
 test('① 죽은 ID 는 «없는 것»으로 본다 — 살아 있는 위쪽만 남는다', function () {
   /* 실제로 있던 꼴: 위 co-real-097(살아 있음) · 회사정보 co-adv-050(명부에 없음) */
-  const f = { companyId: 'co-real-097', company: { companyId: 'co-adv-050', name: '삼화케미칼㈜' } };
+  const f = { companyId: 'co-real-097', company: { companyId: 'co-adv-050', name: '하람케미칼㈜' } };
   const out = drop(f, [LIVE_A]);
   assert.equal(out.company.companyId, '', '★ 죽은 ID 가 남아 있어 계속 막힙니다');
   assert.equal(out.companyId, 'co-real-097', '★ 살아 있는 위쪽을 건드렸습니다');
-  assert.equal(out.company.name, '삼화케미칼㈜', '다른 칸은 그대로');
+  assert.equal(out.company.name, '하람케미칼㈜', '다른 칸은 그대로');
 });
 
 test('② ★ 둘 다 살아 있으면 «그대로 막는다» — 그때는 사람이 골라야 한다', function () {
-  /* 계약-2026-087: ㈜유원에프앤비 vs ㈜유원에프앤비(본점) — 둘 다 명부에 있다 */
-  const other = { id: 'co-imp-52', name: '㈜유원에프앤비(본점)' };
+  /* 계약-2026-087: ㈜자차에프앤비 vs ㈜자차에프앤비(본점) — 둘 다 명부에 있다 */
+  const other = { id: 'co-imp-52', name: '㈜자차에프앤비(본점)' };
   const f = { companyId: 'co-s73', company: { companyId: 'co-imp-52' } };
   const out = drop(f, [LIVE_B, other]);
   assert.equal(out.company.companyId, 'co-imp-52', '★ 살아 있는 값을 지웠습니다 — 잘못 이어질 수 있습니다');
@@ -70,8 +70,8 @@ test('② ★ 둘 다 살아 있으면 «그대로 막는다» — 그때는 사
 
 test('③ ★ 고친 뒤 실제로 «통과»하는가 — 온톨로지 검증을 함께 돌린다', function () {
   const O = ontology();
-  const f = { companyId: 'co-real-097', companyName: '삼화케미칼㈜',
-              company: { companyId: 'co-adv-050', name: '삼화케미칼㈜' } };
+  const f = { companyId: 'co-real-097', companyName: '하람케미칼㈜',
+              company: { companyId: 'co-adv-050', name: '하람케미칼㈜' } };
   assert.equal(O.validateCompanyLink(f, [LIVE_A]).code, 'conflicting_company_ids', '고치기 전에는 막힌다');
   const r = O.validateCompanyLink(drop(f, [LIVE_A]), [LIVE_A]);
   assert.equal(r.ok, true, '★ 고친 뒤에도 막힙니다');

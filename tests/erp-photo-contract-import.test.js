@@ -111,18 +111,18 @@ const t = (name, got, want) => {
     /var ERP_PHOTO_MATCH_MIN_SCORE\s*=\s*60;/.test(src), true);
 
   const items = [
-    { id:'p1', year:'2026', fields:{ company:'주식회사 유원에프앤비' }, at:1000 },
+    { id:'p1', year:'2026', fields:{ company:'주식회사 자차에프앤비' }, at:1000 },
     { id:'p2', year:'2025', fields:{ company:'카타엔지니어링' }, at:2000 },
     { id:'p3', year:'2026', fields:{ company:'' }, at:3000 },            // 회사명 없음 — 후보에서 빠져야 함
-    { id:'p4', year:'2024', fields:{ company:'유원에프앤비 지점' }, at:4000 }, // 부분 일치도 잡혀야 함
+    { id:'p4', year:'2024', fields:{ company:'자차에프앤비 지점' }, at:4000 }, // 부분 일치도 잡혀야 함
   ];
 
-  const r1 = c.erpBuildContractPhotoMatches('유원에프앤비', items);
+  const r1 = c.erpBuildContractPhotoMatches('자차에프앤비', items);
   t('회사명이 일치/포함되는 사진만 후보로 나온다', r1.map(x => x.id).sort(), ['p1', 'p4']);
   t('★ 점수 높은 것이 먼저 온다', r1.map(x => x.id), ['p1', 'p4']);
   t('회사명이 없는 사진은 후보에서 빠진다', r1.some(x => x.id === 'p3'), false);
   t('회사명이 2글자 미만이면 후보 없음', c.erpBuildContractPhotoMatches('유', items), []);
-  t('빈 배열이면 후보 없음', c.erpBuildContractPhotoMatches('유원에프앤비', []), []);
+  t('빈 배열이면 후보 없음', c.erpBuildContractPhotoMatches('자차에프앤비', []), []);
 }
 
 /* ═══ 4. erpContractPhotoApplyPatch — 고를 값 계산 ═══ */
@@ -145,7 +145,7 @@ const t = (name, got, want) => {
 
   const baseF = {
     amounts:{ consulting:0 }, briefs:{ consulting:'' },
-    company:{ name:'유원에프앤비', bizNo:'', ceo:'', address:'' },
+    company:{ name:'자차에프앤비', bizNo:'', ceo:'', address:'' },
     contractFeeVatIncluded:false
   };
   const fields1 = {
@@ -307,8 +307,8 @@ const t = (name, got, want) => {
                     fn('PhotoContractPickerModal'), c);
 
     const items = [
-      { id:'p1', year:'2026', at:1000, score:100, fields:{ company:'유원에프앤비', signDate:'2026-07-01', docName:'컨설팅 계약서' } },
-      { id:'p2', year:'2025', at:2000, score:70,  fields:{ company:'유원에프앤비 지점' } }
+      { id:'p1', year:'2026', at:1000, score:100, fields:{ company:'자차에프앤비', signDate:'2026-07-01', docName:'컨설팅 계약서' } },
+      { id:'p2', year:'2025', at:2000, score:70,  fields:{ company:'자차에프앤비 지점' } }
     ];
     let closed = 0, picked = null;
     const props = { items: items, onClose:function(){ closed++; }, onSelect:function(it){ picked = it; } };
@@ -350,7 +350,7 @@ const t = (name, got, want) => {
     t('계약일이 있으면 계약일을 보여 준다', texts.some(function(s){ return s.indexOf('2026-07-01') >= 0; }), true);
     t('계약일이 없으면 찍은 날짜로 대신한다', texts.some(function(s){ return s.indexOf('2026.08.15') >= 0; }), true);
     t('문서명이 있으면 문서명도', texts.some(function(s){ return s.indexOf('컨설팅 계약서') >= 0; }), true);
-    t('업체명이 줄 머리에 선다', texts.indexOf('유원에프앤비 지점') >= 0, true);
+    t('업체명이 줄 머리에 선다', texts.indexOf('자차에프앤비 지점') >= 0, true);
 
     /* ★ 고른 뒤 «입력» 을 눌러야 넘어간다 — 원본을 보고 나서 정한다 */
     rowsOf(tree)[1].props.onClick();

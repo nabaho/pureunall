@@ -29,7 +29,7 @@ function body(name) {
 function stage() {
   const ITEMS = {
     A: { company: '가나다산업', title: '취업규칙 개정', status: '진행중' },
-    B: { company: '천성가축약품', title: '부당해고 구제신청', status: '진행중' },
+    B: { company: '두레가축약품', title: '부당해고 구제신청', status: '진행중' },
     C: { company: '새롬테크', title: '임금체불 진정', status: '대기응답' },
   };
   const pre = `
@@ -66,7 +66,7 @@ function stage() {
 function threeRows() {
   return [
     { _id: 'A', who: '가나다', done: '개정안 검토', next: { text: '공고문 발송', date: '2026-09-09' }, status: '', stOn: false },
-    { _id: 'B', who: '천성', done: '이유서 제출', next: { text: '', date: '' }, status: '검토', stOn: true },
+    { _id: 'B', who: '두레', done: '이유서 제출', next: { text: '', date: '' }, status: '검토', stOn: true },
     { _id: '', who: '동원산업', done: '전화 상담', next: { text: '', date: '' }, status: '', stOn: false },
   ];
 }

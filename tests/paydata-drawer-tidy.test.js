@@ -26,7 +26,7 @@ function load(appState) {
     'const S = window.PuPaydataStore; S.init({uid:"U1"});',
     'const $ = id => document.getElementById(id);',
     'const App = ' + JSON.stringify(Object.assign({
-      screen: 'drawer', companyId: 'co_1', companyName: '화담원', month: '2026-08',
+      screen: 'drawer', companyId: 'co_1', companyName: '다온원', month: '2026-08',
       kind: 'attend', query: '', arrivals: {}, monthEdit: false, viewingUid: '', viewingDeputy: false
     }, appState)) + ';',
     'App.render = function(){};',
@@ -113,7 +113,7 @@ test('★ 서랍 위에 놓으면 그 사업장·그 달·그 종류로 담긴�
   assert.equal(t.month, '2026-08');
   assert.equal(t.kind, 'attend');
   const hint = W.dropHintHtml(t);
-  assert.match(hint.sub, /화담원/);
+  assert.match(hint.sub, /다온원/);
   assert.match(hint.sub, /2026-08/);
   assert.match(hint.sub, /근태/);
 });
@@ -186,7 +186,7 @@ test('★ 이름표가 다 있으면 대기 칸을 거치지 않고 서랍으로
   S.init(fakeDeps(writes));
   const file = { name: 'a.jpg', type: 'image/jpeg', size: 10 };
   const r = await S.saveFileToDrawer(file,
-    { companyId: 'co_1', companyName: '화담원', month: '2026-08', kind: 'attend' }, '');
+    { companyId: 'co_1', companyName: '다온원', month: '2026-08', kind: 'attend' }, '');
   assert.equal(r.filed, true);
   const last = writes[writes.length - 1];
   const keys = Object.keys(last);
@@ -202,7 +202,7 @@ test('★ 서랍으로 곧장 담은 자료도 창고 자리가 제대로 붙는
   const writes = [];
   S.init(fakeDeps(writes));
   await S.saveFileToDrawer({ name: 'a.jpg', type: 'image/jpeg', size: 10 },
-    { companyId: 'co_1', companyName: '화담원', month: '2026-08', kind: 'attend' }, '');
+    { companyId: 'co_1', companyName: '다온원', month: '2026-08', kind: 'attend' }, '');
   const last = writes[writes.length - 1];
   const item = last[Object.keys(last).filter(k => /\/items\/202608\//.test(k))[0]];
   assert.match(item.file, /^pu_paydata\/U1\/pending\/.*\.jpg$/, '창고 자리가 안 붙었습니다: ' + item.file);

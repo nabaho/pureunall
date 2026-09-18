@@ -85,14 +85,14 @@ eval(gvar('MAIL_COMMON') + '\n' + gvar('cardIdx') + '\n' + gvar('HELP') + '\n'
 
 /* ── 기업정보함: 무엇을 내주고 무엇을 빼는가 ── */
 const ITEMS = {
-  c1: { name: '홍길동', company: '별표수세미', title: '과장', dept: '인사팀', mobile: '010-1111-2222', email: 'h@trista.co.kr' },
-  c2: { name: '김안전', company: '(주)별표수세미', title: '차장', tel: '041-555-1234' },
-  c3: { name: '김계열', company: '별표수세미산업' },
-  c4: { name: '박같은메일', company: '트리스타', email: 'p@trista.co.kr' },
+  c1: { name: '홍길동', company: '타파수세미', title: '과장', dept: '인사팀', mobile: '010-1111-2222', email: 'h@trista.co.kr' },
+  c2: { name: '김안전', company: '(주)타파수세미', title: '차장', tel: '041-555-1234' },
+  c3: { name: '김계열', company: '타파수세미산업' },
+  c4: { name: '박같은메일', company: '벼리스타', email: 'p@trista.co.kr' },
   c5: { name: '남남', company: '전혀다른곳', email: 'x@naver.com' },
   c6: { name: 'ㄱ어머니', company: '', mobile: '010-1200-0011' },
-  c7: { name: '', company: '별표수세미', kind: 'biz', bizno: '123-45-67890' },
-  c8: { name: '숨은이', company: '별표수세미', scope: 'private' }
+  c7: { name: '', company: '타파수세미', kind: 'biz', bizno: '123-45-67890' },
+  c8: { name: '숨은이', company: '타파수세미', scope: 'private' }
 };
 const load = () => { cardIdx = Object.keys(ITEMS).map(k => _cardRow(k, ITEMS[k], false)).filter(Boolean); };
 load();
@@ -104,15 +104,15 @@ ok('이름도 회사도 없는 빈 명함은 뺀다',
 ok('색인 모양으로 와도 같은 칸으로 읽는다',
   _cardRow('z', { n: '색인이', c: '회사', m: '010', k: 'card' }, true).n === '색인이');
 
-let r = cardFind('', '별표수세미');
+let r = cardFind('', '타파수세미');
 ok('담당 회사 사람이 앞줄에', r.mine.map(c => c.n).sort().join() === '김안전,홍길동');
-ok('(주)·공백이 달라도 같은 회사', cardFind('', '(주) 별표수세미').mine.length === 2);
+ok('(주)·공백이 달라도 같은 회사', cardFind('', '(주) 타파수세미').mine.length === 2);
 ok('비슷한 회사를 따로 낸다 (계열사 담당자가 함께 맡는다)',
   r.akin.map(c => c.n).sort().join() === '김계열,박같은메일');
 ok('검색 전에는 그 밖의 사람을 늘어놓지 않는다', r.rest.length === 0);
 ok('이름이 서로를 품으면 같은 무리',
-  coAkin('별표수세미', '별표수세미산업') === true && coAkin('새롬', '새롬테크') === true
-  && coAkin('별표수세미', '별표수세미') === false && coAkin('별표수세미', '전혀다른곳') === false);
+  coAkin('타파수세미', '타파수세미산업') === true && coAkin('새롬', '새롬테크') === true
+  && coAkin('타파수세미', '타파수세미') === false && coAkin('타파수세미', '전혀다른곳') === false);
 ok('두 글자 미만으로는 묶지 않는다 (아무 데나 걸린다)',
   coAkin('가', '가나다라') === false && coAkin('', '새롬') === false);
 ok('메일 도메인이 같으면 같은 무리',
@@ -271,7 +271,7 @@ ok('너무 좁거나 넓게는 못 만들고, 값이 이상하면 기본으로',
 
 /* ── 캘린더에서 무엇을 누르느냐 ── */
 ok('우리 업무는 글자·✏️·⤢ 셋이 각각 다른 일', (function () {
-  const h = calEvHTML({ k: 'due', t: '📅 케이블루', c: '#dc2626', it: 'W1', drag: 1 });
+  const h = calEvHTML({ k: 'due', t: '📅 가람블루', c: '#dc2626', it: 'W1', drag: 1 });
   return h.indexOf("calGo('W1')") > 0 && h.indexOf("calQuick('W1'") > 0
       && h.indexOf("openDrawer('W1')") > 0 && h.indexOf('draggable="true"') > 0;
 })());

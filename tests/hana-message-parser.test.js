@@ -52,7 +52,7 @@ test("인증번호·날짜 없는 알림·승인취소는 자동 저장하지 �
 });
 
 test("같은 거래 알림은 같은 중복방지 번호를 만든다", () => {
-  const text = "하나9541 승인 권*하 100,000원 일시불 08/18 21:37 (주)월드홀딩스";
+  const text = "하나9541 승인 권*하 100,000원 일시불 08/18 21:37 (주)카타홀딩스";
   const first = HM.parseHanaMessage(text, { now: NOW });
   const second = HM.parseHanaMessage(text, { now: NOW });
   assert.equal(first.transaction.id, second.transaction.id);

@@ -58,10 +58,10 @@ console.log('\n■ 걸러내기 판정 — 소스의 진짜 함수를 꺼내 돌
     ` + cut('function invFItems(axis, rowsBase){', '\n  var listRowsF ='), ctx);
 
   const rows = [
-    { __hometax:false, companyName:'정우신약', status:'발행' },
-    { __hometax:true,  companyName:'대운토건주식회사', status:'발행' },
-    { __hometax:true,  companyName:'(주)신한오토텍', status:'발행' },
-    { __hometax:false, companyName:'정우신약', status:'취소' }
+    { __hometax:false, companyName:'나루신약', status:'발행' },
+    { __hometax:true,  companyName:'나루토건주식회사', status:'발행' },
+    { __hometax:true,  companyName:'(주)나루오토텍', status:'발행' },
+    { __hometax:false, companyName:'나루신약', status:'취소' }
   ];
   const kindItems = ctx.invFItems('kind', rows);
   t('구분 값 — 직접발행·홈택스 두 종류', kindItems.map(x => x.v).sort(), ['직접발행', '홈택스']);
@@ -69,7 +69,7 @@ console.log('\n■ 걸러내기 판정 — 소스의 진짜 함수를 꺼내 돌
   ctx.invFunnel = { kind:['홈택스'] };
   t('걸면 직접발행이 막힌다', ctx.invFPass(rows[0]), false);
   t('걸면 홈택스는 통과', ctx.invFPass(rows[1]), true);
-  ctx.invFunnel = { company:['정우신약'] };
+  ctx.invFunnel = { company:['나루신약'] };
   t('업체명으로 걸러도 된다', rows.filter(r => ctx.invFPass(r)).length, 2);
   ctx.invFunnel = { status:['취소'] };
   t('상태로도 걸린다', rows.filter(r => ctx.invFPass(r)).length, 1);

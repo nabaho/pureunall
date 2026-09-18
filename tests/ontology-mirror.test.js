@@ -33,7 +33,7 @@ const erp = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
 /* 진짜배기 — 민감한 칸이 잔뜩 붙은 기업 상세 한 벌 */
 const 기업상세 = {
   b1234567890: {
-    company: '천성가축약품', erpCoId: 'co1',
+    company: '두레가축약품', erpCoId: 'co1',
     bankAcct: '110-123-456789', bankHolder: '홍길동',
     sales: '1200000000', birth: '1970-01-01', bizType: '제조',
     docs: { d1: { docName: '사업자등록증', kind: 'biz', pairs: { 계좌: '110-123-456789' } },
@@ -52,13 +52,13 @@ test('★★① 거울에는 «관계에 쓰는 셋»만 담긴다', () => {
   /* 담아야 할 셋은 들어 있다 */
   const 첫줄 = plan.writes[0].value['ontIdx/b1234567890'];
   assert.deepEqual(Object.keys(첫줄).sort(), ['c', 'd', 'e']);
-  assert.equal(첫줄.c, '천성가축약품');
+  assert.equal(첫줄.c, '두레가축약품');
   assert.equal(첫줄.e, 'co1');
   assert.deepEqual(첫줄.d.d1, { n: '사업자등록증', k: 'biz' });
 });
 
 test('★★② 거울로 읽어도 «같은 관계»가 나온다', () => {
-  const data = { companies: [{ id: 'co1', name: '천성가축약품' }] };
+  const data = { companies: [{ id: 'co1', name: '두레가축약품' }] };
   const 전문 = O.auditIntegrated(data,
     { cards_coinfo: { key: 'cards_coinfo', ok: true, value: 기업상세 } }, {});
   /* 거울을 떠서, 그것으로 다시 읽는다 */

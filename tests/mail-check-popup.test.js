@@ -29,7 +29,7 @@ function cut(from, to){
 }
 
 /* ── 밑그림 ──
-   씨티에스(주)  자문   → 「2.급여+사무대행」 칸에 있다   ⇒ ① 에 걸려야 한다
+   열음에스(주)  자문   → 「2.급여+사무대행」 칸에 있다   ⇒ ① 에 걸려야 한다
    한빛산업      급여   → 「2.급여+사무대행」 칸에 있다   ⇒ 맞으므로 안 걸린다
    누리테크      자문   → 「1.자문」 칸에 있다            ⇒ 맞으므로 안 걸린다
    떠돌이주소           → 아무 데도 안 이어져 있다        ⇒ ② 담당 모름
@@ -40,7 +40,7 @@ const DIR = [
   { sid:'P-002', name:'하윤서', sortOrder:20, role:'member', title:'노무사',     status:'active' },
 ];
 const COS = [
-  { name:'씨티에스(주)', bizNo:'1', typeCode:'자문',     status:'active',
+  { name:'열음에스(주)', bizNo:'1', typeCode:'자문',     status:'active',
     managerMain:'P-002', email:'lmk@cts.co.kr' },
   { name:'한빛산업',     bizNo:'2', typeCode:'급여',     status:'active',
     managerMain:'P-002', email:'gw@hanbit.kr' },
@@ -174,7 +174,7 @@ const find = (list, co) => list.filter(x => x.co === co)[0];
 test('★★ 자문 업체 메일이 「급여+사무대행」 칸에 있으면 «찾아낸다»', () => {
   const c = load();
   const r = c.mbCheckAll();
-  const x = find(r.mix, '씨티에스(주)');
+  const x = find(r.mix, '열음에스(주)');
   assert.ok(x, '어긋난 분류를 못 찾았습니다: ' + JSON.stringify(r.mix.map(m=>m.co)));
   assert.equal(x.erp, '자문', '푸른이알피 유형을 잘못 읽었습니다');
   assert.ok(x.bin.indexOf('급여') >= 0, '담긴 칸을 잘못 읽었습니다: ' + x.bin);
@@ -224,9 +224,9 @@ test('★★ 한 주소가 두 업체에 이어진 것을 찾아낸다', () => {
 
 test('★★ 「넘어가기」한 것은 다시 안 뜬다', () => {
   const c = load();
-  const x = find(c.mbCheckAll().mix, '씨티에스(주)');
+  const x = find(c.mbCheckAll().mix, '열음에스(주)');
   c.mbCheckSkip(x.key);
-  assert.ok(!find(c.__ck().mix, '씨티에스(주)'), '넘어갔는데 또 떴습니다');
+  assert.ok(!find(c.__ck().mix, '열음에스(주)'), '넘어갔는데 또 떴습니다');
   const saved = Object.keys(c._held.wrote).filter(k=>k.indexOf('mailCheckSkip') >= 0);
   assert.ok(saved.length, '넘어간 것을 저장하지 않았습니다 — 다음에 열면 또 뜹니다');
 });
@@ -251,7 +251,7 @@ test('★★ 저장 열쇠에 점이 들어가지 않는다 — 들어가면 저
 
 test('★★ 「자문 칸으로」를 누르면 그 주소 메일이 «다» 옮겨진다', () => {
   const c = load();
-  const x = find(c.mbCheckAll().mix, '씨티에스(주)');
+  const x = find(c.mbCheckAll().mix, '열음에스(주)');
   assert.equal(x.n, 2, '밑그림에 그 업체 메일이 2통 있어야 합니다');
   c.mbCheckMoveTo(x.key);
   /* ⚠ 「그 한 통」이 아니라 «그 주소에서 온 것 전부»가 가야 한다.
@@ -264,13 +264,13 @@ test('★★ 「자문 칸으로」를 누르면 그 주소 메일이 «다» �
   const gone = c.mbCkRows().filter(v => String(v.e||'').toLowerCase() === x.em)
     .map(v => { const b = c.mbBinOfRow(v); return b ? b.id : ''; });
   assert.equal(gone.join(','), 'F1,F1', '그 주소 메일이 다 안 갔습니다: ' + gone.join(','));
-  assert.ok(!find(c.mbCheckAll().mix, '씨티에스(주)'),
+  assert.ok(!find(c.mbCheckAll().mix, '열음에스(주)'),
     '옮겼는데 아직 어긋난 것으로 남아 있습니다');
 });
 
 test('★★ 정해 둔 규칙은 «앞으로 올 메일»에도 걸린다 — 쪽지였다면 내일 또 어긋난다', () => {
   const c = load();
-  const x = find(c.mbCheckAll().mix, '씨티에스(주)');
+  const x = find(c.mbCheckAll().mix, '열음에스(주)');
   c.mbCheckMoveTo(x.key);
   /* 내일 같은 주소에서 «새 메일»이 「2.급여+사무대행」 폴더로 들어온다 */
   const fresh = { u:99, f:'보낸이', e:'lmk@cts.co.kr', t:'x@daum.net', s:'내일 온 메일',
@@ -283,7 +283,7 @@ test('★★ 정해 둔 규칙은 «앞으로 올 메일»에도 걸린다 — �
 test('★★ 「이 한 통만 따로」 옮긴 것은 규칙에 «안 눌린다»', () => {
   /* ⚠ 눌리면 「분류」 단추가 뜻을 잃는다 — 눌러도 도로 규칙 칸으로 가 버린다 */
   const c = load();
-  const x = find(c.mbCheckAll().mix, '씨티에스(주)');
+  const x = find(c.mbCheckAll().mix, '열음에스(주)');
   c.mbCheckMoveTo(x.key);                       /* 그 주소는 «자문 칸»으로 정해 둔다 */
   const one = c.mbCkRows().filter(v => String(v.e||'').toLowerCase() === x.em)[0];
   c.__setPut(one._key, 'F2');                   /* 그 가운데 한 통만 손으로 되돌린다 */
@@ -313,7 +313,7 @@ test('★★ 규칙은 «목록»에도 걸린다 — 딱지만 바뀌고 목록
 
 test('★ 정해 둔 것을 «무를» 수 있다 — 무르면 다시 다음메일 자리로', () => {
   const c = load();
-  const x = find(c.mbCheckAll().mix, '씨티에스(주)');
+  const x = find(c.mbCheckAll().mix, '열음에스(주)');
   c.mbCheckMoveTo(x.key);
   const list = c.mbRuleList();
   assert.ok(list.length, '정해 둔 것이 목록에 안 보입니다');
@@ -327,7 +327,7 @@ test('★ 옮길 «칸이 없으면» 조용히 넘어가지 않고 말해 준�
   /* 「급여+사무대행」 칸만 있는 메일함 — 「자문」이 든 칸이 없다 */
   const c = load({ folders: { F2: FOLDERS.F2 },
                    msgs: { F2: { '5': M(5, 'lmk@cts.co.kr', '등기임원 퇴직금 문의') } } });
-  const x = find(c.mbCheckAll().mix, '씨티에스(주)');
+  const x = find(c.mbCheckAll().mix, '열음에스(주)');
   assert.ok(x, '밑그림이 틀렸습니다 — 어긋난 것이 있어야 합니다');
   c.mbCheckMoveTo(x.key);
   assert.ok(String(c._held.toast||'').indexOf('칸이 없습니다') >= 0,
@@ -364,7 +364,7 @@ test('★★ 「틀렸다」가 아니라 「봐 두시라」로 적혀 있다',
   const h = c.mbCheckHtml();
   assert.ok(h.indexOf('틀렸다는 뜻은 아닙니다') >= 0,
     '어긋남을 「틀렸다」로 읽히게 적었습니다 — 자문 업체에도 급여 일로 메일이 옵니다');
-  assert.ok(h.indexOf('씨티에스') >= 0, '찾은 것이 창에 안 나옵니다');
+  assert.ok(h.indexOf('열음에스') >= 0, '찾은 것이 창에 안 나옵니다');
   assert.ok(h.indexOf('넘어가기') >= 0, '넘어갈 길이 없습니다');
 });
 

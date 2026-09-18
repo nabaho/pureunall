@@ -91,17 +91,17 @@ test('★★⑤ 폴더 한 번에 적용해도 «이미 가려진 줄»은 안 �
     { path: '2022개정/취업규칙_한빛산업_개정안.hwp', name: '취업규칙_한빛산업_개정안.hwp' },
     { path: '2022개정/신구대조표.hwp', name: '신구대조표.hwp' }
   ], ERP);
-  const 적용 = CB.applyFolderSite(rows, '2022개정', '미래테크', '9998887777');
+  const 적용 = CB.applyFolderSite(rows, '2022개정', '마루테크', '9998887777');
   const 이미 = 적용.find((r) => r.name.includes('한빛산업'));
   const 빈것 = 적용.find((r) => r.name.includes('신구대조표'));
   assert.equal(이미.site, '한빛산업', '★★ 맞게 가려진 것을 뭉갰습니다');
-  assert.equal(빈것.site, '미래테크', '빈 줄이 안 채워졌습니다');
+  assert.equal(빈것.site, '마루테크', '빈 줄이 안 채워졌습니다');
   assert.equal(빈것.how, '사람');
   assert.ok(!빈것.why.includes('사업장'), '채웠는데 아직 「사업장」을 못 가린 것으로 둡니다');
 
   /* 사람이 「전부 이 사업장으로」를 누르면 그때는 덮는다 */
-  const 강제 = CB.applyFolderSite(rows, '2022개정', '미래테크', '9998887777', true);
-  assert.equal(강제.find((r) => r.name.includes('한빛산업')).site, '미래테크');
+  const 강제 = CB.applyFolderSite(rows, '2022개정', '마루테크', '9998887777', true);
+  assert.equal(강제.find((r) => r.name.includes('한빛산업')).site, '마루테크');
 });
 
 test('★★ 폴더 이름에서 온 «짐작»은 사람이 알려 주면 덮는다', () => {

@@ -40,7 +40,7 @@ test('★ 하위폴더를 만든다 — 어버이를 적어 둔다', async () =>
 
 test('★ 하위폴더 밑에는 또 못 만든다 — 한 단계 위로 붙인다', async () => {
   const { S, reads, writes } = loadStore('me1');
-  reads['puphotos/u/me1/folders'] = { top1: { name: '㈜가야' }, kid1: { name: '현장', parent: 'top1' } };
+  reads['puphotos/u/me1/folders'] = { top1: { name: '㈜벼리' }, kid1: { name: '현장', parent: 'top1' } };
   const r = await S.addFolder('8월', 'kid1');
   assert.equal(r.parent, 'top1', '좁은 칸에서 계속 파고들면 어디 뒀는지 모르게 됩니다.');
   const key = Object.keys(writes).find(k => k.indexOf('/folders/') > 0);
@@ -51,7 +51,7 @@ test('같은 이름도 어버이가 다르면 따로 만든다', async () => {
   const { S, reads } = loadStore('me1');
   reads['puphotos/u/me1/folders'] = { a: { name: '현장사진', parent: 'top1' } };
   const r = await S.addFolder('현장사진', 'top2');
-  assert.equal(r.created, true, '㈜가야 밑과 8월교육 밑의 현장사진은 다른 것입니다.');
+  assert.equal(r.created, true, '㈜벼리 밑과 8월교육 밑의 현장사진은 다른 것입니다.');
 });
 
 test('같은 어버이 안에서는 같은 이름을 또 안 만든다', async () => {
@@ -65,7 +65,7 @@ test('같은 어버이 안에서는 같은 이름을 또 안 만든다', async (
 test('★ 어버이를 지우면 하위폴더도 함께 지운다 (고아 방지)', async () => {
   const { S, reads, writes } = loadStore('me1');
   reads['puphotos/u/me1/folders'] = {
-    top1: { name: '㈜가야' }, k1: { name: '현장', parent: 'top1' }, k2: { name: '서류', parent: 'top1' },
+    top1: { name: '㈜벼리' }, k1: { name: '현장', parent: 'top1' }, k2: { name: '서류', parent: 'top1' },
     other: { name: '8월 교육' }
   };
   await S.deleteFolder('top1');

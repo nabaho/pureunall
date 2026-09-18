@@ -61,11 +61,11 @@ const erp = (id, status) => ({ id, coName: 'x', status,
 
 /* ── ① 될 것 / 이미 된 것 / 못 하는 것 ─────────────────────────────── */
 test('★ 업체관리에 «없는» 곳은 상태를 못 바꾼다 — 조용히 넘기지 않는다', () => {
-  const b = ctx([ co('111', '(주)소온', null) ]);
+  const b = ctx([ co('111', '(주)마루', null) ]);
   const p = plan(b, ['111'], true);
   assert.equal(p.rows.length, 0);
   assert.equal(p.noErp.length, 1, '★ 조용히 빠지면 처리된 줄 안다');
-  assert.equal(p.noErp[0].name, '(주)소온');
+  assert.equal(p.noErp[0].name, '(주)마루');
 });
 
 test('이미 해지된 곳은 건드리지 않는다', () => {

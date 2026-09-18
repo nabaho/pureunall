@@ -117,8 +117,8 @@ test('★★★ 한쪽이 «돌고 있으면» 끝남을 푼다 — 안 그러�
   /* ⚠ 「남길 쪽」은 일정이 많은 곳이다 — 일정을 안 주면 «도는 쪽»이 남아
        revive 가 빈다(첫 판에 이걸로 헛걸렸다). 끝난 쪽에 일정을 줘 못 박는다. */
   const cos = [
-    CO('keep', '송림산업', { types: ['t1'], endedTypes: { t1: '2026-07-31' } }),
-    CO('gone', '송림산업', { types: ['t1'] }),
+    CO('keep', '열음산업', { types: ['t1'], endedTypes: { t1: '2026-07-31' } }),
+    CO('gone', '열음산업', { types: ['t1'] }),
   ];
   const sch = [SC('s1', 'keep', 't1'), SC('s2', 'keep', 't1')];
   const w = world(cos, sch);
@@ -130,8 +130,8 @@ test('★★★ 한쪽이 «돌고 있으면» 끝남을 푼다 — 안 그러�
 
 test('★★★ «모두» 끝났으면 가장 늦은 날로 끝난다', () => {
   const cos = [
-    CO('keep', '별표수세미', { types: ['t1'], endedTypes: { t1: '2026-07-31' } }),
-    CO('gone', '별표수세미', { types: ['t1'], endedTypes: { t1: '2026-08-15' } }),
+    CO('keep', '타파수세미', { types: ['t1'], endedTypes: { t1: '2026-07-31' } }),
+    CO('gone', '타파수세미', { types: ['t1'], endedTypes: { t1: '2026-08-15' } }),
   ];
   const w = world(cos, []);
   assert.strictEqual(w.mergePreview(cos).ended.t1, '2026-08-15',

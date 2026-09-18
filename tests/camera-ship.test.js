@@ -38,7 +38,7 @@ test('★ 기업정보함으로 간 것은 기업정보함이라고 적는다', 
 });
 
 test('★ 업체관리까지 간 것은 둘 다 적는다', () => {
-  const r = rowOf(done({ _read: { kind: 'bizreg', auto: true, fields: { company: '(주)대한산업' },
+  const r = rowOf(done({ _read: { kind: 'bizreg', auto: true, fields: { company: '(주)마루산업' },
     filed: { id: 'c1' }, filedCo: { found: true, filled: ['bizNo'] } } }));
   assert.equal(r.to, '기업정보함·업체관리', '업체관리에 들어간 것을 안 적으면 확인하러 또 들어가야 합니다.');
 });

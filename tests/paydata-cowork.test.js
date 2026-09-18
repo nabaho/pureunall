@@ -22,10 +22,10 @@ function cut(name) {
   return m[0];
 }
 
-/* 화담원은 김보람(주담당)·박은비(부담당)가 함께 맡는다. 이비는 김보람만. */
+/* 다온원은 김보람(주담당)·박은비(부담당)가 함께 맡는다. 이비는 김보람만. */
 const COS = [
-  { id: 'co_1', name: '화담원', typeCode: '급여', managerMain: 'a-001', managerSubs: ['a-002'] },
-  { id: 'co_2', name: '이비', typeCode: '급여', managerMain: 'a-001', managerSubs: [] }
+  { id: 'co_1', name: '다온원', typeCode: '급여', managerMain: 'a-001', managerSubs: ['a-002'] },
+  { id: 'co_2', name: '벼리비', typeCode: '급여', managerMain: 'a-001', managerSubs: [] }
 ];
 const DIR = [{ sid: 'a-001', name: '김보람' }, { sid: 'a-002', name: '박은비' }];
 const OWNERS = {

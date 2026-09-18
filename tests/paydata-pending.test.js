@@ -31,7 +31,7 @@ test('사업장·귀속월을 모르면 대기 칸 자료가 된다', () => {
 test('★ 서랍으로 내려보내면 대기 칸에서 지워지고 자료가 생긴다 — 한 번에', () => {
   const S = loadStore();
   const rec = S.pendingRecord({ filename: '근태표.jpg', at: 1000, file: 'pu_paydata/U1/pending/p1.jpg' });
-  const up = S.drawerUpdate('p1', rec, { companyId: 'co_7', companyName: '화담원', month: '2026-08', kind: 'attend', at: 2000 });
+  const up = S.drawerUpdate('p1', rec, { companyId: 'co_7', companyName: '다온원', month: '2026-08', kind: 'attend', at: 2000 });
   const keys = Object.keys(up);
 
   // 자료가 생겼다

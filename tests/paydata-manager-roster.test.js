@@ -25,10 +25,10 @@ function loadStore() {
 
 /* 업체관리가 쓰는 칸 그대로 — 사번은 p-001 꼴, 이메일은 p001@pureun.kr */
 const COS = [
-  { id: 'c1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-  { id: 'c2', name: '이비', managerMain: 'p-001', managerSubs: ['p-002'] },
-  { id: 'c3', name: '남광건설', managerMain: 'p-002', managerSubs: [] },
-  { id: 'c4', name: '신흥기업', managerMain: '', managerSubs: [] }        // 담당 없음
+  { id: 'c1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+  { id: 'c2', name: '벼리비', managerMain: 'p-001', managerSubs: ['p-002'] },
+  { id: 'c3', name: '가온건설', managerMain: 'p-002', managerSubs: [] },
+  { id: 'c4', name: '새힘기업', managerMain: '', managerSubs: [] }        // 담당 없음
 ];
 const DIR = [
   { sid: 'p-001', name: '김대표' },
@@ -65,7 +65,7 @@ test('★ 들어온 적 있는 사람에게는 uid 가 붙고, 없는 사람은 
 test('★ 담당자가 없는 업체는 따로 모은다', () => {
   const S = loadStore();
   const r = S.managerRoster(COS, DIR, OWNERS);
-  assert.equal(r.unassigned.map(c => c.name).join(','), '신흥기업');
+  assert.equal(r.unassigned.map(c => c.name).join(','), '새힘기업');
 });
 
 test('★ 공개 명부를 못 읽어도 담당자가 사라지지 않는다', () => {

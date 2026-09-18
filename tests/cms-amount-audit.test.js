@@ -35,9 +35,9 @@ function ok(name, cond, hint) {
 
 /* CMS 이름 → ERP 업체 이름 (실제로는 별칭·사업자번호로 푼다) */
 const NAMES = {
-  '칸토덴카화인프로덕츠한국(주)': '칸토덴카화인프로덕츠',
-  '(주)알산정밀': '(주)알산정밀',
-  '(주)와이엔케이': '(주)와이엔케이',
+  '가온덴카화인프로덕츠한국(주)': '가온덴카화인프로덕츠',
+  '(주)가온정밀': '(주)가온정밀',
+  '(주)파하엔케이': '(주)파하엔케이',
   '모르는회사': ''
 };
 const resolve = (nm) => NAMES[nm] !== undefined ? NAMES[nm] : '';
@@ -45,33 +45,33 @@ const resolve = (nm) => NAMES[nm] !== undefined ? NAMES[nm] : '';
 // ── ① 칸토덴카 사례 — 실제로 275,000 이 빠졌는데 440,000 이 적혔다 ──
 {
   const rows = [
-    { status:'ok', setdate:'2026-02-03', name:'칸토덴카화인프로덕츠한국(주)', amount:275000 },
-    { status:'ok', setdate:'2026-02-03', name:'(주)알산정밀',                 amount:330000 }
+    { status:'ok', setdate:'2026-02-03', name:'가온덴카화인프로덕츠한국(주)', amount:275000 },
+    { status:'ok', setdate:'2026-02-03', name:'(주)가온정밀',                 amount:330000 }
   ];
   const incomes = [
-    { sourceKind:'company', companyName:'칸토덴카화인프로덕츠', date:'2026-02-03', amount:440000,
+    { sourceKind:'company', companyName:'가온덴카화인프로덕츠', date:'2026-02-03', amount:440000,
       id:'fi-1', note:'CMS 일괄이체 자동매칭', kind:'자문료' },
-    { sourceKind:'company', companyName:'(주)알산정밀', date:'2026-02-03', amount:330000,
+    { sourceKind:'company', companyName:'(주)가온정밀', date:'2026-02-03', amount:330000,
       id:'fi-2', note:'CMS 일괄이체 자동매칭', kind:'자문료' }
   ];
   const r = audit(rows, incomes, resolve);
   console.log('[① 칸토덴카 사례]');
   ok('틀린 것 1건만 잡는다', r.bad.length === 1, '잡힌 수: ' + r.bad.length);
-  ok('잡힌 것이 칸토덴카다', r.bad[0] && r.bad[0].co === '칸토덴카화인프로덕츠',
+  ok('잡힌 것이 칸토덴카다', r.bad[0] && r.bad[0].co === '가온덴카화인프로덕츠',
      '잡힌 업체: ' + (r.bad[0] && r.bad[0].co));
   ok('실제 275,000 · 적힌 440,000 을 그대로 보여준다',
      r.bad[0] && r.bad[0].real === 275000 && r.bad[0].saved === 440000,
      JSON.stringify(r.bad[0]));
   ok('차이 +165,000 원', r.bad[0] && r.bad[0].gap === 165000, '차이: ' + (r.bad[0] && r.bad[0].gap));
-  ok('맞는 건(알산정밀)은 안 잡는다', !r.bad.some(b => b.co === '(주)알산정밀'));
+  ok('맞는 건(가온정밀)은 안 잡는다', !r.bad.some(b => b.co === '(주)가온정밀'));
   ok('둘 다 대조했다', r.checked === 2, '대조 수: ' + r.checked);
   ok('어느 기록인지 되짚을 수 있다', r.bad[0] && r.bad[0].ids.indexOf('fi-1') >= 0);
 }
 
 // ── ③ 실패한 출금은 대조에서 뺀다 ──
 {
-  const rows = [{ status:'fail', setdate:'2026-02-03', name:'(주)알산정밀', amount:330000 }];
-  const incomes = [{ sourceKind:'company', companyName:'(주)알산정밀', date:'2026-02-03',
+  const rows = [{ status:'fail', setdate:'2026-02-03', name:'(주)가온정밀', amount:330000 }];
+  const incomes = [{ sourceKind:'company', companyName:'(주)가온정밀', date:'2026-02-03',
                      amount:330000, id:'x', note:'', kind:'자문료' }];
   const r = audit(rows, incomes, resolve);
   console.log('\n[③ 실패한 출금]');
@@ -82,10 +82,10 @@ const resolve = (nm) => NAMES[nm] !== undefined ? NAMES[nm] : '';
 // ── ④ 같은 날 두 번 빠진 것 ──
 {
   const rows = [
-    { status:'ok', setdate:'2026-02-03', name:'(주)와이엔케이', amount:110000 },
-    { status:'ok', setdate:'2026-02-03', name:'(주)와이엔케이', amount:110000 }
+    { status:'ok', setdate:'2026-02-03', name:'(주)파하엔케이', amount:110000 },
+    { status:'ok', setdate:'2026-02-03', name:'(주)파하엔케이', amount:110000 }
   ];
-  const incomes = [{ sourceKind:'company', companyName:'(주)와이엔케이', date:'2026-02-03',
+  const incomes = [{ sourceKind:'company', companyName:'(주)파하엔케이', date:'2026-02-03',
                      amount:220000, id:'y', note:'', kind:'자문료' }];
   const r = audit(rows, incomes, resolve);
   console.log('\n[④ 같은 날 두 번]');
@@ -96,11 +96,11 @@ const resolve = (nm) => NAMES[nm] !== undefined ? NAMES[nm] : '';
 // ── ⑤ 한쪽에만 있는 것 ──
 {
   const rows = [
-    { status:'ok', setdate:'2026-02-03', name:'(주)알산정밀', amount:330000 },
+    { status:'ok', setdate:'2026-02-03', name:'(주)가온정밀', amount:330000 },
     { status:'ok', setdate:'2026-02-03', name:'모르는회사',   amount:99000 }
   ];
   const incomes = [
-    { sourceKind:'company', companyName:'(주)와이엔케이', date:'2026-02-03', amount:220000, id:'z', note:'', kind:'자문료' }
+    { sourceKind:'company', companyName:'(주)파하엔케이', date:'2026-02-03', amount:220000, id:'z', note:'', kind:'자문료' }
   ];
   const r = audit(rows, incomes, resolve);
   console.log('\n[⑤ 한쪽에만 있는 것]');
@@ -112,12 +112,12 @@ const resolve = (nm) => NAMES[nm] !== undefined ? NAMES[nm] : '';
 // ── ⑥ 큰 것부터 · 합계 ──
 {
   const rows = [
-    { status:'ok', setdate:'2026-02-03', name:'(주)알산정밀', amount:330000 },
-    { status:'ok', setdate:'2026-02-03', name:'칸토덴카화인프로덕츠한국(주)', amount:275000 }
+    { status:'ok', setdate:'2026-02-03', name:'(주)가온정밀', amount:330000 },
+    { status:'ok', setdate:'2026-02-03', name:'가온덴카화인프로덕츠한국(주)', amount:275000 }
   ];
   const incomes = [
-    { sourceKind:'company', companyName:'(주)알산정밀', date:'2026-02-03', amount:340000, id:'a', note:'', kind:'자문료' },
-    { sourceKind:'company', companyName:'칸토덴카화인프로덕츠', date:'2026-02-03', amount:440000, id:'b', note:'', kind:'자문료' }
+    { sourceKind:'company', companyName:'(주)가온정밀', date:'2026-02-03', amount:340000, id:'a', note:'', kind:'자문료' },
+    { sourceKind:'company', companyName:'가온덴카화인프로덕츠', date:'2026-02-03', amount:440000, id:'b', note:'', kind:'자문료' }
   ];
   const r = audit(rows, incomes, resolve);
   console.log('\n[⑥ 차례와 합계]');
@@ -128,8 +128,8 @@ const resolve = (nm) => NAMES[nm] !== undefined ? NAMES[nm] : '';
 
 // ── ② 헛경보 없음 (전부 맞을 때) ──
 {
-  const rows = [{ status:'ok', setdate:'2026-02-03', name:'(주)알산정밀', amount:330000 }];
-  const incomes = [{ sourceKind:'company', companyName:'(주)알산정밀', date:'2026-02-03',
+  const rows = [{ status:'ok', setdate:'2026-02-03', name:'(주)가온정밀', amount:330000 }];
+  const incomes = [{ sourceKind:'company', companyName:'(주)가온정밀', date:'2026-02-03',
                      amount:330000, id:'q', note:'', kind:'자문료' }];
   const r = audit(rows, incomes, resolve);
   console.log('\n[② 전부 맞을 때]');

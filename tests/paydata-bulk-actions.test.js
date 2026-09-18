@@ -109,7 +109,7 @@ function loadBulk(pending, picked) {
     'const $ = id => document.getElementById(id);',
     'const S = window.PuPaydataStore; S.init({uid:"U1"});',
     'const App = ' + JSON.stringify({
-      companies: [{ id: 'co_1', name: '화담원' }, { id: 'co_2', name: '이비' }],
+      companies: [{ id: 'co_1', name: '다온원' }, { id: 'co_2', name: '벼리비' }],
       pending: pending, pendTag: {}, pick: { pending: picked },
       viewingUid: '', viewingDeputy: false, month: '2026-08'
     }) + ';',
@@ -128,8 +128,8 @@ function loadBulk(pending, picked) {
 }
 
 const THREE = {
-  p1: { filename: '화담원_2026-08_근태.jpg', at: 3 },
-  p2: { filename: '이비_2026-08_근태.jpg', at: 2 },
+  p1: { filename: '다온원_2026-08_근태.jpg', at: 3 },
+  p2: { filename: '벼리비_2026-08_근태.jpg', at: 2 },
   p3: { filename: '사진 2026-08-14.jpg', at: 1 }      // 업체를 알 수 없다
 };
 

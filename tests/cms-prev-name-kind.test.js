@@ -56,7 +56,7 @@ function idxOf(entries, prevs) {
 }
 
 test('★★ 예전 이름으로 업체를 찾고, «무엇을 보고 찾았는지» 담아 준다', () => {
-  const a = E('c1', '천안청화공사', '1238120196');
+  const a = E('c1', '가나공사', '1238120196');
   const idx = idxOf([a], [{ name: '◯◯산업', e: a }]);
   const out = {};
   const hit = match(idx, '◯◯산업', '', out);
@@ -93,7 +93,7 @@ test('아무것도 못 찾으면 null 이고 via 는 비어 있다', () => {
 });
 
 test('out 을 안 줘도 죽지 않는다 (부르는 곳이 여럿이다)', () => {
-  const a = E('c1', '천안청화공사', '');
+  const a = E('c1', '가나공사', '');
   const idx = idxOf([a], [{ name: '◯◯산업', e: a }]);
   assert.strictEqual(match(idx, '◯◯산업', '').id, 'c1');
 });

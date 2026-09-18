@@ -81,20 +81,20 @@ function gt(name, got, than){
 }
 
 console.log('\n[괄호 안 업체명을 뽑아낸다]');
-eq('최지영(롯데리아) → 롯데리아', parenNames('최지영(롯데리아)').join(','), '롯데리아');
+eq('최지영(나비리아) → 나비리아', parenNames('최지영(나비리아)').join(','), '나비리아');
 eq('괄호 없으면 빈 목록', parenNames('노동권익과').length, 0);
 eq('두 글자 미만은 안 뽑는다', parenNames('홍길동(A)').length, 0);
 
-console.log('\n[실제로 있었던 오매칭 — 최지영(롯데리아)]');
-const before = nameScoreOld('최지영(롯데리아)', '롯데리아 아산남성점');
-const after  = nameScore('최지영(롯데리아)', '롯데리아 아산남성점');
+console.log('\n[실제로 있었던 오매칭 — 최지영(나비리아)]');
+const before = nameScoreOld('최지영(나비리아)', '나비리아 아산남성점');
+const after  = nameScore('최지영(나비리아)', '나비리아 아산남성점');
 console.log('       고치기 전 ' + before + '점 → 고친 뒤 ' + after + '점');
-gt('롯데리아 점수가 올라간다', after, before);
+gt('나비리아 점수가 올라간다', after, before);
 eq('「이름 포함」 수준(85)까지 올라간다', after, 85);
 
 console.log('\n[엉뚱한 업체는 그대로 0점이어야 한다]');
-eq('최지영(롯데리아) vs 충남사회서비스원', nameScore('최지영(롯데리아)', '충남사회서비스원'), 0);
-eq('최지영(롯데리아) vs 한국생산성본부', nameScore('최지영(롯데리아)', '한국생산성본부'), 0);
+eq('최지영(나비리아) vs 가나사회서비스원', nameScore('최지영(나비리아)', '가나사회서비스원'), 0);
+eq('최지영(나비리아) vs 한국생산성본부', nameScore('최지영(나비리아)', '한국생산성본부'), 0);
 
 console.log('\n[은행명 괄호는 업체로 오인하지 않는다]');
 eq('김철수(우리은행) vs 우리산업 — 은행 꼬리가 잘려도 오르지 않는다',
@@ -102,8 +102,8 @@ eq('김철수(우리은행) vs 우리산업 — 은행 꼬리가 잘려도 오�
 
 console.log('\n[기존 동작은 그대로]');
 eq('괄호 없는 정확 일치', nameScore('한국생산성본부', '한국생산성본부'), 100);
-eq('㈜ 표기 무시', nameScore('㈜이피아', '이피아'), 100);
-eq('괄호가 오히려 방해하지 않는다 (이피아(주)) ', nameScore('이피아(주)', '이피아'), 100);
+eq('㈜ 표기 무시', nameScore('㈜아름', '아름'), 100);
+eq('괄호가 오히려 방해하지 않는다 (아름(주)) ', nameScore('아름(주)', '아름'), 100);
 
 console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===\n');
 process.exit(fail ? 1 : 0);

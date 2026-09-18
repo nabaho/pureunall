@@ -39,7 +39,7 @@ const merge = sandbox.merge;
 const R = (o) => Object.assign({ _k:'0', type:'income', src:'bank', date:'2026-04-01', amount:100000, memo:'' }, o);
 const FILE1 = [
   R({ _k:'0', date:'2026-04-01', amount:220000, memo:'광제' }),
-  R({ _k:'1', date:'2026-04-02', amount:330000, memo:'노리시스템' }),
+  R({ _k:'1', date:'2026-04-02', amount:330000, memo:'벼리시스템' }),
 ];
 const copy = (rows) => rows.map(r => Object.assign({}, r));
 
@@ -76,7 +76,7 @@ test('같은 파일을 또 올리면 하나도 늘지 않는다', () => {
 test('기간이 겹쳐도 새 행만 들어간다', () => {
   const a = merge([], copy(FILE1));
   const b = merge(a.rows, [
-    R({ _k:'0', date:'2026-04-02', amount:330000, memo:'노리시스템' }),   // 겹침
+    R({ _k:'0', date:'2026-04-02', amount:330000, memo:'벼리시스템' }),   // 겹침
     R({ _k:'1', date:'2026-04-20', amount:550000, memo:'새 건' }),        // 새것
   ]);
   assert.equal(b.rows.length, 3);
@@ -84,16 +84,16 @@ test('기간이 겹쳐도 새 행만 들어간다', () => {
 });
 
 test('적요를 다듬은 뒤 견준다 (띄어쓰기·대소문자)', () => {
-  const a = merge([], [R({ amount:220000, memo:'노리 시스템' })]);
-  const b = merge(a.rows, [R({ _k:'9', amount:220000, memo:'노리시스템' })]);
+  const a = merge([], [R({ amount:220000, memo:'벼리 시스템' })]);
+  const b = merge(a.rows, [R({ _k:'9', amount:220000, memo:'벼리시스템' })]);
   assert.equal(b.rows.length, 1, '같은 행으로 봐야 한다');
 });
 
 test('⚠ 한 파일 안의 «진짜» 같은 행 둘은 살린다', () => {
   // 같은 곳에서 같은 값을 같은 날 두 번 보내는 일이 있다. 지우면 돈이 사라진다.
   const twice = [
-    R({ _k:'0', date:'2026-04-02', amount:330000, memo:'노리' }),
-    R({ _k:'1', date:'2026-04-02', amount:330000, memo:'노리' }),
+    R({ _k:'0', date:'2026-04-02', amount:330000, memo:'벼리' }),
+    R({ _k:'1', date:'2026-04-02', amount:330000, memo:'벼리' }),
   ];
   const a = merge([], copy(twice));
   assert.equal(a.rows.length, 2, '둘 다 남아야 한다');

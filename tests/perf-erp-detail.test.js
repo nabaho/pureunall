@@ -36,7 +36,7 @@ test('성과 «당사자»(주담당·부담당)를 함께 보여 준다', () =>
 
 test('접힌 줄은 한 줄로 — 갈래말은 펼친 자리로 내렸다', () => {
   const fn = grab('pcRowHTML');
-  /* ★ 폰에서 「6/24 (주)비에스부여공장 · 기타용역비 잔금 · 개인」이 두 줄로 접히던 것이
+  /* ★ 폰에서 「6/24 (주)가온부여공장 · 기타용역비 잔금 · 개인」이 두 줄로 접히던 것이
      이 화면이 정신없던 첫째 까닭이었다(대표 지시 2026-08-20). */
   const head = fn.slice(fn.indexOf('pcToggleRow'), fn.indexOf('if(open)'));
   assert.match(head, /text-overflow:ellipsis;white-space:nowrap/,

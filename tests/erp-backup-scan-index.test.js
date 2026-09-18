@@ -112,7 +112,7 @@ const SNAP = {
   data: {
     contracts: [
       { id: 'c1', no: 'K-1', companyName: '한빛유통' },
-      { id: 'c2', no: 'K-2', companyName: '두리상사', _deleted: true },
+      { id: 'c2', no: 'K-2', companyName: '가온상사', _deleted: true },
     ],
     cases: { a: { id: 's1', caseNo: 'J-9', name: '해솔테크' } },
   },

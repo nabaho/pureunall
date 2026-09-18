@@ -47,12 +47,12 @@ const ROW = (memo, amount, date, extra) =>
 
 test('★★ 「가능액」이 붙은 쪽을 «치울 것»으로, 깨끗한 쪽을 «남길 것»으로 고른다', () => {
   const got = pairs([
-    ROW('롯데리아천 가능액', 52200, '2026-07-31 11:48'),
-    ROW('롯데리아천', 52200, '2026-07-31 11:48'),
+    ROW('나비리아천 가능액', 52200, '2026-07-31 11:48'),
+    ROW('나비리아천', 52200, '2026-07-31 11:48'),
   ]);
   assert.strictEqual(got.length, 1, '겹친 짝을 못 찾는다');
-  assert.strictEqual(got[0].drop.memo, '롯데리아천 가능액', '★ 깨끗한 쪽을 치우면 안 된다');
-  assert.strictEqual(got[0].keep.memo, '롯데리아천');
+  assert.strictEqual(got[0].drop.memo, '나비리아천 가능액', '★ 깨끗한 쪽을 치우면 안 된다');
+  assert.strictEqual(got[0].keep.memo, '나비리아천');
 });
 
 test('★★ 금액이 다르면 «짝이 아니다»', () => {

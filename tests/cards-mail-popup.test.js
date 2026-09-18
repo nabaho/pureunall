@@ -37,9 +37,9 @@ function box(opt){
   const opened = [];
   const ctx = {
     console, encodeURIComponent, String, Number, Object,
-    state: { items: { c1: { id:'c1', name:'이주재', company:'이레메디컬', email:'cust11@naver.com' },
-                      c2: { id:'c2', name:'이정래', company:'세무법인 자연', email:'cust05@hanmail.net' },
-                      c3: { id:'c3', name:'최정식', company:'최정식 세무회계', email:'' } } },
+    state: { items: { c1: { id:'c1', name:'이주재', company:'온새메디컬', email:'cust11@naver.com' },
+                      c2: { id:'c2', name:'이정래', company:'세무법인 다온', email:'cust05@hanmail.net' },
+                      c3: { id:'c3', name:'최정식', company:'한소담 세무회계', email:'' } } },
     normEmail: v => String(v || '').trim().toLowerCase(),
     toast: m => { ctx._toast = m; },
     openSendMaterials: id => { ctx._fellBack = id; },

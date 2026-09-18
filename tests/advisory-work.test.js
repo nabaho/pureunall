@@ -74,7 +74,7 @@ function candBox(master, today){
 }
 
 const 자문사 = {
-  id: 'co-1', name: '(주)토탈방재', typeCode: '자문', status: 'active',
+  id: 'co-1', name: '(주)마루방재', typeCode: '자문', status: 'active',
   managerMain: 'P-003', managerSubs: ['P-004'],
   contractStartDate: '2026-01-01', contractEndDate: '2026-12-31',
   monthlyAdvisoryFee: 220000
@@ -84,7 +84,7 @@ test('★★ 업체관리 한 곳이 「자문」 구분의 업무가 된다', (
   const c = candBox({ companies: [자문사] }).puerpCandidates();
   assert.equal(c.length, 1);
   assert.equal(c[0].cat, '자문');
-  assert.equal(c[0].company, '(주)토탈방재');
+  assert.equal(c[0].company, '(주)마루방재');
 });
 
 test('★ 업체는 회사 이름이 name 이다 — 다른 갈래(companyName)와 칸이 다르다', () => {
@@ -184,7 +184,7 @@ test('★ 끝난 자문사는 후보에서 빠진다', () => {
   const b = candBox({ companies: [자문사, { id: 'co-2', name: '끊긴곳', status: 'terminated' }] });
   const c = b.puerpCandidates();
   assert.equal(c.length, 1);
-  assert.equal(c[0].company, '(주)토탈방재');
+  assert.equal(c[0].company, '(주)마루방재');
 });
 
 test('★ 종료 반영도 갈래를 함께 넘긴다 — 나중에 해지하면 업무가 종료로 빠진다', () => {

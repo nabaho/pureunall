@@ -115,17 +115,17 @@ console.log('\n[정렬 규칙을 실제로 돌려본다]');
   }
   // 차이가 겹치지 않게 잡는다 — 겹치면 무엇이 먼저인지 우연에 맡기게 된다
   const list = [
-    { companyName:'충남사회서비스원', amount:3300000, item:{typeCode:'case-other'} },   // 차이 150,000
-    { companyName:'청아미즈산부인과', amount:1100000, item:{typeCode:'cons-clinic'} },  // 차이 2,050,000
-    { companyName:'중원대학교',      amount:3100000, item:{typeCode:'case-other'} },   // 차이  50,000
-    { companyName:'(주)토탈방재',     amount:1050000, item:{typeCode:'cons-clinic'} },  // 차이 2,100,000
+    { companyName:'가나사회서비스원', amount:3300000, item:{typeCode:'case-other'} },   // 차이 150,000
+    { companyName:'나루미즈산부인과', amount:1100000, item:{typeCode:'cons-clinic'} },  // 차이 2,050,000
+    { companyName:'가나대학교',      amount:3100000, item:{typeCode:'case-other'} },   // 차이  50,000
+    { companyName:'(주)마루방재',     amount:1050000, item:{typeCode:'cons-clinic'} },  // 차이 2,100,000
   ];
   eq('일반 입금이면 금액 가까운 순',
      sortList(list, 3150000, false).map(x=>x.companyName),
-     ['중원대학교','충남사회서비스원','청아미즈산부인과','(주)토탈방재']);
+     ['가나대학교','가나사회서비스원','나루미즈산부인과','(주)마루방재']);
   eq('비즈사업비면 현장클리닉이 먼저, 그 안에서 금액 가까운 순',
      sortList(list, 3150000, true).map(x=>x.companyName),
-     ['청아미즈산부인과','(주)토탈방재','중원대학교','충남사회서비스원']);
+     ['나루미즈산부인과','(주)마루방재','가나대학교','가나사회서비스원']);
 }
 
 console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===\n');

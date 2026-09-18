@@ -44,8 +44,8 @@ function loadSitesModel() {
    typeCode: 자문/급여/노조/기금/사무대행, status: active/closed/suboffice,
    suspended: status 와 따로 켜지는 계약중단 체크 */
 const RAW = {
-  c1: { name: '화담원', typeCode: '급여', status: 'active', managerMain: 'p-001' },
-  c2: { name: '이비', typeCode: '자문', status: 'active', managerMain: 'p-001' },
+  c1: { name: '다온원', typeCode: '급여', status: 'active', managerMain: 'p-001' },
+  c2: { name: '벼리비', typeCode: '자문', status: 'active', managerMain: 'p-001' },
   c3: { name: '노조업체', typeCode: '노조', status: 'active' },
   c4: { name: '기금업체', typeCode: '기금', status: 'active' },
   c5: { name: '중단업체', typeCode: '급여', status: 'active', suspended: true },
@@ -66,7 +66,7 @@ test('★ 유형·상태·계약중단을 업체관리에서 그대로 들고 �
 test('★ 유형이 「급여」인 곳만 남긴다 — 자문·노조·기금은 뺀다', () => {
   const S = loadStore();
   const only = S.payrollCompanies(S.normalizeCompanies(RAW));
-  assert.equal(only.map(c => c.name).sort().join(','), '두번째급여,화담원');
+  assert.equal(only.map(c => c.name).sort().join(','), '다온원,두번째급여');
 });
 
 test('★ 계약중단·종료한 업체는 목록에서 뺀다 (대표 결정 2026-08-17)', () => {
@@ -99,7 +99,7 @@ test('★ 급여 업체가 아닌 곳에 담긴 자료는 이름과 함께 남�
   const arrivals = { c2: { 202608: { attend: { a: 1, b: 1 }, last: 1 } } };
   const out = sitesModel(S.payrollCompanies(all), {}, arrivals, '2026-08', 0, '', all);
   assert.equal(out.offType.length, 1);
-  assert.equal(out.offType[0].name, '이비');   // 번호가 아니라 이름이어야 찾아간다
+  assert.equal(out.offType[0].name, '벼리비');   // 번호가 아니라 이름이어야 찾아간다
   assert.equal(out.offType[0].count, 2);
   assert.equal(out.unlisted.length, 0);        // 「지워진 업체」로 섞이면 안 된다
 });

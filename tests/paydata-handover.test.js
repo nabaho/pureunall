@@ -53,7 +53,7 @@ function store() {
 
 test('★ 넘길 자료·보내는 자리·받는 자리·까닭을 함께 보낸다', async () => {
   const { S, sent } = store();
-  await S.handItem(['a', 'b'], 'u1', 'u2', '유원에프앤비는 김보람 담당입니다');
+  await S.handItem(['a', 'b'], 'u1', 'u2', '자차에프앤비는 김보람 담당입니다');
   const b = sent[0].body;
   assert.match(sent[0].url, /handPaydataItem$/);
   assert.equal(b.ids.length, 2);

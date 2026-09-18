@@ -1,7 +1,7 @@
 'use strict';
 /* 규정관리 ← 푸른이알피 업체관리(data/companies) 읽기
 
-   왜: 화면 콘솔에 「ERP 업체 2건 로드」가 찍혔고(2026-09-05 실측), 씨티에스㈜를
+   왜: 화면 콘솔에 「ERP 업체 2건 로드」가 찍혔고(2026-09-05 실측), 열음에스㈜를
    ERP 에서 못 찾는다고 나왔다. 업체가 2곳이라서가 아니다.
 
    pu-erp 동기화는 data/{키} 를 «포장»해 올린다 — { v: 값, u: 갱신시각 }.
@@ -47,9 +47,9 @@ function line(re, what) {
 /* pu-erp 가 실제로 올리는 모양 그대로 */
 const WRAPPED = {
   v: {
-    c1: { id: 'c1', name: '씨티에스㈜', bizNo: '123-45-67890', ceo: '홍길동' },
+    c1: { id: 'c1', name: '열음에스㈜', bizNo: '123-45-67890', ceo: '홍길동' },
     c2: { id: 'c2', name: '주식회사 한빛산업', bizNo: '1233320517' },
-    c3: { id: 'c3', name: '㈜미래테크', bizNo: '' }
+    c3: { id: 'c3', name: '㈜마루테크', bizNo: '' }
   },
   u: 1725000000000
 };
@@ -65,7 +65,7 @@ test('★ 포장({v,u})을 벗겨 업체만 돌려준다 — 시각 숫자가 �
   assert.equal(out.length, 3, '「2건」이 나오면 포장을 안 벗긴 것입니다');
   assert.ok(out.every(c => c && typeof c === 'object' && typeof c.name === 'string'),
     '업체 아닌 것(숫자·지도 통째)이 섞였습니다: ' + JSON.stringify(out.map(x => typeof x)));
-  assert.ok(out.some(c => c.name === '씨티에스㈜'));
+  assert.ok(out.some(c => c.name === '열음에스㈜'));
 });
 
 test('포장 안이 배열이어도 된다', () => {
@@ -104,16 +104,16 @@ function ctxFind(erpRaw) {
   return c;
 }
 
-test('★ 씨티에스㈜를 상호로 찾는다 — 화면에서 못 찾던 바로 그 경우', () => {
+test('★ 열음에스㈜를 상호로 찾는다 — 화면에서 못 찾던 바로 그 경우', () => {
   const c = ctxFind(WRAPPED);
-  const hit = c.findErpCompany('🏢 씨티에스㈜', '');
+  const hit = c.findErpCompany('🏢 열음에스㈜', '');
   assert.ok(hit, 'ERP 업체관리에서 찾지 못했습니다 — 포장이 안 벗겨진 채입니다');
   assert.equal(hit.ceo, '홍길동');
 });
 
 test('★ 사업자번호로도 찾는다 — 하이픈 표기가 달라도', () => {
   const c = ctxFind(WRAPPED);
-  assert.equal((c.findErpCompany('', '1234567890') || {}).name, '씨티에스㈜');
+  assert.equal((c.findErpCompany('', '1234567890') || {}).name, '열음에스㈜');
   assert.equal((c.findErpCompany('', '123-33-20517') || {}).name, '주식회사 한빛산업');
 });
 
@@ -129,7 +129,7 @@ test('★ 옛 방식이 왜 실패했는지 남겨 둔다 — [지도 통째, �
   vm.runInContext(fn('findErpCompany'), c);
   c.ERP_COS = Object.values(WRAPPED).filter(Boolean);          // 고치기 전 코드가 만들던 것
   assert.equal(c.ERP_COS.length, 2, '이것이 화면의 「ERP 업체 2건 로드」다');
-  assert.equal(c.findErpCompany('씨티에스㈜', ''), null);
+  assert.equal(c.findErpCompany('열음에스㈜', ''), null);
   assert.equal(c.findErpCompany('', '1234567890'), null);
 });
 

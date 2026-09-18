@@ -21,7 +21,7 @@ const ROWS = [
   { org: '다솜유통(주)', bizType: '도소매업', size: '소기업', insured: 42,  start: '2021-03-15', end: '',           status: '진행' },
   { org: '(주)라온전자', bizType: '제조업', size: '중견기업', insured: 530, start: '2017-01-02', end: '',           status: '진행' },
   { org: '마루서비스(주)', bizType: '서비스업', size: '소기업', insured: 38, start: '2018-05-01', end: '2023-06-30', status: '종료' },
-  { org: '(주)바다상사', bizType: '도소매업', size: '소기업',  insured: 25, start: '2016-09-01', end: '2021-12-31', status: '종료' }
+  { org: '(주)다온상사', bizType: '도소매업', size: '소기업',  insured: 25, start: '2016-09-01', end: '2021-12-31', status: '종료' }
 ];
 const TODAY = '2026-09-03';
 

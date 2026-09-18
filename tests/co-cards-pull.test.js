@@ -53,9 +53,9 @@ test('사업자번호는 앞 10자리만 본다 — 종사업장 꼬리가 붙�
 /* ══════ 맞추기 ══════ */
 
 const COS = [
-  { id: 'c1', name: '㈜영도', bizNo: '111-11-11111', managerMain: 'A-003' },
-  { id: 'c2', name: '효마을푸드스토리(양지요양원)', bizNo: '', managerMain: 'A-005' },
-  { id: 'c3', name: '평해식품', bizNo: '333-33-33333', managerMain: 'A-002' },
+  { id: 'c1', name: '㈜가온', bizNo: '111-11-11111', managerMain: 'A-003' },
+  { id: 'c2', name: '새별마을푸드스토리(가나요양원)', bizNo: '', managerMain: 'A-005' },
+  { id: 'c3', name: '마루식품', bizNo: '333-33-33333', managerMain: 'A-002' },
   { id: 'c4', name: '쌍둥이상사(가)', bizNo: '', managerMain: 'A-001' },
   { id: 'c5', name: '쌍둥이상사(나)', bizNo: '', managerMain: 'A-004' }
 ];
@@ -68,13 +68,13 @@ test('★ 사업자번호가 가장 확실하다 — 이름이 달라도 같은 
 });
 
 test('★ 번호가 없으면 이름으로 — ㈜·빈칸은 무시한다', () => {
-  const hit = P.matchOne({ company: '주식회사 영도', email: 'a@b.kr' }, idx());
+  const hit = P.matchOne({ company: '주식회사 가온', email: 'a@b.kr' }, idx());
   assert.equal(hit.co.id, 'c1');
   assert.equal(hit.how, 'name');
 });
 
-test('★ 이름 앞머리로도 본다 — 명함은 「효마을 푸드스토리」라고만 적혀 있다', () => {
-  const hit = P.matchOne({ company: '효마을 푸드스토리', email: 'a@b.kr' }, idx());
+test('★ 이름 앞머리로도 본다 — 명함은 「새별마을 푸드스토리」라고만 적혀 있다', () => {
+  const hit = P.matchOne({ company: '새별마을 푸드스토리', email: 'a@b.kr' }, idx());
   assert.equal(hit.co.id, 'c2');
   assert.equal(hit.how, 'stem');
 });
@@ -90,37 +90,37 @@ test('아무 데도 안 맞으면 빈손', () => {
 /* ══════ 무엇을 넣을지 ══════ */
 
 test('★ 업체관리에 이미 있는 주소는 다시 안 넣는다', () => {
-  const cos = [{ id: 'c1', name: '㈜영도', primaryContactEmail: 'a@b.kr', managerMain: 'A-003' }];
-  const r = P.plan([{ company: '㈜영도', email: 'a@b.kr' }], cos);
+  const cos = [{ id: 'c1', name: '㈜가온', primaryContactEmail: 'a@b.kr', managerMain: 'A-003' }];
+  const r = P.plan([{ company: '㈜가온', email: 'a@b.kr' }], cos);
   assert.equal(r.mails, 0);
 });
 
 test('★ contacts 에 든 주소도 「이미 있는 것」으로 본다 — 딸림값만 보면 두 번 넣는다', () => {
-  const cos = [{ id: 'c1', name: '㈜영도', managerMain: 'A-003',
+  const cos = [{ id: 'c1', name: '㈜가온', managerMain: 'A-003',
     contacts: [{ name: '엄나영', email: 'a@b.kr', isPrimary: true }] }];
-  assert.equal(P.plan([{ company: '㈜영도', email: 'A@B.KR' }], cos).mails, 0);
+  assert.equal(P.plan([{ company: '㈜가온', email: 'A@B.KR' }], cos).mails, 0);
 });
 
 test('★ 명함 두 장에 같은 주소가 있어도 한 번만 넣는다', () => {
   const r = P.plan([
-    { company: '㈜영도', email: 'x@y.kr' },
-    { company: '주식회사 영도', email: 'X@Y.KR' }
+    { company: '㈜가온', email: 'x@y.kr' },
+    { company: '주식회사 가온', email: 'X@Y.KR' }
   ], COS);
   assert.equal(r.mails, 1);
 });
 
 test('★ 담당자별로 묶어 세운다 — 자기 사업장만 확인하면 된다', () => {
   const r = P.plan([
-    { company: '평해식품', bizno: '333-33-33333', email: 'p@n.kr' },
-    { company: '㈜영도', bizno: '111-11-11111', email: 'y@n.kr' }
+    { company: '마루식품', bizno: '333-33-33333', email: 'p@n.kr' },
+    { company: '㈜가온', bizno: '111-11-11111', email: 'y@n.kr' }
   ], COS);
   assert.equal(r.items.map(x => x.co.managerMain).join(','), 'A-002,A-003');
 });
 
 test('셈이 맞는다 — 사업장 수와 주소 수', () => {
   const r = P.plan([
-    { company: '㈜영도', email: 'a@n.kr', memo: '경리 b@n.kr' },
-    { company: '평해식품', email: 'c@n.kr' }
+    { company: '㈜가온', email: 'a@n.kr', memo: '경리 b@n.kr' },
+    { company: '마루식품', email: 'c@n.kr' }
   ], COS);
   assert.equal(r.sites, 2);
   assert.equal(r.mails, 3);
@@ -133,7 +133,7 @@ test('★ 두 곳에 걸려 못 고른 명함 수를 알려 준다 — 조용히
 });
 
 test('★ 공용 칸이 몇 건 풀리는지 센다 — 「해서 뭐가 좋아지나」다', () => {
-  const r = P.plan([{ company: '㈜영도', email: 'y@n.kr' }], COS,
+  const r = P.plan([{ company: '㈜가온', email: 'y@n.kr' }], COS,
     { stuck: { 'y@n.kr': 3 } });
   assert.equal(r.stuck, 3);
 });
@@ -141,7 +141,7 @@ test('★ 공용 칸이 몇 건 풀리는지 센다 — 「해서 뭐가 좋아�
 /* ══════ 쓰기 ══════ */
 
 test('★ 이미 적힌 담당자를 덮지 않는다 — 아래에 붙인다', () => {
-  const co = { id: 'c1', name: '㈜영도',
+  const co = { id: 'c1', name: '㈜가온',
     contacts: [{ name: '기존', position: '실장', phone: '010-1', email: 'old@n.kr', isPrimary: true }] };
   const r = P.patchFor(co, [{ email: 'new@n.kr', name: '엄나영' }]);
   assert.equal(r.patch.contacts.length, 2);
@@ -150,14 +150,14 @@ test('★ 이미 적힌 담당자를 덮지 않는다 — 아래에 붙인다', 
 });
 
 test('★ 대표 담당자 자리를 빼앗지 않는다', () => {
-  const co = { id: 'c1', name: '㈜영도',
+  const co = { id: 'c1', name: '㈜가온',
     contacts: [{ name: '진짜대표', email: 'real@n.kr', isPrimary: true }] };
   const r = P.patchFor(co, [{ email: 'new@n.kr', name: '새사람' }]);
   assert.equal(r.patch.primaryContactName, '진짜대표');
 });
 
 test('아무도 없던 업체는 명함에서 온 사람이 대표가 된다', () => {
-  const r = P.patchFor({ id: 'c1', name: '㈜영도' }, [{ email: 'a@n.kr', name: '엄나영' }]);
+  const r = P.patchFor({ id: 'c1', name: '㈜가온' }, [{ email: 'a@n.kr', name: '엄나영' }]);
   assert.equal(r.patch.primaryContactName, '엄나영');
   assert.equal(r.patch.primaryContactEmail, 'a@n.kr');
 });
@@ -179,7 +179,7 @@ test('넣을 것이 없으면 안 쓴다', () => {
 });
 
 test('★ 안 고른 줄은 쓰지 않는다', () => {
-  const items = P.plan([{ company: '㈜영도', email: 'y@n.kr' }], COS).items;
+  const items = P.plan([{ company: '㈜가온', email: 'y@n.kr' }], COS).items;
   assert.equal(P.writes(items, { 'c1|y@n.kr': false }).length, 0);
   assert.equal(P.writes(items, {}).length, 1);
 });

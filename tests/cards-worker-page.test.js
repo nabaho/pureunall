@@ -98,8 +98,8 @@ test('★★★ 사람 열쇠 규칙이 사진첩 쪽(js/pu-doc-file.js)과 «�
   /* ⚠ 유한회사·농업회사법인 표기를 «반드시» 넣는다 — 업체 찾기(coNameKey)는 그것을
      걷어내고 사람 열쇠는 안 걷어낸다. 이 표본이 없으면 두 쪽이 어긋나도 안 걸린다
      (2026-09-02 되돌림 검사에서 실제로 안 걸렸다). */
-  const COS = ['(주)가나', '가나', '가나㈜', '주식회사 가나', '  가나  ', '한서정공',
-    '(유)대성', '유한회사 대성', '유한책임회사 대성', '농업회사법인 한들', '㈲대성',
+  const COS = ['(주)가나', '가나', '가나㈜', '주식회사 가나', '  가나  ', '마루정공',
+    '(유)다온', '유한회사 다온', '유한책임회사 다온', '농업회사법인 이든', '㈲다온',
     '(주) 나라크라샤', '에스오에스종합관리', 'ABC Corp', '가나.다'];
   NAMES.forEach(function (n) {
     COS.forEach(function (co) {
@@ -229,11 +229,11 @@ test('★ 사건 이름 꼬리 「(노사)」를 뗀다 — 어느 사건에나 
 
 test('★★ 사업장이 사람 이름과 «같은 말»이면 안 그린다 — 한 줄에 두 번 나왔다', () => {
   const c = load();
-  assert.equal(c.wkSiteOf({ name: '심진숙', company: '심진숙' }), '');
-  assert.equal(c.wkSiteOf({ name: '심진숙', company: '심진숙 산재심사청구(출퇴근재해)' }), '',
+  assert.equal(c.wkSiteOf({ name: '한소담', company: '한소담' }), '');
+  assert.equal(c.wkSiteOf({ name: '한소담', company: '한소담 산재심사청구(출퇴근재해)' }), '',
     '★★ 사건 제목이 사업장 칸에 그대로 들어갑니다');
-  assert.equal(c.wkSiteOf({ name: '정우신약 근로자', company: '정우신약' }), '');
-  assert.equal(c.wkSiteOf({ name: '강미향', company: '중원대학교' }), '중원대학교',
+  assert.equal(c.wkSiteOf({ name: '나루신약 근로자', company: '나루신약' }), '');
+  assert.equal(c.wkSiteOf({ name: '강미향', company: '가나대학교' }), '가나대학교',
     '★ 진짜 사업장은 보여야 합니다');
 });
 

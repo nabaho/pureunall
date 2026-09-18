@@ -68,10 +68,10 @@ wctx.erpMatchScore = function(txn, cand){
 vm.createContext(wctx);
 vm.runInContext(slice('function erpNameEvidence(', '\n// ── 자동 정리(1클릭 승인) 3중 관문 ──'), wctx);
 
-const POOL = [{id:'a', companyName:'노리시스템', amount:220000},
-              {id:'b', companyName:'크레오에스지', amount:220000},
-              {id:'c', companyName:'신흥기업', amount:220000}];
-const got1 = wctx.erpMatchTxnToPending({memo:'노리시스템', amount:220000}, POOL, 12);
+const POOL = [{id:'a', companyName:'벼리시스템', amount:220000},
+              {id:'b', companyName:'차카에스지', amount:220000},
+              {id:'c', companyName:'새힘기업', amount:220000}];
+const got1 = wctx.erpMatchTxnToPending({memo:'벼리시스템', amount:220000}, POOL, 12);
 t('이름 맞는 것만 남는다', got1.map(x => x.cand.id), ['a']);
 const got2 = wctx.erpMatchTxnToPending({memo:'비즈사업비2건', amount:220000}, POOL, 12);
 t('이름 근거가 없으면 아무것도 안 나온다', got2.length, 0);

@@ -39,9 +39,9 @@ t('더 받았어도 음수는 안 만든다', ctx.erpExpectAmount(1000000, true,
 // ── 실화면 값으로 (김보람 제보 캡쳐 + 미입금 대기 캡쳐) ──
 const BANK = [
   { _k:'r1', src:'bank', date:'2026-01-28', memo:'이현아',               amount:1000000 },
-  { _k:'r2', src:'bank', date:'2026-01-29', memo:'(자)천안청화공사',      amount:1100000 },
+  { _k:'r2', src:'bank', date:'2026-01-29', memo:'(자)가나공사',      amount:1100000 },
   { _k:'r3', src:'bank', date:'2026-01-20', memo:'계룡시청소년상담복지', amount:300000  },
-  { _k:'r4', src:'bank', date:'2026-01-31', memo:'엠비프라텍',           amount:1100000 },
+  { _k:'r4', src:'bank', date:'2026-01-31', memo:'우람프라텍',           amount:1100000 },
   { _k:'r5', src:'bank', date:'2026-02-02', memo:'더빌이체3572',         amount:1408000 }
 ];
 const idx = ctx.erpBankHitIndex(BANK);
@@ -49,25 +49,25 @@ const hit = (name, amount, used) =>
   ctx.erpBankHitFor({ companyName:name, amount:amount, item:{}, kind:'balance' }, idx, used || {});
 
 console.log('\n■ 이름 + 금액이 모두 맞아야 내준다');
-t('이름·금액 모두 맞음', (hit('웅천새마을금고', 1100000) || {}).row === undefined ? null : true, null);
-t('이름이 맞으면 찾는다 — (자)천안청화공사',
-  ((hit('(자)천안청화공사', 1100000) || {}).row || {})._k, 'r2');
-t('금액도 딱 맞으면 exact', (hit('(자)천안청화공사', 1100000) || {}).state, 'exact');
+t('이름·금액 모두 맞음', (hit('가온새마을금고', 1100000) || {}).row === undefined ? null : true, null);
+t('이름이 맞으면 찾는다 — (자)가나공사',
+  ((hit('(자)가나공사', 1100000) || {}).row || {})._k, 'r2');
+t('금액도 딱 맞으면 exact', (hit('(자)가나공사', 1100000) || {}).state, 'exact');
 // ★ 이게 핵심 — 금액만 같은 줄을 내주면 매달 같은 금액을 내는 곳에 엉뚱하게 붙는다
 t('금액만 같고 이름이 다르면 안 내준다', hit('전혀다른회사', 1100000), null);
-t('이름은 같은데 금액이 크게 다르면 안 내준다', hit('(자)천안청화공사', 5000000), null);
+t('이름은 같은데 금액이 크게 다르면 안 내준다', hit('(자)가나공사', 5000000), null);
 
 console.log('\n■ 모자람·넘침을 가른다');
-t('30,000 모자람 — state', (hit('엠비프라텍', 1130000) || {}).state, 'short');
-t('30,000 모자람 — 차이', (hit('엠비프라텍', 1130000) || {}).diff, -30000);
-t('넘치면 over', (hit('엠비프라텍', 1090000) || {}).state, 'over');
+t('30,000 모자람 — state', (hit('우람프라텍', 1130000) || {}).state, 'short');
+t('30,000 모자람 — 차이', (hit('우람프라텍', 1130000) || {}).diff, -30000);
+t('넘치면 over', (hit('우람프라텍', 1090000) || {}).state, 'over');
 
 console.log('\n■ 한 통장 줄이 두 건에 붙지 않는다');
-t('이미 다른 건이 쓴 줄은 건너뛴다', hit('(자)천안청화공사', 1100000, { r2:1 }), null);
+t('이미 다른 건이 쓴 줄은 건너뛴다', hit('(자)가나공사', 1100000, { r2:1 }), null);
 // 금액이 딱 맞는 쪽이 먼저 가져간다 — 나중 건이 채 가면 앞 건이 「안 들어옴」 이 된다
 const all = ctx.erpBankHitsForAll([
-  { key:'A', companyName:'엠비프라텍', amount:1090000, item:{}, kind:'balance' },   // 넘침
-  { key:'B', companyName:'엠비프라텍', amount:1100000, item:{}, kind:'balance' }    // 딱 맞음
+  { key:'A', companyName:'우람프라텍', amount:1090000, item:{}, kind:'balance' },   // 넘침
+  { key:'B', companyName:'우람프라텍', amount:1100000, item:{}, kind:'balance' }    // 딱 맞음
 ], BANK);
 t('딱 맞는 B 가 그 줄을 가져간다', (all.B && all.B.row._k), 'r4');
 t('넘치는 A 는 못 가져간다', all.A === undefined || all.A === null, true);

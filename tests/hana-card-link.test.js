@@ -31,27 +31,27 @@ function cutBlock(src, header) {
 
 /* ─────────── ① 취소 ─────────── */
 test('★★ 카드 «취소» 문자가 이제 들어온다 (종전에는 통째로 버렸다)', () => {
-  const r = parseHanaMessage('[Web발신] 하나카드 취소 권형하 08/25 13:00 71,700원 (주)루나', NOW);
+  const r = parseHanaMessage('[Web발신] 하나카드 취소 권형하 08/25 13:00 71,700원 (주)소담', NOW);
   assert.ok(r.ok, '아직 버리고 있다: ' + r.reason);
   assert.strictEqual(r.transaction.src, 'card');
   assert.strictEqual(r.transaction.cancel, true, '취소라고 표시하지 않는다');
 });
 
 test('★★ 취소인지 «표»로 알려 준다 — 글자만 보고 재게 하면 안 된다', () => {
-  const c = parseHanaMessage('하나카드 취소 08/25 13:00 71,700원 (주)루나', NOW);
-  const a = parseHanaMessage('하나카드 승인 08/25 12:16 71,700원 일시불 (주)루나', NOW);
+  const c = parseHanaMessage('하나카드 취소 08/25 13:00 71,700원 (주)소담', NOW);
+  const a = parseHanaMessage('하나카드 승인 08/25 12:16 71,700원 일시불 (주)소담', NOW);
   assert.strictEqual(c.transaction.cancel, true);
   assert.strictEqual(a.transaction.cancel, false, '승인인데 취소로 본다');
 });
 
 test('★ 적요 앞에 「[취소]」를 붙여 눈으로도 보인다', () => {
-  const r = parseHanaMessage('하나카드 취소 08/25 13:00 71,700원 (주)루나', NOW);
+  const r = parseHanaMessage('하나카드 취소 08/25 13:00 71,700원 (주)소담', NOW);
   assert.ok(r.transaction.memo.indexOf('[취소]') === 0, '적요: ' + r.transaction.memo);
 });
 
 test('★★ 같은 날 같은 금액의 승인과 취소가 «한 줄로 겹치지» 않는다', () => {
-  const a = parseHanaMessage('하나카드 승인 08/25 13:00 71,700원 (주)루나', NOW);
-  const c = parseHanaMessage('하나카드 취소 08/25 13:00 71,700원 (주)루나', NOW);
+  const a = parseHanaMessage('하나카드 승인 08/25 13:00 71,700원 (주)소담', NOW);
+  const c = parseHanaMessage('하나카드 취소 08/25 13:00 71,700원 (주)소담', NOW);
   assert.notStrictEqual(a.transaction.id, c.transaction.id,
     '열쇠가 같으면 취소가 승인에 덮여 사라진다');
 });
@@ -107,8 +107,8 @@ test('★★ 확정할 때 이름표를 «줄마다» 본다 (화면 전체를 �
 
 /* ─────────── ③ 적요 ─────────── */
 test('★★ 카드 적요에서 «금액»을 뗀다 (적요는 업체 이름을 맞추는 칸이다)', () => {
-  const r = parseHanaMessage('[Web발신] 하나카드 승인 권형하 08/25 12:16 71,700원 일시불 (주)루나', NOW);
-  assert.strictEqual(r.transaction.memo, '(주)루나', '적요: ' + r.transaction.memo);
+  const r = parseHanaMessage('[Web발신] 하나카드 승인 권형하 08/25 12:16 71,700원 일시불 (주)소담', NOW);
+  assert.strictEqual(r.transaction.memo, '(주)소담', '적요: ' + r.transaction.memo);
 });
 
 test('★★ 가게 이름을 깎지 «않는다» (거르개를 넓히면 진짜 이름이 잘린다)', () => {
@@ -153,5 +153,5 @@ test('휴대폰 거르개도 취소를 «보낸다» (서버만 고치면 오지
   const { phoneAccepts, REAL } = require('./phone-filter');
   assert.ok(phoneAccepts(REAL.카드취소), '휴대폰이 카드 취소 문자를 버린다: ' + REAL.카드취소);
   assert.ok(phoneAccepts(REAL.카드승인), '휴대폰이 카드 승인 문자를 버린다: ' + REAL.카드승인);
-  assert.ok(phoneAccepts('하나카드 취소 08/25 13:00 71,700원 (주)루나'), '「하나카드」 꼴도 보내야 한다');
+  assert.ok(phoneAccepts('하나카드 취소 08/25 13:00 71,700원 (주)소담'), '「하나카드」 꼴도 보내야 한다');
 });

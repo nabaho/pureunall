@@ -28,16 +28,16 @@ test('★ 업체관리 자리를 본다 — 최상위 companies 가 아니다', 
 
 test('배열형 명단을 읽는다', () => {
   const S = loadStore();
-  const out = S.normalizeCompanies([{ id: 'co_1', 업체명: '화담원' }, { id: 'co_2', 업체명: '(주)이비' }]);
+  const out = S.normalizeCompanies([{ id: 'co_1', 업체명: '다온원' }, { id: 'co_2', 업체명: '(주)벼리비' }]);
   assert.equal(out.length, 2);
   assert.equal(out[0].id, 'co_1');
-  assert.equal(out[0].name, '화담원');
+  assert.equal(out[0].name, '다온원');
 });
 
 test('★ 객체형 명단도 읽는다', () => {
   const S = loadStore();
   // 푸른이알피는 배열형과 객체형(id 맵)을 둘 다 쓴다. 한쪽만 읽으면 명단이 통째로 빈다.
-  const out = S.normalizeCompanies({ co_1: { id: 'co_1', 업체명: '화담원' }, co_2: { 업체명: '이비' } });
+  const out = S.normalizeCompanies({ co_1: { id: 'co_1', 업체명: '다온원' }, co_2: { 업체명: '벼리비' } });
   assert.equal(out.length, 2);
   const ids = out.map(o => o.id).join(',');
   assert.ok(ids.indexOf('co_1') >= 0);
@@ -47,14 +47,14 @@ test('★ 객체형 명단도 읽는다', () => {
 test('★ 감싸기를 벗긴다', () => {
   const S = loadStore();
   // data/companies = {v: 목록, u: 갱신시각}
-  const out = S.normalizeCompanies({ v: [{ id: 'co_1', 업체명: '화담원' }], u: 123 });
+  const out = S.normalizeCompanies({ v: [{ id: 'co_1', 업체명: '다온원' }], u: 123 });
   assert.equal(out.length, 1);
-  assert.equal(out[0].name, '화담원');
+  assert.equal(out[0].name, '다온원');
 });
 
 test('감싸기 안이 객체형이어도 읽는다', () => {
   const S = loadStore();
-  const out = S.normalizeCompanies({ v: { co_1: { 업체명: '화담원' } }, u: 123 });
+  const out = S.normalizeCompanies({ v: { co_1: { 업체명: '다온원' } }, u: 123 });
   assert.equal(out.length, 1);
   assert.equal(out[0].id, 'co_1');
 });
@@ -78,11 +78,11 @@ test('빈 자료·못 읽은 자료에도 빈 목록을 준다 — 터지지 않
 
 test('★ 이름으로 업체를 맞출 때 앞가지·괄호를 무시한다', () => {
   const S = loadStore();
-  const list = S.normalizeCompanies([{ id: 'co_1', 업체명: '(주)화담원' }]);
-  // 급여관리 설정카드는 「화담원 아산점」처럼 적혀 있다. 글자가 똑같지 않다.
-  assert.equal(S.matchCompanyName('화담원', list).id, 'co_1');
-  assert.equal(S.matchCompanyName('주식회사 화담원', list).id, 'co_1');
-  assert.equal(S.matchCompanyName('화담원 아산점_25년 07월_급여대장.xlsx', list).id, 'co_1');
+  const list = S.normalizeCompanies([{ id: 'co_1', 업체명: '(주)다온원' }]);
+  // 급여관리 설정카드는 「다온원 아산점」처럼 적혀 있다. 글자가 똑같지 않다.
+  assert.equal(S.matchCompanyName('다온원', list).id, 'co_1');
+  assert.equal(S.matchCompanyName('주식회사 다온원', list).id, 'co_1');
+  assert.equal(S.matchCompanyName('다온원 아산점_25년 07월_급여대장.xlsx', list).id, 'co_1');
   assert.equal(S.matchCompanyName('없는곳', list), null);
   assert.equal(S.matchCompanyName('', list), null);
 });
@@ -91,7 +91,7 @@ test('★ 이름으로 업체를 맞출 때 앞가지·괄호를 무시한다', 
 
 test('★ 업체관리의 담당자(managerMain·managerSubs)를 그대로 가져온다', () => {
   const S = loadStore();
-  const out = S.normalizeCompanies([{ id: 'co_1', 업체명: '화담원', managerMain: 'p-001', managerSubs: ['p-002'] }]);
+  const out = S.normalizeCompanies([{ id: 'co_1', 업체명: '다온원', managerMain: 'p-001', managerSubs: ['p-002'] }]);
   assert.equal(out[0].managerMain, 'p-001');
   assert.equal(out[0].managerSubs.join(','), 'p-002');
 });
@@ -99,7 +99,7 @@ test('★ 업체관리의 담당자(managerMain·managerSubs)를 그대로 가�
 test('담당자가 없는 업체도 빈 값으로 정상 처리된다', () => {
   // vm 안에서 만든 배열은 Array 프로토타입이 달라 deepStrictEqual 이 실패한다 — 길이로 견준다.
   const S = loadStore();
-  const out = S.normalizeCompanies([{ id: 'co_1', 업체명: '화담원' }]);
+  const out = S.normalizeCompanies([{ id: 'co_1', 업체명: '다온원' }]);
   assert.equal(out[0].managerMain, '');
   assert.equal(out[0].managerSubs.length, 0);
 });
@@ -137,9 +137,9 @@ test('업체나 이메일이 없으면 조용히 false — 터지지 않는다',
 test('★ 짧은 이름이 긴 이름을 가로채지 않는다', () => {
   const S = loadStore();
   const list = S.normalizeCompanies([
-    { id: 'co_1', 업체명: '화담원' },
-    { id: 'co_2', 업체명: '화담원산업' }
+    { id: 'co_1', 업체명: '다온원' },
+    { id: 'co_2', 업체명: '다온원산업' }
   ]);
-  // 긴 이름부터 봐야 「화담원산업 근태」가 화담원으로 잡히지 않는다.
-  assert.equal(S.matchCompanyName('화담원산업 근태.jpg', list).id, 'co_2');
+  // 긴 이름부터 봐야 「다온원산업 근태」가 다온원으로 잡히지 않는다.
+  assert.equal(S.matchCompanyName('다온원산업 근태.jpg', list).id, 'co_2');
 });

@@ -26,9 +26,9 @@ test('★ 업체관리 어느 칸에 있든 메일 주소를 찾아낸다', () =
   /* ⚠ 칸 이름을 못 박지 않는 것이 요점이다 — 이름이 바뀐 날 조용히
      아무도 통과 못 하는 사고를 막는다. */
   const companies = {
-    c1: { 업체명: '화담원', 담당자이메일: 'boss@hwadam.co.kr' },
-    c2: { 업체명: '이비', email: 'staff@ebi.com' },
-    c3: { 업체명: '참살이', 메모: '문의는 help@chamsari.kr 로' }
+    c1: { 업체명: '다온원', 담당자이메일: 'boss@hwadam.co.kr' },
+    c2: { 업체명: '벼리비', email: 'staff@ebi.com' },
+    c3: { 업체명: '새별살이', 메모: '문의는 help@chamsari.kr 로' }
   };
   const known = MR.buildKnownList(companies, null);
   assert.ok(known.indexOf('boss@hwadam.co.kr') >= 0);

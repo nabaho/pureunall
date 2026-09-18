@@ -39,9 +39,9 @@ const ACCOUNTS = [
 ];
 /* ⚠ mgr_main.sid 를 «일부러 비운다» — 실제 자료가 그렇다(이름만 있다) */
 const ITEMS = {
-  i1: { mgr_main:{name:'임혜미',sid:''}, company:'대운토건', title:'사측' },
-  i2: { mgr_main:{name:'임혜미',sid:''}, company:'대통농산', title:'근로계약서' },
-  i3: { mgr_main:{name:'임혜미',sid:''}, company:'충남9호',  title:'기금', state:'done' },
+  i1: { mgr_main:{name:'임혜미',sid:''}, company:'나루토건', title:'사측' },
+  i2: { mgr_main:{name:'임혜미',sid:''}, company:'하람농산', title:'근로계약서' },
+  i3: { mgr_main:{name:'임혜미',sid:''}, company:'가나9호',  title:'기금', state:'done' },
   i4: { mgr_main:{name:'박한별',sid:'P-003'}, company:'한빛물산', title:'자문' }
 };
 

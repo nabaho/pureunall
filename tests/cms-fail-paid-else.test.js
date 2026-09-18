@@ -22,7 +22,7 @@ const app = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').r
 const bare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
 
 /* ★ 이름 다듬기는 «진짜 것»을 잘라 쓴다. 흉내 내어 적었더니 지우는 «차례»가 달라
-     「(주)이음홀딩스」와 「주식회사 이음홀딩스」를 다른 곳으로 봤다 — 실제로 걸렸다.
+     「(주)다온홀딩스」와 「주식회사 다온홀딩스」를 다른 곳으로 봤다 — 실제로 걸렸다.
      흉내는 그 함수가 바뀔 때 검사만 옛 규칙을 보게 만든다. */
 const ctx = {};
 vm.createContext(ctx);
@@ -34,7 +34,7 @@ vm.runInContext(
 const { mark, stat, ymOf } = ctx;
 
 const FAIL = (o) => Object.assign(
-  { _k: 'x', status: 'fail', name: '이음홀딩스', amount: 165000, wdate: '2026-07-30', setdate: '' }, o);
+  { _k: 'x', status: 'fail', name: '다온홀딩스', amount: 165000, wdate: '2026-07-30', setdate: '' }, o);
 const OK = (o) => Object.assign(
   { _k: 'o', status: 'ok', name: '천일테크', amount: 220000, wdate: '2026-08-05', setdate: '2026-08-06' }, o);
 const PAID = (nm, ymd) => ({ sourceKind: 'company', companyName: nm, date: ymd, amount: 165000 });
@@ -43,7 +43,7 @@ const PAID = (nm, ymd) => ({ sourceKind: 'company', companyName: nm, date: ymd, 
 
 test('★★ 실패했지만 그 달 자문료 입금이 있으면 「손볼 것」에서 뺀다', () => {
   const rows = [FAIL({})];
-  const n = mark(rows, [PAID('이음홀딩스', '2026-07-15')]);
+  const n = mark(rows, [PAID('다온홀딩스', '2026-07-15')]);
   assert.equal(n, 1, '★ 입금이 있는데 못 알아봤습니다');
   assert.equal(rows[0].paidElse, 1);
   const st = stat(rows);
@@ -53,15 +53,15 @@ test('★★ 실패했지만 그 달 자문료 입금이 있으면 「손볼 것
 
 test('★★ 줄을 «지우지 않는다» — 출금이 실패한 것은 사실이고 기록이 남아야 한다', () => {
   const rows = [FAIL({})];
-  mark(rows, [PAID('이음홀딩스', '2026-07-15')]);
+  mark(rows, [PAID('다온홀딩스', '2026-07-15')]);
   assert.equal(rows.length, 1, '★ 줄이 사라졌습니다');
   assert.equal(rows[0].status, 'fail', '★ 실패였다는 사실이 지워졌습니다');
   assert.equal(stat(rows).total, 1, '★ 전체 수에서도 빠졌습니다');
 });
 
 test('★ 업체를 이어 준 이름(co)이 있으면 그것으로 본다 — 회원명과 업체명이 다를 수 있다', () => {
-  const rows = [FAIL({ name: '이음홀딩스', co: { name: '(주)이음홀딩스' } })];
-  mark(rows, [PAID('주식회사 이음홀딩스', '2026-07-01')]);
+  const rows = [FAIL({ name: '다온홀딩스', co: { name: '(주)다온홀딩스' } })];
+  mark(rows, [PAID('주식회사 다온홀딩스', '2026-07-01')]);
   assert.equal(rows[0].paidElse, 1, '★ ㈜·주식회사 표기 차이로 못 찾았습니다');
 });
 
@@ -69,20 +69,20 @@ test('★ 업체를 이어 준 이름(co)이 있으면 그것으로 본다 — �
 
 test('★★ 다른 달 입금으로는 정리하지 않는다 — 7월 미수가 8월 입금으로 지워지면 안 된다', () => {
   const rows = [FAIL({ wdate: '2026-07-30' })];
-  mark(rows, [PAID('이음홀딩스', '2026-08-15')]);
+  mark(rows, [PAID('다온홀딩스', '2026-08-15')]);
   assert.equal(rows[0].paidElse, 0, '★ 다른 달 입금으로 미수가 사라집니다');
   assert.equal(stat(rows).fail, 1);
 });
 
 test('★★ 다른 업체 입금으로는 정리하지 않는다', () => {
   const rows = [FAIL({})];
-  mark(rows, [PAID('씨지아이', '2026-07-15')]);
+  mark(rows, [PAID('다온지아이', '2026-07-15')]);
   assert.equal(rows[0].paidElse, 0, '★ 남의 입금으로 미수가 사라집니다');
 });
 
 test('★ 업체입금(자문료)이 아닌 기록으로는 정리하지 않는다', () => {
   const rows = [FAIL({})];
-  mark(rows, [{ sourceKind: 'case', companyName: '이음홀딩스', date: '2026-07-15' }]);
+  mark(rows, [{ sourceKind: 'case', companyName: '다온홀딩스', date: '2026-07-15' }]);
   assert.equal(rows[0].paidElse, 0, '★ 사건 수임료로 자문료 미수가 지워집니다');
 });
 
@@ -98,7 +98,7 @@ test('★ 성공·대기 줄은 건드리지 않는다', () => {
 
 test('날짜를 모르는 줄은 정리하지 않는다 — 어느 달인지 못 가린다', () => {
   const rows = [FAIL({ wdate: '', setdate: '' })];
-  mark(rows, [PAID('이음홀딩스', '2026-07-15')]);
+  mark(rows, [PAID('다온홀딩스', '2026-07-15')]);
   assert.equal(rows[0].paidElse, 0);
 });
 
@@ -110,7 +110,7 @@ test('정산예정일이 있으면 그것을, 없으면 출금일을 본다 (실
 
 test('다시 표시해도 늘어나지 않는다 — 두 번 눌러도 셈이 같아야 한다', () => {
   const rows = [FAIL({})];
-  const inc = [PAID('이음홀딩스', '2026-07-15')];
+  const inc = [PAID('다온홀딩스', '2026-07-15')];
   mark(rows, inc); mark(rows, inc);
   assert.equal(stat(rows).paidElse, 1, '★ 두 번 세었습니다');
 });

@@ -25,12 +25,12 @@ const MR = require(path.join(R, 'functions', 'mail-receive.js'));
 /* 세무 주소 tax@jd.kr 이 세 곳에 걸려 있다 — 담당은 A-001 둘, A-002 하나 */
 const COS = { v: {
   a: { id: 'co_a', name: '가람떡집', managerMain: 'A-001', taxEmail: 'tax@jd.kr' },
-  b: { id: 'co_b', name: '늘봄반찬(모종점)', managerMain: 'A-001', taxEmail: 'tax@jd.kr' },
-  c: { id: 'co_c', name: '유원에프앤비', managerMain: 'A-002', taxEmail: 'tax@jd.kr' },
-  d: { id: 'co_d', name: '경보엔지니어링', managerMain: 'A-001', email: 'hr@kb.kr' },
+  b: { id: 'co_b', name: '새별반찬(모종점)', managerMain: 'A-001', taxEmail: 'tax@jd.kr' },
+  c: { id: 'co_c', name: '자차에프앤비', managerMain: 'A-002', taxEmail: 'tax@jd.kr' },
+  d: { id: 'co_d', name: '아자엔지니어링', managerMain: 'A-001', email: 'hr@kb.kr' },
   e: { id: 'co_e', name: '두끼', managerMain: 'A-002', email: 'x@dk.kr' },
   f: { id: 'co_f', name: '한세세무', managerMain: 'A-001', taxEmail: 'only@hs.kr' },
-  g: { id: 'co_g', name: '평해식품', managerMain: 'A-001', taxEmail: 'only@hs.kr' }
+  g: { id: 'co_g', name: '마루식품', managerMain: 'A-001', taxEmail: 'only@hs.kr' }
 } };
 const OWNERS = {
   uid1: { email: 'a001@pureun.kr', name: '박은비' },
@@ -71,13 +71,13 @@ test('★ 제목에 사업장 이름이 있으면 그것으로 좁힌다', () =>
 });
 
 test('★ 파일 이름에 있어도 찾는다 — 제목은 「자료 송부」뿐인 메일이 많다', () => {
-  const r = route({ from: 'tax@jd.kr', subject: '자료 송부', filename: '유원에프앤비 근태.xlsx' });
+  const r = route({ from: 'tax@jd.kr', subject: '자료 송부', filename: '자차에프앤비 근태.xlsx' });
   assert.equal(r.tag.companyId, 'co_c');
   assert.equal(r.seat, 'uid2', '담당이 다른 사람인데 앞 업체로 갔습니다');
 });
 
 test('★ ㈜ · 빈칸이 달라도 찾는다', () => {
-  const r = route({ from: 'tax@jd.kr', subject: '㈜ 유원 에프앤비 급여', filename: '' });
+  const r = route({ from: 'tax@jd.kr', subject: '㈜ 자차 에프앤비 급여', filename: '' });
   assert.equal(r.tag.companyId, 'co_c');
 });
 
@@ -91,9 +91,9 @@ test('★ 두 업체가 같은 길이로 걸리면 아무도 안 고른다', () 
   assert.equal(MR.coFromText('가나다 라마바 자료', two), null);
 });
 
-test('긴 이름이 이긴다 — 「늘봄반찬」과 「늘봄반찬(모종점)」이 다 있을 때', () => {
-  const two = [{ id: 'p', name: '늘봄반찬' }, { id: 'q', name: '늘봄반찬(모종점)' }];
-  assert.equal(MR.coFromText('늘봄반찬(모종점) 8월', two).id, 'q');
+test('긴 이름이 이긴다 — 「새별반찬」과 「새별반찬(모종점)」이 다 있을 때', () => {
+  const two = [{ id: 'p', name: '새별반찬' }, { id: 'q', name: '새별반찬(모종점)' }];
+  assert.equal(MR.coFromText('새별반찬(모종점) 8월', two).id, 'q');
 });
 
 /* ══════ 못 좁혔을 때 ══════ */
@@ -114,7 +114,7 @@ test('★ 담당이 여럿이면 공용 칸 — 까닭을 적는다', () => {
 });
 
 test('★ 모르는 주소여도 제목에 사업장이 있으면 임자에게 간다 — 여태 통째로 공용 칸이었다', () => {
-  const r = route({ from: 'nobody@nowhere.kr', subject: '경보엔지니어링 8월 근태', filename: '' });
+  const r = route({ from: 'nobody@nowhere.kr', subject: '아자엔지니어링 8월 근태', filename: '' });
   assert.equal(r.shared, false);
   assert.equal(r.tag.companyId, 'co_d');
   assert.match(r.why, /제목에서 사업장을 찾음/);

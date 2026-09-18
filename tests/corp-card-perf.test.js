@@ -33,7 +33,7 @@ function run(incomes) {
   return ctx;
 }
 
-// 정우신약 같은 건: 주담당 대표(요율 0 → 분배 제외), 부담당 박재원이 다 받는다
+// 나루신약 같은 건: 주담당 대표(요율 0 → 분배 제외), 부담당 박재원이 다 받는다
 const INC = [
   { id: 'a', date: '2026-05-27', amount: 1100000, sourceKind: 'case',
     perfShares: [

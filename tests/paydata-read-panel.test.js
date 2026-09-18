@@ -177,7 +177,7 @@ test('★ 확대(zoom) CSS는 실제로 zoom 클래스가 붙는 요소를 겨�
 function runState(appState, opts) {
   const st = Object.assign({
     kind: 'attend', viewerId: 'a1', viewingUid: '',
-    itemsKeep: {}, companyId: 'co_1', companyName: '화담원', month: '2026-08',
+    itemsKeep: {}, companyId: 'co_1', companyName: '다온원', month: '2026-08',
     readState: { status: 'idle', rows: [], err: '' }
   }, appState);
   if (!st.itemsMonth) {
@@ -535,7 +535,7 @@ function loadSave(existing, confirmYes, opts) {
     // db.ref() 를 인자 없이 부르면 update 를 쓰는 자리다 — 위 ref 가 둘 다 준다
     'const App = ' + JSON.stringify({
       kind: 'attend', viewerId: viewerId, viewingUid: '', companyId: 'co_1',
-      companyName: '화담원', month: '2026-08',
+      companyName: '다온원', month: '2026-08',
       itemsMonth: items,
       itemsKeep: {}, values: {},
       readState: { status: 'done', err: '',

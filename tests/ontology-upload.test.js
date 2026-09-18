@@ -28,9 +28,9 @@ const erp = fs.readFileSync(path.join(root, 'pu-erp.html'), 'utf8');
 /* 사람 이름·금액이 섞인 진짜배기 자료 — 그것이 «안 올라가는지»를 봐야 한다 */
 function 관계망() {
   const rep = O.auditIntegrated({
-    companies: [{ id: 'co1', name: '천성가축약품', bizNo: '123-45-67890' }],
-    contracts: [{ id: 'ct1', companyId: 'co1', companyName: '천성가축약품', managerMain: 'P-001' }],
-    cases: [{ id: 'cs1', companyName: '천성가축약품' }],   /* companyId 없음 → 추정 후보 */
+    companies: [{ id: 'co1', name: '두레가축약품', bizNo: '123-45-67890' }],
+    contracts: [{ id: 'ct1', companyId: 'co1', companyName: '두레가축약품', managerMain: 'P-001' }],
+    cases: [{ id: 'cs1', companyName: '두레가축약품' }],   /* companyId 없음 → 추정 후보 */
     user_accounts: [{ sid: 'P-001', name: '권형하' }],
     attendance_records: [{ id: 'att1', sid: 'P-001', date: '2026-08-01' }],
     payroll_monthly: [{ id: 'pay1', empSid: 'P-001', ym: '2026-08', netPay: 4200000 }],
@@ -80,7 +80,7 @@ test('★③ 추정 후보는 안 올린다 — 확정만', () => {
 test('★★④ 이름·금액·연락처가 값에 «없다»', () => {
   const plan = O.uploadPlan(관계망().snap);
   const 글 = JSON.stringify(plan.writes);
-  for (const 값 of ['천성가축약품', '권형하', '123-45-67890', '4200000', '3300000']) {
+  for (const 값 of ['두레가축약품', '권형하', '123-45-67890', '4200000', '3300000']) {
     assert.ok(글.indexOf(값) < 0,
       '★★ 관계망에 「' + 값 + '」 이 들어갔습니다 — 색인은 원본 payload 를 복제하지 않습니다');
   }

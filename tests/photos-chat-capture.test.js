@@ -73,13 +73,13 @@ test('★ afterRead 가 할 일 배열을 버리지 않는다 — 실제로 돌�
   vm.createContext(ctx);
   vm.runInContext(lib, ctx);
   const out = await ctx.PuDocRead._afterReadForTest({
-    kind: 'chat', company: ' 오색할인마트 ', name: '임대순 대표',
+    kind: 'chat', company: ' 새별할인마트 ', name: '임대순 대표',
     summary: '근로계약서 송부와 병가를 논의',
     todos: [{ t: '휴직 신고', done: false, ours: true },
             { t: '근로계약서 송부', done: true, ours: true }]
   });
   assert.equal(out.kind, 'chat');
-  assert.equal(out.fields.company, '오색할인마트', '문자열은 다듬어 담아야 합니다');
+  assert.equal(out.fields.company, '새별할인마트', '문자열은 다듬어 담아야 합니다');
   assert.ok(Array.isArray(out.fields.todos), '할 일 배열이 사라졌습니다 — 요약만 남고 할 일이 없어집니다');
   assert.equal(out.fields.todos.length, 2);
   assert.equal(out.bizNoOk, null, '대화에는 사업자번호가 없습니다 — false 면 「검증 실패」로 오해합니다');
