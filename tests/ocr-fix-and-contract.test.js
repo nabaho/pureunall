@@ -68,14 +68,14 @@ function 신청서(fix, clear) {
   return {
     kind: 'form',
     fields: {
-      company: '농업회사법인주식회사충서', ceo: '박성달', bizno: '587-86-01913',
-      homepage: '587-86-01913-0', companyTel: '041-667-1107',
+      company: '농업회사법인주식회사부성', ceo: '홍길동', bizno: '123-45-67891',
+      homepage: '123-45-67891-0', companyTel: '041-123-4567',
       pairs: [
-        { k: '기업명', v: '농업회사법인주식회사충서' },
-        { k: '대표자명', v: '박성달' },
-        { k: '사업자등록번호', v: '587-86-01913' },
-        { k: '전화번호', v: '041-667-1107' },
-        { k: '홈페이지', v: '587-86-01913-0' },
+        { k: '기업명', v: '농업회사법인주식회사부성' },
+        { k: '대표자명', v: '홍길동' },
+        { k: '사업자등록번호', v: '123-45-67891' },
+        { k: '전화번호', v: '041-123-4567' },
+        { k: '홈페이지', v: '123-45-67891-0' },
         { k: '혁신형 기업여부', v: '해당없음' }
       ]
     },
@@ -95,16 +95,16 @@ test('★★★ 이름표를 «이름 붙은 칸»으로 옮긴다 — 사전은
 });
 
 test('★★★ 고친 값이 표에 «바로» 보인다 — 안 보이면 고쳐졌는지 알 수 없다', () => {
-  const rows = P.readRows(신청서({ ceo: '박성탈' }));
-  assert.equal(줄값(rows, '대표자명'), '박성탈');
-  assert.equal(줄값(rows, '기업명'), '농업회사법인주식회사충서', '★ 안 고친 줄은 그대로여야 합니다');
+  const rows = P.readRows(신청서({ ceo: '홍길종' }));
+  assert.equal(줄값(rows, '대표자명'), '홍길종');
+  assert.equal(줄값(rows, '기업명'), '농업회사법인주식회사부성', '★ 안 고친 줄은 그대로여야 합니다');
 });
 
 test('★★★ 판독값은 «그대로» 남는다 — 「이 값 어디서 나왔지」에 답해야 한다', () => {
-  const r = 신청서({ ceo: '박성탈' });
-  assert.equal(P.readRawOf(r, 'ceo', '대표자명'), '박성달',
+  const r = 신청서({ ceo: '홍길종' });
+  assert.equal(P.readRawOf(r, 'ceo', '대표자명'), '홍길동',
     '★★★ 덮어쓰면 판독이 무엇을 틀렸는지 영영 알 수 없습니다');
-  assert.equal(r.fields.ceo, '박성달', '★★★ 판독값 자체를 고치면 안 됩니다');
+  assert.equal(r.fields.ceo, '홍길동', '★★★ 판독값 자체를 고치면 안 됩니다');
 });
 
 test('★★★ 「비우기」가 된다 — 헛것을 읽은 칸을 지우는 유일한 길이다', () => {
@@ -117,13 +117,13 @@ test('★★★ 「비우기」가 된다 — 헛것을 읽은 칸을 지우는 
 
 test('★★ 빈 글자만으로는 «안» 지운다 — 「아직 안 고침」과 구별이 안 된다', () => {
   const r = 신청서({ homepage: '' });          /* fixClear 가 없다 */
-  assert.equal(줄값(P.readRows(r), '홈페이지'), '587-86-01913-0');
-  assert.equal(P.readFields(r).homepage, '587-86-01913-0');
+  assert.equal(줄값(P.readRows(r), '홈페이지'), '123-45-67891-0');
+  assert.equal(P.readFields(r).homepage, '123-45-67891-0');
 });
 
 test('★★★ 고친 값이 기업 상세로 «간다» — 이름 붙은 칸으로 옮겨져야 한다', () => {
-  const f = P.readFields(신청서({ ceo: '박성탈', companyTel: '041-000-0000' }));
-  assert.equal(f.ceo, '박성탈');
+  const f = P.readFields(신청서({ ceo: '홍길종', companyTel: '041-000-0000' }));
+  assert.equal(f.ceo, '홍길종');
   assert.equal(f.companyTel, '041-000-0000');
 });
 

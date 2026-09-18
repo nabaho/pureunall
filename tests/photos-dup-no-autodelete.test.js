@@ -63,7 +63,7 @@ function runNote(mine) {
   vm.createContext(ctx);
   vm.runInContext(cutFn(raw, 'function noteRedundant(') +
     '\n;this.go = noteRedundant;', ctx);
-  return ctx.go('p1', '2026', { dupAt: 1, dupWho: '박재역 · (주)충서엘엔디' })
+  return ctx.go('p1', '2026', { dupAt: 1, dupWho: '김철수 · (주)부성엘엔디' })
     .then(function () { return { calls: calls, notes: JSON.parse(JSON.stringify(ctx.dupNotes)) }; });
 }
 

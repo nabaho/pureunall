@@ -5,8 +5,8 @@
    ■ 무엇이 일어나고 있었나 — 살아 있는 자료에서 잰 것(2026-09-18)
    대표께서 신청서 2쪽의 「담당자 정보」 표를 가리키며 「읽히게」라고 하셨다.
    서버를 읽어 보니 **판독은 이미 여섯 칸을 다 읽어 두고 있었다** —
-     담당자명 박재억 · 이메일 choong2015@daum.net · 부서 총괄 · 직위 감사
-     · 유선 041-667-1107 · 휴대전화 010-4582-6770
+     담당자명 김철수 · 이메일 chulsoo@daum.net · 부서 총괄 · 직위 감사
+     · 유선 041-123-4567 · 휴대전화 010-1234-5678
    문제는 «어디로 갔느냐»였다:
      ① 이름·부서·직위는 **어느 칸에도 안 갔다**(pairs 에만 남았다).
      ② ⚠ 이메일·휴대전화는 더 나쁘게 **회사 칸에 앉았다** —
@@ -46,15 +46,15 @@ const D = 판독층();
 
 /* ── 대표께서 보내 주신 그 서류의 pairs (2026-09-18 서버에서 그대로) ── */
 const 그서류 = [
-  { k: '기업명', v: '농업회사법인주식회사총서' },
-  { k: '대표자명', v: '박성달' },
-  { k: '전화번호', v: '041-667-1107' },
-  { k: '담당자명', v: '박재억' },
-  { k: '담당자 이메일', v: 'choong2015@daum.net' },
+  { k: '기업명', v: '농업회사법인주식회사보성' },
+  { k: '대표자명', v: '홍길동' },
+  { k: '전화번호', v: '041-123-4567' },
+  { k: '담당자명', v: '김철수' },
+  { k: '담당자 이메일', v: 'chulsoo@daum.net' },
   { k: '담당자 부서', v: '총괄' },
   { k: '담당자 직위', v: '감사' },
-  { k: '담당자 유선', v: '041-667-1107' },
-  { k: '담당자 휴대전화', v: '010-4582-6770' }
+  { k: '담당자 유선', v: '041-123-4567' },
+  { k: '담당자 휴대전화', v: '010-1234-5678' }
 ];
 
 /* ══════ ① 이름표가 제각각이어도 같은 칸으로 ═══════════════════════ */
@@ -118,19 +118,19 @@ function 보내기(kind, fields) {
     });
 }
 
-const 그값 = { bizno: '587-86-01913', company: '농업회사법인주식회사총서',
-  companyTel: '041-667-1107', name: '박재억', dept: '총괄', title: '감사',
-  tel: '041-667-1107', mobile: '010-4582-6770', email: 'choong2015@daum.net',
+const 그값 = { bizno: '123-45-67891', company: '농업회사법인주식회사보성',
+  companyTel: '041-123-4567', name: '김철수', dept: '총괄', title: '감사',
+  tel: '041-123-4567', mobile: '010-1234-5678', email: 'chulsoo@daum.net',
   docName: '통합 기술보호지원반 신청서' };
 
 test('★★★ 서식의 담당자 여섯이 «제 칸»으로 들어간다', async () => {
   const u = await 보내기('form', 그값);
-  assert.equal(u.contactName, '박재억');
+  assert.equal(u.contactName, '김철수');
   assert.equal(u.contactDept, '총괄');
   assert.equal(u.contactTitle, '감사');
-  assert.equal(u.contactTel, '041-667-1107');
-  assert.equal(u.contactMobile, '010-4582-6770');
-  assert.equal(u.contactEmail, 'choong2015@daum.net');
+  assert.equal(u.contactTel, '041-123-4567');
+  assert.equal(u.contactMobile, '010-1234-5678');
+  assert.equal(u.contactEmail, 'chulsoo@daum.net');
 });
 
 test('★★★ 담당자 연락처가 «회사» 칸에 안 앉는다 — 그 사람이 나가면 못 쓰는 번호다', async () => {
@@ -143,12 +143,12 @@ test('★★★ 담당자 연락처가 «회사» 칸에 안 앉는다 — 그 �
 
 test('★★★ 회사 대표번호는 «그대로» 간다 — 그것은 회사 것이다', async () => {
   const u = await 보내기('form', 그값);
-  assert.equal(u.companyTel, '041-667-1107');
-  assert.equal(u.company, '농업회사법인주식회사총서');
+  assert.equal(u.companyTel, '041-123-4567');
+  assert.equal(u.company, '농업회사법인주식회사보성');
 });
 
 test('★★★ 서식이 «아니면» 안 옮긴다 — 명함의 이메일·휴대폰은 그 사람 것이 맞다', async () => {
-  const u = await 보내기('bizreg', { bizno: '587-86-01913', company: '가나상사',
+  const u = await 보내기('bizreg', { bizno: '123-45-67891', company: '가나상사',
     email: 'help@gana.co.kr', mobile: '010-1111-2222' });
   assert.equal(u.email, 'help@gana.co.kr',
     '★★★ 등록증·명함에서까지 옮기면 회사 이메일이 영영 안 들어갑니다');
