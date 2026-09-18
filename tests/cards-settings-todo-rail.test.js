@@ -64,6 +64,9 @@ function load(counts, extra) {
     emptyTargets: () => N(c.empty),
     mojibakeTargets: () => N(c.moji),
     mixedFixList: () => N(c.mixed),
+    /* 2026-09-18 — 휴지통은 «열 때» 읽으므로 건수도 이 함수로 묻는다.
+       여기서는 이미 읽어 둔 셈치고 실제 건수를 돌려준다(늦게 읽기는 cards-trash-lazy 가 본다). */
+    trashCount: () => Object.keys(trash).length,
     nameFixList: () => N(c.name),
     classifyPlan: () => ({ targetN: c.rules })
   }, extra || {});
@@ -194,7 +197,9 @@ test('★★ 「휴지통」은 «한 곳»에만 — 총계 칩에서 뺐다', 
   const stat = page.slice(s0, page.indexOf('</div>', s0));
   assert.ok(stat.indexOf("'휴지통'") < 0,
     '★ 같은 숫자가 두 곳에 있으면 어느 쪽이 참인지 헷갈린다');
-  assert.match(fnBody('todoAll'), /state\.trash/, '휴지통이 띠에도 없다');
+  /* ⚠ 2026-09-18 — 휴지통은 이제 «열 때» 읽으므로 띠도 state.trash 를 직접 세지 않고
+     trashCount() 에 묻는다(아직 안 읽었으면 null 을 돌려주고 그 자리에서 읽어 온다). */
+  assert.match(fnBody('todoAll'), /trashCount\(\)/, '휴지통이 띠에도 없다');
   assert.equal(load({ trash: 41 }).todoList().map(r => r.label).join(','), '휴지통',
     '★ 휴지통 41건이 띠에 안 오른다');
 });

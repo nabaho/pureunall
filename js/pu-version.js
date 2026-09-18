@@ -50,6 +50,26 @@
      ⚠ 화면 «경로별»로 가른다 — 앱 여러 개를 연달아 여는 것은 정상이다. */
   var BOOT_DEV_KEY = 'pu_boot_dev_v1';
   var BOOT_DEV_STORM_N = 5;
+  /* ★★ 한 번의 일로 «몰려서» 켜진 것은 한 번으로 센다 (2026-09-18 대표 화면)
+     ── 무엇이 있었나
+       포털에 「이 기기에서 이 화면이 3분 안에 7번 다시 켜졌습니다 (매번 새 탭으로 열림)」이
+       떴다. 그런데 서버 기록에는 되풀이 부팅이 없었다 — 또 거짓 경보였다.
+     ── 까닭
+       대표님은 탭을 여러 개 띄워 두신다(이알피 셋·포털 둘 …). 로그아웃하면 pu-authsync 가
+       **그 탭들을 «한꺼번에» 포털로 보낸다.** 탭마다 sessionStorage 는 새것이라 기기 눈에는
+       몇 초 안에 포털 부팅이 대여섯 번 찍힌다. 정상 흐름인데 폭풍으로 보였다.
+     ── 그래서
+       «5초 안에 잇따라 켜진 것»은 한 번으로 접어 센다. 한 번의 일(로그아웃·앱 여러 개 열기)은
+       몇 초 안에 끝나고, 진짜 폭풍은 20초 간격으로 «끝없이» 이어진다 — 그 둘이 갈린다.
+     ⚠ 기록은 그대로 다 남긴다 — 세는 법만 접는다(사람이 콘솔에서 실제 횟수를 봐야 한다). */
+  var BOOT_BURST_MS = 5 * 1000;
+  function countSpread(arr) {
+    var n = 0, last = -Infinity;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] - last >= BOOT_BURST_MS) { n++; last = arr[i]; }
+    }
+    return n;
+  }
   function noteBootDevice(now) {
     try {
       var all = {};
@@ -67,7 +87,9 @@
         if (a.length) all[k] = a; else delete all[k];
       });
       try { window.localStorage.setItem(BOOT_DEV_KEY, JSON.stringify(all)); } catch (_) {}
-      return arr.length;
+      /* 몰려서 켜진 것은 한 번으로 접어 센다 — 로그아웃이 여러 탭을 한꺼번에 보내는 것이
+         폭풍으로 보이던 것을 막는다(2026-09-18 대표 화면). 기록은 그대로 다 남는다. */
+      return countSpread(arr.slice().sort(function (a, b) { return a - b; }));
     } catch (_) { return 0; }
   }
   function bootNavType() {

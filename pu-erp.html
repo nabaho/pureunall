@@ -104,7 +104,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=4"></script>
-<script src="js/pu-version.js?v=6"></script>
+<script src="js/pu-version.js?v=7"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 // CommonJS/AMD 환경 가드 (모바일 WebView 호환)
@@ -304,8 +304,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-18 기업정보함 검색색인 1.36MB 를 «쓸 때» 받는다 — 부팅 때가 아니다(대표 지시). 계약창을 한 번도 안 열어도 이알피를 켤 때마다 받고 있었다. 기업정보함도 「이미 채워졌나」를 세려고 통째로 받던 것을 한 칸 읽기로 바꿨다';
-var BUILD_SEQ = 167;
+var ERP_BUILD = '2026-09-18 부팅 폭풍 감지기 — 로그아웃이 여러 탭을 한꺼번에 포털로 보내는 것을 「3분 안 7번」으로 세던 거짓 경보를 막았다(5초 안에 몰린 것은 한 번으로 센다) · 기업정보함은 명함 본문·검색색인·휴지통을 모두 «쓸 때만» 받는다';
+var BUILD_SEQ = 168;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{

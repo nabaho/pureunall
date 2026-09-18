@@ -55,6 +55,9 @@ function draw(opt) {
     findDupGroups: () => N(0), findSimilarGroups: () => N(o.sim),
     emptyTargets: () => N(0), mojibakeTargets: () => N(0),
     mixedFixList: () => N(0), nameFixList: () => N(0),
+    /* 2026-09-18 — 휴지통은 «열 때» 읽으므로 건수도 이 함수로 묻는다.
+       여기서는 이미 읽어 둔 셈치고 실제 건수를 돌려준다(늦게 읽기는 cards-trash-lazy 가 본다). */
+    trashCount: () => Object.keys(trash).length,
     classifyPlan: () => ({ targetN: 0 })
   };
   SUB_NAMES.forEach(n => {
