@@ -36,7 +36,8 @@ function cutFn(src, head) {
 /* calcUsed는 LeaveManagement 컴포넌트 안 클로저 함수라 attendance·users를
    자유변수로 참조한다 — vm 컨텍스트 전역에 그대로 얹어서 실제로 돌려 본다. */
 function runCalcUsed(attendance, users, sid, year) {
-  const ctx = { attendance, users, parseFloat, console };
+  /* 근태·휴가 규칙은 js/pu-work-core.js 한 자리다 — 상자 안에도 같은 것을 넣어 준다 */
+  const ctx = { attendance, users, parseFloat, console, PuWork: require('../js/pu-work-core.js') };
   vm.createContext(ctx);
   const calcUsed = cutFn(SRC, 'function calcUsed(sid, year){');
   vm.runInContext(calcUsed + '\nvar __r = calcUsed(' + JSON.stringify(sid) + ',' + JSON.stringify(year) + ');', ctx);

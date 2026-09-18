@@ -314,7 +314,9 @@ function gateCtx(){
     _recStamp(x){ return x; },
     _recCanDirect(){ return false; },
     _REC_BADKEY: /[.#$/[\]]/,
-    isAttendLocked(ym){ return (store.locked_attend_months || []).indexOf(ym) >= 0; }
+    isAttendLocked(ym){ return (store.locked_attend_months || []).indexOf(ym) >= 0; },
+    /* 자물쇠 «대상표»도 공용 파일에서 온다 — 상자 안에도 같은 것을 넣어 준다 */
+    PuWork: require('../js/pu-work-core.js')
   };
   vm.createContext(c);
   vm.runInContext(slice('// ── 근태·휴가 마감월 관문', '\nfunction erpNormName('), c);
