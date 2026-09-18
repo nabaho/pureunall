@@ -54,11 +54,13 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-/* 쪽 껍데기 — 편지는 700px 고정 폭 표다(pu-news-tpl.js 의 넓이).
-   ★ 폰에서 «잘리지 않게» 하는 길은 viewport 를 700 으로 못 박는 것이다. 그러면
-     폰 브라우저가 700px 짜리 쪽을 «제 화면에 맞게 줄여» 보여 준다 — 좌우가 안 잘린다.
-     PC 브라우저는 이 값을 무시하므로 700px 그대로 나온다.
-   ⚠ width=device-width 로 두면 폰에서 700px 가 그대로 깔려 오른쪽이 잘린다
+/* 쪽 껍데기 — 편지는 «고정 폭 표»다(메일 700 · 전문 980, pu-news-tpl.js).
+   ★ 폰에서 «잘리지 않게» 하는 길은 viewport 를 그 폭으로 못 박는 것이다. 그러면
+     폰 브라우저가 그 폭짜리 쪽을 «제 화면에 맞게 줄여» 보여 준다 — 좌우가 안 잘린다.
+     PC 브라우저는 이 값을 무시하므로 제 폭 그대로 나온다.
+   ⚠⚠ 폭을 여기에 «적지 않는다» — 지어진 전문에서 읽는다(전문폭). 두 곳에 적으면
+     한쪽만 바뀌어 잘리거나 가운데로 쏠린다. 옛 회차는 700 으로 담겨 있다.
+   ⚠ width=device-width 로 두면 폰에서 그 폭이 그대로 깔려 오른쪽이 잘린다
      (실측 2026-09-12: 375px 폰에서 325px 가 화면 밖으로 나갔다).
    ⚠ transform:scale(calc(100vw/716)) 같은 것으로 줄이려 하지 말 것 —
      scale() 은 «수»를 받는데 calc(길이/수) 는 길이라 통째로 무시된다. 실제로 겪었다.
@@ -123,13 +125,27 @@ function 꼬리제목(제목) {
   return t || '주간뉴스레터';
 }
 
+/* 편지가 «몇 px 짜리 표»인지 — 지어진 것에서 읽는다.
+   ★★ 숫자를 여기에도 적으면 한쪽만 바뀌어 쪽이 잘리거나 가운데로 쏠린다.
+     2026-09-17 전문을 980 으로 넓혔는데, 이 값을 안 따라가면 폰에서 오른쪽이 잘린다.
+   ⚠ 옛 회차는 700 으로 담겨 있다 — 그때 담긴 대로 700 으로 보여야 맞다. */
+function 전문폭(전문) {
+  var m = /<table[^>]*\swidth="(\d{3,4})"[^>]*style="width:\1px;background-color:#ffffff/
+    .exec(String(전문 || ''));
+  var n = m ? Number(m[1]) : 700;
+  return (n >= 600 && n <= 1200) ? n : 700;
+}
+
 function 쪽(제목, 전문) {
+  var 폭 = 전문폭(전문);
   return '<!doctype html><html lang="ko"><head><meta charset="utf-8">'
-    + '<meta name="viewport" content="width=700">'
+    /* ★ 폰에서 «잘리지 않게» 하는 길은 viewport 를 편지 폭으로 못 박는 것이다.
+         그러면 폰이 그 폭짜리 쪽을 제 화면에 맞게 줄여 보여 준다 — 좌우가 안 잘린다. */
+    + '<meta name="viewport" content="width=' + 폭 + '">'
     + '<title>' + esc(제목 || '푸른노무법인 주간뉴스레터') + '</title>'
     + '<meta name="robots" content="noindex">'
     + '<style>html,body{margin:0;padding:0;background:#e9e7e3}'
-    + '#wrap{width:700px;margin:0 auto}'
+    + '#wrap{width:' + 폭 + 'px;margin:0 auto}'
     /* ★★ 차림표를 «틀고정» — 굴러도 따라온다 (대표 지시 2026-09-13 「이부분 틀고정 해라」).
        ★ 편지는 표로 짜여 있다. 차림표 칸(꼭지 넷이 든 tr)에 자리표를 붙여 두고
          여기서 그 줄만 붙잡는다 — 편지 «속 글자»는 손대지 않는다.
@@ -246,4 +262,4 @@ function 없는쪽(까닭) {
     + '</div></body></html>';
 }
 
-module.exports = { 회차열쇠, 읽기, 볼수있나, 쪽, 없는쪽, 까닭말, 꼬리제목 };
+module.exports = { 회차열쇠, 읽기, 볼수있나, 쪽, 없는쪽, 까닭말, 꼬리제목, 전문폭 };
