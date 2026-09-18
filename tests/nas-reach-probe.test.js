@@ -107,12 +107,18 @@ test('⑤★ 가른 뒤에는 «한 갈래»만 말한다 — 셋을 다시 늘�
   });
 });
 
-test('⑥★ CORS 안내에 사설망(PNA) 줄이 «함께» 있다 — 한 줄만 넣으면 넣고도 막힌다', () => {
-  const guide = ERP.slice(ERP.indexOf('NAS 연결 실패 시 해결 방법 (CORS)'));
-  const head = guide.slice(0, guide.indexOf('[방법 2]'));
-  assert.match(head, /Access-Control-Allow-Origin/);
-  assert.match(head, /Access-Control-Allow-Private-Network: true/,
+test('⑥★ CORS 라고 짚을 때 사설망(PNA) 줄이 «함께» 나온다 — 한 줄만 넣으면 넣고도 막힌다', () => {
+  /* ⚠ 2026-09-18 저녁, 늘 떠 있던 「⚠️ NAS 연결 실패 시 해결 방법 (CORS)」 블록을 없앴다
+       (대표 지시 「불필요한 정보 없애라」). 그 안내는 이제 «지금 상태»가 원인을 짚었을 때만 나온다.
+     ⚠ 그래서 못 박을 자리도 그리로 옮긴다 — 화면에서 사라진 블록을 계속 검사하면 헛돈다. */
+  const { ctx } = load(() => Promise.resolve({}));
+  const msg = ctx.nasReachVerdict({ kind: 'cors', ms: 200 }, 'https://192.168.0.21:5001', 'https://nabaho.github.io');
+  assert.match(msg, /Access-Control-Allow-Origin/);
+  assert.match(msg, /Access-Control-Allow-Private-Network: true/,
     '★★ 크롬은 «공개 사이트 → 사설망» 을 CORS 와 따로 막는다 — 첫 줄만 시키면 「시킨 대로 했는데 안 된다」가 된다');
+  const 전체 = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
+  assert.ok(!/NAS 연결 실패 시 해결 방법 \(CORS\)/.test(전체),
+    '★ 늘 떠 있던 긴 안내가 되살아났습니다 — 「지금 상태」와 두 벌이 되면 한 벌만 고쳐집니다');
 });
 
 test('⑦ 되짚기가 실패해도 연결 테스트를 망가뜨리지 않는다', () => {

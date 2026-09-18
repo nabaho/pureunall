@@ -97,12 +97,13 @@ test('④★ 「지금 초기화」는 물러서기 기록도 푼다 — 안 그
   assert.equal(ctx.nasAutoLastTry(), null, '★★ 시도 기록이 남으면 「즉시 실행」이 하루를 더 쉰다 — 눌러도 아무 일이 없다');
   assert.equal(store['pureun_v6_nas_auto_backup'], undefined);
   /* 화면의 단추가 실제로 그 길을 쓰는지 */
-  const btn = ERP.slice(ERP.indexOf('자동 백업 상태 배너'), ERP.indexOf('지금 초기화 (즉시 실행)'));
+  /* ⚠ 자리를 «주석»으로 잡지 않는다 — 2026-09-18 좌우 배치를 하며 그 주석이 사라져 검사가 깨졌다 */
+  const btn = ERP.slice(ERP.indexOf('var 못돎 ='), ERP.indexOf('지금 초기화 (즉시 실행)'));
   assert.match(btn, /nasAutoClear\(\)/, '★ 단추가 열쇠 하나만 지우면 물러서기가 그대로 남는다');
 });
 
 test('⑤★★ 실패했으면 초록 「활성화됨」이라 말하지 않는다', () => {
-  const banner = ERP.slice(ERP.indexOf('자동 백업 상태 배너'), ERP.indexOf('지금 초기화 (즉시 실행)'));
+  const banner = ERP.slice(ERP.indexOf('var 시도 = nasAutoLastTry()'), ERP.indexOf('지금 초기화 (즉시 실행)'));
   assert.match(banner, /nasAutoLastTry\(\)/, '★ 띠가 지난 시도를 안 읽으면 늘 초록이다');
   assert.match(banner, /실패했습니다/, '★★ 한 장도 안 올라갔는데 「활성화됨」만 보이면 화면이 거짓말한다');
   /* 색도 갈려야 한다 — 글자만 바뀌고 초록 바탕이면 눈에 안 들어온다 */

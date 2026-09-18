@@ -111,33 +111,49 @@ test('★ 그 밖 오류는 원문을 그대로 보인다 — 짐작으로 덮�
   assert.equal(ctx.getNasErrMsg(new Error('업로드 실패 코드: 408')), '업로드 실패 코드: 408');
 });
 
-/* ══════ 화면의 CORS 안내 — 「시키는 대로 했는데 안 됨」을 막는다 (2026-09-18) ══════ */
-test('★★ CORS 안내가 «옛 주소»를 가리키지 않는다 — 그대로 따르면 엉뚱한 곳을 허용한다', () => {
-  const 화면 = bare(NAS);
-  assert.ok(화면.indexOf('pureun-erp.netlify.app') < 0,
+/* ══════ 원인을 짚은 뒤의 안내 — 「시키는 대로 했는데 안 됨」을 막는다 ══════
+   ⚠ 2026-09-18 저녁, 늘 떠 있던 「⚠️ NAS 연결 실패 시 해결 방법 (CORS)」 블록을 화면에서 없앴다
+     (대표 지시 「나스저장화면이 너무 길다 … 불필요한 정보 없애라」).
+     같은 안내를 이제 `nasReachVerdict` 가 «원인을 짚었을 때만» 내놓는다.
+   ★ 그래서 못 박을 자리도 그리로 옮긴다 — 사라진 블록을 계속 검사하면 검사가 헛돈다.
+   ★ 두 벌이 되면 한 벌만 고쳐진다 — 옛 블록이 되살아나면 그 자리에서 걸리게 해 둔다. */
+function 짚은말(kind) {
+  const ctx = { Date, Math, fetchT: () => Promise.resolve({}) };
+  vm.createContext(ctx);
+  vm.runInContext(cutFn(SRC, 'function nasReachVerdict('), ctx);
+  return ctx.nasReachVerdict({ kind, ms: 200 }, 'https://192.168.0.21:5001', 'https://nabaho.github.io');
+}
+
+test('★★ CORS 를 짚을 때 «옛 주소»를 가리키지 않는다 — 그대로 따르면 엉뚱한 곳을 허용한다', () => {
+  const m = 짚은말('cors');
+  assert.ok(m.indexOf('pureun-erp.netlify.app') < 0,
     '★★ 안내가 옛 주소(netlify)를 허용하라고 시킵니다 — 이알피는 지금 다른 곳에 있습니다.\n' +
     '  시키는 대로 했는데 안 되는 것은 안내가 없는 것보다 나쁩니다.');
-  const i = 화면.indexOf('신뢰할 수 있는 도메인');
-  assert.ok(i > 0, '★ 신뢰 도메인 안내를 못 찾았습니다');
-  assert.match(화면.slice(i, i + 400), /location\.origin/,
-    '★★ 주소를 글자로 박았습니다 — 지금 이 화면의 주소(location.origin)를 보여야 앞으로도 맞습니다');
+  assert.match(m, /https:\/\/nabaho\.github\.io/,
+    '★★ 넘겨준 «지금 이 화면의 주소»를 그대로 보여야 앞으로 주소가 바뀌어도 맞습니다');
+  const 함수 = stripJs(cutFn(SRC, 'function doTest('));
+  assert.match(함수, /location\.origin/,
+    '★ 주소를 글자로 박으면 다음에 또 엉뚱한 곳을 허용시킵니다');
 });
 
-test('★ 안내 차례가 «실제로 겪는 차례»다 — 인증서가 CORS 보다 먼저', () => {
-  const 화면 = bare(NAS);
-  const cert = 화면.indexOf('인증서를 믿게 하기');
-  const cors = 화면.indexOf('[방법 1] DSM CORS 허용');
+test('★ 짚기 전 안내의 차례가 «실제로 겪는 차례»다 — 인증서가 CORS 보다 먼저', () => {
+  const m = 안내({ useHttps: true });
+  const cert = m.indexOf('인증서');
+  const cors = m.indexOf('CORS');
   assert.ok(cert > 0, '★ 인증서 대목이 안내에 없습니다');
   assert.ok(cors > 0, '★ CORS 대목이 없어졌습니다');
   assert.ok(cert < cors,
     '★ CORS 가 먼저 적혀 있습니다 — 아직 오지도 않은 문제로 DSM 설정을 뒤지게 됩니다');
 });
 
-test('★ 사내 직접접속 안내도 «지금 쓰는 포트»를 보인다 — HTTPS 면 5001', () => {
-  const 화면 = bare(NAS);
-  const i = 화면.indexOf('브라우저 주소창');
-  assert.ok(i > 0, '★ 직접접속 안내를 못 찾았습니다');
-  assert.match(화면.slice(i, i + 300), /getNasBase\(\)/,
-    '★ 늘 5000 을 적어 줍니다 — HTTPS 를 켜 둔 사람은 그 주소로 가면 안 열립니다');
+test('★ 응답이 아예 없을 때는 «지금 쓰는 주소»를 그대로 보인다 — HTTPS 면 5001', () => {
+  const m = 짚은말('silent');
+  assert.match(m, /https:\/\/192\.168\.0\.21:5001/,
+    '★ 늘 5000 을 적어 주면 HTTPS 를 켜 둔 사람은 그 주소로 가서 안 열립니다');
 });
 
+test('★★ 없앤 긴 안내가 되살아나지 않는다 — 두 벌이 되면 한 벌만 고쳐진다', () => {
+  assert.ok(!/NAS 연결 실패 시 해결 방법 \(CORS\)/.test(SRC),
+    '★★ 늘 떠 있던 CORS 블록이 돌아왔습니다. 그 안내는 「지금 상태」가 원인을 짚었을 때만\n' +
+    '  나와야 합니다 — 늘 떠 있으면 정작 필요할 때 안 읽히고 화면만 길어집니다(대표 지시 2026-09-18).');
+});
