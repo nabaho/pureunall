@@ -53,6 +53,10 @@
        표지 옆 글자가 152px 밖에 안 남아 제목이 예닐곱 줄로 쏟아졌다.
        받으신 원본도 600 보다 넓다. 700 은 메일 프로그램이 다 견디는 폭이다. */
   var 넓이 = 700;
+  /* 전문 보기(웹)의 폭 — 메일이 아니라 브라우저 쪽이라 넓게 쓴다.
+     ⚠ 웹 쪽 껍데기(functions/news-view.js)는 이 값을 «지어진 전문에서 읽어» 맞춘다 —
+       숫자를 두 곳에 적으면 한쪽만 바뀌어 쪽이 잘리거나 가운데로 쏠린다. */
+  var 전문넓이 = 980;
   var 기본뉴스그림 = 'https://nabaho.github.io/pureunall/img/news-side.png';
 
   function esc(s) {
@@ -438,20 +442,27 @@
       + '</td></tr></table>';
   }
 
-  /* 두 칸 나란히. 홀수면 마지막 오른쪽은 빈 칸으로 둔다 — 폭이 흔들리지 않게. */
-  function 자료칸(항목들, 바탕) {
+  /* 나란히 놓는다. 자리가 모자라면 마지막 칸은 빈 칸으로 둔다 — 폭이 흔들리지 않게.
+     ★★ 넓은 쪽(전문 보기)에서는 «셋씩» 놓는다 (대표 지시 2026-09-17 「좌우로 넓게」).
+       카드 높이는 글이 아니라 «표지 그림»이 정한다 — 그래서 둘씩 놓으면 오른쪽에
+       빈 자리가 크게 남으면서 줄 수만 늘어난다. 여섯 장이면 세 줄이 두 줄이 된다.
+     ⚠ 메일(700)에서는 그대로 둘씩이다 — 셋이면 한 칸이 200px 남짓이라 글이 쏟아진다. */
+  function 자료칸(항목들, 바탕, 폭) {
     var 것 = (항목들 || []).filter(function (x) { return x && x.갈래 === '자료'; });
     if (!것.length) return '';
+    var 칸수 = Number(폭) >= 900 ? 3 : 2;
+    var 몫 = Math.round(100 / 칸수);
     var 줄 = '';
-    for (var i = 0; i < 것.length; i += 2) {
-      var 첫줄 = i === 0;
-      var 테 = 첫줄 ? '' : 'border-top:1px solid ' + 색.가는줄 + ';';
-      줄 += '<tr>'
-        + '<td width="50%" valign="top" style="width:50%;padding:16px 15px;' + 테
-        + 'border-right:1px solid ' + 색.줄 + ';">' + 자료카드(것[i]) + '</td>'
-        + '<td width="50%" valign="top" style="width:50%;padding:16px 15px;' + 테 + '">'
-        + (것[i + 1] ? 자료카드(것[i + 1]) : '&nbsp;') + '</td>'
-        + '</tr>';
+    for (var i = 0; i < 것.length; i += 칸수) {
+      var 테 = i === 0 ? '' : 'border-top:1px solid ' + 색.가는줄 + ';';
+      줄 += '<tr>';
+      for (var j = 0; j < 칸수; j++) {
+        var 끝칸 = j === 칸수 - 1;
+        줄 += '<td width="' + 몫 + '%" valign="top" style="width:' + 몫 + '%;padding:16px 15px;'
+          + 테 + (끝칸 ? '' : 'border-right:1px solid ' + 색.줄 + ';') + '">'
+          + (것[i + j] ? 자료카드(것[i + j]) : '&nbsp;') + '</td>';
+      }
+      줄 += '</tr>';
     }
     return '<tr><td style="padding:15px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
@@ -544,13 +555,13 @@
      ⚠ 꼭지가 아니라 «칸»의 갈래를 본다. 지난 회차에는 옛 갈래(법령·기사)로
        담긴 것이 남아 있고, 새 회차에는 자료·판례가 담긴다. 한 꼭지 안에
        둘이 섞여도 각자 제 모양으로 그려져야 «지난 회차 다시 보기»가 안 깨진다. */
-  function 꼭지그리기(항목들, 꼭지, 설정) {
+  function 꼭지그리기(항목들, 꼭지, 설정, 폭) {
     var 것 = 항목들 || [];
     var g = 꼭지 || {};
     var s = 설정 || {};
     var out = '';
     /* Trend(인사·노무관리)는 «흰 바탕 + 세로 나눔선» — 원본이 그렇다. ISSUE 만 살구 판이다. */
-    out += 자료칸(것.filter(function (x) { return x && x.갈래 === '자료'; }), g.키 === 'hr' ? '#ffffff' : '');
+    out += 자료칸(것.filter(function (x) { return x && x.갈래 === '자료'; }), g.키 === 'hr' ? '#ffffff' : '', 폭);
     out += 판례칸(것.filter(function (x) { return x && x.갈래 === '판례'; }));
     var 법 = 법령줄(것);
     if (법) {
@@ -834,6 +845,16 @@
        ⚠ 지난 회차에는 이 값이 없다 — 그때 나간 그대로 두는 것이 맞다. */
     var 더한것 = d.더한분들;
 
+    /* ★★ 폭은 «어디서 읽히는가»에 따라 다르다 (대표 지시 2026-09-17
+         「너무 화면 길게 내려온다 한화면에 나오게 좌우로 넓게 만들어봐라」).
+       ⚠ 700 은 «메일»의 한계다 — 메일 프로그램 창이 좁고, 넓으면 옆으로 잘린다.
+         그런데 전문 보기는 «메일이 아니라 브라우저 쪽»이다. 거기까지 700 으로
+         지으니 자료 카드 글이 좁은 통에서 줄줄이 꺾여 쪽이 두 배로 길어졌다.
+       ⚠ 부르는 쪽이 안 주면 700 그대로다 — 메일은 아무것도 안 바뀐다.
+       ⚠⚠ 속을 짓기 «전»에 세워, 자료 칸까지 «넘겨준다». 모듈에 담아 두면 한 번
+         넓게 지은 뒤 그 값이 남아 다음 메일이 넓은 줄 알고 그려진다(잘려 나간다). */
+    var 폭 = Math.max(600, Math.min(1200, Number((옵션 && 옵션.넓이) || 넓이) || 넓이));
+
     /* ★ 추적을 «여기서» 세운다. 밑주소가 없으면 아무것도 안 넣는다 —
          예전처럼 나간다(설정에 밑주소를 넣기 전까지). */
     var 밑 = String(설.추적밑주소 == null ? '' : 설.추적밑주소).trim().replace(/\/+$/, '');
@@ -901,7 +922,7 @@
            ⚠ 쓰실 글이 없는 주에는 자료만 나간다. 빈 상자를 그리지 않는다. */
         var 칸 = 우리글칸(d.우리글);
         var 것들 = 안[g.키] || [];
-        var 자료칸그린것 = 꼭지그리기(것들, g, 설);
+        var 자료칸그린것 = 꼭지그리기(것들, g, 설, 폭);
         if (!칸 && !자료칸그린것) return;
         if (그린것) 속 += 줄긋기(22);
         속 += 꼭지제목(g) + 칸 + 자료칸그린것; 그린것++;
@@ -910,7 +931,7 @@
       var 것 = 안[g.키] || [];
       if (!것.length) return;                    /* 빈 꼭지는 «아예 안 그린다» */
       if (그린것) 속 += 줄긋기(22);
-      속 += 꼭지제목(g) + 꼭지그리기(것, g, 설);
+      속 += 꼭지제목(g) + 꼭지그리기(것, g, 설, 폭);
       그린것++;
     });
     if (요약) 속 += 요약두칸(요약칸들);
@@ -926,8 +947,8 @@
     var html =
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + ' style="background-color:' + 색.바탕 + ';"><tr><td align="center" style="padding:0;">'
-      + '<table role="presentation" width="' + 넓이 + '" cellpadding="0" cellspacing="0" border="0"'
-      + ' style="width:' + 넓이 + 'px;background-color:#ffffff;">'
+      + '<table role="presentation" width="' + 폭 + '" cellpadding="0" cellspacing="0" border="0"'
+      + ' style="width:' + 폭 + 'px;background-color:#ffffff;">'
       /* ★ 요약판은 «신문 머리» 하나로 연다 (대표 결정 2026-09-17).
            큰 사진 띠(184px)와 차림표(85px)는 요약에서 걷었다 — 차림표는 메일에서
            눌러도 아무 데도 안 간다. 전문 보기 쪽은 그대로 둔다(거기서는 붙잡히는 줄이다). */
@@ -1038,7 +1059,8 @@
   }
 
   var API = { 편지짓기: 편지짓기, 평문짓기: 평문짓기,
-    지역뉴스조각: 지역뉴스조각, 지역뉴스평문: 지역뉴스평문, 색: 색, 넓이: 넓이 };
+    지역뉴스조각: 지역뉴스조각, 지역뉴스평문: 지역뉴스평문, 색: 색,
+    넓이: 넓이, 전문넓이: 전문넓이 };
   if (typeof module === 'object' && module.exports) module.exports = API;
   else global.PuNewsTpl = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
