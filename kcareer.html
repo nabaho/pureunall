@@ -1305,15 +1305,33 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
               <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:7px">
                 30초마다 저절로 담깁니다. 아무 것이나 눌러 이어서 하세요 — <b>지금 하던 것도 담아 두고</b> 넘어갑니다.
               </div>
-              <table style="width:100%;border-collapse:collapse">
+              <!-- ★ 고른 것이 있을 때만 나온다 — 목록 화면·휴지통과 «같은 옷»(.sel-bar) -->
+              <div class="sel-bar" id="rhDraftSelBar" style="display:none;position:static;margin:0 0 8px">
+                <b id="rhDraftSelCnt">0건 선택</b>
+                <span style="font-size:11px;color:var(--text-mute)">체크를 누른 채 <b>끌면</b> 여러 줄이 한 번에 골라집니다</span>
+                <button class="btn sm" type="button" onclick="rhDraftSelAll(true)">전체 선택</button>
+                <button class="btn sm" type="button" onclick="rhDraftSelAll(false)">선택 해제</button>
+                <span style="flex:1"></span>
+                <button class="btn sm" type="button" style="color:var(--red)" onclick="rhDraftTrashSel(this)">🗑 선택 버리기</button>
+              </div>
+              <!-- ⚠ table-layout:fixed — 이름 칸이 «남는 폭을 다 쓰되» 표를 밀지 않게 한다.
+                   (예전엔 이름 칸에 max-width:330px 를 박아, 자리가 넉넉한데도 늘 잘렸다)
+                   ⚠★ min-width 620px 이 없으면 «좁은 화면에서 이름 칸이 0px 로 사라진다» —
+                     고정 배치는 다른 칸(52+82+62+214=410)을 먼저 주고 남는 것을 이름에 준다.
+                     실측 375px 폰에서 이름 칸이 통째로 0 이었다. 좁으면 좌우로 민다(목록 화면과 같다). -->
+              <div style="overflow-x:auto">
+              <table style="width:100%;min-width:620px;border-collapse:collapse;table-layout:fixed">
                 <thead><tr>
+                  <th class="rownum-h" style="font-size:10.5px;color:var(--text-mute);padding:4px 7px;width:52px">
+                    <input type="checkbox" id="rhDraftChkAll" onclick="rhDraftSelAll(this.checked)" title="전체 선택"> №</th>
                   <th style="text-align:left;font-size:10.5px;color:var(--text-mute);padding:4px 7px">서식</th>
                   <th style="text-align:left;font-size:10.5px;color:var(--text-mute);padding:4px 7px;width:82px">마지막 담김</th>
                   <th style="text-align:left;font-size:10.5px;color:var(--text-mute);padding:4px 7px;width:62px">친 칸</th>
-                  <th style="width:210px"></th>
+                  <th style="width:214px"></th>
                 </tr></thead>
                 <tbody id="rhDraftRows"></tbody>
               </table>
+              </div>
               <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
                 <span id="rhDraftRoom" style="font-size:11px;color:var(--text-mute)"></span>
                 <span style="margin-left:auto"></span>
@@ -12606,12 +12624,22 @@ function rhDraftDraw(){
   var all=rhDraftAll();
   var 중=all.filter(function(d){ return !d.done; });
   var 지난=all.filter(function(d){ return d.done; });
+  /* № 는 «중 · 지난»을 통틀어 이어 센다 — 두 자리에 1번이 둘이면 서로 가리키기 어렵다 */
+  var 번호=0;
   var 줄=function(d, 지난것){
     var 지금=(d.id===_rhDraftId);
     var c=d.cells||{};
+    번호++;
     return '<tr'+(지금?' style="background:#f0fdf4"':'')+'>'
+      /* ㅁ 체크 + № — 목록 화면·휴지통과 «같은 옷»(.rownum · .rn-chk · .row-chk) */
+      +'<td class="rownum" style="padding:6px 7px;border-top:1px solid var(--border)">'
+        +'<label class="rn-chk"><input type="checkbox" class="row-chk" data-id="'+_jsAttr(d.id)+'"'
+        +' onclick="rhDraftSelSync()"><span>'+번호+'</span></label></td>'
       +'<td style="padding:6px 7px;border-top:1px solid var(--border)">'
-        +'<div style="font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:330px" title="'
+        /* ⚠ 이름은 «한 줄로 길게» — 남는 폭을 다 쓴다(대표 지시 2026-09-18).
+           그래도 줄바꿈은 안 한다: 이름이 길어도 줄을 밀지 않고 …으로 줄이며,
+           전체는 title 로 본다(회귀검사가 이 둘을 고정한다). */
+        +'<div style="font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'
         +escapeHtml(d.name||'')+'">'+escapeHtml(d.name||'(이름 없음)')+'</div>'
         +(지금?'<div style="font-size:10px;color:var(--teal);font-weight:700">지금 하는 것</div>':'')
         /* ⚠ 원본이 없는 자리는 밝혀 둔다 — 다시 채우면 값이 겹칠 수 있다 */
@@ -12631,15 +12659,68 @@ function rhDraftDraw(){
   };
   var html='';
   if(중.length) html+=중.map(function(d){ return 줄(d,false); }).join('');
-  else html+='<tr><td colspan="4" style="padding:10px 7px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-mute)">작성 중인 것이 없습니다</td></tr>';
+  else html+='<tr><td colspan="5" style="padding:10px 7px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-mute)">작성 중인 것이 없습니다</td></tr>';
   if(지난.length){
-    html+='<tr><td colspan="4" style="padding:9px 7px 4px;border-top:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text-mute)">✅ 지난 작성 '+지난.length+'건 — 사본으로 이어 쓸 수 있습니다</td></tr>'
+    html+='<tr><td colspan="5" style="padding:9px 7px 4px;border-top:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text-mute)">✅ 지난 작성 '+지난.length+'건 — 사본으로 이어 쓸 수 있습니다</td></tr>'
       + 지난.map(function(d){ return 줄(d,true); }).join('');
   }
   box.innerHTML=html;
+  /* 끌어서 고르기는 «공용 얼개»를 쓴다 — 화면마다 따로 만들면 「여기선 끌리는데 저기선 안 끌린다」.
+     ⚠ 한 번만 묶는다(bindDragSel 이 dragBound 로 막는다) — 그릴 때마다 묶으면 여러 번 뒤집힌다. */
+  bindDragSel(box, rhDraftSelSync);
+  rhDraftSelSync();
   var r=document.getElementById('rhDraftRoom');
   if(r) r.textContent='자리 '+중.length+' / '+RH_DRAFT_MAX
     +(중.length>=RH_DRAFT_MAX?' — 다 찼습니다. 다 된 것을 버리거나 완성해 주세요':'');
+}
+
+/* ── 작성 중 목록 «골라서 한꺼번에» (대표 지시 2026-09-18
+     「한줄로 길게 넘버링해서 확인하기 쉽게 정리하고 ㅁ 표시해서 선택가능하게」) ──
+   ⚠ 목록 화면·휴지통과 «같은 옷»을 입는다(.rownum · .row-chk · .sel-bar · .sel-on) —
+     같은 일을 하는데 화면마다 모양이 다르면 헷갈린다.
+   ⚠ 줄마다 있는 「↩ 이어서 · ⧉ 사본 · 🗑 버리기」는 그대로 둔다 — 한 건만 만질 때가 더 많다. */
+function _rhDraftChks(){
+  var box=document.getElementById('rhDraftRows');
+  return box ? Array.prototype.slice.call(box.querySelectorAll('.row-chk')) : [];
+}
+function rhDraftSelIds(){
+  return _rhDraftChks().filter(function(c){ return c.checked; }).map(function(c){ return c.dataset.id; });
+}
+function rhDraftSelAll(on){
+  _rhDraftChks().forEach(function(c){ c.checked=!!on; });
+  rhDraftSelSync();
+}
+function rhDraftSelSync(){
+  var all=_rhDraftChks(), ids=rhDraftSelIds();
+  all.forEach(function(c){ var tr=c.closest('tr'); if(tr) tr.classList.toggle('sel-on', c.checked); });
+  var bar=document.getElementById('rhDraftSelBar'), cnt=document.getElementById('rhDraftSelCnt');
+  if(bar) bar.style.display=ids.length?'flex':'none';
+  if(cnt) cnt.textContent=ids.length+'건 선택';
+  var head=document.getElementById('rhDraftChkAll');
+  if(head) head.checked = all.length>0 && ids.length===all.length;
+}
+/* 고른 자리를 한꺼번에 버린다 — 줄마다 버리는 것과 «같은 길»(휴지통 30일 보관)이다.
+   ⚠ 되살릴 수 있어도 «몇 건인지 세고 무엇이 가는지 보여 주고» 묻는다.
+   ⚠ 알림은 «끝에 한 번» — 열 건이면 열 번 뜬다(휴지통에서 얻은 교훈).
+   ⚠ 되살리는 «길»을 반드시 말한다 — 어디로 갔는지 모르면 잃은 것과 같다. */
+function rhDraftTrashSel(btn){
+  var ids=rhDraftSelIds();
+  if(!ids.length){ toast('고른 것이 없습니다'); return; }
+  var 이름=ids.map(function(id){ var d=rhDraftFind(id); return '· '+String((d&&d.name)||id).slice(0,34); });
+  if(!confirm('고른 '+ids.length+'건을 휴지통으로 보냅니다.\n\n'
+    +이름.slice(0,4).join('\n')+(이름.length>4?'\n… 그 밖 '+(이름.length-4)+'건':'')
+    +'\n\n환경설정 › 🗑 휴지통에서 '+TRASH_DAYS+'일 안에 되살릴 수 있습니다.')) return;
+  var 갈것={}; ids.forEach(function(id){ 갈것[id]=1; });
+  var 됨=0;
+  ids.forEach(function(id){
+    var d=rhDraftFind(id); if(!d) return;
+    /* ⚠ 파일은 여기서 지우지 않는다 — 휴지통이 들고 있다가 30일 뒤에 지운다(줄마다 버리기와 같다) */
+    if(kcTrashPut(RH_DRAFTS, 'page-resume-hub', d, '작성 중 서류')) 됨++;
+    if(_rhDraftId===id) _rhDraftId=null;
+  });
+  rhDraftPut(rhDraftAll().filter(function(x){ return !갈것[x.id]; }));
+  rhDraftDraw(); rhDraftCheck();
+  toast('🗑 '+됨+'건을 휴지통으로 보냈습니다 — 환경설정 › 🗑 휴지통에서 '+TRASH_DAYS+'일 안에 되살릴 수 있습니다', 6000);
 }
 
 /* ↩ 이어서 — 그 자리를 열고, 친 값·짝 지정도 되살린다 */
