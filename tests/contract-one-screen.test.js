@@ -127,26 +127,25 @@ test('⑪★ 업체 연결은 회사정보 «뒤»에 온다 — 회사명을 �
     '업체 연결 상자가 회사명 칸보다 «앞»에 있으면 파란 상자 네 줄을 지나야 회사명이 보인다');
 });
 
-test('⑫ 서류 가져오기는 «한 줄»이다 — 전에는 한 덩이가 여섯 줄이었다', () => {
+test('⑫ 서류 가져오기 — 길 셋이 다 있고, 제목이 «제 단추 위»에 있다', () => {
+  /* ⚠★ 2026-09-18 에 한 줄로 합쳤다가 대표 지시로 «되돌렸다»
+       (「캡쳐 기존으로 돌려라」). 기둥이 좁아 한 줄이 도로 세 줄로 접혔고,
+       그때는 제목과 단추가 갈라져 「어느 서류의 단추인지」가 더 헷갈렸다.
+       ★ 넓은 화면을 믿고 한 줄에 몰지 말 것 — 세로로 쪼갠 기둥은 한 줄이 짧다. */
   const dz = stripJs(cutFn(RAW, 'function dropZone('));
-  /* 길 셋은 그대로 남아 있다 */
+  /* 길 셋은 늘 있어야 한다 */
   assert.match(dz, /📇 기업정보함 정보 가져오기/, '기업정보함에서 가져오는 길');
   assert.match(dz, /📷 사진으로 채우기/, '사진으로 채우는 길');
   assert.match(dz, /기업정보함에서 보기/, '사진 보러 가는 길');
-  /* ★ 셋이 «같은 줄»에 있는가 — 끌어다 놓기를 받는 그 한 줄 안에 다 들어 있어야 한다.
-       전에는 제목 줄 · 단추 줄 · 설명 줄로 갈라져 있었다. */
-  const a = dz.indexOf('onDrop:function(e){ e.preventDefault(); fillFrom(');
-  const b = dz.indexOf("h('input', { id:inpId", a);
-  assert.ok(a > 0 && b > a, '끌어다 놓기를 받는 줄을 찾을 수 있다');
-  const 한줄 = dz.slice(a, b);
-  ['📇 기업정보함 정보 가져오기', '📷 사진으로 채우기', '기업정보함에서 보기']
-    .forEach(s => assert.ok(한줄.indexOf(s) > 0, '「' + s + '」 이 그 한 줄 밖에 있다'));
-  assert.ok(!/justifyContent:'space-between'/.test(dz),
-    '제목을 따로 세우던 윗줄이 남아 있다');
-  assert.ok(!/h\('span', \{ style:\{ fontSize:'10px', color:'#94a3b8' \} \}, '글자만 읽고/.test(dz),
-    '늘 떠 있던 설명 글은 말풍선으로 옮겼다');
-  assert.match(cutFn(RAW, 'function dropZone('), /title:'사진을 골라[\s\S]{0,220}글자만 읽고 사진은 버립니다/,
-    '그 설명이 말풍선 안에 «살아 있다» — 지우지 않았다');
+  /* 제목이 «맨 먼저» 온다 — 그래야 어느 서류의 단추인지 안다 */
+  const 제목 = dz.indexOf("h('span', null, title)");
+  const 가져오기 = dz.indexOf('📇 기업정보함 정보 가져오기');
+  const 사진 = dz.indexOf('📷 사진으로 채우기');
+  assert.ok(제목 > 0 && 제목 < 가져오기 && 가져오기 < 사진,
+    '제목 → 가져오기 → 사진으로 채우기 차례라야 한다');
+  assert.match(dz, /글자만 읽고 사진은 버립니다/, '사진을 안 담는다는 것을 화면에 적는다');
+  assert.match(dz, /onDrop:function\(e\)\{ e\.preventDefault\(\); fillFrom\(/,
+    '끌어다 놓기도 받는다');
 });
 
 test('⑬ 늘 떠 있던 안내 한 줄은 말풍선으로 (상태 줄은 그대로 남는다)', () => {
