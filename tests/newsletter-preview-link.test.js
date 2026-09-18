@@ -151,16 +151,22 @@ test('★ 미리보기는 «원문 링크 그대로» — 추적을 걸지 않�
   const T = require('../js/pu-news-tpl.js');
   const C = require('../js/pu-news-core.js');
   /* ⚠ 2026-09-08 부터 기사는 «우리 말»이 있어야 편지에 나간다 — 없으면 편지가
-       null 이 되어 이 검사가 재려던 «링크» 규칙이 헛돈다. */
+       null 이 되어 이 검사가 재려던 «링크» 규칙이 헛돈다.
+     ⚠⚠ 2026-09-18 부터 «기사 원문 링크»는 편지에 아예 안 실린다(대표 지시). 그래서
+       링크가 감싸지는지 보려면 «자료»를 쓴다 — 고용노동부 링크는 그대로 나간다. */
   const d = { 회차: C.회차('2026-08-30'), 범위: '자문중',
     안: { news: [{ 갈래: '기사', 제목: '가', 우리말: '가 — 우리 정리',
                    링크: 'https://www.labortoday.co.kr/x', 언론사: '매일노동뉴스' }],
-          policy: [], case: [], hr: [] } };
+          policy: [{ 갈래: '자료', 제목: '자료 하나', 발행처: '고용노동부',
+                     링크: 'https://www.moel.go.kr/d1' }],
+          case: [], hr: [] } };
   const 설 = { 회사이름: '푸른노무법인', 추적밑주소: 'https://asia-northeast3-pureun-erp.cloudfunctions.net' };
 
   const 미리 = T.편지짓기(d, 설, { 미리보기: true });
-  assert.ok(/labortoday\.co\.kr/.test(미리.서식),
+  assert.ok(/moel\.go\.kr\/d1/.test(미리.서식),
     '★ 미리보기에도 추적 링크가 들어간다 — 눌러도 빈 포털로 튕기고, 셈이 부풀려진다');
+  /* 기사 원문 링크는 미리보기에서도 «없다» */
+  assert.ok(!/labortoday\.co\.kr/.test(미리.서식), '★ 기사 원문 링크가 아직 나간다');
   assert.ok(!/newsClick/.test(미리.서식), '★ 미리보기에 추적 링크가 남아 있다');
 
   /* ⚠ «진짜 보내는» 쪽은 그대로 추적이 걸려야 한다 — 안 걸리면 열람이 영영 빈칸이다 */

@@ -44,7 +44,7 @@
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
 <script src="js/pu-news-core.js?v=38"></script>
-<script src="js/pu-news-tpl.js?v=27"></script>
+<script src="js/pu-news-tpl.js?v=28"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -1702,8 +1702,8 @@ function 꼭지칸하나(d){
   const 글칸 = g.갈래==='우리글' ? `<div class="pad" style="border-bottom:1px solid var(--line)">
      <textarea id="myWrite" class="grow" rows="4" oninput="우리글바뀜(this.value)"
        placeholder="이번 주 한마디 — 이 칸만 우리가 씁니다.">${esc(d.우리글||'')}</textarea>
-     <div class="hint" style="margin-top:6px">나머지 세 꼭지는 <b>제목과 원문 링크</b>만 싣습니다.
-       기사 본문은 남의 글이라 옮기지 않습니다.</div></div>` : '';
+     <div class="hint" style="margin-top:6px">나머지 세 꼭지도 <b>우리가 쓴 글</b>로 나갑니다.
+       기사 본문·제목은 남의 글이라 옮기지 않고, <b>어느 매체를 참고했는지만</b> 밝힙니다.</div></div>` : '';
   const 줄 = 것.length ? 것.map(function(x,i){
     const 실 = Core.실릴까(x);
     /* ⚠ 꺼진 줄을 «감추지 않는다» — 사라지면 왜 안 나가는지도, 다시 켤 길도 없다 */
