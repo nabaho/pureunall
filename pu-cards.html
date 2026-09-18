@@ -25004,8 +25004,16 @@ function coListBuild(){
     return (back === k) ? k : to;
   };
   const nameIdx = {};
+  /* 명함 6천여 장을 사업자/명함으로 한 번만 가른다. 이전에는 allItems()의
+     전체 값 배열을 두 번 만들고 두 번 거른 뒤 각각 정렬했다. 화면 진입 때
+     회사 목록을 새로 조립하는 고정비를 줄이되, 두 갈래의 순서는 그대로 둔다. */
+  const bizItems = [], cardItems = [];
+  Object.values(allItems()).forEach(it=>{
+    if(it.kind==='biz') bizItems.push(it);
+    else if((it.company||'').trim()) cardItems.push(it);
+  });
   /* ① 사업자등록증 — 회사의 뼈대 */
-  _coNewestFirst(Object.values(allItems()).filter(it=>it.kind==='biz')).forEach(it=>{
+  _coNewestFirst(bizItems).forEach(it=>{
     const k = _same(coKeyOf(it));
     /* ⚠ companyTel 을 여기 «안 넣어서» 3순위 「📋 정보부족」이 거짓말을 했다
        (검토 2026-08-27). 등록증에서 대표번호를 읽어 두고도(BIZ_FIELDS) 회사로 안
@@ -25032,7 +25040,7 @@ function coListBuild(){
     const n = _norm(it.company); if(n && !nameIdx[n]) nameIdx[n] = k;
   });
   /* ② 명함 — 그 회사 사람들. 회사가 사업자등록증 없이 명함만 있는 경우도 살린다. */
-  _coNewestFirst(Object.values(allItems()).filter(it=>it.kind!=='biz' && (it.company||'').trim())).forEach(it=>{
+  _coNewestFirst(cardItems).forEach(it=>{
     const k = _same((digits(it.bizno||'').length>=10) ? coKeyOf(it)
             : (nameIdx[_norm(it.company)] || coKeyOf(it)));
     /* ⚠ 명함에서 올리는 것은 «회사 것»뿐이다 — companyTel(회사 대표번호)과

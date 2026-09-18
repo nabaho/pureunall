@@ -88,14 +88,18 @@ test('빈 목록·이상한 값에도 터지지 않는다 — 실자료에는 �
 /* ── 병합이 실제로 그 순서를 쓰는가 ── */
 
 test('★★ 등록증을 도는 자리가 «최근 것부터»다', () => {
+  const partition = slice('const bizItems = [], cardItems = []', '/* ① 사업자등록증');
   const line = slice('/* ① 사업자등록증', 'o.docs++');
-  assert.ok(/_coNewestFirst\(Object\.values\(allItems\(\)\)\.filter\(it=>it\.kind==='biz'\)\)/.test(line),
+  assert.ok(/it\.kind==='biz'\) bizItems\.push\(it\)/.test(partition)
+    && /_coNewestFirst\(bizItems\)/.test(line),
     '등록증 목록을 최근 순으로 돌려야 새 등록증이 옛것을 이깁니다');
 });
 
 test('★★ 명함을 도는 자리도 «최근 것부터»다', () => {
+  const partition = slice('const bizItems = [], cardItems = []', '/* ① 사업자등록증');
   const line = slice("/* ② 명함", 'o.cards.push(it)');
-  assert.ok(/_coNewestFirst\(Object\.values\(allItems\(\)\)\.filter\(it=>it\.kind!=='biz'/.test(line),
+  assert.ok(/cardItems\.push\(it\)/.test(partition)
+    && /_coNewestFirst\(cardItems\)/.test(line),
     '명함도 최근 순이어야 합니다');
 });
 
