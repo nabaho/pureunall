@@ -54,15 +54,27 @@ test('③★ 두 길이 «같은 것»을 부른다 — 어긋나면 한쪽만 �
     '★★ --deploy 가 빠지면 보여만 주고 끝나는데 화면은 「끝났습니다」라고 한다');
 });
 
-test('④ 찾기는 «이알피 폴더인지»까지 본다 — 한 장만 보고 엉뚱한 데로 가지 않는다', () => {
+test('④★★ 찾기는 «지금 쓸 그 파일이 실제로 있는지»까지 본다 — 짐작하지 않는다', () => {
+  /* 2026-09-18 대표 PC — .git 만으로는 두 번 걸렸다.
+     ① Documents\pu-deploy(배포 결과물, scripts 없음)
+     ② Documents\...\pureunall-deploy(이름부터 「배포」, .git 은 있는데 파일이 없었다)
+     배포 워크플로가 올리기 «전에» scripts 폴더를 통째로 지우므로, .git 유무로는 못 가린다. */
   assert.match(PS1, /Filter 'pu-erp\.html'/);
-  assert.match(PS1, /Join-Path \$_\.DirectoryName '\.git'/,
-    '★★ «.git 이 있는가»가 진짜 조건이다. 2026-09-18 대표 PC 에서 scripts 만 보고 찾았더니\n' +
-    '  배포 결과물 폴더(Documents\\pu-deploy)가 잡혔다 — 거기에도 pu-erp.html 과 scripts 가 있다.\n' +
-    '  우리는 git pull 을 할 자리가 필요하다.');
-  assert.match(PS1, /git clone/,
-    '★ 저장소가 아예 없을 수도 있다 — 그때 무엇을 하라는 말이 없으면 사람은 멈춘다');
+  assert.match(PS1, /Join-Path \$_\.DirectoryName '\.git'/);
+  assert.match(PS1, /Join-Path \$_\.DirectoryName 'scripts\\nas-backup-deploy\.js'/,
+    '★★ 「지금 쓸 그 파일」이 실제로 있는지를 안 보면 이름이 「deploy」인 사본에 또 걸린다\n' +
+    '  (2026-09-18 pureunall-deploy 가 바로 그것이었다 — .git 은 있었다)');
   assert.match(PS1, /USERPROFILE/, '★ 흔한 자리부터 봐야 몇 분을 안 기다린다');
+});
+
+test('④-2★ 못 찾으면 «사람에게 되돌리지» 않는다 — 새로 내려받는 것까지 한다', () => {
+  assert.match(PS1, /git clone https:\/\/github\.com\/nabaho\/pureunall\.git/,
+    '★★ 「없습니다」로 끝내면 대표님이 또 명령을 찾아 치셔야 한다 — 여기서 받는다');
+  const i = PS1.indexOf('if ($found) {');
+  const j = PS1.indexOf('git clone');
+  assert.ok(i > -1 && j > i, '★ 찾은 «뒤에» 없을 때만 받아야 한다 — 순서가 바뀌면 매번 새로 받는다');
+  assert.match(PS1, /pureunall-작업용/,
+    '★ 새로 받는 자리가 기존 배포 사본들(pu-deploy·…-deploy)과 이름이 안 겹쳐야 헷갈리지 않는다');
 });
 
 test('⑤ 배포본에 안 나간다 — 개발용이다', () => {
