@@ -15,7 +15,10 @@
       「같은 서류를 다시 읽은 것」이 아니게 되어 기업 상세도 안 고쳐진다.
    ② 다시 읽기는 **요금이 든다** — 「사진만 바꾸기」(0원)와 반드시 갈라 둔다.
    ③ 더 «작은» 것으로 바꿀 때는 묻는다 — 모르고 나쁘게 바꾸면 되돌릴 길이 없다.
-   ④ 한 창을 여러 일에 돌려 쓰므로 닫을 때 반드시 되돌린다. */
+   ④ 한 창을 여러 일에 돌려 쓰므로 닫을 때 반드시 되돌린다.
+   ⑤ PDF 로도 바꾼다(대표 지시 2026-09-18 「PDF 도」) — 그때도 사진을
+      «새로 만들지 않는다». 있는 쪽 자리에 갈아 끼우고, 쪽 수가 다르면
+      겹치는 만큼만 바꾼다. 안에 있던 글자도 함께 갈아 끼운다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -90,7 +93,8 @@ test('★★★ 받는 칸을 «따로» 둔다 — 본문 다시 올리기는 �
 
 test('★★ 그림이 아니면 안 받는다', () => {
   const fn = stripJs(cutFn(PHOTOS, 'function takeRepasteFile(') || '');
-  assert.match(fn, /\^image\\\//, '★★ PDF·문서를 넣으면 그림이 아니라고 말해야 합니다');
+  assert.match(fn, /\^image\\\//,
+    '★★ 그림도 PDF 도 아닌 것(한글·엑셀 …)을 넣으면 그렇다고 말해야 합니다');
 });
 
 test('★★★ 파일을 «그대로» 쥔다 — 글자로 바꾸면 줄이는 층이 깨진다', () => {
@@ -99,8 +103,8 @@ test('★★★ 파일을 «그대로» 쥔다 — 글자로 바꾸면 줄이는
     '★★★ decodeImage 는 Blob 을 받습니다 — dataURL 을 넘기면 그 층이 통째로 깨집니다');
   assert.match(fn, /URL\.revokeObjectURL\(url\)/,
     '★★ 잰 뒤 주소를 안 놓으면 큰 캡처가 메모리에 쌓입니다');
-  const apply = stripJs(cutFn(PHOTOS, 'async function repasteApply(') || '');
-  assert.match(apply, /shrinkMany\(r\.file,/);
+  const put = stripJs(cutFn(PHOTOS, 'async function repastePutImage(') || '');
+  assert.match(put, /shrinkMany\(r\.file,/);
 });
 
 test('★★★ 아무 데나 붙여넣기가 이 창을 «덮치지 않는다» — 사진이 한 장 더 쌓인다', () => {
@@ -121,12 +125,16 @@ test('★★★ 아무 데나 붙여넣기가 이 창을 «덮치지 않는다»
 /* ══════ ③ 바꾸는 방법 — 요금과 되돌릴 수 없음 ═══════════════════ */
 
 test('★★★ 사진 번호가 «안 바뀐다» — 새 항목을 만들지 않는다', () => {
-  const fn = stripJs(cutFn(PHOTOS, 'async function repasteApply(') || '');
-  assert.ok(fn, 'repasteApply 가 없습니다');
-  assert.match(fn, /PuPhotoStore\.replaceImage\(/,
-    '★★★ 새 사진으로 올리면 기업정보함 연결·서류 묶음·보낸 기록이 통째로 끊깁니다');
-  assert.ok(!/addFiles\(|savePhoto\(/.test(fn),
-    '★★★ 새 항목을 만들면 「같은 서류를 다시 읽은 것」이 아니게 되어 기업 상세도 안 고쳐집니다');
+  /* ⚠ 그림이든 PDF 든 «둘 다» 지켜야 하는 규칙이다 — 한쪽만 보면
+     나중에 생긴 길이 조용히 새 사진을 만든다. */
+  ['async function repastePutImage(', 'async function repastePutPdf('].forEach(function (머리) {
+    const fn = stripJs(cutFn(PHOTOS, 머리) || '');
+    assert.ok(fn, 머리 + ' 가 없습니다');
+    assert.match(fn, /PuPhotoStore\.replaceImage\(/,
+      '★★★ 새 사진으로 올리면 기업정보함 연결·서류 묶음·보낸 기록이 통째로 끊깁니다 — ' + 머리);
+    assert.ok(!/addFiles\(|savePhoto\(/.test(fn),
+      '★★★ 새 항목을 만들면 「같은 서류를 다시 읽은 것」이 아니게 되어 기업 상세도 안 고쳐집니다 — ' + 머리);
+  });
 });
 
 test('★★★ 「사진만 바꾸기」와 «갈라» 둔다 — 다시 읽기는 요금이 든다', () => {
@@ -146,9 +154,13 @@ test('★★★ 더 «작은» 것으로 바꿀 때는 묻는다', () => {
 });
 
 test('★★★ 바꾼 «새 크기»를 적는다 — 안 적으면 바꾸고도 계속 「작습니다」가 뜬다', () => {
-  const fn = stripJs(cutFn(PHOTOS, 'async function repasteApply(') || '');
-  assert.match(fn, /w: sized\[0\]\.w, h: sized\[0\]\.h, srcW: r\.w, srcH: r\.h/,
-    '★★★ 판정이 옛 크기를 보면 방금 바꾼 사진에도 「원본이 작습니다」가 그대로 뜹니다');
+  ['async function repastePutImage(', 'async function repastePutPdf('].forEach(function (머리) {
+    const fn = stripJs(cutFn(PHOTOS, 머리) || '');
+    /* 못 박을 것은 «새 크기와 원본 크기를 함께 적는다»는 규칙이다 —
+       어느 변수에서 가져오는지는 그림이냐 PDF 냐에 따라 다르다. */
+    assert.match(fn, /w: sized\[0\]\.w[\s\S]{0,80}srcW:/,
+      '★★★ 판정이 옛 크기를 보면 방금 바꾼 사진에도 「원본이 작습니다」가 그대로 뜹니다 — ' + 머리);
+  });
 });
 
 /* ══════ ④ 다시 읽은 뒤 — 달라진 것만 ═══════════════════════════ */
@@ -188,6 +200,105 @@ test('★★★ 창을 닫으면 쥐고 있던 것을 버리고 단추를 되돌
 
 test('★ 넣기 전에는 «바꾸고 다시 읽기»를 못 누른다', () => {
   const paint = stripJs(cutFn(PHOTOS, 'function paintRepaste(') || '');
-  assert.match(paint, /\$\('kindPopupOk'\)\.disabled = !r\.file;/,
+  /* ⚠ 「!r.file」 을 글자로 박지 않는다 — 넣은 것이 PDF 일 수도 있다.
+     못 박을 것은 «쥔 것이 없으면 못 누른다»는 규칙이다. */
+  assert.match(paint, /\$\('kindPopupOk'\)\.disabled = [^;]*repasteGot\(r\)/,
     '★ 빈 채로 누르면 아무 일도 안 일어나는 단추가 됩니다');
+});
+
+/* ══════ ⑥ PDF 도 (대표 지시 2026-09-18 「PDF 도」) ═══════════════ */
+
+test('★★★ PDF 도 받는다 — 파일 칸·붙여넣는 자리 둘 다', () => {
+  assert.match(몸통, /id="repasteInput"[^>]*accept="[^"]*pdf/,
+    '★★★ 파일 고르기에서 PDF 가 안 보이면 넣을 길이 없습니다');
+  const take = stripJs(cutFn(PHOTOS, 'function takeRepasteFile(') || '');
+  assert.match(take, /pdf/i, '★★★ 받는 자리가 PDF 를 안 가르면 「그림만」이라며 되돌려 보냅니다');
+  assert.match(take, /takeRepastePdf\(/, '★★★ PDF 는 펴는 쪽으로 보내야 합니다');
+});
+
+test('★★★ PDF 는 «쪽마다 펴서» 쥔다 — 그대로 올리면 그림이 아니다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'async function takeRepastePdf(') || '');
+  assert.ok(fn, 'takeRepastePdf 가 없습니다');
+  assert.match(fn, /pdfToPages\(/,
+    '★★★ 올릴 때 쓰는 그 길로 펴야 배율·글자 뽑기가 같아집니다');
+});
+
+test('★★★ 넣은 것이 PDF 면 «PDF 길»로 간다 — 쥔 것을 보고 가른다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'async function repasteApply(') || '');
+  assert.match(fn, /!repasteGot\(r\)\) return;/,
+    '★★★ 첫 줄에서 「r.file」 만 보면, PDF 를 넣었을 때 여기서 되돌아가 아무 일도 안 일어납니다');
+  assert.match(fn, /repastePutPdf\(/,
+    '★★★ PDF 길을 안 부르면 넣어 두고 눌러도 바뀌는 것이 없습니다');
+  assert.match(fn, /repastePutImage\(/, '★★ 그림 길도 그대로 있어야 합니다');
+});
+
+test('★★ 펴는 동안 «무엇을 하는지» 말하고, 그동안은 못 누른다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'async function takeRepastePdf(') || '');
+  assert.match(fn, /busy = '[^']+'/,
+    '★★ 아무 말 없이 멈춰 있으면 「눌렀는데 안 된다」가 됩니다');
+  assert.match(fn, /busy = '';/, '★★ 끝나고 안 지우면 영영 펴는 중입니다');
+  const paint = stripJs(cutFn(PHOTOS, 'function paintRepaste(') || '');
+  assert.match(paint, /\$\('kindPopupOk'\)\.disabled = [^;]*busy/,
+    '★★ 펴는 중에 눌리면 쥔 것 없이 바꾸기가 돕니다');
+});
+
+test('★★★ 몇 쪽을 바꾸는지 «누르기 전에» 말해 준다', () => {
+  const paint = stripJs(cutFn(PHOTOS, 'function paintRepaste(') || '');
+  assert.match(paint, /docPages\(/,
+    '★★★ 이 서류가 몇 쪽인지 안 보면 쪽 수가 맞는지 말할 수 없습니다');
+  assert.match(paint, /쪽 수가 다릅니다/,
+    '★★★ 쪽 수가 다른 것을 말 안 하면, 누른 뒤에야 반만 바뀐 것을 압니다');
+});
+
+test('★★★ PDF 로 바꿔도 사진을 «새로 만들지 않는다» — 번호가 그대로다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'async function repastePutPdf(') || '');
+  assert.ok(fn, 'repastePutPdf 가 없습니다');
+  assert.match(fn, /replaceImage\(/,
+    '★★★ 있는 자리에 갈아 끼워야 기업정보함 연결·서류 묶음이 안 끊깁니다');
+  assert.doesNotMatch(fn, /savePhoto\(|newId\(/,
+    '★★★ 「바꾸기」를 눌렀는데 사진이 늘어나면 사람이 시킨 일이 아닙니다');
+});
+
+test('★★★ 쪽 수가 달라도 «겹치는 만큼만» 바꾼다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'async function repastePutPdf(') || '');
+  assert.match(fn, /Math\.min\(/,
+    '★★★ 적은 쪽에 맞추지 않으면 없는 쪽을 만들거나 빈 자리를 두드립니다');
+});
+
+test('★★★ PDF 안의 «글자»도 함께 갈아 끼우고, 없으면 지운다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'async function repastePutPdf(') || '');
+  assert.match(fn, /replaceText\(/,
+    '★★★ 그림만 바꾸면 판독이 «옛 서류의 글자»를 그대로 읽습니다 — 가장 알아채기 어려운 어긋남입니다');
+  assert.match(fn, /pdfTextUsable\(/,
+    '★★ 쓸 만한 글자인지 가리는 잣대는 올릴 때 쓰는 그것과 같아야 합니다');
+  assert.match(fn, /: ''/,
+    '★★★ 글자 없는 PDF 로 바꿀 때 옛 글자를 안 지우면 값이 옛것으로 남습니다');
+});
+
+test('★★ 한 쪽짜리 PDF 는 «보고 있던 그 쪽»을 바꾼다 — 서류 첫 쪽이 아니다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'async function repastePutPdf(') || '');
+  const i = fn.indexOf('pages.length === 1');
+  assert.ok(i >= 0, '★★ 2쪽을 보다 넣으셨으면 2쪽을 바꾸는 것이 뜻한 바입니다');
+  assert.ok(fn.indexOf('docPages(') > i,
+    '★★ 한 쪽짜리인데 서류 전체를 가져오면 엉뚱한 쪽이 바뀝니다');
+});
+
+test('★★ 마지막에 넣은 것 «하나»만 쓴다 — 그림과 PDF 가 겹치지 않는다', () => {
+  const take = stripJs(cutFn(PHOTOS, 'function takeRepasteFile(') || '');
+  assert.match(take, /_repaste\.pdf = null;/,
+    '★★ 그림을 다시 넣었는데 앞서 넣은 PDF 가 남아 있으면 그 PDF 로 바뀝니다');
+  const pdf = stripJs(cutFn(PHOTOS, 'async function takeRepastePdf(') || '');
+  assert.match(pdf, /_repaste\.file = null;/,
+    '★★ 거꾸로도 마찬가지입니다');
+});
+
+test('★★★ 저장 층에 «글자 갈아 끼우기»가 있고, 글자를 meta 에 안 담는다', () => {
+  const STORE = fs.readFileSync(path.join(R, 'js/pu-photo-store.js'), 'utf8');
+  const fn = stripJs(cutFn(STORE, 'function replaceText(') || '');
+  assert.ok(fn, '★★★ replaceText 가 없으면 화면에서 부르는 것이 없는 함수입니다');
+  assert.match(fn, /textPath\(/,
+    '★★★ 글자는 texts/ 에 둡니다 — meta 에 담으면 사진첩을 열 때마다 수천 자를 내려받습니다');
+  assert.match(fn, /hasText/, '★★ meta 에는 「있다」는 한 글자만 남깁니다');
+  assert.match(stripJs(STORE), /replaceText: replaceText/,
+    '★★★ 안 내보내면 화면에서 못 부릅니다');
 });

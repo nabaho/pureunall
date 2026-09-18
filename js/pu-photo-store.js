@@ -845,6 +845,24 @@
     return replaceImageRtdb(year, id, full, thumb, owner);
   }
 
+  /* ── PDF 글자 갈아 끼우기 (대표 지시 2026-09-18 「PDF 도」) ─────────────────
+     「🔍 다시 넣기」로 PDF를 넣으면 그림만 바뀌는 것이 아니다 — 정부포털 PDF 에는
+     **글자가 그대로 들어 있어** 판독이 그림이 아니라 글자로 간다(더 싸고, 1↔7 오독이
+     원천적으로 없다). 그 글자를 담을 길이 여태 savePhoto 안에만 있었다.
+     ⚠ 글자는 meta 에 안 담는다 — 목록을 부를 때 meta 를 통째로 내려받으므로
+       쪽마다 수천 자를 넣으면 사진첩을 열 때마다 그것을 다 받는다.
+       meta 에는 「있다」는 한 글자(hasText)만 남기고 글자는 texts/ 에 둔다.
+     ⚠ 빈 글자를 주면 «지운다» — 그림으로만 온 PDF(스캔한 종이)로 바꿨을 때
+       옛 글자가 남아 있으면 판독이 엉뚱한 옛 글자를 읽는다. */
+  function replaceText(year, id, text, owner) {
+    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
+    var t = String(text == null ? '' : text);
+    var u = {};
+    u[textPath(year, id, owner)] = t || null;
+    u[metaPath(year, id, owner) + '/hasText'] = t ? true : null;
+    return deps.db.ref().update(u);
+  }
+
   function replaceImageRtdb(year, id, full, thumb, owner) {
     var u = {};
     u[blobPath(year, id, owner)] = full;
@@ -2330,6 +2348,8 @@
     saveNote: saveNote,
     setTakenAt: setTakenAt,
     replaceImage: replaceImage,
+    /* PDF 로 바꿀 때 그 안의 글자도 갈아 끼운다 (위 replaceText 머리 참고) */
+    replaceText: replaceText,
     listFolders: listFolders,
     addFolder: addFolder,
     renameFolder: renameFolder,

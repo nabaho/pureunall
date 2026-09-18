@@ -23,7 +23,7 @@
 <script src="js/pu-health.js?v=4"></script>
 <script src="js/pu-version.js?v=8"></script>
 <!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
-<script src="js/pu-photo-store.js?v=28"></script>
+<script src="js/pu-photo-store.js?v=29"></script>
 <!-- 주민번호 가림 — 계산 층과, 급여데이터함과 나눠 쓰는 긋기 층 -->
 <script src="js/pu-rrn-mask.js?v=4"></script>
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
@@ -1928,7 +1928,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
          ⚠ reuploadInput 과 «따로» 둔다. 그쪽은 「본문이 없는 사진을 채우는」 길이라
            받자마자 바로 올리지만, 이쪽은 넣은 뒤 크기를 견주어 보여 주고
            사람이 「바꾸고 다시 읽기」를 눌러야 올린다 — 흐름이 다르다. -->
-    <input type="file" id="repasteInput" accept="image/*" hidden onchange="onRepasteFile(this.files)">
+    <input type="file" id="repasteInput" accept="image/*,application/pdf" hidden onchange="onRepasteFile(this.files)">
 
     <!-- ⚠ 「보기」 제목 줄을 뺐다(대표 지시 2026-08-10 "대시보드 간략하게 정리").
          아래 「누구 사진」·「내 폴더」가 이미 무엇을 보는 칸인지 말해 주므로
@@ -14929,13 +14929,16 @@ async function onReuploadFile(files) {
    ⚠ 다시 읽기는 **AI 요금이 든다.** 그래서 단추를 둘로 갈랐다 —
      「사진만 바꾸기」(0원)와 「바꾸고 다시 읽기」. 눈으로 대조만 할 때가 잦다.
    ⚠ 더 «작은» 것을 넣으면 한 번 묻는다 — 모르고 나쁘게 바꾸는 일이 없게. */
-let _repaste = null;      // { id, file, w, h } — 넣어 둔 것. 창을 닫으면 버린다
+let _repaste = null;      // { id, file, pdf, w, h, busy } — 넣어 둔 것. 창을 닫으면 버린다
+/* 넣어 둔 것이 있나 — 그림 한 장이든 PDF 여러 쪽이든 «한 잣대»로 본다.
+   두 곳에서 따로 따지면 한쪽만 고쳐져 「넣었는데 단추가 안 켜진다」가 된다. */
+function repasteGot(r) { return !!(r && (r.file || (r.pdf && r.pdf.length))); }
 
 function openRepaste(id) {
   if (!id || blockedIfOther(id)) return;
   const it = gridItems.find(function (x) { return x.id === id; });
   if (!it) return;
-  _repaste = { id: id, file: null, w: 0, h: 0 };
+  _repaste = { id: id, file: null, pdf: null, w: 0, h: 0, busy: '' };
   $('kindPopupTitle').textContent = '🔍 다시 넣기';
   $('kindPopupOk').textContent = '바꾸고 다시 읽기';
   $('kindPopupOk').onclick = function () { repasteApply(true); };
@@ -14949,18 +14952,23 @@ function paintRepaste() {
   const it = gridItems.find(function (x) { return x.id === r.id; });
   const m = (it && it.meta) || {};
   const 지금 = (Number(m.w) || 0) + ' × ' + (Number(m.h) || 0);
+  const 쪽수 = (r.pdf && r.pdf.length) || 0;
+  const 서류쪽 = docPages(r.id).length;
   const 넣음 = r.w ? (r.w + ' × ' + r.h) : '';
   /* 얼마나 커졌나 — 「2배 큽니다」 한마디가 「이만하면 됐나」에 답한다 */
   const 배 = (r.w && Number(m.w)) ? (Math.max(r.w, r.h) / Math.max(Number(m.w), Number(m.h))) : 0;
   const 작아짐 = 배 > 0 && 배 < 1;
   $('kindPopupBody').innerHTML =
-    '<div class="rpdrop' + (r.file ? ' on' : '') + '" id="rpDrop"' +
+    '<div class="rpdrop' + (repasteGot(r) ? ' on' : '') + '" id="rpDrop"' +
     ' onclick="$(\'repasteInput\').click()">' +
-    (r.file
-      ? '✔ <b>넣었습니다</b><br><span class="s">다시 넣으시려면 여기를 누르거나 또 붙여넣으세요</span>'
+    (r.busy
+      ? '<b>' + esc(r.busy) + '</b><br><span class="s">쪽마다 크게 펴서 그립니다 — 잠시만 기다려 주세요</span>'
+      : repasteGot(r)
+      ? '✔ <b>넣었습니다' + (쪽수 ? ' — PDF ' + 쪽수 + '쪽' : '') + '</b>' +
+        '<br><span class="s">다시 넣으시려면 여기를 누르거나 또 붙여넣으세요</span>'
       : '<b>여기에 붙여넣기 (Ctrl+V)</b><br>' +
         '캡처를 복사해 두고 이 창에서 붙여넣으시면 됩니다<br>' +
-        '<span class="s">끌어다 놓기 · <u>파일 고르기</u> 도 됩니다</span>') +
+        '<span class="s">끌어다 놓기 · <u>파일 고르기</u> · <b>PDF</b> 도 됩니다</span>') +
     '</div>' +
     '<div class="rpsz"><div class="box"><div class="t">지금 원본</div><div class="v">' + esc(지금) + '</div></div>' +
     (넣음
@@ -14968,17 +14976,23 @@ function paintRepaste() {
         '<div class="t">넣으신 것</div><div class="v">' + esc(넣음) + '</div></div>'
       : '') +
     '</div>' +
+    (쪽수 ? '<div class="rptip">' + (쪽수 === 서류쪽
+      ? '✔ <b>이 서류와 쪽 수가 같습니다(' + 서류쪽 + '쪽)</b> — 쪽마다 차례대로 바꿉니다.'
+      : 쪽수 === 1
+      ? '이 <b>한 쪽만</b> 바꿉니다' + (서류쪽 > 1 ? ' (이 서류는 ' + 서류쪽 + '쪽입니다)' : '') + '.'
+      : '⚠ <b>PDF ' + 쪽수 + '쪽 · 이 서류 ' + 서류쪽 + '쪽</b> — 쪽 수가 다릅니다. ' +
+        '앞에서부터 겹치는 ' + Math.min(쪽수, 서류쪽) + '쪽만 바꿉니다.') + '</div>' : '') +
     (배 ? '<div class="rptip">' + (작아짐
       ? '⚠ <b>지금 것보다 작습니다.</b> 바꾸면 글자가 더 안 읽힐 수 있습니다 — 그래도 바꾸시려면 누르세요.'
       : '✔ <b>' + (배 >= 1.15 ? (Math.round(배 * 10) / 10) + '배 큽니다' : '크기가 비슷합니다') +
         '</b>' + (배 >= 1.15 ? ' — 글자가 또렷해 판독이 훨씬 잘 됩니다.' : ' — 판독이 크게 나아지지 않을 수 있습니다.')) +
       '</div>' : '') +
-    (r.file
+    (repasteGot(r)
       ? '<div class="rpalso"><button onclick="repasteApply(false)">사진만 바꾸기 ' +
         '<span class="s">(요금 0원 · 읽은 값은 그대로)</span></button></div>'
       : '') +
     '<div class="rptip more">' + smallWhyHtml(it) + biggerTipsHtml() + '</div>';
-  $('kindPopupOk').disabled = !r.file;
+  $('kindPopupOk').disabled = !repasteGot(r) || !!r.busy;
   const d = $('rpDrop');
   if (d) {
     d.ondragover = function (e) { e.preventDefault(); d.classList.add('over'); };
@@ -14999,7 +15013,14 @@ function onRepasteFile(files) {
 function takeRepasteFile(files) {
   const f = files && files[0];
   if (!f || !_repaste) return;
-  if (!/^image\//.test(f.type || '')) { toast('그림 파일만 넣을 수 있습니다', 4000); return; }
+  /* ── PDF 도 받는다 (대표 지시 2026-09-18 「PDF 도」) ─────────────────────
+     ★ PDF 가 가장 좋다 — 정부포털 PDF 에는 **글자가 그대로** 들어 있어 판독이
+       그림이 아니라 글자로 간다(더 싸고, 1↔7·4↔9 오독이 원천적으로 없다).
+       그림도 배율 3.2 로 펴서 그리므로 캡처보다 훨씬 또렷하다.
+     ⚠ PDF 는 «쪽»이 여럿이다 — 한 장 바꾸기와 다르다. 아래 repasteApply 가
+       쪽 수를 견주어 정한다(머리 참고). */
+  if (/pdf$/i.test(f.type || '') || /\.pdf$/i.test(f.name || '')) { takeRepastePdf(f); return; }
+  if (!/^image\//.test(f.type || '')) { toast('그림이나 PDF 만 넣을 수 있습니다', 4000); return; }
   /* ⚠ 파일을 «그대로» 쥔다 — 줄이는 층(decodeImage)이 Blob 을 받는다.
      글자(dataURL)로 바꿔 넘기면 그 층이 통째로 깨진다.
      재는 데만 주소를 잠깐 쓰고 바로 놓는다 — 안 놓으면 큰 캡처가 메모리에 쌓인다. */
@@ -15009,6 +15030,7 @@ function takeRepasteFile(files) {
     URL.revokeObjectURL(url);
     if (!_repaste) return;
     _repaste.file = f;
+    _repaste.pdf = null;               /* 마지막에 넣은 것 하나만 쓴다 */
     _repaste.w = img.naturalWidth || 0;
     _repaste.h = img.naturalHeight || 0;
     paintRepaste();
@@ -15018,6 +15040,47 @@ function takeRepasteFile(files) {
     toast('그림을 읽지 못했습니다', 4000);
   };
   img.src = url;
+}
+
+/* PDF 를 쪽마다 펴서 쥔다 — 아직 올리지 않는다(사람이 쪽 수를 보고 누른다).
+   ⚠ 펴는 데 시간이 걸린다(쪽마다 3.2배로 그린다) — 그동안 무엇을 하는지 말해 준다.
+     아무 말 없이 멈춰 있으면 「눌렀는데 안 된다」가 된다. */
+async function takeRepastePdf(f) {
+  if (!_repaste) return;
+  _repaste.busy = '📄 PDF 를 펴는 중…';
+  paintRepaste();
+  try {
+    const r = await pdfToPages(f);
+    if (!_repaste) return;                       /* 그 사이 창을 닫았다 */
+    const pages = (r && r.pages) || [];
+    if (!pages.length) throw new Error('쪽을 하나도 펴지 못했습니다');
+    /* 첫 쪽으로 크기를 잰다 — 쪽마다 크기가 같다(같은 배율로 그린다) */
+    const sz = await sizeOfBlob(pages[0].blob);
+    if (!_repaste) return;
+    _repaste.file = null;
+    _repaste.pdf = pages;
+    _repaste.w = sz.w; _repaste.h = sz.h;
+    _repaste.busy = '';
+    paintRepaste();
+  } catch (e) {
+    console.warn('[다시 넣기 · PDF]', e);
+    if (_repaste) { _repaste.busy = ''; paintRepaste(); }
+    toast('PDF 를 펴지 못했습니다 — ' + ((e && e.message) || e), 6000);
+  }
+}
+
+/* 그림 한 장의 가로세로를 잰다 — 주소를 잠깐 쓰고 바로 놓는다 */
+function sizeOfBlob(blob) {
+  return new Promise(function (res, rej) {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      res({ w: img.naturalWidth || 0, h: img.naturalHeight || 0 });
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('그림을 읽지 못했습니다')); };
+    img.src = url;
+  });
 }
 
 /* 창이 열려 있는 동안 붙여넣기를 받는다 — 「여기에 넣어서」가 이 기능의 알맹이다.
@@ -15036,7 +15099,7 @@ document.addEventListener('paste', function (e) {
 
 async function repasteApply(reread) {
   const r = _repaste;
-  if (!r || !r.file) return;
+  if (!repasteGot(r)) return;
   const id = r.id;
   const it = gridItems.find(function (x) { return x.id === id; });
   if (!it) return;
@@ -15049,17 +15112,11 @@ async function repasteApply(reread) {
   const 옛판독 = it.meta.read;
   closeKindPopup();
   $('viewerHint').textContent = '바꾸는 중…';
+  let 바꾼쪽 = 0;
   try {
-    const spec = PuPhotoStore.uploadSpec(it.meta.kind === 'doc');
-    const sized = await shrinkMany(r.file, [
-      { maxEdge: spec.maxEdge, quality: spec.quality },
-      { maxEdge: spec.thumbEdge, quality: 0.85 }
-    ]);
-    await PuPhotoStore.replaceImage(photoYearOf(id), id, sized[0].dataUrl, sized[1].dataUrl, photoOwner(id));
-    it.full = sized[0].dataUrl; it.thumb = sized[1].dataUrl;
-    /* 「원본이 작습니다」 판정이 새 크기를 보게 — 안 적으면 바꾸고도 계속 작다고 한다 */
-    it.meta = Object.assign({}, it.meta,
-      { w: sized[0].w, h: sized[0].h, srcW: r.w, srcH: r.h });
+    /* 그림 한 장이냐 PDF 여러 쪽이냐만 여기서 갈린다 —
+       묻기·다시 읽기·달라진 칸 보이기는 둘이 «같은 길»을 탄다. */
+    바꾼쪽 = (r.pdf && r.pdf.length) ? await repastePutPdf(r, id) : await repastePutImage(r, it);
     if (viewerId === id) openViewer(id);
     loadGrid();
   } catch (e) {
@@ -15067,7 +15124,11 @@ async function repasteApply(reread) {
     alert('바꾸지 못했습니다 — ' + ((e && e.message) || e));
     return;
   }
-  if (!reread) { toast('사진을 바꿨습니다 — 읽은 값은 그대로입니다 (요금 0원)', 5000); return; }
+  if (!reread) {
+    toast((바꾼쪽 > 1 ? 'PDF ' + 바꾼쪽 + '쪽을 바꿨습니다' : '사진을 바꿨습니다') +
+      ' — 읽은 값은 그대로입니다 (요금 0원)', 5000);
+    return;
+  }
   $('readPanel').innerHTML = '<div class="box"><p class="note" style="margin:0">판독 중…</p></div>';
   try {
     await readPhoto(id);
@@ -15077,6 +15138,65 @@ async function repasteApply(reread) {
     console.warn('[다시 넣고 판독]', e);
     alert('사진은 바꿨지만 판독하지 못했습니다 — ' + ((e && e.message) || e));
   }
+}
+
+/* 그림 한 장을 «자리에서» 갈아 끼운다 — 사진 번호가 안 바뀐다. */
+async function repastePutImage(r, it) {
+  const id = it.id;
+  const spec = PuPhotoStore.uploadSpec(it.meta.kind === 'doc');
+  const sized = await shrinkMany(r.file, [
+    { maxEdge: spec.maxEdge, quality: spec.quality },
+    { maxEdge: spec.thumbEdge, quality: 0.85 }
+  ]);
+  await PuPhotoStore.replaceImage(photoYearOf(id), id, sized[0].dataUrl, sized[1].dataUrl, photoOwner(id));
+  it.full = sized[0].dataUrl; it.thumb = sized[1].dataUrl;
+  /* 「원본이 작습니다」 판정이 새 크기를 보게 — 안 적으면 바꾸고도 계속 작다고 한다 */
+  it.meta = Object.assign({}, it.meta,
+    { w: sized[0].w, h: sized[0].h, srcW: r.w, srcH: r.h });
+  return 1;
+}
+
+/* ── PDF 로 바꾸기 (대표 지시 2026-09-18 「PDF 도」) ─────────────────────────
+   ★ PDF 가 캡처보다 낫다 — 안에 «글자»가 그대로 들어 있으면 판독이 그림이 아니라
+     글자로 간다(요금이 적고, 1↔7·4↔9 오독이 원천적으로 없다).
+   ⚠ 사진을 **새로 만들지 않는다.** 있는 쪽 자리에 본문만 갈아 끼운다 —
+     번호가 바뀌면 기업정보함 연결·서류 묶음·보낸 기록이 끊긴다.
+   ⚠ 쪽 수가 다르면 **앞에서부터 겹치는 만큼만** 바꾼다. 남는 쪽을 새로 만들지 않는다 —
+     「바꾸기」를 눌렀는데 사진이 늘어나면 그것은 사람이 시킨 일이 아니다.
+     (몇 쪽을 바꾸는지는 누르기 «전에» 팝업이 말해 준다 — paintRepaste 참고)
+   ⚠ 한 쪽짜리 PDF 는 «이 사진»만 바꾼다. 서류의 첫 쪽이 아니다 —
+     2쪽을 보다가 넣으셨으면 2쪽을 바꾸는 것이 사람이 뜻한 바다. */
+async function repastePutPdf(r, id) {
+  const pages = r.pdf || [];
+  const 이것 = gridItems.find(function (x) { return x.id === id; });
+  const 쪽들 = pages.length === 1 ? (이것 ? [이것] : []) : docPages(id);
+  const n = Math.min(pages.length, 쪽들.length);
+  if (!n) throw new Error('바꿀 쪽을 찾지 못했습니다');
+  for (let i = 0; i < n; i++) {
+    const tgt = 쪽들[i];
+    $('viewerHint').textContent = '바꾸는 중… ' + (i + 1) + '/' + n + '쪽';
+    const spec = PuPhotoStore.uploadSpec(tgt.meta.kind === 'doc');
+    /* 쪽마다 원본 크기를 «따로» 잰다 — 세로쪽·가로쪽이 섞인 PDF 가 있다.
+       첫 쪽 크기를 모두에 적으면 「원본이 작습니다」가 엉뚱하게 뜬다/안 뜬다. */
+    const 원본 = await sizeOfBlob(pages[i].blob);
+    const sized = await shrinkMany(pages[i].blob, [
+      { maxEdge: spec.maxEdge, quality: spec.quality },
+      { maxEdge: spec.thumbEdge, quality: 0.85 }
+    ]);
+    await PuPhotoStore.replaceImage(photoYearOf(tgt.id), tgt.id,
+      sized[0].dataUrl, sized[1].dataUrl, photoOwner(tgt.id));
+    /* ⚠ 안에 있던 글자도 **함께** 갈아 끼운다. 글자가 없는 PDF(종이를 스캔한 것)면
+       빈 것을 넣어 **지운다** — 안 지우면 판독이 옛 서류의 글자를 그대로 읽어
+       그림은 바뀌었는데 값은 옛것이 되는, 가장 알아채기 어려운 어긋남이 된다. */
+    const 글자 = pdfTextUsable(pages[i].text) ? pages[i].text : '';
+    await PuPhotoStore.replaceText(photoYearOf(tgt.id), tgt.id, 글자, photoOwner(tgt.id));
+    tgt.full = sized[0].dataUrl; tgt.thumb = sized[1].dataUrl;
+    const m = Object.assign({}, tgt.meta,
+      { w: sized[0].w, h: sized[0].h, srcW: 원본.w, srcH: 원본.h });
+    if (글자) m.hasText = true; else delete m.hasText;
+    tgt.meta = m;
+  }
+  return n;
 }
 
 /* 다시 읽은 뒤 «달라진 것만» 보여 준다 — 스무 칸을 다 늘어놓으면 무엇이 바뀌었는지 안 보인다 */
