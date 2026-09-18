@@ -7,7 +7,8 @@
      추측을 끝내려면 앱이 부팅마다 «몇 초 만에·어떤 종류로» 켜졋는지 스스로 찍어야 한다.
 
    ★ 못 박는 것
-     ① 3분 안 3번째 부팅부터 «폭풍»으로 본다 — 2번은 아니다(F5 두 번은 사람이다)
+     ① 3분 안 5번째 부팅부터 «폭풍»으로 본다 — 그것도 «간격이 고를 때만»이다
+        (2026-09-18 저녁: 3번이면 폭풍이라 했더니 대표님이 나스 인증서 받으시며 누른 F5 세 번이 걸렸다)
      ② 부팅 시각은 같은 탭에서 이어지는 sessionStorage 에 남는다 — localStorage 면 다른 탭·다른 날이 섞인다
      ③ 3분 넘은 옛 부팅은 걷어낸다 — 아침에 켠 것이 저녁 한 번을 폭풍으로 만들면 안 된다
      ④ 폭풍이면 화면에 띠를 띄우고 PU_BOOT.storm 을 세운다 — 앱(이알피)이 그것으로 받기를 멈춘다
@@ -66,14 +67,13 @@ test('① 첫 부팅·둘째 부팅은 폭풍이 아니다 — F5 두 번은 사
   assert.equal(b.win.PU_BOOT.since, 20, '★ 직전 부팅에서 몇 초인지 적어야 원인을 잰다');
 });
 
-test('②★ 3분 안 세 번째 부팅부터 폭풍 — 띠가 뜨고 PU_BOOT.storm 이 선다', () => {
+test('②★ 3분 안 다섯 번째 부팅 + 고른 간격이면 폭풍 — 띠가 뜨고 PU_BOOT.storm 이 선다', () => {
   const sess = {};
-  boot({ session: sess, now: 1000000 });
-  boot({ session: sess, now: 1000000 + 20000 });
-  const c = boot({ session: sess, now: 1000000 + 40000, navType: 'reload' });
+  let c = null;
+  for (let i = 0; i < 5; i++) c = boot({ session: sess, now: 1000000 + i * 20000, navType: 'reload' });
   assert.equal(c.win.PU_BOOT.storm, true);
   assert.ok(c.banner, '★★ 폭풍인데 화면에 아무 말이 없다 — 원인이 바깥이면 사람만 끌 수 있는데 알릴 길이 없다');
-  assert.match(c.banner.kids[0].textContent, /3번 다시 켜졌습니다/);
+  assert.match(c.banner.kids[0].textContent, /5번 다시 켜졌습니다/);
   assert.match(c.banner.kids[0].textContent, /브라우저·확장이 새로고침/, '★ reload 인데 «주소로 다시 열림»이라 하면 원인을 안에서 찾게 만든다');
   assert.ok(c.logs.warn.some(m => /다시 켜졌습니다/.test(m)), '★ 콘솔에도 남아야 사람이 보낸 캡처로 알 수 있다');
 });
@@ -82,6 +82,7 @@ test('③ 3분 넘은 옛 부팅은 걷어낸다 — 아침 것이 저녁 한 �
   const sess = {};
   boot({ session: sess, now: 1000000 });
   boot({ session: sess, now: 1000000 + 10000 });
+  boot({ session: sess, now: 1000000 + 20000 });
   const late = boot({ session: sess, now: 1000000 + 4 * 60 * 1000 });   // 4분 뒤
   assert.equal(late.win.PU_BOOT.count, 1, '★ 옛 부팅을 안 걷으면 하루 종일 세 번째 부팅마다 폭풍이다');
   assert.equal(late.win.PU_BOOT.storm, false);
@@ -225,10 +226,10 @@ test('⑮★ 탭 눈도 «화면 경로별» — 로그아웃→포털→포털 
   assert.equal(erp.win.PU_BOOT.count, 1, '★★ 같은 탭의 포털 부팅을 이알피 부팅으로 세면 정상 로그인 흐름이 폭풍이 된다(2026-09-17 대표 화면 「3번, 주소로 다시 열림」)');
   assert.equal(erp.win.PU_BOOT.storm, false);
   assert.equal(erp.banner, null, '★ 거짓 경보 띠 — 이알피 문까지 닫혀 대표가 「다시 이렇게 나온다」고 했다');
-  /* 같은 화면이 3번이면 여전히 폭풍이다 — 눈이 먼 것이 아니다 */
-  boot({ session: sess, now: 1000000 + 20000, pathname: '/pureunall/pu-erp.html' });
-  const third = boot({ session: sess, now: 1000000 + 40000, pathname: '/pureunall/pu-erp.html' });
-  assert.equal(third.win.PU_BOOT.count, 3); assert.equal(third.win.PU_BOOT.storm, true);
+  /* 같은 화면이 고른 간격으로 5번이면 여전히 폭풍이다 — 눈이 먼 것이 아니다 */
+  let fifth = null;
+  for (let i = 1; i < 5; i++) fifth = boot({ session: sess, now: 1000000 + 12000 + i * 20000, pathname: '/pureunall/pu-erp.html' });
+  assert.equal(fifth.win.PU_BOOT.count, 5); assert.equal(fifth.win.PU_BOOT.storm, true);
 });
 
 test('⑫ 첫 눈(탭)은 여전히 sessionStorage 만 본다 — 기기 눈은 딴 함수에 있다', () => {

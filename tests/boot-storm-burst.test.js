@@ -89,5 +89,6 @@ test('④ 접는 것은 «세는 법»뿐 — 기록은 그대로 남는다', ()
 
 test('⑤ 5초는 «한 번의 일»과 «되풀이»를 가르는 자리다', () => {
   assert.match(VER, /var BOOT_BURST_MS = 5 \* 1000;/, '★ 가르는 자리가 없습니다');
-  assert.match(cutFn(VER, 'function countSpread('), /BOOT_BURST_MS/, '★ 세는 곳이 그것을 안 봅니다');
+  assert.match(cutFn(VER, 'function spreadTimes('), /BOOT_BURST_MS/, '★ 접는 곳이 그것을 안 봅니다');
+  assert.match(cutFn(VER, 'function countSpread('), /spreadTimes\(/, '★ 세는 곳이 접은 것을 안 씁니다');
 });

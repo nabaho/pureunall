@@ -104,7 +104,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=4"></script>
-<script src="js/pu-version.js?v=7"></script>
+<script src="js/pu-version.js?v=8"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 // CommonJS/AMD 환경 가드 (모바일 WebView 호환)
@@ -9627,11 +9627,14 @@ function _fbApplyRecordInner(k, v, opts){
       통째 읽기(_fbInitialSyncFull) 그대로 — 모르면 다 받는다(fail-open).
       재무 담당자가 빈 화면을 보는 것보다 요금을 조금 더 내는 쪽이 낫다. */
 /* ══ 부팅 폭풍이면 «무거운 받기»를 사람이 누를 때까지 멈춘다 (대표 제보 2026-09-17 「계속 돈이 새고 있다») ══
-   js/pu-version.js 의 감지기가 「이 탭이 3분 안 3번 넘게 다시 켜졌다」(PU_BOOT.storm)고 하면,
+   js/pu-version.js 의 감지기가 「3분 안 5번 넘게 다시 켜졌고 «간격이 고르다»」(PU_BOOT.storm)고 하면,
    서버 자료를 통째로 받는 초기 동기화를 시작하지 않고 덮개를 띄운다.
    ■ 왜 — 20초마다 다시 켜지는 탭은 사람이 쓰는 탭이 아니다. 그런 탭이 켤 때마다 917KB·2.8MB 를
      받는 것이 시간당 ₩700 의 정체였다. 원인(대개 바깥의 자동 새로고침)을 사람이 끄기 전까지는
      받지 않는 것이 옳다 — 화면은 이 기기의 지난 사본으로 그대로 보인다.
+   ⚠ «고른 간격»이 함께 서야 폭풍이다(2026-09-18 저녁). 횟수만 보던 때는 대표님이 나스 인증서를
+     받으시며 새로고침 세 번 누르신 것에도 덮개가 내려왔다 — 끌 것이 없는데 「끄고 누르라」고
+     시키는 덮개는 화면이 거짓말하는 것이다.
    ⚠ «이 세션에서 한 번 누르면» 다시 묻지 않는다(sessionStorage) — 사람이 정말 쓰는 탭을 막지 않게.
    ⚠ 돌려주는 것은 «받기를 이어가는 약속»이다 — 부르는 쪽(_startFbSync)의 흐름을 바꾸지 않는다. */
 var _bootStormGateShown = false;
@@ -9666,11 +9669,13 @@ function _erpBootStormGate(){
       /* 재검증(2026-09-17 저녁): 탭 눈은 못 보고 기기 눈만 걸린 폭풍 = 부팅마다 «새 탭». 그때 count 는 1이라
          「1번 다시 켜졌습니다」가 되어 거짓말이 된다 — 기기 수를 쓰고 「새 탭으로」라고 말한다. */
       var _devOnly = !window.PU_BOOT.tabStorm && !!window.PU_BOOT.devStorm;
-      var _n = Math.max(window.PU_BOOT.count || 0, window.PU_BOOT.devCount || 0) || 3;
+      var _n = Math.max(window.PU_BOOT.count || 0, window.PU_BOOT.devCount || 0) || 5;
+      var _every = window.PU_BOOT.every;
       t.textContent = _devOnly ? '⚠ 이 화면이 매번 새 탭으로 계속 열리고 있어 자료 받기를 멈췄습니다' : '⚠ 이 탭이 계속 다시 켜지고 있어 자료 받기를 멈췄습니다';
       var p = document.createElement('div'); p.style.cssText = 'color:#475569;margin-bottom:14px';
-      p.textContent = '3분 안에 ' + _n + '번 ' + (_devOnly ? '이 기기에서 새 탭으로 열렸습니다' : '다시 켜졌습니다') + (window.PU_BOOT.since != null ? ' (마지막은 ' + window.PU_BOOT.since + '초 전' + (window.PU_BOOT.type === 'reload' ? ' · 브라우저·확장이 새로고침' : '') + ')' : '') +
-        '. 켤 때마다 서버 자료를 전부 다시 받아 요금이 나갑니다. 브라우저의 자동 새로고침 확장이나 탭 돌리기를 끄신 뒤 아래를 눌러 주세요. 화면은 이 기기의 지난 사본으로 그대로 보입니다.';
+      p.textContent = '3분 안에 ' + _n + '번 ' + (_devOnly ? '이 기기에서 새 탭으로 열렸습니다' : '다시 켜졌습니다') +
+        (_every != null ? ' (약 ' + _every + '초마다 고르게' + (window.PU_BOOT.type === 'reload' ? ' · 브라우저·확장이 새로고침' : '') + ')' : '') +
+        '. 사람이 누르면 이렇게 고르게 못 누릅니다 — 자동 새로고침 확장·탭 돌리기, 또는 이 화면을 열어 두는 감시 도구를 찾아 꺼 주세요. 켤 때마다 서버 자료를 전부 다시 받아 요금이 나갑니다. 화면은 이 기기의 지난 사본으로 그대로 보입니다.';
       var go = document.createElement('button'); go.type = 'button';
       go.textContent = '자료 받기 계속';
       go.style.cssText = 'font:inherit;font-weight:800;background:#1e40af;color:#fff;border:0;border-radius:8px;padding:9px 18px;cursor:pointer';
