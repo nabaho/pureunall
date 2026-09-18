@@ -28,13 +28,15 @@ const GOV_C = stripJs(GOV);
 /* 셈하는 함수 셋을 가짜 창에 올려 «실제로» 돌린다 */
 function loadCalc(typeList) {
   const ctx = {
-    BIZ_CONS_SEED: [{ code: 'cons-clinic', dayFee: 350000 }],
+    BIZ_CONS_SEED: [{ code: 'cons-clinic', name: '현장클리닉', dayFee: 350000 },
+                    { code: 'cons-ilteo', name: '일터상생혁신' }],
     dbGet: function (k, d) { return (k === 'biz_cons_types') ? (typeList || null) || d : d; },
     Math: Math, parseInt: parseInt, Number: Number
   };
   vm.createContext(ctx);
   vm.runInContext(
     cutFn(ERP, 'function consTypeDayFee(') + '\n' +
+    cutFn(ERP, 'function consNameKey(') + '\n' +
     cutFn(ERP, 'function consDayAmount(') + '\n' +
     cutFn(ERP, 'function consDayMayFill('), ctx);
   return ctx;
@@ -88,6 +90,28 @@ test('⑥ 단가를 «비우면» 0 이다 — 일수 칸이 사라져야 한다
     '빈 문자열은 「안 정했다」이므로 씨앗으로 물러난다');
   const off = loadCalc([{ code: 'cons-clinic', dayFee: 0 }]);
   assert.equal(off.consTypeDayFee('cons-clinic'), 0, '0 은 「쓰지 않는다」는 뜻이라 그대로 0');
+});
+
+test('⑥-2 ★★ 쓰고 있는 유형은 코드가 «지어진 값»이다 — 이름으로도 찾아야 한다', () => {
+  /* 2026-09-18 실측: 서버의 컨설팅 유형 17개는 화면에서 새로 만든 것이라
+     코드가 consulting-mp0w1084 처럼 그때그때 지어졌다 — 씨앗의 cons-clinic 과
+     하나도 안 겹친다. 코드로만 찾으면 일수 칸이 «영영 안 뜬다».
+     실제로 그렇게 내보냈다가 대표께 「안 나오는데?」를 들었다. */
+  const live = loadCalc([{ code: 'consulting-mp0w1084', short: '현클', name: '현장클리닉' }]);
+  assert.equal(live.consTypeDayFee('consulting-mp0w1084'), 350000,
+    '코드가 안 맞아도 이름이 같으면 씨앗의 기본값을 쓴다');
+
+  const spaced = loadCalc([{ code: 'consulting-zzz', name: '현장 클리닉 컨설팅' }]);
+  assert.equal(spaced.consTypeDayFee('consulting-zzz'), 350000,
+    '띄어쓰기와 「컨설팅」 꼬리는 견줄 때 뗀다');
+
+  const other = loadCalc([{ code: 'consulting-mozfisq7', name: '일터상생혁신컨설팅' }]);
+  assert.equal(other.consTypeDayFee('consulting-mozfisq7'), 0,
+    '이름이 맞아도 씨앗에 단가가 없으면 0 — 아무 유형에나 붙지 않는다');
+
+  const shut = loadCalc([{ code: 'consulting-mp0w1084', name: '현장클리닉', dayFee: 0 }]);
+  assert.equal(shut.consTypeDayFee('consulting-mp0w1084'), 0,
+    '0 을 적어 두었으면 이름 대조까지 가지 않는다 — 「쓰지 않는다」가 이긴다');
 });
 
 test('⑦ ★ 사람이 적어 둔 잔금은 절대 안 덮는다 (오늘 CMS 오매칭이 난 바로 그 자리)', () => {
@@ -206,8 +230,8 @@ test('⑫ 씨앗 — 현장클리닉에 1일 단가가 들어 있다 (검사고�
 test('⑬ 설정에서 단가를 고칠 수 있다 — 코드에 박아 두지 않았다', () => {
   const ed = stripJs(cutFn(ERP, 'function editType('));
   assert.match(ed, /df = window\.prompt\('1일 단가/, '✏ 에서 «실제로» 묻는다');
-  assert.match(ed, /if\(n > 0\) nx\.dayFee = n; else delete nx\.dayFee;/,
-    '비우면 칸을 아예 지운다 — 0 을 남기면 「정했는데 0」과 구별이 안 된다');
+  assert.match(ed, /if\(df !== null\) nx\.dayFee = parseInt\(String\(df\)\.replace\(\/\[\^\\d\]\/g, ''\), 10\) \|\| 0;/,
+    '비우면 «0 을 적는다» — 칸을 지우면 「안 정했다」가 되어 씨앗 기본값이 다시 올라온다');
   assert.match(ed, /cat\.key === 'consulting'/, '컨설팅 유형에만 묻는다');
 });
 

@@ -305,7 +305,7 @@ var Component = React.Component;
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
 var ERP_BUILD = '2026-09-18 초기 동기화의 건별 자료를 모아 한 번만 저장 — 수천 건을 받을 때마다 전체 배열을 다시 저장해 화면이 오래 멈추던 길을 줄였다';
-var BUILD_SEQ = 170;
+var BUILD_SEQ = 171;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -13557,8 +13557,21 @@ function consTypeDayFee(code){
   if(t && t.dayFee !== undefined && t.dayFee !== null && t.dayFee !== ''){
     return parseInt(t.dayFee, 10) || 0;
   }
+  /* ★★ 씨앗에서 찾을 때 «코드»만 보면 못 찾는다 (2026-09-18 실측).
+       쓰고 있는 유형 17개는 화면에서 새로 만든 것이라 코드가 `consulting-mp0w1084`
+       처럼 그때그때 지어진 값이다 — 씨앗의 `cons-clinic` 과 «하나도 안 겹친다».
+       그래서 «이름»으로도 찾는다. 이 대조는 우리 씨앗표 안에서만 하고, 값은
+       대표가 설정에서 언제든 덮을 수 있는 «기본값»일 뿐이라 위험하지 않다.
+     ⚠ 유형에 dayFee 가 «적혀 있으면»(0 이라도) 위에서 이미 답이 나갔다 —
+       0 은 「쓰지 않는다」는 뜻이고, 여기까지 오지 않는다. */
   var s = BIZ_CONS_SEED.find(function(x){ return x.code === code; });
+  if(!s && t) s = BIZ_CONS_SEED.find(function(x){ return consNameKey(x.name) === consNameKey(t.name); });
   return (s && parseInt(s.dayFee, 10)) || 0;
+}
+/* 유형 이름을 견줄 꼴로 — 띄어쓰기·괄호와 「컨설팅」 꼬리를 뗀다
+   (「현장클리닉」 ↔ 「현장 클리닉 컨설팅」). */
+function consNameKey(s){
+  return String(s || '').replace(/[\s()（）·,\-]/g, '').replace(/컨설팅$/, '');
 }
 /* 일수 × 단가 → 공급가·부가세·합계.
    ⚠ 부가세는 «원 미만 버림»이다 — 세금계산서가 그렇게 끊긴다.
@@ -33173,10 +33186,9 @@ function BizTypeCard(props){
       if(it.code !== x.code) return it;
       var nx = Object.assign({}, it, { short:sh, name:nm });
       if(ag !== null) nx.agency = ag.trim();
-      if(df !== null){
-        var n = parseInt(String(df).replace(/[^\d]/g, ''), 10) || 0;
-        if(n > 0) nx.dayFee = n; else delete nx.dayFee;
-      }
+      /* ⚠ 비웠을 때 칸을 «지우지» 않고 0 을 적는다 — 지우면 「안 정했다」가 되어
+           씨앗의 기본값(현장클리닉 350,000)이 다시 올라온다. 0 은 「쓰지 않는다」다. */
+      if(df !== null) nx.dayFee = parseInt(String(df).replace(/[^\d]/g, ''), 10) || 0;
       return nx;
     }));
     showToast('✏ 수정됨 — 코드 유지, 기존 사건·컨설팅 연결 그대로');
