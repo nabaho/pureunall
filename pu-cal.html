@@ -170,27 +170,82 @@
     padding:8px 11px;font-size:12px;margin-bottom:10px;white-space:pre-line}
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:50;background:#1e293b;
     color:#ffffff;border-radius:9px;padding:9px 16px;font-size:12.5px;font-weight:700}
-  /* ── 인원 현황 표 ── */
-  .scope{display:flex;align-items:center;gap:6px;margin-bottom:9px;flex-wrap:wrap}
-  .seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden}
-  .seg button{border:none;background:#ffffff;color:var(--sub);font-family:inherit;font-size:11.5px;
-    padding:4px 11px;cursor:pointer}
-  .seg button.on{background:var(--acc2);color:#ffffff;font-weight:700}
-  table.ppl{border-collapse:collapse;width:100%;font-size:12.5px}
-  table.ppl th,table.ppl td{border-bottom:1px solid var(--line);padding:6px 9px;text-align:left;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  table.ppl th{background:var(--bg);font-weight:700;font-size:11.5px;color:var(--sub)}
-  table.ppl td.n{text-align:right;font-variant-numeric:tabular-nums}
-  table.ppl tr.left td{color:var(--faint)}
-  .dot2{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
-  .kindtag{font-size:10px;font-weight:700;border-radius:9px;padding:1px 7px}
-  .kindtag.in{background:#eff6ff;color:#1e40af}
-  .kindtag.ex{background:#fffbeb;color:#854d0e}
-  .kindtag.law{background:#f0fdf4;color:#166534}
-  .days{font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .lnkrow{display:flex;align-items:center;gap:7px;white-space:nowrap}
-  .lnkrow code{font-size:11px;color:var(--sub);background:var(--bg);border-radius:5px;padding:2px 7px;
-    overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  /* ── 이음센터 인원 현황 — 이알피(IeumPeopleTab)와 같은 치수 ── */
+  .ieumbar{display:flex;align-items:stretch;background:#ffffff;border:1px solid var(--line);
+    border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(16,30,70,.04);flex-wrap:wrap}
+  .scopepilot{display:flex;flex-direction:column;justify-content:center;gap:7px;padding:10px 14px;
+    background:var(--bg);border-right:1px solid var(--bg);flex-shrink:0;min-width:196px}
+  .scopenav{display:flex;align-items:center;gap:7px;justify-content:center}
+  .scopetitle{font-size:13px;font-weight:800;min-width:96px;text-align:center;color:var(--ink);letter-spacing:-0.01em}
+  .segpill{display:inline-flex;background:var(--bg);border-radius:8px;padding:2px;gap:2px;justify-content:center}
+  .segpill button{flex:1;padding:3px 9px;font-size:10.5px;font-weight:600;border:none;border-radius:6px;
+    cursor:pointer;background:transparent;color:var(--sub);font-family:inherit;white-space:nowrap}
+  .segpill button.on{background:#ffffff;font-weight:800;color:#1e40af;box-shadow:0 1px 2px rgba(16,30,70,.10)}
+  .kcell{flex:1;display:flex;align-items:center;gap:10px;padding:12px 16px;border-right:1px solid var(--bg);min-width:140px}
+  .kdot{width:8px;height:8px;border-radius:3px;flex-shrink:0}
+  .klabel{font-size:11.5px;font-weight:600;color:var(--sub);white-space:nowrap}
+  .kval{margin-left:auto;font-size:17px;font-weight:800;white-space:nowrap;letter-spacing:-0.02em;color:var(--ink)}
+  .kval small{font-size:10.5px;color:var(--faint);font-weight:600;margin-left:1px}
+  .ppltable{background:#ffffff;border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+  .ppltable table{width:100%;border-collapse:collapse;min-width:640px}
+  .ppltable th{text-align:left;font-size:10.5px;font-weight:800;color:var(--faint);letter-spacing:0.04em;
+    padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--bg)}
+  .ppltable th.no{width:34px;text-align:center}
+  .ppltable th.ublue{box-shadow:inset 0 -2px 0 #2563eb}
+  .ppltable th.uamber{box-shadow:inset 0 -2px 0 #d97706}
+  .ppltable td{padding:8px 10px;border-bottom:1px solid var(--bg);vertical-align:middle;white-space:nowrap;font-size:12px}
+  .ppltable td.no{text-align:center;color:var(--faint);font-weight:700;font-size:11px}
+  .ppltable tr.prow{cursor:pointer}
+  .ppltable tr.prow:hover{background:var(--bg)}
+  .ppltable tr.prow.open{background:var(--acc-soft)}
+  .pname{display:flex;align-items:center;gap:8px}
+  .avatar{width:26px;height:26px;border-radius:8px;color:#ffffff;display:inline-flex;align-items:center;
+    justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+  .avatar.sm{width:22px;height:22px;border-radius:6px;font-size:10px;margin-right:7px;vertical-align:middle}
+  .nm{font-weight:800;font-size:12.5px}
+  .leftbadge{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--bg);
+    color:var(--faint);border:1px dashed #cbd5e1;white-space:nowrap}
+  .rolechip{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap}
+  .dash{color:#cbd5e1}
+  .barwrap{display:flex;align-items:center;gap:7px;min-width:110px}
+  .barnum{font-size:12.5px;font-weight:800;white-space:nowrap}
+  .barnum small{font-size:10px;color:var(--faint);font-weight:600}
+  .bartrack{flex:1;height:7px;border-radius:20px;background:var(--bg);overflow:hidden;min-width:46px}
+  .barfill{display:block;height:100%;border-radius:20px}
+  .tel{text-decoration:none;margin-right:6px}
+  .notecell span{font-size:11px;color:var(--sub);max-width:170px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;display:inline-block}
+  .chev{color:var(--faint);font-size:11px}
+  tr.prow.open .chev{transform:rotate(90deg);display:inline-block}
+  tr.detail td{background:var(--bg);padding:13px 18px;border-bottom:1px solid var(--line);white-space:normal}
+  .detailgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:880px}
+  .dtitle{font-size:10.5px;font-weight:800;color:var(--faint);margin-bottom:7px}
+  .drow{display:flex;align-items:flex-start;gap:8px;padding:3px 0;font-size:11.5px}
+  .dm{width:40px;font-weight:700;flex-shrink:0}
+  .dchips{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+  .dchip{background:#eff6ff;color:#2563eb;font-weight:700;border-radius:4px;padding:1px 6px;font-size:10.5px}
+  .dchip.law{background:#fffbeb;color:#d97706}
+  .dcnt{font-weight:800;flex-shrink:0}
+  .dnone{font-size:11.5px;color:var(--faint)}
+  .lrow{display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:11.5px}
+  .ldate{color:var(--sub);font-weight:700;width:44px;flex-shrink:0}
+  .ltitle{font-weight:600;flex:1}
+  .dhint{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:10.5px;color:var(--faint)}
+  .linklike{border:none;background:none;color:#1e40af;font-weight:700;font-size:10.5px;cursor:pointer;padding:0;font-family:inherit}
+  /* ── 외부 공유 뷰 — 이알피(IeumShareTab)와 같은 치수 ── */
+  .sharecard{background:#ffffff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;max-width:860px}
+  .sctitle{font-size:13.5px;font-weight:800;margin-bottom:6px}
+  .sctitle.sm{font-size:12.5px;margin-bottom:10px}
+  .scdesc{font-size:12px;color:var(--sub);line-height:1.8;margin-bottom:10px}
+  .linktable{width:100%;border-collapse:collapse;font-size:12px}
+  .linktable th{text-align:left;font-size:10.5px;font-weight:800;color:var(--faint);padding:6px 8px;
+    border-bottom:1px solid var(--line)}
+  .linktable td{padding:8px;border-bottom:1px solid var(--bg)}
+  .linktable td.right{text-align:right;white-space:nowrap}
+  .issued{font-size:10.5px;color:#16a34a;font-weight:700}
+  .notissued{font-size:10.5px;color:var(--faint)}
+  .sharefoot{font-size:10.5px;color:var(--faint);text-align:center}
+  .btn.ghost.sm{padding:5px 10px;font-size:11px}
   .later{text-align:center;padding:40px 18px;color:var(--sub)}
   .later h2{font-size:16px;margin:0 0 7px;color:var(--ink)}
   .later p{margin:0 0 16px;font-size:12.5px}
@@ -241,7 +296,7 @@ var D = {};              // 읽어 온 표들
 var FAILED = {};         // 못 읽은 표 — «빈 것»과 갈라 둔다
 var ME = null;           // 나 (직원 한 줄)
 var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'',
-          scope:'month', showLeft:false,
+          scope:'month', showLeft:false, openRows:{},
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
           view:'month', date:'', q:'' };
 
@@ -694,14 +749,15 @@ function ieumPeople(){
        (검사 tests/cal-ieum-same-as-erp.test.js 가 실제로 돌려 본다 — 처음엔 섞여 있었다) */
     if(u.status !== "active") return;
     rows.push({ pk:u.sid, name:u.name||u.sid, kind:"in", roleLabel:"내부 노무사",
-      color:colorOf(u.sid) || "#1e40af", note:(D.ieum_notes && D.ieum_notes[u.sid]) || "" });
+      color:colorOf(u.sid) || "#1e40af", note:(D.ieum_notes && D.ieum_notes[u.sid]) || "",
+      phone:u.phone||u.contact||"" });
   });
   var 변호사인가 = function(x){ return String(x.role||"").indexOf("변호사") >= 0; };
   살아있는외부.filter(function(x){ return !변호사인가(x); }).forEach(function(x){
-    rows.push({ pk:x.id, name:x.name, kind:"ex", roleLabel:"외부 노무사", color:x.color||"#d97706", note:x.note||"" });
+    rows.push({ pk:x.id, name:x.name, kind:"ex", roleLabel:"외부 노무사", color:x.color||"#d97706", note:x.note||"", phone:x.contact||"" });
   });
   살아있는외부.filter(변호사인가).forEach(function(x){
-    rows.push({ pk:x.id, name:x.name, kind:"law", roleLabel:"변호사", color:x.color||"#16a34a", note:x.note||"" });
+    rows.push({ pk:x.id, name:x.name, kind:"law", roleLabel:"변호사", color:x.color||"#16a34a", note:x.note||"", phone:x.contact||"" });
   });
   /* 그만둔 사람 — 기록이 있을 때만, 회색으로 */
   var 이미 = {}; rows.forEach(function(r){ 이미[r.pk] = 1; });
@@ -727,102 +783,183 @@ function inScope(ds){
   return ds.slice(0,7) === S.ym;
 }
 
-function peopleHtml(){
-  var rows = ieumPeople();
-  /* 사람마다: 몇 번 나갔나 · 며칠에 나갔나 */
-  var 근무 = {};
-  arr(D.attendance_records).forEach(function(r){
-    if(!r || r.type !== "eum-work" || !inScope(r.date)) return;
-    var pk = r.externalId || r.sid; if(!pk) return;
-    if(!근무[pk]) 근무[pk] = { 수:0, 날:[] };
-    근무[pk].수++; 근무[pk].날.push(r.date);
-  });
-  Object.keys(근무).forEach(function(pk){ 근무[pk].날.sort(); });
-  var 강의 = {};
-  arr(D.ieum_lectures).forEach(function(l){
-    if(!l || !inScope(l.date)) return;
-    강의[l.personKey] = (강의[l.personKey]||0) + 1;
-  });
-  var 보일것 = S.showLeft ? rows : rows.filter(function(r){ return !r.left; });
-  var 그만둔수 = rows.filter(function(r){ return r.left; }).length;
-  var 합계 = 보일것.reduce(function(n,r){ return n + ((근무[r.pk]||{}).수 || 0); }, 0);
-  var 범위말 = S.scope === "year" ? S.ym.slice(0,4)+"년" : S.scope === "all" ? "전체" : S.ym;
-
-  var 표 = 보일것.map(function(p){
-    var d = 근무[p.pk] || { 수:0, 날:[] };
-    /* 한 칸은 «한 줄»이다 — 날짜가 많으면 … 로 줄이고 전문은 손대면 뜬다 */
-    var 날말 = d.날.map(function(x){ return x.slice(5).replace("-","/"); }).join(", ");
-    return "<tr" + (p.left ? " class=\"left\"" : "") + ">"
-      + "<td><span class=\"dot2\" style=\"background:" + esc(p.color) + "\"></span>" + esc(p.name)
-      + (p.left ? " <span class=\"muted\" style=\"font-size:10.5px\">(그만둠)</span>" : "") + "</td>"
-      + "<td><span class=\"kindtag " + p.kind + "\">" + esc(p.roleLabel) + "</span></td>"
-      + "<td class=\"n\">" + d.수 + "</td>"
-      + "<td><div class=\"days\" title=\"" + esc(날말) + "\">" + esc(날말 || "—") + "</div></td>"
-      + "<td class=\"n\">" + (강의[p.pk] || 0) + "</td>"
-      + "<td><div class=\"days\" title=\"" + esc(p.note) + "\">" + esc(p.note || "—") + "</div></td>"
-      + "</tr>";
-  }).join("");
-
-  return "<div class=\"note\"><span>✏️ 한도·비고·강의 기록을 고치는 것은 아직 푸른이알피에서 합니다.</span>"
-    + "<span class=\"sp\"></span><button class=\"btn\" data-erp=\"dash/ieum\">이알피에서 고치기</button></div>"
-    + "<div class=\"panel\">"
-    + "<div class=\"scope\">"
-    + "<button class=\"mv\" data-mv=\"-1\">‹</button>"
-    + "<span class=\"monthbar\"><span class=\"ym\">" + esc(범위말) + "</span></span>"
-    + "<button class=\"mv\" data-mv=\"1\">›</button>"
-    + "<span class=\"seg\">"
-    + ["month","year","all"].map(function(v){
-        var 이름 = v === "month" ? "월" : v === "year" ? "연" : "전체";
-        return "<button data-scope=\"" + v + "\"" + (S.scope === v ? " class=\"on\"" : "") + ">" + 이름 + "</button>";
-      }).join("")
-    + "</span>"
-    + (그만둔수 ? "<button class=\"chip" + (S.showLeft ? " on" : "") + "\" data-left=\"1\">그만둔 사람 " + 그만둔수 + "명</button>" : "")
-    + "<span class=\"sp\" style=\"margin-left:auto\"></span>"
-    + "<span class=\"muted\" style=\"font-size:11.5px\">" + esc(범위말) + " 이음센터 근무 합계 <b>" + 합계 + "</b>회</span>"
-    + "</div>"
-    + (표
-        ? "<table class=\"ppl\"><tr><th>이름</th><th>구분</th><th style=\"width:64px\">근무</th>"
-          + "<th>나간 날</th><th style=\"width:56px\">강의</th><th>비고</th></tr>" + 표 + "</table>"
-        : "<div class=\"later\"><p>이 범위에 이음센터 사람이 없습니다.</p></div>")
-    + "</div>";
+/* ── 이음센터 · 인원 현황 — 이알피(IeumPeopleTab)와 «똑같은 꼴» ───────────
+   대표 지시 2026-09-18 (/goal) 「대시보드 제외한 화면은 똑같이 만들어라」.
+   KPI 스트립(이음근무·법률상담·이음강의·활동 인원) + 표(No.·인원·구분·근무 막대·
+   잔여·연락처·비고·펼치기)를 이알피와 같은 열·같은 색으로 짓는다.
+   ⚠ 한도·비고·강의 기록을 «고치는» 것은 아직 이알피에서 한다 — 그 세 자리는
+     표 통째로 담겨 있어 우리 저장 관문(칸별 보내기)이 그대로 못 쓴다. 그래서
+     여기서는 값을 «보여만» 주고, 손대면 이알피로 보낸다. 링크 복사처럼 서버에
+     아무것도 안 쓰는 것은 바로 된다. */
+var ROLE_CHIP = { in:{bg:"#eff6ff",fg:"#2563eb"}, ex:{bg:"#eff6ff",fg:"#2563eb"}, law:{bg:"#fffbeb",fg:"#d97706"} };
+function remBadgeHtml(used, cap){
+  if(!cap) return '<span style="color:#cbd5e1">—</span>';
+  var rem = cap - used, pct = used / cap;
+  var bg = pct >= 0.85 ? "#fef2f2" : pct <= 0.4 ? "#f0fdf4" : "#fffbeb";
+  var fg = pct >= 0.85 ? "#dc2626" : pct <= 0.4 ? "#16a34a" : "#d97706";
+  return '<span style="font-size:11px;font-weight:800;background:' + bg + ';color:' + fg + ';border-radius:5px;padding:2px 8px">' + rem + '</span>';
+}
+function barCellHtml(used, cap, color){
+  if(!cap && !used) return '<span style="color:#cbd5e1">—</span>';
+  var pct = cap ? Math.min(100, Math.round(used/cap*100)) : 0;
+  var c = (cap && used/cap >= 0.85) ? "#dc2626" : color;
+  var head = '<div style="display:flex;align-items:center;gap:7px;min-width:110px">'
+    + '<span style="font-size:11.5px;font-weight:700;color:#64748b;white-space:nowrap">'
+    + '<b style="color:#1e293b;font-size:12.5px">' + used + '</b>' + (cap ? " / " + cap + "회" : "회") + '</span>';
+  var bar = cap ? ('<div style="flex:1;height:7px;border-radius:20px;background:#f8fafc;overflow:hidden;min-width:46px">'
+    + '<span style="display:block;height:100%;border-radius:20px;width:' + pct + '%;background:' + c + '"></span></div>') : "";
+  return head + bar + '</div>';
+}
+function ieumKcell(color, label, val, unit, last){
+  return '<div class="kcell"' + (last ? ' style="border-right:none"' : '') + '>'
+    + '<span class="kdot" style="background:' + color + '"></span>'
+    + '<span class="klabel">' + esc(label) + '</span>'
+    + '<span class="kval">' + esc(String(val)) + '<small>' + esc(unit) + '</small></span></div>';
 }
 
-/* ── 이음센터 · 외부 공유 뷰 ──────────────────────────────────────────
+function peopleHtml(){
+  var rows = ieumPeople();
+  var att = arr(D.attendance_records);
+  var duty = {};
+  att.forEach(function(r){
+    if(!r || r.type !== "eum-work" || !inScope(r.date)) return;
+    var pk = r.externalId || r.sid; if(!pk) return;
+    var mm = r.date.slice(0,7), dd = parseInt(r.date.slice(8,10),10);
+    if(!duty[pk]) duty[pk] = { total:0, byMonth:{} };
+    if(!duty[pk].byMonth[mm]) duty[pk].byMonth[mm] = [];
+    duty[pk].byMonth[mm].push(dd); duty[pk].total++;
+  });
+  Object.keys(duty).forEach(function(pk){ Object.keys(duty[pk].byMonth).forEach(function(mm){ duty[pk].byMonth[mm].sort(function(a,b){return a-b;}); }); });
+  var lectures = arr(D.ieum_lectures).filter(function(l){ return l && inScope(l.date); });
+  var caps = (S.scope === "year") ? ((D.ieum_caps && D.ieum_caps[S.ym.slice(0,4)]) || {}) : {};
+  function capOf(pk, kind){ return (caps[pk] && caps[pk][kind]) || 0; }
+  function lecUsed(pk){ return lectures.filter(function(l){ return l.personKey === pk; }).length; }
+
+  var dutyTotal = 0, lawUsedTotal = 0, lawCapTotal = 0, eduUsedTotal = 0, eduCapTotal = 0;
+  rows.forEach(function(p){
+    var t = (duty[p.pk]||{}).total || 0;
+    if(p.kind === "law"){ lawUsedTotal += t; lawCapTotal += capOf(p.pk,"law"); }
+    else dutyTotal += t;
+    eduUsedTotal += lecUsed(p.pk); eduCapTotal += capOf(p.pk,"edu");
+  });
+  var visible = S.showLeft ? rows : rows.filter(function(p){ return !p.left; });
+  var maxDuty = 1; rows.forEach(function(p){ var t=(duty[p.pk]||{}).total||0; if(t>maxDuty) maxDuty=t; });
+  var isYearMode = S.scope === "year";
+  var scopeSfx = S.scope === "month" ? "(" + parseInt(S.ym.slice(5,7),10) + "월)" : S.scope === "year" ? "(" + S.ym.slice(0,4) + ")" : "(전체)";
+  var 범위말 = S.scope === "year" ? S.ym.slice(0,4) + "년" : S.scope === "all" ? "전체 (" + IEUM_START_YEAR + "~)" : S.ym;
+  var 그만둔수 = rows.filter(function(p){ return p.left; }).length;
+
+  var 행들 = visible.map(function(p, idx){
+    var d = duty[p.pk] || { total:0, byMonth:{} };
+    var isLaw = p.kind === "law";
+    var cUsed = isLaw ? (d.total || 0) : 0;
+    var cCap = capOf(p.pk,"law");
+    var eUsed = lecUsed(p.pk), eCap = capOf(p.pk,"edu");
+    var open = S.openRows && S.openRows[p.pk];
+    var chip = ROLE_CHIP[p.kind] || ROLE_CHIP.in;
+    var dutyPct = Math.round((d.total||0) / maxDuty * 100);
+    var 줄 = '<tr class="prow' + (open ? " open" : "") + '" data-toggle="' + esc(p.pk) + '" style="opacity:' + (p.left ? ".55" : "1") + '">'
+      + '<td class="no">' + (idx+1) + '</td>'
+      + '<td><div class="pname"><span class="avatar" style="background:' + esc(p.color) + '">' + esc(String(p.name||"?").charAt(0)) + '</span>'
+      +   '<span class="nm">' + esc(p.name) + '</span>'
+      +   (p.left ? '<span class="leftbadge">🚪 ' + (p.kind==="in"?"퇴사":"종료") + '</span>' : "") + '</div></td>'
+      + '<td><span class="rolechip" style="background:' + chip.bg + ';color:' + chip.fg + '">' + esc(p.roleLabel) + '</span></td>'
+      + '<td>' + ((!isLaw && d.total) ? ('<div class="barwrap"><span class="barnum">' + d.total + '<small>일</small></span>'
+          + '<div class="bartrack"><span class="barfill" style="width:' + dutyPct + '%;background:' + p.color + '"></span></div></div>')
+          : '<span class="dash">—</span>') + '</td>'
+      + '<td>' + (isLaw ? barCellHtml(cUsed, cCap, "#d97706") : '<span class="dash">—</span>') + '</td>'
+      + '<td>' + (isLaw ? remBadgeHtml(cUsed, cCap) : '<span class="dash">—</span>') + '</td>'
+      + '<td>' + ((eUsed||eCap) ? barCellHtml(eUsed, eCap, "#2563eb") : '<span class="dash">—</span>') + '</td>'
+      + '<td>' + remBadgeHtml(eUsed, eCap) + '</td>'
+      + '<td>' + (p.phone ? ('<a class="tel" href="tel:' + esc(String(p.phone).replace(/[^0-9]/g,"")) + '" onclick="event.stopPropagation()">📞</a> ' + esc(p.phone)) : '<span class="dash">—</span>') + '</td>'
+      + '<td class="notecell">' + (p.note ? '<span title="' + esc(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dash">＋ 입력</span>') + '</td>'
+      + '<td class="chev">›</td></tr>';
+    if(open){
+      var months = Object.keys(d.byMonth).sort();
+      var myLecs = lectures.filter(function(l){ return l.personKey === p.pk; })
+        .sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+      줄 += '<tr class="detail"><td colspan="10"><div class="detailgrid">'
+        + '<div><div class="dtitle">' + (isLaw ? "월별 법률상담 일자" : "월별 이음근무 일자") + '</div>'
+        + (months.length ? months.map(function(mm){
+            var lbl = parseInt(mm.slice(5),10) + "월";
+            return '<div class="drow"><span class="dm">' + lbl + '</span><span class="dchips">'
+              + d.byMonth[mm].map(function(dd){ return '<span class="dchip ' + (isLaw ? "law" : "") + '">' + dd + '</span>'; }).join("")
+              + '</span><span class="dcnt">' + d.byMonth[mm].length + '회</span></div>';
+          }).join("") : '<div class="dnone">' + 범위말 + ' 기록 없음</div>')
+        + '</div><div><div class="dtitle">이음강의 이력</div>'
+        + (myLecs.length ? myLecs.map(function(l){
+            return '<div class="lrow"><span class="ldate">' + esc((l.date||"").slice(5)) + '</span>'
+              + '<span class="ltitle">' + esc(l.title || "(제목 없음)") + '</span></div>';
+          }).join("") : '<div class="dnone">기록 없음</div>')
+        + '<div class="dhint">한도·비고·강의 기록은 <button class="linklike" data-erp="dash/ieum">이알피에서</button> 고칩니다</div>'
+        + '</div></div></td></tr>';
+    }
+    return 줄;
+  }).join("");
+
+  return '<div class="ieumbar">'
+    + '<div class="scopepilot">'
+    + '<div class="scopenav">'
+    + '<button class="mv" data-mv="-1">‹</button>'
+    + '<span class="scopetitle">' + esc(범위말) + '</span>'
+    + '<button class="mv" data-mv="1">›</button>'
+    + '</div>'
+    + '<div class="segpill">' + ["month","year","all"].map(function(v){
+        var 이름 = v === "month" ? "월" : v === "year" ? "연" : "전체";
+        return '<button data-scope="' + v + '"' + (S.scope === v ? ' class="on"' : '') + '>' + 이름 + '</button>';
+      }).join("") + '</div></div>'
+    + ieumKcell("#2563eb","이음근무",dutyTotal,"일")
+    + ieumKcell("#d97706","법률상담",lawUsedTotal + (isYearMode && lawCapTotal ? " / " + lawCapTotal : ""),"회")
+    + ieumKcell("#2563eb","이음강의",eduUsedTotal + (isYearMode && eduCapTotal ? " / " + eduCapTotal : ""),"회")
+    + ieumKcell("#16a34a","활동 인원",rows.filter(function(p){return !p.left;}).length,"명",true)
+    + '</div>'
+    + (그만둔수 ? '<button class="chip' + (S.showLeft ? " on" : "") + '" data-left="1">🚪 퇴사·종료 ' + 그만둔수 + '명 ' + (S.showLeft ? "숨기기" : "포함") + '</button>' : "")
+    + '<div class="ppltable">'
+    + (행들
+        ? '<table><thead><tr><th class="no">No.</th><th>인원</th><th>구분</th>'
+          + '<th class="ublue">이음근무 ' + esc(scopeSfx) + '</th><th class="uamber">법률상담 ' + esc(scopeSfx) + '</th><th class="uamber">잔여</th>'
+          + '<th class="ublue">이음강의</th><th class="ublue">잔여</th><th>연락처</th><th>비고</th></tr></thead>'
+          + '<tbody>' + 행들 + '</tbody></table>'
+        : '<div class="later"><p>이 범위에 이음센터 사람이 없습니다.</p></div>')
+    + '</div>';
+}
+
+/* ── 이음센터 · 외부 공유 뷰 — 이알피(IeumShareTab)와 «똑같은 꼴» ─────────
    외부 노무사·변호사에게 «제 근무일만» 보여 주는 개인 링크다.
-   ⚠ 링크를 «만드는» 것과 공개 일정을 «내보내는» 것은 아직 이알피에서 한다 —
-     그 둘은 외부에 무엇이 나가는지를 정하는 일이라, 한 자리에서만 하는 것이 옳다. */
+   ⚠ 링크를 «새로 만드는» 것과 공개 일정을 «내보내는» 것은 서버에 쓰는 일이라
+     아직 이알피에서 한다. 이미 있는 링크를 «복사»하는 것은 서버에 아무것도
+     안 쓰므로 여기서 바로 된다 — 이알피와 같은 동작이다. */
 function shareHtml(){
   var ext = arr(D.external_staff).filter(function(x){ return x && x.active !== false; });
-  var 있는것 = ext.filter(function(x){ return x.shareKey; });
-  var 없는것 = ext.filter(function(x){ return !x.shareKey; });
-  /* 주소를 짓는 자리 — 이알피와 «같은 규칙»이어야 한다.
-     ⚠ https 가 아니면(파일로 열었을 때 등) location.origin 이 「null」이라
-       nullxxx 같은 못 쓰는 주소가 나온다. 그때는 배포 주소로 물러선다.
-     ⚠ 이 주소는 «밖으로» 나간다 — 그럴듯한데 안 열리는 주소가 가장 나쁘다
-       (받은 사람은 우리가 아니라 제 폰을 탓한다). */
   var base = (location.protocol === "https:")
     ? location.origin + location.pathname.replace(/[^\/]*$/, "ieum-view.html")
     : IEUM_VIEW_BASE;
-  var 줄 = 있는것.map(function(x){
-    var url = base + "?k=" + encodeURIComponent(x.shareKey);
-    return "<tr><td><span class=\"dot2\" style=\"background:" + esc(x.color||"#d97706") + "\"></span>" + esc(x.name) + "</td>"
-      + "<td><span class=\"kindtag " + (String(x.role||"").indexOf("변호사")>=0 ? "law" : "ex") + "\">" + esc(x.role||"외부") + "</span></td>"
-      + "<td><div class=\"lnkrow\"><code title=\"" + esc(url) + "\">" + esc(url) + "</code>"
-      + "<button class=\"btn ghost\" data-copy=\"" + esc(url) + "\">복사</button>"
-      + "<button class=\"btn ghost\" data-open=\"" + esc(url) + "\">열기</button></div></td></tr>";
+  var 줄 = ext.map(function(x){
+    var url = x.shareKey ? (base + "?k=" + encodeURIComponent(x.shareKey)) : "";
+    return '<tr><td><span class="avatar sm" style="background:' + esc(x.color||"#2563eb") + '">' + esc(String(x.name||"?").charAt(0)) + '</span>' + esc(x.name) + '</td>'
+      + '<td class="muted">' + esc(x.role||"외부") + '</td>'
+      + '<td>' + (x.shareKey ? '<span class="issued">● 발급됨</span>' : '<span class="notissued">미발급</span>') + '</td>'
+      + '<td class="right">'
+      + (x.shareKey
+          ? ('<button class="btn ghost sm" data-copy="' + esc(url) + '">📋 링크 복사</button>'
+             + ' <button class="btn ghost sm" data-erp="dash/ieum">🔑 재발급</button>')
+          : '<button class="btn ghost sm" data-erp="dash/ieum">이알피에서 발급</button>')
+      + '</td></tr>';
   }).join("");
-  return "<div class=\"note\"><span>🔗 링크 만들기와 공개 일정 내보내기는 푸른이알피에서 합니다 — 여기서는 보고 복사합니다.</span>"
-    + "<span class=\"sp\"></span><button class=\"btn\" data-erp=\"dash/ieum\">이알피에서 하기</button></div>"
-    + "<div class=\"panel\">"
-    + (줄 ? "<table class=\"ppl\"><tr><th style=\"width:130px\">이름</th><th style=\"width:100px\">구분</th><th>개인 링크</th></tr>" + 줄 + "</table>"
-          : "<div class=\"later\"><p>아직 만들어진 개인 링크가 없습니다.</p></div>")
-    + (없는것.length
-        ? "<div class=\"note\" style=\"margin-top:11px\"><span>링크가 아직 없는 사람 " + 없는것.length + "명: "
-          + esc(없는것.map(function(x){ return x.name; }).join(" · ")) + "</span></div>"
-        : "")
-    + "</div>";
+  return '<div class="sharecard">'
+    + '<div class="sctitle">🔗 외부인용 읽기전용 일정 페이지</div>'
+    + '<div class="scdesc">외부 변호사·노무사에게 개인 고유 링크를 보내면 로그인 없이 본인 근무일정을 확인할 수 있습니다.<br>'
+    + '공개되는 정보는 이름·날짜·구분뿐이며, 연락처 등 개인정보는 포함되지 않습니다.<br>'
+    + '일정을 수정한 뒤에는 이알피의 [지금 발행] 버튼으로 공개 일정을 갱신하세요.</div>'
+    + '<button class="btn" data-erp="dash/ieum">📤 이알피에서 발행하기</button>'
+    + '</div>'
+    + '<div class="sharecard">'
+    + '<div class="sctitle sm">개인 링크 목록</div>'
+    + (줄 ? '<table class="linktable"><thead><tr><th>이름</th><th>구분</th><th>링크 상태</th><th></th></tr></thead><tbody>' + 줄 + '</tbody></table>'
+          : '<div class="later"><p>등록된 외부 인원이 없습니다.</p></div>')
+    + '</div>'
+    + '<div class="sharefoot">※ 근무 문자 발송 시 개인 링크가 자동으로 첨부됩니다 (링크 발급된 인원만)</div>';
 }
-
 /* ── 넣고 고치기 ──────────────────────────────────────────────────────
    ⚠ 저장은 반드시 js/pu-cal-write.js 의 관문을 지난다. 여기서 질러가지 말 것 —
      마감된 달 · 번호 없는 항목 · 아직 배열인 표가 그 문에서만 걸린다. */
@@ -965,7 +1102,7 @@ function render(){
 
 /* 누르는 것은 한 자리에서 받는다 — 단추마다 붙이면 다시 그릴 때 하나씩 샌다 */
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -991,6 +1128,12 @@ document.addEventListener('click', function(e){
   }
   if(t.hasAttribute('data-scope')){ S.scope = t.getAttribute('data-scope'); render(); return; }
   if(t.hasAttribute('data-left')){ S.showLeft = !S.showLeft; render(); return; }
+  /* 인원 현황 — 행을 누르면 그 사람의 월별 상세를 편다. 연락처·비고 칸 클릭은 걸러 준다 */
+  if(t.hasAttribute('data-toggle')){
+    var pk = t.getAttribute('data-toggle');
+    var n2 = Object.assign({}, S.openRows); n2[pk] = !n2[pk]; S.openRows = n2;
+    render(); return;
+  }
   if(t.hasAttribute('data-copy')){ copyLink(t.getAttribute('data-copy')); return; }
   if(t.hasAttribute('data-open')){ window.open(t.getAttribute('data-open'), '_blank', 'noopener'); return; }
   if(t.hasAttribute('data-f')){ modalRead(); var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
