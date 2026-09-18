@@ -47,9 +47,19 @@ function load(over){
       names: items.map(x => x.company) }); return Promise.resolve(1); },
     coList: () => (over && over.list) || [] }, (over && over.ctx) || {});
   vm.createContext(ctx);
+  /* 이 PC 저장소 대역 — 고친 글자 짝을 적어 두는 자리다(진짜 브라우저 것이 아니다) */
+  const bag = Object.assign({}, (over && over.기억) || {});
+  ctx.localStorage = { getItem: k => (k in bag ? bag[k] : null),
+                       setItem: (k, v) => { bag[k] = String(v); } };
+  ctx._bag = bag;
   vm.runInContext([
     (SRC.match(/^const _norm = [^\n]*$/m) || [])[0],
+    (SRC.match(/^const CO_NAMEFIX_LS = [^\n]*$/m) || [])[0].replace('const ', 'var '),
+    cutFn(SRC, 'function coNameFixLoad('), cutFn(SRC, 'function coNameFixSave('),
+    cutFn(SRC, 'function coNameFixPairs('), cutFn(SRC, 'function coNameFixRemember('),
+    cutFn(SRC, 'function coNameFixSuggest('), cutFn(SRC, 'function coNameFixTake('),
     cutFn(SRC, 'function coNameCards('), cutFn(SRC, 'function coNameDocs('),
+    cutFn(SRC, 'function coNameOff1('),
     cutFn(SRC, 'function coNameFixHtml('), cutFn(SRC, 'function coAskName('),
     'async ' + cutFn(SRC, 'function coNameFixDo(')
   ].join('\n'), ctx);
@@ -202,6 +212,133 @@ test('★★★ 기업 상세 이름 옆에 ✏ 가 선다 — 틀린 것을 보
   /* ⚠ 이름 «자체»를 누르게 하지 않는다 — 길어서 읽다가 잘못 눌린다 */
   assert.ok(!/class="pdname" onclick/.test(panel),
     '★★ 이름 전체가 단추가 되면 읽다가 고치기 창이 열린다');
+});
+
+/* ══ 고친 «글자 짝»을 기억한다 — 제안만 한다 (대표 지시 2026-09-18) ═══════════
+   「다른 사업장도 이렇게 잘못 읽혀질때 … 어떻게 자동으로 정리시켜야 할까?」
+   ⚠⚠ 자동으로는 안 된다 — 국세청 조회는 상호를 안 주고, 기계는 어느 쪽이 맞는지
+     알 길이 없다. 할 수 있는 것은 «사람이 한 번 고친 것을 기억해 두었다가 묻는 것»뿐이다. */
+
+test('★★★ 대표가 실제로 하신 고침에서 「총 → 충」을 뽑아낸다', () => {
+  const c = load();
+  /* ⚠ 띄어쓰기가 늘어난 고침이다 — 공백까지 글자로 세면 아무 짝도 안 뽑힌다 */
+  assert.deepEqual(Array.from(c.coNameFixPairs('농업회사법인주식회사총서',
+                                               '농업회사법인 주식회사 충서')).map(p => p.join('→')),
+    ['총→충'], '★★★ 바로 이 고침을 못 외우면 기억할 것이 아무것도 없다');
+});
+
+test('★★★ 서너 글자가 한꺼번에 바뀌면 «안 외운다» — 오독이 아니라 다른 이름이다', () => {
+  const c = load();
+  assert.equal(Array.from(c.coNameFixPairs('가나상사', '다라무역')).length, 0);
+  assert.equal(Array.from(c.coNameFixPairs('총서', '충서산업')).length, 0,
+    '★★★ 길이가 달라지면 「한 글자 오독」이 아니라 이름을 새로 적으신 것이다');
+  assert.equal(Array.from(c.coNameFixPairs('가나', '가나상사')).length, 0, '★★ 길이가 다르면 안 본다');
+  assert.equal(Array.from(c.coNameFixPairs('가나상사', '가나상사')).length, 0, '★ 안 바뀐 것은 없다');
+});
+
+test('★★★ 고친 뒤에 외운다 — 못 썼는데 외우면 «일어나지도 않은» 고침을 제안한다', async () => {
+  const c = load({ list:[회사()], input:'농업회사법인 주식회사 충서' });
+  await c.coNameFixDo('b5878601913');
+  assert.deepEqual(Array.from(c.coNameFixLoad()).map(p => p.join('→')), ['총→충']);
+  /* 못 썼을 때는 안 외운다 */
+  const d = load({ list:[회사()], input:'농업회사법인 주식회사 충서', 예스:false });
+  await d.coNameFixDo('b5878601913');
+  assert.equal(Array.from(d.coNameFixLoad()).length, 0,
+    '★★★ 「아니오」를 누르셨는데 외워 두면 다음에 엉뚱한 제안이 뜬다');
+});
+
+test('★★ 같은 짝은 «한 번만» 쌓인다 — 고칠 때마다 쌓으면 목록이 부풀어 잘린다', () => {
+  const c = load();
+  c.coNameFixRemember('총서', '충서');
+  c.coNameFixRemember('총서산업', '충서산업');   /* 같은 「총→충」이다 */
+  c.coNameFixRemember('가서', '거서');
+  assert.deepEqual(Array.from(c.coNameFixLoad()).map(p => p.join('→')), ['총→충','가→거'],
+    '★★ 200개를 넘으면 앞엣것부터 잘린다 — 겹쳐 쌓으면 진짜 기억이 밀려 나간다');
+});
+
+test('★★★ 다음에 같은 글자가 보이면 «후보»를 만들어 보여준다', () => {
+  const c = load({ 기억: { pucards_namefix: JSON.stringify([['총','충']]) } });
+  const got = Array.from(c.coNameFixSuggest('총서산업'));
+  assert.equal(got.length, 1);
+  assert.equal(got[0].text, '충서산업');
+  assert.equal(got[0].from + '→' + got[0].to, '총→충', '★★ 무엇을 바꾸는지 안 보이면 못 믿는다');
+});
+
+test('★★★ 저절로 바뀌지 «않는다» — 「총무부」가 「충무부」가 되면 안 된다', () => {
+  const o = 회사({ name:'총무산업' });
+  const c = load({ list:[o], 기억: { pucards_namefix: JSON.stringify([['총','충']]) } });
+  const h = c.coNameFixHtml(o);
+  /* 제안은 뜨되, 적을 칸에는 «지금 이름»이 그대로 있어야 한다 */
+  assert.match(h, /conamesug/, '★★ 제안이 아예 없으면 기억한 값어치가 없다');
+  assert.match(h, /value="총무산업"/,
+    '★★★ 제안이 칸을 미리 바꿔 두면, 그대로 누르는 순간 「충무산업」이 된다');
+  assert.match(h, /coNameFixTake\(/, '★★ 후보를 칸에 채워 넣을 길이 없다');
+  assert.match(h, /총→충/,
+    '★★★ 무엇을 바꾸자는 것인지 «화면에» 안 보이면, 「총무부」가 「충무부」가 되는 제안을 걸러낼 수가 없다');
+});
+
+test('★★ 적어 둔 것이 없으면 제안 자리가 «아예 없다»', () => {
+  const o = 회사();
+  const c = load({ list:[o] });
+  assert.ok(c.coNameFixHtml(o).indexOf('conamesug') < 0, '★★ 빈 띠가 줄을 먹는다');
+});
+
+test('★★★ 후보를 누르면 «칸에 채워만» 둔다 — 여기서 저장하지 않는다', async () => {
+  /* ⚠ 저장으로 새는지 보려면 «저장이 될 수 있는 판»을 깔아 둬야 한다 —
+     회사도 고를 서류도 없으면 무엇을 해도 안 써져서, 검사가 아무것도 못 본다. */
+  const box = { value:'총서산업', focus(){} };
+  const o = 회사({ name:'총서산업', bizs:[등록증('d1','총서산업')], cards:[] });
+  const c = load({ list:[o], ctx: { $: () => box, state: { coPick:'b5878601913' } } });
+  c.coNameFixTake('충서산업');
+  await new Promise(r => setImmediate(r));
+  assert.equal(box.value, '충서산업');
+  assert.equal(c._calls.put.length, 0,
+    '★★★ 누르자마자 저장되면 「확인하고 누르셔야 바뀝니다」가 거짓말이 된다');
+  assert.equal(c._calls.asked, 0, '★★ 묻지도 않고 지나갔다');
+});
+
+/* ══ 🔗 합치기가 «한 글자 다른» 줄도 찾아낸다 (대표 지시 2026-09-18) ═══════════
+   잘못 읽힌 이름은 한 회사를 «두 줄»로 갈라놓는다. 그런데 글자가 안 들어맞으니
+   합칠 상대를 찾아도 안 나왔다 — 합칠 길이 통째로 막혀 있었다. */
+
+test('★★★ 「충서」로 찾으면 「총서」 줄이 «나온다»', () => {
+  const ctx = { console, Object, Array, String, Number };
+  vm.createContext(ctx);
+  ctx.coList = () => [ { key:'a', name:'총서산업', bizno:'1' },
+                       { key:'b', name:'가나상사', bizno:'2' },
+                       { key:'me', name:'충서산업', bizno:'3' } ];
+  ctx._coInfo = {};
+  vm.runInContext([cutFn(SRC, 'function coMergedKeys('), cutFn(SRC, 'function coNameOff1('),
+                   cutFn(SRC, 'function coMergeFinds(')].join('\n'), ctx);
+  assert.deepEqual(Array.from(ctx.coMergeFinds('me', '충서산업')).map(o => o.key), ['a'],
+    '★★★ 글자가 안 들어맞으면 합칠 길이 통째로 막힌다');
+});
+
+test('★★ 글자가 그대로 들어맞는 줄이 «언제나 먼저»다', () => {
+  const ctx = { console, Object, Array, String, Number };
+  vm.createContext(ctx);
+  ctx.coList = () => [ { key:'off', name:'총서산업', bizno:'1' },
+                       { key:'hit', name:'충서산업 아산점', bizno:'2' },
+                       { key:'me', name:'충서산업', bizno:'3' } ];
+  ctx._coInfo = {};
+  vm.runInContext([cutFn(SRC, 'function coMergedKeys('), cutFn(SRC, 'function coNameOff1('),
+                   cutFn(SRC, 'function coMergeFinds(')].join('\n'), ctx);
+  assert.deepEqual(Array.from(ctx.coMergeFinds('me', '충서산업')).map(o => o.key), ['hit','off'],
+    '★★ 짐작한 것이 앞에 서면, 확실한 것을 못 보고 지나친다');
+});
+
+test('★★★ 두 글자 이상 다르면 «안» 본다 — 「천성」과 「천성전자」는 다른 곳이다', () => {
+  const c = load();
+  assert.equal(c.coNameOff1('총서', '충서'), true);
+  assert.equal(c.coNameOff1('총서산업', '충서상업'), false,
+    '★★★ 두 글자가 다르면 오독이 아니라 다른 회사다 — 합치면 남의 서류가 딸려 간다');
+  assert.equal(c.coNameOff1('가나상사', '다라무역'), false);
+  assert.equal(c.coNameOff1('총서', '충서산업'), false,
+    '★★★ 길이가 다르면 안 본다 — 「가나」와 「가나상사」가 한 곳으로 합쳐진다');
+  assert.equal(c.coNameOff1('가나', '가나상사'), false, '★★ 길이가 다르면 안 본다');
+  assert.equal(c.coNameOff1('가나', '가나'), false, '★ 같은 것은 합칠 상대가 아니다');
+  assert.equal(c.coNameOff1('가', '나'), false, '★★ 한 글자짜리는 다 한 글자 차이다 — 안 본다');
+  assert.equal(c.coNameOff1('충서 산업', '총서산업'), true, '★★ 띄어쓰기는 글자로 안 센다');
 });
 
 test('★★ 고친 뒤 목록을 «다시 짓는다» — 안 그러면 옛 이름이 화면에 남는다', () => {
