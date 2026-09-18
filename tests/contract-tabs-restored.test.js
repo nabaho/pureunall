@@ -27,15 +27,20 @@ const ROOT = path.join(__dirname, '..');
 const RAW = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
 const MODAL = stripJs(cutFn(RAW, 'function ContractModal('));
 
-test('①★ 창 너비는 고정 620px — 화면 폭을 따라 넓어지지 않는다', () => {
-  assert.match(MODAL, /h\('div', \{ className:'modal', style:\{ width:'620px' \}/,
-    '창 너비가 조건부(WIDE)로 바뀌면 안 된다');
+test('①★ 창 너비는 «고정»이다 — 화면 폭을 따라 넓어지지 않는다', () => {
+  /* ⚠ 620 이라는 «값»을 박지 않는다. 2026-09-18 에 네 칸으로 바뀌며 1080 이 됐고
+     그때 이 검사가 «기능이 멀쩡한데» 깨졌다. 못 박을 것은 「한 값으로 고정이고
+     화면 폭(WIDE)을 따라 갈라지지 않는다」는 규칙뿐이다. */
+  const m = /className:'modal', style:\{ width:([^}]+)\}/.exec(MODAL);
+  assert.ok(m, '계약창 너비를 못 찾았다');
+  assert.match(m[1], /^\s*'\d+px'\s*,?\s*$/,
+    '★ 창 너비가 «한 값으로 고정»이 아니다 — 화면 폭에 따라 갈라지면 안 된다: ' + m[1]);
 });
 
 test('②★ 탭 바는 조건 없이 «늘» 그린다', () => {
   /* ⚠ stripJs 가 「// 탭 헤더」 같은 줄 주석을 걷어 내므로, 주석이 아니라
        코드 자체(tabBtn 호출 앞자리)로 찾는다. */
-  const at = MODAL.indexOf("tabBtn('company',  '기업정보',   '🏢')");
+  const at = MODAL.search(/tabBtn\('company',/);
   assert.ok(at > 0, '탭 바(tabBtn 호출)를 못 찾았다');
   const band = MODAL.slice(Math.max(0, at - 220), at + 250);
   assert.match(band, /h\('div', \{ style:\{ display:'flex', borderBottom/,
@@ -48,8 +53,11 @@ test('②★ 탭 바는 조건 없이 «늘» 그린다', () => {
   const before = band.slice(0, divAt).replace(/\s+/g, '');
   assert.ok(!/&&$/.test(before),
     '탭 바 h(...) 바로 앞이 «&&» 로 끝난다 — 이름이 무엇이든 조건부로 가려져 있다');
-  ['기업정보', '계약정보', '담당자정보', '일지'].forEach(t =>
-    assert.ok(band.indexOf(t) > 0, '「' + t + '」 탭이 없다'));
+  /* ⚠ 탭 «개수»나 이름 전문을 박지 않는다 — 2026-09-18 에 일지가 담당자와 합쳐져
+     넷에서 셋이 됐다. 못 박을 것은 「세 갈래가 다 갈 길이 있다」는 규칙이다.
+     (일지를 어디서 보는지는 tests/contract-4col-order.test.js 가 따로 본다) */
+  ['company', 'contract', 'manager'].forEach(v =>
+    assert.ok(band.indexOf("tabBtn('" + v + "'") > 0, '「' + v + '」 탭으로 갈 길이 없다'));
 });
 
 test('③★ 본문은 PANES[tab] 하나만 — 기둥으로 나란히 펴지 않는다', () => {
