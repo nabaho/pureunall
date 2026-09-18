@@ -825,6 +825,11 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .dm-who:hover{background:#eff6ff}
 .dm-who.na{color:#854d0e;background:#f8fafc;border-color:#fde68a}
 .dm-who.na:hover{background:#fde68a}
+/* ── 📤 「미루어 본 것」 딱지 (대표 지시 2026-09-16) ──
+   ⚠ 확실한 것(파랑 테두리)과 «달라 보여야» 한다 — 같으면 짐작이 사실로 읽힌다.
+     테두리를 점선으로 두고 「업체」라고 적어 어떻게 알았는지를 밝힌다. */
+.dm-who.guess{border-style:dashed;color:#1e40af}
+.dm-who.guess i{font-style:normal;color:#64748b;font-size:10px}
 /* ── 「누가 봤나」 딱지 (대표 지시 2026-08-29) ──
    ⚠ 담당자 딱지(파랑)와 «다른 색»이어야 한다 — 같은 색이면 「담당자가 둘」로 읽힌다.
      열어봄은 조용한 회색, 처리함은 초록(끝났다는 뜻). */
@@ -1112,6 +1117,28 @@ table.mstab2 tr:last-child td{border-bottom:none}
   background:#fff;color:#991b1b;border-radius:6px;cursor:pointer}
 .dm-spam button:hover{background:#fef2f2}
 .dm-row.spam{background:#f8fafc}
+/* ── 📤 보낸 메일을 사람마다 갈라 보는 칩 줄 (대표 지시 2026-09-16) ── */
+.dm-sentwho{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 12px;
+  background:#f8fafc;border-top:1px solid #cbd5e1;border-bottom:1px solid #e2e8f0}
+.dm-sentwho .lab{font-size:12px;color:#64748b;margin-right:2px;cursor:help}
+.mbw-chip{border:1px solid #cbd5e1;background:#fff;border-radius:14px;padding:2px 10px;
+  font-size:12.5px;color:#475569;cursor:pointer;white-space:nowrap}
+.mbw-chip:hover{background:#eff6ff;border-color:#bfdbfe}
+.mbw-chip .n{color:#94a3b8;font-size:11.5px;margin-left:4px}
+.mbw-chip.on{background:#1e40af;border-color:#1e40af;color:#fff;font-weight:700}
+.mbw-chip.on .n{color:#bfdbfe}
+.mbw-chip.na{border-style:dashed;color:#854d0e;background:#f8fafc;border-color:#fde68a}
+.mbw-chip.na.on{background:#854d0e;border-color:#854d0e;color:#fff}
+.dm-sentgap{padding:8px 12px;background:#fff;border-bottom:1px solid #e2e8f0;font-size:12.5px}
+.dm-sentgap .hd{color:#475569;margin-bottom:6px}
+.dm-sentgap .r{display:flex;align-items:center;gap:10px;padding:3px 0;
+  border-top:1px solid #f8fafc;white-space:nowrap;overflow:hidden}
+.dm-sentgap .r .d{flex:none;min-width:150px;color:#1e293b}
+.dm-sentgap .r .n{flex:none;color:#64748b;font-size:11.5px}
+.dm-sentgap .r .w{flex:1;color:#64748b;font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
+.dm-sentgap .ft{margin-top:7px}
+.dm-sentgap .ft button{font:inherit;font-size:12px;padding:3px 10px;border:1px solid #1e40af;
+  background:#1e40af;color:#fff;border-radius:6px;cursor:pointer}
 .dm-row.spam .who,.dm-row.spam .sub,.dm-row.spam .pre{color:#94a3b8}
 .dm-why{flex:none;font-size:11px;color:#991b1b;background:#fff;border:1px solid #fecaca;
   border-radius:6px;padding:1px 7px;white-space:nowrap}
@@ -16481,6 +16508,8 @@ function mbDomOf(email){
    ⚠ 「스팸 아님」으로 되돌린 주소는 «다시는 안 걸린다». 되돌릴 길이 없는 거르기는
      아무도 못 믿는다(숨긴 칸의 👁 와 같은 까닭). */
 const MB_SENT_KINDS = { sent:1, drafts:1, tome:1, sched:1 };
+/* 📤 보낸 칸에서 「누가 보냈나」를 못 짚은 것들 — 사람 이름과 안 겹치는 열쇠로 둔다 */
+const MB_SENT_NA = '*na';
 let _mbNotSpam = null;    /* {주소열쇠: 1} — 「스팸 아님」으로 되돌린 주소. 전 직원 공용 */
 let _mbSpamOff = null;    /* true 면 거르기를 껐다. 안 적혀 있으면 «켠 것»이다 */
 
@@ -16704,7 +16733,8 @@ function mbWhoIndex(){
 }
 /* ⚠ 그리는 동안의 셈도 함께 버린다 — 오래 사는 것만 지우면 «이번 그리기»는 옛 표를
      그대로 쓴다(담당자를 바꿨는데 화면이 안 바뀐다). */
-function mbWhoBust(){ _mbWhoIdx = null; const m0 = mbMemoOf(); delete m0.tally; }
+function mbWhoBust(){ _mbWhoIdx = null; const m0 = mbMemoOf();
+  delete m0.tally; delete m0.sentTally; delete m0.sentTallyFor; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    자문이 끝난 업체 — 따로 모은다 (대표 지시 2026-08-26)
@@ -16917,9 +16947,12 @@ function mbCkCount(){
 }
 
 /* ══ 점검 창 열고 닫기 ══ */
-function mbCheckOpen(){
+/* ⚠ tab — 어느 갈래로 열지 부르는 쪽이 정할 수 있다(보낸 칸의 「모름」에서 건너온다).
+     안 주면 보던 갈래 그대로다. */
+function mbCheckOpen(tab){
   mbCheckAll();                      /* 열 때만 센다 */
   state.mbCkOpen = true;
+  if(tab) state.mbCkTab = String(tab);
   if(!state.mbCkTab) state.mbCkTab = 'mix';
   renderMailPage();
 }
@@ -17472,28 +17505,29 @@ function mbNotCo(em){
   return !!(d && set[mbWhoKey('@' + d)]);
 }
 
-/* ── 이 메일의 담당자 ── (아래 순서를 여기 한 자리에서만 따진다) */
-function mbWhoOfRow(v, idx0){
-  const em = String((v&&v.e)||'').trim().toLowerCase();
-  if(!em) return '';
+/* ⚠ 퇴사자로 나오면 «이어받은 사람»에게 넘긴다(대표 지시 2026-08-26).
+     승계표에 한 줄이 있으면 그 사람 칸으로 저절로 간다.
+     없으면 「모름」으로 돌린다 — 퇴사자 칸을 안 만들면서 이름만 두면 그 메일이
+     어느 칸에도 안 들어가 화면에서 통째로 사라진다. */
+function mbWhoLive(w){
+  if(!w) return '';
+  if(!mbRetired(w)) return String(w);
+  return mbSuccOf(w) || '';
+}
+
+/* ── 주소 하나의 담당자 ── (아래 순서를 여기 한 자리에서만 따진다)
+   ⚠★ 받은 메일은 «보낸이» 주소로, 보낸 메일은 «받는이» 주소로 이 잣대를 함께 쓴다
+     (대표 지시 2026-09-16 「각자 사람마다 보낸것에 대해서 별도로 관리할 수 있을까」).
+     두 벌로 만들면 같은 주소가 받은 칸과 보낸 칸에서 «다른 사람»에게 잡힌다.
+   ⚠ «어떻게 알았는지»(why)를 함께 돌려준다 — 짐작인 것을 짐작이라고 적어야 한다.
+       hand = 사람이 정했다(확실) · co = 자문사에 이어 둔 회사 · card = 기업정보함 */
+function mbWhoWhy(em0, idx0){
+  const em = String(em0||'').trim().toLowerCase();
+  const none = { who:'', why:'' };
+  if(!em) return none;
   const set = _mbOwner || {};
-  /* ⚠ 퇴사자로 나오면 «이어받은 사람»에게 넘긴다(대표 지시 2026-08-26).
-       승계표에 한 줄이 있으면 그 사람 칸으로 저절로 간다.
-       없으면 「모름」으로 돌린다 — 퇴사자 칸을 안 만들면서 이름만 두면 그 메일이
-       어느 칸에도 안 들어가 화면에서 통째로 사라진다. */
-  const live = (w)=>{
-    if(!w) return '';
-    if(!mbRetired(w)) return String(w);
-    return mbSuccOf(w) || '';
-  };
-  /* ①-0 이 «메일 한 통»에 박은 것 — 가장 세다 (대표 지시 2026-08-29 「담당자 보내기」).
-     ⚠ 주소 규칙보다 «앞»이어야 한다. 한 통만 다르게 두려고 박는 것이라, 주소 규칙이
-       덮으면 그 단추가 아무 뜻이 없어진다.
-     ⚠ _key 가 없는 자리에서도 부른다(딱지·귀띔) — 없으면 그냥 건너뛴다. */
-  const byMsg = live((v && v._key) ? ((_mbWhoMsg||{})[mbWhoKey(v._key)] || '') : '');
-  if(byMsg) return byMsg;
-  const byHand = live(set[mbWhoKey(em)]);
-  if(byHand) return byHand;                               /* ① 사람이 정한 주소 */
+  const byHand = mbWhoLive(set[mbWhoKey(em)]);
+  if(byHand) return { who:byHand, why:'hand' };           /* ① 사람이 정한 주소 */
   /* ①-2 «자문사»에 이어 둔 주소 — 담당자는 그 회사에서 따라온다 (2026-08-29).
      ⚠ ① 보다 뒤다: 사람이 «이 사람»이라고 못 박은 것이 회사보다 세다.
      ⚠ ② 기업정보함보다 앞이다: 여기 이은 것은 «사람이 직접 고른» 회사이고,
@@ -17501,20 +17535,183 @@ function mbWhoOfRow(v, idx0){
      ⚠ 끝난 회사면 담당자를 안 준다 — 자문종료 칸이 가져간다(mbEndedOfRow). */
   const coRec = mbCoRec(mbCoOf(em));
   if(coRec && !coRec.left){
-    const c1 = live(coRec.main);
-    if(c1) return c1;
+    const c1 = mbWhoLive(coRec.main);
+    if(c1) return { who:c1, why:'co' };
   }
   const idx = idx0 || mbWhoIndex();
-  const a1 = live(idx.byAddr[em]);
-  if(a1) return a1;                                       /* ② 기업정보함 주소 */
+  const a1 = mbWhoLive(idx.byAddr[em]);
+  if(a1) return { who:a1, why:'card' };                   /* ② 기업정보함 주소 */
   const d = mbDomOf(em);
   if(d){
-    const h2 = live(set[mbWhoKey('@' + d)]);
-    if(h2) return h2;                                     /* ③ 사람이 정한 도메인 */
-    const a2 = live(idx.byDom[d]);
-    if(a2) return a2;                                     /* ④ 기업정보함 도메인 */
+    const h2 = mbWhoLive(set[mbWhoKey('@' + d)]);
+    if(h2) return { who:h2, why:'hand' };                 /* ③ 사람이 정한 도메인 */
+    const a2 = mbWhoLive(idx.byDom[d]);
+    if(a2) return { who:a2, why:'card' };                 /* ④ 기업정보함 도메인 */
   }
-  return '';                                              /* ⑤ 담당 모름 */
+  return none;                                            /* ⑤ 담당 모름 */
+}
+
+/* ── 이 메일의 담당자 ── 받은 메일은 «보낸이» 주소로 본다 */
+function mbWhoOfRow(v, idx0){
+  const em = String((v&&v.e)||'').trim().toLowerCase();
+  if(!em) return '';
+  /* ①-0 이 «메일 한 통»에 박은 것 — 가장 세다 (대표 지시 2026-08-29 「담당자 보내기」).
+     ⚠ 주소 규칙보다 «앞»이어야 한다. 한 통만 다르게 두려고 박는 것이라, 주소 규칙이
+       덮으면 그 단추가 아무 뜻이 없어진다.
+     ⚠ _key 가 없는 자리에서도 부른다(딱지·귀띔) — 없으면 그냥 건너뛴다. */
+  const byMsg = mbWhoLive((v && v._key) ? ((_mbWhoMsg||{})[mbWhoKey(v._key)] || '') : '');
+  if(byMsg) return byMsg;
+  return mbWhoWhy(em, idx0).who;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   📤 보낸 메일을 «사람마다» 갈라 본다 (대표 지시 2026-09-16 · 목업 승인 2026-09-18)
+   ══════════════════════════════════════════════════════════════════════════
+   「각자 사람마다 보낸것에 대해서 별도로 관리할 수 있을까?」
+
+   ★ 왜 짐작할 수밖에 없나 — 보낸메일함은 다음메일의 «거울»이고, 거기 보낸이는
+     우리 주소 «하나»다. 글자만으로는 누가 눌렀는지 가를 길이 없다.
+   ★ 실측 2026-09-16 (손에 든 보낸 메일 903통)
+       · 받는 업체의 담당자로 짚이는 것   399통 (44%)
+       · 서명으로 짚이는 것                54통 (6%)  ← 안 쓴다
+       · 아무 근거도 없는 것              450통
+   ⚠★ 서명은 «안 쓴다». 미리보기가 140자에서 잘려 거의 안 들어오고, 걸린 것도
+     인용문 속 남의 서명일 수 있다 — «틀린 이름을 붙이는 것이 모르는 것보다 나쁘다».
+   ⚠ 잣대를 새로 만들지 않는다 — 받은 메일과 «같은» mbWhoWhy 를 받는이 주소에 쓴다.
+     두 벌이면 같은 주소가 받은 칸과 보낸 칸에서 다른 사람에게 잡힌다. */
+
+/* 받는이 «첫» 주소 — 여럿에게 보낸 것은 맨 앞 한 사람으로 본다.
+   ⚠ 여럿을 다 세지 않는다. 한 통이 세 사람 칸에 겹치면 「몇 통 보냈나」를 알 수 없다. */
+function mbSentTo(v){
+  const t = String((v && v.t) || '');
+  const m = t.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/);
+  return m ? m[0].toLowerCase() : '';
+}
+
+/* 이 칸이 «보낸메일함»인가 — 초안·예약은 아직 안 나간 것이라 뺀다 */
+function mbSentBox(id){
+  const f = mbFolderBy(id === undefined ? mbNow() : id);
+  return !!(f && f.kind === 'sent');
+}
+
+/* 이 보낸 메일은 «누가» 보냈나 — {who, why}. why 는 hand(확실) · co(짐작) · ''(모름) */
+function mbSentWho(v, idx0){
+  const none = { who:'', why:'' };
+  if(!v) return none;
+  /* 이 한 통에 사람이 박아 둔 것이 가장 세다 — 받은 메일과 같은 규칙이다 */
+  const byMsg = mbWhoLive(v._key ? ((_mbWhoMsg||{})[mbWhoKey(v._key)] || '') : '');
+  if(byMsg) return { who:byMsg, why:'hand' };
+  const em = mbSentTo(v);
+  if(!em) return none;
+  const r = mbWhoWhy(em, idx0);
+  if(!r.who) return none;
+  /* 기업정보함·자문사에서 따라온 것은 모두 «짐작»이다 — 사람이 정한 것만 확실하다 */
+  return { who:r.who, why: r.why === 'hand' ? 'hand' : 'co' };
+}
+
+/* 보낸 칸의 사람별 셈 — 그리는 «동안»만 산다(mbMemoOf).
+   ⚠ 담아 두지 않으면 칩을 누를 때마다 903통 × 업체 376곳이 새로 돈다. */
+function mbSentTally(){
+  const m = mbMemoOf();
+  const slug = String(mbNow());
+  if(m.sentTally && m.sentTallyFor === slug) return m.sentTally;
+  const cnt = {}, un = {}, gap = {};
+  let n = 0, none = 0, noneUn = 0;
+  const idx = mbWhoIndex();                    /* 표는 «여기서 한 번»만 찾는다 */
+  const v = { t:'', _key:'' };                 /* 돌려 쓰는 한 개 — 줄마다 만들면 만 개다 */
+  const box = (_mbMsgs || {})[slug] || {};
+  Object.keys(box).forEach(uid=>{
+    const row = box[uid]; if(!row) return;
+    v.t = row.t; v._key = slug + ':' + uid;
+    n++;
+    const unread = !Number(row.r || 0);
+    const w = mbSentWho(v, idx).who;
+    if(w){ cnt[w] = (cnt[w]||0) + 1; if(unread) un[w] = (un[w]||0) + 1; return; }
+    none++; if(unread) noneUn++;
+    /* 「모름」을 어떻게 줄이나 — 많이 보낸 도메인부터 보여 준다.
+       한 줄을 채우면 수십 통이 함께 붙는다. */
+    const d = mbDomOf(mbSentTo(v));
+    if(d) gap[d] = (gap[d]||0) + 1;
+  });
+  return (m.sentTallyFor = slug, m.sentTally = { cnt:cnt, un:un, n:n, none:none, noneUn:noneUn, gap:gap });
+}
+
+/* 칩 줄에 세울 사람들 — 통수 많은 순.
+   ⚠ 받은 메일 담당자 칸(mbWhoList)과 달리 «한 통도 없는 사람은 안 세운다».
+     거기는 늘 같은 자리에 있어야 손이 가는 «일하는 칸»이고, 여기는 «갈라 보는 거르개»다.
+     보낸 것이 없는 사람 칩을 눌러 빈 화면을 보는 것은 고장으로 읽힌다. */
+function mbSentWhoList(){
+  const t = mbSentTally();
+  return Object.keys(t.cnt)
+    .filter(w=>!mbRetired(w) && mbPerson(w) === w)
+    .map(w=>({ name:w, n:t.cnt[w]||0, un:t.un[w]||0 }))
+    .sort((a,b)=> (b.n - a.n) || a.name.localeCompare(b.name,'ko'));
+}
+
+/* 「모름」이 많은 도메인 — 왜 모르는지까지 함께 */
+const MB_SENT_GAP_MAX = 8;
+function mbSentGapList(){
+  const t = mbSentTally();
+  return Object.keys(t.gap)
+    .map(d=>{
+      /* 왜 모르는지에 따라 «할 일»이 다르다 — 무료메일은 주소를 하나씩 이어야 한다 */
+      const pub = MB_PUB_DOM.indexOf(d) >= 0;
+      return { dom:d, n:t.gap[d], pub:pub,
+               why: pub ? '무료메일이라 도메인으로는 못 짚습니다 — 주소를 하나씩 이어야 합니다'
+                        : '기업정보함에 이 도메인으로 이어진 업체가 없습니다' };
+    })
+    .sort((a,b)=> b.n - a.n)
+    .slice(0, MB_SENT_GAP_MAX);
+}
+
+/* 칩을 누른다 — 같은 것을 또 누르면 끈다 */
+function mbSentPick(name){
+  const w = String(name||'');
+  state.mbSentWho = (state.mbSentWho === w) ? '' : w;
+  state.mbPage = 1;
+  renderMailPage();
+}
+
+/* 칩 줄 — 보낸 칸에서만.
+   ⚠ 0명이면 줄 자체가 없다(스팸 줄·「🔎 점검」 칩과 같은 규칙) — 떴을 때 뜻이 확실해진다.
+   ⚠ 「모름」은 «점선»으로 둔다. 사람 칩과 같은 모양이면 「모름」이라는 사람이 있는 줄 안다. */
+function mbSentWhoLineHtml(){
+  if(!mbSentBox()) return '';
+  const t = mbSentTally();
+  /* ⚠★ 「한 사람도 못 짚었으면 줄을 없앤다」로 두었다가 도로 고쳤다 —
+       아무도 안 짚이는 때가 바로 이 줄이 «가장 필요한» 때다. 그때 사라지면
+       기업정보함이 비어 있다는 것을 알려 줄 자리가 통째로 없어진다.
+     ⚠ 보낸 메일이 아예 0통일 때만 없앤다 — 셀 것이 없으면 말할 것도 없다. */
+  if(!t.n) return '';
+  const list = mbSentWhoList();
+  const cur = String(state.mbSentWho||'');
+  const chip = (key, label, n, cls)=>
+    `<span class="mbw-chip ${cur===key?'on':''} ${cls||''}"
+       onclick="mbSentPick('${esc(key)}')">${esc(label)}<span class="n">${n.toLocaleString()}</span></span>`;
+  const gap = (cur === MB_SENT_NA) ? mbSentGapHtml() : '';
+  return `<div class="dm-sentwho">
+    <span class="lab" title="보낸이는 우리 주소 하나뿐이라 «받는 업체의 담당자»로 미루어 봅니다 — 짐작입니다">📤 누가 보냈나</span>
+    ${chip('', '전체', t.n)}
+    ${list.map(w=>chip(w.name, w.name, w.n)).join('')}
+    ${t.none ? chip(MB_SENT_NA, '모름', t.none, 'na') : ''}
+    </div>${gap}`;
+}
+
+/* 「모름」을 어떻게 줄이나 — 많이 보낸 도메인부터. 한 줄을 채우면 수십 통이 함께 붙는다.
+   ⚠ 여기서 «담지 않는다» — 담는 자리는 「👤 처음 보는 주소」 하나다. 문만 열어 둔다. */
+function mbSentGapHtml(){
+  const rows = mbSentGapList();
+  if(!rows.length) return '';
+  const t = mbSentTally();
+  return `<div class="dm-sentgap">
+    <div class="hd">모르는 <b>${t.none.toLocaleString()}통</b> 가운데 많이 보낸 곳입니다 —
+      기업정보함에 그 업체를 담아 두시면 <b>지난 메일까지 한꺼번에</b> 사람이 붙습니다</div>
+    ${rows.map(r=>`<div class="r"><span class="d">${esc(r.dom)}</span>
+      <span class="n">${r.n.toLocaleString()}통</span>
+      <span class="w">${esc(r.why)}</span></div>`).join('')}
+    <div class="ft"><button onclick="mbCheckOpen('new')"
+      title="처음 보는 주소를 한 화면에 모아 기업정보함에 담습니다">👤 처음 보는 주소로</button></div>
+  </div>`;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -18409,7 +18606,7 @@ function mbMatchedRows(){
        그리기 없이 묻는 자리(검사·단축키)에서 조용히 틀린다. */
   const m = mbMemoOf();
   const tag = String(mbNow()) + '|' + String(state.mbFilter||'') + '|' + String(state.mbQ||'')
-    + '|' + (state.mbSpamShow?'s':'');
+    + '|' + (state.mbSpamShow?'s':'') + '|' + String(state.mbSentWho||'');
   if(m.matched && m.matchedTag === tag) return m.matched;
   m.matchedTag = tag;
   let rows = mbAllRows();
@@ -18420,6 +18617,18 @@ function mbMatchedRows(){
      ⚠ 「보기」를 누르면(state.mbSpamShow) 그대로 둔다 — 감추는 것이지 없애는 것이
        아니다. 그래서 셈의 열쇠에도 그 값을 넣었다(안 넣으면 눌러도 옛 목록이 나온다). */
   if(!state.mbSpamShow && mbSpamOn()) rows = rows.filter(v=>!mbIsSpam(v));
+  /* ══ 📤 사람마다 갈라 보기 — 보낸 칸에서만 (대표 지시 2026-09-16) ══
+     ★ 스팸 거르개와 «같은 자리»다. 여기서 걸러야 목록·쪽수·「보이는 것 모두 고르기」·
+       방향키가 함께 맞는다. 딴 자리에서 걸면 칩에 적힌 수와 열었을 때 통수가 어긋난다 —
+       2026-09-18 에 「안읽음 8」을 눌러도 아무 일이 없던 것이 바로 그 어긋남이었다.
+     ⚠ 보낸 칸이 아니면 «아무 일도 안 한다» — 받은 칸에는 담당자 칸이 따로 있다. */
+  const sw = String(state.mbSentWho||'');
+  if(sw && mbSentBox()){
+    const idx = mbWhoIndex();
+    rows = (sw === MB_SENT_NA)
+      ? rows.filter(v=>!mbSentWho(v, idx).who)
+      : rows.filter(v=>mbSentWho(v, idx).who === sw);
+  }
   const f = state.mbFilter||'';
   if(f==='unread') rows = rows.filter(v=>!Number(v.r||0));
   else if(f==='flag') rows = rows.filter(v=>Number(v.g||0));
@@ -20601,6 +20810,22 @@ function mbOpenTag(v){
 function mbWhoTag(v){
   const id = mbNow();
   if(id.charAt(0)===MB_RAW_P) return '';
+  /* ── 📤 보낸 칸은 «받는이»로 본다 (대표 지시 2026-09-16) ──
+     ⚠ 어떻게 알았는지를 딱지에 적는다. 「업체」는 짐작이다 — 짐작을 확실한 것처럼
+       보이게 하면 대표께서 틀린 수를 믿으신다.
+     ⚠ 딱지를 누르면 그 «받는이 주소»의 담당자를 바꾼다. 받은 메일과 같은 주소·같은 자리다. */
+  if(mbSentBox(id)){
+    const to = mbSentTo(v);
+    if(!to) return '';
+    const r = mbSentWho(v);
+    if(!r.who) return `<span class="dm-who na" onclick="event.stopPropagation();mbWhoAsk('${esc(to)}',event)"
+      title="이 주소가 누구 담당인지 한 번 정해 주시면 보낸 메일도 저절로 갈립니다">＋ 누가</span>`;
+    const sure = r.why === 'hand';
+    return `<span class="dm-who ${sure?'':'guess'}" onclick="event.stopPropagation();mbWhoAsk('${esc(to)}',event)"
+      title="${esc(r.who)} — ${sure ? '사람이 정해 둔 주소입니다(확실)'
+        : '받는 업체의 담당자로 «미루어 본» 것입니다 — 짐작입니다. 눌러서 바꿀 수 있습니다'}"
+      >👤 ${esc(r.who)}${sure?'':' <i>업체</i>'}</span>`;
+  }
   const em = String(v.e||'').trim().toLowerCase();
   /* 담당자 칸 안에서는 업무 칸을 적어 준다 */
   if(id.charAt(0)===MB_WHO_P && id !== MB_WHO_NA){
@@ -20919,6 +21144,7 @@ function mbListHtml(){
          ⚠ 되살리려면 이 자리에 dm-hint 한 줄을 도로 넣으면 된다(git 에 있다). */''}
     </div>
     ${mbSpamLineHtml()}
+    ${mbSentWhoLineHtml()}
     <div class="dm-list ${mbDense()}">${body}</div>
     ${/* ── 아래 영역 — 쪽번호와 보기설정 (대표 지시 2026-08-30, 다음메일 캡처3·4) ──
          예전에는 「이전 메일 더 보기」 단추 하나였다. 몇 쪽인지도, 지금 몇 쪽인지도
