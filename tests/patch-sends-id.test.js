@@ -28,14 +28,14 @@ const path = require('path');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 const bare = stripComments(src);
 
 test('① ★★★ dbPatch 가 id 를 «함께» 보낸다 — 이 한 줄이 껍데기를 막는다', function () {
-  const 고침 = stripComments('<script>' + cutFn(src, 'function dbPatch(') + '</script>');
+  const 고침 = stripJs(cutFn(src, 'function dbPatch('));
   assert.match(고침, /cp\[id\s*\+\s*'\/id'\]\s*=\s*id;/,
     '★★★ 칸만 보내고 id 를 안 보냅니다 — 서버에 없던 기록에 쓰면 «id 없는 껍데기»가 생기고,\n' +
     '   그 한 건이 그 표 전체를 「통째 저장」으로 떨어뜨립니다(화면이 멈추는 원인).');
@@ -47,7 +47,7 @@ test('① ★★★ dbPatch 가 id 를 «함께» 보낸다 — 이 한 줄이 �
 });
 
 test('② ★★ dbUpsert 쪽 그물은 그대로 — 되돌아가지 않게', function () {
-  const 길 = stripComments('<script>' + cutFn(src, 'function _recFieldPaths(') + '</script>');
+  const 길 = stripJs(cutFn(src, 'function _recFieldPaths('));
   assert.match(길, /out\[item\.id \+ '\/id'\] = item\.id;/,
     '★★ 원래 있던 그물이 사라졌습니다 — 이쪽으로도 껍데기가 생깁니다');
 });

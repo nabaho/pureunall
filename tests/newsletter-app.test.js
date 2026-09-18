@@ -12,16 +12,16 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { 함수몸 } = require('./helpers/strip-comments.js');
 
 const ROOT = path.join(__dirname, '..');
 const 읽기 = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 
 const news = stripComments(읽기('pu-news.html'));
-const functionsIndex = stripComments(읽기('functions/index.js'));
+const functionsIndex = stripJs(읽기('functions/index.js'));
 const enter = stripComments(읽기('enter.html'));
-const appbar = stripComments(읽기('js/pu-appbar.js'));
+const appbar = stripJs(읽기('js/pu-appbar.js'));
 
 /* ══════ ① 문이 둘이면 잣대가 «같아야» 한다 ══════ */
 

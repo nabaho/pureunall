@@ -163,11 +163,11 @@ test('「사진첩을 열어야 고를 수 있다」는 옛 안내가 남아 있
      2026-08-09). 가는 것은 그 안에 지금 담긴 사진이다. 그 차이를 화면이
      말하지 않으면, 나중에 담은 사진이 «조용히 안 가고» 몇 달 뒤에 드러난다. */
 
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 test('★★ 폴더 메뉴에서 담긴 사진을 통째로 열어 줄 수 있다', () => {
-  const fn = stripComments(cutFn(HTML, 'function folderMenu('));
+  const fn = stripJs(cutFn(HTML, 'function folderMenu('));
   assert.match(fn, /shareFolder\(/,
     '★★ 폴더에서 공유로 가는 길이 없습니다 — 이 건의의 둘째 대목입니다.\n' +
     '  길이 없으면 사람은 폴더를 열어 스무 장을 하나씩 고릅니다.');
@@ -184,7 +184,7 @@ test('★★ 단추 이름이 «폴더 공유»가 아니다 — 가는 것은 �
 });
 
 test('★★ 고르개를 새로 만들지 않는다 — 목록이 두 벌이 되면 한쪽만 좋아진다', () => {
-  const fn = stripComments(cutFn(HTML, 'function shareFolder('));
+  const fn = stripJs(cutFn(HTML, 'function shareFolder('));
   assert.match(fn, /openSharePeople\(/,
     '★★ 있는 고르개를 그대로 열어야 합니다');
   assert.ok(!/sharePeopleHtml|innerHTML/.test(fn),
@@ -192,7 +192,7 @@ test('★★ 고르개를 새로 만들지 않는다 — 목록이 두 벌이 �
 });
 
 test('★★ 「나중에 담는 사진은 안 따라간다」를 화면이 말한다', () => {
-  const fn = stripComments(cutFn(HTML, 'function sharePeopleHtml('));
+  const fn = stripJs(cutFn(HTML, 'function sharePeopleHtml('));
   const i = fn.indexOf('p.note');
   assert.ok(i > 0,
     '★★ 폴더에서 왔다는 사실을 고르개가 모릅니다 — 그러면 말해 줄 수도 없습니다');
@@ -202,7 +202,7 @@ test('★★ 「나중에 담는 사진은 안 따라간다」를 화면이 말�
 });
 
 test('★ 폴더가 비었으면 «무엇을 하면 되는지» 말한다', () => {
-  const fn = stripComments(cutFn(HTML, 'function shareFolder('));
+  const fn = stripJs(cutFn(HTML, 'function shareFolder('));
   const i = fn.indexOf('if (!ids.length)');
   assert.ok(i > 0, '★ 빈 폴더를 안 봅니다 — 아무 일도 안 일어나면 고장으로 읽힙니다');
   assert.match(fn.slice(i, i + 400), /담은 뒤 다시/,
@@ -210,8 +210,8 @@ test('★ 폴더가 비었으면 «무엇을 하면 되는지» 말한다', () =
 });
 
 test('★★ 지우기와 열어 주기가 «같은 셈»으로 폴더 안 사진을 센다', () => {
-  const del = stripComments(cutFn(HTML, 'function removeFolderAsk('));
-  const shr = stripComments(cutFn(HTML, 'function shareFolder('));
+  const del = stripJs(cutFn(HTML, 'function removeFolderAsk('));
+  const shr = stripJs(cutFn(HTML, 'function shareFolder('));
   assert.match(del, /folderItems\(/,
     '★★ 지우기가 제 셈을 따로 갖고 있습니다');
   assert.match(shr, /folderItems\(/,
@@ -220,7 +220,7 @@ test('★★ 지우기와 열어 주기가 «같은 셈»으로 폴더 안 사�
 });
 
 test('하위폴더 사진도 함께 간다 — 화면에서 상위를 고르면 하위가 다 보인다', () => {
-  const fn = stripComments(cutFn(HTML, 'function folderItems('));
+  const fn = stripJs(cutFn(HTML, 'function folderItems('));
   assert.match(fn, /folderKids\(|\.parent === fid/,
     '★ 상위 폴더를 눌렀는데 하위 사진이 빠지면, 화면에 보이는 것과 가는 것이 어긋납니다');
 });

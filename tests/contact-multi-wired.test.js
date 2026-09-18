@@ -11,7 +11,7 @@ const path = require('path');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const erp = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
@@ -42,7 +42,7 @@ test('③ 담당자 편집기 «두 곳 모두»에 붙어 있다 (계약 창 ·
 });
 
 test('④ ★ 는 규칙 파일의 promote 를 쓴다 — 화면이 자리를 스스로 바꾸지 않는다', function () {
-  const c = stripComments('<script>' + cutFn(erp, 'function ContactMulti(') + '</script>');
+  const c = stripJs(cutFn(erp, 'function ContactMulti('));
   assert.match(c, /P\.promote\(rec, kind, at\)/, '★ 맞바꿈을 화면이 따로 셈하고 있습니다');
   assert.match(c, /P\.remove\(rec, kind, at\)/);
   assert.match(c, /P\.apply\(rec, kind, next\)/);
@@ -50,21 +50,21 @@ test('④ ★ 는 규칙 파일의 promote 를 쓴다 — 화면이 자리를 �
 });
 
 test('⑤ ★ 값이 하나뿐인 사람에게는 아무것도 안 나온다', function () {
-  const c = stripComments('<script>' + cutFn(erp, 'function ContactMulti(') + '</script>');
+  const c = stripJs(cutFn(erp, 'function ContactMulti('));
   assert.match(c, /if\(!extra\.length\) return;/, '★ 하나뿐인데 빈 줄을 그리고 있습니다');
   assert.match(c, /if\(!rows\.length && !adders\.length\) return null;/,
     '★ 그릴 것이 없을 때 빈 상자가 남습니다');
 });
 
 test('⑥ 규칙 파일이 없어도 화면이 안 죽는다 — 옛 캐시로 열릴 수 있다', function () {
-  const c = stripComments('<script>' + cutFn(erp, 'function ContactMulti(') + '</script>');
+  const c = stripJs(cutFn(erp, 'function ContactMulti('));
   assert.match(c, /if\(!P\) return null;/, '★ PuContact 가 없으면 화면이 터집니다');
-  const tip = stripComments('<script>' + cutFn(erp, 'function ctMultiTip(') + '</script>');
+  const tip = stripJs(cutFn(erp, 'function ctMultiTip('));
   assert.match(tip, /if\(!P\) return '';/);
 });
 
 test('⑦ ★★ 기업정보함 → 푸른이알피 — 곁칸이 딸려 온다', function () {
-  const f = stripComments('<script>' + cutFn(erp, 'function pcToContact(') + '</script>');
+  const f = stripJs(cutFn(erp, 'function pcToContact('));
   assert.match(f, /PuContact\.cardToMore\(x, 'phone'\)/, '★ 명함의 둘째 번호를 안 가져옵니다');
   assert.match(f, /PuContact\.cardToMore\(x, 'email'\)/, '★ 명함의 둘째 이메일을 안 가져옵니다');
   /* 메인은 색인의 m·e 그대로 — 기업정보함에서 고른 것이 여기서도 메인이어야 한다 */
@@ -73,7 +73,7 @@ test('⑦ ★★ 기업정보함 → 푸른이알피 — 곁칸이 딸려 온다
 });
 
 test('⑧ ★★ 푸른이알피 → 기업정보함 — 색인이 곁칸을 담는다 (mm · em)', function () {
-  const f = stripComments('<script>' + cutFn(cards, 'function idxRecord(') + '</script>');
+  const f = stripJs(cutFn(cards, 'function idxRecord('));
   assert.match(f, /PuContact\.moreToCard\(/, '★ 색인이 곁칸을 안 담습니다');
   assert.match(f, /r\.mm = _mm/, '★ 휴대폰 곁칸 열쇠(mm)가 없습니다');
   assert.match(f, /r\.em = _em/, '★ 이메일 곁칸 열쇠(em)가 없습니다');
@@ -84,7 +84,7 @@ test('⑧ ★★ 푸른이알피 → 기업정보함 — 색인이 곁칸을 담
 });
 
 test('⑨ 옛 열쇠(m·e)는 그대로다 — 이 열쇠를 모르는 화면이 안 깨진다', function () {
-  const f = stripComments('<script>' + cutFn(cards, 'function idxRecord(') + '</script>');
+  const f = stripJs(cutFn(cards, 'function idxRecord('));
   assert.match(f, /put\('m', it\.mobile\)/, '★ 메인 휴대폰 열쇠가 바뀌었습니다');
   assert.match(f, /put\('e', it\.email\)/, '★ 메인 이메일 열쇠가 바뀌었습니다');
 });
@@ -106,21 +106,21 @@ function cardsRealm(extra) {
 }
 
 test('⑩ 기업정보함 수정창에 둘째 칸이 «휴대폰·이메일 바로 아래»에 붙는다', function () {
-  const open = stripComments('<script>' + cutFn(cards, 'function openEditor(') + '</script>');
+  const open = stripJs(cutFn(cards, 'function openEditor('));
   assert.match(open, /if \(kind==='card' && \(k==='mobile' \|\| k==='email'\)\) fh \+= pcMoreField\(/,
     '★ 둘째 칸이 없거나 짝에서 멀리 떨어져 있습니다');
-  const snap = stripComments('<script>' + cutFn(cards, 'function editorSnapshot(') + '</script>');
+  const snap = stripJs(cutFn(cards, 'function editorSnapshot('));
   assert.match(snap, /\['mobile2','email2'\]/,
     '★ 둘째 칸만 적고 닫으면 «고친 것 없음»으로 보아 말없이 버려집니다');
 });
 
 test('⑪ 저장할 때 규칙에 태운다 — 화면이 따로 셈하지 않는다', function () {
-  const save = stripComments('<script>' + cutFn(cards, 'async function saveEditor(') + '</script>');
+  const save = stripJs(cutFn(cards, 'async function saveEditor('));
   /* ⚠ 「pcApplyMore(」 만 보면 `if(false) pcApplyMore(…)` 같은 죽은 줄도 통과한다
      (되돌림 검사에서 실제로 빠져나갔다). 살아 있는 줄의 «생김새»까지 본다. */
   assert.match(save, /\['mobile','email'\]\.forEach\(k=>\{[\s\S]{0,240}?pcApplyMore\(it, k, el \?/,
     '★ 둘째 칸이 저장에 안 실립니다 (또는 죽은 줄로 남아 있습니다)');
-  const fn = stripComments('<script>' + cutFn(cards, 'function pcApplyMore(') + '</script>');
+  const fn = stripJs(cutFn(cards, 'function pcApplyMore('));
   assert.match(fn, /PuContact\.apply\(/, '★ 기업정보함이 규칙을 따로 셈하고 있습니다');
 });
 

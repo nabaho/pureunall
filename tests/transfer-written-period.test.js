@@ -23,7 +23,7 @@ const vm = require('vm');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 
@@ -96,7 +96,7 @@ test('⑥ 부가세는 계약서에 적힌 것을 쓴다 — 없을 때만 「�
 });
 
 /* ── 여기부터는 «이관이 실제로 그 함수를 쓰는가» ─────────────────────────── */
-const XFER = stripComments('<script>' + cutFn(src, 'function transferContract(') + '</script>');
+const XFER = stripJs(cutFn(src, 'function transferContract('));
 const COMPANY = XFER.slice(XFER.indexOf("if(kindV === 'company')"), XFER.indexOf("if(kindV === 'case')"));
 
 test('⑦ ★ 이관이 「당겨오기」와 «같은 함수»로 셈한다 — 두 벌이면 화면마다 날짜가 갈린다', function () {

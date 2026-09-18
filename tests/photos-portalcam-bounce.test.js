@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -48,7 +48,7 @@ test('★★ 표는 «페이지가 열릴 때마다» 새로 만든다 — 고�
 });
 
 test('★★ 담을 때 그 표를 단다 — 참/거짓을 달면 위 판정이 아무것도 못 고른다', () => {
-  const fn = stripComments(cutFn(raw, 'async function takePortalCameraFile('));
+  const fn = stripJs(cutFn(raw, 'async function takePortalCameraFile('));
   assert.match(fn, /portalCapture: PORTAL_CAM_RUN/,
     '★★ 담는 쪽이 true 를 달면, 고르는 쪽이 표를 봐도 하나도 안 잡혀\n' +
     '  포털 촬영이 영영 안 돌아갑니다(반대쪽 고장).');
@@ -58,7 +58,7 @@ test('★★ 담을 때 그 표를 단다 — 참/거짓을 달면 위 판정이
 });
 
 test('★★ 주소의 portalcam 은 «읽자마자 지운다» — 남겨 두면 뒤로가기가 이 길을 또 켠다', () => {
-  const fn = stripComments(cutFn(raw, 'async function takePortalCameraFile('));
+  const fn = stripJs(cutFn(raw, 'async function takePortalCameraFile('));
   assert.match(fn, /searchParams\.delete\('portalcam'\)/,
     '★★ 주소에 남으면 방문기록·뒤로가기·앱 복원으로 다시 들어올 때 토큰이 그대로 켜집니다.\n' +
     '  그때는 찍은 것도 없어 ⚠ 창만 뜨고 토큰만 남습니다.');
@@ -69,7 +69,7 @@ test('★★ 주소의 portalcam 은 «읽자마자 지운다» — 남겨 두�
 });
 
 test('★★ 이번 도착이 실패하면 토큰을 비운다 — 안 비우면 뒤에 무엇이든 켤 수 있다', () => {
-  const fn = stripComments(cutFn(raw, 'async function takePortalCameraFile('));
+  const fn = stripJs(cutFn(raw, 'async function takePortalCameraFile('));
   const clears = (fn.match(/portalCameraToken = ''/g) || []).length;
   assert.ok(clears >= 2,
     '★★ 찍은 것을 못 읽었을 때·찍은 것이 없을 때 둘 다 토큰을 비워야 합니다(지금 ' + clears + '곳).\n' +

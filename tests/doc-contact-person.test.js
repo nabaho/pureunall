@@ -26,7 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { cutFn } = require('./cut-fn.js');
-const { stripComments } = require('./strip-comments.js');
+const { stripComments, stripJs } = require('./strip-comments.js');
 
 const R = path.join(__dirname, '..');
 const READ = fs.readFileSync(path.join(R, 'js', 'pu-doc-read.js'), 'utf8');
@@ -176,7 +176,7 @@ test('★★ 회사 칸과 «다른 칸»이다 — 합치면 그 사람이 나�
 });
 
 test('★ 화면이 무엇을 채웠는지 «한국어로» 말한다', () => {
-  const m = stripComments(FILE).match(/var CO_LABEL = \{[\s\S]*?\n  \};/);
+  const m = stripJs(FILE).match(/var CO_LABEL = \{[\s\S]*?\n  \};/);
   assert.ok(m, 'CO_LABEL 을 못 찾았습니다');
   assert.match(m[0], /contactName: '담당자'/);
   assert.match(m[0], /contactEmail: '담당자 이메일'/);

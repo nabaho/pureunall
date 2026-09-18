@@ -23,7 +23,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -109,7 +109,7 @@ test('★ 보내기도 «사진의 해»로 부른다', () => {
 /* ══════ ② 기준이 하나다 ══════ */
 
 test('★★ 고르는 쪽과 보내는 쪽이 «같은 함수»로 거른다 — 세 번째 같은 사고다', () => {
-  const fn = stripComments(cutFn(raw, 'function sendSelected('));
+  const fn = stripJs(cutFn(raw, 'function sendSelected('));
   assert.match(fn, /canSendCards\(it, r\)/,
     '★★ canSend 로 고르면 «명함 뒷면»이 섞여 들어옵니다.\n' +
     '  보내는 함수는 canSendCards 로 막으므로 그 장은 아무 말 없이 되돌아가고,\n' +
@@ -122,7 +122,7 @@ test('★★ 고르는 쪽과 보내는 쪽이 «같은 함수»로 거른다 �
 /* ══════ ③ 못 한 일을 «말한다» ══════ */
 
 test('★★ 못 보낸 까닭을 알림에 적는다 — 알면서 「열어 보라」고만 하지 않는다', () => {
-  const fn = stripComments(cutFn(raw, 'function sendSelected('));
+  const fn = stripJs(cutFn(raw, 'function sendSelected('));
   assert.match(fn, /filedError/,
     '★★ 까닭은 filedError 에 이미 담겨 있습니다. 그것을 안 보여 주면\n' +
     '  스무 장이 실패했을 때 스무 번 열어 봐야 합니다.');
@@ -131,19 +131,19 @@ test('★★ 못 보낸 까닭을 알림에 적는다 — 알면서 「열어 �
 });
 
 test('★ 까닭이 «없을» 때는 없다고 말한다 — 그런 자리는 고장이다', () => {
-  const fn = stripComments(cutFn(raw, 'function sendSelected('));
+  const fn = stripJs(cutFn(raw, 'function sendSelected('));
   assert.match(fn, /까닭이 남지 않았습니다/,
     '★ 까닭이 안 남는 길이 생기면 사람은 열어 보고 아무것도 못 찾습니다 —\n' +
     '  그때는 «고장»이라고 말해야 알려 줄 수 있습니다.');
 });
 
 test('★ 같은 까닭은 한 번만 적는다 — 스무 장이 같은 이유면 스무 줄이 아니다', () => {
-  const fn = stripComments(cutFn(raw, 'function sendSelected('));
+  const fn = stripJs(cutFn(raw, 'function sendSelected('));
   assert.match(fn, /why\.indexOf\(w\) === i/, '★ 같은 말을 여러 줄로 늘어놓습니다');
 });
 
 test('★★ 모아 둔 까닭이 «알림 글월에 실제로 들어간다»', () => {
-  const fn = stripComments(cutFn(raw, 'function sendSelected('));
+  const fn = stripJs(cutFn(raw, 'function sendSelected('));
   /* ⚠ 「모으기만」 하고 안 보여 줘도 위 검사들은 다 통과한다(돌연변이가 살아남아
      드러났다) — 모은 것이 msg 로 «들어가는지»를 본다. */
   const i = fn.indexOf('msg += ');

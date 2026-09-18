@@ -227,7 +227,7 @@ test('무료로 읽었다는 사실과 «못 채운 칸»을 화면이 말한다
 });
 
 test('★ 여러 장짜리 사진 묶음은 무료 길로 «안» 보낸다', () => {
-  const fn = stripComments(cutFn(APP, 'function freeReadTry('));
+  const fn = stripJs(cutFn(APP, 'function freeReadTry('));
   assert.match(fn, /imgs\s*\|\|\s*\[\]\)\.length\s*!==\s*1|imgs\.length\s*!==\s*1/,
     '★ 여러 쪽을 첫 장만 보고 갈래를 정하게 됩니다 — 2쪽 이후를 버리고도 모릅니다');
 });
@@ -242,7 +242,7 @@ test('★ 무료로 읽은 것도 자동 보내기 문턱을 «그대로» 넘�
   vm.runInContext([
     'function readFields(read) { return (read && read.fields) || {}; }',
     'function canSendCoInfo() { return true; }',
-    stripComments(cutFn(APP, 'function autoSendCoInfo('))
+    stripJs(cutFn(APP, 'function autoSendCoInfo('))
   ].join('\n'), box);
   box.__r = r;
   assert.equal(vm.runInContext('autoSendCoInfo(__r)', box), true,

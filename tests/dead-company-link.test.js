@@ -22,7 +22,7 @@ const vm = require('vm');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
@@ -105,7 +105,7 @@ test('⑥ 지워진 업체(_deleted)는 «죽은 것»으로 본다', function (
 /* ── 붙어 있는가 ──────────────────────────────────────────────────────── */
 
 test('⑦ ★ 저장 문이 이 눈으로 본다', function () {
-  const v = stripComments('<script>' + cutFn(src, 'function erpValidateContractCompany(') + '</script>');
+  const v = stripJs(cutFn(src, 'function erpValidateContractCompany('));
   assert.match(v, /form=erpDropDeadCoLink\(form,_cos\);/, '★ 저장할 때 여전히 막힙니다');
   const at = v.indexOf('erpDropDeadCoLink');
   const ok = v.indexOf('validateCompanyLink(form');
@@ -118,7 +118,7 @@ test('⑧ ★ 화면 알림도 «같은 눈»으로 본다 — 저장은 되는�
 });
 
 test('⑨ 죽은 ID 를 «지우지» 않는다 — 못 본 척할 뿐이다', function () {
-  const f = stripComments('<script>' + cutFn(src, 'function erpDropDeadCoLink(') + '</script>');
+  const f = stripJs(cutFn(src, 'function erpDropDeadCoLink('));
   assert.ok(!/dbUpsert|dbPatch|dbSet/.test(f),
     '★ 검증하는 자리에서 자료를 고치고 있습니다 — 읽기만 해야 합니다');
   assert.match(f, /Object\.assign\(\{\}, f/, '★ 원본을 그 자리에서 고치고 있습니다');

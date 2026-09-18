@@ -21,7 +21,7 @@ const vm = require('vm');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
@@ -72,14 +72,14 @@ test('③ ★★ 이미 받은 건은 올리지 않는다 — 다 받은 돈을 
 });
 
 test('④ ★★ 후보 목록 자체는 안 바꾼다 — 금액 0 을 넣으면 매칭·합계가 흔들린다', function () {
-  const parts = stripComments('<script>' + cutFn(src, 'function erpUnpaidParts(') + '</script>');
+  const parts = stripJs(cutFn(src, 'function erpUnpaidParts('));
   assert.match(parts, /if\(f <= 0\) return;/,
     '★★ 금액 0 짜리가 후보에 들어갑니다 — 매칭·합계가 흔들립니다');
   assert.ok(!/erpUnpaidBlocked/.test(parts), '★ 후보 만드는 곳이 막힌 항목까지 섞고 있습니다');
 });
 
 test('⑤ ★★ 「받을 항목이 없다」와 «갈라서» 말한다', function () {
-  const why = stripComments('<script>' + cutFn(src, 'function whyNone(') + '</script>');
+  const why = stripJs(cutFn(src, 'function whyNone('));
   assert.match(why, /blocked/, '★★ 막힌 항목을 안 봅니다');
   /* 갈라 보지 않으면 「등록된 업체지만 받을 항목이 없습니다」로 잘못 안내한다 —
      건은 이미 있는데 「사무관리에 건을 만드세요」라고 하는 셈이다. */

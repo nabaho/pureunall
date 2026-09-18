@@ -22,7 +22,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { sliceFn } = require('./fnslice.js');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const root = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'pu-cards.html'), 'utf8');
@@ -105,7 +105,7 @@ test('★ 메일 문(view=mail)은 예전 그대로 — 마지막이 명함이�
 });
 
 test('★★ 코드에 기업정보함 문 아래 «메일 갈래»가 남아 있지 않다 — 남기면 이 흠이 되살아난다', () => {
-  const body = stripComments(fn('restoreLastScreen'));
+  const body = stripJs(fn('restoreLastScreen'));
   const i = body.indexOf('let s = null');
   assert.ok(i > 0, '★ 마지막 화면을 읽는 자리를 못 찾았습니다');
   const afterDoor = body.slice(i);            // 메일 문 처리(urlWantsMail)는 그 위에서 끝난다

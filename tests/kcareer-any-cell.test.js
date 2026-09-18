@@ -21,7 +21,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const M = require(path.join(R, 'js', 'kcareer-formmap.js'));
@@ -141,7 +141,7 @@ test('⑦★ 목록 표(학력·경력) 줄은 그대로 목록이 맡는다 —
 });
 
 test('⑧★ 넣는 쪽(apply)은 «늘» 모든 칸을 훑는다 — 좁게 훑으면 친 값이 조용히 사라진다', () => {
-  const 소스 = stripComments(fs.readFileSync(path.join(R, 'js', 'kcareer-formmap.js'), 'utf8'));
+  const 소스 = stripJs(fs.readFileSync(path.join(R, 'js', 'kcareer-formmap.js'), 'utf8'));
   const head = 소스.indexOf('function apply(');
   assert.notEqual(head, -1, 'apply 를 찾지 못했습니다');
   let i = 소스.indexOf('{', head), depth = 0;

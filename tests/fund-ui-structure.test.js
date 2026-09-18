@@ -9,7 +9,9 @@ const fs = require('fs');
 const path = require('path');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'fund.html'), 'utf8');
-const stripComments = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+/* 주석 걷개는 tests/strip-comments.js 한 곳에 둔다 — 손으로 적으면 조용히 어긋난다.
+   여기서 보는 것은 함수 «조각»이므로 stripJs 다(stripComments 는 통째 HTML 문서 전용). */
+const { stripJs } = require('./strip-comments.js');
 function slice(from, to) {
   const a = SRC.indexOf(from);
   assert.ok(a >= 0, '기준점을 못 찾음: ' + from);
@@ -22,7 +24,7 @@ test('메뉴를 눌렀을 때 화면이 바뀐다 — pointerdown 에서 포인�
      걸었더니 click 대상이 #navlist 가 되어 .sitem 의 onclick(화면 이동)이 죽었다.
      캡처는 '실제로 끌기 시작한 뒤'에만 걸어야 한다. */
   const nav = slice('function bindNavDrag', '/* ── 모바일 서랍 메뉴 ──');
-  const down = stripComments(nav.slice(nav.indexOf("addEventListener('pointerdown'"), nav.indexOf("addEventListener('pointermove'")));
+  const down = stripJs(nav.slice(nav.indexOf("addEventListener('pointerdown'"), nav.indexOf("addEventListener('pointermove'")));
   const move = nav.slice(nav.indexOf("addEventListener('pointermove'"), nav.indexOf('function end('));
   assert.ok(!down.includes('setPointerCapture'), 'pointerdown 에서 캡처하면 메뉴 클릭이 죽는다');
   assert.ok(move.includes('setPointerCapture'), '끌기 시작 후에는 캡처해야 사이드바 밖으로 나가도 이어진다');

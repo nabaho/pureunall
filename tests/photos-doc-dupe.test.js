@@ -17,7 +17,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -74,7 +74,7 @@ test('★ 가장 «최근 것»이 앞에 온다 — 견줄 것은 바로 앞엣
 /* ══════ ② 자동으로 안 지운다 — 사람이 고른다 ══════ */
 
 test('★★ 겹치면 «보내지 않고» 물음을 남긴다 — 조용히 덮어쓰지 않는다', () => {
-  const fn = stripComments(cutFn(raw, 'function sendWorker('));
+  const fn = stripJs(cutFn(raw, 'function sendWorker('));
   /* ⚠ 「findWorkerDupes 가 어딘가 적혀 있나」만 보면 if (false) 로 죽여도 안 걸린다
      (돌연변이가 살아남아 드러났다) — 그것이 «지나는 길인지»를 본다. */
   assert.match(fn, /if \(!force && PuDocFile\.findWorkerDupes\)/,
@@ -89,16 +89,16 @@ test('★★ 겹치면 «보내지 않고» 물음을 남긴다 — 조용히 �
 test('★★ «뒤에서 도는 판독»은 묻지 않는다 — 스물여덟 번 묻고 아무도 못 본다', () => {
   /* ⚠ 2026-09-12 — 자리 이름(sibs[0])을 글자 그대로 박아 두어, 서류마다 보내게
      바꾸자 뜻은 그대로인데 이 검사만 깨졌다. 지킬 것은 «auto:true 로 부르는가»다. */
-  assert.match(stripComments(cutFn(raw, 'function startRead(')),
+  assert.match(stripJs(cutFn(raw, 'function startRead(')),
     /sendWorker\([^)]*\{ auto: true \}\)/,
     '★★ 자동 판독이 창을 띄우면 사람이 화면 앞에 없을 때 스물여덟 번 묻습니다.');
-  const fn = stripComments(cutFn(raw, 'function sendWorker('));
+  const fn = stripJs(cutFn(raw, 'function sendWorker('));
   assert.match(fn, /if \(!auto\) toast\(/,
     '★ 손으로 누른 때는 왜 안 갔는지 그 자리에서 말해 줘야 합니다.');
 });
 
 test('★ 겹침을 «못 물어봤다고» 보내는 일까지 막지는 않는다', () => {
-  const fn = stripComments(cutFn(raw, 'function sendWorker('));
+  const fn = stripJs(cutFn(raw, 'function sendWorker('));
   const cat = fn.slice(fn.indexOf('.catch('));
   assert.match(cat, /force: true/,
     '★ 겹침 확인이 실패했다고 안 보내면, 못 보내는 것이 겹치는 것보다 나빠집니다.');
@@ -115,7 +115,7 @@ test('★★ 「둘 다 두기」가 있다 — 주소가 바뀐 등본은 옛�
 });
 
 test('★★ 바꾸기는 옛 사진을 «휴지통»으로 — 스스로 한 일은 되돌릴 수 있어야 한다', () => {
-  const fn = stripComments(cutFn(raw, 'function dupReplace('));
+  const fn = stripJs(cutFn(raw, 'function dupReplace('));
   assert.match(fn, /deletePhoto\(/, '★★ 휴지통을 안 거치면 되돌릴 길이 없습니다');
   assert.match(fn, /photoOwner\(ph\.id\)/,
     '★ 주인을 안 넘기면 내 자리에 대고 지우는 시늉만 하고 조용히 끝납니다.');
@@ -125,7 +125,7 @@ test('★★ 바꾸기는 옛 사진을 «휴지통»으로 — 스스로 한 �
 });
 
 test('★ 「보내지 않기」는 사진을 «안 지운다» — 물음에 답했다고 사진까지 없애면 안 된다', () => {
-  const fn = stripComments(cutFn(raw, 'function dupSkip('));
+  const fn = stripJs(cutFn(raw, 'function dupSkip('));
   assert.ok(!/deletePhoto/.test(fn),
     '★ 잘못 눌렀을 때 잃는 것이 너무 큽니다 — 지울지는 사람이 따로 정합니다.');
   assert.match(fn, /dupSkip = /, '★ 답한 표시가 없으면 다음 판독에 또 묻습니다');
@@ -134,7 +134,7 @@ test('★ 「보내지 않기」는 사진을 «안 지운다» — 물음에 �
 /* ══════ ④ 답하기 전에는 «할 일»로 남는다 ══════ */
 
 test('★★ 물음이 남아 있으면 「확인 필요」다 — 「확인했음」으로는 못 치운다', () => {
-  const fn = stripComments(cutFn(raw, 'function checkWhy('));
+  const fn = stripJs(cutFn(raw, 'function checkWhy('));
   const i = fn.indexOf('r.dupWk');
   const j = fn.indexOf('if (r.ack) return');
   assert.ok(i > 0, '★★ 겹침이 할 일에 안 잡히면 그 사진은 영영 안 갑니다.');
@@ -243,7 +243,7 @@ test('★★★ 목록과 사진 판이 «같은 말»을 한다 — 갈리면 �
 /* ══════ ⑤ 「장」과 「건」을 가른다 ══════ */
 
 test('★★ 근로자 정보함이 「신분증 2장」이라 적는다 — 「2」로는 두 건인지 모른다', () => {
-  const fn = stripComments(cutFn(cards, 'function wkDocsSummary('));
+  const fn = stripJs(cutFn(cards, 'function wkDocsSummary('));
   assert.match(fn, /\+ '장'/,
     '★★ 청구는 갈래당 «한 건»입니다(업체 × 근로자 × 서류종류 = 1건).\n' +
     '  같은 신분증을 두 번 찍었다고 두 건이 되면 청구 근거가\n' +
@@ -255,7 +255,7 @@ test('★ 이미 쌓인 겹침은 «한자리에» 모아 보여 준다 — 물�
   assert.match(cards, /function wkDupeNote\(/, '★ 알려 주는 자리가 없습니다');
   assert.match(cards, /\$\{wkDupeNote\(p\)\}/,
     '★ 세어 놓고 안 그리면 아무 데도 안 나옵니다');
-  const fn = stripComments(cutFn(cards, 'function wkDupeNote('));
+  const fn = stripJs(cutFn(cards, 'function wkDupeNote('));
   assert.match(fn, /재발급본/,
     '★ 「잘못됐다」고 하면 안 됩니다 — 재발급본일 수도 있습니다.');
   assert.ok(!/삭제|지웁니다/.test(fn),
@@ -265,13 +265,13 @@ test('★ 이미 쌓인 겹침은 «한자리에» 모아 보여 준다 — 물�
 /* ══════ ⑥ 저장 층은 «찾기만» 한다 ══════ */
 
 test('★★ 겹침을 찾는 층이 스스로 지우지 않는다 — 무엇을 할지는 사람이 정한다', () => {
-  const fn = stripComments(cutFn(store, 'function findWorkerDupes('));
+  const fn = stripJs(cutFn(store, 'function findWorkerDupes('));
   assert.ok(!/update\(|remove\(|set\(/.test(fn),
     '★★ 찾는 김에 지우면, 화면이 묻기도 전에 남의 신분증이 사라질 수 있습니다.');
 });
 
 test('★ 옛 서류를 걷는 것과 «사진을 치우는 것»은 자리가 다르다', () => {
-  const fn = stripComments(cutFn(store, 'function dropWorkerDocs('));
+  const fn = stripJs(cutFn(store, 'function dropWorkerDocs('));
   assert.ok(!/deletePhoto|puphotos/.test(fn),
     '★ 저장 층이 남의 사진첩에 손대기 시작하면 어디서 지워졌는지 아무도 못 짚습니다.');
   assert.match(fn, /docs\/' \+ dk\] = null/, '★ 걷는 일 자체를 안 합니다');

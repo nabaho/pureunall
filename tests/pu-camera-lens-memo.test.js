@@ -23,7 +23,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments.js');
+const { stripJs } = require('./strip-comments.js');
 
 const R = path.join(__dirname, '..');
 const CAM = fs.readFileSync(path.join(R, 'pu-camera.html'), 'utf8');
@@ -33,7 +33,7 @@ function 조각(name) {
   assert.ok(m, '<script data-part="' + name + '"> 조각이 없습니다');
   return m[1];
 }
-const 몸통 = stripComments(조각('app'));
+const 몸통 = stripJs(조각('app'));
 
 /* ── 가짜 폰 ───────────────────────────────────────────────────────────
    o.zoom  : 기기가 받는 배율 {min,max} (없으면 배율을 못 받는 폰)

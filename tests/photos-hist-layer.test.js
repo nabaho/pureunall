@@ -20,7 +20,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -75,22 +75,22 @@ test('★★ 카메라 칸을 놓는 곳은 하나다 — 두 곳이면 한 번�
   const 쓰는층 = (app.match(/puHistDrop\(\)/g) || []).length;
   assert.ok(쓰는층 >= 2,
     '★ puHistDrop 을 쓰는 자리가 ' + 쓰는층 + '곳입니다 — 카메라와 크게 보기 둘이라야 합니다');
-  const drop = stripComments(cutFn(raw, 'function camHistDrop('));
+  const drop = stripJs(cutFn(raw, 'function camHistDrop('));
   assert.match(drop, /puHistDrop\(\)/, '★ 놓는 함수가 실제로 안 놓습니다');
-  const close = stripComments(cutFn(raw, 'function closeCam('));
+  const close = stripJs(cutFn(raw, 'function closeCam('));
   assert.ok(!/history\.back\(\)|puHistDrop\(\)/.test(close),
     '★★ 닫기가 제 손으로도 놓고 있습니다 — camDiscard 가 이미 놓았습니다.');
 });
 
 test('★★ 어떤 길로 접히든 칸을 놓는다 — 「올리기」로 끝나는 길이 그것이다', () => {
-  const fn = stripComments(cutFn(raw, 'function camDiscard('));
+  const fn = stripJs(cutFn(raw, 'function camDiscard('));
   assert.match(fn, /camHistDrop\(\)/,
     '★★ camDiscard 가 칸을 안 놓으면, 「올리기」로 끝난 뒤 헛칸이 남습니다.\n' +
     '  그 뒤 뒤로가기 두 번이면 사진첩 밖입니다.');
 });
 
 test('★ 안 쌓았으면 놓지 않는다 — 없는 칸을 빼면 그것이 곧 사진첩을 나가는 걸음이다', () => {
-  const drop = stripComments(cutFn(raw, 'function camHistDrop('));
+  const drop = stripJs(cutFn(raw, 'function camHistDrop('));
   assert.match(drop, /if \(!camPushed\) return false;/,
     '★★ 쌓았는지 안 보고 빼면, 칸이 없을 때 «진짜 뒤로»가 되어 화면을 나갑니다.');
   assert.match(drop, /camPushed = false;/, '★ 놓고 나서 표를 안 내리면 두 번 뺍니다');

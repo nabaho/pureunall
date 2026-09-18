@@ -18,7 +18,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const ROOT = path.join(__dirname, '..');
@@ -120,7 +120,7 @@ test('★★ 삭제는 계획에 있는 것만 — 그리고 폴더 안 경로�
 
 /* ── 화면 쪽 ── */
 test('★★ 복원은 되돌리기 꾸러미를 «먼저» 올리고 나서 덮어쓴다', () => {
-  const fn = stripComments(cutFn(NAS_RAW, 'async function doRestore('));
+  const fn = stripJs(cutFn(NAS_RAW, 'async function doRestore('));
   const up = fn.indexOf('pureun_erp_undo.json');
   const down = fn.indexOf("restoreFrom('pureun_erp_latest.json'");
   assert.ok(up > 0, '★★ 복원 전에 지금 상태를 어디에도 남기지 않습니다 — 잘못 복원하면 끝입니다');
@@ -129,7 +129,7 @@ test('★★ 복원은 되돌리기 꾸러미를 «먼저» 올리고 나서 덮
 });
 
 test('★ 되돌리기 꾸러미도 비밀을 안 담는다 — 같은 모으기(collectLocal)를 쓴다', () => {
-  const fn = stripComments(cutFn(NAS_RAW, 'async function doRestore('));
+  const fn = stripJs(cutFn(NAS_RAW, 'async function doRestore('));
   assert.match(fn, /collectLocal\(\)/, '★ 따로 모으면 거름망이 두 벌이 됩니다');
 });
 
@@ -141,7 +141,7 @@ test('★★ 화면에 되돌리기 단추가 «실제로» 있다', () => {
 });
 
 test('★★ 정리는 수동 백업과 7일 자동 백업 «둘 다» 따라온다', () => {
-  const manual = stripComments(cutFn(NAS_RAW, 'function doBackup('));
+  const manual = stripJs(cutFn(NAS_RAW, 'function doBackup('));
   assert.match(manual, /nasTidyWith\(/, '★★ 수동 백업 뒤에 정리를 안 합니다');
   const i = CODE.indexOf("_auto:true");
   const auto = CODE.slice(i, i + 2500);
@@ -149,12 +149,12 @@ test('★★ 정리는 수동 백업과 7일 자동 백업 «둘 다» 따라온
 });
 
 test('★ 정리가 실패해도 백업은 성공이다 — 정리 실패로 백업을 실패로 만들지 않는다', () => {
-  const manual = stripComments(cutFn(NAS_RAW, 'function doBackup('));
+  const manual = stripJs(cutFn(NAS_RAW, 'function doBackup('));
   const i = manual.indexOf('nasTidyWith(');
   assert.match(manual.slice(i, i + 300), /\.catch\(/, '★ 정리 오류가 백업 실패로 보입니다 — 백업은 이미 올라갔습니다');
 });
 
 test('★ 되돌릴 것이 없을 때 «왜» 없는지 말한다', () => {
-  const fn = stripComments(cutFn(NAS_RAW, 'async function doUndo('));
+  const fn = stripJs(cutFn(NAS_RAW, 'async function doUndo('));
   assert.match(fn, /복원한 적이 없습니다/, '★ 「파일 없음」만 뜨면 사람은 고장으로 읽습니다');
 });

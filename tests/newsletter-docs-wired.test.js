@@ -17,15 +17,15 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const ROOT = path.join(__dirname, '..');
 const 읽기 = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 
 const news = stripComments(읽기('pu-news.html'));
-const idx = stripComments(읽기('functions/index.js'));
-const tpl = stripComments(읽기('js/pu-news-tpl.js'));
-const core = stripComments(읽기('js/pu-news-core.js'));
+const idx = stripJs(읽기('functions/index.js'));
+const tpl = stripJs(읽기('js/pu-news-tpl.js'));
+const core = stripJs(읽기('js/pu-news-core.js'));
 
 /* ══════ ① 서버가 «자동으로» 찾아온다 ══════ */
 

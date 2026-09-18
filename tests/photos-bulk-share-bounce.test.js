@@ -15,7 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -25,7 +25,7 @@ const app = stripComments(raw);
 /* ══════ ③ 튕김 — 가장 아픈 것 ══════ */
 
 test('★★ 카메라를 닫으면 «돌아갈 곳»도 함께 버린다 — 안 버리면 한참 뒤에 튕긴다', () => {
-  const fn = stripComments(cutFn(raw, 'function closeCam('));
+  const fn = stripJs(cutFn(raw, 'function closeCam('));
   assert.match(fn, /camReturnTo = ''/,
     '★★ 돌아갈 곳이 세션 내내 남습니다.\n' +
     '  포털 📷 로 들어온 뒤 한참 사진첩에서 일하다가, 아무 때나 카메라로 한 장 찍으면\n' +
@@ -33,7 +33,7 @@ test('★★ 카메라를 닫으면 «돌아갈 곳»도 함께 버린다 — �
 });
 
 test('★★ «그만두고 닫을 때»는 안 돌아간다 — 뒤로가기 한 번에 두 번 움직이면 안 된다', () => {
-  const fn = stripComments(cutFn(raw, 'function closeCam('));
+  const fn = stripJs(cutFn(raw, 'function closeCam('));
   assert.ok(!/camGoBack\(\)/.test(fn),
     '★★ 닫기에서 돌려보내면, 폰 뒤로가기로 카메라를 닫은 사람이\n' +
     '  사진첩 밖으로 튕겨 나갑니다(뒤로가기는 이미 한 걸음 갔습니다).');
@@ -45,7 +45,7 @@ test('★ 돌려보내는 것은 «다 올린 뒤» 그 한 자리뿐이다 — 
 });
 
 test('★ 카메라가 «안 열렸을 때»도 돌아갈 곳을 버린다 — 권한 거부가 나중에 튕김이 된다', () => {
-  const fn = stripComments(cutFn(raw, 'function camFail('));
+  const fn = stripJs(cutFn(raw, 'function camFail('));
   assert.match(fn, /camReturnTo = ''/,
     '★ 권한 거부로 못 열었는데 주소가 남으면, 나중에 찍은 한 장이 사람을 내보냅니다.');
 });
@@ -66,7 +66,7 @@ test('★★ 업체 이름만으로는 사진을 접지 않는다 — 카드는 
 /* ══════ ② 공유가 안 된다 — 조용한 실패 ══════ */
 
 test('★★ 담당자를 못 찾으면 «말한다» — 조용히 끝나면 보낸 줄 안다', () => {
-  const fn = stripComments(cutFn(raw, 'function autoShareByCo('));
+  const fn = stripJs(cutFn(raw, 'function autoShareByCo('));
   const head = fn.slice(0, fn.indexOf('const uids'));
   assert.match(head, /toast\(/,
     '★★ 업체를 못 찾았는데 아무 말이 없습니다.\n' +
@@ -77,7 +77,7 @@ test('★★ 담당자를 못 찾으면 «말한다» — 조용히 끝나면 �
 });
 
 test('★ 담당자가 «없는 것»과 «로그인 안 한 것»을 갈라 말한다 — 손쓰는 데가 다르다', () => {
-  const fn = stripComments(cutFn(raw, 'function autoShareByCo('));
+  const fn = stripJs(cutFn(raw, 'function autoShareByCo('));
   const noUid = fn.slice(fn.indexOf('if (!uids.length)'));
   assert.match(noUid.slice(0, 400), /noAcct/,
     '★ 로그인 안 한 담당자는 그 사람이 한 번 들어오면 됩니다.');
@@ -92,7 +92,7 @@ test('★ 담당자가 «없는 것»과 «로그인 안 한 것»을 갈라 말
 /* ══════ ⑤ 직원이 넘기는 길 (대표 보고 2026-09-03 「여전히 쉽지 않다」) ══════ */
 
 test('★★ 손댈 수 «없어도» 넘길 수 있으면 센다 — 되전달이 그것이다', () => {
-  const fn = stripComments(cutFn(raw, 'function shareableSel('));
+  const fn = stripJs(cutFn(raw, 'function shareableSel('));
   assert.match(fn, /filter\(mayShare\)/,
     '★★ mayTouch 로 세면 직원이 «받은 사진»을 고를 때 공유 칸이 통째로 안 뜹니다.\n' +
     '  규칙과 openSharePeople 은 되전달(㉮ 2026-08-30)을 허용하는데\n' +
@@ -100,7 +100,7 @@ test('★★ 손댈 수 «없어도» 넘길 수 있으면 센다 — 되전달�
 });
 
 test('★★ 한 장이라도 못 넘긴다고 «통째로» 거절하지 않는다', () => {
-  const fn = stripComments(cutFn(raw, 'function openSharePeople('));
+  const fn = stripJs(cutFn(raw, 'function openSharePeople('));
   const head = fn.slice(0, fn.indexOf('const shared'));
   assert.match(head, /if \(!can\.length\)/,
     '★★ 「☑ 전부」로 스물여덟 장을 고르면 받은 사진이나 민감 서류가 한 장쯤 섞입니다.\n' +
@@ -111,14 +111,14 @@ test('★★ 한 장이라도 못 넘긴다고 «통째로» 거절하지 않는
 });
 
 test('★★ 고르개가 «넘길 수 있는 것»을 든다 — 못 넘길 것까지 들면 그 장에서 실패한다', () => {
-  const fn = stripComments(cutFn(raw, 'function openSharePeople('));
+  const fn = stripJs(cutFn(raw, 'function openSharePeople('));
   assert.match(fn, /_sharePick = \{ ids: can,/,
     '★★ 고른 것 전부를 들면, 못 넘기는 장에서 서버가 막아 「몇 장은 열지 못했습니다」가 뜹니다.');
   assert.match(fn, /skipped: skipped/, '★ 몇 장이 빠졌는지 들고 있어야 말해 줄 수 있습니다');
 });
 
 test('★★ 빠진 장이 있으면 «왜» 빠졌는지 고르개에 적는다', () => {
-  const fn = stripComments(cutFn(raw, 'function sharePeopleHtml('));
+  const fn = stripJs(cutFn(raw, 'function sharePeopleHtml('));
   /* ⚠ 「p.skipped 가 어딘가 적혀 있나」만 보면 if (false) 로 꺼도 안 걸린다
      (돌연변이가 살아남아 드러났다) — «그 값이 조건»인지를 본다. */
   assert.match(fn, /if \(p\.skipped\)/,
@@ -127,7 +127,7 @@ test('★★ 빠진 장이 있으면 «왜» 빠졌는지 고르개에 적는다
 });
 
 test('★ 고를 사람이 없을 때 «무엇을 하면 되는지» 말한다', () => {
-  const fn = stripComments(cutFn(raw, 'function openSharePeople('));
+  const fn = stripJs(cutFn(raw, 'function openSharePeople('));
   const i = fn.indexOf('if (!others.length)');
   assert.ok(i > 0, '★ 고를 사람이 없을 때를 안 봅니다');
   const msg = fn.slice(i, i + 400);
@@ -153,7 +153,7 @@ test('★★ 폰 도구줄에 «공유로 가는 길»이 있다 — 없으면 �
 });
 
 test('★★ 고르개를 «새로 만들지 않는다» — 두 자리가 되면 한쪽만 고쳐진다', () => {
-  const fn = stripComments(cutFn(raw, 'function shareFromBar('));
+  const fn = stripJs(cutFn(raw, 'function shareFromBar('));
   assert.match(fn, /openShareMany\(\)/,
     '★★ 길잡이 단추가 제자리의 그 고르개를 열어야 합니다 — 목록이 두 벌이 되면 안 됩니다.');
   assert.ok(!/sharePeopleHtml|innerHTML/.test(fn),
@@ -161,7 +161,7 @@ test('★★ 고르개를 «새로 만들지 않는다» — 두 자리가 되�
 });
 
 test('★ 폰에서는 시트를 «먼저 열고» 나서 편다 — 순서가 바뀌면 열자마자 사라진다', () => {
-  const fn = stripComments(cutFn(raw, 'function shareFromBar('));
+  const fn = stripJs(cutFn(raw, 'function shareFromBar('));
   const i = fn.indexOf('openPhSheet()');
   assert.ok(i > 0, '★ 폰에서 시트를 안 엽니다 — 고르개가 시트 안에 있습니다.');
   assert.match(fn.slice(i), /setTimeout\(/,
@@ -170,13 +170,13 @@ test('★ 폰에서는 시트를 «먼저 열고» 나서 편다 — 순서가 �
 });
 
 test('★ 이미 펴져 있으면 다시 접지 않는다 — 시트가 열린 순간 눈앞에서 닫히면 안 된다', () => {
-  const fn = stripComments(cutFn(raw, 'function shareFromBar('));
+  const fn = stripJs(cutFn(raw, 'function shareFromBar('));
   assert.match(fn, /_sharePick && _sharePick\.host === 'sharePickBox'/,
     '★ openShareMany 는 같은 칸이면 «토글»입니다 — 그대로 부르면 접힙니다.');
 });
 
 test('★★ 길잡이 단추는 도구줄과 «같은 셈»으로 나온다 — 갈리면 눌러도 아무 일이 없다', () => {
-  const fn = stripComments(cutFn(raw, 'function renderGridBar('));
+  const fn = stripJs(cutFn(raw, 'function renderGridBar('));
   const m = fn.match(/\$\('shareJumpBtn'\)\.style\.display = ([^;]+);/);
   assert.ok(m, '★ 도구줄이 길잡이 단추를 안 정합니다');
   /* ⚠ 2026-09-03(둘째) — 기준이 touch 에서 «넘길 수 있는 것»(shareIds)으로 바뀌었다.

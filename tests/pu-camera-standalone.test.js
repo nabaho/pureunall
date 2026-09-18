@@ -20,7 +20,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments.js');
+const { stripJs } = require('./strip-comments.js');
 
 const R = path.join(__dirname, '..');
 const CAM = fs.readFileSync(path.join(R, 'pu-camera.html'), 'utf8');
@@ -54,7 +54,7 @@ function 조각(name) {
     ' 이 검사가 어느 코드를 보고 있는지 알 수 없습니다');
   return m[1];
 }
-const 몸통 = stripComments(조각('app'));
+const 몸통 = stripJs(조각('app'));
 
 test('★★★ 제 저장 길을 만들지 않는다 — 2026-08-08 에 없앤 문제가 돌아온다', () => {
   assert.ok(!/\bdb\.ref\s*\(/.test(몸통),

@@ -21,7 +21,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const ROOT = path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
@@ -32,7 +32,7 @@ const SRC = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
    화면 글로 잘못 읽어 검사가 깨졌다. 반대로 주석이 «있어야 할 글자»를 품고 있으면 조용히
    통과할 수도 있다 — 그쪽이 더 무섭다.
    ★ 그래서 조각을 걷을 때는 «가짜 <script> 로 싸서» 같은 걷개를 그대로 쓴다. */
-const bare = (js) => stripComments('<script>' + js + '</script>');
+const bare = (js) => stripJs(js);
 
 function nasSlice(src) {
   const i = src.indexOf('function NasBackupSettings');

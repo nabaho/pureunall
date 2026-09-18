@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const { test } = require('node:test');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(R, 'functions/index.js'), 'utf8').replace(/\r\n/g, '\n');
@@ -22,7 +22,7 @@ function 자동개발구역(){
   const to = ENTER.indexOf("id='sgRollbackConfirm'") >= 0
     ? ENTER.indexOf("id='sgRollbackConfirm'") : ENTER.indexOf('sgRollbackConfirm');
   assert.ok(from > 0 && to > from, '자동개발 구역을 못 찾았습니다');
-  return stripComments('<script>' + ENTER.slice(from, to) + '</script>');
+  return stripJs(ENTER.slice(from, to));
 }
 const bare = 자동개발구역();
 const CLIENT = fs.readFileSync(path.join(R, 'js/pu-dev-automation.js'), 'utf8');

@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { cutFn } = require('./cut-fn.js');
-const { stripComments } = require('./strip-comments.js');
+const { stripComments, stripJs } = require('./strip-comments.js');
 
 const R = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(R, 'pu-photos.html'), 'utf8');
@@ -227,7 +227,7 @@ test('★★★ «격자»도 스위치가 있을 때만 갈래로 거른다 —
        있는데 shownItemsFresh 에서 막이를 빼도 검사가 통과했다. 그러면 폰에서
        **탭 수는 맞는데 격자에서 사진 절반이 사라진다** — 가장 못 믿게 만드는 꼴이다.
      ⚠ 글자 그대로 박지 «않는다». 재는 것은 «차례»다 — 막이가 갈래 거르기보다 앞에 있나. */
-  const fn = stripComments(cutFn(APP, 'function shownItemsFresh('));
+  const fn = stripJs(cutFn(APP, 'function shownItemsFresh('));
   const 거르기 = fn.indexOf('laneOf(');
   const 막이 = fn.indexOf('lanesOn()');
   assert.ok(거르기 > 0, '★ 격자가 갈래로 아예 안 걸러집니다 — 갈래를 나눈 뜻이 없습니다');
@@ -236,7 +236,7 @@ test('★★★ «격자»도 스위치가 있을 때만 갈래로 거른다 —
 });
 
 test('★★ 화면 폭을 «숫자로» 재지 않는다 — CSS 에게 묻는다', () => {
-  const fn = stripComments(cutFn(APP, 'function lanesOn('));
+  const fn = stripJs(cutFn(APP, 'function lanesOn('));
   assert.match(fn, /getComputedStyle/,
     '★★ CSS 에 묻지 않습니다 — 탭을 감추는 규칙(899px)과 isPhone(820px)이 달라 '
     + '821~899px 에서 「스위치는 없는데 걸러지는」 구간이 생깁니다');
@@ -245,7 +245,7 @@ test('★★ 화면 폭을 «숫자로» 재지 않는다 — CSS 에게 묻는�
 });
 
 test('★ 갈래 스위치는 #kinds «안»에 있다 — 폰에서 저절로 감춰진다', () => {
-  assert.match(stripComments(cutFn(APP, 'function renderKindTabs(')),
+  assert.match(stripJs(cutFn(APP, 'function renderKindTabs(')),
     /\$\('kinds'\)\.innerHTML = laneSwitch\(c\)/,
     '★ 스위치가 탭 줄 밖에 있습니다 — 폰에서 감추는 규칙을 따로 만들어야 하고, 그것이 어긋날 자리입니다');
   /* 그 감추는 규칙이 실제로 #kinds 를 끄고 있는지 — 규칙이 사라지면 폰에 스위치가 뜬다 */
@@ -256,7 +256,7 @@ test('★ 갈래 스위치는 #kinds «안»에 있다 — 폰에서 저절로 �
 /* ══════ ⑥ 갈래를 바꿀 때 ═════════════════════════════════════════════════════ */
 
 test('★ 갈래를 바꾸면 «그 갈래의 전체»로 돌아간다 — 빈 화면을 보여 주지 않는다', () => {
-  const fn = stripComments(cutFn(APP, 'function pickLane('));
+  const fn = stripJs(cutFn(APP, 'function pickLane('));
   assert.match(fn, /kindTab = 'all'/,
     '★ 탭을 그대로 두고 갈래를 바꿉니다 — 다른 갈래에 없는 탭이면 빈 화면이 뜹니다');
   assert.match(fn, /selected\.clear\(\)/,
@@ -274,7 +274,7 @@ test('★ 갈래를 «기억하지 않는다» — 늘 서류에서 시작한다
 /* ══════ ⑦ 사진 칸으로 옮기기 ═════════════════════════════════════════════════ */
 
 test('★★ 「사진 칸으로 옮기기」가 새 저장 길을 만들지 않는다', () => {
-  const fn = stripComments(cutFn(APP, 'function moveToPicLane('));
+  const fn = stripJs(cutFn(APP, 'function moveToPicLane('));
   assert.match(fn, /retagPhotos\(\[id\], 'meeting'\)/,
     '★★ 분류 옮기기와 «다른 길»로 저장합니다 — 한쪽만 고쳐지면 갈래와 탭이 어긋납니다');
   assert.equal(/PuPhotoStore\./.test(fn), false,
@@ -301,7 +301,7 @@ test('★★★ 「서류」 딱지는 «사진 갈래»에 안 붙는다 — �
   /* 2026-08-17 에 같은 지적이 있었고(「이 사진은 서류가 아닌데 왜 서류라고 되어 있나」)
      그때는 meeting «하나만» 뺐다. 그 방식은 갈래가 늘 때마다 여기도 함께 고쳐야 해서
      2026-09-09 에 또 같은 지적이 왔다 — 그래서 laneOf 를 그대로 따르게 했다. */
-  const g = stripComments(APP.match(/function renderGrid\(\)[\s\S]*?\n\}/)[0]);
+  const g = stripJs(APP.match(/function renderGrid\(\)[\s\S]*?\n\}/)[0]);
   assert.match(g, /const hasTag = \(it\.meta\.kind === 'doc' && laneOf\(it\) === 'doc'\)/,
     '★★★ 딱지가 갈래를 안 따릅니다 — 갈래가 늘 때마다 여기서 또 어긋납니다');
   /* 갈래를 안 보고 read.kind 를 «직접» 견주는 옛 방식으로 되돌아가지 않았나 */
@@ -312,15 +312,15 @@ test('★★★ 「서류」 딱지는 «사진 갈래»에 안 붙는다 — �
 /* ══════ ⑨ 끌어서 갈래 옮기기 (대표 물음 2026-09-09) ═════════════════════════ */
 
 test('★ 갈래 스위치가 «놓을 자리»다 — data-lane 을 달고 놓으면 옮긴다', () => {
-  assert.match(stripComments(cutFn(APP, 'function laneSwitch(')), /data-lane="/,
+  assert.match(stripJs(cutFn(APP, 'function laneSwitch(')), /data-lane="/,
     '★ 스위치에 놓을 자리 표시가 없습니다 — 끌어다 놓아도 아무 일이 없습니다');
   /* ⚠ data-key 를 쓰면 «끌 수 있는 탭»이 되어 순서 바꾸기·분류 옮기기에 섞인다 */
-  assert.equal(/data-key="/.test(stripComments(cutFn(APP, 'function laneSwitch('))), false,
+  assert.equal(/data-key="/.test(stripJs(cutFn(APP, 'function laneSwitch('))), false,
     '★ 스위치가 분류 탭의 표시(data-key)를 씁니다 — 탭 순서 목록에 섞입니다');
 });
 
 test('★★ 놓았을 때 «새 저장 길»을 만들지 않는다 — 분류 탭에 놓는 것과 같은 길', () => {
-  const drop = stripComments(APP.slice(
+  const drop = stripJs(APP.slice(
     APP.indexOf("$('kinds').addEventListener('drop'"),
     APP.indexOf("$('kinds').addEventListener('dragend'")));
   assert.match(drop, /data-lane/, '★ 놓기 처리가 갈래 스위치를 안 봅니다');
@@ -338,7 +338,7 @@ test('★★ 서류 칸으로 놓아도 «판독하지 않는다» — 스무 �
   assert.match(표, /doc:\s*'other'/,
     '★★ 서류 칸으로 놓을 때 판독을 부르거나 딴 갈래로 적습니다 — 기타서류로 «적기만» 해야 합니다');
   /* 놓기 처리에 판독을 부르는 자리가 없어야 한다 */
-  const drop = stripComments(APP.slice(
+  const drop = stripJs(APP.slice(
     APP.indexOf("$('kinds').addEventListener('drop'"),
     APP.indexOf("$('kinds').addEventListener('dragend'")));
   assert.equal(/readPhoto\(|queueRead\(|readWaitRun\(/.test(drop), false,
@@ -346,7 +346,7 @@ test('★★ 서류 칸으로 놓아도 «판독하지 않는다» — 스무 �
 });
 
 test('놓을 수 있는 자리라는 «표시»가 뜬다 — 안 되는 줄 알고 마는 것을 막는다', () => {
-  const over = stripComments(APP.slice(
+  const over = stripJs(APP.slice(
     APP.indexOf("$('kinds').addEventListener('dragover'"),
     APP.indexOf("$('kinds').addEventListener('dragleave'")));
   assert.match(over, /data-lane/, '★ 갈래 스위치 위에서 놓기 표시가 안 뜹니다');

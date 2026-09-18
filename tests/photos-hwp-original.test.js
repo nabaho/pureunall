@@ -19,12 +19,12 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { cutFn } = require('./cut-fn.js');
-const { stripComments } = require('./strip-comments.js');
+const { stripComments, stripJs } = require('./strip-comments.js');
 
 const ROOT = path.join(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'pu-photos.html'), 'utf8');
 const SRC = stripComments(HTML);
-const STORE = stripComments(fs.readFileSync(path.join(ROOT, 'js/pu-photo-store.js'), 'utf8'));
+const STORE = stripJs(fs.readFileSync(path.join(ROOT, 'js/pu-photo-store.js'), 'utf8'));
 
 /* ── 저장 층을 진짜로 돌려 본다 ── */
 function storeCtx(over) {

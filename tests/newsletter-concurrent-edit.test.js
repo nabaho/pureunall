@@ -14,14 +14,15 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripByName } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const Review = require('../js/pu-news-review.js');
 const Ont = require('../js/pu-ontology.js');
 
 const ROOT = path.join(__dirname, '..');
-const 읽기 = (p) => stripComments(fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));
+/* .html 도 .js 도 온다 — 파일 이름으로 걷개를 고른다(.js 에는 <script> 태그가 없다) */
+const 읽기 = (p) => stripByName(p, fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));
 const 화면 = 읽기('pu-news.html');
 const 서버 = 읽기('functions/index.js');
 

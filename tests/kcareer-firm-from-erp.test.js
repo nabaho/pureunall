@@ -20,13 +20,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const HTML = fs.readFileSync(path.join(R, 'kcareer.html'), 'utf8');
 const FILL = fs.readFileSync(path.join(R, 'js', 'kcareer-hwpxfill.js'), 'utf8');
 const CODE = stripComments(HTML);
-const FCODE = stripComments(FILL);
+const FCODE = stripJs(FILL);
 
 function cutFn(s, decl) {
   const head = s.indexOf(decl);

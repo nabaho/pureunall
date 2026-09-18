@@ -12,10 +12,10 @@ const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'kcareer.html'), 'utf8');
 
-/* 주석을 걷어낸 본문 — 잘 쓴 주석이 검사를 통과시키는 일을 막는다 */
-function stripComments(s) {
-  return s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
-}
+/* 주석을 걷어낸 본문 — 잘 쓴 주석이 검사를 통과시키는 일을 막는다.
+   걷개는 tests/strip-comments.js 한 곳에 둔다. 여기서 보는 것은 grab 이 떼어 낸
+   함수 «조각»이므로 stripJs 다(stripComments 는 통째 HTML 문서 전용). */
+const { stripJs } = require('./strip-comments.js');
 
 /* 이름 붙은 함수 하나를 중괄호 균형으로 떼어 낸다 */
 function grab(name) {
@@ -71,13 +71,13 @@ test('엔진이 없거나 던져도 이름은 망가지지 않는다', () => {
 });
 
 test('올린 파일 이름을 그대로 쓰지 않는다 — 바로잡은 이름 하나로 쭉 간다', () => {
-  const body = stripComments(grab('importTemplateFile'));
+  const body = stripJs(grab('importTemplateFile'));
   assert.match(body, /_hwpFixName\(/, '업로드 입구에서 이름을 바로잡아야 합니다');
   /* 올린 이름은 «바로잡는 재료»로만 쓴다 — 보관함·임시저장·편집기에 그대로 흘려보내면
      다음에 열 때 같은 자리에서 또 막힌다. */
   assert.doesNotMatch(body, /name:\s*file\.name/, '보관함·임시저장에 어긋난 이름이 남습니다');
   assert.doesNotMatch(body, /mountEditor\([^)]*file\.name/, '편집기에 어긋난 이름이 넘어갑니다');
-  assert.match(stripComments(grab('mountEditor')), /_hwpFixName\(/,
+  assert.match(stripJs(grab('mountEditor')), /_hwpFixName\(/,
     '보관함·이어서 하기로 들어오는 길에도 관문이 있어야 합니다');
 });
 
@@ -86,7 +86,7 @@ test('올린 파일 이름을 그대로 쓰지 않는다 — 바로잡은 이름
    팝업은 같은 것을 한 번 더 덮어 보여 주면서 닫기·저장을 그 안에 가뒀다.
    이제 큰 창은 «눌렀을 때만» 뜬다 — 열려 있을 때 채우기가 되는 것은 그대로 지킨다. */
 test('올리는 것만으로 큰 창이 뜨지는 않는다 — 편집기에 원본이 이미 나온다', () => {
-  const body = stripComments(grab('importTemplateFile'));
+  const body = stripJs(grab('importTemplateFile'));
   assert.doesNotMatch(body, /openHwpViewer\(/, '팝업이 화면을 덮으면 안 됩니다');
   assert.match(source, /onclick="rhOpenBigPopup\(\)"/, '크게 보고 싶을 때 열 길은 있어야 합니다');
 });
@@ -99,7 +99,7 @@ test('큰 창이 열려 있으면 그 창에서 바로 채울 수 있다', () =>
 });
 
 test('★ 큰 창에 «다른 문서»가 떠 있으면 그것을 채운다 — 보이는 것과 채우는 것이 달라선 안 된다', () => {
-  const body = stripComments(grab('rhAutoFillDoc'));
+  const body = stripJs(grab('rhAutoFillDoc'));
   assert.match(body, /_hwpView/, '지금 화면에 보이는 문서를 채움 대상으로 삼아야 합니다');
   assert.match(body, /mountEditor\(/,
     '보이는 문서를 편집기에 올려야 칸 지도가 생기고 제대로 채웁니다');

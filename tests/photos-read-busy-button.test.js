@@ -18,7 +18,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -84,7 +84,7 @@ test('★★ 지금 읽는 사진과 줄에 선 사진을 «둘 다» 안다', (
 /* ══════ ③ 화면이 실제로 그렇게 그린다 ══════ */
 
 test('★★ 띠의 단추가 «글과 잠금»을 함께 바꾼다 — 글만 바꾸면 여전히 눌린다', () => {
-  const fn = stripComments(cutFn(raw, 'function renderReadAsk('));
+  const fn = stripJs(cutFn(raw, 'function renderReadAsk('));
   assert.match(fn, /const 도는중 = readingNow\(\);/, '★ 띠가 도는 중인지 안 봅니다');
   assert.match(fn, /도는중 \? ' disabled/,
     '★★ 잠그지 않으면 「판독 중」이라고 적어 놓고도 눌립니다 — 누른 만큼 요금입니다');
@@ -100,14 +100,14 @@ test('★★ 칸의 🔤 단추도 그 사진이 읽히는 중이면 잠긴다',
 });
 
 test('★★ 같은 사진을 두 번 걸지 않는다 — 잠기기 전에 두 번 눌려도 한 번만 읽는다', () => {
-  const fn = stripComments(cutFn(raw, 'function queuePhotoRead('));
+  const fn = stripJs(cutFn(raw, 'function queuePhotoRead('));
   assert.match(fn, /if \(readingThis\(id\)\) return;/,
     '★★ 막지 않으면 한 장을 두 번 읽고 요금도 두 번 듭니다.');
   assert.match(fn, /readRunN \+= 1;/, '★ 몇 장을 걸었는지 안 세면 「3/20」을 적을 수 없습니다');
 });
 
 test('★★ 한 장 끝날 때마다 단추를 다시 그린다 — 안 그리면 숫자가 멈춰 있다', () => {
-  const fn = stripComments(cutFn(raw, 'function pumpRead('));
+  const fn = stripJs(cutFn(raw, 'function pumpRead('));
   assert.match(fn, /readRunDone \+= 1;/, '★ 끝난 장수를 안 셉니다');
   assert.match(fn, /readNowId = job\._photoId \|\| '';/, '★ 지금 읽는 사진을 안 적습니다');
   /* 시작할 때와 끝날 때 둘 다 다시 그려야 숫자가 살아 움직인다 */
