@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563eb">
+<title>푸른 캘린더</title>
+<link rel="manifest" href="pu-cal-manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📅</text></svg>">
+<!-- 아이폰 홈화면 아이콘 — 탭 아이콘과 다른 것이다. 여기는 PNG 여야 한다(SVG 를 안 읽는다) -->
+<link rel="apple-touch-icon" href="icon-cal-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="푸른 캘린더">
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="js/pu-ontology.js?v=27"></script>
+<script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
+<script src="js/pu-resilience.js?v=3"></script>
+<script src="js/pu-gate.js?v=2"></script>
+<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-version.js?v=8"></script>
+<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-work-core.js?v=1"></script>
+<script src="js/pu-cal-read.js?v=1"></script>
+<style>
+  :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
+    --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
+    --danger:#dc2626;--radius:11px}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
+    background:#f8fafc;font-size:14px;-webkit-font-smoothing:antialiased}
+
+  /* ── 머리줄 ──
+     ⚠ 한 줄이다. 낱말 가운데서 잘려 두 줄이 되면 폰에서 화면을 갉아먹는다.
+        넘치면 «줄이는» 것이지 «내리는» 것이 아니다. */
+  #topbar{position:sticky;top:0;z-index:15;background:#ffffff;border-bottom:1px solid var(--line);
+    padding:8px 16px;display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}
+  #topbar .brand{font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;flex-shrink:0}
+  #topbar .sp{margin-left:auto}
+  #conn{font-size:12px;color:var(--sub);flex-shrink:0}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#cbd5e1;margin-right:5px}
+  .dot.on{background:#16a34a}
+  #me{font-size:12.5px;font-weight:700;flex-shrink:0;overflow:hidden;text-overflow:ellipsis}
+  #me .role{color:var(--sub);font-weight:500;margin-left:4px}
+  .lnk{font-size:12.5px;padding:5px 11px;border:1px solid var(--line);color:var(--sub);background:#ffffff;
+    border-radius:8px;cursor:pointer;font-weight:700;flex-shrink:0}
+  .lnk.go{border-color:#bfdbfe;color:var(--acc2)}
+
+  /* ── 탭 한 줄 — 법인 셋 · 이음 셋 ── */
+  #tabs{display:flex;align-items:center;gap:3px;padding:7px 14px;background:#ffffff;
+    border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
+  .gl{font-size:10px;color:var(--faint);font-weight:700;margin:0 3px 0 0;flex-shrink:0}
+  .tab{padding:5px 11px;border-radius:7px;font-size:12px;color:var(--sub);cursor:pointer;
+    border:none;background:transparent;font-family:inherit;flex-shrink:0}
+  .tab:hover{background:var(--bg)}
+  .tab.eum{color:#2563eb}
+  .tab.on{background:var(--acc2);color:#ffffff;font-weight:700}
+  .tsep{width:1px;height:18px;background:#cbd5e1;margin:0 7px;flex-shrink:0}
+
+  #app{padding:14px 16px 90px;max-width:1500px;margin:0 auto}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
+  .note{background:var(--warn-bg);border:1px solid #fde68a;border-radius:9px;padding:9px 13px;
+    font-size:12px;color:var(--warn);margin-bottom:11px;display:flex;align-items:center;gap:9px}
+  .note .sp{margin-left:auto}
+  .btn{border:none;border-radius:7px;font-size:12px;font-weight:700;padding:6px 13px;cursor:pointer;
+    font-family:inherit;background:var(--acc);color:#ffffff}
+  .btn.ghost{background:#ffffff;color:var(--acc2);border:1px solid #bfdbfe}
+  .muted{color:var(--sub)}
+
+  /* ── 달 고르기 ── */
+  .monthbar{display:flex;align-items:center;gap:8px;margin-bottom:9px;white-space:nowrap}
+  .monthbar .ym{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+  .mv{border:1px solid var(--line);background:#ffffff;border-radius:7px;width:28px;height:28px;
+    cursor:pointer;color:var(--sub);font-size:14px;font-family:inherit}
+
+  /* ── 거르개 ── */
+  .chips{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:9px}
+  .chip{font-size:11px;border:1px solid #cbd5e1;border-radius:20px;padding:2px 10px;color:var(--sub);
+    background:#ffffff;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .chip.on{background:var(--acc2);border-color:var(--acc2);color:#ffffff;font-weight:700}
+
+  /* ── 달력 ── */
+  .cal{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#ffffff}
+  .calhd{display:grid;grid-template-columns:repeat(7,1fr);background:var(--bg);font-size:11px;
+    color:var(--sub);text-align:center}
+  .calhd div{padding:5px 0;border-right:1px solid var(--line)}
+  .calhd div:last-child{border-right:none}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr)}
+  .day{min-height:92px;border-right:1px solid var(--line);border-top:1px solid var(--line);padding:3px 4px;overflow:hidden}
+  .day:nth-child(7n){border-right:none}
+  .day.out{background:var(--bg)}
+  .day.today{background:var(--acc-soft)}
+  .dnum{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .dnum.sun,.dnum.hol{color:var(--danger);font-weight:700}
+  .dnum.sat{color:var(--acc)}
+  .holname{font-size:9.5px;color:var(--danger);margin-left:3px}
+  /* 한 칸은 «한 줄»이다 — 넘치면 … 로 줄이고 전문은 title 에 담는다 */
+  .ev{font-size:10.5px;border-radius:4px;padding:1px 5px;margin-top:2px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;cursor:default}
+  .ev.sch{background:#eff6ff;color:#1e40af}
+  .ev.eum{background:#bfdbfe;color:#1e40af}
+  .ev.leave{background:#f0fdf4;color:#166534}
+  .ev.off{background:#fef2f2;color:#991b1b}
+  .ev.trip{background:#fffbeb;color:#854d0e}
+  .more{font-size:9.5px;color:var(--faint);margin-top:1px}
+
+  .legend{display:flex;gap:11px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin-top:9px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+
+  .later{text-align:center;padding:40px 18px;color:var(--sub)}
+  .later h2{font-size:16px;margin:0 0 7px;color:var(--ink)}
+  .later p{margin:0 0 16px;font-size:12.5px}
+
+  @media (max-width:700px){
+    #app{padding:10px 8px 80px}
+    #topbar{padding:7px 10px;gap:7px}
+    #topbar .brand{font-size:13px}
+    #conn span.t{display:none}
+    .day{min-height:66px}
+    .ev{font-size:9.5px}
+  }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="brand">📅 푸른 캘린더</span>
+  <button class="lnk go" id="goErp" title="푸른이알피로 갑니다">← 푸른이알피</button>
+  <span class="sp"></span>
+  <span id="conn"><span class="dot"></span><span class="t">연결 중…</span></span>
+  <span id="me"></span>
+  <button class="lnk" id="logout">로그아웃</button>
+</div>
+
+<div id="tabs"></div>
+<div id="app"><div class="panel muted">불러오는 중…</div></div>
+
+<script>
+/* 푸른 캘린더 — 법인 대시보드 + 이음센터를 이알피에서 떼어 낸 앱 (1걸음)
+   ────────────────────────────────────────────────────────────────────────
+   대표 지시 2026-09-18 「법인대시보드와 이음센터만 완전히 따로 빼서 캘린더를 만들고 싶다」
+
+   ⚠ 1걸음은 «읽기»까지다. 일정·근태를 넣고 고치는 것은 아직 이알피가 한다.
+     까닭: 근태 저장은 마감 자물쇠·번호 규칙·안전 병합을 모두 지나야 하는데,
+     그 문을 여기 다시 지으면 «두 벌»이 된다 — 그러면 마감한 달이 한쪽에서 뚫리고
+     급여가 조용히 틀어진다. 그 문을 공용으로 빼낸 뒤에 붙인다(1걸음-나).
+     그래서 이 화면은 고치는 자리마다 이알피로 보낸다 — «못 한다»가 아니라 «저기서 한다».
+
+   ⚠ 이알피는 그대로 둔다. 한 달은 두 곳에서 같은 달력이 보인다(2걸음).
+     새 앱에서만 생기는 문제를 잡은 뒤에야 이알피 쪽을 뺀다(3걸음). */
+'use strict';
+
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',storageBucket:'pureun-erp.firebasestorage.app',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+
+var fbDb = null;
+var D = {};              // 읽어 온 표들
+var FAILED = {};         // 못 읽은 표 — «빈 것»과 갈라 둔다
+var ME = null;           // 나 (직원 한 줄)
+var S = { tab:'cal', ym:'', filter:null, unwatch:[] };
+
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function ymOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function todayYMD(){ var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function arr(v){ return Array.isArray(v) ? v : []; }
+
+/* ── 어느 탭이 있는가 ──────────────────────────────────────────────────
+   대표 결정 2026-09-18: 법인 셋과 이음 셋을 «한 줄»에 두 묶음으로 둔다.
+   지금은 옆 메뉴를 갔다 와야 오가는데, 여기서는 한 번 누르면 된다 — 그것이 옮기는 뜻이다. */
+var TABS = [
+  { v:'cal',      g:'법인',    label:'📅 캘린더',      ready:true },
+  { v:'workload', g:'법인',    label:'👥 직원별 업무', erp:'dash/corp' },
+  { v:'analytics',g:'법인',    label:'📊 분석',        erp:'dash/corp', money:true },
+  { v:'eumcal',   g:'이음센터', label:'📅 근무 캘린더', ready:true },
+  { v:'eumppl',   g:'이음센터', label:'👤 인원 현황',   erp:'dash/ieum' },
+  { v:'eumshare', g:'이음센터', label:'🔗 외부 공유 뷰', erp:'dash/ieum' }
+];
+
+/* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
+   ⚠ 필요한 것만 읽는다 — 안 쓰는 큰 표를 받으면 요금과 깜빡임이 늘어난다. */
+var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors'];
+
+/* ── 사람 ──────────────────────────────────────────────────────────── */
+function users(){ return arr(D.user_accounts).filter(function(u){ return u && u.sid; }); }
+function userOf(sid){
+  var us = users();
+  for(var i=0;i<us.length;i++) if(us[i].sid===sid) return us[i];
+  return null;
+}
+function nameOf(sid){ var u=userOf(sid); return u ? (u.name||sid) : sid; }
+function externalOf(id){
+  var xs = arr(D.external_staff);
+  for(var i=0;i<xs.length;i++) if(xs[i] && xs[i].id===id) return xs[i];
+  return null;
+}
+/* 직원 색 — 이알피가 정한 것을 그대로 쓴다. 여기서 새로 정하지 않는다
+   (같은 사람이 두 앱에서 다른 색이면 그 색은 아무 뜻도 없어진다). */
+function colorOf(sid){
+  var m = D.staff_colors;
+  if(m && typeof m==='object' && !Array.isArray(m) && m[sid]) return m[sid];
+  return null;
+}
+
+/* ── 공휴일 ────────────────────────────────────────────────────────── */
+function holidayOf(ymd){
+  var hs = D.holidays;
+  if(Array.isArray(hs)){
+    for(var i=0;i<hs.length;i++){ if(hs[i] && hs[i].date===ymd) return hs[i].name||'공휴일'; }
+    return '';
+  }
+  if(hs && typeof hs==='object' && hs[ymd]) return (hs[ymd].name||hs[ymd]) || '공휴일';
+  return '';
+}
+
+/* ── 그 날의 일들 ──────────────────────────────────────────────────── */
+function eventsOn(ymd, eumOnly){
+  var out = [];
+  // ① 일정
+  arr(D.my_schedules).forEach(function(s){
+    if(!s || s.date !== ymd) return;
+    if(s.externalId) return;                       // 외부인 배정은 로스터 화면에만 (이알피와 같은 규칙)
+    var t = s.title || '📅 일정';
+    out.push({ kind:'sch', sid:s.sid, text:t, tip:t + (s.note ? ' · '+s.note : '') });
+  });
+  // ② 근태 — 유형의 뜻은 js/pu-work-core.js 한 자리에서 받는다
+  arr(D.attendance_records).forEach(function(r){
+    if(!r || r.date !== ymd) return;
+    var ty = PuWork.typeOf(r.type);
+    var label = PuWork.labelFor(r.type, 'calendar');
+    var who = r.externalId ? (externalOf(r.externalId)||{}).name : nameOf(r.sid);
+    var text = PuWork.iconFor(r.type) + ' ' + (who||'') + ' ' + label;
+    out.push({
+      kind: r.type==='eum-work' ? 'eum' : (ty && ty.deductLeave) ? 'leave'
+            : (r.type==='trip'||r.type==='telework') ? 'trip' : 'off',
+      sid:r.sid, externalId:r.externalId, type:r.type,
+      text:text, tip:text + (r.note ? ' · '+r.note : '')
+    });
+  });
+  if(eumOnly) out = out.filter(function(e){ return e.kind==='eum'; });
+  return out;
+}
+
+/* 거르개 — null=전체 · 'pureun'=푸른 직원만 · 'eumwork'=이음 근무만 · sid=그 사람만 */
+function passFilter(ev){
+  var f = S.filter;
+  if(!f) return true;
+  if(f==='pureun')  return !ev.externalId;
+  if(f==='eumwork') return ev.kind==='eum';
+  return ev.sid === f;
+}
+
+/* ── 달력 그리기 ───────────────────────────────────────────────────── */
+function calendarHtml(eumOnly){
+  var ym = S.ym, y = +ym.slice(0,4), m = +ym.slice(5,7);
+  var first = new Date(y, m-1, 1);
+  var start = new Date(y, m-1, 1 - first.getDay());      // 그 주 일요일부터
+  var today = todayYMD();
+  var cells = '';
+  for(var i=0;i<42;i++){
+    var d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
+    var ymd = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var out = (d.getMonth()+1) !== m;
+    var hol = holidayOf(ymd);
+    var dow = d.getDay();
+    var cls = 'dnum' + (hol||dow===0 ? ' sun' : dow===6 ? ' sat' : '');
+    var evs = eventsOn(ymd, eumOnly).filter(passFilter);
+    var shown = evs.slice(0, 4), rest = evs.length - shown.length;
+    cells += '<div class="day'+(out?' out':'')+(ymd===today?' today':'')+'">'
+      + '<div class="'+cls+'">'+d.getDate()+(hol?'<span class="holname">'+esc(hol)+'</span>':'')+'</div>'
+      + shown.map(function(e){
+          var c = colorOf(e.sid);
+          var st = (c && !e.externalId) ? ' style="border-left:3px solid '+esc(c)+'"' : '';
+          return '<div class="ev '+e.kind+'"'+st+' title="'+esc(e.tip)+'">'+esc(e.text)+'</div>';
+        }).join('')
+      + (rest>0 ? '<div class="more">+'+rest+'건</div>' : '')
+      + '</div>';
+    if(i>=34 && (d.getMonth()+1)!==m && d.getDay()===6) break;   // 다음 달만 남은 줄은 안 그린다
+  }
+  return '<div class="cal">'
+    + '<div class="calhd"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>'
+    + '<div class="calgrid">'+cells+'</div></div>';
+}
+
+function monthbarHtml(){
+  return '<div class="monthbar">'
+    + '<button class="mv" data-mv="-1">‹</button>'
+    + '<span class="ym">'+esc(S.ym)+'</span>'
+    + '<button class="mv" data-mv="1">›</button>'
+    + '<button class="btn ghost" data-mv="0">오늘</button>'
+    + '</div>';
+}
+
+function chipsHtml(eumOnly){
+  var list = [{v:null,t:'전체'}];
+  if(!eumOnly){
+    list.push({v:'pureun',t:'푸른 직원만'});
+    list.push({v:'eumwork',t:'이음센터 근무'});
+  }
+  users().slice(0,12).forEach(function(u){ list.push({v:u.sid, t:u.name||u.sid}); });
+  return '<div class="chips">' + list.map(function(c){
+    var on = (S.filter||null) === (c.v||null);
+    return '<button class="chip'+(on?' on':'')+'" data-f="'+esc(c.v==null?'':c.v)+'">'+esc(c.t)+'</button>';
+  }).join('') + '</div>';
+}
+
+function legendHtml(){
+  return '<div class="legend">'
+    + '<span><i style="background:#eff6ff"></i>일정</span>'
+    + '<span><i style="background:#bfdbfe"></i>이음센터 근무</span>'
+    + '<span><i style="background:#f0fdf4"></i>연차·반차</span>'
+    + '<span><i style="background:#fffbeb"></i>출장·재택</span>'
+    + '<span><i style="background:#fef2f2"></i>병가·휴직 등</span>'
+    + '</div>';
+}
+
+/* 못 읽은 칸이 있으면 숨기지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이 된다. */
+function failedHtml(){
+  var ks = Object.keys(FAILED);
+  if(!ks.length) return '';
+  return '<div class="note"><span>⚠ 못 읽은 자료가 있습니다 — 달력이 다 차 보이지 않을 수 있습니다: '
+    + esc(ks.join(' · ')) + '</span></div>';
+}
+
+function readOnlyNote(){
+  return '<div class="note">'
+    + '<span>✏️ 넣고 고치는 것은 아직 푸른이알피에서 합니다 — 여기서는 보기만 합니다.</span>'
+    + '<span class="sp"></span>'
+    + '<button class="btn" data-erp="dash/corp">이알피에서 고치기</button></div>';
+}
+
+function laterHtml(tab){
+  return '<div class="panel later">'
+    + '<h2>'+esc(tab.label)+' — 아직 이알피에 있습니다</h2>'
+    + '<p>이 화면은 다음 걸음에 옮깁니다. 지금은 푸른이알피에서 그대로 쓰실 수 있습니다.'
+    + (tab.money ? '<br>금액이 보이는 화면이라 옮길 때 권한을 함께 옮깁니다(관리자만).' : '')
+    + '</p>'
+    + '<button class="btn" data-erp="'+esc(tab.erp)+'">푸른이알피에서 열기</button></div>';
+}
+
+/* ── 그리기 ────────────────────────────────────────────────────────── */
+function renderTabs(){
+  var last = '';
+  $('tabs').innerHTML = TABS.map(function(t){
+    var head = '';
+    if(t.g !== last){ head = (last ? '<span class="tsep"></span>' : '') + '<span class="gl">'+esc(t.g)+'</span>'; last = t.g; }
+    /* 이음 쪽은 글자를 파랗게 — 금 하나만으로는 어느 묶음인지 눈이 못 가른다 */
+    var eum = t.g === '이음센터' ? ' eum' : '';
+    return head + '<button class="tab'+eum+(S.tab===t.v?' on':'')+'" data-t="'+esc(t.v)+'">'+esc(t.label)+'</button>';
+  }).join('');
+}
+
+function render(){
+  renderTabs();
+  var tab = TABS.filter(function(t){ return t.v===S.tab; })[0] || TABS[0];
+  var html;
+  if(tab.v==='cal' || tab.v==='eumcal'){
+    var eumOnly = tab.v==='eumcal';
+    html = failedHtml() + readOnlyNote()
+      + '<div class="panel">' + monthbarHtml() + chipsHtml(eumOnly) + calendarHtml(eumOnly) + legendHtml() + '</div>';
+  } else {
+    html = laterHtml(tab);
+  }
+  $('app').innerHTML = html;
+}
+
+/* 누르는 것은 한 자리에서 받는다 — 단추마다 붙이면 다시 그릴 때 하나씩 샌다 */
+document.addEventListener('click', function(e){
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp]') : null;
+  if(!t) return;
+  if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; render(); return; }
+  if(t.hasAttribute('data-mv')){
+    var mv = +t.getAttribute('data-mv');
+    if(mv===0){ S.ym = ymOf(new Date()); }
+    else { var d=new Date(S.ym+'-01'); d.setMonth(d.getMonth()+mv); S.ym = ymOf(d); }
+    render(); return;
+  }
+  if(t.hasAttribute('data-f')){ var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
+  if(t.hasAttribute('data-erp')){ goErp(t.getAttribute('data-erp')); return; }
+});
+
+/* 이알피로 — 창은 «하나»만 쓴다(새 탭을 자꾸 만들지 않는다) */
+function goErp(menu){
+  var url = 'pu-erp.html?sso=1' + (menu ? '#menu='+encodeURIComponent(menu) : '');
+  try { if(window.PuAppBar && PuAppBar.goApp){ PuAppBar.goApp(url, 'erp'); return; } } catch(e){}
+  location.href = url;
+}
+$('goErp').onclick = function(){ goErp(''); };
+$('logout').onclick = function(){ try{ firebase.auth().signOut(); }catch(e){} };
+
+/* ── 시작 ──────────────────────────────────────────────────────────── */
+function setConn(on, text){
+  var c = $('conn');
+  c.innerHTML = '<span class="dot'+(on?' on':'')+'"></span><span class="t">'+esc(text)+'</span>';
+}
+
+function start(user){
+  PuCalRead.attach(fbDb);
+  S.ym = ymOf(new Date());
+  setConn(true, '연결됨');
+  PuCalRead.readMany(KEYS).then(function(r){
+    D = r.data; FAILED = r.failed;
+    ME = (function(){
+      var us = users();
+      for(var i=0;i<us.length;i++){ if(us[i].uid===user.uid || us[i].email===user.email) return us[i]; }
+      return null;
+    })();
+    $('me').innerHTML = ME ? esc(ME.name||'') + '<span class="role">'+esc(ME.role||ME.position||'')+'</span>'
+                           : '<span class="role">'+esc(user.email||'')+'</span>';
+    render();
+    /* 바뀐 한 건만 받아 다시 그린다 — 큰 표를 통째로 다시 받지 않는다 */
+    ['attendance_records','my_schedules'].forEach(function(k){
+      S.unwatch.push(PuCalRead.watch(k, function(){
+        PuCalRead.readOnce(k).then(function(v){ D[k]=v; render(); }).catch(function(){});
+      }));
+    });
+  }).catch(function(e){
+    $('app').innerHTML = '<div class="panel"><h2 style="color:#dc2626">자료를 못 읽었습니다</h2>'
+      + '<p class="muted">'+esc(e && e.message || e)+'</p>'
+      + '<button class="btn" data-erp="dash/corp">푸른이알피에서 보기</button></div>';
+  });
+}
+
+try{
+  firebase.initializeApp(FB_CONFIG);
+  fbDb = firebase.database();
+  firebase.auth().onAuthStateChanged(function(u){
+    if(u) start(u); else PuGate.show();
+  });
+}catch(e){
+  $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
+}
+</script>
+<script src="js/pu-appbar.js?v=11"></script>
+<script>try{ PuAppBar.mount('#topbar', { current:'cal' }); }catch(e){}</script>
+<script>try{ PuBack.guard(function(){ return false; }); }catch(e){}</script>
+</body>
+</html>

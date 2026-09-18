@@ -32,6 +32,7 @@ const DONE = [
   ['gov-consulting.html', '정부컨설팅'],
   ['kcareer.html', '경력관리'],
   ['work.html', '업무관리'],
+  ['pu-cal.html', '푸른캘린더'],
   ['pu-cards.html', '기업정보함'],
   ['pu-photos.html', '푸른사진첩'],
   ['rules.html', '취업규칙'],

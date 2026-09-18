@@ -35,6 +35,7 @@
        없다 — 이번엔 둘 다였다. 이름도 포털 개명(2026-08-11)을 따라잡았다. */
   var APPS = [
     { key: 'erp',     name: '푸른이알피',   icon: '🏢', url: 'pu-erp.html',         desc: '인사·급여·재무' },
+    { key: 'cal',     name: '푸른 캘린더',  icon: '📅', url: 'pu-cal.html',         desc: '일정·근태·이음센터' },
     { key: 'consult', name: '정부사업일정', icon: '📅', url: 'gov-consulting.html', desc: '보고서 일정및사진관리' },
     { key: 'work',    name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },

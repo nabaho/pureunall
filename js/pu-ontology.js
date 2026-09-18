@@ -18,7 +18,10 @@
       Case:'사건', Project:'사업·컨설팅', Task:'업무', ScheduleEvent:'일정',
       FinancialTransaction:'입출금', Invoice:'세금계산서', Document:'문서',
       MediaAsset:'사진·첨부', Message:'메일·알림', PayrollRecord:'임금기록',
-      Policy:'규정·정책', Submission:'제출·전자송부'
+      Policy:'규정·정책', Submission:'제출·전자송부',
+      /* ⚠ 업무 자료가 아니다 — 「그 사람이 어느 탭·어느 달을 보고 있었나」뿐이다.
+         관계 색인에 넣지 않는다(푸른 캘린더의 읽기 어댑터가 in_app 인 까닭). */
+      ViewState:'보던 자리'
     },
     predicates: {
       belongsToOrganization:['Person','Organization'],
@@ -62,6 +65,16 @@
     erp:{ name:'푸른이알피', file:'pu-erp.html',
       primaryRoots:['data','improve_requests','hanaSmsBridge','ieum_public'],
       entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
+    /* 푸른 캘린더 — 법인 대시보드와 이음센터를 이알피에서 떼어 낸 앱 (대표 지시 2026-09-18).
+       ⚠ 업무 자료의 주인은 «이알피»다. 여기는 그 칸을 빌려 읽는다(sharedRoots).
+         일정·근태를 새로 만들 때도 이알피의 칸에 쓴다 — 두 벌로 갈리면 급여가 틀어진다.
+       제 것은 «보던 자리»뿐이다(어느 탭·어느 거르개였나) — data 아래 곁방에 둔다. */
+    cal:{ name:'푸른 캘린더', file:'pu-cal.html', primaryRoots:['data/cal_view'], sharedRoots:['data'],
+      entityTypes:['ScheduleEvent','Person'],
+      /* ⚠ 여기 적힌 자리 «말고는» 이 앱이 아무것도 못 쓴다(새 프로그램은 기본이 차단이다).
+         1걸음은 읽기까지다 — 일정·근태 저장을 붙일 때 이 목록을 늘린다. 늘릴 때는
+         반드시 마감 자물쇠(PuWork.LOCK_TABLES)를 지나는 문으로만 쓴다. */
+      writeContracts:[{path:'data/cal_view/{uid}',entityType:'ViewState'}] },
     consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting'],
       sharedRoots:['data/consultings','puphotos'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp'], sharedRoots:['data','pucards/idx'],
@@ -289,6 +302,13 @@
   var READ_ADAPTERS = {
     erp_core:{program:'erp',strategy:'local',path:'data',parser:'erp'},
     consult_core:{program:'consult',strategy:'local',path:'data/consultings',parser:'erp'},
+    /* 푸른 캘린더 — 업무 자료를 «따로 담지 않는다». 일정·근태의 주인은 이알피이고
+       그것은 erp_core 가 이미 읽는다. 여기서 또 읽으면 같은 일정이 두 번 세어진다.
+       제 자리(data/cal_view)에 있는 것은 «어느 탭을 보고 있었나»뿐이라 업무 개체가 아니다.
+       ⚠ 그래서 in_app 이다 — 「못 읽는다」가 아니라 «여기서 읽을 것이 없다»는 뜻이다.
+         캘린더가 제 업무 자료를 갖게 되면(1걸음-나 저장 붙이기) 그때 다시 본다. */
+    cal_view:{program:'cal',strategy:'in_app',path:'data/cal_view',parser:'coverage',
+      gives:'보던 탭·거르개 (업무 자료 아님 — 일정·근태는 erp_core 가 읽는다)'},
     fund_core:{program:'fund',strategy:'local',path:'data/funds',parser:'erp'},
     work_items:{program:'work',strategy:'remote',path:'work_erp/items',parser:'workItems'},
     career_counts:{program:'career',strategy:'remote',path:'kcareer/{uid}/counts',parser:'coverage'},
