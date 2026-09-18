@@ -105,6 +105,20 @@
     }
     return esc(u);
   }
+  /* ★★ 바깥으로 나가는 링크는 «새 탭»이다 (대표 지시 2026-09-18
+       「다운로드 받을때 이렇게 나오면 모두 차단으로 들어갈 것 같다」).
+     ⚠⚠ 크롬·엣지는 한 쪽(page)이 파일을 «두 번째» 내려받으려 하면 그때부터
+       「여러 파일 다운로드 — 차단 / 허용」을 묻는다. 세는 자리가 «그 탭»이라,
+       자료를 둘만 받아도 묻는 창이 뜬다. 받는 분이 거기서 «차단»을 누르면
+       그 결정이 우리 주소에 «남아», 그 뒤로는 하나도 못 받는다. 자료가 여섯인
+       편지에서 이것은 시간 문제였다.
+     ★ 새 탭에서 받으면 세는 자리가 «그 새 탭»이라 늘 «첫 번째»다 — 묻지 않는다.
+       PDF 는 새 탭에서 그냥 열리기까지 한다(받을 것도 없어진다).
+     ★ 덤: 「원문 ↗」을 눌러도 편지가 그대로 남는다. 종전에는 편지를 덮고 나갔다.
+     ⚠ mailto: 에는 붙이지 않는다 — 빈 탭만 하나 열리고 만다(꼬리의 수신거부).
+     ⚠ rel="noopener" 를 같이 붙인다. 없으면 새 탭이 window.opener 로 우리 쪽을
+       건드릴 수 있다. */
+  var 새탭 = ' target="_blank" rel="noopener"';
   function 날짜꼴(s) {
     var t = String(s == null ? '' : s).replace(/\D/g, '');
     return t.length === 8 ? t.slice(0, 4) + '-' + t.slice(4, 6) + '-' + t.slice(6) : String(s || '');
@@ -298,7 +312,7 @@
         ? (제목줄 || 표) + esc(내글).replace(/\r?\n/g, '<br>')
         : esc(x.제목 || '');
       var 링 = u
-        ? ' <a href="' + u + '" style="color:' + 색.남색 + ';font-size:12px;'
+        ? ' <a href="' + u + '"' + 새탭 + ' style="color:' + 색.남색 + ';font-size:12px;'
           + 'text-decoration:none;font-weight:bold;">원문 ↗</a>'
         : '';
       /* 우리 글은 «단」이고, 옛 제목 줄은 «점 목록»이다 — 모양으로도 갈라 보인다 */
@@ -367,7 +381,7 @@
         + (x.시행일 ? ' · 시행 ' + esc(날짜꼴(x.시행일)) : '')
         + (x.부처 ? ' · ' + esc(x.부처) : '')
         + '</span>'
-        + (u ? '&nbsp;<a href="' + u + '" style="color:' + 색.남색 + ';font-size:12px;">법제처에서 보기</a>' : '')
+        + (u ? '&nbsp;<a href="' + u + '"' + 새탭 + ' style="color:' + 색.남색 + ';font-size:12px;">법제처에서 보기</a>' : '')
         + '</div>';
     }).filter(Boolean).join('');
     return 줄;
@@ -417,7 +431,7 @@
     var 제 = esc(String((x && x.제목) || '').replace(/\s+/g, ' ').trim());
     var 상세 = href(x && x.링크);
     var 제목칸 = 상세
-      ? '<a href="' + 상세 + '" style="color:' + 색.짙은갈 + ';text-decoration:none;">' + 제 + '</a>'
+      ? '<a href="' + 상세 + '"' + 새탭 + ' style="color:' + 색.짙은갈 + ';text-decoration:none;">' + 제 + '</a>'
       : 제;
 
     /* ★ 우리 글이 «맨 앞»이다 (대표 지시 2026-09-13 「우리글 니가 정리해서 달라」).
@@ -454,7 +468,7 @@
          테두리만 있는 작은 단추로. ⚠ 글귀는 「내려받기」로 시작한다 — 검사와 평문이 그 낱말을 찾는다. */
     var 받기 = 파일
       ? '<div style="padding-top:9px;">'
-        + '<a href="' + 파일 + '" style="display:inline-block;border:1px solid ' + 색.갈 + ';'
+        + '<a href="' + 파일 + '"' + 새탭 + ' style="display:inline-block;border:1px solid ' + 색.갈 + ';'
         + 'color:' + 색.갈 + ';font-size:11px;font-weight:bold;text-decoration:none;padding:4px 10px;'
         + 'border-radius:3px;font-family:' + 폰트 + ';">내려받기 ↓'
         + (파일글(x) ? ' <span style="font-weight:normal;color:' + 색.흐린글 + ';">' + esc(파일글(x)) + '</span>' : '')
@@ -578,7 +592,7 @@
          것인지, 무엇이 열리는지 알 수 없다 — 요지를 뺀 뒤로는 더 그렇다. */
     var 인용칸 = 인
       ? '<div style="padding-top:4px;font-size:12px;font-family:' + 폰트 + ';color:' + 색.흐린글 + ';">'
-        + (u ? 인 + ' · <a href="' + u + '" style="color:' + 색.남색 + ';text-decoration:none;'
+        + (u ? 인 + ' · <a href="' + u + '"' + 새탭 + ' style="color:' + 색.남색 + ';text-decoration:none;'
               + 'font-weight:bold;">전문 보기 ↗</a>'
             : 인)
         + '</div>'
@@ -747,7 +761,7 @@
       /* 링크라도 «글처럼» 보이게 둔다 — 파랗게 밑줄 치면 열다섯 줄이 다 시끄럽다.
          누를 수 있다는 것은 끝의 ↗ 하나로 알린다. */
       var 속 = u
-        ? '<a href="' + u + '" style="color:' + 색.글 + ';text-decoration:none;">'
+        ? '<a href="' + u + '"' + 새탭 + ' style="color:' + 색.글 + ';text-decoration:none;">'
           + esc(r.글) + ' <span style="color:' + 색.남색 + ';font-size:12px;'
           + 'font-weight:bold;">↗</span></a>'
         : esc(r.글);
@@ -826,7 +840,7 @@
       + '<div style="font-size:12px;line-height:1.6;color:' + 색.흐린글 + ';'
       + 'font-family:' + 폰트 + ';">'
       + '한 줄 요약입니다. 원문과 자료 내려받기는 '
-      + '<a href="' + u + '" style="color:' + 색.남색 + ';font-weight:bold;">전문 보기 ↗</a>'
+      + '<a href="' + u + '"' + 새탭 + ' style="color:' + 색.남색 + ';font-weight:bold;">전문 보기 ↗</a>'
       + '</div></td></tr>';
   }
 
@@ -860,7 +874,7 @@
       var u = href(x.링크);
       return '<div style="padding:3px 0 9px 11px;border-left:3px solid ' + 색.바탕 + ';margin-bottom:7px;">'
         + esc(String(x.우리말 || '').trim()).replace(/\r?\n/g, '<br>')
-        + (u ? ' <a href="' + u + '" style="color:' + 색.남색 + ';font-size:12px;'
+        + (u ? ' <a href="' + u + '"' + 새탭 + ' style="color:' + 색.남색 + ';font-size:12px;'
             + 'text-decoration:none;font-weight:bold;">원문 ↗</a>' : '')
         + '<div style="font-size:11.5px;color:' + 색.흐린글 + ';padding-top:4px;">'
         + esc([x.지역 || '전국', x.언론사 || x.기관 || ''].filter(Boolean).join(' · ')) + '</div></div>';
