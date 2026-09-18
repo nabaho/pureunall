@@ -85,12 +85,18 @@
     font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;
     align-items:center;justify-content:center;box-sizing:border-box;padding:0;transition:transform .1s}
   .pchip.on{border-color:#1e293b;transform:scale(1.15)}
-  .pcount{position:absolute;top:-4px;right:-4px;min-width:14px;height:14px;border-radius:999px;
-    background:#1e40af;color:#ffffff;font-size:9px;font-weight:800;display:flex;align-items:center;
-    justify-content:center;padding:0 3px;pointer-events:none}
+  /* 겹친 날 표 — 이알피와 같은 호박 바탕이다. 파랑이면 「좋은 소식」처럼 보인다.
+     ⚠ 글자는 흰색이 아니라 «짙은 호박»이다 — 이알피는 흰 글자인데 호박 위 흰 글자는
+       1.7:1 이라 사실상 안 읽힌다(색 검사가 잡았다). 뜻이 같은 색을 쓰되 읽히게 한다. */
+  .pcount{position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;
+    background:#fbbf24;color:#854d0e;font-size:10px;font-weight:800;display:flex;align-items:center;
+    justify-content:center;border:1.5px solid #ffffff;pointer-events:none;line-height:1;box-sizing:border-box}
   .chip{font-size:10.5px;border:1px solid #cbd5e1;border-radius:20px;padding:2px 10px;color:var(--sub);
     background:#ffffff;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}
   .chip.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700}
+  .chip.warn{background:#fef2f2;border-color:#fecaca;color:#991b1b;font-weight:700}
+  .chip[disabled]{opacity:.6;cursor:default}
+  .srcsep{width:1px;height:18px;background:#cbd5e1;margin:0 4px;flex-shrink:0}
 
   /* 위 줄 — ◀ 2026-09 ▶ · 음력 · 오늘 · 월|주|일 · 검색 */
   .monthbar{display:flex;align-items:center;gap:7px;margin-bottom:7px;white-space:nowrap;flex-wrap:wrap}
@@ -327,13 +333,16 @@ var TABS = [
 /* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
    ⚠ 필요한 것만 읽는다 — 안 쓰는 큰 표를 받으면 요금과 깜빡임이 늘어난다. */
 var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors',
-            'locked_attend_months','ieum_members','ieum_lectures','ieum_notes','ieum_caps'];
+            'locked_attend_months','ieum_members','ieum_lectures','ieum_notes','ieum_caps',
+            /* 구글 만든이 메일 → 사번. 이것이 있어야 구글 일정이 «그 사람 색»으로 칠해진다 */
+            'gcal_mail_sid'];
 
 /* ── 사람 ──────────────────────────────────────────────────────────── */
 /* ⚠ 직원 명부는 «배열»로도, «사번이 열쇠인 지도»로도 올 수 있다.
    배열만 받으면 지도로 왔을 때 조용히 빈 목록이 되고 화면에 이름 대신 사번(S001)이 뜬다 —
    틀린 화면이 아니라 «맞는 척하는» 화면이라 더 나쁘다. 그래서 두 꼴을 다 받는다. */
-function users(){
+/* 명부 전부 — 그만둔 사람까지. «이름을 찾을 때»만 쓴다. */
+function allUsers(){
   var v = D.user_accounts;
   var list = Array.isArray(v) ? v
     : (v && typeof v === "object") ? Object.keys(v).map(function(k){
@@ -343,11 +352,21 @@ function users(){
     : [];
   return list.filter(function(u){ return u && u.sid; });
 }
+/* ★ 현직만 — 칩·고르는 목록은 «반드시» 이것을 쓴다 (이알피 getActiveUsers 와 같은 기준).
+   ⚠ 2026-09-18 대표 화면에서 사람 칩이 «서른셋» 나왔다. 명부 32명 가운데 현직은
+     열뿐인데 그만둔 스물둘이 다 섞였다 — 이알피는 늘 열만 보여 준다.
+     그만둔 사람을 칩에 두면 고를 수는 있는데 아무것도 안 나오고, 줄이 넘쳐
+     정작 현직을 못 찾는다. */
+function users(){
+  return allUsers().filter(function(u){ return u.status === "active"; });
+}
 function userOf(sid){
-  var us = users();
+  var us = allUsers();
   for(var i=0;i<us.length;i++) if(us[i].sid===sid) return us[i];
   return null;
 }
+/* ⚠ 이름은 «그만둔 사람까지» 찾는다 — 이알피도 그렇게 한다.
+     지나간 이음 근무에 「장한돌 이음센터」라고 적혀 있어야지, 사번만 뜨면 못 읽는다. */
 function nameOf(sid){ var u=userOf(sid); return u ? (u.name||sid) : sid; }
 function externalOf(id){
   var xs = arr(D.external_staff);
@@ -374,6 +393,143 @@ function holidayOf(ymd){
 }
 
 /* ── 그 날의 일들 ──────────────────────────────────────────────────── */
+/* ── 구글 캘린더 ──────────────────────────────────────────────────────
+   ★ 이알피 달력을 «채우는 것»이 바로 이것이다. 2026-09 에만 126건이 있고,
+     우리 서버(my_schedules)에는 25건뿐인 옛 기록만 있다.
+     2026-09-18 대표 화면이 텅 비어 보였던 까닭이 이것이다 — 우리가 안 읽고 있었다.
+   ⚠ 읽기는 «열쇠 하나»로 된다(로그인 필요 없음). 이 달력은 회사 공용이라
+     API 열쇠로 공개 읽기가 열려 있다. 넣고 고치는 것만 구글 로그인이 필요하다 —
+     그것은 아직 이알피에서 한다.
+   ⚠ 값은 이알피와 «같은 것»이어야 한다. 달력 주소가 다르면 다른 달력을 보게 된다.
+     tests/cal-gcal-same-as-erp.test.js 가 이알피 소스와 맞대 본다. */
+var GCAL_API_KEY = "AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo";
+var GCAL_CAL_ID  = "euh07th7tvlco9corqen9lqpts@group.calendar.google.com";
+var GCAL = { evs:[], ym:"", loading:false, err:"" };
+
+/* 구글이 쓰는 색표 — 사람이 구글에서 «고른» 색을 그대로 쓰려면 이 표가 있어야 한다.
+   ⚠ 색표를 «먼저» 받고 일정을 받는다 — 순서가 뒤바뀌면 첫 그림에 색이 빠진다. */
+function gcalLoadColors(){
+  if(window._gcalColors) return Promise.resolve(window._gcalColors);
+  return fetch("https://www.googleapis.com/calendar/v3/colors?key=" + GCAL_API_KEY)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var m = {}, ev = (d && d.event) || {};
+      Object.keys(ev).forEach(function(k){ if(ev[k] && ev[k].background) m[String(k)] = ev[k].background; });
+      window._gcalColors = m; return m;
+    })
+    .catch(function(){ window._gcalColors = {}; return window._gcalColors; });
+}
+/* 색을 고를 때 쓰는 목록 — 구글 색표에서 중복을 뺀 것.
+   ⚠ 새 색을 만들지 않는다. 같은 사람이 볼 때마다 색이 바뀌면 색으로 사람을 못 알아본다. */
+function gcalPalette(){
+  var m = window._gcalColors;
+  if(!m) return null;
+  var ks = Object.keys(m).sort(function(a,b){ return (parseInt(a,10)||0) - (parseInt(b,10)||0); });
+  var out = [];
+  ks.forEach(function(k){ if(m[k] && out.indexOf(m[k]) < 0) out.push(m[k]); });
+  return out.length ? out : null;
+}
+/* 실시간DB 열쇠에는 점(.)을 못 쓴다 — 이메일에는 점이 있어 쉼표로 바꿔 담는다.
+   ⚠ 이알피와 «같은 셈»이어야 한다. 다르면 이어 둔 사람이 안 찾아진다. */
+function gcalMailKey(m){ return String(m || "").trim().toLowerCase().replace(/[.#$\[\]\/]/g, ","); }
+function gcalMailMap(){
+  var v = D.gcal_mail_sid;
+  return (v && typeof v === "object" && !Array.isArray(v)) ? v : {};
+}
+/* 만든이 메일 → 직원 사번.
+   ★ 사람이 «한 번 이어 준 것»이 가장 확실하다 — 명부 대조보다 먼저 본다.
+     명부에는 gmail 이 없어(로그인아이디는 사번@… 꼴) 이 표가 없으면 맞출 길이 없다. */
+function gcalSidByMail(mail){
+  var k = gcalMailKey(mail);
+  if(!k) return "";
+  var mp = gcalMailMap();
+  if(mp[k]) return mp[k];
+  var us = users();
+  for(var i = 0; i < us.length; i++){
+    var u = us[i] || {};
+    var cands = [u.loginId, u.email, u.gmail, u.googleEmail];
+    for(var j = 0; j < cands.length; j++){
+      if(cands[j] && gcalMailKey(cands[j]) === k) return u.sid;
+    }
+  }
+  return "";
+}
+/* 이어 준 사람이 없을 때 — 메일로 «늘 같은» 색 하나를 고른다 */
+function gcalMailColor(mail){
+  var k = gcalMailKey(mail);
+  if(!k) return "";
+  var uniq = gcalPalette() || ["#2563eb","#16a34a","#dc2626","#d97706","#64748b","#1e40af"];
+  var h = 0;
+  for(var i = 0; i < k.length; i++){ h = (h * 131 + k.charCodeAt(i)) >>> 0; }
+  return uniq[h % uniq.length];
+}
+
+/* 그 달(앞뒤 걸친 42칸)의 구글 일정을 받아 둔다.
+   ⚠ 달이 바뀔 때만 받는다 — 다시 그릴 때마다 받으면 요금과 깜빡임이 는다. */
+function gcalLoad(force){
+  var 칸 = monthGrid(S.ym);
+  var 첫날 = 칸[0].date, 끝날 = shiftDay(칸[칸.length-1].date, 1);
+  var 키 = 첫날 + "~" + 끝날;
+  if(!force && GCAL.ym === 키) return Promise.resolve();
+  GCAL.ym = 키; GCAL.loading = true; GCAL.err = "";
+  var url = "https://www.googleapis.com/calendar/v3/calendars/"
+    + encodeURIComponent(GCAL_CAL_ID) + "/events?key=" + GCAL_API_KEY
+    + "&timeMin=" + encodeURIComponent(첫날 + "T00:00:00+09:00")
+    + "&timeMax=" + encodeURIComponent(끝날 + "T00:00:00+09:00")
+    + "&singleEvents=true&orderBy=startTime&maxResults=500";
+  return gcalLoadColors()
+    .then(function(){ return fetch(url); })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.error){ throw new Error(d.error.message || "구글 달력 오류"); }
+      GCAL.evs = (d.items || [])
+        .filter(function(ev){ return ev.start && (ev.start.date || ev.start.dateTime); })
+        .map(gcalToEvent);
+      GCAL.loading = false; render();
+    })
+    .catch(function(e){
+      /* ⚠ 못 받았으면 «조용히» 비우지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이다 */
+      GCAL.loading = false; GCAL.err = (e && e.message) || String(e); render();
+    });
+}
+
+/* 구글 일정 한 건 → 우리 칩.
+   ★ 색 고르는 차례 — 앞이 있으면 뒤로 안 넘어간다(이알피와 같다):
+     ①구글에서 그 일정에 «고른» 색  ②만든이가 이어져 있으면 그 직원 색
+     ③제목에 현직 이름이 있으면 그 직원 색  ④만든이 메일로 늘 같은 색  ⑤기본 */
+function gcalToEvent(ev){
+  var date = (ev.start.date || ev.start.dateTime || "").slice(0,10);
+  var timeStr = ev.start.dateTime ? ev.start.dateTime.slice(11,16) : "";
+  var title = (ev.summary || "").trim()
+    || (ev.description || "").replace(/<[^>]+>/g, "").slice(0,20).trim();
+  if(!title && timeStr) title = timeStr + " 일정";
+  if(!title) title = "일정";
+  var gColor = (window._gcalColors && ev.colorId) ? (window._gcalColors[String(ev.colorId)] || "") : "";
+  var mail = (ev.creator && ev.creator.email) || (ev.organizer && ev.organizer.email) || "";
+  var mailSid = gcalSidByMail(mail);
+  var color = gColor || (mailSid ? (colorOf(mailSid) || "") : "")
+    || gcalMailColor(mail) || (ev.summary ? "#2563eb" : "#94a3b8");
+  var sid = mailSid || "GCAL";
+  var us = users();
+  for(var ui = 0; ui < us.length; ui++){
+    var u = us[ui];
+    if(u.name && title.indexOf(u.name) >= 0){
+      /* ⚠ 구글 색이 있으면 «그것이 이긴다» — 앱 색으로 덮으면 구글 화면과 달라진다.
+         ⚠ 만든이가 이미 찾아졌으면 그것이 더 확실하다 — 제목의 이름은 「권형하에게
+           보고」처럼 «남의 이름»일 수도 있다. */
+      if(!gColor && !mailSid) color = colorOf(u.sid) || color;
+      if(!mailSid) sid = u.sid;
+      break;
+    }
+  }
+  /* ⚠ 아이콘을 안 붙인다 — 구글 화면에는 없다(kind 로 이미 갈린다) */
+  return { kind:"gcal", store:"gcal", id:ev.id, sid:sid, date:date,
+    text:title, time: (timeStr && timeStr !== "00:00") ? timeStr.replace(":","") : "",
+    color:color, gcalUrl:ev.htmlLink || "",
+    tip: title + (ev.location ? "\n📍 " + ev.location : "")
+         + (mail ? "\n✉ " + mail : "") };
+}
+
 /* 그 날의 일들 — 칩의 «글자와 색»은 이알피와 글자 하나까지 같다.
    ⚠ 여기서 예쁘게 바꾸지 말 것. 대표님이 두 화면을 나란히 놓고 보신다.
      고칠 일이 생기면 이알피부터 고치고 그 다음 여기를 맞춘다
@@ -444,6 +600,16 @@ function eventsOn(ymd, eumOnly){
       sid:r.sid, externalId:r.externalId, type:r.type,
       text:글, time:"", color:col, tip:tip });
   });
+  /* ③ 구글 캘린더 — 이알피 달력을 채우는 것이 이것이다(9월 126건).
+     ⚠ 이음 보기에서는 안 보탠다 — 거기는 이음 근무만 보는 자리다.
+     ⚠★ 거르개가 「전체」나 「구글」일 때만 섞는다 — 이알피와 «같은 규칙»이다
+        (pu-erp.html: calFilter === null || calFilter === 'gcal').
+        사람을 고른 채로 구글까지 섞으면 칩에 붙는 「겹친 날」 숫자가 두 앱에서 달라진다. */
+  if(!eumOnly && (S.filter === null || S.filter === "gcal")){
+    for(var gi = 0; gi < GCAL.evs.length; gi++){
+      if(GCAL.evs[gi].date === ymd) out.push(GCAL.evs[gi]);
+    }
+  }
   if(eumOnly) out = out.filter(function(e){ return e.kind === "eum"; });
   return out;
 }
@@ -452,11 +618,18 @@ var ATT_SHOW = ["leave","halfday-am","halfday-pm","leave-hour","special-leave","
                 "maternity","parental-leave","trip","telework","eum-work"];
 
 /* 거르개 — null=전체 · 'pureun'=푸른 직원만 · 'eumwork'=이음 근무만 · sid=그 사람만 */
+/* 거르개 — 이알피와 같은 뜻으로 가른다.
+     null      = 전체
+     'pureun'  = 푸른 직원 것만 (구글·외부인 제외)
+     'gcal'    = 구글 달력에서 온 것만
+     'eumwork' = 이음센터 근무만
+     사번      = 그 사람 것만 */
 function passFilter(ev){
   var f = S.filter;
   if(!f) return true;
-  if(f==='pureun')  return !ev.externalId;
-  if(f==='eumwork') return ev.kind==='eum';
+  if(f === 'pureun')  return ev.kind !== 'gcal' && !ev.externalId;
+  if(f === 'gcal')    return ev.kind === 'gcal';
+  if(f === 'eumwork') return ev.kind === 'eum';
   return ev.sid === f;
 }
 
@@ -547,6 +720,8 @@ function chipHtml(e, ymd){
 }
 
 function calendarHtml(eumOnly){
+  /* 보는 달이 바뀌었으면 구글을 다시 받는다 — 같은 달이면 아무 일도 안 한다(gcalLoad 안에서 가른다) */
+  if(fbDb) gcalLoad();
   if(S.view === "week") return weekHtml(eumOnly);
   if(S.view === "day")  return dayHtml(eumOnly);
   var grid = monthGrid(S.ym), today = todayYMD();
@@ -653,23 +828,45 @@ function chipsHtml(eumOnly){
   var 사람 = eumOnly ? ieumPeople().filter(function(p){ return !p.left; }) : users().map(function(u){
     return { pk:u.sid, name:u.name || u.sid, color: colorOf(u.sid) || "#64748b" };
   });
-  var 건수 = {};
+  /* 배지 숫자의 «뜻» — 이알피와 같다: 총 건수가 아니라 «같은 날에 두 건 넘게 잡힌 날이 며칠인가».
+     ⚠ 총 건수를 적으면 바쁜 사람일수록 큰 숫자가 붙어 아무 뜻도 없다.
+       겹친 날을 세면 「이 사람 그날 두 탕이다」가 눈에 띈다 — 그게 봐야 할 것이다. */
+  var 겹침 = {};
   monthDates().forEach(function(ds){
-    eventsOn(ds, eumOnly).forEach(function(e){ var k = e.externalId || e.sid; if(k) 건수[k] = (건수[k]||0) + 1; });
+    var 하루 = {};
+    eventsOn(ds, eumOnly).forEach(function(e){
+      var k = e.externalId || e.sid; if(!k) return;
+      하루[k] = (하루[k] || 0) + 1;
+    });
+    Object.keys(하루).forEach(function(k){ if(하루[k] >= 2) 겹침[k] = (겹침[k] || 0) + 1; });
   });
+  /* 원천 칩 — 이알피 머리줄의 「푸른 · 이음 · 구글(126)」과 같은 뜻.
+     ⚠ 구글 칩에 «몇 건인지»를 적는다. 0 이면 못 받은 것인지 없는 것인지 갈라 적는다 —
+       빈 달력을 말없이 보여 주는 것이 가장 나쁘다(2026-09-18 에 그래서 텅 비어 보였다). */
+  /* 이알피와 «같은 수»를 적는다 — 이알피는 받아 온 것 전부를 센다(앞뒤 달에 걸친
+     42칸 어치). 이 달 것만 세면 이알피 화면과 숫자가 달라 보인다. */
+  var 구글수 = GCAL.evs.length;
   var 앞 = '<button class="allchip' + (S.filter === null ? " on" : "") + '" data-f="">전체</button>';
-  var 뒤 = (!eumOnly)
-    ? '<button class="chip' + (S.filter === "eumwork" ? " on" : "") + '" data-f="eumwork">이음센터 근무</button>'
-    : '';
+  var 뒤 = eumOnly ? '' : (
+      '<span class="srcsep"></span>'
+    + '<button class="chip' + (S.filter === "pureun" ? " on" : "") + '" data-f="pureun">푸른</button>'
+    + '<button class="chip' + (S.filter === "eumwork" ? " on" : "") + '" data-f="eumwork">이음</button>'
+    + (GCAL.err
+        ? '<button class="chip warn" data-gcalretry="1" title="' + esc(GCAL.err) + '">⚠ 구글 못 받음 — 다시</button>'
+        : GCAL.loading
+          ? '<button class="chip" disabled>⏳ 구글 받는 중</button>'
+          : '<button class="chip' + (S.filter === "gcal" ? " on" : "") + '" data-f="gcal">구글 (' + 구글수 + ')</button>')
+  );
   return '<div class="chips">' + 앞
     + 사람.map(function(p){
         var on = S.filter === p.pk;
-        var n = 건수[p.pk] || 0;
+        var n = 겹침[p.pk] || 0;
         return '<span class="pwrap">'
           + '<button class="pchip' + (on ? " on" : "") + '" data-f="' + esc(p.pk) + '"'
           + ' title="' + esc(p.name) + '" style="background:' + esc(p.color) + '">'
           + esc(String(p.name).slice(0,2)) + '</button>'
-          + (n ? '<span class="pcount">' + n + '</span>' : '')
+          + (n ? '<span class="pcount" title="' + esc(p.name) + ' 같은 날 겹친 일정 ' + n + '일">'
+                 + (n > 9 ? "9+" : n) + '</span>' : '')
           + '</span>';
       }).join("")
     + 뒤 + '</div>';
@@ -691,15 +888,17 @@ function failedHtml(){
 }
 
 /* 어느 표가 아직 «배열»이면 그 표는 여기서 못 고친다 — 쓰면 표가 깨진다.
-   숨기지 않고 그대로 적고 이알피로 보낸다. «못 한다»가 아니라 «저기서 한다». */
-function formNote(){
-  var 못쓰는표 = ['attendance_records','my_schedules'].filter(function(k){
-    return !PuCalWrite.isMapForm(PuCalRead.rawForm(k));
-  });
-  if(!못쓰는표.length) return '';
-  var 이름 = 못쓰는표.map(function(k){ return k==='my_schedules' ? '일정' : '근태'; }).join(' · ');
-  return '<div class="note"><span>⚠ '+esc(이름)+'은(는) 아직 옛 방식으로 담겨 있어 여기서 못 고칩니다.</span>'
-    + '<span class="sp"></span><button class="btn" data-erp="dash/corp">이알피에서 고치기</button></div>';
+   ⚠ 이 말을 달력 «맨 위»에 띠로 두지 않는다 — 달력은 이알피와 같아야 하고,
+     아직 아무것도 안 하려는 사람에게 못 하는 것부터 말하면 화면만 좁아진다.
+     대신 «고치려고 창을 연 그 순간» 그 자리에서 말한다(못 한다가 아니라 저기서 한다).
+     (대표 지시 2026-09-18 「대시보드 제외한 화면은 똑같이 만들어라」) */
+function 옛방식표(store){
+  return !PuCalWrite.isMapForm(PuCalRead.rawForm(store));
+}
+function 옛방식안내(store){
+  var 이름 = store === 'my_schedules' ? '일정' : '근태';
+  return '⚠ ' + 이름 + '은(는) 아직 옛 방식(배열)으로 담겨 있어 여기서 못 고칩니다.\n'
+    + '푸른이알피에서 고쳐 주세요 — 여기서 쓰면 표가 깨집니다.';
 }
 /* 마감된 달을 보고 있으면 미리 알린다 — 눌러 보고 나서 거절당하는 것보다 낫다 */
 function lockNote(){
@@ -970,6 +1169,8 @@ function recOf(store, id){
 }
 function openNew(ymd){
   S.modal = { mode:"new", kind:"sch", date:ymd, sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1 };
+  /* 못 쓰는 표면 «열자마자» 알린다 — 다 적고 나서 거절당하는 것이 가장 나쁘다 */
+  if(옛방식표("my_schedules")) S.modal.err = 옛방식안내("my_schedules");
   render();
 }
 function openEdit(store, id){
@@ -978,7 +1179,15 @@ function openEdit(store, id){
   S.modal = { mode:"edit", store:store, id:id, kind:(store==="my_schedules"?"sch":"att"),
     date:r.date||"", sid:r.sid||"", type:r.type||"leave", title:r.title||"", note:r.note||"",
     hours:r.hours||1, prev:r };
+  if(옛방식표(store)) S.modal.err = 옛방식안내(store);
   render();
+}
+/* 구글 일정 한 건을 구글 달력에서 연다 */
+function openGcal(id){
+  var found = null;
+  for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === id) found = GCAL.evs[i];
+  if(found && found.gcalUrl){ window.open(found.gcalUrl, "_blank", "noopener"); return; }
+  toast("구글 달력에서 여는 주소가 없습니다");
 }
 function closeModal(){ S.modal = null; S.busy = false; render(); }
 function toast(t){ S.toast = t; render(); setTimeout(function(){ if(S.toast===t){ S.toast=""; render(); } }, 3200); }
@@ -1086,7 +1295,9 @@ function render(){
   var html;
   if(tab.v==='cal' || tab.v==='eumcal'){
     var eumOnly = tab.v==='eumcal';
-    html = failedHtml() + formNote() + lockNote()
+      /* ⚠ 맨 위 띠를 안 둔다 — 달력은 이알피와 «같아야» 한다(대표 지시 2026-09-18).
+         못 고치는 까닭은 «고치려 할 때» 그 자리에서 말한다(창 안에서). */
+    html = failedHtml() + lockNote()
       + '<div class="calwrap">' + chipsHtml(eumOnly) + monthbarHtml() + calendarHtml(eumOnly) + '</div>';
   } else if(tab.v==='eumppl'){
     html = failedHtml() + peopleHtml();
@@ -1119,6 +1330,7 @@ document.addEventListener('click', function(e){
     else { var d=new Date(S.ym+'-01'); d.setMonth(d.getMonth()+mv); S.ym = ymOf(d); }
     render(); return;
   }
+  if(t.hasAttribute('data-gcalretry')){ gcalLoad(true); return; }
   if(t.hasAttribute('data-view')){
     S.view = t.getAttribute('data-view');
     if(!S.date) S.date = todayYMD();
@@ -1147,6 +1359,9 @@ document.addEventListener('click', function(e){
      ⚠ 일 쪽을 «먼저» 본다 — 일은 칸 «안»에 있어 칸도 함께 걸린다. */
   if(t.hasAttribute('data-ev')){
     var ev = t.getAttribute('data-ev').split(':');
+    /* 구글에서 온 일정은 «구글에서» 고친다 — 우리가 손대면 두 곳이 갈린다.
+       ⚠ 열쇠로 읽기만 하는 길이라 우리에겐 고칠 권한이 아예 없다. */
+    if(ev[0] === 'gcal'){ openGcal(ev.slice(1).join(':')); return; }
     openEdit(ev[0], ev.slice(1).join(':'));
     return;
   }
@@ -1230,6 +1445,9 @@ function start(user){
     $('me').innerHTML = ME ? esc(ME.name||'') + '<span class="role">'+esc(ME.role||ME.position||'')+'</span>'
                            : '<span class="role">'+esc(user.email||'')+'</span>';
     render();
+    /* 구글 달력도 받는다 — 이 달력을 채우는 것이 그쪽이다(9월 126건).
+       ⚠ 우리 자료를 먼저 그리고 그 다음 받는다 — 구글이 늦어도 화면은 먼저 뜬다. */
+    gcalLoad();
     /* 바뀐 한 건만 받아 다시 그린다 — 큰 표를 통째로 다시 받지 않는다 */
     ['attendance_records','my_schedules'].forEach(function(k){
       S.unwatch.push(PuCalRead.watch(k, function(){

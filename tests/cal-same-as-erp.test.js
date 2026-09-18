@@ -47,6 +47,8 @@ function 캘린더칩(rec, 자료) {
     String, Object, Array, JSON
   };
   vm.createContext(상자);
+  /* 구글 일정은 이 검사가 보는 것이 아니다 — 빈 채로 둔다(따로 cal-gcal-and-active 가 본다) */
+  vm.runInContext('var GCAL = { evs:[] }; var S = { filter:null };', 상자);
   vm.runInContext(함수몸(캘린더, 'function eventsOn(ymd, eumOnly){')
     + '\n' + (캘린더.match(/var ATT_SHOW = \[[\s\S]*?\];/) || [''])[0]
     + '\nvar __r = eventsOn(' + JSON.stringify(rec.date) + ');', 상자);
