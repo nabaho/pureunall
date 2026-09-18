@@ -905,7 +905,6 @@ function nasReachVerdict(r, base, origin){
      두 벌이면 포트를 바꿀 때 한 벌만 고쳐져 「시킨 대로 했는데 안 된다」가 된다. */
 var NAS_PROXY_PORT = '5443';                 // 새 창구 포트 (DSM 5001 과 겹치지 않는 자리)
 function nasProxyPlan(cfg){
-  var host = (cfg && cfg.host) || '192.168.0.21';
   var 안쪽 = (cfg && cfg.httpsPort) || '5001';
   /* 이미 창구로 돌려 두었으면 대상은 DSM 기본(5001)이다 — 창구를 창구로 보내면 고리가 된다 */
   if(String(안쪽) === NAS_PROXY_PORT) 안쪽 = '5001';
@@ -915,9 +914,12 @@ function nasProxyPlan(cfg){
     칸: [
       { 이름:'설명',            값:'푸른이알피' },
       { 이름:'소스 · 프로토콜',  값:'HTTPS' },
-      { 이름:'소스 · 호스트 이름', 값:host },
+      /* ★ IP 는 못 넣는다 — DSM 이 「잘못된 도메인 이름」이라며 거절한다(2026-09-18 대표 화면).
+         역방향 프록시의 소스 호스트 이름은 «도메인»만 받는다. 별표는 「어느 이름으로 와도」라는 뜻이라
+         192.168.0.21 로 들어오는 것도 이것으로 받는다. 우리 나스에는 도메인이 없으므로 이 길뿐이다. */
+      { 이름:'소스 · 호스트 이름', 값:'*', 곁:'IP 는 거절당합니다 — 별표가 「어느 이름으로 와도」입니다' },
       { 이름:'소스 · 포트',      값:NAS_PROXY_PORT },
-      { 이름:'대상 · 프로토콜',  값:'HTTPS' },
+      { 이름:'대상 · 프로토콜',  값:'HTTPS', 곁:'기본값이 HTTP 입니다 — 반드시 HTTPS 로 바꾸세요' },
       { 이름:'대상 · 호스트 이름', 값:'localhost' },
       { 이름:'대상 · 포트',      값:String(안쪽) }
     ],
@@ -41685,14 +41687,16 @@ function NasBackupSettings(){
           (function(){
             if(!(진단 && 진단.ok === false && /CORS/.test(진단.msg || ''))) return null;
             var 계획 = nasProxyPlan(cfg);
-            var 값칸 = function(이름, 값){
+            var 값칸 = function(이름, 값, 곁){
               return h('div', { key:이름, style:{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', flexWrap:'wrap'} },
                 h('span', { style:{fontSize:'11.5px', color:'#475569', minWidth:'130px'} }, 이름),
                 h('code', { style:{flex:1, minWidth:'140px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'5px',
                                    padding:'3px 8px', fontFamily:'monospace', fontSize:'11.5px', overflowWrap:'anywhere'} }, 값),
                 h('button', { onClick:function(){ nasCopy(값); },
                   style:{flex:'none', border:'1px solid #1e40af', background:'#fff', color:'#1e40af',
-                         borderRadius:'5px', padding:'2px 9px', fontSize:'11px', cursor:'pointer', fontWeight:600} }, '복사'));
+                         borderRadius:'5px', padding:'2px 9px', fontSize:'11px', cursor:'pointer', fontWeight:600} }, '복사'),
+                /* ★ 걸리기 쉬운 칸에는 «왜 그 값인지»를 같은 줄에 붙인다 — 딴 데 적으면 안 읽는다 */
+                곁 && h('span', { style:{fontSize:'10.5px', color:'#991b1b', flexBasis:'100%', paddingLeft:'130px'} }, '↳ ' + 곁));
             };
             return h('div', { style:{background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'10px', padding:'16px', marginTop:'16px'} },
               h('div', { style:{fontWeight:700, fontSize:'12.5px', color:'#1e40af', marginBottom:'4px'} }, '🧭 자동 백업까지 하시려면 — 따라만 하시면 됩니다'),
@@ -41701,10 +41705,10 @@ function NasBackupSettings(){
                 h('strong', null, '안 하셔도 됩니다'), ' — 왼쪽 「백업 파일 다운로드」로 손수 하셔도 똑같습니다.'),
               h('div', { style:{fontSize:'11.5px', color:'#1e40af', fontWeight:700, marginBottom:'6px'} },
                 '① 나스 → 제어판 → 로그인 포털 → 고급 → 「역방향 프록시」 → 생성'),
-              계획.칸.map(function(k){ return 값칸(k.이름, k.값); }),
+              계획.칸.map(function(k){ return 값칸(k.이름, k.값, k.곁); }),
               h('div', { style:{fontSize:'11.5px', color:'#1e40af', fontWeight:700, margin:'12px 0 6px'} },
                 '② 같은 창의 「사용자 정의 헤더」 탭 → 만들기 (두 줄)'),
-              계획.머리글.map(function(k){ return 값칸(k.이름, k.값); }),
+              계획.머리글.map(function(k){ return 값칸(k.이름, k.값, k.곁); }),
               h('div', { style:{fontSize:'11.5px', color:'#1e40af', fontWeight:700, margin:'12px 0 6px'} },
                 '③ 저장하신 뒤 — 이알피 쪽은 제가 합니다'),
               h('div', { style:{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'} },
