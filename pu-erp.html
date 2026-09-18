@@ -306,8 +306,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-18 계약창 «기둥 셋으로 펴기» 되돌림 — 3개 화면을 다시 한 개씩, 저장하며 넘어가는 예전 방식으로';
-var BUILD_SEQ = 177;
+var ERP_BUILD = '2026-09-18 「회사 한 장」 창이 다른 창 뒤로 숨던 것 — z-index 를 항상 위로';
+var BUILD_SEQ = 178;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -86397,7 +86397,13 @@ function CompanySheetModal(props){
     m ? line('월 자문료', m.monthlyAdvisoryFee ? (Number(m.monthlyAdvisoryFee).toLocaleString() + '원') : '', '업체관리') : null
   ].filter(Boolean);
 
-  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target === e.currentTarget) props.onClose(); } },
+  /* ⚠★ zIndex 를 «반드시» 올린다 (2026-09-18 실측 버그).
+     이 창은 App 뿌리에서 다는데(CompanySheetHost), 계약창 같은 다른 창들은
+     그보다 «나중에» DOM 에 그려진다. .modal-bg 가 전부 같은 z-index(1000)라서
+     같은 값이면 «나중에 그려진 것»이 위로 온다 — 그 결과 방금 연 이 창이
+     계약창 «뒤»로 숨었다. 어디서 열든(계약창·업체상세·사건상세…) 항상
+     맨 위에 오도록 값을 하나 올려 못박는다. */
+  return h('div', { className:'modal-bg', style:{ zIndex:1001 }, onClick:function(e){ if(e.target === e.currentTarget) props.onClose(); } },
     h('div', { className:'modal', style:{ width:'860px', maxWidth:'96vw' }, onClick:function(e){ e.stopPropagation(); } },
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, '📄 회사 한 장'),
