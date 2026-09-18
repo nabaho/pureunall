@@ -50,13 +50,16 @@ test('★★★ contract 와 «가르는 말»이 있다 — 없으면 자문계
     '★★ wcontract 쪽에도 되짚어 줘야 자문계약서가 이리로 오지 않습니다');
 });
 
-test('★★★ 「계약서 찾기」는 여전히 «우리 계약»만 모은다 — 여기가 갈래를 가른 까닭이다', () => {
+test('★★★ 「계약서 찾기」에 «근로계약서»가 섞이지 않는다 — 여기가 갈래를 가른 까닭이다', () => {
   /* 2026-09-12: 훑는 일은 erpScanPhotos 로 모았고, «받을 갈래»는 부를 때 적는다.
-     지켜야 할 것은 그대로다 — 자문계약 찾기가 담는 갈래는 contract 하나뿐이다. */
+     ⚠ 2026-09-18 다시 겨눔 — 신청서 캡처(form)를 «함께» 찾게 됐다(대표 결정).
+       기술보호지원반·현장클리닉 신청서가 계약의 회사 칸을 채워 주기 때문이다.
+       못 박을 것은 「contract 하나뿐」이 아니라 **「근로계약서가 안 섞인다」**다 —
+       바로 아래 wcontract 확인이 그 급소이고, 그것은 그대로 둔다. */
   const fn = /function erpLoadMyContractPhotos\([\s\S]*?\n\}/.exec(erp);
   assert.ok(fn, 'erpLoadMyContractPhotos 를 못 찾았습니다');
-  assert.match(fn[0], /erpScanPhotos\(\{ contract:1 \}/,
-    '★★★ 자문계약 찾기가 근로계약서까지 모으면 목록이 쓸 수 없게 됩니다');
+  assert.match(fn[0], /erpScanPhotos\(\{[^}]*contract:1/,
+    '★★★ 자문계약 찾기에서 계약서가 빠졌습니다');
   assert.ok(fn[0].indexOf('wcontract') < 0,
     '★★★ 자문계약 찾기에 근로계약서가 섞였습니다 — 갈래를 가른 뜻이 없어집니다');
   /* 근로자 서류 찾기는 «그 반대»다 — 거기에 우리 계약(contract)이 섞이면

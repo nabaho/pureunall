@@ -1312,6 +1312,13 @@
       .replace(/[\s·:.\-_/]/g, '');
   }
 
+  /* 이름표 하나를 «이름 붙은 칸»으로 옮긴다 — 없으면 빈 글자.
+     ⚠ 사진첩의 ✎ 칸 고치기(2026-09-18)가 이것을 부른다. 고친 값이 기업 상세까지
+       가려면 「홈페이지」가 homepage 인 줄 알아야 하는데, 그 사전이 여기 있다.
+       두 벌로 베끼지 «말 것» — 55가지라 어긋나도 한참 모르고, 그동안 「표에서는
+       고쳐졌는데 기업정보함에는 옛 값이 간다」가 된다. */
+  function pairFieldKey(label) { return PAIR_TO_KEY[pairKeyName(label)] || ''; }
+
   function fillFromPairs(kind, fields) {
     if (!PAIR_FILL_KINDS[kind]) return [];
     var pairs = Array.isArray(fields && fields.pairs) ? fields.pairs : [];
@@ -2152,6 +2159,8 @@
        이름 붙은 칸으로 옮기고, 그때 사업자번호가 새로 생겼으면 검산도 다시 한다.
        돌려주는 것: 채운 칸 이름 배열(빈 배열이면 손댄 것이 없다). */
     healRead: healRead,
+    /* 이름표 → 이름 붙은 칸 (사진첩 ✎ 고치기가 쓴다 — 위 pairFieldKey 머리 참고) */
+    pairFieldKey: pairFieldKey,
     /* ⑦ 이 서류가 «우리 것»인가 (대표 지시 2026-09-08) — 아래 isOurs 머리에 까닭 */
     isOurs: isOurs, OUR_NAMES: OUR_NAMES, OUR_LABELS: OUR_LABELS,
     MODELS: MODELS,

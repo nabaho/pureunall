@@ -148,7 +148,11 @@ function rowsCtx() {
   const ctx = { Array, Object, String };
   vm.createContext(ctx);
   vm.runInContext(app.match(/const READ_ROWS = \[[\s\S]*?\n\];/)[0].replace('const ', 'var '), ctx);
-  vm.runInContext(fnOf(app, 'docPairs') + '\n' + fnOf(app, 'readRows'), ctx);
+  /* ⚠ 2026-09-18 — readRows 가 사람이 고친 값을 얹어 준다(칸마다 ✎ 고치기).
+     그 도우미와 상수를 함께 실어야 돈다. 표의 차례를 보는 이 검사의 뜻은 그대로다. */
+  vm.runInContext(app.match(/const FIX_PAIR = '[^']*';/)[0].replace('const ', 'var '), ctx);
+  vm.runInContext(fnOf(app, 'fixKeyOfLabel') + '\n' + fnOf(app, 'fixCleared') + '\n'
+    + fnOf(app, 'docPairs') + '\n' + fnOf(app, 'readRows'), ctx);
   return ctx;
 }
 function boxCtx() {

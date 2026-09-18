@@ -38,7 +38,7 @@
      이 파일이 캐시에 묵으면 옛 지시로 읽어 제목이 안 생기는데, 화면(pu-photos.html)은
      새것이라 제목 자리만 비어 보인다 — 고친 것이 통째로 묻힌 것처럼 된다.
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
-<script src="js/pu-doc-read.js?v=46"></script>
+<script src="js/pu-doc-read.js?v=47"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-doc-file.js?v=33"></script>
@@ -1640,6 +1640,17 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 #readPanel table{width:100%;font-size:14.5px;color:var(--ink);border-collapse:collapse;line-height:1.65}
 #readPanel td{padding:5px 0;vertical-align:top;font-weight:600;word-break:break-all}
 #readPanel td.k{color:var(--sub);width:82px;font-weight:500;word-break:keep-all}
+/* ✎ 칸 고치기 (2026-09-18) — 줄에 마우스를 올려야 뜬다. 늘 보이면 스무 줄이 어지럽다.
+   ⚠ 폰에는 «마우스 올리기»가 없으므로 손가락 기기에서는 늘 보이게 둔다(아래 hover:none). */
+#readPanel .fxpen{border:none;background:none;color:#cbd5e1;font-size:12.5px;padding:0 4px;
+  cursor:pointer;opacity:0;transition:opacity .12s}
+#readPanel tr:hover .fxpen{opacity:1}
+#readPanel .fxpen:hover{color:var(--blue)}
+@media (hover:none){ #readPanel .fxpen{opacity:.55} }
+/* 사람이 고친 칸임을 한 글자로 — 판독값과 섞이지 않게 */
+#readPanel .fxmark{color:var(--blue);font-size:11px;margin-left:5px;font-weight:700}
+/* 「판독은 …라고 읽었습니다」 — 덮어쓰지 않았다는 것이 눈에 보여야 한다 */
+#readPanel tr.wasrow td{padding:0 0 5px;font-size:11.5px;font-weight:400;color:var(--sub)}
 #readPanel .note{margin:8px 0 0;font-size:12.5px;color:var(--sub);line-height:1.6}
 #readPanel .cause{margin:0;font-size:12.5px;color:#854d0e;line-height:1.6;white-space:pre-wrap;word-break:break-word;font-family:inherit;user-select:text}
 #readPanel .again{width:100%;margin-top:8px;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:10px;font-size:13.5px;font-weight:600}
@@ -1742,6 +1753,14 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 /* ✏ 이름·회사 채우기 — 임금 칸과 같은 옷을 입힌다(같은 자리·같은 일이라
    다르게 생기면 「이건 또 뭐지」가 된다). 다 갖춰지면 초록으로 가라앉는다. */
 #readPanel .fixbox{margin:10px 0 0;background:#fffbeb;border:1.5px solid #fbbf24;border-radius:10px;padding:11px 12px}
+/* 📋 이 신청서로 계약 등록 (2026-09-18) — 고치기 칸과 «같은 결», 테두리만 파랑이다.
+   둘이 나란히 뜰 때 어느 쪽을 보고 있는지 구별이 되어야 한다. */
+#readPanel .ctbox{margin:10px 0 0;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:11px 12px}
+#readPanel .ctbox .t{font-size:13px;font-weight:800;color:#1e40af;margin-bottom:4px}
+#readPanel .ctbox .d{font-size:12px;color:#475569;line-height:1.65}
+#readPanel .ctbox .go{margin-top:9px;border:none;background:#1e40af;color:#fff;border-radius:8px;
+  padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+#readPanel .ctbox .go:hover{background:#2563eb}
 #readPanel .fixbox.done{background:#f0fdf4;border-color:#4ade80}
 #readPanel .fixbox .t{font-size:13px;font-weight:800;color:#854d0e;margin-bottom:4px}
 #readPanel .fixbox.done .t{color:#166534}
@@ -8593,14 +8612,52 @@ const WORKER_KINDS = { idcard: 1, resident: 1, mandate: 1, consent: 1, wcontract
      근로자 정보함 쪽 일이다(아직 없다 — 남은 일). */
 const FIX_KEYS = [['name', '이름'], ['company', '회사']];
 
+/* ── ✎ 칸마다 고치기 (대표 결정 2026-09-18 「추천대로」) ────────────────────
+   「ocr 했는데 제대로 안 읽힌 부분 일부 단어를 수정하거나 변경하고 싶다.
+     전체 ocr 을 다시 하는 것보다 그것이 효율적인데」
+
+   그때까지 고칠 수 있는 것은 «갈래»와 «이름·회사» 둘뿐이었다. 대표자·주소·전화·
+   업태·종목·매출액·홈페이지는 고치는 칸이 아예 없어, 한 글자가 틀려도 길은
+   **전체 재판독**뿐이었다 — 요금이 들고 같은 곳을 또 틀리게 읽는 일이 잦다.
+   (실제 예 2026-09-18: 농업회사법인 신청서의 「홈페이지」에 사업자등록번호가 흘러들었다.)
+
+   ★ 담는 자리를 새로 만들지 않는다 — 이미 있는 read.fix 를 «모든 칸»으로 넓힌다.
+     판독값(fields)은 그대로 둔다. 둘 다 있어야 「이 값 어디서 나왔지」에 답한다.
+   ⚠ 두 갈래로 담는다:
+       fix[이름붙은칸]      예: fix.homepage — 기업 상세까지 «간다»
+       fix['pair:이름표']   예: fix['pair:혁신형 기업여부'] — 이름표뿐인 칸. 표에만 보인다
+   ⚠ at·by 는 값이 아니라 «언제·누가»다 — 안 거르면 기업 상세에 at 이라는 칸이 생긴다. */
+const FIX_PAIR = 'pair:';
+function fixIsMeta(k) { return k === 'at' || k === 'by'; }
+
+/* 이름표 → 이름 붙은 칸. 없으면 pair: 를 붙여 이름표 자리에 담는다.
+   ⚠ 사전은 판독 층 하나다(PuDocRead.pairFieldKey) — 여기 베끼면 어긋난다.
+     55가지라 어긋나도 한참 모르고, 그동안 「표에서는 고쳐졌는데 기업정보함에는
+     옛 값이 간다」가 된다. */
+function fixKeyOfLabel(label) {
+  /* ⚠ 판독 층이 아직 안 실렸을 수 있다(그리는 차례가 앞설 때) — 그때는 이름표 자리로
+       물러선다. 없는 것을 부르다 터지면 표가 통째로 안 그려진다. */
+  const R = (typeof PuDocRead !== 'undefined') ? PuDocRead : null;
+  const k = (R && R.pairFieldKey) ? R.pairFieldKey(label) : '';
+  return k || (FIX_PAIR + String(label == null ? '' : label).trim());
+}
+
+/* «일부러 비운» 칸인가 — 판독이 헛것을 읽었을 때(홈페이지에 사업자번호) 지우는 길이다.
+   ⚠ 빈 글자만으로는 「아직 안 고침」과 구별이 안 되므로 따로 적어 둔다. */
+function fixCleared(read, key) {
+  return !!((read && read.fixClear) || {})[key];
+}
+
 /* 판독값 위에 «사람이 채운 것»을 덮어 본다. 빈 값은 안 덮는다 —
    빈 칸을 저장했다고 판독이 읽어 둔 것까지 지우면 손해만 난다. */
 function readFields(read) {
   const out = Object.assign({}, (read && read.fields) || {});
   const fx = (read && read.fix) || {};
-  FIX_KEYS.forEach(function (p) {
-    const v = String(fx[p[0]] == null ? '' : fx[p[0]]).trim();
-    if (v) out[p[0]] = v;
+  Object.keys(fx).forEach(function (k) {
+    if (fixIsMeta(k) || k.indexOf(FIX_PAIR) === 0) return;   // 때·사람·이름표뿐인 칸은 안 옮긴다
+    const v = String(fx[k] == null ? '' : fx[k]).trim();
+    if (v) out[k] = v;
+    else if (fixCleared(read, k)) delete out[k];             // 「이 칸은 헛것이다」 — 지운다
   });
   return out;
 }
@@ -15024,13 +15081,42 @@ function docPairs(read) {
   return (Array.isArray(f.pairs) ? f.pairs : [])
     .filter(function (p) { return p && p.k && String(p.v || '').trim() !== ''; });
 }
+/* ⚠ 한 줄에 «세 가지»를 함께 돌려준다 (2026-09-18) — [이름표, 보일 값, 담는 열쇠].
+     열쇠가 있어야 ✎ 로 고친 값을 어디에 담을지 알고, 고친 줄을 다시 찾을 수 있다.
+   ★ 사람이 고친 값이 «이긴다» — 그것이 ✎ 의 뜻이다. 판독값은 fix 와 «따로» 남아
+     아래 줄(「판독은 …라고 읽었습니다」)에 그대로 보인다. */
 function readRows(read) {
+  const fx = (read && read.fix) || {};
+  const 고침 = function (key, 원래) {
+    if (!Object.prototype.hasOwnProperty.call(fx, key)) return 원래;
+    const v = String(fx[key] == null ? '' : fx[key]).trim();
+    if (v) return v;
+    return fixCleared(read, key) ? '' : 원래;      // 일부러 비운 것만 비운다
+  };
   const pairs = docPairs(read);
-  if (pairs.length) return pairs.map(function (p) { return [p.k, p.v]; });
+  if (pairs.length) {
+    return pairs.map(function (p) {
+      const key = fixKeyOfLabel(p.k);
+      return [p.k, 고침(key, p.v), key];
+    }).filter(function (r) { return String(r[1]).trim() !== ''; });
+  }
   const f = (read && read.fields) || {};
   return READ_ROWS
     .filter(function (p) { return f[p[0]] && typeof f[p[0]] === 'string'; })
-    .map(function (p) { return [p[1], f[p[0]]]; });
+    .map(function (p) { return [p[1], 고침(p[0], f[p[0]]), p[0]]; })
+    .filter(function (r) { return String(r[1]).trim() !== ''; });
+}
+
+/* 그 줄의 «판독이 읽은 값» — 고친 줄 아래에 그대로 보여 준다.
+   사람이 고쳤어도 판독이 무엇을 틀렸는지는 늘 볼 수 있어야 한다. */
+function readRawOf(read, key, label) {
+  const pairs = docPairs(read);
+  for (let i = 0; i < pairs.length; i++) {
+    if (fixKeyOfLabel(pairs[i].k) === key) return String(pairs[i].v == null ? '' : pairs[i].v);
+  }
+  const f = (read && read.fields) || {};
+  const v = f[key];
+  return (typeof v === 'string') ? v : '';
 }
 
 /* ══════ 💰 근로계약서의 임금 — 읽되, «사람이 확인해야» 산다 (대표 지시 2026-09-02) ══════
@@ -15285,6 +15371,139 @@ function fixSave() {
     console.warn('[이름·회사 채우기]', e);
     alert('채운 값을 저장하지 못했습니다: ' + ((e && e.message) || e));
   });
+}
+
+/* ══════ ✎ 한 칸만 고치기 (대표 결정 2026-09-18 「추천대로」) ══════════════════
+   ★ 다시 판독하지 «않는다» — 고친 칸만 옮긴다. AI 요금 0원이다.
+   ★ 고치면 기업 상세로 «저절로» 간다. 새로 만들 것이 없다 — 2026-09-15 의
+     「같은 서류에서 온 새 값이면 기업 상세를 고친다」가 그대로 받아 준다
+     (손으로 고친 것도 «그 사진»에서 온 것이다). 반대로 기업정보함 쪽에서 사람이
+     직접 고쳐 둔 칸은 「사람 도장」이 지켜 이쪽이 못 건드린다 — 두 곳이 안 싸운다.
+   ⚠ 비우기도 고치기다 — 헛것을 읽은 칸(홈페이지에 사업자번호)을 지우는 유일한 길이다. */
+function askRowFix(key, label) {
+  const id = viewerId;
+  if (!id || blockedIfOther(id)) return;
+  const it = gridItems.find(function (x) { return x.id === id; });
+  if (!it || !it.meta.read) return;
+  const read = it.meta.read;
+  const 지금 = (readRows(read).filter(function (r) { return r[2] === key; })[0] || [])[1] || '';
+  const v = prompt('「' + label + '」 을 고칩니다\n\n'
+    + '· 비우면 그 칸을 «없는 것»으로 둡니다 (판독이 헛것을 읽었을 때)\n'
+    + '· 판독이 읽은 값은 그대로 남습니다\n'
+    + '· 다시 판독하지 않습니다 — 요금 0원', String(지금));
+  if (v === null) return;                       /* 「취소」는 아무 일도 아니다 */
+  const 새값 = String(v).trim();
+  if (새값 === String(지금).trim()) return;      /* 같으면 한 글자도 안 쓴다 */
+  saveRowFix(it, key, 새값);
+}
+
+function saveRowFix(it, key, 새값) {
+  const id = it.id;
+  const fix = Object.assign({}, (it.meta.read.fix || {}),
+    { at: Date.now(), by: PuPhotoStore.myName() || '' });
+  fix[key] = 새값;
+  /* 「일부러 비웠다」를 따로 적는다 — 빈 글자만으로는 「아직 안 고침」과 구별이 안 된다 */
+  const clear = Object.assign({}, (it.meta.read.fixClear || {}));
+  if (새값) delete clear[key]; else clear[key] = true;
+  const read = Object.assign({}, it.meta.read, { fix: fix, fixClear: clear });
+  it.meta = Object.assign({}, it.meta, { read: read });
+  renderReadPanel(it);
+  renderGridBar();
+  renderGrid();
+  PuPhotoStore.saveRead(photoYearOf(id), id, read, photoOwner(id))
+    .then(function () { return syncFixToCoInfo(it, read); })
+    .catch(function (e) {
+      console.warn('[칸 고치기]', e);
+      alert('고친 값을 저장하지 못했습니다: ' + ((e && e.message) || e));
+    });
+}
+
+/* 고친 칸을 기업 상세로 — «이미 보낸 서류»일 때만 (2026-09-18).
+   ⚠ 아직 안 보낸 서류를 여기서 몰래 보내지 «않는다». 보내는 것은 사람이 누르는 일이고,
+     고치기는 고치기다 — 한 단추가 두 가지 일을 하면 무엇이 일어났는지 알 수 없다. */
+function syncFixToCoInfo(it, read) {
+  if (!read || !read.filedInfo || !read.filedInfo.at) return Promise.resolve();
+  if (!window.PuDocFile || !PuDocFile.sendToCoInfo) return Promise.resolve();
+  return PuDocFile.sendToCoInfo({
+    kind: read.kind, fields: readFields(read), byName: PuPhotoStore.myName() || '',
+    photo: { id: it.id, year: photoYearOf(it.id), owner: photoOwner(it.id) }
+  }).then(function (r) {
+    if (r && r.message) toast('🏢 ' + r.message, 5000);
+  }).catch(function (e) {
+    console.warn('[고친 칸 보내기]', e);
+    toast('고친 값을 기업 상세로 보내지 못했습니다 — 아래 「기업 상세로 보내기」를 눌러 주세요', 6000);
+  });
+}
+
+/* ══════ 📋 이 신청서로 계약 등록 (대표 결정 2026-09-18 「추천대로」) ═══════════
+   「기술보호컨설팅과 현장클리닉과 같이 화면캡쳐되는 것들을 한번에 계약관리에
+     바로 등록될 수 있게 만들고 싶다」
+
+   ■ 실측(2026-09-18) — 신청서 캡처가 «주는 것»과 계약이 «필요한 것»
+     주는 것 : 기업명·대표자·사업자번호·법인번호·주소·전화·업태·종목·설립일 …
+     없는 것 : 계약번호·담당·상태·유형·기간·금액
+   그래서 **여기서 계약을 만들지 않는다.** 금액도 기간도 신청서에 안 적혀 있어
+   지어내면 계약관리의 숫자가 거짓이 된다. 대신 «다시 칠 일»을 없앤다 —
+   계약관리의 새 계약 창을 **회사 칸이 채워진 채로** 연다.
+
+   ⚠⚠ data/contracts 에 «직접 쓰지 않는다». 계약은 계약관리의 저장 길이 만든다 —
+     거기에 업체 연결 검증·중복 검사·월 잠금·관계 검증이 줄줄이 걸려 있다.
+     여기서 직접 쓰면 그 울타리를 통째로 건너뛴다(2026-08-23 「업체는 계약이 만든다」와 같은 결).
+   ⚠ 넘기는 것은 «쪽지 한 장»이다(sessionStorage). 주소에 회사 정보를 실으면
+     주소창·기록에 남는다. */
+const CONTRACT_SEED_KINDS = { form: 1, contract: 1, bizreg: 1 };
+function canMakeContract(read) {
+  if (!read || read.error || viewingOther()) return false;
+  if (!CONTRACT_SEED_KINDS[read.kind]) return false;
+  const f = readFields(read);
+  /* 회사 이름조차 없으면 계약 창에 채울 것이 없다 — 단추만 뜨고 아무 일도 안 하면 안 된다 */
+  return !!String(f.company || '').trim();
+}
+
+/* 판독 칸 → 계약의 company 칸. ⚠ 이름은 계약관리가 쓰는 이름이다 —
+   업태는 bizType, **종목은 bizCategory** 다(실측으로 확인했다. 바꿔 넣으면 157건과 어긋난다).
+   ⚠ 상시근로자수는 «안 보낸다» — 계약의 고용보험 피보험자수와 다른 숫자다. */
+const CONTRACT_CO_MAP = [['company', 'name'], ['ceo', 'ceo'], ['bizno', 'bizNo'],
+  ['corpno', 'corpRegNo'], ['address', 'address'], ['companyTel', 'phone'],
+  ['companyFax', 'fax'], ['email', 'email'], ['bizType', 'bizType'],
+  ['bizItem', 'bizCategory'], ['openDate', 'openDate']];
+
+function contractBox(it) {
+  const read = it && it.meta && it.meta.read;
+  if (!canMakeContract(read)) return '';
+  const f = readFields(read);
+  const 있는칸 = CONTRACT_CO_MAP.filter(function (p) {
+    return String(f[p[0]] == null ? '' : f[p[0]]).trim();
+  }).length;
+  return '<div class="ctbox">' +
+    '<div class="t">📋 이 신청서로 계약 등록</div>' +
+    '<div class="d">계약관리의 새 계약 창이 <b>회사 ' + 있는칸 + '칸이 채워진 채로</b> 열립니다.' +
+    ' 유형·기간·금액은 신청서에 없어 <b>직접 넣으셔야</b> 합니다.</div>' +
+    '<button class="go" onclick="makeContractFromDoc()">계약관리에서 등록하기 →</button>' +
+    '</div>';
+}
+
+function makeContractFromDoc() {
+  const id = viewerId;
+  if (!id || blockedIfOther(id)) return;
+  const it = gridItems.find(function (x) { return x.id === id; });
+  const read = it && it.meta && it.meta.read;
+  if (!canMakeContract(read)) return;
+  const f = readFields(read);
+  const company = {};
+  CONTRACT_CO_MAP.forEach(function (p) {
+    const v = String(f[p[0]] == null ? '' : f[p[0]]).trim();
+    if (v) company[p[1]] = v;
+  });
+  const seed = { company: company, at: Date.now(),
+    /* 어느 사진에서 왔는지 — 계약에 남아 「이 값 어디서 나왔지」에 답한다 */
+    srcPhoto: { id: id, year: photoYearOf(id), owner: photoOwner(id) || '',
+                kind: read.kind, name: String(f.docName || '').trim() } };
+  try { sessionStorage.setItem('pu_new_contract', JSON.stringify(seed)); }
+  catch (e) { alert('계약관리로 넘기지 못했습니다: ' + ((e && e.message) || e)); return; }
+  const url = 'pu-erp.html#menu=biz/contract';
+  if (window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(url, '계약 등록');
+  else location.href = url;
 }
 
 /* 「업체 없음 · 그냥 보관」 — 개인 통장처럼 붙일 업체가 애초에 없는 것.
@@ -16233,9 +16452,27 @@ function renderReadPanel(it) {
   }
   const warn = read.auto ? '' : ' warn';
   /* 문서 차례 그대로 — 이름표까지 원본에 적힌 말이므로 이쪽도 esc 한다 */
-  const rows = readRows(read)
-    .map(function (r) { return '<tr><td class="k">' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>'; })
-    .join('');
+  /* ✎ 는 «내 사진»에만 — 남의 사진은 보기만 하는 것이 지우기·고치기와 같은 원칙이다 */
+  const 고칠수있나 = !viewingOther() && !read.error;
+  const fxMap = read.fix || {};
+  const rows = readRows(read).map(function (r) {
+    const key = r[2] || '';
+    const 고쳤나 = key && Object.prototype.hasOwnProperty.call(fxMap, key);
+    /* 고친 줄에는 «판독이 뭐라고 읽었는지»를 한 줄 아래에 남긴다 —
+       덮어쓰지 않았다는 것이 눈에 보여야 「이 값 어디서 나왔지」에 답할 수 있다. */
+    const 원래 = 고쳤나 ? String(readRawOf(read, key, r[0]) || '').trim() : '';
+    const 아래 = (원래 && 원래 !== String(r[1]).trim())
+      ? '<tr class="wasrow"><td class="k"></td><td>판독은 「' + esc(원래) + '」 이라고 읽었습니다</td></tr>'
+      : '';
+    return '<tr><td class="k">' + esc(r[0]) + '</td><td>' + esc(r[1]) +
+      (고쳤나 ? '<span class="fxmark" title="사람이 고친 값입니다">✎</span>' : '') +
+      (고칠수있나 && key
+        ? '<button class="fxpen" title="이 칸만 고칩니다 — 다시 판독하지 않습니다(요금 0원)"'
+          + ' onclick="askRowFix(' + JSON.stringify(key).replace(/"/g, '&quot;') + ','
+          + JSON.stringify(String(r[0])).replace(/"/g, '&quot;') + ')">✎</button>'
+        : '') +
+      '</td></tr>' + 아래;
+  }).join('');
   /* 실패했으면 AI가 준 설명까지 통째로 보여준다 — 줄바꿈도 살린다.
      이것을 우리 문구로 덮었다가 원인을 잘못 짚은 적이 있다(모델 종료 사고).
      ★ 2026-09-07 — «덮지는» 않되 그 위에 «무슨 뜻인지» 한 줄을 얹는다.
@@ -16431,6 +16668,9 @@ function renderReadPanel(it) {
     wageBox(it) +
     /* ✏ 이름·회사 — 임금 칸과 같은 자리(읽은 칸 바로 아래). 근로자 서류에만 나온다. */
     fixBox(it) +
+    /* 📋 이 신청서로 계약 등록 — 고치기 칸 «바로 아래»에 둔다. 칸을 먼저 바로잡고
+       그다음에 넘기는 것이 차례다(틀린 값을 계약관리로 보내면 거기서 또 고쳐야 한다). */
+    contractBox(it) +
     /* 📄 겹치는 서류 — 이름·회사 칸 바로 아래. 「누구 것인가」가 정해져야
        「그 사람에게 이미 있나」를 물을 수 있으니 차례가 이렇다. */
     dupBox(it) +
