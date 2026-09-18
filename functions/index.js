@@ -5147,6 +5147,7 @@ exports.readMailAttachment = MSYNC.readMailAttachment;
 exports.searchMailbox = MSYNC.searchMailbox;
 exports.mailAttToPaydata = MSYNC.mailAttToPaydata;
 exports.moveMailMessages = MSYNC.moveMailMessages;
+exports.reportMailSpam = MSYNC.reportMailSpam;
 exports.manageMailFolder = MSYNC.manageMailFolder;
 exports.flagMailMessages = MSYNC.flagMailMessages;
 /* POP3 로 «몇 통이 있는지»만 묻는 진단 — 지난 메일을 채울 수 있나를 재는 자리.

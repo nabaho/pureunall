@@ -21067,6 +21067,12 @@ function mbListHtml(){
             안 고른 채 누르면 「고른 것이 없습니다」로 알려 준다. 흐린 단추는 「이 앱은
             그 일을 못 한다」로 읽혀, 대표께서 눌러 보지도 않으신다. */''}
       <button onclick="mbTrash()" title="고른 메일을 다음메일 휴지통으로 옮깁니다">삭제</button>
+      ${/* ── 🚫 스팸신고 — 다음메일 상단과 같은 자리에 (대표 지시 2026-09-18) ──
+           ⚠ 우리 화면에서만 숨기는 🚫 거르개(mbIsSpam)와는 다르다 — 이 단추는
+             다음메일 서버에 «신고»해 스팸함으로 실제로 옮긴다.
+           ⚠ 「우리가 낸 칸」에서는 아예 안 보인다 — 우리가 쓴 것을 신고할 일이 없다. */''}
+      ${mbSentBox() ? '' : `<button onclick="mbSpamReport()"
+        title="다음메일에 «스팸으로 신고»합니다 — 스팸함으로 실제로 옮겨집니다">스팸신고</button>`}
       ${/* 답장은 메일 앱에서 가장 많이 쓰는 자리인데 없었다(대표 지시 2026-08-25) */''}
       <button onclick="mbReply(false)" title="보낸 사람에게 답장합니다">답장</button>
       <button onclick="mbReply(true)" title="받는 사람 모두에게 답장합니다">전체답장</button>
@@ -22872,6 +22878,57 @@ function mbTrash(){
   if(!confirm(`메일 ${picked.length}통을 휴지통으로 옮깁니다.\n\n· ${names}${picked.length>4?'\n· …':''}\n\n`
     + `⚠ 다음메일함에서도 휴지통으로 갑니다(되돌릴 수 있습니다).\n진행할까요?`)) return;
   mbMoveTo(picked, trash.slug, '휴지통');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   🚫 스팸신고 — 다음메일 상단과 같은 자리에 (대표 지시 2026-09-18)
+   ══════════════════════════════════════════════════════════════════════════
+   「다음메일 상단과 같은 내용을 넣어 줄 수 있나」 — 다음메일 캡처의 삭제·스팸신고·
+   전달 세 단추 가운데 스팸신고만 없었다.
+
+   ⚠★ 우리 화면의 🚫 거르개(mbIsSpam)와는 «다른 일»이다. 그것은 다음메일에는
+     아무 일도 안 하고 «우리 눈에만» 숨기는 규칙이다. 이 단추는 다음메일 서버에
+     «신고»해 스팸함으로 «실제로» 옮긴다 — 우리가 스팸함을 안 가져오므로(SKIP_KINDS)
+     신고한 메일은 이 화면에서 곧바로 사라지고, 되돌리려면 다음메일 스팸함에서
+     직접 꺼내야 한다. 그래서 다른 단추보다 무겁게 확인창을 띄운다.
+   ⚠ 「우리가 낸 칸」(보낸메일함·임시보관함·내게쓴메일함·예약메일함)의 메일은
+     신고 대상에서 뺀다 — 서버도 거절한다(reportMailSpam). 전체메일처럼 여러 칸이
+     섞인 곳에서 골랐을 때를 대비해 «조용히 걸러내고» 몇 통을 뺐는지 알린다. */
+function mbSpamReport(){
+  const all = mbPicked(); if(!all.length) return toast('고른 것이 없습니다');
+  if(mbOldBlock(all, '스팸으로 신고할')) return;
+  const picked = all.filter(v=>{
+    const f = mbFolderBy(v._slug);
+    return !(f && MB_SENT_KINDS[f.kind]);
+  });
+  if(!picked.length) return toast('우리가 보낸 메일은 스팸으로 신고할 수 없습니다', 7000);
+  const skipped = all.length - picked.length;
+  const names = picked.slice(0,4).map(v=>v.s||'(제목 없음)').join('\n· ');
+  if(!confirm(`메일 ${picked.length}통을 다음메일에 «스팸으로 신고»합니다.\n\n`
+    + `· ${names}${picked.length>4?'\n· …':''}\n\n`
+    + `⚠ 스팸함으로 실제로 옮겨집니다 — 되돌리려면 다음메일 스팸함에서 직접 꺼내야 합니다.\n`
+    + (skipped ? `⚠ 우리가 보낸 메일 ${skipped}통은 신고 대상에서 뺐습니다.\n` : '')
+    + `진행할까요?`)) return;
+  const byBox = {};
+  picked.forEach(v=>{ (byBox[v._slug] = byBox[v._slug]||[]).push(String(v.u)); });
+  const u = firebase.auth().currentUser;
+  if(!u) return toast('로그인이 필요합니다');
+  toast('신고하고 있습니다…', 3000);
+  u.getIdToken().then(tok=>{
+    const jobs = Object.keys(byBox).map(from=>fetch(MB_FN+'reportMailSpam', {
+      method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
+      body: JSON.stringify({ from:from, uids:byBox[from] })
+    }).then(r=>r.json().catch(()=>({}))));
+    return Promise.all(jobs);
+  }).then(res=>{
+    const bad = res.find(j=>!j || !j.ok);
+    if(bad) throw new Error((bad&&bad.error)||'신고하지 못했습니다');
+    /* 화면에서 먼저 걷어낸다 — 스팸함은 애초에 안 가져오므로 다시 동기화해도 안 돌아온다 */
+    picked.forEach(v=>{ if(_mbMsgs[v._slug]) delete _mbMsgs[v._slug][String(v.u)]; });
+    pickClear('mbox'); state.mbOpen=null;
+    renderPCSide(); renderMailPage();
+    toast(`🚫 ${picked.length}통을 스팸으로 신고했습니다`, 6000);
+  }).catch(e=>toast('신고하지 못했습니다 — '+((e&&e.message)||e), 8000));
 }
 /* ── 어디로 옮길까 — «누른 자리 옆»에 폴더를 늘어놓고 눌러서 고른다 ──
    ⚠ 예전에는 브라우저 알림창에 「1. 자문사답변 2. 급여 … 번호를 적어 주세요」가 떴다.
