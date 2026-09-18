@@ -66,7 +66,7 @@ test('②★ 응답이 오면 «CORS 하나»라고 말한다 — 인증서를 �
   assert.equal(r.kind, 'cors');
   const msg = ctx.nasReachVerdict(r, 'https://192.168.0.21:5001', 'https://nabaho.github.io');
   assert.match(msg, /이미 믿고/, '★★ 인증서를 하신 분께 또 인증서를 말하면 대표 화면이 그대로 되풀이된다');
-  assert.match(msg, /사용자 정의 HTTP 헤더/, '★ 어디를 눌러야 하는지가 없으면 원인만 알고 못 고친다');
+  assert.match(msg, /사용자 정의 헤더/, '★ 어디를 눌러야 하는지가 없으면 원인만 알고 못 고친다');
   assert.match(msg, /https:\/\/nabaho\.github\.io/, '★ 지금 이 화면의 주소를 넣어 줘야 한다 — 옛 주소를 박으면 시킨 대로 해도 안 된다');
   assert.doesNotMatch(msg, /사무실 «밖»/, '★ 가른 뒤에 안 해당하는 갈래를 또 말하면 가른 뜻이 없다');
 });
@@ -78,7 +78,8 @@ test('③★ 빨리 튕기면 «서버는 거기 있다» — 사무실 밖 이�
   const msg = ctx.nasReachVerdict(r, 'https://192.168.0.21:5001', 'https://nabaho.github.io');
   assert.match(msg, /거기 있습니다/);
   assert.match(msg, /인증서/);
-  assert.match(msg, /Access-Control-Allow-Private-Network/, '★ 크롬의 사설망 차단이 이 갈래의 절반이다');
+  assert.match(msg, /사설망/, '★ 크롬의 사설망 차단이 이 갈래의 절반이다');
+  assert.match(msg, /chrome:\/\/flags/, '★★ 「사설망 차단입니다」로 끝내면 받는 사람은 끌 자리를 못 찾는다 — 붙여넣을 것을 준다');
   assert.doesNotMatch(msg, /사무실 «밖»/);
 });
 
@@ -91,7 +92,7 @@ test('④ 오래 기다렸으면 «사무실 밖»을 먼저 말한다', async (
   assert.equal(r.kind, 'silent', '★ 12초를 기다린 것을 「브라우저가 막았다」고 하면 엉뚱한 곳을 뒤진다');
   const msg = ctx.nasReachVerdict(r, 'https://192.168.0.21:5001', 'https://x');
   assert.match(msg, /사무실 «밖»/);
-  assert.match(msg, /수동 백업/, '★ 어느 쪽이든 늘 되는 길은 남겨 둔다');
+  assert.match(msg, /백업 파일 다운로드/, '★ 어느 쪽이든 늘 되는 길은 남겨 둔다');
   assert.doesNotMatch(msg, /이미 믿고/);
 });
 
@@ -121,6 +122,17 @@ test('⑦ 되짚기가 실패해도 연결 테스트를 망가뜨리지 않는�
     '★★ 되짚다 터지면 연결 테스트 전체가 깨진다 — 덧붙이는 말이 본 일을 망치면 안 된다');
   assert.ok(t.indexOf("addLog('❌ 연결 실패") < t.indexOf('nasReachProbe'),
     '★ 실패했다는 말이 먼저 나와야 한다 — 되짚기는 그 다음이다');
-  assert.match(t, /err\.message !== 'Failed to fetch'\) return;/,
+  const 문 = t.indexOf("err.message !== 'Failed to fetch'");
+  assert.ok(문 > -1 && 문 < t.indexOf('nasReachProbe') && /return;/.test(t.slice(문, t.indexOf('nasReachProbe'))),
     '★ 로그인 거절(아이디·비밀번호 틀림)에까지 「못 닿았다」를 되짚으면 엉뚱한 말을 한다');
+});
+
+test('⑧★★ 갈래마다 «지금 바로 되는 길»을 함께 준다 — 원인만 알려 주고 끝내지 않는다', () => {
+  const { ctx } = load(() => Promise.resolve({}));
+  [{ kind: 'cors', ms: 300 }, { kind: 'blocked', ms: 200 }, { kind: 'silent', ms: 12000 }].forEach(r => {
+    const msg = ctx.nasReachVerdict(r, 'https://192.168.0.21:5001', 'https://x');
+    assert.match(msg, /지금 바로 되는 길/,
+      '★★ 원인을 알아도 할 일이 없으면 받는 사람은 그대로 멈춘다 (' + r.kind + ')');
+    assert.match(msg, /백업 파일 다운로드/, '★ 늘 되는 길은 화면에 «있는 단추» 이름으로 말해야 찾는다');
+  });
 });
