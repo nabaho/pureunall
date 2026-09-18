@@ -41421,15 +41421,23 @@ function NasBackupSettings(){
   var btnS = function(c){ return { padding:'8px 18px', background:c, color:'#fff', border:'none', borderRadius:'5px', fontSize:'12.5px', fontWeight:700, cursor:busy?'not-allowed':'pointer', opacity:busy?0.6:1 }; };
 
   return h('div', { className:'page' },
-    h('div', { style:{maxWidth:'700px', margin:'0 auto'} },
-      h('div', { style:{fontWeight:800, fontSize:'17px', marginBottom:'18px', display:'flex', alignItems:'center', gap:'10px'} },
+    /* ★★ 좌우로 편다 — 아래로 자꾸 내려가지 않게 (대표 지시 2026-09-18
+       「나스저장화면 아래로 너무 길게 내려와서 자꾸 내려야 한다. 좌우로 배치해서
+        아래로 안 내려가게, 불필요한 정보 없애라」)
+       ■ 없앤 것
+         · ⚠️ CORS 해결 방법 블록 전체 — 위 「지금 상태」가 «지금 무엇을 해야 하는지»를
+           바로 말한다. 늘 떠 있는 긴 안내는 정작 필요할 때 안 읽히고, 자리만 먹는다.
+           (2026-09-18 실제로 「지금 상태」가 CORS 라고 짚어 냈다 — 그 블록은 그날 쓸모를 잃었다)
+         · 백업/복원의 다섯 줄 설명 — 단추 이름이 이미 말한다. 자세한 것은 단추에 얹었다(title).
+         · 수동 백업의 설명 줄 — 제목에 합쳤다.
+       ■ 좌우로 나눈 것
+         왼쪽 = 손대는 곳(연결 설정) · 오른쪽 = 보는 곳(상태·백업·로그)
+       ⚠ 폰에서는 한 칸이다 — 좁은 화면에서 두 칸으로 두면 글자가 뭉개진다. */
+    h('div', { style:{maxWidth: (window.IS_MOBILE ? '700px' : '1180px'), margin:'0 auto'} },
+      h('div', { style:{fontWeight:800, fontSize:'17px', marginBottom:'14px', display:'flex', alignItems:'center', gap:'8px'} },
         '🖥️ 시놀로지 NAS 백업 설정',
         busy && h('span', { style:{fontSize:'12px', color:'#64748b', fontWeight:400} }, '⏳ 처리 중...')),
 
-      // 자동 백업 상태 배너
-      /* ★★ 「지금 어떤 상태인가」 — 검은 로그를 뒤지지 않아도 되게 맨 위에 크게 적는다.
-         대표님이 하실 일은 이 화면을 여는 것 하나다(위 useEffect 가 스스로 잰다).
-         ⚠ 이 칸 하나만 사진으로 찍어 보내시면 내가 다음을 짚을 수 있다 — 그래서 글씨를 크게 둔다. */
       진단 && h('div', { style:{
           background: 진단.ok === true ? '#f0fdf4' : 진단.ok === null ? '#f8fafc' : '#fef2f2',
           border:'2px solid ' + (진단.ok === true ? '#16a34a' : 진단.ok === null ? '#cbd5e1' : '#991b1b'),
@@ -41439,193 +41447,158 @@ function NasBackupSettings(){
         h('div', { style:{ fontSize:'12px', fontWeight:800, opacity:.75, marginBottom:'6px' } }, '지금 상태'),
         진단.msg),
 
-      /* ★ 마지막 «시도»가 실패였으면 초록으로 「활성화됨」이라 하지 않는다 —
-         나스에 한 장도 안 올라갔는데 「활성화됨」만 보이면 사람은 백업이 있는 줄 안다.
-         백업은 «없는 것»보다 «없는 줄 모르는 것»이 나쁘다(정작 필요할 때 없다). */
-      (function(){
-        var 시도 = nasAutoLastTry();
-        /* ★★ 비밀번호가 없으면 자동 백업은 «돌 수가 없다» — 그런데 초록으로 「활성화됨」이라 했다
-           (2026-09-18 대표 화면: 비밀번호 칸이 빈 채로 「주 1회 자동 백업 활성화됨」).
-           한 번도 돈 적이 없는데 활성화됐다고 하는 것은 화면이 거짓말하는 것이다. */
-        var 못돎 = !cfg.host || !cfg.user || !cfg.pass;
-        var 탈 = 못돎 || !!(시도 && !시도.ok);
-        var 때 = function(ms){ var d = new Date(ms); return d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); };
-        return h('div', { style:{background:탈?'#fef2f2':'#f0fdf4', border:'1px solid '+(탈?'#fecaca':'#bbf7d0'), borderRadius:'8px', padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'} },
-        h('span', { style:{fontSize:'18px'} }, 탈 ? '⚠' : '🔄'),
-        h('div', { style:{flex:1, minWidth:'220px'} },
-          h('div', { style:{fontWeight:700, fontSize:'13px', color:탈?'#991b1b':'#166534'} },
-            못돎 ? '자동 백업이 «꺼져» 있습니다 — 아래 칸이 비어 있어 돌 수가 없습니다'
-                 : 탈 ? '자동 백업이 마지막에 실패했습니다 — 지금 나스에 안 올라가고 있습니다'
-                      : '주 1회 자동 백업 활성화됨'),
-          h('div', { style:{fontSize:'11.5px', color:탈?'#991b1b':'#16a34a', marginTop:'2px'} },
-            (function(){
-              var last = localStorage.getItem(NAS_AUTO_KEY);
-              if(못돎) return 'NAS 아이디·비밀번호가 채워지고 「💾 설정 저장」을 누르셔야 주 1회 자동 백업이 돕니다.';
-              if(탈) return '마지막 시도 ' + 때(시도.at) + ' · ' + (시도.why || '까닭을 알 수 없습니다') +
-                           ' | ' + (last ? '마지막 성공 ' + 때(parseInt(last,10)) : '아직 한 번도 성공한 적 없습니다') +
-                           ' | 하루 뒤 다시 해 봅니다 — 「지금 초기화」를 누르면 바로 다시 합니다';
-              if(!last) return '아직 자동 백업이 실행된 적 없습니다 (앱 열 때 자동 실행)';
-              var next = new Date(parseInt(last,10) + 7*24*60*60*1000);
-              return '마지막 자동 백업: ' + 때(parseInt(last,10)) +
-                     ' | 다음 예정: ' + next.toLocaleDateString('ko-KR');
-            })()
+      h('div', { style:{display:'grid', gap:'16px', alignItems:'start',
+                        gridTemplateColumns: (window.IS_MOBILE ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)')} },
+        h('div', null,
+        // 설정 박스
+        h('div', { style:{background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'20px', marginBottom:'16px'} },
+          h('div', { style:{fontWeight:700, fontSize:'13px', color:'#1e293b', marginBottom:'14px'} }, '📡 NAS 연결 설정'),
+          h('div', { style:{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px'} },
+            h('div', null,
+              h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'NAS 내부 IP 주소'),
+              h('input', { type:'text', value:cfg.host, onChange:field('host'), placeholder:'192.168.0.21', style:iS })),
+            h('div', null,
+              h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'DSM 포트'),
+              h('input', { type:'text', value:cfg.port, onChange:field('port'), placeholder:'5000', style:iS }))
+          ),
+          // 🔒 HTTPS — 종전 오류 안내가 「아래 "HTTPS 모드" 켜고」라고 했지만 그 칸이 «없었다»(2026-09-10 검토)
+          h('div', { style:{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', marginBottom:'12px',
+                            padding:'10px 12px', borderRadius:'8px',
+                            background: nasIsPlain(cfg) ? '#fef2f2' : '#f0fdf4',
+                            border: '1px solid ' + (nasIsPlain(cfg) ? '#fecaca' : '#bbf7d0') } },
+            h('label', { style:{display:'flex', alignItems:'center', gap:'6px', fontSize:'12.5px', fontWeight:600, color:'#1e293b', cursor:'pointer'} },
+              h('input', { type:'checkbox', checked: !nasIsPlain(cfg),
+                           onChange:function(e){ setCfg(Object.assign({}, cfg, { useHttps: !!e.target.checked })); } }),
+              '🔒 HTTPS 로 연결'),
+            h('span', { style:{fontSize:'11.5px', color:'#475569'} }, 'HTTPS 포트'),
+            h('input', { type:'text', value:cfg.httpsPort||'5001', onChange:field('httpsPort'), placeholder:'5001',
+                         style:Object.assign({}, iS, { width:'80px' }) }),
+            nasIsPlain(cfg)
+              ? h('span', { style:{fontSize:'11.5px', color:'#991b1b', fontWeight:600, flex:1, minWidth:'200px'} },
+                  '⚠ HTTP — NAS 비밀번호가 사무실 네트워크에 평문으로 흐릅니다. ',
+                  h('button', { onClick:toHttps, style:{border:'1px solid #991b1b', background:'#fff', color:'#991b1b', borderRadius:'5px', padding:'2px 8px', fontSize:'11.5px', cursor:'pointer'} }, 'HTTPS 로 바꾸기'))
+              : h('span', { style:{fontSize:'11.5px', color:'#166534'} }, '비밀번호가 암호화된 길로만 갑니다')
+          ),
+          h('div', { style:{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px'} },
+            h('div', null,
+              h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'NAS 아이디'),
+              h('input', { type:'text', value:cfg.user, onChange:field('user'), placeholder:'admin', style:iS, autoComplete:'off' })),
+            h('div', null,
+              h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'NAS 비밀번호'),
+              h('input', { type:'password', value:cfg.pass, onChange:field('pass'), placeholder:'비밀번호', style:iS, autoComplete:'new-password' }))
+          ),
+          /* ★ 폴더와 보관 개수를 «한 줄»에 나란히 둔다 — 자리가 넓은데 세로로 쌓지 않는다
+             (CLAUDE.md 「표의 한 칸은 한 줄이다」, 대표 지시 2026-09-18 「좌우로 배치해서 아래로 안 내려가게」) */
+          h('div', { style:{display:'grid', gridTemplateColumns:'minmax(0,3fr) minmax(0,1fr)', gap:'12px', marginBottom:'16px'} },
+            h('div', null,
+              h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, '저장 폴더 경로'),
+              h('input', { type:'text', value:cfg.folder, onChange:field('folder'), placeholder:'/업무자료/pureun_erp', style:iS })),
+          h('div', { style:{display:'flex', alignItems:'flex-end', gap:'8px', flexWrap:'wrap'} },
+            h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569'} }, '보관 개수'),
+            h('input', { type:'number', min:NAS_KEEP_MIN, value:cfg.keep, onChange:field('keep'), placeholder:'30', style:Object.assign({}, iS, { width:'90px' }) }),
+            h('span', { style:{fontSize:'11.5px', color:'#64748b'} },
+              '개만 남깁니다 (최소 '+NAS_KEEP_MIN+')'))),
+          h('div', { style:{display:'flex', gap:'8px', flexWrap:'wrap'} },
+            h('button', { onClick:save, style:btnS(안저장됨() ? '#991b1b' : '#475569') },
+              안저장됨() ? '💾 설정 저장 (아직 저장 안 됨)' : '💾 설정 저장'),
+            h('button', { onClick:doTest, disabled:busy, style:btnS('#16a34a') }, '🔌 연결 테스트'),
+            /* 인증서 예외를 등록하는 «유일한 길». 안내에서 이 단추를 가리키므로 반드시 여기 있어야 한다
+               (2026-09-10 에 「없는 단추를 가리키는 안내」로 한 번 당했다). */
+            h('button', { onClick:openNas, title:getNasBase(), style:btnS('#854d0e') },
+              nasIsPlain(cfg) ? '🌐 NAS 열어 보기' : '🔐 NAS 열어 인증서 믿게 하기'))
+        ),
+        ),
+        h('div', null,
+        /* ★ 마지막 «시도»가 실패였으면 초록으로 「활성화됨」이라 하지 않는다 —
+           나스에 한 장도 안 올라갔는데 「활성화됨」만 보이면 사람은 백업이 있는 줄 안다.
+           백업은 «없는 것»보다 «없는 줄 모르는 것»이 나쁘다(정작 필요할 때 없다). */
+        (function(){
+          var 시도 = nasAutoLastTry();
+          /* ★★ 비밀번호가 없으면 자동 백업은 «돌 수가 없다» — 그런데 초록으로 「활성화됨」이라 했다
+             (2026-09-18 대표 화면: 비밀번호 칸이 빈 채로 「주 1회 자동 백업 활성화됨」).
+             한 번도 돈 적이 없는데 활성화됐다고 하는 것은 화면이 거짓말하는 것이다. */
+          var 못돎 = !cfg.host || !cfg.user || !cfg.pass;
+          var 탈 = 못돎 || !!(시도 && !시도.ok);
+          var 때 = function(ms){ var d = new Date(ms); return d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); };
+          return h('div', { style:{background:탈?'#fef2f2':'#f0fdf4', border:'1px solid '+(탈?'#fecaca':'#bbf7d0'), borderRadius:'8px', padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'} },
+          h('span', { style:{fontSize:'18px'} }, 탈 ? '⚠' : '🔄'),
+          h('div', { style:{flex:1, minWidth:'220px'} },
+            h('div', { style:{fontWeight:700, fontSize:'13px', color:탈?'#991b1b':'#166534'} },
+              못돎 ? '자동 백업이 «꺼져» 있습니다 — 아래 칸이 비어 있어 돌 수가 없습니다'
+                   : 탈 ? '자동 백업이 마지막에 실패했습니다 — 지금 나스에 안 올라가고 있습니다'
+                        : '주 1회 자동 백업 활성화됨'),
+            h('div', { style:{fontSize:'11.5px', color:탈?'#991b1b':'#16a34a', marginTop:'2px'} },
+              (function(){
+                var last = localStorage.getItem(NAS_AUTO_KEY);
+                if(못돎) return 'NAS 아이디·비밀번호가 채워지고 「💾 설정 저장」을 누르셔야 주 1회 자동 백업이 돕니다.';
+                if(탈) return '마지막 시도 ' + 때(시도.at) + ' · ' + (시도.why || '까닭을 알 수 없습니다') +
+                             ' | ' + (last ? '마지막 성공 ' + 때(parseInt(last,10)) : '아직 한 번도 성공한 적 없습니다') +
+                             ' | 하루 뒤 다시 해 봅니다 — 「지금 초기화」를 누르면 바로 다시 합니다';
+                if(!last) return '아직 자동 백업이 실행된 적 없습니다 (앱 열 때 자동 실행)';
+                var next = new Date(parseInt(last,10) + 7*24*60*60*1000);
+                return '마지막 자동 백업: ' + 때(parseInt(last,10)) +
+                       ' | 다음 예정: ' + next.toLocaleDateString('ko-KR');
+              })()
+            )
+          ),
+          h('button', { onClick:function(){
+              nasAutoClear();                      /* ⚠ 물러서기 기록도 함께 푼다 — 안 그러면 눌러도 하루를 쉰다 */
+              showToast('다음 앱 시작 시 즉시 자동 백업 실행됩니다');
+            },
+            style:{padding:'4px 10px',border:'1px solid '+(탈?'#991b1b':'#16a34a'),background:'#fff',color:탈?'#991b1b':'#16a34a',borderRadius:'5px',cursor:'pointer',fontSize:'11px',fontWeight:600} },
+            '지금 초기화 (즉시 실행)'
+          )
+        );
+        })(),
+        // 백업/복원 박스
+        h('div', { style:{background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'10px', padding:'20px', marginBottom:'16px'} },
+          h('div', { style:{fontWeight:700, fontSize:'13px', color:'#1e40af', marginBottom:'8px'} }, '📦 백업 / 복원'),
+          /* ★ 다섯 줄짜리 설명을 걷어냈다 (대표 지시 2026-09-18 「불필요한 정보 없애라」) —
+             단추 이름이 이미 말한다. 자세한 것은 단추에 얹어(title) 필요한 사람만 본다. */
+          h('div', { style:{display:'flex', gap:'10px', flexWrap:'wrap'} },
+            h('button', { onClick:doBackup, disabled:busy, title:'ERP 전체 → '+cfg.folder+'/pureun_erp_latest.json · 날짜별 파일도 함께', style:Object.assign({},btnS('#1e40af'),{flex:1}) }, '📤 NAS에 지금 백업'),
+            h('button', { onClick:doRestore, disabled:busy, title:'NAS 최신 백업 → 지금 ERP (백업에 있는 칸만 덮어씀 · 복원 직전 상태는 undo 로 먼저 올려 둠)', style:Object.assign({},btnS('#dc2626'),{flex:1}) }, '📥 NAS에서 복원'),
+            h('button', { onClick:doUndo, disabled:busy, title:'마지막 복원 직전 상태로', style:Object.assign({},btnS('#475569'),{flex:1}) }, '↩ 복원 전으로 되돌리기'))
+        ),
+        // 수동 백업 (항상 가능)
+        h('div', { style:{background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'10px', padding:'16px', marginBottom:'16px'} },
+          h('div', { style:{fontWeight:700, fontSize:'12.5px', color:'#166534', marginBottom:'10px'} }, '✅ 수동 백업 — 받아서 File Station 에 끌어 놓기 (늘 됩니다)'),
+          h('div', { style:{display:'flex', gap:'8px'} },
+            h('button', { onClick:function(){
+              var data = { _ts:(new Date()).toISOString(), _ver:'v6' };
+              for(var i=0;i<localStorage.length;i++){
+                var k=localStorage.key(i);
+                if(!k || k.indexOf('pureun_v6_')!==0 || SECRET_KEYS.test(k)) continue;   /* 비밀은 안 담는다 */
+                try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
+              }
+              var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+              var url=URL.createObjectURL(blob);
+              var a=document.createElement('a'); a.href=url; a.download='pureun_erp_backup_'+todayYMD()+'.json'; a.click();
+              URL.revokeObjectURL(url);
+              addLog('수동 백업 파일 다운로드됨','ok');
+              showToast('백업 파일 다운로드 완료');
+            }, style:btnS('#16a34a') }, '⬇️ 백업 파일 다운로드'),
+            h('label', { style:Object.assign({},btnS('#2563eb'),{cursor:'pointer'}) }, '⬆️ 백업 파일 복원',
+              h('input', { type:'file', accept:'.json', style:{display:'none'}, onChange:async function(e){
+                var file=e.target.files[0]; if(!file) return;
+                if(!(await popConfirm('백업 파일로 복원하시겠습니까?\n현재 데이터가 교체됩니다.'))) return;
+                var rdr=new FileReader();
+                rdr.onload=function(ev){
+                  try{
+                    var data=JSON.parse(ev.target.result);
+                    var count=0;
+                    Object.keys(data).forEach(function(k){
+                      if(k.indexOf('pureun_v6_')===0){ localStorage.setItem(k, typeof data[k]==='string'?data[k]:JSON.stringify(data[k])); count++; }
+                    });
+                    addLog('파일 복원 완료: '+count+'개 항목','ok');
+                    showToast('복원 완료 — 새로고침합니다');
+                    setTimeout(function(){location.reload();},1500);
+                  }catch(ex){ showToast('파일 형식 오류'); addLog('파일 오류: '+ex.message,'err'); }
+                };
+                rdr.readAsText(file);
+              }}))
           )
         ),
-        h('button', { onClick:function(){
-            nasAutoClear();                      /* ⚠ 물러서기 기록도 함께 푼다 — 안 그러면 눌러도 하루를 쉰다 */
-            showToast('다음 앱 시작 시 즉시 자동 백업 실행됩니다');
-          },
-          style:{padding:'4px 10px',border:'1px solid '+(탈?'#991b1b':'#16a34a'),background:'#fff',color:탈?'#991b1b':'#16a34a',borderRadius:'5px',cursor:'pointer',fontSize:'11px',fontWeight:600} },
-          '지금 초기화 (즉시 실행)'
-        )
-      );
-      })(),
-
-      // 설정 박스
-      h('div', { style:{background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'20px', marginBottom:'16px'} },
-        h('div', { style:{fontWeight:700, fontSize:'13px', color:'#1e293b', marginBottom:'14px'} }, '📡 NAS 연결 설정'),
-        h('div', { style:{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px'} },
-          h('div', null,
-            h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'NAS 내부 IP 주소'),
-            h('input', { type:'text', value:cfg.host, onChange:field('host'), placeholder:'192.168.0.21', style:iS })),
-          h('div', null,
-            h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'DSM 포트'),
-            h('input', { type:'text', value:cfg.port, onChange:field('port'), placeholder:'5000', style:iS }))
-        ),
-        // 🔒 HTTPS — 종전 오류 안내가 「아래 "HTTPS 모드" 켜고」라고 했지만 그 칸이 «없었다»(2026-09-10 검토)
-        h('div', { style:{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', marginBottom:'12px',
-                          padding:'10px 12px', borderRadius:'8px',
-                          background: nasIsPlain(cfg) ? '#fef2f2' : '#f0fdf4',
-                          border: '1px solid ' + (nasIsPlain(cfg) ? '#fecaca' : '#bbf7d0') } },
-          h('label', { style:{display:'flex', alignItems:'center', gap:'6px', fontSize:'12.5px', fontWeight:600, color:'#1e293b', cursor:'pointer'} },
-            h('input', { type:'checkbox', checked: !nasIsPlain(cfg),
-                         onChange:function(e){ setCfg(Object.assign({}, cfg, { useHttps: !!e.target.checked })); } }),
-            '🔒 HTTPS 로 연결'),
-          h('span', { style:{fontSize:'11.5px', color:'#475569'} }, 'HTTPS 포트'),
-          h('input', { type:'text', value:cfg.httpsPort||'5001', onChange:field('httpsPort'), placeholder:'5001',
-                       style:Object.assign({}, iS, { width:'80px' }) }),
-          nasIsPlain(cfg)
-            ? h('span', { style:{fontSize:'11.5px', color:'#991b1b', fontWeight:600, flex:1, minWidth:'200px'} },
-                '⚠ HTTP — NAS 비밀번호가 사무실 네트워크에 평문으로 흐릅니다. ',
-                h('button', { onClick:toHttps, style:{border:'1px solid #991b1b', background:'#fff', color:'#991b1b', borderRadius:'5px', padding:'2px 8px', fontSize:'11.5px', cursor:'pointer'} }, 'HTTPS 로 바꾸기'))
-            : h('span', { style:{fontSize:'11.5px', color:'#166534'} }, '비밀번호가 암호화된 길로만 갑니다')
-        ),
-        h('div', { style:{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'12px'} },
-          h('div', null,
-            h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'NAS 아이디'),
-            h('input', { type:'text', value:cfg.user, onChange:field('user'), placeholder:'admin', style:iS, autoComplete:'off' })),
-          h('div', null,
-            h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, 'NAS 비밀번호'),
-            h('input', { type:'password', value:cfg.pass, onChange:field('pass'), placeholder:'비밀번호', style:iS, autoComplete:'new-password' }))
-        ),
-        h('div', { style:{marginBottom:'16px'} },
-          h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'4px'} }, '저장 폴더 경로'),
-          h('input', { type:'text', value:cfg.folder, onChange:field('folder'), placeholder:'/업무자료/pureun_erp', style:iS })),
-        h('div', { style:{marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'} },
-          h('label', { style:{fontSize:'11.5px', fontWeight:600, color:'#475569'} }, '날짜별 백업 보관 개수'),
-          h('input', { type:'number', min:NAS_KEEP_MIN, value:cfg.keep, onChange:field('keep'), placeholder:'30', style:Object.assign({}, iS, { width:'90px' }) }),
-          h('span', { style:{fontSize:'11.5px', color:'#64748b'} },
-            '새 것부터 이 개수만 남기고(갈래마다) 그보다 오랜 날짜별 파일을 백업 뒤 정리합니다 — 최소 '+NAS_KEEP_MIN+'개 · latest·undo 는 안 건드립니다')),
-        h('div', { style:{display:'flex', gap:'8px', flexWrap:'wrap'} },
-          h('button', { onClick:save, style:btnS(안저장됨() ? '#991b1b' : '#475569') },
-            안저장됨() ? '💾 설정 저장 (아직 저장 안 됨)' : '💾 설정 저장'),
-          h('button', { onClick:doTest, disabled:busy, style:btnS('#16a34a') }, '🔌 연결 테스트'),
-          /* 인증서 예외를 등록하는 «유일한 길». 안내에서 이 단추를 가리키므로 반드시 여기 있어야 한다
-             (2026-09-10 에 「없는 단추를 가리키는 안내」로 한 번 당했다). */
-          h('button', { onClick:openNas, title:getNasBase(), style:btnS('#854d0e') },
-            nasIsPlain(cfg) ? '🌐 NAS 열어 보기' : '🔐 NAS 열어 인증서 믿게 하기'))
-      ),
-
-      // 백업/복원 박스
-      h('div', { style:{background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'10px', padding:'20px', marginBottom:'16px'} },
-        h('div', { style:{fontWeight:700, fontSize:'13px', color:'#1e40af', marginBottom:'8px'} }, '📦 백업 / 복원'),
-        h('div', { style:{fontSize:'11.5px', color:'#64748b', marginBottom:'14px', lineHeight:1.6} },
-          '• 백업: 현재 ERP 전체 데이터 → NAS '+cfg.folder+'/pureun_erp_latest.json', h('br'),
-          '• 날짜별 파일도 함께 저장됩니다 (예: pureun_erp_backup_2026-05-17.json)', h('br'),
-          '• 복원: NAS 최신 백업 → 현재 ERP (백업에 있는 칸만 덮어씀 · 복원 직전 상태는 undo 로 먼저 올려 둠)', h('br'),
-          '• 되돌리기: 마지막 복원 «직전» 상태(pureun_erp_undo.json)로 돌아갑니다', h('br'),
-          '• 날짜별 파일은 새 '+(parseInt(cfg.keep,10)||NAS_KEEP_MIN)+'개만 남기고 그보다 오랜 것은 백업 뒤 정리합니다'),
-        h('div', { style:{display:'flex', gap:'10px', flexWrap:'wrap'} },
-          h('button', { onClick:doBackup, disabled:busy, style:Object.assign({},btnS('#1e40af'),{flex:1}) }, '📤 NAS에 지금 백업'),
-          h('button', { onClick:doRestore, disabled:busy, style:Object.assign({},btnS('#dc2626'),{flex:1}) }, '📥 NAS에서 복원'),
-          h('button', { onClick:doUndo, disabled:busy, title:'마지막 복원 직전 상태로', style:Object.assign({},btnS('#475569'),{flex:1}) }, '↩ 복원 전으로 되돌리기'))
-      ),
-
-      // CORS 안내
-      h('div', { style:{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'10px', padding:'16px', marginBottom:'16px'} },
-        h('div', { style:{fontWeight:700, fontSize:'12.5px', color:'#854d0e', marginBottom:'10px'} }, '⚠️ NAS 연결 실패 시 해결 방법 (CORS)'),
-        h('div', { style:{fontSize:'11.5px', color:'#854d0e', lineHeight:1.9} },
-          /* ★ 차례가 «실제로 겪는 차례»여야 한다 — HTTPS 를 켠 첫 연결은 거의 늘 인증서에서 막힌다.
-               CORS 를 먼저 적어 두면 아직 오지도 않은 문제를 붙들고 DSM 설정을 뒤진다. */
-          h('strong',null,'[먼저] 브라우저가 NAS 인증서를 믿게 하기'), h('br'),
-          '위 「🔐 NAS 열어 인증서 믿게 하기」 → 경고 화면에서 ', h('strong',null,'「고급」 → 「…(안전하지 않음)(으)로 이동」'),
-          ' → DSM 로그인 화면이 보이면 성공 → 돌아와 「연결 테스트」', h('br'),
-          h('span',{style:{color:'#d97706'}},'※ NET::ERR_CERT_AUTHORITY_INVALID 가 바로 이것입니다 — 시놀로지 기본(자체서명) 인증서라 정상입니다'), h('br'), h('br'),
-          h('strong',null,'[방법 1] DSM CORS 허용 (권장)'), h('br'),
-          '① DSM 로그인 → 제어판 → 응용 프로그램 포털 → 응용 프로그램 탭', h('br'),
-          '② 편집할 응용 프로그램(DSM) 선택 → "사용자 정의 HTTP 헤더" → 추가:', h('br'),
-          /* ★ 두 줄이다 — 크롬은 «공개 사이트(github.io) → 사설망(192.168.x)» 요청을 CORS 와 «따로»
-               막는다(PNA). 첫 줄만 넣으면 헤더를 넣었는데도 그대로 막혀 「시킨 대로 했는데 안 된다」가 된다. */
-          h('code',{style:{background:'#fffbeb',padding:'2px 8px',borderRadius:'5px',fontFamily:'monospace',display:'block',margin:'4px 0 4px 16px',whiteSpace:'pre-line'}},
-            'Access-Control-Allow-Origin: *\nAccess-Control-Allow-Private-Network: true'),
-          '③ 또는 DSM → 제어판 → 보안 → 신뢰할 수 있는 도메인 → 추가:', h('br'),
-          /* ★★ 2026-09-18 — 여기 «옛 주소»(pureun-erp.netlify.app)가 박혀 있었다. 이알피는 지금
-               nabaho.github.io 에 있다. 그대로 따르면 «엉뚱한 곳»을 허용하고 연결은 그대로 막힌다 —
-               시키는 대로 했는데 안 되는 것이 안내 없는 것보다 나쁘다.
-             ★ 주소를 박지 않는다. 지금 이 화면이 떠 있는 곳(location.origin)을 그대로 보인다 —
-               앞으로 주소가 또 바뀌어도 저절로 맞는다. tests/nas-connect-fail-help.test.js 가 못 박는다. */
-          h('code',{style:{background:'#fffbeb',padding:'2px 8px',borderRadius:'5px',fontFamily:'monospace',display:'block',margin:'4px 0 4px 16px'}},
-            (function(){ try{ return location.origin; }catch(e){ return '이 화면의 주소'; } })()),
-          h('br'),
-          h('strong',null,'[방법 2] 같은 사내 네트워크에서 직접 접속'), h('br'),
-          '브라우저 주소창: ',
-          h('code',{style:{background:'#fffbeb',padding:'2px 6px',borderRadius:'5px',fontFamily:'monospace'}},
-            /* HTTPS 를 켜 두었으면 5001 이다 — 늘 5000 을 적어 주면 또 헤맨다(2026-09-18) */
-            (function(){ try{ return getNasBase(); }catch(e){ return 'https://192.168.0.21:5001'; } })()
-          ),
-          ' 직접 접속 후 ERP 사용', h('br'), h('br'),
-          h('strong',{style:{color:'#16a34a'}},'[방법 3] 아래 수동 백업 다운로드 → File Station에 드래그 (항상 작동)')
-        )
-      ),
-
-      // 수동 백업 (항상 가능)
-      h('div', { style:{background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'10px', padding:'16px', marginBottom:'16px'} },
-        h('div', { style:{fontWeight:700, fontSize:'12.5px', color:'#166534', marginBottom:'8px'} }, '✅ 수동 백업 (CORS 없이 항상 작동)'),
-        h('div', { style:{fontSize:'11.5px', color:'#64748b', marginBottom:'12px'} }, 'JSON 파일로 다운로드 → NAS File Station에 업로드'),
-        h('div', { style:{display:'flex', gap:'8px'} },
-          h('button', { onClick:function(){
-            var data = { _ts:(new Date()).toISOString(), _ver:'v6' };
-            for(var i=0;i<localStorage.length;i++){
-              var k=localStorage.key(i);
-              if(!k || k.indexOf('pureun_v6_')!==0 || SECRET_KEYS.test(k)) continue;   /* 비밀은 안 담는다 */
-              try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
-            }
-            var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-            var url=URL.createObjectURL(blob);
-            var a=document.createElement('a'); a.href=url; a.download='pureun_erp_backup_'+todayYMD()+'.json'; a.click();
-            URL.revokeObjectURL(url);
-            addLog('수동 백업 파일 다운로드됨','ok');
-            showToast('백업 파일 다운로드 완료');
-          }, style:btnS('#16a34a') }, '⬇️ 백업 파일 다운로드'),
-          h('label', { style:Object.assign({},btnS('#2563eb'),{cursor:'pointer'}) }, '⬆️ 백업 파일 복원',
-            h('input', { type:'file', accept:'.json', style:{display:'none'}, onChange:async function(e){
-              var file=e.target.files[0]; if(!file) return;
-              if(!(await popConfirm('백업 파일로 복원하시겠습니까?\n현재 데이터가 교체됩니다.'))) return;
-              var rdr=new FileReader();
-              rdr.onload=function(ev){
-                try{
-                  var data=JSON.parse(ev.target.result);
-                  var count=0;
-                  Object.keys(data).forEach(function(k){
-                    if(k.indexOf('pureun_v6_')===0){ localStorage.setItem(k, typeof data[k]==='string'?data[k]:JSON.stringify(data[k])); count++; }
-                  });
-                  addLog('파일 복원 완료: '+count+'개 항목','ok');
-                  showToast('복원 완료 — 새로고침합니다');
-                  setTimeout(function(){location.reload();},1500);
-                }catch(ex){ showToast('파일 형식 오류'); addLog('파일 오류: '+ex.message,'err'); }
-              };
-              rdr.readAsText(file);
-            }}))
         )
       ),
 
