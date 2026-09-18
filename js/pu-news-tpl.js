@@ -576,6 +576,21 @@
      ⚠ 값을 여기 한 곳에만 둔다. 여러 군데 흩어 두면 한쪽만 늘어난다. */
   var 판례제목한도 = 100;
 
+  /* ★★ 「전문 보기」를 «그 자리에서 펴는» 손잡이로 만든다 (대표 지시 2026-09-18
+       「전문보기하면 처음화면에서 전문으로 다 내려오게. 새창으로 안 가고」).
+     ★ 법제처 주소에서 «무엇을·몇 번»만 떼어 표로 달아 둔다. 웹 전문 보기 쪽
+       (functions/news-view.js)이 이 표를 보고 newsFull 로 받아 와 아래에 편다.
+     ⚠ 링크는 «날것»(x.링크)에서 읽는다 — href() 를 지난 것은 추적 주소로 감싸여
+       번호가 사라진다. 그때는 표가 없어 예전처럼 법제처로 간다(나빠지지 않는다).
+     ⚠ 메일에서는 뜻 없는 표시다 — 자바스크립트가 없으니 그냥 링크로 남는다. */
+  function _법제처표(링크) {
+    var s = String(링크 == null ? '' : 링크);
+    if (s.indexOf('law.go.kr') < 0) return '';
+    var g = /[?&]target=(prec|expc)\b/.exec(s);
+    var n = /[?&]ID=(\d{1,12})\b/i.exec(s);
+    return (g && n) ? ' data-full="' + g[1] + ':' + n[1] + '"' : '';
+  }
+
   function 판례한칸(x) {
     var 온제목 = String(x.제목 || '').replace(/\s+/g, ' ').trim();
     /* ★ 대표께서 쓰신 «우리 말»이 있으면 그것이 제목이다 — 자른 글보다 낫다.
@@ -592,8 +607,9 @@
          것인지, 무엇이 열리는지 알 수 없다 — 요지를 뺀 뒤로는 더 그렇다. */
     var 인용칸 = 인
       ? '<div style="padding-top:4px;font-size:12px;font-family:' + 폰트 + ';color:' + 색.흐린글 + ';">'
-        + (u ? 인 + ' · <a href="' + u + '"' + 새탭 + ' style="color:' + 색.남색 + ';text-decoration:none;'
-              + 'font-weight:bold;">전문 보기 ↗</a>'
+        + (u ? 인 + ' · <a href="' + u + '"' + 새탭 + _법제처표(x.링크)
+              + ' style="color:' + 색.남색 + ';text-decoration:none;'
+              + 'font-weight:bold;">전문 보기 ↓</a>'
             : 인)
         + '</div>'
       : '';
