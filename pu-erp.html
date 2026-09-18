@@ -804,6 +804,39 @@ function nasInfoLine(info){
   return '🖥 모델 '+(i.model||'?')+' · RAM '+(i.ram||'?')+' · DSM '+(i.dsm||'?')+' · Container Manager(도커) '+도커;
 }
 
+/* ══ 자동 백업이 «조용히» 실패하던 자리 (2026-09-18, 나스를 막 연결한 뒤) ══════════════
+   ■ 무엇이 있었나
+     7일 자동 백업은 아무도 안 볼 때 돈다. 그런데 실패를 `catch(){}` 가 통째로 삼켰다 —
+     주석에도 「⚠ 남은 일: 실패를 설정 화면 기록에라도 남길 것」이라고 적혀 있었다.
+     그 사이 설정 화면은 「주 1회 자동 백업 활성화됨」이라고만 말한다. **화면이 거짓말한다** —
+     한 번도 안 올라갔어도 사람은 백업이 되고 있는 줄 안다. 백업은 안 되는 줄 모르는 것이
+     안 되는 것보다 나쁘다(정작 필요할 때 없다).
+   ■ 하나 더 — 되풀이
+     실패하면 성공 시각을 안 남기므로 **앱을 열 때마다** 저장소 4MB 를 풀어 글자로 만들고
+     나스에 붙어 보고 또 실패했다. 하루에 한 번만 다시 해 본다.
+   ⚠ 「지금 초기화」를 누르면 이 물러서기도 함께 푼다 — 안 그러면 눌러도 안 돈다. */
+var NAS_AUTO_KEY = 'pureun_v6_nas_auto_backup';      // 마지막 «성공» 시각 (예전 그대로)
+var NAS_AUTO_TRY_KEY = 'pureun_v6_nas_auto_try';     // 마지막 «시도» { at, ok, why }
+var NAS_AUTO_RETRY_MS = 24 * 60 * 60 * 1000;         // 실패 뒤 다시 해 보기까지
+function nasAutoWhy(err){
+  var m = (err && (err.message || err)) ? String(err.message || err) : '';
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return '나스에 못 닿았습니다 — 사무실 밖이거나, 브라우저가 나스 인증서를 아직 안 믿거나, CORS 설정이 빠졌습니다';
+  if(/^로그인|계정|비밀번호/.test(m)) return m;
+  return m || '까닭을 알 수 없습니다';
+}
+function nasAutoNote(ok, why){
+  try { localStorage.setItem(NAS_AUTO_TRY_KEY, JSON.stringify({ at: Date.now(), ok: !!ok, why: String(why || '').slice(0, 200) })); } catch(_){}
+}
+function nasAutoLastTry(){
+  try {
+    var v = JSON.parse(localStorage.getItem(NAS_AUTO_TRY_KEY) || 'null');
+    return (v && typeof v === 'object' && typeof v.at === 'number') ? v : null;
+  } catch(_){ return null; }
+}
+function nasAutoClear(){
+  try { localStorage.removeItem(NAS_AUTO_KEY); localStorage.removeItem(NAS_AUTO_TRY_KEY); } catch(_){}
+}
+
 function fetchT(url, opts, ms){
   opts = opts || {};
   var wait = ms || FETCH_MS;
@@ -41085,29 +41118,40 @@ function NasBackupSettings(){
         busy && h('span', { style:{fontSize:'12px', color:'#64748b', fontWeight:400} }, '⏳ 처리 중...')),
 
       // 자동 백업 상태 배너
-      h('div', { style:{background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px', padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'} },
-        h('span', { style:{fontSize:'18px'} }, '🔄'),
-        h('div', { style:{flex:1} },
-          h('div', { style:{fontWeight:700, fontSize:'13px', color:'#166534'} }, '주 1회 자동 백업 활성화됨'),
-          h('div', { style:{fontSize:'11.5px', color:'#16a34a', marginTop:'2px'} },
+      /* ★ 마지막 «시도»가 실패였으면 초록으로 「활성화됨」이라 하지 않는다 —
+         나스에 한 장도 안 올라갔는데 「활성화됨」만 보이면 사람은 백업이 있는 줄 안다.
+         백업은 «없는 것»보다 «없는 줄 모르는 것»이 나쁘다(정작 필요할 때 없다). */
+      (function(){
+        var 시도 = nasAutoLastTry();
+        var 탈 = !!(시도 && !시도.ok);
+        var 때 = function(ms){ var d = new Date(ms); return d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); };
+        return h('div', { style:{background:탈?'#fef2f2':'#f0fdf4', border:'1px solid '+(탈?'#fecaca':'#bbf7d0'), borderRadius:'8px', padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'} },
+        h('span', { style:{fontSize:'18px'} }, 탈 ? '⚠' : '🔄'),
+        h('div', { style:{flex:1, minWidth:'220px'} },
+          h('div', { style:{fontWeight:700, fontSize:'13px', color:탈?'#991b1b':'#166534'} },
+            탈 ? '자동 백업이 마지막에 실패했습니다 — 지금 나스에 안 올라가고 있습니다' : '주 1회 자동 백업 활성화됨'),
+          h('div', { style:{fontSize:'11.5px', color:탈?'#991b1b':'#16a34a', marginTop:'2px'} },
             (function(){
-              var last = localStorage.getItem('pureun_v6_nas_auto_backup');
+              var last = localStorage.getItem(NAS_AUTO_KEY);
+              if(탈) return '마지막 시도 ' + 때(시도.at) + ' · ' + (시도.why || '까닭을 알 수 없습니다') +
+                           ' | ' + (last ? '마지막 성공 ' + 때(parseInt(last,10)) : '아직 한 번도 성공한 적 없습니다') +
+                           ' | 하루 뒤 다시 해 봅니다 — 「지금 초기화」를 누르면 바로 다시 합니다';
               if(!last) return '아직 자동 백업이 실행된 적 없습니다 (앱 열 때 자동 실행)';
-              var d = new Date(parseInt(last,10));
               var next = new Date(parseInt(last,10) + 7*24*60*60*1000);
-              return '마지막 자동 백업: ' + d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) +
+              return '마지막 자동 백업: ' + 때(parseInt(last,10)) +
                      ' | 다음 예정: ' + next.toLocaleDateString('ko-KR');
             })()
           )
         ),
         h('button', { onClick:function(){
-            localStorage.removeItem('pureun_v6_nas_auto_backup');
+            nasAutoClear();                      /* ⚠ 물러서기 기록도 함께 푼다 — 안 그러면 눌러도 하루를 쉰다 */
             showToast('다음 앱 시작 시 즉시 자동 백업 실행됩니다');
           },
-          style:{padding:'4px 10px',border:'1px solid #16a34a',background:'#fff',color:'#16a34a',borderRadius:'5px',cursor:'pointer',fontSize:'11px',fontWeight:600} },
+          style:{padding:'4px 10px',border:'1px solid '+(탈?'#991b1b':'#16a34a'),background:'#fff',color:탈?'#991b1b':'#16a34a',borderRadius:'5px',cursor:'pointer',fontSize:'11px',fontWeight:600} },
           '지금 초기화 (즉시 실행)'
         )
-      ),
+      );
+      })(),
 
       // 설정 박스
       h('div', { style:{background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'20px', marginBottom:'16px'} },
@@ -85441,7 +85485,7 @@ function ERPMain(props){
 
   // ── NAS 자동 백업 (7일 주기, 앱 열릴 때 체크) ──
   useEffect(function(){
-    var AUTO_KEY = 'pureun_v6_nas_auto_backup';
+    var AUTO_KEY = NAS_AUTO_KEY;
     var NAS_KEY  = 'pureun_v6_nas_config';
     try {
       var cfg = safeParse(localStorage.getItem(NAS_KEY), {});
@@ -85452,6 +85496,10 @@ function ERPMain(props){
       var now = Date.now();
       var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
       if(lastStr && (now - parseInt(lastStr,10)) < WEEK_MS) return; // 아직 7일 안 됨
+      /* ⚠ 어제 해 보고 안 됐으면 오늘 하루는 쉰다 — 안 그러면 «앱을 열 때마다» 저장소
+         4MB 를 풀어 글자로 만들고 나스에 붙어 보고 또 실패한다(화면이 그 몇 백 ms 멈춘다). */
+      var _try = nasAutoLastTry();
+      if(_try && !_try.ok && (now - _try.at) < NAS_AUTO_RETRY_MS) return;
 
       // 7일 경과 → 백그라운드 자동 백업 실행 (부르는 길은 위 «한 벌» — nasLoginWith·nasUploadWith)
       var folder = cfg.folder || '/업무자료/pureun_erp';
@@ -85485,11 +85533,14 @@ function ERPMain(props){
         })
         .then(function(){
           localStorage.setItem(AUTO_KEY, String(now));
+          nasAutoNote(true, '');
           showToast('🖥️ NAS 자동 백업 완료 ('+today+')');
           /* 정리도 따라온다 — 자동 백업은 매주 한 장씩 쌓이므로 여기서 안 하면 영영 안 한다 */
           return nasTidyWith(cfg, 세션, folder, cfg.keep).catch(function(){ /* 정리 못 해도 백업은 됐다 */ });
         })
-        .catch(function(){ /* 자동 백업 실패는 조용히 무시 (NAS 미연결·CORS 시 정상) — ⚠ 남은 일: 실패를 설정 화면 기록에라도 남길 것 */ })
+        /* ⚠ 더는 «조용히» 삼키지 않는다 — 화면을 세우지는 않되(사무실 밖이면 늘 실패한다)
+           설정 화면이 읽을 자리에 까닭을 남긴다. 조용한 실패가 이 집에서 가장 아픈 흠이다. */
+        .catch(function(e){ try { nasAutoNote(false, nasAutoWhy(e)); } catch(_){} })
         .then(function(){ return nasLogoutWith(cfg, 세션); });
       };
       // 한가할 때 — 없는 브라우저면 3초 뒤로 (화면은 그 전에 다 뜬다)
