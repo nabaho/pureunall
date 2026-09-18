@@ -165,13 +165,18 @@ test('★ 통과해도 사진을 열면 작다고 알려 준다 — 목록에서
   assert.match(fn, /if \(!tooSmall\(it\)\) return '';/,
     '★ 통과분에서 안내까지 없애면 왜 작게 담겼는지 영영 모릅니다');
   assert.match(fn, /smallCheckedOk\(m\.read\)/, '통과 여부에 따라 말투를 안 가릅니다');
-  assert.match(fn, /기계 검증을 통과했습니다/, '통과했다는 사실을 안 알려 줍니다');
-  assert.match(fn, /PDF로 저장해 올리기/, '더 크게 받는 길이 사라졌습니다');
+  /* ⚠ 2026-09-18 다시 겨눔 — 여섯 줄짜리 상자를 «한 줄»로 접고 안내는 팝업으로
+     옮겼다(대표 결정 「이대로」). 못 박을 것은 «그 말을 한다»는 것이지 어느 함수가
+     적는가가 아니다. 지금 그 말을 적는 곳은 smallWhyHtml 이고, 팝업이 그것을 부른다. */
+  const why = fnOf('smallWhyHtml');
+  assert.match(why, /smallCheckedOk\(m\.read\)/, '통과 여부에 따라 말투를 안 가립니다');
+  assert.match(why, /기계 검증을 통과했습니다/, '통과했다는 사실을 안 알려 줍니다');
+  assert.match(fnOf('biggerTipsHtml'), /PDF로 저장해 올리기/, '더 크게 받는 길이 사라졌습니다');
   /* 통과한 것에 겁주는 말을 남기면 목록에서 뺀 판단을 화면이 뒤집는다.
      ⚠ 앞뒤 몇 글자를 잘라 보면 안 된다 — 두 갈래가 삼항 연산자로 «맞붙어» 있어
        창을 넓게 잡으면 반대쪽 문장이 딸려 온다(여기서 한 번 헛돌았다).
        갈림표(`: `)로 갈라 «각 갈래 안»을 본다. */
-  const arms = fn.slice(fn.indexOf('const body = okd')).split('\n    : ');
+  const arms = why.slice(why.indexOf('return (okd')).split('\n    : ');
   assert.equal(arms.length, 2, '두 갈래로 갈리지 않습니다 — 모양이 바뀌었습니다');
   assert.match(arms[0], /기계 검증을 통과했습니다/, '통과 갈래가 뒤바뀌었습니다');
   assert.ok(!/지어냈을 수 있습니다/.test(arms[0]),

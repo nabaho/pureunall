@@ -144,7 +144,10 @@ test('★ 담을 때 그 자취를 실제로 적는다', () => {
 });
 
 test('★ 「작습니다」 안내가 그 자취를 보여 준다', () => {
-  const fn = cutFn(APP, 'function smallBox(');
+  /* ⚠ 2026-09-18 다시 겨눔 — 여섯 줄짜리 상자를 «한 줄»로 접고 안내는 팝업으로
+     옮겼다(대표 결정 「이대로」). 못 박을 것은 «그 말을 한다»는 것이지 어느 함수가
+     적는가가 아니다. 지금 그 말을 적는 곳은 smallWhyHtml 이고, 팝업이 그것을 부른다. */
+  const fn = cutFn(APP, 'function smallWhyHtml(');
   assert.match(fn, /cameFromLine\(m\)/,
     '★ 적어 놓고 안 보여 주면 적은 뜻이 없습니다');
   assert.match(APP, /\.smallwarn \.camefrom\{/, '꾸밈이 없습니다');

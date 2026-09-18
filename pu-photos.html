@@ -399,7 +399,14 @@ button{font-family:inherit;cursor:pointer}
 #grid .cell .rdgo:disabled{background:#e2e8f0;border-color:#cbd5e1;color:#475569;cursor:default}
 /* 원본이 작아 글자를 못 읽었을 수 있는 서류 — 급여서류(빨강)보다 한 단 낮은 주황.
    지우라는 말이 아니라 「대조해 보라」는 말이라 색을 갈라 둔다. */
-.smallwarn{border:1.5px solid #fbbf24;background:#fffbeb;border-radius:9px;padding:10px 11px;margin:8px 0}
+/* ⚠ 2026-09-18 — 여섯 줄을 «한 줄»로 접었다(대표 결정). 안내는 팝업 안에 있다.
+   누르는 줄이라 손가락·마우스가 닿는 자리임이 보여야 한다. */
+.smallwarn{border:1.5px solid #fbbf24;background:#fffbeb;border-radius:9px;padding:8px 11px;margin:8px 0;
+  display:flex;align-items:center;gap:8px;cursor:pointer}
+.smallwarn:hover{border-color:#d97706}
+.smallwarn.okd:hover{background:#f8fafc}
+.smallwarn .go{margin-left:auto;font-style:normal;font-weight:800;color:#1e40af;
+  font-size:12px;white-space:nowrap}
 .smallwarn .t{font-size:13px;font-weight:800;color:#854d0e}
 .smallwarn .d{font-size:12px;color:#854d0e;margin:3px 0 0;line-height:1.6}
 /* 「어디서·얼마로 들어왔나」 — 「앱이 줄인 건가 원본이 작았던 건가」를 여기서 끝낸다.
@@ -416,6 +423,40 @@ button{font-family:inherit;cursor:pointer}
 .pdfask .pick span{flex:1;text-align:center;border:1.5px solid var(--line);border-radius:8px;
   padding:7px 6px;font-size:12.5px;font-weight:700;color:#475569;cursor:pointer}
 .pdfask .pick span.on{border-color:var(--blue);background:#f8fafc;color:var(--blue)}
+/* ── 🔍 다시 넣기 팝업 (대표 결정 2026-09-18) ────────────────────────────
+   ⚠ 색은 팔레트 안에서만(tests/color-palette-apps.test.js). */
+.rpdrop{border:2px dashed #bfdbfe;border-radius:10px;background:#f8fafc;padding:18px 14px;
+  text-align:center;color:#64748b;font-size:12.5px;line-height:1.8;cursor:pointer}
+.rpdrop b{color:#1e40af;font-size:13px}
+.rpdrop .s{font-size:11.5px;color:#94a3b8}
+.rpdrop:hover,.rpdrop.over{border-color:#2563eb;background:#eff6ff}
+.rpdrop.on{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.rpdrop.on b{color:#166534}
+.rpsz{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:12.5px}
+.rpsz .box{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;background:#fff}
+.rpsz .box .t{font-size:11px;color:#64748b}
+.rpsz .box .v{font-weight:800;font-size:13.5px}
+.rpsz .arw{color:#cbd5e1;font-size:16px;flex:none}
+.rpsz .box.new{border-color:#bbf7d0;background:#f0fdf4}
+.rpsz .box.new .v{color:#166534}
+.rpsz .box.bad{border-color:#fecaca;background:#fef2f2}
+.rpsz .box.bad .v{color:#991b1b}
+.rptip{font-size:11.5px;color:#64748b;line-height:1.7;margin-top:9px}
+.rptip.more{border-top:1px solid #e2e8f0;padding-top:9px;margin-top:11px}
+.rptip b{color:#1e293b}
+/* 「사진만 바꾸기」 — 요금 0원 길. 확인 단추 «옆»에 두면 잘못 눌러 요금이 나간다 */
+.rpalso{margin-top:11px}
+.rpalso button{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:6px 12px;
+  font-size:12.5px;font-family:inherit;color:#1e293b;cursor:pointer}
+.rpalso button:hover{background:#f8fafc}
+.rpalso .s{color:#64748b;font-size:11.5px}
+/* 달라진 칸만 — 한 줄에 한 칸이다(2026-08-30 대표 지시) */
+.rpdiff{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:2px}
+.rpdiff th,.rpdiff td{border-bottom:1px solid #f8fafc;padding:5px 6px;text-align:left;
+  vertical-align:top;word-break:break-all}
+.rpdiff th{font-size:11px;color:#64748b;font-weight:700}
+.rpdiff .o{color:#991b1b;text-decoration:line-through}
+.rpdiff .n{color:#166534;font-weight:700}
 .smallwarn.okd{border-color:#cbd5e1;background:#f8fafc}
 .smallwarn.okd .t{color:#1e293b}
 .smallwarn.okd .d{color:#475569}
@@ -1883,6 +1924,11 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
          따로 두는 이유: docInput 은 여러 장·PDF 를 받아 새 항목을 만드는 자리라,
          "이 자리에 사진 한 장만 채워 넣기"와 흐름이 다르다. -->
     <input type="file" id="reuploadInput" accept="image/*" hidden onchange="onReuploadFile(this.files)">
+    <!-- 🔍 다시 넣기 (2026-09-18) — 「원본이 작습니다」 팝업에서 더 큰 캡처를 받는 칸.
+         ⚠ reuploadInput 과 «따로» 둔다. 그쪽은 「본문이 없는 사진을 채우는」 길이라
+           받자마자 바로 올리지만, 이쪽은 넣은 뒤 크기를 견주어 보여 주고
+           사람이 「바꾸고 다시 읽기」를 눌러야 올린다 — 흐름이 다르다. -->
+    <input type="file" id="repasteInput" accept="image/*" hidden onchange="onRepasteFile(this.files)">
 
     <!-- ⚠ 「보기」 제목 줄을 뺐다(대표 지시 2026-08-10 "대시보드 간략하게 정리").
          아래 「누구 사진」·「내 폴더」가 이미 무엇을 보는 칸인지 말해 주므로
@@ -5529,6 +5575,12 @@ function hasFiles(e) {
 
 /* 화면 캡처는 파일이 아니라 클립보드로 온다. */
 window.addEventListener('paste', function (e) {
+  /* ⚠⚠ 「🔍 다시 넣기」 창이 열려 있으면 여기서 «새 사진을 만들지 않는다» (2026-09-18).
+     이 길은 붙여넣은 것을 새 항목으로 올린다. 창이 열린 채로 붙여넣으면 그 창이
+     받으려던 캡처가 **사진첩에 한 장 더 쌓이고**, 정작 바꾸려던 사진은 그대로다.
+     ⚠ 창 쪽(아래 document 붙여넣기)이 먼저 받고 전파를 끊지만, 그 차례에 기대지
+       않는다 — 망가지는 자리가 여기이므로 여기서도 막는다. */
+  if (_repaste && kindPopupOpen()) return;
   const items = (e.clipboardData && e.clipboardData.items) || [];
   const files = [];
   for (let i = 0; i < items.length; i++) {
@@ -12493,6 +12545,8 @@ function pickKind(key) {
 function showKindPopup() {
   $('kindPopup').style.display = 'flex';
 }
+/* 창이 열려 있나 — 붙여넣기 두 길이 «같은 잣대»를 보게 한 곳에 둔다(2026-09-18) */
+function kindPopupOpen() { return $('kindPopup').style.display === 'flex'; }
 
 /* ══════ 직접 만드는 분류 — 팝업 ══════
    하나를 두 가지 일에 함께 쓴다: 새 분류 만들기 / 고른 사진에 분류 지정.
@@ -12500,6 +12554,12 @@ function showKindPopup() {
 function closeKindPopup() {
   $('kindPopup').style.display = 'none';
   $('kindPopupBody').innerHTML = '';
+  /* ⚠ 「다시 넣기」로 쥐고 있던 것을 버리고 단추를 되돌린다 (2026-09-18) —
+     한 창을 여러 일에 돌려 쓰므로, 안 되돌리면 다음 창의 확인 단추가 꺼진 채
+     뜨거나 엉뚱한 일(사진 바꾸기)을 한다. 「지우기」·단추 이름과 같은 까닭이다. */
+  _repaste = null;
+  $('kindPopupOk').disabled = false;
+  $('kindPopupOk').onclick = null;
   /* 「따로냐 합치냐」를 묻는 중에 닫혔으면 **올리지 않는다**(대표 지시 2026-08-24) —
      기다리던 약속을 안 풀면 올리기가 영원히 멈춘 채 아무 말도 안 한다. */
   if (_pdfAskCancel) { const f = _pdfAskCancel; _pdfAskCancel = null; f(); }
@@ -14853,6 +14913,202 @@ async function onReuploadFile(files) {
   }
 }
 
+/* ══════ 🔍 다시 넣기 — 더 큰 캡처로 바꾸고 다시 읽기 (대표 결정 2026-09-18 「이대로」) ══════
+   「화면인식이 잘 안 되는 경우 다시 한번 더 여기에 넣어서 수정했으면 좋겠는데
+     그 기능 만들어 달라. 캡쳐2는 팝업 형태로 내용이 나와서 확인하게 해라」
+
+   ■ 무엇이 없었나
+   「원본이 작습니다」 상자는 **더 크게 받는 법만** 알려 주고 정작 «넣는 자리»가 없었다.
+   정부포털 화면은 그것이 원본이라 더 큰 것을 받을 길이 앱 안에 아예 없었다.
+
+   ★ 사진 번호(id)가 «안 바뀐다» — 있는 자리에 본문만 새로 쓴다(replaceImage,
+     돌리기·본문 다시 올리기가 쓰는 그 길이다). 그래서
+       · 기업정보함 연결·서류 묶음·보낸 기록이 하나도 안 끊기고
+       · 다시 읽으면 «같은 서류를 다시 읽은 것»이 되어 기업 상세가 저절로 고쳐진다
+         (2026-09-15 규칙). 사람이 ✎ 로 고쳐 둔 칸은 「사람 도장」이 지킨다.
+   ⚠ 다시 읽기는 **AI 요금이 든다.** 그래서 단추를 둘로 갈랐다 —
+     「사진만 바꾸기」(0원)와 「바꾸고 다시 읽기」. 눈으로 대조만 할 때가 잦다.
+   ⚠ 더 «작은» 것을 넣으면 한 번 묻는다 — 모르고 나쁘게 바꾸는 일이 없게. */
+let _repaste = null;      // { id, file, w, h } — 넣어 둔 것. 창을 닫으면 버린다
+
+function openRepaste(id) {
+  if (!id || blockedIfOther(id)) return;
+  const it = gridItems.find(function (x) { return x.id === id; });
+  if (!it) return;
+  _repaste = { id: id, file: null, w: 0, h: 0 };
+  $('kindPopupTitle').textContent = '🔍 다시 넣기';
+  $('kindPopupOk').textContent = '바꾸고 다시 읽기';
+  $('kindPopupOk').onclick = function () { repasteApply(true); };
+  showKindPopup();
+  paintRepaste();
+}
+
+function paintRepaste() {
+  const r = _repaste;
+  if (!r) return;
+  const it = gridItems.find(function (x) { return x.id === r.id; });
+  const m = (it && it.meta) || {};
+  const 지금 = (Number(m.w) || 0) + ' × ' + (Number(m.h) || 0);
+  const 넣음 = r.w ? (r.w + ' × ' + r.h) : '';
+  /* 얼마나 커졌나 — 「2배 큽니다」 한마디가 「이만하면 됐나」에 답한다 */
+  const 배 = (r.w && Number(m.w)) ? (Math.max(r.w, r.h) / Math.max(Number(m.w), Number(m.h))) : 0;
+  const 작아짐 = 배 > 0 && 배 < 1;
+  $('kindPopupBody').innerHTML =
+    '<div class="rpdrop' + (r.file ? ' on' : '') + '" id="rpDrop"' +
+    ' onclick="$(\'repasteInput\').click()">' +
+    (r.file
+      ? '✔ <b>넣었습니다</b><br><span class="s">다시 넣으시려면 여기를 누르거나 또 붙여넣으세요</span>'
+      : '<b>여기에 붙여넣기 (Ctrl+V)</b><br>' +
+        '캡처를 복사해 두고 이 창에서 붙여넣으시면 됩니다<br>' +
+        '<span class="s">끌어다 놓기 · <u>파일 고르기</u> 도 됩니다</span>') +
+    '</div>' +
+    '<div class="rpsz"><div class="box"><div class="t">지금 원본</div><div class="v">' + esc(지금) + '</div></div>' +
+    (넣음
+      ? '<div class="arw">→</div><div class="box' + (작아짐 ? ' bad' : ' new') + '">' +
+        '<div class="t">넣으신 것</div><div class="v">' + esc(넣음) + '</div></div>'
+      : '') +
+    '</div>' +
+    (배 ? '<div class="rptip">' + (작아짐
+      ? '⚠ <b>지금 것보다 작습니다.</b> 바꾸면 글자가 더 안 읽힐 수 있습니다 — 그래도 바꾸시려면 누르세요.'
+      : '✔ <b>' + (배 >= 1.15 ? (Math.round(배 * 10) / 10) + '배 큽니다' : '크기가 비슷합니다') +
+        '</b>' + (배 >= 1.15 ? ' — 글자가 또렷해 판독이 훨씬 잘 됩니다.' : ' — 판독이 크게 나아지지 않을 수 있습니다.')) +
+      '</div>' : '') +
+    (r.file
+      ? '<div class="rpalso"><button onclick="repasteApply(false)">사진만 바꾸기 ' +
+        '<span class="s">(요금 0원 · 읽은 값은 그대로)</span></button></div>'
+      : '') +
+    '<div class="rptip more">' + smallWhyHtml(it) + biggerTipsHtml() + '</div>';
+  $('kindPopupOk').disabled = !r.file;
+  const d = $('rpDrop');
+  if (d) {
+    d.ondragover = function (e) { e.preventDefault(); d.classList.add('over'); };
+    d.ondragleave = function () { d.classList.remove('over'); };
+    d.ondrop = function (e) {
+      e.preventDefault(); d.classList.remove('over');
+      takeRepasteFile((e.dataTransfer && e.dataTransfer.files) || []);
+    };
+  }
+}
+
+function onRepasteFile(files) {
+  $('repasteInput').value = '';   // 같은 파일을 또 골라도 change 가 뜨게
+  takeRepasteFile(files);
+}
+
+/* 넣은 것을 «재어» 둔다 — 아직 올리지 않는다. 사람이 크기를 보고 누른다. */
+function takeRepasteFile(files) {
+  const f = files && files[0];
+  if (!f || !_repaste) return;
+  if (!/^image\//.test(f.type || '')) { toast('그림 파일만 넣을 수 있습니다', 4000); return; }
+  /* ⚠ 파일을 «그대로» 쥔다 — 줄이는 층(decodeImage)이 Blob 을 받는다.
+     글자(dataURL)로 바꿔 넘기면 그 층이 통째로 깨진다.
+     재는 데만 주소를 잠깐 쓰고 바로 놓는다 — 안 놓으면 큰 캡처가 메모리에 쌓인다. */
+  const url = URL.createObjectURL(f);
+  const img = new Image();
+  img.onload = function () {
+    URL.revokeObjectURL(url);
+    if (!_repaste) return;
+    _repaste.file = f;
+    _repaste.w = img.naturalWidth || 0;
+    _repaste.h = img.naturalHeight || 0;
+    paintRepaste();
+  };
+  img.onerror = function () {
+    URL.revokeObjectURL(url);
+    toast('그림을 읽지 못했습니다', 4000);
+  };
+  img.src = url;
+}
+
+/* 창이 열려 있는 동안 붙여넣기를 받는다 — 「여기에 넣어서」가 이 기능의 알맹이다.
+   ⚠ 창이 닫혀 있으면 아무것도 안 한다(사진첩 어디서나 붙여넣는 길은 따로 있다). */
+document.addEventListener('paste', function (e) {
+  if (!_repaste || !kindPopupOpen()) return;
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for (let i = 0; i < items.length; i++) {
+    if (String(items[i].type || '').indexOf('image/') !== 0) continue;
+    const f = items[i].getAsFile();
+    /* ⚠ stopPropagation 까지 해야 위 window 붙여넣기가 같은 것을 또 받지 않는다.
+       preventDefault 는 브라우저 기본 동작만 막는다 — 다른 듣는 이는 그대로 받는다. */
+    if (f) { e.preventDefault(); e.stopPropagation(); takeRepasteFile([f]); return; }
+  }
+});
+
+async function repasteApply(reread) {
+  const r = _repaste;
+  if (!r || !r.file) return;
+  const id = r.id;
+  const it = gridItems.find(function (x) { return x.id === id; });
+  if (!it) return;
+  const 지금긴변 = Math.max(Number(it.meta.w) || 0, Number(it.meta.h) || 0);
+  /* ⚠ 더 작은 것으로 바꾸는 것은 «묻는다» — 모르고 나쁘게 바꾸면 되돌릴 길이 없다 */
+  if (지금긴변 && Math.max(r.w, r.h) < 지금긴변 &&
+      !confirm('넣으신 것이 지금 것보다 작습니다.\n\n'
+        + '지금 ' + it.meta.w + '×' + it.meta.h + ' → 넣으신 것 ' + r.w + '×' + r.h + '\n\n'
+        + '바꾸면 글자가 더 안 읽힐 수 있습니다. 그래도 바꿀까요?')) return;
+  const 옛판독 = it.meta.read;
+  closeKindPopup();
+  $('viewerHint').textContent = '바꾸는 중…';
+  try {
+    const spec = PuPhotoStore.uploadSpec(it.meta.kind === 'doc');
+    const sized = await shrinkMany(r.file, [
+      { maxEdge: spec.maxEdge, quality: spec.quality },
+      { maxEdge: spec.thumbEdge, quality: 0.85 }
+    ]);
+    await PuPhotoStore.replaceImage(photoYearOf(id), id, sized[0].dataUrl, sized[1].dataUrl, photoOwner(id));
+    it.full = sized[0].dataUrl; it.thumb = sized[1].dataUrl;
+    /* 「원본이 작습니다」 판정이 새 크기를 보게 — 안 적으면 바꾸고도 계속 작다고 한다 */
+    it.meta = Object.assign({}, it.meta,
+      { w: sized[0].w, h: sized[0].h, srcW: r.w, srcH: r.h });
+    if (viewerId === id) openViewer(id);
+    loadGrid();
+  } catch (e) {
+    console.warn('[다시 넣기]', e);
+    alert('바꾸지 못했습니다 — ' + ((e && e.message) || e));
+    return;
+  }
+  if (!reread) { toast('사진을 바꿨습니다 — 읽은 값은 그대로입니다 (요금 0원)', 5000); return; }
+  $('readPanel').innerHTML = '<div class="box"><p class="note" style="margin:0">판독 중…</p></div>';
+  try {
+    await readPhoto(id);
+    renderGridBar(); renderGrid();
+    showRepasteDiff(id, 옛판독);
+  } catch (e) {
+    console.warn('[다시 넣고 판독]', e);
+    alert('사진은 바꿨지만 판독하지 못했습니다 — ' + ((e && e.message) || e));
+  }
+}
+
+/* 다시 읽은 뒤 «달라진 것만» 보여 준다 — 스무 칸을 다 늘어놓으면 무엇이 바뀌었는지 안 보인다 */
+function showRepasteDiff(id, 옛판독) {
+  const it = gridItems.find(function (x) { return x.id === id; });
+  const 새판독 = it && it.meta && it.meta.read;
+  if (!새판독) return;
+  const 전 = {}, 후 = {};
+  (readRows(옛판독) || []).forEach(function (row) { 전[row[0]] = String(row[1] == null ? '' : row[1]); });
+  (readRows(새판독) || []).forEach(function (row) { 후[row[0]] = String(row[1] == null ? '' : row[1]); });
+  const 이름 = Object.keys(후);
+  Object.keys(전).forEach(function (k) { if (이름.indexOf(k) < 0) 이름.push(k); });
+  const 달라진 = 이름.filter(function (k) { return (전[k] || '') !== (후[k] || ''); });
+  $('kindPopupTitle').textContent = 달라진.length
+    ? '✔ 다시 읽었습니다 — ' + 달라진.length + '칸이 달라졌습니다'
+    : '✔ 다시 읽었습니다';
+  $('kindPopupBody').innerHTML = 달라진.length
+    ? '<table class="rpdiff"><tr><th>칸</th><th>전</th><th>후</th></tr>' +
+      달라진.map(function (k) {
+        return '<tr><td>' + esc(k) + '</td>' +
+          '<td class="o">' + esc(전[k] || '(못 읽음)') + '</td>' +
+          '<td class="n">' + esc(후[k] || '(없음)') + '</td></tr>';
+      }).join('') + '</table>' +
+      '<div class="rptip">달라지지 않은 칸은 안 적습니다 — 달라진 것만 봐야 눈에 들어옵니다.</div>'
+    : '<p class="note" style="margin:0">읽은 값이 <b>하나도 달라지지 않았습니다.</b><br>' +
+      '더 큰 원본이 필요하거나(PDF로 올리기), 칸을 ✎ 로 손수 고치시는 편이 빠릅니다.</p>';
+  $('kindPopupOk').textContent = '확인';
+  $('kindPopupOk').disabled = false;
+  $('kindPopupOk').onclick = closeKindPopup;
+  showKindPopup();
+}
+
 function closeViewer() {
   $('viewer').style.display = 'none';
   $('viewerPic').classList.remove('zoom');   // 다음 사진은 다시 맞춰 보이게
@@ -15653,21 +15909,47 @@ function smallBox(it) {
      이 안내는 남긴다 — 작다는 사실은 사실이고, 더 크게 받는 길도 알려야 한다.
      다만 겁주는 말투를 바꾼다: 확인이 끝난 것에 「지어냈을 수 있습니다」라고
      적으면, 목록에서 뺀 판단을 화면이 뒤집는 셈이다. */
+  /* ── ⚠ 2026-09-18 다시 겨눔 — 여섯 줄을 «한 줄»로 접는다 (대표 결정 「이대로」) ──
+     대표: 「화면인식이 잘 안 되는 경우 다시 한번 더 여기에 넣어서 수정했으면 좋겠는데
+           … 캡쳐2는 팝업 형태로 내용이 나와서 확인하게 해라」
+
+     여태 이 상자는 판 안에 늘 펼쳐져 여섯 줄을 차지했다. 그런데 정작
+     **더 큰 캡처를 넣는 자리가 없었다** — 「이렇게 하면 크게 받습니다」라고만 하고
+     그 길이 화면에 없었다. 안내는 팝업으로 옮기고, 그 팝업에 «넣는 자리»를 둔다.
+     ⚠ 안내를 «없애는» 것이 아니다 — 팝업 안에 그대로 있다(openRepaste). */
   const okd = smallCheckedOk(m.read);
-  const body = okd
-    ? '읽은 값은 <b>기계 검증을 통과했습니다</b> — 그래서 「확인 필요」에 넣지 ' +
-      '않았습니다. 그래도 한 번 훑어보시려면 아래 표를 원본과 대조하시면 됩니다.<br><br>'
-    : '글자가 작아 <b>못 읽은 칸이 있거나, 안 보이는 글자를 지어냈을 수 있습니다.</b> ' +
-      '아래 표를 원본과 한 줄씩 대조해 주세요.<br><br>';
-  return '<div class="smallwarn' + (okd ? ' okd' : '') + '">' +
-    '<div class="t">🔍 원본이 작습니다 — ' + m.w + '×' + m.h +
-    (okd ? ' · 검증 통과' : '') + '</div>' +
-    '<div class="d">' + body + cameFromLine(m) +
-    '<b>더 크게 다시 받으시려면</b><br>' +
-    '· <b>PDF로 저장해 올리기</b> — 가장 좋습니다(글자를 3배로 펼쳐 담습니다)<br>' +
-    '· 화면 캡처라면 브라우저를 150~200%로 키운 뒤 찍기<br>' +
-    '· 한 화면에 안 들어가면 나눠 찍고 「📎 한 문서로 묶기」</div>' +
+  return '<div class="smallwarn' + (okd ? ' okd' : '') + '"' +
+    (mayTouch(it.id)
+      ? ' onclick="openRepaste(\'' + esc(it.id) + '\')" title="더 큰 캡처를 넣어 다시 읽습니다"'
+      : '') + '>' +
+    '<span class="t">🔍 원본이 작습니다 — ' + m.w + '×' + m.h +
+    (okd ? ' · 검증 통과' : '') + '</span>' +
+    (mayTouch(it.id) ? '<em class="go">다시 넣기 →</em>' : '') +
     '</div>';
+}
+
+/* 왜 작다고 하는지 · 어디서 온 사진인지 — 팝업 안에 그대로 남긴다.
+   ⚠ 한 줄로 접으면서 이 두 가지가 통째로 사라졌었다(2026-09-18, 검사 셋이 잡았다).
+     · 「값을 원본과 한 줄씩 대조해 주세요」는 무엇을 하라는 것인지 알려 주는 말이고
+     · cameFromLine 은 «앱이 줄인 것인지 원본이 작았던 것인지»를 끝내는 한 줄이다.
+       그것이 없으면 「더 크게 받으세요」가 헛말이 된다(이미 원본이 그것뿐일 때). */
+function smallWhyHtml(it) {
+  const m = (it && it.meta) || {};
+  const okd = smallCheckedOk(m.read);
+  return (okd
+    ? '읽은 값은 <b>기계 검증을 통과했습니다</b> — 그래서 「확인 필요」에 넣지 않았습니다. ' +
+      '그래도 한 번 훑어보시려면 표를 원본과 대조하시면 됩니다.<br><br>'
+    : '글자가 작아 <b>못 읽은 칸이 있거나, 안 보이는 글자를 지어냈을 수 있습니다.</b> ' +
+      '표를 원본과 한 줄씩 대조해 주세요.<br><br>') + cameFromLine(m);
+}
+
+/* 팝업 안에 들어가는 «더 크게 받는 법» — 줄이 접혀도 안내는 사라지지 않는다.
+   ⚠ 한 곳에서만 만든다. 두 곳에 적으면 한쪽만 고쳐져 서로 다른 말을 한다. */
+function biggerTipsHtml() {
+  return '<b>더 크게 받으시려면</b><br>' +
+    '· <b>PDF로 저장해 올리기</b> — 가장 좋습니다(글자를 3배로 펼쳐 담습니다)<br>' +
+    '· 화면 캡처라면 브라우저를 <b>150~200%로 키운 뒤</b> 찍기<br>' +
+    '· 한 화면에 안 들어가면 나눠 찍고 「📎 한 문서로 묶기」';
 }
 
 /* 내려받기·공유 줄. 공유는 되는 기기(주로 폰)에만 보인다 —

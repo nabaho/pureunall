@@ -80,12 +80,23 @@ test('★ 크기를 모르는 옛 사진은 안 건드린다', () => {
 
 test('★ 알림이 무엇을 하라는 것인지까지 적는다', () => {
   const fn = fnOf('smallBox');
-  assert.match(fn, /지어냈을 수 있습니다/,
+  /* ⚠ 2026-09-18 다시 겨눔 — 여섯 줄짜리 상자를 «한 줄»로 접고 안내는 팝업으로
+     옮겼다(대표 결정 「이대로」). 못 박을 것은 «그 말을 한다»는 것이지 어느 함수가
+     적는가가 아니다. 지금 그 말을 적는 곳은 smallWhyHtml 이고, 팝업이 그것을 부른다.
+     ⚠ 팝업이 그것을 «실제로 부르는지»까지 함께 본다 — 적어 놓고 안 부르면 헛일이다. */
+  const why = fnOf('smallWhyHtml');
+  assert.match(fnOf('paintRepaste'), /smallWhyHtml\(it\)/,
+    '★ 팝업이 이 안내를 안 부르면 어디에도 안 뜹니다');
+  assert.match(why, /지어냈을 수 있습니다/,
     '★ "작습니다"만 적으면 사람이 읽은 값을 그대로 믿습니다');
-  assert.match(fn, /원본과 한 줄씩 대조/);
-  assert.match(fn, /PDF로 저장해 올리기/, '할 수 있는 일을 안 적으면 알림이 잔소리가 됩니다');
-  assert.match(fn, /150~200%/);
-  assert.match(fn, /한 문서로 묶기/);
+  assert.match(why, /원본과 한 줄씩 대조/);
+  /* ⚠ 「어떻게 하면 되나」도 팝업 안이다(biggerTipsHtml) — 안내를 한 곳에서만 만든다. */
+  assert.match(fnOf('biggerTipsHtml'), /PDF로 저장해 올리기/,
+    '할 수 있는 일을 안 적으면 알림이 잔소리가 됩니다');
+  assert.match(fnOf('paintRepaste'), /biggerTipsHtml\(\)/,
+    '★ 팝업이 그 안내를 안 부르면 어디에도 안 뜹니다');
+  assert.match(fnOf('biggerTipsHtml'), /150~200%/);
+  assert.match(fnOf('biggerTipsHtml'), /한 문서로 묶기/);
   // 실제 크기를 적어야 "얼마나 작은지"를 사람이 안다
   assert.match(fn, /m\.w \+ '×' \+ m\.h/);
   // 작지 않으면 아무것도 안 낸다
@@ -95,6 +106,11 @@ test('★ 알림이 무엇을 하라는 것인지까지 적는다', () => {
   /* ⚠ 2026-08-27 부터 smallBox 가 「어디서·얼마로 들어왔나」(cameFromLine)도 부른다 —
      「앱이 줄인 건가 원본이 작았던 건가」를 이 알림이 답해야 하기 때문이다.
      함께 넣지 않으면 그 자리에서 멎는다. */
+  /* ⚠ 2026-09-18 부터 smallBox 가 「남의 사진인가」(mayTouch)를 본다 — 남의 사진에는
+     「다시 넣기」를 안 내주기 때문이다. 대역을 안 주면 그 자리에서 멎는다.
+     ⚠ 여기서는 «내 사진»으로 둔다 — 이 검사가 보는 것은 말투이지 권한이 아니다. */
+  ctx.mayTouch = function () { return true; };
+  ctx.esc = function (v) { return String(v == null ? '' : v); };
   vm.runInContext(lineOf('TEL_SHAPE') + '\n' + lineOf('MAIL_SHAPE') + '\n' +
     constOf('VIA_LABEL') + '\n' + fnOf('cameFromLine') + '\n' +
     fnOf('smallCheckedOk') + '\n' + fnOf('smallBox'), ctx);
