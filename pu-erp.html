@@ -305,7 +305,7 @@ var Component = React.Component;
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
 var ERP_BUILD = '2026-09-18 초기 동기화의 건별 자료를 모아 한 번만 저장 — 수천 건을 받을 때마다 전체 배열을 다시 저장해 화면이 오래 멈추던 길을 줄였다';
-var BUILD_SEQ = 172;
+var BUILD_SEQ = 173;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -18691,38 +18691,38 @@ function ContractModal(props){
       if(!file) return;
       attachFile(field, file, function(b64){ runOcr(field, b64); });
     }
-    return h('div', { style:{ flex:1 } },
-      h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'4px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'4px', flexWrap:'wrap' } },
-        h('span', null, title),
-        h('span', { style:{ display:'inline-flex', alignItems:'center', gap:'4px', flexWrap:'wrap' } },
-          /* (2026-08-09) 사진이 아니라 «정보» 를 가져온다 — 대표 지시.
-             사진은 기업정보함에 이미 있으니 두 번 보관할 이유가 없다. */
-          h('button', { type:'button', onClick:function(){ setPcCoPick(field); },
-            title:'기업정보함에서 회사정보(사업자번호·대표·업태·종목·주소·연락처)를 가져옵니다\n'
-                 +'— 사진은 가져오지 않습니다. 사진은 기업정보함에서 보세요',
-            style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'2px 8px', borderRadius:'4px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
-            '📇 기업정보함 정보 가져오기'),
-          h('a', { href:'pu-cards.html', target:'_blank', rel:'noopener',
-            title:'기업정보함을 새 탭에서 엽니다 — 사진은 거기서 보세요',
-            style:{ color:'#64748b', fontSize:'10.5px', textDecoration:'underline', whiteSpace:'nowrap' } },
-            '기업정보함에서 보기')
-        )
-      ),
-      /* 사진으로 «채우기» — 붙이기가 아니다. 끌어다 놓기도 여기서 받는다. */
+    /* 🧹 한 줄로 (대표 지시 2026-09-18 「화면 정리」)
+       전에는 한 덩이가 «여섯 줄»이었다 — 제목 · 가져오기 · 「기업정보함에서 보기」 ·
+       사진으로 채우기 · 「글자만 읽고 사진은 버립니다」. 그것이 둘이라 열두 줄이
+       회사명 칸 «위»를 차지했다.
+       ⚠ 단추를 «없애지» 않았다 — 설명 글만 말풍선으로 옮기고 한 줄에 폈다.
+       ⚠ 「기업정보함에서 보기」 길도 남긴다 — 사진은 거기서 본다. 아이콘 하나로 줄였다. */
+    return h('div', { style:{ flex:1, minWidth:0 } },
       h('div', {
           onDragOver:function(e){ e.preventDefault(); },
           onDrop:function(e){ e.preventDefault(); fillFrom(e.dataTransfer.files && e.dataTransfer.files[0]); },
-          style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
+          style:{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' } },
+        h('span', { style:{ fontSize:'11px', fontWeight:700, color:'#475569', whiteSpace:'nowrap' } }, title),
+        /* (2026-08-09) 사진이 아니라 «정보» 를 가져온다 — 대표 지시.
+           사진은 기업정보함에 이미 있으니 두 번 보관할 이유가 없다. */
+        h('button', { type:'button', onClick:function(){ setPcCoPick(field); },
+          title:'기업정보함에서 회사정보(사업자번호·대표·업태·종목·주소·연락처)를 가져옵니다\n'
+               +'— 사진은 가져오지 않습니다. 사진은 기업정보함에서 보세요',
+          style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'3px 9px', borderRadius:'5px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
+          '📇 기업정보함 정보 가져오기'),
         h('button', { type:'button', disabled:ocrBusy,
           onClick:function(){ var el = document.getElementById(inpId); if(el) el.click(); },
           title:'사진을 골라 «글자만» 읽어 빈 칸을 채웁니다.\n'
-               +'⚠ 사진은 계약에 저장하지 않습니다 — 사진은 기업정보함에 둡니다.\n'
+               +'⚠ 사진은 계약에 저장하지 않습니다 — 글자만 읽고 사진은 버립니다.\n'
                +'PC 는 끌어다 놓기 · Ctrl+V 도 됩니다',
           style:{ background:ocrBusy?'#cbd5e1':'#f8fafc', color:ocrBusy?'#fff':'#475569',
-            border:'1px dashed '+(ocrBusy?'#cbd5e1':'#cbd5e1'), padding:'5px 10px', borderRadius:'6px',
+            border:'1px dashed #cbd5e1', padding:'3px 9px', borderRadius:'5px',
             fontSize:'10.5px', fontWeight:700, cursor:ocrBusy?'wait':'pointer', whiteSpace:'nowrap' } },
           ocrBusy ? '⏳ 읽는 중…' : '📷 사진으로 채우기'),
-        h('span', { style:{ fontSize:'10px', color:'#94a3b8' } }, '글자만 읽고 사진은 버립니다'),
+        h('a', { href:'pu-cards.html', target:'_blank', rel:'noopener',
+          title:'기업정보함을 새 탭에서 엽니다 — 사진은 거기서 보세요',
+          style:{ color:'#64748b', fontSize:'10.5px', textDecoration:'underline', whiteSpace:'nowrap' } },
+          '기업정보함에서 보기'),
         h('input', { id:inpId, type:'file', accept:'image/*,.pdf',
           onChange:function(e){ var fl = e.target.files && e.target.files[0]; e.target.value=''; fillFrom(fl); },
           style:{ display:'none' } })
@@ -19124,35 +19124,6 @@ function ContractModal(props){
             );
           })),
 
-      // 6-1단계: 사업자번호가 하나와 정확히 일치하면 자동 연결하고, 예외만 사람이 확인한다.
-      companyLinkCheck&&companyLinkCheck.ok&&companyLinkCheck.status==='linked'&&!companyLinkManualOpen
-      ? h('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',marginBottom:'12px',border:'1px solid #bbf7d0',borderRadius:'6px',background:'#f0fdf4'}},
-          h('strong',{style:{fontSize:'12px',color:'#166534'}},'✓ 업체 자동 확인'),
-          h('span',{style:{fontSize:'11px',color:'#475569',flex:'1'}},((f.company||{}).name||f.companyName||'')+' · '+((f.company||{}).bizNo||f.bizNo||'')),
-          h('button',{type:'button',onClick:function(){setCompanyLinkManualOpen(true);},style:{padding:'4px 8px',border:'1px solid #bbf7d0',borderRadius:'4px',background:'#fff',color:'#166534',fontSize:'11px',cursor:'pointer'}},'변경'))
-      : h('div',{style:{padding:'10px',marginBottom:'12px',border:'1px solid #bfdbfe',borderRadius:'6px',background:'#eff6ff'}},
-        h('strong',{style:{fontSize:'12px',color:'#1e40af'}},'업체 연결 확인'),
-        h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'7px'}},
-          h('input',{type:'search',value:companyLinkQuery,onChange:function(e){setCompanyLinkQuery(e.target.value);},placeholder:'업체명·사업자번호·ID 검색',style:{flex:'1',minWidth:'170px',padding:'6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}}),
-          h('select',{value:f.companyId||(f.company||{}).companyId||'',onChange:function(e){chooseCompanyLink(e.target.value);},style:{flex:'2',minWidth:'220px',padding:'6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}},
-            h('option',{value:''},'업체 선택 — 선택 시 회사명·사업자번호 반영'),
-            companyLinkChoices.map(function(x){return h('option',{key:x.id,value:x.id},x.name+' · '+(x.bizNo||'번호 없음')+' · '+x.id);}))),
-        h('label',{style:{display:'block',fontSize:'11px',color:'#475569',marginTop:'7px'}},h('input',{type:'checkbox',checked:f.companyLinkStatus==='pending',onChange:function(e){deferCompanyLink(e.target.checked);}}),' 신규·미확정 업체: 연결 보류 (업체정보에 쓰지 않음)'),
-        /* ★ 후보가 «하나뿐»이면 누르면 끝나는 단추 — 고르개를 뒤질 까닭이 없다 */
-        companyLinkOnly && h('button',{type:'button',onClick:function(){chooseCompanyLink(companyLinkOnly.id);},
-          style:{marginTop:'7px',width:'100%',padding:'7px',border:'1px solid #2563eb',borderRadius:'5px',
-                 background:'#2563eb',color:'#fff',fontSize:'12px',fontWeight:700,cursor:'pointer'}},
-          '✓ 「'+companyLinkOnly.name+'」 로 연결'),
-        /* ★ 아직 아무것도 «안 하신» 때는 혼내지 않는다 — 붉은 글씨는 잘못했을 때만.
-           처음부터 경고가 떠 있으면 「계속 검증하라고 한다」로 읽힌다(대표 말씀). */
-        h('div',{style:{fontSize:'11px',marginTop:'5px',
-            color:!companyLinkTouched?'#64748b':(companyLinkCheck&&companyLinkCheck.ok?'#166534':'#d97706')}},
-          !companyLinkEngine ? '검증 모듈을 불러오지 못했습니다.'
-          : !companyLinkTouched ? '업체를 고르면 회사명·사업자번호가 저절로 채워집니다. 새 업체면 아래 「연결 보류」를 켜세요.'
-          : (!companyLinkPicked && f.companyLinkStatus!=='pending' && companyLinkChoices.length)
-            ? ('찾았습니다 — 위 고르개에서 골라 주세요 ('+companyLinkChoices.length+'곳)')
-            : (companyLinkCheck?companyLinkCheck.message:'')),
-        h('div',{style:{fontSize:'10.5px',marginTop:'4px',color:'#64748b'}},'사업자번호가 하나의 업체와 정확히 일치하면 자동 연결합니다. 이름만 같거나 중복되면 직접 확인해야 합니다.')),
       // 회사 정보 섹션 (worker 단독이 아닐 때)
       showCompany && h('div', null,
         // 명함 + 사업자등록증 드롭존
@@ -19696,6 +19667,44 @@ function ContractModal(props){
             style:{ width:'100px', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'monospace', textAlign:'right' } }),
           h('span', { style:{ fontSize:'11.5px', color:'#94a3b8', marginLeft:'4px' } }, '명')
         )),
+
+      /* 🔗 업체 연결 — 회사정보 «뒤»에 둔다 (대표 지시 2026-09-18 「화면 정리」).
+         맨 위에 있었더니 회사명 칸을 보기도 전에 파란 상자 네 줄을 지나야 했다.
+         차례가 거꾸로였다 — 회사명을 쳐야 후보가 나오고, 그다음이 고르기다.
+         ⚠ 위로 되돌리지 말 것. 「검증부터 하라고 한다」로 읽힌다(대표 말씀). */
+      // 6-1단계: 사업자번호가 하나와 정확히 일치하면 자동 연결하고, 예외만 사람이 확인한다.
+      companyLinkCheck&&companyLinkCheck.ok&&companyLinkCheck.status==='linked'&&!companyLinkManualOpen
+      ? h('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',marginBottom:'12px',border:'1px solid #bbf7d0',borderRadius:'6px',background:'#f0fdf4'}},
+          h('strong',{style:{fontSize:'12px',color:'#166534'}},'✓ 업체 자동 확인'),
+          h('span',{style:{fontSize:'11px',color:'#475569',flex:'1'}},((f.company||{}).name||f.companyName||'')+' · '+((f.company||{}).bizNo||f.bizNo||'')),
+          h('button',{type:'button',onClick:function(){setCompanyLinkManualOpen(true);},style:{padding:'4px 8px',border:'1px solid #bbf7d0',borderRadius:'4px',background:'#fff',color:'#166534',fontSize:'11px',cursor:'pointer'}},'변경'))
+      : h('div',{style:{padding:'10px',marginBottom:'12px',border:'1px solid #bfdbfe',borderRadius:'6px',background:'#eff6ff'}},
+        /* 설명 두 줄 중 «늘 떠 있던» 한 줄을 말풍선으로 옮겼다 (대표 지시 2026-09-18).
+           아래 상태 줄은 그때그때 달라지므로 그대로 둔다 — 그건 잔소리가 아니라 답이다. */
+        h('strong',{style:{fontSize:'12px',color:'#1e40af'}},'업체 연결 확인'),
+        h('span',{style:{fontSize:'11px',color:'#64748b',marginLeft:'4px',cursor:'help'},
+          title:'사업자번호가 하나의 업체와 정확히 일치하면 자동 연결합니다.\n이름만 같거나 중복되면 직접 확인해야 합니다.'},'ⓘ'),
+        h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'7px'}},
+          h('input',{type:'search',value:companyLinkQuery,onChange:function(e){setCompanyLinkQuery(e.target.value);},placeholder:'업체명·사업자번호·ID 검색',style:{flex:'1',minWidth:'170px',padding:'6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}}),
+          h('select',{value:f.companyId||(f.company||{}).companyId||'',onChange:function(e){chooseCompanyLink(e.target.value);},style:{flex:'2',minWidth:'220px',padding:'6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}},
+            h('option',{value:''},'업체 선택 — 선택 시 회사명·사업자번호 반영'),
+            companyLinkChoices.map(function(x){return h('option',{key:x.id,value:x.id},x.name+' · '+(x.bizNo||'번호 없음')+' · '+x.id);}))),
+        h('label',{style:{display:'block',fontSize:'11px',color:'#475569',marginTop:'7px'}},h('input',{type:'checkbox',checked:f.companyLinkStatus==='pending',onChange:function(e){deferCompanyLink(e.target.checked);}}),' 신규·미확정 업체: 연결 보류 (업체정보에 쓰지 않음)'),
+        /* ★ 후보가 «하나뿐»이면 누르면 끝나는 단추 — 고르개를 뒤질 까닭이 없다 */
+        companyLinkOnly && h('button',{type:'button',onClick:function(){chooseCompanyLink(companyLinkOnly.id);},
+          style:{marginTop:'7px',width:'100%',padding:'7px',border:'1px solid #2563eb',borderRadius:'5px',
+                 background:'#2563eb',color:'#fff',fontSize:'12px',fontWeight:700,cursor:'pointer'}},
+          '✓ 「'+companyLinkOnly.name+'」 로 연결'),
+        /* ★ 아직 아무것도 «안 하신» 때는 혼내지 않는다 — 붉은 글씨는 잘못했을 때만.
+           처음부터 경고가 떠 있으면 「계속 검증하라고 한다」로 읽힌다(대표 말씀). */
+        h('div',{style:{fontSize:'11px',marginTop:'5px',
+            color:!companyLinkTouched?'#64748b':(companyLinkCheck&&companyLinkCheck.ok?'#166534':'#d97706')}},
+          !companyLinkEngine ? '검증 모듈을 불러오지 못했습니다.'
+          : !companyLinkTouched ? '업체를 고르면 회사명·사업자번호가 저절로 채워집니다. 새 업체면 아래 「연결 보류」를 켜세요.'
+          : (!companyLinkPicked && f.companyLinkStatus!=='pending' && companyLinkChoices.length)
+            ? ('찾았습니다 — 위 고르개에서 골라 주세요 ('+companyLinkChoices.length+'곳)')
+            : (companyLinkCheck?companyLinkCheck.message:'')),
+        ),
 
       // 기업담당자 (다중)
       h('div', { style:{ display:'flex', alignItems:'center', borderBottom:'1px solid #e2e8f0', paddingBottom:'4px', marginTop:'14px', marginBottom:'8px' } },
@@ -20250,7 +20259,10 @@ function ContractModal(props){
             })
           )
         )),
-      // 변경 이력 (최근 5건)
+      /* 변경 이력 (최근 5건) — 없으면 «상자째» 안 그린다 (대표 지시 2026-09-18 「화면 정리」).
+         새 계약에는 이력이 있을 수가 없다. 「변경 이력 없음」이라 적힌 빈 상자가
+         담당자 기둥 한가운데를 차지하고 있었다 — 아무것도 안 알리면서 자리만 먹었다. */
+      (f.mgrHistory||[]).length > 0 &&
       h('div', { style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'12px', marginTop:'14px' } },
         h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#475569', marginBottom:'8px', display:'flex', alignItems:'center', gap:'6px' } },
           h('span', null, '📜'),
