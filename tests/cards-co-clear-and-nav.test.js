@@ -84,8 +84,8 @@ test('비우는 값은 null 이다 — 빈 글자를 넣으면 값이 남는다'
 test('옛 이름 열쇠도 함께 비운다 — 안 그러면 비웠는데 그대로 보인다', () => {
   /* coEffectiveExtra 가 옛 열쇠 값을 끌어와 합쳐 보여준다(coMoveSelTo 와 같은 이유). */
   const C = load();
-  const upd = C.coClearPlan([{ key: '2148205236', name: '한빛기계', nameKey: 'n한빛기계' }], 400)[0];
-  assert.ok('coInfo/2148205236/folder' in upd, '새 열쇠를 안 비운다');
+  const upd = C.coClearPlan([{ key: '1238220440', name: '한빛기계', nameKey: 'n한빛기계' }], 400)[0];
+  assert.ok('coInfo/1238220440/folder' in upd, '새 열쇠를 안 비운다');
   assert.ok('coInfo/n한빛기계/folder' in upd, '옛 이름 열쇠를 안 비운다');
   assert.ok('coInfo/n한빛기계/tags' in upd);
 });

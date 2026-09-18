@@ -28,8 +28,8 @@ const CARDS = stripJs(fs.readFileSync(path.join(ROOT, 'pu-cards.html'), 'utf8'))
 /* 2026-09-18 서버에 실제로 있는 번호.
    ⚠★ 뒤의 셋은 «아홉째 자리가 2 이상»이다 — 국세청 규칙의 ×5 보정을 지워도
      아홉째 자리가 0·1 이면 그대로 통과한다. 그 구멍을 실제로 겪었다. 지우지 말 것. */
-const REAL = ['314-86-59404', '215-81-62801', '312-81-43008',
-              '312-86-42324', '312-83-01166', '312-81-05571'];
+const REAL = ['123-86-20128', '123-81-20370', '123-81-20216',
+              '123-86-20389', '123-83-20393', '123-81-20405'];
 
 test('① 검산 — 국세청 규칙 그대로', () => {
   REAL.forEach(n => assert.equal(K.bizNoOk(n), true, n));
@@ -44,22 +44,22 @@ test('① 검산 — 국세청 규칙 그대로', () => {
 });
 
 test('② 열쇠 — 열세 자리도 앞 열 자리로 끊는다 (업체관리에 실제로 있다)', () => {
-  assert.equal(K.key('312-10-55163-0'), '3121055163', '뒤 사업장 번호는 떼어 낸다');
-  assert.equal(K.key('3148659404'), '3148659404');
-  assert.equal(K.key('314-86-59404'), '3148659404', '붙임표가 있어도 같은 열쇠');
+  assert.equal(K.key('123-10-20410-0'), '1231020410', '뒤 사업장 번호는 떼어 낸다');
+  assert.equal(K.key('1238620128'), '1238620128');
+  assert.equal(K.key('123-86-20128'), '1238620128', '붙임표가 있어도 같은 열쇠');
   assert.equal(K.key('123-45-67890'), '', '검산 못 한 번호는 열쇠가 «없다»');
   assert.equal(K.key('3148'), '');
 });
 
 test('③ 자리 이름을 한 곳에서만 만든다 — 한쪽이 coinfo 로 적으면 영영 안 보인다', () => {
-  assert.equal(K.coInfoPath('314-86-59404'), 'pucards/coInfo/3148659404');
+  assert.equal(K.coInfoPath('123-86-20128'), 'pucards/coInfo/1238620128');
   assert.equal(K.coInfoPath('123-45-67890'), '', '못 믿을 번호면 자리도 없다');
 });
 
 test('④ 같은 회사인가 — 번호가 없으면 «판단하지 않는다»(false 가 아니다)', () => {
-  assert.equal(K.sameCo('314-86-59404', '3148659404'), true);
-  assert.equal(K.sameCo('314-86-59404', '312-86-42324'), false);
-  assert.equal(K.sameCo('314-86-59404', ''), null, '한쪽이 없으면 모른다');
+  assert.equal(K.sameCo('123-86-20128', '1238620128'), true);
+  assert.equal(K.sameCo('123-86-20128', '123-86-20389'), false);
+  assert.equal(K.sameCo('123-86-20128', ''), null, '한쪽이 없으면 모른다');
   assert.equal(K.sameCo('', ''), null);
   assert.equal(K.sameCo('123-45-67890', '123-45-67890'), null, '둘 다 못 믿으면 모른다');
 });

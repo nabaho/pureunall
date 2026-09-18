@@ -151,9 +151,9 @@ test('지정·기억을 안 넘겨도 2단계처럼 돈다 — 옛 부름꼴을 
 
 test('★ 붙일 때 «두 자리»를 한 번에 쓴다 — 이 서류 하나와 같은 이름의 다음 것들', () => {
   const { docAttachPlan } = load();
-  const u = docAttachPlan('3128149225', 'd1', '자문계약서', 'consulting~C-1');
-  assert.strictEqual(u['coInfo/3128149225/docPin/d1'], 'consulting~C-1');
-  assert.strictEqual(u['coInfo/3128149225/docRule/자문계약서'], 'consulting~C-1');
+  const u = docAttachPlan('1238120012', 'd1', '자문계약서', 'consulting~C-1');
+  assert.strictEqual(u['coInfo/1238120012/docPin/d1'], 'consulting~C-1');
+  assert.strictEqual(u['coInfo/1238120012/docRule/자문계약서'], 'consulting~C-1');
   assert.strictEqual(Object.keys(u).length, 2, '두 자리뿐이어야 한다');
 });
 

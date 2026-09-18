@@ -70,7 +70,7 @@ const PAIRS = [
   { k:'지원 희망금액', v:'80,000,000원' },
   { k:'고용보험 관리번호', v:'12345678900' }
 ];
-const SEND = { fields:{ bizno:'134-86-05772', company:'가나테크', ceo:'나성환',
+const SEND = { fields:{ bizno:'123-86-20021', company:'가나테크', ceo:'고길동',
                         docName:'4·4 제도 도입기업 선정 신청서', pairs: PAIRS },
                byName:'권형하', photo: PHOTO };
 
@@ -132,7 +132,7 @@ test('같은 서류를 두 번 보내도 줄이 안 는다 — 하던 규칙 그
 
 test('★ pairs 가 없으면 그 칸을 아예 안 만든다 — 빈 껍데기를 두지 않는다', () => {
   const c = load({});
-  const noPairs = { fields:{ bizno:'134-86-05772', ceo:'나성환', docName:'사업자등록증' },
+  const noPairs = { fields:{ bizno:'123-86-20021', ceo:'고길동', docName:'사업자등록증' },
                     byName:'권형하', photo: PHOTO };
   return c.sendToCoInfo(noPairs).then(() => {
     const doc = c._writes[0].val['docs/2026_p77'];
@@ -143,7 +143,7 @@ test('★ pairs 가 없으면 그 칸을 아예 안 만든다 — 빈 껍데기�
 
 test('빈 항목·빈 값은 안 담는다', () => {
   const c = load({});
-  const dirty = { fields:{ bizno:'134-86-05772', docName:'서식',
+  const dirty = { fields:{ bizno:'123-86-20021', docName:'서식',
     pairs:[ { k:'', v:'값만' }, { k:'항목만', v:'' }, { k:'쓸것', v:'있다' }, null ] },
     photo: PHOTO };
   return c.sendToCoInfo(dirty).then(() => {
@@ -159,7 +159,7 @@ test('★ 항목이 너무 많으면 자르고 «잘랐다고» 남긴다 — �
   const many = [];
   for (let i = 0; i < 200; i++) many.push({ k:'항목' + i, v:'값' + i });
   const c = load({});
-  return c.sendToCoInfo({ fields:{ bizno:'134-86-05772', docName:'서식', pairs: many },
+  return c.sendToCoInfo({ fields:{ bizno:'123-86-20021', docName:'서식', pairs: many },
                           photo: PHOTO }).then(() => {
     const doc = c._writes[0].val['docs/2026_p77'];
     assert.ok(doc.pairs.length <= 60,
@@ -172,7 +172,7 @@ test('★ 항목이 너무 많으면 자르고 «잘랐다고» 남긴다 — �
 test('값이 아주 길면 자른다 — 판독이 본문을 통째로 담는 일이 있다', () => {
   const long = 'ㄱ'.repeat(5000);
   const c = load({});
-  return c.sendToCoInfo({ fields:{ bizno:'134-86-05772', docName:'서식',
+  return c.sendToCoInfo({ fields:{ bizno:'123-86-20021', docName:'서식',
                                    pairs:[{ k:'비고', v: long }] }, photo: PHOTO }).then(() => {
     const p = c._writes[0].val['docs/2026_p77'].pairs[0];
     assert.ok(p.v.length <= 300, '한 값이 5,000자면 서류 한 장이 그만큼 무거워진다');
@@ -217,7 +217,7 @@ test('사진이 없으면 pairs 도 안 담는다 — 담을 서류가 없다', 
 
 test('★ 팩스가 회사 칸으로 올라온다 — 되메워 놓고 버리던 칸이다', () => {
   const c = load({});
-  return c.sendToCoInfo({ fields:{ bizno:'134-86-05772', companyFax:'041-556-0036',
+  return c.sendToCoInfo({ fields:{ bizno:'123-86-20021', companyFax:'041-556-0036',
                                    docName:'서식' }, photo: PHOTO }).then(() => {
     assert.equal(c._writes[0].val.companyFax, '041-556-0036');
   });
@@ -227,7 +227,7 @@ test('담당자 이름은 회사 칸으로 «안» 올린다 — 회사 이름�
   /* coVal(o,'name') 은 extra.name 을 먼저 본다. 담당자 이름을 그 칸에 넣으면
      상세 패널에서 «회사 이름» 자리를 가린다. 담당자는 pairs 에 그대로 남는다. */
   const c = load({});
-  return c.sendToCoInfo({ fields:{ bizno:'134-86-05772', name:'박대리', docName:'서식' },
+  return c.sendToCoInfo({ fields:{ bizno:'123-86-20021', name:'박대리', docName:'서식' },
                           photo: PHOTO }).then(() => {
     assert.equal(c._writes[0].val.name, undefined);
   });
@@ -289,7 +289,7 @@ test('★ 자른 것이 있으면 «잘랐다»고 화면에도 말한다', () =
 
 test('★ 어긋남 알림에 영어가 안 샌다 — 기업정보함 칸 이름표를 쓴다', () => {
   const c = load({ companyTel:'041-000-0000' });
-  return c.sendToCoInfo({ fields:{ bizno:'134-86-05772', companyTel:'041-556-0035',
+  return c.sendToCoInfo({ fields:{ bizno:'123-86-20021', companyTel:'041-556-0035',
                                    docName:'서식' }, photo: PHOTO }).then(r => {
     assert.ok(r.message.indexOf('대표번호') > 0,
       '★ 업체관리(ERP) 이름표에는 companyTel 이 없어 영어가 그대로 샜다');

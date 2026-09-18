@@ -30,14 +30,14 @@ test('판독 층이 window에 붙는다', () => {
 
 test('사업자등록번호 체크섬 — 유효/무효를 가른다', () => {
   const R = loadRead();
-  assert.equal(R.bizNoValid('220-81-62517'), true);
-  assert.equal(R.bizNoValid('2208162517'), true);
+  assert.equal(R.bizNoValid('123-81-20031'), true);
+  assert.equal(R.bizNoValid('1238120031'), true);
   assert.equal(R.bizNoValid('220 81 62517'), true);
   // 한 자리만 틀리면 걸러진다 — AI 오인식을 잡는 지점
-  assert.equal(R.bizNoValid('220-81-62518'), false);
+  assert.equal(R.bizNoValid('123-81-20177'), false);
   // 자리 수가 안 맞거나 값이 없으면 false
   assert.equal(R.bizNoValid('220-81-6251'), false);
-  assert.equal(R.bizNoValid('220-81-625171'), false);
+  assert.equal(R.bizNoValid('123-81-200311'), false);
   assert.equal(R.bizNoValid('가나다'), false);
   assert.equal(R.bizNoValid(''), false);
   assert.equal(R.bizNoValid(null), false);
@@ -46,10 +46,10 @@ test('사업자등록번호 체크섬 — 유효/무효를 가른다', () => {
 
 test('사업자등록번호 표기 정리', () => {
   const R = loadRead();
-  assert.equal(R.bizNoDigits('220-81-62517'), '2208162517');
+  assert.equal(R.bizNoDigits('123-81-20031'), '1238120031');
   assert.equal(R.bizNoDigits(null), '');
-  assert.equal(R.fmtBizNo('2208162517'), '220-81-62517');
-  assert.equal(R.fmtBizNo('220-81-62517'), '220-81-62517');
+  assert.equal(R.fmtBizNo('1238120031'), '123-81-20031');
+  assert.equal(R.fmtBizNo('123-81-20031'), '123-81-20031');
   // 이상한 값이 와도 터지지 않는다
   assert.equal(R.fmtBizNo(''), '');
   assert.equal(R.fmtBizNo(null), '');
@@ -63,12 +63,12 @@ test('사업자등록번호 표기 정리', () => {
 test('사업자등록증 → 기업정보함 필드', () => {
   const R = loadRead();
   const out = R.mapTo('cards', 'bizreg', {
-    company: '가나상사', ceo: '홍길동', bizno: '220-81-62517',
+    company: '가나상사', ceo: '홍길동', bizno: '123-81-20031',
     openDate: '2020-01-02', bizType: '제조업', bizItem: '금속가공', address: '천안시'
   });
   assert.equal(out.kind, 'biz');       // 기업정보함은 종류 칸이 있다
   assert.equal(out.company, '가나상사');
-  assert.equal(out.bizno, '220-81-62517');
+  assert.equal(out.bizno, '123-81-20031');
   assert.equal(out.bizItem, '금속가공');
   assert.equal(out.openDate, '2020-01-02');
 });
@@ -76,11 +76,11 @@ test('사업자등록증 → 기업정보함 필드', () => {
 test('사업자등록증 → 사업장 정보(푸른이알피) 필드', () => {
   const R = loadRead();
   const out = R.mapTo('erp', 'bizreg', {
-    company: '가나상사', ceo: '홍길동', bizno: '2208162517',
+    company: '가나상사', ceo: '홍길동', bizno: '1238120031',
     bizType: '제조업', bizItem: '금속가공', address: '천안시', companyTel: '041-000-0000'
   });
   assert.equal(out.name, '가나상사');        // 회사명은 name
-  assert.equal(out.bizNo, '220-81-62517');   // 대문자 N + 보기 좋은 꼴
+  assert.equal(out.bizNo, '123-81-20031');   // 대문자 N + 보기 좋은 꼴
   assert.equal(out.bizCategory, '금속가공');  // 종목은 bizCategory
   assert.equal(out.bizType, '제조업');
   assert.equal(out.phone, '041-000-0000');
@@ -92,10 +92,10 @@ test('사업자등록증 → 사업장 정보(푸른이알피) 필드', () => {
 test('사업자등록증 → 기금 참여사업장 필드', () => {
   const R = loadRead();
   const out = R.mapTo('fund', 'bizreg', {
-    company: '가나상사', ceo: '홍길동', bizno: '2208162517', bizType: '제조업', address: '천안시'
+    company: '가나상사', ceo: '홍길동', bizno: '1238120031', bizType: '제조업', address: '천안시'
   });
   assert.equal(out.name, '가나상사');
-  assert.equal(out.biz_no, '220-81-62517'); // 기금은 스네이크
+  assert.equal(out.biz_no, '123-81-20031'); // 기금은 스네이크
   assert.equal(out.biz_type, '제조업');
   assert.equal(out.address, '천안시');
 });
@@ -110,9 +110,9 @@ test('명함 → 기업정보함 필드는 이름이 그대로다', () => {
 
 test('중소기업확인서 → 사업장 정보 필드 (기업규모가 들어간다)', () => {
   const R = loadRead();
-  const out = R.mapTo('erp', 'sme', { company: '가나상사', bizno: '2208162517', smeType: '소기업', industry: '금속가공' });
+  const out = R.mapTo('erp', 'sme', { company: '가나상사', bizno: '1238120031', smeType: '소기업', industry: '금속가공' });
   assert.equal(out.name, '가나상사');
-  assert.equal(out.bizNo, '220-81-62517');
+  assert.equal(out.bizNo, '123-81-20031');
   assert.equal(out.companySize, '소기업');
   assert.equal(out.industry, '금속가공');
 });
@@ -157,7 +157,7 @@ const DUMMY_IMG = 'data:image/jpeg;base64,AAAA';
 test('사업자등록증을 읽고 번호 검증까지 한다', async () => {
   const R = loadRead();
   R.init({
-    fetch: fakeFetch('```json\n{"kind":"bizreg","company":"가나상사","ceo":"홍길동","bizno":"220-81-62517"}\n```'),
+    fetch: fakeFetch('```json\n{"kind":"bizreg","company":"가나상사","ceo":"홍길동","bizno":"123-81-20031"}\n```'),
     getKey: () => Promise.resolve('KEY')
   });
   const r = await R.read(DUMMY_IMG);
@@ -173,7 +173,7 @@ test('사업자등록증을 읽고 번호 검증까지 한다', async () => {
 
 test('번호가 한 자리 틀리면 검증에 걸린다 — 자동 입력하면 안 되는 경우', async () => {
   const R = loadRead();
-  R.init({ fetch: fakeFetch('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62518"}'),
+  R.init({ fetch: fakeFetch('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20177"}'),
            getKey: () => Promise.resolve('KEY') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.bizNoOk, false);
@@ -190,14 +190,14 @@ test('명함은 번호 검증 대상이 아니다 (null, false 아님)', async (
 
 test('중소기업확인서는 유효기간을 읽는다', async () => {
   const R = loadRead();
-  R.init({ fetch: fakeFetch('{"kind":"sme","company":"가나상사","bizno":"2208162517","smeType":"소기업","expiry":"2027-03-31"}'),
+  R.init({ fetch: fakeFetch('{"kind":"sme","company":"가나상사","bizno":"1238120031","smeType":"소기업","expiry":"2027-03-31"}'),
            getKey: () => Promise.resolve('KEY') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.kind, 'sme');
   assert.equal(r.fields.expiry, '2027-03-31');
   assert.equal(r.fields.smeType, '소기업');
   assert.equal(r.bizNoOk, true);
-  assert.equal(r.fields.bizno, '220-81-62517', '번호를 보기 좋은 꼴로 정리해야 합니다');
+  assert.equal(r.fields.bizno, '123-81-20031', '번호를 보기 좋은 꼴로 정리해야 합니다');
 });
 
 test('서류가 아니면 other 로 두고 억지로 맞추지 않는다', async () => {
@@ -304,7 +304,7 @@ const noWait = function (fn) { fn(); };
 
 test('AI가 바쁘면(429) 기다렸다 스스로 다시 시도한다', async () => {
   const R = loadRead();
-  const f = flakyFetch(2, 429, '{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}');
+  const f = flakyFetch(2, 429, '{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}');
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), delay: noWait });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.kind, 'bizreg', '다시 시도해서 읽어냈어야 합니다');
@@ -409,7 +409,7 @@ test('첫 모델이 계속 바쁘면(429) 다음 모델로 넘어간다', async 
   const R = loadRead();
   const first = R.MODELS[0];
   const behavior = {}; behavior[first] = 429;
-  const f = modelFetch(behavior, '{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}');
+  const f = modelFetch(behavior, '{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}');
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), delay: noWait });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.kind, 'bizreg');
@@ -503,7 +503,7 @@ function fakeBoth(geminiText, ntsResult, opts) {
 
 test('국세청 키가 있으면 조회해서 상태를 담는다', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}',
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}',
     { data: [{ b_stt: '계속사업자' }] });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
@@ -514,7 +514,7 @@ test('국세청 키가 있으면 조회해서 상태를 담는다', async () => 
 
 test('체크섬에서 이미 걸린 번호는 국세청에 묻지 않는다', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62518"}', { data: [] });
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20177"}', { data: [] });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(f.seen.nts, 0, '틀린 번호로 국세청을 부르면 헛일입니다');
@@ -531,7 +531,7 @@ test('명함은 국세청에 묻지 않는다', async () => {
 
 test('국세청 조회가 실패해도 판독 결과는 살린다', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}', null, { ntsFail: true });
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}', null, { ntsFail: true });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.fields.company, '가나상사');
@@ -542,7 +542,7 @@ test('국세청 조회가 실패해도 판독 결과는 살린다', async () => 
 
 test('국세청에 자료가 없어도 판독 결과는 살린다', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}', { data: [] });
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}', { data: [] });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.bizNoOk, true);
@@ -551,7 +551,7 @@ test('국세청에 자료가 없어도 판독 결과는 살린다', async () => 
 
 test('폐업자로 나오면 상태를 그대로 남긴다 (판단은 부르는 쪽이 한다)', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}',
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}',
     { data: [{ b_stt: '폐업자' }] });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
@@ -594,7 +594,7 @@ test('명함 — 검증할 것이 없으므로 자동', () => {
 test('이름도 회사도 못 읽었으면 자동으로 넣지 않는다', () => {
   const R = loadRead();
   assert.equal(R.autoOk({ kind: 'card', fields: {}, bizNoOk: null, error: null }).auto, false);
-  assert.equal(R.autoOk({ kind: 'bizreg', fields: { bizno: '220-81-62517' }, bizNoOk: true, error: null }).auto, false);
+  assert.equal(R.autoOk({ kind: 'bizreg', fields: { bizno: '123-81-20031' }, bizNoOk: true, error: null }).auto, false);
 });
 
 test('중소기업확인서 — 유효기간이 지났으면 사람 확인', () => {

@@ -24,8 +24,8 @@ const app = fs.readFileSync(path.join(R, 'pu-photos.html'), 'utf8');
 const reader = fs.readFileSync(path.join(R, 'js', 'pu-doc-read.js'), 'utf8');
 
 /* ── 두 서류의 판독 결과(제목만 다르고 나머지는 같다) ── */
-const 등록증 = { kind: 'bizreg', fields: { docName: '사업자등록증', company: '주식회사 가야엔지니어링', bizno: '310-81-13809', ceo: '최상윤' } };
-const 증명원 = { kind: 'bizreg', fields: { docName: '사업자등록증명', company: '주식회사 가야엔지니어링', bizno: '310-81-13809', ceo: '최상윤' } };
+const 등록증 = { kind: 'bizreg', fields: { docName: '사업자등록증', company: '주식회사 카타엔지니어링', bizno: '123-81-20157', ceo: '한지우' } };
+const 증명원 = { kind: 'bizreg', fields: { docName: '사업자등록증명', company: '주식회사 카타엔지니어링', bizno: '123-81-20157', ceo: '한지우' } };
 
 /* 화면의 판정 함수들을 그대로 떠와서 돌린다 */
 function loadGates() {

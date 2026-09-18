@@ -113,13 +113,13 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
   const ctx3 = { console, Object, String, window: { pucardsIdx: {
     a1: { k: 'card', n: '이진주', c: '목동', ti: '팀장', d: '경영지원팀',
           m: '010-1200-0013', e: 'lee@mokdong.co.kr' },
-    a2: { k: 'card', n: '김종복', c: '남양인텍', ti: '대표', m: '010-1111-2222' },
-    b1: { k: 'biz',  n: '남양인텍', c: '남양인텍', bz: '123-45-67890' } } } };
+    a2: { k: 'card', n: '문가람', c: '아자인텍', ti: '대표', m: '010-1111-2222' },
+    b1: { k: 'biz',  n: '아자인텍', c: '아자인텍', bz: '123-45-67890' } } } };
   vm.createContext(ctx3);
   vm.runInContext(cutPe('function searchPucardsPeople(query){', '\nfunction '), ctx3);
   const sp = q => ctx3.searchPucardsPeople(q).map(x => x.n);
   eq('이름으로',        sp('이진주'), ['이진주']);
-  eq('회사로',          sp('남양인텍'), ['김종복']);
+  eq('회사로',          sp('아자인텍'), ['문가람']);
   eq('직책으로',        sp('팀장'), ['이진주']);
   eq('★ 부서로',        sp('경영지원'), ['이진주']);
   eq('★ 이메일로',      sp('mokdong.co.kr'), ['이진주']);
@@ -132,26 +132,26 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
 /* ── 회사 검색이 사람 이름으로도 걸리고, 사람 정보를 함께 내놓는가 ── */
 (function () {
   const ctx4 = { console, Object, String, window: { pucardsIdx: {
-    a2: { k: 'card', n: '김종복', c: '남양인텍', ti: '대표', m: '010-1111-2222',
+    a2: { k: 'card', n: '문가람', c: '아자인텍', ti: '대표', m: '010-1111-2222',
           e: 'kim@ni.kr', ad: '충남 천안시 서북구', ct: '041-500-1000' },
-    a3: { k: 'card', n: '박대리', c: '남양인텍', ti: '대리', m: '010-3333-4444' } } } };
+    a3: { k: 'card', n: '박대리', c: '아자인텍', ti: '대리', m: '010-3333-4444' } } } };
   vm.createContext(ctx4);
   ['var PC_CORP_TOKENS =', 'function pcNormCo(', 'function pcIsCeoTitle('].forEach(function (fn) {
     vm.runInContext(cutPe(fn, '\nfunction '), ctx4);
   });
   vm.runInContext(cutPe('function pcGroupCompanies(){', '\nfunction '), ctx4);
   vm.runInContext(cutPe('function searchPucardsCompanies(query){', '\nfunction '), ctx4);
-  const rows = ctx4.searchPucardsCompanies('남양인텍');
+  const rows = ctx4.searchPucardsCompanies('아자인텍');
   ok('회사가 찾힌다', rows.length === 1, '실제 ' + rows.length + '건');
   const r0 = rows[0] || {};
   eq('사업자등록증 없음', r0.hasBiz, false);
   eq('명함 2장', r0.cardCount, 2);
-  eq('★ 사업자등록증이 없어도 대표를 명함에서 찾는다', r0.ceo, '김종복');
+  eq('★ 사업자등록증이 없어도 대표를 명함에서 찾는다', r0.ceo, '문가람');
   eq('★ 주소도 명함에서', r0.address, '충남 천안시 서북구');
   eq('★ 전화도 명함에서', r0.phone, '041-500-1000');
   ok('★ 명함 원본 줄을 함께 넘긴다 (사진만 아니라 사람까지 가져오려면 필요)',
     Array.isArray(r0.cards) && r0.cards.length === 2);
-  eq('대표 직책이 앞으로', (r0.cards[0] || {}).n, '김종복');
+  eq('대표 직책이 앞으로', (r0.cards[0] || {}).n, '문가람');
   ok('명함 id 도 순서대로', Array.isArray(r0.cardIdsOrdered) && r0.cardIdsOrdered.length === 2);
   // 사람 이름으로도 그 회사가 찾힌다
   const byPerson = ctx4.searchPucardsCompanies('박대리');
@@ -299,7 +299,7 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
 
 /* ── pcToContact 가 팩스·홈페이지를 옮기는가 ── */
 (function () {
-  const full = { n:'김종복', c:'남양인텍', ti:'대표이사',
+  const full = { n:'문가람', c:'아자인텍', ti:'대표이사',
     m:'010-1200-0009', ct:'041-583-1893', cfx:'041-583-1895',
     e:'cust14@naver.com', ad:'충남 천안시 서북구', w:'http://ni.kr' };
   const g = ctx.pcToContact(full, true, 'c1');
@@ -325,7 +325,7 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
   vm.createContext(ctx2);
   vm.runInContext(cutPe('function contactRole(c){', '\n'), ctx2);
   vm.runInContext(cutPe('function _normPersonKey(c){', '\ntry {'), ctx2);
-  const r = ctx2.mergeCompanyContacts([], [{ name:'김종복', position:'대표이사',
+  const r = ctx2.mergeCompanyContacts([], [{ name:'문가람', position:'대표이사',
     phone:'010-1200-0009', bizPhone:'041-583-1893', fax:'041-583-1895',
     email:'cust14@naver.com', addr:'충남 천안', website:'http://ni.kr', dept:'경영' }]);
   const g = r.contacts[0];
@@ -336,10 +336,10 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
 /* ── 회사 검색이 팩스·업태·종목·법인번호를 내놓는가 ── */
 (function () {
   const ctx5 = { console, Object, String, window: { pucardsIdx: {
-    b1: { k:'biz', n:'남양인텍', c:'남양인텍', bz:'312-81-28123', ceo:'김종복',
+    b1: { k:'biz', n:'아자인텍', c:'아자인텍', bz:'123-81-20119', ceo:'문가람',
           ct:'041-583-1893', cfx:'041-583-1895', ad:'충남 천안시 서북구',
           bt:'제조업', bi:'인쇄 및 기록매체 복제업', cno:'110111-1234567' },
-    a1: { k:'card', n:'김종복', c:'남양인텍', ti:'대표이사', m:'010-1200-0009',
+    a1: { k:'card', n:'문가람', c:'아자인텍', ti:'대표이사', m:'010-1200-0009',
           cfx:'041-583-1895', e:'cust14@naver.com' } } } };
   vm.createContext(ctx5);
   ['var PC_CORP_TOKENS =', 'function pcNormCo(', 'function pcIsCeoTitle('].forEach(function (fn) {
@@ -347,9 +347,9 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
   });
   vm.runInContext(cutPe('function pcGroupCompanies(){', '\nfunction '), ctx5);
   vm.runInContext(cutPe('function searchPucardsCompanies(query){', '\nfunction '), ctx5);
-  const r0 = ctx5.searchPucardsCompanies('남양인텍')[0] || {};
-  eq('사업자번호',      r0.bizNo, '312-81-28123');
-  eq('대표자',          r0.ceo, '김종복');
+  const r0 = ctx5.searchPucardsCompanies('아자인텍')[0] || {};
+  eq('사업자번호',      r0.bizNo, '123-81-20119');
+  eq('대표자',          r0.ceo, '문가람');
   eq('★ 팩스',          r0.fax, '041-583-1895');
   eq('★ 업태',          r0.bizType, '제조업');
   eq('★ 종목',          r0.bizCategory, '인쇄 및 기록매체 복제업');
@@ -358,7 +358,7 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
   eq('주소',            r0.address, '충남 천안시 서북구');
   // 사업자등록증이 없어도 명함의 회사팩스를 쓴다
   const ctx6 = { console, Object, String, window: { pucardsIdx: {
-    a1: { k:'card', n:'김종복', c:'남양인텍', ti:'대표이사', cfx:'041-999-8888' } } } };
+    a1: { k:'card', n:'문가람', c:'아자인텍', ti:'대표이사', cfx:'041-999-8888' } } } };
   vm.createContext(ctx6);
   ['var PC_CORP_TOKENS =', 'function pcNormCo(', 'function pcIsCeoTitle('].forEach(function (fn) {
     vm.runInContext(cutPe(fn, '\nfunction '), ctx6);
@@ -366,7 +366,7 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
   vm.runInContext(cutPe('function pcGroupCompanies(){', '\nfunction '), ctx6);
   vm.runInContext(cutPe('function searchPucardsCompanies(query){', '\nfunction '), ctx6);
   eq('★ 사업자등록증 없어도 명함 회사팩스를 쓴다',
-     (ctx6.searchPucardsCompanies('남양인텍')[0]||{}).fax, '041-999-8888');
+     (ctx6.searchPucardsCompanies('아자인텍')[0]||{}).fax, '041-999-8888');
 })();
 
 /* ── 회사를 고르면 그 항목들까지 채우는가 ── */
@@ -394,12 +394,12 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
    ══════════════════════════════════════════════════════════════ */
 (function () {
   const IDX = {
-    b1: { k:'biz', n:'남양인텍', c:'남양인텍', bz:'312-81-28123', ceo:'김종복',
+    b1: { k:'biz', n:'아자인텍', c:'아자인텍', bz:'123-81-20119', ceo:'문가람',
           ct:'041-583-1893', cfx:'041-583-1895', ad:'충남 천안시 서북구 성거읍 석문길 194',
           bt:'제조업', bi:'인쇄 및 기록매체 복제업', e:'cust10@daum.net' },
-    a1: { k:'card', n:'김종복', c:'남양인텍', ti:'대표이사',
+    a1: { k:'card', n:'문가람', c:'아자인텍', ti:'대표이사',
           m:'010-1200-0009', ct:'041-583-1893', cfx:'041-583-1895', e:'cust14@naver.com' },
-    a2: { k:'card', n:'박대리', c:'남양인텍', ti:'대리', m:'010-3333-4444' }
+    a2: { k:'card', n:'박대리', c:'아자인텍', ti:'대리', m:'010-3333-4444' }
   };
   function mk(idx) {
     const c = { console, Object, String, window: { pucardsIdx: idx } };
@@ -410,19 +410,19 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
     vm.runInContext(cutPe('function searchPucardsCompanies(query){', '\nfunction '), c);
     return c;
   }
-  const r0 = mk(IDX).searchPucardsCompanies('남양인텍')[0] || {};
+  const r0 = mk(IDX).searchPucardsCompanies('아자인텍')[0] || {};
   eq('★ 대표자 전화 = 대표 명함의 휴대폰', r0.ceoPhone, '010-1200-0009');
   eq('회사 대표번호는 따로',               r0.phone, '041-583-1893');
   ok('★ 둘이 다른 값이다 (같은 칸에 넣으면 안 된다)', r0.ceoPhone !== r0.phone);
   eq('대표 이메일은 사업자등록증 것 먼저', r0.ceoEmail, 'cust10@daum.net');
 
   // 사업자등록증이 없으면 대표 명함의 이메일을 쓴다
-  const noBiz = mk({ a1: IDX.a1, a2: IDX.a2 }).searchPucardsCompanies('남양인텍')[0] || {};
+  const noBiz = mk({ a1: IDX.a1, a2: IDX.a2 }).searchPucardsCompanies('아자인텍')[0] || {};
   eq('사업자등록증 없으면 대표 명함 이메일', noBiz.ceoEmail, 'cust14@naver.com');
   eq('사업자등록증 없어도 대표자 전화는 온다', noBiz.ceoPhone, '010-1200-0009');
 
   // 대표 직책 명함이 없으면 대표자 전화는 비운다 (대리 휴대폰을 넣으면 안 된다)
-  const noCeo = mk({ a2: IDX.a2 }).searchPucardsCompanies('남양인텍')[0] || {};
+  const noCeo = mk({ a2: IDX.a2 }).searchPucardsCompanies('아자인텍')[0] || {};
   eq('★ 대표 명함이 없으면 비운다 (직원 휴대폰을 넣지 않는다)', noCeo.ceoPhone, '');
 })();
 
@@ -460,7 +460,7 @@ ok('계약모달에 대표자 전화 칸이 있다', /f\.company\.ceoPhone/.test
 
 /* ══════════════════════════════════════════════════════════════
    추가: 담당자가 두 줄로 늘어나던 문제 · 팝업에 기본 데이터 다 보이기
-   가야엔지니어링 최상윤 대표가 #1(동일인)·#2(기업정보함) 로 중복됐다.
+   카타엔지니어링 한지우 대표가 #1(동일인)·#2(기업정보함) 로 중복됐다.
    동일인 줄은 회사정보(대표자·연락처)에서 자동으로 채워지므로 그 줄이 곧 대표다.
    ══════════════════════════════════════════════════════════════ */
 
@@ -492,23 +492,23 @@ ok('계약모달에 대표자 전화 칸이 있다', /f\.company\.ceoPhone/.test
   vm.runInContext(cutPe('function _normPersonKey(c){', '\ntry {'), ctx7);
   const M = ctx7.mergeCompanyContacts;
   // 실제 사고 재현: 동일인 줄이 아직 비어 있는 상태에서 대표 명함이 들어온다
-  const r1 = M([{ name:'최상윤', role:'대표자', phone:'', bizPhone:'', isPrimary:true, sameAsCeo:true }],
-               [{ name:'최상윤', position:'대표이사', phone:'010-1200-0015', bizPhone:'041-664-1241' }]);
+  const r1 = M([{ name:'한지우', role:'대표자', phone:'', bizPhone:'', isPrimary:true, sameAsCeo:true }],
+               [{ name:'한지우', position:'대표이사', phone:'010-1200-0015', bizPhone:'041-664-1241' }]);
   eq('★ 줄이 늘지 않는다', [r1.added, r1.contacts.length], [0, 1]);
   eq('있는 줄을 고치지도 않는다', r1.contacts[0].phone, '');
   // 이름이 다르면 정상 추가
-  const r2 = M([{ name:'최상윤', phone:'', isPrimary:true }], [{ name:'박대리', phone:'010-3333-4444' }]);
+  const r2 = M([{ name:'한지우', phone:'', isPrimary:true }], [{ name:'박대리', phone:'010-3333-4444' }]);
   eq('다른 사람은 추가된다', [r2.added, r2.contacts.length], [1, 2]);
   // 둘 다 전화가 있고 다르면 딴 사람 (기존 규칙 유지)
-  const r3 = M([{ name:'최상윤', phone:'010-1111-1111', isPrimary:true }],
-               [{ name:'최상윤', phone:'010-1200-0015' }]);
+  const r3 = M([{ name:'한지우', phone:'010-1111-1111', isPrimary:true }],
+               [{ name:'한지우', phone:'010-1200-0015' }]);
   eq('둘 다 전화 있고 다르면 딴 사람', [r3.added, r3.contacts.length], [1, 2]);
   // 이름·전화가 똑같으면 당연히 넘긴다
-  const r4 = M([{ name:'최상윤', phone:'010-1200-0015', isPrimary:true }],
-               [{ name:'최상윤', phone:'010-1200-0015' }]);
+  const r4 = M([{ name:'한지우', phone:'010-1200-0015', isPrimary:true }],
+               [{ name:'한지우', phone:'010-1200-0015' }]);
   eq('완전히 같으면 넘긴다', [r4.added, r4.contacts.length], [0, 1]);
   // 공백·대소문자 차이는 같은 사람
-  const r5 = M([{ name:'최 상 윤', phone:'', isPrimary:true }], [{ name:'최상윤', phone:'010-1200-0015' }]);
+  const r5 = M([{ name:'한 지 우', phone:'', isPrimary:true }], [{ name:'한지우', phone:'010-1200-0015' }]);
   eq('이름의 공백 차이는 같은 사람', [r5.added, r5.contacts.length], [0, 1]);
 })();
 

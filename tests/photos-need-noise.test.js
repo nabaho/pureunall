@@ -90,13 +90,13 @@ test('★ 서식을 읽었고 보낼 곳이 없으면 할 일이 아니다 — �
 });
 
 test('★ 서식에서 사업자번호를 읽었는데 아직 안 보냈으면 할 일이다 — 누르면 끝난다', () => {
-  const it = form({ fields: { bizno: '312-81-49225', docName: '신청기업 정보' } });
+  const it = form({ fields: { bizno: '123-81-20012', docName: '신청기업 정보' } });
   assert.equal(J.needsCheck(it), true, '★ 보낼 것이 남았는데 조용히 묻히면 안 됩니다');
   assert.match(J.checkWhy(it), /기업 상세로 아직 안 보냄/, '무엇을 하라는지 안 적혀 있습니다');
 });
 
 test('★ 기업 상세로 보냈으면 끝이다 — 다시 볼 일이 없다', () => {
-  const it = form({ fields: { bizno: '312-81-49225' },
+  const it = form({ fields: { bizno: '123-81-20012' },
                     filedInfo: { at: 1756000000000, by: '박은비', n: 4 } });
   assert.equal(J.needsCheck(it), false, '★ 보냈는데도 ⚠ 가 남으면 치울 수 없는 할 일이 됩니다');
   assert.equal(J.checkWhy(it), '');
@@ -175,7 +175,7 @@ test('★ 원본이 작은 서식은 여전히 할 일이다 — 그 줄이 먼�
 
 test('★ 사업자번호를 검산한 작은 서식은 통과한다 — 2026-08-23 결정 그대로', () => {
   const it = { meta: { w: 1141, h: 1400,
-    read: { kind: 'form', auto: false, bizNoOk: true, fields: { bizno: '312-81-49225' },
+    read: { kind: 'form', auto: false, bizNoOk: true, fields: { bizno: '123-81-20012' },
             filedInfo: { at: 1 } } } };
   assert.equal(J.needsCheck(it), false);
 });
@@ -188,7 +188,7 @@ test('★ 할 일이면 반드시 이유가 있고, 할 일이 아니면 이유�
     [true, false].forEach(auto => {
       [undefined, { at: 1 }].forEach(filedInfo => {
         [undefined, [{ t: 'ㄱ', done: false }], [{ t: 'ㄱ', done: true }], []].forEach(todos => {
-          [{}, { bizno: '312-81-49225' }, { company: '가나' }].forEach(f => {
+          [{}, { bizno: '123-81-20012' }, { company: '가나' }].forEach(f => {
             cases.push(big({ kind: k, auto: auto, filedInfo: filedInfo,
               fields: Object.assign({}, f, todos ? { todos: todos } : {}) }));
           });

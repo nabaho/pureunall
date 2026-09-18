@@ -73,9 +73,9 @@ const item = (bizno, year, id, pairs) => ({
 /* ══════ ① 이미 보낸 서류에만 ══════ */
 
 test('★ 이미 보낸 서류에 「적힌 것」이 채워진다', () => {
-  const co = { '1348605772': { docs: { '2026_p1': { name:'서식', id:'p1' } } } };
+  const co = { '1238620021': { docs: { '2026_p1': { name:'서식', id:'p1' } } } };
   const { api, writes } = load(co);
-  return api.backfillPairs([ item('134-86-05772', '2026', 'p1', [P('신청 사유','설비 교체')]) ])
+  return api.backfillPairs([ item('123-86-20021', '2026', 'p1', [P('신청 사유','설비 교체')]) ])
     .then(r => {
       assert.equal(r.filled, 1);
       assert.equal(writes.length, 1);
@@ -86,9 +86,9 @@ test('★ 이미 보낸 서류에 「적힌 것」이 채워진다', () => {
 });
 
 test('★ 기업정보함에 «없는» 서류는 안 만든다 — 이름·날짜 없는 껍데기가 생긴다', () => {
-  const co = { '1348605772': { docs: { '2026_p1': { name:'서식' } } } };
+  const co = { '1238620021': { docs: { '2026_p1': { name:'서식' } } } };
   const { api, writes } = load(co);
-  return api.backfillPairs([ item('134-86-05772', '2026', 'p9', [P('가','나')]) ])
+  return api.backfillPairs([ item('123-86-20021', '2026', 'p9', [P('가','나')]) ])
     .then(r => {
       assert.equal(r.filled, 0);
       assert.equal(writes.length, 0, '★ 안 보낸 사진까지 쓰면 없던 서류가 생긴다');
@@ -98,16 +98,16 @@ test('★ 기업정보함에 «없는» 서류는 안 만든다 — 이름·날�
 
 test('회사가 아예 기업정보함에 없으면 건너뛴다', () => {
   const { api, writes } = load({});
-  return api.backfillPairs([ item('134-86-05772', '2026', 'p1', [P('가','나')]) ])
+  return api.backfillPairs([ item('123-86-20021', '2026', 'p1', [P('가','나')]) ])
     .then(r => { assert.equal(r.filled, 0); assert.equal(writes.length, 0); });
 });
 
 /* ══════ ② 이미 있으면 안 건드린다 ══════ */
 
 test('★ 이미 「적힌 것」이 있으면 다시 안 쓴다 — 다시 쓰면 그만큼 요금이다', () => {
-  const co = { '1348605772': { docs: { '2026_p1': { name:'서식', pairs:[P('옛','것')] } } } };
+  const co = { '1238620021': { docs: { '2026_p1': { name:'서식', pairs:[P('옛','것')] } } } };
   const { api, writes } = load(co);
-  return api.backfillPairs([ item('134-86-05772', '2026', 'p1', [P('새','것')]) ])
+  return api.backfillPairs([ item('123-86-20021', '2026', 'p1', [P('새','것')]) ])
     .then(r => {
       assert.equal(r.filled, 0);
       assert.equal(writes.length, 0);
@@ -116,10 +116,10 @@ test('★ 이미 「적힌 것」이 있으면 다시 안 쓴다 — 다시 쓰�
 });
 
 test('담을 것이 없는 사진은 건너뛴다', () => {
-  const co = { '1348605772': { docs: { '2026_p1': { name:'서식' } } } };
+  const co = { '1238620021': { docs: { '2026_p1': { name:'서식' } } } };
   const { api, writes } = load(co);
-  return api.backfillPairs([ item('134-86-05772', '2026', 'p1', []),
-                             item('134-86-05772', '2026', 'p1', null) ])
+  return api.backfillPairs([ item('123-86-20021', '2026', 'p1', []),
+                             item('123-86-20021', '2026', 'p1', null) ])
     .then(() => assert.equal(writes.length, 0));
 });
 
@@ -132,13 +132,13 @@ test('사업자번호를 못 읽은 사진은 건너뛴다 — 어느 회사인�
 /* ══════ ③ 회사마다 한 번 읽고 한 번 쓴다 ══════ */
 
 test('★ 한 회사에 서류가 여럿이어도 «한 번» 읽고 «한 번» 쓴다', () => {
-  const co = { '1348605772': { docs: {
+  const co = { '1238620021': { docs: {
     '2026_p1': { name:'가' }, '2026_p2': { name:'나' }, '2026_p3': { name:'다' } } } };
   const { api, reads, writes } = load(co);
   return api.backfillPairs([
-    item('134-86-05772', '2026', 'p1', [P('a','1')]),
-    item('134-86-05772', '2026', 'p2', [P('b','2')]),
-    item('134-86-05772', '2026', 'p3', [P('c','3')])
+    item('123-86-20021', '2026', 'p1', [P('a','1')]),
+    item('123-86-20021', '2026', 'p2', [P('b','2')]),
+    item('123-86-20021', '2026', 'p3', [P('c','3')])
   ]).then(r => {
     assert.equal(r.filled, 3);
     assert.equal(reads.length, 1, '★ 서류마다 읽으면 400장이 400번 오간다');
@@ -148,12 +148,12 @@ test('★ 한 회사에 서류가 여럿이어도 «한 번» 읽고 «한 번»
 });
 
 test('회사가 여럿이면 회사 수만큼만 오간다', () => {
-  const co = { '1348605772': { docs: { '2026_p1': { name:'가' } } },
-               '5058600987': { docs: { '2026_p2': { name:'나' } } } };
+  const co = { '1238620021': { docs: { '2026_p1': { name:'가' } } },
+               '1238620100': { docs: { '2026_p2': { name:'나' } } } };
   const { api, reads, writes } = load(co);
   return api.backfillPairs([
-    item('134-86-05772', '2026', 'p1', [P('a','1')]),
-    item('505-86-00987', '2026', 'p2', [P('b','2')])
+    item('123-86-20021', '2026', 'p1', [P('a','1')]),
+    item('123-86-20100', '2026', 'p2', [P('b','2')])
   ]).then(() => {
     assert.equal(reads.length, 2);
     assert.equal(writes.length, 2);
@@ -165,9 +165,9 @@ test('회사가 여럿이면 회사 수만큼만 오간다', () => {
 test('★ 자르는 규칙이 «보낼 때와 같다» — 두 벌이면 한쪽만 고쳐진다', () => {
   const many = [];
   for (let i = 0; i < 200; i++) many.push(P('항목' + i, '값' + i));
-  const co = { '1348605772': { docs: { '2026_p1': { name:'서식' } } } };
+  const co = { '1238620021': { docs: { '2026_p1': { name:'서식' } } } };
   const { api, writes } = load(co);
-  return api.backfillPairs([ item('134-86-05772', '2026', 'p1', many) ]).then(() => {
+  return api.backfillPairs([ item('123-86-20021', '2026', 'p1', many) ]).then(() => {
     const v = writes[0].val;
     assert.ok(v['docs/2026_p1/pairs'].length <= 60, '개수를 안 잘랐다');
     assert.ok(v['docs/2026_p1/pairsCut'] > 0, '자른 개수를 안 남겼다');
@@ -175,9 +175,9 @@ test('★ 자르는 규칙이 «보낼 때와 같다» — 두 벌이면 한쪽�
 });
 
 test('값이 아주 길면 보낼 때와 같이 자른다', () => {
-  const co = { '1348605772': { docs: { '2026_p1': { name:'서식' } } } };
+  const co = { '1238620021': { docs: { '2026_p1': { name:'서식' } } } };
   const { api, writes } = load(co);
-  return api.backfillPairs([ item('134-86-05772', '2026', 'p1',
+  return api.backfillPairs([ item('123-86-20021', '2026', 'p1',
     [P('비고', 'ㄱ'.repeat(5000))]) ]).then(() => {
     assert.ok(writes[0].val['docs/2026_p1/pairs'][0].v.length <= 300);
   });
@@ -186,13 +186,13 @@ test('값이 아주 길면 보낼 때와 같이 자른다', () => {
 /* ══════ ⑤ 무엇을 했는지 돌려준다 ══════ */
 
 test('★ 무엇을 했는지 세어서 돌려준다 — 안 세면 다 됐는지 알 수 없다', () => {
-  const co = { '1348605772': { docs: {
+  const co = { '1238620021': { docs: {
     '2026_p1': { name:'가' }, '2026_p2': { name:'나', pairs:[P('있','음')] } } } };
   const { api } = load(co);
   return api.backfillPairs([
-    item('134-86-05772', '2026', 'p1', [P('a','1')]),
-    item('134-86-05772', '2026', 'p2', [P('b','2')]),
-    item('134-86-05772', '2026', 'p9', [P('c','3')]),
+    item('123-86-20021', '2026', 'p1', [P('a','1')]),
+    item('123-86-20021', '2026', 'p2', [P('b','2')]),
+    item('123-86-20021', '2026', 'p9', [P('c','3')]),
     item('', '2026', 'p8', [P('d','4')])
   ]).then(r => {
     assert.equal(r.filled, 1);
@@ -206,12 +206,12 @@ test('★ 무엇을 했는지 세어서 돌려준다 — 안 세면 다 됐는�
 /* ══════ ⑥ 하나가 실패해도 나머지는 계속 ══════ */
 
 test('★ 한 회사가 실패해도 나머지는 계속한다', () => {
-  const co = { '1348605772': { docs: { '2026_p1': { name:'가' } } },
-               '5058600987': { docs: { '2026_p2': { name:'나' } } } };
-  const { api } = load(co, { writeFails: { 'pucards/coInfo/1348605772': 1 } });
+  const co = { '1238620021': { docs: { '2026_p1': { name:'가' } } },
+               '1238620100': { docs: { '2026_p2': { name:'나' } } } };
+  const { api } = load(co, { writeFails: { 'pucards/coInfo/1238620021': 1 } });
   return api.backfillPairs([
-    item('134-86-05772', '2026', 'p1', [P('a','1')]),
-    item('505-86-00987', '2026', 'p2', [P('b','2')])
+    item('123-86-20021', '2026', 'p1', [P('a','1')]),
+    item('123-86-20100', '2026', 'p2', [P('b','2')])
   ]).then(r => {
     assert.equal(r.failed, 1, '실패를 세야 다시 눌러 볼 줄 안다');
     assert.equal(r.filled, 1, '★ 한 회사에서 멈추면 나머지가 영영 안 채워진다');

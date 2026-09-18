@@ -18,9 +18,9 @@ const MR = require(path.join(__dirname, '..', 'functions', 'mail-receive.js'));
 /* 업체관리가 실제로 쓰는 모양 — {v: 목록} 이고 목록은 배열이거나 번호 맵이다 */
 const COMPANIES = {
   v: [
-    { id: 'co_1', name: '텃골영농조합법인(용인)', email: 'texas@daum.net',
+    { id: 'co_1', name: '가온영농조합법인(가나시)', email: 'gaon@daum.net',
       typeCode: '급여', status: 'active', managerMain: 'p-001', managerSubs: [] },
-    { id: 'co_2', name: '팔천식품', email: 'palchun@naver.com',
+    { id: 'co_2', name: '다온식품', email: 'daon@naver.com',
       typeCode: '급여', status: 'active', managerMain: 'p-002', managerSubs: ['p-001'] },
     { id: 'co_3', name: '㈜주원테크', email: 'juwon@gmail.com',
       typeCode: '급여', status: 'active', managerMain: 'p-009', managerSubs: [] },
@@ -39,13 +39,13 @@ const OWNERS = {
 
 test('★ 보낸 주소로 업체를 찾는다', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
-  assert.equal(MR.companyFor('texas@daum.net', idx).id, 'co_1');
-  assert.equal(MR.companyFor('PALCHUN@NAVER.COM', idx).id, 'co_2', '대소문자로 어긋나면 안 됩니다');
+  assert.equal(MR.companyFor('gaon@daum.net', idx).id, 'co_1');
+  assert.equal(MR.companyFor('DAON@NAVER.COM', idx).id, 'co_2', '대소문자로 어긋나면 안 됩니다');
 });
 
 test('메일 머리글 꼴(이름 <주소>)로도 찾는다', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
-  assert.equal(MR.companyFor('텃골 담당자 <texas@daum.net>', idx).id, 'co_1');
+  assert.equal(MR.companyFor('가온 담당자 <gaon@daum.net>', idx).id, 'co_1');
 });
 
 test('모르는 주소는 못 찾는다고 한다', () => {
@@ -57,7 +57,7 @@ test('모르는 주소는 못 찾는다고 한다', () => {
 test('업체 목록이 번호 맵이어도 읽는다', () => {
   // 푸른이알피는 배열일 때도 {키:값} 일 때도 있다
   const idx = MR.buildCompanyIndex({ v: { a: COMPANIES.v[0], b: COMPANIES.v[1] } });
-  assert.equal(MR.companyFor('texas@daum.net', idx).id, 'co_1');
+  assert.equal(MR.companyFor('gaon@daum.net', idx).id, 'co_1');
 });
 
 test('자료가 없어도 터지지 않는다', () => {
@@ -68,7 +68,7 @@ test('자료가 없어도 터지지 않는다', () => {
 
 test('★ 주담당의 자리(uid)를 찾는다', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
-  const co = MR.companyFor('texas@daum.net', idx);
+  const co = MR.companyFor('gaon@daum.net', idx);
   assert.equal(MR.seatFor(co, OWNERS), 'U1');
 });
 
@@ -89,7 +89,7 @@ test('★ 주담당이 안 적힌 업체도 자리가 없다', () => {
 test('부담당 자리로 보내지 않는다 — 주담당 한 사람만', () => {
   // 둘에게 다 보내면 같은 자료가 두 벌 되고, 부담당에게만 보내면 주담당이 모른다
   const idx = MR.buildCompanyIndex(COMPANIES);
-  const co = MR.companyFor('palchun@naver.com', idx);
+  const co = MR.companyFor('daon@naver.com', idx);
   assert.equal(MR.seatFor(co, OWNERS), 'U2');
 });
 
@@ -102,9 +102,9 @@ test('업체를 못 찾았으면 자리도 없다', () => {
 test('★ 주소로 찾은 사업장이 채워진다 — 파일 이름을 못 알아봐도', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
   const t = MR.tagFor({ filename: 'IMG_2841.jpg', subject: '' },
-    MR.companyFor('palchun@naver.com', idx));
+    MR.companyFor('daon@naver.com', idx));
   assert.equal(t.companyId, 'co_2');
-  assert.equal(t.companyName, '팔천식품');
+  assert.equal(t.companyName, '다온식품');
   assert.equal(t.month, '', '알 수 없는 달을 억지로 채우면 안 됩니다');
   assert.equal(t.kind, '', '알 수 없는 종류를 억지로 채우면 안 됩니다');
 });
@@ -112,7 +112,7 @@ test('★ 주소로 찾은 사업장이 채워진다 — 파일 이름을 못 �
 test('★ 파일 이름에서 귀속월과 종류를 읽는다', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
   const t = MR.tagFor({ filename: '2026년 8월 근태표.xlsx', subject: '' },
-    MR.companyFor('texas@daum.net', idx));
+    MR.companyFor('gaon@daum.net', idx));
   assert.equal(t.month, '2026-08');
   assert.equal(t.kind, 'attend');
 });
@@ -122,7 +122,7 @@ test('★ 메일 제목에서도 읽는다 — 파일 이름이 밋밋할 때', 
      제목을 안 읽으면 세 칸이 다 빈칸이 된다. */
   const idx = MR.buildCompanyIndex(COMPANIES);
   const t = MR.tagFor({ filename: 'scan001.pdf', subject: '2026-08 급여대장 보냅니다' },
-    MR.companyFor('texas@daum.net', idx));
+    MR.companyFor('gaon@daum.net', idx));
   assert.equal(t.month, '2026-08');
   assert.equal(t.kind, 'ledger');
 });
@@ -148,7 +148,7 @@ test('짧은 연도 꼴도 읽는다', () => {
 
 test('★ 임자를 찾으면 그 사람 대기 칸 자리를 알려 준다', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
-  const r = MR.routeFor({ from: 'texas@daum.net', filename: '2026년 8월 근태표.xlsx', subject: '' },
+  const r = MR.routeFor({ from: 'gaon@daum.net', filename: '2026년 8월 근태표.xlsx', subject: '' },
     idx, OWNERS);
   assert.equal(r.seat, 'U1');
   assert.equal(r.shared, false);
@@ -189,8 +189,8 @@ test('★ 공용 칸으로 가도 알아낸 이름표는 함께 넘긴다', () =
 test('★ 담당자 칸에 넣는 줄에 이름표가 채워져 있다', () => {
   const rec = MR.pendingRecordFor({
     filename: '근태.xlsx', file: 'pu_paydata/x/pending/m1.xlsx', mime: '', bytes: 10, at: 5,
-    mailFrom: 'texas@daum.net', mailSubject: '8월 자료',
-    tag: { companyId: 'co_1', companyName: '텃골', month: '2026-08', kind: 'attend' }
+    mailFrom: 'gaon@daum.net', mailSubject: '8월 자료',
+    tag: { companyId: 'co_1', companyName: '가온', month: '2026-08', kind: 'attend' }
   });
   assert.equal(rec.companyId, 'co_1');
   assert.equal(rec.month, '2026-08');
@@ -201,14 +201,14 @@ test('★ 담당자 칸에 넣는 줄에 이름표가 채워져 있다', () => {
 
 test('★ 서버가 보냈다는 표시가 남는다 — 사람이 맡은 것과 갈라 봐야 한다', () => {
   const rec = MR.pendingRecordFor({ filename: 'a.pdf', at: 1, mailFrom: 'x@y.com',
-    tag: { companyId: 'co_1', companyName: '텃골', month: '', kind: '' } });
+    tag: { companyId: 'co_1', companyName: '가온', month: '', kind: '' } });
   assert.equal(rec.routed, true);
 });
 
 test('보낸이·제목이 그대로 남는다 — 나중에 누가 보냈는지 물을 수 있다', () => {
   const rec = MR.pendingRecordFor({ filename: 'a.pdf', at: 1,
-    mailFrom: 'texas@daum.net', mailSubject: '8월 자료', tag: {} });
-  assert.match(rec.note, /texas@daum\.net/);
+    mailFrom: 'gaon@daum.net', mailSubject: '8월 자료', tag: {} });
+  assert.match(rec.note, /gaon@daum\.net/);
   assert.match(rec.note, /8월 자료/);
 });
 

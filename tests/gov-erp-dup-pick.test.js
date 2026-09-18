@@ -112,8 +112,8 @@ test('★★ 종류를 «안 넘기면» 예전처럼 첫 것 — 옛 부름을 
 });
 
 test('★ 하나뿐이면 그대로 고른다', () => {
-  const cos = [CO('only', '남양인텍')];
-  assert.strictEqual(find(cos, 'E9', '남양인텍', 't4').id, 'only');
+  const cos = [CO('only', '아자인텍')];
+  assert.strictEqual(find(cos, 'E9', '아자인텍', 't4').id, 'only');
 });
 
 test('★★ 법인격을 떼고 맞춘다 — 「(주)별표수세미」와 「별표수세미」는 한 곳이다', () => {

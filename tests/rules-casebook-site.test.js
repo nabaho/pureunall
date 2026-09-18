@@ -11,7 +11,7 @@ const CB = require(path.join(__dirname, '..', 'js', 'pu-rules-casebook.js'));
 
 const ERP = [
   { name: '주식회사 한빛산업', bizNo: '123-45-67890' },
-  { name: '㈜미래테크', bizNo: '2223344556' },
+  { name: '㈜미래테크', bizNo: '1233320517' },
   { name: '청솔전자 주식회사', bizNo: '3334455667' }
 ];
 
@@ -42,7 +42,7 @@ test('폴더가 부분만 맞아도 찾아낸다', () => {
 
 test('★ 폴더가 없으면 파일명에서 뽑는다', () => {
   const r = CB.siteOf({ path: '취업규칙_미래테크_개정안.hwp', name: '취업규칙_미래테크_개정안.hwp' }, ERP);
-  assert.equal(r.bizno, '2223344556');
+  assert.equal(r.bizno, '1233320517');
   assert.ok(r.how === 'ERP 정확' || r.how === 'ERP 부분');
 });
 

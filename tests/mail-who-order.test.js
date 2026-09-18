@@ -36,12 +36,12 @@ const DIR = [
   { sid:'P-001', name:'권형하', sortOrder:10,  role:'admin',  title:'대표노무사', status:'active' },
   { sid:'P-002', name:'하윤서', sortOrder:20,  role:'member', title:'노무사',   status:'active' },
   { sid:'P-003', name:'가온',   sortOrder:30,  role:'member', title:'노무사',   status:'active' },
-  { sid:'A-001', name:'나래',   sortOrder:100, role:'staff',  title:'과장',     status:'active' },
+  { sid:'A-001', name:'새롬',   sortOrder:100, role:'staff',  title:'과장',     status:'active' },
 ];
 const BYNAME = {
   '하윤사': { company:'하윤사', main:'하윤서', subs:[], left:false },
   '가온사': { company:'가온사', main:'가온',   subs:[], left:false },
-  '나래사': { company:'나래사', main:'나래',   subs:[], left:false },
+  '새롬사': { company:'새롬사', main:'새롬',   subs:[], left:false },
   '대표사': { company:'대표사', main:'권형하', subs:[], left:false },
   /* ⚠ 자문이 «끝난» 업체 — 없으면 자문종료 줄이 늘 0통이라 그 줄을 못 잰다 */
   '끝난사': { company:'끝난사', main:'하윤서', subs:[], left:true },
@@ -49,7 +49,7 @@ const BYNAME = {
 const ITEMS = {
   i1:{ id:'i1', email:'a@hy.kr', company:'하윤사' },
   i2:{ id:'i2', email:'b@ga.kr', company:'가온사' },
-  i3:{ id:'i3', email:'c@nr.kr', company:'나래사' },
+  i3:{ id:'i3', email:'c@nr.kr', company:'새롬사' },
   i4:{ id:'i4', email:'d@dp.kr', company:'대표사' },
   i5:{ id:'i5', email:'e@en.kr', company:'끝난사' },
 };
@@ -178,9 +178,9 @@ test('★★ 갈래 머리줄이 없다 — 목록이 도막나면 칩을 바꿀
 test('★ 「나」를 뺀 나머지는 «사번 순»이다 — 이름순이 아니다', () => {
   const c = load();
   const rest = names(c).slice(1);
-  /* 사번 순: 하윤서(P-002) · 가온(P-003) · 나래(A-001).
-     이름순이라면 「가온·나래·하윤서」가 된다 — 그것과 달라야 사번순임이 드러난다. */
-  assert.deepEqual(rest, ['하윤서', '가온', '나래'],
+  /* 사번 순: 하윤서(P-002) · 가온(P-003) · 새롬(A-001).
+     이름순이라면 「가온·새롬·하윤서」가 된다 — 그것과 달라야 사번순임이 드러난다. */
+  assert.deepEqual(rest, ['하윤서', '가온', '새롬'],
     '사번 순이 아닙니다: ' + rest.join(' · '));
 });
 
@@ -197,32 +197,32 @@ test('★ 「나」가 첫 줄이고, 끌 수 없다 — 끌어 내리면 「내
 
 test('★ 끌어 옮긴 차례가 있어도 「나」는 맨 위 그대로', () => {
   /* 「나」에게 큰 번호를 억지로 매겨도 맨 위여야 한다 */
-  const c = load({ who: { '권형하': 99, '나래': 0 } });
+  const c = load({ who: { '권형하': 99, '새롬': 0 } });
   assert.equal(names(c)[0], '권형하', '차례를 매겼더니 내 줄이 내려갔습니다');
 });
 
 /* ══════ ④ 끌어서 차례 옮기기 ══════ */
 
 test('★★ 끌어 옮긴 차례가 사번순보다 «이긴다»', () => {
-  const c = load({ who: { '나래': 0, '하윤서': 1, '가온': 2 } });
-  assert.deepEqual(names(c).slice(1), ['나래', '하윤서', '가온'],
+  const c = load({ who: { '새롬': 0, '하윤서': 1, '가온': 2 } });
+  assert.deepEqual(names(c).slice(1), ['새롬', '하윤서', '가온'],
     '끌어 옮긴 차례를 안 따릅니다');
 });
 
 test('★ 끌어 놓으면 차례가 «남는다» — 다음에 열어도 그대로', () => {
   const c = load();
-  c.state.mbDrag = { kind:'who', id:'나래' };
+  c.state.mbDrag = { kind:'who', id:'새롬' };
   c.mbWhoDrop({ preventDefault(){} }, '하윤서', null);
   const saved = c._held.wrote['pucards/config/mailWhoOrder'];
   assert.ok(saved, '차례를 저장하지 않았습니다');
   const k = c.mbWhoKey;
-  assert.ok(Number(saved[k('나래')]) < Number(saved[k('가온')]),
+  assert.ok(Number(saved[k('새롬')]) < Number(saved[k('가온')]),
     '옮긴 자리가 안 담겼습니다: ' + JSON.stringify(saved));
 });
 
 test('★★ 「나」는 차례 표에 «안 들어간다» — 넣으면 남을 나보다 위로 끌 때 그 사람이 사라진다', () => {
   const c = load();
-  c.state.mbDrag = { kind:'who', id:'나래' };
+  c.state.mbDrag = { kind:'who', id:'새롬' };
   c.mbWhoDrop({ preventDefault(){} }, '하윤서', null);
   const saved = c._held.wrote['pucards/config/mailWhoOrder'] || {};
   assert.ok(!(c.mbWhoKey('권형하') in saved),
@@ -230,12 +230,12 @@ test('★★ 「나」는 차례 표에 «안 들어간다» — 넣으면 남�
 });
 
 test('★★ 업무 칸을 옮겨도 담당자 차례가 «안 지워진다» — 두 표는 따로 산다', () => {
-  const c = load({ who: { '나래': 0, '하윤서': 1, '가온': 2 } });
+  const c = load({ who: { '새롬': 0, '하윤서': 1, '가온': 2 } });
   const bins = c.mbBins();
   assert.ok(bins.length > 1, '밑그림에 업무 칸이 둘 이상 있어야 합니다 (' + bins.length + '개)');
   c.state.mbDrag = { kind:'bin', id:bins[0].id };
   c.mbDrop({ preventDefault(){} }, bins[1].id, null);
-  ['나래','하윤서','가온'].forEach(nm =>
+  ['새롬','하윤서','가온'].forEach(nm =>
     assert.ok(c.mbWhoKey(nm) in c.__who(),
       '업무 칸을 옮겼더니 담당자 차례(' + nm + ')가 지워졌습니다: ' + JSON.stringify(c.__who())));
 });
@@ -244,7 +244,7 @@ test('메일을 사람 줄에 떨어뜨려도 차례는 «그대로»다', () =>
   /* ⚠ 이것은 «규칙을 못 박는» 검사다. 지금은 kind 가드를 떼도 아래 indexOf 가
      어차피 막아 준다(뮤테이션으로 확인 2026-08-30). 목록 만드는 법이 바뀌면
      그때는 이 검사만이 막는다 — 그러라고 둔다. */
-  const c = load({ who: { '나래': 0, '하윤서': 1, '가온': 2 } });
+  const c = load({ who: { '새롬': 0, '하윤서': 1, '가온': 2 } });
   const before = JSON.stringify(c.__who());
   c.state.mbDrag = { kind:'mail', id:'1' };
   c.mbWhoDrop({ preventDefault(){} }, '하윤서', null);

@@ -75,11 +75,11 @@ function scanErp(cos){
   return ctx.OUT;
 }
 
-const 등록증 = { kind:'biz', company:'가나테크', bizno:'134-86-05772', ceo:'나성환',
+const 등록증 = { kind:'biz', company:'가나테크', bizno:'123-86-20021', ceo:'고길동',
                 address:'충남 천안시 서북구 1', companyTel:'041-556-0035',
                 companyFax:'041-556-0036', bizType:'서비스', bizItem:'노무' };
-const 업체 = (extra) => Object.assign({ name:'가나테크', bizNo:'134-86-05772',
-  ceo:'나성환', typeCode:'자문', status:'active', managerMain:'s1' }, extra || {});
+const 업체 = (extra) => Object.assign({ name:'가나테크', bizNo:'123-86-20021',
+  ceo:'고길동', typeCode:'자문', status:'active', managerMain:'s1' }, extra || {});
 
 /* ══════ ① 등록증의 팩스가 회사에 올라온다 ══════ */
 
@@ -110,7 +110,7 @@ test('★ 명함의 «개인» 팩스·이메일은 회사 값이 «아니다»'
 
 test('★ 업체관리를 훑을 때 업태·종목·팩스·이메일을 실어 둔다', () => {
   const r = scanErp([업체({ bizType:'제조업', bizCategory:'금속가공',
-                           fax:'02-123-4567', email:'info@gana.co.kr' })])['1348605772'];
+                           fax:'02-123-4567', email:'info@gana.co.kr' })])['1238620021'];
   assert.ok(r, '업체 기록을 못 만들었다');
   assert.equal(r.bizType, '제조업');
   assert.equal(r.fax, '02-123-4567');

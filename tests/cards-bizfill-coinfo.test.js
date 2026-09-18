@@ -48,8 +48,8 @@ function load(items, coInfo) {
      «십의 자리»를 한 번 더 더하는 보정이 있는데, 아홉째 자리가 0·1 이면 그 보정이
      0 이라 «빼도 통과한다». 앞의 셋만 두었더니 보정을 지워도 검사가 멀쩡했다
      (이빨 확인에서 실제로 구멍으로 잡혔다). 이 셋을 지우지 말 것. */
-const REAL_OK = ['314-86-59404', '215-81-62801', '312-81-43008',
-                 '312-86-42324', '312-83-01166', '312-81-05571'];
+const REAL_OK = ['123-86-20128', '123-81-20370', '123-81-20216',
+                 '123-86-20389', '123-83-20393', '123-81-20405'];
 
 test('①★ 사업자번호 검산 — 국세청 규칙대로', () => {
   const c = load();
@@ -68,7 +68,7 @@ test('①★ 사업자번호 검산 — 국세청 규칙대로', () => {
 
 test('②★ 검산 못 한 번호는 «안 보낸다» — 남의 회사 칸에 들어간다', () => {
   const c = load({
-    a: { kind: 'biz', bizno: '314-86-59404', company: '가나상사' },   // 맞는 번호
+    a: { kind: 'biz', bizno: '123-86-20128', company: '가나상사' },   // 맞는 번호
     b: { kind: 'biz', bizno: '123-45-67890', company: '나다물산' },   // 틀린 번호
     d: { kind: 'biz', bizno: '',             company: '라마전자' }    // 번호 없음
   });
@@ -80,26 +80,26 @@ test('②★ 검산 못 한 번호는 «안 보낸다» — 남의 회사 칸에
 });
 
 test('③★ 빈 칸만 센다 — 이미 든 값은 건드리지 않는다', () => {
-  const item = { kind: 'biz', bizno: '314-86-59404',
+  const item = { kind: 'biz', bizno: '123-86-20128',
     company: '가나상사', ceo: '홍길동', address: '충남 천안시', bizType: '제조업' };
   const none = load({ a: item }).bizFillPlan();
   assert.equal(none.fieldN, 4, '기업상세가 비었으면 넉 칸');
 
-  const half = load({ a: item }, { '3148659404': { company: '가나상사', ceo: '임꺽정' } }).bizFillPlan();
+  const half = load({ a: item }, { '1238620128': { company: '가나상사', ceo: '임꺽정' } }).bizFillPlan();
   assert.equal(half.fieldN, 2, '이미 든 상호·대표자는 안 센다 (대표자가 달라도 안 덮는다)');
   assert.deepEqual([...half.cos[0].fields].sort(), ['address', 'bizType']);
 
   const full = load({ a: item },
-    { '3148659404': { company: 'ㄱ', ceo: 'ㄴ', address: 'ㄷ', bizType: 'ㄹ' } }).bizFillPlan();
+    { '1238620128': { company: 'ㄱ', ceo: 'ㄴ', address: 'ㄷ', bizType: 'ㄹ' } }).bizFillPlan();
   assert.equal(full.coN, 0, '채울 것이 없으면 목록에서 빠진다');
-  assert.equal(load({ a: item }, { '3148659404': { company: 'ㄱ', ceo: 'ㄴ', address: 'ㄷ', bizType: 'ㄹ' } })
+  assert.equal(load({ a: item }, { '1238620128': { company: 'ㄱ', ceo: 'ㄴ', address: 'ㄷ', bizType: 'ㄹ' } })
     .bizFillCount(), 0);
 });
 
 test('④ 같은 회사의 등록증이 여러 장이면 «한 곳»으로 묶는다', () => {
   const p = load({
-    a: { kind: 'biz', bizno: '314-86-59404', company: '가나상사', ceo: '홍길동' },
-    b: { kind: 'biz', bizno: '314-86-59404', company: '가나상사', address: '충남 천안시' }
+    a: { kind: 'biz', bizno: '123-86-20128', company: '가나상사', ceo: '홍길동' },
+    b: { kind: 'biz', bizno: '123-86-20128', company: '가나상사', address: '충남 천안시' }
   }).bizFillPlan();
   assert.equal(p.coN, 1, '회사는 하나');
   assert.equal(p.itemN, 2, '등록증은 두 장');
@@ -109,7 +109,7 @@ test('④ 같은 회사의 등록증이 여러 장이면 «한 곳»으로 묶�
 
 test('⑤ 명함은 안 본다 — 등록증만', () => {
   const p = load({
-    a: { kind: 'card', bizno: '314-86-59404', company: '가나상사', ceo: '홍길동' }
+    a: { kind: 'card', bizno: '123-86-20128', company: '가나상사', ceo: '홍길동' }
   }).bizFillPlan();
   assert.equal(p.coN, 0);
   assert.equal(p.badNo, 0);

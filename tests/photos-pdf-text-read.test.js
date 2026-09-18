@@ -52,7 +52,7 @@ const J = (function () {
     fnOf(app, 'pdfTextUsable') + '\n' + fnOf(app, 'textOfOne') + '\n' + fnOf(app, 'docTextOf'), c);
   return c;
 })();
-const LONG = '사업자등록증명 상호 남양인텍 대표자 김종복 사업자등록번호 312-81-28123 개업일 1997-10-01';
+const LONG = '사업자등록증명 상호 아자인텍 대표자 문가람 사업자등록번호 123-81-20119 개업일 1997-10-01';
 
 test('★ 쓸 만큼 글자가 있으면 글자로 간다', () => {
   assert.equal(J.pdfTextUsable(LONG), true);

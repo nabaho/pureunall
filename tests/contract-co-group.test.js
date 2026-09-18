@@ -67,12 +67,12 @@ const person = (who, coName) => ({
 
 test('★ 대표가 겪은 그 경우 — 표기가 다른 세 줄이 한 줄이 된다', () => {
   const gs = group([
-    co('천안청화공사', '612-81-08893'),
+    co('천안청화공사', '123-81-20196'),
     pc('합자회사 천안청화공사', '', 3),
     pc('(자)천안청화공사', '', 1)
   ]);
   assert.strictEqual(gs.length, 1, '한 회사여야 한다');
-  assert.strictEqual(gs[0].bizNo, '612-81-08893', '번호는 가지고 있는 줄에서 온다');
+  assert.strictEqual(gs[0].bizNo, '123-81-20196', '번호는 가지고 있는 줄에서 온다');
   assert.strictEqual(gs[0].name, '천안청화공사', '업체관리 이름을 앞세운다');
   assert.strictEqual(gs[0].rows.length, 3);
   assert.ok(gs[0].hasMaster && gs[0].hasCards);
@@ -116,7 +116,7 @@ test('★ (자) 도 법인 표기로 본다 — 합자회사의 줄임말이다'
 });
 
 test('★ 사람 줄은 «사람 이름»이 아니라 그 사람의 회사로 묶인다', () => {
-  const gs = group([co('천안청화공사', '612-81-08893'), person('김상호', '천안청화공사')]);
+  const gs = group([co('천안청화공사', '123-81-20196'), person('김상호', '천안청화공사')]);
   assert.strictEqual(gs.length, 1, '사람 이름으로 따로 떨어지면 안 된다');
   assert.strictEqual(gs[0].name, '천안청화공사');
 });
@@ -139,7 +139,7 @@ test('정보 줄과 사업현황 줄을 갈라 담는다', () => {
 
 test('묶은 «다른 이름»을 모두 들고 있다 (화면에 적어 보이려고)', () => {
   const g = group([
-    co('천안청화공사', '612-81-08893'),
+    co('천안청화공사', '123-81-20196'),
     pc('합자회사 천안청화공사', '', 3),
     pc('(자)천안청화공사', '', 1)
   ])[0];

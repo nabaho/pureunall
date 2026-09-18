@@ -67,9 +67,9 @@ ok('카드 갈래는 사람·업체·유형·기관',
 ok('키는 저장할 수 있는 글자로 바꾼다 (점·슬래시가 있으면 경로가 깨진다)',
   kbKey('천안/지청.1') === '천안_지청_1' && kbKey('  통상임금  ') === '통상임금');
 ok('기업 키는 사업자 ID 가 있으면 그것 (이름을 고쳐도 카드가 안 흩어진다)',
-  kbCoKey({ co_id: 'CO1', company: '나래산업' }) === 'CO1');
+  kbCoKey({ co_id: 'CO1', company: '새롬산업' }) === 'CO1');
 ok('ID 가 없으면 (주)·공백을 뗀 이름',
-  kbCoKey({ company: '(주) 나래 산업' }) === kbCoKey({ company: '나래산업' }));
+  kbCoKey({ company: '(주) 새롬 산업' }) === kbCoKey({ company: '새롬산업' }));
 
 kb = {
   cat: { 부당해고: {
@@ -77,7 +77,7 @@ kb = {
     k2: { t: '', x: '제목 없음' },
     k3: 'not-an-object'
   } },
-  company: { 나래산업: { k4: { t: '이 회사 관행', at: '2026-06-01' } } },
+  company: { 새롬산업: { k4: { t: '이 회사 관행', at: '2026-06-01' } } },
   person: { 강감독관: { k5: { t: '연락은 오전에', at: '2020-01-01' } } },
   office: { 천안지청: { k6: { t: '접수 창구', kl: '천안지청', at: '2026-07-20' } } }
 };
@@ -99,7 +99,7 @@ ok('틀렸다고 표시된 카드는 따로 본다',
   kbBad({ flags: [{ by: 'u2' }] }) === true && kbBad({ flags: [] }) === false && kbBad({}) === false);
 
 const IT = {
-  ptype: '부당해고', cat: '사건', company: '나래산업', title: '천안지청 진정 건',
+  ptype: '부당해고', cat: '사건', company: '새롬산업', title: '천안지청 진정 건',
   officer: '강감독관', client: '홍길동',
   contacts: [{ name: '이차장', phone: '010-1200-0026', position: '인사팀장' }]
 };
@@ -125,7 +125,7 @@ ok('업무가 없으면 빈 목록 (터지지 않는다)', kbRelated(null).lengt
 
 /* ══ 전체 검색 ══ */
 items = {
-  W1: { company: '나래산업', title: '부당해고 구제신청', mgr_main: { name: '김동현' },
+  W1: { company: '새롬산업', title: '부당해고 구제신청', mgr_main: { name: '김동현' },
         contacts: [{ name: '이차장', phone: '010-1200-0026' }, { name: '박대리', phone: '01099998888' }],
         mgr_subs: [{ name: '권형하' }],
         ho_note: { sit: '통상임금 다툼이 있었다', todo: '', qa: [{ q: '무엇이 남았나', a: '자료 정리' }],
@@ -138,7 +138,7 @@ ok('한 글자로는 찾지 않는다 (다 걸린다)', (function () {
   const r = searchAll('나');
   return r.items.length === 0 && r.cards.length === 0 && r.logs.length === 0;
 })());
-let R = searchAll('나래');
+let R = searchAll('새롬');
 ok('업무 정보에서 찾는다', R.items.length === 1 && R.items[0].where.indexOf('업무 정보') >= 0);
 R = searchAll('통상임금');
 ok('인수인계 노트 본문에서도 찾는다', R.items.length === 1 && R.items[0].where.length > 0);

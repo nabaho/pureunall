@@ -136,7 +136,7 @@ peMaster = { contract: [{ id: 'k1', companyName: '케이블루', contractNo: '�
 let c = puerpCandidates()[0];
 ok('계약관리 건은 구분이 계약', c.cat === '계약');
 ok('회사명을 업무명으로 쓰지 않는다 (기업 칸과 겹치고 마스터가 더러워진다)', c.title === '');
-peMaster = { case: [{ id: 'c1', companyName: '나래', title: '부당해고 구제신청', managerMain: 'u1' }] };
+peMaster = { case: [{ id: 'c1', companyName: '새롬', title: '부당해고 구제신청', managerMain: 'u1' }] };
 ok('푸른이알피 업무명이 있으면 그대로', puerpCandidates()[0].title === '부당해고 구제신청');
 
 /* ── 목록에 보일 이름 ── */

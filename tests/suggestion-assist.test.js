@@ -30,7 +30,7 @@ const ENTER = fs.readFileSync(path.join(R, 'enter.html'), 'utf8').replace(/\r\n/
 const 제목 = '2025년도 수임 사건 2026년도에 보수 이체되었을 경우 매칭이 안됩니다.';
 const 본문 = '지난 25/12/12 수임한 홍길동 님 임금체불사건(사건번호 임금체불-2025-001) 착수금은 '
   + '같은 날 입금이 완료되었으나 성공보수가 26/02/02 입금되어 이를 반영하고자 계약등록 및 '
-  + '이관을 하였음에도 거래내역에서 매칭이 되지 않습니다. 담당 ㈜나래산업 010-1234-5678 '
+  + '이관을 하였음에도 거래내역에서 매칭이 되지 않습니다. 담당 ㈜새롬산업 010-1234-5678 '
   + 'hong@example.com 123-45-67890';
 
 test('① ★★ 사람 이름이 가려진다 — 가장 자주 새는 자리', function () {
@@ -43,7 +43,7 @@ test('① ★★ 사람 이름이 가려진다 — 가장 자주 새는 자리',
 test('② ★★ 번호·업체·연락처가 가려진다', function () {
   const m = SA.maskPersonal(본문);
   assert.ok(!/임금체불-2025-001/.test(m.text), '★★ 사건번호가 남았습니다');
-  assert.ok(!/나래산업/.test(m.text), '★★ 업체명이 남았습니다');
+  assert.ok(!/새롬산업/.test(m.text), '★★ 업체명이 남았습니다');
   assert.ok(!/010-1234-5678/.test(m.text), '★★ 전화번호가 남았습니다');
   assert.ok(!/hong@example\.com/.test(m.text), '★★ 이메일이 남았습니다');
   assert.ok(!/123-45-67890/.test(m.text), '★★ 사업자번호가 남았습니다');
@@ -62,7 +62,7 @@ test('③ ★ 고치는 데 필요한 낱말은 «살린다» — 다 지우면 
 test('④ ★★ 프롬프트에 원문 이름이 «한 글자도» 안 들어간다', function () {
   const p = SA.assistParts(제목, 본문);
   const 보낼글 = p.parts.map(function (x) { return x.text; }).join('\n');
-  ['홍길동', '임금체불-2025-001', '나래산업', '010-1234-5678', 'hong@example.com']
+  ['홍길동', '임금체불-2025-001', '새롬산업', '010-1234-5678', 'hong@example.com']
     .forEach(function (secret) {
       assert.ok(보낼글.indexOf(secret) < 0, '★★ 「' + secret + '」 이 그대로 구글로 갑니다');
     });

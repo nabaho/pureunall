@@ -87,7 +87,7 @@ function load() {
      준다(autoOk). 그 상태에서 할 일이 되는지가 이 검사의 핵심이다. */
 function photo(kind, extra) {
   return { meta: { w: 2000, h: 1400, read: Object.assign(
-    { kind: kind, auto: false, fields: { company: '가야엔지니어링' } }, extra || {}) } };
+    { kind: kind, auto: false, fields: { company: '카타엔지니어링' } }, extra || {}) } };
 }
 
 /* 갈래 → [할 일인가, 이유에 들어 있어야 할 말, 판독 결과 덧붙임]
@@ -102,15 +102,15 @@ const TABLE = {
   /* ⚠ 2026-08-24 대표 지시로 둘의 뜻이 바뀌었다 — 「조건 없이 할 일」에서
      「사람이 해서 달라지는 것이 있을 때만」으로. 그래서 표에는 **할 일이 되는 꼴**을
      넣고, 할 일이 아닌 꼴은 아래에 따로 못박는다. */
-  chat:      [true,  /할 일/, { fields: { company: '가야엔지니어링',
+  chat:      [true,  /할 일/, { fields: { company: '카타엔지니어링',
                                           todos: [{ t: '견적서 보내기', done: false }] } }],
   timesheet: [true,  /대조/],                  // 손글씨 숫자는 기계가 검산할 방법이 없다
-  form:      [true,  /기업 상세/, { fields: { company: '가야엔지니어링',
-                                             bizno: '312-81-49225' } }],
+  form:      [true,  /기업 상세/, { fields: { company: '카타엔지니어링',
+                                             bizno: '123-81-20012' } }],
   /* CMS 자동이체 신청서 (대표 지시 2026-08-28) — 서식과 같은 자리로 간다.
      ⚠ 그 서식에는 **사업자번호 칸이 아예 없다.** 업체명만으로도 보낼 수 있어야 하므로
        여기 표본도 업체명만 준다 — 그것으로 할 일이 잡혀야 맞다. */
-  cms:       [true,  /기업 상세/, { fields: { company: '아이행복어린이집',
+  cms:       [true,  /기업 상세/, { fields: { company: '나라어린이집',
                                              bankName: '국민은행',
                                              bankAcct: '123456-04-567890',
                                              bankHolder: '양유정' } }],
@@ -120,21 +120,21 @@ const TABLE = {
   /* 통장·계좌 (2026-08-31 갈래 추가 / 2026-09-02 갈 곳 부여) — 서식·CMS 와 같은 자리로 간다.
      ⚠ 갈래를 만들 때 «보낼 길»을 안 만들어, 은행·계좌·예금주를 읽어 놓고 아무 곳에도
        안 갔다. 그 서식에도 사업자번호 칸이 없어 업체명으로 찾는다(CMS 와 같은 규칙). */
-  bankbook:  [true,  /기업 상세/, { fields: { company: '아이행복어린이집',
+  bankbook:  [true,  /기업 상세/, { fields: { company: '나라어린이집',
                                              bankName: '국민은행',
                                              bankAcct: '123456-04-567890',
                                              bankHolder: '양유정' } }],
   /* ── 근로자 서류 넷 (대표 결정 2026-09-01) ──
      회사가 아니라 «사람»에게 간다. 열쇠가 「이름 + 회사」라 둘 다 있어야 할 일이 된다 —
      회사가 없으면 보낼 수 없으므로 아래 NOT_TODO 에 그 꼴을 따로 못박는다. */
-  idcard:    [true,  /근로자 정보함/, { fields: { name: '강석', company: '해찬솔에프쓰리' } }],
-  resident:  [true,  /근로자 정보함/, { fields: { name: '강석', company: '해찬솔에프쓰리' } }],
-  mandate:   [true,  /근로자 정보함/, { fields: { name: '강석', company: '해찬솔에프쓰리' } }],
-  consent:   [true,  /근로자 정보함/, { fields: { name: '강석', company: '해찬솔에프쓰리' } }],
+  idcard:    [true,  /근로자 정보함/, { fields: { name: '강석', company: '다온솔에프쓰리' } }],
+  resident:  [true,  /근로자 정보함/, { fields: { name: '강석', company: '다온솔에프쓰리' } }],
+  mandate:   [true,  /근로자 정보함/, { fields: { name: '강석', company: '다온솔에프쓰리' } }],
+  consent:   [true,  /근로자 정보함/, { fields: { name: '강석', company: '다온솔에프쓰리' } }],
   /* ── 근로계약서 (대표 지시 2026-09-02) ──
      ⚠ 바로 위 contract 와 «갈 곳이 다르다». 우리 사무소 계약은 사진첩에만 두지만,
        근로계약서는 근로자와 사업주의 것이라 «사람»에게 간다(WORKER_KINDS). */
-  wcontract: [true,  /근로자 정보함/, { fields: { name: '강석', company: '해찬솔에프쓰리' } }],
+  wcontract: [true,  /근로자 정보함/, { fields: { name: '강석', company: '다온솔에프쓰리' } }],
   other:     [true,  /분류 지정/]              // 종류를 못 가렸다(내용은 읽었다)
 };
 
@@ -158,17 +158,17 @@ const NOT_TODO = [
   ['서식 — 보낼 곳이 없다(사업자번호를 못 읽음)', 'form',
     { fields: { docName: '통합 기술보호지원반 신청서' } }],
   ['서식 — 기업 상세로 이미 보냈다', 'form',
-    { fields: { bizno: '312-81-49225' }, filedInfo: { at: 1756000000000, n: 4 } }],
+    { fields: { bizno: '123-81-20012' }, filedInfo: { at: 1756000000000, n: 4 } }],
   ['대화캡처 — 뽑은 할 일을 다 끝냈다', 'chat',
     { fields: { todos: [{ t: 'ㄱ', done: true }] } }],
   ['대화캡처 — 뽑은 할 일이 하나도 없다', 'chat', { fields: {} }],
   /* ── 근로자 서류 — 이미 근로자 정보함에 보냈다 (2026-09-01) ── */
   ['신분증 — 근로자 정보함에 이미 보냈다', 'idcard',
-    { fields: { name: '강석', company: '해찬솔에프쓰리' },
+    { fields: { name: '강석', company: '다온솔에프쓰리' },
       filedWk: { at: 1756000000000, n: 1 } }],
   /* ⚠ 통장도 같다 — 보낸 뒤에도 할 일로 남으면 치울 수 없는 ⚠ 가 된다 */
   ['통장 — 기업 상세로 이미 보냈다', 'bankbook',
-    { fields: { company: '아이행복어린이집', bankName: '국민은행',
+    { fields: { company: '나라어린이집', bankName: '국민은행',
                 bankAcct: '123456-04-567890', bankHolder: '양유정' },
       filedInfo: { at: 1756000000000, n: 3 } }]
 ];

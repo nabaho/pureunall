@@ -123,7 +123,7 @@ test('★★ 「그냥 보관」으로 치울 수 있다 — 업체 없는 통�
 
 test('★ 왜 못 보내는지 화면이 말한다 — 단추만 없으면 「왜 안 되지」로 시간을 버린다', () => {
   assert.equal(F.coWhyNot(bank({ bankName: '농협' })), '어느 업체 것인지 몰라 기업 상세로 못 보냈습니다 — 상호를 적어 주세요');
-  assert.equal(F.coWhyNot(bank({ bizno: '312-81-49225' })), '', '★ 보낼 수 있으면 까닭이 없어야 합니다');
+  assert.equal(F.coWhyNot(bank({ bizno: '123-81-20012' })), '', '★ 보낼 수 있으면 까닭이 없어야 합니다');
   assert.equal(F.coWhyNot({ kind: 'idcard', fields: {} }), '', '★ 근로자 서류는 이 말을 쓰지 않습니다');
 });
 

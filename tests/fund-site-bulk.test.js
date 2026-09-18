@@ -51,17 +51,17 @@ function matcher() {
 }
 
 const IDX = [
-  { _id: 'b1', k: 'biz', c: '가나다산업㈜', bz: '412-81-12595', ceo: '김대표', ad: '○○시 1' },
-  { _id: 'b2', k: 'biz', c: '라마바물산', bz: '134-81-03880', ceo: '이대표', ad: '○○시 2' },
+  { _id: 'b1', k: 'biz', c: '가나다산업㈜', bz: '123-81-20098', ceo: '김대표', ad: '○○시 1' },
+  { _id: 'b2', k: 'biz', c: '라마바물산', bz: '123-81-20313', ceo: '이대표', ad: '○○시 2' },
   { _id: 'b3', k: 'biz', c: '라마바물산산업', bz: '999-99-99999', ceo: '박대표' },
   { _id: 'k1', k: 'card', c: '가나다산업㈜', n: '김담당', ti: '과장', m: '010-0000-0000' }
 ];
 
 test('사업자등록번호가 맞으면 그것으로 짝짓는다 — 표기가 달라도', () => {
   const m = matcher();
-  assert.equal(m({ name: '엉뚱한 이름', biz_no: '4128112595' }, IDX)._id, 'b1',
+  assert.equal(m({ name: '엉뚱한 이름', biz_no: '1238120098' }, IDX)._id, 'b1',
     '구분기호가 없어도 숫자가 같으면 같은 회사다');
-  assert.equal(m({ name: '', biz_no: '412-81-12595' }, IDX)._id, 'b1');
+  assert.equal(m({ name: '', biz_no: '123-81-20098' }, IDX)._id, 'b1');
 });
 
 test('번호가 없으면 이름이 «완전히» 같을 때만', () => {
@@ -78,8 +78,8 @@ test('짝이 확실하지 않으면 건너뛴다', () => {
   assert.equal(m({ name: '가' }, IDX), null, '너무 짧은 이름은 아무거나 걸린다');
   assert.equal(m({ name: '' }, IDX), null);
   /* 같은 번호가 둘이면 사람이 볼 일이다 */
-  const dup = IDX.concat([{ _id: 'b9', k: 'biz', c: '다른회사', bz: '412-81-12595' }]);
-  assert.equal(m({ name: '아무', biz_no: '412-81-12595' }, dup), null, '번호가 겹치면 골라선 안 된다');
+  const dup = IDX.concat([{ _id: 'b9', k: 'biz', c: '다른회사', bz: '123-81-20098' }]);
+  assert.equal(m({ name: '아무', biz_no: '123-81-20098' }, dup), null, '번호가 겹치면 골라선 안 된다');
 });
 
 test('명함은 짝짓기에 안 쓴다 — 회사 번호는 등록증에만 있다', () => {

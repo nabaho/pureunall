@@ -1205,10 +1205,10 @@ test('★ «끝난» 자문사에 이으면 담당자 칸이 아니라 자문종
 });
 
 test('★ 담당자가 «없는» 자문사에 이어도 막지 않는다 — 담당을 적는 순간 저절로 간다', () => {
-  const c = loadCo({ co: { 'zzz@nowhere,kr': '나래산업' } });
+  const c = loadCo({ co: { 'zzz@nowhere,kr': '새롬산업' } });
   assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '', '없는 담당자를 지어냈다');
   const EM = c.ErpMatch;
-  EM.byName[EM._norm('나래산업')] = { company:'나래산업', main:'김보람', subs:[], left:false };
+  EM.byName[EM._norm('새롬산업')] = { company:'새롬산업', main:'김보람', subs:[], left:false };
   c.mbWhoBust();
   assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '김보람', '담당을 적었는데 안 갔다');
 });
@@ -1405,8 +1405,8 @@ test('★ 맡지 «않은» 사람 칸에는 안 보인다 — 공동이라고 �
 });
 
 test('★ 주담당이 «없으면» 부담당만으로는 안 넣는다 — 덜 채워진 자료지 맡은 것이 아니다', () => {
-  const c = loadSeen({ co: { 'zzz@nowhere,kr': '나래산업' },
-                       subs: { '나래산업': ['최기운'] } });
+  const c = loadSeen({ co: { 'zzz@nowhere,kr': '새롬산업' },
+                       subs: { '새롬산업': ['최기운'] } });
   assert.equal(c.mbWhoOfRow(SROW('zzz@nowhere.kr')), '', '검사 밑그림이 틀렸다 — 주담당이 있다');
   assert.equal(c.mbRowFits(SROW('zzz@nowhere.kr'), '@최기운'), false,
     '★ 주담당 없이 부담당 칸에만 들어갔습니다');

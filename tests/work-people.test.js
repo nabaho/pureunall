@@ -111,10 +111,10 @@ ok('비슷한 회사를 따로 낸다 (계열사 담당자가 함께 맡는다)'
   r.akin.map(c => c.n).sort().join() === '김계열,박같은메일');
 ok('검색 전에는 그 밖의 사람을 늘어놓지 않는다', r.rest.length === 0);
 ok('이름이 서로를 품으면 같은 무리',
-  coAkin('별표수세미', '별표수세미산업') === true && coAkin('나래', '나래테크') === true
+  coAkin('별표수세미', '별표수세미산업') === true && coAkin('새롬', '새롬테크') === true
   && coAkin('별표수세미', '별표수세미') === false && coAkin('별표수세미', '전혀다른곳') === false);
 ok('두 글자 미만으로는 묶지 않는다 (아무 데나 걸린다)',
-  coAkin('가', '가나다라') === false && coAkin('', '나래') === false);
+  coAkin('가', '가나다라') === false && coAkin('', '새롬') === false);
 ok('메일 도메인이 같으면 같은 무리',
   mailDom('a@trista.co.kr') === 'trista.co.kr' && mailDom('b@TRISTA.CO.KR') === 'trista.co.kr');
 ok('공용 메일로는 묶지 않는다 (남남이 한 무리가 된다)',

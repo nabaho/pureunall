@@ -24,7 +24,7 @@ const COMPANIES = {
   v: [
     { id: 'c1', name: '화담원', email: 'hr@hwadam.kr',
       typeCode: '급여', status: 'active', managerMain: 'p-001', managerSubs: [] },
-    { id: 'c2', name: '팔천식품', email: 'acct@palchun.kr',
+    { id: 'c2', name: '다온식품', email: 'acct@daon.kr',
       typeCode: '급여', status: 'active', managerMain: 'p-002', managerSubs: [] }
   ]
 };
@@ -99,7 +99,7 @@ test('★ 업체를 몰라도 폴더로 사람이 정해지면 그 사람에게 
 
 test('폴더를 안 주면 예전과 똑같이 돈다', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
-  const r = MR.routeFor({ from: 'acct@palchun.kr', filename: 'a.xlsx', subject: '' }, idx, OWNERS);
+  const r = MR.routeFor({ from: 'acct@daon.kr', filename: 'a.xlsx', subject: '' }, idx, OWNERS);
   assert.equal(r.seat, 'U2');
   assert.equal(r.byBox, false);
 });

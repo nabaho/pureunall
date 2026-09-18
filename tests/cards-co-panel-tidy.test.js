@@ -57,7 +57,7 @@ function load(opt) {
   return ctx;
 }
 /* 손볼 것이 있는 회사 / 없는 회사 */
-const 회사 = (x) => Object.assign({ key:'1348605772', name:'다라컨트롤', cards:[], folder:'',
+const 회사 = (x) => Object.assign({ key:'1238620021', name:'다라컨트롤', cards:[], folder:'',
   erp:{ type:'자문' }, extra:{} }, x || {});
 const 문제있음 = () => 회사({ extra:{
   conflicts:{ address:{had:'가',got:'나'}, ceo:{had:'다',got:'라'} },

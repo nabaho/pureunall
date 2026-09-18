@@ -61,12 +61,12 @@ const CO = (o) => Object.assign({ id: '', name: '', bizNo: '', status: 'active',
 /* ══════════ ④ 열쇠 표는 «그 업체 하나»를 가리킨다 ══════════ */
 
 test('★★★ 다듬은 이름이 겹치는 업체 둘이 있어도 열쇠는 «각자»를 가리킨다', () => {
-  /* 이 저장소가 실제로 당한 사고다 — 「주식회사 행복한단홍갈비」와 「행복한 단홍갈비」는
+  /* 이 저장소가 실제로 당한 사고다 — 「주식회사 다라갈비」와 「다라 갈비」는
      다듬으면 이름이 같아진다. 이름 표(byName)는 하나만 담으므로, 열쇠를 그 표에서
      되찾으면 «진» 쪽이 남의 기록을 가리킨다. */
   const r = scanErp([
-    CO({ id: 'co-A', name: '주식회사 행복한단홍갈비', bizNo: '213-87-03415', typeCode: '자문' }),
-    CO({ id: 'co-B', name: '행복한 단홍갈비', bizNo: '726-33-00338', typeCode: '급여' })
+    CO({ id: 'co-A', name: '주식회사 다라갈비', bizNo: '123-87-20052', typeCode: '자문' }),
+    CO({ id: 'co-B', name: '다라 갈비', bizNo: '123-33-20082', typeCode: '급여' })
   ]);
   assert.ok(r.byId['co-A'], 'co-A 가 열쇠 표에 없습니다');
   assert.ok(r.byId['co-B'], 'co-B 가 열쇠 표에 없습니다');
@@ -124,10 +124,10 @@ test('★★★ 확정한 회사는 상호로 «다시 맞추지 않는다» —
 });
 
 test('★ 확정이 없으면 예전 그대로 — 번호 먼저, 이름은 임자 없는 것만', () => {
-  const cos = [CO({ id: 'co-1', name: '주식회사 행복한단홍갈비', bizNo: '213-87-03415', typeCode: '자문' })];
+  const cos = [CO({ id: 'co-1', name: '주식회사 다라갈비', bizNo: '123-87-20052', typeCode: '자문' })];
   const { out } = matched(cos, [
-    { key: 'k1', name: '주식회사 행복한단홍갈비', bizno: '213-87-03415' },
-    { key: 'k2', name: '행복한 단홍갈비', bizno: '726-33-00338' }
+    { key: 'k1', name: '주식회사 다라갈비', bizno: '123-87-20052' },
+    { key: 'k2', name: '다라 갈비', bizno: '123-33-20082' }
   ]);
   assert.equal(out.k1.type, '자문', '번호로 맞추는 길이 깨졌습니다');
   assert.equal(out.k2, undefined, '★ 임자 있는 기록을 이름으로 또 가져갔습니다');

@@ -66,14 +66,14 @@ function boot(db){
 /* 두 쪽 신청서: 담당자는 읽혔고 «상호는 못 읽었다» */
 const 담당자만 = { name:'한재수', dept:'경영지원', title:'팀장',
   tel:'041-000-2001', mobile:'010-1200-0018', email:'cust21@ganabsol.com',
-  bizno:'304-81-18380' };
+  bizno:'123-81-20064' };
 
 /* ── ①② 찾아서 채운다 ─────────────────────────────────────────── */
 
 test('★ 상호를 못 읽어도 사업자번호로 «찾아» 채운다 — 등록증에서', async () => {
   const { F } = boot({
-    'pucards/bykey/b3048118380': 'biz9',
-    'pucards/idx/biz9': { k:'biz', bz:'304-81-18380', c:'가나비솔루션' }
+    'pucards/bykey/b1238120064': 'biz9',
+    'pucards/idx/biz9': { k:'biz', bz:'123-81-20064', c:'가나비솔루션' }
   });
   const res = await F.sendToCards({ kind:'form', fields: 담당자만 });
   assert.equal(res.coFilled, '가나비솔루션',
@@ -81,7 +81,7 @@ test('★ 상호를 못 읽어도 사업자번호로 «찾아» 채운다 — �
 });
 
 test('★ 등록증이 없으면 «기업 상세»에 적힌 이름으로 물러난다', async () => {
-  const { F } = boot({ 'pucards/coInfo/3048118380/company': '가나비솔루션' });
+  const { F } = boot({ 'pucards/coInfo/1238120064/company': '가나비솔루션' });
   const res = await F.sendToCards({ kind:'form', fields: 담당자만 });
   assert.equal(res.coFilled, '가나비솔루션',
     '★ 등록증이 아직 없는 회사도 서식이 이름을 적어 두었을 수 있다');
@@ -99,8 +99,8 @@ test('둘 다 없으면 «지어내지 않는다» — 빈 것이 틀린 것보�
 test('★ 목록을 통째로 훑지 «않는다» — 두세 칸만 읽는다', async () => {
   /* 사진 한 장마다 색인 6천 줄을 내려받던 그 실수를 되풀이하지 않는다 */
   const { F, reads } = boot({
-    'pucards/bykey/b3048118380': 'biz9',
-    'pucards/idx/biz9': { k:'biz', bz:'304-81-18380', c:'가나비솔루션' }
+    'pucards/bykey/b1238120064': 'biz9',
+    'pucards/idx/biz9': { k:'biz', bz:'123-81-20064', c:'가나비솔루션' }
   });
   await F.sendToCards({ kind:'form', fields: 담당자만 });
   const 통째 = reads.filter(p => /\/idx$|\/items$|data\/companies/.test(p));
@@ -123,9 +123,9 @@ test('사업자번호가 없으면 «찾지도 않는다» — 헛돈이 나가�
 
 test('★ 번호가 «바뀐» 등록증의 옛 열쇠로 남의 회사를 붙이지 않는다', async () => {
   const { F } = boot({
-    'pucards/bykey/b3048118380': 'biz9',
+    'pucards/bykey/b1238120064': 'biz9',
     /* 그 등록증은 번호를 다른 것으로 고쳤다 — 옛 열쇠만 남아 있다 */
-    'pucards/idx/biz9': { k:'biz', bz:'134-86-05772', c:'엉뚱한회사' }
+    'pucards/idx/biz9': { k:'biz', bz:'123-86-20021', c:'엉뚱한회사' }
   });
   const res = await F.sendToCards({ kind:'form', fields: 담당자만 });
   assert.ok(!res.coFilled,
@@ -134,14 +134,14 @@ test('★ 번호가 «바뀐» 등록증의 옛 열쇠로 남의 회사를 붙�
 
 test('가리킨 것이 «명함»이면 회사 이름으로 안 쓴다', async () => {
   const { F } = boot({
-    'pucards/bykey/b3048118380': 'c9',
-    'pucards/idx/c9': { k:'card', bz:'304-81-18380', c:'엉뚱한회사' }
+    'pucards/bykey/b1238120064': 'c9',
+    'pucards/idx/c9': { k:'card', bz:'123-81-20064', c:'엉뚱한회사' }
   });
   assert.ok(!(await F.sendToCards({ kind:'form', fields: 담당자만 })).coFilled);
 });
 
 test('가리킨 등록증이 지워졌으면 조용히 넘어간다', async () => {
-  const { F } = boot({ 'pucards/bykey/b3048118380': 'biz9' });
+  const { F } = boot({ 'pucards/bykey/b1238120064': 'biz9' });
   const res = await F.sendToCards({ kind:'form', fields: 담당자만 });
   assert.equal(res.coMissing, true);
 });
@@ -150,8 +150,8 @@ test('가리킨 등록증이 지워졌으면 조용히 넘어간다', async () =
 
 test('★ 서류에 상호가 «적혀 있으면» 찾은 것으로 덮지 않는다', async () => {
   const { F, reads } = boot({
-    'pucards/bykey/b3048118380': 'biz9',
-    'pucards/idx/biz9': { k:'biz', bz:'304-81-18380', c:'옛이름' }
+    'pucards/bykey/b1238120064': 'biz9',
+    'pucards/idx/biz9': { k:'biz', bz:'123-81-20064', c:'옛이름' }
   });
   const res = await F.sendToCards({
     kind:'form', fields: Object.assign({}, 담당자만, { company:'가나비솔루션' }) });
@@ -210,8 +210,8 @@ test('★ 이미 있는 명함의 «빈 회사 칸»도 이때 채워진다', as
   /* ⚠ boot 가 «세운 자리»를 받아 본다. 넣어 준 객체를 그대로 들여다보면 boot 가
      만든 사본을 못 보고 늘 「안 채웠다」가 된다(2026-08-31 에 실제로 헛돌았다). */
   const { F, db } = boot({
-    'pucards/bykey/b3048118380': 'biz9',
-    'pucards/idx/biz9': { k:'biz', bz:'304-81-18380', c:'가나비솔루션' },
+    'pucards/bykey/b1238120064': 'biz9',
+    'pucards/idx/biz9': { k:'biz', bz:'123-81-20064', c:'가나비솔루션' },
     'pucards/bykey/c01012000018': 'card7',
     'pucards/idx/card7': { k:'card', m:'010-1200-0018', n:'한재수' },
     'pucards/items/card7': { id:'card7', kind:'card', name:'한재수', company:'' }

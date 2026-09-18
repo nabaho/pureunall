@@ -36,7 +36,7 @@ function load(existing){
   vm.runInContext(src.slice(i, j), ctx);
   return ctx;
 }
-const FORM = { bizno:'134-86-05772', company:'가나컨트롤(주)', ceo:'나성환',
+const FORM = { bizno:'123-86-20021', company:'가나컨트롤(주)', ceo:'고길동',
   corpno:'110111-1234567', docName:'기술·경영 혁신 지원신청서', applyNo:'2026-5',
   applyItems:'가드레일, 크래쉬쿠션, 태양광', applyField:'인사·조직', applyDate:'2026-03-15',
   dueDays:'60일', homepage:'www.ganactrl.co.kr/', email:'cust20@ganactrl.co.kr' };
@@ -46,7 +46,7 @@ test('사업자번호를 열쇠로 회사 자리에 넣는다', async () => {
   const c = load({});
   const r = await c.sendToCoInfo({ fields: FORM });
   assert.equal(r.ok, true);
-  assert.equal(c._writes[0].path, 'pucards/coInfo/1348605772');
+  assert.equal(c._writes[0].path, 'pucards/coInfo/1238620021');
 });
 
 test('신청서에서 읽은 칸이 다 들어간다', async () => {

@@ -95,10 +95,10 @@ test('★ 회사 열쇠는 기업 상세가 쓰는 «그 열쇠»다 — 새 잣
   const c = load({
     coList: () => [
       { key: 'n딴회사', cards: [{ id: 'x1' }] },
-      { key: '3128149225', cards: [{ id: 'c1' }, { id: 'c2' }] }
+      { key: '1238120012', cards: [{ id: 'c1' }, { id: 'c2' }] }
     ]
   });
-  assert.equal(c.coKeyOfCard('c2'), '3128149225');
+  assert.equal(c.coKeyOfCard('c2'), '1238120012');
   assert.equal(c.coKeyOfCard('x1'), 'n딴회사');
 });
 
@@ -112,12 +112,12 @@ test('★ 회사를 못 찾으면 «빈 열쇠» — 남의 회사에 붙이느�
 /* ── 남기는 것 ── */
 
 test('★ 회사 밑에 한 줄이 남는다 — 자리와 값', () => {
-  const c = load({ coList: () => [{ key: '3128149225', cards: [{ id: 'c1' }] }] });
+  const c = load({ coList: () => [{ key: '1238120012', cards: [{ id: 'c1' }] }] });
   c.state.items.c1 = { id: 'c1', name: '김대리' };
   c.logSentToCompany('c1', { at: 1756800000000, by: 'na@pureun.kr', to: 'kim@x.kr',
                              names: ['제안서'], set: '신규계약 묶음' });
   assert.equal(c._쓴것.length, 1);
-  assert.equal(c._쓴것[0].자리, 'pucards/sentDocs/3128149225');
+  assert.equal(c._쓴것[0].자리, 'pucards/sentDocs/1238120012');
   const v = c._쓴것[0].값;
   assert.equal(v.at, 1756800000000);
   assert.equal(v.by, 'na@pureun.kr');

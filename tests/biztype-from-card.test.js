@@ -47,7 +47,7 @@ function makeCtx(items){
 const ITEMS = {
   'b1': { kind:'biz', bizType:'제조업', bizItem:'석재', corpno:'110111-1234567', openDate:'2010-03-02',
           photo:'data:image/jpeg;base64,AAAA' },
-  'b2': { kind:'biz', bizno:'313-81-17783' },        // 원본에도 업태가 없다
+  'b2': { kind:'biz', bizno:'123-81-20365' },        // 원본에도 업태가 없다
   'b3': { kind:'biz', bizType:'  도매업  ' }         // 앞뒤 빈칸
 };
 

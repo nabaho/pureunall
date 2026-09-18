@@ -45,7 +45,7 @@ test('서식으로 잡혔지만 제목이 고유번호증이면 골라낸다', (
 test('제목이 비었어도 칸 이름으로 찾는다', () => {
   const { uidMisread } = load();
   assert.strictEqual(uidMisread(mk('form', {
-    pairs: [{ k: '단체명', v: 'ㅇㅇ' }, { k: '고유번호', v: '312-82-15421' }],
+    pairs: [{ k: '단체명', v: 'ㅇㅇ' }, { k: '고유번호', v: '123-82-20509' }],
   })), true);
 });
 

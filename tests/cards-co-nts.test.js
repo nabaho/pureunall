@@ -43,7 +43,7 @@ function load(over) {
   ].join('\n'), ctx);
   return ctx;
 }
-const CO = (o) => Object.assign({ key:'k1', name:'가나', bizno:'1348605772', extra:{} }, o || {});
+const CO = (o) => Object.assign({ key:'k1', name:'가나', bizno:'1238620021', extra:{} }, o || {});
 
 /* ── ⑤ 국세청이 준 말을 그대로 ────────────────────────────────────────── */
 
@@ -153,7 +153,7 @@ test('★★ 사업자번호가 없으면 묻지도 않는다', async () => {
 });
 
 test('★★★ ⑥ 상태와 확인일을 «한 번에» 쓴다 — 따로 쓰면 날짜 없는 상태가 남는다', async () => {
-  const c = await 물어보기({ res: 답({ b_no:'1348605772', b_stt:'폐업자', tax_type:'부가가치세 일반과세자' }) });
+  const c = await 물어보기({ res: 답({ b_no:'1238620021', b_stt:'폐업자', tax_type:'부가가치세 일반과세자' }) });
   assert.deepEqual(Object.keys(c.saved.patch).sort(), ['ntsAt','ntsState']);
   assert.equal(c.saved.patch.ntsState, '폐업자');
   assert.equal(c.saved.patch.ntsAt, '2026-09-13', '★★★ 「오늘」을 받아 적는다');
@@ -162,7 +162,7 @@ test('★★★ ⑥ 상태와 확인일을 «한 번에» 쓴다 — 따로 쓰�
 
 test('★★ 물어볼 때 «번호만» 보낸다 — 필요 없는 것을 밖으로 내보내지 않는다', async () => {
   const c = await 물어보기({ res: 답({ b_stt:'계속사업자' }) });
-  assert.equal(c.fetched.body, JSON.stringify({ b_no:['1348605772'] }),
+  assert.equal(c.fetched.body, JSON.stringify({ b_no:['1238620021'] }),
     '★★ 상호·대표자까지 실어 보낼 까닭이 없다');
   assert.match(c.fetched.url, /api\.odcloud\.kr/);
   assert.match(c.fetched.url, /serviceKey=KEY123/);

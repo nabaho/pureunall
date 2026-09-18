@@ -52,14 +52,14 @@ test('① 계약서 사진의 판독값이 업체 칸으로 옮겨진다', () =>
   const c = realm();
   const r = c.erpPhotoToCoFields({
     company: '어느 업체', fee: '165,000', startDate: '2026-07-20', endDate: '2027-07-19',
-    vat: '부가세 포함', ceo: '홍길동', bizno: '312-81-43008'
+    vat: '부가세 포함', ceo: '홍길동', bizno: '123-81-20216'
   });
   assert.strictEqual(r.fields.monthlyAdvisoryFee, 165000);
   assert.strictEqual(r.fields.contractStartDate, '2026-07-20');
   assert.strictEqual(r.fields.contractEndDate, '2027-07-19');
   assert.strictEqual(r.fields.vatType, 'inclusive', '업체관리의 「포함」 값은 inclusive 다');
   assert.strictEqual(r.fields.ceo, '홍길동');
-  assert.strictEqual(r.fields.bizNo, '312-81-43008');
+  assert.strictEqual(r.fields.bizNo, '123-81-20216');
 });
 
 test('★ ① 금액의 «단위»는 짐작하지 않는다 — 만 배 틀리느니 안 채운다', () => {

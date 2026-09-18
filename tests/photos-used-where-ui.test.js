@@ -50,7 +50,7 @@ const plain = () => ({ takenAt: Date.now() });
 
 test('★ 어디에 썼는지를 꺼내 온다', () => {
   const c = load();
-  assert.equal(c.usedWhere(used('푸른이알피 계약 — 가야엔지니어링')), '푸른이알피 계약 — 가야엔지니어링');
+  assert.equal(c.usedWhere(used('푸른이알피 계약 — 카타엔지니어링')), '푸른이알피 계약 — 카타엔지니어링');
   assert.equal(c.usedWhere(plain()), '', '안 쓴 사진에 무언가를 적으면 안 됩니다');
   assert.equal(c.usedWhere({ used: { where: '어딘가' } }), '',
     '언제 썼는지가 없으면 증빙으로 안 봅니다 — 보유기간을 그것으로 셉니다');
@@ -78,10 +78,10 @@ test('★ 보관기한을 사람 말로 적는다 — 「5년」만으로는 안
 /* ── ③ 지우기 물음 ── */
 
 test('★ 증빙으로 쓴 사진을 지우려 하면 어디에 썼는지 보여 준다', () => {
-  const c = load({ gridItems: [{ id: 'a', meta: used('푸른이알피 계약 — 가야엔지니어링') }] });
+  const c = load({ gridItems: [{ id: 'a', meta: used('푸른이알피 계약 — 카타엔지니어링') }] });
   const t = c.usedWarnText(['a']);
   assert.match(t, /증빙으로 쓰였습니다/, '★ 아무 말 없이 지우면 모르고 지웁니다');
-  assert.match(t, /가야엔지니어링/, '어디에 썼는지를 안 적었습니다');
+  assert.match(t, /카타엔지니어링/, '어디에 썼는지를 안 적었습니다');
   assert.match(t, /보관기한/, '언제까지 갖고 있어야 하는지를 안 적었습니다');
 });
 

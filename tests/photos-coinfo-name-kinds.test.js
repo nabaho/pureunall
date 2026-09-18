@@ -74,7 +74,7 @@ function gate() {
 }
 function 보내는갈래(c) {
   return ALL_KINDS.filter(k =>
-    c.canSendCoInfo({ kind: k, fields: { company: '아이행복어린이집' } })).sort();
+    c.canSendCoInfo({ kind: k, fields: { company: '나라어린이집' } })).sort();
 }
 
 /* ── ① 두 목록이 같다 ── */
@@ -88,21 +88,21 @@ test('★★ 「상호를 묻는 갈래」와 「상호로 보낼 수 있는 갈
 
 test('★★ 서식(form)이 그 안에 있다 — 2026-09-07 에 빠져 있던 그것이다', () => {
   assert.ok(묻는갈래().indexOf('form') >= 0, '★ 서식에 상호를 묻지 않는다');
-  assert.equal(gate().canSendCoInfo({ kind: 'form', fields: { company: '아이행복' } }), true,
+  assert.equal(gate().canSendCoInfo({ kind: 'form', fields: { company: '나라' } }), true,
     '★ 서식에 상호를 적어도 안 받는다');
 });
 
 test('★★ 상호를 «묻지 않는» 갈래는 상호로 못 보낸다 — 급여명세서로 회사가 생기면 안 된다', () => {
   const c = gate();
   ['payslip', 'timesheet', 'chat', 'idcard', 'card'].forEach(k =>
-    assert.equal(c.canSendCoInfo({ kind: k, fields: { company: '아이행복' } }), false,
+    assert.equal(c.canSendCoInfo({ kind: k, fields: { company: '나라' } }), false,
       '★ ' + k + ' 이 상호만으로 기업 상세에 간다'));
 });
 
 test('★ 사업자번호가 열 자리면 갈래를 안 가린다 — 번호가 곧 회사다', () => {
   const c = gate();
   ['form', 'cms', 'bankbook', 'payslip', 'other'].forEach(k =>
-    assert.equal(c.canSendCoInfo({ kind: k, fields: { bizno: '312-81-49225' } }), true,
+    assert.equal(c.canSendCoInfo({ kind: k, fields: { bizno: '123-81-20012' } }), true,
       '★ ' + k + ' 이 번호가 있는데도 못 간다'));
 });
 
@@ -128,7 +128,7 @@ test('★★ 상호만 있는 것은 «스스로» 안 간다 — 이름 맞추�
   const c = gate();
   ['form', 'cms', 'bankbook'].forEach(k => {
     /* bizNoOk 를 참으로 «억지로» 둬도 안 가야 한다 — 번호가 없으니까 */
-    assert.equal(c.autoSendCoInfo({ kind: k, bizNoOk: true, fields: { company: '아이행복' } }), false,
+    assert.equal(c.autoSendCoInfo({ kind: k, bizNoOk: true, fields: { company: '나라' } }), false,
       '★ ' + k + ' 이 상호만으로 스스로 갔다');
   });
 });
@@ -142,8 +142,8 @@ test('★★ 번호를 «직접» 본다 — bizNoOk 하나에 기대면 판독�
 
 test('★ 검산한 번호는 스스로 간다 — 그 길을 막아 버리면 안 된다', () => {
   const c = gate();
-  assert.equal(c.autoSendCoInfo({ kind: 'form', bizNoOk: true, fields: { bizno: '312-81-49225' } }), true);
-  assert.equal(c.autoSendCoInfo({ kind: 'form', bizNoOk: false, fields: { bizno: '312-81-49225' } }), false,
+  assert.equal(c.autoSendCoInfo({ kind: 'form', bizNoOk: true, fields: { bizno: '123-81-20012' } }), true);
+  assert.equal(c.autoSendCoInfo({ kind: 'form', bizNoOk: false, fields: { bizno: '123-81-20012' } }), false,
     '★ 검산에 걸린 번호가 스스로 갔다 — 지어낸 번호도 열 자리다');
 });
 

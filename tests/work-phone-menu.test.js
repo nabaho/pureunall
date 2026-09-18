@@ -50,7 +50,7 @@ test('메뉴를 고르면 서랍이 닫힌다', () => {
 test('팀 전체 화면은 폰에서 줄이 세로로 쌓이지 않는다', () => {
   const at = work.indexOf('@media (max-width:520px)');
   const b = work.slice(at, work.indexOf('@media', at + 10) > 0 ? work.length : work.length);
-  /* ★ 열이 예닐곱인 표를 412px 에 우겨 넣으면 「주식/회사/나래/산업」처럼 칸마다
+  /* ★ 열이 예닐곱인 표를 412px 에 우겨 넣으면 「주식/회사/새롬/산업」처럼 칸마다
      글자가 세로로 쌓여 한 줄이 79px 이 된다 — 표에 제 너비를 줘야 한다. */
   assert.match(b, /\.panel\.tbl table\{min-width:\d+px\}/,
     '★ 표에 제 너비가 없으면 폰에서 칸마다 글자가 세로로 쌓입니다.');

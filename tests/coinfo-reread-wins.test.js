@@ -6,10 +6,10 @@
    ■ 무엇이 문제였나 — 살아 있는 자료에서 잰 것(2026-09-15)
    대표: 「ocr 인식이 잘못되어 다시 인식시켰는데 기업정보함에 기존 정보로 잘못
          올라가거나 변경되는 경우가 종종 있다」
-   삼성검수주식회사(316-81-03842)가 기업 상세에 이렇게 들어 있었다 —
-     상호  「삼성검수주식회사표자」  ← 「대표자」의 「표자」가 붙었다
+   차카검수주식회사(123-81-20142)가 기업 상세에 이렇게 들어 있었다 —
+     상호  「차카검수주식회사표자」  ← 「대표자」의 「표자」가 붙었다
      대표자「변경」                  ← 「발급사유: 대표자 변경」의 「변경」이 앉았다
-   대표님이 하루 전 «맞게» 다시 읽히셨는데(「삼성검수주식회사」·「안용운」),
+   대표님이 하루 전 «맞게» 다시 읽히셨는데(「차카검수주식회사」·「서동일」),
    그 값이 conflicts 에 갇힌 채 틀린 값이 화면에 남아 있었다.
 
    ■ ★★ 못 박는 것 셋 — 셋은 «따로 떼면 위험하다»
@@ -63,15 +63,15 @@ const 사진 = { id: '-P1U5Vgy8qps1uB0y7SU', year: '2026', owner: 'U1' };
 const 그사진열쇠 = '2026_-P1U5Vgy8qps1uB0y7SU';
 const 다른사진 = { id: '-P06pi9G7tRUjczDqmzl', year: '2026', owner: 'U1' };
 
-/* 삼성검수 — 처음 판독이 두 칸을 잘못 읽은 «그 상태» */
+/* 차카검수 — 처음 판독이 두 칸을 잘못 읽은 «그 상태» */
 function 잘못읽힌회사(src) {
   return {
-    company: '삼성검수주식회사표자', ceo: '변경', bizno: '316-81-03842',
+    company: '차카검수주식회사표자', ceo: '변경', bizno: '123-81-20142',
     src: src || { company: 그사진열쇠, ceo: 그사진열쇠 }
   };
 }
 const 바르게읽음 = {
-  bizno: '316-81-03842', company: '삼성검수주식회사', ceo: '안용운', docName: '사업자등록증'
+  bizno: '123-81-20142', company: '차카검수주식회사', ceo: '서동일', docName: '사업자등록증'
 };
 
 function 보내기(자리값, fields, photo) {
@@ -90,9 +90,9 @@ function 합친쓰기(쓴것) {
 test('★★★ 같은 사진을 다시 읽으면 틀린 값을 «고친다» — 이것이 대표님이 다시 읽히신 까닭이다', async () => {
   const { r, 쓴것 } = await 보내기(잘못읽힌회사(), 바르게읽음);
   const u = 합친쓰기(쓴것);
-  assert.equal(u.company, '삼성검수주식회사',
+  assert.equal(u.company, '차카검수주식회사',
     '★★★ 다시 읽어도 안 고치면, 대표님은 판독을 눌러도 화면이 그대로인 것을 보십니다');
-  assert.equal(u.ceo, '안용운');
+  assert.equal(u.ceo, '서동일');
   assert.equal(Array.from(r.redone || []).sort().join(','), 'ceo,company');
 });
 
@@ -125,7 +125,7 @@ test('★★★ 사람 도장이 찍힌 칸은 같은 사진을 다시 읽어도
   assert.equal(u.company, undefined,
     '★★★ 대표님이 손으로 고쳐 두신 값이 판독 한 번에 지워집니다 — 2026-07 사고의 재판입니다');
   assert.ok(u['conflicts/company'], '★★ 안 덮더라도 «다른 값이 왔다»는 사실은 남겨야 합니다');
-  assert.equal(u.ceo, '안용운', '도장이 없는 칸은 그대로 고쳐져야 합니다');
+  assert.equal(u.ceo, '서동일', '도장이 없는 칸은 그대로 고쳐져야 합니다');
 });
 
 test('★★★ 기업정보함이 손으로 고칠 때 «도장을 찍는다» — 안 찍으면 위 울타리가 헛돈다', () => {
@@ -158,8 +158,8 @@ test('★★★ 다른 사진에서 온 값은 안 덮고 ⚠ 로 남긴다 — 
   assert.equal(u.company, undefined,
     '★★★ 다른 서류가 이기게 하면, 자세히 적힌 업태가 신청서 한 줄로 지워집니다');
   assert.ok(u['conflicts/company'], '★★ 어긋났다는 사실은 반드시 남겨야 합니다');
-  assert.equal(u['conflicts/company'].got, '삼성검수주식회사');
-  assert.equal(u['conflicts/company'].had, '삼성검수주식회사표자');
+  assert.equal(u['conflicts/company'].got, '차카검수주식회사');
+  assert.equal(u['conflicts/company'].had, '차카검수주식회사표자');
   assert.equal(r.conflicts, 2);
 });
 
@@ -178,14 +178,14 @@ test('★★ 사진이 없는 보내기는 아무것도 덮지 않는다 — 열
 });
 
 test('★ 빈 칸 채우기는 그대로다 — 이 일의 본래 값이다', async () => {
-  const { 쓴것 } = await 보내기({ bizno: '316-81-03842' }, 바르게읽음);
+  const { 쓴것 } = await 보내기({ bizno: '123-81-20142' }, 바르게읽음);
   const u = 합친쓰기(쓴것);
-  assert.equal(u.company, '삼성검수주식회사');
+  assert.equal(u.company, '차카검수주식회사');
   assert.equal(u['src/company'], 그사진열쇠);
 });
 
 test('★ 값이 «같으면» 한 글자도 안 쓴다 — 요금이 는다', async () => {
-  const 자리 = { bizno: '316-81-03842', company: '삼성검수주식회사', ceo: '안용운',
+  const 자리 = { bizno: '123-81-20142', company: '차카검수주식회사', ceo: '서동일',
                  src: { company: 그사진열쇠, ceo: 그사진열쇠 } };
   const { 쓴것 } = await 보내기(자리, 바르게읽음);
   const u = 합친쓰기(쓴것);

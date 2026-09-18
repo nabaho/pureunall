@@ -65,16 +65,16 @@ const ERP = (o) => Object.assign({ id: 'co-1', company: '가나', bizNo: '' }, o
 
 test('★★★ 확정한 회사는 이알피 번호를 «가져온다»', () => {
   const c = load();
-  const o = CO({ erp: ERP({ bizNo: '312-81-49225' }), extra: { erpCoId: 'co-1' } });
+  const o = CO({ erp: ERP({ bizNo: '123-81-20012' }), extra: { erpCoId: 'co-1' } });
   const hit = c.coBiznoFromErp(o);
   assert.ok(hit, '가져올 번호를 못 찾았습니다');
-  assert.equal(hit.no, '3128149225');
+  assert.equal(hit.no, '1238120012');
   assert.equal(hit.pinned, true, '★★★ 확정한 회사가 «확인 대기»로 떨어집니다');
 });
 
 test('★★★ 상호로 맞춘 회사는 «사람이 볼 것»으로 남는다 — 자동으로 안 채운다', () => {
   const c = load();
-  const o = CO({ erp: ERP({ bizNo: '312-81-49225' }), extra: {} });
+  const o = CO({ erp: ERP({ bizNo: '123-81-20012' }), extra: {} });
   const hit = c.coBiznoFromErp(o);
   assert.ok(hit, '후보에서 빠졌습니다 — 사람이 볼 기회조차 없어집니다');
   assert.equal(hit.pinned, false,
@@ -84,13 +84,13 @@ test('★★★ 상호로 맞춘 회사는 «사람이 볼 것»으로 남는다
 test('★★ 딴 업체로 확정해 두었으면 «자동이 아니다»', () => {
   /* 확정은 co-9 인데 지금 붙은 것은 co-1 — 그 번호를 자동으로 넣으면 안 된다 */
   const c = load();
-  const o = CO({ erp: ERP({ id: 'co-1', bizNo: '312-81-49225' }), extra: { erpCoId: 'co-9' } });
+  const o = CO({ erp: ERP({ id: 'co-1', bizNo: '123-81-20012' }), extra: { erpCoId: 'co-9' } });
   assert.equal(c.coBiznoFromErp(o).pinned, false);
 });
 
 test('★★ 이알피 기록에 열쇠(id)가 없으면 자동이 아니다 — 무엇으로 확정했는지 모른다', () => {
   const c = load();
-  const o = CO({ erp: ERP({ id: '', bizNo: '312-81-49225' }), extra: { erpCoId: '' } });
+  const o = CO({ erp: ERP({ id: '', bizNo: '123-81-20012' }), extra: { erpCoId: '' } });
   assert.equal(c.coBiznoFromErp(o).pinned, false);
 });
 
@@ -98,7 +98,7 @@ test('★★ 이알피 기록에 열쇠(id)가 없으면 자동이 아니다 —
 
 test('★★ 이미 번호가 있으면 «안 건드린다» — 등록증·명함이 먼저다', () => {
   const c = load();
-  const o = CO({ bizno: '111-11-11111', erp: ERP({ bizNo: '312-81-49225' }), extra: { erpCoId: 'co-1' } });
+  const o = CO({ bizno: '111-11-11111', erp: ERP({ bizNo: '123-81-20012' }), extra: { erpCoId: 'co-1' } });
   assert.equal(c.coBiznoFromErp(o), null,
     '★★ 등록증에서 읽은 번호를 이알피 번호가 덮습니다');
 });

@@ -69,19 +69,19 @@ const code = _pure + '\n' + histDeps(source) + '\n' + source.slice(nameAt, rende
 
 test('기록이 없으면 칸을 비운다', () => {
   const c = loadHistBlock();
-  c.renderCoErpHistory({ bizno:'312-81-49225', name:'가나' }, null);
+  c.renderCoErpHistory({ bizno:'123-81-20012', name:'가나' }, null);
   assert.equal(c._calls.boxHtml, '');
-  c.renderCoErpHistory({ bizno:'312-81-49225', name:'가나' }, { byBiz:{}, byName:{} });
+  c.renderCoErpHistory({ bizno:'123-81-20012', name:'가나' }, { byBiz:{}, byName:{} });
   assert.equal(c._calls.boxHtml, '');
 });
 
 test('사업자번호로 매칭되는 기록만 줄로 나열한다', () => {
   const c = loadHistBlock();
-  const data = { byBiz: { '3128149225': [
+  const data = { byBiz: { '1238120012': [
     { _kind:'case', typeName:'부당해고 구제신청', status:'pending', brief:'해고 구제 신청', managerMain:'p001' },
     { _kind:'consulting', typeCode:'cons-ilteo', status:'active', contractFee:1000000, balanceFee:500000, startDate:'2025-03-01', endDate:'2025-06-30', managerMain:'p002' }
   ] } };
-  c.renderCoErpHistory({ bizno:'312-81-49225', name:'가나' }, data);
+  c.renderCoErpHistory({ bizno:'123-81-20012', name:'가나' }, data);
   assert.match(c._calls.boxHtml, /부당해고 구제신청/);
   assert.match(c._calls.boxHtml, /일터상생혁신/, '컨설팅은 typeCode 를 사람이 읽는 이름으로 바꿔 보여줘야 한다');
   assert.match(c._calls.boxHtml, /1,500,000/, '계약금과 잔금을 합쳐 보여줘야 한다');
@@ -91,7 +91,7 @@ test('다른 회사(다른 사업자번호·다른 이름)의 기록은 안 섞�
   const c = loadHistBlock();
   const data = { byBiz: { '9999999999': [{ _kind:'case', typeName:'남의 회사 사건' }] },
                  byName: { '남의회사': [{ _kind:'case', typeName:'남의 회사 사건2' }] } };
-  c.renderCoErpHistory({ bizno:'312-81-49225', name:'가나기업' }, data);
+  c.renderCoErpHistory({ bizno:'123-81-20012', name:'가나기업' }, data);
   assert.equal(c._calls.boxHtml, '');
 });
 

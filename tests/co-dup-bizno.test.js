@@ -6,14 +6,14 @@
    중복 정리는 **이름으로만** 묶고 있었다. 그래서 사무대행 명단을 가져올 때
    같은 사업장이 다른 이름으로 한 줄 더 생긴 것을 **한 묶음도 못 잡았다** —
    실제 자료에서 25묶음이었다.
-     「해찬솔에프쓰리」 ↔ 「해찬솔F3」
+     「다온솔에프쓰리」 ↔ 「다온솔F3」
      「청아미즈산부인과」 ↔ 「청아미즈산부인과의원」
      「주식회사씨지아이」 ↔ 「주식회사씨지아이(CGI)」
    그중 둘은 **살아 있는 쪽에 담당이 없고 담당 붙은 쪽이 닫혀 있어**,
    그 사업장 자료가 어느 쪽으로도 못 가고 있었다.
 
    ⚠ 종사업장번호(사업자번호 뒤 한 자리)가 다르면 **다른 사업장**이다.
-   합치면 두 사업장 자료가 한 곳에 섞인다 — 실제로 더존앤테크·성지정보통신이
+   합치면 두 사업장 자료가 한 곳에 섞인다 — 실제로 바사앤테크·자차정보통신이
    그런 사이였다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -53,8 +53,8 @@ function run(cos, skip) {
 }
 
 const HAECHAN = [
-  { id: 'a', name: '해찬솔에프쓰리', bizNo: '172-11-01009', status: 'closed', managerMain: 'A-003', createdAt: '2020-01-01' },
-  { id: 'b', name: '해찬솔F3', bizNo: '172-11-01009-0', status: 'active', managerMain: '', createdAt: '2026-06-01' }
+  { id: 'a', name: '다온솔에프쓰리', bizNo: '123-11-20208', status: 'closed', managerMain: 'A-003', createdAt: '2020-01-01' },
+  { id: 'b', name: '다온솔F3', bizNo: '123-11-20208-0', status: 'active', managerMain: '', createdAt: '2026-06-01' }
 ];
 
 test('★ 이름이 달라도 사업자번호가 같으면 잡는다 — 여태 한 묶음도 못 잡았다', () => {
@@ -70,8 +70,8 @@ test('★ 꼬리가 없는 것과 -0 은 같은 본사업장이다', () => {
 
 test('★ 종사업장번호가 다르면 안 묶는다 — 합치면 두 사업장 자료가 섞인다', () => {
   const out = run([
-    { id: 'a', name: '더존앤테크', bizNo: '312-81-83145', status: 'active', managerMain: 'P-007' },
-    { id: 'b', name: '더존앤테크(일괄)', bizNo: '312-81-83145-6', status: 'suboffice', managerMain: '' }
+    { id: 'a', name: '바사앤테크', bizNo: '123-81-20268', status: 'active', managerMain: 'P-007' },
+    { id: 'b', name: '바사앤테크(일괄)', bizNo: '123-81-20268-6', status: 'suboffice', managerMain: '' }
   ]);
   assert.equal(out.length, 0, '본사업장과 다른 사업장을 합치려 합니다');
 });
@@ -83,9 +83,9 @@ test('본사업장 둘 + 다른 사업장 하나면, 본사업장 둘만 묶는�
      아니므로, 종류를 맞추고 원래 보려던 것만 남긴다.
      사무대행이 섞인 경우는 tests/co-dup-suboffice-apart.test.js 가 본다. */
   const out = run([
-    { id: 'a', name: '성지정보통신', bizNo: '312-81-95374', status: 'active', managerMain: 'A-003' },
-    { id: 'b', name: '성지정보통신(본사)', bizNo: '312-81-95374-0', status: 'active', managerMain: '' },
-    { id: 'c', name: '성지정보통신(현장)', bizNo: '312-81-95374-6', status: 'active', managerMain: '' }
+    { id: 'a', name: '자차정보통신', bizNo: '123-81-20079', status: 'active', managerMain: 'A-003' },
+    { id: 'b', name: '자차정보통신(본사)', bizNo: '123-81-20079-0', status: 'active', managerMain: '' },
+    { id: 'c', name: '자차정보통신(현장)', bizNo: '123-81-20079-6', status: 'active', managerMain: '' }
   ]);
   assert.equal(out.length, 1);
   assert.equal(out[0].list.map(c => c.id).sort().join(','), 'a,b');
@@ -95,7 +95,7 @@ test('본사업장 둘 + 다른 사업장 하나면, 본사업장 둘만 묶는�
 
 test('★ 살아 있는 쪽을 남긴다 — 닫힌 업체로 합치면 사업장이 사라진다', () => {
   const out = run(HAECHAN);
-  assert.equal(out[0].keepId, 'b', '닫힌 「해찬솔에프쓰리」로 합치려 합니다');
+  assert.equal(out[0].keepId, 'b', '닫힌 「다온솔에프쓰리」로 합치려 합니다');
 });
 
 test('★ 둘 다 살아 있으면 담당이 있는 쪽을 남긴다', () => {

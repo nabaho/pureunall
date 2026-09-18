@@ -2,7 +2,7 @@
 /* 대기 칸 줄에 이미 적혀 있는 이름표를 화면이 쓴다 — 실행: node --test tests/*.test.js
 
    2026-08-21에 찾은 구멍: `pendTagOf` 는 사업장·귀속월·종류를 **늘 파일 이름에서
-   다시 짐작**했다. 그래서 서버가 「이 자료는 텃골영농조합법인 2026-08 근태」라고
+   다시 짐작**했다. 그래서 서버가 「이 자료는 가온영농조합법인 2026-08 근태」라고
    적어 보내도 화면은 그것을 버리고 파일 이름만 봤다 — IMG_2841.jpg 면 세 칸이
    다 빈칸이 됐다.
    메일을 담당자 칸으로 저절로 보내는 일(대표 승낙 2026-08-21)의 절반이 여기다.
@@ -32,8 +32,8 @@ function load(appState) {
     'const S = window.PuPaydataStore; S.init({uid:"U1"});',
     'const App = ' + JSON.stringify(Object.assign({
       companies: [
-        { id: 'co_1', name: '텃골영농조합법인(용인)' },
-        { id: 'co_2', name: '팔천식품' }
+        { id: 'co_1', name: '가온영농조합법인(가나시)' },
+        { id: 'co_2', name: '다온식품' }
       ],
       pendTag: {}
     }, appState)) + ';',
@@ -46,8 +46,8 @@ function load(appState) {
 /* 서버가 갈라 보낸 줄 — 이름표가 이미 채워져 있다 */
 const ROUTED = {
   filename: 'IMG_2841.jpg', from: 'mail', routed: true,
-  companyId: 'co_2', companyName: '팔천식품', month: '2026-08', kind: 'attend',
-  note: '메일 palchun@naver.com · 8월 자료'
+  companyId: 'co_2', companyName: '다온식품', month: '2026-08', kind: 'attend',
+  note: '메일 daon@naver.com · 8월 자료'
 };
 
 test('★ 줄에 적힌 사업장을 쓴다 — 파일 이름으로 다시 짐작하지 않는다', () => {
@@ -68,7 +68,7 @@ test('★ 사람이 고친 것이 줄에 적힌 것을 이긴다', () => {
 test('★ 줄에 안 적힌 칸은 파일 이름으로 짐작한다', () => {
   const W = load();
   // 서버가 사업장만 알아냈을 때 — 월·종류는 파일 이름에서 캔다
-  const half = { filename: '2026년 8월 근태표.xlsx', companyId: 'co_2', companyName: '팔천식품',
+  const half = { filename: '2026년 8월 근태표.xlsx', companyId: 'co_2', companyName: '다온식품',
     month: '', kind: '', from: 'mail' };
   const g = W.pendTagOf('p1', half);
   assert.equal(g.companyId, 'co_2');
@@ -86,7 +86,7 @@ test('사람이 일부러 비운 칸은 짐작으로 되돌아가지 않는다',
 
 test('예전처럼 이름표 없이 올린 줄은 그대로 짐작한다', () => {
   const W = load();
-  const g = W.pendTagOf('p1', { filename: '팔천식품_2026-08_근태.jpg', from: 'upload' });
+  const g = W.pendTagOf('p1', { filename: '다온식품_2026-08_근태.jpg', from: 'upload' });
   assert.equal(g.companyId, 'co_2');
   assert.equal(g.month, '2026-08');
   assert.equal(g.kind, 'attend');

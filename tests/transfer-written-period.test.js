@@ -41,7 +41,7 @@ function fields(ct) {
   return vm.runInContext('erpContractToCoFields(' + JSON.stringify(ct) + ')', ctx);
 }
 
-test('① 적어 둔 계약기간이 그대로 들어간다 — 나래(계약-2026-121)가 겪은 것', function () {
+test('① 적어 둔 계약기간이 그대로 들어간다 — 새롬(계약-2026-121)가 겪은 것', function () {
   const f = fields({ contractNo: '계약-2026-121', signDate: '',
     startDate: '2026-09-01', endDate: '2027-08-31',
     typeCodes: { company: '자문' }, amounts: { company: 300000 } });

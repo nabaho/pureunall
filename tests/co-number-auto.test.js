@@ -57,7 +57,7 @@ function realm(opts) {
   return ctx;
 }
 
-const NO_NUM = { id: 'co-new', name: '주식회사 나래산업', typeCode: '자문', status: 'active' };
+const NO_NUM = { id: 'co-new', name: '주식회사 새롬산업', typeCode: '자문', status: 'active' };
 const HAS_NUM = { id: 'co-old', name: '이미 있는 곳', typeCode: '급여', status: 'active', puNo: 10200, puNoHead: '급여' };
 
 test('① 번호 없는 곳만 고른다 — 있는 곳은 안 건드린다', function () {

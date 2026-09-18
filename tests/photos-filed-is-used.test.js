@@ -41,11 +41,11 @@ function markCtx() {
 
 test('★ 주인 자리에 표시한다 — 안 넘기면 남이 올린 사진에는 영영 안 남는다', () => {
   const c = markCtx();
-  c.markFiledUsed('p1', '2026', '기업정보함 — 가야엔지니어링');
+  c.markFiledUsed('p1', '2026', '기업정보함 — 카타엔지니어링');
   assert.equal(c._calls.length, 1);
   assert.equal(c._calls[0].owner, 'OWNER',
     '★ 주인을 안 넘기면 저장 층이 «내» 자리에 적어 아무 일도 안 일어납니다');
-  assert.equal(c._calls[0].where, '기업정보함 — 가야엔지니어링',
+  assert.equal(c._calls[0].where, '기업정보함 — 카타엔지니어링',
     '어디에 썼는지 안 적으면 나중에 「이 사진 지워도 되나」에 답할 수 없습니다');
 });
 
@@ -76,7 +76,7 @@ function sendCtx(kind) {
   const used = [];
   const ctx = {
     Promise, Object, String, Date, console: { warn() {} },
-    gridItems: [{ id: 'p1', meta: { read: { kind: 'card', fields: { company: '가야엔지니어링' } } } }],
+    gridItems: [{ id: 'p1', meta: { read: { kind: 'card', fields: { company: '카타엔지니어링' } } } }],
     gridYear: '2026', viewerId: null,
     photoOwner: function () { return 'OWNER'; },
     photoYearOf: function () { return '2026'; },
@@ -122,7 +122,7 @@ test('★ 기업정보함으로 보내면 «실제로» 증빙 표시가 남는�
 test('★ 기업 상세로 보내면 «실제로» 증빙 표시가 남는다', async () => {
   const c = sendCtx('sendCoInfoWith');
   c.sendCoInfoWith('p1', '2026', null,
-    c.gridItems[0], c.gridItems[0].meta.read, { company: '가야엔지니어링' });
+    c.gridItems[0], c.gridItems[0].meta.read, { company: '카타엔지니어링' });
   await settle();
   assert.equal(c._used.length, 1, '★ 서식·신청서 원본이 1년 뒤 「지난 사진」으로 뜹니다');
   assert.match(c._used[0].where, /^기업 상세 —/);

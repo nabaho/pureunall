@@ -1,6 +1,6 @@
 /* 입금 자동매칭이 «전혀 다른 업체» 에 붙은 일 (2026-08-18 대표 제보)
      「DYM SOLUTI」  → ㈜정일제지
-     「태성디티(주)(이석」 → (주)케이이알 (구㈜한국전자파연구소)
+     「파하디티(주)(이석」 → (주)케이이알 (구㈜한국전자파연구소)
 
    ★ 뿌리 — 내가 이름을 보고 붙인 것이 «아니다».
      2026-08-08 에 «한 번» 확정한 것이 곧바로 「규칙(입금자 별칭)」이 되어,
@@ -49,7 +49,7 @@ function load() {
 test('이번에 문제된 두 짝은 «안 닮았다»', () => {
   const { close } = load();
   assert.strictEqual(close('dymsoluti', '㈜정일제지'), false);
-  assert.strictEqual(close('태성디티이석', '(주)케이이알 (구㈜한국전자파연구소)'), false);
+  assert.strictEqual(close('파하디티이석', '(주)케이이알 (구㈜한국전자파연구소)'), false);
 });
 
 test('멀쩡한 학습은 «닮았다» 로 남는다 — 같이 죽이면 안 된다', () => {
@@ -93,9 +93,9 @@ test('★ weak 표시가 «없는» 옛 기록도 다시 재 본다', () => {
   /* 이게 없으면 8월 8일에 굳은 잘못된 것들이 그대로 살아 있다.
      대표님이 손으로 지우기 전에는 계속 붙는다. */
   const { weak, trusted } = load();
-  const old = { companyName: '(주)케이이알 (구㈜한국전자파연구소)', count: 1, samples: ['태성디티(주)(이석'] };
-  assert.strictEqual(weak(old, '태성디티이석'), true, '옛 기록을 안 재 본다');
-  assert.strictEqual(trusted(old, '태성디티이석'), false, '옛 잘못이 그대로 살아 있다');
+  const old = { companyName: '(주)케이이알 (구㈜한국전자파연구소)', count: 1, samples: ['파하디티(주)(이석'] };
+  assert.strictEqual(weak(old, '파하디티이석'), true, '옛 기록을 안 재 본다');
+  assert.strictEqual(trusted(old, '파하디티이석'), false, '옛 잘못이 그대로 살아 있다');
   const oldOk = { companyName: '보문사', count: 1, samples: ['선학원보문사'] };
   assert.strictEqual(trusted(oldOk, '선학원보문사'), true, '멀쩡한 옛 기록까지 죽인다');
 });

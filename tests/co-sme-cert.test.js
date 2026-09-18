@@ -44,7 +44,7 @@ function 이름갈이() {
 
 test('★★★ 확인서의 유효기간·발급일·발급번호가 «제 칸»으로 간다', () => {
   const smeKeys = 이름갈이();
-  const out = smeKeys('sme', { bizno: '1348605772', smeType: '소기업',
+  const out = smeKeys('sme', { bizno: '1238620021', smeType: '소기업',
     expiry: '2027-03-31', issueNo: 'SME-2026-1', issueDate: '2026-04-01' });
   assert.equal(out.smeExpiry, '2027-03-31', '★★ 유효기간이 안 담긴다 — 언제 다시 받을지 알 길이 없다');
   assert.equal(out.smeIssueDate, '2026-04-01');
@@ -55,14 +55,14 @@ test('★★★ 확인서 발급일이 「등록증 발급일」 자리에 «앉
   /* 그 칸은 어느 등록증이 최신인가를 가리는 «유일한» 잣대다(2026-09-07).
      확인서 날짜가 앉으면 옛 등록증이 새것으로 보인다. */
   const smeKeys = 이름갈이();
-  const out = smeKeys('sme', { bizno: '1348605772', issueDate: '2026-04-01' });
+  const out = smeKeys('sme', { bizno: '1238620021', issueDate: '2026-04-01' });
   assert.equal(out.issueDate, undefined,
     '★★★ 확인서 발급일이 등록증 발급일 칸에 남았다 — 최신 등록증을 가리는 잣대가 망가진다');
 });
 
 test('★★★ 확인서가 «아닌» 서류의 날짜는 한 글자도 안 건드린다', () => {
   const smeKeys = 이름갈이();
-  const 등록증 = { bizno: '1348605772', issueDate: '2026-04-01', ceo: '나성환' };
+  const 등록증 = { bizno: '1238620021', issueDate: '2026-04-01', ceo: '고길동' };
   const out = smeKeys('bizreg', 등록증);
   assert.equal(out.issueDate, '2026-04-01',
     '★★★ 등록증 발급일을 옮겼다 — 이 함정의 «반대 방향»이다');
@@ -74,8 +74,8 @@ test('★★★ 확인서가 «아닌» 서류의 날짜는 한 글자도 안 �
 
 test('★ 옮기지 않는 칸은 그대로 온다 — 옮기며 흘리면 안 된다', () => {
   const smeKeys = 이름갈이();
-  const out = smeKeys('sme', { bizno: '1348605772', company: '가나컨트롤(주)',
-    ceo: '나성환', smeType: '소기업', industry: '제조업' });
+  const out = smeKeys('sme', { bizno: '1238620021', company: '가나컨트롤(주)',
+    ceo: '고길동', smeType: '소기업', industry: '제조업' });
   ['bizno', 'company', 'ceo', 'smeType', 'industry'].forEach(k =>
     assert.ok(out[k], k + ' 이 옮기는 사이에 사라졌다'));
 });
@@ -108,7 +108,7 @@ function 보내기(existing) {
 test('★★★ 확인서를 보내면 유효기간이 «실제로» 기업정보에 담긴다', async () => {
   const c = 보내기({});
   const r = await c.sendToCoInfo({ kind: 'sme', fields: {
-    bizno: '134-86-05772', docName: '중소기업확인서', smeType: '소기업',
+    bizno: '123-86-20021', docName: '중소기업확인서', smeType: '소기업',
     expiry: '2027-03-31', issueDate: '2026-04-01', issueNo: 'SME-2026-1' } });
   assert.equal(r.ok, true);
   const v = c._writes[0].val;
@@ -122,7 +122,7 @@ test('★★★ 확인서를 보내면 유효기간이 «실제로» 기업정�
 test('★★ 확인서로도 «이미 있는 값»은 안 덮는다 — 이 길의 오래된 약속이다', async () => {
   const c = 보내기({ smeExpiry: '2026-03-31' });
   await c.sendToCoInfo({ kind: 'sme', fields: {
-    bizno: '134-86-05772', docName: '중소기업확인서', expiry: '2027-03-31' } });
+    bizno: '123-86-20021', docName: '중소기업확인서', expiry: '2027-03-31' } });
   const v = c._writes[0].val;
   assert.equal(v.smeExpiry, undefined, '★★ 사람이 고쳐 둔 유효기간을 덮었다');
   /* 다만 «어긋났다»는 것은 남긴다 — 조용히 버리면 아무도 모른다(2026-08-24) */

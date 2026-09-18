@@ -134,7 +134,7 @@ function loadListBlockWithSelBar(items){
 }
 
 test('선택 모드에서 목록 위에 폴더로 옮기기·탭에 담기 동작 바가 보인다', () => {
-  const c = loadListBlockWithSelBar([{ key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
+  const c = loadListBlockWithSelBar([{ key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
   c.state.coSel = { k1:1 };
   c.renderCoMobileList();
   assert.match(c._calls.html, /coMoveToFolder\(\)/);
@@ -142,7 +142,7 @@ test('선택 모드에서 목록 위에 폴더로 옮기기·탭에 담기 동�
 });
 
 test('아무 것도 안 골랐으면 동작 바가 안 보인다', () => {
-  const c = loadListBlockWithSelBar([{ key:'k1', name:'대명크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
+  const c = loadListBlockWithSelBar([{ key:'k1', name:'나라크라샤', bizno:'', erp:null, folder:'', cards:[], docs:0, tags:{} }]);
   c.state.coSel = {};
   c.renderCoMobileList();
   assert.doesNotMatch(c._calls.html, /coMoveToFolder\(\)/);

@@ -109,16 +109,16 @@ function loadPanelBlock(items){
 }
 
 test('openCoDetailPanel 은 이 회사 내용으로 패널을 채우고 연다', () => {
-  const c = loadPanelBlock([{ key:'k1', name:'대명크라샤', bizno:'312-81-49225', ceo:'이태준', cards:[], extra:{}, folder:'' }]);
+  const c = loadPanelBlock([{ key:'k1', name:'나라크라샤', bizno:'123-81-20012', ceo:'강대호', cards:[], extra:{}, folder:'' }]);
   c.openCoDetailPanel('k1');
-  assert.match(c._calls.panelHtml, /대명크라샤/);
-  assert.match(c._calls.panelHtml, /이태준/);
+  assert.match(c._calls.panelHtml, /나라크라샤/);
+  assert.match(c._calls.panelHtml, /강대호/);
   assert.equal(c._calls.panelOpen, true);
   assert.equal(c._calls.overlayOn, true);
 });
 
 test('pickCo 는 같은 회사를 두 번 누르면 패널을 닫는다', () => {
-  const c = loadPanelBlock([{ key:'k1', name:'대명크라샤', bizno:'', ceo:'', cards:[], extra:{}, folder:'' }]);
+  const c = loadPanelBlock([{ key:'k1', name:'나라크라샤', bizno:'', ceo:'', cards:[], extra:{}, folder:'' }]);
   c.pickCo('k1');
   assert.equal(c.state.coPick, 'k1');
   c.pickCo('k1');
@@ -249,7 +249,7 @@ test('ESC 로 닫을 때는 closeDetail 이 아니라 closePcDetail 을 불러 c
 });
 
 test('폴더에 든 회사는 상세 패널에 폴더 딱지가 보인다', () => {
-  const c = loadPanelBlock([{ key:'k1', name:'대명크라샤', bizno:'', ceo:'', cards:[], extra:{}, folder:'f1' }]);
+  const c = loadPanelBlock([{ key:'k1', name:'나라크라샤', bizno:'', ceo:'', cards:[], extra:{}, folder:'f1' }]);
   c._coFolders = { f1:{ id:'f1', name:'현장클리닉' } };
   c.openCoDetailPanel('k1');
   assert.match(c._calls.panelHtml, /현장클리닉/);

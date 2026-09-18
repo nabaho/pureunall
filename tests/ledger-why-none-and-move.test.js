@@ -41,7 +41,7 @@ t('★ 괄호 «안» 의 상호를 먼저 본다 (상호가 업체명일 때가
 t('괄호 «앞» 의 예금주도 본다', ctx.erpMemoNames('최건(아우어베이커리').indexOf('최건') >= 0, true);
 t('닫는 괄호가 없어도 읽는다 (통장이 적요를 자른다)',
   ctx.erpMemoNames('최건(아우어베이커리').length >= 2, true);
-t('닫는 괄호가 있어도 읽는다', ctx.erpMemoNames('황규주(팔천식품)')[0], '팔천식품');
+t('닫는 괄호가 있어도 읽는다', ctx.erpMemoNames('황규주(다온식품)')[0], '다온식품');
 t('괄호가 없으면 통째로', ctx.erpMemoNames('노리시스템(주)').length >= 1, true);
 t('한 글자는 뽑지 않는다 (아무 데나 걸린다)', ctx.erpMemoNames('김'), []);
 t('빈 적요는 빈 목록', ctx.erpMemoNames(''), []);

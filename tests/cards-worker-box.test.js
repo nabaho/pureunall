@@ -60,8 +60,8 @@ const PH = { year: '2026', id: '-Oabc123', owner: 'u1' };
 
 test('★ 열쇠는 이름과 회사를 «함께» 쓴다 — 이름만으로는 동명이인이 한 사람이 된다', () => {
   const { F } = rig({});
-  const a = F.workerKey('김수', '(주)대명크라샤');
-  const b = F.workerKey('김수', '해찬솔에프쓰리');
+  const a = F.workerKey('김수', '(주)나라크라샤');
+  const b = F.workerKey('김수', '다온솔에프쓰리');
   assert.ok(a && b, '열쇠가 만들어져야 합니다');
   assert.notEqual(a, b, '★ 회사가 다른 같은 이름이 한 열쇠가 됐습니다 — 남의 서류가 붙습니다');
 });
@@ -276,7 +276,7 @@ const big = read => ({ meta: { w: 2000, h: 2800, read: read } });
 test('★★ 근로자 서류 넷은 «근로자 정보함으로 보내기»가 할 일이다', () => {
   const c = photoCtx();
   ['idcard', 'resident', 'mandate', 'consent'].forEach(function (k) {
-    const it = big({ kind: k, auto: false, fields: { name: '강석', company: '해찬솔에프쓰리' } });
+    const it = big({ kind: k, auto: false, fields: { name: '강석', company: '다온솔에프쓰리' } });
     assert.equal(c.needsCheck(it), true, k + ' 이 할 일이 아닙니다');
     assert.match(c.checkWhy(it), /근로자 정보함/,
       '★★ ' + k + ' 의 이유가 「' + c.checkWhy(it) + '」 입니다 — 2026-08-10 계약서처럼 틀린 이유가 붙었습니다');
@@ -307,7 +307,7 @@ test('★ 이름도 회사도 못 읽었으면 이름부터 말한다', () => {
 test('★★ 통장·계좌가 기업 상세로 간다 — 2026-08-31 부터 갈 곳이 없었다', () => {
   const c = photoCtx();
   const read = { kind: 'bankbook', auto: true,
-    fields: { company: '아이행복어린이집', bankName: '국민은행',
+    fields: { company: '나라어린이집', bankName: '국민은행',
               bankAcct: '123456-04-567890', bankHolder: '양유정' } };
   assert.equal(c.canSendCoInfo(read), true, '★★ 통장이 기업 상세로 갈 길이 없습니다');
   assert.match(c.checkWhy(big(read)), /기업 상세/, c.checkWhy(big(read)));
@@ -316,7 +316,7 @@ test('★★ 통장·계좌가 기업 상세로 간다 — 2026-08-31 부터 갈
 test('★ 통장을 이미 보냈으면 할 일이 아니다', () => {
   const c = photoCtx();
   const it = big({ kind: 'bankbook', auto: true,
-    fields: { company: '아이행복어린이집', bankName: '국민은행',
+    fields: { company: '나라어린이집', bankName: '국민은행',
               bankAcct: '1', bankHolder: '양유정' },
     filedInfo: { at: 1756000000000, n: 3 } });
   assert.equal(c.needsCheck(it), false);
@@ -336,7 +336,7 @@ test('★★★ 근태표를 보내도 «아무에게도» 안 붙는다', () =>
   const { F } = rig({});
   const t = F.workerDocTargets({
     kind: 'timesheet', photo: PH,
-    fields: { company: '해찬솔에프쓰리', rows: [{ name: '강석' }, { name: '고민' }] }
+    fields: { company: '다온솔에프쓰리', rows: [{ name: '강석' }, { name: '고민' }] }
   });
   assert.equal(t.targets.length, 0,
     '★★★ 근태표가 사람에게 붙었습니다 — 목록이 근태표 이름으로 덮입니다');
@@ -378,7 +378,7 @@ test('★ 여러 장을 한 번에 보내도 «쓰기는 한 번»이다', async
   const list = [];
   for (let i = 0; i < 12; i++) {
     list.push({ kind: 'idcard', photo: { year: '2026', id: 'p' + i, owner: 'u1' },
-      fields: { company: '해찬솔에프쓰리', name: '사람' + i, docName: '주민등록증' } });
+      fields: { company: '다온솔에프쓰리', name: '사람' + i, docName: '주민등록증' } });
   }
   const res = await F.sendToWorkerMany(list);
   assert.equal(res.people, 12);
@@ -393,7 +393,7 @@ test('★ 여러 장을 한 번에 보내도 «쓰기는 한 번»이다', async
      그 사이 남이 채워 둔 이름을 옛 값으로 덮는다. 그 경계를 함께 못박는다. */
 
 const ONE = [{ kind: 'idcard', photo: PH,
-  fields: { company: '해찬솔에프쓰리', name: '강석', docName: '주민등록증' } }];
+  fields: { company: '다온솔에프쓰리', name: '강석', docName: '주민등록증' } }];
 
 test('★★ 겹침을 찾고 곧바로 보내면 사람 칸을 «한 번만» 읽는다', async () => {
   const { F, reads } = rig({});
@@ -418,15 +418,15 @@ test('★★ 안 넘기면 «제대로» 읽는다 — 물려주기가 읽기를
 test('★★★ 아는 사람이 빠진 것을 넘기면 «통째로 다시» 읽는다 — 반만 새 값이면 못 짚는다', async () => {
   const { F, reads } = rig({});
   const two = ONE.concat([{ kind: 'idcard', photo: { year: '2026', id: 'p2', owner: 'u1' },
-    fields: { company: '해찬솔에프쓰리', name: '이영희', docName: '주민등록증' } }]);
-  await F.sendToWorkerMany(two, { '해찬솔에프쓰리__강석': {} });   // 한 사람만 아는 값
+    fields: { company: '다온솔에프쓰리', name: '이영희', docName: '주민등록증' } }]);
+  await F.sendToWorkerMany(two, { '다온솔에프쓰리__강석': {} });   // 한 사람만 아는 값
   assert.equal(reads.length, 2,
     '★★★ 반쪽짜리를 그대로 믿었습니다 — 모르는 사람의 이름·회사를 빈 칸으로 보고 덮습니다');
 });
 
 test('★★★ 물려받은 값으로도 «사람이 고쳐 둔 이름»을 안 덮는다', async () => {
   const { F, updates } = rig({
-    'pucards/workerInfo/해찬솔에프쓰리__강석': { name: '강○석', company: '해찬솔' }
+    'pucards/workerInfo/다온솔에프쓰리__강석': { name: '강○석', company: '마바' }
   });
   const got = {};
   await F.findWorkerDupes(ONE, got);
@@ -441,8 +441,8 @@ test('★★ 이미 붙어 있는 서류는 물려받은 값으로도 «다시 �
   /* 이름·회사까지 이미 차 있는 자리다 — 그래야 「쓸 것이 하나도 없다」를 볼 수 있다
      (이름이 비어 있으면 그 칸을 채우느라 쓰기가 한 번 일어난다). */
   const { F, updates } = rig({
-    'pucards/workerInfo/해찬솔에프쓰리__강석': {
-      name: '강석', company: '해찬솔에프쓰리',
+    'pucards/workerInfo/다온솔에프쓰리__강석': {
+      name: '강석', company: '다온솔에프쓰리',
       docs: { '2026_-Oabc123': { kind: 'idcard' } }
     }
   });

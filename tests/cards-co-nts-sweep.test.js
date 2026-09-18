@@ -56,24 +56,24 @@ function load(list) {
 /* ── ③ 무엇을 훑나 ────────────────────────────────────────────────────── */
 
 test('★★★ 사업자번호가 «없는» 곳은 훑지 않는다 — 물어볼 수가 없다', () => {
-  const c = load([ CO('a',''), CO('b','1234'), CO('c','1348605772') ]);
+  const c = load([ CO('a',''), CO('b','1234'), CO('c','1238620021') ]);
   assert.deepEqual(Array.from(c.coNtsTargets(오늘)).map(x => x.key), ['c']);
 });
 
 test('★★★ 최근에 물어본 곳은 «다시 안 묻는다» — 누를 때마다 4,000개가 또 나가면 안 된다', () => {
-  const c = load([ CO('갓물어봄','1348605772',{ extra:{ ntsAt:'2026-09-10' } }),
+  const c = load([ CO('갓물어봄','1238620021',{ extra:{ ntsAt:'2026-09-10' } }),
                    CO('오래됐다','2208612345',{ extra:{ ntsAt:'2026-01-01' } }),
-                   CO('한번도','3128149225') ]);
+                   CO('한번도','1238120012') ]);
   assert.deepEqual(Array.from(c.coNtsTargets(오늘)).map(x => x.key), ['오래됐다','한번도']);
 });
 
 test('★★ 딱 30일째면 «다시» 묻는다 — 한 달에 한 번이 이 잣대의 뜻이다', () => {
-  const c = load([ CO('딱30일','1348605772',{ extra:{ ntsAt:'2026-08-14' } }) ]);
+  const c = load([ CO('딱30일','1238620021',{ extra:{ ntsAt:'2026-08-14' } }) ]);
   assert.equal(c.coNtsTargets(오늘).length, 1);
 });
 
 test('★ 날짜를 «못 읽은» 것은 다시 묻는다 — 언제 물었는지 모르는 것은 안 물은 것과 같다', () => {
-  const c = load([ CO('이상한날','1348605772',{ extra:{ ntsAt:'작년 언젠가' } }) ]);
+  const c = load([ CO('이상한날','1238620021',{ extra:{ ntsAt:'작년 언젠가' } }) ]);
   assert.equal(c.coNtsTargets(오늘).length, 1);
 });
 
@@ -97,10 +97,10 @@ test('★ 빈 목록이면 묶음도 없다 — 빈 통을 보내지 않는다',
 
 test('★★★ 답을 «번호»로 맞춘다 — 차례로 맞추면 남의 상태가 이 회사에 앉는다', () => {
   const c = load();
-  const chunk = [ CO('가','1348605772'), CO('나','2208612345'), CO('다','3128149225') ];
+  const chunk = [ CO('가','1238620021'), CO('나','2208612345'), CO('다','1238120012') ];
   /* 국세청이 차례를 «바꿔» 돌려줬다 */
-  const rows = [ { b_no:'3128149225', b_stt:'폐업자' },
-                 { b_no:'1348605772', b_stt:'계속사업자' } ];
+  const rows = [ { b_no:'1238120012', b_stt:'폐업자' },
+                 { b_no:'1238620021', b_stt:'계속사업자' } ];
   const got = Array.from(c.coNtsMatch(chunk, rows));
   assert.deepEqual(got.map(x => x.key + '=' + x.state).sort(),
     ['가=계속사업자','다=폐업자'],
@@ -109,7 +109,7 @@ test('★★★ 답을 «번호»로 맞춘다 — 차례로 맞추면 남의 �
 
 test('★★ 우리가 «안 물어본» 번호가 섞여 오면 버린다', () => {
   const c = load();
-  const got = c.coNtsMatch([ CO('가','1348605772') ],
+  const got = c.coNtsMatch([ CO('가','1238620021') ],
     [ { b_no:'9999999999', b_stt:'폐업자' } ]);
   assert.equal(got.length, 0, '★★ 남의 답을 우리 줄에 앉히면 안 된다');
 });
@@ -117,16 +117,16 @@ test('★★ 우리가 «안 물어본» 번호가 섞여 오면 버린다', () 
 test('★★ 같은 번호를 가진 줄이 둘이면 «둘 다» 받는다', () => {
   const c = load();
   const got = Array.from(c.coNtsMatch(
-    [ CO('가','1348605772'), CO('나','1348605772') ],
-    [ { b_no:'134-86-05772', b_stt:'휴업자' } ]));
+    [ CO('가','1238620021'), CO('나','1238620021') ],
+    [ { b_no:'123-86-20021', b_stt:'휴업자' } ]));
   assert.deepEqual(got.map(x => x.key).sort(), ['가','나']);
   assert.equal(got[0].state, '휴업자', '★ 하이픈이 있어도 같은 번호다');
 });
 
 test('★★ 아무 말도 없는 답은 «안 담는다» — 「확인했는데 모른다」가 남으면 안 된다', () => {
   const c = load();
-  assert.equal(c.coNtsMatch([ CO('가','1348605772') ],
-    [ { b_no:'1348605772', b_stt:'', tax_type:'' } ]).length, 0);
+  assert.equal(c.coNtsMatch([ CO('가','1238620021') ],
+    [ { b_no:'1238620021', b_stt:'', tax_type:'' } ]).length, 0);
 });
 
 /* ── ⑥ 쓰기 ──────────────────────────────────────────────────────────── */
@@ -151,9 +151,9 @@ test('★★★ 상태와 확인일을 «함께» 쓴다 — 날짜 없는 상�
 
 test('★★★ 폐업·휴업만 추린다 — 계속사업자는 챙길 일이 없다', () => {
   const c = load([ CO('폐업','1','',{}), CO('휴업','2'), CO('계속','3'), CO('안물어봄','4') ]);
-  c.coList = () => [ CO('폐업','1348605772',{ extra:{ ntsState:'폐업자', ntsAt:오늘 } }),
+  c.coList = () => [ CO('폐업','1238620021',{ extra:{ ntsState:'폐업자', ntsAt:오늘 } }),
                      CO('휴업','2208612345',{ extra:{ ntsState:'휴업자', ntsAt:오늘 } }),
-                     CO('계속','3128149225',{ extra:{ ntsState:'계속사업자', ntsAt:오늘 } }),
+                     CO('계속','1238120012',{ extra:{ ntsState:'계속사업자', ntsAt:오늘 } }),
                      CO('안물어봄','4118612345') ];
   const got = Array.from(c.coNtsBadList()).map(x => x.name);
   assert.deepEqual(got, ['폐업','휴업'], '★★★ 폐업이 휴업보다 앞 — 급한 순이다');

@@ -96,7 +96,7 @@ const RICH = {
     b: { id:'b', kind:'biz',  group:'',   owner:'' }
   },
   state: { groups: { g1:{ id:'g1', name:'업체관리', kind:'card', order:1 } } },
-  cos: [{ key:'k1', name:'대명크라샤', erp:{ type:'자문' }, folder:'f1' }],
+  cos: [{ key:'k1', name:'나라크라샤', erp:{ type:'자문' }, folder:'f1' }],
   coFolders: { f1:{ id:'f1', name:'현장클리닉', order:1 } },
   coTags: [{ t:'일터상생혁신', n:2 }],
   coFTabs: [{ id:'t1', name:'1차' }],

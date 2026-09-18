@@ -71,12 +71,12 @@ const ERP_READ_PATHS = ['data/biz_cons_types','data/biz_fund_types','data/biz_ot
 
 test('loadErpCaseCons 는 이알피의 정해진 자리만 읽는다', async () => {
   const c = loadErpCaseConsBlock();
-  c._fixtures = { 'data/cases/v': { c1:{ id:'c1', bizNo:'312-81-49225', typeName:'부당해고' } },
-                  'data/consultings/v': { k1:{ id:'k1', bizNo:'312-81-49225', typeCode:'cons-ilteo' } } };
+  c._fixtures = { 'data/cases/v': { c1:{ id:'c1', bizNo:'123-81-20012', typeName:'부당해고' } },
+                  'data/consultings/v': { k1:{ id:'k1', bizNo:'123-81-20012', typeCode:'cons-ilteo' } } };
   let got = null;
   await new Promise(res => c.loadErpCaseCons(data => { got = data; res(); }));
   assert.deepEqual(c._calls.onceCalls.sort(), ERP_READ_PATHS);
-  assert.equal(got.byBiz['3128149225'].length, 2);
+  assert.equal(got.byBiz['1238120012'].length, 2);
 });
 
 test('사업자번호 10자리 미만인 기록은 «번호» 색인에서 뺀다 — 이름 색인으로 간다', async () => {
@@ -124,7 +124,7 @@ test('erpConsTypeName 은 등록된 코드를 사람이 읽는 이름으로 바�
    아무도 틀린 답을 먼저 받지 않는다. */
 test('조회가 도는 중에 또 부르면 기다렸다가 실제 결과를 받는다 — 미리 null 을 안 준다', async () => {
   const c = loadErpCaseConsBlock();
-  c._fixtures = { 'data/cases/v': { c1:{ id:'c1', bizNo:'312-81-49225', typeName:'부당해고' } }, 'data/consultings/v': {} };
+  c._fixtures = { 'data/cases/v': { c1:{ id:'c1', bizNo:'123-81-20012', typeName:'부당해고' } }, 'data/consultings/v': {} };
   const firstGot = []; const secondGot = [];
   const p1 = new Promise(res => c.loadErpCaseCons(data => { firstGot.push(data); res(); }));
   const p2 = new Promise(res => c.loadErpCaseCons(data => { secondGot.push(data); res(); }));

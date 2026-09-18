@@ -33,7 +33,7 @@ const SRC = fs.readFileSync(path.join(R, 'js', 'pu-ontology.js'), 'utf8');
 /* 이알피 원장 표본 — 업체 둘 */
 const DATA = {
   companies: [
-    { id: 'co-1', name: '(주)대명크라샤', bizNo: '312-81-49225' },
+    { id: 'co-1', name: '(주)나라크라샤', bizNo: '123-81-20012' },
     { id: 'co-2', name: '한서정공', bizNo: '111-11-11111' }
   ],
   user_dir: [{ sid: 'p001', name: '권형하' }]
@@ -41,8 +41,8 @@ const DATA = {
 
 /* 기업 상세 표본 — 하나는 «확정», 하나는 이름만 */
 const COINFO = {
-  '3128149225': {
-    company: '(주)대명크라샤',
+  '1238120012': {
+    company: '(주)나라크라샤',
     erpCoId: 'co-1',                       /* 사람이 확정한 열쇠 */
     bizType: '제조', workers: '42',
     docs: { '2026_-Oa': { kind: 'bizreg', docName: '사업자등록증', at: 100 } }
@@ -55,8 +55,8 @@ const COINFO = {
 
 /* 근로자 정보함 표본 — 담기는 칸은 다섯뿐이다 */
 const WORKERS = {
-  '대명크라샤__김수': {
-    name: '김수', company: '(주) 대명크라샤',
+  '나라크라샤__김수': {
+    name: '김수', company: '(주) 나라크라샤',
     docs: { '2026_-Oc': { kind: 'idcard', docName: '주민등록증', period: '', at: 300,
                           photo: { year: '2026', id: '-Oc', owner: 'u1' } } }
   }
@@ -133,7 +133,7 @@ test('★★★ 읽는 경로에 사진 원본·판독 글자·급여 금액·�
 test('★★★ 기업 상세에서 pairs(문서의 모든 칸)를 개체로 만들지 않는다', () => {
   /* pairs 에는 계좌·주민번호가 딸려 올 수 있다. 관계를 찾는다는 이유로 그것을
      한 화면에 모으지 않는다(2단계 문서의 원칙). */
-  const r = audit({ cards_coinfo: { ok: true, value: { '3128149225': {
+  const r = audit({ cards_coinfo: { ok: true, value: { '1238120012': {
     company: '가나', erpCoId: 'co-1',
     docs: { d1: { kind: 'bizreg', docName: '등록증',
       pairs: [{ k: '주민등록번호', v: '900101-1234567' }] } } } } } });
@@ -155,7 +155,7 @@ test('★★ 근로자 정보함에는 주민번호·주소가 «애초에 없�
 
 test('★★ 근로자 정보함의 사람은 «기업정보함 안의» 사람이다 — 직원 명부와 안 섞인다', () => {
   const r = audit();
-  const id = O.sourceCanonicalId('Person', 'cards', '대명크라샤__김수');
+  const id = O.sourceCanonicalId('Person', 'cards', '나라크라샤__김수');
   assert.ok(r.entities[id], '사람을 안 만들었습니다: ' + Object.keys(r.entities).join(' '));
   /* 직원 명부의 사람은 Person:사번 이다 — 이름으로 그것과 합쳐지면 안 된다 */
   assert.ok(!r.entities['Person:%EA%B9%80%EC%88%98'],
@@ -165,8 +165,8 @@ test('★★ 근로자 정보함의 사람은 «기업정보함 안의» 사람�
 
 test('★ 서류가 그 사람에게 붙는다(attachedTo)', () => {
   const r = audit();
-  const who = O.sourceCanonicalId('Person', 'cards', '대명크라샤__김수');
-  const doc = O.sourceCanonicalId('Document', 'cards', '대명크라샤__김수/2026_-Oc');
+  const who = O.sourceCanonicalId('Person', 'cards', '나라크라샤__김수');
+  const doc = O.sourceCanonicalId('Document', 'cards', '나라크라샤__김수/2026_-Oc');
   assert.ok(r.entities[doc], '서류를 안 만들었습니다');
   assert.ok(r.edges.some(e => e.subject === doc && e.predicate === 'attachedTo' && e.object === who),
     '★ 서류가 사람에게 안 붙었습니다');
@@ -174,8 +174,8 @@ test('★ 서류가 그 사람에게 붙는다(attachedTo)', () => {
 
 test('★ 기업 상세 서류가 그 회사에 붙는다', () => {
   const r = audit();
-  const co = O.sourceCanonicalId('Organization', 'cards', 'coinfo:3128149225');
-  const doc = O.sourceCanonicalId('Document', 'cards', '3128149225/2026_-Oa');
+  const co = O.sourceCanonicalId('Organization', 'cards', 'coinfo:1238120012');
+  const doc = O.sourceCanonicalId('Document', 'cards', '1238120012/2026_-Oa');
   assert.ok(r.entities[co] && r.entities[doc]);
   assert.ok(r.edges.some(e => e.subject === doc && e.predicate === 'attachedTo' && e.object === co),
     '★ 서류가 회사에 안 붙었습니다');

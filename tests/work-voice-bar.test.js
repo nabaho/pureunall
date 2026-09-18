@@ -30,7 +30,7 @@ function stage() {
   const ITEMS = {
     A: { company: '가나다산업', title: '취업규칙 개정', status: '진행중' },
     B: { company: '천성가축약품', title: '부당해고 구제신청', status: '진행중' },
-    C: { company: '나래테크', title: '임금체불 진정', status: '대기응답' },
+    C: { company: '새롬테크', title: '임금체불 진정', status: '대기응답' },
   };
   const pre = `
     var VO={id:'',rec:null,chunks:[],sec:0,tick:null,blob:null,url:'',res:null,list:null,busy:false,err:''};
