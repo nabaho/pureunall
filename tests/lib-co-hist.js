@@ -69,7 +69,13 @@ function panelDeps(app) {
     (app.match(/^const digits = [^\n]*;$/m) || [])[0] || '',
     cutFn(app, 'function coNtsWord('),
     cutFn(app, 'function coNtsCls('),
-    cutFn(app, 'function coNtsChipHtml(')
+    cutFn(app, 'function coNtsChipHtml('),
+    /* 2026-09-18: 이름 옆에 ✏ 상호 고치기가 붙었다(대표 지시 「총서 → 충서」).
+       ⚠ «진짜»를 싣는다 — 이 함수가 「고칠 서류가 있나」를 가려 ✏ 를 띄울지 정한다.
+         대역으로 0을 돌려주면 ✏ 가 사라져도 검사가 아무 말을 안 한다.
+       ⚠ _norm 은 화살표 한 줄이라 cutFn 으로는 못 뜬다 — 줄째로 뜬다(digits 와 같다). */
+    (app.match(/^const _norm = [^\n]*$/m) || [])[0] || '',
+    cutFn(app, 'function coNameCards(')
   ].join('\n');
 }
 
