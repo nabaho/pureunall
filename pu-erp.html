@@ -305,7 +305,7 @@ var Component = React.Component;
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
 var ERP_BUILD = '2026-09-18 초기 동기화의 건별 자료를 모아 한 번만 저장 — 수천 건을 받을 때마다 전체 배열을 다시 저장해 화면이 오래 멈추던 길을 줄였다';
-var BUILD_SEQ = 169;
+var BUILD_SEQ = 170;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -13538,6 +13538,51 @@ function getKindTypes(kindV, includeHidden){
   return arr.filter(function(x){ return !x.hidden; });
 }
 
+/* ══════ 🏥 하루 단위로 셈하는 컨설팅 (대표 지시 2026-09-18) ══════════════════
+   「현장클리닉은 1일 출장 35만원이고 3일이면 105만원이다. 3일을 넣으면 잔금에
+    부가세까지 붙은 1,155,000원이 들어갔으면 좋겠다」
+
+   ⚠ 단가는 «유형»에 둔다 — 코드에 박으면 값이 오를 때 대표님이 못 고친다.
+     고치는 자리는 설정 › 컨설팅 유형의 ✏ 다.
+   ⚠ 이미 쓰고 있는 유형표에는 이 칸이 없다. 서버를 고쳐 넣지 «않고»,
+     못 찾으면 씨앗에서 찾는다 — 읽을 때 메우므로 아무것도 안 써도 바로 듣는다.
+   ⚠ 단가가 없거나 0 이면 일수 칸 자체가 «안 보인다». 쓸 수 없는 칸을 띄우면
+     「왜 안 되지」가 된다.
+   ⚠ 단가를 나중에 고쳐도 지난 계약 금액은 안 바뀐다 — 맺은 금액을 소급해
+     바꾸는 것이 사고다. 계약에는 그때의 단가를 함께 적어 둔다(dayCalc). */
+function consTypeDayFee(code){
+  if(!code) return 0;
+  var list = dbGet('biz_cons_types', BIZ_CONS_SEED) || [];
+  var t = list.find(function(x){ return x && x.code === code; });
+  if(t && t.dayFee !== undefined && t.dayFee !== null && t.dayFee !== ''){
+    return parseInt(t.dayFee, 10) || 0;
+  }
+  var s = BIZ_CONS_SEED.find(function(x){ return x.code === code; });
+  return (s && parseInt(s.dayFee, 10)) || 0;
+}
+/* 일수 × 단가 → 공급가·부가세·합계.
+   ⚠ 부가세는 «원 미만 버림»이다 — 세금계산서가 그렇게 끊긴다.
+     350,000 × 3 = 1,050,000 → 부가세 105,000 → 합계 1,155,000.
+   ⚠ 단가나 일수가 0 이하면 null 을 돌려준다(0원짜리 띠를 띄우지 않는다). */
+function consDayAmount(dayFee, days){
+  var f = parseInt(dayFee, 10) || 0;
+  var d = parseInt(days, 10) || 0;
+  if(f <= 0 || d <= 0) return null;
+  var net = f * d;
+  var vat = Math.floor(net / 10);
+  return { dayFee:f, days:d, net:net, vat:vat, total:net + vat };
+}
+/* 지금 잔금을 «저절로» 바꿔도 되는가.
+   ★ 돈 칸은 말없이 덮지 않는다 — 오늘 CMS 오매칭이 꼭 이 자리에서 났다.
+   된다: 비어 있거나(0), 직전에 이 셈이 넣어 둔 값 그대로일 때(일수만 고친 경우).
+   안 된다: 사람이 손으로 다른 값을 적어 둔 때 — 그때는 띠와 단추만 띄운다. */
+function consDayMayFill(curFee, prevCalc){
+  var cur = parseInt(curFee, 10) || 0;
+  if(!cur) return true;
+  var prev = prevCalc && parseInt(prevCalc.total, 10);
+  return !!prev && cur === prev;
+}
+
 // ============ 과거 회사 통합 검색 (6개 모듈) ============
 // 사업자번호(- 제거 후) 또는 회사명 부분일치로 검색
 function searchPastCompanies(query){
@@ -17126,6 +17171,10 @@ function ContractModal(props){
     endDate: '',                        // 계약 종료일 (자문/컨설팅용)
     successFee:0,
     successFeeType:'amount',
+    /* 🏥 하루 단위로 셈하는 컨설팅 — 현장클리닉 같은 것. 유형에 1일 단가가 있을 때만 쓴다.
+       dayCalc 는 «어떻게 나온 숫자인지»를 남긴다 — 나중에 「이 1,155,000 어디서 왔나」에 답한다. */
+    consultDays:0,
+    dayCalc:null,                       // {dayFee, days, net, vat, total}
     payerName:'',                       // 입금자(예금주) — 업체명과 다르게 입금될 때만 사용
     vatType: 'separate',                // 'separate'(별도) | 'inclusive'(포함)
     journals: [],                       // 활동 일지 [{id, date, by, content}]
@@ -18388,6 +18437,11 @@ function ContractModal(props){
       bizNo: f.company.bizNo,
       contractAmount: totalAmount,
       mgrHistory: hist,
+      /* 🏥 일수로 셈한 근거는 «지금 금액과 맞을 때만» 남긴다.
+         셈해 보여 준 뒤 대표님이 잔금을 손으로 고치셨으면 그 근거는 더 이상
+         이 금액의 근거가 아니다 — 남겨 두면 나중에 거짓말이 된다. */
+      dayCalc: (f.dayCalc && (parseInt(f.successFee, 10) || 0) === parseInt(f.dayCalc.total, 10))
+        ? f.dayCalc : null,
       // 과거 데이터 수동 계약번호
       _manualContractNo: (manualNo && manualNo.trim()) ? manualNo.trim() : ''
     });
@@ -19761,6 +19815,23 @@ function ContractModal(props){
           var isCase = kindV === 'case';
           var isConsulting = kindV === 'consulting';
           var isOther = kindV === 'other';
+          /* 🏥 하루 단위 컨설팅 — 고른 유형에 1일 단가가 있을 때만 일수 칸이 뜬다.
+             ⚠ 단가가 0 이면 아래 줄 자체를 안 그린다(쓸 수 없는 칸을 띄우지 않는다). */
+          var _selType  = isConsulting ? (f.typeCodes[kindV] || (typesArr[0] ? typesArr[0].code : '')) : '';
+          var _dayFee   = isConsulting ? consTypeDayFee(_selType) : 0;
+          var _dayCalc  = _dayFee > 0 ? consDayAmount(_dayFee, f.consultDays) : null;
+          /* 셈한 값을 잔금에 넣는다. 부가세포함도 «함께» 켠다 — 칸에 든 숫자가
+             세금까지 든 값이라는 뜻이라, 안 켜면 뒤에서 한 번 더 붙는다. */
+          function _applyDayCalc(calc){
+            if(!calc) return;
+            setF(function(prev){
+              return Object.assign({}, prev, {
+                successFee: calc.total,
+                balanceFeeVatIncluded: true,
+                dayCalc: calc
+              });
+            });
+          }
           // 컨설팅·사건·기타: grid 2행 (착수금/성공보수 같은 column 정렬)
           if(isConsulting || isCase || isOther){
             return h('div', { key:kindV, style:{
@@ -19799,6 +19870,45 @@ function ContractModal(props){
                   style:{ margin:0, width:'13px', height:'13px', cursor:'pointer' } }),
                 h('span', null, '🧾 부가세포함')),
               h('span'), h('span'),
+              /* ─── 🏥 일수 행 — 하루 단위로 셈하는 컨설팅에만 (대표 지시 2026-09-18) ───
+                 「3일」만 치면 아래 띠에 35만×3+부가세 = 1,155,000 이 뜨고 잔금으로 간다.
+                 ⚠ 칸 여섯을 «정확히» 채운다 — 격자라 하나만 빠져도 아랫줄이 밀린다. */
+              _dayFee > 0 && h('span', { style:{ fontSize:'11.5px', fontWeight:700, color:'#166534' } }, '🏥 컨설팅 일수'),
+              _dayFee > 0 && h('span', { style:{ fontSize:'10.5px', color:'#64748b' } },
+                '1일 ' + _dayFee.toLocaleString() + '원 · 부가세 별도'),
+              _dayFee > 0 && h('span', { style:{ fontSize:'10.5px', color:'#64748b', fontWeight:600, textAlign:'right' } }, '일수'),
+              _dayFee > 0 && h(NumberInput, { value:f.consultDays || 0,
+                onChange:function(e){
+                  var n = parseInt(e.target.value, 10) || 0;
+                  var calc = consDayAmount(_dayFee, n);
+                  /* 일수만 고쳤을 때는 잔금도 따라온다. 사람이 손으로 적어 둔
+                     금액은 «건드리지 않는다» — 띠의 단추를 눌러야 바뀐다. */
+                  if(calc && consDayMayFill(f.successFee, f.dayCalc)){
+                    setF(function(prev){ return Object.assign({}, prev, {
+                      consultDays:n, successFee:calc.total, balanceFeeVatIncluded:true, dayCalc:calc }); });
+                  } else {
+                    setF(function(prev){ return Object.assign({}, prev, { consultDays:n }); });
+                  }
+                },
+                placeholder:'0',
+                style:{ width:'100%', padding:'7px 10px', border:'1px solid #bbf7d0', borderRadius:'6px', fontSize:'12px', fontFamily:'monospace', textAlign:'right' } }),
+              _dayFee > 0 && h('span', { style:{ fontSize:'11px', color:'#64748b' } }, '일'),
+              _dayFee > 0 && h('span'),
+              /* 셈한 것을 한 줄로 보여 준다 — 「어떻게 1,155,000 이 됐나」가 눈에 보여야 한다. */
+              _dayCalc && h('div', { style:{ gridColumn:'1 / -1', display:'flex', alignItems:'center', gap:'10px',
+                  flexWrap:'wrap', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'7px 10px' } },
+                h('span', { style:{ fontSize:'11.5px', fontFamily:'monospace', color:'#1e40af' } },
+                  _dayCalc.days + '일 × ' + _dayCalc.dayFee.toLocaleString() + ' = ' + _dayCalc.net.toLocaleString()
+                  + '  +  부가세 ' + _dayCalc.vat.toLocaleString()),
+                h('span', { style:{ fontSize:'13px', fontWeight:700, color:'#1e40af' } },
+                  '= ' + _dayCalc.total.toLocaleString() + '원'),
+                (parseInt(f.successFee, 10) || 0) === _dayCalc.total
+                  ? h('span', { style:{ fontSize:'10.5px', color:'#166534', fontWeight:700 } }, '✓ 잔금에 들어갔습니다')
+                  : h('button', { type:'button', onClick:function(){ _applyDayCalc(_dayCalc); },
+                      title:'잔금에 ' + _dayCalc.total.toLocaleString() + '원을 넣고 「부가세포함」을 켭니다.\n지금 적힌 금액은 지워집니다.',
+                      style:{ background:'#2563eb', color:'#fff', border:0, borderRadius:'6px', padding:'4px 11px',
+                        fontSize:'11px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } }, '잔금에 넣기')
+              ),
               // ─── 서브 행: 업무 요약(1~2열 묶음) / 잔금|성공보수 / input / 단위 / 토글(사건만) ───
               // 업무 요약을 잔금과 같은 줄 왼쪽 빈 칸에 넣는다 —
               // 아래 한 줄을 통째로 쓰던 것을 없애 창이 그만큼 짧아진다.
@@ -20937,6 +21047,10 @@ function transferContract(contract){
       balanceFee: (kindV === 'consulting' || kindV === 'other') ? (contract.successFee || 0) : 0,
       contractFeeVatIncluded: !!contract.contractFeeVatIncluded,
       balanceFeeVatIncluded: !!contract.balanceFeeVatIncluded,
+      /* 🏥 일수 승계 (대표 지시 2026-09-18) — 정부사업일정이 이 숫자를 읽어
+         「3일이라는데 지금 3회차가 맞나」를 알린다. 컨설팅에만 뜻이 있다. */
+      consultDays: (kindV === 'consulting') ? (parseInt(contract.consultDays, 10) || 0) : 0,
+      dayCalc: (kindV === 'consulting' && contract.dayCalc) ? contract.dayCalc : null,
       status: 'pending',
       brief: brief,                               // 업무 요약 — 계약에서 승계
       personalDeposit: !!contract.personalDeposit, // 👤 개인입금 승계 — 안 넘기면 입금확정이 못 본다
@@ -32771,7 +32885,9 @@ var BIZ_CONS_SEED = [
   { code:'cons-job-neung', short:'산능', name:'산업일자리',       agency:'한국능률협회',       sortOrder:20  },
   { code:'cons-job-chung', short:'산충', name:'산업일자리',       agency:'충남기업혁신협회',   sortOrder:30  },
   { code:'cons-voucher',   short:'바우', name:'혁신바우처',       agency:'',                   sortOrder:40  },
-  { code:'cons-clinic',    short:'클릭', name:'현장클리닉',       agency:'',                   sortOrder:50  },
+  /* dayFee — 하루 나가면 얼마(공급가). 이 값이 있는 유형만 계약창에 「일수」 칸이 뜬다.
+     현장클리닉 350,000원/일 (대표 확인 2026-09-18: 부가세 별도 · 전액 잔금 · 3일 = 3회차). */
+  { code:'cons-clinic',    short:'클릭', name:'현장클리닉',       agency:'', dayFee:350000, sortOrder:50  },
   { code:'cons-techguard', short:'기보', name:'기술보호울타리',   agency:'',                   sortOrder:60  },
   { code:'cons-hr',        short:'인노', name:'인사노무',         agency:'',                   sortOrder:70  },
   { code:'cons-fund',      short:'복기', name:'복지기금설립',     agency:'',                   sortOrder:80  },
@@ -33043,12 +33159,24 @@ function BizTypeCard(props){
     var nm = window.prompt('유형 이름', x.name || ''); if(nm === null) return;
     sh = sh.trim().slice(0,4); nm = nm.trim();
     if(!sh || !nm){ showToast('약어와 이름을 모두 입력하세요'); return; }
-    var ag = null;
-    if(cat.key === 'consulting'){ ag = window.prompt('기관 (없으면 비워두기)', x.agency || ''); if(ag === null) ag = x.agency || ''; }
+    var ag = null, df = null;
+    if(cat.key === 'consulting'){
+      ag = window.prompt('기관 (없으면 비워두기)', x.agency || ''); if(ag === null) ag = x.agency || '';
+      /* 🏥 1일 단가 (대표 지시 2026-09-18) — 현장클리닉처럼 «하루 나가면 얼마»인 사업.
+         ⚠ 부가세 «별도» 금액(공급가)을 넣는다. 계약창이 여기에 10%를 얹는다.
+         ⚠ 비우면 계약창에 일수 칸이 안 뜬다 — 그게 지금까지의 모습이다.
+         ⚠ 여기를 고쳐도 이미 맺은 계약 금액은 안 바뀐다(계약에 그때 단가가 적혀 있다). */
+      var cur = (x.dayFee === undefined || x.dayFee === null || x.dayFee === '') ? '' : String(x.dayFee);
+      df = window.prompt('1일 단가 — 부가세 별도, 원 (하루 단위로 받는 사업만. 없으면 비워두기)', cur);
+    }
     persist(list.map(function(it){
       if(it.code !== x.code) return it;
       var nx = Object.assign({}, it, { short:sh, name:nm });
       if(ag !== null) nx.agency = ag.trim();
+      if(df !== null){
+        var n = parseInt(String(df).replace(/[^\d]/g, ''), 10) || 0;
+        if(n > 0) nx.dayFee = n; else delete nx.dayFee;
+      }
       return nx;
     }));
     showToast('✏ 수정됨 — 코드 유지, 기존 사건·컨설팅 연결 그대로');
@@ -33120,7 +33248,10 @@ function BizTypeCard(props){
               h('span', { style:{ flex:1, fontSize:'11px', color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 } },
                 x.name,
                 x.hidden ? h('span', { style:{ marginLeft:'6px', fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } }, '숨김') : null,
-                cat.key === 'consulting' && x.agency ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#64748b', background:'#f8fafc', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null
+                cat.key === 'consulting' && x.agency ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#64748b', background:'#f8fafc', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null,
+                /* 🏥 1일 단가 — 있는 유형만. 계약창에 일수 칸이 뜨는 유형이 어느 것인지
+                   여기서 한눈에 보여야 한다(안 보이면 「왜 저기만 일수가 뜨지」가 된다). */
+                cat.key === 'consulting' && x.dayFee > 0 ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#166534', background:'#f0fdf4', border:'1px solid #bbf7d0', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '1일 ' + Number(x.dayFee).toLocaleString() + '원') : null
               ),
               h('button', { onClick:function(){ editType(x); }, className:'erp-tip', 'data-tip':'✏ 수정 가능 (코드 유지 — 연결 안 끊김)',
                 style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer' } }, '✏'),
