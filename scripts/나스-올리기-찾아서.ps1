@@ -19,15 +19,21 @@ $found = $null
 # 흔한 자리부터 본다 — 대개 여기서 바로 나온다
 foreach ($root in @($env:USERPROFILE, 'C:\', 'D:\')) {
   if (-not (Test-Path $root)) { continue }
+  # ⚠★ «.git 이 있는» 폴더만 본다 (2026-09-18 대표 화면)
+  #    처음에는 scripts 가 옆에 있는지만 봤다 — 그러자 배포 결과물 폴더
+  #    (Documents\pu-deploy)가 잡혔다. 거기에도 pu-erp.html 과 scripts 가 있다.
+  #    우리는 git pull 을 할 자리가 필요하므로 «저장소인가»가 진짜 조건이다.
   $found = Get-ChildItem -Path $root -Filter 'pu-erp.html' -Recurse -File -ErrorAction SilentlyContinue |
-           Where-Object { Test-Path (Join-Path $_.DirectoryName 'scripts') } |
+           Where-Object { Test-Path (Join-Path $_.DirectoryName '.git') } |
            Select-Object -First 1
   if ($found) { break }
 }
 
 if (-not $found) {
   Write-Host '✗ 이알피 폴더를 못 찾았습니다.' -ForegroundColor Red
-  Write-Host '  이 PC 에 저장소가 없을 수 있습니다 — 클로드에게 이 화면을 보여 주세요.'
+  Write-Host '  이 PC 에 저장소(.git 이 있는 폴더)가 없는 것 같습니다.'
+  Write-Host '  내려받으려면:  git clone https://github.com/nabaho/pureunall.git'
+  Write-Host '  그래도 안 되면 클로드에게 이 화면을 보여 주세요.'
   Read-Host '엔터를 누르면 닫힙니다'
   exit 1
 }

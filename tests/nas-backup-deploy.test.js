@@ -52,7 +52,15 @@ test('③★ 열쇠가 이미 있으면 다시 만들지 않는다', () => {
 test('④★★ 열쇠를 파일로 남기지 않는다', () => {
   assert.ok(!/writeFileSync|appendFileSync|createWriteStream/.test(SRC),
     '★★ 열쇠를 파일로 적으면 그 파일 하나로 백업 전부를 받아 갈 수 있다');
-  assert.match(SRC, /이 화면에만 있습니다/, '★ 어디에 있는 것인지 말해 줘야 사람이 지킨다');
+  assert.match(SRC, /이 화면에만 있습니다|열쇠가 들어 있습니다/,
+    '★ 열쇠가 «지금 어디에» 있는지 말해 줘야 사람이 지킨다');
+  /* ★ 완성본을 건네는 길도 파일이 아니라 «클립보드»다 — 잠깐 있다 사라진다 */
+  assert.match(SRC, /function 클립보드에\(/,
+    '★★ 완성된 스크립트를 파일로 떨어뜨리면 열쇠가 든 파일이 PC 에 남는다');
+  const i = SRC.indexOf('function 나스스크립트만들기(');
+  const j = SRC.indexOf('function 클립보드에(');
+  assert.ok(i > -1 && j > i && !/writeFileSync/.test(SRC.slice(i, j)),
+    '★ 만드는 대목에서 파일로 쓰고 있다');
   /* 서버에 넣을 때도 명령줄이 아니라 «들어가는 물길»로 준다 — ps 에 안 보이게 */
   assert.match(SRC, /'--data-file', '-'/,
     '★★ 열쇠를 명령줄 인자로 주면 같은 PC 의 다른 프로그램이 ps 로 그대로 본다');

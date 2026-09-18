@@ -56,8 +56,12 @@ test('③★ 두 길이 «같은 것»을 부른다 — 어긋나면 한쪽만 �
 
 test('④ 찾기는 «이알피 폴더인지»까지 본다 — 한 장만 보고 엉뚱한 데로 가지 않는다', () => {
   assert.match(PS1, /Filter 'pu-erp\.html'/);
-  assert.match(PS1, /Join-Path \$_\.DirectoryName 'scripts'/,
-    '★ 내려받기 폴더에 있는 pu-erp.html 한 장을 저장소로 잘못 보면 git pull 이 또 터진다');
+  assert.match(PS1, /Join-Path \$_\.DirectoryName '\.git'/,
+    '★★ «.git 이 있는가»가 진짜 조건이다. 2026-09-18 대표 PC 에서 scripts 만 보고 찾았더니\n' +
+    '  배포 결과물 폴더(Documents\\pu-deploy)가 잡혔다 — 거기에도 pu-erp.html 과 scripts 가 있다.\n' +
+    '  우리는 git pull 을 할 자리가 필요하다.');
+  assert.match(PS1, /git clone/,
+    '★ 저장소가 아예 없을 수도 있다 — 그때 무엇을 하라는 말이 없으면 사람은 멈춘다');
   assert.match(PS1, /USERPROFILE/, '★ 흔한 자리부터 봐야 몇 분을 안 기다린다');
 });
 
