@@ -151,3 +151,40 @@ test('⑫ 어디서든 열 수 있고, 실제로 달려 있다', () => {
   assert.match(SRC, /onClick:function\(\)\{ erpOpenCoSheet\(f\.company\.bizNo\); \}/,
     '계약창 띠에서 열 수 있다');
 });
+
+/* ── 3걸음: 컨설팅관리·사건관리·업체관리에서도 열 수 있다 (2026-09-18 「3」) ── */
+
+test('⑬★ 업체관리(CompanyDetailModal)에 단추가 있고 «검산 통과할 때만» 뜬다', () => {
+  const modal = stripJs(cutFn(RAW, 'function CompanyDetailModal('));
+  const at = modal.indexOf('회사 한 장');
+  assert.ok(at > 0, '업체관리 상세창에 단추가 없다');
+  const band = modal.slice(Math.max(0, at - 400), at + 40);
+  assert.match(band, /window\.PuCoKey && window\.PuCoKey\.key\(co\.bizNo\)/,
+    '검산을 통과 못 하면 단추를 아예 안 그려야 한다 — 못 믿을 번호로 열면 남의 회사가 뜬다');
+  assert.match(band, /erpOpenCoSheet\(co\.bizNo\)/, '같은 공용 함수를 부른다(새로 안 만든다)');
+});
+
+test('⑭★ 사건관리·컨설팅·기금·기타사업이 함께 쓰는 UnifiedDetailModal 에도 있다', () => {
+  const modal = stripJs(cutFn(RAW, 'function UnifiedDetailModal('));
+  const at = modal.indexOf('회사 한 장');
+  assert.ok(at > 0, '공유 상세창에 단추가 없다');
+  const band = modal.slice(Math.max(0, at - 400), at + 40);
+  assert.match(band, /window\.PuCoKey && window\.PuCoKey\.key\(c\.bizNo\)/,
+    '여기도 검산을 통과할 때만 뜬다');
+  assert.match(band, /erpOpenCoSheet\(c\.bizNo\)/, '같은 공용 함수를 부른다');
+  /* 이 모달이 실제로 CaseDetailModal 과 ProjectDetailModal(컨설팅/기금/기타) 이
+     함께 쓰는 자리인지 — 새 모달을 따로 만든 게 아니라 공유 모달 «하나만» 고쳤는지.
+     ⚠ 거리로 자르지 않는다 — 함수 «전체»를 cutFn 으로 떼어 그 안에 있는지 본다. */
+  assert.match(stripJs(cutFn(RAW, 'function CaseDetailModal(')), /h\(UnifiedDetailModal,/,
+    '사건관리가 이 공유 모달을 쓴다');
+  assert.match(stripJs(cutFn(RAW, 'function ProjectDetailModal(')), /h\(UnifiedDetailModal,/,
+    '컨설팅·기금·기타사업이 이 공유 모달을 쓴다');
+});
+
+test('⑮ 세 자리 모두 «단추가 하나씩만» — 중복으로 안 늘어난다', () => {
+  const modal1 = stripJs(cutFn(RAW, 'function CompanyDetailModal('));
+  const modal2 = stripJs(cutFn(RAW, 'function UnifiedDetailModal('));
+  const count = s => (s.match(/'\uD83D\uDCC4 회사 한 장'/g) || []).length;
+  assert.equal(count(modal1), 1, '업체관리 상세창에 단추가 둘 이상이거나 없다');
+  assert.equal(count(modal2), 1, '공유 상세창에 단추가 둘 이상이거나 없다');
+});

@@ -306,8 +306,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-18 초기 동기화의 건별 자료를 모아 한 번만 저장 — 수천 건을 받을 때마다 전체 배열을 다시 저장해 화면이 오래 멈추던 길을 줄였다';
-var BUILD_SEQ = 175;
+var ERP_BUILD = '2026-09-18 「회사 한 장」 단추를 업체관리·사건관리·컨설팅/기금/기타사업 상세창에도 — 사업자번호가 검산을 통과할 때만 뜬다';
+var BUILD_SEQ = 176;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -27736,7 +27736,12 @@ function CompanyDetailModal(props){
     h('div', { className:'modal', style:{ width:'720px' }, onClick:function(e){ e.stopPropagation(); } },
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, '🏢 ' + co.name + ' - 상세'),
-        h('button', { className:'x', onClick:props.onClose }, '×')
+        h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
+          (window.PuCoKey && window.PuCoKey.key(co.bizNo)) && h('button', { onClick:function(){ erpOpenCoSheet(co.bizNo); },
+            title:'이 회사의 자문·계약·컨설팅·사건을 한 화면에 모아 봅니다 — 보기만 합니다',
+            style:{ background:'#fff', color:'#166534', border:'1px solid #bbf7d0', padding:'4px 10px', borderRadius:'5px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '📄 회사 한 장'),
+          h('button', { className:'x', onClick:props.onClose }, '×')
+        )
       ),
       h('div', { className:'modal-b', style:{ maxHeight:'70vh', overflowY:'auto', padding:'14px 18px' } },
         // 회사 정보 (계약관리와 동기화)
@@ -30383,6 +30388,9 @@ function UnifiedDetailModal(props){
           _linkedContract && h('button', { onClick:function(){ _setContractPrint(_linkedContract); },
             title:'이 건의 원본 계약서 보기/출력 (계약금액·업무범위 확인)',
             style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fbbf24', padding:'4px 10px', borderRadius:'5px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '\ud83d\udcc4 원본 계약서'),
+          (window.PuCoKey && window.PuCoKey.key(c.bizNo)) && h('button', { onClick:function(){ erpOpenCoSheet(c.bizNo); },
+            title:'이 회사의 자문·계약·컨설팅·사건을 한 화면에 모아 봅니다 — 보기만 합니다',
+            style:{ background:'#fff', color:'#166534', border:'1px solid #bbf7d0', padding:'4px 10px', borderRadius:'5px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '📄 회사 한 장'),
           h('button', { className:'x', onClick:props.onClose }, '×')
         )
       ),
