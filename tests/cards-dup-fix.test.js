@@ -280,10 +280,44 @@ test('배지를 눌러 팝업이 열린다 — 줄 클릭과 겹치지 않게 �
     '배지를 누르면 상세보기까지 함께 열립니다');
 });
 
-test('자동 합치기는 이름까지 같은 묶음만 건드린다', () => {
-  /* 이 줄이 없으면 회사 대표이메일을 함께 쓰는 다른 사람들이 한 장으로 합쳐진다. */
-  const fn = fnBody('autoMergeAll');
-  assert.match(fn, /dupSameName/, '이름이 엇갈리는 묶음까지 자동으로 합칩니다');
+test('★★★ 자동 합치기는 이름까지 같은 묶음만 건드린다', () => {
+  /* 이것이 없으면 회사 대표이메일을 함께 쓰는 다른 사람들이 한 장으로 합쳐진다.
+     ⚠ 2026-09-18 — 예전에는 autoMergeAll 안에 「dupSameName 이라는 글자가 있나」로
+       봤다. 그런데 잣대가 findDupGroups 한 곳으로 모이자 그 글자가 사라졌다 —
+       기능은 멀쩡한데 검사만 깨졌다. 글자 대신 **돌려서** 본다. */
+  const C = load();
+  C.state = { tab: 'card', items: {
+    a: card({ id:'a', name:'김철수', email:'info@ga.co.kr' }),
+    b: card({ id:'b', name:'박영희', email:'info@ga.co.kr' }),   /* 회사 대표이메일을 함께 쓴다 */
+    c: card({ id:'c', name:'이몽룡', mobile:'010-5555-6666' }),
+    d: card({ id:'d', name:'이몽룡', mobile:'01055556666' })     /* 진짜 같은 사람 */
+  } };
+  /* 바깥 둘은 대역이다 — 이 검사가 재려는 것은 «무엇을 세느냐»이지 어디서 읽어오느냐가 아니다 */
+  C._ign = null;
+  vm.runInContext('function dupPool(){ return Object.values(state.items); }\n'
+    + 'function dupIgnoreSet(){ return _ign || new Set(); }\n'
+    + fnBody('findDupGroups'), C);
+  const got = C.findDupGroups().map(g => g.map(x => x.id).sort().join('+')).sort();
+  same(got, ['c+d'],
+    '★★★ 이름이 엇갈리는 묶음까지 자동으로 합치면 한 사람이 휴지통으로 사라진다');
+});
+
+test('★★★ 「중복 아님」으로 치운 짝은 세는 곳에서도 빠진다 — 치울 수 없는 숫자는 없느니만 못하다', () => {
+  /* ⚠⚠ 대표가 짚어 주신 자리다 — 정리 창은 「중복 아님」을 뺐는데 할 일 배지는
+     안 봤다. 그래서 눌러서 치워도 숫자가 영영 그대로였고, 열어 보면 0묶음이었다. */
+  const C = load();
+  C.state = { tab: 'card', items: {
+    c: card({ id:'c', name:'이몽룡', mobile:'010-5555-6666' }),
+    d: card({ id:'d', name:'이몽룡', mobile:'01055556666' })
+  } };
+  C._ign = null;
+  vm.runInContext('function dupPool(){ return Object.values(state.items); }\n'
+    + 'function dupIgnoreSet(){ return _ign || new Set(); }\n'
+    + fnBody('findDupGroups'), C);
+  assert.equal(C.findDupGroups().length, 1, '치우기 전에는 한 묶음이어야 한다');
+  C._ign = new Set([C.dupIgnoreKey('c', 'd')]);       /* 「중복 아님」을 눌렀다 */
+  assert.equal(C.findDupGroups().length, 0,
+    '★★★ 「중복 아님」을 눌러도 숫자가 남으면 목록 전체를 못 믿게 된다');
 });
 
 test('한 번에 정리 화면은 안전한 것과 사람이 볼 것을 갈라 보여준다', () => {

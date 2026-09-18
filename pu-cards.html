@@ -13183,24 +13183,47 @@ function itemKeys(it){
   if (it.kind==='biz'){ const d=digits(it.bizno); return d.length>=10 ? ['b'+d] : []; }
   return rowKeys(it);
 }
+/* ══════ 「확실한 중복」을 세는 잣대는 여기 «한 곳»이다 (대표 지시 2026-09-18) ══════
+   ★★ 무엇이 틀렸었나 — 이 함수가 제 셈을 «따로» 하고 있었다.
+     · 정리 창(openDedup) — 「중복 아님」으로 치워 둔 짝을 **뺀다**
+     · 이 함수(할 일 배지 · 청소 센터) — 그 목록을 **안 봤다**
+     그래서 대표가 「중복 아님」을 누르셔도 **할 일 숫자는 영영 그대로**였고,
+     눌러서 열어 보면 0묶음이었다. **치울 수 없는 숫자는 없느니만 못하다** —
+     목록 전체를 못 믿게 만든다.
+
+   ⚠ 바로 아래 dupGroupsOf 머리에 「배지와 정리의 기준이 달랐다 — 그것을 고쳤다」고
+     적혀 있다. 그 고침이 **세는 자리 두 곳에는 안 들어와 있었다.** 이제 들어왔다.
+   ⚠ 이름이 엇갈리는 묶음을 빼는 까닭은 dupSameName 머리에 있다(같은 대표 이메일을
+     쓰는 다른 사람을 합치면 한 사람이 휴지통으로 사라진다).
+   ⚠ 여기에 셈을 다시 적지 «말 것». 한 줄이어야 두 곳이 갈릴 수가 없다.
+   ⚠ 한 줄로 «붙여» 쓰지 말 것 — 검사가 함수를 떼어 갈 때 `\n}` 를 끝으로 삼는다
+     (tests/cards-dup-fix.test.js 의 fnBody). 붙여 쓰면 다음 함수까지 딸려 간다. */
 function findDupGroups(){
-  const arr=Object.values(state.items).filter(it=>it.kind===state.tab);
-  const parent={}; arr.forEach(it=>parent[it.id]=it.id);
-  const find=x=>parent[x]===x?x:(parent[x]=find(parent[x]));
-  const uni=(a,b)=>{ parent[find(a)]=find(b); };
-  const map={};
-  arr.forEach(it=>itemKeys(it).forEach(k=>{ if(map[k]) uni(it.id,map[k]); else map[k]=it.id; }));
-  const groups={};
-  arr.forEach(it=>{ const r=find(it.id); (groups[r]=groups[r]||[]).push(it); });
-  /* ★ 이름이 서로 다르면 '확실한 중복'이 아니다.
-     한 회사가 대표 이메일(info@…) 하나를 여럿이 함께 쓰거나, 회사 대표번호를
-     휴대폰 칸에 적어 둔 명함이 흔하다. 그것만 보고 합치면 김철수와 박영희가
-     한 장으로 합쳐지고 한 사람이 휴지통으로 사라진다 — 합친 뒤에는 어느 값이
-     누구 것이었는지 알 수 없어 되돌려도 원래대로 돌아오지 않는다.
-     이름이 엇갈리면 애초에 같은 사람이 아니므로 중복으로 세지 않는다. */
-  return Object.values(groups).filter(g=>g.length>1).filter(g=>{
-    const names=new Set(g.map(x=>String(x.name||'').toLowerCase().replace(/\s/g,'')).filter(Boolean));
-    return names.size<=1;
+  return dupGroupsOf(dupPool(), dupIgnoreSet()).filter(dupSameName);
+}
+
+/* ══════ ✓ 「칸이 하나도 안 다른」 묶음 (대표 지시 2026-09-18) ══════════════════
+   대표: 「이렇게 완전히 중복되는 자료는 어떻게 관리하는게 좋은가?」
+     — 상호·대표자·사업자번호·업태·종목·소재지가 «한 글자도» 안 다른 두 줄을 보시고.
+
+   ★★ 이런 묶음은 **사람이 판단할 것이 하나도 없다.** 어느 쪽을 남겨도 결과가 같고,
+     합쳐도 메모에 남길 것이 없다. 그런데 여태 「이름이 같은 묶음」 무더기에 섞여 있어,
+     **볼 것이 없는데도 볼 것처럼** 보였다. 갈라 놓으면 숫자가 확 줄어
+     정작 봐야 할 묶음이 눈에 든다.
+
+   ⚠ 잣대는 mergeGroup 이 값을 견줄 때 쓰는 규칙과 «같다»(소문자·공백·붙임표 무시).
+     여기서 다르게 재면 「달라지는 것이 없습니다」라고 말해 놓고 메모에 [병합]이 남는다.
+   ⚠ 빈 칸도 «양쪽 다» 비어야 같은 것으로 센다 — 한쪽에만 값이 있으면 합칠 때
+     그 빈 칸이 채워지므로(달라진다) 이 갈래가 아니다.
+   ⚠ 사진은 안 본다 — mergeGroup 은 사진을 «잃지 않는다»(한쪽에만 있으면 지켜 옮긴다). */
+const DUP_NORM = v => String(v == null ? '' : v).toLowerCase().replace(/[\s\-]/g, '');
+function dupAllSame(group){
+  const g = (group || []).filter(Boolean);
+  if(g.length < 2) return false;
+  const keys = (g[0].kind === 'card' ? CARD_FIELDS : BIZ_FIELDS).map(f => f[0]);
+  return keys.every(function(k){
+    const v = DUP_NORM(g[0][k]);
+    return g.every(x => DUP_NORM(x[k]) === v);
   });
 }
 /* keepId — 사람이 「남길 것」으로 고른 명함을 바탕으로 삼는다.
@@ -13247,11 +13270,24 @@ function openDedup(){
     return toast(msg);
   }
   const label = state.tab==='card' ? '명함' : '사업자등록증';
+  /* ⚠ 확실한 중복을 «둘»로 가른다 (대표 지시 2026-09-18) — 까닭은 dupAllSame 머리에.
+     똑같은 것은 볼 것이 없고, 값이 다른 것은 메모에 자국이 남는다. 같은 단추로 묶으면
+     「볼 것 없는 것」이 「자국 남는 것」에 섞여 둘 다 망설이게 된다. */
+  const exact = safe.filter(dupAllSame);                /* 칸이 하나도 안 다름 */
+  const fill  = safe.filter(g => !dupAllSame(g));       /* 이름은 같고 값이 다름 */
   let h=`<div class="mhead"><b>🧹 중복 정리 — ${all.length}묶음</b>${_closeBtn()}</div>`;
-  if (safe.length){
-    h+=`<div class="dupok">✓ 이름까지 같은 <b>확실한 중복 ${safe.length}묶음</b> — 한 번에 합쳐도 됩니다.</div>
-      <button class="btn primary" style="width:100%;margin:10px 0 4px" onclick="autoMergeAll()">
-        ⚡ 확실한 중복 ${safe.length}묶음 한 번에 합치기</button>
+  if (exact.length){
+    h+=`<div class="dupok">✓ <b>칸이 하나도 안 다른 ${exact.length}묶음</b> — 합쳐도 달라지는 것이 없습니다. 보실 것이 없습니다.</div>
+      <button class="btn primary" style="width:100%;margin:10px 0 4px" onclick="autoMergeAll('exact')">
+        ⚡ 똑같은 ${exact.length}묶음 치우기</button>
+      <p style="font-size:12px;color:var(--sub);line-height:1.7;margin:0 0 12px">
+        모든 칸의 값이 서로 같습니다 — <b>메모에 남을 것이 없습니다.</b>
+        한쪽에만 있는 사진은 지켜 옮깁니다.</p>`;
+  }
+  if (fill.length){
+    h+=`<div class="dupok">✓ 이름은 같고 <b>값이 다른 ${fill.length}묶음</b> — 한 번에 합쳐도 됩니다.</div>
+      <button class="btn ${exact.length ? 'ghost' : 'primary'}" style="width:100%;margin:10px 0 4px" onclick="autoMergeAll('same')">
+        ⚡ 이름이 같은 ${fill.length}묶음 합치기</button>
       <p style="font-size:12px;color:var(--sub);line-height:1.7;margin:0 0 12px">
         빈 칸은 서로 채워지고, 값이 다른 것은 메모에 [병합]으로 남습니다. 사진도 지킵니다.</p>`;
   }
@@ -13276,17 +13312,23 @@ function openDedup(){
   }
   showPanel(h);
 }
-/* 확실한 중복(이름까지 같은 것)만 합친다 — 이름이 엇갈리는 묶음은 손대지 않는다 */
-async function autoMergeAll(){
-  const groups=dupGroupsOf(dupPool(), dupIgnoreSet()).filter(dupSameName);
-  if (!groups.length) return toast('한 번에 합칠 확실한 중복이 없습니다');
+/* 확실한 중복(이름까지 같은 것)만 합친다 — 이름이 엇갈리는 묶음은 손대지 않는다.
+   which — 'exact' 칸이 하나도 안 다른 것만 / 'same' 값이 다른 것만 / 안 주면 둘 다.
+   ⚠ 잣대를 여기서 다시 적지 «않는다» — findDupGroups 한 곳에서 받아 거르기만 한다. */
+async function autoMergeAll(which){
+  const safe = findDupGroups();
+  const groups = which === 'exact' ? safe.filter(dupAllSame)
+               : which === 'same'  ? safe.filter(g => !dupAllSame(g))
+               : safe;
+  const 갈래 = which === 'exact' ? '똑같은' : which === 'same' ? '이름이 같은' : '확실한 중복';
+  if (!groups.length) return toast(`한 번에 합칠 ${갈래} 묶음이 없습니다`);
   let i=0;
   for (const g of groups){ await mergeGroup(g.map(x=>x.id));
     if (++i%10===0) toast(`합치는 중… ${i}/${groups.length}`,3000); }
   $('dedupBg').classList.remove('open'); render();
   const left = dupGroupsOf(dupPool(), dupIgnoreSet()).length;
-  toast(`✅ 확실한 중복 ${i}묶음을 합쳤습니다.`+
-    (left?` 사람이 봐야 할 ${left}묶음이 남았습니다 — 표의 담당 칸 ⚠ 를 눌러 보세요.`:''), 8000);
+  toast(`✅ ${갈래} ${i}묶음을 합쳤습니다.`+
+    (left?` ${left}묶음이 남았습니다 — 표의 담당 칸 ⚠ 를 눌러 보세요.`:''), 8000);
 }
 
 /* ══════ 중복 판단 — 순수 로직 (테스트 대상) ══════
@@ -13299,7 +13341,10 @@ async function autoMergeAll(){
      그래서 배지를 영원히 달고 있으면서 정리 목록에는 없는 명함이 생겼다 —
      사람이 「이건 다른 사람이다」라고 말할 자리가 없었다.
      이 층은 **이름으로 걸러내지 않고 묶고**, 대신 이름이 모이는지를 따로 알려 준다.
-     걸러내는 것은 자동 합치기만 하고, 사람은 다 본다. */
+     걸러내는 것은 자동 합치기만 하고, 사람은 다 본다.
+   ★ 2026-09-18 — 그 고침이 **세는 자리 두 곳(할 일 배지·정리 센터)에는 안 들어와**
+     있었다. findDupGroups 가 제 셈을 따로 하며 「중복 아님」을 안 봤다. 이제 그 함수가
+     이 층을 그대로 부른다 — 세는 곳도 여는 곳도 한 잣대다. */
 const DUP_IGNORE_LS = 'pucards_dup_ignore';
 
 /* 짝 서명 — 어느 쪽을 먼저 넣어도 한 가지 모양이어야 한다.
