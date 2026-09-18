@@ -25,10 +25,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { cutFn } = require('./cut-fn.js');
+const { stripJs } = require('./strip-comments.js');
 
 const ROOT = path.join(__dirname, '..');
 const ERP = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
-const NAS = cutFn(ERP, 'function NasBackupSettings(');
+/* ⚠ 조각이므로 stripComments 가 아니라 stripJs 다 — 주석 속 낱말이 코드로 읽히면 안 된다 */
+const NAS = stripJs(cutFn(ERP, 'function NasBackupSettings('));
 const EFF = NAS.slice(NAS.indexOf('useEffect(function'), NAS.indexOf('function 안저장됨('));
 
 test('①★★ 빈 칸이면 «무엇이» 비었는지 이름으로 말한다 — 조용히 물러서지 않는다', () => {
@@ -54,7 +56,9 @@ test('③ 빈 칸일 때는 나스를 두드리지 않는다', () => {
 });
 
 test('④★★ 자동 백업 띠가 «활성화됨»이라 하지 않는다 — 돌 수가 없는 상태다', () => {
-  const 띠 = NAS.slice(NAS.indexOf('자동 백업 상태 배너'), NAS.indexOf('📡 NAS 연결 설정'));
+  const 띠시작 = NAS.indexOf('var 못돎 =');
+  assert.ok(띠시작 > -1, '★ 자동 백업 띠를 못 찾았다 — 검사가 빈 글자를 보고 있다');
+  const 띠 = NAS.slice(띠시작, NAS.indexOf('📡 NAS 연결 설정'));
   assert.match(띠, /var 못돎 = !cfg\.host \|\| !cfg\.user \|\| !cfg\.pass;/,
     '★ 띠가 «돌 수 있는 상태인지»를 안 보면 언제나 활성화됐다고 한다');
   assert.match(띠, /돌 수가 없습니다/, '★★ 한 번도 돌 수 없었는데 「활성화됨」이라 하는 것은 거짓말이다');

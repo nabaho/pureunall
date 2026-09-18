@@ -24,10 +24,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { cutFn } = require('./cut-fn.js');
+const { stripJs } = require('./strip-comments.js');
 
 const ROOT = path.join(__dirname, '..');
 const ERP = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
-const NAS = cutFn(ERP, 'function NasBackupSettings(');
+/* ⚠ 주석을 먼저 걷는다 — 안 걷으면 내가 쓴 «설명»의 낱말이 코드로 읽혀 검사가 거짓으로 통과하거나
+     거짓으로 깨진다(2026-09-18 실제로 「실행 로그」라는 주석 때문에 순서 검사가 깨졌다).
+   ⚠ 조각에는 stripComments 가 아니라 stripJs 다 — 조각에는 <script> 태그가 없어 아무 일도 안 한다. */
+const NAS = stripJs(cutFn(ERP, 'function NasBackupSettings('));
 /* 여는 순간 스스로 재는 대목만 떼어 본다 — 자리는 주석이 아니라 «코드»로 잡는다 */
 const EFF = (() => {
   const i = NAS.indexOf('useEffect(function');
@@ -64,13 +68,15 @@ test('⑤★ 답은 맨 위 — 검은 로그«보다 앞»에 둔다', () => {
   assert.ok(로그칸 > -1 && 진단칸 < 로그칸,
     '★★ 답이 로그 뒤에 있으면 대표님은 또 스크롤해서 찾으셔야 한다 — 그게 「모르겠다」가 된 자리다');
   /* 줄바꿈이 살아야 읽힌다 — 한 덩어리로 붙으면 안 읽는다 */
-  const 칸 = NAS.slice(진단칸 - 900, 진단칸 + 200);
+  const 칸시작 = NAS.lastIndexOf('진단 && h(', 진단칸);
+  assert.ok(칸시작 > -1, '★ 「지금 상태」 칸을 그리는 대목을 못 찾았다');
+  const 칸 = NAS.slice(칸시작, 진단칸 + 200);
   assert.match(칸, /whiteSpace:\s*'pre-line'/, '★ 여러 줄 안내를 한 줄로 붙이면 아무도 안 읽는다');
 });
 
 test('⑥ 됐는지 안 됐는지가 «색»으로도 갈린다', () => {
   const 진단칸 = NAS.indexOf("'지금 상태'");
-  const 칸 = NAS.slice(진단칸 - 900, 진단칸 + 200);
+  const 칸 = NAS.slice(NAS.lastIndexOf('진단 && h(', 진단칸), 진단칸 + 200);
   assert.match(칸, /진단\.ok === true \? '#f0fdf4'/, '★ 됐을 때 초록');
   assert.match(칸, /'#fef2f2'/, '★ 안 됐을 때 빨강 — 글자만 바뀌면 눈이 넘어간다');
   assert.match(칸, /진단\.ok === null/, '★ «아직 모름»을 «안 됨»과 같은 색으로 칠하면 겁만 준다');
