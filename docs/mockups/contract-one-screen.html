@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>계약창 한 화면</title>
+<style>
+  :root{
+    --g0:#f8fafc;--g1:#e2e8f0;--g2:#cbd5e1;--g3:#94a3b8;--g4:#64748b;--g5:#475569;--g6:#1e293b;
+    --b0:#eff6ff;--b1:#bfdbfe;--b2:#60a5fa;--b3:#2563eb;--b4:#1e40af;
+    --n0:#f0fdf4;--n1:#bbf7d0;--n3:#16a34a;--n4:#166534;
+    --y0:#fffbeb;--y1:#fde68a;--y3:#d97706;--y4:#854d0e;
+    --r0:#fef2f2;--r1:#fecaca;--r3:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--g0);color:var(--g6);
+    font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;
+    font-size:13px;line-height:1.55}
+  .wrap{max-width:1640px;margin:0 auto;padding:22px 16px 64px}
+  h1{font-size:20px;margin:0 0 3px}
+  .sub{color:var(--g4);font-size:12.5px;margin:0 0 20px}
+  h2{font-size:15px;margin:26px 0 10px;display:flex;align-items:center;gap:8px}
+  .tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--b0);color:var(--b3);border:1px solid var(--b1)}
+  .tag.new{background:var(--n0);color:var(--n4);border-color:var(--n1)}
+  .tag.cut{background:var(--r0);color:var(--r3);border-color:var(--r1)}
+
+  /* ── 창 ── */
+  .win{background:#fff;border:1px solid var(--g2);border-radius:12px;overflow:hidden;
+    box-shadow:0 12px 40px rgba(15,23,42,.10)}
+  .win-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:9px 14px;border-bottom:1px solid var(--g1);background:var(--g0)}
+  .win-h .t{font-size:14px;font-weight:800}
+  .no{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;font-weight:700;
+    background:#fff;border:1px solid var(--g2);border-radius:6px;padding:3px 9px}
+  .chips{display:inline-flex;gap:3px;background:var(--g1);border-radius:8px;padding:2px}
+  .chip{padding:3px 11px;border-radius:6px;font-size:11px;font-weight:700;color:var(--g5);
+    background:transparent;border:0;cursor:pointer;white-space:nowrap}
+  .chip.on{background:var(--b4);color:#fff}
+  .spacer{margin-left:auto}
+  .ghost{background:#fff;color:var(--g5);border:1px solid var(--g2);border-radius:6px;
+    padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+  .col{padding:12px 14px;border-right:1px solid var(--g1);min-width:0}
+  .col:last-child{border-right:0}
+  .col-h{font-size:12px;font-weight:800;color:var(--b4);margin:0 0 8px;
+    padding-bottom:5px;border-bottom:2px solid var(--b1);display:flex;align-items:center;gap:6px}
+  .col-h .n{margin-left:auto;font-size:10px;font-weight:700;color:var(--g3)}
+
+  .fld{display:grid;grid-template-columns:78px 1fr;align-items:center;gap:7px;margin-bottom:5px}
+  .fld > label{font-size:11px;font-weight:700;color:var(--g5);text-align:right}
+  .fld .two{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  input,select{font-family:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--g2);
+    border-radius:6px;width:100%;background:#fff;color:var(--g6);min-width:0}
+  input::placeholder{color:var(--g3)}
+  .num{font-family:ui-monospace,Menlo,Consolas,monospace;text-align:right}
+  .row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .mini{font-size:10.5px;color:var(--g4)}
+  .ok{color:var(--n4);font-weight:700}
+  .badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;
+    background:var(--n0);color:var(--n4);border:1px solid var(--n1);white-space:nowrap}
+  .badge.b{background:var(--b0);color:var(--b3);border-color:var(--b1)}
+
+  .kinds{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:9px}
+  .kind{display:flex;align-items:center;gap:5px;border:1.5px solid var(--g1);border-radius:7px;
+    padding:6px 8px;font-size:11.5px;font-weight:700;color:var(--g5);cursor:pointer;background:#fff}
+  .kind.on{border-color:var(--b3);background:var(--b0);color:var(--b4)}
+  .kind.on2{border-color:var(--y3);background:var(--y0);color:var(--y4)}
+
+  .box{background:var(--g0);border:1px solid var(--g1);border-radius:8px;padding:9px;margin-bottom:9px}
+  .box .cap{font-size:11px;font-weight:800;color:var(--g5);margin-bottom:7px;display:flex;gap:6px;align-items:center}
+  .grid6{display:grid;grid-template-columns:76px 1fr 44px 106px 18px auto;align-items:center;gap:6px 7px}
+  .rt{text-align:right;font-size:10.5px;color:var(--g4);font-weight:700}
+  .chkline{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--g4);white-space:nowrap}
+  .chkline input{width:13px;height:13px;padding:0;margin:0}
+  .calc{grid-column:1/-1;display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+    background:var(--b0);border:1px solid var(--b1);border-radius:6px;padding:6px 9px}
+  .calc .eq{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--b4)}
+  .calc .big{font-size:13px;font-weight:800;color:var(--b4)}
+
+  .person{border:1px solid var(--g1);border-radius:7px;padding:7px;margin-bottom:6px;background:#fff}
+  .person .hd{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+  .jr{border-left:2px solid var(--b1);padding:3px 0 3px 8px;margin-bottom:6px}
+  .jr .d{font-size:10px;color:var(--g3);font-family:ui-monospace,monospace}
+
+  .win-f{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--g1);background:var(--g0)}
+  .primary{background:var(--b3);color:#fff;border:0;border-radius:7px;padding:7px 20px;
+    font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
+  .fold{width:100%;text-align:left;background:#fff;border:1px dashed var(--g2);border-radius:7px;
+    padding:5px 9px;font-size:11px;font-weight:700;color:var(--g4);cursor:pointer;font-family:inherit;margin-bottom:7px}
+
+  /* ── 견주기 ── */
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:#fff;border:1px solid var(--g1);border-radius:10px;padding:14px}
+  .card h3{margin:0 0 8px;font-size:13px}
+  .bad{border-color:var(--r1);background:var(--r0)}
+  .good{border-color:var(--n1);background:var(--n0)}
+  ul.tight{margin:0;padding-left:18px}
+  ul.tight li{margin-bottom:5px;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
+  th,td{padding:7px 9px;border-bottom:1px solid var(--g1);text-align:left;vertical-align:top}
+  th{background:var(--g0);color:var(--g5);font-weight:700;font-size:11.5px;white-space:nowrap}
+  td.n{font-family:ui-monospace,monospace;text-align:right;white-space:nowrap}
+  .note{display:flex;gap:8px;align-items:flex-start;border-radius:8px;padding:9px 11px;
+    font-size:11.5px;margin:9px 0}
+  .note.w{background:var(--y0);border:1px solid var(--y1);color:var(--y4)}
+  .note.i{background:var(--b0);border:1px solid var(--b1);color:var(--b4)}
+  .note.g{background:var(--n0);border:1px solid var(--n1);color:var(--n4)}
+
+  @media(max-width:1400px){ .cols{grid-template-columns:1fr 1fr}
+    .col:nth-child(2){border-right:0} .col:nth-child(3){grid-column:1/-1;border-top:1px solid var(--g1)} }
+  @media(max-width:900px){ .cols{grid-template-columns:1fr} .col{border-right:0;border-top:1px solid var(--g1)}
+    .cmp{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>계약창을 한 화면에 — 좌우로 펴고, 안 쓰는 것을 덜어낸다</h1>
+  <p class="sub">대표 지시 2026-09-18 · 설계안(목업) · 아직 코딩 안 했습니다 · 예시는 가상 회사입니다</p>
+
+  <!-- ══ 지금 vs 바뀐 뒤 ══ -->
+  <div class="cmp">
+    <div class="card bad">
+      <h3>지금 — 620px 한 줄, 탭 4장</h3>
+      <ul class="tight">
+        <li>창 너비 <b>620px</b>. 화면이 1920px여도 <b>3분의 1</b>만 씁니다.</li>
+        <li>안쪽 높이가 <b>화면의 55%</b>로 묶여 있어 늘 스크롤합니다.</li>
+        <li>기업정보 · 계약정보 · 담당자정보 · 일지 <b>네 장</b>을 오갑니다.</li>
+        <li>회사명을 치고 → 다음 → 금액을 넣고 → 이전 → 다시 확인.</li>
+        <li>맨 위 노란 상자가 <b>다섯 줄</b>인데 한 번 누르고 마는 것입니다.</li>
+      </ul>
+    </div>
+    <div class="card good">
+      <h3>바뀐 뒤 — 1560px 세 기둥, 탭 없음</h3>
+      <ul class="tight">
+        <li>기업 · 계약 · 담당자를 <b>나란히</b> 놓습니다. 한눈에 다 보입니다.</li>
+        <li>금액을 넣으면서 회사명이 <b>옆에 그대로</b> 보입니다.</li>
+        <li>「다음 → 이전」이 없어집니다. <b>저장 하나</b>입니다.</li>
+        <li>의뢰인 유형은 머리줄의 <b>작은 칩 셋</b>으로 (다섯 줄 → 한 줄).</li>
+        <li>좁은 화면에서는 두 기둥 → 한 기둥으로 접힙니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══ 새 창 ══ -->
+  <h2>바뀐 창 <span class="tag new">목업</span></h2>
+  <div class="win">
+    <div class="win-h">
+      <span class="t">계약 수정</span>
+      <span class="no">계약-2026-152</span>
+      <button class="ghost">✏ 번호</button>
+      <span class="chips">
+        <button class="chip on" title="회사가 의뢰인 — 취업규칙·자문·컨설팅">🏢 회사</button>
+        <button class="chip" title="근로자가 의뢰인 — 부당해고·체불·산재">👤 근로자</button>
+        <button class="chip" title="양쪽 모두">🏢+👤 둘 다</button>
+      </span>
+      <span class="badge b">📷 계약서 5건</span>
+      <span class="spacer"></span>
+      <button class="ghost">🗑 원래대로</button>
+      <button class="ghost">✕</button>
+    </div>
+
+    <div class="cols">
+      <!-- 1 -->
+      <div class="col">
+        <div class="col-h">🏢 의뢰인 · 기업정보 <span class="n">업체관리와 이어짐</span></div>
+        <div class="fld"><label>회사명 *</label>
+          <div class="row"><input value="가나상사" style="flex:1"><span class="badge">✓ 업체관리</span></div></div>
+        <div class="fld"><label>사업자번호</label>
+          <div class="row"><input class="num" value="123-45-67890" style="flex:1"><span class="badge">🏛 국세청 확인</span></div></div>
+        <div class="fld"><label>대표자</label><div class="two"><input value="홍길동"><input placeholder="대표자 2 (선택)"></div></div>
+        <div class="fld"><label>업태 / 종목</label><div class="two"><input value="도매 및 소매업"><input value="농수산물"></div></div>
+        <div class="fld"><label>주소</label>
+          <div class="row"><input value="31198" style="width:66px"><button class="ghost">🔍</button>
+            <input value="충남 천안시 동남구 …" style="flex:1"></div></div>
+        <div class="fld"><label>대표 전화</label><div class="two"><input placeholder="041-000-0000"><input placeholder="팩스"></div></div>
+        <div class="fld"><label>대표 이메일</label><input placeholder="contact@company.kr"></div>
+        <div class="fld"><label>규모 · 인원</label>
+          <div class="row"><select style="flex:1"><option>-- 선택 --</option></select>
+            <span class="mini">고용</span><input class="num" value="0" style="width:52px">
+            <span class="mini">산재</span><input class="num" value="0" style="width:52px"></div></div>
+        <button class="fold">▸ 그 밖 — 본사주소 · 대표자 전화 · 법인번호 · 개업일 <span class="mini">(비어 있음)</span></button>
+        <div class="box" style="margin-bottom:0">
+          <div class="cap">🔗 업체 연결 <span class="badge">✓ 「가나상사」 로 연결됨</span></div>
+          <div class="row"><input placeholder="업체명·사업자번호로 다시 찾기" style="flex:1">
+            <label class="chkline"><input type="checkbox"> 연결 보류</label></div>
+        </div>
+      </div>
+
+      <!-- 2 -->
+      <div class="col">
+        <div class="col-h">📄 계약정보 <span class="n">돈이 들어가는 자리</span></div>
+        <div class="kinds">
+          <label class="kind"><input type="checkbox"> 📞 상담사항</label>
+          <label class="kind on2"><input type="checkbox" checked> 🏢 업체계약</label>
+          <label class="kind"><input type="checkbox"> ⚖ 사건계약</label>
+          <label class="kind on"><input type="checkbox" checked> 📊 컨설팅계약</label>
+          <label class="kind"><input type="checkbox"> 🏦 기금관리</label>
+          <label class="kind"><input type="checkbox"> 📋 기타사업</label>
+        </div>
+
+        <div class="box">
+          <div class="cap">📊 컨설팅계약</div>
+          <div class="grid6">
+            <span class="rt">유형</span>
+            <select><option>[현클] 현장클리닉</option></select>
+            <span class="rt">계약금</span><input class="num" value="0"><span class="mini">원</span>
+            <label class="chkline"><input type="checkbox"> 🧾 포함</label>
+
+            <span class="rt" style="color:var(--n4)">🏥 일수</span>
+            <span class="mini">1일 350,000원 · 부가세 별도</span>
+            <span class="rt">일수</span><input class="num" value="3" style="border-color:var(--n3)">
+            <span class="mini">일</span><span></span>
+
+            <div class="calc">
+              <span class="eq">3일 × 350,000 = 1,050,000 + 부가세 105,000</span>
+              <span class="big">= 1,155,000원</span>
+              <span class="ok">✓ 잔금에 들어갔습니다</span>
+            </div>
+
+            <span class="rt">업무요약</span>
+            <input placeholder="예) 취업규칙 정비 + 관리자 교육 2회">
+            <span class="rt">잔금</span><input class="num" value="1,155,000" style="font-weight:700">
+            <span class="mini">원</span>
+            <label class="chkline"><input type="checkbox" checked> 🧾 포함</label>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="cap">🏢 업체계약</div>
+          <div class="grid6">
+            <span class="rt">유형</span><select><option>[자문] 자문</option></select>
+            <span class="rt">월 자문료</span><input class="num" value="0"><span class="mini">원</span>
+            <span class="badge b">🧾 부가세포함</span>
+          </div>
+        </div>
+
+        <div class="row" style="margin-bottom:8px">
+          <label class="chkline"><input type="checkbox"> 🏦 CMS 자동이체</label>
+          <label class="chkline"><input type="checkbox"> 👤 개인입금(법인 아닌 개인 계좌)</label>
+        </div>
+        <div class="fld"><label>입금자</label><input placeholder="업체명과 다를 때만 (모회사·협회·대표자 개인)"></div>
+        <div class="fld"><label>계약일</label><input value="2026.09.14"></div>
+        <div class="fld"><label>계약기간</label><div class="two"><input placeholder="시작일"><input placeholder="종료일"></div></div>
+      </div>
+
+      <!-- 3 -->
+      <div class="col">
+        <div class="col-h">👤 담당자 · 📋 일지 <span class="n">누가 · 무슨 일이</span></div>
+        <div class="fld"><label>주담당</label><select><option>권형하 (대표노무사)</option></select></div>
+        <div class="fld"><label>부담당</label><div class="row"><span class="badge b">박재원 ✕</span><button class="ghost">+ 추가</button></div></div>
+
+        <div class="row" style="margin:10px 0 6px">
+          <span style="font-size:11px;font-weight:800;color:var(--g5)">👥 기업담당자 (1)</span>
+          <span class="spacer"></span>
+          <button class="ghost">📇 기업정보함에서</button>
+          <button class="ghost">+ 추가</button>
+        </div>
+        <div class="person">
+          <div class="hd"><span class="badge">✓ 주담당자</span>
+            <select style="width:96px"><option>맡는 일 —</option></select>
+            <span class="spacer"></span><button class="ghost">✕</button></div>
+          <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px">
+            <input placeholder="이름 *"><input placeholder="직책/직급"></div>
+          <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <input placeholder="연락처"><input placeholder="이메일"></div>
+        </div>
+
+        <div class="row" style="margin:12px 0 6px">
+          <span style="font-size:11px;font-weight:800;color:var(--g5)">📋 일지</span>
+          <span class="spacer"></span><button class="ghost">+ 적기</button>
+        </div>
+        <div class="jr"><div class="d">09-14 권형하</div>계약서 받음 · 3일 일정 협의</div>
+        <div class="jr"><div class="d">09-11 박재원</div>현장 방문 일정 문의 전화</div>
+      </div>
+    </div>
+
+    <div class="win-f">
+      <span class="mini">⌨ Ctrl+Enter 로 저장 · Esc 로 닫기</span>
+      <span class="spacer"></span>
+      <button class="ghost">취소</button>
+      <button class="primary">💾 저장</button>
+    </div>
+  </div>
+
+  <div class="note g"><span>✅</span><span>
+    <b>「다음 → 담당자정보」가 없어집니다.</b> 넣어야 할 것을 못 넣으면 그 칸이 붉어지고
+    저장할 때 한 번에 알려 드립니다 — 탭을 옮겨 다니며 찾지 않습니다.</span></div>
+  <div class="note i"><span>📐</span><span>
+    <b>화면이 좁으면 스스로 접힙니다.</b> 1400px 아래는 두 기둥(담당자·일지가 아래로),
+    900px 아래는 한 기둥 — 노트북과 폰에서도 그대로 씁니다.</span></div>
+
+  <!-- ══ 덜어낼 것 ══ -->
+  <h2>덜어낼 것 <span class="tag cut">화면이 너무 많다</span></h2>
+  <table>
+    <tr><th>지금</th><th>차지하는 높이</th><th>바꿀 것</th></tr>
+    <tr><td>「⚖️ 의뢰인 유형 — 먼저 선택하세요」 제목 + 큰 단추 셋 + 설명 두 줄</td>
+        <td class="n">약 5줄</td><td><b>머리줄의 칩 셋</b>으로. 설명은 마우스를 올릴 때.</td></tr>
+    <tr><td>업체 연결 확인 — 설명 세 줄</td><td class="n">3줄</td>
+        <td><b>연결됐으면 배지 한 줄.</b> 안 됐을 때만 찾기 칸을 편다.</td></tr>
+    <tr><td>비어 있는 「본사주소 · 대표자 전화 · 대표 팩스 · 법인번호 · 개업일」</td>
+        <td class="n">5줄</td><td><b>「▸ 그 밖」 한 줄로 접는다.</b> 값이 있으면 저절로 펴진다.</td></tr>
+    <tr><td>탭 바 + 「← 이전 / 다음 →」 단추</td><td class="n">2줄 × 4장</td>
+        <td><b>없앤다.</b> 세 기둥이 다 보이므로 오갈 곳이 없다.</td></tr>
+    <tr><td>안쪽 높이 제한 <span class="mini">maxHeight 55vh</span></td><td class="n">—</td>
+        <td><b>창 높이에 맞춘다</b>(88vh). 세로로 반만 쓰던 것을 다 쓴다.</td></tr>
+  </table>
+  <div class="note w"><span>⚠</span><span>
+    <b>값이 든 칸은 절대 안 숨깁니다.</b> 「그 밖」은 <b>비어 있을 때만</b> 접힙니다 —
+    적어 둔 것이 안 보이면 없는 줄 알고 또 적게 됩니다.</span></div>
+
+  <!-- ══ 여쭐 것 ══ -->
+  <h2>대표님께 여쭐 것 <span class="tag">둘</span></h2>
+  <div class="card">
+    <ul class="tight">
+      <li><b>세 기둥이 맞습니까, 두 기둥이 낫습니까?</b><br>
+        <span class="mini">대표님 화면은 1920px로 보입니다 — 세 기둥이 넉넉합니다.
+        다만 노무사들 노트북이 1366px이면 거기서는 두 기둥으로 접힙니다.
+        모두 두 기둥으로 맞출 수도 있습니다(글자가 더 큽니다).</span></li>
+      <li><b>「일지」를 셋째 기둥에 같이 둘까요, 따로 뺄까요?</b><br>
+        <span class="mini">일지가 길어지면 그 기둥만 늘어납니다.
+        지금 목업은 같이 두었고, 스크롤은 그 기둥 안에서만 생깁니다.</span></li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>
