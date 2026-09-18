@@ -30,6 +30,7 @@ const HanaMessage = require("./hana-message");
 const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
 const 지역뉴스부품 = require("./news-region");
+const NasBackupExport = require("./nas-backup-export");
 
 if (!getApps().length) initializeApp();
 
@@ -5204,3 +5205,21 @@ exports.mailOpenPixel = functions
     }
     send();
   });
+
+/* ══ 나스가 «받아 가는» 백업 (2026-09-18 대표 지시 「자동화 설계해라」) ══════════════
+   여태는 브라우저가 나스에 «올렸다». 그런데 대표님 나스(DSM)에는 브라우저가 요구하는
+   쪽지(CORS 응답 머리글)를 붙일 자리가 아예 없다 — 로그인 포털 세 탭을 다 확인했고,
+   역방향 프록시의 「사용자 지정 머리글」은 뒤쪽으로 가는 «요청» 머리글이었다.
+   그래서 방향을 뒤집는다: 나스의 작업 스케줄러가 새벽에 wget 으로 받아 간다.
+   wget 은 브라우저가 아니므로 **CORS 라는 것이 아예 없다.**
+
+   ⚠ 이 함수는 브라우저용이 아니다 — CORS 머리글을 일부러 안 붙인다.
+   ⚠ 열쇠는 한 번만: firebase functions:secrets:set NAS_BACKUP_KEY --project pureun-erp
+   ⚠ 나스 쪽 스크립트: docs/나스-백업-스크립트.sh (붙여넣기만 하면 된다)
+   설계: docs/2026-09-18-나스-자동백업-설계.md */
+exports.nasBackupExport = functions
+  .runWith({ secrets: ["NAS_BACKUP_KEY"], timeoutSeconds: 120, memory: "512MB" })
+  .https.onRequest(NasBackupExport.핸들러만들기({
+    db: () => getDatabase(),
+    key: () => process.env.NAS_BACKUP_KEY || "",
+  }));
