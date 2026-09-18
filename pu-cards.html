@@ -45,7 +45,7 @@
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
-<script src="js/pu-version.js?v=6"></script>
+<script src="js/pu-version.js?v=7"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
@@ -3896,9 +3896,26 @@ const Store = {
              다음에 켤 때 나타난다 — 휴지통은 실시간으로 볼 자리가 아니다.
            ⚠ 내가 지우고 되살리는 것은 그대로 보인다(state.trash 를 그 자리에서 고친다).
            ⚠ 배지 숫자·휴지통 화면·30일 정리(purgeTrash)는 그대로 돈다 — 한 번 읽은 값을 쓴다. */
-        this.db.ref(DB_ROOT+'/trash').once('value').then(s => { state.trash = s.val()||{}; renderSoon();
-          if(!Store._trashPurgeDone){ Store._trashPurgeDone=true; setTimeout(purgeTrash, 2000); } })
-          .catch(()=>{});
+        /* ★★ 휴지통은 «열 때» 읽는다 — 부팅 때가 아니다 (대표 지시 2026-09-18 「휴지통도 줄여라」)
+           ── 무엇이 있었나
+             2026-08-18 에 «구독»은 끊었지만 «한 번 읽기»는 남겼다. 그 한 번이 0.71MB 다.
+             휴지통은 평소에 들여다보는 자리가 아닌데 켤 때마다 받고 있었다.
+           ── 어떻게
+             ⑴ 휴지통 화면을 열 때 읽는다(openTrash) — 서류 기록 휴지통이 이미 쓰는 방식 그대로.
+             ⑵ 30일 자동 정리는 «하루 한 번»만 돈다. 그때만 읽는다.
+             ⑶ 정리 도구의 「휴지통 N건」은 아직 안 읽었으면 «…» 로 두고, 그 자리에서 읽어 온다.
+           ⚠ 지우고 되살리는 것은 그대로 보인다 — state.trash 를 그 자리에서 고치기 때문이다. */
+        if(!Store._trashPurgeDone){
+          Store._trashPurgeDone = true;
+          var _pk = 'pucards_trash_purge_at', _plast = 0;
+          try{ _plast = Number(localStorage.getItem(_pk)) || 0; }catch(_){}
+          if(Date.now() - _plast > 20*3600*1000){
+            setTimeout(function(){ loadTrash(function(){
+              try{ localStorage.setItem(_pk, String(Date.now())); }catch(_){}
+              purgeTrash();
+            }); }, 8000);
+          }
+        }
         watchCardMap(this.db.ref(DB_ROOT+'/classifyRules'), value => { state.rules = value||{}; }, () => {
           if(!Store._ruleSeedDone){ Store._ruleSeedDone=true; setTimeout(seedClassifyRules, 3000); } });
         /* 메일 수신거부 명단 — 전 직원 공유. 목록 화면에 나오는 값이 아니라 render() 는 부르지 않는다. */
@@ -4057,6 +4074,9 @@ const Store = {
       if (!priv){ removeIdx(id, it);  /* 개인 명함은 애초에 검색목록에 없다 */
         /* 지운 자국 — 「바뀐 것만」 받는 기기는 이 자국이 없으면 지운 명함을 계속 들고 있다 */
         cardTomb(id); }
+      /* 휴지통을 «다시 읽어야 할 것»으로 표시한다 (2026-09-18) — 이제 열 때 읽으므로,
+         방금 지운 것이 목록에 안 보이면 사람이 「안 지워졌나」 한다. */
+      _trashLoaded = false;
     } else {
       const t=JSON.parse(localStorage.getItem('pucards_local_trash')||'{}'); t[id]=rec;
       try{ localStorage.setItem('pucards_local_trash', JSON.stringify(t)); }catch(e){}
@@ -4072,6 +4092,7 @@ const Store = {
       this.delPhoto(id); this.delPhoto(id+'_b');
       this.delThumb(id); this.delThumb(id+'_b');
       this.db.ref(`${DB_ROOT}/trash/${id}`).remove();
+      _trashLoaded = false;          /* 다음에 열 때 다시 읽는다 (2026-09-18) */
     }
     else { const t=JSON.parse(localStorage.getItem('pucards_local_trash')||'{}'); delete t[id];
       localStorage.setItem('pucards_local_trash', JSON.stringify(t));
@@ -4094,7 +4115,8 @@ const Store = {
     this.put(it);
     /* ⚠ hardDel 은 이제 사진까지 지운다 — 복원한 뒤에 부르면 방금 살린 사진을
        도로 지운다. 그래서 여기서는 **휴지통 기록만** 없앤다. */
-    if (this.mode==='firebase') this.db.ref(`${DB_ROOT}/trash/${id}`).remove();
+    if (this.mode==='firebase'){ this.db.ref(`${DB_ROOT}/trash/${id}`).remove();
+      _trashLoaded = false; }        /* 다음에 열 때 다시 읽는다 (2026-09-18) */
     else { const t=JSON.parse(localStorage.getItem('pucards_local_trash')||'{}'); delete t[id];
       localStorage.setItem('pucards_local_trash', JSON.stringify(t)); delete state.trash[id]; render(); }
   },
@@ -12643,9 +12665,37 @@ function openMenu(){
 
 /* ════════════ 🗑 휴지통 (30일 보관) ════════════ */
 const TRASH_DAYS = 30;
+/* 휴지통 내용은 «열 때» 한 번 읽는다 (2026-09-18) — 0.71MB 라 부팅마다 받을 값이 아니다.
+   _trashLoaded 가 거짓이면 state.trash 는 «비었다»가 아니라 «아직 모른다»는 뜻이다. */
+let _trashLoaded = false, _trashWaiting = null;
+function loadTrash(cb){
+  if(_trashLoaded){ if(cb) cb(); return; }
+  if(_trashWaiting){ if(cb) _trashWaiting.push(cb); return; }
+  _trashWaiting = cb ? [cb] : [];
+  if(Store.mode !== 'firebase'){ _trashLoaded = true; const w=_trashWaiting; _trashWaiting=null; w.forEach(f=>{ try{ f(); }catch(_){}}); return; }
+  Store.db.ref(DB_ROOT+'/trash').once('value').then(s=>{
+    state.trash = s.val() || {};
+    _trashLoaded = true;
+    const w = _trashWaiting || []; _trashWaiting = null;
+    try{ renderSoon(); }catch(_){}
+    w.forEach(f=>{ try{ f(); }catch(_){} });
+  }).catch(()=>{
+    /* 못 읽어도 화면을 막지 않는다 — 다음에 열 때 다시 해 본다 */
+    const w = _trashWaiting || []; _trashWaiting = null;
+    w.forEach(f=>{ try{ f(); }catch(_){} });
+  });
+}
+/* 아직 안 읽었으면 «모른다»(null)를 돌려주고 그 자리에서 읽어 온다 — 0 이라고 하면 거짓말이다 */
+function trashCount(){
+  if(_trashLoaded) return Object.keys(state.trash||{}).length;
+  loadTrash();
+  return null;
+}
 /* ⚠ 서류 기록 휴지통은 «열 때» 한 번 읽는다 — 늘 들고 있을 값이 아니다.
      아직 못 읽었으면 읽고 나서 다시 그린다(두 번째부터는 받아 둔 것을 쓴다). */
 function openTrash(){
+  /* 휴지통 내용도 «열 때» 읽는다 (2026-09-18) — 서류 기록과 같은 방식이다 */
+  if(!_trashLoaded){ loadTrash(()=>openTrash()); return; }
   if(_trashDocs === null){ loadTrashDocs(()=>openTrash()); return; }
   const all = Object.values(state.trash||{}).sort((a,b)=>(b._deletedAt||0)-(a._deletedAt||0));
   const dleft = ts => Math.max(0, TRASH_DAYS - Math.floor((Date.now()-(ts||0))/86400000));
@@ -14123,7 +14173,9 @@ function openCleanupCenter(){
   try{ simN=isCard ? findSimilarGroups().length : 0; }catch(e){ console.warn(e); }
   const emptyN = emptyTargets().length;
   const mojiN  = isCard ? mojibakeTargets().length : 0;
-  const trashN = Object.keys(state.trash||{}).length;
+  /* 아직 안 읽었으면 «…» — 0 건이라고 하면 거짓말이다 (2026-09-18). 읽어 오면 다시 그린다. */
+  const _tn = trashCount();
+  const trashN = (_tn === null) ? '…' : _tn;
   let nameFixN=0; try{ nameFixN=nameFixList().length; }catch(e){ console.warn(e); }
   let mixedFixN=0; try{ mixedFixN=mixedFixList().length; }catch(e){ console.warn(e); }
   let rulesN=0; try{ rulesN=classifyPlan().targetN; }catch(e){ console.warn(e); }
@@ -24377,7 +24429,7 @@ function todoAll(){
     { icon:'🗂', label:'규칙으로 한 번에 분류', unit:'장', sub:'rules',
       n:_todoN(()=>classifyPlan().targetN) },
     { icon:'🗑', label:'휴지통',           unit:'건',   sub:'trash',
-      n:Object.keys(state.trash||{}).length }
+      n:trashCount() }                      /* 아직 안 읽었으면 null — 「할 일」 띠에서 빠진다 */
   ];
   return (_todoMemo = rows);
 }

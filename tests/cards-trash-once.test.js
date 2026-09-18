@@ -27,15 +27,19 @@ test('★ 휴지통을 구독하지 않는다 — 한 번만 읽는다', () => {
 test('★ 한 번 읽은 뒤 화면을 다시 그린다 — 안 그리면 배지가 0으로 남는다', () => {
   const at = src.indexOf("ref(DB_ROOT+'/trash').once('value')");
   assert.ok(at > 0);
-  const arm = src.slice(at, at + 260);
-  assert.match(arm, /state\.trash = s\.val\(\)\|\|\{\}/);
+  const arm = src.slice(at, at + 300);
+  assert.match(arm, /state\.trash = s\.val\(\) \|\| \{\}/);
   assert.match(arm, /renderSoon\(\)/,
     '구독이면 저절로 다시 그려졌지만, 한 번 읽기는 직접 그려 줘야 합니다.');
 });
 
+/* ⚠ 2026-09-18 — 정리는 읽기 «옆»이 아니라 부팅 자리로 옮겼다(하루 한 번만 돈다).
+   읽기와 붙어 있는지가 아니라 «정리가 실제로 돌긴 하는가»를 본다. */
 test('★ 30일 정리는 그대로 돈다 — 안 돌면 휴지통이 영영 안 비워진다', () => {
-  const at = src.indexOf("ref(DB_ROOT+'/trash').once('value')");
-  assert.match(src.slice(at, at + 300), /_trashPurgeDone[\s\S]*?purgeTrash/);
+  const at = src.indexOf('if(!Store._trashPurgeDone){');
+  assert.ok(at > 0, '정리를 거는 자리를 못 찾았습니다');
+  assert.match(src.slice(at, at + 700), /loadTrash\([\s\S]*?purgeTrash\(\)/,
+    '정리하려면 휴지통을 읽어야 하고, 읽었으면 정리해야 합니다.');
 });
 
 test('★ 읽기가 실패해도 기업정보함이 멎지 않는다', () => {

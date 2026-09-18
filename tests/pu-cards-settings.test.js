@@ -39,6 +39,10 @@ function makeCtx(counts, panelTarget){
     mojibakeTargets(){ return new Array(counts.moji || 0); },
     nameFixList(){ return new Array(counts.nameFix || 0); },
     mixedFixList(){ return new Array(counts.mixedFix || 0); },
+    /* 2026-09-18 — 휴지통은 «열 때» 읽으므로 건수도 이 함수로 묻는다.
+       여기서는 이미 읽어 둔 셈치고 실제 건수를 돌려준다
+       (아직 안 읽었을 때의 «…» 는 tests/cards-trash-lazy.test.js 가 본다). */
+    trashCount(){ return Object.keys(trashObj).length; },
     toast(){}
   };
   vm.createContext(c);
