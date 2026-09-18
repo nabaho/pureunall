@@ -569,6 +569,8 @@
 
   /* 업체 칸 이름표 — 무엇을 채웠는지 사람 말로 알리려고 쓴다. */
   var CO_LABEL = {
+    contactName: '담당자', contactDept: '담당자 부서', contactTitle: '담당자 직위',
+    contactTel: '담당자 전화', contactMobile: '담당자 휴대전화', contactEmail: '담당자 이메일',
     name: '업체명', bizNo: '사업자번호', ceo: '대표자', corpNo: '법인번호',
     openDate: '개업일', bizType: '업태', bizCategory: '종목', address: '소재지',
     phone: '전화', fax: '팩스', companySize: '기업규모', industry: '주업종',
@@ -686,9 +688,35 @@
       });
       return out;
     }
+    /* ── 신청서의 «담당자»는 회사가 아니다 (대표 지시 2026-09-18 「읽히게」) ────
+       기술보호·현장클리닉 신청서에는 담당자 이름·부서·직위·유선·휴대전화·이메일이
+       한 표로 들어 있다. 판독은 그것을 읽어 두는데 갈 칸이 없어 버려지거나,
+       더 나쁘게는 **회사 칸에 앉았다** — 실측(2026-09-18) 농업회사법인의
+       기업 상세에 회사 이메일이 담당자 개인 메일(choong2015@daum.net)로,
+       회사 휴대폰이 담당자 휴대전화로 들어가 있었다.
+
+       ★ 그래서 **서식일 때만** 사람 연락처를 제 칸으로 옮겨 담는다.
+         회사 대표번호(companyTel)는 그대로 둔다 — 그것은 회사 것이 맞다.
+       ⚠ 명함으로 갈 때(sendToCards)는 «안» 옮긴다. 명함의 이메일·휴대폰은
+         그 사람 것이 맞기 때문이다 — 그래서 이 갈아끼우기는 여기에만 있다
+         (중소기업확인서의 smeKeys 와 같은 결이다).
+       ⚠ 이미 회사 칸에 들어간 옛 값은 그대로 둔다 — 값을 지우지 않는다.
+         사람이 ✎ 로 고치는 길이 열려 있다(2026-09-18). */
+    function contactKeys(kind, fields) {
+      if (kind !== 'form') return fields;
+      var out = {}, MOVE = {
+        name: 'contactName', dept: 'contactDept', title: 'contactTitle',
+        tel: 'contactTel', mobile: 'contactMobile', email: 'contactEmail'
+      };
+      Object.keys(fields).forEach(function (k) {
+        if (MOVE[k]) { out[MOVE[k]] = fields[k]; return; }
+        out[k] = fields[k];
+      });
+      return out;
+    }
     o = o || {};
     if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
-    var fields = smeKeys(o.kind, o.fields || {});
+    var fields = contactKeys(o.kind, smeKeys(o.kind, o.fields || {}));
     var key = bizKey(fields.bizno);
     if (!key) {
       return Promise.resolve({ ok: false, filled: [], message: '사업자번호를 읽지 못해 어느 회사인지 알 수 없습니다' });
@@ -703,7 +731,11 @@
     /* ⚠ issueDate(등록증 발급일)는 «최신을 가리는 잣대»다 (2026-09-07). 이것이 없으면
          대표자가 바뀐 새 등록증과 옛 등록증을 구별할 길이 아예 없다.
          pu-cards.html 의 CO_FIELDS 에도 함께 들어 있다 — 둘은 늘 짝이다. */
-    var KEEP = ['company','ceo','corpno','address','companyTel','mobile','email','homepage','companyFax',
+    /* ⚠ 담당자 여섯은 위 contactKeys 가 «서식일 때만» 만들어 준다 —
+       회사 칸(email·mobile)과 갈라 두는 것이 이 여섯의 존재 이유다.
+       pu-cards.html 의 CO_FIELDS 와 짝이다 — 한쪽만 늘리면 값은 쌓이는데 화면에 안 나온다. */
+    var KEEP = ['contactName','contactDept','contactTitle','contactTel','contactMobile','contactEmail',
+                'company','ceo','corpno','address','companyTel','mobile','email','homepage','companyFax',
                 'issueDate',
                 'bizType','bizItem','openDate','smeType','product','sales','workers',
                 /* ── 중소기업 확인서 (대표 지시 2026-09-10) ──────────────────
