@@ -2883,6 +2883,50 @@ exports.newsView = functions
     }
   });
 
+/* 판례·행정해석 «전문» — 전문 보기 쪽이 그 자리에서 펴 보이려고 부른다.
+   ═══════════════════════════════════════════════════════════════════════════
+   대표 지시 2026-09-18 「전문보기하면 처음화면에서 전문으로 다 내려오게」.
+
+   ⚠⚠ 여는 문은 «법제처 둘»(prec·expc)뿐이다. 주소를 우리가 짓고 번호는 숫자만
+     받는다 — 받은 글자를 주소에 끼우면 남의 서버로 아무 데나 부르는 문이 된다.
+   ⚠ 판결문·법령해석은 저작물이 아니라 실어도 된다(저작권법 제7조). ★ 뉴스 기사는
+     아니다 — 여기에 신문사를 붙이지 말 것.
+   ⚠ 우리 자료(DB)는 하나도 안 읽는다. 로그인 없는 자리라 읽을 것이 없어야 맞다.
+   ★ 하루 굳힌다 — 지나간 판결은 안 바뀐다. 같은 회차를 여럿이 열어도 한 번만 받는다. */
+exports.newsFull = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 20, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    const NF = require("./news-full");
+    res.set("Content-Type", "application/json; charset=utf-8");
+    res.set("X-Robots-Tag", "noindex");
+    const q = NF.읽기(req.query);
+    if (!q.ok) {
+      res.set("Cache-Control", "no-store");
+      res.status(400).json({ ok: false, 까닭: "갈래", 말: NF.까닭말["갈래"] });
+      return;
+    }
+    try {
+      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호));
+      const 것 = NF.풀기(q.갈래, xml);
+      if (!것.ok) {
+        /* ⚠ «못 준다»는 답은 굳히지 않는다 — 법제처가 잠깐 이상했을 때
+             그 답이 하루 굳으면 멀쩡해진 뒤에도 계속 안 보인다. */
+        res.set("Cache-Control", "no-store");
+        res.status(404).json({ ok: false, 까닭: 것.까닭, 말: NF.까닭말[것.까닭] || NF.까닭말["빈답"],
+          법제처: NF.법제처주소(q.갈래, q.번호) });
+        return;
+      }
+      res.set("Cache-Control", "public, max-age=86400");
+      res.status(200).json(Object.assign({}, 것, { 법제처: NF.법제처주소(q.갈래, q.번호) }));
+    } catch (e) {
+      console.warn("newsFull", (e && e.message) || e);
+      res.set("Cache-Control", "no-store");
+      res.status(502).json({ ok: false, 까닭: "못받음", 말: NF.까닭말["못받음"],
+        법제처: NF.법제처주소(q.갈래, q.번호) });
+    }
+  });
+
 exports.readHomepage = functions
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
   .https.onRequest(async (req, res) => {

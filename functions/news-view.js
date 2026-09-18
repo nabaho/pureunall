@@ -153,6 +153,66 @@ var 차림표스크립트 =
   'window.addEventListener("scroll",어디냐,{passive:true});어디냐();' +
   '})();';
 
+/* ══════════════════════════════════════════════════════════════════════════
+   「전문 보기」를 «그 자리에서» 편다 (대표 지시 2026-09-18)
+   ══════════════════════════════════════════════════════════════════════════
+   「판례 전문보기 클릭하면 이렇게 창으로 넘어간다. 그러면 읽고 보는게 더힘들다.
+     전문보기하면 처음화면에서 전문으로 다 내려오게만 만들어야된다.
+     캡쳐1 화면에서 모두 보이는것이다 새창으로 안가고」
+
+   ★ 누르면 newsFull 에서 받아 «그 자리 아래»에 편다. 창으로 안 넘어간다.
+   ★ 어느 판례인지는 두 곳에서 읽는다 —
+       ① 편지가 달아 둔 표(data-full="prec:622111")
+       ② 없으면 법제처 주소에서(옛 회차의 담아 둔 전문도 그대로 된다)
+   ⚠ 잡는 자리가 «훑는 쪽»(capture)이다. 팝업 여는 손잡이보다 먼저 잡아야
+     누를 때 창이 같이 뜨지 않는다.
+   ⚠ 못 받아 오면 «법제처에서 보기» 링크를 그대로 보여 준다 — 오늘보다 나빠지지 않는다.
+   ⚠ 자바스크립트가 없으면 그냥 옛날처럼 법제처로 간다(링크를 살려 둔다). */
+var 전문펴기스크립트 =
+  '(function(){' +
+  'function 씻(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")' +
+  '.replace(/>/g,"&gt;").replace(/"/g,"&quot;");}' +
+  'function 줄(s){return 씻(s).replace(/\\n/g,"<br>");}' +
+  'function 어느것(a){var d=a.getAttribute("data-full");' +
+  'if(d){var p=d.split(":");' +
+  'if(p.length===2&&/^(prec|expc)$/.test(p[0])&&/^\\d{1,12}$/.test(p[1]))return p;}' +
+  'var h=a.getAttribute("href")||"";if(h.indexOf("law.go.kr")<0)return null;' +
+  'var g=/[?&]target=(prec|expc)\\b/.exec(h),n=/[?&]ID=(\\d{1,12})\\b/i.exec(h);' +
+  'return (g&&n)?[g[1],n[1]]:null;}' +
+  /* 어디에 펴나 — 창 안이면 창 바닥, 쪽이면 그 건의 «표 바로 다음».
+     ⚠⚠ 판례 한 건은 <table> 이다. 거기에 그냥 붙이면(appendChild) 덩이가 표 «안»으로
+       들어가 74px 짜리 딱지 칸 폭으로 쪼그라든다 — 실제로 그렇게 나왔다(2026-09-18).
+       표 «다음»에 끼워야 칸 폭을 다 쓴다. */
+  'function 놓기(a,칸){var b=a.closest("#popb");if(b){b.appendChild(칸);return;}' +
+  'var t=a.closest("[data-pop]");' +
+  'if(t&&t.parentNode){t.parentNode.insertBefore(칸,t.nextSibling);return;}' +
+  '(a.closest("td")||a.parentNode).appendChild(칸);}' +
+  'function 펴기(a,t,id){' +
+  'if(a.__full){var 켜짐=a.__full.style.display!=="none";' +
+  'a.__full.style.display=켜짐?"none":"";a.textContent=켜짐?"전문 보기 ↓":"접기 ↑";return;}' +
+  'var 칸=document.createElement("div");칸.className="full";' +
+  '칸.innerHTML=\'<div class="ld">전문을 받아 오는 중입니다…</div>\';' +
+  '놓기(a,칸);a.__full=칸;a.textContent="접기 ↑";' +
+  'fetch("/newsFull?t="+t+"&id="+id).then(function(r){return r.json();}).then(function(d){' +
+  'if(!d||!d.ok)throw new Error((d&&d.말)||"못 받아 왔습니다");' +
+  'var h="";' +
+  'if(d.제목)h+=\'<div class="tt">\'+씻(d.제목)+"</div>";' +
+  'if(d.인용)h+=\'<div class="ct">\'+씻(d.인용)+"</div>";' +
+  '(d.칸들||[]).forEach(function(k){h+="<h4>"+씻(k.이름)+\'</h4><div class="p">\'+줄(k.글)' +
+  '+(k.잘림?\'<div class="cut">… 너무 길어 여기까지만 보여 드립니다. 아래 「법제처에서 보기」로 다 보실 수 있습니다.</div>\':"")' +
+  '+"</div>";});' +
+  'h+=\'<div class="src"><a href="\'+씻(d.법제처||"")+\'" target="_blank" rel="noopener">법제처에서 보기 ↗</a></div>\';' +
+  '칸.innerHTML=h;' +
+  '}).catch(function(err){' +
+  '칸.innerHTML=\'<div class="err">\'+씻((err&&err.message)||"못 받아 왔습니다")' +
+  '+\' <a href="\'+씻(a.getAttribute("href")||"")+\'" target="_blank" rel="noopener">법제처에서 보기 ↗</a></div>\';' +
+  '});}' +
+  'document.addEventListener("click",function(e){' +
+  'var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;' +
+  'var 것=어느것(a);if(!것)return;' +
+  'e.preventDefault();e.stopPropagation();펴기(a,것[0],것[1]);},true);' +
+  '})();';
+
 /* 꼬리에 적을 제목 — «법인 이름은 덜어 낸다».
    ⚠⚠ 실측 2026-09-13(배포한 창을 열어 보고 알았다): 꼬리가
      「푸른노무법인  푸른노무법인 2026년 09월 2주차 주간뉴스레터 입니다.」였다.
@@ -207,6 +267,20 @@ function 쪽(제목, 전문) {
     + '#wrap [data-stick] td.nav.on{color:#241a13 !important;'
     + 'box-shadow:inset 0 -2px 0 #6f5a48}'
     + '#wrap [data-stick] td.nav:focus-visible{outline:2px solid #c9b79b;outline-offset:-3px}'
+    /* ★ 그 자리에서 편 «전문» (2026-09-18). 창으로 안 넘어가고 여기에 쌓인다.
+       ⚠ 글자 크기를 편지보다 살짝 낮춘다 — 길어서, 편지와 같은 크기면 벽처럼 보인다.
+       ⚠ 창 안(.bd)은 zoom 1.22 가 걸려 있어 여기서 더 키우지 않는다. */
+    + '.full{margin-top:16px;padding-top:13px;border-top:1px solid #e0dcd6;text-align:left;'
+    + 'font:13.5px/1.85 \'Malgun Gothic\',sans-serif;color:#33302c}'
+    + '.full h4{margin:15px 0 5px;font-size:11.5px;letter-spacing:1.5px;color:#8a6f57;font-weight:bold}'
+    + '.full h4:first-child{margin-top:0}'
+    + '.full .tt{font-weight:bold;font-size:14.5px;line-height:1.5;color:#241a13;word-break:keep-all}'
+    + '.full .ct{margin-top:3px;font-size:12px;color:#9a938a}'
+    + '.full .p{word-break:keep-all}'
+    + '.full .ld,.full .err{padding:6px 0;font-size:13px;color:#8a837a}'
+    + '.full .cut{margin-top:8px;font-size:12px;color:#9a938a}'
+    + '.full .src{margin-top:15px;font-size:12px}'
+    + '.full .src a,.full .err a{color:#1b3a6b;font-weight:bold;text-decoration:none}'
     /* 누를 수 있다는 것을 손이 알게 한다 — 메일에는 이 규칙이 안 간다(<style> 은 지워진다) */
     + '[data-pop]{cursor:pointer}'
     + '[data-pop]{border-radius:6px;transition:outline-color .12s}'
@@ -293,7 +367,7 @@ function 쪽(제목, 전문) {
     + '<span>' + esc(꼬리제목(제목)) + '</span>'
     + '<span class="sp"></span><span>문의 041-556-0035</span></div>'
     + '</div></div>'
-    + '<script>' + 창스크립트 + 차림표스크립트 + '<\/script>'
+    + '<script>' + 창스크립트 + 차림표스크립트 + 전문펴기스크립트 + '<\/script>'
     + '</body></html>';
 }
 
