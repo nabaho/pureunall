@@ -1448,6 +1448,50 @@ module.exports = function build(deps) {
         reply(res, 200, { ok: true, moved: uids.length });
       })),
 
+    /* ══════ 스팸신고 — 다음메일 스팸함으로 «실제로» 옮긴다 (대표 승인 2026-09-18) ══════
+       화면의 🚫 거르개(mbIsSpam)와는 다른 일이다 — 그것은 «우리 눈에만» 숨기는
+       우리 자체 규칙이고, 이 단추는 다음메일 서버에 «신고»해 스팸함으로 실제로 옮긴다.
+
+       ⚠★ 스팸함은 syncMailbox 가 «일부러 안 가져오는» 칸이다(mail-box.js SKIP_KINDS).
+         그래서 data/folders 에 등록돼 있지 않고, moveMailMessages 의 folderPath 로는
+         못 찾는다 — 매번 client.list() 로 «그 자리에서» 스팸함 자리를 찾는다.
+         LIST 는 선택된 폴더와 무관한 명령이라, from 폴더에 잠금을 쥔 채로도 부를 수 있다.
+       ⚠ 「우리가 낸 칸」(보낸메일함·임시보관함·내게쓴메일함·예약메일함)에서는 부를 수
+         없다 — 우리가 쓴 것을 스팸으로 신고하는 것은 뜻이 없다. 화면에서도 그 칸에는
+         단추를 안 그린다(mbSpamReportable). */
+    reportMailSpam: F
+      .region(REGION)
+      .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 120, memory: '512MB' })
+      .https.onRequest((req, res) => gate(req, res, async () => {
+        const b = req.body || {};
+        const from = String(b.from || '');
+        const uids = (Array.isArray(b.uids) ? b.uids : []).map(String).filter((u) => /^\d+$/.test(u));
+        if (!from || !uids.length) { reply(res, 400, { ok: false, error: '무엇을 신고할지 알 수 없습니다.' }); return; }
+        if (uids.length > 200) { reply(res, 400, { ok: false, error: '한 번에 200통까지 신고할 수 있습니다.' }); return; }
+
+        const kSnap = await deps.getDatabase().ref(ROOT + '/folders/' + from + '/kind').once('value');
+        const kind = String(kSnap.val() || '');
+        if (['sent', 'drafts', 'tome', 'sched'].indexOf(kind) >= 0) {
+          reply(res, 400, { ok: false, error: '우리가 보낸 칸은 스팸으로 신고할 수 없습니다.' }); return;
+        }
+
+        const moved = await withFolder(deps, from, async (client) => {
+          const boxes = await client.list();
+          const spam = boxes.find((x) => MB.folderKind(x) === 'spam');
+          if (!spam) { const e = new Error('다음메일에서 스팸함을 찾지 못했습니다'); e.status = 404; throw e; }
+          await client.messageMove(uids.join(','), spam.path, { uid: true });
+          return uids.length;
+        }, { write: true });
+
+        /* 우리 목록에서도 곧바로 뺀다 — 스팸함은 애초에 안 가져오므로 다음 회차를
+           기다려도 «다시 오지» 않는다. 여기서 안 지우면 신고했는데도 화면에 남는다. */
+        const up = {};
+        uids.forEach((u) => { up[ROOT + '/msgs/' + from + '/' + u] = null; });
+        await deps.getDatabase().ref().update(up);
+
+        reply(res, 200, { ok: true, moved: moved });
+      })),
+
     /* ══════════════════════════════════════════════════════════════════════
        POP3 로 «몇 통이 있는지»만 물어본다 (대표 지시 2026-09-06 「1년치 보관」)
        ══════════════════════════════════════════════════════════════════════
