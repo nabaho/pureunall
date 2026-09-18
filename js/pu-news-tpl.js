@@ -139,32 +139,49 @@
       + 'background-color:' + 빛깔 + ';">&nbsp;</td></tr></table>';
   }
 
+  /* ★★ 신문 «제호(masthead)» — 가운데로 세운다 (대표 지시 2026-09-18 「상단을 좀더
+       이쁘게 해달라」).
+     종전에는 이름이 왼쪽, 회차가 오른쪽 «한 줄»이었다. 글자는 큰데 줄이 하나라
+     제목이 아니라 «머리글»처럼 읽혔다. 신문의 제호는 셋이 가운데로 쌓인다 —
+       ① 가는 영문 한 줄  ② 큰 이름  ③ 회차
+     그리고 위아래를 «겹줄»(가는 줄 + 굵은 줄)로 닫는다. 그것이 제호의 표다.
+   ⚠ 아웃룩이 견디는 것만 쓴다 — 표·align="center"·인라인 서식뿐이다.
+     letter-spacing 은 모르는 프로그램이 있는데, 몰라도 글자는 그대로 읽힌다.
+   ⚠ 로고를 넣어 두셨으면 이름 «앞»에 작게 붙는다. 가운데 쌓기라 로고까지
+     한 덩이로 가운데 오게 안쪽 표를 하나 더 쓴다(align 만으로는 안 된다). */
   function 요약머리(회차한벌, 설정) {
     var s = 설정 || {};
     var 회 = 회차한벌 || {};
-    /* 로고를 넣어 두셨으면 이름 앞에 작게 둔다.
-       ⚠ 주소는 img주소() 를 지난다 — 남의 서버 그림은 여기서 걸린다(추적 구멍). */
+    /* ⚠ 주소는 img주소() 를 지난다 — 남의 서버 그림은 여기서 걸린다(추적 구멍). */
     var 로 = img주소(s.로고그림);
-    var 로고칸 = 로
-      ? '<td valign="middle" style="padding-right:10px;">'
-        + '<img src="' + 로 + '" width="30" height="30" alt=""'
-        + ' style="display:block;width:30px;height:30px;"></td>'
-      : '';
-    return '<tr><td style="padding:24px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
-      + _줄띠(3, 색.짙은갈)
-      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
-      + ' style="border-bottom:1px solid ' + 색.줄 + ';"><tr>'
-      + 로고칸
-      + '<td style="padding:12px 0;">'
-      + '<div style="font-size:24px;font-weight:bold;color:' + 색.짙은갈 + ';'
-      + 'letter-spacing:-0.5px;line-height:1.25;font-family:' + 세리프 + ';">'
+    var 이름 = '<span style="font-size:27px;font-weight:bold;color:' + 색.짙은갈 + ';'
+      + 'letter-spacing:-0.5px;line-height:1.2;font-family:' + 세리프 + ';">'
       + esc(s.회사이름 || '푸른노무법인')
       + ' <span style="color:' + 색.갈 + ';">' + esc(s.요약머리말 || '주간 노무 브리핑')
-      + '</span></div></td>'
-      + '<td align="right" valign="bottom" style="padding:0 0 14px 0;">'
-      + '<span style="font-size:12px;color:' + 색.흐린글 + ';letter-spacing:1px;'
-      + 'white-space:nowrap;font-family:' + 세리프 + ';">' + esc(회.이름 || '') + '</span></td>'
-      + '</tr></table></td></tr>';
+      + '</span></span>';
+    var 이름칸 = 로
+      ? '<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0"><tr>'
+        + '<td valign="middle" style="padding-right:11px;">'
+        + '<img src="' + 로 + '" width="32" height="32" alt=""'
+        + ' style="display:block;width:32px;height:32px;"></td>'
+        + '<td valign="middle">' + 이름 + '</td></tr></table>'
+      : 이름;
+    return '<tr><td style="padding:18px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
+      /* 겹줄 — 가는 줄 위, 굵은 줄 아래. 한 줄만 그으면 그냥 «칸막이»로 보인다. */
+      + _줄띠(1, 색.갈)
+      + '<div style="height:3px;line-height:3px;font-size:1px;">&nbsp;</div>'
+      + _줄띠(3, 색.짙은갈)
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
+      + '<tr><td align="center" style="padding:13px 0 0 0;">'
+      + '<div style="font-size:10px;letter-spacing:4px;line-height:1.4;color:' + 색.딱지 + ';'
+      + 'font-family:' + 세리프 + ';">PUREUN LABOR LAW FIRM</div></td></tr>'
+      + '<tr><td align="center" style="padding:6px 0 0 0;">' + 이름칸 + '</td></tr>'
+      + '<tr><td align="center" style="padding:8px 0 11px 0;">'
+      + '<div style="font-size:11.5px;letter-spacing:2px;line-height:1.4;color:' + 색.흐린글 + ';'
+      + 'white-space:nowrap;font-family:' + 세리프 + ';">' + esc(회.이름 || '') + '</div>'
+      + '</td></tr></table>'
+      + _줄띠(1, 색.줄)
+      + '</td></tr>';
   }
 
   /* 요약판 꼭지 머리 — 딱지를 걷고 «글자»로 세운다.
@@ -448,35 +465,71 @@
          좁아져 줄 수가 늘어난다 — 걷어 낸 까닭이 사라진다. */
     var 표 = 표지칸(x, 96);
     var 표칸 = 표 ? '<td width="96" valign="top" style="width:96px;">' + 표 + '</td>' : '';
-    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
-      + _자리표(x) + '><tr>'
+    /* ★★ 발행처·내려받기를 «바닥에» 붙인다 (대표 지시 2026-09-18 「줄 이나 열을 좀
+         정렬 해라」). 종전에는 글 바로 밑에 따라붙어, 나란한 카드 셋의 단추가
+         저마다 다른 높이에 떠 있었다 — 줄이 셋인데 밑줄이 여섯 군데로 보였다.
+       ★ 길은 «키 100%짜리 속표» 둘이다: 윗칸은 위로 붙고(valign=top),
+         아랫칸은 아래로 붙는다(valign=bottom). 칸의 키는 그 줄에서 제일 긴 카드가
+         정하므로, 셋의 단추가 같은 자리에 선다.
+       ⚠ height:100% 를 모르는 메일 프로그램에서는 예전처럼 «글 바로 밑»에 붙는다 —
+         나빠지지 않는다. 그래서 메일에서도 같은 것을 쓴다(두 벌로 두지 않는다). */
+    var 바닥 = (밑칸 + 받기);
+    var 속 = 바닥
+      ? '<table role="presentation" width="100%" height="100%" cellpadding="0" cellspacing="0"'
+        + ' border="0" style="height:100%;">'
+        + '<tr><td valign="top">'
+        + '<div style="font-size:13.5px;font-weight:bold;line-height:1.5;color:' + 색.짙은갈 + ';'
+        + 'font-family:' + 폰트 + ';word-break:keep-all;">' + 제목칸 + '</div>'
+        + 목차칸 + '</td></tr>'
+        + '<tr><td valign="bottom" style="padding-top:2px;">' + 바닥 + '</td></tr>'
+        + '</table>'
+      : '<div style="font-size:13.5px;font-weight:bold;line-height:1.5;color:' + 색.짙은갈 + ';'
+        + 'font-family:' + 폰트 + ';word-break:keep-all;">' + 제목칸 + '</div>' + 목차칸;
+    return '<table role="presentation" width="100%" height="100%" cellpadding="0" cellspacing="0"'
+      + ' border="0" style="height:100%;"' + _자리표(x) + '><tr>'
       + 표칸
       + '<td valign="top" style="' + (표 ? 'padding-left:13px;' : '') + '">'
-      + '<div style="font-size:13.5px;font-weight:bold;line-height:1.5;color:' + 색.짙은갈 + ';'
-      + 'font-family:' + 폰트 + ';word-break:keep-all;">' + 제목칸 + '</div>'
-      + 목차칸 + 밑칸 + 받기
+      + 속
       + '</td></tr></table>';
   }
 
   /* 나란히 놓는다. 자리가 모자라면 마지막 칸은 빈 칸으로 둔다 — 폭이 흔들리지 않게.
-     ★★ 넓은 쪽(전문 보기)에서는 «셋씩 + 쌓기»다 (대표 지시 2026-09-17 「좌우로 넓게」,
-       2026-09-18 「더 줄여라」).
-     ⚠ 표(table)로 셋씩 놓으면 «한 줄의 키를 그 줄에서 제일 긴 카드»가 정한다 —
-       짧은 카드 둘 아래가 통째로 빈다. 그래서 넓은 쪽은 표가 아니라 «단»에 쌓는다.
-       단은 키를 스스로 고르게 나눠 담아, 빈 자리가 거의 안 남는다(실측 648 → 아래 검사).
-     ⚠ 세로 나눔선은 column-rule 이 긋는다 — 칸 테두리를 못 쓰니 그것이 짝이다.
-     ⚠⚠ 메일(700)은 예전 표 그대로 둘씩이다. 아웃룩은 단(column-count)을 모르고,
-       셋이면 한 칸이 200px 남짓이라 글이 쏟아진다. */
+     ★★ 넓은 쪽(전문 보기)에서는 «셋씩» 놓는다 (대표 지시 2026-09-17 「좌우로 넓게」).
+     ★★ «줄과 열을 맞춘다» (대표 지시 2026-09-18 「줄 이나 열을 좀 정렬 해라」).
+       2026-09-18 아침에 단(column-count)으로 «쌓아» 봤다 — 빈 자리는 25px 덜 남았지만
+       둘째 줄 카드들이 저마다 다른 높이에서 시작해 «층이 어긋난 것»처럼 보였다.
+       대표께서 그 화면을 짚으셨다. 표로 돌아온다 — 한 줄의 카드들이 같은 자리에서
+       시작하고, 줄과 줄 사이에 가로줄이 그어진다.
+     ⚠ 아낀 25px 보다 «줄이 맞는 것»이 낫다. 되돌리지 말 것 — 이미 재 보고 고른 것이다.
+     ⚠ 메일(700)에서는 그대로 둘씩이다 — 셋이면 한 칸이 200px 남짓이라 글이 쏟아진다. */
   function 자료칸(항목들, 바탕, 폭) {
     var 것 = (항목들 || []).filter(function (x) { return x && x.갈래 === '자료'; });
     if (!것.length) return '';
+    /* ★★ 넓은 쪽은 «칸틀(grid)»이다 — 표가 아니다.
+         표로도 줄·열은 맞는다. 그런데 «발행처와 내려받기 단추»는 못 맞춘다:
+         칸의 키가 저절로(auto)라 속의 height:100% 가 갈 곳이 없어, 카드가 글 높이
+         그대로 멎는다(2026-09-18 실측 1015/932/973 — 단추 셋이 다 다른 자리).
+       ★ 칸틀의 칸은 줄 키만큼 «늘어난다». 그러면 그 안의 height:100% 가 살아나,
+         카드 바닥 줄(valign=bottom)이 줄마다 같은 자리에 선다.
+       ⚠ 이 길은 «웹 전문 보기»에서만 쓴다 — 아웃룩은 grid 를 모른다. 메일(≤900)은
+         아래 표 그대로다. 카드 자체(자료카드)는 두 길이 «같은 것»을 쓴다 —
+         두 벌로 베끼면 반드시 어긋난다.
+       ⚠ 빈 자리에도 칸을 하나 둔다. 안 두면 마지막 줄의 가로줄이 도중에 끊긴다. */
     if (Number(폭) >= 900) {
-      var 덩 = 것.map(function (x) {
-        return '<div style="' + 안깨지게(폭) + 'padding:15px 15px;">' + 자료카드(x) + '</div>';
-      }).join('');
+      var 열 = 3;
+      var 줄수 = Math.ceil(것.length / 열);
+      var 칸들 = '';
+      for (var n = 0; n < 줄수 * 열; n++) {
+        var 테두리 = [];
+        if (n >= 열) 테두리.push('border-top:1px solid ' + 색.가는줄);
+        if ((n % 열) !== 열 - 1) 테두리.push('border-right:1px solid ' + 색.줄);
+        칸들 += '<div style="display:flex;flex-direction:column;padding:16px 15px;'
+          + (테두리.length ? 테두리.join(';') + ';' : '') + '">'
+          + (것[n] ? 자료카드(것[n]) : '') + '</div>';
+      }
       return '<tr><td style="padding:15px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
-        + '<div style="background-color:' + (바탕 || 색.살구) + ';column-count:3;column-gap:0;'
-        + 'column-rule:1px solid ' + 색.줄 + ';">' + 덩 + '</div></td></tr>';
+        + '<div style="display:grid;grid-template-columns:repeat(' + 열 + ',1fr);'
+        + 'background-color:' + (바탕 || 색.살구) + ';">' + 칸들 + '</div></td></tr>';
     }
     var 칸수 = 2;
     var 몫 = Math.round(100 / 칸수);

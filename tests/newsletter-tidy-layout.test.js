@@ -249,17 +249,22 @@ function 폭읽기(h) {
 }
 /* 살구 판이 몇 칸으로 놓였나.
    ⚠ <td> 를 세면 «카드 안»의 칸(표지·글)까지 세어 늘 3 이 나온다 — 처음에 그렇게
-     짜서 아무것도 못 잡았다. 바깥 칸만 가리키는 것은 «폭 몫»(50%)과 «단 수»다.
-   ⚠ 넓은 쪽은 2026-09-18 부터 표가 아니라 «단»에 쌓는다 — 표로 놓으면 한 줄의 키를
-     그 줄에서 제일 긴 카드가 정해 짧은 카드 아래가 통째로 빈다. 그래서 두 꼴을 다 읽는다. */
+     짜서 아무것도 못 잡았다. 바깥 칸만 가리키는 것은 «폭 몫»(50%)과 «칸틀의 열 수»다.
+   ⚠ 넓은 쪽은 «칸틀(grid)»이고 메일은 «표»다 — 두 꼴을 다 읽는다. */
 function 자료칸수(h) {
+  const g = /grid-template-columns:repeat\((\d)/.exec(h);
+  if (g) return Number(g[1]);
   const i = h.indexOf('background-color:#fbf4ea');
   assert.ok(i > 0, '자료 칸(살구 판)을 못 찾았다');
-  const 판 = h.slice(i);
-  const c = /^[^<]*column-count:(\d)/.exec(판);
-  if (c) return Number(c[1]);
-  if (판.indexOf('width="50%"') >= 0) return 2;
+  if (h.slice(i).indexOf('width="50%"') >= 0) return 2;
   assert.fail('자료 칸의 칸 수를 못 읽었다');
+}
+/* 자료 판만 잘라 본다 — 넓은 쪽은 칸틀, 메일은 살구 표 */
+function 자료판(h) {
+  const i = h.indexOf('display:grid');
+  const j = i >= 0 ? i : h.indexOf('background-color:#fbf4ea');
+  assert.ok(j >= 0, '자료 칸을 못 찾았다');
+  return h.slice(j);
 }
 function 전문편지(옵션) {
   const d = {
@@ -283,10 +288,42 @@ test('★★★ 넓게 주면 «넓게» 짓고 자료 카드를 셋씩 놓는�
   assert.ok(Tpl.전문넓이 >= 900, '전문 폭이 안 넓다');
   assert.equal(폭읽기(h), Tpl.전문넓이, '준 폭으로 안 지었다');
   assert.equal(자료칸수(h), 3, '넓은데 세 칸이 아니다 — 오른쪽이 통째로 빈다');
-  /* ⚠ 셋씩 «표»로 놓으면 안 된다. 한 줄의 키를 제일 긴 카드가 정해 나머지 아래가 빈다. */
-  const 판 = h.slice(h.indexOf('background-color:#fbf4ea'));
-  assert.ok(판.indexOf('width="33%"') < 0, '넓은 쪽을 아직 표로 놓는다 — 빈 자리가 남는다');
-  assert.match(판, /break-inside:avoid/, '한 카드가 단 사이에서 잘린다');
+});
+
+test('★★★ 넓은 쪽 자료 카드는 «줄과 열이 맞는다» (대표 지시 2026-09-18)', () => {
+  /* 「줄 이나 열을 좀 정렬 해라」.
+     ⚠ 표로 놓으면 줄·열은 맞지만 «발행처와 내려받기 단추»가 카드마다 다른 높이에 뜬다.
+       칸의 키가 저절로(auto)라 속의 height:100% 가 갈 곳이 없기 때문이다
+       (2026-09-18 실측 1015/932/973). 칸틀의 칸은 줄 키만큼 늘어나 그 100% 가 산다. */
+  const 판 = 자료판(전문편지({ 넓이: Tpl.전문넓이 }));
+  assert.match(판, /display:grid/, '넓은 쪽을 칸틀로 안 놓는다 — 바닥이 안 맞는다');
+  assert.ok(판.indexOf('width="33%"') < 0, '아직 표로 놓는다 — 단추 높이가 제각각이 된다');
+  assert.match(판, /display:flex;flex-direction:column/, '칸이 늘어나는 꼴이 아니다');
+  /* ★ 늘임은 «사슬»이다 — 칸 → 카드 → 속표. 한 마디만 빠져도 바닥이 안 붙는다.
+     ⚠ 판 전체에서 height:100% 를 세면 안 된다 — 속표에만 둘이 있어 사슬이 끊겨도 통과한다
+       (2026-09-18 이빨 확인에서 그 구멍으로 빠져나갔다). 카드 «그 태그»를 콕 집는다. */
+  const 카드표 = /<table[^>]*id="n-policy-0"[^>]*>/.exec(판);
+  assert.ok(카드표, '카드를 못 찾았다');
+  assert.match(카드표[0], /height:100%/, '★ 카드가 칸 키만큼 안 늘어난다 — 사슬이 끊겼다');
+  const 속표 = /<table(?:(?!<\/table>)[\s\S])*?<td valign="bottom"/.exec(판);
+  assert.ok(속표 && /height:100%/.test(속표[0]), '★ 카드 속표가 안 늘어난다 — 사슬이 끊겼다');
+  assert.match(판, /valign="bottom"/, '발행처·내려받기가 바닥에 안 붙는다');
+});
+
+test('★★ 마지막 줄이 덜 차도 «칸»은 만든다 — 안 만들면 가로줄이 도중에 끊긴다', () => {
+  /* ⚠ 여섯 장으로 보면 안 걸린다 — 6 은 이미 3의 배수라 «안 만들어도» 수가 맞는다.
+       2026-09-18 이빨 확인에서 실제로 그 구멍으로 빠져나갔다. 넷으로 본다. */
+  [4, 5, 7].forEach((몇) => {
+    const d = { 열쇠: '2026-09-w2', 상태: '초안', 범위: '자문중', 회차: Core.회차('2026-09-10'),
+      우리글: '', 지역뉴스: [], 안: { news: [], case: [], hr: [],
+        policy: Array.from({ length: 몇 }, (_, i) => ({ 갈래: '자료', 제목: '자료 ' + (i + 1),
+          발행처: '고용노동부' })) } };
+    const 판 = 자료판(Tpl.편지짓기(d, { 회사이름: '푸른노무법인' },
+      { 요약: false, 미리보기: true, 넓이: Tpl.전문넓이 }).서식);
+    const 칸수 = (판.match(/display:flex;flex-direction:column/g) || []).length;
+    assert.equal(칸수, Math.ceil(몇 / 3) * 3,
+      '자료 ' + 몇 + '장인데 칸이 ' + 칸수 + '개다 — 마지막 줄의 빈 칸을 안 만들었다');
+  });
 });
 
 test('★★★ 넓게 한 번 지은 뒤에도 «메일은 그대로»다', () => {
@@ -352,13 +389,16 @@ test('★★★ 넓은 쪽은 «단»으로 흘린다 — 메일에는 절대 �
     news: [{ 갈래: '기사', 한줄: '한 줄', 우리말: '우리가 쓴 글', 언론사: '매일노동뉴스' }],
     policy: [1, 2, 3].map((i) => ({ 갈래: '자료', 제목: '자료 ' + i, 발행처: '고용노동부' })),
   }, '이번 주 한마디입니다.');
-  assert.ok(메일.indexOf('column-count') < 0, '⚠ 메일에 단이 샜다 — 아웃룩에서 글이 쏟아진다');
-  assert.ok(메일.indexOf('break-inside') < 0, '⚠ 메일에 단 부속이 샜다');
-  /* 넓은 쪽은 «기사·자료·우리 글» 세 군데가 단이다 */
-  const 단수 = (넓은.match(/column-count:\d/g) || []).length;
-  assert.ok(단수 >= 3, '넓은 쪽에 단이 ' + 단수 + '곳뿐이다 — 기사·자료·우리 글 셋이어야 한다');
-  assert.match(넓은, /column-count:3/, '자료 카드가 세 단이 아니다');
-  assert.match(넓은, /column-count:2/, '글이 두 단이 아니다');
+  /* ⚠⚠ 메일에는 «웹에서만 되는 것»이 하나도 없어야 한다 — 단·칸틀·늘임 모두. */
+  ['column-count', 'break-inside', 'display:grid', 'display:flex'].forEach((것) => {
+    assert.ok(메일.indexOf(것) < 0, '⚠ 메일에 ' + 것 + ' 이 샜다 — 아웃룩이 모른다');
+  });
+  /* 넓은 쪽: 글(기사·우리 글)은 «두 단», 자료 카드는 «세 열 칸틀» */
+  const 단수 = (넓은.match(/column-count:2/g) || []).length;
+  assert.ok(단수 >= 2, '넓은 쪽 글이 두 단인 곳이 ' + 단수 + '곳뿐이다 — 기사와 우리 글 둘이어야 한다');
+  assert.match(넓은, /grid-template-columns:repeat\(3/, '자료 카드가 세 열이 아니다');
+  assert.ok(넓은.indexOf('column-count:3') < 0,
+    '자료 카드를 단에 «쌓는다» — 그러면 줄이 어긋난다 (대표 지시 2026-09-18)');
 });
 
 test('★★★ 판례는 넓어도 «한 단»이다 — 나눠 봤고 더 길어졌다', () => {
@@ -402,6 +442,72 @@ test('★★ 표지가 없으면 «칸 자체»가 없다 — 빈 96px 은 글�
   const { 넓은 } = 두꼴({ policy: [{ 갈래: '자료', 제목: '자료 하나', 발행처: '고용노동부' }] });
   assert.ok(!/<td width="96"[^>]*><\/td>/.test(넓은), '★ 빈 96px 칸이 남아 있다');
   assert.ok(넓은.indexOf('width="96"') < 0, '★ 표지도 없는데 96px 칸을 만든다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⑥ 제호와 틀고정 (대표 지시 2026-09-18 「상단을 좀더 이쁘게」·「캡쳐2 틀고정」)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+test('★★ 제호는 «가운데로 쌓인다» — 영문 한 줄 · 이름 · 회차', () => {
+  /* 종전에는 이름 왼쪽·회차 오른쪽 «한 줄»이라 제목이 아니라 머리글처럼 읽혔다.
+     ⚠ 글자 크기를 못 박지 않는다 — 규칙은 «셋이 가운데로 선다»는 것이다. */
+  const h = 편지(true);
+  const 영 = h.indexOf('PUREUN LABOR LAW FIRM');
+  const 이 = h.indexOf('주간 노무 브리핑');
+  const 회 = h.indexOf('주차');
+  assert.ok(영 > 0, '★ 영문 한 줄이 없다');
+  assert.ok(영 < 이 && 이 < 회, '★ 영문·이름·회차 차례가 아니다');
+  /* 제호는 «굵은 줄»에서 시작해 회차까지다 — 글자 크기를 못 박지 않는다 */
+  const 시 = h.indexOf('background-color:#241a13');
+  assert.ok(시 > 0 && 시 < 영, '제호를 닫는 굵은 줄을 못 찾았다');
+  const 제호 = h.slice(시, 회 + 40);
+  assert.ok((제호.match(/align="center"/g) || []).length >= 3,
+    '★ 제호가 가운데로 안 섰다 — 영문·이름·회차 셋이 가운데여야 한다');
+  assert.ok(제호.indexOf('align="right"') < 0, '★ 회차가 아직 오른쪽에 붙어 있다');
+});
+
+test('★ 제호 위아래는 «겹줄»이다 — 한 줄만 그으면 칸막이로 보인다', () => {
+  const 몸 = stripComments(fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8'));
+  const f = cutFn(몸, 'function 요약머리(');
+  assert.ok((f.match(/_줄띠\(/g) || []).length >= 3, '제호를 닫는 줄이 모자란다');
+});
+
+test('★★ 로고를 넣어도 제호가 «가운데»에 남는다', () => {
+  /* align 만으로는 그림+글자 덩이가 안 가운데 온다 — 안쪽 표가 있어야 한다.
+     ⚠ 남의 서버 그림은 여기서 걸린다(열람 추적이 새는 자리다). */
+  const d = { 열쇠: '2026-09-w2', 상태: '초안', 범위: '자문중', 회차: Core.회차('2026-09-10'),
+    우리글: '', 지역뉴스: [], 안: { news: [], case: [], hr: [],
+      policy: [{ 갈래: '자료', 제목: '자료 하나', 발행처: '고용노동부' }] } };
+  const 짓 = (로고) => Tpl.편지짓기(d, { 회사이름: '푸른노무법인', 로고그림: 로고 },
+    { 요약: false, 미리보기: true }).서식;
+  const 우리 = 짓('https://nabaho.github.io/pureunall/img/logo.png');
+  assert.match(우리, /<table[^>]*align="center"[^>]*>(?:(?!<\/table>)[\s\S])*?logo\.png/,
+    '★ 로고가 가운데 덩이 밖에 있다 — 제호가 왼쪽으로 쏠린다');
+  assert.ok(짓('https://evil.example.com/logo.png').indexOf('evil.example.com') < 0,
+    '⚠ 남의 서버 로고가 나갔다 — 열람 추적이 새는 자리다');
+});
+
+test('★★★ 틀고정한 차림표가 «일한다» — 누르면 그 꼭지로 간다', () => {
+  /* 대표 지시 2026-09-18 「캡쳐2 틀고정」. 지금까지는 따라오기만 하고 눌러도
+     아무 일이 없었다 — 값이 없는 띠였다.
+     ⚠ 편지(pu-news-tpl.js)가 아니라 «웹 껍데기»가 붙인다. 메일 프로그램은 같은 편지
+       안 자리이동을 무시하므로, 편지에 링크를 넣으면 눌러도 헛일이 된다. */
+  const 전 = 전문편지({ 넓이: Tpl.전문넓이 });
+  const 쪽 = NV.쪽('제목', 전);
+  assert.match(전, /data-stick/, '붙잡을 줄이 편지에 없다');
+  assert.ok(전.indexOf('<a href="#g-') < 0, '⚠ 편지에 자리이동 링크를 넣었다 — 메일에서 헛일이 된다');
+  assert.match(쪽, /data-stick/, '껍데기가 붙잡는 규칙을 잃었다');
+  assert.match(쪽, /td\[align=center\]/, '차림표 칸을 못 찾게 되어 있다');
+  assert.match(쪽, /addEventListener\("click",가자\)/, '눌러도 가는 길이 없다');
+  assert.match(쪽, /td\.nav\.on/, '지금 보는 꼭지에 표시가 없다');
+  /* ⚠ 누를 때 초점이 잡히면 창이 좁을 때 쪽이 «옆으로» 밀려 왼쪽이 잘린다 */
+  assert.match(쪽, /addEventListener\("mousedown"[\s\S]{0,60}?preventDefault/,
+    '⚠ 누를 때 쪽이 옆으로 밀린다 — 왼쪽이 잘린다');
+  /* ⚠ 내려앉는 자리와 «지금 어디냐»의 잣대가 어긋나면 눌러도 옛 꼭지에 밑줄이 남는다 */
+  const 앉 = /offsetHeight-(\d+)/.exec(쪽), 잣 = /offsetHeight\+(\d+)/.exec(쪽);
+  assert.ok(앉 && 잣, '내려앉는 자리나 잣대를 못 읽었다');
+  assert.ok(Number(잣[1]) > Number(앉[1]),
+    '내려앉은 꼭지가 안 켜진다 (' + 앉[1] + ' vs ' + 잣[1] + ')');
 });
 
 test('★ 명조는 «웹폰트가 아니다» — 못 받아 오면 글자가 통째로 바뀐다', () => {

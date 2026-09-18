@@ -111,6 +111,48 @@ var 창스크립트 =
   'window.addEventListener("hashchange",해시로);해시로();' +
   '})();';
 
+/* ══════════════════════════════════════════════════════════════════════════
+   틀고정한 차림표를 «일하게» 만든다 (대표 지시 2026-09-18 「캡쳐2 틀고정」)
+   ══════════════════════════════════════════════════════════════════════════
+   ⚠⚠ 차림표는 지금까지 «글자»였다. 굴러도 따라오기는 하는데 눌러도 아무 일이
+     없었다 — 따라오는 값이 없는 띠였다. 편지(pu-news-tpl.js)에서 링크로 못 만드는
+     까닭은 «메일 프로그램이 같은 편지 안 자리이동(#앵커)을 대개 무시»하기 때문이다.
+     누르면 헛일이 되는 손잡이를 편지에 둘 수는 없다.
+   ★ 그래서 «여기»에서 붙인다. 이 쪽은 브라우저라 확실히 통하고, 편지 속 글자는
+     하나도 안 건드린다(메일은 예전 그대로다).
+   ★ 짝은 «차례»로 맺는다. 차림표 칸 넷과 꼭지 자리표(<a id="g-…">)가 같은 차례다.
+     ⚠ 지역 소식 꼭지도 id="g-" 를 달고 나오는데 «맨 뒤»라 넷과 안 부딪힌다.
+   ★ 지금 보고 있는 꼭지에 밑줄이 그어진다 — 긴 쪽에서 «내가 어디쯤인지»가 보인다.
+   ⚠ 따라오는 띠의 «키»만큼 덜 내려가야 제목이 띠 밑에 숨지 않는다. */
+var 차림표스크립트 =
+  '(function(){' +
+  'var 줄=document.querySelector("#wrap [data-stick]");if(!줄)return;' +
+  'var 칸=줄.querySelectorAll("td[align=center]");' +
+  'var 가=document.querySelectorAll("#wrap [id^=\'g-\']");' +
+  'var 표=[];' +
+  'for(var i=0;i<칸.length&&i<가.length;i++){(function(c,a){' +
+  'c.className="nav";c.setAttribute("role","link");c.tabIndex=0;표.push({c:c,a:a});' +
+  /* ⚠ 내려앉는 자리(-띠키-14)와 아래 «어디냐»의 잣대(+띠키+22)는 짝이다.
+       내려앉은 꼭지가 곧바로 «켜져» 보여야 한다 — 어긋나면 눌렀는데 옛 꼭지에
+       밑줄이 남아 「안 눌렸나」가 된다(2026-09-18 실측: 1px 차이로 그랬다). */
+  'function 가자(){var y=a.getBoundingClientRect().top+window.scrollY-줄.offsetHeight-14;' +
+  'window.scrollTo({top:y<0?0:y,behavior:"smooth"});}' +
+  /* ⚠⚠ 누를 때 «초점»이 잡히면 브라우저가 그 칸을 보이게 하려고 쪽을 «옆으로» 민다.
+       창이 편지(980)보다 좁으면 왼쪽이 통째로 잘려 나간다 — 실제로 겪었다(2026-09-18).
+       마우스 누름을 막으면 초점이 안 잡히고, 누르기(click)는 그대로 온다.
+     ⚠ 키보드(Tab)로 올 때는 초점이 필요하다 — 그때 옆으로 미는 것은 «맞는» 일이다. */
+  'c.addEventListener("mousedown",function(e){e.preventDefault();});' +
+  'c.addEventListener("click",가자);' +
+  'c.addEventListener("keydown",function(e){' +
+  'if(e.key==="Enter"||e.key===" "){e.preventDefault();가자();}});' +
+  '})(칸[i],가[i]);}' +
+  'if(!표.length)return;' +
+  'function 어디냐(){var h=줄.offsetHeight+22,사=0;' +
+  'for(var i=0;i<표.length;i++){if(표[i].a.getBoundingClientRect().top<=h)사=i;}' +
+  'for(var j=0;j<표.length;j++)표[j].c.className=(j===사?"nav on":"nav");}' +
+  'window.addEventListener("scroll",어디냐,{passive:true});어디냐();' +
+  '})();';
+
 /* 꼬리에 적을 제목 — «법인 이름은 덜어 낸다».
    ⚠⚠ 실측 2026-09-13(배포한 창을 열어 보고 알았다): 꼬리가
      「푸른노무법인  푸른노무법인 2026년 09월 2주차 주간뉴스레터 입니다.」였다.
@@ -155,6 +197,16 @@ function 쪽(제목, 전문) {
        ⚠ 바탕을 안 깔면 뒤 글자가 그대로 비친다. */
     + '#wrap [data-stick]{position:sticky;top:0;z-index:5;background:#ffffff;'
     + 'box-shadow:0 2px 6px rgba(36,26,19,.06)}'
+    /* ⚠ 줄(tr)에 건 그림자를 안 그리는 브라우저가 있다 — 칸에도 한 번 건다. */
+    + '#wrap [data-stick]>td{box-shadow:0 2px 6px rgba(36,26,19,.06)}'
+    /* ★ 눌리는 차림표 (2026-09-18). 칸 서식이 «인라인»이라 !important 가 있어야 이긴다.
+       ⚠ 밑줄은 border 가 아니라 inset 그림자로 긋는다 — border 를 얹으면 그 칸만
+         1px 커져 차림표가 통째로 들썩인다. */
+    + '#wrap [data-stick] td.nav{cursor:pointer;transition:color .12s,background .12s}'
+    + '#wrap [data-stick] td.nav:hover{color:#241a13 !important;background:#faf8f5}'
+    + '#wrap [data-stick] td.nav.on{color:#241a13 !important;'
+    + 'box-shadow:inset 0 -2px 0 #6f5a48}'
+    + '#wrap [data-stick] td.nav:focus-visible{outline:2px solid #c9b79b;outline-offset:-3px}'
     /* 누를 수 있다는 것을 손이 알게 한다 — 메일에는 이 규칙이 안 간다(<style> 은 지워진다) */
     + '[data-pop]{cursor:pointer}'
     + '[data-pop]{border-radius:6px;transition:outline-color .12s}'
@@ -241,7 +293,7 @@ function 쪽(제목, 전문) {
     + '<span>' + esc(꼬리제목(제목)) + '</span>'
     + '<span class="sp"></span><span>문의 041-556-0035</span></div>'
     + '</div></div>'
-    + '<script>' + 창스크립트 + '<\/script>'
+    + '<script>' + 창스크립트 + 차림표스크립트 + '<\/script>'
     + '</body></html>';
 }
 
