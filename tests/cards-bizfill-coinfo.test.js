@@ -24,8 +24,12 @@ const SRC = stripJs(RAW);
 
 /* 셈하는 함수를 가짜 창에 올려 실제로 돌린다 */
 function load(items, coInfo) {
+  /* 🔑 검산·열쇠는 공용 파일이 한다(2026-09-18 온톨로지 1걸음) — 가짜 창에도 얹는다.
+     ⚠ 여기서 흉내 내지 «말 것». 흉내 내면 이 검사는 «흉내»를 보게 되고,
+       진짜 규칙이 갈라져도 초록으로 남는다. 진짜 파일을 넣는다. */
   const ctx = {
     console, Object, String, Number, Math, Set, Array, JSON,
+    window: { PuCoKey: require(path.join(ROOT, 'js', 'pu-cokey.js')) },
     state: { items: items || {} },
     _coInfo: coInfo || {}
   };

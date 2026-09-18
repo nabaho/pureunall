@@ -178,6 +178,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
 <script src="js/pu-ontology.js?v=26"></script>
+<script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=1"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
@@ -305,7 +306,7 @@ var Component = React.Component;
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
 var ERP_BUILD = '2026-09-18 초기 동기화의 건별 자료를 모아 한 번만 저장 — 수천 건을 받을 때마다 전체 배열을 다시 저장해 화면이 오래 멈추던 길을 줄였다';
-var BUILD_SEQ = 173;
+var BUILD_SEQ = 174;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -17444,6 +17445,9 @@ function ContractModal(props){
   var pcpk = useState(null); var pcPickIdx = pcpk[0]; var setPcPickIdx = pcpk[1];  // 기업정보함 담당자 찾기: 대상 담당자 index
   var pcmp = useState(false); var pcMultiOpen = pcmp[0]; var setPcMultiOpen = pcmp[1]; // 기업정보함에서 담당자 여러 명 골라 담기
   var pcco = useState(''); var pcCoPick = pcco[0]; var setPcCoPick = pcco[1];      // 기업정보함 회사 찾기: 누른 첨부칸(businessCardImg/bizLicenseImg)
+  /* 🔑 사업자번호로 찾아 둔 기업정보함 기업상세 (온톨로지 1걸음, 2026-09-18).
+     {key, v} 또는 null. 번호가 «검산을 통과할 때만» 한 번 읽는다. */
+  var cik = useState(null); var coInfoHit = cik[0]; var setCoInfoHit = cik[1];
   var hrw = useState(false); var hideRetiredWk = hrw[0]; var setHideRetiredWk = hrw[1];  // 근로자: 재직자만 보기
   /* 👷 근로자 정보함에서 가져오기 (대표 지시 2026-09-02) — 사건 창과 «같은 창»을 쓴다.
      ⚠ 담기는 줄 모양만 다르다(계약 창은 f.company.workers · 주민번호·직책·입사일 칸). */
@@ -17494,6 +17498,31 @@ function ContractModal(props){
   var pdv = useState(false); var docViewOpen = pdv[0]; var setDocViewOpen = pdv[1];
   // 창을 열 때 한 번만 읽는다 — 실시간 구독이 아니다(설계 확정)
   useEffect(function(){ erpLoadMyContractPhotos(function(){ setContractPhotosLoaded(true); }); }, []);
+
+  /* ══ 🔑 사업자번호로 기업정보함을 찾는다 (온톨로지 1걸음, 대표 결정 2026-09-18) ══
+     번호가 검산을 통과하면 그 열쇠로 기업상세를 «한 번» 읽는다.
+
+     ⚠★ 이름으로는 찾지 «않는다». 「가나상사」가 두 곳일 수 있다 —
+       오늘 아침 CMS 오매칭이 이름·금액으로 맞추다 난 사고다. 번호는 틀릴 수가 없다.
+     ⚠ 구독하지 않는다. 한 번 읽고 만다 — 계약 창을 여는 동안 회사는 안 바뀐다.
+     ⚠ 열쇠 만들기는 공용 파일(js/pu-cokey.js)이 한다. 여기서 자릿수를 끊지 말 것. */
+  useEffect(function(){
+    var k = (window.PuCoKey && window.PuCoKey.key(f.company && f.company.bizNo)) || '';
+    if(!k){ setCoInfoHit(null); return; }
+    var dead = false;
+    try {
+      firebase.database().ref(window.PuCoKey.coInfoPath(f.company.bizNo)).once('value')
+        .then(function(s){
+          if(dead) return;
+          var v = s.val();
+          /* 열쇠만 있고 알맹이가 없는 자리가 많다(2026-09-18 실측: 207 중 180) —
+             회사명이 없으면 «없는 것»으로 친다. 빈 띠를 띄우지 않는다. */
+          setCoInfoHit(v && String(v.company||'').trim() ? { key:k, v:v } : null);
+        })
+        .catch(function(){ if(!dead) setCoInfoHit(null); });
+    } catch(_){ setCoInfoHit(null); }
+    return function(){ dead = true; };
+  }, [ (f.company && f.company.bizNo) || '' ]);
   /* ⚠ 「종류를 딱 하나만 골랐을 때」라는 조건을 뺐다(2026-08-26). 이 목록은 이제
      **초록불(N건 발견)** 을 켜는 데 쓰고, 찾기 창은 종류와 상관없이 열린다.
      예전에는 새 계약이 종류 0개로 시작하므로 회사명을 치는 동안 조건이 영영
@@ -17972,6 +18001,37 @@ function ContractModal(props){
   }
 
   // ========== 기업정보 ==========
+  /* 🔑 기업정보함에서 찾은 회사정보로 «빈 칸만» 채운다 (온톨로지 1걸음, 2026-09-18).
+     ⚠★ 이미 적힌 값은 건드리지 않는다 — 사람이 고쳐 둔 것이 조용히 지워지면
+       그게 가장 나쁘다(기업정보함으로 보낼 때와 «같은 규칙»이다).
+     ⚠ 기업정보함의 「종목」은 계약의 bizCategory 다 — 이름이 달라 짝을 여기 적어 둔다.
+       바꿔 넣으면 업태 칸에 종목이 들어간다(사진첩의 CONTRACT_CO_MAP 과 같은 짝). */
+  var COINFO_TO_CONTRACT = [
+    ['company','name'], ['ceo','ceo'], ['corpno','corpRegNo'], ['address','address'],
+    ['companyTel','phone'], ['companyFax','fax'], ['email','email'],
+    ['bizType','bizType'], ['bizItem','bizCategory'], ['openDate','openDate']
+  ];
+  function coInfoFillable(hit){
+    if(!hit || !hit.v) return [];
+    var cur = f.company || {};
+    return COINFO_TO_CONTRACT.filter(function(p){
+      var got = String(hit.v[p[0]] == null ? '' : hit.v[p[0]]).trim();
+      var had = String(cur[p[1]] == null ? '' : cur[p[1]]).trim();
+      return got && !had;
+    });
+  }
+  function coInfoFill(hit){
+    var add = coInfoFillable(hit);
+    if(!add.length){ showToast('채울 빈 칸이 없습니다'); return; }
+    setF(function(prev){
+      var nextC = Object.assign({}, prev.company);
+      add.forEach(function(p){ nextC[p[1]] = String(hit.v[p[0]]).trim(); });
+      return Object.assign({}, prev, { company: nextC,
+        companyName: nextC.name || prev.companyName });
+    });
+    showToast('📇 기업정보함에서 ' + add.length + '칸을 채웠습니다 — 이미 적힌 값은 그대로 두었습니다');
+  }
+
   function setCompanyField(k){ return function(e){
     var v;
     if(e.target.type === 'number') v = parseInt(e.target.value||0, 10);
@@ -18691,38 +18751,42 @@ function ContractModal(props){
       if(!file) return;
       attachFile(field, file, function(b64){ runOcr(field, b64); });
     }
-    /* 🧹 한 줄로 (대표 지시 2026-09-18 「화면 정리」)
-       전에는 한 덩이가 «여섯 줄»이었다 — 제목 · 가져오기 · 「기업정보함에서 보기」 ·
-       사진으로 채우기 · 「글자만 읽고 사진은 버립니다」. 그것이 둘이라 열두 줄이
-       회사명 칸 «위»를 차지했다.
-       ⚠ 단추를 «없애지» 않았다 — 설명 글만 말풍선으로 옮기고 한 줄에 폈다.
-       ⚠ 「기업정보함에서 보기」 길도 남긴다 — 사진은 거기서 본다. 아이콘 하나로 줄였다. */
+    /* ⚠★ 한 줄로 합쳤다가 «되돌렸다» (대표 지시 2026-09-18 「캡쳐 기존으로 돌려라」).
+       기둥이 좁아 한 줄이 도로 세 줄로 접혔고, 그때는 제목과 단추가 갈라져
+       「어느 서류의 단추인지」가 더 헷갈렸다. 넓은 화면을 믿고 한 줄에 몰면 안 된다 —
+       세로로 쪼갠 기둥은 한 줄이 짧다. 제목을 머리에 두는 옛 모습이 맞다. */
     return h('div', { style:{ flex:1, minWidth:0 } },
+      h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'4px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'4px', flexWrap:'wrap' } },
+        h('span', null, title),
+        h('span', { style:{ display:'inline-flex', alignItems:'center', gap:'4px', flexWrap:'wrap' } },
+          /* (2026-08-09) 사진이 아니라 «정보» 를 가져온다 — 대표 지시.
+             사진은 기업정보함에 이미 있으니 두 번 보관할 이유가 없다. */
+          h('button', { type:'button', onClick:function(){ setPcCoPick(field); },
+            title:'기업정보함에서 회사정보(사업자번호·대표·업태·종목·주소·연락처)를 가져옵니다\n'
+                 +'— 사진은 가져오지 않습니다. 사진은 기업정보함에서 보세요',
+            style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'2px 8px', borderRadius:'4px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
+            '📇 기업정보함 정보 가져오기'),
+          h('a', { href:'pu-cards.html', target:'_blank', rel:'noopener',
+            title:'기업정보함을 새 탭에서 엽니다 — 사진은 거기서 보세요',
+            style:{ color:'#64748b', fontSize:'10.5px', textDecoration:'underline', whiteSpace:'nowrap' } },
+            '기업정보함에서 보기')
+        )
+      ),
+      /* 사진으로 «채우기» — 붙이기가 아니다. 끌어다 놓기도 여기서 받는다. */
       h('div', {
           onDragOver:function(e){ e.preventDefault(); },
           onDrop:function(e){ e.preventDefault(); fillFrom(e.dataTransfer.files && e.dataTransfer.files[0]); },
-          style:{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' } },
-        h('span', { style:{ fontSize:'11px', fontWeight:700, color:'#475569', whiteSpace:'nowrap' } }, title),
-        /* (2026-08-09) 사진이 아니라 «정보» 를 가져온다 — 대표 지시.
-           사진은 기업정보함에 이미 있으니 두 번 보관할 이유가 없다. */
-        h('button', { type:'button', onClick:function(){ setPcCoPick(field); },
-          title:'기업정보함에서 회사정보(사업자번호·대표·업태·종목·주소·연락처)를 가져옵니다\n'
-               +'— 사진은 가져오지 않습니다. 사진은 기업정보함에서 보세요',
-          style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'3px 9px', borderRadius:'5px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
-          '📇 기업정보함 정보 가져오기'),
+          style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
         h('button', { type:'button', disabled:ocrBusy,
           onClick:function(){ var el = document.getElementById(inpId); if(el) el.click(); },
           title:'사진을 골라 «글자만» 읽어 빈 칸을 채웁니다.\n'
-               +'⚠ 사진은 계약에 저장하지 않습니다 — 글자만 읽고 사진은 버립니다.\n'
+               +'⚠ 사진은 계약에 저장하지 않습니다 — 사진은 기업정보함에 둡니다.\n'
                +'PC 는 끌어다 놓기 · Ctrl+V 도 됩니다',
           style:{ background:ocrBusy?'#cbd5e1':'#f8fafc', color:ocrBusy?'#fff':'#475569',
-            border:'1px dashed #cbd5e1', padding:'3px 9px', borderRadius:'5px',
+            border:'1px dashed '+(ocrBusy?'#cbd5e1':'#cbd5e1'), padding:'5px 10px', borderRadius:'6px',
             fontSize:'10.5px', fontWeight:700, cursor:ocrBusy?'wait':'pointer', whiteSpace:'nowrap' } },
           ocrBusy ? '⏳ 읽는 중…' : '📷 사진으로 채우기'),
-        h('a', { href:'pu-cards.html', target:'_blank', rel:'noopener',
-          title:'기업정보함을 새 탭에서 엽니다 — 사진은 거기서 보세요',
-          style:{ color:'#64748b', fontSize:'10.5px', textDecoration:'underline', whiteSpace:'nowrap' } },
-          '기업정보함에서 보기'),
+        h('span', { style:{ fontSize:'10px', color:'#94a3b8' } }, '글자만 읽고 사진은 버립니다'),
         h('input', { id:inpId, type:'file', accept:'image/*,.pdf',
           onChange:function(e){ var fl = e.target.files && e.target.files[0]; e.target.value=''; fillFrom(fl); },
           style:{ display:'none' } })
@@ -19124,6 +19188,34 @@ function ContractModal(props){
             );
           })),
 
+      /* ══ 🔑 사업자번호로 찾은 기업정보함 회사 (온톨로지 1걸음, 2026-09-18) ══
+         번호가 검산을 통과하고 기업정보함에 그 회사가 «있을 때만» 뜬다.
+         ⚠ 저절로 채우지 않는다 — 누르셔야 들어간다. 그래야 무엇이 들어갔는지 아신다.
+         ⚠ 채울 빈 칸이 없으면 「다 들어 있다」고만 말한다. 쓸 수 없는 단추를 띄우지 않는다. */
+      coInfoHit && (function(){
+        var add = coInfoFillable(coInfoHit);
+        var L = { name:'상호', ceo:'대표자', corpRegNo:'법인번호', address:'주소',
+                  phone:'전화', fax:'팩스', email:'이메일',
+                  bizType:'업태', bizCategory:'종목', openDate:'개업일' };
+        return h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap',
+            background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'6px',
+            padding:'8px 10px', marginBottom:'10px' } },
+          h('span', { style:{ fontSize:'11.5px', fontWeight:700, color:'#166534' } },
+            '📇 기업정보함에 「' + String(coInfoHit.v.company || '').trim() + '」 이 있습니다'),
+          add.length
+            ? h('span', { style:{ fontSize:'10.5px', color:'#475569', flex:1, minWidth:0,
+                overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } },
+                '빈 칸 ' + add.length + '개: ' + add.map(function(p){ return L[p[1]] || p[1]; }).join(' · '))
+            : h('span', { style:{ fontSize:'10.5px', color:'#64748b', flex:1 } }, '이미 다 들어 있습니다'),
+          add.length
+            ? h('button', { type:'button', onClick:function(){ coInfoFill(coInfoHit); },
+                title:'기업정보함의 값으로 «빈 칸만» 채웁니다.\n이미 적어 두신 값은 건드리지 않습니다.',
+                style:{ background:'#16a34a', color:'#fff', border:0, borderRadius:'6px',
+                  padding:'4px 11px', fontSize:'11px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
+                '빈 칸 채우기')
+            : null
+        );
+      })(),
       // 회사 정보 섹션 (worker 단독이 아닐 때)
       showCompany && h('div', null,
         // 명함 + 사업자등록증 드롭존
