@@ -14884,6 +14884,7 @@ function erpNameRun(a, b){
   var best = 0;
   for(var i = 0; i < a.length; i++){
     for(var j = i + best + 1; j <= a.length; j++){
+      /* break 는 «빠르기»다 — 짧은 토막이 없으면 더 긴 토막도 없다(답은 안 바뀐다) */
       if(b.indexOf(a.slice(i, j)) >= 0) best = j - i; else break;
     }
   }
@@ -14892,7 +14893,10 @@ function erpNameRun(a, b){
 /* 돌려주는 것: 맞는 유형 하나 또는 null. ⚠ 둘 이상 걸리면 null 이다(사람이 고른다). */
 function erpConsTypeByDocName(docName, types){
   var d = erpTypeNameTidy(docName);
-  if(d.length < 4) return null;
+  /* ⚠ 「너무 짧으면 그만두기」를 따로 안 둔다 — 아래 문턱이 이미 그 일을 한다.
+     겹침이 5자 이상이라야 후보가 되는데 겹침은 d 길이를 넘을 수 없으므로,
+     네 글자 이하는 저절로 후보가 0개다. 한 줄 더 두면 «닿을 수 없는 줄»이 되어
+     되돌림으로도 확인이 안 된다(지키는 것은 아래 문턱 하나다). */
   var hits = [];
   (types || []).forEach(function(t){
     var n = erpTypeNameTidy(t && t.name);
