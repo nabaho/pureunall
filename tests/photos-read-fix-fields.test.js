@@ -31,6 +31,10 @@ function load() {
   vm.createContext(ctx);
   /* ⚠ 2026-09-03 — canSendCoInfo 가 «사람이 채운 값»(readFields)을 본다 */
   const want = ['const WORKER_KINDS =', 'const FIX_KEYS =', 'const CO_FIX_KINDS =',
+    'const FIX_PAIR =',
+    /* ⚠ 2026-09-18 — readFields 가 도우미 셋을 부른다(칸마다 ✎ 고치기).
+       안 실으면 「fixIsMeta is not defined」로 이 검사가 통째로 운다. */
+    'function fixIsMeta(', 'function fixKeyOfLabel(', 'function fixCleared(',
     'function readFields(', 'function fixKeysOf(',
     'function canSendWorker(', 'function workerWhyNot(', 'function fixBoxOn(',
     'const RESIDENT_FRESH_DAYS =', 'function issuedDaysAgo(', 'function residentStale('];

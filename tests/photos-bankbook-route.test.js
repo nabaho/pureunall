@@ -37,6 +37,11 @@ function load() {
     grab(/^const FIX_KEYS = \[[^\r\n]*\];/m),
     grab(/^const CO_FIX_KINDS = \{[^}]*\};/m),
     grab(/^const WORKER_KINDS = \{[^}]*\};/m),
+    /* ⚠ 2026-09-18 — readFields 가 도우미 둘과 상수 하나를 본다(칸마다 ✎ 고치기).
+       안 실으면 「fixIsMeta is not defined」로 이 검사가 통째로 운다. 규칙은 그대로다. */
+    grab(/^const FIX_PAIR = '[^']*';/m),
+    cutFn(app, 'function fixIsMeta('),
+    cutFn(app, 'function fixCleared('),
     cutFn(app, 'function readFields('),
     cutFn(app, 'function canSendCoInfo('),
     cutFn(app, 'function fixKeysOf('),
