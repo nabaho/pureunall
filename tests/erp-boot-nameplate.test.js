@@ -102,10 +102,21 @@ test('실제로 일찍 빠지는지 돌려 본다', () => {
   assert.ok(box._saved, '채웠으면 저장한다');
 });
 
-/* ── 부팅 낭비 ② 저장소 전체를 화면 뜨는 길에서 글자로 만들기 ── */
+/* ── 부팅 낭비 ② 저장소 전체를 화면 뜨는 길에서 글자로 만들기 ──
+   ⚠ 자리를 «주석»으로 잡고 끝은 useEffect 가 닫히는 곳까지 간다.
+     예전에는 `var AUTO_KEY = '…'` 글자로 잡고 3,400자를 잘랐다 — 그 한 줄이 공용 상수로
+     바뀌자(2026-09-18) indexOf 가 -1 이 되어 «빈 글자»를 검사했고, 왜 깨졌는지도 안 보였다.
+     tests/test-cut-truncation.test.js 가 경고하는 «고정 폭 자르기»가 이것이다. */
+function nasAutoBlock() {
+  const i = app.indexOf('// ── NAS 자동 백업 (7일 주기');
+  assert.ok(i > 0, '★ 자동 백업 자리를 못 찾았다 — 검사가 빈 글자를 보고 있다');
+  const end = app.indexOf('}, []);', i);
+  assert.ok(end > i && end - i < 6000, '★ 끝을 못 찾았다');
+  return app.slice(i, end);
+}
+
 test('NAS 자동 백업을 화면 뜨는 길에서 비켜 놓았다', () => {
-  const i = app.indexOf("var AUTO_KEY = 'pureun_v6_nas_auto_backup'");
-  const blk = app.slice(i, i + 3400);
+  const blk = nasAutoBlock();
   assert.match(blk, /if\(window\.requestIdleCallback\) requestIdleCallback\(_run, \{ timeout:15000 \}\);/);
   assert.match(blk, /else setTimeout\(_run, 3000\);/, '없는 브라우저도 화면 먼저');
   // 무거운 일이 _run 안에 들어가 있어야 뜻이 있다
@@ -115,8 +126,7 @@ test('NAS 자동 백업을 화면 뜨는 길에서 비켜 놓았다', () => {
 });
 
 test('설정이 없으면 여전히 아무것도 안 한다', () => {
-  const i = app.indexOf("var AUTO_KEY = 'pureun_v6_nas_auto_backup'");
-  const blk = app.slice(i, i + 3400);
+  const blk = nasAutoBlock();
   assert.match(blk, /if\(!cfg\.user \|\| !cfg\.pass \|\| !cfg\.host\) return;/);
   assert.match(blk, /if\(lastStr && \(now - parseInt\(lastStr,10\)\) < WEEK_MS\) return;/);
   // 일찍 빠지는 두 검사는 «미루기 전»에 있어야 한다 — 미룬 뒤에 걸러 봐야 늦다
