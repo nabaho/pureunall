@@ -1,4 +1,4 @@
-// 밀린 자문료를 한 번에 받는 경우 — 코엘이엔지 220,000 × 3개월 = 660,000
+// 밀린 자문료를 한 번에 받는 경우 — 다라이엔지 220,000 × 3개월 = 660,000
 const fs = require('fs');
 const path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
@@ -56,9 +56,9 @@ eq('6월에서 2달 전', ymBack('2026-06',2), '2026-04');
 eq('해를 넘긴다 (2월에서 3달 전)', ymBack('2026-02',3), '2025-11');
 eq('1월에서 1달 전', ymBack('2026-01',1), '2025-12');
 
-console.log('\n[코엘이엔지 — 3개월 밀렸다가 660,000 한 번에]');
+console.log('\n[다라이엔지 — 3개월 밀렸다가 660,000 한 번에]');
 {
-  const co = [{ name:'주식회사코엘이엔지', monthlyAdvisoryFee:220000 }];
+  const co = [{ name:'주식회사다라이엔지', monthlyAdvisoryFee:220000 }];
   const p = advPending(co, [], ['2026-06']);
   eq('안 걷힌 세 달이 모두 후보로 뜬다', p.map(x=>x.ym), ['2026-06','2026-05','2026-04']);
   eq('달마다 220,000 씩', p.map(x=>x.expect), [220000,220000,220000]);

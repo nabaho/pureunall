@@ -70,7 +70,7 @@ function box(coInfo) {
 const plan = (b, key) => JSON.parse(JSON.stringify(vm.runInContext('coOrphanAdoptPlan(' + JSON.stringify(key) + ')', b)));
 
 const REC = {
-  company: '대성정밀', ceo: '김대성', address: '경기 안산시 …', bizType: '제조',
+  company: '열음정밀', ceo: '김열음', address: '경기 안산시 …', bizType: '제조',
   bizItem: '금속가공', companyTel: '031-000-0000', folder: 'f1', tags: { a: true },
   docs: { d1: { id: 'p1', name: '사업자등록증' } }
 };
@@ -87,23 +87,23 @@ test('★ 만든 사업자등록증의 열쇠가 그 고아의 열쇠와 «같�
 
 test('사업자번호는 rec 이 아니라 «열쇠»에서 온다', () => {
   /* 사진첩이 보낸 값에 bizno 칸이 비어 있을 수 있다. 열쇠가 곧 그 번호다 */
-  const b = box({ '3128144907': { company: '대성정밀', ceo: '김대성' } });
+  const b = box({ '3128144907': { company: '열음정밀', ceo: '김열음' } });
   const p = plan(b, '3128144907');
   assert.equal(p.ok, true);
   assert.equal(b.digits(p.item.bizno), '3128144907');
 });
 
 test('이름열쇠(n…)면 상호로 만든다 — 번호를 지어내지 않는다', () => {
-  const b = box({ 'n대성정밀': { company: '대성정밀', ceo: '김대성' } });
-  const p = plan(b, 'n대성정밀');
+  const b = box({ 'n열음정밀': { company: '열음정밀', ceo: '김열음' } });
+  const p = plan(b, 'n열음정밀');
   assert.equal(p.ok, true, p.why || '');
   assert.equal(p.item.bizno, '', '★ 없는 사업자번호를 지어냈다');
   const k = vm.runInContext('coKeyOf(' + JSON.stringify(p.item) + ')', b);
-  assert.equal(k, 'n대성정밀', '열쇠가 달라 안 붙는다');
+  assert.equal(k, 'n열음정밀', '열쇠가 달라 안 붙는다');
 });
 
 test('이름열쇠인데 상호마저 없으면 «거절한다»', () => {
-  const b = box({ 'n': { ceo: '김대성' } });
+  const b = box({ 'n': { ceo: '김열음' } });
   const p = plan(b, 'n');
   assert.equal(p.ok, false, '★ 이름도 번호도 없는데 회사를 만들면 유령이 는다');
   assert.ok(p.why && p.why.length > 3, '까닭이 없다');
@@ -124,9 +124,9 @@ test('★ 등록증이 아는 칸만 옮긴다 — 모르는 칸은 «두 목록
   const b2 = box({ '3128144907': rec });
   const p = plan(b2, '3128144907');
 
-  assert.equal(p.item.ceo, '김대성');
+  assert.equal(p.item.ceo, '김열음');
   assert.equal(p.item.bizType, '제조');
-  assert.equal(p.item.company, '대성정밀');
+  assert.equal(p.item.company, '열음정밀');
   unknown.forEach(k => {
     assert.equal(p.item[k], undefined,
       '★ 등록증에 없는 칸 「' + k + '」을 넣었다 — 서식에 없는 값은 화면에 안 나오고 자리만 먹는다');
@@ -138,7 +138,7 @@ test('★ 등록증이 아는 칸만 옮긴다 — 모르는 칸은 «두 목록
 });
 
 test('빈 칸은 «만들지 않는다» — 빈 글자로 덮으면 나중 값이 안 들어온다', () => {
-  const b = box({ '3128144907': { company: '대성정밀', ceo: '' } });
+  const b = box({ '3128144907': { company: '열음정밀', ceo: '' } });
   const p = plan(b, '3128144907');
   assert.ok(!('ceo' in p.item) || p.item.ceo === undefined,
     '빈 대표자를 넣었다');
@@ -176,7 +176,7 @@ function runDrop(answer) {
   const writes = [];
   let asked = '';
   const b = {
-    _coInfo: { '3128144907': { company: '대성정밀' } },
+    _coInfo: { '3128144907': { company: '열음정밀' } },
     confirm: m => { asked = m; return answer; },
     toast: () => {}, coListBust: () => {}, renderCoAny: () => {},
     showPanel: () => {}, coOrphanHtml: () => '',

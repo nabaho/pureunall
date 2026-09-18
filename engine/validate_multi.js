@@ -10,7 +10,7 @@ const DATA_ROOT = process.env.PAYROLL_DATA_ROOT ||
 const OUT_DIR = path.join(DATA_ROOT, '_harness_out');
 
 const SITES = process.argv.slice(2);
-const targets = SITES.length ? SITES : ['가람떡집', '화담원 서산점', '늘봄반찬'];
+const targets = SITES.length ? SITES : ['가람떡집', '다온원 서산점', '새별반찬'];
 const MODES = ['절사', '올림', '반올림'];
 
 const res = JSON.parse(fs.readFileSync(path.join(OUT_DIR, 'parser_output.json'), 'utf-8'));

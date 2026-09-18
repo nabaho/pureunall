@@ -24,7 +24,7 @@ function seed() {
       mode: 'full', doneBy: '김노무', doneAt: '2024-12-18 17:41' }],
     ['site_2148601234', 'r20230301_enact', { site: '주식회사 한빛산업', bizno: '214-86-01234', asof: '2023-03-01',
       from: 'chwieop', changed: 86, doneBy: '이사무', doneAt: '2023-02-27 16:30' }],
-    ['site_x', 'r1', { site: '성진테크', asof: '2024-11-01', kind: '일부개정', changed: 1, arts: ['제20조(휴일)'] }]
+    ['site_x', 'r1', { site: '파하테크', asof: '2024-11-01', kind: '일부개정', changed: 1, arts: ['제20조(휴일)'] }]
   ].map(a => H._shape(a[0], a[1], a[2])));
 }
 
@@ -38,9 +38,9 @@ test('한 회사의 회차는 상호 표기가 달라도 사업자번호로 한 
 
 test('사업자번호가 없으면 상호명으로 찾되, 법인격 표기는 따지지 않는다', () => {
   seed();
-  assert.equal(H.forCompany({ company: '성진테크' }).length, 1);
-  assert.equal(H.forCompany({ company: '(주)성진테크' }).length, 1, '(주)가 붙어도 같은 회사');
-  assert.equal(H.forCompany({ company: '성 진 테 크' }).length, 1, '띄어쓰기가 달라도 같은 회사');
+  assert.equal(H.forCompany({ company: '파하테크' }).length, 1);
+  assert.equal(H.forCompany({ company: '(주)파하테크' }).length, 1, '(주)가 붙어도 같은 회사');
+  assert.equal(H.forCompany({ company: '파 하 테 크' }).length, 1, '띄어쓰기가 달라도 같은 회사');
 });
 
 test('없는 회사는 빈 목록 — 화면에 빈 칸이 생기면 안 된다', () => {

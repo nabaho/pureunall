@@ -26,13 +26,13 @@ function loadModel() {
   return sandbox.window.sitesModel;
 }
 
-const COMPANIES = [{ id: 'co_1', name: '화담원' }, { id: 'co_2', name: '이비' }];
+const COMPANIES = [{ id: 'co_1', name: '다온원' }, { id: 'co_2', name: '벼리비' }];
 
 test('업체마다 한 줄이 나온다', () => {
   const model = loadModel();
   const out = model(COMPANIES, {}, {}, '2026-08', 0);
   assert.equal(out.rows.length, 2);
-  assert.equal(out.rows[0].name, '화담원');
+  assert.equal(out.rows[0].name, '다온원');
 });
 
 test('★ 도착 여부를 도착 칸에서 읽는다', () => {
@@ -108,8 +108,8 @@ test('자료가 없어도 터지지 않는다', () => {
 
 test('★ 내가 주담당인 업체에 mine 표시가 붙는다', () => {
   const model = loadModel();
-  const cos = [{ id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-    { id: 'co_2', name: '이비', managerMain: 'p-002', managerSubs: [] }];
+  const cos = [{ id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+    { id: 'co_2', name: '벼리비', managerMain: 'p-002', managerSubs: [] }];
   const out = model(cos, {}, {}, '2026-08', 0, 'p001@pureun.kr');
   const byId = {}; out.rows.forEach(r => { byId[r.id] = r; });
   assert.equal(byId.co_1.mine, true);
@@ -118,14 +118,14 @@ test('★ 내가 주담당인 업체에 mine 표시가 붙는다', () => {
 
 test('내가 부담당이어도 mine 이다', () => {
   const model = loadModel();
-  const cos = [{ id: 'co_1', name: '화담원', managerMain: 'p-002', managerSubs: ['p-001'] }];
+  const cos = [{ id: 'co_1', name: '다온원', managerMain: 'p-002', managerSubs: ['p-001'] }];
   const out = model(cos, {}, {}, '2026-08', 0, 'p001@pureun.kr');
   assert.equal(out.rows[0].mine, true);
 });
 
 test('내 이메일을 안 주면 아무 업체도 mine 이 아니다', () => {
   const model = loadModel();
-  const cos = [{ id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] }];
+  const cos = [{ id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] }];
   const out = model(cos, {}, {}, '2026-08', 0, '');
   assert.equal(out.rows[0].mine, false);
 });

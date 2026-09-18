@@ -90,7 +90,7 @@ function loadPend() {
   new vm.Script(store, { filename: 'store.js' }).runInContext(sandbox);
   new vm.Script([
     'const S = window.PuPaydataStore; S.init({uid:"U1"});',
-    'const App = { companies: [{id:"co_1",name:"화담원"}], pendTag: {} };',
+    'const App = { companies: [{id:"co_1",name:"다온원"}], pendTag: {} };',
     cut('guessTag'), cut('pendTagOf'), cut('setPendTag'),
     'window.App = App; window.pendTagOf = pendTagOf; window.setPendTag = setPendTag;'
   ].join('\n'), { filename: 'pend.js' }).runInContext(sandbox);
@@ -107,7 +107,7 @@ test('★ 사람이 고른 사업장은 다시 그려도 그대로다', () => {
 
 test('★ 사람이 고친 귀속월이 짐작값을 이긴다', () => {
   const W = loadPend();
-  const rec = { filename: '화담원_2026-08_근태.jpg' };
+  const rec = { filename: '다온원_2026-08_근태.jpg' };
   assert.equal(W.pendTagOf('p1', rec).month, '2026-08');
   W.setPendTag('p1', 'month', '2026-07');
   assert.equal(W.pendTagOf('p1', rec).month, '2026-07', '손으로 고친 달이 짐작값에 덮이면 안 됩니다');
@@ -115,7 +115,7 @@ test('★ 사람이 고친 귀속월이 짐작값을 이긴다', () => {
 
 test('안 고친 칸은 그대로 짐작값이다 — 하나 고쳤다고 나머지가 비면 안 된다', () => {
   const W = loadPend();
-  const rec = { filename: '화담원_2026-08_근태.jpg' };
+  const rec = { filename: '다온원_2026-08_근태.jpg' };
   W.setPendTag('p1', 'kind', 'ledger');
   const g = W.pendTagOf('p1', rec);
   assert.equal(g.kind, 'ledger');

@@ -53,7 +53,7 @@ function notify(over) {
     console,
     todayStr: () => TODAY,
     getEnv: () => ({ warnDeadlineDays: 14 }),
-    getCos: () => [{ id: 'c1', name: '이피아', active: true, types: [] }],
+    getCos: () => [{ id: 'c1', name: '아름', active: true, types: [] }],
     getTypes: () => [{ id: 't1', name: '현장클리닉' }],
     getScheds: o.scheds || scheds,
     getCoAtts: () => [],
@@ -76,7 +76,7 @@ test('방문했는데 사진이 없으면 알린다 — 아무도 안 알려 주
   const got = notify();
   const ids = got.map(x => x.sub).join(' | ');
   assert.equal(got.length, 1, '★ 증빙 없는 방문을 못 찾습니다: ' + ids);
-  assert.match(got[0].title, /이피아/);
+  assert.match(got[0].title, /아름/);
   assert.match(got[0].sub, /2회차/, '어느 회차인지 안 적습니다');
   assert.match(got[0].sub, /지남/, '며칠 지났는지 안 적습니다');
 });
@@ -119,7 +119,7 @@ test('★ 끝난 컨설팅은 안 묻는다 — 업무관리 「밀린 것 모�
     console,
     todayStr: () => TODAY,
     getEnv: () => ({ warnDeadlineDays: 14 }),
-    getCos: () => [{ id: 'c1', name: '이피아', active: true, types: [], endedTypes: { t1: 1 } }],
+    getCos: () => [{ id: 'c1', name: '아름', active: true, types: [], endedTypes: { t1: 1 } }],
     getTypes: () => [{ id: 't1', name: '현장클리닉' }],
     getScheds: scheds,
     getCoAtts: () => [], getCoMandatory: () => 0, getCoMaxRounds: () => 0,

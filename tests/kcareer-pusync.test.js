@@ -26,19 +26,19 @@ const UMAP = { '2001': '권형하', '2003': '박한별' };
 
 test('mapRecord: cases → case 스토어', () => {
   const r = PS.mapRecord('cases', '-Nx1', {
-    caseType: '부당해고', companyName: '대운토건', title: '부당해고 구제신청',
+    caseType: '부당해고', companyName: '나루토건', title: '부당해고 구제신청',
     closedDate: '2026-03-15', managerMain: '2001'
   }, UMAP);
   assert.equal(r.store, 'case');
   assert.deepEqual(r.rec, {
-    type: '부당해고', agency: '', org: '대운토건', project: '부당해고 구제신청',
+    type: '부당해고', agency: '', org: '나루토건', project: '부당해고 구제신청',
     year: '2026', main: '권형하', status: '완료', puRef: 'cases/-Nx1'
   });
 });
 
 test('mapRecord: consultings → consult, funds → fund, other_projects → etc', () => {
   const c = PS.mapRecord('consultings', '-Nc1', {
-    consultingType: '일터혁신', companyName: '삼원폴리텍', programName: '임금체계 재설계',
+    consultingType: '일터혁신', companyName: '열음폴리텍', programName: '임금체계 재설계',
     closedDate: '2025-11-30', workers: [{ sid: '2003', isPrimary: true }]
   }, UMAP);
   assert.equal(c.store, 'consult');
@@ -47,7 +47,7 @@ test('mapRecord: consultings → consult, funds → fund, other_projects → etc
   assert.equal(c.rec.puRef, 'consultings/-Nc1');
 
   const f = PS.mapRecord('funds', '-Nf1', {
-    fundType: '사내근로복지기금', companyName: '다움', title: '설립 컨설팅',
+    fundType: '사내근로복지기금', companyName: '소담', title: '설립 컨설팅',
     status: 'done', endDate: '2026-01-10', managerMain: '2001'
   }, UMAP);
   assert.equal(f.store, 'fund');
@@ -65,7 +65,7 @@ test('mapRecord: caseType이 비면 사건번호에서 유형·연도를 뽑는�
   // pu-erp 사건은 caseType이 비어 있고 진행중이라 종료일도 없다.
   // 그런데 사건번호에 둘 다 들어 있다 — 부해등-2026-003 → 유형 부해등, 연도 2026 (실사용)
   const r = PS.mapRecord('cases', 'k1', {
-    companyName: '충남사회서비스원', caseNo: '부해등-2026-003', managerMain: '2001'
+    companyName: '가나사회서비스원', caseNo: '부해등-2026-003', managerMain: '2001'
   }, UMAP);
   assert.equal(r.rec.type, '부해등');
   assert.equal(r.rec.year, '2026');
@@ -73,7 +73,7 @@ test('mapRecord: caseType이 비면 사건번호에서 유형·연도를 뽑는�
   assert.equal(r.rec.main, '권형하');
 
   // 쉼표가 든 유형도 그대로 — 성,직괴-2026-001
-  const r2 = PS.mapRecord('cases', 'k2', { companyName: '롯데리아', caseNo: '성,직괴-2026-001' }, UMAP);
+  const r2 = PS.mapRecord('cases', 'k2', { companyName: '나비리아', caseNo: '성,직괴-2026-001' }, UMAP);
   assert.equal(r2.rec.type, '성,직괴');
   assert.equal(r2.rec.year, '2026');
 
@@ -104,14 +104,14 @@ const TYPEMAP = {
 
 test('mapRecord: 유형 코드에서 유형 이름과 수행기관을 채운다', () => {
   const r = PS.mapRecord('consultings', 'k1', {
-    companyName: '지나테크', typeCode: 'cons-job-neung', status: 'closed', closedDate: '2026-02-01', managerMain: '2001'
+    companyName: '벼리테크', typeCode: 'cons-job-neung', status: 'closed', closedDate: '2026-02-01', managerMain: '2001'
   }, UMAP, TYPEMAP);
   assert.equal(r.rec.type, '산업일자리');
   assert.equal(r.rec.agency, '한국능률협회', '수행기관이 채워지면 외부기관 실적 탭으로 간다');
 
   /* typeCodes.consulting 형태도 읽는다 */
   const r2 = PS.mapRecord('consultings', 'k2', {
-    companyName: '노리아이', typeCodes: { consulting: 'cons-ilteo' }, status: 'done'
+    companyName: '벼리아이', typeCodes: { consulting: 'cons-ilteo' }, status: 'done'
   }, UMAP, TYPEMAP);
   assert.equal(r2.rec.type, '일터상생혁신');
   assert.equal(r2.rec.agency, '노사발전재단');
@@ -141,14 +141,14 @@ test('buildSyncPlan: puRef 없는 기존 실적에는 붙이고 새로 만들지
   const collData = {
     cases: null,
     consultings: { v: {
-      k1: { companyName: '지나테크', typeCode: 'cons-job-neung', status: 'closed', closedDate: '2026-02-01' },
+      k1: { companyName: '벼리테크', typeCode: 'cons-job-neung', status: 'closed', closedDate: '2026-02-01' },
       k2: { companyName: '새로운회사', typeCode: 'cons-ilteo', status: 'closed', closedDate: '2026-03-01' }
     }, u: 1 },
     funds: null, other_projects: null
   };
   /* 시드로 들어있던 기존 실적 — puRef가 없다 */
   const existing = [
-    { id: 'CN0001', store: 'consult', org: '지나테크', year: '2026', type: '산업일자리' }
+    { id: 'CN0001', store: 'consult', org: '벼리테크', year: '2026', type: '산업일자리' }
   ];
   const plan = PS.buildSyncPlan(collData, new Set(), UMAP, TYPEMAP, existing);
   assert.equal(plan.adds.length, 1, '기존에 있는 건은 새로 만들지 않는다');
@@ -166,7 +166,7 @@ test('mapRecord: 모르는 컬렉션은 null', () => {
 test('mapRecord: 상태를 pu-erp 실제 상태로 옮긴다 — 진행중도 가져온다', () => {
   // 사건 13건 중 11건이 진행중이었다(실사용). 종료만 받으면 실적이 영원히 안 들어온다.
   const open = PS.mapRecord('cases', 'k9', {
-    caseType: '임금체불', companyName: '오철진', title: '임금체불사건', managerMain: '2001'
+    caseType: '임금체불', companyName: '오지훈', title: '임금체불사건', managerMain: '2001'
   }, UMAP);
   assert.equal(open.rec.status, '진행');
   const closed = PS.mapRecord('cases', 'k8', {

@@ -41,7 +41,7 @@ function loadApp(appState, extra) {
   new vm.Script([
     'const S = window.PuPaydataStore; S.init({uid:"U1"});',
     'const App = ' + JSON.stringify(Object.assign({
-      screen: 'sites', companyId: 'co_1', companyName: '화담원', month: '2026-08',
+      screen: 'sites', companyId: 'co_1', companyName: '다온원', month: '2026-08',
       kind: 'attend', query: '', folderPick: 'all', values: {}, pick: {},
       viewingUid: '', viewingName: '', viewingDeputy: false
     }, appState)) + ';',
@@ -65,7 +65,7 @@ function loadApp(appState, extra) {
   return { W: sandbox.window, calls };
 }
 
-const 화담원값 = {
+const 다온원값 = {
   v1: { companyId: 'co_1', month: '202608', name: '배영승', sourceId: 'a1', at: 1,
         pairs: [{ item: '유급일수', value: '22일' }] }
 };
@@ -73,27 +73,27 @@ const 화담원값 = {
 /* ══════ 언제 버리는가 ══════ */
 
 test('★ 다른 사업장으로 들어가면 앞 사업장 값을 버린다', () => {
-  const { W } = loadApp({ companyId: 'co_1', values: 화담원값 });
+  const { W } = loadApp({ companyId: 'co_1', values: 다온원값 });
   W.App.go('drawer', { companyId: 'co_2', companyName: '푸른상사', kind: 'attend', query: '' });
   assert.equal(W.App.values, null,
-    '앞 사업장(화담원) 값이 그대로 남았습니다 — 이 사업장 제목 밑에 남의 근로자 이름이 뜹니다');
+    '앞 사업장(다온원) 값이 그대로 남았습니다 — 이 사업장 제목 밑에 남의 근로자 이름이 뜹니다');
 });
 
 test('같은 사업장으로 다시 들어가면 굳이 버리지 않는다 — 다시 읽는 값이다', () => {
-  const { W } = loadApp({ companyId: 'co_1', values: 화담원값 });
-  W.App.go('drawer', { companyId: 'co_1', companyName: '화담원', kind: 'ledger', query: '' });
+  const { W } = loadApp({ companyId: 'co_1', values: 다온원값 });
+  W.App.go('drawer', { companyId: 'co_1', companyName: '다온원', kind: 'ledger', query: '' });
   assert.notEqual(W.App.values, null);
 });
 
 test('★ 기준 월을 바꾸면 값을 버린다 — 지난달 값이 이 달 것으로 남는다', () => {
-  const { W } = loadApp({ month: '2026-08', values: 화담원값 });
+  const { W } = loadApp({ month: '2026-08', values: 다온원값 });
   W.changeMonth('2026-07');
   assert.equal(W.App.values, null, '기준 월만 바꿔도 들고 있던 값은 지난달 것입니다');
   assert.equal(W.App.month, '2026-07');
 });
 
 test('★ 자리를 옮기면 값을 버린다 — 자리마다 값 칸이 따로다', () => {
-  const { W } = loadApp({ values: 화담원값 });
+  const { W } = loadApp({ values: 다온원값 });
   W.resetOwnerCaches();
   assert.equal(W.App.values, null,
     '방금 보던 자리의 근로자 이름이 새 자리 값 표에 그대로 남습니다');

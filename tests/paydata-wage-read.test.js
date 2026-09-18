@@ -44,7 +44,7 @@ test('★ 급여표에서 사람별 금액을 담아 온다 — kind=payslip 과
   const R = loadRead();
   R.init({
     fetch: fakeFetch(JSON.stringify({
-      company: '화담원', period: '2026-08', docName: '급여대장',
+      company: '다온원', period: '2026-08', docName: '급여대장',
       rows: [
         { name: '홍길동', pairs: [{ item: '기본급', value: '3,200,000' }, { item: '실수령', value: '2,950,000' }] },
         { name: '김철수', pairs: [{ item: '기본급', value: '2,800,000' }] }
@@ -55,7 +55,7 @@ test('★ 급여표에서 사람별 금액을 담아 온다 — kind=payslip 과
   const r = await R.readWageTable(DUMMY_IMG);
   assert.equal(r.ok, true);
   assert.equal(r.error, null);
-  assert.equal(r.company, '화담원');
+  assert.equal(r.company, '다온원');
   assert.equal(r.period, '2026-08');
   assert.equal(r.docName, '급여대장');
   assert.equal(r.rows.length, 2);
@@ -68,7 +68,7 @@ test('이름 없는 줄은 버린다 — 빈 값 줄이 저장되면 안 된다'
   const R = loadRead();
   R.init({
     fetch: fakeFetch(JSON.stringify({
-      company: '화담원', period: '2026-08',
+      company: '다온원', period: '2026-08',
       rows: [{ name: '', pairs: [{ item: '기본급', value: '1' }] }, { name: '홍길동', pairs: [] }]
     })),
     getKey: () => Promise.resolve('KEY')

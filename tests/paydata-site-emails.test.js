@@ -40,7 +40,7 @@ function cut(name) {
 test('★ 업체를 당겨올 때 메일 칸을 함께 담는다 — 안 담아서 어디에도 안 보였다', () => {
   const S = store();
   const got = S.normalizeCompanies({ v: { a: {
-    id: 'c1', name: '㈜정일제지', typeCode: '급여', status: 'active', managerMain: 'A-002',
+    id: 'c1', name: '㈜가온제지', typeCode: '급여', status: 'active', managerMain: 'A-002',
     contacts: [{ name: '임대용', position: '', email: 'cust12@naver.com', isPrimary: true }],
     primaryContactName: '임대용', primaryContactEmail: 'cust12@naver.com',
     taxOfficeName: '윤병수회계사무소', taxEmail: 'cust01@hanmail.net'

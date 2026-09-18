@@ -125,7 +125,7 @@ test('★ 합칠 때 「맡는 일」을 잃지 않는다', () => {
 });
 
 test('★ 이미 저장된 계약도 열 때 정리된다', () => {
-  const rec = { id: 'c1', company: { name: '천안청화공사', contacts: [BLANK({ isPrimary: true }), P('김상호')] } };
+  const rec = { id: 'c1', company: { name: '가나공사', contacts: [BLANK({ isPrimary: true }), P('김상호')] } };
   const out = tidyIn(rec);
   assert.strictEqual(out.company.contacts.length, 1);
   assert.strictEqual(out.company.contacts[0].name, '김상호');

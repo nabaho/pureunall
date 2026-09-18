@@ -11,8 +11,8 @@ const CB = require(path.join(__dirname, '..', 'js', 'pu-rules-casebook.js'));
 
 const ERP = [
   { name: '주식회사 한빛산업', bizNo: '123-45-67890' },
-  { name: '㈜미래테크', bizNo: '1233320517' },
-  { name: '청솔전자 주식회사', bizNo: '3334455667' }
+  { name: '㈜마루테크', bizNo: '1233320517' },
+  { name: '나루전자 주식회사', bizNo: '3334455667' }
 ];
 
 test('★ 법인격 표기를 털어내고 견준다', () => {
@@ -30,7 +30,7 @@ test('★ 폴더 이름으로 ERP 업체를 찾고 사업자번호를 채운다'
 });
 
 test('★ 폴더가 파일명보다 이긴다', () => {
-  const r = CB.siteOf({ path: '한빛산업/2022/취업규칙_미래테크.hwp', name: '취업규칙_미래테크.hwp' }, ERP);
+  const r = CB.siteOf({ path: '한빛산업/2022/취업규칙_마루테크.hwp', name: '취업규칙_마루테크.hwp' }, ERP);
   assert.equal(r.site, '주식회사 한빛산업');
 });
 
@@ -41,7 +41,7 @@ test('폴더가 부분만 맞아도 찾아낸다', () => {
 });
 
 test('★ 폴더가 없으면 파일명에서 뽑는다', () => {
-  const r = CB.siteOf({ path: '취업규칙_미래테크_개정안.hwp', name: '취업규칙_미래테크_개정안.hwp' }, ERP);
+  const r = CB.siteOf({ path: '취업규칙_마루테크_개정안.hwp', name: '취업규칙_마루테크_개정안.hwp' }, ERP);
   assert.equal(r.bizno, '1233320517');
   assert.ok(r.how === 'ERP 정확' || r.how === 'ERP 부분');
 });
@@ -72,7 +72,7 @@ test('한 글자 폴더는 단서로 쓰지 않는다', () => {
 
 test('★ 파일명에서 업체명을 뽑는다 — 2단계가 이 함수를 따로 쓴다', () => {
   assert.equal(CB.nameFromFile('취업규칙_삼성디지컴_개정안.hwp'), '삼성디지컴');
-  assert.equal(CB.nameFromFile('취업규칙_미래테크.hwp'), '미래테크');
+  assert.equal(CB.nameFromFile('취업규칙_마루테크.hwp'), '마루테크');
   assert.equal(CB.nameFromFile('취업규칙.hwp'), '', '뒤에 이름이 없으면 빈 문자열');
   assert.equal(CB.nameFromFile('규정.hwp'), '', '「취업규칙」이라는 말이 없으면 뽑지 않는다');
 });
@@ -100,8 +100,8 @@ test('★★ 폴더 이름에 붙은 연도를 벗긴다 — 안 벗기면 같�
 
 test('연도가 없는 이름은 «그대로 둔다»', () => {
   assert.strictEqual(CB.stripYear('한빛산업'), '한빛산업');
-  assert.strictEqual(CB.stripYear('씨티에스㈜'), '씨티에스㈜');
-  assert.strictEqual(CB.stripYear('주식회사 다래물산'), '주식회사 다래물산');
+  assert.strictEqual(CB.stripYear('열음에스㈜'), '열음에스㈜');
+  assert.strictEqual(CB.stripYear('주식회사 가온물산'), '주식회사 가온물산');
 });
 
 test('★ 벗긴 것으로 «바꿔치기»하지 않는다 — 이름에 정말 숫자가 든 회사가 있다', () => {

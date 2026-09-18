@@ -30,8 +30,8 @@ function cut(name) {
 }
 
 const COS = [
-  { name: '㈜제이앤드씨', typeCode: '급여', status: 'active', managerMain: 'A-004' },
-  { name: '천성', typeCode: '급여', status: 'active', managerMain: 'A-003' },
+  { name: '㈜나라앤드씨', typeCode: '급여', status: 'active', managerMain: 'A-004' },
+  { name: '두레', typeCode: '급여', status: 'active', managerMain: 'A-003' },
 ];
 const DIR = { v: [{ sid: 'A-003', name: '김보람' }, { sid: 'A-004', name: '주민정' }] };
 
@@ -50,7 +50,7 @@ function load(opts) {
     'var me = {email:"p001@pureun.kr"};',
     'var coData = ' + JSON.stringify(o.coData === undefined ? { companies: COS, dir: DIR } : o.coData) + ';',
     'var coErr = ' + JSON.stringify(o.coErr || '') + ';',
-    'var SITES = ' + JSON.stringify(o.sites || ['제이앤드씨', '천성', '세창ENG']) + ';',
+    'var SITES = ' + JSON.stringify(o.sites || ['나라앤드씨', '두레', '세창ENG']) + ';',
     'var RECS = ' + JSON.stringify(o.recs || {}) + ';',
     'var LOCK = ' + JSON.stringify(o.lock || {}) + ';',
     'var LINKS = ' + JSON.stringify(o.links || {}) + ';',
@@ -74,7 +74,7 @@ function load(opts) {
 }
 
 test('★ 회사 한 장에 일곱 칸이 모두 있다', () => {
-  const s = load({ App: { screen: 'hub', site: '제이앤드씨' }, recs: { '제이앤드씨': [{ 월: '8월', 신호: 'green' }] } });
+  const s = load({ App: { screen: 'hub', site: '나라앤드씨' }, recs: { '나라앤드씨': [{ 월: '8월', 신호: 'green' }] } });
   const h = s.screenHub();
   ['자료 도착', '급여 처리', '근태', '연차', '퇴직', '명세서', '신고'].forEach((칸) => {
     assert.ok(h.indexOf(칸) >= 0, '「' + 칸 + '」 칸이 없습니다');
@@ -82,14 +82,14 @@ test('★ 회사 한 장에 일곱 칸이 모두 있다', () => {
 });
 
 test('회사 한 장이 업체관리에서 읽은 담당을 보여 준다', () => {
-  const s = load({ App: { screen: 'hub', site: '제이앤드씨' } });
+  const s = load({ App: { screen: 'hub', site: '나라앤드씨' } });
   const h = s.screenHub();
   assert.ok(h.indexOf('담당 주민정') >= 0, '담당이 안 보입니다: ' + h.slice(0, 300));
-  assert.ok(h.indexOf('㈜제이앤드씨') >= 0, '이어 붙인 업체 이름이 안 보입니다');
+  assert.ok(h.indexOf('㈜나라앤드씨') >= 0, '이어 붙인 업체 이름이 안 보입니다');
 });
 
 test('★ 짐작일 때는 짐작이라 밝히고 «확정» 단추를 준다', () => {
-  const s = load({ App: { screen: 'hub', site: '제이앤드씨' } });
+  const s = load({ App: { screen: 'hub', site: '나라앤드씨' } });
   const h = s.screenHub();
   assert.ok(h.indexOf('(짐작)') >= 0, '짐작을 짐작이라 말하지 않습니다');
   assert.ok(h.indexOf('linkCo(') >= 0, '사람이 확정할 단추가 없습니다');
@@ -97,8 +97,8 @@ test('★ 짐작일 때는 짐작이라 밝히고 «확정» 단추를 준다', 
 
 test('사람이 확정한 뒤에는 짐작 표시도 단추도 사라진다', () => {
   const s = load({
-    App: { screen: 'hub', site: '제이앤드씨' },
-    links: { '제이앤드씨': { coName: '㈜제이앤드씨', by: 'p001@pureun.kr', at: 1 } }
+    App: { screen: 'hub', site: '나라앤드씨' },
+    links: { '나라앤드씨': { coName: '㈜나라앤드씨', by: 'p001@pureun.kr', at: 1 } }
   });
   const h = s.screenHub();
   assert.equal(h.indexOf('(짐작)'), -1, '확정했는데 아직 짐작이라 합니다');
@@ -117,13 +117,13 @@ test('업체 명단을 못 읽어도 목록은 열린다 — 묶기만 없어진
   const s = load({ coData: null, coErr: 'PERMISSION_DENIED' });
   const h = s.hubPickHtml();
   assert.ok(h.indexOf('PERMISSION_DENIED') >= 0, '왜 못 읽었는지 안 알려 줍니다');
-  assert.ok(h.indexOf('제이앤드씨') >= 0, '명단을 못 읽었다고 사업장까지 감췄습니다');
+  assert.ok(h.indexOf('나라앤드씨') >= 0, '명단을 못 읽었다고 사업장까지 감췄습니다');
 });
 
 test('★ 목록을 그리는 동안 직원 표를 받지 않는다 (110곳에서 화면이 안 열린다)', () => {
-  const s = load({ recs: { '제이앤드씨': [{ 월: '8월', 신호: 'green' }, { 월: '9월', 신호: 'orange' }] } });
+  const s = load({ recs: { '나라앤드씨': [{ 월: '8월', 신호: 'green' }, { 월: '9월', 신호: 'orange' }] } });
   assert.doesNotThrow(() => s.hubPickHtml());          // siteEmployees 를 부르면 터지도록 세워 뒀다
-  const c = s.hubCounts('제이앤드씨');
+  const c = s.hubCounts('나라앤드씨');
   assert.equal(c.months, 2);
   assert.equal(c.review, 1);                           // 초록 아닌 달 = 검토할 것
 });

@@ -23,21 +23,21 @@ function split(sugs){
 
 console.log('\n[1번 행 실제 자료 — 후보 12건이 몇 건으로 줄어드나]');
 {
-  // 적요 「(주)이피아」 · 1,100,000원. 화면에 실제로 떴던 후보들.
+  // 적요 「(주)아름」 · 1,100,000원. 화면에 실제로 떴던 후보들.
   // nameScore 는 적요 vs 업체명 점수 (일치 100 · 포함 85 · 부분 60 · 유사 35 · 없음 0)
   const sugs = [
-    { name:'이피아 컨설팅(잔금)',        store:'consultings', nameScore:100, amount:1155000 },
-    { name:'이피아 사건(착수)',          store:'cases',       nameScore:100, amount:550000  },
-    { name:'이피아 사건(성공보수)',      store:'cases',       nameScore:100, amount:22      },
-    { name:'웅천새마을금고 컨설팅(계약금)', store:'consultings', nameScore:0,  amount:1100000 },
-    { name:'맥스텍 컨설팅(잔금)',        store:'consultings', nameScore:0,   amount:1155000 },
+    { name:'아름 컨설팅(잔금)',        store:'consultings', nameScore:100, amount:1155000 },
+    { name:'아름 사건(착수)',          store:'cases',       nameScore:100, amount:550000  },
+    { name:'아름 사건(성공보수)',      store:'cases',       nameScore:100, amount:22      },
+    { name:'가온새마을금고 컨설팅(계약금)', store:'consultings', nameScore:0,  amount:1100000 },
+    { name:'우람텍 컨설팅(잔금)',        store:'consultings', nameScore:0,   amount:1155000 },
     { name:'- 사건(착수)',               store:'cases',       nameScore:0,   amount:1000000 },
   ];
   const { hit, other } = split(sugs);
   eq('이름이 맞는 것 3건만 먼저 보인다', hit.length, 3);
   eq('이름이 다른 3건은 접힌다', other.length, 3);
-  eq('먼저 보이는 것은 전부 이피아',
-     hit.map(s => s.name.split(' ')[0]), ['이피아','이피아','이피아']);
+  eq('먼저 보이는 것은 전부 아름',
+     hit.map(s => s.name.split(' ')[0]), ['아름','아름','아름']);
 
   // 계약 6건을 뺀 뒤이므로 12 → 6, 다시 이름으로 3건
   ok('처음 12건이 눈에 보이는 3건으로 줄었다', hit.length <= 3);
@@ -73,9 +73,9 @@ console.log('\n[갈림 기준 — 어디까지를 「이름이 맞다」고 보�
 console.log('\n[검색·필터가 제대로 거르나]');
 {
   const other = [
-    { cand:{ companyName:'웅천새마을금고', label:'컨설팅(계약금)', store:'consultings', item:{no:'인사노무-2026-006'} } },
-    { cand:{ companyName:'맥스텍',        label:'컨설팅(잔금)',   store:'consultings', item:{no:'현물-2026-014'} } },
-    { cand:{ companyName:'송림산업',      label:'사건(성공보수)', store:'cases',       item:{caseNo:'부해등-2026-002'} } },
+    { cand:{ companyName:'가온새마을금고', label:'컨설팅(계약금)', store:'consultings', item:{no:'인사노무-2026-006'} } },
+    { cand:{ companyName:'우람텍',        label:'컨설팅(잔금)',   store:'consultings', item:{no:'현물-2026-014'} } },
+    { cand:{ companyName:'열음산업',      label:'사건(성공보수)', store:'cases',       item:{caseNo:'부해등-2026-002'} } },
   ];
   function filt(list, kf, q){
     q = (q||'').trim().toLowerCase();
@@ -90,10 +90,10 @@ console.log('\n[검색·필터가 제대로 거르나]');
     });
   }
   eq('필터 없으면 전부', filt(other,'','').length, 3);
-  eq('종류 칩 — 컨설팅만', filt(other,'consultings','').map(s=>s.cand.companyName), ['웅천새마을금고','맥스텍']);
-  eq('업체명으로 찾기', filt(other,'','맥스').map(s=>s.cand.companyName), ['맥스텍']);
-  eq('관리번호로 찾기', filt(other,'','부해등').map(s=>s.cand.companyName), ['송림산업']);
-  eq('칩과 검색을 같이', filt(other,'cases','송림').map(s=>s.cand.companyName), ['송림산업']);
+  eq('종류 칩 — 컨설팅만', filt(other,'consultings','').map(s=>s.cand.companyName), ['가온새마을금고','우람텍']);
+  eq('업체명으로 찾기', filt(other,'','우람').map(s=>s.cand.companyName), ['우람텍']);
+  eq('관리번호로 찾기', filt(other,'','부해등').map(s=>s.cand.companyName), ['열음산업']);
+  eq('칩과 검색을 같이', filt(other,'cases','열음').map(s=>s.cand.companyName), ['열음산업']);
   eq('없으면 빈 목록', filt(other,'','없는이름').length, 0);
 }
 

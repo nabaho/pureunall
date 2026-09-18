@@ -535,10 +535,10 @@ test('★ 옆줄 위 덩어리는 틀고정 — 폴더를 내려도 [메일쓰�
 test('★ 주소만으로는 누구인지 모른다 — 기업정보함에서 이름·회사를 찾아 붙인다', () => {
   const c = load({ folders: FOLDERS, msgs: MSGS });
   c.allItems = () => ({
-    a: { id:'a', email:'cust39@gmail.com', name:'김대표', company:'화암스톤' },
+    a: { id:'a', email:'cust39@gmail.com', name:'김대표', company:'하람스톤' },
     b: { id:'b', email:'tax@hanse.kr', name:'박세무', company:'' }
   });
-  assert.equal(c.mbNameOf('cust39@gmail.com'), '김대표 (화암스톤)');
+  assert.equal(c.mbNameOf('cust39@gmail.com'), '김대표 (하람스톤)');
   assert.equal(c.mbNameOf('tax@hanse.kr'), '박세무', '회사가 없으면 이름만');
   assert.equal(c.mbNameOf('none@x.com', '메일이 알려준 이름'), '메일이 알려준 이름',
     '명함에 없으면 메일이 알려 준 이름을 쓴다');
@@ -884,7 +884,7 @@ test('★ 얼굴딱지 색은 사람마다 늘 같다 — 그릴 때마다 바�
   /* ⚠ 「두 이름은 색이 달라야 한다」로 못 박지 않는다 — 색이 열두 가지뿐이라 어떤 짝은
      반드시 겹친다. 볼 것은 «고르게 흩어지는가»다. */
   const names = ['세무법인 한세','윤병수회계사무소','김현아','유문경','정곤영','심아람',
-                 'LUNA LAB','이혜원','우명진','효성에프엠에스','충남북부상공회의소','이피아관리팀'];
+                 'LUNA LAB','이혜원','우명진','효성에프엠에스','충남북부상공회의소','아름관리팀'];
   const kinds = new Set(names.map((n) => c.dmmFaceColor(n)));
   assert.ok(kinds.size >= 5, '열두 사람이 색 ' + kinds.size + '가지로만 나온다 — 너무 뭉친다');
 });

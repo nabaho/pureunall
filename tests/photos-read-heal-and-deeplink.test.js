@@ -4,7 +4,7 @@
       판독 표는 pairs(문서 차례 그대로)를 그리고, 「기업 상세로 보내기」는 이름 붙은
       칸(fields.bizno)을 본다. AI 가 pairs 에만 담고 이름 붙은 칸을 비워 두면
       **사람 눈에는 있는 값이 프로그램에는 없다** — 화면이 스스로 모순된 말을 한다.
-      실사례: 「4·4 제도 도입기업 선정 신청서」(성진테크 123-81-20138).
+      실사례: 「4·4 제도 도입기업 선정 신청서」(파하테크 123-81-20138).
       운영 데이터 확인 — 서식 25장 가운데 5장이 그 꼴이었다.
       ⚠ 다시 판독해서 고치지 «않는다» — 판 번호를 올리면 읽어 둔 사진 수백 장이
         다시 읽히고 그것이 그대로 요금이다. 읽어 온 자리에서 되메운다.
@@ -43,7 +43,7 @@ function capturedForm() {
     fields: {
       docName: '4·4 제도 도입기업 선정 신청서',
       pairs: [
-        { k: '기업명', v: '(주)성진테크' },
+        { k: '기업명', v: '(주)파하테크' },
         { k: '대표자', v: '이종석' },
         { k: '사업자등록번호', v: '123-81-20138' },
         { k: '주소', v: '경기도 안산시 단원구 산단로 325, 102호' },
@@ -66,7 +66,7 @@ test('★ pairs 에만 있던 사업자번호가 이름 붙은 칸으로 온다 
   const filled = D.healRead(read);
   assert.ok(filled.indexOf('bizno') >= 0, '★ 사업자번호를 못 옮겼습니다: ' + filled.join(','));
   assert.equal(read.fields.bizno, '123-81-20138', '번호 모양이 어긋납니다: ' + read.fields.bizno);
-  assert.equal(read.fields.company, '(주)성진테크');
+  assert.equal(read.fields.company, '(주)파하테크');
   assert.equal(read.fields.ceo, '이종석');
   assert.equal(read.fields.bizType, '기계부품', '업태를 종목으로 뒤바꿔 담았습니다');
   assert.equal(read.fields.bizItem, '제조업', '업종을 업태로 뒤바꿔 담았습니다');
@@ -89,11 +89,11 @@ test('★ 되메운 사업자번호도 검산을 받는다 — 검산 없이 통
 test('★ 이미 담긴 값은 덮지 않는다 — AI 가 다듬어 둔 값이 더 나을 수 있다', () => {
   const D = loadReader();
   const read = capturedForm();
-  read.fields.company = '주식회사 성진테크';
+  read.fields.company = '주식회사 파하테크';
   read.fields.bizno = '111-11-11111';
   read.bizNoOk = true;                            // 국세청 조회까지 거친 값일 수 있다
   D.healRead(read);
-  assert.equal(read.fields.company, '주식회사 성진테크', '★ 이미 있던 회사명을 덮었습니다');
+  assert.equal(read.fields.company, '주식회사 파하테크', '★ 이미 있던 회사명을 덮었습니다');
   assert.equal(read.fields.bizno, '111-11-11111', '★ 이미 있던 사업자번호를 덮었습니다');
   assert.equal(read.bizNoOk, true, '★ 원래 있던 번호의 판정을 건드렸습니다');
 });

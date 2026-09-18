@@ -4,7 +4,7 @@
    "폴더는 나만 수정하는것이다. 회의사진처럼 같이 공유하는 부분은 공유로 하면된다"
 
    분류 탭과 **다른 축**이다 — 분류는 「무엇인가」(명함·회의사진), 폴더는
-   「어느 일인가」(㈜가야 실태조사). 그래서 한 사진이 둘 다에 든다. */
+   「어느 일인가」(㈜벼리 실태조사). 그래서 한 사진이 둘 다에 든다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -39,7 +39,7 @@ function loadStore(uid) {
 
 test('★ 폴더는 내 자리 안에 들어간다 (규칙을 새로 안 짜도 된다)', async () => {
   const { S, writes } = loadStore('me1');
-  await S.addFolder('㈜가야 실태조사');
+  await S.addFolder('㈜벼리 실태조사');
   const keys = Object.keys(writes);
   assert.ok(keys.length, '아무것도 안 썼습니다.');
   assert.ok(keys.every(k => k.indexOf('puphotos/u/me1/') === 0),

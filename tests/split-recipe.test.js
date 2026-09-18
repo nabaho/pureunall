@@ -37,14 +37,14 @@ console.log('\n[② 기억할 꼴 — 후보 번호가 아니라 업체·항목�
 /* 후보 번호(id)는 달마다 새로 생긴다. 번호로 적어 두면 다음 달엔 아무것도 못 찾는다. */
 const row = { memo:'비즈사업비2건', amount:2100000, date:'2026-07-14' };
 const parts = [
-  { co:'중원대학교',       label:'착수금', store:'cases',        amount:600000 },
-  { co:'충남사회서비스원', label:'자문료', store:'companies',    amount:500000 },
-  { co:'청아미즈산부인과', label:'컨설팅', store:'consultings',  amount:600000 },
-  { co:'(주)토탈방재',     label:'착수금', store:'cases',        amount:400000 }
+  { co:'가나대학교',       label:'착수금', store:'cases',        amount:600000 },
+  { co:'가나사회서비스원', label:'자문료', store:'companies',    amount:500000 },
+  { co:'나루미즈산부인과', label:'컨설팅', store:'consultings',  amount:600000 },
+  { co:'(주)마루방재',     label:'착수금', store:'cases',        amount:400000 }
 ];
 const rec = ctx.erpMakeRecipe(row, parts);
 t('네 곳을 적었다', rec.parts.length, 4);
-t('업체 이름을 적는다', rec.parts[0].co, '중원대학교');
+t('업체 이름을 적는다', rec.parts[0].co, '가나대학교');
 t('항목도 적는다 (같은 업체에 건이 여럿일 수 있다)', rec.parts[0].label, '착수금');
 t('금액도 적는다', rec.parts[0].amount, 600000);
 t('그때 입금액을 적어 둔다 (금액이 다르면 알려야 한다)', rec.amount, 2100000);
@@ -75,7 +75,7 @@ t('그 금액의 기억을 준다',
 t('금액이 다르면 다르다고 알리고 내준다 (업체만이라도 맞으면 낫다)',
   ctx.erpFindRecipe(both, { memo:'비즈사업비2건', amount:999999 }).exact, false);
 t('모르는 적요는 기억이 없다',
-  ctx.erpFindRecipe(both, { memo:'노리시스템(주)', amount:330000 }), null);
+  ctx.erpFindRecipe(both, { memo:'벼리시스템(주)', amount:330000 }), null);
 t('적요가 비면 기억이 없다', ctx.erpFindRecipe(both, { memo:'', amount:1 }), null);
 t('조각이 없는 기억은 내주지 않는다',
   ctx.erpFindRecipe([{ key:ctx.erpRecipeKey('비즈사업비2건'), parts:[] }], { memo:'비즈사업비2건', amount:1 }), null);
@@ -84,17 +84,17 @@ console.log('\n[⑤ 기억한 업체를 지금 후보에서 다시 찾는다]');
 /* ★ 「잔금」을 «먼저» 둔다 — 항목을 안 보고 첫 것을 집으면 착수금 자리에 잔금이 들어간다.
    순서를 뒤집어 두지 않으면 항목을 보든 안 보든 같은 답이 나와 검사가 아무것도 못 지킨다. */
 const pend = [
-  { id:'p2', companyName:'중원대학교',       label:'잔금'   },
-  { id:'p1', companyName:'중원대학교',       label:'착수금' },
-  { id:'p3', companyName:'충남사회서비스원', label:'자문료' },
-  { id:'p4', companyName:'청아미즈산부인과', label:'컨설팅' }
+  { id:'p2', companyName:'가나대학교',       label:'잔금'   },
+  { id:'p1', companyName:'가나대학교',       label:'착수금' },
+  { id:'p3', companyName:'가나사회서비스원', label:'자문료' },
+  { id:'p4', companyName:'나루미즈산부인과', label:'컨설팅' }
 ];
 const m = ctx.erpMatchRecipe(rec, pend);
 t('세 곳을 찾았다', m.found.length, 3);
 t('★ 항목까지 맞는 후보를 고른다 (같은 업체에 착수금·잔금이 둘 다 있다)', m.found[0].id, 'p1');
 t('기억한 금액을 그대로 들고 온다', m.found[0].amount, 600000);
 t('★ 못 찾은 곳을 «못 찾았다고» 돌려준다 (조용히 빼면 모자란 채로 확정한다)', m.missing.length, 1);
-t('못 찾은 곳의 이름을 남긴다', m.missing[0].co, '(주)토탈방재');
+t('못 찾은 곳의 이름을 남긴다', m.missing[0].co, '(주)마루방재');
 /* 같은 업체가 기억에 두 번 있으면(착수금·잔금) 후보도 «서로 다른 두 건» 이어야 한다.
    한 후보를 두 번 담으면 같은 건에 돈이 두 번 들어간 것으로 적힌다. */
 t('한 후보를 두 번 담지 않는다 (서로 다른 건으로 간다)',
@@ -102,9 +102,9 @@ t('한 후보를 두 번 담지 않는다 (서로 다른 건으로 간다)',
   ['p1', 'p2']);
 t('그 업체 후보가 하나뿐이면 나머지는 못 찾은 것으로 남긴다',
   ctx.erpMatchRecipe(ctx.erpMakeRecipe(row, [parts[0], parts[0]]),
-    [{ id:'p1', companyName:'중원대학교', label:'착수금' }]).missing.length, 1);
+    [{ id:'p1', companyName:'가나대학교', label:'착수금' }]).missing.length, 1);
 t('항목이 안 맞아도 이름이 맞으면 쓴다 (항목 이름은 바뀔 수 있다)',
-  ctx.erpMatchRecipe(ctx.erpMakeRecipe(row, [{ co:'중원대학교', label:'없는항목', amount:1 }]), pend).found.length, 1);
+  ctx.erpMatchRecipe(ctx.erpMakeRecipe(row, [{ co:'가나대학교', label:'없는항목', amount:1 }]), pend).found.length, 1);
 t('후보가 하나도 없으면 전부 못 찾은 것', ctx.erpMatchRecipe(rec, []).missing.length, 4);
 
 console.log('\n[⑥ 화면 — 곧바로 확정하지 않는다]');

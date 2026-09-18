@@ -82,7 +82,7 @@ function loadOrphan(coInfo, cos){
 
 const COS = [
   co('1234567890', { name:'가나상사', bizno:'123-45-67890' }),
-  co('n광원전력',   { name:'광원전력' }),
+  co('n나비전력',   { name:'나비전력' }),
   co('n대원산업',   { name:'대원산업' })
 ];
 
@@ -94,7 +94,7 @@ test('★ 번호 없는 회사를 센다', () => {
 
 test('★ 번호 없는 회사만 골라 볼 수 있다', () => {
   const C = loadFilter({ coOnlyNoBiz:true }, COS);
-  assert.deepEqual(C.coVisible().map(o=>o.name), ['광원전력','대원산업']);
+  assert.deepEqual(C.coVisible().map(o=>o.name), ['나비전력','대원산업']);
 });
 
 test('꺼져 있으면 전부 보인다', () => {
@@ -118,7 +118,7 @@ test('거르는 일은 coFilteredList 한 곳에만 둔다', () => {
 test('★ 어느 회사의 열쇠도 아닌 기업정보가 고아다', () => {
   const C = loadOrphan({
     '1234567890': { ceo:'홍길동' },              /* 가나상사 것 — 고아 아님 */
-    '5555555555': { company:'광원전력', ceo:'김철수' }   /* 아무도 안 가짐 — 고아 */
+    '5555555555': { company:'나비전력', ceo:'김철수' }   /* 아무도 안 가짐 — 고아 */
   }, COS);
   const out = plain(C.coOrphanList());
   assert.deepEqual(out.map(o=>o.key), ['5555555555']);
@@ -169,7 +169,7 @@ test('★ 0건이면 화면에 아무 것도 안 띄운다', () => {
 });
 
 test('1건이라도 있으면 띠가 뜨고 몇 건인지 말한다', () => {
-  const h = bar([{ key:'5555555555', name:'광원전력', fields:['ceo'], docs:0 }]);
+  const h = bar([{ key:'5555555555', name:'나비전력', fields:['ceo'], docs:0 }]);
   assert.ok(h.indexOf('1건') > 0, '몇 건인지 안 알려 준다: ' + h);
   assert.match(h, /coorphbar/, '띠가 안 뜬다');
   assert.match(h, /openCoOrphan\(\)/, '눌러서 볼 길이 없다');
@@ -179,17 +179,17 @@ test('1건이라도 있으면 띠가 뜨고 몇 건인지 말한다', () => {
 
 test('★ 고아마다 회사 이름과 «든 것»을 알려 준다', () => {
   const C = loadOrphan({
-    '5555555555': { company:'광원전력', ceo:'김철수', address:'충남 천안' }
+    '5555555555': { company:'나비전력', ceo:'김철수', address:'충남 천안' }
   }, COS);
   const o = plain(C.coOrphanList())[0];
-  assert.equal(o.name, '광원전력', '이름이 없으면 어느 회사 것인지 모른다');
+  assert.equal(o.name, '나비전력', '이름이 없으면 어느 회사 것인지 모른다');
   assert.ok(o.fields.length >= 2, '무슨 값이 들었는지 안 알려 준다');
 });
 
 test('★ 이름이 같은 회사가 있으면 짚어 준다 — 사람이 이어 붙일 수 있게', () => {
-  const C = loadOrphan({ '5555555555': { company:'광원전력', ceo:'김철수' } }, COS);
+  const C = loadOrphan({ '5555555555': { company:'나비전력', ceo:'김철수' } }, COS);
   const o = plain(C.coOrphanList())[0];
-  assert.equal(o.sameName, '광원전력',
+  assert.equal(o.sameName, '나비전력',
     '★ 이름이 같은 회사를 안 짚어 주면 어디에 붙일지 사람이 다시 찾아야 한다');
 });
 

@@ -111,7 +111,7 @@ test('★★ 계약 파이프라인(contracts)은 실적으로 가져오지 않�
 
 test('동기화 계획이 자문을 따로 센다', () => {
   const plan = S.buildSyncPlan(
-    { companies: { co1: co(), co2: co({ name: '(주)두빛', contractStartDate: '2021-01-04' }) } },
+    { companies: { co1: co(), co2: co({ name: '(주)온새', contractStartDate: '2021-01-04' }) } },
     [], USERMAP, TYPEMAP, []);
   assert.equal(plan.counts.advisory, 2);
   assert.equal(plan.adds.length, 2);

@@ -57,14 +57,14 @@ function runSave(d) {
     .forEach((head) => vm.runInContext(sliceFn(erp, head), ctx));
   vm.runInContext(sliceFn(erp, 'function saveDirectIncome(d){'), ctx);
   ctx.saveDirectIncome(Object.assign({
-    row: { amount: 165000, date: '2026-08-10', memo: '최건(아우어베이커리', _k: 'k1' },
+    row: { amount: 165000, date: '2026-08-10', memo: '최건(마루베이커리', _k: 'k1' },
     doc: 'tax',
   }, d));
   return saved;
 }
 
 test('★ 자문료로 등록하면 자문료 «항목»으로 들어간다 — 기타수입이 아니다', () => {
-  const r = runSave({ name: '아우어베이커리', kind: '자문료' });
+  const r = runSave({ name: '마루베이커리', kind: '자문료' });
   assert.equal(r.kind, '자문료');
   assert.equal(r.category, 'inc-advisory',
     '★ inc-other 로 적으면 자문료 매출에서 통째로 빠집니다.');
@@ -72,21 +72,21 @@ test('★ 자문료로 등록하면 자문료 «항목»으로 들어간다 — 
 
 test('★ 받을 달을 고르면 그 달 매출로 친다 — 밀려 들어온 자문료가 사라지지 않게', () => {
   /* 7월 자문료가 8월 10일에 들어온 경우. 입금월(8월)로 잡으면 7월 미입금이 안 지워진다. */
-  const r = runSave({ name: '아우어베이커리', kind: '자문료', advYm: '2026-07' });
+  const r = runSave({ name: '마루베이커리', kind: '자문료', advYm: '2026-07' });
   assert.equal(r.advisoryYm, '2026-07');
 });
 
 test('받을 달을 안 고르면 입금월로 둔다 — 비워 두면 미입금 대조가 아예 안 된다', () => {
-  const r = runSave({ name: '아우어베이커리', kind: '자문료' });
+  const r = runSave({ name: '마루베이커리', kind: '자문료' });
   assert.equal(r.advisoryYm, '2026-08');
 });
 
 test('★ 미입금 대기가 이 기록을 «찾을 수 있는» 모양이어야 한다', () => {
   /* addAdvisoryPending 은 kind==='자문료' 인 것만 모아 «회사명|받을 달» 로 더한다.
      셋 중 하나라도 어긋나면 그 달 미입금이 그대로 남아 같은 돈이 두 번 보인다. */
-  const r = runSave({ name: '아우어베이커리', kind: '자문료', advYm: '2026-07' });
+  const r = runSave({ name: '마루베이커리', kind: '자문료', advYm: '2026-07' });
   const key = r.companyName + '|' + (r.advisoryYm || String(r.date).slice(0, 7));
-  assert.equal(key, '아우어베이커리|2026-07');
+  assert.equal(key, '마루베이커리|2026-07');
   assert.equal(r.kind, '자문료', '★ kind 가 「자문료」가 아니면 합계에서 아예 안 셉니다.');
 
   /* ⚠ 첫 등장은 «다른 곳을 가리키는 주석» 이다 — 실제 함수 자리를 집어야 한다.
@@ -101,7 +101,7 @@ test('★ 미입금 대기가 이 기록을 «찾을 수 있는» 모양이어�
 
 test('★ 자문료에는 성과급이 안 붙는다 — 확정창을 거친 자문료와 같은 규칙', () => {
   /* calcPerfShares 스텁이 «늘 있다»고 답하는데도 비어야 한다 — 우리가 막는지 보는 것이다. */
-  const r = runSave({ name: '아우어베이커리', kind: '자문료', perfOn: true, mainSid: 'P001' });
+  const r = runSave({ name: '마루베이커리', kind: '자문료', perfOn: true, mainSid: 'P001' });
   /* ⚠ 배열이 vm 안에서 만들어져 prototype 이 다르다 — deepEqual 은 그것 때문에 걸린다.
      여기서 볼 것은 «비었는가» 이지 어느 realm 의 배열인가가 아니다. */
   assert.equal(r.perfShares.length, 0, '★ 자문료에 성과급이 붙으면 확정창 것과 금액이 갈립니다.');

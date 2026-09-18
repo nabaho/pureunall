@@ -72,9 +72,9 @@ test('★ 급여관리 수신함 자리에 그 모양대로 적힌다', () => {
   const S = loadStore();
   const db = fakeDbMulti();
   S.init({ db: db, uid: 'U1', name: '권형하', isAdmin: true });
-  return S.handoffToPayroll({ companyId: 'co_1', companyName: '화담원', month: '2026-08', at: 1000 }).then(inboxId => {
+  return S.handoffToPayroll({ companyId: 'co_1', companyName: '다온원', month: '2026-08', at: 1000 }).then(inboxId => {
     const rec = getAtPath(db._tree, S.payrollInboxPath(inboxId));
-    assert.equal(rec.사업장, '화담원');
+    assert.equal(rec.사업장, '다온원');
     assert.equal(rec.월, '2026-08');
     assert.equal(rec.상태, '대기');
     assert.equal(rec.출처, '급여데이터함');
@@ -87,13 +87,13 @@ test('★ handoff_log 에도 함께 남는다 — 사유 없이, 넘긴 사실�
   const S = loadStore();
   const db = fakeDbMulti();
   S.init({ db: db, uid: 'U1', name: '권형하', isAdmin: true });
-  return S.handoffToPayroll({ companyId: 'co_1', companyName: '화담원', month: '2026-08', at: 1000 }).then(() => {
+  return S.handoffToPayroll({ companyId: 'co_1', companyName: '다온원', month: '2026-08', at: 1000 }).then(() => {
     const logBox = getAtPath(db._tree, 'paydata/handoff_log');
     const ids = Object.keys(logBox || {});
     assert.equal(ids.length, 1);
     const rec = logBox[ids[0]];
     assert.equal(rec.companyId, 'co_1');
-    assert.equal(rec.companyName, '화담원');
+    assert.equal(rec.companyName, '다온원');
     assert.equal(rec.month, '2026-08');
     assert.equal(rec.byUid, 'U1');
     assert.equal(rec.byName, '권형하');
@@ -113,7 +113,7 @@ test('사업장을 모르면 거절한다', () => {
 test('귀속월을 모르면 거절한다', () => {
   const S = loadStore();
   S.init({ db: fakeDbMulti(), uid: 'U1' });
-  return S.handoffToPayroll({ companyName: '화담원' }).then(
+  return S.handoffToPayroll({ companyName: '다온원' }).then(
     () => { throw new Error('거절해야 합니다'); },
     e => assert.match(e.message, /귀속월/)
   );
@@ -121,7 +121,7 @@ test('귀속월을 모르면 거절한다', () => {
 
 test('실시간DB가 없으면 알리고 거절한다', () => {
   const S = loadStore();
-  return S.handoffToPayroll({ companyName: '화담원', month: '2026-08' }).then(
+  return S.handoffToPayroll({ companyName: '다온원', month: '2026-08' }).then(
     () => { throw new Error('거절해야 합니다'); },
     e => assert.match(e.message, /실시간DB/)
   );
@@ -131,7 +131,7 @@ test('종류 이름을 안 주면 기본 이름을 쓴다', () => {
   const S = loadStore();
   const db = fakeDbMulti();
   S.init({ db: db, uid: 'U1', name: '권형하' });
-  return S.handoffToPayroll({ companyName: '화담원', month: '2026-08', at: 1 }).then(inboxId => {
+  return S.handoffToPayroll({ companyName: '다온원', month: '2026-08', at: 1 }).then(inboxId => {
     const rec = getAtPath(db._tree, S.payrollInboxPath(inboxId));
     assert.equal(rec.종류, '급여데이터함 값');
   });

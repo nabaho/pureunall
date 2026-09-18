@@ -30,26 +30,26 @@ vm.runInContext(slice('function erpGroupPendByCompany(', '\nfunction FinanceLedg
 
 const S = (co, ym, id, amt) => ({ cand:{ id:id, companyName:co, kind:'advisory', ym:ym,
                                          expect:amt, amount:amt, label:'자문료' }, score:95 });
-const g1 = gctx.erpGroupPendByCompany([S('크레오', '2026-07', 'a', 220000),
-                                       S('크레오', '2026-05', 'b', 220000),
-                                       S('크레오', '2026-06', 'c', 220000),
-                                       S('신흥',   '2026-06', 'd', 220000)]);
+const g1 = gctx.erpGroupPendByCompany([S('차카', '2026-07', 'a', 220000),
+                                       S('차카', '2026-05', 'b', 220000),
+                                       S('차카', '2026-06', 'c', 220000),
+                                       S('새힘',   '2026-06', 'd', 220000)]);
 t('업체 수만큼 줄이 된다', g1.length, 2);
 t('세 달이 한 줄로 묶인다', g1[0].n, 3);
 t('오래된 달부터 채운다', g1[0].head.cand.id, 'b');
 t('묶인 달이 오름차순이다', g1[0].months, ['2026-05', '2026-06', '2026-07']);
-t('다른 업체는 안 섞인다', g1[1].company, '신흥');
+t('다른 업체는 안 섞인다', g1[1].company, '새힘');
 t('종류를 모아 보여준다', g1[0].kinds, ['자문료']);
 
 /* 이름 표기가 달라도(㈜·(주)·공백) 같은 업체면 한 줄 — erpNormName 을 열쇠로 쓴다 */
-const g2 = gctx.erpGroupPendByCompany([S('㈜한엘', '2026-06', 'x', 330000),
-                                       S('(주)한엘', '2026-07', 'y', 330000)]);
+const g2 = gctx.erpGroupPendByCompany([S('㈜벼리', '2026-06', 'x', 330000),
+                                       S('(주)벼리', '2026-07', 'y', 330000)]);
 t('표기가 달라도 같은 업체로 묶는다', g2.length, 1);
 
 /* 달이 없는 것(사건 착수금 등)은 점수 높은 쪽이 먼저 */
 const g3 = gctx.erpGroupPendByCompany([
-  { cand:{ id:'p', companyName:'대성', label:'사건(착수)' }, score:70 },
-  { cand:{ id:'q', companyName:'대성', label:'사건(잔금)' }, score:92 }]);
+  { cand:{ id:'p', companyName:'다온', label:'사건(착수)' }, score:70 },
+  { cand:{ id:'q', companyName:'다온', label:'사건(잔금)' }, score:92 }]);
 t('달이 없으면 점수 높은 것이 먼저', g3[0].head.cand.id, 'q');
 t('종류가 둘이면 둘 다 모인다', g3[0].kinds.length, 2);
 
@@ -88,7 +88,7 @@ vm.createContext(octx);
 vm.runInContext(slice('function erpOverpayPlan(', '\n/* ── 여러 입금을 한 항목에 묶기'), octx);
 
 const R = { amount:400000, date:'2026-07-18' };
-const C = { id:'c1', companyName:'한엘', expect:330000, kind:'advisory', ym:'2026-07' };
+const C = { id:'c1', companyName:'벼리', expect:330000, kind:'advisory', ym:'2026-07' };
 
 const p1 = octx.erpOverpayPlan(R, C, 'prepay');
 t('미리 받으면 두 조각', p1.length, 2);

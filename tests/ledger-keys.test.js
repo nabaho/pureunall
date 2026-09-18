@@ -73,8 +73,8 @@ t('커서가 없으면 그대로 없다', ctx.erpCurAfterAct(-1, 10, 9), -1);
 
 console.log('\n[⑥ 표 안에서 찾기 — 줄을 감추지 않는다]');
 const r = (memo, amount) => ({ memo:memo, amount:amount, date:'2026-07-14' });
-t('적요로 찾는다', ctx.erpLedgerHit(r('노리시스템(주)', 330000), null, '노리'), true);
-t('업체명으로 찾는다', ctx.erpLedgerHit(r('익선원', 220000), { co:'㈜신흥기업' }, '신흥'), true);
+t('적요로 찾는다', ctx.erpLedgerHit(r('벼리시스템(주)', 330000), null, '벼리'), true);
+t('업체명으로 찾는다', ctx.erpLedgerHit(r('익선원', 220000), { co:'㈜새힘기업' }, '새힘'), true);
 t('담당자로도 찾는다', ctx.erpLedgerHit(r('익선원', 220000), { staff:'김동현' }, '김동현'), true);
 t('금액을 숫자만 쳐도 찾는다', ctx.erpLedgerHit(r('비즈사업비2건', 2100000), null, '2100000'), true);
 t('★ 콤마를 넣어 쳐도 찾는다 (통장을 보고 그대로 옮겨 적는다)',
@@ -82,15 +82,15 @@ t('★ 콤마를 넣어 쳐도 찾는다 (통장을 보고 그대로 옮겨 적�
 t('금액 일부만 쳐도 찾는다', ctx.erpLedgerHit(r('비즈사업비2건', 2100000), null, '210'), true);
 t('찾는 금액 두 꼴을 모두 넣어 둔다',
   /String\(amt\), amt\.toLocaleString\(\)\]\.join\(' '\)/.test(src), true);
-t('안 맞으면 안 찾힌다', ctx.erpLedgerHit(r('노리시스템(주)', 330000), null, '신흥'), false);
+t('안 맞으면 안 찾힌다', ctx.erpLedgerHit(r('벼리시스템(주)', 330000), null, '새힘'), false);
 t('빈 글자면 모두 맞는 것으로 본다 (아무것도 감추지 않는다)',
-  ctx.erpLedgerHit(r('노리시스템(주)', 330000), null, ''), true);
-t('앞뒤 공백은 무시한다', ctx.erpLedgerHit(r('노리시스템(주)', 330000), null, '  노리  '), true);
-t('빈 줄도 안 터진다', ctx.erpLedgerHit(null, null, '노리'), false);
+  ctx.erpLedgerHit(r('벼리시스템(주)', 330000), null, ''), true);
+t('앞뒤 공백은 무시한다', ctx.erpLedgerHit(r('벼리시스템(주)', 330000), null, '  벼리  '), true);
+t('빈 줄도 안 터진다', ctx.erpLedgerHit(null, null, '벼리'), false);
 
 console.log('\n[⑦ Enter 로 다음 짝으로 — 엑셀 찾기와 같다]');
-const rows = [r('노리시스템', 1), r('신흥기업', 2), r('노리시스템', 3), r('중원공영', 4)];
-t('맞는 줄의 자리를 모은다', ctx.erpHitIdx(rows, null, '노리'), [0, 2]);
+const rows = [r('벼리시스템', 1), r('새힘기업', 2), r('벼리시스템', 3), r('중원공영', 4)];
+t('맞는 줄의 자리를 모은다', ctx.erpHitIdx(rows, null, '벼리'), [0, 2]);
 t('다음 짝으로', ctx.erpNextHit([0, 2], 0), 2);
 t('마지막을 지나면 처음으로 돈다', ctx.erpNextHit([0, 2], 2), 0);
 t('아직 아무 줄도 안 골랐으면 첫 짝으로', ctx.erpNextHit([0, 2], -1), 0);

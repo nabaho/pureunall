@@ -68,15 +68,15 @@ function photo(id, url, company, upAt) {
 /* ══════ ① 원본 파일이 나간다 ══════ */
 
 test('★ 한 장을 끌면 원본 파일이 실린다 — 이것이 없으면 밖으로 아무것도 안 나간다', () => {
-  const { dt } = run([photo('p1', U1, '주식회사 율산')], ['p1']);
+  const { dt } = run([photo('p1', U1, '주식회사 가람')], ['p1']);
   assert.ok(dt.data['DownloadURL'], '★ DownloadURL 이 없으면 탐색기·한글이 알아듣지 못합니다');
   assert.match(dt.data['DownloadURL'], /^image\/jpeg:/, '종류를 안 적으면 이름 없는 파일이 됩니다');
   assert.ok(dt.data['DownloadURL'].indexOf(U1) > 0, '★ 원본 주소가 안 실렸습니다');
 });
 
 test('★ 파일 이름이 날짜 + 업체다 — 받은 쪽에서 무엇인지 알아야 한다', () => {
-  const { dt } = run([photo('p1', U1, '주식회사 율산')], ['p1']);
-  assert.match(dt.data['DownloadURL'], /:2026-08-21 주식회사 율산\.jpg:/);
+  const { dt } = run([photo('p1', U1, '주식회사 가람')], ['p1']);
+  assert.match(dt.data['DownloadURL'], /:2026-08-21 주식회사 가람\.jpg:/);
 });
 
 test('★ 이름에 못 쓰는 글자를 걷어낸다 — 남기면 저장이 통째로 실패한다', () => {
@@ -164,10 +164,10 @@ test('목록에 없는 번호는 조용히 건너뛴다 — 그것 때문에 끌
 const B1 = 'blob:https://nabaho.github.io/8e2b-4c11';
 
 test('★ 주소가 없어도 미리 받아 둔 사진이면 파일이 실린다 — 한글에 글자가 찍히던 그것', () => {
-  const { dt, calls } = run([photo('p1', '', '주식회사 율산')], ['p1'], { p1: B1 });
+  const { dt, calls } = run([photo('p1', '', '주식회사 가람')], ['p1'], { p1: B1 });
   assert.ok(dt.data['DownloadURL'], '★ 미리 받아 뒀는데도 안 실었습니다 — 한글에 또 글자가 찍힙니다');
   assert.ok(dt.data['DownloadURL'].indexOf(B1) > 0, '★ 미리 받아 둔 주소가 안 실렸습니다');
-  assert.match(dt.data['DownloadURL'], /:2026-08-21 주식회사 율산\.jpg:/, '이름은 그대로 날짜+업체다');
+  assert.match(dt.data['DownloadURL'], /:2026-08-21 주식회사 가람\.jpg:/, '이름은 그대로 날짜+업체다');
   assert.ok(!calls.some(function (c) { return c[0] === 'toast'; }), '나가는데 못 나간다고 했습니다');
 });
 

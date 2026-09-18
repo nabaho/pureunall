@@ -1,8 +1,8 @@
 /* 「업체가 전혀 일치하지 않는다」 + 「잘못 붙은 것을 고친다」
    (2026-08-10) 대표 제보 두 가지:
-     ① 165,000원 · 적요 「최건(아우어베이커리」 에 후보 7곳이 떴는데 근거가 죄다 「입금이력」이었다.
+     ① 165,000원 · 적요 「최건(마루베이커리」 에 후보 7곳이 떴는데 근거가 죄다 「입금이력」이었다.
         「이 회사는 매달 165,000원을 낸다」는 뜻일 뿐이라 165,000원 업체가 열둘이면 열둘이 다 뜬다.
-        정작 적요의 아우어베이커리는 후보에 없는데 「골라야 합니다」라고 부추기고 있었다.
+        정작 적요의 마루베이커리는 후보에 없는데 「골라야 합니다」라고 부추기고 있었다.
      ② 자동으로 붙은 것이 잘못됐을 때 고칠 길이 없었다 (지금 「수정」은 담당·성과만 바꾼다). */
 const fs = require('fs');
 const path = require('path');
@@ -34,15 +34,15 @@ t('세금계산서가 이름보다 앞선다', ev(75, 0, 100).why, '세금계산
 t('아무 근거도 없으면 금액지문이라고 하지 않는다', !!ev(20, 0, 0).fp, false);
 
 console.log('\n[② 적요에서 이름일 만한 조각 뽑기]');
-/* 통장에는 「최건(아우어베이커리」 처럼 예금주와 상호가 함께 찍힌다.
+/* 통장에는 「최건(마루베이커리」 처럼 예금주와 상호가 함께 찍힌다.
    통째로만 견주면 둘 다 못 찾으므로 괄호 안팎을 따로 본다. */
 t('★ 괄호 «안» 의 상호를 먼저 본다 (상호가 업체명일 때가 많다)',
-  ctx.erpMemoNames('최건(아우어베이커리')[0], '아우어베이커리');
-t('괄호 «앞» 의 예금주도 본다', ctx.erpMemoNames('최건(아우어베이커리').indexOf('최건') >= 0, true);
+  ctx.erpMemoNames('최건(마루베이커리')[0], '마루베이커리');
+t('괄호 «앞» 의 예금주도 본다', ctx.erpMemoNames('최건(마루베이커리').indexOf('최건') >= 0, true);
 t('닫는 괄호가 없어도 읽는다 (통장이 적요를 자른다)',
-  ctx.erpMemoNames('최건(아우어베이커리').length >= 2, true);
+  ctx.erpMemoNames('최건(마루베이커리').length >= 2, true);
 t('닫는 괄호가 있어도 읽는다', ctx.erpMemoNames('황규주(다온식품)')[0], '다온식품');
-t('괄호가 없으면 통째로', ctx.erpMemoNames('노리시스템(주)').length >= 1, true);
+t('괄호가 없으면 통째로', ctx.erpMemoNames('벼리시스템(주)').length >= 1, true);
 t('한 글자는 뽑지 않는다 (아무 데나 걸린다)', ctx.erpMemoNames('김'), []);
 t('빈 적요는 빈 목록', ctx.erpMemoNames(''), []);
 t('없는 값도 안 터진다', ctx.erpMemoNames(null), []);
@@ -52,19 +52,19 @@ console.log('\n[③ 적요의 이름으로 업체를 찾는다]');
    앞은 사무관리에 건을 만들면 되고, 뒤는 업체부터 만들어야 한다.
    그냥 「후보 없음」이라고만 하면 둘 중 무엇인지 알 수 없어 아무것도 못 한다. */
 const cos = [
-  { id:'c1', name:'아우어베이커리' },
-  { id:'c2', name:'(주)케이아이알' },
-  { id:'c3', name:'중원대학교' }
+  { id:'c1', name:'마루베이커리' },
+  { id:'c2', name:'(주)가나아이알' },
+  { id:'c3', name:'가나대학교' }
 ];
-const pends = [{ id:'p1', companyName:'(주)케이아이알', label:'자문료' }];
+const pends = [{ id:'p1', companyName:'(주)가나아이알', label:'자문료' }];
 
-const r1 = ctx.erpFindCompanyByMemo('최건(아우어베이커리', cos, pends);
+const r1 = ctx.erpFindCompanyByMemo('최건(마루베이커리', cos, pends);
 t('업체를 찾았다', r1.found, true);
-t('어느 업체인지 알려준다', r1.company.name, '아우어베이커리');
+t('어느 업체인지 알려준다', r1.company.name, '마루베이커리');
 t('★ 받을 항목이 없다는 것까지 알려준다 (사무관리에 건을 만들면 된다)', r1.pending.length, 0);
-t('어느 이름으로 찾았는지도 남긴다', r1.matched, '아우어베이커리');
+t('어느 이름으로 찾았는지도 남긴다', r1.matched, '마루베이커리');
 
-const r2 = ctx.erpFindCompanyByMemo('케이아이알', cos, pends);
+const r2 = ctx.erpFindCompanyByMemo('가나아이알', cos, pends);
 t('받을 항목이 있으면 그것도 알려준다 (매칭이 못 찾은 것 — 찾기에서 고르면 된다)', r2.pending.length, 1);
 
 const r3 = ctx.erpFindCompanyByMemo('없는회사이름', cos, pends);
@@ -73,17 +73,17 @@ t('무엇으로 찾아봤는지 남긴다 (왜 못 찾았는지 사람이 짚어
 t('적요가 비면 아무 말도 안 한다', ctx.erpFindCompanyByMemo('', cos, pends), null);
 t('업체 목록이 없어도 안 터진다', ctx.erpFindCompanyByMemo('아우어', null, null).found, false);
 t('이름이 없는 업체는 건너뛴다',
-  ctx.erpFindCompanyByMemo('아우어베이커리', [{ id:'x' }, cos[0]], []).company.name, '아우어베이커리');
+  ctx.erpFindCompanyByMemo('마루베이커리', [{ id:'x' }, cos[0]], []).company.name, '마루베이커리');
 
 console.log('\n[④ 표에서는 이름이 꼭 같은 것만 — 505줄 × 900업체를 매번 훑을 수 없다]');
 const idx = ctx.erpCoIndexByName(cos);
-t('이름으로 바로 찾는다', ctx.erpQuickCoByMemo(idx, '최건(아우어베이커리').name, '아우어베이커리');
-/* 「(주)」 같은 꾸밈말은 erpNormName 이 걷어내므로 «케이아이알» 로도 바로 찾힌다 */
-t('꾸밈말이 달라도 찾는다', ctx.erpQuickCoByMemo(idx, '케이아이알').name, '(주)케이아이알');
+t('이름으로 바로 찾는다', ctx.erpQuickCoByMemo(idx, '최건(마루베이커리').name, '마루베이커리');
+/* 「(주)」 같은 꾸밈말은 erpNormName 이 걷어내므로 «가나아이알» 로도 바로 찾힌다 */
+t('꾸밈말이 달라도 찾는다', ctx.erpQuickCoByMemo(idx, '가나아이알').name, '(주)가나아이알');
 t('이름이 다르면 표에서는 못 찾는다 (샅샅이 뒤지는 것은 찾기 창의 몫)',
   ctx.erpQuickCoByMemo(idx, '아우어'), null);
 t('빈 적요도 안 터진다', ctx.erpQuickCoByMemo(idx, ''), null);
-t('색인이 없어도 안 터진다', ctx.erpQuickCoByMemo(null, '아우어베이커리'), null);
+t('색인이 없어도 안 터진다', ctx.erpQuickCoByMemo(null, '마루베이커리'), null);
 
 console.log('\n[⑤ 조용히 빼지 않는다]');
 t('금액만 같아서 뺀 곳의 수를 센다', /if\(r\.score > 0 && !ev\.ok && ev\.fp\) fpHidden\+\+;/.test(src), true);

@@ -55,8 +55,8 @@ const K = (g) => g.verdict + ':' + g.kindLabel + ':' + g.coName + ':' + g.rows.l
     c.dupSweepCoKey({ bizNo:'1234567890', companyName:'가나' }),
     c.dupSweepCoKey({ bizNo:'123-45-67890', companyName:'가나상사' }));
   t('★ (주) 표기 차이는 무시한다',
-    c.dupSweepCoKey({ companyName:'(주)유원에프앤비' }),
-    c.dupSweepCoKey({ companyName:'유원에프앤비' }));
+    c.dupSweepCoKey({ companyName:'(주)자차에프앤비' }),
+    c.dupSweepCoKey({ companyName:'자차에프앤비' }));
   t('★ 주식회사 표기도 같게', c.dupSweepCoKey({ companyName:'주식회사 아자인텍' }),
     c.dupSweepCoKey({ companyName:'아자인텍' }));
   t('공백·기호 차이도 같게', c.dupSweepCoKey({ companyName:'카타 엔지니어링' }),
@@ -99,12 +99,12 @@ const K = (g) => g.verdict + ':' + g.kindLabel + ':' + g.coName + ':' + g.rows.l
 // 같은 사업장 · 같은 세부 종류 · 둘 다 진행 중 → 진짜 중복
 {
   const r = scan({ contracts:[
-    { id:'c1', companyName:'유원에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
+    { id:'c1', companyName:'자차에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
       kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' }, status:'signed' },
-    { id:'c2', companyName:'(주)유원에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
+    { id:'c2', companyName:'(주)자차에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
       kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' }, status:'signed' }
   ]});
-  t('★ 같은 세부 종류가 둘 다 진행 중이면 진짜 중복', r.groups.map(K), ['dup:계약:유원에프앤비:2']);
+  t('★ 같은 세부 종류가 둘 다 진행 중이면 진짜 중복', r.groups.map(K), ['dup:계약:자차에프앤비:2']);
   t('진행 중 건수를 센다', r.groups[0].openN, 2);
   t('집계', [r.counts.dup, r.counts.again, r.counts.unknown], [1, 0, 0]);
   t('훑은 건수', r.counts.scanned, 2);
@@ -362,16 +362,16 @@ function renderSweep(result, filter){
 }
 {
   const r = scan({ contracts:[
-    { id:'c1', companyName:'유원에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
+    { id:'c1', companyName:'자차에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
       kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' } },
-    { id:'c2', companyName:'유원에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
+    { id:'c2', companyName:'자차에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
       kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' } }
   ]});
   let threw = '', v = null;
   try { v = renderSweep(r); } catch(e){ threw = String(e && e.message); }
   t('★ 창이 터지지 않고 그려진다', threw, '');
   if(!v){ console.log('렌더 실패 — 이후 생략'); process.exit(1); }
-  t('업체명이 보인다', v.all.indexOf('유원에프앤비') >= 0, true);
+  t('업체명이 보인다', v.all.indexOf('자차에프앤비') >= 0, true);
   t('갈래 이름이 보인다', v.all.indexOf('계약') >= 0, true);
   t('관리번호가 둘 다 보인다',
     v.all.indexOf('계약-041') >= 0 && v.all.indexOf('계약-172') >= 0, true);

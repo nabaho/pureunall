@@ -198,11 +198,11 @@ test('★★★ 「한꺼번에 다 채우기」 단추가 «없다» — 상호
 
 test('★★ 이름이 겹치는 업체는 «먼저 말하고» 「고르기」를 준다', () => {
   const c = load();
-  c.ErpMatch.companies = [{ id: 'co-1', name: '주식회사 대성' }, { id: 'co-2', name: '대성' }];
-  assert.equal(c.coNoBizNameDup({ company: '대성' }), true,
+  c.ErpMatch.companies = [{ id: 'co-1', name: '주식회사 다온' }, { id: 'co-2', name: '다온' }];
+  assert.equal(c.coNoBizNameDup({ company: '다온' }), true,
     '★★ 다듬으면 같아지는 업체가 둘인데 안 짚어 줍니다');
-  c.ErpMatch.companies = [{ id: 'co-1', name: '한서정공' }];
-  assert.equal(c.coNoBizNameDup({ company: '한서정공' }), false);
+  c.ErpMatch.companies = [{ id: 'co-1', name: '마루정공' }];
+  assert.equal(c.coNoBizNameDup({ company: '마루정공' }), false);
 });
 
 test('★ 겹친 이름 줄은 «확인»이 아니라 «고르기»로 간다', () => {

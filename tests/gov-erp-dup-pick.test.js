@@ -78,32 +78,32 @@ test('★★★ 그 사업이 «안 끝난» 쪽을 고른다', () => {
   /* ⚠ 끝난 쪽에도 «다른 도는 사업»을 하나 준다 — 안 그러면 「도는 쪽을 고른다」가
        대신 맞혀서 이 규칙을 빼도 통과한다. */
   const cos = [
-    CO('ended', '별표수세미', { types: ['t4', 't1'], endedTypes: { t4: '2026-07-31' } }),
-    CO('live', '별표수세미', { types: ['t4'] }),
+    CO('ended', '타파수세미', { types: ['t4', 't1'], endedTypes: { t4: '2026-07-31' } }),
+    CO('live', '타파수세미', { types: ['t4'] }),
   ];
-  assert.strictEqual(find(cos, 'E9', '별표수세미', 't4').id, 'live',
+  assert.strictEqual(find(cos, 'E9', '타파수세미', 't4').id, 'live',
     '끝난 쪽에 붙는다 — 새 회차가 종료된 사업에 들어간다');
 });
 
 test('★★ 그 사업이 어디에도 없으면 «아직 도는» 쪽을 고른다', () => {
   const cos = [
-    CO('dead', '별표수세미', { types: ['t1'], endedTypes: { t1: '2026-07-31' } }),
-    CO('alive', '별표수세미', { types: ['t1'] }),
+    CO('dead', '타파수세미', { types: ['t1'], endedTypes: { t1: '2026-07-31' } }),
+    CO('alive', '타파수세미', { types: ['t1'] }),
   ];
-  assert.strictEqual(find(cos, 'E9', '별표수세미', 't4').id, 'alive',
+  assert.strictEqual(find(cos, 'E9', '타파수세미', 't4').id, 'alive',
     '다 끝난 껍데기 사업장에 새 사업을 붙인다');
 });
 
 test('★★ 쉬는 사업장보다 도는 사업장을 고른다', () => {
-  const cos = [CO('rest', '세화전자', { active: false }), CO('work', '세화전자')];
-  assert.strictEqual(find(cos, 'E9', '세화전자', 't4').id, 'work');
+  const cos = [CO('rest', '벼리전자', { active: false }), CO('work', '벼리전자')];
+  assert.strictEqual(find(cos, 'E9', '벼리전자', 't4').id, 'work');
 });
 
 test('★★★ 다 같으면 «먼저 있던 것»이 이긴다 — 뒤죽박죽 바뀌면 안 된다', () => {
   /* 점수가 같을 때 차례가 흔들리면 부를 때마다 다른 사업장에 붙는다. */
-  const cos = [CO('one', '이케이', { types: ['t1'] }), CO('two', '이케이', { types: ['t1'] })];
-  assert.strictEqual(find(cos, 'E9', '이케이', 't4').id, 'one');
-  assert.strictEqual(find(cos, 'E9', '이케이', 't4').id, 'one', '부를 때마다 답이 바뀐다');
+  const cos = [CO('one', '우람', { types: ['t1'] }), CO('two', '우람', { types: ['t1'] })];
+  assert.strictEqual(find(cos, 'E9', '우람', 't4').id, 'one');
+  assert.strictEqual(find(cos, 'E9', '우람', 't4').id, 'one', '부를 때마다 답이 바뀐다');
 });
 
 test('★★ 종류를 «안 넘기면» 예전처럼 첫 것 — 옛 부름을 깨지 않는다', () => {
@@ -116,9 +116,9 @@ test('★ 하나뿐이면 그대로 고른다', () => {
   assert.strictEqual(find(cos, 'E9', '아자인텍', 't4').id, 'only');
 });
 
-test('★★ 법인격을 떼고 맞춘다 — 「(주)별표수세미」와 「별표수세미」는 한 곳이다', () => {
-  const cos = [CO('a', '별표수세미', { types: ['t4'] })];
-  assert.strictEqual(find(cos, 'E9', '(주)별표수세미', 't4').id, 'a');
+test('★★ 법인격을 떼고 맞춘다 — 「(주)타파수세미」와 「타파수세미」는 한 곳이다', () => {
+  const cos = [CO('a', '타파수세미', { types: ['t4'] })];
+  assert.strictEqual(find(cos, 'E9', '(주)타파수세미', 't4').id, 'a');
   assert.strictEqual(find(cos, 'E9', '티앤에스㈜', 't4'), null,
     '엉뚱한 회사에 붙는다');
 });

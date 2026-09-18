@@ -11872,7 +11872,7 @@ function shownItems() {
 function shownItemsFresh() {
   let list = gridItems;
   /* 폴더는 분류 탭과 **다른 축**이라 함께 걸린다 —
-     「회의사진」이면서 「㈜가야 실태조사」인 사진을 둘 다로 좁혀 볼 수 있다.
+     「회의사진」이면서 「㈜벼리 실태조사」인 사진을 둘 다로 좁혀 볼 수 있다.
      ⚠ 없어진 폴더를 가리키는 사진은 아무 데도 안 걸리면 사라져 보인다.
         폴더를 지우면 folderPick 이 'all' 로 돌아가므로 「전체」에서 늘 보인다. */
   if (folderPick !== 'all') list = list.filter(function (it) {
@@ -12375,7 +12375,7 @@ function newFolder(parentId) {
   closeFolderMenu();
   const up = parentId ? (FOLDERS[parentId] || {}).name : '';
   foldOpen(parentId ? 'sub' : 'new', parentId || '', '',
-    up ? '「' + up + '」 안에 만들 이름' : '예: ㈜가야 실태조사');
+    up ? '「' + up + '」 안에 만들 이름' : '예: ㈜벼리 실태조사');
 }
 
 function renameFolderAsk(fid) {

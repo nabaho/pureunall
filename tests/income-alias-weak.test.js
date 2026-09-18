@@ -1,6 +1,6 @@
 /* 입금 자동매칭이 «전혀 다른 업체» 에 붙은 일 (2026-08-18 대표 제보)
-     「DYM SOLUTI」  → ㈜정일제지
-     「파하디티(주)(이석」 → (주)케이이알 (구㈜한국전자파연구소)
+     「ABC SOLUTI」  → ㈜가온제지
+     「파하디티(주)(하람」 → (주)나루이알 (구㈜가나전자파연구소)
 
    ★ 뿌리 — 내가 이름을 보고 붙인 것이 «아니다».
      2026-08-08 에 «한 번» 확정한 것이 곧바로 「규칙(입금자 별칭)」이 되어,
@@ -8,7 +8,7 @@
      한 번의 실수가 영원히 되풀이되는 구조였다.
 
    ★ 고친 규칙 —
-     이름이 «닮은» 학습은 한 번으로 배운다(아우어베이커리·이케이 …) — 안전하다.
+     이름이 «닮은» 학습은 한 번으로 배운다(마루베이커리·우람 …) — 안전하다.
      이름이 «안 닮은» 짝은 «두 번» 확정돼야 규칙이 된다. 그전까지는 노랑(확인 필요). */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -48,23 +48,23 @@ function load() {
 
 test('이번에 문제된 두 짝은 «안 닮았다»', () => {
   const { close } = load();
-  assert.strictEqual(close('dymsoluti', '㈜정일제지'), false);
-  assert.strictEqual(close('파하디티이석', '(주)케이이알 (구㈜한국전자파연구소)'), false);
+  assert.strictEqual(close('dymsoluti', '㈜가온제지'), false);
+  assert.strictEqual(close('파하디티이석', '(주)나루이알 (구㈜가나전자파연구소)'), false);
 });
 
 test('멀쩡한 학습은 «닮았다» 로 남는다 — 같이 죽이면 안 된다', () => {
   /* 무작정 엄하게 하면 잘 되던 것까지 노랑이 되어 일이 늘어난다. */
   const { close } = load();
-  assert.strictEqual(close('최건아우어베이커리', '아우어베이커리 서산호수공원점'), true);
-  assert.strictEqual(close('선학원보문사', '보문사'), true);
-  assert.strictEqual(close('이케이', '㈜이케이 (구 지흥)'), true);
+  assert.strictEqual(close('최건마루베이커리', '마루베이커리 가나호수공원점'), true);
+  assert.strictEqual(close('선학원나루사', '나루사'), true);
+  assert.strictEqual(close('우람', '㈜우람 (구 지흥)'), true);
   assert.strictEqual(close('충남육아종합지원센터', '충청남도육아종합지원센터'), true);
 });
 
 test('CMS 일괄이체 적요를 한 곳으로 배운 것도 «안 닮았다»', () => {
   /* 「더빌이체3572」는 여러 곳이 섞여 들어오는 줄이다 — 한 곳으로 굳으면 위험하다. */
   const { close } = load();
-  assert.strictEqual(close('더빌이체3572', '이레메디컬의원'), false);
+  assert.strictEqual(close('더빌이체3572', '온새메디컬의원'), false);
   assert.strictEqual(close('본가왕뼈감자탕', '중원공영'), false);
 });
 
@@ -72,32 +72,32 @@ test('CMS 일괄이체 적요를 한 곳으로 배운 것도 «안 닮았다»',
 
 test('안 닮은 짝은 «한 번» 으로 규칙이 되지 않는다', () => {
   const { trusted } = load();
-  const e = { companyName: '㈜정일제지', count: 1, weak: true };
+  const e = { companyName: '㈜가온제지', count: 1, weak: true };
   assert.strictEqual(trusted(e, 'dymsoluti'), false, '한 번으로 규칙이 된다');
 });
 
 test('안 닮은 짝도 «두 번» 확정되면 규칙이 된다', () => {
   /* 영원히 막으면 진짜로 그 관계인 곳(예금주가 다른 회사)을 못 배운다. */
   const { trusted } = load();
-  const e = { companyName: '㈜정일제지', count: 2, weak: true };
+  const e = { companyName: '㈜가온제지', count: 2, weak: true };
   assert.strictEqual(trusted(e, 'dymsoluti'), true);
 });
 
 test('닮은 짝은 한 번으로 충분하다', () => {
   const { trusted } = load();
-  const e = { companyName: '아우어베이커리 서산호수공원점', count: 1, weak: false };
-  assert.strictEqual(trusted(e, '최건아우어베이커리'), true);
+  const e = { companyName: '마루베이커리 가나호수공원점', count: 1, weak: false };
+  assert.strictEqual(trusted(e, '최건마루베이커리'), true);
 });
 
 test('★ weak 표시가 «없는» 옛 기록도 다시 재 본다', () => {
   /* 이게 없으면 8월 8일에 굳은 잘못된 것들이 그대로 살아 있다.
      대표님이 손으로 지우기 전에는 계속 붙는다. */
   const { weak, trusted } = load();
-  const old = { companyName: '(주)케이이알 (구㈜한국전자파연구소)', count: 1, samples: ['파하디티(주)(이석'] };
+  const old = { companyName: '(주)나루이알 (구㈜가나전자파연구소)', count: 1, samples: ['파하디티(주)(하람'] };
   assert.strictEqual(weak(old, '파하디티이석'), true, '옛 기록을 안 재 본다');
   assert.strictEqual(trusted(old, '파하디티이석'), false, '옛 잘못이 그대로 살아 있다');
-  const oldOk = { companyName: '보문사', count: 1, samples: ['선학원보문사'] };
-  assert.strictEqual(trusted(oldOk, '선학원보문사'), true, '멀쩡한 옛 기록까지 죽인다');
+  const oldOk = { companyName: '나루사', count: 1, samples: ['선학원나루사'] };
+  assert.strictEqual(trusted(oldOk, '선학원나루사'), true, '멀쩡한 옛 기록까지 죽인다');
 });
 
 /* ── 앱이 그 규칙을 실제로 쓰나 ── */

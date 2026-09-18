@@ -22,7 +22,7 @@ const COMPANIES = {
       typeCode: '급여', status: 'active', managerMain: 'p-001', managerSubs: [] },
     { id: 'co_2', name: '다온식품', email: 'daon@naver.com',
       typeCode: '급여', status: 'active', managerMain: 'p-002', managerSubs: ['p-001'] },
-    { id: 'co_3', name: '㈜주원테크', email: 'juwon@gmail.com',
+    { id: 'co_3', name: '㈜열음테크', email: 'yeoleum@gmail.com',
       typeCode: '급여', status: 'active', managerMain: 'p-009', managerSubs: [] },
     { id: 'co_4', name: '담당없는곳', email: 'noman@daum.net',
       typeCode: '급여', status: 'active', managerMain: '', managerSubs: [] }
@@ -76,7 +76,7 @@ test('★ 아직 급여데이터함에 안 들어온 담당자는 자리가 없�
   /* 그 사람 자리에 넣으면 아무도 못 본다(그 자리는 아직 아무도 안 연다).
      공용 칸에 남겨 두면 전원에게 보이고 아무나 맡는다. */
   const idx = MR.buildCompanyIndex(COMPANIES);
-  const co = MR.companyFor('juwon@gmail.com', idx);
+  const co = MR.companyFor('yeoleum@gmail.com', idx);
   assert.equal(MR.seatFor(co, OWNERS), '');
 });
 
@@ -168,7 +168,7 @@ test('★ 업체를 못 찾으면 공용 칸으로 보내고 까닭을 남긴다
 
 test('★ 담당자가 아직 안 들어왔으면 공용 칸으로 보내고 그렇다고 적는다', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
-  const r = MR.routeFor({ from: 'juwon@gmail.com', filename: 'a.pdf', subject: '' }, idx, OWNERS);
+  const r = MR.routeFor({ from: 'yeoleum@gmail.com', filename: 'a.pdf', subject: '' }, idx, OWNERS);
   assert.equal(r.shared, true);
   assert.match(r.why, /들어온|접속/);
   // 업체는 알았으니 그것만이라도 넘겨 준다 — 맡는 사람이 다시 고를 일이 없다
@@ -223,7 +223,7 @@ test('이름표를 안 주면 빈칸으로 둔다 — 없는 값을 만들지 �
 
 test('★ 공용 칸 줄에 왜 못 갈랐는지 적는다', () => {
   const rec = MR.sharedPendingRecord({ filename: 'a.pdf', at: 1, mailFrom: 'x@y.com',
-    why: '업체관리에 없는 주소', tag: { companyId: 'co_3', companyName: '㈜주원테크' } });
+    why: '업체관리에 없는 주소', tag: { companyId: 'co_3', companyName: '㈜열음테크' } });
   assert.equal(rec.why, '업체관리에 없는 주소');
   assert.equal(rec.companyId, 'co_3', '알아낸 업체는 넘겨야 다시 고를 일이 없습니다');
 });

@@ -77,9 +77,9 @@ function loadApp(appState, opts) {
 }
 
 const COMPANIES = [
-  { id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
+  { id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
   { id: 'co_2', name: '안전공사', managerMain: 'p-001', managerSubs: [] },
-  { id: 'co_3', name: '(주)이비', managerMain: 'p-002', managerSubs: [] }
+  { id: 'co_3', name: '(주)벼리비', managerMain: 'p-002', managerSubs: [] }
 ];
 const OWNERS = { U1: { name: '권형하', email: 'p001@pureun.kr' }, U2: { name: '민미애', email: 'p002@pureun.kr' } };
 
@@ -90,13 +90,13 @@ test('★ 내 업체에만 드래그 손잡이·공유 단추가 붙는다', () 
   const h = W.colListHtml();          // 기본 보기는 「내 담당」
   assert.match(h, /draggable="true"/, '내 업체는 끌 수 있어야 합니다');
   assert.match(h, /openShare/);
-  assert.equal(h.indexOf('(주)이비'), -1, '「내 담당」에 남의 업체가 섞이면 안 됩니다');
+  assert.equal(h.indexOf('(주)벼리비'), -1, '「내 담당」에 남의 업체가 섞이면 안 됩니다');
 });
 
 test('★ 남의 업체 목록에서는 끌거나 공유할 수 없다', () => {
   const { W } = loadApp({ companies: COMPANIES, owners: OWNERS, sideView: 'all' }, { isAdmin: true });
   const h = W.colListHtml();
-  assert.match(h, /\(주\)이비/, '관리자는 전체 목록을 봅니다');
+  assert.match(h, /\(주\)벼리비/, '관리자는 전체 목록을 봅니다');
   assert.equal(/draggable="true"/.test(h), false, '남의 업체까지 끌 수 있으면 안 됩니다');
 });
 
@@ -140,11 +140,11 @@ test('★ 급여데이터함에 안 들어온 담당자는 그렇다고 알린�
 });
 
 test('★ 공유받음 보기가 개수와 함께 보인다', () => {
-  const shares = { s1: { companyId: 'co_9', companyName: '참살이', byName: '민미애', tags: ['확인 부탁드립니다'], at: 1 } };
+  const shares = { s1: { companyId: 'co_9', companyName: '새별살이', byName: '민미애', tags: ['확인 부탁드립니다'], at: 1 } };
   const { W } = loadApp({ companies: COMPANIES, owners: OWNERS, shares });
   assert.match(W.viewBarHtml(), /공유받음<\/b><span class="n">1<\/span>/);
   const h = loadApp({ companies: COMPANIES, owners: OWNERS, shares, sideView: 'shared' }).W.colListHtml();
-  assert.match(h, /참살이/);
+  assert.match(h, /새별살이/);
   assert.match(h, /확인 부탁드립니다/);
 });
 
@@ -177,7 +177,7 @@ test('★ 첫 칸을 접었다 폈다 할 수 있다', () => {
 
 test('★ 아직 안 들어온 담당자의 업체를 누르면 헛걸음 대신 안내가 뜬다', () => {
   const { W, calls } = loadApp({});
-  W.openColCompany('co_3', '(주)이비', false, '', '민미애');
+  W.openColCompany('co_3', '(주)벼리비', false, '', '민미애');
   assert.equal(calls.alerts.length, 1);
   assert.match(calls.alerts[0], /들어온 적이 없어/);
   assert.equal(W.App.screen, 'sites', '빈 서랍으로 들어가면 안 됩니다');
@@ -185,7 +185,7 @@ test('★ 아직 안 들어온 담당자의 업체를 누르면 헛걸음 대신
 
 test('담당자가 아예 없는 업체는 내 자리에서 연다', () => {
   const { W, calls } = loadApp({});
-  W.openColCompany('co_5', '신흥기업', false, '', '');
+  W.openColCompany('co_5', '새힘기업', false, '', '');
   assert.equal(calls.alerts.length, 0);
   assert.equal(W.App.screen, 'drawer');
   assert.equal(W.App.companyId, 'co_5');
@@ -195,7 +195,7 @@ test('담당자가 아예 없는 업체는 내 자리에서 연다', () => {
 
 test('★ 내 업체는 사유 없이 곧장 서랍으로 간다', () => {
   const { W } = loadApp({});
-  W.sideOpenCompany('U1', '권형하', 'co_1', '화담원', true);
+  W.sideOpenCompany('U1', '권형하', 'co_1', '다온원', true);
   assert.equal(W.App.screen, 'drawer');
   assert.equal(W.App.companyId, 'co_1');
   assert.equal(W.App.sideReason, null);
@@ -204,7 +204,7 @@ test('★ 내 업체는 사유 없이 곧장 서랍으로 간다', () => {
 test('★ 대리로 맡은 자리면 남의 업체도 사유 없이 곧장 들어간다', async () => {
   const db = fakeDbConst({ to: Date.now() + 100000 });
   const { W } = loadApp({}, { db });
-  W.sideOpenCompany('U2', '민미애', 'co_3', '(주)이비', false);
+  W.sideOpenCompany('U2', '민미애', 'co_3', '(주)벼리비', false);
   await new Promise(r => setTimeout(r, 0));
   assert.equal(W.App.screen, 'drawer');
   assert.equal(W.App.viewingUid, 'U2');
@@ -215,7 +215,7 @@ test('★ 대리로 맡은 자리면 남의 업체도 사유 없이 곧장 들�
 test('★ 대리가 아니면 사유를 먼저 묻는다 — 서랍으로 바로 안 간다', async () => {
   const db = fakeDbConst(null);
   const { W } = loadApp({}, { db });
-  W.sideOpenCompany('U2', '민미애', 'co_3', '(주)이비', false);
+  W.sideOpenCompany('U2', '민미애', 'co_3', '(주)벼리비', false);
   await new Promise(r => setTimeout(r, 0));
   assert.equal(W.App.screen, 'sites', '사유를 안 물었는데 서랍으로 갔습니다');
   assert.ok(W.App.sideReason);
@@ -224,15 +224,15 @@ test('★ 대리가 아니면 사유를 먼저 묻는다 — 서랍으로 바로
 });
 
 test('사유 프롬프트 화면에 안내 문구가 있다', () => {
-  const { W } = loadApp({ sideReason: { targetUid: 'U2', targetName: '민미애', companyId: 'co_3', companyName: '(주)이비' } });
+  const { W } = loadApp({ sideReason: { targetUid: 'U2', targetName: '민미애', companyId: 'co_3', companyName: '(주)벼리비' } });
   const h = W.sideReasonHtml();
   assert.match(h, /민미애/);
-  assert.match(h, /\(주\)이비/);
+  assert.match(h, /\(주\)벼리비/);
   assert.match(h, /사유가 필요 없습니다/);
 });
 
 test('사유 없이 확인을 누르면 거절한다', () => {
-  const { W, calls } = loadApp({ sideReason: { targetUid: 'U2', targetName: '민미애', companyId: 'co_3', companyName: '이비' } });
+  const { W, calls } = loadApp({ sideReason: { targetUid: 'U2', targetName: '민미애', companyId: 'co_3', companyName: '벼리비' } });
   W.submitSideReason();
   assert.equal(calls.alerts.length, 1);
   assert.equal(W.App.screen, 'sites');
@@ -247,7 +247,7 @@ test('★ 사유를 적으면 기록하고 곧장 서랍으로 들어간다', as
     }
   };
   const { W } = loadApp(
-    { sideReason: { targetUid: 'U2', targetName: '민미애', companyId: 'co_3', companyName: '이비' } },
+    { sideReason: { targetUid: 'U2', targetName: '민미애', companyId: 'co_3', companyName: '벼리비' } },
     { db, byId: { sideReasonInput: { value: '급여 문의' } } }
   );
   W.submitSideReason();
@@ -286,7 +286,7 @@ test('같은 자리에 놓으면 아무 일도 안 한다', () => {
 /* ══════ 공유받음 열기 — 사유 없이 ══════ */
 
 test('★ 공유받은 것을 열면 사유 없이 곧장 서랍으로 가고 공유 배너가 뜬다', async () => {
-  const shares = { s1: { companyId: 'co_9', companyName: '참살이', byUid: 'U2', byName: '민미애', tags: ['확인 부탁드립니다'], at: 1 } };
+  const shares = { s1: { companyId: 'co_9', companyName: '새별살이', byUid: 'U2', byName: '민미애', tags: ['확인 부탁드립니다'], at: 1 } };
   const db = fakeDbConst(null);
   const { W } = loadApp({ shares: shares }, { db });
   W.openShared('s1');
@@ -310,7 +310,7 @@ test('★ 공유 배너가 있으면 bannerHtml 이 초록 띠를 그린다', ()
 
 test('★ 공유하기를 열면 사람 고르기부터 시작한다', () => {
   const { W } = loadApp({});
-  W.openShare('co_1', '화담원');
+  W.openShare('co_1', '다온원');
   assert.equal(W.App.shareCtx.step, 'pick');
   const h = W.shareModalHtml();
   assert.match(h, /누구와 공유할까요/);
@@ -318,7 +318,7 @@ test('★ 공유하기를 열면 사람 고르기부터 시작한다', () => {
 
 test('사람을 안 고르고 다음을 누르면 거절한다', () => {
   const { W, calls } = loadApp({});
-  W.openShare('co_1', '화담원');
+  W.openShare('co_1', '다온원');
   W.goShareTags();
   assert.equal(calls.alerts.length, 1);
   assert.equal(W.App.shareCtx.step, 'pick');
@@ -326,7 +326,7 @@ test('사람을 안 고르고 다음을 누르면 거절한다', () => {
 
 test('★ 사람을 고르고 다음으로 가면 공유사항 체크 화면이 뜬다', () => {
   const { W } = loadApp({});
-  W.openShare('co_1', '화담원');
+  W.openShare('co_1', '다온원');
   W.pickShareTarget('U2', '민미애');
   W.goShareTags();
   assert.equal(W.App.shareCtx.step, 'tags');
@@ -338,7 +338,7 @@ test('★ 사람을 고르고 다음으로 가면 공유사항 체크 화면이 
 
 test('공유사항을 하나도 안 고르면 거절한다', () => {
   const { W, calls } = loadApp({});
-  W.openShare('co_1', '화담원');
+  W.openShare('co_1', '다온원');
   W.pickShareTarget('U2', '민미애');
   W.goShareTags();
   W.confirmShare();
@@ -354,7 +354,7 @@ test('★ 공유사항을 고르고 확인하면 저장되고 창이 닫힌다',
     }
   };
   const { W } = loadApp({}, { db });
-  W.openShare('co_1', '화담원');
+  W.openShare('co_1', '다온원');
   W.pickShareTarget('U2', '민미애');
   W.goShareTags();
   W.toggleShareTag('확인 부탁드립니다');
@@ -368,7 +368,7 @@ test('★ 공유사항을 고르고 확인하면 저장되고 창이 닫힌다',
 
 test('뒤로 가면 사람 고르기로 돌아간다', () => {
   const { W } = loadApp({});
-  W.openShare('co_1', '화담원');
+  W.openShare('co_1', '다온원');
   W.pickShareTarget('U2', '민미애');
   W.goShareTags();
   W.backShareStep();
@@ -377,7 +377,7 @@ test('뒤로 가면 사람 고르기로 돌아간다', () => {
 
 test('취소하면 공유 상태가 사라진다', () => {
   const { W } = loadApp({});
-  W.openShare('co_1', '화담원');
+  W.openShare('co_1', '다온원');
   W.closeShare();
   assert.equal(W.App.shareCtx, null);
   assert.equal(W.shareModalHtml(), '');
@@ -397,12 +397,12 @@ test('★ 사업장 목록에 번호가 붙는다 — 「28곳 중 몇 번째」
 test('★ 지금 서랍에 열어 놓은 곳이 목록에서 짚어진다', () => {
   const { W } = loadApp({
     companies: COMPANIES, owners: OWNERS, sideView: 'all',
-    screen: 'drawer', companyId: 'co_3', companyName: '(주)이비'
+    screen: 'drawer', companyId: 'co_3', companyName: '(주)벼리비'
   }, { isAdmin: true });
   const h = W.colListHtml();
   assert.match(h, /class="crow[^"]* sel"/, '열어 놓은 곳이 안 짚어지면 본문과 목록이 딴 말을 합니다');
   const sel = h.match(/<div class="crow[^"]* sel"[\s\S]*?<\/div>\s*<\/div>/);
-  assert.ok(sel && sel[0].indexOf('이비') >= 0, '엉뚱한 줄이 짚어졌습니다');
+  assert.ok(sel && sel[0].indexOf('벼리비') >= 0, '엉뚱한 줄이 짚어졌습니다');
 });
 
 test('첫 화면(서랍이 아닐 때)에는 아무 줄도 안 짚는다 — 열어 둔 것이 없다', () => {

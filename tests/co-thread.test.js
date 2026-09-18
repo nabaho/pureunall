@@ -17,7 +17,7 @@ require(path.join(__dirname, '..', 'js', 'pu-co-thread.js'));
 const T = globalThis.PuCoThread;
 
 const CO = {
-  id: 'c1', name: '㈜정일제지',
+  id: 'c1', name: '㈜가온제지',
   contacts: [{ name: '임대용', email: 'cust12@naver.com', isPrimary: true }],
   taxEmail: 'cust01@hanmail.net'
 };
@@ -39,7 +39,7 @@ test('★ 세무사무실 주소도 그 사업장 것으로 본다', () => {
 });
 
 test('★ 제목에 이름이 있으면 짐작으로 본다 — 짐작이라고 적어 둔다', () => {
-  assert.equal(T.matchRow({ subject: '주식회사 정일제지 8월 급여' }, CO, {}), 'text');
+  assert.equal(T.matchRow({ subject: '주식회사 가온제지 8월 급여' }, CO, {}), 'text');
 });
 
 test('★ 짧은 이름은 제목으로 안 찾는다 — 아무 데나 걸린다', () => {
@@ -59,7 +59,7 @@ const MAILLOG = {
   m1: { at: 3000, from: '임대용 <cust12@naver.com>', subject: '8월 급여자료',
     preview: '보내드립니다', companyId: 'c1', atts: 2, took: 2, seatName: '신욱임' },
   m2: { at: 1000, from: 'nobody@x.kr', subject: '광고입니다', preview: '', companyId: '' },
-  m3: { at: 5000, from: 'x@y.kr', subject: '정일제지 퇴직금 문의', preview: '문의드립니다' }
+  m3: { at: 5000, from: 'x@y.kr', subject: '가온제지 퇴직금 문의', preview: '문의드립니다' }
 };
 const SENT = {
   s1: { at: 4000, to: 'cust12@naver.com', subject: 'RE: 8월 급여자료',
@@ -159,7 +159,7 @@ test('★ 줄에 사업장 번호가 적혀 있으면 좁히기가 그것을 못
 test('★ 새 갈래를 더해도 줄기·셈이 그대로 돈다 — 문자·카톡이 이 길로 온다', () => {
   /* 나중에 생길 문자 갈래를 흉내 낸다. thread() 를 **손대지 않고** 더해진다. */
   const sms = { key: 'sms', label: '문자', rows: [
-    { id: 't1', at: 6000, who: '010-1234-5678', text: '정일제지 근태 보냈습니다',
+    { id: 't1', at: 6000, who: '010-1234-5678', text: '가온제지 근태 보냈습니다',
       companyId: 'c1' }
   ] };
   const rows = T.thread(CO, [T.fromMailLog(MAILLOG), T.fromSentBox(SENT), sms]);

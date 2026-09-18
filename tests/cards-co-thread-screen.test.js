@@ -28,7 +28,7 @@ function cut(name) {
 }
 
 const COS = [
-  { id: 'c1', name: '㈜정일제지',
+  { id: 'c1', name: '㈜가온제지',
     contacts: [{ name: '임대용', email: 'cust12@naver.com', isPrimary: true }] },
   { id: 'c2', name: '한빛산업개발', primaryContactEmail: 'hanbit@daum.net' },
   { id: 'c3', name: '오간것없는회사', primaryContactEmail: 'none@x.kr' }
@@ -37,7 +37,7 @@ const INBOX = {
   m1: { at: 3000, from: '임대용 <cust12@naver.com>', subject: '8월 급여자료',
     preview: '보내드립니다', companyId: 'c1', atts: 2, took: 2, seatName: '신욱임' },
   m2: { at: 1000, from: 'nobody@x.kr', subject: '광고입니다', preview: '' },
-  m3: { at: 5000, from: 'x@y.kr', subject: '정일제지 퇴직금 문의', preview: '문의드립니다' }
+  m3: { at: 5000, from: 'x@y.kr', subject: '가온제지 퇴직금 문의', preview: '문의드립니다' }
 };
 const SENT = {
   s1: { at: 4000, to: 'hanbit@daum.net', subject: 'RE: 급여대장 보냅니다', body: '확인 부탁드립니다' }
@@ -86,7 +86,7 @@ test('★ 받은 것과 보낸 것을 함께 센다 — 보낸 것만 있는 곳
 
 test('사업장 이름으로 좁혀 본다', () => {
   const h = load({ coThreadQ: '한빛' }).html();
-  assert.equal(/정일제지<\/b>/.test(h), false, '좁혔는데 남의 사업장이 남았습니다');
+  assert.equal(/가온제지<\/b>/.test(h), false, '좁혔는데 남의 사업장이 남았습니다');
 });
 
 /* ══════ 그리기 ══════ */
@@ -94,7 +94,7 @@ test('사업장 이름으로 좁혀 본다', () => {
 test('★ 고른 사업장과 오간 것이 한 줄기로 그려진다 — 이 화면의 핵심이다', () => {
   const h = load({ coThreadId: 'c1' }).html();
   assert.match(h, /8월 급여자료/);
-  assert.match(h, /정일제지 퇴직금 문의/);
+  assert.match(h, /가온제지 퇴직금 문의/);
   assert.equal(/광고입니다/.test(h), false, '남의 사업장 것이 섞였습니다');
 });
 

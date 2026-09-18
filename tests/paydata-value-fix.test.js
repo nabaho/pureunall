@@ -61,10 +61,10 @@ const SLOT = '202608';
 function seed() {
   return {
     paydata: { u: { U1: { values: { 202608: {
-      r1: { sourceId: 's1', companyId: 'co_1', companyName: '화담원', month: SLOT,
+      r1: { sourceId: 's1', companyId: 'co_1', companyName: '다온원', month: SLOT,
         name: '김철수', pairs: [{ item: '근무일수', value: '27' }, { item: '연장', value: '12' }],
         confirmed: true, by: 'U1', at: 100 },
-      r2: { sourceId: 's2', companyId: 'co_1', companyName: '화담원', month: SLOT,
+      r2: { sourceId: 's2', companyId: 'co_1', companyName: '다온원', month: SLOT,
         name: '이영희', pairs: [{ item: '기본급', value: '2400000' }],
         confirmed: false, by: 'U1', at: 200 }
     } } },
@@ -183,7 +183,7 @@ test('★ 판독 취소 뒤에도 「표 N명」이 맞다', () => {
 
 test('★ 다른 사업장 값은 건드리지 않는다', () => {
   const t = seed();
-  t.paydata.u.U1.values['202608'].r9 = { sourceId: 's1', companyId: 'co_2', companyName: '이비',
+  t.paydata.u.U1.values['202608'].r9 = { sourceId: 's1', companyId: 'co_2', companyName: '벼리비',
     month: SLOT, name: '박민수', pairs: [{ item: '근무일수', value: '20' }], at: 300 };
   const db = fakeDb(t);
   const S = loadStore(db);

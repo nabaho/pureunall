@@ -82,7 +82,7 @@ test('★ 판독기가 «글자만» 보내는 요청도 서버가 받는다 —
      클라이언트만 고치고 서버를 안 고쳤는데 **아무도 몰랐다** — 사람이 그 PDF 를
      올려 볼 때까지. 여기서 걸렸으면 그날 알았다. */
   const r = readerWithSpy();
-  await r.D.readDocText('사업자등록증명\n상호 주식회사 대원유지\n사업자등록번호 123-86-20282');
+  await r.D.readDocText('사업자등록증명\n상호 주식회사 바사유지\n사업자등록번호 123-86-20282');
   assert.equal(r.sent.length, 1, '글자 판독이 서버를 안 불렀습니다');
   const body = r.sent[0];
   assert.ok(!body.parts.some(function (p) { return p.inline_data; }),

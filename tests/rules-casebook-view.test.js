@@ -16,7 +16,7 @@ const IDX = {
             revCount: 3, lastYear: '2024', updatedBy: '권형하', updatedAt: '2026-09-07 10:00' },
   site_b: { site: '가나상사', bizno: '2223334440', industry: '도소매', size: 8,
             revCount: 1, lastYear: '2024', updatedBy: '김노무', updatedAt: '2026-09-01 09:00' },
-  site_c: { site: '다래물산', bizno: '3334445550', industry: '건설',
+  site_c: { site: '가온물산', bizno: '3334445550', industry: '건설',
             revCount: 2, lastYear: '2021', updatedBy: '권형하', updatedAt: '2026-08-01 09:00' },
   site_d: { site: '연도없음', revCount: 1, updatedBy: '권형하' }
 };
@@ -25,7 +25,7 @@ const IDX = {
 
 test('★ 최근 연도가 앞, 같은 해면 사업장 이름 차례', () => {
   const r = CB.indexRows(IDX);
-  assert.deepEqual(Array.from(r, x => x.site), ['가나상사', '한빛산업', '다래물산', '연도없음']);
+  assert.deepEqual(Array.from(r, x => x.site), ['가나상사', '한빛산업', '가온물산', '연도없음']);
 });
 
 test('★ 연도를 모르는 것은 «맨 뒤» — 가운데 섞이면 목록이 뒤죽박죽으로 보인다', () => {
@@ -56,7 +56,7 @@ test('글자로 찾을 때 사업장·사업자번호·업종·담당을 함께 
   const rows = CB.indexRows(IDX);
   assert.equal(CB.filterIndex(rows, { text: '한빛' })[0].site, '한빛산업');
   assert.equal(CB.filterIndex(rows, { text: '2223334440' })[0].site, '가나상사');
-  assert.equal(CB.filterIndex(rows, { text: '건설' })[0].site, '다래물산');
+  assert.equal(CB.filterIndex(rows, { text: '건설' })[0].site, '가온물산');
   assert.equal(CB.filterIndex(rows, { text: '김노무' })[0].site, '가나상사');
 });
 

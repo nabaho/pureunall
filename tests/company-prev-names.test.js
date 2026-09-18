@@ -45,7 +45,7 @@ const CO = (id, name, prevNames, extra) =>
   Object.assign({ id: id, name: name, prevNames: prevNames || [] }, extra || {});
 
 test('★ 예전 이름 목록을 다듬는다 (빈칸·겹침·공백)', () => {
-  const co = CO('c1', '천안청화공사', ['  ◯◯산업 ', '', '◯◯산업', '천안청화', null]);
+  const co = CO('c1', '가나공사', ['  ◯◯산업 ', '', '◯◯산업', '천안청화', null]);
   assert.deepStrictEqual(Array.from(prevs(co)), ['◯◯산업', '천안청화']);
   assert.deepStrictEqual(Array.from(prevs({})), []);
   assert.deepStrictEqual(Array.from(prevs(null)), []);
@@ -53,14 +53,14 @@ test('★ 예전 이름 목록을 다듬는다 (빈칸·겹침·공백)', () => 
 });
 
 test('★ 이름 비교는 계약창 묶기와 «같은» 규칙을 쓴다 (법인 표기·기호를 뗀다)', () => {
-  assert.strictEqual(key('(주)천안청화공사'), key('천안청화공사'));
-  assert.strictEqual(key('합자회사 천안청화공사'), key('(자)천안청화공사'));
+  assert.strictEqual(key('(주)가나공사'), key('가나공사'));
+  assert.strictEqual(key('합자회사 가나공사'), key('(자)가나공사'));
   assert.notStrictEqual(key('가나상사'), key('나가상사'));
 });
 
 test('★★ 예전 이름으로 업체를 찾고, «무엇을 보고 찾았는지» 알려 준다', () => {
-  const list = [CO('c1', '천안청화공사', ['◯◯산업']), CO('c2', '가나상사')];
-  const a = find('천안청화공사', list);
+  const list = [CO('c1', '가나공사', ['◯◯산업']), CO('c2', '가나상사')];
+  const a = find('가나공사', list);
   assert.strictEqual(a.co.id, 'c1'); assert.strictEqual(a.via, 'name');
   const b = find('◯◯산업', list);
   assert.strictEqual(b.co.id, 'c1', '예전 이름으로 못 찾는다');
@@ -93,32 +93,32 @@ test('지워진 업체는 예전 이름으로도 안 찾는다', () => {
 
 /* ── 막는 규칙 셋 — 이 검사가 이 파일의 핵심이다 ── */
 test('★★ ① 다른 업체의 «현재» 이름은 예전 이름이 될 수 없다 (두 회사가 섞인다)', () => {
-  const list = [CO('c1', '천안청화공사'), CO('c2', '가나상사')];
+  const list = [CO('c1', '가나공사'), CO('c2', '가나상사')];
   const why = bad(list, 'c1', '가나상사');
   assert.ok(why, '막지 않는다 — 두 회사가 섞인다');
   assert.ok(why.indexOf('가나상사') >= 0 && why.indexOf('현재') >= 0, '까닭에 어느 회사인지 없다: ' + why);
 });
 
 test('★★ ② 같은 예전 이름을 두 업체가 가질 수 없다 (어느 쪽인지 알 수 없어진다)', () => {
-  const list = [CO('c1', '천안청화공사', ['◯◯산업']), CO('c2', '가나상사')];
+  const list = [CO('c1', '가나공사', ['◯◯산업']), CO('c2', '가나상사')];
   const why = bad(list, 'c2', '◯◯산업');
   assert.ok(why, '막지 않는다');
-  assert.ok(why.indexOf('천안청화공사') >= 0, '누가 이미 쓰는지 안 알려 준다: ' + why);
+  assert.ok(why.indexOf('가나공사') >= 0, '누가 이미 쓰는지 안 알려 준다: ' + why);
 });
 
 test('★★ ③ 자기 이름은 예전 이름이 아니다', () => {
-  const list = [CO('c1', '천안청화공사')];
-  assert.ok(bad(list, 'c1', '천안청화공사'), '자기 이름을 넣게 둔다');
-  assert.ok(bad(list, 'c1', '(주)천안청화공사'), '법인 표기만 다른 자기 이름을 넣게 둔다');
+  const list = [CO('c1', '가나공사')];
+  assert.ok(bad(list, 'c1', '가나공사'), '자기 이름을 넣게 둔다');
+  assert.ok(bad(list, 'c1', '(주)가나공사'), '법인 표기만 다른 자기 이름을 넣게 둔다');
 });
 
 test('★ 이미 넣어 둔 것을 또 넣으면 알려 준다', () => {
-  const list = [CO('c1', '천안청화공사', ['◯◯산업'])];
+  const list = [CO('c1', '가나공사', ['◯◯산업'])];
   assert.ok(bad(list, 'c1', '◯◯산업'));
 });
 
 test('★ 넣어도 되는 이름은 «빈 문자열»을 돌려준다', () => {
-  const list = [CO('c1', '천안청화공사'), CO('c2', '가나상사')];
+  const list = [CO('c1', '가나공사'), CO('c2', '가나상사')];
   assert.strictEqual(bad(list, 'c1', '◯◯산업'), '');
 });
 

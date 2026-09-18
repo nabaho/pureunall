@@ -22,7 +22,7 @@ const FN = fs.readFileSync(path.join(R, 'functions', 'index.js'), 'utf8');
 /* 급여 업체 셋 — 주담당이 각각 다르다 */
 const COMPANIES = {
   v: [
-    { id: 'c1', name: '화담원', email: 'hr@hwadam.kr',
+    { id: 'c1', name: '다온원', email: 'hr@hwadam.kr',
       typeCode: '급여', status: 'active', managerMain: 'p-001', managerSubs: [] },
     { id: 'c2', name: '다온식품', email: 'acct@daon.kr',
       typeCode: '급여', status: 'active', managerMain: 'p-002', managerSubs: [] }
@@ -67,7 +67,7 @@ test('명단이 없으면 빈 값이다', () => {
 
 test('★ 폴더가 사람을 가리키면 업체관리 담당을 이긴다', () => {
   const idx = MR.buildCompanyIndex(COMPANIES);
-  /* 화담원(주담당 최기운=U1)에서 온 메일인데 신욱임 폴더에 있다 →
+  /* 다온원(주담당 최기운=U1)에서 온 메일인데 신욱임 폴더에 있다 →
      사람이 손으로 옮긴 것이니 신욱임(U2)에게 간다. */
   const r = MR.routeFor({ from: 'hr@hwadam.kr', filename: 'a.xlsx', subject: '' },
     idx, OWNERS, '급여-신욱임');

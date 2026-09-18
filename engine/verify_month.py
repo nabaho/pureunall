@@ -9,7 +9,7 @@
   세 개가 다 맞으면 그 직원 데이터는 '내부 정합' = 믿을 수 있음.
 - 사람이 할 일: 원본 엑셀을 열어 직원 2~3명 숫자를 명세서와 눈으로 대조.
 - 개인정보: 성명만. 결과물은 자료폴더 _harness_out(깃 밖).
-사용: python engine/verify_month.py "제이앤드씨" "7월" "(주)제이앤드씨 25년 7월 급여대장.xlsx"
+사용: python engine/verify_month.py "나라앤드씨" "7월" "(주)나라앤드씨 25년 7월 급여대장.xlsx"
 """
 import os, sys, json, math
 
@@ -142,7 +142,7 @@ def gen(site, month, fname=None):
 
 
 def main():
-    site = sys.argv[1] if len(sys.argv) > 1 else "제이앤드씨"
+    site = sys.argv[1] if len(sys.argv) > 1 else "나라앤드씨"
     month = sys.argv[2] if len(sys.argv) > 2 else "7월"
     fname = sys.argv[3] if len(sys.argv) > 3 else None
     gen(site, month, fname)

@@ -4,7 +4,7 @@
    ■ 무엇이 문제였나
      기업정보함은 이알피 업체 열쇠를 저장하지 않고, 회사를 열 때마다 «상호를 다듬어»
      맞췄다. 표기가 어긋나면 조용히 끊긴다 — 2026-08-30 점검에서 표본 열셋 중 여덟이
-     그랬다(「(유)대성」 vs 「유한회사 대성」). 담당·계약상태·🚪 가 남의 것이 붙거나 사라졌다.
+     그랬다(「(유)다온」 vs 「유한회사 다온」). 담당·계약상태·🚪 가 남의 것이 붙거나 사라졌다.
 
    ■ 통합 온톨로지가 여기서 막혀 있었다
      docs/푸른통합온톨로지-2단계.md — 업체명이 유일하게 맞을 때만 신뢰도 0.85,
@@ -98,10 +98,10 @@ function matched(cos, list) {
 }
 
 test('★★★ 확정한 열쇠가 «상호»를 이긴다', () => {
-  const cos = [CO({ id: 'co-1', name: '대성', bizNo: '', typeCode: '자문' }),
-               CO({ id: 'co-2', name: '대성기업개발', bizNo: '', typeCode: '급여' })];
-  /* 상호로는 「대성」에 붙지만, 사람이 co-2 로 확정해 두었다 */
-  const { out } = matched(cos, [{ key: 'k1', name: '대성', bizno: '', erpCoId: 'co-2' }]);
+  const cos = [CO({ id: 'co-1', name: '다온', bizNo: '', typeCode: '자문' }),
+               CO({ id: 'co-2', name: '다온기업개발', bizNo: '', typeCode: '급여' })];
+  /* 상호로는 「다온」에 붙지만, 사람이 co-2 로 확정해 두었다 */
+  const { out } = matched(cos, [{ key: 'k1', name: '다온', bizno: '', erpCoId: 'co-2' }]);
   assert.equal(out.k1.type, '급여',
     '★★★ 사람이 확정한 것을 상호가 이겼습니다 — 확정해도 아무 일이 안 일어납니다');
 });
@@ -117,8 +117,8 @@ test('★★★ 확정한 열쇠가 «사업자번호»도 이긴다', () => {
 test('★★★ 확정한 회사는 상호로 «다시 맞추지 않는다» — 없어졌으면 빈손이다', () => {
   /* 확정해 둔 업체가 이알피에서 사라졌을 때, 조용히 이름 맞추기로 되돌아가면
      사람은 아직 확정된 줄 안다. 그러면 잘못된 연결이 영구가 된다. */
-  const cos = [CO({ id: 'co-1', name: '대성', bizNo: '', typeCode: '자문' })];
-  const { out } = matched(cos, [{ key: 'k1', name: '대성', bizno: '', erpCoId: 'co-사라짐' }]);
+  const cos = [CO({ id: 'co-1', name: '다온', bizNo: '', typeCode: '자문' })];
+  const { out } = matched(cos, [{ key: 'k1', name: '다온', bizno: '', erpCoId: 'co-사라짐' }]);
   assert.equal(out.k1, undefined,
     '★★★ 확정해 둔 업체가 없는데 상호로 다시 붙였습니다 — 화면이 「없어졌습니다」를 못 말합니다');
 });
@@ -134,10 +134,10 @@ test('★ 확정이 없으면 예전 그대로 — 번호 먼저, 이름은 임�
 });
 
 test('★ 확정한 업체는 다른 회사가 이름으로 «가져갈 수 없다»', () => {
-  const cos = [CO({ id: 'co-1', name: '대성', bizNo: '', typeCode: '자문' })];
+  const cos = [CO({ id: 'co-1', name: '다온', bizNo: '', typeCode: '자문' })];
   const { out } = matched(cos, [
     { key: 'k1', name: '딴이름', bizno: '', erpCoId: 'co-1' },
-    { key: 'k2', name: '대성', bizno: '' }
+    { key: 'k2', name: '다온', bizno: '' }
   ]);
   assert.equal(out.k1.type, '자문');
   assert.equal(out.k2, undefined, '★ 한 업체가 두 회사에 겹쳐 붙었습니다');
@@ -196,11 +196,11 @@ test('★ 이알피를 아직 못 읽었으면 «없어졌다»고 하지 않는
 
 test('★ 업체 찾기 — 상호 일부와 사업자번호로 찾고, 짧은 이름이 먼저다', () => {
   const c = view();
-  const list = [{ id: 'a', name: '대성기업개발', bizNo: '111-11-11111' },
-                { id: 'b', name: '대성', bizNo: '222-22-22222' },
-                { id: 'c', name: '한서정공', bizNo: '333-33-33333' }];
-  assert.deepEqual(Array.from(c.coErpSearch(list, '대성', 10).map(x => x.id)), ['b', 'a'],
-    '★ 「대성」을 찾을 때 「대성」이 먼저 나와야 합니다');
+  const list = [{ id: 'a', name: '다온기업개발', bizNo: '111-11-11111' },
+                { id: 'b', name: '다온', bizNo: '222-22-22222' },
+                { id: 'c', name: '마루정공', bizNo: '333-33-33333' }];
+  assert.deepEqual(Array.from(c.coErpSearch(list, '다온', 10).map(x => x.id)), ['b', 'a'],
+    '★ 「다온」을 찾을 때 「다온」이 먼저 나와야 합니다');
   assert.deepEqual(Array.from(c.coErpSearch(list, '333', 10).map(x => x.id)), ['c']);
   assert.deepEqual(Array.from(c.coErpSearch(list, '', 10)), [], '빈 말로 전체를 쏟지 않습니다');
   assert.deepEqual(Array.from(c.coErpSearch(list, '없는이름', 10)), []);
@@ -208,7 +208,7 @@ test('★ 업체 찾기 — 상호 일부와 사업자번호로 찾고, 짧은 �
 
 test('★ 열쇠 없는 업체는 찾기에서도 안 나온다 — 확정할 수 없다', () => {
   const c = view();
-  assert.deepEqual(Array.from(c.coErpSearch([{ id: '', name: '대성' }], '대성', 10)), []);
+  assert.deepEqual(Array.from(c.coErpSearch([{ id: '', name: '다온' }], '다온', 10)), []);
 });
 
 test('★★ 확정 전에는 «상호로 맞췄다»고 알리고 확정 단추를 준다', () => {

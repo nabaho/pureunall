@@ -1,15 +1,15 @@
 /* 자동매칭이 틀렸을 때 «그 자리에서» 고치기
    (2026-08-13) 김보람 제보 — 세 건 모두 자동으로 후보가 붙은 줄이었다.
      1. 1/28 이현아 1,000,000 → 「상대방미정」 사건에 붙음 (사건이 등록돼 있지 않다)
-     2. 1/20 계룡시청소년상담복지센터 300,000 → 「엠비프라텍」 에 붙음
-     3. 1/29 (자)천안청화공사 1,100,000 → 「웅천새마을금고」 에 붙음
+     2. 1/20 가나시청소년상담복지센터 300,000 → 「우람프라텍」 에 붙음
+     3. 1/29 (자)가나공사 1,100,000 → 「가온새마을금고」 에 붙음
 
    까닭: 「찾기」·「등록」·「보류」 는 _st.state==='none' — «후보가 하나도 없을 때» 만 나온다.
    후보가 붙는 순간 셋 다 사라지므로, 엉뚱하게 붙어도 떼어낼 길이 그 자리에 없었다.
    일단 확정한 뒤 「확정 이력 ▸ 업체 바꾸기」 로 돌아가야 했다.
 
    ★ 더 나쁜 것: 적요와 업체명이 같으면 잘못 배운 별칭을 «안 지웠다».
-     「(자)천안청화공사」 를 바로잡아도 별칭이 남아 다음 달에 또 웅천새마을금고로 끌려간다. */
+     「(자)가나공사」 를 바로잡아도 별칭이 남아 다음 달에 또 가온새마을금고로 끌려간다. */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -101,7 +101,7 @@ vm.runInContext(grab('var PAYER_ALIAS_KEY =', '\n// ── 출금 적요 → 카
 
 /* ★ CMS 적요는 배우지 않는다 — 여기서도 한 줄 확인한다(건의 2026-09-15).
      전용 검사는 tests/cms-alias-not-a-name.test.js 에 있다. */
-ctx.erpLearnPayerAlias('더빌이체3572', { companyName:'충남천막산업' });
+ctx.erpLearnPayerAlias('더빌이체3572', { companyName:'나루천막산업' });
 t('★ CMS 적요(더빌이체3572)는 업체 이름으로 안 배운다',
   ctx.erpAliasCompany('더빌이체3572'), null);
 
@@ -114,12 +114,12 @@ t('다시 고르면 새 곳으로 바뀐다', ctx.erpAliasCompany('이현아').c
 t('셈도 1부터 다시 — 틀린 학습의 무게를 물려받지 않는다', ctx.erpAliasCompany('이현아').count, 1);
 
 // ③ ★ 적요가 곧 업체명인 경우 — 예전에는 그냥 false 로 돌아서 틀린 별칭이 남았다
-ctx.erpLearnPayerAlias('(자)천안청화공사', { companyName:'웅천새마을금고' });
-t('잘못 배운 「천안청화공사 → 웅천새마을금고」',
-  ctx.erpAliasCompany('(자)천안청화공사').companyName, '웅천새마을금고');
-const ret = ctx.erpLearnPayerAlias('(자)천안청화공사', { companyName:'(자)천안청화공사' });
+ctx.erpLearnPayerAlias('(자)가나공사', { companyName:'가온새마을금고' });
+t('잘못 배운 「가나공사 → 가온새마을금고」',
+  ctx.erpAliasCompany('(자)가나공사').companyName, '가온새마을금고');
+const ret = ctx.erpLearnPayerAlias('(자)가나공사', { companyName:'(자)가나공사' });
 t('배울 것이 없으므로 false 를 돌려준다', ret, false);
-t('그래도 틀린 별칭은 지워진다', ctx.erpAliasCompany('(자)천안청화공사'), null);
+t('그래도 틀린 별칭은 지워진다', ctx.erpAliasCompany('(자)가나공사'), null);
 
 // ④ 없는 것을 지우려 해도 안 터진다
 t('없는 것을 지워도 조용하다', ctx.erpForgetPayerAlias('없는키'), false);

@@ -42,7 +42,7 @@ t('알 수 없으면 아무것도 안 켠다', ctx.erpInitDeductions({}, ''), {}
 t('계약 자체가 없으면 아무것도 안 켠다', ctx.erpInitDeductions(null, 'separate'), {});
 /* ★ 옛 계약에는 이 칸이 아예 없다(undefined). 그때 켜지면 법인 매출이 조용히 빠진다 */
 t('★ 옛 계약(칸 없음)은 개인수익을 안 켠다',
-  ctx.erpInitDeductions({ companyName:'후암석재' }, 'inclusive'), { vatIncluded:true });
+  ctx.erpInitDeductions({ companyName:'다온석재' }, 'inclusive'), { vatIncluded:true });
 t('개인입금을 껐으면 안 켠다', ctx.erpInitDeductions({ personalDeposit:false }, 'inclusive'), { vatIncluded:true });
 
 console.log('\n[③ 두 입구 모두 같은 규칙을 쓴다]');

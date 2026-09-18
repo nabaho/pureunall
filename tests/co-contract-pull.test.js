@@ -45,7 +45,7 @@ vm.runInContext(
 const { find, toFields } = ctx;
 
 const CT = (o) => Object.assign({ contractNo: 'C-1', signDate: '2026-07-20',
-  companyName: '미소신협', bizNo: '123-45-67890' }, o);
+  companyName: '가온신협', bizNo: '123-45-67890' }, o);
 
 /* ══════ ① 네 가지 열쇠 ══════ */
 
@@ -57,14 +57,14 @@ test('★★ 계약번호가 적혀 있으면 그것이 가장 확실하다', ()
 });
 
 test('★ 사업자번호가 같으면 이름이 달라도 같은 회사다', () => {
-  const got = find({ name: '(주)미소신협 천안점', bizNo: '1234567890' },
-    [CT({ contractNo: 'C-7', companyName: '미소신협' })]);
+  const got = find({ name: '(주)가온신협 천안점', bizNo: '1234567890' },
+    [CT({ contractNo: 'C-7', companyName: '가온신협' })]);
   assert.equal(got.contractNo, 'C-7',
     '★ 이름 표기가 조금만 달라도 못 찾으면, 결국 손으로 칩니다');
 });
 
 test('★ 이름은 띄어쓰기·대소문자를 무시하고 맞춘다', () => {
-  const got = find({ name: ' 미소 신협 ' }, [CT({ bizNo: '' })]);
+  const got = find({ name: ' 가온 신협 ' }, [CT({ bizNo: '' })]);
   assert.ok(got, '★ 띄어쓰기 하나로 못 찾으면 안 됩니다');
 });
 
@@ -74,7 +74,7 @@ test('★★ 남의 계약서를 물어오지 않는다', () => {
 });
 
 test('★★ 여럿이면 «가장 최근에 맺은» 것', () => {
-  const got = find({ name: '미소신협' },
+  const got = find({ name: '가온신협' },
     [CT({ contractNo: 'C-옛', signDate: '2024-01-01' }),
       CT({ contractNo: 'C-새', signDate: '2026-07-20' })]);
   assert.equal(got.contractNo, 'C-새',

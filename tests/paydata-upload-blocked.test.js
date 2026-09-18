@@ -27,7 +27,7 @@ function load(app) {
   new vm.Script([
     'const S = window.PuPaydataStore; S.init({uid:"U1"});',
     'const App = ' + JSON.stringify(Object.assign({
-      screen: 'drawer', companyId: 'co_1', companyName: '유명육가공', month: '2026-08',
+      screen: 'drawer', companyId: 'co_1', companyName: '나루육가공', month: '2026-08',
       kind: 'attend', viewingUid: '', viewingName: '', viewingDeputy: false
     }, app)) + ';',
     cut('esc'), cut('canWrite'), cut('dropTargetNow'), cut('dropHintHtml'),

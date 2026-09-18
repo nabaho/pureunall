@@ -106,7 +106,7 @@ console.log('\n■ 미리보기 값이 저장 값과 같은 셈인가 (진짜 �
   vm.runInContext(cut('function erpInitDeductions(item, vatType){', '\nfunction calcPerfShares('), ctx);
   vm.runInContext(cut('function calcPerfShares(amount, mainSid, subSids, sourceKind, splitMainPct, opts){', '\nfunction genCaseNo('), ctx);
 
-  // 정우신약 착수금 6,000,000 · 부가세 포함 → 성과 기준 5,454,545 · 주담당 15%
+  // 나루신약 착수금 6,000,000 · 부가세 포함 → 성과 기준 5,454,545 · 주담당 15%
   const base = ctx.calcDeductions(6000000, { vatIncluded:true }).perfBaseAmount;
   t('성과 기준 (6,000,000 − 1/11)', base, 5454545);
   const sh = ctx.calcPerfShares(base, 'P-001', [], 'case', 100, { paidDate:'2026-07-02' });

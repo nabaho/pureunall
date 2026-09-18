@@ -85,7 +85,7 @@ function world(data, me, opt) {
 function fixture() {
   return {
     scal_staff: [{ id: 'g1', name: '권형하', erpSid: 'khh' }, { id: 'g2', name: '박재원', erpSid: 'pjw' }],
-    scal_cos: [{ id: 'c1', name: '이피아' }, { id: 'c2', name: '삼화케미칼' }],
+    scal_cos: [{ id: 'c1', name: '아름' }, { id: 'c2', name: '하람케미칼' }],
     scal_types: [{ id: 't1', name: '현장클리닉' }],
     scal_scheds: [
       { id: 's1', date: '2026-08-24', coId: 'c1', typeId: 't1', round: 2, attId: 'g1', isField: true },
@@ -109,8 +109,8 @@ const ME = { sid: 'khh', name: '권형하' };
 test('내 일정만 센다 — 남의 것과 지난 달은 안 나온다', async () => {
   const { box, app } = world(fixture(), ME);
   await box.renderVisits();
-  assert.match(app.innerHTML, /이피아/, '내 일정이 안 나옵니다');
-  assert.match(app.innerHTML, /삼화케미칼/);
+  assert.match(app.innerHTML, /아름/, '내 일정이 안 나옵니다');
+  assert.match(app.innerHTML, /하람케미칼/);
   /* ★ 남의 일정이 새면 개인 화면이 아니게 된다 */
   assert.doesNotMatch(app.innerHTML, /1회/, '★ 남의 일정(박재원)이 섞였습니다');
   assert.doesNotMatch(app.innerHTML, /9회/, '★ 지난 달 일정이 섞였습니다');
@@ -295,7 +295,7 @@ test('★ 오늘·앞으로의 방문은 밀린 것이 아니다', async () => {
 
 test('★ 끝난 컨설팅은 안 담는다 — 제출이 끝난 건을 매일 보여 주면 목록을 안 보게 된다', async () => {
   const d = fixture();
-  d.scal_cos = [{ id: 'c1', name: '이피아', endedTypes: { t1: 1 } }, { id: 'c2', name: '삼화케미칼' }];
+  d.scal_cos = [{ id: 'c1', name: '아름', endedTypes: { t1: 1 } }, { id: 'c2', name: '하람케미칼' }];
   d.scal_photoLog = [{ t: '2026-06-01T00:00:00.000Z', action: 'add', sid: 'sZ', slot: 0 }];
   const { box, app } = world(d, ME);
   box.visSetMode('late');

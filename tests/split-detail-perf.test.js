@@ -28,8 +28,8 @@ const ctx = { console, Object, JSON, Array, String, Number, parseInt, isNaN, Mat
 vm.createContext(ctx);
 vm.runInContext(slice('function erpWhoOf(p){', '\nif(typeof window !== \'undefined\'){ window.erpWhoOf'), ctx);
 
-t('업체명이 있으면 그대로', ctx.erpWhoOf({companyName:'노리시스템'}), '노리시스템');
-t('기록 쪽 이름으로 물러난다', ctx.erpWhoOf({item:{companyName:'㈜한엘'}}), '㈜한엘');
+t('업체명이 있으면 그대로', ctx.erpWhoOf({companyName:'벼리시스템'}), '벼리시스템');
+t('기록 쪽 이름으로 물러난다', ctx.erpWhoOf({item:{companyName:'㈜벼리'}}), '㈜벼리');
 t('의뢰인 이름도 본다', ctx.erpWhoOf({item:{clientName:'김민수'}}), '김민수');
 t('사업 이름도 본다', ctx.erpWhoOf({item:{name:'용천새마을금고'}}), '용천새마을금고');
 t('★ 대시(-)는 이름이 아니다', ctx.erpWhoOf({companyName:'-'}), '');
@@ -40,7 +40,7 @@ t('빈 값도 안 터진다', ctx.erpWhoOf(null), '');
 t('건명을 찾는다', ctx.erpTitleOf({item:{caseName:'부당해고 구제신청'}}), '부당해고 구제신청');
 t('컨설팅 이름도 본다', ctx.erpTitleOf({item:{consultingName:'일터혁신'}}), '일터혁신');
 t('업체명과 같으면 두 번 안 적는다',
-  ctx.erpTitleOf({companyName:'대성물류', item:{title:'대성물류'}}), '');
+  ctx.erpTitleOf({companyName:'다온물류', item:{title:'다온물류'}}), '');
 t('건명이 없으면 빈 값', ctx.erpTitleOf({item:{}}), '');
 t('빈 값도 안 터진다', ctx.erpTitleOf(null), '');
 

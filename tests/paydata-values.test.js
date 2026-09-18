@@ -18,7 +18,7 @@ function loadStore() {
 }
 
 const PARSED = {
-  company: '화담원', period: '2026-08', docName: '급여대장',
+  company: '다온원', period: '2026-08', docName: '급여대장',
   rows: [
     { name: '홍길동', pairs: [{ item: '기본급', value: '3,200,000' }, { item: '실수령', value: '2,950,000' }] },
     { name: '김철수', pairs: [{ item: '기본급', value: '2,800,000' }] }

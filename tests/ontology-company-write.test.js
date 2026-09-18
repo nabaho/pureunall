@@ -142,7 +142,7 @@ test('회사명·사업자번호를 바꾸면 과거 ID와 보류 선택을 풀�
 test('사업자번호 입력을 마치면 유일한 업체 ID를 자동으로 넣고 이름은 덮지 않는다',()=>{
   const code=panel.slice(panel.indexOf('  function autoLinkCompanyByBiz(raw,notify){'),panel.indexOf('  /* 직접 입력뿐 아니라 기업정보함·OCR'))
     +panel.slice(panel.indexOf('  function onBizNoBlur(e){'),panel.indexOf('  // ========== 기업정보 =========='));
-  let draft={companyId:'',companyLinkStatus:'',company:{companyId:'',name:'주식회사 메가터치',bizNo:'1112233333'}};
+  let draft={companyId:'',companyLinkStatus:'',company:{companyId:'',name:'주식회사 새힘터치',bizNo:'1112233333'}};
   const notices=[];
   const ctx={window:{PuOntology:O},props:{cur:null},f:draft,
     fmtBizNo:v=>v.slice(0,3)+'-'+v.slice(3,5)+'-'+v.slice(5),
@@ -153,7 +153,7 @@ test('사업자번호 입력을 마치면 유일한 업체 ID를 자동으로 �
   ctx.onBizNoBlur({target:{value:'1112233333'}});
   assert.equal(draft.companyId,'A');
   assert.equal(draft.company.companyId,'A');
-  assert.equal(draft.company.name,'주식회사 메가터치');
+  assert.equal(draft.company.name,'주식회사 새힘터치');
   assert.match(notices.join('\n'),/자동 연결/);
 });
 

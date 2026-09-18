@@ -25,7 +25,7 @@ function seed() {
       doneBy: '나바호', doneAt: '2026-08-23 14:20' }],
     ['site_b', 'r0', { site: '주식회사 한빛산업', bizno: '2148601234', asof: '2023-03-01',
       from: 'chwieop', changed: 86, doneBy: '이사무', doneAt: '2023-02-27 16:30' }],
-    ['site_x', 'r1', { site: '성진테크', asof: '2024-11-01', kind: '전부개정', doneBy: '김노무' }]
+    ['site_x', 'r1', { site: '파하테크', asof: '2024-11-01', kind: '전부개정', doneBy: '김노무' }]
   ].map(a => H._shape(a[0], a[1], a[2])));
 }
 
@@ -123,7 +123,7 @@ test('회차가 없으면 칸 자체를 안 그린다 — 빈 칸이 생기면 �
 test('업체 목록을 아직 못 읽었어도 상호명으로 잇는다', () => {
   seed();
   const dRulesHTML = loadWorkBox({ co: null });          // coFind 가 아직 null
-  const h = dRulesHTML({ company: '성진테크' });
+  const h = dRulesHTML({ company: '파하테크' });
   assert.match(h, /1회차/);
   assert.match(h, /전부개정/);
 });

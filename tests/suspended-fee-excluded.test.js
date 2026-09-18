@@ -42,7 +42,7 @@ const stopped = (co, ym, now) =>
 /* 실제로 중단돼 있던 두 곳 */
 const CODIS = { name: '코디스', status: 'active', suspended: true, suspendedAt: '2026-06-18', monthlyAdvisoryFee: 150000 };
 const SINSEOK = { name: '신석개발산업㈜', status: 'active', suspended: true, suspendedAt: '2025-06-01', monthlyAdvisoryFee: 200000 };
-const LIVE = { name: '송림산업', status: 'active', monthlyAdvisoryFee: 132000 };
+const LIVE = { name: '열음산업', status: 'active', monthlyAdvisoryFee: 132000 };
 
 test('① 중단일이 지난 달은 «안 받는다»', function () {
   assert.equal(stopped(CODIS, '2026-09'), true, '★ 중단한 업체가 아직 세어지고 있습니다');

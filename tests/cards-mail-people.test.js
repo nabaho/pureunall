@@ -28,9 +28,9 @@ const same = (a, b, msg) => assert.deepEqual(JSON.parse(JSON.stringify(a)), b, m
 
 const PEOPLE = {
   a:{id:'a', name:'권형하', company:'한국공인노무사회', email:'370-6@hanmail.net'},
-  b:{id:'b', name:'강태민', company:'주식회사 에스에이피', email:'tm.kang@sacfurnace.com'},
+  b:{id:'b', name:'강벼리', company:'주식회사 타파에이피', email:'oh@katae.co.kr'},
   c:{id:'c', name:'강기령', company:'', email:''},
-  d:{id:'d', name:'박민서', company:'주식회사 에스에이씨', email:'ms.park@sacfurnace.com'}
+  d:{id:'d', name:'한소담', company:'주식회사 카타에이씨', email:'han@katae.co.kr'}
 };
 
 test('이름으로 찾는다', () => {
@@ -40,17 +40,17 @@ test('이름으로 찾는다', () => {
 
 test('회사로도 찾는다', () => {
   const c = load();
-  same(c.findPeople(PEOPLE,'에스에이피',8).map(x=>x.id), ['b']);
+  same(c.findPeople(PEOPLE,'타파에이피',8).map(x=>x.id), ['b']);
 });
 
 test('이메일로도 찾는다', () => {
   const c = load();
-  same(c.findPeople(PEOPLE,'sacfurnace',8).map(x=>x.id).sort(), ['b','d']);
+  same(c.findPeople(PEOPLE,'katae',8).map(x=>x.id).sort(), ['b','d']);
 });
 
-test('띄어쓰기는 무시한다 — 「주식회사 에스에이피」를 붙여 쳐도 찾는다', () => {
+test('띄어쓰기는 무시한다 — 「주식회사 타파에이피」를 붙여 쳐도 찾는다', () => {
   const c = load();
-  same(c.findPeople(PEOPLE,'주식회사에스에이피',8).map(x=>x.id), ['b']);
+  same(c.findPeople(PEOPLE,'주식회사타파에이피',8).map(x=>x.id), ['b']);
 });
 
 test('이메일 없는 사람도 보여 준다 — 안 보이면 기업정보함에 없는 줄 안다', () => {
@@ -62,7 +62,7 @@ test('이메일 없는 사람도 보여 준다 — 안 보이면 기업정보함
 test('이메일 있는 사람이 먼저 나온다 — 골라도 못 보내는 사람이 위에 있으면 안 된다', () => {
   const c = load();
   const ids = c.findPeople(PEOPLE,'강',8).map(x=>x.id);
-  assert.equal(ids[0], 'b', '이메일 있는 강태민이 먼저');
+  assert.equal(ids[0], 'b', '이메일 있는 강벼리가 먼저');
   assert.equal(ids[ids.length-1], 'c', '이메일 없는 강기령이 뒤');
 });
 

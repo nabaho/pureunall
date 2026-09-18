@@ -37,11 +37,11 @@ const TODAY0 = 10 * DAY;                        // 오늘 0시(목업 시계 기
 
 /* 급여 업체 다섯 곳 — 나(p-001) 셋, 박노무(p-002) 하나, 담당 없음 하나 */
 const COS = [
-  { id: 'c1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-  { id: 'c2', name: '이비', managerMain: 'p-001', managerSubs: [] },
+  { id: 'c1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+  { id: 'c2', name: '벼리비', managerMain: 'p-001', managerSubs: [] },
   { id: 'c3', name: '대한기공', managerMain: 'p-001', managerSubs: [] },
-  { id: 'c4', name: '남광건설', managerMain: 'p-002', managerSubs: [] },
-  { id: 'c5', name: '신흥기업', managerMain: '', managerSubs: [] }
+  { id: 'c4', name: '가온건설', managerMain: 'p-002', managerSubs: [] },
+  { id: 'c5', name: '새힘기업', managerMain: '', managerSubs: [] }
 ];
 const DIR = [{ sid: 'p-001', name: '김대표' }, { sid: 'p-002', name: '박노무' }];
 const OWNERS = { U1: { name: '김대표', email: 'p001@pureun.kr' } };
@@ -168,7 +168,7 @@ test('★ 「아직 안 온 곳」 보기는 미도착만 담는다', () => {
 test('★ 「담당 없음」 보기는 주·부담당이 비어 있는 급여 업체만 담는다', () => {
   const M = load();
   const out = M.sideListModel('noman', ctx(true), { q: '', filter: 'all', order: [] });
-  assert.equal(out.rows.map(r => r.name).join(','), '신흥기업');
+  assert.equal(out.rows.map(r => r.name).join(','), '새힘기업');
 });
 
 test('★ 상태 칩이 목록을 거른다', () => {
@@ -180,26 +180,26 @@ test('★ 상태 칩이 목록을 거른다', () => {
 
 test('★ 사업장 이름으로 찾는다', () => {
   const M = load();
-  const out = M.sideListModel('all', ctx(true), { q: '화담', filter: 'all', order: [] });
-  assert.equal(out.rows.map(r => r.name).join(','), '화담원');
+  const out = M.sideListModel('all', ctx(true), { q: '다온', filter: 'all', order: [] });
+  assert.equal(out.rows.map(r => r.name).join(','), '다온원');
 });
 
 test('★ 전체 목록에서는 담당자 이름으로도 찾힌다 (대표 결정: 사람·업체 둘 다)', () => {
   const M = load();
   const out = M.sideListModel('all', ctx(true), { q: '박노무', filter: 'all', order: [] });
-  assert.equal(out.rows.map(r => r.name).join(','), '남광건설');
+  assert.equal(out.rows.map(r => r.name).join(','), '가온건설');
 });
 
 test('찾는 글자의 앞뒤 빈칸과 대소문자는 무시한다', () => {
   const M = load();
-  const out = M.sideListModel('all', ctx(true), { q: '  화담  ', filter: 'all', order: [] });
+  const out = M.sideListModel('all', ctx(true), { q: '  다온  ', filter: 'all', order: [] });
   assert.equal(out.rows.length, 1);
 });
 
 test('★ 한 담당자의 목록을 볼 수 있다 (관리자가 사람 줄을 눌렀을 때)', () => {
   const M = load();
   const out = M.sideListModel('p:p-002', ctx(true), { q: '', filter: 'all', order: [] });
-  assert.equal(out.rows.map(r => r.name).join(','), '남광건설');
+  assert.equal(out.rows.map(r => r.name).join(','), '가온건설');
   assert.equal(out.title.indexOf('박노무') >= 0, true);
 });
 
@@ -207,12 +207,12 @@ test('★ 공유받음은 최근 받은 것이 위로 온다', () => {
   const M = load();
   const c = ctx(false);
   c.shares = {
-    s1: { companyId: 'c1', companyName: '화담원', byName: '민미애', tags: ['확인 부탁드립니다'], at: 100 },
-    s2: { companyId: 'c4', companyName: '남광건설', byName: '박노무', tags: ['급여 반영 요청'], at: 900 }
+    s1: { companyId: 'c1', companyName: '다온원', byName: '민미애', tags: ['확인 부탁드립니다'], at: 100 },
+    s2: { companyId: 'c4', companyName: '가온건설', byName: '박노무', tags: ['급여 반영 요청'], at: 900 }
   };
   const out = M.sideListModel('shared', c, { q: '', filter: 'all', order: [] });
   assert.equal(out.isShared, true);
-  assert.equal(out.rows.map(r => r.name).join(','), '남광건설,화담원');
+  assert.equal(out.rows.map(r => r.name).join(','), '가온건설,다온원');
   assert.equal(out.rows[0].shareId, 's2', '열쇠(공유 번호)가 있어야 눌러서 연다');
   assert.equal(out.rows[0].tags.join(','), '급여 반영 요청');
 });

@@ -60,13 +60,13 @@ function world(cons, cos, map) {
   ].join('\n'), ctx);
   return ctx;
 }
-const CO = (o) => Object.assign({ id: 'c1', name: '해담솔', types: ['t1'], endedTypes: {} }, o);
+const CO = (o) => Object.assign({ id: 'c1', name: '가온솔', types: ['t1'], endedTypes: {} }, o);
 /* 이알피가 실제로 적는 모습 — status + closedAt + endDate, closedDate 는 없다 */
 const CLOSED = (o) => Object.assign({
-  id: 'e1', companyName: '해담솔', typeCode: 'CODE1',
+  id: 'e1', companyName: '가온솔', typeCode: 'CODE1',
   status: 'closed', closedAt: '2026-08-13', endDate: '2026-08-13',
 }, o);
-const OPEN = (o) => Object.assign({ id: 'e1', companyName: '해담솔', typeCode: 'CODE1', status: 'progress' }, o);
+const OPEN = (o) => Object.assign({ id: 'e1', companyName: '가온솔', typeCode: 'CODE1', status: 'progress' }, o);
 
 /* ══ 끝났나 안 끝났나 ═══════════════════════════════════════════ */
 

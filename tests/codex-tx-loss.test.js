@@ -62,7 +62,7 @@ test('★★ 같은 문자를 다시 가져와도 두 줄이 되지 않는다 �
 
 test('★ 시각이 없는 줄(통장 엑셀)은 «예전 그대로» — 같은 파일을 또 올려도 안 늘어난다', () => {
   const B = (o) => Object.assign({ _k: '0', type: 'income', src: 'bank',
-    date: '2026-08-30', amount: 220000, memo: '주원테' }, o);
+    date: '2026-08-30', amount: 220000, memo: '열음테' }, o);
   const had = merge([], [B({ _k: 'a' })]).rows;
   const m = merge(had, [B({ _k: 'b' })]);
   assert.equal(m.rows.length, 1, '★ 통장 엑셀을 다시 올리면 두 배가 됩니다');

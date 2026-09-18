@@ -88,7 +88,7 @@ function 담기무대() {
 
 const 다섯 = [
   { page: 'consult', store: 'consult', 값: { org: '가장큰약국', project: '일터혁신 컨설팅', year: '2026' } },
-  { page: 'case', store: 'case', 값: { org: '(주)성문전자', project: '부당해고 구제신청', year: '2026' } },
+  { page: 'case', store: 'case', 값: { org: '(주)라온전자', project: '부당해고 구제신청', year: '2026' } },
   { page: 'fund', store: 'fund', 값: { org: '푸른공동근로복지기금', project: '기금 설립', year: '2026' } },
   { page: 'etc', store: 'etc', 값: { org: '충청남도', project: '노사민정 실무협의', year: '2026' } },
   { page: 'lecture', store: 'lecture', 값: { topic: '직장 내 괴롭힘 예방', org: '충남경제진흥원', date: '2026.03.04' } }

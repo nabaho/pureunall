@@ -51,7 +51,7 @@ function loadStore(db) {
   return S;
 }
 
-const JOB = { companyId: 'co_1', companyName: '화담원', month: '2026-08', rowCount: 12, at: 1000 };
+const JOB = { companyId: 'co_1', companyName: '다온원', month: '2026-08', rowCount: 12, at: 1000 };
 
 /* ══════ ① 수신함 열쇠 ══════ */
 
@@ -74,7 +74,7 @@ test('★ 다시 넘기면 줄 수와 시각이 새것으로 바뀐다', () => {
     .then(() => {
       const key = Object.keys(db.tree).filter(k => k.indexOf('payroll_os/inbox/') === 0)[0];
       assert.equal(db.tree[key].ts, 2000, '덮어쓸 때 시각이 안 바뀌면 낡은 알림으로 보입니다');
-      assert.equal(db.tree[key].사업장, '화담원');
+      assert.equal(db.tree[key].사업장, '다온원');
       assert.equal(db.tree[key].월, '2026-08');
     });
 });
@@ -94,7 +94,7 @@ test('★ 다른 사업장도 따로 선다', () => {
   const db = fakeDb();
   const S = loadStore(db);
   return S.handoffToPayroll(JOB)
-    .then(() => S.handoffToPayroll(Object.assign({}, JOB, { companyId: 'co_2', companyName: '이비' })))
+    .then(() => S.handoffToPayroll(Object.assign({}, JOB, { companyId: 'co_2', companyName: '벼리비' })))
     .then(() => {
       const inbox = Object.keys(db.tree).filter(k => k.indexOf('payroll_os/inbox/') === 0);
       assert.equal(inbox.length, 2);
@@ -146,7 +146,7 @@ function loadScreen(opts) {
   }
   new vm.Script([
     'const S = window.PuPaydataStore; S.init({uid:"U1", name:"권형하", db: db, isFin: true});',
-    'const App = { companyId:"co_1", companyName:"화담원", month:"2026-08", values:null,'
+    'const App = { companyId:"co_1", companyName:"다온원", month:"2026-08", values:null,'
       + ' handoffBusy:false, render: function(){} };',
     /* 값은 서버에서 새로 읽는다 — 여기서는 가짜로 열두 줄을 준다 */
     'function fetchValues(){ return Promise.resolve({ v1: { name:"김철수",'

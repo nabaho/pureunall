@@ -99,7 +99,7 @@ function loadScreen(opts) {
   return sandbox;
 }
 
-const COMPANIES = [{ id: 'co_1', name: '화담원' }, { id: 'co_2', name: '이비' }];
+const COMPANIES = [{ id: 'co_1', name: '다온원' }, { id: 'co_2', name: '벼리비' }];
 const ARRIVALS = { co_1: { 202608: { attend: { a: 1 }, last: 1 } } };
 
 test('★ 업체마다 ㅁ 체크와 순번이 있다', () => {
@@ -115,8 +115,8 @@ test('★ 업체명이 도착 표시보다 먼저 나온다 — 위치를 바꾼
   const sb = loadScreen();
   sb.window.App.companies = COMPANIES; sb.window.App.arrivals = ARRIVALS;
   const html2 = sb.window.screenSites.call(sb);
-  const row = html2.slice(html2.indexOf('화담원') - 200, html2.indexOf('화담원') + 400);
-  const nameAt = row.indexOf('화담원');
+  const row = html2.slice(html2.indexOf('다온원') - 200, html2.indexOf('다온원') + 400);
+  const nameAt = row.indexOf('다온원');
   /* 「도착/미도착」 둘이던 표시가 네 자리(미도착·대기·담김·표)로 갈렸다
      (대표 지시 2026-08-17) — 글자를 못 박지 않고 **그 자리 표시**를 찾는다. */
   const chipAt = row.indexOf('class="stpill');
@@ -163,14 +163,14 @@ test('업체가 없으면 체크박스도 순번도 안 만든다', () => {
 test('★ 「내 담당」 보기에서는 목록이 곧 내 담당이다 — 남의 업체가 안 섞인다', () => {
   const sb = loadScreen({ app: { sideView: 'mine' } });
   sb.window.App.companies = [
-    { id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-    { id: 'co_2', name: '이비', managerMain: 'p-002', managerSubs: [] }
+    { id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+    { id: 'co_2', name: '벼리비', managerMain: 'p-002', managerSubs: [] }
   ];
   sb.window.App.arrivals = {};
   const html2 = sb.window.screenSites.call(sb);
   assert.match(html2, /내 담당 사업장/, '무엇을 보고 있는지 제목이 말해 줘야 합니다');
-  assert.match(html2, /화담원/);
-  assert.equal(/이비/.test(html2), false, '내 담당이 아닌 업체가 섞였습니다');
+  assert.match(html2, /다온원/);
+  assert.equal(/벼리비/.test(html2), false, '내 담당이 아닌 업체가 섞였습니다');
 });
 
 /* 대표 지적 2026-08-17 「오른쪽 대시보드 사업장 이름과 본문 사업장 이름이
@@ -178,35 +178,35 @@ test('★ 「내 담당」 보기에서는 목록이 곧 내 담당이다 — �
    본문은 「전체 112곳」이라 이름도 번호도 달랐다. */
 test('★ 본문 목록이 왼쪽에서 고른 보기를 그대로 따른다', () => {
   const cos = [
-    { id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-    { id: 'co_2', name: '이비', managerMain: 'p-002', managerSubs: [] }
+    { id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+    { id: 'co_2', name: '벼리비', managerMain: 'p-002', managerSubs: [] }
   ];
   const all = loadScreen({ app: { sideView: 'all', companies: cos } });
   const hAll = all.window.screenSites.call(all);
-  assert.match(hAll, /화담원/);
-  assert.match(hAll, /이비/, '전체 보기인데 남의 업체가 빠졌습니다');
+  assert.match(hAll, /다온원/);
+  assert.match(hAll, /벼리비/, '전체 보기인데 남의 업체가 빠졌습니다');
 
   const mine = loadScreen({ app: { sideView: 'mine', companies: cos } });
   const hMine = mine.window.screenSites.call(mine);
-  assert.equal(/이비/.test(hMine), false, '보기를 바꿨는데 본문이 안 따라옵니다');
+  assert.equal(/벼리비/.test(hMine), false, '보기를 바꿨는데 본문이 안 따라옵니다');
 });
 
 test('★ 왼쪽 칸에서 걸러 둔 것이 본문에도 걸린다 — 두 목록이 같아야 한다', () => {
-  const sb = loadScreen({ app: { sideView: 'all', colQuery: '화담',
+  const sb = loadScreen({ app: { sideView: 'all', colQuery: '다온',
     companies: [
-      { id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-      { id: 'co_2', name: '이비', managerMain: 'p-002', managerSubs: [] }
+      { id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+      { id: 'co_2', name: '벼리비', managerMain: 'p-002', managerSubs: [] }
     ] } });
   const h = sb.window.screenSites.call(sb);
-  assert.match(h, /화담원/);
-  assert.equal(/이비/.test(h), false, '왼쪽에서 찾아 걸렀는데 본문에는 다 나옵니다');
+  assert.match(h, /다온원/);
+  assert.equal(/벼리비/.test(h), false, '왼쪽에서 찾아 걸렀는데 본문에는 다 나옵니다');
 });
 
 /* 같은 사업장이 왼쪽에서는 안 열리고 본문에서는 열리던 어긋남 — 본문이 곧장
    내 자리 서랍을 열어, 남의 담당 업체를 「0건」으로 보여 주었다. */
 test('★ 본문에서도 왼쪽과 같은 길로 연다 — 내 자리 서랍을 몰래 열지 않는다', () => {
   const sb = loadScreen({ app: { sideView: 'all',
-    companies: [{ id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] }] } });
+    companies: [{ id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] }] } });
   const h = sb.window.screenSites.call(sb);
   assert.match(h, /openColCompany\(/, '왼쪽과 다른 길로 열면 같은 사업장이 다르게 동작합니다');
 });
@@ -219,7 +219,7 @@ test('★ 본문에서도 왼쪽과 같은 길로 연다 — 내 자리 서랍�
    없는 것과, 찾다 못 찾은 것은 서로 다른 일이고 할 일도 다르다. */
 test('담당 업체가 없으면 그렇다고 말하고, 어떻게 하면 채워지는지도 적는다', () => {
   const sb = loadScreen({ app: { sideView: 'mine', me: { uid: 'U1', email: 'p099@pureun.kr' },
-    companies: [{ id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] }] } });
+    companies: [{ id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] }] } });
   const h = sb.window.screenSites.call(sb);
   assert.match(h, /내 담당 업체가 없습니다/, '없다는 것을 말해 줘야 고장으로 안 보입니다');
   assert.match(h, /업체관리에 주담당·부담당으로 등록하면/, '어떻게 해야 채워지는지도 적어야 합니다');
@@ -230,7 +230,7 @@ test('명단을 못 읽은 것과 「이 보기에 없는 것」을 갈라 말�
   assert.match(none.window.screenSites.call(none), /업체관리 명단을 읽지 못했습니다/);
 
   const nofind = loadScreen({ app: { sideView: 'all', colQuery: '없는이름',
-    companies: [{ id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] }] } });
+    companies: [{ id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] }] } });
   assert.match(nofind.window.screenSites.call(nofind), /찾는 사업장이 없습니다/);
 });
 
@@ -239,9 +239,9 @@ test('명단을 못 읽은 것과 「이 보기에 없는 것」을 갈라 말�
 test('★ 첫 화면 맨 위에 이 달 현황이 뜬다 — 몇 곳 중 몇 곳이 왔나', () => {
   const sb = loadScreen();
   sb.window.App.companies = [
-    { id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-    { id: 'co_2', name: '이비', managerMain: 'p-002', managerSubs: [] },
-    { id: 'co_3', name: '보문사', managerMain: 'p-002', managerSubs: [] }
+    { id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+    { id: 'co_2', name: '벼리비', managerMain: 'p-002', managerSubs: [] },
+    { id: 'co_3', name: '나루사', managerMain: 'p-002', managerSubs: [] }
   ];
   sb.window.App.arrivals = { co_1: { 202608: { attend: { a: 1 }, last: 1 } } };
   const h = sb.window.screenSites.call(sb);
@@ -260,8 +260,8 @@ test('★ 첫 화면 맨 위에 이 달 현황이 뜬다 — 몇 곳 중 몇 곳
 /* 왼쪽 칸과 **같은 수**를 세야 한다 — 두 곳이 다른 말을 하면 어느 쪽도 못 믿는다. */
 test('★ 현황의 사업장 수가 아래 목록 줄 수와 같다', () => {
   const sb = loadScreen({ app: { sideView: 'all', companies: [
-    { id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-    { id: 'co_2', name: '이비', managerMain: 'p-002', managerSubs: [] }
+    { id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+    { id: 'co_2', name: '벼리비', managerMain: 'p-002', managerSubs: [] }
   ] } });
   const h = sb.window.screenSites.call(sb);
   assert.match(h, /class="dkpi"[^>]*><b>2<\/b>곳/);
@@ -272,8 +272,8 @@ test('★ 현황의 사업장 수가 아래 목록 줄 수와 같다', () => {
    그대로 떠 있으면 무엇의 현황인지 알 수 없다. */
 test('★ 보기를 좁히면 현황도 그 보기 기준으로 센다', () => {
   const sb = loadScreen({ app: { sideView: 'mine', companies: [
-    { id: 'co_1', name: '화담원', managerMain: 'p-001', managerSubs: [] },
-    { id: 'co_2', name: '이비', managerMain: 'p-002', managerSubs: [] }
+    { id: 'co_1', name: '다온원', managerMain: 'p-001', managerSubs: [] },
+    { id: 'co_2', name: '벼리비', managerMain: 'p-002', managerSubs: [] }
   ] } });
   const h = sb.window.screenSites.call(sb);
   assert.match(h, /class="dkpi"[^>]*><b>1<\/b>곳/, '내 담당은 한 곳인데 전체 수를 셌습니다');

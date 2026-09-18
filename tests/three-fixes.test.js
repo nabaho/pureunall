@@ -65,28 +65,28 @@ vm.runInContext(slice('function erpNormName(', '\nfunction erpLcsLen('), ctx);
 vm.runInContext(slice('function erpInvoiceMatchAll(invs, incs, asOf){', '\nif(typeof window !== \'undefined\') window.erpInvoiceMatchAll'), ctx);
 
 const INV = [
-  { id:'a', companyName:'노리시스템', amount:300000, issueDate:'2026-06-01', vatType:'separate', status:'발행' },
-  { id:'b', companyName:'㈜한엘',     amount:550000, issueDate:'2026-05-01', vatType:'included', status:'발행' },
-  { id:'c', companyName:'대성물류',   amount:100000, issueDate:'2026-07-01', vatType:'included', status:'미발행' }
+  { id:'a', companyName:'벼리시스템', amount:300000, issueDate:'2026-06-01', vatType:'separate', status:'발행' },
+  { id:'b', companyName:'㈜벼리',     amount:550000, issueDate:'2026-05-01', vatType:'included', status:'발행' },
+  { id:'c', companyName:'다온물류',   amount:100000, issueDate:'2026-07-01', vatType:'included', status:'미발행' }
 ];
 const INC = [
-  { companyName:'노리시스템', amount:330000, date:'2026-06-10', kind:'컨설팅(잔금)' },   // 300,000 ×1.1
-  { companyName:'세창이엔지', amount:220000, date:'2026-06-20', kind:'사건(착수)' },     // 계산서 없음
+  { companyName:'벼리시스템', amount:330000, date:'2026-06-10', kind:'컨설팅(잔금)' },   // 300,000 ×1.1
+  { companyName:'마바이엔지', amount:220000, date:'2026-06-20', kind:'사건(착수)' },     // 계산서 없음
   { companyName:'가나상사',   amount:110000, date:'2026-06-20', sourceKind:'company' }   // 자문료 — 제외
 ];
 const R = ctx.erpInvoiceMatchAll(INV, INC, '2026-07-31');
 
 t('부가세 별도는 ×1.1 로 맞춘다', R.paid.length, 1);
-t('맞은 것은 노리시스템', R.paid[0].inv.id, 'a');
+t('맞은 것은 벼리시스템', R.paid[0].inv.id, 'a');
 t('예상 입금액을 함께 준다', R.paid[0].expect, 330000);
 t('안 들어온 계산서를 센다', R.unpaid.length, 1);
-t('안 들어온 것은 ㈜한엘', R.unpaid[0].inv.id, 'b');
+t('안 들어온 것은 ㈜벼리', R.unpaid[0].inv.id, 'b');
 t('며칠 지났는지 센다', R.unpaid[0].days, 91);
 t('미입금 합계', R.sumUnpaid, 550000);
 t('★ 미발행(예정)은 대조하지 않는다',
   R.paid.concat(R.unpaid).some(function(x){ return x.inv.id === 'c'; }), false);
 t('계산서 없는 입금을 센다', R.noInvoice.length, 1);
-t('그것은 세창이엔지', R.noInvoice[0].inc.companyName, '세창이엔지');
+t('그것은 마바이엔지', R.noInvoice[0].inc.companyName, '마바이엔지');
 t('★ 자문료는 계산서 없음에서 뺀다',
   R.noInvoice.some(function(x){ return x.inc.companyName === '가나상사'; }), false);
 t('탭 뱃지에 쓸 수 있게 todo 를 준다', R.todo, 1);

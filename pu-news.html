@@ -3776,7 +3776,7 @@ async function 명함담기(){
 function 기업정보함에서찾기(회사){
   const q = String(회사 == null ? '' : 회사).trim();
   if(!q) return toast('회사 이름이 없습니다');
-  /* ⚠ 이름에 괄호·&·＃ 가 든 곳이 많다((주)크레오에스지(구-큐로컴, 스마젠 …)).
+  /* ⚠ 이름에 괄호·&·＃ 가 든 곳이 많다((주)차카에스지(구-큐로컴, 스마젠 …)).
        싸지 않고 보내면 찾기가 엉뚱한 말로 걸린다. */
   window.open('pu-cards.html?q=' + encodeURIComponent(q), '_blank');
 }

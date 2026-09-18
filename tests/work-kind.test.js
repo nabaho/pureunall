@@ -132,7 +132,7 @@ ok('목록에 없는 이름도 색이 나오고 늘 같은 색',
 
 /* ── 후보 만들기 ── */
 _peU2N = { u1: '김동현' };
-peMaster = { contract: [{ id: 'k1', companyName: '케이블루', contractNo: '계약-2026-027', managerMain: 'u1' }] };
+peMaster = { contract: [{ id: 'k1', companyName: '가람블루', contractNo: '계약-2026-027', managerMain: 'u1' }] };
 let c = puerpCandidates()[0];
 ok('계약관리 건은 구분이 계약', c.cat === '계약');
 ok('회사명을 업무명으로 쓰지 않는다 (기업 칸과 겹치고 마스터가 더러워진다)', c.title === '');
@@ -144,7 +144,7 @@ ok('한 줄 이름은 요약 → 업무명 → 유형 차례',
   itemName({ brief: '기술보호 컨설팅', title: 'T', ptype: '기술보호' }) === '기술보호 컨설팅'
   && itemName({ brief: '', title: '부당해고 구제신청', ptype: '부해' }) === '부당해고 구제신청'
   && itemName({ brief: '', title: '', ptype: '현장클리닉' }) === '현장클리닉'
-  && itemName({ brief: '', title: '', ptype: '', cat: '계약', company: '케이블루' }) === '');
+  && itemName({ brief: '', title: '', ptype: '', cat: '계약', company: '가람블루' }) === '');
 ok('공백만 있는 값은 없는 것으로 본다',
   itemName({ brief: '   ', title: '  ', ptype: '현장클리닉' }) === '현장클리닉');
 ok('업무명 필터가 묶는 기준은 유형',
@@ -165,8 +165,8 @@ ok('요약만 있으면 요약을 올려 쓴다 (같은 말을 두 번 쓰지 �
 })());
 ok('셋 다 비면 바로 적을 수 있는 버튼', nameCell({ _id: 'W1' }).indexOf('이름 적기') > 0);
 ok('회사명·구분은 업무 칸에 절대 안 나온다', (function () {
-  const h = nameCell({ _id: 'W1', cat: '계약', company: '케이블루' });
-  return h.indexOf('케이블루') < 0 && h.indexOf('계약') < 0;
+  const h = nameCell({ _id: 'W1', cat: '계약', company: '가람블루' });
+  return h.indexOf('가람블루') < 0 && h.indexOf('계약') < 0;
 })());
 ok('작은따옴표가 든 업무ID도 핸들러가 안 깨진다', nameCell({ _id: "W'1" }).indexOf("W\\'1") > 0);
 ok('채울 대상은 셋 다 빈 것만',

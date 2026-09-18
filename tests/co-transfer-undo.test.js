@@ -75,8 +75,8 @@ test('② ㈜·주식회사 차이만으로는 안 멈춘다 — 매번 뜨는 �
   const same = call({ companyName: '주식회사 새롬산업', typeCodes: { company: '자문' } },
                     { name: '㈜새롬산업', typeCode: '자문' });
   assert.equal(same.differs, false, '★ ㈜ 차이로 멈추면 사람이 경고를 안 읽게 됩니다');
-  const spaced = call({ companyName: '(주) 해담솔', typeCodes: { company: '급여' } },
-                      { name: '주식회사해담솔', typeCode: '급여' });
+  const spaced = call({ companyName: '(주) 가온솔', typeCodes: { company: '급여' } },
+                      { name: '주식회사가온솔', typeCode: '급여' });
   assert.equal(spaced.differs, false, '★ 띄어쓰기 차이로 멈추면 안 됩니다');
 });
 
@@ -84,8 +84,8 @@ test('③ 유형만 달라도 멈춘다 — 지금껏 아무 데서도 안 보�
   const ctx = realm({ window: { PuOntology: loadOntology() } });
   load(ctx, ['function erpCoTransferGap(']);
   const g = vm.runInContext('erpCoTransferGap(' +
-    JSON.stringify({ companyName: '송림산업', typeCodes: { company: '자문' } }) + ',' +
-    JSON.stringify({ name: '송림산업', typeCode: '급여' }) + ')', ctx);
+    JSON.stringify({ companyName: '열음산업', typeCodes: { company: '자문' } }) + ',' +
+    JSON.stringify({ name: '열음산업', typeCode: '급여' }) + ')', ctx);
   assert.equal(g.typeGap, true, '★ 자문 계약이 급여 업체로 들어가는데 안 멈춥니다');
   assert.equal(g.nameGap, false);
   assert.equal(g.differs, true);

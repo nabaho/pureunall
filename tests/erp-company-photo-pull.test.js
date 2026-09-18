@@ -65,7 +65,7 @@ test('★★ 번호가 있으면 «번호로만» 맞춘다 — 이름이 같아
   const c = 판();
   const docs = [등록증({ id: 'same', fields: Object.assign({}, 등록증().fields, { bizno: '111-11-11111' }) })];
   /* 이름은 똑같다. 그래도 번호가 다르면 남의 서류다 —
-     「천성」과 「천성가축약품」이 붙던 그 사고를 여기서 막는다. */
+     「두레」과 「두레가축약품」이 붙던 그 사고를 여기서 막는다. */
   const got = c.erpCoPullCandidates(docs, { bizNo: '123-81-20046', name: '가온들왕소금구이' });
   assert.equal(got.length, 0, '★★ 번호가 다른 서류가 붙었습니다 — 남의 회사 값이 들어갑니다');
 });

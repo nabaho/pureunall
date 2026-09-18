@@ -26,17 +26,17 @@ function loadGuess() {
   return sandbox.window.guessTag;
 }
 
-const COMPANIES = [{ id: 'co_1', name: '(주)화담원' }, { id: 'co_2', name: '이비' }];
+const COMPANIES = [{ id: 'co_1', name: '(주)다온원' }, { id: 'co_2', name: '벼리비' }];
 
 test('파일 이름에서 사업장을 짐작한다', () => {
   const g = loadGuess();
-  assert.equal(g({ filename: '화담원 아산점_25년 07월_급여대장.xlsx' }, COMPANIES).companyId, 'co_1');
+  assert.equal(g({ filename: '다온원 아산점_25년 07월_급여대장.xlsx' }, COMPANIES).companyId, 'co_1');
 });
 
 test('파일 이름에서 귀속월을 짐작한다', () => {
   const g = loadGuess();
-  assert.equal(g({ filename: '화담원_2026-08_근태.jpg' }, COMPANIES).month, '2026-08');
-  assert.equal(g({ filename: '화담원_25년 07월_급여대장.xlsx' }, COMPANIES).month, '2025-07');
+  assert.equal(g({ filename: '다온원_2026-08_근태.jpg' }, COMPANIES).month, '2026-08');
+  assert.equal(g({ filename: '다온원_25년 07월_급여대장.xlsx' }, COMPANIES).month, '2025-07');
   assert.equal(g({ filename: '근태표.jpg' }, COMPANIES).month, '');
 });
 

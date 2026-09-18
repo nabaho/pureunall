@@ -1,7 +1,7 @@
 /* ══════ ✓ 「칸이 하나도 안 다른」 중복 (대표 지시 2026-09-18) ═══════════════════
 
    대표: 「이렇게 완전히 중복되는 자료는 어떻게 관리하는게 좋은가?」
-     — 남경테크 두 줄을 짚으시며. 상호·대표자·사업자번호·업태·종목·소재지가
+     — 사아테크 두 줄을 짚으시며. 상호·대표자·사업자번호·업태·종목·소재지가
        **한 글자도** 안 달랐다.
 
    ★★ 이런 묶음은 «사람이 판단할 것이 하나도 없다». 어느 쪽을 남겨도 결과가 같고,
@@ -42,7 +42,7 @@ const biz = o => Object.assign({ kind:'biz' }, o);
 const card = o => Object.assign({ kind:'card' }, o);
 
 /* 대표가 짚으신 그 두 줄 */
-const 남경테크 = () => biz({ company:'남경테크', ceo:'임위빈', bizno:'123-81-20458',
+const 사아테크 = () => biz({ company:'사아테크', ceo:'임위빈', bizno:'123-81-20458',
   bizType:'제조업', bizItem:'금속 가공제품 제조업; 기계 및 …',
   address:'31416 충남 아산시 음봉면 월산로 192-150' });
 
@@ -50,13 +50,13 @@ const 남경테크 = () => biz({ company:'남경테크', ceo:'임위빈', bizno:
 
 test('★★★ 대표가 짚으신 그 두 줄은 «칸이 하나도 안 다르다»', () => {
   const c = load();
-  assert.equal(c.dupAllSame([남경테크(), 남경테크()]), true,
+  assert.equal(c.dupAllSame([사아테크(), 사아테크()]), true,
     '★★★ 이것을 못 가리면 볼 것이 없는 묶음이 「봐야 할 것」 무더기에 섞인다');
 });
 
 test('★★★ 한 칸이라도 «값이» 다르면 그 갈래가 아니다', () => {
   const c = load();
-  const a = 남경테크(), b = 남경테크();
+  const a = 사아테크(), b = 사아테크();
   b.ceo = '임위빈, 김철수';
   assert.equal(c.dupAllSame([a, b]), false,
     '★★★ 합치면 메모에 [병합]이 남는다 — 「달라지는 것이 없습니다」가 거짓말이 된다');
@@ -64,7 +64,7 @@ test('★★★ 한 칸이라도 «값이» 다르면 그 갈래가 아니다', 
 
 test('★★★ ㉡ 한쪽만 «비어» 있으면 그 갈래가 아니다 — 합치면 그 칸이 채워진다', () => {
   const c = load();
-  const a = 남경테크(), b = 남경테크();
+  const a = 사아테크(), b = 사아테크();
   a.companyFax = '';
   b.companyFax = '041-000-0000';
   assert.equal(c.dupAllSame([a, b]), false,
@@ -106,14 +106,14 @@ test('★★ 명함은 «명함 칸»으로, 등록증은 «등록증 칸»으�
 
 test('★ 혼자면 중복이 아니다', () => {
   const c = load();
-  assert.equal(c.dupAllSame([남경테크()]), false);
+  assert.equal(c.dupAllSame([사아테크()]), false);
   assert.equal(c.dupAllSame([]), false);
   assert.equal(c.dupAllSame(null), false);
 });
 
 test('★★ 셋이어도 «모두» 같아야 한다 — 하나만 달라도 그 갈래가 아니다', () => {
   const c = load();
-  const a = 남경테크(), b = 남경테크(), d = 남경테크();
+  const a = 사아테크(), b = 사아테크(), d = 사아테크();
   d.bizItem = '기계 제조';
   assert.equal(c.dupAllSame([a, b, d]), false,
     '★★ 첫 둘만 견주면 셋째가 몰래 섞여 들어간다');

@@ -117,9 +117,9 @@ function cellFor(o) {
   return ctx.html;
 }
 
-const DOC = { id: 'p1', thumb: 't', meta: { kind: 'doc', company: '그린파이', read: { kind: 'bizreg' } } };
+const DOC = { id: 'p1', thumb: 't', meta: { kind: 'doc', company: '온새파이', read: { kind: 'bizreg' } } };
 const MEET = { id: 'p2', thumb: 't', meta: { kind: 'doc', company: '', read: { kind: 'meeting' } } };
-const PHOTO = { id: 'p3', thumb: 't', meta: { kind: 'photo', company: '오색농산물', read: { kind: 'meeting' } } };
+const PHOTO = { id: 'p3', thumb: 't', meta: { kind: 'photo', company: '새별농산물', read: { kind: 'meeting' } } };
 
 /* ══════ ① 서류 카드: 딱지가 그대로 경고가 된다 ══════ */
 
@@ -151,7 +151,7 @@ test('★ 딱지가 없는 서류 칸(회의로 읽힌 것)은 모서리 표를 
        사진을 접지 않는다, 김동현 제보). 그래서 시늉에 제목을 준다.
        업체만 있는 서류로 두면 이제 사진 칸으로 가서 wnpad 가 애초에 안 붙는다 —
        그러면 이 검사는 «모서리 표 규칙»이 아니라 «갈림길»을 재는 것이 되어 버린다. */
-  const h = cellFor({ it: { id: 'p2', thumb: 't', meta: { kind: 'doc', company: '그린파이',
+  const h = cellFor({ it: { id: 'p2', thumb: 't', meta: { kind: 'doc', company: '온새파이',
     read: { kind: 'meeting' } } }, title: '현장 회의록', need: true });
   assert.ok(!/class="tag/.test(h), '회의로 읽힌 서류에는 딱지를 안 붙입니다(8/17 지시)');
   assert.match(h, /class="wn">⚠/, '★ 얹을 딱지가 없는데 경고까지 사라지면 놓칩니다');

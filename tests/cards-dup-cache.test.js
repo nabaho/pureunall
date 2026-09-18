@@ -126,10 +126,10 @@ test('명함 차례가 바뀌면 다시 센다 — 안전한 쪽으로', () => {
 /* ══════ 값이 붙어 헷갈리지 않는다 ══════ */
 
 test('칸 사이를 가르지 않아 생기는 헷갈림이 없다', () => {
-  /* 가름 글자가 없으면 이름「김철」+상호「수한빛」과 이름「김철수」+상호「한빛」이
+  /* 가름 글자가 없으면 이름「김철」+상호「가온빛」과 이름「김철수」+상호「한빛」이
      같은 글자가 되어, 서로 다른 자료를 「안 바뀌었다」고 잘못 읽는다. */
   const C = load();
-  const A = [card('a', { name: '김철', company: '수한빛' })];
+  const A = [card('a', { name: '김철', company: '가온빛' })];
   const B = [card('a', { name: '김철수', company: '한빛' })];
   assert.notEqual(C.dupCacheKey(A, new Set()), C.dupCacheKey(B, new Set()));
 });

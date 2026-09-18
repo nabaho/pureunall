@@ -56,7 +56,7 @@ const reply = (obj) => ({ candidates: [{ content: { parts: [{ text: JSON.stringi
 
 test('★ 한 줄 요약을 돌려준다 — 열지 않고도 무엇인지 안다', async () => {
   const { D } = reader(reply({ sum: '8월 급여대장 · 12명', kind: 'ledger',
-    month: '2026-08', company: '평해식품', people: 12, amount: '32,400,000' }));
+    month: '2026-08', company: '마루식품', people: 12, amount: '32,400,000' }));
   const r = await D.summarizeText('이름\t기본급\n김철수\t2400000', '급여대장.xlsx');
   assert.equal(r.ok, true);
   assert.equal(r.sum, '8월 급여대장 · 12명');

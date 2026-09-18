@@ -42,8 +42,8 @@ function card(it) { return M.vcardLines(it).join('\r\n'); }
 /* ══════ ① 글자 다듬기 — 조용히 틀리는 자리 ══════ */
 
 test('★★ 쉼표가 든 회사 이름이 «칸을 밀지 않는다» — 폰 연락처에 이상한 값이 들어앉는다', () => {
-  const v = card({ name: '김성호', company: '(주)대운토건, 서울지사' });
-  assert.match(v, /ORG:\(주\)대운토건\\,\s?서울지사/,
+  const v = card({ name: '김성호', company: '(주)나루토건, 서울지사' });
+  assert.match(v, /ORG:\(주\)나루토건\\,\s?서울지사/,
     '★★ 쉼표를 안 다듬으면 그 뒤가 딴 칸으로 밀립니다 — 화면에는 아무 표시가 없습니다');
 });
 

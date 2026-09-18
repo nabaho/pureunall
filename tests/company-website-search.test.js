@@ -24,7 +24,7 @@ const modal = cutFn(SRC, 'function CompanyEditModal(props)');
 
 function makeSandbox(initial) {
   const toasts = [];
-  const state = { f: Object.assign({ name: '(주)크레오에스지', address: '충청남도 천안시 서북구 원두정8길 6' }, initial || {}) };
+  const state = { f: Object.assign({ name: '(주)차카에스지', address: '충청남도 천안시 서북구 원두정8길 6' }, initial || {}) };
   const calls = [];
   const ctx = {
     f: state.f,

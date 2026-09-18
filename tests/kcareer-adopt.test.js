@@ -128,9 +128,9 @@ test('⚠ 금액은 안 담는다 — 계약서와 엮인 값이라 틀린 채�
 });
 
 test('종류 칸이 없는 기금실적에는 유형을 적지 않는다 — 화면에 안 나오고 파일만 커진다', () => {
-  const r = makeBox({}).toRec('funds', { id:'f1', companyName:'노리', fundType:'설립', closedDate:'2026-03-01' });
+  const r = makeBox({}).toRec('funds', { id:'f1', companyName:'벼리', fundType:'설립', closedDate:'2026-03-01' });
   assert.ok(!('type' in r));
-  assert.equal(r.org, '노리');
+  assert.equal(r.org, '벼리');
 });
 
 test('컨설팅은 담당 칸에 본인 이름을 적는다', () => {

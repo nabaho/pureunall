@@ -60,7 +60,7 @@ ok('setAttend·lput·addSever 가 window 에 노출됨',
 
 section('코어 자체 규율');
 ok('코어에 사업장 이름이 박혀 있지 않다(설정 주입식)',
-  !/화담원|제이앤드씨|늘봄|주민정/.test(CORE));
+  !/다온원|나라앤드씨|새별|주민정/.test(CORE));
 ok('코어는 DOM 을 만지지 않는다',
   !/document\.|window\.addEventListener|innerHTML/.test(CORE));
 ok('코어는 Firebase 를 모른다', !/firebase|dbGet|dbSet/.test(CORE));
@@ -114,7 +114,7 @@ ok('주 12시간 한도 초과를 알린다', /연장근로 주 12시간 한도 
 ok('달력 값 칸은 읽기전용으로 둔다(두 값이 싸우지 않게)', /달력으로 계산된 값/.test(H));
 
 section('월 이름 읽기 — 실제 시트 이름이 제각각이다');
-/* 급여대장 시트 이름은 '3월'·'2026-03'·'23년 7월'·'25.05 늘봄반찬' 등으로 섞여 온다.
+/* 급여대장 시트 이름은 '3월'·'2026-03'·'23년 7월'·'25.05 새별반찬' 등으로 섞여 온다.
    여기서 연·월을 잘못 읽으면 달력이 안 그려지거나 최저임금 연도가 어긋난다. */
 const grabFn = (name) => {
   const i = H.indexOf('function ' + name + '(');
@@ -135,9 +135,9 @@ eq("'3월' → 3월", laborMonthNum('3월'), 3);
 eq("'3월' → 연도 없으면 올해", laborYearOfMonth('3월'), '2026');
 eq("'23년 7월' → 2023년", laborYearOfMonth('23년 7월'), '2023');
 eq("'23년 7월' → 7월", laborMonthNum('23년 7월'), 7);
-eq("'25.05 늘봄반찬' → 5월", laborMonthNum('25.05 늘봄반찬'), 5);
+eq("'25.05 새별반찬' → 5월", laborMonthNum('25.05 새별반찬'), 5);
 eq('월을 못 읽으면 null (달력 대신 합계 입력 안내)', laborMonthNum('놀봄모종'), null);
-eq("'25.05 늘봄반찬' → 2025년", laborYearOfMonth('25.05 늘봄반찬'), '2025');
+eq("'25.05 새별반찬' → 2025년", laborYearOfMonth('25.05 새별반찬'), '2025');
 eq("'25.12' → 12월", laborMonthNum('25.12'), 12);
 eq('13월 같은 헛값은 안 받는다', laborMonthNum('25.13'), null);
 eq("'23년 7월 사계절찬' → 7월", laborMonthNum('23년 7월 사계절찬'), 7);

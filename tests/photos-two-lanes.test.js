@@ -101,7 +101,7 @@ test('★★★ other 는 «둘»로 갈린다 — 값을 읽었으면 서류, �
      이 화면은 그 갈림을 이미 쓰고 있었다(readLabel·needsCheck) — 갈래만 안 썼다. */
   assert.equal(갈래({ kind: 'doc', read: { kind: 'other', fields: {} } }), 'pic',
     '★★★ 판독기가 «서류가 아니라»고 한 사진이 서류 칸에 남습니다 — 대표 지적 그대로입니다');
-  assert.equal(갈래({ kind: 'doc', read: { kind: 'other', fields: { company: '㈜가야' } } }), 'doc',
+  assert.equal(갈래({ kind: 'doc', read: { kind: 'other', fields: { company: '㈜벼리' } } }), 'doc',
     '★★ 값을 읽어낸 「기타 서류」가 사진 칸에 숨었습니다 — 기업정보함으로 갈 서류가 영영 안 갑니다');
   /* PIC_KINDS 를 그대로 가져다 쓰면 위 갈림이 사라진다(그 표는 값을 안 본다) */
   const src = BARE.slice(BARE.indexOf('function laneOf('), BARE.indexOf('function laneOf(') + 900);

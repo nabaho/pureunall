@@ -84,8 +84,8 @@ test('★★③④ 안 읽었으면 숨기지 않는다 — 그리고 «권한 �
 });
 
 test('★⑤ 켜면 실제로 읽고 관계가 나온다', () => {
-  const data = { companies: [{ id: 'co1', name: '천성가축약품' }] };
-  const value = { 'b1234567890': { company: '천성가축약품', erpCoId: 'co1',
+  const data = { companies: [{ id: 'co1', name: '두레가축약품' }] };
+  const value = { 'b1234567890': { company: '두레가축약품', erpCoId: 'co1',
     bankAcct: '110-123-456789', sales: '1200000000',
     docs: { d1: { docName: '사업자등록증', kind: 'biz' } } } };
   const rep = O.auditIntegrated(data,
@@ -97,8 +97,8 @@ test('★⑤ 켜면 실제로 읽고 관계가 나온다', () => {
 });
 
 test('★ 저장되는 것에는 민감한 칸이 «안 들어간다» — 문제는 저장이 아니라 내려받기다', () => {
-  const data = { companies: [{ id: 'co1', name: '천성가축약품' }] };
-  const value = { 'b1': { company: '천성가축약품', erpCoId: 'co1',
+  const data = { companies: [{ id: 'co1', name: '두레가축약품' }] };
+  const value = { 'b1': { company: '두레가축약품', erpCoId: 'co1',
     bankAcct: '110-123-456789', bankHolder: '홍길동', sales: '1200000000', birth: '1970-01-01',
     docs: { d1: { docName: '사업자등록증' } } } };
   const rep = O.auditIntegrated(data, { cards_coinfo: { key: 'cards_coinfo', ok: true, value } }, {});

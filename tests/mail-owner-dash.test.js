@@ -46,12 +46,12 @@ const MSGS = {
 /* 기업정보함(items) — 주소와 회사가 든 명함 */
 const ITEMS = {
   i1: { id:'i1', email:'a@hanbit.co.kr', company:'한빛물산' },
-  i2: { id:'i2', email:'c@daehan.kr',    company:'대한산업' }
+  i2: { id:'i2', email:'c@daehan.kr',    company:'마루산업' }
 };
 /* ErpMatch 자리 — 회사 → 담당 노무사 */
 const BYNAME = {
   '한빛물산': { company:'한빛물산', main:'박한별', subs:[] },
-  '대한산업': { company:'대한산업', main:'김혜민', subs:[] }
+  '마루산업': { company:'마루산업', main:'김혜민', subs:[] }
 };
 
 function load(over){
@@ -334,14 +334,14 @@ const DIR = [
 /* 회사 → 담당자. 퇴사자가 담당인 회사도 둔다(실제로 그런 회사가 있다). */
 const BYNAME2 = {
   '한빛물산': { company:'한빛물산', main:'박한별', subs:[] },
-  '대한산업': { company:'대한산업', main:'최기운', subs:[] },
+  '마루산업': { company:'마루산업', main:'최기운', subs:[] },
   '옛거래처': { company:'옛거래처', main:'박성수', subs:[] },   /* 퇴사자가 담당 */
   '휴직담당': { company:'휴직담당', main:'김석우', subs:[] },
   '과장담당': { company:'과장담당', main:'김보람', subs:[] }
 };
 const ITEMS2 = {
   a: { id:'a', email:'a@hanbit.co.kr', company:'한빛물산' },
-  b: { id:'b', email:'b@daehan.kr',    company:'대한산업' },
+  b: { id:'b', email:'b@daehan.kr',    company:'마루산업' },
   c: { id:'c', email:'c@old.kr',       company:'옛거래처' },
   d: { id:'d', email:'d@leave.kr',     company:'휴직담당' },
   e: { id:'e', email:'e@gwa.kr',       company:'과장담당' }
@@ -1158,7 +1158,7 @@ function loadCo(over){
     + '_mbNotCo = ' + JSON.stringify(o.notco || {}) + ';', c);
   return c;
 }
-/* 이 harness 의 자문사: 한빛물산(박한별) · 대한산업(최기운) · 옛거래처(박성수·퇴사) */
+/* 이 harness 의 자문사: 한빛물산(박한별) · 마루산업(최기운) · 옛거래처(박성수·퇴사) */
 const ROW = e => ({ e: e, r: 1, _slug: 'B_JAMUN', _key: 'B_JAMUN:9' });
 
 test('★★ 자문사에 이으면 «담당자는 회사에서 따라온다»', () => {
@@ -1473,7 +1473,7 @@ test('★ 먼저 본 사람이 «앞»에 온다 — 늦게 본 사람이 앞에
 test('★★ 공동이면 «공용 자리», 아니면 «대표 전용 자리»', () => {
   const c = loadSeen({ me: '박한별', subs: { '한빛물산': ['최기운'] } });
   const shared = SROW('a@hanbit.co.kr');       /* 한빛물산 — 부담당 있음 */
-  const solo   = SROW('b@daehan.kr');          /* 대한산업 — 부담당 없음 */
+  const solo   = SROW('b@daehan.kr');          /* 마루산업 — 부담당 없음 */
   assert.equal(c.mbSeenShared(shared), true, '공동인데 공동이 아니라고 한다');
   assert.equal(c.mbSeenShared(solo), false, '단독인데 공동이라고 한다');
   assert.match(c.mbSeenPath(shared), /pucards/, '공동 기록이 공용 자리가 아니다');

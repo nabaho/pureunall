@@ -109,12 +109,12 @@ test('★ 업체를 공유하면 받는 사람 칸에 적힌다', () => {
   const db = fakeDbMulti();
   S.init({ db: db, uid: 'U1', name: '권형하' });
   return S.shareCompany({
-    targetUid: 'U2', companyId: 'co_5', companyName: '참살이',
+    targetUid: 'U2', companyId: 'co_5', companyName: '새별살이',
     tags: ['확인 부탁드립니다', '서명·날인 필요'], at: 1000
   }).then(id => {
     const rec = getAtPath(db._tree, S.sharePath('U2', id));
     assert.equal(rec.companyId, 'co_5');
-    assert.equal(rec.companyName, '참살이');
+    assert.equal(rec.companyName, '새별살이');
     assert.equal(rec.byUid, 'U1');
     assert.equal(rec.byName, '권형하');
     assert.deepEqual(rec.tags, ['확인 부탁드립니다', '서명·날인 필요']);
@@ -164,7 +164,7 @@ test('★ 받는 사람은 자기에게 온 공유 목록을 읽는다', () => {
   const S = loadStore();
   const db = fakeDbMulti();
   S.init({ db: db, uid: 'U1', name: '권형하' });
-  return S.shareCompany({ targetUid: 'U2', companyId: 'co_5', companyName: '참살이', tags: ['참고만 하세요'] })
+  return S.shareCompany({ targetUid: 'U2', companyId: 'co_5', companyName: '새별살이', tags: ['참고만 하세요'] })
     .then(() => S.listShares('U2'))
     .then(list => { assert.equal(Object.keys(list).length, 1); });
 });

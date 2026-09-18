@@ -34,12 +34,12 @@ const DIR = [
   { sid:'A-009', name:'김정현', sortOrder:110, role:'staff',  title:'대리',       status:'retired' },
 ];
 const BYNAME = {
-  '하윤사': { company:'하윤사', main:'하윤서', subs:[], left:false },
+  '가람사': { company:'가람사', main:'하윤서', subs:[], left:false },
   '떠난사': { company:'떠난사', main:'박성수', subs:[], left:false },   /* 퇴사자가 담당 */
   '쉬는사': { company:'쉬는사', main:'김석우', subs:[], left:false },   /* 휴직자가 담당 */
 };
 const ITEMS = {
-  i1:{ id:'i1', email:'a@hy.kr', company:'하윤사' },
+  i1:{ id:'i1', email:'a@hy.kr', company:'가람사' },
   i2:{ id:'i2', email:'b@gone.kr', company:'떠난사' },
   i3:{ id:'i3', email:'c@rest.kr', company:'쉬는사' },
 };

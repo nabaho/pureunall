@@ -1027,7 +1027,7 @@ ok('전각 괄호도 지움', src.includes('（주）|（유）|주식회사|유
 ok('잘려 적힌 회사명도 인식', src.includes('if(nm.indexOf(toks[q])===0)')
   && src.includes("var toks=all.filter(function(t){ return t.length>=4; });"));
 /* 사업장명이 **더 긴 낱말의 앞부분**일 때는 그 사업장이 아니다.
-   붙여 놓은 글자열에서 찾기만 하던 때는 「에이이피렌탈 환불」이 '(주)에이이피' 로,
+   붙여 놓은 글자열에서 찾기만 하던 때는 「라온이피렌탈 환불」이 '(주)라온이피' 로,
    「가치평가수수료」가 '가치' 로 잡혔다 — 출연금으로 잘못 잡히면 기본재산이 부풀고
    준비금2 한도·별지15호 ⑬⑳㉚ 가 함께 틀어진다. */
 ok('이름 뒤에 한글이 이어지면 다른 낱말로 본다', src.includes('var glued=function(nm){')
@@ -1331,7 +1331,7 @@ ok('숫자만인 값은 성격으로 보지 않음', src.includes('!/^[\\d,.\\s]
 ok('거래마다 kind를 담음', src.includes('kind:kind});'));
 ok('가져오기가 kind를 넘기고 보관', src.includes('proposeAcct(x.memo,x.deposit>0,_snames,x.kind)')
   && src.includes("kind:(x.kind||'')"));
-// 공동기금 최대 유입인 출연금은 적요에 '출연' 없이 회사명만 찍힌다((주)수영로지콘·청원건설)
+// 공동기금 최대 유입인 출연금은 적요에 '출연' 없이 회사명만 찍힌다((주)가온로지콘·청원건설)
 ok('참여사업장명 입금을 출연금으로', src.includes('function _siteNames')
   && src.includes('if(isDep&&sites&&sites.length){')
   && src.includes("return {d:'현금성자산',c:'기본재산'};"));
