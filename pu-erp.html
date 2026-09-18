@@ -37490,17 +37490,6 @@ function erpCmsAmountAudit(rows, incomes, resolveName){
 function DataDiagnostics(){
   var rsS = useState(null); var results = rsS[0]; var setResults = rsS[1];
   var busyS = useState(false); var busy = busyS[0]; var setBusy = busyS[1];
-  /* ★★ 「지금 어떤 상태인가」를 화면 맨 위에 한 줄로 (2026-09-18 저녁, 대표님 「모르겠다 니가 직접하면 안되나」)
-     ── 무엇이 있었나
-       나스가 안 붙는 까닭을 가려 드리려고 검은 실행 로그에 🔎 줄을 넣었다. 그런데 대표님은
-       ① 단추를 찾아 누르고 ② 검은 칸에서 그 줄을 찾아 ③ 사진을 찍어 보내셔야 했다.
-       세 걸음이다. 그러다 「모르겠다」가 나왔다 — 안내가 길면 안내가 아니다.
-     ── 그래서
-       설정 화면을 여는 «그 순간» 스스로 재 보고, 검은 칸이 아니라 **맨 위 큰 글씨**로 답을 적는다.
-       대표님이 하실 일은 «화면을 여는 것» 하나다. 누를 것이 없다.
-     ⚠ 나는 사무실 밖(클라우드)에 있어 192.168.0.21 에 닿을 수 없다. 그 안에서 재는 것은
-       대표님 브라우저뿐이다 — 그러니 브라우저가 스스로 재고 스스로 말하게 한다. */
-  var 진단S = useState(null); var 진단 = 진단S[0]; var set진단 = 진단S[1];
   var fixLogS = useState([]); var fixLog = fixLogS[0]; var setFixLog = fixLogS[1];
 
   function runDiagnostics(){
@@ -41070,6 +41059,22 @@ function NasBackupSettings(){
   var cfg = cs[0]; var setCfg = cs[1];
   var logS = useState([]); var logs = logS[0]; var setLogs = logS[1];
   var busyS = useState(false); var busy = busyS[0]; var setBusy = busyS[1];
+  /* ★★ 「지금 어떤 상태인가」를 화면 맨 위에 한 줄로 (2026-09-18 저녁, 대표님 「모르겠다 니가 직접하면 안되나」)
+     ── 무엇이 있었나
+       나스가 안 붙는 까닭을 가려 드리려고 검은 실행 로그에 🔎 줄을 넣었다. 그런데 대표님은
+       ① 단추를 찾아 누르고 ② 검은 칸에서 그 줄을 찾아 ③ 사진을 찍어 보내셔야 했다.
+       세 걸음이다. 그러다 「모르겠다」가 나왔다 — 안내가 길면 안내가 아니다.
+     ── 그래서
+       설정 화면을 여는 «그 순간» 스스로 재 보고, 검은 칸이 아니라 **맨 위 큰 글씨**로 답을 적는다.
+       대표님이 하실 일은 «화면을 여는 것» 하나다. 누를 것이 없다.
+     ⚠ 나는 사무실 밖(클라우드)에 있어 192.168.0.21 에 닿을 수 없다. 그 안에서 재는 것은
+       대표님 브라우저뿐이다 — 그러니 브라우저가 스스로 재고 스스로 말하게 한다.
+     ⚠⚠ **이 칸은 이 컴포넌트 안에 있어야 한다.** 2026-09-18 저녁 이 줄이 «데이터 진단» 컴포넌트
+       (37,500줄께)에 잘못 들어가 환경설정 화면 전체가 「진단 is not defined」로 죽었다.
+       고칠 자리를 «첫 번째로 닮은 줄»로 찾으면 이 파일에서는 늘 남의 집이 걸린다 —
+       이 파일에는 var busyS = useState(false) 가 두 곳에 있다.
+       tests/state-declared-in-own-component.test.js 가 이제 기계로 막는다. */
+  var 진단S = useState(null); var 진단 = 진단S[0]; var set진단 = 진단S[1];
 
   function addLog(msg, type){ setLogs(function(l){ return [{ts:(new Date()).toLocaleTimeString(), msg:msg, type:type||'info'}].concat(l.slice(0,19)); }); }
   async function save(){
@@ -70545,11 +70550,14 @@ function ClosedManagement(){
             ? h('tr', null, h('td', { colSpan:9, className:'ac', style:{ color:'#94a3b8', padding:'40px' } }, '등록된 데이터가 없습니다'))
             : P.paged.map(function(c, idx){
                 var t = caseTypes.find(function(x){return x.code===c.typeCode;});
-                return h('tr', { key:c.id,
-                onContextMenu:function(ev){
-                  ev.preventDefault();
-                  setCtxMenu({x:ev.clientX, y:ev.clientY, item:c});
-                } },
+                /* ★ 오른쪽 클릭 손잡이를 걷어냈다 (2026-09-18, 새 검사가 잡아냈다)
+                   여기에 onContextMenu 가 있었는데 setCtxMenu 를 불렀다 — 그런데 이 화면에는
+                   그 상태 칸도, 띄울 메뉴도 없다(다른 화면에서 옮겨 붙을 때 딸려 온 것이다).
+                   그래서 종료관리 표에서 오른쪽을 누르면 «브라우저 메뉴도 안 뜨고»
+                   「setCtxMenu is not defined」로 그 자리에서 터졌다.
+                   메뉴를 새로 만들지 않고 손잡이를 뗀다 — 이제 브라우저 기본 메뉴가 정상으로 뜬다.
+                   tests/state-declared-in-own-component.test.js 가 이런 것을 기계로 잡는다. */
+                return h('tr', { key:c.id },
                   h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'11px' } }, P.base+idx+1),
                   h('td', { style:{ fontFamily:'monospace', fontWeight:700, fontSize:'12px' } }, c.caseNo),
                   h('td', { style:{ fontWeight:600 } }, c.companyName),
