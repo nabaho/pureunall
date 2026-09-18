@@ -72,9 +72,13 @@
     cal:{ name:'푸른 캘린더', file:'pu-cal.html', primaryRoots:['data/cal_view'], sharedRoots:['data'],
       entityTypes:['ScheduleEvent','Person'],
       /* ⚠ 여기 적힌 자리 «말고는» 이 앱이 아무것도 못 쓴다(새 프로그램은 기본이 차단이다).
-         1걸음은 읽기까지다 — 일정·근태 저장을 붙일 때 이 목록을 늘린다. 늘릴 때는
-         반드시 마감 자물쇠(PuWork.LOCK_TABLES)를 지나는 문으로만 쓴다. */
-      writeContracts:[{path:'data/cal_view/{uid}',entityType:'ViewState'}] },
+         ⚠★ 아래 둘은 «이알피의 칸»이다 — 주인이 우리가 아니다. 그래서 규칙이 하나 더 붙는다:
+            반드시 js/pu-cal-write.js 의 관문으로만 쓴다. 그 문이 마감 자물쇠·번호 그물·
+            «바뀐 칸만 보내기»·배열인 표 거르기를 한 자리에서 지킨다.
+            질러가서 쓰면 이알피와 서로를 덮고, 그 손해는 급여에서 드러난다. */
+      writeContracts:[{path:'data/cal_view/{uid}',entityType:'ViewState'},
+                      {path:'data/my_schedules/v/{id}',entityType:'ScheduleEvent'},
+                      {path:'data/attendance_records/v/{id}',entityType:'ScheduleEvent'}] },
     consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting'],
       sharedRoots:['data/consultings','puphotos'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp'], sharedRoots:['data','pucards/idx'],
