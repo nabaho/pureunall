@@ -175,6 +175,14 @@
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
       },
+      "attendance_records": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
+      },
+      "my_schedules": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
+      },
       "presence_hours": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"

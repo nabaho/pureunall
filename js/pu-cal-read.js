@@ -92,13 +92,19 @@
        열린 모든 화면으로 다시 내려온다(요금과 깜빡임의 뿌리, 2026-09-17).
        한 번 받고(once), 그 뒤에는 바뀐 «한 건»만 받는다. */
   var _db = null;
+  var _raw = {};           // 표마다 «편기 전» 생김새 — 쓰는 쪽이 이것을 봐야 한다
   function attach(db) { _db = db; return api; }
+
+  /* 편기 «전»의 생김새. 저장 관문이 「이 표가 아직 배열인가」를 여기서 본다 —
+     배열인 표에 글자 열쇠를 쓰면 표가 깨지므로, 그때는 쓰지 않고 이알피로 보낸다. */
+  function rawForm(key) { return Object.prototype.hasOwnProperty.call(_raw, key) ? _raw[key] : null; }
 
   function readOnce(key) {
     if (!_db) return Promise.reject(new Error('서버에 아직 안 붙었습니다'));
     return _db.ref('data/' + key).once('value').then(function (s) {
       var raw = s.val();
       var v = (raw && typeof raw === 'object' && 'v' in raw) ? raw.v : raw;
+      _raw[key] = v;
       return normalize(v);
     });
   }
@@ -130,6 +136,7 @@
     normalize: normalize,
     stableId: stableId,
     attach: attach,
+    rawForm: rawForm,
     readOnce: readOnce,
     readMany: readMany,
     watch: watch

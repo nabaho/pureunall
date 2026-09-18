@@ -16,7 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=27"></script>
+<script src="js/pu-ontology.js?v=28"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=2"></script>
@@ -24,7 +24,8 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-cal-read.js?v=1"></script>
+<script src="js/pu-cal-read.js?v=2"></script>
+<script src="js/pu-cal-write.js?v=1"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -110,6 +111,23 @@
   .legend{display:flex;gap:11px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin-top:9px}
   .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 
+  /* ── 넣고 고치는 창 ── */
+  .veil{position:fixed;inset:0;background:#1e293b;opacity:.45;z-index:40}
+  .modal{position:fixed;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92vw);
+    background:#ffffff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;max-height:88vh;overflow:auto}
+  .modal h3{margin:0 0 12px;font-size:15px}
+  .fld{margin-bottom:10px}
+  .fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px;font-weight:700}
+  .fld input,.fld select{width:100%;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;
+    font-size:13px;font-family:inherit;background:#ffffff;color:var(--ink)}
+  .mbtns{display:flex;gap:7px;margin-top:14px;align-items:center}
+  .mbtns .sp{margin-left:auto}
+  .btn.danger{background:#dc2626}
+  .btn[disabled]{opacity:.55;cursor:default}
+  .werr{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:7px;
+    padding:8px 11px;font-size:12px;margin-bottom:10px;white-space:pre-line}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:50;background:#1e293b;
+    color:#ffffff;border-radius:9px;padding:9px 16px;font-size:12.5px;font-weight:700}
   .later{text-align:center;padding:40px 18px;color:var(--sub)}
   .later h2{font-size:16px;margin:0 0 7px;color:var(--ink)}
   .later p{margin:0 0 16px;font-size:12.5px}
@@ -159,7 +177,7 @@ var fbDb = null;
 var D = {};              // 읽어 온 표들
 var FAILED = {};         // 못 읽은 표 — «빈 것»과 갈라 둔다
 var ME = null;           // 나 (직원 한 줄)
-var S = { tab:'cal', ym:'', filter:null, unwatch:[] };
+var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'' };
 
 var $ = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
@@ -183,10 +201,23 @@ var TABS = [
 
 /* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
    ⚠ 필요한 것만 읽는다 — 안 쓰는 큰 표를 받으면 요금과 깜빡임이 늘어난다. */
-var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors'];
+var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors',
+            'locked_attend_months'];
 
 /* ── 사람 ──────────────────────────────────────────────────────────── */
-function users(){ return arr(D.user_accounts).filter(function(u){ return u && u.sid; }); }
+/* ⚠ 직원 명부는 «배열»로도, «사번이 열쇠인 지도»로도 올 수 있다.
+   배열만 받으면 지도로 왔을 때 조용히 빈 목록이 되고 화면에 이름 대신 사번(S001)이 뜬다 —
+   틀린 화면이 아니라 «맞는 척하는» 화면이라 더 나쁘다. 그래서 두 꼴을 다 받는다. */
+function users(){
+  var v = D.user_accounts;
+  var list = Array.isArray(v) ? v
+    : (v && typeof v === "object") ? Object.keys(v).map(function(k){
+        var u = v[k];
+        return (u && typeof u === "object") ? (u.sid ? u : Object.assign({ sid:k }, u)) : null;
+      })
+    : [];
+  return list.filter(function(u){ return u && u.sid; });
+}
 function userOf(sid){
   var us = users();
   for(var i=0;i<us.length;i++) if(us[i].sid===sid) return us[i];
@@ -225,7 +256,8 @@ function eventsOn(ymd, eumOnly){
     if(!s || s.date !== ymd) return;
     if(s.externalId) return;                       // 외부인 배정은 로스터 화면에만 (이알피와 같은 규칙)
     var t = s.title || '📅 일정';
-    out.push({ kind:'sch', sid:s.sid, text:t, tip:t + (s.note ? ' · '+s.note : '') });
+    out.push({ kind:'sch', store:'my_schedules', id:s.id, sid:s.sid, text:t,
+      tip:t + (s.note ? ' · '+s.note : '') });
   });
   // ② 근태 — 유형의 뜻은 js/pu-work-core.js 한 자리에서 받는다
   arr(D.attendance_records).forEach(function(r){
@@ -237,6 +269,7 @@ function eventsOn(ymd, eumOnly){
     out.push({
       kind: r.type==='eum-work' ? 'eum' : (ty && ty.deductLeave) ? 'leave'
             : (r.type==='trip'||r.type==='telework') ? 'trip' : 'off',
+      store:'attendance_records', id:r.id,
       sid:r.sid, externalId:r.externalId, type:r.type,
       text:text, tip:text + (r.note ? ' · '+r.note : '')
     });
@@ -270,12 +303,13 @@ function calendarHtml(eumOnly){
     var cls = 'dnum' + (hol||dow===0 ? ' sun' : dow===6 ? ' sat' : '');
     var evs = eventsOn(ymd, eumOnly).filter(passFilter);
     var shown = evs.slice(0, 4), rest = evs.length - shown.length;
-    cells += '<div class="day'+(out?' out':'')+(ymd===today?' today':'')+'">'
+    cells += '<div class="day'+(out?' out':'')+(ymd===today?' today':'')+'" data-day="'+ymd+'">'
       + '<div class="'+cls+'">'+d.getDate()+(hol?'<span class="holname">'+esc(hol)+'</span>':'')+'</div>'
       + shown.map(function(e){
           var c = colorOf(e.sid);
           var st = (c && !e.externalId) ? ' style="border-left:3px solid '+esc(c)+'"' : '';
-          return '<div class="ev '+e.kind+'"'+st+' title="'+esc(e.tip)+'">'+esc(e.text)+'</div>';
+          /* 손대면 그 건을 연다. 빈 자리를 누르면 새로 넣는다(칸의 data-day). */
+          return '<div class="ev '+e.kind+'"'+st+' title="'+esc(e.tip)+'" data-ev="'+esc(e.store)+':'+esc(e.id)+'">'+esc(e.text)+'</div>';
         }).join('')
       + (rest>0 ? '<div class="more">+'+rest+'건</div>' : '')
       + '</div>';
@@ -326,11 +360,22 @@ function failedHtml(){
     + esc(ks.join(' · ')) + '</span></div>';
 }
 
-function readOnlyNote(){
-  return '<div class="note">'
-    + '<span>✏️ 넣고 고치는 것은 아직 푸른이알피에서 합니다 — 여기서는 보기만 합니다.</span>'
-    + '<span class="sp"></span>'
-    + '<button class="btn" data-erp="dash/corp">이알피에서 고치기</button></div>';
+/* 어느 표가 아직 «배열»이면 그 표는 여기서 못 고친다 — 쓰면 표가 깨진다.
+   숨기지 않고 그대로 적고 이알피로 보낸다. «못 한다»가 아니라 «저기서 한다». */
+function formNote(){
+  var 못쓰는표 = ['attendance_records','my_schedules'].filter(function(k){
+    return !PuCalWrite.isMapForm(PuCalRead.rawForm(k));
+  });
+  if(!못쓰는표.length) return '';
+  var 이름 = 못쓰는표.map(function(k){ return k==='my_schedules' ? '일정' : '근태'; }).join(' · ');
+  return '<div class="note"><span>⚠ '+esc(이름)+'은(는) 아직 옛 방식으로 담겨 있어 여기서 못 고칩니다.</span>'
+    + '<span class="sp"></span><button class="btn" data-erp="dash/corp">이알피에서 고치기</button></div>';
+}
+/* 마감된 달을 보고 있으면 미리 알린다 — 눌러 보고 나서 거절당하는 것보다 낫다 */
+function lockNote(){
+  if(arr(D.locked_attend_months).indexOf(S.ym) < 0) return '';
+  return '<div class="note"><span>🔒 '+esc(S.ym)+' 근태·휴가는 마감됐습니다 — 연차·근태는 고칠 수 없습니다'
+    + ' (일정은 됩니다).</span></div>';
 }
 
 function laterHtml(tab){
@@ -340,6 +385,114 @@ function laterHtml(tab){
     + (tab.money ? '<br>금액이 보이는 화면이라 옮길 때 권한을 함께 옮깁니다(관리자만).' : '')
     + '</p>'
     + '<button class="btn" data-erp="'+esc(tab.erp)+'">푸른이알피에서 열기</button></div>';
+}
+
+/* ── 넣고 고치기 ──────────────────────────────────────────────────────
+   ⚠ 저장은 반드시 js/pu-cal-write.js 의 관문을 지난다. 여기서 질러가지 말 것 —
+     마감된 달 · 번호 없는 항목 · 아직 배열인 표가 그 문에서만 걸린다. */
+function recOf(store, id){
+  var list = arr(D[store]);
+  for(var i=0;i<list.length;i++) if(list[i] && list[i].id===id) return list[i];
+  return null;
+}
+function openNew(ymd){
+  S.modal = { mode:"new", kind:"sch", date:ymd, sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1 };
+  render();
+}
+function openEdit(store, id){
+  var r = recOf(store, id);
+  if(!r){ toast("그 건을 못 찾았습니다 — 새로 받아 오는 중일 수 있습니다"); return; }
+  S.modal = { mode:"edit", store:store, id:id, kind:(store==="my_schedules"?"sch":"att"),
+    date:r.date||"", sid:r.sid||"", type:r.type||"leave", title:r.title||"", note:r.note||"",
+    hours:r.hours||1, prev:r };
+  render();
+}
+function closeModal(){ S.modal = null; S.busy = false; render(); }
+function toast(t){ S.toast = t; render(); setTimeout(function(){ if(S.toast===t){ S.toast=""; render(); } }, 3200); }
+
+function modalHtml(){
+  var m = S.modal; if(!m) return "";
+  var 새것 = m.mode==="new";
+  var 일정 = m.kind==="sch";
+  var 유형들 = PuWork.typesFor("calendar");
+  return "<div class=\"veil\" data-close=\"1\"></div><div class=\"modal\">"
+    + "<h3>"+(새것?"➕ 새로 넣기":"✏️ 고치기")+" — "+esc(m.date||"")+"</h3>"
+    + (m.err ? "<div class=\"werr\">"+esc(m.err)+"</div>" : "")
+    + (새것 ? "<div class=\"fld\"><label>무엇을</label><select data-m=\"kind\">"
+        + "<option value=\"sch\""+(일정?" selected":"")+">📅 일정</option>"
+        + "<option value=\"att\""+(일정?"":" selected")+">🏖️ 연차·근태</option></select></div>" : "")
+    + "<div class=\"fld\"><label>날짜</label><input type=\"date\" data-m=\"date\" value=\""+esc(m.date)+"\"></div>"
+    + "<div class=\"fld\"><label>누구</label><select data-m=\"sid\">"
+        + users().map(function(u){ return "<option value=\""+esc(u.sid)+"\""+(u.sid===m.sid?" selected":"")+">"
+            + esc(u.name||u.sid)+"</option>"; }).join("") + "</select></div>"
+    + (일정
+        ? "<div class=\"fld\"><label>무슨 일</label><input data-m=\"title\" value=\""+esc(m.title)+"\" placeholder=\"가나상사 컨설팅 2차\"></div>"
+        : "<div class=\"fld\"><label>유형</label><select data-m=\"type\">"
+            + 유형들.map(function(t){ return "<option value=\""+esc(t.code)+"\""+(t.code===m.type?" selected":"")+">"
+                + esc(t.icon+" "+PuWork.labelFor(t.code,"calendar"))+"</option>"; }).join("")
+            + "</select></div>"
+          + (m.type==="leave-hour"
+              ? "<div class=\"fld\"><label>몇 시간</label><input type=\"number\" min=\"1\" max=\"8\" data-m=\"hours\" value=\""+esc(m.hours)+"\"></div>"
+              : ""))
+    + "<div class=\"fld\"><label>메모</label><input data-m=\"note\" value=\""+esc(m.note)+"\" placeholder=\"안 적어도 됩니다\"></div>"
+    + "<div class=\"mbtns\">"
+    + (새것 ? "" : "<button class=\"btn danger\" data-act=\"del\""+(S.busy?" disabled":"")+">지우기</button>")
+    + "<span class=\"sp\"></span>"
+    + "<button class=\"btn ghost\" data-close=\"1\">그만</button>"
+    + "<button class=\"btn\" data-act=\"save\""+(S.busy?" disabled":"")+">"+(S.busy?"저장 중…":"저장")+"</button>"
+    + "</div></div>";
+}
+
+/* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
+function modalRead(){
+  var m = S.modal; if(!m) return;
+  ["kind","date","sid","type","title","note","hours"].forEach(function(f){
+    var el = document.querySelector("[data-m='"+f+"']");
+    if(el) m[f] = el.value;
+  });
+}
+
+function doSave(){
+  modalRead();
+  var m = S.modal; if(!m || S.busy) return;
+  var 일정 = m.kind==="sch";
+  var store = 일정 ? "my_schedules" : "attendance_records";
+  if(!m.date){ m.err = "날짜를 골라 주세요"; render(); return; }
+  if(일정 && !String(m.title||"").trim()){ m.err = "무슨 일인지 적어 주세요"; render(); return; }
+  var id = m.mode==="edit" ? m.id : PuCalWrite.newId(일정 ? "sch" : "att");
+  var item = { id:id, date:m.date, sid:m.sid, note:String(m.note||"") };
+  if(일정) item.title = String(m.title).trim();
+  else { item.type = m.type; item.hours = PuWork.hoursOf(m.type, m.hours); }
+  /* 고치는 것이면 «내가 보던 판»을 함께 넘긴다 — 바뀐 칸만 보내고,
+     원래 있던 달이 잠겼는지도 그것으로 본다. */
+  var prev = m.mode==="edit" ? (recOf(store, id) || m.prev) : null;
+  S.busy = true; m.err = ""; render();
+  PuCalWrite.save(store, item, prev).then(function(r){
+    S.busy = false;
+    if(!r.ok){ m.err = r.message; render(); return; }
+    var 고침 = m.mode==="edit";
+    closeModal();
+    toast(고침 ? "✅ 고쳤습니다" : "✅ 넣었습니다");
+    refreshOne(store);
+  });
+}
+
+function doDelete(){
+  var m = S.modal; if(!m || m.mode!=="edit" || S.busy) return;
+  if(!confirm("이 건을 지울까요?")) return;
+  var prev = recOf(m.store, m.id) || m.prev;
+  S.busy = true; m.err = ""; render();
+  PuCalWrite.remove(m.store, m.id, prev).then(function(r){
+    S.busy = false;
+    if(!r.ok){ m.err = r.message; render(); return; }
+    var st = m.store;
+    closeModal(); toast("🗑 지웠습니다"); refreshOne(st);
+  });
+}
+
+/* 바뀐 표 하나만 다시 받는다 — 나머지는 그대로 둔다 */
+function refreshOne(store){
+  PuCalRead.readOnce(store).then(function(v){ D[store]=v; render(); }).catch(function(){});
 }
 
 /* ── 그리기 ────────────────────────────────────────────────────────── */
@@ -360,17 +513,20 @@ function render(){
   var html;
   if(tab.v==='cal' || tab.v==='eumcal'){
     var eumOnly = tab.v==='eumcal';
-    html = failedHtml() + readOnlyNote()
-      + '<div class="panel">' + monthbarHtml() + chipsHtml(eumOnly) + calendarHtml(eumOnly) + legendHtml() + '</div>';
+    html = failedHtml() + formNote() + lockNote()
+      + '<div class="panel">' + monthbarHtml() + chipsHtml(eumOnly) + calendarHtml(eumOnly) + legendHtml()
+      + '<div class="muted" style="font-size:11px;margin-top:7px">빈 칸을 누르면 새로 넣고, 일을 누르면 고칩니다.</div></div>';
   } else {
     html = laterHtml(tab);
   }
+  html += modalHtml();
+  if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   $('app').innerHTML = html;
 }
 
 /* 누르는 것은 한 자리에서 받는다 — 단추마다 붙이면 다시 그릴 때 하나씩 샌다 */
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -379,8 +535,21 @@ document.addEventListener('click', function(e){
     else { var d=new Date(S.ym+'-01'); d.setMonth(d.getMonth()+mv); S.ym = ymOf(d); }
     render(); return;
   }
-  if(t.hasAttribute('data-f')){ var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
+  if(t.hasAttribute('data-f')){ modalRead(); var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
   if(t.hasAttribute('data-erp')){ goErp(t.getAttribute('data-erp')); return; }
+  if(t.hasAttribute('data-close')){ closeModal(); return; }
+  if(t.hasAttribute('data-act')){
+    if(t.getAttribute('data-act')==='save') doSave(); else doDelete();
+    return;
+  }
+  /* 일을 누르면 그 건을 연다. 칸의 빈 자리를 누르면 새로 넣는다.
+     ⚠ 일 쪽을 «먼저» 본다 — 일은 칸 «안»에 있어 칸도 함께 걸린다. */
+  if(t.hasAttribute('data-ev')){
+    var ev = t.getAttribute('data-ev').split(':');
+    openEdit(ev[0], ev.slice(1).join(':'));
+    return;
+  }
+  if(t.hasAttribute('data-day')){ openNew(t.getAttribute('data-day')); return; }
 });
 
 /* 이알피로 — 창은 «하나»만 쓴다(새 탭을 자꾸 만들지 않는다) */
@@ -389,6 +558,19 @@ function goErp(menu){
   try { if(window.PuAppBar && PuAppBar.goApp){ PuAppBar.goApp(url, 'erp'); return; } } catch(e){}
   location.href = url;
 }
+/* 유형을 시간연차로 바꾸면 «몇 시간» 칸이 생긴다 — 바뀔 때 다시 그린다.
+   ⚠ 다시 그리기 전에 지금 적힌 것을 먼저 담는다(안 그러면 적던 것이 날아간다). */
+document.addEventListener('change', function(e){
+  if(!S.modal || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-m')) return;
+  var f = e.target.getAttribute('data-m');
+  if(f !== 'type' && f !== 'kind') return;
+  modalRead(); render();
+});
+/* ESC 로 창을 닫는다 — 뒤로가기 층과 다투지 않게 여기서만 받는다 */
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && S.modal){ e.preventDefault(); closeModal(); }
+});
+
 $('goErp').onclick = function(){ goErp(''); };
 $('logout').onclick = function(){ try{ firebase.auth().signOut(); }catch(e){} };
 
@@ -400,6 +582,13 @@ function setConn(on, text){
 
 function start(user){
   PuCalRead.attach(fbDb);
+  /* 저장 관문이 봐야 할 셋을 넘긴다 —
+     ① 어느 달이 마감됐나 ② 그 표가 아직 배열인가 ③ 누가 고쳤나 */
+  PuCalWrite.attach(fbDb, {
+    lockedMonths: function(){ return arr(D.locked_attend_months); },
+    formOf: function(k){ return PuCalRead.rawForm(k); },
+    who: function(){ return (ME && ME.name) || (ME && ME.sid) || ''; }
+  });
   S.ym = ymOf(new Date());
   setConn(true, '연결됨');
   PuCalRead.readMany(KEYS).then(function(r){
