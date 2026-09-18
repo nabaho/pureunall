@@ -28,13 +28,26 @@ const ROOT = path.join(__dirname, '..');
 const raw = fs.readFileSync(path.join(ROOT, 'kcareer.html'), 'utf8');
 const bare = stripComments(raw);
 
-/* 화면에 OCR 칸이 있는 보관함 — 여기서 «찾아»낸다 */
-const 칸 = [...new Set([...raw.matchAll(/class="ocr-zone"\s+data-store="([A-Za-z_]+)"/g)]
-  .map((m) => m[1]))];
+/* OCR 로 서류를 받는 화면 — 여기서 «찾아»낸다.
+   ⚠★ 받는 «길이 둘»이다. 한쪽만 찾으면 다른 쪽이 통째로 눈 밖에 난다 —
+     실제로 그랬다(대표 제보 2026-09-18): 실적 네 화면과 강의 화면은 ⑵ 길이라
+     이 검사가 못 보았고, saveOCRRecord 에 갈래가 없는 채로 오래 남아 있었다.
+     ⑴ 상자를 둔 화면        — class="ocr-zone" data-store="…"
+     ⑵ 화면 전체로 받는 화면 — ondrop="pageDropFile(event,'…')"
+   ⚠ 목록을 손으로 적지 않는다 — 적는 순간 새 화면이 늘 때 검사가 눈을 감는다. */
+const 상자칸 = [...raw.matchAll(/class="ocr-zone"\s+data-store="([A-Za-z_]+)"/g)].map((m) => m[1]);
+const 화면칸 = [...raw.matchAll(/pageDropFile\(event,\s*'([A-Za-z_]+)'\)/g)].map((m) => m[1]);
+const 칸 = [...new Set([...상자칸, ...화면칸])];
 
 test('화면에 OCR 칸이 여럿 있다 (찾는 자가 헛돌지 않는다)', () => {
   assert.ok(칸.length >= 5,
     'OCR 칸을 못 찾았다(' + 칸.length + '개) — 찾는 자가 낡았다. 이 검사부터 고칠 것');
+});
+
+test('★ 받는 길 «둘»을 모두 찾는다 — 한쪽만 보면 다른 쪽이 통째로 빠진다', () => {
+  const 화면만 = 칸.filter((s) => 상자칸.indexOf(s) < 0);
+  assert.ok(화면만.length >= 5,
+    '화면 전체로 받는 화면(pageDropFile)을 못 찾았다 — 찾는 자가 낡았다: ' + JSON.stringify(화면만));
 });
 
 /* PAGE_OCR_PROMPT 안쪽만 잘라 본다 — 밖에서 같은 낱말이 나와도 속지 않게 */

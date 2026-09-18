@@ -72,6 +72,17 @@ function savedFields() {
   while ((k = dr.exec(blk))) if (keys.indexOf(k[1]) < 0) keys.push(k[1]);
   const pr = /parsed\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
   while ((k = pr.exec(blk))) if (keys.indexOf(k[1]) < 0) keys.push(k[1]);
+  /* ★ 칸 이름을 «목록으로 적어» 서식(FORM_DEFS)에서 끌어다 담는 갈래도 본다
+       (실적 네 화면 + 강의, 2026-09-18). `parsed[k]` 처럼 이름을 계산해서 쓰면
+       위의 `parsed.xxx` 찾기로는 한 칸도 안 보여 «다 빠진 것»으로 읽힌다.
+     ⚠ 아무 글자나 세지 않는다 — 이름이 KEYS 로 끝나는 «목록 선언» 안의 것만 센다.
+       그래서 목록에서 칸을 빼면 여기서도 사라져 이 검사가 그대로 걸린다. */
+  const lr = /[A-Za-z_가-힣]*KEYS\s*=([^;]*);/g;
+  while ((k = lr.exec(blk))) {
+    const sr = /'([a-zA-Z_][a-zA-Z0-9_]*)'/g;
+    let s;
+    while ((s = sr.exec(k[1]))) if (keys.indexOf(s[1]) < 0) keys.push(s[1]);
+  }
   return keys;
 }
 
