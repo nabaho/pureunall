@@ -116,3 +116,49 @@ test('⑩ 기둥 제목이 탭 이름을 대신한다 — 어디가 어딘지 �
   assert.match(MODAL, /colPane\('👤 담당자정보'[\s\S]{0,140}colPane\('📋 일지'/,
     '두 기둥일 때는 아래 줄에 나란히');
 });
+
+/* ───────── 2026-09-18 두 번째 정리 (대표 「현재 이렇게 하면 엉망이 된다」) ───────── */
+
+test('⑪★ 업체 연결은 회사정보 «뒤»에 온다 — 회사명을 쳐야 후보가 나온다', () => {
+  const 회사명 = MODAL.indexOf("'의뢰인 (회사명) '");
+  const 연결   = MODAL.indexOf("'업체 연결 확인'");
+  assert.ok(회사명 > 0 && 연결 > 0, '두 자리를 모두 찾을 수 있다');
+  assert.ok(연결 > 회사명,
+    '업체 연결 상자가 회사명 칸보다 «앞»에 있으면 파란 상자 네 줄을 지나야 회사명이 보인다');
+});
+
+test('⑫ 서류 가져오기는 «한 줄»이다 — 전에는 한 덩이가 여섯 줄이었다', () => {
+  const dz = stripJs(cutFn(RAW, 'function dropZone('));
+  /* 길 셋은 그대로 남아 있다 */
+  assert.match(dz, /📇 기업정보함 정보 가져오기/, '기업정보함에서 가져오는 길');
+  assert.match(dz, /📷 사진으로 채우기/, '사진으로 채우는 길');
+  assert.match(dz, /기업정보함에서 보기/, '사진 보러 가는 길');
+  /* ★ 셋이 «같은 줄»에 있는가 — 끌어다 놓기를 받는 그 한 줄 안에 다 들어 있어야 한다.
+       전에는 제목 줄 · 단추 줄 · 설명 줄로 갈라져 있었다. */
+  const a = dz.indexOf('onDrop:function(e){ e.preventDefault(); fillFrom(');
+  const b = dz.indexOf("h('input', { id:inpId", a);
+  assert.ok(a > 0 && b > a, '끌어다 놓기를 받는 줄을 찾을 수 있다');
+  const 한줄 = dz.slice(a, b);
+  ['📇 기업정보함 정보 가져오기', '📷 사진으로 채우기', '기업정보함에서 보기']
+    .forEach(s => assert.ok(한줄.indexOf(s) > 0, '「' + s + '」 이 그 한 줄 밖에 있다'));
+  assert.ok(!/justifyContent:'space-between'/.test(dz),
+    '제목을 따로 세우던 윗줄이 남아 있다');
+  assert.ok(!/h\('span', \{ style:\{ fontSize:'10px', color:'#94a3b8' \} \}, '글자만 읽고/.test(dz),
+    '늘 떠 있던 설명 글은 말풍선으로 옮겼다');
+  assert.match(cutFn(RAW, 'function dropZone('), /title:'사진을 골라[\s\S]{0,220}글자만 읽고 사진은 버립니다/,
+    '그 설명이 말풍선 안에 «살아 있다» — 지우지 않았다');
+});
+
+test('⑬ 늘 떠 있던 안내 한 줄은 말풍선으로 (상태 줄은 그대로 남는다)', () => {
+  assert.ok(!/h\('div',\{style:\{fontSize:'10\.5px',marginTop:'4px',color:'#64748b'\}\},'사업자번호가 하나의 업체와/.test(MODAL),
+    '늘 떠 있던 줄은 없앴다');
+  assert.match(RAW, /title:'사업자번호가 하나의 업체와 정확히 일치하면 자동 연결합니다/,
+    '그 글은 말풍선에 살아 있다 — 지우지 않았다');
+  assert.match(MODAL, /!companyLinkTouched \? '업체를 고르면/,
+    '그때그때 달라지는 «답» 줄은 그대로 둔다 — 그건 잔소리가 아니다');
+});
+
+test('⑭ 빈 상자는 안 그린다 — 「변경 이력 없음」이 기둥 한가운데를 먹고 있었다', () => {
+  assert.match(MODAL, /\(f\.mgrHistory\|\|\[\]\)\.length > 0 &&\s*h\('div'/,
+    '이력이 없으면 상자째 안 그린다');
+});
