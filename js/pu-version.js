@@ -40,7 +40,23 @@
      이 정상 흐름이 3분 안 3번으로 세어져 «폭풍»이 됐고, 문까지 닫혔다(「주소로 다시 열림, 10초 전」).
      서버 기록에는 되풀이 부팅이 없었다 — 감지기의 거짓 경보였다. 포털 부팅은 이알피 수에 안 넣는다. */
   var BOOT_KEY = 'pu_boot_log_v2';
-  var BOOT_STORM_N = 3, BOOT_STORM_MS = 3 * 60 * 1000;
+  /* ★★★ 문턱을 3 → 5 로 올리고 «간격이 고른지»를 함께 본다 (2026-09-18 저녁, 대표 화면 셋째 장)
+     ── 무엇이 있었나
+       대표님이 나스 인증서를 받으시느라 192.168.0.21 을 열었다 닫았다 하시며 새로고침을
+       몇 번 누르셨다. 3분 안 3번 · 「브라우저·확장이 새로고침」 — 띠가 떴고, 띠는
+       「자동 새로고침 확장이나 탭 돌리기를 꺼 주세요」라고 시켰다. 그래서 대표님이
+       「탭돌리기 꺼주세요 이것 처리해라」고 하셨다. **끌 것이 없었다.**
+       (이 감지기의 거짓 경보는 이것으로 세 번째다 — 9/17 저녁, 9/18 낮, 그리고 이것)
+     ── 까닭
+       지금까지는 «횟수»만 셌다. 그런데 새로고침을 손으로 세 번 누르는 것은 아주 흔하다
+       (인증서 받기·연결 시험·화면이 이상할 때). 횟수만으로는 사람과 기계를 못 가른다.
+     ── 가르는 것은 «고름»이다
+       기계는 고르게 켠다 — 20초·20초·20초. 사람은 제멋대로다 — 47초·9초·2분.
+       그래서 ① 5번 넘고 ② 간격이 고를 때만 폭풍으로 본다. 진짜 폭풍(20초마다 8번/165초)은
+       둘 다 넘으므로 그대로 잡힌다.
+     ⚠ 못 가릴 때는 «띠를 띄우지 않는다». 콘솔에는 언제나 다 남는다 —
+       사람에게 시키려면 먼저 시킬 만한 근거가 있어야 한다. */
+  var BOOT_STORM_N = 5, BOOT_STORM_MS = 3 * 60 * 1000;
   /* ★ 두 번째 눈 — «이 기기·이 화면» 단위 (2026-09-17 저녁, 재검증에서 잡힘)
      첫 눈(같은 탭, sessionStorage)만 두었더니 배포 1시간 뒤 기록에서도 부팅 8번/165초가
      그대로였다 — 문이 한 번도 안 닫혔다. 부팅마다 «새 탭»이 열리면 sessionStorage 는 매번
@@ -63,12 +79,31 @@
        몇 초 안에 끝나고, 진짜 폭풍은 20초 간격으로 «끝없이» 이어진다 — 그 둘이 갈린다.
      ⚠ 기록은 그대로 다 남긴다 — 세는 법만 접는다(사람이 콘솔에서 실제 횟수를 봐야 한다). */
   var BOOT_BURST_MS = 5 * 1000;
-  function countSpread(arr) {
-    var n = 0, last = -Infinity;
+  function spreadTimes(arr) {
+    var out = [], last = -Infinity;
     for (var i = 0; i < arr.length; i++) {
-      if (arr[i] - last >= BOOT_BURST_MS) { n++; last = arr[i]; }
+      if (arr[i] - last >= BOOT_BURST_MS) { out.push(arr[i]); last = arr[i]; }
     }
-    return n;
+    return out;
+  }
+  function countSpread(arr) { return spreadTimes(arr).length; }
+  /* ── 간격이 «고른가» — 사람과 기계를 가르는 자리 ────────────────────────────
+     기계(자동 새로고침 확장·탭 돌리기·모니터링 도구)는 정해진 초마다 켠다. 사람은 못 그런다.
+     가운뎃값(중앙값)을 잡고 모든 간격이 그 언저리(±35%, 최소 ±4초)에 들면 «고르다».
+     ⚠ 간격이 셋은 있어야 본다(=부팅 넷). 둘은 우연히 닮기 쉽다.
+     ⚠ 아주 뜸한 것(2분 반 넘김)은 고르더라도 폭풍이라 하지 않는다 — 요금이 새는 속도가 아니다. */
+  var GAP_EVEN_RATIO = 0.35, GAP_EVEN_SLACK_MS = 4000, GAP_MAX_MS = 150 * 1000;
+  function gapStat(times) {
+    var gaps = [], i;
+    for (i = 1; i < times.length; i++) gaps.push(times[i] - times[i - 1]);
+    if (gaps.length < 3) return { every: null, even: false };
+    var s = gaps.slice().sort(function (a, b) { return a - b; });
+    var mid = s.length % 2 ? s[(s.length - 1) / 2] : Math.round((s[s.length / 2 - 1] + s[s.length / 2]) / 2);
+    var every = mid ? Math.round(mid / 1000) : null;
+    if (!mid || mid > GAP_MAX_MS) return { every: every, even: false };
+    var slack = Math.max(GAP_EVEN_SLACK_MS, mid * GAP_EVEN_RATIO);
+    var even = gaps.every(function (g) { return Math.abs(g - mid) <= slack; });
+    return { every: every, even: even };
   }
   function noteBootDevice(now) {
     try {
@@ -88,9 +123,11 @@
       });
       try { window.localStorage.setItem(BOOT_DEV_KEY, JSON.stringify(all)); } catch (_) {}
       /* 몰려서 켜진 것은 한 번으로 접어 센다 — 로그아웃이 여러 탭을 한꺼번에 보내는 것이
-         폭풍으로 보이던 것을 막는다(2026-09-18 대표 화면). 기록은 그대로 다 남는다. */
-      return countSpread(arr.slice().sort(function (a, b) { return a - b; }));
-    } catch (_) { return 0; }
+         폭풍으로 보이던 것을 막는다(2026-09-18 대표 화면). 기록은 그대로 다 남는다.
+         ⚠ «접고 남은 시각»도 함께 돌려준다 — 간격이 고른지 재려면 접기 전 시각으로는 안 된다. */
+      var kept = spreadTimes(arr.slice().sort(function (a, b) { return a - b; }));
+      return { count: kept.length, times: kept };
+    } catch (_) { return { count: 0, times: [] }; }
   }
   function bootNavType() {
     try { var e = window.performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]; return (e && e.type) || ''; } catch (_) { return ''; }
@@ -111,28 +148,51 @@
       var since = prev ? Math.round((now - prev) / 1000) : null;
       var from = '';
       try { from = window.document.referrer ? window.document.referrer.replace(window.location.origin, '') : ''; } catch (_) {}
-      var devCount = noteBootDevice(now);
-      var tabStorm = arr.length >= BOOT_STORM_N;
-      var devStorm = devCount >= BOOT_DEV_STORM_N;
+      /* 탭 눈도 «몰린 것»을 접어 센다 — 기기 눈만 접으면 한 탭 안에서 잇따라 켜진 것이 그대로 센다 */
+      var tabTimes = spreadTimes(arr.slice().sort(function (a, b) { return a - b; }));
+      var tabCount = tabTimes.length;
+      var dev = noteBootDevice(now);
+      var devCount = dev.count;
+      var tabMany = tabCount >= BOOT_STORM_N;
+      var devMany = devCount >= BOOT_DEV_STORM_N;
+      /* ★ 횟수를 넘은 «그 눈»의 시각으로 고름을 잰다 — 넘지도 않은 눈의 간격을 재면 뜻이 없다 */
+      var stat = gapStat(tabMany ? tabTimes : devMany ? dev.times : []);
+      /* ★★ 횟수«와» 고름이 둘 다 서야 폭풍이다. 하나만으로는 사람과 기계가 안 갈린다 —
+         이 줄이 없어서 대표님이 새로고침 세 번 누르신 것에 「탭 돌리기를 끄라」고 시켰다. */
+      var tabStorm = tabMany && stat.even;
+      var devStorm = devMany && stat.even;
       var storm = tabStorm || devStorm;
-      window.PU_BOOT = { count: arr.length, devCount: devCount, since: since, type: nav, from: from, storm: storm, tabStorm: tabStorm, devStorm: devStorm };
+      window.PU_BOOT = { count: tabCount, rawCount: arr.length, devCount: devCount, since: since, type: nav, from: from,
+        storm: storm, tabStorm: tabStorm, devStorm: devStorm, every: stat.every, even: stat.even };
       if (window.console && console.info) {
         console.info('[부팅] ' + (nav || '?') + (since != null ? ' · 직전 부팅에서 ' + since + '초' : ' · 이 탭의 첫 부팅')
-          + ' · 이 탭에서 3분 안 ' + arr.length + '번 · 이 기기의 이 화면 3분 안 ' + devCount + '번' + (from ? ' · 온 곳 ' + from : ''));
+          + ' · 이 탭에서 3분 안 ' + tabCount + '번 · 이 기기의 이 화면 3분 안 ' + devCount + '번'
+          + (stat.every != null ? ' · 간격 ' + (stat.even ? '고름(약 ' + stat.every + '초마다)' : '제각각(가운데 ' + stat.every + '초)') : '')
+          + (from ? ' · 온 곳 ' + from : ''));
+      }
+      /* ⚠ 횟수는 넘었는데 간격이 제각각 = 사람이 누른 것이다. 콘솔에만 남기고 «띠는 안 띄운다» */
+      if (!storm && (tabMany || devMany) && window.console && console.info) {
+        console.info('[부팅] 여러 번 켜졌지만 간격이 제각각입니다 — 사람이 새로고침한 것으로 보고 알리지 않습니다.');
       }
       if (storm) {
         /* 탭은 「첫 부팅」인데 기기로는 다섯 번째 = 부팅마다 «새 탭»이 열리고 있다 — 그 말을 그대로 적는다 */
         var how = (!tabStorm && devStorm) ? '매번 새 탭으로 열림' : (nav === 'reload' ? '브라우저·확장이 새로고침' : nav === 'navigate' ? '주소로 다시 열림' : (nav || '종류 모름'));
-        var n = tabStorm ? arr.length : devCount;
+        var n = tabStorm ? tabCount : devCount;
         if (window.console && console.warn) {
-          console.warn('★★ 이 ' + (tabStorm ? '탭' : '기기의 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 (' + how + ').'
+          console.warn('★★ 이 ' + (tabStorm ? '탭' : '기기의 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 ('
+            + how + ' · 약 ' + stat.every + '초마다 고르게).'
             + ' 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다 — 자동 새로고침 확장·탭 돌리기를 확인하세요.');
         }
-        mountStormBanner(n, since, how, tabStorm);
+        mountStormBanner(n, stat.every, how, tabStorm);
       }
     } catch (_) {}
   }
-  function mountStormBanner(n, since, how, tabStorm) {
+  /* ── 띠는 «근거를 대고» 말한다 (2026-09-18 저녁) ────────────────────────────
+     옛 띠는 「자동 새로고침 확장이나 탭 돌리기를 꺼 주세요」라고 시키기만 했다. 그런데
+     그것이 정말 있는지 우리는 모른다 — 대표님은 끌 것을 찾다 못 찾고 나에게 시키셨다.
+     이제 띠는 «간격이 고를 때만» 뜨므로 그 근거를 그대로 적는다: 「약 20초마다 고르게 —
+     사람이 누른 것이 아닙니다」. 그 한 줄이 있어야 「그럼 뭘 끄라는 건가」가 풀린다. */
+  function mountStormBanner(n, every, how, tabStorm) {
     function mount() {
       try {
         if (!window.document.body || window.document.getElementById('pu-boot-storm')) return;
@@ -143,8 +203,10 @@
           'padding:9px 14px;font:700 13px/1.45 system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
         var msg = window.document.createElement('span');
         msg.style.cssText = 'flex:1;min-width:0';
-        msg.textContent = '⚠ 이 ' + (tabStorm ? '탭' : '기기에서 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 (' + how + (since != null && tabStorm ? ', 마지막은 ' + since + '초 전' : '') + ')' +
-          '. 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다 — 브라우저의 자동 새로고침 확장이나 탭 돌리기를 꺼 주세요.';
+        msg.textContent = '⚠ 이 ' + (tabStorm ? '탭' : '기기에서 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 ('
+          + how + (every != null ? ' · 약 ' + every + '초마다 고르게' : '') + ').'
+          + ' 사람이 누르면 이렇게 고르게 못 누릅니다 — 브라우저의 자동 새로고침 확장·탭 돌리기, 또는 이 화면을 열어 두는 감시 도구를 찾아 꺼 주세요.'
+          + ' 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다.';
         var x = window.document.createElement('span');
         x.setAttribute('role', 'button'); x.tabIndex = 0;
         x.textContent = '닫기';
