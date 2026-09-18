@@ -889,6 +889,61 @@ function nasReachVerdict(r, base, origin){
     + '② 사무실 «안»이라면 NAS 가 꺼져 있거나 주소·포트가 다릅니다.\n'
     + '\n〔지금 바로 되는 길〕 아래 「💾 백업 파일 다운로드」로 받아 File Station 에 끌어 놓으십시오.';
 }
+/* ══ 역방향 프록시 «따라만 하기» (대표 지시 2026-09-18 「역방향 니가 직접 만들어 해달라」) ══════
+   ■ 왜 필요하게 됐나
+     브라우저는 나스가 「이 화면에 자료를 줘도 된다」고 써 준 쪽지(CORS 머리글)를 요구한다.
+     보통 DSM 은 제어판 → 로그인 포털 → 응용 프로그램에서 그 쪽지를 붙일 수 있는데,
+     대표님 나스 판에는 **그 칸이 아예 없다**(2026-09-18 세 탭을 다 뒤졌다 —
+     고급 탭에는 「역방향 프록시」와 「액세스 제어 프로파일」뿐이다).
+     역방향 프록시는 나스 «앞에 내는 새 창구»이고, 그 창구에는 쪽지 붙이는 칸이 있다.
+   ■ 내가 못 하는 것
+     192.168.0.21 은 사무실 안 주소다 — 클라우드에서 도는 나는 닿을 수 없다.
+     그래서 «대신 눌러 드리는 것»은 못 한다. 대신 **옮겨 적을 것을 없앤다** —
+     칸마다 값을 만들어 두고 복사 단추를 달고, 이알피 쪽 마무리는 내가 한다.
+   ⚠ 값을 두 곳에 적지 않는다. 화면도 이 한 벌(nasProxyPlan)을 보고 그린다 —
+     두 벌이면 포트를 바꿀 때 한 벌만 고쳐져 「시킨 대로 했는데 안 된다」가 된다. */
+var NAS_PROXY_PORT = '5443';                 // 새 창구 포트 (DSM 5001 과 겹치지 않는 자리)
+function nasProxyPlan(cfg){
+  var host = (cfg && cfg.host) || '192.168.0.21';
+  var 안쪽 = (cfg && cfg.httpsPort) || '5001';
+  /* 이미 창구로 돌려 두었으면 대상은 DSM 기본(5001)이다 — 창구를 창구로 보내면 고리가 된다 */
+  if(String(안쪽) === NAS_PROXY_PORT) 안쪽 = '5001';
+  var origin = (function(){ try { return location.origin; } catch(_){ return 'https://nabaho.github.io'; } })();
+  return {
+    port: NAS_PROXY_PORT,
+    칸: [
+      { 이름:'설명',            값:'푸른이알피' },
+      { 이름:'소스 · 프로토콜',  값:'HTTPS' },
+      { 이름:'소스 · 호스트 이름', 값:host },
+      { 이름:'소스 · 포트',      값:NAS_PROXY_PORT },
+      { 이름:'대상 · 프로토콜',  값:'HTTPS' },
+      { 이름:'대상 · 호스트 이름', 값:'localhost' },
+      { 이름:'대상 · 포트',      값:String(안쪽) }
+    ],
+    머리글: [
+      { 이름:'Access-Control-Allow-Origin', 값:origin },
+      { 이름:'Access-Control-Allow-Private-Network', 값:'true' }
+    ]
+  };
+}
+function nasCopy(t, 말){
+  function 됐다(){ try { showToast('📋 복사됨 — ' + (말 || '나스 칸에 붙여넣으세요')); } catch(_){} }
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(됐다, function(){ nasCopyFallback(t, 됐다); });
+      return;
+    }
+  } catch(_){}
+  nasCopyFallback(t, 됐다);
+}
+function nasCopyFallback(t, 됐다){
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = t; ta.style.position='fixed'; ta.style.left='-9999px';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); 됐다();
+  } catch(_){ try { showToast('복사가 안 됩니다 — 값을 손으로 옮겨 적어 주세요'); } catch(__){} }
+}
 function nasAutoClear(){
   try { localStorage.removeItem(NAS_AUTO_KEY); localStorage.removeItem(NAS_AUTO_TRY_KEY); } catch(_){}
 }
@@ -41217,6 +41272,15 @@ function NasBackupSettings(){
       });
     } catch(e){ return false; }
   }
+  /* ★ 마지막 한 단계는 «내가» 한다 — 대표님이 이알피 칸을 다시 찾아 고치실 것 없이.
+     ⚠ 저장까지 해야 뜻이 있다 — 바꾸기만 하면 화면을 떠나는 순간 사라진다(그 덫에 이미 한 번 걸렸다). */
+  function 창구로돌리기(){
+    var n = Object.assign({}, cfg, { useHttps:true, httpsPort: NAS_PROXY_PORT });
+    setCfg(n);
+    try { localStorage.setItem(NAS_KEY, JSON.stringify(n)); } catch(_){}
+    addLog('이알피를 새 창구(' + NAS_PROXY_PORT + ')로 돌리고 저장했습니다 — 「🔌 연결 테스트」를 눌러 보세요', 'ok');
+    showToast('✅ 이알피 쪽은 끝났습니다 — 연결 테스트를 눌러 보세요');
+  }
   function toHttps(){ setCfg(Object.assign({}, cfg, { useHttps:true })); addLog('HTTPS 로 바꿨습니다 — 「설정 저장」을 눌러 굳히십시오','info'); }
   function field(k){ return function(e){ setCfg(Object.assign({},cfg,(function(){var x={};x[k]=e.target.value;return x;})())) ; }; }
 
@@ -41605,7 +41669,43 @@ function NasBackupSettings(){
               }}))
           )
         ),
-        )
+        ),
+          /* ══ 「따라만 하시면 됩니다」 — 타이핑을 없앤다 (대표 지시 2026-09-18) ══
+             ⚠ 원인이 CORS 로 «짚혔을 때»만 편다. 늘 펴 두면 또 화면이 길어진다
+               (같은 날 긴 CORS 안내를 걷어낸 까닭이 그것이다). */
+          (function(){
+            if(!(진단 && 진단.ok === false && /CORS/.test(진단.msg || ''))) return null;
+            var 계획 = nasProxyPlan(cfg);
+            var 값칸 = function(이름, 값){
+              return h('div', { key:이름, style:{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', flexWrap:'wrap'} },
+                h('span', { style:{fontSize:'11.5px', color:'#475569', minWidth:'130px'} }, 이름),
+                h('code', { style:{flex:1, minWidth:'140px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'5px',
+                                   padding:'3px 8px', fontFamily:'monospace', fontSize:'11.5px', overflowWrap:'anywhere'} }, 값),
+                h('button', { onClick:function(){ nasCopy(값); },
+                  style:{flex:'none', border:'1px solid #1e40af', background:'#fff', color:'#1e40af',
+                         borderRadius:'5px', padding:'2px 9px', fontSize:'11px', cursor:'pointer', fontWeight:600} }, '복사'));
+            };
+            return h('div', { style:{background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'10px', padding:'16px', marginTop:'16px'} },
+              h('div', { style:{fontWeight:700, fontSize:'12.5px', color:'#1e40af', marginBottom:'4px'} }, '🧭 자동 백업까지 하시려면 — 따라만 하시면 됩니다'),
+              h('div', { style:{fontSize:'11.5px', color:'#475569', marginBottom:'12px', lineHeight:1.7} },
+                '이 나스 판에는 DSM 에 쪽지를 붙일 칸이 없어, 나스 앞에 «창구»를 하나 냅니다. ',
+                h('strong', null, '안 하셔도 됩니다'), ' — 왼쪽 「백업 파일 다운로드」로 손수 하셔도 똑같습니다.'),
+              h('div', { style:{fontSize:'11.5px', color:'#1e40af', fontWeight:700, marginBottom:'6px'} },
+                '① 나스 → 제어판 → 로그인 포털 → 고급 → 「역방향 프록시」 → 생성'),
+              계획.칸.map(function(k){ return 값칸(k.이름, k.값); }),
+              h('div', { style:{fontSize:'11.5px', color:'#1e40af', fontWeight:700, margin:'12px 0 6px'} },
+                '② 같은 창의 「사용자 정의 헤더」 탭 → 만들기 (두 줄)'),
+              계획.머리글.map(function(k){ return 값칸(k.이름, k.값); }),
+              h('div', { style:{fontSize:'11.5px', color:'#1e40af', fontWeight:700, margin:'12px 0 6px'} },
+                '③ 저장하신 뒤 — 이알피 쪽은 제가 합니다'),
+              h('div', { style:{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'} },
+                h('button', { onClick:창구로돌리기, style:btnS('#1e40af') },
+                  '🔁 이알피를 새 창구(' + 계획.port + ')로 돌리기'),
+                h('span', { style:{fontSize:'11px', color:'#64748b'} }, '누르면 포트를 바꾸고 저장까지 합니다')),
+              h('div', { style:{fontSize:'11px', color:'#64748b', marginTop:'10px', lineHeight:1.7} },
+                '※ 새 창구도 같은 자체서명 인증서라 처음 한 번 「🔐 NAS 열어 인증서 믿게 하기」가 다시 필요할 수 있습니다.', h('br'),
+                '※ 화면이 여기 적은 것과 다르면 그 자리에서 멈추고 화면을 찍어 보내 주세요.'))
+          })()
       ),
 
       // 로그
