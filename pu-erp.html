@@ -305,7 +305,7 @@ var Component = React.Component;
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
 var ERP_BUILD = '2026-09-18 초기 동기화의 건별 자료를 모아 한 번만 저장 — 수천 건을 받을 때마다 전체 배열을 다시 저장해 화면이 오래 멈추던 길을 줄였다';
-var BUILD_SEQ = 171;
+var BUILD_SEQ = 172;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -18659,6 +18659,18 @@ function ContractModal(props){
       icon + ' ' + label);
   }
 
+  /* 넓은 화면에서 한 «기둥». 제목 한 줄이 탭 이름을 대신한다.
+     ⚠ 스크롤은 기둥 «안»에서만 생긴다 — 한 기둥이 길어져도 옆이 안 밀린다.
+     ⚠ 제목은 붙어 있다(sticky) — 기둥을 내려도 여기가 어디인지 안 잃는다. */
+  function colPane(title, body, hasBorder){
+    return h('div', { style:{ borderRight: hasBorder ? '1px solid #e2e8f0' : 'none',
+        minWidth:0, overflowY:'auto', overflowX:'hidden', padding:'0 14px 14px' } },
+      h('div', { style:{ position:'sticky', top:0, zIndex:2, background:'#fff',
+          padding:'10px 0 6px', marginBottom:'8px',
+          borderBottom:'2px solid #bfdbfe', fontSize:'12px', fontWeight:800, color:'#1e40af' } }, title),
+      body);
+  }
+
   /* 사진은 «담지 않는다» — 글자만 읽고 곧바로 버린다 (2026-08-26 대표 승인, 안 ㉯).
      ★ 대표 지시는 「사진 첨부는 필요없다, 기업정보함에서 모두 가져오면 된다」였다.
         없앨 것은 «사진을 계약에 쌓아 두는 일»이고, «사진에서 글자를 읽는 편함»은 아니다.
@@ -18873,16 +18885,25 @@ function ContractModal(props){
     return h('div', { className:'fld' }, labelNode, ctrl);
   }
 
-  // ====== 탭 콘텐츠 ======
+  /* ══════ 한 화면에 펴기 (대표 지시 2026-09-18 · 목업 승인) ══════════════════
+     「계약관리 전체 화면이 아래로 안 내려가고 한 화면에 모두 볼 수 있게 좌우로 넓게」
+
+     예전에는 네 장(기업·계약·담당자·일지) 가운데 «지금 장»만 만들었다.
+     이제 넷을 다 만들어 두고, 화면이 넓으면 기둥으로 나란히 세운다.
+     ⚠ 넷을 늘 만들어도 «훅»이 없어 안전하다 — 안에 useState·useEffect 가 하나도
+       없는 것을 확인하고 바꿨다. 이 안에 훅을 새로 넣지 말 것
+       (장 하나만 그리던 시절의 순서로 되돌아가 조용히 어긋난다).
+     ⚠ 좁은 화면에서는 예전 그대로 탭이다 — 폰에서 기둥 셋은 못 쓴다. */
+  var PANES = {};
   var tabBody;
-  if(tab === 'company'){
+  {
     var clientType = f.clientType || 'company';
     var showCompany = true;  // 근로자 단독이어도 상대 회사(피신청인) 입력 필요 → 항상 표시
     var showWorker = clientType !== 'company';
 
     
 
-    tabBody = h('div', null,
+    PANES.company = h('div', null,
       // 의뢰인 유형 안내는 탭 줄 위 상단 고정 밴드(ctDesc) 하나만 쓴다 (중복 설명 제거)
       // 의뢰인(근로자) 섹션 - clientType='worker' 또는 'both'일 때만 표시 (토글 박스 직후 노출)
       showWorker && h('div', { style:{ display:'flex', alignItems:'center', borderBottom:'1px solid #e2e8f0', paddingBottom:'4px', marginTop:'10px', marginBottom:'8px' } },
@@ -19866,8 +19887,9 @@ function ContractModal(props){
           : '▴ 접기 — 주담당만 보기'),
 
     );
-  } else if(tab === 'contract'){
-    tabBody = h('div', null,
+  }
+  {
+    PANES.contract = h('div', null,
       // 계약유형 다중 체크
       h('div', { className:'fld' }, h('label', null, '계약유형 (다중 선택 가능) *'),
         h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'6px' } },
@@ -20158,8 +20180,9 @@ function ContractModal(props){
       fld('비고',
         h('textarea', { value:f.note, onChange:setSimple('note'), placeholder:'특이사항' }))
     );
-  } else if(tab === 'manager'){
-    tabBody = h('div', null,
+  }
+  {
+    PANES.manager = h('div', null,
       h(OntologyWorkReferencePanel,{store:'contracts',value:f,onChange:function(patch){setF(function(prev){return Object.assign({},prev,patch);});}}),
       h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'4px', padding:'8px 12px', fontSize:'11.5px', color:'#1e40af', marginBottom:'12px' } },
         '💡 환경설정 → 인사관리기준 → 사용자 관리에 등록된 ',
@@ -20245,10 +20268,11 @@ function ContractModal(props){
             })
       )
     );
-  } else if(tab === 'journal'){
+  }
+  {
     // 활동 일지
     var newJournalContent = (typeof window !== 'undefined' && window.__contractJournalDraft) || '';
-    tabBody = h('div', null,
+    PANES.journal = h('div', null,
       h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 12px', marginBottom:'12px' } },
         h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#1e40af', marginBottom:'6px' } }, '✍️ 새 일지 작성'),
         h('textarea', {
@@ -20309,13 +20333,23 @@ function ContractModal(props){
           })
     );
   }
+  tabBody = PANES[tab] || PANES.company;
+
+  /* 화면이 넓으면 기둥으로 편다. 1280px 아래는 예전 그대로 탭이다.
+     ⚠ 1280 은 «노트북 한 대»의 폭이다 — 더 낮추면 기둥이 좁아 두 줄로 접히고,
+       그건 대표 지시(「자리가 넓으면 2줄로 절대 만들지 마라」)를 스스로 어기는 것이다. */
+  var WIDE = (typeof window !== 'undefined') && window.innerWidth >= 1280;
+  var WIDE3 = (typeof window !== 'undefined') && window.innerWidth >= 1560;
 
   return h('div', { className:'modal-bg', onClick:function(e){
       // C: 외부(어두운 배경) 직접 클릭만 처리, 내부 클릭은 무시
       if(e.target !== e.currentTarget) return;
       safeClose(false);
     } },
-    h('div', { className:'modal', style:{ width:'620px' }, onClick:function(e){ e.stopPropagation(); } },
+    h('div', { className:'modal',
+      /* 넓은 화면에서는 «화면 폭을 쓴다». 620px 은 1920px 화면의 3분의 1이었다. */
+      style:{ width: WIDE3 ? '1560px' : (WIDE ? '1180px' : '620px'), maxWidth:'97vw' },
+      onClick:function(e){ e.stopPropagation(); } },
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, props.cur ? '계약 수정' : '계약 추가'),
         h('button', { className:'x', onClick:function(){ safeClose(false); } }, '×')
@@ -20451,6 +20485,14 @@ function ContractModal(props){
       (function(){
         var ct = f.clientType || 'company';
         var M = window.innerWidth<=768;
+        /* ⚠ 말풍선 글은 «한 벌»이다. 넓은 화면(칩)과 좁은 화면(큰 단추)이 같은 글을
+             나눠 쓴다 — 두 벌로 적으면 한쪽만 고쳐져 설명이 갈린다
+             (tests/office-help-text.test.js 가 세어서 막는다). */
+        var CT_TIP = {
+          company:'【회사가 의뢰인일 때】\n회사정보(회사명·대표자·사업자번호·주소)를 입력합니다.\n\n예) 취업규칙 작성, 인사노무 자문, 컨설팅,\n임금체계 설계, 평가보상 등 회사 의뢰 업무',
+          worker: '【근로자가 의뢰인일 때】\n근로자 정보(이름·주민번호·연락처·주소)를 입력합니다.\n상대 회사(피신청인·사용자)는 아래 "상대 회사" 칸에 선택 입력.\n\n예) 부당해고 구제신청, 임금체불 진정,\n산재 신청 등 근로자 대리 사건',
+          both:   '【회사+근로자 함께】\n양측 정보를 모두 입력합니다.\n\n예) 노사 양쪽이 얽힌 특수 케이스,\n집단 사건에서 회사·근로자 정보를 함께 관리할 때'
+        };
         function ctBar(v, label, tip){
           var on = ct === v;
           return h('button', { type:'button', title:tip,
@@ -20464,33 +20506,71 @@ function ContractModal(props){
           : ct === 'worker'
           ? '👤 근로자가 의뢰인 — 근로자 정보(이름·연락처·주소)를 입력하고, 상대 회사(피신청인)는 아래에서 선택 입력합니다. 예) 부당해고·임금체불·산재'
           : '🏢+👤 회사와 근로자를 함께 등록 — 양측 정보를 모두 입력합니다. 예) 노사 양쪽 관련 특수 케이스';
+        /* ── 넓은 화면: 한 줄짜리 칩 셋 (대표 지시 2026-09-18 「화면이 너무 불필요하게 많이 있다」)
+             예전에는 제목 한 줄 + 큰 단추 셋 + 설명 두 줄 = 다섯 줄이었다.
+             한 번 누르고 마는 것에 다섯 줄을 쓰고 있었다.
+           ⚠ 설명을 «없애지» 않는다 — 단추의 title 로 옮겼다(마우스를 올리면 나온다).
+             무엇을 고르는지 모르면 첫 계약에서 막힌다. */
+        if(WIDE){
+          function ctChip(v, label, tip){
+            var on = ct === v;
+            return h('button', { type:'button', title:tip,
+              onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { clientType: v }); }); },
+              style:{ padding:'4px 12px', border:0, borderRadius:'6px', fontSize:'11.5px', fontWeight:700,
+                background: on?'#1e40af':'transparent', color: on?'#fff':'#475569', cursor:'pointer', whiteSpace:'nowrap' } }, label);
+          }
+          return h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap', margin:'10px 16px 0' } },
+            h('span', { style:{ fontSize:'11px', fontWeight:800, color:'#854d0e' } }, '⚖️ 의뢰인'),
+            h('div', { style:{ display:'inline-flex', gap:'3px', background:'#e2e8f0', borderRadius:'8px', padding:'2px' } },
+              ctChip('company', '🏢 회사',     CT_TIP.company),
+              ctChip('worker',  '👤 근로자',   CT_TIP.worker),
+              ctChip('both',    '🏢+👤 둘 다', CT_TIP.both)),
+            h('span', { style:{ fontSize:'10.5px', color:'#64748b' } }, ctDesc)
+          );
+        }
         return h('div', { style:{ margin: M?'5px 10px 0':'12px 16px 0', background:'#fffbeb', border:'1.5px solid #fbbf24', borderRadius:'8px', padding: M?'5px 7px':'8px 10px' } },
           h('div', { style:{ fontSize: M?'9.5px':'11px', fontWeight:800, color:'#854d0e', marginBottom: M?'3px':'6px' } },
             '⚖️ 의뢰인 유형 — 먼저 선택하세요'),
           h('div', { style:{ display:'flex', gap: M?'4px':'6px' } },
-            ctBar('company', '🏢 회사(의뢰인)',
-              '【회사가 의뢰인일 때】\n회사정보(회사명·대표자·사업자번호·주소)를 입력합니다.\n\n예) 취업규칙 작성, 인사노무 자문, 컨설팅,\n임금체계 설계, 평가보상 등 회사 의뢰 업무'),
-            ctBar('worker',  '👤 근로자(의뢰인)',
-              '【근로자가 의뢰인일 때】\n근로자 정보(이름·주민번호·연락처·주소)를 입력합니다.\n상대 회사(피신청인·사용자)는 아래 "상대 회사" 칸에 선택 입력.\n\n예) 부당해고 구제신청, 임금체불 진정,\n산재 신청 등 근로자 대리 사건'),
-            ctBar('both',    '🏢+👤 둘 다',
-              '【회사+근로자 함께】\n양측 정보를 모두 입력합니다.\n\n예) 노사 양쪽이 얽힌 특수 케이스,\n집단 사건에서 회사·근로자 정보를 함께 관리할 때')
+            ctBar('company', '🏢 회사(의뢰인)',   CT_TIP.company),
+            ctBar('worker',  '👤 근로자(의뢰인)', CT_TIP.worker),
+            ctBar('both',    '🏢+👤 둘 다',       CT_TIP.both)
           ),
           h('div', { style:{ fontSize: M?'9px':'10.5px', color:'#854d0e', marginTop: M?'3px':'7px', lineHeight: M?1.3:1.5, background:'#fffbeb', borderRadius:'5px', padding: M?'3px 6px':'5px 8px' } }, ctDesc)
         );
       })(),
-      // 탭 헤더
-      h('div', { style:{ display:'flex', borderBottom:'1px solid #e2e8f0', marginTop: window.innerWidth<=768?'5px':'10px', background:'#f8fafc' } },
+      // 탭 헤더 — 기둥으로 펴면 오갈 곳이 없으므로 안 그린다
+      !WIDE && h('div', { style:{ display:'flex', borderBottom:'1px solid #e2e8f0', marginTop: window.innerWidth<=768?'5px':'10px', background:'#f8fafc' } },
         tabBtn('company',  '기업정보',   '🏢'),
         tabBtn('contract', '계약정보',   '📄'),
         tabBtn('manager',  '담당자정보', '👤'),
         tabBtn('journal',  '일지',       '📋')
       ),
-      // 탭 콘텐츠
-      h('div', { className:'modal-b',
-        ref:function(el){ modalBodyRef.current = el; },
-        style:{ maxHeight:'55vh', overflowY:'auto', padding:'16px' } },
-        tabBody
-      ),
+      /* ── 본문 ──
+         넓으면 기둥, 좁으면 예전 탭. 세로 높이도 55% 로 묶지 않고 창에 맞춘다
+         (반만 쓰고 나머지 반은 늘 스크롤이었다).
+         ⚠ 스크롤은 «기둥 안»에서 생긴다 — 일지가 길어져도 옆 기둥은 안 밀린다. */
+      WIDE
+        ? h('div', { className:'modal-b',
+            ref:function(el){ modalBodyRef.current = el; },
+            style:{ display:'grid',
+              gridTemplateColumns: WIDE3 ? '1fr 1fr 1fr' : '1fr 1fr',
+              gap:'0', padding:0, maxHeight:'70vh', overflow:'hidden' } },
+            colPane('🏢 의뢰인 · 기업정보', PANES.company, true),
+            colPane('📄 계약정보',          PANES.contract, WIDE3),
+            WIDE3
+              ? colPane('👤 담당자 · 📋 일지', h('div', null, PANES.manager,
+                  h('div', { style:{ height:'14px' } }), PANES.journal), false)
+              : h('div', { style:{ gridColumn:'1 / -1', display:'grid', gridTemplateColumns:'1fr 1fr',
+                  borderTop:'1px solid #e2e8f0', maxHeight:'34vh', overflow:'hidden' } },
+                  colPane('👤 담당자정보', PANES.manager, true),
+                  colPane('📋 일지',       PANES.journal, false))
+          )
+        : h('div', { className:'modal-b',
+            ref:function(el){ modalBodyRef.current = el; },
+            style:{ maxHeight:'55vh', overflowY:'auto', padding:'16px' } },
+            tabBody
+          ),
       h('div', { className:'modal-f' },
         h('button', { className:'btn-secondary', onClick:function(){ safeClose(false); } }, '취소'),
         // 단계별 진행: 기업정보 → 계약정보 → 담당자정보 → 저장
@@ -20518,6 +20598,13 @@ function ContractModal(props){
             if(tab === 'contract') setTab('company');
             else if(tab === 'manager') setTab('contract');
             else if(tab === 'note') setTab('manager');
+          }
+          /* 기둥으로 펴면 오갈 곳이 없다 — 저장 하나만 남긴다
+             (대표 지시 2026-09-18 「한 번에 데이터 보고 넣게」). */
+          if(WIDE){
+            return h('button', { className:'btn-primary',
+              onClick:function(){ Promise.resolve().then(save).catch(function(e){ console.error('[계약저장오류]', e); try{ showToast('❌ 저장 오류: ' + ((e && e.message) || String(e))); }catch(_){} }); } },
+              '💾 저장');
           }
           return h('span', null,
             // 이전 버튼 (company 제외)

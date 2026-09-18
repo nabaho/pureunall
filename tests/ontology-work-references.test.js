@@ -115,9 +115,15 @@ test('실제 계약 담당자 선택창은 동명이인도 SID로 구별하고 �
   ctx.setF=fn=>{ctx.f=fn(ctx.f);};
   const helpers=erp.indexOf('  function changeMgrMain(newSid){');
   new vm.Script(erp.slice(helpers,erp.indexOf('  function setSimple(k)',helpers))).runInContext(ctx);
-  const start=erp.indexOf("  } else if(tab === 'manager'){");
-  const body=erp.slice(erp.indexOf('    tabBody =',start),erp.indexOf("  } else if(tab === 'journal'){",start));
-  function render(){new vm.Script(body).runInContext(ctx);return nodes(ctx.tabBody,'select');}
+  /* ⚠ 2026-09-18 에 탭을 기둥으로 펴면서 담당자 장이 tabBody 대신 PANES.manager 에
+       담긴다. 규칙(동명이인을 SID로 가른다)은 그대로라 «자리만» 다시 가리킨다. */
+  const start=erp.indexOf('    PANES.manager = h(');
+  const rest=erp.slice(start,erp.indexOf('    PANES.journal = h(',start));
+  /* 장과 장 사이의 `}` `{` 까지 끌고 오면 구문이 깨진다 — 문장 하나에서 끊는다 */
+  const cut=rest.search(/\r?\n  \}/);
+  const body=cut>0?rest.slice(0,cut):rest;
+  ctx.PANES={};
+  function render(){new vm.Script(body).runInContext(ctx);return nodes(ctx.PANES.manager,'select');}
   let selects=render();
   assert.ok(nodes(selects[0],'option').some(x=>x.props.value==='P2'&&x.children.join('').includes('P2')));
   assert.ok(!nodes(selects[0],'option').some(x=>x.props.value==='같은이름'));

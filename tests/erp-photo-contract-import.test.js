@@ -408,12 +408,15 @@ const t = (name, got, want) => {
        영영 성립하지 않아, 새 계약에서는 배지가 한 번도 안 뜬다(수정 화면에서만 보였다).
        실제로 그렇게 배포됐다 — 유형을 고르는 바로 그 화면에 있어야 한다. */
     {
+      /* ⚠ 자리를 «장을 만드는 곳»으로 가리킨다 — 2026-09-18 에 탭을 기둥으로 펴면서
+           `if(tab === 'company')` 라는 글자가 사라졌다. 규칙(배지는 계약정보 쪽)은
+           그대로이므로 묻는 법만 고쳤다. */
       const badgeAt = blk.indexOf("'📷 계약서 ' + photoMatches.length");
-      const companyTabAt = blk.indexOf("if(tab === 'company'){");
-      const contractTabAt = blk.indexOf("} else if(tab === 'contract'){");
-      t('배지·두 탭의 자리를 모두 찾을 수 있다',
+      const companyTabAt = blk.indexOf('PANES.company = h(');
+      const contractTabAt = blk.indexOf('PANES.contract = h(');
+      t('배지·두 장의 자리를 모두 찾을 수 있다',
         badgeAt > 0 && companyTabAt > 0 && contractTabAt > companyTabAt, true);
-      t('★ 배지는 계약정보 탭에 있다 (기업정보 탭이 아니다)',
+      t('★ 배지는 계약정보 쪽에 있다 (기업정보 쪽이 아니다)',
         badgeAt > contractTabAt, true);
     }
     t('배지에 몇 건인지 적는다', /'📷 계약서 ' \+ photoMatches\.length \+ '건 발견'/.test(blk), true);
