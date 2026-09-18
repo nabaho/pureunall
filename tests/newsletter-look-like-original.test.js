@@ -53,12 +53,24 @@ test('★★ 판례는 «채운 상자»가 아니라 «테두리 딱지 + 한 �
   assert.ok(!/\[판례\]|\[행정해석\]/.test(조각), '딱지 상자 안에 괄호 글자까지 들어갔다 — 상자가 이미 괄호다');
 });
 
-test('★ 표지는 «흰 종이 표지»다 — 위에 띠, 흰 바탕, 아래 발행처', () => {
+test('★★ «글자 표지»는 없다 — 제목을 두 번 적지 않는다', () => {
+  /* 대표 지시 2026-09-18 「더 줄여라」. 그림이 없을 때 그리던 흰 종이 모양 표지는
+     바로 옆 제목을 한 번 더 적은 것이었고, 130px 로 «카드 높이를 혼자 정하고» 있었다.
+     ⚠ 발행처는 카드 밑줄에 그대로 남는다 — 걷은 것은 «되풀이»지 내용이 아니다. */
   const h = 편지({ policy: [자료(1), 자료(2)] });
   const 조각 = 꼭지조각(h, '고용·노동정책 · 기업지원');
-  assert.ok(/background-color:#ffffff;border:1px solid/.test(조각), '★ 표지 바탕이 흰 종이가 아니다');
-  assert.match(조각, /height:5px[^>]*background-color:/, '★ 표지 위 띠가 없다 — 그냥 네모로 보인다');
-  assert.match(조각, />고용노동부<\/div>/, '표지 아래 발행처가 없다');
+  assert.ok(!/height:98px/.test(조각), '★ 글자 표지 상자가 아직 그려진다');
+  const 제목수 = (조각.match(/자료 1/g) || []).length;
+  assert.equal(제목수, 1, '★ 같은 제목이 표지에 한 번 더 적혀 있다 (' + 제목수 + '번)');
+  assert.match(조각, />고용노동부/, '발행처까지 사라졌다 — 그건 내용이다');
+});
+
+test('★ 표지 «그림»을 주면 그때는 그린다 — 우리 홈페이지 것만', () => {
+  const 그림자료 = Object.assign(자료(1), { 표지: 'https://nabaho.github.io/pureunall/img/c1.png' });
+  const 남의것 = Object.assign(자료(2), { 표지: 'https://evil.example.com/c2.png' });
+  const 조각 = 꼭지조각(편지({ policy: [그림자료, 남의것] }), '고용·노동정책 · 기업지원');
+  assert.match(조각, /<img src="https:\/\/nabaho\.github\.io\/pureunall\/img\/c1\.png"/, '★ 우리 표지 그림이 안 나온다');
+  assert.ok(!/evil\.example\.com/.test(조각), '⚠ 남의 서버 표지가 나갔다 — 열람 추적이 새는 자리다');
 });
 
 test('★ Trend(인사·노무관리) 자료 칸은 흰 바탕이고, ISSUE 는 살구 판이다 — 원본이 그렇다', () => {

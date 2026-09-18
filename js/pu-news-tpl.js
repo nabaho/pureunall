@@ -57,7 +57,6 @@
      ⚠ 웹 쪽 껍데기(functions/news-view.js)는 이 값을 «지어진 전문에서 읽어» 맞춘다 —
        숫자를 두 곳에 적으면 한쪽만 바뀌어 쪽이 잘리거나 가운데로 쏠린다. */
   var 전문넓이 = 980;
-  var 기본뉴스그림 = 'https://nabaho.github.io/pureunall/img/news-side.png';
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -212,8 +211,10 @@
     /* ★★ 요약과 «똑같은 꼭지 머리»를 쓴다 (대표 지시 2026-09-17 「전문보기도 맞춰라」).
          갈색 알약 딱지는 걷었다 — 요약은 글자로 세우는데 전문만 알약이면,
          「자세히 보기」로 넘어가는 순간 다른 편지처럼 보인다.
-       ⚠ 자리표(anchor)는 요약꼭지제목 안에 있다 — 요약판의 「↗」가 여기로 내려앉는다. */
-    return '<tr><td style="padding:' + (g.딱지 ? 28 : 22) + 'px ' + 옆여백 + 'px 0 '
+       ⚠ 자리표(anchor)는 요약꼭지제목 안에 있다 — 요약판의 「↗」가 여기로 내려앉는다.
+       ★ 위 여백을 28/22 → 18/14 로 줄였다 (2026-09-18 「더 줄여라」). 바로 위에 이미
+         꼭지 사이 «가는 줄»이 있어 갈라 보이는데, 그 위아래로 여백이 겹쳐 있었다. */
+    return '<tr><td style="padding:' + (g.딱지 ? 18 : 14) + 'px ' + 옆여백 + 'px 0 '
       + 옆여백 + 'px;">' + 요약꼭지제목(g) + '</td></tr>';
   }
 
@@ -237,8 +238,26 @@
     return k ? ' id="n-' + esc(k) + '" data-pop="1"' : '';
   }
 
-  function 기사줄(항목들, 그림) {
+  /* ★★ 넓은 쪽(전문 보기)에서는 «두 단»으로 흘린다 (대표 지시 2026-09-17 「좌우로
+       넓게」 · 2026-09-18 「더 줄여라」).
+     ⚠ 까닭이 둘이다. ① 980px 한 단이면 한 줄이 예순다섯 자다 — 신문이 단을 나누는
+       바로 그 까닭으로, 눈이 다음 줄 첫 글자를 못 찾는다. ② 같은 글이 두 단으로
+       나뉘면 그 칸의 높이가 «반»이 된다. 실측 826px → 440px.
+     ⚠⚠ 메일(700)에서는 절대 켜지 않는다. 아웃룩은 column-count 를 모르고, 안다 해도
+       350px 두 단이면 글이 쏟아진다. 그래서 폭을 «받아서» 판단한다 — 모듈에 담아
+       두면 한 번 넓게 지은 뒤 그 값이 남아 다음 메일이 두 단으로 나간다.
+     ⚠ 단 사이에서 «한 건이 잘리지» 않게 break-inside:avoid 를 건마다 건다. 안 걸면
+       제목만 앞 단 맨 아래 남고 글은 뒷단에서 시작한다. */
+  function 단나누기(폭) {
+    return Number(폭) >= 900 ? 'column-count:2;column-gap:30px;' : '';
+  }
+  function 안깨지게(폭) {
+    return Number(폭) >= 900 ? 'break-inside:avoid;-webkit-column-break-inside:avoid;' : '';
+  }
+
+  function 기사줄(항목들, 그림, 폭) {
     var 것 = (항목들 || []);
+    var 붙 = 안깨지게(폭);
     var 줄 = 것.map(function (x) {
       var u = href(x.링크);
       /* ⚠ «우리 말»이 본문이다. 지난 회차(그때는 이 칸이 없었다)에는 없으니
@@ -269,9 +288,9 @@
       /* «·» 점 목록 (2026-09-14) — 원본의 주간뉴스는 점으로 시작하는 짧은 줄들이다.
          왼쪽 띠 대신 점, 줄 사이는 가는 줄 하나. */
       return 내글
-        ? '<div' + _자리표(x) + ' style="padding:6px 0 8px 0;border-bottom:1px solid ' + 색.가는줄 + ';">'
+        ? '<div' + _자리표(x) + ' style="' + 붙 + 'padding:6px 0 8px 0;border-bottom:1px solid ' + 색.가는줄 + ';">'
           + 몸 + 링 + '</div>'
-        : '<div' + _자리표(x) + ' style="padding-bottom:2px;">' + 표 + 몸
+        : '<div' + _자리표(x) + ' style="' + 붙 + 'padding-bottom:2px;">' + 표 + 몸
           + (x.언론사 ? ' <span style="color:' + 색.흐린글 + ';font-size:12px;">· '
               + esc(x.언론사) + '</span>' : '') + 링 + '</div>';
     }).join('');
@@ -283,19 +302,28 @@
       if (String(x.우리말 || '').trim() && x.언론사) 곳[String(x.언론사)] = 1;
     });
     var 이름들 = Object.keys(곳);
+    /* ⚠ 출처 줄은 «단 밖»이다. 안에 두면 두 단 가운데 한쪽 아래에만 붙어,
+         왼쪽 단만 출처가 있는 것처럼 읽힌다. */
+    var 단 = 단나누기(폭);
+    if (단) 줄 = '<div style="' + 단 + '">' + 줄 + '</div>';
     if (이름들.length) {
       줄 += '<div style="margin-top:11px;padding-top:9px;border-top:1px solid ' + 색.줄 + ';'
         + 'font-size:11.5px;color:' + 색.흐린글 + ';font-family:' + 폰트 + ';">'
         + '참고: <strong>' + esc(이름들.join(' · ')) + '</strong>'
         + ' · 위 정리는 푸른노무법인이 썼습니다</div>';
     }
-    var 글칸 = 'font-size:14px;line-height:1.95;color:' + 색.글 + ';font-family:' + 폰트 + ';';
+    /* ⚠ 줄 사이는 넓은 쪽에서 조금 좁힌다 — 단이 둘이라 한 줄이 짧아져, 1.95 는
+         이제 성기게만 보인다(글자 크기는 그대로 둔다). */
+    var 글칸 = 'font-size:14px;line-height:' + (단 ? '1.8' : '1.95')
+      + ';color:' + 색.글 + ';font-family:' + 폰트 + ';';
 
     /* 사진을 «옆»에 두는 꼴 — 원본의 「주간노동뉴스」가 그렇다(사진 왼쪽, 줄 오른쪽).
-       ⚠ 설정에 그림 주소가 있을 때만이다. 없으면 예전처럼 줄만 그린다 —
-         자리만 잡아 두고 빈 네모를 그리면 「그림이 깨졌나」로 보인다.
+       ⚠ 설정(뉴스그림)에 주소를 적어 두셨을 때«만» 그린다.
+       ★★ 붙박이 그림(img/news-side.png)을 걷었다 (대표 지시 2026-09-18 「더 줄여라」).
+         190px 을 차지하면서 «아무것도 안 알려 주는» 장식 그림이었다 — 옆 글이 그만큼
+         좁아져 줄 수가 늘고, 쪽이 그만큼 길어졌다. 되살리지 말 것.
        ⚠ 우리 홈페이지에 올린 그림만 나간다(mail-send.js 의 IMG_HOST_OK). */
-    var g = img주소(그림 || 기본뉴스그림);
+    var g = img주소(그림);
     if (!g) {
       return '<tr><td style="padding:16px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;' + 글칸 + '">' + 줄 + '</td></tr>';
     }
@@ -340,37 +368,21 @@
      거기에 우리 것 하나를 더 붙인다: «내려받기»(파일 종류와 크기까지).
      거리는 functions/news-docs.js 가 고용노동부 정책자료실에서 가져온다. */
 
-  /* 표지 — 그림이 있으면 그림, 없으면 «글자 표지».
-     ⚠ 그림에 기대면 안 된다. 아웃룩·회사 메일은 바깥 그림을 기본으로 막고,
-       우리 발송기도 허락한 곳 밖의 그림은 지운다(mail-send.js 의 IMG_HOST_OK).
-       그래서 그림이 없어도 «책 표지처럼 보이는 칸»이 늘 그려지게 둔다. */
+  /* 표지 — «진짜 그림이 있을 때만» 그린다. 없으면 빈 글자를 돌려준다.
+     ★★ «글자 표지»를 걷었다 (대표 지시 2026-09-18 「더 줄여라」).
+       그것은 바로 옆 제목을 흰 종이 모양 상자에 한 번 더 적어 둔 것이었고,
+       높이 130px 남짓을 잡아 «카드 높이를 혼자 정하고» 있었다. 같은 말을 두 번
+       적으면서 쪽만 길어진 셈이다 — 자료가 여섯이면 그것만 두 줄에 260px 이다.
+     ⚠ 되살리지 말 것. 표지가 필요하면 발행처가 준 «진짜 그림»을 채운다
+       (news-docs.js 의 표지 칸은 아직 늘 빈칸이다).
+     ⚠ 그림에 기대면 안 된다 — 아웃룩·회사 메일은 바깥 그림을 기본으로 막는다.
+       그래서 표지가 없어도 카드가 멀쩡히 읽히게, 제목·우리글·발행처를 오른쪽에 다 둔다. */
   function 표지칸(x, 너비) {
     var w = Number(너비) || 96;
     var 그림 = img주소(x && x.표지);
-    if (그림) {
-      return '<img src="' + 그림 + '" width="' + w + '" alt=""'
-        + ' style="display:block;width:' + w + 'px;border:1px solid ' + 색.표지테 + ';">';
-    }
-    var 제 = String((x && x.제목) || '').replace(/\s+/g, ' ').trim();
-    /* ⚠ 28자에서 자른다. 안 자르면 표지가 글자 수만큼 «길어져» 두 칸 높이가 어긋난다
-         (미리보기에서 왼쪽 표지만 20px 더 길었다). 표지는 책등이지 본문이 아니다. */
-    var 짧 = 제.length > 28 ? 제.slice(0, 28) + '…' : 제;
-    /* ★ «종이 표지»처럼 (대표 지시 2026-09-14) — 베이지 상자에 글자만 얹으면 «칸»으로 보이고,
-         원본의 보고서 표지들은 «흰 종이 위 제목 + 아래 발행처»다. 위에 가는 띠, 흰 바탕,
-         제목 가운데, 발행처는 맨 아래 — 그림이 와도 같은 자리(표지칸)에 그대로 들어간다. */
-    return '<table role="presentation" width="' + w + '" cellpadding="0" cellspacing="0" border="0"'
-      + ' style="width:' + w + 'px;background-color:#ffffff;border:1px solid ' + 색.표지테 + ';'
-      + 'border-bottom:3px solid ' + 색.표지테 + ';">'
-      + '<tr><td style="height:5px;line-height:5px;font-size:1px;background-color:' + 색.갈 + ';">&nbsp;</td></tr>'
-      + '<tr><td height="98" align="center" valign="middle" style="height:98px;padding:8px 8px 4px 8px;">'
-      + '<div style="font-size:11px;line-height:1.5;font-weight:bold;color:' + 색.짙은갈 + ';'
-      + 'font-family:' + 폰트 + ';word-break:keep-all;">' + esc(짧) + '</div>'
-      + '</td></tr>'
-      + '<tr><td align="center" valign="bottom" style="padding:0 6px 9px 6px;">'
-      + '<div style="font-size:9px;line-height:1.3;color:' + 색.흐린글 + ';font-family:' + 폰트 + ';'
-      + 'border-top:1px solid ' + 색.가는줄 + ';padding-top:6px;">'
-      + esc((x && x.발행처) || '') + '</div>'
-      + '</td></tr></table>';
+    if (!그림) return '';
+    return '<img src="' + 그림 + '" width="' + w + '" alt=""'
+      + ' style="display:block;width:' + w + 'px;border:1px solid ' + 색.표지테 + ';">';
   }
 
   /* 「pdf · 756KB」 — 누르기 «전에» 무엇을 얼마나 받는지 알려 준다 */
@@ -432,10 +444,14 @@
         + '</a></div>'
       : '';
 
+    /* ⚠ 표지가 없으면 «칸 자체»를 안 만든다. 빈 96px 칸을 남겨 두면 글이 그만큼
+         좁아져 줄 수가 늘어난다 — 걷어 낸 까닭이 사라진다. */
+    var 표 = 표지칸(x, 96);
+    var 표칸 = 표 ? '<td width="96" valign="top" style="width:96px;">' + 표 + '</td>' : '';
     return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + _자리표(x) + '><tr>'
-      + '<td width="96" valign="top" style="width:96px;">' + 표지칸(x, 96) + '</td>'
-      + '<td valign="top" style="padding-left:13px;">'
+      + 표칸
+      + '<td valign="top" style="' + (표 ? 'padding-left:13px;' : '') + '">'
       + '<div style="font-size:13.5px;font-weight:bold;line-height:1.5;color:' + 색.짙은갈 + ';'
       + 'font-family:' + 폰트 + ';word-break:keep-all;">' + 제목칸 + '</div>'
       + 목차칸 + 밑칸 + 받기
@@ -443,14 +459,26 @@
   }
 
   /* 나란히 놓는다. 자리가 모자라면 마지막 칸은 빈 칸으로 둔다 — 폭이 흔들리지 않게.
-     ★★ 넓은 쪽(전문 보기)에서는 «셋씩» 놓는다 (대표 지시 2026-09-17 「좌우로 넓게」).
-       카드 높이는 글이 아니라 «표지 그림»이 정한다 — 그래서 둘씩 놓으면 오른쪽에
-       빈 자리가 크게 남으면서 줄 수만 늘어난다. 여섯 장이면 세 줄이 두 줄이 된다.
-     ⚠ 메일(700)에서는 그대로 둘씩이다 — 셋이면 한 칸이 200px 남짓이라 글이 쏟아진다. */
+     ★★ 넓은 쪽(전문 보기)에서는 «셋씩 + 쌓기»다 (대표 지시 2026-09-17 「좌우로 넓게」,
+       2026-09-18 「더 줄여라」).
+     ⚠ 표(table)로 셋씩 놓으면 «한 줄의 키를 그 줄에서 제일 긴 카드»가 정한다 —
+       짧은 카드 둘 아래가 통째로 빈다. 그래서 넓은 쪽은 표가 아니라 «단»에 쌓는다.
+       단은 키를 스스로 고르게 나눠 담아, 빈 자리가 거의 안 남는다(실측 648 → 아래 검사).
+     ⚠ 세로 나눔선은 column-rule 이 긋는다 — 칸 테두리를 못 쓰니 그것이 짝이다.
+     ⚠⚠ 메일(700)은 예전 표 그대로 둘씩이다. 아웃룩은 단(column-count)을 모르고,
+       셋이면 한 칸이 200px 남짓이라 글이 쏟아진다. */
   function 자료칸(항목들, 바탕, 폭) {
     var 것 = (항목들 || []).filter(function (x) { return x && x.갈래 === '자료'; });
     if (!것.length) return '';
-    var 칸수 = Number(폭) >= 900 ? 3 : 2;
+    if (Number(폭) >= 900) {
+      var 덩 = 것.map(function (x) {
+        return '<div style="' + 안깨지게(폭) + 'padding:15px 15px;">' + 자료카드(x) + '</div>';
+      }).join('');
+      return '<tr><td style="padding:15px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
+        + '<div style="background-color:' + (바탕 || 색.살구) + ';column-count:3;column-gap:0;'
+        + 'column-rule:1px solid ' + 색.줄 + ';">' + 덩 + '</div></td></tr>';
+    }
+    var 칸수 = 2;
     var 몫 = Math.round(100 / 칸수);
     var 줄 = '';
     for (var i = 0; i < 것.length; i += 칸수) {
@@ -539,9 +567,16 @@
   }
 
   /* 줄 사이는 «점선» — 원본이 그렇다. 마지막 줄 아래는 안 긋는다. */
-  function 판례칸(항목들) {
+  function 판례칸(항목들, 폭) {
     var 것 = (항목들 || []).filter(function (x) { return x && x.갈래 === '판례'; });
     if (!것.length) return '';
+    /* ⚠⚠ 판례는 «한 단»으로 둔다 — 두 단으로 나눠 봤고, 더 «길어졌다»
+         (2026-09-18 실측 482px → 564px). 까닭: 단을 반으로 좁히면 글이 그만큼 더
+         꺾여 한 건의 키가 1.8배가 된다. 건이 셋뿐이라 왼쪽에 둘·오른쪽에 하나가
+         되고, 그 «둘 쌓은 쪽»이 통째 높이를 정한다.
+       ★ 여기서 배울 것: 단을 나눈다고 글의 «넓이»가 주는 게 아니다. 같은 폭이면
+         높이는 대체로 그대로다. 단이 이기는 것은 «빈 자리»가 있을 때뿐이다 —
+         자료 카드(높이가 제각각이라 오른쪽이 남던 것)와 기사(짧은 줄이 여럿)가 그렇다. */
     var 줄 = 것.map(function (x, i) {
       var 테 = (i < 것.length - 1) ? 'border-bottom:1px dashed ' + 색.줄 + ';' : '';
       return '<tr><td style="padding:13px 0;' + 테 + '">' + 판례한칸(x) + '</td></tr>';
@@ -562,7 +597,7 @@
     var out = '';
     /* Trend(인사·노무관리)는 «흰 바탕 + 세로 나눔선» — 원본이 그렇다. ISSUE 만 살구 판이다. */
     out += 자료칸(것.filter(function (x) { return x && x.갈래 === '자료'; }), g.키 === 'hr' ? '#ffffff' : '', 폭);
-    out += 판례칸(것.filter(function (x) { return x && x.갈래 === '판례'; }));
+    out += 판례칸(것.filter(function (x) { return x && x.갈래 === '판례'; }), 폭);
     var 법 = 법령줄(것);
     if (법) {
       out += '<tr><td style="padding:14px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;font-size:14px;line-height:1.85;'
@@ -571,7 +606,7 @@
     var 기사 = 것.filter(function (x) {
       return x && x.갈래 !== '자료' && x.갈래 !== '판례' && x.갈래 !== '법령';
     });
-    if (기사.length) out += 기사줄(기사, g.키 === 'news' ? s.뉴스그림 : '');
+    if (기사.length) out += 기사줄(기사, g.키 === 'news' ? s.뉴스그림 : '', 폭);
     return out;
   }
 
@@ -743,11 +778,17 @@
   }
 
   /* ── 우리 글 꼭지 — 이 칸만 우리가 쓴다 ───────────────────────────── */
-  function 우리글칸(글) {
+  /* ★★ 넓은 쪽에서는 이 글도 «두 단»이다 (2026-09-18). 대표께서 쓰신 이번 주 글은
+       한 덩이 문단이라 980px 한 단에서 383px 을 차지했다 — 전문 전체의 8분의 1이다.
+       여기는 «갈라도 되는 글»이라(건이 아니라 이어지는 문장) 단이 제대로 이긴다.
+     ⚠ 메일(700)에서는 켜지 않는다 — 아웃룩이 모른다. 그래서 폭을 받는다. */
+  function 우리글칸(글, 폭) {
     var t = String(글 == null ? '' : 글).trim();
     if (!t) return '';
     /* 줄바꿈만 살린다. 사람이 적은 글이라 태그를 그대로 믿지 않는다. */
     var 몸 = esc(t).replace(/\r?\n/g, '<br>');
+    var 단 = 단나누기(폭);
+    if (단) 몸 = '<div style="' + 단 + '">' + 몸 + '</div>';
     return '<tr><td style="padding:14px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + ' id="n-hr-w" data-pop="1"'
@@ -771,7 +812,7 @@
         + '<div style="font-size:11.5px;color:' + 색.흐린글 + ';padding-top:4px;">'
         + esc([x.지역 || '전국', x.언론사 || x.기관 || ''].filter(Boolean).join(' · ')) + '</div></div>';
     }).join('');
-    return 줄긋기(22) + 꼭지제목({ 이름:'우리 지역 노동소식', 딱지:'Local' })
+    return 줄긋기(13) + 꼭지제목({ 이름:'우리 지역 노동소식', 딱지:'Local' })
       + '<tr><td style="padding:16px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;font-size:14px;line-height:1.95;color:'
       + 색.글 + ';font-family:' + 폰트 + ';">' + 줄 + '</td></tr>';
   }
@@ -807,10 +848,12 @@
       ? '이 메일은 <b>광고성 정보</b>가 포함될 수 있습니다. 수신에 동의하신 분께 보내 드립니다.'
       : '이 메일은 푸른노무법인과 자문 관계에 있는 곳에 보내 드립니다.';
 
-    return '<tr><td style="padding:30px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
+    /* ★ 여백·줄간격을 죈다 (2026-09-18 「더 줄여라」) — 꼬리가 268px 이었다.
+         글은 하나도 안 버렸다. 30→20 · 18→14 · 줄간격 1.9→1.7 · 맨 아래 34→20. */
+    return '<tr><td style="padding:20px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + ' style="border-top:2px solid ' + 색.갈 + ';">'
-      + '<tr><td style="padding:18px 0 0 0;font-size:12px;line-height:1.9;color:#8a837a;'
+      + '<tr><td style="padding:14px 0 0 0;font-size:12px;line-height:1.7;color:#8a837a;'
       + 'font-family:' + 폰트 + ';">'
       + '기사는 원문을 옮기지 않고 <b>푸른노무법인이 직접 정리한 글</b>만 싣습니다. '
       + '출처와 원문 링크는 함께 밝힙니다.<br><br>'
@@ -825,7 +868,7 @@
       + ' &nbsp;·&nbsp; T.' + esc(s.서산전화 || '041-429-0123')
       + '<br><br><span style="color:#b3aca3;">' + 머리말 + ' ' + 거부 + '</span>'
       + '</td></tr></table></td></tr>'
-      + '<tr><td style="height:34px;line-height:34px;font-size:1px;">&nbsp;</td></tr>';
+      + '<tr><td style="height:20px;line-height:20px;font-size:1px;">&nbsp;</td></tr>';
   }
 
   /* ══════════════════════════════════════════════════════════════════════
@@ -920,17 +963,17 @@
              우리는 그 위에 «대표님 한마디»를 두고, 그 아래 자료 카드를 붙인다.
            ⚠ 둘 다 없으면 «아예 안 그린다» — 제목만 덩그러니 남으면 흉하다.
            ⚠ 쓰실 글이 없는 주에는 자료만 나간다. 빈 상자를 그리지 않는다. */
-        var 칸 = 우리글칸(d.우리글);
+        var 칸 = 우리글칸(d.우리글, 폭);
         var 것들 = 안[g.키] || [];
         var 자료칸그린것 = 꼭지그리기(것들, g, 설, 폭);
         if (!칸 && !자료칸그린것) return;
-        if (그린것) 속 += 줄긋기(22);
+        if (그린것) 속 += 줄긋기(13);
         속 += 꼭지제목(g) + 칸 + 자료칸그린것; 그린것++;
         return;
       }
       var 것 = 안[g.키] || [];
       if (!것.length) return;                    /* 빈 꼭지는 «아예 안 그린다» */
-      if (그린것) 속 += 줄긋기(22);
+      if (그린것) 속 += 줄긋기(13);
       속 += 꼭지제목(g) + 꼭지그리기(것, g, 설, 폭);
       그린것++;
     });
