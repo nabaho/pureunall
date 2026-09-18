@@ -133,6 +133,38 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 .fld input, .fld textarea, .fld select { width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-family: inherit; }
 .fld input:focus, .fld textarea:focus, .fld select:focus { outline: 0; border-color: #2563eb; }
 .fld textarea { resize: vertical; min-height: 44px; }
+
+/* ── 한 줄에 네 칸 (대표 지시 2026-09-18 「4칸으로 한다」) ─────────────────
+   ⚠ .fld 와 «다른 점»은 라벨 자리다. .fld 는 라벨을 칸 왼쪽(110px)에 두는데,
+     그러면 네 칸으로 쪼갤 때 입력 자리가 170px 밑으로 내려가 회사명·주소·
+     이메일 같은 «긴 값»이 칸 밖으로 밀린다. 그래서 라벨을 칸 «위»로 올렸다.
+   ⚠ 짧은 값(번호·이름·업태·숫자)만 네 칸에 넣는다. 긴 값은 .pu-c4-4 로
+     한 줄을 통째 쓴다 — 칸 수를 맞추려고 긴 값을 좁은 칸에 우겨넣지 말 것.
+   ⚠ min-width:0 이 «없으면» 그리드 칸이 안쪽 입력 너비만큼 부풀어
+     네 칸이 창 밖으로 넘친다(그리드 기본값이 min-content 라서). 지우지 말 것. */
+.pu-g4 { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 12px; row-gap: 11px; }
+.pu-c4 { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pu-c4 > label { font-size: 10px; font-weight: 700; color: #475569;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pu-c4 input, .pu-c4 select, .pu-c4 textarea { width: 100%; padding: 6px 7px;
+  border: 1px solid #cbd5e1; border-radius: 5px; font-size: 11.5px; font-family: inherit; }
+.pu-c4 input:focus, .pu-c4 select:focus, .pu-c4 textarea:focus { outline: 0; border-color: #2563eb; }
+.pu-c4 textarea { resize: vertical; min-height: 40px; }
+.pu-c4-2 { grid-column: span 2; } .pu-c4-3 { grid-column: span 3; } .pu-c4-4 { grid-column: span 4; }
+/* 묶음 머리 — 어디서 어디까지가 한 덩어리인지 */
+.pu-g4-sec { grid-column: 1 / -1; font-size: 11px; font-weight: 800; color: #475569;
+  border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-top: 8px;
+  display: flex; align-items: center; gap: 6px; }
+.pu-g4-sec .hint { font-weight: 500; color: #94a3b8; font-size: 10px; margin-left: auto; }
+/* 좁은 화면에서는 네 칸이 너무 좁다 — 두 칸으로 접는다 */
+@media (max-width: 900px) {
+  .pu-g4 { grid-template-columns: repeat(2, 1fr); }
+  .pu-c4-3, .pu-c4-4 { grid-column: span 2; }
+}
+@media (max-width: 560px) {
+  .pu-g4 { grid-template-columns: 1fr; }
+  .pu-c4-2, .pu-c4-3, .pu-c4-4 { grid-column: span 1; }
+}
 .env-actions { margin-top: 24px; display: flex; gap: 8px; }
 .btn-primary { background: #2563eb; color: #fff; padding: 10px 22px; border-radius: 6px; font-size: 13px; font-weight: 700; }
 .btn-primary:hover { background: #1d4ed8; }

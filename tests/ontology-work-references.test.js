@@ -113,6 +113,10 @@ test('실제 계약 담당자 선택창은 동명이인도 SID로 구별하고 �
   Object.assign(ctx,{f:{...form(),companyLinkStatus:'pending',company:{name:'신규'}},users:data.user_dir,lawyers:data.user_dir,
     assignable:data.user_dir,SUBMGR_ADD_OPT:'추가',REASSIGN_SUFFIX:')',getUserAssignStatus:()=>({assignable:true,label:''})});
   ctx.setF=fn=>{ctx.f=fn(ctx.f);};
+  /* ⚠ 담당자 장이 4칸으로 바뀌면서 fld4·sec4 를 쓴다 (2026-09-18). 흉내내지 않고
+     «산 코드»를 그대로 상자에 넣는다 — 흉내내면 진짜가 깨져도 검사가 통과한다. */
+  const g4=erp.indexOf('  function fld4(label, ctrl, span){');
+  new vm.Script(erp.slice(g4,erp.indexOf('  /* ══════',g4))).runInContext(ctx);
   const helpers=erp.indexOf('  function changeMgrMain(newSid){');
   new vm.Script(erp.slice(helpers,erp.indexOf('  function setSimple(k)',helpers))).runInContext(ctx);
   /* ⚠ 2026-09-18 에 탭을 기둥으로 펴면서 담당자 장이 tabBody 대신 PANES.manager 에

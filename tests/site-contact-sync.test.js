@@ -311,7 +311,10 @@ ok('편집칸은 그대로 position 을 쓴다 (읽기만 통일했다)',
 ok('근로자(workers)의 직책은 건드리지 않았다', peCount('wk.position') >= 1);
 
 /* ══ ⑦ pu-erp 배선 — 중복 배너 접기·닫기 ══ */
-const banner = peSlice('// 동일 회사 계약 실시간 안내 (종류별 구분)', "h('div', { className:'fld' }, h('label', null, '대표자 (1 / 2)')");
+/* ⚠ 끝 표지로 «옆 칸의 이름»을 쓰지 않는다 — 2026-09-18 에 대표자 칸이 위 줄로
+   옮겨 가며 이 표지가 사라졌고, 배너는 멀쩡한데 검사가 통째로 멎었다.
+   지금은 «다음 묶음 상자가 열리는 곳»으로 끊는다 — 칸이 오가도 안 흔들린다. */
+const banner = peSlice('// 동일 회사 계약 실시간 안내 (종류별 구분)', "className:'pu-g4'");
 ok('★ 한 줄로 접힌다 (점 · 몇 건)', banner.indexOf("dotIcon + ' 같은 사업장 ' + dupContracts.length + '건'") > 0);
 ok('한 줄 결론이 붙는다', banner.indexOf("String(conclusion).replace(/^→\\s*/, '')") > 0);
 ok('[자세히] 버튼이 있다', banner.indexOf("dupDetail ? '접기' : '자세히'") > 0);
