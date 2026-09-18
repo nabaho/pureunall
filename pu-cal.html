@@ -128,6 +128,27 @@
     padding:8px 11px;font-size:12px;margin-bottom:10px;white-space:pre-line}
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:50;background:#1e293b;
     color:#ffffff;border-radius:9px;padding:9px 16px;font-size:12.5px;font-weight:700}
+  /* ── 인원 현황 표 ── */
+  .scope{display:flex;align-items:center;gap:6px;margin-bottom:9px;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden}
+  .seg button{border:none;background:#ffffff;color:var(--sub);font-family:inherit;font-size:11.5px;
+    padding:4px 11px;cursor:pointer}
+  .seg button.on{background:var(--acc2);color:#ffffff;font-weight:700}
+  table.ppl{border-collapse:collapse;width:100%;font-size:12.5px}
+  table.ppl th,table.ppl td{border-bottom:1px solid var(--line);padding:6px 9px;text-align:left;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.ppl th{background:var(--bg);font-weight:700;font-size:11.5px;color:var(--sub)}
+  table.ppl td.n{text-align:right;font-variant-numeric:tabular-nums}
+  table.ppl tr.left td{color:var(--faint)}
+  .dot2{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  .kindtag{font-size:10px;font-weight:700;border-radius:9px;padding:1px 7px}
+  .kindtag.in{background:#eff6ff;color:#1e40af}
+  .kindtag.ex{background:#fffbeb;color:#854d0e}
+  .kindtag.law{background:#f0fdf4;color:#166534}
+  .days{font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .lnkrow{display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .lnkrow code{font-size:11px;color:var(--sub);background:var(--bg);border-radius:5px;padding:2px 7px;
+    overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .later{text-align:center;padding:40px 18px;color:var(--sub)}
   .later h2{font-size:16px;margin:0 0 7px;color:var(--ink)}
   .later p{margin:0 0 16px;font-size:12.5px}
@@ -177,7 +198,8 @@ var fbDb = null;
 var D = {};              // 읽어 온 표들
 var FAILED = {};         // 못 읽은 표 — «빈 것»과 갈라 둔다
 var ME = null;           // 나 (직원 한 줄)
-var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'' };
+var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'',
+          scope:'month', showLeft:false };
 
 var $ = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
@@ -195,14 +217,14 @@ var TABS = [
   { v:'workload', g:'법인',    label:'👥 직원별 업무', erp:'dash/corp' },
   { v:'analytics',g:'법인',    label:'📊 분석',        erp:'dash/corp', money:true },
   { v:'eumcal',   g:'이음센터', label:'📅 근무 캘린더', ready:true },
-  { v:'eumppl',   g:'이음센터', label:'👤 인원 현황',   erp:'dash/ieum' },
-  { v:'eumshare', g:'이음센터', label:'🔗 외부 공유 뷰', erp:'dash/ieum' }
+  { v:'eumppl',   g:'이음센터', label:'👤 인원 현황',   ready:true },
+  { v:'eumshare', g:'이음센터', label:'🔗 외부 공유 뷰', ready:true }
 ];
 
 /* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
    ⚠ 필요한 것만 읽는다 — 안 쓰는 큰 표를 받으면 요금과 깜빡임이 늘어난다. */
 var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors',
-            'locked_attend_months'];
+            'locked_attend_months','ieum_members','ieum_lectures','ieum_notes','ieum_caps'];
 
 /* ── 사람 ──────────────────────────────────────────────────────────── */
 /* ⚠ 직원 명부는 «배열»로도, «사번이 열쇠인 지도»로도 올 수 있다.
@@ -387,6 +409,167 @@ function laterHtml(tab){
     + '<button class="btn" data-erp="'+esc(tab.erp)+'">푸른이알피에서 열기</button></div>';
 }
 
+/* ── 이음센터 · 인원 현황 ─────────────────────────────────────────────
+   「누가 몇 번 이음센터에 나갔나」를 사람별로 센다.
+   ⚠ 이 화면은 «읽기»다. 한도·비고·강의 기록을 고치는 것은 아직 이알피에서 한다 —
+     그 세 자리는 한 줄짜리 기록이 아니라 «표 통째»로 담겨 있어, 우리 저장 관문
+     (칸별로 보내기)이 그대로 못 쓴다. 억지로 통째 저장을 흉내 내면 두 사람이
+     같은 순간에 고칠 때 한쪽이 통째로 날아간다. */
+var IEUM_START_YEAR = 2024;
+/* 이알피의 같은 이름과 «같은 값»이어야 한다 — 다르면 밖으로 나간 링크가 갈린다.
+   tests/cal-ieum-view.test.js 가 두 값을 맞대 본다. */
+var IEUM_VIEW_BASE = 'https://nabaho.github.io/pureunall/ieum-view.html';
+
+/* 사람 목록 — 내부 노무사 → 외부 노무사 → 변호사 → 그만둔 사람(기록이 있는 경우만).
+   ⚠ 그만둔 사람을 지우지 않는다 — 지나간 근무 기록이 사라지면 셈이 틀어진다. */
+function ieumPeople(){
+  var ext = arr(D.external_staff);
+  var att = arr(D.attendance_records);
+  var 살아있는외부 = ext.filter(function(x){ return x && x.active !== false; });
+  var 이음근무있나 = function(pred){ return att.some(function(r){ return r.type === "eum-work" && pred(r); }); };
+  var 수동명단 = Array.isArray(D.ieum_members) ? D.ieum_members : null;
+  var rows = [];
+  /* 내부: 노무사는 늘 넣는다. 수동 명단이 있으면 그것을, 없으면 이음근무 기록이 있는 사람을. */
+  users().forEach(function(u){
+    var 노무사 = (String(u.title||"") + String(u.role||"")).indexOf("노무사") >= 0;
+    var 수동 = 수동명단 && 수동명단.indexOf(u.sid) >= 0;
+    var 기록 = !수동명단 && 이음근무있나(function(r){ return r.sid === u.sid && !r.externalId; });
+    if(!(노무사 || 수동 || 기록)) return;
+    /* ⚠ 현직만 이 줄에 넣는다 — 이알피와 같은 기준(status === "active").
+       그만둔 사람은 아래에서 «회색으로» 따로 넣는다. 여기 섞으면 그만둔 노무사가
+       현직처럼 보이고, 이음 근무를 배정할 사람 목록에까지 오른다.
+       (검사 tests/cal-ieum-same-as-erp.test.js 가 실제로 돌려 본다 — 처음엔 섞여 있었다) */
+    if(u.status !== "active") return;
+    rows.push({ pk:u.sid, name:u.name||u.sid, kind:"in", roleLabel:"내부 노무사",
+      color:colorOf(u.sid) || "#1e40af", note:(D.ieum_notes && D.ieum_notes[u.sid]) || "" });
+  });
+  var 변호사인가 = function(x){ return String(x.role||"").indexOf("변호사") >= 0; };
+  살아있는외부.filter(function(x){ return !변호사인가(x); }).forEach(function(x){
+    rows.push({ pk:x.id, name:x.name, kind:"ex", roleLabel:"외부 노무사", color:x.color||"#d97706", note:x.note||"" });
+  });
+  살아있는외부.filter(변호사인가).forEach(function(x){
+    rows.push({ pk:x.id, name:x.name, kind:"law", roleLabel:"변호사", color:x.color||"#16a34a", note:x.note||"" });
+  });
+  /* 그만둔 사람 — 기록이 있을 때만, 회색으로 */
+  var 이미 = {}; rows.forEach(function(r){ 이미[r.pk] = 1; });
+  users().forEach(function(u){
+    if(이미[u.sid] || u.status === "active") return;
+    if(!이음근무있나(function(r){ return r.sid === u.sid && !r.externalId; })) return;
+    rows.push({ pk:u.sid, name:u.name||u.sid, kind:"in", roleLabel:"내부 노무사", color:"#94a3b8", left:true, note:"" });
+  });
+  ext.filter(function(x){ return x && x.active === false; }).forEach(function(x){
+    if(이미[x.id]) return;
+    if(!이음근무있나(function(r){ return r.externalId === x.id; })) return;
+    rows.push({ pk:x.id, name:x.name, kind:변호사인가(x)?"law":"ex", roleLabel:변호사인가(x)?"변호사":"외부 노무사",
+      color:"#94a3b8", left:true, note:x.note||"" });
+  });
+  return rows;
+}
+
+/* 범위 안인가 — 월 / 연 / 전체 */
+function inScope(ds){
+  if(!ds) return false;
+  if(S.scope === "year") return ds.slice(0,4) === S.ym.slice(0,4);
+  if(S.scope === "all")  return true;
+  return ds.slice(0,7) === S.ym;
+}
+
+function peopleHtml(){
+  var rows = ieumPeople();
+  /* 사람마다: 몇 번 나갔나 · 며칠에 나갔나 */
+  var 근무 = {};
+  arr(D.attendance_records).forEach(function(r){
+    if(!r || r.type !== "eum-work" || !inScope(r.date)) return;
+    var pk = r.externalId || r.sid; if(!pk) return;
+    if(!근무[pk]) 근무[pk] = { 수:0, 날:[] };
+    근무[pk].수++; 근무[pk].날.push(r.date);
+  });
+  Object.keys(근무).forEach(function(pk){ 근무[pk].날.sort(); });
+  var 강의 = {};
+  arr(D.ieum_lectures).forEach(function(l){
+    if(!l || !inScope(l.date)) return;
+    강의[l.personKey] = (강의[l.personKey]||0) + 1;
+  });
+  var 보일것 = S.showLeft ? rows : rows.filter(function(r){ return !r.left; });
+  var 그만둔수 = rows.filter(function(r){ return r.left; }).length;
+  var 합계 = 보일것.reduce(function(n,r){ return n + ((근무[r.pk]||{}).수 || 0); }, 0);
+  var 범위말 = S.scope === "year" ? S.ym.slice(0,4)+"년" : S.scope === "all" ? "전체" : S.ym;
+
+  var 표 = 보일것.map(function(p){
+    var d = 근무[p.pk] || { 수:0, 날:[] };
+    /* 한 칸은 «한 줄»이다 — 날짜가 많으면 … 로 줄이고 전문은 손대면 뜬다 */
+    var 날말 = d.날.map(function(x){ return x.slice(5).replace("-","/"); }).join(", ");
+    return "<tr" + (p.left ? " class=\"left\"" : "") + ">"
+      + "<td><span class=\"dot2\" style=\"background:" + esc(p.color) + "\"></span>" + esc(p.name)
+      + (p.left ? " <span class=\"muted\" style=\"font-size:10.5px\">(그만둠)</span>" : "") + "</td>"
+      + "<td><span class=\"kindtag " + p.kind + "\">" + esc(p.roleLabel) + "</span></td>"
+      + "<td class=\"n\">" + d.수 + "</td>"
+      + "<td><div class=\"days\" title=\"" + esc(날말) + "\">" + esc(날말 || "—") + "</div></td>"
+      + "<td class=\"n\">" + (강의[p.pk] || 0) + "</td>"
+      + "<td><div class=\"days\" title=\"" + esc(p.note) + "\">" + esc(p.note || "—") + "</div></td>"
+      + "</tr>";
+  }).join("");
+
+  return "<div class=\"note\"><span>✏️ 한도·비고·강의 기록을 고치는 것은 아직 푸른이알피에서 합니다.</span>"
+    + "<span class=\"sp\"></span><button class=\"btn\" data-erp=\"dash/ieum\">이알피에서 고치기</button></div>"
+    + "<div class=\"panel\">"
+    + "<div class=\"scope\">"
+    + "<button class=\"mv\" data-mv=\"-1\">‹</button>"
+    + "<span class=\"monthbar\"><span class=\"ym\">" + esc(범위말) + "</span></span>"
+    + "<button class=\"mv\" data-mv=\"1\">›</button>"
+    + "<span class=\"seg\">"
+    + ["month","year","all"].map(function(v){
+        var 이름 = v === "month" ? "월" : v === "year" ? "연" : "전체";
+        return "<button data-scope=\"" + v + "\"" + (S.scope === v ? " class=\"on\"" : "") + ">" + 이름 + "</button>";
+      }).join("")
+    + "</span>"
+    + (그만둔수 ? "<button class=\"chip" + (S.showLeft ? " on" : "") + "\" data-left=\"1\">그만둔 사람 " + 그만둔수 + "명</button>" : "")
+    + "<span class=\"sp\" style=\"margin-left:auto\"></span>"
+    + "<span class=\"muted\" style=\"font-size:11.5px\">" + esc(범위말) + " 이음센터 근무 합계 <b>" + 합계 + "</b>회</span>"
+    + "</div>"
+    + (표
+        ? "<table class=\"ppl\"><tr><th>이름</th><th>구분</th><th style=\"width:64px\">근무</th>"
+          + "<th>나간 날</th><th style=\"width:56px\">강의</th><th>비고</th></tr>" + 표 + "</table>"
+        : "<div class=\"later\"><p>이 범위에 이음센터 사람이 없습니다.</p></div>")
+    + "</div>";
+}
+
+/* ── 이음센터 · 외부 공유 뷰 ──────────────────────────────────────────
+   외부 노무사·변호사에게 «제 근무일만» 보여 주는 개인 링크다.
+   ⚠ 링크를 «만드는» 것과 공개 일정을 «내보내는» 것은 아직 이알피에서 한다 —
+     그 둘은 외부에 무엇이 나가는지를 정하는 일이라, 한 자리에서만 하는 것이 옳다. */
+function shareHtml(){
+  var ext = arr(D.external_staff).filter(function(x){ return x && x.active !== false; });
+  var 있는것 = ext.filter(function(x){ return x.shareKey; });
+  var 없는것 = ext.filter(function(x){ return !x.shareKey; });
+  /* 주소를 짓는 자리 — 이알피와 «같은 규칙»이어야 한다.
+     ⚠ https 가 아니면(파일로 열었을 때 등) location.origin 이 「null」이라
+       nullxxx 같은 못 쓰는 주소가 나온다. 그때는 배포 주소로 물러선다.
+     ⚠ 이 주소는 «밖으로» 나간다 — 그럴듯한데 안 열리는 주소가 가장 나쁘다
+       (받은 사람은 우리가 아니라 제 폰을 탓한다). */
+  var base = (location.protocol === "https:")
+    ? location.origin + location.pathname.replace(/[^\/]*$/, "ieum-view.html")
+    : IEUM_VIEW_BASE;
+  var 줄 = 있는것.map(function(x){
+    var url = base + "?k=" + encodeURIComponent(x.shareKey);
+    return "<tr><td><span class=\"dot2\" style=\"background:" + esc(x.color||"#d97706") + "\"></span>" + esc(x.name) + "</td>"
+      + "<td><span class=\"kindtag " + (String(x.role||"").indexOf("변호사")>=0 ? "law" : "ex") + "\">" + esc(x.role||"외부") + "</span></td>"
+      + "<td><div class=\"lnkrow\"><code title=\"" + esc(url) + "\">" + esc(url) + "</code>"
+      + "<button class=\"btn ghost\" data-copy=\"" + esc(url) + "\">복사</button>"
+      + "<button class=\"btn ghost\" data-open=\"" + esc(url) + "\">열기</button></div></td></tr>";
+  }).join("");
+  return "<div class=\"note\"><span>🔗 링크 만들기와 공개 일정 내보내기는 푸른이알피에서 합니다 — 여기서는 보고 복사합니다.</span>"
+    + "<span class=\"sp\"></span><button class=\"btn\" data-erp=\"dash/ieum\">이알피에서 하기</button></div>"
+    + "<div class=\"panel\">"
+    + (줄 ? "<table class=\"ppl\"><tr><th style=\"width:130px\">이름</th><th style=\"width:100px\">구분</th><th>개인 링크</th></tr>" + 줄 + "</table>"
+          : "<div class=\"later\"><p>아직 만들어진 개인 링크가 없습니다.</p></div>")
+    + (없는것.length
+        ? "<div class=\"note\" style=\"margin-top:11px\"><span>링크가 아직 없는 사람 " + 없는것.length + "명: "
+          + esc(없는것.map(function(x){ return x.name; }).join(" · ")) + "</span></div>"
+        : "")
+    + "</div>";
+}
+
 /* ── 넣고 고치기 ──────────────────────────────────────────────────────
    ⚠ 저장은 반드시 js/pu-cal-write.js 의 관문을 지난다. 여기서 질러가지 말 것 —
      마감된 달 · 번호 없는 항목 · 아직 배열인 표가 그 문에서만 걸린다. */
@@ -516,6 +699,10 @@ function render(){
     html = failedHtml() + formNote() + lockNote()
       + '<div class="panel">' + monthbarHtml() + chipsHtml(eumOnly) + calendarHtml(eumOnly) + legendHtml()
       + '<div class="muted" style="font-size:11px;margin-top:7px">빈 칸을 누르면 새로 넣고, 일을 누르면 고칩니다.</div></div>';
+  } else if(tab.v==='eumppl'){
+    html = failedHtml() + peopleHtml();
+  } else if(tab.v==='eumshare'){
+    html = failedHtml() + shareHtml();
   } else {
     html = laterHtml(tab);
   }
@@ -526,15 +713,22 @@ function render(){
 
 /* 누르는 것은 한 자리에서 받는다 — 단추마다 붙이면 다시 그릴 때 하나씩 샌다 */
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; render(); return; }
   if(t.hasAttribute('data-mv')){
     var mv = +t.getAttribute('data-mv');
     if(mv===0){ S.ym = ymOf(new Date()); }
+    else if(S.tab==='eumppl' && S.scope==='year'){
+      var y=new Date(S.ym+'-01'); y.setFullYear(y.getFullYear()+mv); S.ym = ymOf(y);
+    }
     else { var d=new Date(S.ym+'-01'); d.setMonth(d.getMonth()+mv); S.ym = ymOf(d); }
     render(); return;
   }
+  if(t.hasAttribute('data-scope')){ S.scope = t.getAttribute('data-scope'); render(); return; }
+  if(t.hasAttribute('data-left')){ S.showLeft = !S.showLeft; render(); return; }
+  if(t.hasAttribute('data-copy')){ copyLink(t.getAttribute('data-copy')); return; }
+  if(t.hasAttribute('data-open')){ window.open(t.getAttribute('data-open'), '_blank', 'noopener'); return; }
   if(t.hasAttribute('data-f')){ modalRead(); var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
   if(t.hasAttribute('data-erp')){ goErp(t.getAttribute('data-erp')); return; }
   if(t.hasAttribute('data-close')){ closeModal(); return; }
@@ -551,6 +745,19 @@ document.addEventListener('click', function(e){
   }
   if(t.hasAttribute('data-day')){ openNew(t.getAttribute('data-day')); return; }
 });
+
+/* 링크 복사 — 못 하는 자리(https 아님·권한 거절)에서는 «됐다»고 하지 않는다.
+   「복사됐습니다」는 말만 뜨고 실제로는 안 붙는 것이 가장 나쁘다. */
+function copyLink(url){
+  function 실패(){ toast('복사가 안 됩니다 — 링크를 길게 눌러 직접 복사해 주세요'); }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(function(){ toast('📋 링크를 복사했습니다'); }, 실패);
+      return;
+    }
+  }catch(e){}
+  실패();
+}
 
 /* 이알피로 — 창은 «하나»만 쓴다(새 탭을 자꾸 만들지 않는다) */
 function goErp(menu){
