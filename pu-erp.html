@@ -306,7 +306,7 @@ var Component = React.Component;
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
 var ERP_BUILD = '2026-09-18 초기 동기화의 건별 자료를 모아 한 번만 저장 — 수천 건을 받을 때마다 전체 배열을 다시 저장해 화면이 오래 멈추던 길을 줄였다';
-var BUILD_SEQ = 174;
+var BUILD_SEQ = 175;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -19207,6 +19207,12 @@ function ContractModal(props){
                 overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } },
                 '빈 칸 ' + add.length + '개: ' + add.map(function(p){ return L[p[1]] || p[1]; }).join(' · '))
             : h('span', { style:{ fontSize:'10.5px', color:'#64748b', flex:1 } }, '이미 다 들어 있습니다'),
+          /* 📄 회사 한 장 — 번호 하나로 그 회사의 모든 일을 모아 본다(2걸음, 2026-09-18) */
+          h('button', { type:'button', onClick:function(){ erpOpenCoSheet(f.company.bizNo); },
+            title:'이 회사와 한 일을 한 화면에 모아 보여 드립니다 — 보기만 합니다.',
+            style:{ background:'#fff', color:'#166534', border:'1px solid #bbf7d0', borderRadius:'6px',
+              padding:'4px 10px', fontSize:'11px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
+            '📄 회사 한 장'),
           add.length
             ? h('button', { type:'button', onClick:function(){ coInfoFill(coInfoHit); },
                 title:'기업정보함의 값으로 «빈 칸만» 채웁니다.\n이미 적어 두신 값은 건드리지 않습니다.',
@@ -86297,6 +86303,171 @@ function ERPMain(props){
 }
 
 
+/* ══════════ 📄 회사 한 장 (온톨로지 2걸음, 대표 결정 2026-09-18) ══════════
+   「사업자번호 하나로 그 회사의 모든 것을 모아 본다」
+
+   ■ 왜
+     한 회사가 자문·계약·컨설팅·사건·기금·명함에 흩어져 있다. 「이 회사와 무슨
+     일을 했더라」를 알려면 화면 여섯을 돌아야 했다. 열쇠가 생겼으니 모을 수 있다.
+
+   ⚠★ **읽기만 한다.** 고치는 단추를 두지 않는다 — 손대는 것은 «그 화면»에서 한다.
+     거기라야 그 화면의 권한·동시편집·검증을 지난다(온톨로지 규칙).
+   ⚠★ **어디서 온 값인지 한 줄마다 적는다.** 「이 숫자 어디서 났지」에 답해야 한다.
+   ⚠★ **번호로 이은 것과 이름으로 찾은 것을 갈라 적는다.** 명함에는 사업자번호가 없어
+     이름으로 셀 수밖에 없는데, 그것을 「이어졌다」고 적으면 거짓이 된다.
+   ⚠ 정부사업일정은 사업장에 사업자번호가 «하나도 없어» 이 길로는 못 잇는다 — 그렇다고 적는다. */
+function erpCoSheetGather(bizNo, coInfo){
+  var key = (window.PuCoKey && window.PuCoKey.key(bizNo)) || '';
+  var out = { key:key, bizNo:bizNo, coInfo:coInfo || null, name:'', rows:[], cardN:null, coMaster:null };
+  if(!key) return out;
+  function same(v){ return window.PuCoKey.sameCo(key, v) === true; }
+
+  var master = (dbGet('companies', []) || []).find(function(c){ return c && !c._deleted && same(c.bizNo); });
+  if(master){ out.coMaster = master; out.name = master.name || ''; }
+  if(!out.name && coInfo && coInfo.company) out.name = String(coInfo.company).trim();
+
+  var STORES = [
+    { key:'contracts',      label:'계약',   icon:'📄', no:'contractNo' },
+    { key:'consultings',    label:'컨설팅', icon:'📊', no:'no' },
+    { key:'cases',          label:'사건',   icon:'⚖',  no:'no' },
+    { key:'funds',          label:'기금',   icon:'🏦', no:'no' },
+    { key:'other_projects', label:'기타',   icon:'📋', no:'no' }
+  ];
+  STORES.forEach(function(s){
+    (dbGet(s.key, []) || []).forEach(function(r){
+      if(!r || r._deleted || !same(r.bizNo)) return;
+      if(!out.name && r.companyName) out.name = String(r.companyName).trim();
+      out.rows.push({ store:s.key, label:s.label, icon:s.icon,
+        no: r[s.no] || r.contractNo || r.no || '',
+        title: r.brief || r.typeName || r.companyName || '',
+        date: r.startDate || r.contractDate || r.signDate || r.estDate || '',
+        closed: r.status === 'closed' });
+    });
+  });
+  out.rows.sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+
+  /* 명함은 «이름으로» 센다 — 명함에 사업자번호가 없다. 그래서 따로 적는다. */
+  if(out.name){
+    try {
+      var idx = (typeof ensurePucardsIdx === 'function') ? ensurePucardsIdx() : (window.pucardsIdx || null);
+      if(idx){
+        var want = pcNormCo(out.name), n = 0;
+        Object.keys(idx).forEach(function(id){
+          var r = idx[id];
+          if(r && r.k !== 'biz' && want && pcNormCo(r.c) === want) n++;
+        });
+        out.cardN = n;
+      }
+    } catch(_){}
+  }
+  return out;
+}
+
+function CompanySheetModal(props){
+  var d = props.data || {};
+  var ci = d.coInfo || {};
+  var m = d.coMaster || null;
+  function line(k, v, src){
+    if(!String(v == null ? '' : v).trim()) return null;
+    return h('div', { style:{ display:'flex', gap:'8px', alignItems:'baseline', fontSize:'12px',
+        padding:'4px 0', borderBottom:'1px dashed #e2e8f0' } },
+      h('span', { style:{ color:'#64748b', minWidth:'68px', fontSize:'11px', flexShrink:0 } }, k),
+      h('span', { style:{ flex:1, minWidth:0, wordBreak:'break-all' } }, String(v)),
+      h('span', { style:{ fontSize:'10px', color:'#94a3b8', whiteSpace:'nowrap' } }, src));
+  }
+  var facts = [
+    line('대표자',    ci.ceo,        '사업자등록증'),
+    line('업태/종목', [ci.bizType, ci.bizItem].filter(Boolean).join(' · '), '사업자등록증'),
+    line('주소',      ci.address,    '사업자등록증'),
+    line('전화',      ci.companyTel, '기업정보함'),
+    line('이메일',    ci.email,      '기업정보함'),
+    line('매출·인원', [ci.sales, ci.workers].filter(Boolean).join(' · '), '신청서'),
+    line('중소기업',  ci.smeExpiry ? (ci.smeExpiry + ' 까지') : '', '확인서'),
+    m ? line('월 자문료', m.monthlyAdvisoryFee ? (Number(m.monthlyAdvisoryFee).toLocaleString() + '원') : '', '업체관리') : null
+  ].filter(Boolean);
+
+  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target === e.currentTarget) props.onClose(); } },
+    h('div', { className:'modal', style:{ width:'860px', maxWidth:'96vw' }, onClick:function(e){ e.stopPropagation(); } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '📄 회사 한 장'),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ maxHeight:'74vh', overflowY:'auto' } },
+        h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', marginBottom:'12px' } },
+          h('span', { style:{ fontSize:'16px', fontWeight:800 } }, d.name || '(이름 모름)'),
+          h('span', { style:{ fontFamily:'monospace', fontSize:'12px', fontWeight:700, background:'#eff6ff',
+            border:'1px solid #bfdbfe', color:'#1e40af', borderRadius:'6px', padding:'2px 9px' } }, d.bizNo || ''),
+          m && h('span', { style:{ fontSize:'10.5px', fontWeight:700, background:'#f0fdf4', color:'#166534',
+            border:'1px solid #bbf7d0', borderRadius:'10px', padding:'2px 8px' } }, '✓ 업체관리')),
+        h('div', { style:{ display:'grid', gridTemplateColumns: window.innerWidth >= 760 ? '1fr 1fr' : '1fr', gap:'16px' } },
+          h('div', null,
+            h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#1e40af', marginBottom:'6px' } }, '🏢 회사'),
+            facts.length ? facts
+              : h('div', { style:{ fontSize:'11.5px', color:'#94a3b8', padding:'10px 0' } },
+                  '기업정보함에 이 회사의 상세가 아직 없습니다 — 사업자등록증을 올리면 채워집니다.')),
+          h('div', null,
+            h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#1e40af', marginBottom:'6px' } },
+              '📂 이 회사와 한 일 ',
+              h('span', { style:{ fontSize:'10.5px', fontWeight:600, color:'#64748b' } }, '(사업자번호로 이어진 것)')),
+            d.rows.length
+              ? d.rows.map(function(r, i){
+                  return h('div', { key:i, style:{ display:'flex', gap:'8px', alignItems:'baseline', fontSize:'12px',
+                      padding:'4px 0', borderBottom:'1px dashed #e2e8f0' } },
+                    h('span', { style:{ minWidth:'54px', fontSize:'11px', color:'#475569', fontWeight:700, flexShrink:0 } },
+                      r.icon + ' ' + r.label),
+                    h('span', { style:{ fontFamily:'monospace', fontSize:'11px', color:'#1e40af', flexShrink:0 } }, r.no),
+                    h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' },
+                      title:r.title }, r.title),
+                    r.closed && h('span', { style:{ fontSize:'10px', color:'#94a3b8' } }, '종료'),
+                    h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', whiteSpace:'nowrap' } }, String(r.date).slice(0,10)));
+                })
+              : h('div', { style:{ fontSize:'11.5px', color:'#94a3b8', padding:'10px 0' } },
+                  '사업자번호로 이어진 일이 아직 없습니다.'),
+            /* 번호로 못 잇는 것은 «갈라서» 적는다 — 「이어졌다」로 뭉뚱그리면 거짓이 된다 */
+            h('div', { style:{ marginTop:'12px', paddingTop:'8px', borderTop:'1px solid #e2e8f0',
+                fontSize:'11px', color:'#64748b', lineHeight:1.7 } },
+              h('div', { style:{ fontWeight:700, color:'#854d0e', marginBottom:'3px' } }, '⚠ 번호로는 못 이은 것'),
+              h('div', null, '📇 명함 ',
+                d.cardN === null ? '(아직 안 셌습니다)' : (d.cardN + '장'),
+                ' — 명함에는 사업자번호가 없어 ', h('b', null, '이름으로'), ' 셌습니다'),
+              h('div', null, '📅 정부사업일정 — 사업장에 사업자번호가 ', h('b', null, '하나도 없어'),
+                ' 아직 못 잇습니다')))),
+        h('div', { style:{ marginTop:'14px', padding:'9px 11px', background:'#fffbeb',
+            border:'1px solid #fde68a', borderRadius:'6px', fontSize:'11.5px', color:'#854d0e' } },
+          '이 화면은 ', h('b', null, '보기만'), ' 합니다 — 고치실 것은 그 일이 사는 화면에서 하세요. ',
+          '거기라야 그 화면의 권한과 동시편집 규칙을 지납니다.')),
+      h('div', { className:'modal-f' },
+        h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'))
+    ));
+}
+
+/* 어디서든 열 수 있게 — 번호 하나만 넘긴다 */
+function erpOpenCoSheet(bizNo){
+  try { window.dispatchEvent(new CustomEvent('erp-co-sheet', { detail:{ bizNo:bizNo } })); } catch(_){}
+}
+window.erpOpenCoSheet = erpOpenCoSheet;
+
+/* 창을 실제로 다는 곳. 열 때 기업정보함 기업상세를 «한 번» 읽는다(구독하지 않는다). */
+function CompanySheetHost(){
+  var s = useState(null); var data = s[0]; var setData = s[1];
+  useEffect(function(){
+    function on(e){
+      var bizNo = (e && e.detail && e.detail.bizNo) || '';
+      var key = (window.PuCoKey && window.PuCoKey.key(bizNo)) || '';
+      if(!key){ showToast('사업자번호가 없거나 검산에 맞지 않습니다'); return; }
+      setData(erpCoSheetGather(bizNo, null));               // 먼저 있는 것으로 연다
+      try {
+        firebase.database().ref(window.PuCoKey.coInfoPath(bizNo)).once('value').then(function(sn){
+          setData(erpCoSheetGather(bizNo, sn.val()));       // 기업상세가 오면 다시 그린다
+        }).catch(function(){});
+      } catch(_){}
+    }
+    window.addEventListener('erp-co-sheet', on);
+    return function(){ window.removeEventListener('erp-co-sheet', on); };
+  }, []);
+  if(!data) return null;
+  return h(CompanySheetModal, { data:data, onClose:function(){ setData(null); } });
+}
+
 // ============ 루트 앱 (로그인 상태 관리) ============
 function App(){
   // 세션 키만으로 판단하지 않음 — 세션의 sid가 user_accounts에서 활성 사용자로 매핑되어야 로그인 상태
@@ -86583,6 +86754,9 @@ function App(){
       h('span', { style:{ textDecoration:'underline' } }, 'https://nabaho.github.io/pureunall/pu-erp.html'),
       ' 주소로 접속하세요. (현재 데이터는 이 PC에만 저장됩니다)'
     ),
+    /* 📄 회사 한 장 — 어느 화면에서 열든 여기 하나에 뜬다(온톨로지 2걸음, 2026-09-18).
+       ⚠ 로그인한 뒤에만 단다 — 로그인 화면에서 회사 자료를 그릴 일이 없다. */
+    isLoggedIn && h(CompanySheetHost),
     isLoggedIn
       ? h(ERPMain, { onLogout: function(){ handleLogout({ reload:true }); } })
       : ((ssoWait || portalWait)
