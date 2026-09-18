@@ -25,18 +25,18 @@ const path = require('path');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 const bare = stripComments(src);
-const 묻기 = stripComments('<script>' + cutFn(src, 'async function erpAskDeferCompanyLink(') + '</script>');
+const 묻기 = stripJs(cutFn(src, 'async function erpAskDeferCompanyLink('));
 
 test('① ★★ 저장 단추 자리에서 «먼저» 묻는다 — 막히고 나서가 아니다', function () {
   /* ⚠ 고정 폭으로 자르지 않는다 — 창을 좁게 잡으면 함수 끝에 못 닿아 «안 보고 통과»한다
      (tests/test-cut-truncation.test.js 가 이것을 기계로 막는다). cutFn 으로 통째로 뽑는다.
      ⚠ save(form) 은 사건관리에도 있다 — 계약 쪽을 잡았는지 먼저 확인한다. */
-  const 저장 = stripComments('<script>' + cutFn(src, 'async function save(form)') + '</script>');
+  const 저장 = stripJs(cutFn(src, 'async function save(form)'));
   assert.match(저장, /erpValidateContractCompany/,
     '★ 계약 저장 자리를 못 잘랐습니다 — 다른 save 를 잡았는지 보세요');
   const 물음 = 저장.indexOf('erpAskDeferCompanyLink');
@@ -79,7 +79,7 @@ test('④ ★ 물을 필요 없는 자리는 안 묻는다', function () {
 });
 
 test('⑤ ★★ 검증 함수 자체는 그대로 — 이관·저장직전 재검사가 같은 문을 쓴다', function () {
-  const 검증 = stripComments('<script>' + cutFn(src, 'function erpValidateContractCompany(') + '</script>');
+  const 검증 = stripJs(cutFn(src, 'function erpValidateContractCompany('));
   assert.match(검증, /if\(!checked\.ok\)\{showToast\('⚠ '\+checked\.message\);return null;\}/,
     '★★ 검증 문이 물러졌습니다 — 이관·저장직전 재검사도 이 문을 씁니다');
   assert.ok(!/popConfirm/.test(검증),

@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const { test } = require('node:test');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -119,7 +119,7 @@ test('⑧ ★★ 옛 건의 이사가 돌아도 AI 를 안 부른다 — 요금 
 /* ── 배선 — 만들어만 두고 «안 부르는» 일이 없게 ─────────────────────────── */
 
 test('⑨ ★★ 한도를 «먼저» 보고 부른다 — 새는 길을 하나 더 내지 않는다', function () {
-  const body = stripComments('<script>' + cutFn(APP, 'async function buildSuggestionAssist(') + '</script>');
+  const body = stripJs(cutFn(APP, 'async function buildSuggestionAssist('));
   assert.match(body, /aiMonthSpend\(\)/, '★★ 이번 달 요금 한도를 안 봅니다');
   assert.ok(body.indexOf('aiMonthSpend') < body.indexOf('callGemini'),
     '★★ 부르고 «나서» 한도를 봅니다 — 이미 돈이 나간 뒤입니다');
@@ -144,7 +144,7 @@ test('⑪ ★ 자동 트리거가 문턱을 «실제로» 본다', function () {
 
 test('⑫ ★ 손수 짓기는 총괄관리자만', function () {
   const seg = APP.slice(APP.indexOf('exports.suggestionAssistNow'));
-  const body = stripComments('<script>' + seg.slice(0, 3000) + '</script>');
+  const body = stripJs(seg.slice(0, 3000));
   assert.match(body, /verifyIdToken/, '★★ 누가 부르는지 안 봅니다');
   assert.match(body, /isAdmin\s*!==\s*true/, '★★ 총괄관리자 검사가 없습니다 — 건의는 직원이 대표께 올린 글입니다');
 });
@@ -156,7 +156,7 @@ test('⑬ ★★ 초안은 자동 게시되지 않는다 — 사람이 눌러야
   assert.match(bare, /id="sgAsstUse"/, '★ [답변란에 넣기] 단추가 없습니다');
   /* 초안을 답변 자리(sgReplyIn)에 넣는 곳이 «단추 눌림» 안에만 있어야 한다.
      그리기(sgAssistHtml)가 곧바로 넣으면 확인 없이 나간다. */
-  const draw = stripComments('<script>' + cutFn(ENTER, 'function sgAssistHtml(') + '</script>');
+  const draw = stripJs(cutFn(ENTER, 'function sgAssistHtml('));
   assert.ok(!/sgReplyIn/.test(draw), '★★ 그리면서 답변칸을 채웁니다 — 확인 없이 나갑니다');
   assert.ok(!/\.update\(|\.set\(/.test(draw), '★★ 그리면서 서버에 씁니다');
 });
@@ -173,7 +173,7 @@ test('⑭ ★ 쓰고 있던 답변을 지우지 않는다', function () {
 });
 
 test('⑮ ★ 못 지었을 때도 «왜» 를 보여 준다', function () {
-  const draw = stripComments('<script>' + cutFn(ENTER, 'function sgAssistHtml(') + '</script>');
+  const draw = stripJs(cutFn(ENTER, 'function sgAssistHtml('));
   assert.match(draw, /SG_ASSIST_WHY/, '★ 까닭을 안 보여 줍니다 — 빈칸은 고장으로 보입니다');
   ['budget', 'nokey', 'ai', 'parse'].forEach(function (k) {
     assert.ok(new RegExp(k + '\\s*:').test(stripComments(ENTER)), '까닭 「' + k + '」 의 설명이 없습니다');

@@ -25,11 +25,11 @@ const path = require('path');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
-const 이관 = stripComments('<script>' + cutFn(src, 'function transferContract(') + '</script>');
+const 이관 = stripJs(cutFn(src, 'function transferContract('));
 
 /* 사건 갈래만 잘라 본다 — 아래 컨설팅 갈래가 같은 줄을 갖고 있어, 통째로 보면
    사건에서 빼도 검사가 통과한다(2026-09-11 되돌림 검사에서 확인). */
@@ -59,7 +59,7 @@ test('② ★ 컨설팅·기금·기타도 그대로 들고 간다 — 되돌아
 });
 
 test('③ ★★ 두 칸은 «따로» 쓰인다 — 하나만 넣으면 반만 고쳐진다', function () {
-  const 미납 = stripComments('<script>' + cutFn(src, 'function erpUnpaidParts(') + '</script>');
+  const 미납 = stripJs(cutFn(src, 'function erpUnpaidParts('));
   /* 착수금·계약금은 contractFee…(cVat), 성공보수·잔금은 balanceFee…(bVat) 를 본다.
      이 짝이 깨지면 이관에서 한 칸만 들고 가도 반쪽만 맞는다. */
   assert.match(미납, /var cVat = it\.contractFeeVatIncluded/, '착수금 쪽 표시가 바뀌었습니다');
@@ -77,7 +77,7 @@ test('③ ★★ 두 칸은 «따로» 쓰인다 — 하나만 넣으면 반만 
    운영 자료를 고치는 단추라 지켜야 할 것이 많다. */
 
 test('⑤ ★★ 바로잡기는 «금액을 건드리지 않는다» — 표시 한 칸만 바꾼다', function () {
-  const 고침 = stripComments('<script>' + cutFn(src, 'function VatCarryFixSection(') + '</script>');
+  const 고침 = stripJs(cutFn(src, 'function VatCarryFixSection('));
   /* 쓰는 것은 dbPatch 한 곳이고, 넣는 것은 참/거짓 한 칸뿐이어야 한다 */
   assert.match(고침, /var p = \{\};\s*p\[x\.flag\] = true;/,
     '★★ 표시 말고 다른 것을 씁니다 — 금액이 바뀌면 돈이 틀어집니다');
@@ -92,7 +92,7 @@ test('⑤ ★★ 바로잡기는 «금액을 건드리지 않는다» — 표시
 });
 
 test('⑥ ★★ 잇는 열쇠가 sourceContractNo · sourceContractId 다', function () {
-  const 훑기 = stripComments('<script>' + cutFn(src, 'function erpVatCarryScan(') + '</script>');
+  const 훑기 = stripJs(cutFn(src, 'function erpVatCarryScan('));
   /* ⚠ srcContractId·contractId 로 이으면 «0건»이 나온다(2026-09-12 에 실제로 그랬다).
      0건은 「고칠 것이 없다」로 읽혀서 틀린 안심을 준다 — 그래서 열쇠를 못 박는다. */
   assert.match(훑기, /it\.sourceContractNo && byNo\[it\.sourceContractNo\]/,
@@ -103,14 +103,14 @@ test('⑥ ★★ 잇는 열쇠가 sourceContractNo · sourceContractId 다', fun
 });
 
 test('⑦ ★ 셈에서 빼야 할 것을 뺀다 — %·0원·이미 맞는 것', function () {
-  const 훑기 = stripComments('<script>' + cutFn(src, 'function erpVatCarryScan(') + '</script>');
+  const 훑기 = stripJs(cutFn(src, 'function erpVatCarryScan('));
   assert.match(훑기, /if\(!c\[flag\]\) return;/, '★★ 계약이 «포함»인지 안 보고 고칩니다');
   assert.match(훑기, /if\(it\[flag\]\) return;/, '★ 이미 맞는 칸도 고치려 듭니다');
   assert.match(훑기, /successFeeType === 'percent'/,
     '★★ 성공보수 %(요율)를 금액으로 셉니다 — 요율에는 부가세가 없습니다');
   assert.match(훑기, /if\(!amt\) return;/, '★ 0원도 어긋났다고 셉니다');
   /* 돈이 걸린 자리 — 관리자만 본다 */
-  const 화면 = stripComments('<script>' + cutFn(src, 'function VatCarryFixSection(') + '</script>');
+  const 화면 = stripJs(cutFn(src, 'function VatCarryFixSection('));
   assert.match(화면, /CURRENT_USER\.isAdmin \|\| CURRENT_USER\.isSubAdmin/,
     '★★ 아무나 돈 기록을 고칠 수 있습니다');
   /* ⚠ 「popConfirm 이라는 글자가 있나」로는 부족하다 — if(false && await popConfirm(…))
@@ -126,7 +126,7 @@ test('⑧ ★★ 고쳤다고 «말하기 전에 다시 읽어» 본다 — 돌�
        «못 찾았다»던 산재등-2026-003 은 고쳐져 있었고, «고쳤다»던 칸 하나는 안 들어가 있었다.
        ★ 양쪽으로 다 틀렸다 — 이 기기 사본이 서버와 어긋나면 돌아온 값과 실제가 갈린다.
        그래서 «다시 읽어» 표시가 실제로 붙었는지 본다. 그것만이 사실이다. */
-  const 고침 = stripComments('<script>' + cutFn(src, 'function VatCarryFixSection(') + '</script>');
+  const 고침 = stripJs(cutFn(src, 'function VatCarryFixSection('));
   assert.match(고침, /dbGet\(x\.store, \[\]\)[\s\S]{0,120}y\.id === x\.id/,
     '★★ 고친 뒤 «다시 읽지» 않습니다 — dbPatch 가 돌려준 값만 믿으면 사실과 다른 말을 합니다');
   assert.match(고침, /다시\[x\.flag\]/,
@@ -139,7 +139,7 @@ test('⑧ ★★ 고쳤다고 «말하기 전에 다시 읽어» 본다 — 돌�
 });
 
 test('④ ★ 「부가세 포함」이면 그대로, 아니면 ×1.1 — 셈은 한 곳에서만', function () {
-  const 셈 = stripComments('<script>' + cutFn(src, 'function erpExpectAmount(') + '</script>');
+  const 셈 = stripJs(cutFn(src, 'function erpExpectAmount('));
   assert.match(셈, /taxType\s*\?\s*f\s*:\s*Math\.round\(f\s*\*\s*1\.1\)/,
     '★ 부가세 셈이 바뀌었습니다 — 표시가 있어도 ×1.1 하면 고친 뜻이 없어집니다');
   /* 165만원 예: 표시가 있으면 1,650,000 · 없으면 1,815,000 → 차액 165,000 */

@@ -18,16 +18,16 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const { stripComments } = require('./strip-comments.js');
+const { stripComments, stripJs } = require('./strip-comments.js');
 const { cutFn } = require('./cut-fn.js');
 
 const ROOT = path.join(__dirname, '..');
 const VR = require(path.join(ROOT, 'functions', 'vision-read.js'));
 const DR = require(path.join(ROOT, 'functions', 'doc-read.js'));
-const IDX = stripComments(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'));
+const IDX = stripJs(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'));
 const ERP_RAW = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
 const ERP = stripComments(ERP_RAW);
-const READER = stripComments(fs.readFileSync(path.join(ROOT, 'js', 'pu-doc-read.js'), 'utf8'));
+const READER = stripJs(fs.readFileSync(path.join(ROOT, 'js', 'pu-doc-read.js'), 'utf8'));
 
 /* readVision 함수 몸통 전체 — «다음 exports.» 까지.
    ⚠ 2026-09-08 이전에는 고정폭(i + 3000)으로 잘라 썼다. 달 몫 문턱을 앞에
@@ -65,7 +65,7 @@ test('★★ 「어디서 넣나」를 화면이 알려 준다 — 칸만 없애
 });
 
 test('★★★ 서버가 열쇠를 «브라우저로 돌려주지» 않는다', () => {
-  const fn = stripComments(cutFn(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'),
+  const fn = stripJs(cutFn(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'),
     'function readVisionKey('));
   assert.ok(fn, 'readVisionKey 가 없습니다');
   /* 답으로 나가는 것은 글과 쪽수뿐이어야 한다 */
@@ -76,7 +76,7 @@ test('★★★ 서버가 열쇠를 «브라우저로 돌려주지» 않는다',
 });
 
 test('★ 열쇠는 «금고에서만» 온다 — 실시간DB 갈래를 새로 만들지 않았다', () => {
-  const fn = stripComments(cutFn(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'),
+  const fn = stripJs(cutFn(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'),
     'function readVisionKey('));
   assert.match(fn, /process\.env\.VISION_KEY/, '금고에서 안 읽습니다');
   assert.ok(!/getDatabase|db\.ref/.test(fn),
@@ -84,7 +84,7 @@ test('★ 열쇠는 «금고에서만» 온다 — 실시간DB 갈래를 새로 
 });
 
 test('★ 자리 채우개를 «없는 것»으로 본다 — 금고에 비밀이 있어야 배포되므로 먼저 자리만 만든다', () => {
-  const fn = stripComments(cutFn(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'),
+  const fn = stripJs(cutFn(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'),
     'function readVisionKey('));
   assert.match(fn, /unset/, '★ 자리 채우개로 구글을 부르면 403 만 받습니다');
   assert.match(fn, /length < \d+/, '★ 너무 짧은 값을 열쇠로 씁니다');
@@ -132,7 +132,7 @@ test('★★★ 로그인 확인을 «부르기 전에» 한다 — 아니면 �
 });
 
 test('★★ 화면도 로그인 없이는 «안 부른다» — 401 만 받고 사람은 까닭을 모른다', () => {
-  const fn = stripComments(cutFn(ERP_RAW, 'function ocrWithGoogleVision('));
+  const fn = stripJs(cutFn(ERP_RAW, 'function ocrWithGoogleVision('));
   assert.ok(fn, 'ocrWithGoogleVision 이 없습니다');
   assert.match(fn, /currentUser/, '★ 로그인 여부를 안 봅니다');
   /* ⚠ 「currentUser 라는 글자가 있나」로는 모자란다 — 값을 꺼내 놓고 «보지 않으면»
@@ -267,7 +267,7 @@ test('★★★ Vision 셈은 «장 수»로 센다 — 요청 수로 세면 달
 });
 
 test('★ 셈이 «몇을 더할지» 받는다 — 안 받으면 장 수를 셀 길이 없다', () => {
-  const fn = stripComments(cutFn(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'),
+  const fn = stripJs(cutFn(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'),
     'async function bumpReadTally('));
   assert.ok(fn, 'bumpReadTally 가 없습니다');
   /* ⚠ 「howMany 라는 글자가 있나」로는 모자랐다 — 매개변수에서 빼도 몸통에 그 글자가
@@ -278,7 +278,7 @@ test('★ 셈이 «몇을 더할지» 받는다 — 안 받으면 장 수를 셀
 });
 
 test('★★★ 「안 켰다」면 «조용히» 물러서지 않는다 — 한 번 누르면 되는 일을 영영 모른다', () => {
-  const fn = stripComments(cutFn(ERP_RAW, 'function ocrExtract('));
+  const fn = stripJs(cutFn(ERP_RAW, 'function ocrExtract('));
   assert.ok(fn, 'ocrExtract 가 없습니다');
   assert.match(fn, /showToast/,
     '★★★ 개발자 도구에만 적고 사람에게는 안 알립니다 — 대표님은 「판독이 왜 흐리지」만 보고 '
@@ -292,7 +292,7 @@ test('★★★ 「안 켰다」면 «조용히» 물러서지 않는다 — 한
 });
 
 test('★★ 열쇠가 없어도 브라우저 판독(Tesseract)으로 «물러선다» — 그 길을 막지 않았다', () => {
-  const fn = stripComments(cutFn(ERP_RAW, 'function ocrExtract('));
+  const fn = stripJs(cutFn(ERP_RAW, 'function ocrExtract('));
   assert.ok(fn, 'ocrExtract 가 없습니다');
   assert.match(fn, /ocrWithGoogleVision\(/, 'Vision 을 먼저 안 부릅니다');
   assert.match(fn, /ocrWithTesseract\(/,

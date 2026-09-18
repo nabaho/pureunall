@@ -21,7 +21,7 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 const { test } = require('node:test');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -119,7 +119,7 @@ test('⑧ ★★ 접기는 «맨 끝»이다 — 먼저 접으면 안 쓴 벌까
 });
 
 test('⑨ ★★ 목록은 «접기를 끌 수» 있다 — 지운 것이 아니라는 증거다', function () {
-  const 창 = stripComments(ERP.slice(ERP.indexOf('function PhotoContractPickerModal('))).slice(0, 40000);
+  const 창 = stripJs(ERP.slice(ERP.indexOf('function PhotoContractPickerModal('))).slice(0, 40000);
   /* ⚠ 글귀만 찾으면 안 된다 — 덧말(title)에도 같은 말이 있어 «헛도는 검사»가 된다.
      스위치가 «실제로 걸려 있는» 줄을 본다: 체크 상태와 누를 때의 동작 둘 다. */
   assert.match(창, /checked:\s*showDup/, '★★ 접기를 끄는 스위치가 걸려 있지 않습니다');
@@ -133,7 +133,7 @@ test('⑩ ★★ 지우는 코드가 «없다» — 접기는 보임만 바꾼�
   const fns = ['function erpPhotoFold(', 'function erpPhotoFoldOnce(',
     'function erpPhotoDocKey(', 'function erpPhotoSameKey('];
   fns.forEach(function (d) {
-    const src = stripComments(cutFn(ERP, d));
+    const src = stripJs(cutFn(ERP, d));
     assert.ok(!/deletePhoto|\.remove\(|dbSet|= *null;? *\/\/ *지움/.test(src),
       '★★ ' + d + ' 이 사진을 지우려 합니다 — 접기는 보임만 바꿔야 합니다');
   });

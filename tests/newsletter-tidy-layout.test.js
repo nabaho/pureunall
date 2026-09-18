@@ -16,7 +16,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const Core = require('../js/pu-news-core.js');
@@ -208,7 +208,7 @@ test('★★ 요약과 전문이 «같은 여백»을 쓴다', () => {
 });
 
 test('★★ 가는 줄은 «칸에 색을 깔아» 만든다 — div 테두리는 아웃룩에서 사라진다', () => {
-  const 몸 = stripComments(fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8'));
+  const 몸 = stripJs(fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8'));
   const i = 몸.indexOf('function _줄띠(');
   assert.ok(i > 0, '줄 긋는 자를 못 찾았다');
   const f = 몸.slice(i, 몸.indexOf('\n  function ', i + 10));
@@ -405,7 +405,7 @@ test('★★ 표지가 없으면 «칸 자체»가 없다 — 빈 96px 은 글�
 });
 
 test('★ 명조는 «웹폰트가 아니다» — 못 받아 오면 글자가 통째로 바뀐다', () => {
-  const 몸 = stripComments(fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8'));
+  const 몸 = stripJs(fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8'));
   const m = /var 세리프 = "([^"]+)"/.exec(몸);
   assert.ok(m, '명조를 못 찾았다');
   assert.ok(!/http|@import|fonts\./.test(m[1]), '웹폰트를 쓴다');

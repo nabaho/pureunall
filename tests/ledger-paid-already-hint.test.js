@@ -27,19 +27,19 @@ const path = require('path');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 const bare = stripComments(src);
-const 찾기 = stripComments('<script>' + cutFn(src, 'function erpPaidAlreadyHint(') + '</script>');
+const 찾기 = stripJs(cutFn(src, 'function erpPaidAlreadyHint('));
 
 test('① ★★ 후보가 «하나도 없을 때»만 본다 — 진짜 후보를 밀어내지 않는다', function () {
-  const 묶음 = stripComments('<script>' + cutFn(src, 'function erpBuildSugChunk(') + '</script>');
+  const 묶음 = stripJs(cutFn(src, 'function erpBuildSugChunk('));
   assert.match(묶음, /if\(!_sg\.length\) out\.paidHint\[row\._k\] = erpPaidAlreadyHint\(/,
     '★★ 후보가 있어도 이 안내를 계산합니다 — 진짜 후보를 밀어냅니다');
   /* 그릇이 없으면 화면이 그 자리에서 죽는다 */
-  const 초기 = stripComments('<script>' + cutFn(src, 'function erpBuildSugInit(') + '</script>');
+  const 초기 = stripJs(cutFn(src, 'function erpBuildSugInit('));
   assert.match(초기, /paidHint:\{\}/, '★ 그릇(paidHint)을 안 만듭니다');
 });
 

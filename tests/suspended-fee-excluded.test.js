@@ -22,7 +22,7 @@ const vm = require('vm');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
@@ -96,9 +96,9 @@ test('⑦ ★ 얼마를 뺐는지 말해 준다 — 말없이 줄면 고장으�
 
 test('⑧ ★ 자문료관리도 «같은 눈»으로 본다 — 화면마다 금액이 갈리면 안 된다', function () {
   const off = cutFn(src, 'function feeMonthOff(');
-  assert.match(stripComments('<script>' + off + '</script>'), /isAfterSuspend\(/,
+  assert.match(stripJs(off), /isAfterSuspend\(/,
     '★ 자문료관리의 「그 달 없음」 판정이 중단을 안 봅니다');
-  const after = stripComments('<script>' + cutFn(src, 'function isAfterSuspend(') + '</script>');
+  const after = stripJs(cutFn(src, 'function isAfterSuspend('));
   assert.match(after, /erpFeeStopped\(/, '★ 규칙을 따로 베껴 두면 한쪽만 고쳐집니다');
 });
 
@@ -106,7 +106,7 @@ test('⑨ ★ 「받을 일 없는 입금」을 만들지 않는다 — 일괄 �
   /* 달을 한꺼번에 확정하는 길이 다섯이다. 하나라도 빠지면 그 길로 유령 입금이 생긴다 */
   [['toggleMonthAll', 'month'], ['toggleRow', 'm'], ['registerCMS', 'cmsMonth'],
    ['autoGenerate', 'nowMonth'], ['autoGenerateYear', 'm']].forEach(function (pair) {
-    const body = stripComments('<script>' + cutFn(src, 'function ' + pair[0] + '(') + '</script>');
+    const body = stripJs(cutFn(src, 'function ' + pair[0] + '('));
     assert.match(body, new RegExp('feeMonthOff\\(co\\s*,\\s*' + pair[1] + '\\)'),
       '★ ' + pair[0] + ' 이 중단·계약전 달에도 입금을 만듭니다');
   });
@@ -130,7 +130,7 @@ test('⑫ ★ 점검·미입금 후보도 중단을 뺀다', function () {
   const rec = bare.slice(bare.indexOf('var advThisMonth'), bare.indexOf('var byCat'));
   assert.equal((rec.match(/erpFeeStopped\(co,\s*thisYM\)/g) || []).length, 2,
     '★ 「자문료미생성」·「자문료합계」 둘 다 중단 업체를 걸고 있습니다');
-  const adv = stripComments('<script>' + cutFn(src, 'function addAdvisoryPending(') + '</script>');
+  const adv = stripJs(cutFn(src, 'function addAdvisoryPending('));
   assert.match(adv, /erpFeeStopped\(co,\s*ym\)/,
     '★ 돈줄맞추기가 중단 업체를 매달 미입금으로 올립니다');
 });

@@ -17,7 +17,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { stripComments } = require('./strip-comments.js');
+const { stripComments, stripJs } = require('./strip-comments.js');
 const { cutFn } = require('./cut-fn.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -88,7 +88,7 @@ test('★ 판정이 «한 곳»에 있다 — 화면마다 적으면 한 곳은 
 test('★★★ 기업정보함·기업 상세·업체관리 «셋 다» 막는다 — 한 곳만 막으면 딴 길로 간다', () => {
   [['canSend', '기업정보함'], ['canSendCoInfo', '기업 상세'], ['canSendCo', '업체관리']]
     .forEach(function ([fn, 어디]) {
-      const body = stripComments(cutFn(RAW, 'function ' + fn + '('));
+      const body = stripJs(cutFn(RAW, 'function ' + fn + '('));
       assert.ok(body, fn + ' 이 없습니다');
       assert.match(body, /isOursRead\(read\)/,
         '★★★ ' + 어디 + ' 로 가는 길이 안 막혔습니다 — 우리 법인이 거래처 자료가 됩니다');
@@ -96,7 +96,7 @@ test('★★★ 기업정보함·기업 상세·업체관리 «셋 다» 막는�
 });
 
 test('★★ 사람이 «고친 값»까지 본다 — 적으라고 해 놓고 안 받으면 안 된다', () => {
-  const body = stripComments(cutFn(RAW, 'function isOursRead('));
+  const body = stripJs(cutFn(RAW, 'function isOursRead('));
   assert.ok(body, 'isOursRead 가 없습니다');
   assert.match(body, /readFields\(read\)/,
     '★★ 판독값만 봅니다 — 소속을 잘못 읽어 사람이 고쳐 놓아도 안 듣습니다');
@@ -124,9 +124,9 @@ test('★★★ 단추를 그냥 없애지 않고 «까닭»을 적는다 — �
 test('★ 막는 것은 «보내기»뿐이다 — 판독·복사·보관은 그대로', () => {
   /* ⚠ 「우리 것」이라고 판독까지 막으면 위촉기간·기관을 읽어 둘 수 없다.
        경력관리가 그 값을 쓰므로 읽는 것은 그대로 되어야 한다. */
-  const wait = stripComments(cutFn(RAW, 'function readWaitOf('));
+  const wait = stripJs(cutFn(RAW, 'function readWaitOf('));
   assert.ok(!/isOurs/.test(wait), '★★ 우리 것이라고 판독까지 막았습니다 — 경력관리가 쓸 값이 안 읽힙니다');
-  const skip = stripComments(cutFn(RAW, 'function readSkipWhy('));
+  const skip = stripJs(cutFn(RAW, 'function readSkipWhy('));
   assert.ok(!/isOurs/.test(skip), '★★ 판독 문지기에 넣었습니다 — 읽지도 않게 됩니다');
 });
 
@@ -138,6 +138,6 @@ test('★★★ 판정 함수가 «실제로 있다» — typeof 로 감쌌으�
     '★★★ 판정 함수가 사라졌습니다 — 문지기가 typeof 로 감싸져 있어 «조용히» 지나갑니다.\n'
     + '  위촉장이 다시 거래처 명부(기업정보함)으로 갑니다.');
   /* 그리고 그 함수가 공용 판정을 실제로 부르는지 */
-  const body = stripComments(cutFn(RAW, 'function isOursRead('));
+  const body = stripJs(cutFn(RAW, 'function isOursRead('));
   assert.match(body, /PuDocRead\.isOurs/, '★★ 껍데기만 남고 판정을 안 부릅니다');
 });

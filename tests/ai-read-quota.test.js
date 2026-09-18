@@ -14,21 +14,21 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const { stripComments } = require('./strip-comments.js');
+const { stripComments, stripJs } = require('./strip-comments.js');
 const { cutFn } = require('./cut-fn.js');
 
 const ROOT = path.join(__dirname, '..');
 const RAW = fs.readFileSync(path.join(ROOT, 'pu-photos.html'), 'utf8');
 const APP = stripComments(RAW);
 const DR = require(path.join(ROOT, 'functions', 'doc-read.js'));
-const READER = stripComments(fs.readFileSync(path.join(ROOT, 'js', 'pu-doc-read.js'), 'utf8'));
-const IDX = stripComments(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'));
-const STORE = stripComments(fs.readFileSync(path.join(ROOT, 'js', 'pu-photo-store.js'), 'utf8'));
+const READER = stripJs(fs.readFileSync(path.join(ROOT, 'js', 'pu-doc-read.js'), 'utf8'));
+const IDX = stripJs(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'));
+const STORE = stripJs(fs.readFileSync(path.join(ROOT, 'js', 'pu-photo-store.js'), 'utf8'));
 
 /* ══════ ① 저절로 걸지 않는다 ══════════════════════════════════════ */
 
 test('★★★ 화면을 열 때 «저절로» 판독에 걸지 않는다 — 하루 몫을 태우던 것이 이것이었다', () => {
-  const fn = stripComments(cutFn(RAW, 'function autoReadPending('));
+  const fn = stripJs(cutFn(RAW, 'function autoReadPending('));
   assert.ok(fn, 'autoReadPending 이 없습니다');
   assert.ok(!/queuePhotoRead\(/.test(fn),
     '★★★ 세는 함수가 아직 «직접 걸고» 있습니다 — 서류는 한 장씩 오므로 '
@@ -36,7 +36,7 @@ test('★★★ 화면을 열 때 «저절로» 판독에 걸지 않는다 — �
 });
 
 test('★★ 거는 일은 «누를 때» 부르는 자리 하나에 모였다', () => {
-  const run = stripComments(cutFn(RAW, 'function readWaitRun('));
+  const run = stripJs(cutFn(RAW, 'function readWaitRun('));
   assert.ok(run, '★ 눌러서 거는 자리(readWaitRun)가 없습니다');
   assert.match(run, /queuePhotoRead\(/, '★ 눌러도 아무것도 안 걸립니다');
   /* ⚠ 상한을 버리면 안 된다 — 400장을 한 번에 걸면 그 한 번으로 하루 몫이 사라진다 */
@@ -50,7 +50,7 @@ test('★★ 거는 일은 «누를 때» 부르는 자리 하나에 모였다',
 });
 
 test('★ 한 장만 누르는 길도 있다 — 「이 한 장이 급하다」가 안 되면 20장을 다 걸게 된다', () => {
-  const one = stripComments(cutFn(RAW, 'function readWaitOne('));
+  const one = stripJs(cutFn(RAW, 'function readWaitOne('));
   assert.ok(one, '★ 한 장만 읽는 자리가 없습니다');
   assert.match(one, /queuePhotoRead\(/, '한 장 단추가 아무것도 안 겁니다');
   /* ⚠ 그릴 때와 누를 때 사이에 화면이 바뀔 수 있다 — 문지기를 «다시» 본다 */
@@ -100,7 +100,7 @@ test('★★ 단추를 눌러도 «칸이 열리지 않는다» — 사진이 �
 });
 
 test('★★ 띠가 «몇 장 기다리는지» 센다 — 안 세면 안 읽힌 것을 한 달 뒤에 안다', () => {
-  const fn = stripComments(cutFn(RAW, 'function renderReadAsk('));
+  const fn = stripJs(cutFn(RAW, 'function renderReadAsk('));
   assert.ok(fn, 'renderReadAsk 가 없습니다');
   assert.match(fn, /readWaitOf/, '★ 띠가 기다리는 것을 안 봅니다');
   assert.match(fn, /readWaitRun\(\)/, '★ 띠에 한 번에 거는 단추가 없습니다');
@@ -114,7 +114,7 @@ test('★★ 띠가 «몇 장 기다리는지» 센다 — 안 세면 안 읽힌
 /* ══════ ③ 사람이 누르는 길은 막지 않는다 ═════════════════════════ */
 
 test('★★★ 한도에 걸렸으면 «눌러도 같은 답»이라 딱지를 안 붙인다 — 헛클릭이 몫을 더 태운다', () => {
-  const fn = stripComments(cutFn(RAW, 'function readWaitOf('));
+  const fn = stripJs(cutFn(RAW, 'function readWaitOf('));
   assert.ok(fn, 'readWaitOf 가 없습니다');
   assert.match(fn, /readQuotaOut/,
     '★★ 오늘 몫이 없는데 「판독 필요」라고 적습니다 — 누를수록 몫을 더 태웁니다');
@@ -125,7 +125,7 @@ test('★★★ 한도에 걸렸으면 «눌러도 같은 답»이라 딱지를 
 });
 
 test('★ 이미 줄에 있는 것에는 안 붙는다 — 두 번 걸면 몫이 두 배다', () => {
-  const fn = stripComments(cutFn(RAW, 'function readWaitOf('));
+  const fn = stripJs(cutFn(RAW, 'function readWaitOf('));
   assert.match(fn, /_queuedRead/, '★ 이미 걸린 것에 또 단추가 붙습니다');
 });
 
@@ -201,7 +201,7 @@ test('★ 사람에게 보일 이름표는 «이름을 정하는 곳»에 있다
 });
 
 test('★★★ 셈을 적다 실패해도 «판독은 계속된다» — 세는 일 때문에 못 읽으면 훨씬 큰 손해다', () => {
-  const fn = stripComments(cutFn(IDX, 'async function bumpReadTally('));
+  const fn = stripJs(cutFn(IDX, 'async function bumpReadTally('));
   assert.ok(fn, 'bumpReadTally 가 없습니다');
   /* ⚠ /catch/ 만 보면 «큰 조각을 잘랐을 때» 다른 catch 가 대신 통과시킨다.
      그래서 «이 함수가 스스로 삼킨다»는 증거 — 그 자리에 적어 둔 말 — 을 본다. */
@@ -292,7 +292,7 @@ test('★ 숫자만 받는다 — 사진·글·이름이 새어 들어갈 자리
      누르면 같은 서류를 두 번째·세 번째로 읽었다 — 하루 몫은 그만큼 사라진다. */
 
 test('★★★ 「안 읽은 것」 목록에 «이미 읽은 것»이 들어가지 않는다', () => {
-  const fn = stripComments(cutFn(RAW, 'function readWaitOf('));
+  const fn = stripJs(cutFn(RAW, 'function readWaitOf('));
   assert.ok(fn, 'readWaitOf 가 없습니다');
   assert.match(fn, /neverRead\(it\)/, '★ 한 번도 안 읽은 것을 안 봅니다');
   assert.ok(!/staleRead\(/.test(fn),
@@ -303,7 +303,7 @@ test('★★★ 「안 읽은 것」 목록에 «이미 읽은 것»이 들어�
 });
 
 test('★★★ 눌러도 «이미 읽은 것»은 안 걸린다 — 거기서 하루 몫이 사라졌다', () => {
-  const fn = stripComments(cutFn(RAW, 'function autoReadPending('));
+  const fn = stripJs(cutFn(RAW, 'function autoReadPending('));
   assert.ok(fn, 'autoReadPending 이 없습니다');
   const i = fn.indexOf('const take =');
   assert.ok(i > 0, 'take 를 만드는 자리가 없습니다');
@@ -318,12 +318,12 @@ test('★★ 그래도 staleRead 판정을 «지우지 않았다» — 한 장�
   assert.match(RAW, /function staleRead\(/,
     '★★ 판정을 통째로 지웠습니다 — 사진을 열었을 때 「다시 읽으면 나아진다」를 알 길이 없어집니다');
   /* 셈은 남겨 둔다 — 몇 장이 그런지 볼 수 있어야 다음에 판단할 수 있다 */
-  const fn = stripComments(cutFn(RAW, 'function autoReadPending('));
+  const fn = stripJs(cutFn(RAW, 'function autoReadPending('));
   assert.match(fn, /stale:\s*stale/, '★ 몇 장인지 세는 것도 없애 버렸습니다');
 });
 
 test('★★ 「남은 N장」이 «걸 수 있는 것»만 센다 — 못 걸 것을 세면 영영 안 줄어든다', () => {
-  const fn = stripComments(cutFn(RAW, 'function autoReadPending('));
+  const fn = stripJs(cutFn(RAW, 'function autoReadPending('));
   const i = fn.indexOf('const rest =');
   assert.ok(i > 0, 'rest 를 만드는 자리가 없습니다');
   const restBlock = fn.slice(i, fn.indexOf(';', i));

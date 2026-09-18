@@ -22,7 +22,7 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 const { test } = require('node:test');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -153,7 +153,7 @@ test('⑫-0 ★★ 이름이 «안 겹친다» — 한 파일이라 뒤엣것이
 });
 
 test('⑫ ★★ 고르기 «전»에 무엇이 들어오는지 보인다', function () {
-  const 창 = stripComments(cutFn(ERP, 'function WorkerPhotoPickerModal('));
+  const 창 = stripJs(cutFn(ERP, 'function WorkerPhotoPickerModal('));
   assert.match(창, /erpWorkerFromDoc\(it\.kind, it\.fields, props\.hint/,
     '★★ 줄마다 「무엇이 들어오는지」를 안 그립니다 — 눌러 보고 알면 늦습니다');
   assert.match(창, /got\.lines/, '★ 들어올 값을 줄에 안 적습니다');
@@ -163,7 +163,7 @@ test('⑫ ★★ 고르기 «전»에 무엇이 들어오는지 보인다', func
 });
 
 test('⑬ ★★ 원본 사진은 «안 받는다» — 고를 때마다 1~2MB 가 나간다', function () {
-  const 창 = stripComments(cutFn(ERP, 'function WorkerPhotoPickerModal('));
+  const 창 = stripJs(cutFn(ERP, 'function WorkerPhotoPickerModal('));
   assert.ok(!/loadFull/.test(창),
     '★★ 원본을 받고 있습니다 — 여기서 고르는 것은 「이 사람이 맞나」이고 미리보기면 충분합니다');
   assert.match(창, /loadThumb/, '★ 미리보기는 받아야 합니다 — 명함은 생김새로 알아봅니다');

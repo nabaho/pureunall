@@ -28,7 +28,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
@@ -38,7 +38,7 @@ const app = stripComments(raw);
 /* ══════ ① 스스로 지우지 않는다 ══════ */
 
 test('★★ 겹침을 알아낸 자리에서 사진을 «지우지 않는다» — 179장이 그렇게 사라졌다', () => {
-  const fn = stripComments(cutFn(raw, 'function noteRedundant('));
+  const fn = stripJs(cutFn(raw, 'function noteRedundant('));
   assert.ok(!/deletePhoto\(/.test(fn),
     '★★ 자동 삭제가 되살아났습니다. 「겹친다」의 판정은 «기업정보함 기록에 채울 칸이\n' +
     '  있나»지 «서류가 같은가»가 아닙니다 — 같은 사람이 낸 다른 서식, 같은 회사의\n' +
@@ -97,7 +97,7 @@ test('★★ 서식·사업자등록증은 «겹쳤다고 말하지 않는다» 
 /* ══════ ③ 안 한 일을 했다고 적지 않는다 ══════ */
 
 test('★★ 「휴지통으로 보냈습니다」는 이제 거짓말이다 — 사람이 헛걸음한다', () => {
-  const fn = stripComments(cutFn(raw, 'function renderDupBox('));
+  const fn = stripJs(cutFn(raw, 'function renderDupBox('));
   assert.ok(!/장을 휴지통으로 보냈습니다/.test(fn),
     '★★ 안 보냈는데 보냈다고 적고 있습니다 — 사람이 사진을 찾으러 휴지통에 갑니다.');
   assert.match(fn, /사진은 그대로 둡니다/, '★ 그대로 두었다는 말이 없습니다');
@@ -105,7 +105,7 @@ test('★★ 「휴지통으로 보냈습니다」는 이제 거짓말이다 —
 });
 
 test('★★ 치우는 길은 «사람이 누르는» 단추 하나 — 까닭을 적고 휴지통으로', () => {
-  const fn = stripComments(cutFn(raw, 'function dropDup('));
+  const fn = stripJs(cutFn(raw, 'function dropDup('));
   assert.match(fn, /PuPhotoStore\.deletePhoto\(/, '★ 휴지통을 안 거치고 지웁니다');
   assert.match(fn, /겹침 —/, '★ 왜 치웠는지 지운 기록에 안 남깁니다');
   assert.match(fn, /사람이 치움/,
@@ -115,7 +115,7 @@ test('★★ 치우는 길은 «사람이 누르는» 단추 하나 — 까닭�
 });
 
 test('★★ 알리는 함수가 «치우기를 부르지 않는다» — 이름만 바꾼 자동 삭제가 되면 안 된다', () => {
-  const fn = stripComments(cutFn(raw, 'function noteRedundant('));
+  const fn = stripJs(cutFn(raw, 'function noteRedundant('));
   assert.ok(!/dropDup\(/.test(fn),
     '★★ 알리자마자 치우면 이름만 바뀐 자동 삭제입니다.');
 });

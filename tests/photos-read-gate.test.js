@@ -28,19 +28,19 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
 const raw = fs.readFileSync(path.join(R, 'pu-photos.html'), 'utf8');
 const app = stripComments(raw);
 const srvRaw = fs.readFileSync(path.join(R, 'functions', 'doc-read.js'), 'utf8');
-const srv = stripComments(srvRaw);
+const srv = stripJs(srvRaw);   // .js 파일은 통째로 코드다 — <script> 태그가 없다
 
 /* ══════ ① 문지기는 «한 곳»이다 ══════ */
 
 test('★★ 자동 대기열 «세 목록 모두»가 문지기를 지난다 — 한 곳이 빠지면 그리로 다 샌다', () => {
-  const fn = stripComments(cutFn(raw, 'function autoReadPending('));
+  const fn = stripJs(cutFn(raw, 'function autoReadPending('));
   assert.match(fn, /const gate = function \(it\) \{ return !readSkipWhy\(it\); \};/,
     '★ 문지기를 부르는 자리가 없습니다');
   const n = (fn.match(/\.filter\(gate\)/g) || []).length;
@@ -51,7 +51,7 @@ test('★★ 자동 대기열 «세 목록 모두»가 문지기를 지난다 �
 });
 
 test('★★ 올린 직후 길도 같은 문지기를 지난다 — 여기가 열려 있으면 막은 뜻이 없다', () => {
-  const fn = stripComments(cutFn(raw, 'function queueRead('));
+  const fn = stripJs(cutFn(raw, 'function queueRead('));
   assert.match(fn, /readSkipWhy\(\{ meta: job\.meta \}\)/,
     '★★ 올라오는 즉시 판독으로 갑니다 — 자동 대기열만 막아 두면\n' +
     '  막힌 것처럼 보이고 실제로는 새로 올린 것이 전부 나갑니다.');
@@ -175,7 +175,7 @@ test('★★ 「서류입니다」는 «그 뭉치에만» 듣는다 — 다른 
 });
 
 test('★ 「서류입니다」를 누르면 «묻고 있던 뭉치들»에 표를 남긴다', () => {
-  const fn = stripComments(cutFn(raw, 'function readAskDocs('));
+  const fn = stripJs(cutFn(raw, 'function readAskDocs('));
   assert.match(fn, /readAskSaid\[upBatchKey\(it\)\] = 1/,
     '★★ 「이제부터 다 읽어라」로 두면 그 뒤에 열어 보는 뭉치까지 함께 나갑니다.');
   assert.match(fn, /readHoldMine\(it\)/,
@@ -183,7 +183,7 @@ test('★ 「서류입니다」를 누르면 «묻고 있던 뭉치들»에 표�
 });
 
 test('★★ 딱지와 띠가 «같은 기준»을 쓴다 — 네 번 밟은 자리다', () => {
-  const mine = stripComments(cutFn(raw, 'function readHoldMine('));
+  const mine = stripJs(cutFn(raw, 'function readHoldMine('));
   assert.match(mine, /readHoldOf\(it\) && mayTouch\(it\.id\)/,
     '★ 「내가 답할 수 있는 보류인가」를 정하는 자리가 없습니다');
   /* 딱지·띠·답 남기기 셋이 다 이 한 함수를 부르는가 */
@@ -192,7 +192,7 @@ test('★★ 딱지와 띠가 «같은 기준»을 쓴다 — 네 번 밟은 자
     '★★ 칸 딱지가 readHoldOf 를 «직접» 부르면, 남의 사진 칸에는 「보류」라고 적히는데\n' +
     '  답할 띠가 안 뜹니다 — 왜 안 읽혔는지 물을 자리가 없어집니다.\n' +
     '  (2026-08-05 지우기 · 08-25 뒷면 단추 · 08-28 공유 단추 · 09-03 보내기와 같은 모양)');
-  const bar = stripComments(cutFn(raw, 'function readHoldIds('));
+  const bar = stripJs(cutFn(raw, 'function readHoldIds('));
   assert.match(bar, /filter\(readHoldMine\)/, '★ 띠가 다른 기준으로 셉니다');
 });
 
@@ -208,7 +208,7 @@ test('★ 뭉치는 «누가·언제»로 갈린다 — 남이 같은 날 올린
 /* ══════ ② 답을 저장하는 방식 — 꾸민 판독 결과로 남기지 않는다 ══════ */
 
 test('★★ 「그냥 사진」 답은 «사람이 그랬다»고 적는다 — AI 판정으로 꾸미지 않는다', () => {
-  const fn = stripComments(cutFn(raw, 'async function readAskPics('));
+  const fn = stripJs(cutFn(raw, 'async function readAskPics('));
   assert.match(fn, /noRead: true/,
     '★★ noRead 없이 kind 만 적으면, 나중에 「AI 가 회의사진이라고 했다」로 읽힙니다 —\n' +
     '  읽지도 않은 것을 읽은 척하는 기록입니다.');
@@ -223,7 +223,7 @@ test('★★ 「그냥 사진」 답은 «사람이 그랬다»고 적는다 —
 });
 
 test('★★ 「판독 안 함」 딱지가 AI 판정과 «갈라져» 있다', () => {
-  const fn = stripComments(cutFn(raw, 'function readLabel('));
+  const fn = stripJs(cutFn(raw, 'function readLabel('));
   assert.match(fn, /read\.noRead/,
     '★★ 안 읽은 것을 「회의·현장 사진」으로 적으면 다시 읽을 생각을 못 합니다 —\n' +
     '  명함을 사진으로 올렸다가 회의사진으로 읽힌 일이 실제로 있었습니다(2026-08-03).');
@@ -234,7 +234,7 @@ test('★★ 「판독 안 함」 딱지가 AI 판정과 «갈라져» 있다', 
 /* ══════ ③ 한도에 걸리면 멈춘다 ══════ */
 
 test('★★ 한도에 걸리면 자동 줄을 «비운다» — 남은 것이 한 장씩 두드리지 않게', () => {
-  const fn = stripComments(cutFn(raw, 'function pumpRead('));
+  const fn = stripJs(cutFn(raw, 'function pumpRead('));
   assert.match(fn, /if \(readQuotaOut\)/, '★★ 걸린 뒤에도 남은 사진이 계속 판독을 부릅니다');
   /* ⚠ 「_queuedRead = false 가 어딘가에 있다」로 보면 **안 된다** — pumpRead 는
      한 장을 읽고 나서도 그 표를 내린다. 그래서 한도 갈래에서 그 줄을 빼도 검사가
@@ -247,20 +247,20 @@ test('★★ 한도에 걸리면 자동 줄을 «비운다» — 남은 것이 �
 });
 
 test('★★ 한도를 알아채는 곳이 «판독 결과를 만드는 두 길 모두»에 있다', () => {
-  const a = stripComments(cutFn(raw, 'function startRead('));
-  const b = stripComments(cutFn(raw, 'function readPhoto('));
+  const a = stripJs(cutFn(raw, 'function startRead('));
+  const b = stripJs(cutFn(raw, 'function readPhoto('));
   assert.match(a, /readQuotaWatch\(read\)/, '★ 올릴 때 읽는 길이 한도를 안 봅니다');
   assert.match(b, /readQuotaWatch\(read\)/,
     '★★ 다시 읽는 길이 한도를 안 보면, 그 길로 백 번 두드리는 것이 그대로 남습니다.');
-  const w = stripComments(cutFn(raw, 'function readQuotaWatch('));
+  const w = stripJs(cutFn(raw, 'function readQuotaWatch('));
   assert.match(w, /readFailKind\(read\) === 'quota'/, '★ 무엇으로 가리는지가 없습니다');
   assert.match(w, /!read\.error && readQuotaOut/,
     '★★ 한 장이라도 읽히면 다시 열어야 합니다 — 안 열면 「새로고침해야 판독이 된다」가 됩니다.');
 });
 
 test('★★ 사람이 «직접 누르는» 길은 막지 않는다 — 급한 서류 한 장이 있다', () => {
-  const again = stripComments(cutFn(raw, 'function readAgain('));
-  const sel = stripComments(cutFn(raw, 'function readSelected('));
+  const again = stripJs(cutFn(raw, 'function readAgain('));
+  const sel = stripJs(cutFn(raw, 'function readSelected('));
   assert.ok(!/readQuotaOut/.test(again),
     '★★ 「다시 판독」까지 막으면 「왜 아무것도 안 되나」가 됩니다.\n' +
     '  막는 것이 아니라 «자동으로» 헛돈을 안 쓰는 것입니다.');
@@ -284,14 +284,14 @@ test('★★ 하루 몫이 없는 429 는 «기다리지 않는다» — 한 장
 /* ══════ ④ 사람이 고른 갈래를 버리지 않는다 ══════ */
 
 test('★★ 카메라에서 고른 갈래가 «저장까지» 간다 — 여태 여기서 버려졌다', () => {
-  const up = stripComments(cutFn(raw, 'async function camUpload('));
+  const up = stripJs(cutFn(raw, 'async function camUpload('));
   assert.match(up, /metaKind: camUpKind/,
     '★★ 카메라에 「📷 일반사진 / ▣ 명함·서류」가 있는데 고른 값이 여기서 버려졌습니다 —\n' +
     '  무엇을 고르든 「서류」로 적혀 전부 구글로 갔습니다.');
   assert.match(up, /addFiles\(files, true,/,
     '★★ isDoc 은 **true 로 둔다** — 그것이 정하는 것은 «화질»입니다(2560px).\n' +
     '  사진으로 담아 1600px 로 줄이면, 뒤에 「서류였다」고 눌러도 글자를 못 읽습니다.');
-  const add = stripComments(cutFn(raw, 'async function addFiles('));
+  const add = stripJs(cutFn(raw, 'async function addFiles('));
   assert.match(add, /const upKind = \(opts && opts\.metaKind === 'photo'\) \? 'photo' :/,
     '★ 갈래와 화질을 가르는 자리가 없습니다');
   const n = (add.match(/kind: upKind,/g) || []).length;
@@ -303,10 +303,10 @@ test('★★ 카메라에서 고른 갈래가 «저장까지» 간다 — 여태
 
 test('★ 찍은 것 고르기 화면이 «고른 쪽을 보여 준다» — 둘 다 흐리면 아무도 안 고른다', () => {
   assert.match(app, /function setCamUpKind\(/, '★ 고르는 함수가 없습니다');
-  const s = stripComments(cutFn(raw, 'function setCamUpKind('));
+  const s = stripJs(cutFn(raw, 'function setCamUpKind('));
   assert.match(s, /camKindDoc/, '★ 단추에 켠 표시를 안 합니다');
   assert.match(s, /camKindPic/, '★ 단추에 켠 표시를 안 합니다');
-  const o = stripComments(cutFn(raw, 'function openCamReview('));
+  const o = stripJs(cutFn(raw, 'function openCamReview('));
   assert.match(o, /setCamUpKind\(camCaptureMode === 'document' \? 'doc' : 'photo'\)/,
     '★★ 위에서 고른 촬영 방식을 안 받아 오면 **두 자리에서 따로 묻는** 셈입니다 —\n' +
     '  「명함·서류」로 찍고 또 「서류」를 눌러야 하면 그것이 곧 안 누르는 이유가 됩니다.');
@@ -316,7 +316,7 @@ test('★ 찍은 것 고르기 화면이 «고른 쪽을 보여 준다» — 둘
 
 test('★★ 판독을 멈춘 자리는 반드시 화면에 보인다 — 조용히 멈추면 그것이 고장이다', () => {
   assert.match(app, /id="readAskBar"/, '★ 묻는 띠가 없습니다');
-  const r = stripComments(cutFn(raw, 'function renderReadAsk('));
+  const r = stripJs(cutFn(raw, 'function renderReadAsk('));
   assert.match(r, /readAskDocs\(\)/, '★ 「서류입니다」 단추가 없습니다');
   assert.match(r, /readAskPics\(\)/, '★ 「그냥 사진입니다」 단추가 없습니다');
   /* ⚠ 2026-09-08 — 띠를 «한 줄»로 줄이며 글월이 짧아졌다(대표 지시 「한줄로 정리」).
@@ -348,6 +348,6 @@ test('★★ 판독을 멈춘 자리는 반드시 화면에 보인다 — 조용
 });
 
 test('★ 자동 판독을 훑을 때마다 띠를 다시 그린다 — 답한 뒤 그대로 남으면 안 된다', () => {
-  const fn = stripComments(cutFn(raw, 'function autoReadPending('));
+  const fn = stripJs(cutFn(raw, 'function autoReadPending('));
   assert.match(fn, /renderReadAsk\(\)/, '★ 띠가 새로 그려지지 않습니다');
 });

@@ -122,8 +122,8 @@ test('★ 상벌만 있는 표도 채운다 — 자격 칸이 없다고 못 본 
 });
 
 test('★ 줄을 «자리»로 바꾸는 자가 하나뿐이다 — 두 곳이면 다시 어긋난다', () => {
-  const { stripComments } = require('./strip-comments');
-  const src = stripComments(require('node:fs')
+  const { stripComments, stripJs } = require('./strip-comments');
+  const src = stripJs(require('node:fs')
     .readFileSync(require('node:path').join(__dirname, '..', 'js', 'kcareer-hwpxfill.js'), 'utf8'));
   assert.match(src, /function replaceRowAt\(/, '줄을 자리로 바꾸는 자가 없습니다');
   /* 줄(tr)을 글자로 찾아 바꾸는 곳이 남아 있으면 안 된다 */

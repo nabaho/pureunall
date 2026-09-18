@@ -19,7 +19,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const raw = fs.readFileSync(path.join(R, 'pu-photos.html'), 'utf8');
@@ -66,9 +66,9 @@ test('★★ 판독이 못 읽어도 «사람이 채우면» 보낼 수 있다 �
 test('★★ 보내는 값 자체가 «채운 것»이다 — 막는 쪽만 고치면 옛 이름으로 간다', () => {
   const send = raw.slice(raw.indexOf('function sendWorker('));
   const body = send.slice(0, send.indexOf('\nfunction '));
-  assert.ok(!/fields:\s*read\.fields/.test(stripComments(body)),
+  assert.ok(!/fields:\s*read\.fields/.test(stripJs(body)),
     '★★ read.fields 를 그대로 보내면 「단추는 떴는데 옛 이름으로 간다」가 됩니다.');
-  assert.ok(/readFields\(read\)/.test(stripComments(body)),
+  assert.ok(/readFields\(read\)/.test(stripJs(body)),
     '★ 보내는 쪽도 readFields() 한 곳을 봐야 합니다.');
 });
 
@@ -88,7 +88,7 @@ test('★★ 판독이 읽은 것은 «그대로» 남는다 — 덮으면 「�
   assert.equal(read.fields.name, '김절수',
     '★★ 판독값이 바뀌었습니다 — 무엇을 잘못 읽었는지 영영 알 수 없게 됩니다.');
   const save = raw.slice(raw.indexOf('function fixSave('));
-  const body = stripComments(save.slice(0, save.indexOf('\n/*')));
+  const body = stripJs(save.slice(0, save.indexOf('\n/*')));
   assert.ok(!/fields\s*[:=]\s*/.test(body.replace(/read\.fields/g, '')),
     '★★ 저장하며 fields 를 건드리면 판독값이 사라집니다.');
 });
@@ -114,7 +114,7 @@ test('★ 이미 보낸 것에는 채우기 칸을 안 낸다 — 두 곳이 어
 /* ══════ ③ 읽어 둔 값에 이름표가 있다 ══════ */
 
 test('★★ 판독이 읽는 칸은 «화면에 이름표»가 있다 — 없으면 읽고 버리는 셈이다', () => {
-  const reader = stripComments(fs.readFileSync(path.join(R, 'js', 'pu-doc-read.js'), 'utf8'));
+  const reader = stripJs(fs.readFileSync(path.join(R, 'js', 'pu-doc-read.js'), 'utf8'));
   const rows = app.match(/const READ_ROWS = \[([\s\S]*?)\n\];/);
   assert.ok(rows, 'READ_ROWS 를 찾지 못했습니다.');
   const labelled = {};
@@ -162,7 +162,7 @@ test('★★ 못 읽었으면 «아무 말도 안 한다» — 「모른다」�
 
 test('★★ 오래됐다고 «막지는» 않는다 — 판독이 틀리면 멀쩡한 서류가 못 들어간다', () => {
   const can = raw.slice(raw.indexOf('function canSendWorker('));
-  const body = stripComments(can.slice(0, can.indexOf('\n/*')));
+  const body = stripJs(can.slice(0, can.indexOf('\n/*')));
   /* ⚠ 대소문자를 가리면 residentStale 을 놓친다 — 돌연변이가 그대로 살아남았다 */
   assert.ok(!/stale|issuedDaysAgo/i.test(body),
     '★★ 보내기를 막으면, 발급일을 잘못 읽은 등본이 영영 못 들어갑니다.\n' +

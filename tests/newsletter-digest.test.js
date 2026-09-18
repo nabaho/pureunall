@@ -17,7 +17,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripByName } = require('./strip-comments');
 /* 함수 «몸»을 중괄호로 세어 뽑는다 — 글자 수로 자르면 옆 함수가 딸려 와, 저쪽에 있는
    글귀가 이쪽을 통과시킨다(실제로 시험발송 검사가 그렇게 헛돌았다 2026-09-12). */
 const { 함수몸 } = require('./helpers/strip-comments.js');
@@ -25,7 +25,8 @@ const Tpl = require('../js/pu-news-tpl.js');
 const NV = require('../functions/news-view.js');
 
 const ROOT = path.join(__dirname, '..');
-const 읽기 = (f) => stripComments(fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\r\n/g, '\n'));
+/* .html 도 .js 도 온다 — 파일 이름으로 걷개를 고른다(.js 에는 <script> 태그가 없다) */
+const 읽기 = (f) => stripByName(f, fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\r\n/g, '\n'));
 const news = 읽기('pu-news.html');
 const idx = 읽기('functions/index.js');
 const 밑주소 = 'https://asia-northeast3-pureun-erp.cloudfunctions.net';

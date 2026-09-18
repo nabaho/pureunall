@@ -138,7 +138,7 @@ test('★★★ 기업정보함이 손으로 고칠 때 «도장을 찍는다» 
 
 test('★★★ 도장 글자가 두 파일에서 «같다» — 어긋나면 도장이 아무것도 안 막는다', () => {
   /* 기업정보함은 판독 층을 안 실어서 글자가 두 곳에 적힌다. 그래서 기계로 견준다. */
-  const m = stripComments(SRC).match(/var HAND\s*=\s*'([^']+)'/);
+  const m = stripJs(SRC).match(/var HAND\s*=\s*'([^']+)'/);
   assert.ok(m, 'js/pu-doc-file.js 에 HAND 도장이 없습니다');
   const 판독층 = m[1];
   const fn = stripJs(cutFn(CARDS, 'function coSaveInfoPatch(') || '');

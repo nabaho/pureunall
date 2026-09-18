@@ -26,7 +26,7 @@ const vm = require('vm');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const APP = path.join(__dirname, '..', 'pu-erp.html');
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n/g, '\n');
@@ -171,7 +171,7 @@ test('⑤-4 sourceKind 가 계약이 아니면 계획이 안 선다 — 사진·
 });
 
 test('⑤-5 ★ 옛 이관을 되돌리면 «출처 자국»을 끊는다 — 안 끊으면 단추가 영영 붙어 있다', function () {
-  const fn = stripComments('<script>' + cutFn(src, 'async function undoCompanyTransfer(') + '</script>');
+  const fn = stripJs(cutFn(src, 'async function undoCompanyTransfer('));
   const leg = fn.slice(fn.indexOf("if(plan.mode === 'legacy')"));
   assert.match(leg, /back\.sourceContractNo = '';/, '★ 출처 계약번호가 남습니다');
   assert.match(leg, /back\.sourceContractId = '';/, '★ 출처 계약 ID 가 남습니다');
@@ -226,9 +226,9 @@ test('⑩ 새로 만든 업체는 되돌리는 법이 다르다', function () {
 // ══════════════════════════════════════════════════════════════════
 // 아래는 «화면에 붙어 있는가»를 본다 — 붙지 않은 함수는 아무도 못 쓴다
 const XFER = cutFn(src, 'function transferContract(');
-const XFER_BARE = stripComments('<script>' + XFER + '</script>');
+const XFER_BARE = stripJs(XFER);
 const UNDO_FN = cutFn(src, 'async function undoCompanyTransfer(');
-const UNDO_BARE = stripComments('<script>' + UNDO_FN + '</script>');
+const UNDO_BARE = stripJs(UNDO_FN);
 
 test('⑪ 이관은 두 갈래 «모두» 되돌릴 자리를 남긴다 — 없으면 되돌릴 길이 없다', function () {
   assert.match(XFER_BARE, /xferUndo\s*=\s*\{\s*mode:\s*'merged'/, '★ 「이음」 갈래가 자리를 안 남깁니다');
@@ -269,7 +269,7 @@ test('⑮ ⋯ 메뉴 두 자리 «모두»에 붙어 있다 — 한쪽만 붙이
      부르는 자리만 센다(뒤의 쉼표가 그 표시다). */
   const rows = (bare.match(/coUndoItem\(co\),/g) || []).length;
   assert.ok(rows >= 2, '★ ⋯ 메뉴 자리는 둘입니다 (활성·사무대행) — ' + rows + '군데만 붙었습니다');
-  const item = stripComments('<script>' + cutFn(src, 'function coUndoItem(') + '</script>');
+  const item = stripJs(cutFn(src, 'function coUndoItem('));
   assert.match(item, /return null;/, '★ 이관으로 온 업체에만 보여야 합니다');
   assert.match(item, /sourceContractNo \|\| co\.sourceContractId/,
     '★ xferUndo 만 보면 2026-09-07 전에 이관된 곳에서 단추가 사라집니다');
@@ -293,7 +293,7 @@ test('⑮-1 ★ 단추는 손으로 만든 업체에는 안 보인다 (실제로
 });
 
 test('⑯ 막이가 실제로 이관 길목에 걸려 있다 — 함수만 있고 안 부르면 아무것도 안 막는다', function () {
-  const doT = stripComments('<script>' + cutFn(src, 'async function doTransfer(') + '</script>');
+  const doT = stripJs(cutFn(src, 'async function doTransfer('));
   assert.match(doT, /erpCoTransferGap\(/, '★ 막이를 부르지 않습니다');
   assert.match(doT, /if\(_go !== 'force'\) return;/, '★ 「그래도 넣기」가 아니면 멈춰야 합니다');
   const gapAt = doT.indexOf('erpCoTransferGap(');
@@ -302,7 +302,7 @@ test('⑯ 막이가 실제로 이관 길목에 걸려 있다 — 함수만 있�
 });
 
 test('⑰ 이관된 것이 «그 유형 탭»에서 보인다 (대표 지시 2026-09-07)', function () {
-  const doT = stripComments('<script>' + cutFn(src, 'async function doTransfer(') + '</script>');
+  const doT = stripJs(cutFn(src, 'async function doTransfer('));
   assert.match(doT, /window\.__erpCoArrived\s*=\s*\{/, '★ 업체관리에 알려 주지 않습니다');
   /* 받는 쪽 — 깔때기를 «갈아 끼워야» 보인다. 기금이 걸린 화면에 자문이 오면 안 뜬다. */
   assert.match(bare, /var msg = window\.__erpCoArrived;/, '★ 업체관리가 그 쪽지를 안 읽습니다');

@@ -25,7 +25,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const C = require('../js/pu-news-core.js');
 const T = require('../js/pu-news-tpl.js');
 
@@ -96,7 +96,7 @@ test('★ 화면이 「첨부 안 붙음」을 «말한다» — 조용히 빠�
 
 test('★★★ 요약 꼭지를 «둘씩 나란히» 놓는다', () => {
   /* ⚠⚠ 넷을 세로로 줄줄이 놓아 화면을 한참 내려야 했다(대표 화면 2026-09-13). */
-  const tpl = stripComments(
+  const tpl = stripJs(
     fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8').replace(/\r\n/g, '\n'));
   assert.ok(tpl.indexOf('function 요약두칸(') >= 0,
     '★★★ 둘씩 나란히 놓는 자리가 없다');
@@ -124,7 +124,7 @@ test('★★ 꼭지가 «홀수»여도 오른쪽이 안 깨진다', () => {
   const 편 = T.편지짓기(d, 설정, { 미리보기: true, 요약: true })
     || T.편지짓기(d, 설정, { 미리보기: true });
   assert.ok(편, '홀수일 때 편지가 안 만들어졌다');
-  const tpl = stripComments(
+  const tpl = stripJs(
     fs.readFileSync(path.join(ROOT, 'js/pu-news-tpl.js'), 'utf8').replace(/\r\n/g, '\n'));
   const i = tpl.indexOf('function 요약두칸(');
   assert.ok(/&nbsp;|빈칸|''/.test(tpl.slice(i, i + 2000)),

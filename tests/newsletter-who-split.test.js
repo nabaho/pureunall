@@ -17,11 +17,12 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripByName } = require('./strip-comments');
 const C = require('../js/pu-news-core.js');
 
 const ROOT = path.join(__dirname, '..');
-const 읽기 = (f) => stripComments(fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\r\n/g, '\n'));
+/* .html 도 .js 도 온다 — 파일 이름으로 걷개를 고른다(.js 에는 <script> 태그가 없다) */
+const 읽기 = (f) => stripByName(f, fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\r\n/g, '\n'));
 const news = 읽기('pu-news.html');
 const erp = 읽기('pu-erp.html');
 const cards = 읽기('pu-cards.html');

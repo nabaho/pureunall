@@ -17,7 +17,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { stripComments } = require('./strip-comments.js');
+const { stripComments, stripJs } = require('./strip-comments.js');
 const { cutFn } = require('./cut-fn.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -39,7 +39,7 @@ test('★★ 창을 여는 일이 «공용 층 한 곳»에 있다 — 앱마다
 });
 
 test('★★★ 창에 «이름»을 붙인다 — 그것이 「하나만」의 유일한 방법이다', () => {
-  const fn = stripComments(cutFn(BAR_RAW, 'function goApp('));
+  const fn = stripJs(cutFn(BAR_RAW, 'function goApp('));
   assert.ok(fn, 'goApp 이 없습니다');
   assert.match(fn, /global\.open\(u,\s*name\)/,
     '★★★ 이름 없이 엽니다 — 이름이 없으면 누를 때마다 새 탭이 쌓입니다');
@@ -63,13 +63,13 @@ test('★★ 이름을 «주소에서» 뽑는다 — 부르는 곳마다 적게
 });
 
 test('★★ 열려 있던 창을 «앞으로 끌어온다» — 안 하면 「아무 일도 안 일어난」 것처럼 보인다', () => {
-  const fn = stripComments(cutFn(BAR_RAW, 'function goApp('));
+  const fn = stripJs(cutFn(BAR_RAW, 'function goApp('));
   assert.match(fn, /\.focus\(\)/,
     '★★ 창을 앞으로 안 끌어옵니다 — 이미 열려 있으면 눌러도 반응이 없어 보입니다');
 });
 
 test('★★ 팝업이 막히면 «이 창»에서 간다 — 아무 일도 안 하면 반응 없는 화면이 된다', () => {
-  const fn = stripComments(cutFn(BAR_RAW, 'function goApp('));
+  const fn = stripJs(cutFn(BAR_RAW, 'function goApp('));
   assert.match(fn, /navTo\(/,
     '★★ 팝업이 막혔을 때 되돌아갈 길이 없습니다 — 눌러도 아무 일이 없습니다');
 });
@@ -151,7 +151,7 @@ test('★★ 이 검사에 «이빨»이 있다 — 이름 없이 여는 줄을 
 
 test('★★ 대표님이 짚으신 그 자리가 «실제로» 고쳐졌다 — 사진첩 → 기업정보함', () => {
   const src = fs.readFileSync(path.join(ROOT, 'pu-photos.html'), 'utf8');
-  const fn = stripComments(cutFn(src, 'function openFiledCard('));
+  const fn = stripJs(cutFn(src, 'function openFiledCard('));
   assert.ok(fn, 'openFiledCard 가 없습니다');
   assert.match(fn, /PuAppBar\.goApp\(/,
     '★★★ 「기업정보함에서 이 명함 보기」가 아직 새 탭을 엽니다 — 대표님이 짚으신 자리입니다');
@@ -176,7 +176,7 @@ test('★ 앱마다 «창 이름을 따로 짓는» 상수를 안 만든다 — 
 /* ══════ 앱바 자신은 «같은 창»에서 옮긴다 — 「기존과 같이」 ══════════ */
 
 test('★★ 앱바로 프로그램을 옮기면 «새 창을 안 띄운다» — 대표님이 「기존과 같이」라 하셨다', () => {
-  const fn = stripComments(cutFn(BAR_RAW, 'function navTo('));
+  const fn = stripJs(cutFn(BAR_RAW, 'function navTo('));
   assert.ok(fn, 'navTo 가 없습니다');
   assert.match(fn, /location\.href/, '★ 같은 창에서 옮기지 않습니다');
   assert.ok(!/window\.open|global\.open/.test(fn),
@@ -234,7 +234,7 @@ test('★★ 단추가 «줄어들지도 늘어나지도» 않는다 — 늘어�
 });
 
 test('★★ 긴 까닭을 «title 로» 옮겼다 — 띠에 세워 두면 자리만 먹는다', () => {
-  const fn = stripComments(cutFn(PHOTOS, 'function renderReadAsk('));
+  const fn = stripJs(cutFn(PHOTOS, 'function renderReadAsk('));
   assert.ok(fn, 'renderReadAsk 가 없습니다');
   /* 세 갈래(한도·기다림·보류) 모두 설명에 title 이 붙어야 한다 */
   const 설명칸 = fn.match(/<span class="d"[^>]*>/g) || [];
@@ -246,7 +246,7 @@ test('★★ 긴 까닭을 «title 로» 옮겼다 — 띠에 세워 두면 자�
 });
 
 test('★ 띠에 남긴 말이 «지금 무슨 일인지»를 답한다 — 그 한 줄은 지운 것이 아니다', () => {
-  const fn = stripComments(cutFn(PHOTOS, 'function renderReadAsk('));
+  const fn = stripJs(cutFn(PHOTOS, 'function renderReadAsk('));
   /* 이 저장소가 가장 여러 번 밟은 자리 — 「올렸는데 판독이 안 된다」 */
   assert.match(fn, /답할 때까지 판독에 안 갑니다/,
     '★★ 「지금 안 읽고 있다」를 띠에서 지웠습니다 — 짧게 만드느라 가장 중요한 말을 뺐습니다');

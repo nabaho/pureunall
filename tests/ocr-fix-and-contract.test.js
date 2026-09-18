@@ -286,7 +286,7 @@ test('★★ 씨앗을 props.cur 로 넘기지 않는다 — 임시저장 열쇠
 /* ══════ ⑤ 판독 층 — 사전은 한 벌이다 ═══════════════════════════════ */
 
 test('★★★ 이름표 사전을 두 벌로 만들지 않는다', () => {
-  assert.match(stripComments(READ), /pairFieldKey: pairFieldKey/,
+  assert.match(stripJs(READ), /pairFieldKey: pairFieldKey/,
     '★★★ 사진첩이 이 사전을 부릅니다 — 안 내주면 사진첩이 제 사전을 만들게 됩니다');
   const 몸통 = stripComments(PHOTOS);
   assert.ok(!/기업명: 'company'|사업자등록번호: 'bizno'/.test(몸통),

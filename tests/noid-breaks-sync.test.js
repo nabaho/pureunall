@@ -22,14 +22,14 @@ const path = require('path');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 const bare = stripComments(src);
 
 test('① ★★ 「모두 id 가 있을 때만 병합」 문턱이 그대로다', function () {
-  const 저장 = stripComments('<script>' + cutFn(src, 'function dbSet(') + '</script>');
+  const 저장 = stripJs(cutFn(src, 'function dbSet('));
   assert.match(저장, /_canMerge\s*=[\s\S]{0,220}every\(function\s*\(x\)\s*\{\s*return x && x\.id;/,
     '★★ 병합 전 「모두 id 가 있나」를 안 봅니다 — id 없는 항목이 병합에서 사라집니다');
   assert.match(저장, /if\(!curArr\.every\(function\(x\)\{ return x && x\.id; \}\)\) return;/,
@@ -83,8 +83,8 @@ test('③ ★ 자동으로 지우지 않는다 — 돈이 걸린 자료다', fun
 });
 
 test('④ ★ 새 기록은 id 없이 못 들어간다', function () {
-  const up = stripComments('<script>' + cutFn(src, 'function dbUpsert(') + '</script>');
-  const pa = stripComments('<script>' + cutFn(src, 'function dbPatch(') + '</script>');
+  const up = stripJs(cutFn(src, 'function dbUpsert('));
+  const pa = stripJs(cutFn(src, 'function dbPatch('));
   assert.match(up, /typeof item\.id !== 'string' \|\| !item\.id/, '★★ dbUpsert 가 id 없는 항목을 받습니다');
   assert.match(pa, /typeof id !== 'string' \|\| !id/, '★★ dbPatch 가 빈 id 를 받습니다');
   assert.match(pa, /대상 없음/, '★ 없는 id 를 고치라 하면 새로 만들어 버립니다');

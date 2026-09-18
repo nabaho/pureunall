@@ -15,9 +15,10 @@ const path = require('node:path');
 
 const app = fs.readFileSync(path.join(path.join(__dirname, '..'), 'pu-erp.html'), 'utf8');
 
-function stripComments(s) {
-  return s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/[^\n]*/gm, ' ');
-}
+/* 걷개는 tests/strip-comments.js 한 곳에 둔다 — 여기서 제 손으로 적은 걷개는
+   마크업까지 주석으로 읽어 pu-erp.html 의 «진짜 코드» 4,970자를 조용히 삼키고 있었다
+   (2026-08-30 에 673KB 중 230KB 를 삼킨 것과 같은 병). app 은 통째 HTML 문서다. */
+const { stripComments } = require('./strip-comments.js');
 function fnSlice(startMarker, endMarker) {
   const i = app.indexOf(startMarker);
   assert.ok(i >= 0, startMarker + ' 를 찾지 못했습니다.');

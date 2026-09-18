@@ -19,7 +19,7 @@ const vm = require('vm');
 const assert = require('assert');
 const { test } = require('node:test');
 const { cutFn } = require('./cut-fn');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
@@ -67,7 +67,7 @@ test('① 번호 없는 곳만 고른다 — 있는 곳은 안 건드린다', fu
 });
 
 test('② 번호는 «서버 번호통»에서 온다 — 화면이 지어내지 않는다', function () {
-  const fn = stripComments('<script>' + cutFn(src, 'function coAssignNumbers(') + '</script>');
+  const fn = stripJs(cutFn(src, 'function coAssignNumbers('));
   assert.match(fn, /coNoTakeBlock\(todo\.length\)/, '★ 서버에서 안 뽑고 있습니다');
   assert.ok(!/Math\.max|maxNo|\+\s*1\s*;/.test(fn), '★ 번호를 화면에서 셈하고 있습니다 — 둘이 겹칩니다');
 });
@@ -122,7 +122,7 @@ test('⑦ 고른 것만 준다 — 남의 업체까지 건드리지 않는다', 
 /* ── 붙어 있는가 ──────────────────────────────────────────────────────── */
 
 test('⑧ ★ 이관이 끝나면 «곧바로» 준다', function () {
-  const doT = stripComments('<script>' + cutFn(src, 'async function doTransfer(') + '</script>');
+  const doT = stripJs(cutFn(src, 'async function doTransfer('));
   assert.match(doT, /coAutoNumber\(\[_arrivedCo\.id\]\)/, '★ 이관 뒤 번호를 안 줍니다');
   /* ⚠ 기다리면 이관 완료 알림이 서버 왕복만큼 늦는다 — await 를 붙이지 않는다 */
   assert.ok(!/await coAutoNumber\(/.test(doT), '★ 번호통을 기다리느라 이관 알림이 늦습니다');
@@ -132,7 +132,7 @@ test('⑧ ★ 이관이 끝나면 «곧바로» 준다', function () {
 });
 
 test('⑨ ★ 환경설정도 «같은 함수»를 쓴다 — 두 벌이면 규칙이 갈라진다', function () {
-  const panel = stripComments('<script>' + cutFn(src, 'function CoNumberPanel(') + '</script>');
+  const panel = stripJs(cutFn(src, 'function CoNumberPanel('));
   assert.match(panel, /coAssignNumbers\(todo\)/, '★ 환경설정이 번호를 따로 셈하고 있습니다');
   assert.ok(!/puNoHistory:\s*\[\{/.test(panel), '★ 이력 만들기가 두 벌입니다');
 });

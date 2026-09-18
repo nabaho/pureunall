@@ -15,7 +15,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { cutFn } = require('./cut-fn.js');
-const { stripComments } = require('./strip-comments.js');
+const { stripComments, stripJs } = require('./strip-comments.js');
 
 const R = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(R, 'pu-photos.html'), 'utf8');
@@ -137,7 +137,7 @@ test('★★ 판독 길이 «둘»인데 둘 다 실패 시각을 적는다', ()
 });
 
 test('★ 분류를 손으로 정하면 실패 시각도 함께 지운다', () => {
-  const fn = stripComments(cutFn(APP, 'function retagPhotos('));
+  const fn = stripJs(cutFn(APP, 'function retagPhotos('));
   assert.match(fn, /failAt:\s*null/,
     '★ 실패가 아닌 기록에 실패 시각이 남습니다 — 뜻 없는 흔적이 됩니다');
   assert.ok(fn.indexOf('it.meta.read') < fn.indexOf('failAt: null'),
@@ -154,14 +154,14 @@ test('★ 날은 한국 날짜로 가른다 — 서버 셈(ymdKST)과 같은 날
 });
 
 test('셈을 읽는 곳도 «같은» 함수를 쓴다 — 두 벌로 두면 한쪽만 고쳐진다', () => {
-  assert.match(stripComments(cutFn(APP, 'function loadReadTally(')), /ymdKST\(\)/,
+  assert.match(stripJs(cutFn(APP, 'function loadReadTally(')), /ymdKST\(\)/,
     '★ 날짜 만드는 식을 또 적었습니다 — 한 곳만 고쳐지면 셈과 되걸기가 서로 다른 날을 봅니다');
 });
 
 /* ══════ ③ 손으로 옮기면 옛 «실패»가 남지 않는다 ═════════════════════════════ */
 
 test('★★★ 분류를 손으로 정하면 옛 error 를 지운다 — 안 지우면 끌어다 놓아도 제자리다', () => {
-  const fn = stripComments(cutFn(APP, 'function retagPhotos('));
+  const fn = stripJs(cutFn(APP, 'function retagPhotos('));
   assert.match(fn, /error:\s*null/,
     '★★★ 옛 실패가 그대로 남습니다 — Object.assign 이 앞 것의 칸을 물려받아, '
     + '판독이 실패했던 사진은 사람이 분류를 정해도 갈래가 안 바뀝니다(끌어놓기가 헛돕니다)');

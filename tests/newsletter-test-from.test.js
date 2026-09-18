@@ -15,12 +15,12 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const MB = require('../functions/mail-bulk.js');
 const MD = require('../functions/mail-deliver.js');
 
 const ROOT = path.join(__dirname, '..');
-const idx = stripComments(fs.readFileSync(path.join(ROOT, 'functions/index.js'), 'utf8')
+const idx = stripJs(fs.readFileSync(path.join(ROOT, 'functions/index.js'), 'utf8')
   .replace(/\r\n/g, '\n'));
 const news = stripComments(fs.readFileSync(path.join(ROOT, 'pu-news.html'), 'utf8')
   .replace(/\r\n/g, '\n'));
