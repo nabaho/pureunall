@@ -124,7 +124,8 @@ test('⑥★ CORS 라고 짚을 때 사설망(PNA) 줄이 «함께» 나온다 �
 test('⑦ 되짚기가 실패해도 연결 테스트를 망가뜨리지 않는다', () => {
   const t = cutFn(ERP, 'function doTest(');
   assert.match(t, /nasReachProbe\(cfg\)/, '★ 연결 테스트가 되짚지 않으면 이 길은 아무도 안 쓴다');
-  assert.match(t, /nasReachProbe\(cfg\)[\s\S]{0,200}\.catch\(function\(\)\{\}\)/,
+  /* ⚠ 자를 폭을 숫자로 박지 않는다 — 주석 몇 줄이 늘면 그 자리에서 깨진다(2026-09-18 실제로 그랬다) */
+  assert.match(t.slice(t.indexOf('nasReachProbe(cfg)')), /\.catch\(function\(\)\s*\{\s*\}\)/,
     '★★ 되짚다 터지면 연결 테스트 전체가 깨진다 — 덧붙이는 말이 본 일을 망치면 안 된다');
   assert.ok(t.indexOf("addLog('❌ 연결 실패") < t.indexOf('nasReachProbe'),
     '★ 실패했다는 말이 먼저 나와야 한다 — 되짚기는 그 다음이다');
