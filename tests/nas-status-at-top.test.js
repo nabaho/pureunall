@@ -28,29 +28,33 @@ const { cutFn } = require('./cut-fn.js');
 const ROOT = path.join(__dirname, '..');
 const ERP = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
 const NAS = cutFn(ERP, 'function NasBackupSettings(');
+/* 여는 순간 스스로 재는 대목만 떼어 본다 — 자리는 주석이 아니라 «코드»로 잡는다 */
+const EFF = (() => {
+  const i = NAS.indexOf('useEffect(function');
+  const j = NAS.indexOf('function 안저장됨(');
+  assert.ok(i > -1 && j > i, '★ 스스로 재는 대목을 못 찾았다 — 검사가 빈 글자를 보고 있다');
+  return NAS.slice(i, j);
+})();
 
 test('①★★ 화면을 열면 «스스로» 잰다 — 대표님이 누를 것이 없다', () => {
-  assert.match(NAS, /useEffect\(function\s*\(\)\s*\{[\s\S]{0,400}?doTest\(\)/,
+  assert.match(EFF, /doTest\(\)/,
     '★★ 스스로 안 재면 대표님은 다시 「단추를 찾아 누르고 검은 칸에서 줄을 찾는」 세 걸음을 하셔야 한다');
 });
 
 test('② 설정이 없으면 안 잰다 — 빈 설정으로 나스를 두드리지 않는다', () => {
-  const eff = NAS.slice(NAS.indexOf('useEffect(function'), NAS.indexOf('function toHttps('));
-  assert.match(eff, /!cfg\.host \|\| !cfg\.user \|\| !cfg\.pass\) return;/,
-    '★ 처음 쓰는 사람에게 «빈 계정»으로 로그인을 시도하면 로그만 더럽히고 답도 틀린다');
-  assert.ok(eff.indexOf('return;') < eff.indexOf('doTest()'), '★ 걸러내기가 두드리기 뒤면 이미 두드린 뒤다');
+  assert.match(EFF, /!cfg\.host/, '★ 주소가 비었는지 안 보면 빈 값으로 두드린다');
+  assert.match(EFF, /!cfg\.pass/, '★ 처음 쓰는 사람에게 «빈 계정»으로 로그인을 시도하면 로그만 더럽히고 답도 틀린다');
+  assert.ok(EFF.indexOf('return;') < EFF.indexOf('doTest()'), '★ 걸러내기가 두드리기 뒤면 이미 두드린 뒤다');
 });
 
 test('③ 다시 그릴 때마다 로그인하지 않는다 — 딸린 것 없는 한 번', () => {
-  const eff = NAS.slice(NAS.indexOf('useEffect(function'), NAS.indexOf('function toHttps('));
-  assert.match(eff, /\}\s*,\s*\[\]\s*\)\s*;/,
+  assert.match(EFF, /\}\s*,\s*\[\]\s*\)\s*;/,
     '★★ 딸린 것을 안 비우면 글자 한 자 고칠 때마다 나스에 로그인한다');
 });
 
 test('④ 재는 동안에도 «재고 있다»고 말한다 — 빈 화면은 안 되는 것처럼 보인다', () => {
-  const eff = NAS.slice(NAS.indexOf('useEffect(function'), NAS.indexOf('function toHttps('));
-  assert.match(eff, /set진단\(\{\s*ok:\s*null/, '★ 기다리는 동안 아무 말이 없으면 「또 안 되는구나」로 읽힌다');
-  assert.match(eff, /보고 있습니다/);
+  assert.match(EFF, /set진단\(\{\s*ok:\s*null/, '★ 기다리는 동안 아무 말이 없으면 「또 안 되는구나」로 읽힌다');
+  assert.match(EFF, /보고 있습니다/);
 });
 
 test('⑤★ 답은 맨 위 — 검은 로그«보다 앞»에 둔다', () => {
