@@ -833,6 +833,56 @@ function nasAutoLastTry(){
     return (v && typeof v === 'object' && typeof v.at === 'number') ? v : null;
   } catch(_){ return null; }
 }
+/* ══ 「닿지 못했습니다」의 «어느 쪽인가»를 우리가 알아낸다 (2026-09-18 대표 화면 둘째) ══════
+   ■ 무엇이 있었나
+     대표님이 인증서를 받으신 뒤에도 연결 테스트가 실패했다. 그런데 화면이 내놓은 것은
+     ①인증서 ②CORS ③사무실 밖 ④수동 백업 — **네 가지를 늘어놓고 고르라**는 것이었다.
+     ①을 이미 하신 분께 같은 넷을 또 보여 주는 안내는 안내가 아니다.
+   ■ 까닭
+     브라우저의 `fetch` 는 인증서를 안 믿어도, CORS 가 막아도, 사무실 밖이어도
+     **똑같이 'Failed to fetch'** 다. 우리 코드가 아무것도 모르니 사람에게 떠넘겼다.
+   ■ 가르는 길 — 두 가지 표시를 함께 본다
+     ① `mode:'no-cors'` 로 한 번 더 두드린다. 응답이 «오면»(opaque) TLS 도 서버도 멀쩡하다
+        → 막은 것은 CORS 하나다. no-cors 응답은 읽을 수 없지만 읽을 필요가 없다 — «왔다»는 사실만 쓴다.
+     ② 얼마나 «빨리» 튕겼는가. 브라우저가 막은 것은 몇 백 ms 만에 튕기고,
+        정말 없는 서버는 끝까지 기다리다 끊긴다. 그 둘이 갈린다.
+   ⚠ 크롬은 «공개 사이트 → 사설망(192.168.x)» 요청을 따로 막을 때가 있다(PNA).
+     그때는 no-cors 두드리기도 함께 막혀 ②로 떨어진다 — 그래서 ②의 안내에 그 길도 함께 적는다.
+   ⚠ 확실한 것만 확실하게 말한다 — 못 가렸으면 «못 가렸다»고 적고 남은 둘을 보여 준다. */
+var NAS_FAST_FAIL_MS = 3000;          // 이보다 빨리 튕기면 서버는 «거기 있다»
+function nasReachProbe(cfg){
+  var t0 = Date.now();
+  return fetchT(nasBaseOf(cfg) + '/webapi/query.cgi?api=SYNO.API.Info&version=1&method=query',
+      { mode:'no-cors', credentials:'omit', cache:'no-store' }, 12000)
+    .then(function(){ return { kind:'cors', ms: Date.now() - t0 }; })
+    .catch(function(){
+      var ms = Date.now() - t0;
+      return { kind: ms < NAS_FAST_FAIL_MS ? 'blocked' : 'silent', ms: ms };
+    });
+}
+/* 알아낸 것을 «한 가지»로 말한다 — 고르라고 하지 않는다 */
+function nasReachVerdict(r, base, origin){
+  var 초 = Math.round(((r && r.ms) || 0) / 100) / 10;
+  if(r && r.kind === 'cors'){
+    return '🔎 원인을 찾았습니다 — 인증서는 «이미 믿고» 있고 NAS 도 살아 있습니다(' + 초 + '초 만에 응답).\n'
+      + '   막은 것은 CORS 하나입니다. DSM → 제어판 → 응용 프로그램 포털 → 응용 프로그램 → DSM\n'
+      + '   → 「사용자 정의 HTTP 헤더」에 이 두 줄을 넣고 저장한 뒤, 여기서 다시 「연결 테스트」를 누르세요.\n'
+      + '      Access-Control-Allow-Origin: ' + origin + '\n'
+      + '      Access-Control-Allow-Private-Network: true';
+  }
+  if(r && r.kind === 'blocked'){
+    return '🔎 원인을 좁혔습니다 — NAS 는 «거기 있습니다»(' + 초 + '초 만에 튕겼습니다. 없는 서버라면 한참 기다립니다).\n'
+      + '   브라우저가 막은 것입니다. 둘 중 하나입니다 —\n'
+      + '   ① 인증서를 아직 안 믿습니다 → 아래 「🔐 NAS 열어 인증서 믿게 하기」를 누르고\n'
+      + '      새 탭에서 「고급 → 계속 진행」한 뒤 돌아와 다시 테스트하세요.\n'
+      + '   ② 크롬이 «공개 사이트 → 사설망» 요청을 막고 있습니다 → DSM 「사용자 정의 HTTP 헤더」에\n'
+      + '      Access-Control-Allow-Private-Network: true 를 함께 넣어 주세요.';
+  }
+  return '🔎 원인을 좁혔습니다 — ' + base + ' 에서 아무 응답도 없습니다(' + 초 + '초 기다렸습니다).\n'
+    + '   ① 지금 사무실 «밖»일 수 있습니다 — 192.168 주소는 밖에서 안 보입니다(폰 LTE 도 바깥입니다).\n'
+    + '   ② 사무실 «안»이라면 NAS 가 꺼져 있거나 주소·포트가 다릅니다.\n'
+    + '   어느 쪽이든 아래 「수동 백업 다운로드」로 파일을 받아 File Station 에 올리면 됩니다.';
+}
 function nasAutoClear(){
   try { localStorage.removeItem(NAS_AUTO_KEY); localStorage.removeItem(NAS_AUTO_TRY_KEY); } catch(_){}
 }
@@ -40931,7 +40981,7 @@ function NasBackupSettings(){
            시놀로지 기본 인증서가 바로 그것이라, HTTPS 를 켠 «첫 연결»은 거의 늘 여기서 막힌다.
            고치는 길은 한 번 열어 예외를 등록하는 것뿐이고, 그것을 모르면 영영 못 넘는다.
          ⚠ 흔한 차례대로 적고, 줄마다 «무엇을 누르면 되는지»를 쓴다. */
-      return 'NAS(' + getNasBase() + ')에 닿지 못했습니다.\n'
+      return 'NAS(' + getNasBase() + ')에 닿지 못했습니다 — 어느 쪽인지 지금 되짚고 있습니다(아래 🔎 줄을 보세요).\n'
         + '① 가장 흔한 것 — 브라우저가 NAS 인증서를 아직 안 믿습니다.\n'
         + '   아래 「🔐 NAS 열어 인증서 믿게 하기」를 누르고, 새 탭에서 「고급 → 계속 진행」한 뒤 돌아와 다시 테스트하세요.\n'
         + '② 그래도 안 되면 — DSM 이 이 주소를 안 받아들입니다(CORS). 아래 [방법 1] 대로 허용해 주세요.\n'
@@ -41084,6 +41134,12 @@ function NasBackupSettings(){
       addLog('❌ 연결 실패: '+getNasErrMsg(err),'err');
       showToast('연결 실패 — 아래 로그 확인');
       if(세션) nasLogout(세션);
+      /* ★ 여기서 그치지 않는다 — 「닿지 못했다」는 셋을 다 뜻하므로 한 번 더 두드려 «어느 쪽인지» 가른다.
+         ⚠ 이 되짚기가 실패해도 연결 테스트의 결과를 바꾸지 않는다 — 덧붙이는 말일 뿐이다. */
+      if(!err || err.message !== 'Failed to fetch') return;
+      return nasReachProbe(cfg)
+        .then(function(r){ addLog(nasReachVerdict(r, getNasBase(), location.origin), 'err'); })
+        .catch(function(){});
     }).finally(function(){ setBusy(false); });
   }
   async function doUndo(){
@@ -41235,8 +41291,10 @@ function NasBackupSettings(){
           h('strong',null,'[방법 1] DSM CORS 허용 (권장)'), h('br'),
           '① DSM 로그인 → 제어판 → 응용 프로그램 포털 → 응용 프로그램 탭', h('br'),
           '② 편집할 응용 프로그램(DSM) 선택 → "사용자 정의 HTTP 헤더" → 추가:', h('br'),
-          h('code',{style:{background:'#fffbeb',padding:'2px 8px',borderRadius:'5px',fontFamily:'monospace',display:'block',margin:'4px 0 4px 16px'}},
-            'Access-Control-Allow-Origin: *'),
+          /* ★ 두 줄이다 — 크롬은 «공개 사이트(github.io) → 사설망(192.168.x)» 요청을 CORS 와 «따로»
+               막는다(PNA). 첫 줄만 넣으면 헤더를 넣었는데도 그대로 막혀 「시킨 대로 했는데 안 된다」가 된다. */
+          h('code',{style:{background:'#fffbeb',padding:'2px 8px',borderRadius:'5px',fontFamily:'monospace',display:'block',margin:'4px 0 4px 16px',whiteSpace:'pre-line'}},
+            'Access-Control-Allow-Origin: *\nAccess-Control-Allow-Private-Network: true'),
           '③ 또는 DSM → 제어판 → 보안 → 신뢰할 수 있는 도메인 → 추가:', h('br'),
           /* ★★ 2026-09-18 — 여기 «옛 주소»(pureun-erp.netlify.app)가 박혀 있었다. 이알피는 지금
                nabaho.github.io 에 있다. 그대로 따르면 «엉뚱한 곳»을 허용하고 연결은 그대로 막힌다 —
