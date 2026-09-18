@@ -140,7 +140,12 @@ test('★ 여러 장 중 일부만 주소가 있으면 있는 것으로 나간�
   assert.ok(dt.data['DownloadURL'].indexOf(U2) > 0,
     '★ 첫 장에 주소가 없다고 통째로 포기하면 나머지가 억울합니다');
   assert.equal(dt.data['text/uri-list'], U2);
-  assert.ok(!calls.some(function (c) { return c[0] === 'toast'; }), '나갈 것이 있는데 경고했습니다');
+  /* ⚠ 「알림이 하나도 없다」로 못 박지 않는다 — 2026-09-18 부터 여러 장을 끌면
+     「한 장만 나갑니다」라고 **알려 준다**(photos-drag-easier.test.js). 그것은 경고가 아니다.
+     못 박을 것은 «나갈 것이 있는데 못 나간다고 말하지 않는다»는 규칙이다. */
+  assert.ok(!calls.some(function (c) {
+    return c[0] === 'toast' && /준비|복사|Ctrl\+V/.test(c[1]);
+  }), '나갈 것이 있는데 「못 나간다」고 말했습니다');
 });
 
 test('목록에 없는 번호는 조용히 건너뛴다 — 그것 때문에 끌기가 죽으면 안 된다', () => {

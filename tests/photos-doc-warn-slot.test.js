@@ -102,8 +102,13 @@ function cellFor(o) {
   /* 🗂 「서류」 딱지가 «갈래»를 보게 됐다(2026-09-09) — 안 실으면 칸이 통째로 안 그려진다.
      ⚠ 대역을 만들지 «않는다»: 이 파일이 재는 것이 「서류 딱지가 언제 붙나」이고,
        그 답이 이제 laneOf 안에 있다. 가짜로 두면 정작 그 규칙을 안 재게 된다. */
+  /* ↗ 끌기 손잡이·안내가 늘었다(2026-09-18) — 안 실으면 칸이 통째로 안 그려진다.
+     ⚠ 대역을 만들지 «않는다»: 진짜 값을 실어야 이 검사가 「칸에 손잡이가 붙는가」까지
+       함께 지킨다. 빈 대역을 두면 손잡이를 없애도 이 파일은 통과한다. */
   vm.runInContext([
     app.match(/^const LANE_PIC_KINDS = \{[^}]*\};/m)[0].replace('const ', 'var '),
+    app.match(/^const GRAB_TAG = .*$/m)[0].replace('const ', 'var '),
+    app.match(/^const DRAG_TIP = [\s\S]*?';$/m)[0].replace('const ', 'var '),
     cutFn(app, 'function readAnyField('),
     cutFn(app, 'function laneOf(')
   ].join('\n'), ctx);

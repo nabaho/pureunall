@@ -1503,6 +1503,20 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   display:flex;align-items:center;justify-content:center;font-weight:800;cursor:pointer}
 #grid .cell .ck:hover{border-color:var(--blue)}
 #grid .cell.on .ck{background:var(--blue);border-color:var(--blue);color:#fff}
+/* ── ↗ 끌기 (대표 결정 2026-09-18 「끌어내기를 더 쉽게」) ──
+   격자 사진은 2026-08-23 부터 밖으로 끌어낼 수 있었는데 **아무 표시가 없었다.**
+   끌 수 있는 줄 모르면 없는 기능이다 — 「크게 보기」 한 장에만 안내가 붙어 있었다.
+   ⚠ **가운데**에 둔다. 네 모서리는 이미 찼다(왼위 딱지·오른위 체크·오른아래 판독·아래 띠).
+     빈 모서리를 찾아 끼우면 딱지가 하나 붙는 순간 서로 겹친다.
+   ⚠ **pointer-events:none** 이라야 한다 — 이 딱지가 눌림을 먹으면
+     정작 «끌기»가 시작되지 않는다. 안내가 기능을 막는 꼴이 된다.
+   ⚠ 얹었을 때만 뜬다. 늘 떠 있으면 사진을 가린다. 손가락 기기에는 얹기가 없어
+     영영 안 뜨는데, 거기서는 끌어다 놓기 자체가 없으므로 그것이 맞다. */
+#grid .cell .grab{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:rgba(30,41,59,.74);color:#fff;font-size:10.5px;font-weight:800;line-height:1;
+  padding:4px 7px;border-radius:7px;white-space:nowrap;opacity:0;transition:opacity .12s;
+  pointer-events:none;z-index:3}
+#grid .cell:hover .grab{opacity:1}
 /* 확인 필요 표시 — 칸에서 바로 보인다.
    ⚠ z-index 로 늘 맨 위에 그린다(대표 보고 2026-08-15 "경고표시가 안에 들어가 있으면
      확인이 어렵다") — 아래 .wn.why 는 .cap 을 밀어내지만, 이 짧은 모서리 딱지(.wn)는
@@ -10601,7 +10615,8 @@ function renderGrid() {
          ⚠ 제목이 없으면(제목순 보기) 업체·설명을 제목 자리로 올린다 —
            빈 줄을 남겨 두면 카드가 절반만 쓰인다.
          ⚠ 둘 다 없을 때는 여기 안 온다 — 위에서 사진을 꽉 채우는 쪽으로 갈렸다. */
-      html += '<div class="cell doc' + (warn ? ' wnpad' : '') + on + '" data-id="' + esc(it.id) + '" draggable="true">' +
+      html += '<div class="cell doc' + (warn ? ' wnpad' : '') + on + '" data-id="' + esc(it.id) + '" draggable="true"' + DRAG_TIP + '>' +
+        GRAB_TAG +
         '<span class="strip">' + img + tag + '</span>' +
         '<span class="bd">' +
           (l1 ? '<span class="dttl">' + esc(l1) + '</span>' : '') +
@@ -10609,8 +10624,8 @@ function renderGrid() {
         '</span>' +
         stack + proof + shr + warn + rdgo + '<span class="ck">✓</span></div>';
     } else {
-      html += '<div class="cell' + on + '" data-id="' + esc(it.id) + '" draggable="true">' +
-        img + tag + stack + proof + shr + warn + cap + ttl + rdgo + '<span class="ck">✓</span></div>';
+      html += '<div class="cell' + on + '" data-id="' + esc(it.id) + '" draggable="true"' + DRAG_TIP + '>' +
+        img + tag + stack + proof + shr + warn + cap + ttl + rdgo + GRAB_TAG + '<span class="ck">✓</span></div>';
     }
   });
   html += '</div>';
@@ -10880,6 +10895,15 @@ function dragRefOf(id) {
    ⚠ 미리보기(240px)가 아니라 **원본**을 보낸다. 서류는 글자를 읽어야 한다.
      원본 주소(fullUrl)는 이미 정보에 적혀 있어 «기다림 없이» 바로 실을 수 있다 —
      끌기 시작(dragstart)은 기다려 주지 않으므로 이 점이 중요하다. */
+/* ↗ 끌기 — 손잡이와 얹었을 때 나오는 말. 칸이 두 벌(사진·서류)이라 여기서 한 번만 만든다.
+   ⚠ 「메일 첨부 칸에 바로는 안 된다」를 **여기서 말한다.** 안 적으면 대표님이
+     다음메일 첨부 칸에 놓아 보고 아무 일도 안 일어나는 것을 겪으신다 —
+     그것은 우리가 못 고치는 브라우저 규칙이라(웹→웹 끌기는 파일을 안 넘긴다)
+     **미리 말해 주는 것**이 우리가 할 수 있는 전부다. */
+const GRAB_TAG = '<span class="grab">↗ 끌기</span>';
+const DRAG_TIP = ' title="끌어서 바탕화면·폴더에 놓으면 파일이 됩니다&#10;'
+  + '메일 첨부 칸에는 바로 못 놓습니다 — 폴더를 한 번 거쳐 주세요"';
+
 function dragFileName(it) {
   const r = (it && it.meta && it.meta.read) || {};
   const co = (r.fields && (r.fields.company || r.fields.name))
@@ -10953,6 +10977,28 @@ function warmDragOut(id) {
       길까지 같이 죽는다. */
 function trimWarmData() {
   for (let i = 0; i < warmOrder.length - WARM_KEEP_DATA; i++) warmData.delete(warmOrder[i]);
+}
+
+/* ── 고른 사진을 미리 받아 둔다 (대표 결정 2026-09-18 「끌어내기를 더 쉽게」) ──
+   계약서·근태표는 주소를 일부러 안 남겨(보안 2단계 2026-08-17) 끌기 직전에
+   받아 둬야 나간다. 여태는 마우스를 **얹어야** 받기 시작해서, 고르자마자 끌면
+   「사진을 준비하는 중입니다」가 떴다.
+
+   ⚠⚠ **고른 것이 적을 때만 받는다.** 이것이 이 함수에서 가장 중요한 줄이다.
+      고르기는 끌기에만 쓰는 것이 아니다 — 지우기·분류·판독이 다 여러 장 단위라,
+      「전부 고르기」로 200장을 고른 순간 원본 200장을 내려받게 된다.
+      2026-08-01~11 에 같은 사진을 되풀이해 받아 **GB 단위**가 나온 자리가 있다.
+      끌기는 한 번에 한 장이므로, 여러 장을 고른 사람은 「⬇ 내려받기」로 간다.
+   ⚠ 마우스가 있는 기기에서만 — 손가락 기기에는 끌어다 놓기가 없다(warmPointer 참고).
+   ⚠ 이미 주소가 있는 사진은 warmDragOut 이 스스로 걸러 낸다(공짜다). */
+const WARM_PICK_MAX = 8;
+
+function warmSelected() {
+  if (!selected || !selected.size || selected.size > WARM_PICK_MAX) return;
+  try {
+    if (window.matchMedia && !window.matchMedia('(pointer: fine)').matches) return;
+  } catch (e) { /* 모르면 그냥 간다 — 걸러 내는 것은 warmDragOut 이 또 한다 */ }
+  selected.forEach(function (id) { warmDragOut(id); });
 }
 
 /* 마우스가 사진 위에 잠깐 머물면 준비한다 — 훑고 지나가는 것까지 받지 않게 조금 기다린다. */
@@ -11032,6 +11078,17 @@ function attachFileDragOut(dt, ids) {
           잠깐 뒤에 다시 끌면 나간다. 그렇게 말해 줘야 헛되이 포기하지 않는다. */
     toast && toast('사진을 준비하는 중입니다 — 잠깐 뒤 다시 끌거나, 「📋 복사」 뒤 Ctrl+V 하세요');
     return;
+  }
+  /* ── 여러 장을 끌면 «한 장만» 나간다 (대표 결정 2026-09-18) ──
+     브라우저가 한 번에 파일 하나만 허락한다. 여태 그 말을 «아무 데서도 안 했다» —
+     25장을 골라 끌어도 조용히 한 장만 나갔고, 받은 폴더를 열어 보고서야 알았다.
+     ⚠ **막지 않는다.** 한 장만 필요한 때가 훨씬 많다 — 막으면 그 흔한 일이 안 된다.
+       나가되, 무엇이 나갔는지 말한다.
+     ⚠ 세는 것은 «고른 수»(ids)가 아니라 **실을 수 있었던 수**(pairs)여야 하나?
+       아니다 — 대표님이 고르신 것은 ids 다. 「3장 골랐는데 1장만」이 사람의 셈이다. */
+  if (ids.length > 1 && toast) {
+    toast('↗ 한 장만 끌려 나갑니다 — 나머지 ' + (ids.length - 1) +
+      '장은 「⬇ 내려받기」로 받아 주세요', 6000);
   }
   try {
     /* 파일 하나 — 집은 사진(ids 의 첫째)부터 주소가 있는 것을 고른다. */
@@ -14071,6 +14128,9 @@ function cnt(m, sel) {
 }
 
 function renderGridBar() {
+  /* 고른 것이 바뀌면 끌어낼 채비를 해 둔다 — 고르기가 바뀌는 자리가 예닐곱 군데라
+     그 자리마다 부르면 한 곳을 빠뜨린다. 장수 줄을 다시 그리는 여기 «한 곳»에서 한다. */
+  warmSelected();
   /* 사람이 세는 것은 **사진 장수**다 — 접힌 문서는 한 칸이지만 여섯 장이다.
      칸 수로 세면 「5장」이라 해 놓고 「10장 지우기」가 되어 말이 어긋난다. */
   const shown = shownCount();
