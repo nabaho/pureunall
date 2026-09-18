@@ -41177,19 +41177,31 @@ function NasBackupSettings(){
       h('div', { style:{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'10px', padding:'16px', marginBottom:'16px'} },
         h('div', { style:{fontWeight:700, fontSize:'12.5px', color:'#854d0e', marginBottom:'10px'} }, '⚠️ NAS 연결 실패 시 해결 방법 (CORS)'),
         h('div', { style:{fontSize:'11.5px', color:'#854d0e', lineHeight:1.9} },
+          /* ★ 차례가 «실제로 겪는 차례»여야 한다 — HTTPS 를 켠 첫 연결은 거의 늘 인증서에서 막힌다.
+               CORS 를 먼저 적어 두면 아직 오지도 않은 문제를 붙들고 DSM 설정을 뒤진다. */
+          h('strong',null,'[먼저] 브라우저가 NAS 인증서를 믿게 하기'), h('br'),
+          '위 「🔐 NAS 열어 인증서 믿게 하기」 → 경고 화면에서 ', h('strong',null,'「고급」 → 「…(안전하지 않음)(으)로 이동」'),
+          ' → DSM 로그인 화면이 보이면 성공 → 돌아와 「연결 테스트」', h('br'),
+          h('span',{style:{color:'#d97706'}},'※ NET::ERR_CERT_AUTHORITY_INVALID 가 바로 이것입니다 — 시놀로지 기본(자체서명) 인증서라 정상입니다'), h('br'), h('br'),
           h('strong',null,'[방법 1] DSM CORS 허용 (권장)'), h('br'),
           '① DSM 로그인 → 제어판 → 응용 프로그램 포털 → 응용 프로그램 탭', h('br'),
           '② 편집할 응용 프로그램(DSM) 선택 → "사용자 정의 HTTP 헤더" → 추가:', h('br'),
           h('code',{style:{background:'#fffbeb',padding:'2px 8px',borderRadius:'5px',fontFamily:'monospace',display:'block',margin:'4px 0 4px 16px'}},
             'Access-Control-Allow-Origin: *'),
           '③ 또는 DSM → 제어판 → 보안 → 신뢰할 수 있는 도메인 → 추가:', h('br'),
+          /* ★★ 2026-09-18 — 여기 «옛 주소»(pureun-erp.netlify.app)가 박혀 있었다. 이알피는 지금
+               nabaho.github.io 에 있다. 그대로 따르면 «엉뚱한 곳»을 허용하고 연결은 그대로 막힌다 —
+               시키는 대로 했는데 안 되는 것이 안내 없는 것보다 나쁘다.
+             ★ 주소를 박지 않는다. 지금 이 화면이 떠 있는 곳(location.origin)을 그대로 보인다 —
+               앞으로 주소가 또 바뀌어도 저절로 맞는다. tests/nas-connect-fail-help.test.js 가 못 박는다. */
           h('code',{style:{background:'#fffbeb',padding:'2px 8px',borderRadius:'5px',fontFamily:'monospace',display:'block',margin:'4px 0 4px 16px'}},
-            'https://pureun-erp.netlify.app'),
+            (function(){ try{ return location.origin; }catch(e){ return '이 화면의 주소'; } })()),
           h('br'),
           h('strong',null,'[방법 2] 같은 사내 네트워크에서 직접 접속'), h('br'),
           '브라우저 주소창: ',
           h('code',{style:{background:'#fffbeb',padding:'2px 6px',borderRadius:'5px',fontFamily:'monospace'}},
-            (function(){ try{var c=safeParse(localStorage.getItem('pureun_v6_nas_config'), {}); return (c.host||'192.168.0.21')+':'+(c.port||'5000');}catch(e){return '192.168.0.21:5000';} })()
+            /* HTTPS 를 켜 두었으면 5001 이다 — 늘 5000 을 적어 주면 또 헤맨다(2026-09-18) */
+            (function(){ try{ return getNasBase(); }catch(e){ return 'https://192.168.0.21:5001'; } })()
           ),
           ' 직접 접속 후 ERP 사용', h('br'), h('br'),
           h('strong',{style:{color:'#16a34a'}},'[방법 3] 아래 수동 백업 다운로드 → File Station에 드래그 (항상 작동)')

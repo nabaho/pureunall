@@ -25,12 +25,22 @@ const { stripComments } = require('./strip-comments');
 
 const ROOT = path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
-const NAS = (() => {
-  const i = SRC.indexOf('function NasBackupSettings');
-  const j = SRC.indexOf("var listS = useState(dbGet('nas_archive'", i);
+
+/* ⚠⚠ stripComments 는 «<script> 태그 안»에서만 주석을 걷는다(마크업의 accept="image/*" 를
+   삼키지 않으려고 그렇게 만들어졌다 — tests/strip-comments.js 머리말). 그래서 함수 «조각»에
+   그냥 쓰면 **한 글자도 안 걷힌다.** 2026-09-18 에 실제로 그랬다: 주석에 적어 둔 옛 주소를
+   화면 글로 잘못 읽어 검사가 깨졌다. 반대로 주석이 «있어야 할 글자»를 품고 있으면 조용히
+   통과할 수도 있다 — 그쪽이 더 무섭다.
+   ★ 그래서 조각을 걷을 때는 «가짜 <script> 로 싸서» 같은 걷개를 그대로 쓴다. */
+const bare = (js) => stripComments('<script>' + js + '</script>');
+
+function nasSlice(src) {
+  const i = src.indexOf('function NasBackupSettings');
+  const j = src.indexOf("var listS = useState(dbGet('nas_archive'", i);
   assert.ok(i > 0 && j > i, '★ NAS 설정 컴포넌트를 못 찾았습니다');
-  return SRC.slice(i, j);
-})();
+  return src.slice(i, j);
+}
+const NAS = nasSlice(SRC);          // 진짜 코드 (cutFn·vm 이 쓴다)
 
 /* 안내를 «실제로» 지어 본다 — 글자 대조만 하면 조건이 뒤집혀도 통과한다 */
 function 안내(opts) {
@@ -65,10 +75,10 @@ test('★★ 안내가 가리키는 단추가 «실제로 화면에 있다»', (
   const m = 안내({ useHttps: true });
   const 이름 = (m.match(/「([^」]*인증서[^」]*)」/) || [])[1];
   assert.ok(이름, '★ 안내가 단추 이름을 「」로 가리키지 않습니다');
-  const 화면 = stripComments(NAS);
+  const 화면 = bare(NAS);
   assert.ok(화면.indexOf(이름) >= 0, '★★ 안내는 「' + 이름 + '」를 누르라는데 화면에 그 단추가 없습니다');
   assert.match(화면, /onClick:openNas/, '★★ 그 단추가 아무 일도 안 합니다');
-  assert.match(stripComments(cutFn(NAS, 'function openNas(')), /window\.open\(/, '★ 새 탭으로 안 엽니다');
+  assert.match(bare(cutFn(NAS, 'function openNas(')), /window\.open\(/, '★ 새 탭으로 안 엽니다');
 });
 
 test('★ 어느 주소인지 적는다 — 주소를 모르면 확인할 수가 없다', () => {
@@ -100,3 +110,34 @@ test('★ 그 밖 오류는 원문을 그대로 보인다 — 짐작으로 덮�
   ['getNasBase', 'isMixedContent', 'getNasErrMsg'].forEach((n) => vm.runInContext(cutFn(NAS, 'function ' + n + '('), ctx));
   assert.equal(ctx.getNasErrMsg(new Error('업로드 실패 코드: 408')), '업로드 실패 코드: 408');
 });
+
+/* ══════ 화면의 CORS 안내 — 「시키는 대로 했는데 안 됨」을 막는다 (2026-09-18) ══════ */
+test('★★ CORS 안내가 «옛 주소»를 가리키지 않는다 — 그대로 따르면 엉뚱한 곳을 허용한다', () => {
+  const 화면 = bare(NAS);
+  assert.ok(화면.indexOf('pureun-erp.netlify.app') < 0,
+    '★★ 안내가 옛 주소(netlify)를 허용하라고 시킵니다 — 이알피는 지금 다른 곳에 있습니다.\n' +
+    '  시키는 대로 했는데 안 되는 것은 안내가 없는 것보다 나쁩니다.');
+  const i = 화면.indexOf('신뢰할 수 있는 도메인');
+  assert.ok(i > 0, '★ 신뢰 도메인 안내를 못 찾았습니다');
+  assert.match(화면.slice(i, i + 400), /location\.origin/,
+    '★★ 주소를 글자로 박았습니다 — 지금 이 화면의 주소(location.origin)를 보여야 앞으로도 맞습니다');
+});
+
+test('★ 안내 차례가 «실제로 겪는 차례»다 — 인증서가 CORS 보다 먼저', () => {
+  const 화면 = bare(NAS);
+  const cert = 화면.indexOf('인증서를 믿게 하기');
+  const cors = 화면.indexOf('[방법 1] DSM CORS 허용');
+  assert.ok(cert > 0, '★ 인증서 대목이 안내에 없습니다');
+  assert.ok(cors > 0, '★ CORS 대목이 없어졌습니다');
+  assert.ok(cert < cors,
+    '★ CORS 가 먼저 적혀 있습니다 — 아직 오지도 않은 문제로 DSM 설정을 뒤지게 됩니다');
+});
+
+test('★ 사내 직접접속 안내도 «지금 쓰는 포트»를 보인다 — HTTPS 면 5001', () => {
+  const 화면 = bare(NAS);
+  const i = 화면.indexOf('브라우저 주소창');
+  assert.ok(i > 0, '★ 직접접속 안내를 못 찾았습니다');
+  assert.match(화면.slice(i, i + 300), /getNasBase\(\)/,
+    '★ 늘 5000 을 적어 줍니다 — HTTPS 를 켜 둔 사람은 그 주소로 가면 안 열립니다');
+});
+
