@@ -67,6 +67,8 @@ function load(counts, extra) {
     /* 2026-09-18 — 휴지통은 «열 때» 읽으므로 건수도 이 함수로 묻는다.
        여기서는 이미 읽어 둔 셈치고 실제 건수를 돌려준다(늦게 읽기는 cards-trash-lazy 가 본다). */
     trashCount: () => Object.keys(trash).length,
+    /* 📋 등록증 → 기업상세 (2026-09-18) — 여기서는 셀 것이 없다 */
+    bizFillCount: () => 0,
     nameFixList: () => N(c.name),
     classifyPlan: () => ({ targetN: c.rules })
   }, extra || {});
