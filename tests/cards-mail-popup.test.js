@@ -123,9 +123,12 @@ test('★ 메일 창이 뜰 때 to 가 있으면 «쓰기», 없으면 받은메
        (openMailPage 하나만 박아 두었더니, 기본 설정인 사람에게는 새 창이 떠서
         안내문만 보였다 — tests/cards-mail-always-own-window.test.js 참고) */
   const i = src.indexOf('if(urlWantsMail()){');
-  const b = code(src.slice(i, src.indexOf("openMailBox('')", i) + 40));
+  /* ⚠ 여는 칸 이름을 박지 않는다 — 2026-09-18 에 첫 화면이 전체메일로 바뀌며
+       "openMailBox('')" 를 박아 둔 이 줄이 깨졌다. 지킬 것은 «차례»다:
+       to 를 «먼저» 보고, 그 뒤에 메일함을 연다. */
+  const b = code(src.slice(i, src.indexOf('openMailBox(', i) + 40));
   const at = b.indexOf('mailToFromUrl()');
-  const bx = b.indexOf("openMailBox('')");
+  const bx = b.indexOf('openMailBox(');
   assert.ok(at > 0, '★ 메일 창이 「누구에게」를 안 본다 — 이메일을 눌러도 받은메일함이 열린다');
   assert.ok(at < bx, '★ 받은메일함을 «먼저» 열어 버린다 — to 를 먼저 봐야 한다');
   assert.match(b.slice(at, bx), /openMailPage\(|openSendMaterials\(/,

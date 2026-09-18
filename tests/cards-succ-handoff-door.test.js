@@ -239,7 +239,8 @@ test('★★★ 메일 문에서 «사업장 갈래 뒤에» 이어받기를 본
   const fn = fnBody('restoreLastScreen');
   const co = fn.indexOf('mailCoFromUrl()');
   const wt = fn.indexOf('mailWhoFromUrl()');
-  const bx = fn.indexOf("openMailBox('')");
+  /* ⚠ 여는 칸 이름은 안 본다 — 지킬 것은 «차례»다(2026-09-18 첫 화면이 바뀌며 깨졌다) */
+  const bx = fn.indexOf('openMailBox(');
   assert.ok(co > 0 && wt > co, '★★ 차례가 어긋났다 — ?mail=co 가 이어받기로 샐 수 있다');
   assert.ok(wt < bx, '★★★ 받은메일함을 «먼저» 열어 버린다 — 이어받기 띠를 눌러도 메일함이 뜬다');
   assert.match(fn.slice(wt, bx), /openWhoPage\(_wt\)/, '★★★ 이어받기 화면을 안 연다');

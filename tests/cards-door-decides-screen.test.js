@@ -97,7 +97,11 @@ test('★ 메일 문(view=mail)은 예전 그대로 — 마지막이 명함이�
   const back = boot('u2', '?view=mail');
   back.__store[back.lastScreenKey()] = c.__store[c.lastScreenKey()];
   back.restoreLastScreen();
-  assert.deepEqual(Array.from(back.opened), ['box:'], '메일 타일을 눌렀으면 메일함이어야 합니다');
+  /* ⚠ «어느 칸»인지는 여기서 안 본다 — 2026-09-18 에 첫 화면이 받은메일함에서
+       전체메일로 바뀌자 'box:' 를 박아 둔 이 줄이 깨졌다. 이 검사가 지키는 것은
+       «메일 문으로 들어오면 메일함이 열리는가»이지 그 안 어느 칸인가가 아니다. */
+  assert.equal(back.opened.length, 1, '연 화면이 하나가 아닙니다: ' + back.opened.join(', '));
+  assert.match(back.opened[0], /^box:/, '메일 타일을 눌렀으면 메일함이어야 합니다');
 });
 
 test('★★ 코드에 기업정보함 문 아래 «메일 갈래»가 남아 있지 않다 — 남기면 이 흠이 되살아난다', () => {

@@ -236,9 +236,11 @@ test('★ 주소가 메일이면 저장된 화면을 이긴다 — 아이콘을 
   back.__store[back.lastScreenKey()] = c.__store[c.lastScreenKey()];
   back.location.search = '?view=mail';             // 메일 아이콘으로 들어왔다
   back.restoreLastScreen();
-  /* 2026-08-24: 메일 아이콘으로 들어오면 «받은메일함»이 열린다(예전엔 쓰기 화면).
-     칸을 안 넘기면(box:'') mbNow() 가 받은메일함을 골라 준다. */
-  assert.deepEqual(back.opened, ['box:'], '★ 메일 아이콘을 눌렀으면 메일함이 열려야 합니다.');
+  /* 2026-08-24: 메일 아이콘으로 들어오면 «메일함»이 열린다(예전엔 쓰기 화면).
+     ⚠ «어느 칸»인지는 여기서 안 본다 — 2026-09-18 에 첫 화면이 전체메일로 바뀌자
+       'box:' 를 박아 둔 이 줄이 깨졌다. 이 검사가 지키는 것은 «메일 창이 열렸는가»다. */
+  assert.equal(back.opened.length, 1, '연 화면이 하나가 아닙니다: ' + back.opened.join(', '));
+  assert.match(back.opened[0], /^box:/, '★ 메일 아이콘을 눌렀으면 메일함이 열려야 합니다.');
 });
 
 test('★★ 기업정보함 문(보통 주소)으로 들어오면 마지막이 메일이었어도 메일을 열지 않는다', () => {
