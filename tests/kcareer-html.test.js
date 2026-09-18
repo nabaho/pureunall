@@ -2370,9 +2370,17 @@ test('★★ 중복은 «만든 것»으로 세지 않는다 — 숫자가 거�
   const d = funcSource('ocrDrop');
   assert.match(d, /var tally=function\(res\)\{/, '세는 곳이 한 군데여야 합니다');
   assert.match(d, /if\(res && res\.dup\)\{ dup\+\+;/, '중복은 따로 셉니다');
-  // ⚠ 세 갈래가 모두 tally 를 거쳐야 한다 — 하나라도 done++ 이면 숫자가 어긋난다
-  assert.equal((d.match(/tally\(await saveOCRRecord\(/g) || []).length, 3,
-    '⚠ 세 갈래(HWP·OCR·파일명) 모두 tally 를 거쳐야 합니다');
+  /* ⚠ 담는 갈래는 «모두» tally 를 거쳐야 한다 — 하나라도 done++ 이면 숫자가 어긋난다.
+     ⚠★ 갯수를 못박지 않는다 — 갈래가 늘 때마다 숫자만 올리면 «새 갈래가 tally 를
+       건너뛰어도» 통과한다. 「부르는 곳 전부가 감싸여 있나」로 견준다(더 엄하다).
+     지금 갈래 넷: 한글 읽음 · 한글 파일명 · 그림/PDF 읽음 · 파일명 되돌림. */
+  const 부름 = [...d.matchAll(/(.{0,24})saveOCRRecord\(/g)].map((m) => m[1]);
+  assert.ok(부름.length >= 5, '⚠ 담는 갈래가 줄었습니다(' + 부름.length + ') — 무엇이 없어졌는지 보세요');
+  /* 「갈라 담기」는 res 를 받아 `if(tally(res))` 로 센다 — 그것도 tally 를 거치는 것이다 */
+  const 샌것 = 부름.filter((pre) => !/tally\(await $/.test(pre) && !/var res=await $/.test(pre));
+  assert.deepEqual(샌것, [],
+    '⚠ saveOCRRecord 를 부르는 곳은 «모두» tally 를 거쳐야 합니다 — 위 자리가 빠져 있습니다');
+  assert.match(d, /if\(tally\(res\)\)/, '갈라 담는 길도 tally 로 셉니다');
   assert.ok(!/saveOCRRecord\([^)]*\); done\+\+/.test(d), '⚠ done++ 로 되돌리면 숫자가 거짓이 됩니다');
   assert.match(d, /이미 있는 서류 '\+dup\+'건은 «새로 만들지 않았습니다»/, '몇 건인지 알려야 합니다');
 });
