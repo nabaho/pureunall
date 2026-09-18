@@ -292,3 +292,36 @@ test('★★★ 이름표 사전을 두 벌로 만들지 않는다', () => {
   assert.ok(!/기업명: 'company'|사업자등록번호: 'bizno'/.test(몸통),
     '★★★ 사진첩에 이름표 사전이 베껴졌습니다 — 55가지라 어긋나도 한참 모릅니다');
 });
+
+/* ══════ ⑤ 고칠 수 있다는 것이 «화면에 보이는가» ═══════════════════════
+   대표 물음 2026-09-18 — 고치는 길을 만들어 배포한 «그 화면»을 보시고
+   「이 화면에서 수정할 수 있게 만들어 줄 수 있나」고 물으셨다.
+   기능은 있었는데 ✎ 를 «마우스를 올려야» 뜨게 해 두어 아무도 못 찾았다.
+   ★ 있는 기능을 못 찾는 것이 단추 하나 더 보이는 것보다 훨씬 나쁘다. */
+
+test('★★★ ✎ 가 «늘» 보인다 — 마우스를 올려야 뜨면 있는 줄도 모른다', () => {
+  const css = PHOTOS.match(/#readPanel \.fxpen\{[^}]*\}/);
+  assert.ok(css, '.fxpen 모양이 없습니다');
+  assert.ok(!/opacity:\s*0[;}]/.test(css[0]),
+    '★★★ 감춰 두면 고칠 수 있다는 것을 아무도 모릅니다 — 실제로 대표님이 못 찾으셨습니다');
+});
+
+test('★★★ 표 «위»에 고칠 수 있다고 적는다 — 아래 두면 스무 줄을 다 읽고 나서야 안다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'function renderReadPanel(') || '');
+  assert.match(fn, /class="fxhint"/,
+    '★★★ 안내가 없으면 단추가 있어도 안 눌립니다');
+  const i = fn.indexOf('fxhint'), j = fn.indexOf("'<table>' + rows");
+  assert.ok(i >= 0 && j >= 0 && i < j, '★★ 안내가 표 «아래»에 있습니다');
+});
+
+test('★★ 고칠 수 없을 때는 안내를 «안» 띄운다 — 눌러도 안 되는 안내다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'function renderReadPanel(') || '');
+  assert.match(fn, /\(고칠수있나 && rows/,
+    '★★ 남의 사진·판독 실패에도 「고치세요」가 뜨면 눌렀다가 안 됩니다');
+});
+
+test('★ 안내가 «요금 0원»과 «비우기»를 말한다 — 그 둘이 이 기능의 값이다', () => {
+  const fn = stripJs(cutFn(PHOTOS, 'function renderReadPanel(') || '');
+  assert.match(fn, /요금 0원/);
+  assert.match(fn, /비우면 그 칸을 없앱니다/);
+});

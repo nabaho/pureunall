@@ -1642,13 +1642,20 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 #readPanel td.k{color:var(--sub);width:82px;font-weight:500;word-break:keep-all}
 /* ✎ 칸 고치기 (2026-09-18) — 줄에 마우스를 올려야 뜬다. 늘 보이면 스무 줄이 어지럽다.
    ⚠ 폰에는 «마우스 올리기»가 없으므로 손가락 기기에서는 늘 보이게 둔다(아래 hover:none). */
-#readPanel .fxpen{border:none;background:none;color:#cbd5e1;font-size:12.5px;padding:0 4px;
-  cursor:pointer;opacity:0;transition:opacity .12s}
-#readPanel tr:hover .fxpen{opacity:1}
-#readPanel .fxpen:hover{color:var(--blue)}
-@media (hover:none){ #readPanel .fxpen{opacity:.55} }
+/* ⚠ 2026-09-18 — 처음에는 «마우스를 올려야» 뜨게 했다(늘 보이면 어지럽다고 봤다).
+   그런데 대표님이 그 화면을 보시고 「이 화면에서 수정할 수 있게 만들어 줄 수 있나」고
+   물으셨다 — **고칠 수 있는데 고칠 수 있다는 것이 화면에 없었다.**
+   있는 기능을 못 찾는 것이 단추 하나 더 보이는 것보다 훨씬 나쁘다. 늘 보인다. */
+#readPanel .fxpen{border:none;background:none;color:#94a3b8;font-size:12.5px;padding:0 4px;
+  cursor:pointer;opacity:.7;transition:opacity .12s,color .12s}
+#readPanel tr:hover .fxpen{opacity:1;color:var(--blue)}
+#readPanel .fxpen:hover{color:var(--blue);opacity:1}
 /* 사람이 고친 칸임을 한 글자로 — 판독값과 섞이지 않게 */
 #readPanel .fxmark{color:var(--blue);font-size:11px;margin-left:5px;font-weight:700}
+/* ✎ 안내 한 줄 — 표 바로 위. 눈에 걸리되 값보다 앞서지는 않게 */
+#readPanel .fxhint{margin:8px 0 2px;font-size:11.5px;line-height:1.6;color:var(--sub);
+  background:#eff6ff;border-left:3px solid #bfdbfe;border-radius:0 7px 7px 0;padding:6px 9px}
+#readPanel .fxhint b{color:var(--ink)}
 /* 「판독은 …라고 읽었습니다」 — 덮어쓰지 않았다는 것이 눈에 보여야 한다 */
 #readPanel tr.wasrow td{padding:0 0 5px;font-size:11.5px;font-weight:400;color:var(--sub)}
 #readPanel .note{margin:8px 0 0;font-size:12.5px;color:var(--sub);line-height:1.6}
@@ -16659,6 +16666,14 @@ function renderReadPanel(it) {
        문서마다 다른 자리에 묻힌다. 늘 같은 자리에 있어야 눈이 찾는다. */
     (docTitle(it) ? '<div class="dtitle">' + esc(docTitle(it)) + '</div>' : '') +
     cause +
+    /* ✎ 고칠 수 있다고 «말한다» (대표 물음 2026-09-18 「이 화면에서 수정할 수 있게
+       만들어 줄 수 있나」) — 단추만 있고 안내가 없으면 있는 줄도 모른다.
+       ⚠ 표 «위»에 둔다. 아래 두면 스무 줄을 다 읽고 나서야 알게 된다.
+       ⚠ 고칠 수 없는 때(남의 사진·판독 실패)에는 안 띄운다 — 눌러도 안 되는 안내다. */
+    (고칠수있나 && rows
+      ? '<p class="fxhint">✎ 잘못 읽은 칸은 <b>그 줄의 ✎</b> 를 눌러 고치세요' +
+        ' — 다시 판독하지 않습니다(<b>요금 0원</b>). 비우면 그 칸을 없앱니다.</p>'
+      : '') +
     (rows ? '<table>' + rows + '</table>' : '') +
     /* 💡 무료로 읽었다는 말과 「AI 로 더」 단추 — 표 **바로 아래**다. 표를 다 읽고
        나서야 「칸이 왜 적지」를 알게 되면, 이미 그 적은 값을 믿은 뒤다. */
