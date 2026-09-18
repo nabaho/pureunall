@@ -71,45 +71,87 @@
   .btn.ghost{background:#ffffff;color:var(--acc2);border:1px solid #bfdbfe}
   .muted{color:var(--sub)}
 
-  /* ── 달 고르기 ── */
-  .monthbar{display:flex;align-items:center;gap:8px;margin-bottom:9px;white-space:nowrap}
-  .monthbar .ym{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
-  .mv{border:1px solid var(--line);background:#ffffff;border-radius:7px;width:28px;height:28px;
-    cursor:pointer;color:var(--sub);font-size:14px;font-family:inherit}
+  /* ── 달력 — 치수는 이알피(법인 대시보드)에서 그대로 가져왔다 ──
+     ⚠ 눈대중으로 고치지 말 것. 두 화면이 갈리면 대표님이 같은 것을 두 모양으로 보신다. */
+  .calwrap{background:#ffffff;border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px 10px}
 
-  /* ── 거르개 ── */
-  .chips{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:9px}
-  .chip{font-size:11px;border:1px solid #cbd5e1;border-radius:20px;padding:2px 10px;color:var(--sub);
-    background:#ffffff;cursor:pointer;font-family:inherit;white-space:nowrap}
-  .chip.on{background:var(--acc2);border-color:var(--acc2);color:#ffffff;font-weight:700}
+  /* 사람 칩 줄 — 색 동그라미 + 이름 두 글자 */
+  .chips{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:7px}
+  .allchip{padding:3px 9px;border:none;border-radius:10px;cursor:pointer;font-size:10.5px;font-weight:700;
+    font-family:inherit;flex-shrink:0;background:#f8fafc;color:#475569}
+  .allchip.on{background:#1e293b;color:#ffffff}
+  .pwrap{position:relative;flex-shrink:0;display:inline-flex}
+  .pchip{width:26px;height:26px;border-radius:50%;border:2.5px solid transparent;color:#ffffff;
+    font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;
+    align-items:center;justify-content:center;box-sizing:border-box;padding:0;transition:transform .1s}
+  .pchip.on{border-color:#1e293b;transform:scale(1.15)}
+  .pcount{position:absolute;top:-4px;right:-4px;min-width:14px;height:14px;border-radius:999px;
+    background:#1e40af;color:#ffffff;font-size:9px;font-weight:800;display:flex;align-items:center;
+    justify-content:center;padding:0 3px;pointer-events:none}
+  .chip{font-size:10.5px;border:1px solid #cbd5e1;border-radius:20px;padding:2px 10px;color:var(--sub);
+    background:#ffffff;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}
+  .chip.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700}
 
-  /* ── 달력 ── */
+  /* 위 줄 — ◀ 2026-09 ▶ · 음력 · 오늘 · 월|주|일 · 검색 */
+  .monthbar{display:flex;align-items:center;gap:7px;margin-bottom:7px;white-space:nowrap;flex-wrap:wrap}
+  .monthbar .ym{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+  .monthbar .lunrange{font-size:11px;color:var(--faint)}
+  .mv{border:1px solid var(--line);background:#ffffff;border-radius:8px;width:26px;height:26px;
+    cursor:pointer;color:var(--sub);font-size:11px;font-family:inherit;padding:0}
+  .todaybtn{padding:4px 10px;border:1px solid var(--line);background:#ffffff;border-radius:10px;
+    cursor:pointer;font-size:11.5px;font-weight:600;color:var(--sub);font-family:inherit}
+  .seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden}
+  .seg button{padding:4px 12px;font-size:11.5px;font-weight:700;background:#ffffff;color:var(--sub);
+    border:none;border-right:1px solid var(--line);cursor:pointer;font-family:inherit}
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:#1e40af;color:#ffffff}
+  .srch{position:relative;display:inline-flex;align-items:center}
+  .srch .ic{position:absolute;left:7px;font-size:10px;pointer-events:none}
+  .srch input{padding:4px 10px 4px 24px;font-size:11.5px;border:1px solid var(--line);border-radius:10px;
+    width:130px;background:#ffffff;box-sizing:border-box;font-family:inherit;color:var(--ink)}
+
+  /* 달력 몸통 */
   .cal{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#ffffff}
   .calhd{display:grid;grid-template-columns:repeat(7,1fr);background:var(--bg);font-size:11px;
     color:var(--sub);text-align:center}
   .calhd div{padding:5px 0;border-right:1px solid var(--line)}
   .calhd div:last-child{border-right:none}
-  .calgrid{display:grid;grid-template-columns:repeat(7,1fr)}
-  .day{min-height:92px;border-right:1px solid var(--line);border-top:1px solid var(--line);padding:3px 4px;overflow:hidden}
-  .day:nth-child(7n){border-right:none}
-  .day.out{background:var(--bg)}
-  .day.today{background:var(--acc-soft)}
-  .dnum{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
-  .dnum.sun,.dnum.hol{color:var(--danger);font-weight:700}
-  .dnum.sat{color:var(--acc)}
-  .holname{font-size:9.5px;color:var(--danger);margin-left:3px}
-  /* 한 칸은 «한 줄»이다 — 넘치면 … 로 줄이고 전문은 title 에 담는다 */
-  .ev{font-size:10.5px;border-radius:4px;padding:1px 5px;margin-top:2px;white-space:nowrap;
-    overflow:hidden;text-overflow:ellipsis;cursor:default}
-  .ev.sch{background:#eff6ff;color:#1e40af}
-  .ev.eum{background:#bfdbfe;color:#1e40af}
-  .ev.leave{background:#f0fdf4;color:#166534}
-  .ev.off{background:#fef2f2;color:#991b1b}
-  .ev.trip{background:#fffbeb;color:#854d0e}
-  .more{font-size:9.5px;color:var(--faint);margin-top:1px}
+  .calhd .sun{color:var(--danger)}
+  .calhd .sat{color:var(--acc)}
+  /* 여섯 줄 고정 — 달마다 표 높이가 들썩이지 않게 */
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr)}
+  .day{min-height:104px;padding:5px 4px 3px;overflow:hidden;box-sizing:border-box;position:relative}
+  /* 날짜 줄 — 칸 «가운데»에 「25 (13)」 처럼 날짜와 음력을 나란히 */
+  .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:4px;padding:0 2px}
+  .dnum{min-width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;
+    padding:0 3px;font-size:12px;font-weight:400;cursor:pointer;color:var(--ink);background:transparent}
+  /* 오늘 동그라미는 «숫자에만» — 음력까지 감싸면 알약처럼 길어진다 */
+  .dnum.today{background:#2563eb;color:#ffffff;font-weight:700}
+  .dnum.other{color:#94a3b8}
+  .lun{font-size:10.5px;color:#94a3b8;line-height:1}
+  .lun.other{color:#cbd5e1}
+  .evs{display:flex;flex-direction:column;gap:1.5px}
+  /* 한 칸은 «한 줄»이다 — 넘치면 … 로 줄이고 전문은 손대면 뜬다 */
+  .ev{padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500;line-height:16px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .ev b{font-weight:700;margin-right:3px}
+  /* 공휴일은 칸 맨 위에 «칩»으로 — 일정 칩과 같은 치수여야 한 줄만 도드라지지 않는다 */
+  .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default}
+  .more{font-size:10.5px;color:var(--sub);padding:0 5px;cursor:pointer;line-height:15px}
+  .more:hover{text-decoration:underline}
 
-  .legend{display:flex;gap:11px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin-top:9px}
-  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  /* 주 보기 */
+  .wgrid{display:grid;grid-template-columns:repeat(7,1fr);min-height:420px}
+  .wcol{border-right:1px solid var(--line);padding:0 3px 6px;overflow:hidden}
+  .wcol:last-child{border-right:none}
+  .whd{text-align:center;font-size:11px;color:var(--sub);padding:5px 0 4px;border-bottom:1px solid var(--line);
+    margin-bottom:5px;display:flex;flex-direction:column;align-items:center;gap:1px}
+  .whd.sun{color:var(--danger)}
+  .whd.sat{color:var(--acc)}
+  .whd .dnum{margin:0 auto}
+  /* 일 보기 */
+  .dayview{padding:12px;display:flex;flex-direction:column;gap:3px;min-height:320px}
+  .dayview .ev{font-size:13px;line-height:24px;padding:2px 9px;border-radius:6px}
 
   /* ── 넣고 고치는 창 ── */
   .veil{position:fixed;inset:0;background:#1e293b;opacity:.45;z-index:40}
@@ -199,12 +241,18 @@ var D = {};              // 읽어 온 표들
 var FAILED = {};         // 못 읽은 표 — «빈 것»과 갈라 둔다
 var ME = null;           // 나 (직원 한 줄)
 var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'',
-          scope:'month', showLeft:false };
+          scope:'month', showLeft:false,
+          /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
+          view:'month', date:'', q:'' };
 
 var $ = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function ymOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function shiftDay(ymd, n){
+  var d = new Date((ymd||todayYMD())+'T00:00:00'); d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function todayYMD(){ var d=new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function arr(v){ return Array.isArray(v) ? v : []; }
@@ -271,34 +319,82 @@ function holidayOf(ymd){
 }
 
 /* ── 그 날의 일들 ──────────────────────────────────────────────────── */
+/* 그 날의 일들 — 칩의 «글자와 색»은 이알피와 글자 하나까지 같다.
+   ⚠ 여기서 예쁘게 바꾸지 말 것. 대표님이 두 화면을 나란히 놓고 보신다.
+     고칠 일이 생기면 이알피부터 고치고 그 다음 여기를 맞춘다
+     (tests/cal-same-as-erp.test.js 가 두 쪽을 맞대 본다). */
 function eventsOn(ymd, eumOnly){
   var out = [];
-  // ① 일정
+  /* ① 일정 — 외부 협력자 일정은 ⚖️·🤝 를 앞에 붙이고 그 사람 색으로 */
   arr(D.my_schedules).forEach(function(s){
     if(!s || s.date !== ymd) return;
-    if(s.externalId) return;                       // 외부인 배정은 로스터 화면에만 (이알피와 같은 규칙)
-    var t = s.title || '📅 일정';
-    out.push({ kind:'sch', store:'my_schedules', id:s.id, sid:s.sid, text:t,
-      tip:t + (s.note ? ' · '+s.note : '') });
+    if(s.externalId){
+      var ext = externalOf(s.externalId);
+      if(!ext || ext.active === false) return;
+      var prefix = ext.role === "변호사" ? "⚖️" : "🤝";
+      out.push({ kind:"sch", store:"my_schedules", id:s.id, sid:"EXT_"+s.externalId, externalId:s.externalId,
+        text: prefix + " " + ext.name + (s.title ? " · " + s.title : ""),
+        time:"", color: ext.color || "#2563eb",
+        tip: ext.name + (ext.role ? " (" + ext.role + ")" : "") + (ext.contact ? "\n☎ " + ext.contact : "")
+             + (ext.note ? "\n📝 요구사항: " + ext.note : "") });
+      return;
+    }
+    var hm = String(s.time || "").slice(0,5);
+    out.push({ kind:"sch", store:"my_schedules", id:s.id, sid:s.sid,
+      text: s.title || "일정",
+      /* 시각은 「1030」처럼 콜론 없이 — 좁은 칸에서 제목이 두 글자쯤 더 보인다 */
+      time: (hm && hm !== "00:00") ? hm.replace(":","") : "",
+      color: colorOf(s.sid) || "#64748b",
+      tip: (s.title || "일정") + (s.note ? " · " + s.note : "") });
   });
-  // ② 근태 — 유형의 뜻은 js/pu-work-core.js 한 자리에서 받는다
+  /* ② 근태 — 이알피와 같은 글자·같은 색 */
   arr(D.attendance_records).forEach(function(r){
     if(!r || r.date !== ymd) return;
-    var ty = PuWork.typeOf(r.type);
-    var label = PuWork.labelFor(r.type, 'calendar');
-    var who = r.externalId ? (externalOf(r.externalId)||{}).name : nameOf(r.sid);
-    var text = PuWork.iconFor(r.type) + ' ' + (who||'') + ' ' + label;
-    out.push({
-      kind: r.type==='eum-work' ? 'eum' : (ty && ty.deductLeave) ? 'leave'
-            : (r.type==='trip'||r.type==='telework') ? 'trip' : 'off',
-      store:'attendance_records', id:r.id,
+    if(ATT_SHOW.indexOf(r.type) < 0) return;
+    var who = nameOf(r.sid) ? " (" + nameOf(r.sid) + ")" : "";
+    var 글 = r.type === "leave" ? "🏖️ 연차" + who
+      : r.type === "halfday-am" ? "🌅 오전반차" + who
+      : r.type === "halfday-pm" ? "🌇 오후반차" + who
+      : r.type === "leave-hour" ? "⏱️ 시간연차" + who
+      : r.type === "special-leave" ? "🎁 특별휴가" + who
+      : r.type === "maternity" ? "🤱 출산휴가" + who
+      : r.type === "parental-leave" ? "👶 육아휴직" + who
+      : r.type === "sick" ? "🤒 병가" + who + (r.note ? " " + r.note : "")
+      : r.type === "trip" ? "🚗 출장" + who + (r.note ? " " + r.note : "")
+      : r.type === "telework" ? "🏠 재택" + who + (r.note ? " " + r.note : "")
+      : r.type === "eum-work" ? (function(){
+          var t = r.startTime ? r.startTime.replace(":","") + "-" + String(r.endTime||"").replace(":","") + " " : "";
+          if(r.externalId){
+            var ex = externalOf(r.externalId);
+            if(ex) return "🏛️ " + t + ex.name + " 이음센터" + (r.note ? " " + r.note : "");
+          }
+          var nm = nameOf(r.sid);
+          return "🏛️ " + t + (nm ? nm + " 이음센터" : "이음센터") + (r.note ? " " + r.note : "");
+        })()
+      : "";
+    /* 색 — 이알피와 같은 차례. 이음센터는 «그 직원 색», 사람을 모르면 회색이다
+       (외부 협력자의 이음 근무가 회색인 까닭 — 이알피도 그 사람 색을 쓰지 않는다). */
+    var col = r.type === "trip" ? "#1e40af"
+      : r.type === "telework" ? "#2563eb"
+      : r.type === "eum-work" ? (colorOf(r.sid) || "#94a3b8")
+      : r.type === "sick" ? "#dc2626"
+      : (colorOf(r.sid) || "#64748b");
+    var tip = 글;
+    if(r.type === "eum-work" && r.externalId){
+      var e2 = externalOf(r.externalId);
+      if(e2) tip = e2.name + (e2.role ? " (" + e2.role + ")" : "")
+        + (e2.contact ? "\n☎ " + e2.contact : "") + (e2.note ? "\n📝 요구사항: " + e2.note : "");
+    }
+    out.push({ kind: r.type === "eum-work" ? "eum" : "att", store:"attendance_records", id:r.id,
       sid:r.sid, externalId:r.externalId, type:r.type,
-      text:text, tip:text + (r.note ? ' · '+r.note : '')
-    });
+      text:글, time:"", color:col, tip:tip });
   });
-  if(eumOnly) out = out.filter(function(e){ return e.kind==='eum'; });
+  if(eumOnly) out = out.filter(function(e){ return e.kind === "eum"; });
   return out;
 }
+/* 달력에 그리는 근태 — 이알피와 같은 목록이다(지각·조퇴·결근·공가는 달력에 안 뜬다) */
+var ATT_SHOW = ["leave","halfday-am","halfday-pm","leave-hour","special-leave","sick",
+                "maternity","parental-leave","trip","telework","eum-work"];
 
 /* 거르개 — null=전체 · 'pureun'=푸른 직원만 · 'eumwork'=이음 근무만 · sid=그 사람만 */
 function passFilter(ev){
@@ -310,68 +406,225 @@ function passFilter(ev){
 }
 
 /* ── 달력 그리기 ───────────────────────────────────────────────────── */
+/* ── 달력 — 이알피(법인 대시보드)와 «같은 꼴» ─────────────────────────
+   대표 지시 2026-09-18 「대시보드 제외한 화면은 똑같이 만들어라」.
+   그래서 여기서 정하는 것은 우리 취향이 아니라 «이알피가 하던 그대로»다:
+     · 날짜 옆 괄호는 음력 날짜 — 구글 달력 위젯이 「25 (13)」로 붙여 주는 그 숫자
+     · 오늘은 숫자에만 파란 동그라미(음력까지 감싸면 알약처럼 길어진다)
+     · 공휴일은 칸 맨 위에 «칩»으로 (오른쪽 위 작은 글씨가 아니다)
+     · 한 칸에 넷까지 보이고 나머지는 접는다 — 셋이면 더보기가 너무 자주 뜬다
+     · 시각은 「1030」처럼 콜론 없이 붙여 쓴다 — 좁은 칸에서 제목이 두 글자쯤 더 보인다
+     · 여섯 줄 고정(6×7) — 달마다 표 높이가 들썩이지 않게
+   ⚠ 값을 바꾸고 싶으면 이알피부터 보라. 두 화면이 갈리는 것이 여기서 가장 나쁘다. */
+
+/* 음력 — 표를 손으로 들고 있지 않는다. 브라우저에 든 단기(檀紀)력을 쓴다.
+   ⚠ 42칸을 다시 그릴 때마다 새로 세면 느리다 — 한 번 센 것은 적어 둔다. */
+var _lunar = {};
+function lunarDay(ymd){
+  if(!ymd) return "";
+  if(_lunar[ymd] !== undefined) return _lunar[ymd];
+  var out = "";
+  try{
+    out = new Intl.DateTimeFormat("ko-KR-u-ca-dangi", {day:"numeric", timeZone:"UTC"})
+            .format(new Date(ymd + "T00:00:00Z")).replace(/[^0-9]/g, "");
+  }catch(e){ out = ""; }
+  _lunar[ymd] = out;
+  return out;
+}
+/* 머리글의 「병오년8월 – 9월」 — 그 달 첫날·끝날의 음력 달.
+   ⚠ 간지(병오)는 era:"long" 을 켜야 나온다. year:"numeric" 만 주면 2026 만 온다. */
+function lunarRange(ym){
+  try{
+    var y = +String(ym).slice(0,4), m = +String(ym).slice(5,7);
+    if(!y || !m) return "";
+    var a = new Date(Date.UTC(y, m-1, 1)), b = new Date(Date.UTC(y, m, 0));
+    var fm = new Intl.DateTimeFormat("ko-KR-u-ca-dangi", {era:"long", year:"numeric", month:"numeric", timeZone:"UTC"});
+    function pick(d, t){ var ps = fm.formatToParts(d); for(var i=0;i<ps.length;i++) if(ps[i].type===t) return ps[i].value; return ""; }
+    var yn = pick(a,"yearName"), m1 = pick(a,"month"), m2 = pick(b,"month");
+    if(!m1) return "";
+    return yn + "년" + m1 + (m2 && m2 !== m1 ? " – " + m2 : "");
+  }catch(e){ return ""; }
+}
+
+/* 바탕색 위에 어떤 글자색이 읽히나 — 이알피의 calTextOn 과 같은 셈이어야 한다.
+   초록이 가장 밝게 느껴지므로 사람 눈 기준(0.299/0.587/0.114)으로 잰다. */
+function textOn(bg){
+  var hex = String(bg || "").replace("#", "");
+  if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  if(hex.length !== 6) return "#ffffff";
+  var r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  var lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+  return lum > 0.62 ? "#1e293b" : "#ffffff";
+}
+
+/* 여섯 줄 고정 격자 — 이알피 buildMonthGrid 와 같다 */
+function monthGrid(ym){
+  var year = parseInt(ym.slice(0,4),10), month = parseInt(ym.slice(5,7),10) - 1;
+  var first = new Date(year, month, 1), startDay = first.getDay();
+  var lastDate = new Date(year, month+1, 0).getDate();
+  var prevLast = new Date(year, month, 0).getDate();
+  var grid = [], k;
+  for(k = startDay-1; k >= 0; k--){
+    var pd = prevLast - k, pm = new Date(year, month-1, 1);
+    grid.push({ date: ymdOf(pm.getFullYear(), pm.getMonth()+1, pd), day:pd, other:true });
+  }
+  for(k = 1; k <= lastDate; k++) grid.push({ date: ymdOf(year, month+1, k), day:k, other:false });
+  var n = 1;
+  while(grid.length < 42){
+    var nm = new Date(year, month+1, 1);
+    grid.push({ date: ymdOf(nm.getFullYear(), nm.getMonth()+1, n), day:n, other:true }); n++;
+  }
+  return grid;
+}
+function ymdOf(y, m, d){
+  return y + "-" + String(m).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+}
+
+/* 일정 칩 하나 — 월·주·일 보기가 «같은 규칙»을 쓴다(보기를 바꿀 때 색이 튀지 않게) */
+function chipHtml(e, ymd){
+  var bg = e.color || "#64748b";
+  var 지남 = ymd < todayYMD();
+  var 시각 = e.time ? "<b>" + esc(e.time) + "</b> " : "";
+  return '<div class="ev" data-ev="' + esc(e.store) + ':' + esc(e.id) + '"'
+    + ' title="' + esc(e.tip) + '"'
+    + ' style="background:' + esc(bg) + ';color:' + textOn(bg) + (지남 ? ';opacity:.65' : '') + '">'
+    + 시각 + esc(e.text) + '</div>';
+}
+
 function calendarHtml(eumOnly){
-  var ym = S.ym, y = +ym.slice(0,4), m = +ym.slice(5,7);
-  var first = new Date(y, m-1, 1);
-  var start = new Date(y, m-1, 1 - first.getDay());      // 그 주 일요일부터
-  var today = todayYMD();
-  var cells = '';
-  for(var i=0;i<42;i++){
-    var d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
-    var ymd = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    var out = (d.getMonth()+1) !== m;
-    var hol = holidayOf(ymd);
-    var dow = d.getDay();
-    var cls = 'dnum' + (hol||dow===0 ? ' sun' : dow===6 ? ' sat' : '');
-    var evs = eventsOn(ymd, eumOnly).filter(passFilter);
-    var shown = evs.slice(0, 4), rest = evs.length - shown.length;
-    cells += '<div class="day'+(out?' out':'')+(ymd===today?' today':'')+'" data-day="'+ymd+'">'
-      + '<div class="'+cls+'">'+d.getDate()+(hol?'<span class="holname">'+esc(hol)+'</span>':'')+'</div>'
-      + shown.map(function(e){
-          var c = colorOf(e.sid);
-          var st = (c && !e.externalId) ? ' style="border-left:3px solid '+esc(c)+'"' : '';
-          /* 손대면 그 건을 연다. 빈 자리를 누르면 새로 넣는다(칸의 data-day). */
-          return '<div class="ev '+e.kind+'"'+st+' title="'+esc(e.tip)+'" data-ev="'+esc(e.store)+':'+esc(e.id)+'">'+esc(e.text)+'</div>';
-        }).join('')
-      + (rest>0 ? '<div class="more">+'+rest+'건</div>' : '')
-      + '</div>';
-    if(i>=34 && (d.getMonth()+1)!==m && d.getDay()===6) break;   // 다음 달만 남은 줄은 안 그린다
-  }
+  if(S.view === "week") return weekHtml(eumOnly);
+  if(S.view === "day")  return dayHtml(eumOnly);
+  var grid = monthGrid(S.ym), today = todayYMD();
+  var MAX = 4;   /* 구글은 한 칸에 넷을 보이고 나머지를 접는다 */
+  var cells = grid.map(function(c, idx){
+    var evs = eventsOn(c.date, eumOnly).filter(passFilter).filter(matchSearch);
+    var hol = holidayOf(c.date);
+    var 오늘 = c.date === today;
+    var 찾음 = !!(S.q && evs.length);
+    var bg = 오늘 ? "#fffbeb" : c.other ? "#f8fafc" : hol ? "#fef2f2" : 찾음 ? "#fffbeb" : "#ffffff";
+    var 테 = c.other ? "#e2e8f0" : "#f8fafc";
+    var 숨김 = evs.length > MAX ? evs.length - MAX : 0;
+    return '<div class="day" data-day="' + c.date + '"'
+      + ' style="background:' + bg + ';border-right:1px solid ' + 테 + ';border-bottom:1px solid ' + 테
+      + (찾음 ? ';outline:2px solid #fbbf24;outline-offset:-2px' : '') + '">'
+      + '<div class="dline">'
+      +   '<div class="dnum' + (오늘 ? " today" : "") + (c.other ? " other" : "") + '">' + c.day + '</div>'
+      +   '<span class="lun' + (c.other ? " other" : "") + '">(' + lunarDay(c.date) + ')</span>'
+      + '</div>'
+      + '<div class="evs">'
+      +   (hol ? '<div class="ev hol" title="' + esc(hol) + '"' + (c.other ? ' style="opacity:.55"' : '') + '>' + esc(hol) + '</div>' : '')
+      +   evs.slice(0, MAX).map(function(e){ return chipHtml(e, c.date); }).join("")
+      +   (숨김 ? '<div class="more" data-day="' + c.date + '">' + 숨김 + '개 더보기</div>' : '')
+      + '</div></div>';
+  }).join("");
   return '<div class="cal">'
-    + '<div class="calhd"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>'
-    + '<div class="calgrid">'+cells+'</div></div>';
+    + '<div class="calhd">' + ["일","월","화","수","목","금","토"].map(function(w,i){
+        return '<div' + (i===0 ? ' class="sun"' : i===6 ? ' class="sat"' : '') + '>' + w + '</div>';
+      }).join("") + '</div>'
+    + '<div class="calgrid">' + cells + '</div></div>';
 }
 
+/* ── 주 보기 ── 이알피와 같게: 이레를 나란히, 하루씩 위에서 아래로 */
+function weekDays(ymd){
+  var d = new Date(ymd + "T00:00:00"), out = [];
+  d.setDate(d.getDate() - d.getDay());
+  for(var i=0;i<7;i++){ out.push(ymdOf(d.getFullYear(), d.getMonth()+1, d.getDate())); d.setDate(d.getDate()+1); }
+  return out;
+}
+function weekHtml(eumOnly){
+  var days = weekDays(S.date), today = todayYMD();
+  var cols = days.map(function(ds){
+    var evs = eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch);
+    var hol = holidayOf(ds);
+    var 오늘 = ds === today;
+    var d = new Date(ds + "T00:00:00");
+    return '<div class="wcol" data-day="' + ds + '" style="background:' + (오늘 ? "#fffbeb" : hol ? "#fef2f2" : "#ffffff") + '">'
+      + '<div class="whd' + (d.getDay()===0 ? " sun" : d.getDay()===6 ? " sat" : "") + '">'
+      +   ["일","월","화","수","목","금","토"][d.getDay()]
+      +   '<div class="dnum' + (오늘 ? " today" : "") + '">' + d.getDate() + '</div>'
+      +   '<span class="lun">(' + lunarDay(ds) + ')</span></div>'
+      + '<div class="evs">'
+      +   (hol ? '<div class="ev hol">' + esc(hol) + '</div>' : '')
+      +   evs.map(function(e){ return chipHtml(e, ds); }).join("")
+      + '</div></div>';
+  }).join("");
+  return '<div class="cal"><div class="wgrid">' + cols + '</div></div>';
+}
+
+/* ── 일 보기 ── 하루치를 한 줄씩 크게 */
+function dayHtml(eumOnly){
+  var ds = S.date;
+  var evs = eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch);
+  var hol = holidayOf(ds);
+  return '<div class="cal"><div class="dayview" data-day="' + ds + '">'
+    + (hol ? '<div class="ev hol">' + esc(hol) + '</div>' : '')
+    + (evs.length ? evs.map(function(e){ return chipHtml(e, ds); }).join("")
+                  : '<div class="later"><p>이 날에는 아무것도 없습니다. 눌러서 넣으세요.</p></div>')
+    + '</div></div>';
+}
+
+/* ── 위 줄 ── ◀ 2026-09 ▶ · 병오년8월 – 9월 · 오늘 · [월|주|일] · 🔍 일정 검색 */
 function monthbarHtml(){
+  var 가운데 = S.view === "month" ? S.ym
+    : S.view === "week" ? (function(){ var w = weekDays(S.date); return w[0].slice(5) + " ~ " + w[6].slice(5); })()
+    : (S.date.slice(5) + " (" + ["일","월","화","수","목","금","토"][new Date(S.date + "T00:00:00").getDay()] + ")");
+  var 음력 = S.view === "month" ? lunarRange(S.ym) : "";
   return '<div class="monthbar">'
-    + '<button class="mv" data-mv="-1">‹</button>'
-    + '<span class="ym">'+esc(S.ym)+'</span>'
-    + '<button class="mv" data-mv="1">›</button>'
-    + '<button class="btn ghost" data-mv="0">오늘</button>'
+    + '<button class="mv" data-mv="-1">◀</button>'
+    + '<span class="ym">' + esc(가운데) + '</span>'
+    + '<button class="mv" data-mv="1">▶</button>'
+    + (음력 ? '<span class="lunrange">' + esc(음력) + '</span>' : '')
+    + '<button class="todaybtn" data-mv="0">오늘</button>'
+    + '<span class="seg">'
+    + [["month","월"],["week","주"],["day","일"]].map(function(v){
+        return '<button data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>';
+      }).join("")
+    + '</span>'
+    + '<span class="srch"><span class="ic">🔍</span>'
+    + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>'
     + '</div>';
 }
 
+/* 검색 — 제목·메모·사람 이름 어디에 걸려도 남긴다 */
+function matchSearch(e){
+  if(!S.q) return true;
+  return String(e.tip || e.text || "").toLowerCase().indexOf(S.q.toLowerCase()) >= 0;
+}
+
+/* ── 사람 칩 ── 이알피처럼 «색 동그라미 + 이름 두 글자».
+   ⚠ 색은 이알피가 정한 것을 그대로 쓴다 — 같은 사람이 두 앱에서 다른 색이면
+     그 색은 아무 뜻도 없어진다. 여기서 새로 정하지 않는다. */
 function chipsHtml(eumOnly){
-  var list = [{v:null,t:'전체'}];
-  if(!eumOnly){
-    list.push({v:'pureun',t:'푸른 직원만'});
-    list.push({v:'eumwork',t:'이음센터 근무'});
-  }
-  users().slice(0,12).forEach(function(u){ list.push({v:u.sid, t:u.name||u.sid}); });
-  return '<div class="chips">' + list.map(function(c){
-    var on = (S.filter||null) === (c.v||null);
-    return '<button class="chip'+(on?' on':'')+'" data-f="'+esc(c.v==null?'':c.v)+'">'+esc(c.t)+'</button>';
-  }).join('') + '</div>';
+  var 사람 = eumOnly ? ieumPeople().filter(function(p){ return !p.left; }) : users().map(function(u){
+    return { pk:u.sid, name:u.name || u.sid, color: colorOf(u.sid) || "#64748b" };
+  });
+  var 건수 = {};
+  monthDates().forEach(function(ds){
+    eventsOn(ds, eumOnly).forEach(function(e){ var k = e.externalId || e.sid; if(k) 건수[k] = (건수[k]||0) + 1; });
+  });
+  var 앞 = '<button class="allchip' + (S.filter === null ? " on" : "") + '" data-f="">전체</button>';
+  var 뒤 = (!eumOnly)
+    ? '<button class="chip' + (S.filter === "eumwork" ? " on" : "") + '" data-f="eumwork">이음센터 근무</button>'
+    : '';
+  return '<div class="chips">' + 앞
+    + 사람.map(function(p){
+        var on = S.filter === p.pk;
+        var n = 건수[p.pk] || 0;
+        return '<span class="pwrap">'
+          + '<button class="pchip' + (on ? " on" : "") + '" data-f="' + esc(p.pk) + '"'
+          + ' title="' + esc(p.name) + '" style="background:' + esc(p.color) + '">'
+          + esc(String(p.name).slice(0,2)) + '</button>'
+          + (n ? '<span class="pcount">' + n + '</span>' : '')
+          + '</span>';
+      }).join("")
+    + 뒤 + '</div>';
 }
 
-function legendHtml(){
-  return '<div class="legend">'
-    + '<span><i style="background:#eff6ff"></i>일정</span>'
-    + '<span><i style="background:#bfdbfe"></i>이음센터 근무</span>'
-    + '<span><i style="background:#f0fdf4"></i>연차·반차</span>'
-    + '<span><i style="background:#fffbeb"></i>출장·재택</span>'
-    + '<span><i style="background:#fef2f2"></i>병가·휴직 등</span>'
-    + '</div>';
+/* 지금 보고 있는 범위의 날짜들 — 칩 옆 건수를 그 범위로만 센다 */
+function monthDates(){
+  if(S.view === "day") return [S.date];
+  if(S.view === "week") return weekDays(S.date);
+  return monthGrid(S.ym).filter(function(c){ return !c.other; }).map(function(c){ return c.date; });
 }
 
 /* 못 읽은 칸이 있으면 숨기지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이 된다. */
@@ -697,8 +950,7 @@ function render(){
   if(tab.v==='cal' || tab.v==='eumcal'){
     var eumOnly = tab.v==='eumcal';
     html = failedHtml() + formNote() + lockNote()
-      + '<div class="panel">' + monthbarHtml() + chipsHtml(eumOnly) + calendarHtml(eumOnly) + legendHtml()
-      + '<div class="muted" style="font-size:11px;margin-top:7px">빈 칸을 누르면 새로 넣고, 일을 누르면 고칩니다.</div></div>';
+      + '<div class="calwrap">' + chipsHtml(eumOnly) + monthbarHtml() + calendarHtml(eumOnly) + '</div>';
   } else if(tab.v==='eumppl'){
     html = failedHtml() + peopleHtml();
   } else if(tab.v==='eumshare'){
@@ -713,16 +965,28 @@ function render(){
 
 /* 누르는 것은 한 자리에서 받는다 — 단추마다 붙이면 다시 그릴 때 하나씩 샌다 */
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; render(); return; }
   if(t.hasAttribute('data-mv')){
     var mv = +t.getAttribute('data-mv');
-    if(mv===0){ S.ym = ymOf(new Date()); }
+    if(mv===0){ S.ym = ymOf(new Date()); S.date = todayYMD(); }
     else if(S.tab==='eumppl' && S.scope==='year'){
       var y=new Date(S.ym+'-01'); y.setFullYear(y.getFullYear()+mv); S.ym = ymOf(y);
     }
+    /* 달력에서는 보기에 따라 옮기는 폭이 다르다 — 월은 한 달, 주는 이레, 일은 하루 */
+    else if((S.tab==='cal'||S.tab==='eumcal') && S.view!=='month'){
+      S.date = shiftDay(S.date, S.view==='week' ? mv*7 : mv);
+      S.ym = S.date.slice(0,7);
+    }
     else { var d=new Date(S.ym+'-01'); d.setMonth(d.getMonth()+mv); S.ym = ymOf(d); }
+    render(); return;
+  }
+  if(t.hasAttribute('data-view')){
+    S.view = t.getAttribute('data-view');
+    if(!S.date) S.date = todayYMD();
+    /* 주·일에서 월로 돌아오면 «보고 있던 날»의 달을 편다 — 엉뚱한 달로 튀지 않게 */
+    if(S.view==='month') S.ym = S.date.slice(0,7);
     render(); return;
   }
   if(t.hasAttribute('data-scope')){ S.scope = t.getAttribute('data-scope'); render(); return; }
@@ -742,6 +1006,10 @@ document.addEventListener('click', function(e){
     var ev = t.getAttribute('data-ev').split(':');
     openEdit(ev[0], ev.slice(1).join(':'));
     return;
+  }
+  /* 「3개 더보기」 — 접힌 것을 보려면 그 날로 간다(이알피는 팝오버를 띄운다) */
+  if(t.classList && t.classList.contains('more')){
+    S.date = t.getAttribute('data-day'); S.view = 'day'; render(); return;
   }
   if(t.hasAttribute('data-day')){ openNew(t.getAttribute('data-day')); return; }
 });
@@ -767,6 +1035,17 @@ function goErp(menu){
 }
 /* 유형을 시간연차로 바꾸면 «몇 시간» 칸이 생긴다 — 바뀔 때 다시 그린다.
    ⚠ 다시 그리기 전에 지금 적힌 것을 먼저 담는다(안 그러면 적던 것이 날아간다). */
+/* 일정 검색 — 치는 대로 거른다.
+   ⚠ 다시 그리면 칸이 새로 생겨 «적던 글자와 커서»를 잃는다. 그래서 그린 뒤
+     그 칸에 값을 도로 넣고 커서를 끝으로 돌려 준다. 안 그러면 한 글자마다 칸이 튄다. */
+document.addEventListener('input', function(e){
+  if(!e.target || e.target.id !== 'calq') return;
+  S.q = e.target.value;
+  render();
+  var el = document.getElementById('calq');
+  if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} }
+});
+
 document.addEventListener('change', function(e){
   if(!S.modal || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-m')) return;
   var f = e.target.getAttribute('data-m');
@@ -796,7 +1075,7 @@ function start(user){
     formOf: function(k){ return PuCalRead.rawForm(k); },
     who: function(){ return (ME && ME.name) || (ME && ME.sid) || ''; }
   });
-  S.ym = ymOf(new Date());
+  S.ym = ymOf(new Date()); S.date = todayYMD();
   setConn(true, '연결됨');
   PuCalRead.readMany(KEYS).then(function(r){
     D = r.data; FAILED = r.failed;
