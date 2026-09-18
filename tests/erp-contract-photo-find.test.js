@@ -200,7 +200,13 @@ function applyPatch() {
   vm.runInContext(ERP.slice(cmsAt, ERP.indexOf('];', cmsAt) + 2) + '\n' +
                   cutFn(ERP, 'function erpDocText(') + '\n' +
                   cutFn(ERP, 'function erpCmsFromDoc(') + '\n' +
+  /* 2026-09-18: 서류 이름으로 컨설팅 «유형»을 고르는 길이 붙었다 — 함께 안 실으면
+     「erpConsTypeByDocName is not defined」로 여기가 통째로 넘어진다.
+     ⚠ 유형 목록은 «넷째 값»으로 받는다(안 주면 유형은 안 고른다) — 이 검사는 안 준다. */
                   cutFn(ERP, 'function erpVatTextToFlag(') + '\n' +
+                  cutFn(ERP, 'function erpTypeNameTidy(') + '\n' +
+                  cutFn(ERP, 'function erpNameRun(') + '\n' +
+                  cutFn(ERP, 'function erpConsTypeByDocName(') + '\n' +
                   cutFn(ERP, 'function erpContractPhotoApplyPatch('), ctx);
   return ctx.erpContractPhotoApplyPatch;
 }

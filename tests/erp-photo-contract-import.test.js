@@ -135,6 +135,12 @@ const t = (name, got, want) => {
   vm.runInContext(slice('var ERP_CMS_WORDS =', '\nfunction erpDocText('), c);
   vm.runInContext(fn('erpDocText'), c);
   vm.runInContext(fn('erpCmsFromDoc'), c);
+  /* 2026-09-18: 서류 이름으로 컨설팅 «유형»을 고르는 길이 붙었다 — 함께 안 실으면
+     「erpConsTypeByDocName is not defined」로 여기가 통째로 넘어진다.
+     ⚠ 유형 목록은 «넷째 값»으로 받는다(안 주면 유형은 안 고른다) — 이 검사는 안 준다. */
+  vm.runInContext(fn('erpTypeNameTidy'), c);
+  vm.runInContext(fn('erpNameRun'), c);
+  vm.runInContext(fn('erpConsTypeByDocName'), c);
   vm.runInContext(fn('erpContractPhotoApplyPatch'), c);
 
   const baseF = {
@@ -413,7 +419,10 @@ const t = (name, got, want) => {
     t('배지에 몇 건인지 적는다', /'📷 계약서 ' \+ photoMatches\.length \+ '건 발견'/.test(blk), true);
     t('★ 배지를 누르면 목록이 열린다', /onClick:function\(\)\{ setPhotoPickerOpen\(true\); \}/.test(blk), true);
     t('목록 팝업이 실제로 그려진다', /photoPickerOpen && h\(PhotoContractPickerModal, \{/.test(blk), true);
-    t('★ 고르면 채울 값을 계산한다', /erpContractPhotoApplyPatch\(it\.fields, kindV, f\)/.test(blk), true);
+    /* ⚠ 2026-09-18 다시 겨눔 — 유형 목록을 «넷째 값»으로 받게 됐다(서류 이름으로 유형
+       미리 고르기). 안에서 저장소를 부르면 순수 함수가 아니게 되어 이 파일이 그 셈을
+       떠서 돌릴 수 없다. 못 박을 것은 「고르면 채울 값을 계산한다」이지 값이 몇 개인가가 아니다. */
+    t('★ 고르면 채울 값을 계산한다', /erpContractPhotoApplyPatch\(it\.fields, kindV, f[,)]/.test(blk), true);
     /* ★ 바로 안 채운다 — 판독 글자는 틀릴 수 있어 사람이 보고 정해야 한다 */
     t('★ 고른 뒤 바로 안 채우고 미리보기로 넘긴다', /setPhotoPreview\(\{ item: it, kindV: kindV, result: result \}\)/.test(blk), true);
     t('무엇이 바뀌는지 줄줄이 보여 준다', /photoPreview\.result\.previewLines\.map/.test(blk), true);
