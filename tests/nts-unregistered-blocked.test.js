@@ -3,11 +3,11 @@
    ■ 무엇이 있었나
      대표께서 기업정보함의 한 회사를 짚으시며 「캡쳐3 정보는 오류로 잘못 입력된 것이다.
      이런부분은 사진첩에 어떻게 처리하는게 좋은가?」 하셨다.
-     그 회사의 사업자번호는 `587-86-01913` — **국세청에 없는 번호**다.
+     그 회사의 사업자번호는 `123-45-67891` — **국세청에 없는 번호**다.
 
    ★★★ 왜 체크섬이 못 막았나
-     587-86-01913 은 검산을 «통과한다». 앞 아홉 자리 가중합이 137 이라 검사자리가 3 이고,
-     적힌 것도 3 이다. 자릿수도 맞다. 즉 **기계적으로는 흠이 없는 번호**다.
+     123-45-67891 은 검산을 «통과한다». 앞 아홉 자리 가중합이 169 라 검사자리가 1 이고,
+     적힌 것도 1 이다. 자릿수도 맞다. 즉 **기계적으로는 흠이 없는 번호**다.
      이런 번호는 오직 국세청만 가려낼 수 있다.
 
    ★★★ 그런데 그 답을 우리가 «안 읽고 있었다»
@@ -48,7 +48,7 @@ const DUMMY_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAA
 
 /* 국세청이 실제로 주는 꼴 — 없는 번호는 b_stt 가 비고 tax_type 에 안내문이 온다.
    (PR #1239 때 진짜 응답으로 확인해 둔 꼴이다 — pu-cards 의 coNtsWord 머리 주석에도 적혀 있다.) */
-const 없는번호답 = { data: [{ b_no: '5878601913', b_stt: '', tax_type: '국세청에 등록되지 않은 사업자등록번호입니다.' }] };
+const 없는번호답 = { data: [{ b_no: '1234567891', b_stt: '', tax_type: '국세청에 등록되지 않은 사업자등록번호입니다.' }] };
 
 function 가짜서버(geminiText, ntsResult) {
   const seen = { nts: 0 };
@@ -75,30 +75,30 @@ function 등록증읽기(bizno, ntsResult) {
 
 test('★★★ 대표가 짚으신 그 번호는 체크섬을 «통과한다» — 국세청만 가릴 수 있다', () => {
   const R = loadRead();
-  assert.equal(R.bizNoValid('587-86-01913'), true,
+  assert.equal(R.bizNoValid('123-45-67891'), true,
     '★★★ 이것이 이 일의 전부다 — 검산으로 막을 수 있었다면 국세청을 안 물어도 됐다');
 });
 
 /* ── ★★★ 진짜 문제: 없는 번호가 자동으로 들어갔다 ───────────────────── */
 
 test('★★★ 국세청에 «없는» 번호는 자동으로 안 들어간다', async () => {
-  const { R, r } = await 등록증읽기('587-86-01913', 없는번호답);
+  const { R, r } = await 등록증읽기('123-45-67891', 없는번호답);
   assert.equal(r.bizNoOk, true, '번호 «모양»은 멀쩡하다 — 그래서 이 문이 필요하다');
   assert.equal(r.ntsChecked, true);
   const v = R.autoOk(r);
   assert.equal(v.auto, false,
-    '★★★ 여기가 열려 있어서 587-86-01913 이 기업정보함까지 걸어 들어갔다');
+    '★★★ 여기가 열려 있어서 123-45-67891 이 기업정보함까지 걸어 들어갔다');
   assert.match(v.why, /없는 사업자등록번호/);
 });
 
 test('★★★ 안내문을 «담는다» — b_stt 만 보던 옛 길에서는 여기가 null 이었다', async () => {
-  const { r } = await 등록증읽기('587-86-01913', 없는번호답);
+  const { r } = await 등록증읽기('123-45-67891', 없는번호답);
   assert.equal(r.ntsState, '국세청에 등록되지 않은 사업자등록번호입니다.');
   assert.equal(r.ntsFound, false, '★★ 「없다」를 «값으로» 남긴다 — 글을 다시 뒤지지 않게');
 });
 
 test('★★ 「국세청에 국세청에 …」로 겹쳐 적지 않는다 — 사람이 읽을 글이다', async () => {
-  const { R, r } = await 등록증읽기('587-86-01913', 없는번호답);
+  const { R, r } = await 등록증읽기('123-45-67891', 없는번호답);
   const why = R.autoOk(r).why;
   assert.ok(why.indexOf('국세청에 국세청에') < 0, '겹쳐 적힌 글: ' + why);
   assert.ok(!/[A-Za-z]{4,}/.test(why), '영어 내부 용어가 노출됩니다: ' + why);
@@ -179,7 +179,7 @@ test('★ 휴업자는 국세청이 준 말 그대로 사람에게 보인다', a
 });
 
 test('★★ 국세청 답이 이상해도 판독 결과는 살린다 — 회사 이름은 그대로 있다', async () => {
-  const { r } = await 등록증읽기('587-86-01913', 없는번호답);
+  const { r } = await 등록증읽기('123-45-67891', 없는번호답);
   assert.equal(r.fields.company, '가나상사');
   assert.equal(r.error, null, '★★ 국세청 일이 판독 실패로 번지면 사진이 통째로 버려진다');
 });
@@ -189,7 +189,7 @@ test('★★ 국세청 답이 이상해도 판독 결과는 살린다 — 회사
 test('★★ 쪽마다 갈라 읽어도 «없다»가 딸려 간다 — docs 에서 빠지면 그 쪽만 샌다', async () => {
   const R = loadRead();
   const f = 가짜서버(JSON.stringify({ docs: [
-    { pages: [1], kind: 'bizreg', fields: { company: '가나상사', bizno: '587-86-01913' } },
+    { pages: [1], kind: 'bizreg', fields: { company: '가나상사', bizno: '123-45-67891' } },
     { pages: [2], kind: 'card', fields: { name: '홍길동' } }
   ] }), 없는번호답);
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
@@ -235,7 +235,7 @@ test('★★ 기업정보함은 그 안내문을 «흐린 빛»으로 본다 —
 /* ── ★★ 사진첩 화면이 «거짓말»하지 않는다 ───────────────────────────── */
 
 test('★★★ 사진첩 한 줄이 「번호 확인됨」이라고 하지 않는다 — 막은 까닭을 적는다', async () => {
-  const { R, r } = await 등록증읽기('587-86-01913', 없는번호답);
+  const { R, r } = await 등록증읽기('123-45-67891', 없는번호답);
   const v = R.autoOk(r);
 
   /* pu-photos 의 그 함수를 «실제로 돌린다» — 글자만 찾으면 순서가 뒤집혀도 통과한다 */
