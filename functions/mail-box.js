@@ -564,12 +564,56 @@ function nextSync(sync, seen, uidValidity, done) {
          셈(n)·prunedAt 을 이어 주는 것과 같은 까닭이다. */
     unread: Number.isFinite(Number(s.unread)) ? Number(s.unread) : -1,
     sweptAt: Number(s.sweptAt || 0),
+    /* ⚠ 「이 수까지는 맞춰 봤다」도 그대로 이어 준다 (2026-09-19) — 바로 위 unread 와
+         같은 까닭이다. 여기서 떨어뜨리면 sweepNeeded 가 «맞춰 본 적 없다»로 읽어
+         회차마다 폴더를 통째로 다시 읽는다. 그것을 막으려고 둔 칸인데 헛것이 된다. */
+    unseenOk: Number.isFinite(Number(s.unseenOk)) ? Number(s.unseenOk) : -1,
     /* ⚠ 이 칸이 «언제부터 언제까지»인가도 그대로 이어 준다 (2026-09-06).
          적는 자리(runSync)에서 세어 넣는 값이라, 여기서 떨어뜨리면 회차마다 지워져
          화면의 「지난 메일」 표가 늘 비어 보인다 — 바로 위 unread·sweptAt 과 같은 까닭이다. */
     oldest: Number(s.oldest || 0),
     newest: Number(s.newest || 0),
   };
+}
+
+/* ── 표시(읽음·중요·답장함)를 다시 훑을 때인가 ────────────────────────────
+   ★★ 2026-09-19 실측 — 이 판정이 «영영 참»이 되는 폴더가 둘 있었다.
+     받은메일함(들고 있는 481 / 다음이 보여 주는 400, 우리 셈 5 vs 다음 0)과
+     보낸편지함(909 / 400, 8 vs 0). 이 둘만 10분마다 통째로 다시 읽히고 있었다
+     (나머지 서른 폴더는 하루에 한 번). 하루 288번 × 수백 KB — 「자동으로 도는데
+     쓸데없이 나가는 값」의 자동 쪽 절반이 여기였다.
+
+   ★ 왜 영영 참이 되나 — 두 수가 «다른 무리»를 세고 있었다.
+     · 다음이 말하는 안읽음(unseen)은 «지금 보여 주는 목록»(폴더당 400통)을 센다.
+     · 우리 셈은 «우리가 든 전부»를 셌다 — 창 밖으로 밀려난 옛 줄까지(대표 지시
+       2026-08-28 로 안 지운다). 그 옛 줄이 안읽음이면 다음은 영영 그 수를 모른다.
+     그래서 아무리 맞춰도 안 맞고, 안 맞으니 또 맞추러 들어간다.
+
+   ★ 그래서 둘을 함께 고친다
+     ① 셈을 «같은 무리»로 — 다음이 보여 주는 번호만 센다(sweepUnread).
+     ② 그래도 안 맞으면 «그 수는 맞춰 봤다»고 적어 두고 넘어간다(unseenOk).
+       다음이 말하는 수가 바뀌면 그때 다시 훑는다 — 그것이 곧 「누가 뭘 읽었다」는 신호다.
+   ⚠ ①만으로는 모자란다. 다음이 목록 밖까지 세는 폴더가 있으면 다시 영영 참이 된다.
+   ⚠ ②만으로는 모자란다. 화면에 적히는 안읽음 수가 다음과 계속 다르게 남는다.
+   ⚠ 하루가 지나면 그물로 한 번은 훑는다 — 중요·답장함만 바뀐 경우를 잡는 길이다. */
+function sweepNeeded(sync, unseenNow, sinceSwept, gapMs) {
+  const s = sync || {};
+  if (!s.done) return false;
+  const known = Number(s.unread);
+  if (!Number.isFinite(known) || known < 0) return true;      // 한 번도 안 훑었다
+  if (Number(sinceSwept) > Number(gapMs)) return true;         // 하루 그물
+  const now = Number(unseenNow || 0);
+  if (known === now) return false;                             // 맞는다 — 조용히
+  return Number(s.unseenOk) !== now;                           // 이 수는 맞춰 봤나
+}
+
+/* 훑은 뒤의 안읽음 수 — «다음이 보여 주는 번호»만 센다.
+   ⚠ 우리가 든 전부를 세면 창 밖 옛 줄까지 들어가, 다음이 결코 모를 수를 만들어
+     위 판정이 영영 참이 된다(2026-09-19). 견줄 값이니 같은 무리를 세야 한다. */
+function sweepUnread(flags) {
+  let n = 0;
+  Object.keys(flags || {}).forEach((u) => { if (!(flags[u] && flags[u].r)) n++; });
+  return n;
 }
 
 /* ── 지운 것인가, 「창 밖」으로 밀려난 것인가 (대표 지시 2026-08-28) ──
@@ -628,4 +672,5 @@ module.exports = {
   textPartOf, decodePart, toText, looksUtf8, previewFrom, unentity, isHeadLine, PREVIEW_MAX,
   ROW_VER, needsRefetch, folderDone,
   pickToFetch, uidSet, nextSync, uidReset, goneKeys,
+  sweepNeeded, sweepUnread,
 };

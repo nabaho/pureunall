@@ -59,14 +59,22 @@ test('★★ 훑을 때는 «표시만» 받는다 — envelope 을 다시 받�
 
 /* ══════ ③ 신호를 보고 훑는다 ══════ */
 test('★★ 회차마다 훑지 않는다 — «두 수가 다를 때»가 신호다', () => {
+  /* ⚠ 2026-09-19 — 판정이 MB.sweepNeeded 한 자리로 옮겨 갔다. 예전에는 여기서
+       `knownUnread !== unseenNow` 라는 «글자»를 찾았는데, 그러면 식은 그대로인 채
+       판정이 영영 참이 되는 것을 못 잡는다(실제로 그랬다). 이제는 돌려서 본다. */
   const b = sweepBlock();
   assert.match(b, /p\.st\.unseen/, '★ 다음메일이 말하는 안읽음 수를 안 봅니다');
   assert.match(b, /p\.sync\.unread/, '★ 우리가 든 안읽음 수를 안 적어 둡니다 — 견줄 것이 없습니다');
-  assert.match(b, /knownUnread\s*!==\s*unseenNow/,
-    '★ 두 수를 곧바로 견주지 않습니다');
-  /* 그물 — 중요·답장함만 바뀐 경우를 위해 하루에 한 번 */
   assert.match(b, /sweptAt/, '★ 언제 훑었는지 안 적어 둡니다');
   assert.match(b, /PRUNE_GAP_MS|GAP_MS/, '★ 하루 그물이 없습니다');
+
+  const DAY = 24 * 60 * 60 * 1000;
+  const 훑나 = (s, unseen, since) => MB.sweepNeeded(s, unseen, since || 0, DAY);
+  assert.equal(훑나({ done: true, unread: 3 }, 3), false,
+    '★ 두 수가 맞는데 또 훑습니다 — 회차마다 이러면 그것이 요금입니다');
+  assert.equal(훑나({ done: true, unread: 3 }, 0), true,
+    '★★ 두 수가 어긋나는데 안 훑습니다 — 다음이 «이미 0» 인 상황을 못 잡습니다');
+  assert.equal(훑나({ done: true, unread: 0 }, 0, DAY + 1), true, '★ 하루 그물이 안 돕니다');
 });
 
 test('★★ 신호가 «지난번과 달라졌나»가 아니라 «두 수가 다른가»다', () => {
@@ -85,8 +93,13 @@ test('★ 훑은 뒤에는 «다시 세어» 적어 둔다 — 안 적으면 매
   const after = b.slice(i);
   assert.match(after, /p\.sync\.unread\s*=/, '★ 맞춘 뒤의 안읽음 수를 안 적어 둡니다');
   assert.match(after, /sweptAt\s*=/, '★ 훑은 때를 안 적어 둡니다');
-  /* 세는 자리가 «맞춘 뒤» 값을 봐야 한다 — 옛 값을 세면 늘 어긋난 것으로 남는다 */
-  assert.match(after, /flags\[u\]/, '★ 맞추기 «전» 값으로 셉니다 — 영원히 다시 훑습니다');
+  /* 세는 자리가 «맞춘 뒤» 값(flags)을 봐야 한다 — 옛 값을 세면 늘 어긋난 것으로 남는다.
+     ⚠ 2026-09-19 — 세는 규칙이 MB.sweepUnread 로 옮겨 갔다. 글자 대신 «무엇을 세나»를 본다:
+       갓 받아 온 표시만 세야 하고, 우리가 든 전부를 세면 창 밖 옛 줄까지 들어가
+       다음이 결코 모를 수가 되어 영원히 다시 훑는다(그것이 실제로 일어났다). */
+  assert.match(after, /flags/, '★ 맞추기 «전» 값으로 셉니다 — 영원히 다시 훑습니다');
+  assert.equal(MB.sweepUnread({ 10: { r: 1 }, 11: { r: 0 } }), 1, '★ 안읽음을 안 셉니다');
+  assert.equal(MB.sweepUnread({ 10: { r: 1 } }), 0, '★ 다 읽었는데 남은 것이 있다고 셉니다');
 });
 
 /* ══════ ④⑤ 바뀐 줄만 ══════ */
@@ -139,7 +152,12 @@ test('★ 훑다 실패해도 회차가 안 멈춘다 — 표시 하나 때문�
 
 /* ══════ 다 가져온 칸에서만 ══════ */
 test('★ 아직 «가져오는 중»인 칸은 안 훑는다 — 곧 제 값으로 덮인다', () => {
-  const b = sweepBlock();
-  assert.match(b, /p\.sync\.done/,
+  /* ⚠ 2026-09-19 — done 을 보는 자리도 MB.sweepNeeded 안으로 들어갔다. 돌려서 본다. */
+  const DAY = 24 * 60 * 60 * 1000;
+  assert.equal(MB.sweepNeeded({ done: false, unread: 3 }, 0, 0, DAY), false,
     '★ 아직 채우는 중인 칸까지 훑습니다 — 곧 덮일 것을 두 번 합니다');
+  assert.equal(MB.sweepNeeded({ done: false, unread: -1 }, 0, 99 * DAY, DAY), false,
+    '★ 하루 그물이 done 을 앞지릅니다');
+  assert.equal(MB.sweepNeeded({ done: true, unread: -1 }, 0, 0, DAY), true,
+    '★ 다 채운 칸을 한 번도 안 훑습니다');
 });

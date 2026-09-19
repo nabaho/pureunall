@@ -567,11 +567,12 @@ async function runSync(deps, opts) {
            ⚠ 「다음 쪽 수가 지난번과 달라졌나」로는 모자란다. 다음이 «이미 0» 인데
              우리만 34통이 안읽음인 지금 상황을 못 잡는다 — 0 은 더 안 줄어든다.
              두 수를 곧바로 견주면 그 어긋남이 바로 신호가 되고, 맞춘 뒤에는 조용해진다. */
+        /* ⚠★ 판정은 MB.sweepNeeded 한 자리다 (2026-09-19). 여기 식으로 적어 넣으면
+             검사로 돌려 볼 수가 없고, 실제로 그래서 두 폴더가 10분마다 통째로 다시
+             읽히는 것을 몇 주 동안 아무도 못 봤다 — 까닭은 그 함수 머리글에 있다. */
         const unseenNow = Number(p.st.unseen || 0);
-        const knownUnread = Number(p.sync.unread);
-        const sweptGap = nowMs() - Number(p.sync.sweptAt || 0) > PRUNE_GAP_MS;
-        const needSweep = !!p.sync.done && p.uids && p.uids.length &&
-          (!Number.isFinite(knownUnread) || knownUnread !== unseenNow || sweptGap);
+        const needSweep = !!(p.uids && p.uids.length) &&
+          MB.sweepNeeded(p.sync, unseenNow, nowMs() - Number(p.sync.sweptAt || 0), PRUNE_GAP_MS);
         if (needSweep && swept < 2 && nowMs() < deadline) {
           swept++;
           try {
@@ -603,13 +604,10 @@ async function runSync(deps, opts) {
             /* ⚠ 맞춘 «뒤»의 안읽음 수를 세어 둔다 — 다음 회차에 다음메일이 말하는 수와
                  견줄 값이다. 안 세어 두면 어긋남을 못 알아채거나(안 훑음),
                  늘 어긋난 것으로 보여 회차마다 폴더를 통째로 읽는다(요금). */
-            let unread = 0;
-            Object.keys(have).forEach((u) => {
-              const f = flags[u];
-              const r = f ? f.r : Number(have[u].r || 0);
-              if (!r) unread++;
-            });
-            p.sync.unread = unread;
+            p.sync.unread = MB.sweepUnread(flags);
+            /* ★ 그래도 안 맞으면 «이 수는 맞춰 봤다»고 적고 넘어간다 — 안 적으면
+                 맞출 수 없는 어긋남 하나가 회차마다 폴더 전체를 다시 읽힌다. */
+            p.sync.unseenOk = unseenNow;
             p.sync.sweptAt = nowMs();
           } catch (e) {
             console.warn('syncMailbox 표시 맞추기 실패:', p.box.path, String((e && e.message) || e));
