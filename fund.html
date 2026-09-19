@@ -3220,6 +3220,7 @@ function renderForms(){
       +docsFor(DOC_TAX,cur.fund_type||'공동').map(formRow).join('')+'</div>';
   } else if(S.formPhase==='ops'){
     body='<div class="panel"><div class="row"><h2 style="font-size:15px">④ 운영 단계 서식</h2>'+typeChip+hlp('forms.ops')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
+      +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap"><button class="primary" onclick="estabBundle(\'ops\')" style="padding:5px 11px" title="운영 서식을 번호 차례대로 세우고 채울 자리를 셉니다">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+'</div>'
       +docsFor(DOC_OPS,cur.fund_type||'공동').map(formRow).join('')
       +'<div style="max-width:680px;margin-top:10px">'
       +opsRow('현행 정관 (편집)','<button onclick="selectForm(\'charter\')" style="padding:4px 10px">👁 편집</button> '+((S._hwpHas||{}).charter?'<button class="primary" onclick="openHwpEditor(\'charter\')" style="padding:4px 9px">📄 HWP 편집</button>':'<button onclick="pickHwp(\'charter\')" style="padding:4px 9px">⬆ .hwp 등록</button>'))
@@ -3231,6 +3232,7 @@ function renderForms(){
       +'</div></div>';
   } else {
     body='<div class="panel"><div class="row"><h2 style="font-size:15px">⑤ 근복지원금 신청 서식 <span class="chip warn" style="font-size:10px">공동 전용</span></h2>'+hlp('forms.sub')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
+      +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap"><button class="primary" onclick="estabBundle(\'sub\')" style="padding:5px 11px" title="지원금 제출 서류를 번호 차례대로 세우고 채울 자리를 셉니다">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+'</div>'
       +(fundMode?opsRow('근복지원금 데이터 입력','<button class="primary" onclick="gotoFundTab(\'subsidy\')" style="padding:4px 10px">📊 근복지원금 입력으로 →</button>'):'')
       +DOC_SUB.map(formRow).join('')+'</div>'+tplCard(TPL.subsidy);
   }
@@ -3915,7 +3917,21 @@ var FORM_FILL=[
   [/^자격\s*\/\s*성명$/, function(f){ var n=_boss(f).name||f.chairman; return n?'이사 '+n:''; }],
   /* 임대차계약서의 임대인 — 원본에 «남의 회사 이름»이 박혀 있었다(2026-09-07 지웠다).
      비워 두면 그 자리를 손으로 쳐야 하므로, 적어 둔 임대인을 넣는다. */
-  [/^임대인\(갑\)$/, function(f){return f.lease_lessor;}]
+  [/^임대인\(갑\)$/, function(f){return f.lease_lessor;}],
+  /* ── 2026-09-19: 「자료는 있는데 라벨 «모양»이 달라」 비던 자리들 ──
+     대표 지시로 다섯 단계 서식을 «실제로 그려» 빈칸 102곳을 세어 보고 갈랐다.
+     ⚠ 한글 서식은 라벨을 자간 벌림으로 쓴다 — 「소 재 지」·「주 소」. 붙여 쓴 규칙은
+       눈으로는 같아 보여도 한 번도 안 맞는다. 그래서 낱자 사이에 \s* 를 둔다. */
+  [/^소\s*재\s*지$/, function(f){return f.address;}, /신청인|기금법인|^$/],
+  /* ⚠ 사람에 관한 값은 «어느 칸 아래인지»를 반드시 건다 — 안 걸었더니 대표자 개인 주소가
+     등록면허세 신고서와 임대차계약서에까지 들어간 적이 있다(파수꾼이 이것을 지킨다).
+     ⚠ 「주임이사」·「대표(주임)이사」는 표 칸이 아니라 «문장 안»에 있다(위임장·재산목록표) —
+       여기 두면 죽은 규칙이 된다. 그쪽은 fillDerived 가 맡는다. */
+  [/^대표자\s*성명$/, function(f){return _boss(f).name||f.chairman;}, /기금법인|^$/],
+  [/^기금\s*인가\s*번호$/, function(f){return f.inka_no;}],
+  [/^기금\s*법인\s*명(?:칭)?$/, function(f){return f.name;}],
+  [/^기금\s*명$/, function(f){return f.name;}],
+  [/^관할\s*(?:지방)?\s*고용노동청$/, function(f){return f.labor_office;}]
 ];
 /* ── 설립준비위원회 위원 격자 ──
    라벨 다음 칸을 채우는 방식으로는 «반복 줄»을 못 채운다. 원본 격자가 이렇다:
@@ -5072,6 +5088,34 @@ function fillDerived(root,f,sites,kind){
     ['tax_lease', _rx('기간은 '+W+'부터 2년간'), function(){ return f.lease_from?'기간은 '+_dotDate(f.lease_from)+'부터 2년간':''; }],
     ['tax_lease', _rx('임대인 '+W6+'\\(인\\)'), function(){ return f.lease_lessor?'임대인 '+f.lease_lessor+'(인)':''; }],
     ['tax_hometax', _rx('이사 '+W6+' \\(서명 또는 인\\)'), function(){ return boss?'이사 '+boss+' (서명 또는 인)':''; }],
+    /* ── 2026-09-19: 다섯 단계를 «실제로 그려» 세어 보고 찾은 자리들 (대표 지시) ──
+       자료는 다 있는데 «문장 안»에 있는 자리라 칸 채우기(FORM_FILL)가 닿지 못했다.
+       ⚠ 한글 서식은 라벨을 자간 벌림으로 쓴다(「소 재 지」·「주 소」) — _rx 가 공백을 \s* 로
+         바꿔 주므로 규칙에는 벌려 쓴 그대로 적는다. */
+    ['reg_proxy', _rx('소 재 지 : '+W), function(){ return f.address?'소 재 지 : '+f.address:''; }],
+    ['reg_proxy', _rx('주임이사 : '+W), function(){ return boss?'주임이사 : '+boss:''; }],
+    ['reg_proxy', _rx('^'+W+'년 월 일'), function(){ return todayKo; }],
+    ['sub_assets', _rx('소 재 지 : '+W), function(){ return f.address?'소 재 지 : '+f.address:''; }],
+    ['sub_assets', _rx('대표\\(주임\\)이사 '+W), function(){ return boss?'대표(주임)이사 '+boss:''; }],
+    /* 인가번호 「제 ＿＿＿＿-＿＿＿＿-＿호」 — 서약서·복지사업계획서·지급신청서가 같은 꼴로 묻는다.
+       우리 인가번호는 「7210-2021-2」처럼 세 토막이라 그대로 끼운다. */
+    ['sub_oath', _rx('제 [＿_]{2,}-[＿_]{2,}-[＿_]{1,}호'), function(){ return f.inka_no?'제 '+f.inka_no+'호':''; }],
+    ['sub_oath', _rx('^'+W+'$'), function(){ return todayDot; }],
+    ['sub_oath', _rx(esc(f.name||'#')+' '+W6+'\\(서명 또는 인\\)'),
+      function(){ return boss?(f.name+' '+boss+'(서명 또는 인)'):''; }],
+    ['sub_welfare_plan', _rx('제 [＿_]{2,}-[＿_]{2,}-[＿_]{1,}호'), function(){ return f.inka_no?'제 '+f.inka_no+'호':''; }],
+    ['sub_payment', _rx('제[＿_]{2,}-[＿_]{2,}-[＿_]{1,}호'), function(){ return f.inka_no?'제'+f.inka_no+'호':''; }],
+    ['sub_payment', _rx('^[＿_]{6}-[＿_]{7}$'), function(){ return f.corp_reg_no; }],
+    ['sub_checklist', _rx('위와 같이 확인합니다\\. '+W), function(){ return '위와 같이 확인합니다. '+todayDot; }],
+    ['sub_checklist', _rx('신청인 '+esc(f.name||'#')+' '+W6+' \\(인\\)'),
+      function(){ return boss?('신청인 '+f.name+' '+boss+' (인)'):''; }],
+    /* 재산변동상황보고서 — 대표자·소재지·노동청이 다 있는데 «문장 안»이라 비어 나갔다 */
+    ['ops_asset_change', _rx('대표자 성명 '+W), function(){ return boss?'대표자 성명 '+boss:''; }],
+    ['ops_asset_change', _rx('주사무소 소재지 '+W), function(){ return f.address?'주사무소 소재지 '+f.address:''; }],
+    ['ops_asset_change', _rx(W+'장 기금법인 대표자'),
+      function(){ return f.labor_office?(f.labor_office+'장 기금법인 대표자'):''; }],
+    /* 협의회 회의록(사용범위) — 출연금은 아는 값이다 */
+    ['ops_minutes_scope', _rx('출연금 '+W+'원'), function(){ return amt?'출연금 '+amt.toLocaleString()+'원':''; }],
   ];
   /* 취임승낙서 — 「대표권있는 이사」 장만 이사장 이름을 넣는다. 다른 이사의 장은 이사마다 따로라 비워 둔다. */
   var walker=document.createTreeWalker(root,4/*TEXT*/,null,false), n, nodes=[];
@@ -6149,13 +6193,78 @@ function sidePreview(kind){
 
    ⚠ 채울 자리가 몇 곳인지 «함께» 센다. 이것이 이 화면의 알맹이다 — 날인은 되돌릴 수 없어서,
      도장을 찍기 «전»에 무엇이 비었는지 알아야 한다. 종전에는 여섯 장을 눈으로 훑어야 했다.
-   ⚠ 이 단계 서류들은 장부를 읽지 않는다(DOC_NEEDS_LEDGER 에 없다) — 그래서 _docExtra 없이 그린다.
-     지원금·운영 단계를 여기 넣으려면 장부부터 읽어야 한다. */
+   ⚠ ④운영·⑤지원금 서류 일부는 «장부»를 읽어야 채워진다(DOC_NEEDS_LEDGER). 그래서 묶음을
+     그리기 전에 _docExtra 로 장부를 먼저 읽는다 — 안 읽으면 그 서식들이 통째로 빈다. */
+/* ★ 다섯 단계를 «모두» 묶음으로 본다 (대표 지시 2026-09-19
+     「인가 법인설립 고유번호증 운영 근복지원금등 필요서류에 내용 넣어라 확인할 수 있게」).
+   종전에는 ①②③ 뿐이라 ④운영·⑤지원금은 한 장씩 눌러 봐야 했다. */
 var ESTAB_PHASES=[
   ['kinds','① 노동부 설립인가',function(){return DOC_KINDS;}],
   ['reg','② 법인 설립등기',function(){return DOC_REG;}],
-  ['tax','③ 고유번호증(세무서)',function(){return DOC_TAX;}]
+  ['tax','③ 고유번호증(세무서)',function(){return DOC_TAX;}],
+  ['ops','④ 운영',function(){return DOC_OPS;}],
+  ['sub','⑤ 근복지원금',function(){return DOC_SUB;}]
 ];
+/* ══ 서식의 빈칸이 «어디서 오는가» ══ (대표 지시 2026-09-19)
+   서식을 아무리 잘 이어도 «자료»가 없으면 빈칸이다. 그런데 화면은 「채울 자리 34곳」만
+   말할 뿐, 그것이 ①우리가 안 이어서인지 ②아직 안 적으셔서인지 가려 주지 않았다.
+   여기서 «자료 쪽»을 세어, 무엇을 어디에 적으면 어느 서식이 따라오는지 말해 준다.
+
+   ⚠ 「없다」고 말할 수 있는 것만 담는다 — 관청이 적는 칸(접수번호·처리기간)은 여기 없다.
+   ⚠ 어디에 적는지(where)를 반드시 함께 준다. 「비었다」만 알려 주면 찾아 헤맨다. */
+var ESTAB_NEED=[
+  ['chairman','대표자 성명','기금 정보 › 인가·등기','별지7호·등기·인감·세무',function(f){ return !String(f.chairman||'').trim(); }],
+  ['rep_position','대표자 직책','기금 정보 › 설립','별지7호·재산변동보고서',function(f){ return !String(f.rep_position||'').trim(); }],
+  ['address','주사무소 소재지','기금 정보 › 관할·연락','별지7호·등기·세무·정관',function(f){ return !String(f.address||'').trim(); }],
+  ['phone','전화','기금 정보 › 관할·연락','별지7호·등기·세무',function(f){ return !String(f.phone||'').trim(); }],
+  ['inka_no','인가번호','기금 정보 › 인가·등기','재산변동보고서·지원신청서',function(f){ return !String(f.inka_no||'').trim(); }],
+  ['inka_date','인가일','기금 정보 › 인가·등기','등기신청서(인가서도달 연월일)',function(f){ return !String(f.inka_date||'').trim(); }],
+  ['corp_reg_no','법인등록번호','기금 정보 › 인가·등기','임대차계약서·세무',function(f){ return !String(f.corp_reg_no||'').trim(); }],
+  ['tax_id_no','고유번호','기금 정보 › 인가·등기','지원금 서식·청구',function(f){ return !String(f.tax_id_no||'').trim(); }],
+  ['registry_office','관할등기소','기금 정보 › 관할·연락','등기신청서(귀중)',function(f){ return !String(f.registry_office||'').trim(); }],
+  ['labor_office','관할 노동청','기금 정보 › 관할·연락','별지7호·재산변동보고서(귀하)',function(f){ return !String(f.labor_office||'').trim(); }],
+  ['meeting_date','설립준비위 회의일','기금 정보 › 설립','설립합의서·회의록',function(f){ return !String(f.meeting_date||'').trim(); }],
+  ['officers','임원 명부','기금 정보 › 임원 명부','취임승낙서·등기·인감·협의회 명부',function(f){ return !_officersOf(f).length; }],
+  ['lease_lessor','사무소 임대인','기금 정보 › 사무소 임대차','임대차계약서·전대동의서',function(f){ return !String(f.lease_lessor||'').trim(); }]
+];
+/* 참여사업장 쪽 — 한 곳만 비어도 그 회사 몫의 서류가 빈다 */
+var ESTAB_NEED_SITE=[
+  ['ceo','대표자','설립합의서·정관 서명란·기금출연확인서',function(s){ return !String(s.ceo||'').trim(); }],
+  ['wrep_name','근로자대표 성명','설립합의서·정관 서명란·별지7호 위원 격자',function(s){ return !_siteWrep(s).name; }],
+  ['contrib','출연 약정액','기금출연확인서·회의록·사업계획서',function(s,f){ return siteContribOf(s,f)<=0; }],
+  ['biz_no','사업자등록번호','지원신청서·체크리스트',function(s){ return !String(s.biz_no||'').trim(); }],
+  ['address','소재지','정관 제3조 참여회사 목록',function(s){ return !String(s.address||'').trim(); }]
+];
+/* 이 기금에서 «비어 있는» 것을 모은다 — 서식을 그리지 않고 자료만 본다(빠르다) */
+function estabGaps(f,sites){
+  var out=[], live=estabSites(sites);
+  ESTAB_NEED.forEach(function(c){
+    if(c[4](f||{})) out.push({k:c[0], label:c[1], where:c[2], docs:c[3], n:1, of:1, site:false});
+  });
+  ESTAB_NEED_SITE.forEach(function(c){
+    var n=live.filter(function(s){ return c[3](s,f||{}); }).length;
+    if(n) out.push({k:c[0], label:c[1], where:'참여사업장 › 편집', docs:c[2], n:n, of:live.length, site:true});
+  });
+  if(!live.length) out.push({k:'_sites', label:'참여사업장', where:'참여사업장 › + 사업장 추가',
+    docs:'설립합의서·정관·기금출연확인서·별지7호', n:1, of:1, site:false});
+  return out;
+}
+/* 빈 곳 목록을 화면에 세운다 — 누르면 어디로 가야 하는지까지 말한다 */
+function estabGapHTML(f,sites){
+  var g=estabGaps(f,sites);
+  if(!g.length) return '<div class="msg ok" style="font-size:12px;margin:0 0 8px">'
+    +'서식이 읽는 자료가 <b>모두 채워져 있습니다.</b> 아래에 남은 빈칸은 관청이 적는 칸이거나 손으로 쓸 자리입니다.</div>';
+  return '<div class="msg warn" style="font-size:12px;margin:0 0 8px">'
+    +'<b>아직 안 적은 자료 '+g.length+'가지</b> 때문에 아래 서류에 빈칸이 남습니다 — 여기를 채우면 서식이 따라옵니다.'
+    +'<div style="margin-top:6px;overflow-x:auto"><table style="font-size:11.5px">'
+    +'<thead><tr><th>비어 있는 것</th><th>적는 곳</th><th>이 서식들이 읽습니다</th></tr></thead><tbody>'
+    +g.map(function(x){
+      return '<tr><td style="white-space:nowrap;font-weight:600">'+esc(x.label)
+        +(x.site?(' <span class="chip warn" style="font-size:10px">'+x.n+'/'+x.of+'곳</span>'):'')+'</td>'
+        +'<td style="white-space:nowrap">'+esc(x.where)+'</td>'
+        +'<td class="muted">'+esc(x.docs)+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+}
 /* 서류에 남은 «채울 자리» — 밑줄 자리표(＿＿·______)와 회사 자리표(○○)를 센다.
    ⚠ 못 채워 남은 자리와 «관청이 적는 칸»(접수번호·처리기간)이 섞인다. 그래서 이 수는
      「아직 덜 됐다」가 아니라 「여기를 보라」는 뜻이다 — 0 을 목표로 삼는 수가 아니다. */
@@ -6177,12 +6286,23 @@ function estabBundle(phase){
     +'<h2 style="margin:0;font-size:14px">'+esc(ph[1])+' — 번호 차례</h2>'+hlp('estab.bundle')
     +'<span class="muted" style="font-size:11px">'+esc(f.short_name||f.name||'')+'</span>'
     +'<span style="flex:1"></span><button class="primary" onclick="printDoc()" style="padding:3px 10px">🖨 전부 인쇄(날인용)</button></div>'
+    +'<div id="bundleGap"></div>'
     +'<div id="bundleSum" class="row" style="margin:0 0 6px;gap:5px;flex-wrap:wrap"></div>'
     +'<div class="row" style="margin:0 0 6px;gap:6px"><span class="chip" style="font-size:10px">📄 A4 세로 · 여백 20mm</span>'
     +'<span style="flex:1"></span><span class="muted" style="font-size:11px">배율 <b id="docZoomLbl">—</b></span>'
     +'<button onclick="toggleDocZoom()" style="padding:2px 8px;font-size:11px">⤢ 배율</button></div>'
     +'<div id="docwrap" style="border:1px solid var(--line);border-radius:8px;max-height:72vh;overflow:auto;padding:14px;background:#e2e8f0">'+loadingHTML()+'</div>';
-  (f._sample?Promise.resolve([]):_loadSites(S.formFund)).then(function(sites){
+  /* ④운영·⑤지원금에는 «장부를 읽어야» 채워지는 서식이 있다(재산목록표·출연확인서·체크리스트…).
+     한 서식만 열 때는 _docExtra 가 읽어 주는데, 묶음은 여러 서식을 한꺼번에 그리므로
+     여기서 «먼저 한 번» 읽어 둔다 — 안 읽으면 그 서식들이 통째로 빈 채로 나간다. */
+  var _need=docsFor(ph[2](),f.fund_type||'공동').some(function(d){ return DOC_NEEDS_LEDGER[d[0]]; });
+  var _pre=_need ? _docExtra(docsFor(ph[2](),f.fund_type||'공동').filter(function(d){ return DOC_NEEDS_LEDGER[d[0]]; })[0][0], f)
+                 : Promise.resolve(null);
+  _pre.catch(function(){ return null; }).then(function(){
+  return (f._sample?Promise.resolve([]):_loadSites(S.formFund));
+  }).then(function(sites){
+    /* 빈칸이 «왜» 비는지 먼저 말한다 — 날인은 되돌릴 수 없어서, 찍기 전에 알아야 한다 */
+    var gp=$('bundleGap'); if(gp) gp.innerHTML=estabGapHTML(f,sites);
     // 서식마다 A4 한 장 — 화면에서도 낱장으로 보이고 인쇄 시 그대로 페이지가 나뉜다
     var lst=docsFor(ph[2](),f.fund_type||'공동'), tot=0, chips=[];
     var inner=lst.map(function(d,i){
@@ -14636,7 +14756,9 @@ var HELP={
    +'<p><b>맨 위의 「채울 자리 N곳」</b>이 이 화면의 알맹이입니다. <b>날인은 되돌릴 수 없습니다</b> — 도장을 찍기 <b>전</b>에 무엇이 비었는지 보세요. 서류마다 몇 곳인지도 딱지로 붙습니다.</p>'
    +'<p>이 수에는 <b>관청이 적는 칸</b>(접수번호·처리기간)과 <b>사람이 손으로 적어야 하는 칸</b>(주민등록번호·인감·계좌)도 함께 셉니다. 그래서 <b>0을 목표로 삼는 수가 아닙니다</b> — 「여기를 보라」는 뜻입니다.</p>'
    +'<p><b>[🖨 전부 인쇄]</b>는 A4 낱장으로 나뉘어 그대로 인쇄됩니다. 그 종이에 날인하면 됩니다.</p>'
-   +'<p>내용은 <b>기금 정보 · 참여사업장 · 임원 명부</b>에서 옵니다. 빈칸이 많으면 그 셋을 먼저 채우세요.</p>'},
+   +'<p>내용은 <b>기금 정보 · 참여사업장 · 임원 명부</b>에서 옵니다.</p>'
+   +'<p>★ <b>맨 위의 표가 「아직 안 적은 자료」</b>를 알려 줍니다 — 무엇이 비었는지, <b>어디에 적는지</b>, 그것을 <b>어느 서식이 읽는지</b>까지. 빈칸이 많으면 그 표부터 채우세요. 한 곳을 적으면 여러 서식이 함께 따라옵니다.</p>'
+   +'<p>다섯 단계 <b>모두</b>에 있습니다 — ①인가 ②법인설립 ③고유번호증 ④운영 ⑤근복지원금. ④⑤에는 <b>장부를 읽어야</b> 채워지는 서식이 있어(재산목록표·출연확인서·체크리스트) 그리기 전에 회계 자료를 먼저 읽습니다.</p>'},
  'site.reps':{t:'한 사업장에 나오는 사람 넷',h:'<p>설립 서류를 쓰려면 <b>네 사람</b>을 갈라 적어야 합니다. 넷이 다 다른 사람인 일이 흔합니다.</p>'
    +'<p><b>대표자</b> — 등기부·사업자등록증에 적힌 사람입니다.<br><b>담당자</b> — 실무 연락처입니다.<br>'
    +'<b>사용자대표</b> — 협의회에 <b>사용자측으로 나오는</b> 사람입니다. 대표이사가 다 나오지 못해 공장장·관리부장이 나오는 일이 많습니다.<br>'
