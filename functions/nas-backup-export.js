@@ -26,9 +26,13 @@ const crypto = require('crypto');
    ⚠ 한쪽만 고치면 어긋난다 — nas-backup-export.test.js 가 두 곳을 견준다. */
 const SECRET_KEY_RE = /api_key|api_keys|nas_config|token|secret|passwd|password/i;
 
-/* 날짜 이름만 받는다 — 2026-09-18 꼴. 다른 이름이면 아예 안 본다
-   (경로를 글자로 이어 붙이므로 여기서 막지 않으면 남의 칸을 읽힌다). */
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/* 날짜 이름만 받는다 — 2026-09-18 또는 2026-09-18-pm 꼴. 다른 이름이면 아예 안 본다
+   (경로를 글자로 이어 붙이므로 여기서 막지 않으면 남의 칸을 읽힌다).
+   ⚠ 저녁 백업(-pm)을 받아들인다 (2026-09-19). 예전에는 낮 것만 날짜로 쳤다 —
+     새벽에 나스가 받아 갈 때 «어제 저녁» 백업을 두고 «어제 아침» 것을 가져갔다.
+     반나절치가 조용히 빠진 채 보관되고 있었다. 자리는 serverBackups/{ymd}-pm 으로
+     이미 있다(pu-erp.html serverBackupEvening). */
+const DATE_RE = /^\d{4}-\d{2}-\d{2}(-pm)?$/;
 
 /* 열쇠 견주기 — 길이가 같아도 «몇 글자까지 맞았는지»가 시간으로 새지 않게.
    ⚠ 길이가 다르면 timingSafeEqual 이 던진다. 먼저 길이를 보고, 그때도 한 번은 견준다. */
@@ -44,6 +48,14 @@ function 열쇠맞나(받은것, 참값) {
   }
   try { return crypto.timingSafeEqual(a, b); } catch (_) { return false; }
 }
+
+/* 목록에서 «끝 몇 개»만 본다 — 열쇠가 곧 날짜라 사전순 끝이 가장 최근이다.
+   ⚠ 왜 전부를 안 받나 — 「가벼운 쪽」이라 적어 두고 실제로는 안 가벼웠다.
+     실측 2026-09-19: serverBackupsIndex 가 **900KB** 였다. 한 벌마다 사건·업체
+     이름표(ids)가 31KB 씩 붙어 있어, 날짜 하나 고르자고 그 전부를 받고 있었다.
+   ⚠ 몇 개면 되나 — 하루에 아침·저녁 두 벌이 쌓이므로 8 이면 나흘치다.
+     그 안에 날짜 꼴이 하나도 없으면 아래에서 예전처럼 통째로 물러선다. */
+const 꼬리수 = 8;
 
 /* 가장 최근 날짜 하나 — 이름이 날짜 꼴인 것만 본다 */
 function 최신날짜(목록) {
@@ -81,6 +93,19 @@ function 내보낼모양(날짜, 백업, 뺀것) {
     droppedKeys: 뺀것,                   // 비밀이라 뺀 칸 이름
     data: (백업 && 백업.data) || {},
   };
+}
+
+/* 목록에서 가장 최근 날짜 — 끝 몇 개만 받아 고른다.
+   ⚠ 끝만 받는 길이 막힌 곳(옛 SDK·질의 실패)에서는 예전처럼 통째로 물러선다.
+     아껴서 «못 받는» 것보다 비싸게라도 받는 편이 낫다 — 이건 백업이다. */
+async function 최신날짜고르기(데이터베이스) {
+  const 자리 = 데이터베이스.ref('serverBackupsIndex');
+  try {
+    const 끝 = (await 자리.orderByKey().limitToLast(꼬리수).once('value')).val();
+    const 고른것 = 최신날짜(끝);
+    if (고른것) return 고른것;
+  } catch (_) { /* 아래로 물러선다 */ }
+  return 최신날짜((await 자리.once('value')).val());
 }
 
 /* ══ 핸들러 ══════════════════════════════════════════════════════════════
@@ -125,8 +150,7 @@ function 핸들러만들기(옵션) {
         return;
       }
       if (!날짜) {
-        const 목록 = (await 데이터베이스.ref('serverBackupsIndex').once('value')).val();
-        날짜 = 최신날짜(목록);
+        날짜 = await 최신날짜고르기(데이터베이스);
         if (!날짜) {
           res.status(404).json({ ok: false, error: '서버에 백업이 아직 하나도 없습니다' });
           return;
@@ -166,4 +190,4 @@ function 핸들러만들기(옵션) {
   };
 }
 
-module.exports = { SECRET_KEY_RE, DATE_RE, 열쇠맞나, 최신날짜, 비밀걸러내기, 내보낼모양, 핸들러만들기 };
+module.exports = { SECRET_KEY_RE, DATE_RE, 꼬리수, 열쇠맞나, 최신날짜, 최신날짜고르기, 비밀걸러내기, 내보낼모양, 핸들러만들기 };

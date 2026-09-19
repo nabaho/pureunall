@@ -29,12 +29,31 @@ function 부르기(opts) {
   opts = opts || {};
   const 쓴것 = {};
   const 값 = opts.값 || {};
+  /* 읽은 자리를 «어떻게» 읽었는지까지 적는다 — 「끝 몇 개만 받았나」를 재려면
+     통째로 받은 것과 꼬리만 받은 것을 갈라 봐야 한다. */
+  const 읽은것 = [];
   const db = () => ({
     ref(p) {
-      return {
-        once: () => Promise.resolve({ val: () => (p in 값 ? 값[p] : null) }),
-        set: (v) => { if (opts.흔적못씀) return Promise.reject(new Error('막힘')); 쓴것[p] = v; return Promise.resolve(); },
-      };
+      function 마디(꼬리) {
+        return {
+          orderByKey() {
+            if (opts.꼬리막힘) throw new Error('이 판에는 질의가 없습니다');
+            return 마디(꼬리 === null ? Infinity : 꼬리);
+          },
+          limitToLast(n) { return 마디(n); },
+          once: () => {
+            읽은것.push(꼬리 === null ? p : p + ' 끝' + 꼬리);
+            const v = (p in 값) ? 값[p] : null;
+            if (꼬리 === null || !v || typeof v !== 'object') return Promise.resolve({ val: () => v });
+            const ks = Object.keys(v).sort().slice(-꼬리);
+            const 잘린것 = {};
+            ks.forEach((k) => { 잘린것[k] = v[k]; });
+            return Promise.resolve({ val: () => 잘린것 });
+          },
+          set: (nv) => { if (opts.흔적못씀) return Promise.reject(new Error('막힘')); 쓴것[p] = nv; return Promise.resolve(); },
+        };
+      }
+      return 마디(null);
     },
   });
   const res = { _code: 200, _body: null, _head: {},
@@ -49,7 +68,7 @@ function 부르기(opts) {
     get(n) { return this.headers[String(n).toLowerCase()]; },
   };
   const h = M.핸들러만들기({ db, key: () => opts.참열쇠, now: () => 1700000000000 });
-  return h(req, res).then(() => ({ res, 쓴것 }));
+  return h(req, res).then(() => ({ res, 쓴것, 읽은것 }));
 }
 
 const 백업하나 = {
@@ -126,15 +145,53 @@ test('⑥ 흔적을 남긴다 — 다만 흔적을 못 남겨도 자료는 준�
   assert.equal(b.res._code, 200, '★★ 흔적을 못 남겼다고 백업이 멎으면 안 된다');
 });
 
-test('⑦★ 목록은 «가벼운 쪽»에서 고른다 — 고르자고 본문 2~5MB 를 받지 않는다', () => {
-  const src = fs.readFileSync(path.join(__dirname, 'nas-backup-export.js'), 'utf8');
-  const i = src.indexOf("ref('serverBackupsIndex')");
-  const j = src.indexOf("ref('serverBackups/'");
-  assert.ok(i > 0 && j > i,
-    '★★ 날짜를 고르려고 serverBackups 를 통째로 받으면 그것만으로 요금이 난다(2026-08-16 에 겪었다)');
-  assert.equal(M.최신날짜({ '2026-09-01': 1, '2026-09-18': 1, 'x': 1 }), '2026-09-18');
+test('⑦★★ 목록은 «정말로» 가벼운 쪽에서 고른다 — 끝 몇 개만 받는다', async () => {
+  /* ★ 예전에는 이 검사가 「serverBackupsIndex 를 먼저 읽는가」만 봤다. 그래서
+       그 칸이 **900KB** 로 자란 것을 못 잡았다(실측 2026-09-19 — 한 벌마다
+       사건·업체 이름표 31KB). 「어느 칸을 읽나」가 아니라 «얼마나 받나»를 본다. */
+  const 목록 = {};
+  for (let d = 1; d <= 20; d++) {
+    const ymd = '2026-08-' + String(d).padStart(2, '0');
+    목록[ymd] = { ids: 'x'.repeat(300) };
+    목록[ymd + '-pm'] = { ids: 'x'.repeat(300) };
+  }
+  const 값 = { serverBackupsIndex: 목록, 'serverBackups/2026-08-20-pm': 백업하나 };
+  const { res, 읽은것 } = await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값 });
+  assert.equal(res._code, 200, '★ 가장 최근 백업을 못 골랐다');
+
+  const 목록읽기 = 읽은것.filter((r) => r.indexOf('serverBackupsIndex') === 0);
+  assert.ok(목록읽기.length > 0, '★ 목록을 아예 안 봤다 — 날짜를 어디서 골랐나');
+  assert.ok(목록읽기.every((r) => /끝\d+$/.test(r)),
+    '★★ 날짜 하나 고르자고 목록을 «통째로» 받고 있습니다 — 그 칸은 지금 900KB 입니다: ' + JSON.stringify(목록읽기));
+  const 받은칸수 = Math.max.apply(null, 목록읽기.map((r) => Number(r.match(/끝(\d+)$/)[1])));
+  assert.ok(받은칸수 <= 20 && 받은칸수 < Object.keys(목록).length,
+    '★ 끝만 받는다더니 사실상 전부입니다(' + 받은칸수 + '칸 / ' + Object.keys(목록).length + '칸)');
+});
+
+test('⑦-2★★ 저녁 백업(-pm)도 «가장 최근»이다 — 반나절치가 조용히 빠지지 않게', async () => {
+  /* 새벽에 나스가 받아 갈 때 어제 저녁 백업이 이미 있는데도 어제 «아침» 것을
+     가져가고 있었다. 이름 끝의 -pm 을 날짜로 안 쳤기 때문이다. */
+  const 값 = {
+    serverBackupsIndex: { '2026-09-18': 1, '2026-09-18-pm': 1 },
+    'serverBackups/2026-09-18': 백업하나,
+    'serverBackups/2026-09-18-pm': 백업하나,
+  };
+  const { res } = await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값 });
+  assert.equal(res._code, 200);
+  assert.equal(JSON.parse(res._body).date, '2026-09-18-pm',
+    '★★ 저녁 백업을 두고 아침 것을 가져갑니다 — 반나절이 보관에서 빠집니다');
+  assert.equal(M.최신날짜({ '2026-09-18': 1, '2026-09-18-pm': 1, 'x': 1 }), '2026-09-18-pm');
+  assert.equal(M.최신날짜({ '2026-09-18-pm': 1, '2026-09-19': 1 }), '2026-09-19',
+    '★ 다음 날 아침이 어제 저녁보다 새것이다');
   assert.equal(M.최신날짜({ 'x': 1 }), null, '★ 날짜가 아닌 이름을 고르면 엉뚱한 칸을 읽는다');
   assert.equal(M.최신날짜(null), null);
+});
+
+test('⑦-3★ 끝만 받는 길이 막혀도 백업은 나간다 — 아끼려다 «못 받으면» 더 나쁘다', async () => {
+  const 값 = { serverBackupsIndex: { '2026-09-18': 1 }, 'serverBackups/2026-09-18': 백업하나 };
+  const { res, 읽은것 } = await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값, 꼬리막힘: true });
+  assert.equal(res._code, 200, '★★ 질의가 막혔다고 백업이 멎으면 안 된다');
+  assert.ok(읽은것.indexOf('serverBackupsIndex') >= 0, '★ 물러선 길(통째로 받기)이 안 돌았다');
 });
 
 test('⑧★★ 거르는 규칙이 이알피의 것과 «같다» — 두 벌이면 한 벌만 고쳐진다', () => {
