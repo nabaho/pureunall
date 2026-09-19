@@ -1,4 +1,4 @@
-/* 설립 서식 — «자료는 있는데 배선이 없던» 자리가 정말 채워지는가. 그리고 지어내지 않는가.
+﻿/* 설립 서식 — «자료는 있는데 배선이 없던» 자리가 정말 채워지는가. 그리고 지어내지 않는가.
 
    서식 18종을 «자료가 다 있는 기금»으로 실제로 그려 보고(2026-09-06), 그래도 비는 자리
    52개를 갈랐다. 여기서 보는 것은 그중 «자료는 있는데 잇지 않아» 비던 자리들이다:
@@ -53,7 +53,7 @@ global.funds = {};
      여기 없으면 「foundContrib is not defined」로 이 검사가 통째로 죽는다.
      ⚠ gV 는 {·[ 로 시작하는 값만 잡는다. 글자 하나짜리 상수는 줄째로 꺼낸다. */
   gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
-  gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
+  gF('estabSites'), gF('siteContribOf'), gF('siteContribNow'), gF('foundContribOf'), gF('foundContrib'),
   gF('partyNames'), gF('partyJoin'), gF('_fillWho'), gF('fillPartyList'), gF('fillPartyDates'),
   /* 원본 줄맞춤 자국 걷어내기 + 이름 자리표(2026-09-14) — hwpFormHTML 이 부른다.
      여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
@@ -144,8 +144,11 @@ console.log('\n■ 기금출연확인서 — 사업장마다 한 장');
   ok('약정액이 없어도 회사·대표자는 찍힌다',
     /가나기계 대표이사 김가나/.test(tn) && /마바산업 대표이사 최마바/.test(tn));
   ok('금액 자리는 비워 둔다 (지어내지 않는다)', /￦ [＿_]+/.test(tn) && !/원정/.test(tn));
-  ok('몇 곳이 비었는지 말해 준다', /3곳 중 3곳은 출연 약정액이 적혀 있지 않아/.test(tn),
-    (tn.match(/※[^※]{0,60}/) || [''])[0]); }
+  /* 2026-09-19: 그 해 출연금(참여사업장 › 연도별 기록)까지 보게 되어 안내문 글귀가 바뀌었다 */
+  ok('몇 곳이 비었는지 말해 준다', /3곳 중 3곳은 출연금이 적혀 있지 않아/.test(tn),
+    (tn.match(/※[^※]{0,60}/) || [''])[0]);
+  ok('어느 칸을 채우면 되는지 짚어 준다', /연도별 기록/.test(tn) && /1인당 출연단가/.test(tn),
+    (tn.match(/※[^※]{0,160}/) || [''])[0]); }
 
 console.log('\n■ 사업계획서·등기신청서·취임승낙서·인감·등록면허세');
 { const t = draw('bizplan', F);

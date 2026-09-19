@@ -109,8 +109,10 @@ test('사업장 한 곳 — 적어 둔 값이 먼저, 없으면 사람수 × 단
 test('한글본 확인서와 엑셀본 확인서가 «같은 자»를 쓴다', () => {
   const hwp = grabFn('fillFoundContribDoc');
   const xls = grabFn('fillContribXls');
-  assert.match(hwp, /siteContribOf\(/, '한글본이 siteContribOf 를 써야 한다');
-  assert.match(xls, /siteContribOf\(/, '엑셀본이 siteContribOf 를 써야 한다');
+  /* 2026-09-19: 그 해 출연금(연도별 기록)까지 보는 siteContribNow 로 «둘 다» 옮겼다.
+     한쪽만 옮기면 같은 확인서인데 한글본과 엑셀본의 금액이 또 갈린다. */
+  assert.match(hwp, /siteContribNow\(/, '한글본이 siteContribNow 를 써야 한다');
+  assert.match(xls, /siteContribNow\(/, '엑셀본이 siteContribNow 를 써야 한다');
   assert.doesNotMatch(xls, /contrib_per_worker\)\|\|400000/,
     '엑셀본이 단가를 «따로» 셈하면 안 된다 — 두 확인서 금액이 갈린다');
 });
@@ -248,17 +250,34 @@ test('묶음 화면이 번호와 채울 자리 수를 함께 보여 준다 — �
   assert.match(fn, /printDoc\(\)/, '그대로 인쇄해 날인할 수 있어야 한다');
 });
 
+/* ⚠ 여기 서식을 «함부로» 더하지 말 것. 장부를 읽어야 채워지는 서식을 묶음에 넣으면
+     장부를 못 읽었을 때 숫자가 통째로 0 으로 찍혀 나간다(재산목록표가 그랬다).
+   예외는 «못 읽어도 제 값을 내는» 서식뿐이다:
+     · contrib(기금출연확인서) — 2026-09-19. 그 해 출연금을 못 읽으면 siteContribNow 가
+       사업장 약정액으로 조용히 내려간다(종전과 같은 값이다). 0 이 찍히지 않는다. */
+const LEDGER_OK = { contrib: '못 읽으면 약정액으로 내려간다 (siteContribNow)' };
+
 test('묶음 단계에 «장부가 필요한» 서식을 넣지 않았다 — 넣으면 빈 숫자가 찍힌다', () => {
   const need = grabDecl('DOC_NEEDS_LEDGER');
   ['DOC_KINDS', 'DOC_REG', 'DOC_TAX'].forEach((n) => {
     const decl = grabDecl(n);
     const keys = [...decl.matchAll(/\['([a-z_0-9]+)',/g)].map((m) => m[1]);
     keys.forEach((k) => {
+      if (LEDGER_OK[k]) return;
       /* 이름 «전체»가 맞아야 한다 — contrib 로 sub_contrib 를 잡으면 안 된다 */
       assert.ok(!new RegExp('[{,]\\s*' + k + ':1').test(need),
         n + ' 의 ' + k + ' 는 장부를 읽는 서식이라 묶음에 넣으면 안 된다');
     });
   });
+});
+
+test('★★ 예외로 둔 서식은 «못 읽어도» 제 값을 낸다 — 0 이 찍히면 안 된다', () => {
+  /* contrib 의 근거: siteContribNow 가 _docRok() 이 비면 siteContribOf 로 내려간다 */
+  assert.match(grabFn('siteContribNow'), /\|\|siteContribOf\(s,f\)\|\|0;/,
+    '장부를 못 읽었을 때 내려갈 자리가 없으면 예외로 둘 수 없다');
+  /* 묶음은 그리기 «전에» 한 번 읽어 둔다 — 그래서 대개는 그 해 값이 실린다 */
+  assert.match(grabFn('estabBundle'), /DOC_NEEDS_LEDGER\[d\[0\]\]/,
+    '묶음이 장부를 먼저 읽지 않으면 여러 서식이 한꺼번에 빈다');
 });
 
 /* ══════════ ⑤ 사업자등록증 판독 ══════════ */
