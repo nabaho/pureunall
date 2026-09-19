@@ -85,7 +85,11 @@ APPS.forEach(function ([page, mf, tag]){
 
 console.log('\n[⑤ ★ 탭 그림글자 = 바탕화면 아이콘 = 포털 타일]');
 /* 굽는 스크립트가 쓴 그림글자를 파일 이름표로 되짚을 수는 없으므로,
-   «탭 그림글자»와 «포털 타일 그림»이 같은지를 본다. 바탕화면 PNG 는 그 그림글자로 구웠다. */
+   «탭 그림글자»와 «포털 타일 그림»이 같은지를 본다. 바탕화면 PNG 는 그 그림글자로 구웠다.
+   ⚠ 2026-09-19 부터 그림글자가 아니라 «그린 SVG» 를 쓰는 앱이 생겼다(푸른 캘린더 —
+     대표가 스무 견본 중 2번 「빨강 머리띠」를 골랐다). icon 필드가 `<svg` 로 시작하면
+     그 길로 견준다: 탭 favicon 은 encodeURIComponent 로 안전하게 묶여 있으므로 되풀어
+     «문자 그대로 같은지» 를 본다. 그림글자 앱은 예전 그대로 <text> 안 글자를 뽑아 견준다. */
 const tileRe = /\{ key:'([\w]+)',[^}]*?icon:'([^']*)',\s*url:'([^'?]+)([^']*)'/g;
 let t, checked = 0, bad = [];
 while((t = tileRe.exec(portal))){
@@ -101,6 +105,15 @@ while((t = tileRe.exec(portal))){
     checked++;
     if(emo !== icon.replace(/️/g, '')) bad.push('메일 — 타일 ' + icon + ' / 탭 ' + emo);
     continue;   /* ⚠ return 을 쓰면 «모듈이 통째로» 끝난다 — 아래 검사가 안 돈다 */
+  }
+  if(icon.indexOf('<svg') === 0){
+    /* 그린 아이콘 — favicon 문자열을 되풀어 «똑같은 SVG»인지 본다(글자로 안 가른다) */
+    const fm = html.match(/<link rel="icon" href="data:image\/svg\+xml,([^"]*)">/);
+    let decoded = null;
+    try { decoded = fm ? decodeURIComponent(fm[1]) : null; } catch (e) { decoded = null; }
+    checked++;
+    if(decoded !== icon) bad.push(key + ' — 타일과 탭의 SVG 가 다르다(그린 아이콘)');
+    continue;
   }
   const im = html.match(/<link rel="icon" href="[^"]*font-size='80'>([^<]*)<\/text>/);
   const emo = im ? im[1] : null;
