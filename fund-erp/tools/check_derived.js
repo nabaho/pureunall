@@ -59,7 +59,9 @@ global.funds = {};
      여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
   gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
   /* 2026-09-19: 노동조합대표자→근로자대표 · 홀로 선 날짜 자리 · 작성 예 제외 */
-  gS('DATE_CTX'), gF('_dateSlot'), gF('fillWrepLabel'), gF('_stripSample'),
+  gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),
+  /* 2026-09-19: 회의록 의안마다 새 장 */
+  gS('MINUTES_AGENDA'), gF('fillMinutesPages'),
   /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다.
      여기 없으면 「fillFundTypeWords is not defined」로 이 검사가 통째로 죽는다. */
   gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
@@ -293,7 +295,7 @@ console.log('\n■ 정관·설립합의서 — 참여사업장이 이름으로 �
   /* 서명란은 회사마다 한 줄이어야 한다 — 날인을 회사마다 받기 때문이다 */
   const ag = draw('agreement', F, SITES);
   live.forEach(s => ok('설립합의서 서명란에 ' + s.name + ' 이 있다',
-    new RegExp(s.name + '\\s*근로자측\\s*대표').test(ag)));
+    new RegExp(s.name + '\\s*근로자대표').test(ag)));   /* 2026-09-19: 「근로자측대표」→「근로자대표」 */
   /* 사업장이 없으면 손대지 않는다 — 자리표가 틀린 이름보다 낫다 */
   const none = draw('agreement', F, []);
   ok('사업장이 없으면 자리표를 그대로 둔다', /(?:○○|XX)\s*주식회사/.test(none));

@@ -32,6 +32,18 @@ const grabLine = (n) => {
   assert.ok(m, 'fund.html 에 상수가 없다: ' + n);
   return m[0];
 };
+/* 여러 줄짜리 값({·[ 로 시작) — 괄호를 세어 끝을 찾는다 */
+function grabDecl(name) {
+  const i = SRC.indexOf('var ' + name + '=');
+  assert.ok(i >= 0, 'fund.html 에 상수가 없다: ' + name);
+  let d = 0, on = false;
+  for (let j = SRC.indexOf('=', i); j < SRC.length; j++) {
+    const c = SRC[j];
+    if (c === '{' || c === '[') { d++; on = true; }
+    else if (c === '}' || c === ']') { d--; if (on && !d) return SRC.slice(i, j + 1) + ';'; }
+  }
+  throw new Error('상수 끝을 못 찾음: ' + name);
+}
 
 /* ══════════ ① 「노동조합대표자」 → 「근로자대표」 ══════════ */
 
@@ -40,7 +52,7 @@ const LBL = (() => {
   new Function([
     'var D=null;',
     'function T(s){ return {nodeType:3, nodeValue:s}; }',
-    grabFn('fillWrepLabel'),
+    grabDecl('WREP_LBL'), grabFn('fillWrepLabel'),
     'this.run=function(txts){',
     '  var kids=txts.map(T);',
     '  var root={nodeType:1, childNodes:kids};',
@@ -65,10 +77,15 @@ test('그 밖의 글은 건드리지 않는다', () => {
 });
 
 test('왜 바꿨는지 까닭이 코드에 남아 있다', () => {
-  /* grabFn 은 함수 «몸통»만 준다 — 까닭은 그 위 주석에 있다. 앞쪽을 함께 본다. */
-  const i = SRC.indexOf('function fillWrepLabel(');
-  const around = SRC.slice(Math.max(0, i - 700), i);
+  /* grabFn 은 함수 «몸통»만 준다 — 까닭은 주석에 있다. 주석 머리를 «직접» 찾는다.
+     ⚠ 「함수 앞 700자」로 잡았더니, 사이에 다른 함수가 끼면서 창 밖으로 밀려났다. */
+  const i = SRC.indexOf('══ 「노동조합대표자」는 «근로자대표»다 ══');
+  assert.ok(i >= 0, '왜 바꿨는지 적어 둔 주석 머리가 없다');
+  const around = SRC.slice(i, i + 700);
   assert.ok(around.indexOf('노동조합이 «없는» 곳이 많고') >= 0, '노조 없는 회사 이야기가 없다');
+  /* 2026-09-19: 「근로자측대표」도 함께 바꾼다 — 그 까닭도 곁에 적혀 있어야 한다 */
+  const near = SRC.slice(Math.max(0, SRC.indexOf('var WREP_LBL=') - 400), SRC.indexOf('var WREP_LBL=') + 200);
+  assert.ok(near.indexOf('정관과 설립합의서가 같은 말을 써야 한다') >= 0, '왜 합의서도 바꿨는지 안 적혀 있다');
   assert.ok(around.indexOf('제55조제2항') >= 0, '법 근거가 안 적혀 있다');
   assert.ok(around.indexOf('fillPartyList «앞»에서') >= 0, '차례가 왜 중요한지 안 적혀 있다');
 });
