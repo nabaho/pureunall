@@ -1283,7 +1283,13 @@ body.portal-mode #moreFab{display:flex;}
   // 줄이 다르면 서로 자리를 못 옮긴다(관리자가 설정에서 풀 수 있다).
   var APPS = [
     { key:'erp',     name:'푸른이알피',   desc:'인사·급여·재무',   icon:'🏢', url:'pu-erp.html',         roles:null, row:'client' },
-    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'📅', url:'pu-cal.html',         roles:null, row:'client' },
+    /* ⏰ 푸른 캘린더 — 바로 아래 정부사업일정과 «같은 📅» 였다(대표 지시 2026-09-19
+       「푸른캘린더 아이콘은 다른것으로 해라」). 이름이 다른데 그림이 같으면
+       타일을 그림으로 찾는 사람은 매번 글자를 읽어야 한다 — 타일을 쓰는 까닭이 없어진다.
+       달력붙이를 다시 고르면 크기가 작아질수록 또 같아 보이므로 시계로 갈랐다
+       (이 앱이 다루는 것이 일정·근태, 곧 «시각»이기도 하다).
+       ⚠ 탭 그림글자·바탕화면 아이콘도 같이 간다 — tests/app-icons.test.js 가 견준다. */
+    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'⏰', url:'pu-cal.html',         roles:null, row:'client' },
     { key:'consult', name:'정부사업일정',  desc:'보고서 일정및사진관리',    icon:'📅', url:'gov-consulting.html', roles:null, row:'client' },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inout' },

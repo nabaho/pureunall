@@ -50,45 +50,30 @@ function toPng(size, pixelAt) {
   ]);
 }
 
-/* ── 무엇을 그리나 — 달력 한 장 ──
+/* ── 무엇을 그리나 — 알람시계 ──
+   ⚠ 2026-09-19 에 «달력»에서 바꿨다 (대표 지시 「푸른캘린더 아이콘은 다른것으로 해라」).
+     포털에서 바로 옆 정부사업일정이 같은 달력 그림이라 둘을 글자로만 가를 수 있었다.
+     달력붙이를 다시 고르면 작아질수록 또 같아 보인다 — 아예 다른 물건으로 간다.
+     이 앱이 다루는 것이 일정·근태, 곧 «시각»이기도 하다.
    ⚠ 바탕은 «가장자리까지» 채운다. 기기가 동그라미로 잘라도 흰 귀퉁이가 안 생긴다.
-   ⚠ 달력은 안쪽 안전 구역에만 그린다 — 잘려도 안 잘리게. */
+   ⚠ 시계는 안쪽 안전 구역에만 그린다 — 잘려도 안 잘리게. */
 const BG_TOP = [30, 64, 175];      // #1e40af
 const BG_BOT = [37, 99, 235];      // #2563eb
 const WHITE = [255, 255, 255];
-const RED = [220, 38, 38];         // #dc2626 — 고리 아래 빨간 머리띠(달력임을 한눈에)
+const FACE = [219, 234, 254];      // #dbeafe — 시계판(흰 테두리와 갈라 보이게)
+const RED = [220, 38, 38];         // #dc2626 — 바늘(작아져도 «시계»로 읽히는 것이 이것이다)
 
 function draw(size) {
   const S = 3;                                  // 한 칸을 3×3 으로 훑어 계단을 없앤다
-  const box = { x0: .20, x1: .80, y0: .26, y1: .80, r: .05 };
-  const bandY = box.y0 + .10;                   // 머리띠 아래끝
-  const ringY = box.y0 - .045;                  // 고리 두 개
+  const cx = .50, cy = .565;                    // 몸통 한가운데
 
-  function inRounded(u, v) {
-    if (u < box.x0 || u > box.x1 || v < box.y0 || v > box.y1) return false;
-    const r = box.r;
-    const cx = Math.min(Math.max(u, box.x0 + r), box.x1 - r);
-    const cy = Math.min(Math.max(v, box.y0 + r), box.y1 - r);
-    const dx = u - cx, dy = v - cy;
-    return dx * dx + dy * dy <= r * r;
-  }
-  function onRing(u, v) {
-    const w = .022, h = .055;
-    return [.36, .64].some(function (cx) {
-      return Math.abs(u - cx) <= w && v >= ringY && v <= ringY + h;
-    });
-  }
-  /* 날짜 점 — 3줄 × 3칸. 가운데 한 칸만 빨갛게(「오늘」) */
-  function onDot(u, v) {
-    const cols = [.33, .50, .67], rows = [.46, .59, .72], rr = .045;
-    for (let i = 0; i < rows.length; i++) {
-      for (let j = 0; j < cols.length; j++) {
-        if (i === 2 && j === 2) continue;        // 마지막 한 칸은 비운다(빽빽해 보이지 않게)
-        const dx = u - cols[j], dy = v - rows[i];
-        if (dx * dx + dy * dy <= rr * rr) return (i === 1 && j === 1) ? 'today' : 'day';
-      }
-    }
-    return '';
+  function disc(u, v, x, y, r) { const dx = u - x, dy = v - y; return dx * dx + dy * dy <= r * r; }
+  /* 점이 선분에서 w 안쪽인가 — 바늘 하나를 이렇게 그린다 */
+  function seg(u, v, x1, y1, x2, y2, w) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const t = Math.min(1, Math.max(0, ((u - x1) * dx + (v - y1) * dy) / (dx * dx + dy * dy)));
+    const px = u - (x1 + dx * t), py = v - (y1 + dy * t);
+    return px * px + py * py <= w * w;
   }
 
   return function (x, y) {
@@ -97,14 +82,16 @@ function draw(size) {
       const u = (x + (sx + .5) / S) / size, v = (y + (sy + .5) / S) / size;
       const bg = [0, 1, 2].map(i => Math.round(BG_TOP[i] + (BG_BOT[i] - BG_TOP[i]) * v));
       let c = bg;
-      if (onRing(u, v)) c = WHITE;
-      else if (inRounded(u, v)) {
-        if (v <= bandY) c = RED;                 // 머리띠
-        else {
-          const d = onDot(u, v);
-          c = d === 'today' ? RED : d === 'day' ? bg : WHITE;
-        }
-      }
+      /* 아래에서 위로 덮어 그린다 — 나중 것이 이긴다 */
+      if (u >= .455 && u <= .545 && v >= .175 && v <= .275) c = WHITE;   // 위 손잡이
+      if (disc(u, v, .285, .295, .115) || disc(u, v, .715, .295, .115)) c = WHITE;  // 종 둘
+      if (disc(u, v, .235, .855, .070) || disc(u, v, .765, .855, .070)) c = WHITE;  // 다리 둘
+      if (disc(u, v, cx, cy, .310)) c = WHITE;                            // 몸통(테두리)
+      if (disc(u, v, cx, cy, .250)) c = FACE;                             // 시계판
+      /* 바늘 — 10시 10분. 어느 쪽으로도 안 치우쳐 보여 작을수록 시계로 읽힌다 */
+      if (seg(u, v, cx, cy, .385, .445, .026)) c = RED;                   // 짧은바늘
+      if (seg(u, v, cx, cy, .655, .420, .020)) c = RED;                   // 긴바늘
+      if (disc(u, v, cx, cy, .038)) c = RED;                              // 가운데 못
       r += c[0]; g += c[1]; b += c[2];
     }
     const n = S * S;

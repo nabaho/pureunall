@@ -38,6 +38,7 @@ const APPS = [
   ['pu-camera.html',  'pu-camera-manifest.json',  'camera',  null],
   ['pu-paydata.html', 'pu-paydata-manifest.json', 'paydata', 'paydata'],
   ['work.html',       'work-manifest.json',       'work',    'work'],
+  ['pu-cal.html',     'pu-cal-manifest.json',     'cal',     'cal'],
 ];
 const MAIL = ['pu-mail-manifest.json', 'mail', 'mail'];   // 주소로 갈라 쓰는 것
 
@@ -110,7 +111,24 @@ ok('포털 타일을 실제로 읽었다', checked >= 4, '읽은 수: ' + checke
 ok('★ 타일 그림과 탭 그림이 같다 (설치 아이콘도 이 그림으로 구웠다)', bad.length === 0,
    bad.map(b => '      ' + b).join('\n'));
 
-console.log('\n[⑥ 포털과 이알피가 manifest 를 같이 쓰지 않는다]');
+console.log('\n[⑥ ★ 타일 그림이 서로 겹치지 않는다]');
+/* 대표 지시 2026-09-19 「푸른캘린더 아이콘은 다른것으로 해라」 —
+   푸른 캘린더와 정부사업일정이 둘 다 📅 였다. 이름은 다른데 그림이 같으면
+   그림으로 찾는 사람은 매번 글자를 읽어야 한다. 타일을 쓰는 까닭이 없어진다.
+   ⚠ 글자 찾기로 「📅 가 둘이면 안 된다」를 박지 않는다 — 어느 그림이든 둘이면 안 된다. */
+const 타일 = {};
+const tileRe2 = /\{ key:'([\w]+)',\s*name:'([^']*)',[^}]*?icon:'([^']*)'/g;
+let t2;
+while((t2 = tileRe2.exec(portal))){
+  const 그림 = t2[3].replace(/️/g, '');          // 색 지정(VS16)은 떼고 견준다
+  (타일[그림] = 타일[그림] || []).push(t2[2]);
+}
+ok('포털 타일을 모두 읽었다', Object.keys(타일).length >= 10, '읽은 그림 수: ' + Object.keys(타일).length);
+const 겹침 = Object.keys(타일).filter(k => 타일[k].length > 1);
+ok('★ 같은 그림을 쓰는 타일이 없다', 겹침.length === 0,
+   겹침.map(k => '      ' + k + ' → ' + 타일[k].join(' · ')).join('\n'));
+
+console.log('\n[⑦ 포털과 이알피가 manifest 를 같이 쓰지 않는다]');
 /* 같이 쓰면 둘 중 하나를 설치할 때 다른 하나의 이름·아이콘으로 깔린다 */
 const pm = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 const em = JSON.parse(fs.readFileSync(path.join(ROOT, 'pu-erp-manifest.json'), 'utf8'));
