@@ -58,6 +58,8 @@ global.funds = {};
   /* 원본 줄맞춤 자국 걷어내기 + 이름 자리표(2026-09-14) — hwpFormHTML 이 부른다.
      여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
   gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
+  /* 2026-09-19: 노동조합대표자→근로자대표 · 홀로 선 날짜 자리 · 작성 예 제외 */
+  gS('DATE_CTX'), gF('_dateSlot'), gF('fillWrepLabel'), gF('_stripSample'),
   /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다.
      여기 없으면 「fillFundTypeWords is not defined」로 이 검사가 통째로 죽는다. */
   gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
@@ -326,8 +328,12 @@ console.log('\n■ 서명란 — 근로자대표·사용자대표가 사업장�
      날인란이 관청에 나가면 안 된다. 정관 원본은 서명 줄이 두 쌍이다. */
   const ONE = [{ name: '가나기계', ceo: '김가나', wrep_name: '박근로', status: 'active' }];
   const t1 = draw('charter', F, ONE);
+  /* 2026-09-19 대표 지시로 「노동조합대표자」를 «근로자대표»로 고쳤다 —
+     참여회사에 노조가 «없는» 곳이 많고, 법 제55조제2항을 준용해 «선출»하는 사람이다. */
+  ok('정관 — 「노동조합대표자」가 «근로자대표»로 바뀐다', t1.indexOf('노동조합') < 0,
+    (t1.match(/.{0,20}노동조합.{0,16}/) || [''])[0]);
   ok('정관 — 사업장이 하나면 서명 줄도 하나 (남는 줄은 지운다)',
-    (t1.match(/노동조합대표자/g) || []).length === 1, (t1.match(/노동조합대표자/g) || []).length + '줄');
+    (t1.match(/근로자대표 /g) || []).length === 1, (t1.match(/근로자대표 /g) || []).length + '줄');
   /* 근로자대표를 안 적어 둔 사업장은 그 자리를 «비워» 둔다 — 지어내지 않는다 */
   const NOW = [{ name: '가나기계', ceo: '김가나', status: 'active' }];
   const t2 = draw('agreement', F, NOW);

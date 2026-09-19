@@ -55,7 +55,7 @@ const NUM = `function num(v){ if(v==null||v==='')return ''; if(typeof v==='numbe
 const API = build([
   NUM,
   grabFn('estabSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'),
-  grabFn('partyNames'), grabFn('partyJoin'), grabFn('_blankCount'),
+  grabFn('partyNames'), grabFn('partyJoin'), grabFn('_stripSample'), grabFn('_blankCount'),
   grabFn('_flat'), grabFn('_loose'), grabFn('_cleanAddr'), grabFn('_cleanCoName'),
   grabFn('_cleanBizWord'), grabFn('parseBizReg'),
 ]);
@@ -225,6 +225,8 @@ test('채울 자리 세기 — 밑줄·회사 자리표를 센다', () => {
   assert.equal(API._blankCount('다 채워진 글'), 0);
   assert.equal(API._blankCount(''), 0);
   assert.equal(API._blankCount(null), 0);
+  /* 2026-09-19: 서식의 「작성 예」 안내문은 «채울 자리»가 아니다 — 채우면 안내문이 망가진다 */
+  assert.equal(API._blankCount('(작성 예) ○○동 ○○○○번지 ○○호'), 0);
 });
 
 test('묶음 세 단계가 실제 서식 목록을 가리킨다', () => {

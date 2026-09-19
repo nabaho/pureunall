@@ -65,6 +65,8 @@ global.funds = {};
   /* 원본 줄맞춤 자국 걷어내기 + 이름 자리표(2026-09-14) — hwpFormHTML 이 부른다.
      여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
   gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
+  /* 2026-09-19: 노동조합대표자→근로자대표 · 홀로 선 날짜 자리 · 작성 예 제외 */
+  gS('DATE_CTX'), gF('_dateSlot'), gF('fillWrepLabel'), gF('_stripSample'),
   /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다. 위와 같은 까닭이다. */
   gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
   gF('ftypeSkipDoc'), gS('FTYPE_PICK_SRC'), gF('_ftypeSwap'), gF('_ftypeWords'), gF('_isTypePickBox'), gF('fillFundTypeWords'),
