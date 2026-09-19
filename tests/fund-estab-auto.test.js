@@ -399,8 +399,13 @@ function renderBundle(phase) {
     'function docBody(){ return "<p>몸통 ＿＿＿＿＿</p>"; }',
     'function _showDocHTML(h){ HOST.body=h; }',
     'function docBlanks(h){ return 1; }',
-    'var S={};',
+    /* 2026-09-19: 묶음이 다섯 단계로 늘고, ④⑤ 는 장부를 먼저 읽고, 빈 곳 표를 그린다 */
+    'function _docExtra(){ return Promise.resolve(null); }',
+    'function estabGapHTML(){ return "<i>빈곳표</i>"; }',
+    'function isTempName(){ return false; }',
+    'var funds={}; var S={};',
     grabDecl('DOC_KINDS'), grabDecl('DOC_REG'), grabDecl('DOC_TAX'),
+    grabDecl('DOC_OPS'), grabDecl('DOC_SUB'), grabDecl('DOC_NEEDS_LEDGER'),
     grabFn('docsFor'), grabDecl('ESTAB_PHASES'), grabFn('estabBundle'),
     'this.run=estabBundle;',
   ].join('\n');
@@ -410,7 +415,7 @@ function renderBundle(phase) {
 }
 
 test('묶음 화면을 «정말 그리면» 단추가 성한 채로 나온다 — 변수가 새지 않는다', () => {
-  ['kinds', 'reg', 'tax'].forEach((p) => {
+  ['kinds', 'reg', 'tax', 'ops', 'sub'].forEach((p) => {
     const html = renderBundle(p);
     assert.ok(html.includes('printDoc()'), p + ': 인쇄 단추가 없다');
     assert.ok(html.includes('id="docwrap"'), p + ': 서류 자리가 없다');
@@ -425,6 +430,9 @@ test('묶음 화면 제목이 단계마다 다르다 — 어느 단계를 보는
   assert.match(renderBundle('kinds'), /① 노동부 설립인가/);
   assert.match(renderBundle('reg'), /② 법인 설립등기/);
   assert.match(renderBundle('tax'), /③ 고유번호증/);
+  /* 2026-09-19: ④운영·⑤근복지원금도 묶음으로 본다 (대표 지시) */
+  assert.match(renderBundle('ops'), /④ 운영/);
+  assert.match(renderBundle('sub'), /⑤ 근복지원금/);
   // 모르는 이름을 주면 첫 단계로 — 빈 화면을 내지 않는다
   assert.match(renderBundle('없는단계'), /① 노동부 설립인가/);
 });
