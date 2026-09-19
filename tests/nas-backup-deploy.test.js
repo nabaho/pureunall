@@ -43,10 +43,23 @@ test('②★★ 함수 «하나만» 올린다 — 다른 함수를 건드리면
 test('③★ 열쇠가 이미 있으면 다시 만들지 않는다', () => {
   assert.match(SRC, /secrets:access/,
     '★ 있는지 안 보고 만들면 나스에 넣어 둔 옛 열쇠가 조용히 죽는다 — 다음 주 새벽에야 안다');
-  const i = SRC.indexOf('if (있나)');
+  const i = SRC.indexOf('if (기존값)');
   const j = SRC.indexOf('randomBytes');
-  assert.ok(i > -1 && j > i, '★★ 만들기가 «있나» 검사보다 앞이면 검사한 뜻이 없다');
-  assert.match(SRC.slice(i, j), /return null/, '★ 있는데도 이어 가면 덮어쓴다');
+  assert.ok(i > -1 && j > i, '★★ 만들기가 «있는지» 검사보다 앞이면 검사한 뜻이 없다');
+  assert.match(SRC.slice(i, j), /return 기존값;/, '★ 있는데도 이어 가면 덮어쓴다');
+});
+
+test('③-2★★ 「이미 있다」고 값을 «버리지» 않는다 — 두 번째 --deploy 부터도 붙여넣을 것을 준다', () => {
+  /* 2026-09-19 대표 화면: 처음 --deploy 했을 때는 클립보드에 완성 스크립트가 담겼다.
+     나스 화면을 만지시다 클립보드가 다른 것으로 덮이자 「다시 올려달라」고 다시 돌리셨는데,
+     이번엔 아무것도 안 담겼다 — 존재를 확인하며 «이미 받아 온 진짜 값»을 그냥 버리고
+     null 을 돌려줬기 때문이다. 값을 손에 쥐고도 몰라서 못 준다고 한 것이다. */
+  const f = SRC.slice(SRC.indexOf('function 열쇠준비('), SRC.indexOf('function 올리기('));
+  assert.doesNotMatch(f, /return null;/,
+    '★★ 이미 있는 열쇠를 확인하려고 받아 온 진짜 값을 버리고 null 을 돌려주면,\n' +
+    '  두 번째부터는 나스에 붙여넣을 것을 영영 못 만든다');
+  assert.match(f, /기존값 = \(out && out\.trim\(\)\) \? out\.trim\(\) : null;/,
+    '★ 존재 확인에 쓴 그 값을 그대로 재사용해야 한다 — 다시 부르면 서버에 한 번 더 물어보는 것이다');
 });
 
 test('④★★ 열쇠를 파일로 남기지 않는다', () => {

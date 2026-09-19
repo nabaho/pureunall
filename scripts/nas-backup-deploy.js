@@ -61,17 +61,29 @@ function 로그인확인() {
 
 /* ── ② 열쇠 — 있으면 그대로, 없으면 만들어 넣는다 ─────────────────────── */
 function 열쇠준비() {
-  let 있나 = false;
+  /* ⚠★★ 「이미 있다」고 값을 «버리던» 자리 (2026-09-19 대표 화면 — 붙여넣을 것을 두 번째부터 못 줬다)
+     ── 무엇이 있었나
+       처음 --deploy 했을 때는 열쇠를 새로 만들어 클립보드에 완성 스크립트를 담아 줬다.
+       나스 화면을 만지시다 클립보드가 다른 것으로 덮이자 「다시 올려달라」고 다시 --deploy 를
+       돌리셨는데, 이번엔 «준비만 하고» 아무것도 안 담겼다.
+     ── 까닭
+       존재 확인을 위해 이미 `functions:secrets:access` 로 «진짜 값»을 받아 왔으면서,
+       있는 줄 알면 그 값을 그대로 버리고 null 을 돌려줬다. 값을 이미 손에 쥐고도
+       «몰라서 못 준다»고 말한 것이다. 아래 나스스크립트만들기·클립보드에 는 열쇠가
+       있어야 도는데, null 을 받으면 조용히 건너뛴다.
+     ── 그래서
+       이미 있으면 «그 값 그대로» 돌려준다. 새로 만드는 것도 서버에 쓰는 것도 아니다 —
+       존재를 확인하며 이미 읽은 값을 재사용할 뿐이라 위험이 없다. */
+  let 기존값 = null;
   try {
     const out = fb(['functions:secrets:access', 비밀이름, '--project', 프로젝트],
       { stdio: ['ignore', 'pipe', 'pipe'] });
-    있나 = !!(out && out.trim());
-  } catch (_) { 있나 = false; }
+    기존값 = (out && out.trim()) ? out.trim() : null;
+  } catch (_) { 기존값 = null; }
 
-  if (있나) {
+  if (기존값) {
     말('② 열쇠 ✓  이미 서버에 있습니다 — 다시 만들지 않습니다.');
-    말('   (나스 스크립트의 열쇠를 잊으셨으면: npx -y firebase-tools functions:secrets:access ' + 비밀이름 + ' --project ' + 프로젝트 + ')');
-    return null;
+    return 기존값;
   }
 
   const 새열쇠 = crypto.randomBytes(32).toString('base64url');
