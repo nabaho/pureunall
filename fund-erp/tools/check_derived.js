@@ -54,7 +54,10 @@ global.funds = {};
      ⚠ gV 는 {·[ 로 시작하는 값만 잡는다. 글자 하나짜리 상수는 줄째로 꺼낸다. */
   gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
   gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
-  gF('partyNames'), gF('partyJoin'), gF('fillPartyList'), gF('fillPartyDates'),
+  gF('partyNames'), gF('partyJoin'), gF('_fillWho'), gF('fillPartyList'), gF('fillPartyDates'),
+  /* 원본 줄맞춤 자국 걷어내기 + 이름 자리표(2026-09-14) — hwpFormHTML 이 부른다.
+     여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
+  gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
   /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다.
      여기 없으면 「fillFundTypeWords is not defined」로 이 검사가 통째로 죽는다. */
   gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
@@ -74,6 +77,11 @@ const T = t => String(t || '').replace(/\s+/g, ' ');
 const draw = (kind, f, sites) => { const d = dom.window.document.createElement('div');
   d.innerHTML = hwpFormHTML(kind, f, sites || []).replace(/<\/t[dh]>/g, ' $&').replace(/<br\s*\/?>/g, ' ');
   return T(d.textContent); };
+/* 공백을 «접지 않은» 글 — 자간 벌림이 살아 있는지 보려면 T() 를 거치면 안 된다
+   (T 가 모든 연속 공백을 한 칸으로 만들어, 무엇이 남았는지 알 수 없다). */
+const drawRaw = (kind, f, sites) => { const d = dom.window.document.createElement('div');
+  d.innerHTML = hwpFormHTML(kind, f, sites || []).replace(/<\/t[dh]>/g, ' $&').replace(/<br\s*\/?>/g, '\n');
+  return String(d.textContent || ''); };
 
 /* «자료가 다 있는» 기금 */
 const F = { name:'가나공동근로복지기금', fund_type:'공동', chairman:'홍길동', inka_date:'2026-01-02',
@@ -112,8 +120,21 @@ console.log('\n■ 기금출연확인서 — 사업장마다 한 장');
   ok('사업장·대표자가 선다', /가나기계 대표이사 김가나/.test(t) && /다라전자 대표이사 이다라/.test(t));
   ok('원본 자리표 「0000(주) 대표이사 0 0 0」이 안 남는다', !/0000\(주\)|0 0 0/.test(t));
   const t0 = draw('contrib', F, []);
-  /* 글귀는 2026-09-10 에 바뀌었다 — 이제 1인당 단가로도 셈하므로 「기본 출연금」만 말하지 않는다 */
-  ok('출연 사업장이 없으면 지어내지 않고 까닭을 남긴다', /출연 약정액이 적힌 참여사업장이 없어/.test(t0) && /￦ [＿_]+/.test(t0)); }
+  ok('참여사업장이 아예 없으면 지어내지 않고 까닭을 남긴다',
+    /참여사업장이 없어 확인서를 만들지 못했습니다/.test(t0) && /￦ [＿_]+/.test(t0));
+  /* ★ 금액이 없어도 «사업장마다 한 장» 만든다 (대표 화면 2026-09-14) — 종전에는 약정액이
+       적힌 곳만 골라, 열여섯 곳이 등록돼 있어도 빈 한 장만 나갔다. */
+  const NOAMT = [{ name: '가나기계', ceo: '김가나', status: 'active' },
+    { name: '다라전자', ceo: '이다라', status: 'active' },
+    { name: '마바산업', ceo: '최마바', status: 'active' }];
+  const tn = draw('contrib', Object.assign({}, F, { contrib_per_worker: 0 }), NOAMT);
+  ok('약정액이 없어도 사업장 수만큼 장이 나온다', (tn.match(/기 금 출 연 확 인 서/g) || []).length === 3,
+    (tn.match(/기 금 출 연 확 인 서/g) || []).length + '장');
+  ok('약정액이 없어도 회사·대표자는 찍힌다',
+    /가나기계 대표이사 김가나/.test(tn) && /마바산업 대표이사 최마바/.test(tn));
+  ok('금액 자리는 비워 둔다 (지어내지 않는다)', /￦ [＿_]+/.test(tn) && !/원정/.test(tn));
+  ok('몇 곳이 비었는지 말해 준다', /3곳 중 3곳은 출연 약정액이 적혀 있지 않아/.test(tn),
+    (tn.match(/※[^※]{0,60}/) || [''])[0]); }
 
 console.log('\n■ 사업계획서·등기신청서·취임승낙서·인감·등록면허세');
 { const t = draw('bizplan', F);
@@ -274,6 +295,71 @@ console.log('\n■ 정관·설립합의서 — 참여사업장이 이름으로 �
   /* 사업장이 없으면 손대지 않는다 — 자리표가 틀린 이름보다 낫다 */
   const none = draw('agreement', F, []);
   ok('사업장이 없으면 자리표를 그대로 둔다', /(?:○○|XX)\s*주식회사/.test(none));
+}
+
+/* ══ 서명란 — 근로자대표·사용자대표가 «사업장에서» 온다 ══ (대표 지시 2026-09-14)
+   「캡쳐 3의 참여 회사 대표등은 설립합의서·설립준비위원회 회의록·기금출연확인서 모두
+     동기화 되어야한다. 이부분의 데이터는 참여사업장의 근로자대표·사용자대표에 모두
+     연결되어 동기화 되어야한다.」
+
+   ⚠ 정관 서명란은 자리표 모양이 달라 한 번도 안 채워졌다 — 둘째 줄이 「□□주식회사」,
+     이름 자리가 「○○○」 이다(설립합의서는 「○○주식회사」·「× × ×」). */
+console.log('\n■ 서명란 — 근로자대표·사용자대표가 사업장에서 온다');
+{
+  const P = [
+    { name: '가나기계', ceo: '김가나', wrep_name: '박근로', status: 'active' },
+    { name: '다라전자', ceo: '이다라', wrep_name: '최근로', status: 'active' },
+    { name: '마바산업', ceo: '정마바', wrep_name: '한근로', status: 'active' },
+  ];
+  ['charter', 'agreement'].forEach((k) => {
+    const t = draw(k, F, P);
+    P.forEach((s) => {
+      ok(k + ' — ' + s.name + ' 의 근로자대표 ' + s.wrep_name + ' 가 선다', t.indexOf(s.wrep_name) >= 0,
+        (t.match(new RegExp(s.name + '.{0,80}')) || [''])[0]);
+      ok(k + ' — ' + s.name + ' 의 대표자 ' + s.ceo + ' 가 선다', t.indexOf(s.ceo) >= 0);
+    });
+    ok(k + ' — 이름 자리표 ○○○·× × × 가 안 남는다', !/○○○|×\s*×\s*×/.test(t),
+      (t.match(/.{0,40}(?:○○○|×\s*×\s*×).{0,20}/) || [''])[0]);
+    ok(k + ' — 회사 자리표 □□주식회사가 안 남는다', t.indexOf('□□') < 0);
+  });
+  /* 서식의 줄이 사업장보다 «많으면» 남는 자리표 줄은 지운다 — 있지도 않은 회사의
+     날인란이 관청에 나가면 안 된다. 정관 원본은 서명 줄이 두 쌍이다. */
+  const ONE = [{ name: '가나기계', ceo: '김가나', wrep_name: '박근로', status: 'active' }];
+  const t1 = draw('charter', F, ONE);
+  ok('정관 — 사업장이 하나면 서명 줄도 하나 (남는 줄은 지운다)',
+    (t1.match(/노동조합대표자/g) || []).length === 1, (t1.match(/노동조합대표자/g) || []).length + '줄');
+  /* 근로자대표를 안 적어 둔 사업장은 그 자리를 «비워» 둔다 — 지어내지 않는다 */
+  const NOW = [{ name: '가나기계', ceo: '김가나', status: 'active' }];
+  const t2 = draw('agreement', F, NOW);
+  ok('근로자대표가 없으면 그 자리는 자리표로 남는다', /×\s*×\s*×/.test(t2));
+  ok('그래도 대표자는 찍힌다', t2.indexOf('김가나') >= 0);
+}
+
+/* ══ 원본 한글의 «줄맞춤 자국» ══ (대표 지시 2026-09-14 「정관안에 줄칸 등 모두 정렬해달라」)
+   원본을 쓴 사람이 줄 끝을 맞추려고 낱말 사이에 공백을 여러 칸 넣어, 폭이 다른 화면에서는
+   문장 한가운데 구멍이 났다(「각 1인의 위원으로 구    성한다」). */
+console.log('\n■ 정관 — 줄맞춤 자국이 걷혔다');
+{
+  const t = draw('charter', F, SITES);
+  ok('「구    성한다」가 「구성한다」로 붙는다', t.indexOf('위원으로 구성한다') >= 0,
+    (t.match(/1인의 위원.{0,24}/) || [''])[0]);
+  ok('「사용자를    대표하는」의 구멍이 메워진다', t.indexOf('사용자를 대표하는') >= 0);
+  /* ⚠ 「된다」는 온전한 서술어다 — 앞말과 «띄어» 써야 한다. 구멍만 메우고 붙이지는 않는다. */
+  ok('「의장이     된다」의 구멍만 메워진다 (붙이지는 않는다)', t.indexOf('대표하는 의장이 된다') >= 0,
+    (t.match(/호선하여.{0,40}/) || [''])[0]);
+  /* 긴 본문 문단에는 두 칸 이상 공백이 남으면 안 된다 — 그것이 곧 구멍이다 */
+  const raw = drawRaw('charter', F, SITES);
+  const body = (raw.match(/제19조[\s\S]{0,500}/) || [''])[0];
+  ok('본문에 두 칸 이상 공백이 안 남는다', !/[가-힣] {2,}[가-힣]/.test(body),
+    (body.match(/[가-힣] {2,}[가-힣]/) || [''])[0]);
+  /* ⚠ 제목의 «자간 벌림»은 건드리면 안 된다 — 한글 문서가 일부러 벌려 쓴 것이다 */
+  const m = drawRaw('minutes', F, SITES);
+  ok('회의록 제목의 자간 벌림은 그대로 둔다', /의 {1,3}결 {1,3}주 {1,3}문/.test(m),
+    (m.match(/의 {0,3}결[^:\n]{0,14}/) || [''])[0]);
+  ok('사업계획서 표 머리의 자간 벌림도 그대로', /차 {2,}변/.test(drawRaw('bizplan', F, SITES)));
+  /* 서명란의 «두 단 벌림»(근로자측 ↔ 사용자측)도 남아야 한다 — 여기까지 메우면 두 단이 붙는다 */
+  ok('서명란 두 단 벌림은 그대로 둔다', / {6,}/.test((raw.match(/근로자측 위 원[\s\S]{0,120}/) || [''])[0]),
+    (raw.match(/근로자측 위 원.{0,40}/) || [''])[0]);
 }
 
 /* ══ 공동/사내 — 서식 «전부»가 같은 말을 하는가 ══ (2026-09-11)
