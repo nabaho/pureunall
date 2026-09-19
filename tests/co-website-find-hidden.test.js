@@ -38,9 +38,11 @@ const _mStart = erp.indexOf('function CompanyEditModal(props){');
 assert.ok(_mStart > 0, 'CompanyEditModal 을 못 찾았습니다');
 const _mEnd = erp.indexOf('\nfunction ', _mStart + 10);
 const modal = bare(erp.slice(_mStart, _mEnd > 0 ? _mEnd : undefined));
-/* 홈페이지 칸 한 덩이 — 라벨부터 후보 목록 앞까지 */
-const iSite = modal.indexOf("h('label', null, '홈페이지')");
-const siteBlock = iSite > 0 ? modal.slice(iSite, iSite + 1600) : '';
+/* 홈페이지 칸 한 덩이 — 라벨부터 후보 목록 앞까지.
+   ⚠ 2026-09-19 에 업체창이 네 칸으로 바뀌며 이 칸도 fld4('홈페이지', ...) 를
+     쓴다 — 만들개 이름이 아니라 「이 칸이 있는가」만 본다. */
+const iSite = modal.indexOf("fld4('홈페이지'");
+const siteBlock = iSite > 0 ? modal.slice(iSite, iSite + 1700) : '';
 
 test('★★ 스위치가 꺼져 있다 — 지금은 단추가 안 보인다', () => {
   const m = code.match(/var CO_WEBSITE_FIND_ON = (true|false);/);

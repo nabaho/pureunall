@@ -153,7 +153,9 @@ test('④ 빈손일 때 «왜» 빈손인지 갈라서 말한다', () => {
 function contractSection() {
   const at = bare.indexOf("'📋 계약정보'");
   assert.ok(at > 0, '계약정보 칸을 찾지 못했습니다');
-  const end = bare.indexOf("h('div', { className:'fld' }, h('label', null, '업체유형')", at);
+  /* ⚠ 2026-09-19 에 계약정보 칸이 네 칸으로 바뀌며 업체유형이 fld4() 를 쓴다 —
+       칸을 그리는 «만들개 이름」이 아니라 어디까지가 이 칸인지만 본다. */
+  const end = bare.indexOf("fld4('업체유형'", at);
   assert.ok(end > at, '계약정보 칸의 끝을 찾지 못했습니다');
   return bare.slice(at, end);
 }
