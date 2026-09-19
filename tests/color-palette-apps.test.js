@@ -88,6 +88,9 @@ const EXCEPT = {
   'sign.html': new Set([]),
   'ieum-view.html': new Set([]),
   'install.html': new Set([]),
+  /* ⚠ DONE 에 든 파일은 EXCEPT 에도 칸이 있어야 한다 — 없으면 팔레트 밖 색이
+     나왔을 때 «무엇이 잘못됐는지 말하는 대신» TypeError 로 터진다(2026-09-19 에 그랬다). */
+  'pu-cal.html': new Set([]),
   'kcareer.html': new Set([]),
 };
 
