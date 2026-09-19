@@ -101,8 +101,14 @@
       entityTypes:['Person','Organization','Message','Document'] },
     cards:{ name:'기업정보함', file:'pu-cards.html', primaryRoots:['pucards'], sharedRoots:['data/companies'],
       entityTypes:['Organization','Person','Document','MediaAsset','Message'] },
-    photos:{ name:'사진첩', file:'pu-photos.html', primaryRoots:['puphotos'], sharedRoots:['pucards/coInfo'],
-      entityTypes:['Person','Organization','Document','MediaAsset'] },
+    photos:{ name:'사진첩', file:'pu-photos.html', primaryRoots:['puphotos'],
+      /* data/contract_requests — 「담당자 고르고 계약 만들기」가 남기는 요청 (2026-09-19).
+         ⚠ 사진첩은 계약(data/contracts)을 직접 안 쓴다. 요청만 남기고 계약관리가 만든다 —
+           업체 연결·중복·월 잠금 검사가 그 집에 있기 때문이다.
+         data/user_dir — 주담당 고르개에 쓸 직원 공개 명부(읽기만). */
+      sharedRoots:['pucards/coInfo','data/contract_requests','data/user_dir'],
+      writeContracts:[{path:'data/contract_requests/{id}',entityType:'Task'}],
+      entityTypes:['Person','Organization','Document','MediaAsset','Task'] },
     fund:{ name:'기금관리', file:'fund.html', primaryRoots:['data/funds'], sharedRoots:['data/finance_income','pucards/idx','pucards/coInfo'],
       entityTypes:['Organization','Person','Project','FinancialTransaction','Document'] },
     rules:{ name:'취업규칙 관리', file:'rules.html', primaryRoots:['chwieop','rules_mgmt'], sharedRoots:['data/user_dir'],
@@ -286,6 +292,9 @@
 
   var STORE_TYPES = {
     companies:'Organization', user_accounts:'Person', user_dir:'Person', contracts:'Contract',
+    /* 계약 «등록 요청» — 아직 계약이 아니다(계약관리가 검사를 지나야 계약이 된다).
+       그래서 Contract 가 아니라 Task 다. Contract 로 적으면 관계 색인이 «없는 계약»을 센다. */
+    contract_requests:'Task',
     cases:'Case', consultings:'Project', funds:'Project', other_projects:'Project',
     my_work_items:'Task', my_schedules:'ScheduleEvent', finance_income:'FinancialTransaction',
     finance_expense:'FinancialTransaction', finance_invoice:'Invoice', payroll_monthly:'PayrollRecord',
