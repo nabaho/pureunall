@@ -306,8 +306,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-19 업체 수정 네 칸 — 계약창과 같은 차례로 · 법인등록번호 · 부담당 칸별';
-var BUILD_SEQ = 180;
+var ERP_BUILD = '2026-09-19 이관 누락 넷 고침 — 법인번호·대표자전화·본사주소·대표자2';
+var BUILD_SEQ = 181;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -17831,6 +17831,7 @@ function ContractModal(props){
     if(!fo) return { bizNo:(r && r.bizNo) || '' };
     var co = fo.isContract ? (fo.item.company || {}) : fo.item;
     return { bizNo:co.bizNo, ceo:co.ceo, ceo2:co.ceo2, zipcode:co.zipcode, address:co.address,
+             addressDetail:co.addressDetail,
              phone:co.phone, fax:co.fax, email:co.email, ceoPhone:co.ceoPhone,
              bizType:co.bizType, bizCategory:co.bizCategory, corpRegNo:co.corpRegNo,
              companySize:co.companySize,
@@ -17839,7 +17840,7 @@ function ContractModal(props){
              injuryInsuredCount: co.injuryInsuredCount,
              contacts:(co.contacts||[]), workers:(co.workers||[]) };
   }
-  var ERP_CO_FILL_KEYS = ['bizNo','ceo','ceo2','zipcode','address','phone','fax','email',
+  var ERP_CO_FILL_KEYS = ['bizNo','ceo','ceo2','zipcode','address','addressDetail','phone','fax','email',
                           'ceoPhone','bizType','bizCategory','corpRegNo','companySize','companyId'];
   /* 그룹 «전체»에서 빈 칸만 채운다.
      ★ 이것이 대표가 겪은 「기업정보함 이름을 골랐더니 사업자번호가 안 왔다」를 없앤다 —
@@ -21245,10 +21246,14 @@ function transferContract(contract){
         name: contract.companyName || co.name || '',
         bizNo: contract.bizNo || co.bizNo || '',
         ceo: co.ceo || '',
+        ceo2: co.ceo2 || '',
+        corpRegNo: co.corpRegNo || '',
         zipcode: co.zipcode || '',
         address: co.address || '',
         phone: co.phone || '',
         fax: co.fax || '',
+        ceoPhone: co.ceoPhone || '',
+        addressDetail: co.addressDetail || '',
         email: co.email || '',
         bizType: co.bizType || '',
         bizCategory: co.bizCategory || '',
@@ -21361,10 +21366,13 @@ function transferContract(contract){
         bizNo: contract.bizNo,
         ceo: caseCo.ceo || '',
         ceo2: caseCo.ceo2 || '',
+        corpRegNo: caseCo.corpRegNo || '',
         zipcode: caseCo.zipcode || '',
         address: caseCo.address || '',
         phone: caseCo.phone || '',
         fax: caseCo.fax || '',
+        ceoPhone: caseCo.ceoPhone || '',
+        addressDetail: caseCo.addressDetail || '',
         email: caseCo.email || '',
         bizType: caseCo.bizType || '',
         bizCategory: caseCo.bizCategory || '',
@@ -21455,8 +21463,10 @@ function transferContract(contract){
       companyId: contract.companyId||'', companyLinkStatus:contract.companyLinkStatus,
       ceo: co2.ceo || '',
       ceo2: co2.ceo2 || '',
+      corpRegNo: co2.corpRegNo || '',
       zipcode: co2.zipcode || '', address: co2.address || '',
       phone: co2.phone || '', fax: co2.fax || '', email: co2.email || '',
+      ceoPhone: co2.ceoPhone || '', addressDetail: co2.addressDetail || '',
       bizType: co2.bizType || '', bizCategory: co2.bizCategory || '',
       companySize: co2.companySize || '',
       employmentInsuredCount: co2.employmentInsuredCount || 0,
@@ -27292,6 +27302,11 @@ function CompanyEditModal(props){
               })(),
               h('input', { type:'text', value:f.address || '', onChange:set('address'), placeholder:'사업장 주소', style:{ flex:1 } })
             )),
+          /* 본사주소 — 2026-09-19 에 넣었다(같은 검증). 계약창엔 이미 있었는데
+             이 창엔 칸이 없어 이관할 자리가 없었다. */
+          fld4('본사주소',
+            h('input', { type:'text', value:f.addressDetail || '', onChange:set('addressDetail'),
+              placeholder:'(본사와 다를 때만)' }), 4),
           sec4('☎ 연락처', '네 칸이라 한 줄로 모았다'),
           fld4('대표 전화',
             h('input', { type:'text', value:f.phone || '', onChange:set('phone'),
@@ -27301,6 +27316,13 @@ function CompanyEditModal(props){
             h('input', { type:'text', value:f.fax || '', onChange:set('fax'),
               onBlur:function(e){ var v = fmtPhone(e.target.value); if(v !== e.target.value) set('fax')({target:{value:v,type:'text'}}); },
               placeholder:'팩스' })),
+          /* 대표자 전화 — 2026-09-19 에 넣었다. 계약창(ContractModal)엔 이미 있었는데
+             이 창엔 칸이 없어 transferContract() 가 이관할 자리가 없었다(검증 2026-09-19
+             「사무관리에 옮겨져도 충돌 생기면 안 된다」). 계약창과 같은 이름·같은 자리. */
+          fld4('대표자 전화',
+            h('input', { type:'text', value:f.ceoPhone || '', onChange:set('ceoPhone'),
+              onBlur:function(e){ var v = fmtPhone(e.target.value); if(v !== e.target.value) set('ceoPhone')({target:{value:v,type:'text'}}); },
+              placeholder:'010-0000-0000' })),
           /* ── 대표자 이메일 (대표 결정 2026-09-09) — 회사 이메일(아래)과 «다른 칸»이다.
              뉴스레터가 여기로 간다. 빈 칸이면 회사 이메일로 물러선다. */
           fld4('대표자 이메일',
