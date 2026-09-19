@@ -21994,27 +21994,38 @@ function ContractManagement(props){
     form.kinds = ['consulting'];
     form.managerMain = String(req.managerMain || '');
     if(req.srcPhoto) form.srcPhoto = req.srcPhoto;
-    /* 서류 이름으로 컨설팅 유형을 짐작한다 — 쪽지 길(위 useEffect)과 «같은 함수»다 */
+    /* ★★ 유형은 «사진첩에서 고른 것»을 그대로 쓴다 (2026-09-19 실제 자료로 검증한 뒤 고침).
+       ⚠⚠ 처음에는 못 고르면 첫 유형(현장클리닉)으로 찍었다. 실제 신청서 47장을 넣어 보니
+         **25장이 그렇게 찍혔다** — 「인사노무 컨설팅 신청서」가 현장클리닉이 되었다.
+         모달은 사람이 드롭다운을 «보고» 있어서 첫 항목 기본값이 괜찮지만,
+         자동 등록은 아무도 안 보고 있다. 그래서 찍지 «않고», 사진첩에서 미리 고르게 했다.
+       ⚠ 짐작이 되는 서류는 사진첩이 이미 골라 둔 채로 보낸다 — 사람은 확인만 한다.
+         짐작이 안 되는 서류(「인사노무컨설팅충남북부상의」와 「…서산」처럼 후보가 둘이라
+         고를 수 없는 것)만 사람이 고른다. */
     var docName = (req.srcPhoto && req.srcPhoto.name) || '';
-    var types = dbGet('biz_cons_types', BIZ_CONS_SEED);
-    var ty = docName ? erpConsTypeByDocName(docName, types) : null;
-    var 짐작 = '';
-    if(ty && ty.code){ form.typeCodes.consulting = ty.code; 짐작 = '유형 「' + (ty.name || '') + '」 은 서류 이름으로 골랐습니다'; }
-    else if(types && types.length){
-      /* 못 찾으면 첫 유형으로 둔다 — 모달의 저장 길도 그렇게 한다(fixTypeCodes).
-         ⚠ 비워 두면 업체관리·컨설팅의 어느 유형 칸에도 안 나와 «사라진 것»처럼 된다.
-         ⚠ 대신 «짐작 못 했다»고 적어 둔다 — 말없이 찍으면 사람이 고른 줄 안다. */
-      form.typeCodes.consulting = types[0].code;
-      짐작 = '⚠ 유형을 서류 이름으로 못 골라 「' + (types[0].name || '') + '」 으로 두었습니다 — 확인해 주세요';
-    }
+    var code = String(req.consultingType || '');
+    var types = dbGet('biz_cons_types', BIZ_CONS_SEED) || [];
+    var ty = types.find(function(t){ return t && t.code === code; });
+    if(ty) form.typeCodes.consulting = ty.code;
     form.note = '📸 사진첩에서 자동 등록 (' + (docName || '신청서') + ')'
-      + (req.by ? ' · 보낸 사람 ' + req.by : '') + (짐작 ? '\n' + 짐작 : '');
+      + (req.by ? ' · 보낸 사람 ' + req.by : '')
+      + (ty ? '\n유형 「' + (ty.name || '') + '」 으로 등록했습니다' : '');
     return form;
   }
 
   /* 걸리는 까닭을 돌려준다. 빈 문자열이면 «만들어도 되는 것»이다. */
   function ctReqWhy(form){
     if(!form.company.name) return '회사 이름이 없습니다';
+    /* ★ 사업자번호가 없으면 계약이 아니다 (2026-09-19 실제 자료로 갈라 봤다).
+       신청서 48장 중 진짜 신청서 44장은 **44장 모두** 사업자번호를 갖고 있었고,
+       계약이 아닌 것(등기사항전부증명서·위촉장·「신청내용」) 4장은 **하나도** 없었다.
+       칸 수로 가르는 것보다 이 한 칸이 깨끗하게 가른다.
+       ⚠ 중복 검사도 이 번호로 해야 제대로 된다 — 이름만으로는 「총서/충서」처럼
+         한 글자가 달라진 같은 회사를 못 잡는다. */
+    if(!String(form.company.bizNo || '').replace(/\D/g,''))
+      return '사업자번호가 없습니다 — 계약으로 만들 서류가 아닐 수 있습니다';
+    if(!form.typeCodes.consulting)
+      return '컨설팅 유형을 고르지 않았습니다';
     if(!form.managerMain) return '주담당이 없습니다';
     if(!getActiveUsers().some(function(x){ return x.sid === form.managerMain; }))
       return '주담당으로 보낸 사람이 직원 명부에 없습니다';

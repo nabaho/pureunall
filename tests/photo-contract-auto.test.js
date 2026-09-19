@@ -16,7 +16,18 @@
       따로 세면 「화면은 묻는데 자동은 안 막는」 어긋남이 생긴다.
    ③ 목록이 **다 내려오기 전에는 안 돈다.** 업체 목록이 비어 보이면 전부 「연결 보류」가
       되고, 계약 목록이 비어 보이면 중복을 못 찾아 같은 계약을 또 만든다.
-   ④ 걸리면 **안 만들고 까닭을 남긴다.** 자동이라 아무도 그 자리에서 안 보고 있다. */
+   ④ 걸리면 **안 만들고 까닭을 남긴다.** 자동이라 아무도 그 자리에서 안 보고 있다.
+
+   ■ ★★★ 실제 자료로 재 보고 고친 것 둘 (2026-09-19, 대표 지시 「고치고 다시 검증」)
+   실제 신청서 49장을 넣어 보니 처음 판에 구멍이 둘 있었다.
+   ⑤ **유형을 못 고르면 첫 유형(현장클리닉)으로 찍었다** — 47장 중 25장이 그랬다.
+      「인사노무 컨설팅 신청서」가 현장클리닉이 되었다. 모달은 사람이 드롭다운을
+      «보고» 있어 첫 항목 기본값이 괜찮지만 자동 등록은 아무도 안 보고 있다.
+      → 찍지 «않고» 사진첩에서 고르게 했다. 짐작되면 미리 골라 두고, 아니면 사람이.
+   ⑥ **계약이 아닌 서류가 계약이 되었다** — 위촉장·등기사항전부증명서·「신청내용」.
+      판독이 「서식」으로 묶는 범위가 계약보다 넓다.
+      → **사업자번호**로 가른다. 실제 48장 중 진짜 신청서 44장은 모두 갖고 있었고,
+        계약이 아닌 4장은 하나도 없었다. 칸 수보다 이 한 칸이 깨끗하게 가른다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -70,19 +81,30 @@ test('★★★ 요청에는 «누가 맡는지»가 사번으로 들어간다',
     '★★★ 회사 이름 없는 요청도 영영 걸립니다');
 });
 
-test('★★★ 담당자를 안 고르면 «만들 수 없다»', () => {
+test('★★★ 담당자·유형을 안 고르면 «만들 수 없다»', () => {
   const box = stripJs(cutFn(PHOTOS, 'function contractBox(') || '');
-  assert.match(box, /_ctMgr \? '' : ' disabled'/,
-    '★★★ 담당자 없이 보내면 계약관리가 거절해 요청만 쌓입니다');
+  assert.match(box, /_ctMgr && _ctType \? '' : ' disabled'/,
+    '★★★ 둘 중 하나라도 없이 보내면 계약관리가 거절해 요청만 쌓입니다');
   const fn = stripJs(cutFn(PHOTOS, 'function sendContractRequest(') || '');
-  assert.match(fn, /!_ctMgr\) return/,
+  assert.match(fn, /!_ctMgr \|\| !_ctType\) return/,
     '★★★ 단추만 막으면 안 됩니다 — 보내는 쪽에서도 막아야 합니다');
 });
 
-test('★★ 창을 닫으면 고른 담당자를 «잊는다»', () => {
+test('★★★ 보내고 난 뒤에도 고른 담당자·유형을 «잊는다»', () => {
+  /* ⚠ 되돌림에서 이 자리가 안 걸렸다(2026-09-19) — 창을 닫는 쪽만 보고 있었다.
+     한 서류를 보낸 뒤 창을 안 닫고 다음 서류로 넘어가면, 앞 서류의 담당자·유형이
+     그대로 남아 **엉뚱한 사람·엉뚱한 유형으로 계약이 만들어진다.** */
+  const fn = stripJs(cutFn(PHOTOS, 'function sendContractRequest(') || '');
+  const i = fn.indexOf('.then(');
+  assert.ok(i >= 0, '보낸 뒤를 못 찾았습니다');
+  assert.match(fn.slice(i), /_ctMgr = ''; _ctType = ''/,
+    '★★★ 보낸 뒤 안 지우면 다음 서류가 앞 서류의 담당자·유형으로 등록됩니다');
+});
+
+test('★★ 창을 닫으면 고른 담당자·유형을 «잊는다»', () => {
   const fn = stripJs(cutFn(PHOTOS, 'function closeViewer(') || '');
-  assert.match(fn, /_ctMgr = ''/,
-    '★★ 안 지우면 다음 서류가 앞 서류의 담당자 앞으로 등록됩니다');
+  assert.match(fn, /_ctMgr = ''; _ctType = ''/,
+    '★★ 안 지우면 다음 서류가 앞 서류의 담당자·유형으로 등록됩니다');
 });
 
 test('★★ 직원 명부는 «공개 명부»를 읽는다 — 관리자만 읽는 쪽이 아니다', () => {
@@ -222,10 +244,61 @@ test('★★ 빈 서식은 모달과 «같은 것»을 쓴다', () => {
   assert.match(form, /erpBlankContractForm\(\)/);
 });
 
-test('★★ 유형을 못 골랐으면 «못 골랐다고» 적는다', () => {
+test('★★★ 유형을 «찍지 않는다» — 사진첩에서 고른 것만 쓴다', () => {
+  /* ⚠⚠ 이 검사가 이번 일에서 가장 값진 자리다. 처음 판은 유형을 못 고르면
+     types[0].code(현장클리닉)로 «찍었고», 실제 신청서 47장 중 25장이 그렇게 찍혔다.
+     모달은 사람이 드롭다운을 보고 있어 괜찮지만 자동 등록은 아무도 안 보고 있다. */
   const fn = stripJs(cutFn(ERP, 'function ctReqForm(') || '');
-  assert.match(fn, /못 골라/,
-    '★★ 말없이 첫 유형을 찍어 두면 대표님이 손수 고르신 줄 아십니다');
+  assert.ok(!/types\[0\]/.test(fn),
+    '★★★ 첫 유형으로 찍으면 「인사노무 컨설팅 신청서」가 현장클리닉이 됩니다');
+  assert.match(fn, /req\.consultingType/,
+    '★★★ 사진첩에서 고른 유형을 써야 합니다');
+  assert.match(fn, /t\.code === code/,
+    '★★ 있는 유형인지 확인해야 합니다 — 없는 코드가 들어오면 유형 없는 계약이 됩니다');
+});
+
+test('★★★ 유형이 없으면 계약을 «안 만든다»', () => {
+  const why = stripJs(cutFn(ERP, 'function ctReqWhy(') || '');
+  assert.match(why, /typeCodes\.consulting[\s\S]{0,80}return/,
+    '★★★ 유형 없는 계약은 업체관리·컨설팅의 어느 칸에도 안 나와 «사라진 것»이 됩니다');
+  const req = stripJs(cutFn(DOCFILE, 'function requestContract(') || '');
+  assert.match(req, /!o\.consultingType\)\s*return Promise\.reject/,
+    '★★★ 보내는 쪽에서도 막아야 걸린 요청이 안 쌓입니다');
+});
+
+test('★★★ 사업자번호가 없으면 «계약 서류가 아니다»', () => {
+  /* 실제 48장으로 갈라 봤다 — 진짜 신청서 44장은 모두 있었고,
+     위촉장·등기사항전부증명서·「신청내용」 4장은 하나도 없었다. */
+  const fn = stripJs(cutFn(PHOTOS, 'function canMakeContract(') || '');
+  assert.match(fn, /f\.bizno/,
+    '★★★ 없으면 위촉장·등기부에도 「계약 등록」 단추가 뜹니다');
+  const why = stripJs(cutFn(ERP, 'function ctReqWhy(') || '');
+  assert.match(why, /company\.bizNo[\s\S]{0,120}return/,
+    '★★★ 화면만 막으면 안 됩니다 — 만드는 쪽에서도 봐야 합니다');
+});
+
+test('★★★ 짐작기는 «후보가 둘이면 안 고른다»', () => {
+  const fn = cutFn(DOCFILE, 'function guessConsType(') || '';
+  const 안 = cutFn(DOCFILE, 'function nameRun(') || '';
+  const 정 = cutFn(DOCFILE, 'function typeNameTidy(') || '';
+  const ctx = {}; vm.createContext(ctx);
+  vm.runInContext('var TYPE_RUN_MIN = 5;\n' + 정 + '\n' + 안 + '\n' + fn, ctx);
+  /* 실제로 있는 짝이다 — 앞 일곱 글자가 같다. 하나를 찍으면 절반이 틀린다. */
+  const 유형 = [{ code:'a', name:'인사노무컨설팅충남북부상의' },
+                { code:'b', name:'인사노무컨설팅서산' },
+                { code:'c', name:'통합기술보호지원단' }];
+  assert.equal(ctx.guessConsType('2026년 충남북부상공회의소 인사노무 컨설팅 신청서', 유형), null,
+    '★★★ 후보가 둘인데 하나를 찍으면 절반은 틀린 유형으로 계약이 만들어집니다');
+  const t = ctx.guessConsType('통합 기술보호지원반 신청서', 유형);
+  assert.ok(t && t.code === 'c', '★★ 하나뿐일 때는 골라야 합니다 — 안 그러면 늘 사람이 고릅니다');
+});
+
+test('★★ 짐작하는 잣대가 «사진첩과 계약관리에서 같다»', () => {
+  /* 사진첩이 고른 유형이 계약관리가 아는 것과 달라지면, 화면에는 A 라고 적히고
+     계약에는 B 가 들어간다. 그래서 짐작은 한 곳(PuDocFile)에서만 한다. */
+  const box = stripJs(cutFn(PHOTOS, 'function ctGuessType(') || '');
+  assert.match(box, /PuDocFile\.guessConsType\(/,
+    '★★ 사진첩이 제 잣대를 따로 지으면 계약관리와 갈립니다');
 });
 
 /* ══════ ⑤ 자리와 권한 ═══════════════════════════════════════════ */
