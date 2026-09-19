@@ -143,8 +143,11 @@ test('고칠 것이 없으면 원본을 그대로 돌려준다 (쓸데없이 다
 });
 
 test('★ 계약창이 열 때 그 정리를 «부른다»', () => {
-  const B = bare(SRC);
-  assert.ok(B.indexOf('var init = (props.cur ? erpTidyContactsIn(props.cur) : null) || {') >= 0,
+  /* ⚠ 뒤에 무엇이 오는지(`|| { …` 인지 `|| erpBlankContractForm()` 인지)를 박지 않는다 —
+     2026-09-19 에 빈 서식을 함수로 뽑으면서 그 자리가 바뀌었고, 규칙은 그대로인데
+     검사만 깨졌다. 못 박을 것은 «고치는 계약을 열 때 정리를 거친다»는 것이다. */
+  const B = bare(cutBlock(SRC, 'function ContractModal(props){'));
+  assert.ok(/var init = \(props\.cur \? erpTidyContactsIn\(props\.cur\)/.test(B),
     '열 때 정리를 안 부르면 이미 저장된 빈 줄이 그대로 보인다');
 });
 

@@ -178,7 +178,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-billing.js?v=10"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=28"></script>
+<script src="js/pu-ontology.js?v=29"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=1"></script>
@@ -17277,6 +17277,100 @@ function erpValidateContractCompany(form){
   return Object.assign({},form,{companyId:checked.companyId,companyLinkStatus:checked.status,
     company:Object.assign({},form.company||{},{companyId:checked.companyId})});
 }
+/* ══════ 사진첩에서 온 「계약 등록 요청」 (대표 지시 2026-09-19) ══════════════
+   「신청서 캡처가 OCR 된 뒤 담당자만 고르면 계약관리에 자동으로 올라가게」
+
+   ■ ★★ 이 대목의 핵심은 «검사를 한 곳에 두는 것»이다.
+     계약 저장 길에는 사람이 답해야 하는 문이 다섯 있다(유형·주담당·업체연결·
+     사업자번호 충돌·계약 중복). 사진첩이 그것을 흉내 내면 같은 규칙이 두 곳으로
+     갈라져 한쪽만 고쳐지는 날이 온다 — 그래서 **사진첩은 «요청»만 남기고,
+     계약을 만드는 일도 검사하는 일도 전부 여기(계약관리)에서 한다.**
+
+   ■ ⚠⚠ 자동이라고 «무조건 만들지» 않는다.
+     사업자번호가 다른 업체와 겹치거나, 같은 회사에 유형이 겹치는 계약이 이미 있으면
+     **만들지 않고 「확인 필요」로 남긴다.** 기계가 그 자리에서 「예」라고 대신 답하면
+     같은 계약이 둘 생기거나 엉뚱한 업체에 붙는다 — 사람이 가장 늦게 알아채는 사고다. */
+
+/* 새 계약의 «빈 서식». 모달과 자동 등록이 **같은 모양**을 쓴다 —
+   따로 두면 자동으로 만든 계약에만 없는 칸이 생겨 화면이 조용히 깨진다. */
+function erpBlankContractForm(){
+  return {
+    kinds: [],
+    typeCodes: { consult:'', company:'', case:'', consulting:'', fund:'', other:'' },
+    amounts:   { consult:0, company:0, case:0, consulting:0, fund:0, other:0 },
+    // 업무 요약 — 종류별 한 줄(40자). 이관 시 사건/컨설팅/기금/기타로 승계되고 업무관리와 양방향 동기화된다
+    briefs:    { case:'', consulting:'', fund:'', other:'' },
+    company: {
+      name:'', bizNo:'', ceo:'', address:'', phone:'', email:'', fax:'',
+      // 사업자등록증 항목
+      bizType:'',          // 업태 (예: 제조업, 서비스업)
+      bizCategory:'',      // 종목 (예: 운수, 도소매)
+      companySize:'',      // 규모 (소기업/중기업/중견기업/대기업)
+      // 4대보험 가입자수
+      employmentInsuredCount:0,  // 고용보험 가입자수
+      injuryInsuredCount:0,      // 산재보험 가입자수
+      // 다중 담당자
+      contacts:[
+        { id:'mc-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+          name:'', role:'', phone:'', fax:'', email:'', isPrimary:true }
+      ],
+      // 의뢰인(근로자) - 다중. 사건 의뢰인이 근로자일 때 사용
+      workers:[], businessCardImg:'', bizLicenseImg:''
+    },
+    companyName:'', bizNo:'',
+    managerMain:'', managerSubs:[], mgrHistory:[],
+    signDate: todayYMD(),
+    startDate:'',                       // 계약 시작일 (자문/컨설팅용)
+    endDate:'',                         // 계약 종료일 (자문/컨설팅용)
+    successFee:0, successFeeType:'amount',
+    /* 🏥 하루 단위로 셈하는 컨설팅 — 현장클리닉 같은 것. 유형에 1일 단가가 있을 때만 쓴다.
+       dayCalc 는 «어떻게 나온 숫자인지»를 남긴다 — 나중에 「이 1,155,000 어디서 왔나」에 답한다. */
+    consultDays:0,
+    dayCalc:null,                       // {dayFee, days, net, vat, total}
+    payerName:'',                       // 입금자(예금주) — 업체명과 다르게 입금될 때만 사용
+    vatType:'separate',                 // 'separate'(별도) | 'inclusive'(포함)
+    journals:[],                        // 활동 일지 [{id, date, by, content}]
+    status:'consult', note:'', transferredTo:null
+  };
+}
+
+/* #B 사업자번호가 «다른 업체»에 이미 있나. 모달은 물어보고, 자동 등록은 멈춘다 —
+   **찾아내는 규칙은 하나**여야 두 길이 같은 것을 본다. */
+function erpBiznoClash(form, cos){
+  var co = (form && form.company) || {};
+  var biz = String(co.bizNo || '').replace(/\D/g,'');
+  if(biz.length !== 10) return null;
+  return (cos || []).find(function(x){
+    if(!x) return false;
+    if(x.id === co.id) return false;            // 본인 제외
+    if(x.name === co.name) return false;        // 같은 이름은 동일 업체로 본다
+    return String(x.bizNo || '').replace(/\D/g,'') === biz;
+  }) || null;
+}
+
+/* #C 같은 회사에 «유형이 겹치는» 진행 중 계약이 있나.
+   ⚠ 유형이 안 겹치면 다른 일이다(자문과 컨설팅은 함께 있을 수 있다) — 안 막는다. */
+function erpContractDupBlock(form, contracts){
+  var co = (form && form.company) || {};
+  var nm = String(co.name || '').trim();
+  var biz = String(co.bizNo || '').replace(/\D/g,'');
+  if(!nm && !biz) return [];
+  var kinds = (form && form.kinds) || [];
+  return (contracts || []).filter(function(c){
+    if(!c || c._deleted) return false;
+    if(c.status === 'closed' || c.status === 'cancelled') return false;
+    var cBiz = String((c.bizNo || (c.company && c.company.bizNo)) || '').replace(/\D/g,'');
+    var cName = String((c.companyName || (c.company && c.company.name)) || '').trim();
+    var same = (biz && biz.length >= 8 && cBiz === biz) || (nm && nm.length >= 2 && cName === nm);
+    if(!same) return false;
+    return (c.kinds || []).some(function(k){ return kinds.indexOf(k) >= 0; });
+  });
+}
+
+/* 두 번 겹쳐 돌지 않게 — 화면이 다시 그려져도 처리는 한 번이다.
+   ⚠ 겹쳐 돌면 같은 요청으로 계약이 둘 생긴다(요청을 지우기 «전»에 둘째가 읽는다). */
+var _erpCtReqBusy = false;
+
 function ContractModal(props){
   useEscClose(props.onClose);
   useEnterSave(function(){ var saveBtn=document.querySelector('.modal-bg .modal .btn-primary'); if(saveBtn) saveBtn.click(); });
@@ -17300,53 +17394,11 @@ function ContractModal(props){
        씨앗은 따로 받아 아래에서 «빈 칸에만» 얹는다.
      ⚠ 금액·기간·유형은 씨앗에 «없다» — 신청서에 안 적혀 있다. 사람이 넣는다. */
   /* ★ 이미 저장된 계약에도 빈 줄이 들어 있다 — 열 때 한 번 정리한다. */
-  var init = (props.cur ? erpTidyContactsIn(props.cur) : null) || {
-    kinds: [],
-    typeCodes: { consult:'', company:'', case:'', consulting:'', fund:'', other:'' },
-    amounts:   { consult:0, company:0, case:0, consulting:0, fund:0, other:0 },
-    // 업무 요약 — 종류별 한 줄(40자). 이관 시 사건/컨설팅/기금/기타로 승계되고 업무관리와 양방향 동기화된다
-    briefs:    { case:'', consulting:'', fund:'', other:'' },
-    company: {
-      name:'', bizNo:'', ceo:'', address:'', phone:'', email:'', fax:'',
-      // 사업자등록증 항목
-      bizType:'',          // 업태 (예: 제조업, 서비스업)
-      bizCategory:'',      // 종목 (예: 운수, 도소매)
-      companySize:'',      // 규모 (소기업/중기업/중견기업/대기업)
-      // 4대보험 가입자수
-      employmentInsuredCount:0,  // 고용보험 가입자수
-      injuryInsuredCount:0,      // 산재보험 가입자수
-      // 다중 담당자
-      contacts:[
-        { id:'mc-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-          name:'', role:'', phone:'', fax:'', email:'',
-          isPrimary:true }
-      ],
-      // 의뢰인(근로자) - 다중. 사건 의뢰인이 근로자일 때 사용
-      workers:[],
-      businessCardImg:'',
-      bizLicenseImg:''
-    },
-    companyName:'',
-    bizNo:'',
-    managerMain: firstMgr,
-    managerSubs: [],
-    mgrHistory: [],
-    signDate: todayYMD(),
-    startDate: '',                      // 계약 시작일 (자문/컨설팅용)
-    endDate: '',                        // 계약 종료일 (자문/컨설팅용)
-    successFee:0,
-    successFeeType:'amount',
-    /* 🏥 하루 단위로 셈하는 컨설팅 — 현장클리닉 같은 것. 유형에 1일 단가가 있을 때만 쓴다.
-       dayCalc 는 «어떻게 나온 숫자인지»를 남긴다 — 나중에 「이 1,155,000 어디서 왔나」에 답한다. */
-    consultDays:0,
-    dayCalc:null,                       // {dayFee, days, net, vat, total}
-    payerName:'',                       // 입금자(예금주) — 업체명과 다르게 입금될 때만 사용
-    vatType: 'separate',                // 'separate'(별도) | 'inclusive'(포함)
-    journals: [],                       // 활동 일지 [{id, date, by, content}]
-    status:'consult',
-    note:'',
-    transferredTo:null
-  };
+  /* ⚠ 빈 서식은 erpBlankContractForm 이 «한 곳에서» 만든다 — 자동 등록도 같은 것을 쓴다.
+     여기에 칸을 늘리면 그 함수에 늘려야 자동으로 만든 계약에도 그 칸이 생긴다.
+     (칸마다 붙어 있던 설명은 그 함수로 함께 옮겼다) */
+  var init = (props.cur ? erpTidyContactsIn(props.cur) : null)
+          || Object.assign(erpBlankContractForm(), { managerMain: firstMgr });
   /* ★ 씨앗 얹기 — 사진첩에서 신청서를 들고 왔을 때만. «빈 칸에만» 얹는다.
      ⚠ 새 계약일 때만이다(props.cur 가 있으면 고치는 중이라 손대면 안 된다). */
   if(!props.cur && props.seed && props.seed.company){
@@ -18520,21 +18572,14 @@ function ContractModal(props){
     if(!f.kinds || f.kinds.length === 0){ showToast('계약유형 1개 이상 선택'); setTab('contract'); return; }
     if(!f.managerMain){ showToast('주담당 선택'); setTab('manager'); return; }
     // #B 사업자번호 중복 차단 (10자리 입력 시 다른 업체와 동일하면 경고)
-    if(f.company.bizNo){
-      var newBiz = String(f.company.bizNo).replace(/\D/g,'');
-      if(newBiz.length === 10){
-        var allCos = dbGet('companies', []) || [];
-        var dupCo = allCos.find(function(x){
-          if(x.id === f.company.id) return false;  // 본인 제외
-          if(x.name === f.company.name) return false;  // 같은 이름은 동일 업체로 간주
-          var xBiz = (x.bizNo || '').replace(/\D/g,'');
-          return xBiz === newBiz;
-        });
-        if(dupCo){
-          if(!(await popConfirm('⚠️ 동일한 사업자번호('+f.company.bizNo+')가 이미 등록되어 있습니다.\n\n• 기존 업체: ' + (dupCo.name || '-') + '\n• 입력한 이름: ' + f.company.name + '\n\n그래도 저장하시겠습니까? (취소 권장)'))){
-            setTab('company');
-            return;
-          }
+    // ⚠ 찾아내는 규칙은 erpBiznoClash 하나다 — 자동 등록(사진첩 요청)도 같은 것을 본다.
+    //   여기서만 고치면 자동 등록은 옛 잣대로 판단한다.
+    {
+      var dupCo = erpBiznoClash(f, dbGet('companies', []) || []);
+      if(dupCo){
+        if(!(await popConfirm('⚠️ 동일한 사업자번호('+f.company.bizNo+')가 이미 등록되어 있습니다.\n\n• 기존 업체: ' + (dupCo.name || '-') + '\n• 입력한 이름: ' + f.company.name + '\n\n그래도 저장하시겠습니까? (취소 권장)'))){
+          setTab('company');
+          return;
         }
       }
     }
@@ -18553,11 +18598,11 @@ function ContractModal(props){
           return false;
         });
         if(dupCs.length > 0){
-          // 계약유형 겹침 여부 판단
-          var newKinds2 = f.kinds || [];
-          var hasOverlap = dupCs.some(function(c){
-            return (c.kinds||[]).some(function(k){ return newKinds2.indexOf(k) >= 0; });
-          });
+          /* 계약유형 겹침 여부 — ⚠ 판정은 erpContractDupBlock 하나가 한다.
+             자동 등록(사진첩 요청)이 «멈추는 잣대»가 바로 이것이라, 여기서 따로 세면
+             화면은 묻지 않는데 자동은 멈추는(또는 그 반대) 어긋남이 생긴다.
+             ⚠ 위의 dupCs 는 «보여 줄 목록»이라 유형이 안 겹치는 것도 담는다 — 그대로 둔다. */
+          var hasOverlap = erpContractDupBlock(f, allContracts).length > 0;
           // 체크박스로 이미 확인했거나, 다른 종류 계약이면 confirm 생략
           if(!confirmedDuplicate && hasOverlap){
             // 지금 작성 중인 것도 세부 종류까지 채운다 — 판정(dup/again/diff)에 필요하다
@@ -21921,6 +21966,117 @@ function ContractManagement(props){
       ? '📋 「' + docName + '」 으로 유형을 「' + (ty.name || '') + '」 으로 골라 뒀습니다 — 기간·금액만 넣어 주세요'
       : '📋 신청서의 회사 정보를 채웠습니다 — 유형·기간·금액을 골라 주세요', 8000);
   }, []);
+  /* ══════ 사진첩 「계약 등록 요청」 자동 처리 (대표 지시 2026-09-19 「가」) ══════
+     「신청서 캡처가 OCR 된 뒤 담당자만 고르면 계약관리에 자동으로 올라가게」
+
+     ■ 왜 «여기»인가 — 검사가 여기 있기 때문이다.
+       업체 연결·사업자번호 충돌·계약 중복·월 잠금은 전부 «업체 목록과 계약 목록»을
+       읽어야 판단한다. 사진첩은 그것을 안 읽는다(읽게 만들면 같은 규칙이 두 곳으로
+       갈려 한쪽만 고쳐지는 날이 온다). 그래서 사진첩은 «요청»만 남기고 만드는 일은 여기서 한다.
+
+     ■ ⚠⚠ 목록이 다 내려오기 «전»에는 절대 안 돈다.
+       업체 목록이 비어 보이면 전부 「연결 보류」가 되고, 계약 목록이 비어 보이면
+       중복을 못 찾아 같은 계약을 또 만든다. **자동이라 그 자리에서 아무도 못 본다.**
+
+     ■ ⚠ 자동이라고 «무조건» 만들지 않는다 — 걸리면 안 만들고 까닭을 적어 남긴다.
+       만든 요청은 지운다(「어디서 왔나」는 계약의 srcPhoto 가 들고 있다).
+       걸린 요청은 남긴다 — 사람이 봐야 한다. */
+  function ctReqForm(req){
+    var form = erpBlankContractForm();
+    var co = (req && req.company) || {};
+    Object.keys(co).forEach(function(k){
+      var v = co[k];
+      /* ⚠ 빈 서식에 «있는 칸»만 받는다 — 모르는 칸을 그대로 넣으면 계약에 정체 모를 칸이 쌓인다 */
+      if(v !== '' && v != null && form.company.hasOwnProperty(k)) form.company[k] = v;
+    });
+    form.companyName = form.company.name || '';
+    form.bizNo = form.company.bizNo || '';
+    form.kinds = ['consulting'];
+    form.managerMain = String(req.managerMain || '');
+    if(req.srcPhoto) form.srcPhoto = req.srcPhoto;
+    /* 서류 이름으로 컨설팅 유형을 짐작한다 — 쪽지 길(위 useEffect)과 «같은 함수»다 */
+    var docName = (req.srcPhoto && req.srcPhoto.name) || '';
+    var types = dbGet('biz_cons_types', BIZ_CONS_SEED);
+    var ty = docName ? erpConsTypeByDocName(docName, types) : null;
+    var 짐작 = '';
+    if(ty && ty.code){ form.typeCodes.consulting = ty.code; 짐작 = '유형 「' + (ty.name || '') + '」 은 서류 이름으로 골랐습니다'; }
+    else if(types && types.length){
+      /* 못 찾으면 첫 유형으로 둔다 — 모달의 저장 길도 그렇게 한다(fixTypeCodes).
+         ⚠ 비워 두면 업체관리·컨설팅의 어느 유형 칸에도 안 나와 «사라진 것»처럼 된다.
+         ⚠ 대신 «짐작 못 했다»고 적어 둔다 — 말없이 찍으면 사람이 고른 줄 안다. */
+      form.typeCodes.consulting = types[0].code;
+      짐작 = '⚠ 유형을 서류 이름으로 못 골라 「' + (types[0].name || '') + '」 으로 두었습니다 — 확인해 주세요';
+    }
+    form.note = '📸 사진첩에서 자동 등록 (' + (docName || '신청서') + ')'
+      + (req.by ? ' · 보낸 사람 ' + req.by : '') + (짐작 ? '\n' + 짐작 : '');
+    return form;
+  }
+
+  /* 걸리는 까닭을 돌려준다. 빈 문자열이면 «만들어도 되는 것»이다. */
+  function ctReqWhy(form){
+    if(!form.company.name) return '회사 이름이 없습니다';
+    if(!form.managerMain) return '주담당이 없습니다';
+    if(!getActiveUsers().some(function(x){ return x.sid === form.managerMain; }))
+      return '주담당으로 보낸 사람이 직원 명부에 없습니다';
+    var clash = erpBiznoClash(form, dbGet('companies', []) || []);
+    if(clash) return '같은 사업자번호가 다른 업체(' + (clash.name || '-') + ')에 이미 있습니다';
+    var dup = erpContractDupBlock(form, dbGet('contracts', []) || []);
+    if(dup.length) return '같은 회사에 진행 중인 같은 유형 계약이 ' + dup.length + '건 있습니다'
+      + (dup[0].contractNo ? ' (' + dup[0].contractNo + ')' : '');
+    return '';
+  }
+
+  async function runContractRequests(){
+    if(_erpCtReqBusy || !fbDb) return;
+    var cos = dbGet('companies', null);
+    var cts = dbGet('contracts', null);
+    if(!Array.isArray(cos) || !Array.isArray(cts)) return;   // ⚠ 아직 안 내려왔다 — 머리글 참고
+    _erpCtReqBusy = true;
+    var made = [], blocked = 0;
+    try {
+      var snap = await fbDb.ref('data/contract_requests').once('value');
+      var all = snap.val() || {};
+      var keys = Object.keys(all).filter(function(k){
+        var r = all[k];
+        return r && r.state === 'pending' && r.company && r.company.name;
+      });
+      for(var i = 0; i < keys.length; i++){
+        var key = keys[i];
+        var form = ctReqForm(all[key]);
+        var why = ctReqWhy(form);
+        if(!why){
+          var newOne = Object.assign({}, form, {
+            id: 'ct-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+            contractNo: genContractNo(),
+            transferredTo: null,
+            regAt: (new Date()).toISOString()
+          });
+          /* ★ persistOne 이 월 잠금·업체 연결·관계 검증을 한 번 더 지난다 —
+             사람이 저장 단추를 누른 것과 «같은 문»이다. */
+          if(persistOne(newOne)){
+            made.push(newOne);
+            await fbDb.ref('data/contract_requests/' + key).remove().catch(function(){});
+            continue;
+          }
+          why = '계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)';
+        }
+        blocked++;
+        await fbDb.ref('data/contract_requests/' + key)
+          .update({ state:'blocked', why:why, handledAt:Date.now() }).catch(function(){});
+      }
+    } catch(e){
+      console.warn('[계약 등록 요청]', e && e.message);
+    }
+    _erpCtReqBusy = false;
+    if(made.length) showToast('📸 사진첩에서 온 계약 ' + made.length + '건을 등록했습니다 — '
+      + made.map(function(x){ return x.companyName; }).join(', ')
+      + ' · 기간·금액을 넣어 주세요', 9000);
+    /* ⚠ 걸린 것을 조용히 두지 않는다 — 자동이라 아무도 기다리고 있지 않다 */
+    if(blocked) showToast('⚠ 자동 등록하지 못한 요청 ' + blocked + '건 — 중복이거나 사업자번호가 겹칩니다.'
+      + ' 사진첩에서 그 서류로 직접 등록해 주세요', 11000);
+  }
+  useEffect(function(){ runContractRequests(); }, []);
+
   function openPrintModal(c){ setPrintModal(c); }
   function closePrintModal(){ setPrintModal(null); }
 

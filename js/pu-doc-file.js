@@ -1555,9 +1555,57 @@
     });
   }
 
+  /* ══════ 계약 등록 «요청» (대표 지시 2026-09-19) ══════════════════════════
+     「신청서 캡처가 읽히면 담당자만 고르고 계약관리에 자동으로 올라가게」
+
+     ⚠⚠ 이 일이 왜 화면이 아니라 «여기»에 있나 — 사진첩 화면은 `db.ref` 도
+       포털 공용 자리(`data/…`)도 직접 만지지 않기로 했다(2026-07 실데이터 사고 뒤
+       세운 울타리, tests/pu-photos-html.test.js 가 지킨다). 남의 앱 자리 이름을
+       아는 일은 이 파일의 몫이다 — 그쪽이 바뀌면 여기 한 곳만 고치면 된다.
+
+     ⚠ 계약(data/contracts)에는 **쓰지 않는다.** 업체 연결·사업자번호 충돌·계약 중복·
+       월 잠금 검사가 전부 계약관리 안에 있어서다. 여기서 남기는 것은 «요청 한 줄»이고,
+       계약관리가 열릴 때 그 집 안에서 검사하고 만든다. */
+  var ERP_ROOT = 'data';
+  var CT_REQ = ERP_ROOT + '/contract_requests';
+  var STAFF_DIR = ERP_ROOT + '/user_dir';
+
+  /* 주담당 고르개에 쓸 직원 명부.
+     ⚠ user_accounts 가 «아니다» — 그쪽은 관리자만 읽는다. 공개 명부라야 직원 누구나 고른다. */
+  function erpStaff() {
+    if (!deps.db) return Promise.resolve([]);
+    return deps.db.ref(STAFF_DIR).once('value').then(function (sn) {
+      var v = sn.val();
+      var arr = Array.isArray(v) ? v
+        : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }) : []);
+      return arr.filter(function (u) {
+        return u && u.sid && u.name && (u.status === 'active' || !u.status);
+      }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+    }).catch(function () { return []; });
+  }
+
+  /* 요청 한 줄을 남긴다. 돌려주는 것은 그 번호다.
+     ⚠ 주담당·회사 이름이 없으면 «안 남긴다» — 그대로 보내면 계약관리가 거절해
+       요청만 걸린 채 쌓인다(사람은 등록된 줄 안다). */
+  function requestContract(o) {
+    if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
+    o = o || {};
+    if (!o.managerMain) return Promise.reject(new Error('주담당을 고르지 않았습니다'));
+    if (!o.company || !o.company.name) return Promise.reject(new Error('회사 이름이 없습니다'));
+    var key = 'ctreq-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    var rec = {
+      id: key, state: 'pending', at: Date.now(),
+      by: String(o.by || ''), managerMain: String(o.managerMain),
+      company: o.company, srcPhoto: o.srcPhoto || null
+    };
+    return deps.db.ref(CT_REQ + '/' + key).set(rec).then(function () { return key; });
+  }
+
   global.PuDocFile = {
     HAND: HAND,
     init: init,
+    erpStaff: erpStaff,
+    requestContract: requestContract,
     MAIL_MAX_BYTES: MAIL_MAX_BYTES,
     pickMailPeople: pickMailPeople,
     findMailPeople: findMailPeople,
