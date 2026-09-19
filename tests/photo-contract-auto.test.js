@@ -301,7 +301,57 @@ test('★★ 짐작하는 잣대가 «사진첩과 계약관리에서 같다»',
     '★★ 사진첩이 제 잣대를 따로 지으면 계약관리와 갈립니다');
 });
 
-/* ══════ ⑤ 자리와 권한 ═══════════════════════════════════════════ */
+/* ══════ ⑤ 업체관리에 «없는» 회사 — 실제 계약을 만들어 보고 찾은 것 ══════
+   대표 지시 「실제 계약 만들어서 테스트해라」(2026-09-19)로 진짜 한 건을 넣어 보니
+   **막혔다.** 까닭은 「주식회사피아이코드」가 업체관리에 없어서였다.
+
+   ★★★ 설계에는 「업체가 없으면 연결 보류로 저장한다」고 적어 두고 **코드에 안 넣었다.**
+     모달은 사람에게 묻고(erpAskDeferCompanyLink) 「예」면 보류로 두는데,
+     자동 등록은 그 걸음 없이 persistOne 을 곧바로 불렀다 → 업체 연결 검증이 막았다.
+   ⚠⚠ 이것이 **가장 흔한 경우**다 — 정부사업 신청 회사는 대개 업체관리에 아직 없다.
+     즉 자동 등록이 «거의 늘» 막혀 있었다.
+   ⚠ 앞선 모의 검증은 이것을 못 잡았다. ctReqWhy(내 다섯 문)만 돌리고
+     persistOne 까지는 안 갔기 때문이다 — **모의는 실패가 나는 자리 한 걸음 앞에서 멈췄다.** */
+
+test('★★★ 업체관리에 없는 회사면 «연결 보류»로 만든다', () => {
+  const run = stripJs(cutFn(ERP, 'async function runContractRequests(') || '');
+  assert.match(run, /erpDeferCoLinkIfNew\(form\)/,
+    '★★★ 이 걸음이 없으면 업체관리에 없는 회사는 통째로 막힙니다 — 가장 흔한 경우입니다');
+  const i = run.indexOf('erpDeferCoLinkIfNew');
+  const j = run.indexOf('ctReqWhy(form)');
+  assert.ok(i >= 0 && j > i,
+    '★★★ 보류로 정하기 «전»에 검사하면 그 검사가 막습니다 — 차례가 뜻입니다');
+});
+
+test('★★★ 보류로 두어도 «업체 ID는 안 채운다»', () => {
+  const fn = stripJs(cutFn(ERP, 'function erpDeferCoLinkIfNew(') || '');
+  assert.ok(fn, 'erpDeferCoLinkIfNew 가 없습니다');
+  assert.match(fn, /companyId:''/,
+    '★★★ 이름이 비슷하다고 ID를 채우면 자문 계약이 남의 업체에 들어갑니다');
+  assert.match(fn, /companyLinkStatus:'pending'/);
+  assert.match(fn, /code!=='company_selection_required'\) return null/,
+    '★★★ «업체가 없다»가 아닌 다른 까닭으로 막힌 것까지 보류로 넘기면 안 됩니다');
+});
+
+test('★★ 묻는 길과 자동 등록이 «같은 함수»로 보류를 정한다', () => {
+  const ask = stripJs(cutFn(ERP, 'async function erpAskDeferCompanyLink(') || '');
+  assert.match(ask, /erpDeferCoLinkIfNew\(form\)/,
+    '★★ 모달이 제 잣대로 따로 따지면 사람에게 묻는 때와 자동이 넘어가는 때가 갈립니다');
+});
+
+test('★★★ 걸린 까닭이 «고칠 수 있는 말»이어야 한다', () => {
+  /* 실제로 넣어 봤을 때 남은 말이 「월 잠금·업체 연결 등」뿐이었다 —
+     무엇을 고쳐야 하는지 알 수가 없었다. 기계가 대신 답하는 길일수록 더 또렷해야 한다. */
+  const why = stripJs(cutFn(ERP, 'function ctReqWhy(') || '');
+  assert.match(why, /isContractLocked\(ym\)/,
+    '★★★ 월 잠금을 미리 안 보면 persistOne 이 막고 까닭은 뭉뚱그려집니다');
+  assert.match(why, /validateCompanyLink\(form/,
+    '★★★ 업체 연결도 미리 봐야 «무엇이» 문제인지 적을 수 있습니다');
+  assert.match(why, /chk\.message/,
+    '★★ 검증이 돌려준 말을 그대로 적어야 고칠 수 있습니다');
+});
+
+/* ══════ ⑥ 자리와 권한 ═══════════════════════════════════════════ */
 
 test('★★★ 새 자리의 권한이 «계약과 같다»', () => {
   assert.match(RULES, /contract_requests:\s*\{\s*'\.read':\s*LOGIN,\s*'\.write':\s*LOGIN\s*\}/,
