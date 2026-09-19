@@ -60,6 +60,9 @@
   .tab.eum{color:#2563eb}
   .tab.on{background:var(--acc2);color:#ffffff;font-weight:700}
   .tsep{width:1px;height:18px;background:#cbd5e1;margin:0 7px;flex-shrink:0}
+  /* 탭 줄에 얹은 사람 칩 — 오른쪽 끝에 붙는다(왼쪽 탭과 안 섞이게) */
+  .tabchips{margin-left:auto;display:flex;align-items:center;flex-shrink:0;padding-left:16px}
+  .tabchips .chips{margin-bottom:0;flex-wrap:nowrap}
 
   #app{padding:14px 16px 90px;max-width:1500px;margin:0 auto}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
@@ -98,8 +101,14 @@
   .chip[disabled]{opacity:.6;cursor:default}
   .srcsep{width:1px;height:18px;background:#cbd5e1;margin:0 4px;flex-shrink:0}
 
-  /* 위 줄 — ◀ 2026-09 ▶ · 음력 · 오늘 · 월|주|일 · 검색 */
-  .monthbar{display:flex;align-items:center;gap:7px;margin-bottom:7px;white-space:nowrap;flex-wrap:wrap}
+  /* 머리줄 — ◀ 2026-09 ▶ · 음력 · 오늘 · 월|주|일 · 사람 칩 … 검색(맨 오른쪽)
+     ★ 셋을 «한 줄»에 둔다 (대표 지시 2026-09-19). 쌓으면 달력이 그만큼 아래로 밀린다. */
+  .calhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px}
+  .calhead .monthbar,.calhead .chips{margin-bottom:0}
+  /* ⚠ 검색을 margin-left:auto 로 오른쪽 끝에 밀지 않는다 — 줄이 차면 그것만
+       «둘째 줄로 떨어져» 도로 두 줄이 된다(2026-09-19 미리보기에서 그랬다).
+       달바 바로 뒤에 붙여 두면 칩이 남는 자리를 먹고, 모자라면 칩부터 접힌다. */
+  .monthbar{display:flex;align-items:center;gap:7px;white-space:nowrap;flex-wrap:wrap}
   .monthbar .ym{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
   .monthbar .lunrange{font-size:11px;color:var(--faint)}
   .mv{border:1px solid var(--line);background:#ffffff;border-radius:8px;width:26px;height:26px;
@@ -128,8 +137,13 @@
   /* ★ 줄 높이는 «그 주에서 가장 바쁜 날»에 맞춰 늘어난다 (대표 지시 2026-09-19 「맞다 늘려라」).
      여태는 repeat(6,1fr) 로 여섯 줄을 똑같이 눌러 두고 한 칸에 넷까지만 보였다.
      2026년 9월을 진짜 자료로 재 보니 42칸 가운데 18칸이 넷을 넘었고 «56건»이 접혀 있었다.
-     바닥값(104px)은 그대로라 한가한 주는 여전히 낮다 — 늘어나는 것은 바쁜 주뿐이다. */
-  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:minmax(104px,auto)}
+   ★ 바닥값은 «화면 높이»를 따른다 (대표 지시 2026-09-19 「달력 늘려라」).
+     240px 는 머리(위 띠·탭·머리줄·요일줄)와 아래 여백이 먹는 몫이다 — 그만큼 빼고
+     남은 것을 여섯으로 나누면 한가한 달이 화면을 «가득» 채운다.
+     ⚠ 104px 아래로는 안 내려간다(작은 화면에서 칸이 글자보다 낮아지면 못 읽는다).
+       바쁜 주는 여기서 더 늘어난다 — 바닥값이지 뚜껑이 아니다. */
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);
+    grid-auto-rows:minmax(max(104px,calc((100vh - 240px) / 6)),auto)}
   .day{min-height:104px;padding:5px 4px 3px;overflow:hidden;box-sizing:border-box;position:relative}
   /* 날짜 줄 — 칸 «가운데»에 「25 (13)」 처럼 날짜와 음력을 나란히 */
   .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:4px;padding:0 2px}
@@ -801,6 +815,14 @@ function dayHtml(eumOnly){
 }
 
 /* ── 위 줄 ── ◀ 2026-09 ▶ · 병오년8월 – 9월 · 오늘 · [월|주|일] · 🔍 일정 검색 */
+/* 달력 머리줄 — 달 이동·보기·검색. «한 줄»이다 (대표 지시 2026-09-19 「한줄로 정리해라」).
+   ★ 사람 칩은 여기 없다 — 탭 줄로 올렸다(대표 지시 「캡쳐1은 캡쳐2 줄에 넣어라」).
+     탭 줄은 오른쪽이 통째로 비어 있었고, 칩을 한 줄 따로 두면 달력이 그만큼 내려간다.
+   ⚠ 좁은 화면에서는 접힌다(flex-wrap). 못 들어가는 것을 우겨 넣으면 글자가 잘린다.
+   ⚠ eumOnly 를 그대로 받는다 — 쓰지 않아도 부르는 쪽 모양을 바꾸지 않는다. */
+function calheadHtml(eumOnly){
+  return '<div class="calhead">' + monthbarHtml() + srchHtml() + '</div>';
+}
 function monthbarHtml(){
   var 가운데 = S.view === "month" ? S.ym
     : S.view === "week" ? (function(){ var w = weekDays(S.date); return w[0].slice(5) + " ~ " + w[6].slice(5); })()
@@ -817,9 +839,14 @@ function monthbarHtml(){
         return '<button data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>';
       }).join("")
     + '</span>'
-    + '<span class="srch"><span class="ic">🔍</span>'
-    + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>'
     + '</div>';
+}
+
+/* 검색칸 — 줄 맨 오른쪽 끝에 붙는다(.calhead .srch 의 margin-left:auto).
+   ⚠ 달바 안에 두면 월|주|일 바로 옆에 붙어 오른쪽이 통째로 빈다. */
+function srchHtml(){
+  return '<span class="srch"><span class="ic">🔍</span>'
+    + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>';
 }
 
 /* 검색 — 제목·메모·사람 이름 어디에 걸려도 남긴다 */
@@ -1287,13 +1314,20 @@ function refreshOne(store){
 /* ── 그리기 ────────────────────────────────────────────────────────── */
 function renderTabs(){
   var last = '';
-  $('tabs').innerHTML = TABS.map(function(t){
+  var 탭들 = TABS.map(function(t){
     var head = '';
     if(t.g !== last){ head = (last ? '<span class="tsep"></span>' : '') + '<span class="gl">'+esc(t.g)+'</span>'; last = t.g; }
     /* 이음 쪽은 글자를 파랗게 — 금 하나만으로는 어느 묶음인지 눈이 못 가른다 */
     var eum = t.g === '이음센터' ? ' eum' : '';
     return head + '<button class="tab'+eum+(S.tab===t.v?' on':'')+'" data-t="'+esc(t.v)+'">'+esc(t.label)+'</button>';
   }).join('');
+  /* ★ 사람 칩을 탭 줄 «오른쪽 끝»에 얹는다 (대표 지시 2026-09-19 「캡쳐1은 캡쳐2 줄에 넣어라」).
+     탭은 왼쪽 절반도 안 쓰는데 칩은 제 줄을 따로 차지하고 있었다 — 한 줄을 통째로 아낀다.
+     ⚠ 달력을 보는 탭에서만 얹는다. 직원별 업무·분석에는 «걸러 낼 것»이 없어
+       칩이 아무 일도 안 하면서 자리만 먹는다. */
+  var 칩 = (S.tab === 'cal' || S.tab === 'eumcal')
+    ? '<span class="tabchips">' + chipsHtml(S.tab === 'eumcal') + '</span>' : '';
+  $('tabs').innerHTML = 탭들 + 칩;
 }
 
 function render(){
@@ -1305,7 +1339,7 @@ function render(){
       /* ⚠ 맨 위 띠를 안 둔다 — 달력은 이알피와 «같아야» 한다(대표 지시 2026-09-18).
          못 고치는 까닭은 «고치려 할 때» 그 자리에서 말한다(창 안에서). */
     html = failedHtml() + lockNote()
-      + '<div class="calwrap">' + chipsHtml(eumOnly) + monthbarHtml() + calendarHtml(eumOnly) + '</div>';
+      + '<div class="calwrap">' + calheadHtml(eumOnly) + calendarHtml(eumOnly) + '</div>';
   } else if(tab.v==='eumppl'){
     html = failedHtml() + peopleHtml();
   } else if(tab.v==='eumshare'){
