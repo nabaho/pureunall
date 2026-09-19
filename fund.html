@@ -4252,6 +4252,24 @@ var PARTY_RUN_SRC=PARTY_ONE_SRC+'(?:\\s*(?:및|와|과|,)\\s*'+PARTY_ONE_SRC+')+
 /* 사람 이름 자리표 — 설립합의서는 「× × ×」, 정관은 「○○○」 이다.
    ⚠ ○ 이 넷 이상이면 사람 이름 자리가 아니다(○○○○지청 같은 곳). */
 var PARTY_WHO_SRC='×\\s*×\\s*×|○○○(?!○)';
+/* ══ 「노동조합대표자」는 «근로자대표»다 ══ (대표 지시 2026-09-19
+     「노동조합 대표자는 다 모두 근로자 대표 이다. 정관에 내용 바꿔라」)
+   참여회사에 노동조합이 «없는» 곳이 많고, 법 제55조제2항을 준용해 «선출»하는 사람이라
+   노동조합 대표자가 아니다. 노조가 없는 회사의 서명란에 「노동조합대표자」라 적혀 나가면
+   그 자리에 서명할 사람이 없다.
+   ⚠ 글자만 바꾼다 — 누가 서명하는지는 그대로 참여사업장의 근로자대표(_siteWrep)다.
+   ⚠ fillPartyList «앞»에서 돌아야 한다. 줄을 늘릴 때 베끼는 글귀(sigTpl)가 이미 바뀐
+     말이어야, 늘어난 줄에도 「근로자대표」로 적힌다. */
+function fillWrepLabel(root){
+  var walk=document.createTreeWalker(root,4/*TEXT*/,null,false), tn, nodes=[];
+  while((tn=walk.nextNode())) nodes.push(tn);
+  nodes.forEach(function(x){
+    var t=x.nodeValue||'';
+    if(t.indexOf('노동조합')<0) return;
+    var v=t.replace(/노동조합\s*대표자/g,'근로자대표');
+    if(v!==t) x.nodeValue=v;
+  });
+}
 /* 서명란의 이름 자리표 둘을 채운다 — 앞은 «근로자측», 뒤는 «사용자측».
    대표 지시 2026-09-14: 「참여사업장의 근로자대표·사용자대표에 모두 연결되어 동기화」.
 
@@ -4769,7 +4787,11 @@ function fillContribDoc(root,f,sites){
   /* 출연한 곳이 없으면 «지어내지 않는다» — 빈 확인서 한 장과 까닭을 남긴다.
      남의 값이 박힌 원본을 그냥 두는 것보다 낫다. */
   var made=list.length?list.map(one):[one(null)];
-  while(root.firstChild) root.removeChild(root.firstChild);
+  /* ★ 회사마다 «A4 한 장씩» 나뉜다 (대표 지시 2026-09-19 「기금출연확인서는 회사마다
+       1장씩 넣는 것이다」). 종전에는 확인서 여럿이 한 장에 이어 붙어, 쪽 나누기가
+       아무 데서나 잘랐다 — 한 회사의 확인서가 두 장에 걸쳐 찍히기도 했다.
+     ⚠ 첫 장에는 표를 붙이지 않는다 — 붙이면 맨 앞에 빈 장이 하나 생긴다. */
+  made.forEach(function(x,i){ if(i) x.setAttribute('data-newpage','1'); });  while(root.firstChild) root.removeChild(root.firstChild);
   if(!list.length){
     var w=document.createElement('p'); w.className='note';
     w.textContent=R
@@ -4936,7 +4958,7 @@ function hwpFormHTML(kind,f,sites){
   if(kind==='contrib') fillFoundContribDoc(d,f,sites);
   /* 정관·설립합의서의 「○○주식회사」 자리표에 참여사업장을 넣는다 — 걷어내기보다 «먼저» 돈다.
      뒤에 돌면 자리표가 이미 ＿＿＿ 로 바뀌어 바꿀 것을 못 찾는다. */
-  if(kind==='charter'||kind==='agreement'){ fillPartyList(d,f,sites); fillPartyDates(d,f); }
+  if(kind==='charter'||kind==='agreement'){ fillWrepLabel(d); fillPartyList(d,f,sites); fillPartyDates(d,f); }
   /* 줄맞춤 자국 걷어내기는 «자리표를 채운 뒤»에 돈다 — 먼저 돌면 서명란의 두 단 벌림이
      아직 자리표 상태라 길이가 짧아, 본문으로 오해받을 수 있다. */
   fillFlowText(d);
@@ -5027,6 +5049,10 @@ function _bizTotals(f){
   return {rev:rev, exp:exp, net:pick('10.당기순이익')};
 }
 var _K=function(n){ return Math.round((num(n)||0)/1000).toLocaleString(); };   // 천원
+/* 서류를 «내는 날»이 적히는 문맥 — 이 말이 든 덩이의 밑줄은 날짜 자리다 */
+var DATE_CTX=/신고합니다|신청합니다|제출합니다|확인합니다|위임함|보관한다|승낙합니다|서약합니다|보고합니다|의결한다/;
+/* 밑줄만(또는 밑줄 + 「년 월 일」)으로 이루어진 마디인가 */
+function _dateSlot(t){ return /^[\s＿_]*[＿_]{3,}[\s＿_]*(?:년\s*월\s*일)?\s*$/.test(String(t||'')); }
 function fillDerived(root,f,sites,kind){
   var b=_boss(f)||{}, boss=(b.name||'').trim(), amt=foundContrib(f,sites);
   var yr=S.year, today=new Date(), dirs=_prepDirectors(f);
@@ -5116,6 +5142,42 @@ function fillDerived(root,f,sites,kind){
       function(){ return f.labor_office?(f.labor_office+'장 기금법인 대표자'):''; }],
     /* 협의회 회의록(사용범위) — 출연금은 아는 값이다 */
     ['ops_minutes_scope', _rx('출연금 '+W+'원'), function(){ return amt?'출연금 '+amt.toLocaleString()+'원':''; }],
+    /* 재산변동보고서 — 기준일과 주소 */
+    ['ops_asset_change', _rx('기 본 재 산 목 록\\( '+W+' 현재\\)'), function(){ return '기 본 재 산 목 록('+todayDot+' 현재)'; }],
+    ['ops_asset_change', _rx('주소: '+W), function(){ return f.address?'주소: '+f.address:''; }],
+    /* 사업계획서 산출근거 — 이자는 «기본재산 × 요율»이라 적는 자리다 */
+    ['bizplan', _rx('예금이자 '+W+' \\*'), function(){ var b=Math.round(amt*(1-useRate(f)));
+      return b?('예금이자 '+b.toLocaleString()+' *'):''; }],
+    /* ── 어느 서식에나 같은 꼴로 나오는 자리 ('*') ──
+       날짜와 대표자 서명은 서식마다 열몇 곳에 흩어져 있다. 서식마다 규칙을 따로 쓰면
+       하나 늘릴 때마다 열 줄이 늘고, 빠뜨린 서식은 조용히 빈 채로 나간다. */
+    ['*', _rx('^'+W+'년 월 일$'), function(){ return todayKo; }],
+    ['*', _rx('^'+W+' 년 월 일$'), function(){ return todayKo; }],
+    ['*', _rx('위임함\\. '+W), function(){ return '위임함. '+todayDot; }],
+    ['*', _rx('신청합니다\\. '+W), function(){ return '신청합니다. '+todayDot; }],
+    ['*', _rx('제출합니다\\. '+W), function(){ return '제출합니다. '+todayDot; }],
+    ['*', _rx('확인합니다\\. '+W), function(){ return '확인합니다. '+todayDot; }],
+    ['*', _rx('신고합니다\\. '+W), function(){ return '신고합니다. '+todayDot; }],
+    ['*', _rx('보고합니다\\. '+W+'장'),
+      function(){ return f.labor_office?('보고합니다. '+f.labor_office+'장'):''; }],
+    /* 서명 자리 — 「신청인 {기금이름} ＿＿＿ (서명 또는 인)」 꼴이 여럿이다 */
+    ['*', _rx(esc(f.name||'#')+' '+W6+' ?\\(서명 또는 인\\)'),
+      function(){ return boss?(f.name+' '+boss+' (서명 또는 인)'):''; }],
+    ['*', _rx(esc(f.name||'#')+' '+W6+'\\(서명 또는 인\\)'),
+      function(){ return boss?(f.name+' '+boss+'(서명 또는 인)'):''; }],
+    /* 인감 서식 — 신고인·신청인은 대표자다. 「지배인」은 없는 자리라 비워 둔다. */
+    ['reg_seal', _rx('본 인 성 명 '+W6+'\\(인\\)'), function(){ return boss?'본 인 성 명 '+boss+'(인)':''; }],
+    ['reg_seal', _rx('대표이사 '+W6+' \\(법인인감\\)'), function(){ return boss?'대표이사 '+boss+' (법인인감)':''; }],
+    ['reg_sealcard', _rx('\\(본 인\\) 성 명 '+W6), function(){ return boss?'(본 인) 성 명 '+boss:''; }],
+    ['reg_sealcard', _rx('인감신고인 성 명 '+W6), function(){ return boss?'인감신고인 성 명 '+boss:''; }],
+    ['reg_sealcard', _rx('\\(전화 : ?[＿_]{2}-[＿_]{4}-[＿_]{4}\\)'), function(){ return ph?'(전화 : '+ph+')':''; }],
+    ['reg_sealcard', _rx('\\(전화[＿_]{2}-[＿_]{4}-[＿_]{4}\\)'), function(){ return ph?'(전화'+ph+')':''; }],
+    /* 임대차계약서 — 서명일 */
+    ['tax_lease', _rx('보관한다\\. '+W), function(){ return '보관한다. '+todayDot; }],
+    /* 사업자등록신청서 — 종업원수는 참여사업장 상시근로자 합계다(아는 값이다) */
+    ['tax_bizreg', _rx(W+'명 전자우편주소'), function(){
+      var w=estabSites(sites).reduce(function(s,x){ return s+(num(x.company_size)||0); },0);
+      return w?(w.toLocaleString()+'명 전자우편주소'):''; }],
   ];
   /* 취임승낙서 — 「대표권있는 이사」 장만 이사장 이름을 넣는다. 다른 이사의 장은 이사마다 따로라 비워 둔다. */
   var walker=document.createTreeWalker(root,4/*TEXT*/,null,false), n, nodes=[];
@@ -5129,12 +5191,23 @@ function fillDerived(root,f,sites,kind){
     if(!/[＿_]{2,}|서울남부지방법원/.test(t)) return;
     var para=(tn.parentNode&&tn.parentNode.textContent)||'';
     RULES.forEach(function(r){
-      if(r[0]!==kind) return;
+      /* '*' 는 «어느 서식에나» 같은 꼴로 나오는 자리다(날짜·서명). 서식마다 규칙을 따로
+         쓰면 하나 늘릴 때마다 열 줄이 늘고, 빠뜨린 서식은 조용히 빈 채로 나간다. */
+      if(r[0]!=='*'&&r[0]!==kind) return;
       var m=t.match(r[1]); if(!m) return;
       var v=r[2](m); if(!ok(v)) return;
       t=t.replace(r[1],v);
     });
     if(kind==='reg_accept'&&/대표권있는/.test(para)&&boss) t=t.replace(_rx('위 이사 '+W6+' \\(개인인감\\)'),'위 이사 '+boss+' (개인인감)');
+    /* ── 홀로 선 «날짜 자리» ── (대표 지시 2026-09-19 「남은것도 자동으로」)
+       서류를 내는 날짜는 라벨과 «다른 글자마디»에 있는 일이 많다 — 「…신고합니다.」와
+       「＿＿＿＿＿」가 갈려 있어, 마디 하나만 보는 위 규칙으로는 한 번도 못 물었다.
+       그래서 «부모 덩이»의 글로 문맥을 보고, 홀로 선 밑줄 마디를 오늘로 채운다.
+       ⚠ 덩이에 날짜가 이미 있으면 손대지 않는다 — 두 번 찍힌다.
+       ⚠ 덩이에 문맥이 없으면 손대지 않는다 — 아무 밑줄이나 날짜로 만들면 안 된다. */
+    if(_dateSlot(t)&&DATE_CTX.test(para)&&!/\d{4}\s*[.년]/.test(para)){
+      t=/년\s*월\s*일/.test(t) ? todayKo : todayDot;
+    }
     if(t!==tn.nodeValue) tn.nodeValue=t;
   });
   /* 라벨과 값이 «옆 칸»인데 값 칸에 단위가 박힌 자리 — FORM_FILL 은 빈 칸만 채워 못 닿는다 */
@@ -5241,7 +5314,11 @@ function fillFoundContribDoc(root,f,sites){
     return d;
   };
   var made=list.length?list.map(one):[one(null)];
-  while(root.firstChild) root.removeChild(root.firstChild);
+  /* ★ 회사마다 «A4 한 장씩» 나뉜다 (대표 지시 2026-09-19 「기금출연확인서는 회사마다
+       1장씩 넣는 것이다」). 종전에는 확인서 여럿이 한 장에 이어 붙어, 쪽 나누기가
+       아무 데서나 잘랐다 — 한 회사의 확인서가 두 장에 걸쳐 찍히기도 했다.
+     ⚠ 첫 장에는 표를 붙이지 않는다 — 붙이면 맨 앞에 빈 장이 하나 생긴다. */
+  made.forEach(function(x,i){ if(i) x.setAttribute('data-newpage','1'); });  while(root.firstChild) root.removeChild(root.firstChild);
   var w=document.createElement('p'); w.className='note';
   if(!list.length){
     w.textContent='※ 참여사업장이 없어 확인서를 만들지 못했습니다 — 참여사업장을 먼저 등록하세요.';
@@ -6268,8 +6345,15 @@ function estabGapHTML(f,sites){
 /* 서류에 남은 «채울 자리» — 밑줄 자리표(＿＿·______)와 회사 자리표(○○)를 센다.
    ⚠ 못 채워 남은 자리와 «관청이 적는 칸»(접수번호·처리기간)이 섞인다. 그래서 이 수는
      「아직 덜 됐다」가 아니라 「여기를 보라」는 뜻이다 — 0 을 목표로 삼는 수가 아니다. */
+/* ⚠ 서식의 «작성 예» 안내문은 세지 않는다 — 채우면 «안 되는» 자리다.
+   사업자등록신청서 끝에 「(작성 예) ○○동 ○○○○번지 ○○호 ○○상가(빌딩) ○○동 ○○층 ○○○○호」가
+   있어 여덟 곳이 늘 「채울 자리」로 세어졌다. 채우면 안내문이 망가진다.
+   0 을 목표로 삼을 수 있으려면 «채울 수 있는 자리»만 세어야 한다(대표 지시 2026-09-19). */
+function _stripSample(t){
+  return String(t||'').replace(/\(\s*작성\s*예\s*\)[^\n]{0,140}/g,' ');
+}
 function _blankCount(t){
-  t=String(t||'');
+  t=_stripSample(t);
   return (t.match(/[＿]{2,}/g)||[]).length
        + (t.match(/_{4,}/g)||[]).length
        + (t.match(/○{2,}/g)||[]).length;
