@@ -30,20 +30,28 @@
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
     --danger:#dc2626;--radius:11px}
+  /* 어두운판 — 수동 전환(대표 지시 2026-09-19 「2번 수동」). 밝은판 값은 위 그대로 두고
+     여기서 «덧씌운다». 색은 전부 이미 쓰는 27색 + 흰/검 안에서 고른다(팔레트 검사).
+     ⚠ 판(--panel)이 바탕(--bg)보다 «밝다» — 밝은판의 관계(카드가 바탕보다 밝다)를
+       그대로 뒤집어 지킨다. --acc·--acc2·--danger 는 검게 배경 위에서도 잘 읽혀
+       그대로 둔다(실측: 대비 5.9~6.1:1). */
+  :root[data-theme="dark"]{--ink:#f8fafc;--sub:#94a3b8;--faint:#64748b;--line:#475569;
+    --panel:#1e293b;--bg:#000000;--acc-soft:rgba(37,99,235,.16);--ok:#4ade80;
+    --warn:#fbbf24;--warn-bg:#1e293b}
   *{box-sizing:border-box}
   /* ★ 화면 한 장에 담는다 (대표 지시 2026-09-19 「한화면에 나오게」).
      문서가 굴러가지 않게 몸통을 «세로 세 칸»으로 세운다 — 머리줄·탭줄·본문.
      본문만 제 안에서 굴러간다(달력 탭에서는 그것조차 안 굴러간다). */
   html,body{height:100%}
   body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
-    background:#f8fafc;font-size:14px;-webkit-font-smoothing:antialiased;
+    background:var(--bg);font-size:14px;-webkit-font-smoothing:antialiased;
     display:flex;flex-direction:column;overflow:hidden}
 
   /* ── 머리줄 ──
      ⚠ 한 줄이다. 낱말 가운데서 잘려 두 줄이 되면 폰에서 화면을 갉아먹는다.
         넘치면 «줄이는» 것이지 «내리는» 것이 아니다. */
   /* sticky 가 필요 없어졌다 — 몸통이 안 굴러가므로 늘 맨 위다 */
-  #topbar{flex:none;z-index:15;background:#ffffff;border-bottom:1px solid var(--line);
+  #topbar{flex:none;z-index:15;background:var(--panel);border-bottom:1px solid var(--line);
     padding:8px 16px;display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}
   #topbar .brand{font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;flex-shrink:0}
   #topbar .sp{margin-left:auto}
@@ -52,12 +60,12 @@
   .dot.on{background:#16a34a}
   #me{font-size:12.5px;font-weight:700;flex-shrink:0;overflow:hidden;text-overflow:ellipsis}
   #me .role{color:var(--sub);font-weight:500;margin-left:4px}
-  .lnk{font-size:12.5px;padding:5px 11px;border:1px solid var(--line);color:var(--sub);background:#ffffff;
+  .lnk{font-size:12.5px;padding:5px 11px;border:1px solid var(--line);color:var(--sub);background:var(--panel);
     border-radius:8px;cursor:pointer;font-weight:700;flex-shrink:0}
   .lnk.go{border-color:#bfdbfe;color:var(--acc2)}
 
   /* ── 탭 한 줄 — 법인 셋 · 이음 셋 ── */
-  #tabs{flex:none;display:flex;align-items:center;gap:3px;padding:7px 14px;background:#ffffff;
+  #tabs{flex:none;display:flex;align-items:center;gap:3px;padding:7px 14px;background:var(--panel);
     border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
   .gl{font-size:10px;color:var(--faint);font-weight:700;margin:0 3px 0 0;flex-shrink:0}
   .tab{padding:5px 11px;border-radius:7px;font-size:12px;color:var(--sub);cursor:pointer;
@@ -87,31 +95,31 @@
   .note .sp{margin-left:auto}
   .btn{border:none;border-radius:7px;font-size:12px;font-weight:700;padding:6px 13px;cursor:pointer;
     font-family:inherit;background:var(--acc);color:#ffffff}
-  .btn.ghost{background:#ffffff;color:var(--acc2);border:1px solid #bfdbfe}
+  .btn.ghost{background:var(--panel);color:var(--acc2);border:1px solid #bfdbfe}
   .muted{color:var(--sub)}
 
   /* ── 달력 — 치수는 이알피(법인 대시보드)에서 그대로 가져왔다 ──
      ⚠ 눈대중으로 고치지 말 것. 두 화면이 갈리면 대표님이 같은 것을 두 모양으로 보신다. */
-  .calwrap{background:#ffffff;border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px 10px}
+  .calwrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px 10px}
 
   /* 사람 칩 줄 — 색 동그라미 + 이름 두 글자 */
   .chips{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:7px}
   .allchip{padding:3px 9px;border:none;border-radius:10px;cursor:pointer;font-size:10.5px;font-weight:700;
-    font-family:inherit;flex-shrink:0;background:#f8fafc;color:#475569}
+    font-family:inherit;flex-shrink:0;background:var(--bg);color:#475569}
   .allchip.on{background:#1e293b;color:#ffffff}
   .pwrap{position:relative;flex-shrink:0;display:inline-flex}
   .pchip{width:26px;height:26px;border-radius:50%;border:2.5px solid transparent;color:#ffffff;
     font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;
     align-items:center;justify-content:center;box-sizing:border-box;padding:0;transition:transform .1s}
-  .pchip.on{border-color:#1e293b;transform:scale(1.15)}
+  .pchip.on{border-color:var(--ink);transform:scale(1.15)}
   /* 겹친 날 표 — 이알피와 같은 호박 바탕이다. 파랑이면 「좋은 소식」처럼 보인다.
      ⚠ 글자는 흰색이 아니라 «짙은 호박»이다 — 이알피는 흰 글자인데 호박 위 흰 글자는
        1.7:1 이라 사실상 안 읽힌다(색 검사가 잡았다). 뜻이 같은 색을 쓰되 읽히게 한다. */
   .pcount{position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;
     background:#fbbf24;color:#854d0e;font-size:10px;font-weight:800;display:flex;align-items:center;
-    justify-content:center;border:1.5px solid #ffffff;pointer-events:none;line-height:1;box-sizing:border-box}
+    justify-content:center;border:1.5px solid var(--panel);pointer-events:none;line-height:1;box-sizing:border-box}
   .chip{font-size:10.5px;border:1px solid #cbd5e1;border-radius:20px;padding:2px 10px;color:var(--sub);
-    background:#ffffff;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}
+    background:var(--panel);cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}
   .chip.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700}
   .chip.warn{background:#fef2f2;border-color:#fecaca;color:#991b1b;font-weight:700}
   .chip[disabled]{opacity:.6;cursor:default}
@@ -127,22 +135,22 @@
   .monthbar{display:flex;align-items:center;gap:7px;white-space:nowrap;flex-wrap:wrap}
   .monthbar .ym{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
   .monthbar .lunrange{font-size:11px;color:var(--faint)}
-  .mv{border:1px solid var(--line);background:#ffffff;border-radius:8px;width:26px;height:26px;
+  .mv{border:1px solid var(--line);background:var(--panel);border-radius:8px;width:26px;height:26px;
     cursor:pointer;color:var(--sub);font-size:11px;font-family:inherit;padding:0}
-  .todaybtn{padding:4px 10px;border:1px solid var(--line);background:#ffffff;border-radius:10px;
+  .todaybtn{padding:4px 10px;border:1px solid var(--line);background:var(--panel);border-radius:10px;
     cursor:pointer;font-size:11.5px;font-weight:600;color:var(--sub);font-family:inherit}
   .seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden}
-  .seg button{padding:4px 12px;font-size:11.5px;font-weight:700;background:#ffffff;color:var(--sub);
+  .seg button{padding:4px 12px;font-size:11.5px;font-weight:700;background:var(--panel);color:var(--sub);
     border:none;border-right:1px solid var(--line);cursor:pointer;font-family:inherit}
   .seg button:last-child{border-right:none}
   .seg button.on{background:#1e40af;color:#ffffff}
   .srch{position:relative;display:inline-flex;align-items:center}
   .srch .ic{position:absolute;left:7px;font-size:10px;pointer-events:none}
   .srch input{padding:4px 10px 4px 24px;font-size:11.5px;border:1px solid var(--line);border-radius:10px;
-    width:130px;background:#ffffff;box-sizing:border-box;font-family:inherit;color:var(--ink)}
+    width:130px;background:var(--panel);box-sizing:border-box;font-family:inherit;color:var(--ink)}
 
   /* 달력 몸통 */
-  .cal{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#ffffff}
+  .cal{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
   .calhd{display:grid;grid-template-columns:repeat(7,1fr);background:var(--bg);font-size:11px;
     color:var(--sub);text-align:center}
   .calhd div{padding:5px 0;border-right:1px solid var(--line)}
@@ -177,7 +185,7 @@
     font-weight:700;border-radius:3px;background:var(--bg);flex:none}
   .more:hover{background:var(--line);color:var(--ink)}
   /* 펼침 창 — 화면에 못 박아 띄운다(칸 안에 두면 달력 테두리에 잘린다) */
-  .pop{position:fixed;z-index:40;background:#ffffff;border:1px solid var(--line);border-radius:10px;
+  .pop{position:fixed;z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:10px;
     box-shadow:0 12px 32px rgba(15,23,42,.20);padding:8px 9px 9px;min-width:236px;max-width:340px;
     max-height:62vh;overflow-y:auto}
   .pop .ph{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;margin-bottom:6px}
@@ -202,12 +210,12 @@
   /* ── 넣고 고치는 창 ── */
   .veil{position:fixed;inset:0;background:#1e293b;opacity:.45;z-index:40}
   .modal{position:fixed;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92vw);
-    background:#ffffff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;max-height:88vh;overflow:auto}
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;max-height:88vh;overflow:auto}
   .modal h3{margin:0 0 12px;font-size:15px}
   .fld{margin-bottom:10px}
   .fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px;font-weight:700}
   .fld input,.fld select{width:100%;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;
-    font-size:13px;font-family:inherit;background:#ffffff;color:var(--ink)}
+    font-size:13px;font-family:inherit;background:var(--panel);color:var(--ink)}
   .mbtns{display:flex;gap:7px;margin-top:14px;align-items:center}
   .mbtns .sp{margin-left:auto}
   .btn.danger{background:#dc2626}
@@ -217,7 +225,7 @@
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:50;background:#1e293b;
     color:#ffffff;border-radius:9px;padding:9px 16px;font-size:12.5px;font-weight:700}
   /* ── 이음센터 인원 현황 — 이알피(IeumPeopleTab)와 같은 치수 ── */
-  .ieumbar{display:flex;align-items:stretch;background:#ffffff;border:1px solid var(--line);
+  .ieumbar{display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line);
     border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(16,30,70,.04);flex-wrap:wrap}
   .scopepilot{display:flex;flex-direction:column;justify-content:center;gap:7px;padding:10px 14px;
     background:var(--bg);border-right:1px solid var(--bg);flex-shrink:0;min-width:196px}
@@ -226,13 +234,13 @@
   .segpill{display:inline-flex;background:var(--bg);border-radius:8px;padding:2px;gap:2px;justify-content:center}
   .segpill button{flex:1;padding:3px 9px;font-size:10.5px;font-weight:600;border:none;border-radius:6px;
     cursor:pointer;background:transparent;color:var(--sub);font-family:inherit;white-space:nowrap}
-  .segpill button.on{background:#ffffff;font-weight:800;color:#1e40af;box-shadow:0 1px 2px rgba(16,30,70,.10)}
+  .segpill button.on{background:var(--panel);font-weight:800;color:#1e40af;box-shadow:0 1px 2px rgba(16,30,70,.10)}
   .kcell{flex:1;display:flex;align-items:center;gap:10px;padding:12px 16px;border-right:1px solid var(--bg);min-width:140px}
   .kdot{width:8px;height:8px;border-radius:3px;flex-shrink:0}
   .klabel{font-size:11.5px;font-weight:600;color:var(--sub);white-space:nowrap}
   .kval{margin-left:auto;font-size:17px;font-weight:800;white-space:nowrap;letter-spacing:-0.02em;color:var(--ink)}
   .kval small{font-size:10.5px;color:var(--faint);font-weight:600;margin-left:1px}
-  .ppltable{background:#ffffff;border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+  .ppltable{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
   .ppltable table{width:100%;border-collapse:collapse;min-width:640px}
   .ppltable th{text-align:left;font-size:10.5px;font-weight:800;color:var(--faint);letter-spacing:0.04em;
     padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--bg)}
@@ -250,7 +258,7 @@
   .avatar.sm{width:22px;height:22px;border-radius:6px;font-size:10px;margin-right:7px;vertical-align:middle}
   .nm{font-weight:800;font-size:12.5px}
   .leftbadge{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--bg);
-    color:var(--faint);border:1px dashed #cbd5e1;white-space:nowrap}
+    color:var(--faint);border:1px dashed var(--line);white-space:nowrap}
   .rolechip{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap}
   .dash{color:#cbd5e1}
   .barwrap{display:flex;align-items:center;gap:7px;min-width:110px}
@@ -279,7 +287,7 @@
   .dhint{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:10.5px;color:var(--faint)}
   .linklike{border:none;background:none;color:#1e40af;font-weight:700;font-size:10.5px;cursor:pointer;padding:0;font-family:inherit}
   /* ── 외부 공유 뷰 — 이알피(IeumShareTab)와 같은 치수 ── */
-  .sharecard{background:#ffffff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;max-width:860px}
+  .sharecard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;max-width:860px}
   .sctitle{font-size:13.5px;font-weight:800;margin-bottom:6px}
   .sctitle.sm{font-size:12.5px;margin-bottom:10px}
   .scdesc{font-size:12px;color:var(--sub);line-height:1.8;margin-bottom:10px}
@@ -295,6 +303,26 @@
   .later{text-align:center;padding:40px 18px;color:var(--sub)}
   .later h2{font-size:16px;margin:0 0 7px;color:var(--ink)}
   .later p{margin:0 0 16px;font-size:12.5px}
+
+  /* ── 어두운판 ② — CSS 변수로 못 옮기는 나머지 ──────────────────────
+     탭·칸 배경 같은 큰 자리는 위 --panel/--bg 하나로 다 끌려간다. 여기는
+     자기 색을 «직접 든» 자리만 손으로 하나씩 덧씌운다. */
+  :root[data-theme="dark"] .allchip.on{background:var(--acc2)}
+  :root[data-theme="dark"] .chip{border-color:var(--line)}
+  :root[data-theme="dark"] .chip.warn{background:var(--panel);border-color:#991b1b;color:#f87171}
+  :root[data-theme="dark"] .srcsep{background:var(--line)}
+  :root[data-theme="dark"] .note{border-color:#854d0e}
+  :root[data-theme="dark"] .werr{background:var(--panel);border-color:#991b1b;color:var(--ink)}
+  :root[data-theme="dark"] .fld input,:root[data-theme="dark"] .fld select{border-color:var(--line);background:var(--panel);color:var(--ink)}
+  :root[data-theme="dark"] .issued{color:var(--ok)}
+  :root[data-theme="dark"] .linklike{color:#60a5fa}
+  :root[data-theme="dark"] .dchip{background:rgba(37,99,235,.18);color:#60a5fa}
+  :root[data-theme="dark"] .dchip.law{background:rgba(217,119,6,.18);color:var(--warn)}
+  :root[data-theme="dark"] .dash{color:var(--faint)}
+  /* 오늘 칸은 «칠하지 않는다» — 낮은판의 옅은 노랑칠(#fffbeb)은 어두운판에서 글자가
+     안 읽힌다. 대신 칸 테두리를 살짝 파랗게 둘러 「오늘」을 표한다(파랑 원은 그대로). */
+  :root[data-theme="dark"] .day.today{outline:1.5px solid var(--acc);outline-offset:-1.5px}
+  :root[data-theme="dark"] .wcol.today{outline:1.5px solid var(--acc);outline-offset:-1.5px}
 
   @media (max-width:700px){
     #app{padding:10px 8px 80px}
@@ -314,6 +342,7 @@
   <span class="sp"></span>
   <span id="conn"><span class="dot"></span><span class="t">연결 중…</span></span>
   <span id="me"></span>
+  <button class="lnk" id="themeToggle" title="어두운 화면으로 바꿉니다">🌙</button>
   <button class="lnk" id="logout">로그아웃</button>
 </div>
 
@@ -342,12 +371,42 @@ var D = {};              // 읽어 온 표들
 var FAILED = {};         // 못 읽은 표 — «빈 것»과 갈라 둔다
 var ME = null;           // 나 (직원 한 줄)
 /* open — 「+N개 더」를 눌러 «펼쳐 둔» 날. 달을 옮기거나 다른 데를 누르면 닫는다. */
-var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'', open:null,
+/* theme — 밝은판·어두운판. 수동으로만 바뀐다(대표 지시 2026-09-19 「2번 수동」) —
+   자동(prefers-color-scheme)으로 넘어가지 않는다. */
+var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'', open:null, theme:'light',
           scope:'month', showLeft:false, openRows:{},
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
           view:'month', date:'', q:'' };
 
 var $ = function(id){ return document.getElementById(id); };
+
+/* ── 어두운 모드 (수동 전환) ──────────────────────────────────────
+   ⚠ 시스템 설정을 안 따라간다(대표 지시 「2번 수동」) — prefers-color-scheme 을
+     안 듣는다. 켠 채로 남기려면 이 기기에서만 기억한다(localStorage) —
+     사람 계정이 아니라 «이 화면»의 취향이라 device-local 이 맞다. */
+function themeInit(){
+  var v = null;
+  try{ v = localStorage.getItem("pu_cal_theme"); }catch(e){}
+  S.theme = (v === 'dark') ? 'dark' : 'light';
+  themeApply();
+}
+function themeApply(){
+  document.documentElement.setAttribute("data-theme", S.theme);
+  var b = $("themeToggle");
+  if(b){
+    b.textContent = S.theme === 'dark' ? '☀️' : '🌙';
+    b.title = S.theme === 'dark' ? '밝은 화면으로 바꿉니다' : '어두운 화면으로 바꿉니다';
+  }
+}
+function themeToggle(){
+  S.theme = (S.theme === 'dark') ? 'light' : 'dark';
+  themeApply();
+  try{ localStorage.setItem("pu_cal_theme", S.theme); }catch(e){}
+  /* 칸·칩 배경은 그릴 때 «미리 정해» 넣는다(인라인) — CSS 변수만으로는 안 따라오니
+     판을 바꾼 뒤에는 다시 그려야 한다. 지금 탭이 달력이 아니어도 해롭지 않다. */
+  render();
+}
+
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function ymOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
@@ -716,7 +775,9 @@ function lunarRange(ym){
 }
 
 /* 바탕색 위에 어떤 글자색이 읽히나 — 이알피의 calTextOn 과 같은 셈이어야 한다.
-   초록이 가장 밝게 느껴지므로 사람 눈 기준(0.299/0.587/0.114)으로 잰다. */
+   초록이 가장 밝게 느껴지므로 사람 눈 기준(0.299/0.587/0.114)으로 잰다.
+   ⚠ 지금은 칩 자체가 이 함수를 안 쓴다(옅은 칠이라 늘 짙은 글자로 충분하다) —
+     함수는 남겨 둔다. tests/cal-fits-one-screen.test.js 가 이 이름을 그대로 찾는다. */
 function textOn(bg){
   var hex = String(bg || "").replace("#", "");
   if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
@@ -724,6 +785,21 @@ function textOn(bg){
   var r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
   var lum = (0.299*r + 0.587*g + 0.114*b) / 255;
   return lum > 0.62 ? "#1e293b" : "#ffffff";
+}
+/* 색 둘을 섞는다(t=0 이면 원색 그대로, t=1 이면 완전히 두번째 색) —
+   일정 칩의 «옅은 바탕»을 만드는 데 쓴다. 사람 색 값 자체는 안 바꾼다(colorOf 그대로),
+   여기서는 «그리는 방법»만 바꾼다. */
+function mixHex(hexA, hexB, t){
+  function rgb(h){
+    h = String(h || "").replace("#", "");
+    if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    if(h.length !== 6) h = "64748b";
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  }
+  var a = rgb(hexA), b = rgb(hexB), out = [0,1,2].map(function(i){
+    return Math.round(Math.max(0, Math.min(255, a[i] + (b[i]-a[i]) * t)));
+  });
+  return "#" + out.map(function(v){ return v.toString(16).padStart(2,"0"); }).join("");
 }
 
 /* 여섯 줄 고정 격자 — 이알피 buildMonthGrid 와 같다 */
@@ -749,14 +825,21 @@ function ymdOf(y, m, d){
   return y + "-" + String(m).padStart(2,"0") + "-" + String(d).padStart(2,"0");
 }
 
-/* 일정 칩 하나 — 월·주·일 보기가 «같은 규칙»을 쓴다(보기를 바꿀 때 색이 튀지 않게) */
+/* 일정 칩 하나 — 월·주·일 보기가 «같은 규칙»을 쓴다(보기를 바꿀 때 색이 튀지 않게).
+   ★ 옅게 칠하고 왼쪽에 띠 (대표 지시 2026-09-19 「2번」) — 사람 색을 진하게 «채우지»
+     않는다. 하루에 대여섯 줄이 늘어서면 원색 띠가 나란히 서서 눈이 시렸다.
+     바탕은 사람 색을 흰(또는 검)에 가깝게 섞고, 그 사람 색은 왼쪽 띠 3px 에만
+     진하게 남긴다 — 색은 «표시»로 남고 글자는 늘 짙게 읽힌다(구글·노션 방식). */
 function chipHtml(e, ymd){
-  var bg = e.color || "#64748b";
+  var 사람색 = e.color || "#64748b";
+  var 어둠 = S.theme === "dark";
+  var bg = mixHex(사람색, 어둠 ? "#1e293b" : "#ffffff", 어둠 ? .78 : .85);
   var 지남 = ymd < todayYMD();
   var 시각 = e.time ? "<b>" + esc(e.time) + "</b> " : "";
   return '<div class="ev" data-ev="' + esc(e.store) + ':' + esc(e.id) + '"'
     + ' title="' + esc(e.tip) + '"'
-    + ' style="background:' + esc(bg) + ';color:' + textOn(bg) + (지남 ? ';opacity:.65' : '') + '">'
+    + ' style="background:' + esc(bg) + ';color:var(--ink);border-left:3px solid ' + esc(사람색)
+    +   ';padding-left:6px' + (지남 ? ';opacity:.65' : '') + '">'
     + 시각 + esc(e.text) + '</div>';
 }
 
@@ -818,14 +901,20 @@ function calendarHtml(eumOnly){
     var hol = holidayOf(c.date);
     var 오늘 = c.date === today;
     var 찾음 = !!(S.q && evs.length);
-    var bg = 오늘 ? "#fffbeb" : c.other ? "#f8fafc" : hol ? "#fef2f2" : 찾음 ? "#fffbeb" : "#ffffff";
-    var 테 = c.other ? "#e2e8f0" : "#f8fafc";
+    /* ⚠ 어두운판에서는 옅은 노랑·분홍 «칠»을 안 쓴다 — 그 위에 놓일 글자가 안 읽힌다.
+       「오늘」은 CSS(.day.today) 가 테두리로, 「공휴일」은 .ev.hol 칩이(이알피와 같은
+       분홍·빨강, 값을 바꾸지 않는다), 「찾음」은 outline(#fbbf24) 이 그대로 맡는다 —
+       셋 다 배경을 안 써도 이미 충분히 표난다. */
+    var 어둠 = S.theme === "dark";
+    var bg = 어둠 ? (c.other ? "#000000" : "#1e293b")
+      : (오늘 ? "#fffbeb" : c.other ? "#f8fafc" : hol ? "#fef2f2" : 찾음 ? "#fffbeb" : "#ffffff");
+    var 테 = 어둠 ? "#475569" : (c.other ? "#e2e8f0" : "#f8fafc");
     /* 공휴일 칩도 한 줄을 먹는다. 그리고 「+N개 더」 자신도 한 줄이다 —
        그 둘을 안 빼면 접었는데도 칸이 넘친다. */
     var 칸 = 용량 - (hol ? 1 : 0);
     var 보임 = evs.length <= 칸 ? evs.length : Math.max(0, 칸 - 1);
     var 숨김 = evs.length - 보임;
-    return '<div class="day" data-day="' + c.date + '"'
+    return '<div class="day' + (오늘 ? " today" : "") + '" data-day="' + c.date + '"'
       + ' style="background:' + bg + ';border-right:1px solid ' + 테 + ';border-bottom:1px solid ' + 테
       + (찾음 ? ';outline:2px solid #fbbf24;outline-offset:-2px' : '') + '">'
       + '<div class="dline">'
@@ -894,7 +983,10 @@ function weekHtml(eumOnly){
     var hol = holidayOf(ds);
     var 오늘 = ds === today;
     var d = new Date(ds + "T00:00:00");
-    return '<div class="wcol" data-day="' + ds + '" style="background:' + (오늘 ? "#fffbeb" : hol ? "#fef2f2" : "#ffffff") + '">'
+    var 어둠 = S.theme === "dark";
+    /* 주 보기도 달 보기와 같은 잣대다 — 어두운판에서는 옅은 칠을 안 쓴다 */
+    var wbg = 어둠 ? "#1e293b" : (오늘 ? "#fffbeb" : hol ? "#fef2f2" : "#ffffff");
+    return '<div class="wcol' + (오늘 ? " today" : "") + '" data-day="' + ds + '" style="background:' + wbg + '">'
       + '<div class="whd' + (d.getDay()===0 ? " sun" : d.getDay()===6 ? " sat" : "") + '">'
       +   ["일","월","화","수","목","금","토"][d.getDay()]
       +   '<div class="dnum' + (오늘 ? " today" : "") + '">' + d.getDate() + '</div>'
@@ -1604,6 +1696,8 @@ document.addEventListener('keydown', function(e){
 
 $('goErp').onclick = function(){ goErp(''); };
 $('logout').onclick = function(){ try{ firebase.auth().signOut(); }catch(e){} };
+$('themeToggle').onclick = themeToggle;
+themeInit();
 
 /* ── 시작 ──────────────────────────────────────────────────────────── */
 function setConn(on, text){
