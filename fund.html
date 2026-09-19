@@ -4260,13 +4260,33 @@ var PARTY_WHO_SRC='×\\s*×\\s*×|○○○(?!○)';
    ⚠ 글자만 바꾼다 — 누가 서명하는지는 그대로 참여사업장의 근로자대표(_siteWrep)다.
    ⚠ fillPartyList «앞»에서 돌아야 한다. 줄을 늘릴 때 베끼는 글귀(sigTpl)가 이미 바뀐
      말이어야, 늘어난 줄에도 「근로자대표」로 적힌다. */
+/* ══ 설립준비위 회의록 — 의안마다 «새 장» ══ (대표 지시 2026-09-19
+     「설립준비위원회 회의록 의안에 따라 새로운 페이지로 넘어가야 한다」)
+   의안 하나가 「의결 주문 · 제안 사유 · 주요 골자 · 의결후 조치사항」 네 마디로 이루어진다.
+   종전에는 의안 둘이 한 장에 이어 붙고 다음 장에서 잘려, 어느 의안을 보는지 알 수 없었다.
+   ⚠ 첫 의안에는 표를 붙이지 않는다 — 붙이면 앞에 빈 장이 하나 생긴다. */
+var MINUTES_AGENDA=/^[\s\-–—]*의\s*안\s*\d+\s*호/;
+function fillMinutesPages(root){
+  var at=0;
+  [].slice.call(root.querySelectorAll('p')).forEach(function(p){
+    if(!MINUTES_AGENDA.test(String(p.textContent||'').trim())) return;
+    at++;
+    if(at>1){ p.setAttribute('data-newpage','1'); p.setAttribute('data-kept','1'); }
+  });
+  return at;
+}
+/* ★ 「근로자측대표」도 «근로자대표»로 (대표 지시 2026-09-19 「설립합의서에도 근로자측대표가
+     아니라 근로자 대표로 바꿔라 일괄」). 정관과 설립합의서가 같은 말을 써야 한다.
+   ⚠ 「근로자측 위 원」·「근로자측대표자」는 건드리지 않는다 — 앞엣것은 위원 구분이고,
+     뒤엣것은 이미 「자」가 붙은 다른 말이다. 그래서 뒤에 「자」가 오면 비껴간다. */
+var WREP_LBL=[[/노동조합\s*대표자/g,'근로자대표'],[/근로자측\s*대표(?!자)/g,'근로자대표']];
 function fillWrepLabel(root){
   var walk=document.createTreeWalker(root,4/*TEXT*/,null,false), tn, nodes=[];
   while((tn=walk.nextNode())) nodes.push(tn);
   nodes.forEach(function(x){
-    var t=x.nodeValue||'';
-    if(t.indexOf('노동조합')<0) return;
-    var v=t.replace(/노동조합\s*대표자/g,'근로자대표');
+    var t=x.nodeValue||'', v=t;
+    if(t.indexOf('노동조합')<0&&t.indexOf('근로자측')<0) return;
+    WREP_LBL.forEach(function(r){ v=v.replace(r[0],r[1]); });
     if(v!==t) x.nodeValue=v;
   });
 }
@@ -4959,6 +4979,7 @@ function hwpFormHTML(kind,f,sites){
   /* 정관·설립합의서의 「○○주식회사」 자리표에 참여사업장을 넣는다 — 걷어내기보다 «먼저» 돈다.
      뒤에 돌면 자리표가 이미 ＿＿＿ 로 바뀌어 바꿀 것을 못 찾는다. */
   if(kind==='charter'||kind==='agreement'){ fillWrepLabel(d); fillPartyList(d,f,sites); fillPartyDates(d,f); }
+  if(kind==='minutes') fillMinutesPages(d);
   /* 줄맞춤 자국 걷어내기는 «자리표를 채운 뒤»에 돈다 — 먼저 돌면 서명란의 두 단 벌림이
      아직 자리표 상태라 길이가 짧아, 본문으로 오해받을 수 있다. */
   fillFlowText(d);
@@ -9602,9 +9623,19 @@ function sitesPeopleBody(arr){
         +_smeChip(s)
         +'</td></tr>';
   }).join('');
-  return '<div class="muted" style="font-size:11.5px;margin:8px 0 6px">'
-    +'대표자·담당자는 보여만 줍니다 — 고치려면 상호를 누르세요. '
-    +'사용자대표 <b>'+nU+'</b>/'+arr.length+' · 근로자대표 <b>'+nW+'</b>/'+arr.length+' 적혀 있습니다.</div>'
+  /* ★ 「한번에」 — 사용자대표는 대개 회사 대표이사다(정관 제19조: 「사용자를 대표하는 위원은
+       해당 참여회사 대표자 또는 그 대표자가 위촉하는 사람」). 열여섯 곳을 하나씩 켜는 대신
+       한 번에 켠다 (대표 지시 2026-09-19 「근로자 대표 이름넣는것도 한번에 하게」).
+     ⚠ 근로자대표는 «한번에»가 없다 — 회사마다 다른 사람이고 법 제55조제2항을 준용해
+       «선출»하는 사람이라 지어낼 근거가 없다. 그 줄은 이 표에서 죽 쳐 넣으면 된다. */
+  return '<div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0 6px;align-items:center">'
+    +'<span class="muted" style="font-size:11.5px">대표자·담당자는 보여만 줍니다 — 고치려면 상호를 누르세요.</span>'
+    +'<span class="stat"'+(nU<arr.length?' style="color:var(--warn)"':'')+'>사용자대표 '+nU+'/'+arr.length+'</span>'
+    +'<span class="stat"'+(nW<arr.length?' style="color:var(--warn)"':'')+'>근로자대표 '+nW+'/'+arr.length+'</span>'
+    +'<span style="flex:1"></span>'
+    +(nU<arr.length
+      ? '<button onclick="repSameAll()" title="사용자대표를 «회사 대표자와 같음»으로 한 번에 켭니다 — 이름을 따로 적어 둔 곳은 건드리지 않습니다">👤 사용자대표 = 대표자 (한번에)</button>'
+      : '')+hlp('site.reps')+'</div>'
     +'<div style="overflow-x:auto"><table><thead><tr><th>번호</th><th>상호</th>'
     +'<th class="ph" title="등기부·사업자등록증에 적힌 사람">대표자</th>'
     +'<th class="ph" title="실무 연락 담당자">담당자</th>'
@@ -9821,6 +9852,28 @@ function syLoad(){
     if((S.tab==='sites'||S.tab==='subsidy')&&S.view==='fund') renderFund();   // 지원금 한도 계산도 출연금을 쓴다
   }).catch(function(){ if(S.syFor===key){ S.sy={}; if((S.tab==='sites'||S.tab==='subsidy')&&S.view==='fund') renderFund(); } });
   return false;
+}
+/* 사용자대표를 «모두» 대표자와 같음으로 — 정관 제19조가 「사용자를 대표하는 위원은 해당
+   참여회사 대표자 또는 그 대표자가 위촉하는 사람」이라 대개 대표이사다.
+   ⚠ 이름을 이미 따로 적어 둔 곳은 건드리지 않는다 — 위촉한 사람이 있다는 뜻이다. */
+function repSameAll(){
+  var fid=S.fundId, m=S.sites||{};
+  var hit=Object.keys(m).filter(function(k){
+    var s=m[k]||{};
+    return s.status!=='closed' && !s.urep_same && !String(s.urep_name||'').trim() && String(s.ceo||'').trim();
+  });
+  if(!hit.length){ toast('바꿀 곳이 없습니다 — 이미 켜 두었거나 이름을 따로 적어 두었습니다','warn'); return; }
+  confirmM(hit.length+'곳의 사용자대표를 «회사 대표자와 같음»으로 켤까요?\n\n'
+    +hit.slice(0,8).map(function(k){ return '· '+(m[k].name||'')+' → '+(m[k].ceo||''); }).join('\n')
+    +(hit.length>8?('\n· 그 밖 '+(hit.length-8)+'곳'):'')
+    +'\n\n이름을 따로 적어 둔 곳은 건드리지 않습니다.',{ok:hit.length+'곳 켜기'}).then(function(ok){
+    if(!ok) return;
+    var up={}; hit.forEach(function(k){ up[k+'/urep_same']=true; });
+    fbDb.ref(NS+'/sites/'+fid).update(up).then(function(){
+      hit.forEach(function(k){ if(S.sitesFor===fid&&S.sites&&S.sites[k]) S.sites[k].urep_same=true; });
+      toast(hit.length+'곳을 켰습니다 — 서식에 대표자 이름이 섭니다'); renderFund();
+    }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+  });
 }
 function sySet(sid,k,v){
   var fid=S.fundId, yr=S.year, val=num(v)||0;
@@ -14848,7 +14901,9 @@ var HELP={
    +'<b>사용자대표</b> — 협의회에 <b>사용자측으로 나오는</b> 사람입니다. 대표이사가 다 나오지 못해 공장장·관리부장이 나오는 일이 많습니다.<br>'
    +'<b>근로자대표</b> — 노사 합의에 서명하는 사람입니다.</p>'
    +'<p><b>비워 두면 지어내지 않습니다.</b> 사용자대표가 비면 서식에도 빈칸으로 나갑니다 — 관청에 나가는 서류라, 아무도 정하지 않은 이름을 찍지 않습니다.</p>'
-   +'<p>열여섯 곳을 한 화면에서 채우려면 <b>[👤 사람]</b> 보기를 쓰세요.</p>'},
+   +'<p>열여섯 곳을 한 화면에서 채우려면 <b>[👤 사람]</b> 보기를 쓰세요. 칸을 고치면 <b>바로 저장</b>됩니다.</p>'
+   +'<p>★ <b>[👤 사용자대표 = 대표자 (한번에)]</b> — 사용자대표는 대개 회사 대표이사입니다(정관 제19조: 「사용자를 대표하는 위원은 해당 참여회사 <b>대표자</b> 또는 그 대표자가 위촉하는 사람」). 한 번 누르면 비어 있는 곳을 모두 켭니다. <b>이름을 따로 적어 둔 곳은 건드리지 않습니다</b> — 위촉한 사람이 있다는 뜻이니까요.</p>'
+   +'<p><b>근로자대표는 「한번에」가 없습니다.</b> 회사마다 다른 사람이고 법 제55조제2항을 준용해 <b>선출</b>하는 사람이라, 지어낼 근거가 없습니다. 이 표에서 죽 쳐 넣으시면 됩니다 — 그 이름이 <b>설립합의서 · 정관 서명란 · 별지 제7호 위원 격자 · 설립준비위 회의록</b>에 한꺼번에 섭니다.</p>'},
  'site.smecert':{t:'중소기업확인서',h:'<p>근로복지공단 지원사업 <b>제출서류</b>입니다. 중소기업확인서에 적힌 <b>기업규모</b>와 <b>유효기간</b>을 적어 둡니다.</p>'
    +'<p><b>기업규모(위 칸)와 다릅니다.</b> 그것은 기업정보함에서 온 값이고, 이것은 <b>확인서에서 읽은</b> 값입니다. 심사에 내는 것은 확인서 쪽입니다.</p>'
    +'<p><b>해마다 새로 뗍니다</b>(보통 4월 1일~다음해 3월 31일). 기간이 지나면 빨간 딱지가 붙습니다 — 지난 확인서를 내면 반려됩니다.</p>'

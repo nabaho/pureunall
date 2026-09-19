@@ -66,7 +66,9 @@ global.funds = {};
      여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
   gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
   /* 2026-09-19: 노동조합대표자→근로자대표 · 홀로 선 날짜 자리 · 작성 예 제외 */
-  gS('DATE_CTX'), gF('_dateSlot'), gF('fillWrepLabel'), gF('_stripSample'),
+  gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),
+  /* 2026-09-19: 회의록 의안마다 새 장 */
+  gS('MINUTES_AGENDA'), gF('fillMinutesPages'),
   /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다. 위와 같은 까닭이다. */
   gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
   gF('ftypeSkipDoc'), gS('FTYPE_PICK_SRC'), gF('_ftypeSwap'), gF('_ftypeWords'), gF('_isTypePickBox'), gF('fillFundTypeWords'),

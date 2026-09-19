@@ -249,6 +249,8 @@ test('★★ ⑯ 사람 보기를 정말 그리면 네 사람이 각각 제 칸�
   const b = load([
     'function esc(s){ return String(s==null?"":s); }',
     'function _siteContacts(s){ return (s&&s._c)||{}; }',
+    /* 2026-09-19: 머리줄에 ⓘ 와 「한번에」 단추가 붙었다 — 하네스에도 세워 둔다 */
+    'function hlp(k){ return "<i>"+k+"</i>"; }',
     grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('_siteSme'), grabFn('_smeChip'),
     grabFn('sitesPeopleBody'),
     'this.f=sitesPeopleBody;']);
