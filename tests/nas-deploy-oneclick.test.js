@@ -77,6 +77,24 @@ test('④-2★ 못 찾으면 «사람에게 되돌리지» 않는다 — 새로 
     '★ 새로 받는 자리가 기존 배포 사본들(pu-deploy·…-deploy)과 이름이 안 겹쳐야 헷갈리지 않는다');
 });
 
+test('⑥★★ 「git pull」만 믿지 않는다 — 반드시 origin/main 으로 못 박는다', () => {
+  /* 2026-09-19 대표 화면: shell:true 를 고쳐 올렸는데도 대표님 화면엔 여전히
+     «고치기 전» 오류(spawnSync npx ENOENT)가 그대로 났다. git pull 은
+     「Already up to date」라고 했다 — 이 폴더가 어느 가지를 보고 있었는지,
+     정말 main 최신인지를 짐작만 했지 확인하지 않았기 때문이다.
+     git pull 은 «지금 보고 있는 가지»만 맞추지 그 가지가 main 인지는 안 본다. */
+  [BAT, PS1].forEach((SRC, i) => {
+    const 이름 = i === 0 ? '.bat' : '.ps1';
+    assert.doesNotMatch(SRC, /^\s*git pull\s*$/m,
+      '★★ ' + 이름 + ' 에 무른 「git pull」이 남아 있다 — 다른 가지에 있었거나\n' +
+      '  병합 순간과 겹치면 조용히 옛 코드로 돈다');
+    assert.match(SRC, /git fetch origin main/, '★ ' + 이름 + ' 이 origin/main 을 명시로 받지 않는다');
+    assert.match(SRC, /git checkout -B main origin\/main/, '★ ' + 이름 + ' 이 main 가지로 못 박지 않는다');
+    assert.match(SRC, /git reset --hard origin\/main/,
+      '★★ ' + 이름 + ' 이 «그대로 덮어쓰기»를 안 하면 로컬에 남은 옛 커밋이 fast-forward 를 막을 수 있다');
+  });
+});
+
 test('⑤ 배포본에 안 나간다 — 개발용이다', () => {
   const gate = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'deploy-pages.yml'), 'utf8');
   assert.match(gate, /\bscripts\b/,
