@@ -556,3 +556,140 @@ test('★ 「이 칸에 모두 몇 통」은 우리가 든 수로 적는다 — 
   assert.equal(held, 15, '검사 밑그림이 틀렸습니다');
   assert.equal(shown, held, '다음메일이 보여 주는 수(10)를 적고 있습니다 — 목록에는 15통이 보입니다');
 });
+
+/* ══════ 표시 맞추기가 «영영» 도는 것 (실측 2026-09-19) ══════════════════════
+   ★★ 무슨 일이 있었나
+     서른두 폴더 가운데 «둘»만 10분마다 폴더를 통째로 다시 읽고 있었다 —
+     받은메일함(우리 481통 / 다음이 보여 주는 400, 우리 셈 5 vs 다음 0)과
+     보낸편지함(909 / 400, 8 vs 0). 나머지 서른은 하루에 한 번이었다.
+     하루 288번 × 수백 KB. 23분을 재 보니 «자동으로 도는» 통신의 절반이 이것이었다.
+
+   ★ 까닭 — 두 수가 «다른 무리»를 셌다
+     다음이 말하는 안읽음은 지금 보여 주는 목록(폴더당 400통)을 센다.
+     우리 셈은 우리가 든 전부를 셌다 — 창 밖으로 밀려난 옛 줄까지(2026-08-28 로 안 지운다).
+     그 옛 줄이 안읽음이면 다음은 영영 그 수를 모른다. 그래서 맞춰도 안 맞고,
+     안 맞으니 또 맞추러 들어간다.
+
+   ⚠ 바로 위 「통수가 그대로면 다시 읽지 않는다」 검사로는 못 잡는다 —
+     거기서는 우리가 든 것과 다음이 보여 주는 것이 «같은 무리»라 두 수가 애초에 맞는다. */
+function 창밖으로밀린폴더() {
+  /* 1~3 은 안읽음, 4~6 은 읽음 */
+  const msgs = {};
+  for (let u = 1; u <= 6; u++) {
+    msgs[String(u)] = Object.assign({}, envelope(u));
+    if (u >= 4) msgs[String(u)].flags = ['\\Seen'];
+  }
+  return { msgs: msgs };
+}
+
+test('★★ 맞출 수 없는 어긋남 하나가 폴더를 «회차마다» 다시 읽히지 않는다', async () => {
+  const folders = { INBOX: 창밖으로밀린폴더() };
+  const db = fakeDb();
+  const d = deps(db);
+  await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+  await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+
+  /* 창이 밀렸다 — 다음은 이제 4~6 만 보여 주고 그 셋은 다 읽음이라 「안읽음 0」이다.
+     우리 거울에는 1~3 이 «안읽음»인 채 그대로 남는다(창 밖이라 안 지운다). */
+  delete folders.INBOX.msgs['1'];
+  delete folders.INBOX.msgs['2'];
+  delete folders.INBOX.msgs['3'];
+
+  await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });  // 줄었다 — 정리·맞추기 한 번씩은 마땅하다
+  const kept = uidsIn(db, slug('INBOX'));
+  assert.ok(kept.indexOf(1) >= 0, '★ 창 밖으로 밀린 옛 줄을 지웠습니다 — 2026-08-28 결정이 깨졌습니다');
+
+  /* ★ 적어 둔 안읽음 수가 «다음이 말하는 수»와 같은 무리를 세야 한다.
+       우리가 든 전부(창 밖 1~3 포함)를 세면 3 이 되어 다음의 0 과 영영 어긋난다 —
+       그 어긋남이 곧 회차마다 다시 읽는 길이었다(2026-08-30 에 고치려던 그 어긋남이다). */
+  const 적힌것 = db.__get(MS.ROOT + '/sync/' + slug('INBOX')) || {};
+  assert.equal(Number(적힌것.unread), 0,
+    '★★ 적어 둔 안읽음 수가 다음이 말하는 수(0)와 다릅니다 — 창 밖 옛 줄까지 세고 있습니다: '
+    + Number(적힌것.unread));
+
+  const before = fullReads(db, slug('INBOX'));
+  await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+  await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+  await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+  assert.equal(fullReads(db, slug('INBOX')), before,
+    '★★ 맞출 수 없는 어긋남 때문에 회차마다 폴더를 통째로 다시 읽습니다 — '
+    + '실제로 받은메일함·보낸편지함이 10분마다 그러고 있었습니다(요금). '
+    + '읽은 횟수: ' + fullReads(db, slug('INBOX')) + ' (그대로여야 하는 값: ' + before + ')');
+});
+
+test('★★ 그래도 «다음이 말하는 수»가 바뀌면 그때는 훑는다 — 조용해지려고 눈을 감으면 안 된다', async () => {
+  const folders = { INBOX: 창밖으로밀린폴더() };
+  const db = fakeDb();
+  const d = deps(db);
+  for (let i = 0; i < 3; i++) await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+  delete folders.INBOX.msgs['1'];
+  delete folders.INBOX.msgs['2'];
+  delete folders.INBOX.msgs['3'];
+  for (let i = 0; i < 3; i++) await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+
+  /* 남은 것 하나가 «안읽음»으로 바뀌었다 — 다음이 말하는 수가 0 에서 1 이 된다 */
+  const m = folders.INBOX.msgs['4'];
+  assert.ok(m, '흉내 낸 메일함에 4번이 없습니다');
+  m.flags = [];
+  const before = fullReads(db, slug('INBOX'));
+  await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+  assert.ok(fullReads(db, slug('INBOX')) > before,
+    '★★ 다음에서 안읽음이 생겼는데 훑지 않습니다 — 조용해지려고 눈을 감은 셈입니다');
+  const after = (db.__get(MS.ROOT + '/msgs/' + slug('INBOX')) || {})['4'] || {};
+  assert.equal(Number(after.r || 0), 0, '★ 훑고도 우리 줄이 «읽음»으로 남아 있습니다');
+});
+
+test('★ 셈은 «다음이 보여 주는 무리»만 센다 — 견줄 값이니 같은 무리여야 한다', () => {
+  assert.equal(MB.sweepUnread({ 10: { r: 1 }, 11: { r: 0 }, 12: { r: 0 } }), 2);
+  assert.equal(MB.sweepUnread({ 10: { r: 1 } }), 0);
+  assert.equal(MB.sweepUnread({}), 0);
+  assert.equal(MB.sweepUnread(null), 0);
+});
+
+test('★★ 훑을까 판정 — 맞으면 조용히, 못 맞추는 수는 한 번만, 하루 지나면 그물', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const 훑나 = (s, unseen, since) => MB.sweepNeeded(s, unseen, since === undefined ? 0 : since, DAY);
+
+  /* ⚠ 「아직 다 안 채웠다」는 두 가지로 걸러야 한다 — 한 번도 안 훑은 것(-1)과
+       어긋난 것(3 vs 0). 둘 다 done 을 안 보면 «훑자»가 되어, 받아 오는 중인 폴더를
+       회차마다 통째로 읽는다. 값이 우연히 맞는 경우(0 vs 0)로 재면 이 자리가 샌다. */
+  assert.equal(훑나({ done: false, unread: -1 }, 0), false, '★ 아직 다 안 채운 폴더를 훑으면 헛일이다');
+  assert.equal(훑나({ done: false, unread: 3 }, 0), false,
+    '★★ 받아 오는 중인 폴더를 어긋났다고 훑습니다 — 다 채우기도 전에 회차마다 통째로 읽습니다');
+  assert.equal(훑나({ done: false, unread: 3 }, 0, 99 * DAY), false, '★ 하루 그물도 done 앞에서는 멈춘다');
+  assert.equal(훑나({ done: true, unread: -1 }, 0), true, '★ 한 번도 안 훑었으면 훑어야 한다');
+  assert.equal(훑나({ done: true, unread: 3 }, 3), false, '★ 두 수가 맞는데 또 훑으면 그것이 요금이다');
+  assert.equal(훑나({ done: true, unread: 3 }, 0), true, '★ 어긋나면 한 번은 맞춰 봐야 한다');
+  assert.equal(훑나({ done: true, unread: 3, unseenOk: 0 }, 0), false,
+    '★★ 맞춰 봤는데도 안 맞는 수를 또 훑습니다 — 이것이 10분마다 도는 길입니다');
+  assert.equal(훑나({ done: true, unread: 3, unseenOk: 0 }, 1), true,
+    '★★ 다음이 말하는 수가 바뀌었는데 안 훑습니다 — 누가 뭘 읽었다는 신호를 놓칩니다');
+  assert.equal(훑나({ done: true, unread: 3, unseenOk: 0 }, 0, DAY + 1), true,
+    '★ 하루가 지나면 그물로 한 번은 훑어야 한다(중요·답장함만 바뀐 경우)');
+});
+
+test('★★ 「맞춰 봤다」는 표가 회차 사이에 «살아남는다» — 떨어뜨리면 고친 뜻이 사라진다', () => {
+  const s = MB.nextSync({ hi: 500, lo: 1, uv: 7, unread: 3, unseenOk: 0, sweptAt: 99 }, [10], 7, true);
+  assert.equal(s.unseenOk, 0,
+    '★★ nextSync 가 unseenOk 를 떨어뜨립니다 — 다음 회차에 「맞춰 본 적 없다」가 되어 또 통째로 읽습니다');
+  assert.equal(s.unread, 3, '★ unread 도 함께 이어져야 합니다');
+  const fresh = MB.nextSync({}, [10], 7, true);
+  assert.equal(fresh.unseenOk, -1, '★ 적힌 적 없으면 «모른다»(-1)여야 합니다 — 0 이면 「맞춰 봤다」로 읽힙니다');
+});
+
+test('★★ 훑은 뒤 «이 수는 맞춰 봤다»를 실제로 적어 둔다 — 안 적으면 마지막 그물이 없다', async () => {
+  /* ⚠ 위 「회차마다 다시 읽지 않는다」만으로는 이 자리를 못 지킨다 — 거기서는 셈을
+       같은 무리로 고친 것만으로 두 수가 맞아떨어져, unseenOk 를 안 적어도 조용하다.
+     그런데 다음이 목록 밖까지 세는 폴더에서는 그 «맞아떨어짐»이 없다. 그때 남는
+     마지막 그물이 이 칸이다 — 적히는지를 여기서 따로 못 박는다. */
+  const folders = { INBOX: 창밖으로밀린폴더() };
+  const db = fakeDb();
+  const d = deps(db);
+  for (let i = 0; i < 2; i++) await MS.runSync(d, { client: fakeMail(folders), deadlineMs: 60000 });
+  const s = db.__get(MS.ROOT + '/sync/' + slug('INBOX')) || {};
+  assert.equal(Number.isFinite(Number(s.unseenOk)) && Number(s.unseenOk) >= 0, true,
+    '★★ 훑고도 «맞춰 본 수»를 안 적었습니다 — 못 맞추는 폴더가 10분마다 통째로 읽힙니다: '
+    + JSON.stringify({ unread: s.unread, unseenOk: s.unseenOk }));
+  assert.equal(Number(s.unseenOk), 3,
+    '★ 적은 값이 «다음이 그때 말한 수»가 아닙니다 — 그러면 다음 회차 견주기가 어긋납니다');
+});
