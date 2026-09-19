@@ -127,9 +127,11 @@ test('⑧ 어두운판에서 「오늘·공휴일·찾음」 칸을 옅게 칠�
   const 계산 = 함수몸(캘린더, 'function calendarHtml(eumOnly){');
   const i = 계산.indexOf('어둠 ? (c.other');
   assert.ok(i >= 0, '어두운판 칸 배경 갈래를 못 찾았습니다');
-  const j = 계산.indexOf(')\r\n      : (', i);
-  assert.ok(j >= 0, '어두운판 갈래가 끝나는 자리(: 로 넘어가는 곳)를 못 찾았습니다');
-  const 어둠갈래 = 계산.slice(i, j);
+  /* ⚠ 줄끝(\r\n · \n)을 못 박지 않는다 — 이 저장소는 CRLF, CI 는 LF 로 받는다
+     (tests-crlf-vs-ci-lf 메모). 공백·줄바꿈은 몇 글자든 건너뛴다. */
+  const m = 계산.slice(i).match(/\)\s*:\s*\(/);
+  assert.ok(m, '어두운판 갈래가 끝나는 자리(: 로 넘어가는 곳)를 못 찾았습니다');
+  const 어둠갈래 = 계산.slice(i, i + m.index);
   assert.strictEqual(/fffbeb|fef2f2/.test(어둠갈래), false,
     '어두운판 갈래에도 옅은 칠(오늘·공휴일)을 씁니다 — 글자가 안 읽힙니다: ' + 어둠갈래);
 });
