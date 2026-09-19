@@ -31,6 +31,12 @@ const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 const bare = stripComments(src);
 const 묻기 = stripJs(cutFn(src, 'async function erpAskDeferCompanyLink('));
+/* ⚠ 2026-09-19 — 「보류로 두어도 되는 상황인가」를 «정하는» 일이 제 함수로 갈라졌다.
+     까닭: 사진첩에서 온 자동 등록도 같은 판단이 필요한데, 그쪽에는 물을 사람이 없다.
+     판단을 한 곳에 두고, 묻는 일만 모달이 한다 — 두 길이 «같은 잣대»를 보게 하려고.
+   ⚠ 그래서 아래 검사들은 «둘을 합쳐» 본다. 규칙은 그대로이고 자리만 갈렸다. */
+const 정하기 = stripJs(cutFn(src, 'function erpDeferCoLinkIfNew('));
+const 보류길 = 정하기 + '\n' + 묻기;
 
 test('① ★★ 저장 단추 자리에서 «먼저» 묻는다 — 막히고 나서가 아니다', function () {
   /* ⚠ 고정 폭으로 자르지 않는다 — 창을 좁게 잡으면 함수 끝에 못 닿아 «안 보고 통과»한다
@@ -48,33 +54,37 @@ test('① ★★ 저장 단추 자리에서 «먼저» 묻는다 — 막히고 �
     '★★ 물어 놓고 그 답을 «안 받습니다» — 고른 값이 저장에 안 실립니다');
 });
 
-test('② ★ 묻는 것은 «업체를 못 고른 때»만 — 다른 잘못까지 덮지 않는다', function () {
-  assert.match(묻기, /checked\.code!=='company_selection_required'/,
-    '★★ 어떤 잘못이든 「연결 보류」를 권합니다 — 업체가 «중복»이거나 «사업자번호가 다른» 것까지\n' +
+test('② ★ 보류로 두는 것은 «업체를 못 고른 때»만 — 다른 잘못까지 덮지 않는다', function () {
+  assert.match(보류길, /checked\.code!=='company_selection_required'/,
+    '★★ 어떤 잘못이든 「연결 보류」로 넘깁니다 — 업체가 «중복»이거나 «사업자번호가 다른» 것까지\n' +
     '   보류로 덮으면, 고쳐야 할 것을 덮고 지나갑니다');
-  assert.match(묻기, /checked\.ok \|\|/, '★ 멀쩡할 때도 묻습니다');
+  assert.match(보류길, /checked\.ok \|\|/, '★ 멀쩡할 때도 보류로 넘깁니다');
 });
 
 test('③ ★★ 문턱을 «풀지 않는다» — 이름이 같다고 업체 ID 를 채우지 않는다', function () {
   /* 이 검증이 있는 까닭: 사업자번호가 같다는 이유로 자문 계약이 기금 업체에 들어간 적이 있다.
      「연결 보류」는 ID 를 «안 채운다»고 사람이 밝히는 것이라 그 위험이 없다. */
-  assert.match(묻기, /companyId:\s*''/,
-    '★★ 보류로 고를 때 업체 ID 를 비우지 않습니다 — 엉뚱한 업체에 붙을 수 있습니다');
-  assert.match(묻기, /companyLinkStatus:\s*'pending'/,
+  assert.match(보류길, /companyId:\s*''/,
+    '★★ 보류로 둘 때 업체 ID 를 비우지 않습니다 — 엉뚱한 업체에 붙을 수 있습니다');
+  assert.match(보류길, /companyLinkStatus:\s*'pending'/,
     '★★ 「연결 보류」라고 표시하지 않습니다 — 나중에 무엇이 미확정인지 알 수 없게 됩니다');
   /* ⚠ 후보를 찾아 «저절로» 붙이는 길이 생기면 안 된다 */
-  assert.ok(!/companyLinkAutoMatch|companyLinkCandidates/.test(묻기),
-    '★★ 묻는 자리에서 업체를 «자동으로» 찾아 붙입니다 — 사람이 고른 것이 아닙니다');
-  /* 사람이 고른 것만 보류가 된다 */
-  assert.match(묻기, /await popConfirm\(/, '★★ 묻지도 않고 보류로 바꿉니다');
+  assert.ok(!/companyLinkAutoMatch|companyLinkCandidates/.test(보류길),
+    '★★ 업체를 «자동으로» 찾아 붙입니다 — 그것이 이 검증이 막으려는 바로 그 일입니다');
+  /* ⚠⚠ 2026-09-19 — 여기 «사람이 고른 것만 보류가 된다»고 적혀 있었다. 그 뜻이 바뀌었다:
+       사진첩에서 온 자동 등록은 **묻지 않고** 보류로 둔다(대표 결정 「사람 확인 없이 바로 저장」).
+       ★ 그래도 위험이 안 늘어나는 까닭은 «ID 를 안 채우기» 때문이다 — 이 검사가 지키는 바로 그것.
+         엉뚱한 업체에 붙는 사고는 ID 를 «채울» 때 나지, 비울 때 나지 않는다.
+       ⚠ 사람이 보고 있는 길(모달)에서는 **여전히 묻는다** — 아래가 그것을 지킨다. */
+  assert.match(묻기, /await popConfirm\(/, '★★ 모달이 묻지도 않고 보류로 바꿉니다');
   assert.match(묻기, /if\(!yes\) return form;/,
     '★★ 「업체 고르기」를 골라도 보류로 바꿉니다 — 사람의 답을 무시합니다');
 });
 
 test('④ ★ 물을 필요 없는 자리는 안 묻는다', function () {
-  assert.match(묻기, /clientType==='worker'/,
+  assert.match(보류길, /clientType==='worker'/,
     '★ 근로자 의뢰인데도 업체를 고르라고 묻습니다 — 그쪽은 업체가 없는 게 정상입니다');
-  assert.match(묻기, /companyLinkStatus==='pending'/,
+  assert.match(보류길, /companyLinkStatus==='pending'/,
     '★ 이미 보류로 고른 것에 또 묻습니다');
 });
 

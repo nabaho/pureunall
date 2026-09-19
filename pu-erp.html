@@ -17249,14 +17249,28 @@ function erpDropDeadCoLink(form, companies){
         들어간 적이 있다). 연결 보류는 «ID 를 안 채운다»고 사람이 밝히는 것이라 그 위험이 없다.
      ⚠ 검증 함수(erpValidateContractCompany)는 «안 건드린다» — 이관·저장직전 재검사도
        같은 문을 쓴다. 묻는 일은 사람이 저장 단추를 누른 «그 자리»에서만 한다. */
-async function erpAskDeferCompanyLink(form){
+/* 「업체관리에 없는 업체」인가 — 맞으면 «연결 보류»로 만든 폼을 돌려준다.
+   ⚠⚠ 묻는 일과 «정하는 일»을 갈라 둔다 (2026-09-19, 실제 계약을 만들어 보고 알았다).
+     모달은 사람에게 묻고 「예」면 이 함수를 부른다. 자동 등록은 묻지 않고 바로 부른다 —
+     보류는 «업체 ID를 안 채우는» 쪽이라 기계가 골라도 위험하지 않다.
+   ★ 이 갈래가 없던 탓에 자동 등록이 통째로 막혀 있었다. 정부사업 신청 회사는
+     대개 업체관리에 «아직 없다» — 즉 가장 흔한 경우가 막혔다. */
+function erpDeferCoLinkIfNew(form){
   var O=window.PuOntology;
-  if(!form || !O || typeof O.validateCompanyLink!=='function') return form;
-  if(form.clientType==='worker') return form;                 // 근로자 의뢰는 업체가 없는 게 정상
-  if(form.companyLinkStatus==='pending') return form;         // 이미 보류로 고른 것
+  if(!form || !O || typeof O.validateCompanyLink!=='function') return null;
+  if(form.clientType==='worker') return null;                 // 근로자 의뢰는 업체가 없는 게 정상
+  if(form.companyLinkStatus==='pending') return null;         // 이미 보류로 고른 것
   var _cos=dbGet('companies',[]);
   var checked=O.validateCompanyLink(erpDropDeadCoLink(form,_cos),_cos);
-  if(checked.ok || checked.code!=='company_selection_required') return form;
+  if(checked.ok || checked.code!=='company_selection_required') return null;
+  return Object.assign({},form,{ companyId:'', companyLinkStatus:'pending',
+    company:Object.assign({},form.company||{},{ companyId:'' }) });
+}
+async function erpAskDeferCompanyLink(form){
+  /* ⚠ 「보류로 두어도 되는 상황인가」는 위 한 함수가 정한다 — 여기서 또 따지면
+     사람에게 묻는 길과 자동 등록이 «다른 잣대»를 보게 된다. */
+  var 보류=erpDeferCoLinkIfNew(form);
+  if(!보류) return form;
   var nm=String(form.companyName || (form.company&&form.company.name) || '').trim();
   var yes=await popConfirm('「'+(nm||'이 업체')+'」는 업체관리에 없습니다.\n\n'
     + '지난 계약을 그대로 남기시려면 「연결 보류」로 저장하면 됩니다.\n'
@@ -17264,8 +17278,7 @@ async function erpAskDeferCompanyLink(form){
     + '연결 보류로 저장할까요?',
     { okText:'연결 보류로 저장', cancelText:'업체 고르기', danger:false });
   if(!yes) return form;   // 「업체 고르기」 — 그대로 두면 아래 검증이 막고 안내한다
-  return Object.assign({},form,{ companyId:'', companyLinkStatus:'pending',
-    company:Object.assign({},form.company||{},{ companyId:'' }) });
+  return 보류;
 }
 function erpValidateContractCompany(form){
   var O=window.PuOntology;
@@ -22034,6 +22047,18 @@ function ContractManagement(props){
     var dup = erpContractDupBlock(form, dbGet('contracts', []) || []);
     if(dup.length) return '같은 회사에 진행 중인 같은 유형 계약이 ' + dup.length + '건 있습니다'
       + (dup[0].contractNo ? ' (' + dup[0].contractNo + ')' : '');
+    /* ★★ 아래 둘은 persistOne 이 막는 자리다. 여기서 «미리» 봐서 까닭을 또렷이 적는다.
+       ⚠ 2026-09-19 에 실제로 한 건 넣어 보고 알았다 — persistOne 이 막으면 남는 말이
+       「월 잠금·업체 연결 등」뿐이라 **무엇을 고쳐야 하는지 알 수가 없었다.**
+       기계가 대신 답하는 길일수록 실패한 까닭은 더 또렷해야 한다. */
+    var ym = String(form.signDate || '').slice(0, 7);
+    if(ym && typeof isContractLocked === 'function' && isContractLocked(ym))
+      return ym + ' 이 잠겨 있어 계약을 만들 수 없습니다';
+    var O = window.PuOntology;
+    if(O && typeof O.validateCompanyLink === 'function'){
+      var chk = O.validateCompanyLink(form, dbGet('companies', []) || []);
+      if(!chk.ok) return '업체 연결: ' + (chk.message || chk.code || '확인이 필요합니다');
+    }
     return '';
   }
 
@@ -22054,6 +22079,11 @@ function ContractManagement(props){
       for(var i = 0; i < keys.length; i++){
         var key = keys[i];
         var form = ctReqForm(all[key]);
+        /* ★★ 업체관리에 없는 회사면 «연결 보류»로 둔다 — 사람에게 묻는 길이
+           「예」일 때 하는 것과 «같은 함수»다(erpDeferCoLinkIfNew).
+           ⚠ 이 걸음이 빠져 있어 자동 등록이 통째로 막혀 있었다(2026-09-19 실제로 겪음).
+             정부사업 신청 회사는 대개 업체관리에 아직 없다 — 가장 흔한 경우였다. */
+        form = erpDeferCoLinkIfNew(form) || form;
         var why = ctReqWhy(form);
         if(!why){
           var newOne = Object.assign({}, form, {
