@@ -21807,6 +21807,60 @@ function ContractHelpModal(props){
   );
 }
 
+/* ══════ 걸린 요청을 «보는» 화면 (대표 지시 2026-09-19) ══════════════════════
+   사진첩에서 온 계약 자동 등록이 막히면 지금까지는 토스트 한 줄로 끝났다 —
+   화면을 새로고침하면 무엇이 걸렸는지 사라진다. 여기서 회사·까닭·유형·보낸 사람을
+   한눈에 보고, 그 자리에서 «다시 시도»하거나 «지운다».
+   ⚠ 「사진첩에서 원본 보기」는 넣지 않았다 — 다른 프로그램(pu-photos.html) 창을
+     새로 여는 일이라 손이 더 가고, 신청서 이름만 적어 둬도 사람이 사진첩에서
+     찾을 수 있다(목업 검토 2026-09-19, 대표 「니가 추천대로」). */
+function BlockedRequestsModal(props){
+  useEscClose(props.onClose);
+  var reqs = props.requests || [];
+  function fmtWhen(ts){
+    if(!ts) return '';
+    var d = new Date(ts);
+    return (d.getMonth()+1) + '/' + d.getDate() + ' ' +
+      ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+  }
+  function card(r){
+    var co = (r.company && r.company.name) || '(상호 없음)';
+    var docName = (r.srcPhoto && r.srcPhoto.name) || '';
+    return h('div', { key:r._key, style:{ border:'1px solid #fecaca', background:'#fef2f2',
+      borderRadius:'8px', padding:'12px 14px', marginBottom:'10px' } },
+      h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:'8px' } },
+        h('span', { style:{ fontWeight:700, fontSize:'13.5px', color:'#1e293b' } }, co),
+        h('span', { style:{ fontSize:'11px', color:'#64748b', whiteSpace:'nowrap' } }, fmtWhen(r.handledAt))),
+      h('div', { style:{ fontSize:'12px', color:'#991b1b', marginTop:'4px', fontWeight:600 } }, '⚠ ' + (r.why || '까닭 없음')),
+      h('div', { style:{ fontSize:'11.5px', color:'#475569', marginTop:'6px', lineHeight:'1.6' } },
+        '컨설팅 유형: ' + props.consTypeName(r.consultingType) +
+        (r.by ? ' · 보낸 사람: ' + r.by : '') +
+        (docName ? ' · 신청서: 「' + docName + '」' : '')),
+      h('div', { style:{ display:'flex', gap:'6px', marginTop:'10px' } },
+        h('button', { onClick:function(){ props.onRetry(r._key, r); },
+          style:{ padding:'6px 12px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1',
+            borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:700 } }, '↻ 다시 시도'),
+        h('button', { onClick:function(){ props.onRemove(r._key, co); },
+          style:{ padding:'6px 12px', background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca',
+            borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:700 } }, '🗑 요청 지우기')));
+  }
+  return h('div', { className:'modal-bg', onClick:props.onClose },
+    h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ maxWidth:'640px' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '⚠ 사진첩에서 걸린 계약 등록 요청 (' + reqs.length + '건)'),
+        h('button', { className:'x', onClick:props.onClose }, '×')
+      ),
+      h('div', { className:'modal-b', style:{ maxHeight:'70vh', overflowY:'auto' } },
+        reqs.length ? reqs.map(card)
+          : h('div', { style:{ textAlign:'center', color:'#64748b', fontSize:'13px', padding:'30px 0' } }, '걸린 요청이 없습니다 🎉')
+      ),
+      h('div', { className:'modal-f' },
+        h('button', { className:'btn-primary', onClick:props.onClose }, '확인')
+      )
+    )
+  );
+}
+
 function ContractManagement(props){
   props = props || {};
   var existing = dbGet('contracts', null);
@@ -22072,6 +22126,38 @@ function ContractManagement(props){
     return '';
   }
 
+  /* 요청 «한 건»을 만들어 본다 — 되면 계약을, 안 되면 걸린 까닭을 남긴다.
+     ⚠ 한 무더기를 도는 runContractRequests 도, 사람이 「↻ 다시 시도」를 누르는 길
+       (retryBlockedRequest, 걸린 요청 화면)도 «이 함수 하나»를 쓴다.
+       두 곳에 같은 판단을 따로 두면 한쪽만 고쳐지는 날이 온다. */
+  async function processOneContractRequest(key, req){
+    var form = ctReqForm(req);
+    /* ★★ 업체관리에 없는 회사면 «연결 보류»로 둔다 — 사람에게 묻는 길이
+       「예」일 때 하는 것과 «같은 함수»다(erpDeferCoLinkIfNew).
+       ⚠ 이 걸음이 빠져 있어 자동 등록이 통째로 막혀 있었다(2026-09-19 실제로 겪음).
+         정부사업 신청 회사는 대개 업체관리에 아직 없다 — 가장 흔한 경우였다. */
+    form = erpDeferCoLinkIfNew(form) || form;
+    var why = ctReqWhy(form);
+    if(!why){
+      var newOne = Object.assign({}, form, {
+        id: 'ct-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+        contractNo: genContractNo(),
+        transferredTo: null,
+        regAt: (new Date()).toISOString()
+      });
+      /* ★ persistOne 이 월 잠금·업체 연결·관계 검증을 한 번 더 지난다 —
+         사람이 저장 단추를 누른 것과 «같은 문»이다. */
+      if(persistOne(newOne)){
+        await fbDb.ref('data/contract_requests/' + key).remove().catch(function(){});
+        return { made: newOne };
+      }
+      why = '계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)';
+    }
+    await fbDb.ref('data/contract_requests/' + key)
+      .update({ state:'blocked', why:why, handledAt:Date.now() }).catch(function(){});
+    return { why: why };
+  }
+
   async function runContractRequests(){
     if(_erpCtReqBusy || !fbDb) return;
     var cos = dbGet('companies', null);
@@ -22088,32 +22174,8 @@ function ContractManagement(props){
       });
       for(var i = 0; i < keys.length; i++){
         var key = keys[i];
-        var form = ctReqForm(all[key]);
-        /* ★★ 업체관리에 없는 회사면 «연결 보류»로 둔다 — 사람에게 묻는 길이
-           「예」일 때 하는 것과 «같은 함수»다(erpDeferCoLinkIfNew).
-           ⚠ 이 걸음이 빠져 있어 자동 등록이 통째로 막혀 있었다(2026-09-19 실제로 겪음).
-             정부사업 신청 회사는 대개 업체관리에 아직 없다 — 가장 흔한 경우였다. */
-        form = erpDeferCoLinkIfNew(form) || form;
-        var why = ctReqWhy(form);
-        if(!why){
-          var newOne = Object.assign({}, form, {
-            id: 'ct-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
-            contractNo: genContractNo(),
-            transferredTo: null,
-            regAt: (new Date()).toISOString()
-          });
-          /* ★ persistOne 이 월 잠금·업체 연결·관계 검증을 한 번 더 지난다 —
-             사람이 저장 단추를 누른 것과 «같은 문»이다. */
-          if(persistOne(newOne)){
-            made.push(newOne);
-            await fbDb.ref('data/contract_requests/' + key).remove().catch(function(){});
-            continue;
-          }
-          why = '계약관리가 저장을 막았습니다 (월 잠금·업체 연결 등)';
-        }
-        blocked++;
-        await fbDb.ref('data/contract_requests/' + key)
-          .update({ state:'blocked', why:why, handledAt:Date.now() }).catch(function(){});
+        var r = await processOneContractRequest(key, all[key]);
+        if(r.made) made.push(r.made); else blocked++;
       }
     } catch(e){
       console.warn('[계약 등록 요청]', e && e.message);
@@ -22127,6 +22189,45 @@ function ContractManagement(props){
       + ' 사진첩에서 그 서류로 직접 등록해 주세요', 11000);
   }
   useEffect(function(){ runContractRequests(); }, []);
+
+  /* ══════ 걸린 요청을 «보는» 화면 (대표 지시 2026-09-19 「다음」→「걸린 요청을 보는 화면」) ══════
+     지금까지는 걸려도 토스트 한 줄로 끝났다 — 화면을 새로고침하면 무엇이 걸렸는지
+     사라진다. `data/contract_requests` 는 FB_ALL_SYNC_KEYS 방식(=,{u,v} 배열)이 아니라
+     열쇠(id)로 된 그릇이라 dbGet 이 아니라 «제 것»(fbDb.on)으로 따로 듣는다. */
+  var bqS = useState([]); var blockedReqs = bqS[0]; var setBlockedReqs = bqS[1];
+  var sbrS = useState(false); var showBlockedReqs = sbrS[0]; var setShowBlockedReqs = sbrS[1];
+  useEffect(function(){
+    if(!fbDb) return;
+    var ref = fbDb.ref('data/contract_requests');
+    var cb = ref.on('value', function(snap){
+      var all = snap.val() || {};
+      var list = Object.keys(all)
+        .filter(function(k){ return all[k] && all[k].state === 'blocked'; })
+        .map(function(k){ return Object.assign({ _key:k }, all[k]); })
+        .sort(function(a,b){ return (b.handledAt||0) - (a.handledAt||0); });
+      setBlockedReqs(list);
+    });
+    return function(){ try{ ref.off('value', cb); }catch(_){} };
+  }, []);
+  async function retryBlockedRequest(key, req){
+    if(_erpCtReqBusy){ showToast('⏳ 처리 중입니다 — 잠시 후 다시 눌러 주세요'); return; }
+    var cos = dbGet('companies', null);
+    var cts = dbGet('contracts', null);
+    if(!Array.isArray(cos) || !Array.isArray(cts)){ showToast('⏳ 아직 자료를 받는 중입니다'); return; }
+    _erpCtReqBusy = true;
+    try {
+      var r = await processOneContractRequest(key, req);
+      if(r.made) showToast('✔ ' + (r.made.companyName || '') + ' 계약을 등록했습니다 — 기간·금액을 넣어 주세요', 8000);
+      else showToast('⚠ 여전히 막힙니다 — ' + r.why, 9000);
+    } finally { _erpCtReqBusy = false; }
+  }
+  async function removeBlockedRequest(key, companyName){
+    if(!fbDb) return;
+    if(!(await popConfirm('「' + (companyName || '이 요청') + '」 요청을 지울까요?\n사진은 그대로 남습니다 — 사진첩에서 다시 누르면 요청이 새로 생깁니다.'))) return;
+    fbDb.ref('data/contract_requests/' + key).remove()
+      .then(function(){ showToast('🗑 요청을 지웠습니다'); })
+      .catch(function(){ showToast('❌ 지우기 실패'); });
+  }
 
   function openPrintModal(c){ setPrintModal(c); }
   function closePrintModal(){ setPrintModal(null); }
@@ -22893,9 +22994,24 @@ function ContractManagement(props){
           background: monthOnly?'#1e40af':'#fff', color: monthOnly?'#fff':'#475569',
           border:'1px solid '+(monthOnly?'#1e40af':'#cbd5e1'), borderRadius:'5px', cursor:'pointer',
           fontSize: window.innerWidth<=768?'11px':'11.5px', fontWeight:600, whiteSpace:'nowrap' } },
-        monthOnly ? '✓ 이번 달만' : '📅 이번 달만') ]
+        monthOnly ? '✓ 이번 달만' : '📅 이번 달만') ].concat(
+        /* ⚠ 걸린 것이 없으면 배지 자체를 안 그린다 — 「0건」을 늘 보여 주면
+           «있다/없다»가 색으로 안 갈리고, 평소에 안 봐도 될 것이 하나 늘어난다. */
+        blockedReqs.length > 0 ? [ h('button', { key:'blkreq', onClick:function(){ setShowBlockedReqs(true); },
+          title:'사진첩에서 온 자동 등록 요청 중 막힌 것',
+          style:{ padding: window.innerWidth<=768?'5px 9px':'6px 12px', background:'#fef2f2', color:'#dc2626',
+            border:'1px solid #fecaca', borderRadius:'5px', cursor:'pointer',
+            fontSize: window.innerWidth<=768?'11px':'11.5px', fontWeight:700, whiteSpace:'nowrap' } },
+          '⚠ 걸린 요청 ' + blockedReqs.length + '건') ] : [])
     }),
     showHelp && h(ContractHelpModal, { onClose:function(){ setShowHelp(false); } }),
+    showBlockedReqs && h(BlockedRequestsModal, { requests:blockedReqs,
+      onClose:function(){ setShowBlockedReqs(false); },
+      onRetry:retryBlockedRequest, onRemove:removeBlockedRequest,
+      consTypeName:function(code){
+        var t = (dbGet('biz_cons_types', BIZ_CONS_SEED) || []).find(function(x){ return x && x.code === code; });
+        return t ? t.name : (code || '-');
+      } }),
     // (종류 탭은 아래 툴바 드롭다운으로 통합)
     // 툴바+담당자 필터 영역 틀고정
     h('div', { style:{ position: window.innerWidth<=768?'static':'sticky', top:0, zIndex: window.innerWidth<=768?0:50, background:'#fff',

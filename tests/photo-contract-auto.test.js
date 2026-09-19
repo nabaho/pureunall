@@ -198,15 +198,18 @@ test('★★★ 두 번 겹쳐 돌지 않는다 — 겹치면 계약이 둘 생�
 
 /* ══════ ④ 걸리면 안 만들고 까닭을 남긴다 ═══════════════════════════ */
 
+/* ⚠ 2026-09-19 「걸린 요청 화면」을 만들며 아래 셋의 대상을 processOneContractRequest 로
+   옮겼다 — 그 판단이 실제로 사는 자리다(runContractRequests 는 그것을 부르기만 한다). */
+
 test('★★★ 걸린 요청은 «만들지 않고» 까닭을 적어 남긴다', () => {
-  const fn = stripJs(cutFn(ERP, 'async function runContractRequests(') || '');
+  const fn = stripJs(cutFn(ERP, 'async function processOneContractRequest(') || '');
   assert.match(fn, /state:'blocked'/,
     '★★★ 조용히 버리면 대표님은 등록된 줄 아십니다');
-  assert.match(fn, /why:why/, '★★★ 무엇에 걸렸는지 안 적으면 고칠 수가 없습니다');
+  assert.match(fn, /why:\s*why/, '★★★ 무엇에 걸렸는지 안 적으면 고칠 수가 없습니다');
 });
 
 test('★★★ 만든 요청은 지우고, 걸린 것은 «남긴다»', () => {
-  const fn = stripJs(cutFn(ERP, 'async function runContractRequests(') || '');
+  const fn = stripJs(cutFn(ERP, 'async function processOneContractRequest(') || '');
   const 지움 = fn.indexOf('.remove()');
   const 막힘 = fn.indexOf("state:'blocked'");
   assert.ok(지움 >= 0, '★★ 만든 요청을 안 지우면 계약관리를 열 때마다 또 만듭니다');
@@ -215,7 +218,7 @@ test('★★★ 만든 요청은 지우고, 걸린 것은 «남긴다»', () => 
 });
 
 test('★★★ 사람이 누른 것과 «같은 문»으로 저장한다', () => {
-  const fn = stripJs(cutFn(ERP, 'async function runContractRequests(') || '');
+  const fn = stripJs(cutFn(ERP, 'async function processOneContractRequest(') || '');
   assert.match(fn, /persistOne\(newOne\)/,
     '★★★ persistOne 을 거쳐야 월 잠금·업체 연결·관계 검증을 지납니다');
   assert.ok(!/dbUpsert\('contracts'/.test(fn),
@@ -314,13 +317,68 @@ test('★★ 짐작하는 잣대가 «사진첩과 계약관리에서 같다»',
      persistOne 까지는 안 갔기 때문이다 — **모의는 실패가 나는 자리 한 걸음 앞에서 멈췄다.** */
 
 test('★★★ 업체관리에 없는 회사면 «연결 보류»로 만든다', () => {
-  const run = stripJs(cutFn(ERP, 'async function runContractRequests(') || '');
-  assert.match(run, /erpDeferCoLinkIfNew\(form\)/,
+  /* ⚠ 2026-09-19 「걸린 요청 화면」을 만들며 판단을 processOneContractRequest 로
+     빼냈다(무더기 처리·「↻ 다시 시도」가 «같은 함수»를 쓰게 하려고). 그래서 여기서는
+     그 함수를 본다 — runContractRequests 는 그것을 부르기만 한다(아래 별도 검사). */
+  const one = stripJs(cutFn(ERP, 'async function processOneContractRequest(') || '');
+  assert.match(one, /erpDeferCoLinkIfNew\(form\)/,
     '★★★ 이 걸음이 없으면 업체관리에 없는 회사는 통째로 막힙니다 — 가장 흔한 경우입니다');
-  const i = run.indexOf('erpDeferCoLinkIfNew');
-  const j = run.indexOf('ctReqWhy(form)');
+  const i = one.indexOf('erpDeferCoLinkIfNew');
+  const j = one.indexOf('ctReqWhy(form)');
   assert.ok(i >= 0 && j > i,
     '★★★ 보류로 정하기 «전»에 검사하면 그 검사가 막습니다 — 차례가 뜻입니다');
+});
+
+/* ══════ ⑥ 걸린 요청을 «보는» 화면 (대표 지시 2026-09-19 「다음」→「걸린 요청을 보는 화면」) ══════
+   지금까지는 토스트 한 줄로 끝나 새로고침하면 무엇이 걸렸는지 사라졌다.
+   목업 검토(대표 「니가 추천대로」) 뒤 만듦 — 사진첩 원본 보기 단추는 넣지 않았다. */
+
+test('★★ 무더기 처리도 「다시 시도」도 «같은 판단 함수» 를 쓴다', () => {
+  const run = stripJs(cutFn(ERP, 'async function runContractRequests(') || '');
+  assert.match(run, /processOneContractRequest\(/,
+    '★★ 무더기 처리가 판단을 따로 하면 「걸린 요청 화면」의 다시 시도와 규칙이 갈립니다');
+  const retry = stripJs(cutFn(ERP, 'async function retryBlockedRequest(') || '');
+  assert.match(retry, /processOneContractRequest\(/,
+    '★★ 「다시 시도」가 제 잣대로 따로 판단하면 화면마다 다른 대답을 합니다');
+});
+
+test('★ 「다시 시도」는 겹쳐 누르거나 자료가 안 왔을 때를 막는다', () => {
+  const retry = stripJs(cutFn(ERP, 'async function retryBlockedRequest(') || '');
+  assert.match(retry, /if\(_erpCtReqBusy\)\{[^}]*return;/,
+    '★ 무더기 처리와 동시에 같은 요청을 두 번 만들 수 있습니다 — «걸려 있으면 그 자리에서 멈춰야» 합니다');
+  assert.match(retry, /!Array\.isArray\(cos\)[\s\S]{0,90}return;/,
+    '★ 업체 목록이 아직 안 내려왔으면 전부 «연결 보류»로 잘못 판단합니다');
+});
+
+test('★ 요청 지우기는 확인 없이 바로 지우지 않는다', () => {
+  const rm = stripJs(cutFn(ERP, 'async function removeBlockedRequest(') || '');
+  assert.match(rm, /popConfirm\(/,
+    '★ 실수로 누르면 되돌릴 수 없는데, 확인 없이 지웁니다');
+  assert.match(rm, /contract_requests\/'\s*\+\s*key\)\.remove\(\)/,
+    '★ 사진 원본까지 지우면 안 됩니다 — 요청 한 줄만 지웁니다');
+});
+
+test('★★ 걸린 요청 목록은 실시간으로 듣는다 (once 가 아니다)', () => {
+  const box = stripJs(cutFn(ERP, "function ContractManagement(") || '');
+  assert.match(box, /var ref = fbDb\.ref\('data\/contract_requests'\);\s*var cb = ref\.on\('value'/,
+    '★★ once 로 한 번만 받으면 다른 사람이 만든 요청·다른 방의 처리 결과가 안 보입니다');
+  assert.match(box, /ref\.off\('value'/,
+    '★ 화면을 나가도 리스너가 안 끊기면 창을 여러 번 여닫을수록 하나씩 쌓입니다');
+});
+
+test('★ 배지는 걸린 것이 있을 때만 뜬다', () => {
+  const box = stripJs(cutFn(ERP, "function ContractManagement(") || '');
+  assert.match(box, /blockedReqs\.length > 0 \?/,
+    '★ 0건도 늘 그리면 «있다/없다»가 색으로 안 갈립니다');
+});
+
+test('★★ 걸린 요청 화면은 다시 시도·지우기만 있다 — 계약을 직접 만들지 않는다', () => {
+  const modal = stripJs(cutFn(ERP, 'function BlockedRequestsModal(') || '');
+  assert.match(modal, /onRetry/, '다시 시도 길이 없습니다');
+  assert.match(modal, /onRemove/, '지우기 길이 없습니다');
+  assert.ok(!/dbUpsert|persistOne/.test(modal),
+    '★★ 이 화면이 계약을 직접 만들면 업체 연결·중복 검사를 건너뛸 길이 하나 더 생깁니다 — ' +
+    '다시 만드는 일은 retryBlockedRequest(→processOneContractRequest) 하나로 모아야 합니다');
 });
 
 test('★★★ 보류로 두어도 «업체 ID는 안 채운다»', () => {
