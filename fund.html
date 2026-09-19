@@ -619,6 +619,19 @@ function siteContribOf(s,f){
   var rate=num((f||{}).contrib_per_worker)||0, w=num(s&&s.company_size)||0;
   return (rate>0&&w>0)?rate*w:0;
 }
+/* ★ 사업장 한 곳이 «그 해» 내는 돈 (대표 지시 2026-09-19 「금액은 기금정보에서 받아서 넣는다」)
+   ─ 기금출연확인서의 금액 자리가 늘 비어 나갔다. siteContribOf 는 «기본 출연금»(사업장 명부의
+     한 칸)과 «사람수 × 1인당 출연단가»만 본다. 그런데 이미 세운 기금은 출연금을 해마다
+     참여사업장 › 연도별 기록(site_years/{기금}/{연도}/{사업장}/contrib)에 적는다.
+     그 칸을 확인서가 안 봐서, 열여섯 곳 금액을 다 적어 두고도 밑줄로 나갔다.
+   ⚠ 지원신청서(별지 제1호의2)와 기금출연확인서가 «같은 이 함수»를 본다 — 따로 세면 또 어긋난다.
+   ⚠ 차례가 곧 믿음의 차례다: 그 해 적은 값 → 사업장 약정액 → 사람수 × 단가.
+   ⚠ 장부를 아직 못 읽었으면 조용히 약정액으로 내려간다 — _docRok 이 «이 기금·이 해» 것인지
+     대조하므로, 기금을 옮긴 직후에 남의 금액이 확인서에 찍히지 않는다. */
+function siteContribNow(s,f){
+  var sy=(_docRok()||{}).sy||{};
+  return num((sy[(s||{})._id]||{}).contrib)||siteContribOf(s,f)||0;
+}
 function foundContribOf(f,sites){
   var list=estabSites(sites), sum=0, n=0, est=false;
   list.forEach(function(s){
@@ -5510,19 +5523,20 @@ function fillDerived(root,f,sites,kind){
 }
 /* 설립 때의 기금출연확인서 — 사업장마다 한 장. 원본 문구를 그대로 쓰고 자리표만 채운다. */
 function fillFoundContribDoc(root,f,sites){
-  /* 금액은 siteContribOf 하나로 셈한다 — 엑셀본(fillContribXls)이 여태 «사람수 × 단가»를
-     따로 셈해, 같은 확인서인데 어느 길로 뽑느냐에 따라 금액이 달랐다(2026-09-10 고침). */
+  /* 금액은 siteContribNow 하나로 셈한다 — 엑셀본(fillContribXls)이 여태 «사람수 × 단가»를
+     따로 셈해, 같은 확인서인데 어느 길로 뽑느냐에 따라 금액이 달랐다(2026-09-10 고침).
+     2026-09-19: 그 해 출연금(참여사업장 › 연도별 기록)까지 본다 — 그것이 첫째 근거다. */
   /* ★ 금액이 없어도 «사업장마다 한 장» 만든다 (대표 화면 2026-09-14).
      종전에는 약정액이 적힌 곳만 골라서, 열여섯 곳이 등록돼 있어도 금액을 안 넣었으면
      빈 한 장만 나갔다. 회사 이름·대표자는 이미 아는 값이니 그것만이라도 찍어 주고
      금액 자리만 밑줄로 둔다 — 손으로 채울 자리가 한 칸이면 될 일이었다.
-     ⚠ 금액은 여전히 지어내지 않는다. siteContribOf 하나로만 셈한다(엑셀본과 같은 값). */
+     ⚠ 금액은 여전히 지어내지 않는다. siteContribNow 하나로만 셈한다(엑셀본과 같은 값). */
   var list=estabSites(sites);
-  var noAmt=list.filter(function(x){ return siteContribOf(x,f)<=0; }).length;
+  var noAmt=list.filter(function(x){ return siteContribNow(x,f)<=0; }).length;
   var today=new Date(), dt=today.getFullYear()+'. '+(today.getMonth()+1)+'. '+today.getDate()+'.';
   var one=function(c){
     var d=document.createElement('p'); d.setAttribute('data-kept','1');
-    var a=c?siteContribOf(c,f):0;
+    var a=c?siteContribNow(c,f):0;
     var u=c?_siteUrep(c):{name:''};
     /* 서명은 «대표이사»가 한다 — 회사 대표자다. 사용자대표는 협의회에 나오는 사람이라
        늘 같지 않다. 대표자가 비어 있을 때만 사용자대표로 갈음한다. */
@@ -5545,8 +5559,9 @@ function fillFoundContribDoc(root,f,sites){
     w.textContent='※ 참여사업장이 없어 확인서를 만들지 못했습니다 — 참여사업장을 먼저 등록하세요.';
     root.appendChild(w);
   } else if(noAmt){
-    w.textContent='※ '+list.length+'곳 중 '+noAmt+'곳은 출연 약정액이 적혀 있지 않아 금액 자리를 비워 두었습니다 — '
-      +'참여사업장의 기본 출연금을 넣거나, 기금 정보 › 설립의 1인당 출연단가를 넣으면 금액까지 채워집니다.';
+    w.textContent='※ '+list.length+'곳 중 '+noAmt+'곳은 출연금이 적혀 있지 않아 금액 자리를 비워 두었습니다 — '
+      +'참여사업장 › 연도별 기록의 '+S.year+'년 출연금을 넣거나, 사업장 명부의 기본 출연금, '
+      +'또는 기금 정보 › 설립의 1인당 출연단가를 넣으면 금액까지 채워집니다.';
     root.appendChild(w);
   }
   made.forEach(function(x){ root.appendChild(x); });
@@ -6063,7 +6078,10 @@ function docBody(kind,f,sites){
     var empT=sites.reduce(function(a,s){return a+(num(s.company_size)||0);},0);
     /* ⚠ 예전에는 s.contribution 을 봤다 — 사업장 자료에 «없는 칸»이라(SITE_FIELDS 는 contrib)
        출연금 칸이 늘 비어 나갔다. 그 해 값이 있으면 그것을, 없으면 기본 출연금을 쓴다
-       (지원금 한도 계산 _subPlanAgg 와 같은 규칙). */
+       (지원금 한도 계산 _subPlanAgg 와 같은 규칙).
+       ⚠ 여기는 «사람수 × 단가»로 내려가지 않는다(siteContribNow 와 다른 점이다).
+         지원신청서에 적는 출연금액은 공단이 지원금을 셈하는 근거라 어림한 수를 적을 수 없다.
+         기금출연확인서는 «내겠다는 약속»이라 단가로 어림한 약정액도 근거가 된다. */
     var _sy2=(_docRok()||{}).sy||{};
     var _c2=function(s){ return num((_sy2[s._id]||{}).contrib)||num(s.contrib)||0; };
     var contribT=sites.reduce(function(a,s){return a+_c2(s);},0)||foundContrib(f,sites)||'';
@@ -6393,8 +6411,11 @@ function _setDocLayer(layer,ftype){ S._docLayer=layer;
    ⚠ 읽어 둔 값에 «어느 기금·어느 해»인지 함께 적는다. 안 적으면 기금을 옮겼을 때
      지난 기금의 숫자가 그대로 서식에 찍힌다 — 남의 기금 금액을 노동청에 내게 된다. */
 /* 장부를 읽어야 채워지는 서식들 — 나머지는 기금 정보만으로 그려진다(서약서 등) */
+/* ⚠ contrib(기금출연확인서)도 여기 있어야 한다 (2026-09-19). 회사마다 적는 금액이
+     참여사업장 › 연도별 기록에 있는데, 이 목록에 없으면 site_years 를 아예 안 읽어
+     siteContribNow 가 늘 약정액으로 내려간다 — 금액을 다 적어 두고도 밑줄로 나갔다. */
 var DOC_NEEDS_LEDGER={ops_asset_change:1,sub_assets:1,sub_contrib:1,sub_welfare_plan:1,
-                      sub_payment:1,sub_checklist:1,subsidy:1};
+                      sub_payment:1,sub_checklist:1,subsidy:1,contrib:1};
 function _docExtra(kind,f){
   S._docBf=null; S._docR=null;
   if(!DOC_NEEDS_LEDGER[kind]||!f||f._sample) return Promise.resolve(null);
@@ -6529,9 +6550,11 @@ var ESTAB_NEED=[
 var ESTAB_NEED_SITE=[
   ['ceo','대표자','설립합의서·정관 서명란·기금출연확인서',function(s){ return !String(s.ceo||'').trim(); }],
   ['wrep_name','근로자대표 성명','설립합의서·정관 서명란·별지7호 위원 격자',function(s){ return !_siteWrep(s).name; }],
-  ['contrib','출연 약정액','기금출연확인서·회의록·사업계획서',function(s,f){ return siteContribOf(s,f)<=0; }],
+  /* 2026-09-19: 그 해 출연금(연도별 기록)이 있으면 비어 있는 것이 아니다 — 확인서가 그것을 쓴다 */
+  ['contrib','출연금','기금출연확인서·회의록·사업계획서',function(s,f){ return siteContribNow(s,f)<=0; }],
   ['biz_no','사업자등록번호','지원신청서·체크리스트',function(s){ return !String(s.biz_no||'').trim(); }],
-  ['address','소재지','정관 제3조 참여회사 목록',function(s){ return !String(s.address||'').trim(); }]
+  /* 2026-09-19: 정관 제3조 아래의 참여회사 소재지 목록은 없앴다(대표 지시) — 주소를 쓰는 곳을 고쳐 적는다 */
+  ['address','소재지','참여 지자체 셈·체크리스트·엑셀 서식',function(s){ return !String(s.address||'').trim(); }]
 ];
 /* 이 기금에서 «비어 있는» 것을 모은다 — 서식을 그리지 않고 자료만 본다(빠르다) */
 function estabGaps(f,sites){
@@ -7004,8 +7027,10 @@ function fillSetup(wb,f,sites){
 }
 /* 기금출연확인서(사업장별) — [기업정보] 시트를 참여사업장으로 채우면
    확인서 시트가 연번(CJ3) 기준 VLOOKUP으로 해당 사업장 확인서를 만든다.
-   ⚠ 금액은 한글본과 «같은 자»(siteContribOf)로 셈한다. 여태 여기서만 「사람수 × 단가」를
+   ⚠ 금액은 한글본과 «같은 자»(siteContribNow)로 셈한다. 여태 여기서만 「사람수 × 단가」를
      따로 셈해, 사업장에 적어 둔 약정액을 무시하고 다른 금액이 나갔다(2026-09-10 고침).
+     2026-09-19: 한글본이 그 해 출연금(연도별 기록)까지 보게 되어 여기도 같이 옮긴다 —
+     한 쪽만 옮기면 같은 확인서인데 한글본과 엑셀본의 금액이 또 달라진다.
    ※ 대표자·근로자 생년월일은 개인정보라 시스템에 저장하지 않음 → 빈 칸(엑셀에서 직접 입력). */
 function fillContribXls(wb,f,sites){
   var info=wb.getWorksheet('기업정보'); if(!info) throw new Error('기업정보 시트를 찾을 수 없습니다');
@@ -7015,7 +7040,7 @@ function fillContribXls(wb,f,sites){
     setC(info,'B'+r,s.name||''); setC(info,'C'+r,s.ceo||'');
     var n=num(s.company_size)||0;
     if(n) info.getCell(r,8).value=n;
-    var amt=info.getCell(r,9), v=siteContribOf(s,f);
+    var amt=info.getCell(r,9), v=siteContribNow(s,f);
     if(amt.type!==ExcelJS.ValueType.Formula) amt.value=v||null;
   });
   if(info.rowCount>=2+sites.length) clearRange(info,2+sites.length,info.rowCount,1,9);

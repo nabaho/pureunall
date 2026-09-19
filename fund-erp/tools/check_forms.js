@@ -1,4 +1,4 @@
-/* 서식이 «정말 채워지는지» 실제로 그려 확인한다 — 소스에 글자가 있는지가 아니라.
+﻿/* 서식이 «정말 채워지는지» 실제로 그려 확인한다 — 소스에 글자가 있는지가 아니라.
 
    왜 필요한가: 문자열만 보는 검사는 «순서가 바뀐 것»을 못 잡는다.
    실제로 그랬다 — stripBaked 를 나중에 넣으면서 지원신청서의 금액·신청일이
@@ -60,7 +60,7 @@ global.funds = {};
   /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10) — 위와 같은 까닭이다.
      ⚠ gV 는 {·[ 로 시작하는 값만 잡는다. 글자 하나짜리 상수는 줄째로 꺼낸다. */
   gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
-  gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
+  gF('estabSites'), gF('siteContribOf'), gF('siteContribNow'), gF('foundContribOf'), gF('foundContrib'),
   gF('partyNames'), gF('partyJoin'), gF('_fillWho'), gF('fillPartyList'), gF('fillPartyDates'),
   /* 원본 줄맞춤 자국 걷어내기 + 이름 자리표(2026-09-14) — hwpFormHTML 이 부른다.
      여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
