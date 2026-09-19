@@ -150,6 +150,14 @@ test('사용자측 칸은 서식이 「대표이사」라 부르므로 회사 �
     '대표자가 없을 때만 사용자대표로 내려가야 한다');
 });
 
+test('★ 이름과 (인) 은 칸의 오른쪽 끝에 붙는다 — 날인 자리가 세로로 한 줄에 선다', () => {
+  const fn = grabFn('fillSignTable');
+  assert.match(fn, /<div class="right">/, '왼쪽에 두면 회사 이름 길이마다 (인) 자리가 어긋난다');
+  /* 서식 CSS 에 이미 있는 이름을 써야 한다 — 화면과 인쇄가 같은 규칙을 봐야 한다 */
+  assert.match(SRC, /\+"\.right\{text-align:right\}/, '.right 가 인쇄용 서식 CSS 에 없다');
+  assert.match(SRC, /\+s\+" \.right\{text-align:right\}"/, '.right 가 화면용 서식 CSS 에 없다');
+});
+
 test('★ 표 머리와 줄에 번호가 붙는다', () => {
   const fn = grabFn('fillSignTable');
   assert.match(fn, /번호/, '번호 칸이 있어야 한다');
@@ -332,6 +340,10 @@ test('★ 그려 보기 — 정관 표지·제3조·서명표', (t) => {
   assert.deepEqual(rows[0], ['번호', '각 참여회사 근로자대표', '각 참여회사 대표이사']);
   assert.equal(rows[1][0], '1');
   assert.ok(rows[1][1].indexOf('가나기계 근로자대표') === 0 && rows[1][1].indexOf('박근로') > 0, rows[1][1]);
+  /* 이름 줄이 «따로 선 마디»여야 오른쪽 끝으로 붙는다 */
+  const sig = tb.querySelectorAll('td .right');
+  assert.equal(sig.length, 4, '칸마다 오른쪽 정렬한 이름 줄이 하나씩 있어야 한다');
+  assert.ok(/박근로/.test(sig[0].textContent) && /\(인\)/.test(sig[0].textContent), sig[0].textContent);
   assert.ok(rows[1][2].indexOf('김가나') > 0, rows[1][2]);
   assert.equal(rows[2][0], '2');
   assert.ok(/＿{3,}/.test(rows[2][1]), '근로자대표를 모르면 밑줄 — ' + rows[2][1]);
