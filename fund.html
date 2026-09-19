@@ -4449,12 +4449,19 @@ function fillSignTable(root,f,sites){
   tb.setAttribute('data-kept','1');
   var head='<tr><th style="width:44px">번호</th>'
     +'<th>각 참여회사 '+esc(lab.l)+'</th><th>각 참여회사 '+esc(lab.r)+'</th></tr>';
+  /* ★ 이름과 (인) 은 칸의 «오른쪽 끝»에 붙인다 (대표 지시 2026-09-19 「줄칸을 오른쪽 끝으로」).
+     회사 이름 길이가 저마다 달라 왼쪽에 두면 (인) 자리가 줄마다 어긋났다 — 오른쪽에 붙이면
+     열여섯 줄의 날인 자리가 세로로 한 줄에 선다. 우리나라 서명란 관례이기도 하다.
+     ⚠ .right 는 서식 CSS(화면·인쇄 둘 다)에 이미 있는 이름이다 — 새 이름을 만들지 않는다. */
   var body=list.map(function(s,i){
     var w=_siteWrep(s), u=_siteUrep(s), nm=esc(String(s.name||'').trim()||'＿＿＿＿');
     var who=function(x){ x=String(x||'').trim(); return x?esc(x):'＿＿＿＿＿'; };
+    var cell=function(lbl,name){
+      return '<td>'+nm+' '+esc(lbl)+'<div class="right">'+who(name)+' &nbsp;(인)</div></td>';
+    };
     return '<tr><td class="center">'+(i+1)+'</td>'
-      +'<td>'+nm+' '+esc(lab.l)+'<br>'+who(w.name)+' &nbsp;(인)</td>'
-      +'<td>'+nm+' '+esc(lab.r)+'<br>'+who(String(s.ceo||'').trim()||u.name)+' &nbsp;(인)</td></tr>';
+      +cell(lab.l, w.name)
+      +cell(lab.r, String(s.ceo||'').trim()||u.name)+'</tr>';
   }).join('');
   tb.innerHTML=head+body;
   /* 표를 놓을 자리 — 서명 줄만 든 마디면 «그 자리», 본문까지 한 마디에 든 서식(설립합의서)은

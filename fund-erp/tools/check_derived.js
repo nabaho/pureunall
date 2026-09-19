@@ -84,9 +84,12 @@ let bad = 0;
 const ok = (n, c, w) => { if (c) console.log('  · ' + n); else { bad++; console.log('  ✗ ' + n + (w ? '  — ' + w : '')); } };
 const T = t => String(t || '').replace(/\s+/g, ' ');
 /* ⚠ 칸(td) 사이에 공백을 끼운다 — textContent 는 칸을 그냥 이어 붙여 「자본금10,000천원」이 되고,
-     한 칸 안의 값과 두 칸에 걸친 값을 가를 수 없다. */
+     한 칸 안의 값과 두 칸에 걸친 값을 가를 수 없다.
+   ⚠ 2026-09-19: </div> 도 같이 띄운다. 서명표의 이름 줄이 <br> 에서 <div class="right"> 로
+     바뀌면서 「근로자대표박근로」로 붙어 버렸다 — 검사가 «화면에 보이는 대로» 읽어야 한다. */
 const draw = (kind, f, sites) => { const d = dom.window.document.createElement('div');
-  d.innerHTML = hwpFormHTML(kind, f, sites || []).replace(/<\/t[dh]>/g, ' $&').replace(/<br\s*\/?>/g, ' ');
+  d.innerHTML = hwpFormHTML(kind, f, sites || [])
+    .replace(/<\/t[dh]>/g, ' $&').replace(/<div[^>]*>|<\/div>/g, ' $&').replace(/<br\s*\/?>/g, ' ');
   return T(d.textContent); };
 /* 공백을 «접지 않은» 글 — 자간 벌림이 살아 있는지 보려면 T() 를 거치면 안 된다
    (T 가 모든 연속 공백을 한 칸으로 만들어, 무엇이 남았는지 알 수 없다). */
