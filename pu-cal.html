@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#2563eb">
 <title>푸른 캘린더</title>
 <link rel="manifest" href="pu-cal-manifest.json">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📅</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⏰</text></svg>">
 <!-- 아이폰 홈화면 아이콘 — 탭 아이콘과 다른 것이다. 여기는 PNG 여야 한다(SVG 를 안 읽는다) -->
 <link rel="apple-touch-icon" href="icon-cal-192.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -125,7 +125,11 @@
   .calhd .sun{color:var(--danger)}
   .calhd .sat{color:var(--acc)}
   /* 여섯 줄 고정 — 달마다 표 높이가 들썩이지 않게 */
-  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr)}
+  /* ★ 줄 높이는 «그 주에서 가장 바쁜 날»에 맞춰 늘어난다 (대표 지시 2026-09-19 「맞다 늘려라」).
+     여태는 repeat(6,1fr) 로 여섯 줄을 똑같이 눌러 두고 한 칸에 넷까지만 보였다.
+     2026년 9월을 진짜 자료로 재 보니 42칸 가운데 18칸이 넷을 넘었고 «56건»이 접혀 있었다.
+     바닥값(104px)은 그대로라 한가한 주는 여전히 낮다 — 늘어나는 것은 바쁜 주뿐이다. */
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:minmax(104px,auto)}
   .day{min-height:104px;padding:5px 4px 3px;overflow:hidden;box-sizing:border-box;position:relative}
   /* 날짜 줄 — 칸 «가운데»에 「25 (13)」 처럼 날짜와 음력을 나란히 */
   .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:4px;padding:0 2px}
@@ -143,8 +147,6 @@
   .ev b{font-weight:700;margin-right:3px}
   /* 공휴일은 칸 맨 위에 «칩»으로 — 일정 칩과 같은 치수여야 한 줄만 도드라지지 않는다 */
   .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default}
-  .more{font-size:10.5px;color:var(--sub);padding:0 5px;cursor:pointer;line-height:15px}
-  .more:hover{text-decoration:underline}
 
   /* 주 보기 */
   .wgrid{display:grid;grid-template-columns:repeat(7,1fr);min-height:420px}
@@ -262,6 +264,7 @@
     #topbar .brand{font-size:13px}
     #conn span.t{display:none}
     .day{min-height:66px}
+    .calgrid{grid-auto-rows:minmax(66px,auto)}
     .ev{font-size:9.5px}
   }
 </style>
@@ -269,7 +272,7 @@
 <body>
 
 <div id="topbar">
-  <span class="brand">📅 푸른 캘린더</span>
+  <span class="brand">⏰ 푸른 캘린더</span>
   <button class="lnk go" id="goErp" title="푸른이알피로 갑니다">← 푸른이알피</button>
   <span class="sp"></span>
   <span id="conn"><span class="dot"></span><span class="t">연결 중…</span></span>
@@ -725,7 +728,13 @@ function calendarHtml(eumOnly){
   if(S.view === "week") return weekHtml(eumOnly);
   if(S.view === "day")  return dayHtml(eumOnly);
   var grid = monthGrid(S.ym), today = todayYMD();
-  var MAX = 4;   /* 구글은 한 칸에 넷을 보이고 나머지를 접는다 */
+  /* ★ 한 칸에 «다» 보인다 — 접지 않는다 (대표 지시 2026-09-19 「맞다 늘려라」).
+     여태는 넷까지 보이고 나머지를 「N개 더보기」로 접었다(구글이 그렇고 이알피도 그렇다).
+     2026년 9월을 진짜 자료로 재 보니 42칸 가운데 18칸이 넷을 넘었고 «56건»이 접혀 있었다 —
+     달력을 펴는 까닭이 바로 그 56건인데, 그걸 보려면 칸마다 한 번 더 눌러야 했다.
+     ⚠ 이 «한 가지»는 이알피와 다르다(그쪽은 아직 MAX_SHOW=4 에서 접는다).
+       「대시보드 제외한 화면은 똑같이」 뒤에 온 지시라 이것이 이긴다.
+       되돌리려면 그 지시부터 확인할 것 — tests/cal-cell-shows-all.test.js 가 막는다. */
   var cells = grid.map(function(c, idx){
     var evs = eventsOn(c.date, eumOnly).filter(passFilter).filter(matchSearch);
     var hol = holidayOf(c.date);
@@ -733,7 +742,6 @@ function calendarHtml(eumOnly){
     var 찾음 = !!(S.q && evs.length);
     var bg = 오늘 ? "#fffbeb" : c.other ? "#f8fafc" : hol ? "#fef2f2" : 찾음 ? "#fffbeb" : "#ffffff";
     var 테 = c.other ? "#e2e8f0" : "#f8fafc";
-    var 숨김 = evs.length > MAX ? evs.length - MAX : 0;
     return '<div class="day" data-day="' + c.date + '"'
       + ' style="background:' + bg + ';border-right:1px solid ' + 테 + ';border-bottom:1px solid ' + 테
       + (찾음 ? ';outline:2px solid #fbbf24;outline-offset:-2px' : '') + '">'
@@ -743,8 +751,7 @@ function calendarHtml(eumOnly){
       + '</div>'
       + '<div class="evs">'
       +   (hol ? '<div class="ev hol" title="' + esc(hol) + '"' + (c.other ? ' style="opacity:.55"' : '') + '>' + esc(hol) + '</div>' : '')
-      +   evs.slice(0, MAX).map(function(e){ return chipHtml(e, c.date); }).join("")
-      +   (숨김 ? '<div class="more" data-day="' + c.date + '">' + 숨김 + '개 더보기</div>' : '')
+      +   evs.map(function(e){ return chipHtml(e, c.date); }).join("")
       + '</div></div>';
   }).join("");
   return '<div class="cal">'
@@ -1365,10 +1372,6 @@ document.addEventListener('click', function(e){
     openEdit(ev[0], ev.slice(1).join(':'));
     return;
   }
-  /* 「3개 더보기」 — 접힌 것을 보려면 그 날로 간다(이알피는 팝오버를 띄운다) */
-  if(t.classList && t.classList.contains('more')){
-    S.date = t.getAttribute('data-day'); S.view = 'day'; render(); return;
-  }
   if(t.hasAttribute('data-day')){ openNew(t.getAttribute('data-day')); return; }
 });
 
@@ -1471,7 +1474,7 @@ try{
   $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
 }
 </script>
-<script src="js/pu-appbar.js?v=11"></script>
+<script src="js/pu-appbar.js?v=12"></script>
 <script>try{ PuAppBar.mount('#topbar', { current:'cal' }); }catch(e){}</script>
 <script>try{ PuBack.guard(function(){ return false; }); }catch(e){}</script>
 </body>
