@@ -83,7 +83,8 @@ function 그려본다(하루, 건수, 공휴일, 용량) {
     'function gcalPalette(){', 'function gcalMailColor(mail){', 'function gcalToEvent(ev){',
     'function eventsOn(ymd, eumOnly){', 'function passFilter(ev){', 'function matchSearch(e){',
     'function lunarDay(ymd){', 'function textOn(bg){', 'function monthGrid(ym){',
-    'function ymdOf(y, m, d){', 'function chipHtml(e, ymd){', 'function 펼침Html(eumOnly){',
+    'function ymdOf(y, m, d){', 'function mixHex(hexA, hexB, t){', 'function chipHtml(e, ymd){',
+    'function 펼침Html(eumOnly){',
     'function calendarHtml(eumOnly){'];
   let 조각 = 'var _lunar = {}; var GCAL = { evs:[], ym:"", loading:false, err:"" };\n'
     + 'function gcalLoad(){ return Promise.resolve(); }\n'
