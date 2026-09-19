@@ -31,13 +31,19 @@
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
     --danger:#dc2626;--radius:11px}
   *{box-sizing:border-box}
+  /* ★ 화면 한 장에 담는다 (대표 지시 2026-09-19 「한화면에 나오게」).
+     문서가 굴러가지 않게 몸통을 «세로 세 칸»으로 세운다 — 머리줄·탭줄·본문.
+     본문만 제 안에서 굴러간다(달력 탭에서는 그것조차 안 굴러간다). */
+  html,body{height:100%}
   body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
-    background:#f8fafc;font-size:14px;-webkit-font-smoothing:antialiased}
+    background:#f8fafc;font-size:14px;-webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;overflow:hidden}
 
   /* ── 머리줄 ──
      ⚠ 한 줄이다. 낱말 가운데서 잘려 두 줄이 되면 폰에서 화면을 갉아먹는다.
         넘치면 «줄이는» 것이지 «내리는» 것이 아니다. */
-  #topbar{position:sticky;top:0;z-index:15;background:#ffffff;border-bottom:1px solid var(--line);
+  /* sticky 가 필요 없어졌다 — 몸통이 안 굴러가므로 늘 맨 위다 */
+  #topbar{flex:none;z-index:15;background:#ffffff;border-bottom:1px solid var(--line);
     padding:8px 16px;display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}
   #topbar .brand{font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;flex-shrink:0}
   #topbar .sp{margin-left:auto}
@@ -51,7 +57,7 @@
   .lnk.go{border-color:#bfdbfe;color:var(--acc2)}
 
   /* ── 탭 한 줄 — 법인 셋 · 이음 셋 ── */
-  #tabs{display:flex;align-items:center;gap:3px;padding:7px 14px;background:#ffffff;
+  #tabs{flex:none;display:flex;align-items:center;gap:3px;padding:7px 14px;background:#ffffff;
     border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
   .gl{font-size:10px;color:var(--faint);font-weight:700;margin:0 3px 0 0;flex-shrink:0}
   .tab{padding:5px 11px;border-radius:7px;font-size:12px;color:var(--sub);cursor:pointer;
@@ -64,7 +70,17 @@
   .tabchips{margin-left:auto;display:flex;align-items:center;flex-shrink:0;padding-left:16px}
   .tabchips .chips{margin-bottom:0;flex-wrap:nowrap}
 
-  #app{padding:14px 16px 90px;max-width:1500px;margin:0 auto}
+  #app{flex:1;min-height:0;overflow-y:auto;width:100%;padding:14px 16px 90px;max-width:1500px;margin:0 auto}
+  /* ★ 달력 탭 — 한 화면에 «딱» 맞춘다. 좌우도 꽉 채운다(1500px 뚜껑을 벗긴다).
+     칸에 안 들어가는 일정은 「+N개 더」로 접고, 누르면 그 자리에서 펼쳐 보인다
+     (대표 지시 「달력안에 모든 내용 안보여도 된다. 펼서 볼수 있게 하면 된다」). */
+  #app.fit{overflow:hidden;display:flex;flex-direction:column;max-width:none;padding:10px 12px 12px}
+  #app.fit .calwrap{flex:1;min-height:0;display:flex;flex-direction:column}
+  #app.fit .calhead{flex:none}
+  #app.fit .cal{flex:1;min-height:0;display:flex;flex-direction:column}
+  #app.fit .calhd{flex:none}
+  #app.fit .calgrid{flex:1;min-height:0;grid-template-rows:repeat(6,1fr)}
+  #app.fit .day{min-height:0}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
   .note{background:var(--warn-bg);border:1px solid #fde68a;border-radius:9px;padding:9px 13px;
     font-size:12px;color:var(--warn);margin-bottom:11px;display:flex;align-items:center;gap:9px}
@@ -134,16 +150,11 @@
   .calhd .sun{color:var(--danger)}
   .calhd .sat{color:var(--acc)}
   /* 여섯 줄 고정 — 달마다 표 높이가 들썩이지 않게 */
-  /* ★ 줄 높이는 «그 주에서 가장 바쁜 날»에 맞춰 늘어난다 (대표 지시 2026-09-19 「맞다 늘려라」).
-     여태는 repeat(6,1fr) 로 여섯 줄을 똑같이 눌러 두고 한 칸에 넷까지만 보였다.
-     2026년 9월을 진짜 자료로 재 보니 42칸 가운데 18칸이 넷을 넘었고 «56건»이 접혀 있었다.
-   ★ 바닥값은 «화면 높이»를 따른다 (대표 지시 2026-09-19 「달력 늘려라」).
-     240px 는 머리(위 띠·탭·머리줄·요일줄)와 아래 여백이 먹는 몫이다 — 그만큼 빼고
-     남은 것을 여섯으로 나누면 한가한 달이 화면을 «가득» 채운다.
-     ⚠ 104px 아래로는 안 내려간다(작은 화면에서 칸이 글자보다 낮아지면 못 읽는다).
-       바쁜 주는 여기서 더 늘어난다 — 바닥값이지 뚜껑이 아니다. */
-  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);
-    grid-auto-rows:minmax(max(104px,calc((100vh - 240px) / 6)),auto)}
+  /* ★ 여섯 줄을 «남은 높이»로 똑같이 나눈다 (대표 지시 2026-09-19 「한화면에 나오게」).
+     한때는 줄이 내용에 따라 늘어났는데, 그러면 바쁜 달이 화면 밖으로 내려갔다.
+     이제 판의 높이가 먼저 정해지고, 칸은 «들어가는 만큼»만 보인다(나머지는 펼쳐 본다).
+     ⚠ 바닥값(minmax)을 다시 두지 말 것 — 그 순간 여섯 줄이 화면을 넘긴다. */
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr)}
   .day{min-height:104px;padding:5px 4px 3px;overflow:hidden;box-sizing:border-box;position:relative}
   /* 날짜 줄 — 칸 «가운데»에 「25 (13)」 처럼 날짜와 음력을 나란히 */
   .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:4px;padding:0 2px}
@@ -161,6 +172,19 @@
   .ev b{font-weight:700;margin-right:3px}
   /* 공휴일은 칸 맨 위에 «칩»으로 — 일정 칩과 같은 치수여야 한 줄만 도드라지지 않는다 */
   .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default}
+  /* 접힌 것이 몇인지 — 누르면 그 자리에서 펼쳐 보인다 */
+  .more{font-size:10.5px;color:var(--sub);padding:0 4px;cursor:pointer;line-height:15px;
+    font-weight:700;border-radius:3px;background:var(--bg);flex:none}
+  .more:hover{background:var(--line);color:var(--ink)}
+  /* 펼침 창 — 화면에 못 박아 띄운다(칸 안에 두면 달력 테두리에 잘린다) */
+  .pop{position:fixed;z-index:40;background:#ffffff;border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 12px 32px rgba(15,23,42,.20);padding:8px 9px 9px;min-width:236px;max-width:340px;
+    max-height:62vh;overflow-y:auto}
+  .pop .ph{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;margin-bottom:6px}
+  .pop .ph .n{color:var(--sub);font-weight:600;font-size:11px}
+  .pop .ph .x{margin-left:auto;border:none;background:transparent;cursor:pointer;color:var(--faint);
+    font-size:15px;line-height:1;padding:0 2px;font-family:inherit}
+  .pop .evs{gap:2px}
 
   /* 주 보기 */
   .wgrid{display:grid;grid-template-columns:repeat(7,1fr);min-height:420px}
@@ -278,7 +302,6 @@
     #topbar .brand{font-size:13px}
     #conn span.t{display:none}
     .day{min-height:66px}
-    .calgrid{grid-auto-rows:minmax(66px,auto)}
     .ev{font-size:9.5px}
   }
 </style>
@@ -318,7 +341,8 @@ var fbDb = null;
 var D = {};              // 읽어 온 표들
 var FAILED = {};         // 못 읽은 표 — «빈 것»과 갈라 둔다
 var ME = null;           // 나 (직원 한 줄)
-var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'',
+/* open — 「+N개 더」를 눌러 «펼쳐 둔» 날. 달을 옮기거나 다른 데를 누르면 닫는다. */
+var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'', open:null,
           scope:'month', showLeft:false, openRows:{},
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
           view:'month', date:'', q:'' };
@@ -736,19 +760,59 @@ function chipHtml(e, ymd){
     + 시각 + esc(e.text) + '</div>';
 }
 
+/* ── 한 칸에 «몇 개»가 들어가나 ──
+   못 박은 수를 쓰지 않는다. 판이 화면에 맞춰 늘고 줄므로, 그려 놓고 «재서» 정한다.
+   ⚠ 재기 전 첫 그림에는 어림값(5)을 쓴다. 그린 뒤 재서 달라졌으면 «한 번만» 다시 그린다
+     — 값이 같아지면 다시 그리지 않으므로 돌고 돌지 않는다. */
+var _칸용량 = 0;
+function 칸용량(){
+  if(_칸용량) return _칸용량;
+  /* ⚠ 아직 «못 쟀을 때»의 어림이다. 한때 여기에 5 를 못 박아 두었더니,
+     못 재는 판(창이 숨어 있을 때 등)에서는 그 5 가 그대로 남아 칸마다 넘쳤다.
+     못 박은 수 대신 화면 높이에서 뽑는다 — 200 은 머리(위 띠·탭줄·머리줄·요일줄)와
+     아래 여백이 먹는 몫, 30 은 칸 안의 날짜줄과 여백, 19.5 는 칩 하나와 틈이다.
+     재고 나면 이 값은 곧 «잰 값»으로 바뀐다(용량재기). */
+  var 남은 = (window.innerHeight || 800) - 200;
+  return Math.max(2, Math.floor((남은 / 6 - 30) / 19.5));
+}
+function 용량재기(){
+  var g = document.querySelector(".calgrid");
+  if(!g || !g.clientHeight) return false;
+  var 칸 = g.querySelector(".day");
+  if(!칸) return false;
+  /* ⚠ 높이를 «짐작»하지 않는다. 처음에 날짜줄 22·칩 17.5 로 어림했더니 칸마다 11px 씩
+     넘쳐 「+N개 더」가 잘렸다 — 날짜 동그라미는 24px 이고 칩은 테두리까지 18px 이다.
+     꾸밈을 한 줄만 고쳐도 어림값은 또 틀어진다. 그래서 그려 놓은 것을 실제로 잰다. */
+  var 줄 = g.clientHeight / 6;
+  var cs = getComputedStyle(칸);
+  var 여백 = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  var 날짜줄 = 0;
+  var dl = 칸.querySelector(".dline");
+  if(dl) 날짜줄 = dl.offsetHeight + (parseFloat(getComputedStyle(dl).marginBottom) || 0);
+  var ev = g.querySelector(".ev");
+  var 칩 = ev ? ev.offsetHeight + 1.5 : 19.5;      /* 칩 하나 + 사이 틈 */
+  if(!칩) return false;
+  var n = Math.max(1, Math.floor((줄 - 여백 - 날짜줄) / 칩));
+  if(n === _칸용량) return false;
+  _칸용량 = n;
+  return true;
+}
+
 function calendarHtml(eumOnly){
   /* 보는 달이 바뀌었으면 구글을 다시 받는다 — 같은 달이면 아무 일도 안 한다(gcalLoad 안에서 가른다) */
   if(fbDb) gcalLoad();
   if(S.view === "week") return weekHtml(eumOnly);
   if(S.view === "day")  return dayHtml(eumOnly);
   var grid = monthGrid(S.ym), today = todayYMD();
-  /* ★ 한 칸에 «다» 보인다 — 접지 않는다 (대표 지시 2026-09-19 「맞다 늘려라」).
-     여태는 넷까지 보이고 나머지를 「N개 더보기」로 접었다(구글이 그렇고 이알피도 그렇다).
-     2026년 9월을 진짜 자료로 재 보니 42칸 가운데 18칸이 넷을 넘었고 «56건»이 접혀 있었다 —
-     달력을 펴는 까닭이 바로 그 56건인데, 그걸 보려면 칸마다 한 번 더 눌러야 했다.
-     ⚠ 이 «한 가지»는 이알피와 다르다(그쪽은 아직 MAX_SHOW=4 에서 접는다).
-       「대시보드 제외한 화면은 똑같이」 뒤에 온 지시라 이것이 이긴다.
-       되돌리려면 그 지시부터 확인할 것 — tests/cal-cell-shows-all.test.js 가 막는다. */
+  /* ★ 한 칸에 «들어가는 만큼» 그린다 (대표 지시 2026-09-19
+       「한화면에 나오게하고 달력안에 모든 내용 안보여도 된다. 펼서 볼수 있게 하면 된다」).
+     넷이라는 «못 박은 수»가 아니다 — 판의 높이를 재서 나온 수다(칸용량).
+     화면이 크면 여덟이 보이고 작으면 넷이 보인다. 남는 것은 「+N개 더」로 접고,
+     누르면 그 자리에서 펼쳐 전부 보인다 — 다른 데로 데려가지 않는다.
+   ⚠ 앞선 지시(「맞다 늘려라」)로 한때 아무것도 안 접었다. 그랬더니 바쁜 달이
+     화면 밖으로 내려갔고(「너무 내려왔다」), 이 지시가 그것을 고친 것이다.
+     되돌리려면 두 지시를 함께 볼 것 — tests/cal-cell-shows-all.test.js 가 막는다. */
+  var 용량 = 칸용량();
   var cells = grid.map(function(c, idx){
     var evs = eventsOn(c.date, eumOnly).filter(passFilter).filter(matchSearch);
     var hol = holidayOf(c.date);
@@ -756,6 +820,11 @@ function calendarHtml(eumOnly){
     var 찾음 = !!(S.q && evs.length);
     var bg = 오늘 ? "#fffbeb" : c.other ? "#f8fafc" : hol ? "#fef2f2" : 찾음 ? "#fffbeb" : "#ffffff";
     var 테 = c.other ? "#e2e8f0" : "#f8fafc";
+    /* 공휴일 칩도 한 줄을 먹는다. 그리고 「+N개 더」 자신도 한 줄이다 —
+       그 둘을 안 빼면 접었는데도 칸이 넘친다. */
+    var 칸 = 용량 - (hol ? 1 : 0);
+    var 보임 = evs.length <= 칸 ? evs.length : Math.max(0, 칸 - 1);
+    var 숨김 = evs.length - 보임;
     return '<div class="day" data-day="' + c.date + '"'
       + ' style="background:' + bg + ';border-right:1px solid ' + 테 + ';border-bottom:1px solid ' + 테
       + (찾음 ? ';outline:2px solid #fbbf24;outline-offset:-2px' : '') + '">'
@@ -765,7 +834,9 @@ function calendarHtml(eumOnly){
       + '</div>'
       + '<div class="evs">'
       +   (hol ? '<div class="ev hol" title="' + esc(hol) + '"' + (c.other ? ' style="opacity:.55"' : '') + '>' + esc(hol) + '</div>' : '')
-      +   evs.map(function(e){ return chipHtml(e, c.date); }).join("")
+      +   evs.slice(0, 보임).map(function(e){ return chipHtml(e, c.date); }).join("")
+      +   (숨김 > 0 ? '<div class="more" data-more="' + c.date + '" title="눌러서 그 날을 펼쳐 봅니다">+'
+            + 숨김 + '개 더</div>' : '')
       + '</div></div>';
   }).join("");
   return '<div class="cal">'
@@ -773,6 +844,40 @@ function calendarHtml(eumOnly){
         return '<div' + (i===0 ? ' class="sun"' : i===6 ? ' class="sat"' : '') + '>' + w + '</div>';
       }).join("") + '</div>'
     + '<div class="calgrid">' + cells + '</div></div>';
+}
+
+/* ── 펼침 창 ── 접힌 날을 «그 자리에서» 전부 보여 준다.
+   ⚠ 다른 화면으로 데려가지 않는다 — 한 칸을 보려고 보던 달을 잃으면 안 된다.
+     자리잡기는 그린 뒤에 한다(펼침자리) — 칸이 어디 있는지는 그려 봐야 안다. */
+function 펼침Html(eumOnly){
+  if(!S.open) return "";
+  var evs = eventsOn(S.open, eumOnly).filter(passFilter).filter(matchSearch);
+  var hol = holidayOf(S.open);
+  var d = new Date(S.open + "T00:00:00");
+  return '<div class="pop" id="pop">'
+    + '<div class="ph">' + esc(S.open.slice(5).replace("-", "월 ")) + '일'
+    +   ' (' + ["일","월","화","수","목","금","토"][d.getDay()] + ')'
+    +   ' <span class="n">' + evs.length + '건</span>'
+    +   '<button class="x" data-popclose="1" title="닫기">✕</button></div>'
+    + '<div class="evs">'
+    +   (hol ? '<div class="ev hol">' + esc(hol) + '</div>' : "")
+    +   evs.map(function(e){ return chipHtml(e, S.open); }).join("")
+    +   (evs.length ? "" : '<div style="font-size:11.5px;color:var(--sub);padding:4px 2px">이 날은 비어 있습니다</div>')
+    + '</div></div>';
+}
+function 펼침자리(){
+  var p = document.getElementById("pop");
+  if(!p) return;
+  var 칸 = document.querySelector('.day[data-day="' + S.open + '"]');
+  if(!칸){ S.open = null; p.parentNode.removeChild(p); return; }
+  var r = 칸.getBoundingClientRect();
+  var w = p.offsetWidth, h = p.offsetHeight;
+  /* 칸 위에 겹쳐 띄우되, 화면 밖으로 나가면 안쪽으로 당긴다 */
+  var x = r.left - 2, y = r.top - 2;
+  if(x + w > window.innerWidth - 8) x = window.innerWidth - w - 8;
+  if(y + h > window.innerHeight - 8) y = window.innerHeight - h - 8;
+  p.style.left = Math.max(8, x) + "px";
+  p.style.top  = Math.max(8, y) + "px";
 }
 
 /* ── 주 보기 ── 이알피와 같게: 이레를 나란히, 하루씩 위에서 아래로 */
@@ -1347,16 +1452,54 @@ function render(){
   } else {
     html = laterHtml(tab);
   }
+  var 달력 = (tab.v === "cal" || tab.v === "eumcal");
+  if(달력) html += 펼침Html(tab.v === "eumcal");
   html += modalHtml();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   $('app').innerHTML = html;
+  /* 달력 탭에서만 화면에 «딱» 맞춘다 — 다른 탭은 여느 때처럼 제 안에서 굴러간다 */
+  $('app').className = 달력 ? 'fit' : '';
+  if(달력){
+    펼침자리();
+    /* 그려 놓고 재서, 한 칸에 들어가는 수가 달라졌으면 «한 번만» 다시 그린다.
+       ⚠ 용량재기() 는 값이 바뀔 때만 참이다 — 그래서 돌고 돌지 않는다.
+         그래도 빗장을 하나 더 건다(창 크기가 계속 바뀌는 동안을 위해). */
+    if(!_다시그리는중){
+      if(용량재기()){
+        _다시그리는중 = true;
+        try{ render(); } finally{ _다시그리는중 = false; }
+      } else if(!_칸용량){
+        /* ⚠ «첫 그림»에서는 판의 높이가 아직 0 이라 못 잰다 — 그러면 어림값(5)이
+           그대로 남아 칸이 넘친다(2026-09-19 에 실제로 그랬다).
+           다음 칸에 한 번 더 재 본다. 그때는 자리가 잡혀 있다. */
+        requestAnimationFrame(function(){ if(!_다시그리는중 && 용량재기()) render(); });
+      }
+    }
+  }
 }
+var _다시그리는중 = false;
+
+/* 창 크기가 바뀌면 한 칸에 들어가는 수도 바뀐다 — 잦은 신호라 한 박자 쉬고 그린다 */
+var _크기타이머 = null;
+window.addEventListener('resize', function(){
+  if(_크기타이머) clearTimeout(_크기타이머);
+  _크기타이머 = setTimeout(function(){ _크기타이머 = null; render(); }, 150);
+});
 
 /* 누르는 것은 한 자리에서 받는다 — 단추마다 붙이면 다시 그릴 때 하나씩 샌다 */
+/* 자물쇠 없이 닫는 길 하나 더 — 창이 떠 있을 때 ESC */
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && S.open){ S.open = null; render(); }
+});
 document.addEventListener('click', function(e){
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle]') : null;
+  /* 펼침 창은 «바깥을 누르면» 닫힌다 — 창 안을 누른 것은 그대로 둔다 */
+  if(S.open && !(e.target.closest && e.target.closest(".pop"))
+     && !(e.target.closest && e.target.closest("[data-more]"))){
+    S.open = null; render();
+  }
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
   if(!t) return;
-  if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; render(); return; }
+  if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
     var mv = +t.getAttribute('data-mv');
     if(mv===0){ S.ym = ymOf(new Date()); S.date = todayYMD(); }
@@ -1398,6 +1541,13 @@ document.addEventListener('click', function(e){
   }
   /* 일을 누르면 그 건을 연다. 칸의 빈 자리를 누르면 새로 넣는다.
      ⚠ 일 쪽을 «먼저» 본다 — 일은 칸 «안»에 있어 칸도 함께 걸린다. */
+  /* 「+N개 더」 — 그 날을 그 자리에서 펼친다(다른 화면으로 안 간다) */
+  if(t.hasAttribute('data-more')){
+    var 날 = t.getAttribute('data-more');
+    S.open = (S.open === 날) ? null : 날;
+    render(); return;
+  }
+  if(t.hasAttribute('data-popclose')){ S.open = null; render(); return; }
   if(t.hasAttribute('data-ev')){
     var ev = t.getAttribute('data-ev').split(':');
     /* 구글에서 온 일정은 «구글에서» 고친다 — 우리가 손대면 두 곳이 갈린다.
