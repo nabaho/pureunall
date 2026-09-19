@@ -35,7 +35,7 @@
        없다 — 이번엔 둘 다였다. 이름도 포털 개명(2026-08-11)을 따라잡았다. */
   var APPS = [
     { key: 'erp',     name: '푸른이알피',   icon: '🏢', url: 'pu-erp.html',         desc: '인사·급여·재무' },
-    { key: 'cal',     name: '푸른 캘린더',  icon: '⏰', url: 'pu-cal.html',         desc: '일정·근태·이음센터' },
+    { key: 'cal',     name: '푸른 캘린더',  icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url: 'pu-cal.html',         desc: '일정·근태·이음센터' },
     { key: 'consult', name: '정부사업일정', icon: '📅', url: 'gov-consulting.html', desc: '보고서 일정및사진관리' },
     { key: 'work',    name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
@@ -250,8 +250,17 @@
         row.appendChild(star);
 
         var ic = document.createElement('span');
-        ic.textContent = a.icon;
-        ic.style.cssText = 'font-size:15px;flex-shrink:0';
+        /* ⚠ SVG 로 그린 아이콘은 «문자열이 HTML»이다 — textContent 로 넣으면
+           글자 그대로(<svg...) 찍힌다. 그림글자만 textContent 로 넣는다. */
+        if(typeof a.icon === 'string' && a.icon.indexOf('<svg') === 0){
+          ic.innerHTML = a.icon;
+          ic.style.cssText = 'width:15px;height:15px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center';
+          var svgEl = ic.querySelector('svg');
+          if(svgEl){ svgEl.style.width = '100%'; svgEl.style.height = '100%'; }
+        } else {
+          ic.textContent = a.icon;
+          ic.style.cssText = 'font-size:15px;flex-shrink:0';
+        }
         row.appendChild(ic);
 
         var nm = document.createElement('span');

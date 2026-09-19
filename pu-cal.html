@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#2563eb">
 <title>푸른 캘린더</title>
 <link rel="manifest" href="pu-cal-manifest.json">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⏰</text></svg>">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20x%3D%2215%22%20y%3D%2224%22%20width%3D%2270%22%20height%3D%2262%22%20rx%3D%229%22%20fill%3D%22%23ffffff%22%20stroke%3D%22%23cbd5e1%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M15%2033a9%209%200%200%201%209-9h52a9%209%200%200%201%209%209v11H15z%22%20fill%3D%22%23dc2626%22%2F%3E%3Ccircle%20cx%3D%2231%22%20cy%3D%2258%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2258%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3Ccircle%20cx%3D%2269%22%20cy%3D%2258%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3Ccircle%20cx%3D%2231%22%20cy%3D%2272%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2272%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3C%2Fsvg%3E">
 <!-- 아이폰 홈화면 아이콘 — 탭 아이콘과 다른 것이다. 여기는 PNG 여야 한다(SVG 를 안 읽는다) -->
 <link rel="apple-touch-icon" href="icon-cal-192.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -309,7 +309,7 @@
 <body>
 
 <div id="topbar">
-  <span class="brand">⏰ 푸른 캘린더</span>
+  <span class="brand"><svg viewBox="0 0 100 100" style="width:17px;height:17px;vertical-align:-3px;margin-right:1px"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg> 푸른 캘린더</span>
   <button class="lnk go" id="goErp" title="푸른이알피로 갑니다">← 푸른이알피</button>
   <span class="sp"></span>
   <span id="conn"><span class="dot"></span><span class="t">연결 중…</span></span>
@@ -1658,7 +1658,7 @@ try{
   $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
 }
 </script>
-<script src="js/pu-appbar.js?v=12"></script>
+<script src="js/pu-appbar.js?v=13"></script>
 <script>try{ PuAppBar.mount('#topbar', { current:'cal' }); }catch(e){}</script>
 <script>try{ PuBack.guard(function(){ return false; }); }catch(e){}</script>
 </body>

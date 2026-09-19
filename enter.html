@@ -1283,13 +1283,13 @@ body.portal-mode #moreFab{display:flex;}
   // 줄이 다르면 서로 자리를 못 옮긴다(관리자가 설정에서 풀 수 있다).
   var APPS = [
     { key:'erp',     name:'푸른이알피',   desc:'인사·급여·재무',   icon:'🏢', url:'pu-erp.html',         roles:null, row:'client' },
-    /* ⏰ 푸른 캘린더 — 바로 아래 정부사업일정과 «같은 📅» 였다(대표 지시 2026-09-19
-       「푸른캘린더 아이콘은 다른것으로 해라」). 이름이 다른데 그림이 같으면
-       타일을 그림으로 찾는 사람은 매번 글자를 읽어야 한다 — 타일을 쓰는 까닭이 없어진다.
-       달력붙이를 다시 고르면 크기가 작아질수록 또 같아 보이므로 시계로 갈랐다
-       (이 앱이 다루는 것이 일정·근태, 곧 «시각»이기도 하다).
-       ⚠ 탭 그림글자·바탕화면 아이콘도 같이 간다 — tests/app-icons.test.js 가 견준다. */
-    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'⏰', url:'pu-cal.html',         roles:null, row:'client' },
+    /* 푸른 캘린더 — 정부사업일정과 «같은 📅» 였다가 ⏰ 로 갔다(2026-09-19).
+       그 뒤 «달력붙이 스무 가지»를 그려 보여 드렸고 대표가 2번(빨강 머리띠)을 골랐다
+       (대표 지시 2026-09-19 「2」). 그림글자가 아니라 «SVG 로 그린» 아이콘이다 —
+       그림글자에 달력은 📅 📆 🗓️ 셋뿐이고 작아지면 서로 같아 보였다.
+       ⚠ icon 값이 이제 «HTML 문자열»이다(innerHTML 로 꽂는다). enter.html 이 그렇게 쓴다.
+       ⚠ 탭 그림글자·바탕화면 아이콘도 같은 그림이다 — tests/app-icons.test.js 가 견준다. */
+    { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client' },
     { key:'consult', name:'정부사업일정',  desc:'보고서 일정및사진관리',    icon:'📅', url:'gov-consulting.html', roles:null, row:'client' },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inout' },
