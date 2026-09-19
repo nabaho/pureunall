@@ -92,3 +92,18 @@ test('⑦ 나스에 넣을 두 줄을 끝에 그대로 찍는다 — 사람이 �
   assert.match(sh, /^NAS_KEY=/m, '★★ 올리개가 찍는 이름과 나스 스크립트의 이름이 어긋나면 붙여넣어도 안 된다');
   assert.match(sh, /^URL=/m);
 });
+
+test('⑧★★ 윈도우에서 npx 를 못 찾던 자리 — shell:true 를 준다 (대표 화면 2026-09-18)', () => {
+  /* 대표님 PC 에서 실제로 이렇게 걸렸다:
+       ✗ 파이어베이스 CLI 를 못 불렀습니다 — 인터넷과 npx 를 확인하세요.
+         spawnSync npx ENOENT
+     npx 는 있었다 — 윈도우의 npx 는 실제로 npx.cmd 라 shell:true 없이는
+     Node 의 spawnSync·execFileSync 가 그 확장자를 못 찾는다(Node 자체의 한계다). */
+  const npx호출 = SRC.match(/(?:execFileSync|spawnSync)\('npx',[\s\S]{0,220}?\}\)/g) || [];
+  assert.ok(npx호출.length >= 3, '★ npx 를 부르는 자리를 못 찾았다 — 검사가 헛돈다');
+  npx호출.forEach((call, i) => {
+    assert.match(call, /shell:\s*true/,
+      '★★ ' + (i + 1) + '번째 npx 호출에 shell:true 가 없다 — 윈도우에서 ENOENT 로 그 자리에서 멎는다.\n' +
+      '  ' + call.slice(0, 80));
+  });
+});
