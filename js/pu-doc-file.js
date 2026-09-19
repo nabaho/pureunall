@@ -1584,18 +1584,64 @@
     }).catch(function () { return []; });
   }
 
+  /* 컨설팅 유형 목록 — 사진첩의 유형 고르개가 쓴다.
+     ⚠ 푸른이알피의 자료는 { u: 마지막수정, v: 목록 } 꼴이다. v 를 안 풀면 목록이 아니라
+       칸 두 개짜리 객체가 나온다(2026-09-19 검증에서 실제로 「업체 2건」이 나왔다). */
+  function consTypes() {
+    if (!deps.db) return Promise.resolve([]);
+    return deps.db.ref(ERP_ROOT + '/biz_cons_types').once('value').then(function (sn) {
+      var raw = sn.val();
+      var v = (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.v !== undefined) ? raw.v : raw;
+      var arr = Array.isArray(v) ? v
+        : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }) : []);
+      return arr.filter(function (t) { return t && t.code && t.name; });
+    }).catch(function () { return []; });
+  }
+
+  /* 서류 이름으로 컨설팅 유형을 짐작한다 — 못 고르면 null 이고, 그때는 사람이 고른다.
+     ★★ 잣대가 계약관리(erpConsTypeByDocName)와 «같은 얼개»여야 한다. 따로 지으면
+       사진첩이 골라 둔 것과 계약관리가 아는 것이 갈린다.
+     ⚠ 후보가 둘이면 «안 고른다» — 「인사노무컨설팅충남북부상의」와 「…서산」처럼
+       앞부분이 같은 유형이 있다. 하나를 찍으면 절반은 틀린다
+       (2026-09-19 실제 자료로 재 보니 그래서 17장을 안 골랐고, 그 조심성이 옳았다). */
+  var TYPE_RUN_MIN = 5;
+  function typeNameTidy(s) { return String(s || '').replace(/[\s()\[\]{}·,.\-_/]/g, ''); }
+  function nameRun(a, b) {
+    var best = 0;
+    for (var i = 0; i < a.length; i++) {
+      for (var j = i + best + 1; j <= a.length; j++) {
+        if (b.indexOf(a.slice(i, j)) < 0) break;
+        if (j - i > best) best = j - i;
+      }
+    }
+    return best;
+  }
+  function guessConsType(docName, types) {
+    var d = typeNameTidy(docName);
+    if (!d) return null;
+    var hits = (types || []).filter(function (t) {
+      var n = typeNameTidy(t && t.name);
+      if (!n) return false;
+      var run = nameRun(n, d);
+      return run >= TYPE_RUN_MIN && run >= Math.min(d.length, n.length) / 2;
+    });
+    return hits.length === 1 ? hits[0] : null;
+  }
+
   /* 요청 한 줄을 남긴다. 돌려주는 것은 그 번호다.
-     ⚠ 주담당·회사 이름이 없으면 «안 남긴다» — 그대로 보내면 계약관리가 거절해
+     ⚠ 주담당·유형·회사 이름이 없으면 «안 남긴다» — 그대로 보내면 계약관리가 거절해
        요청만 걸린 채 쌓인다(사람은 등록된 줄 안다). */
   function requestContract(o) {
     if (!deps.db) return Promise.reject(new Error('실시간DB가 연결되지 않았습니다'));
     o = o || {};
     if (!o.managerMain) return Promise.reject(new Error('주담당을 고르지 않았습니다'));
+    if (!o.consultingType) return Promise.reject(new Error('컨설팅 유형을 고르지 않았습니다'));
     if (!o.company || !o.company.name) return Promise.reject(new Error('회사 이름이 없습니다'));
     var key = 'ctreq-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     var rec = {
       id: key, state: 'pending', at: Date.now(),
       by: String(o.by || ''), managerMain: String(o.managerMain),
+      consultingType: String(o.consultingType),
       company: o.company, srcPhoto: o.srcPhoto || null
     };
     return deps.db.ref(CT_REQ + '/' + key).set(rec).then(function () { return key; });
@@ -1605,6 +1651,8 @@
     HAND: HAND,
     init: init,
     erpStaff: erpStaff,
+    consTypes: consTypes,
+    guessConsType: guessConsType,
     requestContract: requestContract,
     MAIL_MAX_BYTES: MAIL_MAX_BYTES,
     pickMailPeople: pickMailPeople,
