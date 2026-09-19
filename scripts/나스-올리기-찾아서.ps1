@@ -55,13 +55,31 @@ Set-Location -LiteralPath $dir
 Write-Host '  (다음부터는 이 폴더의 scripts\나스-올리기.bat 을 두 번 누르시면 됩니다)'
 Write-Host ''
 
-Write-Host '[1/2] 최신으로 맞춥니다...'
-git pull
+# ⚠★★ 「git pull」만 믿지 않는다 (2026-09-19 대표 화면 — 고쳐서 올렸는데도 옛 오류가 그대로 났다)
+#   ── 무엇이 있었나
+#     shell:true 를 고쳐 올리고 「다시 해 보세요」라고 했는데, 대표님 화면에
+#     여전히 «고치기 전» 오류(spawnSync npx ENOENT)가 그대로 났다. git pull 은
+#     「Already up to date」라고 했다 — 그런데 방금 올린 수정이 없었다.
+#   ── 까닭
+#     이 폴더가 «어느 가지를 보고 있는지» 짐작만 했다. main 이 아닌 다른 가지를
+#     보고 있었거나, git pull 이 병합 순간과 겹쳐 빈손으로 끝났을 수 있다.
+#     git pull 은 «지금 보고 있는 가지»만 맞추지, 우리가 원하는 main 최신인지는
+#     확인하지 않는다.
+#   ── 그래서
+#     추측을 버리고 못 박는다 — «반드시 main, 반드시 origin 의 최신 그대로».
+#     이 폴더는 사람이 직접 편집하는 자리가 아니라 «올리기 전용 사본»이므로
+#     로컬에 무엇이 있었든(다른 가지·엇나간 커밋) origin/main 으로 덮어써도 된다.
+Write-Host '[1/2] main 을 «그대로» 받습니다 (다른 가지·옛 커밋은 버립니다)...'
+git fetch origin main
 if ($LASTEXITCODE -ne 0) {
-  Write-Host '✗ git pull 이 안 됐습니다. 위 메시지를 그대로 클로드에게 보여 주세요.' -ForegroundColor Red
+  Write-Host '✗ git fetch 가 안 됐습니다. 인터넷 연결을 확인하고, 위 메시지를 클로드에게 보여 주세요.' -ForegroundColor Red
   Read-Host '엔터를 누르면 닫힙니다'
   exit 1
 }
+git checkout -B main origin/main
+git reset --hard origin/main
+$after = git rev-parse --short HEAD
+Write-Host ("  지금 판: " + $after) -ForegroundColor Green
 
 Write-Host ''
 Write-Host '[2/2] 올립니다...'
