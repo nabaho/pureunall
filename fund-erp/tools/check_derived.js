@@ -67,6 +67,8 @@ global.funds = {};
   gF('_signLabels'), gF('fillSignTable'),
   gS('CHARTER_TITLE'), gS('CHARTER_NAME'), gS('CHARTER_BRANCH'), gS('CHARTER_DATELINE'),
   gF('fillCharterHead'),
+  /* 2026-09-19: 사내 정관의 서명 격자(원본이 이미 표다 — 이름만 비어 있었다) */
+  gS('GRID_NAME'), gS('GRID_TITLE'), gS('GRID_BLANK'), gF('_gridCell'), gF('fillSignGrid'),
   /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다.
      여기 없으면 「fillFundTypeWords is not defined」로 이 검사가 통째로 죽는다. */
   gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
