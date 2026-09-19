@@ -32,8 +32,20 @@ const 올린다 = process.argv.includes('--deploy');
 function 말(s) { console.log(s); }
 function 멈춤(s, code) { console.error('\n✗ ' + s); process.exit(code == null ? 1 : code); }
 
+/* ⚠★ 윈도우에서 「spawnSync npx ENOENT」로 걸리던 자리 (2026-09-18 대표 화면)
+   ── 무엇이 있었나
+     npx 는 원래 있었다 — 대표님 PC 에서 이미 여러 번 npx 를 쓰셨다(firebase-tools 를
+     그렇게 부르고 있었다). 그런데도 이 스크립트만 「ENOENT」로 못 찾았다.
+   ── 까닭
+     윈도우에서 npx 는 실제로 `npx.cmd` 라는 «배치 파일»이다. Node 의 spawnSync·
+     execFileSync 는 shell:true 를 안 주면 그 .cmd 확장자를 붙여 찾지 않는다 —
+     PATH 에 있어도 못 찾는다(node 자체의 잘 알려진 윈도우 한계다).
+     맥·리눅스에서는 npx 가 진짜 실행 파일이라 이 문제가 안 생겨서 여기서는
+     못 봤다. **남의 PC(더구나 다른 운영체제)에서 도는 것은 여기서 시험 못 한다** —
+     그래서 셋 다 shell:true 를 준다(값은 전부 이 파일 안의 고정 글자뿐이라 안전하다). */
 function fb(args, opts) {
-  return execFileSync('npx', ['-y', 'firebase-tools'].concat(args), Object.assign({ encoding: 'utf8' }, opts || {}));
+  return execFileSync('npx', ['-y', 'firebase-tools'].concat(args),
+    Object.assign({ encoding: 'utf8', shell: true }, opts || {}));
 }
 
 /* ── ① 로그인 확인 ────────────────────────────────────────────────────── */
@@ -66,7 +78,7 @@ function 열쇠준비() {
   if (!올린다) { 말('② 열쇠 — 아직 없습니다. 올릴 때 새로 만들어 넣습니다.'); return '(올릴 때 만듭니다)'; }
 
   const r = spawnSync('npx', ['-y', 'firebase-tools', 'functions:secrets:set', 비밀이름,
-    '--project', 프로젝트, '--data-file', '-'], { input: 새열쇠, encoding: 'utf8' });
+    '--project', 프로젝트, '--data-file', '-'], { input: 새열쇠, encoding: 'utf8', shell: true });
   if (r.status !== 0) 멈춤('열쇠를 넣지 못했습니다.\n' + (r.stderr || r.stdout || ''));
   말('② 열쇠 ✓  새로 만들어 넣었습니다.');
   return 새열쇠;
@@ -76,7 +88,7 @@ function 열쇠준비() {
 function 올리기() {
   말('③ 함수를 올립니다 (' + 함수 + ' 하나만) …');
   const r = spawnSync('npx', ['-y', 'firebase-tools', 'deploy',
-    '--only', 'functions:' + 함수, '--project', 프로젝트], { stdio: 'inherit' });
+    '--only', 'functions:' + 함수, '--project', 프로젝트], { stdio: 'inherit', shell: true });
   if (r.status !== 0) 멈춤('올리지 못했습니다. 위 메시지를 보세요.');
   말('③ 올림 ✓');
 }
