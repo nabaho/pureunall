@@ -183,9 +183,13 @@ test('여섯 줄 42칸 — 줄 높이는 바닥값을 두고 «늘어난다»', 
      「N개 더보기」가 필요했다 — 이제 접지 않으므로 줄이 늘 수 있어야 한다.
      ★ 바닥값은 그대로다: 한가한 주가 납작해지면 달력이 표처럼 보인다.
      칸 수(42)는 그대로 못 박는다 — 달마다 줄 수가 들쭉날쭉하면 안 된다. */
-  const m = 캘린더.match(/\.calgrid\{[^}]*grid-auto-rows:minmax\((\d+)px,\s*auto\)/);
-  assert.ok(m, '줄이 늘 수 없습니다 (.calgrid 의 grid-auto-rows 가 minmax 가 아닙니다)');
-  assert.ok(Number(m[1]) >= 60, '줄 바닥값이 너무 낮습니다: ' + m[1] + 'px');
+  /* ⚠ 넓은 화면 쪽만 본다 — 그냥 찾으면 손전화 규칙이 먼저 걸려 샌다 */
+  const 덩이 = 캘린더.match(/\.calgrid\{[^}]*grid-template-columns[^}]*\}/);
+  assert.ok(덩이, '넓은 화면 .calgrid 를 못 찾았습니다');
+  const v = (덩이[0].match(/grid-auto-rows:([^;}]+)/) || [])[1] || '';
+  assert.match(v, /,\s*auto\)\s*$/, '줄이 늘 수 없습니다: ' + v);
+  const px = (v.match(/(\d+)px/) || [])[1];
+  assert.ok(px && Number(px) >= 60, '줄 바닥값이 없거나 너무 낮습니다: ' + v);
   const 격자 = 함수몸(캘린더, 'function monthGrid(ym){');
   assert.match(격자, /grid\.length < 42/, '42칸을 채우지 않습니다');
 });
