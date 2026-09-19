@@ -60,6 +60,9 @@
   .tab.eum{color:#2563eb}
   .tab.on{background:var(--acc2);color:#ffffff;font-weight:700}
   .tsep{width:1px;height:18px;background:#cbd5e1;margin:0 7px;flex-shrink:0}
+  /* 탭 줄에 얹은 사람 칩 — 오른쪽 끝에 붙는다(왼쪽 탭과 안 섞이게) */
+  .tabchips{margin-left:auto;display:flex;align-items:center;flex-shrink:0;padding-left:16px}
+  .tabchips .chips{margin-bottom:0;flex-wrap:nowrap}
 
   #app{padding:14px 16px 90px;max-width:1500px;margin:0 auto}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
@@ -812,12 +815,13 @@ function dayHtml(eumOnly){
 }
 
 /* ── 위 줄 ── ◀ 2026-09 ▶ · 병오년8월 – 9월 · 오늘 · [월|주|일] · 🔍 일정 검색 */
-/* 머리줄 — 달·보기·사람 칩·검색을 «한 줄»에 둔다 (대표 지시 2026-09-19 「한줄로 정리해라」).
-   여태는 두 줄이었다(사람 칩 한 줄 + 달 한 줄). 오른쪽에 빈 자리가 넉넉한데 세로로
-   쌓으니 달력이 그만큼 아래로 밀렸다 — 표 한 칸을 두 줄로 만들지 않는 것과 같은 까닭이다.
-   ⚠ 좁은 화면에서는 접힌다(flex-wrap). 못 들어가는 것을 우겨 넣으면 글자가 잘린다. */
+/* 달력 머리줄 — 달 이동·보기·검색. «한 줄»이다 (대표 지시 2026-09-19 「한줄로 정리해라」).
+   ★ 사람 칩은 여기 없다 — 탭 줄로 올렸다(대표 지시 「캡쳐1은 캡쳐2 줄에 넣어라」).
+     탭 줄은 오른쪽이 통째로 비어 있었고, 칩을 한 줄 따로 두면 달력이 그만큼 내려간다.
+   ⚠ 좁은 화면에서는 접힌다(flex-wrap). 못 들어가는 것을 우겨 넣으면 글자가 잘린다.
+   ⚠ eumOnly 를 그대로 받는다 — 쓰지 않아도 부르는 쪽 모양을 바꾸지 않는다. */
 function calheadHtml(eumOnly){
-  return '<div class="calhead">' + monthbarHtml() + srchHtml() + chipsHtml(eumOnly) + '</div>';
+  return '<div class="calhead">' + monthbarHtml() + srchHtml() + '</div>';
 }
 function monthbarHtml(){
   var 가운데 = S.view === "month" ? S.ym
@@ -1310,13 +1314,20 @@ function refreshOne(store){
 /* ── 그리기 ────────────────────────────────────────────────────────── */
 function renderTabs(){
   var last = '';
-  $('tabs').innerHTML = TABS.map(function(t){
+  var 탭들 = TABS.map(function(t){
     var head = '';
     if(t.g !== last){ head = (last ? '<span class="tsep"></span>' : '') + '<span class="gl">'+esc(t.g)+'</span>'; last = t.g; }
     /* 이음 쪽은 글자를 파랗게 — 금 하나만으로는 어느 묶음인지 눈이 못 가른다 */
     var eum = t.g === '이음센터' ? ' eum' : '';
     return head + '<button class="tab'+eum+(S.tab===t.v?' on':'')+'" data-t="'+esc(t.v)+'">'+esc(t.label)+'</button>';
   }).join('');
+  /* ★ 사람 칩을 탭 줄 «오른쪽 끝»에 얹는다 (대표 지시 2026-09-19 「캡쳐1은 캡쳐2 줄에 넣어라」).
+     탭은 왼쪽 절반도 안 쓰는데 칩은 제 줄을 따로 차지하고 있었다 — 한 줄을 통째로 아낀다.
+     ⚠ 달력을 보는 탭에서만 얹는다. 직원별 업무·분석에는 «걸러 낼 것»이 없어
+       칩이 아무 일도 안 하면서 자리만 먹는다. */
+  var 칩 = (S.tab === 'cal' || S.tab === 'eumcal')
+    ? '<span class="tabchips">' + chipsHtml(S.tab === 'eumcal') + '</span>' : '';
+  $('tabs').innerHTML = 탭들 + 칩;
 }
 
 function render(){

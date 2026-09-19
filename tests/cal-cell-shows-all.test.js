@@ -200,14 +200,71 @@ function 머리줄안쪽(h) {
   throw new Error('머리줄 그릇이 안 닫혔습니다');
 }
 
-test('⑦ 달·사람 칩·검색이 «한 줄»에 있다 — 쌓으면 달력이 그만큼 밀린다', () => {
+test('⑦ 달 이동·보기·검색이 «한 줄»에 있다 — 쌓으면 달력이 그만큼 밀린다', () => {
   const h = 머리줄그려본다();
   /* 그릇이 «하나»여야 한다 — 둘이면 그게 두 줄이다 */
   assert.strictEqual((h.match(/class="calhead"/g) || []).length, 1, '머리줄 그릇이 둘 이상입니다');
   const 안 = 머리줄안쪽(h);
-  ['class="monthbar"', 'class="chips"', 'class="srch"'].forEach((부품) => {
+  ['class="monthbar"', 'class="srch"'].forEach((부품) => {
     assert.ok(안.indexOf(부품) >= 0, 부품 + ' 가 머리줄 «안»에 없습니다(밖에 붙어 있으면 그게 두 줄이다)');
   });
+  /* ★ 사람 칩은 여기 있으면 «안 된다» — 탭 줄로 올렸다(대표 지시 2026-09-19).
+     되돌아오면 줄이 하나 다시 생기고 달력이 그만큼 내려간다. */
+  assert.strictEqual(h.indexOf('class="chips"') >= 0, false,
+    '사람 칩이 달력 머리줄로 되돌아왔습니다 — 탭 줄에 있어야 합니다');
+});
+
+/* 탭 줄을 실제로 그려 본다 — $ 는 innerHTML 만 받아 두는 가짜를 준다 */
+function 탭줄그려본다(탭) {
+  const 담기 = { innerHTML: '' };
+  const 상자 = {
+    D: {
+      my_schedules: [{ id: 's1', date: '2026-09-18', sid: 'P-001', type: 'meet', title: '가나상사 면담' }],
+      attendance_records: [], external_staff: [], staff_colors: [], holidays: [],
+      user_accounts: [{ sid: 'P-001', name: '홍길동', status: 'active' }]
+    },
+    PuWork: require(path.join(ROOT, 'js', 'pu-work-core.js')),
+    console, String, Object, Array, JSON, Math, Date, Intl,
+    parseInt, parseFloat, isFinite, encodeURIComponent,
+    window: { _gcalColors: {} }, fbDb: null,
+    $: () => 담기,
+    S: { filter: null, q: '', scope: 'month', ym: '2026-09', view: 'month', date: '2026-09-18', tab: 탭 }
+  };
+  vm.createContext(상자);
+  const 이름들 = ['function esc(s){', 'function arr(v){', 'function todayYMD(){',
+    'function allUsers(){', 'function users(){', 'function userOf(sid){', 'function nameOf(sid){',
+    'function externalOf(id){', 'function colorOf(sid){', 'function holidayOf(ymd){',
+    'function gcalMailKey(m){', 'function gcalMailMap(){', 'function gcalSidByMail(mail){',
+    'function gcalPalette(){', 'function gcalMailColor(mail){', 'function gcalToEvent(ev){',
+    'function eventsOn(ymd, eumOnly){', 'function monthDates(){', 'function monthGrid(ym){',
+    'function ymdOf(y, m, d){', 'function ieumPeople(){', 'function chipsHtml(eumOnly){',
+    'function renderTabs(){'];
+  let 조각 = 'var _lunar = {}; var GCAL = { evs:[], ym:"", loading:false, err:"" };\n'
+    + 'var ME = { sid:"P-001" };\n'
+    + (캘린더.match(/var TABS = \[[\s\S]*?\n\];/) || [''])[0] + '\n';
+  이름들.forEach((h) => { 조각 += 함수몸(캘린더, h) + '\n'; });
+  조각 += (캘린더.match(/var ATT_SHOW = \[[\s\S]*?\];/) || [''])[0] + '\n';
+  vm.runInContext(조각 + '\nrenderTabs();', 상자);
+  return 담기.innerHTML;
+}
+
+test('⑩ 사람 칩이 «탭 줄»에 얹혀 있다 — 제 줄을 따로 차지하지 않는다', () => {
+  const h = 탭줄그려본다('cal');
+  assert.ok(h.indexOf('data-t="cal"') >= 0, '탭이 안 그려졌습니다');
+  assert.ok(h.indexOf('class="chips"') >= 0,
+    '탭 줄에 사람 칩이 없습니다 — 칩이 제 줄을 따로 차지하면 달력이 그만큼 내려갑니다');
+  assert.ok(h.indexOf('class="pchip') >= 0, '사람 동그라미가 안 그려졌습니다');
+  /* 오른쪽 끝에 붙어야 한다 — 탭 사이에 끼면 어느 것이 탭이고 어느 것이 거르개인지 헷갈린다 */
+  const c = 캘린더.match(/.tabchips{([^}]*)}/);
+  assert.ok(c, '.tabchips 꾸밈이 없습니다');
+  assert.match(c[1], /margin-left:auto/, '칩이 탭 줄 오른쪽 끝에 안 붙습니다: ' + c[1]);
+});
+
+test('⑪ 걸러 낼 것이 없는 탭에는 칩을 안 얹는다 — 자리만 먹는다', () => {
+  const h = 탭줄그려본다('eumppl');
+  assert.ok(h.indexOf('data-t="eumppl"') >= 0, '탭이 안 그려졌습니다');
+  assert.strictEqual(h.indexOf('class="chips"') >= 0, false,
+    '인원 현황 탭에까지 사람 칩이 붙었습니다 — 거기서는 아무 일도 안 합니다');
 });
 
 test('⑨ 화면이 그 그릇을 «실제로» 쓴다 — 그릇만 만들어 두면 소용이 없다', () => {
