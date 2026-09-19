@@ -165,6 +165,39 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   .pu-g4 { grid-template-columns: 1fr; }
   .pu-c4-2, .pu-c4-3, .pu-c4-4 { grid-column: span 1; }
 }
+
+/* ── 한 줄에 여섯 칸 · 라벨 없이 (대표 지시 2026-09-19 「셀 위 안내설명을 셀 안에」)
+   ─────────────────────────────────────────────────────────────────────
+   ⚠ .pu-g4 를 고치지 않고 «따로» 둔다 — 업체관리(CompanyEditModal)는 아직
+     라벨-있는-4칸 그대로다. 여기(.pu-g6)를 쓰는 화면(계약창)과 업체관리가
+     보기에 서로 달라진다 — 알고 하는 선택이다(상태 기록에 남겨 둔다).
+   ⚠ auto-fill(최소폭만 정하고 개수는 자동)을 처음엔 썼는데, 폭이 애매하면
+     6개가 아니라 5개만 들어가며 마지막 한 칸이 혼자 다음 줄로 흘러내렸다
+     (실측 2026-09-19, 1031px 화면). 그래서 칸 «수를 여섯으로 못 박는다» —
+     좁아지면 통째로 3칸 → 2칸으로 접지, 5칸으로 어중간하게 줄지 않는다.
+   ⚠ 칸 안 글자(placeholder)만으로 무엇인지 알린다 — 값을 채우면 그 글자는
+     사라진다. 칸 «차례»가 늘 같다는 것으로 보완한다(문서에 차례를 적어 둔다). */
+.pu-g6 { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); column-gap: 8px; row-gap: 8px; }
+.pu-n6 { display: flex; flex-direction: column; min-width: 0; }
+.pu-n6 input, .pu-n6 select, .pu-n6 textarea { width: 100%; padding: 7px 8px;
+  border: 1px solid #cbd5e1; border-radius: 5px; font-size: 11.5px; font-family: inherit; }
+.pu-n6 input:focus, .pu-n6 select:focus, .pu-n6 textarea:focus { outline: 0; border-color: #2563eb; }
+.pu-n6 textarea { resize: vertical; min-height: 40px; }
+.pu-n6 select.pu-ph { color: #94a3b8; }
+.pu-n6-2 { grid-column: span 2; } .pu-n6-3 { grid-column: span 3; }
+.pu-n6-4 { grid-column: span 4; } .pu-n6-6 { grid-column: span 6; }
+.pu-g6-sec { grid-column: 1 / -1; font-size: 11px; font-weight: 800; color: #475569;
+  border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-top: 8px;
+  display: flex; align-items: center; gap: 6px; }
+.pu-g6-sec .hint { font-weight: 500; color: #94a3b8; font-size: 10px; margin-left: auto; }
+@media (max-width: 980px) {
+  .pu-g6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pu-n6-4, .pu-n6-6 { grid-column: span 3; }
+}
+@media (max-width: 640px) {
+  .pu-g6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pu-n6-2, .pu-n6-3, .pu-n6-4, .pu-n6-6 { grid-column: span 2; }
+}
 .env-actions { margin-top: 24px; display: flex; gap: 8px; }
 .btn-primary { background: #2563eb; color: #fff; padding: 10px 22px; border-radius: 6px; font-size: 13px; font-weight: 700; }
 .btn-primary:hover { background: #1d4ed8; }

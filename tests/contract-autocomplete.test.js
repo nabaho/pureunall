@@ -87,7 +87,9 @@ const t = (name, got, want) => {
 
 /* ═══ 2. ★ 이미 정해진 회사에서는 칸을 눌렀다고 목록이 다시 열리지 않는다 ═══ */
 {
-  const blk = slice('          onFocus:function(e){', '          placeholder:\'회사명 또는 엑셀 한 행 붙여넣기\'');
+  /* ⚠ 2026-09-19 에 회사명 칸의 placeholder 를 '의뢰인(회사명) *' 로 바꿨다(라벨을
+     없애고 칸 안 글자로 옮겼다) — 끝 표식은 그 자리가 아니라 onFocus 함수 «몸통»으로 잡는다. */
+  const blk = slice('          onFocus:function(e){', '          placeholder:\'의뢰인(회사명) *\'');
   t('★ 계약 수정 화면에서는 안 연다', /if\(props\.cur\) return;/.test(blk), true);
   t('★ 이미 업체를 특정했으면 안 연다', /if\(\(f\.company\|\|\{\}\)\.companyId\) return;/.test(blk), true);
   t('신규·미특정일 때는 예전대로 연다', /searchPastCompanies\(f\.company\.name\.toLowerCase\(\)\)/.test(blk), true);
