@@ -69,6 +69,11 @@ global.funds = {};
   gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),
   /* 2026-09-19: 회의록 의안마다 새 장 */
   gS('MINUTES_AGENDA'), gF('fillMinutesPages'),
+  /* 2026-09-19: 서명란을 번호 붙인 표로 · 정관 머리와 제3조 손보기 */
+  gS('SIGN_L'), gS('SIGN_R'), gS('SIGN_WHO_ONLY_SRC'), gS('SIGN_HEAD'),
+  gF('_signLabels'), gF('fillSignTable'),
+  gS('CHARTER_TITLE'), gS('CHARTER_NAME'), gS('CHARTER_BRANCH'), gS('CHARTER_DATELINE'),
+  gF('fillCharterHead'),
   /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다. 위와 같은 까닭이다. */
   gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
   gF('ftypeSkipDoc'), gS('FTYPE_PICK_SRC'), gF('_ftypeSwap'), gF('_ftypeWords'), gF('_isTypePickBox'), gF('fillFundTypeWords'),

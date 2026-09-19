@@ -4319,21 +4319,16 @@ function fillPartyList(root,f,sites){
   nodes.forEach(function(x){
     var t=x.nodeValue||'', v=t;
     if(reAny.test(t)){
-      /* ① 정관 제3조 — 「“○○시 ○○로 ○○, ○○회사, ○○군 …, ○○회사”」 참여회사 소재지 목록.
-         주소와 이름이 «짝»을 이루므로 따옴표 안을 통째로 다시 쓴다. */
-      var q=t.match(/[“"]([^”"]*(?:○○|XX)\s*회사[^”"]*)[”"]/);
-      if(q && (q[1].match(/(?:○○|XX)\s*회사/g)||[]).length>=2){
-        v=t.replace(q[0],'“'+list.map(function(s){
-          return (String(s.address||'').trim()||'＿＿＿＿')+', '+String(s.name||'').trim();
-        }).join(', ')+'”');
-      }
-      /* ② 서명란 — 한 줄이 한 회사다(그 회사 근로자측대표와 대표이사가 나란히 선다).
-         회사마다 날인을 받아야 하므로 줄마다 «다른» 회사를 세운다.
-         ⚠ 정관은 이름 자리표가 «같은 줄»에 있다(「○○주식회사 노동조합대표자 ○○○ (인)」).
-           설립합의서는 이름이 «다음 줄»이라 아래 ④가 맡는다. 두 꼴을 다 받는다.
+      /* ① 정관 제3조 아래의 참여회사 소재지 목록은 여기서 «채우지» 않는다 —
+           fillCharterHead 가 통째로 지운다(대표 지시 2026-09-19 「제3조 아래 필요없다」).
+         ② 서명란 — 한 줄이 한 회사다(그 회사 근로자대표와 대표이사가 나란히 선다).
+           회사마다 날인을 받아야 하므로 줄마다 «다른» 회사를 세운다.
+         ⚠ 정관·설립합의서는 fillSignTable 이 «표»로 다시 짜 가므로 여기까지 오지 않는다.
+           아래는 표로 못 바꾼 서식(사내 정관 등)을 위해 남겨 둔 길이다.
+         ⚠ 이름 자리표가 «같은 줄»인 꼴과 «다음 줄»인 꼴을 둘 다 받는다(뒤엣것은 ④가 맡는다).
          ⚠ 서식의 줄이 참여사업장보다 많으면 남는 줄은 «지운다» — 자리표가 그대로
            찍혀 나가면 있지도 않은 회사의 날인란이 관청에 간다. */
-      else if(/근로자측\s*대표|근로자\s*대표|노동조합\s*대표자/.test(t) && /대표이사|사용자측\s*대표/.test(t)){
+      if(/근로자측\s*대표|근로자\s*대표|노동조합\s*대표자/.test(t) && /대표이사|사용자측\s*대표/.test(t)){
         var s0=list[sigAt], nm=s0?String(s0.name||'').trim():'';
         if(nm){
           if(!sigTpl) sigTpl=t;                   // 자리표가 든 «원래» 글귀를 베껴 둔다
@@ -4388,6 +4383,132 @@ function fillPartyList(root,f,sites){
     tn.nodeValue='';
     if(!String(p.textContent||'').replace(/[\s()인×○]/g,'') && p.parentNode) p.parentNode.removeChild(p);
     n++;
+  });
+  return n;
+}
+/* ══ 서명란을 «번호 붙인 세 칸 표»로 다시 짠다 ══ (대표 지시 2026-09-19
+     「캡쳐5는 모두 열을 좀 일치시켜라」·「설립합의서에 기업하고 이름 열을 일치시키고 넘버링 해라」)
+
+   원본은 두 단을 «공백»으로 벌려 놓았다. 회사 이름 길이가 저마다 달라 줄이 들쭉날쭉했고,
+   설립합의서는 회사 줄과 이름 줄이 서로 어긋나 누구 날인 자리인지 한눈에 안 들어왔다.
+   표로 세우면 열이 맞고 번호가 붙는다 — 몇 곳에서 날인을 받아야 하는지 세기도 쉽다.
+
+   ⚠ 서식마다 «부르는 말»이 다르다. 원본 줄에서 그대로 베껴 쓴다 — 한 가지로 박으면
+     그 서식에 없던 말이 찍혀 나간다.
+   ⚠ 두 꼴을 다 받는다. 정관은 줄마다 <p> 가 따로고, 설립합의서는 «한 <p> 안»에서
+     <br> 로만 나뉜다. 그래서 <p> 가 아니라 «글줄(텍스트 마디)»을 본다.
+   ⚠ 이름을 모르면 밑줄로 둔다 — 관청에 나가는 서류에 이름을 지어낼 수 없다.
+   ⚠ 참여사업장이 없으면 손대지 않는다 — 자리표가 틀린 이름보다 낫다. */
+var SIGN_L=/근로자대표|근로자측\s*대표|노동조합\s*대표자/;
+var SIGN_R=/대표이사|사용자측\s*대표/;
+var SIGN_WHO_ONLY_SRC='^[\\s()인×○]*(?:×\\s*×\\s*×|○○○(?!○))[\\s()인×○]*$';
+var SIGN_HEAD=/^각참여회사근로자측위원.*사용자측위원$/;
+/* 「○○주식회사 근로자대표 ○○○ (인)」 → {l:'근로자대표', r:'대표이사'} */
+function _signLabels(t){
+  var s=String(t||'').replace(new RegExp(PARTY_ONE_SRC,'g'),'§').replace(new RegExp(PARTY_WHO_SRC,'g'),'§');
+  var seg=s.split('§').map(function(x){ return x.replace(/[()인\s]+/g,' ').trim(); }).filter(Boolean);
+  var pick=function(re,dft){ var v=seg.filter(function(x){ return re.test(x); })[0]; return (v||dft).trim(); };
+  return { l:pick(SIGN_L,'근로자대표'), r:pick(SIGN_R,'대표이사') };
+}
+function fillSignTable(root,f,sites){
+  var list=estabSites(sites); if(!list.length) return 0;
+  var reCo=new RegExp(PARTY_ONE_SRC), reWho=new RegExp(SIGN_WHO_ONLY_SRC);
+  var walk=document.createTreeWalker(root,4/*TEXT*/,null,false), tn, nodes=[];
+  while((tn=walk.nextNode())) nodes.push(tn);
+  /* 회사 줄 — 한 글줄에 근로자측·사용자측 부르는 말이 «둘 다» 있고 회사 자리표가 있다 */
+  var hits=nodes.filter(function(x){ var t=x.nodeValue||'';
+    return SIGN_L.test(t)&&SIGN_R.test(t)&&reCo.test(t); });
+  if(!hits.length) return 0;
+  var lab=_signLabels(hits[0].nodeValue||'');
+  /* 지울 글줄 — 회사 줄, 그 «바로 뒤»의 이름만 든 줄(설립합의서), 그리고 머리줄 */
+  var kill=[];
+  hits.forEach(function(x){
+    kill.push(x);
+    var j=nodes.indexOf(x)+1;
+    if(j<nodes.length && reWho.test(String(nodes[j].nodeValue||'').trim())) kill.push(nodes[j]);
+  });
+  /* 머리줄(「각 참여회사 근로자측 위 원 … 사용자측 위원」)은 표의 머리가 대신한다.
+     원본이 두 단을 공백으로 벌려 놓아 띄어쓰기가 제각각이라 «글자만» 남겨 본다. */
+  nodes.forEach(function(x){
+    if(SIGN_HEAD.test(String(x.nodeValue||'').replace(/\s/g,'')) && kill.indexOf(x)<0) kill.push(x);
+  });
+  var tb=document.createElement('table');
+  tb.setAttribute('data-kept','1');
+  var head='<tr><th style="width:44px">번호</th>'
+    +'<th>각 참여회사 '+esc(lab.l)+'</th><th>각 참여회사 '+esc(lab.r)+'</th></tr>';
+  var body=list.map(function(s,i){
+    var w=_siteWrep(s), u=_siteUrep(s), nm=esc(String(s.name||'').trim()||'＿＿＿＿');
+    var who=function(x){ x=String(x||'').trim(); return x?esc(x):'＿＿＿＿＿'; };
+    return '<tr><td class="center">'+(i+1)+'</td>'
+      +'<td>'+nm+' '+esc(lab.l)+'<br>'+who(w.name)+' &nbsp;(인)</td>'
+      +'<td>'+nm+' '+esc(lab.r)+'<br>'+who(String(s.ceo||'').trim()||u.name)+' &nbsp;(인)</td></tr>';
+  }).join('');
+  tb.innerHTML=head+body;
+  /* 표를 놓을 자리 — 서명 줄만 든 마디면 «그 자리», 본문까지 한 마디에 든 서식(설립합의서)은
+     그 마디 «뒤». 앞에 놓으면 설립합의서 맨 위에 표가 얹힌다. */
+  var host=hits[0].parentNode, gone=0;
+  kill.forEach(function(x){ if(x.parentNode===host) gone+=String(x.nodeValue||'').length; });
+  var rest=String(host.textContent||'').length-gone;
+  if(rest>40){ if(host.parentNode) host.parentNode.insertBefore(tb,host.nextSibling); }
+  else if(host.parentNode) host.parentNode.insertBefore(tb,host);
+  /* 글줄을 걷어낸다 — 자기 마디를 통째로 비우면 마디까지 지운다(빈 줄이 남지 않게) */
+  kill.forEach(function(x){
+    var p=x.parentNode; if(!p) return;
+    var br=x.previousSibling;
+    x.nodeValue='';
+    if(br&&br.nodeType===1&&br.tagName==='BR'&&br.parentNode) br.parentNode.removeChild(br);
+    if(p!==tb && !String(p.textContent||'').replace(/\s/g,'') && p.parentNode) p.parentNode.removeChild(p);
+  });
+  return list.length;
+}
+/* ══ 정관 머리·제3조 손보기 ══ (대표 지시 2026-09-19)
+     「정관이름은 기금법인 이름이다. 00으로 하지 말고 연결해라」
+     「기금소재지는 이미 기금법인 주소와 같다. 기업주소는 필요없다. 제3조 아래 필요없다.」
+     「년월일은 가운데 해야하고 줄간격을 조금 더 넓게 해달라」
+
+   원본 정관은 표지가 「00공동근로복지기금 정관」이고 제3조 소재지가 「○○시 ○○구 ○○로 ○○」다.
+   기금법인 이름·주소는 이미 기금 정보에 있으니 그대로 잇는다.
+   제3조 아래의 «분사무소 목록»은 지운다 — 참여회사 주소를 정관에 적을 일이 없고,
+   목록을 지우면 「아래와 같이 분사무소를 둔다」가 허공을 가리키므로 문장도 함께 여민다.
+
+   ⚠ 주소를 모르면 자리표를 그대로 둔다. 다만 분사무소 줄은 «주소를 몰라도» 지운다 —
+     필요 없다는 판단은 주소 유무와 상관이 없다.
+   ⚠ 「년 월 일」은 날짜를 «채우지 않는다». 정관을 작성한 날은 자료에 없다. */
+var CHARTER_TITLE=/^\s*(?:0{2}\s*)?(?:공동|사내)근로복지기금\s*정\s*관\s*$/;
+var CHARTER_NAME=/0{2}\s*(?:공동|사내)근로복지기금/g;
+var CHARTER_BRANCH=/[“"][^”"]*(?:○○|XX)\s*(?:회사|공장)[^”"]*[”"]/;
+var CHARTER_DATELINE=/^\s*년\s+월\s+일\s*$/;
+function fillCharterHead(root,f){
+  var nm=String((f||{}).name||'').trim(), addr=String((f||{}).address||'').trim(), n=0;
+  var ps=[].slice.call(root.querySelectorAll('p'));
+  ps.forEach(function(p){
+    if(p.children.length) return;
+    var t=String(p.textContent||''), v=t;
+    /* ① 표지·속표지의 기금 이름 */
+    if(nm){
+      if(CHARTER_TITLE.test(t)) v=nm+' 정관';
+      else v=v.replace(CHARTER_NAME,nm);
+    }
+    /* ② 제3조 — 소재지는 기금법인 주소, 「○○주식회사 본사」와 분사무소 예고는 걷어낸다 */
+    if(/^제3조\s*\(\s*기금의\s*소재지\s*\)/.test(t)){
+      if(addr) v=v.replace(/○○시\s*○○구\s*○○로\s*○○/,addr);
+      v=v.replace(/\s*소재\s*(?:○○|□□|XX)\s*(?:주식회사|회사)\s*본사/,'')
+         .replace(/\s*에\s*두고\s*,\s*필요시\s*아래와\s*같이\s*분사무소를\s*둔다\s*\./,'에 둔다.');
+    }
+    /* ③ 「년 월 일」 — 가운데로, 줄간격을 넓게(날인란과 맞닿아 답답했다) */
+    if(CHARTER_DATELINE.test(t)){
+      p.setAttribute('style','text-align:center;line-height:260%;letter-spacing:3px');
+      p.setAttribute('data-kept','1'); n++;
+    }
+    if(v!==t){ p.textContent=v; p.setAttribute('data-kept','1'); n++; }
+  });
+  /* ④ 제3조 아래의 참여회사 소재지 목록 줄 — 통째로 지운다 */
+  ps.forEach(function(p){
+    if(p.children.length||!p.parentNode) return;
+    var t=String(p.textContent||'').trim();
+    if(CHARTER_BRANCH.test(t) && t.replace(CHARTER_BRANCH,'').replace(/\s/g,'')===''){
+      p.parentNode.removeChild(p); n++;
+    }
   });
   return n;
 }
@@ -4978,7 +5099,13 @@ function hwpFormHTML(kind,f,sites){
   if(kind==='contrib') fillFoundContribDoc(d,f,sites);
   /* 정관·설립합의서의 「○○주식회사」 자리표에 참여사업장을 넣는다 — 걷어내기보다 «먼저» 돈다.
      뒤에 돌면 자리표가 이미 ＿＿＿ 로 바뀌어 바꿀 것을 못 찾는다. */
-  if(kind==='charter'||kind==='agreement'){ fillWrepLabel(d); fillPartyList(d,f,sites); fillPartyDates(d,f); }
+  /* ⚠ 차례가 중요하다. ① 말부터 「근로자대표」로 맞추고(그래야 표 머리에 그 말이 실린다),
+       ② 서명란을 번호 붙인 표로 다시 짠 다음, ③ 남은 자리표를 채운다.
+       표를 뒤에 세우면 자리표가 이미 회사 이름으로 바뀐 뒤라 서명 줄을 못 알아본다. */
+  if(kind==='charter'){ fillCharterHead(d,f); }
+  if(kind==='charter'||kind==='agreement'){
+    fillWrepLabel(d); fillSignTable(d,f,sites); fillPartyList(d,f,sites); fillPartyDates(d,f);
+  }
   if(kind==='minutes') fillMinutesPages(d);
   /* 줄맞춤 자국 걷어내기는 «자리표를 채운 뒤»에 돈다 — 먼저 돌면 서명란의 두 단 벌림이
      아직 자리표 상태라 길이가 짧아, 본문으로 오해받을 수 있다. */

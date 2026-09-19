@@ -189,9 +189,13 @@ test('자리표 채우기가 걷어내기보다 «먼저» 돈다', () => {
 
 test('정관과 설립합의서 «둘 다» 자리표를 채운다', () => {
   const fn = grabFn('hwpFormHTML');
-  const line = fn.split('\n').filter((l) => l.includes('fillPartyList')).join(' ');
-  assert.match(line, /charter/, '정관이 빠지면 제3조·제4조가 ○○ 로 나간다');
-  assert.match(line, /agreement/, '설립합의서가 빠지면 서명란이 ○○ 로 나간다');
+  /* 2026-09-19: 서명표가 늘면서 부르는 줄이 여러 줄이 됐다 — 줄 하나가 아니라
+     「어느 서식에서 부르나」를 정하는 «바로 앞 if 줄»까지 함께 본다. */
+  const at = fn.indexOf('fillPartyList(d,f,sites)');
+  assert.ok(at >= 0, 'hwpFormHTML 이 fillPartyList 를 불러야 한다');
+  const block = fn.slice(Math.max(0, at - 260), at);
+  assert.match(block, /charter/, '정관이 빠지면 제3조·제4조가 ○○ 로 나간다');
+  assert.match(block, /agreement/, '설립합의서가 빠지면 서명란이 ○○ 로 나간다');
 });
 
 test('자리표를 알아보는 규칙이 ○○ 와 XX 를 모두 본다 — 원본이 둘 다 쓴다', () => {
