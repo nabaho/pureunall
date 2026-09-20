@@ -139,19 +139,21 @@ test('★ 참여사업장이 없으면 손대지 않는다 — 자리표가 틀�
   assert.match(grabFn('fillSignTable'), /if\(!list\.length\) return 0/);
 });
 
+/* 2026-09-20: 표를 «짜는» 일은 signTableHTML 한 곳으로 모았다 — 설립합의서·정관과
+   회의록 뒤쪽 참석위원표가 «같은 모양»이어야 하기 때문이다(대표 지시 「모두 캡쳐1과 같이」). */
 test('★ 모르는 이름은 밑줄로 둔다 — 관청 서류에 이름을 지어낼 수 없다', () => {
-  const fn = grabFn('fillSignTable');
+  const fn = grabFn('signTableHTML');
   assert.match(fn, /＿{3,}/, '빈자리를 밑줄로 그려야 한다');
   assert.ok(!/\|\|\s*'미정'/.test(fn), '없는 이름을 말로 메우면 안 된다');
 });
 
 test('사용자측 칸은 서식이 「대표이사」라 부르므로 회사 대표자가 먼저다', () => {
-  assert.match(grabFn('fillSignTable'), /String\(s\.ceo\|\|''\)\.trim\(\)\|\|u\.name/,
+  assert.match(grabFn('signTableHTML'), /String\(s\.ceo\|\|''\)\.trim\(\)\|\|u\.name/,
     '대표자가 없을 때만 사용자대표로 내려가야 한다');
 });
 
 test('★ 이름과 (인) 은 칸의 오른쪽 끝에 붙는다 — 날인 자리가 세로로 한 줄에 선다', () => {
-  const fn = grabFn('fillSignTable');
+  const fn = grabFn('signTableHTML');
   assert.match(fn, /<div class="right">/, '왼쪽에 두면 회사 이름 길이마다 (인) 자리가 어긋난다');
   /* 서식 CSS 에 이미 있는 이름을 써야 한다 — 화면과 인쇄가 같은 규칙을 봐야 한다 */
   assert.match(SRC, /\+"\.right\{text-align:right\}/, '.right 가 인쇄용 서식 CSS 에 없다');
@@ -159,9 +161,19 @@ test('★ 이름과 (인) 은 칸의 오른쪽 끝에 붙는다 — 날인 자�
 });
 
 test('★ 표 머리와 줄에 번호가 붙는다', () => {
-  const fn = grabFn('fillSignTable');
+  const fn = grabFn('signTableHTML');
   assert.match(fn, /번호/, '번호 칸이 있어야 한다');
   assert.match(fn, /\(i\+1\)/, '줄마다 번호를 매겨야 한다');
+});
+
+test('★★ 연명 날인표를 «짜는 곳»은 하나다 — 둘이면 서식마다 모양이 갈린다', () => {
+  ['fillSignTable', 'fillAttendSign'].forEach((n) => {
+    assert.match(grabFn(n), /signTableHTML\(lab,list\)/, '★ ' + n + ' 이 표를 따로 짭니다.');
+  });
+  /* 짜는 코드가 정말 한 곳뿐인지 — 「(인)」을 붙이는 자리가 둘이면 갈라진 것이다 */
+  const 코드 = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.equal((코드.match(/&nbsp;\(인\)/g) || []).length, 1,
+    '★ 날인 자리를 두 곳에서 그립니다 — 한쪽만 고치면 서식마다 달라집니다.');
 });
 
 test('★ 본문까지 한 마디에 든 서식(설립합의서)은 표를 그 마디 «뒤»에 붙인다', () => {
@@ -302,7 +314,8 @@ function boot() {
     gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),
     gS('MINUTES_AGENDA'), gF('fillMinutesPages'),
     gS('SIGN_L'), gS('SIGN_R'), gS('SIGN_WHO_ONLY_SRC'), gS('SIGN_HEAD'),
-    gF('_signLabels'), gF('fillSignTable'),
+    /* 2026-09-20: 표를 짜는 일은 signTableHTML 한 곳 — 회의록 참석위원표도 같은 것을 쓴다 */
+    gF('_signLabels'), gF('signTableHTML'), gF('fillSignTable'), gF('fillAttendSign'),
     gS('CHARTER_TITLE'), gS('CHARTER_NAME'), gS('CHARTER_BRANCH'), gS('CHARTER_DATELINE'),
     gF('fillCharterHead'),
     gS('GRID_NAME'), gS('GRID_TITLE'), gS('GRID_BLANK'), gF('_gridCell'), gF('fillSignGrid'),
