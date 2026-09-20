@@ -187,9 +187,16 @@ var 전문펴기스크립트 =
   'var t=a.closest("[data-pop]");' +
   'if(t&&t.parentNode){t.parentNode.insertBefore(칸,t.nextSibling);return;}' +
   '(a.closest("td")||a.parentNode).appendChild(칸);}' +
+  /* ⚠⚠ 접었을 때 돌려놓는 글귀를 «글자로 박아 두지 않는다» (2026-09-20 실측).
+       「전문 보기 ↓」로 박아 두었더니, 편지가 ↗ 로 바뀐 뒤에도 여기만 ↓ 로 되돌려
+       놓아 «한 번 폈다 접으면 화살표가 바뀌는» 쪽이 되었다. 살아 있는 쪽에서
+       ↗ 둘·↓ 하나가 잡혔다.
+     ★ 그래서 처음 글귀를 «적어 두었다가» 그대로 돌려놓는다 — 편지가 무엇으로
+       바뀌든 여기는 따라간다(두 곳에 같은 글귀를 두지 않는다). */
   'function 펴기(a,t,id){' +
+  'if(a.__label==null)a.__label=a.textContent;' +
   'if(a.__full){var 켜짐=a.__full.style.display!=="none";' +
-  'a.__full.style.display=켜짐?"none":"";a.textContent=켜짐?"전문 보기 ↓":"접기 ↑";return;}' +
+  'a.__full.style.display=켜짐?"none":"";a.textContent=켜짐?a.__label:"접기 ↑";return;}' +
   'var 칸=document.createElement("div");칸.className="full";' +
   '칸.innerHTML=\'<div class="ld">전문을 받아 오는 중입니다…</div>\';' +
   '놓기(a,칸);a.__full=칸;a.textContent="접기 ↑";' +
