@@ -1,10 +1,9 @@
-/* ══ 【4걸음 알림 — 사람이 정해야 한다】 ════════════════════════════════════
-   ★ 4걸음 전에 «대표님께 여쭐 것».
-   이 파일이 지키는 gcalApiCall·gcalDeleteIfLinked 는 «구글 캘린더에 쓰는» 길이다
-   (우리 일정을 지울 때 구글 쪽 일정도 함께 지운다). 둘 다 CorpDashboard 안에 있어
-   4걸음에서 함께 사라진다 — 그런데 푸른 캘린더에는 그 길이 «없다»(구글은 읽기만 한다).
-   그러니 4걸음은 이 기능을 «옮길지 · 없앨지»를 정한 뒤에 해야 한다.
-   지금 승계자 없음.
+/* ══ 【4걸음 알림 — 살린다】 ════════════════════════════════════
+   ★ 여쭌 결과 «옮긴다»(대표 지시 2026-09-20). 구글 쓰기 얼개는 공용 모듈
+     js/pu-gcal-auth.js 로 옮겼고, 이알피는 그것을 부른다 — 그래서 이 파일은 4걸음
+     뒤에도 «살아 있다»(이알피의 길이 끝까지 도는지 그대로 본다).
+     ⚠ 토큰 받는 자리를 대시보드 밖으로 뺐다 — 안 그러면 보수총액 Gmail 발송이 함께 죽는다.
+     같은 규칙을 모듈 쪽에서 재는 검사: tests/gcal-auth.test.js
    (캘린더를 한 곳으로 모으기 — status/2026-09-20-cal-tests-move.md)
    ════════════════════════════════════════════════════════════════════ */
 'use strict';
@@ -47,6 +46,20 @@ function load(opts){
       });
     }
   };
+  /* ★ 2026-09-20 — 대답을 해석하는 «셈»이 공용 모듈(js/pu-gcal-auth.js)로 옮겨졌다.
+     그래서 상자에 그 모듈을 «진짜로» 넣어 준다. 흉내 낸 가짜를 넣으면 이알피가
+     실제로 무엇을 받는지 못 보게 된다 — 그러면 이 검사가 헛돈다.
+     ⚠ 모듈은 fetchT 가 아니라 fetch 를 쓴다(창 밖에서도 돌게). 여기서 이어 준다. */
+  const PuGcalAuth = require(require('node:path').join(__dirname, '..', 'js', 'pu-gcal-auth.js'));
+  box.PuGcalAuth = {
+    hasToken: () => !!opts.token,
+    apiCall: (m, p, b) => PuGcalAuth.apiCall(m, p, b, {
+      fetch: (url, o) => box.fetchT(url, o)
+    })
+  };
+  /* 모듈이 토큰을 보게 한다 — 판정은 위 hasToken 이 하지만 머리글에 실제로 실린다 */
+  globalThis._gcalToken = opts.token ? 'tok' : '';
+  globalThis._gcalExpiry = opts.token ? (Date.now() + 600000) : 0;
   vm.createContext(box);
   vm.runInContext(grab('gcalApiCall') + '\nthis.f = gcalApiCall;', box);
   return box;
@@ -136,6 +149,12 @@ test('Gmail 은 원래 확인하고 있었다 (같은 방식으로 맞춘 것)',
 });
 
 test('토큰 판정은 한 곳에서 (만료까지 함께 본다)', () => {
-  assert.match(app, /function gcalHasToken\(\)\{ return !!\(window\._gcalToken && Date\.now\(\) < \(window\._gcalExpiry\|\|0\)-60000\); \}/);
+  /* ★ 2026-09-20 — 판정하는 «셈»이 공용 모듈(js/pu-gcal-auth.js)로 옮겨졌다.
+     예전에는 여기서 그 한 줄을 글자 그대로 박아 두었는데, 옮기고 나니 깨졌다.
+     지킬 것은 «그 줄의 생김새»가 아니라 «판정이 한 곳인가»다 —
+     지금은 두 앱(이알피·푸른 캘린더)이 같은 모듈을 부르므로 더 잘 지켜진다.
+     만료 1분 전 처리까지 실제로 돌려 보는 검사는 tests/gcal-auth.test.js ⑤ 에 있다. */
+  assert.match(app, /function gcalHasToken\(\)\{[^}]*PuGcalAuth\.hasToken\(\)/,
+    '토큰 판정을 이알피가 따로 합니다 — 공용 모듈에 맡겨야 두 앱이 안 갈립니다');
   assert.match(grab('gcalApiCall'), /if\(!gcalHasToken\(\)\)\{/, '따로 판정하면 어긋난다');
 });

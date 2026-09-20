@@ -174,6 +174,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <div id="root"></div>
 <script src="js/utils.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
+<script src="js/pu-gcal-auth.js?v=1"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-photo-store.js?v=29"></script>
 <script src="js/pu-billing.js?v=10"></script>
@@ -24845,7 +24846,13 @@ function CompanyManagement(){
       +'?subject='+encodeURIComponent(taxMailSubject())
       +'&body='+encodeURIComponent(taxMailBody(g));
   }
-  // Gmail send-as 자동발송 (기존 캘린더 OAuth 토큰 재사용, gmail.send 스코프 필요)
+  /* ★ 2026-09-20 구글 토큰을 «화면 밖»에서 받아 둔다 (캘린더 한 곳으로 모으기 3걸음-나).
+   전에는 법인 대시보드 안에서만 받았다. 그 화면은 4걸음에서 사라지는데,
+   아래 Gmail 자동발송이 «같은 토큰»을 빌려 쓴다 — 함께 죽지 않게 밖으로 뺀다.
+   ⚠ 받는 셈은 js/pu-gcal-auth.js 한 곳이다. 여기서 다시 짜지 말 것. */
+try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
+
+// Gmail send-as 자동발송 (기존 캘린더 OAuth 토큰 재사용, gmail.send 스코프 필요)
   var GMAIL_OAUTH_ID = '30712196914-1qc61a41ptmo6u7hbk71i70g00k3a8lk.apps.googleusercontent.com';
   function gmailSignIn(){
     var redirect = (window.location.protocol === 'https:')
@@ -63506,7 +63513,8 @@ function CorpDashboard(props){
     // 기존 토큰 유효하면 상태 복원
     if(window._gcalToken && Date.now() < (window._gcalExpiry||0)-60000) setGcalAuthed(true);
   }, []);
-  function gcalHasToken(){ return !!(window._gcalToken && Date.now() < (window._gcalExpiry||0)-60000); }
+  /* 토큰 판정은 공용 모듈 한 곳에서(js/pu-gcal-auth.js) — 두 벌이 되면 만료 기준이 갈린다 */
+  function gcalHasToken(){ return (typeof PuGcalAuth !== 'undefined') && PuGcalAuth.hasToken(); }
   function gcalSignIn(){
     // ★ 현재 접속 URL이 https이면 그대로, 아니면 GitHub Pages URL 사용
     var redirect = (window.location.protocol === 'https:')
@@ -63526,28 +63534,18 @@ function CorpDashboard(props){
     if(m) return 'https://calendar.google.com/calendar/r/eventedit?eid='+m[1];
     return htmlLink;
   }
+  /* 구글 API 부르기 — 셈은 공용 모듈(js/pu-gcal-auth.js)에 있다.
+     ⚠ 여기서 다시 짜지 말 것. 실패를 «값»으로 넘기지 않는 규칙(401 본문을 자료인 척
+       넘기면 「삭제됨」 거짓말이 된다)이 그 파일에 적혀 있고 검사가 지킨다.
+     부르는 쪽 모양(cb)은 그대로 둔다 — 부르는 자리가 여럿이다. */
   function gcalApiCall(method, path, body, cb){
-    /* ⚠ 두 가지가 빠져 있었다.
-       ① 로그인 전에 부르면 'Bearer undefined' 가 나간다 — Gmail 쪽은 미리 확인하는데
-         여기만 안 했다. 사람에게는 아무 말도 없이 그냥 실패했다.
-       ② 구글이 돌려준 401·404 의 «본문»이 그대로 cb 로 넘어갔다. 부른 쪽은 그것을
-         성공한 자료로 받는다 — 삭제 화면은 안 지워졌는데도 「🗑️ 삭제됨」이라고 말했다.
-       실패는 cb 를 «부르지 않는 것»으로 알린다. 부르면 그 뒤 줄이 성공인 양 이어진다. */
     if(!gcalHasToken()){
       showToast('구글 로그인이 필요합니다 — 캘린더 위 [구글 로그인]을 눌러 주세요');
       return;
     }
-    fetchT('https://www.googleapis.com/calendar/v3'+path,{
-      method:method,
-      headers:{ 'Authorization':'Bearer '+window._gcalToken, 'Content-Type':'application/json' },
-      body: body ? JSON.stringify(body) : undefined
-    }, 20000).then(function(r){
-      if(r.status===204) return {};                     // 지웠을 때는 본문이 없다
-      return r.json().then(function(j){
-        if(!r.ok || (j && j.error)) throw new Error((j && j.error && j.error.message) || ('HTTP '+r.status));
-        return j;
-      });
-    }).then(cb).catch(function(e){ showToast('❌ 구글 캘린더 오류: '+(e&&e.message||'')); });
+    PuGcalAuth.apiCall(method, path, body)
+      .then(cb)
+      .catch(function(e){ showToast('❌ 구글 캘린더 오류: '+(e&&e.message||'')); });
   }
   // ERP 레코드에 gcalEventId가 있으면 구글 캘린더에서도 삭제
   // ★ moveGcalEventToDate 내부에 갇혀 있던 것을 밖으로 — 외부 호출부에서 ReferenceError 나던 버그 수정

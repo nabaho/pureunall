@@ -24,6 +24,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
+<script src="js/pu-gcal-auth.js?v=1"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=2"></script>
 <script src="js/pu-cal-write.js?v=4"></script>
@@ -196,6 +197,10 @@
   .pubmsg{font-size:11.5px;color:var(--ok);margin-left:9px}
   .pubat{font-size:11px;color:var(--faint);margin-left:9px}
   /* 계정 잇기 — 할 일이 있을 때만 머리줄에 뜬다(없으면 아예 안 그린다) */
+  .glogin{font-size:11.5px;padding:4px 10px;border:1px solid #bfdbfe;background:var(--acc-soft);
+    color:var(--acc2);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
+    white-space:nowrap;flex-shrink:0;margin-left:auto}
+  .glogin + .linkacct{margin-left:6px}
   .linkacct{font-size:11.5px;padding:4px 10px;border:1px solid #fde68a;background:var(--warn-bg);
     color:var(--warn);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
     white-space:nowrap;flex-shrink:0;margin-left:auto}
@@ -703,6 +708,38 @@ function 잇기저장(메일열쇠, sid){
   })["catch"](function(e){
     m.busy = false; m.err = (e && e.message) || String(e); render();
   });
+}
+
+/* ── 구글 로그인 (지우기용) ──────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 3걸음-나. 「옮긴다」(대표 지시 2026-09-20).
+
+   ★ 읽기와 쓰기는 «다른 자격»이다
+     달력을 «읽는» 것은 열쇠 하나로 되고 로그인이 필요 없다. 그런데 이어진 구글
+     일정을 «지우려면» 그 사람 자격이 있어야 한다 — 그래서 로그인이 따로 필요하다.
+   ★ 그래서 단추는 «필요할 때만» 뜬다 — 이어진 건이 화면에 있는데 아직 로그인을
+     안 했을 때. 늘 띄우면 아무도 안 누르고 머리줄만 좁아진다.
+   ⚠ 되돌아올 주소가 구글 콘솔에 «등록»돼 있어야 한다(pu-cal.html).
+     등록 전에는 구글이 redirect_uri_mismatch 로 막는다 — 그때는 이알피에서
+     로그인하고 오면 같은 창의 토큰을 그대로 쓴다. */
+var GCAL_OAUTH_ID = "30712196914-1qc61a41ptmo6u7hbk71i70g00k3a8lk.apps.googleusercontent.com";
+var GCAL_SCOPE    = "https://www.googleapis.com/auth/calendar.events";
+function 구글로그인(){
+  location.href = PuGcalAuth.signInUrl({
+    clientId: GCAL_OAUTH_ID, scope: GCAL_SCOPE,
+    fallbackRedirect: "https://nabaho.github.io/pureunall/pu-cal.html"
+  });
+}
+/* 지금 화면에 «구글과 이어진» 건이 있나 — 있으면 지울 때 로그인이 필요하다 */
+function 이어진건있나(){
+  return arr(D.attendance_records).some(function(r){ return r && r.gcalEventId; });
+}
+function 구글단추Html(){
+  if(typeof PuGcalAuth === "undefined") return "";
+  if(PuGcalAuth.hasToken()) return "";
+  if(!이어진건있나()) return "";
+  return '<button class="glogin" data-glogin="1" title="구글과 이어진 일정을 지우려면'
+    + ' 구글 로그인이 필요합니다. 로그인 없이 지우면 구글 쪽에 일정이 남습니다.">'
+    + '🔐 구글 로그인</button>';
 }
 
 /* ── 비고(개인 요구사항) 고치기 ──────────────────────────────────────────
@@ -1398,7 +1435,7 @@ function monthbarHtml(){
 /* 검색칸 — 줄 맨 오른쪽 끝에 붙는다(.calhead .srch 의 margin-left:auto).
    ⚠ 달바 안에 두면 월|주|일 바로 옆에 붙어 오른쪽이 통째로 빈다. */
 function srchHtml(){
-  return 잇기단추Html()
+  return 구글단추Html() + 잇기단추Html()
     + '<span class="srch"><span class="ic">🔍</span>'
     + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>';
 }
@@ -1830,11 +1867,28 @@ function doDelete(){
   if(!confirm("이 건을 지울까요?")) return;
   var prev = recOf(m.store, m.id) || m.prev;
   S.busy = true; m.err = ""; render();
-  PuCalWrite.remove(m.store, m.id, prev).then(function(r){
+  /* 구글과 «이어진» 건이면 그쪽도 함께 지운다 — 우리만 지우면 구글에 남는다.
+     ⚠ 이어진 근태가 지금 30건 있다(2026-09-20 실측). 이알피가 만들면서 이어 둔 것이다.
+     ⚠ 구글부터 지운다. 우리 것을 먼저 지우면 «무엇을 지워야 하는지»를 잃는다.
+     ⚠ 구글에서 못 지워도 우리 것은 지운다 — 그 대신 «못 지웠다»고 분명히 말한다
+       (이알피가 여기서 데었다: 안 지워졌는데 「삭제됨」이라고 했다). */
+  var 구글번호 = prev && prev.gcalEventId;
+  var 구글말 = "";
+  var 구글먼저 = (구글번호 && typeof PuGcalAuth !== "undefined")
+    ? PuGcalAuth.deleteEvent(GCAL_CAL_ID, 구글번호)
+        .then(function(){ 구글말 = ""; })
+        ["catch"](function(e){
+          구글말 = " ⚠ 구글 쪽은 못 지웠습니다(" + ((e && e.message) || "") + ")";
+        })
+    : Promise.resolve();
+
+  구글먼저.then(function(){
+    return PuCalWrite.remove(m.store, m.id, prev);
+  }).then(function(r){
     S.busy = false;
     if(!r.ok){ m.err = r.message; render(); return; }
     var st = m.store;
-    closeModal(); toast("🗑 지웠습니다"); refreshOne(st);
+    closeModal(); toast("🗑 지웠습니다" + 구글말); refreshOne(st);
     if(st === "attendance_records") 발행예약();
   });
 }
@@ -1925,7 +1979,7 @@ document.addEventListener('click', function(e){
      && !(e.target.closest && e.target.closest("[data-more]"))){
     S.open = null; render();
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -1965,6 +2019,7 @@ document.addEventListener('click', function(e){
   /* 비고는 줄 «안»의 단추다 — 줄 펼치기(data-toggle)보다 먼저 잡아야 한다 */
   if(t.hasAttribute('data-note-open')){ e.stopPropagation(); openNote(t.getAttribute('data-note-open')); return; }
   if(t.hasAttribute('data-noteact')){ saveNote(); return; }
+  if(t.hasAttribute('data-glogin')){ 구글로그인(); return; }
   if(t.hasAttribute('data-mmopen')){ openMailMap(); return; }
   if(t.hasAttribute('data-pub')){ 발행하기(false); return; }
   if(t.hasAttribute('data-newkey')){ 링크발급(t.getAttribute('data-newkey')); return; }
@@ -2065,6 +2120,8 @@ function start(user){
     formOf: function(k){ return PuCalRead.rawForm(k); },
     who: function(){ return (ME && ME.name) || (ME && ME.sid) || ''; }
   });
+  /* 구글 로그인에서 돌아왔으면 주소 꼬리에서 토큰을 꺼낸다(주소는 깨끗이 지운다) */
+  try{ if(typeof PuGcalAuth !== "undefined" && PuGcalAuth.capture()) toast("✅ 구글에 연결됐습니다"); }catch(e){}
   S.ym = ymOf(new Date()); S.date = todayYMD();
   setConn(true, '연결됨');
   PuCalRead.readMany(KEYS).then(function(r){
