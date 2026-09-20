@@ -130,7 +130,11 @@ test('의안이 없으면 아무것도 안 한다', () => {
 });
 
 test('★ hwpFormHTML 이 회의록에서 이것을 부른다', () => {
-  assert.match(grabFn('hwpFormHTML'), /if\(kind==='minutes'\) fillMinutesPages\(d\);/);
+  /* 2026-09-20: 회의록 뒤쪽 참석위원 서명표도 여기서 갈아 끼운다 — 쪽 나누기보다 «먼저»
+     돌아야 한다(줄이 열여섯으로 늘어나므로, 뒤에 돌면 늘어난 줄이 쪽에 안 담긴다). */
+  const fn = grabFn('hwpFormHTML');
+  assert.match(fn, /if\(kind==='minutes'\)\{ fillAttendSign\(d,f,sites\); fillMinutesPages\(d\); \}/,
+    '★ 참석위원표를 안 갈아 끼우거나, 쪽 나누기 뒤에 돕니다.');
 });
 
 test('쪽 나누기가 data-newpage 를 실제로 본다', () => {

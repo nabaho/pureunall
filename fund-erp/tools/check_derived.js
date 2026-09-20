@@ -64,7 +64,9 @@ global.funds = {};
   gS('MINUTES_AGENDA'), gF('fillMinutesPages'),
   /* 2026-09-19: 서명란을 번호 붙인 표로 · 정관 머리와 제3조 손보기 */
   gS('SIGN_L'), gS('SIGN_R'), gS('SIGN_WHO_ONLY_SRC'), gS('SIGN_HEAD'),
-  gF('_signLabels'), gF('fillSignTable'),
+  /* 2026-09-20: 연명 날인표를 짜는 일은 signTableHTML 한 곳으로 모았다 —
+    설립합의서·정관과 회의록 뒤쪽 참석위원표가 같은 모양이어야 한다 */
+ gF('_signLabels'), gF('signTableHTML'), gF('fillSignTable'), gF('fillAttendSign'),
   gS('CHARTER_TITLE'), gS('CHARTER_NAME'), gS('CHARTER_BRANCH'), gS('CHARTER_DATELINE'),
   gF('fillCharterHead'),
   /* 2026-09-19: 사내 정관의 서명 격자(원본이 이미 표다 — 이름만 비어 있었다) */

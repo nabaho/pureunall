@@ -4423,6 +4423,32 @@ function _signLabels(t){
   var pick=function(re,dft){ var v=seg.filter(function(x){ return re.test(x); })[0]; return (v||dft).trim(); };
   return { l:pick(SIGN_L,'근로자대표'), r:pick(SIGN_R,'대표이사') };
 }
+/* ★ 연명 날인표 — 서명·날인을 받는 자리는 «모두 이 한 모양»이다
+     (대표 지시 2026-09-20 「모든 연명 서명날인은 모두 캡쳐1과 같이 바꿔라」).
+   번호 · 각 참여회사 <근로자측 부르는 말> · 각 참여회사 <사용자측 부르는 말>.
+   ★ 이름과 (인) 은 칸의 «오른쪽 끝»에 붙인다 (대표 지시 2026-09-19 「줄칸을 오른쪽 끝으로」).
+     회사 이름 길이가 저마다 달라 왼쪽에 두면 (인) 자리가 줄마다 어긋났다 — 오른쪽에 붙이면
+     열여섯 줄의 날인 자리가 세로로 한 줄에 선다. 우리나라 서명란 관례이기도 하다.
+     ⚠ .right 는 서식 CSS(화면·인쇄 둘 다)에 이미 있는 이름이다 — 새 이름을 만들지 않는다.
+   ⚠ 모르는 이름은 밑줄로 둔다 — 관청에 나가는 서류에 이름을 지어낼 수 없다.
+   ⚠ 부르는 말(lab)은 «서식이 쓴 그대로» 받는다. 정관은 「노동조합대표자」, 설립합의서는
+     「근로자측대표」, 회의록 뒤쪽은 「근로자위원」이다 — 한 가지로 박으면 그 서식에
+     없던 말이 찍혀 나간다. */
+function signTableHTML(lab,list){
+  var head='<tr><th style="width:44px">번호</th>'
+    +'<th>각 참여회사 '+esc(lab.l)+'</th><th>각 참여회사 '+esc(lab.r)+'</th></tr>';
+  var body=(list||[]).map(function(s,i){
+    var w=_siteWrep(s), u=_siteUrep(s), nm=esc(String(s.name||'').trim()||'＿＿＿＿');
+    var who=function(x){ x=String(x||'').trim(); return x?esc(x):'＿＿＿＿＿'; };
+    var cell=function(lbl,name){
+      return '<td>'+nm+' '+esc(lbl)+'<div class="right">'+who(name)+' &nbsp;(인)</div></td>';
+    };
+    return '<tr><td class="center">'+(i+1)+'</td>'
+      +cell(lab.l, w.name)
+      +cell(lab.r, String(s.ceo||'').trim()||u.name)+'</tr>';
+  }).join('');
+  return head+body;
+}
 function fillSignTable(root,f,sites){
   var list=estabSites(sites); if(!list.length) return 0;
   var reCo=new RegExp(PARTY_ONE_SRC), reWho=new RegExp(SIGN_WHO_ONLY_SRC);
@@ -4447,23 +4473,7 @@ function fillSignTable(root,f,sites){
   });
   var tb=document.createElement('table');
   tb.setAttribute('data-kept','1');
-  var head='<tr><th style="width:44px">번호</th>'
-    +'<th>각 참여회사 '+esc(lab.l)+'</th><th>각 참여회사 '+esc(lab.r)+'</th></tr>';
-  /* ★ 이름과 (인) 은 칸의 «오른쪽 끝»에 붙인다 (대표 지시 2026-09-19 「줄칸을 오른쪽 끝으로」).
-     회사 이름 길이가 저마다 달라 왼쪽에 두면 (인) 자리가 줄마다 어긋났다 — 오른쪽에 붙이면
-     열여섯 줄의 날인 자리가 세로로 한 줄에 선다. 우리나라 서명란 관례이기도 하다.
-     ⚠ .right 는 서식 CSS(화면·인쇄 둘 다)에 이미 있는 이름이다 — 새 이름을 만들지 않는다. */
-  var body=list.map(function(s,i){
-    var w=_siteWrep(s), u=_siteUrep(s), nm=esc(String(s.name||'').trim()||'＿＿＿＿');
-    var who=function(x){ x=String(x||'').trim(); return x?esc(x):'＿＿＿＿＿'; };
-    var cell=function(lbl,name){
-      return '<td>'+nm+' '+esc(lbl)+'<div class="right">'+who(name)+' &nbsp;(인)</div></td>';
-    };
-    return '<tr><td class="center">'+(i+1)+'</td>'
-      +cell(lab.l, w.name)
-      +cell(lab.r, String(s.ceo||'').trim()||u.name)+'</tr>';
-  }).join('');
-  tb.innerHTML=head+body;
+  tb.innerHTML=signTableHTML(lab,list);
   /* 표를 놓을 자리 — 서명 줄만 든 마디면 «그 자리», 본문까지 한 마디에 든 서식(설립합의서)은
      그 마디 «뒤». 앞에 놓으면 설립합의서 맨 위에 표가 얹힌다. */
   var host=hits[0].parentNode, gone=0;
@@ -4480,6 +4490,46 @@ function fillSignTable(root,f,sites){
     if(p!==tb && !String(p.textContent||'').replace(/\s/g,'') && p.parentNode) p.parentNode.removeChild(p);
   });
   return list.length;
+}
+/* ★ 회의록 뒤쪽 「참석위원」 서명표도 같은 모양으로 (대표 지시 2026-09-20 「캡쳐3도 같다」·
+     「설립준비위원회회의록에 이름」).
+
+   원본은 〈구분 | 근로자위원 | 서명 | 사용자위원 | 서명〉 다섯 칸에 「참석위원」 한 줄뿐이고,
+   이름 자리에 남의 「000」이 박혀 있었다(걷어내기가 지우면 빈 줄만 남는다).
+   회사가 열여섯이면 날인도 열여섯 곳에서 받아야 하는데 줄이 하나뿐이라 손으로 그려야 했다.
+
+   ⚠ 부르는 말은 이 서식이 쓴 「근로자위원·사용자위원」을 그대로 쓴다.
+   ⚠ 참여사업장이 없으면 손대지 않는다 — 원본 그대로 두는 편이 낫다. */
+function fillAttendSign(root,f,sites){
+  var list=estabSites(sites); if(!list.length) return 0;
+  var 글=function(el){ return String((el&&el.textContent)||'').replace(/\s/g,''); };
+  var tbs=[].slice.call(root.querySelectorAll('table')), 한것=0;
+  tbs.forEach(function(tb){
+    var trs=[].slice.call(tb.querySelectorAll('tr'));
+    /* 머리줄 — 근로자·사용자 부르는 말이 둘 다 있고 「서명」 칸이 있는 줄 */
+    var hi=-1;
+    for(var i=0;i<trs.length;i++){
+      var t=글(trs[i]);
+      if(/근로자위원/.test(t)&&/사용자위원/.test(t)&&/서명/.test(t)){ hi=i; break; }
+    }
+    if(hi<0) return;
+    /* 그 아래에 「참석위원」 줄이 있어야 이 표가 맞다 — 없으면 다른 표다 */
+    var ai=-1;
+    for(var j=hi+1;j<trs.length;j++){ if(/^참석위원/.test(글(trs[j]))){ ai=j; break; } }
+    if(ai<0) return;
+    var lab={l:'근로자위원', r:'사용자위원'};
+    /* 머리줄과 참석위원 줄을 우리 표로 갈아 끼운다. 원본의 빈 자리 줄(높이만 있는 줄)은
+       그대로 둔다 — 그 자리가 서식의 아래 여백이다. */
+    var 새=document.createElement('table');
+    새.setAttribute('data-kept','1');
+    새.innerHTML=signTableHTML(lab,list);
+    if(tb.parentNode) tb.parentNode.insertBefore(새,tb);
+    [trs[hi],trs[ai]].forEach(function(tr){ if(tr&&tr.parentNode) tr.parentNode.removeChild(tr); });
+    /* 남은 것이 빈 줄뿐이면 원본 표째 걷는다 — 빈 격자가 새 표 아래 또 서면 어지럽다 */
+    if(!글(tb) && tb.parentNode) tb.parentNode.removeChild(tb);
+    한것+=list.length;
+  });
+  return 한것;
 }
 /* ══ 정관 머리·제3조 손보기 ══ (대표 지시 2026-09-19)
      「정관이름은 기금법인 이름이다. 00으로 하지 말고 연결해라」
@@ -5199,7 +5249,8 @@ function hwpFormHTML(kind,f,sites){
     if(kind==='charter') fillSignGrid(d,f,sites);
     fillSignTable(d,f,sites); fillPartyList(d,f,sites); fillPartyDates(d,f);
   }
-  if(kind==='minutes') fillMinutesPages(d);
+  /* 회의록 뒤쪽 참석위원 서명표 — 쪽을 나누기 «전»에 갈아 끼운다(줄이 늘어나므로) */
+  if(kind==='minutes'){ fillAttendSign(d,f,sites); fillMinutesPages(d); }
   /* 줄맞춤 자국 걷어내기는 «자리표를 채운 뒤»에 돈다 — 먼저 돌면 서명란의 두 단 벌림이
      아직 자리표 상태라 길이가 짧아, 본문으로 오해받을 수 있다. */
   fillFlowText(d);
