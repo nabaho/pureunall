@@ -276,7 +276,14 @@
          검사의 눈(ref('…')) 에 안 띄었을 뿐, 자리는 줄곧 쓰이고 있었다. */
     suggestions_private:'포털 건의함 — 건의 원문·AI 답변 초안(관리자만)',
     suggestions_meta_private:'포털 건의함 색인 — 알림·배지용 경량 메타',
-    suggestions_resolved_private:'포털 건의함 — 올린 사람이 보는 처리 결과'
+    suggestions_resolved_private:'포털 건의함 — 올린 사람이 보는 처리 결과',
+    /* 로그인 보안 감시(functions/index.js logLoginAttempt, 2026-09-20) —
+       업무 개체가 아니라 «보안 로그»다. 담긴 것은 로그인 성공·실패 기록,
+       계정별로 이미 본 기기·접속 국가, 짧은 시간 비밀번호 반복실패 셈뿐이라
+       사람이 손으로 고치지 않는다(서버가 쓰고, 관리자만 읽는 감시 화면이 본다).
+       업체·의뢰인·근로자 같은 업무 자료가 아니라서 온톨로지 개체로 만들지 않는다. */
+    login_events:'로그인 시도 기록(성공·실패 전부)', login_devices:'계정별 알려진 기기',
+    login_countries:'계정별 알려진 접속 국가', login_fail_burst:'짧은 시간 비밀번호 반복실패 셈'
   };
 
   /* ── 사전에만 있고 아직 만들지 않는 관계어 ──
