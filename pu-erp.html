@@ -87706,6 +87706,78 @@ document.addEventListener('keydown', function(e){
   setTimeout(rm, 4000);
 })();
 </script>
+<!-- TypeSafe Jev: 사람이 요청할 때만, 가린 글을 제안 판정으로 보낸다. 결과 저장·자동처리는 하지 않는다. -->
+<script>
+(function(){
+  'use strict';
+  var FN_URL='https://asia-northeast3-pureun-erp.cloudfunctions.net/typeSafeEvaluate';
+  var MAX=4000;
+  var host, box, input, result, runBtn, status;
+
+  function answerOf(v){
+    if(v == null) return '';
+    if(typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
+    return String(v.choice != null ? v.choice : (v.value != null ? v.value : (v.score != null ? v.score : (v.noul != null ? v.noul : ''))));
+  }
+  function yesNo(v){
+    var n=Number(v); if(!isNaN(n)) return n >= .5 ? '예' : '아니오';
+    return /true|yes|예/i.test(String(v)) ? '예' : '아니오';
+  }
+  function close(){ if(host) host.style.display='none'; }
+  function make(){
+    if(host) return;
+    host=document.createElement('div');
+    host.id='pu-typesafe-review';
+    host.style.cssText='position:fixed;inset:0;z-index:2147483000;display:none;background:rgba(15,23,42,.46);align-items:center;justify-content:center;padding:18px;box-sizing:border-box;';
+    box=document.createElement('section');
+    box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); box.setAttribute('aria-label','TypeSafe 검토');
+    box.style.cssText='width:min(560px,100%);max-height:min(700px,calc(100vh - 36px));overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,.35);padding:20px;box-sizing:border-box;color:#1e293b;font-family:inherit;';
+    var head=document.createElement('div'); head.style.cssText='display:flex;justify-content:space-between;gap:12px;align-items:start;';
+    var title=document.createElement('div'); title.innerHTML='<strong style="font-size:19px">✨ TypeSafe 검토</strong><div style="margin-top:5px;font-size:12px;color:#64748b">개인 식별번호·연락처는 가린 뒤, 제안만 받습니다. 저장·발송·자동처리는 하지 않습니다.</div>';
+    var x=document.createElement('button'); x.type='button'; x.textContent='닫기'; x.style.cssText='border:0;background:#f8fafc;border-radius:8px;padding:7px 10px;color:#475569;font-weight:700;cursor:pointer;'; x.onclick=close;
+    head.appendChild(title); head.appendChild(x); box.appendChild(head);
+    var label=document.createElement('label'); label.textContent='검토할 내용'; label.style.cssText='display:block;margin-top:17px;font-size:13px;font-weight:700;'; box.appendChild(label);
+    input=document.createElement('textarea'); input.maxLength=MAX; input.placeholder='문의·메모·오류 내용을 붙여넣으세요.\n예: 계약 마감이 오늘인데 담당자 확인이 필요합니다.';
+    input.style.cssText='display:block;width:100%;height:142px;resize:vertical;box-sizing:border-box;margin-top:7px;padding:11px;border:1px solid #cbd5e1;border-radius:10px;font:14px/1.55 inherit;color:#1e293b;'; box.appendChild(input);
+    var bottom=document.createElement('div'); bottom.style.cssText='display:flex;align-items:center;gap:9px;margin-top:12px;';
+    runBtn=document.createElement('button'); runBtn.type='button'; runBtn.textContent='제안 받기'; runBtn.style.cssText='border:0;border-radius:9px;background:#2563eb;color:#fff;padding:10px 15px;font-weight:800;cursor:pointer;';
+    status=document.createElement('span'); status.style.cssText='font-size:12px;color:#64748b;'; bottom.appendChild(runBtn); bottom.appendChild(status); box.appendChild(bottom);
+    result=document.createElement('div'); result.style.cssText='display:none;margin-top:15px;padding:13px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;line-height:1.7;'; box.appendChild(result);
+    runBtn.onclick=run;
+    host.addEventListener('click',function(e){ if(e.target===host) close(); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape' && host.style.display!=='none') close(); });
+    host.appendChild(box); document.body.appendChild(host);
+  }
+  async function run(){
+    var text=String(input.value||'').trim();
+    if(!text){ status.textContent='검토할 내용을 입력해 주세요.'; input.focus(); return; }
+    var user=window.firebase && firebase.auth && firebase.auth().currentUser;
+    if(!user){ status.textContent='ERP 로그인 후 이용해 주세요.'; return; }
+    runBtn.disabled=true; runBtn.style.opacity='.65'; status.textContent='개인정보를 가린 뒤 제안을 받는 중…'; result.style.display='none';
+    try{
+      var token=await user.getIdToken();
+      var resp=await fetchT(FN_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({text:text})},30000);
+      var data=await resp.json().catch(function(){ return {}; });
+      if(!resp.ok || !data.ok) throw new Error(data.error||('서버 응답 '+resp.status));
+      var a=data.answers||{};
+      var urgency=answerOf(a.urgency); var route=answerOf(a.route); var review=answerOf(a.human_review);
+      result.innerHTML='<strong style="color:#1e293b">검토 제안</strong><br>· 긴급·기한 민감: <b>'+yesNo(urgency)+'</b><br>· 검토 경로: <b>'+esc(route||'판단 결과 없음')+'</b><br>· 사람 확인 필요: <b>'+yesNo(review)+'</b>'+(data.maskedKinds&&data.maskedKinds.length?'<div style="margin-top:7px;color:#64748b">가린 항목: '+esc(data.maskedKinds.join(', '))+'</div>':'')+'<div style="margin-top:8px;color:#64748b">이 결과는 참고용입니다. 실제 저장·발송·상태 변경은 직접 확인 후 처리하세요.</div>';
+      result.style.display='block'; status.textContent='저장하지 않은 제안 결과입니다.';
+    }catch(e){ status.textContent=''; result.textContent='검토를 받지 못했습니다: '+String((e&&e.message)||e); result.style.display='block'; }
+    finally{ runBtn.disabled=false; runBtn.style.opacity='1'; }
+  }
+  function esc(s){ var d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+  window.PuTypeSafe={open:function(){ make(); host.style.display='flex'; input.focus(); }};
+  function addButton(){
+    if(document.getElementById('pu-typesafe-review-button')) return;
+    var b=document.createElement('button'); b.id='pu-typesafe-review-button'; b.type='button'; b.textContent='✨ TypeSafe 검토';
+    b.title='개인정보를 가린 뒤 제안만 받습니다';
+    b.style.cssText='position:fixed;left:14px;bottom:64px;z-index:8998;border:1px solid #bfdbfe;border-radius:999px;background:#fff;color:#1e40af;padding:8px 12px;font:700 12px inherit;box-shadow:0 4px 14px rgba(30,64,175,.15);cursor:pointer;';
+    b.onclick=function(){ window.PuTypeSafe.open(); }; document.body.appendChild(b);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',addButton); else addButton();
+})();
+</script>
 <!-- 리액트 창은 useEscClose 가 걸어 준다. 이 줄은 그 밖의 옛 덮개용이다. -->
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>

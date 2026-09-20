@@ -31,6 +31,7 @@ const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
 const 지역뉴스부품 = require("./news-region");
 const NasBackupExport = require("./nas-backup-export");
+const TypeSafeEvaluate = require("./typesafe-evaluate");
 
 if (!getApps().length) initializeApp();
 
@@ -2123,6 +2124,27 @@ async function requireReader(req) {
   }
   return decoded;
 }
+
+/* Jev 판단 — 첫 판은 화면이 «제안»만 받는다. 저장·발송·상태변경은 이 함수가 하지 않는다. */
+exports.typeSafeEvaluate = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB", secrets: ["TYPESAFE_API_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    try { await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const key = String(process.env.TYPESAFE_API_KEY || "").trim();
+    if (!key || key === "unset") { res.status(503).json({ ok: false, error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." }); return; }
+    try {
+      const result = await TypeSafeEvaluate.evaluate(fetch, key, req.body && req.body.text);
+      res.status(result.ok ? 200 : result.status).json(result);
+    } catch (e) {
+      console.warn("Jev 판단 실패:", String((e && e.message) || e).slice(0, 300));
+      res.status(502).json({ ok: false, error: "Jev 판단을 받지 못했습니다." });
+    }
+  });
 
 /* 열쇠를 얻는다 — 서버 비밀이 먼저.
    ⚠ 실시간DB 갈래는 **옮기는 동안만** 쓰는 임시 다리다. 네 앱(사진첩·기업정보함·
