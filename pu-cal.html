@@ -420,11 +420,12 @@ function arr(v){ return Array.isArray(v) ? v : []; }
 
 /* ── 어느 탭이 있는가 ──────────────────────────────────────────────────
    대표 결정 2026-09-18: 법인 셋과 이음 셋을 «한 줄»에 두 묶음으로 둔다.
-   지금은 옆 메뉴를 갔다 와야 오가는데, 여기서는 한 번 누르면 된다 — 그것이 옮기는 뜻이다. */
+   지금은 옆 메뉴를 갔다 와야 오가는데, 여기서는 한 번 누르면 된다 — 그것이 옮기는 뜻이다.
+   ⚠ 「직원별 업무」·「분석」은 뺐다(대표 지시 2026-09-20 「필요없다 여기 넣지 마라」).
+     여태는 «다음 걸음에 옮긴다»는 안내 탭(laterHtml)으로 자리만 잡아 뒀는데,
+     아예 필요 없다는 뜻이라 탭 자체를 없앤다. 이알피 옆 메뉴에는 그대로 있다. */
 var TABS = [
   { v:'cal',      g:'법인',    label:'📅 캘린더',      ready:true },
-  { v:'workload', g:'법인',    label:'👥 직원별 업무', erp:'dash/corp' },
-  { v:'analytics',g:'법인',    label:'📊 분석',        erp:'dash/corp', money:true },
   { v:'eumcal',   g:'이음센터', label:'📅 근무 캘린더', ready:true },
   { v:'eumppl',   g:'이음센터', label:'👤 인원 현황',   ready:true },
   { v:'eumshare', g:'이음센터', label:'🔗 외부 공유 뷰', ready:true }
@@ -1144,15 +1145,6 @@ function lockNote(){
     + ' (일정은 됩니다).</span></div>';
 }
 
-function laterHtml(tab){
-  return '<div class="panel later">'
-    + '<h2>'+esc(tab.label)+' — 아직 이알피에 있습니다</h2>'
-    + '<p>이 화면은 다음 걸음에 옮깁니다. 지금은 푸른이알피에서 그대로 쓰실 수 있습니다.'
-    + (tab.money ? '<br>금액이 보이는 화면이라 옮길 때 권한을 함께 옮깁니다(관리자만).' : '')
-    + '</p>'
-    + '<button class="btn" data-erp="'+esc(tab.erp)+'">푸른이알피에서 열기</button></div>';
-}
-
 /* ── 이음센터 · 인원 현황 ─────────────────────────────────────────────
    「누가 몇 번 이음센터에 나갔나」를 사람별로 센다.
    ⚠ 이 화면은 «읽기»다. 한도·비고·강의 기록을 고치는 것은 아직 이알피에서 한다 —
@@ -1547,8 +1539,6 @@ function render(){
     html = failedHtml() + peopleHtml();
   } else if(tab.v==='eumshare'){
     html = failedHtml() + shareHtml();
-  } else {
-    html = laterHtml(tab);
   }
   var 달력 = (tab.v === "cal" || tab.v === "eumcal");
   if(달력) html += 펼침Html(tab.v === "eumcal");
