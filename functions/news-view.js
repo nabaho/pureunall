@@ -277,7 +277,38 @@ function 쪽(제목, 전문) {
     + '<title>' + esc(제목 || '푸른노무법인 주간뉴스레터') + '</title>'
     + '<meta name="robots" content="noindex">'
     + '<style>html,body{margin:0;padding:0;background:#e9e7e3}'
-    + '#wrap{width:' + 폭 + 'px;margin:0 auto}'
+    /* ══════════════════════════════════════════════════════════════════════
+       ★★★ 쪽도 «창(팝업)과 같은 옷»을 입는다 (대표 지시 2026-09-20
+         「현재 팝업디자인이 정말 마음에 든다 이렇게 뉴스레터 화면 바꿔 줄수없나」)
+       ══════════════════════════════════════════════════════════════════════
+       ★ 창이 좋았던 까닭은 둘이다 — ① 갈색 머리띠가 «누가 보낸 것인지»를 먼저
+         말한다 ② 흰 종이가 떠 있어 «한 장»으로 보인다. 그 둘을 쪽에도 입힌다.
+       ⚠⚠ 카드에 overflow:hidden 을 걸지 «말 것». 걸면 안에 있는 차림표의
+         틀고정(position:sticky)이 통째로 죽는다 — 창(#pop .in)에서 베껴 올 때
+         제일 쉽게 딸려 오는 줄이 그것이다. 모서리는 머리·꼬리에 따로 둥글린다.
+       ⚠ 창 뒤의 «큰 PUREUN 글자»는 여기 안 가져온다. 재 보니 그 글자가 550px 인데
+         편지 카드가 982px 라, 어떤 창 너비에서도 카드에 가려 «한 번도 안 보인다».
+         안 보이는 것을 넣어 두면 다음 사람이 「왜 안 나오지」로 시간을 쓴다. */
+    + 'body{padding:24px 0 44px}'
+    /* 떠 있는 흰 종이 — 창의 .in 과 같은 결(그림자는 조금 옅게, 늘 떠 있으므로) */
+    + '#card{position:relative;z-index:1;width:' + 폭 + 'px;margin:0 auto;background:#fff;'
+    + 'border:1px solid #ddd7cf;border-radius:16px;'
+    + 'box-shadow:0 18px 44px rgba(36,26,19,.16),0 2px 6px rgba(36,26,19,.06)}'
+    + '#card .hd{display:flex;align-items:center;gap:10px;padding:14px 20px;'
+    + 'background:#6f5a48;border-radius:15px 15px 0 0}'
+    + '#card .hd .mark{font:bold 11px Georgia,\'Times New Roman\',serif;letter-spacing:2.5px;'
+    + 'color:#e2d3bd;white-space:nowrap}'
+    + '#card .hd .bar{width:1px;align-self:stretch;background:#8a7563}'
+    + '#card .hd b{flex:1;min-width:0;font:bold 15px \'Malgun Gothic\',sans-serif;color:#fff;'
+    + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    /* 살구빛 가는 띠 — 머리와 편지 사이를 한 겹 띄운다(창과 같다) */
+    + '#card .acc{height:5px;background:#fbf4ea;border-bottom:1px solid #efe7dc}'
+    + '#card .ft{display:flex;align-items:center;gap:8px;padding:12px 20px;background:#faf8f5;'
+    + 'border-top:1px solid #eceae6;border-radius:0 0 15px 15px;'
+    + 'font:12px \'Malgun Gothic\',sans-serif;color:#9a938a}'
+    + '#card .ft .nm{font-weight:bold;color:#6f5a48}'
+    + '#card .ft .sp{flex:1}'
+    + '#wrap{width:100%;margin:0 auto}'
     /* ★★ 차림표를 «틀고정» — 굴러도 따라온다 (대표 지시 2026-09-13 「이부분 틀고정 해라」).
        ★ 편지는 표로 짜여 있다. 차림표 칸(꼭지 넷이 든 tr)에 자리표를 붙여 두고
          여기서 그 줄만 붙잡는다 — 편지 «속 글자»는 손대지 않는다.
@@ -400,7 +431,17 @@ function 쪽(제목, 전문) {
     + '#pop .ft .nm{font-weight:bold;color:#6f5a48}'
     + '#pop .ft .sp{flex:1}'
     + '</style>'
-    + '</head><body><div id="wrap">' + 전문 + '</div>'
+    + '</head><body>'
+    /* 떠 있는 흰 종이 — 머리띠 · 편지 · 꼬리띠 (창과 같은 차림) */
+    + '<div id="card">'
+    + '<div class="hd"><span class="mark">PUREUN</span><span class="bar"></span>'
+    + '<b>' + esc(꼬리제목(제목) || '주간 노동뉴스레터') + '</b></div>'
+    + '<div class="acc"></div>'
+    + '<div id="wrap">' + 전문 + '</div>'
+    + '<div class="ft"><span class="nm">푸른노무법인</span>'
+    + '<span>' + esc(꼬리제목(제목)) + '</span>'
+    + '<span class="sp"></span><span>문의 041-556-0035</span></div>'
+    + '</div>'
     + '<div id="pop">'
     + '<div class="bg" aria-hidden="true">'
     + '<div class="top"><div class="w">PUREUN</div>'
