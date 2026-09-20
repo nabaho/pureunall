@@ -11,13 +11,17 @@
  * 셋을 고친 뒤, 대표가 「이알피 안에서만 쓰지 말고 통합시스템 전체에서 쓸 수 있게」라고
  * 하셔서 화면 쪽 코드를 js/pu-typesafe.js(공용 부품)로 뽑았다(pu-gate.js·pu-backup.js 와 같은 길).
  * ⚠ 뽑아낸 것 자체가 «켰다»는 뜻은 아니다 — 지금은 pu-erp.html 만 그 부품을 부른다.
- *   다른 화면에 붙이는 것은 대표 판단 셋(이름·국외보관·사용범위)이 끝난 뒤의 걸음이다.
+ *   다른 화면에 붙이는 것은 대표 판단 나머지 둘(이름·국외보관)이 끝난 뒤의 걸음이다.
+ * 세 판단 가운데 «사용범위»는 2026-09-20 에 정해졌다 — 「관리자만 일단쓴다」.
+ * 화면(단추 숨김)과 서버(functions/index.js typeSafeIsAdmin) **둘 다** 본다 —
+ * 화면 판정은 표시일 뿐이고, 진짜 자격은 서버가 매번 다시 검사한다.
  *
  * ■ 여기서 보는 것 — «값»이 아니라 «규칙»이다
  * 문구·숫자·좌표는 안 본다(그것은 typesafe-evaluate.test.js 가 규칙으로 본다).
  * 여기서는 **이은 자리**만 본다: 부르기 «전»에 막는가, 성공한 것만 세는가,
- * 로그아웃하면 감추는가, 그리고 그 감춤이 «이 화면만»의 것이 아니라 다른 화면에
- * 붙여도 먹히는가. 이 넷은 한 곳이라도 끊기면 울타리가 통째로 없는 것과 같다. */
+ * 로그아웃하면 감추는가, 관리자가 아니면 막는가, 그리고 그 감춤이 «이 화면만»의
+ * 것이 아니라 다른 화면에 붙여도 먹히는가. 이 다섯은 한 곳이라도 끊기면
+ * 울타리가 통째로 없는 것과 같다. */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -67,6 +71,50 @@ test('남은 횟수를 돌려준다 — 화면이 스스로 셈을 읽지 않아
     '남은 횟수를 안 돌려주면 화면은 셈 자리를 직접 읽어야 하고, 그러면 규칙을 새로 열어야 합니다.');
 });
 
+/* ══ 관리자만 (2026-09-20 대표 결정 「관리자만 일단쓴다」) ══════════════════════ */
+
+test('관리자 확인은 로그인 다음, «무엇보다 먼저» 선다', () => {
+  const 확인자리 = 본체.indexOf('typeSafeIsAdmin(who');
+  const 열쇠확인자리 = 본체.indexOf('noKey');
+  const 셈본자리 = 본체.indexOf('typeSafeDayLeft');
+  const 부른자리 = 본체.indexOf('TypeSafeEvaluate.evaluate');
+  assert.ok(확인자리 > 0, '관리자 확인 자리를 못 찾았습니다 — 아무나 쓸 수 있는 것과 같습니다.');
+  assert.ok(확인자리 < 열쇠확인자리,
+    '관리자 확인이 열쇠 확인보다 뒤에 있습니다 — 관리자가 아닌 사람에게 「열쇠가 없다」같은' +
+    ' 서버 금고 상태까지 알려 줄 까닭이 없습니다.');
+  assert.ok(확인자리 < 셈본자리 && 확인자리 < 부른자리,
+    '관리자 확인이 하루 문·업체 호출보다 뒤에 있습니다 — 자격 없는 사람의 글이 먼저 나갈 수 있습니다.');
+  /* 넘겼으면(아니면) 거기서 끝나야 한다 */
+  const 사이 = 본체.slice(확인자리, 열쇠확인자리);
+  assert.match(사이, /\breturn\b/,
+    '관리자가 아닐 때 되돌아가는 자리가 없습니다 — 확인만 하고 그냥 넘어갑니다.');
+  assert.match(사이, /403/, '권한 없음은 403 으로 답해야 합니다(401 은 «로그인 안 함»과 헷갈립니다).');
+});
+
+test('관리자 확인은 «진짜 역할표»를 본다 — 아무나 통과시키지 않는다', () => {
+  const 확인개 = cutFn(FN, 'async function typeSafeIsAdmin(');
+  const try부분 = 확인개.slice(확인개.indexOf('try'), 확인개.indexOf('catch'));
+  assert.match(try부분, /role\.isAdmin\s*\|\|\s*role\.isSubAdmin/,
+    '성공 갈래가 role.isAdmin/isSubAdmin 을 안 봅니다 — 값을 못 박지 않고 그냥 true 를' +
+    ' 돌려줘도 이 검사를 통과할 수 있다는 뜻입니다(그러면 아무나 관리자가 됩니다).');
+  /* 서버가 보는 자리(uid_roles)와 이알피가 이미 아는 자리(CURRENT_USER.isAdmin/isSubAdmin)가
+     «같은 기준»이어야 한다 — 다르면 화면엔 단추가 안 보이는데 서버는 통과시키거나,
+     그 반대가 된다. isSubAdmin 을 하나만 빠뜨려도 이 검사가 잡는다. */
+  assert.match(try부분, /uid_roles\//, 'uid_roles 를 안 봅니다 — 이 저장소의 다른 관리자 확인과 기준이 달라집니다.');
+});
+
+test('관리자 판정은 «못 읽으면 막는다» — 하루 문과 반대 방향이다', () => {
+  const 확인개 = cutFn(FN, 'async function typeSafeIsAdmin(');
+  assert.match(확인개, /catch/, '못 읽을 때를 받는 자리가 없습니다.');
+  /* 하루 문(typeSafeDayLeft)은 못 읽으면 over:false(연다) — 여긴 반대로 false(막는다)여야 한다.
+     ⚠ 값이 아니라 «방향»을 본다: catch 블록이 true 를 돌려주면(열어 버리면) 이 검사가 잡는다. */
+  const catch부분 = 확인개.slice(확인개.indexOf('catch'));
+  assert.doesNotMatch(catch부분, /return\s+true/,
+    '못 읽었는데 관리자로 쳐 줍니다 — 권한 확인은 «모르면 막는다»가 안전합니다.');
+  assert.match(catch부분, /return\s+false/,
+    '못 읽었을 때 명시적으로 막지 않습니다.');
+});
+
 /* ══ 여기부터 — 공용 부품(js/pu-typesafe.js)이 «어느 화면에 붙여도» 옳게 도는가 ══ */
 
 test('로그인 여부는 호스트 화면이 알려 줄 수 있고, 안 알려 주면 파이어베이스로 판단한다', () => {
@@ -77,6 +125,38 @@ test('로그인 여부는 호스트 화면이 알려 줄 수 있고, 안 알려 
     ' 진짜 로그인은 아직»인 화면에서 단추가 잘못 보입니다.');
   assert.match(판단개, /firebase\.auth\(\)\.currentUser/,
     '호스트가 안 알려 줘도 기본으로 판단할 길이 있어야, 아무 화면에나 붙여도 돌아갑니다.');
+});
+
+test('관리자가 아니면(또는 모르면) 단추를 감춘다 — «모르면 보여 준다»가 아니다', () => {
+  const bare = stripJs(WIDGET);
+  assert.match(bare, /toggle\(\s*'pu-typesafe-hidden'\s*,\s*!\(\s*isLoggedIn\(\)\s*&&\s*isAdmin\(\)\s*\)\s*\)/,
+    '감추는 판정이 로그인 «그리고» 관리자 둘 다를 보지 않습니다.');
+
+  const 넘김개 = cutFn(bare, 'function adminOverride(');
+  /* ⚠ 이름이 «어딘가에 있다»만 보면 안 된다 — 지키개(guard) 줄이 지워져 그 아래 줄이
+     죽은 코드로 남아도 이름은 여전히 파일 어딘가에 있어 통과해 버린다. 그래서
+     «호스트가 안 정의했으면 null」을 가르는 지키개 자체의 모양을 못 박는다. */
+  assert.match(넘김개, /typeof\s+w\.PU_TYPESAFE_IS_ADMIN\s*!==\s*'function'/,
+    '호스트가 정의했는지 가르는 지키개 줄이 없습니다 — 그 아래 «호스트 판정을 실제로 부르는»' +
+    ' 코드가 죽은 자리에 남아 있을 수 있습니다(항상 그 앞에서 return 됨).');
+  assert.match(넘김개, /return\s+!!w\.PU_TYPESAFE_IS_ADMIN\(\)/,
+    '호스트 화면이 더 정확한 관리자 판정을 넘길 길이 없으면, 이알피처럼 이미 아는 화면도' +
+    ' 서버(uid_roles)를 다시 왕복해야 합니다.');
+  /* fail-closed — 넘긴 게 없을 때(모를 때) 참을 돌려주면 로그인 직후 한순간 단추가 보입니다. */
+  const 판단개 = cutFn(bare, 'function isAdmin(');
+  assert.doesNotMatch(판단개, /return\s+true\s*;\s*$/m,
+    '모를 때 기본으로 참을 돌려줍니다 — 관리자 판정은 «모르면 막는다»가 안전합니다.');
+});
+
+test('호스트가 안 알려 주면 uid_roles 를 스스로 읽고, 못 읽으면 «아니다»로 정한다', () => {
+  const bare = stripJs(WIDGET);
+  assert.match(bare, /uid_roles\//, 'uid_roles 를 읽는 자리가 없습니다 — pu-backup.js 와 다른 기준을 쓰게 됩니다.');
+  const 읽개 = cutFn(bare, 'function lookUpAdminIfNeeded(');
+  assert.match(읽개, /isAdmin\s*\|\|[\s\S]{0,20}isSubAdmin/,
+    '관리자 판정에 부관리자(isSubAdmin)를 안 넣었습니다 — 이 저장소의 다른 관리자 전용 기능과' +
+    ' 기준이 달라집니다(pu-erp.html 의 CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin 과 비교).');
+  assert.match(읽개, /_adminKnownValue\s*=\s*false/,
+    '서버 읽기가 실패했을 때 «아니다»로 정하는 자리가 없습니다.');
 });
 
 test('감추는 표시는 «이 부품 자신의» 이름이다 — 호스트 화면의 이름을 빌리지 않는다', () => {
@@ -102,11 +182,14 @@ test('공용 부품은 «혼자서도» 돈다 — 이알피의 전역 도우미
   });
 });
 
-test('이알피는 자기가 아는 «진짜 로그인»을 공용 부품에 넘긴다', () => {
+test('이알피는 자기가 아는 «진짜 로그인» 과 «관리자 여부»를 공용 부품에 넘긴다', () => {
   const bare = stripComments(ERP);
   assert.match(bare, /window\.PU_TYPESAFE_IS_LOGGED_IN\s*=\s*function\s*\(\s*\)\s*\{\s*return\s+isLoggedIn/,
     '이알피가 자기만 아는 로그인 상태를 부품에 안 알려 주면, 부품은 파이어베이스 로그인만' +
     ' 보고 판단해 통합 로그인 중 화면에서도 단추가 보일 수 있습니다.');
+  assert.match(bare, /window\.PU_TYPESAFE_IS_ADMIN\s*=\s*function\s*\(\s*\)\s*\{\s*return\s*!!\(\s*CURRENT_USER\.isAdmin\s*\|\|\s*CURRENT_USER\.isSubAdmin\s*\)/,
+    '이알피가 이미 아는 CURRENT_USER.isAdmin/isSubAdmin 을 부품에 안 넘기면, 이미 아는' +
+    ' 값이 있는데도 부품이 굳이 서버(uid_roles)를 다시 왕복합니다.');
   assert.match(bare, /PuTypeSafe\.refresh/,
     '로그인 상태가 바뀐 뒤 부품에 다시 보라고 알려 주지 않으면, 로그아웃해도 단추가 그대로 남습니다.');
   assert.match(bare, /<script src="js\/pu-typesafe\.js\?v=\d+"><\/script>/,
@@ -122,7 +205,7 @@ test('화면은 까닭(why)을 «무엇을 하면 되는지»로 바꿔 보인�
   /* 까닭표에 서버의 갈래가 모두 들어 있어야 한다 — 하나라도 빠지면 그 실패만
      «무엇을 하라»는 말 없이 남는다. 문구는 안 본다, 열쇠만 본다. */
   const 서버갈래 = require('../functions/typesafe-evaluate').FAILURES
-    .map((f) => f.why).concat(['network', 'dayLimit', 'noKey']);
+    .map((f) => f.why).concat(['network', 'dayLimit', 'noKey', 'adminOnly']);
   const NEXT시작 = bare.search(/var\s+NEXT\s*=\s*\{/);
   assert.ok(NEXT시작 >= 0, '까닭 → 할 일 표(NEXT)를 못 찾았습니다.');
   const 표 = bare.slice(NEXT시작);
