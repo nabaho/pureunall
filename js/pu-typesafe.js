@@ -33,7 +33,7 @@
 
   var FN_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/typeSafeEvaluate';
   var MAX = 4000;
-  var host, box, input, result, runBtn, status;
+  var host, box, input, result, runBtn, status, ack;
 
   /* 호스트 화면의 fetchT(있으면 그것)에 기대지 않는다 — 이 파일은 어느 화면에
      붙어도 혼자 돌아야 한다. 30초 안에 안 오면 스스로 끊는다. */
@@ -87,9 +87,20 @@
     var label = d.createElement('label'); label.textContent = '검토할 내용'; label.style.cssText = 'display:block;margin-top:17px;font-size:13px;font-weight:700;'; box.appendChild(label);
     input = d.createElement('textarea'); input.maxLength = MAX; input.placeholder = '문의·메모·오류 내용을 붙여넣으세요.\n예: 계약 마감이 오늘인데 담당자 확인이 필요합니다.';
     input.style.cssText = 'display:block;width:100%;height:142px;resize:vertical;box-sizing:border-box;margin-top:7px;padding:11px;border:1px solid #cbd5e1;border-radius:10px;font:14px/1.55 inherit;color:#1e293b;'; box.appendChild(input);
+    /* ── 국외 보관 확인란 (2026-09-20 대표 결정 「안내문 만들고 쓴다」) ────────────
+       미국 업체 서버에 글이 남는다는 것을, 안내만 하고 넘어가지 않는다 — 사람이
+       «확인했다»고 스스로 표시해야 다음 단추가 눌린다. 안내글을 읽었는지까지는
+       못 보장하지만, 최소한 «몰랐다」는 못 하게 한다.
+       ⚠ 열 때마다 다시 확인란을 비운다(아래 openDialog) — 한 번 체크했다고 다음
+         번(다른 내용을 넣을 때)까지 넘어가면 확인의 뜻이 없어진다. */
+    var ackRow = d.createElement('label'); ackRow.style.cssText = 'display:flex;gap:7px;align-items:flex-start;margin-top:11px;font-size:12px;color:#475569;line-height:1.5;cursor:pointer;';
+    ack = d.createElement('input'); ack.id = 'pu-typesafe-ack'; ack.type = 'checkbox'; ack.style.cssText = 'margin-top:2px;flex:none;';
+    var ackText = d.createElement('span'); ackText.textContent = '근로자 등 외부인의 개인정보(이름·연락처·주소 등)를 넣지 않았고, 이 글이 미국 업체 서버로 전송된다는 것을 확인했습니다.';
+    ackRow.appendChild(ack); ackRow.appendChild(ackText); box.appendChild(ackRow);
     var bottom = d.createElement('div'); bottom.style.cssText = 'display:flex;align-items:center;gap:9px;margin-top:12px;';
-    runBtn = d.createElement('button'); runBtn.type = 'button'; runBtn.textContent = '제안 받기'; runBtn.style.cssText = 'border:0;border-radius:9px;background:#2563eb;color:#fff;padding:10px 15px;font-weight:800;cursor:pointer;';
-    status = d.createElement('span'); status.style.cssText = 'font-size:12px;color:#64748b;'; bottom.appendChild(runBtn); bottom.appendChild(status); box.appendChild(bottom);
+    runBtn = d.createElement('button'); runBtn.id = 'pu-typesafe-run-btn'; runBtn.type = 'button'; runBtn.textContent = '제안 받기'; runBtn.disabled = true; runBtn.style.cssText = 'border:0;border-radius:9px;background:#2563eb;color:#fff;padding:10px 15px;font-weight:800;cursor:pointer;opacity:.5;';
+    ack.onchange = function () { runBtn.disabled = !ack.checked; runBtn.style.opacity = ack.checked ? '1' : '.5'; };
+    status = d.createElement('span'); status.id = 'pu-typesafe-status'; status.style.cssText = 'font-size:12px;color:#64748b;'; bottom.appendChild(runBtn); bottom.appendChild(status); box.appendChild(bottom);
     result = d.createElement('div'); result.style.cssText = 'display:none;margin-top:15px;padding:13px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;line-height:1.7;'; box.appendChild(result);
     runBtn.onclick = run;
     host.addEventListener('click', function (e) { if (e.target === host) close(); });
@@ -135,6 +146,9 @@
   }
 
   async function run() {
+    /* 방어선 — 단추가 disabled 인 동안은 클릭 자체가 안 되지만, 혹시 다른 경로로
+       불려도(프로그램으로 호출 등) 확인 없이 나가지 않게 한 번 더 본다. */
+    if (!ack || !ack.checked) { status.textContent = '위 확인란에 체크해야 이용할 수 있습니다.'; return; }
     var text = String(input.value || '').trim();
     if (!text) { status.textContent = '검토할 내용을 입력해 주세요.'; input.focus(); return; }
     var user = w.firebase && firebase.auth && firebase.auth().currentUser;
@@ -213,6 +227,15 @@
     } catch (_) { _adminKnownUid = user.uid; _adminKnownValue = false; }
   }
 
+  /* 열 때마다 확인란을 다시 비운다 — 지난번에 체크했던 것이 이번 내용에도
+     그대로 이어지면, 확인란을 두는 뜻(«이번 글은 괜찮은지» 매번 묻기)이 없어진다. */
+  function openDialog() {
+    make();
+    if (ack) { ack.checked = false; if (typeof ack.onchange === 'function') ack.onchange(); }
+    host.style.display = 'flex';
+    input.focus();
+  }
+
   function css() {
     if (d.getElementById('pu-typesafe-css')) return;
     var st = d.createElement('style'); st.id = 'pu-typesafe-css';
@@ -233,7 +256,7 @@
     var b = d.createElement('button'); b.id = 'pu-typesafe-review-button'; b.type = 'button'; b.textContent = '✨ TypeSafe 검토';
     b.title = '개인정보를 가린 뒤 제안만 받습니다 (관리자 전용)';
     b.style.cssText = 'position:fixed;left:14px;bottom:64px;z-index:8998;border:1px solid #bfdbfe;border-radius:999px;background:#fff;color:#1e40af;padding:8px 12px;font:700 12px inherit;box-shadow:0 4px 14px rgba(30,64,175,.15);cursor:pointer;';
-    b.onclick = function () { make(); host.style.display = 'flex'; input.focus(); };
+    b.onclick = openDialog;
     d.body.appendChild(b);
     refreshVisibility();
     try {
@@ -244,7 +267,7 @@
   }
 
   w.PuTypeSafe = {
-    open: function () { make(); host.style.display = 'flex'; input.focus(); },
+    open: openDialog,
     /* 호스트 화면이 «진짜 로그인» 여부를 더 정확히 알게 됐을 때 부른다
        (PU_TYPESAFE_IS_LOGGED_IN 을 바꾼 직후). 안 불러도 파이어베이스
        로그인 변화에는 스스로 반응한다. */
