@@ -5324,7 +5324,7 @@ exports.nasBackupExport = functions
 // 이 함수가 죽거나 늦어도 로그인 자체는 전혀 영향받지 않는다(클라이언트가 안 기다림).
 exports.logLoginAttempt = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 10, memory: "128MB" })
+  .runWith({ timeoutSeconds: 10, memory: "512MB" })
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
