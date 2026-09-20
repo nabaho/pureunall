@@ -2692,7 +2692,9 @@ async function photoGate(decoded, v) {
   const item = itemSnap.val();
   const seen = PV.canSee({ viewerUid: decoded.uid, owner: v.owner, role: roleSnap.val() || {}, item: item });
   if (!seen.ok) return seen;
-  const ok = PV.decide(item);
+  /* ⚠ 자격(seen.as)을 함께 넘긴다 — 총괄관리자는 주소가 없는 사진도 이 길로 받는다
+     (대표 지시 2026-09-20). 안 넘기면 관리자에게만 연 그 길이 조용히 안 열린다. */
+  const ok = PV.decide(item, seen.as);
   if (!ok.ok) return ok;
   /* ⚠ 자격(as)과 사진 정보(item)를 «함께» 돌려준다 — 열람 기록에 「무슨 자격으로
      무슨 서류를 봤나」를 적어야 하는데, 여기서 버리면 밖에서 다시 읽어야 한다.
