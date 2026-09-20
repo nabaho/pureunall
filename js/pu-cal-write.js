@@ -176,6 +176,38 @@
       .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
   }
 
+  /* ── 구글 계정 ↔ 직원 잇기 (data/gcal_mail_sid) ───────────────────────────
+     캘린더 한 곳으로 모으기 1걸음(나). 이 표를 쓰는 곳도 이알피 법인 대시보드
+     한 곳뿐이었다. 구글 일정에는 «누가 만들었는지»(메일)만 남고 이름이 없어,
+     이어 주지 않으면 그 사람 일정이 담당자·색 없이 뜬다.
+
+     ⚠ 색표(saveColors)와 닮았지만 «빈 것»을 대하는 태도가 다르다 —
+       · 색표가 비면 사고다(모든 사람 색이 날아간다) → 빈 지도를 막는다
+       · 여기서는 「마지막 하나를 끊었다」가 멀쩡한 상태다 → 빈 지도를 허락한다
+     ⚠ 열쇠는 «메일 그대로»가 아니라 점을 쉼표로 바꾼 꼴이다(실시간DB 열쇠 제약).
+       이알피 gcalMailKey 와 «같은 셈»이어야 한다 — 다르면 이은 것을 서로 못 찾는다.
+       그래서 여기서는 «금지문자가 없는지»만 보고, 바꾸는 일은 부르는 쪽이 한다. */
+  function saveMailMap(map) {
+    if (!_db) return Promise.resolve(fail('no_db', '아직 서버에 붙기 전입니다'));
+    if (!map || typeof map !== 'object' || Array.isArray(map)) {
+      return Promise.resolve(fail('bad_shape', '«메일 → 사번» 지도여야 합니다'));
+    }
+    var keys = Object.keys(map);
+    for (var i = 0; i < keys.length; i++) {
+      if (BADKEY.test(keys[i])) {
+        return Promise.resolve(fail('bad_id',
+          '열쇠에 실시간DB 가 못 쓰는 글자가 있습니다(점은 쉼표로 바꿔 주세요): ' + keys[i]));
+      }
+      var sid = map[keys[i]];
+      if (typeof sid !== 'string' || !sid || BADKEY.test(sid)) {
+        return Promise.resolve(fail('bad_sid', '사번이 이상합니다: ' + keys[i] + ' = ' + sid));
+      }
+    }
+    return _db.ref('data/gcal_mail_sid').set({ v: map, u: Date.now() })
+      .then(function () { return OK; })
+      .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
+  }
+
   /* 한 건 지우기 — 자리를 비운다(v/{번호} = null). */
   function remove(table, id, prev) {
     var g = check(table, id, {}, prev && prev.date);
@@ -206,6 +238,7 @@
     fieldPaths: fieldPaths,
     save: save,
     saveColors: saveColors,
+    saveMailMap: saveMailMap,
     remove: remove,
     newId: newId
   };
