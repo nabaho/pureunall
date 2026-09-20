@@ -3046,7 +3046,10 @@ exports.newsFull = functions
       return;
     }
     try {
-      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호));
+      /* ⚠ «작은 주머니»(6초)를 들려 보낸다 — 첫 시도와 IPv4 재시도를 더해도 12초라,
+         함수 제한(20초) 안에 돌아와 NF.오류쪽 을 우리 얼굴로 내놓는다.
+         안 그러면 23초를 쓰려다 잘려 맨 오류(408)가 나간다(글자로받기 주석 참고). */
+      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호), 6000);
       const 것 = NF.풀기(q.갈래, xml);
       if (!것.ok) {
         /* ⚠ «못 준다»는 답은 굳히지 않는다 — 법제처가 잠깐 이상했을 때
@@ -3099,7 +3102,10 @@ exports.newsFullPage = functions
     }
     const 법제처 = NF.법제처주소(q.갈래, q.번호);
     try {
-      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호));
+      /* ⚠ «작은 주머니»(6초)를 들려 보낸다 — 첫 시도와 IPv4 재시도를 더해도 12초라,
+         함수 제한(20초) 안에 돌아와 NF.오류쪽 을 우리 얼굴로 내놓는다.
+         안 그러면 23초를 쓰려다 잘려 맨 오류(408)가 나간다(글자로받기 주석 참고). */
+      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호), 6000);
       const 것 = NF.풀기(q.갈래, xml);
       if (!것.ok) {
         res.set("Cache-Control", "no-store");
@@ -3635,8 +3641,11 @@ const 브리핑샘 = {
 /* 한글이 깨지지 않게 «바이트로» 받아서 한 번에 푼다.
    ★ 글자로 이어 붙이면 여러 바이트짜리 한글이 조각 사이에서 잘려 깨진다
      (실제로 「소관부처명」이 「소관부처」로 깨져 왔다). */
-function IPv4로글자받기(url, 옮김횟수) {
+function IPv4로글자받기(url, 옮김횟수, 제한밀리초) {
   const 횟수 = 옮김횟수 || 0;
+  /* ⚠ 부르는 쪽이 «작은 주머니»를 들려 보낼 수 있다 — 글자로받기() 주석 참고.
+       안 주면 예전 그대로 15초다(밤에 도는 모으기는 넉넉해도 된다). */
+  const 제한 = Number(제한밀리초) > 0 ? Number(제한밀리초) : 15000;
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       family: 4,
@@ -3644,14 +3653,14 @@ function IPv4로글자받기(url, 옮김횟수) {
         "User-Agent": "Mozilla/5.0 (compatible; PureunNewsletter/1.0)",
         Accept: "application/rss+xml, application/xml, text/xml, */*"
       },
-      timeout: 15000
+      timeout: 제한
     }, res => {
       if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
         res.resume();
         if (횟수 >= 3) return reject(new Error("주소 이동이 너무 많습니다"));
         const 다음 = new URL(res.headers.location, url);
         if (다음.protocol !== "https:") return reject(new Error("안전하지 않은 주소 이동입니다"));
-        return IPv4로글자받기(다음.href, 횟수 + 1).then(resolve, reject);
+        return IPv4로글자받기(다음.href, 횟수 + 1, 제한).then(resolve, reject);
       }
       if (res.statusCode < 200 || res.statusCode >= 300) {
         res.resume();
@@ -3671,11 +3680,22 @@ function IPv4로글자받기(url, 옮김횟수) {
   });
 }
 
-async function 글자로받기(url) {
+/* ★★★ 기다리는 «총 시간»을 부르는 쪽이 정할 수 있다 (2026-09-20 실측으로 드러났다).
+     ⚠⚠ 기본값은 8초 + 15초 = 23초다. 모으는 일(밤에 도는 것)은 시간이 넉넉해 괜찮다.
+       그런데 «판례 쪽»(newsFullPage·newsFull)은 함수 제한이 20초다 — 법제처가 한 번만
+       안 받아 줘도 23초를 쓰려다 20초에 잘려, 공들여 지어 둔 「못 받아 왔습니다」
+       쪽(NF.오류쪽)이 «한 번도 못 뜬다». 받는 분은 우리 얼굴 대신 맨 오류를 본다:
+         408 upstream request timeout
+       실측 2026-09-20 12:23~12:26 — 부를 때마다 19,999ms 에서 'timeout'.
+     ★ 그래서 그 두 곳은 «작은 주머니»를 들려 보낸다. 다 못 받아 와도 시간 안에
+       돌아와 우리 얼굴로 「법제처에서 원문 보기」를 내민다. */
+async function 글자로받기(url, 제한밀리초) {
+  const 첫제한 = Number(제한밀리초) > 0 ? Number(제한밀리초) : 8000;
+  const 둘째제한 = Number(제한밀리초) > 0 ? Number(제한밀리초) : 15000;
   try {
     const r = await fetch(url, {
       headers: { "User-Agent": "pureun-erp-news-brief" },
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(첫제한)
     });
     if (!r.ok) throw new Error(url + " 응답 " + r.status);
     const buf = Buffer.from(await r.arrayBuffer());
@@ -3684,7 +3704,7 @@ async function 글자로받기(url) {
     /* 일부 공공기관 RSS는 Cloud Functions의 기본(IPv6 우선) 연결을 끊는다.
        첫 통신만 실패할 때 IPv4로 한 번 더 읽어 수집 전체가 비는 일을 막는다. */
     try {
-      return await IPv4로글자받기(url);
+      return await IPv4로글자받기(url, 0, 둘째제한);
     } catch (둘째오류) {
       const 첫원인 = 첫오류.cause && 첫오류.cause.code ? " [" + 첫오류.cause.code + "]" : "";
       const 둘째원인 = 둘째오류.code ? " [" + 둘째오류.code + "]" : "";
