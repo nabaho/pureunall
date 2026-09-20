@@ -43,8 +43,8 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=39"></script>
-<script src="js/pu-news-tpl.js?v=32"></script>
+<script src="js/pu-news-core.js?v=40"></script>
+<script src="js/pu-news-tpl.js?v=33"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -1241,7 +1241,10 @@ function 이번회차화면(){
   const d = 지금회차();
   const r = 명단셈();
   const 갈수있나 = Core.보낼수있나(d, r.셈);
-  const 상태딱지 = { 초안:'b-draft', 시험:'b-test', 발송:'b-sent' }[d.상태] || 'b-draft';
+  /* ★ 시험 발송은 «연습 표본이 있어도» 눌러야 한다 — 연습은 시험으로 하는 것이다.
+       진짜 발송·자동발송 예약만 연습에 걸린다(Core.보낼수있나 주석 참고). */
+  const 시험갈수있나 = Core.보낼수있나(d, r.셈, { 시험: true });
+  const 상태딱지 ={ 초안:'b-draft', 시험:'b-test', 발송:'b-sent' }[d.상태] || 'b-draft';
   /* ★ 「실린 것」은 «ㅁ 를 켠 것»이다 (대표 지시 2026-09-08).
        담긴 수를 세면 ㅁ 를 다 꺼 놓고도 「15건 실렸다」로 보인다 — 그러면
        빈 뉴스레터가 그 숫자를 믿고 나간다. 담긴 수는 옆에 함께 적는다. */
@@ -1282,13 +1285,18 @@ function 이번회차화면(){
       ${App.isAdmin?'':'disabled'}>↻ 전문 다시 담기</button>`}
     <!-- ★ 「나에게」가 아니다 (대표 지시 2026-09-13) — 보낼 때 주소를 골라 넣는다.
          법인 메일에서 «개인 메일»로 보내 봐야 진짜로 가는지 안다. -->
-    <button class="btn warn" onclick="시험발송()" ${갈수있나.ok?'':'disabled'}
+    <button class="btn warn" onclick="시험발송()" ${시험갈수있나.ok?'':'disabled'}
       title="받을 주소를 넣어 한 통만 보냅니다 — 거래처에는 나가지 않습니다">✉ 시험 발송</button>
     <!-- ★ 확정본이 낡았는지를 «이 단추 한 줄»로 말한다 (2026-09-13).
-         ⚠ 셋째 줄을 만들지 않는다 — 머리가 늘어나면 대표가 같은 것을 보려고 더 굴린다. -->
-    <button class="btn ${예약.꼴}" onclick="자동발송준비()" title="${esc(예약.곁||'')}"
+         ⚠ 셋째 줄을 만들지 않는다 — 머리가 늘어나면 대표가 같은 것을 보려고 더 굴린다.
+         ⚠⚠ 못 누르는 단추에는 «왜»를 붙인다 — 연습 표본 때문에 잠긴 것을
+           말해 주지 않으면 대표께서 「고장났다」로 보신다. -->
+    <button class="btn ${예약.꼴}" onclick="자동발송준비()"
+      title="${esc(갈수있나.ok ? (예약.곁||'') : 갈수있나.까닭)}"
       ${갈수있나.ok && App.isAdmin?'':'disabled'}>${esc(예약.글)}</button>
-    <button class="btn pri" onclick="진짜보내기()" ${갈수있나.ok && App.isAdmin?'':'disabled'}>
+    <button class="btn pri" onclick="진짜보내기()"
+      title="${esc(갈수있나.ok ? '' : 갈수있나.까닭)}"
+      ${갈수있나.ok && App.isAdmin?'':'disabled'}>
       📨 ${App.유형 ? esc(App.유형)+' ' : ''}${r.셈.보낼곳.toLocaleString()}곳에 보내기</button>
   </div>
   <!-- ⚠ 「아직 못 보냅니다」 알림은 오른쪽 «요약»으로 옮겼다 (대표 지시 2026-09-08

@@ -2903,6 +2903,32 @@ exports.newsOpen = functions
     res.status(200).send(NT.빈그림);
   });
 
+/* ★★★ 「내려받기」가 죽었나 한 번 두드려 본다 (대표 검증 지시 2026-09-20).
+     실측: 기업마당이 붙임을 「(최종)」판으로 갈아 끼우면서 fileSn 이 0→1 로 바뀌어,
+     편지의 「내려받기 ↓ HWPX · 156KB」가 «500 오류 쪽»을 열었다. 모으는 때와 보내는
+     때 사이에 남의 서버가 파일을 갈면 언제든 또 난다 — 이미 나간 편지는 고칠 수도 없다.
+   ★ 그래서 보내기 직전에 여기서 두드려 보고, 죽었으면 «뒷길»(그 자료의 상세 쪽)로
+     돌린다. 받는 분은 500 대신 그 공고 쪽에서 새 붙임을 받으신다.
+   ⚠⚠ «확실히 죽었을 때만» 물러선다. 그물이 느리거나 끊긴 것까지 죽음으로 치면
+     멀쩡한 파일을 두고 엉뚱한 쪽으로 보내게 된다 — 모르면 «가던 길»이다.
+   ⚠ 몸통은 안 받는다(파일이 수백 MB 일 수 있다). 머리만 보고 곧바로 끊는다.
+   ⚠ 뒷길이 있는 줄(자료 내려받기)에서만 부른다 — 뉴스 원문까지 두드리면
+     누를 때마다 한 걸음씩 느려진다. */
+async function 살아있나(주소) {
+  const 멈춤 = new AbortController();
+  const 시계 = setTimeout(() => 멈춤.abort(), 4000);
+  try {
+    const 답 = await fetch(주소, {
+      method: "GET", redirect: "follow", signal: 멈춤.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; PureunNewsletter/1.0)" }
+    });
+    try { await 답.body?.cancel(); } catch (_) { /* 이미 닫혔으면 그만이다 */ }
+    return 답.status < 400;
+  } catch (e) {
+    return true;                       /* 모르면 «가던 길» — 위 ⚠⚠ 참고 */
+  } finally { clearTimeout(시계); }
+}
+
 exports.newsClick = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 15, memory: "128MB" })
@@ -2920,6 +2946,11 @@ exports.newsClick = functions
         // ★ 목적지는 «회차에 적어 둔 목록»에서 번호로 찾는다 — 주소로 받지 않는다
         const s = await db.ref("newsletter/issues/" + q.회차 + "/링크들").once("value");
         갈곳 = NT.링크찾기(s.val(), q.번호);
+        const 뒷길 = NT.뒷길찾기(s.val(), q.번호);
+        if (갈곳 && 뒷길 && !(await 살아있나(갈곳))) {
+          console.warn("newsClick 내려받기 죽음 → 뒷길", 갈곳, "→", 뒷길);
+          갈곳 = 뒷길;
+        }
       } catch (e) { console.warn("newsClick", (e && e.message) || e); }
     }
     // 못 찾으면 우리 홈페이지로 — «아무 데도 안 보내는 것»이 안전한 쪽이다

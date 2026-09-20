@@ -452,9 +452,16 @@ test('★ 감싼 링크 목록을 «함께 돌려준다» — 서버가 번호�
     Object.assign({}, 설정, { 추적밑주소: 'https://fn.example.com' }));
   assert.ok(Array.isArray(편.링크들), '링크 목록을 안 돌려줍니다');
   assert.ok(편.링크들.length >= 3, '링크가 너무 적습니다: ' + 편.링크들.length);
-  /* 편지에 n=0 이 있으면 목록의 0번이 그 링크여야 한다 */
-  편.링크들.forEach(function (u, i) {
-    assert.match(u, /^https?:\/\//, i + '번이 주소가 아닙니다: ' + u);
+  /* 편지에 n=0 이 있으면 목록의 0번이 그 링크여야 한다.
+     ⚠ 2026-09-20 부터 자료 내려받기 줄은 «{주소, 뒷길}» 꾸러미다 — 그 주소가 죽었을 때
+       상세 쪽으로 물러서기 위함이다(tests/newsletter-download-fallback.test.js).
+       규칙은 그대로다: «어느 줄이든 갈 곳은 http(s) 주소»여야 한다. */
+  편.링크들.forEach(function (x, i) {
+    const u = (x && typeof x === 'object') ? x.주소 : x;
+    assert.match(u, /^https?:\/\//, i + '번이 주소가 아닙니다: ' + JSON.stringify(x));
+    if (x && typeof x === 'object') {
+      assert.match(x.뒷길, /^https?:\/\//, i + '번 뒷길이 주소가 아닙니다: ' + x.뒷길);
+    }
   });
   /* 편지 안의 가장 큰 번호가 목록 안에 있어야 한다 */
   const 번호들 = [...편.서식.matchAll(/newsClick\?i=[^"]*(?:&|&amp;)n=(\d+)/g)].map((m) => Number(m[1]));
