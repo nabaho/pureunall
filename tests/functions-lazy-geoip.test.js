@@ -62,25 +62,52 @@ test('★★ 부르는 자리가 «함수 안»이다', () => {
     '★★ 터졌을 때 빈 글자로 안 물러선다 — 로그인 보고가 이것 때문에 멎는다');
 });
 
-test('★★ 나라 찾기가 «실제로» 돈다 — 느리게 불러도 기능은 그대로', () => {
-  /* ⚠ 글자만 보면(「require 가 함수 안에 있다」) 안이 비어 있어도 통과한다.
-       그래서 «같은 몸»을 떼어 내 진짜로 돌려 본다. */
+/* 파일에 적힌 «그 몸 그대로»를 떼어 내 돌린다.
+   ⚠ 글자만 보면(「require 가 함수 안에 있다」) 안이 비어 있어도 통과한다. */
+function 떼어내기(가짜require) {
   const m = /function geoip나라\(ip\)\s*\{[\s\S]*?\n\}/.exec(몸);
-  /* ⚠ geoip-lite 는 functions/node_modules 에 있다 — 여기서 그냥 require 하면
-       못 찾고, 못 찾은 것이 catch 에 삼켜져 «기능이 죽어도 초록»이 된다.
+  assert.ok(m, '★★ geoip나라() 가 없다');
+  // eslint-disable-next-line no-new-func
+  return new Function('require', 'return (' + m[0] + ')')(가짜require);
+}
+
+test('★★ 나라 찾기의 «셈»이 맞다 — 꾸러미 없이도 본다', () => {
+  /* ⚠⚠ 품질문(CI)은 functions/node_modules 를 안 깐다. 진짜 꾸러미로만 보면
+       그 자리에서 검사가 빨강이 된다(2026-09-20 실제로 났다). 셈은 «가짜 꾸러미»로
+       어디서나 보고, 진짜 꾸러미는 아래 검사에서 «있을 때만» 본다. */
+  const 가짜 = (찾기) => (이름) => {
+    assert.equal(이름, 'geoip-lite', '엉뚱한 꾸러미를 부른다: ' + 이름);
+    return { lookup: 찾기 };
+  };
+  assert.equal(떼어내기(가짜(() => ({ country: 'KR' })))('1.2.3.4'), 'KR',
+    '★★ 찾은 나라를 안 돌려준다');
+  assert.equal(떼어내기(가짜(() => null))('1.2.3.4'), '',
+    '★★ 못 찾았는데 빈 글자가 아니다');
+  assert.equal(떼어내기(가짜(() => ({})))('1.2.3.4'), '',
+    '★★ 나라 칸이 빈 답에 빈 글자가 아니다');
+  assert.equal(떼어내기(가짜(() => { throw new Error('터짐'); }))('1.2.3.4'), '',
+    '★★ 터졌는데 빈 글자로 안 물러선다 — 로그인 보고가 이것 때문에 멎는다');
+  assert.equal(떼어내기(() => { throw new Error('꾸러미 없음'); })('1.2.3.4'), '',
+    '★★ 꾸러미를 못 읽을 때 빈 글자로 안 물러선다');
+});
+
+test('★ 진짜 꾸러미로도 돈다 — functions 를 깐 자리에서만', () => {
+  /* ⚠ geoip-lite 는 functions/node_modules 에 있다. 여기서 그냥 require 하면 못 찾고,
+       못 찾은 것이 catch 에 삼켜져 «기능이 죽어도 초록»이 된다 —
        그래서 «그 파일 자리에서 부르는» require 를 만들어 넘긴다. */
   const 그자리require = require('node:module')
     .createRequire(path.join(뿌리, 'functions/index.js'));
-  try { 그자리require('geoip-lite'); }
-  catch (e) { assert.fail('geoip-lite 를 못 읽는다 — functions 에서 npm install 을 하셔야 합니다'); }
-  // eslint-disable-next-line no-new-func
-  const geoip나라 = new Function('require', 'return (' + m[0] + ')')(그자리require);
-
+  try { 그자리require.resolve('geoip-lite'); }
+  catch (e) {
+    /* 품질문에는 안 깔려 있다 — 여기서 빨강을 내지 않는다. 셈은 위에서 봤다. */
+    console.log('    (건너뜀) geoip-lite 가 없다 — functions 에서 npm install 한 자리에서만 봅니다');
+    return;
+  }
+  const geoip나라 = 떼어내기(그자리require);
   assert.equal(geoip나라('8.8.8.8'), 'US',
-    '★★ 아는 주소(구글 DNS)의 나라를 못 찾는다 — 느리게 부르다 기능을 잃었다');
-  assert.equal(typeof geoip나라('1.1.1.1'), 'string', '나라가 글자가 아니다');
+    '★ 아는 주소(구글 DNS)의 나라를 못 찾는다 — 꾸러미 쪽이 바뀌었다');
   ['', null, undefined, '집주소아님', '999.999.999.999'].forEach((나쁨) => {
     assert.equal(geoip나라(나쁨), '',
-      '★★ 이상한 값(' + JSON.stringify(나쁨) + ')에 빈 글자를 안 준다 — 로그인 보고가 멎는다');
+      '★ 이상한 값(' + JSON.stringify(나쁨) + ')에 빈 글자를 안 준다');
   });
 });
