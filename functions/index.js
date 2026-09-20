@@ -5351,13 +5351,19 @@ exports.logLoginAttempt = functions
         try { verified = await getAuth().verifyIdToken(bearer[1], true); }
         catch (e) { verified = null; }
       }
+      /* ⚠⚠ 재검토(2026-09-20 재검토): 증표는 있는데 «이메일 없는» 증표(익명 로그인 등)로
+           올 수 있다 — 이 프로젝트는 익명 로그인을 실제로 쓴다(sign.html 등). 그 증표를
+           받아 주면 본문 email 로 도로 떨어져 «증표 없을 때와 똑같은 구멍»이 다시 열린다.
+           비밀번호 로그인 증표만, 그리고 이메일이 «증표에 실제로 적혀 있을 때만» 받는다. */
+      if (verified && (!verified.email
+        || (verified.firebase && verified.firebase.sign_in_provider !== "password"))) {
+        verified = null;
+      }
       if (!verified) { res.status(200).json({ ok: true }); return; }
     }
 
-    // 성공 보고는 «증표에 적힌» 계정으로만 다룬다 — 본문의 email 은 믿지 않는다.
-    const email = verified
-      ? String(verified.email || parsed.email).trim().toLowerCase()
-      : parsed.email;
+    // 성공 보고는 «증표에 적힌» 계정으로만 다룬다 — 본문의 email 은 절대 안 쓴다(대체 없음).
+    const email = verified ? String(verified.email).trim().toLowerCase() : parsed.email;
 
     const ip = LS.lastIp(req.headers["x-forwarded-for"]) || String(req.ip || "");
     const now = Date.now();

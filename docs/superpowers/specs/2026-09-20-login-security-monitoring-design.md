@@ -25,11 +25,16 @@
 ## 3. 전체 구조
 ```
 enter.html (로그인 성공/실패 직후, 기다리지 않고 fire-and-forget 호출)
-   │  { email, ok, code, deviceId, ua }
+   │  { email, ok, code, deviceId, ua } — 성공(ok:true) 보고에는
+   │  Authorization: Bearer <Firebase ID 토큰> 도 함께 보낸다(2026-09-20 재검토 반영)
    ▼
-functions/index.js 의 새 함수  logLoginAttempt (HTTPS, 인증 불필요)
+functions/index.js 의 새 함수  logLoginAttempt (HTTPS)
+   │  ok:true 는 증표(비밀번호 로그인 ID 토큰, 이메일 있는 것만)를 검증해야 받는다 —
+   │  본문의 email 은 그 경우 절대 쓰지 않는다(익명 로그인 증표로도 못 속인다).
+   │  ok:false 는 증표 없이 받되, 누적만 올리고 되돌리거나 기준을 세우지 못한다.
    │  요청 헤더에서 IP 추출 → 내장 지역 DB로 국가만 판별(외부 전송 없음)
-   │  admin.auth().getUserByEmail(email) 로 uid 조회(실패해도 계속 진행)
+   │  uid 는 증표에서 바로 쓰거나(성공), 실패 보고는 admin.auth().getUserByEmail(email) 로
+   │  조회한다(실패해도 계속 진행)
    ▼
 RTDB 기록 (Admin SDK — 규칙 우회, 클라이언트는 이 경로에 쓰기 권한 없음)
    login_events/{uid|unk_해시}/{push-id}      ← 성공/실패 전부, 무조건 기록

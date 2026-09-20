@@ -49,3 +49,26 @@ test('화면이 부르는 함수 이름이 서버에 실제로 있다', () => {
       + ' — 주소와 서버 함수 이름이 어긋나면 로그인 감지가 조용히 멎습니다',
   );
 });
+
+/* 2026-09-20 재검토(최종 리뷰 뒤 발견) — 성공 보고의 이메일은 «증표에 적힌 것만» 믿어야
+   한다. `verified.email || parsed.email` 처럼 증표에 이메일이 없을 때(익명 로그인 등)
+   본문 값으로 도로 떨어지면, 익명으로 로그인한 누구나 «증표는 있다»는 사실만으로
+   실제 직원 이메일을 자처해 가짜 성공 기록·경보를 만들 수 있다 — 값이 아니라
+   «그 패턴이 없는가»만 본다(다른 코드가 바뀌어도 이 검사는 안 흔들린다). */
+test('성공 보고의 이메일은 본문으로 대체되지 않는다 (증표에 없으면 그냥 막는다)', () => {
+  const serverSrc = fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8');
+  assert.ok(
+    !/verified\.email\s*\|\|\s*parsed\.email/.test(serverSrc),
+    'functions/index.js 에 「증표 이메일이 없으면 본문 이메일로 대체」하는 자리가 있습니다'
+      + ' — 익명 로그인 증표로도 남의 이메일을 자처할 수 있게 됩니다',
+  );
+});
+
+test('성공 보고는 비밀번호 로그인 증표만 받는다 (익명 로그인 증표는 막는다)', () => {
+  const serverSrc = fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8');
+  assert.match(
+    serverSrc,
+    /sign_in_provider\s*!==\s*["']password["']/,
+    'functions/index.js 에 로그인 방식(sign_in_provider)이 비밀번호인지 가르는 자리가 없습니다',
+  );
+});
