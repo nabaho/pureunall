@@ -51,7 +51,9 @@ login_events/{key}/{pushId}:
 
 login_devices/{uid}/{deviceId}: { firstSeenAt: number, ua: string }
 login_countries/{uid}/{countryCode}: { firstSeenAt: number }
-login_fail_burst/{uid}: { count: number, windowStartAt: number }
+login_fail_burst/{uid}: { count: number, windowStartAt: number, alerted: boolean }
+  (alerted: 이 반복 구간에서 이미 경보를 보냈는지 — 문턱을 «넘는 순간»에만 한 번 켜고,
+   성공 또는 창 만료로 구간이 리셋되면 다시 꺼진다. 없으면 실패마다 계속 경보가 쌓인다.)
 
 systemAlerts/{uid}/{id}:  (기존 스키마 그대로 재사용, js/pu-health.js 참고)
   uid, kind: 'security-device'|'security-country'|'security-burst',
@@ -65,8 +67,9 @@ systemAlerts/{uid}/{id}:  (기존 스키마 그대로 재사용, js/pu-health.js
 1. **새 기기**: `deviceId`가 `login_devices/{uid}`에 없고, 그 계정에 **이미 기록된 기기가
    하나 이상 있을 때만** 의심으로 본다. (계정의 첫 로그인 기록 자체는 비교 대상이 없으므로
    기준선으로만 저장하고 알리지 않는다 — 켜는 첫날 전 직원이 한꺼번에 "새 기기"로 뜨는
-   것을 막는다.) 판정 여부와 무관하게 매번 `login_devices`에 기록해 다음부터는 "아는 기기"가
-   되게 한다.
+   것을 막는다.) **로그인이 실제로 성공했을 때만** `login_devices`에 기록해 다음부터는
+   "아는 기기"가 되게 한다 — 실패한 시도로는 기준선을 세우지 않는다(최종 검토에서 발견:
+   실패 뒤 성공하는 흔한 시도 순서가 새 기기 신호를 무력화하는 것을 막는다).
    - deviceId는 브라우저 `localStorage`에 저장하는 임의 문자열(최초 1회 생성) — 기기
      하드웨어 식별이 아니라 "이 브라우저를 전에 본 적 있는가"만 구분한다. 저장공간을
      지우면 다시 "새 기기"로 보일 수 있음(허용된 오탐).
