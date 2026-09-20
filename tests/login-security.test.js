@@ -92,7 +92,21 @@ test('buildAlerts — 걸린 것만 담고, 공통 자리(uid/email/page/status)
     assert.equal(a.status, 'new');
     assert.ok(a.kind.indexOf('security-') === 0);
     assert.ok(a.message.length > 0);
+    assert.ok(a.detail.includes('1.2.3.4'), 'detail에 IP 포함');
+    assert.ok(a.detail.includes('US'), 'detail에 국가 포함');
+    assert.ok(a.detail.includes('UA'), 'detail에 UA 포함');
   });
   assert.deepEqual(all.map((a) => a.kind).sort(),
     ['security-burst', 'security-country', 'security-device']);
+});
+
+test('buildAlerts — detail 필드의 (모름) 대체경로', () => {
+  const noIp = LS.buildAlerts({
+    uid: 'u2', email: 'b@pureun.kr', deviceIsNew: true, countryIsNew: false,
+    burstSuspicious: false, country: '', ip: '', ua: '', failCount: 0,
+  });
+  assert.equal(noIp.length, 1);
+  assert.ok(noIp[0].detail.includes('(모름)'), 'IP가 없으면 (모름) 표시');
+  assert.ok(!noIp[0].detail.includes(' · 국가'), 'country가 없으면 국가 부분 생략');
+  assert.ok(!noIp[0].detail.includes(' · ') || noIp[0].detail.indexOf(' · ') === noIp[0].detail.lastIndexOf(' · '), 'UA가 없으면 마지막 · 생략');
 });
