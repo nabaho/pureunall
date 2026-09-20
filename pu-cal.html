@@ -25,7 +25,7 @@
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=2"></script>
-<script src="js/pu-cal-write.js?v=2"></script>
+<script src="js/pu-cal-write.js?v=3"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -186,6 +186,25 @@
      #991b1b)은 그대로다 — 팔레트·tests/cal-same-as-erp.test.js 가 색만 못 박는다. */
   .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default;
     border-radius:0;margin:0 -4px}
+  /* 계정 잇기 — 할 일이 있을 때만 머리줄에 뜬다(없으면 아예 안 그린다) */
+  .linkacct{font-size:11.5px;padding:4px 10px;border:1px solid #fde68a;background:var(--warn-bg);
+    color:var(--warn);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
+    white-space:nowrap;flex-shrink:0;margin-left:auto}
+  .linkacct:hover{background:#fde68a}
+  /* 검색칸이 맨 오른쪽 — 잇기 단추가 왼쪽으로 밀어 준다 */
+  .calhead .linkacct + .srch{margin-left:8px}
+  .mmnote{font-size:11.5px;color:var(--warn);background:var(--warn-bg);border:1px solid #fde68a;
+    border-radius:8px;padding:7px 10px;margin-bottom:10px;line-height:1.5}
+  .mmlist{max-height:52vh;overflow-y:auto;margin-bottom:4px}
+  .mmrow{display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid var(--line)}
+  .mmwho{flex:1;min-width:0}
+  .mmmail{display:block;font-size:12px;font-weight:700;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mmn{display:block;font-size:10.5px;color:var(--sub);margin-top:1px}
+  .mmrow select{width:148px;flex-shrink:0;padding:5px 7px;font-size:11.5px;font-family:inherit;
+    border:1px solid var(--line);border-radius:6px;background:var(--warn-bg);color:var(--ink)}
+  .mmrow select.on{background:#f0fdf4}
+  .mmempty{font-size:12.5px;color:var(--sub);padding:18px 4px;text-align:center}
   /* 접힌 것이 몇인지 — 누르면 그 자리에서 펼쳐 보인다 */
   .more{font-size:10.5px;color:var(--sub);padding:0 4px;cursor:pointer;line-height:15px;
     font-weight:700;border-radius:3px;background:var(--bg);flex:none}
@@ -599,6 +618,84 @@ function 색채우기(){
   }catch(e){}
 }
 
+/* ── 구글 계정 ↔ 직원 잇기 ──────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 1걸음(나).
+
+   ★ 왜 여기로 왔나
+     구글 일정에는 «누가 만들었는지»(메일)만 남고 이름이 없다. 이어 주지 않으면
+     그 사람 일정이 담당자·색 없이 뜬다(메일로 늘 같은 색을 주긴 하지만 대표님이
+     고른 그 사람 색은 아니다). 이어 주는 화면이 이알피 법인 대시보드 한 곳뿐이라,
+     그 화면을 걷어내면 남은 사람을 영영 못 잇는다.
+
+   ★ 이알피와 «같은 열쇠»를 쓴다 — gcalMailKey(점 → 쉼표). 다르면 이어 둔 것을
+     서로 못 찾는다. 그래서 그 함수를 그대로 쓴다(새로 짓지 않는다).
+   ⚠ 관리자만 쓸 수 있다(서버 규칙). 색 채우기와 같은 잣대를 쓴다. */
+/* ⚠ typeof 로 본다 — 검사가 머리줄만 떼어 상자에 넣고 돌 때 ME 가 없다(chipHtml 과 같은 까닭) */
+function 잇기할수있나(){ return !!(typeof ME !== "undefined" && ME && ME.role === "admin"); }
+/* 지금 달력에 뜬 구글 일정에서 «만든이»를 모은다 — 많이 만든 사람부터 */
+function 메일줄들(){
+  var 셈 = {};
+  (GCAL.evs || []).forEach(function(e){
+    if(!e || !e.mail) return;
+    var k = gcalMailKey(e.mail);
+    if(!셈[k]) 셈[k] = { key:k, mail:e.mail, n:0 };
+    셈[k].n++;
+  });
+  var mp = gcalMailMap();
+  return Object.keys(셈).map(function(k){
+    var r = 셈[k]; r.sid = mp[k] || ""; return r;
+  }).sort(function(a,b){ return b.n - a.n; });
+}
+function 안이은수(){ return 메일줄들().filter(function(r){ return !r.sid; }).length; }
+function openMailMap(){ S.mailmap = { busy:false, err:"" }; render(); }
+function closeMailMap(){ S.mailmap = null; render(); }
+function mailmapHtml(){
+  var m = S.mailmap; if(!m) return "";
+  var 줄 = 메일줄들();
+  var 현직 = users().filter(function(u){ return u && u.status === "active"; });
+  return '<div class="veil" data-close="1"></div><div class="modal" style="max-width:560px">'
+    + '<h3>👤 구글 계정 ↔ 직원 잇기</h3>'
+    + '<div class="mmnote">한 번 이어 주면 그 뒤로 담당자 색과 거르기가 정확해집니다. '
+    +   '다른 PC 에서도 같이 보입니다.</div>'
+    + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : '')
+    + (줄.length
+        ? '<div class="mmlist">' + 줄.map(function(r){
+            return '<div class="mmrow">'
+              + '<div class="mmwho"><span class="mmmail" title="' + esc(r.mail) + '">' + esc(r.mail) + '</span>'
+              +   '<span class="mmn">' + r.n + '건 · ' + (r.sid ? esc(nameOf(r.sid)) + ' 이어짐' : '아직 안 이음') + '</span></div>'
+              + '<select data-mm="' + esc(r.key) + '"' + (m.busy ? ' disabled' : '')
+              +   ' class="' + (r.sid ? 'on' : '') + '">'
+              +   '<option value="">— 고르세요 —</option>'
+              +   현직.map(function(u){
+                    return '<option value="' + esc(u.sid) + '"' + (u.sid === r.sid ? ' selected' : '') + '>'
+                      + esc(u.name || u.sid) + '</option>';
+                  }).join("")
+              + '</select></div>';
+          }).join("") + '</div>'
+        : '<div class="mmempty">이 달에 구글 일정이 없습니다 — 달을 옮기면 그 달의 계정이 뜹니다.</div>')
+    + '<div class="mbtns"><span class="sp"></span>'
+    + '<button class="btn ghost" data-close="1">닫기</button></div></div>';
+}
+function 잇기저장(메일열쇠, sid){
+  var m = S.mailmap; if(!m || m.busy) return;
+  var 다음 = Object.assign({}, gcalMailMap());
+  if(sid) 다음[메일열쇠] = sid; else delete 다음[메일열쇠];
+  m.busy = true; m.err = ""; render();
+  PuCalWrite.saveMailMap(다음).then(function(r){
+    m.busy = false;
+    if(r && r.ok){
+      D.gcal_mail_sid = 다음;
+      /* 색을 다시 칠하려면 일정을 다시 «해석»해야 한다 — 받아 둔 것을 다시 그린다 */
+      gcalLoad(true);
+    } else {
+      m.err = (r && r.message) || "저장하지 못했습니다";
+    }
+    render();
+  })["catch"](function(e){
+    m.busy = false; m.err = (e && e.message) || String(e); render();
+  });
+}
+
 /* 실시간DB 열쇠에는 점(.)을 못 쓴다 — 이메일에는 점이 있어 쉼표로 바꿔 담는다.
    ⚠ 이알피와 «같은 셈»이어야 한다. 다르면 이어 둔 사람이 안 찾아진다. */
 function gcalMailKey(m){ return String(m || "").trim().toLowerCase().replace(/[.#$\[\]\/]/g, ","); }
@@ -698,6 +795,8 @@ function gcalToEvent(ev){
   /* ⚠ 아이콘을 안 붙인다 — 구글 화면에는 없다(kind 로 이미 갈린다) */
   return { kind:"gcal", store:"gcal", id:ev.id, sid:sid, date:date,
     text:title, time: (timeStr && timeStr !== "00:00") ? timeStr.replace(":","") : "",
+    /* 만든이 메일을 남긴다 — 「계정 잇기」 창이 «아직 안 이은 사람»을 여기서 센다 */
+    mail:mail, mailSid:mailSid || "",
     color:color, gcalUrl:ev.htmlLink || "",
     tip: title + (ev.location ? "\n📍 " + ev.location : "")
          + (mail ? "\n✉ " + mail : "") };
@@ -1160,8 +1259,18 @@ function monthbarHtml(){
 /* 검색칸 — 줄 맨 오른쪽 끝에 붙는다(.calhead .srch 의 margin-left:auto).
    ⚠ 달바 안에 두면 월|주|일 바로 옆에 붙어 오른쪽이 통째로 빈다. */
 function srchHtml(){
-  return '<span class="srch"><span class="ic">🔍</span>'
+  return 잇기단추Html()
+    + '<span class="srch"><span class="ic">🔍</span>'
     + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>';
+}
+/* 「계정 잇기」 단추 — 아직 안 이은 사람이 있을 때만, 관리자에게만 보인다.
+   ⚠ 할 일이 없으면 안 보인다. 늘 떠 있으면 머리줄만 좁아지고 아무도 안 누른다. */
+function 잇기단추Html(){
+  if(!잇기할수있나()) return "";
+  var 남음 = 안이은수();
+  if(!남음) return "";
+  return '<button class="linkacct" data-mmopen="1" title="구글 일정에는 «누가 만들었는지»만 남습니다.'
+    + ' 한 번 이어 주면 그 뒤로 담당자 색이 정확해집니다.">👤 계정 잇기 ' + 남음 + '명</button>';
 }
 
 /* 검색 — 제목·메모·사람 이름 어디에 걸려도 남긴다 */
@@ -1654,6 +1763,7 @@ function render(){
   var 달력 = (tab.v === "cal" || tab.v === "eumcal");
   if(달력) html += 펼침Html(tab.v === "eumcal");
   html += modalHtml();
+  html += mailmapHtml();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   $('app').innerHTML = html;
   /* 달력 탭에서만 화면에 «딱» 맞춘다 — 다른 탭은 여느 때처럼 제 안에서 굴러간다 */
@@ -1696,7 +1806,7 @@ document.addEventListener('click', function(e){
      && !(e.target.closest && e.target.closest("[data-more]"))){
     S.open = null; render();
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -1733,7 +1843,9 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-open')){ window.open(t.getAttribute('data-open'), '_blank', 'noopener'); return; }
   if(t.hasAttribute('data-f')){ modalRead(); var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
   if(t.hasAttribute('data-erp')){ goErp(t.getAttribute('data-erp')); return; }
-  if(t.hasAttribute('data-close')){ closeModal(); return; }
+  if(t.hasAttribute('data-mmopen')){ openMailMap(); return; }
+  /* 닫기 — 잇기 창이 열려 있으면 그것부터 닫는다(둘이 겹쳐 뜨지 않는다) */
+  if(t.hasAttribute('data-close')){ if(S.mailmap) closeMailMap(); else closeModal(); return; }
   if(t.hasAttribute('data-act')){
     if(t.getAttribute('data-act')==='save') doSave(); else doDelete();
     return;
@@ -1790,6 +1902,11 @@ document.addEventListener('input', function(e){
   if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} }
 });
 
+/* 계정 잇기 — 고르면 «바로» 저장한다(따로 저장 단추를 두지 않는다) */
+document.addEventListener('change', function(e){
+  if(!S.mailmap || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-mm')) return;
+  잇기저장(e.target.getAttribute('data-mm'), e.target.value);
+});
 document.addEventListener('change', function(e){
   if(!S.modal || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-m')) return;
   var f = e.target.getAttribute('data-m');
@@ -1798,7 +1915,9 @@ document.addEventListener('change', function(e){
 });
 /* ESC 로 창을 닫는다 — 뒤로가기 층과 다투지 않게 여기서만 받는다 */
 document.addEventListener('keydown', function(e){
-  if(e.key === 'Escape' && S.modal){ e.preventDefault(); closeModal(); }
+  if(e.key !== 'Escape') return;
+  if(S.mailmap){ e.preventDefault(); closeMailMap(); return; }
+  if(S.modal){ e.preventDefault(); closeModal(); }
 });
 
 $('goErp').onclick = function(){ goErp(''); };

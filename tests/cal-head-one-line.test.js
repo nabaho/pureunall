@@ -65,6 +65,10 @@ function 머리줄그려본다() {
     'function monthGrid(ym){', 'function passFilter(ev){',
     'function shiftDay(ymd, n){', 'function ymdOf(y, m, d){', 'function lunarDay(ymd){',
     'function lunarRange(ym){', 'function weekDays(ymd){', 'function ieumPeople(){',
+    /* 2026-09-20 — srchHtml 이 「계정 잇기」 단추를 앞에 붙인다(1걸음-나).
+       그 단추가 세는 함수들도 함께 넣어야 상자가 돈다. */
+    'function 잇기할수있나(){', 'function 메일줄들(){', 'function 안이은수(){',
+    'function 잇기단추Html(){',
     'function monthbarHtml(){', 'function srchHtml(){', 'function chipsHtml(eumOnly){',
     'function calheadHtml(eumOnly){'];
   let 조각 = 'var _lunar = {}; var GCAL = { evs:[], ym:"", loading:false, err:"" };\n'
