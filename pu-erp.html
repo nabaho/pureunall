@@ -87723,6 +87723,12 @@ document.addEventListener('keydown', function(e){
     var n=Number(v); if(!isNaN(n)) return n >= .5 ? '예' : '아니오';
     return /true|yes|예/i.test(String(v)) ? '예' : '아니오';
   }
+  function confidenceOf(a){
+    var vals=Object.keys(a||{}).map(function(k){ return Number(a[k]&&a[k].confidence); }).filter(function(v){ return !isNaN(v); });
+    if(!vals.length) return '제공되지 않음';
+    var n=Math.round((vals.reduce(function(sum,v){ return sum+v; },0)/vals.length)*100);
+    return n+'%';
+  }
   function close(){ if(host) host.style.display='none'; }
   function make(){
     if(host) return;
@@ -87760,8 +87766,10 @@ document.addEventListener('keydown', function(e){
       var data=await resp.json().catch(function(){ return {}; });
       if(!resp.ok || !data.ok) throw new Error(data.error||('서버 응답 '+resp.status));
       var a=data.answers||{};
-      var urgency=answerOf(a.urgency); var route=answerOf(a.route); var review=answerOf(a.human_review);
-      result.innerHTML='<strong style="color:#1e293b">검토 제안</strong><br>· 긴급·기한 민감: <b>'+yesNo(urgency)+'</b><br>· 검토 경로: <b>'+esc(route||'판단 결과 없음')+'</b><br>· 사람 확인 필요: <b>'+yesNo(review)+'</b>'+(data.maskedKinds&&data.maskedKinds.length?'<div style="margin-top:7px;color:#64748b">가린 항목: '+esc(data.maskedKinds.join(', '))+'</div>':'')+'<div style="margin-top:8px;color:#64748b">이 결과는 참고용입니다. 실제 저장·발송·상태 변경은 직접 확인 후 처리하세요.</div>';
+      var urgency=answerOf(a.urgency), route=answerOf(a.route), review=answerOf(a.human_review);
+      var deadline=answerOf(a.deadline), impact=answerOf(a.impact), risk=answerOf(a.legal_wage_risk);
+      var privacy=answerOf(a.privacy_security), missing=answerOf(a.info_missing), first=answerOf(a.first_action);
+      result.innerHTML='<strong style="color:#1e293b">검토 제안</strong><br>· 긴급·기한 민감: <b>'+yesNo(urgency)+'</b><br>· 응답 시점: <b>'+esc(deadline||'판단 결과 없음')+'</b><br>· 검토 경로: <b>'+esc(route||'판단 결과 없음')+'</b><br>· 영향 범위: <b>'+esc(impact||'판단 결과 없음')+'</b><br>· 노무·임금·계약 위험: <b>'+esc(risk||'판단 결과 없음')+'</b><br>· 개인정보·보안 주의: <b>'+yesNo(privacy)+'</b><br>· 추가 자료 필요: <b>'+yesNo(missing)+'</b><br>· 권장 첫 조치: <b>'+esc(first||'판단 결과 없음')+'</b><br>· 사람 확인 필요: <b>'+yesNo(review)+'</b><br>· 평균 판단 신뢰도: <b>'+confidenceOf(a)+'</b>'+(data.maskedKinds&&data.maskedKinds.length?'<div style="margin-top:7px;color:#64748b">가린 항목: '+esc(data.maskedKinds.join(', '))+'</div>':'')+'<div style="margin-top:8px;color:#64748b">이 결과는 참고용입니다. 실제 저장·발송·상태 변경은 직접 확인 후 처리하세요.</div>';
       result.style.display='block'; status.textContent='저장하지 않은 제안 결과입니다.';
     }catch(e){ status.textContent=''; result.textContent='검토를 받지 못했습니다: '+String((e&&e.message)||e); result.style.display='block'; }
     finally{ runBtn.disabled=false; runBtn.style.opacity='1'; }

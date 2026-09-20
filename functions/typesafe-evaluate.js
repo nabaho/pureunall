@@ -42,6 +42,42 @@ function questions() {
       },
     },
     human_review: { type: "noul", instructions: "Should a human review this before any action is taken?" },
+    deadline: {
+      type: "choice", instructions: "What response timeframe does this request need?",
+      criteria: {
+        "오늘": "Needs action today or within 24 hours",
+        "3일 이내": "Needs action within three days",
+        "이번 주": "Needs action this week but not today",
+        "일반": "No clear near-term deadline",
+      },
+    },
+    impact: {
+      type: "choice", instructions: "How broad is the likely impact if this is not handled?",
+      criteria: {
+        "한 사람·한 업체": "Affects one person or one client company",
+        "여러 업체": "Affects multiple client companies or workers",
+        "시스템 전체": "Affects shared ERP, access, or a system-wide process",
+      },
+    },
+    legal_wage_risk: {
+      type: "choice", instructions: "How much labor-law, payroll, or contractual risk needs expert attention?",
+      criteria: {
+        "높음": "Could create material legal, payroll, filing, or contractual risk",
+        "보통": "Needs routine professional review but is not clearly high risk",
+        "낮음": "Appears administrative or low risk",
+      },
+    },
+    privacy_security: { type: "noul", instructions: "Does this request require privacy or information-security caution?" },
+    info_missing: { type: "noul", instructions: "Is essential information missing before a person can act on this request?" },
+    first_action: {
+      type: "choice", instructions: "What is the safest first human action?",
+      criteria: {
+        "담당자 확인": "Confirm facts or ownership with the responsible person",
+        "자료 요청": "Request missing documents, details, or evidence",
+        "즉시 대응": "Take prompt human action to prevent a deadline or operational issue",
+        "일반 답변": "A normal informational response is the appropriate first step",
+      },
+    },
   };
 }
 
