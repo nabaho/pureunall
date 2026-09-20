@@ -63,8 +63,11 @@ test('★★★ 추적밑주소가 있으면 손잡이가 «우리 쪽»(newsFul
 test('★★ 행정해석(expc)도 같은 규칙이다', () => {
   const 링크 = 'https://www.law.go.kr/DRF/lawService.do?OC=test&target=expc&type=HTML&ID=340383';
   const h = 판례편지(링크, { 추적밑주소: 밑주소 });
+  /* ⚠ 주소 끝에 «모양 판»(&v=…)이 붙는다 — 갈무리를 비껴가기 위한 것이라
+       늘어날 수 있다(js/pu-news-tpl.js 전문쪽모양판). 규칙은 «우리 쪽으로 가고
+       표가 붙는가»이지, 물음표 뒤가 한 글자도 안 바뀌는 것이 아니다. */
   assert.match(h, new RegExp('href="' + 밑주소.replace(/[.]/g, '\\.')
-    + '/newsFullPage\\?t=expc&amp;id=340383"[^>]*data-full="expc:340383"'));
+    + '/newsFullPage\\?t=expc&amp;id=340383[^"]*"[^>]*data-full="expc:340383"'));
 });
 
 test('★ 추적밑주소가 없으면 «예전처럼» 법제처 원문이다 — 나빠지지 않는다', () => {
@@ -158,5 +161,10 @@ test('★★★ newsFullPage 도 «우리 자료»를 하나도 안 읽는다', 
     assert.ok(몫.indexOf(말) < 0, 'newsFullPage 가 「' + 말 + '」 을 만진다');
   });
   assert.match(몫, /NF\.읽기\(req\.query\)/, '★★★ 물음을 안 걸러 받는다 — 갈래·번호가 새는 문');
-  assert.match(몫, /max-age=86400/, '하루 안 굳힌다');
+  /* ⚠ 2026-09-20 에 하루(86400) → 한 시간(3600)으로 줄였다 — 까닭은
+       tests/newsletter-full-fresh.test.js 머리말 참고(고친 모양이 하루 동안 안 닿았다).
+       지키는 규칙은 그대로다: «매번 다시 받지 않는다». 값이 아니라 그것을 본다. */
+  const 굳 = /max-age=(\d+)/.exec(몫);
+  assert.ok(굳 && Number(굳[1]) > 0, '갈무리를 아예 안 한다 — 매번 법제처를 두드린다');
+  assert.match(몫, /public/, '갈무리를 «공용»으로 안 한다');
 });

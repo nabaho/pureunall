@@ -3056,7 +3056,9 @@ exports.newsFull = functions
           법제처: NF.법제처주소(q.갈래, q.번호) });
         return;
       }
-      res.set("Cache-Control", "public, max-age=86400");
+      /* ⚠ 위 newsFullPage 와 «같은 잣대»다 — 여기가 길면 그 자리에서 편 것만
+           옛 모양으로 남는다(두 화면이 달라진다). 까닭은 그쪽 주석 참고. */
+      res.set("Cache-Control", "public, max-age=3600");
       res.status(200).json(Object.assign({}, 것, { 법제처: NF.법제처주소(q.갈래, q.번호) }));
     } catch (e) {
       console.warn("newsFull", (e && e.message) || e);
@@ -3104,7 +3106,15 @@ exports.newsFullPage = functions
         res.status(404).send(NF.오류쪽(NF.까닭말[것.까닭] || NF.까닭말["빈답"], 법제처));
         return;
       }
-      res.set("Cache-Control", "public, max-age=86400");
+      /* ⚠⚠ 하루(86400)로 굳혀 두었더니, 쪽 «모양»을 고쳐 배포해도 이미 갈무리된
+           것이 하루까지 그대로 나왔다 — 2026-09-20 실측(age=15056 으로 옛 모양).
+           대표께서 고친 것을 눌러 보시고 «안 고쳐졌다»고 보시게 된다.
+         ★ 한 시간으로 줄인다. 법제처 문을 두드리는 횟수는 여전히 24 배 적고
+           (OC 가 시험 계정이라 한도가 있다 — 그래서 아주 끄지는 않는다),
+           모양을 고치면 한 시간 안에 모두에게 닿는다.
+         ★ 그래도 «지금 당장» 바꿔야 할 때가 있다 — 그때는 편지가 주소 끝에 붙이는
+           모양 판(js/pu-news-tpl.js 전문쪽모양판)을 올린다. 주소가 달라져 곧바로 새것이 된다. */
+      res.set("Cache-Control", "public, max-age=3600");
       res.status(200).send(NF.쪽(것, 법제처));
     } catch (e) {
       console.warn("newsFullPage", (e && e.message) || e);
