@@ -107,7 +107,8 @@
     vendorDown: '조금 뒤에 다시 눌러 주세요 — 우리 쪽 문제가 아닙니다.',
     network: '잠시 뒤 다시 눌러 주세요. 되풀이되면 알려 주세요.',
     dayLimit: '내일 다시 쓸 수 있습니다.',
-    noKey: '대표님께 알려 주세요 — 서버 금고에 열쇠가 없습니다.'
+    noKey: '대표님께 알려 주세요 — 서버 금고에 열쇠가 없습니다.',
+    adminOnly: '지금은 관리자만 쓸 수 있습니다 — 대표님께 요청해 주세요.'
   };
   function failure(data, httpStatus) {
     var e = new Error((data && data.error) || ('서버 응답 ' + httpStatus));
@@ -155,6 +156,42 @@
     try { return !!(w.firebase && firebase.auth && firebase.auth().currentUser); } catch (_) { return false; }
   }
 
+  /* ── 관리자만 (2026-09-20 대표 지시 「관리자만 일단쓴다」) ────────────────────
+     ⚠ 로그인 여부와 «반대로» 다룬다 — 모르면 안 보여 준다(fail-closed).
+       로그인 판정은 몰라도 안전(그저 단추가 안 보일 뿐)하지만, 관리자 판정을
+       몰라서 «보여 주는» 쪽으로 잘못 넘어가면 권한 없는 사람이 단추를 보게 된다.
+     호스트가 PU_TYPESAFE_IS_ADMIN 을 정의해 두면 그것을 먼저 따른다(이알피가 그렇다 —
+     이미 아는 CURRENT_USER.isAdmin 을 바로 넘겨줘, 아래 서버 왕복이 필요 없다).
+     안 정의한 화면은 이 부품이 스스로 uid_roles/{uid} 를 읽어 알아낸다
+     (js/pu-backup.js 가 관리자 단추를 보일 때 쓰는 것과 같은 자리·같은 뜻).
+     ★ 서버(functions/index.js typeSafeIsAdmin)도 «같은 자리»를 다시 본다 — 여기 판정은
+       화면 표시일 뿐이고, 진짜 자격은 매번 서버가 다시 검사한다. */
+  var _adminKnownUid = null, _adminKnownValue = false;
+  function adminOverride() {
+    if (typeof w.PU_TYPESAFE_IS_ADMIN !== 'function') return null;
+    try { return !!w.PU_TYPESAFE_IS_ADMIN(); } catch (_) { return false; }
+  }
+  function isAdmin() {
+    var o = adminOverride();
+    if (o !== null) return o;
+    var user = w.firebase && firebase.auth && firebase.auth().currentUser;
+    return !!user && _adminKnownUid === user.uid && _adminKnownValue;
+  }
+  /* 호스트가 안 알려 주는 화면만 스스로 읽는다 — 한 uid 당 한 번, 결과가 오면 다시 그린다. */
+  function lookUpAdminIfNeeded(user) {
+    if (typeof w.PU_TYPESAFE_IS_ADMIN === 'function') return;   // 호스트가 이미 안다
+    if (!user || _adminKnownUid === user.uid) return;
+    try {
+      if (!w.firebase || typeof firebase.database !== 'function') { _adminKnownUid = user.uid; _adminKnownValue = false; return; }
+      var uid = user.uid;
+      firebase.database().ref('uid_roles/' + uid).once('value').then(function (snap) {
+        var role = snap.val() || {};
+        _adminKnownUid = uid; _adminKnownValue = !!(role.isAdmin || role.isSubAdmin);
+        refreshVisibility();
+      }, function () { _adminKnownUid = uid; _adminKnownValue = false; refreshVisibility(); });  // 못 읽으면 «아니다»
+    } catch (_) { _adminKnownUid = user.uid; _adminKnownValue = false; }
+  }
+
   function css() {
     if (d.getElementById('pu-typesafe-css')) return;
     var st = d.createElement('style'); st.id = 'pu-typesafe-css';
@@ -166,19 +203,23 @@
   }
 
   function refreshVisibility() {
-    try { d.body.classList.toggle('pu-typesafe-hidden', !isLoggedIn()); } catch (_) {}
+    try { d.body.classList.toggle('pu-typesafe-hidden', !(isLoggedIn() && isAdmin())); } catch (_) {}
   }
 
   function addButton() {
     css();
     if (d.getElementById('pu-typesafe-review-button')) return;
     var b = d.createElement('button'); b.id = 'pu-typesafe-review-button'; b.type = 'button'; b.textContent = '✨ TypeSafe 검토';
-    b.title = '개인정보를 가린 뒤 제안만 받습니다';
+    b.title = '개인정보를 가린 뒤 제안만 받습니다 (관리자 전용)';
     b.style.cssText = 'position:fixed;left:14px;bottom:64px;z-index:8998;border:1px solid #bfdbfe;border-radius:999px;background:#fff;color:#1e40af;padding:8px 12px;font:700 12px inherit;box-shadow:0 4px 14px rgba(30,64,175,.15);cursor:pointer;';
     b.onclick = function () { make(); host.style.display = 'flex'; input.focus(); };
     d.body.appendChild(b);
     refreshVisibility();
-    try { if (w.firebase && firebase.auth) firebase.auth().onAuthStateChanged(refreshVisibility); } catch (_) {}
+    try {
+      if (w.firebase && firebase.auth) {
+        firebase.auth().onAuthStateChanged(function (user) { lookUpAdminIfNeeded(user); refreshVisibility(); });
+      }
+    } catch (_) {}
   }
 
   w.PuTypeSafe = {

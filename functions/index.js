@@ -2140,6 +2140,24 @@ async function typeSafeDayLeft(uid) {
   }
 }
 
+/* 관리자만 — 대표 결정 2026-09-20 「관리자만 일단쓴다」.
+   ⚠ 위 하루 문(typeSafeDayLeft)과 «반대 방향»으로 못 읽음을 다룬다.
+     하루 문은 못 읽으면 열어 둬도 사고가 안 난다(한도가 잠깐 없어질 뿐이다).
+     여기서 못 읽고도 열어 두면 «권한 없는 사람에게 권한을 준» 것과 같다.
+     그래서 자격 확인은 실패를 «막힘»으로 다룬다(fail-closed). */
+async function typeSafeIsAdmin(uid) {
+  if (!uid) return false;
+  try {
+    const db = getDatabase();
+    const snap = await db.ref("uid_roles/" + uid).once("value");
+    const role = snap.val() || {};
+    return !!(role.isAdmin || role.isSubAdmin);
+  } catch (e) {
+    console.warn("Jev 관리자 확인 못 함(막는다):", String((e && e.message) || e));
+    return false;
+  }
+}
+
 /* 센다 — «성공한 것만» 센다. 열쇠가 거절당한 부름은 글이 업체에 남지 않았으므로
    한도를 먹일 까닭이 없다(그것까지 세면 첫 시험 몇 번에 하루 몫이 날아간다).
    ★ ServerValue.increment 대신 «거래»로 올린다 — 이 파일에 admin 변수가 없다(위 bumpReadTally 참고). */
@@ -2165,6 +2183,13 @@ exports.typeSafeEvaluate = functions
     let who;
     try { who = await requireReader(req); }
     catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    /* ── 관리자만 (2026-09-20 대표 지시) — 열쇠 유무보다 «먼저» 본다 ──────────────
+       관리자가 아닌 사람에게는 서버 금고 상태(열쇠가 있는지 없는지)조차 알려 줄
+       까닭이 없다. 로그인 확인 다음, 그 무엇보다 먼저 자격을 본다. */
+    if (!(await typeSafeIsAdmin(who && who.uid))) {
+      res.status(403).json({ ok: false, why: "adminOnly", error: "지금은 관리자만 쓸 수 있습니다." });
+      return;
+    }
     const key = String(process.env.TYPESAFE_API_KEY || "").trim();
     if (!key || key === "unset") {
       res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
