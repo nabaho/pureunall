@@ -152,7 +152,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=9">
+<link rel="stylesheet" href="css/pu-erp.css?v=10">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=2"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -306,8 +306,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-19 이관 누락 넷 고침 — 법인번호·대표자전화·본사주소·대표자2';
-var BUILD_SEQ = 181;
+var ERP_BUILD = '2026-09-19 계약창 여섯 칸 — 라벨을 셀 안 placeholder 로, 긴 값은 한 줄 통째로';
+var BUILD_SEQ = 182;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -18870,42 +18870,35 @@ function ContractModal(props){
       if(!file) return;
       attachFile(field, file, function(b64){ runOcr(field, b64); });
     }
-    /* ⚠★ 한 줄로 합쳤다가 «되돌렸다» (대표 지시 2026-09-18 「캡쳐 기존으로 돌려라」).
-       기둥이 좁아 한 줄이 도로 세 줄로 접혔고, 그때는 제목과 단추가 갈라져
-       「어느 서류의 단추인지」가 더 헷갈렸다. 넓은 화면을 믿고 한 줄에 몰면 안 된다 —
-       세로로 쪼갠 기둥은 한 줄이 짧다. 제목을 머리에 두는 옛 모습이 맞다. */
-    return h('div', { style:{ flex:1, minWidth:0 } },
-      h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'4px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'4px', flexWrap:'wrap' } },
-        h('span', null, title),
-        h('span', { style:{ display:'inline-flex', alignItems:'center', gap:'4px', flexWrap:'wrap' } },
-          /* (2026-08-09) 사진이 아니라 «정보» 를 가져온다 — 대표 지시.
-             사진은 기업정보함에 이미 있으니 두 번 보관할 이유가 없다. */
-          h('button', { type:'button', onClick:function(){ setPcCoPick(field); },
-            title:'기업정보함에서 회사정보(사업자번호·대표·업태·종목·주소·연락처)를 가져옵니다\n'
-                 +'— 사진은 가져오지 않습니다. 사진은 기업정보함에서 보세요',
-            style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'2px 8px', borderRadius:'4px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
-            '📇 기업정보함 정보 가져오기'),
-          h('a', { href:'pu-cards.html', target:'_blank', rel:'noopener',
-            title:'기업정보함을 새 탭에서 엽니다 — 사진은 거기서 보세요',
-            style:{ color:'#64748b', fontSize:'10.5px', textDecoration:'underline', whiteSpace:'nowrap' } },
-            '기업정보함에서 보기')
-        )
-      ),
-      /* 사진으로 «채우기» — 붙이기가 아니다. 끌어다 놓기도 여기서 받는다. */
-      h('div', {
-          onDragOver:function(e){ e.preventDefault(); },
-          onDrop:function(e){ e.preventDefault(); fillFrom(e.dataTransfer.files && e.dataTransfer.files[0]); },
-          style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
+    /* ⚠★ 한 줄로 (대표 지시 2026-09-19 「캡쳐2 정도는 한줄로 정리」).
+       2026-09-18 에는 창이 620px 라 한 줄이 도로 세 줄로 접혔었다. 지금은
+       계약창이 1080px 라 제목·단추·사진 버튼이 한 줄에 다 들어간다.
+       글자를 줄였다(「기업정보함 정보 가져오기」→「가져오기」 등) — 전문은
+       title 로 옮겼다. */
+    return h('div', { className:'dz1line', style:{ flex:1, minWidth:0 },
+        onDragOver:function(e){ e.preventDefault(); },
+        onDrop:function(e){ e.preventDefault(); fillFrom(e.dataTransfer.files && e.dataTransfer.files[0]); } },
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap',
+          border:'1px solid #e2e8f0', borderRadius:'6px', padding:'5px 8px', background:'#f8fafc' } },
+        h('span', { style:{ fontSize:'11px', fontWeight:700, color:'#475569', whiteSpace:'nowrap', flexShrink:0 } }, title),
+        h('button', { type:'button', onClick:function(){ setPcCoPick(field); },
+          title:'기업정보함에서 회사정보(사업자번호·대표·업태·종목·주소·연락처)를 가져옵니다\n'
+               +'— 사진은 가져오지 않습니다. 사진은 기업정보함에서 보세요',
+          style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'2px 8px', borderRadius:'4px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } },
+          '📇 가져오기'),
+        h('a', { href:'pu-cards.html', target:'_blank', rel:'noopener',
+          title:'기업정보함을 새 탭에서 엽니다 — 사진은 거기서 보세요',
+          style:{ color:'#64748b', fontSize:'10.5px', textDecoration:'underline', whiteSpace:'nowrap', flexShrink:0 } },
+          '보기'),
         h('button', { type:'button', disabled:ocrBusy,
           onClick:function(){ var el = document.getElementById(inpId); if(el) el.click(); },
           title:'사진을 골라 «글자만» 읽어 빈 칸을 채웁니다.\n'
                +'⚠ 사진은 계약에 저장하지 않습니다 — 사진은 기업정보함에 둡니다.\n'
                +'PC 는 끌어다 놓기 · Ctrl+V 도 됩니다',
-          style:{ background:ocrBusy?'#cbd5e1':'#f8fafc', color:ocrBusy?'#fff':'#475569',
-            border:'1px dashed '+(ocrBusy?'#cbd5e1':'#cbd5e1'), padding:'5px 10px', borderRadius:'6px',
-            fontSize:'10.5px', fontWeight:700, cursor:ocrBusy?'wait':'pointer', whiteSpace:'nowrap' } },
-          ocrBusy ? '⏳ 읽는 중…' : '📷 사진으로 채우기'),
-        h('span', { style:{ fontSize:'10px', color:'#94a3b8' } }, '글자만 읽고 사진은 버립니다'),
+          style:{ marginLeft:'auto', background:ocrBusy?'#cbd5e1':'#fff', color:ocrBusy?'#fff':'#475569',
+            border:'1px dashed '+(ocrBusy?'#cbd5e1':'#cbd5e1'), padding:'3px 8px', borderRadius:'5px',
+            fontSize:'10.5px', fontWeight:700, cursor:ocrBusy?'wait':'pointer', whiteSpace:'nowrap', flexShrink:0 } },
+          ocrBusy ? '⏳ 읽는 중…' : '📷 채우기'),
         h('input', { id:inpId, type:'file', accept:'image/*,.pdf',
           onChange:function(e){ var fl = e.target.files && e.target.files[0]; e.target.value=''; fillFrom(fl); },
           style:{ display:'none' } })
@@ -19063,33 +19056,25 @@ function ContractModal(props){
     });
   }
 
-  function fld(label, ctrl){
-    // 라벨에 * 있으면 빨간색 강조
-    var labelNode = label.indexOf('*') >= 0
-      ? h('label', null,
-          label.replace(' *','').replace('*',''),
-          h('span', { style:{ color:'#dc2626', fontWeight:700, marginLeft:'2px' } }, ' *'))
-      : h('label', null, label);
-    return h('div', { className:'fld' }, labelNode, ctrl);
+  /* 부담당 칸만은 라벨을 남긴다(className:'pu-c4' 를 직접 씀, 아래 예외 설명 참고) —
+     여기 있던 fld()·fld4()·sec4() 는 6칸/무라벨 전환(2026-09-19) 뒤로는 부르는
+     자리가 없어 걷어냈다. 자리를 세는 css(.pu-c4/.pu-g4-sec)는 CompanyEditModal 이
+     그대로 쓰므로 css/pu-erp.css 에는 남겨 둔다. */
+  /* ── 여섯 칸 · 라벨 없이 (대표 지시 2026-09-19 「셀 위 안내설명을 셀 안에」) ──
+     ⚠ ctrl 이 스스로 placeholder(또는 select 의 첫 옵션)로 무엇인지 말한다.
+       예전 라벨-위 칸처럼 <label> 을 더 그리지 않는다 — 값을 채우면 이름이 사라지는
+       대신, «칸 차례가 늘 같다»로 무엇인지 가늠한다(대표 승인 2026-09-19). */
+  function fldn6(ctrl, span){
+    var cn = 'pu-n6' + (span > 1 ? (' pu-n6-' + span) : '');
+    return h('div', { className:cn }, ctrl);
   }
-
-  /* ── 4칸 칸 만들개 (대표 지시 2026-09-18 「4칸으로 한다」) ──────────────
-     fld() 와 쓰임은 같고 «라벨이 칸 위»에 온다는 것만 다르다(css 의 .pu-c4).
-     span 은 이 칸이 네 칸 중 몇 칸을 차지할지다 — 회사명·주소처럼 긴 값은 4.
-     ⚠ 짧은 값만 1칸에 넣는다. 긴 값을 1칸에 우겨넣으면 글자가 칸 밖으로 밀린다. */
-  function fld4(label, ctrl, span){
-    var labelNode = label.indexOf('*') >= 0
-      ? h('label', null, label.replace(' *','').replace('*',''),
-          h('span', { style:{ color:'#dc2626', fontWeight:700, marginLeft:'2px' } }, ' *'))
-      : h('label', null, label);
-    var cn = 'pu-c4' + (span > 1 ? (' pu-c4-' + span) : '');
-    return h('div', { className:cn }, labelNode, ctrl);
-  }
-  /* 묶음 머리 — 「여기서부터 연락처」처럼 덩어리를 가른다. hint 는 오른쪽 옅은 글씨. */
-  function sec4(title, hint){
-    return h('div', { className:'pu-g4-sec' }, h('span', null, title),
+  function sec6(title, hint){
+    return h('div', { className:'pu-g6-sec' }, h('span', null, title),
       hint ? h('span', { className:'hint' }, hint) : null);
   }
+  /* select 의 «칸 안 안내글» — 첫 옵션을 disabled·hidden 으로 두면 값을 고르기
+     전에는 그 옵션이 보이다가, 고르면 다른 값들과 똑같이 보인다. */
+  function phOption(text){ return h('option', { value:'', disabled:true, hidden:true }, text); }
 
   /* ══════ 한 화면에 펴기 (대표 지시 2026-09-18 · 목업 승인) ══════════════════
      「계약관리 전체 화면이 아래로 안 내려가고 한 화면에 모두 볼 수 있게 좌우로 넓게」
@@ -19244,8 +19229,9 @@ function ContractModal(props){
                     color:'#1e40af', fontWeight:600, fontFamily:'inherit' } },
                   '📷 사진첩에서 찾기')
               ),
-              // 입력 필드
-              h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px' } },
+              // 입력 필드 — 이름·주민번호·직책·연락처·입사~퇴사가 한 줄(여섯 칸),
+              // 주소·이메일·비고가 다음 한 줄 (대표 지시 2026-09-19 「근로자도 회사와 같이 … 줄을 줄이는게 좋겠다」)
+              h('div', { className:'pu-g6' },
                 h('input', { type:'text', value:wk.name || '',
                   onPaste:function(e){
                     var cd = e.clipboardData || window.clipboardData;
@@ -19282,11 +19268,27 @@ function ContractModal(props){
                   onChange:function(e){ setWorker(idx, 'phone', e.target.value); },
                   placeholder:'연락처',
                   style:{ padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } }),
-                h('div', { style:{ gridColumn:'span 2', display:'flex', gap:'4px' } },
+                /* 입사~퇴사 — 한 칸(두 칸 너비)으로 묶는다. 따로 두면 폭이 애매할 때
+                   각자 «최소 폭»을 채우지 못해 하나가 혼자 다음 줄로 흘러내렸다
+                   (실측 2026-09-19, 1031px 화면 — 회사 쪽 담당자 칸에서도 같은 일이 났다). */
+                h('div', { style:{ gridColumn:'span 2', display:'flex', alignItems:'center', gap:'4px' } },
+                  h(KoreanDatePicker, { value:wk.hireDate || '',
+                    onChange:function(e){ setWorker(idx, 'hireDate', e.target.value); },
+                    title:'입사일',
+                    style:{ flex:1, minWidth:0, padding:'7px 6px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'inherit' } }),
+                  h('span', { style:{ color:'#94a3b8', fontSize:'11px', flexShrink:0 } }, '~'),
+                  h(KoreanDatePicker, { value:wk.leaveDate || '',
+                    onChange:function(e){ setWorker(idx, 'leaveDate', e.target.value); },
+                    title:'퇴사일',
+                    style:{ flex:1, minWidth:0, padding:'7px 6px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'inherit' } })
+                ),
+                /* 주소·이메일·비고 — «한 줄»로 (대표 지시 2026-09-19). 검색 단추를
+                   주소 바로 옆에 두어 회사 쪽 사업장주소와 같은 결로 맞췄다. */
+                h('div', { style:{ gridColumn:'1 / -1', display:'flex', gap:'6px' } },
                   h('input', { type:'text', value:wk.address || '',
                     onChange:function(e){ setWorker(idx, 'address', e.target.value); },
                     placeholder:'주소',
-                    style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } }),
+                    style:{ flex:'2.2 1 0', minWidth:0, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } }),
                   h('button', { type:'button',
                     onClick:function(){
                       openAddressSearch(function(r){
@@ -19300,27 +19302,16 @@ function ContractModal(props){
                         showToast(ADDR_OK_MSG + r.address);
                       }, wk.address);   // 적어 둔 주소로 미리 찾기
                     },
-                    style:{ padding:'6px 10px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '🔍')
-                ),
-                h('input', { type:'email', value:wk.email || '',
-                  onChange:function(e){ setWorker(idx, 'email', e.target.value); },
-                  placeholder:'이메일',
-                  style:{ gridColumn:'span 2', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } }),
-                // 입사일/퇴사일
-                h('div', { style:{ display:'flex', alignItems:'center', gap:'4px' } },
-                  h('span', { style:{ fontSize:'10.5px', color:'#64748b', minWidth:'32px' } }, '입사:'),
-                  h(KoreanDatePicker, { value:wk.hireDate || '',
-                    onChange:function(e){ setWorker(idx, 'hireDate', e.target.value); },
-                    style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } })),
-                h('div', { style:{ display:'flex', alignItems:'center', gap:'4px' } },
-                  h('span', { style:{ fontSize:'10.5px', color:'#64748b', minWidth:'32px' } }, '퇴사:'),
-                  h(KoreanDatePicker, { value:wk.leaveDate || '',
-                    onChange:function(e){ setWorker(idx, 'leaveDate', e.target.value); },
-                    style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } })),
-                h('input', { type:'text', value:wk.note || '',
-                  onChange:function(e){ setWorker(idx, 'note', e.target.value); },
-                  placeholder:'비고 (사건 관련 메모)',
-                  style:{ gridColumn:'span 2', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } })
+                    style:{ flexShrink:0, padding:'6px 10px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } }, '🔍'),
+                  h('input', { type:'email', value:wk.email || '',
+                    onChange:function(e){ setWorker(idx, 'email', e.target.value); },
+                    placeholder:'이메일',
+                    style:{ flex:'1.2 1 0', minWidth:0, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } }),
+                  h('input', { type:'text', value:wk.note || '',
+                    onChange:function(e){ setWorker(idx, 'note', e.target.value); },
+                    placeholder:'비고 (사건 관련 메모)',
+                    style:{ flex:'1.4 1 0', minWidth:0, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } })
+                )
               )
             );
           })),
@@ -19401,12 +19392,15 @@ function ContractModal(props){
            ② 기업담당자를 가운데(8~13번) 대신 «맨 뒤»로 뺐다. 사람이 늘면 카드가
               늘어 가운데 두면 아래 칸이 통째로 밀린다 — 「아까 그 칸이 어디 갔지」.
          ⚠ 순서를 되돌릴 때는 tests/contract-4col-order.test.js 도 함께 본다. */
-      h('div', { className:'pu-g4' },
-      sec4('🏢 회사 신원', '기업정보함 1~3번과 같은 차례'),
+      h('div', { className:'pu-g6' },
+      sec6('🏢 회사 신원', '기업정보함 1~3번과 같은 차례'),
       // 회사명 (자동완성 포함, 엑셀 행 붙여넣기 자동 분리)
-      h('div', { className:'pu-c4 pu-c4-4', style:{ position:'relative' } },
-        h('label', null, '의뢰인 (회사명) ', h('span', { style:{ color:'#dc2626', fontWeight:700 } }, '*')),
+      /* ⚠ 두 칸(pu-n6-2)이다 — 전에는 한 줄 전체를 썼는데, 그러면 사업자번호·
+         대표자1·대표자2·법인등록번호가 다음 줄로 밀려 «한 줄에 다 안 들어간다»
+         (대표 지시 2026-09-19 「1줄로」). 회사명은 긴 값이라 두 칸을 준다. */
+      h('div', { className:'pu-n6 pu-n6-2', style:{ position:'relative' } },
         h('input', { type:'text', value:f.company.name,
+          title:'엑셀 한 행을 복사해 여기 붙이면(Ctrl+V) 자동으로 나뉘어 채워집니다',
           onPaste:function(e){
             var cd = e.clipboardData || window.clipboardData;
             if(!cd) return;
@@ -19464,7 +19458,7 @@ function ContractModal(props){
               setAutoResults(erpGroupCoHits(res).slice(0,6)); setWorkOpen('');
             }
           },
-          placeholder:'회사명 또는 엑셀 한 행 붙여넣기',
+          placeholder:'의뢰인(회사명) *',
           'data-autocomplete-input':'1',
           style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', boxSizing:'border-box' } }),
         autoResults.length > 0 && h('div', {
@@ -19535,20 +19529,20 @@ function ContractModal(props){
       ),
       /* 내 사진첩에 이 회사 계약서가 있으면 알려 준다 — 찾아 헤매지 않게 회사명 바로 아래.
          계약유형을 하나만 골랐을 때만 뜬다(위 useEffect 참고). */
-      fld4('사업자번호',
-        h('input', { type:'text', value:f.company.bizNo, onChange:setCompanyField('bizNo'), onBlur:onBizNoBlur, placeholder:'000-00-00000', inputmode:'numeric' })),
-      fld4('대표자 1',
+      fldn6(
+        h('input', { type:'text', value:f.company.bizNo, onChange:setCompanyField('bizNo'), onBlur:onBizNoBlur, placeholder:'사업자번호', title:'000-00-00000', inputmode:'numeric' })),
+      fldn6(
         h('input', { type:'text', value:f.company.ceo || '', onChange:setCompanyField('ceo'), placeholder:'대표자 1' })),
-      fld4('대표자 2',
-        h('input', { type:'text', value:f.company.ceo2 || '', onChange:setCompanyField('ceo2'), placeholder:'(선택)' })),
+      fldn6(
+        h('input', { type:'text', value:f.company.ceo2 || '', onChange:setCompanyField('ceo2'), placeholder:'대표자 2 (선택)' })),
       /* 법인등록번호 — 자료 통로는 이미 다 있었는데 «입력칸만» 없던 칸이다
          (대표 지시 2026-09-18 「법인등록번호는 넣어라」). 기업정보함 3번 칸이고,
          등록증 판독(corpNo)·기업정보함 가져오기(COINFO_TO_CONTRACT 의 corpno)·
          한글 서식 채우기({{법인등록번호}})가 모두 corpRegNo 를 쓰고 있었다.
          그래서 값은 들어오는데 사람이 눈으로 볼 자리가 없어 고칠 수가 없었다. */
-      fld4('법인등록번호',
+      fldn6(
         h('input', { type:'text', value:f.company.corpRegNo || '', onChange:setCompanyField('corpRegNo'),
-          placeholder:'000000-0000000' })),
+          placeholder:'법인등록번호', title:'000000-0000000' })),
       ),  // 그리드 1(회사 신원) 닫기
 
       // 동일 회사 계약 실시간 안내 (종류별 구분)
@@ -19828,8 +19822,8 @@ function ContractModal(props){
 
       /* 대표자·업태·종목·규모는 여기 있었다 — 대표자는 위 「회사 신원」 줄로,
          업태·종목·규모는 아래 「업종 · 규모」 줄로 옮겼다 (기업정보함 차례). */
-      h('div', { className:'pu-g4' },
-      sec4('📍 주소', '기업정보함 4번 「소재지」'),
+      h('div', { className:'pu-g6' },
+      sec6('📍 주소', '기업정보함 4번 「소재지」'),
       (function(){
         // 주소 검색 공용 실행 (버튼 클릭·입력칸 Enter 모두 이걸로)
         function doAddrSearch(){
@@ -19849,7 +19843,7 @@ function ContractModal(props){
         // 주소칸에서 Enter → 저장(useEnterSave)이 아니라 주소 검색을 연다
         function onAddrEnter(e){ if(e.key==='Enter'){ e.preventDefault(); e.stopPropagation(); doAddrSearch(); } }
         var _needZip = !f.company.zipcode && String(f.company.address||'').trim().length >= 2;
-        return h('div', { className:'pu-c4 pu-c4-4' }, h('label', null, '사업장 주소'),
+        return h('div', { className:'pu-n6 pu-n6-6' },
           h('div', { style:{ display:'flex', gap:'6px', alignItems:'center' } },
             h('input', { type:'text', value:f.company.zipcode || '', onChange:setCompanyField('zipcode'), onKeyDown:onAddrEnter,
               placeholder:'우편번호', maxLength:7,
@@ -19865,38 +19859,62 @@ function ContractModal(props){
               style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } })
           ));
       })(),
-      h('div', { className:'pu-c4 pu-c4-4' }, h('label', null, '본사주소 (본사와 다를 때만)'),
-        h('input', { type:'text', value:f.company.addressDetail || '', onChange:setCompanyField('addressDetail'),
-          placeholder:'' })),
-      sec4('☎ 연락처', '기업정보함 5·6·7·14번 — 네 칸이라 한 줄로 모았다'),
-        fld4('대표 전화',
+      /* 본사주소도 «검색 칸»으로 (대표 지시 2026-09-19 「본사주소도 사업장주소와 같이
+         셀검색 셀로」). ⚠ 새 칸(headZipcode 등)을 안 만든다 — addressDetail 은
+         한 줄 문자열 그대로 두고, 검색 결과를 「(우편번호) 주소」로 합쳐 넣는다.
+         칸을 늘리면 transferContract() 이관까지 또 손대야 한다(2026-09-19에 그
+         길을 한 번 겪었다) — 문자열 하나로 끝내는 편이 안전하다. */
+      (function(){
+        function doHeadAddrSearch(){
+          openAddressSearch(function(r){
+            if(!r || (!r.zipcode && !r.address)){ showToast(ADDR_NONE_MSG); return; }
+            var combined = (r.zipcode ? '(' + r.zipcode + ') ' : '') + r.address;
+            setCompanyField('addressDetail')({ target:{ value: combined, type:'text' } });
+            showToast(ADDR_OK_MSG + combined);
+          }, f.company.addressDetail);
+        }
+        function onHeadAddrEnter(e){ if(e.key==='Enter'){ e.preventDefault(); e.stopPropagation(); doHeadAddrSearch(); } }
+        return h('div', { className:'pu-n6 pu-n6-6' },
+          h('div', { style:{ display:'flex', gap:'6px', alignItems:'center' } },
+            h('input', { type:'text', value:f.company.addressDetail || '', onChange:setCompanyField('addressDetail'), onKeyDown:onHeadAddrEnter,
+              placeholder:'본사주소 (본사와 다를 때만)',
+              style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } }),
+            h('button', { type:'button', onClick:doHeadAddrSearch, onKeyDown:onHeadAddrEnter,
+              title:'본사주소 검색',
+              style:{ padding:'8px 12px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
+              '🔍 검색')
+          ));
+      })(),
+      sec6('☎ 연락처', '기업정보함 5·6·7·14번 — 네 칸이라 한 줄로 모았다'),
+        fldn6(
           h('input', { type:'text', value:f.company.phone, onChange:setCompanyField('phone'),
             onPaste:function(e){ try{ var t=(e.clipboardData||window.clipboardData).getData('text'); var c=t.replace(/[\s\u0000-\u001F\u007F-\u009F]+/g,''); if(c!==t){ e.preventDefault(); setCompanyField('phone')({target:{value:c,type:'text'}}); } }catch(_){} },
             onBlur:function(e){ var v = fmtPhone(e.target.value); if(v !== e.target.value) setCompanyField('phone')({target:{value:v,type:'text'}}); },
-            placeholder:'041-000-0000', inputmode:'tel' })),
-        fld4('대표 팩스',
+            placeholder:'대표 전화', title:'041-000-0000', inputmode:'tel' })),
+        fldn6(
           h('input', { type:'text', value:f.company.fax, onChange:setCompanyField('fax'),
             onPaste:function(e){ try{ var t=(e.clipboardData||window.clipboardData).getData('text'); var c=t.replace(/[\s\u0000-\u001F\u007F-\u009F]+/g,''); if(c!==t){ e.preventDefault(); setCompanyField('fax')({target:{value:c,type:'text'}}); } }catch(_){} },
             onBlur:function(e){ var v = fmtPhone(e.target.value); if(v !== e.target.value) setCompanyField('fax')({target:{value:v,type:'text'}}); },
-            placeholder:'041-000-0001', inputmode:'tel' })),
-        fld4('대표자 전화',
+            placeholder:'대표 팩스', title:'041-000-0001', inputmode:'tel' })),
+        fldn6(
           h('input', { type:'text', value:f.company.ceoPhone||'', onChange:setCompanyField('ceoPhone'),
             onBlur:function(e){ var v = fmtPhone(e.target.value); if(v !== e.target.value) setCompanyField('ceoPhone')({target:{value:v,type:'text'}}); },
-            placeholder:'010-0000-0000', inputmode:'tel' })),
-        fld4('대표 이메일',
-          h('input', { type:'email', value:f.company.email, onChange:setCompanyField('email'), placeholder:'contact@company.kr' })),
+            placeholder:'대표자 전화', title:'010-0000-0000', inputmode:'tel' })),
+        fldn6(
+          h('input', { type:'email', value:f.company.email, onChange:setCompanyField('email'), placeholder:'대표 이메일', title:'contact@company.kr' })),
       /* 업태·종목·규모 — 기업정보함도 16·17·20번으로 서로 붙여 두었다.
          위 「회사 신원」에 있던 것을 여기로 내렸다. 되돌리지 말 것. */
-      sec4('🏭 업종 · 규모', '기업정보함 16·17·20번'),
-      fld4('업태',
+      sec6('🏭 업종 · 규모', '기업정보함 16·17·20번'),
+      fldn6(
         h('input', { type:'text', value:f.company.bizType, onChange:setCompanyField('bizType'),
-          placeholder:'예: 제조업' })),
-      fld4('종목',
+          placeholder:'업태', title:'예: 제조업' })),
+      fldn6(
         h('input', { type:'text', value:f.company.bizCategory, onChange:setCompanyField('bizCategory'),
-          placeholder:'예: 자동차 부품' })),
-      fld4('규모',
-        h('select', { value:f.company.companySize || '', onChange:setCompanyField('companySize') },
-          h('option', { value:'' }, '-- 선택 --'),
+          placeholder:'종목', title:'예: 자동차 부품' })),
+      fldn6(
+        h('select', { value:f.company.companySize || '', onChange:setCompanyField('companySize'),
+            className: f.company.companySize ? '' : 'pu-ph' },
+          phOption('규모'),
           ['소기업','중기업','중견기업','대기업','공공기관','기타'].map(function(sz){
             return h('option', { key:sz, value:sz }, sz);
           })
@@ -19905,19 +19923,18 @@ function ContractModal(props){
       )  // 회사정보 내용 wrapper 닫기
       ),  // showCompany 닫기
 
-      // 4대보험 가입자수
-      h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b', borderBottom:'1px solid #e2e8f0', paddingBottom:'4px', marginTop:'14px', marginBottom:'8px' } }, '👥 4대보험 가입자수'),
       /* ⚠ 이 상자는 showCompany «밖»에 있다 — 근로자 단독 의뢰에서도 보인다.
          4칸으로 옮기면서도 그 성질은 건드리지 않았다(보이는 조건을 바꾸면
          근로자 사건에서 쓰던 칸이 말없이 사라진다). 그래서 그리드도 따로 연다. */
-      h('div', { className:'pu-g4' },
-        fld4('고용보험 (명)',
+      h('div', { className:'pu-g6', style:{ marginTop:'14px' } },
+        sec6('👥 4대보험 가입자수'),
+        fldn6(
           h(NumberInput, { value:f.company.employmentInsuredCount,
-            onChange:setCompanyField('employmentInsuredCount'), placeholder:'0',
+            onChange:setCompanyField('employmentInsuredCount'), placeholder:'고용보험(명)',
             style:{ textAlign:'right', fontFamily:'monospace' } })),
-        fld4('산재보험 (명)',
+        fldn6(
           h(NumberInput, { value:f.company.injuryInsuredCount,
-            onChange:setCompanyField('injuryInsuredCount'), placeholder:'0',
+            onChange:setCompanyField('injuryInsuredCount'), placeholder:'산재보험(명)',
             style:{ textAlign:'right', fontFamily:'monospace' } }))
       ),  // 4대보험 그리드 닫기
 
@@ -20095,8 +20112,9 @@ function ContractModal(props){
               '🔄 기업정보함 최신정보로 새로고침')),
           locked && h('div', { style:{ fontSize:'10.5px', color:'#1e40af', marginBottom:'6px', background:'#eff6ff', padding:'4px 8px', borderRadius:'4px' } },
             '🔒 회사정보(대표자/연락처)와 동기화 중 - 회사정보 수정 시 자동 반영.'),
-          // 입력 필드: 이름/직급 | 담당자전화/회사팩스 | 담당자핸드폰/담당자이메일
-          h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px' } },
+          // 입력 필드: 이름·직급·담당자전화·회사팩스·담당자핸드폰·담당자이메일 — 한 줄 여섯 칸
+          // (대표 지시 2026-09-19 「기업담당자는 왜 안 줄였나 … 4칸으로」)
+          h('div', { className:'pu-g6' },
             h('input', { type:'text', value:ct.name || '',
               onChange:function(e){ setContact(idx, 'name', e.target.value); },
               placeholder:'이름',
@@ -20421,31 +20439,31 @@ function ContractModal(props){
            기간이 그 뒤였다. 계약서를 보며 넣을 때 눈이 읽는 차례는
            «언제 맺었나 → 언제부터 언제까지 → 지금 어떤 상태인가 → 돈은 누가»다.
          ⚠ 날짜를 다시 돈 뒤로 내리지 말 것 — tests/contract-4col-order.test.js 가 막는다. */
-      h('div', { className:'pu-g4' },
-      sec4('📅 언제', '계약서를 읽는 차례대로 — 날짜가 금액 뒤에 있었다'),
-      fld4('계약일',
-        h(KoreanDatePicker, { value:f.signDate, onChange:setSimple('signDate') })),
-      fld4('계약 시작일',
-        h(KoreanDatePicker, { value:f.startDate || '', onChange:setSimple('startDate') })),
-      fld4('계약 종료일',
-        h(KoreanDatePicker, { value:f.endDate || '', onChange:setSimple('endDate') })),
-      fld4('진행상태',
+      h('div', { className:'pu-g6' },
+      sec6('📅 언제', '계약서를 읽는 차례대로 — 날짜가 금액 뒤에 있었다'),
+      fldn6(
+        h(KoreanDatePicker, { value:f.signDate, onChange:setSimple('signDate'), title:'계약일' })),
+      fldn6(
+        h(KoreanDatePicker, { value:f.startDate || '', onChange:setSimple('startDate'), title:'계약 시작일' })),
+      fldn6(
+        h(KoreanDatePicker, { value:f.endDate || '', onChange:setSimple('endDate'), title:'계약 종료일' })),
+      fldn6(
         h('select', { value:f.status, onChange:setSimple('status') },
           CONTRACT_STATUS.map(function(s){ return h('option', { key:s.v, value:s.v }, s.icon + ' ' + s.label); }))),
-      sec4('💰 입금 · 접속'),
+      sec6('💰 입금 · 접속'),
       /* 입금자(예금주) — 통장 적요가 업체명과 다를 때 적어 두면 거래내역 자동매칭이
          이 이름으로도 대조한다. 이름이라 한 칸으로는 좁아 두 칸을 쓴다. */
-      fld4('입금자 (예금주)',
+      fldn6(
         h('input', { type:'text', value:f.payerName || '', onChange:setSimple('payerName'),
-          placeholder:PAYER_PH }), 2),
+          placeholder:'입금자(예금주)', title:PAYER_PH }), 2),
       // 사이트 아이디/비번 (관리자 전용) — 한 칸에 몰려 있던 둘을 갈랐다
-      CURRENT_USER && CURRENT_USER.isAdmin && fld4('🔐 포털 아이디 (관리자 전용)',
-        h('input', { type:'text', placeholder:'아이디', value:f.siteId||'', onChange:setSimple('siteId') })),
-      CURRENT_USER && CURRENT_USER.isAdmin && fld4('🔐 포털 비번 (관리자 전용)',
-        h('input', { type:'text', placeholder:'비번', value:f.sitePw||'', onChange:setSimple('sitePw') })),
-      sec4('📝 비고'),
-      fld4('특이사항',
-        h('textarea', { value:f.note, onChange:setSimple('note'), placeholder:'특이사항' }), 4)
+      CURRENT_USER && CURRENT_USER.isAdmin && fldn6(
+        h('input', { type:'text', placeholder:'🔐 포털 아이디', title:'관리자 전용', value:f.siteId||'', onChange:setSimple('siteId') })),
+      CURRENT_USER && CURRENT_USER.isAdmin && fldn6(
+        h('input', { type:'text', placeholder:'🔐 포털 비번', title:'관리자 전용', value:f.sitePw||'', onChange:setSimple('sitePw') })),
+      sec6('📝 비고'),
+      fldn6(
+        h('textarea', { value:f.note, onChange:setSimple('note'), placeholder:'특이사항' }), 6)
       )  // 계약정보 그리드 닫기
     );
   }
@@ -20461,14 +20479,19 @@ function ContractModal(props){
            될 수 있으므로 셀로 사람 선택하게 해라」). 부담당은 사람마다 칸 하나다.
          ⚠ 한 칸에 이름을 몰아 칩으로 쌓지 말 것 — 되돌아간 모양이다.
            tests/contract-4col-order.test.js 가 막는다. */
-      h('div', { className:'pu-g4' },
-      sec4('👤 누가 맡나'),
+      h('div', { className:'pu-g6' },
+      sec6('👤 누가 맡나'),
+      /* ⚠ 부담당 슬롯(아래)은 라벨을 그대로 둔다 — 「부담당 몇 번째」라는 자리값과
+         ✕(그 사람만 빼기) 단추를 함께 얹을 자리가 필요해서다. placeholder 만으로는
+         값을 채운 뒤 «몇 번째 부담당인지» 알 길이 없다(대표 지시 2026-09-19 원칙의
+         예외 — status 기록에 남겨 둔다). 주담당은 단순 선택이라 없앤다. */
       // 새 선택값은 사번이다. 과거 이름은 별도 옵션으로 보존하며 자동 치환하지 않는다.
       (function(){
         var currentSid = f.managerMain || '';
-        return fld4('주담당 *',
-        h('select', { value:currentSid, onChange:function(e){ changeMgrMain(e.target.value); } },
-          [h('option', { key:'__empty', value:'' }, '— 주담당 선택 —')].concat(
+        return fldn6(
+        h('select', { value:currentSid, onChange:function(e){ changeMgrMain(e.target.value); },
+            className: currentSid ? '' : 'pu-ph' },
+          phOption('주담당 *'),
             (function(){
               // 담당 가능한 직원 + 기존 주담당(휴직중이면 라벨)
               var optList = assignable.slice();
@@ -20482,7 +20505,7 @@ function ContractModal(props){
                 return h('option', { key:u.sid, value:u.sid, style: u._statusLabel ? { color:'#dc2626' } : {} }, label+' · '+u.sid);
               });
             })()
-          )));
+          ));
       })(),
       /* 부담당 — 사람마다 칸 하나. 자리마다 select 를 두어 «그 자리»만 바꾼다.
          휴직·재배정이 필요한 사람은 라벨에 🚫 를 붙여 «말로» 알린다
@@ -20514,8 +20537,9 @@ function ContractModal(props){
             })));
       }),
       // 다음 자리 — 고르면 칸이 하나 더 생긴다
-      fld4('부담당 ' + ((f.managerSubs||[]).length + 1) + ' 넣기',
-        h('select', { value:'',
+      // 다음 자리 select — 첫 옵션 자체가 「+ 부담당 추가…」 안내글이라 라벨이 따로 없어도 된다
+      fldn6(
+        h('select', { value:'', className:'pu-ph',
           onChange:function(e){ if(e.target.value){ toggleSub(e.target.value); e.target.value=''; } } },
           [h('option', { key:'__add', value:'' }, SUBMGR_ADD_OPT)].concat(
             assignable.filter(function(u){
