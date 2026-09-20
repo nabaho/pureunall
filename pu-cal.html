@@ -631,7 +631,12 @@ function 색채우기(){
      서로 못 찾는다. 그래서 그 함수를 그대로 쓴다(새로 짓지 않는다).
    ⚠ 관리자만 쓸 수 있다(서버 규칙). 색 채우기와 같은 잣대를 쓴다. */
 /* ⚠ typeof 로 본다 — 검사가 머리줄만 떼어 상자에 넣고 돌 때 ME 가 없다(chipHtml 과 같은 까닭) */
-function 잇기할수있나(){ return !!(typeof ME !== "undefined" && ME && ME.role === "admin"); }
+/* 이을 수 있는 사람 — 규칙(data/gcal_mail_sid .write = MGR)과 «같게» 맞춘다.
+   ⚠ 화면이 규칙보다 넓으면 눌러 놓고 조용히 거절당하고, 좁으면 될 사람이 못 한다. */
+function 잇기할수있나(){
+  if(typeof ME === "undefined" || !ME) return false;
+  return ME.role === "admin" || ME.isAdmin === true || ME.isSubAdmin === true;
+}
 /* 지금 달력에 뜬 구글 일정에서 «만든이»를 모은다 — 많이 만든 사람부터 */
 function 메일줄들(){
   var 셈 = {};
