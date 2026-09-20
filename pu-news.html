@@ -43,8 +43,8 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=38"></script>
-<script src="js/pu-news-tpl.js?v=28"></script>
+<script src="js/pu-news-core.js?v=39"></script>
+<script src="js/pu-news-tpl.js?v=29"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -1405,14 +1405,17 @@ function 편지요약(d, r, 갈수있나){
       + '판례 한 건을 ✕ 로 빼시면 들어갑니다.');
   if(!모.이회차)
     경고.push('<b>이 회차에 드는 기사가 없어</b> 가장 최근 것으로 채웠습니다.');
-  /* ★ 기사는 «우리 말»을 써야 나간다 — 몇 건을 썼는지 여기서 먼저 말한다.
-       안 그러면 「여덟 건 담았는데 편지에 하나도 없다」를 편지에서 찾게 된다. */
+  /* ★ 2026-09-20 부터는 «안 써도 나간다»(원문 제목·매체·링크로) — 대표 지시
+       「검토필요없이 자동으로 원문붙여서 넣자」. 그래서 이 알림도 「안 나갑니다」가
+       아니라 «무엇으로 나가는지»를 말해야 한다. 안 그러면 있지도 않은 문제를
+       고치려 하시게 된다(2026-09-14 「내려받기 표시」 때와 같은 실수). */
   {
     const 기 = (d.안.news || []).filter(x => x && x.갈래 === '기사' && Core.실릴까(x));
     const 쓴것 = 기.filter(x => String(x.우리말||'').trim()).length;
     if(기.length && 쓴것 < 기.length)
       경고.push(`<b>주간노동뉴스 ${기.length}건 가운데 ${쓴것}건만 «우리 말»로 썼습니다</b> — `
-        + `나머지 ${기.length - 쓴것}건은 편지에 안 나갑니다. 줄을 눌러 쓰시면 실립니다.`);
+        + `나머지 ${기.length - 쓴것}건은 원문 제목·매체·링크 그대로 나갑니다. `
+        + `줄을 눌러 쓰시면 그 글로 바뀝니다.`);
   }
   if(첨.넘친것.length)
     경고.push(`<b>한 통 한도(${Core.크기글(첨.한도)})를 넘어 «못 붙는» 첨부 ${첨.넘친것.length}개</b> — `
@@ -1728,10 +1731,13 @@ function 꼭지칸하나(d){
     const 기사인가 = x && x.갈래 === '기사';
     const 내글 = String((x && x.우리말) || '').trim();
     const AI글 = String((x && x.AI초안) || '').trim();
+    /* ★ 2026-09-20 대표 지시로 «안 써도 실린다» — 딱지도 그것을 말해야 한다.
+         「안 실림」이라 적어 두면 실제로는 나가는데 안 나가는 줄 아시고,
+         있지도 않은 일을 고치려 하신다. */
     const 딱지 = !기사인가 ? ''
       : (내글 ? '<span class="wtag">✎ 우리 말 있음</span>'
-              : (AI글 ? '<span class="wtag no">✨ AI 초안 — 검토 필요</span>'
-                       : '<span class="wtag no">✎ 아직 안 씀 — 안 실림</span>'));
+              : (AI글 ? '<span class="wtag no">✨ AI 초안 — 옮기면 이 글이 나갑니다</span>'
+                       : '<span class="wtag no">↗ 원문 그대로 나갑니다 — 제목·매체·링크</span>'));
     return `<div class="item${실?'':' off'}">
       <input type="checkbox" class="ck" ${실?'checked':''}
         onchange="실음바꾸기('${g.키}',${i})" onclick="event.stopPropagation()"
@@ -2521,7 +2527,15 @@ function 지금편지(미리보기, 받는지역){
        지난 회차에는 안 넘긴다(아래 회차크게·지난미리보기) — 그때 나간 그대로여야 한다. */
   return Tpl.편지짓기(Object.assign({}, d, { 범위: App.설정.범위, 더한분들: App.더한분들 }),
                       App.설정, { 미리보기: 미리보기 === true, 지역: 받는지역 || '',
-                                   요약: true });
+                                   /* ★★★ 되돌렸다 (대표 지시 2026-09-20
+                                        「메일에서 받을때 화면을 캡쳐2로 해라 그게 더 안정적이다」).
+                                      ⚠ 요약판은 자료를 받으려면 «웹으로 한 번 더» 나가야 했다.
+                                        메일이 링크를 막거나 손님이 안 누르면 그대로 끝이다.
+                                        전문판은 내려받기 단추까지 편지 «안»에 있다.
+                                      ⚠⚠ 넓이는 «안 넘긴다» — 메일은 700 이라야 한다.
+                                        웹 폭(980)으로 지으면 아웃룩에서 표가 삐져나간다.
+                                        전문판은 폭을 보고 스스로 둘씩/셋씩을 가른다. */
+                                   요약: false });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2543,7 +2557,10 @@ async function 전문담기(열쇠){
     App.설정, { 미리보기: true, 지역: '전국', 요약: false, 넓이: Tpl.전문넓이 });
   if(!전) return false;
   await db.ref('newsletter/issues/' + 열쇠).update({
-    전문: 전.서식, 제목: 전.제목, 꼴: '요약', 전문담은때: Date.now()
+    /* ⚠ 꼴 은 「이 회차가 어떤 모습으로 나갔나」의 기록이다. 2026-09-20 부터 메일이
+         전문판이므로 여기도 '전문' 이라야, 나중에 다시 그릴 때 보낸 것과 같아진다.
+         지난 회차에 적힌 '요약' 은 그대로 둔다 — 그때는 정말 요약으로 나갔다. */
+    전문: 전.서식, 제목: 전.제목, 꼴: '전문', 전문담은때: Date.now()
   });
   return true;
 }
