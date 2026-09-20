@@ -81,7 +81,7 @@
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', 'TypeSafe 검토');
     box.style.cssText = 'width:min(560px,100%);max-height:min(700px,calc(100vh - 36px));overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,.35);padding:20px;box-sizing:border-box;color:#1e293b;font-family:inherit;';
     var head = d.createElement('div'); head.style.cssText = 'display:flex;justify-content:space-between;gap:12px;align-items:start;';
-    var title = d.createElement('div'); title.innerHTML = '<strong style="font-size:19px">✨ TypeSafe 검토</strong><div style="margin-top:5px;font-size:12px;color:#64748b">주민번호·사업자번호·전화·이메일·계좌는 가린 뒤 보냅니다. 저장·발송·자동처리는 하지 않습니다.<br>⚠ 이름·업체명·주소는 <b>가려지지 않습니다</b> — 미국 업체 서버로 갑니다. 하루 30번까지.</div>';
+    var title = d.createElement('div'); title.innerHTML = '<strong style="font-size:19px">✨ TypeSafe 검토</strong><div style="margin-top:5px;font-size:12px;color:#64748b">주민번호·사업자번호·전화·이메일·계좌와, 직원명부·업체관리에 있는 이름은 가린 뒤 보냅니다. 저장·발송·자동처리는 하지 않습니다.<br>⚠ <b>목록에 없는 사람 이름·주소는 가려지지 않습니다</b> — 미국 업체 서버로 갑니다. 하루 30번까지.</div>';
     var x = d.createElement('button'); x.type = 'button'; x.textContent = '닫기'; x.style.cssText = 'border:0;background:#f8fafc;border-radius:8px;padding:7px 10px;color:#475569;font-weight:700;cursor:pointer;'; x.onclick = close;
     head.appendChild(title); head.appendChild(x); box.appendChild(head);
     var label = d.createElement('label'); label.textContent = '검토할 내용'; label.style.cssText = 'display:block;margin-top:17px;font-size:13px;font-weight:700;'; box.appendChild(label);
@@ -117,11 +117,31 @@
     return e;
   }
 
+  /* ── 우리가 아는 이름·업체명을 먼저 가린다 (2026-09-20 대표 결정 「우리 목록만」) ──
+     서버(functions/typesafe-evaluate.js)는 번호(주민번호·전화·계좌 등)만 가린다 —
+     그건 모양이 정해져 있어 기계가 확실히 찾을 수 있어서다. 이름·회사 이름은 그런
+     모양이 없어 서버 혼자서는 다 못 가린다. 대신 «우리가 이미 아는» 직원 명부·
+     업체관리 이름은 호스트 화면(이알피)이 확실히 가려서 넘겨줄 수 있다.
+     ⚠ 안 정의한 화면(다른 앱)은 그냥 건너뛴다 — 번호만 가려진 채로 나간다.
+     ⚠★ 「다 가린다」는 뜻이 아니다 — 목록에 없는 사람(외부인·의뢰인)의 이름은
+       이 길로 못 잡는다. 화면에 그대로 안내한다(위 창 머리글 참고). */
+  function localRedact(text) {
+    if (typeof w.PU_TYPESAFE_LOCAL_REDACT !== 'function') return { text: text, localMaskedKinds: [] };
+    try {
+      var r = w.PU_TYPESAFE_LOCAL_REDACT(text);
+      if (r && typeof r.text === 'string') return { text: r.text, localMaskedKinds: (r.localMaskedKinds || []) };
+    } catch (_) { /* 가리기가 죽어도 판단 자체는 막지 않는다 — 원문 그대로 진행 */ }
+    return { text: text, localMaskedKinds: [] };
+  }
+
   async function run() {
     var text = String(input.value || '').trim();
     if (!text) { status.textContent = '검토할 내용을 입력해 주세요.'; input.focus(); return; }
     var user = w.firebase && firebase.auth && firebase.auth().currentUser;
     if (!user) { status.textContent = '로그인 후 이용해 주세요.'; return; }
+    /* ⚠ 서버로 부르기 «전»에 가려야 뜻이 있다 — 부른 뒤에 가리면 이미 나간 뒤다. */
+    var local = localRedact(text);
+    text = local.text;
     runBtn.disabled = true; runBtn.style.opacity = '.65'; status.textContent = '개인정보를 가린 뒤 제안을 받는 중…'; result.style.display = 'none';
     try {
       var token = await user.getIdToken();
@@ -132,7 +152,8 @@
       var urgency = answerOf(a.urgency), route = answerOf(a.route), review = answerOf(a.human_review);
       var deadline = answerOf(a.deadline), impact = answerOf(a.impact), risk = answerOf(a.legal_wage_risk);
       var privacy = answerOf(a.privacy_security), missing = answerOf(a.info_missing), first = answerOf(a.first_action);
-      result.innerHTML = '<strong style="color:#1e293b">검토 제안</strong><br>· 긴급·기한 민감: <b>' + yesNo(urgency) + '</b><br>· 응답 시점: <b>' + esc(deadline || '판단 결과 없음') + '</b><br>· 검토 경로: <b>' + esc(route || '판단 결과 없음') + '</b><br>· 영향 범위: <b>' + esc(impact || '판단 결과 없음') + '</b><br>· 노무·임금·계약 위험: <b>' + esc(risk || '판단 결과 없음') + '</b><br>· 개인정보·보안 주의: <b>' + yesNo(privacy) + '</b><br>· 추가 자료 필요: <b>' + yesNo(missing) + '</b><br>· 권장 첫 조치: <b>' + esc(first || '판단 결과 없음') + '</b><br>· 사람 확인 필요: <b>' + yesNo(review) + '</b><br>· 평균 판단 신뢰도: <b>' + confidenceOf(a) + '</b>' + (data.maskedKinds && data.maskedKinds.length ? '<div style="margin-top:7px;color:#64748b">가린 항목: ' + esc(data.maskedKinds.join(', ')) + '</div>' : '') + '<div style="margin-top:8px;color:#64748b">이 결과는 참고용입니다. 실제 저장·발송·상태 변경은 직접 확인 후 처리하세요.</div>';
+      var 가린것 = local.localMaskedKinds.concat(data.maskedKinds || []);
+      result.innerHTML = '<strong style="color:#1e293b">검토 제안</strong><br>· 긴급·기한 민감: <b>' + yesNo(urgency) + '</b><br>· 응답 시점: <b>' + esc(deadline || '판단 결과 없음') + '</b><br>· 검토 경로: <b>' + esc(route || '판단 결과 없음') + '</b><br>· 영향 범위: <b>' + esc(impact || '판단 결과 없음') + '</b><br>· 노무·임금·계약 위험: <b>' + esc(risk || '판단 결과 없음') + '</b><br>· 개인정보·보안 주의: <b>' + yesNo(privacy) + '</b><br>· 추가 자료 필요: <b>' + yesNo(missing) + '</b><br>· 권장 첫 조치: <b>' + esc(first || '판단 결과 없음') + '</b><br>· 사람 확인 필요: <b>' + yesNo(review) + '</b><br>· 평균 판단 신뢰도: <b>' + confidenceOf(a) + '</b>' + (가린것.length ? '<div style="margin-top:7px;color:#64748b">가린 항목: ' + esc(가린것.join(', ')) + '</div>' : '') + '<div style="margin-top:8px;color:#64748b">이 결과는 참고용입니다. 실제 저장·발송·상태 변경은 직접 확인 후 처리하세요.</div>';
       result.style.display = 'block';
       status.textContent = '저장하지 않은 제안 결과입니다.' + (data.left != null ? ' · 오늘 ' + data.left + '번 남음' : '');
     } catch (e) {
