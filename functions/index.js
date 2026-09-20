@@ -3033,7 +3033,13 @@ exports.newsFull = functions
    ⚠ 여기도 우리 자료(DB)를 하나도 안 읽는다 — 로그인 없는 자리다. */
 exports.newsFullPage = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 20, memory: "256MB" })
+  /* ⚠⚠ 256MB 로 처음 배포했다가 배포 직후 실제로 크래시가 났다 —
+       "Memory limit of 256 MiB exceeded with 384 MiB used"(2026-09-20 실측).
+       이 파일 맨 위(line 34)의 `require("geoip-lite")` 가 «어느 함수를 부르든»
+       콜드 스타트마다 같이 실린다 — geoip 데이터베이스 자체가 이미 256MB 를
+       넘긴다. newsFull(바로 위)도 256MB 인데 같은 위험을 안고 있다 — 그쪽은
+       손대지 않는다(이 PR 의 몫이 아니다), 여기만 올려 막는다. */
+  .runWith({ timeoutSeconds: 20, memory: "512MB" })
   .https.onRequest(async (req, res) => {
     const NF = require("./news-full");
     res.set("Content-Type", "text/html; charset=utf-8");
