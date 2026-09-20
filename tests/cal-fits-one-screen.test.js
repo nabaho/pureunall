@@ -72,7 +72,8 @@ function 그려본다(하루, 건수, 공휴일, 용량) {
     parseInt, parseFloat, isFinite, encodeURIComponent,
     window: { _gcalColors: {} },
     fbDb: null,                       /* 구글은 안 부른다 — 여기서 보는 것이 아니다 */
-    S: { filter: null, q: '', scope: 'month', ym: 하루.slice(0, 7), view: 'month', date: 하루, open: null }
+    S: { filter: null, q: '', scope: 'month', ym: 하루.slice(0, 7), view: 'month', date: 하루, open: null },
+    ME: null                          /* «내 것» 채움을 켜지 않는다 — 여기서 보는 것은 칸 용량이다 */
   };
   vm.createContext(상자);
 
@@ -82,7 +83,8 @@ function 그려본다(하루, 건수, 공휴일, 용량) {
     'function gcalMailKey(m){', 'function gcalMailMap(){', 'function gcalSidByMail(mail){',
     'function gcalPalette(){', 'function gcalMailColor(mail){', 'function gcalToEvent(ev){',
     'function eventsOn(ymd, eumOnly){', 'function passFilter(ev){', 'function matchSearch(e){',
-    'function lunarDay(ymd){', 'function textOn(bg){', 'function monthGrid(ym){',
+    'function lunarDay(ymd){', 'function 상대밝기(bg){', 'function 대비(a, b){', 'function textOn(bg){',
+    'function monthGrid(ym){',
     'function ymdOf(y, m, d){', 'function mixHex(hexA, hexB, t){', 'function chipHtml(e, ymd){',
     'function 펼침Html(eumOnly){',
     'function calendarHtml(eumOnly){'];
@@ -90,6 +92,9 @@ function 그려본다(하루, 건수, 공휴일, 용량) {
     + 'function gcalLoad(){ return Promise.resolve(); }\n'
     + 'function weekHtml(){ return ""; }\n'
     + 'function dayHtml(){ return ""; }\n'
+    /* chipHtml 이 참조하는 모듈급 상수 — 소스에서 그대로 뽑아 온다 */
+    + (캘린더.match(/var 칩_어둠_누름 = [^;]+;/) || [''])[0] + '\n'
+    + (캘린더.match(/var 칩_옅게\s*= [^;]+;/) || [''])[0] + '\n'
     /* ★ 용량은 검사가 쥐여 준다 — 화면이 없으니 잴 수가 없다.
          잰 값을 «쓰는지»가 규칙이고, 잘 재는지는 따로 본다(⑥). */
     + 'function 칸용량(){ return ' + 용량 + '; }\n';

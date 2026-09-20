@@ -31,16 +31,32 @@ const PALETTE = [
 const allow = {};
 PALETTE.forEach(c => allow[c] = 1);
 
-/* ① 6자리 색 — 전부 팔레트 안이어야 한다 */
+/* 사람 구분색은 이 팔레트에 매어 두지 않는다(대표 결정 2026-08-30 「가」) —
+   5계열 27색은 «뜻»으로 짜여 있어(파랑=동작, 초록=성공…) 사람을 서로 갈라 놓기엔
+   턱없이 모자란다. 같은 판단이 gov-consulting.html 의 GCAL11 예외(구글 캘린더
+   열한 색, tests/color-palette-apps.test.js)에도 있다. 여기 스물넷은 대표 지시
+   2026-09-20 「각 사람마다의 색을 어떻게 중복되지 않게 할 것인가」로 새로 만든
+   EXT_COLOR_CANDIDATES(pu-erp.html) — 어느 두 색을 집어도 사람 눈 색 거리(ΔE)
+   20 이상이도록 «재서» 짰다(tests/cal-mine-first.test.js 가 잰다).
+   ⚠ 이 목록을 늘리지 말 것 — 늘리려면 EXT_COLOR_CANDIDATES 를 고치고 여기도
+   함께 고친다. 검사고정-허용: 사람 구분색은 값 자체가 팔레트다. */
+const EXT_PERSON_COLORS = new Set([
+  '#e71ddd', '#1d1de7', '#812d8b', '#c2410c', '#0e7490', '#a21caf', '#4d7c0f', '#be185d',
+  '#7c2d12', '#1e3a8a', '#166534', '#9f1239', '#5b21b6', '#155e75', '#92400e', '#701a75',
+  '#3730a3', '#065f46', '#9a3412', '#6b21a8', '#134e4a', '#831843', '#78350f', '#1e40af',
+]);
+
+/* ① 6자리 색 — 전부 팔레트 안이어야 한다(사람 구분색 제외) */
 const used = {};
 [...src.matchAll(/#[0-9a-fA-F]{6}(?![0-9a-fA-F])/g)].forEach(m => {
   const k = m[0].toLowerCase();
   used[k] = (used[k] || 0) + 1;
 });
-const strays = Object.keys(used).filter(c => !allow[c]);
+const strays = Object.keys(used).filter(c => !allow[c] && !EXT_PERSON_COLORS.has(c));
 t('팔레트 밖의 색이 없다' + (strays.length ? (' — ' + strays.slice(0, 8).map(c => c + '(' + used[c] + ')').join(' ')) : ''),
   strays.length, 0);
-t('고유 색이 29가지를 넘지 않는다', Object.keys(used).length <= 29, true);
+t('고유 색이 29가지를 넘지 않는다(사람 구분색 제외)',
+  Object.keys(used).filter(c => !EXT_PERSON_COLORS.has(c)).length <= 29, true);
 
 /* ② 3자리 색 — 흰·검만 */
 const used3 = {};
