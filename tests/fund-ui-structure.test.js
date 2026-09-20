@@ -115,15 +115,20 @@ test('서식은 A4 규격으로 나뉜다', () => {
       else if (SRC[j] === '}') { d--; if (on && !d) return SRC.slice(i, j + 1); }
     }
   }
-  /* ⚠ dgDocCss·dgDocCssIn 이 DK_TYPO_CSS(서식마다 글자 크기)를 함께 쓴다 —
-       같이 실어 주지 않으면 여기서 「DK_TYPO_CSS is not defined」로 죽는다.
-       이 모래상자가 그 둘을 실어 돌리는 «유일한» 곳이다. */
-  new Function(varLine[0] + '\n' + grabFn('DK_TYPO_CSS') + '\n'
+  /* ⚠ dgDocCss·dgDocCssIn 이 DK_TYPO_CSS(서식마다 글자 크기)·DK_MARGIN_CSS(서식마다
+       여백)를 함께 쓴다 — 같이 실어 주지 않으면 「~ is not defined」로 죽는다.
+       이 모래상자가 그 셋을 실어 돌리는 «유일한» 곳이다. */
+  new Function(varLine[0] + '\n' + grabFn('DK_TYPO_CSS') + '\n' + grabFn('DK_MARGIN_CSS') + '\n'
     + grabFn('dgDocCss') + '\n' + grabFn('dgDocCssIn')
     + ';this.print=dgDocCss();this.screen=dgDocCssIn();').call(box);
   assert.match(box.print, /@page\{size:A4 portrait/, '인쇄가 A4 세로가 아니다');
-  assert.match(box.print, /\.a4\{width:170mm/, '본문폭 = 210 − 여백 20×2');
-  assert.match(box.print, /\.a4\{[^}]*height:257mm/, '본문높이 = 297 − 여백 20×2');
+  /* ⚠ 2026-09-20 「여백 등 이상하다」 — 인쇄판은 이제 @page 여백을 0 으로 비우고
+       .a4 자신이 210×297mm 를 통째로 그린 뒤 padding 으로 여백을 낸다(서식마다
+       다른 여백을 주려면 이 구조가 필요하다 — @page 여백은 문서 전체에 하나뿐이다).
+       기본값(20mm)일 때 안쪽 칸은 예전과 «똑같다»(210-20×2=170, 297-20×2=257). */
+  assert.match(box.print, /@page\{size:A4 portrait;margin:0\}/, '@page 여백이 0 이 아니다 — 서식별 여백과 겹친다');
+  assert.match(box.print, /\.a4\{width:210mm;height:297mm;box-sizing:border-box;padding:20mm/,
+    '인쇄 .a4 가 210×297mm 통짜+padding 구조가 아니다');
   assert.match(box.print, /\.a4:last-child\{page-break-after:auto\}/, '마지막 장 뒤에 빈 페이지가 생긴다');
   assert.match(box.screen, /#doced \.a4\{width:210mm/, '화면 용지가 A4 폭이 아니다');
   assert.match(box.screen, /box-sizing:border-box/, '여백이 폭에 포함되지 않으면 250mm 가 된다');

@@ -3580,12 +3580,67 @@ function _dotDate(d){
 }
 function dgToday(){ var d=new Date(); return d.getFullYear()+'년 &nbsp; '+(d.getMonth()+1)+'월 &nbsp; '+d.getDate()+'일'; }
 /* ── 모든 서식은 A4 세로 기준 ──
-   용지 210×297mm, 여백 20mm → 본문 폭 170mm. 화면 미리보기·인쇄·PDF가 같은 규격을 쓴다. */
-var A4_W='210mm', A4_H='297mm', A4_PAD='20mm', A4_BODY_H='257mm';   // 본문 높이 = 297 - 20*2
-function dgDocCss(){ return "@page{size:A4 portrait;margin:"+A4_PAD+"}"
+   용지 210×297mm, 여백 20mm → 본문 폭 170mm. 화면 미리보기·인쇄·PDF가 같은 규격을 쓴다.
+   ⚠ 여백이 «전부 20mm는 아니다» — DK_MARGIN_CSS() 가 서식마다 다른 진짜 여백을 준다. */
+var A4_W='210mm', A4_H='297mm', A4_PAD='20mm', A4_BODY_H='257mm';   // 본문 높이 = 297 - 20*2 (기본값)
+/* ★ 서식마다 «제 여백»을 준다 (대표 지시 2026-09-20 「여백 등 이상하다 다시 원본 검토해서
+     위치 크기 박스크기 등 모든영역다시 검토해라」 — 특수법인설립등기신청서 화면 확인).
+   ⚠⚠ 이 통짜 주석에는 중괄호·대괄호를 «한 글자도» 안 쓴다. 바로 위 A4_W 선언과 바로 아래
+     함수 사이에 있는 글인데, 여러 검사 파일이 naive 하게(주석을 안 벗기고) 여는 중괄호·
+     대괄호 짝을 세어 「var A4_W=」부터 함수를 잘라낸다 — 이 자리에 CSS 보기(중괄호로 쓴)를
+     적었다가 그 검사들이 A4_W 선언 대신 이 함수 몸통까지 통째로 잘라가 「Unexpected token
+     'if'」로 죽는 사고를 실제로 냈다(전체 검사에서 6건 잡힘). 그래서 여기서부터는 예로 드는
+     CSS 도 중괄호 없이 말로 푼다.
+   ▣ 무엇을 발견했나 — 법인 설립등기 8종의 원본 .hwp 를 다시 열어 여백(hp:margin)을
+     «직접» 쟀더니, 전부 우리 기본값 20mm 가 «아니었다». 법원(등기소)·세무서에 내는
+     서식마다 여백이 다르다:
+       특수법인설립등기신청서 15/16mm   취임승낙서·협의회명부·위임장 15~20/30mm(더 좁게 쓴다)
+       인감신고서·인감카드발급신청서 16/25mm   인감대지 15~20/19.5~21mm
+       등록면허세신고서 5~10/15mm(가장 좁다)
+     그동안 «전부 20mm»로 찍어 왔다 — 어떤 서식은 원본보다 좁게(글이 더 많이 접혀 칸을
+     넘치고), 어떤 서식은 원본보다 훨씬 넓게(빈 자리가 많이 남고) 나가고 있었다.
+     ① 인가 6종은 다시 확인해 봤다 — 여섯 종 모두 20mm 가 «맞다»(2026-09-20 이전 조사).
+   ▣ 값의 근거 — 원본 .hwp 를 .hwpx 로 풀어 header.xml 이 아니라 section0.xml 의
+     hp:margin(header·footer·left·right·top·bottom, 1/7200인치)을 직접 읽었다. 0.5mm
+     단위로 반올림했다(인쇄에서 그 이상은 의미 없다).
+   ▣ 어떻게 두 화면(인쇄·화면)에 같이 먹이는가 — 화면(#doced 의 용지 칸)은 이미
+     border-box 와 padding 으로 되어 있어 서식별 padding 규칙을 덧붙이면 그만이다.
+     인쇄는 예전에 페이지 여백(문서 전체에 «하나»뿐이라 서식마다 다르게 못 준다)으로
+     만들고 용지 칸을 폭 170mm 짜리 안쪽 내용으로 나눠 만들었다 — 이 구조로는 서식마다
+     다른 여백을 줄 수 없다. 그래서 인쇄도 화면과 «같은 구조»로 바꿨다: 페이지 여백을
+     0 으로 비우고, 용지 칸 자신이 210×297mm 를 통째로(border-box) 그린 뒤 그 padding
+     으로 여백을 표현한다 — 그러면 서식마다 padding 만 다르게 주면 된다. 기본값(20mm)
+     일 때 결과는 예전과 «똑같다»(210-20*2=170, 297-20*2=257 — 그대로다). */
+function DK_MARGIN_CSS(p){
+  /* 표 한 줄 = 키, 위, 오른쪽, 아래, 왼쪽(mm) — 없는 키는 기본 20mm 그대로 쓴다(표에 안 올린다) */
+  var T=[['reg_apply',15,16,15,16],
+         ['reg_accept',20,30,15,30],
+         ['reg_roster',20,30,15,30],
+         ['reg_seal',16,25,16,25],
+         ['reg_sealpaper',20,19.5,15,21],
+         ['reg_sealcard',16,25,16,25],
+         ['reg_proxy',20,30,15,30],
+         ['reg_license',5,15,10,15]];
+  return T.map(function(t){
+    return p+".dk-"+t[0]+"{padding:"+t[1]+"mm "+t[2]+"mm "+t[3]+"mm "+t[4]+"mm}";
+  }).join("");
+}
+/* 화면에 보여 줄 말 — 「여백 20mm」 칩이 실제로는 안 맞는 서식이 있어서(원본이 다르다)
+   그 서식을 볼 때는 진짜 값을 보여 준다. 표는 DK_MARGIN_CSS 와 «같은 원본»에서 뽑는다 —
+   두 군데에 값을 따로 적으면 하나만 고치는 사고가 난다(전에 겪은 것과 같은 종류). */
+function _marginLabelOf(kind){
+  var css=DK_MARGIN_CSS('.x');                 // 접두사는 무엇이든 상관없다 — 값만 읽는다
+  var m=new RegExp('\\.x\\.dk-'+kind+'\\{padding:([\\d.]+)mm ([\\d.]+)mm ([\\d.]+)mm ([\\d.]+)mm\\}').exec(css);
+  if(!m) return '여백 20mm';
+  var tb=(m[1]===m[3])?m[1]+'mm':m[1]+'/'+m[3]+'mm', lr=(m[2]===m[4])?m[2]+'mm':m[4]+'/'+m[2]+'mm';
+  return '여백 위아래 '+tb+' · 좌우 '+lr;
+}
+function dgDocCss(){ return "@page{size:A4 portrait;margin:0}"
   +"body{font-family:'Batang','바탕',serif;margin:0 auto;line-height:1.9;font-size:13.5px;color:#1e293b}"
-  // 인쇄: 한 장 = 본문영역(170×257mm). 쪽수(.a4f)는 flex로 장 하단에 붙는다.
-  +".a4{width:170mm;height:"+A4_BODY_H+";margin:0 auto;display:flex;flex-direction:column;page-break-after:always}"
+  // 인쇄: .a4 가 «쪽 전체»(210×297mm)를 border-box 로 그리고 padding 이 여백이 된다.
+  // 기본 padding(20mm)일 때 안쪽 칸은 예전과 같다(170×257mm) — DK_MARGIN_CSS 가 서식별로 덮는다.
+  +".a4{width:"+A4_W+";height:"+A4_H+";box-sizing:border-box;padding:"+A4_PAD+";margin:0 auto;display:flex;flex-direction:column;page-break-after:always}"
+  +DK_MARGIN_CSS(".a4")
   +".a4:last-child{page-break-after:auto}.a4b{flex:1 1 auto}"
   +".a4f{flex:0 0 auto;text-align:center;font-size:11px;color:#475569;padding-top:4mm}"
   +"h1{text-align:center;font-size:21px;letter-spacing:6px;margin:24px 0}h2{font-size:15px;margin:20px 0 6px;text-align:center;letter-spacing:3px}"
@@ -3725,6 +3780,7 @@ function dgDocCssIn(){ var s="#doced";
   return s+"{font-family:'Batang','바탕',serif;line-height:1.9;font-size:13.5px;color:#1e293b;transform-origin:top left}"
   +s+" .a4{width:"+A4_W+";height:"+A4_H+";box-sizing:border-box;padding:"+A4_PAD+";margin:0 auto 16px;background:#fff;"
      +"box-shadow:0 1px 6px rgba(0,0,0,.18);border:1px solid #e2e8f0;position:relative;display:flex;flex-direction:column}"
+  +DK_MARGIN_CSS(s+" .a4")   // 서식별 진짜 여백 — 인쇄판과 같은 값(값이 한 군데뿐이다)
   +s+" .a4b{flex:1 1 auto;min-height:0}"                                  // 본문 영역
   +s+" .a4f{flex:0 0 auto;text-align:center;font-size:11px;color:#64748b;padding-top:3mm;border-top:1px dotted #e2e8f0;margin-top:3mm}"
   +s+" .a4.of{border-color:#f87171;box-shadow:0 0 0 2px rgba(224,160,160,.35)}"   // 넘침 표시
@@ -6815,7 +6871,7 @@ function sidePreview(kind){
     +'<button '+(smp?'class="primary" ':'')+'onclick="saveDocType(\''+kind+'\')" style="padding:3px 10px" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button>'
     +(smp?'':'<button class="primary" onclick="saveDocEdit(\''+kind+'\')" style="padding:3px 10px" title="이 기금에만 저장">💾 이 기금</button>')+'</div>'
     +(smp?'<p class="muted" style="font-size:11px;margin:0 0 6px">샘플(견본) 편집 중 — [💾 '+ftype+' 공통]이 모든 '+ftype+'기금 기본이 됩니다.</p>':'')
-    +'<div class="row" style="margin:0 0 6px;gap:6px"><span class="chip" style="font-size:10px">📄 A4 세로 · 여백 20mm</span>'
+    +'<div class="row" style="margin:0 0 6px;gap:6px"><span class="chip" style="font-size:10px">📄 A4 세로 · '+esc(_marginLabelOf(kind))+'</span>'
     +'<span id="a4Warn" style="display:none;font-size:10.5px;color:#991b1b">넘친 쪽 있음</span>'
     +'<button onclick="repaginateDoc()" style="padding:2px 8px;font-size:11px" title="내용에 맞춰 쪽을 다시 나눕니다">⎘ 다시 나누기</button>'
     +docAlignBar()
@@ -6934,7 +6990,8 @@ function estabBundle(phase){
     +'<span style="flex:1"></span><button class="primary" onclick="printDoc()" style="padding:3px 10px">🖨 전부 인쇄(날인용)</button></div>'
     +'<div id="bundleGap"></div>'
     +'<div id="bundleSum" class="row" style="margin:0 0 6px;gap:5px;flex-wrap:wrap"></div>'
-    +'<div class="row" style="margin:0 0 6px;gap:6px"><span class="chip" style="font-size:10px">📄 A4 세로 · 여백 20mm</span>'
+    /* 묶음은 여러 서식이 섞인다 — 서식마다 여백이 달라 «하나의 숫자»로는 못 보여 준다 */
+    +'<div class="row" style="margin:0 0 6px;gap:6px"><span class="chip" style="font-size:10px">📄 A4 세로 · 여백은 서식마다 원본대로</span>'
     +'<span style="flex:1"></span><span class="muted" style="font-size:11px">배율 <b id="docZoomLbl">—</b></span>'
     +'<button onclick="toggleDocZoom()" style="padding:2px 8px;font-size:11px">⤢ 배율</button></div>'
     +'<div id="docwrap" style="border:1px solid var(--line);border-radius:8px;max-height:72vh;overflow:auto;padding:14px;background:#e2e8f0">'+loadingHTML()+'</div>';
@@ -6992,8 +7049,13 @@ function _docToHwpxRun(kind){
     toast('한글 파일로 저장했습니다');
   }catch(e){ toast('한글 변환 실패: '+((e&&e.message)||e),'err'); }
 }
-/* 인쇄·PDF — A4 세로 고정. 화면과 같은 규격(여백 20mm, 본문 170mm)으로 나온다.
-   화면용 용지 그림자·테두리는 인쇄에서 제거하고, .a4 낱장마다 페이지를 나눈다. */
+/* 인쇄·PDF — A4 세로 고정. 화면과 같은 규격(서식마다 제 여백, DK_MARGIN_CSS)으로 나온다.
+   화면용 용지 그림자·테두리는 인쇄에서 제거하고, .a4 낱장마다 페이지를 나눈다.
+   ⚠ 2026-09-20 「여백 등 이상하다」 — @page 여백은 «서식 전체에 하나»뿐이라 서식마다
+     다른 여백을 줄 수 없었다. 그래서 @page 는 0으로 비우고 .a4 자신이 210×297mm 를
+     통째로 그린 뒤 padding 으로 여백을 낸다(화면판과 같은 구조) — 예전에 여기서
+     «화면처럼 보이게» 따로 덧입히던 @media screen 겹침이 이제 필요 없다. dgDocCss()
+     의 기본 .a4 규칙이 이미 그 모양이라, 미리보기 창의 화면 표시도 그대로 맞다. */
 function printDoc(){ var ed=$('doced'); if(!ed)return;
   var w=window.open('','_blank'); if(!w){ toast('팝업이 차단되었습니다','err'); return; }
   var body=sanitizeDocHTML(ed.innerHTML);
@@ -7003,9 +7065,7 @@ function printDoc(){ var ed=$('doced'); if(!ed)return;
   if(!/class\s*=\s*["'][^"']*\ba4\b/.test(body)) body='<div class="a4">'+body+'</div>';
   w.document.write('<!doctype html><meta charset=utf-8><title>서식 인쇄</title><style>'+dgDocCss()
     +'.a4{box-shadow:none;border:0;background:#fff}.a4of{display:none}'   // 화면용 넘침배지는 인쇄 제외
-    // 새 창 화면에서는 용지처럼(여백 포함) 보이게, 인쇄 시엔 @page 여백이 대신한다
-    +'@media screen{body{background:#f8fafc;padding:16px}'
-    +'.a4{box-sizing:content-box;padding:'+A4_PAD+';box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 auto 16px}}'
+    +'@media screen{body{background:#f8fafc;padding:16px}}'   // 미리보기 창의 바탕만 — .a4 는 이미 용지 그대로다
     +'</style>'+body);
   w.document.close(); setTimeout(function(){ w.print(); },400); }
 
