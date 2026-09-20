@@ -174,6 +174,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <div id="root"></div>
 <script src="js/utils.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
+<script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-photo-store.js?v=29"></script>
 <script src="js/pu-billing.js?v=10"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
@@ -67694,34 +67695,20 @@ function ieumEnsureShareKey(extId){
   return x.shareKey;
 }
 // 공개 미러 발행: 이름·날짜·구분만 (연락처 등 개인정보 제외) — 단방향, 원본은 attendance_records
+/* ★ 2026-09-20 — «만드는 셈»을 js/pu-ieum-public.js 로 옮겼다.
+   까닭: 이음 근무를 푸른 캘린더에서도 고치게 되면서(캘린더 한 곳으로 모으기 1걸음),
+   캘린더에서 고친 것이 공개 뷰에 안 따라가는 구멍이 생겼다. 캘린더에 같은 셈을
+   한 벌 더 쓰면 두 벌이 되어 언젠가 어긋난다 — 그래서 한 파일에 두고 둘이 부른다.
+   ⚠ 여기서 셈을 되살리지 말 것. 고칠 일이 생기면 그 파일 하나를 고친다. */
 function ieumPublishPublic(cb){
   if(typeof fbDb === 'undefined' || !fbDb){ cb && cb(false, 'Firebase 미연결'); return; }
-  var att = dbGet('attendance_records', []) || [];
-  var users = getAssignableUsers();
-  var ext = getExternalStaff();
-  var extMap = {}; ext.forEach(function(x){ extMap[x.id] = x; });
-  var userMap = {}; users.forEach(function(u){ userMap[u.sid] = u; });
-  var roster = {};
-  var yearFrom = String(new Date().getFullYear() - 1); // 전년도부터 발행 (연말·연초 경계 대비)
-  att.forEach(function(r){
-    if(r.type !== 'eum-work' || !r.date) return;
-    if(r.date.slice(0,4) < yearFrom) return;
-    var name = '', kind = 'in';
-    if(r.externalId){
-      var e = extMap[r.externalId]; if(!e) return;
-      name = e.name; kind = ((e.role||'').indexOf('변호사') >= 0) ? 'law' : 'ex';
-    } else if(r.sid){
-      var u = userMap[r.sid]; name = u ? u.name : r.sid; kind = 'in';
-    } else return;
-    if(!roster[r.date]) roster[r.date] = [];
-    roster[r.date].push({ n:name, k:kind });
-  });
-  var people = {};
-  ext.filter(function(x){ return x.active !== false && x.shareKey; }).forEach(function(x){
-    people[x.shareKey] = { name:x.name };
-  });
-  fbDb.ref('ieum_public').set({ roster:roster, people:people, updatedAt:Date.now() })
-    .then(function(){ cb && cb(true); })
+  if(typeof PuIeumPublic === 'undefined'){ cb && cb(false, '공개 일정 만들개를 못 읽었습니다'); return; }
+  PuIeumPublic.publish(fbDb, {
+    attendance: dbGet('attendance_records', []) || [],
+    users: getAssignableUsers(),
+    externals: getExternalStaff(),
+    year: new Date().getFullYear()
+  }).then(function(){ cb && cb(true); })
     .catch(function(e){ cb && cb(false, e && e.message); });
 }
 

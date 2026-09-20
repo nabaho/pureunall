@@ -24,6 +24,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
+<script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=2"></script>
 <script src="js/pu-cal-write.js?v=3"></script>
 <style>
@@ -186,6 +187,8 @@
      #991b1b)은 그대로다 — 팔레트·tests/cal-same-as-erp.test.js 가 색만 못 박는다. */
   .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default;
     border-radius:0;margin:0 -4px}
+  .pubmsg{font-size:11.5px;color:var(--ok);margin-left:9px}
+  .pubat{font-size:11px;color:var(--faint);margin-left:9px}
   /* 계정 잇기 — 할 일이 있을 때만 머리줄에 뜬다(없으면 아예 안 그린다) */
   .linkacct{font-size:11.5px;padding:4px 10px;border:1px solid #fde68a;background:var(--warn-bg);
     color:var(--warn);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
@@ -694,6 +697,78 @@ function 잇기저장(메일열쇠, sid){
   })["catch"](function(e){
     m.busy = false; m.err = (e && e.message) || String(e); render();
   });
+}
+
+/* ── 외부 공유 뷰 «발행» ────────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 2걸음.
+
+   ★ 여기서 고친 진짜 고장
+     공개 일정(ieum_public)을 만드는 일이 이알피에만 걸려 있었다. 그런데 이음 근무를
+     «푸른 캘린더에서도» 고치게 되면서(1걸음), 캘린더에서 고친 것은 공개 뷰에 안
+     따라갔다 — 외부 변호사가 받은 링크에 옛 일정이 그대로 떠 있었다.
+     이알피 이음센터 화면을 열어야만 다시 발행됐기 때문이다.
+
+   ★ 만드는 셈은 js/pu-ieum-public.js «한 곳»이다 — 이알피도 그 파일을 부른다.
+     여기서 다시 셈하지 말 것(두 벌이 되면 두 화면의 공개 일정이 갈린다).
+   ⚠ 발행은 «덮어쓰기»다. 원본은 근태라 언제든 다시 만들 수 있다. */
+function 발행자료(){
+  return {
+    attendance: arr(D.attendance_records),
+    users: allUsers(),
+    externals: arr(D.external_staff),
+    year: new Date().getFullYear()
+  };
+}
+function 발행하기(조용히){
+  if(typeof PuIeumPublic === "undefined" || !fbDb) return;
+  if(!조용히){ S.pub = { busy:true, msg:"" }; render(); }
+  return PuIeumPublic.publish(fbDb, 발행자료()).then(function(만든것){
+    var 날수 = Object.keys(만든것.roster || {}).length;
+    S.pub = { busy:false, msg:"✅ 발행했습니다 — " + 날수 + "일치", at:Date.now() };
+    if(!조용히) render();
+  })["catch"](function(e){
+    S.pub = { busy:false, msg:"발행하지 못했습니다: " + ((e && e.message) || e) };
+    if(!조용히) render();
+  });
+}
+/* 일정을 고치면 «저절로» 발행한다 — 이알피와 같은 요령(3초 모아서 한 번).
+   ⚠ 고칠 때마다 바로 올리면 끌어놓기로 여러 건을 잇따라 고칠 때 그만큼 올라간다. */
+var _발행타이머 = null;
+function 발행예약(){
+  if(typeof PuIeumPublic === "undefined" || !fbDb) return;
+  clearTimeout(_발행타이머);
+  _발행타이머 = setTimeout(function(){ 발행하기(true); }, 3000);
+}
+function 발행시각Html(){
+  var at = (S.pub && S.pub.at) || 0;
+  if(!at) return "";
+  var d = new Date(at);
+  return '<span class="pubat">마지막 발행 ' + String(d.getHours()).padStart(2,"0")
+    + ":" + String(d.getMinutes()).padStart(2,"0") + '</span>';
+}
+
+/* ── 개인 공유 링크 발급·재발급 ──────────────────────────────────────────
+   ⚠ 재발급하면 «지금 링크가 그때부터 안 열린다». 되돌릴 수 없으니 한 번 묻는다.
+   ⚠ 외부 인원 표(external_staff)는 지도형이라 칸별 저장 문을 그대로 쓴다 —
+     그 사람의 shareKey 칸 하나만 고친다(다른 칸·다른 사람을 안 건드린다). */
+function 링크발급(extId){
+  if(!잇기할수있나()) return;
+  var x = arr(D.external_staff).filter(function(e){ return e && e.id === extId; })[0];
+  if(!x) return;
+  var 다시 = !!x.shareKey;
+  if(다시 && !window.confirm(x.name + "님의 링크를 재발급할까요?\n지금 링크는 그때부터 열리지 않습니다."))
+    return;
+  var 새열쇠 = PuIeumPublic.newShareKey();
+  PuCalWrite.save("external_staff", { id: extId, shareKey: 새열쇠 }, x).then(function(r){
+    if(r && r.ok){
+      x.shareKey = 새열쇠;                     /* 화면이 든 것도 함께 고친다 */
+      toast(다시 ? "🔑 재발급했습니다 — 새 링크를 전해 주세요" : "🔑 발급했습니다");
+      발행하기(true);                          /* people 목록이 바뀌었으니 다시 올린다 */
+      render();
+    } else {
+      toast("발급하지 못했습니다: " + ((r && r.message) || ""));
+    }
+  })["catch"](function(e){ toast("발급하지 못했습니다: " + ((e && e.message) || e)); });
 }
 
 /* 실시간DB 열쇠에는 점(.)을 못 쓴다 — 이메일에는 점이 있어 쉼표로 바꿔 담는다.
@@ -1590,16 +1665,24 @@ function shareHtml(){
       + '<td class="right">'
       + (x.shareKey
           ? ('<button class="btn ghost sm" data-copy="' + esc(url) + '">📋 링크 복사</button>'
-             + ' <button class="btn ghost sm" data-erp="dash/ieum">🔑 재발급</button>')
-          : '<button class="btn ghost sm" data-erp="dash/ieum">이알피에서 발급</button>')
+             + (잇기할수있나()
+                 ? ' <button class="btn ghost sm" data-newkey="' + esc(x.id) + '"'
+                   + ' title="새 링크를 만듭니다 — 지금 링크는 그때부터 안 열립니다">🔑 재발급</button>'
+                 : ''))
+          : (잇기할수있나()
+              ? '<button class="btn ghost sm" data-newkey="' + esc(x.id) + '">🔑 발급</button>'
+              : '<span class="muted">관리자만 발급</span>'))
       + '</td></tr>';
   }).join("");
   return '<div class="sharecard">'
     + '<div class="sctitle">🔗 외부인용 읽기전용 일정 페이지</div>'
     + '<div class="scdesc">외부 변호사·노무사에게 개인 고유 링크를 보내면 로그인 없이 본인 근무일정을 확인할 수 있습니다.<br>'
     + '공개되는 정보는 이름·날짜·구분뿐이며, 연락처 등 개인정보는 포함되지 않습니다.<br>'
-    + '일정을 수정한 뒤에는 이알피의 [지금 발행] 버튼으로 공개 일정을 갱신하세요.</div>'
-    + '<button class="btn" data-erp="dash/ieum">📤 이알피에서 발행하기</button>'
+    + '일정을 고치면 <b>저절로 발행</b>됩니다 — 아래 단추는 바로 올리고 싶을 때만 쓰세요.</div>'
+    + '<button class="btn" data-pub="1"' + (S.pub && S.pub.busy ? ' disabled' : '') + '>'
+    +   (S.pub && S.pub.busy ? '발행 중…' : '📤 지금 발행') + '</button>'
+    + (S.pub && S.pub.msg ? '<span class="pubmsg">' + esc(S.pub.msg) + '</span>' : '')
+    + 발행시각Html()
     + '</div>'
     + '<div class="sharecard">'
     + '<div class="sctitle sm">개인 링크 목록</div>'
@@ -1705,6 +1788,8 @@ function doSave(){
     closeModal();
     toast(고침 ? "✅ 고쳤습니다" : "✅ 넣었습니다");
     refreshOne(store);
+    /* 이음 근무가 바뀌면 외부 공유 뷰도 따라가야 한다 — 안 걸면 옛 일정이 그대로 뜬다 */
+    if(store === "attendance_records") 발행예약();
   });
 }
 
@@ -1718,6 +1803,7 @@ function doDelete(){
     if(!r.ok){ m.err = r.message; render(); return; }
     var st = m.store;
     closeModal(); toast("🗑 지웠습니다"); refreshOne(st);
+    if(st === "attendance_records") 발행예약();
   });
 }
 
@@ -1806,7 +1892,7 @@ document.addEventListener('click', function(e){
      && !(e.target.closest && e.target.closest("[data-more]"))){
     S.open = null; render();
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-pub],[data-newkey],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -1844,6 +1930,8 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-f')){ modalRead(); var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
   if(t.hasAttribute('data-erp')){ goErp(t.getAttribute('data-erp')); return; }
   if(t.hasAttribute('data-mmopen')){ openMailMap(); return; }
+  if(t.hasAttribute('data-pub')){ 발행하기(false); return; }
+  if(t.hasAttribute('data-newkey')){ 링크발급(t.getAttribute('data-newkey')); return; }
   /* 닫기 — 잇기 창이 열려 있으면 그것부터 닫는다(둘이 겹쳐 뜨지 않는다) */
   if(t.hasAttribute('data-close')){ if(S.mailmap) closeMailMap(); else closeModal(); return; }
   if(t.hasAttribute('data-act')){
