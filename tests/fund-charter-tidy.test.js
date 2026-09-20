@@ -316,7 +316,7 @@ function boot() {
     gF('partyNames'), gF('partyJoin'), gF('_fillWho'), gF('fillPartyList'), gF('fillPartyDates'),
     gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
     gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),
-    gS('MINUTES_AGENDA'), gF('fillMinutesPages'),
+    gS('MINUTES_AGENDA'), gS('MINUTES_PROGRESS_HEAD'), gF('fillMinutesPages'),
     gS('SIGN_L'), gS('SIGN_R'), gS('SIGN_WHO_ONLY_SRC'), gS('SIGN_HEAD'),
     /* 2026-09-20: 표를 짜는 일은 signTableHTML 한 곳 — 회의록 참석위원표도 같은 것을 쓴다 */
     gF('_signLabels'), gF('signTableHTML'), gF('fillSignTable'), gF('fillAttendSign'),
