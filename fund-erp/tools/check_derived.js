@@ -45,7 +45,8 @@ global.funds = {};
     ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
  (/var COMMITTEE_ROWS=\d+;/.exec(src) || [''])[0],
  gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmSeeAnnex'), gF('committeeAnnexHTML'),
- gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'),
+ /* 2026-09-20: 확인서 한 장의 모양(제목·가운데 배치·회사이름·날인 자리)을 하나로 모았다 */
+ gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dotDate'), gF('contribCertHTML'), gF('fillContribDoc'), gF('fillChecklistDoc'),
   gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'), gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'),
   gF('fillCommittee'), gF('fillRoster'), gF('fillSubsidyDoc'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
   /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10).
@@ -95,6 +96,10 @@ const draw = (kind, f, sites) => { const d = dom.window.document.createElement('
   return T(d.textContent); };
 /* 공백을 «접지 않은» 글 — 자간 벌림이 살아 있는지 보려면 T() 를 거치면 안 된다
    (T 가 모든 연속 공백을 한 칸으로 만들어, 무엇이 남았는지 알 수 없다). */
+/* 글자가 아니라 «짜임»을 보려면 원소 그대로 돌려준다 — 제목 크기·가운데 배치·
+   회사이름·날인 자리가 제대로 붙었는지는 텍스트만 봐서는 알 수 없다(2026-09-20). */
+const drawEl = (kind, f, sites) => { const d = dom.window.document.createElement('div');
+  d.innerHTML = hwpFormHTML(kind, f, sites || []); return d; };
 const drawRaw = (kind, f, sites) => { const d = dom.window.document.createElement('div');
   d.innerHTML = hwpFormHTML(kind, f, sites || []).replace(/<\/t[dh]>/g, ' $&').replace(/<br\s*\/?>/g, '\n');
   return String(d.textContent || ''); };
@@ -130,8 +135,11 @@ console.log('■ 회의록 — 명부·출연금·예산에서 온다');
   ok('추정대차대조표는 스냅샷이 없으면 비워 둔다', /추정대차대조표 : 자산 [＿_]+천원/.test(t)); }
 
 console.log('\n■ 기금출연확인서 — 사업장마다 한 장');
+/* 2026-09-20: 회사마다 한 장 «모양»을 contribCertHTML 로 다시 짰다 —
+   제목은 이제 자간을 CSS(.fmtitle)로 벌리고 글자 사이엔 공백을 안 둔다.
+   그래서 페이지 수는 옛 스페이스 낀 제목이 아니라 「기금출연확인서」 자체를 센다. */
 { const t = draw('contrib', F, SITES);
-  ok('사업장마다 한 장 (닫은 곳은 뺀다)', (t.match(/기 금 출 연 확 인 서/g) || []).length === 2, (t.match(/기 금 출 연 확 인 서/g) || []).length + '장');
+  ok('사업장마다 한 장 (닫은 곳은 뺀다)', (t.match(/기금출연확인서/g) || []).length === 2, (t.match(/기금출연확인서/g) || []).length + '장');
   ok('금액이 한글·숫자로 선다', /육백만원정\(￦ 6,000,000\)/.test(t) && /사백만원정\(￦ 4,000,000\)/.test(t), t.slice(0, 200));
   ok('사업장·대표자가 선다', /가나기계 대표이사 김가나/.test(t) && /다라전자 대표이사 이다라/.test(t));
   ok('원본 자리표 「0000(주) 대표이사 0 0 0」이 안 남는다', !/0000\(주\)|0 0 0/.test(t));
@@ -144,11 +152,23 @@ console.log('\n■ 기금출연확인서 — 사업장마다 한 장');
     { name: '다라전자', ceo: '이다라', status: 'active' },
     { name: '마바산업', ceo: '최마바', status: 'active' }];
   const tn = draw('contrib', Object.assign({}, F, { contrib_per_worker: 0 }), NOAMT);
-  ok('약정액이 없어도 사업장 수만큼 장이 나온다', (tn.match(/기 금 출 연 확 인 서/g) || []).length === 3,
-    (tn.match(/기 금 출 연 확 인 서/g) || []).length + '장');
+  ok('약정액이 없어도 사업장 수만큼 장이 나온다', (tn.match(/기금출연확인서/g) || []).length === 3,
+    (tn.match(/기금출연확인서/g) || []).length + '장');
   ok('약정액이 없어도 회사·대표자는 찍힌다',
     /가나기계 대표이사 김가나/.test(tn) && /마바산업 대표이사 최마바/.test(tn));
   ok('금액 자리는 비워 둔다 (지어내지 않는다)', /￦ [＿_]+/.test(tn) && !/원정/.test(tn));
+  /* ★ 한 장의 «짜임» (대표 지시 2026-09-20 「줄간격 글자크기 회사이름 날인 위치를 조정」) —
+     목업대로 제목은 fmtitle, 본문 덩이는 지면 가운데(cbwrap), 회사 이름·도장 자리가
+     따로 도드라져야 한다. 텍스트만 보면 이 넷을 구별할 수 없어 원소를 직접 본다. */
+  const el = drawEl('contrib', F, SITES);
+  const wraps = [].slice.call(el.querySelectorAll('.cbwrap'));
+  ok('회사마다 지면 가운데로 내리는 덩이(.cbwrap)가 선다', wraps.length === 2, wraps.length + '개');
+  ok('제목은 fmtitle(굵게·자간)을 쓴다 — 다른 서식과 통일', el.querySelectorAll('.cbwrap .fmtitle').length === 2);
+  ok('회사 이름이 따로 도드라진다(.cbco)', el.querySelectorAll('.cbco').length === 2);
+  ok('도장 자리가 표시된다(.cbseal)', el.querySelectorAll('.cbseal').length === 2
+    && [].slice.call(el.querySelectorAll('.cbseal')).every((x) => x.textContent === '인'));
+  ok('둘째 장부터 새 장에서 시작한다', el.querySelectorAll(':scope > [data-newpage]').length === 1,
+    '첫 장에 표시가 있으면 앞에 빈 장이 생긴다');
   /* 2026-09-19: 그 해 출연금(참여사업장 › 연도별 기록)까지 보게 되어 안내문 글귀가 바뀌었다 */
   ok('몇 곳이 비었는지 말해 준다', /3곳 중 3곳은 출연금이 적혀 있지 않아/.test(tn),
     (tn.match(/※[^※]{0,60}/) || [''])[0]);

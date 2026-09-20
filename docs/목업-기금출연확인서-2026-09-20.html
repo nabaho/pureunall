@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>기금출연확인서 개별 페이지 — 목업</title>
+<style>
+  :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
+    --line:#e2e8f0;--panel:#fff;--bg:#e2e8f0;--warn:#854d0e}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
+    background:var(--bg);font-size:14px;padding:18px 22px 60px}
+  h1{font-size:19px;margin:0 0 4px}
+  .lede{color:var(--sub);font-size:13px;margin:0 0 18px;max-width:780px;line-height:1.65}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:18px 20px;margin-bottom:16px}
+  .lab{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:#fff;
+    background:var(--ink);border-radius:6px;padding:2px 8px;margin-bottom:10px}
+  .lab.now{background:#b91c1c}
+  .lab.new{background:#15803d}
+  .note{font-size:12px;color:var(--sub);line-height:1.7;margin:10px 0 0}
+  .note b{color:var(--ink)}
+  ul{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--sub);line-height:1.8}
+  ul b{color:var(--ink)}
+
+  /* ── A4 지면 — 축소해서 나란히 보여준다(실제는 210×297mm) ── */
+  .pages{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;justify-content:center}
+  .a4wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .a4tag{font-size:11.5px;color:var(--sub);font-weight:700}
+  .a4{width:420px;height:594px;background:#fff;border:1px solid var(--line);
+    box-shadow:0 4px 18px rgba(15,23,42,.10);position:relative;overflow:hidden}
+  .a4 .pagefoot{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8}
+
+  /* 지금 — 위쪽에 쏠려 있고 아래는 빈 채, 제목은 그냥 자간 넓힌 글자, 서명은 왼쪽 정렬 */
+  .doc-now{font-family:'Batang','바탕',serif;padding:30px 26px;line-height:1.55;font-size:11.5px;color:#1e293b}
+  .doc-now .t{font-size:14px;margin:0 0 14px}
+  .doc-now .amt{margin:0 0 10px}
+  .doc-now .body{text-align:left;margin:0 0 14px}
+  .doc-now .date{margin:0 0 10px}
+  .doc-now .sign{margin:0}
+
+  /* 바꾼 뒤 — fmtitle/fmdate/fmsign 관례를 따르고, 본문 덩이를 지면 가운데로 내린다 */
+  .doc-new{font-family:'Batang','바탕',serif;height:100%;display:flex;flex-direction:column;
+    padding:26px 28px;color:#1e293b}
+  .doc-new .mid{flex:1;display:flex;flex-direction:column;justify-content:center}
+  .doc-new .fmtitle{text-align:center;font-size:22px;font-weight:700;letter-spacing:7px;margin:0 0 34px}
+  .doc-new .amt{text-align:center;font-size:13.5px;line-height:2;margin:0 0 26px}
+  .doc-new .amt b{font-size:15px;letter-spacing:1px}
+  .doc-new .body{text-align:justify;text-indent:1em;line-height:2.15;font-size:12.5px;margin:0 0 30px}
+  .doc-new .fmdate{text-align:center;letter-spacing:3px;font-size:12.5px;margin:0 0 40px}
+  .doc-new .fmsign{text-align:right;margin:0 10px 0 0}
+  .doc-new .co{font-size:15.5px;font-weight:800;letter-spacing:.5px;margin:0 0 8px}
+  .doc-new .ceo{font-size:13px;line-height:2.3}
+  .doc-new .ceo .seal{display:inline-block;min-width:34px;border-bottom:1px solid #94a3b8;
+    text-align:center;margin:0 2px}
+
+  .arrow{align-self:center;font-size:26px;color:var(--sub);margin-top:230px}
+  .cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:6px}
+  .cnt{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .cnt .k{font-size:11px;color:var(--sub)}
+  .cnt .v{font-size:12.5px;margin-top:3px}
+  .cnt .v .old{color:#b91c1c;text-decoration:line-through;margin-right:6px;font-size:11.5px}
+  .cnt .v .new{color:#15803d;font-weight:700}
+</style></head><body>
+
+<h1>기금출연확인서 — 회사마다 한 장씩</h1>
+<p class="lede">대표 지시 「기금출연확인서의 회사 대표자는 1회사당 1장씩하고 나중에 출력해서 날인을 한다. …
+줄간격 글자크기 회사이름 날인 위치를 조정해서 참여사업장수만큼 만들어라. 만들기전에 항상목업 해라」<br>
+<b>회사 이름·대표자는 모두 가짜입니다.</b> 참여사업장 수만큼(예: 16곳) 페이지가 나뉘는 것은 이미 되어 있습니다 —
+이번에 손보는 것은 <b>한 장 한 장의 짜임(줄간격·글자크기·회사이름·날인 위치)</b>입니다.</p>
+
+<div class="panel">
+  <span class="lab now">지금 · 한 장</span>
+  <div class="pages">
+    <div class="a4wrap">
+      <div class="a4tag">1 / 16 — 가짜기금 예산</div>
+      <div class="a4">
+        <div class="doc-now">
+          <p class="t">기 금 출 연 확 인 서</p>
+          <p class="amt">금&nbsp; 액 : &nbsp;일천이백만원정(￦ 12,000,000)</p>
+          <p class="body">상기 금액은 가짜공동근로복지기금법인이 고용노동부 인가를 득하여 설립등기 후 예금계좌를 개설할 경우, 10일 이내에 가짜공동근로복지기금에 출연할 것을 확인함.</p>
+          <p class="date">2026. 9. 20.</p>
+          <p class="sign">가나산업㈜ 대표이사 홍길동 (인)</p>
+        </div>
+        <div class="pagefoot">- 1 / 16 -</div>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>무엇이 아쉬운가</b> — 제목이 그냥 글자 사이를 띄운 것뿐이라 다른 서식(정관·설립합의서)의 큰 표제와
+  느낌이 다릅니다. 본문이 위쪽에 몰려 있어 아래 <b>절반 가까이가 빈 종이</b>로 남습니다. 서명줄이 왼쪽에 붙어 있어
+  회사 이름이 눈에 잘 안 띄고, 도장 찍을 자리도 따로 표시가 없습니다.</p>
+</div>
+
+<div class="panel">
+  <span class="lab new">바꾼 뒤 · 한 장</span>
+  <div class="pages">
+    <div class="a4wrap">
+      <div class="a4tag">1 / 16 — 가짜기금 예산</div>
+      <div class="a4">
+        <div class="doc-new">
+          <div class="mid">
+            <div class="fmtitle">기금출연확인서</div>
+            <div class="amt">금&nbsp;&nbsp;액<br><b>일천이백만원정 (￦ 12,000,000)</b></div>
+            <div class="body">상기 금액은 가짜공동근로복지기금법인이 고용노동부 인가를 득하여 설립등기 후 예금계좌를 개설할 경우, 10일 이내에 가짜공동근로복지기금에 출연할 것을 확인함.</div>
+            <div class="fmdate">2026. 9. 20.</div>
+            <div class="fmsign">
+              <div class="co">가나산업㈜</div>
+              <div class="ceo">대표이사 &nbsp;홍길동&nbsp; <span class="seal">인</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="pagefoot">- 1 / 16 -</div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="a4wrap">
+      <div class="a4tag">2 / 16 — 다음 참여사업장</div>
+      <div class="a4">
+        <div class="doc-new">
+          <div class="mid">
+            <div class="fmtitle">기금출연확인서</div>
+            <div class="amt">금&nbsp;&nbsp;액<br><b>구백만원정 (￦ 9,000,000)</b></div>
+            <div class="body">상기 금액은 가짜공동근로복지기금법인이 고용노동부 인가를 득하여 설립등기 후 예금계좌를 개설할 경우, 10일 이내에 가짜공동근로복지기금에 출연할 것을 확인함.</div>
+            <div class="fmdate">2026. 9. 20.</div>
+            <div class="fmsign">
+              <div class="co">다라전자㈜</div>
+              <div class="ceo">대표이사 &nbsp;김철수&nbsp; <span class="seal">인</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="pagefoot">- 2 / 16 -</div>
+      </div>
+    </div>
+  </div>
+  <p class="note">회사마다 <b>새 장</b>에서 시작합니다(지금도 그렇습니다 — 이번에 바뀌는 것은 한 장의 짜임뿐입니다).
+  16곳이면 16장, 3곳이면 3장이 그대로 나옵니다.</p>
+</div>
+
+<div class="panel">
+  <span class="lab">네 가지, 무엇을 바꾸나</span>
+  <div class="cmp">
+    <div class="cnt"><div class="k">제목</div>
+      <div class="v"><span class="old">글자 사이만 띄움</span><span class="new">굵게·자간 넓힌 표제(다른 서식과 통일)</span></div></div>
+    <div class="cnt"><div class="k">줄간격 · 배치</div>
+      <div class="v"><span class="old">위쪽에 몰림, 아래 절반 빈 종이</span><span class="new">본문 덩이를 지면 가운데로</span></div></div>
+    <div class="cnt"><div class="k">회사 이름</div>
+      <div class="v"><span class="old">본문과 같은 크기, 왼쪽 정렬</span><span class="new">15.5px 굵게, 서명줄 첫머리에 단독으로</span></div></div>
+    <div class="cnt"><div class="k">날인 위치</div>
+      <div class="v"><span class="old">문장 끝에 그냥 붙음</span><span class="new">오른쪽 아래, 도장 자리에 밑줄 표시</span></div></div>
+  </div>
+  <p class="note"><b>금액을 모르는 곳은 어떻게 되나</b> — 지금과 같습니다. 밑줄(＿＿＿＿)로 비워 두고 회사 이름·대표자는
+  아는 대로 채웁니다. 지어내지 않습니다.</p>
+</div>
+
+<div class="panel" style="background:#fffbeb;border-color:#fde68a">
+  <b style="font-size:13px">확인 부탁드립니다</b>
+  <ul>
+    <li>이 짜임(제목 크기·가운데 배치·서명 자리)이 <b>정관·설립합의서 표지</b>에 이미 쓰는 서체 규칙과 같은 것입니다 —
+      서식끼리 느낌이 통일됩니다. 이대로 진행해도 될까요?</li>
+    <li>회사 이름 아래 대표이사 이름·도장 자리를 <b>한 줄</b>로 뒀습니다 — 두 줄(이름 줄, 도장 줄)로 나눠 도장 자리를
+      더 넓게 드릴 수도 있습니다. 어느 쪽이 나으실까요?</li>
+  </ul>
+</div>
+
+</body></html>

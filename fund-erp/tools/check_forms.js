@@ -39,7 +39,8 @@ global.funds = {};
   gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'),
   gF('_officersOf'), gF('_boss'), gF('_isBlankCell'), gF('_isLabelCell'), gF('_bakeText'),
   gF('_isRateRow'), gF('stripBaked'), gF('korWon'), gF('_docRok'),
-  gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'), gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'),
+  /* 2026-09-20: 확인서 한 장의 모양(제목·가운데 배치·회사이름·날인 자리)을 하나로 모았다 */
+  gF('_dotDate'), gF('contribCertHTML'), gF('fillContribDoc'), gF('fillChecklistDoc'), gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'),
   /* 출연금 하나로 세우는 첫해 예산(2026-09-12) — bizplanRows·bizplanBS 가 부른다.
      여기 없으면 「planBudget is not defined」로 이 검사가 통째로 죽는다. */
   gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
@@ -186,8 +187,10 @@ console.log('\n■ 기금 출연 확인서 — 사업장마다 한 장씩');
                      sy:{ s1:{contrib:3070000}, s2:{contrib:12340000}, s3:{} } };
   const d = dom.window.document.createElement('div');
   d.innerHTML = hwpFormHTML('sub_contrib', f, sites);
-  const ps = [].slice.call(d.querySelectorAll('p'))
-    .filter(x => /출 연 확 인 서/.test(T(x.textContent)));
+  /* 2026-09-20: 한 장의 짜임을 contribCertHTML 로 다시 짰다 — 회사마다 감싸는
+     바깥 껍데기가 <p> 가 아니라 <div class="cbwrap"> 다. */
+  const ps = [].slice.call(d.querySelectorAll('.cbwrap'))
+    .filter(x => /출연확인서/.test(T(x.textContent)));
   chk('출연한 두 곳만 두 장', ps.length === 2, ps.length);
   const all = T(d.textContent);
   chk('내지 않은 사업장은 없다', !all.includes('마바산업'), all);
@@ -217,7 +220,7 @@ console.log('\n■ 기금 출연 확인서 — 사업장마다 한 장씩');
   chk('장부를 못 읽어도 남의 금액은 없다',
       !t3.includes('오백만원') && !t3.includes('5,000,000'), t3.slice(0, 260));
   chk('못 읽은 까닭을 따로 적어 둔다', t3.includes('아직 못 읽었습니다'), t3.slice(0, 260));
-  chk('그래도 빈 확인서 한 장은 남긴다', /출 연 확 인 서/.test(t3), t3.slice(0, 260));
+  chk('그래도 빈 확인서 한 장은 남긴다', /출연확인서/.test(t3), t3.slice(0, 260));
 }
 
 console.log('\n■ 자율 체크리스트 — 남의 답을 지우고 우리 자료를 넣는가');
@@ -292,7 +295,8 @@ console.log('\n■ 한글 금액·사람 수도 걷어낸다');
 
   const c = t('contrib');
   chk('출연확인서(contrib) — 「오백만원정」이 없다', !c.includes('오백만원'), c.slice(0, 200));
-  chk('그 자리가 빈칸으로 남는다', /금 액 : ＿/.test(c.replace(/\s+/g, ' ')), c.slice(0, 200));
+  /* 2026-09-20: 라벨·값을 콜론 대신 줄바꿈으로 가른다(목업 승인본) — 「금액」 다음 줄에 빈칸 */
+  chk('그 자리가 빈칸으로 남는다', /금\s*액\s*＿/.test(c.replace(/\s+/g, ' ')), c.slice(0, 200));
 
   const b = t('bizplan');
   chk('사업계획서 — 「일천만원」이 없다', !b.includes('일천만원'), b.slice(0, 200));

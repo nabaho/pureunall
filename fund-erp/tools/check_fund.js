@@ -764,9 +764,15 @@ ok('지원신청서를 걷어내기보다 먼저 채운다',
   src.indexOf("if(kind==='subsidy') fillSubsidyDoc(d,f);") < src.indexOf('  stripBaked(d);')
   && src.indexOf("if(kind==='subsidy') fillSubsidyDoc(d,f);") > 0);
 // 채운 칸에 표를 남겨야 걷어내기가 도로 지우지 않는다
-ok('채운 칸을 걷어내기가 건너뛴다', src.includes("td.setAttribute('data-kept','1');")
+/* 2026-09-20: «바로 위 부모»만 보다가 실제 사고가 났다 — 기금출연확인서 금액을
+   <div data-kept><div class="cbwrap"><div class="cbamt"><b>…로 두 겹 감쌌더니
+   바로 위 부모(<b>)엔 data-kept 가 없어, 걷어내기가 방금 넣은 진짜 금액을 남의
+   박힌 금액인 줄 알고 지웠다. closest() 로 조상 전체를 보게 고쳤다 — 몇 겹을
+   감싸도 지켜져야 한다. */
+ok('채운 칸을 걷어내기가 건너뛴다(중첩 몇 겹이어도)', src.includes("td.setAttribute('data-kept','1');")
   && src.includes("if(td.getAttribute('data-kept')) return;")
-  && src.includes("if(el.getAttribute&&el.getAttribute('data-kept')) continue;"));
+  && src.includes("if(el.closest&&el.closest('[data-kept]')) continue;")
+  && !src.includes("if(el.getAttribute&&el.getAttribute('data-kept')) continue;"));
 /* ⚠ 확정 스냅샷은 자산총계를 «assets» 로 담는다(computeFin 의 totalAssets 가 아니다).
    그것을 몰라 추정재무상태표가 실데이터로는 한 번도 안 채워졌다 —
    지어낸 시험자료로만 통과했다. */
