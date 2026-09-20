@@ -1190,6 +1190,7 @@
     },
     "esign": {
       "cases": {
+        ".read": "auth != null && auth.token.email != null",
         "$caseId": {
           "meta": {
             ".read": "auth != null",
