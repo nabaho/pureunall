@@ -159,7 +159,8 @@ test('★★ ④ 쪽을 나눌 때 장마다 서식 이름표를 단다', () => 
 
 test('★★ ⑤ 묶음 인쇄는 서식마다 «제» 이름표를 쓴다 — 여섯 종이 한 창에 섞인다', () => {
   const eb = 코드만(grabFn('estabBundle'));
-  assert.match(eb, /class="a4 dk-'\+esc\(d\[0\]\)\+'"/, '★ 묶음 장에 서식 이름표가 없습니다.');
+  /* ⚠ 2026-09-20 정관 사내/공동 갈래(_dkKeyOf) 가 끼어들었다 — d[0] 을 그대로 안 쓴다 */
+  assert.match(eb, /class="a4 dk-'\+esc\(_dkKeyOf\(d\[0\],f\)\)\+'"/, '★ 묶음 장에 서식 이름표가 없습니다.');
   /* 들어온 장의 이름표를 물려받는 갈래가 있어야 한다 */
   const pd = 코드만(grabFn('paginateDoc'));
   assert.match(pd, /dk-\[a-z_0-9\]\+/, '★ 들어온 장의 이름표를 읽지 않습니다.');
@@ -169,7 +170,8 @@ test('★★ ⑤ 묶음 인쇄는 서식마다 «제» 이름표를 쓴다 — �
 
 test('★★ ⑥ 한 서식만 열 때는 지금 열린 서식을 쓴다', () => {
   const pd = 코드만(grabFn('paginateDoc'));
-  assert.match(pd, /_dkNow=\(S&&S\._docKind\)\?'dk-'\+S\._docKind:''/,
+  /* ⚠ 2026-09-20 정관 사내/공동 갈래(_dkKeyOf) 가 끼어들었다 — S._docKind 를 그대로 안 쓴다 */
+  assert.match(pd, /_dkNow=\(S&&S\._docKind\)\?'dk-'\+_dkKeyOf\(S\._docKind,curForm\(\)\):''/,
     '★ 지금 열린 서식을 안 봅니다.');
 });
 
