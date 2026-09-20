@@ -280,6 +280,39 @@ test('서버 문지기', async (t) => {
   await t.test('★ 지워진 사진은 404', () => {
     assert.equal(PV.decide(null).status, 404);
   });
+
+  /* ── 총괄관리자는 «주소가 없어도» 받는다 (대표 지시 2026-09-20) ──
+     「권형하 총괄관리자는 공유되지 않아도 다른사람의 사진을 다운받을 수 있게 해달라」
+
+     창고 규칙은 「자기 사진만」이라 남의 사진은 정보에 적힌 토큰 주소로만 열린다.
+     올릴 때 주소받기가 실패하면 그 칸이 비고(실측 2026-09-20: 남의 사진 770장 중 2장),
+     그러면 관리자는 **어느 길로도 그 사진을 못 받는다** — 창고는 403, 실시간DB에는
+     본문이 없고, 여기서는 「민감 서류가 아니다」로 되돌아갔다. */
+  await t.test('★★ 관리자는 민감하지 않은 남의 사진도 이 길로 받는다 — 마지막 길이다', () => {
+    const r = PV.decide({ read: { kind: 'meeting' } }, 'admin');
+    assert.equal(r.ok, true,
+      '★★ 주소가 없는 남의 사진을 관리자가 어느 길로도 못 받습니다 —\n' +
+      '  창고는 403, 실시간DB에는 본문이 없고, 여기서 막으면 그것으로 끝입니다.');
+  });
+
+  await t.test('★★ 주인·공유받은 사람에게는 그대로 400 — 격자가 통째로 느려진다', () => {
+    ['owner', 'shared', undefined].forEach(function (as) {
+      const r = PV.decide({ read: { kind: 'meeting' } }, as);
+      assert.equal(r.status, 400,
+        '★★ 자격 「' + as + '」까지 서버를 거치면 회의사진 수백 장이 서버를 지납니다 —\n' +
+        '  격자가 느려지고 요금이 늡니다. 그들은 적힌 주소로 보면 됩니다.');
+    });
+  });
+
+  await t.test('★ 지워진 사진은 관리자에게도 404 — 없는 것은 없는 것이다', () => {
+    assert.equal(PV.decide(null, 'admin').status, 404);
+  });
+
+  await t.test('★★ 서버가 «자격을 넘겨야» 이 길이 열린다 — 안 넘기면 조용히 안 열린다', () => {
+    const idx = fs.readFileSync(path.join(R, 'functions', 'index.js'), 'utf8');
+    assert.match(idx, /PV\.decide\(item, seen\.as\)/,
+      '★★ decide 에 자격을 안 넘기면 관리자에게만 연 길이 «코드에는 있는데 안 도는» 것이 됩니다.');
+  });
 });
 
 /* ══════ ⑤ 서버 — 요청 검사와 경로 ══════ */
