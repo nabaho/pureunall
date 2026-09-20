@@ -637,9 +637,49 @@
      (js/kcareer-colmap-ai.js). 사전이 못 알아본 서식을 사람 손 없이 채우기 위한 것이다.
      ⚠ 사전보다 «앞선다» — 사전은 서식마다 새로 빗나가지만 AI는 그 표를 보고 답한다.
      ⚠ 없으면 지금까지처럼 사전으로 간다. AI가 없어도 앱은 그대로 돌아야 한다. */
+  /* ★★ 「머리행답나」 — AI 가 짚어 준 짝짓기(colMap)도 «반드시» 이 잣대를 지나야 한다.
+     ■ 왜 생겼나 (대표 계정 실측 2026-09-20)
+       AI 짝짓기 21개가 쌓여 있었는데 그 가운데 여섯이 «목록 표가 아닌 것»을 목록으로 만들었다:
+         현근무처 | 기관명:부서명:직위:            → 인적사항 줄이 «경력 목록»이 됐다
+         A|B|C|D|E|점수                          → 평가기준표가 «경력 목록»이 됐다
+         자격및면허|종류|취득년월일|상벌|…           → 자격·상벌 표가 «경력 목록»이 됐다
+       그래서 이름이 겹쳐 쌓이고(「푸른노무법인푸른노무법인푸른노무법인」) 학력·경력이
+       엉뚱한 표에 박혔다. 겹칠 때마다 지문이 달라져 «잘못된 기억이 하나 더» 생겼다.
+     ■ 뚫린 자리
+       「머리행에는 빈 칸이 없다」 빗장이 if(!hit) 안에 있어, colMap 이 맞으면 통째로 건너뛰었다.
+     ⚠★ 이 잣대는 «쓸 때» 건다 — 이미 쌓인 기억을 지우지 않아도 해가 멈춘다(대표 결정 2026-09-20
+        「그대로 두고 울타리만 친다」). */
+  function 머리행답나(cells) {
+    if (!cells.length) return false;
+    var i, 짧은칸 = 0;
+    for (i = 0; i < cells.length; i++) {
+      /* ① 빈 칸이 있으면 머리행이 아니다 — 열 이름이 죽 적혀 있는 줄이기 때문이다 */
+      if (isEmptyCell(cells[i])) return false;
+      var t = cellText(cells[i]).replace(/[\s　]+/g, '');
+      /* ② 칸 안에 라벨이 들어 있으면 머리행이 아니다 — 「기관명:부서명:직위:」는 인적사항 줄이다 */
+      if (/[:：]\s*$/.test(t) || /[:：][\s\S]*[:：]/.test(t) || /_{2,}/.test(t)) return false;
+      if (t.length <= 1) 짧은칸++;
+    }
+    /* ③ 한 글자짜리 이름이 절반을 넘으면 열 이름이 아니다 — 「A|B|C|D|E|점수」는 평가표다 */
+    if (짧은칸 * 2 > cells.length) return false;
+    return true;
+  }
+
   function detectHeader(cells, colMap) {
     var map = [], hit = 0, i;
-    if (colMap) {
+    /* ⚠★ 사전이 «이미 알아보는» 머리행에는 AI 짝짓기를 쓰지 않는다.
+       AI 는 「사전이 못 알아본 서식」을 거들라고 부른 것이다. 사전을 이기게 두었더니
+       자격·상벌 표(사전은 certaward 로 안다)가 AI 답 때문에 경력 목록이 됐다. */
+    var 사전이안다 = false;
+    if (colMap && 머리행답나(cells)) {
+      var 사전맵 = [], 사전맞은수 = 0;
+      for (i = 0; i < cells.length; i++) {
+        var k0 = colKeyOf(cellText(cells[i]));
+        사전맵.push(k0); if (k0) 사전맞은수++;
+      }
+      사전이안다 = 사전맞은수 >= 2;
+    }
+    if (colMap && !사전이안다 && 머리행답나(cells)) {
       var key = cells.map(function (c) { return cellText(c).replace(/[\s　]+/g, ''); }).join('|');
       var given = colMap[key];
       if (given && given.length === cells.length) {
@@ -652,9 +692,9 @@
          이 빗장이 없으면 「소속기관 | (빈칸) | 직위 | (빈칸)」 같은 «보통 라벨 표»가
          경력 목록으로 오인되어 그 표의 빈 칸을 통째로 놓친다
          (실측 2026-09-05: 사전에 「소속기관」을 더했더니 채울 자리 4개가 0개가 됐다).
-         ⚠ 사전을 넓힐수록 이 오인이 잦아진다 — 낱말을 더할 때 이 빗장을 풀지 말 것.
-         ⚠ 사람·AI 가 짚어 준 짝짓기(colMap)는 위에서 이미 hit 를 잡아 여기까지 오지 않는다. */
-      for (i = 0; i < cells.length; i++) if (isEmptyCell(cells[i])) return null;
+         ⚠ 사전을 넓힐수록 이 오인이 잦아진다 — 낱말을 더할 때 이 빗장을 풀지 말 것. */
+      if (!머리행답나(cells)) return null;
+      map = [];
       for (i = 0; i < cells.length; i++) {
         var k = colKeyOf(cellText(cells[i]));
         map.push(k); if (k) hit++;
@@ -991,6 +1031,9 @@
        두 곳에 따로 두면 「지도엔 빈 줄인데 안 채워지는」 어긋남이 생긴다. */
     isRowBlank: isRowBlank, bracketKey: bracketKey,
     colAddrOf: colAddrOf, rowShape: rowShape, shiftOf: shiftOf,
+    /* ⚠ 「머리행답나」 잣대는 «이 하나»다 — 검사도 같은 자를 쓴다.
+       두 벌로 만들면 「채울 때는 머리행인데 검사에서는 아닌」 줄이 생긴다. */
+    isHeaderish: 머리행답나,
     /* 「여기부터 남의 자리」 판정 — 검사가 «머리줄을 머리줄로 아는지» 직접 볼 수 있게 */
     isBoundary: isBoundary,
     incellFill: function (tc, fields) {
