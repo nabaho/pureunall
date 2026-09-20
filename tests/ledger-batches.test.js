@@ -96,8 +96,18 @@ t('★ 용량 초과를 이유로 기존 묶음을 자동삭제하지 않는다'
   /dbRemoveMany\(LEDGER_BATCH_KEY, _tr\.dropped/.test(src), false);
 t('다른 PC 도 받아 볼 수 있게 동기화 목록에 있다',
   /'ledger_batches','ledger_held','ledger_split_recipes'/.test(src), true);
-t('★ 백업 스냅샷에는 안 담는다 (16MB 한도를 넘겨 백업이 통째로 실패했던 그 원인)',
-  /bank_ledger_draft:1, ledger_batches:1, co_merge_log:1/.test(src), true);
+/* ⚠★ 2026-09-20 «반대로» 뒤집혔다 — 대표 지시 「다담아라」
+     여기서는 통장 묶음이 백업에서 «빠져 있는지»를 글자 그대로 보고 있었다.
+     뺀 까닭은 통장 4,000행이 스냅샷을 실시간DB 한 번 쓰기 한도(16MB) 위로
+     밀어 올린 것이었다. 그런데 그 뒤 erpBackupBatches 가 **큰 배열을 행 단위로
+     쪼개** 싣도록 고쳐졌다 — 까닭은 사라졌는데 «빼 둔 것»만 남았다.
+     그 사이 통장 묶음은 «없어지면 알려는 주는데(DIFF_KEYS) 되돌릴 백업은 없는»
+     자료로 한 달 넘게 있었다. 경보만 울리고 소화기가 없었던 셈이다.
+     ⚠ 16MB 는 여전히 진짜 위험이다. 다만 막는 장치가 «빼기»가 아니라 «쪼개기»로
+       바뀌었을 뿐이다 — 그 장치가 정말 듣는지는 실제로 돌려서 잰다:
+       tests/backup-covers-sync-keys.test.js ⑤ */
+t('★ 백업에서 빼지 않는다 (서버로 함께 쓰는 업무 자료다)',
+  /bank_ledger_draft:1,\s*ledger_batches:1/.test(src), false);
 t('서버 동기화에서 빠지지는 않았다 (빠지면 여전히 이 PC 에만 남는다)',
   /FB_EXCLUDE = \[[^\]]*'ledger_batches'/.test(src), false);
 
