@@ -67081,10 +67081,12 @@ var EXPENSE_CAT_QUICK = [
 // ═══════════════════════ 이음센터 (dash/ieum) ═══════════════════════
 // 이음센터 전용 데이터 키 (모두 기존 dbGet/dbSet 계층 사용 — localStorage+Firebase 동기화):
 //   ieum_members  : 인원현황에 표시할 내부직원 sid 배열 (null=자동: eum-work 기록 있는 직원)
-//   ieum_caps     : { "<년도>": { "<personKey>": { law:24, edu:6 } } } — 연간 한도
-//   (법률상담은 변호사의 캘린더 이음센터 일정을 자동 집계 — 별도 수기 키 없음)
-//   ieum_lectures : [ { id, date, time, place, title, content, attendees, personKey } ] — 이음강의 기록
+//   ieum_notes    : { "<personKey>": "비고" } — 내부 직원 비고(외부 인원은 external_staff.note)
+//   (법률상담·이음근무는 캘린더의 이음센터 일정을 자동 집계 — 수기로 넣는 칸이 없다)
 // personKey = 내부직원 sid 또는 external_staff id
+// ★ 2026-09-20 «ieum_caps(연간 한도)»와 «ieum_lectures(이음강의 기록)»을 없앴다
+//   (대표 지시 「정리 지워라」). 만들어만 두고 아무도 한 번도 안 썼다 — 서버의 두 자리가
+//   모두 비어 있었다(실측). 되살리지 말 것. 다시 필요하면 «쓸 사람과 함께» 새로 짓는다.
 
 // (이음근무 집계는 IeumPeopleTab 내부의 스코프 기반 집계로 대체됨 — 구 ieumDutyStats 제거)
 
@@ -67224,7 +67226,6 @@ function IeumPeopleTab(props){
   var fS = useState('all'); var roleFilter = fS[0]; var setRoleFilter = fS[1];
   var oS = useState({});    var openRows = oS[0];   var setOpenRows = oS[1];
   var rfS = useState(0);    var rfk = rfS[0];       var setRfk = rfS[1];
-  var lmS = useState(null); var lecModal = lmS[0];  var setLecModal = lmS[1];
   var mmS = useState(false); var memberModal = mmS[0]; var setMemberModal = mmS[1];
   var enS = useState(null); var editNote = enS[0];  var setEditNote = enS[1]; // {pk, val} 비고 인라인 편집
 
@@ -67282,8 +67283,10 @@ function IeumPeopleTab(props){
     });
     return out;
   })();
-  var caps = isYearMode ? ((dbGet('ieum_caps', {})||{})[year] || {}) : {}; // 한도(연간)는 연 모드에서만 적용
-  var lectures = (dbGet('ieum_lectures', []) || []).filter(function(l){ return inScope(l.date); });
+  /* ★ 2026-09-20 «연간 한도»(ieum_caps)와 «이음강의 기록»(ieum_lectures)을 걷어냈다
+     (대표 지시 「정리 지워라」). 만들어만 두고 아무도 한 번도 안 썼다 — 서버의 두 자리가
+     모두 비어 있었다(실측). 안 쓰는 칸이 표에 넉 줄을 차지하고 늘 「—」만 뜨고 있었다.
+     ⚠ 되살리지 말 것. 다시 필요해지면 «쓸 사람과 함께» 새로 짓는다. */
 
   // 비고: 개인 요구사항 메모 — 외부 인원은 external_staff.note(캘린더 툴팁과 공유), 내부 직원은 ieum_notes에 저장
   var ieumNotes = dbGet('ieum_notes', {}) || {};
@@ -67303,38 +67306,13 @@ function IeumPeopleTab(props){
 
   // 변호사 법률상담 = 캘린더의 이음센터 일정(eum-work) 자동 집계 (수기 입력 없음)
   function consultUsed(pk){ return (duty[pk] || {total:0}).total; }
-  function lecUsed(pk){ return lectures.filter(function(l){ return l.personKey === pk; }).length; }
-  function capOf(pk, kind){ return (caps[pk] && caps[pk][kind]) || 0; }
 
   // 수정 함수들 (전 직원 수정 가능 — 확정 사양)
-  function saveCap(pk, kind, n){
-    if(!isYearMode){ showToast('한도는 [연] 기준에서 설정하세요'); return; }
-    var all = dbGet('ieum_caps', {}) || {};
-    if(!all[year]) all[year] = {};
-    if(!all[year][pk]) all[year][pk] = {};
-    all[year][pk][kind] = Math.max(0, n|0);
-    dbSet('ieum_caps', all); setRfk(rfk+1);
-  }
-  function addLecture(rec){
-    var arr = dbGet('ieum_lectures', []) || [];
-    rec.id = 'lec-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
-    arr.push(rec); dbSet('ieum_lectures', arr);
-    setLecModal(null); setRfk(rfk+1); showToast('📚 이음강의 기록 추가');
-  }
-  function removeLecture(id){
-    customConfirm('이 강의 기록을 삭제할까요?', function(){
-      var arr = (dbGet('ieum_lectures', []) || []).filter(function(l){ return l.id !== id; });
-      dbSet('ieum_lectures', arr); setRfk(rfk+1); showToast('🗑️ 강의 기록 삭제');
-    });
-  }
-
   // KPI 집계 — 변호사=법률상담, 노무사=이음근무 (모두 현재 스코프 기준 하나만)
-  var dutyTotal = 0, lawUsedTotal = 0, lawCapTotal = 0, eduUsedTotal = 0, eduCapTotal = 0;
+  var dutyTotal = 0, lawUsedTotal = 0;
   people.forEach(function(p){
     var t = (duty[p.pk]||{}).total || 0;
-    if(p.kind === 'law'){ lawUsedTotal += t; lawCapTotal += capOf(p.pk,'law'); }
-    else dutyTotal += t;
-    eduUsedTotal += lecUsed(p.pk); eduCapTotal += capOf(p.pk,'edu');
+    if(p.kind === 'law') lawUsedTotal += t; else dutyTotal += t;
   });
 
   // 표시 행: 기본은 재직자만, '퇴사·종료 포함' 선택 시 전체 (퇴사자는 build 순서상 맨 아래)
@@ -67401,7 +67379,7 @@ function IeumPeopleTab(props){
         style:{padding:'3px 8px',fontSize:'10.5px',fontWeight:700,border:'1px solid #e2e8f0',borderRadius:'8px',background:'#f8fafc',color:'#475569',cursor:'pointer',flexShrink:0,height:'26px'}},'⚙ 내부 인원'),
       h('span',{style:{marginLeft:'auto',fontSize:'10.5px',color:'#94a3b8',whiteSpace:'nowrap',paddingRight:'4px'}},'행 클릭 → 월별 상세')
     ),
-    // ── 현황판: [기간 조종석 | 이음근무 | 법률상담 | 이음강의 | 활동 인원] 한 몸 ──
+    // ── 현황판: [기간 조종석 | 이음근무 | 법률상담 | 활동 인원] 한 몸 ──
     h('div',{style:{display:'flex',alignItems:'stretch',background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px',
       marginBottom:'12px',overflow:'hidden',boxShadow:'0 1px 3px rgba(16,30,70,.04)',flexWrap:IS_MOBILE?'wrap':'nowrap'}},
       // 기간 조종석
@@ -67437,8 +67415,7 @@ function IeumPeopleTab(props){
           }))
       ),
       kcell('#2563eb','이음근무', dutyTotal, '일'),
-      kcell('#d97706','법률상담', lawUsedTotal + (isYearMode && lawCapTotal ? ' / '+lawCapTotal : ''), '회'),
-      kcell('#2563eb','이음강의', eduUsedTotal + (isYearMode && eduCapTotal ? ' / '+eduCapTotal : ''), '회'),
+      kcell('#d97706','법률상담', lawUsedTotal, '회'),
       kcell('#16a34a','활동 인원', people.filter(function(p){ return !p.left; }).length, '명', true)
     ),
     // 테이블
@@ -67450,9 +67427,6 @@ function IeumPeopleTab(props){
           h('th',{style:thStyle},'구분'),
           h('th',{style:Object.assign({},thStyle,{boxShadow:'inset 0 -2px 0 #2563eb'})},'이음근무 '+scopeSfx),
           h('th',{style:Object.assign({},thStyle,{boxShadow:'inset 0 -2px 0 #d97706'})},'법률상담 '+scopeSfx),
-          h('th',{style:Object.assign({},thStyle,{boxShadow:'inset 0 -2px 0 #d97706'})},'잔여'),
-          h('th',{style:Object.assign({},thStyle,{boxShadow:'inset 0 -2px 0 #2563eb'})},'이음강의'),
-          h('th',{style:Object.assign({},thStyle,{boxShadow:'inset 0 -2px 0 #2563eb'})},'잔여'),
           h('th',{style:thStyle},'연락처'),
           h('th',{style:Object.assign({},thStyle,{minWidth:'150px'})},'비고 (개인 요구사항)'),
           h('th',{style:Object.assign({},thStyle,{width:'26px'})},'')
@@ -67460,8 +67434,7 @@ function IeumPeopleTab(props){
         h('tbody',null, visible.map(function(p, idx){
           var d = duty[p.pk] || { total:0, byMonth:{} };
           var isLaw = p.kind === 'law';
-          var cUsed = consultUsed(p.pk), cCap = capOf(p.pk,'law');
-          var eUsed = lecUsed(p.pk),    eCap = capOf(p.pk,'edu');
+          var cUsed = consultUsed(p.pk);
           var open = !!openRows[p.pk];
           var chip = ROLE_CHIP[p.kind];
           var dutyPct = Math.round(d.total/maxDuty*100);
@@ -67523,11 +67496,9 @@ function IeumPeopleTab(props){
             // 월 라벨: 월/연 모드='M월', 전체/기간 모드='YYYY.M' (byMonth 키는 항상 'YYYY-MM')
             var _wide = (scope==='all' || scope==='range');
             var mLabel = function(mm){ return _wide ? (mm.slice(0,4)+'.'+parseInt(mm.slice(5),10)) : (parseInt(mm.slice(5),10)+'월'); };
-            var myLecs = lectures.filter(function(l){ return l.personKey === p.pk; })
-              .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
             rows.push(h('tr',{key:p.pk+'-detail'},
               h('td',{colSpan:11, style:{background:'#f8fafc',padding:'13px 18px',borderBottom:'1px solid #e2e8f0',whiteSpace:'normal'}},
-                h('div',{style:{display:'grid',gridTemplateColumns:IS_MOBILE?'1fr':'1fr 1fr',gap:'16px',maxWidth:'880px'}},
+                h('div',{style:{maxWidth:'880px'}},
                   // 좌: 월별 이음근무 or 월별 상담건수
                   h('div',null,
                     h('div',{style:{fontSize:'10.5px',fontWeight:800,color:'#94a3b8',marginBottom:'7px'}},
@@ -67546,37 +67517,6 @@ function IeumPeopleTab(props){
                         })
                       : h('div',{style:{fontSize:'11.5px',color:'#94a3b8'}},
                           scopeTitle+' '+(isLaw?'법률상담':'이음근무')+' 기록 없음'))
-                  ),
-                  // 우: 이음강의 이력 + 한도 설정
-                  h('div',null,
-                    h('div',{style:{fontSize:'10.5px',fontWeight:800,color:'#94a3b8',marginBottom:'7px'}},'이음강의 이력'),
-                    myLecs.length
-                      ? myLecs.map(function(l){
-                          return h('div',{key:l.id,style:{display:'flex',gap:'8px',alignItems:'baseline',padding:'3px 0',fontSize:'11.5px'}},
-                            h('span',{style:{color:'#64748b',fontWeight:700,width:'44px',flexShrink:0}}, (l.date||'').slice(5)),
-                            h('span',{style:{fontWeight:600,flex:1}}, l.title || '(제목 없음)',
-                              l.place ? h('span',{style:{color:'#94a3b8',fontWeight:400,fontSize:'10.5px'}}, ' · '+l.place) : null),
-                            l.attendees ? h('span',{style:{color:'#94a3b8',fontSize:'10.5px',flexShrink:0}},'참여 '+l.attendees+'명') : null,
-                            h('button',{onClick:function(){ removeLecture(l.id); },
-                              style:{border:'none',background:'none',color:'#cbd5e1',cursor:'pointer',fontSize:'11px',flexShrink:0}},'✕'));
-                        })
-                      : h('div',{style:{fontSize:'11.5px',color:'#94a3b8'}},'기록 없음'),
-                    h('button',{onClick:function(){ setLecModal({ personKey:p.pk, personName:p.name, date:todayYMD(), time:'', place:'', title:'', content:'', attendees:'' }); },
-                      style:{marginTop:'7px',padding:'5px 10px',fontSize:'11px',fontWeight:700,border:'1px dashed #cbd5e1',borderRadius:'7px',background:'#fff',color:'#475569',cursor:'pointer'}},'＋ 강의 기록 추가'),
-                    // 한도 설정 — 연간 기준이므로 [연] 모드에서만 표시·설정
-                    isYearMode
-                      ? h('div',{style:{marginTop:'12px',paddingTop:'10px',borderTop:'1px dashed #e2e8f0',display:'flex',gap:'12px',alignItems:'center',flexWrap:'wrap'}},
-                          h('span',{style:{fontSize:'10.5px',fontWeight:800,color:'#94a3b8'}},'연간 한도 설정'),
-                          isLaw && h('label',{style:{fontSize:'11px',color:'#64748b',display:'flex',alignItems:'center',gap:'5px'}},'상담',
-                            h('input',{type:'number',min:'0',defaultValue:cCap||'',placeholder:'0',
-                              onBlur:function(e){ var v=parseInt(e.target.value,10)||0; if(v!==cCap){ saveCap(p.pk,'law',v); showToast('✅ 상담 한도 저장'); } },
-                              style:{width:'56px',padding:'4px 6px',fontSize:'11.5px',border:'1px solid #e2e8f0',borderRadius:'6px'}}),'회'),
-                          h('label',{style:{fontSize:'11px',color:'#64748b',display:'flex',alignItems:'center',gap:'5px'}},'강의',
-                            h('input',{type:'number',min:'0',defaultValue:eCap||'',placeholder:'0',
-                              onBlur:function(e){ var v=parseInt(e.target.value,10)||0; if(v!==eCap){ saveCap(p.pk,'edu',v); showToast('✅ 강의 한도 저장'); } },
-                              style:{width:'56px',padding:'4px 6px',fontSize:'11.5px',border:'1px solid #e2e8f0',borderRadius:'6px'}}),'회'))
-                      : h('div',{style:{marginTop:'12px',paddingTop:'10px',borderTop:'1px dashed #e2e8f0',fontSize:'10.5px',color:'#94a3b8'}},
-                          '연간 한도·잔여는 [연] 기준에서 표시·설정됩니다')
                   )
                 ))
             ));
@@ -67591,13 +67531,7 @@ function IeumPeopleTab(props){
           h('td',{style:Object.assign({},tdStyle,{background:'#f8fafc',borderTop:'2px solid #e2e8f0',fontWeight:800})},
             sumRows.reduce(function(s,p){ return s+(p.kind==='law'?0:((duty[p.pk]||{}).total||0)); },0)+'일'),
           h('td',{style:Object.assign({},tdStyle,{background:'#f8fafc',borderTop:'2px solid #e2e8f0',fontWeight:800})},
-            lawUsedTotal + (lawCapTotal?' / '+lawCapTotal+'회':'회')),
-          h('td',{style:Object.assign({},tdStyle,{background:'#f8fafc',borderTop:'2px solid #e2e8f0'})},
-            lawCapTotal ? remBadge(lawUsedTotal, lawCapTotal) : ''),
-          h('td',{style:Object.assign({},tdStyle,{background:'#f8fafc',borderTop:'2px solid #e2e8f0',fontWeight:800})},
-            eduUsedTotal + (eduCapTotal?' / '+eduCapTotal+'회':'회')),
-          h('td',{style:Object.assign({},tdStyle,{background:'#f8fafc',borderTop:'2px solid #e2e8f0'})},
-            eduCapTotal ? remBadge(eduUsedTotal, eduCapTotal) : ''),
+            lawUsedTotal + '회'),
           h('td',{style:Object.assign({},tdStyle,{background:'#f8fafc',borderTop:'2px solid #e2e8f0'})},''),
           h('td',{style:Object.assign({},tdStyle,{background:'#f8fafc',borderTop:'2px solid #e2e8f0'})},''),
           h('td',{style:Object.assign({},tdStyle,{background:'#f8fafc',borderTop:'2px solid #e2e8f0'})},'')
@@ -67605,44 +67539,7 @@ function IeumPeopleTab(props){
       )
     ),
     h('div',{style:{fontSize:'10.5px',color:'#94a3b8',textAlign:'center',padding:'8px'}},
-      '※ 이음근무(노무사)·법률상담(변호사) 모두 캘린더의 이음센터 일정 자동 집계 · 이음강의=기록 추가 시 집계'),
-
-    // 강의 기록 추가 모달
-    lecModal && h('div',{onClick:function(e){ if(e.target===e.currentTarget) setLecModal(null); },
-      style:{position:'fixed',inset:0,background:'rgba(15,23,42,0.5)',zIndex:10000,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}},
-      h('div',{style:{background:'#fff',borderRadius:'12px',width:'430px',maxWidth:'100%',padding:'20px 22px',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}},
-        h('div',{style:{fontSize:'14px',fontWeight:800,marginBottom:'12px'}},'📚 이음강의 기록 — '+lecModal.personName),
-        h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}},
-          h('label',{style:{fontSize:'11px',color:'#64748b'}},'일자',
-            h('input',{type:'date',value:lecModal.date,onChange:function(e){ setLecModal(Object.assign({},lecModal,{date:e.target.value})); },
-              style:{width:'100%',padding:'7px 8px',fontSize:'12px',border:'1px solid #e2e8f0',borderRadius:'7px',boxSizing:'border-box',marginTop:'3px'}})),
-          h('label',{style:{fontSize:'11px',color:'#64748b'}},'시간',
-            h('input',{type:'time',value:lecModal.time,onChange:function(e){ setLecModal(Object.assign({},lecModal,{time:e.target.value})); },
-              style:{width:'100%',padding:'7px 8px',fontSize:'12px',border:'1px solid #e2e8f0',borderRadius:'7px',boxSizing:'border-box',marginTop:'3px'}}))),
-        h('label',{style:{fontSize:'11px',color:'#64748b',display:'block',marginTop:'8px'}},'장소',
-          h('input',{type:'text',value:lecModal.place,placeholder:'예: 이음센터 3층 세미나실',onChange:function(e){ setLecModal(Object.assign({},lecModal,{place:e.target.value})); },
-            style:{width:'100%',padding:'7px 8px',fontSize:'12px',border:'1px solid #e2e8f0',borderRadius:'7px',boxSizing:'border-box',marginTop:'3px'}})),
-        h('label',{style:{fontSize:'11px',color:'#64748b',display:'block',marginTop:'8px'}},'교육 제목 *',
-          h('input',{type:'text',value:lecModal.title,placeholder:'예: 직장 내 괴롭힘 예방 교육',onChange:function(e){ setLecModal(Object.assign({},lecModal,{title:e.target.value})); },
-            style:{width:'100%',padding:'7px 8px',fontSize:'12px',border:'1px solid #e2e8f0',borderRadius:'7px',boxSizing:'border-box',marginTop:'3px'}})),
-        h('label',{style:{fontSize:'11px',color:'#64748b',display:'block',marginTop:'8px'}},'교육 내용',
-          h('textarea',{value:lecModal.content,onChange:function(e){ setLecModal(Object.assign({},lecModal,{content:e.target.value})); },
-            style:{width:'100%',minHeight:'56px',padding:'7px 8px',fontSize:'12px',border:'1px solid #e2e8f0',borderRadius:'7px',boxSizing:'border-box',marginTop:'3px',resize:'vertical',fontFamily:'inherit'}})),
-        h('label',{style:{fontSize:'11px',color:'#64748b',display:'block',marginTop:'8px'}},'참여 인원(명)',
-          h('input',{type:'number',min:'0',value:lecModal.attendees,onChange:function(e){ setLecModal(Object.assign({},lecModal,{attendees:e.target.value})); },
-            style:{width:'90px',padding:'7px 8px',fontSize:'12px',border:'1px solid #e2e8f0',borderRadius:'7px',boxSizing:'border-box',marginTop:'3px',display:'block'}})),
-        h('div',{style:{display:'flex',gap:'8px',marginTop:'14px'}},
-          h('button',{onClick:function(){ setLecModal(null); },
-            style:{flex:1,padding:'10px',border:'1px solid #e2e8f0',background:'#fff',borderRadius:'8px',fontSize:'12.5px',fontWeight:600,cursor:'pointer'}},'취소'),
-          h('button',{onClick:function(){
-              if(!lecModal.title.trim()){ showToast('교육 제목을 입력하세요'); return; }
-              if(!lecModal.date){ showToast('일자를 입력하세요'); return; }
-              addLecture({ date:lecModal.date, time:lecModal.time, place:lecModal.place.trim(),
-                title:lecModal.title.trim(), content:lecModal.content.trim(),
-                attendees:parseInt(lecModal.attendees,10)||0, personKey:lecModal.personKey });
-            },
-            style:{flex:2,padding:'10px',border:'none',background:'#1e40af',color:'#fff',borderRadius:'8px',fontSize:'12.5px',fontWeight:700,cursor:'pointer'}},'저장'))
-      )),
+      '※ 이음근무(노무사)·법률상담(변호사) 모두 캘린더의 이음센터 일정 자동 집계'),
 
     // 내부 인원 관리 모달
     memberModal && (function(){

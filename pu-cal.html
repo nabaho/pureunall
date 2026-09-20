@@ -187,6 +187,9 @@
      #991b1b)은 그대로다 — 팔레트·tests/cal-same-as-erp.test.js 가 색만 못 박는다. */
   .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default;
     border-radius:0;margin:0 -4px}
+  .detailgrid.one{grid-template-columns:1fr}
+  .lawcnt{font-size:12px;color:var(--sub)}
+  .lawcnt b{color:var(--ink);font-size:12.5px}
   .pubmsg{font-size:11.5px;color:var(--ok);margin-left:9px}
   .pubat{font-size:11px;color:var(--faint);margin-left:9px}
   /* 계정 잇기 — 할 일이 있을 때만 머리줄에 뜬다(없으면 아예 안 그린다) */
@@ -462,7 +465,7 @@ var TABS = [
 /* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
    ⚠ 필요한 것만 읽는다 — 안 쓰는 큰 표를 받으면 요금과 깜빡임이 늘어난다. */
 var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors',
-            'locked_attend_months','ieum_members','ieum_lectures','ieum_notes','ieum_caps',
+            'locked_attend_months','ieum_members','ieum_notes',
             /* 구글 만든이 메일 → 사번. 이것이 있어야 구글 일정이 «그 사람 색»으로 칠해진다 */
             'gcal_mail_sid'];
 
@@ -1506,33 +1509,17 @@ function inScope(ds){
   return ds.slice(0,7) === S.ym;
 }
 
-/* ── 이음센터 · 인원 현황 — 이알피(IeumPeopleTab)와 «똑같은 꼴» ───────────
-   대표 지시 2026-09-18 (/goal) 「대시보드 제외한 화면은 똑같이 만들어라」.
-   KPI 스트립(이음근무·법률상담·이음강의·활동 인원) + 표(No.·인원·구분·근무 막대·
-   잔여·연락처·비고·펼치기)를 이알피와 같은 열·같은 색으로 짓는다.
-   ⚠ 한도·비고·강의 기록을 «고치는» 것은 아직 이알피에서 한다 — 그 세 자리는
-     표 통째로 담겨 있어 우리 저장 관문(칸별 보내기)이 그대로 못 쓴다. 그래서
-     여기서는 값을 «보여만» 주고, 손대면 이알피로 보낸다. 링크 복사처럼 서버에
-     아무것도 안 쓰는 것은 바로 된다. */
+/* ── 이음센터 · 인원 현황 ─────────────────────────────────────────────────
+   대표 지시 2026-09-18 (/goal) 「대시보드 제외한 화면은 똑같이 만들어라」로
+   이알피(IeumPeopleTab)와 같은 꼴로 지었다.
+
+   ★ 2026-09-20 «연간 한도»와 «이음강의 기록»을 걷어냈다 (대표 지시 「정리 지워라」).
+     두 기능은 만들어만 두고 **아무도 한 번도 안 썼다** — 서버의 ieum_caps ·
+     ieum_lectures 가 둘 다 비어 있었다(실측). 안 쓰는 칸이 표에 넉 줄(법률상담 잔여 ·
+     이음강의 · 이음강의 잔여 · 강의 이력)을 차지하고 늘 「—」만 뜨고 있었다.
+     ⚠ 되살리지 말 것. 다시 필요해지면 «쓸 사람과 함께» 새로 짓는다.
+   ⚠ 비고를 «고치는» 것은 아직 이알피에서 한다(다음 걸음). 여기서는 보여만 준다. */
 var ROLE_CHIP = { in:{bg:"#eff6ff",fg:"#2563eb"}, ex:{bg:"#eff6ff",fg:"#2563eb"}, law:{bg:"#fffbeb",fg:"#d97706"} };
-function remBadgeHtml(used, cap){
-  if(!cap) return '<span style="color:#cbd5e1">—</span>';
-  var rem = cap - used, pct = used / cap;
-  var bg = pct >= 0.85 ? "#fef2f2" : pct <= 0.4 ? "#f0fdf4" : "#fffbeb";
-  var fg = pct >= 0.85 ? "#dc2626" : pct <= 0.4 ? "#16a34a" : "#d97706";
-  return '<span style="font-size:11px;font-weight:800;background:' + bg + ';color:' + fg + ';border-radius:5px;padding:2px 8px">' + rem + '</span>';
-}
-function barCellHtml(used, cap, color){
-  if(!cap && !used) return '<span style="color:#cbd5e1">—</span>';
-  var pct = cap ? Math.min(100, Math.round(used/cap*100)) : 0;
-  var c = (cap && used/cap >= 0.85) ? "#dc2626" : color;
-  var head = '<div style="display:flex;align-items:center;gap:7px;min-width:110px">'
-    + '<span style="font-size:11.5px;font-weight:700;color:#64748b;white-space:nowrap">'
-    + '<b style="color:#1e293b;font-size:12.5px">' + used + '</b>' + (cap ? " / " + cap + "회" : "회") + '</span>';
-  var bar = cap ? ('<div style="flex:1;height:7px;border-radius:20px;background:#f8fafc;overflow:hidden;min-width:46px">'
-    + '<span style="display:block;height:100%;border-radius:20px;width:' + pct + '%;background:' + c + '"></span></div>') : "";
-  return head + bar + '</div>';
-}
 function ieumKcell(color, label, val, unit, last){
   return '<div class="kcell"' + (last ? ' style="border-right:none"' : '') + '>'
     + '<span class="kdot" style="background:' + color + '"></span>'
@@ -1553,21 +1540,13 @@ function peopleHtml(){
     duty[pk].byMonth[mm].push(dd); duty[pk].total++;
   });
   Object.keys(duty).forEach(function(pk){ Object.keys(duty[pk].byMonth).forEach(function(mm){ duty[pk].byMonth[mm].sort(function(a,b){return a-b;}); }); });
-  var lectures = arr(D.ieum_lectures).filter(function(l){ return l && inScope(l.date); });
-  var caps = (S.scope === "year") ? ((D.ieum_caps && D.ieum_caps[S.ym.slice(0,4)]) || {}) : {};
-  function capOf(pk, kind){ return (caps[pk] && caps[pk][kind]) || 0; }
-  function lecUsed(pk){ return lectures.filter(function(l){ return l.personKey === pk; }).length; }
-
-  var dutyTotal = 0, lawUsedTotal = 0, lawCapTotal = 0, eduUsedTotal = 0, eduCapTotal = 0;
+  var dutyTotal = 0, lawUsedTotal = 0;
   rows.forEach(function(p){
     var t = (duty[p.pk]||{}).total || 0;
-    if(p.kind === "law"){ lawUsedTotal += t; lawCapTotal += capOf(p.pk,"law"); }
-    else dutyTotal += t;
-    eduUsedTotal += lecUsed(p.pk); eduCapTotal += capOf(p.pk,"edu");
+    if(p.kind === "law") lawUsedTotal += t; else dutyTotal += t;
   });
   var visible = S.showLeft ? rows : rows.filter(function(p){ return !p.left; });
   var maxDuty = 1; rows.forEach(function(p){ var t=(duty[p.pk]||{}).total||0; if(t>maxDuty) maxDuty=t; });
-  var isYearMode = S.scope === "year";
   var scopeSfx = S.scope === "month" ? "(" + parseInt(S.ym.slice(5,7),10) + "월)" : S.scope === "year" ? "(" + S.ym.slice(0,4) + ")" : "(전체)";
   var 범위말 = S.scope === "year" ? S.ym.slice(0,4) + "년" : S.scope === "all" ? "전체 (" + IEUM_START_YEAR + "~)" : S.ym;
   var 그만둔수 = rows.filter(function(p){ return p.left; }).length;
@@ -1575,9 +1554,6 @@ function peopleHtml(){
   var 행들 = visible.map(function(p, idx){
     var d = duty[p.pk] || { total:0, byMonth:{} };
     var isLaw = p.kind === "law";
-    var cUsed = isLaw ? (d.total || 0) : 0;
-    var cCap = capOf(p.pk,"law");
-    var eUsed = lecUsed(p.pk), eCap = capOf(p.pk,"edu");
     var open = S.openRows && S.openRows[p.pk];
     var chip = ROLE_CHIP[p.kind] || ROLE_CHIP.in;
     var dutyPct = Math.round((d.total||0) / maxDuty * 100);
@@ -1590,18 +1566,16 @@ function peopleHtml(){
       + '<td>' + ((!isLaw && d.total) ? ('<div class="barwrap"><span class="barnum">' + d.total + '<small>일</small></span>'
           + '<div class="bartrack"><span class="barfill" style="width:' + dutyPct + '%;background:' + p.color + '"></span></div></div>')
           : '<span class="dash">—</span>') + '</td>'
-      + '<td>' + (isLaw ? barCellHtml(cUsed, cCap, "#d97706") : '<span class="dash">—</span>') + '</td>'
-      + '<td>' + (isLaw ? remBadgeHtml(cUsed, cCap) : '<span class="dash">—</span>') + '</td>'
-      + '<td>' + ((eUsed||eCap) ? barCellHtml(eUsed, eCap, "#2563eb") : '<span class="dash">—</span>') + '</td>'
-      + '<td>' + remBadgeHtml(eUsed, eCap) + '</td>'
+      /* 법률상담 — 변호사의 이음 근무를 센 것이다(한도는 2026-09-20 에 걷어냈다) */
+      + '<td>' + (isLaw
+          ? ('<span class="lawcnt"><b>' + (d.total || 0) + '</b>회</span>')
+          : '<span class="dash">—</span>') + '</td>'
       + '<td>' + (p.phone ? ('<a class="tel" href="tel:' + esc(String(p.phone).replace(/[^0-9]/g,"")) + '" onclick="event.stopPropagation()">📞</a> ' + esc(p.phone)) : '<span class="dash">—</span>') + '</td>'
       + '<td class="notecell">' + (p.note ? '<span title="' + esc(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dash">＋ 입력</span>') + '</td>'
       + '<td class="chev">›</td></tr>';
     if(open){
       var months = Object.keys(d.byMonth).sort();
-      var myLecs = lectures.filter(function(l){ return l.personKey === p.pk; })
-        .sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
-      줄 += '<tr class="detail"><td colspan="10"><div class="detailgrid">'
+      줄 += '<tr class="detail"><td colspan="8"><div class="detailgrid one">'
         + '<div><div class="dtitle">' + (isLaw ? "월별 법률상담 일자" : "월별 이음근무 일자") + '</div>'
         + (months.length ? months.map(function(mm){
             var lbl = parseInt(mm.slice(5),10) + "월";
@@ -1609,12 +1583,7 @@ function peopleHtml(){
               + d.byMonth[mm].map(function(dd){ return '<span class="dchip ' + (isLaw ? "law" : "") + '">' + dd + '</span>'; }).join("")
               + '</span><span class="dcnt">' + d.byMonth[mm].length + '회</span></div>';
           }).join("") : '<div class="dnone">' + 범위말 + ' 기록 없음</div>')
-        + '</div><div><div class="dtitle">이음강의 이력</div>'
-        + (myLecs.length ? myLecs.map(function(l){
-            return '<div class="lrow"><span class="ldate">' + esc((l.date||"").slice(5)) + '</span>'
-              + '<span class="ltitle">' + esc(l.title || "(제목 없음)") + '</span></div>';
-          }).join("") : '<div class="dnone">기록 없음</div>')
-        + '<div class="dhint">한도·비고·강의 기록은 <button class="linklike" data-erp="dash/ieum">이알피에서</button> 고칩니다</div>'
+        + '<div class="dhint">비고는 <button class="linklike" data-erp="dash/ieum">이알피에서</button> 고칩니다</div>'
         + '</div></div></td></tr>';
     }
     return 줄;
@@ -1632,16 +1601,15 @@ function peopleHtml(){
         return '<button data-scope="' + v + '"' + (S.scope === v ? ' class="on"' : '') + '>' + 이름 + '</button>';
       }).join("") + '</div></div>'
     + ieumKcell("#2563eb","이음근무",dutyTotal,"일")
-    + ieumKcell("#d97706","법률상담",lawUsedTotal + (isYearMode && lawCapTotal ? " / " + lawCapTotal : ""),"회")
-    + ieumKcell("#2563eb","이음강의",eduUsedTotal + (isYearMode && eduCapTotal ? " / " + eduCapTotal : ""),"회")
+    + ieumKcell("#d97706","법률상담",lawUsedTotal,"회")
     + ieumKcell("#16a34a","활동 인원",rows.filter(function(p){return !p.left;}).length,"명",true)
     + '</div>'
     + (그만둔수 ? '<button class="chip' + (S.showLeft ? " on" : "") + '" data-left="1">🚪 퇴사·종료 ' + 그만둔수 + '명 ' + (S.showLeft ? "숨기기" : "포함") + '</button>' : "")
     + '<div class="ppltable">'
     + (행들
         ? '<table><thead><tr><th class="no">No.</th><th>인원</th><th>구분</th>'
-          + '<th class="ublue">이음근무 ' + esc(scopeSfx) + '</th><th class="uamber">법률상담 ' + esc(scopeSfx) + '</th><th class="uamber">잔여</th>'
-          + '<th class="ublue">이음강의</th><th class="ublue">잔여</th><th>연락처</th><th>비고</th></tr></thead>'
+          + '<th class="ublue">이음근무 ' + esc(scopeSfx) + '</th><th class="uamber">법률상담 ' + esc(scopeSfx) + '</th>'
+          + '<th>연락처</th><th>비고</th></tr></thead>'
           + '<tbody>' + 행들 + '</tbody></table>'
         : '<div class="later"><p>이 범위에 이음센터 사람이 없습니다.</p></div>')
     + '</div>';
