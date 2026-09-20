@@ -139,6 +139,43 @@
       .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
   }
 
+  /* ── 사람 색 «채워 넣기» (data/staff_colors) ──────────────────────────────
+     캘린더를 한 곳으로 모으기 1걸음. 이 색을 «정하는 곳»이 여태 이알피 법인
+     대시보드 한 곳뿐이라, 그 화면을 걷어내면 새 직원에게 색이 영영 안 생긴다.
+
+     ⚠ 이것만은 «레코드 표»가 아니라 한 덩이 지도다(사번 → 색). 위 여섯 관문
+       (번호·마감·지도형…)이 그대로 맞지 않아 따로 둔다. 대신 이 넷을 본다 —
+       ① 빈 지도는 안 쓴다 — 올리면 서버의 색이 «통째로» 날아간다
+       ② 열쇠는 사번(금지문자 없음), 값은 #rrggbb 만 — 섞이면 읽는 쪽이 깨진다
+       ③ 이알피 dbSet 과 «같은 겉꼴»({v,u})로 쓴다 — 아니면 서로 못 읽는다
+       ④ 통째로 «덮어쓴다» — 부르는 쪽이 「있던 것 + 채운 것」을 다 넘겨야 한다.
+          (그래서 부르는 쪽이 있던 색을 먼저 읽었는지가 중요하다)
+     ⚠ «누가» 쓸 수 있는지는 여기서 안 본다 — 부르는 쪽이 고르고, 마지막 문은
+       서버 규칙(staff_colors 는 관리자·위임관리인만)이다. */
+  var COLORV = /^#[0-9a-fA-F]{6}$/;
+  function saveColors(colors) {
+    if (!_db) return Promise.resolve(fail('no_db', '아직 서버에 붙기 전입니다'));
+    if (!colors || typeof colors !== 'object' || Array.isArray(colors)) {
+      return Promise.resolve(fail('bad_shape', '사람 색은 «사번 → 색» 지도여야 합니다'));
+    }
+    var keys = Object.keys(colors);
+    if (!keys.length) {
+      return Promise.resolve(fail('empty', '빈 색표는 안 올립니다 — 서버의 색이 통째로 날아갑니다'));
+    }
+    for (var i = 0; i < keys.length; i++) {
+      if (BADKEY.test(keys[i])) {
+        return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다: ' + keys[i]));
+      }
+      if (!COLORV.test(String(colors[keys[i]]))) {
+        return Promise.resolve(fail('bad_color',
+          '색이 #rrggbb 꼴이 아닙니다: ' + keys[i] + ' = ' + colors[keys[i]]));
+      }
+    }
+    return _db.ref('data/staff_colors').set({ v: colors, u: Date.now() })
+      .then(function () { return OK; })
+      .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
+  }
+
   /* 한 건 지우기 — 자리를 비운다(v/{번호} = null). */
   function remove(table, id, prev) {
     var g = check(table, id, {}, prev && prev.date);
@@ -168,6 +205,7 @@
     check: check,
     fieldPaths: fieldPaths,
     save: save,
+    saveColors: saveColors,
     remove: remove,
     newId: newId
   };
