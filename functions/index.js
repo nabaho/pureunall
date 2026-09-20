@@ -30,6 +30,8 @@ const HanaMessage = require("./hana-message");
 const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
 const 지역뉴스부품 = require("./news-region");
+const LS = require("./login-security");
+const geoip = require("geoip-lite");
 const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
 
@@ -5313,3 +5315,85 @@ exports.nasBackupExport = functions
     db: () => getDatabase(),
     key: () => process.env.NAS_BACKUP_KEY || "",
   }));
+
+// ════════════════════════════════════════════════════════════════════════════
+// 로그인 무단시도 감지 — logLoginAttempt
+// ════════════════════════════════════════════════════════════════════════════
+// 설계문서: docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md
+// enter.html 이 로그인 성공/실패 직후 «응답을 기다리지 않고» 부른다.
+// 이 함수가 죽거나 늦어도 로그인 자체는 전혀 영향받지 않는다(클라이언트가 안 기다림).
+exports.logLoginAttempt = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 10, memory: "128MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false }); return; }
+
+    const parsed = LS.parseAttempt(req.body);
+    if (!parsed.valid) { res.status(400).json({ ok: false, error: parsed.why }); return; }
+
+    const ip = LS.firstIp(req.headers["x-forwarded-for"]) || String(req.ip || "");
+    const now = Date.now();
+    const country = (() => {
+      try {
+        const hit = geoip.lookup(ip);
+        return (hit && hit.country) ? String(hit.country) : "";
+      } catch (e) { return ""; }
+    })();
+
+    // 실재 계정인지는 «안으로만» 쓴다 — 화면 에러 문구는 절대 안 바뀐다(2026-09-07 결정 유지).
+    let uid = "";
+    try { uid = (await getAuth().getUserByEmail(parsed.email)).uid; }
+    catch (e) { uid = ""; }
+
+    const db = getDatabase();
+    const rawKey = uid || ("unk_" + crypto.createHash("sha1").update(parsed.email).digest("hex").slice(0, 16));
+
+    // 원시 기록은 계정을 찾았든 못 찾았든 항상 남긴다(설계문서 §2 "성공·실패 전부 기록").
+    try {
+      await db.ref("login_events/" + rawKey).push({
+        at: now, ok: parsed.ok, code: parsed.code, email: parsed.email,
+        ip, country, deviceId: parsed.deviceId, ua: parsed.ua, page: "enter.html",
+      });
+    } catch (e) {
+      console.warn("logLoginAttempt: 원시 기록 실패", String((e && e.message) || e));
+    }
+
+    if (!uid) { res.status(200).json({ ok: true }); return; }   // 비교 기준(uid)이 없다
+
+    try {
+      const [devicesSnap, countriesSnap, burstSnap] = await Promise.all([
+        db.ref("login_devices/" + uid).once("value"),
+        db.ref("login_countries/" + uid).once("value"),
+        db.ref("login_fail_burst/" + uid).once("value"),
+      ]);
+      const knownDevices = devicesSnap.val() || {};
+      const knownCountries = countriesSnap.val() || {};
+      const deviceIsNew = LS.isNewDevice(knownDevices, parsed.deviceId);
+      const countryIsNew = LS.isNewCountry(knownCountries, country);
+      const burst = LS.nextBurst(burstSnap.val(), now, parsed.ok);
+      const burstSuspicious = LS.burstIsSuspicious(burst);
+
+      const writes = { ["login_fail_burst/" + uid]: burst };
+      if (!knownDevices[parsed.deviceId]) {
+        writes["login_devices/" + uid + "/" + parsed.deviceId] = { firstSeenAt: now, ua: parsed.ua };
+      }
+      if (country && !knownCountries[country]) {
+        writes["login_countries/" + uid + "/" + country] = { firstSeenAt: now };
+      }
+      await db.ref().update(writes);
+
+      const alerts = LS.buildAlerts({
+        uid, email: parsed.email, deviceIsNew, countryIsNew, burstSuspicious,
+        country, ip, ua: parsed.ua, failCount: burst.count,
+      });
+      for (const a of alerts) {
+        await db.ref("systemAlerts/" + uid).push(Object.assign({ createdAt: now }, a));
+      }
+    } catch (e) {
+      console.warn("logLoginAttempt: 판정 실패", String((e && e.message) || e));
+    }
+
+    res.status(200).json({ ok: true });
+  });
