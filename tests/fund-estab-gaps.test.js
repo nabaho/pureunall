@@ -176,9 +176,14 @@ test('★★ 묶음이 다섯 단계를 «모두» 덮는다 — ④운영·⑤�
   assert.match(p, /DOC_SUB/);
 });
 
-test('★ ④⑤ 화면에도 묶음 단추가 있다 — 없으면 누를 곳이 없다', () => {
-  assert.ok(SRC.indexOf("estabBundle(\\'ops\\')") >= 0, '④운영에 단추가 없다');
-  assert.ok(SRC.indexOf("estabBundle(\\'sub\\')") >= 0, '⑤지원금에 단추가 없다');
+test('★ 다섯 단계 «모두» 화면에 묶음 단추가 있다 — 없으면 누를 곳이 없다', () => {
+  /* 2026-09-20 줄 정리: 단계마다 따로 찍던 단추를 머리줄 하나(phaseHead)로 모았다.
+     그래서 단추가 있는지는 «단계마다 phaseHead 를 부르는지»로 본다 — 다섯이 같은 모양이다. */
+  assert.match(SRC, /function phaseHead\(title,helpKey,bundleKind,extraChip\)\{/, '머리줄 함수가 없다');
+  assert.match(SRC, /estabBundle\(\\'\'\+bundleKind\+\'\\'\)/, '머리줄이 묶음 단추를 안 그린다');
+  ['kinds', 'reg', 'tax', 'ops', 'sub'].forEach((k) => {
+    assert.match(SRC, new RegExp("phaseHead\\('[^']*','[^']*','" + k + "'"), k + ' 단계에 단추가 없다');
+  });
 });
 
 test('★★ 묶음이 장부를 «먼저» 읽는다 — ④⑤에는 장부 없이 못 그리는 서식이 있다', () => {

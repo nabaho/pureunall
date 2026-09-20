@@ -58,8 +58,12 @@ test('설명은 화면에 깔지 않고 ⓘ 로 접는다 — 오류 메시지�
   });
   /* ⓘ 는 hlp('키') 로 직접 부르기도 하고, 표(CARD_TARGETS 등)에 help:'키' 로 적어 두고
      hlp(T.help) 로 부르기도 한다 — 둘 다 «쓰고 있는 것»으로 센다. */
+  /* ⓘ 를 부르는 길이 셋이다 — hlp('키') 직접, 표에 help:'키' 로 적어 두고 hlp(T.help),
+     그리고 2026-09-20 줄 정리로 생긴 단계 머리줄 phaseHead(제목,'키',묶음) 이다.
+     ⚠ 셋을 다 세지 않으면 «쓰고 있는데 안 쓴다»고 잘못 운다(실제로 다섯 개가 그랬다). */
   const used = [...SRC.matchAll(/hlp\('([^']+)'\)/g)].map(m => m[1])
-    .concat([...SRC.matchAll(/help:\s*'([^']+)'/g)].map(m => m[1]));
+    .concat([...SRC.matchAll(/help:\s*'([^']+)'/g)].map(m => m[1]))
+    .concat([...SRC.matchAll(/phaseHead\('[^']*','([^']+)'/g)].map(m => m[1]));
   const missing = [...new Set(used)].filter(k => !box.HELP[k]);
   assert.deepEqual(missing, [], '등록부에 없는 도움말을 부른다(빈 버튼이 된다)');
   const unused = keys.filter(k => !used.includes(k));
