@@ -3019,6 +3019,47 @@ exports.newsFull = functions
     }
   });
 
+/* ══════════════════════════════════════════════════════════════════════════
+   판례·행정해석 「전문 보기」를 «따로 열어도» 우리 양식으로 (대표 지시 2026-09-20
+   「판례등 전문보기는 판례정보를 그대로 넣지말고 푸른양식으로 정리해라」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ newsFull(위)은 JSON 만 준다 — 「그 자리에서 펴는」 자바스크립트가 그것을 fetch
+     해서 편지 안에 그린다. 그 손잡이(href)가 이제 이 쪽(newsFullPage)을 가리킨다
+     (js/pu-news-tpl.js 판례한칸). 정상 클릭은 그대로 편지 안에서 펴지고, 그 밖의
+     모든 열기(새 탭·Ctrl+클릭)는 «법제처 원문»이 아니라 «이 쪽»이 열린다.
+   ⚠ 문지기는 newsFull 과 같다 — 갈래 둘(prec·expc), 번호는 숫자만.
+   ⚠ 여기도 우리 자료(DB)를 하나도 안 읽는다 — 로그인 없는 자리다. */
+exports.newsFullPage = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 20, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    const NF = require("./news-full");
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.set("X-Robots-Tag", "noindex");
+    const q = NF.읽기(req.query);
+    if (!q.ok) {
+      res.set("Cache-Control", "no-store");
+      res.status(400).send(NF.오류쪽(NF.까닭말["갈래"], ""));
+      return;
+    }
+    const 법제처 = NF.법제처주소(q.갈래, q.번호);
+    try {
+      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호));
+      const 것 = NF.풀기(q.갈래, xml);
+      if (!것.ok) {
+        res.set("Cache-Control", "no-store");
+        res.status(404).send(NF.오류쪽(NF.까닭말[것.까닭] || NF.까닭말["빈답"], 법제처));
+        return;
+      }
+      res.set("Cache-Control", "public, max-age=86400");
+      res.status(200).send(NF.쪽(것, 법제처));
+    } catch (e) {
+      console.warn("newsFullPage", (e && e.message) || e);
+      res.set("Cache-Control", "no-store");
+      res.status(502).send(NF.오류쪽(NF.까닭말["못받음"], 법제처));
+    }
+  });
+
 exports.readHomepage = functions
   .runWith({ timeoutSeconds: 60, memory: "256MB" })
   .https.onRequest(async (req, res) => {
