@@ -1658,11 +1658,15 @@ body.portal-mode #moreFab{display:flex;}
       return v;
     } catch(e){ return 'no-storage-' + Date.now().toString(36); }
   }
-  function reportLogin(email, ok, code){
+  // 성공 보고에는 «본인이 맞다»는 증표(ID 토큰)를 함께 붙인다 — 안 붙이면 서버가 조용히 버린다
+  // (2026-09-20 보안검토 CRITICAL 1). 실패 보고에는 붙일 증표가 아예 없다.
+  function reportLogin(email, ok, code, idToken){
     try {
+      var headers = { 'Content-Type': 'application/json' };
+      if(idToken) headers['Authorization'] = 'Bearer ' + idToken;
       fetch(LOGIN_LOG_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({ email: email, ok: !!ok, code: code || '', deviceId: loginDeviceId(), ua: navigator.userAgent })
       }).catch(function(){});
     } catch(e){}
@@ -1709,7 +1713,13 @@ body.portal-mode #moreFab{display:flex;}
       return auth.signInWithEmailAndPassword(email, pw);
     }).then(function(cred){
       _settled = true; clearTimeout(_watchdog);
-      reportLogin(email, true, '');
+      // ⚠ 증표를 «기다리지 않는다» — 아래 아이디 저장도 enterPortal 도 이 약속과 무관하게
+      //   그대로 진행된다. 증표를 못 얻으면 이번 성공은 그냥 기록하지 않는다(로그인이 먼저다).
+      try {
+        cred.user.getIdToken()
+          .then(function(tok){ reportLogin(email, true, '', tok); })
+          .catch(function(){});
+      } catch(e){}
       // 아이디 저장 (포털 전용 키 + ERP 화면 채움용 공유 키 병행)
       try {
         if($('saveId').checked){

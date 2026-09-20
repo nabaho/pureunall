@@ -5333,7 +5333,33 @@ exports.logLoginAttempt = functions
     const parsed = LS.parseAttempt(req.body);
     if (!parsed.valid) { res.status(400).json({ ok: false, error: parsed.why }); return; }
 
-    const ip = LS.firstIp(req.headers["x-forwarded-for"]) || String(req.ip || "");
+    /* ★ 「로그인에 성공했다」는 보고는 «증표»가 있어야 믿는다
+         (2026-09-20 보안검토 CRITICAL 1).
+       증표가 없던 때는 주소만 알면 누구나 남의 이메일로 ok:true 를 쏘아
+         ① 연속실패 누적을 마음대로 0 으로 되돌리고(3번 신호 무력화)
+         ② 자기 기기·국가를 미리 «아는 것»으로 심어(1·2번 신호 무력화)
+         ③ 멀쩡한 직원 이름으로 가짜 알림을 들이부을 수 있었다.
+       ⚠ 증표가 없거나 틀려도 오류를 돌려주지 않는다 — 돌려주면 「이 계정이 있다/없다」가
+         밖으로 새어 나간다. uid 를 못 찾았을 때와 똑같이 조용히 200 만 돌려준다.
+       ⚠ 실패 보고(ok:false)에는 증표가 있을 수 없다(성공한 인증이 없으니까). 그래서 그대로
+         열어 두되, 실패 보고는 누적을 «올리기만» 할 뿐 되돌리거나 기준선을 세우지 못한다
+         (아래 CRITICAL 2 의 성공 여부 가르기). */
+    let verified = null;
+    if (parsed.ok) {
+      const bearer = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ""));
+      if (bearer) {
+        try { verified = await getAuth().verifyIdToken(bearer[1], true); }
+        catch (e) { verified = null; }
+      }
+      if (!verified) { res.status(200).json({ ok: true }); return; }
+    }
+
+    // 성공 보고는 «증표에 적힌» 계정으로만 다룬다 — 본문의 email 은 믿지 않는다.
+    const email = verified
+      ? String(verified.email || parsed.email).trim().toLowerCase()
+      : parsed.email;
+
+    const ip = LS.lastIp(req.headers["x-forwarded-for"]) || String(req.ip || "");
     const now = Date.now();
     const country = (() => {
       try {
@@ -5343,17 +5369,22 @@ exports.logLoginAttempt = functions
     })();
 
     // 실재 계정인지는 «안으로만» 쓴다 — 화면 에러 문구는 절대 안 바뀐다(2026-09-07 결정 유지).
+    // 성공 보고는 증표에 적힌 uid 를 그대로 쓴다(이메일로 되찾지 않는다).
     let uid = "";
-    try { uid = (await getAuth().getUserByEmail(parsed.email)).uid; }
-    catch (e) { uid = ""; }
+    if (verified) {
+      uid = String(verified.uid || "");
+    } else {
+      try { uid = (await getAuth().getUserByEmail(email)).uid; }
+      catch (e) { uid = ""; }
+    }
 
     const db = getDatabase();
-    const rawKey = uid || ("unk_" + crypto.createHash("sha1").update(parsed.email).digest("hex").slice(0, 16));
+    const rawKey = uid || ("unk_" + crypto.createHash("sha1").update(email).digest("hex").slice(0, 16));
 
     // 원시 기록은 계정을 찾았든 못 찾았든 항상 남긴다(설계문서 §2 "성공·실패 전부 기록").
     try {
       await db.ref("login_events/" + rawKey).push({
-        at: now, ok: parsed.ok, code: parsed.code, email: parsed.email,
+        at: now, ok: parsed.ok, code: parsed.code, email,
         ip, country, deviceId: parsed.deviceId, ua: parsed.ua, page: "enter.html",
       });
     } catch (e) {
@@ -5370,22 +5401,34 @@ exports.logLoginAttempt = functions
       ]);
       const knownDevices = devicesSnap.val() || {};
       const knownCountries = countriesSnap.val() || {};
-      const deviceIsNew = LS.isNewDevice(knownDevices, parsed.deviceId);
-      const countryIsNew = LS.isNewCountry(knownCountries, country);
-      const burst = LS.nextBurst(burstSnap.val(), now, parsed.ok);
-      const burstSuspicious = LS.burstIsSuspicious(burst);
+      const prevBurst = burstSnap.val();
 
-      const writes = { ["login_fail_burst/" + uid]: burst };
-      if (!knownDevices[parsed.deviceId]) {
+      /* ★ 기기·국가는 «실제로 성공한 로그인»에서만 본다 (2026-09-20 보안검토 CRITICAL 2).
+           예전에는 실패한 시도로도 기준선을 세웠다 — 남의 비밀번호를 한 번 틀리고 두 번째에
+           맞히는 흔한 순서에서, 침입자의 기기가 «첫 실패»에 이미 아는 기기로 등록되어
+           정작 성공한 로그인이 조용히 지나갔다.
+           알림 문구도 「로그인 성공」이라 적히므로, 실패한 시도에 이 둘을 켜면 거짓말이 된다. */
+      const deviceIsNew = parsed.ok && LS.isNewDevice(knownDevices, parsed.deviceId);
+      const countryIsNew = parsed.ok && LS.isNewCountry(knownCountries, country);
+      const burst = LS.nextBurst(prevBurst, now, parsed.ok);
+      // 연속실패 알림은 문턱을 «넘는 순간» 한 번만(IMPORTANT 3). 울렸으면 표시를 남긴다.
+      const burstSuspicious = LS.burstAlertDue(prevBurst, burst);
+
+      const writes = {
+        ["login_fail_burst/" + uid]: burstSuspicious
+          ? Object.assign({}, burst, { alerted: true })
+          : burst,
+      };
+      if (parsed.ok && !knownDevices[parsed.deviceId]) {
         writes["login_devices/" + uid + "/" + parsed.deviceId] = { firstSeenAt: now, ua: parsed.ua };
       }
-      if (country && !knownCountries[country]) {
+      if (parsed.ok && country && !knownCountries[country]) {
         writes["login_countries/" + uid + "/" + country] = { firstSeenAt: now };
       }
       await db.ref().update(writes);
 
       const alerts = LS.buildAlerts({
-        uid, email: parsed.email, deviceIsNew, countryIsNew, burstSuspicious,
+        uid, email, deviceIsNew, countryIsNew, burstSuspicious,
         country, ip, ua: parsed.ua, failCount: burst.count,
       });
       for (const a of alerts) {
