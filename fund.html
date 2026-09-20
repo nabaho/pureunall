@@ -4000,11 +4000,50 @@ function markA4Overflow(){
   var w=$('a4Warn'); if(w) w.style.display=n?'':'none';
   return n;
 }
-function repaginateDoc(){
+/* 쪽 경계를 없애고 처음부터 다시 나눈다 — [다시 나누기] 단추와 자동 다시 나누기가 같이 쓴다.
+   ⚠ 알림(toast)은 여기서 안 띄운다 — 사람이 단추를 눌렀을 때만 알려 준다(repaginateDoc).
+   자동으로 도는 쪽은 타이핑마다 알림이 뜨면 시끄럽다. */
+function _repaginateCore(){
   var ed=$('doced'); if(!ed) return;
   var parts=[]; Array.prototype.forEach.call(ed.querySelectorAll('.a4 .a4b'),function(b){ parts.push(b.innerHTML); });
-  paginateDoc(parts.join(''));   // 쪽 경계를 없애고 처음부터 다시 나눔
-  fitDocA4(); toast('쪽을 다시 나눴습니다');
+  paginateDoc(parts.join(''));
+  fitDocA4();
+}
+function repaginateDoc(){ _repaginateCore(); toast('쪽을 다시 나눴습니다'); }
+/* ★ 타이핑하다 쪽을 넘기면 «한글 프로그램처럼» 저절로 다음 장으로 넘어간다
+   (대표 지시 2026-09-20 「다음페이지로 넘어가야되는데 왜 안되나 한글 프로그램
+   편집하듯이 그렇게 가능하게 해달라 전체서식들」).
+   ⚠⚠ paginateDoc 은 #doced 를 «통째로 다시 그린다» — 그냥 자동으로 돌리면 타이핑
+     중에 커서 자리가 사라져 «자동으로 되니 더 나쁜» 경험이 될 뻔했다. 그래서 다시
+     나누기 전에 커서 자리에 «표시(빈 <span>)»를 심어 두고, 다시 나눈 뒤 그 표시를
+     찾아 커서를 되돌린다. 표시는 문단 «안»에 있어 그 문단이 통째로 다음 장으로
+     넘어가면 표시도 같이 따라간다(paginateDoc 이 문단을 통째로 옮기지, 글자를
+     하나씩 다시 쓰지 않기 때문에 가능하다).
+   ⚠ 이 함수는 «서식마다 따로» 만들지 않는다 — 입력창(#doced)에 한 번만 걸어 두면
+     모든 서식이 같이 이 혜택을 받는다(전체서식들). */
+function _saveCaretMarker(root){
+  var old=root.querySelector('#__caretMark__'); if(old) old.remove();
+  var sel=window.getSelection(); if(!sel||!sel.rangeCount) return null;
+  var range=sel.getRangeAt(0);
+  if(!range.collapsed || !root.contains(range.startContainer)) return null;   // 글을 «고른» 채면 건드리지 않는다
+  var marker=document.createElement('span'); marker.id='__caretMark__';
+  try{ range.insertNode(marker); }catch(e){ return null; }
+  return marker;
+}
+function _restoreCaretMarker(root){
+  var marker=root.querySelector('#__caretMark__'); if(!marker) return false;
+  var range=document.createRange();
+  range.setStartAfter(marker); range.collapse(true);
+  var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  marker.parentNode.removeChild(marker);
+  return true;
+}
+function _autoRepaginate(){
+  var ed=$('doced'); if(!ed) return;
+  if(!markA4Overflow()){ fitDocA4(); return; }             // 안 넘쳤으면 배율만 다시 맞춘다
+  var marker=_saveCaretMarker(ed);
+  _repaginateCore();
+  if(marker) _restoreCaretMarker(ed);
 }
 /* 미리보기 배율 — 패널 폭에 맞춰 A4 한 장이 가로로 다 들어오게. S.docZoom='fit'|1 */
 function fitDocA4(){
@@ -6828,7 +6867,7 @@ function _showDocHTML(html){ var w=$('docwrap'); if(!w)return;
   var ed=$('doced');
   if(ed&&!ed._dirtyBound){ ed._dirtyBound=1;
     ed.addEventListener('input',function(){ markDirty();
-      clearTimeout(ed._ovT); ed._ovT=setTimeout(function(){ markA4Overflow(); fitDocA4(); },400); }); }
+      clearTimeout(ed._ovT); ed._ovT=setTimeout(_autoRepaginate,400); }); }
   fitDocA4();
 }
 // ── 서식 저장 3계층: 개별 기금(doc_edits/{fid}) > 유형 공통(doc_edits_type/{공동|사내}) > 자동생성 ──
