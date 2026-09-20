@@ -4696,7 +4696,22 @@ window.erpRepairFinanceIncomeIds = function(opts){
 /* 건별 저장 표 목록 — dbSet «밖»에 둔다 (2026-09-16).
    전에는 dbSet 안 4486줄대에 있었다. var 는 끌어올려지지만 값은 그 줄에 가서야 들어가므로,
    그 줄 «앞»에서는 undefined 였다 — 아래 번호 붙이기 그물이 쓸 수 없었다. */
-var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches'];
+/* ★ my_schedules 를 2026-09-20 에 더했다 (캘린더 한 곳으로 모으기 0걸음).
+   ■ 왜
+     이 표만 여태 «배열»로 서버에 담겨 있었다. 푸른 캘린더의 저장 관문은 배열 표에
+     칸별로 쓰면 표가 깨지므로 «이알피에서 고치세요»로 돌려보낸다 — 그래서 일정은
+     푸른 캘린더에서 고칠 수가 없었다. 이알피 달력을 걷어내려면 이것부터 풀어야 한다.
+   ■ 이 목록에 들면 무엇이 달라지나
+     dbSet 이 저장할 때 «모두 번호가 있으면» arrayToIdMap 으로 지도형으로 바꿔 올린다
+     (아래 4938줄대). 그러면 칸별 저장·안전 병합·건별 경로가 함께 살아난다.
+   ■ 안전한가 — 실제 자료로 재 봤다(2026-09-20)
+     서버의 25건이 «전부» 번호를 갖고 있고 겹치지 않으며 실시간DB 금지문자도 없다.
+     지도형으로 바꾼 뒤 이알피 normalizeFbValue 와 푸른캘린더 normalize 로 되읽어
+     25건이 한 글자도 안 달라지는 것을 확인했다. 마지막 일정이 7/31 이라 두 달째
+     아무도 안 쓰는 표이기도 하다(진짜 일정은 구글에서 온다).
+   ⚠ 번호 없는 항목이 하나라도 섞이면 지도형 전환이 꺼지고 통째 저장으로 떨어진다 —
+     그래서 dbSet 첫머리의 «번호 붙이기 그물»이 이 표에도 함께 걸리게 된다(그게 맞다). */
+var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules'];
 function dbSet(k, v){
   /* ★★ 번호 없는 항목에는 저장 «전»에 번호를 붙인다 (2026-09-16 대표 「데이터가 들어갈 때마다·
      다른 직원이 넣을 때마다 충돌 — 해결책까지 전체 검토」).
