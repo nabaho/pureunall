@@ -43,7 +43,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=40"></script>
+<script src="js/pu-news-core.js?v=41"></script>
 <script src="js/pu-news-tpl.js?v=33"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
@@ -951,9 +951,16 @@ function 불러오기(){
          그러면 기업정보함에서 status 를 바꾸거나 담당자에 left 를 켜면 저절로 빠진다 —
          뉴스레터에서 따로 지울 일이 없다. 한 곳만 고치면 된다. */
     db.ref('data/companies/v').once('value').catch(()=>({val:()=>({})})),
-    db.ref('config/mailBlock').once('value').catch(()=>({val:()=>({})})),
+    /* ★ 공용 수신거부 — 기업정보함이 «쓰는 그 자리»를 읽는다 (2026-09-20 바로잡음)
+         여기는 `pucards/config/mailBlock` 이다. 예전에는 맨 위 `config/mailBlock`
+         을 읽고 있었는데 ① 그런 자리는 아예 없고 ② 규칙에도 없어 permission_denied
+         였다. 아래 `.catch` 가 그것을 조용히 `{}` 로 바꿔 «막은 사람이 없다»처럼
+         보이게 했다 — 아무도 막힌 줄 몰랐다(지금 명단이 비어 있어 실제 피해는 없다).
+       ⚠ 열쇠 모양도 기업정보함과 맞춰야 한다 — 거기는 점을 쉼표로 바꿔 담는다
+         (`emailKey`: a@b.com → a@b,com). 거르개(명단다듬기)가 그 모양도 본다. */
+    db.ref('pucards/config/mailBlock').once('value').catch(()=>({val:()=>({})})),
     /* 뉴스레터만의 수신거부 — 「뉴스레터는 그만」이라 한 곳도 자료 발송은 받아야 한다.
-       그래서 공용 수신거부(config/mailBlock)와 «따로» 둔다. 둘을 합쳐서 본다. */
+       그래서 공용 수신거부와 «따로» 둔다. 둘을 합쳐서 본다. */
     db.ref('newsletter/blocked').once('value').catch(()=>({val:()=>({})})),
     /* 자동으로 담을 밑감 — 매일 07:00 이 모아 두는 자리 */
     db.ref('homepage/newsBrief/모음').once('value').catch(()=>({val:()=>({})})),

@@ -94,10 +94,11 @@ const PG = (() => {
   const box = {};
   new Function([
     'var ROOT=null;',
-    grabLine('MINUTES_AGENDA'),
+    grabLine('MINUTES_AGENDA'), grabLine('MINUTES_PROGRESS_HEAD'),
     grabFn('fillMinutesPages').replace(/root\.querySelectorAll\('p'\)/g, 'ROOT'),
     'this.run=function(ps){ ROOT=ps; return fillMinutesPages(null); };',
     'this.re=MINUTES_AGENDA;',
+    'this.reProg=MINUTES_PROGRESS_HEAD;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -113,9 +114,12 @@ test('★ 의안 줄을 알아본다', () => {
 });
 
 test('★★ 둘째 의안부터 «새 장»이 된다 — 첫 의안에는 안 붙인다(빈 장이 생긴다)', () => {
-  const ps = [P('경 과 보 고'), P('-의안1호 정관(안)제정-'), P('1. 의 결 주 문 :'),
+  /* ⚠ 2026-09-20 전에는 첫 자리를 '경 과 보 고' 필러로 뒀는데, 이제 그 글자 자체가
+     새 장 표시를 받는 자리라(아래 별도 검사) 헷갈린다 — 상관없는 글로 바꿨다. */
+  const ps = [P('일  시 : 20  . 00. 00.'), P('-의안1호 정관(안)제정-'), P('1. 의 결 주 문 :'),
     P('-의안2호 이사 및 감사 선임-'), P('-의안3호 기금출연(안)-'), P('-의안4호 사업계획-')];
   assert.equal(PG.run(ps), 4, '의안을 네 개로 안 셌다');
+  assert.equal(ps[0]._a['data-newpage'], undefined, '상관없는 글에 표를 붙였다');
   assert.equal(ps[1]._a['data-newpage'], undefined, '첫 의안에 표를 붙였다 — 앞에 빈 장이 생긴다');
   [3, 4, 5].forEach((i) => {
     assert.equal(ps[i]._a['data-newpage'], '1', i + '번째 의안이 새 장이 아니다');
@@ -124,9 +128,35 @@ test('★★ 둘째 의안부터 «새 장»이 된다 — 첫 의안에는 안 
 });
 
 test('의안이 없으면 아무것도 안 한다', () => {
-  const ps = [P('경 과 보 고'), P('1. 의 결 주 문 :')];
+  const ps = [P('일  시 : 20  . 00. 00.'), P('1. 의 결 주 문 :')];
   assert.equal(PG.run(ps), 0);
   assert.equal(ps[0]._a['data-newpage'], undefined);
+});
+
+/* ══════════ ②-2 「경과보고」 본문 — 회순 요약과 헷갈리지 않고 새 장 ══════════
+ * 대표 지시 2026-09-20 「설립준비위원회 회의록도 주제별로 페이지 정리해야되는데
+ *   페이지 넘어가도록 안된다」 — 회순(개요, "Ⅱ.  경  과  보  고" «로마숫자 붙은 요약»)
+ *   다음에 경과보고 «본문»("경  과  보  고" 넉 자만)이 곧바로 이어져, 그 아래 서술
+ *   목록이 회순 꼬리에 붙어 흐르다가 아무 데서나 잘렸다(대표가 보여준 화면 그대로).
+ */
+test('★ 「경과보고」 자리표를 알아본다 — 로마숫자 붙은 회순 요약과는 다르다', () => {
+  ['경과보고', '경  과  보  고', '경     과    보     고'].forEach((s) => {
+    assert.ok(PG.reProg.test(s), s + ' 를 경과보고 본문으로 안 봅니다.');
+  });
+  ['Ⅱ.  경   과   보   고', 'ㅇ 사내근로복지기금 설립 경과 …… 3', '경과보고서', '전체경과보고'].forEach((s) => {
+    assert.ok(!PG.reProg.test(s), s + ' 를 경과보고 본문으로 잘못 봅니다.');
+  });
+});
+
+test('★★ 「경과보고」 본문이 «새 장»에서 시작한다 — 회순 꼬리에 안 붙는다', () => {
+  const ps = [P('Ⅱ.  경   과   보   고'), P('ㅇ 사내근로복지기금 설립 경과 …… 3'),
+    P('Ⅲ.  부   의   안   건'), P('경     과    보     고'), P('1. 공동근로복지기금설립 추진'),
+    P('-의안1호 정관(안)제정-')];
+  PG.run(ps);
+  assert.equal(ps[0]._a['data-newpage'], undefined, '회순 요약 줄(Ⅱ.)에 표를 붙였습니다.');
+  assert.equal(ps[3]._a['data-newpage'], '1', '★ 경과보고 본문이 새 장에서 안 시작합니다.');
+  assert.equal(ps[3]._a['data-kept'], '1', '걷어내기가 이 줄을 지울 수 있습니다.');
+  assert.equal(ps[4]._a['data-newpage'], undefined, '경과보고 다음 서술 줄까지 표를 붙였습니다.');
 });
 
 test('★ hwpFormHTML 이 회의록에서 이것을 부른다', () => {

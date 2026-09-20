@@ -1,5 +1,16 @@
 # 로그인 무단시도 감지·경보 — 2026-09-20
 
+> ## ✅ 2026-09-20 전수점검에서 다시 잼 — 「남은 일」은 이미 풀렸다
+> 아래 「⚠ 남은 일」에 적힌 **403(아무도 호출 못 함)은 지금 없다.** 직접 두드려 보니
+> `GET 405` · `POST 400 {"ok":false,"error":"이메일이 없거나 이상합니다"}` — 구글 앞단을
+> 지나 우리 코드까지 닿는다. 즉 `allUsers` 초대자 권한은 열려 있다.
+> **콘솔에서 따로 하실 일이 없다.**
+>
+> 다만 `login_events`·`login_devices` 는 **아직 비어 있다** — 자동로그인 중인 사람은
+> 로그인 화면을 안 거치므로 보고가 일어나지 않는다. 대표님이 한 번 로그아웃했다가
+> 다시 로그인하시면 그때 첫 기록이 쌓인다(그것으로 실제로 도는지 확인된다).
+> — `status/2026-09-20-all-sessions-audit.md`
+
 브랜치: `worktree-login-security-monitoring` (main 최신 기준 새 워크트리)
 설계: [docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md](../docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md)
 계획: [docs/superpowers/plans/2026-09-20-login-security-monitoring.md](../docs/superpowers/plans/2026-09-20-login-security-monitoring.md)

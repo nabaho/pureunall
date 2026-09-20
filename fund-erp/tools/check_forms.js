@@ -68,8 +68,8 @@ global.funds = {};
   gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
   /* 2026-09-19: 노동조합대표자→근로자대표 · 홀로 선 날짜 자리 · 작성 예 제외 */
   gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),
-  /* 2026-09-19: 회의록 의안마다 새 장 */
-  gS('MINUTES_AGENDA'), gF('fillMinutesPages'),
+  /* 2026-09-19: 회의록 의안마다 새 장 · 2026-09-20: 경과보고 본문도 새 장에서 시작 */
+  gS('MINUTES_AGENDA'), gS('MINUTES_PROGRESS_HEAD'), gF('fillMinutesPages'),
   /* 2026-09-19: 서명란을 번호 붙인 표로 · 정관 머리와 제3조 손보기 */
   gS('SIGN_L'), gS('SIGN_R'), gS('SIGN_WHO_ONLY_SRC'), gS('SIGN_HEAD'),
   gF('_signLabels'), gF('fillSignTable'),

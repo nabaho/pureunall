@@ -212,12 +212,16 @@ function 눌러보기(쪽, 손잡이) {
   vm.runInContext(m[1], 짐);
   assert.ok(짐.document._클릭, '훑는 쪽(capture)에서 잡는 손잡이가 없다');
   let 막았나 = false;
-  짐.document._클릭({
-    target: { closest: function (sel) { return sel === 'a[href]' ? 손 : null; } },
-    preventDefault: function () { 막았나 = true; },
-    stopPropagation: function () {}
-  });
-  return { 부른것: 부른것, 막았나: 막았나, 손: 손 };
+  /* ★ 한 번 더 누를 수 있게 «누르기»를 돌려준다 — 폈다 접는 것은 두 번 눌러야 안다. */
+  function 누르기() {
+    짐.document._클릭({
+      target: { closest: function (sel) { return sel === 'a[href]' ? 손 : null; } },
+      preventDefault: function () { 막았나 = true; },
+      stopPropagation: function () {}
+    });
+  }
+  누르기();
+  return { 부른것: 부른것, 막았나: 막았나, 손: 손, 누르기: 누르기 };
 }
 
 test('★★★ 편지의 «표»를 보고 그 판례를 받아 온다', () => {
@@ -225,6 +229,26 @@ test('★★★ 편지의 «표»를 보고 그 판례를 받아 온다', () => 
   const r = 눌러보기(쪽, { 'attr_data-full': 'prec:622111', attr_href: 'https://n.kr/딴데' });
   assert.equal(r.부른것[0], '/newsFull?t=prec&id=622111', '엉뚱한 자리를 부른다');
   assert.ok(r.막았나, '눌러도 그대로 나간다 — 새 창으로 넘어간다');
+});
+
+test('★★★ 폈다 «접으면» 처음 글귀로 돌아온다 — 화살표가 바뀌지 않는다', () => {
+  /* ⚠⚠ 2026-09-20 살아 있는 쪽에서 「전문 보기 ↗」 둘과 「전문 보기 ↓」 하나가
+       함께 잡혔다. 껍데기가 접을 때 돌려놓는 글귀를 «글자로 박아» 두었던 탓이다
+       (편지는 ↗ 로 바뀌었는데 여기만 ↓ 로 되돌려 놓았다).
+     ★ 같은 손잡이가 폈다 접었다고 모양이 바뀌면, 받는 분은 «다른 것»으로 읽는다.
+     ⚠ 값(↗)이 아니라 «처음 글귀를 그대로 돌려놓는가»를 본다 — 편지 쪽 글귀가
+       또 바뀌어도 이 검사는 그대로 맞는다. */
+  const 쪽 = NV.쪽('제목', 판례편지('https://www.law.go.kr/DRF/lawService.do?OC=test&target=prec&type=HTML&ID=622111'));
+  const 처음글귀 = '전문 보기 ↗';
+  const r = 눌러보기(쪽, { 'attr_data-full': 'prec:622111', attr_href: 'https://n.kr/딴데',
+    textContent: 처음글귀 });
+
+  assert.equal(r.손.textContent, '접기 ↑', '★ 폈는데 「접기」로 안 바뀐다');
+  r.누르기();                                   /* 접는다 */
+  assert.equal(r.손.textContent, 처음글귀,
+    '★★★ 접었더니 처음 글귀가 아니다 («' + r.손.textContent + '») — 화살표가 바뀌었다');
+  r.누르기();                                   /* 다시 편다 */
+  assert.equal(r.손.textContent, '접기 ↑', '★ 다시 폈는데 「접기」로 안 바뀐다');
 });
 
 test('★★★ 표가 없는 «옛 회차»는 주소에서 읽는다', () => {
