@@ -145,3 +145,104 @@ test('★ 표시가 없으면 «조용히» 넘어간다 — 되돌릴 것이 �
   const root = dom.window.document.getElementById('doced');
   assert.equal(box.restore(root), false, '★ 표시가 없을 때 false 를 안 돌려줍니다.');
 });
+
+/* ══ ③ 한글 조합(IME) ═════════════════════════════════════════════════
+ * 대표 지시 2026-09-20 「이동확인은되는데 «수정이 이상하다»」
+ *
+ * ▣ 무엇이 문제였나 — 한글은 낱자를 모아 한 글자를 만든다(ㄱ→가→각). 그 «조합»
+ *   이 끝나기 전에도 input 이 (isComposing=true 로) 터진다. 400ms 만 멈칫하면
+ *   _autoRepaginate 가 돌고, _repaginateCore 는 innerHTML 을 «새로 쓴다» —
+ *   조합중이던 글마디(텍스트 노드)가 통째로 버려진다. 브라우저 조합기는 바로
+ *   그 마디를 붙들고 있으므로 글자가 겹치거나·사라지거나·엉뚱한 곳에 박힌다.
+ *   («쪽 넘김»은 멀쩡한데 «글자 치기»만 이상했던 이유가 이것이다.)
+ *
+ * ▣ 실제 브라우저에서 재현했다 — 조합중 마디가 isConnected=false 가 되고 쪽이
+ *   8→13 장으로 조합 도중에 다시 나뉘었다.
+ *
+ * ▣ 어떻게 고쳤나 — 조합중엔 미루고(_ime 표), 조합이 «끝난 뒤» 한 번만 돈다.
+ */
+
+/* _showDocHTML 안의 «배선 토막»만 떼어내 진짜로 돌려 본다 */
+function grabWiring() {
+  const s = 코드만(grabFn('_showDocHTML'));
+  const i = s.indexOf("if(ed&&!ed._dirtyBound)");
+  assert.ok(i >= 0, '입력창 배선 토막을 못 찾았다');
+  let d = 0, on = false;
+  for (let j = s.indexOf('{', i); j < s.length; j++) {
+    const c = s[j];
+    if (c === '{') { d++; on = true; }
+    else if (c === '}') { d--; if (on && !d) return s.slice(i, j + 1); }
+  }
+  throw new Error('배선 토막 끝을 못 찾음');
+}
+
+test('★★ ⑧ 한글 조합중(isComposing)엔 다시 나누기를 «예약조차» 안 한다', (t) => {
+  if (!JSDOM) return t.skip('jsdom 없음');
+  const dom = new JSDOM('<!doctype html><body><div id="doced" contenteditable="true"></div></body>');
+  const win = dom.window, doc = win.document;
+  const 부름 = [];
+  const run = new Function('document', 'window', 'setTimeout', 'clearTimeout',
+    '$', 'markDirty', '_autoRepaginate', 'ed', grabWiring());
+  const timers = new Map(); let seq = 0;
+  const st = (fn, ms) => { const id = ++seq; timers.set(id, fn); return id; };
+  const ct = (id) => { timers.delete(id); };
+  const ed = doc.getElementById('doced');
+  run(doc, win, st, ct, (id) => doc.getElementById(id), () => {}, () => 부름.push('돌았다'), ed);
+  const 타이머수 = () => timers.size;
+
+  /* 조합 시작 → 조합중 input */
+  ed.dispatchEvent(new win.CompositionEvent('compositionstart', { bubbles: true }));
+  const e = new win.InputEvent('input', { bubbles: true, isComposing: true, data: 'ㄱ' });
+  ed.dispatchEvent(e);
+  assert.equal(타이머수(), 0,
+    '★ 한글을 조합하는 «도중»에 다시 나누기를 예약했습니다 — 치던 글자가 깨집니다.');
+
+  /* 조합 끝 → 이제는 예약돼야 한다 */
+  ed.dispatchEvent(new win.CompositionEvent('compositionend', { bubbles: true, data: '각' }));
+  assert.equal(타이머수(), 1, '★ 조합이 «끝난 뒤»에도 다시 나누기를 안 겁니다 — 영영 안 나뉩니다.');
+  timers.forEach((fn) => fn());
+  assert.deepEqual(부름, ['돌았다'], '★ 조합이 끝났는데 다시 나누기가 안 돌았습니다.');
+
+  /* 조합 끝난 뒤의 보통 타이핑은 여전히 예약된다 */
+  timers.clear();
+  ed.dispatchEvent(new win.InputEvent('input', { bubbles: true, isComposing: false }));
+  assert.equal(타이머수(), 1, '★ 조합이 아닌 보통 타이핑까지 막아버렸습니다.');
+});
+
+test('★★ ⑨ 조합이 «시작»되면 이미 걸려 있던 예약을 끈다', (t) => {
+  if (!JSDOM) return t.skip('jsdom 없음');
+  const dom = new JSDOM('<!doctype html><body><div id="doced" contenteditable="true"></div></body>');
+  const win = dom.window, doc = win.document;
+  const timers = new Map(); let seq = 0;
+  const run = new Function('document', 'window', 'setTimeout', 'clearTimeout',
+    '$', 'markDirty', '_autoRepaginate', 'ed', grabWiring());
+  const ed = doc.getElementById('doced');
+  run(doc, win, (fn) => { const id = ++seq; timers.set(id, fn); return id; }, (id) => timers.delete(id),
+    (id) => doc.getElementById(id), () => {}, () => {}, ed);
+
+  ed.dispatchEvent(new win.InputEvent('input', { bubbles: true, isComposing: false }));
+  assert.equal(timers.size, 1, '보통 타이핑은 예약돼야 한다');
+  ed.dispatchEvent(new win.CompositionEvent('compositionstart', { bubbles: true }));
+  assert.equal(timers.size, 0,
+    '★ 조합이 시작됐는데 «앞서 걸린» 예약이 그대로 남아 있습니다 — 조합 도중에 터집니다.');
+});
+
+test('★★ ⑩ _autoRepaginate 자체에도 «조합중» 방어턱이 있다', () => {
+  const auto = 코드만(grabFn('_autoRepaginate'));
+  const i = auto.indexOf('ed._ime'), j = auto.indexOf('markA4Overflow');
+  assert.ok(i >= 0, '★ _autoRepaginate 가 조합중인지 안 봅니다 — 다른 데서 부르면 또 깨집니다.');
+  assert.ok(i < j, '★ 조합중 검사가 «다시 나누기 전»에 있지 않습니다.');
+  assert.match(auto, /if\(ed\._ime\)\{\s*return;\s*\}/,
+    '★ 조합중일 때 그냥 돌아가지 않습니다.');
+});
+
+test('★★ ⑪ 입력 처리기가 isComposing 과 _ime 를 «둘 다» 본다', () => {
+  const w = 코드만(grabWiring());
+  assert.match(w, /addEventListener\('compositionstart'/, '★ 조합 시작을 안 듣습니다.');
+  assert.match(w, /addEventListener\('compositionend'/, '★ 조합 끝을 안 듣습니다.');
+  assert.match(w, /if\(ed\._ime\|\|\(e&&e\.isComposing\)\)\s*return;/,
+    '★ 조합중 건너뛰기가 없습니다 — 브라우저마다 둘 중 하나만 맞을 때가 있어 «둘 다» 봐야 합니다.');
+  const iSkip = w.indexOf('e.isComposing'), iArm = w.indexOf('_ovT=setTimeout', w.indexOf("'input'"));
+  assert.ok(iSkip >= 0 && iSkip < iArm,
+    '★ 건너뛰기가 예약보다 «뒤»에 있습니다 — 막아도 이미 예약된 뒤입니다.');
+});

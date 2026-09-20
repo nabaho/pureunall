@@ -4040,6 +4040,7 @@ function _restoreCaretMarker(root){
 }
 function _autoRepaginate(){
   var ed=$('doced'); if(!ed) return;
+  if(ed._ime){ return; }                                   // 한글 조합중이면 미룬다 — 끝나면 compositionend 가 다시 부른다
   if(!markA4Overflow()){ fitDocA4(); return; }             // 안 넘쳤으면 배율만 다시 맞춘다
   var marker=_saveCaretMarker(ed);
   _repaginateCore();
@@ -6866,7 +6867,15 @@ function _showDocHTML(html){ var w=$('docwrap'); if(!w)return;
   paginateDoc(body);            // A4 본문높이에 맞춰 장을 나누고 쪽수를 붙인다
   var ed=$('doced');
   if(ed&&!ed._dirtyBound){ ed._dirtyBound=1;
-    ed.addEventListener('input',function(){ markDirty();
+    /* 한글은 낱자를 모아 한 글자를 만든다(조합). 조합이 끝나기 «전»에 쪽을 다시
+       나누면 _repaginateCore 가 innerHTML 을 새로 써서 조합중이던 글마디 자체가
+       버려진다 — 브라우저 조합기는 그 마디를 붙들고 있으므로 글자가 겹치거나
+       사라지거나 엉뚱한 곳에 박힌다. 그래서 조합중엔 미루고, 끝난 뒤 한 번 돈다. */
+    ed.addEventListener('compositionstart',function(){ ed._ime=1; clearTimeout(ed._ovT); });
+    ed.addEventListener('compositionend',function(){ ed._ime=0;
+      clearTimeout(ed._ovT); ed._ovT=setTimeout(_autoRepaginate,400); });
+    ed.addEventListener('input',function(e){ markDirty();
+      if(ed._ime||(e&&e.isComposing)) return;
       clearTimeout(ed._ovT); ed._ovT=setTimeout(_autoRepaginate,400); }); }
   fitDocA4();
 }
