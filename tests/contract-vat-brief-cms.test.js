@@ -40,152 +40,94 @@ const t = (name, got, want) => {
   t('★ 창을 막던 알림창은 사라졌다', /window\.showAlertMutable\s*=/.test(src), false);
 }
 
-/* ═══ 2. ★ 6열 격자의 칸 수 — 한 칸이라도 어긋나면 전부 밀린다 ═══ */
-{
-  const blk = slice("          if(isConsulting || isCase || isOther){", '          // 기금/업체/기타/상담');
-  t('격자는 여전히 6열', /gridTemplateColumns:'90px 1fr 60px 120px auto auto'/.test(blk), true);
-  // 잔금 줄: briefCell(1~2열 묶음) + 라벨 + input + 단위 + 토글 = 5개 자리
-  t('★ 업무 요약이 잔금 줄로 들어갔다', /briefCell\(kindV\),\s*[\r\n]+\s*h\('span', \{ style:\{ fontSize:'10\.5px', color:'#64748b', fontWeight:600, textAlign:'right' \} \}, isConsulting \? '잔금' : '성공보수'\)/.test(blk), true);
-  t('★ 옛 전체폭 업무 요약 줄이 사라졌다', /briefRow\(kindV\)/.test(blk), false);
-  t('★ 잔금 줄 앞에 빈 칸 두 개가 남아 있지 않다',
-    /h\('span'\),\s*[\r\n]+\s*h\('span'\),\s*[\r\n]+\s*h\('span', \{ style:\{ fontSize:'10\.5px'[^}]*\} \}, isConsulting \? '잔금'/.test(blk), false);
-  t('부가세 줄은 그대로 빈 칸 3개 + 체크 + 빈 칸 2개',
-    /h\('span'\), h\('span'\), h\('span'\),\s*[\r\n]+\s*h\('label'[\s\S]*?balanceFeeVatIncluded[\s\S]*?h\('span'\), h\('span'\)/.test(blk), true);
-}
-
-/* ═══ 2-2. ★★ 격자 칸 수를 실제로 센다 — 이게 조용히 어긋나면 모든 칸이 밀린다 ═══ */
-function gridCtx(kindV, opts){
-  opts = opts || {};
+/* ═══ 2. ★ 세부설정 박스가 flex(.pu-kbox/.pu-krow)로 바뀌었다 (2026-09-19, 목업
+   승인 contract-detail-box-v2, 대표 지시 「한줄로 넣어라 … 셀과 내용을 다 해야
+   혼란이 없다」) — 옛 6열 CSS Grid의 «칸 개수가 정확히 6의 배수여야 안 밀린다»는
+   걱정은 flex 로 바뀌며 아예 없어졌다. 대신 실제로 렌더링해 종류마다 맞는 줄에
+   맞는 칸이 나오는지를 본다. ═══ */
+function kboxCtx(kindV, extraF){
+  const from = src.indexOf('(f.kinds||[]).map(function(kindV){');
+  const to = src.indexOf(',\n        // CMS 자동이체', from);
+  const expr = src.slice(from, to > 0 ? to : src.indexOf(',\r\n        // CMS 자동이체', from));
   const c = {
     console, Object, JSON, Array, String, Number, parseFloat, parseInt,
     f: Object.assign({
       kinds:[kindV], typeCodes:{}, amounts:{}, briefs:{},
       successFee:0, successFeeType:'amount',
       contractFeeVatIncluded:false, balanceFeeVatIncluded:false, fundVatIncluded:false
-    }, opts.f || {}),
+    }, extraF || {}),
     BRIEF_KINDS:['case','consulting','fund','other'], BRIEF_MAX:40, BRIEF_PH:{},
-    NumberInput:function NumberInput(){},
+    NumberInput:function NumberInput(){}, PercentInput:function PercentInput(){},
     kindInfo(){ return { color:'#000', icon:'X', label:'라벨' }; },
     getKindTypes(){ return [{ code:'t1', short:'약', name:'이름' }]; },
     setTypeCodeFor(){ return function(){}; },
     setAmountFor(){ return function(){}; },
     setSimple(){ return function(){}; },
     setBriefFor(){ return function(){}; },
-    setF(){}, vatIncludedHint(){},
+    setF(){}, vatIncludedHint(){}, vatFocusHint(){}, vatAmountHint(){},
     /* 🏥 하루 단위 컨설팅 — 이 검사는 «부가세·업무요약·CMS» 를 본다.
-       단가를 0 으로 두면 일수 줄은 안 그려지므로 열 세기가 예전 그대로다
-       (일수 줄 자체는 tests/clinic-days-fee.test.js 가 본다). */
+       일수 줄 자체는 tests/clinic-days-fee.test.js 가 본다. */
     consTypeDayFee(){ return 0; },
     consDayAmount(){ return null; },
     consDayMayFill(){ return true; },
-    // 아래쪽 종류(기금·업체·상담)는 아직 옛 briefRow 를 쓴다 — 전체폭 한 줄이라 열 계산에서 빼고 센다
-    briefRow(){ return { tag:'div', props:{ style:{ gridColumn:'1 / -1' } }, kids:[] }; },
     h(tag, props){
       const kids = Array.prototype.slice.call(arguments, 2);
       return { tag, props: props || {}, kids };
     }
   };
   vm.createContext(c);
-  vm.runInContext(slice('  function cmsBlock(){', '  // 종류별 세부설정 그리드 안에 들어가는'), c);
-  // 격자를 만드는 map 표현식을 통째로 평가한다 — f.kinds 에 한 종류만 넣어 두었으므로 결과는 한 칸짜리 배열
-  const expr = slice('(f.kinds||[]).map(function(kindV){', ',\n        // CMS 자동이체');
   vm.runInContext('var __arr = ' + expr + ';', c);
   return c.__arr[0];
 }
-// 칸 하나가 차지하는 열 수 — 1~3 묶음은 2칸, 전체폭은 한 줄을 통째로 쓴다
-function cellSpan(x){
-  const gc = x && x.props && x.props.style && x.props.style.gridColumn;
-  if(gc === '1 / 3') return 2;
-  if(gc === '1 / -1') return 6;
-  return 1;
-}
+function realKids(node){ return (node && node.kids || []).filter(x => x !== null && x !== undefined && x !== false); }
+function findByClass(kids, cls){ return kids.find(x => x && x.props && x.props.className === cls); }
 {
-  // ★ 세어야 할 것은 칸 개수가 아니라 "차지하는 열 수" 다 — briefCell 이 두 칸을 묶기 때문.
-  //   합이 6의 배수가 아니면 어딘가 한 칸이 밀려 라벨과 입력칸이 어긋난다.
+  t('★ 옛 briefRow 를 더는 안 부른다', /briefRow\(kindV\)/.test(src), false);
+  t('★ 옛 briefCell 도 더는 안 부른다', /briefCell\(kindV\)/.test(src), false);
   ['consulting','case','other','fund','company','consult'].forEach(function(kv){
-    const node = gridCtx(kv);
-    const cells = node.kids.filter(function(x){ return x !== null && x !== undefined && x !== false; });
-    const span = cells.reduce(function(s, x){ return s + cellSpan(x); }, 0);
-    t('★ ' + kv + ' 격자가 열을 딱 맞게 채운다', span % 6, 0);
+    const box = kboxCtx(kv);
+    t('★ ' + kv + ' 이 새 박스 모양(pu-kbox)을 쓴다', box.props.className, 'pu-kbox');
   });
 }
 {
-  // 컨설팅: 메인행 6 + 부가세행 6 + 잔금행(briefCell 2 + 4칸) 6 + 부가세행 6 = 24열 / 23칸
-  const node = gridCtx('consulting');
-  const cells = node.kids.filter(function(x){ return x !== null && x !== undefined && x !== false; });
-  t('★ 컨설팅은 4줄(24열)을 쓴다', cells.reduce(function(s, x){ return s + cellSpan(x); }, 0), 24);
-  t('★ 칸 개수는 23 (briefCell 이 두 칸을 묶으므로 하나 적다)', cells.length, 23);
-  const spanning = cells.filter(function(x){ return cellSpan(x) === 2; });
-  t('★ 1~2열을 묶는 칸이 정확히 하나', spanning.length, 1);
-  t('★ 그 칸이 업무 요약이다',
-    JSON.stringify(spanning[0].kids).indexOf('업무 요약') >= 0, true);
-  t('★ 컨설팅 격자에 전체폭 줄이 남아 있지 않다',
-    cells.some(function(x){ return cellSpan(x) === 6; }), false);
-  // 업무 요약 바로 다음 칸이 '잔금' 라벨이어야 한다 — 여기가 어긋나면 라벨이 밀린다
-  const at = cells.indexOf(spanning[0]);
-  t('★ 업무 요약 다음 칸이 잔금 라벨', JSON.stringify(cells[at + 1].kids).indexOf('잔금') >= 0, true);
-  t('★ 그다음이 금액 입력칸', typeof cells[at + 2].tag === 'function', true);
+  const kids = realKids(kboxCtx('consulting'));
+  t('★ 컨설팅은 머리·계약금줄·잔금줄 = 3줄', kids.length, 3);
+  const row1 = realKids(kids[1]);
+  t('★ 계약금 줄에 업무 요약이 들어갔다', !!findByClass(row1, 'pu-grow'), true);
+  t('★ 계약금 줄엔 원/% 토글이 없다 (컨설팅 잔금은 금액 고정)', !!findByClass(row1, 'pu-toggle2'), false);
 }
 {
-  // 사건은 '성공보수' 라벨 — 컨설팅과 같은 자리여야 한다
-  const node = gridCtx('case');
-  const cells = node.kids.filter(function(x){ return x !== null && x !== undefined && x !== false; });
-  const spanning = cells.filter(function(x){ return cellSpan(x) === 2; });
-  const at = cells.indexOf(spanning[0]);
-  t('★ 사건도 업무 요약 다음이 성공보수 라벨',
-    JSON.stringify(cells[at + 1].kids).indexOf('성공보수') >= 0, true);
+  // 사건·기타 — 착수금과 성공보수가 «한 줄»에 함께 있어야 한다
+  ['case','other'].forEach(function(kv){
+    const kids = realKids(kboxCtx(kv));
+    t('★ ' + kv + ' 은 머리·한 줄 = 2줄', kids.length, 2);
+    const row1 = realKids(kids[1]);
+    t('★ ' + kv + ' 줄에 원/% 토글이 있다', !!findByClass(row1, 'pu-toggle2'), true);
+    t('★ ' + kv + ' 줄에 업무 요약도 함께 있다', !!findByClass(row1, 'pu-grow'), true);
+  });
 }
 {
-  // 상담사항은 업무 요약이 없다 — 그래도 빈 칸이 나와 열 수가 유지되어야 한다 (아래 branch 는 briefRow 사용)
-  const node = gridCtx('consult');
-  const cells = node.kids.filter(function(x){ return x !== null && x !== undefined && x !== false; });
-  t('상담사항도 열을 딱 맞게 채운다', cells.reduce(function(s, x){ return s + cellSpan(x); }, 0) % 6, 0);
+  const kids = realKids(kboxCtx('fund'));
+  t('★ 기금은 머리·한 줄 = 2줄 (그대로)', kids.length, 2);
+  const row1 = realKids(kids[1]);
+  t('★ 기금 줄에 업무 요약이 있다', !!findByClass(row1, 'pu-grow'), true);
+}
+{
+  // 상담사항은 요약 대상이 아니다(BRIEF_KINDS 밖) — flex 라 칸이 없어도 격자가 밀릴 걱정이 없다
+  const kids = realKids(kboxCtx('consult'));
+  const row1 = realKids(kids[1]);
+  t('★ 상담사항엔 업무 요약 칸이 없다(대상 아님)', !!findByClass(row1, 'pu-grow'), false);
 }
 
-/* ═══ 3. ★ briefCell 이 격자 칸을 정확히 하나만 차지하는가 ═══ */
-function briefCtx(kinds, briefs){
-  const made = [];
-  const c = {
-    console, Object, JSON, Array, String, Number,
-    BRIEF_KINDS: kinds || ['case','consulting','fund','other'],
-    BRIEF_MAX: 40,
-    BRIEF_PH: { consulting:'예) 취업규칙 정비' },
-    f: { briefs: briefs || {} },
-    setBriefFor(){ return function(){}; },
-    setF(){},
-    h(tag, props){
-      const kids = Array.prototype.slice.call(arguments, 2);
-      const node = { tag, props: props || {}, kids };
-      made.push(node);
-      return node;
-    }
-  };
-  vm.createContext(c);
-  vm.runInContext(slice('  function briefCell(kindV){', '  // 종류별 세부설정 그리드 안에 들어가는'), c);
-  return { c, made };
-}
+/* ═══ 3. ★ 업무 요약(brief) 칸 — 값이 그대로 보이고, 글자수 제한이 걸려 있다 ═══ */
 {
-  const { c } = briefCtx();
-  const cell = c.briefCell('consulting');
-  t('★ 1~2열을 묶어 한 칸으로', cell.props.style.gridColumn, '1 / 3');
-  t('입력칸이 안에 있다', cell.kids.some(k => k && k.props && k.props.type === 'text'), true);
-  t('글자수 제한이 걸려 있다', cell.kids.find(k => k && k.props && k.props.type === 'text').props.maxLength, 40);
-  t('★ 좁아도 넘치지 않게 minWidth 0', cell.props.style.minWidth, 0);
-  t('말풍선에 최대 글자수를 알려준다',
-    /최대 40자/.test(cell.kids.find(k => k && k.props && k.props.type === 'text').props.title), true);
-}
-{
-  // 요약이 없는 종류(상담사항)에서도 칸은 반드시 하나 나와야 한다 — 안 그러면 격자가 밀린다
-  const { c } = briefCtx(['case']);
-  const cell = c.briefCell('consult');
-  t('★ 요약 없는 종류도 빈 칸을 내보낸다', cell.tag, 'span');
-  t('★ 그 빈 칸도 1~2열을 묶는다', cell.props.style.gridColumn, '1 / 3');
-  t('★ null 을 돌려주지 않는다 (격자 밀림 방지)', cell === null, false);
-}
-{
-  const { c } = briefCtx(undefined, { consulting:'취업규칙 정비' });
-  t('저장된 요약이 그대로 보인다',
-    c.briefCell('consulting').kids.find(k => k && k.props && k.props.type === 'text').props.value, '취업규칙 정비');
+  const kids = realKids(kboxCtx('consulting', { briefs:{ consulting:'취업규칙 정비' } }));
+  const row1 = realKids(kids[1]);
+  const brief = findByClass(row1, 'pu-grow');
+  t('★ 업무 요약 칸이 있다', !!brief, true);
+  t('저장된 요약이 그대로 보인다', brief.props.value, '취업규칙 정비');
+  t('글자수 제한이 걸려 있다', brief.props.maxLength, 40);
+  t('말풍선에 최대 글자수를 알려준다', /최대 40자/.test(brief.props.title), true);
 }
 
 /* ═══ 4. ★ CMS — 박스 안으로 옮겼고, 없어지지 않는다 ═══ */
@@ -203,7 +145,8 @@ function cmsCtx(isCMS, extra){
     }
   };
   vm.createContext(c);
-  vm.runInContext(slice('  function cmsBlock(){', '  // 잔금·성공보수 줄의 왼쪽 두 칸'), c);
+  // ⚠ 2026-09-19 끝 표식이 바뀌었다 — 옛 briefCell()/briefRow() 를 걷어내고 그 자리에 남긴 주석이 새 경계다.
+  vm.runInContext(slice('  function cmsBlock(){', '  /* 옛 briefCell()·briefRow()'), c);
   return { c, made };
 }
 {
@@ -281,15 +224,38 @@ t('★ 계약유형을 안 골랐을 때도 CMS 를 손댈 수 있다',
   /\(f\.kinds\|\|\[\]\)\.length === 0 && h\('div', \{ className:'fld' \}[\s\S]{0,160}?cmsBlock\(\)\)/.test(src), true);
 t('그 이유를 코드에 적어 뒀다', /끌 길이 사라지면 안 된다/.test(src), true);
 
-/* ═══ 5. 부가세 안내가 모든 부가세 체크박스에 붙었는가 ═══ */
+/* ═══ 5. 부가세 안내가 모든 부가세 체크박스에 붙었는가 ═══
+   ⚠ 2026-09-19 다시 겨눔 — ContractModal 의 계약금·잔금·기금 체크박스 셋을
+   `vatPill()` 한 함수로 묶었다(중복 제거). 그 뒤로 `checked:!!f.xxx` 라는
+   «문자 모양»은 vatPill 정의 «안»에만 한 번 남고, 부르는 자리마다는 안 남는다
+   (제네릭 매개변수 `checked`로 받으니까). 그래서 이제는:
+   ① ContractModal 은 vatPill 을 «부르는 횟수»로 센다(계약금 1·잔금/성공보수 2·기금 1 = 4)
+   ② vatPill "정의 하나"가 체크박스·안내를 항상 «함께» 낸다 — 따로 떼어 놓을 수 없다
+   ③ CaseEditModal(다른 화면, tests/case-success-fee.test.js 가 따로 본다)은 손 안 댔다 — 그대로. */
+const MODAL_SLICE = slice('function ContractModal(props){', 'function CaseEditModal(props){');
 {
-  // 부가세포함 체크박스는 8곳 — 하나라도 빠지면 그 화면만 조용히 다르게 동작한다
-  const boxes = src.match(/checked:!!f\.(contractFeeVatIncluded|balanceFeeVatIncluded|fundVatIncluded)/g) || [];
-  const hints = src.match(/vatIncludedHint\(e\.target\.checked/g) || [];
-  t('★ 부가세 체크박스 수와 안내 연결 수가 같다', hints.length, boxes.length);
-  t('체크박스가 8곳', boxes.length, 8);
-  t('★ 안내를 안 부르는 옛 형태가 남아 있지 않다',
-    /onChange:function\(e\)\{ setF\(function\(prev\)\{ return Object\.assign\(\{\}, prev, \{ (contractFeeVatIncluded|balanceFeeVatIncluded|fundVatIncluded):e\.target\.checked \}\); \}\); \}/.test(src), false);
+  const calls = MODAL_SLICE.match(/vatPill\(f\.(contractFeeVatIncluded|balanceFeeVatIncluded|fundVatIncluded)/g) || [];
+  t('★ 계약창이 vatPill 을 4곳에서 부른다 (계약금·잔금+성공보수 둘·기금)', calls.length, 4);
+  const def = slice('function vatPill(checked, field, label){', '// 업무 요약 — 이관 대상 종류에만');
+  t('★ vatPill 정의 하나에 체크박스가 있다', /type:'checkbox'/.test(def), true);
+  t('★ 그 체크박스가 늘 안내를 부른다 — 떼어 놓을 수 없다', /vatIncludedHint\(e\.target\.checked/.test(def), true);
+  t('★ 안 켜진 형태(정적 배지)는 기금 아닌 종류(업체·상담)에만 남아 있다',
+    /: h\('span', \{ className:'pu-vatpill on' \}, '🧾 부가세포함'\)/.test(MODAL_SLICE), true);
+  /* ★★ «읽는 칸»과 «쓰는 칸»이 실제로 같은 이름인가 — vatPill(f.X, 'Y', ...) 에서
+     X !== Y 로 잘못 적으면(복붙 실수) 체크박스는 f.X 값을 보여 주면서 정작
+     누르면 f.Y 를 고친다. 화면은 안 바뀌는데 엉뚱한 칸이 조용히 바뀐다.
+     첫 인자 뒤 문자만 세는 위 검사로는 못 잡는다 — 둘째 인자까지 실제로 견준다. */
+  const pairs = [...MODAL_SLICE.matchAll(/vatPill\(f\.(\w+),\s*'(\w+)'/g)];
+  t('★ vatPill 읽는 자리를 4곳 다 찾았다', pairs.length, 4);
+  pairs.forEach(function(m){
+    t('★ vatPill(f.' + m[1] + ", '" + m[2] + "') — 읽는 칸과 쓰는 칸이 같다", m[1], m[2]);
+  });
+}
+{
+  // CaseEditModal(사건관리 화면)은 이번 변경과 무관 — 옛 문자 모양이 그대로 있어야 한다
+  const CASE_SLICE = slice('function CaseEditModal(props){', 'function CaseManagement(props){');
+  const boxes = CASE_SLICE.match(/checked:!!f\.(contractFeeVatIncluded|balanceFeeVatIncluded)/g) || [];
+  t('CaseEditModal 은 손 안 댔다 — 체크박스가 그대로 있다', boxes.length >= 3, true);
 }
 t('안내 함수를 밖에서도 쓸 수 있다', /window\.vatIncludedHint\s*=/.test(src), true);
 t('음소거 판단 함수도 열려 있다', /window\.vatHintMuted\s*=/.test(src), true);

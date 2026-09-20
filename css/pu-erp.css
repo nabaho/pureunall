@@ -198,6 +198,43 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   .pu-g6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pu-n6-2, .pu-n6-3, .pu-n6-4, .pu-n6-6 { grid-column: span 2; }
 }
+
+/* ── 계약금·잔금 「종류별 세부설정」 박스 — flex 줄 (대표 지시 2026-09-19
+   「이부분도 한줄로 넣어라 … 설명되는것은 한줄에 모두 셀과 내용을 다 해야
+   혼란이 없다」, 목업 승인 contract-detail-box-v2) ───────────────────────
+   ⚠ CSS Grid(6열)가 아니라 flex 를 쓴다 — 종류마다 칸 개수가 다른데(컨설팅은
+     일수 칸이 붙었다 뗐다 한다), 그리드는 «정확히 6의 배수»를 맞춰야 라벨이
+     안 밀리는 깨지기 쉬운 구조였다. flex 는 칸이 늘거나 줄어도 그 줄 안에서
+     자연히 다시 채워질 뿐이라 그 걱정이 아예 없다. */
+.pu-kbox { border: 1px solid #e2e8f0; border-radius: 7px; padding: 10px 11px;
+  background: #f8fafc; margin-bottom: 8px; }
+.pu-khead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.pu-krow { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-bottom: 7px; }
+.pu-krow:last-child { margin-bottom: 0; }
+.pu-krow input, .pu-krow select { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 5px;
+  font-size: 12px; font-family: inherit; color: #1e293b; }
+.pu-krow input:focus, .pu-krow select:focus { outline: 0; border-color: #2563eb; }
+.pu-w-type { width: 170px; flex: none; }
+.pu-w-amt { width: 130px; flex: none; font-family: ui-monospace, monospace; text-align: right; }
+.pu-w-day { width: 56px; flex: none; font-family: ui-monospace, monospace; text-align: right; }
+.pu-grow { flex: 1 1 110px; min-width: 110px; }
+.pu-vatpill { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: #64748b;
+  white-space: nowrap; background: #fff; border: 1px solid #cbd5e1; border-radius: 20px;
+  padding: 3px 9px; cursor: pointer; flex: none; user-select: none; }
+.pu-vatpill.on { color: #1e40af; border-color: #bfdbfe; background: #eff6ff; font-weight: 700; }
+.pu-toggle2 { display: inline-flex; border-radius: 5px; overflow: hidden; border: 1px solid #cbd5e1; flex: none; }
+.pu-toggle2 span { padding: 6px 8px; font-size: 11px; font-weight: 700; color: #64748b; cursor: pointer; }
+.pu-toggle2 span.on { background: #2563eb; color: #fff; }
+.pu-calc { font-size: 11.5px; color: #1e40af; font-weight: 700; white-space: nowrap; }
+.pu-goBtn { flex: none; background: #2563eb; color: #fff; border: 0; border-radius: 5px;
+  padding: 6px 11px; font-size: 10.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.pu-okTag { flex: none; font-size: 10.5px; color: #166534; font-weight: 700; white-space: nowrap; }
+.pu-daylabel { font-size: 11px; color: #475569; font-weight: 700; white-space: nowrap; flex: none; }
+.pu-daysub { font-size: 10.5px; color: #64748b; white-space: nowrap; flex: none; }
+@media (max-width: 560px) {
+  .pu-w-type, .pu-w-amt { width: auto; flex: 1 1 45%; }
+}
+
 .env-actions { margin-top: 24px; display: flex; gap: 8px; }
 .btn-primary { background: #2563eb; color: #fff; padding: 10px 22px; border-radius: 6px; font-size: 13px; font-weight: 700; }
 .btn-primary:hover { background: #1d4ed8; }
