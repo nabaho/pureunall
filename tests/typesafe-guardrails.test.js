@@ -214,3 +214,45 @@ test('화면은 까닭(why)을 «무엇을 하면 되는지»로 바꿔 보인�
       '「' + why + '」 갈래에 다음에 할 일이 안 적혀 있습니다.');
   });
 });
+
+/* ══ 우리가 아는 이름·업체명 가리기 (2026-09-20 대표 결정 「우리 목록만」) ═════════
+   값·경계는 tests/typesafe-local-redact.test.js 가 vm 으로 실제로 돌려 본다.
+   여기서는 «이어진 자리»만 본다 — 언제 부르는가, 없으면 어떻게 되는가. */
+
+test('업체를 부르기 «전»에 이름·업체명을 먼저 가린다', () => {
+  const bare = stripJs(WIDGET);
+  const 함수몸 = cutFn(bare, 'async function run(');
+  const 가리는자리 = 함수몸.indexOf('localRedact(text)');
+  const 부르는자리 = 함수몸.indexOf('fetchTimeout(FN_URL');
+  assert.ok(가리는자리 > 0, 'localRedact 를 부르는 자리를 못 찾았습니다.');
+  assert.ok(가리는자리 < 부르는자리,
+    '가리기를 «부른 뒤»에 하면 원문이 이미 업체로 나간 뒤입니다.');
+  /* 가린 결과를 실제로 text 에 다시 담아야 한다 — 계산만 하고 안 쓰면 소용없다 */
+  assert.match(함수몸.slice(가리는자리, 부르는자리), /text\s*=\s*local\.text/,
+    '가린 결과를 text 에 다시 담지 않으면 원문이 그대로 나갑니다.');
+});
+
+test('호스트가 안 가려 줘도(다른 화면) 죽지 않고 원문을 그대로 쓴다', () => {
+  const bare = stripJs(WIDGET);
+  const 가리개 = cutFn(bare, 'function localRedact(');
+  assert.match(가리개, /typeof\s+w\.PU_TYPESAFE_LOCAL_REDACT\s*!==\s*'function'/,
+    '정의 여부를 가르는 지키개가 없습니다 — 다른 화면(정의 안 함)에서 그냥 죽을 수 있습니다.');
+  assert.match(가리개, /catch/, '가리는 함수가 죽어도 판단 자체는 막지 말아야 하는데, 받는 자리가 없습니다.');
+});
+
+test('가린 항목 안내에 «우리 목록» 가림과 서버(번호) 가림이 함께 보인다', () => {
+  const bare = stripJs(WIDGET);
+  const 함수몸 = cutFn(bare, 'async function run(');
+  assert.match(함수몸, /local\.localMaskedKinds\.concat\(\s*data\.maskedKinds/,
+    '화면 쪽(이름·업체명) 가림과 서버 쪽(번호) 가림을 한 자리에 안 합칩니다 — 무엇이' +
+    ' 가려졌는지 한쪽만 보이면 나머지는 가려진 줄 착각하기 쉽습니다.');
+});
+
+test('이알피는 우리가 아는 이름·업체명 가리기 함수를 공용 부품에 실제로 넘긴다', () => {
+  const bare = stripComments(ERP);
+  assert.match(bare, /window\.PU_TYPESAFE_LOCAL_REDACT\s*=\s*typeSafeLocalRedact/,
+    '전역에 안 걸면 js/pu-typesafe.js 가 이 함수를 찾지 못해 번호만 가려진 채 나갑니다.');
+  const 가리개 = cutFn(bare, 'function typeSafeLocalRedact(');
+  assert.match(가리개, /dbGet\(\s*'user_accounts'/, '직원 명부를 안 봅니다.');
+  assert.match(가리개, /dbGet\(\s*'companies'/, '업체관리 목록을 안 봅니다.');
+});
