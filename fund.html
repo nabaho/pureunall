@@ -3573,7 +3573,18 @@ function dgDocCss(){ return "@page{size:A4 portrait;margin:"+A4_PAD+"}"
   +".fmto{font-weight:700;margin:18px 0 8px}"
   +".fmcols{display:flex;gap:14px;margin:4px 0;line-height:2.2}.fmcols span{flex:1;text-align:center}"
   +".fmsep{border:none;border-top:1px dashed #cbd5e1;margin:30px 0}"
-  +"table.fmauto{table-layout:auto}"; }
+  +"table.fmauto{table-layout:auto}"
+  /* 기금출연확인서 — 회사마다 한 장이라 지면 가운데로 내리고 회사 이름·도장 자리를
+     도드라지게 한다(대표 지시 2026-09-20 「줄간격 글자크기 회사이름 날인 위치를 조정」).
+     ⚠ .cbwrap 은 «이 안에서만» 가운데 정렬한다 — .a4b 전체를 건드리면 다른 여러-쪽
+       서식(정관 등)까지 위아래로 밀린다. */
+  +".cbwrap{height:100%;display:flex;flex-direction:column;justify-content:center}"
+  +".cbamt{text-align:center;line-height:2;margin:0 0 26px}.cbamt b{font-size:15px;letter-spacing:1px}"
+  +".cbbody{text-align:justify;text-indent:1em;line-height:2.15;margin:0 0 30px}"
+  +".cbsign{text-align:right;margin:0 10mm 0 0}"
+  +".cbco{font-size:15.5px;font-weight:800;letter-spacing:.5px;margin:0 0 8px}"
+  +".cbceo{font-size:13px;line-height:2.3}"
+  +".cbseal{display:inline-block;min-width:34px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 2px}"; }
 /* #doced 안에서만 적용되는 스코프판 — 페이지(앱 전체)로 새지 않게. 인라인(사이드패널·모달) 전용.
    화면에서도 A4 용지 한 장처럼 보이게 흰 페이지(210×297mm, 여백 20mm)를 그린다.
    패널이 좁으면 fitDocA4()가 배율을 줄여 용지 전체가 들어오게 맞춘다. */
@@ -3611,6 +3622,14 @@ function dgDocCssIn(){ var s="#doced";
   +s+" .fmcols span{flex:1;text-align:center}"
   +s+" .fmsep{border:none;border-top:1px dashed #cbd5e1;margin:30px 0}"
   +s+" table.fmauto{table-layout:auto}"
+  /* 기금출연확인서 화면판 — 인쇄판(dgDocCss)과 같은 값을 #doced 안에서만 적용한다 */
+  +s+" .cbwrap{height:100%;display:flex;flex-direction:column;justify-content:center}"
+  +s+" .cbamt{text-align:center;line-height:2;margin:0 0 26px}"+s+" .cbamt b{font-size:15px;letter-spacing:1px}"
+  +s+" .cbbody{text-align:justify;text-indent:1em;line-height:2.15;margin:0 0 30px}"
+  +s+" .cbsign{text-align:right;margin:0 10mm 0 0}"
+  +s+" .cbco{font-size:15.5px;font-weight:800;letter-spacing:.5px;margin:0 0 8px}"
+  +s+" .cbceo{font-size:13px;line-height:2.3}"
+  +s+" .cbseal{display:inline-block;min-width:34px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 2px}"
   +s+"{tab-size:4}"; }
 /* ── 쪽 나누기 ──
    긴 서식을 A4 본문높이(257mm)에 맞춰 여러 장으로 자르고, 장마다 하단에 쪽수를 붙인다.
@@ -4154,7 +4173,12 @@ function stripBaked(root){
     for(var i=0;i<el.childNodes.length;i++){
       var n=el.childNodes[i];
       if(n.nodeType===3){                                  // 글자 마디만 손댄다 — 표 짜임새는 안 건드린다
-        if(el.getAttribute&&el.getAttribute('data-kept')) continue;   // 우리가 채운 칸
+        /* ⚠⚠ 2026-09-20: «바로 위 부모»만 보다가 실제 사고가 났다 — 기금출연확인서를
+             지면 가운데로 내리며 금액을 <div class="cbwrap"><div class="cbamt"><b>…
+             구조로 두 겹 감쌌더니, 바로 위 부모는 <b> 라 data-kept 가 안 보여
+             걷어내기가 «방금 넣은 진짜 금액»을 «남의 박힌 금액」인 줄 알고 지웠다.
+             data-rate 처럼 조상 전체를 본다(closest) — 몇 겹을 감싸도 지켜진다. */
+        if(el.closest&&el.closest('[data-kept]')) continue;           // 우리가 채운 칸(중첩 포함)
         if(el.closest&&el.closest('[data-rate]')) continue;           // 규정이 정한 요율
         var t=n.nodeValue||'';
         if(/㎜|㎡|g\//.test(t)) continue;                   // 용지 규격
@@ -5044,6 +5068,22 @@ function fillChecklistDoc(root,f,sites){
 
    금액은 참여사업장 › 연도별 기록의 그 해 출연금(sy[사업장].contrib)이다 —
    별지15호·체크리스트와 같은 값이라 서류끼리 어긋나지 않는다. */
+/* ★ 확인서 한 장의 «모양» — 설립 때(fillFoundContribDoc)와 지원신청용(fillContribDoc)이
+     부르는 말·본문·금액 자리표는 서로 달라 «내용»은 각자 짓지만, 회사마다 한 장씩 인쇄해
+     날인을 받는 «모양»은 같아야 한다(대표 지시 2026-09-20 「줄간격 글자크기 회사이름
+     날인 위치를 조정해서」). 모양을 두 곳에서 따로 짜면 한쪽만 고쳐져 서식마다 갈린다.
+   ⚠ .cbwrap 은 «이 div 안에서만» 지면 가운데로 내린다 — .a4b 전체를 건드리면 정관처럼
+     여러 쪽으로 흐르는 서식까지 위아래로 밀린다. */
+function contribCertHTML(o){
+  return '<div class="cbwrap">'
+    +'<div class="fmtitle">기금출연확인서</div>'
+    +'<div class="cbamt">금&nbsp;&nbsp;액<br><b>'+o.amtLine+'</b></div>'
+    +'<div class="cbbody">'+o.body+'</div>'
+    +'<div class="fmdate">'+o.dateLine+'</div>'
+    +'<div class="cbsign"><div class="cbco">'+o.name+'</div>'
+    +'<div class="cbceo">'+o.signLabel+'&nbsp; '+o.who+'&nbsp; <span class="cbseal">인</span></div></div>'
+    +'</div>';
+}
 function fillContribDoc(root,f,sites){
   /* ⚠ 장부를 못 읽었다고 «그냥 돌아가면» 안 된다 — 원본에 박힌 남의 금액
      「오백만원」이 그대로 남아 인쇄된다(한글이라 걷어내기가 못 지운다).
@@ -5054,14 +5094,15 @@ function fillContribDoc(root,f,sites){
                               amt:num((R.sy[x._id]||{}).contrib)||0}; })
     .filter(function(x){ return x.amt>0; });
   var one=function(c){
-    var d=document.createElement('p');
+    var d=document.createElement('div');
     d.setAttribute('data-kept','1');                 // 다시 짠 장이다 — 걷어내기가 손대면 안 된다
-    d.innerHTML='기 금 출 연 확 인 서<br>금&nbsp; 액 : &nbsp;'
-      +(c?esc(korWon(c.amt))+'원정(￦'+Number(c.amt).toLocaleString()+')':BAKE_BLANK)
-      +'<br>상기 금액은 '+esc(f.name||'')+'법인에 위 금액을 출연하였음.'
-      +'<br>'+BAKE_BLANK
-      +'<br>'+(c&&c.name?esc(c.name):BAKE_BLANK)
-      +' 대표 '+(c&&c.ceo?esc(c.ceo):BAKE_BLANK)+' (인)';
+    d.innerHTML=contribCertHTML({
+      amtLine:c?esc(korWon(c.amt))+'원정(￦'+Number(c.amt).toLocaleString()+')':BAKE_BLANK,
+      body:'상기 금액은 '+esc(f.name||'')+'법인에 위 금액을 출연하였음.',
+      dateLine:BAKE_BLANK,
+      name:c&&c.name?esc(c.name):BAKE_BLANK,
+      signLabel:'대표', who:c&&c.ceo?esc(c.ceo):BAKE_BLANK
+    });
     return d;
   };
   /* 출연한 곳이 없으면 «지어내지 않는다» — 빈 확인서 한 장과 까닭을 남긴다.
@@ -5593,17 +5634,20 @@ function fillFoundContribDoc(root,f,sites){
   var noAmt=list.filter(function(x){ return siteContribNow(x,f)<=0; }).length;
   var today=new Date(), dt=today.getFullYear()+'. '+(today.getMonth()+1)+'. '+today.getDate()+'.';
   var one=function(c){
-    var d=document.createElement('p'); d.setAttribute('data-kept','1');
+    var d=document.createElement('div'); d.setAttribute('data-kept','1');
     var a=c?siteContribNow(c,f):0;
     var u=c?_siteUrep(c):{name:''};
     /* 서명은 «대표이사»가 한다 — 회사 대표자다. 사용자대표는 협의회에 나오는 사람이라
        늘 같지 않다. 대표자가 비어 있을 때만 사용자대표로 갈음한다. */
     var who=(c&&String(c.ceo||'').trim())||u.name||'';
-    d.innerHTML='기 금 출 연 확 인 서<br>금&nbsp; 액 : &nbsp;'
-      +(a?esc(korWon(a))+'원정(￦ '+Number(a).toLocaleString()+')':BAKE_BLANK+'(￦ '+BAKE_BLANK+')')
-      +'<br>상기 금액은 '+esc(f.name||'')+'법인이 고용노동부 인가를 득하여 설립등기 후 예금계좌를 개설할 경우, 10일 이내에 '
-      +esc(f.name||'')+'에 출연할 것을 확인함.<br>'+dt+'<br>'
-      +(c&&c.name?esc(c.name):BAKE_BLANK)+' 대표이사 '+(who?esc(who):BAKE_BLANK)+' (인)';
+    d.innerHTML=contribCertHTML({
+      amtLine:a?esc(korWon(a))+'원정(￦ '+Number(a).toLocaleString()+')':BAKE_BLANK+'(￦ '+BAKE_BLANK+')',
+      body:'상기 금액은 '+esc(f.name||'')+'법인이 고용노동부 인가를 득하여 설립등기 후 예금계좌를 개설할 경우, 10일 이내에 '
+        +esc(f.name||'')+'에 출연할 것을 확인함.',
+      dateLine:dt,
+      name:c&&c.name?esc(c.name):BAKE_BLANK,
+      signLabel:'대표이사', who:who?esc(who):BAKE_BLANK
+    });
     return d;
   };
   var made=list.length?list.map(one):[one(null)];
