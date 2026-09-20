@@ -34718,7 +34718,53 @@ function KoreanDatePicker(props){
 
 // ============ 외부협력자 마스터 ============
 // 이음센터 등 외부 기관의 노무사·변호사 등록 (ERP 로그인 X, 일정 표시용)
-var EXT_COLOR_PALETTE = ['#2563eb','#2563eb','#16a34a','#d97706','#dc2626','#16a34a','#2563eb','#16a34a','#2563eb','#2563eb'];
+// [색 중복 방지] 대표 지시 2026-09-20 「각 사람마다의 색이 겹치지 않게」.
+//   ★ 옛 팔레트는 열 자리에 파랑 여섯·초록 셋뿐이라 «새로 넣을수록 겹쳤다»
+//     (실측: 장한돌·박병훈이 ΔE 7.1 — 같은 보라로 보였다).
+//   ★ 색 값을 하나 못 박지 않는다 — 「직원 색(구글이 정함, 손 못 댐)과도 안 겹치는
+//     것」이 규칙이라 후보 24개 중에서 «그 순간 이미 쓰는 색과 가장 먼 것»을 고른다.
+//   ⚠ 팔레트 27색 규율(color-palette-apps 검사) 밖이다 — 사람 구분색은 그 검사의
+//     정한 예외다(2026-08-30 대표 결정 「가」, tests/color-palette-apps.test.js).
+var EXT_COLOR_CANDIDATES = [
+  '#e71ddd','#1d1de7','#812d8b','#c2410c','#0e7490','#a21caf','#4d7c0f','#be185d',
+  '#7c2d12','#1e3a8a','#166534','#9f1239','#5b21b6','#155e75','#92400e','#701a75',
+  '#3730a3','#065f46','#9a3412','#6b21a8','#134e4a','#831843','#78350f','#1e40af'
+];
+/* 실제 눈이 느끼는 색 거리(CIE76 ΔE, lib-palette.js 의 lum 계산과 같은 감마 보정) —
+   사람 눈에는 ΔE 20 안팎부터 «다른 색이구나»가 온다(작은 칩 글씨 기준). */
+function extColorDistance(hexA, hexB){
+  function lin(hex){
+    hex = String(hex||'').replace('#','');
+    if(hex.length===3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    return [0,2,4].map(function(i){
+      var v = parseInt(hex.slice(i,i+2),16)/255;
+      return v>0.04045 ? Math.pow((v+0.055)/1.055,2.4) : v/12.92;
+    });
+  }
+  function lab(hex){
+    var c = lin(hex);
+    var X=(c[0]*0.4124+c[1]*0.3576+c[2]*0.1805)/0.95047,
+        Y= c[0]*0.2126+c[1]*0.7152+c[2]*0.0722,
+        Z=(c[0]*0.0193+c[1]*0.1192+c[2]*0.9505)/1.08883;
+    var f = function(t){ return t>0.008856 ? Math.cbrt(t) : (7.787*t+16/116); };
+    return [116*f(Y)-16, 500*(f(X)-f(Y)), 200*(f(Y)-f(Z))];
+  }
+  var A = lab(hexA), B = lab(hexB);
+  return Math.sqrt(Math.pow(A[0]-B[0],2) + Math.pow(A[1]-B[1],2) + Math.pow(A[2]-B[2],2));
+}
+/* 새로 넣을 외부 협력자 색 — 「지금 쓰이는 모든 색」(직원 + 외부)과 가장 먼 후보를 고른다.
+   existingColors 가 비어 있으면(색표를 아직 못 읽었으면) 첫 후보를 준다 — 그래도
+   다음 사람부터는 실제로 갈라진다. */
+function extNextColor(existingColors){
+  var used = (existingColors||[]).filter(Boolean);
+  if(!used.length) return EXT_COLOR_CANDIDATES[0];
+  var best = EXT_COLOR_CANDIDATES[0], bestDist = -1;
+  EXT_COLOR_CANDIDATES.forEach(function(cand){
+    var minDist = Math.min.apply(null, used.map(function(u){ return extColorDistance(cand, u); }));
+    if(minDist > bestDist){ bestDist = minDist; best = cand; }
+  });
+  return best;
+}
 // [보안] 외부 노무사·변호사 실명·연락처를 코드에서 제거했다 — 저장소가 공개라 그대로 노출된다.
 // 실제 목록은 Firebase(external_staff)에만 있다. 이 시드는 최초 1회 병합용이라 비워도
 // 손실이 없다(아래 getExternalStaff 참고 — 빈 시드면 그냥 아무것도 더하지 않는다).
@@ -34813,7 +34859,13 @@ function ExternalStaffMasters(){
   function add(){
     if(!form.name.trim()){ showToast('이름 입력'); return; }
     var nextOrder = list.length===0 ? 10 : (Math.max.apply(null, list.map(function(x){return x.sortOrder||0;}))+10);
-    var color = EXT_COLOR_PALETTE[list.length % EXT_COLOR_PALETTE.length];
+    /* 지금 쓰이는 모든 색(직원 + 다른 외부 협력자)과 가장 먼 색을 준다 —
+       한 자리 순번(list.length)이 아니라 «실제로 쓰이는 색표»를 본다.
+       staff_colors 는 직원 색을 «정하는 한 곳»이다(위 63317줄대 주석 참고). */
+    var _savedStaffColors = dbGet('staff_colors', {}) || {};
+    var usedColors = Object.keys(_savedStaffColors).map(function(k){ return _savedStaffColors[k]; })
+      .concat(list.map(function(x){ return x.color; }));
+    var color = extNextColor(usedColors);
     persist(list.concat([{
       id:'ex-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
       name:form.name.trim(), role:form.role, org:form.org.trim(), contact:form.contact.trim(),
