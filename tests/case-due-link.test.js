@@ -53,23 +53,18 @@ const many = { stages:[
   t('★ 가장 이른 기한을 고른다', erp.caseNextDue(many, '2026-07-16').due, early);
 }
 
-/* ══════ 2. pu-erp 캘린더 — 단계 기한이 실려 오는가 ══════ */
-t('캘린더에 단계 기한 층이 있다', /type:'stage-due'/.test(ERP), true);
-t('사람이 넣은 마감일 층은 그대로', /type:'deadline'/.test(ERP), true);
-t('★ 단계 기한은 끌어 옮길 수 없다',
-  /type:'stage-due'[\s\S]{0,400}?draggable:false/.test(ERP), true);
-t('확인 안 된 기한에 (확인) 을 붙인다',
-  /type:'stage-due'[\s\S]{0,300}?dueVerified \? '' : '\(확인\)'/.test(ERP), true);
-t('확인 여부로 색을 나눈다',
-  /type:'stage-due'[\s\S]{0,500}?info\.dueVerified \? '#991b1b' : '#d97706'/.test(ERP), true);
-t('종료·보관된 사건은 캘린더에서 뺀다',
-  /3-2\) 사건 단계 기한[\s\S]{0,300}?c\.permanentArchived \|\| c\.closedDate/.test(ERP), true);
-t('달 범위 밖은 넣지 않는다',
-  /type:'stage-due'[\s\S]{0,900}/.test(ERP) && /!inCalRange\(d\.due\)/.test(ERP), true);
-t('상세창이 어디서 고치는지 알려준다', /사건 ▸ 심급·단계에서 계산된 기한/.test(ERP), true);
-t('단계 기한 함수 없으면 캘린더가 건너뛴다',
-  /if\(typeof caseStageDue === 'function'\)\{\s*[\r\n]+\s*cases\.forEach/.test(ERP), true);
+/* ⚠★ 2026-09-20(4걸음) — 「2. pu-erp 캘린더」 칸을 통째로 뺐다.
+   법인 대시보드를 걷어내면서 그 달력의 «단계 기한 층»(stage-due)도 함께 사라졌다.
 
+   ★★ 사라진 것이 무엇인지 분명히 적어 둔다 — 이 파일 머리글이 「기한이 한 군데라도
+     안 보이면 사고」라고 적고 있다. 그 말은 여전히 살아 있다.
+     남은 자리(아래 3·4·5 번이 그대로 지킨다):
+       · 나의 업무 — 내 프로젝트 D-day (pu-erp)
+       · 업무관리 — 「단계 기한」 층 (work.html)
+     없어진 자리:
+       · «공유 달력»에 뜨던 단계 기한 — 푸른 캘린더에는 아직 없다.
+   ⚠ 푸른 캘린더에 옮기기로 정하면 이 칸을 그리로 견주어 되살릴 것.
+     (기록: status/2026-09-20-erp-drop-dashboard.md — 「사라진 일 셋」) */
 /* ══════ 3. pu-erp 내 프로젝트 D-day ══════ */
 t('D-day 가 단계 기한도 같이 본다',
   /사람이 넣은 마감일\) \+ 심급·단계에서 계산된 법정 기한 중 가장 가까운 것/.test(ERP), true);

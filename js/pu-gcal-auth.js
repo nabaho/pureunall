@@ -19,6 +19,8 @@
      ③ 200 인데 본문에 error 가 있으면 «실패»다
      ④ 204(지움)는 본문이 없어도 «성공»이다
      ⑤ 토큰이 살아 있는지는 «한 곳»에서 본다(만료 1분 전부터는 죽은 것으로)
+     ⑦ 답이 안 오면 20초에 끊는다 — 이알피의 fetchT 가 하던 일이다. 안 끊으면
+        「지우는 중…」이 영영 안 끝나고 사람은 지워졌는지 아닌지 모른다
 
    ⚠ 되돌아올 주소(redirect_uri)는 구글 콘솔에 «등록된 것»이어야 한다.
      등록 안 된 주소로 보내면 구글이 redirect_uri_mismatch 로 막는다.
@@ -33,6 +35,8 @@
   'use strict';
 
   var BASE = 'https://www.googleapis.com/calendar/v3';
+  /* 이알피의 fetchT 와 같은 20초 — 밖으로 나가는 부름은 끊을 수 있어야 한다 */
+  var TIMEOUT_MS = 20000;
   /* 토큰은 «창»에 둔다 — 이알피가 그렇게 써 왔고, 두 화면이 같은 창을 본다.
      ⚠ 저장소에 넣지 않는다. 남의 PC 에 남으면 그 사람 자격이 남는다. */
   function store() { return (typeof window !== 'undefined') ? window : globalThis; }
@@ -90,10 +94,33 @@
     }
     var f = o.fetch || (typeof fetch !== 'undefined' ? fetch : null);
     if (!f) return Promise.reject(new Error('부를 길이 없습니다'));
-    return f(BASE + path, {
+    var 보낼것 = {
       method: method,
       headers: { 'Authorization': 'Bearer ' + token(), 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined
+    };
+    /* ⑦ 시간 제한 — 답이 안 오면 끊는다.
+       ⚠ 이알피는 밖으로 나가는 부름을 모두 fetchT(20초)로 감쌌다. 이리로 옮기면서
+         그 울타리를 벗어났다 — 여기서 다시 세운다. 안 세우면 구글이 대답을 안 할 때
+         「지우는 중…」이 영영 안 끝나고, 사람은 지워졌는지 아닌지 모른 채 기다린다.
+       ⚠ 끊긴 것은 «실패»다 — 값으로 넘기지 않는다(②와 같은 까닭). */
+    var 제한 = o.timeoutMs || TIMEOUT_MS;
+    var 끊개 = (typeof AbortController !== 'undefined' && 제한) ? new AbortController() : null;
+    var 시계 = null;
+    if (끊개) {
+      보낼것.signal = 끊개.signal;
+      시계 = setTimeout(function () { 끊개.abort(); }, 제한);
+    }
+    var 끄기 = function () { if (시계) { clearTimeout(시계); 시계 = null; } };
+    return f(BASE + path, 보낼것).then(function (r) {
+      끄기();
+      return r;
+    }, function (e) {
+      끄기();
+      if (e && e.name === 'AbortError') {
+        throw new Error(Math.round(제한 / 1000) + '초 안에 구글이 답하지 않았습니다');
+      }
+      throw e;
     }).then(function (r) {
       if (r.status === 204) return {};                        /* ④ 지웠다 — 본문이 없다 */
       return r.json().then(function (j) {

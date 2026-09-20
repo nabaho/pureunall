@@ -50,11 +50,22 @@ test('구글·국세청·NAS 도 걸렸다', () => {
      ★ 지켜야 할 것은 「밖으로 나가는 부름이 모두 fetchT 로 감싸였나」이고,
        그것은 이 파일의 첫 검사가 통째로 지킨다(감싸지 않은 fetch 가 한 줄이라도
        남으면 거기서 걸린다). */
-  ['https://api.odcloud.kr', 'https://gmail.googleapis.com', 'https://www.googleapis.com/calendar/v3',
+  /* ⚠ 2026-09-20 — 'https://www.googleapis.com/calendar/v3' 를 이 목록에서 «뺐다».
+       빠뜨린 것이 아니라 법인 대시보드를 걷어내며 그 부름이 이알피를 떠났기 때문이다.
+       지금은 공용 모듈 js/pu-gcal-auth.js 가 부른다 — 시간 제한은 그 파일이 스스로 건다.
+       그것을 실제로 돌려 보는 검사: tests/gcal-auth.test.js ⑮.
+       아래 «따로 재는 줄»이 그 울타리가 사라지지 않았는지 여기서도 한 번 더 본다. */
+  ['https://api.odcloud.kr', 'https://gmail.googleapis.com',
    'https://data.jsdelivr.com'].forEach(function(u){
     const re = new RegExp('fetchT\\(\'' + u.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&'));
     assert.match(app, re, u);
   });
+  /* 구글 달력은 공용 모듈이 부른다 — 거기에 시간 제한이 «있는가»만 본다.
+     ⚠ 숫자(20000)를 못 박지 않는다. 지킬 것은 «끊을 수 있는가»이지 몇 초인가가 아니다. */
+  const gcal = require('fs').readFileSync(require('path').join(__dirname,'..','js','pu-gcal-auth.js'),'utf8');
+  assert.match(gcal, /AbortController/, '구글 달력 부름에 시간 제한이 없습니다 — 답이 없으면 영영 기다립니다');
+  assert.match(gcal, /signal/, '끊개를 만들고 부름에 안 붙였습니다');
+
   /* Vision 은 «대리인»으로 나간다 — 그 부름도 감싸였는지 본다 */
   assert.match(app, /fetchT\('https:\/\/asia-northeast3-pureun-erp\.cloudfunctions\.net\/readVision'/,
     'Vision 대리인 부름이 사라졌거나 감싸지 않았습니다');

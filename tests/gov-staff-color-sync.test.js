@@ -17,26 +17,31 @@ const bare = (s) => s
 
 const GOV_SRC = R('gov-consulting.html');
 const GOV = bare(GOV_SRC);
-const ERP = bare(R('pu-erp.html'));
+/* ★ 2026-09-20 — 색을 «정하는 쪽»이 이알피에서 푸른 캘린더로 옮겼다.
+   이알피 법인 대시보드를 걷어내며 그 안에 있던 올리개가 함께 사라졌다.
+   ⚠ 지키려는 것은 처음부터 «이알피가 한다»가 아니라 «한 곳에서만 정한다»였다.
+     그 한 곳이 이제 푸른 캘린더다 — 겨냥만 옮기고 규칙은 그대로다. */
+const CAL = bare(R('pu-cal.html'));
+const CALW = bare(R('js/pu-cal-write.js'));
 
 const ok = (name, cond, msg) => test(name, () => assert.ok(cond, msg || name));
 
 /* ───────── 올리는 쪽(푸른이알피) ───────── */
 
-ok('★★ 푸른이알피가 정한 색을 «공용 자리»에 올린다',
-   /dbSet\('staff_colors'/.test(ERP),
+ok('★★ 푸른 캘린더가 정한 색을 «공용 자리»에 올린다',
+   /data\/staff_colors/.test(CALW) && /saveColors/.test(CAL),
    '색이 그 PC 브라우저에만 남는다 — 다른 PC·다른 앱에서는 순번 색으로 돌아간다');
 
-ok('★★ «다 푼 색»을 올린다 — 읽는 쪽이 순번 규칙을 흉내 내지 않게',
-   /staffColorMap\[u\.sid\]\s*=\s*customColors\[u\.sid\]\s*\|\|\s*STAFF_COLORS\[/.test(ERP),
-   '손수 고른 색과 순번 색을 합쳐 올리지 않는다 — 직원이 드나들면 두 앱의 차례가 어긋난다');
+ok('★★ 현직 «모두»의 색이 서버에 있게 한다 — 읽는 쪽이 순번을 흉내 내지 않게',
+   /빠진색채우기/.test(CAL) && /status === "active"/.test(CAL),
+   '빠진 사람을 안 채우면 그 사람 색이 서버에 없다 — 읽는 쪽이 순번으로 지어내게 된다');
 
 ok('★ 사번(sid)을 열쇠로 올린다 — 이름은 흔들린다',
-   /staffColorMap\[u\.sid\]/.test(ERP),
+   /새로\[u\.sid\]/.test(CAL),
    '이름을 열쇠로 쓰면 동명이인·개명에 색이 흔들린다');
 
-ok('★ 같으면 안 쓴다 — 그리기마다 쓰면 쓰기가 폭주한다',
-   /JSON\.stringify\(was\)\s*===\s*JSON\.stringify\(staffColorMap\)/.test(ERP),
+ok('★ 채울 것이 없으면 안 쓴다 — 그리기마다 쓰면 쓰기가 폭주한다',
+   /if\(!Object\.keys\(새로\)\.length\) return;/.test(CAL),
    '바뀐 게 없어도 매번 올린다 — 화면을 그릴 때마다 부르는 자리다');
 
 /* ───────── 읽는 쪽(정부컨설팅) ───────── */

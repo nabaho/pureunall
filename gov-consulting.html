@@ -5857,7 +5857,7 @@ function renderStaffList(){
     const over=maxVal>0&&todayCnt>=maxVal;
     return `
     <div class="staff-row">
-      <input class="staff-color" type="color" value="${staffColor(s)}" disabled title="색은 푸른이알피 법인대시보드에서 정합니다 — 여기서는 보기만 합니다">
+      <input class="staff-color" type="color" value="${staffColor(s)}" disabled title="색은 푸른 캘린더에서 정합니다 — 여기서는 보기만 합니다">
       <input class="staff-name-inp" type="text" value="${s.name}" onchange="saveStaffField('${s.id}','name',this.value)" placeholder="이름">
       <div style="display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;" title="같은 날 담당(정·협업 포함) 최대 건수. 0=무제한">
         <span style="font-size:10px;color:var(--t2);">당일 최대</span>
@@ -5885,7 +5885,7 @@ function renderStaffList(){
       </div>
       ${gone.map(s=>`
       <div class="staff-row" style="opacity:.6;">
-        <input class="staff-color" type="color" value="${staffColor(s)}" disabled title="색은 푸른이알피 법인대시보드에서 정합니다">
+        <input class="staff-color" type="color" value="${staffColor(s)}" disabled title="색은 푸른 캘린더에서 정합니다">
         <input class="staff-name-inp" type="text" value="${s.name}" disabled>
         <span style="font-size:11px;font-weight:800;color:var(--danger);white-space:nowrap;">${escAttr(s.leftWhy||'빠짐')}</span>
         ${s.erpSid?`<span style="font-size:10px;font-weight:700;color:var(--t2);white-space:nowrap;">🔗 ${escAttr(s.erpSid)}</span>`:''}
@@ -5961,7 +5961,9 @@ function saveStaffField(id,field,val){
      푸른이알피가 정한다(아래 staffColor). 대표 지시 2026-08-30. */
 const STAFF_COLORS=['#d97706','#2563eb','#16a34a','#2563eb','#dc2626','#16a34a'];
 
-/* ══ 사람 색은 «푸른이알피 법인대시보드»가 정한다 (대표 지시 2026-08-30 ③㉮) ══
+/* ══ 사람 색은 «푸른 캘린더»가 정한다 (대표 지시 2026-08-30 ③㉮)
+   ★ 2026-09-20 — 정하는 자리가 이알피 법인 대시보드에서 푸른 캘린더로 옮겼다.
+     그 화면을 걷어냈다 — 읽기만 하는 여기는 달라진 것이 없다. ══
    ⚠ 여기서 «정하지 않는다». 두 곳에서 정하면 언젠가 어긋나고, 그때 어느 쪽이
      맞는지 아무도 모른다 — 읽어 쓰기만 한다.
    ⚠ 사번(erpSid)으로 맞춘다. 이름으로 맞추면 동명이인·개명에 흔들린다.
