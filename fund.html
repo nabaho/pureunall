@@ -4550,16 +4550,33 @@ var PARTY_WHO_SRC='×\\s*×\\s*×|○○○(?!○)';
    ⚠ 글자만 바꾼다 — 누가 서명하는지는 그대로 참여사업장의 근로자대표(_siteWrep)다.
    ⚠ fillPartyList «앞»에서 돌아야 한다. 줄을 늘릴 때 베끼는 글귀(sigTpl)가 이미 바뀐
      말이어야, 늘어난 줄에도 「근로자대표」로 적힌다. */
-/* ══ 설립준비위 회의록 — 의안마다 «새 장» ══ (대표 지시 2026-09-19
-     「설립준비위원회 회의록 의안에 따라 새로운 페이지로 넘어가야 한다」)
+/* ══ 설립준비위 회의록 — 주제마다 «새 장» ══ (대표 지시 2026-09-19
+     「설립준비위원회 회의록 의안에 따라 새로운 페이지로 넘어가야 한다」
+     → 2026-09-20 「설립준비위원회 회의록도 주제별로 페이지 정리해야되는데
+     페이지 넘어가도록 안된다」)
    의안 하나가 「의결 주문 · 제안 사유 · 주요 골자 · 의결후 조치사항」 네 마디로 이루어진다.
    종전에는 의안 둘이 한 장에 이어 붙고 다음 장에서 잘려, 어느 의안을 보는지 알 수 없었다.
-   ⚠ 첫 의안에는 표를 붙이지 않는다 — 붙이면 앞에 빈 장이 하나 생긴다. */
+   ⚠ 첫 의안에는 표를 붙이지 않는다 — 붙이면 앞에 빈 장이 하나 생긴다.
+
+   ▣ 2026-09-20 — 「경과보고」 본문(서술)도 같은 문제였다. 문서는 두 층이다:
+       회순(개요) — "Ⅱ.  경  과  보  고" 처럼 «로마숫자 붙은 한 줄 요약»만 있다.
+       경과보고(본문) — 로마숫자 없이 "경  과  보  고" 넉 자만 있는 «다른 문단»이고,
+         그 아래 "1. 공동근로복지기금설립 추진" 같은 서술 목록이 이어진다.
+     이 경계에 쪽 나누기 표시가 없어서, 목록이 회순 꼬리에 붙어 흐르다가 아무 데서나
+     잘렸다(대표가 보여준 화면 그대로 — 1번 목록 중간에서 페이지가 갈렸다).
+   ⚠ 회순의 요약 줄("Ⅱ.  경  과  보  고")과 헷갈리면 안 된다 — 그 줄은 앞에 로마숫자가
+     있어 MINUTES_PROGRESS_HEAD(줄 전체가 "경과보고" 넉 자뿐)에 걸리지 않는다. */
 var MINUTES_AGENDA=/^[\s\-–—]*의\s*안\s*\d+\s*호/;
+var MINUTES_PROGRESS_HEAD=/^경\s*과\s*보\s*고$/;
 function fillMinutesPages(root){
   var at=0;
   [].slice.call(root.querySelectorAll('p')).forEach(function(p){
-    if(!MINUTES_AGENDA.test(String(p.textContent||'').trim())) return;
+    var t=String(p.textContent||'').trim();
+    if(MINUTES_PROGRESS_HEAD.test(t)){
+      p.setAttribute('data-newpage','1'); p.setAttribute('data-kept','1');
+      return;
+    }
+    if(!MINUTES_AGENDA.test(t)) return;
     at++;
     if(at>1){ p.setAttribute('data-newpage','1'); p.setAttribute('data-kept','1'); }
   });
