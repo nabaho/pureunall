@@ -297,5 +297,13 @@ test('★★★ 서버 문은 «우리 자료»를 하나도 안 읽는다', () 
   const 몫 = idx.slice(i, idx.indexOf('\nexports.', i + 10));
   assert.ok(몫.indexOf('getDatabase') < 0, 'newsFull 이 우리 자료를 읽는다');
   assert.match(몫, /NF\.읽기\(req\.query\)/, '물음을 안 걸러 받는다');
-  assert.match(몫, /max-age=86400/, '하루 안 굳힌다 — 같은 판례를 매번 다시 받는다');
+  /* ⚠ 2026-09-20 에 하루(86400) → 한 시간(3600)으로 줄였다. 하루로 굳혀 두었더니
+       쪽 «모양»을 고쳐 배포해도 이미 갈무리된 것이 하루까지 그대로 나왔다
+       (실측 age=15056 으로 옛 모양). 지키는 규칙은 그대로다 — «매번 다시 받지
+       않는다»(법제처 OC 가 시험 계정이라 한도가 있다). 값이 아니라 그것을 본다.
+       tests/newsletter-full-fresh.test.js 가 「너무 길지 않은가」를 따로 못 박는다. */
+  const 굳 = /max-age=(\d+)/.exec(몫);
+  assert.ok(굳 && Number(굳[1]) > 0,
+    '갈무리를 아예 안 한다 — 같은 판례를 매번 법제처에서 다시 받는다');
+  assert.match(몫, /public/, '갈무리를 «공용»으로 안 한다 — 가장자리가 안 붙잡는다');
 });
