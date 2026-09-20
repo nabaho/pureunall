@@ -13,6 +13,13 @@
  *     등록면허세신고서 5·10/15mm(가장 좁다)
  *   ① 인가 6종은 다시 확인했다 — 여섯 종 모두 20mm 가 맞다(달라진 것 없음).
  *
+ * ▣ 2026-09-20 두 번째 조사(「나머지 여백 원본대로 모두 확인」 → 「넣어라」) —
+ *   ③ 고유번호증 4종·④ 운영 3종·⑤ 지원금 신청 8종·⑥ 공단 인센티브 1종·정관(사내본)
+ *   까지 마저 쟀다. «하나도 빠짐없이» 20mm 가 아니었다. 그 중 정관은 공동본(20mm,
+ *   안 바뀜)과 사내본(8/20/6/20mm)이 «원본 파일 자체가 다른» 서식이라, 사내본만
+ *   가려서 새 여백을 준다 — 그리고 이 과정에서 «사내 정관이 공동본 여백을 그대로
+ *   뒤집어쓰던» 별개의 사고를 하나 더 찾아 고쳤다(_dkKeyOf).
+ *
  * ▣ 값의 근거 — 원본 .hwp 를 .hwpx 로 풀어 section0.xml 의 hp:margin
  *   (header·footer·left·right·top·bottom, 1/7200인치)을 직접 읽었다. 0.5mm 단위로
  *   반올림했다.
@@ -53,8 +60,29 @@ const 원본여백 = {
   reg_sealcard:  [16, 25, 16, 25],
   reg_proxy:     [20, 30, 15, 30],
   reg_license:   [5, 15, 10, 15],
+  /* 대표 지시 2026-09-20 「나머지 여백 원본대로 모두 확인」 → 「넣어라」 — ③④⑤⑥ 를 마저 쟀다.
+     ⚠ charter_sane(정관·사내)은 charter(정관·공동)와 «원본 파일 자체가 다르다» — 공동본은
+     20mm 가 맞다(다시 확인, 안 바뀜). 사내본만 여기 올린다. */
+  charter_sane:      [8, 20, 6, 20],
+  tax_bizreg:        [10, 15, 10, 15],
+  tax_lease:         [15, 25, 15, 25],
+  tax_sublease:      [20, 30, 15, 30],
+  tax_hometax:       [20, 20, 10, 20],
+  ops_asset_change:  [8, 20, 6, 20],
+  ops_minutes_use:   [20, 20, 10, 20],
+  ops_minutes_scope: [20, 20, 10, 20],
+  sub_required:      [20, 30, 15, 30],
+  subsidy:           [15, 20, 15, 20],
+  sub_checklist:     [10, 20, 10, 20],
+  sub_contrib:       [15, 20, 15, 20],
+  sub_oath:          [20, 30, 15, 30],
+  sub_welfare_plan:  [20, 30, 15, 30],
+  sub_assets:        [15, 20, 15, 20],
+  sub_payment:       [20, 20, 10, 20],
+  incent_cost:       [20, 21.5, 15, 14],
 };
-/* ① 인가 6종 — 다시 재 봤고 «전부 20mm 가 맞다». 이 키들에는 override 가 없어야 한다. */
+/* ① 인가 6종 — 다시 재 봤고 «전부 20mm 가 맞다»(charter 는 공동본만; 사내본은 charter_sane
+   으로 따로 잰다). 이 키들에는 override 가 없어야 한다. */
 const 재확인_기본유지 = ['inka', 'agreement', 'charter', 'minutes', 'contrib', 'bizplan'];
 
 function 여백규칙(prefix) {
@@ -69,7 +97,7 @@ function 여백규칙(prefix) {
 
 /* ══ ① 값이 원본과 맞는가 ═══════════════════════════════════════ */
 
-test('★★ ① 여덟 등기 서식이 «저마다» 원본 여백을 쓴다', () => {
+test('★★ ① 스물다섯 서식이 «저마다» 원본 여백을 쓴다', () => {
   const { map } = 여백규칙('.a4');
   Object.keys(원본여백).forEach((k) => {
     assert.ok(map[k], '★ 이 서식에 여백이 없습니다: ' + k);
@@ -144,9 +172,10 @@ test('★★ ⑥ 단일 서식 화면의 여백 칩이 «진짜 값»을 보여 
   assert.equal(box.f('charter'), '여백 20mm', '★ 기본 서식은 20mm 그대로 보여 줘야 합니다.');
 });
 
-test('★★ ⑦ 단일 서식 패널이 그 칩을 실제로 쓴다', () => {
+test('★★ ⑦ 단일 서식 패널이 그 칩을 실제로 쓴다 — 정관은 사내/공동을 갈라서', () => {
   const sp = 코드만(grabFn('sidePreview'));
-  assert.match(sp, /_marginLabelOf\(kind\)/, '★ 단일 서식 화면이 여백 칩에 진짜 값을 안 씁니다.');
+  assert.match(sp, /_marginLabelOf\(_dkKeyOf\(kind,f\)\)/,
+    '★ 단일 서식 화면이 여백 칩에 진짜 값을(정관 사내/공동을 갈라서) 안 씁니다.');
   assert.ok(!/여백 20mm<\/span>/.test(sp.replace(/\s/g, '')) || /_marginLabelOf/.test(sp),
     '★ 20mm 를 그대로 박아 둔 채 함수를 안 씁니다.');
 });
@@ -175,4 +204,35 @@ test('★★ ⑨ A4_W 선언과 다음 함수 사이(주석 포함)에 중괄호
     '★ A4_W 선언과 DK_MARGIN_CSS 사이(주석 포함)에 중괄호·대괄호가 있습니다 — ' +
     'grabDecl(\'A4_W\') 류의 naive 검사가 이 함수 몸통까지 통째로 잘라갑니다. ' +
     '걸린 글자: ' + JSON.stringify((between.match(/.{0,20}[{}[\]].{0,20}/) || [])[0]));
+});
+
+/* ══ ⑥ 정관 — 사내본이 «공동본의 여백»을 뒤집어쓰던 것을 고쳤다 ═════════════
+ * ▣ 무엇을 찾았나 — 정관은 원본 파일이 «둘»이다: 공동본(charter, 20mm)과
+ *   사내본(charter_sane, 8/20/6/20mm). hwpFormHTML() 은 fund_type 을 보고 그릴
+ *   때만 사내본으로 바꿔 «그렸을» 뿐, 장에 붙는 이름표(dk-키)는 여태 늘 'charter'
+ *   하나였다 — 그래서 사내 정관을 열어도 이름표는 'dk-charter'로 남아 공동본의
+ *   (맞는) 20mm 를 그대로 뒤집어썼다. _dkKeyOf(kind,f) 가 hwpFormHTML 과 «같은
+ *   규칙»으로 갈라 준다(규칙을 두 곳에 적으면 한쪽만 고치는 사고가 난다).
+ */
+test('★★ ⑩ _dkKeyOf 가 hwpFormHTML 과 «같은 규칙»으로 정관을 가른다', () => {
+  const dk = 코드만(grabFn('_dkKeyOf'));
+  const real = 코드만(grabFn('hwpFormHTML'));
+  const 규칙 = /kind==='charter'&&ftype==='사내'/;
+  assert.match(dk, 규칙, '★ _dkKeyOf 의 갈래 규칙이 다릅니다.');
+  assert.match(real, 규칙, '★ hwpFormHTML 의 갈래 규칙이 다릅니다 — 서로 달라지면 화면과 실제 그림이 어긋납니다.');
+
+  const box = {};
+  new Function(dk + ';this.k=_dkKeyOf;').call(box);
+  assert.equal(box.k('charter', { fund_type: '공동' }), 'charter', '★ 공동 정관이 갈립니다.');
+  assert.equal(box.k('charter', { fund_type: '사내' }), 'charter_sane', '★ 사내 정관을 안 가릅니다.');
+  assert.equal(box.k('minutes', { fund_type: '사내' }), 'minutes', '★ 정관이 아닌 서식까지 건드립니다.');
+});
+
+test('★★ ⑪ 쪽 나누기·묶음 인쇄가 «둘 다» _dkKeyOf 를 쓴다', () => {
+  const pd = 코드만(grabFn('paginateDoc'));
+  assert.match(pd, /_dkKeyOf\(S\._docKind,curForm\(\)\)/,
+    '★ 쪽 나누기가 사내/공동 정관을 안 가립니다 — 한 서식만 열 때 여백이 틀립니다.');
+  const eb = 코드만(grabFn('estabBundle'));
+  assert.match(eb, /_dkKeyOf\(d\[0\],f\)/,
+    '★ 묶음 인쇄가 사내/공동 정관을 안 가립니다 — 묶음 속 정관 장만 여백이 틀립니다.');
 });

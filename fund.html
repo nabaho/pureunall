@@ -26,7 +26,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
-<script src="fund_forms.js?v=6"></script>
+<script src="fund_forms.js?v=7"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#fff;--bg:#e2e8f0;--ok:#166534;--ok-bg:#f8fafc;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -3612,7 +3612,11 @@ var A4_W='210mm', A4_H='297mm', A4_PAD='20mm', A4_BODY_H='257mm';   // 본문 �
      으로 여백을 표현한다 — 그러면 서식마다 padding 만 다르게 주면 된다. 기본값(20mm)
      일 때 결과는 예전과 «똑같다»(210-20*2=170, 297-20*2=257 — 그대로다). */
 function DK_MARGIN_CSS(p){
-  /* 표 한 줄 = 키, 위, 오른쪽, 아래, 왼쪽(mm) — 없는 키는 기본 20mm 그대로 쓴다(표에 안 올린다) */
+  /* 표 한 줄 = 키, 위, 오른쪽, 아래, 왼쪽(mm) — 없는 키는 기본 20mm 그대로 쓴다(표에 안 올린다).
+     ② 등기 8종 다음으로 나머지 서식도 «전부» 다시 쟀다(대표 지시 2026-09-20
+     「나머지 여백 원본대로 모두 확인」 → 「넣어라」). ③④⑤⑥ 서른 종 가까이를 재 보니
+     «하나도 빠짐없이» 20mm 가 아니었다 — 노동부·세무서·공단·법원 서식마다 원본을 만든
+     시기·부서가 달라 여백 설정이 제각각이다. */
   var T=[['reg_apply',15,16,15,16],
          ['reg_accept',20,30,15,30],
          ['reg_roster',20,30,15,30],
@@ -3620,10 +3624,48 @@ function DK_MARGIN_CSS(p){
          ['reg_sealpaper',20,19.5,15,21],
          ['reg_sealcard',16,25,16,25],
          ['reg_proxy',20,30,15,30],
-         ['reg_license',5,15,10,15]];
+         ['reg_license',5,15,10,15],
+         /* ① 정관(사내) — 정관(공동, charter)과 원본 자체가 다른 파일이다(다른 표준서식).
+            공동본은 20mm 가 맞다(기존 확인) — 사내본만 여기 올린다. dk 이름표도
+            'charter' 가 아니라 'charter_sane' 을 따로 쓴다(_dkKeyOf 가 갈라 준다) —
+            안 가르면 사내 정관이 공동 정관의(맞는) 20mm 를 그대로 뒤집어쓴다. */
+         ['charter_sane',8,20,6,20],
+         /* ③ 고유번호증(세무서) 4종 */
+         ['tax_bizreg',10,15,10,15],
+         ['tax_lease',15,25,15,25],
+         ['tax_sublease',20,30,15,30],
+         ['tax_hometax',20,20,10,20],
+         /* ④ 운영 3종 */
+         ['ops_asset_change',8,20,6,20],
+         ['ops_minutes_use',20,20,10,20],
+         ['ops_minutes_scope',20,20,10,20],
+         /* ⑤ 지원금 신청(공동 전용) 8종 — bizplan(사업계획서)은 ①과 같은 파일이라 이미 20mm */
+         ['sub_required',20,30,15,30],
+         ['subsidy',15,20,15,20],
+         ['sub_checklist',10,20,10,20],
+         ['sub_contrib',15,20,15,20],
+         ['sub_oath',20,30,15,30],
+         ['sub_welfare_plan',20,30,15,30],
+         ['sub_assets',15,20,15,20],
+         ['sub_payment',20,20,10,20],
+         /* ⑥ 공단 인센티브 1종 */
+         ['incent_cost',20,21.5,15,14]];
   return T.map(function(t){
     return p+".dk-"+t[0]+"{padding:"+t[1]+"mm "+t[2]+"mm "+t[3]+"mm "+t[4]+"mm}";
   }).join("");
+}
+/* 정관은 «원본이 둘»이다 — 공동본(charter)과 사내본(charter_sane)이 서로 다른 표준서식
+   파일에서 왔고 여백도 다르다(공동 20mm, 사내 8/20/6/20mm). 그런데 화면·인쇄가 서식을
+   가리키는 이름표(dk-키)는 여태 늘 'charter' 하나였다 — hwpFormHTML() 안에서만 fund_type
+   을 보고 charter_sane 원본으로 «바꿔 그렸을» 뿐, 이름표는 안 바뀌었다. 그래서 사내
+   정관을 열어도 이름표는 'dk-charter'로 남아 «공동본의(맞는) 20mm»를 그대로 뒤집어썼다
+   — 사내본이 실제로는 8/20/6/20mm 인데도.
+   ⚠ hwpFormHTML() 의 판갈이 규칙과 «똑같은» 규칙을 여기서도 쓴다 — 규칙을 두 곳에
+   따로 적으면 한쪽만 고치는 사고가 난다. 여기서 부르는 자리: 쪽을 나눌 때(paginateDoc)
+   ·묶음 인쇄(estabBundle)·여백 칩(sidePreview) 셋이다. */
+function _dkKeyOf(kind,f){
+  var ftype=(f&&f.fund_type==='사내')?'사내':'공동';
+  return (kind==='charter'&&ftype==='사내')?'charter_sane':kind;
 }
 /* 화면에 보여 줄 말 — 「여백 20mm」 칩이 실제로는 안 맞는 서식이 있어서(원본이 다르다)
    그 서식을 볼 때는 진짜 값을 보여 준다. 표는 DK_MARGIN_CSS 와 «같은 원본»에서 뽑는다 —
@@ -3884,7 +3926,9 @@ function paginateDoc(rawHTML){
      ⚠ 묶음 인쇄는 서식마다 크기가 «다르다». 그래서 들어온 장에 이름표가 붙어 있으면
        그것을 그대로 물려주고, 없을 때만(한 서식만 열 때) 지금 열린 서식을 쓴다.
        이 갈래를 안 두면 묶음에서 여섯 종이 모두 «마지막에 연 서식»의 크기로 찍힌다. */
-  var _dkNow=(S&&S._docKind)?'dk-'+S._docKind:'';
+  /* 정관은 사내/공동 원본이 갈린다(_dkKeyOf) — 이름표를 그냥 S._docKind 로 쓰면
+     사내 정관도 'dk-charter'(공동본 여백)를 뒤집어쓴다. */
+  var _dkNow=(S&&S._docKind)?'dk-'+_dkKeyOf(S._docKind,curForm()):'';
   var _dkOf=function(el){
     var m=/(?:^|\s)(dk-[a-z_0-9]+)/.exec((el&&el.className)||'');
     return m?m[1]:_dkNow;
@@ -4506,16 +4550,33 @@ var PARTY_WHO_SRC='×\\s*×\\s*×|○○○(?!○)';
    ⚠ 글자만 바꾼다 — 누가 서명하는지는 그대로 참여사업장의 근로자대표(_siteWrep)다.
    ⚠ fillPartyList «앞»에서 돌아야 한다. 줄을 늘릴 때 베끼는 글귀(sigTpl)가 이미 바뀐
      말이어야, 늘어난 줄에도 「근로자대표」로 적힌다. */
-/* ══ 설립준비위 회의록 — 의안마다 «새 장» ══ (대표 지시 2026-09-19
-     「설립준비위원회 회의록 의안에 따라 새로운 페이지로 넘어가야 한다」)
+/* ══ 설립준비위 회의록 — 주제마다 «새 장» ══ (대표 지시 2026-09-19
+     「설립준비위원회 회의록 의안에 따라 새로운 페이지로 넘어가야 한다」
+     → 2026-09-20 「설립준비위원회 회의록도 주제별로 페이지 정리해야되는데
+     페이지 넘어가도록 안된다」)
    의안 하나가 「의결 주문 · 제안 사유 · 주요 골자 · 의결후 조치사항」 네 마디로 이루어진다.
    종전에는 의안 둘이 한 장에 이어 붙고 다음 장에서 잘려, 어느 의안을 보는지 알 수 없었다.
-   ⚠ 첫 의안에는 표를 붙이지 않는다 — 붙이면 앞에 빈 장이 하나 생긴다. */
+   ⚠ 첫 의안에는 표를 붙이지 않는다 — 붙이면 앞에 빈 장이 하나 생긴다.
+
+   ▣ 2026-09-20 — 「경과보고」 본문(서술)도 같은 문제였다. 문서는 두 층이다:
+       회순(개요) — "Ⅱ.  경  과  보  고" 처럼 «로마숫자 붙은 한 줄 요약»만 있다.
+       경과보고(본문) — 로마숫자 없이 "경  과  보  고" 넉 자만 있는 «다른 문단»이고,
+         그 아래 "1. 공동근로복지기금설립 추진" 같은 서술 목록이 이어진다.
+     이 경계에 쪽 나누기 표시가 없어서, 목록이 회순 꼬리에 붙어 흐르다가 아무 데서나
+     잘렸다(대표가 보여준 화면 그대로 — 1번 목록 중간에서 페이지가 갈렸다).
+   ⚠ 회순의 요약 줄("Ⅱ.  경  과  보  고")과 헷갈리면 안 된다 — 그 줄은 앞에 로마숫자가
+     있어 MINUTES_PROGRESS_HEAD(줄 전체가 "경과보고" 넉 자뿐)에 걸리지 않는다. */
 var MINUTES_AGENDA=/^[\s\-–—]*의\s*안\s*\d+\s*호/;
+var MINUTES_PROGRESS_HEAD=/^경\s*과\s*보\s*고$/;
 function fillMinutesPages(root){
   var at=0;
   [].slice.call(root.querySelectorAll('p')).forEach(function(p){
-    if(!MINUTES_AGENDA.test(String(p.textContent||'').trim())) return;
+    var t=String(p.textContent||'').trim();
+    if(MINUTES_PROGRESS_HEAD.test(t)){
+      p.setAttribute('data-newpage','1'); p.setAttribute('data-kept','1');
+      return;
+    }
+    if(!MINUTES_AGENDA.test(t)) return;
     at++;
     if(at>1){ p.setAttribute('data-newpage','1'); p.setAttribute('data-kept','1'); }
   });
@@ -6871,7 +6932,7 @@ function sidePreview(kind){
     +'<button '+(smp?'class="primary" ':'')+'onclick="saveDocType(\''+kind+'\')" style="padding:3px 10px" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button>'
     +(smp?'':'<button class="primary" onclick="saveDocEdit(\''+kind+'\')" style="padding:3px 10px" title="이 기금에만 저장">💾 이 기금</button>')+'</div>'
     +(smp?'<p class="muted" style="font-size:11px;margin:0 0 6px">샘플(견본) 편집 중 — [💾 '+ftype+' 공통]이 모든 '+ftype+'기금 기본이 됩니다.</p>':'')
-    +'<div class="row" style="margin:0 0 6px;gap:6px"><span class="chip" style="font-size:10px">📄 A4 세로 · '+esc(_marginLabelOf(kind))+'</span>'
+    +'<div class="row" style="margin:0 0 6px;gap:6px"><span class="chip" style="font-size:10px">📄 A4 세로 · '+esc(_marginLabelOf(_dkKeyOf(kind,f)))+'</span>'
     +'<span id="a4Warn" style="display:none;font-size:10.5px;color:#991b1b">넘친 쪽 있음</span>'
     +'<button onclick="repaginateDoc()" style="padding:2px 8px;font-size:11px" title="내용에 맞춰 쪽을 다시 나눕니다">⎘ 다시 나누기</button>'
     +docAlignBar()
@@ -7013,8 +7074,9 @@ function estabBundle(phase){
       chips.push('<span class="chip '+(b?'warn':'ok')+'" style="font-size:10.5px">'+(i+1)+'. '+esc(d[1])
         +(b?' · '+b:' · 다 참')+'</span>');
       /* 서식 이름표 — 묶음은 여섯 종이 한 창에 섞인다. 장마다 제 글자 크기를 써야 한다
-         (이름표가 없으면 paginateDoc 이 「지금 열린 서식」 크기를 통째로 씌운다). */
-      return '<div class="a4 dk-'+esc(d[0])+'"><div class="note" style="text-align:right">'+(i+1)+' / '+lst.length+' · '+esc(d[1])
+         (이름표가 없으면 paginateDoc 이 「지금 열린 서식」 크기를 통째로 씌운다).
+         정관은 _dkKeyOf 로 사내/공동을 가른다 — 안 가르면 사내 정관이 공동본 여백을 쓴다. */
+      return '<div class="a4 dk-'+esc(_dkKeyOf(d[0],f))+'"><div class="note" style="text-align:right">'+(i+1)+' / '+lst.length+' · '+esc(d[1])
         +(b?' · 채울 자리 '+b+'곳':'')+'</div>'+body+'</div>';
     }).join('');
     var sum=$('bundleSum');

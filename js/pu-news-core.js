@@ -1103,7 +1103,12 @@
       if (!r) return;
       var e = String(r.email == null ? '' : r.email).trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { 주소없음++; return; }
-      if (r.noMail || B[e] || B[e.replace(/[.#$/[\]]/g, '_')]) { 수신거부++; return; }
+      /* ⚠ 막은 명단은 «담은 곳마다 열쇠 모양이 다르다» — 한 모양만 보면 조용히 샌다.
+           · 그대로              a@b.com   (뉴스레터가 직접 담은 것)
+           · 밑줄로 바꾼 것      a@b_com   (실시간DB 금지문자 치환)
+           · 쉼표로 바꾼 것      a@b,com   (기업정보함 emailKey — 공용 수신거부)
+         셋을 다 본다. 2026-09-20 전수점검에서 쉼표 모양을 안 보고 있었다. */
+      if (r.noMail || B[e] || B[e.replace(/[.#$/[\]]/g, '_')] || B[e.replace(/\./g, ',')]) { 수신거부++; return; }
       if (본것[e]) { 겹침++; return; }
       본것[e] = 1;
       ok.push({
