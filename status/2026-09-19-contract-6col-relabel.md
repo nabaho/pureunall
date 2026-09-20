@@ -1,7 +1,7 @@
 # 2026-09-19 · 계약창(ContractModal) 여섯 칸 — 라벨을 셀 안 placeholder 로
 
 - 가지: `feat/contract-6col-relabel`
-- PR: (열면서 채움)
+- PR: #1495
 - 앞선 걸음: `fix/contract-transfer-gaps` (PR #1483, 이미 병합) — 계약→업체/사건 이관 때
   `corpRegNo`·`ceoPhone`·`addressDetail`·`ceo2` 가 빠지던 것을 먼저 고쳤다.
 
