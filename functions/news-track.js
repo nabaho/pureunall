@@ -34,14 +34,37 @@ function 읽기(q) {
   return { 회차: 회차, 주소: 주소, 번호: Math.floor(번호), ok: !!(회차 && 주소) };
 }
 
+/* 목록 한 줄은 «글자»이거나 «꾸러미»다.
+   ★ 글자      — 예전부터 쓰던 꼴. 그냥 갈 곳이다.
+   ★ 꾸러미    — { 주소, 뒷길 }. 주소가 죽었을 때 대신 갈 곳이 «뒷길»이다
+                 (js/pu-news-tpl.js href() 주석 참고 — 남의 서버가 붙임을 갈면
+                  내려받기 주소가 조용히 500 이 된다).
+   ⚠ 두 꼴을 «둘 다» 읽어야 한다. 이미 나간 편지의 목록은 글자뿐이다. */
+function _한줄(링크들, 번호) {
+  const L = Array.isArray(링크들) ? 링크들 : [];
+  if (번호 < 0 || 번호 >= L.length) return null;
+  const v = L[번호];
+  return (v && typeof v === 'object') ? v : { 주소: v, 뒷길: '' };
+}
+function _씻기(u) {
+  const s = String(u == null ? '' : u).trim();
+  return /^https?:\/\//i.test(s) ? s : '';
+}
+
 /* 이 회차의 링크 목록에서 번호로 찾는다.
    ⚠ 목록에 없으면 «빈 값»을 돌려준다 — 어디로도 보내지 않는다. 그것이 안전한 쪽이다.
    ⚠ http/https 만 — javascript: 같은 것이 목록에 잘못 들어가도 여기서 막는다. */
 function 링크찾기(링크들, 번호) {
-  const L = Array.isArray(링크들) ? 링크들 : [];
-  if (번호 < 0 || 번호 >= L.length) return '';
-  const u = String(L[번호] == null ? '' : L[번호]).trim();
-  return /^https?:\/\//i.test(u) ? u : '';
+  const r = _한줄(링크들, 번호);
+  return r ? _씻기(r.주소) : '';
+}
+
+/* 그 번호의 «뒷길» — 없으면 빈 값.
+   ⚠ 여기도 http/https 만 통과시킨다. 뒷길이라고 무른 문을 두면 안 된다 —
+     열린 리다이렉트를 막는 까닭이 앞문과 똑같다. */
+function 뒷길찾기(링크들, 번호) {
+  const r = _한줄(링크들, 번호);
+  return r ? _씻기(r.뒷길) : '';
 }
 
 /* 열람·클릭을 적을 자리 — newsletter/opens/{회차}/{주소} */
@@ -107,7 +130,7 @@ const 빈그림 = Buffer.from(
   'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 
 module.exports = {
-  주소열쇠, 회차열쇠, 읽기, 링크찾기, 적을자리, 보냄표,
+  주소열쇠, 회차열쇠, 읽기, 링크찾기, 뒷길찾기, 적을자리, 보냄표,
   받는이자리, 번호열쇠, 새번호,
   열람그림주소, 클릭주소, 빈그림,
 };
