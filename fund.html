@@ -26,7 +26,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
-<script src="fund_forms.js?v=5"></script>
+<script src="fund_forms.js?v=6"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#fff;--bg:#e2e8f0;--ok:#166534;--ok-bg:#f8fafc;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -3638,7 +3638,67 @@ function dgDocCss(){ return "@page{size:A4 portrait;margin:"+A4_PAD+"}"
   +".cbceo{font-size:20px;line-height:2.2}"
   +".cbseal{display:inline-block;min-width:52px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 3px}"
   /* 참석위원표의 소속 — 이름보다 작게, 옅게(2026-09-20 「위원은 회의록 위원과 같다」) */
-  +".cmco{font-size:10.5px;color:#475569}"; }
+  +".cmco{font-size:10.5px;color:#475569}"
+  +DK_TYPO_CSS(".a4"); }
+/* ★ 서식마다 «제 글자 크기»를 준다 (대표 지시 2026-09-20 「나머지 서류들도 서식 다시확인하고
+     글자크기 줄간격 모두 검토 다시해라」 → 목업 승인 「추천대로 해라」).
+     목업: docs/목업-인가서식-글자간격-2026-09-20.html
+
+   ▣ 왜 필요한가 — 한글을 HTML 로 옮기는 변환기(fund-erp/tools/hwp2html.py 의 _style())는
+     정렬·줄간격·칸 높이만 옮기고 «글자 크기는 아예 안 옮긴다». 그래서 원본이 8pt 든
+     14pt 든 전부 바탕 글자 하나(13.5px)로 눌렸다. 서식마다 크기가 다른 데는 까닭이
+     있다 — 신청서는 칸이 빽빽해 작게, 정관은 읽히라고 크게 쓴 것이다.
+
+   ▣ 값의 근거 — 원본 .hwp 를 .hwpx 로 풀어 header.xml 의 charPr height(1/100pt)·
+     paraPr lineSpacing 을 직접 읽었다. 용지는 여섯 종 모두 210×297mm, 좌우 여백 20mm,
+     글 너비 170mm 로 우리 .a4 와 같다. 96dpi 에서 1pt = 1.3333px.
+
+   ⚠⚠ 어느 원본을 따르는가 — «빈 양식»이다. 재 보니 원본이 두 벌이었다:
+       ┌ 빈 양식 (03_과거자료\설립관련과거자료\1. 노동부인가시필요서류)
+       │   = build_forms.py 가 fund_forms.js 를 만들 때 쓴 «바로 그 파일». 우리 HTML 이
+       │     곧 이 문서다. 문단마다 줄간격이 이미 박혀 있다.
+       └ 2024 제출본 (03_과거자료\2024년\…\1. 설립인가신청) = 대표가 첨부한 실제 제출본.
+     같은 잣대(표 안/밖을 갈라서)로 재면 본문 글자가 이만큼 갈린다:
+       설립인가신청서 10pt ↔ 10pt (같다)   설립합의서 13 ↔ 12   정관 11 ↔ 12
+       회의록 13 ↔ 14                      사업계획서 12 ↔ 14
+       표 칸은 네 서식에서 아예 같다(신청서 8pt · 출연확인서 14pt · 사업계획서 11pt).
+     우리가 그리는 글이 빈 양식이므로 빈 양식을 따른다. 1~2pt 차이라 어느 쪽을 골라도
+     크게 다르지 않지만, «글자는 이 문서 · 줄간격은 저 문서»로 섞으면 아무 원본과도
+     안 맞게 된다 — 한 문서로 맞춘다.
+   ⚠ 잣대를 맞춰 재라. 처음엔 빈 양식만 표 안/밖을 갈라 재고 제출본은 통째로 재어
+     견줬더니, 실제보다 훨씬 크게 갈리는 것처럼 보였다(사업계획서 11 ↔ 12 로 나왔다가
+     갈라 재니 둘 다 본문 12pt·칸 11pt 였다). 잣대가 다르면 없는 차이가 보인다.
+
+   ⚠ 줄간격은 «받쳐 주는 값»이다 — 템플릿이 문단마다 style="line-height:…" 을 달고
+     있고 인라인이 이깁니다(실제로 그렇다: 정관에 2.0 을 줘도 화면은 1.6 이었다).
+     그러니 이 값은 템플릿이 아무 말 없는 문단(설립합의서 같은)에만 듣는다.
+     글자 크기는 템플릿이 전혀 안 달아서(_style() 이 안 옮긴다) 여기 값이 그대로 듣는다.
+
+   ⚠ 이름표는 «장(.a4)마다» 붙인다 — 인쇄(printDoc 은 #doced 안만 가져간다)·저장본·
+     묶음 인쇄(서식마다 다른 크기가 한 창에 섞인다)까지 모두 따라가야 하기 때문이다.
+   ▣ 인쇄판(dgDocCss)·화면판(dgDocCssIn)이 이 함수를 «함께» 쓴다 — 값이 한 군데에만
+     있으니 둘이 어긋날 수가 없다(cb* 처럼 두 벌로 적으면 한쪽만 고치는 사고가 난다).
+   ⚠ 바깥 함수를 새로 만드는 것은 조심해야 한다 — 검사들이 함수를 하나씩 골라 실어
+     돌리는 구조라, 새 바깥 이름을 쓰면 모래상자마다 그것도 실어 줘야 한다(docnote 때
+     상수를 빼려다 38건이 터졌다). 여기서는 dgDocCss 를 실어 돌리는 모래상자가
+     tests/fund-ui-structure.test.js «한 곳»뿐임을 확인하고 그 한 곳에 같이 실었다. */
+function DK_TYPO_CSS(p){
+  /* [키, 본문 px, 줄간격(받침), 표 칸 px, 빈 양식 실측(본문/칸)]
+     ⚠ 표 «안»과 «밖»을 따로 쟀다 — 서식에 따라 글의 대부분이 표 안에 있어서(사업계획서는
+       3,504자가 표 안, 584자가 밖) 표 칸 크기를 어림짐작하면 그것이 곧 본문 크기가 된다.
+       실제로 짐작한 13.5px 를 넣었더니 사업계획서가 원본(11pt≈14.7px)과 어긋났다. */
+  var T=[['inka',13.5,1.4,11,'본문 10pt / 칸 8pt'],    // 칸이 빽빽한 관공서 서식 — 글이 거의 표 안이다
+         ['agreement',17.5,1.6,16,'본문 13pt / 칸 12pt'], // 템플릿에 줄간격이 없어 이 값이 실제로 듣는다
+         ['charter',15,1.6,15,'본문 11pt / 표 없음'],
+         ['minutes',17.5,2.2,15,'본문 13pt / 칸 11pt'],   // 빈 양식에서 가장 큰 서식이다
+         ['contrib',19,2.2,19,'칸 14pt'],                 // .cbwrap 이 더 자세히 다스린다(두 원본이 같다)
+         ['bizplan',16,1.6,15,'본문 12pt / 칸 11pt']];
+  return T.map(function(t){
+    var sel=p+".dk-"+t[0];
+    return sel+"{font-size:"+t[1]+"px;line-height:"+t[2]+"}"
+      +sel+" td,"+sel+" th{font-size:"+t[3]+"px}";
+  }).join("");
+}
 /* #doced 안에서만 적용되는 스코프판 — 페이지(앱 전체)로 새지 않게. 인라인(사이드패널·모달) 전용.
    화면에서도 A4 용지 한 장처럼 보이게 흰 페이지(210×297mm, 여백 20mm)를 그린다.
    패널이 좁으면 fitDocA4()가 배율을 줄여 용지 전체가 들어오게 맞춘다. */
@@ -3690,13 +3750,16 @@ function dgDocCssIn(){ var s="#doced";
   +s+" .cbceo{font-size:20px;line-height:2.2}"
   +s+" .cbseal{display:inline-block;min-width:52px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 3px}"
   +s+" .cmco{font-size:10.5px;color:#475569}"
+  /* 서식마다 제 글자 크기 — 인쇄판과 «같은 함수»에서 나온다(값이 한 군데뿐이다) */
+  +DK_TYPO_CSS(s+" .a4")
   +s+"{tab-size:4}"; }
 /* ── 쪽 나누기 ──
    긴 서식을 A4 본문높이(257mm)에 맞춰 여러 장으로 자르고, 장마다 하단에 쪽수를 붙인다.
    블록 요소 단위로 담다가 넘치면 다음 장으로 넘긴다(표 한 개가 한 장보다 크면 그 장에 두고 표시).
    편집 중 자동 재분할은 하지 않는다 — 커서가 튀기 때문. 넘치면 배지로 알리고 [다시 나누기]로 처리. */
-function _a4Page(no){
-  var p=document.createElement('div'); p.className='a4';
+/* dk 는 'dk-charter' 같은 서식 이름표 — 없으면 바탕 글자를 쓴다(예전과 같다) */
+function _a4Page(no,dk){
+  var p=document.createElement('div'); p.className='a4'+(dk?' '+dk:'');
   var b=document.createElement('div'); b.className='a4b';
   var f=document.createElement('div'); f.className='a4f'; f.setAttribute('contenteditable','false');
   f.textContent='- '+no+' -';
@@ -3742,16 +3805,27 @@ function paginateDoc(rawHTML){
     while(b.firstChild) b.parentNode.insertBefore(b.firstChild,b);
     b.remove();
   });
+  /* 서식 이름표(dk-…) — 장마다 제 글자 크기를 쓰게 한다.
+     ⚠ 묶음 인쇄는 서식마다 크기가 «다르다». 그래서 들어온 장에 이름표가 붙어 있으면
+       그것을 그대로 물려주고, 없을 때만(한 서식만 열 때) 지금 열린 서식을 쓴다.
+       이 갈래를 안 두면 묶음에서 여섯 종이 모두 «마지막에 연 서식»의 크기로 찍힌다. */
+  var _dkNow=(S&&S._docKind)?'dk-'+S._docKind:'';
+  var _dkOf=function(el){
+    var m=/(?:^|\s)(dk-[a-z_0-9]+)/.exec((el&&el.className)||'');
+    return m?m[1]:_dkNow;
+  };
   // 이미 .a4로 감싼 입력(전체 초안 등)은 장 단위가 정해져 있으니 각 장 안에서만 다시 나눈다
   var groups=holder.querySelectorAll(':scope > .a4');
   var blocks=[];
-  if(groups.length) Array.prototype.forEach.call(groups,function(g){ blocks.push(Array.prototype.slice.call(g.childNodes)); });
-  else blocks.push(Array.prototype.slice.call(holder.childNodes));
+  if(groups.length) Array.prototype.forEach.call(groups,function(g){
+    blocks.push({nodes:Array.prototype.slice.call(g.childNodes), dk:_dkOf(g)}); });
+  else blocks.push({nodes:Array.prototype.slice.call(holder.childNodes), dk:_dkNow});
 
   ed.innerHTML='<style>'+dgDocCssIn()+'</style>';
   var no=0, pages=[];
-  blocks.forEach(function(nodes){
-    no++; var page=_a4Page(no); ed.appendChild(page); pages.push(page);
+  blocks.forEach(function(blk){
+    var nodes=blk.nodes, dk=blk.dk;
+    no++; var page=_a4Page(no,dk); ed.appendChild(page); pages.push(page);
     var body=page.querySelector('.a4b'), limit=body.clientHeight;
     var queue=nodes.slice(), guard=0;
     while(queue.length && ++guard<4000){
@@ -3760,7 +3834,7 @@ function paginateDoc(rawHTML){
       /* ★ 「여기서부터 새 장」 표시 — 별지(설립준비위원회 위원 명단)가 앞장 꼬리에
            붙어 버리면 «별지»가 아니다. 이미 빈 장이면 그 장을 쓴다(빈 장을 안 만든다). */
       if(nd.nodeType===1 && nd.getAttribute && nd.getAttribute('data-newpage') && body.childNodes.length){
-        no++; page=_a4Page(no); ed.appendChild(page); pages.push(page);
+        no++; page=_a4Page(no,dk); ed.appendChild(page); pages.push(page);
         body=page.querySelector('.a4b'); limit=body.clientHeight;
       }
       body.appendChild(nd);
@@ -3770,7 +3844,7 @@ function paginateDoc(rawHTML){
       if(rest){ queue.unshift(rest); }
       else if(body.childNodes.length>1){ body.removeChild(nd); queue.unshift(nd); }   // ② 통째로 다음 장
       else if(!queue.length){ continue; }                                  // ③ 혼자서도 안 들어감(마지막) → 그 장에 두고 넘침 표시
-      no++; page=_a4Page(no); ed.appendChild(page); pages.push(page);      // 다음 장 준비
+      no++; page=_a4Page(no,dk); ed.appendChild(page); pages.push(page);   // 다음 장 준비
       body=page.querySelector('.a4b'); limit=body.clientHeight;
     }
     /* 안전장치(guard)에 걸려 멈췄는데 남은 마디가 있으면 **버리지 않는다**.
@@ -6862,7 +6936,9 @@ function estabBundle(phase){
       var body=docBody(d[0],f,sites), b=docBlanks(body); tot+=b;
       chips.push('<span class="chip '+(b?'warn':'ok')+'" style="font-size:10.5px">'+(i+1)+'. '+esc(d[1])
         +(b?' · '+b:' · 다 참')+'</span>');
-      return '<div class="a4"><div class="note" style="text-align:right">'+(i+1)+' / '+lst.length+' · '+esc(d[1])
+      /* 서식 이름표 — 묶음은 여섯 종이 한 창에 섞인다. 장마다 제 글자 크기를 써야 한다
+         (이름표가 없으면 paginateDoc 이 「지금 열린 서식」 크기를 통째로 씌운다). */
+      return '<div class="a4 dk-'+esc(d[0])+'"><div class="note" style="text-align:right">'+(i+1)+' / '+lst.length+' · '+esc(d[1])
         +(b?' · 채울 자리 '+b+'곳':'')+'</div>'+body+'</div>';
     }).join('');
     var sum=$('bundleSum');
@@ -6902,7 +6978,10 @@ function _docToHwpxRun(kind){
 function printDoc(){ var ed=$('doced'); if(!ed)return;
   var w=window.open('','_blank'); if(!w){ toast('팝업이 차단되었습니다','err'); return; }
   var body=sanitizeDocHTML(ed.innerHTML);
-  if(!/class\s*=\s*["']a4["']/.test(body)) body='<div class="a4">'+body+'</div>';
+  /* ⚠ 「a4」를 «낱말»로 찾는다. 종전에는 class="a4" 딱 그 모양만 찾았는데, 장마다
+       서식 이름표가 붙어 class="a4 dk-charter" 가 되면서 못 찾고 «한 겹 더» 감쌌다.
+       그러면 장이 통째로 한 장 안에 들어가 인쇄가 어그러진다. */
+  if(!/class\s*=\s*["'][^"']*\ba4\b/.test(body)) body='<div class="a4">'+body+'</div>';
   w.document.write('<!doctype html><meta charset=utf-8><title>서식 인쇄</title><style>'+dgDocCss()
     +'.a4{box-shadow:none;border:0;background:#fff}.a4of{display:none}'   // 화면용 넘침배지는 인쇄 제외
     // 새 창 화면에서는 용지처럼(여백 포함) 보이게, 인쇄 시엔 @page 여백이 대신한다

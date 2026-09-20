@@ -261,7 +261,10 @@ test('★★ ⑦ 별지를 «뒷장»에 붙인다 — 앞장 꼬리에 붙으�
   const pg = 코드만(grabFn('paginateDoc'));
   assert.match(pg, /getAttribute\('data-newpage'\) && body\.childNodes\.length/,
     '★ 쪽 나누기가 표시를 모릅니다 — 별지가 앞장 꼬리에 붙습니다.');
-  assert.match(pg, /no\+\+; page=_a4Page\(no\)/, '★ 새 장을 안 엽니다.');
+  /* ⚠ 서식별 글자 크기가 들어오면서 _a4Page 가 이름표를 함께 받는다(_a4Page(no,dk)).
+       «새 장을 여는가»가 이 검사의 뜻이므로 넘기는 것이 몇 개든 상관없게 둔다 —
+       예전에는 _a4Page(no) 글자 그대로를 못박아, 뜻은 그대로인데 검사만 깨졌다. */
+  assert.match(pg, /no\+\+; page=_a4Page\(no\b/, '★ 새 장을 안 엽니다.');
 });
 
 test('★ ⑧ 이미 빈 장이면 «빈 장을 더 만들지 않는다»', () => {
