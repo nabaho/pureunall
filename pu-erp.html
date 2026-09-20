@@ -64504,6 +64504,10 @@ function CorpDashboard(props){
           gcalEvList.forEach(function(e){ if(e.creatorMail) mails[e.creatorMail] = 1; });
           var all = Object.keys(mails), left = all.filter(function(m){ return !mp[m]; }).length;
           if(!all.length) return null;
+          /* ★ 2026-09-20 — 관리자·위임관리인만. 온 회사가 같이 보는 이름표라
+             한 사람이 잘못 이으면 모두의 달력에 남의 이름이 뜬다(규칙도 MGR 로 좁혔다).
+             ⚠ 단추를 안 가리면 눌러 놓고 «조용히» 거절당한다 — 그게 더 나쁘다. */
+          if(!IS_ADMIN) return null;
           return h('button',{onClick:function(){ setColorPicker(null); setMailMapOpen(true); },
             title:'구글 일정을 만든 계정이 누구인지 한 번 이어 주면, 그 뒤로 담당자 색과 거르기가 정확해집니다',
             style:{padding:'3px 8px',fontSize:'10.5px',fontWeight:left?700:500,
