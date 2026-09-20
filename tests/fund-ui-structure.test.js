@@ -115,7 +115,11 @@ test('서식은 A4 규격으로 나뉜다', () => {
       else if (SRC[j] === '}') { d--; if (on && !d) return SRC.slice(i, j + 1); }
     }
   }
-  new Function(varLine[0] + '\n' + grabFn('dgDocCss') + '\n' + grabFn('dgDocCssIn')
+  /* ⚠ dgDocCss·dgDocCssIn 이 DK_TYPO_CSS(서식마다 글자 크기)를 함께 쓴다 —
+       같이 실어 주지 않으면 여기서 「DK_TYPO_CSS is not defined」로 죽는다.
+       이 모래상자가 그 둘을 실어 돌리는 «유일한» 곳이다. */
+  new Function(varLine[0] + '\n' + grabFn('DK_TYPO_CSS') + '\n'
+    + grabFn('dgDocCss') + '\n' + grabFn('dgDocCssIn')
     + ';this.print=dgDocCss();this.screen=dgDocCssIn();').call(box);
   assert.match(box.print, /@page\{size:A4 portrait/, '인쇄가 A4 세로가 아니다');
   assert.match(box.print, /\.a4\{width:170mm/, '본문폭 = 210 − 여백 20×2');
