@@ -1080,4 +1080,14 @@ rules.fcm_tokens = { $uid: {
   }
 } };
 
+/* ══ 로그인 무단시도 감지 ══════════════════════════════════════════════
+   설계문서: docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md
+   ⚠ '.write' 를 아예 안 둔다 — 이 네 자리는 오직 functions/index.js 의
+     logLoginAttempt(관리자 SDK)만 쓴다. 브라우저가 직접 쓸 수 있으면
+     누구든 「새 기기 아님」으로 자기 기록을 조작해 경보를 피할 수 있다. */
+rules.login_events    = { '.read': MGR };
+rules.login_devices   = { '.read': MGR };
+rules.login_countries = { '.read': MGR };
+rules.login_fail_burst= { '.read': MGR };
+
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');
