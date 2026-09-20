@@ -32,10 +32,10 @@ functions/index.js 의 새 함수  logLoginAttempt (HTTPS, 인증 불필요)
    │  admin.auth().getUserByEmail(email) 로 uid 조회(실패해도 계속 진행)
    ▼
 RTDB 기록 (Admin SDK — 규칙 우회, 클라이언트는 이 경로에 쓰기 권한 없음)
-   data/login_events/{uid|unk_해시}/{push-id}      ← 성공/실패 전부, 무조건 기록
-   data/login_devices/{uid}/{deviceId}             ← 이 계정이 이전에 본 기기 집합
-   data/login_countries/{uid}/{countryCode}        ← 이 계정이 이전에 접속한 국가 집합
-   data/login_fail_burst/{uid}                     ← 최근 실패 연속 카운터(짧은 창)
+   login_events/{uid|unk_해시}/{push-id}      ← 성공/실패 전부, 무조건 기록
+   login_devices/{uid}/{deviceId}             ← 이 계정이 이전에 본 기기 집합
+   login_countries/{uid}/{countryCode}        ← 이 계정이 이전에 접속한 국가 집합
+   login_fail_burst/{uid}                     ← 최근 실패 연속 카운터(짧은 창)
    │  (uid 를 못 찾았으면 devices/countries/burst 갱신은 건너뜀 — 비교 기준이 없음)
    ▼
 의심 판정 3종 중 하나라도 걸리면 → systemAlerts/{uid}/{id} 에 한 건 추가
@@ -44,14 +44,14 @@ RTDB 기록 (Admin SDK — 규칙 우회, 클라이언트는 이 경로에 쓰�
 
 ## 4. 데이터 모델
 ```
-data/login_events/{key}/{pushId}:
+login_events/{key}/{pushId}:
   at: number(ms), ok: boolean, code: string(''|firebase auth 에러코드),
   email: string(마스킹 없이 그대로 — 관리자만 읽음), ip: string, country: string(''|'KR' 등),
   deviceId: string, deviceKnown: boolean, ua: string(150자 제한), page: 'enter.html'
 
-data/login_devices/{uid}/{deviceId}: { firstSeenAt: number, ua: string }
-data/login_countries/{uid}/{countryCode}: { firstSeenAt: number }
-data/login_fail_burst/{uid}: { count: number, windowStartAt: number }
+login_devices/{uid}/{deviceId}: { firstSeenAt: number, ua: string }
+login_countries/{uid}/{countryCode}: { firstSeenAt: number }
+login_fail_burst/{uid}: { count: number, windowStartAt: number }
 
 systemAlerts/{uid}/{id}:  (기존 스키마 그대로 재사용, js/pu-health.js 참고)
   uid, kind: 'security-device'|'security-country'|'security-burst',

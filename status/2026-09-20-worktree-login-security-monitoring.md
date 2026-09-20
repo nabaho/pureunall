@@ -7,7 +7,7 @@
 ## 무엇을 만들었나
 - `functions/login-security.js` — 새 기기·새 국가·15분/5회 반복실패 판정 순수 함수(단위테스트 12개)
 - `functions/index.js` `exports.logLoginAttempt` — 로그인 성공·실패마다 불려 기록·판정하는 서버 함수
-- `data/login_events`·`login_devices`·`login_countries`·`login_fail_burst` 네 자리 — 관리자·위임관리인만 읽기, 클라이언트 쓰기 없음(서버 전용)
+- `login_events`·`login_devices`·`login_countries`·`login_fail_burst` 네 자리 — 관리자·위임관리인만 읽기, 클라이언트 쓰기 없음(서버 전용)
 - 의심 판정은 기존 `systemAlerts` 관리자 경보 화면에 그대로 추가로 뜬다(새 화면 없음)
 - `enter.html` — 로그인 성공/실패 직후 서버에 보고(응답은 절대 기다리지 않음, 실패해도 로그인 무영향)
 - `js/pu-ontology.js` INFRA_ROOTS 에 새 4자리 등록(온톨로지 규칙 준수)
