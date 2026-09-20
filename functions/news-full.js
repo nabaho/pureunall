@@ -109,7 +109,89 @@ const 까닭말 = {
   못받음: '지금 법제처에서 받아 오지 못했습니다.'
 };
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ★★★ 「전문 보기」를 «따로 열어도» 법제처 원문이 아니라 우리 양식으로 (대표 지시
+     2026-09-20 「판례등 전문보기는 판례정보를 그대로 넣지말고 푸른양식으로 정리해라」)
+   ══════════════════════════════════════════════════════════════════════════
+   ⚠⚠ news-view.js 가 이미 «그 자리에서 펴는» 손잡이를 갖고 있다(2026-09-18) —
+     정상 클릭이면 편지 안에서 펴진다. 그런데 그 손잡이의 href «자체»가 그때까지도
+     법제처 원문이었다. 가운데 클릭·Ctrl+클릭·오른쪽 버튼 「새 탭에서 열기」처럼
+     click 손잡이를 «거치지 않는» 열기는 그대로 법제처로 간다 — 대표께서 실제로
+     그렇게 열어 보시고 겪으신 자리가 이것이다.
+   ★ 그래서 손잡이 href 자체를 이 쪽(newsFullPage, functions/index.js)으로 바꾼다.
+     정상 클릭은 그대로 편지 안에서 펴지고(안 바뀜), 그 밖의 모든 열기는 이제
+     «우리 서버가 지은 이 쪽»이 열린다. 법제처는 이 쪽 맨 아래 한 줄로만 남는다.
+   ⚠ 여기 그리는 것도 news-view.js 의 「그 자리에서 펴는」 것과 «같은 정보»(NF.풀기의
+     칸들)를 쓴다 — 화면마다 다른 것을 보여 주면 안 된다. 모양만 «온 쪽 하나»로 편다.
+   ⚠⚠ 남의 XML 에서 뽑은 글자를 esc() 없이 심으면 안 된다 — 법제처 응답에 태그가
+     섞여 오면(실제로 판시사항에 <p> 가 섞여 온 적이 있다) 그대로 심는 순간
+     우리 쪽에서 그 글자가 돈다. 반드시 «씻어서» 심는다. */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function 줄(s) { return esc(s).replace(/\r?\n/g, '<br>'); }
+
+/* 두 쪽(정상·오류)이 «같은 껍데기»를 쓴다 — 하나만 고치면 반쪽만 우리 얼굴이 된다. */
+function _껍데기(제목, 속) {
+  return '<!doctype html><html lang="ko"><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>' + esc(제목) + '</title>'
+    + '<meta name="robots" content="noindex">'
+    + '<style>html,body{margin:0;padding:0;background:#e9e7e3;'
+    + "font-family:'Malgun Gothic',sans-serif}"
+    + '#wrap{max-width:700px;margin:0 auto;background:#fff;padding:26px 24px 30px}'
+    + '.mk{font:bold 10px Georgia,\'Times New Roman\',serif;letter-spacing:3px;'
+    + 'color:#8a6f57;text-align:center}'
+    + '.nm{text-align:center;font-size:19px;font-weight:bold;color:#241a13;'
+    + 'letter-spacing:-0.3px;margin-top:6px;padding-bottom:16px;'
+    + 'border-bottom:2px solid #241a13}'
+    + '.tt{margin-top:18px;font-weight:bold;font-size:16px;line-height:1.5;'
+    + 'color:#241a13;word-break:keep-all}'
+    + '.ct{margin-top:4px;font-size:12.5px;color:#9a938a}'
+    + 'h4{margin:20px 0 6px;font-size:11.5px;letter-spacing:1.5px;color:#8a6f57;'
+    + 'font-weight:bold}'
+    + '.p{font-size:13.5px;line-height:1.85;color:#33302c;word-break:keep-all}'
+    + '.cut{margin-top:8px;font-size:12px;color:#9a938a}'
+    + '.src{margin-top:26px;padding-top:14px;border-top:1px solid #e0dcd6;'
+    + 'font-size:12px;color:#9a938a}'
+    + '.src a{color:#1b3a6b;font-weight:bold;text-decoration:none}'
+    + '.err{font-size:13.5px;color:#8a837a;padding:10px 0}'
+    + '</style></head><body><div id="wrap">'
+    + '<div class="mk">PUREUN LABOR LAW FIRM</div>'
+    + '<div class="nm">푸른노무법인</div>'
+    + 속 + '</div></body></html>';
+}
+
+/* 정상 쪽 — NF.풀기() 가 내준 「것」 하나를 그대로 그린다.
+   ⚠ 여기서 다시 법제처를 두드리지 않는다 — 부르는 쪽(functions/index.js)이 이미
+     받아 풀어서 넘긴다. 이 함수는 «인터넷을 모른다»(파일 맨 위 규칙). */
+function 쪽(것, 법제처) {
+  var 제목 = String((것 && 것.제목) || '') || (것 && 것.갈래 === 'expc' ? '행정해석' : '판례');
+  var 속 = '<div class="tt">' + esc(제목) + '</div>';
+  if (것 && 것.인용) 속 += '<div class="ct">' + esc(것.인용) + '</div>';
+  (것 && 것.칸들 || []).forEach(function (k) {
+    속 += '<h4>' + esc(k.이름) + '</h4><div class="p">' + 줄(k.글)
+      + (k.잘림 ? '<div class="cut">… 너무 길어 여기까지만 보여 드립니다. '
+          + '아래 「법제처에서 원문 보기」로 다 보실 수 있습니다.</div>' : '')
+      + '</div>';
+  });
+  속 += '<div class="src"><a href="' + esc(법제처 || '') + '" target="_blank" rel="noopener">'
+    + '법제처에서 원문 보기 ↗</a></div>';
+  return _껍데기(제목 + ' — 푸른노무법인', 속);
+}
+
+/* 못 받아 온 쪽 — «빈 법제처 화면»이 아니라 이것도 우리 얼굴로 낸다. */
+function 오류쪽(말, 법제처) {
+  var 속 = '<div class="err">' + esc(말 || '내용을 받아 오지 못했습니다.') + '</div>'
+    + '<div class="src"><a href="' + esc(법제처 || '') + '" target="_blank" rel="noopener">'
+    + '법제처에서 원문 보기 ↗</a></div>';
+  return _껍데기('푸른노무법인', 속);
+}
+
 module.exports = {
   갈래고르기: 갈래고르기, 읽기: 읽기, 받을주소: 받을주소, 법제처주소: 법제처주소,
-  자르기: 자르기, 풀기: 풀기, 머리글: 머리글, 까닭말: 까닭말, 칸한도: 칸한도
+  자르기: 자르기, 풀기: 풀기, 머리글: 머리글, 까닭말: 까닭말, 칸한도: 칸한도,
+  쪽: 쪽, 오류쪽: 오류쪽
 };
