@@ -25,7 +25,7 @@
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=2"></script>
-<script src="js/pu-cal-write.js?v=1"></script>
+<script src="js/pu-cal-write.js?v=2"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -536,6 +536,69 @@ function gcalPalette(){
   ks.forEach(function(k){ if(m[k] && out.indexOf(m[k]) < 0) out.push(m[k]); });
   return out.length ? out : null;
 }
+/* ── 사람 색 «채워 넣기» ────────────────────────────────────────────────
+   캘린더를 한 곳으로 모으기 1걸음 (대표 지시 2026-09-20 「0부터 순서대로」).
+
+   ★ 왜 여기로 왔나
+     data/staff_colors 를 «쓰는 곳»이 이알피 법인 대시보드 한 곳뿐이었다.
+     그 화면을 걷어내면 새로 온 직원에게 색이 영영 안 생기고, 컨설팅일정도
+     같은 자리를 읽으므로 두 앱이 함께 회색이 된다.
+
+   ★ 이알피처럼 «다시 셈해 통째로» 올리지 않는다 — «빠진 사람만» 채운다.
+     이알피는 그 PC 에만 있는 손수 고른 색(localStorage)을 섞어 셈한다.
+     그것을 흉내 내 통째로 올리면 대표님이 다른 자리에서 고른 색을 덮는다.
+     없는 칸만 채우면 남의 것을 건드릴 일이 없어, 두 앱이 함께 돌아도 안 싸운다.
+
+   ★ 고르는 법 — «아직 아무도 안 쓰는» 색을 앞에서부터. 그래야 새로 온 사람이
+     옆자리와 같은 색으로 뜨지 않는다. 색을 새로 만들지 않는다(구글 색표 안에서만).
+
+   ⚠ 구글 색표가 아직 «안 왔으면» 아무것도 안 한다. 되돌아갈 색을 올리면 서버의
+     진짜 색을 덮는다 — 이알피가 그 자리에서 한 번 데었다.
+   ⚠ 관리자만 쓸 수 있다(서버 규칙). 명부의 role 로 가르므로 «위임관리인»은 여기서
+     못 채운다 — 서버는 허락하지만 조용히 실패하느니 아예 안 한다. */
+function 빠진색채우기(있는색, 사람들, 색표){
+  var 쓰는색 = {};
+  Object.keys(있는색 || {}).forEach(function(k){
+    if(있는색[k]) 쓰는색[String(있는색[k]).toLowerCase()] = 1;
+  });
+  var 새로 = {};
+  (사람들 || []).forEach(function(u){
+    if(!u || !u.sid || (있는색 && 있는색[u.sid])) return;
+    var 고름 = "";
+    for(var i=0;i<색표.length;i++){
+      if(!쓰는색[String(색표[i]).toLowerCase()]){ 고름 = 색표[i]; break; }
+    }
+    /* 색표를 다 썼으면 처음부터 다시 — 겹치더라도 «없는 것»보다 낫다 */
+    if(!고름) 고름 = 색표[Object.keys(새로).length % 색표.length];
+    if(!고름) return;
+    새로[u.sid] = 고름;
+    쓰는색[String(고름).toLowerCase()] = 1;
+  });
+  return 새로;
+}
+function 색채우기(){
+  try{
+    if(!(ME && ME.role === "admin")) return;            /* 관리자만 */
+    var 색표 = gcalPalette();
+    if(!색표 || !색표.length) return;                    /* 색표가 안 왔으면 손대지 않는다 */
+    var 있는색 = (D.staff_colors && typeof D.staff_colors === "object"
+                  && !Array.isArray(D.staff_colors)) ? D.staff_colors : {};
+    var 현직 = users().filter(function(u){ return u && u.status === "active"; });
+    if(!현직.length) return;                             /* 사람이 없으면 아무 일도 안 한다 */
+    var 새로 = 빠진색채우기(있는색, 현직, 색표);
+    if(!Object.keys(새로).length) return;                /* 채울 사람이 없으면 안 올린다 */
+    var 합친것 = Object.assign({}, 있는색, 새로);
+    PuCalWrite.saveColors(합친것).then(function(r){
+      if(r && r.ok){
+        D.staff_colors = 합친것;
+        console.log("[사람색] 빠진 " + Object.keys(새로).length + "명을 채웠습니다: "
+          + Object.keys(새로).map(function(s){ return nameOf(s) + "=" + 새로[s]; }).join(", "));
+        render();
+      }
+    })["catch"](function(){});
+  }catch(e){}
+}
+
 /* 실시간DB 열쇠에는 점(.)을 못 쓴다 — 이메일에는 점이 있어 쉼표로 바꿔 담는다.
    ⚠ 이알피와 «같은 셈»이어야 한다. 다르면 이어 둔 사람이 안 찾아진다. */
 function gcalMailKey(m){ return String(m || "").trim().toLowerCase().replace(/[.#$\[\]\/]/g, ","); }
@@ -593,6 +656,9 @@ function gcalLoad(force){
         .filter(function(ev){ return ev.start && (ev.start.date || ev.start.dateTime); })
         .map(gcalToEvent);
       GCAL.loading = false; render();
+      /* 색표가 이제 손에 있다 — 색이 없는 직원이 있으면 이때 채운다(1걸음).
+         ⚠ 그리기가 끝난 «뒤»다. 색 채우다 실패해도 달력은 이미 떠 있다. */
+      색채우기();
     })
     .catch(function(e){
       /* ⚠ 못 받았으면 «조용히» 비우지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이다 */
