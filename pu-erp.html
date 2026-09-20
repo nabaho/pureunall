@@ -3391,6 +3391,11 @@ window.erpAllowBulk = function(){
 // ── 서버 자동백업: 하루 1회, data/와 분리된 serverBackups/ 칸에 스냅샷 저장(10일치 유지) ──
 //    이 칸은 동기화(fbInitialSync)·자동삭제 루틴이 건드리지 않음.
 var SERVER_BACKUP_KEEP = 20;   // 아침+저녁 2회 × 10일. 실시간DB 용량 절약(무료 1GB)
+/* ⚠★ 이것은 «담을 것을 고르는 목록»이 아니다 — 백업이 «비어 있지 않은지» 보는 잣대다.
+   실제로 담기는 것은 buildBackupSnapshot 이 localStorage 를 통째로 훑은 것이다
+   (SNAP_EXCLUDE·SECRET_KEYS 만 뺀다). 이름이 「백업 키」라서 2026-09-20 에
+   「21칸만 백업된다」고 잘못 읽고 대표께 그대로 보고한 일이 있다.
+   여기 있는 키의 뜻은 «이 중 하나라도 자료가 있어야 백업할 값어치가 있다» 이다. */
 var SERVER_BACKUP_KEYS = [
   'contracts','cases','consultings','funds','other_projects','companies',
   'finance_income','payroll_monthly','attendance_records','my_schedules',
@@ -3415,12 +3420,20 @@ function buildBackupSnapshot(){
   var SNAP_EXCLUDE = { force_pw:1,last_login_id:1,save_id_flag:1,current_menu:1,env_last_tab:1,
     open_groups:1,dark_mode:1,sidebar_collapsed:1,corp_dash_tab:1,mydesk_cal_custom_w:1,
     mydesk_cal_size:1,mydesk_widget_collapsed:1,last_server_backup:1,recent_sig:1,
-    // 기기 임시 작업분·이 PC 전용 되돌리기 기록 — 동기화(FB_EXCLUDE)에서 빼는 것과 같은 이유로
-    // 백업에서도 뺀다. 특히 bank_ledger_draft 는 올린 통장 파일이 최대 4,000행까지 쌓여서
-    // 스냅샷을 실시간DB 한 번 쓰기 한도(16MB) 위로 밀어 올렸다(write_too_big — 실제로 났다).
-    // ledger_batches 도 같은 이유로 백업에서 뺀다 — 서버로는 «실시간 공유» 되지만(FB_EXCLUDE 아님)
-    // 스냅샷에 담으면 통장 4,000행이 다시 실려 16MB 한도를 밀어 올린다.
-    bank_ledger_draft:1, ledger_batches:1, co_merge_log:1, co_link_log:1, co_vat_log:1 };
+    /* ⚠★ 여기서 빼는 것은 «이 PC 의 임시·되돌리기 기록» 뿐이다 (대표 지시 2026-09-20 「다 담아라」).
+
+       ── ledger_batches(통장 묶음)를 도로 넣었다
+         이것은 업무 자료다 — 서버로 실시간 공유되고 유실검사(DIFF_KEYS)도 본다.
+         그런데 백업에서만 빠져 있었다. 뺀 까닭은 통장 4,000행이 스냅샷을 실시간DB
+         한 번 쓰기 한도(16MB) 위로 밀어 올렸기 때문인데, 그 뒤 erpBackupBatches 가
+         **큰 배열을 행 단위로 쪼개** 싣도록 고쳐졌다(같은 파일 위쪽).
+         까닭은 사라졌는데 «빼 둔 것»만 남아 있었다 — 이런 자리가 가장 오래 안 보인다.
+
+       ── 남은 넷은 서버에도 «없는» 것들이다(FB_EXCLUDE)
+         bank_ledger_draft 는 올리다 만 통장 임시본이고(원본 엑셀이 있으면 다시 만든다),
+         co_*_log 는 «이 PC 에서 누른 것»을 되돌리려고 남긴 기록이다.
+         다른 PC 에 되살리면 남의 되돌리기 기록이 내 화면에 얹힌다 — 지키는 것이 아니라 섞는 것이다. */
+    bank_ledger_draft:1, co_merge_log:1, co_link_log:1, co_vat_log:1 };
   var data = {};
   for(var i=0;i<localStorage.length;i++){
     var full = localStorage.key(i);
@@ -3607,11 +3620,21 @@ function serverBackupDaily(force){
   if(!(CURRENT_USER && (CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin))) return;
   var ymd = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD (로컬 기준)
   if(!force && localStorage.getItem('pureun_v6_last_server_backup') === ymd) return;
+  /* ⚠★ 부팅 때 «아무에게도 안 받는» 키(FB_COLD_KEYS)를 먼저 받아 온다 (2026-09-20 「다 담아라」).
+     스냅샷은 localStorage 를 훑어서 만든다. 그런데 이 키들은 그 화면을 열어야 내려온다 —
+     그날 아무도 급여감사 화면을 안 열었으면 백업에서 통째로 빠지고, **빠진 줄도 모른다.**
+     ⚠ 못 받아도 백업은 그대로 간다. 한 칸 때문에 백업 전부를 잃는 것이 더 나쁘다. */
+  var 차가운것 = (window.erpEnsureKeys && typeof FB_COLD_KEYS !== 'undefined')
+    ? window.erpEnsureKeys(FB_COLD_KEYS).catch(function(){ return 0; })
+    : Promise.resolve(0);
+  return 차가운것.then(function(){ return _serverBackupSave(ymd); });
+}
+function _serverBackupSave(ymd){
   var snap = buildBackupSnapshot();
   // 빈 스냅샷(데이터 미로드 등)은 저장하지 않음
   var hasData = SERVER_BACKUP_KEYS.some(function(k){ return Array.isArray(snap.data[k]) && snap.data[k].length > 0; });
   if(!hasData) return;
-  serverBackupWrite(ymd, snap)
+  return serverBackupWrite(ymd, snap)
     .then(function(n){
       localStorage.setItem('pureun_v6_last_server_backup', ymd);
       console.log('[ERP] 서버 자동백업 저장: '+ymd+' ('+n+'조각)');
