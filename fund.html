@@ -273,12 +273,25 @@
     .stat{font-size:10.5px;padding:2px 8px}
     .tabbar{margin:8px 0 10px}
   }
+  /* 서식 안내 — 용지 «밖»에 띄운다(2026-09-20 「캡쳐2 내용 삭제」).
+     여태 A4 첫 장 맨 위에 찍혀 제출 서류에 인쇄되고 저장본에까지 박혔다.
+     여기(#doced 바깥)에 두면 인쇄(printDoc 은 #doced 안만 가져간다)에도, 저장본에도 안 들어간다. */
+  .docnotes{margin:0 0 10px;padding:8px 11px;background:var(--warn-bg);border:1px solid #fde68a;
+    border-radius:8px;font-size:11.5px;color:var(--warn);line-height:1.65}
+  .docnotes>div+div{margin-top:4px}
+  /* 서식 탭의 엑셀 원본 한 줄 (2026-09-20 줄 정리) — 패널 하나를 줄 하나로 접었다 */
+  .xlrow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 10px;
+    padding:8px 11px;background:#f8fafc;border:1px solid var(--line);border-radius:9px}
+  .xlrow .nm{font-weight:700;font-size:12.5px;white-space:nowrap}
+  .xlrow .fn{flex:1;min-width:140px;font-size:11px;color:var(--sub);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* 화면 배경색은 화면에서만 — 인쇄·PDF는 흰 바탕(제출 서식에 색이 깔리면 안 된다) */
   @media print{
     body{background:#fff}
     #side,#topbar,#sideveil{display:none}
     #main{margin-left:0}#app{padding:0}
     .panel{border:none;margin:0 0 10px}
+    .docnotes{display:none}
   }
 /* ══ 서류 확인 창의 좌우 2단 — 왼쪽 원본, 오른쪽 값 ══
    경력관리(kcareer.html)의 편집 창과 «같은 결»로 맞췄다(대표 지시 2026-09-05).
@@ -2791,11 +2804,14 @@ function delBilling(id){ confirmM('이 청구 항목을 삭제할까요?',{ok:'�
 // ── 서식 자료실 (설립·지원신청서 원본 채움) ──
 // 원본 법정서식 엑셀은 실데이터 미포함 빈 양식 → 브라우저 IndexedDB에 1회 저장 후 자동 사용.
 // 채움은 ExcelJS(테두리·병합·수식 보존). 통장 파싱용 SheetJS와 별개.
-var TPL={ setup:{key:'setup',label:'설립 서식(6종)',file:'2024년 근로복지기금 설립인가신청서 양식_240906.xlsx',gong:false},
+var TPL={ setup:{key:'setup',label:'설립 서식(6종)',file:'2024년 근로복지기금 설립인가신청서 양식_240906.xlsx',gong:false,
+                 /* 2026-09-20 줄 정리 — 옛 단추 줄에 있던 ⓘ(forms.excel)가 이 줄로 옮겨 왔다 */
+                 help:'forms.excel'},
           subsidy:{key:'subsidy',label:'지원신청서',file:'2025년 공동근로복지기금지원신청서 양식(폐업 사업장 미포함).xlsx',gong:true},
           // 참여사업장별 출연확인서 — 기업정보 시트를 참여사업장으로 채우면 확인서가 VLOOKUP으로 뽑힘
+          /* 긴 설명은 화면에 깔지 않고 ⓘ 로 접는다(2026-09-20 줄 정리) — help 키로 옮겼다 */
           contribx:{key:'contribx',label:'기금출연확인서(사업장별)',file:'기금출연확인서 양식(빈양식).xlsx',gong:false,
-                    hint:'참여사업장 목록으로 [기업정보] 시트를 채웁니다. 확인서 시트의 <b>연번(CJ3)</b>을 바꾸면 해당 사업장 확인서가 나옵니다. 대표자·근로자 생년월일은 개인정보라 저장하지 않으니 엑셀에서 직접 입력하세요.'} };
+                    help:'tpl.contribx'} };
 /* ═══════════ 문서 끌어놓기(드래그앤드롭) → 자동 판독 ═══════════
    · 모든 업로드의 기본은 마우스 드래그. 클릭해서 파일 선택도 함께 지원.
    · PDF는 pdf.js로 글자를 직접 읽는다(좌표 기준 정렬 — 표 레이아웃에서 순서가 섞이는 것 방지).
@@ -3176,19 +3192,39 @@ function renderForms(){
   var fsel='<span style="display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden">'
     +'<button onclick="S.sampleType=\'공동\';renderForms()" style="padding:5px 14px;border:none'+(isGong?';background:var(--acc);color:#fff;font-weight:700':';background:transparent')+'">공동기금 샘플</button>'
     +'<button onclick="S.sampleType=\'사내\';renderForms()" style="padding:5px 14px;border:none'+(!isGong?';background:var(--acc);color:#fff;font-weight:700':';background:transparent')+'">사내기금 샘플</button></span>';
-  function tplCard(t){
-    var reg=has[t.key];
-    var regLine=reg?'<span class="chip ok">원본 등록됨</span> <button onclick="pickTpl(\''+t.key+'\')" style="padding:3px 8px">원본 교체</button> <button onclick="clearTpl(\''+t.key+'\')" style="padding:3px 8px">삭제</button>'
-      :'<span class="chip dg">원본 미등록</span> <button class="primary" onclick="pickTpl(\''+t.key+'\')" style="padding:3px 10px">📎 원본 엑셀 등록</button>';
-    var fill='';
-    if(reg){
-      if(t.gong&&!isGong) fill='<div class="muted" style="font-size:12px;margin-top:8px">지원신청서는 공동근로복지기금 전용입니다. (선택된 기금은 '+esc(cur.fund_type||'?')+')</div>';
-      else if(fundMode) fill='<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="primary" onclick="fillForm(\''+t.key+'\')">⬇ ['+esc(cur.short_name||cur.name||'')+'] '+esc(t.label)+' 데이터 채워 받기</button><button onclick="previewExcel(\''+t.key+'\')">👁 엑셀 화면에서 보기</button></div>';
-      else fill='<div class="muted" style="font-size:12px;margin-top:8px">실데이터 채움·엑셀 보기는 <b>기금 현황 → 기금 클릭 → 📑 서식</b>에서 합니다. (여기는 샘플 영역)</div>';
-    }
-    return '<div class="panel"><div class="row"><h2 style="font-size:15px">'+esc(t.label)+'</h2><span style="flex:1"></span>'+regLine+'</div>'
-      +'<p class="muted" style="font-size:11.5px;margin:6px 0 0">원본 파일: '+esc(t.file)+'</p>'
-      +(t.hint?'<p class="muted" style="font-size:11.5px;margin:4px 0 0">'+t.hint+'</p>':'')+fill+'</div>';
+  /* ★ 엑셀 원본을 «한 줄»로 (대표 지시 2026-09-20 「캡쳐2 줄 정리하고 캡쳐3 중복 정리」) —
+       종전에는 같은 ① 인가 단계인데 패널이 셋이었고, 그중 둘이 «같은 단추»를 갖고 있었다:
+         「⬇ 인가 6종 엑셀 채워받기 / 👁 엑셀 보기」 = 「⬇ [기금] 설립 서식(6종) 데이터 채워 받기 / 👁 엑셀 화면에서 보기」
+       패널을 없애고 이름도 짧게 줄인다 — 어느 기금인지는 화면 맨 위에 이미 있다.
+     ⚠ 기능은 하나도 없애지 않는다. 등록·교체·삭제·채움·보기 모두 이 줄에 있다.
+     ⚠ 긴 설명(hint)은 화면에 깔지 않고 ⓘ 로 접는다(이 시스템의 기존 규칙). */
+  function tplRow(t){
+    var reg=has[t.key], 막힘=(t.gong&&!isGong);
+    var btns=reg
+      ? (막힘 ? '<span class="muted" style="font-size:11px">공동기금 전용</span>'
+        : (fundMode
+          ? '<button class="primary" onclick="fillForm(\''+t.key+'\')" style="padding:4px 10px">⬇ 채워 받기</button>'
+            +'<button onclick="previewExcel(\''+t.key+'\')" style="padding:4px 10px">👁 보기</button>'
+          : '<span class="muted" style="font-size:11px">채움은 기금의 📑 서식에서</span>'))
+        +'<button onclick="pickTpl(\''+t.key+'\')" style="padding:3px 8px">교체</button>'
+        +'<button onclick="clearTpl(\''+t.key+'\')" style="padding:3px 8px">삭제</button>'
+      : '<button class="primary" onclick="pickTpl(\''+t.key+'\')" style="padding:4px 10px">📎 원본 엑셀 등록</button>';
+    return '<div class="xlrow">'
+      +'<span class="nm">📗 '+esc(t.label)+'</span>'
+      +'<span class="chip '+(reg?'ok':'dg')+'" style="font-size:10px">'+(reg?'등록됨':'미등록')+'</span>'
+      +'<span class="fn">'+esc(t.file)+'</span>'
+      +(t.help?hlp(t.help):'')+btns+'</div>';
+  }
+  /* 단계 머리줄 — 다섯 단계가 같은 모양이다. 늘 쓰는 [번호 차례대로 전부]는 오른쪽 위로 올리고,
+     처음 한 번만 쓰는 [.hwp 여러 개]는 그 옆에 흐리게 둔다. ⓘ 는 제목 옆 하나로 모은다. */
+  function phaseHead(title,helpKey,bundleKind,extraChip){
+    return '<div class="row"><h2 style="font-size:15px">'+title+'</h2>'
+      +(extraChip||'')+typeChip+hlp(helpKey)
+      +'<span style="flex:1"></span>'
+      +'<button class="primary" onclick="estabBundle(\''+bundleKind+'\')" style="padding:5px 11px" '
+      +'title="그 단계 서류를 번호 차례대로 한 화면에 세우고 채울 자리가 몇 곳인지 셉니다 — 그대로 인쇄해 날인하세요">🖨 번호 차례대로 전부(날인용)</button>'
+      +hlp('estab.bundle')
+      +'<button onclick="pickHwpBulk()" style="padding:5px 10px">📁 .hwp 여러 개</button></div>';
   }
   function formRow(d,i){
     var kind=d[0], label=(i+1)+'. '+d[1], reg=(S._hwpHas||{})[kind], on=(S._sideKind===kind);
@@ -3204,36 +3240,33 @@ function renderForms(){
   if(isGong) PH=PH.concat([['subsidy','⑤ 근복지원금']]);
   if(PH.map(function(p){return p[0];}).indexOf(S.formPhase)<0) S.formPhase='inka';
   var phBar='<div class="tabbar">'+PH.map(function(p){return '<div class="tab'+(S.formPhase===p[0]?' on':'')+'" onclick="S.formPhase=\''+p[0]+'\';renderForms()">'+p[1]+'</div>';}).join('')+'</div>';
-  var bulkBtn='<button class="primary" onclick="pickHwpBulk()" style="padding:4px 10px">📁 여러 .hwp 한번에 등록</button>';
   // 공동/사내 기본서식을 구분해 보여주는 표시
   var typeChip='<span class="chip '+(isGong?'warn':'dg')+'" style="font-size:10.5px;margin-left:6px">'+esc(cur.fund_type||'?')+'기금 기본서식</span>'+hlp('ftype.words');
   var hwpNote='';   // 설명은 제목 옆 ⓘ(forms.hwp)로 옮김 — 단계마다 반복 출력하던 3줄 안내 제거
   function opsRow(title,btns){ return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;min-width:180px;font-weight:600">'+title+'</span>'+btns+'</div>'; }
   var body;
   if(S.formPhase==='inka'){
-    var setupReg=has['setup'];
     var isSetupFund=(cur.setup_stage==='설립준비');
-    // 안내 문단 없이 버튼 한 줄로 — 설명은 ⓘ(forms.excel)에
-    var inkaBatch='<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap">'
-      +(setupReg?(fundMode?'<button class="primary" onclick="fillForm(\'setup\')" style="padding:5px 11px">⬇ 인가 6종 엑셀 채워받기</button><button onclick="previewExcel(\'setup\')" style="padding:5px 11px">👁 엑셀 보기</button>':'<span class="chip ok" style="font-size:10.5px">원본 등록됨 — 채움은 기금의 📑 서식에서</span>'):'<button class="primary" onclick="pickTpl(\'setup\')" style="padding:5px 11px">📎 원본 엑셀 등록(최초 1회)</button>')
-      +'<button class="primary" onclick="estabBundle(\'kinds\')" style="padding:5px 11px" title="여섯 서류를 번호 차례대로 한 화면에 세우고 채울 자리가 몇 곳인지 셉니다 — 그대로 인쇄해 날인하세요">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+hlp('forms.excel')
-      +(isSetupFund?'<span class="chip warn" style="font-size:10px">설립중 기금</span>':'')+'</div>';
     var inkaList=docsFor(DOC_KINDS,cur.fund_type||'공동');
-    body='<div class="panel"><div class="row"><h2 style="font-size:15px">① 노동부 설립인가 서식</h2>'+typeChip+hlp('forms.hwp')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
-      +inkaBatch+inkaList.map(formRow).join('')
+    /* ★ 패널 셋 → 하나 (대표 지시 2026-09-20). 「설립 서식(6종)」·「기금출연확인서」 패널을
+         없애고 한 줄짜리 엑셀 줄로 이 패널 안에 넣는다 — 어차피 같은 ① 인가 단계 서류다.
+       ★ 같은 단추 두 벌 → 한 벌. 채움·보기는 엑셀 줄에만 둔다. */
+    body='<div class="panel">'
+      +phaseHead('① 노동부 설립인가 서식','forms.hwp','kinds',
+        isSetupFund?'<span class="chip warn" style="font-size:10px;margin-left:6px">설립중 기금</span>':'')
+      +tplRow(TPL.setup)
+      +inkaList.map(formRow).join('')
       +(isGong?'':'<p class="muted" style="font-size:11px;margin:8px 0 0">※ 설립합의서는 공동기금 전용 — 사내기금 목록에서 제외</p>')
-      +'</div>'+tplCard(TPL.setup)+tplCard(TPL.contribx);
+      +tplRow(TPL.contribx)
+      +'</div>';
   } else if(S.formPhase==='reg'){
-    body='<div class="panel"><div class="row"><h2 style="font-size:15px">② 법인 설립등기 서식</h2>'+typeChip+hlp('forms.hwp')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
-      +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap"><button class="primary" onclick="estabBundle(\'reg\')" style="padding:5px 11px" title="등기 서류를 번호 차례대로 세우고 채울 자리를 셉니다">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+'</div>'
+    body='<div class="panel">'+phaseHead('② 법인 설립등기 서식','forms.hwp','reg')
       +docsFor(DOC_REG,cur.fund_type||'공동').map(formRow).join('')+'</div>';
   } else if(S.formPhase==='tax'){
-    body='<div class="panel"><div class="row"><h2 style="font-size:15px">③ 고유번호증(세무서) 서식</h2>'+typeChip+hlp('forms.tax')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
-      +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap"><button class="primary" onclick="estabBundle(\'tax\')" style="padding:5px 11px" title="세무서 제출 서류를 번호 차례대로 세우고 채울 자리를 셉니다">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+'</div>'
+    body='<div class="panel">'+phaseHead('③ 고유번호증(세무서) 서식','forms.tax','tax')
       +docsFor(DOC_TAX,cur.fund_type||'공동').map(formRow).join('')+'</div>';
   } else if(S.formPhase==='ops'){
-    body='<div class="panel"><div class="row"><h2 style="font-size:15px">④ 운영 단계 서식</h2>'+typeChip+hlp('forms.ops')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
-      +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap"><button class="primary" onclick="estabBundle(\'ops\')" style="padding:5px 11px" title="운영 서식을 번호 차례대로 세우고 채울 자리를 셉니다">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+'</div>'
+    body='<div class="panel">'+phaseHead('④ 운영 단계 서식','forms.ops','ops')
       +docsFor(DOC_OPS,cur.fund_type||'공동').map(formRow).join('')
       +'<div style="max-width:680px;margin-top:10px">'
       +opsRow('현행 정관 (편집)','<button onclick="selectForm(\'charter\')" style="padding:4px 10px">👁 편집</button> '+((S._hwpHas||{}).charter?'<button class="primary" onclick="openHwpEditor(\'charter\')" style="padding:4px 9px">📄 HWP 편집</button>':'<button onclick="pickHwp(\'charter\')" style="padding:4px 9px">⬆ .hwp 등록</button>'))
@@ -3244,10 +3277,12 @@ function renderForms(){
         : opsRow('운영상황보고서·결산서·변경이벤트','<span class="muted" style="font-size:12px">실데이터 기반 — 각 기금의 <b>📑 서식</b>/해당 탭에서</span>'))
       +'</div></div>';
   } else {
-    body='<div class="panel"><div class="row"><h2 style="font-size:15px">⑤ 근복지원금 신청 서식 <span class="chip warn" style="font-size:10px">공동 전용</span></h2>'+hlp('forms.sub')+'<span style="flex:1"></span>'+bulkBtn+'</div>'
-      +'<div class="row" style="gap:6px;margin:0 0 10px;flex-wrap:wrap"><button class="primary" onclick="estabBundle(\'sub\')" style="padding:5px 11px" title="지원금 제출 서류를 번호 차례대로 세우고 채울 자리를 셉니다">🖨 번호 차례대로 전부(날인용)</button>'+hlp('estab.bundle')+'</div>'
+    body='<div class="panel">'
+      +phaseHead('⑤ 근복지원금 신청 서식','forms.sub','sub',
+        '<span class="chip warn" style="font-size:10px;margin-left:6px">공동 전용</span>')
+      +tplRow(TPL.subsidy)
       +(fundMode?opsRow('근복지원금 데이터 입력','<button class="primary" onclick="gotoFundTab(\'subsidy\')" style="padding:4px 10px">📊 근복지원금 입력으로 →</button>'):'')
-      +DOC_SUB.map(formRow).join('')+'</div>'+tplCard(TPL.subsidy);
+      +DOC_SUB.map(formRow).join('')+'</div>';
   }
   if(!EMB) $('crumb').textContent='서식 자료실';   // 단독 렌더는 항상 전사 표준서식
   // 머리말은 한 줄로 — 긴 설명은 ⓘ 팝업(forms.fund / forms.lib)
@@ -3578,13 +3613,30 @@ function dgDocCss(){ return "@page{size:A4 portrait;margin:"+A4_PAD+"}"
      도드라지게 한다(대표 지시 2026-09-20 「줄간격 글자크기 회사이름 날인 위치를 조정」).
      ⚠ .cbwrap 은 «이 안에서만» 가운데 정렬한다 — .a4b 전체를 건드리면 다른 여러-쪽
        서식(정관 등)까지 위아래로 밀린다. */
-  +".cbwrap{height:100%;display:flex;flex-direction:column;justify-content:center}"
-  +".cbamt{text-align:center;line-height:2;margin:0 0 26px}.cbamt b{font-size:15px;letter-spacing:1px}"
-  +".cbbody{text-align:justify;text-indent:1em;line-height:2.15;margin:0 0 30px}"
+  /* ★ 2026-09-20 두 번째 조정 — 「줄간격 더 길게, 글자 좀더 크게, 위아래 배치를 더 적절하게.
+       첨부한 한글 화일 보고 글자크기·위아래 간격을 모두 검토해서 다시 조정해라」.
+     ▣ 원본을 «실제로 재서» 맞춘 값이다. 2024년 일원공동근로복지기금 기금출연확인서.hwp 를
+       .hwpx 로 풀어 header.xml 의 charPr height(1/100pt) · paraPr lineSpacing 을 읽었다:
+         제목 24pt/200%   금액 13pt/200%   본문 14pt/220%   날짜 14pt/200%   서명 15pt/200%
+         용지 210×297mm, 좌우 여백 20mm → 글 너비 170mm (우리 .a4 와 같다)
+       ⇒ 96dpi 에서 1pt=1.333px 이므로 24pt≈32px, 14pt≈19px, 15pt≈20px 로 옮긴다.
+     ⚠ 앞선 값(본문 15px)은 원본보다 «작았다» — 그래서 키운다.
+     ⚠ 본문 줄간격은 2.6 → 2.2 로 «숫자만» 줄었다. 원본이 220% 이고, 글자가 15→19px 로
+       커졌으므로 줄 사이 실제 간격은 39px → 42px 로 오히려 넓어진다.
+     ▣ 원본은 이 크기로 «한 장에 두 장씩» 넣었다(쪽 나누기 0곳, 같은 덩이가 두 번).
+       우리는 회사마다 한 장(대표 지시 2026-09-19)이라 세로가 두 배로 남는다 — 그 여백은
+       글자를 더 키우는 대신 «칸 사이»(margin)에 돌린다. 크기는 원본 그대로가 눈에 익다.
+     ⚠ 아래로 조금 남긴다(padding-bottom) — 정확히 한가운데보다 살짝 위가 보기에 안정적이다. */
+  +".cbwrap{height:100%;display:flex;flex-direction:column;justify-content:center;padding-bottom:5%}"
+  +".cbwrap .fmtitle{font-size:32px;letter-spacing:12px;margin:0 0 60px}"
+  +".cbamt{text-align:center;line-height:2.4;font-size:17px;margin:0 0 44px}"
+  +".cbamt b{font-size:21px;letter-spacing:1.5px}"
+  +".cbbody{text-align:justify;text-indent:1em;font-size:19px;line-height:2.2;margin:0 0 60px}"
+  +".cbwrap .fmdate{font-size:19px;letter-spacing:5px;margin:0 0 64px}"
   +".cbsign{text-align:right;margin:0 10mm 0 0}"
-  +".cbco{font-size:15.5px;font-weight:800;letter-spacing:.5px;margin:0 0 8px}"
-  +".cbceo{font-size:13px;line-height:2.3}"
-  +".cbseal{display:inline-block;min-width:34px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 2px}"
+  +".cbco{font-size:22px;font-weight:800;letter-spacing:1px;margin:0 0 14px}"
+  +".cbceo{font-size:20px;line-height:2.2}"
+  +".cbseal{display:inline-block;min-width:52px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 3px}"
   /* 참석위원표의 소속 — 이름보다 작게, 옅게(2026-09-20 「위원은 회의록 위원과 같다」) */
   +".cmco{font-size:10.5px;color:#475569}"; }
 /* #doced 안에서만 적용되는 스코프판 — 페이지(앱 전체)로 새지 않게. 인라인(사이드패널·모달) 전용.
@@ -3624,14 +3676,19 @@ function dgDocCssIn(){ var s="#doced";
   +s+" .fmcols span{flex:1;text-align:center}"
   +s+" .fmsep{border:none;border-top:1px dashed #cbd5e1;margin:30px 0}"
   +s+" table.fmauto{table-layout:auto}"
-  /* 기금출연확인서 화면판 — 인쇄판(dgDocCss)과 같은 값을 #doced 안에서만 적용한다 */
-  +s+" .cbwrap{height:100%;display:flex;flex-direction:column;justify-content:center}"
-  +s+" .cbamt{text-align:center;line-height:2;margin:0 0 26px}"+s+" .cbamt b{font-size:15px;letter-spacing:1px}"
-  +s+" .cbbody{text-align:justify;text-indent:1em;line-height:2.15;margin:0 0 30px}"
+  /* 기금출연확인서 화면판 — 인쇄판(dgDocCss)과 «같은 값»을 #doced 안에서만 적용한다.
+     값을 고칠 때는 반드시 둘을 함께 고친다 — 화면과 종이가 달라지면 아무도 못 알아챈다.
+     값의 근거(원본 .hwp 실측)는 인쇄판 쪽 주석에 적어 두었다. */
+  +s+" .cbwrap{height:100%;display:flex;flex-direction:column;justify-content:center;padding-bottom:5%}"
+  +s+" .cbwrap .fmtitle{font-size:32px;letter-spacing:12px;margin:0 0 60px}"
+  +s+" .cbamt{text-align:center;line-height:2.4;font-size:17px;margin:0 0 44px}"
+  +s+" .cbamt b{font-size:21px;letter-spacing:1.5px}"
+  +s+" .cbbody{text-align:justify;text-indent:1em;font-size:19px;line-height:2.2;margin:0 0 60px}"
+  +s+" .cbwrap .fmdate{font-size:19px;letter-spacing:5px;margin:0 0 64px}"
   +s+" .cbsign{text-align:right;margin:0 10mm 0 0}"
-  +s+" .cbco{font-size:15.5px;font-weight:800;letter-spacing:.5px;margin:0 0 8px}"
-  +s+" .cbceo{font-size:13px;line-height:2.3}"
-  +s+" .cbseal{display:inline-block;min-width:34px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 2px}"
+  +s+" .cbco{font-size:22px;font-weight:800;letter-spacing:1px;margin:0 0 14px}"
+  +s+" .cbceo{font-size:20px;line-height:2.2}"
+  +s+" .cbseal{display:inline-block;min-width:52px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 3px}"
   +s+" .cmco{font-size:10.5px;color:#475569}"
   +s+"{tab-size:4}"; }
 /* ── 쪽 나누기 ──
@@ -5150,7 +5207,7 @@ function fillContribDoc(root,f,sites){
      ⚠ 첫 장에는 표를 붙이지 않는다 — 붙이면 맨 앞에 빈 장이 하나 생긴다. */
   made.forEach(function(x,i){ if(i) x.setAttribute('data-newpage','1'); });  while(root.firstChild) root.removeChild(root.firstChild);
   if(!list.length){
-    var w=document.createElement('p'); w.className='note';
+    var w=document.createElement('p'); w.className='note docnote';
     w.textContent=R
       ? ('※ '+S.year+'년에 출연한 사업장이 없어 금액을 채우지 못했습니다 —'
          +' 참여사업장 › 연도별 기록에 그 해 출연금을 넣으면 사업장마다 한 장씩 만들어집니다.')
@@ -5386,7 +5443,13 @@ function hwpFormHTML(kind,f,sites){
   /* 라벨 옆 칸 방식으로는 못 닿는 자리 — 줄글 속의 밑줄, 라벨과 한 칸에 든 값.
      서식 18종을 «자료가 다 있는 기금»으로 그려 보고 남은 빈 자리를 하나씩 이었다. */
   fillDerived(d,f,sites,kind);
-  return "<p class='note'>※ <b>원본 서식 그대로 변환</b>(03_과거자료 .hwp) — 라벨 옆 칸은 기금 데이터 자동 채움. 빈칸은 수기 기입. 이 창에서 바로 수정하세요.</p>"+d.innerHTML;
+  /* ★ 안내는 «종이 밖»으로 (대표 지시 2026-09-20 「캡쳐2 내용 삭제」).
+       여태 이 줄이 A4 첫 장 맨 위에 찍혀 나갔다 — 노동청에 내는 서류에
+       「원본 서식 그대로 변환(03_과거자료 .hwp)」이 인쇄되는 꼴이었다.
+       게다가 이 창에서 고쳐 저장하면 그 줄까지 저장본에 박혔다.
+     ⚠ 없애지는 않는다 — 보는 사람에게는 필요한 말이다. docnote 표를 달아 두면
+       화면에 올릴 때 용지 밖으로 옮겨진다(_showDocHTML). */
+  return "<p class='note docnote'>※ <b>원본 서식 그대로 변환</b>(03_과거자료 .hwp) — 라벨 옆 칸은 기금 데이터 자동 채움. 빈칸은 수기 기입. 이 창에서 바로 수정하세요.</p>"+d.innerHTML;
 }
 /* ══ 줄글 속 빈 자리 채우기 ══
    FORM_FILL 은 «라벨 칸 → 옆 칸»만 채운다. 그런데 서식에는 라벨이 없는 자리가 많다 —
@@ -5692,7 +5755,9 @@ function fillFoundContribDoc(root,f,sites){
        아무 데서나 잘랐다 — 한 회사의 확인서가 두 장에 걸쳐 찍히기도 했다.
      ⚠ 첫 장에는 표를 붙이지 않는다 — 붙이면 맨 앞에 빈 장이 하나 생긴다. */
   made.forEach(function(x,i){ if(i) x.setAttribute('data-newpage','1'); });  while(root.firstChild) root.removeChild(root.firstChild);
-  var w=document.createElement('p'); w.className='note';
+  /* 안내는 «종이 밖»으로 (대표 지시 2026-09-20 「캡쳐2 내용 삭제」) — 확인서 첫 장 위에
+     찍혀 나가던 줄이다. 말은 그대로 두되 docnote 표를 달아 용지 밖으로 옮겨지게 한다. */
+  var w=document.createElement('p'); w.className='note docnote';
   if(!list.length){
     w.textContent='※ 참여사업장이 없어 확인서를 만들지 못했습니다 — 참여사업장을 먼저 등록하세요.';
     root.appendChild(w);
@@ -5752,12 +5817,21 @@ function _closeFigures(yr){
     +"<tr><th>잔액</th><td class='right'>"+w(fin.f15_rest)+" 천원</td></tr></table>"
     +"<p class='note'>※ 별지 제13호 서식에는 없는 표입니다 — 승인 근거를 남기려고 더한 것이니 필요 없으면 지우세요.</p>";
 }
+/* ★ 서식 안내는 «종이 밖»에 (대표 지시 2026-09-20 「캡쳐2 내용 삭제」) —
+     여태 A4 첫 장 맨 위에 ※ 줄이 찍혀 나갔다. 제출용 종이에 들어갈 말이 아니고,
+     이 창에서 고쳐 저장하면 저장본에까지 박혔다.
+   ⚠ «만드는 쪽»은 그대로 둔다 — 지금처럼 글에 섞어 돌려준다. 다만 class 에 docnote 를
+     달아 두면, 화면에 올릴 때(_showDocHTML)가 그것만 골라 용지 밖으로 옮긴다.
+     이렇게 해야 서식을 짜는 함수들이 «화면이 있는지»를 몰라도 된다(검사 모래상자 포함).
+   ⚠ 이름표를 상수로 빼지 않는다 — 검사들이 함수를 «하나씩 골라» 실어 돌리는 구조라,
+     바깥 상수를 쓰면 모래상자마다 그 상수를 또 실어 줘야 한다(실제로 38건이 터졌다).
+     글자 그대로 'note docnote' 를 쓴다. */
 function docBody(kind,f,sites){
   sites=sites||[];
   var _real=hwpFormHTML(kind,f,sites); if(_real) return _real;   // 원본 변환본 우선
   var fname=esc(f.name||''), chairman=(f.chairman||''), ftype=f.fund_type||'공동';
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:chairman}];
-  var note="<p class='note'>※ 초안 자동생성본 — 제출 전 담당자 검토 필수. 밑줄 공란은 수기 기입. 이 창에서 바로 수정할 수 있습니다.</p>";
+  var note="<p class='note docnote'>※ 초안 자동생성본 — 제출 전 담당자 검토 필수. 밑줄 공란은 수기 기입. 이 창에서 바로 수정할 수 있습니다.</p>";
   if(kind==='charter'){ return note+(ftype==='사내'?charterSane(f,sites):charterGong(f,sites)); }
   if(kind==='minutes'){
     return note+"<h1>설립준비위원회 회의록</h1>"
@@ -6524,9 +6598,22 @@ function _docTypeset(root){
     });
   }catch(e){}
 }
+/* ★ 안내(.docnote)를 용지 밖으로 떼어 낸다 (대표 지시 2026-09-20 「캡쳐2 내용 삭제」).
+     서식을 짜는 함수들은 지금처럼 글에 섞어 돌려주고, 화면에 올리는 여기서만 갈라낸다.
+   ⚠ 인쇄(printDoc)·저장은 #doced 안만 가져간다 — 밖으로 빼면 둘 다에서 빠진다. */
+function _splitDocNotes(html){
+  var box=document.createElement('div'); box.innerHTML=html||'';
+  var notes=[].slice.call(box.querySelectorAll('.docnote'));
+  var out=notes.map(function(n){ var t=n.innerHTML; if(n.parentNode) n.parentNode.removeChild(n); return t; });
+  return { notes:out, body:box.innerHTML };
+}
 function _showDocHTML(html){ var w=$('docwrap'); if(!w)return;
-  var body=sanitizeDocHTML(html);
-  w.innerHTML='<div id="docstage"><div id="doced" contenteditable="true" style="outline:none"></div></div>';
+  var 갈라=_splitDocNotes(sanitizeDocHTML(html));
+  var body=갈라.body;
+  /* 안내는 용지 «밖»(#doced 바깥)에 둔다 — 인쇄도, 저장본에도 들어가지 않는다 */
+  w.innerHTML='<div id="docstage">'
+    +(갈라.notes.length?'<div class="docnotes">'+갈라.notes.map(function(t){ return '<div>'+t+'</div>'; }).join('')+'</div>':'')
+    +'<div id="doced" contenteditable="true" style="outline:none"></div></div>';
   paginateDoc(body);            // A4 본문높이에 맞춰 장을 나누고 쪽수를 붙인다
   var ed=$('doced');
   if(ed&&!ed._dirtyBound){ ed._dirtyBound=1;
@@ -15252,6 +15339,10 @@ var HELP={
    +'<p>이름이 정해지면 기금 머리의 <b>✎ 가칭</b> 딱지를 눌러 확정으로 바꾸세요.</p>'
    +'<p><b>이름을 바꿔도 자료는 따라옵니다.</b> 기금의 열쇠는 이름이 아니라 등록번호(FUND-NNNN)라서, 참여사업장·거래·연간일정·정관이 그대로 붙어 있습니다. <b>옛 이름으로도 계속 찾을 수 있습니다.</b></p>'
    +'<p>손봐야 하는 것은 <b>이 기금 전용으로 저장해 둔 서식본</b>뿐입니다 — 그 안에는 옛 이름이 글자로 박혀 있어, 이름을 바꾸면 알려 주고 지울지 물어봅니다.</p>'},
+ /* 2026-09-20 줄 정리 — 출연확인서 엑셀 줄에 깔려 있던 설명 석 줄을 여기로 접었다 */
+ 'tpl.contribx':{t:'기금출연확인서(사업장별) 엑셀',h:'<p>참여사업장 목록으로 <b>[기업정보]</b> 시트를 채웁니다.</p>'
+   +'<p>확인서 시트의 <b>연번(CJ3)</b>을 바꾸면 그 사업장 확인서가 나옵니다.</p>'
+   +'<p><b>대표자·근로자 생년월일은 개인정보라 저장하지 않습니다</b> — 엑셀에서 직접 넣으세요.</p>'},
  'estab.bundle':{t:'번호 차례대로 전부 (날인용)',h:'<p>그 단계의 서류를 <b>번호 차례대로</b> 한 화면에 세웁니다. 하나씩 열어 볼 필요가 없습니다.</p>'
    +'<p><b>맨 위의 「채울 자리 N곳」</b>이 이 화면의 알맹이입니다. <b>날인은 되돌릴 수 없습니다</b> — 도장을 찍기 <b>전</b>에 무엇이 비었는지 보세요. 서류마다 몇 곳인지도 딱지로 붙습니다.</p>'
    +'<p>이 수에는 <b>관청이 적는 칸</b>(접수번호·처리기간)과 <b>사람이 손으로 적어야 하는 칸</b>(주민등록번호·인감·계좌)도 함께 셉니다. 그래서 <b>0을 목표로 삼는 수가 아닙니다</b> — 「여기를 보라」는 뜻입니다.</p>'

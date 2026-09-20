@@ -301,7 +301,12 @@ console.log('\n■ 값이 없으면 «지어내지 않는다»');
   global.funds.X = F; }
 
 console.log('\n■ 배선');
-ok('hwpFormHTML 이 마지막에 fillDerived 를 부른다', /fillDerived\(d,f,sites,kind\);\s*return "<p class='note'>/.test(gF('hwpFormHTML')));
+/* 2026-09-20: 안내 줄에 docnote 표를 달았다 — 화면에 올릴 때 용지 밖으로 옮겨진다
+   (제출 서류에 「원본 서식 그대로 변환…」이 인쇄되고 저장본에까지 박히던 것을 고쳤다). */
+ok('hwpFormHTML 이 마지막에 fillDerived 를 부른다',
+  /fillDerived\(d,f,sites,kind\);[\s\S]{0,600}?return "<p class='note docnote'>/.test(gF('hwpFormHTML')));
+ok('안내 줄이 용지 밖으로 빠지게 표를 단다(docnote)',
+  (gF('hwpFormHTML').match(/class='note docnote'/g) || []).length === 1);
 /* 「바로 앞줄인가」가 아니라 «앞서 도는가»를 본다 — 2026-09-10 에 그 사이로 자리표 채우기가
    들어왔다(정관·설립합의서). 붙어 있기를 요구하면 새 채움을 넣을 때마다 이 검사가 깨진다. */
 (() => {
