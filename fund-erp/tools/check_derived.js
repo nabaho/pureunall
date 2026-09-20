@@ -67,7 +67,9 @@ global.funds = {};
   gS('SIGN_L'), gS('SIGN_R'), gS('SIGN_WHO_ONLY_SRC'), gS('SIGN_HEAD'),
   /* 2026-09-20: 연명 날인표를 짜는 일은 signTableHTML 한 곳으로 모았다 —
     설립합의서·정관과 회의록 뒤쪽 참석위원표가 같은 모양이어야 한다 */
- gF('_signLabels'), gF('signTableHTML'), gF('fillSignTable'), gF('fillAttendSign'),
+ /* 2026-09-20 오후: 회의록 뒤쪽은 «위원마다 한 줄»(attendSignHTML)로 갈라졌다 */
+ gF('_signLabels'), gF('signTableHTML'), gF('fillSignTable'),
+ gF('_cmWho'), gF('attendSignHTML'), gF('fillAttendSign'),
   gS('CHARTER_TITLE'), gS('CHARTER_NAME'), gS('CHARTER_BRANCH'), gS('CHARTER_DATELINE'),
   gF('fillCharterHead'),
   /* 2026-09-19: 사내 정관의 서명 격자(원본이 이미 표다 — 이름만 비어 있었다) */

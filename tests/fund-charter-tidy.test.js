@@ -166,10 +166,14 @@ test('★ 표 머리와 줄에 번호가 붙는다', () => {
   assert.match(fn, /\(i\+1\)/, '줄마다 번호를 매겨야 한다');
 });
 
-test('★★ 연명 날인표를 «짜는 곳»은 하나다 — 둘이면 서식마다 모양이 갈린다', () => {
-  ['fillSignTable', 'fillAttendSign'].forEach((n) => {
-    assert.match(grabFn(n), /signTableHTML\(lab,list\)/, '★ ' + n + ' 이 표를 따로 짭니다.');
-  });
+test('★★ «회사마다 한 줄» 날인표를 짜는 곳은 하나다 — 둘이면 서식마다 모양이 갈린다', () => {
+  /* 2026-09-20 오후: 회의록 뒤쪽은 «위원마다 한 줄»(attendSignHTML)로 갈라졌다 —
+     회의록의 참석위원은 회사가 아니라 위원이기 때문이다(등기임원이 빠지고 있었다).
+     정관·설립합의서·출연확인서는 회사끼리 맺는 계약이라 그대로 «회사마다 한 줄»이다. */
+  assert.match(grabFn('fillSignTable'), /signTableHTML\(lab,list\)/,
+    '★ 계약 서식의 회사별 날인표가 따로 짜입니다.');
+  assert.match(grabFn('fillAttendSign'), /attendSignHTML\(f,sites,lab\)/,
+    '★ 회의록 참석위원표가 위원 명단에서 안 옵니다.');
   /* 짜는 코드가 정말 한 곳뿐인지 — 「(인)」을 붙이는 자리가 둘이면 갈라진 것이다 */
   const 코드 = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ');
   assert.equal((코드.match(/&nbsp;\(인\)/g) || []).length, 1,

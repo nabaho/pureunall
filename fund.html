@@ -3584,7 +3584,9 @@ function dgDocCss(){ return "@page{size:A4 portrait;margin:"+A4_PAD+"}"
   +".cbsign{text-align:right;margin:0 10mm 0 0}"
   +".cbco{font-size:15.5px;font-weight:800;letter-spacing:.5px;margin:0 0 8px}"
   +".cbceo{font-size:13px;line-height:2.3}"
-  +".cbseal{display:inline-block;min-width:34px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 2px}"; }
+  +".cbseal{display:inline-block;min-width:34px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 2px}"
+  /* 참석위원표의 소속 — 이름보다 작게, 옅게(2026-09-20 「위원은 회의록 위원과 같다」) */
+  +".cmco{font-size:10.5px;color:#475569}"; }
 /* #doced 안에서만 적용되는 스코프판 — 페이지(앱 전체)로 새지 않게. 인라인(사이드패널·모달) 전용.
    화면에서도 A4 용지 한 장처럼 보이게 흰 페이지(210×297mm, 여백 20mm)를 그린다.
    패널이 좁으면 fitDocA4()가 배율을 줄여 용지 전체가 들어오게 맞춘다. */
@@ -3630,6 +3632,7 @@ function dgDocCssIn(){ var s="#doced";
   +s+" .cbco{font-size:15.5px;font-weight:800;letter-spacing:.5px;margin:0 0 8px}"
   +s+" .cbceo{font-size:13px;line-height:2.3}"
   +s+" .cbseal{display:inline-block;min-width:34px;border-bottom:1px solid #94a3b8;text-align:center;margin:0 2px}"
+  +s+" .cmco{font-size:10.5px;color:#475569}"
   +s+"{tab-size:4}"; }
 /* ── 쪽 나누기 ──
    긴 서식을 A4 본문높이(257mm)에 맞춰 여러 장으로 자르고, 장마다 하단에 쪽수를 붙인다.
@@ -4524,8 +4527,42 @@ function fillSignTable(root,f,sites){
 
    ⚠ 부르는 말은 이 서식이 쓴 「근로자위원·사용자위원」을 그대로 쓴다.
    ⚠ 참여사업장이 없으면 손대지 않는다 — 원본 그대로 두는 편이 낫다. */
+/* ★★ 2026-09-20 두 번째 지시로 «줄의 뜻»이 바뀌었다 —
+     「기금설립준비위원회의 위원은 설립준비위원회회의록 위원과 같다」
+
+   종전에는 이 표가 signTableHTML(«참여회사마다 한 줄»)을 썼다. 그래서
+   «등기임원명부에만 있고 어느 사업장에도 안 묶인 위원»(예: 근로자측 이사로 선임된 사람)이
+   이 표에서 통째로 빠졌다 — 별지 제7호 위원 명부에는 있는 사람이 회의록에는 없었다.
+   회의록의 참석위원은 «회사»가 아니라 «위원»이다. _prepCommittee 하나(등기임원 ∪ 사업장
+   대표, 이름으로 중복 제거)에서 받아 위원마다 한 줄을 세운다.
+
+   ⚠ 정관·설립합의서·출연확인서의 「참여회사마다 한 줄」 서명표(signTableHTML)는 그대로 둔다 —
+     그것은 회사끼리 맺는 계약이라 회사마다 날인을 받는 것이 맞다.
+   ⚠ 위원이 많아도 «별지로 빼지 않는다» — 서명은 이름이 적힌 자리에서 받는 것이라
+     「별지와 같음」이 말이 안 된다. 줄을 그대로 늘리면 쪽 나누기가 다음 장으로 이어 준다.
+   ⚠ 소속은 «아는 것만» 적는다(사업장에서 온 위원). 등기임원은 소속이 자료에 없으므로 비운다. */
+function _cmWho(o){
+  var n=String((o&&o.name)||'').trim(); if(!n) return '';
+  var co=String((o&&o.company)||'').trim();
+  return esc(n)+(co?' <span class="cmco">('+esc(co)+')</span>':'');
+}
+function attendSignHTML(f,sites,lab){
+  var wk=_prepCommittee(f,'근로자측',sites), er=_prepCommittee(f,'사용자측',sites);
+  var n=Math.max(wk.length,er.length); if(!n) return '';
+  var head='<tr><th style="width:40px">번호</th><th>'+esc(lab.l)+'</th><th style="width:64px">서명</th>'
+    +'<th>'+esc(lab.r)+'</th><th style="width:64px">서명</th></tr>';
+  var body='';
+  for(var i=0;i<n;i++){
+    body+='<tr><td class="center">'+(i+1)+'</td>'
+      +'<td>'+(_cmWho(wk[i])||'&nbsp;')+'</td><td></td>'
+      +'<td>'+(_cmWho(er[i])||'&nbsp;')+'</td><td></td></tr>';
+  }
+  return head+body;
+}
 function fillAttendSign(root,f,sites){
-  var list=estabSites(sites); if(!list.length) return 0;
+  var lab={l:'근로자위원', r:'사용자위원'};
+  var html=attendSignHTML(f,sites,lab);
+  if(!html) return 0;                       /* 위원이 하나도 없으면 원본 그대로 둔다 */
   var 글=function(el){ return String((el&&el.textContent)||'').replace(/\s/g,''); };
   var tbs=[].slice.call(root.querySelectorAll('table')), 한것=0;
   tbs.forEach(function(tb){
@@ -4541,17 +4578,16 @@ function fillAttendSign(root,f,sites){
     var ai=-1;
     for(var j=hi+1;j<trs.length;j++){ if(/^참석위원/.test(글(trs[j]))){ ai=j; break; } }
     if(ai<0) return;
-    var lab={l:'근로자위원', r:'사용자위원'};
     /* 머리줄과 참석위원 줄을 우리 표로 갈아 끼운다. 원본의 빈 자리 줄(높이만 있는 줄)은
        그대로 둔다 — 그 자리가 서식의 아래 여백이다. */
     var 새=document.createElement('table');
     새.setAttribute('data-kept','1');
-    새.innerHTML=signTableHTML(lab,list);
+    새.innerHTML=html;
     if(tb.parentNode) tb.parentNode.insertBefore(새,tb);
     [trs[hi],trs[ai]].forEach(function(tr){ if(tr&&tr.parentNode) tr.parentNode.removeChild(tr); });
     /* 남은 것이 빈 줄뿐이면 원본 표째 걷는다 — 빈 격자가 새 표 아래 또 서면 어지럽다 */
     if(!글(tb) && tb.parentNode) tb.parentNode.removeChild(tb);
-    한것+=list.length;
+    한것++;
   });
   return 한것;
 }

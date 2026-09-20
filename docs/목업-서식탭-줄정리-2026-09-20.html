@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>서식 탭 줄 정리 — 목업</title>
+<style>
+  :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
+    --line:#e2e8f0;--panel:#fff;--bg:#e2e8f0;--ok:#166534;--ok-bg:#f0fdf4;--warn:#854d0e;--warn-bg:#fffbeb;
+    --danger:#dc2626}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
+    background:var(--bg);font-size:14px;padding:18px 22px 60px}
+  h1{font-size:19px;margin:0 0 4px}
+  .lede{color:var(--sub);font-size:13px;margin:0 0 18px;max-width:840px;line-height:1.7}
+  .wrap{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px}
+  .lab{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:#fff;
+    background:var(--ink);border-radius:6px;padding:2px 8px;margin-bottom:12px}
+  .lab.now{background:#b91c1c} .lab.new{background:#15803d}
+  .note{font-size:12px;color:var(--sub);line-height:1.75;margin:10px 0 0}
+  .note b{color:var(--ink)}
+  ul{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--sub);line-height:1.85}
+  ul b{color:var(--ink)}
+
+  /* 앱 화면 흉내 */
+  .app{background:#e2e8f0;padding:12px;border-radius:9px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:12px}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  h2{font-size:15px;margin:0}
+  button{font-family:inherit;font-size:12.5px;padding:5px 11px;border:1px solid var(--line);background:#fff;
+    border-radius:8px;color:var(--ink);cursor:default}
+  button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+  button.sm{padding:3px 8px;font-size:11.5px}
+  .chip{font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:999px}
+  .chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.dg{background:#fef2f2;color:var(--danger)}
+  .chip.warn{background:var(--warn-bg);color:var(--warn)}
+  .i{display:inline-flex;width:17px;height:17px;border-radius:50%;border:1px solid var(--line);
+    align-items:center;justify-content:center;font-size:10px;color:var(--sub)}
+  .frow{display:flex;align-items:center;gap:6px;padding:7px 6px;border-bottom:1px solid var(--line);font-size:12.5px}
+  .frow .t{flex:1;font-weight:600}
+  .frow .t small{font-weight:400;color:var(--faint);font-size:10.5px;margin-left:4px}
+  .muted{color:var(--sub);font-size:11.5px}
+  .dup{outline:2px dashed #dc2626;outline-offset:3px;border-radius:8px;position:relative}
+  .duptag{position:absolute;top:-9px;left:8px;background:#dc2626;color:#fff;font-size:9.5px;
+    font-weight:800;border-radius:4px;padding:1px 6px}
+  .cnt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}
+  .c{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .c .k{font-size:11px;color:var(--sub)}
+  .c .v{font-size:19px;font-weight:800;margin-top:2px}
+  .c .v.bad{color:#b91c1c} .c .v.good{color:#15803d}
+  .xrow{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8fafc;
+    border:1px solid var(--line);border-radius:9px;margin:0 0 10px;flex-wrap:wrap}
+  .xrow .nm{font-weight:700;font-size:12.5px;white-space:nowrap}
+  .xrow .fn{font-size:11px;color:var(--sub);flex:1;min-width:150px}
+</style></head><body>
+
+<h1>서식 탭 ① 인가 — 줄 정리 · 중복 정리 목업</h1>
+<p class="lede">「캡쳐2 줄컨정리하고 캡쳐3동 중복되는 부분 모두 어떻게 정리해야할지 목업해라」<br>
+파일 이름·기금 이름은 가짜입니다. <b>기능은 하나도 없애지 않고</b>, 같은 일을 하는 단추가 두 군데 있는 것만 모읍니다.</p>
+
+<!-- ══════ 지금 ══════ -->
+<div class="wrap">
+  <span class="lab now">지금 — 패널 3개</span>
+  <div class="app">
+    <div class="panel">
+      <div class="row">
+        <h2>① 노동부 설립인가 서식</h2>
+        <span class="chip warn">공동기금 기본서식</span><span class="i">ⓘ</span><span class="i">ⓘ</span>
+        <span style="flex:1"></span>
+        <button class="primary">📁 여러 .hwp 한번에 등록</button>
+      </div>
+      <div class="row" style="margin:10px 0">
+        <span class="dup"><span class="duptag">중복 A</span>
+          <button class="primary">⬇ 인가 6종 엑셀 채워받기</button>
+          <button>👁 엑셀 보기</button></span>
+        <button class="primary">🖨 번호 차례대로 전부(날인용)</button>
+        <span class="i">ⓘ</span><span class="i">ⓘ</span>
+      </div>
+      <div class="frow"><span class="t">1. 설립인가신청서(별지 제7호) <small>클릭=미리보기</small></span><button>⬆ 원본 .hwp 등록</button></div>
+      <div class="frow"><span class="t">2. 설립합의서 <small>클릭=미리보기</small></span><button>⬆ 원본 .hwp 등록</button></div>
+      <div class="frow"><span class="t">3. 정관 <small>클릭=미리보기</small></span><button>⬆ 원본 .hwp 등록</button></div>
+      <div class="frow" style="color:var(--faint)">… 4·5·6 …</div>
+    </div>
+
+    <div class="panel dup"><span class="duptag">중복 A — 같은 단추</span>
+      <div class="row"><h2>설립 서식(6종)</h2><span style="flex:1"></span>
+        <span class="chip ok">원본 등록됨</span>
+        <button class="sm">원본 교체</button><button class="sm">삭제</button></div>
+      <p class="muted" style="margin:6px 0 0">원본 파일: 2024년 근로복지기금 설립인가신청서 양식_240906.xlsx</p>
+      <div class="row" style="margin-top:10px">
+        <button class="primary">⬇ [충남 1호] 설립 서식(6종) 데이터 채워 받기</button>
+        <button>👁 엑셀 화면에서 보기</button></div>
+    </div>
+
+    <div class="panel">
+      <div class="row"><h2>기금출연확인서(사업장별)</h2><span style="flex:1"></span>
+        <span class="chip dg">원본 미등록</span>
+        <button class="primary sm">📎 원본 엑셀 등록</button></div>
+      <p class="muted" style="margin:6px 0 0">원본 파일: 기금출연확인서 양식(빈양식).xlsx</p>
+      <p class="muted" style="margin:4px 0 0">참여사업장 목록으로 [기업정보] 시트를 채웁니다. 확인서 시트의 연번(CJ3)을 바꾸면 해당 사업장 확인서가 나옵니다. 대표자·근로자 생년월일은 개인정보라 저장하지 않으니 엑셀에서 직접 입력하세요.</p>
+    </div>
+  </div>
+  <p class="note"><b>무엇이 겹치나</b> — 빨간 테두리 <b>중복 A</b> 둘은 <b>같은 단추</b>입니다.
+  「⬇ 인가 6종 엑셀 채워받기 / 👁 엑셀 보기」와 「⬇ [충남 1호] 설립 서식(6종) 데이터 채워 받기 / 👁 엑셀 화면에서 보기」가
+  <b>똑같은 기능</b>인데 이름만 다르게 두 군데 있습니다. 게다가 <b>같은 엑셀 한 벌</b>을 두고
+  「① 노동부 설립인가 서식」과 「설립 서식(6종)」이라는 <b>서로 다른 이름의 패널 둘</b>로 갈라져 있습니다.</p>
+</div>
+
+<!-- ══════ 바꾼 뒤 ══════ -->
+<div class="wrap">
+  <span class="lab new">바꾼 뒤 — 패널 1개</span>
+  <div class="app">
+    <div class="panel">
+      <div class="row">
+        <h2>① 노동부 설립인가 서식</h2>
+        <span class="chip warn">공동기금 기본서식</span><span class="i">ⓘ</span>
+        <span style="flex:1"></span>
+        <button class="primary">🖨 번호 차례대로 전부(날인용)</button>
+        <button>📁 .hwp 여러 개 등록</button>
+      </div>
+
+      <div class="xrow" style="margin-top:10px">
+        <span class="nm">📗 엑셀 6종</span>
+        <span class="chip ok">등록됨</span>
+        <span class="fn">2024년 근로복지기금 설립인가신청서 양식_240906.xlsx</span>
+        <button class="primary">⬇ 채워 받기</button>
+        <button>👁 보기</button>
+        <button class="sm">교체</button><button class="sm">삭제</button>
+      </div>
+
+      <div class="frow"><span class="t">1. 설립인가신청서(별지 제7호) <small>클릭=미리보기</small></span><button>⬆ 원본 .hwp 등록</button></div>
+      <div class="frow"><span class="t">2. 설립합의서 <small>클릭=미리보기</small></span><button>⬆ 원본 .hwp 등록</button></div>
+      <div class="frow"><span class="t">3. 정관 <small>클릭=미리보기</small></span><button>⬆ 원본 .hwp 등록</button></div>
+      <div class="frow" style="color:var(--faint)">… 4·5·6 …</div>
+
+      <div class="xrow" style="margin:12px 0 0">
+        <span class="nm">📗 기금출연확인서(사업장별)</span>
+        <span class="chip dg">미등록</span>
+        <span class="fn">기금출연확인서 양식(빈양식).xlsx</span>
+        <span class="i">ⓘ</span>
+        <button class="primary">📎 원본 엑셀 등록</button>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>무엇을 바꿨나</b></p>
+  <ul>
+    <li><b>패널 셋 → 하나.</b> 「설립 서식(6종)」·「기금출연확인서」 패널을 없애고, 그 안의 것들을
+      <b>한 줄짜리 엑셀 줄</b>로 바꿔 같은 패널 안에 넣었습니다 — 어차피 <b>같은 ① 인가 단계의 서류</b>입니다.</li>
+    <li><b>같은 단추 두 벌 → 한 벌.</b> 「채워 받기 / 보기」는 엑셀 줄에만 둡니다.
+      이름도 길게 늘이지 않습니다(「[충남 1호] 설립 서식(6종) 데이터 채워 받기」 → 「채워 받기」) —
+      어느 기금인지는 화면 맨 위에 이미 있습니다.</li>
+    <li><b>ⓘ 넷 → 둘.</b> 제목 옆 ⓘ 하나(이 단계 서식 전체 설명)와 출연확인서 줄의 ⓘ 하나만 남깁니다.</li>
+    <li><b>긴 설명 석 줄은 ⓘ 안으로.</b> 출연확인서 엑셀의 「[기업정보] 시트를 채웁니다…」 설명은
+      화면에서 빼고 ⓘ 로 접습니다(이 시스템의 기존 규칙입니다).</li>
+    <li><b>자주 쓰는 것을 오른쪽 위로.</b> 늘 쓰는 [🖨 번호 차례대로 전부]는 머리줄로 올리고,
+      처음 한 번만 쓰는 [📁 .hwp 여러 개 등록]은 그 옆에 흐리게 둡니다.</li>
+  </ul>
+  <div class="cnt">
+    <div class="c"><div class="k">패널</div><div class="v"><span class="bad">3</span> → <span class="good">1</span></div></div>
+    <div class="c"><div class="k">단추</div><div class="v"><span class="bad">11</span> → <span class="good">8</span></div></div>
+    <div class="c"><div class="k">ⓘ</div><div class="v"><span class="bad">4</span> → <span class="good">2</span></div></div>
+    <div class="c"><div class="k">화면에 깔린 설명줄</div><div class="v"><span class="bad">4</span> → <span class="good">0</span></div></div>
+  </div>
+</div>
+
+<div class="wrap" style="background:var(--warn-bg);border-color:#fde68a">
+  <b style="font-size:13px">다른 단계(②~⑤)도 같이 할까요?</b>
+  <ul>
+    <li>② 법인설립·③ 고유번호증·④ 운영·⑤ 근복지원금도 <b>머리줄 모양이 같습니다</b> —
+      [🖨 번호 차례대로 전부]를 머리줄로 올리고 ⓘ 를 하나로 줄이면 다섯 단계가 같은 모양이 됩니다.
+      ⑤ 근복지원금에는 「지원신청 서식」 엑셀 패널이 하나 더 붙어 있는데, ①과 같은 방식으로
+      한 줄로 접으면 됩니다.</li>
+    <li><b>이 목업대로 진행할지</b>, ①만 먼저 해 볼지 말씀해 주십시오.</li>
+  </ul>
+</div>
+
+</body></html>
