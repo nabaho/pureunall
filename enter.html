@@ -1647,6 +1647,27 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
 
+  // ── 로그인 시도 기록(무단 로그인 감지용, 2026-09-20) ──────────────────
+  // ⚠ 응답을 절대 기다리지 않는다 — 이 기록이 실패해도 로그인 자체는 그대로 되어야 한다.
+  var LOGIN_LOG_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/logLoginAttempt';
+  function loginDeviceId(){
+    var KEY = 'pu_device_id';
+    try {
+      var v = localStorage.getItem(KEY);
+      if(!v){ v = Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem(KEY, v); }
+      return v;
+    } catch(e){ return 'no-storage-' + Date.now().toString(36); }
+  }
+  function reportLogin(email, ok, code){
+    try {
+      fetch(LOGIN_LOG_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, ok: !!ok, code: code || '', deviceId: loginDeviceId(), ua: navigator.userAgent })
+      }).catch(function(){});
+    } catch(e){}
+  }
+
   function doLogin(){
     var id = ($('loginId').value || '').trim();
     var pw = $('loginPw').value || '';
@@ -1688,6 +1709,7 @@ body.portal-mode #moreFab{display:flex;}
       return auth.signInWithEmailAndPassword(email, pw);
     }).then(function(cred){
       _settled = true; clearTimeout(_watchdog);
+      reportLogin(email, true, '');
       // 아이디 저장 (포털 전용 키 + ERP 화면 채움용 공유 키 병행)
       try {
         if($('saveId').checked){
@@ -1716,6 +1738,7 @@ body.portal-mode #moreFab{display:flex;}
       _settled = true; clearTimeout(_watchdog);
       $('loginBtn').disabled = false;
       var code = (err && err.code) || '';
+      reportLogin(email, false, code || (err && err.puPersistence ? 'persistence' : 'unknown'));
       if(err && err.puPersistence){
         showErr(wantsAutoLogin
           ? '이 브라우저에서는 자동로그인을 저장할 수 없습니다. 삼성 인터넷 또는 Chrome에서 다시 시도해 주세요.'
