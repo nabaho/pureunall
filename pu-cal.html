@@ -166,8 +166,10 @@
   .day{min-height:104px;padding:5px 4px 3px;overflow:hidden;box-sizing:border-box;position:relative}
   /* 날짜 줄 — 칸 «가운데»에 「25 (13)」 처럼 날짜와 음력을 나란히 */
   .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:4px;padding:0 2px}
+  /* 대표 지시 2026-09-20 「한글과 숫자가 좀더 진했으면」 — 400(보통)은 12px 에서
+     연해 보인다. 600(약간 굵게)으로 올렸다. 색(--ink #1e293b)은 이미 짙어서 안 바꿨다. */
   .dnum{min-width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;
-    padding:0 3px;font-size:12px;font-weight:400;cursor:pointer;color:var(--ink);background:transparent}
+    padding:0 3px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink);background:transparent}
   /* 오늘 동그라미는 «숫자에만» — 음력까지 감싸면 알약처럼 길어진다 */
   .dnum.today{background:#2563eb;color:#ffffff;font-weight:700}
   .dnum.other{color:#94a3b8}
@@ -879,7 +881,10 @@ function chipHtml(e, ymd){
     글자 = textOn(바탕);
   } else {
     바탕 = 어둠 ? mixHex(사람색, "#1e293b", .80) : mixHex(사람색, "#ffffff", 칩_옅게);
-    글자 = 어둠 ? mixHex(사람색, "#ffffff", .50) : mixHex(사람색, "#000000", .58);
+    /* 대표 지시 2026-09-20 「한글이 좀더 진했으면」 — 밝은판만 .58 → .72 로 검정을
+       더 섞었다(재 보니 대비가 오히려 더 좋아진다: 최악 5.86:1 → 9.15:1). 어두운판은
+       이미 흰 쪽으로 옅어 안 바꿨다 — 더 섞으면 색이 지워진다. */
+    글자 = 어둠 ? mixHex(사람색, "#ffffff", .50) : mixHex(사람색, "#000000", .72);
     띠   = ";border-left:3px solid " + esc(사람색) + ";border-radius:0 4px 4px 0";
   }
   return '<div class="ev" data-ev="' + esc(e.store) + ':' + esc(e.id) + '"'
