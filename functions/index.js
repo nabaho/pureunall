@@ -31,7 +31,21 @@ const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
 const 지역뉴스부품 = require("./news-region");
 const LS = require("./login-security");
-const geoip = require("geoip-lite");
+/* ★★★ geoip-lite 는 «부를 때» 부른다 — 맨 위에서 부르면 안 된다 (2026-09-20 실측).
+     ⚠⚠ 이 꾸러미는 나라 대역표를 통째로 메모리에 올린다. 맨 위에서 부르면 이 파일의
+       «모든 함수»가 콜드 스타트마다 그 값을 치른다 — 정작 쓰는 데는 아래 한 곳뿐이다.
+     ⚠ 실제로 두 번 터졌다:
+       ① newsFullPage 256MB → "Memory limit of 256 MiB exceeded with 384 MiB used"
+       ② newsClick 128MB → 배포 자체가 "function load attempt timed out" 으로 실패
+     ★ 그래서 쓰는 자리에서 부른다. 한 번 부르면 require 가 갈무리해 두므로,
+       그 함수는 두 번째부터 값을 안 치른다. 나머지 함수는 아예 안 치른다.
+     ⚠ 되돌리지 말 것 — 맨 위로 옮기는 순간 128MB 짜리 함수들이 «배포부터» 안 된다. */
+function geoip나라(ip) {
+  try {
+    const hit = require("geoip-lite").lookup(ip);
+    return (hit && hit.country) ? String(hit.country) : "";
+  } catch (e) { return ""; }
+}
 const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
 
@@ -5447,12 +5461,7 @@ exports.logLoginAttempt = functions
 
     const ip = LS.lastIp(req.headers["x-forwarded-for"]) || String(req.ip || "");
     const now = Date.now();
-    const country = (() => {
-      try {
-        const hit = geoip.lookup(ip);
-        return (hit && hit.country) ? String(hit.country) : "";
-      } catch (e) { return ""; }
-    })();
+    const country = geoip나라(ip);
 
     // 실재 계정인지는 «안으로만» 쓴다 — 화면 에러 문구는 절대 안 바뀐다(2026-09-07 결정 유지).
     // 성공 보고는 증표에 적힌 uid 를 그대로 쓴다(이메일로 되찾지 않는다).
