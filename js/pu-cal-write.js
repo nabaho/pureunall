@@ -208,6 +208,32 @@
       .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
   }
 
+  /* ── 내부 직원 비고 (data/ieum_notes) ────────────────────────────────────
+     캘린더 한 곳으로 모으기 2걸음. 「개인 요구사항」 메모다.
+     ⚠ 외부 인원의 비고는 여기가 아니라 external_staff 레코드의 note 칸이다 —
+       그쪽은 «레코드 표»라 위의 칸별 저장 문(save)을 그대로 쓴다. 두 자리가
+       갈린 것은 이알피가 그렇게 담아 온 것이라 그대로 따른다(옮기면 옛 글이 사라진다).
+     ⚠ 색표와 달리 «빈 지도»를 허락한다 — 마지막 비고를 지운 것은 멀쩡한 상태다.
+     ⚠ 누가 쓸 수 있는지는 서버 규칙이 정한다(이 칸은 로그인한 직원 누구나 — 이알피와 같다). */
+  function saveNotes(notes) {
+    if (!_db) return Promise.resolve(fail('no_db', '아직 서버에 붙기 전입니다'));
+    if (!notes || typeof notes !== 'object' || Array.isArray(notes)) {
+      return Promise.resolve(fail('bad_shape', '비고는 «사번 → 글» 지도여야 합니다'));
+    }
+    var keys = Object.keys(notes);
+    for (var i = 0; i < keys.length; i++) {
+      if (BADKEY.test(keys[i])) {
+        return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다: ' + keys[i]));
+      }
+      if (typeof notes[keys[i]] !== 'string') {
+        return Promise.resolve(fail('bad_note', '비고는 글이어야 합니다: ' + keys[i]));
+      }
+    }
+    return _db.ref('data/ieum_notes').set({ v: notes, u: Date.now() })
+      .then(function () { return OK; })
+      .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
+  }
+
   /* 한 건 지우기 — 자리를 비운다(v/{번호} = null). */
   function remove(table, id, prev) {
     var g = check(table, id, {}, prev && prev.date);
@@ -239,6 +265,7 @@
     save: save,
     saveColors: saveColors,
     saveMailMap: saveMailMap,
+    saveNotes: saveNotes,
     remove: remove,
     newId: newId
   };
