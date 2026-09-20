@@ -2125,6 +2125,35 @@ async function requireReader(req) {
   return decoded;
 }
 
+/* 오늘 이 사람이 몇 번 썼나 · 사무실 전체가 몇 번 썼나.
+   ⚠ 못 읽으면 «막지 않는다» — 셈이 안 되는 것과 한도를 넘은 것은 다른 일이다.
+     여기서 막으면 실시간DB 가 잠깐 흔들릴 때 기능이 통째로 멎는다(readDoc 과 같은 판단). */
+async function typeSafeDayLeft(uid) {
+  try {
+    const db = getDatabase();
+    const paths = TypeSafeEvaluate.tallyPaths(uid, DR.ymdKST());
+    const [mine, all] = await Promise.all(paths.map((p) => db.ref(p).once("value")));
+    return Object.assign({ known: true }, TypeSafeEvaluate.leftOf(mine.val(), all.val()));
+  } catch (e) {
+    console.warn("Jev 하루 셈 못 읽음(막지 않는다):", String((e && e.message) || e));
+    return { known: false, left: TypeSafeEvaluate.PERSON_DAY_LIMIT, mine: 0, all: 0, over: false };
+  }
+}
+
+/* 센다 — «성공한 것만» 센다. 열쇠가 거절당한 부름은 글이 업체에 남지 않았으므로
+   한도를 먹일 까닭이 없다(그것까지 세면 첫 시험 몇 번에 하루 몫이 날아간다).
+   ★ ServerValue.increment 대신 «거래»로 올린다 — 이 파일에 admin 변수가 없다(위 bumpReadTally 참고). */
+async function bumpTypeSafeTally(uid) {
+  try {
+    const db = getDatabase();
+    await Promise.all(TypeSafeEvaluate.tallyPaths(uid, DR.ymdKST()).map(function (p) {
+      return db.ref(p).transaction(function (cur) { return (Number(cur) || 0) + 1; });
+    }));
+  } catch (e) {
+    console.warn("Jev 셈 적기 실패(판단은 이미 끝났다):", String((e && e.message) || e));
+  }
+}
+
 /* Jev 판단 — 첫 판은 화면이 «제안»만 받는다. 저장·발송·상태변경은 이 함수가 하지 않는다. */
 exports.typeSafeEvaluate = functions
   .region(MAIL_REGION)
@@ -2133,16 +2162,29 @@ exports.typeSafeEvaluate = functions
     setCors(req, res);
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
-    try { await requireReader(req); }
+    let who;
+    try { who = await requireReader(req); }
     catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
     const key = String(process.env.TYPESAFE_API_KEY || "").trim();
-    if (!key || key === "unset") { res.status(503).json({ ok: false, error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." }); return; }
+    if (!key || key === "unset") {
+      res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
+      return;
+    }
+    /* ── 하루 문 — 넘었으면 «부르지 않는다» (2026-09-20 대표 지시 「고쳐라」) ──
+       글이 나가기 «전»에 막아야 뜻이 있다. 부른 뒤에 세면 이미 나간 것이다. */
+    const 몫 = await typeSafeDayLeft(who && who.uid);
+    if (몫.over) { const r = TypeSafeEvaluate.overLimitError(몫); res.status(r.status).json(r); return; }
     try {
       const result = await TypeSafeEvaluate.evaluate(fetch, key, req.body && req.body.text);
+      if (result.ok) {
+        await bumpTypeSafeTally(who && who.uid);
+        result.left = Math.max(0, 몫.left - 1);
+        result.dayLimit = TypeSafeEvaluate.PERSON_DAY_LIMIT;
+      }
       res.status(result.ok ? 200 : result.status).json(result);
     } catch (e) {
       console.warn("Jev 판단 실패:", String((e && e.message) || e).slice(0, 300));
-      res.status(502).json({ ok: false, error: "Jev 판단을 받지 못했습니다." });
+      res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
     }
   });
 
