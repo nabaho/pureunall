@@ -18,3 +18,10 @@ test("Jev 응답은 제안값만 돌려주고 열쇠는 담지 않는다", async
   assert.equal(got.answers.urgency.noul, 0.9);
   assert.equal(JSON.stringify(got).includes("비밀열쇠"), false);
 });
+
+test("업무 제안은 기한·영향·위험·주의·자료·첫 조치를 나누어 묻는다", () => {
+  const q = T.questions();
+  ["deadline", "impact", "legal_wage_risk", "privacy_security", "info_missing", "first_action"].forEach((key) => {
+    assert.ok(q[key], key + " 질문이 있어야 합니다.");
+  });
+});
