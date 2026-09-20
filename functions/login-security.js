@@ -26,4 +26,59 @@ function parseAttempt(body) {
   return { valid: true, email, deviceId, ua, ok, code };
 }
 
-module.exports = { firstIp, parseAttempt };
+// 검사고정-허용: 설계문서 §5 승인 문턱값 — 15분 안에 비밀번호 5회 연속 실패
+const FAIL_WINDOW_MS = 15 * 60 * 1000;
+const FAIL_THRESHOLD = 5;
+
+function isNewDevice(knownDevices, deviceId) {
+  const known = knownDevices || {};
+  const hasBaseline = Object.keys(known).length > 0;
+  return hasBaseline && !known[deviceId];
+}
+
+function isNewCountry(knownCountries, country) {
+  if (!country) return false;                 // 모르면 의심하지 않는다
+  const known = knownCountries || {};
+  const hasBaseline = Object.keys(known).length > 0;
+  return hasBaseline && !known[country];
+}
+
+function nextBurst(prevBurst, nowMs, ok) {
+  if (ok) return { count: 0, windowStartAt: nowMs };
+  const prev = (prevBurst && typeof prevBurst === 'object') ? prevBurst : null;
+  const withinWindow = !!prev && (nowMs - prev.windowStartAt) < FAIL_WINDOW_MS;
+  return {
+    count: withinWindow ? prev.count + 1 : 1,
+    windowStartAt: withinWindow ? prev.windowStartAt : nowMs,
+  };
+}
+
+function burstIsSuspicious(burst) {
+  return !!burst && burst.count >= FAIL_THRESHOLD;
+}
+
+function buildAlerts(input) {
+  const alerts = [];
+  const detail = 'IP ' + (input.ip || '(모름)')
+    + (input.country ? ' · 국가 ' + input.country : '')
+    + (input.ua ? ' · ' + input.ua : '');
+  if (input.deviceIsNew) {
+    alerts.push({ kind: 'security-device', message: '처음 보는 기기에서 로그인 성공 (' + input.email + ')' });
+  }
+  if (input.countryIsNew) {
+    alerts.push({ kind: 'security-country', message: '평소와 다른 국가에서 로그인 성공: ' + input.country + ' (' + input.email + ')' });
+  }
+  if (input.burstSuspicious) {
+    alerts.push({ kind: 'security-burst', message: '짧은 시간에 비밀번호 ' + input.failCount + '회 연속 실패 (' + input.email + ')' });
+  }
+  return alerts.map((a) => Object.assign(
+    { uid: input.uid, email: input.email, page: 'enter.html', status: 'new', detail },
+    a,
+  ));
+}
+
+module.exports = {
+  firstIp, parseAttempt,
+  FAIL_WINDOW_MS, FAIL_THRESHOLD,
+  isNewDevice, isNewCountry, nextBurst, burstIsSuspicious, buildAlerts,
+};
