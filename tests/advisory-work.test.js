@@ -155,7 +155,15 @@ test('★★ status 가 active 가 아니면 안 들어온다 — 푸른이알�
 
 test('★★ 푸른이알피와 같은 잣대라는 것을 두 파일로 견준다', () => {
   const erp = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
-  assert.match(erp, /var myCompanies = allCompanies\.filter\(function\(c\)\{\s*if\(c\.status !== 'active'\) return false;/,
+  /* ⚠ 2026-09-20 — 전에는 법인 대시보드 안의 myCompanies 한 줄을 «글자 그대로» 보았다.
+     그 화면을 걷어내니 깨졌다. 잣대가 «바뀐» 것이 아니라 «자리를 옮긴» 것이다 —
+     지금은 나의 업무(MyDeskV2)의 자문 셈이 같은 잣대를 쓴다.
+     ★ 그래서 한 줄의 생김새가 아니라 «잣대 자체»를 본다:
+       자문을 세는 자리에서 active 가 아닌 업체를 걸러내는가. */
+  const i자문 = erp.indexOf('if(showAdvisory)');
+  assert.ok(i자문 > 0, '푸른이알피에서 자문 세는 자리를 못 찾았다 — 이름이 바뀌었나?');
+  assert.match(erp.slice(i자문, i자문 + 900),
+    /allCompanies\.forEach\(function\(co\)\{\s*if\(co\.status !== 'active'\) return;/,
     '푸른이알피 쪽 잣대가 바뀌었다 — 업무관리도 함께 고쳐야 한다');
   assert.match(code(grab('_peClosed')), /if\(t==='companies'\) return st!=='active';/);
 });

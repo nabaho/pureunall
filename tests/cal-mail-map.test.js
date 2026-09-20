@@ -59,7 +59,8 @@ function 상자만들기(옵션) {
   vm.createContext(상자);
   ['function esc(s){', 'function arr(v){', 'function allUsers(){', 'function users(){',
    'function userOf(sid){', 'function nameOf(sid){', 'function gcalMailKey(m){',
-   'function gcalMailMap(){', 'function 잇기할수있나(){', 'function 메일줄들(){',
+   'function gcalMailMap(){', 'function 관리자인가(){',
+   'function 잇기할수있나(){', 'function 메일줄들(){',
    'function 안이은수(){', 'function mailmapHtml(){', 'function 잇기단추Html(){'
   ].forEach((h) => vm.runInContext(함수몸(h), 상자));
   return 상자;

@@ -61,27 +61,33 @@ function 이음표(src, head) {
 }
 
 test('③ 표에 그 칸이 다시 생기지 않았다', () => {
+  /* ⚠ 2026-09-20(4걸음) — 이알피 쪽 이음 표(IeumPeopleTab)가 화면과 함께 사라졌다.
+     표는 이제 푸른 캘린더 한 곳이다. 이알피는 «다시 생기지 않았는가»만 본다. */
   const 캘표 = 이음표(CAL, 'function peopleHtml(){');
-  const 알표 = 이음표(ERP, 'function IeumPeopleTab(');
   assert.strictEqual(/이음강의/.test(캘표), false, '푸른 캘린더 표에 「이음강의」가 다시 생겼습니다');
-  assert.strictEqual(/이음강의/.test(알표), false, '이알피 표에 「이음강의」가 다시 생겼습니다');
   /* 「잔여」는 한도가 있어야 뜻이 있는 칸이다 — 한도를 없앴으니 함께 없어야 한다 */
   assert.strictEqual(/잔여/.test(캘표), false, '푸른 캘린더 이음 표에 「잔여」 칸이 남아 있습니다');
-  assert.strictEqual(/잔여/.test(알표), false, '이알피 이음 표에 「잔여」 칸이 남아 있습니다');
+  assert.strictEqual(/function IeumPeopleTab\(/.test(ERP), false,
+    '이알피에 이음 인원 표가 다시 생겼습니다 — 표는 푸른 캘린더 한 곳입니다');
 });
 
 test('④★ 「법률상담」 셈은 살아 있다 — 한도와 함께 지워 버리면 안 된다', () => {
   /* 법률상담은 변호사의 이음센터 «일정»을 저절로 센 것이라 한도와 상관없다.
      한도를 걷어내며 이것까지 지우면 변호사 근무가 화면에서 통째로 사라진다. */
+  /* ⚠ 2026-09-20(4걸음) — 세는 자리가 푸른 캘린더 한 곳이 됐다(이알피 표는 사라졌다). */
   assert.match(CAL, /법률상담/, '푸른 캘린더에서 법률상담 칸이 사라졌습니다');
-  assert.match(ERP, /법률상담/, '이알피에서 법률상담 칸이 사라졌습니다');
-  assert.match(ERP, /function consultUsed\(pk\)/, '법률상담 세는 함수가 사라졌습니다');
+  /* 셈은 따로 함수를 두지 않고 표를 그리면서 바로 센다 —
+     변호사(isLaw)면 그 사람의 이음 근무 수를 «회»로 적는다. 그 갈래가 살아 있는지 본다. */
+  assert.match(CAL, /isLaw/, '변호사를 가르는 자리가 사라졌습니다');
+  assert.match(CAL, /lawcnt/, '법률상담 횟수를 적는 칸이 사라졌습니다');
 });
 
 test('⑤ 비고는 남는다 — 이것은 실제로 쓰고 있는 자료다', () => {
   /* external_staff.note 에 「2·4주 금 (3/13 선호)」 같은 실제 기록이 들어 있다.
      한도·강의와 함께 쓸어버리지 않았는지 본다. */
-  assert.match(ERP, /ieum_notes/, '내부 직원 비고(ieum_notes)가 사라졌습니다');
+  /* ⚠ 2026-09-20(4걸음) — 비고를 «고치는 곳»도 푸른 캘린더로 옮겼다(2걸음-다).
+     이알피에는 이제 이 자료를 다루는 화면이 없다 — 자료 자체는 그대로 살아 있다. */
   assert.match(CAL, /ieum_notes/, '푸른 캘린더가 비고를 안 읽습니다');
-  assert.match(ERP, /function saveNote\(/, '비고를 고치는 길이 사라졌습니다');
+  assert.match(CAL, /function saveNote\(/, '비고를 고치는 길이 사라졌습니다');
+  assert.match(CAL, /function openNote\(/, '비고를 여는 길이 사라졌습니다');
 });

@@ -150,19 +150,50 @@ test('⑫★ 이알피와 푸른 캘린더가 같은 모듈을 싣는다 — 두
   });
 });
 
-test('⑬★ 이알피가 토큰을 «화면 밖»에서 받는다 — 대시보드와 함께 죽으면 Gmail 도 죽는다', () => {
+test('⑬★ 이알피가 토큰을 받는다 — 보수총액 Gmail 자동발송보다 «먼저»', () => {
+  /* ★ 2026-09-20(4걸음) — 전에는 「법인 대시보드보다 앞인가」를 보았다.
+     그 화면을 실제로 걷어냈으므로 기준이 사라졌다. 지킬 것은 처음부터 «그 화면»이
+     아니라 «Gmail 이 토큰을 쓸 때 이미 받아 두었나»였다 — 그것을 바로 잰다.
+     이 한 줄이 대시보드 안에 있어서, 달력과 아무 상관없는 보수총액 발송이
+     달력 화면에 얹혀 있었다. 다시 어느 화면 «안»으로 들어가면 여기서 걸린다. */
   const s = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
   const i = s.indexOf('PuGcalAuth.capture()');
-  const j = s.indexOf('function CorpDashboard(');
-  assert.ok(i > 0, '이알피가 토큰을 안 받습니다');
-  assert.ok(i < j, '★ 토큰 받는 자리가 아직 법인 대시보드 «안»입니다 — '
-    + '4걸음에서 그 화면을 지우면 보수총액 Gmail 자동발송이 함께 죽습니다');
+  const j = s.indexOf('// Gmail send-as 자동발송');
+  assert.ok(i > 0, '이알피가 토큰을 안 받습니다 — 보수총액 발송이 로그인을 못 씁니다');
+  assert.ok(j > 0, 'Gmail 자동발송 자리를 못 찾았습니다');
+  assert.ok(i < j, '★ 토큰을 받기 «전»에 Gmail 이 씁니다');
+  /* 어느 함수 «안»에 있으면 그 함수가 사라질 때 함께 죽는다 — 맨 바깥이어야 한다.
+     맨 바깥 줄은 들여쓰기가 없다. */
+  const 들여쓰기 = /(^|\n)([ \t]*)[^\n]*$/.exec(s.slice(0, i))[2];
+  assert.strictEqual(들여쓰기, '', '★ 토큰 받는 줄이 들여써져 있습니다 — 어느 화면 «안»이라는 뜻입니다');
 });
 
-test('⑭ 이알피 안에 «옛 셈»이 남지 않았다 — 남으면 두 벌이 된다', () => {
+test('⑭ 이알피가 구글 달력을 «제 손으로» 부르지 않는다 — 두 벌이 되면 규칙이 갈린다', () => {
+  /* ★ 2026-09-20(4걸음) — 이알피의 gcalApiCall 은 법인 대시보드 «안»에 있었고
+     그 화면과 함께 사라졌다. 이제 이알피에는 달력을 부르는 셈이 아예 없다.
+     ⚠ 그래서 검사도 «옛 셈이 남았나»가 아니라 «다시 생겼나»를 본다.
+        누군가 급해서 여기에 한 벌 더 쓰면 로그인 확인·401 처리가 갈린다. */
   const s = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
-  const i = s.indexOf('function gcalApiCall(');
-  const 몸통 = s.slice(i, s.indexOf('\n  function ', i + 10));
-  assert.strictEqual(/status===204/.test(몸통), false, '이알피가 아직 제 손으로 대답을 해석합니다');
-  assert.match(몸통, /PuGcalAuth\.apiCall\(/, '이알피가 공용 모듈을 안 씁니다');
+  assert.ok(!/googleapis\.com\/calendar\/v3/.test(s),
+    '★ 이알피가 구글 달력을 다시 «직접» 부릅니다 — js/pu-gcal-auth.js 를 쓰십시오');
+  assert.ok(!/function gcalApiCall\(/.test(s),
+    '★ 대답을 해석하는 셈이 이알피에 다시 생겼습니다');
+});
+
+test('⑮★ 답이 안 오면 끊는다 — 안 끊으면 「지우는 중…」이 영영 안 끝난다', async () => {
+  /* 이알피는 밖으로 나가는 부름을 모두 fetchT(20초)로 감쌌다(tests/erp-fetch-timeout).
+     이리로 옮기면서 그 울타리를 벗어났었다 — 여기서 다시 세운 것을 잰다. */
+  토큰놓기(10 * 60 * 1000);
+  let 끊겼나 = false;
+  const f = function (url, opt) {
+    return new Promise(function (_, reject) {
+      opt.signal.addEventListener('abort', function () {
+        끊겼나 = true;
+        const e = new Error('aborted'); e.name = 'AbortError'; reject(e);
+      });
+    });
+  };
+  await assert.rejects(() => A.apiCall('DELETE', '/x', null, { fetch: f, timeoutMs: 30 }),
+    /초 안에 구글이 답하지 않았습니다/, '★ 답이 없는데 기다리기만 합니다');
+  assert.strictEqual(끊겼나, true, '★ 부름을 실제로 끊지 않았습니다 — 뒤에서 계속 돕니다');
 });
