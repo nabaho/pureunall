@@ -87,7 +87,23 @@ var 창스크립트 =
   'var s=가[i].nextElementSibling;n=s?s.textContent:n;}}return n;}' +
   'function 열기(el){if(!el)return;b.innerHTML="";' +
   'var c=el.cloneNode(true);c.removeAttribute("id");c.removeAttribute("data-pop");' +
-  'c.style.cursor="auto";b.appendChild(c);' +
+  'c.style.cursor="auto";' +
+  /* ⚠ 목록의 머리표 「—」는 «목록에서만» 뜻이 있다. 창에 따라 들어오면 글 앞에
+       점 하나가 덩그러니 남는다 — 대표 화면에서 실제로 그렇게 보였다(2026-09-20). */
+  'var 머=c.querySelector("span");' +
+  'if(머&&머.textContent.replace(/\\s|\\u00a0/g,"")==="\\u2014")머.parentNode.removeChild(머);' +
+  'b.appendChild(c);' +
+  /* ★★★ 기사 창에 «어디서 온 기사인지 · 원문으로 가는 단추»를 붙인다
+       (대표 지시 2026-09-20 「노동뉴스는 … 당해 뉴스를 팝업하게 해라」).
+     ⚠ 줄이 한 줄뿐인 기사는 창을 열어도 새로 얻는 것이 없었다 — 제목만 되풀이했다.
+     ⚠ 기사 «본문»은 여기에 안 싣는다. 판례(판결문)는 저작권 대상이 아니라 우리
+       양식으로 펼 수 있지만, 신문 기사는 남의 저작물이다(functions/news-brief.js
+       맨 위 규칙). 그래서 «그 기사로 바로 가는 큰 단추»까지가 우리가 할 수 있는 것이다. */
+  'var 매체=el.getAttribute("data-src")||"",주소=el.getAttribute("data-url")||"";' +
+  'if(주소){var f=document.createElement("div");f.className="popf";' +
+  'f.innerHTML=\'<a href="\'+주소.replace(/"/g,"&quot;")+\'" target="_blank" rel="noopener">\'' +
+  '+(매체?매체.replace(/</g,"&lt;")+"에서 ":"")+"기사 원문 보기 ↗</a>";' +
+  'b.appendChild(f);}' +
   't.textContent=꼭지이름(el)||"이 소식";p.className="on";' +
   /* ⚠ 창이 떠 있는 동안 «뒤가 굴러가지» 않게 한다. 안 막으면 창 안에서 굴린 줄
        알았는데 뒤의 편지가 움직여, 닫았을 때 엉뚱한 자리에 서 있게 된다.
@@ -205,9 +221,16 @@ var 전문펴기스크립트 =
   'var h="";' +
   'if(d.제목)h+=\'<div class="tt">\'+씻(d.제목)+"</div>";' +
   'if(d.인용)h+=\'<div class="ct">\'+씻(d.인용)+"</div>";' +
-  '(d.칸들||[]).forEach(function(k){h+="<h4>"+씻(k.이름)+\'</h4><div class="p">\'+줄(k.글)' +
+  /* ⚠⚠ 여기와 news-full.js 쪽() 은 «같은 칸들»을 그린다 — 한쪽만 고치면
+       메일에서 새 탭으로 여신 분과 웹에서 그 자리에 펴신 분이 «다른 것»을 보신다.
+     ★ 주문은 판에 얹고, 접는 칸(판결 이유)은 <details> 로 접어 둔다. */
+  '(d.칸들||[]).forEach(function(k){' +
+  'var 몸=\'<div class="p\'+(k.이름==="주문"?" key":"")+\'">\'+줄(k.글)' +
   '+(k.잘림?\'<div class="cut">… 너무 길어 여기까지만 보여 드립니다. 아래 「법제처에서 보기」로 다 보실 수 있습니다.</div>\':"")' +
-  '+"</div>";});' +
+  '+"</div>";' +
+  'h+=k.접기?(\'<details class="fold"><summary>\'+씻(k.이름)' +
+  '+\' <span style="font-weight:normal;letter-spacing:0">(\'+String(k.글||"").length.toLocaleString()+\'자)</span></summary>\'' +
+  '+몸+"</details>"):("<h4>"+씻(k.이름)+"</h4>"+몸);});' +
   'h+=\'<div class="src"><a href="\'+씻(d.법제처||"")+\'" target="_blank" rel="noopener">법제처에서 보기 ↗</a></div>\';' +
   '칸.innerHTML=h;' +
   '}).catch(function(err){' +
@@ -284,6 +307,17 @@ function 쪽(제목, 전문) {
     + '.full .tt{font-weight:bold;font-size:14.5px;line-height:1.5;color:#241a13;word-break:keep-all}'
     + '.full .ct{margin-top:3px;font-size:12px;color:#9a938a}'
     + '.full .p{word-break:keep-all}'
+    /* ★ 주문은 «결론»이다 — 판에 얹어 눈에 먼저 들어오게 한다 (news-full.js 쪽() 과 같은 모양) */
+    + '.full .p.key{background:#fbf4ea;border-left:3px solid #6f5a48;padding:10px 12px;'
+    + 'font-weight:bold;color:#241a13}'
+    /* ★★ 긴 이유는 접어 둔다 — 그 자리에서 펴도 쪽이 18장이 되면 안 본다 */
+    + '.full details.fold{margin-top:15px;border-top:1px solid #e0dcd6;padding-top:4px}'
+    + '.full details.fold>summary{cursor:pointer;list-style:none;padding:7px 0;'
+    + 'font-size:11.5px;letter-spacing:1.5px;color:#8a6f57;font-weight:bold}'
+    + '.full details.fold>summary::-webkit-details-marker{display:none}'
+    + '.full details.fold>summary::after{content:" 펴 보기 ▾";font-weight:normal;color:#9a938a}'
+    + '.full details.fold[open]>summary::after{content:" 접기 ▴";font-weight:normal;color:#9a938a}'
+    + '.full details.fold>summary:hover{color:#241a13}'
     + '.full .ld,.full .err{padding:6px 0;font-size:13px;color:#8a837a}'
     + '.full .cut{margin-top:8px;font-size:12px;color:#9a938a}'
     + '.full .src{margin-top:15px;font-size:12px}'
@@ -352,6 +386,14 @@ function 쪽(제목, 전문) {
          비율만 키우면 편지가 정한 결(제목이 본문보다 얼마나 큰가)이 그대로 산다 —
          편지를 손대지 않고 크게 보는 유일한 길이다. */
     + '#pop .bd{overflow:auto;padding:26px 28px;zoom:1.22}'
+    /* ★ 기사 창 아래의 «원문으로 가는 단추» — 창을 연 보람이 여기에 있다.
+         ⚠ 기사 본문은 안 싣는다(남의 저작물). 그래서 단추를 «크게» 둔다 —
+           작은 글씨 「원문 ↗」 하나로는 열어 본 뜻이 없다. */
+    + '#pop .popf{margin-top:18px;padding-top:15px;border-top:1px solid #e0dcd6}'
+    + '#pop .popf a{display:inline-block;background:#6f5a48;color:#fff;'
+    + "font:bold 13px 'Malgun Gothic',sans-serif;text-decoration:none;"
+    + 'padding:10px 18px;border-radius:4px}'
+    + '#pop .popf a:hover{background:#5b4938}'
     /* ★ 꼬리 — 누가 보낸 쪽인지, 궁금하면 어디로 물어야 하는지. 없던 자리다. */
     + '#pop .ft{display:flex;align-items:center;gap:8px;padding:12px 18px;background:#faf8f5;'
     + 'border-top:1px solid #eceae6;font:12px \'Malgun Gothic\',sans-serif;color:#9a938a}'
