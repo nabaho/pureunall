@@ -1,9 +1,13 @@
 # 2026-09-19 · 계약금·잔금 「종류별 세부설정」 박스 — CSS Grid에서 flex 로
 
-- 가지: `feat/contract-6col-relabel` (같은 PR 에 이어 담음 — 대표 지시 「나머지도 모두해라」)
-- 앞선 걸음: [2026-09-19-contract-6col-relabel.md](2026-09-19-contract-6col-relabel.md) —
+- 가지: `feat/contract-detail-box-flex` — 대표 지시 「나머지도 모두해라」로 이어 진행
+- PR: [#1501](https://github.com/nabaho/pureunall/pull/1501)
+- 앞선 걸음: [2026-09-19-contract-6col-relabel.md](2026-09-19-contract-6col-relabel.md)
+  (PR [#1495](https://github.com/nabaho/pureunall/pull/1495), 이미 병합) —
   기업정보·계약정보·담당자 탭을 6칸으로 바꾼 것. 그 PR 에서 「종류별 세부설정」
   박스(계약금·잔금)는 **계산 로직이 얽혀 있어 더 신중히 다룰 별도 작업**으로 미뤄 뒀었다.
+  ⚠ 그 가지는 이미 병합돼 새 가지(`feat/contract-detail-box-flex`)를 origin/main 에서
+  새로 따서 이 커밋 하나를 cherry-pick 했다 — 옛 가지에 더 얹지 않는다.
 
 ## 대표 지시·승인
 
