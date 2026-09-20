@@ -178,8 +178,12 @@
   .ev{padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500;line-height:16px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
   .ev b{font-weight:700;margin-right:3px}
-  /* 공휴일은 칸 맨 위에 «칩»으로 — 일정 칩과 같은 치수여야 한 줄만 도드라지지 않는다 */
-  .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default}
+  /* 공휴일은 칸 맨 위에 «띠»로 — 구글은 둥근 칩이 아니라 칸 옆까지 꽉 채운 띠를 쓴다
+     (대표 지시 2026-09-20 「구글과 완벽하게 같게」 — 실제 화면을 재서 확인했다).
+     .day 의 좌우 여백(4px)을 음수 마진으로 지워 옆까지 닿게 한다. 색 값(#fecaca·
+     #991b1b)은 그대로다 — 팔레트·tests/cal-same-as-erp.test.js 가 색만 못 박는다. */
+  .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default;
+    border-radius:0;margin:0 -4px}
   /* 접힌 것이 몇인지 — 누르면 그 자리에서 펼쳐 보인다 */
   .more{font-size:10.5px;color:var(--sub);padding:0 4px;cursor:pointer;line-height:15px;
     font-weight:700;border-radius:3px;background:var(--bg);flex:none}
@@ -944,13 +948,13 @@ function calendarHtml(eumOnly){
     var hol = holidayOf(c.date);
     var 오늘 = c.date === today;
     var 찾음 = !!(S.q && evs.length);
-    /* ⚠ 어두운판에서는 옅은 노랑·분홍 «칠»을 안 쓴다 — 그 위에 놓일 글자가 안 읽힌다.
-       「오늘」은 CSS(.day.today) 가 테두리로, 「공휴일」은 .ev.hol 칩이(이알피와 같은
-       분홍·빨강, 값을 바꾸지 않는다), 「찾음」은 outline(#fbbf24) 이 그대로 맡는다 —
-       셋 다 배경을 안 써도 이미 충분히 표난다. */
+    /* ⚠ 칸 전체를 칠하지 않는다 — 구글 실제 화면을 재 보니(대표 지시 2026-09-20)
+       «오늘»도 «공휴일»도 칸 배경은 흰색 그대로였다(픽셀로 확인: 255,255,255).
+       「오늘」은 숫자의 파란 동그라미(.dnum.today)만, 「공휴일」은 .ev.hol 띠만 맡는다.
+       「찾음」은 이 앱만의 기능이라(구글에 없다) outline+옅은 칠을 그대로 둔다. */
     var 어둠 = S.theme === "dark";
     var bg = 어둠 ? (c.other ? "#000000" : "#1e293b")
-      : (오늘 ? "#fffbeb" : c.other ? "#f8fafc" : hol ? "#fef2f2" : 찾음 ? "#fffbeb" : "#ffffff");
+      : (c.other ? "#f8fafc" : 찾음 ? "#fffbeb" : "#ffffff");
     var 테 = 어둠 ? "#475569" : (c.other ? "#e2e8f0" : "#f8fafc");
     /* 공휴일 칩도 한 줄을 먹는다. 그리고 「+N개 더」 자신도 한 줄이다 —
        그 둘을 안 빼면 접었는데도 칸이 넘친다. */
@@ -1027,8 +1031,8 @@ function weekHtml(eumOnly){
     var 오늘 = ds === today;
     var d = new Date(ds + "T00:00:00");
     var 어둠 = S.theme === "dark";
-    /* 주 보기도 달 보기와 같은 잣대다 — 어두운판에서는 옅은 칠을 안 쓴다 */
-    var wbg = 어둠 ? "#1e293b" : (오늘 ? "#fffbeb" : hol ? "#fef2f2" : "#ffffff");
+    /* 주 보기도 달 보기와 같은 잣대다 — 오늘·공휴일 모두 칸 배경은 흰색 그대로다 */
+    var wbg = 어둠 ? "#1e293b" : "#ffffff";
     return '<div class="wcol' + (오늘 ? " today" : "") + '" data-day="' + ds + '" style="background:' + wbg + '">'
       + '<div class="whd' + (d.getDay()===0 ? " sun" : d.getDay()===6 ? " sat" : "") + '">'
       +   ["일","월","화","수","목","금","토"][d.getDay()]
