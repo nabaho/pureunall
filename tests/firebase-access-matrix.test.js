@@ -176,3 +176,14 @@ test('역할표: 일반 직원은 권한을 스스로 true로 바꾸지 못한�
   }
 });
 
+test('역할표: 로그인 감지 기록은 관리자·위임관리인만 읽고, 클라이언트는 아무도 못 쓴다', () => {
+  const paths = ['login_events', 'login_devices', 'login_countries', 'login_fail_burst'];
+  for (const p of paths) {
+    assert.ok(rules[p], p + ' 규칙이 없습니다');
+    assert.equal(evaluate(rules[p]['.read'], { auth: auth('adminUid') }), true, p + ' 관리자 읽기');
+    assert.equal(evaluate(rules[p]['.read'], { auth: auth('subUid') }), true, p + ' 위임관리인 읽기');
+    assert.equal(evaluate(rules[p]['.read'], { auth: auth('staffUid') }), false, p + ' 일반 직원은 못 읽음');
+    assert.equal(rules[p]['.write'], undefined, p + ' 클라이언트 쓰기 규칙이 있으면 안 됨(서버 전용)');
+  }
+});
+

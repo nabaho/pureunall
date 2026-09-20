@@ -142,7 +142,10 @@ const allowTop = ['systemAlerts','systemBackups','systemBackupsIndex','systemRes
      직원은 자기 자리에만 «더하기»만 하고, 지우는 것은 관리자만 한다.
      ⚠ 이 줄을 안 적어 main 이 빨간불이었다(커밋 4a0172e3 이 PR 없이 올라가 CI 를 안 지났다).
        최상위를 늘렸으면 «반드시» 여기에 적을 것 — 이 검사 하나가 모든 앱 배포를 막는다. */
-  'kcareer_inbox'];
+  'kcareer_inbox',
+  /* 2026-09-20 로그인 무단시도 감지 — 설계문서 docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md.
+     클라이언트 쓰기 없음(Admin SDK 전용), 읽기는 관리자·위임관리인만. */
+  'login_events','login_devices','login_countries','login_fail_burst'];
 
 const keys = Object.keys(R);
 const removed = baseTop.filter(function (k) { return keys.indexOf(k) < 0; });

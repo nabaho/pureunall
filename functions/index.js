@@ -30,6 +30,8 @@ const HanaMessage = require("./hana-message");
 const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
 const 지역뉴스부품 = require("./news-region");
+const LS = require("./login-security");
+const geoip = require("geoip-lite");
 const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
 
@@ -5315,3 +5317,134 @@ exports.nasBackupExport = functions
     db: () => getDatabase(),
     key: () => process.env.NAS_BACKUP_KEY || "",
   }));
+
+// ════════════════════════════════════════════════════════════════════════════
+// 로그인 무단시도 감지 — logLoginAttempt
+// ════════════════════════════════════════════════════════════════════════════
+// 설계문서: docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md
+// enter.html 이 로그인 성공/실패 직후 «응답을 기다리지 않고» 부른다.
+// 이 함수가 죽거나 늦어도 로그인 자체는 전혀 영향받지 않는다(클라이언트가 안 기다림).
+exports.logLoginAttempt = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 10, memory: "512MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false }); return; }
+
+    const parsed = LS.parseAttempt(req.body);
+    if (!parsed.valid) { res.status(400).json({ ok: false, error: parsed.why }); return; }
+
+    /* ★ 「로그인에 성공했다」는 보고는 «증표»가 있어야 믿는다
+         (2026-09-20 보안검토 CRITICAL 1).
+       증표가 없던 때는 주소만 알면 누구나 남의 이메일로 ok:true 를 쏘아
+         ① 연속실패 누적을 마음대로 0 으로 되돌리고(3번 신호 무력화)
+         ② 자기 기기·국가를 미리 «아는 것»으로 심어(1·2번 신호 무력화)
+         ③ 멀쩡한 직원 이름으로 가짜 알림을 들이부을 수 있었다.
+       ⚠ 증표가 없거나 틀려도 오류를 돌려주지 않는다 — 돌려주면 「이 계정이 있다/없다」가
+         밖으로 새어 나간다. uid 를 못 찾았을 때와 똑같이 조용히 200 만 돌려준다.
+       ⚠ 실패 보고(ok:false)에는 증표가 있을 수 없다(성공한 인증이 없으니까). 그래서 그대로
+         열어 두되, 실패 보고는 누적을 «올리기만» 할 뿐 되돌리거나 기준선을 세우지 못한다
+         (아래 CRITICAL 2 의 성공 여부 가르기). */
+    let verified = null;
+    if (parsed.ok) {
+      const bearer = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ""));
+      if (bearer) {
+        try { verified = await getAuth().verifyIdToken(bearer[1], true); }
+        catch (e) { verified = null; }
+      }
+      /* ⚠⚠ 재검토(2026-09-20 재검토): 증표는 있는데 «이메일 없는» 증표(익명 로그인 등)로
+           올 수 있다 — 이 프로젝트는 익명 로그인을 실제로 쓴다(sign.html 등). 그 증표를
+           받아 주면 본문 email 로 도로 떨어져 «증표 없을 때와 똑같은 구멍»이 다시 열린다.
+           비밀번호 로그인 증표만, 그리고 이메일이 «증표에 실제로 적혀 있을 때만» 받는다. */
+      if (verified && (!verified.email
+        || (verified.firebase && verified.firebase.sign_in_provider !== "password"))) {
+        verified = null;
+      }
+      if (!verified) { res.status(200).json({ ok: true }); return; }
+    }
+
+    // 성공 보고는 «증표에 적힌» 계정으로만 다룬다 — 본문의 email 은 절대 안 쓴다(대체 없음).
+    const email = verified ? String(verified.email).trim().toLowerCase() : parsed.email;
+
+    const ip = LS.lastIp(req.headers["x-forwarded-for"]) || String(req.ip || "");
+    const now = Date.now();
+    const country = (() => {
+      try {
+        const hit = geoip.lookup(ip);
+        return (hit && hit.country) ? String(hit.country) : "";
+      } catch (e) { return ""; }
+    })();
+
+    // 실재 계정인지는 «안으로만» 쓴다 — 화면 에러 문구는 절대 안 바뀐다(2026-09-07 결정 유지).
+    // 성공 보고는 증표에 적힌 uid 를 그대로 쓴다(이메일로 되찾지 않는다).
+    let uid = "";
+    if (verified) {
+      uid = String(verified.uid || "");
+    } else {
+      try { uid = (await getAuth().getUserByEmail(email)).uid; }
+      catch (e) { uid = ""; }
+    }
+
+    const db = getDatabase();
+    const rawKey = uid || ("unk_" + crypto.createHash("sha1").update(email).digest("hex").slice(0, 16));
+
+    // 원시 기록은 계정을 찾았든 못 찾았든 항상 남긴다(설계문서 §2 "성공·실패 전부 기록").
+    try {
+      await db.ref("login_events/" + rawKey).push({
+        at: now, ok: parsed.ok, code: parsed.code, email,
+        ip, country, deviceId: parsed.deviceId, ua: parsed.ua, page: "enter.html",
+      });
+    } catch (e) {
+      console.warn("logLoginAttempt: 원시 기록 실패", String((e && e.message) || e));
+    }
+
+    if (!uid) { res.status(200).json({ ok: true }); return; }   // 비교 기준(uid)이 없다
+
+    try {
+      const [devicesSnap, countriesSnap, burstSnap] = await Promise.all([
+        db.ref("login_devices/" + uid).once("value"),
+        db.ref("login_countries/" + uid).once("value"),
+        db.ref("login_fail_burst/" + uid).once("value"),
+      ]);
+      const knownDevices = devicesSnap.val() || {};
+      const knownCountries = countriesSnap.val() || {};
+      const prevBurst = burstSnap.val();
+
+      /* ★ 기기·국가는 «실제로 성공한 로그인»에서만 본다 (2026-09-20 보안검토 CRITICAL 2).
+           예전에는 실패한 시도로도 기준선을 세웠다 — 남의 비밀번호를 한 번 틀리고 두 번째에
+           맞히는 흔한 순서에서, 침입자의 기기가 «첫 실패»에 이미 아는 기기로 등록되어
+           정작 성공한 로그인이 조용히 지나갔다.
+           알림 문구도 「로그인 성공」이라 적히므로, 실패한 시도에 이 둘을 켜면 거짓말이 된다. */
+      const deviceIsNew = parsed.ok && LS.isNewDevice(knownDevices, parsed.deviceId);
+      const countryIsNew = parsed.ok && LS.isNewCountry(knownCountries, country);
+      const burst = LS.nextBurst(prevBurst, now, parsed.ok);
+      // 연속실패 알림은 문턱을 «넘는 순간» 한 번만(IMPORTANT 3). 울렸으면 표시를 남긴다.
+      const burstSuspicious = LS.burstAlertDue(prevBurst, burst);
+
+      const writes = {
+        ["login_fail_burst/" + uid]: burstSuspicious
+          ? Object.assign({}, burst, { alerted: true })
+          : burst,
+      };
+      if (parsed.ok && !knownDevices[parsed.deviceId]) {
+        writes["login_devices/" + uid + "/" + parsed.deviceId] = { firstSeenAt: now, ua: parsed.ua };
+      }
+      if (parsed.ok && country && !knownCountries[country]) {
+        writes["login_countries/" + uid + "/" + country] = { firstSeenAt: now };
+      }
+      await db.ref().update(writes);
+
+      const alerts = LS.buildAlerts({
+        uid, email, deviceIsNew, countryIsNew, burstSuspicious,
+        country, ip, ua: parsed.ua, failCount: burst.count,
+      });
+      for (const a of alerts) {
+        await db.ref("systemAlerts/" + uid).push(Object.assign({ createdAt: now }, a));
+      }
+    } catch (e) {
+      console.warn("logLoginAttempt: 판정 실패", String((e && e.message) || e));
+    }
+
+    res.status(200).json({ ok: true });
+  });
