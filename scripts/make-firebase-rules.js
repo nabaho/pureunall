@@ -865,8 +865,18 @@ rules.kcareer_inbox = {
 
 /* ══ 전자서명 ══════════════════════════════════════════════════════════
    ⚠ 근로자는 링크로 들어와 «암호화된 채로» 낸다. meta 는 그래서 열려 있다.
-     낸 것은 우리 직원만 읽는다. */
-rules.esign = { cases: { $caseId: {
+     낸 것은 우리 직원만 읽는다.
+
+   ★ cases 에 '.read' 가 «있어야» 한다 (2026-09-20 전수점검에서 찾음)
+     docs-esign.html 의 사건 목록은 `esign/cases` 를 통째로 한 번 읽는다(loadCases).
+     실시간DB 는 «읽는 자리나 그 위»에 읽기가 있어야 열어 준다 — 아래 칸
+     (meta·secret·…)에만 적어 두면 목록은 permission_denied 로 막힌다.
+     실제로 막혀 있었다(장애알림 9건, 마지막 2026-09-18). 사건이 0건이라 아무도
+     못 느꼈을 뿐이다.
+   ⚠ 새로 보이게 되는 것은 «없다» — 여기서 주는 MAIL 은 아래 칸들이 이미 MAIL 에게
+     주고 있는 것과 똑같다(secret·arrears·submissions 모두 MAIL, meta 는 더 넓은
+     auth != null). 부모에 적는다고 아래가 좁아지지도 넓어지지도 않는다. */
+rules.esign = { cases: { '.read': MAIL, $caseId: {
   meta:        { '.read': 'auth != null', '.write': MAIL },
   secret:      { '.read': MAIL, '.write': MAIL },
   arrears:     { '.read': MAIL, '.write': MAIL },
