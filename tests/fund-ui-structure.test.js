@@ -196,7 +196,10 @@ test('기금 정보 폼은 화면 폭을 다 쓴다 — 760px 2열에 갇히지 
   // 여백은 바뀔 수 있다 — 「기금 정보 폼이 넓은 격자를 쓰는가」만 본다
   /* 2026-09-13 묶음 접기 뒤로 격자는 «묶음마다» 하나씩이고, 고침 표시는 그 바깥에서 다 받는다.
      한 태그에 둘이 같이 붙어 있는지를 보던 검사는 그 모양만 못 박고 있었다 — 둘을 따로 본다. */
-  const 폼 = SRC.slice(SRC.indexOf('function infoForm('), SRC.indexOf('function infoForm(') + 6000);
+  /* 이 window 는 infoForm() 의 실제 길이를 넉넉히 덮어야 한다 — 함수 안에 코드가 늘면
+     (예: 2026-09-21 소재지 우편번호 검색 추가) 고정 길이가 짧으면 뒤쪽 문자열이 잘려
+     나가 «내용은 그대로인데 검사만 깨진다». 여유를 넉넉히 둔다. */
+  const 폼 = SRC.slice(SRC.indexOf('function infoForm('), SRC.indexOf('function infoForm(') + 7000);
   assert.match(폼, /'<div class="gridw">'\+g\.fields\.map/, '기금 정보가 넓은 격자를 쓰지 않는다');
   assert.match(폼, /oninput="markDirty\(\)" onchange="markDirty\(\)">'\+flds/,
     '고침 표시가 칸들을 감싸지 않는다 — 고쳐도 저장 대상으로 안 잡힌다');

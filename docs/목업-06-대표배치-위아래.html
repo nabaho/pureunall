@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>목업 6 — 사용자대표·근로자대표, 위아래</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--line:#e2e8f0;--panel:#fff;--bg:#e2e8f0;--radius:11px}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);background:#f1f5f9;font-size:14px;padding:24px 16px 60px}
+  .wrap{max-width:520px;margin:0 auto}
+  h1{font-size:17px;margin:0 0 6px}
+  .tag{display:inline-block;font-size:11px;font-weight:800;color:#fff;background:#7c3aed;border-radius:6px;padding:3px 10px;margin-bottom:14px}
+  .muted{color:var(--sub);font-size:12.5px}
+  .fld{display:flex;flex-direction:column;gap:4px}
+  .fld label{font-size:11.5px;color:var(--sub);font-weight:600}
+  .fld input{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%}
+  .gridw{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .boxhead{font-size:13px;font-weight:800;color:var(--acc2);display:flex;align-items:center;gap:6px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--acc-soft)}
+  .subbox{background:var(--bg);border-radius:9px;padding:12px 14px;margin-bottom:12px}
+  .subbox:last-child{margin-bottom:0}
+  .subhead{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>목업 6 — 사용자대표·근로자대표 배치</h1>
+<span class="tag">위아래로 쌓기</span>
+<p class="muted" style="margin:0 0 14px">칸 수가 늘어도(휴대폰·이메일 등) 한 줄이 좁아지지 않습니다.
+견주어 볼 일이 적으면 이쪽이 더 편합니다.</p>
+
+<div class="box">
+  <div class="boxhead">⚖️ 사용자 대표 · 근로자 대표</div>
+  <div class="subbox">
+    <div class="subhead">사용자 대표</div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:10px;cursor:pointer">
+      <input type="checkbox" checked> 대표자와 같은 사람입니다
+    </label>
+    <div class="gridw">
+      <div class="fld"><label>성명</label><input value="홍길동" disabled></div>
+      <div class="fld"><label>직위</label><input value=""></div>
+      <div class="fld"><label>휴대폰</label><input value=""></div>
+      <div class="fld"><label>생년월일</label><input value=""></div>
+    </div>
+  </div>
+  <div class="subbox">
+    <div class="subhead">근로자 대표</div>
+    <div class="gridw">
+      <div class="fld"><label>성명</label><input value=""></div>
+      <div class="fld"><label>직위</label><input value=""></div>
+      <div class="fld"><label>휴대폰</label><input value=""></div>
+      <div class="fld"><label>생년월일</label><input value=""></div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>

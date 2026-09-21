@@ -63,7 +63,7 @@ function 폼그리기(f, sites) {
     'function charterZone(){ return ""; }',
     'function bindDocIntake(){}',
     'var setTimeout=function(){};',
-    grabFn('infoGroups'), grabFn('infoForm'),
+    grabFn('infoGroups'), grabFn('infoForm'), grabFn('_addrStack'),
     'this.html=infoForm(F); this.groups=infoGroups();'
   ].join('\n')).call(box, f, sites || {});
   return box;

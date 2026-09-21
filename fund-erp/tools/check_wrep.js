@@ -62,9 +62,43 @@ ok('빈 사업장에도 안 터진다', (function(){ try { const e = _siteWrep(n
 
 console.log('\n■ 편집 화면');
 const es = gF('editSite');
-ok('근로자대표 칸을 그린다', /WREP_FIELDS\.map/.test(es), es.slice(0, 200));
-ok('담당자와 «다른 이름»으로 그린다 (sw- / sc-)', /id="sw-'/.test(es) && /id="sc-'/.test(es));
 ok('재직증명서 줄을 붙인다', /_wrepDocRow\(sid,s\)/.test(es));
+
+/* ★ 근로자대표 칸이 «실제로 그려지는지»는 소스 모양(WREP_FIELDS.map 같은 특정 형태)이
+   아니라 «진짜로 돌려서» 확인한다(2026-09-21, 사용자대표·근로자대표를 표로 묶으며
+   UREP_FIELDS 와 짝지어 그리는 식으로 바뀌었다 — 소스 정규식은 구현이 바뀔 때마다 깨진다). */
+global.S = { sites: { S1: SITE }, fundId: 'F1' };
+let modalHTML = '';
+global.showModal = (h) => { modalHTML = h; };
+global.closeM = () => {};
+global.bindSiteDocIntake = () => {};
+(0, eval)(gV('SITE_FIELDS'));
+(0, eval)(gV('CONTACT_FIELDS'));
+(0, eval)(gV('WREP_FIELDS'));
+(0, eval)(gV('UREP_FIELDS'));
+(0, eval)(gV('SME_FIELDS'));
+(0, eval)(gV('SME_OPTS'));
+(0, eval)(gF('_primaryContact'));
+(0, eval)(gF('_siteSme'));
+(0, eval)(gF('_siteUrep'));
+(0, eval)(gF('_smeChip'));
+(0, eval)(gF('_repTable'));
+(0, eval)(gF('_addrStack'));
+(0, eval)(gF('editSite'));
+try {
+  editSite('S1');
+  ok('근로자대표 칸을 그린다',
+     wkeys.length > 0 && wkeys.every(k => modalHTML.indexOf('id="sw-' + k + '"') >= 0),
+     wkeys.join(','));
+  const ckeys = (CONTACT_FIELDS || []).map(c => c[0]);
+  ok('담당자와 «다른 이름»으로 그린다 (sw- / sc-)',
+     ckeys.length > 0 && ckeys.every(k => modalHTML.indexOf('id="sc-' + k + '"') >= 0)
+       && wkeys.every(k => modalHTML.indexOf('id="sw-' + k + '"') >= 0),
+     'sc:' + ckeys.join(',') + ' / sw:' + wkeys.join(','));
+} catch (e) {
+  ok('근로자대표 칸을 그린다', false, 'editSite 실행 실패: ' + (e && e.message || e));
+  ok('담당자와 «다른 이름»으로 그린다 (sw- / sc-)', false, 'editSite 실행 실패');
+}
 
 console.log('\n■ 재직증명서 — 이어 두면 볼 수 있나');
 if (!JSDOM) {
