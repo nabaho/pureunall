@@ -50,6 +50,8 @@ function drawCal(scheds, y, m, opt) {
   vm.createContext(box);
   vm.runInContext([fnSrc('p2'), fnSrc('escAttr'), fnSrc('schedPhase'),
     fnSrc('usedRoundShort'), fnSrc('usedDayTip'), fnSrc('coOtherTypeOn'),
+    // 기관 하루1건(agencyExclusiveDay) — renderSingleCal 이 부른다
+    fnSrc('agencyOtherSiteOn'),
     fnSrc('renderSingleCal')].join('\n'), box);
   box.renderSingleCal();
   /* 그려진 칸을 하나씩 뜯어 본다 */
