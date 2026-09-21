@@ -180,13 +180,18 @@ test('⑬★ 없어진 탭 이름으로 열려 있어도 «저장 단추»가 �
   assert.match(band, /journal/, "★ 옛 탭 이름('journal')을 마지막 장으로 안 친다 — 저장 단추가 안 나온다");
 });
 
-test('⑭ 창이 네 칸을 담을 만큼 넓어졌고, 작은 화면은 css 가 막는다', () => {
+test('⑭ 창 너비는 고정 px 값이고, 작은 화면은 css 가 막는다', () => {
+  /* 검사고정-허용: 756 은 대표가 2026-09-21 「좌우 넓이의 30% 줄이고 싶다」로
+     직접 고른 값이다(목업 승인 https://claude.ai/artifact/JpfhvrAFpSjzdrfzwWDk1v).
+     ⚠ 예전엔 여기서 «≥900(칸 하나 210px 이상)» 을 막았다 — 그 기준을 대표가
+     알고 낮춘 것이라, 옛 문턱을 되살리지 말 것. 기업정보 4칸이 좁아지는 것은
+     이 결정의 알려진 대가다(같은 목업에서 확인·승인받음). */
   const at = MODAL.length ? SRC.indexOf("className:'modal', style:{ width:") : -1;
   assert.ok(at > 0, '계약창 너비를 못 찾았다');
   const m = /width:\s*'(\d+)px'/.exec(SRC.slice(at, at + 80));
   assert.ok(m, '계약창 너비가 px 로 안 적혀 있다');
-  assert.ok(Number(m[1]) >= 900,
-    '★ 창이 네 칸을 담기엔 좁다 — 칸 하나가 210px 밑으로 내려가면 회사명·주소가 잘린다: ' + m[1]);
+  assert.equal(Number(m[1]), 756,
+    '★ 계약창 너비가 대표가 고른 756px 이 아니다(2026-09-21 결정): ' + m[1]);
   assert.match(CSS, /\.modal \{[^}]*max-width:\s*\d+vw/,
     '.modal 에 max-width 가 없다 — 작은 화면에서 창이 밖으로 나간다');
 });
