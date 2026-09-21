@@ -43,7 +43,7 @@ function 모든파일(d) {
 }
 
 test('①★★ 서류가 «남의 서버»로 가지 않는다 — studioUrl 을 우리 것으로 준다', () => {
-  const fn = cutFn(CODE, 'async function rhHwpEdOpen(');
+  const fn = cutFn(CODE, 'async function _hwpEdCreate(');
   assert.match(fn, /studioUrl\s*:\s*'vendor\/rhwp-studio\/index\.html'/,
     '★ studioUrl 을 우리 것으로 안 줍니다 — 이음쇠의 기본값은 남의 서버입니다.\n'
     + '  그 한 줄이 없으면 주민번호·도장이 든 서류가 통째로 넘어갑니다.');
@@ -56,14 +56,30 @@ test('①-2★★ 설정에 적힌 주소를 «편집기가 쓰지 않는다»',
   /* 설정 칸(rhwp_url·PU_CFG.rhwpStudioUrl)은 2026-09-21 부터 아무 데서도 안 쓴다.
      ⚠ 이것을 편집기에 도로 물리면, 그 칸에 적힌 주소로 서류가 통째로 나간다 —
      설정은 한 사람이 채우고 온 식구가 쓰는 자리라 ① 보다 더 조용히 샌다. */
-  const fn = cutFn(CODE, 'async function rhHwpEdOpen(');
+  const fn = cutFn(CODE, 'async function _hwpEdCreate(');
   assert.ok(!/rhwpStudioUrl|rhwp_url|PU_CFG/.test(fn),
     '★ 편집기가 설정 주소를 끌어다 씁니다 — 거기 적힌 곳으로 서류가 나갑니다.\n'
     + '  studioUrl 은 «우리 것 한 곳»으로 굳혀 두세요(vendor/rhwp-studio/index.html).');
 });
 
+test('①-3★★ 편집기를 짓는 자리가 «한 곳»뿐이다', () => {
+  /* 부르는 화면은 둘(서류 만들기·한글 보기 큰 창)이고 앞으로 더 늘 수 있다.
+     ⚠ 짓는 자리가 둘이 되면 빗장(studioUrl)도 둘이 된다 — 한쪽만 고치면
+       그 화면에서만 서류가 남의 서버로 나가고, 아무도 모른다. */
+  /* ⚠ 이름이 같은 «내장 편집기»(createEditor, 겹치기 입력판)가 따로 있다 —
+     그것은 바깥과 무관하다. 우리가 세는 것은 «이음쇠를 통해 짓는» 자리다. */
+  const 짓는곳 = (CODE.match(/\.createEditor\s*\(/g) || []).length;
+  assert.equal(짓는곳, 1,
+    '★ 이음쇠로 편집기를 짓는 자리가 ' + 짓는곳 + '곳입니다 — _hwpEdCreate 한 곳으로 모으세요.\n'
+    + '  빗장(studioUrl)이 여러 곳에 흩어지면 한쪽만 고쳐져 조용히 샙니다.');
+  /* 이음쇠를 들여오는 곳도 한 곳 — 들여온 자리마다 짓고 싶어진다 */
+  const 들여옴 = (CODE.match(/vendor\/rhwp-editor\/index\.js/g) || []).length;
+  assert.equal(들여옴, 1,
+    '★ 이음쇠를 들여오는 자리가 ' + 들여옴 + '곳입니다 — _hwpEdCreate 한 곳에서만 들여오세요.');
+});
+
 test('②★ 그림 엔진을 안 넣었으므로 renderer 를 canvas2d 로 준다', () => {
-  const fn = cutFn(CODE, 'async function rhHwpEdOpen(');
+  const fn = cutFn(CODE, 'async function _hwpEdCreate(');
   assert.match(fn, /renderer\s*:\s*'canvas2d'/, 'renderer 를 안 주면 없는 canvaskit 을 찾습니다');
   /* 정말 안 넣었는지 — 넣어 놓고 canvas2d 를 주면 7.4MB 가 헛되이 실린다 */
   const 있나 = 모든파일(스튜디오).some((p) => /canvaskit/i.test(p));
@@ -158,6 +174,55 @@ test('⑥ 화면에 단추와 자리가 있다', () => {
   assert.match(CODE, /onclick="rhHwpEdSave\(\)"/, '되받기 단추가 없습니다');
   /* 모드 줄에 새 단추가 들어갔나 — 안 들어가면 켜도 꺼진 것처럼 보인다 */
   assert.match(CODE, /\['kfM5','edit'\]/, '모드 표시에 새 단추가 빠졌습니다');
+});
+
+test('⑨★ 회의·비용관리에서도 고칠 수 있다 — 큰 창에 편집기가 달렸다', () => {
+  /* 대표 지시 2026-09-21 「회의관리비용도 같이」.
+     ⚠ 회의·비용관리에는 «서식 채우기» 화면이 없다. 문서가 나오는 자리는
+       「📨 동의서」(feeConsentDoc) 하나이고 그것은 한글 보기 큰 창으로 열린다.
+       그래서 큰 창에 편집기가 달려 있어야 비용관리도 고칠 수 있다 —
+       이 줄이 «회의·비용관리도 함께»를 지키는 유일한 고리다. */
+  const 동의서 = cutFn(CODE, 'function feeConsentDoc(');
+  assert.match(동의서, /openHwpViewer\(/,
+    '동의서가 큰 창으로 안 열립니다 — 그러면 아래 고리가 끊깁니다');
+  assert.match(CODE, /onclick="hwpViewEdit\(\)"/,
+    '★ 큰 창에 「✏️ 한글로 고치기」 단추가 없습니다 — 회의·비용관리에서 못 고칩니다');
+  assert.match(CODE, /id="hwpViewEdBox"/, '큰 창에 편집기가 들어갈 자리가 없습니다');
+  assert.match(CODE, /onclick="hwpViewEditDone\(\)"/, '고친 것을 받아오는 단추가 없습니다');
+
+  /* 고친 것을 «실제로» 받아와 이 창의 문서로 삼는가 — 단추만 있고 안 받아오면 헛것이다 */
+  const 받기 = cutFn(CODE, 'async function hwpViewEditDone(');
+  assert.match(받기, /exportHwpx\(\)/, '편집기에서 받아오지 않습니다');
+  assert.match(받기, /openHwpViewer\(/,
+    '받아온 것으로 다시 그리지 않습니다 — ⬇ 저장·🖨 인쇄가 옛 문서를 뽑습니다');
+
+  /* 창을 닫으면 편집기도 거둔다 — 숨은 채로 계속 돌면 메모리를 문다 */
+  const 닫기 = cutFn(CODE, 'function closeHwpView(');
+  assert.match(닫기, /hwpViewEdClose\(\)/, '큰 창을 닫아도 편집기가 남습니다');
+});
+
+test('⑩★★ 편집기가 브라우저에 남긴 서류를 지운다 — 다음 사람이 남의 이력서를 못 본다', () => {
+  /* 2026-09-21 실측: 편집기를 닫았다 열자 «지난번 서류를 되살리겠느냐»는 창이 떴다.
+     우리 저장공간에 두 자리를 만들어 두고 있었다 —
+       rhwpStudioAutosave/drafts : 서류 원본 바이트 통째(109,568바이트를 실제로 봤다)
+       rhwpStudioRecent/recent   : 연 파일 이름(이름만으로도 누구 것인지 드러난다)
+     ⚠ 이 집 서류에는 주민등록번호·도장·계좌가 있고 사무실 PC 는 여럿이 쓴다.
+       그대로 두면 다음 사람이 앞사람 것을 복구창으로 받는다. */
+  assert.match(CODE, /function _hwpEdForget\(/, '★ 지우는 길이 없습니다');
+  const fn = cutFn(CODE, 'function _hwpEdForget(');
+  ['rhwpStudioAutosave', 'rhwpStudioRecent'].forEach((n) => {
+    assert.ok(fn.indexOf(n) >= 0, '★ ' + n + ' 을 안 지웁니다 — 서류가 이 PC 에 남습니다');
+  });
+  assert.match(fn, /deleteDatabase\(/, '★ 지우지 않고 읽기만 합니다');
+
+  /* 열 때와 닫을 때 «둘 다» 불러야 한다 —
+     열 때만 부르면 닫은 뒤 그대로 남고, 닫을 때만 부르면 브라우저가 꺼진 뒤 남는다. */
+  const 짓기 = cutFn(CODE, 'async function _hwpEdCreate(');
+  assert.match(짓기, /_hwpEdForget\(\)/, '★ 열 때 안 지웁니다 — 앞사람 것이 복구창에 뜹니다');
+  ['function rhHwpEdClose(', 'function hwpViewEdClose('].forEach((d) => {
+    assert.match(cutFn(CODE, d), /_hwpEdForget\(\)/,
+      '★ ' + d + ' 에서 안 지웁니다 — 닫아도 서류가 남습니다');
+  });
 });
 
 test('⑦ 편집기가 배포에서 지워지지 않는다 — 지워지면 화면에서 안 열린다', () => {
