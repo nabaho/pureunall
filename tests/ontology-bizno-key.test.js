@@ -106,12 +106,14 @@ test('★★ 기업정보함 서류가 «같은 번호»의 회사에 붙는다 
 /* ══════ ④ 안 이어야 할 자리 ══════ */
 
 test('★★★ 같은 번호가 둘 이상이면 «안 잇는다» — 이름으로 물러서지도 않는다', () => {
+  /* ⚠ 예시 번호는 «123-» 으로 시작해야 한다 — tests/no-real-client-data.test.js 가 막는다.
+     그 밖의 번호는 국세청에 치면 실제 사업장이 나올 수 있다. */
   const r = O.auditIntegrated({
     companies: [
-      { id: 'co-a', name: '가나상사', bizNo: '555-55-55555' },
-      { id: 'co-b', name: '가나상사', bizNo: '555-55-55555' }
+      { id: 'co-a', name: '가나상사', bizNo: '123-45-67890' },
+      { id: 'co-b', name: '가나상사', bizNo: '123-45-67890' }
     ],
-    contracts: [{ id: 'ct-1', bizNo: '555-55-55555', companyName: '가나상사' }]
+    contracts: [{ id: 'ct-1', bizNo: '123-45-67890', companyName: '가나상사' }]
   }, {}, { uid: 'u1' });
   assert.deepEqual(회사관계(r, 'Contract:ct-1'), [],
     '★ 같은 번호를 가진 업체가 둘인데 이었습니다 — 어느 쪽인지 사람이 먼저 정해야 합니다.');
