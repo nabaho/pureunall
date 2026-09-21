@@ -225,6 +225,59 @@ test('⑩★★ 편집기가 브라우저에 남긴 서류를 지운다 — 다�
   });
 });
 
+test('⑪★ 고친 서식이 보관함에 «새 줄»로 담긴다 — 원본을 덮지 않는다', () => {
+  /* 대표 결정 2026-09-21 「새 줄로 담는다」.
+     ⚠ 보관함에는 «판(버전)» 개념이 아예 없다. 파일 담개(saveFileUnified)는 같은 번호를
+       주면 그냥 덮어써서, 기관이 준 옛 양식이 그 자리에서 사라지고 되돌릴 길이 없다.
+       그래서 «새 번호 · 새 줄»이어야 한다. */
+  const fn = cutFn(CODE, 'function hwpViewSaveToLib(');
+
+  /* 새 번호를 짓는가 — 온곳의 번호를 그대로 쓰면 원본이 덮인다 */
+  assert.match(fn, /saveFileUnified\(\s*id\s*,/, '파일을 담지 않습니다');
+  assert.match(fn, /id\s*=\s*'CVFORM'\s*\+/,
+    '★ 새 번호를 안 짓습니다 — 원본 양식이 그 자리에서 사라집니다');
+  assert.ok(!/_hwpView\.from\.id/.test(fn),
+    '★ 온곳의 번호로 담고 있습니다 — 그것이 곧 «덮어쓰기»입니다');
+
+  /* 목록에도 한 줄 더한다 — 빼는 코드가 있으면 안 된다 */
+  assert.match(fn, /set\(\s*'cvforms'/, '보관함 목록에 안 넣습니다');
+  assert.match(fn, /unshift\(/, '목록에 «더하지» 않습니다');
+  assert.ok(!/filter\(/.test(fn), '★ 목록에서 무언가를 빼고 있습니다 — 담기만 해야 합니다');
+
+  /* 보관함에서 온 것일 때만 담는다 */
+  assert.match(fn, /kind\s*===\s*'cvform'/,
+    '★ 아무 문서나 기관 양식으로 담깁니다 — 그 자리에서 만든 동의서까지 목록에 들어갑니다');
+});
+
+test('⑪-2★ 온곳은 «받은 것만» 쓴다 — 앞 문서 것을 물려받지 않는다', () => {
+  /* 이 큰 창은 여러 곳이 함께 쓴다. 앞 문서의 온곳이 남아 있으면,
+     보관함 서식을 본 «뒤에» 만든 동의서가 「보관함에서 온 것」이 되어 엉뚱한 줄이 담긴다. */
+  const fn = cutFn(CODE, 'async function openHwpViewer(');
+  assert.match(fn, /from\s*:\s*온곳\s*\|\|\s*null/,
+    '★ 온곳을 받은 그대로 쓰지 않습니다 — 앞 문서 것이 물려집니다');
+  assert.ok(!/_hwpView\s*(&&|\.)\s*[^\n]*from[^\n]*:/.test(fn.split('_hwpView =')[0] || ''),
+    '★ 새 문서를 만들기 전에 옛 온곳을 읽고 있습니다');
+
+  /* 고쳐서 다시 그릴 때는 온곳을 «명시로» 넘긴다 — 안 넘기면 단추가 사라진다 */
+  const 받기 = cutFn(CODE, 'async function hwpViewEditDone(');
+  assert.match(받기, /openHwpViewer\([\s\S]*?,\s*온곳\s*\)/,
+    '★ 고친 뒤 다시 그릴 때 온곳을 안 넘깁니다 — 「보관함에 담기」가 사라집니다');
+
+  /* 보관함에서 열 때는 온곳을 준다 — 이 한 줄이 전체를 잇는다 */
+  const 보기 = cutFn(CODE, 'async function cvFormHwpView(');
+  assert.match(보기, /kind\s*:\s*'cvform'/,
+    '★ 보관함이 온곳을 안 줍니다 — 고쳐도 담을 길이 없습니다');
+});
+
+test('⑪-3 이름에 «(고침)»을 겹쳐 붙이지 않는다', () => {
+  /* 세 번 고치면 「(고침) (고침) (고침).hwpx」가 된다 — 목록에서 어느 것이 최근인지 못 읽는다 */
+  const fn = cutFn(CODE, 'function _cvFixedName(');
+  assert.match(fn, /replace\(\s*\/\\s\*\\\(고침/,
+    '★ 이미 붙은 (고침)을 떼지 않습니다 — 고칠수록 이름이 길어집니다');
+  assert.match(fn, /indexOf\(이름\)\s*<\s*0|some\(/,
+    '★ 같은 이름이 이미 있는지 안 봅니다 — 목록에 같은 이름이 둘 생깁니다');
+});
+
 test('⑦ 편집기가 배포에서 지워지지 않는다 — 지워지면 화면에서 안 열린다', () => {
   const wf = fs.readFileSync(path.join(R, '.github', 'workflows', 'deploy-pages.yml'), 'utf8');
   const 지움 = wf.match(/for d in ([\s\S]*?)do/);
