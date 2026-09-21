@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://nabaho.github.io",
+      "http://localhost:8799",
+      "http://127.0.0.1:8799"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Range", "Content-Disposition"],
+    "maxAgeSeconds": 3600
+  }
+]
