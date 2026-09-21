@@ -20183,21 +20183,26 @@ function ContractModal(props){
   }
   {
     PANES.contract = h('div', null,
-      // 계약유형 다중 체크
+      // 계약유형 다중 체크 — 대표 지시 2026-09-21 「계약유형 셀 1줄로 만들어라」로
+      // 3열×2줄(1fr 1fr 1fr)에서 «항목 수만큼 열»×1줄로. 지금은 6종이라 6열이지만,
+      // CONTRACT_KINDS 가 늘거나 줄어도 열 수가 스스로 맞춰지게 개수에서 뽑는다
+      // (숫자 6을 그대로 박으면 나중에 7번째 종류가 생겨도 줄이 안 늘어난다).
+      // 칸 안 여백만 살짝 줄여 「컨설팅계약」(가장 긴 이름)도 안 잘리게 했다.
       h('div', { className:'fld' }, h('label', null, '계약유형 (다중 선택 가능) *'),
-        h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'6px' } },
+        h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(' + CONTRACT_KINDS.length + ', 1fr)', gap:'5px' } },
           CONTRACT_KINDS.map(function(k){
             var on = (f.kinds||[]).indexOf(k.v) >= 0;
             return h('button', { key:k.v, type:'button',
               onClick:function(){ toggleKind(k.v); },
-              style:{ padding:'9px 12px', borderRadius:'6px', cursor:'pointer',
+              style:{ padding:'9px 6px', borderRadius:'6px', cursor:'pointer',
                 border: on ? '2px solid '+k.color : '1px solid #cbd5e1',
                 background: on ? '#fff' : '#f8fafc',
                 color: on ? k.color : '#64748b',
                 fontWeight: on ? 700 : 500, fontSize:'12px',
-                display:'flex', alignItems:'center', gap:'6px', justifyContent:'flex-start' } },
-              h('span', { style:{ fontSize:'14px' } }, on ? '☑' : '☐'),
-              h('span', null, k.icon + ' ' + k.label));
+                display:'flex', alignItems:'center', gap:'4px', justifyContent:'center',
+                whiteSpace:'nowrap', overflow:'hidden' } },
+              h('span', { style:{ fontSize:'14px', flexShrink:0 } }, on ? '☑' : '☐'),
+              h('span', { style:{ overflow:'hidden', textOverflow:'ellipsis' } }, k.icon + ' ' + k.label));
           }))),
       // 선택된 종류별 세부설정
       (f.kinds||[]).length > 0 && h('div', { style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'12px', marginBottom:'12px' } },
