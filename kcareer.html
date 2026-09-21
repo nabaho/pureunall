@@ -1104,6 +1104,9 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
+     다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-ontology.js?v=31"></script>
 <script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -3038,13 +3041,81 @@ function hasOriginal(r){
   return fileExists(r.id);
 }
 
+/* ===== 양식 원본을 창고(Storage)에 둔다 — 다른 PC 에서도 열리게 (2026-09-21) =====
+   ■ 무엇이 문제였나
+     기관 양식 보관함은 **목록만 서버로 가고 파일은 이 PC 에만** 있었다
+     (목록은 localStorage → kcareer/<uid>/ls, 파일은 IndexedDB). 그래서 다른 PC 로
+     로그인하면 **양식 딱지는 보이는데 「원본을 찾을 수 없습니다」** 가 떴다.
+   ■ 어떻게 고쳤나 — rules.html(서고 원본)이 이미 쓰는 길을 그대로 따른다.
+     ⚠ 레코드에는 «주소»가 아니라 «자리(경로)»만 적는다 — 내려받기 주소는 시한이 있어
+       적어 두면 얼마 뒤 죽는다. 열 때 그 자리로 주소를 새로 얻는다.
+     ⚠ 올리기가 실패해도 **담기 자체는 성공**이다. 이 PC 에서는 그대로 쓰이고,
+       자리만 안 적힌다(그러면 다른 PC 에서 옛날처럼 안 열릴 뿐이다).
+   ⚠ 자리는 **사람마다 따로**다(kcareer_forms/{uid}/…) — 고친 양식에는 값이 적혀 있을 수
+     있어 남이 보면 안 된다. 창고 규칙도 「본인만」으로 올렸다. */
+var KC_FORM_BUCKET='gs://pureun-erp-hrphotos';
+function kcFormStorage(){
+  try{
+    if(!window.firebase || !firebase.apps || !firebase.apps.length) return null;
+    if(typeof firebase.app().storage!=='function') return null;
+    return firebase.app().storage(KC_FORM_BUCKET);
+  }catch(e){ return null; }
+}
+function kcFormPath(id){
+  if(typeof fbUid==='undefined' || !fbUid) return '';
+  return 'kcareer_forms/'+fbUid+'/'+String(id||'').replace(/[^A-Za-z0-9_.-]/g,'_');
+}
+/* 올린다. 된 자리를 돌려주고, 안 되면 '' 를 돌려준다(부르는 쪽이 그냥 이어간다). */
+async function kcFormUpload(id, base64, ext){
+  var st=kcFormStorage(), 자리=kcFormPath(id);
+  if(!st || !자리 || !base64) return '';
+  try{
+    await st.ref(자리).putString(base64, 'base64', { contentType:_kcFormMime(ext) });
+    return 자리;
+  }catch(e){ console.warn('양식 창고 올리기', e); return ''; }
+}
+function _kcFormMime(ext){
+  var e=String(ext||'').toLowerCase();
+  if(e==='hwpx') return 'application/hwp+zip';
+  if(e==='hwp')  return 'application/x-hwp';
+  if(e==='pdf')  return 'application/pdf';
+  if(e==='png')  return 'image/png';
+  if(e==='jpg'||e==='jpeg') return 'image/jpeg';
+  return 'application/octet-stream';
+}
+/* 이 PC 에 없는 양식을 창고에서 데려온다 — 데려온 뒤 이 PC 에도 담아 둔다(다음부터 빠르다)
+   ⚠★ 개발 중(localhost)에는 «여기만» 막힌다 — 창고가 localhost 를 안 받아 준다(CORS).
+      2026-09-21 실측: 같은 주소가 localhost 에서는 「Failed to fetch」,
+      진짜 주소(nabaho.github.io)에서는 200 · 75,956바이트로 내려왔다.
+      ⚠ 고장이 아니다. 창고 설정을 건드리지 말 것 — 올리기는 localhost 에서도 된다. */
+async function kcFormFromCloud(id){
+  var 줄=(get('cvforms')||[]).filter(function(x){ return x && x.id===id && x.stPath; })[0];
+  if(!줄) return null;
+  var st=kcFormStorage(); if(!st) return null;
+  try{
+    var url=await st.ref(줄.stPath).getDownloadURL();
+    /* ⚠ 맨 fetch 를 쓰지 말 것 — 답이 안 오면 화면이 굳는다. kcFetch 가 시간 제한을 건다. */
+    var buf=await (await kcFetch(url)).arrayBuffer();
+    var rec={ id:id, name:줄.name||'양식', ext:줄.ext||'hwpx', size:buf.byteLength,
+              base64:abToB64(buf), savedAt:줄.savedAt||new Date().toISOString() };
+    saveFileUnified(id, rec);          /* 이 PC 에도 담아 둔다 */
+    return rec;
+  }catch(e){ console.warn('양식 창고에서 데려오기', e); return null; }
+}
+
 async function getFileAsync(id){
   if(_cache[id]) return _cache[id];
-  try{ const db=await _openIDB(); return new Promise(function(res){
-    const tx=db.transaction('files','readonly'); const req=tx.objectStore('files').get(id);
-    req.onsuccess=function(){ if(req.result){ _cache[id]=req.result; res(req.result); } else { res(getFile(id)); } };
-    req.onerror=function(){ res(getFile(id)); };
-  }); }catch(e){ return getFile(id); }
+  var 여기 = await new Promise(async function(res){
+    try{ const db=await _openIDB();
+      const tx=db.transaction('files','readonly'); const req=tx.objectStore('files').get(id);
+      req.onsuccess=function(){ if(req.result){ _cache[id]=req.result; res(req.result); } else { res(getFile(id)); } };
+      req.onerror=function(){ res(getFile(id)); };
+    }catch(e){ res(getFile(id)); }
+  });
+  if(여기 && 여기.base64) return 여기;
+  /* ⚠ 마지막 수단 — 창고. 여기까지 와야 다른 PC 에서 양식이 열린다. */
+  var 저기 = await kcFormFromCloud(id);
+  return 저기 || 여기;
 }
 
 function deleteFile(id){
@@ -3853,22 +3924,20 @@ function _cvFixedName(원래){
   }
   return 밑+' (고침 '+Date.now()+')'+ext;
 }
-function hwpViewSaveToLib(){
+async function hwpViewSaveToLib(){
   if(!_hwpView||!_hwpView.bytes||!_hwpView.bytes.length){ toast('담을 문서가 없습니다'); return; }
   if(!(_hwpView.from&&_hwpView.from.kind==='cvform')){ toast('보관함에서 연 서식만 담을 수 있습니다'); return; }
   var 이름=_cvFixedName(_hwpView.name);
   var ext=(이름.split('.').pop()||'hwpx').toLowerCase();
   var id='CVFORM'+Date.now()+Math.random().toString(36).slice(2,6);
-  var 때=new Date().toISOString();
+  var 줄;
   try{
-    saveFileUnified(id, { id:id, name:이름, ext:ext, size:_hwpView.bytes.length,
-                          base64:abToB64(_hwpView.bytes), savedAt:때 });
-    var arr=get('cvforms')||[];
-    arr.unshift({ id:id, name:이름, ext:ext, savedAt:때 });
-    set('cvforms', arr);
+    줄=await cvFormPut(id, { id:id, name:이름, ext:ext, size:_hwpView.bytes.length,
+                             base64:abToB64(_hwpView.bytes), savedAt:new Date().toISOString() });
   }catch(e){ console.warn('보관함에 담기', e); toast('담지 못했습니다 — '+String(e&&e.message||e)); return; }
   _safe(renderFormLib);
-  toast('📥 「'+이름+'」으로 담았습니다 — 원본 양식은 그대로 있습니다');
+  toast('📥 「'+이름+'」으로 담았습니다 — 원본 양식은 그대로 있습니다'
+        +(줄.stPath?'':' (이 PC 에만 — 창고에 못 올렸습니다)'));
 }
 async function hwpViewEditDone(){
   if(!_hwpViewEd){ hwpViewEdClose(); return; }
@@ -5728,11 +5797,12 @@ async function importTemplateFile(file,d){ const cfg=DOMAINS[d].create;
   else showSidePreview(tempId);
   /* 양식 보관함에 추가 체크 시 */
   if(document.getElementById(cfg.saveLib).checked){ const id='tpl_'+Date.now();
-    saveFileUnified(id,{id,name:fname,ext,size:file.size,base64:b64,savedAt:new Date().toISOString()});
     /* ⚠ 종류별 보관함(resume_tpl…)에 담지 않는다 — 기관 양식은 이력서든 프로필이든 같은 파일이다.
-       갈라 담았더니 빠른 이력서 쪽 cvforms 와 서로 안 보이는 두 보관함이 되었다. */
-    const arr=get('cvforms'); arr.unshift({id:id,name:fname,ext:ext,savedAt:new Date().toISOString()});
-    set('cvforms',arr); renderFormLib(); toast('양식 보관함에 추가됨'); }
+       갈라 담았더니 빠른 이력서 쪽 cvforms 와 서로 안 보이는 두 보관함이 되었다.
+       ⚠ 담는 것은 cvFormPut «한 곳»이다 — 여기서 따로 담으면 이 길로 올린 양식만
+         다른 PC 에서 안 열린다. */
+    const 줄=await cvFormPut(id,{id:id,name:fname,ext:ext,size:file.size,base64:b64,savedAt:new Date().toISOString()});
+    renderFormLib(); toast(줄.stPath?'양식 보관함에 추가됨 — 다른 PC 에서도 열립니다':'양식 보관함에 추가됨 (이 PC 에만)'); }
   await mountEditor(buf,fname,cfg);
   /* ⚠ 여기서 큰 창(팝업)을 «띄우지 않는다» — 대표 지시 2026-08-30.
      전에는 서식을 올리기만 해도 팝업이 튀어나왔다. 그런데 편집기에 원본이 이미
@@ -8470,6 +8540,11 @@ function kcTrashPurge(tid){
   var rest=t.filter(function(x){ if(x.tid===tid){ e=x; return false; } return true; });
   if(!e) return 0;
   (e.files||[]).forEach(function(fid){ try{ deleteFile(fid); }catch(err){} });
+  /* ⚠ 창고에 올린 양식도 함께 비운다 — 안 비우면 아무도 못 꺼내는 파일이 창고에
+     영영 쌓이고 요금만 나간다. «완전삭제»일 때만이다(휴지통에 있는 동안은 그대로 둔다 —
+     되살릴 수 있어야 하니까). 실패해도 지우기는 그대로 성공시킨다. */
+  try{ var 자리=e.rec&&e.rec.stPath; var st=자리?kcFormStorage():null;
+       if(st) st.ref(자리).delete().catch(function(){}); }catch(err){}
   set(TRASH_STORE, rest);
   return 1;
 }
@@ -11040,10 +11115,24 @@ function _tplMerge(){
   if(moved){ set('cvforms',arr); console.log('옛 양식 보관함 '+moved+'건을 한 곳으로 옮겼습니다'); }
   return moved;
 }
+/* ★ 양식 한 줄을 «담는 한 곳» — 세 길이 모두 여기로 온다
+     ① ＋ 양식 올리기(cvAddForm) ② 고친 것 되돌리기(hwpViewSaveToLib) ③ 서식 올리며 보관(importTemplateFile)
+   ⚠ 길을 따로 만들지 말 것 — 하나라도 빠지면 «그 길로 담은 양식만» 다른 PC 에서 안 열린다.
+     그런 어긋남은 몇 달 뒤에야 드러나고, 그때는 어느 길로 담았는지 아무도 모른다.
+   ⚠ 창고 올리기가 실패해도 담기는 «성공»이다 — 이 PC 에서는 그대로 쓰인다. */
+async function cvFormPut(id, rec){
+  saveFileUnified(id, rec);
+  var 자리 = await kcFormUpload(id, rec.base64, rec.ext);
+  var 줄 = { id:id, name:rec.name, ext:rec.ext, savedAt:rec.savedAt };
+  if(자리) 줄.stPath = 자리;
+  var arr = get('cvforms') || [];
+  arr.unshift(줄); set('cvforms', arr);
+  return 줄;
+}
 async function cvAddForm(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='.hwp,.hwpx,.pdf,.doc,.docx,.jpg,.jpeg,.png';
   inp.onchange=async function(){ const f=inp.files[0]; if(!f) return; const buf=await f.arrayBuffer(); const id='CVFORM'+Date.now()+Math.random().toString(36).slice(2,6); const ext=(f.name.split('.').pop()||'').toLowerCase();
-    saveFileUnified(id,{id:id,name:f.name,ext:ext,size:f.size,base64:abToB64(buf),savedAt:new Date().toISOString()});
-    const arr=get('cvforms'); arr.unshift({id:id,name:f.name,ext:ext}); set('cvforms',arr); renderFormLib(); toast('기관 양식 보관됨'); }; inp.click(); }
+    const 줄=await cvFormPut(id,{id:id,name:f.name,ext:ext,size:f.size,base64:abToB64(buf),savedAt:new Date().toISOString()});
+    renderFormLib(); toast(줄.stPath?'기관 양식 보관됨 — 다른 PC 에서도 열립니다':'기관 양식 보관됨 (이 PC 에만 — 창고에 못 올렸습니다)'); }; inp.click(); }
 function cvDelForm(id, btn){
   var r=get('cvforms').find(function(f){ return f.id===id; });
   if(!r){ toast('이미 지워졌습니다'); return; }
