@@ -19855,29 +19855,43 @@ function ContractModal(props){
           ));
       })(),
       /* 본사주소도 «검색 칸»으로 (대표 지시 2026-09-19 「본사주소도 사업장주소와 같이
-         셀검색 셀로」). ⚠ 새 칸(headZipcode 등)을 안 만든다 — addressDetail 은
-         한 줄 문자열 그대로 두고, 검색 결과를 「(우편번호) 주소」로 합쳐 넣는다.
-         칸을 늘리면 transferContract() 이관까지 또 손대야 한다(2026-09-19에 그
-         길을 한 번 겪었다) — 문자열 하나로 끝내는 편이 안전하다. */
+         셀검색 셀로」 → 2026-09-21 「본사주소도 같은 형태로해라 셀 검색 셀로」로
+         다시 지시 — 09-19 판은 [입력+검색] 두 칸이었는데, «우편번호 칸까지 셋으로
+         나뉜» 사업장주소와 «같은 모양»을 말씀하신 것이었다.
+         ⚠ 새 칸(headZipcode 등)은 여전히 안 만든다 — addressDetail 은 한 줄
+         문자열 그대로 두고, 그 앞의 「(우편번호)」만 잘라내 «보여주는 칸»을 둘로
+         나눴을 뿐이다. 칸을 늘리면 transferContract() 이관까지 또 손대야 한다
+         (2026-09-19에 그 길을 한 번 겪었다) — 문자열 하나로 끝내는 편이 안전하다. */
       (function(){
+        var _hm = /^\((\d{3,7})\)\s*(.*)$/.exec(String(f.company.addressDetail || ''));
+        var _headZip = _hm ? _hm[1] : '';
+        var _headAddr = _hm ? _hm[2] : String(f.company.addressDetail || '');
+        function combineHead(zip, addr){ return (zip ? '(' + zip + ') ' : '') + addr; }
+        function setHeadField(next){ setCompanyField('addressDetail')({ target:{ value: next, type:'text' } }); }
         function doHeadAddrSearch(){
           openAddressSearch(function(r){
             if(!r || (!r.zipcode && !r.address)){ showToast(ADDR_NONE_MSG); return; }
-            var combined = (r.zipcode ? '(' + r.zipcode + ') ' : '') + r.address;
-            setCompanyField('addressDetail')({ target:{ value: combined, type:'text' } });
+            var combined = combineHead(r.zipcode, r.address);
+            setHeadField(combined);
             showToast(ADDR_OK_MSG + combined);
-          }, f.company.addressDetail);
+          }, _headAddr);
         }
         function onHeadAddrEnter(e){ if(e.key==='Enter'){ e.preventDefault(); e.stopPropagation(); doHeadAddrSearch(); } }
         return h('div', { className:'pu-n6 pu-n6-6' },
           h('div', { style:{ display:'flex', gap:'6px', alignItems:'center' } },
-            h('input', { type:'text', value:f.company.addressDetail || '', onChange:setCompanyField('addressDetail'), onKeyDown:onHeadAddrEnter,
-              placeholder:'본사주소 (본사와 다를 때만)',
-              style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } }),
+            h('input', { type:'text', value:_headZip, onKeyDown:onHeadAddrEnter,
+              onChange:function(e){ setHeadField(combineHead(e.target.value, _headAddr)); },
+              placeholder:'우편번호', maxLength:7,
+              style:{ width:'90px', padding:'7px 10px', borderRadius:'6px', fontSize:'12.5px', fontFamily:'monospace', textAlign:'center', flexShrink:0,
+                border:'1px solid #cbd5e1' } }),
             h('button', { type:'button', onClick:doHeadAddrSearch, onKeyDown:onHeadAddrEnter,
               title:'본사주소 검색',
               style:{ padding:'8px 12px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-              '🔍 검색')
+              '🔍 검색'),
+            h('input', { type:'text', value:_headAddr, onKeyDown:onHeadAddrEnter,
+              onChange:function(e){ setHeadField(combineHead(_headZip, e.target.value)); },
+              placeholder:'본사주소 (본사와 다를 때만)',
+              style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } })
           ));
       })(),
       sec6('☎ 연락처', '기업정보함 5·6·7·14번 — 네 칸이라 한 줄로 모았다'),
@@ -19897,9 +19911,15 @@ function ContractModal(props){
             placeholder:'대표자 전화', title:'010-0000-0000', inputmode:'tel' })),
         fldn6(
           h('input', { type:'email', value:f.company.email, onChange:setCompanyField('email'), placeholder:'대표 이메일', title:'contact@company.kr' })),
-      /* 업태·종목·규모 — 기업정보함도 16·17·20번으로 서로 붙여 두었다.
-         위 「회사 신원」에 있던 것을 여기로 내렸다. 되돌리지 말 것. */
-      sec6('🏭 업종 · 규모', '기업정보함 16·17·20번'),
+      /* 업태·종목·규모·4대보험 가입자수 — 대표 지시 2026-09-21 「한줄로 만들어라」로
+         한 줄에 모았다. 기업정보함도 16·17·20번으로 서로 붙여 두었다.
+         위 「회사 신원」에 있던 것을 여기로 내렸다. 되돌리지 말 것.
+         ⚠ 4대보험 칸은 예전엔 showCompany «밖»의 딴 그리드에 따로 있었다 —
+           「근로자 단독 의뢰에서도 보인다」던 이유였는데, showCompany 는 이미
+           위(line ~19086)에서 늘 true 다(「근로자 단독이어도 상대 회사 입력
+           필요 → 항상 표시」) — 즉 이 자리는 실제로는 늘 함께 그려지고 있었다.
+           그래서 그리드를 갈라 둘 까닭이 없어 한 줄로 합쳤다. */
+      sec6('🏭 업종 · 규모 · 4대보험 가입자수', '기업정보함 16·17·20번'),
       fldn6(
         h('input', { type:'text', value:f.company.bizType, onChange:setCompanyField('bizType'),
           placeholder:'업태', title:'예: 제조업' })),
@@ -19913,25 +19933,18 @@ function ContractModal(props){
           ['소기업','중기업','중견기업','대기업','공공기관','기타'].map(function(sz){
             return h('option', { key:sz, value:sz }, sz);
           })
-        ))
-      )  // 그리드 2(주소·연락처·업종) 닫기
+        )),
+      fldn6(
+        h(NumberInput, { value:f.company.employmentInsuredCount,
+          onChange:setCompanyField('employmentInsuredCount'), placeholder:'고용보험(명)',
+          style:{ textAlign:'right', fontFamily:'monospace' } })),
+      fldn6(
+        h(NumberInput, { value:f.company.injuryInsuredCount,
+          onChange:setCompanyField('injuryInsuredCount'), placeholder:'산재보험(명)',
+          style:{ textAlign:'right', fontFamily:'monospace' } }))
+      )  // 그리드 2(주소·연락처·업종·4대보험) 닫기
       )  // 회사정보 내용 wrapper 닫기
       ),  // showCompany 닫기
-
-      /* ⚠ 이 상자는 showCompany «밖»에 있다 — 근로자 단독 의뢰에서도 보인다.
-         4칸으로 옮기면서도 그 성질은 건드리지 않았다(보이는 조건을 바꾸면
-         근로자 사건에서 쓰던 칸이 말없이 사라진다). 그래서 그리드도 따로 연다. */
-      h('div', { className:'pu-g6', style:{ marginTop:'14px' } },
-        sec6('👥 4대보험 가입자수'),
-        fldn6(
-          h(NumberInput, { value:f.company.employmentInsuredCount,
-            onChange:setCompanyField('employmentInsuredCount'), placeholder:'고용보험(명)',
-            style:{ textAlign:'right', fontFamily:'monospace' } })),
-        fldn6(
-          h(NumberInput, { value:f.company.injuryInsuredCount,
-            onChange:setCompanyField('injuryInsuredCount'), placeholder:'산재보험(명)',
-            style:{ textAlign:'right', fontFamily:'monospace' } }))
-      ),  // 4대보험 그리드 닫기
 
       /* 🔗 업체 연결 — 회사정보 «뒤»에 둔다 (대표 지시 2026-09-18 「화면 정리」).
          맨 위에 있었더니 회사명 칸을 보기도 전에 파란 상자 네 줄을 지나야 했다.
