@@ -21,7 +21,11 @@ function slice(a, b) {
 
 /* ── 실제 코드를 그대로 떼어 모래상자에서 돌린다 (시드도 파일 원본) ── */
 const STAGE_SRC = slice('// ============ 사건 심급·단계 카탈로그 ============', '// ── 사건 심급·단계 카탈로그 끝 ──');
-const ctx = { console, Object, Array, String, Number, JSON, Math, Date, parseInt, parseFloat, window: {}, __store: {} };
+/* ★ 2026-09-21 — 단계 기한 셈이 공용 모듈(js/pu-case-due.js)로 옮겨졌다.
+   상자에 그 모듈을 «진짜로» 넣는다 — 흔내 낸 가짜를 넣으면
+   이알피가 실제로 어떤 날짜를 받는지 못 보게 된다. */
+const ctx = { console, Object, Array, String, Number, JSON, Math, Date, parseInt, parseFloat, window: {}, __store: {},
+  PuCaseDue: require(require('path').join(__dirname, '..', 'js', 'pu-case-due.js')) };
 ctx.dbGet = function (k, d) { return Object.prototype.hasOwnProperty.call(ctx.__store, k) ? ctx.__store[k] : d; };
 ctx.dbSet = function (k, v) { ctx.__store[k] = v; };
 vm.createContext(ctx);
@@ -173,8 +177,13 @@ ok('법정 기한 근거(dueNote)가 노무사가 읽을 수 있게 들어 있�
   (stageInfo('lrc-local') || {}).dueNote.indexOf('10일 이내') >= 0
   && (stageInfo('lrc-central') || {}).dueNote.indexOf('15일 이내') >= 0);
 ok('달력일 기준임을 주석에 밝혔다', /달력일.*영업일 아님|영업일 아님/.test(STAGE_SRC));
-ok('시간대에 밀리지 않게 Date.UTC 로만 계산한다',
-  /Date\.UTC\(/.test(STAGE_SRC) && !/new Date\((['"]|ymd|base)/.test(STAGE_SRC.replace(/new Date\(t\)/g, '')));
+/* ★ 2026-09-21 — 날짜 더하기가 공용 모듈(js/pu-case-due.js)로 옮겨졌다.
+   지킬 것은 «이 파일에 Date.UTC 가 있는가»가 아니라 «지역 시간으로 세지 않는가»다 —
+   그러지 않으면 서머타임·시간대에 따라 법정 기한이 하루 밀린다(그건 사고다).
+   실제로 돌려 보는 검사: tests/case-due-chips.test.js 「날짜 더하기를 UTC 로 센다」 */
+ok('단계 카탈로그가 제 손으로 날짜를 세지 않는다 (공용 모듈에 맡긴다)',
+  /PuCaseDue\.(addDays|stageDue)\(/.test(STAGE_SRC)
+  && !/new Date\((['"]|ymd|base)/.test(STAGE_SRC.replace(/new Date\(t\)/g, '')));
 
 /* ══ ⑦ 화면 배선 — 사건 수정창 ══ */
 const caseModal = slice('function CaseEditModal(props){', 'function CaseManagement(props){');

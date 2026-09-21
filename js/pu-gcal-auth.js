@@ -136,6 +136,46 @@
     });
   }
 
+  /* 구글 일정을 «다른 날로» 옮긴다 (2026-09-21, 끌어 옮기기).
+     ★ 먼저 그 일정을 받아 와야 한다 — 시각을 그대로 두고 «날짜만» 바꾸려면
+       지금 몇 시인지 알아야 하기 때문이다. 종일 일정이면 날짜만 있다.
+     ⚠ 종일 일정의 end 는 «다음 날»이다(구글 규칙). 하루 더해 주지 않으면
+       옮긴 일정이 길이 0 이 되어 화면에서 사라진다.
+     ⚠ 참석자에게 알림을 보내지 않는다(sendUpdates=none) — 우리가 자리를 옮긴 것을
+       바깥 사람에게 일일이 알릴 일이 아니다. */
+  function moveEvent(calId, eventId, newDate, opt) {
+    if (!calId || !eventId) return Promise.reject(new Error('옮길 일정을 찾지 못했습니다'));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(newDate || ''))) {
+      return Promise.reject(new Error('옮길 날짜가 올바르지 않습니다'));
+    }
+    var 길 = '/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(eventId);
+    return apiCall('GET', 길, null, opt).then(function (ev) {
+      if (!ev || !ev.start) throw new Error('구글에서 그 일정을 찾지 못했습니다');
+      var 고칠것;
+      if (ev.start.date) {
+        고칠것 = { start: { date: newDate }, end: { date: addDay(newDate) } };
+      } else {
+        var s = ev.start.dateTime ? String(ev.start.dateTime).slice(11, 16) : '09:00';
+        var e = (ev.end && ev.end.dateTime) ? String(ev.end.dateTime).slice(11, 16) : '10:00';
+        고칠것 = {
+          start: { dateTime: newDate + 'T' + s + ':00', timeZone: 'Asia/Seoul' },
+          end: { dateTime: newDate + 'T' + e + ':00', timeZone: 'Asia/Seoul' }
+        };
+      }
+      return apiCall('PATCH', 길 + '?sendUpdates=none', 고칠것, opt);
+    }).then(function (r) {
+      if (!r || !r.id) throw new Error('구글이 옮겼다고 대답하지 않았습니다');
+      return { moved: true, id: r.id };
+    });
+  }
+  /* 종일 일정의 끝날 — 하루 뒤. UTC 로만 센다(지역 시간이면 하루 밀린다). */
+  function addDay(ymd) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+    var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) + 86400000);
+    return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2)
+      + '-' + ('0' + d.getUTCDate()).slice(-2);
+  }
+
   /* 이어진 구글 일정을 지운다. 이어진 것이 없으면 «할 일이 없다»(성공으로 본다). */
   function deleteEvent(calId, eventId, opt) {
     if (!eventId || !calId) return Promise.resolve({ skipped: true });
@@ -147,6 +187,6 @@
 
   return {
     hasToken: hasToken, token: token, capture: capture,
-    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent
+    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent
   };
 });
