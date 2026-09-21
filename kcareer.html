@@ -1116,7 +1116,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=4"></script>
 <script src="js/pu-doc-read.js?v=48"></script>
-<script src="js/kcareer-hwpxfill.js?v=26"></script>
+<script src="js/kcareer-hwpxfill.js?v=27"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
@@ -2054,6 +2054,20 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           </div>
         </div>
         <div class="tabpanel" id="tab-data"><div class="desc">원본 보호 · 데이터 복원</div>
+          <!-- 🧠 서식 기억 (대표 지시 2026-09-20 「화면에서 보고 지우는 길을 만들어 두세요」) -->
+          <div class="card" style="margin-bottom:12px"><div class="rc-h">🧠 서식 기억 — 한 번 짚어 둔 짝짓기</div>
+            <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">
+              사전이 못 알아본 표는 AI 에게 물어 그 답을 <b>서식마다 기억</b>해 둡니다.
+              잘못 기억되면 엉뚱한 표에 학력·경력이 박힙니다 —
+              <b>「🚫 안 씀」</b>은 울타리가 막고 있는 것이라 해가 없고, 지우셔도 됩니다.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+              <button class="btn" type="button" onclick="mmDraw()">🔄 다시 보기</button>
+              <button class="btn" type="button" onclick="mmClearBlocked()">🧹 막힌 것만 지우기</button>
+              <button class="btn" type="button" style="border-color:#fecaca;color:var(--red)" onclick="mmClearAll()">🗑 모두 지우기</button>
+            </div>
+            <div id="mmBox"></div>
+          </div>
           <div class="card" style="margin-bottom:12px"><div class="rc-h">🔒 원본 파일 삭제 보호</div>
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="origLockChk"> <b>원본 삭제 보호 켜기</b></label>
             <div style="font-size:12px;color:var(--text-mute);margin-top:6px">켜면 🗑원본 버튼을 눌러도 첨부 원본이 삭제되지 않습니다(실수 방지). 정말 삭제할 때만 잠시 끄세요.</div>
@@ -10050,6 +10064,8 @@ function initTabs(){
     /* 'account' 탭은 신분증 탭으로 합쳐졌다 — 단추가 없으니 여기 남겨 둘 필요가 없다 */
     'staff': ()=>{ _safe(renderStaffMgr); _safe(function(){ fbLoadStaff(false); }); },
     'api': ()=>{ _safe(initApiTab); },
+    /* 🧠 서식 기억 — 이 탭을 열 때 그린다(대표 지시 2026-09-20) */
+    'data': ()=>{ _safe(mmDraw); },
   };
   document.querySelectorAll('.tabrow').forEach(row=>{
     const page=row.closest('.page');
@@ -12294,6 +12310,103 @@ async function rhFillByMap(){
 var RH_COLMEM='col_maps';
 function _rhColAll(){ try{ return JSON.parse(LS.get(NS+RH_COLMEM)||'{}')||{}; }catch(e){ return {}; } }
 function _rhColSave(all){ try{ LS.set(NS+RH_COLMEM, JSON.stringify(all)); }catch(e){} }
+
+/* ── 🧠 서식 기억 보기·지우기 (대표 지시 2026-09-20) ──────────────────────
+   ■ 왜 필요한가 — 실측 2026-09-20
+     대표 계정에 AI 짝짓기가 21개 쌓여 있었고, 그 가운데 여섯이 «목록 표가 아닌 것»을
+     목록으로 만들고 있었다(평가기준표가 경력 목록이 되는 식). 그런데 **무엇이 쌓였는지
+     볼 길이 아예 없었다** — 대표도, 나도. 그래서 「계속 이상하다」가 되풀이됐다.
+   ⚠ 울타리(머리행답나)가 이미 막고 있으므로 지우지 않아도 해는 없다.
+     다만 «보이는 것»과 «지울 수 있는 것»은 다른 일이다. 여기서 둘 다 준다.
+   ⚠★ 막힘 판정은 채우는 쪽과 «같은 자»(KcareerHwpxFill.isHeaderishText)를 쓴다 —
+     두 벌로 만들면 「화면엔 쓰인다는데 실제로는 막히는」 어긋남이 생긴다. */
+/* 「이 기억이 실제로 쓰이나」 — 안 쓰이면 «까닭»까지 준다.
+   ⚠★ 까닭이 셋인 것은 채우는 쪽에 빗장이 셋이기 때문이다. 화면이 「씀」이라고 했는데
+      실제로는 안 쓰이면 그게 더 나쁘다 — 대표가 엉뚱한 것을 지우게 된다. */
+function mmWhyBlocked(머리줄, 짝){
+  var X=window.KcareerHwpxFill;
+  if(!X||typeof X.isHeaderishText!=='function') return '';
+  var 이름들=String(머리줄||'').split('|');
+  if(!X.isHeaderishText(이름들)) return '머리줄이 아님';
+  /* 사전이 이미 알아보면 AI 답을 안 쓴다 — AI 는 «사전이 모를 때만» 거든다 */
+  var 사전=0;
+  이름들.forEach(function(n){ if(X.colKeyOf(n)) 사전++; });
+  if(사전>=2) return '사전이 이미 앎';
+  /* 열쇠가 둘 미만이면 목록 표로 안 본다 */
+  var 열쇠수=0;
+  Object.keys(짝||{}).forEach(function(c){ if(짝[c] && 짝[c]!=='none') 열쇠수++; });
+  if(열쇠수<2) return '열쇠가 둘 미만';
+  return '';
+}
+function mmBlocked(머리줄, 짝){ return !!mmWhyBlocked(머리줄, 짝); }
+function mmRows(){
+  var out=[];
+  var col=_rhColAll();
+  Object.keys(col).forEach(function(k){
+    var m=col[k]||{};
+    var 짝=Object.keys(m).map(function(c){ return c+'→'+m[c]; }).filter(function(s){ return !/→none$/.test(s); });
+    var 까닭=mmWhyBlocked(k, m);
+    out.push({ 곳:RH_COLMEM, 열쇠:k, 이름:'열 짝짓기', 보임:k, 짝:짝.join(' · ')||'(없음)',
+               막힘:!!까닭, 까닭:까닭 });
+  });
+  var slot=_rhSlotAll();
+  Object.keys(slot).forEach(function(k){
+    var n=(slot[k]&&slot[k].picks)?Object.keys(slot[k].picks).length:0;
+    out.push({ 곳:RH_SLOTMEM, 열쇠:k, 이름:'칸 짚기', 보임:'서식 지문 '+String(k).slice(0,18)+'…',
+               짝:n+'칸', 막힘:false, 까닭:'' });
+  });
+  return out;
+}
+function mmDraw(){
+  var box=document.getElementById('mmBox'); if(!box) return;
+  var rows=mmRows();
+  if(!rows.length){ box.innerHTML='<div style="font-size:12.5px;color:var(--text-mute);padding:8px 0">기억해 둔 것이 없습니다.</div>'; return; }
+  var 막힌수=rows.filter(function(r){ return r.막힘; }).length;
+  box.innerHTML='<div style="font-size:12px;color:var(--text-sub);margin-bottom:7px">'
+    +'모두 <b>'+rows.length+'개</b>'+(막힌수?(' · 그중 <b style="color:var(--red)">'+막힌수+'개</b>는 울타리가 막고 있습니다'):'')+'</div>'
+    +'<div class="dt" style="max-height:340px;overflow:auto"><table><thead><tr>'
+    +'<th style="width:78px">갈래</th><th>기억해 둔 머리줄</th><th style="width:26%">짝</th>'
+    +'<th style="width:110px">쓰임</th><th style="width:60px">관리</th></tr></thead><tbody>'
+    +rows.map(function(r,i){
+      return '<tr'+(r.막힘?' style="background:#fef2f2"':'')+'>'
+        +'<td style="font-size:11.5px;color:var(--text-mute)">'+escapeHtml(r.이름)+'</td>'
+        +'<td style="font-size:11.5px;word-break:break-all">'+escapeHtml(String(r.보임).slice(0,90))+'</td>'
+        +'<td style="font-size:11.5px;color:var(--text-mute);word-break:break-all">'+escapeHtml(r.짝)+'</td>'
+        +'<td style="font-size:11px;font-weight:700;'+(r.막힘?'color:var(--red)':'color:var(--teal)')+'"'
+          +(r.까닭?(' title="'+_jsAttr(r.까닭)+'"'):'')+'>'
+          +(r.막힘?('🚫 '+escapeHtml(r.까닭||'안 씀')):'✓ 씀')+'</td>'
+        +'<td><button class="btn sm" type="button" onclick="mmDrop('+i+')">지우기</button></td></tr>';
+    }).join('')+'</tbody></table></div>';
+  _mmRows=rows;
+}
+var _mmRows=[];
+function mmDrop(i){
+  var r=_mmRows[i]; if(!r) return;
+  if(!confirm('이 기억을 지웁니다.\n\n'+String(r.보임).slice(0,70)+'\n\n다음에 그 서식을 열면 새로 짚습니다. 계속할까요?')) return;
+  mmRemove(r.곳, r.열쇠);
+  toast('지웠습니다'); mmDraw();
+}
+function mmRemove(곳, 열쇠){
+  try{
+    var all=JSON.parse(LS.get(NS+곳)||'{}')||{};
+    delete all[열쇠];
+    LS.set(NS+곳, JSON.stringify(all));
+  }catch(e){ console.warn('기억 지우기', e); }
+}
+function mmClearBlocked(){
+  var 막힌것=mmRows().filter(function(r){ return r.막힘; });
+  if(!막힌것.length){ toast('막혀 있는 기억이 없습니다'); return; }
+  if(!confirm('울타리가 막고 있는 기억 '+막힌것.length+'개를 지웁니다.\n\n지워도 손해가 없습니다 — 이미 쓰이지 않는 것들입니다.\n\n계속할까요?')) return;
+  막힌것.forEach(function(r){ mmRemove(r.곳, r.열쇠); });
+  toast('🧹 '+막힌것.length+'개를 지웠습니다'); mmDraw();
+}
+function mmClearAll(){
+  var n=mmRows().length;
+  if(!n){ toast('지울 것이 없습니다'); return; }
+  if(!confirm('기억해 둔 짝짓기 '+n+'개를 «모두» 지웁니다.\n\n다음에 서식을 열면 처음부터 다시 짚습니다\n(사전이 못 알아본 표는 AI 에게 다시 묻습니다).\n\n계속할까요?')) return;
+  try{ LS.set(NS+RH_COLMEM,'{}'); LS.set(NS+RH_SLOTMEM,'{}'); }catch(e){}
+  toast('🗑 '+n+'개를 모두 지웠습니다'); mmDraw();
+}
 
 async function rhColMap(srcBytes){
   if(!window.KcareerColMapAi || !window.PuAiCall) return null;
