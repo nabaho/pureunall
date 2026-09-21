@@ -1029,11 +1029,18 @@ class ErrorBoundary extends Component {
 
 // ============ 메뉴 정의 ============
 var MENUS = [
-  { gid:'dash', name:'대시보드', icon:'📊', items:[
-    /* ★ 2026-09-20 — 법인 대시보드·이음센터를 걷어내고 «푸른 캘린더»로 바꿨다.
-       app 이 있으면 이 앱 안에서 그리지 않고 그 앱을 연다(아래 selectMenu).
-       ⚠ 창을 새로 띄우지 않는다 — PuAppBar.goApp 이 «같은 창»에서 옮겨 간다. */
-    { id:'dash/cal',  icon:'📅', text:'푸른 캘린더', app:'pu-cal.html' },
+  /* ★ 2026-09-21 — 「푸른 캘린더」를 옆 메뉴에서 뺐다 (대표 지시, 검토 뒤).
+       ① 이알피 메뉴에서 «앱 밖으로 나가는» 항목은 그것 하나뿐이었다. 형제 앱이
+          열여섯인데 전부 메뉴에 없다 — 하나만 예외면 규칙이 없는 것과 같다.
+       ② 문이 이미 둘 더 있다: 화면 오른쪽 가장자리의 「즐겨찾기」 탭(= 프로그램 이동,
+          ☆ 를 누르면 맨 위로 올라온다)과 포털의 타일.
+       ③ 메뉴를 눌렀는데 앱이 통째로 바뀌면, 돌아올 때 걸음이 꼬인다.
+     ⚠ 다시 넣지 말 것. 넣고 싶어지면 먼저 «업무관리도 넣을 것인가»를 답해 볼 것 —
+       답이 아니오면 이것도 아니오다.
+     ★ flat — 머리(▶ 대시보드 1)를 그리지 않고 항목만 낸다. 항목 하나짜리 접이는
+       한 번 더 누르게 할 뿐 아무것도 안 알려 준다. 나의 업무는 로그인하면 처음 뜨는
+       화면이라 맨 위에 홑으로 있는 편이 맞다. */
+  { gid:'dash', name:'대시보드', icon:'📊', flat:true, items:[
     { id:'dash/my',   icon:'📋', text:'나의 업무' }
   ]},
   { gid:'biz', name:'사무관리', icon:'💼', items:[
@@ -11333,6 +11340,20 @@ function Sidebar(props){
     try{ localStorage.setItem('pu_build_popup_off', '1'); }catch(e){}
   }
 
+  /* 「달력 어디 갔나」 안내 — 2026-09-21, 옆 메뉴에서 「푸른 캘린더」를 뺀 날.
+     ⚠ 배포 팝업(위)에 얹지 않는다. 그것은 ①관리자만 보고 ②한 번 닫으면 그 뒤
+       모든 빌드에서 영영 안 뜬다 — 달력을 쓰던 «모든 직원»에게 가야 하는 말이다.
+     ⚠ 이 안내는 «닫으면 끝»이다. 자리를 계속 먹으면 그것대로 잔소리가 된다.
+     ⚠ 다 알려진 뒤에는 이 덩이를 지운다 — 남겨 두면 새로 온 사람이
+       「있었던 적 없는 것」을 찾게 된다. */
+  var calMovedS = useState(function(){
+    try{ return localStorage.getItem('pu_cal_moved_off') !== '1'; }catch(e){ return true; }
+  }); var showCalMoved = calMovedS[0]; var setShowCalMoved = calMovedS[1];
+  function dismissCalMoved(){
+    setShowCalMoved(false);
+    try{ localStorage.setItem('pu_cal_moved_off', '1'); }catch(e){}
+  }
+
   // 검색
   var sq = useState(''); var sbQuery = sq[0]; var setSbQuery = sq[1];
   // 권형하 카드 클릭 메뉴
@@ -11552,6 +11573,26 @@ function Sidebar(props){
             border:'1px solid ' + (on ? '#2563eb' : '#1e293b') } }, t.label);
       })
     ),
+    /* 달력이 어디로 갔는지 — 한 번만. 누르면 바로 그리로 간다(말만 하고 끝내지 않는다) */
+    showCalMoved && h('div', {
+      style:{ position:'relative', margin:'2px 10px 8px', padding:'9px 28px 9px 10px',
+        /* 바로 위 「이번 업데이트」 알림과 «같은 색»이다 — 같은 자리의 같은 결의 말이라
+           새 색을 만들 까닭이 없다(팔레트 27색 밖으로 나가면 tests/color-palette 가 막는다). */
+        background:'#1e40af', border:'1px solid #2563eb', borderRadius:'8px',
+        fontSize:'11px', color:'#bfdbfe', lineHeight:1.55 } },
+      h('div', { style:{ fontWeight:800, marginBottom:'2px' } }, '📅 달력이 옮겨졌습니다'),
+      h('div', null, '「푸른 캘린더」는 이제 따로 선 프로그램입니다. ',
+        h('b', null, '오른쪽 가장자리의 파란 「즐겨찾기」 탭'), ' 에서 열 수 있고, ',
+        '거기서 ☆ 를 눌러 두면 맨 위로 올라옵니다.'),
+      h('button', { onClick:function(){ dismissCalMoved(); try{ PuAppBar.goApp('pu-cal.html?sso=1'); }catch(e){} },
+        style:{ marginTop:'7px', padding:'5px 10px', border:'1px solid #2563eb', borderRadius:'6px',
+          background:'#1e40af', color:'#fff', fontSize:'11px', fontWeight:700, cursor:'pointer' } },
+        '📅 지금 열어 보기'),
+      h('button', { onClick:dismissCalMoved, title:'다시 안 보기',
+        style:{ position:'absolute', top:'5px', right:'5px', width:'20px', height:'20px', border:'none',
+          borderRadius:'5px', background:'transparent', color:'#bfdbfe', fontSize:'13px', fontWeight:700,
+          cursor:'pointer', lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' } }, '✕')
+    ),
     h('nav', { className:'sb-nav', style:{ flex:'1 1 auto', minHeight:0, overflowY:'auto' } },
       // ⭐ 즐겨찾기 뷰: 즐겨찾기만 세로 목록(드래그 순서변경·우클릭 해제)
       sbView === 'fav' ? (
@@ -11644,9 +11685,11 @@ function Sidebar(props){
           var itemMatch = visibleItems.some(function(it){ return matchSearch(it.text); });
           if(!grpMatch && !itemMatch) return null;
         }
-        var open = openSet[grp.gid] || (sbQuery ? true : false); // 검색 시 자동 펼침
+        /* ★ flat 묶음은 «머리를 안 그린다» — 항목 하나짜리 접이는 한 번 더 누르게
+           할 뿐 아무것도 안 알려 준다(2026-09-21, 대시보드 묶음). 늘 펼쳐 둔다. */
+        var open = grp.flat ? true : (openSet[grp.gid] || (sbQuery ? true : false)); // 검색 시 자동 펼침
         return h('div', { key:grp.gid },
-          h('div', { className:'sb-grp-h', 'data-grp-id':grp.gid, tabIndex:0,
+          !grp.flat && h('div', { className:'sb-grp-h', 'data-grp-id':grp.gid, tabIndex:0,
             onClick:function(){ onToggleGrp(grp.gid); } },
             h('span', { className:'arrow' }, open ? '▼' : '▶'),
             h('span', { className:'icon' }, grp.icon),
@@ -37658,7 +37701,7 @@ function flatMenus(){
 
 // 역할 프리셋: 메뉴 ID 배열로 정의
 // 직원 기본: 대시보드 2개 + 사무관리 7개만 (총 9개)
-var DASH_MENUS = ['dash/cal','dash/my'];
+var DASH_MENUS = ['dash/my'];
 var BIZ_MENUS  = ['biz/contract','biz/company','biz/case','biz/consulting','biz/fund','biz/other','biz/closed'];
 var BIZ_DEFAULT_MENUS = DASH_MENUS.concat(BIZ_MENUS);
 
@@ -60563,7 +60606,7 @@ function MyDeskV2(props){
       h('div', {style:{display:'flex',gap:'6px',alignItems:'center'}},
         h('button',{onClick:refreshDash, title:'데이터 새로고침',
           style:{padding: IS_MOBILE?'4px 8px':'7px 10px',background:'#fff',color:'#475569',border:'1px solid #e2e8f0',borderRadius:'10px',cursor:'pointer',fontSize:'13px',fontWeight:700,lineHeight:1.2}},'🔄'),
-        h('button', { onClick:function(){navigate('dash/cal');},
+        h('button', { onClick:function(){ try{ PuAppBar.goApp('pu-cal.html?sso=1'); }catch(e){} },
           style:{ padding: IS_MOBILE?'4px 10px':'7px 14px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'5px', cursor:'pointer', fontSize: IS_MOBILE?'11px':'12px', fontWeight:700 } },
           CURRENT_USER.isAdmin ? '🏢 법인 대시보드 →' : '📅 전체 일정 캘린더 →')
       )
@@ -81671,24 +81714,12 @@ function ERPMain(props){
   }, []);
 
   function selectMenu(id){
-    /* ★ 2026-09-20 — 다른 «앱»으로 가는 메뉴(app 칸). 푸른 캘린더가 첫 사례다.
-       ⚠ 새 창을 띄우지 않는다 — 앱마다 창이 늘면 어느 창이 지금 것인지 모른다.
-         PuAppBar.goApp 이 같은 창에서 옮기고 돌아올 길도 함께 남긴다.
-       ⚠ 권한 확인을 «먼저» 한다 — 권한 없는 사람이 다른 앱으로 새 나가면 안 된다. */
+    /* ⚠ 2026-09-21 — 메뉴에서 «다른 앱»으로 보내던 갈래(app 칸)를 걷어냈다.
+       푸른 캘린더 한 줄뿐이었고 그 줄을 뺐다 — 쓰는 데 없는 길은 남기지 않는다.
+       다른 앱으로 가는 문은 오른쪽 「즐겨찾기」 탭(PuAppBar) 하나다. */
+    // 권한 체크: 권한 없는 메뉴 진입 차단
     if(!isMenuPermitted(CURRENT_USER, id)){
       showToast('🔒 접근 권한이 없습니다');
-      return;
-    }
-    var _app = (function(){
-      for(var g=0; g<MENUS.length; g++){
-        var its = MENUS[g].items || [];
-        for(var i=0; i<its.length; i++){ if(its[i].id === id) return its[i].app || ''; }
-      }
-      return '';
-    })();
-    if(_app){
-      try{ PuAppBar.goApp(_app + '?sso=1'); }
-      catch(e){ showToast('앱을 열지 못했습니다 — ' + (e && e.message || '')); }
       return;
     }
     // 모바일 차단 메뉴 (재무 관련) 진입 시 토스트 + 차단 — 관리자는 제외
@@ -81761,7 +81792,7 @@ function ERPMain(props){
       // Alt+1~5 → 각 그룹 첫 화면
       if(e.altKey && !ctrl && !e.shiftKey){
         var map = { '1':'dash/my', '2':'biz/company', '3':'biz/case', '4':'biz/consulting', '5':'biz/contract',
-                    '6':'fin/income', '7':'hr/attend', '8':'dash/cal', '9':'env/settings' };
+                    '6':'fin/income', '7':'hr/attend', '8':'hr/leave', '9':'env/settings' };
         if(map[e.key]){ e.preventDefault(); selectMenu(map[e.key]); return; }
       }
       // Ctrl+S → 열린 모달의 저장 버튼 클릭
