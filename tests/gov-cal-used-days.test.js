@@ -41,6 +41,7 @@ function drawCal(scheds, y, m, opt) {
     console, String, Object, Array, Number, Math, Date, JSON, Map, Set,
     single: { coId: 'co1', typeId: 'ty1', isField: true, selDate: '', calY: y, calM: m, multi: false, picks: [] },
     getScheds: () => scheds,
+    getTypes: () => opt.types || [],
     isBlocked: ds => (opt.blocked || []).includes(ds) ? '막힌 날' : null,
     todayStr: () => opt.today || '2000-01-01',
     q: sel => sel === '#mSingleCal' ? { set innerHTML(v) { out.html = v; } }
@@ -48,7 +49,8 @@ function drawCal(scheds, y, m, opt) {
   };
   vm.createContext(box);
   vm.runInContext([fnSrc('p2'), fnSrc('escAttr'), fnSrc('schedPhase'),
-    fnSrc('usedRoundShort'), fnSrc('usedDayTip'), fnSrc('renderSingleCal')].join('\n'), box);
+    fnSrc('usedRoundShort'), fnSrc('usedDayTip'), fnSrc('coOtherTypeOn'),
+    fnSrc('renderSingleCal')].join('\n'), box);
   box.renderSingleCal();
   /* 그려진 칸을 하나씩 뜯어 본다 */
   const cells = [];
