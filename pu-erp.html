@@ -29990,14 +29990,20 @@ function CaseManagement(props){
         colVis.type && h('th', { onClick:function(){toggleSort('typeCode');},
           style:{ cursor:'pointer', userSelect:'none', width:'124px', minWidth:'124px', maxWidth:'124px' } },
           '유형' + sortIcon('typeCode')),
-        h('th', { onClick:function(){toggleSort('companyName');}, style:{ cursor:'pointer', userSelect:'none' } }, '의뢰인' + sortIcon('companyName')),
-        colVis.opponent && h('th', { style:{ minWidth:'80px' } }, '상대방'),
-        colVis.mgrMain && h('th', { onClick:function(){toggleSort('managerMain');}, style:{ cursor:'pointer', userSelect:'none', minWidth:'70px' } }, '주담당' + sortIcon('managerMain')),
-        colVis.mgrSubs && h('th', { style:{ minWidth:'90px' } }, '부담당'),
-        colVis.jurOrg && h('th', null, '관할기관'),
-        colVis.jurOfficer && h('th', null, '관할담당자'),
-        colVis.jurPhone && h('th', null, '관할연락처'),
-        colVis.jurEmail && h('th', null, '관할이메일'),
+        /* ⚠ 의뢰인·관할기관·담당자·연락처·이메일 넷에는 minWidth·whiteSpace 가
+           «없었다»(다른 칸엔 다 있었다) — 사건관리에만 있는 칸이라 컨설팅·기금관리와
+           견줄 짝이 없어 놓쳤다. 관할 셋을 함께 켜면 표 전체가 좁아져 글자가
+           한 글자씩 세로로 쌓였다(대표 지시 2026-09-21 「빈공간으로 인해 글자가
+           한줄씩 나오면 안된다」). 표 한 칸은 한 줄 — 넘치면 가로스크롤(.wrap 이
+           overflow:auto)로 밀어내지, 세로로 접지 않는다. */
+        h('th', { onClick:function(){toggleSort('companyName');}, style:{ cursor:'pointer', userSelect:'none', minWidth:'120px', whiteSpace:'nowrap' } }, '의뢰인' + sortIcon('companyName')),
+        colVis.opponent && h('th', { style:{ minWidth:'80px', whiteSpace:'nowrap' } }, '상대방'),
+        colVis.mgrMain && h('th', { onClick:function(){toggleSort('managerMain');}, style:{ cursor:'pointer', userSelect:'none', minWidth:'70px', whiteSpace:'nowrap' } }, '주담당' + sortIcon('managerMain')),
+        colVis.mgrSubs && h('th', { style:{ minWidth:'90px', whiteSpace:'nowrap' } }, '부담당'),
+        colVis.jurOrg && h('th', { style:{ minWidth:'100px', whiteSpace:'nowrap' } }, '관할기관'),
+        colVis.jurOfficer && h('th', { style:{ minWidth:'90px', whiteSpace:'nowrap' } }, '관할담당자'),
+        colVis.jurPhone && h('th', { style:{ minWidth:'110px', whiteSpace:'nowrap' } }, '관할연락처'),
+        colVis.jurEmail && h('th', { style:{ minWidth:'150px', whiteSpace:'nowrap' } }, '관할이메일'),
         colVis.receiveDate && h('th', { onClick:function(){toggleSort('receiveDate');}, style:{ cursor:'pointer', userSelect:'none' } }, '수임일' + sortIcon('receiveDate')),
         colVis.dueDate && h('th', { onClick:function(){toggleSort('dueDate');}, style:{ cursor:'pointer', userSelect:'none' } }, '기한' + sortIcon('dueDate')),
         colVis.stage && h('th', { onClick:function(){toggleSort('stageCode');}, style:{ cursor:'pointer', userSelect:'none', minWidth:'92px' } }, '심급/단계' + sortIcon('stageCode')),
@@ -30088,7 +30094,7 @@ function CaseManagement(props){
                 ),
 
                 // 의뢰인 - 클릭 시 업체 정보 팝업
-                h('td', null,
+                h('td', { style:{ whiteSpace:'nowrap' } },
                   h('div', { style:{ fontWeight:600, color:'#2563eb', cursor:'pointer', textDecoration:'underline' },
                     onClick:function(){ setCompanyModal(c); }, title:'업체 정보 보기' },
                     // both: 근로자 + 회사 모두 표시 (구분선)
@@ -30108,7 +30114,7 @@ function CaseManagement(props){
 
                 // 상대방 (근로자 사건은 사업장명, 그 외는 별도 입력값)
                 // ⚠ 컨설팅·기금관리와 크기를 맞춘다 — 12px 는 그 표에 없는 크기였다.
-                colVis.opponent && h('td', null,
+                colVis.opponent && h('td', { style:{ whiteSpace:'nowrap' } },
                   (function(){ var op = c.opponent || (c.clientType === 'worker' ? (c.companyName||'') : '');
                     return op
                       ? h('span', { style:{ color:'#475569', fontSize:'11.5px' } }, op)
@@ -30136,10 +30142,10 @@ function CaseManagement(props){
 
                 /* 관할기관·담당자·연락처·이메일 — 사건관리에만 있는 칸이라 견줄 짝이 없다.
                    컨설팅·기금관리의 「담당자」 칸(이름 11.5px · 전화 10.5px)에 맞춘다. */
-                colVis.jurOrg && h('td', { style:{ fontSize:'11.5px', color: jur.org ? '#1e293b' : '#cbd5e1' } }, jur.org || '-'),
-                colVis.jurOfficer && h('td', { style:{ fontSize:'11.5px', color: jur.officer ? '#1e293b' : '#cbd5e1' } }, jur.officer || '-'),
-                colVis.jurPhone && h('td', { style:{ fontSize:'10.5px', fontFamily:'monospace', color: jur.phone ? '#1e293b' : '#cbd5e1' } }, jur.phone || '-'),
-                colVis.jurEmail && h('td', { style:{ fontSize:'10.5px', color: jur.email ? '#1e293b' : '#cbd5e1' } }, jur.email || '-'),
+                colVis.jurOrg && h('td', { style:{ fontSize:'11.5px', whiteSpace:'nowrap', color: jur.org ? '#1e293b' : '#cbd5e1' } }, jur.org || '-'),
+                colVis.jurOfficer && h('td', { style:{ fontSize:'11.5px', whiteSpace:'nowrap', color: jur.officer ? '#1e293b' : '#cbd5e1' } }, jur.officer || '-'),
+                colVis.jurPhone && h('td', { style:{ fontSize:'10.5px', fontFamily:'monospace', whiteSpace:'nowrap', color: jur.phone ? '#1e293b' : '#cbd5e1' } }, jur.phone || '-'),
+                colVis.jurEmail && h('td', { style:{ fontSize:'10.5px', whiteSpace:'nowrap', color: jur.email ? '#1e293b' : '#cbd5e1' } }, jur.email || '-'),
 
                 // 수임일 + D+ — 컨설팅·기금관리의 시작일·종료일은 11px 다.
                 colVis.receiveDate && h('td', null,
