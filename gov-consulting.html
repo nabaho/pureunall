@@ -962,6 +962,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 /* 양 끝 칸은 쪽지가 창 밖으로 나가지 않게 모서리에 붙인다 */
 .bulk-cell.tip-r[data-tip]::after{left:auto;right:0;transform:none;}
 .bulk-cell.tip-l[data-tip]::after{left:0;right:auto;transform:none;}
+/* 같은 사업장이 «다른 사업»으로 그 날짜에 이미 일정이 있으면(대표 지시 2026-09-21) */
+.bulk-cell.busy{color:var(--danger);cursor:default;text-decoration:line-through;background:rgba(233,69,96,.08);}
 .bulk-cell.sel-field{background:var(--accent);color:#fff;border-color:var(--accent);}
 .bulk-cell.sel-office{background:#fff;color:var(--info);border:2px solid var(--info);}
 
@@ -4726,6 +4728,16 @@ function usedDayTip(sc,m,d){
   const r=(sc&&sc.round)||'?';
   return `${m+1}월 ${d}일 · ${ph}${r}회차 · ${sc&&sc.isField?'📍 방문':'🏢 사무실'}`;
 }
+/* ★ 대표 지시 2026-09-21: 같은 사업장이 «다른 사업»으로 이미 그 날짜에 일정이
+   있으면 여기서도 날짜를 막는다 — 한 사업장에 서로 다른 컨설팅이 같은 날 섞이면
+   나중에 어느 사업 방문인지 헷갈린다. 종료된 사업의 옛 일정도 「그 날 이미 갔다」는
+   사실은 그대로이므로 제외하지 않는다. */
+function coOtherTypeOn(coId,typeId,ds,excludeId){
+  const hit=getScheds().find(s=>s.coId===coId&&s.typeId!==typeId&&s.date===ds&&s.id!==excludeId);
+  if(!hit)return '';
+  const t=getTypes().find(x=>x.id===hit.typeId);
+  return t?(t.fullName||t.name):'다른 사업';
+}
 function renderSingleCal(){
   const y=single.calY,m=single.calM,today=todayStr();
   q('#mSingleMonth').textContent=`${y}년 ${m+1}월`;
@@ -4742,19 +4754,23 @@ function renderSingleCal(){
     const ds=`${y}-${p2(m+1)}-${p2(d)}`;
     /* 여기는 «사업이 정해진» 고르개다 — 그 사업 규칙 그대로 본다 */
     const blocked=!!isBlocked(ds,single.typeId);
+    const otherBiz=coOtherTypeOn(single.coId,single.typeId,ds);
     const pick=single.multi?single.picks.find(x=>x.date===ds):null;
     const used=taken.get(ds);
     const isTaken=!!used,isSel=single.multi?!!pick:(single.selDate===ds),isToday=ds===today;
     let cls='bulk-cell';
     /* ⚠ 쓴 날에는 dis 를 안 붙인다 — dis 는 글자를 거의 안 보이게 만든다.
-       못 고르는 것은 onclick 을 안 주는 것으로 이미 막혀 있다(색으로 막는 게 아니다). */
+       못 고르는 것은 onclick 을 안 주는 것으로 이미 막혀 있다(색으로 막는 게 아니다).
+       다만 «다른 사업이 쓴 날»(otherBiz)은 이 사업으로는 절대 못 쓰는 날이라
+       dis busy 로 눈에 띄게 막는다(대표 지시 2026-09-21). */
     if(blocked)cls+=' dis';
     else if(isTaken)cls+=' taken '+(used.isField?'uf':'uo');
+    else if(otherBiz)cls+=' dis busy';
     else if(isSel)cls+=(pick?pick.isField:single.isField)?' sel-field':' sel-office';
     else if(isToday)cls+=' today';
-    const clk=(!blocked&&!isTaken)?`onclick="pickSingleDate('${ds}')"`:'';
+    const clk=(!blocked&&!isTaken&&!otherBiz)?`onclick="pickSingleDate('${ds}')"`:'';
     const icon=isSel?((pick?pick.isField:single.isField)?'📍':'🏢'):'';
-    const droppable=(single.multi&&!blocked&&!isTaken)
+    const droppable=(single.multi&&!blocked&&!isTaken&&!otherBiz)
       ? ` ondragover="event.preventDefault();this.classList.add('drop-hover');" ondragleave="this.classList.remove('drop-hover');" ondrop="onDropDate(event,'${ds}')"`
       : '';
     let inner=icon||d,tipAttr='';
@@ -4763,8 +4779,10 @@ function renderSingleCal(){
       if(col>=5)cls+=' tip-r'; else if(col<=1)cls+=' tip-l';
       inner=`<span class="ud">${d}</span><span class="ur">${usedRoundShort(used)}</span>`;
       tipAttr=` data-tip="${escAttr(usedDayTip(used,m,d))}"`;
+    }else if(otherBiz){
+      tipAttr=` title="${escAttr(otherBiz+' 일정이 있는 날짜입니다')}"`;
     }
-    h+=`<div class="${cls}" ${clk}${droppable}${tipAttr}>${inner}</div>`;
+    h+=`<div class="${cls}" data-ds="${ds}" ${clk}${droppable}${tipAttr}>${inner}</div>`;
   }
   q('#mSingleCal').innerHTML=h+`</div>`;
 }
@@ -4842,6 +4860,8 @@ async function saveSingle(){
   if(!single.selDate){toast('날짜를 선택해주세요','err');return;}
   const blockMsg=isBlocked(single.selDate,single.typeId);
   if(blockMsg){toast(blockMsg,'err');return;}
+  const otherBiz=coOtherTypeOn(single.coId,single.typeId,single.selDate);
+  if(otherBiz){showBigAlert(`${single.selDate}\n같은 사업장에 이미 [${otherBiz}] 일정이 있습니다.\n다른 날짜를 골라주세요.`);return;}
   const co=getCos().find(c=>c.id===single.coId);
   const t=getTypes().find(x=>x.id===single.typeId);
   const maxR=getCoMaxRounds(single.coId,single.typeId);
@@ -4893,6 +4913,8 @@ async function saveMultiSingle(){
     const ds=pk.date;
     const blockMsg=isBlocked(ds,single.typeId);
     if(blockMsg){skipped.push(`${ds.slice(5)}(${blockMsg})`);continue;}
+    const otherBiz=coOtherTypeOn(single.coId,single.typeId,ds);
+    if(otherBiz){skipped.push(`${ds.slice(5)}(${otherBiz} 있음)`);continue;}
     const scheds=getScheds();
     if(scheds.find(x=>x.date===ds&&x.coId===single.coId&&x.typeId===single.typeId)){skipped.push(`${ds.slice(5)}(중복)`);continue;}
     const exErr=checkExclusiveDay(single.coId,single.typeId,ds);
