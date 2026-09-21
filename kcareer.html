@@ -2317,7 +2317,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <div id="hwpViewEdBox" style="display:none"></div>
     </div>
     <div class="modal-foot">
-      <span id="hwpViewFootRead"><button class="btn" onclick="closeHwpView()">닫기</button><button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 이 서식의 빈 칸에 넣습니다">✨ 내 정보로 채우기</button><button class="btn" onclick="hwpViewEdit()" title="한글 프로그램처럼 이 문서를 직접 고칩니다 — 글자를 치고 지우고 표를 손봅니다">✏️ 한글로 고치기</button><button class="btn" onclick="hwpViewPdfFile()" title="곧바로 .pdf 파일로 내려받습니다 — 다만 그림이라 글자 복사·검색은 안 됩니다">⬇ PDF 바로받기(그림)</button><button class="btn primary" onclick="hwpViewPdf()" title="인쇄창에서 「PDF로 저장」을 고르면 글자가 살아 있는 PDF가 됩니다 — 복사·검색이 됩니다">🖨 인쇄 · PDF(글자 살아 있음)</button><button class="btn" onclick="hwpViewDownload()">⬇ 파일로 저장</button></span>
+      <span id="hwpViewFootRead"><button class="btn" onclick="closeHwpView()">닫기</button><button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 이 서식의 빈 칸에 넣습니다">✨ 내 정보로 채우기</button><button class="btn" onclick="hwpViewEdit()" title="한글 프로그램처럼 이 문서를 직접 고칩니다 — 글자를 치고 지우고 표를 손봅니다">✏️ 한글로 고치기</button><button class="btn" id="hwpViewToLib" style="display:none" onclick="hwpViewSaveToLib()" title="고친 서식을 양식 보관함에 «새 줄»로 담습니다 — 원본은 그대로 남습니다">📥 보관함에 담기</button><button class="btn" onclick="hwpViewPdfFile()" title="곧바로 .pdf 파일로 내려받습니다 — 다만 그림이라 글자 복사·검색은 안 됩니다">⬇ PDF 바로받기(그림)</button><button class="btn primary" onclick="hwpViewPdf()" title="인쇄창에서 「PDF로 저장」을 고르면 글자가 살아 있는 PDF가 됩니다 — 복사·검색이 됩니다">🖨 인쇄 · PDF(글자 살아 있음)</button><button class="btn" onclick="hwpViewDownload()">⬇ 파일로 저장</button></span>
       <span id="hwpViewFootEdit" style="display:none"><button class="btn" onclick="hwpViewEditCancel()" title="고친 것을 버리고 보기로 돌아갑니다">↩ 그만두기</button><button class="btn primary" onclick="hwpViewEditDone()" title="고친 내용을 이 창으로 가져옵니다 — 그 다음 인쇄하거나 파일로 저장하세요">✔ 다 고쳤습니다</button></span>
     </div>
   </div>
@@ -3735,14 +3735,20 @@ window.addEventListener('resize', function(){
   var ov = document.getElementById('modalHwpView');
   if(ov && ov.classList.contains('open')) _hwpViewFit();
 });
-async function openHwpViewer(bytes, name){
+/* 온곳 = 이 문서가 «어디서 왔는지». 지금은 기관 양식 보관함만 쓴다({kind:'cvform'}).
+   ⚠ 이 창은 여러 곳이 함께 쓴다 — 온곳을 안 주면 「보관함에 담기」가 안 뜬다.
+     그 편이 옳다: 그 자리에서 만든 동의서를 «기관 양식»으로 담으면 목록이 더러워진다. */
+async function openHwpViewer(bytes, name, 온곳){
   if(!window.PureunHwp){ toast('한글 문서 도구를 불러오지 못했습니다'); return; }
   var ov = document.getElementById('modalHwpView');
   var box = document.getElementById('hwpViewBody');
   var info = document.getElementById('hwpViewInfo');
   if(!ov || !box) return;
   var u8 = (bytes instanceof Uint8Array) ? bytes : new Uint8Array(bytes);
-  _hwpView = { bytes:u8, name:_hwpFixName(u8, name || '문서.hwpx') };
+  /* ⚠ 온곳은 «받은 것만» 쓴다. 앞 문서 것을 물려받게 두면, 보관함 서식을 보고 난 뒤
+     그 자리에서 만든 동의서까지 「보관함에서 온 것」이 되어 엉뚱한 줄이 담긴다. */
+  _hwpView = { bytes:u8, name:_hwpFixName(u8, name || '문서.hwpx'), from:온곳 || null };
+  _hwpViewLibUI();
   ov.classList.add('open');
   box.innerHTML = '';
   info.textContent = _hwpEngineReady
@@ -3819,6 +3825,51 @@ async function hwpViewEdit(){
   }
 }
 function hwpViewEditCancel(){ hwpViewEdClose(); toast('고친 것을 버렸습니다'); }
+
+/* ── 📥 고친 서식을 보관함에 «새 줄»로 담는다 (대표 결정 2026-09-21) ─────────────
+   ■ 왜 «새 줄»인가 — 대표가 고르셨고, 까닭이 있다.
+     양식 보관함에는 **판(버전) 개념이 아예 없다.** 파일 담개(saveFileUnified)는 같은
+     번호를 주면 그냥 덮어써서, 기관이 준 옛 양식이 **그 자리에서 사라지고 되돌릴 길이 없다.**
+     새 줄이면 잘못 고쳐도 원본이 살아 있고, 필요 없으면 ✕ 로 휴지통에 넣으면 된다
+     (그 길은 이미 있다 — cvDelForm → kcTrashPut).
+   ■ 어디서만 뜨나 — «보관함에서 연 서식»일 때만(`_hwpView.from.kind==='cvform'`).
+     ⚠ 그 자리에서 만든 동의서·완성 서류를 «기관 양식»으로 담으면 목록이 더러워진다.
+   ⚠ 새 잣대를 안 만든다 — 담는 모양은 cvAddForm 과 같은 {id,name,ext,savedAt} 이다. */
+function _hwpViewLibUI(){
+  var b=document.getElementById('hwpViewToLib'); if(!b) return;
+  var 보관함것 = !!(_hwpView && _hwpView.from && _hwpView.from.kind==='cvform');
+  b.style.display = 보관함것 ? '' : 'none';
+}
+/* 「이력서양식.hwpx」 → 「이력서양식 (고침).hwpx」 → 「… (고침 2).hwpx」
+   ⚠ (고침)을 겹쳐 붙이지 않는다 — 세 번 고치면 「(고침) (고침) (고침)」이 된다. */
+function _cvFixedName(원래){
+  var s=String(원래||'양식.hwpx');
+  var ext=(s.match(/\.[a-z0-9]+$/i)||[''])[0];
+  var 밑=s.slice(0, s.length-ext.length).replace(/\s*\(고침(\s+\d+)?\)\s*$/,'');
+  var 있는=(get('cvforms')||[]).map(function(x){ return String((x&&x.name)||''); });
+  for(var n=1;n<200;n++){
+    var 이름=밑+' (고침'+(n>1?' '+n:'')+')'+ext;
+    if(있는.indexOf(이름)<0) return 이름;
+  }
+  return 밑+' (고침 '+Date.now()+')'+ext;
+}
+function hwpViewSaveToLib(){
+  if(!_hwpView||!_hwpView.bytes||!_hwpView.bytes.length){ toast('담을 문서가 없습니다'); return; }
+  if(!(_hwpView.from&&_hwpView.from.kind==='cvform')){ toast('보관함에서 연 서식만 담을 수 있습니다'); return; }
+  var 이름=_cvFixedName(_hwpView.name);
+  var ext=(이름.split('.').pop()||'hwpx').toLowerCase();
+  var id='CVFORM'+Date.now()+Math.random().toString(36).slice(2,6);
+  var 때=new Date().toISOString();
+  try{
+    saveFileUnified(id, { id:id, name:이름, ext:ext, size:_hwpView.bytes.length,
+                          base64:abToB64(_hwpView.bytes), savedAt:때 });
+    var arr=get('cvforms')||[];
+    arr.unshift({ id:id, name:이름, ext:ext, savedAt:때 });
+    set('cvforms', arr);
+  }catch(e){ console.warn('보관함에 담기', e); toast('담지 못했습니다 — '+String(e&&e.message||e)); return; }
+  _safe(renderFormLib);
+  toast('📥 「'+이름+'」으로 담았습니다 — 원본 양식은 그대로 있습니다');
+}
 async function hwpViewEditDone(){
   if(!_hwpViewEd){ hwpViewEdClose(); return; }
   toast('⏳ 고친 것을 받아오는 중…');
@@ -3827,8 +3878,9 @@ async function hwpViewEditDone(){
   catch(e){ console.warn('큰 창 되받기', e); toast('받아오지 못했습니다 — '+String(e&&e.message||e)); return; }
   if(!bytes||!bytes.byteLength){ toast('받아온 것이 비었습니다'); return; }
   var 이름=String(_hwpView.name||'문서.hwpx').replace(/\.hwp$/i,'.hwpx');
+  var 온곳=_hwpView.from;                              /* ⚠ 다시 그리면 _hwpView 가 새로 만들어진다 — 먼저 챙긴다 */
   hwpViewEdClose();
-  await openHwpViewer(new Uint8Array(bytes), 이름);   /* 고친 것으로 다시 그린다 */
+  await openHwpViewer(new Uint8Array(bytes), 이름, 온곳);   /* 고친 것으로 다시 그린다 */
   toast('✅ 고친 내용이 이 창에 들어왔습니다 — ⬇ 저장 이나 🖨 인쇄로 뽑으세요 (원래 파일은 그대로입니다)');
 }
 function hwpViewDownload(){
@@ -11007,7 +11059,8 @@ function cvDelForm(id, btn){
 async function cvFormHwpView(id){
   var f=await getFileAsync(id);
   if(!f||!f.base64){ toast('양식 원본을 찾을 수 없습니다'); return; }
-  openHwpViewer(b64ToAb(f.base64), f.name||'양식.hwpx');
+  /* ⚠ «온곳»을 준다 — 이것이 있어야 고친 뒤 [📥 보관함에 담기]가 뜬다 */
+  openHwpViewer(b64ToAb(f.base64), f.name||'양식.hwpx', { kind:'cvform', id:id });
 }
 function _xesc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function _fillTokens(xml,map,stat){ return xml.replace(/\{\{([\s\S]*?)\}\}/g,function(m,inner){ const name=inner.replace(/<[^>]*>/g,'').replace(/\s+/g,''); if(Object.prototype.hasOwnProperty.call(map,name)){ stat.done++; return _xesc(map[name]); } stat.miss[name]=(stat.miss[name]||0)+1; return m; }); }
