@@ -230,19 +230,23 @@ test('⑪★ 고친 서식이 보관함에 «새 줄»로 담긴다 — 원본�
      ⚠ 보관함에는 «판(버전)» 개념이 아예 없다. 파일 담개(saveFileUnified)는 같은 번호를
        주면 그냥 덮어써서, 기관이 준 옛 양식이 그 자리에서 사라지고 되돌릴 길이 없다.
        그래서 «새 번호 · 새 줄»이어야 한다. */
-  const fn = cutFn(CODE, 'function hwpViewSaveToLib(');
+  const fn = cutFn(CODE, 'async function hwpViewSaveToLib(');
 
   /* 새 번호를 짓는가 — 온곳의 번호를 그대로 쓰면 원본이 덮인다 */
-  assert.match(fn, /saveFileUnified\(\s*id\s*,/, '파일을 담지 않습니다');
   assert.match(fn, /id\s*=\s*'CVFORM'\s*\+/,
     '★ 새 번호를 안 짓습니다 — 원본 양식이 그 자리에서 사라집니다');
   assert.ok(!/_hwpView\.from\.id/.test(fn),
     '★ 온곳의 번호로 담고 있습니다 — 그것이 곧 «덮어쓰기»입니다');
 
-  /* 목록에도 한 줄 더한다 — 빼는 코드가 있으면 안 된다 */
-  assert.match(fn, /set\(\s*'cvforms'/, '보관함 목록에 안 넣습니다');
-  assert.match(fn, /unshift\(/, '목록에 «더하지» 않습니다');
-  assert.ok(!/filter\(/.test(fn), '★ 목록에서 무언가를 빼고 있습니다 — 담기만 해야 합니다');
+  /* ⚠ 담는 일 자체는 «한 곳»(cvFormPut)이 한다 — 2026-09-21 에 창고 올리기가 붙으면서
+     세 길이 그리로 모였다. 여기서 제 손으로 담으면 그 길만 창고에 안 올라간다. */
+  assert.match(fn, /cvFormPut\(/, '담는 한 곳을 안 씁니다');
+  assert.ok(!/set\(\s*'cvforms'/.test(fn), '★ 목록을 제 손으로 고칩니다 — cvFormPut 으로 모으세요');
+
+  const 한곳 = cutFn(CODE, 'async function cvFormPut(');
+  assert.match(한곳, /saveFileUnified\(/, '파일을 담지 않습니다');
+  assert.match(한곳, /unshift\(/, '목록에 «더하지» 않습니다');
+  assert.ok(!/filter\(/.test(한곳), '★ 목록에서 무언가를 빼고 있습니다 — 담기만 해야 합니다');
 
   /* 보관함에서 온 것일 때만 담는다 */
   assert.match(fn, /kind\s*===\s*'cvform'/,

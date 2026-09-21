@@ -206,6 +206,28 @@ service firebase.storage {
       allow delete: if isStaff();
     }
 
+    // ── 경력관리 기관 양식 보관함 (2026-09-21 추가) · 창고 pureun-erp-hrphotos ──
+    //    여태 양식 «목록»만 서버로 가고 «파일»은 그 PC 의 브라우저에만 있었습니다.
+    //    그래서 다른 PC 로 로그인하면 양식 딱지는 보이는데 「원본을 찾을 수 없습니다」가
+    //    떴습니다. 파일을 여기 두어 어느 PC 에서나 열리게 합니다.
+    //    ⚠ 이 칸은 서고(casebook) «뒤»에 둡니다 — 앞에 끼우면 서고 안내와 창고 이름
+    //      사이가 멀어져 tests/casebook-storage-rule.test.js 가 걸립니다.
+    //      (규칙은 순서에 뜻이 없으므로 어디 두어도 똑같이 듣습니다.)
+    //    ⚠ 읽기가 «본인만»입니다 — 고친 양식에는 성명 같은 값이 적혀 있을 수 있습니다.
+    //      전 직원이 보는 자리(casebook·pu_paydata)와 일부러 다르게 두었습니다.
+    //    ⚠ 사진만 받는 검사(okImage)를 걸지 않습니다 — 한글(.hwp/.hwpx)·PDF·워드를
+    //      받습니다. 한글은 브라우저가 종류를 안 알려 주는 일이 흔해 종류로 묶으면
+    //      통째로 막힙니다(급여데이터함·서고가 이미 겪은 것과 같은 까닭).
+    //    ⚠ 이 칸이 없으면 «담기는 그대로 되고» 그 PC 에서는 쓰입니다 —
+    //      다른 PC 에서만 옛날처럼 안 열립니다. 앱이 그 사실을 화면에 적습니다.
+    match /kcareer_forms/{uid}/{file} {
+      allow read:   if signedIn() && request.auth.uid == uid;
+      allow write:  if signedIn() && request.auth.uid == uid
+                    && request.resource != null
+                    && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
     // ── 급여데이터함 (2026-08-13 추가) ──
     //    사진첩과 두 군데가 다르다. 둘 다 일부러 그렇다.
     //    ① 읽기가 전 직원이다 — 남의 자리를 이름 골라 볼 수 있어야 한다(대표 결정).
