@@ -649,20 +649,25 @@
        「머리행에는 빈 칸이 없다」 빗장이 if(!hit) 안에 있어, colMap 이 맞으면 통째로 건너뛰었다.
      ⚠★ 이 잣대는 «쓸 때» 건다 — 이미 쌓인 기억을 지우지 않아도 해가 멈춘다(대표 결정 2026-09-20
         「그대로 두고 울타리만 친다」). */
-  function 머리행답나(cells) {
-    if (!cells.length) return false;
+  /* ⚠★ 잣대는 «글자»로 둔다 — 화면(기억 지우개)은 XML 이 아니라 기억해 둔 머리줄 글자만 들고 있다.
+     칸(XML)으로 보는 자리와 글자로 보는 자리가 «같은 자»를 써야 한다. 두 벌로 만들면
+     「채울 때는 막히는데 화면에서는 쓰인다고 나오는」 어긋남이 생긴다. */
+  function 머리행답나글자(names) {
+    if (!names || !names.length) return false;
     var i, 짧은칸 = 0;
-    for (i = 0; i < cells.length; i++) {
+    for (i = 0; i < names.length; i++) {
+      var t = String(names[i] == null ? '' : names[i]).replace(/[\s　]+/g, '');
       /* ① 빈 칸이 있으면 머리행이 아니다 — 열 이름이 죽 적혀 있는 줄이기 때문이다 */
-      if (isEmptyCell(cells[i])) return false;
-      var t = cellText(cells[i]).replace(/[\s　]+/g, '');
+      if (!t) return false;
       /* ② 칸 안에 라벨이 들어 있으면 머리행이 아니다 — 「기관명:부서명:직위:」는 인적사항 줄이다 */
       if (/[:：]\s*$/.test(t) || /[:：][\s\S]*[:：]/.test(t) || /_{2,}/.test(t)) return false;
       if (t.length <= 1) 짧은칸++;
     }
     /* ③ 한 글자짜리 이름이 절반을 넘으면 열 이름이 아니다 — 「A|B|C|D|E|점수」는 평가표다 */
-    if (짧은칸 * 2 > cells.length) return false;
-    return true;
+    return 짧은칸 * 2 <= names.length;
+  }
+  function 머리행답나(cells) {
+    return 머리행답나글자((cells || []).map(cellText));
   }
 
   function detectHeader(cells, colMap) {
@@ -1033,7 +1038,7 @@
     colAddrOf: colAddrOf, rowShape: rowShape, shiftOf: shiftOf,
     /* ⚠ 「머리행답나」 잣대는 «이 하나»다 — 검사도 같은 자를 쓴다.
        두 벌로 만들면 「채울 때는 머리행인데 검사에서는 아닌」 줄이 생긴다. */
-    isHeaderish: 머리행답나,
+    isHeaderish: 머리행답나, isHeaderishText: 머리행답나글자,
     /* 「여기부터 남의 자리」 판정 — 검사가 «머리줄을 머리줄로 아는지» 직접 볼 수 있게 */
     isBoundary: isBoundary,
     incellFill: function (tc, fields) {
