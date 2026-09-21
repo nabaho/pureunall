@@ -19894,7 +19894,7 @@ function ContractModal(props){
               style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } })
           ));
       })(),
-      sec6('☎ 연락처', '기업정보함 5·6·7·14번 — 네 칸이라 한 줄로 모았다'),
+      sec6('☎ 대표연락처', '기업정보함 5·6·7·14번 — 네 칸이라 한 줄로 모았다'),
         fldn6(
           h('input', { type:'text', value:f.company.phone, onChange:setCompanyField('phone'),
             onPaste:function(e){ try{ var t=(e.clipboardData||window.clipboardData).getData('text'); var c=t.replace(/[\s\u0000-\u001F\u007F-\u009F]+/g,''); if(c!==t){ e.preventDefault(); setCompanyField('phone')({target:{value:c,type:'text'}}); } }catch(_){} },
@@ -19920,20 +19920,32 @@ function ContractModal(props){
            필요 → 항상 표시」) — 즉 이 자리는 실제로는 늘 함께 그려지고 있었다.
            그래서 그리드를 갈라 둘 까닭이 없어 한 줄로 합쳤다. */
       sec6('🏭 업종 · 규모 · 4대보험 가입자수', '기업정보함 16·17·20번'),
+      /* ⚠ 고용·산재 칸 위에만 글자를 얹었더니(아래) 그 두 칸만 한 줄 아래로
+         밀려 «업태·종목·규모» 와 줄이 안 맞았다(행일치, 대표 지시 2026-09-21
+         「행일치시키고 고용산재는 바로 윗줄에 넣어라」). .pu-g6 는 grid라 한 행의
+         높이가 «가장 큰 칸» 을 따라가는데, 업태·종목·규모 칸엔 그 글자 한 줄이
+         없어 위로 붙어 버린 것 — 안 보이는 같은 높이의 글자를 얹어 다섯 칸의
+         높이를 맞춘다(내용은 없지만 자리는 차지하는 spacer). */
       fldn6(
-        h('input', { type:'text', value:f.company.bizType, onChange:setCompanyField('bizType'),
-          placeholder:'업태', title:'예: 제조업' })),
+        h('div', null,
+          h('div', { style:{ fontSize:'10px', fontWeight:600, marginBottom:'2px', visibility:'hidden' } }, ' '),
+          h('input', { type:'text', value:f.company.bizType, onChange:setCompanyField('bizType'),
+            placeholder:'업태', title:'예: 제조업' }))),
       fldn6(
-        h('input', { type:'text', value:f.company.bizCategory, onChange:setCompanyField('bizCategory'),
-          placeholder:'종목', title:'예: 자동차 부품' })),
+        h('div', null,
+          h('div', { style:{ fontSize:'10px', fontWeight:600, marginBottom:'2px', visibility:'hidden' } }, ' '),
+          h('input', { type:'text', value:f.company.bizCategory, onChange:setCompanyField('bizCategory'),
+            placeholder:'종목', title:'예: 자동차 부품' }))),
       fldn6(
-        h('select', { value:f.company.companySize || '', onChange:setCompanyField('companySize'),
-            className: f.company.companySize ? '' : 'pu-ph' },
-          phOption('규모'),
-          ['소기업','중기업','중견기업','대기업','공공기관','기타'].map(function(sz){
-            return h('option', { key:sz, value:sz }, sz);
-          })
-        )),
+        h('div', null,
+          h('div', { style:{ fontSize:'10px', fontWeight:600, marginBottom:'2px', visibility:'hidden' } }, ' '),
+          h('select', { value:f.company.companySize || '', onChange:setCompanyField('companySize'),
+              className: f.company.companySize ? '' : 'pu-ph' },
+            phOption('규모'),
+            ['소기업','중기업','중견기업','대기업','공공기관','기타'].map(function(sz){
+              return h('option', { key:sz, value:sz }, sz);
+            })
+          ))),
       /* ⚠ 라벨 없이 원칙(2026-09-19)의 예외다 — 부담당 슬롯과 같은 까닭
          (대표 지시 2026-09-21 「4대보험가입자 줄의 숫자위에 고용 산재 단어 넣어라」).
          placeholder 는 값이 «비어 있을 때만» 보인다. 고용·산재 인원수는 기본값이
