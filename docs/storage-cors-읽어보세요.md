@@ -30,9 +30,24 @@ No 'Access-Control-Allow-Origin' header is present on the requested resource.
 - **`fetch()` 로 받아 data:URL 로 바꾸는 곳만** 걸린다.
   기업정보함(`_fetchFromBucket`)과 사진첩(`pu-photo-store.js` 의 `fetchFromBucket`)이 그 꼴이다.
 
-사진첩은 **다른 버킷**(`pureun-erp-hrphotos`)을 쓰고 잘 돌아간다 —
-그 버킷에는 CORS 가 들어 있고 `pureun-erp-photos` 에는 없는 것으로 보인다.
-⚠ 확인은 못 했다(버킷 설정을 읽을 자격이 이 PC 에 없다). 아래 명령으로 **찍어 보면 바로 안다.**
+사진첩은 **다른 버킷**(`pureun-erp-hrphotos`)을 쓰고 잘 돌아갔다.
+
+## ★ 2026-09-21 실측 — 짐작이 맞았고, 파다가 하나를 더 건졌다
+
+대표가 Cloud Shell 에서 찍어 확인하고 그 자리에서 고쳤다.
+
+| 버킷 | 고치기 전 | 지금 |
+|---|---|---|
+| `pureun-erp-photos` (명함·메일) | **비어 있음** ← 범인 | 넣음 ✅ |
+| `pureun-erp-hrphotos` (사진첩) | `GET` + `Content-Type` | 그대로(잘 돌아서 안 건드림) |
+| `pureun-erp.firebasestorage.app` (급여데이터함) | **비어 있음** | 넣음 ✅ |
+
+⚠★ **급여데이터함도 같은 병이 조용히 나 있었다** — `js/pu-paydata-store.js` 의
+`fileToDataUrl` 이 똑같이 `getDownloadURL()` → `fetch(url)` 로 받는다.
+명함 옮기기를 하다 걸려서 알았다. **한 가지를 파다 둘을 건졌다.**
+
+⚠ **버킷을 새로 만들면 CORS 가 «빈 채로» 시작한다.** `fetch` 로 읽을 작정이면
+만든 그날 같이 넣을 것 — 안 넣으면 `<img src>` 만 돌고 나머지는 조용히 안 된다.
 
 ## 고치는 법 — 구글 클라우드 콘솔의 Cloud Shell (설치할 것 없음)
 
