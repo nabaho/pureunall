@@ -2085,6 +2085,20 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
             </div>
             <div id="mmBox"></div>
           </div>
+          <!-- ☁ 옛 양식 한꺼번에 올리기 (대표 지시 2026-09-21) -->
+          <div class="card" style="margin-bottom:12px"><div class="rc-h">☁ 양식 창고 올리기 — 다른 PC 에서도 열리게</div>
+            <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">
+              2026-09-21 <b>전에</b> 담아 두신 기관 양식은 <b>이 PC 에만</b> 있습니다.
+              창고에 올리면 다른 PC 로 로그인해도 그대로 열립니다.
+              <br>⚠ 올리는 것은 <b>이 PC 에 원본이 있는 것</b>만입니다 — 다른 PC 에서 담은 양식은
+              그 PC 에서 이 단추를 누르셔야 합니다.
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+              <button class="btn primary" type="button" id="cvCloudBtn" onclick="cvCloudRun()">☁ 안 올라간 것 올리기</button>
+              <button class="btn" type="button" id="cvCloudStopBtn" style="display:none" onclick="cvCloudStop()">✋ 그만</button>
+            </div>
+            <div id="cvCloudBox"></div>
+          </div>
           <div class="card" style="margin-bottom:12px"><div class="rc-h">🔒 원본 파일 삭제 보호</div>
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="origLockChk"> <b>원본 삭제 보호 켜기</b></label>
             <div style="font-size:12px;color:var(--text-mute);margin-top:6px">켜면 🗑원본 버튼을 눌러도 첨부 원본이 삭제되지 않습니다(실수 방지). 정말 삭제할 때만 잠시 끄세요.</div>
@@ -10277,7 +10291,7 @@ function initTabs(){
     'staff': ()=>{ _safe(renderStaffMgr); _safe(function(){ fbLoadStaff(false); }); },
     'api': ()=>{ _safe(initApiTab); },
     /* 🧠 서식 기억 — 이 탭을 열 때 그린다(대표 지시 2026-09-20) */
-    'data': ()=>{ _safe(mmDraw); },
+    'data': ()=>{ _safe(mmDraw); _safe(cvCloudDraw); },
   };
   document.querySelectorAll('.tabrow').forEach(row=>{
     const page=row.closest('.page');
@@ -11129,6 +11143,89 @@ async function cvFormPut(id, rec){
   arr.unshift(줄); set('cvforms', arr);
   return 줄;
 }
+
+/* ── ☁ 옛 양식 한꺼번에 올리기 (대표 지시 2026-09-21 「옛양식 한꺼번에 올리기」) ─────
+   ■ 왜 필요한가
+     창고에 올리기는 2026-09-21 부터다. 그 전에 담아 둔 양식은 자리(stPath)가 없어
+     이 PC 에만 있다 — 다른 PC 에서는 여전히 「원본을 찾을 수 없습니다」가 뜬다.
+   ■ 무엇만 올리나 — «이 PC 에 원본이 있는 것»뿐이다.
+     ⚠ 다른 PC 에서 담은 양식은 여기 목록에는 있어도 파일이 없다. 그것까지 「올리겠다」고
+       세면 대표는 «끝나지 않는 일»을 보게 된다. 그래서 갈라 세고, 갈라 적는다.
+   ⚠ 한 줄 올릴 때마다 목록을 저장한다 — 중간에 끊겨도 «거기까지»는 남아야 한다.
+     (서버로 밀어 올리는 것은 2.5초 모아치기라 여러 번 저장해도 한 번만 나간다.) */
+var _cvCloudStop = false;
+var CV_CLOUD_MAX = 25 * 1024 * 1024;   /* 창고 규칙이 25MB 미만만 받는다 */
+async function cvCloudStat(){
+  var arr = get('cvforms') || [];
+  var 올림=0, 올릴것=[], 파일없음=0, 너무큼=0;
+  for (var i=0;i<arr.length;i++){
+    var r = arr[i]; if(!r||!r.id) continue;
+    if(r.stPath){ 올림++; continue; }
+    var f = null;
+    try{ f = await getFileAsync(r.id); }catch(e){}
+    if(!f || !f.base64){ 파일없음++; continue; }
+    if(f.base64.length * 0.75 >= CV_CLOUD_MAX){ 너무큼++; continue; }
+    올릴것.push({ 줄:r, 파일:f });
+  }
+  return { 전체:arr.length, 올림:올림, 올릴것:올릴것, 파일없음:파일없음, 너무큼:너무큼 };
+}
+async function cvCloudDraw(){
+  var box = document.getElementById('cvCloudBox'); if(!box) return;
+  var btn = document.getElementById('cvCloudBtn');
+  box.innerHTML = '<div style="font-size:12.5px;color:var(--text-mute);padding:6px 0">세는 중…</div>';
+  var s = await cvCloudStat();
+  var 칸 = [];
+  칸.push(['양식 전부', s.전체 + '건']);
+  칸.push(['창고에 올라간 것', s.올림 + '건']);
+  칸.push(['올릴 수 있는 것', '<b style="color:var(--navy)">' + s.올릴것.length + '건</b>']);
+  if(s.파일없음) 칸.push(['이 PC 에 원본이 없어 못 올림', s.파일없음 + '건 <span style="color:var(--text-mute)">— 그 양식을 담은 PC 에서 눌러 주세요</span>']);
+  if(s.너무큼) 칸.push(['너무 커서 못 올림(25MB 이상)', s.너무큼 + '건']);
+  box.innerHTML = '<table style="font-size:12.5px;border-collapse:collapse">'
+    + 칸.map(function(c){ return '<tr><td style="padding:2px 12px 2px 0;color:var(--text-mute)">'+c[0]+'</td><td style="padding:2px 0">'+c[1]+'</td></tr>'; }).join('')
+    + '</table>';
+  if(btn){
+    btn.textContent = s.올릴것.length ? ('☁ 안 올라간 것 올리기 (' + s.올릴것.length + '건)') : '☁ 올릴 것이 없습니다';
+    btn.disabled = !s.올릴것.length;
+  }
+  return s;
+}
+function cvCloudStop(){ _cvCloudStop = true; toast('다음 한 건까지만 올리고 멈춥니다'); }
+async function cvCloudRun(){
+  var box = document.getElementById('cvCloudBox');
+  var btn = document.getElementById('cvCloudBtn'), stop = document.getElementById('cvCloudStopBtn');
+  if(!kcFormStorage() || !kcFormPath('x')){
+    toast('아직 로그인 전이라 창고에 못 올립니다 — 잠시 뒤 다시 눌러 주세요'); return;
+  }
+  var s = await cvCloudStat();
+  if(!s.올릴것.length){ toast('올릴 것이 없습니다'); await cvCloudDraw(); return; }
+  _cvCloudStop = false;
+  if(btn) btn.disabled = true;
+  if(stop) stop.style.display = '';
+  var 됨=0, 안됨=0;
+  for (var i=0;i<s.올릴것.length;i++){
+    if(_cvCloudStop) break;
+    var 한건 = s.올릴것[i];
+    if(box) box.innerHTML = '<div style="font-size:12.5px;padding:6px 0">☁ ' + (i+1) + ' / ' + s.올릴것.length
+      + ' — ' + escapeHtml(한건.줄.name || '') + ' 올리는 중…</div>';
+    var 자리 = await kcFormUpload(한건.줄.id, 한건.파일.base64, 한건.줄.ext || 한건.파일.ext);
+    if(자리){
+      /* ⚠ 목록을 «그때그때» 다시 읽는다 — 올리는 동안 다른 화면이 양식을 담았을 수 있다 */
+      var arr = get('cvforms') || [];
+      var 있나 = false;
+      for (var j=0;j<arr.length;j++) if(arr[j] && arr[j].id === 한건.줄.id){ arr[j].stPath = 자리; 있나 = true; break; }
+      if(있나) set('cvforms', arr);
+      됨++;
+    } else 안됨++;
+  }
+  if(btn) btn.disabled = false;
+  if(stop) stop.style.display = 'none';
+  await cvCloudDraw();
+  _safe(renderFormLib);
+  toast(_cvCloudStop ? ('✋ 멈췄습니다 — ' + 됨 + '건 올렸습니다')
+        : (안됨 ? ('☁ ' + 됨 + '건 올렸습니다 · ' + 안됨 + '건은 못 올렸습니다')
+                : ('✅ ' + 됨 + '건 모두 올렸습니다 — 이제 다른 PC 에서도 열립니다')));
+}
+
 async function cvAddForm(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='.hwp,.hwpx,.pdf,.doc,.docx,.jpg,.jpeg,.png';
   inp.onchange=async function(){ const f=inp.files[0]; if(!f) return; const buf=await f.arrayBuffer(); const id='CVFORM'+Date.now()+Math.random().toString(36).slice(2,6); const ext=(f.name.split('.').pop()||'').toLowerCase();
     const 줄=await cvFormPut(id,{id:id,name:f.name,ext:ext,size:f.size,base64:abToB64(buf),savedAt:new Date().toISOString()});
