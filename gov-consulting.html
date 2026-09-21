@@ -2690,7 +2690,7 @@ function getHoliday(ds){
 /* dayRule — 이 사업이 쉬는 날에도 나가는가.
    ''(빈 값) = 전체 설정을 따른다(처음 값) · 'exceptSun' = 일요일만 빼고 아무 날이나.
    ⚠ 새 갈래를 늘릴 때는 isBlocked 도 함께 봐야 한다 — 여기만 늘리면 조용히 무시된다. */
-function getTypes(){const s=localStorage.getItem('p_types');if(!s){lsSet('p_types',JSON.stringify(DEFAULT_TYPES));return DEFAULT_TYPES;}return JSON.parse(s).map(t=>({mandatoryField:0,fullName:'',agency:'',exclusiveDay:false,onePhoto:false,dayRule:'',...t}));}
+function getTypes(){const s=localStorage.getItem('p_types');if(!s){lsSet('p_types',JSON.stringify(DEFAULT_TYPES));return DEFAULT_TYPES;}return JSON.parse(s).map(t=>({mandatoryField:0,fullName:'',agency:'',exclusiveDay:false,onePhoto:false,dayRule:'',agencyExclusiveDay:false,...t}));}
 function setTypes(v){lsSet('p_types',JSON.stringify(v));fbPush('p_types',v);publishTypeColors();}
 function getCos(){return JSON.parse(localStorage.getItem('p_cos')||'[]');}
 // ===== 데이터 안전장치: 대량 삭제(비정상 축소) 감지 =====
@@ -4755,22 +4755,28 @@ function renderSingleCal(){
     /* 여기는 «사업이 정해진» 고르개다 — 그 사업 규칙 그대로 본다 */
     const blocked=!!isBlocked(ds,single.typeId);
     const otherBiz=coOtherTypeOn(single.coId,single.typeId,ds);
+    /* ★ 능률협회처럼 «수행기관 자체가 하루 1건»인 유형 — 담당자가 달라도
+       다른 사업장이 이미 그 날짜를 썼으면 고르지 못하게 막는다(대표 지시
+       2026-09-21 「능률협회는 1일 하나의 사업장만 컨설팅 가능하다」). */
+    const agencyOther=agencyOtherSiteOn(single.coId,single.typeId,ds);
     const pick=single.multi?single.picks.find(x=>x.date===ds):null;
     const used=taken.get(ds);
     const isTaken=!!used,isSel=single.multi?!!pick:(single.selDate===ds),isToday=ds===today;
     let cls='bulk-cell';
     /* ⚠ 쓴 날에는 dis 를 안 붙인다 — dis 는 글자를 거의 안 보이게 만든다.
        못 고르는 것은 onclick 을 안 주는 것으로 이미 막혀 있다(색으로 막는 게 아니다).
-       다만 «다른 사업이 쓴 날»(otherBiz)은 이 사업으로는 절대 못 쓰는 날이라
-       dis busy 로 눈에 띄게 막는다(대표 지시 2026-09-21). */
+       다만 «다른 사업이 쓴 날»(otherBiz)·«다른 사업장이 쓴 기관 하루1건 날»
+       (agencyOther)은 이 사업으로는 절대 못 쓰는 날이라 dis busy 로 눈에 띄게
+       막는다(대표 지시 2026-09-21). */
     if(blocked)cls+=' dis';
     else if(isTaken)cls+=' taken '+(used.isField?'uf':'uo');
     else if(otherBiz)cls+=' dis busy';
+    else if(agencyOther)cls+=' dis busy';
     else if(isSel)cls+=(pick?pick.isField:single.isField)?' sel-field':' sel-office';
     else if(isToday)cls+=' today';
-    const clk=(!blocked&&!isTaken&&!otherBiz)?`onclick="pickSingleDate('${ds}')"`:'';
+    const clk=(!blocked&&!isTaken&&!otherBiz&&!agencyOther)?`onclick="pickSingleDate('${ds}')"`:'';
     const icon=isSel?((pick?pick.isField:single.isField)?'📍':'🏢'):'';
-    const droppable=(single.multi&&!blocked&&!isTaken&&!otherBiz)
+    const droppable=(single.multi&&!blocked&&!isTaken&&!otherBiz&&!agencyOther)
       ? ` ondragover="event.preventDefault();this.classList.add('drop-hover');" ondragleave="this.classList.remove('drop-hover');" ondrop="onDropDate(event,'${ds}')"`
       : '';
     let inner=icon||d,tipAttr='';
@@ -4781,6 +4787,8 @@ function renderSingleCal(){
       tipAttr=` data-tip="${escAttr(usedDayTip(used,m,d))}"`;
     }else if(otherBiz){
       tipAttr=` title="${escAttr(otherBiz+' 일정이 있는 날짜입니다')}"`;
+    }else if(agencyOther){
+      tipAttr=` title="${escAttr(agencyOther+' 에 이미 등록된 날짜입니다 (기관 하루 1건)')}"`;
     }
     h+=`<div class="${cls}" data-ds="${ds}" ${clk}${droppable}${tipAttr}>${inner}</div>`;
   }
@@ -4872,6 +4880,8 @@ async function saveSingle(){
   if(exErr){toast(exErr,'err');return;}
   const mxErr=checkConflictMatrix(single.coId,single.typeId,single.selDate);
   if(mxErr){showBigAlert(mxErr);return;}
+  const agErr=checkAgencyExclusive(single.coId,single.typeId,single.selDate);
+  if(agErr){showBigAlert(agErr);return;}
   const newId=uid();
   // 담당자 배정: 사업장 정담당 우선, 협업노무사가 등록해도 정담당 유지
   const defA=co?.defAtt||myId()||'a1';
@@ -4921,6 +4931,8 @@ async function saveMultiSingle(){
     if(exErr){skipped.push(`${ds.slice(5)}(${exErr})`);continue;}
     const mxErr=checkConflictMatrix(single.coId,single.typeId,ds);
     if(mxErr){skipped.push(`${ds.slice(5)}(중복제한)`);continue;}
+    const agErr=checkAgencyExclusive(single.coId,single.typeId,ds);
+    if(agErr){skipped.push(`${ds.slice(5)}(기관중복)`);continue;}
     const attErr=checkAttLimit(defA,ds);
     if(attErr){skipped.push(`${ds.slice(5)}(${attErr})`);continue;}
     const newId=uid();
@@ -7367,6 +7379,8 @@ function moveChip(sid,newDate){
   if(exErr){toast(exErr,'err');return;}
   const mxErr=checkConflictMatrix(sc.coId,sc.typeId,newDate,sid);
   if(mxErr){showBigAlert(mxErr);return;}
+  const agErr=checkAgencyExclusive(sc.coId,sc.typeId,newDate,sid);
+  if(agErr){showBigAlert(agErr);return;}
   // 변경 전 회차 스냅샷 → 시뮬레이션(날짜 변경 + 날짜순 재정렬) → 영향 회차 산출
   const mvPhase=schedPhase(sc);
   const before={};
@@ -7630,6 +7644,34 @@ function checkConflictMatrix(coId,typeId,date,excludeId=null){
   }
   return null;
 }
+/* 수행기관 자체가 하루에 한 사업장만 — 담당자가 달라도 막는다 (대표 지시
+   2026-09-21 「능률협회는 1일 하나의 사업장만 컨설팅 가능하다」).
+   ⚠ checkConflictMatrix(위)는 2026-07-14에 일부러 «같은 주담당» 으로 좁혔다
+   (전역 단독실시가 과잉 차단하던 것을 고친 결정, 커밋 9a045811) — 그 결정을
+   되돌리면 그때 고친 다른 유형들이 다시 깨진다. 그래서 되돌리지 않고,
+   «수행기관 자체가 병목인» 유형만 담당자와 무관하게 막는 새 칸
+   (agencyExclusiveDay, 환경설정 「기관 하루1건」)을 따로 둔다. */
+function checkAgencyExclusive(coId,typeId,date,excludeId=null){
+  const t=getTypes().find(x=>x.id===typeId);
+  if(!t||!t.agencyExclusiveDay)return null;
+  const clash=getScheds().find(s=>
+    s.date===date&&s.id!==excludeId&&s.typeId===typeId&&s.coId!==coId
+  );
+  if(!clash)return null;
+  const co2=getCos().find(c=>c.id===clash.coId)?.name||'?';
+  return `[${t.fullName||t.name}]${t.agency?'('+t.agency+')':''}은 하루에 한 사업장만 가능합니다.\n${date}에 이미 [${co2}] 일정이 있습니다.`;
+}
+/* checkAgencyExclusive 와 같은 규칙을 «달력 칸 표시용»으로 — 저장 전에 미리
+   막고(dis busy), 마우스를 올리면 어느 사업장 때문인지 보여준다. 반환은
+   coOtherTypeOn 과 같은 모양(그 사업장 이름 또는 빈 문자열)이라 렌더 쪽에서
+   같은 방식으로 쓸 수 있다. */
+function agencyOtherSiteOn(coId,typeId,ds,excludeId){
+  const t=getTypes().find(x=>x.id===typeId);
+  if(!t||!t.agencyExclusiveDay)return '';
+  const hit=getScheds().find(s=>s.typeId===typeId&&s.coId!==coId&&s.date===ds&&s.id!==excludeId);
+  if(!hit)return '';
+  return getCos().find(c=>c.id===hit.coId)?.name||'다른 사업장';
+}
 // [폐기됨 2026-07-14] 전역 '당일 단독 실시' 개념 제거.
 // 이제 중복 판정은 checkConflictMatrix(주담당 기준)에서만 처리한다.
 // 호출부 변경을 최소화하기 위해 함수는 남겨두되 항상 통과(null)시킨다.
@@ -7848,6 +7890,8 @@ async function handleDrop(date,item){
   if(exErr){toast(exErr,'err');return;}
   const mxErr=checkConflictMatrix(item.coId,item.typeId,date);
   if(mxErr){showBigAlert(mxErr);return;}
+  const agErr=checkAgencyExclusive(item.coId,item.typeId,date);
+  if(agErr){showBigAlert(agErr);return;}
   const ty=getTypes().find(t=>t.id===item.typeId);
   const defA=co?.defAtt||myId()||'a1';
   const defCoAs=getCoAtts(co);
@@ -9871,14 +9915,21 @@ function renderSettings(){
   erpRows.forEach(et=>{ const g=erpMap[et.code]; if(g)(erpByGov[g]=erpByGov[g]||[]).push(et); });
   const rows=types.map(t=>{
     const inactive=t.active===false;
-    let onceCell,pairCell;
+    let onceCell,pairCell,agencyCell;
     if(inactive){
       onceCell='<span style="color:var(--t2);">—</span>';
       pairCell='<span style="color:var(--t2);">—</span>';
+      agencyCell='<span style="color:var(--t2);">—</span>';
     }else{
       const once=isConflictPair(t.id,t.id);
       onceCell=`<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--t2);white-space:nowrap;">
         <input type="checkbox" ${once?'checked':''} onchange="toggleConflict('${t.id}','${t.id}');renderSettings();">하루 1건</label>`;
+      /* 「하루 1건」과 다르다 — 저건 «같은 주담당»일 때만 막는다(2026-07-14
+         의도적 결정). 여기는 담당자가 달라도 «수행기관 자체»가 하루에 한
+         사업장만 가능한 유형(예: 능률협회)을 위한 것이다(대표 지시
+         2026-09-21). */
+      agencyCell=`<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--t2);white-space:nowrap;">
+        <input type="checkbox" ${t.agencyExclusiveDay?'checked':''} onchange="saveTypeField('${t.id}','agencyExclusiveDay',this.checked);renderSettings();">기관 하루1건</label>`;
       const partners=active.filter(o=>o.id!==t.id);
       const chips=partners.filter(o=>isConflictPair(t.id,o.id)).map(o=>
         `<span onclick="toggleConflict('${t.id}','${o.id}');renderSettings();" title="클릭하면 해제" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;background:rgba(233,69,96,.10);border:1px solid rgba(233,69,96,.35);color:var(--danger);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;"><span style="width:7px;height:7px;border-radius:50%;background:${o.color};"></span>${o.name} ✕</span>`).join('');
@@ -9913,6 +9964,7 @@ function renderSettings(){
       <td style="text-align:center;"><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--t2);white-space:nowrap;"><input type="checkbox" ${t.onePhoto?'checked':''} onchange="saveTypeField('${t.id}','onePhoto',this.checked)">1장만</label></td>
       <td style="text-align:center;"><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--t2);white-space:nowrap;" title="켜면 이 사업은 토요일·공휴일에도 등록됩니다. 일요일은 켜도 막힙니다."><input type="checkbox" ${t.dayRule==='exceptSun'?'checked':''} onchange="saveTypeField('${t.id}','dayRule',this.checked?'exceptSun':'')">일요일 빼고</label></td>
       <td style="text-align:center;">${onceCell}</td>
+      <td style="text-align:center;">${agencyCell}</td>
       <td>${pairCell}</td>
       <td>${erpCell}</td>
       <td><div class="act-cell">
@@ -9928,7 +9980,8 @@ function renderSettings(){
         <th title="0=무제한">최대회차</th><th>의무방문</th>
         <th title="켜면 이 컨설팅은 사진을 1장(시작)만 등록합니다 (예: 비즈니스지원단)">사진 1장</th>
         <th title="켜면 이 컨설팅만 토요일·공휴일에도 등록됩니다 (전체 설정을 덮어씁니다). 일요일은 켜도 막힙니다.">쉬는 날</th>
-        <th title="켜면 이 컨설팅은 하루에 1건만 등록됩니다">하루 1건</th>
+        <th title="켜면 이 컨설팅은 하루에 1건만 등록됩니다 (같은 주담당일 때만 — 2026-07-14)">하루 1건</th>
+        <th title="켜면 담당자가 달라도 이 컨설팅은 하루에 한 사업장만 등록됩니다 (수행기관 자체가 병목일 때, 예: 능률협회)">기관 하루1건</th>
         <th title="같은 날 함께 등록할 수 없는 컨설팅 (사업장이 달라도 적용)">같은 날 불가</th>
         <th title="이 종류가 푸른ERP의 어떤 컨설팅 유형과 이어져 있는지. 이어두면 ERP 사업장을 그대로 가져올 수 있습니다">ERP 연결</th>
         <th>관리</th>

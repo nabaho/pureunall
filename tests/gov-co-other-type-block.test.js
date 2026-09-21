@@ -80,7 +80,10 @@ function world(scheds) {
   vm.createContext(ctx);
   vm.runInContext([
     grab('p2'), grab('todayStr'), grab('escAttr'),
-    grab('isBlocked'), grab('coOtherTypeOn'), grab('renderSingleCal'),
+    grab('isBlocked'), grab('coOtherTypeOn'),
+    // 기관 하루1건(agencyExclusiveDay) — renderSingleCal·saveSingle·saveMultiSingle 이 부른다
+    grab('agencyOtherSiteOn'), grab('checkAgencyExclusive'),
+    grab('renderSingleCal'),
     grab('saveSingle'), grab('saveMultiSingle'),
   ].join('\n'), ctx);
   return { ctx, state, calls };
