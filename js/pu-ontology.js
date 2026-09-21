@@ -397,6 +397,30 @@
        즉 «같은 일을 하는 다듬개 둘이 서로 다른 답»을 내고 있었다. 이제 하나다. */
   function normName(v){ return clean(v).toLowerCase().replace(/주식회사|유한회사|㈜|[\s()（）·.,_\-]/g,''); }
   function normBiz(v){ return clean(v).replace(/\D/g,''); }
+  /* ★ 회사를 «사업자번호»로 알아본다 (대표 결정 2026-09-18 「열쇠는 사업자번호」,
+       2026-09-21 목업 ㉠㉡ 승인).
+     ■ 왜
+       계약이 든 사업자번호 81개 가운데 업체관리에 있는 것이 «0개»였다(2026-09-18 실측).
+       컨설팅 사업장을 업체관리에 일부러 안 넣기로 했기 때문이다. 그래서 번호가 또렷이
+       적혀 있어도 맞춰 볼 상대가 없어 관계가 0개였다.
+     ■ 셋 중 하나를 돌려준다
+       ① 그 번호를 가진 업체관리 줄이 «하나» — 그 업체가 이 번호의 얼굴이다.
+          ⚠ 새 개체를 만들지 «않는다». 만들면 이미 이어져 있던 관계가 둘로 갈라진다.
+       ② 그 번호를 가진 업체관리 줄이 «둘 이상» — 빈 값. 어느 쪽인지 사람이 먼저 정한다.
+       ③ 업체관리에 «없다» — 번호 자체가 회사다.
+     ⚠ 10자리가 아니면 안 쓴다 — 잘못 적힌 번호로 남의 회사에 붙이지 않는다.
+     ⚠ 이름으로 찾는 것과 «질이 다르다». 번호는 나라가 매긴 유일한 것이라 1.0 이고,
+       이름은 예전처럼 0.85 다(그래서 관계망 색인에는 안 담긴다). */
+  var BIZ_ORG_PREFIX = 'biz:';
+  function bizOrgIdOf(bz, byBiz){
+    bz = normBiz(bz);
+    if(bz.length !== 10) return '';
+    var hit = (byBiz || {})[bz];
+    if(hit && hit.length === 1) return clean(hit[0].id);
+    if(hit && hit.length > 1) return '';
+    return BIZ_ORG_PREFIX + bz;
+  }
+  function isBizOrg(id){ return clean(id).indexOf(BIZ_ORG_PREFIX) === 0; }
   /* encodeURIComponent가 점(.)은 남기므로 Firebase 열쇠 금지문자까지 한 번 더 막는다. */
   function canon(type, id){ return type + ':' + encodeURIComponent(clean(id)).replace(/\./g,'%2E'); }
   function sourceCanon(type, program, id){ return canon(type,clean(program)+':'+clean(id)); }
@@ -464,6 +488,18 @@
     Object.keys(byCoName).forEach(function(k){ if(byCoName[k].length>1) issue(issues,'medium','ambiguous_company_name','companies','',byCoName[k][0].name,'같은 정규화 업체명 '+byCoName[k].length+'건'); });
     Object.keys(byBiz).forEach(function(k){ if(byBiz[k].length>1) issue(issues,'high','duplicate_business_number','companies','',k,'같은 사업자번호 '+byBiz[k].length+'건'); });
 
+    /* 업체관리에 없는 번호는 «번호가 회사»다 — 그 개체를 여기서 만들어 둔다.
+       ⚠ 이름표는 담기지만 관계망 색인에는 «안 실린다»(이름을 안 싣는 규칙 그대로).
+       ⚠ 만들지 않고 관계만 이으면 그 관계는 색인에서 «매달린 것»으로 조용히 버려진다. */
+    var bizOrgs={};
+    function ensureBizOrg(oid,label){
+      if(!isBizOrg(oid)) return oid;
+      var k=canon('Organization',oid);
+      if(!entities[k]) entities[k]={type:'Organization',store:'companies',program:'erp',id:oid,
+        label:clean(label)||oid.slice(BIZ_ORG_PREFIX.length)};
+      bizOrgs[oid]=1;
+      return oid;
+    }
     COMPANY_STORES.forEach(function(store){
       arr(data[store]).forEach(function(r){
         var rid=clean(r.id), cid=clean(r.companyId), label=clean(r.companyName||r.company||r.name||rid);
@@ -471,11 +507,24 @@
         if(cid && !byCoId[cid]) issue(issues,'high','orphan_company',store,rid,label,'존재하지 않는 companyId: '+cid);
         if(!cid){
           var bz=normBiz(r.bizNo||r.bizno), nm=normName(r.companyName||r.company);
-          var hits=(bz&&byBiz[bz]&&byBiz[bz].length===1)?byBiz[bz]:(nm&&byCoName[nm]&&byCoName[nm].length===1?byCoName[nm]:[]);
-          if(hits.length===1){ candidate=hits[0].id; confidence=bz?0.99:0.85; issue(issues,'medium','missing_company_id',store,rid,label,'업체를 찾았지만 companyId가 비어 있습니다.',candidate); cid=candidate; }
-          else if(label && store!=='my_schedules') issue(issues,'medium','unresolved_company',store,rid,label,'업체 ID를 확정하지 못했습니다.');
+          var oid=bizOrgIdOf(bz,byBiz);
+          if(oid){
+            /* 번호로 찾았다 — 이름 추정이 아니라 나라가 매긴 번호라 1.0 이다 */
+            confidence=1; cid=oid;
+            if(isBizOrg(oid)) ensureBizOrg(oid,label);
+            else issue(issues,'medium','missing_company_id',store,rid,label,'업체를 찾았지만 companyId가 비어 있습니다.',oid);
+          } else if(bz.length===10 && byBiz[bz] && byBiz[bz].length>1){
+            /* ⚠ 같은 번호가 둘 이상이면 «이름으로 물러서지 않는다» — 물러서면
+               사람이 정리해야 할 자리를 조용히 남의 회사로 이어 버린다. */
+            issue(issues,'high','duplicate_business_number',store,rid,label,
+              '사업자번호 '+bz+' 를 가진 업체가 둘 이상이라 잇지 않았습니다.');
+          } else {
+            var hits=(nm&&byCoName[nm]&&byCoName[nm].length===1)?byCoName[nm]:[];
+            if(hits.length===1){ candidate=hits[0].id; confidence=0.85; issue(issues,'medium','missing_company_id',store,rid,label,'업체를 찾았지만 companyId가 비어 있습니다.',candidate); cid=candidate; }
+            else if(label && store!=='my_schedules') issue(issues,'medium','unresolved_company',store,rid,label,'업체 ID를 확정하지 못했습니다.');
+          }
         }
-        if(cid && byCoId[cid]){
+        if(cid && (byCoId[cid] || bizOrgs[cid])){
           var st=STORE_TYPES[store], pred=store==='contracts'?'contractedWith':store==='cases'?'concerns':(store==='finance_invoice'?'invoicedTo':(store==='finance_income'||store==='finance_expense'?'paidFor':(store==='my_schedules'?'scheduledFor':'projectFor')));
           addEdge(edges,canon(st,rid),pred,canon('Organization',cid),store,rid,confidence);
         }
@@ -540,7 +589,9 @@
     });
     var sev={high:0,medium:0,low:0}; issues.forEach(function(x){ sev[x.severity]=(sev[x.severity]||0)+1; });
     return { schemaVersion:VERSION, readOnly:true, entityCount:Object.keys(entities).length, edgeCount:edges.length,
-      issueCount:issues.length, severity:sev, stats:stats, entities:entities, edges:edges, issues:issues };
+      issueCount:issues.length, severity:sev, stats:stats, entities:entities, edges:edges, issues:issues,
+      /* 번호로 만든 회사 개체 — 다른 프로그램도 «같은 회사»에 이으려면 이 표가 필요하다 */
+      bizOrgs:bizOrgs, byBiz:byBiz };
   }
 
   function resolvePath(path, context){
@@ -562,8 +613,15 @@
   }
   function addForOrganization(edges, subject, rec, source, id, companies){
     var cid=clean(rec.companyId||rec.co_id||rec.company_id), name=clean(rec.companyName||rec.company||rec.사업장||rec.site);
+    var 적힌것=cid;
+    /* ★ 번호로 잇는 길 (㉠㉡ 2026-09-21) — 업체관리에 없는 회사도 여기서 이어진다.
+       ⚠ 이름보다 «먼저» 본다. 이름이 먼저면 번호가 있는데도 0.85 로 떨어진다. */
+    if(!cid){
+      var 번호=bizOrgIdOf(rec.bizNo||rec.bizno||rec.사업자번호, companies.byBiz);
+      if(번호){ cid=번호; 적힌것=번호; if(isBizOrg(번호)) companies.ensureBizOrg(번호,name); }
+    }
     if(!cid&&name){ var hits=companies.byName[normName(name)]||[]; if(hits.length===1) cid=hits[0].id; }
-    if(cid&&companies.byId[cid]) addEdge(edges,subject,'forOrganization',canon('Organization',cid),source,id,cid===clean(rec.companyId||rec.co_id||rec.company_id)?1:0.85);
+    if(cid&&(companies.byId[cid]||companies.bizOrgs[cid])) addEdge(edges,subject,'forOrganization',canon('Organization',cid),source,id,cid===적힌것?1:0.85);
   }
   function parseExternal(adapter, value, graph, companies){
     var key=adapter.key, program=adapter.program, entities=graph.entities, edges=graph.edges, count=0;
@@ -592,7 +650,10 @@
          거기에는 계좌·주민번호가 딸려 올 수 있다. */
     else if(adapter.parser==='coInfo') entries(value).forEach(function(p){
       var r=p[1]||{}, coKey=clean(p[0]);
-      var rec=Object.assign({},r,{companyId:clean(r.erpCoId)});
+      /* ★ 기업정보함의 회사 열쇠는 «이미 사업자번호»다 — 번호가 없는 회사만 이름 열쇠다.
+         그것을 그대로 넘기면 업체관리에 없는 회사도 이어진다 (㉠㉡ 2026-09-21). */
+      var rec=Object.assign({},r,{companyId:clean(r.erpCoId),
+        bizNo:/^\d{10}$/.test(coKey)?coKey:clean(r.bizno||r.bizNo)});
       /* ⚠ 회사 개체에는 rec 를 넘기지 «않는다» — 넘기면 addForOrganization 이
          Organization → Organization 관계를 만든다. 관계 사전에 없는 꼴이다.
          이알피 업체와 잇는 일은 아래 «서류»가 한다(Document → Organization). */
@@ -607,7 +668,8 @@
        ⚠ 둘이 다른 관계를 내면 거울을 켰다 껐다 할 때 관계망이 흔들린다. */
     else if(adapter.parser==='coIdx') entries(value).forEach(function(p){
       var r=p[1]||{}, coKey=clean(p[0]);
-      var rec={companyId:clean(r.e)};
+      /* ⚠ 무거운 자리 파서와 «같은 관계»를 내야 한다 — 번호도 똑같이 넘긴다 */
+      var rec={companyId:clean(r.e), bizNo:/^\d{10}$/.test(coKey)?coKey:''};
       var s0=entity('Organization','coinfo:'+coKey,clean(r.c)||coKey);
       entries(r.d).forEach(function(d){
         var dk=clean(d[0]), doc=d[1]||{};
@@ -649,8 +711,19 @@
   function auditIntegrated(data, sourceResults, context){
     var base=audit(data), graph={entities:Object.assign({},base.entities),edges:base.edges.slice()}, issues=base.issues.slice();
     sourceResults=sourceResults||{}; context=context||{};
-    var companies={byId:{},byName:{}};
+    var companies={byId:{},byName:{},byBiz:base.byBiz||{},bizOrgs:base.bizOrgs||{}};
     arr(data&&data.companies).forEach(function(c){if(!c||!c.id)return;companies.byId[c.id]=c;var n=normName(c.name||c.companyName);if(n){if(!companies.byName[n])companies.byName[n]=[];companies.byName[n].push(c);}});
+    /* 번호로 만든 회사 개체를 «여기서도» 만들 수 있어야 한다 — 이알피에는 그 번호를 쓰는
+       업무가 없지만 기업정보함에는 있는 경우다(서류만 있고 계약은 아직 없는 회사).
+       ⚠ 안 만들고 관계만 이으면 색인에서 «매달린 것»으로 조용히 버려진다. */
+    companies.ensureBizOrg=function(oid,label){
+      if(!isBizOrg(oid)) return oid;
+      var k=canon('Organization',oid);
+      if(!graph.entities[k]) graph.entities[k]={type:'Organization',store:'companies',program:'erp',id:oid,
+        label:clean(label)||oid.slice(BIZ_ORG_PREFIX.length)};
+      companies.bizOrgs[oid]=1;
+      return oid;
+    };
     var coverage={}; Object.keys(PROGRAMS).forEach(function(k){coverage[k]={program:k,name:PROGRAMS[k].name,state:'not_loaded',records:0,adapters:0,loaded:0,denied:0,inApp:0,skipped:0};});
     Object.keys(READ_ADAPTERS).forEach(function(key){
       var a=READ_ADAPTERS[key], c=coverage[a.program]; c.adapters++;
