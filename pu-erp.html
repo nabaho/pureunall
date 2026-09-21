@@ -19934,14 +19934,25 @@ function ContractModal(props){
             return h('option', { key:sz, value:sz }, sz);
           })
         )),
+      /* ⚠ 라벨 없이 원칙(2026-09-19)의 예외다 — 부담당 슬롯과 같은 까닭
+         (대표 지시 2026-09-21 「4대보험가입자 줄의 숫자위에 고용 산재 단어 넣어라」).
+         placeholder 는 값이 «비어 있을 때만» 보인다. 고용·산재 인원수는 기본값이
+         0(빈 칸이 아니라 «값 0»)이라 placeholder 가 한 번도 안 뜨고, 업태·종목처럼
+         값 자체로 무엇인지 알 수 있는 칸도 아니다 — "0" 두 칸만 나란히 있으면
+         어느 쪽이 고용이고 어느 쪽이 산재인지 알 길이 없다. 그래서 이 둘만
+         칸 위에 작은 글자를 남긴다. */
       fldn6(
-        h(NumberInput, { value:f.company.employmentInsuredCount,
-          onChange:setCompanyField('employmentInsuredCount'), placeholder:'고용보험(명)',
-          style:{ textAlign:'right', fontFamily:'monospace' } })),
+        h('div', null,
+          h('div', { style:{ fontSize:'10px', color:'#94a3b8', fontWeight:600, marginBottom:'2px' } }, '고용'),
+          h(NumberInput, { value:f.company.employmentInsuredCount,
+            onChange:setCompanyField('employmentInsuredCount'), placeholder:'고용보험(명)',
+            style:{ textAlign:'right', fontFamily:'monospace' } }))),
       fldn6(
-        h(NumberInput, { value:f.company.injuryInsuredCount,
-          onChange:setCompanyField('injuryInsuredCount'), placeholder:'산재보험(명)',
-          style:{ textAlign:'right', fontFamily:'monospace' } }))
+        h('div', null,
+          h('div', { style:{ fontSize:'10px', color:'#94a3b8', fontWeight:600, marginBottom:'2px' } }, '산재'),
+          h(NumberInput, { value:f.company.injuryInsuredCount,
+            onChange:setCompanyField('injuryInsuredCount'), placeholder:'산재보험(명)',
+            style:{ textAlign:'right', fontFamily:'monospace' } })))
       )  // 그리드 2(주소·연락처·업종·4대보험) 닫기
       )  // 회사정보 내용 wrapper 닫기
       ),  // showCompany 닫기
