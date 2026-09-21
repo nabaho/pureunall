@@ -18497,40 +18497,47 @@ function ContractModal(props){
     // 업무 요약 바로 아랫줄로 붙인다 — 굵은 구분선을 두면 "다른 구역"처럼 보여
     // 금액 넣던 흐름이 끊긴다. 종류를 여럿 고르면 계약 전체에 하나만 적용된다고 밝힌다.
     var manyKinds = (f.kinds||[]).length > 1;
-    return h('div', { style:{ marginTop:'4px' } },
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap',
-        padding:'6px 8px', background: on ? '#eff6ff' : '#f8fafc', borderRadius:'6px' } },
-        h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'7px', cursor:'pointer' } },
-          h('input', { type:'checkbox', checked:on,
-            onChange:function(e){ setF(function(prev){ return Object.assign({}, prev, { isCMS: e.target.checked }); }); },
-            style:{ width:'16px', height:'16px', accentColor:'#2563eb', cursor:'pointer', flexShrink:0 } }),
-          h('span', { style:{ fontSize:'12px', fontWeight:700, color: on ? '#2563eb' : '#64748b' } },
-            on ? '🏦 CMS 자동이체 등록됨' : '🏦 CMS 자동이체')),
-        // 켜졌을 때만 이체일·1회성이 같은 줄에 이어 붙는다
-        on && h('span', { style:{ display:'inline-flex', alignItems:'center', gap:'4px' } },
-          h('span', { style:{ fontSize:'11.5px', color:'#475569' } }, '매월'),
-          h('input', { type:'number', min:1, max:31,
-            value: (f.cmsPayDay||f.taxInvoicePaymentDay||'').toString().replace(/[^0-9]/g,'') || '',
-            onChange:function(e){
-              var v=e.target.value;
-              setF(function(prev){ return Object.assign({}, prev, { cmsPayDay: v, taxInvoicePaymentDay: v?(v+'일'):'' }); });
-            },
-            placeholder:'일',
-            style:{ width:'54px', padding:'4px 6px', border:'1px solid #bfdbfe', borderRadius:'4px', fontSize:'12px', textAlign:'center', fontWeight:700 } }),
-          h('span', { style:{ fontSize:'11.5px', color:'#475569' } }, '일 이체')),
-        on && h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'5px', cursor:'pointer',
-            padding:'3px 8px', background:'#fffbeb', borderRadius:'5px', border:'1px solid #fbbf24' } },
-          h('input', { type:'checkbox', checked:!!(f.cmsOneTime),
-            onChange:function(e){ setF(function(prev){ return Object.assign({}, prev, { cmsOneTime: e.target.checked }); }); },
-            style:{ width:'14px', height:'14px', accentColor:'#d97706', cursor:'pointer', flexShrink:0 } }),
-          h('span', { style:{ fontSize:'11px', fontWeight:700, color:'#854d0e' } }, '⚡ 1회성 (정기 아님)')),
-        // 종류를 여럿 고르면 종류마다 따로 있는 것으로 오해할 수 있다 — 하나뿐이라고 밝힌다
-        manyKinds && h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', whiteSpace:'nowrap' } },
-          '· 계약 전체에 하나만 적용')
+    /* ⚠ CMS·개인입금 두 줄을 한 줄로 (대표 지시 2026-09-21 「이부분도 한줄로
+       만들어줘」). personalDepositBlock() «부르는 자리»는 그대로 두고(다른
+       검사가 그 순서를 본다), 바깥을 flex 로 바꿔 두 블록을 나란히 놓는다 —
+       각자 켜졌을 때 뜨는 안내 띠는 «제 블록 안에서만» 아래로 붙어, 옆줄과
+       안 섞인다. 좁아지면 flexWrap 으로 자연히 다시 두 줄이 된다. */
+    return h('div', { style:{ marginTop:'4px', display:'flex', flexWrap:'wrap', gap:'8px', alignItems:'flex-start' } },
+      h('div', { style:{ flex:'1 1 260px', minWidth:0 } },
+        h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap',
+          padding:'6px 8px', background: on ? '#eff6ff' : '#f8fafc', borderRadius:'6px' } },
+          h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'7px', cursor:'pointer' } },
+            h('input', { type:'checkbox', checked:on,
+              onChange:function(e){ setF(function(prev){ return Object.assign({}, prev, { isCMS: e.target.checked }); }); },
+              style:{ width:'16px', height:'16px', accentColor:'#2563eb', cursor:'pointer', flexShrink:0 } }),
+            h('span', { style:{ fontSize:'12px', fontWeight:700, color: on ? '#2563eb' : '#64748b' } },
+              on ? '🏦 CMS 자동이체 등록됨' : '🏦 CMS 자동이체')),
+          // 켜졌을 때만 이체일·1회성이 같은 줄에 이어 붙는다
+          on && h('span', { style:{ display:'inline-flex', alignItems:'center', gap:'4px' } },
+            h('span', { style:{ fontSize:'11.5px', color:'#475569' } }, '매월'),
+            h('input', { type:'number', min:1, max:31,
+              value: (f.cmsPayDay||f.taxInvoicePaymentDay||'').toString().replace(/[^0-9]/g,'') || '',
+              onChange:function(e){
+                var v=e.target.value;
+                setF(function(prev){ return Object.assign({}, prev, { cmsPayDay: v, taxInvoicePaymentDay: v?(v+'일'):'' }); });
+              },
+              placeholder:'일',
+              style:{ width:'54px', padding:'4px 6px', border:'1px solid #bfdbfe', borderRadius:'4px', fontSize:'12px', textAlign:'center', fontWeight:700 } }),
+            h('span', { style:{ fontSize:'11.5px', color:'#475569' } }, '일 이체')),
+          on && h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'5px', cursor:'pointer',
+              padding:'3px 8px', background:'#fffbeb', borderRadius:'5px', border:'1px solid #fbbf24' } },
+            h('input', { type:'checkbox', checked:!!(f.cmsOneTime),
+              onChange:function(e){ setF(function(prev){ return Object.assign({}, prev, { cmsOneTime: e.target.checked }); }); },
+              style:{ width:'14px', height:'14px', accentColor:'#d97706', cursor:'pointer', flexShrink:0 } }),
+            h('span', { style:{ fontSize:'11px', fontWeight:700, color:'#854d0e' } }, '⚡ 1회성 (정기 아님)')),
+          // 종류를 여럿 고르면 종류마다 따로 있는 것으로 오해할 수 있다 — 하나뿐이라고 밝힌다
+          manyKinds && h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', whiteSpace:'nowrap' } },
+            '· 계약 전체에 하나만 적용')
+        ),
+        on && h('div', { style:{ marginTop:'6px', background:'#bfdbfe', borderRadius:'5px', padding:'5px 9px',
+          fontSize:'10.5px', color:'#2563eb', fontWeight:600 } },
+          '✓ 확정 시 업체관리·재무관리에 자동 동기화 / 이체일 도래 시 자동 알림')
       ),
-      on && h('div', { style:{ marginTop:'6px', background:'#bfdbfe', borderRadius:'5px', padding:'5px 9px',
-        fontSize:'10.5px', color:'#2563eb', fontWeight:600 } },
-        '✓ 확정 시 업체관리·재무관리에 자동 동기화 / 이체일 도래 시 자동 알림'),
       /* ── 👤 개인입금 (2026-08-11 대표 지시) ────────────────────────────
          "부가세 포함의 경우 법인에 입금이지만 개인입금인 경우가 있다."
          CMS 와 마찬가지로 «계약 전체에 하나» 다 — 계약금은 법인, 잔금은 개인으로
@@ -18542,7 +18549,7 @@ function ContractModal(props){
   }
   function personalDepositBlock(){
     var pd = !!f.personalDeposit;
-    return h('div', { style:{ marginTop:'4px' } },
+    return h('div', { style:{ flex:'1 1 260px', minWidth:0 } },
       h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'7px', cursor:'pointer',
           padding:'6px 8px', background: pd ? '#fffbeb' : '#f8fafc', borderRadius:'6px',
           border:'1px solid ' + (pd ? '#fde68a' : 'transparent') } },
