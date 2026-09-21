@@ -27,6 +27,8 @@
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="fund_forms.js?v=7"></script>
+<!-- 다음(Daum) 우편번호 서비스 — 무료, 가입 불필요. 푸른이알피(pu-erp.html)에서 이미 쓰는 것과 같다 -->
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#fff;--bg:#e2e8f0;--ok:#166534;--ok-bg:#f8fafc;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -169,6 +171,32 @@
   .fld{display:flex;flex-direction:column;gap:4px}.fld.full{grid-column:1/-1}
   .fld label{font-size:11.5px;color:var(--sub);font-weight:600}
   .fld input,.fld select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+  /* ── 사업장 편집 — 상자로 구분 + 열맞춤(대표 지시 2026-09-21) ──
+     .secbox 안에서만 라벨을 작고 흐리게 한다 — 다른 폼(.fld label)은 그대로 둔다.
+     전에 이걸 전역으로 걸었다가 앱 전체 라벨이 다 작아질 뻔했다. */
+  .secbox{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px}
+  .secbox .bh{font-size:12.5px;font-weight:800;color:var(--acc2);display:flex;align-items:center;gap:6px;
+    margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--acc-soft)}
+  .secbox .bh .d{font-weight:400;font-size:11px;color:var(--sub)}
+  .secbox .fld{gap:1px}
+  .secbox .fld label{font-size:9.5px;color:var(--faint);font-weight:700;letter-spacing:.01em;margin-left:1px}
+  .secbox .fld input,.secbox .fld select{padding:6px 9px 7px}
+  /* 열맞춤 표 — 왼쪽 줄이름 칸 + 칸마다 하나씩. 칸 수는 자바스크립트가 style 로 정한다
+     (대표자·담당자는 2칸, 나중에 셋이 될 수도 있어 고정 3열로 박지 않는다). */
+  .reptable{display:grid;gap:6px 10px;align-items:center}
+  .reptable .rh{font-size:11px;font-weight:800;color:var(--acc2);text-align:center;padding-bottom:6px;border-bottom:2px solid var(--acc-soft)}
+  .reptable .rl{font-size:11.5px;color:var(--sub);font-weight:700;text-align:right;padding-right:2px}
+  .reptable input{padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%}
+  .reptable .rmiss{border:1px dashed var(--line);border-radius:8px;padding:7px 9px;font-size:11.5px;
+    color:var(--faint);text-align:center;background:var(--bg)}
+  .reppair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:560px){.reppair{grid-template-columns:1fr}}
+  /* 소재지 — 우편번호+검색 한 줄, 도로명주소 다음 줄(대표 지시 「세로로 한줄로 할 필요없다」) */
+  .addrstack{display:flex;flex-direction:column;gap:6px}
+  .addrstack .ar1{display:flex;gap:6px}
+  .addrstack .ar1 .zip{width:120px;flex:none}
+  .addrstack .ar1 .zip input{font-family:monospace;text-align:center;background:var(--bg);color:var(--sub)}
+  .addrstack .ar1 button{white-space:nowrap;padding:0 12px;font-size:12.5px}
   .msg{margin:12px 0;padding:9px 13px;border-radius:8px;font-size:12.5px;display:none}
   .msg.ok{display:block;background:var(--ok-bg);color:var(--ok)}.msg.err{display:block;background:var(--danger-bg);color:var(--danger)}
   /* ⚠ warn 이 빠져 있었다 — class="msg warn" 을 쓰면 .msg 의 display:none 에 걸려
@@ -388,6 +416,7 @@ var FIELDS=[['name','기금법인명','text'],['short_name','약칭','text'],['f
   ['corp_reg_no','법인등록번호','text'],['reg_date','설립등기일','date'],['tax_id_no','고유번호','text'],
   ['tax_office','관할세무서','text'],['registry_office','관할등기소','text'],
   ['labor_office','관할 노동청','text'],['phone','전화','text'],['address','소재지','text'],
+  ['zipcode','우편번호','text'],
   /* 사무소 임대차 — 임대차계약서·사업자등록신청서·전대동의서가 묻는다. 없으면 그 서식들이 손으로 남았다.
      ⚠ 임대인의 주민등록번호는 두지 않는다 — 남의 것이다. 상호(성명)만 받는다.
      ⚠ 기간은 시작일 하나만 받는다 — 서식이 「＿부터 2년간」이라 끝은 셈한다. */
@@ -531,7 +560,11 @@ var SITE_FIELDS=[['seq_label','연번','text'],['name','상호','text'],['ceo','
      중소기업확인서가 필요한지를 가른다. 개업일은 중소기업 판정에 쓰인다.
      ⚠ 새 칸은 «맨 뒤»에 붙인다 — 가운데 끼우면 이미 만들어 둔 붙여넣기 자료가 밀린다. */
   ['biz_item','종목','text'],['open_date','개업일','text'],
-  ['sme_type','기업규모','text'],['company_tel','회사 전화','text']];
+  ['sme_type','기업규모','text'],['company_tel','회사 전화','text'],
+  /* 우편번호 — 소재지(address)와 같이 저장되는 새 칸(2026-09-21, 우편번호 검색 도입).
+     맨 뒤에 붙인다 — 이 목록은 엑셀 일괄 가져오기의 «열 차례»라 가운데 끼우면 밀린다.
+     화면에서는 소재지 칸 «안»에 나란히 그린다(SITE_MOVED 로 일반 자리에서는 뺀다). */
+  ['zipcode','우편번호','text']];
 /* 협력업체 표시(partner)는 명부 표의 체크상자로 바로 켠다(setSitePartner) —
    여기에 칸 정의를 또 두면 «편집 폼에도 있는 것처럼» 읽혀 헷갈린다. 그래서 지웠다.
    쓰임은 별지15호 ⑩ 협력업체 근로자 수 집계다. */
@@ -923,6 +956,50 @@ function toast(msg,type){
   var t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
   t.textContent=msg; t.className='show'+(type==='err'?' err':(type==='warn'?' warn':''));
   clearTimeout(window._toastT); window._toastT=setTimeout(function(){ t.className=''; }, type==='err'?3200:1800);
+}
+/* ══════════ 주소 검색(다음 우편번호) ══════════
+   같은 회사가 만든 푸른이알피(pu-erp.html)에 이미 있는 것을 들여왔다 — 새로 만들지 않고
+   검증된 것을 쓴다(대표 지시 2026-09-21). fund.html 은 공개 배포되지만 이 위젯은 사람이
+   «공개 주소»를 검색해 고르는 것뿐이라 개인정보·기금 자료를 어디로도 보내지 않는다.
+   사용법: openAddressSearch(function(r){ ... }, '미리 찾을 주소')
+   r = { zipcode, address(도로명 우선), roadAddress, jibunAddress }
+   목록에서 하나를 고르면 «그 자리에서 바로» 콜백을 부르고 창을 닫는다. */
+function openAddressSearch(onComplete,prefill){
+  if(typeof daum==='undefined'||!daum.Postcode){ toast('주소 검색 서비스를 불러오지 못했습니다(네트워크 확인)','err'); return; }
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(20,30,50,.45);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;width:min(480px,100%);height:min(620px,90vh);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)';
+  box.onclick=function(e){ e.stopPropagation(); };
+  var head=document.createElement('div');
+  head.style.cssText='padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;flex-shrink:0';
+  head.innerHTML='🔍 주소 검색 <span class="muted" style="font-weight:400;font-size:11px">주소를 고르면 바로 채워집니다</span>';
+  var xb=document.createElement('button'); xb.type='button'; xb.textContent='✕';
+  xb.style.cssText='border:none;background:none;font-size:16px;cursor:pointer;color:var(--sub);padding:0 4px';
+  head.appendChild(xb);
+  var body=document.createElement('div'); body.style.cssText='flex:1;min-height:0';
+  box.appendChild(head); box.appendChild(body); ov.appendChild(box); document.body.appendChild(ov);
+
+  var done=false;
+  function cleanup(){ if(done) return; done=true; try{ ov.parentNode&&ov.parentNode.removeChild(ov); }catch(e){} }
+  xb.onclick=cleanup;
+  ov.onclick=function(e){ if(e.target===ov) cleanup(); };
+
+  /* 미리 찾을 말 다듬기 — 괄호 안 건물명·층/호는 빼야 검색이 잘 걸린다 */
+  var q=String(prefill||'').replace(/\([^)]*\)/g,' ').replace(/\s*\d+층.*$/,' ').replace(/\s*[\d-]+호.*$/,' ').replace(/\s+/g,' ').trim();
+  try{
+    new daum.Postcode({
+      oncomplete:function(data){
+        var addr=data.roadAddress||data.jibunAddress||data.address||'';
+        if(data.buildingName&&data.apartment==='Y') addr+=' ('+data.buildingName+')';
+        var r={zipcode:data.zonecode||'',address:addr,roadAddress:data.roadAddress||'',jibunAddress:data.jibunAddress||''};
+        cleanup();
+        try{ onComplete&&onComplete(r); }
+        catch(e){ toast('주소 반영 중 오류: '+(e&&e.message||e),'err'); }
+      },
+      width:'100%', height:'100%'
+    }).embed(body, q.length>=2?{q:q,autoClose:false}:undefined);
+  }catch(e){ cleanup(); toast('주소 검색 창을 열지 못했습니다: '+(e&&e.message||e),'err'); }
 }
 // ── 공통 편의: 네비게이션 + 브라우저 뒤로가기 (저장 안 한 변경 이탈 경고 포함) ──
 function _leaveGuard(){ if(!_dirty) return Promise.resolve(true);
@@ -7912,6 +7989,8 @@ function infoForm(f){
     // 묶음 머리가 이미 「담당」이므로 라벨에 또 쓰지 않는다
     if(c[0]==='manager') return '<div class="fld w3"><label>주담당 · 부담당</label>'
       +'<div class="mgrrow">'+mgrMainField(f)+mgrSubField(f)+'</div></div>';
+    /* 우편번호는 소재지 칸 «안»에 같이 그린다(대표 지시 2026-09-21) — 여기서는 자리를 안 만든다 */
+    if(c[0]==='zipcode') return '';
     var v=f[c[0]]||'', inp;
     if(c[2]==='select') inp='<select id="fd-'+c[0]+'">'+(SELECT_OPTS[c[0]]||['공동','사내']).map(function(o){return '<option'+(v===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
     else if(c[0]==='registry_office') inp='<div style="display:flex;gap:5px"><input id="fd-'+c[0]+'" type="text" value="'+esc(v)+'" style="flex:1">'
@@ -7920,6 +7999,9 @@ function infoForm(f){
       +'<button type="button" onclick="fillTaxOffice()" title="소재지로 관할세무서 자동 추정(확인 필요)" style="white-space:nowrap;padding:0 10px;cursor:pointer">🔍 소재지로</button></div>';
     else if(c[0]==='labor_office') inp='<div style="display:flex;gap:5px"><input id="fd-'+c[0]+'" type="text" value="'+esc(v)+'" placeholder="예: 대전지방고용노동청 천안지청" style="flex:1">'
       +'<button type="button" onclick="fillLabor()" title="소재지로 관할 지방고용노동청·지청 자동 추정(확인 필요)" style="white-space:nowrap;padding:0 10px;cursor:pointer">🔍 소재지로</button></div>';
+    /* 소재지 — 우편번호 검색을 붙인다(대표 지시 2026-09-21 「기금 자체 소재지도 붙일지」→붙임).
+       관할 노동청·세무서·등기소 추정(위 세 칸)이 이 값을 읽으므로, 정확한 도로명주소일수록 낫다. */
+    else if(c[0]==='address') inp=_addrStack('fd-',f,'fdAddrSearch');
     else inp='<input id="fd-'+c[0]+'" type="'+c[2]+'" value="'+esc(v)+'">';
     /* ★ 참여 지자체를 「지역」 «바로 옆»에 둔다(대표 지시 2026-09-13 「지역 옆에 넣어라 하나씩」).
          맨 아래 따로 두었더니 화면을 끝까지 내려야 보였다 — 지역과 나란히 있어야
@@ -10416,41 +10498,98 @@ function _smeChip(s){
     +(m.expired?'유효기간이 지났습니다 — 새로 떼어야 합니다':'유효합니다')+'">'
     +esc(m.from||'?')+' ~ '+esc(m.to||'?')+(m.expired?' · 지남':'')+'</span>';
 }
+/* 왼쪽 줄이름 칸 + 칸마다 하나씩 — 대표자·담당자, 사용자대표·근로자대표가 같은 모양을 쓴다
+   (대표 지시 2026-09-21 「각각 열을 일치시켜라」). colHeads 개수만큼 칸을 만든다. */
+function _repTable(colHeads,rows){
+  var out='<div class="reptable" style="grid-template-columns:64px repeat('+colHeads.length+',1fr)">'
+    +'<div></div>'+colHeads.map(function(h){ return '<div class="rh">'+esc(h)+'</div>'; }).join('');
+  rows.forEach(function(r){ out+='<div class="rl">'+esc(r[0])+'</div>'+r[1].join(''); });
+  return out+'</div>';
+}
+/* 소재지 — 우편번호+검색 한 줄, 도로명주소 다음 줄(대표 지시 2026-09-21 「세로로 한줄로
+   할 필요없다 2줄 또는 3줄로 나눠도 된다」 → 2줄 안 승인). onSearchFn 은 [🔍 검색]이 부를
+   함수 이름 — 문서(모달)마다 검색 뒤 처리가 달라 밖에서 정한다. */
+function _addrStack(prefix,s,onSearchFn){
+  return '<div class="addrstack"><div class="ar1"><div class="zip">'
+    +'<input id="'+prefix+'zipcode" type="text" value="'+esc(s.zipcode||'')+'" readonly placeholder="우편번호"></div>'
+    +'<button type="button" class="primary" onclick="'+onSearchFn+'()">🔍 우편번호 검색</button></div>'
+    +'<input id="'+prefix+'address" type="text" value="'+esc(s.address||'')+'" placeholder="도로명주소 — 검색 뒤 이어서 적을 수 있습니다"></div>';
+}
+/* 사업장 소재지 검색 — 편집창을 겹쳐 띄우지 않는 이 파일의 관례를 따른다
+   (openDocConfirm·applyDocFound 와 같은 「걷어두기→닫기→다시 열기」). */
+function siteAddrSearch(){
+  var cur=$('se-address');
+  _siteDocGrab(); closeM();
+  openAddressSearch(function(r){
+    var keep=Object.assign({},_siteDocKeep||{});
+    keep.zipcode=r.zipcode; keep.address=r.address;
+    var _sid=_siteEditSid||''; _siteDocKeep=null;
+    editSite(_sid,keep);
+    toast('주소를 채워 편집 창을 다시 열었습니다 — 확인 후 [저장]');
+  }, cur?cur.value:'');
+}
+/* 기금 자체 소재지 검색 — 모달이 아니라 페이지 안 폼이라 겹쳐 띄워도 된다(걷어두기 불필요) */
+function fdAddrSearch(){
+  var cur=$('fd-address');
+  openAddressSearch(function(r){
+    var z=$('fd-zipcode'), a=$('fd-address');
+    if(z) z.value=r.zipcode; if(a) a.value=r.address;
+    markDirty();
+    toast('주소를 채웠습니다 — 확인 후 저장');
+  }, cur?cur.value:'');
+}
 function editSite(sid,prefill){
   var isNew=!sid; if(isNew&&prefill){_sitePrefill=prefill;} else if(isNew){_sitePrefill=null;}
   _siteEditSid=sid||'';
   /* 편집일 때도 prefill 을 얹는다 — 기업정보함에서 채워 돌아오는 길이다.
      저장된 값 위에 «걷어 둔 화면 값 + 새로 채운 값»이 올라간다. */
   var s=(isNew&&prefill)?prefill:Object.assign({},(S.sites&&S.sites[sid])||{},prefill||{});
-  /* ★ 「기업규모」를 회사 칸에서 «내린다» — 아래 중소기업 묶음으로 옮겨 「중소기업 여부」와
-       나란히 둔다(대표 지시 2026-09-13 「중복되어 확인이 어렵다」).
-     ⚠ SITE_FIELDS 에서 «지우지는» 않는다 — 그 목록은 엑셀 붙여넣기의 열 차례라,
-       빼면 이미 만들어 둔 붙여넣기 자료가 한 칸씩 밀린다. 보이는 자리만 옮긴다. */
-  var SME_MOVED=['sme_type'];
-  var flds=SITE_FIELDS.filter(function(c){ return SME_MOVED.indexOf(c[0])<0; })
-    .map(function(c){return '<div class="fld'+(c[0]==='address'||c[0]==='note'?' full':'')+'"><label>'+c[1]+'</label>'
+  /* ★ 화면을 «기업정보 / 대표자·담당자 / 사용자대표·근로자대표 / 중소기업」 상자로 나눈다
+       (대표 지시 2026-09-21 「화면상으로 구분해서 정리하고 싶다」). 자료가 담기는 칸(SITE_FIELDS
+       등)은 하나도 안 바꾼다 — 어디에 그리는지만 바꾼다.
+     ⚠ 대표자(ceo)·소재지(address)·우편번호(zipcode)·기업규모(sme_type)는 «기업정보 상자의
+       일반 칸 차례»에서 뺀다 — 각각 다른 상자·다른 모양(표·소재지 칸)으로 따로 그리기
+       때문이다. SITE_FIELDS 배열 자체(엑셀 열 차례)는 그대로 둔다. */
+  var CO_MOVED=['ceo','address','zipcode','sme_type'];
+  var flds=SITE_FIELDS.filter(function(c){ return CO_MOVED.indexOf(c[0])<0; })
+    .map(function(c){return '<div class="fld'+(c[0]==='note'?' full':'')+'"><label>'+c[1]+'</label>'
     +'<input id="se-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';}).join('');
   var pc=_primaryContact(s).c;
-  var cflds=CONTACT_FIELDS.map(function(c){return '<div class="fld"><label>'+c[1]+'</label>'
-    +'<input id="sc-'+c[0]+'" type="'+c[2]+'" value="'+esc(pc[c[0]]||(c[0]==='mobile'?(pc.phone||''):''))+'"></div>';}).join('');
-  var wflds=WREP_FIELDS.map(function(c){return '<div class="fld"><label>'+c[1]+'</label>'
-    +'<input id="sw-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';}).join('');
+  /* CONTACT_FIELDS 와 «같은 값 규칙»(mobile 이 비면 옛 phone 을 대신 보여준다) —
+     표로 옮기며 규칙까지 달라지면 안 된다. */
+  var cv=function(key){ return pc[key]||(key==='mobile'?(pc.phone||''):''); };
+  var repTbl1=_repTable(['대표자','담당자'],[
+    ['이름', ['<input id="se-ceo" type="text" value="'+esc(s.ceo||'')+'">',
+              '<input id="sc-name" type="text" value="'+esc(cv('name'))+'">']],
+    ['직위', ['<div class="rmiss">— 없음 —</div>',
+              '<input id="sc-position" type="text" value="'+esc(cv('position'))+'">']],
+    ['연락처', ['<div class="rmiss">— 없음 —</div>',
+              '<input id="sc-mobile" type="text" value="'+esc(cv('mobile'))+'">']],
+    ['이메일', ['<div class="rmiss">— 없음 —</div>',
+              '<input id="sc-email" type="text" value="'+esc(cv('email'))+'">']]
+  ]);
   /* ★ 「회사 대표자와 같은 사람」 — 체크하면 성명 칸을 잠그고 대표자 칸을 따라간다
-       (대표 지시 2026-09-14). 이름을 베껴 넣지 않는다: 대표자가 바뀌면 저절로 따라가야 한다. */
+       (대표 지시 2026-09-14). 이름을 베껴 넣지 않는다: 대표자가 바뀌면 저절로 따라가야 한다.
+     ★ 사용자대표·근로자대표는 자료가 «이미 같은 차례»다(성명·직위·휴대폰·생년월일) — 배열을
+       나란히 훑어 표를 만든다. 빈 줄이 생기지 않는다(대표자·담당자 표와 다른 점). */
   var _u=_siteUrep(s);
-  var uflds=UREP_FIELDS.map(function(c){
-    if(c[0]==='urep_name') return '<div class="fld"><label>'+c[1]+'</label>'
-      +'<input id="su-'+c[0]+'" type="text" value="'+esc(_u.same?_u.name:(s.urep_name||''))+'"'
-      +(_u.same?' readonly title="대표자 칸을 따라갑니다 — 체크를 끄면 따로 적을 수 있습니다" style="background:var(--bg);color:var(--sub)"':'')
-      +'></div>';
-    return '<div class="fld"><label>'+c[1]+'</label>'
-      +'<input id="su-'+c[0]+'" type="'+c[2]+'" value="'+esc(s[c[0]]||'')+'"></div>';
-  }).join('');
-  var usame='<div class="fld full" style="margin:-2px 0 2px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400">'
+  var repRows2=UREP_FIELDS.map(function(uc,i){
+    var wc=WREP_FIELDS[i];
+    var 줄이름=(i===0)?'성명':uc[1];
+    var uro=(uc[0]==='urep_name'&&_u.same);
+    var uval=(uc[0]==='urep_name')?(_u.same?_u.name:(s.urep_name||'')):(s[uc[0]]||'');
+    var uCell='<input id="su-'+uc[0]+'" type="'+uc[2]+'" value="'+esc(uval)+'"'
+      +(uro?' readonly title="대표자 칸을 따라갑니다 — 체크를 끄면 따로 적을 수 있습니다" style="background:var(--bg);color:var(--sub)"':'')
+      +'>';
+    var wCell='<input id="sw-'+wc[0]+'" type="'+wc[2]+'" value="'+esc(s[wc[0]]||'')+'">';
+    return [줄이름,[uCell,wCell]];
+  });
+  var repTbl2=_repTable(['사용자 대표','근로자 대표'],repRows2);
+  var usame='<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:12px;margin-bottom:8px">'
     +'<input type="checkbox" id="su-urep_same"'+(_u.same?' checked':'')+' onchange="urepSameToggle(this.checked)">'
-    +'<span>회사 <b>대표자와 같은 사람</b>입니다'
-    +'<span class="muted" style="font-size:11px"> — 켜면 위 <b>대표자</b> 칸을 그대로 씁니다(대표자가 바뀌면 따라갑니다)</span></span>'
-    +'</label></div>';
+    +'<span>사용자 대표는 <b>대표자와 같은 사람</b>입니다'
+    +'<span class="muted" style="font-size:11px"> — 켜면 대표자 칸을 그대로 씁니다(대표자가 바뀌면 따라갑니다)</span></span>'
+    +'</label>';
   /* ⚠ 중소기업 여부는 «고르는 칸»이다 — 손으로 치면 「중소」·「중소기업임」처럼 제각각 적혀
      나중에 세어 볼 수가 없다. type 이 select 인 칸은 input 으로 그리면 안 된다. */
   /* ★ 두 칸이 «같아 보이던» 것을 한 자리에 모으고 «출처»를 적는다(대표 지시 2026-09-13).
@@ -10478,23 +10617,16 @@ function editSite(sid,prefill){
          기업정보함에 없는 것이라(한 사람의 증명서, 해마다 새로 떼는 확인서) 길이 있어야 한다.
          거기서 읽으면 이 창이 값과 함께 다시 열린다 — 돌아오는 길은 그대로다. */
     +'<div id="siteDocOut" style="margin:0 0 10px"></div>'
-    +'<div class="grid">'+flds+'</div>'
-    +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">담당자 (대표 연락처)'
-      +' <span style="font-weight:400;font-size:11px">— 사업장 실무 담당자입니다(대표자·협의회 위원과 다릅니다)</span></div>'
-    +'<div class="grid">'+cflds+'</div>'
+    +'<div class="secbox"><div class="bh">🏢 기업정보 <span class="d">— 상호·번호·규모 등</span></div>'
+      +'<div class="gridw">'+flds+'<div class="fld full"><label>소재지</label>'+_addrStack('se-',s,'siteAddrSearch')+'</div></div></div>'
+    +'<div class="secbox"><div class="bh">👤 대표자 · 담당자 '
+      +'<span class="d">— 사업장 실무 담당자입니다(대표자·협의회 위원과 다릅니다)</span></div>'+repTbl1+'</div>'
     /* ★ 사용자대표 — 대표자와 «다른 사람»이다. 협의회에 사용자측으로 나오는 사람. */
-    +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">사용자 대표'
-      +' <span style="font-weight:400;font-size:11px">— 협의회에 사용자측으로 나오는 사람(대표자가 아닐 수 있습니다)</span>'
-      +hlp('site.reps')+'</div>'
-    +'<div class="grid">'+usame+uflds+'</div>'
-    +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">근로자 대표'
-      +' <span style="font-weight:400;font-size:11px">— 대표자·담당자와 다른 사람인 경우가 많습니다</span></div>'
-    +'<div class="grid">'+wflds+'</div>'
-    +_wrepDocRow(sid,s)
-    +'<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;color:var(--sub)">중소기업'
-      +' <span style="font-weight:400;font-size:11px">— 지원금 심사에 씁니다</span>'
-      +hlp('site.smecert')+'</div>'
-    +'<div class="grid">'+sflds+'</div>'
+    +'<div class="secbox"><div class="bh">⚖️ 사용자 대표 · 근로자 대표 '
+      +'<span class="d">— 협의회 구성 인원, 대표자·담당자와 다른 사람인 경우가 많습니다</span>'+hlp('site.reps')+'</div>'
+      +usame+repTbl2+_wrepDocRow(sid,s)+'</div>'
+    +'<div class="secbox"><div class="bh">🏷️ 중소기업 <span class="d">— 지원금 심사에 씁니다</span>'+hlp('site.smecert')+'</div>'
+      +'<div class="gridw">'+sflds+'</div></div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:16px">'
     +(isNew?'':'<button onclick="delSite(\''+sid+'\')" style="margin-right:auto;color:var(--danger)">삭제</button>')
     +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>'

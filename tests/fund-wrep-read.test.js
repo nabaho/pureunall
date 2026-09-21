@@ -241,7 +241,8 @@ test('사업장 편집 창을 정말 그리면 재직증명서 줄이 성하게 
     'function hlp(k){ return "<i>"+k+"</i>"; }',
     'function showModal(h){ OUT.html+=h; }',
     'function bindSiteDocIntake(){}',
-    grabFn('dropZoneSlim'), grabFn('_primaryContact'), grabFn('_wrepDocRow'), grabFn('editSite'),
+    grabFn('dropZoneSlim'), grabFn('_primaryContact'), grabFn('_wrepDocRow'),
+    grabFn('_repTable'), grabFn('_addrStack'), grabFn('editSite'),
     'this.run=editSite;',
   ].join('\n')).call(box, out);
   ['S1', ''].forEach((sid) => {

@@ -480,7 +480,8 @@ test('사업장 편집 창을 «정말 그리면» 칸만 있고 서류 판독 �
     'function hlp(k){ return "<i>"+k+"</i>"; }',
     'function showModal(h){ OUT.html+=h; }',
     'function bindSiteDocIntake(){}',
-    grabFn('dropZoneSlim'), grabFn('_primaryContact'), grabFn('_wrepDocRow'), grabFn('editSite'),
+    grabFn('dropZoneSlim'), grabFn('_primaryContact'), grabFn('_wrepDocRow'),
+    grabFn('_repTable'), grabFn('_addrStack'), grabFn('editSite'),
     'this.run=editSite;',
   ].join('\n');
   new Function('OUT', code).call(box, out);
