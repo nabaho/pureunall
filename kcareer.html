@@ -1426,6 +1426,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <button class="kf-mode" id="kfM3" onclick="rhSetMode('both')" title="입력판과 한글을 나란히 — 친 값이 실제로 어떻게 들어갔는지 바로 견줍니다">⇄ 나란히</button>
                 <!-- ★ 대표 지시 2026-09-13 「필요하면 직접 타이핑이 가능해야 되는데 그건 왜 안 되나」 -->
                 <button class="kf-mode" id="kfM4" onclick="rhToggleAnyCell()" title="표의 «모든 칸»에 입력칸을 얹습니다 — 서식 문구까지 고치거나 지울 수 있습니다. 기본은 꺼짐입니다(문구 위에 칸이 얹히면 서식을 읽을 수 없습니다)">✍ 아무 칸이나</button>
+                <!-- ★ 대표 지시 2026-09-21 「붙여라」 — 저장소에 넣어 둔 한글 편집기 -->
+                <button class="kf-mode" id="kfM5" onclick="rhSetMode('edit')" title="한글 프로그램처럼 글자·표·서식을 직접 고칩니다. 편집기는 이 PC 안에서만 돌고 서류는 밖으로 안 나갑니다">✏️ 한글 편집</button>
               </div>
               <div class="rc-actions">
                 <button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 양식 칸에 넣습니다">✨ 내 정보로 채우기</button>
@@ -1461,6 +1463,15 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <div id="kfSheetWrap" style="display:none"><div class="kf-sheet" id="kfSheet"></div></div>
                 <div id="rhwpEditor"></div>
                 </div><!-- #kfPair -->
+                <!-- ✏️ 한글 편집 — 편집기가 제 도구줄·눈금자를 다 들고 오므로 자리를 통째로 준다 -->
+                <div id="rhHwpEd" style="display:none;flex-direction:column;gap:8px">
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <button class="btn primary" type="button" onclick="rhHwpEdSave()">💾 고친 것 되받기</button>
+                    <button class="btn" type="button" onclick="rhSetMode('in')">← 입력판으로</button>
+                    <span style="font-size:11.5px;color:var(--text-mute)">고치신 뒤 <b>되받기</b>를 눌러야 반영됩니다 · 편집기는 이 PC 안에서만 돕니다</span>
+                  </div>
+                  <div id="rhHwpEdBox" style="flex:1;min-height:70vh;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff"></div>
+                </div>
                 <div id="docxEditorWrap" style="display:none;border:1px solid var(--border);border-radius:10px;overflow:hidden">
                   <div style="background:var(--soft);padding:8px 14px;font-size:12px;color:var(--text-mute);border-bottom:1px solid var(--border)">📝 편집 — 커서 위치에 오른쪽 항목 클릭하면 삽입</div>
                   <div id="docxEditor" contenteditable="true" spellcheck="false" style="min-height:500px;padding:24px 32px;font-size:13px;line-height:1.8;outline:none;background:#fff;max-height:70vh;overflow:auto"></div>
@@ -2038,7 +2049,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
             <div class="api-row"><label>Anthropic Claude API 키 (OCR 파싱·이력서)</label>
               <div style="display:flex;gap:6px"><input id="apiAN" type="password" class="tb-input" style="flex:1" placeholder="sk-ant-..." autocomplete="off"><button type="button" class="btn" onclick="toggleApiVis('apiAN',this)" style="flex-shrink:0;font-size:12px">👁 보기</button></div>
             </div>
-            <div class="api-row"><label>rhwp-studio 주소 (HWPX 편집기 자체호스팅)</label><input id="apiRH" class="tb-input" style="width:100%" placeholder="https://nabaho.github.io/rhwp-studio/"></div>
+            <div class="api-row"><label>한글 편집기 주소 <span style="color:var(--text-mute);font-weight:400">— 이제 안 씁니다</span></label><input id="apiRH" class="tb-input" style="width:100%" placeholder="(비워 두세요)"><div style="font-size:12px;color:var(--text-mute);margin-top:4px">한글 편집기가 이 프로그램 안에 들어왔습니다. 여기에 주소를 적어도 쓰이지 않습니다 — 서류는 밖으로 나가지 않습니다.</div></div>
             <button class="btn primary" id="apiSave" style="margin-top:10px">저장</button>
             <button class="btn" id="apiTest" style="margin-top:10px" onclick="testApiConnection()">🔌 연결 테스트</button>
             <span id="apiStat" style="margin-left:10px;font-size:12px;color:var(--text-mute)"></span>
@@ -2557,7 +2568,11 @@ function puCfgLoad(){
       .catch(function(){});   /* 권한·네트워크 실패해도 기존 동작 유지 */
   }catch(e){}
 }
-function rhwpStudioUrl(){ return LS.get(NS+'rhwp_url') || PU_CFG.rhwpStudioUrl || 'https://nabaho.github.io/rhwp-studio/'; }
+/* ⚠ 2026-09-21 부터 «아무 데서도 안 쓴다».
+   한글 편집기를 저장소 안에 넣었으므로(vendor/rhwp-studio) 바깥 주소를 쓸 일이 없다 —
+   rhHwpEdOpen 이 우리 것만 연다. 이 함수는 설정 칸을 채워 보여 주는 데만 남아 있다.
+   ⚠ 여기에 주소를 적어도 편집기가 그리로 가지 않는다 — 가면 안 된다. */
+function rhwpStudioUrl(){ return LS.get(NS+'rhwp_url') || PU_CFG.rhwpStudioUrl || ''; }
 
 /* zip 읽개를 한 번만 받아 온다.
    ⚠★ 이것은 여태 createEditor «안»에 숨어 있었다 — 그래서 밖에서 부르는 두 곳
@@ -5396,6 +5411,8 @@ async function mountEditor(buffer,name,cfg){
                           _rhBaseSaved='';
                           /* 새 서식이면 쪽 번호도 뺀 자리도 남의 것이다 — 놓는다 */
                           if(typeof rhTidyReset==='function') rhTidyReset();
+                          /* 새 서식이면 편집기도 닫는다 — 남의 서식이 떠 있으면 안 된다 */
+                          if(typeof rhHwpEdClose==='function') rhHwpEdClose();
                           _rhOrig=null; _rhOutHandle=null;
                           /* 「아무 칸이나」는 서식마다 새로 켠다 — 남의 서식 설정이 따라오면
                              기관 문구 위에 입력칸이 얹힌 채로 열린다 */
@@ -11238,6 +11255,7 @@ async function rhCloseDoc(){
   if(!confirm('화면에서 치울까요?\n\n지금까지 친 것은 담아 두고 치웁니다 — 「↩ 이어서」로 돌아올 수 있습니다.')) return;
   await rhDraftNow();
   try{ closeHwpView(); }catch(e){}
+  if(typeof rhHwpEdClose==='function') rhHwpEdClose();
   _rhDoc=null; _rhMap=null; _rhPicks={}; _rhVals={}; _rhUndo=null; _rcFileName='';
   var card=document.getElementById('rcEditCard'); if(card){ card.style.display='none'; card.classList.remove('rh-doc','rh-wide'); }
   document.body.classList.remove('rh-doc-on'); document.body.style.overflow='';
@@ -11635,17 +11653,85 @@ var _rhMode = 'in';
 
 function rhSetMode(m){
   _rhMode=m;
-  [['kfM1','in'],['kfM2','hwp'],['kfM3','both']].forEach(function(p){
+  [['kfM1','in'],['kfM2','hwp'],['kfM3','both'],['kfM5','edit']].forEach(function(p){
     var b=document.getElementById(p[0]); if(b) b.classList.toggle('on', m===p[1]);
   });
   var sheet=document.getElementById('kfSheetWrap'), ed=document.getElementById('rhwpEditor');
   var pair=document.getElementById('kfPair');
+  var 편집=document.getElementById('rhHwpEd');
+  /* ★ 「한글 편집」은 화면을 통째로 쓴다 — 편집기가 제 도구줄·눈금자를 다 들고 온다 */
+  if(편집) 편집.style.display = (m==='edit')?'flex':'none';
+  if(m==='edit'){
+    if(sheet) sheet.style.display='none';
+    if(ed) ed.style.display='none';
+    if(pair) pair.classList.remove('kf-both');
+    _safe(rhHwpEdOpen);
+    return;
+  }
   /* 나란히 — 왼쪽 입력판, 오른쪽 한글. 친 값이 실제로 어떻게 들어갔는지 바로 견준다 */
   if(pair) pair.classList.toggle('kf-both', m==='both');
   if(sheet) sheet.style.display = (m==='hwp')?'none':'flex';
   if(ed) ed.style.display = (m==='in')?'none':'';
   if(m!=='in') rhPreviewHwp();
   _safe(rhApplyFit);
+}
+
+/* ── ✏️ 한글 편집 (대표 지시 2026-09-21 「붙여라」) ─────────────────────────
+   ■ 무엇인가
+     저장소에 넣어 둔 한글 편집기(vendor/rhwp-studio)를 화면 안에 띄운다.
+     글자·표·서식을 «한글 프로그램처럼» 고치고, 고친 것을 바탕으로 되받는다.
+   ⚠★ studioUrl 을 «반드시» 우리 것으로 준다. 안 주면 이음쇠의 기본값이
+      https://edwardkim.github.io/rhwp/ 라 서류가 통째로 남의 서버로 간다
+      (2026-09-05 에 막은 그 구조다. 이 한 줄이 그 빗장이다).
+   ⚠★ renderer 를 'canvas2d' 로 준다 — 그림 엔진(canvaskit 7.4MB)을 «안 넣었다».
+      안 주면 없는 것을 찾는다.
+   ⚠ 편집기는 제 창(iframe) 안에서만 돈다. 우리 입력판·칸 지도는 그대로 살아 있고,
+     「저장」을 눌렀을 때만 바탕이 갈아 끼워진다. */
+var _rhHwpEd=null, _rhHwpEdFor='';
+async function rhHwpEdOpen(){
+  var box=document.getElementById('rhHwpEdBox');
+  var base=_rhBase||_rhDoc;
+  if(!box||!base||!base.bytes){ toast('먼저 서식을 올려주세요'); return; }
+  var 이름=(base.name||'양식');
+  if(_rhHwpEd && _rhHwpEdFor===이름) return;              /* 이미 그 서식으로 떠 있다 */
+  rhHwpEdClose();
+  box.innerHTML='<div class="rc-mute" style="padding:22px">한글 편집기를 여는 중… (처음 한 번은 조금 걸립니다)</div>';
+  var bytes=await rhComposeBytes();                       /* 친 값·정리가 들어간 것을 연다 */
+  if(!bytes){ box.innerHTML='<div class="rc-mute" style="padding:22px">이 형식은 편집기로 못 엽니다 — 한글에서 HWPX 로 저장해 올려주세요</div>'; return; }
+  try{
+    var mod=await import('./vendor/rhwp-editor/index.js');
+    box.innerHTML='';
+    _rhHwpEd=await mod.createEditor(box, {
+      studioUrl:'vendor/rhwp-studio/index.html',           /* ⚠ 우리 것 — 이 줄을 지우지 말 것 */
+      renderer:'canvas2d',                                 /* ⚠ 그림 엔진을 안 넣었다 */
+      width:'100%', height:'100%'
+    });
+    await _rhHwpEd.loadFile(bytes.buffer.slice(0), rhCleanName(이름,''));
+    _rhHwpEdFor=이름;
+    toast('✏️ 한글 편집기 — 다 고치셨으면 「💾 고친 것 되받기」를 누르세요');
+  }catch(e){
+    console.warn('한글 편집기', e);
+    box.innerHTML='<div class="rc-mute" style="padding:22px">한글 편집기를 열지 못했습니다 — '+escapeHtml(String(e&&e.message||e))+'</div>';
+  }
+}
+function rhHwpEdClose(){
+  if(_rhHwpEd){ try{ _rhHwpEd.destroy(); }catch(e){} }
+  _rhHwpEd=null; _rhHwpEdFor='';
+  var box=document.getElementById('rhHwpEdBox'); if(box) box.innerHTML='';
+}
+/* 편집기에서 고친 것을 «바탕»으로 되받는다.
+   ⚠ 한글 왕복(rhAdoptBase)과 «같은 길»을 쓴다 — 친 값을 비우고 칸 지도를 다시 세운다.
+     두 길로 만들면 한쪽만 고쳐져 어긋난다. */
+async function rhHwpEdSave(){
+  if(!_rhHwpEd){ toast('편집기가 열려 있지 않습니다'); return; }
+  toast('⏳ 고친 것을 받아오는 중…');
+  var bytes;
+  try{ bytes=await _rhHwpEd.exportHwpx(); }
+  catch(e){ console.warn('되받기', e); toast('받아오지 못했습니다 — '+String(e&&e.message||e)); return; }
+  if(!bytes||!bytes.byteLength){ toast('받아온 것이 비었습니다'); return; }
+  var 이름=rhCleanName((_rhBase&&_rhBase.name)||'양식','');
+  await rhAdoptBase(new File([bytes], 이름, {type:'application/hwp+zip'}));
+  toast('✅ 고치신 것이 이제 바탕입니다 — 입력판에서 이어서 치실 수 있습니다');
 }
 
 /* 입력판을 그린다 — 서식을 열 때 칸 지도와 함께 만들어진다 */
