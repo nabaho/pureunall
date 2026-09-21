@@ -181,7 +181,10 @@ function cmsCtx(isCMS, extra){
   const root = c.cmsBlock();
   t('★ 굵은 구분선이 없다 (다른 구역처럼 보이지 않게)', !!(root.props.style || {}).borderTop, false);
   t('★ 업무 요약 바로 아래로 바짝 붙는다', root.props.style.marginTop, '4px');
-  t('줄 자체가 옅은 상자로 묶여 있다', /borderRadius/.test(JSON.stringify(root.kids[0].props.style)), true);
+  /* ⚠ 2026-09-21 에 CMS·개인입금을 한 줄로 묶으며(대표 지시 「이부분도 한줄로
+     만들어줘」) 이 상자를 감싸는 flex 짝 div 가 하나 더 생겼다 — «몇 번째
+     자식인가» 가 아니라 root.kids[0] 하위 어딘가에 상자 모양이 있는지만 본다. */
+  t('줄 자체가 옅은 상자로 묶여 있다', /borderRadius/.test(JSON.stringify(root.kids[0])), true);
 }
 {
   // 종류가 하나면 "계약 전체에 하나만" 안내가 필요 없다
