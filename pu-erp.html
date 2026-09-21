@@ -20708,11 +20708,15 @@ function ContractModal(props){
       if(e.target !== e.currentTarget) return;
       safeClose(false);
     } },
-    /* 620 → 1080 (대표 지시 2026-09-18 「4칸으로 한다」). 네 칸으로 쪼개려면
-       칸 하나가 210px 은 돼야 회사명·주소 같은 «긴 값»이 안 잘린다.
-       작은 화면은 .modal 의 max-width:90vw 가 막고(css/pu-erp.css), 900px 밑에서는
-       .pu-g4 가 두 칸으로 접힌다 — 네 칸을 억지로 유지하지 않는다. */
-    h('div', { className:'modal', style:{ width:'1080px' },
+    /* 620 → 1080 (대표 지시 2026-09-18 「4칸으로 한다」) → 756 (대표 지시 2026-09-21
+       「좌우 넓이의 30% 줄이고 싶다」, 목업 승인 https://claude.ai/artifact/JpfhvrAFpSjzdrfzwWDk1v
+       — 배치는 그대로, 값만 30% 줄임).
+       ⚠ .pu-g4 가 두 칸으로 접히는 기준(900px)은 «이 모달의 너비»가 아니라 «브라우저
+       창 폭» 이다(css/pu-erp.css 미디어쿼리) — 모달 값만 줄여선 접히지 않고, 대신
+       기업정보 4칸의 칸 하나하나가 좁아진다(1080 시절의 "칸 210px 은 돼야" 기준에는
+       못 미친다 — 알고 받아들인 선택). 종류별 세부설정의 «일수+잔금» 줄도 실측으로
+       2줄이 되는 것을 확인하고 그대로 승인받았다(대표 지시 「이대로 진행해라」). */
+    h('div', { className:'modal', style:{ width:'756px' },
       onClick:function(e){ e.stopPropagation(); } },
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, props.cur ? '계약 수정' : '계약 추가'),
