@@ -24,9 +24,10 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=2"></script>
+<script src="js/pu-gcal-auth.js?v=3"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=2"></script>
+<script src="js/pu-case-due.js?v=1"></script>
 <script src="js/pu-cal-write.js?v=4"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
@@ -182,6 +183,14 @@
   .ev{padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500;line-height:16px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
   .ev b{font-weight:700;margin-right:3px}
+  /* ── 끌어 옮기기 (5걸음) ──
+     ⚠ «잡을 수 있는 것»과 아닌 것이 손끝에서 갈려야 한다 — 잡히지도 않는 것을
+       한참 끌어 보고서야 아는 것이 제일 나쁘다. */
+  .ev[draggable="true"]{cursor:grab}
+  .ev[draggable="true"]:active{cursor:grabbing}
+  .ev.dragging{opacity:.4}
+  /* 놓을 칸 — 테두리만 준다. 바탕을 칠하면 그 칸의 칩 색이 안 보인다. */
+  .day.dropon,.wcol.dropon,.dayview.dropon{outline:2px solid #2563eb;outline-offset:-2px}
   /* 공휴일은 칸 맨 위에 «띠»로 — 구글은 둥근 칩이 아니라 칸 옆까지 꽉 채운 띠를 쓴다
      (대표 지시 2026-09-20 「구글과 완벽하게 같게」 — 실제 화면을 재서 확인했다).
      .day 의 좌우 여백(4px)을 음수 마진으로 지워 옆까지 닿게 한다. 색 값(#fecaca·
@@ -488,7 +497,12 @@ var TABS = [
 var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors',
             'locked_attend_months','ieum_members','ieum_notes',
             /* 구글 만든이 메일 → 사번. 이것이 있어야 구글 일정이 «그 사람 색»으로 칠해진다 */
-            'gcal_mail_sid'];
+            'gcal_mail_sid',
+            /* ★ 5걸음 — 달력에 «날짜로 뜨는» 것들(대표 지시 2026-09-21 「둘다」).
+               4걸음에서 법인 대시보드와 함께 사라진 층 셋을 되살린다.
+               ⚠ cases 는 54KB 로 근태표만 하다 — 가볍지 않다. 그래도 켤 때 한 번이고,
+                 그 뒤로는 바뀐 것만 받는다(PuCalRead.watch). */
+            'cases','biz_case_stages','leave_of_absence'];
 
 /* ── 사람 ──────────────────────────────────────────────────────────── */
 /* ⚠ 직원 명부는 «배열»로도, «사번이 열쇠인 지도»로도 올 수 있다.
@@ -1164,6 +1178,23 @@ function eventsOn(ymd, eumOnly){
       if(GCAL.evs[gi].date === ymd) out.push(GCAL.evs[gi]);
     }
   }
+  /* ④ 사건 마감일 · 단계 기한 · 휴직 (5걸음에 되살린 층 셋)
+     ⚠ 이음 보기에는 안 넣는다 — 거기는 이음 근무만 보는 자리다(구글과 같은 까닭).
+     ⚠ 「구글만」 거르개일 때도 안 넣는다 — 구글에서 온 것만 보자는 뜻이다.
+     ⚠ 셋 다 movable:false 다. 계산된 값이거나 다른 화면이 주인이라,
+       여기서 끌어 옮기면 그 화면과 어긋난다. */
+  /* ⚠ typeof 로 본다 — 검사가 eventsOn 만 떼어 상자에 넣고 도는 자리가 여럿 있다
+     (chipHtml 의 ME 와 같은 까닭). 없으면 그 층만 안 그린다 — 나머지는 멀줦하다.
+     진짜로 도는지는 tests/case-due-chips.test.js 가 따로 재서 본다. */
+  if(!eumOnly && S.filter !== "gcal" && typeof 기한칩 === "function"){
+    기한칩(ymd).forEach(function(c){
+      /* 사람 거르개 — 담당자가 그 사람인 것만. 휴직은 그 사람 것만. */
+      if(S.filter && S.filter !== "pureun" && S.filter !== "eumwork" && c.sid !== S.filter) return;
+      if(S.filter === "eumwork") return;
+      out.push({ kind:c.kind, store:"", id:c.kind + ":" + c.date + ":" + (c.sid || ""),
+        sid:c.sid, text:c.text, time:"", color:c.color, tip:c.tip, movable:false });
+    });
+  }
   if(eumOnly) out = out.filter(function(e){ return e.kind === "eum"; });
   return out;
 }
@@ -1334,8 +1365,17 @@ function chipHtml(e, ymd){
     글자 = 어둠 ? mixHex(사람색, "#ffffff", .50) : mixHex(사람색, "#000000", .72);
     띠   = ";border-left:3px solid " + esc(사람색) + ";border-radius:0 4px 4px 0";
   }
+  /* ★ 끌어 옮길 수 있는 것과 아닌 것 (5걸음, 대표 지시 2026-09-21)
+       옮길 수 있다 — 우리 일정·근태(sch·att·eum)와 구글 일정(gcal)
+       옮길 수 없다 — 공휴일 · 사건 마감일 · 단계 기한 · 휴직
+     ⚠ 사건 기한은 «계산된 값»이고 휴직은 인사관리가 주인이다. 달력에서 옮기면
+       그 화면과 어긋난다 — 그래서 아예 못 잡게 한다(잡히면 사람은 된다고 믿는다).
+     ⚠ 잠긴 달은 «여기서» 막지 않는다. 막는 자리는 저장 문(pu-cal-write) 하나여야
+       두 곳이 어긋나지 않는다 — 놓은 뒤에 「잠긴 달입니다」라고 분명히 말한다. */
+  var 옮길수있나 = (e.movable !== false) && !!e.store && !!e.id;
   return '<div class="ev" data-ev="' + esc(e.store) + ':' + esc(e.id) + '"'
-    + ' title="' + esc(e.tip) + '"'
+    + (옮길수있나 ? ' draggable="true" data-drag="' + esc(e.store) + ':' + esc(e.id) + '"' : '')
+    + ' title="' + esc(e.tip) + (옮길수있나 ? ' (끌어서 다른 날로 옮길 수 있습니다)' : '') + '"'
     + ' style="background:' + esc(바탕) + ';color:' + esc(글자)
     +   (내일 ? ";font-weight:700" : "") + 띠
     +   (지남 ? ";opacity:.65" : "") + '">'
@@ -1613,6 +1653,36 @@ function chipsHtml(eumOnly){
 }
 
 /* 지금 보고 있는 범위의 날짜들 — 칩 옆 건수를 그 범위로만 센다 */
+/* 지금 «보이는» 첫 날과 마지막 날 — 앞뒤 달에 걸친 줄까지 넣는다.
+   ⚠ 그 달의 1일~말일로 자르면, 달력 첫 줄·끝 줄에 걸친 앞뒤 달 날짜가 빈 채로 뜬다. */
+function 보이는범위(){
+  if(S.view === "day") return { from:S.date, to:S.date };
+  if(S.view === "week"){ var w = weekDays(S.date); return { from:w[0], to:w[w.length-1] }; }
+  var g = monthGrid(S.ym);
+  return { from:g[0].date, to:g[g.length-1].date };
+}
+/* 사건 기한·휴직 칩 — 한 번 셈해 날짜별로 모아 둔다(칸마다 다시 셈하면 42번 돈다).
+   ⚠ 셈은 js/pu-case-due.js 한 곳이다. 여기서 다시 짜지 말 것 —
+     이알피 「나의 업무」의 D-day 도 같은 셈을 쓴다. */
+var _기한칩 = { 열쇠:"", 표:{} };
+function 기한칩(ymd){
+  var r = 보이는범위();
+  var 열쇠 = r.from + "~" + r.to + "|" + (D.cases ? arr(D.cases).length : 0)
+    + "|" + (D.leave_of_absence ? arr(D.leave_of_absence).length : 0);
+  if(_기한칩.열쇠 !== 열쇠){
+    var 표 = {};
+    if(typeof PuCaseDue !== "undefined"){
+      PuCaseDue.chips({
+        cases: arr(D.cases), stageCatalog: arr(D.biz_case_stages),
+        loa: arr(D.leave_of_absence), users: users(),
+        from: r.from, to: r.to
+      }).forEach(function(c){ (표[c.date] = 표[c.date] || []).push(c); });
+    }
+    _기한칩 = { 열쇠:열쇠, 표:표 };
+  }
+  return _기한칩.표[ymd] || [];
+}
+
 function monthDates(){
   if(S.view === "day") return [S.date];
   if(S.view === "week") return weekDays(S.date);
@@ -1999,6 +2069,105 @@ function doDelete(){
   });
 }
 
+/* ── 끌어서 다른 날로 옮기기 ─────────────────────────────────────────────
+   대표 지시 2026-09-21 「둘다」 — 4걸음에서 법인 대시보드와 함께 사라진 것을 되살린다.
+
+   ★ 어디에 손잡이를 다나 — 판(app) 한 곳이다. 칩마다 달면 다시 그릴 때마다 새로 달아야
+     하고, 하나라도 빠지면 «어떤 것은 안 끌리는» 화면이 된다.
+   ⚠ dragstart 는 거품처럼 위로 올라온다 — 바깥에서 preventDefault 를 하면 안쪽 끌기가
+     통째로 죽는다(컨설팅일정이 이 덫에 일주일 걸렸다). 여기서는 바깥에서 막지 않는다.
+   ⚠ 「놓을 수 있다」를 말해 주지 않으면 브라우저가 놓기를 아예 안 받는다 —
+     dragover 에서 preventDefault 를 «해야» 놓을 수 있다. 헷갈리기 쉬운 반대다. */
+var _끄는것 = null;
+function 끌기손잡이(){
+  var 판 = $('app'); if(!판 || 판._끌기달림) return;
+  판._끌기달림 = true;
+  판.addEventListener('dragstart', function(e){
+    var t = e.target && e.target.closest ? e.target.closest('[data-drag]') : null;
+    if(!t){ _끄는것 = null; return; }
+    _끄는것 = t.getAttribute('data-drag');
+    t.classList.add('dragging');
+    try{ e.dataTransfer.setData('text/plain', _끄는것); e.dataTransfer.effectAllowed = 'move'; }catch(x){}
+  });
+  판.addEventListener('dragend', function(){
+    _끄는것 = null;
+    Array.prototype.forEach.call(판.querySelectorAll('.dragging,.dropon'),
+      function(el){ el.classList.remove('dragging','dropon'); });
+  });
+  판.addEventListener('dragover', function(e){
+    if(!_끄는것) return;
+    var 칸 = e.target && e.target.closest ? e.target.closest('[data-day]') : null;
+    if(!칸) return;
+    e.preventDefault();                       /* ⚠ 이것이 있어야 놓을 수 있다 */
+    try{ e.dataTransfer.dropEffect = 'move'; }catch(x){}
+    if(!칸.classList.contains('dropon')){
+      Array.prototype.forEach.call(판.querySelectorAll('.dropon'),
+        function(el){ el.classList.remove('dropon'); });
+      칸.classList.add('dropon');
+    }
+  });
+  판.addEventListener('drop', function(e){
+    var 칸 = e.target && e.target.closest ? e.target.closest('[data-day]') : null;
+    var 끈것 = _끄는것;
+    if(!칸 || !끈것) return;
+    e.preventDefault();
+    _끄는것 = null;
+    옮기기(끈것, 칸.getAttribute('data-day'));
+  });
+}
+
+/* 「store:id」와 새 날짜. 우리 것이면 저장 문으로, 구글 것이면 구글로. */
+function 옮기기(끈것, 새날){
+  if(S.busy) return;
+  var i = String(끈것).indexOf(":");
+  var store = String(끈것).slice(0, i), id = String(끈것).slice(i + 1);
+  if(!store || !id || !새날) return;
+
+  /* ── 구글 일정 ── */
+  if(store === "gcal"){
+    var ev = null;
+    for(var k = 0; k < GCAL.evs.length; k++){ if(GCAL.evs[k].id === id){ ev = GCAL.evs[k]; break; } }
+    if(!ev) return;
+    if(ev.date === 새날) return;                    /* 제자리에 놓았다 */
+    if(typeof PuGcalAuth === "undefined" || !PuGcalAuth.hasToken()){
+      /* ⚠ 조용히 실패하지 않는다 — 안 옮겨졌는데 옮겨진 줄 알면 그날 사람이 안 온다 */
+      toast("🔐 구글 로그인이 필요합니다 — 일정은 옮기지 못했습니다");
+      return;
+    }
+    S.busy = true; render();
+    PuGcalAuth.moveEvent(GCAL_CAL_ID, id, 새날).then(function(){
+      S.busy = false;
+      ev.date = 새날;                               /* 받아 둔 것을 고쳐 바로 보인다 */
+      toast("✅ 구글 일정을 " + 새날 + " 로 옮겼습니다");
+      render();
+      gcalLoad(true);                               /* 진짜로 그리 됐는지 다시 받아 맞춘다 */
+    })["catch"](function(err){
+      S.busy = false;
+      toast("❌ 구글 일정을 옮기지 못했습니다 — " + ((err && err.message) || ""));
+      render();
+    });
+    return;
+  }
+
+  /* ── 우리 일정·근태 ── */
+  var prev = recOf(store, id);
+  if(!prev) return;
+  if(prev.date === 새날) return;
+  S.busy = true; render();
+  /* ⚠ 바뀐 칸만 보낸다(date). 저장 문이 «옛 달·새 달»을 둘 다 보고 잠금을 판단한다. */
+  PuCalWrite.save(store, { id:id, date:새날 }, prev).then(function(r){
+    S.busy = false;
+    if(!r.ok){ toast("❌ " + (r.message || "옮기지 못했습니다")); render(); return; }
+    toast("✅ " + 새날 + " 로 옮겼습니다");
+    refreshOne(store);
+    if(store === "attendance_records") 발행예약();
+  })["catch"](function(err){
+    S.busy = false;
+    toast("❌ 옮기지 못했습니다 — " + ((err && err.message) || ""));
+    render();
+  });
+}
+
 /* 바뀐 표 하나만 다시 받는다 — 나머지는 그대로 둔다 */
 function refreshOne(store){
   PuCalRead.readOnce(store).then(function(v){ D[store]=v; render(); }).catch(function(){});
@@ -2046,6 +2215,7 @@ function render(){
   html += noteHtml();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   $('app').innerHTML = html;
+  끌기손잡이();   /* 판이 새로 그려져도 손잡이는 한 번만 달린다 */
   /* 달력 탭에서만 화면에 «딱» 맞춘다 — 다른 탭은 여느 때처럼 제 안에서 굴러간다 */
   $('app').className = 달력 ? 'fit' : '';
   if(달력){

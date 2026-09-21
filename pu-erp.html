@@ -174,7 +174,8 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <div id="root"></div>
 <script src="js/utils.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=2"></script>
+<script src="js/pu-case-due.js?v=1"></script>
+<script src="js/pu-gcal-auth.js?v=3"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-photo-store.js?v=29"></script>
 <script src="js/pu-billing.js?v=10"></script>
@@ -33783,25 +33784,17 @@ function caseStageInfo(code){
   if(!code) return null;
   return getCaseStagesAll(true).find(function(x){ return x.code === code; }) || null;
 }
-// YYYY-MM-DD + n일. Date.UTC 로만 계산해 시간대에 따라 하루 밀리는 일이 없게 한다
-function _ymdAddDays(ymd, days){
-  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||''));
-  if(!m) return '';
-  var t = Date.UTC(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10)) + (days*86400000);
-  var d = new Date(t);
-  return d.getUTCFullYear() + '-' + ('0'+(d.getUTCMonth()+1)).slice(-2) + '-' + ('0'+d.getUTCDate()).slice(-2);
-}
+// ⚠ 2026-09-21 — _ymdAddDays 를 지웠다. 셈이 공용 모듈(js/pu-case-due.js)로 옮기면서
+// 부르는 자리가 없어졌다. 날짜 더하기가 다시 필요하면 PuCaseDue.addDays 를 쓴다.
 // 단계 하나의 다음 기한. 기산일(송달일 또는 판정일) + dueDays '달력일'
 //   ※ 달력일 기준이다(영업일 아님). 실제 법정 기준이 영업일이면 대표가 유형 관리에서 고친다.
+/* ★ 2026-09-21 — 셈이 공용 모듈(js/pu-case-due.js)로 옮겨졌다.
+   까닭: 5걸음에서 푸른 캘린더에 「단계 기한」 층을 되살렸는데, 같은 셈을 거기에
+   한 벌 더 쓰면 언젠가 어긋난다 — 그때 어느 날짜가 맞는지 아무도 모른다.
+   법정 기한이 하루 밀리는 것은 사고다. 그래서 한 파일에 두고 둘이 부른다.
+   ⚠ 여기서 다시 짜지 말 것. 검사: tests/case-due-chips.test.js */
 function caseStageDue(stage, stageDef){
-  if(!stage || !stageDef) return null;
-  var days = parseInt(stageDef.dueDays, 10) || 0;
-  if(days <= 0) return null;
-  var basis = (stageDef.dueFrom === 'result') ? 'result' : 'notice';
-  var base  = (basis === 'result') ? stage.resultDate : stage.noticeDate;
-  var due = _ymdAddDays(base, days);
-  if(!due) return null;
-  return { due:due, basis:basis, days:days };
+  return (typeof PuCaseDue !== 'undefined') ? PuCaseDue.stageDue(stage, stageDef) : null;
 }
 // 접수일(filedDate) 순 → 같으면 입력 순. 날짜가 아직 없는 단계는 방금 넣은 것이라 맨 뒤(= 현재 단계)
 function caseStagesOrdered(stages){

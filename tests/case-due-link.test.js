@@ -28,6 +28,10 @@ const erp = (function(){
   const c = {
     console, Date, Math, Object, JSON, Array, String, Number, parseInt, isNaN, RegExp,
     window:{}, showToast(){}, todayYMD(){ return '2026-08-04'; },
+    /* ★ 2026-09-21 — 단계 기한 셈이 공용 모듈(js/pu-case-due.js)로 옮겨졌다.
+       상자에 그 모듈을 «진짜로» 넣어 준다 — 흔내 낸 가짜를 넣으면
+       이알피가 실제로 어떤 날짜를 받는지 못 보게 된다. */
+    PuCaseDue: require(path.join(__dirname, '..', 'js', 'pu-case-due.js')),
     dbGet(k, d){ return (k in store) ? store[k] : d; }, dbSet(k, v){ store[k] = v; return true; }
   };
   vm.createContext(c);
