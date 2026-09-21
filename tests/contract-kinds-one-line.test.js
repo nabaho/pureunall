@@ -19,7 +19,7 @@ const RAW = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
 const MODAL = stripJs(cutFn(RAW, 'function ContractModal(props)'));
 
 test('계약유형 그리드는 «항목 개수만큼» 열이 나온다 — 6을 그대로 박지 않는다', () => {
-  const 자리 = MODAL.indexOf("h('label', null, '계약유형 (다중 선택 가능) *')");
+  const 자리 = MODAL.indexOf("'계약유형 (다중 선택 가능) *'");
   assert.ok(자리 > 0, '계약유형 라벨을 못 찾았습니다.');
   const 그리드줄 = MODAL.slice(자리, 자리 + 300);
 
@@ -31,7 +31,7 @@ test('계약유형 그리드는 «항목 개수만큼» 열이 나온다 — 6�
 });
 
 test('칸 하나가 두 줄로 안 접히게 — 줄바꿈 없이 잘라 보인다', () => {
-  const 자리 = MODAL.indexOf("h('label', null, '계약유형 (다중 선택 가능) *')");
+  const 자리 = MODAL.indexOf("'계약유형 (다중 선택 가능) *'");
   const 버튼자리 = MODAL.indexOf('toggleKind(k.v)', 자리);
   assert.ok(버튼자리 > 자리, '계약유형 단추를 못 찾았습니다.');
   const 버튼모양 = MODAL.slice(버튼자리, 버튼자리 + 700);

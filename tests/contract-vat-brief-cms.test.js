@@ -59,6 +59,7 @@ function kboxCtx(kindV, extraF){
     BRIEF_KINDS:['case','consulting','fund','other'], BRIEF_MAX:40, BRIEF_PH:{},
     NumberInput:function NumberInput(){}, PercentInput:function PercentInput(){},
     kindInfo(){ return { color:'#000', icon:'X', label:'라벨' }; },
+    kboxColorStyle(hex){ return { borderLeft:'4px solid '+hex }; },
     getKindTypes(){ return [{ code:'t1', short:'약', name:'이름' }]; },
     setTypeCodeFor(){ return function(){}; },
     setAmountFor(){ return function(){}; },

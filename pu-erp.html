@@ -13344,6 +13344,17 @@ var CONTRACT_KINDS = [
     typesKey:'biz_other_types',   targetMenu:'biz/other',   targetStorage:'other_projects', desc:'기타사업으로 이관' }
 ];
 function kindInfo(v){ return CONTRACT_KINDS.find(function(x){return x.v===v;}) || CONTRACT_KINDS[0]; }
+/* 종류별 세부설정 박스 테두리를 그 종류 버튼과 같은 색으로 (대표 지시 2026-09-21
+   「각 셀의 박스 외각에 계약유형 셀의 테두리색과 같이 색을 넣어주는건 어떤가」,
+   목업 승인 https://claude.ai/artifact/SZJcwEdUoUS8HGfp3tSUQy) — 여러 종류를
+   동시에 골라 박스가 쌓였을 때 스크롤하다가도 어느 버튼과 이어진 박스인지
+   색으로 바로 안다. 왼쪽은 굵은 띠(그 색 그대로), 나머지 세 면은 옅게(­33
+   = 약 20% 불투명도의 8자리 hex) — 박스 전체를 두꺼운 색으로 두르면 옆줄
+   내용보다 튀어 어수선해진다. */
+function kboxColorStyle(hex){
+  return { borderLeft:'4px solid '+hex, borderTop:'1px solid '+hex+'33',
+    borderRight:'1px solid '+hex+'33', borderBottom:'1px solid '+hex+'33' };
+}
 
 // 종류별 세부 분류 라벨 — 칸반 카드/리스트에서 배지 옆에 표시
 // 컨설팅: consultingType / 사건: caseType / 기금: fundType / 업체·기타: programName
@@ -20261,7 +20272,13 @@ function ContractModal(props){
       // CONTRACT_KINDS 가 늘거나 줄어도 열 수가 스스로 맞춰지게 개수에서 뽑는다
       // (숫자 6을 그대로 박으면 나중에 7번째 종류가 생겨도 줄이 안 늘어난다).
       // 칸 안 여백만 살짝 줄여 「컨설팅계약」(가장 긴 이름)도 안 잘리게 했다.
-      h('div', { className:'fld' }, h('label', null, '계약유형 (다중 선택 가능) *'),
+      /* ⚠ .fld(라벨 110px + 칸 1fr «한 줄에 나란히») 를 여기 쓰면 안 된다 —
+         이 라벨은 글자가 길어 110px 에 못 들어가 줄바뀜이 나고, 버튼 6개와
+         «같은 줄에 억지로 나란히» 놓여 어색했다(대표 지시 2026-09-21 「캡쳐1
+         글자를 캡쳐2 셀위에 올려라」, 목업 승인 https://claude.ai/artifact/SZJcwEdUoUS8HGfp3tSUQy).
+         라벨을 전체 폭 «한 줄」로 두고 버튼을 그 아래에 둔다. */
+      h('div', { className:'fld', style:{ display:'block' } },
+        h('label', { style:{ display:'block', marginBottom:'6px' } }, '계약유형 (다중 선택 가능) *'),
         h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(' + CONTRACT_KINDS.length + ', 1fr)', gap:'5px' } },
           CONTRACT_KINDS.map(function(k){
             var on = (f.kinds||[]).indexOf(k.v) >= 0;
@@ -20346,7 +20363,7 @@ function ContractModal(props){
           }
           // 컨설팅: 계약금 줄 + 일수·잔금 줄(2줄). 사건·기타: 착수금·성공보수 한 줄(1줄).
           if(isConsulting || isCase || isOther){
-            return h('div', { key:kindV, className:'pu-kbox' },
+            return h('div', { key:kindV, className:'pu-kbox', style:kboxColorStyle(k.color) },
               h('div', { className:'pu-khead' },
                 h('span', { style:{ fontSize:'12.5px', fontWeight:800, color:k.color } }, k.icon + ' ' + k.label)),
               // ─── 줄 1: 계약금/착수금 (+ 사건·기타는 성공보수까지 한 줄에) ───
@@ -20430,7 +20447,7 @@ function ContractModal(props){
           }
           // 기금/업체/상담: 한 줄(그대로) — 새 모양(pu-kbox/pu-krow)에만 맞춘다
           // ⚠ 여기도 금액+부가세포함을 줄 맨 끝으로 보냈다(위 컨설팅·사건·기타와 같은 규칙).
-          return h('div', { key:kindV, className:'pu-kbox' },
+          return h('div', { key:kindV, className:'pu-kbox', style:kboxColorStyle(k.color) },
             h('div', { className:'pu-khead' },
               h('span', { style:{ fontSize:'12.5px', fontWeight:800, color:k.color } }, k.icon + ' ' + k.label)),
             h('div', { className:'pu-krow' },

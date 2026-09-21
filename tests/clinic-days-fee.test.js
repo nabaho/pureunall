@@ -155,6 +155,7 @@ function kboxWithDayFee(dayFee, days) {
     BRIEF_KINDS: ['case', 'consulting', 'fund', 'other'], BRIEF_MAX: 40, BRIEF_PH: {},
     NumberInput: function NumberInput() {},
     kindInfo() { return { color: '#000', icon: 'X', label: '라벨' }; },
+    kboxColorStyle(hex) { return { borderLeft: '4px solid ' + hex }; },
     getKindTypes() { return [{ code: 'cons-clinic', short: '현클', name: '현장클리닉' }]; },
     setTypeCodeFor() { return function () {}; },
     setAmountFor() { return function () {}; },
