@@ -1,7 +1,7 @@
 # 2026-09-23 · ✨ TypeSafe 검토 — 이알피에서 포털(첫 화면)로 옮김
 
 - 가지: `feat/typesafe-portal`
-- PR: (열면서 채움)
+- PR: [#1572](https://github.com/nabaho/pureunall/pull/1572)
 - 대표 지시: 「푸른이알피에 있는 type 이것을 푸른통합시스템 전체로 적용해서 캡쳐3화면으로
   옮기고 연결해줘」 → 목업(스크래치패드 `typesafe-portal.html`, 저장소에 안 둠)에서
   **①안 「빼고 포털로만」** 승인.
