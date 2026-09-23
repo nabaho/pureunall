@@ -53,7 +53,12 @@
 
 ## 배포
 
-- 창고 규칙(`newsletter_files`) · `sendBulkMail`(noticeSend·담당) · `newsView`(?file=) — 합친 뒤 올린다.
+- 창고 규칙 `newsletter_files` — `storage-rules-deploy.js --deploy` 로 3곳 (사라지는 것 0 · 안 덮인 자리 0).
+  ⚠ 기준이 대표님이 옮겨 주신 09-13 파일이라, 그 뒤 콘솔 손질은 이 비교가 모른다.
+- PR #1581 합쳐짐(08:59Z) → pu-deploy 를 main(21383217)에 맞춰 `sendBulkMail`·`newsView` 이름 찍어 배포.
+- 살아 있는 서버 확인: `?file=` 나쁜 열쇠·html·없는 파일 → 404 · `?img=` 없는 사진 → 404 ·
+  전문(원래 길) → 200 · `sendBulkMail` 로그인 없이 → 401.
+- ⚠ 총괄관리자 토큰이 있어야 도는 «진짜 보내기»와 «자료 올리기 → 내려받기» 성공 길은 아직 안 돌았다.
 
 ## 남은 일
 
