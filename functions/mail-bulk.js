@@ -88,6 +88,13 @@ function cleanTargets(list) {
       region: String(o.region || o.지역 || '전국').trim().slice(0, 40) || '전국',
       regionHtml: String(o.regionHtml == null ? '' : o.regionHtml),
       regionText: String(o.regionText == null ? '' : o.regionText),
+      /* ★ 그 사업장의 «담당 노무사» 이름 (대표 지시 2026-09-23 안내문 「사업장별 담당 노무사」).
+           편지의 {담당문의} 가 통마다 이것으로 바뀐다.
+         ⚠ 서식에 «그대로» 끼워지므로 태그·따옴표·중괄호가 될 글자를 걷는다 —
+           중괄호가 남으면 fill 이 그것을 또 다른 자리로 읽는다.
+         ⚠ 이름만 싣는다. 전화·주소는 싣지 않는다 — 직원 명부(user_dir)에는 연락처가
+           일부러 빠져 있고, 개인 번호를 거래처 143곳에 뿌리지 않는다. */
+      staff: String(o.staff == null ? '' : o.staff).replace(/[<>&"'{}\r\n]/g, '').trim().slice(0, 40),
     });
   });
   return { ok: out, bad: bad, dup: dup };
@@ -155,6 +162,9 @@ function buildQueue(v, now, by, batchId) {
     const vals = { 이름: t.name, 회사: t.company, 직책: t.title,
                    name: t.name, company: t.company, title: t.title,
                    지역뉴스: t.regionHtml || '', 지역뉴스평문: t.regionText || '',
+                   /* ★ 안내문의 문의 줄 — 「문의 · {담당문의}푸른노무법인 T.…」.
+                        담당을 모르면 «빈 글자»가 되어 법인 대표 번호만 남는다(지어내지 않는다). */
+                   담당문의: t.staff ? ('담당 ' + t.staff + ' · ') : '',
                    /* ★ 열람·클릭 추적 열쇠 — 편지 몸통의 {추적열쇠} 가 통마다 이 값으로 바뀐다.
                         안 채우면 «모두가 같은 사람»으로 찍혀 누가 열었는지 알 수 없다.
                       ★ 2026-09-03: 보내는 쪽이 «뜻 없는 번호»(t.track)를 함께 주면 그것을 쓴다.
