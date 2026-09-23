@@ -129,8 +129,13 @@ function reassemble(batches){
   const snap = c.buildBackupSnapshot();
   t('진짜 데이터는 백업에 들어간다', !!snap.data.contracts, true);
   t('cms_ledger 도 들어간다 (서버 동기화 대상)', !!snap.data.cms_ledger, true);
-  t('★ 올린 통장 파일(bank_ledger_draft)은 백업에 안 들어간다', 'bank_ledger_draft' in snap.data, false);
-  t('★ 이 PC 전용 되돌리기 기록도 안 들어간다', 'co_merge_log' in snap.data, false);
+  /* ⚠★ 2026-09-20 «반대로» 뒤집혔다 — 대표 지시 「다담아라」(두 번 말씀하셨다).
+     이 PC 에만 있는 것이라 다른 PC 에 되살리면 남의 작업 상태가 얹힌다고 말씀드렸고,
+     그래도 담으라 하셨다 — 잃는 것보다 낫다는 판단이다.
+     ⚠ 담기 시작하면 «지우개»(_backupKnownKeys)도 같이 알아야 한다. 안 그러면 옛 백업을
+       비울 때 이 칸만 남아, 껍데기 삭제가 한도에 걸려 옛 백업이 안 지워진다. */
+  t('★ 올린 통장 작업 상태도 담는다 (2026-09-20 「다담아라」)', 'bank_ledger_draft' in snap.data, true);
+  t('★ 이 PC 되돌리기 기록도 담는다', 'co_merge_log' in snap.data, true);
   t('★★ NAS 비밀번호는 백업에 안 들어간다', 'nas_config' in snap.data, false);
   t('★★ API 열쇠도 안 들어간다', 'nts_api_key' in snap.data, false);
 }

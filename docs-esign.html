@@ -45,7 +45,25 @@
 <!-- 프로그램 사이 이동 (공용 앱바) — 이 한 줄이 빠져 있어서
      문서관리에만 오른쪽 「즐겨찾기」 손잡이가 없었다(대표 보고 2026-08-13) -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
-<script src="js/pu-gate.js?v=2"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<!-- 「준비중」 판단에 «지금 로그인한 사람의 역할»이 필요하다 (2026-09-23) -->
+<script src="js/pu-whoami.js?v=1"></script>
+<!-- ⚠ 이 화면은 머리줄 #whoami 를 «스스로» 채운다(loadAll 안). 자리를 안 알려 주면
+     부품이 떠 있는 표를 따로 그려 그 위에 겹친다 — 다른 셋(급여데이터함·급여관리·
+     취업규칙)과 같은 길로 「그리지 말라」고 한다. tests/whoami-mount.test.js 가 지킨다. -->
+<script>
+(function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script>
+/* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
+   포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
+   주소창에 docs-esign.html 를 직접 친 사람을 막는다. 둘 중 하나만 있으면 뚫린다.
+   ⚠ 잣대는 포털(enter.html appIsSoon)과 «같은 것» — 명부의 role === 'admin'.
+     사번으로 박지 않는다(바뀌는 날 대표님이 잠긴다).
+   ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
+try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
+</script>
 <script src="js/pu-appbar.js?v=13"></script>
 </head>
 <body>

@@ -28,7 +28,7 @@ test('포털 머리줄에서 PC/폰 전환 단추를 걷어냈다', () => {
 
 test('머리줄에 남은 단추는 «가끔 쓰는 것»뿐이다', () => {
   const bar = enter.slice(enter.indexOf('<div class="pbar">'), enter.indexOf('<div class="pmeta">'));
-  /* 늘 쓰는 것(로그아웃·건의하기)과, 한 번 하면 사라지는 것(앱으로 깔기)만 남긴다 */
+  /* 늘 쓰는 것(로그아웃·건의하기)만 남긴다 — 앱으로 깔기도 2026-09-23 설정 창·⋯ 로 옮겼다 */
   assert.ok(bar.indexOf('logoutBtn') > 0, '로그아웃이 사라졌습니다');
   assert.ok(bar.indexOf('sgFab') > 0, '건의하기가 사라졌습니다');
   assert.ok(bar.indexOf('pcViewBtn') < 0, 'PC 화면 단추가 머리줄에 다시 붙었습니다');
@@ -60,7 +60,6 @@ test('★ 화면이 그려지기 «전» 에 자리를 잡는다 — 안 그러�
 test('없앤 단추의 흔적(빈 배선·죽은 CSS)이 남아 있지 않다', () => {
   assert.ok(enter.indexOf('function wire(){') < 0, '빈 배선 함수가 남았습니다');
   assert.ok(enter.indexOf('.pcview.on{') < 0, '누른 모양(.on) CSS 가 남았습니다 — 이제 아무도 안 씁니다');
-  /* .pcview 자체는 「앱으로 깔기」가 아직 쓴다 — 지우면 그 단추가 깨진다 */
-  assert.match(enter, /class="pcview appinst"/, '앱으로 깔기 단추가 그 모양을 잃었습니다');
-  assert.match(enter, /\.pcview\{/, '앱으로 깔기가 쓰는 모양까지 지웠습니다');
+  /* .pcview 를 마지막으로 쓰던 「앱으로 깔기」도 2026-09-23 머리 카드에서 옮겼다 — 모양도 함께 걷었다 */
+  assert.ok(enter.indexOf('.pcview{') < 0, '아무도 안 쓰는 .pcview 모양이 남았습니다');
 });

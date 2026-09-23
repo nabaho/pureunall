@@ -11,7 +11,7 @@
 <script src="js/pu-ontology.js?v=31"></script>
 <script src="js/pu-ontology-write.js?v=3" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-gate.js?v=2"></script>
+<script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
@@ -6894,7 +6894,10 @@ function _fmBlock(txt,body,st){
   }
   if(s.length<=34&&(FM_DATE.test(s)||FM_DATE2.test(s))) return '<p class="fmdate">'+body+'</p>';
   if(FM_TO.test(s)&&s.length<=40){ st.ended=true; return '<p class="fmto">'+body+'</p>'; }
-  var c=_fmCols(s);
+  /* ⚠ 원본 한글에서 온 줄(st.hwp)은 두 칸으로 쪼개지 않는다 — 「Ⅰ. 개 회」「Ⅳ. 폐 회」처럼
+     자간을 벌린 제목을 서명란으로 잘못 보고 쪼갰다(대표 캡쳐 2026-09-23). 원본 자간은
+     아래 ① 단계가 &nbsp; 로 그대로 살린다. */
+  var c=st.hwp?null:_fmCols(s);
   if(c){ st.ended=true;
     return '<div class="fmcols c'+c.length+'">'+c.map(function(x){return '<span>'+esc(x)+'</span>';}).join('')+'</div>'; }
   if(FM_SIGN.test(s)){ st.ended=true; return '<p class="fmsign">'+body+'</p>'; }
@@ -6922,14 +6925,40 @@ function typesetForm(root){
   if(!blocks.length) return;
   var st={title:false,ended:false,n:0};
   blocks.forEach(function(el){
+    var hwp=_fmHwpAttrs(el);
+    st.hwp=!!hwp;
     var parts=el.innerHTML.split(/<br\s*\/?>/i), out=[];
     parts.forEach(function(part){
       var txt=_fmText(part); if(!txt.trim()) return;
       out.push(_fmBlock(txt,_fmClean(part),st));
     });
     if(!out.length){ el.remove(); return; }
-    el.outerHTML=out.join('');
+    if(!hwp){ el.outerHTML=out.join(''); return; }
+    /* 원본에서 온 문단 — 새로 만든 줄마다 원본 모양(style·data-*)을 도로 달아 준다.
+       ⚠ 새 장 표시(data-newpage)는 «첫 줄»에만 단다. 줄마다 달면 줄마다 새 장이 생긴다. */
+    var box=document.createElement('div'); box.innerHTML=out.join('');
+    var first=true;
+    [].slice.call(box.children).forEach(function(n){
+      if(n.tagName==='HR') return;
+      if(hwp.style&&!n.getAttribute('style')) n.setAttribute('style',hwp.style);
+      hwp.data.forEach(function(a){ if(a[0]!=='data-newpage'||first) n.setAttribute(a[0],a[1]); });
+      first=false;
+    });
+    var par=el.parentNode;
+    while(box.firstChild) par.insertBefore(box.firstChild,el);
+    par.removeChild(el);
   });
+}
+/* ★ 원본 한글에서 온 모양 (대표 지시 2026-09-23 「글자나 줄간격등이 계속 엉망이 된다」)
+   typesetForm 은 문단을 «글자만 남기고» 새로 만든다. 그러면서 원본 한글에서 옮겨 온
+   줄간격·정렬(style — hwp2html 이 원본 문단 모양에서 읽었다)과 새 장 표시(data-newpage)·
+   걷어내기 비껴가기(data-kept)를 전부 버렸다. 시험대에서 재 보니 회의록 78줄·정관 114줄의
+   줄간격·정렬과 회의록 새 장 4곳이 화면에 오기 «전»에 사라졌다.
+   여기서 그것들을 챙겨 두었다가, 새로 만든 줄에 도로 달아 준다. 없으면 null — 종전과 같다. */
+function _fmHwpAttrs(el){
+  var style=el.getAttribute('style')||'', data=[];
+  [].forEach.call(el.attributes,function(a){ if(/^data-/.test(a.name)) data.push([a.name,a.value]); });
+  return (style||data.length)?{style:style,data:data}:null;
 }
 function _docTypeset(root){
   try{

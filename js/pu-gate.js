@@ -91,6 +91,61 @@
       try { var sp = d.getElementById('pu-boot-splash'); if (sp) sp.remove(); } catch (e) {}
       return box;
     },
+    /* ══ 「준비중」 — 로그인은 됐는데 «아직 안 열린» 화면 (대표 지시 2026-09-23) ══
+       ⚠★ 위의 show() 를 여기에 쓰면 «안 된다». 그 화면은 「로그인하세요」라고 말하는데,
+         이 사람은 이미 로그인해 있다 — 시키는 대로 해도 아무것도 안 달라지는 안내가
+         가장 나쁘다(이 파일 머리말에 적어 둔 그대로다).
+       ★ 그래서 자물쇠(🔒)가 아니라 연장(🔧)이고, 글도 다르다.
+       ⚠ 포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
+         주소를 직접 친 사람을 막는다. 둘 중 하나만 있으면 뚫린다. */
+    soon: function (name) {
+      css();
+      var box = d.getElementById(ID);
+      if (!box) {
+        box = d.createElement('div');
+        box.id = ID;
+        (d.body || d.documentElement).appendChild(box);
+      }
+      box.innerHTML =
+        '<div>' +
+          '<div class="pg-lock">🔧</div>' +
+          '<div class="pg-title">' + (name ? esc(name) + '은(는) ' : '') + '아직 준비중입니다</div>' +
+          '<div class="pg-msg">다 되면 열어 드리겠습니다.<br>' +
+            '그때까지는 통합시스템의 다른 프로그램을 이용해 주세요.</div>' +
+          '<a class="pg-btn" href="' + esc(portalUrl()) + '">🏠 통합시스템으로 이동</a>' +
+        '</div>';
+      box.style.display = 'flex';
+      try { var sp = d.getElementById('pu-boot-splash'); if (sp) sp.remove(); } catch (e) {}
+      return box;
+    },
+    /* 「대표가 아니면 준비중을 씌운다」 — 잣대를 «한 곳»에 둔다.
+       포털(enter.html appIsSoon)도 같은 것을 본다: 명부(user_dir)의 role === 'admin'.
+       ⚠★ 모르는 동안에는 «씌우지 않는다». PuWhoami 는 이름을 먼저 주고 역할은 뒤에 준다 —
+         모른다고 씌우면 대표님 화면이 한 번 껌뻑이고, 명부를 못 읽는 날에는
+         **대표님이 자기 프로그램에서 잠긴다.** 그것이 못 막는 것보다 나쁘다.
+         이것은 «비밀을 지키는 문»이 아니라 «반쪽짜리를 안 보이게 하는 가림막»이다 —
+         진짜 문은 파이어베이스 규칙이 지킨다.
+       ⚠ 사번(P-001)으로 못 박지 않는다 — 사번이 바뀌는 날 대표님이 잠긴다. */
+    soonUnlessAdmin: function (name) {
+      var self = this;
+      function 판단(me) {
+        var role = (me && me.role) || '';
+        if (!role) return;                 // 아직 모른다 — 씌우지 않는다
+        if (role === 'admin') { self.hideSoon(); return; }
+        self.soon(name);
+      }
+      try {
+        if (!w.PuWhoami) return false;     // 이 화면은 누구인지 알 길이 없다 — 그냥 둔다
+        w.PuWhoami.onChange(판단);
+        판단(w.PuWhoami.get());
+        return true;
+      } catch (e) { return false; }
+    },
+    /* 준비중만 걷는다 — 로그인 화면까지 함께 걷으면 안 되므로 지금 무엇이 떠 있는지 본다 */
+    hideSoon: function () {
+      var box = d.getElementById(ID);
+      if (box && box.innerHTML.indexOf('준비중') >= 0) box.style.display = 'none';
+    },
     hide: function () {
       var box = d.getElementById(ID);
       if (box) box.style.display = 'none';

@@ -76,9 +76,17 @@ test('★ 아이콘 아래 설명 줄은 «없애는 것이 아니라 옮긴 것
 });
 
 test('★ 「PC 전용」만은 줄로 남긴다 — 그것은 설명이 아니라 경고다', () => {
-  /* 폰에서 눌러도 안 열리는 앱이다(기금관리). 감추면 왜 안 열리는지 알 길이 없다. */
+  /* 폰에서 눌러도 안 열리는 앱이다(기금관리). 감추면 왜 안 열리는지 알 길이 없다.
+
+     ⚠★ 2026-09-23 — 여기서 «삼항식을 글자 그대로» 박아 두고 있었다:
+           /mobileLocal \? '<span>PC 전용<\/span>' : ''/
+         그래서 같은 자리에 「준비중」 딱지를 하나 더 붙이자(대표 지시 2026-09-23)
+         **기능이 멀쩡한데** 이 검사가 깨졌다. CLAUDE.md 「지금 값이 아니라 규칙을
+         못 박는다」가 말하는 바로 그 경우다.
+         지켜야 할 것은 삼항식의 «모양»이 아니라 —
+         「PC 전용 경고가 mobileLocal 일 때 «붙어 있는가»」다. */
   const at = enter.indexOf('a.innerHTML =');
-  const mk = enter.slice(at, at + 500);
-  assert.match(mk, /mobileLocal \? '<span>PC 전용<\/span>' : ''/,
+  const mk = enter.slice(at, at + 700);
+  assert.match(mk, /mobileLocal[\s\S]{0,60}?<span>PC 전용<\/span>/,
     '★ 「PC 전용」까지 걷으면 폰에서 눌리지 않는 까닭이 사라집니다.');
 });

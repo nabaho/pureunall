@@ -296,7 +296,7 @@ test('★ 글 번호가 아직 없는 새 구성원은 「새로 올릴 것」�
     members: { 'new-1755300000000': { name: '신입 노무사', srl: '', position1: '', position2: '', careers: [] } },
     pages: {}, staff: [], check: null, saveErr: ''
   };
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   run(ctx, constSource('PAGE_IDS') + '\n' + fnSource('todayString') + '\n' + fnSource('applyStatus'));
   await ctx.applyStatus([{ srl: '190', name: '권형하', careers: [] }], {}, []);
   const members = plain(ctx.App.check.members);
@@ -311,7 +311,7 @@ test('★ 자료에 key 칸이 섞여 들어와도 우리 열쇠를 못 덮는�
     members: { '190': { key: '멋대로', name: '권형하', srl: '190', careers: [] } },
     pages: {}, staff: [], check: null, saveErr: ''
   };
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   run(ctx, constSource('PAGE_IDS') + '\n' + fnSource('todayString') + '\n' + fnSource('applyStatus'));
   await ctx.applyStatus([{ srl: '190', name: '권형하', careers: [] }], {}, []);
   assert.ok(plain(ctx.App.check.members)['190'], '우리 열쇠가 자료의 key 칸에 덮였습니다');
@@ -515,6 +515,11 @@ test('★ 화면이 같은 판단을 다시 만들지 않는다', () => {
     '화면이 <div> 를 스스로 가려내고 있습니다 — 두 곳에 두면 서로 다른 답을 낸다');
 });
 
+/* ⚠ 위의 db 대역들은 set 과 update 를 «둘 다» 준다. 이 검사들이 보는 것은
+   「저장 실패를 삼키지 않는가」이지 「어느 방법으로 쓰는가」가 아니다 —
+   방법을 대역으로 못 박으면 쓰는 길이 바뀔 때마다 엉뚱하게 깨진다.
+   (2026-09-23: 딱지를 «한 칸만» 쓰도록 set → update 로 바꾸자 여기서 둘이 깨졌다.
+    경로와 방법을 보는 것은 tests/no-whole-node-clobber.test.js ① 의 일이다.) */
 /* ══════ Minor 8 — 딱지 강등 저장 실패를 삼키지 않는다 ══════ */
 
 test('★ 딱지 강등 저장이 실패하면 화면에 남긴다', async () => {
@@ -525,7 +530,7 @@ test('★ 딱지 강등 저장이 실패하면 화면에 남긴다', async () =>
     check: { members: { '190': { name: '권형하', status: 'same', reason: '' } }, pages: {} },
     render() { drew++; }
   };
-  ctx.db = { ref: () => ({ set: () => Promise.reject({ code: 'PERMISSION_DENIED' }) }) };
+  ctx.db = { ref: () => ({ set: () => Promise.reject({ code: 'PERMISSION_DENIED' }), update: () => Promise.reject({ code: 'PERMISSION_DENIED' }) }) };
   run(ctx, fnSource('markChanged'));
   ctx.markChanged('member', '190');
   await tick();
@@ -540,7 +545,7 @@ test('딱지 강등 저장이 되면 겁주는 띠를 띄우지 않는다', asyn
     check: { members: { '190': { name: '권형하', status: 'same', reason: '' } }, pages: {} },
     render() {}
   };
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   run(ctx, fnSource('markChanged'));
   ctx.markChanged('member', '190');
   await tick();
@@ -922,7 +927,7 @@ test('★ done(내려간) 사람도 이름 잔존을 훑는다 — toRemove 일 
     ],
     check: null, saveErr: ''
   };
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   run(ctx, constSource('PAGE_IDS') + '\n' + fnSource('todayString') + '\n' + fnSource('applyStatus'));
 
   // 190(나간사람)은 홈페이지 구성원 목록(live)에 없다 → done. 191(아직안내림)은 아직 있다 → toRemove.
@@ -1230,7 +1235,7 @@ test('★ 대조는 여전히 «뭉친 글자»로 한다 — 줄 목록이 대�
 
   ctx.App = { members: {}, pages: { work1: { text: 뭉친글자 } }, staff: [], check: null,
               saveErr: '', pageLines: {} };
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   run(ctx, constSource('PAGE_IDS') + '\n' + fnSource('todayString') + '\n' + fnSource('applyStatus'));
   await ctx.applyStatus([{ srl: '190', name: '권형하', careers: [] }], { work1: 뭉친글자 }, []);
   assert.equal(plain(ctx.App.check.pages).work1.status, 'same',
@@ -1244,7 +1249,7 @@ test('★ 대조는 여전히 «뭉친 글자»로 한다 — 줄 목록이 대�
 test('★ 대조 기준이 아직 없는 쪽(새로 추가한 쪽)은 「안 올라감」이 아니라 「기준 없음」이다', async () => {
   const ctx = box();
   ctx.App = { members: {}, pages: {}, staff: [], check: null, saveErr: '', pageLines: {} };
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   run(ctx, constSource('PAGE_IDS') + '\n' + fnSource('todayString') + '\n' + fnSource('applyStatus'));
 
   // work1 은 홈페이지에서 방금 «제대로» 읽혔다(livePages 에 실제 문장이 있다) — 「못 읽음」이 아니다.
@@ -1287,7 +1292,7 @@ test('★ 「홈페이지 다시 확인」이 줄 목록도 함께 채운다 (�
     checking: false, checkMsg: '', checkBad: false, members: {}, pages: {}, staff: [],
     check: null, saveErr: '', pageLines: {}, pageRuns: {}, pageFix: {}, render() {}
   };
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   ctx.firebase = { auth: () => ({ currentUser: { getIdToken: () => Promise.resolve('T') } }) };
   ctx.toast = () => {};
   ctx.fetch = (url, opt) => {
@@ -2456,7 +2461,7 @@ test('★ 「홈페이지 다시 확인」이 명부 딱지를 대조 결과에 
     pages: {}, staff: [{ name: '박성수', leftAt: '2026-06-30' }],
     check: null, saveErr: '', pageLines: {}
   };
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   run(ctx, constSource('PAGE_IDS') + '\n' + fnSource('todayString') + '\n' + fnSource('applyStatus'));
   await ctx.applyStatus(
     [{ srl: '193', name: '박성수', position1: '', position2: '공인노무사', careers: [] }], {}, []);
@@ -2723,7 +2728,7 @@ test('★ 「어느 칸이 다른가」는 대조가 담아 준 자료를 그대
               staff: [{ name: '권형하' }], pages: {}, check: null, pageLines: {}, pageRuns: {},
               pageFix: {}, render() {} };
   run(ctx, constSource('PAGE_IDS') + '\n' + fnSource('todayString') + '\n' + fnSource('applyStatus'));
-  ctx.db = { ref: () => ({ set: () => Promise.resolve() }) };
+  ctx.db = { ref: () => ({ set: () => Promise.resolve(), update: () => Promise.resolve() }) };
   const live = [{ srl: '10', name: '권형하', position1: '대표', position2: '공인노무사',
                  careers: ['現 가'] }];
   return ctx.applyStatus(live, {}, []).then(() => {

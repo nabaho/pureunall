@@ -51,17 +51,34 @@
     }
   }catch(e){}
 
-  var _installEvt = null;
+  /* ── 자리 (대표 결정 2026-09-23 「앱으로 깔기 여기 위에 두지 말고」 → ③ 설정 창 안) ──
+     머리 카드에 두었더니 PC 크롬도 「깔 수 있음」 신호를 보내 PC 에도 떴고(누르면 아무 일도
+     없었다), 그 한 칸 때문에 「건의하기」가 카드 밖으로 밀려 나갔다.
+     ★ 관리자는 ⚙ 설정 창 안 한 줄(cfgAppInstallRow), 직원은 폰 ⋯ 안(appInstallFab).
+       설정 창은 API 열쇠가 든 관리자 전용 창이라 직원에게 열지 않는다 — 그래서 둘로 나눴다.
+     ⚠ 관리자 여부를 «알기 전»에는 어느 쪽도 안 띄운다(__puInstallAdmin 이 참/거짓으로 정해진 뒤).
+     ⚠ ⋯ 는 폰 폭(520px 이하)에만 있다 — 그보다 넓은 태블릿의 직원에게는 깔 자리가 없다. */
+  var _installEvt = null, _installed = false;
+  var _narrow = null;
+  try{ _narrow = window.matchMedia ? window.matchMedia('(max-width:520px)') : null; }catch(e){}
+  function phoneDevice(){
+    return (window.innerWidth <= 820) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  }
+  function syncInstall(){
+    var can = phoneDevice() && !standalone() && !_installed;   // PC 이거나 이미 앱이면 뜻이 없다
+    var known = typeof window.__puInstallAdmin === 'boolean', admin = window.__puInstallAdmin === true;
+    var row = document.getElementById('cfgAppInstallRow'), fab = document.getElementById('appInstallFab');
+    if(row) row.hidden = !(known && can && admin);
+    if(fab) fab.hidden = !(known && can && !admin && !!(_narrow && _narrow.matches));
+  }
+  window.puAppInstallSync = syncInstall;
   try{
     window.addEventListener('beforeinstallprompt', function(e){
       e.preventDefault(); _installEvt = e;
-      var b = document.getElementById('appInstallBtn');
-      if(b && !standalone()){ b.hidden = false; b.style.display = 'inline-flex'; }
+      syncInstall();
     });
-    window.addEventListener('appinstalled', function(){
-      var b = document.getElementById('appInstallBtn');
-      if(b){ b.hidden = true; b.style.display = 'none'; }
-    });
+    window.addEventListener('appinstalled', function(){ _installed = true; syncInstall(); });
+    if(_narrow && _narrow.addEventListener) _narrow.addEventListener('change', syncInstall);
   }catch(e){}
   function standalone(){
     try{
@@ -69,26 +86,24 @@
              || window.navigator.standalone === true;
     }catch(e){ return false; }
   }
+  function runInstall(){
+    if(_installEvt){
+      _installEvt.prompt();
+      _installEvt.userChoice.then(function(r){
+        if(r && r.outcome === 'accepted'){ _installed = true; syncInstall(); }
+      })['catch'](function(){});
+      _installEvt = null;
+      return;
+    }
+    /* 신호가 없는 브라우저(아이폰 사파리·카카오 등) — 세 걸음 안내로 보낸다 */
+    location.href = 'install.html';
+  }
   function wireInstall(){
-    var btn = document.getElementById('appInstallBtn');
-    if(!btn) return;
-    var phone = (window.innerWidth <= 820) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-    if(!phone || standalone()) return;      // PC 이거나 이미 앱으로 열렸으면 뜻이 없다
-    btn.hidden = false;
-    btn.style.display = 'inline-flex';
-    btn.title = '홈 화면에 깔면 주소창·탭 없이 앱처럼 열립니다';
-    btn.addEventListener('click', function(){
-      if(_installEvt){
-        _installEvt.prompt();
-        _installEvt.userChoice.then(function(r){
-          if(r && r.outcome === 'accepted'){ btn.hidden = true; btn.style.display = 'none'; }
-        })['catch'](function(){});
-        _installEvt = null;
-        return;
-      }
-      /* 신호가 없는 브라우저(아이폰 사파리·카카오 등) — 세 걸음 안내로 보낸다 */
-      location.href = 'install.html';
+    ['appInstallFab', 'cfgAppInstall'].forEach(function(id){
+      var btn = document.getElementById(id);
+      if(btn) btn.addEventListener('click', runInstall);
     });
+    syncInstall();
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ wireInstall(); });
@@ -193,6 +208,11 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 /* 한 줄 고정 — 어떤 항목도 두 줄로 꺾이지 않게 */
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
 .pbar #sgFab{order:4;}   /* 로그아웃(order:3)보다 오른쪽 끝 */
+/* ✨ TypeSafe 검토 — 「업무 시스템」 줄 오른쪽, 로그인 후 바로가기 바로 왼쪽 (js/pu-typesafe.js 가 넣는다).
+   ⚠ 머리 카드(.pbar)에 넣지 말 것 — 관리자 화면은 사용액·AI 판독 딱지로 이미 920px 를 다 쓴다
+     (2026-09-23 실측: 그대로도 934px, 여기 넣으면 1081px 로 카드 밖으로 163px 넘쳤다). */
+.sec #pu-typesafe-review-button{margin-left:auto;}
+.sec #pu-typesafe-review-button + .homebar{margin-left:10px;}
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;}
 .pbar .nm b{font-size:.92rem;}
@@ -241,14 +261,12 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;}
 .logout{color:var(--accent);font-weight:700;cursor:pointer;background:none;border:none;font-size:.8rem;font-family:inherit;}
-/* 머리줄 작은 단추 — 지금은 「앱으로 깔기」가 쓴다
-   (PC/폰 전환 단추는 2026-08-30 대표 지시로 없앴다) */
-.pcview{order:3;display:none;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;
-  background:rgba(46,58,140,.08);color:var(--accent);border:none;border-radius:8px;
-  padding:6px 11px;font-size:.72rem;font-weight:700;font-family:inherit;}
-.pcview[hidden]{display:none;}
-/* 앱으로 깔기 — 한 번 하면 사라지는 단추라 눈에 띄어야 한다 */
-.appinst{background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;}
+/* 📲 앱으로 깔기 — 직원 폰 ⋯ 안(appInstallFab) · 관리자 설정 창 안(cfgAppInstallRow).
+   ⚠ ⋯ 안의 .docked 가 display 를 !important 로 켜므로, 숨김([hidden])이 그보다 세야 한다(아래 #moreDock 규칙). */
+#appInstallFab{display:none;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;border:none;
+  border-radius:99px;padding:7px 13px;font-size:.74rem;font-weight:700;font-family:inherit;
+  background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;}
+.cfg-tool[hidden]{display:none;}
 .sec{font-size:.82rem;font-weight:700;color:var(--sub);margin:24px 4px 12px;display:flex;align-items:center;gap:10px;}
 .sec h2{font:inherit;color:inherit;}
 /* 타일 순서 고정 토글 */
@@ -543,6 +561,9 @@ body.portal-mode #moreFab{display:flex;}
 /* 데려온 단추는 제 좌표를 버리고 이 줄에 선다 — 원래 파일의 inline position:fixed 를 덮어야 하므로 !important */
 #moreDock .docked{position:static!important;left:auto!important;right:auto!important;
   top:auto!important;bottom:auto!important;display:inline-flex!important;margin:0!important;}
+/* 숨긴 단추는 ⋯ 안에서도 숨는다 — 위 줄이 display 를 !important 로 켜서, 관리자 전용 「⚙ 설정」이
+   직원 폰 ⋯ 에 눌러도 안 되는 채로 떠 있었다. [hidden] 이 붙은 것만 끈다. */
+#moreDock .docked[hidden]{display:none!important;}
 @media(prefers-reduced-motion:no-preference){
   #moreDock.on > *{animation:dockIn .16s ease both;}
   @keyframes dockIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -969,8 +990,6 @@ body.portal-mode #moreFab{display:flex;}
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
       <button class="logout" id="logoutBtn">로그아웃</button>
-      <!-- 앱으로 깔기 — 폰에서, 아직 안 깔았을 때만 뜬다(JS 가 켠다) -->
-      <button class="pcview appinst" id="appInstallBtn" type="button" hidden>📲 앱으로 깔기</button>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 💰 돈 자리 — 딱지 둘을 «붙여 세운다» (대표 결정 2026-09-12 「다」안).
            ⚠ 상자 자체도 JS 가 켠다(moneyBoxSync) — 둘 다 감춰졌는데 상자만 남으면
@@ -1039,6 +1058,8 @@ body.portal-mode #moreFab{display:flex;}
 
 <!-- ── 시스템 설정 (관리자 전용) — 화면 왼쪽 아래 구석 ── -->
 <button id="cfgFab" type="button" title="시스템 설정 (관리자 전용)">⚙ 설정</button>
+<!-- 📲 직원 폰의 「앱으로 깔기」 — ⋯ 안에 선다(관리자는 ⚙ 설정 창 안에서 깐다) -->
+<button id="appInstallFab" type="button" hidden title="홈 화면에 깔면 주소창·탭 없이 앱처럼 열립니다">📲 앱으로 깔기</button>
 <!-- ⋯ 더보기 — 설정·백업·복구·최신을 여기로 모은다 (dockAdopt) -->
 <div id="fabBar" role="group" aria-label="도구 모음">
   <button id="moreFab" type="button" aria-expanded="false" aria-controls="moreDock"
@@ -1152,6 +1173,16 @@ body.portal-mode #moreFab{display:flex;}
           <span>장애가 생기면 화면 왼쪽 아래에 빨갛게 뜹니다. 평소에 지난 것까지 보려면 여기서 여세요.</span>
         </div>
         <button type="button" id="cfgHealth">열어보기</button>
+      </div>
+
+      <!-- 📲 이 기기에 앱으로 깔기 (대표 결정 2026-09-23 ③안) — 폰에서, 아직 안 깔았을 때만 보인다.
+           저장하는 값이 아니라 «이 기기»에서 하는 일이다. 직원은 폰 ⋯ 안에서 깐다. -->
+      <div class="cfg-tool" id="cfgAppInstallRow" hidden>
+        <div>
+          <b>📲 이 기기에 앱으로 깔기</b>
+          <span>홈 화면에 깔면 주소창·탭 없이 앱처럼 열립니다.</span>
+        </div>
+        <button type="button" id="cfgAppInstall">깔기</button>
       </div>
 
       <label for="cfgGemini">Gemini API 키 <span class="cfg-free">무료</span></label>
@@ -1309,16 +1340,16 @@ body.portal-mode #moreFab{display:flex;}
        그래서 타일 둘은 «한 프로그램의 문 둘»이 아니라 «다른 두 화면»이 되었다.
        대표 지시 2026-08-24: 「해라 포털도」.
        ⚠ 주소에 ?view=mail 이 붙어야 한다. 그냥 pu-cards.html 이면 명함이 열린다. */
-    { key:'mail',    name:'푸른 메일',     desc:'메일 쓰기·보낸 메일·자료함', icon:'📧', url:'pu-cards.html?view=mail', roles:null, row:'store' },
+    { key:'mail',    name:'푸른 메일',     desc:'메일 쓰기·보낸 메일·자료함', icon:'📧', url:'pu-cards.html?view=mail', roles:null, soon:true, row:'store' },
     { key:'cards',   name:'기업정보함',    desc:'사업자·명함·계약서', icon:'📇', url:'pu-cards.html',       roles:null, row:'store' },
     { key:'photos',  name:'사진첩',       desc:'사진·서류',        icon:'🖼️', url:'pu-photos.html',      roles:null, row:'store' },
     { key:'fund',    name:'기금관리',     desc:'근로복지기금 운영', icon:'🪙', url:'fund.html',           roles:null, row:'client' },
-    { key:'rules',   name:'취업규칙 관리', desc:'작성·검토·개정·신고', icon:'📜', url:'rules.html',          roles:null, row:'client' },
-    { key:'docs',    name:'문서관리',     desc:'계약서 전자송부',  icon:'📤', url:'docs-esign.html',     roles:null, row:'client' },
-    { key:'payroll', name:'급여관리',     desc:'급여 아웃소싱',    icon:'💰', url:'payroll-os.html',     roles:null, row:'client' },
+    { key:'rules',   name:'취업규칙 관리', desc:'작성·검토·개정·신고', icon:'📜', url:'rules.html',          roles:null, soon:true, row:'client' },
+    { key:'docs',    name:'문서관리',     desc:'계약서 전자송부',  icon:'📤', url:'docs-esign.html',     roles:null, soon:true, row:'client' },
+    { key:'payroll', name:'급여관리',     desc:'급여 아웃소싱',    icon:'💰', url:'payroll-os.html',     roles:null, soon:true, row:'client' },
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
        사진첩(업무지원)과 달리 이 줄에 둔다. */
-    { key:'paydata', name:'급여데이터함',  desc:'급여자료 사업장별', icon:'💼', url:'pu-paydata.html',     roles:null, row:'store' },
+    { key:'paydata', name:'급여데이터함',  desc:'급여자료 사업장별', icon:'💼', url:'pu-paydata.html',     roles:null, soon:true, row:'store' },
     /* 경력관리·홈페이지 관리 — 총괄관리자만 본다 (대표 지시 2026-08-17).
        「흐리게도 보이지 않게」 하라 하셨으므로 타일을 아예 안 그린다.
        ★ 잣대는 ⚙ 설정·백업 타일과 «같은 것»(sgIsAdmin = 명부의 role)을 쓴다.
@@ -1339,6 +1370,25 @@ body.portal-mode #moreFab{display:flex;}
        내외관리 줄은 경력관리·홈페이지 관리 둘이다.
        ⚠ 다시 타일로 넣지 말 것. 넣으려면 떠 있는 단추를 먼저 없애야 한다. */
   ];
+
+  /* ══ 「준비중」 — 보이되 못 누르게 (대표 지시 2026-09-23) ══════════════════
+     「권형하 이외 클릭하면 앱이 안 열리게 해달라. 준비중 이라고 연하게 앱에 보이고
+      다른사람은 클릭안되게 했으면좋겠다」
+
+     ★ adminOnly 와 «다른» 것이다. adminOnly 는 타일을 아예 안 그린다
+       (2026-08-17 「흐리게도 보이지 않게」). 이것은 반대다 — **보이되 못 누른다.**
+       아직 짓는 중인 것이 «있다는 사실»은 알리되, 열어서 반쪽짜리를 보지는 않게 한다.
+
+     ⚠★ 잣대는 adminOnly 와 «똑같은 것»(명부의 role === 'admin')을 쓴다.
+       「권형하」를 사번(P-001)으로 못 박지 않는다 — 사번은 바뀔 수 있고, 박아 두면
+       바뀌는 날 대표님 화면에서 앱이 통째로 잠긴다. 오늘 role === 'admin' 인 사람은
+       대표님 한 분이다(위임관리인은 role 이 'staff' 이고 isSubAdmin 으로 갈린다).
+     ⚠ 잣대를 여기 «한 함수»에 둔다. 타일과 바로가기 목록 두 곳이 이것을 함께 본다 —
+       한쪽만 막으면 타일은 잠갔는데 「로그인 후 바로가기」로 그냥 열린다.
+     ⚠ 이것은 «포털의 문»이다. 주소를 직접 치면 앱 자체는 열린다.
+       앱마다 문을 달려면 앱 다섯을 각각 고쳐야 한다 — 그것은 다음 걸음이다. */
+  function appIsSoon(app, isAdmin){ return !!(app && app.soon) && !isAdmin; }
+
   /* ══ 초기화면 줄 (대표 결정 2026-08-29 「1」= 안 ㉮) ══
      여태는 「업무지원 / 직접업무」 둘이었다. 그런데 그것은 «프로그램 입장»의
      구분이라(돕는 도구냐 직접 하는 일이냐) 찾을 때 도움이 안 됐다 —
@@ -2242,6 +2292,7 @@ body.portal-mode #moreFab{display:flex;}
       if(!isMobile() && !isAct) a.target = portalAppWindowName(app.key);
       // 로컬 앱(기금관리 등, localhost 실행)은 폰에서 열 수 없음 → 이동 대신 안내
       var mobileLocal = isMobile() && app.local && !isAct;
+      var 준비중 = appIsSoon(app, _isAdm);
       /* ── 설명 줄을 뺀다 (대표 지시 2026-08-24 「아이콘 제목 아래 설명 필요 없다.
             차라리 PC에서는 마우스 올리면 나오게 하고, 폰에서는 두 번째 줄 없애라」) ──
          ★ 없애는 것이 아니라 «옮기는» 것이다 — PC 에서는 마우스를 올리면 나온다.
@@ -2249,11 +2300,29 @@ body.portal-mode #moreFab{display:flex;}
          ⚠ 「PC 전용」은 설명이 아니라 «경고» 다 — 폰에서 눌러도 안 열린다는 뜻이라
            그것만은 줄로 남긴다. 감추면 왜 안 열리는지 알 길이 없다. */
       a.title = app.name + (app.desc ? ' — ' + app.desc : '');
+      /* 「준비중」은 «연하게» 보인다. 아주 안 보이면 있다는 것조차 모르고,
+         또렷하면 눌러도 되는 줄 안다 — 그 사이가 이 흐림이다.
+         ⚠ 「탭 이동 ↗」은 안 그린다. 안 열리는데 열린다고 적혀 있으면 안 된다. */
       a.innerHTML =
-        '<div class="ic"' + (mobileLocal ? ' style="opacity:.45"' : '') + '>' + app.icon + '</div>' +
+        '<div class="ic"' + (mobileLocal || 준비중 ? ' style="opacity:.45"' : '') + '>' + app.icon + '</div>' +
         '<div class="tx"><b>' + app.name + '</b>' +
-        (mobileLocal ? '<span>PC 전용</span>' : '') + '</div>' +
-        (isMobile() ? '' : '<div class="newtab">탭 이동 ↗</div>');
+        (mobileLocal ? '<span>PC 전용</span>' : (준비중 ? '<span>준비중</span>' : '')) + '</div>' +
+        ((isMobile() || 준비중) ? '' : '<div class="newtab">탭 이동 ↗</div>');
+      if(준비중){
+        a.style.opacity = '.55';
+        a.style.cursor = 'not-allowed';
+        a.removeAttribute('target');       // 새 탭으로도 안 열린다
+        a.href = '#';
+        a.title = app.name + ' — 준비중입니다';
+        a.setAttribute('aria-disabled', 'true');
+        /* ⚠ pointer-events:none 으로 막지 «않는다» — 그러면 눌러도 아무 일이 안 나고
+           왜 안 되는지 알 길이 없다. 눌리게 두고, 눌렀을 때 까닭을 말한다
+           (바로 아래 「PC 전용」이 쓰는 것과 같은 길이다). */
+        a.addEventListener('click', function(ev){
+          ev.preventDefault();
+          alert('🔧 ' + app.name + '은(는) 아직 준비중입니다.\n\n다 되면 열어 드리겠습니다.');
+        });
+      }
       if(mobileLocal){
         a.href = '#';
         a.addEventListener('click', function(ev){
@@ -2266,7 +2335,16 @@ body.portal-mode #moreFab{display:flex;}
         tileCont(appRowOf(app)).appendChild(a);
         return;
       }
-      if(!isMobile()){
+      /* ⚠★★ 준비중이면 «여는 처리를 아예 안 붙인다» (2026-09-23).
+         ── 처음엔 위에서 stopPropagation() 으로 막으려 했다. **안 막힌다.**
+            그것은 «부모로 올라가는 것»을 막을 뿐, 같은 칸에 붙은 다른 처리는 그대로 돈다.
+            아래 처리는 href 를 안 보고 openPortalApp() 을 «스스로» 부르므로
+            href='#' 로 바꿔 둔 것도 소용이 없다 — PC 에서 그냥 열렸다.
+         ── stopImmediatePropagation() 이면 막히긴 한다. 그런데 그것은 «붙은 차례»에
+            기댄다 — 나중에 누가 처리를 위쪽에 하나 끼우면 조용히 다시 열린다.
+            차례에 기대지 않으려면 «안 붙이는 것»이 맞다.
+         ⚠ 검사가 이것을 잡았다. 글자만 봤으면 못 잡는다 — 눌러 봐야 안다. */
+      if(!isMobile() && !준비중){
         a.addEventListener('click', function(ev){
           ev.preventDefault();
           var _v = Math.floor(Date.now() / 600000);  // 10분 버킷 캐시 우회
@@ -3013,6 +3091,9 @@ body.portal-mode #moreFab{display:flex;}
     return APPS.filter(function(a){
       if(a.roles && a.roles.indexOf(_curRole) < 0) return false;
       if(a.adminOnly && !_adm) return false;
+      /* ★ 타일을 잠가 놓고 여기서 새면 뜻이 없다 — 「로그인 후 바로가기」로 그냥 열린다.
+         maybeGoHome 도 이 목록을 보므로, 예전에 골라 둔 것이 있어도 자동으로 안 넘어간다. */
+      if(appIsSoon(a, _adm)) return false;
       return true;
     });
   }
@@ -3231,7 +3312,13 @@ body.portal-mode #moreFab{display:flex;}
   var CFG_PATH = 'data/app_config';
   var CFG_FIELDS = [['cfgGemini','geminiKey'], ['cfgNts','ntsKey'], ['cfgVapid','fcmVapidKey'], ['cfgRhwp','rhwpStudioUrl'], ['cfgProxy','aiProxyUrl'], ['cfgIdle','idleMinutes'], ['cfgTileCross','tileCrossRow']];
 
-  function cfgShowFab(){ var b = $('cfgFab'); if(b) b.style.display = sgIsAdmin() ? 'inline-flex' : 'none'; }
+  function cfgShowFab(){
+    var b = $('cfgFab'), admin = sgIsAdmin();
+    if(b){ b.style.display = admin ? 'inline-flex' : 'none'; b.hidden = !admin; }
+    /* 📲 앱으로 깔기 — 관리자는 설정 창 안, 직원은 폰 ⋯ 안. 누가 누군지 안 뒤에야 띄운다 */
+    window.__puInstallAdmin = admin;
+    if(typeof window.puAppInstallSync === 'function') window.puAppInstallSync();
+  }
 
   function cfgOpen(){
     if(!sgIsAdmin()) return;
@@ -4401,7 +4488,8 @@ body.portal-mode #moreFab{display:flex;}
   //    (로그인·권한 확인 뒤) 새로 생기는지 지켜보다가 잡는다.
   (function(){
     // ⋯ 안으로 접어 넣는 것 — 자주 안 쓰는 둘만
-    var DOCK_IDS = ['cfgFab', 'pu-version-fab'];
+    /* ✨ TypeSafe(pu-typesafe-review-button)는 PC 에선 「업무 시스템」 줄에 서지만, 폰에서는 여기로 */
+    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'pu-typesafe-review-button', 'appInstallFab'];
     /* 아래 한 줄 바(#fabBar)에 세우는 것 — 자주 쓰거나(백업·복구),
        바로 눈에 띄어야 하는 것(장애 알림·연결 경고).
        이 셋은 각자 파일이 left/right:12px, bottom:12px 를 쓰고 있어 서로, 그리고
@@ -4445,11 +4533,18 @@ body.portal-mode #moreFab{display:flex;}
         var el = document.getElementById(id), h = home[id];
         if(!el || !h || (el.parentNode !== dock && el.parentNode !== bar)) return;
         el.classList.remove('docked');
-        h.parent.insertBefore(el, h.next);
+        /* 원래 옆 자리가 그새 다른 데로 갔으면(폰에서 «로그인 후 바로가기»가 머리 카드로 간다)
+           insertBefore 가 죽고 나머지 단추까지 ⋯ 안에 갇힌다 — 그때는 원래 부모 끝에 둔다. */
+        h.parent.insertBefore(el, (h.next && h.next.parentNode === h.parent) ? h.next : null);
       });
       openDock(false);
     }
-    function sync(){ phone.matches ? adopt() : release(); moveHomeBar(phone.matches); }
+    /* ⚠ 차례가 중요하다 — PC 로 돌아갈 땐 «로그인 후 바로가기»를 먼저 제자리에 돌려놓아야
+       그 바로 왼쪽이 자리인 ✨ TypeSafe 단추가 제 옆자리를 찾는다. */
+    function sync(){
+      if(phone.matches){ adopt(); moveHomeBar(true); }
+      else { moveHomeBar(false); release(); }
+    }
 
     fab.addEventListener('click', function(e){
       e.stopPropagation();
@@ -4471,6 +4566,8 @@ body.portal-mode #moreFab{display:flex;}
       new MutationObserver(function(){ if(phone.matches){ adopt(); moveHomeBar(true); } })
         .observe(document.body, { childList:true });
     } catch(_){}
+    /* TypeSafe 단추는 body 가 아니라 「업무 시스템」 줄 안에 생겨 위 지켜보기에 안 걸린다 — 생겼다고 알려 오면 다시 맞춘다 */
+    document.addEventListener('pu-typesafe-mounted', sync);
     sync();
   })();
   // 💳 사용액 — 누르면 항목별 내역 팝업 (설정창과 같은 닫기 방식)
@@ -4578,5 +4675,21 @@ body.portal-mode #moreFab{display:flex;}
 
 })();
 </script>
+<script>
+/* ── ✨ TypeSafe 검토 — 이알피 왼쪽 아래에서 «포털 첫 화면»으로 옮겼다
+   (대표 지시 2026-09-23 「푸른통합시스템 전체로 적용해서 캡쳐3화면으로 옮기고 연결해줘」,
+   목업 ①안 「빼고 포털로만」).
+   ⚠ 포털은 떠 있는 단추 자리를 한 곳에서만 정한다(위 「화면에 떠 있는 단추의 자리」) —
+     그래서 떠 있게 두지 않고 「업무 시스템」 줄 오른쪽(로그인 후 바로가기 왼쪽)에 세운다.
+     ⚠ 목업에선 건의하기 왼쪽이었지만 관리자 머리 카드는 이미 꽉 차 넘친다(위 css 설명). 폰에서는 ⋯ 안으로 들어간다(DOCK_IDS).
+   관리자만 보이는 것·미국 서버 확인란·하루 한도는 js/pu-typesafe.js 가 그대로 지킨다.
+   포털은 직원·업체 목록을 안 들고 있으므로 가리기용 함수를 넘기지 «않는다» —
+   부품이 「제안 받기」를 누를 때 스스로 목록을 읽어 가린다. */
+window.PU_TYPESAFE_MOUNT = function(){
+  var home = document.getElementById('homeBar');
+  return home && home.parentNode ? { parent: home.parentNode, before: home } : null;
+};
+</script>
+<script src="js/pu-typesafe.js?v=6"></script>
 </body>
 </html>
