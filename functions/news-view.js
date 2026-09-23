@@ -28,8 +28,51 @@ function 회차열쇠(v) {
 function 읽기(q) {
   const o = q && typeof q === 'object' ? q : {};
   const 회차 = 회차열쇠(o.i);
-  return { 회차: 회차, ok: !!회차 };
+  /* ★ show=1 — 「움직이는 화면」을 달라는 뜻이다 (2026-09-23).
+       ⚠ 같은 문(newsView)을 쓰는 까닭: 새 함수를 만들면 공개 호출 권한을 콘솔에서
+         손으로 줘야 한다(이 PC 에 gcloud 가 없다). 이 문은 이미 열려 있다. */
+  return { 회차: 회차, ok: !!회차, 쇼: String(o.show == null ? '' : o.show) === '1' };
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   창고 그림 한 장 — ?img=<열쇠> (대표 결정 2026-09-23 「창고 + 함수」)
+   ══════════════════════════════════════════════════════════════════════════
+   명절 인사에 «얼굴»이 들어간다. 공개 저장소(img/)에 두면 인터넷 누구나 보고,
+   지워도 기록에 영영 남는다. 그래서 창고(newsletter_img/)에 두고 이 문이 내준다.
+
+   ⚠⚠ 열쇠는 «우리가 지은 모양»만 받는다 — 32자리 16진수 + 사진 확장자.
+     받은 글자를 그대로 창고 자리에 끼우면 «../» 로 남의 자리(급여자료·명함)를
+     꺼내 가는 문이 된다. 이 창고에는 급여데이터함이 함께 있다.
+   ⚠ 실시간DB 를 «안 읽는다» — 열쇠가 곧 허락이다(찍어서 맞힐 수 없는 길이).
+   ★ 열쇠는 한 번 지으면 다시 안 쓴다 — 그래서 길게 굳혀도 된다(바꾸면 새 열쇠). */
+const 그림종류 = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
+function 그림열쇠(v) {
+  const s = String(v == null ? '' : v);
+  const m = /^([0-9a-f]{32})\.(jpg|png|webp|gif)$/.exec(s);
+  if (!m) return null;
+  return { 자리: 'newsletter_img/' + m[1] + '.' + m[2], 종류: 그림종류[m[2]] };
+}
+
+/* 움직이는 화면을 보여 줄 수 있나 — 전문(볼수있나)과 «같은 잣대»다.
+   ⚠ 초안은 안 보여 준다. 열쇠가 규칙이라 다음 주 것을 누구나 지어 볼 수 있다. */
+function 쇼볼수있나(상태, 쇼) {
+  const s = String(상태 == null ? '' : 상태).trim();
+  const t = String(쇼 == null ? '' : 쇼).trim();
+  if (!s) return { ok: false, 까닭: '없음' };
+  if (s === '초안') return { ok: false, 까닭: '초안' };
+  if (!t) return { ok: false, 까닭: '쇼없음' };
+  return { ok: true, 까닭: '' };
+}
+
+/* ★★ 움직이는 화면의 «문지기» — 브라우저가 스스로 막게 한다.
+   ⚠ 담아 둔 쪽은 화면(pu-news-show.js)이 «우리 그림만» 골라 지었다. 그래도
+     여기서 한 번 더 막는다: 누가 회차의 쇼 칸을 손으로 고쳐 남의 그림을 넣어도
+     브라우저가 불러오지 않는다. 문이 둘이라야 한쪽이 뚫려도 안 샌다.
+   ⚠ 두 주소는 발송기(mail-send.js IMG_HOST_OK)와 «같다». 더하지 말 것. */
+const 쇼보안 = "default-src 'none'; "
+  + "img-src https://nabaho.github.io https://asia-northeast3-pureun-erp.cloudfunctions.net; "
+  + "style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
+  + "base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 /* 보여 줄 수 있는 회차인가.
    ⚠ 「없다」와 「아직 안 보냈다」를 가른다 — 사람에게 하는 말이 달라야 한다. */
@@ -45,7 +88,8 @@ function 볼수있나(상태, 전문) {
 const 까닭말 = {
   없음: '그런 회차가 없습니다.',
   초안: '아직 보내지 않은 회차입니다.',
-  전문없음: '이 회차는 전문이 담겨 있지 않습니다.'
+  전문없음: '이 회차는 전문이 담겨 있지 않습니다.',
+  쇼없음: '이 회차에는 움직이는 화면이 없습니다.'
 };
 
 function esc(s) {
@@ -136,17 +180,35 @@ var 창스크립트 =
      누르면 헛일이 되는 손잡이를 편지에 둘 수는 없다.
    ★ 그래서 «여기»에서 붙인다. 이 쪽은 브라우저라 확실히 통하고, 편지 속 글자는
      하나도 안 건드린다(메일은 예전 그대로다).
-   ★ 짝은 «차례»로 맺는다. 차림표 칸 넷과 꼭지 자리표(<a id="g-…">)가 같은 차례다.
-     ⚠ 지역 소식 꼭지도 id="g-" 를 달고 나오는데 «맨 뒤»라 넷과 안 부딪힌다.
+   ★ 짝은 «차례»로 맺는다. 차림표 칸과 꼭지 자리표(<a id="g-…">)가 같은 차례다.
+     ⚠⚠ 2026-09-23 까지는 «안 맞았다». 차림표가 꼭지 넷을 늘 그렸는데 빈 꼭지는
+       자리표가 안 생겨 한 칸씩 밀렸다(정책이 빈 주에 「고용·노동정책」을 누르면 판례로).
+       이제 편지 짓는 쪽(pu-news-tpl.js 차림표)이 «그린 꼭지만» 부른다.
+       ★ 그래서 이 짝짓기를 «이름으로» 바꾸지 않았다 — 차례가 맞으면 차례가 가장 싸다.
+       ⚠ 옛 회차(그 전에 담은 전문)는 여전히 밀릴 수 있다 — 「↻ 전문 다시 담기」로 고친다.
+     ⚠ 지역 소식 꼭지도 id="g-" 를 달고 나오는데 «맨 뒤»라 앞의 짝과 안 부딪힌다.
    ★ 지금 보고 있는 꼭지에 밑줄이 그어진다 — 긴 쪽에서 «내가 어디쯤인지»가 보인다.
    ⚠ 따라오는 띠의 «키»만큼 덜 내려가야 제목이 띠 밑에 숨지 않는다. */
 var 차림표스크립트 =
   '(function(){' +
   'var 줄=document.querySelector("#wrap [data-stick]");if(!줄)return;' +
   'var 칸=줄.querySelectorAll("td[align=center]");' +
-  'var 가=document.querySelectorAll("#wrap [id^=\'g-\']");' +
+  'var 가=[].slice.call(document.querySelectorAll("#wrap [id^=\'g-\']"));' +
   'var 표=[];' +
-  'for(var i=0;i<칸.length&&i<가.length;i++){(function(c,a){' +
+  /* ★★ 짝을 «이름»으로 맺는다 (2026-09-23). 차례로 맺으면 빈 꼭지가 있을 때 한 칸씩
+       밀렸다 — 차림표는 넷을 그렸는데 빈 꼭지는 자리표가 없었다.
+     ⚠ 새 편지는 이제 차례도 맞지만(pu-news-tpl 이 그린 꼭지만 부른다) «이미 보낸»
+       회차는 전문을 다시 못 담는다(「그때 나간 그대로」). 그 회차들을 편지 글자 하나
+       안 건드리고 고치는 길이 이것이다.
+     ★ 차림표 이름(짧은 이름)은 꼭지 제목의 «앞머리»다(판례·재결례 → 판례·재결례·행정해석).
+       그래서 자리표가 든 칸의 글자에 차림표 글자가 들어 있으면 그 꼭지다.
+     ⚠ 짝이 없는 칸은 «누를 수 없게» 둔다(nav 를 안 붙인다) — 눌러도 엉뚱한 데로
+       가는 칸보다 그냥 글자가 낫다. 모양은 메일에서 보던 그대로다. */
+  'function 짝(t){for(var k=0;k<가.length;k++){var g=가[k];if(!g)continue;' +
+  'var p=g.closest?g.closest("td"):g.parentNode;' +
+  'if(p&&t&&p.textContent.indexOf(t)>=0){가[k]=null;return g;}}return null;}' +
+  'for(var i=0;i<칸.length;i++){var 이=칸[i],맞=짝((이.textContent||"").trim());' +
+  'if(!맞)continue;(function(c,a){' +
   'c.className="nav";c.setAttribute("role","link");c.tabIndex=0;표.push({c:c,a:a});' +
   /* ⚠ 내려앉는 자리(-띠키-14)와 아래 «어디냐»의 잣대(+띠키+22)는 짝이다.
        내려앉은 꼭지가 곧바로 «켜져» 보여야 한다 — 어긋나면 눌렀는데 옛 꼭지에
@@ -161,7 +223,7 @@ var 차림표스크립트 =
   'c.addEventListener("click",가자);' +
   'c.addEventListener("keydown",function(e){' +
   'if(e.key==="Enter"||e.key===" "){e.preventDefault();가자();}});' +
-  '})(칸[i],가[i]);}' +
+  '})(이,맞);}' +
   'if(!표.length)return;' +
   'function 어디냐(){var h=줄.offsetHeight+22,사=0;' +
   'for(var i=0;i<표.length;i++){if(표[i].a.getBoundingClientRect().top<=h)사=i;}' +
@@ -478,4 +540,5 @@ function 없는쪽(까닭) {
     + '</div></body></html>';
 }
 
-module.exports = { 회차열쇠, 읽기, 볼수있나, 쪽, 없는쪽, 까닭말, 꼬리제목, 전문폭 };
+module.exports = { 회차열쇠, 읽기, 볼수있나, 쪽, 없는쪽, 까닭말, 꼬리제목, 전문폭,
+  그림열쇠, 쇼볼수있나, 쇼보안 };

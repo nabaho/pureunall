@@ -275,6 +275,13 @@
        ⚠ 2026-09-11 에야 여기 적혔다 — 그 전에는 화면이 변수로 불러(SG_PRIVATE_PATH)
          검사의 눈(ref('…')) 에 안 띄었을 뿐, 자리는 줄곧 쓰이고 있었다. */
     suggestions_private:'포털 건의함 — 건의 원문·AI 답변 초안(관리자만)',
+    /* ⚠ 실시간DB 가 «아니다» — 창고(Storage) 자리다 (2026-09-23 뉴스레터 명절 인사).
+         검사의 눈(ref('…'))은 DB 와 창고를 못 가른다. 변수로 불러 눈을 피하지 않고
+         (위 suggestions_private 주석의 교훈) 여기 밝혀 적는다.
+       ⚠ 업무 개체로 만들지 않는다 — 사진 «원본»이라 통합 진단 경로에 넣지 않는다(CLAUDE.md).
+         무엇을 담았나(주소)는 뉴스레터 회차(newsletter/)에 있고, 주인은 뉴스레터다.
+       ⚠ 실시간DB 규칙을 만들지 말 것 — 규칙은 창고 쪽(docs/firebase-storage-전체)에 있다. */
+    newsletter_img:'창고(Storage) — 뉴스레터 명절 인사 사진. DB 자리 아님, 주인은 뉴스레터(news)',
     suggestions_meta_private:'포털 건의함 색인 — 알림·배지용 경량 메타',
     suggestions_resolved_private:'포털 건의함 — 올린 사람이 보는 처리 결과',
     /* 로그인 보안 감시(functions/index.js logLoginAttempt, 2026-09-20) —
