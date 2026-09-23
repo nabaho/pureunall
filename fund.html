@@ -5062,11 +5062,22 @@ function fillCharterHead(root,f){
 var GRID_NAME=/○\s*○\s*○/;
 var GRID_TITLE=/□\s*□\s*□/;
 var GRID_BLANK='＿＿＿＿＿';
+/* ★ 이름·(인) 은 칸 오른쪽 끝으로 (대표 지시 2026-09-23 「사내 정관 서명 격자도」).
+   원본 줄은 "근로자대표 ○ ○ ○ 인" 처럼 직함(또는 자간을 벌린 「대 표 이 사」)과 이름 자리표가
+   한 줄에 붙어 있다 — 이름 길이가 사람마다 달라 「인」 자리가 줄마다 어긋났다.
+   ⚠ 서명표(signTableHTML)와 달리 «한 줄»을 유지한다 — 이 칸은 원래도 한 줄(25.1pt)이라
+     <div class="right"> 처럼 블록으로 떼면 줄이 나뉘어 칸 높이가 배로 는다. 대신 칸 전체를
+     한 줄짜리 flex 로 감싸 직함은 왼쪽, 이름·인은 오른쪽에 «같은 줄»로 세운다. */
 function _gridCell(td,o,keepLabel){
   var nm=(o&&String(o.name||'').trim())||GRID_BLANK;
   var t=String(td.textContent||'');
   if(!keepLabel) t=t.replace(GRID_TITLE,(o&&String(o.title||'').trim())||'＿＿＿');
-  td.textContent=t.replace(GRID_NAME,nm);
+  var m=t.match(GRID_NAME);
+  if(m){
+    var i=t.indexOf(m[0]), label=t.slice(0,i).replace(/\s+$/,''), tail=t.slice(i+m[0].length);
+    td.innerHTML='<div style="display:flex;justify-content:space-between;gap:8px">'
+      +'<span>'+esc(label)+'</span><span>'+esc(nm)+esc(tail)+'</span></div>';
+  } else td.textContent=t;
   td.setAttribute('data-kept','1');
 }
 function fillSignGrid(root,f,sites){

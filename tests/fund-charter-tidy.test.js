@@ -224,6 +224,57 @@ test('격자 줄에 data-cm 을 달아 라벨 채우기가 덮지 않게 한다'
   assert.match(grabFn('fillSignGrid'), /setAttribute\('data-cm','1'\)/);
 });
 
+/* 2026-09-23: 「사내 정관 서명 격자도 오른쪽 정렬」 — 직함은 왼쪽, 이름·인은 오른쪽.
+   ⚠ 서명표(signTableHTML)의 <div class="right"> 를 그대로 옮기면 안 된다 — 그건 블록이라
+     줄을 나눈다. 이 칸은 원래 «한 줄»(25.1pt)이라 줄을 나누면 칸 높이가 배로 는다.
+     대신 한 줄짜리 flex 로 직함·이름을 양끝에 세운다. */
+test('★ 사내 격자도 직함은 왼쪽, 이름·인은 오른쪽으로 — 단 «한 줄»은 유지한다', () => {
+  const fn = grabFn('_gridCell');
+  assert.match(fn, /justify-content:space-between/, '한 줄에서 양끝으로 벌려야 한다');
+  assert.ok(!/<div class="right">/.test(fn),
+    '블록 class="right" 를 쓰면 줄이 나뉘어 칸 높이가 배로 는다(서명표와 다른 칸이다)');
+  assert.match(fn, /t\.indexOf\(m\[0\]\)/, '이름 자리표 뒤를 갈라 오른쪽 칸으로 떼어야 한다');
+});
+
+const GRIDCELL = (() => {
+  const box = {};
+  new Function([
+    'function esc(s){ return String(s==null?"":s); }',
+    grabLine('GRID_NAME'), grabLine('GRID_TITLE'), grabLine('GRID_BLANK'),
+    grabFn('_gridCell'),
+    /* 실제 <td> 대신 «한 곳(_t)만 보는» 자리 — textContent 로 읽고 innerHTML 로 쓰는 것까지
+       실제 DOM 과 같은 순서로 흉내 낸다. */
+    'this.run=function(t,o,keepLabel){',
+    '  var td={_t:t, setAttribute:function(){}};',
+    '  Object.defineProperty(td,"textContent",{get:function(){return td._t;},set:function(v){td._t=v;}});',
+    '  Object.defineProperty(td,"innerHTML",{get:function(){return td._t;},set:function(v){td._t=v;}});',
+    '  _gridCell(td,o,keepLabel);',
+    '  return td._t;',
+    '};',
+  ].join('\n')).call(box);
+  return box;
+})();
+
+test('사내 격자 — 직함의 원본 자간(스페이스로 벌린 글자)은 그대로 둔다', () => {
+  /* 첫 줄(라벨을 그대로 두는 줄) — 「대 표 이 사」의 자간이 살아 있어야 한다 */
+  const out = GRIDCELL.run('대 표 이 사 ○ ○ ○ 인', { name: '김대표' }, true);
+  assert.equal(out,
+    '<div style="display:flex;justify-content:space-between;gap:8px">'
+    + '<span>대 표 이 사</span><span>김대표 인</span></div>');
+});
+
+test('사내 격자 — 이름을 모르면 밑줄, 직책을 모르면 자리표 그대로 둔다', () => {
+  const out = GRIDCELL.run('□ □ □ ○ ○ ○ 인', null, false);
+  assert.match(out, /＿{3,}/, '직책도 이름도 모르면 자리표가 남아야 한다');
+  assert.match(out, /<span>＿{3,} 인<\/span>/, '이름 자리는 밑줄로 오른쪽 칸에 서야 한다');
+});
+
+test('사내 격자 — 한 줄을 유지한다 (block 이 아니라 flex 로 감싼다)', () => {
+  const out = GRIDCELL.run('근로자대표 ○ ○ ○ 인', { name: '박근로' }, true);
+  assert.equal((out.match(/<div/g) || []).length, 1, '줄을 나누는 두 번째 block 이 있으면 안 된다');
+  assert.doesNotMatch(out, /<br/, '줄바꿈을 넣으면 한 줄이 아니다');
+});
+
 /* ══════════ ④ 차례 ══════════ */
 
 test('★ 차례 — 말 고치기 → 표로 짜기 → 자리표 채우기 → 걷어내기', () => {
