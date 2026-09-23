@@ -72,6 +72,68 @@
   function esc(s) { var el = d.createElement('div'); el.textContent = String(s); return el.innerHTML; }
   function close() { if (host) host.style.display = 'none'; }
 
+  /* ══ 창을 마우스로 옮긴다 (대표 지시 2026-09-23 「팝업창 마우스로 이동가능하게 해줘」) ══
+     ★ 자리를 «transform» 으로 옮긴다. 이 창은 host 의 flex 가 가운데로 세워 주는데,
+       position/left/top 으로 옮기면 그 가운데 세우기와 싸운다 — 창 크기가 바뀌거나
+       글이 길어질 때마다 어긋난다. transform 은 «세워진 자리에서 얼마나 밀지»만 말하므로
+       가운데 세우기를 그대로 두고 얹을 수 있다.
+     ★ 마우스·손가락을 따로 적지 않는다 — pointer 하나로 둘 다 받는다.
+     ⚠ 옮긴 자리를 «기억한다». 열 때마다 가운데로 돌아가면, 가리는 것을 보려고
+       옮긴 사람이 열 때마다 다시 옮겨야 한다.
+     ⚠ 다만 열 때·창 크기가 바뀔 때 «화면 안으로 도로 당긴다» — 작은 화면으로 옮겨 가면
+       창이 밖에 나가 영영 못 잡는다. 그것이 제일 나쁘다. */
+  var _dx = 0, _dy = 0;
+  function 자리적용() {
+    if (!box) return;
+    box.style.transform = (_dx || _dy) ? ('translate(' + _dx + 'px,' + _dy + 'px)') : '';
+  }
+  /* 화면 밖으로 못 나가게 당긴다. 잣대는 «창의 지금 자리»다 —
+     얼마나 밀었는지만 보면 창 크기가 바뀐 뒤에는 틀린 답이 나온다. */
+  function 안으로당기기() {
+    if (!box || !host || host.style.display === 'none') return;
+    var 여백 = 8;
+    var r = box.getBoundingClientRect();
+    var W = w.innerWidth || d.documentElement.clientWidth;
+    var H = w.innerHeight || d.documentElement.clientHeight;
+    if (r.width > W - 2 * 여백) { _dx = 0; } else {
+      if (r.left < 여백) _dx += 여백 - r.left;
+      else if (r.right > W - 여백) _dx -= r.right - (W - 여백);
+    }
+    /* 세로는 «머리줄이 보이는가»로 본다 — 머리줄을 잡아야 다시 옮길 수 있다.
+       창이 화면보다 길 수 있으므로 아래쪽은 바닥이 아니라 머리줄을 기준으로 막는다. */
+    if (r.top < 여백) _dy += 여백 - r.top;
+    else if (r.top > H - 48) _dy -= r.top - (H - 48);
+    자리적용();
+  }
+  function 끌기달기(손잡이, 닫기단추) {
+    var 잡았나 = false, sx = 0, sy = 0, bx = 0, by = 0, id = null;
+    손잡이.addEventListener('pointerdown', function (e) {
+      /* 닫기 단추에서 시작한 것은 끌기가 아니다 — 누르려다 1px 흔들려도 안 닫히면 안 된다 */
+      if (닫기단추 && (e.target === 닫기단추 || 닫기단추.contains(e.target))) return;
+      if (e.button != null && e.button !== 0) return;      // 왼쪽 단추만
+      잡았나 = true; id = e.pointerId;
+      sx = e.clientX; sy = e.clientY; bx = _dx; by = _dy;
+      try { 손잡이.setPointerCapture(id); } catch (_) {}
+      손잡이.style.userSelect = 'none';                     // 끄는 동안 글자가 잡히지 않게
+      e.preventDefault();
+    });
+    손잡이.addEventListener('pointermove', function (e) {
+      if (!잡았나 || (id != null && e.pointerId !== id)) return;
+      _dx = bx + (e.clientX - sx); _dy = by + (e.clientY - sy);
+      자리적용();
+    });
+    function 놓기(e) {
+      if (!잡았나 || (id != null && e && e.pointerId !== id)) return;
+      잡았나 = false;
+      try { 손잡이.releasePointerCapture(id); } catch (_) {}
+      손잡이.style.userSelect = '';
+      안으로당기기();
+    }
+    손잡이.addEventListener('pointerup', 놓기);
+    손잡이.addEventListener('pointercancel', 놓기);
+  }
+  try { w.addEventListener('resize', 안으로당기기); } catch (_) {}
+
   function make() {
     if (host) return;
     host = d.createElement('div');
@@ -80,7 +142,8 @@
     box = d.createElement('section');
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', 'TypeSafe 검토');
     box.style.cssText = 'width:min(560px,100%);max-height:min(700px,calc(100vh - 36px));overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,.35);padding:20px;box-sizing:border-box;color:#1e293b;font-family:inherit;';
-    var head = d.createElement('div'); head.style.cssText = 'display:flex;justify-content:space-between;gap:12px;align-items:start;';
+    var head = d.createElement('div'); head.style.cssText = 'display:flex;justify-content:space-between;gap:12px;align-items:start;'
+      + 'cursor:move;touch-action:none;';   /* ← 여기를 잡고 창을 옮긴다 (대표 지시 2026-09-23) */
     /* 호스트가 이름 목록을 안 들고 있으면(포털) 누를 때 스스로 읽어 온다 — 그 사실을
        창에서도 밝힌다(「가린다」고만 적고 어디서 읽는지 숨기지 않는다). */
     var selfLoad = typeof w.PU_TYPESAFE_LOCAL_REDACT !== 'function';
@@ -88,6 +151,7 @@
       + (selfLoad ? '<br>「제안 받기」를 누를 때 직원·업체 목록을 한 번 읽어 와서 가립니다.' : '') + '</div>';
     var x = d.createElement('button'); x.type = 'button'; x.textContent = '닫기'; x.style.cssText = 'border:0;background:#f8fafc;border-radius:8px;padding:7px 10px;color:#475569;font-weight:700;cursor:pointer;'; x.onclick = close;
     head.appendChild(title); head.appendChild(x); box.appendChild(head);
+    끌기달기(head, x);
     var label = d.createElement('label'); label.textContent = '검토할 내용'; label.style.cssText = 'display:block;margin-top:17px;font-size:13px;font-weight:700;'; box.appendChild(label);
     input = d.createElement('textarea'); input.maxLength = MAX; input.placeholder = '문의·메모·오류 내용을 붙여넣으세요.\n예: 계약 마감이 오늘인데 담당자 확인이 필요합니다.';
     input.style.cssText = 'display:block;width:100%;height:142px;resize:vertical;box-sizing:border-box;margin-top:7px;padding:11px;border:1px solid #cbd5e1;border-radius:10px;font:14px/1.55 inherit;color:#1e293b;'; box.appendChild(input);
@@ -303,6 +367,8 @@
     make();
     if (ack) { ack.checked = false; if (typeof ack.onchange === 'function') ack.onchange(); }
     host.style.display = 'flex';
+    /* 지난번에 옮겨 둔 자리를 그대로 쓰되, 그 사이 화면이 작아졌으면 안으로 당긴다 */
+    자리적용(); 안으로당기기();
     input.focus();
   }
 

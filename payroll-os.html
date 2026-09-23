@@ -138,11 +138,20 @@ h1{font-size:20px;margin-bottom:4px}.sub{color:var(--sub);font-size:13px;margin-
 <!-- 프로그램 사이 이동 (공용 앱바) — 문서관리와 함께 이 앱에만 빠져 있었다(2026-08-13) -->
 <script src="js/pu-appbar.js?v=13"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
-<script src="js/pu-gate.js?v=2"></script>
+<script src="js/pu-gate.js?v=3"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-authsync.js?v=2"></script>
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-whoami.js?v=1"></script>
+<script>
+/* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
+   포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
+   주소창에 payroll-os.html 를 직접 친 사람을 막는다. 둘 중 하나만 있으면 뚫린다.
+   ⚠ 잣대는 포털(enter.html appIsSoon)과 «같은 것» — 명부의 role === 'admin'.
+     사번으로 박지 않는다(바뀌는 날 대표님이 잠긴다).
+   ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
+try { PuGate.soonUnlessAdmin('급여관리'); } catch(_){}
+</script>
 <!-- ⚠ mount(false) = 「우리가 이미 그린다」 (대표 지적 2026-08-24 「화면 겹쳐지게 하지 마라」)
      자리를 안 알려 주면 이 부품이 화면 오른쪽 위에 **떠서** 붙는다(position:fixed).
      이 앱은 머리줄 #whoami 에 스스로 이름을 그리므로 뜬 표가 그 위에 겹친다. -->

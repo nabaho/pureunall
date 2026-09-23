@@ -36,6 +36,11 @@ function load(opts) {
     return {
       tagName: tag, style: {}, children: [],
       setAttribute() {}, addEventListener() {}, removeEventListener() {}, focus() {}, remove() {},
+      /* ⚠ 진짜 요소에는 이것이 «늘» 있다. 없는 가짜를 쓰면, 자리를 재는 코드가
+         들어오는 날 검사가 «기능이 멀쩡한데» 깨진다 — 2026-09-23 창 끌기를 넣자
+         이 자리에서 그렇게 깨졌다. 가짜는 실물에 없는 것을 더하지 말되,
+         실물에 «있는 것»을 빠뜨려도 안 된다. */
+      getBoundingClientRect() { return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }; },
       appendChild(child) { this.children.push(child); return child; },
       _id: '',
       get id() { return this._id; },

@@ -1340,16 +1340,16 @@ body.portal-mode #moreFab{display:flex;}
        그래서 타일 둘은 «한 프로그램의 문 둘»이 아니라 «다른 두 화면»이 되었다.
        대표 지시 2026-08-24: 「해라 포털도」.
        ⚠ 주소에 ?view=mail 이 붙어야 한다. 그냥 pu-cards.html 이면 명함이 열린다. */
-    { key:'mail',    name:'푸른 메일',     desc:'메일 쓰기·보낸 메일·자료함', icon:'📧', url:'pu-cards.html?view=mail', roles:null, row:'store' },
+    { key:'mail',    name:'푸른 메일',     desc:'메일 쓰기·보낸 메일·자료함', icon:'📧', url:'pu-cards.html?view=mail', roles:null, soon:true, row:'store' },
     { key:'cards',   name:'기업정보함',    desc:'사업자·명함·계약서', icon:'📇', url:'pu-cards.html',       roles:null, row:'store' },
     { key:'photos',  name:'사진첩',       desc:'사진·서류',        icon:'🖼️', url:'pu-photos.html',      roles:null, row:'store' },
     { key:'fund',    name:'기금관리',     desc:'근로복지기금 운영', icon:'🪙', url:'fund.html',           roles:null, row:'client' },
-    { key:'rules',   name:'취업규칙 관리', desc:'작성·검토·개정·신고', icon:'📜', url:'rules.html',          roles:null, row:'client' },
-    { key:'docs',    name:'문서관리',     desc:'계약서 전자송부',  icon:'📤', url:'docs-esign.html',     roles:null, row:'client' },
-    { key:'payroll', name:'급여관리',     desc:'급여 아웃소싱',    icon:'💰', url:'payroll-os.html',     roles:null, row:'client' },
+    { key:'rules',   name:'취업규칙 관리', desc:'작성·검토·개정·신고', icon:'📜', url:'rules.html',          roles:null, soon:true, row:'client' },
+    { key:'docs',    name:'문서관리',     desc:'계약서 전자송부',  icon:'📤', url:'docs-esign.html',     roles:null, soon:true, row:'client' },
+    { key:'payroll', name:'급여관리',     desc:'급여 아웃소싱',    icon:'💰', url:'payroll-os.html',     roles:null, soon:true, row:'client' },
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
        사진첩(업무지원)과 달리 이 줄에 둔다. */
-    { key:'paydata', name:'급여데이터함',  desc:'급여자료 사업장별', icon:'💼', url:'pu-paydata.html',     roles:null, row:'store' },
+    { key:'paydata', name:'급여데이터함',  desc:'급여자료 사업장별', icon:'💼', url:'pu-paydata.html',     roles:null, soon:true, row:'store' },
     /* 경력관리·홈페이지 관리 — 총괄관리자만 본다 (대표 지시 2026-08-17).
        「흐리게도 보이지 않게」 하라 하셨으므로 타일을 아예 안 그린다.
        ★ 잣대는 ⚙ 설정·백업 타일과 «같은 것»(sgIsAdmin = 명부의 role)을 쓴다.
@@ -1370,6 +1370,25 @@ body.portal-mode #moreFab{display:flex;}
        내외관리 줄은 경력관리·홈페이지 관리 둘이다.
        ⚠ 다시 타일로 넣지 말 것. 넣으려면 떠 있는 단추를 먼저 없애야 한다. */
   ];
+
+  /* ══ 「준비중」 — 보이되 못 누르게 (대표 지시 2026-09-23) ══════════════════
+     「권형하 이외 클릭하면 앱이 안 열리게 해달라. 준비중 이라고 연하게 앱에 보이고
+      다른사람은 클릭안되게 했으면좋겠다」
+
+     ★ adminOnly 와 «다른» 것이다. adminOnly 는 타일을 아예 안 그린다
+       (2026-08-17 「흐리게도 보이지 않게」). 이것은 반대다 — **보이되 못 누른다.**
+       아직 짓는 중인 것이 «있다는 사실»은 알리되, 열어서 반쪽짜리를 보지는 않게 한다.
+
+     ⚠★ 잣대는 adminOnly 와 «똑같은 것»(명부의 role === 'admin')을 쓴다.
+       「권형하」를 사번(P-001)으로 못 박지 않는다 — 사번은 바뀔 수 있고, 박아 두면
+       바뀌는 날 대표님 화면에서 앱이 통째로 잠긴다. 오늘 role === 'admin' 인 사람은
+       대표님 한 분이다(위임관리인은 role 이 'staff' 이고 isSubAdmin 으로 갈린다).
+     ⚠ 잣대를 여기 «한 함수»에 둔다. 타일과 바로가기 목록 두 곳이 이것을 함께 본다 —
+       한쪽만 막으면 타일은 잠갔는데 「로그인 후 바로가기」로 그냥 열린다.
+     ⚠ 이것은 «포털의 문»이다. 주소를 직접 치면 앱 자체는 열린다.
+       앱마다 문을 달려면 앱 다섯을 각각 고쳐야 한다 — 그것은 다음 걸음이다. */
+  function appIsSoon(app, isAdmin){ return !!(app && app.soon) && !isAdmin; }
+
   /* ══ 초기화면 줄 (대표 결정 2026-08-29 「1」= 안 ㉮) ══
      여태는 「업무지원 / 직접업무」 둘이었다. 그런데 그것은 «프로그램 입장»의
      구분이라(돕는 도구냐 직접 하는 일이냐) 찾을 때 도움이 안 됐다 —
@@ -2273,6 +2292,7 @@ body.portal-mode #moreFab{display:flex;}
       if(!isMobile() && !isAct) a.target = portalAppWindowName(app.key);
       // 로컬 앱(기금관리 등, localhost 실행)은 폰에서 열 수 없음 → 이동 대신 안내
       var mobileLocal = isMobile() && app.local && !isAct;
+      var 준비중 = appIsSoon(app, _isAdm);
       /* ── 설명 줄을 뺀다 (대표 지시 2026-08-24 「아이콘 제목 아래 설명 필요 없다.
             차라리 PC에서는 마우스 올리면 나오게 하고, 폰에서는 두 번째 줄 없애라」) ──
          ★ 없애는 것이 아니라 «옮기는» 것이다 — PC 에서는 마우스를 올리면 나온다.
@@ -2280,11 +2300,29 @@ body.portal-mode #moreFab{display:flex;}
          ⚠ 「PC 전용」은 설명이 아니라 «경고» 다 — 폰에서 눌러도 안 열린다는 뜻이라
            그것만은 줄로 남긴다. 감추면 왜 안 열리는지 알 길이 없다. */
       a.title = app.name + (app.desc ? ' — ' + app.desc : '');
+      /* 「준비중」은 «연하게» 보인다. 아주 안 보이면 있다는 것조차 모르고,
+         또렷하면 눌러도 되는 줄 안다 — 그 사이가 이 흐림이다.
+         ⚠ 「탭 이동 ↗」은 안 그린다. 안 열리는데 열린다고 적혀 있으면 안 된다. */
       a.innerHTML =
-        '<div class="ic"' + (mobileLocal ? ' style="opacity:.45"' : '') + '>' + app.icon + '</div>' +
+        '<div class="ic"' + (mobileLocal || 준비중 ? ' style="opacity:.45"' : '') + '>' + app.icon + '</div>' +
         '<div class="tx"><b>' + app.name + '</b>' +
-        (mobileLocal ? '<span>PC 전용</span>' : '') + '</div>' +
-        (isMobile() ? '' : '<div class="newtab">탭 이동 ↗</div>');
+        (mobileLocal ? '<span>PC 전용</span>' : (준비중 ? '<span>준비중</span>' : '')) + '</div>' +
+        ((isMobile() || 준비중) ? '' : '<div class="newtab">탭 이동 ↗</div>');
+      if(준비중){
+        a.style.opacity = '.55';
+        a.style.cursor = 'not-allowed';
+        a.removeAttribute('target');       // 새 탭으로도 안 열린다
+        a.href = '#';
+        a.title = app.name + ' — 준비중입니다';
+        a.setAttribute('aria-disabled', 'true');
+        /* ⚠ pointer-events:none 으로 막지 «않는다» — 그러면 눌러도 아무 일이 안 나고
+           왜 안 되는지 알 길이 없다. 눌리게 두고, 눌렀을 때 까닭을 말한다
+           (바로 아래 「PC 전용」이 쓰는 것과 같은 길이다). */
+        a.addEventListener('click', function(ev){
+          ev.preventDefault();
+          alert('🔧 ' + app.name + '은(는) 아직 준비중입니다.\n\n다 되면 열어 드리겠습니다.');
+        });
+      }
       if(mobileLocal){
         a.href = '#';
         a.addEventListener('click', function(ev){
@@ -2297,7 +2335,16 @@ body.portal-mode #moreFab{display:flex;}
         tileCont(appRowOf(app)).appendChild(a);
         return;
       }
-      if(!isMobile()){
+      /* ⚠★★ 준비중이면 «여는 처리를 아예 안 붙인다» (2026-09-23).
+         ── 처음엔 위에서 stopPropagation() 으로 막으려 했다. **안 막힌다.**
+            그것은 «부모로 올라가는 것»을 막을 뿐, 같은 칸에 붙은 다른 처리는 그대로 돈다.
+            아래 처리는 href 를 안 보고 openPortalApp() 을 «스스로» 부르므로
+            href='#' 로 바꿔 둔 것도 소용이 없다 — PC 에서 그냥 열렸다.
+         ── stopImmediatePropagation() 이면 막히긴 한다. 그런데 그것은 «붙은 차례»에
+            기댄다 — 나중에 누가 처리를 위쪽에 하나 끼우면 조용히 다시 열린다.
+            차례에 기대지 않으려면 «안 붙이는 것»이 맞다.
+         ⚠ 검사가 이것을 잡았다. 글자만 봤으면 못 잡는다 — 눌러 봐야 안다. */
+      if(!isMobile() && !준비중){
         a.addEventListener('click', function(ev){
           ev.preventDefault();
           var _v = Math.floor(Date.now() / 600000);  // 10분 버킷 캐시 우회
@@ -3044,6 +3091,9 @@ body.portal-mode #moreFab{display:flex;}
     return APPS.filter(function(a){
       if(a.roles && a.roles.indexOf(_curRole) < 0) return false;
       if(a.adminOnly && !_adm) return false;
+      /* ★ 타일을 잠가 놓고 여기서 새면 뜻이 없다 — 「로그인 후 바로가기」로 그냥 열린다.
+         maybeGoHome 도 이 목록을 보므로, 예전에 골라 둔 것이 있어도 자동으로 안 넘어간다. */
+      if(appIsSoon(a, _adm)) return false;
       return true;
     });
   }
@@ -4640,6 +4690,6 @@ window.PU_TYPESAFE_MOUNT = function(){
   return home && home.parentNode ? { parent: home.parentNode, before: home } : null;
 };
 </script>
-<script src="js/pu-typesafe.js?v=5"></script>
+<script src="js/pu-typesafe.js?v=6"></script>
 </body>
 </html>

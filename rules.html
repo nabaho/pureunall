@@ -678,13 +678,22 @@ table.daejo td.dj2{padding:0}
 }
 </style>
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
-  <script src="js/pu-gate.js?v=2"></script>
+  <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=13"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=1"></script>
+<script>
+/* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
+   포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
+   주소창에 rules.html 를 직접 친 사람을 막는다. 둘 중 하나만 있으면 뚫린다.
+   ⚠ 잣대는 포털(enter.html appIsSoon)과 «같은 것» — 명부의 role === 'admin'.
+     사번으로 박지 않는다(바뀌는 날 대표님이 잠긴다).
+   ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
+try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
+</script>
   <!-- ⚠ mount(false) = 「우리가 이미 그린다」 (대표 지적 2026-08-24 「화면 겹쳐지게 하지 마라」)
        자리를 안 알려 주면 이 부품이 화면 오른쪽 위에 **떠서** 붙는다(position:fixed).
        이 화면은 머리줄 #who 에 updateWho() 로 스스로 그리므로 뜬 표가 그 위에 겹친다. -->
@@ -5690,17 +5699,42 @@ async function bankMergeUpload(map,progFn){
     await FBDB.ref("chwieop/bank").update(batch);
     if(progFn)progFn(Math.min(keys.length,i+CH),keys.length);
   }
-  // 총계 갱신
+  /* ── 총계 갱신 ─────────────────────────────────────────────────────────
+     ⚠★★ 읽고→더하고→쓰면 «둘이 동시에 올릴 때 한쪽 셈이 사라진다» (2026-09-23 전체점검 ②)
+       종전: once('value') 로 읽고, 거기에 더하고, set 으로 썼다.
+       A 와 B 가 같은 순간에 올리면 둘 다 「100」을 읽고 각자 「120」·「130」을 쓴다 —
+       나중 것만 남아 한쪽이 올린 20개가 셈에서 사라진다. 이 집에 여럿이 올리는 화면이다.
+     ★ 트랜잭션은 «서버가 들고 있는 그 값»에 더한다 — 겹쳐도 둘 다 더해진다.
+     ⚠ 조용히 삼키지 않는다. 종전 catch(e){} 는 총계가 안 맞아도 아무 말이 없었다 —
+       그래서 「은행에 몇 개 있나」가 슬금슬금 어긋나도 아무도 몰랐다. */
   try{
-    const m=(await FBDB.ref("chwieop/bank/meta").once("value")).val()||{};
-    m.clauses=Math.max(m.clauses||0,0)+keys.length;   // 근사치 — 정확한 수는 다음 전체 구축 때
-    m.builtAt=new Date().toISOString().slice(0,16).replace("T"," "); m.by=myName()||"";
-    await FBDB.ref("chwieop/bank/meta").set(m);
-  }catch(e){}
+    await FBDB.ref("chwieop/bank/meta").transaction(m=>{
+      const cur=m||{};
+      cur.clauses=Math.max(cur.clauses||0,0)+keys.length;   // 근사치 — 정확한 수는 다음 전체 구축 때
+      cur.builtAt=new Date().toISOString().slice(0,16).replace("T"," ");
+      cur.by=myName()||"";
+      cur.atMs=Date.now();
+      return cur;
+    });
+  }catch(e){
+    /* ⚠ 여기서 팝업을 띄우지 않는다 — 이 함수는 여섯 군데에서 불리고 더러는 되돌이 안이다.
+       한 번 실패할 때마다 확인창이 뜨면 아무도 못 쓴다.
+       대신 «자국»을 남겨 두고, 전체 구축이 끝나는 자리에서 한 번에 알린다.
+       ⚠ 총계는 원래 근사치다(정확한 수는 다음 전체 구축 때) — 그래서 이 실패는
+         「자료가 새는 것」이 아니라 「화면의 개수가 조금 어긋나는 것」이다. 그만큼만 알린다. */
+    console.warn("문안은행 총계 갱신 실패:",e);
+    _bankMetaWarn="총계를 갱신하지 못했습니다 — 화면의 개수가 실제와 다를 수 있습니다";
+  }
   return keys.length;
 }
+/* 총계 갱신이 어긋났을 때 남기는 «자국». 되돌이 안에서 팝업을 띄울 수 없어
+   여기 담아 두었다가, 일이 끝나 확인창을 띄우는 자리에서 한 줄로 함께 알린다.
+   ⚠ 조용히 삼키던 것(catch(e){})을 대신하는 자리다 — 비우는 것을 잊지 말 것. */
+let _bankMetaWarn="";
 async function bankBuild(files){
   if(!FBDB||!FBUSER){ alert("문안 은행은 법인 공동 저장소에 보관됩니다 — 포털 로그인 후 이용하세요."); return; }
+  _bankMetaWarn="";
+  const _bankBuildAt=Date.now();   // 내 구축이 «시작한» 시각 — 남의 더 새 구축을 안 덮는 잣대
   const list=[...files].filter(f=>/\.(hwpx?|docx|odt|rtf|pdf|txt)$/i.test(f.name));
   if(!list.length){ alert("읽을 수 있는 문서가 없습니다."); return; }
   const prog=$("bank-prog"); prog.style.display="block";
@@ -5730,11 +5764,29 @@ async function bankBuild(files){
   prog.innerHTML=`정리 완료 — 문안 ${keys.length}개 (원 조문 ${arts}개에서 중복 접음)<br><span class="muted">법인 저장소에 올리는 중…</span>`;
   await bankMergeUpload(map,(u,t2)=>{ prog.innerHTML=`올리는 중 ${u} / ${t2}…`; });
   const meta={files:ok,failed:fail,clauses:keys.length,rawArts:arts,
-    builtAt:new Date().toISOString().slice(0,16).replace("T"," "),by:myName()||""};
-  await FBDB.ref("chwieop/bank/meta").set(meta);
+    builtAt:new Date().toISOString().slice(0,16).replace("T"," "),by:myName()||"",atMs:_bankBuildAt};
+  /* ⚠★ 「전체 구축」은 통째로 갈아 끼우는 것이 맞다 — 다만 «나보다 늦게 시작한 구축»은
+     덮지 않는다 (2026-09-23 전체점검 ②). 내 구축이 느려 뒤늦게 끝나면, 그 사이 남이
+     끝낸 더 새로운 결과를 옛 것으로 되돌려 놓기 때문이다. 잣대는 «시작한 시각»이다. */
+  let _saved=meta;
+  try{
+    const r=await FBDB.ref("chwieop/bank/meta").transaction(cur=>{
+      if(cur&&typeof cur.atMs==="number"&&cur.atMs>_bankBuildAt) return;   // 더 새 구축이 있다 — 그대로 둔다
+      return meta;
+    });
+    if(r&&r.committed===false){
+      const v=r.snapshot&&r.snapshot.val();
+      if(v)_saved=v;
+      _bankMetaWarn="그 사이 다른 분이 더 새로 구축했습니다 — 그쪽 결과를 그대로 두었습니다";
+    }
+  }catch(e){
+    console.warn("문안은행 구축 결과 저장 실패:",e);
+    _bankMetaWarn="구축 결과를 저장하지 못했습니다 — 화면의 개수가 실제와 다를 수 있습니다";
+  }
   prog.style.display="none";
-  bankRenderStat(meta);
-  alert(`문안 은행 구축 완료\n파일 ${ok}개 (실패 ${fail}) → 조문 ${arts}개 → 문안 ${keys.length}개\n⚠ 개정 전 문구 의심 ${Object.values(map).filter(c=>c.w).length}건`);
+  bankRenderStat(_saved);
+  alert(`문안 은행 구축 완료\n파일 ${ok}개 (실패 ${fail}) → 조문 ${arts}개 → 문안 ${keys.length}개\n⚠ 개정 전 문구 의심 ${Object.values(map).filter(c=>c.w).length}건`
+    +(_bankMetaWarn?`\n\n⚠ ${_bankMetaWarn}`:""));
 }
 function bankRenderStat(meta){
   $("bank-stat").innerHTML=meta&&meta.clauses
