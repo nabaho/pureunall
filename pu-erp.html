@@ -4867,11 +4867,11 @@ function dbSet(k, v){
     //    서버를 덮어써 과거로 회귀하는 문제를 원천 차단. (로컬에는 이미 저장됨)
     if(!_fbSynced){
       try { (window._fbPendingKeys = window._fbPendingKeys || {})[k] = true; } catch(_){}
+      console.warn('[동기화보호] 초기 동기화 완료 전 — '+k+' 서버 쓰기 보류 (로컬만 저장)');
       /* ★ 어느 «줄»을 바꿨는지도 적는다 (2026-09-23) — 표 통째 표시만 두면 나중에
            이 PC 사본 전체가 «못 보낸 변경»으로 읽혀, 남이 넣은 줄은 지우고 남이 지운
            줄은 되살린다. 까닭은 _fbOpsAdd 머리글. */
       try { if(DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v)){ var _po0 = (window._fbPendingOps = window._fbPendingOps || {}); _po0[k] = _fbOpsAdd(_po0[k], prev, v); } } catch(_){}
-      console.warn('[동기화보호] 초기 동기화 완료 전 — '+k+' 서버 쓰기 보류 (로컬만 저장)');
       return true;
     }
     try {
