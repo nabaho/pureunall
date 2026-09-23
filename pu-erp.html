@@ -4914,6 +4914,10 @@ function dbSet(k, v){
     if(!_fbSynced){
       try { (window._fbPendingKeys = window._fbPendingKeys || {})[k] = true; } catch(_){}
       console.warn('[동기화보호] 초기 동기화 완료 전 — '+k+' 서버 쓰기 보류 (로컬만 저장)');
+      /* ★ 어느 «줄»을 바꿨는지도 적는다 (2026-09-23) — 표 통째 표시만 두면 나중에
+           이 PC 사본 전체가 «못 보낸 변경»으로 읽혀, 남이 넣은 줄은 지우고 남이 지운
+           줄은 되살린다. 까닭은 _fbOpsAdd 머리글. */
+      try { if(DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v)){ var _po0 = (window._fbPendingOps = window._fbPendingOps || {}); _po0[k] = _fbOpsAdd(_po0[k], prev, v); } } catch(_){}
       return true;
     }
     try {
@@ -4927,7 +4931,11 @@ function dbSet(k, v){
       //   나중에 원격값이 그 변경을 조용히 지우던 문제가 있었다. 이 표시가 있으면 원격 적용 시
       //   '로컬에만 있는 레코드'를 다시 살려 재전송한다(_fbApplyRecord 참고). 가드로 의도적으로 막은
       //   경우(0건·급감·옛데이터)에는 표시하지 않는다 — 되살리면 안 되는 값일 수 있으므로.
-      var _markPending = function(){ try { (window._fbPendingKeys = window._fbPendingKeys || {})[k] = true; } catch(_){} };
+      var _markPending = function(){
+        try { (window._fbPendingKeys = window._fbPendingKeys || {})[k] = true; } catch(_){}
+        /* ★ 이 저장이 «실제로 바꾼 줄»만 못 보낸 것으로 적는다 (2026-09-23, _fbOpsAdd 머리글) */
+        try { if(DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v)){ var _po1 = (window._fbPendingOps = window._fbPendingOps || {}); _po1[k] = _fbOpsAdd(_po1[k], prev, v); } } catch(_){}
+      };
 
       // ── 자동 Diff Sync (핵심 5개 키) — 1단계: 변경 개수 무관 항상 건별 저장 ──
       // #4 Tier 3: id 키 기반 부분 업데이트 (인덱스 충돌 제거) — 삭제도 가능
@@ -5111,6 +5119,19 @@ function dbSet(k, v){
                 try { if(typeof _scheduleFbChanged === 'function') _scheduleFbChanged(k); } catch(_){}
               } catch(_){}
               try { showToast('🔄 다른 기기의 최신 데이터로 갱신됨 — 방금 변경은 다시 확인하세요'); } catch(_){}
+              return;
+            }
+            /* ★★ 기준을 모르면 «지운 것»도 모른다 — 서버 줄을 하나도 안 지운다 (2026-09-23)
+                 여기까지 와서 이전 값(prev)이 배열이 아니면, 이 저장이 무엇을 지웠는지 알 길이
+                 없다. 그런데 바로 아래 set 은 서버 표를 이 PC 사본으로 «통째» 바꾼다 — 사본에
+                 없는 줄은 모두 사라진다. 2026-09-23 급여 40건이 이 한 줄로 사라졌다.
+               ⚠ 서버가 이름 열쇠 표(객체)일 때만 이 길로 간다 — 줄마다 경로가 있어야 얹을 수 있다.
+               ⚠ 지우기가 정말 필요하면 이전 값이 있는 보통 저장(건별·병합)이 한다. */
+            if(DIFF_KEYS.indexOf(k) >= 0 && !Array.isArray(prev) && sv && sv.v && typeof sv.v === 'object' && !Array.isArray(sv.v)){
+              var _ub = _fbUnknownBaseUpserts(k, v, sv.v, ts);
+              if(!_ub){ _metaRollback(); return; }
+              console.warn('[기준없음] '+k+': 이전 값을 몰라 서버 줄은 지우지 않고 바뀐 줄 '+(Object.keys(_ub).length-1)+'건만 얹습니다');
+              fbDb.ref().update(_ub).then(function(){ _fbObjForm[k] = true; }).catch(function(e){ _metaRollback(); _markPending(); fbSyncFail(e); });
               return;
             }
             fbDb.ref('data/'+k).set({v:fbValue, u:ts}).then(function(){ if(DIFF_KEYS.indexOf(k)>=0 && fbValue && !Array.isArray(fbValue)) _fbObjForm[k]=true; }).catch(function(e){ _metaRollback(); _markPending(); fbSyncFail(e); });
@@ -5299,6 +5320,148 @@ function computeArrayDiff(prev, next){
   });
 
   return { upserts:upserts, removes:removes, totalChange: upserts.length + removes.length };
+}
+
+/* ══ 못 보낸 변경은 «표 통째»가 아니라 «줄»로 적는다 (2026-09-23) ════════════════════
+   대표 지시 「다른 사람들이 로그인 할때마다 계속 데이터 삭제 및 소실 문제가 끊임없이
+   발생한다 정확한 이유를 찾아서 완벽하게 해결해라」.
+
+   ■ 무엇이 있었나 (2026-09-23 실측, 급여 payroll_monthly)
+     15:14 백업 526건 → 15:16 서버 486건. 오늘 접속자는 대표 한 분(PC 두 대).
+     한 PC 가 낡은 사본으로 급여표를 «통째로» 다시 써서, 다른 PC 가 막 넣은 40건이
+     지워졌다. 다른 쪽 PC 에는 「263건이 한꺼번에 지워졌습니다」가 떴다.
+     그보다 앞서 낡은 사본 쪽에서 이미 지워졌던 옛 모양 열쇠(pay-X-202601) 41건이
+     되살아나 있었다 — 지워진 것이 살아나고, 산 것이 지워지는 핑퐁이다.
+
+   ■ 뿌리 — 셋이 같은 착각을 했다: 「서버에 없고 이 PC 에만 있는 줄 = 내가 못 보낸 변경」
+     ① 못 보낸 표시가 «표 통째»였다(_fbPendingKeys[k] = true). 어느 줄을 바꿨는지 몰랐다.
+     ② 로그인해 서버 값을 받을 때(_fbApplyRecordInner) 「이 PC 에만 있는 줄」을
+        전부 되살려 다시 보냈다 — 남이 지운 줄까지. 낡은 PC 일수록 많이 되살렸다.
+     ③ 다시 보내는 일꾼(_flushPendingLocalNewer)이 이 PC 사본을 «지우고» dbSet 을 불렀다.
+        그러면 dbSet 이 이전 값(prev)을 null 로 보아 건별 저장·병합을 못 하고,
+        마지막 줄의 `set({v,u})` — 서버 표 통째 덮어쓰기로 떨어졌다. 급감 차단은
+        「절반 이하」만 막으므로 526→486(8%) 은 그대로 통과했다.
+        주석에는 「모든 보호로직 통과 후에만」이라 적혀 있었지만 하나도 안 탔다.
+     ⚠ 2026-08-30 에 ③ 을 «연결이 이어질 때마다» 돌게 바꿨다 — 그래서 로그인할 때만이
+       아니라 와이파이가 한 번 끊겼다 붙을 때마다 일어났다. 「끊임없이」의 까닭이다.
+
+   ■ 고침
+     · 못 보낸 변경을 «줄»로 적는다: { up:{id:줄}, rm:{id:1} }. 이 저장이 실제로 바꾼 것뿐이다.
+     · 되살리기·다시 보내기는 그 줄만 한다. 적히지 않은 줄은 «남이 지운 것»으로 본다.
+     · 기준(prev)을 모르는 저장이 이름 열쇠 표에 오면 서버 줄을 «하나도» 지우지 않는다.
+   ⚠ 옛 «숫자 열쇠» 모양 표(연장근로·휴가부여·비정기급여 — 각 11~17건)는 줄 단위로 서버에
+     쓸 수 없어 예전 길로 둔다. 이름 열쇠 표(급여·계약·사건·업체·입금 등)가 이 길을 탄다. */
+function _fbOpsAdd(ops, prev, next){
+  ops = ops || { up:{}, rm:{} };
+  ops.up = ops.up || {}; ops.rm = ops.rm || {};
+  var pm = {}, nm = {};
+  (Array.isArray(prev) ? prev : []).forEach(function(x){ if(x && x.id != null && x.id !== '') pm[String(x.id)] = x; });
+  (Array.isArray(next) ? next : []).forEach(function(x){ if(x && x.id != null && x.id !== '') nm[String(x.id)] = x; });
+  Object.keys(nm).forEach(function(id){
+    if(!pm[id] || JSON.stringify(pm[id]) !== JSON.stringify(nm[id])){ ops.up[id] = nm[id]; delete ops.rm[id]; }
+  });
+  Object.keys(pm).forEach(function(id){
+    if(!nm[id]){ ops.rm[id] = 1; delete ops.up[id]; }
+  });
+  return ops;
+}
+function _fbOpsEmpty(ops){
+  return !ops || (!Object.keys(ops.up || {}).length && !Object.keys(ops.rm || {}).length);
+}
+/* 적어 둔 줄을 지금 사본에 얹는다 — 적히지 않은 줄은 «손대지 않는다» */
+function _fbOpsApply(arr, ops){
+  var up = (ops && ops.up) || {}, rm = (ops && ops.rm) || {};
+  var out = [], seen = {};
+  (Array.isArray(arr) ? arr : []).forEach(function(x){
+    var id = (x && x.id != null && x.id !== '') ? String(x.id) : null;
+    if(id && rm[id]) return;
+    if(id && up[id]){ if(!seen[id]){ out.push(up[id]); seen[id] = 1; } return; }
+    out.push(x); if(id) seen[id] = 1;
+  });
+  Object.keys(up).forEach(function(id){ if(!seen[id]) out.push(up[id]); });
+  return out;
+}
+/* 적어 둔 줄을 서버에 «그 줄만» 보내는 경로들 */
+function _fbOpsUpdates(k, ops, ts){
+  var u = {};
+  Object.keys((ops && ops.up) || {}).forEach(function(id){ u['data/' + k + '/v/' + id] = ops.up[id]; });
+  Object.keys((ops && ops.rm) || {}).forEach(function(id){ u['data/' + k + '/v/' + id] = null; });
+  u['data/' + k + '/u'] = ts;
+  return u;
+}
+/* 로그인해 서버 값을 받을 때 «되살릴» 줄 — 서버에 없고, 이 PC 에만 있고,
+   **내가 못 보낸 것으로 적힌** 줄만. 적힌 것이 없으면(ops 없음) 예전처럼 본다 —
+   숫자 열쇠 옛 표는 줄로 적지 못하므로 그 길을 남긴다. */
+function _fbPendKeepRows(localArr, serverArr, ops){
+  var sm = {};
+  (Array.isArray(serverArr) ? serverArr : []).forEach(function(x){ if(x && x.id) sm[String(x.id)] = 1; });
+  return (Array.isArray(localArr) ? localArr : []).filter(function(x){
+    if(!x || !x.id || sm[String(x.id)]) return false;
+    if(ops) return !!(ops.up && ops.up[String(x.id)]);
+    return true;
+  });
+}
+/* 기준(prev)을 모르는 저장 — 무엇을 «지웠는지» 모르므로 서버 줄을 하나도 안 지운다.
+   서버와 다른 줄·새 줄만 얹는다. 서버가 이름 열쇠 표(객체)일 때만 쓴다.
+   돌려주는 것: 보낼 경로들, 또는 보낼 것이 없으면 null. */
+function _fbUnknownBaseUpserts(k, v, srvMap, ts){
+  if(!Array.isArray(v) || !srvMap || typeof srvMap !== 'object' || Array.isArray(srvMap)) return null;
+  var u = {}, n = 0;
+  v.forEach(function(x){
+    if(!x || x.id == null || x.id === '') return;
+    var s = srvMap[x.id];
+    if(!s || JSON.stringify(s) !== JSON.stringify(x)){ u['data/' + k + '/v/' + x.id] = x; n++; }
+  });
+  if(!n) return null;
+  u['data/' + k + '/u'] = ts;
+  return u;
+}
+/* 적어 둔 줄을 «그 줄만» 다시 보낸다. 보냈으면(또는 보낼 것이 없어 끝냈으면) true.
+   ⚠ 이름 열쇠 표(_fbObjForm[k] === true)만 한다 — 줄마다 경로가 있어야 그 줄만 쓸 수 있다.
+     아니면 false 를 돌려 예전 길(숫자 열쇠 옛 표)에 맡긴다.
+   ⚠ 지우기가 절반을 넘으면(10건 이상) 보내지 않고 묻는 쪽으로 돌린다 — 보통 저장과 같은 기준이다.
+     동기화 전에 보류된 저장은 급감 차단을 한 번도 안 거쳤다. */
+function _fbReplayOps(k){
+  var po = window._fbPendingOps || {};
+  var ops = po[k];
+  if(_fbOpsEmpty(ops)){ delete po[k]; return false; }
+  if(_fbObjForm[k] !== true) return false;
+  if(!fbDb || !_fbSynced) return false;
+  var cur = dbGet(k, []) || [];
+  var nRm = Object.keys(ops.rm || {}).length;
+  var bulkOk = window._bulkDeleteIntent && (Date.now() - window._bulkDeleteIntent < 15000);
+  if(cur.length >= 10 && nRm >= cur.length * 0.5 && !bulkOk){
+    console.warn('[데이터보호] '+k+': 보류됐던 지우기 '+nRm+'건이 절반을 넘어 서버에 보내지 않았습니다');
+    try { window.erpAlert && erpAlert('danger', '보류됐던 대량 지우기: '+k, '연결이 끊긴 동안 '+nRm+'건을 지운 것으로 적혀 있어 서버에 보내지 않았습니다.', '의도한 것이면 F12 콘솔에 erpAllowBulk() 입력 후 15초 안에 다시 저장하세요.'); } catch(_){}
+    delete po[k]; if(window._fbPendingKeys) delete window._fbPendingKeys[k];
+    return true;
+  }
+  delete po[k]; if(window._fbPendingKeys) delete window._fbPendingKeys[k];
+  var next = _fbOpsApply(cur, ops);
+  /* 이 PC 사본에도 얹는다 — 서버 값을 받으며 덮였을 수 있다 */
+  try {
+    if(JSON.stringify(next) !== JSON.stringify(cur)){
+      if(typeof _erpStoreSet === 'function') _erpStoreSet(k, JSON.stringify(next));
+      else localStorage.setItem(KEY+k, JSON.stringify(next));
+      _dbCache[k] = next;
+      try { _scheduleFbChanged(k); } catch(_){}
+    }
+  } catch(_w){}
+  var ts = Date.now();
+  fbDb.ref().update(_fbOpsUpdates(k, ops, ts)).then(function(){
+    try { localStorage.setItem(KEY+'_meta_'+k, String(ts)); } catch(_){}
+    console.log('[동기화보호] 보류됐던 '+k+' 줄 '+(Object.keys(ops.up).length+nRm)+'건만 다시 보냈습니다');
+  }).catch(function(e){
+    /* 또 못 보냈다 — 줄을 도로 적어 둔다(다음 연결 때 다시) */
+    var p2 = (window._fbPendingOps = window._fbPendingOps || {});
+    var back = p2[k] || { up:{}, rm:{} };
+    Object.keys(ops.up).forEach(function(id){ if(!back.rm[id]) back.up[id] = back.up[id] || ops.up[id]; });
+    Object.keys(ops.rm).forEach(function(id){ if(!back.up[id]) back.rm[id] = 1; });
+    p2[k] = back;
+    (window._fbPendingKeys = window._fbPendingKeys || {})[k] = true;
+    fbSyncFail(e);
+  });
+  return true;
 }
 
 // ── 묶음표(객체) 자료의 «바뀐 열쇠만» 골라내기 (2026-08-11) ──────────
@@ -9799,18 +9962,24 @@ function _fbApplyRecordInner(k, v, opts){
       // [코덱스 Q2 P1] 서버 전송이 실패해 로컬에만 남아있던 변경이 원격값에 덮여 조용히 사라지던 문제.
       //   → 원격 적용 전에 '로컬에만 있는 레코드'를 보관해, 적용 후 추가(추가 전용)로 되살리고 재전송한다.
       var _pendKeep = [];
+      /* ★★ 되살리는 것은 «내가 못 보낸 것으로 적힌 줄»뿐이다 (2026-09-23, _fbOpsAdd 머리글)
+           예전에는 「서버에 없고 이 PC 에만 있는 줄」을 전부 되살렸다. 그런데 그런 줄의
+           대부분은 «남이 지운 줄»이다 — 낡은 PC 일수록 많다. 그래서 로그인할 때마다
+           지워진 것이 살아났다(2026-09-23 급여 옛 열쇠 41건). */
+      var _pOps = (window._fbPendingOps && window._fbPendingOps[k]) || null;
+      var _useOps = !!(_pOps && !_fbOpsEmpty(_pOps) && _fbObjForm[k] === true);
       try {
         if(window._fbPendingKeys && window._fbPendingKeys[k] && Array.isArray(arrValue)){
           var _lb = dbGet(k, null);
-          if(Array.isArray(_lb)){
-            var _rmap = {};
-            arrValue.forEach(function(x){ if(x && x.id) _rmap[x.id] = 1; });
-            _pendKeep = _lb.filter(function(x){ return x && x.id && !_rmap[x.id]; });
-          }
+          if(Array.isArray(_lb)) _pendKeep = _fbPendKeepRows(_lb, arrValue, _pOps);
         }
       } catch(_pk){}
       _write(arrValue, v.u, opts.notify);
-      if(_pendKeep.length > 0){
+      if(_useOps){
+        /* 줄로 적혀 있으면 그 줄만 다시 보낸다 — 지운 줄도 다시 지운다(되살리기만 하던 예전 길은
+           내가 지운 것을 서버가 도로 채워 넣어도 모른 체했다) */
+        setTimeout(function(){ try { _fbReplayOps(k); } catch(_e5){ window._erpErrLog && window._erpErrLog(_e5); } }, 0);
+      } else if(_pendKeep.length > 0){
         console.warn('[동기화보호] '+k+': 서버 미반영 로컬 '+_pendKeep.length+'건 되살려 재전송');
         try { showToast('↩ 서버에 반영되지 않았던 '+_pendKeep.length+'건을 다시 저장합니다 ('+k+')'); } catch(_){}
         setTimeout(function(){
@@ -10664,6 +10833,16 @@ if(fbDb){
       keys.forEach(function(k){
         try {
           if(!fbShouldSync(k)) return;
+          /* ★★ 이름 열쇠 표는 «적어 둔 줄만» 다시 보낸다 (2026-09-23, _fbOpsAdd 머리글)
+               예전 아래 길은 이 PC 사본을 지우고 dbSet 을 불러, 이전 값이 없는 저장이 되어
+               서버 표를 사본으로 «통째» 바꿨다 — 낡은 PC 가 남이 넣은 줄을 지운 길이다.
+             ⚠ 이름 열쇠 표인데 적힌 줄이 없으면 아무것도 안 민다 — 통째로 밀 까닭이 없다. */
+          if(_fbReplayOps(k)) return;
+          if(DIFF_KEYS.indexOf(k) >= 0 && _fbObjForm[k] === true){
+            if(window._fbPendingOps) delete window._fbPendingOps[k];
+            console.warn('[동기화보호] '+k+': 적힌 줄이 없어 통째로 밀지 않았습니다');
+            return;
+          }
           var raw = _erpStoreGet(k);
           var val = raw ? JSON.parse(raw) : null;
           if(val == null) return;
