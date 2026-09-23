@@ -20,7 +20,8 @@
    ⓒ 다시 보낼 때 «그 줄만» 보낸다 — 다른 줄은 한 줄도 건드리지 않는다
    ⓓ 이름 열쇠 표를 «통째로» 밀지 않는다 — 사본을 지우고 부르는 옛 길을 안 탄다
    ⓔ 기준을 모르는 저장은 서버 줄을 하나도 지우지 않는다
-   ⓕ 옛 숫자 열쇠 표는 예전 길 그대로다 — 줄로 쓸 수 없어서다
+   ⓕ 옛 숫자 열쇠 표(연장근로·비정기급여)도 통째로 안 민다 — 트랜잭션으로 적힌 줄만 얹는다
+   ⓖ 사번 묶음표(휴가부여)는 «바뀐 사번»만 적고 얹는다 — 뭉개진 배열도 옛 자리를 지우지 않는다
 
    실행: node --test tests/login-stale-copy-wipes-server.test.js */
 const test = require('node:test');
@@ -191,10 +192,201 @@ test('ⓓ★ 보류됐던 지우기가 절반을 넘으면 보내지 않고 알�
   assert.equal(calls.alert, 1, '★ 막았다고 사람에게 알리지 않습니다');
 });
 
-test('ⓕ 옛 숫자 열쇠 표는 예전 길 그대로 — 줄로 쓸 수 없어서다', () => {
-  const { 원래 } = 오늘();
-  const { calls } = flushWith({ 사본: 원래, legacy: [{ id: 'o1' }], flags: { overtime_records: true } });
-  assert.deepEqual(calls.dbSet.map((c) => c.k), ['overtime_records'], '옛 표의 못 보낸 것이 안 올라갑니다');
+/* ══════ ⓕ 옛 숫자 열쇠 표·사번 묶음표도 통째로 안 민다 (2026-09-23 저녁) ══════
+   연장근로(overtime_records)·비정기급여(payroll_irregular)는 서버가 아직 배열 꼴이고,
+   휴가부여(leave_grants)는 사번 묶음표가 옛 코드에 뭉개져 번호 없는 배열이 돼 있다.
+   예전에는 이 셋만 «사본을 지우고 dbSet» 하는 옛 길로 갔다. */
+function flushLegacy(opts) {
+  const calls = { dbSet: [], storeRemove: [], update: [], txn: [], alert: 0 };
+  const server = JSON.parse(JSON.stringify(opts.server));   // { 'data/표': {v,u} }
+  const store = {};
+  Object.keys(opts.사본).forEach((k) => { store[k] = JSON.stringify(opts.사본[k]); });
+  const ctx = {
+    JSON, Object, Array, String, Number, Date, Math, console: { log() {}, warn() {} },
+    window: { _fbPendingKeys: Object.assign({}, opts.flags), _fbPendingOps: JSON.parse(JSON.stringify(opts.ops || {})) },
+    DIFF_KEYS: ['payroll_monthly', 'overtime_records', 'leave_grants', 'payroll_irregular'],
+    _fbObjForm: Object.assign({ overtime_records: false, leave_grants: false, payroll_irregular: false }, opts.objForm),
+    fbDb: {
+      ref(path) {
+        return {
+          update(u) { calls.update.push(u); return Promise.resolve(); },
+          transaction(fnT, cb) {
+            calls.txn.push(path);
+            const res = fnT(server[path] === undefined ? null : JSON.parse(JSON.stringify(server[path])));
+            if (res === undefined) { cb(null, false, null); return; }
+            server[path] = res;
+            cb(null, true, { val: () => JSON.parse(JSON.stringify(res)) });
+          },
+        };
+      },
+    },
+    _fbSynced: true, KEY: 'k_',
+    localStorage: { setItem() {} },
+    _dbCache: {},
+    fbShouldSync() { return true; },
+    _erpStoreGet(k) { return store[k] || null; },
+    _erpStoreSet(k, v) { store[k] = v; },
+    _erpStoreRemove(k) { calls.storeRemove.push(k); delete store[k]; },
+    dbGet(k, d) { return store[k] ? JSON.parse(store[k]) : d; },
+    dbSet(k, v) { calls.dbSet.push({ k }); },
+    _scheduleFbChanged() {}, fbSyncFail() {},
+    erpAlert() { calls.alert++; },
+  };
+  ctx.window.erpAlert = ctx.erpAlert;
+  vm.createContext(ctx);
+  ['function _fbOpsEmpty(', 'function _fbOpsApply(', 'function _fbOpsUpdates(', 'function _fbReplayOps(',
+   'function _fbReplayOpsTxn(', 'function _fbReplayMapOps(', 'function _fbOpsPutBack(', 'function _fbTakeServer(',
+   'function _erpNameMap(', 'function erpObjIsMap(', 'function erpObjMerge(', 'function normalizeFbValue(',
+   'function arrayToIdMap(', 'function _fbStableId(', 'function _flushPendingLocalNewer('].forEach((d) => vm.runInContext(fn(d), ctx));
+  ctx._flushPendingLocalNewer();
+  return { calls, server, store, ctx };
+}
+const ot = (i, extra) => Object.assign({ id: 'ot-' + i, sid: 'P-00' + (i % 5), date: '2026-06-' + String(i + 1).padStart(2, '0'), hours: 2 }, extra || {});
+
+test('ⓕ★★★ 옛 숫자 열쇠 표(연장근로) — 낡은 PC 가 «한 줄» 고쳤으면 서버 11건 위에 그 한 줄만 얹는다', () => {
+  const 서버줄 = []; for (let i = 0; i < 11; i++) 서버줄.push(ot(i));
+  /* 낡은 PC 사본: 남이 넣은 끝 두 줄이 없다 + 내가 오프라인에서 5번 줄을 고쳤다 */
+  const 고친 = ot(5, { hours: 4 });
+  const 사본 = 서버줄.slice(0, 9).map((x, i) => (i === 5 ? 고친 : x));
+  const { calls, server, store } = flushLegacy({
+    server: { 'data/overtime_records': { v: 서버줄, u: 1 } },
+    사본: { overtime_records: 사본 },
+    flags: { overtime_records: true },
+    ops: { overtime_records: { up: { [고친.id]: 고친 }, rm: {} } },
+  });
+  assert.deepEqual(calls.storeRemove, [], '★★★ 이 PC 사본을 지우고 저장합니다 — 급여 40건이 사라진 그 옛 길입니다');
+  assert.deepEqual(calls.dbSet, [], '★★★ 낡은 사본(9건)을 dbSet 으로 통째 밉니다 — 남이 넣은 2건이 지워집니다');
+  const v = server['data/overtime_records'].v;
+  assert.ok(!Array.isArray(v), '★ 쓰는 김에 이름 열쇠 꼴로 안 바뀌었습니다 — 다음에도 옛 길을 탑니다');
+  assert.equal(Object.keys(v).length, 11, '★★★ 서버 11건이 ' + Object.keys(v).length + '건이 됐습니다 — 남의 줄을 지웠습니다');
+  assert.equal(v['ot-5'].hours, 4, '★★ 내가 고친 한 줄이 안 올라갔습니다');
+  assert.ok(v['ot-9'] && v['ot-10'], '★★ 남이 넣은 줄이 사라졌습니다');
+  assert.equal(JSON.parse(store.overtime_records).length, 11, '★ 이 PC 사본이 서버 결과로 안 맞춰졌습니다');
+});
+
+test('ⓕ★★ 옛 숫자 열쇠 표에 «표 통째 표시»만 있으면 아무것도 안 민다', () => {
+  const 서버줄 = []; for (let i = 0; i < 11; i++) 서버줄.push(ot(i));
+  const { calls, server } = flushLegacy({
+    server: { 'data/overtime_records': { v: 서버줄, u: 1 } },
+    사본: { overtime_records: 서버줄.slice(0, 3) },
+    flags: { overtime_records: true },
+  });
+  assert.deepEqual(calls.dbSet, [], '★★★ 적힌 줄이 없는데 사본 3건을 통째로 밉니다 — 서버 11건이 3건이 됩니다');
+  assert.deepEqual(calls.storeRemove, []);
+  assert.equal(server['data/overtime_records'].v.length, 11);
+});
+
+test('ⓕ★ 서버 줄이 «모두» 번호가 없으면 손대지 않고 다음에 다시 — 이름 열쇠 꼴로 바꾸면 전부 빠진다', () => {
+  const 서버줄 = [{ sid: 'P-001', hours: 1 }, { sid: 'P-002', hours: 2 }];
+  const { calls, server, ctx } = flushLegacy({
+    server: { 'data/payroll_irregular': { v: 서버줄, u: 1 } },
+    사본: { payroll_irregular: [ot(0, { hours: 9 })] },
+    flags: { payroll_irregular: true },
+    ops: { payroll_irregular: { up: { 'ot-0': ot(0, { hours: 9 }) }, rm: {} } },
+  });
+  assert.deepEqual(server['data/payroll_irregular'].v, 서버줄, '★★ 번호 없는 줄들을 버렸습니다');
+  assert.deepEqual(calls.dbSet, []);
+  assert.ok(ctx.window._fbPendingOps.payroll_irregular, '★ 못 보낸 줄을 버렸습니다 — 다음 연결 때 다시 보내야 합니다');
+});
+
+test('ⓕ★ 번호 없는 줄이 «섞여» 있으면 한결같은 번호를 받아 함께 남는다 — 한 줄도 안 빠진다', () => {
+  const { server } = flushLegacy({
+    server: { 'data/payroll_irregular': { v: [ot(0), { sid: 'P-001', hours: 1 }], u: 1 } },
+    사본: { payroll_irregular: [ot(0, { hours: 9 })] },
+    flags: { payroll_irregular: true },
+    ops: { payroll_irregular: { up: { 'ot-0': ot(0, { hours: 9 }) }, rm: {} } },
+  });
+  const v = server['data/payroll_irregular'].v;
+  assert.equal(Object.keys(v).length, 2, '★★ 번호 없던 줄이 빠졌습니다');
+  assert.equal(v['ot-0'].hours, 9);
+});
+
+test('ⓕ★★ 낡은 PC 사본이 작아도, 서버 기준으로 절반 넘게 지우게 되면 안 보내고 알린다', () => {
+  const 서버줄 = []; for (let i = 0; i < 12; i++) 서버줄.push(ot(i));
+  const rm = {}; 서버줄.slice(0, 8).forEach((x) => { rm[x.id] = 1; });
+  /* 이 PC 사본은 3건뿐이라 이 PC 기준 검사(10건 이상)는 안 걸린다 — 서버 기준으로 다시 봐야 한다 */
+  const { calls, server } = flushLegacy({
+    server: { 'data/overtime_records': { v: 서버줄, u: 1 } },
+    사본: { overtime_records: 서버줄.slice(8, 11) },
+    flags: { overtime_records: true },
+    ops: { overtime_records: { up: {}, rm } },
+  });
+  assert.equal(server['data/overtime_records'].v.length, 12, '★★ 서버 12건 가운데 8건 지우기를 묻지도 않고 보냅니다');
+  assert.equal(calls.alert, 1, '★ 막았다고 알리지 않습니다');
+});
+
+/* 휴가부여 — 서버가 뭉개진 배열 11칸(번호·사번 없음). 남이 P-002 를 이미 고쳐 둔 상태 */
+const 뭉갠휴가 = () => { const a = []; for (let i = 0; i < 11; i++) a.push({ 2025: { total: 16, carryOver: 0 } }); return a; };
+
+test('ⓖ★★★ 사번 묶음표(휴가부여) — 적힌 사번만 얹는다. 옛 11칸도, 남이 고친 사번도 그대로다', () => {
+  const 서버v = Object.assign({}, 뭉갠휴가(), { 'P-002': { 2026: { total: 20, carryOver: 1 } } });
+  const 내것 = { 2026: { total: 17, carryOver: 0 } };
+  const { calls, server } = flushLegacy({
+    server: { 'data/leave_grants': { v: 서버v, u: 1 } },
+    사본: { leave_grants: Object.assign({}, 뭉갠휴가(), { 'P-001': 내것, 'P-002': { 2026: { total: 15, carryOver: 0 } } }) },
+    flags: { leave_grants: true },
+    ops: { leave_grants: { up: {}, rm: {}, map: { set: { 'P-001': 내것 }, del: {} } } },
+    objForm: { leave_grants: true },
+  });
+  assert.deepEqual(calls.dbSet, [], '★★★ 사본 전체를 dbSet 으로 밉니다 — 남이 고친 P-002 가 옛 값으로 돌아갑니다');
+  const v = server['data/leave_grants'].v;
+  assert.deepEqual(v['P-001'], 내것, '★★ 내가 고친 사번이 안 올라갔습니다');
+  assert.equal(v['P-002'][2026].total, 20, '★★★ 남이 고친 P-002 를 이 PC 의 옛 값으로 되돌렸습니다');
+  for (let i = 0; i < 11; i++) assert.ok(v[String(i)], '★★ 옛 자리 ' + i + ' 를 지웠습니다');
+});
+
+test('ⓖ★★ 서버가 «뭉개진 배열» 그대로여도 얹는다 — 막으면 휴가부여는 영영 저장이 안 된다', () => {
+  const 내것 = { 2026: { total: 17, carryOver: 0 } };
+  const { server } = flushLegacy({
+    server: { 'data/leave_grants': { v: 뭉갠휴가(), u: 1 } },
+    사본: { leave_grants: 뭉갠휴가() },
+    flags: { leave_grants: true },
+    ops: { leave_grants: { up: {}, rm: {}, map: { set: { 'P-001': 내것 }, del: {} } } },
+  });
+  const v = server['data/leave_grants'].v;
+  assert.ok(!Array.isArray(v) && v['P-001'], '★★ 뭉개진 배열이라는 까닭으로 저장을 막았습니다');
+  assert.equal(Object.keys(v).length, 12, '★★ 옛 11칸 가운데 지운 것이 있습니다');
+});
+
+test('ⓖ★ 번호 있는 줄의 배열(목록 표)에는 사번 열쇠를 얹지 않는다 — 모양이 다른 것이다', () => {
+  const { server } = flushLegacy({
+    server: { 'data/leave_grants': { v: [ot(0), ot(1)], u: 1 } },
+    사본: { leave_grants: {} },
+    flags: { leave_grants: true },
+    ops: { leave_grants: { up: {}, rm: {}, map: { set: { 'P-001': { 2026: {} } }, del: {} } } },
+  });
+  assert.ok(Array.isArray(server['data/leave_grants'].v), '★ 목록 표에 사번 열쇠를 섞었습니다');
+});
+
+test('ⓖ★★ 사번 묶음표의 못 보낸 변경은 «바뀐 사번»만 적힌다 — 뭉개진 배열에서 시작해도', () => {
+  const ctx = { JSON, Object, Array, String };
+  vm.createContext(ctx);
+  ['function erpObjIsMap(', 'function erpObjDiff(', 'function _erpNameMap(', 'function _fbMapOpsAdd(']
+    .forEach((d) => vm.runInContext(fn(d), ctx));
+  const prev = 뭉갠휴가();
+  const next = Object.assign(ctx._erpNameMap(prev), { 'P-001': { 2026: { total: 17 } } });
+  const ops = ctx._fbMapOpsAdd(null, prev, next);
+  assert.deepEqual(Object.keys(ops.map.set), ['P-001'], '★★ 바꾸지 않은 칸까지 적습니다: ' + Object.keys(ops.map.set).join(','));
+  assert.deepEqual(Object.keys(ops.map.del), [], '★★ 옛 11칸을 «지운 것»으로 적습니다 — 다시 보낼 때 서버에서 지웁니다');
+});
+
+test('ⓖ★★ 휴가부여 저장은 뭉개진 배열을 지도로 펴서 쓴다 — 아니면 「수정됨」이라 뜨고 아무것도 안 남는다', () => {
+  /* 휴가부여를 «쓰는» 자리마다, 바로 앞에서 읽은 값을 지도로 폈는가 */
+  const re = /dbSet\('leave_grants'/g; let m, n = 0;
+  while ((m = re.exec(SRC))) {
+    n++;
+    const before = SRC.slice(Math.max(0, m.index - 700), m.index);
+    const rd = before.lastIndexOf("dbGet('leave_grants'");
+    assert.ok(rd >= 0, '휴가부여 저장 앞에서 읽는 자리를 못 찾았습니다');
+    assert.match(before.slice(Math.max(0, rd - 14), rd), /_erpNameMap\($/,
+      '★★ 휴가부여 저장이 읽은 값을 지도로 안 폅니다 — 서버가 뭉개진 배열이면 사번이 JSON 에서 조용히 빠집니다');
+  }
+  assert.ok(n >= 2, '휴가부여 저장 자리를 못 찾았습니다');
+  const body = fn('function dbSet(');
+  const g = body.indexOf("_mGuard = '형태'");
+  assert.ok(g > 0, '묶음표 형태 보호를 못 찾았습니다');
+  assert.match(body.slice(Math.max(0, g - 700), g), /_erpNameMap\(_mBase\)/,
+    '★★ 서버가 뭉개진 배열이면 묶음표 저장이 «형태» 보호에 걸려 영영 실패합니다');
 });
 
 /* ══════ ⓔ 기준을 모르면 지우지 않는다 ══════ */
@@ -226,10 +418,14 @@ test('ⓐ★★ 동기화 전 보류·보내기 실패 두 자리 모두 «줄»
   const body = fn('function dbSet(');
   const i = body.indexOf('if(!_fbSynced){');
   assert.ok(i > 0, '동기화 전 보류 자리를 못 찾았습니다');
-  assert.match(body.slice(i, i + 900), /_fbOpsAdd\(/, '★★ 동기화 전에 보류한 저장이 «줄»로 안 적힙니다');
+  assert.match(body.slice(i, i + 900), /_fbOpsAdd\(|_fbPendRecord\(/, '★★ 동기화 전에 보류한 저장이 «줄»로 안 적힙니다');
   const j = body.indexOf('var _markPending = function(');
   assert.ok(j > 0, '보내기 실패 자리를 못 찾았습니다');
-  assert.match(body.slice(j, j + 700), /_fbOpsAdd\(/, '★★ 보내기에 실패한 저장이 «줄»로 안 적힙니다');
+  assert.match(body.slice(j, j + 700), /_fbOpsAdd\(|_fbPendRecord\(/, '★★ 보내기에 실패한 저장이 «줄»로 안 적힙니다');
+  /* 적는 한 자리가 줄·열쇠 둘 다 적는가 */
+  const rec = fn('function _fbPendRecord(');
+  assert.match(rec, /_fbOpsAdd\(/, '★★ 목록 표를 줄로 안 적습니다');
+  assert.match(rec, /_fbMapOpsAdd\(/, '★★ 사번 묶음표를 열쇠로 안 적습니다 — 다시 보낼 때 사본 전체가 밀립니다');
 });
 
 test('ⓑ★★ 로그인 때 서버 값을 받는 자리가 «적힌 줄»로만 되살린다', () => {

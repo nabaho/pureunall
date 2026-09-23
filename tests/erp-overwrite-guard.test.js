@@ -52,7 +52,8 @@ test('★ id 있는 배열은 트랜잭션으로 병합한다 (통째 덮어쓰�
 
 test('묶음표(객체)도 통째로 덮지 않고 바뀐 열쇠만 얹는다', () => {
   assert.match(dbSet, /erpObjIsMap\(v\)/);
-  assert.match(dbSet, /erpObjMerge\(cur && cur\.v, _md\)/);
+  /* 얹는 바탕은 서버 지금 값(cur.v) — 뭉개진 배열을 지도로 펴는 한 단계가 끼어도 된다 */
+  assert.match(dbSet, /erpObjMerge\(cur && cur\.v, _md\)|var _mBase = cur && cur\.v;[\s\S]{0,400}erpObjMerge\(_mBase, _md\)/);
 });
 
 test('실패하면 meta 를 되돌리고 다시 보낼 것으로 표시한다', () => {
