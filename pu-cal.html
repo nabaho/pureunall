@@ -16,16 +16,19 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=29"></script>
-<script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
+<script src="js/pu-ontology.js?v=31"></script>
+<script src="js/pu-ontology-write.js?v=3" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
+<script src="js/pu-gcal-auth.js?v=3"></script>
+<script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=2"></script>
-<script src="js/pu-cal-write.js?v=1"></script>
+<script src="js/pu-case-due.js?v=1"></script>
+<script src="js/pu-cal-write.js?v=4"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -166,8 +169,10 @@
   .day{min-height:104px;padding:5px 4px 3px;overflow:hidden;box-sizing:border-box;position:relative}
   /* 날짜 줄 — 칸 «가운데»에 「25 (13)」 처럼 날짜와 음력을 나란히 */
   .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:4px;padding:0 2px}
+  /* 대표 지시 2026-09-20 「한글과 숫자가 좀더 진했으면」 — 400(보통)은 12px 에서
+     연해 보인다. 600(약간 굵게)으로 올렸다. 색(--ink #1e293b)은 이미 짙어서 안 바꿨다. */
   .dnum{min-width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;
-    padding:0 3px;font-size:12px;font-weight:400;cursor:pointer;color:var(--ink);background:transparent}
+    padding:0 3px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink);background:transparent}
   /* 오늘 동그라미는 «숫자에만» — 음력까지 감싸면 알약처럼 길어진다 */
   .dnum.today{background:#2563eb;color:#ffffff;font-weight:700}
   .dnum.other{color:#94a3b8}
@@ -178,8 +183,64 @@
   .ev{padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500;line-height:16px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
   .ev b{font-weight:700;margin-right:3px}
-  /* 공휴일은 칸 맨 위에 «칩»으로 — 일정 칩과 같은 치수여야 한 줄만 도드라지지 않는다 */
-  .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default}
+  /* ── 끌어 옮기기 (5걸음) ──
+     ⚠ «잡을 수 있는 것»과 아닌 것이 손끝에서 갈려야 한다 — 잡히지도 않는 것을
+       한참 끌어 보고서야 아는 것이 제일 나쁘다. */
+  .ev[draggable="true"]{cursor:grab}
+  .ev[draggable="true"]:active{cursor:grabbing}
+  .ev.dragging{opacity:.4}
+  /* 놓을 칸 — 테두리만 준다. 바탕을 칠하면 그 칸의 칩 색이 안 보인다. */
+  .day.dropon,.wcol.dropon,.dayview.dropon{outline:2px solid #2563eb;outline-offset:-2px}
+  /* 공휴일은 칸 맨 위에 «띠»로 — 구글은 둥근 칩이 아니라 칸 옆까지 꽉 채운 띠를 쓴다
+     (대표 지시 2026-09-20 「구글과 완벽하게 같게」 — 실제 화면을 재서 확인했다).
+     .day 의 좌우 여백(4px)을 음수 마진으로 지워 옆까지 닿게 한다. 색 값(#fecaca·
+     #991b1b)은 그대로다 — 팔레트·tests/cal-same-as-erp.test.js 가 색만 못 박는다. */
+  .ev.hol{background:#fecaca;color:#991b1b;font-weight:600;cursor:default;
+    border-radius:0;margin:0 -4px}
+  .detailgrid.one{grid-template-columns:1fr}
+  .lawcnt{font-size:12px;color:var(--sub)}
+  .lawcnt b{color:var(--ink);font-size:12.5px}
+  .notebtn{border:none;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;width:100%}
+  .notebtn:hover .dash{color:var(--acc);text-decoration:underline}
+  .modal textarea{width:100%;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel);color:var(--ink);resize:vertical}
+  .pubmsg{font-size:11.5px;color:var(--ok);margin-left:9px}
+  .pubat{font-size:11px;color:var(--faint);margin-left:9px}
+  /* 계정 잇기 — 할 일이 있을 때만 머리줄에 뜬다(없으면 아예 안 그린다) */
+  .glogin{font-size:11.5px;padding:4px 10px;border:1px solid #bfdbfe;background:var(--acc-soft);
+    color:var(--acc2);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
+    white-space:nowrap;flex-shrink:0;margin-left:auto}
+  .glogin + .linkacct{margin-left:6px}
+  .linkacct{font-size:11.5px;padding:4px 10px;border:1px solid #fde68a;background:var(--warn-bg);
+    color:var(--warn);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
+    white-space:nowrap;flex-shrink:0;margin-left:auto}
+  .linkacct:hover{background:#fde68a}
+  /* 검색칸이 맨 오른쪽 — 잇기 단추가 왼쪽으로 밀어 준다 */
+  .calhead .linkacct + .srch{margin-left:8px}
+  .mmnote{font-size:11.5px;color:var(--warn);background:var(--warn-bg);border:1px solid #fde68a;
+    border-radius:8px;padding:7px 10px;margin-bottom:10px;line-height:1.5}
+  .mmlist{max-height:52vh;overflow-y:auto;margin-bottom:4px}
+  .mmrow{display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid var(--line)}
+  .mmwho{flex:1;min-width:0}
+  .mmmail{display:block;font-size:12px;font-weight:700;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mmn{display:block;font-size:10.5px;color:var(--sub);margin-top:1px}
+  .mmrow select{width:148px;flex-shrink:0;padding:5px 7px;font-size:11.5px;font-family:inherit;
+    border:1px solid var(--line);border-radius:6px;background:var(--warn-bg);color:var(--ink)}
+  .mmrow select.on{background:#f0fdf4}
+  .mmempty{font-size:12.5px;color:var(--sub);padding:18px 4px;text-align:center}
+  /* 사람 색 바꾸기 — 지금 색 동그라미 하나, 누르면 그 줄 아래에 색표가 펼쳐진다.
+     ⚠ 색은 «구글이 준 것»을 그대로 칠한다(style 로 들어온다) — 여기서 색을 정하지 않는다. */
+  .cdot{width:26px;height:26px;flex-shrink:0;border-radius:50%;border:2px solid var(--line);
+    cursor:pointer;padding:0}
+  .cdot.on{border-color:var(--ink)}
+  .cdot:disabled{cursor:default;opacity:.5}
+  .cpal{flex-basis:100%;display:flex;flex-wrap:wrap;gap:5px;padding:7px 0 3px}
+  .cswatch{width:22px;height:22px;border-radius:5px;border:2px solid transparent;cursor:pointer;
+    padding:0;line-height:1;position:relative}
+  .cswatch:hover{border-color:var(--ink)}
+  .cswatch.cur{border-color:var(--ink);box-shadow:0 0 0 2px var(--bg) inset}
+  /* 남이 쓰는 색에 점 하나 — 막지는 않는다(같은 색을 일부러 줄 일도 있다) */
+  .ctaken{color:#fff;font-size:15px;font-weight:900;text-shadow:0 0 2px rgba(0,0,0,.6)}
   /* 접힌 것이 몇인지 — 누르면 그 자리에서 펼쳐 보인다 */
   .more{font-size:10.5px;color:var(--sub);padding:0 4px;cursor:pointer;line-height:15px;
     font-weight:700;border-radius:3px;background:var(--bg);flex:none}
@@ -420,11 +481,12 @@ function arr(v){ return Array.isArray(v) ? v : []; }
 
 /* ── 어느 탭이 있는가 ──────────────────────────────────────────────────
    대표 결정 2026-09-18: 법인 셋과 이음 셋을 «한 줄»에 두 묶음으로 둔다.
-   지금은 옆 메뉴를 갔다 와야 오가는데, 여기서는 한 번 누르면 된다 — 그것이 옮기는 뜻이다. */
+   지금은 옆 메뉴를 갔다 와야 오가는데, 여기서는 한 번 누르면 된다 — 그것이 옮기는 뜻이다.
+   ⚠ 「직원별 업무」·「분석」은 뺐다(대표 지시 2026-09-20 「필요없다 여기 넣지 마라」).
+     여태는 «다음 걸음에 옮긴다»는 안내 탭(laterHtml)으로 자리만 잡아 뒀는데,
+     아예 필요 없다는 뜻이라 탭 자체를 없앤다. 이알피 옆 메뉴에는 그대로 있다. */
 var TABS = [
   { v:'cal',      g:'법인',    label:'📅 캘린더',      ready:true },
-  { v:'workload', g:'법인',    label:'👥 직원별 업무', erp:'dash/corp' },
-  { v:'analytics',g:'법인',    label:'📊 분석',        erp:'dash/corp', money:true },
   { v:'eumcal',   g:'이음센터', label:'📅 근무 캘린더', ready:true },
   { v:'eumppl',   g:'이음센터', label:'👤 인원 현황',   ready:true },
   { v:'eumshare', g:'이음센터', label:'🔗 외부 공유 뷰', ready:true }
@@ -433,9 +495,14 @@ var TABS = [
 /* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
    ⚠ 필요한 것만 읽는다 — 안 쓰는 큰 표를 받으면 요금과 깜빡임이 늘어난다. */
 var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors',
-            'locked_attend_months','ieum_members','ieum_lectures','ieum_notes','ieum_caps',
+            'locked_attend_months','ieum_members','ieum_notes',
             /* 구글 만든이 메일 → 사번. 이것이 있어야 구글 일정이 «그 사람 색»으로 칠해진다 */
-            'gcal_mail_sid'];
+            'gcal_mail_sid',
+            /* ★ 5걸음 — 달력에 «날짜로 뜨는» 것들(대표 지시 2026-09-21 「둘다」).
+               4걸음에서 법인 대시보드와 함께 사라진 층 셋을 되살린다.
+               ⚠ cases 는 54KB 로 근태표만 하다 — 가볍지 않다. 그래도 켤 때 한 번이고,
+                 그 뒤로는 바뀐 것만 받는다(PuCalRead.watch). */
+            'cases','biz_case_stages','leave_of_absence'];
 
 /* ── 사람 ──────────────────────────────────────────────────────────── */
 /* ⚠ 직원 명부는 «배열»로도, «사번이 열쇠인 지도»로도 올 수 있다.
@@ -529,6 +596,402 @@ function gcalPalette(){
   ks.forEach(function(k){ if(m[k] && out.indexOf(m[k]) < 0) out.push(m[k]); });
   return out.length ? out : null;
 }
+/* ── 사람 색 «채워 넣기» ────────────────────────────────────────────────
+   캘린더를 한 곳으로 모으기 1걸음 (대표 지시 2026-09-20 「0부터 순서대로」).
+
+   ★ 왜 여기로 왔나
+     data/staff_colors 를 «쓰는 곳»이 이알피 법인 대시보드 한 곳뿐이었다.
+     그 화면을 걷어내면 새로 온 직원에게 색이 영영 안 생기고, 컨설팅일정도
+     같은 자리를 읽으므로 두 앱이 함께 회색이 된다.
+
+   ★ 이알피처럼 «다시 셈해 통째로» 올리지 않는다 — «빠진 사람만» 채운다.
+     이알피는 그 PC 에만 있는 손수 고른 색(localStorage)을 섞어 셈한다.
+     그것을 흉내 내 통째로 올리면 대표님이 다른 자리에서 고른 색을 덮는다.
+     없는 칸만 채우면 남의 것을 건드릴 일이 없어, 두 앱이 함께 돌아도 안 싸운다.
+
+   ★ 고르는 법 — «아직 아무도 안 쓰는» 색을 앞에서부터. 그래야 새로 온 사람이
+     옆자리와 같은 색으로 뜨지 않는다. 색을 새로 만들지 않는다(구글 색표 안에서만).
+
+   ⚠ 구글 색표가 아직 «안 왔으면» 아무것도 안 한다. 되돌아갈 색을 올리면 서버의
+     진짜 색을 덮는다 — 이알피가 그 자리에서 한 번 데었다.
+   ⚠ 관리자만 쓸 수 있다(서버 규칙). 명부의 role 로 가르므로 «위임관리인»은 여기서
+     못 채운다 — 서버는 허락하지만 조용히 실패하느니 아예 안 한다. */
+function 빠진색채우기(있는색, 사람들, 색표){
+  var 쓰는색 = {};
+  Object.keys(있는색 || {}).forEach(function(k){
+    if(있는색[k]) 쓰는색[String(있는색[k]).toLowerCase()] = 1;
+  });
+  var 새로 = {};
+  (사람들 || []).forEach(function(u){
+    if(!u || !u.sid || (있는색 && 있는색[u.sid])) return;
+    var 고름 = "";
+    for(var i=0;i<색표.length;i++){
+      if(!쓰는색[String(색표[i]).toLowerCase()]){ 고름 = 색표[i]; break; }
+    }
+    /* 색표를 다 썼으면 처음부터 다시 — 겹치더라도 «없는 것»보다 낫다 */
+    if(!고름) 고름 = 색표[Object.keys(새로).length % 색표.length];
+    if(!고름) return;
+    새로[u.sid] = 고름;
+    쓰는색[String(고름).toLowerCase()] = 1;
+  });
+  return 새로;
+}
+function 색채우기(){
+  try{
+    if(!(ME && ME.role === "admin")) return;            /* 관리자만 */
+    var 색표 = gcalPalette();
+    if(!색표 || !색표.length) return;                    /* 색표가 안 왔으면 손대지 않는다 */
+    var 있는색 = (D.staff_colors && typeof D.staff_colors === "object"
+                  && !Array.isArray(D.staff_colors)) ? D.staff_colors : {};
+    var 현직 = users().filter(function(u){ return u && u.status === "active"; });
+    if(!현직.length) return;                             /* 사람이 없으면 아무 일도 안 한다 */
+    var 새로 = 빠진색채우기(있는색, 현직, 색표);
+    if(!Object.keys(새로).length) return;                /* 채울 사람이 없으면 안 올린다 */
+    var 합친것 = Object.assign({}, 있는색, 새로);
+    PuCalWrite.saveColors(합친것).then(function(r){
+      if(r && r.ok){
+        D.staff_colors = 합친것;
+        console.log("[사람색] 빠진 " + Object.keys(새로).length + "명을 채웠습니다: "
+          + Object.keys(새로).map(function(s){ return nameOf(s) + "=" + 새로[s]; }).join(", "));
+        render();
+      }
+    })["catch"](function(){});
+  }catch(e){}
+}
+
+/* ── 사람 색 «바꾸기» ────────────────────────────────────────────────────
+   캘린더를 한 곳으로 모으기 4걸음 (대표 지시 2026-09-20).
+
+   ★ 왜 여기로 왔나 — 안 옮기면 «온 시스템에서» 색을 바꿀 길이 사라진다.
+     색을 고르는 자리가 이알피 법인 대시보드 한 곳뿐이었다(사람 칩에 마우스를
+     올리면 뜨던 팔레트). 그 화면을 걷어내는데 그대로 두면, 빠진 사람은
+     채워지지만(색채우기) «이미 있는 색을 바꾸는 일»은 아무 데서도 못 한다.
+     data/staff_colors 는 컨설팅일정도 읽는 자리라 손해가 이 앱에서 안 그친다.
+
+   ★ 이알피와 다른 점 — «이 PC 에만» 담지 않는다.
+     이알피는 고른 색을 그 PC 브라우저(localStorage)에 담고, 화면을 그릴 때마다
+     다시 셈해 통째로 올렸다. 그래서 다른 PC 에서 열면 순번 색으로 돌아갔다.
+     여기서는 고른 그 칸 하나만 서버에 적는다 — 담는 데가 한 곳이라 어긋날 수 없다.
+
+   ⚠ 색을 «새로 만들지» 않는다 — 구글 색표 안에서만 고른다. 우리가 만든 색은
+     구글 화면에서 다르게 보여, 같은 일정이 두 앱에서 다른 색이 된다.
+   ⚠ 색표가 아직 안 왔으면 고르게 하지 않는다. 그때 고른 색은 «되돌아갈 색»이라
+     서버의 진짜 색을 덮는다 — 이알피가 그 자리에서 한 번 데었다. */
+function openColors(){ S.colors = { pick:"", busy:false, err:"" }; render(); }
+function closeColors(){ S.colors = null; render(); }
+function colorsHtml(){
+  var m = S.colors; if(!m) return "";
+  var 색표 = gcalPalette() || [];
+  var 현직 = users().filter(function(u){ return u && u.status === "active"; });
+  var 쓰임 = {};
+  현직.forEach(function(u){ var c = colorOf(u.sid); if(c) 쓰임[String(c).toLowerCase()] = u.sid; });
+  return '<div class="veil" data-close="1"></div><div class="modal" style="max-width:560px">'
+    + '<h3>🎨 사람 색 바꾸기</h3>'
+    + '<div class="mmnote">여기서 정한 색은 컨설팅일정에서도 같이 보입니다. '
+    +   '구글 색표 안에서만 고릅니다 — 새 색을 만들면 구글 화면과 달라집니다.</div>'
+    + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : "")
+    + (!색표.length
+        ? '<div class="mmempty">구글 색표를 아직 못 받았습니다 — 잠시 뒤에 다시 열어 주십시오. '
+          + '(색표 없이 고르면 서버의 진짜 색을 덮습니다)</div>'
+        : '<div class="mmlist">' + 현직.map(function(u){
+            var 지금 = colorOf(u.sid) || "";
+            var 열림 = m.pick === u.sid;
+            return '<div class="mmrow" style="flex-wrap:wrap">'
+              + '<div class="mmwho"><span class="mmmail">' + esc(u.name || u.sid) + '</span>'
+              +   '<span class="mmn">' + (지금 ? esc(지금) : "아직 색이 없습니다") + '</span></div>'
+              + '<button class="cdot' + (열림 ? " on" : "") + '" data-copen="' + esc(u.sid) + '"'
+              +   (m.busy ? " disabled" : "")
+              +   ' title="눌러서 색을 고릅니다" style="background:' + esc(지금 || "#cbd5e1") + '"></button>'
+              + (열림
+                  ? '<div class="cpal">' + 색표.map(function(c){
+                      var 임자 = 쓰임[String(c).toLowerCase()];
+                      var 남의것 = 임자 && 임자 !== u.sid;
+                      return '<button class="cswatch' + (String(c).toLowerCase() === String(지금).toLowerCase() ? " cur" : "") + '"'
+                        + ' data-cset="' + esc(u.sid) + '|' + esc(c) + '"'
+                        + ' style="background:' + esc(c) + '"'
+                        + ' title="' + (남의것 ? esc(nameOf(임자)) + ' 님이 쓰는 색입니다' : esc(c)) + '">'
+                        + (남의것 ? '<span class="ctaken">·</span>' : "") + '</button>';
+                    }).join("") + '</div>'
+                  : "")
+              + '</div>';
+          }).join("") + '</div>')
+    + '<div class="mbtns"><span class="sp"></span>'
+    + '<button class="btn ghost" data-close="1">닫기</button></div></div>';
+}
+function 색고르기(sid, 색){
+  var m = S.colors; if(!m || m.busy) return;
+  var 있는색 = (D.staff_colors && typeof D.staff_colors === "object"
+                && !Array.isArray(D.staff_colors)) ? D.staff_colors : {};
+  if(String(있는색[sid] || "").toLowerCase() === String(색).toLowerCase()){ m.pick = ""; render(); return; }
+  /* ⚠ 고른 «그 칸 하나»만 바꾼다 — 통째로 다시 셈해 올리면 다른 자리에서 고른 색을 덮는다 */
+  var 다음 = Object.assign({}, 있는색); 다음[sid] = 색;
+  m.busy = true; m.err = ""; render();
+  PuCalWrite.saveColors(다음).then(function(r){
+    m.busy = false;
+    if(r && r.ok){ D.staff_colors = 다음; m.pick = ""; }
+    else m.err = (r && r.message) || "저장하지 못했습니다";
+    render();
+  })["catch"](function(e){
+    m.busy = false; m.err = (e && e.message) || String(e); render();
+  });
+}
+/* 「색」 단추 — 관리자·위임관리인에게만. 할 일이 «늘» 있는 일이라 숫자는 안 붙인다. */
+function 색단추Html(){
+  if(!관리자인가()) return "";
+  return '<button class="linkacct" data-copen-all="1" title="사람마다의 색을 바꿉니다.'
+    + ' 여기서 정한 색은 컨설팅일정에서도 같이 보입니다.">🎨 색</button>';
+}
+
+/* ── 구글 계정 ↔ 직원 잇기 ──────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 1걸음(나).
+
+   ★ 왜 여기로 왔나
+     구글 일정에는 «누가 만들었는지»(메일)만 남고 이름이 없다. 이어 주지 않으면
+     그 사람 일정이 담당자·색 없이 뜬다(메일로 늘 같은 색을 주긴 하지만 대표님이
+     고른 그 사람 색은 아니다). 이어 주는 화면이 이알피 법인 대시보드 한 곳뿐이라,
+     그 화면을 걷어내면 남은 사람을 영영 못 잇는다.
+
+   ★ 이알피와 «같은 열쇠»를 쓴다 — gcalMailKey(점 → 쉼표). 다르면 이어 둔 것을
+     서로 못 찾는다. 그래서 그 함수를 그대로 쓴다(새로 짓지 않는다).
+   ⚠ 관리자만 쓸 수 있다(서버 규칙). 색 채우기와 같은 잣대를 쓴다. */
+/* ⚠ typeof 로 본다 — 검사가 머리줄만 떼어 상자에 넣고 돌 때 ME 가 없다(chipHtml 과 같은 까닭) */
+/* 관리자·위임관리인인가 — 서버 규칙의 MGR 와 «같게» 맞춘다.
+   data/gcal_mail_sid 와 data/staff_colors 둘 다 쓰기가 MGR 이라 잣대가 하나다.
+   ⚠ 화면이 규칙보다 넓으면 눌러 놓고 조용히 거절당하고, 좁으면 될 사람이 못 한다.
+   ⚠ 잣대를 두 벌로 만들지 말 것 — 한쪽만 고치면 어느 쪽이 맞는지 아무도 모른다. */
+function 관리자인가(){
+  if(typeof ME === "undefined" || !ME) return false;
+  return ME.role === "admin" || ME.isAdmin === true || ME.isSubAdmin === true;
+}
+function 잇기할수있나(){
+  return 관리자인가();
+}
+/* 지금 달력에 뜬 구글 일정에서 «만든이»를 모은다 — 많이 만든 사람부터 */
+function 메일줄들(){
+  var 셈 = {};
+  (GCAL.evs || []).forEach(function(e){
+    if(!e || !e.mail) return;
+    var k = gcalMailKey(e.mail);
+    if(!셈[k]) 셈[k] = { key:k, mail:e.mail, n:0 };
+    셈[k].n++;
+  });
+  var mp = gcalMailMap();
+  return Object.keys(셈).map(function(k){
+    var r = 셈[k]; r.sid = mp[k] || ""; return r;
+  }).sort(function(a,b){ return b.n - a.n; });
+}
+function 안이은수(){ return 메일줄들().filter(function(r){ return !r.sid; }).length; }
+function openMailMap(){ S.mailmap = { busy:false, err:"" }; render(); }
+function closeMailMap(){ S.mailmap = null; render(); }
+function mailmapHtml(){
+  var m = S.mailmap; if(!m) return "";
+  var 줄 = 메일줄들();
+  var 현직 = users().filter(function(u){ return u && u.status === "active"; });
+  return '<div class="veil" data-close="1"></div><div class="modal" style="max-width:560px">'
+    + '<h3>👤 구글 계정 ↔ 직원 잇기</h3>'
+    + '<div class="mmnote">한 번 이어 주면 그 뒤로 담당자 색과 거르기가 정확해집니다. '
+    +   '다른 PC 에서도 같이 보입니다.</div>'
+    + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : '')
+    + (줄.length
+        ? '<div class="mmlist">' + 줄.map(function(r){
+            return '<div class="mmrow">'
+              + '<div class="mmwho"><span class="mmmail" title="' + esc(r.mail) + '">' + esc(r.mail) + '</span>'
+              +   '<span class="mmn">' + r.n + '건 · ' + (r.sid ? esc(nameOf(r.sid)) + ' 이어짐' : '아직 안 이음') + '</span></div>'
+              + '<select data-mm="' + esc(r.key) + '"' + (m.busy ? ' disabled' : '')
+              +   ' class="' + (r.sid ? 'on' : '') + '">'
+              +   '<option value="">— 고르세요 —</option>'
+              +   현직.map(function(u){
+                    return '<option value="' + esc(u.sid) + '"' + (u.sid === r.sid ? ' selected' : '') + '>'
+                      + esc(u.name || u.sid) + '</option>';
+                  }).join("")
+              + '</select></div>';
+          }).join("") + '</div>'
+        : '<div class="mmempty">이 달에 구글 일정이 없습니다 — 달을 옮기면 그 달의 계정이 뜹니다.</div>')
+    + '<div class="mbtns"><span class="sp"></span>'
+    + '<button class="btn ghost" data-close="1">닫기</button></div></div>';
+}
+function 잇기저장(메일열쇠, sid){
+  var m = S.mailmap; if(!m || m.busy) return;
+  var 다음 = Object.assign({}, gcalMailMap());
+  if(sid) 다음[메일열쇠] = sid; else delete 다음[메일열쇠];
+  m.busy = true; m.err = ""; render();
+  PuCalWrite.saveMailMap(다음).then(function(r){
+    m.busy = false;
+    if(r && r.ok){
+      D.gcal_mail_sid = 다음;
+      /* 색을 다시 칠하려면 일정을 다시 «해석»해야 한다 — 받아 둔 것을 다시 그린다 */
+      gcalLoad(true);
+    } else {
+      m.err = (r && r.message) || "저장하지 못했습니다";
+    }
+    render();
+  })["catch"](function(e){
+    m.busy = false; m.err = (e && e.message) || String(e); render();
+  });
+}
+
+/* ── 구글 로그인 (지우기용) ──────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 3걸음-나. 「옮긴다」(대표 지시 2026-09-20).
+
+   ★ 읽기와 쓰기는 «다른 자격»이다
+     달력을 «읽는» 것은 열쇠 하나로 되고 로그인이 필요 없다. 그런데 이어진 구글
+     일정을 «지우려면» 그 사람 자격이 있어야 한다 — 그래서 로그인이 따로 필요하다.
+   ★ 그래서 단추는 «필요할 때만» 뜬다 — 이어진 건이 화면에 있는데 아직 로그인을
+     안 했을 때. 늘 띄우면 아무도 안 누르고 머리줄만 좁아진다.
+   ⚠ 되돌아올 주소가 구글 콘솔에 «등록»돼 있어야 한다(pu-cal.html).
+     등록 전에는 구글이 redirect_uri_mismatch 로 막는다 — 그때는 이알피에서
+     로그인하고 오면 같은 창의 토큰을 그대로 쓴다. */
+var GCAL_OAUTH_ID = "30712196914-1qc61a41ptmo6u7hbk71i70g00k3a8lk.apps.googleusercontent.com";
+var GCAL_SCOPE    = "https://www.googleapis.com/auth/calendar.events";
+function 구글로그인(){
+  location.href = PuGcalAuth.signInUrl({
+    clientId: GCAL_OAUTH_ID, scope: GCAL_SCOPE,
+    fallbackRedirect: "https://nabaho.github.io/pureunall/pu-cal.html"
+  });
+}
+/* 지금 화면에 «구글과 이어진» 건이 있나 — 있으면 지울 때 로그인이 필요하다 */
+function 이어진건있나(){
+  return arr(D.attendance_records).some(function(r){ return r && r.gcalEventId; });
+}
+function 구글단추Html(){
+  if(typeof PuGcalAuth === "undefined") return "";
+  if(PuGcalAuth.hasToken()) return "";
+  if(!이어진건있나()) return "";
+  return '<button class="glogin" data-glogin="1" title="구글과 이어진 일정을 지우려면'
+    + ' 구글 로그인이 필요합니다. 로그인 없이 지우면 구글 쪽에 일정이 남습니다.">'
+    + '🔐 구글 로그인</button>';
+}
+
+/* ── 비고(개인 요구사항) 고치기 ──────────────────────────────────────────
+   캘린더 한 곳으로 모으기 2걸음(다). 이알피로 보내던 마지막 자리다.
+
+   ⚠ 담기는 자리가 둘이다 — 이알피가 그렇게 담아 온 것을 그대로 따른다.
+     · 외부 인원: external_staff 레코드의 note 칸 → «레코드 표»라 칸별 저장 문(save)
+     · 내부 직원: data/ieum_notes 의 { 사번: 글 } → 한 덩이 지도라 saveNotes
+     옮겨서 한 자리로 합치고 싶어도 지금 하지 않는다 — 옮기다 옛 글을 잃는다.
+   ⚠ 관리자만이 아니다. 서버 규칙이 «로그인한 직원 누구나»로 열려 있고,
+     이알피도 「전 직원 수정 가능」이 확정 사양이었다. 같게 둔다. */
+function openNote(pk){
+  var p = ieumPeople().filter(function(x){ return x.pk === pk; })[0];
+  if(!p) return;
+  S.note = { pk:pk, kind:p.kind, name:p.name, text:p.note || "", busy:false, err:"" };
+  render();
+}
+function closeNote(){ S.note = null; render(); }
+function noteHtml(){
+  var m = S.note; if(!m) return "";
+  return '<div class="veil" data-close="1"></div><div class="modal" style="max-width:420px">'
+    + '<h3>📝 비고 — ' + esc(m.name) + '</h3>'
+    + '<div class="mmnote">그 사람에게만 해당하는 요구사항을 적습니다. '
+    +   '예: 「2·4주 금요일만」·「오전만」. 달력 칩을 손대면 뜨는 설명에도 같이 보입니다.</div>'
+    + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : '')
+    + '<div class="fld"><textarea data-note="1" rows="3" placeholder="안 적어도 됩니다"'
+    +   (m.busy ? ' disabled' : '') + '>' + esc(m.text) + '</textarea></div>'
+    + '<div class="mbtns"><span class="sp"></span>'
+    + '<button class="btn ghost" data-close="1">그만</button>'
+    + '<button class="btn" data-noteact="save"' + (m.busy ? ' disabled' : '') + '>'
+    +   (m.busy ? '저장 중…' : '저장') + '</button></div></div>';
+}
+function saveNote(){
+  var m = S.note; if(!m || m.busy) return;
+  var el = document.querySelector('[data-note]');
+  var 글 = el ? String(el.value || "").trim() : m.text;
+  m.busy = true; m.err = ""; render();
+  var 끝 = function(r){
+    m.busy = false;
+    if(r && r.ok){
+      closeNote(); toast("✅ 비고를 적었습니다");
+      refreshOne(m.kind === "in" ? "ieum_notes" : "external_staff");
+    } else {
+      m.err = (r && r.message) || "저장하지 못했습니다"; render();
+    }
+  };
+  if(m.kind === "in"){
+    var 다음 = Object.assign({}, (D.ieum_notes && typeof D.ieum_notes === "object") ? D.ieum_notes : {});
+    if(글) 다음[m.pk] = 글; else delete 다음[m.pk];
+    PuCalWrite.saveNotes(다음).then(function(r){ if(r && r.ok) D.ieum_notes = 다음; 끝(r); })
+      ["catch"](function(e){ 끝({ ok:false, message:(e && e.message) || String(e) }); });
+  } else {
+    var x = arr(D.external_staff).filter(function(e){ return e && e.id === m.pk; })[0];
+    PuCalWrite.save("external_staff", { id:m.pk, note:글 }, x).then(function(r){
+      if(r && r.ok && x) x.note = 글;
+      끝(r);
+    })["catch"](function(e){ 끝({ ok:false, message:(e && e.message) || String(e) }); });
+  }
+}
+
+/* ── 외부 공유 뷰 «발행» ────────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 2걸음.
+
+   ★ 여기서 고친 진짜 고장
+     공개 일정(ieum_public)을 만드는 일이 이알피에만 걸려 있었다. 그런데 이음 근무를
+     «푸른 캘린더에서도» 고치게 되면서(1걸음), 캘린더에서 고친 것은 공개 뷰에 안
+     따라갔다 — 외부 변호사가 받은 링크에 옛 일정이 그대로 떠 있었다.
+     이알피 이음센터 화면을 열어야만 다시 발행됐기 때문이다.
+
+   ★ 만드는 셈은 js/pu-ieum-public.js «한 곳»이다 — 이알피도 그 파일을 부른다.
+     여기서 다시 셈하지 말 것(두 벌이 되면 두 화면의 공개 일정이 갈린다).
+   ⚠ 발행은 «덮어쓰기»다. 원본은 근태라 언제든 다시 만들 수 있다. */
+function 발행자료(){
+  return {
+    attendance: arr(D.attendance_records),
+    users: allUsers(),
+    externals: arr(D.external_staff),
+    year: new Date().getFullYear()
+  };
+}
+function 발행하기(조용히){
+  if(typeof PuIeumPublic === "undefined" || !fbDb) return;
+  if(!조용히){ S.pub = { busy:true, msg:"" }; render(); }
+  return PuIeumPublic.publish(fbDb, 발행자료()).then(function(만든것){
+    var 날수 = Object.keys(만든것.roster || {}).length;
+    S.pub = { busy:false, msg:"✅ 발행했습니다 — " + 날수 + "일치", at:Date.now() };
+    if(!조용히) render();
+  })["catch"](function(e){
+    S.pub = { busy:false, msg:"발행하지 못했습니다: " + ((e && e.message) || e) };
+    if(!조용히) render();
+  });
+}
+/* 일정을 고치면 «저절로» 발행한다 — 이알피와 같은 요령(3초 모아서 한 번).
+   ⚠ 고칠 때마다 바로 올리면 끌어놓기로 여러 건을 잇따라 고칠 때 그만큼 올라간다. */
+var _발행타이머 = null;
+function 발행예약(){
+  if(typeof PuIeumPublic === "undefined" || !fbDb) return;
+  clearTimeout(_발행타이머);
+  _발행타이머 = setTimeout(function(){ 발행하기(true); }, 3000);
+}
+function 발행시각Html(){
+  var at = (S.pub && S.pub.at) || 0;
+  if(!at) return "";
+  var d = new Date(at);
+  return '<span class="pubat">마지막 발행 ' + String(d.getHours()).padStart(2,"0")
+    + ":" + String(d.getMinutes()).padStart(2,"0") + '</span>';
+}
+
+/* ── 개인 공유 링크 발급·재발급 ──────────────────────────────────────────
+   ⚠ 재발급하면 «지금 링크가 그때부터 안 열린다». 되돌릴 수 없으니 한 번 묻는다.
+   ⚠ 외부 인원 표(external_staff)는 지도형이라 칸별 저장 문을 그대로 쓴다 —
+     그 사람의 shareKey 칸 하나만 고친다(다른 칸·다른 사람을 안 건드린다). */
+function 링크발급(extId){
+  if(!잇기할수있나()) return;
+  var x = arr(D.external_staff).filter(function(e){ return e && e.id === extId; })[0];
+  if(!x) return;
+  var 다시 = !!x.shareKey;
+  if(다시 && !window.confirm(x.name + "님의 링크를 재발급할까요?\n지금 링크는 그때부터 열리지 않습니다."))
+    return;
+  var 새열쇠 = PuIeumPublic.newShareKey();
+  PuCalWrite.save("external_staff", { id: extId, shareKey: 새열쇠 }, x).then(function(r){
+    if(r && r.ok){
+      x.shareKey = 새열쇠;                     /* 화면이 든 것도 함께 고친다 */
+      toast(다시 ? "🔑 재발급했습니다 — 새 링크를 전해 주세요" : "🔑 발급했습니다");
+      발행하기(true);                          /* people 목록이 바뀌었으니 다시 올린다 */
+      render();
+    } else {
+      toast("발급하지 못했습니다: " + ((r && r.message) || ""));
+    }
+  })["catch"](function(e){ toast("발급하지 못했습니다: " + ((e && e.message) || e)); });
+}
+
 /* 실시간DB 열쇠에는 점(.)을 못 쓴다 — 이메일에는 점이 있어 쉼표로 바꿔 담는다.
    ⚠ 이알피와 «같은 셈»이어야 한다. 다르면 이어 둔 사람이 안 찾아진다. */
 function gcalMailKey(m){ return String(m || "").trim().toLowerCase().replace(/[.#$\[\]\/]/g, ","); }
@@ -586,6 +1049,9 @@ function gcalLoad(force){
         .filter(function(ev){ return ev.start && (ev.start.date || ev.start.dateTime); })
         .map(gcalToEvent);
       GCAL.loading = false; render();
+      /* 색표가 이제 손에 있다 — 색이 없는 직원이 있으면 이때 채운다(1걸음).
+         ⚠ 그리기가 끝난 «뒤»다. 색 채우다 실패해도 달력은 이미 떠 있다. */
+      색채우기();
     })
     .catch(function(e){
       /* ⚠ 못 받았으면 «조용히» 비우지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이다 */
@@ -625,6 +1091,8 @@ function gcalToEvent(ev){
   /* ⚠ 아이콘을 안 붙인다 — 구글 화면에는 없다(kind 로 이미 갈린다) */
   return { kind:"gcal", store:"gcal", id:ev.id, sid:sid, date:date,
     text:title, time: (timeStr && timeStr !== "00:00") ? timeStr.replace(":","") : "",
+    /* 만든이 메일을 남긴다 — 「계정 잇기」 창이 «아직 안 이은 사람»을 여기서 센다 */
+    mail:mail, mailSid:mailSid || "",
     color:color, gcalUrl:ev.htmlLink || "",
     tip: title + (ev.location ? "\n📍 " + ev.location : "")
          + (mail ? "\n✉ " + mail : "") };
@@ -710,6 +1178,23 @@ function eventsOn(ymd, eumOnly){
       if(GCAL.evs[gi].date === ymd) out.push(GCAL.evs[gi]);
     }
   }
+  /* ④ 사건 마감일 · 단계 기한 · 휴직 (5걸음에 되살린 층 셋)
+     ⚠ 이음 보기에는 안 넣는다 — 거기는 이음 근무만 보는 자리다(구글과 같은 까닭).
+     ⚠ 「구글만」 거르개일 때도 안 넣는다 — 구글에서 온 것만 보자는 뜻이다.
+     ⚠ 셋 다 movable:false 다. 계산된 값이거나 다른 화면이 주인이라,
+       여기서 끌어 옮기면 그 화면과 어긋난다. */
+  /* ⚠ typeof 로 본다 — 검사가 eventsOn 만 떼어 상자에 넣고 도는 자리가 여럿 있다
+     (chipHtml 의 ME 와 같은 까닭). 없으면 그 층만 안 그린다 — 나머지는 멀줦하다.
+     진짜로 도는지는 tests/case-due-chips.test.js 가 따로 재서 본다. */
+  if(!eumOnly && S.filter !== "gcal" && typeof 기한칩 === "function"){
+    기한칩(ymd).forEach(function(c){
+      /* 사람 거르개 — 담당자가 그 사람인 것만. 휴직은 그 사람 것만. */
+      if(S.filter && S.filter !== "pureun" && S.filter !== "eumwork" && c.sid !== S.filter) return;
+      if(S.filter === "eumwork") return;
+      out.push({ kind:c.kind, store:"", id:c.kind + ":" + c.date + ":" + (c.sid || ""),
+        sid:c.sid, text:c.text, time:"", color:c.color, tip:c.tip, movable:false });
+    });
+  }
   if(eumOnly) out = out.filter(function(e){ return e.kind === "eum"; });
   return out;
 }
@@ -774,17 +1259,29 @@ function lunarRange(ym){
   }catch(e){ return ""; }
 }
 
-/* 바탕색 위에 어떤 글자색이 읽히나 — 이알피의 calTextOn 과 같은 셈이어야 한다.
-   초록이 가장 밝게 느껴지므로 사람 눈 기준(0.299/0.587/0.114)으로 잰다.
-   ⚠ 지금은 칩 자체가 이 함수를 안 쓴다(옅은 칠이라 늘 짙은 글자로 충분하다) —
-     함수는 남겨 둔다. tests/cal-fits-one-screen.test.js 가 이 이름을 그대로 찾는다. */
-function textOn(bg){
+/* WCAG 상대밝기 — «글자가 읽히는가»를 재는 데 쓴다.
+   ⚠ 사람 눈 어림(0.299/0.587/0.114)과 다르다. 그 어림으로 흰/검을 고르면
+     초록(#51b749) 위에 짙은 글자가 붙어 2.55:1 까지 떨어진다 — 안 읽힌다.
+     이알피 calTextOn 이 아직 그 셈이다(거기도 같은 구멍 — 따로 고칠 일). */
+function 상대밝기(bg){
   var hex = String(bg || "").replace("#", "");
   if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-  if(hex.length !== 6) return "#ffffff";
-  var r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
-  var lum = (0.299*r + 0.587*g + 0.114*b) / 255;
-  return lum > 0.62 ? "#1e293b" : "#ffffff";
+  if(hex.length !== 6) return 1;
+  var c = [0,2,4].map(function(i){
+    var v = parseInt(hex.slice(i,i+2),16) / 255;
+    return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4);
+  });
+  return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
+}
+function 대비(a, b){
+  var x = 상대밝기(a), y = 상대밝기(b);
+  return (Math.max(x,y) + 0.05) / (Math.min(x,y) + 0.05);
+}
+/* 바탕색 위에 어떤 글자색이 읽히나 — 흰·검 둘을 «실제로 재서» 나은 쪽을 고른다.
+   ⚠ 고르는 두 색은 흰과 검뿐이다(팔레트 규율 — tests/color-palette-apps.test.js).
+     실측 최악: 밝은판 4.76:1 · 어두운판 4.59:1(사람 색 22 + 붙박이 색 5). */
+function textOn(bg){
+  return 대비(bg, "#ffffff") >= 대비(bg, "#000000") ? "#ffffff" : "#000000";
 }
 /* 색 둘을 섞는다(t=0 이면 원색 그대로, t=1 이면 완전히 두번째 색) —
    일정 칩의 «옅은 바탕»을 만드는 데 쓴다. 사람 색 값 자체는 안 바꾼다(colorOf 그대로),
@@ -826,20 +1323,62 @@ function ymdOf(y, m, d){
 }
 
 /* 일정 칩 하나 — 월·주·일 보기가 «같은 규칙»을 쓴다(보기를 바꿀 때 색이 튀지 않게).
-   ★ 옅게 칠하고 왼쪽에 띠 (대표 지시 2026-09-19 「2번」) — 사람 색을 진하게 «채우지»
-     않는다. 하루에 대여섯 줄이 늘어서면 원색 띠가 나란히 서서 눈이 시렸다.
-     바탕은 사람 색을 흰(또는 검)에 가깝게 섞고, 그 사람 색은 왼쪽 띠 3px 에만
-     진하게 남긴다 — 색은 «표시»로 남고 글자는 늘 짙게 읽힌다(구글·노션 방식). */
+   ═══════════════════════════════════════════════════════════════════════════
+   ★ 네 판을 거쳤다. 되돌리기 전에 먼저 읽을 것.
+     ① 원색 채우기 — 하루에 대여섯 줄이 늘어서면 원색 띠가 부딪혀 눈이 시렸다.
+     ② 옅게 칠하고 왼쪽에 띠(85% 흰섞기) — 대비를 채우려니 바탕이 거의 흰색이 되어
+       색 자체가 지워졌다(대표 지시 2026-09-20 「너무연해서 … 색이 눈에 보이지 않는다」).
+     ③ 글자 자체를 그 사람 색으로(74% 검정) — 색이 «어두운 구석으로 죄다 뭉쳤다».
+       실측: 열여덟 사람 가운데 가장 닮은 둘(장한돌·박병훈)의 색 거리가
+       ΔE 7.1 에서 2.7 로 주저앉았다. ②와 같은 잘못이다 — 대비만 재고
+       «서로 갈라지는가»는 안 쟀다.
+     ④ 지금 — 대표 지시 2026-09-20 「1」(견본 셋 가운데 «구글 그대로»).
+       구글 캘린더처럼 채운다. 채우면 색 거리가 안 줄어든다(ΔE 23.4 그대로).
+   ★ 규칙 — 숫자가 아니라 이것을 지킨다(tests/cal-dark-mode.test.js)
+     ㉮ 칩은 그 사람 색으로 «채운다». 색을 글자에 눌러 담지 않는다.
+     ㉯ 내 일정은 원색 그대로, 남의 일정은 옅게 깔고 왼쪽에 «원색 띠»를 남긴다.
+        옅게 깐 바탕끼리는 ΔE 3.6 밖에 안 난다 — 누구인지는 «띠»가 알린다.
+     ㉰ 글자색은 바탕과의 «실제 대비»로 고른다(textOn).
+     ㉱ 어두운판은 바탕을 «조금만» 누른다. 절반까지 누르면 색끼리 ΔE 14 로 뭉친다.
+   실측(사람 색 22 + 붙박이 색 5): 내 일정 4.76:1·4.59:1 · 남의 일정 5.86:1·5.07:1 */
+var 칩_어둠_누름 = .14;   /* 어두운판에서 바탕을 누르는 양 — 더 누르면 색이 뭉친다 */
+var 칩_옅게     = .84;   /* 남의 일정 바탕을 흰(어두운판은 판) 쪽으로 옮기는 양 */
 function chipHtml(e, ymd){
   var 사람색 = e.color || "#64748b";
   var 어둠 = S.theme === "dark";
-  var bg = mixHex(사람색, 어둠 ? "#1e293b" : "#ffffff", 어둠 ? .78 : .85);
+  /* «내 일»이 먼저 눈에 들어와야 한다(대표 지시) — 사번으로 가른다.
+     ⚠ 이름으로 가르지 않는다(동명이인·개명). ME 가 없으면 아무것도 «내 것»이 아니다. */
+  /* typeof 로 본다 — 검사가 chipHtml 만 떼어 상자에 넣고 도는데(ME 를 안 만든다),
+     그때 ReferenceError 로 죽으면 안 된다. ME 가 아예 없으면 아무것도 «내 것»이 아니다. */
+  var 내일 = !!(typeof ME !== "undefined" && ME && ME.sid && e.sid === ME.sid);
   var 지남 = ymd < todayYMD();
   var 시각 = e.time ? "<b>" + esc(e.time) + "</b> " : "";
+  var 바탕, 글자, 띠 = "";
+  if(내일){
+    바탕 = 어둠 ? mixHex(사람색, "#000000", 칩_어둠_누름) : 사람색;
+    글자 = textOn(바탕);
+  } else {
+    바탕 = 어둠 ? mixHex(사람색, "#1e293b", .80) : mixHex(사람색, "#ffffff", 칩_옅게);
+    /* 대표 지시 2026-09-20 「한글이 좀더 진했으면」 — 밝은판만 .58 → .72 로 검정을
+       더 섞었다(재 보니 대비가 오히려 더 좋아진다: 최악 5.86:1 → 9.15:1). 어두운판은
+       이미 흰 쪽으로 옅어 안 바꿨다 — 더 섞으면 색이 지워진다. */
+    글자 = 어둠 ? mixHex(사람색, "#ffffff", .50) : mixHex(사람색, "#000000", .72);
+    띠   = ";border-left:3px solid " + esc(사람색) + ";border-radius:0 4px 4px 0";
+  }
+  /* ★ 끌어 옮길 수 있는 것과 아닌 것 (5걸음, 대표 지시 2026-09-21)
+       옮길 수 있다 — 우리 일정·근태(sch·att·eum)와 구글 일정(gcal)
+       옮길 수 없다 — 공휴일 · 사건 마감일 · 단계 기한 · 휴직
+     ⚠ 사건 기한은 «계산된 값»이고 휴직은 인사관리가 주인이다. 달력에서 옮기면
+       그 화면과 어긋난다 — 그래서 아예 못 잡게 한다(잡히면 사람은 된다고 믿는다).
+     ⚠ 잠긴 달은 «여기서» 막지 않는다. 막는 자리는 저장 문(pu-cal-write) 하나여야
+       두 곳이 어긋나지 않는다 — 놓은 뒤에 「잠긴 달입니다」라고 분명히 말한다. */
+  var 옮길수있나 = (e.movable !== false) && !!e.store && !!e.id;
   return '<div class="ev" data-ev="' + esc(e.store) + ':' + esc(e.id) + '"'
-    + ' title="' + esc(e.tip) + '"'
-    + ' style="background:' + esc(bg) + ';color:var(--ink);border-left:3px solid ' + esc(사람색)
-    +   ';padding-left:6px' + (지남 ? ';opacity:.65' : '') + '">'
+    + (옮길수있나 ? ' draggable="true" data-drag="' + esc(e.store) + ':' + esc(e.id) + '"' : '')
+    + ' title="' + esc(e.tip) + (옮길수있나 ? ' (끌어서 다른 날로 옮길 수 있습니다)' : '') + '"'
+    + ' style="background:' + esc(바탕) + ';color:' + esc(글자)
+    +   (내일 ? ";font-weight:700" : "") + 띠
+    +   (지남 ? ";opacity:.65" : "") + '">'
     + 시각 + esc(e.text) + '</div>';
 }
 
@@ -901,13 +1440,13 @@ function calendarHtml(eumOnly){
     var hol = holidayOf(c.date);
     var 오늘 = c.date === today;
     var 찾음 = !!(S.q && evs.length);
-    /* ⚠ 어두운판에서는 옅은 노랑·분홍 «칠»을 안 쓴다 — 그 위에 놓일 글자가 안 읽힌다.
-       「오늘」은 CSS(.day.today) 가 테두리로, 「공휴일」은 .ev.hol 칩이(이알피와 같은
-       분홍·빨강, 값을 바꾸지 않는다), 「찾음」은 outline(#fbbf24) 이 그대로 맡는다 —
-       셋 다 배경을 안 써도 이미 충분히 표난다. */
+    /* ⚠ 칸 전체를 칠하지 않는다 — 구글 실제 화면을 재 보니(대표 지시 2026-09-20)
+       «오늘»도 «공휴일»도 칸 배경은 흰색 그대로였다(픽셀로 확인: 255,255,255).
+       「오늘」은 숫자의 파란 동그라미(.dnum.today)만, 「공휴일」은 .ev.hol 띠만 맡는다.
+       「찾음」은 이 앱만의 기능이라(구글에 없다) outline+옅은 칠을 그대로 둔다. */
     var 어둠 = S.theme === "dark";
     var bg = 어둠 ? (c.other ? "#000000" : "#1e293b")
-      : (오늘 ? "#fffbeb" : c.other ? "#f8fafc" : hol ? "#fef2f2" : 찾음 ? "#fffbeb" : "#ffffff");
+      : (c.other ? "#f8fafc" : 찾음 ? "#fffbeb" : "#ffffff");
     var 테 = 어둠 ? "#475569" : (c.other ? "#e2e8f0" : "#f8fafc");
     /* 공휴일 칩도 한 줄을 먹는다. 그리고 「+N개 더」 자신도 한 줄이다 —
        그 둘을 안 빼면 접었는데도 칸이 넘친다. */
@@ -984,8 +1523,8 @@ function weekHtml(eumOnly){
     var 오늘 = ds === today;
     var d = new Date(ds + "T00:00:00");
     var 어둠 = S.theme === "dark";
-    /* 주 보기도 달 보기와 같은 잣대다 — 어두운판에서는 옅은 칠을 안 쓴다 */
-    var wbg = 어둠 ? "#1e293b" : (오늘 ? "#fffbeb" : hol ? "#fef2f2" : "#ffffff");
+    /* 주 보기도 달 보기와 같은 잣대다 — 오늘·공휴일 모두 칸 배경은 흰색 그대로다 */
+    var wbg = 어둠 ? "#1e293b" : "#ffffff";
     return '<div class="wcol' + (오늘 ? " today" : "") + '" data-day="' + ds + '" style="background:' + wbg + '">'
       + '<div class="whd' + (d.getDay()===0 ? " sun" : d.getDay()===6 ? " sat" : "") + '">'
       +   ["일","월","화","수","목","금","토"][d.getDay()]
@@ -1042,8 +1581,18 @@ function monthbarHtml(){
 /* 검색칸 — 줄 맨 오른쪽 끝에 붙는다(.calhead .srch 의 margin-left:auto).
    ⚠ 달바 안에 두면 월|주|일 바로 옆에 붙어 오른쪽이 통째로 빈다. */
 function srchHtml(){
-  return '<span class="srch"><span class="ic">🔍</span>'
+  return 구글단추Html() + 색단추Html() + 잇기단추Html()
+    + '<span class="srch"><span class="ic">🔍</span>'
     + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>';
+}
+/* 「계정 잇기」 단추 — 아직 안 이은 사람이 있을 때만, 관리자에게만 보인다.
+   ⚠ 할 일이 없으면 안 보인다. 늘 떠 있으면 머리줄만 좁아지고 아무도 안 누른다. */
+function 잇기단추Html(){
+  if(!잇기할수있나()) return "";
+  var 남음 = 안이은수();
+  if(!남음) return "";
+  return '<button class="linkacct" data-mmopen="1" title="구글 일정에는 «누가 만들었는지»만 남습니다.'
+    + ' 한 번 이어 주면 그 뒤로 담당자 색이 정확해집니다.">👤 계정 잇기 ' + 남음 + '명</button>';
 }
 
 /* 검색 — 제목·메모·사람 이름 어디에 걸려도 남긴다 */
@@ -1104,6 +1653,36 @@ function chipsHtml(eumOnly){
 }
 
 /* 지금 보고 있는 범위의 날짜들 — 칩 옆 건수를 그 범위로만 센다 */
+/* 지금 «보이는» 첫 날과 마지막 날 — 앞뒤 달에 걸친 줄까지 넣는다.
+   ⚠ 그 달의 1일~말일로 자르면, 달력 첫 줄·끝 줄에 걸친 앞뒤 달 날짜가 빈 채로 뜬다. */
+function 보이는범위(){
+  if(S.view === "day") return { from:S.date, to:S.date };
+  if(S.view === "week"){ var w = weekDays(S.date); return { from:w[0], to:w[w.length-1] }; }
+  var g = monthGrid(S.ym);
+  return { from:g[0].date, to:g[g.length-1].date };
+}
+/* 사건 기한·휴직 칩 — 한 번 셈해 날짜별로 모아 둔다(칸마다 다시 셈하면 42번 돈다).
+   ⚠ 셈은 js/pu-case-due.js 한 곳이다. 여기서 다시 짜지 말 것 —
+     이알피 「나의 업무」의 D-day 도 같은 셈을 쓴다. */
+var _기한칩 = { 열쇠:"", 표:{} };
+function 기한칩(ymd){
+  var r = 보이는범위();
+  var 열쇠 = r.from + "~" + r.to + "|" + (D.cases ? arr(D.cases).length : 0)
+    + "|" + (D.leave_of_absence ? arr(D.leave_of_absence).length : 0);
+  if(_기한칩.열쇠 !== 열쇠){
+    var 표 = {};
+    if(typeof PuCaseDue !== "undefined"){
+      PuCaseDue.chips({
+        cases: arr(D.cases), stageCatalog: arr(D.biz_case_stages),
+        loa: arr(D.leave_of_absence), users: users(),
+        from: r.from, to: r.to
+      }).forEach(function(c){ (표[c.date] = 표[c.date] || []).push(c); });
+    }
+    _기한칩 = { 열쇠:열쇠, 표:표 };
+  }
+  return _기한칩.표[ymd] || [];
+}
+
 function monthDates(){
   if(S.view === "day") return [S.date];
   if(S.view === "week") return weekDays(S.date);
@@ -1136,15 +1715,6 @@ function lockNote(){
   if(arr(D.locked_attend_months).indexOf(S.ym) < 0) return '';
   return '<div class="note"><span>🔒 '+esc(S.ym)+' 근태·휴가는 마감됐습니다 — 연차·근태는 고칠 수 없습니다'
     + ' (일정은 됩니다).</span></div>';
-}
-
-function laterHtml(tab){
-  return '<div class="panel later">'
-    + '<h2>'+esc(tab.label)+' — 아직 이알피에 있습니다</h2>'
-    + '<p>이 화면은 다음 걸음에 옮깁니다. 지금은 푸른이알피에서 그대로 쓰실 수 있습니다.'
-    + (tab.money ? '<br>금액이 보이는 화면이라 옮길 때 권한을 함께 옮깁니다(관리자만).' : '')
-    + '</p>'
-    + '<button class="btn" data-erp="'+esc(tab.erp)+'">푸른이알피에서 열기</button></div>';
 }
 
 /* ── 이음센터 · 인원 현황 ─────────────────────────────────────────────
@@ -1213,33 +1783,17 @@ function inScope(ds){
   return ds.slice(0,7) === S.ym;
 }
 
-/* ── 이음센터 · 인원 현황 — 이알피(IeumPeopleTab)와 «똑같은 꼴» ───────────
-   대표 지시 2026-09-18 (/goal) 「대시보드 제외한 화면은 똑같이 만들어라」.
-   KPI 스트립(이음근무·법률상담·이음강의·활동 인원) + 표(No.·인원·구분·근무 막대·
-   잔여·연락처·비고·펼치기)를 이알피와 같은 열·같은 색으로 짓는다.
-   ⚠ 한도·비고·강의 기록을 «고치는» 것은 아직 이알피에서 한다 — 그 세 자리는
-     표 통째로 담겨 있어 우리 저장 관문(칸별 보내기)이 그대로 못 쓴다. 그래서
-     여기서는 값을 «보여만» 주고, 손대면 이알피로 보낸다. 링크 복사처럼 서버에
-     아무것도 안 쓰는 것은 바로 된다. */
+/* ── 이음센터 · 인원 현황 ─────────────────────────────────────────────────
+   대표 지시 2026-09-18 (/goal) 「대시보드 제외한 화면은 똑같이 만들어라」로
+   이알피(IeumPeopleTab)와 같은 꼴로 지었다.
+
+   ★ 2026-09-20 «연간 한도»와 «이음강의 기록»을 걷어냈다 (대표 지시 「정리 지워라」).
+     두 기능은 만들어만 두고 **아무도 한 번도 안 썼다** — 서버의 ieum_caps ·
+     ieum_lectures 가 둘 다 비어 있었다(실측). 안 쓰는 칸이 표에 넉 줄(법률상담 잔여 ·
+     이음강의 · 이음강의 잔여 · 강의 이력)을 차지하고 늘 「—」만 뜨고 있었다.
+     ⚠ 되살리지 말 것. 다시 필요해지면 «쓸 사람과 함께» 새로 짓는다.
+   ⚠ 비고를 «고치는» 것은 아직 이알피에서 한다(다음 걸음). 여기서는 보여만 준다. */
 var ROLE_CHIP = { in:{bg:"#eff6ff",fg:"#2563eb"}, ex:{bg:"#eff6ff",fg:"#2563eb"}, law:{bg:"#fffbeb",fg:"#d97706"} };
-function remBadgeHtml(used, cap){
-  if(!cap) return '<span style="color:#cbd5e1">—</span>';
-  var rem = cap - used, pct = used / cap;
-  var bg = pct >= 0.85 ? "#fef2f2" : pct <= 0.4 ? "#f0fdf4" : "#fffbeb";
-  var fg = pct >= 0.85 ? "#dc2626" : pct <= 0.4 ? "#16a34a" : "#d97706";
-  return '<span style="font-size:11px;font-weight:800;background:' + bg + ';color:' + fg + ';border-radius:5px;padding:2px 8px">' + rem + '</span>';
-}
-function barCellHtml(used, cap, color){
-  if(!cap && !used) return '<span style="color:#cbd5e1">—</span>';
-  var pct = cap ? Math.min(100, Math.round(used/cap*100)) : 0;
-  var c = (cap && used/cap >= 0.85) ? "#dc2626" : color;
-  var head = '<div style="display:flex;align-items:center;gap:7px;min-width:110px">'
-    + '<span style="font-size:11.5px;font-weight:700;color:#64748b;white-space:nowrap">'
-    + '<b style="color:#1e293b;font-size:12.5px">' + used + '</b>' + (cap ? " / " + cap + "회" : "회") + '</span>';
-  var bar = cap ? ('<div style="flex:1;height:7px;border-radius:20px;background:#f8fafc;overflow:hidden;min-width:46px">'
-    + '<span style="display:block;height:100%;border-radius:20px;width:' + pct + '%;background:' + c + '"></span></div>') : "";
-  return head + bar + '</div>';
-}
 function ieumKcell(color, label, val, unit, last){
   return '<div class="kcell"' + (last ? ' style="border-right:none"' : '') + '>'
     + '<span class="kdot" style="background:' + color + '"></span>'
@@ -1260,21 +1814,13 @@ function peopleHtml(){
     duty[pk].byMonth[mm].push(dd); duty[pk].total++;
   });
   Object.keys(duty).forEach(function(pk){ Object.keys(duty[pk].byMonth).forEach(function(mm){ duty[pk].byMonth[mm].sort(function(a,b){return a-b;}); }); });
-  var lectures = arr(D.ieum_lectures).filter(function(l){ return l && inScope(l.date); });
-  var caps = (S.scope === "year") ? ((D.ieum_caps && D.ieum_caps[S.ym.slice(0,4)]) || {}) : {};
-  function capOf(pk, kind){ return (caps[pk] && caps[pk][kind]) || 0; }
-  function lecUsed(pk){ return lectures.filter(function(l){ return l.personKey === pk; }).length; }
-
-  var dutyTotal = 0, lawUsedTotal = 0, lawCapTotal = 0, eduUsedTotal = 0, eduCapTotal = 0;
+  var dutyTotal = 0, lawUsedTotal = 0;
   rows.forEach(function(p){
     var t = (duty[p.pk]||{}).total || 0;
-    if(p.kind === "law"){ lawUsedTotal += t; lawCapTotal += capOf(p.pk,"law"); }
-    else dutyTotal += t;
-    eduUsedTotal += lecUsed(p.pk); eduCapTotal += capOf(p.pk,"edu");
+    if(p.kind === "law") lawUsedTotal += t; else dutyTotal += t;
   });
   var visible = S.showLeft ? rows : rows.filter(function(p){ return !p.left; });
   var maxDuty = 1; rows.forEach(function(p){ var t=(duty[p.pk]||{}).total||0; if(t>maxDuty) maxDuty=t; });
-  var isYearMode = S.scope === "year";
   var scopeSfx = S.scope === "month" ? "(" + parseInt(S.ym.slice(5,7),10) + "월)" : S.scope === "year" ? "(" + S.ym.slice(0,4) + ")" : "(전체)";
   var 범위말 = S.scope === "year" ? S.ym.slice(0,4) + "년" : S.scope === "all" ? "전체 (" + IEUM_START_YEAR + "~)" : S.ym;
   var 그만둔수 = rows.filter(function(p){ return p.left; }).length;
@@ -1282,9 +1828,6 @@ function peopleHtml(){
   var 행들 = visible.map(function(p, idx){
     var d = duty[p.pk] || { total:0, byMonth:{} };
     var isLaw = p.kind === "law";
-    var cUsed = isLaw ? (d.total || 0) : 0;
-    var cCap = capOf(p.pk,"law");
-    var eUsed = lecUsed(p.pk), eCap = capOf(p.pk,"edu");
     var open = S.openRows && S.openRows[p.pk];
     var chip = ROLE_CHIP[p.kind] || ROLE_CHIP.in;
     var dutyPct = Math.round((d.total||0) / maxDuty * 100);
@@ -1297,18 +1840,20 @@ function peopleHtml(){
       + '<td>' + ((!isLaw && d.total) ? ('<div class="barwrap"><span class="barnum">' + d.total + '<small>일</small></span>'
           + '<div class="bartrack"><span class="barfill" style="width:' + dutyPct + '%;background:' + p.color + '"></span></div></div>')
           : '<span class="dash">—</span>') + '</td>'
-      + '<td>' + (isLaw ? barCellHtml(cUsed, cCap, "#d97706") : '<span class="dash">—</span>') + '</td>'
-      + '<td>' + (isLaw ? remBadgeHtml(cUsed, cCap) : '<span class="dash">—</span>') + '</td>'
-      + '<td>' + ((eUsed||eCap) ? barCellHtml(eUsed, eCap, "#2563eb") : '<span class="dash">—</span>') + '</td>'
-      + '<td>' + remBadgeHtml(eUsed, eCap) + '</td>'
+      /* 법률상담 — 변호사의 이음 근무를 센 것이다(한도는 2026-09-20 에 걷어냈다) */
+      + '<td>' + (isLaw
+          ? ('<span class="lawcnt"><b>' + (d.total || 0) + '</b>회</span>')
+          : '<span class="dash">—</span>') + '</td>'
       + '<td>' + (p.phone ? ('<a class="tel" href="tel:' + esc(String(p.phone).replace(/[^0-9]/g,"")) + '" onclick="event.stopPropagation()">📞</a> ' + esc(p.phone)) : '<span class="dash">—</span>') + '</td>'
-      + '<td class="notecell">' + (p.note ? '<span title="' + esc(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dash">＋ 입력</span>') + '</td>'
+      /* 비고 — 눌러서 그 자리에서 고친다(2걸음까지는 이알피로 보내던 자리다).
+         ⚠ 줄 전체를 누르면 «펼치기»라, 여기서는 퍼짐을 멈춘다(끌리는 것 안의 끌기와 같은 덫). */
+      + '<td class="notecell"><button class="notebtn" data-note-open="' + esc(p.pk) + '" title="눌러서 고칩니다">'
+      +   (p.note ? '<span title="' + esc(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dash">＋ 입력</span>')
+      +   '</button></td>'
       + '<td class="chev">›</td></tr>';
     if(open){
       var months = Object.keys(d.byMonth).sort();
-      var myLecs = lectures.filter(function(l){ return l.personKey === p.pk; })
-        .sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
-      줄 += '<tr class="detail"><td colspan="10"><div class="detailgrid">'
+      줄 += '<tr class="detail"><td colspan="8"><div class="detailgrid one">'
         + '<div><div class="dtitle">' + (isLaw ? "월별 법률상담 일자" : "월별 이음근무 일자") + '</div>'
         + (months.length ? months.map(function(mm){
             var lbl = parseInt(mm.slice(5),10) + "월";
@@ -1316,12 +1861,6 @@ function peopleHtml(){
               + d.byMonth[mm].map(function(dd){ return '<span class="dchip ' + (isLaw ? "law" : "") + '">' + dd + '</span>'; }).join("")
               + '</span><span class="dcnt">' + d.byMonth[mm].length + '회</span></div>';
           }).join("") : '<div class="dnone">' + 범위말 + ' 기록 없음</div>')
-        + '</div><div><div class="dtitle">이음강의 이력</div>'
-        + (myLecs.length ? myLecs.map(function(l){
-            return '<div class="lrow"><span class="ldate">' + esc((l.date||"").slice(5)) + '</span>'
-              + '<span class="ltitle">' + esc(l.title || "(제목 없음)") + '</span></div>';
-          }).join("") : '<div class="dnone">기록 없음</div>')
-        + '<div class="dhint">한도·비고·강의 기록은 <button class="linklike" data-erp="dash/ieum">이알피에서</button> 고칩니다</div>'
         + '</div></div></td></tr>';
     }
     return 줄;
@@ -1339,16 +1878,15 @@ function peopleHtml(){
         return '<button data-scope="' + v + '"' + (S.scope === v ? ' class="on"' : '') + '>' + 이름 + '</button>';
       }).join("") + '</div></div>'
     + ieumKcell("#2563eb","이음근무",dutyTotal,"일")
-    + ieumKcell("#d97706","법률상담",lawUsedTotal + (isYearMode && lawCapTotal ? " / " + lawCapTotal : ""),"회")
-    + ieumKcell("#2563eb","이음강의",eduUsedTotal + (isYearMode && eduCapTotal ? " / " + eduCapTotal : ""),"회")
+    + ieumKcell("#d97706","법률상담",lawUsedTotal,"회")
     + ieumKcell("#16a34a","활동 인원",rows.filter(function(p){return !p.left;}).length,"명",true)
     + '</div>'
     + (그만둔수 ? '<button class="chip' + (S.showLeft ? " on" : "") + '" data-left="1">🚪 퇴사·종료 ' + 그만둔수 + '명 ' + (S.showLeft ? "숨기기" : "포함") + '</button>' : "")
     + '<div class="ppltable">'
     + (행들
         ? '<table><thead><tr><th class="no">No.</th><th>인원</th><th>구분</th>'
-          + '<th class="ublue">이음근무 ' + esc(scopeSfx) + '</th><th class="uamber">법률상담 ' + esc(scopeSfx) + '</th><th class="uamber">잔여</th>'
-          + '<th class="ublue">이음강의</th><th class="ublue">잔여</th><th>연락처</th><th>비고</th></tr></thead>'
+          + '<th class="ublue">이음근무 ' + esc(scopeSfx) + '</th><th class="uamber">법률상담 ' + esc(scopeSfx) + '</th>'
+          + '<th>연락처</th><th>비고</th></tr></thead>'
           + '<tbody>' + 행들 + '</tbody></table>'
         : '<div class="later"><p>이 범위에 이음센터 사람이 없습니다.</p></div>')
     + '</div>';
@@ -1372,16 +1910,24 @@ function shareHtml(){
       + '<td class="right">'
       + (x.shareKey
           ? ('<button class="btn ghost sm" data-copy="' + esc(url) + '">📋 링크 복사</button>'
-             + ' <button class="btn ghost sm" data-erp="dash/ieum">🔑 재발급</button>')
-          : '<button class="btn ghost sm" data-erp="dash/ieum">이알피에서 발급</button>')
+             + (잇기할수있나()
+                 ? ' <button class="btn ghost sm" data-newkey="' + esc(x.id) + '"'
+                   + ' title="새 링크를 만듭니다 — 지금 링크는 그때부터 안 열립니다">🔑 재발급</button>'
+                 : ''))
+          : (잇기할수있나()
+              ? '<button class="btn ghost sm" data-newkey="' + esc(x.id) + '">🔑 발급</button>'
+              : '<span class="muted">관리자만 발급</span>'))
       + '</td></tr>';
   }).join("");
   return '<div class="sharecard">'
     + '<div class="sctitle">🔗 외부인용 읽기전용 일정 페이지</div>'
     + '<div class="scdesc">외부 변호사·노무사에게 개인 고유 링크를 보내면 로그인 없이 본인 근무일정을 확인할 수 있습니다.<br>'
     + '공개되는 정보는 이름·날짜·구분뿐이며, 연락처 등 개인정보는 포함되지 않습니다.<br>'
-    + '일정을 수정한 뒤에는 이알피의 [지금 발행] 버튼으로 공개 일정을 갱신하세요.</div>'
-    + '<button class="btn" data-erp="dash/ieum">📤 이알피에서 발행하기</button>'
+    + '일정을 고치면 <b>저절로 발행</b>됩니다 — 아래 단추는 바로 올리고 싶을 때만 쓰세요.</div>'
+    + '<button class="btn" data-pub="1"' + (S.pub && S.pub.busy ? ' disabled' : '') + '>'
+    +   (S.pub && S.pub.busy ? '발행 중…' : '📤 지금 발행') + '</button>'
+    + (S.pub && S.pub.msg ? '<span class="pubmsg">' + esc(S.pub.msg) + '</span>' : '')
+    + 발행시각Html()
     + '</div>'
     + '<div class="sharecard">'
     + '<div class="sctitle sm">개인 링크 목록</div>'
@@ -1487,6 +2033,8 @@ function doSave(){
     closeModal();
     toast(고침 ? "✅ 고쳤습니다" : "✅ 넣었습니다");
     refreshOne(store);
+    /* 이음 근무가 바뀌면 외부 공유 뷰도 따라가야 한다 — 안 걸면 옛 일정이 그대로 뜬다 */
+    if(store === "attendance_records") 발행예약();
   });
 }
 
@@ -1495,11 +2043,128 @@ function doDelete(){
   if(!confirm("이 건을 지울까요?")) return;
   var prev = recOf(m.store, m.id) || m.prev;
   S.busy = true; m.err = ""; render();
-  PuCalWrite.remove(m.store, m.id, prev).then(function(r){
+  /* 구글과 «이어진» 건이면 그쪽도 함께 지운다 — 우리만 지우면 구글에 남는다.
+     ⚠ 이어진 근태가 지금 30건 있다(2026-09-20 실측). 이알피가 만들면서 이어 둔 것이다.
+     ⚠ 구글부터 지운다. 우리 것을 먼저 지우면 «무엇을 지워야 하는지»를 잃는다.
+     ⚠ 구글에서 못 지워도 우리 것은 지운다 — 그 대신 «못 지웠다»고 분명히 말한다
+       (이알피가 여기서 데었다: 안 지워졌는데 「삭제됨」이라고 했다). */
+  var 구글번호 = prev && prev.gcalEventId;
+  var 구글말 = "";
+  var 구글먼저 = (구글번호 && typeof PuGcalAuth !== "undefined")
+    ? PuGcalAuth.deleteEvent(GCAL_CAL_ID, 구글번호)
+        .then(function(){ 구글말 = ""; })
+        ["catch"](function(e){
+          구글말 = " ⚠ 구글 쪽은 못 지웠습니다(" + ((e && e.message) || "") + ")";
+        })
+    : Promise.resolve();
+
+  구글먼저.then(function(){
+    return PuCalWrite.remove(m.store, m.id, prev);
+  }).then(function(r){
     S.busy = false;
     if(!r.ok){ m.err = r.message; render(); return; }
     var st = m.store;
-    closeModal(); toast("🗑 지웠습니다"); refreshOne(st);
+    closeModal(); toast("🗑 지웠습니다" + 구글말); refreshOne(st);
+    if(st === "attendance_records") 발행예약();
+  });
+}
+
+/* ── 끌어서 다른 날로 옮기기 ─────────────────────────────────────────────
+   대표 지시 2026-09-21 「둘다」 — 4걸음에서 법인 대시보드와 함께 사라진 것을 되살린다.
+
+   ★ 어디에 손잡이를 다나 — 판(app) 한 곳이다. 칩마다 달면 다시 그릴 때마다 새로 달아야
+     하고, 하나라도 빠지면 «어떤 것은 안 끌리는» 화면이 된다.
+   ⚠ dragstart 는 거품처럼 위로 올라온다 — 바깥에서 preventDefault 를 하면 안쪽 끌기가
+     통째로 죽는다(컨설팅일정이 이 덫에 일주일 걸렸다). 여기서는 바깥에서 막지 않는다.
+   ⚠ 「놓을 수 있다」를 말해 주지 않으면 브라우저가 놓기를 아예 안 받는다 —
+     dragover 에서 preventDefault 를 «해야» 놓을 수 있다. 헷갈리기 쉬운 반대다. */
+var _끄는것 = null;
+function 끌기손잡이(){
+  var 판 = $('app'); if(!판 || 판._끌기달림) return;
+  판._끌기달림 = true;
+  판.addEventListener('dragstart', function(e){
+    var t = e.target && e.target.closest ? e.target.closest('[data-drag]') : null;
+    if(!t){ _끄는것 = null; return; }
+    _끄는것 = t.getAttribute('data-drag');
+    t.classList.add('dragging');
+    try{ e.dataTransfer.setData('text/plain', _끄는것); e.dataTransfer.effectAllowed = 'move'; }catch(x){}
+  });
+  판.addEventListener('dragend', function(){
+    _끄는것 = null;
+    Array.prototype.forEach.call(판.querySelectorAll('.dragging,.dropon'),
+      function(el){ el.classList.remove('dragging','dropon'); });
+  });
+  판.addEventListener('dragover', function(e){
+    if(!_끄는것) return;
+    var 칸 = e.target && e.target.closest ? e.target.closest('[data-day]') : null;
+    if(!칸) return;
+    e.preventDefault();                       /* ⚠ 이것이 있어야 놓을 수 있다 */
+    try{ e.dataTransfer.dropEffect = 'move'; }catch(x){}
+    if(!칸.classList.contains('dropon')){
+      Array.prototype.forEach.call(판.querySelectorAll('.dropon'),
+        function(el){ el.classList.remove('dropon'); });
+      칸.classList.add('dropon');
+    }
+  });
+  판.addEventListener('drop', function(e){
+    var 칸 = e.target && e.target.closest ? e.target.closest('[data-day]') : null;
+    var 끈것 = _끄는것;
+    if(!칸 || !끈것) return;
+    e.preventDefault();
+    _끄는것 = null;
+    옮기기(끈것, 칸.getAttribute('data-day'));
+  });
+}
+
+/* 「store:id」와 새 날짜. 우리 것이면 저장 문으로, 구글 것이면 구글로. */
+function 옮기기(끈것, 새날){
+  if(S.busy) return;
+  var i = String(끈것).indexOf(":");
+  var store = String(끈것).slice(0, i), id = String(끈것).slice(i + 1);
+  if(!store || !id || !새날) return;
+
+  /* ── 구글 일정 ── */
+  if(store === "gcal"){
+    var ev = null;
+    for(var k = 0; k < GCAL.evs.length; k++){ if(GCAL.evs[k].id === id){ ev = GCAL.evs[k]; break; } }
+    if(!ev) return;
+    if(ev.date === 새날) return;                    /* 제자리에 놓았다 */
+    if(typeof PuGcalAuth === "undefined" || !PuGcalAuth.hasToken()){
+      /* ⚠ 조용히 실패하지 않는다 — 안 옮겨졌는데 옮겨진 줄 알면 그날 사람이 안 온다 */
+      toast("🔐 구글 로그인이 필요합니다 — 일정은 옮기지 못했습니다");
+      return;
+    }
+    S.busy = true; render();
+    PuGcalAuth.moveEvent(GCAL_CAL_ID, id, 새날).then(function(){
+      S.busy = false;
+      ev.date = 새날;                               /* 받아 둔 것을 고쳐 바로 보인다 */
+      toast("✅ 구글 일정을 " + 새날 + " 로 옮겼습니다");
+      render();
+      gcalLoad(true);                               /* 진짜로 그리 됐는지 다시 받아 맞춘다 */
+    })["catch"](function(err){
+      S.busy = false;
+      toast("❌ 구글 일정을 옮기지 못했습니다 — " + ((err && err.message) || ""));
+      render();
+    });
+    return;
+  }
+
+  /* ── 우리 일정·근태 ── */
+  var prev = recOf(store, id);
+  if(!prev) return;
+  if(prev.date === 새날) return;
+  S.busy = true; render();
+  /* ⚠ 바뀐 칸만 보낸다(date). 저장 문이 «옛 달·새 달»을 둘 다 보고 잠금을 판단한다. */
+  PuCalWrite.save(store, { id:id, date:새날 }, prev).then(function(r){
+    S.busy = false;
+    if(!r.ok){ toast("❌ " + (r.message || "옮기지 못했습니다")); render(); return; }
+    toast("✅ " + 새날 + " 로 옮겼습니다");
+    refreshOne(store);
+    if(store === "attendance_records") 발행예약();
+  })["catch"](function(err){
+    S.busy = false;
+    toast("❌ 옮기지 못했습니다 — " + ((err && err.message) || ""));
+    render();
   });
 }
 
@@ -1541,14 +2206,16 @@ function render(){
     html = failedHtml() + peopleHtml();
   } else if(tab.v==='eumshare'){
     html = failedHtml() + shareHtml();
-  } else {
-    html = laterHtml(tab);
   }
   var 달력 = (tab.v === "cal" || tab.v === "eumcal");
   if(달력) html += 펼침Html(tab.v === "eumcal");
   html += modalHtml();
+  html += mailmapHtml();
+  html += colorsHtml();
+  html += noteHtml();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   $('app').innerHTML = html;
+  끌기손잡이();   /* 판이 새로 그려져도 손잡이는 한 번만 달린다 */
   /* 달력 탭에서만 화면에 «딱» 맞춘다 — 다른 탭은 여느 때처럼 제 안에서 굴러간다 */
   $('app').className = 달력 ? 'fit' : '';
   if(달력){
@@ -1589,7 +2256,7 @@ document.addEventListener('click', function(e){
      && !(e.target.closest && e.target.closest("[data-more]"))){
     S.open = null; render();
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -1626,7 +2293,26 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-open')){ window.open(t.getAttribute('data-open'), '_blank', 'noopener'); return; }
   if(t.hasAttribute('data-f')){ modalRead(); var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
   if(t.hasAttribute('data-erp')){ goErp(t.getAttribute('data-erp')); return; }
-  if(t.hasAttribute('data-close')){ closeModal(); return; }
+  /* 비고는 줄 «안»의 단추다 — 줄 펼치기(data-toggle)보다 먼저 잡아야 한다 */
+  if(t.hasAttribute('data-copen-all')){ openColors(); return; }
+  if(t.hasAttribute('data-copen')){
+    var _cs = t.getAttribute('data-copen');
+    if(S.colors){ S.colors.pick = (S.colors.pick === _cs) ? "" : _cs; render(); }
+    return;
+  }
+  if(t.hasAttribute('data-cset')){
+    var _cv = String(t.getAttribute('data-cset')).split('|');
+    색고르기(_cv[0], _cv[1]);
+    return;
+  }
+  if(t.hasAttribute('data-note-open')){ e.stopPropagation(); openNote(t.getAttribute('data-note-open')); return; }
+  if(t.hasAttribute('data-noteact')){ saveNote(); return; }
+  if(t.hasAttribute('data-glogin')){ 구글로그인(); return; }
+  if(t.hasAttribute('data-mmopen')){ openMailMap(); return; }
+  if(t.hasAttribute('data-pub')){ 발행하기(false); return; }
+  if(t.hasAttribute('data-newkey')){ 링크발급(t.getAttribute('data-newkey')); return; }
+  /* 닫기 — 잇기 창이 열려 있으면 그것부터 닫는다(둘이 겹쳐 뜨지 않는다) */
+  if(t.hasAttribute('data-close')){ if(S.note) closeNote(); else if(S.colors) closeColors(); else if(S.mailmap) closeMailMap(); else closeModal(); return; }
   if(t.hasAttribute('data-act')){
     if(t.getAttribute('data-act')==='save') doSave(); else doDelete();
     return;
@@ -1683,6 +2369,11 @@ document.addEventListener('input', function(e){
   if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} }
 });
 
+/* 계정 잇기 — 고르면 «바로» 저장한다(따로 저장 단추를 두지 않는다) */
+document.addEventListener('change', function(e){
+  if(!S.mailmap || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-mm')) return;
+  잇기저장(e.target.getAttribute('data-mm'), e.target.value);
+});
 document.addEventListener('change', function(e){
   if(!S.modal || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-m')) return;
   var f = e.target.getAttribute('data-m');
@@ -1691,7 +2382,10 @@ document.addEventListener('change', function(e){
 });
 /* ESC 로 창을 닫는다 — 뒤로가기 층과 다투지 않게 여기서만 받는다 */
 document.addEventListener('keydown', function(e){
-  if(e.key === 'Escape' && S.modal){ e.preventDefault(); closeModal(); }
+  if(e.key !== 'Escape') return;
+  if(S.note){ e.preventDefault(); closeNote(); return; }
+  if(S.mailmap){ e.preventDefault(); closeMailMap(); return; }
+  if(S.modal){ e.preventDefault(); closeModal(); }
 });
 
 $('goErp').onclick = function(){ goErp(''); };
@@ -1714,6 +2408,8 @@ function start(user){
     formOf: function(k){ return PuCalRead.rawForm(k); },
     who: function(){ return (ME && ME.name) || (ME && ME.sid) || ''; }
   });
+  /* 구글 로그인에서 돌아왔으면 주소 꼬리에서 토큰을 꺼낸다(주소는 깨끗이 지운다) */
+  try{ if(typeof PuGcalAuth !== "undefined" && PuGcalAuth.capture()) toast("✅ 구글에 연결됐습니다"); }catch(e){}
   S.ym = ymOf(new Date()); S.date = todayYMD();
   setConn(true, '연결됨');
   PuCalRead.readMany(KEYS).then(function(r){
@@ -1738,7 +2434,7 @@ function start(user){
   }).catch(function(e){
     $('app').innerHTML = '<div class="panel"><h2 style="color:#dc2626">자료를 못 읽었습니다</h2>'
       + '<p class="muted">'+esc(e && e.message || e)+'</p>'
-      + '<button class="btn" data-erp="dash/corp">푸른이알피에서 보기</button></div>';
+      + '<button class="btn" onclick="location.reload()">다시 열기</button></div>';
   });
 }
 

@@ -58,8 +58,12 @@ test('설명은 화면에 깔지 않고 ⓘ 로 접는다 — 오류 메시지�
   });
   /* ⓘ 는 hlp('키') 로 직접 부르기도 하고, 표(CARD_TARGETS 등)에 help:'키' 로 적어 두고
      hlp(T.help) 로 부르기도 한다 — 둘 다 «쓰고 있는 것»으로 센다. */
+  /* ⓘ 를 부르는 길이 셋이다 — hlp('키') 직접, 표에 help:'키' 로 적어 두고 hlp(T.help),
+     그리고 2026-09-20 줄 정리로 생긴 단계 머리줄 phaseHead(제목,'키',묶음) 이다.
+     ⚠ 셋을 다 세지 않으면 «쓰고 있는데 안 쓴다»고 잘못 운다(실제로 다섯 개가 그랬다). */
   const used = [...SRC.matchAll(/hlp\('([^']+)'\)/g)].map(m => m[1])
-    .concat([...SRC.matchAll(/help:\s*'([^']+)'/g)].map(m => m[1]));
+    .concat([...SRC.matchAll(/help:\s*'([^']+)'/g)].map(m => m[1]))
+    .concat([...SRC.matchAll(/phaseHead\('[^']*','([^']+)'/g)].map(m => m[1]));
   const missing = [...new Set(used)].filter(k => !box.HELP[k]);
   assert.deepEqual(missing, [], '등록부에 없는 도움말을 부른다(빈 버튼이 된다)');
   const unused = keys.filter(k => !used.includes(k));
@@ -111,11 +115,20 @@ test('서식은 A4 규격으로 나뉜다', () => {
       else if (SRC[j] === '}') { d--; if (on && !d) return SRC.slice(i, j + 1); }
     }
   }
-  new Function(varLine[0] + '\n' + grabFn('dgDocCss') + '\n' + grabFn('dgDocCssIn')
+  /* ⚠ dgDocCss·dgDocCssIn 이 DK_TYPO_CSS(서식마다 글자 크기)·DK_MARGIN_CSS(서식마다
+       여백)를 함께 쓴다 — 같이 실어 주지 않으면 「~ is not defined」로 죽는다.
+       이 모래상자가 그 셋을 실어 돌리는 «유일한» 곳이다. */
+  new Function(varLine[0] + '\n' + grabFn('DK_TYPO_CSS') + '\n' + grabFn('DK_MARGIN_CSS') + '\n'
+    + grabFn('dgDocCss') + '\n' + grabFn('dgDocCssIn')
     + ';this.print=dgDocCss();this.screen=dgDocCssIn();').call(box);
   assert.match(box.print, /@page\{size:A4 portrait/, '인쇄가 A4 세로가 아니다');
-  assert.match(box.print, /\.a4\{width:170mm/, '본문폭 = 210 − 여백 20×2');
-  assert.match(box.print, /\.a4\{[^}]*height:257mm/, '본문높이 = 297 − 여백 20×2');
+  /* ⚠ 2026-09-20 「여백 등 이상하다」 — 인쇄판은 이제 @page 여백을 0 으로 비우고
+       .a4 자신이 210×297mm 를 통째로 그린 뒤 padding 으로 여백을 낸다(서식마다
+       다른 여백을 주려면 이 구조가 필요하다 — @page 여백은 문서 전체에 하나뿐이다).
+       기본값(20mm)일 때 안쪽 칸은 예전과 «똑같다»(210-20×2=170, 297-20×2=257). */
+  assert.match(box.print, /@page\{size:A4 portrait;margin:0\}/, '@page 여백이 0 이 아니다 — 서식별 여백과 겹친다');
+  assert.match(box.print, /\.a4\{width:210mm;height:297mm;box-sizing:border-box;padding:20mm/,
+    '인쇄 .a4 가 210×297mm 통짜+padding 구조가 아니다');
   assert.match(box.print, /\.a4:last-child\{page-break-after:auto\}/, '마지막 장 뒤에 빈 페이지가 생긴다');
   assert.match(box.screen, /#doced \.a4\{width:210mm/, '화면 용지가 A4 폭이 아니다');
   assert.match(box.screen, /box-sizing:border-box/, '여백이 폭에 포함되지 않으면 250mm 가 된다');
@@ -183,7 +196,10 @@ test('기금 정보 폼은 화면 폭을 다 쓴다 — 760px 2열에 갇히지 
   // 여백은 바뀔 수 있다 — 「기금 정보 폼이 넓은 격자를 쓰는가」만 본다
   /* 2026-09-13 묶음 접기 뒤로 격자는 «묶음마다» 하나씩이고, 고침 표시는 그 바깥에서 다 받는다.
      한 태그에 둘이 같이 붙어 있는지를 보던 검사는 그 모양만 못 박고 있었다 — 둘을 따로 본다. */
-  const 폼 = SRC.slice(SRC.indexOf('function infoForm('), SRC.indexOf('function infoForm(') + 6000);
+  /* 이 window 는 infoForm() 의 실제 길이를 넉넉히 덮어야 한다 — 함수 안에 코드가 늘면
+     (예: 2026-09-21 소재지 우편번호 검색 추가) 고정 길이가 짧으면 뒤쪽 문자열이 잘려
+     나가 «내용은 그대로인데 검사만 깨진다». 여유를 넉넉히 둔다. */
+  const 폼 = SRC.slice(SRC.indexOf('function infoForm('), SRC.indexOf('function infoForm(') + 7000);
   assert.match(폼, /'<div class="gridw">'\+g\.fields\.map/, '기금 정보가 넓은 격자를 쓰지 않는다');
   assert.match(폼, /oninput="markDirty\(\)" onchange="markDirty\(\)">'\+flds/,
     '고침 표시가 칸들을 감싸지 않는다 — 고쳐도 저장 대상으로 안 잡힌다');

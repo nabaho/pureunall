@@ -214,11 +214,18 @@ test('🔄 도 fbDb·동기화 전이면 아무것도 안 한다', () => {
   assert.equal(b.calls.fbInitialSync, 0);
 });
 
-test('★ 두 대시보드가 모두 erpRefreshData 를 거친다 — 한쪽만 고치면 그쪽으로 샌다', () => {
+test('★ 다시받기 단추는 erpRefreshData 를 거친다 — 건너뛰면 켤 때마다 2.83MB 다', () => {
   /* ⚠ **주석을 걷어내고** 본다. 안 걷으면 "fbInitialSync() 를 바로 부르지 않는다"라고
      적어 둔 설명 주석 자체가 「직접 부른다」로 잡힌다 — 실제로 여기서 한 번 속았다. */
   const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  for (const fn of ['refreshDash', 'corpRefresh']) {
+  /* ⚠ 2026-09-20 — 전에는 ['refreshDash','corpRefresh'] 둘을 못 박아 두었다.
+     법인 대시보드를 걷어내며 corpRefresh 가 그 화면과 «함께» 사라졌다 —
+     빠뜨린 것이 아니다. 그래서 이름표를 고치는 대신 재는 법을 바꾼다.
+     ★ 지킬 것은 개수도 이름도 아니라 «다시받기가 큰 표를 통째로 받지 않는가»다.
+       그래서 ① 남은 다시받기가 문을 거치는지 보고,
+          ② 파일 어디에도 «감싸개 밖»에서 fbInitialSync 를 부르는 데가 없는지 본다.
+       ②가 있으면 새 화면이 제 다시받기를 만들어도 이름을 적어 두지 않고 걸린다. */
+  for (const fn of ['refreshDash']) {
     const m = app.match(new RegExp('function ' + fn + '\\(\\)\\{[\\s\\S]*?\\n  \\}'));
     assert.ok(m, fn + ' 를 찾지 못했습니다');
     const body = strip(m[0]);
@@ -226,4 +233,8 @@ test('★ 두 대시보드가 모두 erpRefreshData 를 거친다 — 한쪽만 
     assert.ok(!/\bfbInitialSync\s*\(/.test(body),
       '★ ' + fn + ' 이 아직 fbInitialSync 를 직접 부릅니다 — 누를 때마다 2.83MB 입니다');
   }
+
+  /* ⚠ 한때 「fbInitialSync 를 부르는 자리가 넷 이하」를 덧댔다가 바로 뺐다 —
+     실제로는 여덟 곳이고 «모두 옳다»(함수 자신·권한오류 재시도·첫 동기화 세 길·감싸개).
+     개수는 규칙이 아니었다. 지키려던 것(다시받기가 문을 거치는가)은 위에서 이미 잰다. */
 });

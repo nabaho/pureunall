@@ -78,28 +78,27 @@ test('이름은 «그만둔 사람까지» 찾는다 — 지나간 근무에 사
 });
 
 // ── ③ 구글 달력 ───────────────────────────────────────────────────────
-test('구글 달력 주소·열쇠가 이알피와 같다 — 다르면 다른 달력을 본다', () => {
-  const 뽑기 = (src, 이름) => {
-    const m = src.match(new RegExp(이름 + "\\s*=\\s*'([^']+)'"));
-    assert.ok(m, 이름 + ' 을 못 찾았습니다');
-    return m[1];
-  };
-  const 뽑기2 = (src, 이름) => {
-    const m = src.match(new RegExp(이름 + '\\s*=\\s*"([^"]+)"'));
-    assert.ok(m, 이름 + ' 을 못 찾았습니다');
-    return m[1];
-  };
-  assert.strictEqual(뽑기2(캘린더, 'GCAL_CAL_ID'), 뽑기(이알피, 'GCAL_CAL_ID'),
-    '두 앱이 서로 «다른 달력»을 봅니다');
-  assert.ok(뽑기2(캘린더, 'GCAL_API_KEY').length > 20, '구글 열쇠가 없습니다');
+test('★ 보는 달력이 «회사 공용 달력»이다 — 다른 것을 보면 남의 일정이 뜬다', () => {
+  /* 검사고정-허용 — 이 주소가 «규칙»이다. 회사가 쓰는 구글 공용 달력 하나이고,
+     이 달력을 채우는 것이 그쪽이다(9월 실측 126건). 주소가 한 글자만 달라도
+     화면은 멀쩡히 뜨는데 일정이 통째로 안 보이거나 남의 것이 뜬다.
+     ⚠ 2026-09-20 까지는 이알피 소스와 맞대 보았다. 그 화면을 걷어내서 값으로 적는다. */
+  const m = 캘린더.match(/GCAL_CAL_ID\s*=\s*"([^"]+)"/);
+  assert.ok(m, 'GCAL_CAL_ID 을 못 찾았습니다');
+  assert.strictEqual(m[1], 'euh07th7tvlco9corqen9lqpts@group.calendar.google.com',
+    '★ 보는 달력이 바뀌었습니다 — 회사 공용 달력이 맞는지 확인하십시오');
+  const k = 캘린더.match(/GCAL_API_KEY\s*=\s*"([^"]+)"/);
+  assert.ok(k && k[1].length > 20, '구글 열쇠가 없습니다');
 });
 
-test('구글에서 받아 오는 조건이 이알피와 같다', () => {
+test('★ 구글에서 받아 오는 조건 — 하나만 빠져도 조용히 어긋난다', () => {
   const 몸 = 함수몸(캘린더원문, 'function gcalLoad(force){');
   ['singleEvents=true', 'orderBy=startTime', 'maxResults=500', 'timeMin=', 'timeMax=']
     .forEach((x) => assert.ok(몸.indexOf(x) >= 0, '받아 오는 조건에 ' + x + ' 가 없습니다'));
-  assert.ok(이알피.indexOf('singleEvents=true&orderBy=startTime&maxResults=500') >= 0,
-    '이알피 쪽 조건을 못 찾았습니다');
+  /* ⚠ 셋을 함께 못 박는 까닭:
+       singleEvents — 반복 일정을 «하루치씩» 펴서 준다. 안 켜면 매주 회의가 한 번만 뜬다.
+       orderBy      — singleEvents 를 켜야만 쓸 수 있다. 시간순이 아니면 칩 차례가 뒤죽박죽이다.
+       maxResults   — 한 번에 받는 수. 작으면 바쁜 달의 뒷부분이 조용히 잘린다. */
 });
 
 test('보는 달의 «42칸» 어치를 받는다 — 앞뒤 달에 걸친 줄도 채워야 한다', () => {
@@ -158,24 +157,23 @@ test('색 ③ — 제목에 현직 이름이 있으면 그 직원. 다만 만든
     '만든이가 이미 찾아졌는데 제목의 이름으로 덮었습니다 — 「권형하에게 보고」는 남의 이름일 수 있습니다');
 });
 
-test('메일을 열쇠로 바꾸는 셈이 이알피와 같다 — 다르면 이어 둔 사람이 안 찾아진다', () => {
+test('★ 메일을 열쇠로 바꾸는 셈 — 바뀌면 이어 둔 사람이 안 찾아진다', () => {
   const 몸 = 함수몸(캘린더원문, 'function gcalMailKey(m){');
-  const 이알피몸 = 함수몸(이알피, 'function gcalMailKey(m){');
-  /* ⚠ 따옴표 «모양»(' vs ")까지 박지 않는다 — 그것은 셈이 아니라 글씨체다.
-     지키는 것은 «같은 것을 같게 바꾸는가»이므로, 실제로 돌려 맞대는 것이 가장 확실하다. */
-  const 씻기 = (x) => x.replace(/\s+/g, '').replace(/['"]/g, '"')
-    .replace(/^function.*?\{/, '').replace(/\}$/, '');
-  assert.strictEqual(씻기(몸), 씻기(이알피몸), '메일 → 열쇠 셈이 두 앱에서 다릅니다');
-  /* 그리고 실제로 돌려서도 같은지 본다 — 글자가 같아도 결과가 다르면 소용없다 */
-  const 돌리기 = (src) => {
-    const 상자 = { String, out: null };
-    vm.createContext(상자);
-    vm.runInContext(함수몸(src, 'function gcalMailKey(m){')
-      + '\nout = ["A.B@Gmail.COM", " x#y[z]/w ", ""].map(gcalMailKey);', 상자);
-    return JSON.parse(JSON.stringify(상자.out));
-  };
-  assert.deepStrictEqual(돌리기(캘린더원문), 돌리기(이알피),
-    '글자는 같은데 돌려 보니 결과가 다릅니다');
+  /* ⚠ 2026-09-20 까지는 이알피의 같은 함수와 글자로 맞대 보았다. 그 화면을 걷어냈다.
+     ★ 글자가 아니라 «셈»을 본다 — 아래에서 실제로 돌려 값으로 잰다.
+       파이어베이스 열쇠에는 . # $ [ ] / 를 못 쓴다. 그래서 쉼표로 바꾼다.
+       한 가지라도 빠뜨리면 그 메일은 «저장이 거부»되어 이어 둔 것이 사라진다. */
+  /* 실제로 돌려서 값으로 잰다 — 글자만 보면 «돌려 보면 다른» 것을 놓친다.
+     검사고정-허용 — 아래 세 답이 «규칙»이다.
+       ① 앞뒤 빈칸을 떼고 ② 모두 소문자로 ③ 파이어베이스가 못 받는 여섯 글자를 쉼표로.
+     ⚠ 소문자로 바꾸는 것까지 규칙이다 — 구글은 같은 메일을 대소문자 섞어 돌려준다.
+       안 맞추면 「Hong@…」과 「hong@…」이 다른 사람이 된다. */
+  const 상자 = { String, out: null };
+  vm.createContext(상자);
+  vm.runInContext(몸 + '\nout = ["A.B@Gmail.COM", " x#y[z]/w ", ""].map(gcalMailKey);', 상자);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(상자.out)),
+    ['a,b@gmail,com', 'x,y,z,,w', ''],
+    '메일 → 열쇠 셈이 바뀌었습니다 — 이어 둔 사람이 안 찾아집니다');
 });
 
 test('종일 일정은 시각을 안 적고, 00:00 도 안 적는다 (이알피와 같다)', () => {
@@ -220,12 +218,12 @@ test('이음 보기에는 구글을 안 섞는다 — 거기는 이음 근무만
     '이음 보기에도 구글 일정이 섞입니다');
 });
 
-test('구글을 섞는 «때»가 이알피와 같다 — 전체·구글 거르개일 때만', () => {
-  /* 이알피: if(calFilter === null || calFilter === 'gcal') { gcalEvList.forEach(push) }
-     ⚠ 사람을 고른 채로 구글까지 섞으면 칩의 「겹친 날」 숫자가 두 앱에서 달라진다. */
+test('★ 구글을 섞는 «때» — 전체·구글 거르개일 때만', () => {
+  /* 사람을 고른 채로 구글까지 섞으면, 고른 사람 것이 아닌 일정이 함께 뜬다.
+     그러면 칩 옆의 「겹친 날」 숫자도 뜻을 잃는다 — 고른 사람이 두 탕인지를 보는 숫자다.
+     ⚠ 구글 일정에는 «누가 만들었는지»(메일)만 남아, 사람으로 거르는 것이 미덥지 않다.
+       그래서 사람을 고르면 아예 안 섞는다(이알피가 그렇게 해 왔다). */
   const 몸 = 함수몸(캘린더원문, 'function eventsOn(ymd, eumOnly){');
   assert.match(몸, /S\.filter\s*===\s*null\s*\|\|\s*S\.filter\s*===\s*["']gcal["']/,
     '구글을 섞는 때가 이알피와 다릅니다');
-  assert.match(이알피, /calFilter === null \|\| calFilter === 'gcal'/,
-    '이알피 쪽 규칙을 못 찾았습니다');
 });

@@ -18,8 +18,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=29"></script>
-<script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
+<script src="js/pu-ontology.js?v=31"></script>
+<script src="js/pu-ontology-write.js?v=3" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
@@ -9268,7 +9268,7 @@ function calPanel(){
     +'<span class="vseg">'+[['month','월'],['week','주'],['day','일']].map(function(v){
         return '<span class="'+(S.calView===v[0]?'on':'')+'" onclick="calSetView(\''+v[0]+'\')">'+v[1]+'</span>';}).join('')+'</span>'
     +'<span style="flex:1"></span>'
-    +'<span class="cbtn" onclick="openPuerpCal()" title="일정 새로 만들기·시간 변경·구글 캘린더는 푸른이알피에서 합니다">🗓 푸른이알피</span>'
+    +'<span class="cbtn" onclick="openPuerpCal()" title="일정 새로 만들기·시간 변경·구글 캘린더는 푸른 캘린더에서 합니다">📅 푸른 캘린더</span>'
     +'<span class="cbtn gh" onclick="calToggle()" title="캘린더 접기">✕</span>'
     +'</div>'
     // 거르개 — 묶음별 한 줄씩. 묶음 이름을 누르면 그 묶음이 통째로 켜지고 꺼진다.
@@ -9343,9 +9343,12 @@ function calNav(n){
   else d=addDays(d,(S.calView==='week'?7:1)*n);
   S.calDate=ymd(d); route();
 }
-// 일정 만들기·시간 변경·구글 캘린더는 푸른이알피에서 (여기서 쓰면 덮여 사라진다)
+/* 일정 만들기·시간 변경·구글 캘린더는 «푸른 캘린더»에서 (여기서 쓰면 덮여 사라진다)
+   ★ 2026-09-20 — 전에는 푸른이알피 법인 대시보드로 보냈다. 그 화면을 걷어냈다.
+   ⚠ 이름(openPuerpCal)은 그대로 둔다 — 부르는 자리가 둘이고, 이름을 바꾸는 것은
+     이 고침과 아무 상관이 없다. 무엇을 하는지는 이 주석이 말한다. */
 function openPuerpCal(){
-  PuAppBar.goApp('pu-erp.html?sso=1#menu='+encodeURIComponent(isAdmin()?'dash/corp':'dash/my'));
+  PuAppBar.goApp('pu-cal.html?sso=1');
 }
 function calDrag(e,id,k){
   _calDrag={id:id,k:k};

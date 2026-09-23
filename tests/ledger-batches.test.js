@@ -86,7 +86,14 @@ t('로그인 정보가 없으면 전부 남의 것으로 본다', ctx.erpBatchSu
 
 console.log('\n[⑥ 서버에 «묶음마다 따로» 실린다 — 이것이 이 기능의 뼈대]');
 /* 한 덩어리로 저장하면 A와 B가 동시에 올릴 때 나중 사람이 앞사람 묶음을 지운다 */
-t('★ 건별 저장 목록(DIFF_KEYS)에 들어 있다', /'employment_contracts','ledger_batches'\]/.test(src), true);
+/* ⚠ 2026-09-20 고침 — 예전에는 /'employment_contracts','ledger_batches'\]/ 로
+   «배열의 마지막 원소»를 박아 두었다. 목록에 다른 표를 하나 더하기만 해도(my_schedules)
+   기능은 멀쩡한데 이 검사가 깨졌다. 지킬 것은 «차례»가 아니라 «들어 있는가»다.
+   (CLAUDE.md 「검사를 쓰는 규칙」 — 지금 값이 아니라 규칙을 못 박는다) */
+t('★ 건별 저장 목록(DIFF_KEYS)에 들어 있다', (function(){
+  var m = src.match(/var DIFF_KEYS = \[([^\]]*)\]/);
+  return !!(m && /'ledger_batches'/.test(m[1]));
+})(), true);
 t('★ 실시간 수신도 묶음별이다 (통째 17→1 급감 모달 경로로 가지 않는다)',
   /'leave_grants', 'leave_of_absence', 'closed_archive', 'ledger_batches'/.test(src), true);
 t('★ 올릴 때 묶음 하나만 고쳐 쓴다 (통째로 덮어쓰지 않는다)',

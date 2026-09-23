@@ -41,7 +41,13 @@ test('폰 아래 단추 자리는 한 곳(--fab-edge/--fab-bottom)에서만 정�
 
 test('자주 안 쓰는 설정·최신만 ⋯ 안으로 넣는다', () => {
   // 백업·복구는 자주 써서 밖에 둔다(대표 지시 2026-08-15)
-  assert.match(enter, /DOCK_IDS = \['cfgFab', 'pu-version-fab'\]/);
+  /* ⚠ 목록을 글자 그대로 박지 않는다 — 2026-09-23 ✨ TypeSafe 가 ⋯ 안에 들어오며
+     «멀쩡한 추가» 때문에 깨졌다. 지키는 것은 «설정·최신은 안에, 백업·복구는 밖에»다. */
+  const m = enter.match(/DOCK_IDS\s*=\s*\[([^\]]*)\]/);
+  assert.ok(m, 'DOCK_IDS 목록을 못 찾았습니다.');
+  assert.match(m[1], /'cfgFab'/, '설정이 ⋯ 안에 안 들어갑니다.');
+  assert.match(m[1], /'pu-version-fab'/, '최신 단추가 ⋯ 안에 안 들어갑니다.');
+  assert.doesNotMatch(m[1], /'pu-backup-admin-button'/, '자주 쓰는 백업·복구까지 ⋯ 안에 숨겼습니다.');
 });
 
 test('아래 왼쪽 단추는 모두 한 줄 바에 모은다', () => {
@@ -68,7 +74,11 @@ test('폰에서는 한 화면에 다 넣는다 — 바로가기는 헤더 안, �
   assert.match(enter, /\.sec\{display:none;\}/);
   assert.match(enter, /\.pbar #homeBar\{/);
   assert.match(enter, /function moveHomeBar\(toHeader\)/);
-  assert.match(enter, /moveHomeBar\(phone\.matches\)/, 'PC로 넓히면 제자리로 돌아가야 합니다');
+  /* ⚠ 부르는 «글자»(moveHomeBar(phone.matches))를 박지 않는다 — 2026-09-23 차례를 바꿔
+     (PC 로 갈 땐 바로가기를 먼저 되돌림) 적는 모양이 달라졌다. 지키는 것은 «폰에선 넣고 PC 에선 뺀다». */
+  const 맞추개 = enter.slice(enter.indexOf('function sync(){'), enter.indexOf('function sync(){') + 300);
+  assert.match(맞추개, /moveHomeBar\((true|phone\.matches)\)/, '폰에서 바로가기를 헤더에 안 넣습니다.');
+  assert.match(맞추개, /moveHomeBar\((false|phone\.matches)\)/, 'PC로 넓히면 제자리로 돌아가야 합니다');
   /* ⚠ 못 박는 것은 «한 줄에 넷» 이지 그것을 적는 «글자» 가 아니다.
      여기 repeat(4,1fr) 을 글자 그대로 박아 두었더니, 좁은 폰에서 타일이 화면 밖으로
      나가던 것을 repeat(4,minmax(0,1fr)) 로 고치자 «멀쩡한 개선» 때문에 깨졌다

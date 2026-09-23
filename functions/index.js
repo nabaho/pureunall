@@ -30,7 +30,24 @@ const HanaMessage = require("./hana-message");
 const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
 const 지역뉴스부품 = require("./news-region");
+const LS = require("./login-security");
+/* ★★★ geoip-lite 는 «부를 때» 부른다 — 맨 위에서 부르면 안 된다 (2026-09-20 실측).
+     ⚠⚠ 이 꾸러미는 나라 대역표를 통째로 메모리에 올린다. 맨 위에서 부르면 이 파일의
+       «모든 함수»가 콜드 스타트마다 그 값을 치른다 — 정작 쓰는 데는 아래 한 곳뿐이다.
+     ⚠ 실제로 두 번 터졌다:
+       ① newsFullPage 256MB → "Memory limit of 256 MiB exceeded with 384 MiB used"
+       ② newsClick 128MB → 배포 자체가 "function load attempt timed out" 으로 실패
+     ★ 그래서 쓰는 자리에서 부른다. 한 번 부르면 require 가 갈무리해 두므로,
+       그 함수는 두 번째부터 값을 안 치른다. 나머지 함수는 아예 안 치른다.
+     ⚠ 되돌리지 말 것 — 맨 위로 옮기는 순간 128MB 짜리 함수들이 «배포부터» 안 된다. */
+function geoip나라(ip) {
+  try {
+    const hit = require("geoip-lite").lookup(ip);
+    return (hit && hit.country) ? String(hit.country) : "";
+  } catch (e) { return ""; }
+}
 const NasBackupExport = require("./nas-backup-export");
+const TypeSafeEvaluate = require("./typesafe-evaluate");
 
 if (!getApps().length) initializeApp();
 
@@ -2124,6 +2141,94 @@ async function requireReader(req) {
   return decoded;
 }
 
+/* 오늘 이 사람이 몇 번 썼나 · 사무실 전체가 몇 번 썼나.
+   ⚠ 못 읽으면 «막지 않는다» — 셈이 안 되는 것과 한도를 넘은 것은 다른 일이다.
+     여기서 막으면 실시간DB 가 잠깐 흔들릴 때 기능이 통째로 멎는다(readDoc 과 같은 판단). */
+async function typeSafeDayLeft(uid) {
+  try {
+    const db = getDatabase();
+    const paths = TypeSafeEvaluate.tallyPaths(uid, DR.ymdKST());
+    const [mine, all] = await Promise.all(paths.map((p) => db.ref(p).once("value")));
+    return Object.assign({ known: true }, TypeSafeEvaluate.leftOf(mine.val(), all.val()));
+  } catch (e) {
+    console.warn("Jev 하루 셈 못 읽음(막지 않는다):", String((e && e.message) || e));
+    return { known: false, left: TypeSafeEvaluate.PERSON_DAY_LIMIT, mine: 0, all: 0, over: false };
+  }
+}
+
+/* 관리자만 — 대표 결정 2026-09-20 「관리자만 일단쓴다」.
+   ⚠ 위 하루 문(typeSafeDayLeft)과 «반대 방향»으로 못 읽음을 다룬다.
+     하루 문은 못 읽으면 열어 둬도 사고가 안 난다(한도가 잠깐 없어질 뿐이다).
+     여기서 못 읽고도 열어 두면 «권한 없는 사람에게 권한을 준» 것과 같다.
+     그래서 자격 확인은 실패를 «막힘»으로 다룬다(fail-closed). */
+async function typeSafeIsAdmin(uid) {
+  if (!uid) return false;
+  try {
+    const db = getDatabase();
+    const snap = await db.ref("uid_roles/" + uid).once("value");
+    const role = snap.val() || {};
+    return !!(role.isAdmin || role.isSubAdmin);
+  } catch (e) {
+    console.warn("Jev 관리자 확인 못 함(막는다):", String((e && e.message) || e));
+    return false;
+  }
+}
+
+/* 센다 — «성공한 것만» 센다. 열쇠가 거절당한 부름은 글이 업체에 남지 않았으므로
+   한도를 먹일 까닭이 없다(그것까지 세면 첫 시험 몇 번에 하루 몫이 날아간다).
+   ★ ServerValue.increment 대신 «거래»로 올린다 — 이 파일에 admin 변수가 없다(위 bumpReadTally 참고). */
+async function bumpTypeSafeTally(uid) {
+  try {
+    const db = getDatabase();
+    await Promise.all(TypeSafeEvaluate.tallyPaths(uid, DR.ymdKST()).map(function (p) {
+      return db.ref(p).transaction(function (cur) { return (Number(cur) || 0) + 1; });
+    }));
+  } catch (e) {
+    console.warn("Jev 셈 적기 실패(판단은 이미 끝났다):", String((e && e.message) || e));
+  }
+}
+
+/* Jev 판단 — 첫 판은 화면이 «제안»만 받는다. 저장·발송·상태변경은 이 함수가 하지 않는다. */
+exports.typeSafeEvaluate = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB", secrets: ["TYPESAFE_API_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let who;
+    try { who = await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    /* ── 관리자만 (2026-09-20 대표 지시) — 열쇠 유무보다 «먼저» 본다 ──────────────
+       관리자가 아닌 사람에게는 서버 금고 상태(열쇠가 있는지 없는지)조차 알려 줄
+       까닭이 없다. 로그인 확인 다음, 그 무엇보다 먼저 자격을 본다. */
+    if (!(await typeSafeIsAdmin(who && who.uid))) {
+      res.status(403).json({ ok: false, why: "adminOnly", error: "지금은 관리자만 쓸 수 있습니다." });
+      return;
+    }
+    const key = String(process.env.TYPESAFE_API_KEY || "").trim();
+    if (!key || key === "unset") {
+      res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
+      return;
+    }
+    /* ── 하루 문 — 넘었으면 «부르지 않는다» (2026-09-20 대표 지시 「고쳐라」) ──
+       글이 나가기 «전»에 막아야 뜻이 있다. 부른 뒤에 세면 이미 나간 것이다. */
+    const 몫 = await typeSafeDayLeft(who && who.uid);
+    if (몫.over) { const r = TypeSafeEvaluate.overLimitError(몫); res.status(r.status).json(r); return; }
+    try {
+      const result = await TypeSafeEvaluate.evaluate(fetch, key, req.body && req.body.text);
+      if (result.ok) {
+        await bumpTypeSafeTally(who && who.uid);
+        result.left = Math.max(0, 몫.left - 1);
+        result.dayLimit = TypeSafeEvaluate.PERSON_DAY_LIMIT;
+      }
+      res.status(result.ok ? 200 : result.status).json(result);
+    } catch (e) {
+      console.warn("Jev 판단 실패:", String((e && e.message) || e).slice(0, 300));
+      res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
+    }
+  });
+
 /* 열쇠를 얻는다 — 서버 비밀이 먼저.
    ⚠ 실시간DB 갈래는 **옮기는 동안만** 쓰는 임시 다리다. 네 앱(사진첩·기업정보함·
      enter·경력관리)을 다 옮기고 `firebase functions:secrets:set GEMINI_KEY` 를
@@ -2603,7 +2708,9 @@ async function photoGate(decoded, v) {
   const item = itemSnap.val();
   const seen = PV.canSee({ viewerUid: decoded.uid, owner: v.owner, role: roleSnap.val() || {}, item: item });
   if (!seen.ok) return seen;
-  const ok = PV.decide(item);
+  /* ⚠ 자격(seen.as)을 함께 넘긴다 — 총괄관리자는 주소가 없는 사진도 이 길로 받는다
+     (대표 지시 2026-09-20). 안 넘기면 관리자에게만 연 그 길이 조용히 안 열린다. */
+  const ok = PV.decide(item, seen.as);
   if (!ok.ok) return ok;
   /* ⚠ 자격(as)과 사진 정보(item)를 «함께» 돌려준다 — 열람 기록에 「무슨 자격으로
      무슨 서류를 봤나」를 적어야 하는데, 여기서 버리면 밖에서 다시 읽어야 한다.
@@ -2810,6 +2917,32 @@ exports.newsOpen = functions
     res.status(200).send(NT.빈그림);
   });
 
+/* ★★★ 「내려받기」가 죽었나 한 번 두드려 본다 (대표 검증 지시 2026-09-20).
+     실측: 기업마당이 붙임을 「(최종)」판으로 갈아 끼우면서 fileSn 이 0→1 로 바뀌어,
+     편지의 「내려받기 ↓ HWPX · 156KB」가 «500 오류 쪽»을 열었다. 모으는 때와 보내는
+     때 사이에 남의 서버가 파일을 갈면 언제든 또 난다 — 이미 나간 편지는 고칠 수도 없다.
+   ★ 그래서 보내기 직전에 여기서 두드려 보고, 죽었으면 «뒷길»(그 자료의 상세 쪽)로
+     돌린다. 받는 분은 500 대신 그 공고 쪽에서 새 붙임을 받으신다.
+   ⚠⚠ «확실히 죽었을 때만» 물러선다. 그물이 느리거나 끊긴 것까지 죽음으로 치면
+     멀쩡한 파일을 두고 엉뚱한 쪽으로 보내게 된다 — 모르면 «가던 길»이다.
+   ⚠ 몸통은 안 받는다(파일이 수백 MB 일 수 있다). 머리만 보고 곧바로 끊는다.
+   ⚠ 뒷길이 있는 줄(자료 내려받기)에서만 부른다 — 뉴스 원문까지 두드리면
+     누를 때마다 한 걸음씩 느려진다. */
+async function 살아있나(주소) {
+  const 멈춤 = new AbortController();
+  const 시계 = setTimeout(() => 멈춤.abort(), 4000);
+  try {
+    const 답 = await fetch(주소, {
+      method: "GET", redirect: "follow", signal: 멈춤.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; PureunNewsletter/1.0)" }
+    });
+    try { await 답.body?.cancel(); } catch (_) { /* 이미 닫혔으면 그만이다 */ }
+    return 답.status < 400;
+  } catch (e) {
+    return true;                       /* 모르면 «가던 길» — 위 ⚠⚠ 참고 */
+  } finally { clearTimeout(시계); }
+}
+
 exports.newsClick = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 15, memory: "128MB" })
@@ -2827,6 +2960,11 @@ exports.newsClick = functions
         // ★ 목적지는 «회차에 적어 둔 목록»에서 번호로 찾는다 — 주소로 받지 않는다
         const s = await db.ref("newsletter/issues/" + q.회차 + "/링크들").once("value");
         갈곳 = NT.링크찾기(s.val(), q.번호);
+        const 뒷길 = NT.뒷길찾기(s.val(), q.번호);
+        if (갈곳 && 뒷길 && !(await 살아있나(갈곳))) {
+          console.warn("newsClick 내려받기 죽음 → 뒷길", 갈곳, "→", 뒷길);
+          갈곳 = 뒷길;
+        }
       } catch (e) { console.warn("newsClick", (e && e.message) || e); }
     }
     // 못 찾으면 우리 홈페이지로 — «아무 데도 안 보내는 것»이 안전한 쪽이다
@@ -2908,7 +3046,10 @@ exports.newsFull = functions
       return;
     }
     try {
-      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호));
+      /* ⚠ «작은 주머니»(6초)를 들려 보낸다 — 첫 시도와 IPv4 재시도를 더해도 12초라,
+         함수 제한(20초) 안에 돌아와 NF.오류쪽 을 우리 얼굴로 내놓는다.
+         안 그러면 23초를 쓰려다 잘려 맨 오류(408)가 나간다(글자로받기 주석 참고). */
+      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호), 6000);
       const 것 = NF.풀기(q.갈래, xml);
       if (!것.ok) {
         /* ⚠ «못 준다»는 답은 굳히지 않는다 — 법제처가 잠깐 이상했을 때
@@ -2918,13 +3059,73 @@ exports.newsFull = functions
           법제처: NF.법제처주소(q.갈래, q.번호) });
         return;
       }
-      res.set("Cache-Control", "public, max-age=86400");
+      /* ⚠ 위 newsFullPage 와 «같은 잣대»다 — 여기가 길면 그 자리에서 편 것만
+           옛 모양으로 남는다(두 화면이 달라진다). 까닭은 그쪽 주석 참고. */
+      res.set("Cache-Control", "public, max-age=3600");
       res.status(200).json(Object.assign({}, 것, { 법제처: NF.법제처주소(q.갈래, q.번호) }));
     } catch (e) {
       console.warn("newsFull", (e && e.message) || e);
       res.set("Cache-Control", "no-store");
       res.status(502).json({ ok: false, 까닭: "못받음", 말: NF.까닭말["못받음"],
         법제처: NF.법제처주소(q.갈래, q.번호) });
+    }
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   판례·행정해석 「전문 보기」를 «따로 열어도» 우리 양식으로 (대표 지시 2026-09-20
+   「판례등 전문보기는 판례정보를 그대로 넣지말고 푸른양식으로 정리해라」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ newsFull(위)은 JSON 만 준다 — 「그 자리에서 펴는」 자바스크립트가 그것을 fetch
+     해서 편지 안에 그린다. 그 손잡이(href)가 이제 이 쪽(newsFullPage)을 가리킨다
+     (js/pu-news-tpl.js 판례한칸). 정상 클릭은 그대로 편지 안에서 펴지고, 그 밖의
+     모든 열기(새 탭·Ctrl+클릭)는 «법제처 원문»이 아니라 «이 쪽»이 열린다.
+   ⚠ 문지기는 newsFull 과 같다 — 갈래 둘(prec·expc), 번호는 숫자만.
+   ⚠ 여기도 우리 자료(DB)를 하나도 안 읽는다 — 로그인 없는 자리다. */
+exports.newsFullPage = functions
+  .region(MAIL_REGION)
+  /* ⚠⚠ 256MB 로 처음 배포했다가 배포 직후 실제로 크래시가 났다 —
+       "Memory limit of 256 MiB exceeded with 384 MiB used"(2026-09-20 실측).
+       이 파일 맨 위(line 34)의 `require("geoip-lite")` 가 «어느 함수를 부르든»
+       콜드 스타트마다 같이 실린다 — geoip 데이터베이스 자체가 이미 256MB 를
+       넘긴다. newsFull(바로 위)도 256MB 인데 같은 위험을 안고 있다 — 그쪽은
+       손대지 않는다(이 PR 의 몫이 아니다), 여기만 올려 막는다. */
+  .runWith({ timeoutSeconds: 20, memory: "512MB" })
+  .https.onRequest(async (req, res) => {
+    const NF = require("./news-full");
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.set("X-Robots-Tag", "noindex");
+    const q = NF.읽기(req.query);
+    if (!q.ok) {
+      res.set("Cache-Control", "no-store");
+      res.status(400).send(NF.오류쪽(NF.까닭말["갈래"], ""));
+      return;
+    }
+    const 법제처 = NF.법제처주소(q.갈래, q.번호);
+    try {
+      /* ⚠ «작은 주머니»(6초)를 들려 보낸다 — 첫 시도와 IPv4 재시도를 더해도 12초라,
+         함수 제한(20초) 안에 돌아와 NF.오류쪽 을 우리 얼굴로 내놓는다.
+         안 그러면 23초를 쓰려다 잘려 맨 오류(408)가 나간다(글자로받기 주석 참고). */
+      const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호), 6000);
+      const 것 = NF.풀기(q.갈래, xml);
+      if (!것.ok) {
+        res.set("Cache-Control", "no-store");
+        res.status(404).send(NF.오류쪽(NF.까닭말[것.까닭] || NF.까닭말["빈답"], 법제처));
+        return;
+      }
+      /* ⚠⚠ 하루(86400)로 굳혀 두었더니, 쪽 «모양»을 고쳐 배포해도 이미 갈무리된
+           것이 하루까지 그대로 나왔다 — 2026-09-20 실측(age=15056 으로 옛 모양).
+           대표께서 고친 것을 눌러 보시고 «안 고쳐졌다»고 보시게 된다.
+         ★ 한 시간으로 줄인다. 법제처 문을 두드리는 횟수는 여전히 24 배 적고
+           (OC 가 시험 계정이라 한도가 있다 — 그래서 아주 끄지는 않는다),
+           모양을 고치면 한 시간 안에 모두에게 닿는다.
+         ★ 그래도 «지금 당장» 바꿔야 할 때가 있다 — 그때는 편지가 주소 끝에 붙이는
+           모양 판(js/pu-news-tpl.js 전문쪽모양판)을 올린다. 주소가 달라져 곧바로 새것이 된다. */
+      res.set("Cache-Control", "public, max-age=3600");
+      res.status(200).send(NF.쪽(것, 법제처));
+    } catch (e) {
+      console.warn("newsFullPage", (e && e.message) || e);
+      res.set("Cache-Control", "no-store");
+      res.status(502).send(NF.오류쪽(NF.까닭말["못받음"], 법제처));
     }
   });
 
@@ -3440,8 +3641,11 @@ const 브리핑샘 = {
 /* 한글이 깨지지 않게 «바이트로» 받아서 한 번에 푼다.
    ★ 글자로 이어 붙이면 여러 바이트짜리 한글이 조각 사이에서 잘려 깨진다
      (실제로 「소관부처명」이 「소관부처」로 깨져 왔다). */
-function IPv4로글자받기(url, 옮김횟수) {
+function IPv4로글자받기(url, 옮김횟수, 제한밀리초) {
   const 횟수 = 옮김횟수 || 0;
+  /* ⚠ 부르는 쪽이 «작은 주머니»를 들려 보낼 수 있다 — 글자로받기() 주석 참고.
+       안 주면 예전 그대로 15초다(밤에 도는 모으기는 넉넉해도 된다). */
+  const 제한 = Number(제한밀리초) > 0 ? Number(제한밀리초) : 15000;
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       family: 4,
@@ -3449,14 +3653,14 @@ function IPv4로글자받기(url, 옮김횟수) {
         "User-Agent": "Mozilla/5.0 (compatible; PureunNewsletter/1.0)",
         Accept: "application/rss+xml, application/xml, text/xml, */*"
       },
-      timeout: 15000
+      timeout: 제한
     }, res => {
       if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
         res.resume();
         if (횟수 >= 3) return reject(new Error("주소 이동이 너무 많습니다"));
         const 다음 = new URL(res.headers.location, url);
         if (다음.protocol !== "https:") return reject(new Error("안전하지 않은 주소 이동입니다"));
-        return IPv4로글자받기(다음.href, 횟수 + 1).then(resolve, reject);
+        return IPv4로글자받기(다음.href, 횟수 + 1, 제한).then(resolve, reject);
       }
       if (res.statusCode < 200 || res.statusCode >= 300) {
         res.resume();
@@ -3476,11 +3680,22 @@ function IPv4로글자받기(url, 옮김횟수) {
   });
 }
 
-async function 글자로받기(url) {
+/* ★★★ 기다리는 «총 시간»을 부르는 쪽이 정할 수 있다 (2026-09-20 실측으로 드러났다).
+     ⚠⚠ 기본값은 8초 + 15초 = 23초다. 모으는 일(밤에 도는 것)은 시간이 넉넉해 괜찮다.
+       그런데 «판례 쪽»(newsFullPage·newsFull)은 함수 제한이 20초다 — 법제처가 한 번만
+       안 받아 줘도 23초를 쓰려다 20초에 잘려, 공들여 지어 둔 「못 받아 왔습니다」
+       쪽(NF.오류쪽)이 «한 번도 못 뜬다». 받는 분은 우리 얼굴 대신 맨 오류를 본다:
+         408 upstream request timeout
+       실측 2026-09-20 12:23~12:26 — 부를 때마다 19,999ms 에서 'timeout'.
+     ★ 그래서 그 두 곳은 «작은 주머니»를 들려 보낸다. 다 못 받아 와도 시간 안에
+       돌아와 우리 얼굴로 「법제처에서 원문 보기」를 내민다. */
+async function 글자로받기(url, 제한밀리초) {
+  const 첫제한 = Number(제한밀리초) > 0 ? Number(제한밀리초) : 8000;
+  const 둘째제한 = Number(제한밀리초) > 0 ? Number(제한밀리초) : 15000;
   try {
     const r = await fetch(url, {
       headers: { "User-Agent": "pureun-erp-news-brief" },
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(첫제한)
     });
     if (!r.ok) throw new Error(url + " 응답 " + r.status);
     const buf = Buffer.from(await r.arrayBuffer());
@@ -3489,7 +3704,7 @@ async function 글자로받기(url) {
     /* 일부 공공기관 RSS는 Cloud Functions의 기본(IPv6 우선) 연결을 끊는다.
        첫 통신만 실패할 때 IPv4로 한 번 더 읽어 수집 전체가 비는 일을 막는다. */
     try {
-      return await IPv4로글자받기(url);
+      return await IPv4로글자받기(url, 0, 둘째제한);
     } catch (둘째오류) {
       const 첫원인 = 첫오류.cause && 첫오류.cause.code ? " [" + 첫오류.cause.code + "]" : "";
       const 둘째원인 = 둘째오류.code ? " [" + 둘째오류.code + "]" : "";
@@ -5224,3 +5439,129 @@ exports.nasBackupExport = functions
     db: () => getDatabase(),
     key: () => process.env.NAS_BACKUP_KEY || "",
   }));
+
+// ════════════════════════════════════════════════════════════════════════════
+// 로그인 무단시도 감지 — logLoginAttempt
+// ════════════════════════════════════════════════════════════════════════════
+// 설계문서: docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md
+// enter.html 이 로그인 성공/실패 직후 «응답을 기다리지 않고» 부른다.
+// 이 함수가 죽거나 늦어도 로그인 자체는 전혀 영향받지 않는다(클라이언트가 안 기다림).
+exports.logLoginAttempt = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 10, memory: "512MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false }); return; }
+
+    const parsed = LS.parseAttempt(req.body);
+    if (!parsed.valid) { res.status(400).json({ ok: false, error: parsed.why }); return; }
+
+    /* ★ 「로그인에 성공했다」는 보고는 «증표»가 있어야 믿는다
+         (2026-09-20 보안검토 CRITICAL 1).
+       증표가 없던 때는 주소만 알면 누구나 남의 이메일로 ok:true 를 쏘아
+         ① 연속실패 누적을 마음대로 0 으로 되돌리고(3번 신호 무력화)
+         ② 자기 기기·국가를 미리 «아는 것»으로 심어(1·2번 신호 무력화)
+         ③ 멀쩡한 직원 이름으로 가짜 알림을 들이부을 수 있었다.
+       ⚠ 증표가 없거나 틀려도 오류를 돌려주지 않는다 — 돌려주면 「이 계정이 있다/없다」가
+         밖으로 새어 나간다. uid 를 못 찾았을 때와 똑같이 조용히 200 만 돌려준다.
+       ⚠ 실패 보고(ok:false)에는 증표가 있을 수 없다(성공한 인증이 없으니까). 그래서 그대로
+         열어 두되, 실패 보고는 누적을 «올리기만» 할 뿐 되돌리거나 기준선을 세우지 못한다
+         (아래 CRITICAL 2 의 성공 여부 가르기). */
+    let verified = null;
+    if (parsed.ok) {
+      const bearer = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ""));
+      if (bearer) {
+        try { verified = await getAuth().verifyIdToken(bearer[1], true); }
+        catch (e) { verified = null; }
+      }
+      /* ⚠⚠ 재검토(2026-09-20 재검토): 증표는 있는데 «이메일 없는» 증표(익명 로그인 등)로
+           올 수 있다 — 이 프로젝트는 익명 로그인을 실제로 쓴다(sign.html 등). 그 증표를
+           받아 주면 본문 email 로 도로 떨어져 «증표 없을 때와 똑같은 구멍»이 다시 열린다.
+           비밀번호 로그인 증표만, 그리고 이메일이 «증표에 실제로 적혀 있을 때만» 받는다. */
+      if (verified && (!verified.email
+        || (verified.firebase && verified.firebase.sign_in_provider !== "password"))) {
+        verified = null;
+      }
+      if (!verified) { res.status(200).json({ ok: true }); return; }
+    }
+
+    // 성공 보고는 «증표에 적힌» 계정으로만 다룬다 — 본문의 email 은 절대 안 쓴다(대체 없음).
+    const email = verified ? String(verified.email).trim().toLowerCase() : parsed.email;
+
+    const ip = LS.lastIp(req.headers["x-forwarded-for"]) || String(req.ip || "");
+    const now = Date.now();
+    const country = geoip나라(ip);
+
+    // 실재 계정인지는 «안으로만» 쓴다 — 화면 에러 문구는 절대 안 바뀐다(2026-09-07 결정 유지).
+    // 성공 보고는 증표에 적힌 uid 를 그대로 쓴다(이메일로 되찾지 않는다).
+    let uid = "";
+    if (verified) {
+      uid = String(verified.uid || "");
+    } else {
+      try { uid = (await getAuth().getUserByEmail(email)).uid; }
+      catch (e) { uid = ""; }
+    }
+
+    const db = getDatabase();
+    const rawKey = uid || ("unk_" + crypto.createHash("sha1").update(email).digest("hex").slice(0, 16));
+
+    // 원시 기록은 계정을 찾았든 못 찾았든 항상 남긴다(설계문서 §2 "성공·실패 전부 기록").
+    try {
+      await db.ref("login_events/" + rawKey).push({
+        at: now, ok: parsed.ok, code: parsed.code, email,
+        ip, country, deviceId: parsed.deviceId, ua: parsed.ua, page: "enter.html",
+      });
+    } catch (e) {
+      console.warn("logLoginAttempt: 원시 기록 실패", String((e && e.message) || e));
+    }
+
+    if (!uid) { res.status(200).json({ ok: true }); return; }   // 비교 기준(uid)이 없다
+
+    try {
+      const [devicesSnap, countriesSnap, burstSnap] = await Promise.all([
+        db.ref("login_devices/" + uid).once("value"),
+        db.ref("login_countries/" + uid).once("value"),
+        db.ref("login_fail_burst/" + uid).once("value"),
+      ]);
+      const knownDevices = devicesSnap.val() || {};
+      const knownCountries = countriesSnap.val() || {};
+      const prevBurst = burstSnap.val();
+
+      /* ★ 기기·국가는 «실제로 성공한 로그인»에서만 본다 (2026-09-20 보안검토 CRITICAL 2).
+           예전에는 실패한 시도로도 기준선을 세웠다 — 남의 비밀번호를 한 번 틀리고 두 번째에
+           맞히는 흔한 순서에서, 침입자의 기기가 «첫 실패»에 이미 아는 기기로 등록되어
+           정작 성공한 로그인이 조용히 지나갔다.
+           알림 문구도 「로그인 성공」이라 적히므로, 실패한 시도에 이 둘을 켜면 거짓말이 된다. */
+      const deviceIsNew = parsed.ok && LS.isNewDevice(knownDevices, parsed.deviceId);
+      const countryIsNew = parsed.ok && LS.isNewCountry(knownCountries, country);
+      const burst = LS.nextBurst(prevBurst, now, parsed.ok);
+      // 연속실패 알림은 문턱을 «넘는 순간» 한 번만(IMPORTANT 3). 울렸으면 표시를 남긴다.
+      const burstSuspicious = LS.burstAlertDue(prevBurst, burst);
+
+      const writes = {
+        ["login_fail_burst/" + uid]: burstSuspicious
+          ? Object.assign({}, burst, { alerted: true })
+          : burst,
+      };
+      if (parsed.ok && !knownDevices[parsed.deviceId]) {
+        writes["login_devices/" + uid + "/" + parsed.deviceId] = { firstSeenAt: now, ua: parsed.ua };
+      }
+      if (parsed.ok && country && !knownCountries[country]) {
+        writes["login_countries/" + uid + "/" + country] = { firstSeenAt: now };
+      }
+      await db.ref().update(writes);
+
+      const alerts = LS.buildAlerts({
+        uid, email, deviceIsNew, countryIsNew, burstSuspicious,
+        country, ip, ua: parsed.ua, failCount: burst.count,
+      });
+      for (const a of alerts) {
+        await db.ref("systemAlerts/" + uid).push(Object.assign({ createdAt: now }, a));
+      }
+    } catch (e) {
+      console.warn("logLoginAttempt: 판정 실패", String((e && e.message) || e));
+    }
+
+    res.status(200).json({ ok: true });
+  });

@@ -87,7 +87,23 @@ var 창스크립트 =
   'var s=가[i].nextElementSibling;n=s?s.textContent:n;}}return n;}' +
   'function 열기(el){if(!el)return;b.innerHTML="";' +
   'var c=el.cloneNode(true);c.removeAttribute("id");c.removeAttribute("data-pop");' +
-  'c.style.cursor="auto";b.appendChild(c);' +
+  'c.style.cursor="auto";' +
+  /* ⚠ 목록의 머리표 「—」는 «목록에서만» 뜻이 있다. 창에 따라 들어오면 글 앞에
+       점 하나가 덩그러니 남는다 — 대표 화면에서 실제로 그렇게 보였다(2026-09-20). */
+  'var 머=c.querySelector("span");' +
+  'if(머&&머.textContent.replace(/\\s|\\u00a0/g,"")==="\\u2014")머.parentNode.removeChild(머);' +
+  'b.appendChild(c);' +
+  /* ★★★ 기사 창에 «어디서 온 기사인지 · 원문으로 가는 단추»를 붙인다
+       (대표 지시 2026-09-20 「노동뉴스는 … 당해 뉴스를 팝업하게 해라」).
+     ⚠ 줄이 한 줄뿐인 기사는 창을 열어도 새로 얻는 것이 없었다 — 제목만 되풀이했다.
+     ⚠ 기사 «본문»은 여기에 안 싣는다. 판례(판결문)는 저작권 대상이 아니라 우리
+       양식으로 펼 수 있지만, 신문 기사는 남의 저작물이다(functions/news-brief.js
+       맨 위 규칙). 그래서 «그 기사로 바로 가는 큰 단추»까지가 우리가 할 수 있는 것이다. */
+  'var 매체=el.getAttribute("data-src")||"",주소=el.getAttribute("data-url")||"";' +
+  'if(주소){var f=document.createElement("div");f.className="popf";' +
+  'f.innerHTML=\'<a href="\'+주소.replace(/"/g,"&quot;")+\'" target="_blank" rel="noopener">\'' +
+  '+(매체?매체.replace(/</g,"&lt;")+"에서 ":"")+"기사 원문 보기 ↗</a>";' +
+  'b.appendChild(f);}' +
   't.textContent=꼭지이름(el)||"이 소식";p.className="on";' +
   /* ⚠ 창이 떠 있는 동안 «뒤가 굴러가지» 않게 한다. 안 막으면 창 안에서 굴린 줄
        알았는데 뒤의 편지가 움직여, 닫았을 때 엉뚱한 자리에 서 있게 된다.
@@ -187,9 +203,16 @@ var 전문펴기스크립트 =
   'var t=a.closest("[data-pop]");' +
   'if(t&&t.parentNode){t.parentNode.insertBefore(칸,t.nextSibling);return;}' +
   '(a.closest("td")||a.parentNode).appendChild(칸);}' +
+  /* ⚠⚠ 접었을 때 돌려놓는 글귀를 «글자로 박아 두지 않는다» (2026-09-20 실측).
+       「전문 보기 ↓」로 박아 두었더니, 편지가 ↗ 로 바뀐 뒤에도 여기만 ↓ 로 되돌려
+       놓아 «한 번 폈다 접으면 화살표가 바뀌는» 쪽이 되었다. 살아 있는 쪽에서
+       ↗ 둘·↓ 하나가 잡혔다.
+     ★ 그래서 처음 글귀를 «적어 두었다가» 그대로 돌려놓는다 — 편지가 무엇으로
+       바뀌든 여기는 따라간다(두 곳에 같은 글귀를 두지 않는다). */
   'function 펴기(a,t,id){' +
+  'if(a.__label==null)a.__label=a.textContent;' +
   'if(a.__full){var 켜짐=a.__full.style.display!=="none";' +
-  'a.__full.style.display=켜짐?"none":"";a.textContent=켜짐?"전문 보기 ↓":"접기 ↑";return;}' +
+  'a.__full.style.display=켜짐?"none":"";a.textContent=켜짐?a.__label:"접기 ↑";return;}' +
   'var 칸=document.createElement("div");칸.className="full";' +
   '칸.innerHTML=\'<div class="ld">전문을 받아 오는 중입니다…</div>\';' +
   '놓기(a,칸);a.__full=칸;a.textContent="접기 ↑";' +
@@ -198,9 +221,16 @@ var 전문펴기스크립트 =
   'var h="";' +
   'if(d.제목)h+=\'<div class="tt">\'+씻(d.제목)+"</div>";' +
   'if(d.인용)h+=\'<div class="ct">\'+씻(d.인용)+"</div>";' +
-  '(d.칸들||[]).forEach(function(k){h+="<h4>"+씻(k.이름)+\'</h4><div class="p">\'+줄(k.글)' +
+  /* ⚠⚠ 여기와 news-full.js 쪽() 은 «같은 칸들»을 그린다 — 한쪽만 고치면
+       메일에서 새 탭으로 여신 분과 웹에서 그 자리에 펴신 분이 «다른 것»을 보신다.
+     ★ 주문은 판에 얹고, 접는 칸(판결 이유)은 <details> 로 접어 둔다. */
+  '(d.칸들||[]).forEach(function(k){' +
+  'var 몸=\'<div class="p\'+(k.이름==="주문"?" key":"")+\'">\'+줄(k.글)' +
   '+(k.잘림?\'<div class="cut">… 너무 길어 여기까지만 보여 드립니다. 아래 「법제처에서 보기」로 다 보실 수 있습니다.</div>\':"")' +
-  '+"</div>";});' +
+  '+"</div>";' +
+  'h+=k.접기?(\'<details class="fold"><summary>\'+씻(k.이름)' +
+  '+\' <span style="font-weight:normal;letter-spacing:0">(\'+String(k.글||"").length.toLocaleString()+\'자)</span></summary>\'' +
+  '+몸+"</details>"):("<h4>"+씻(k.이름)+"</h4>"+몸);});' +
   'h+=\'<div class="src"><a href="\'+씻(d.법제처||"")+\'" target="_blank" rel="noopener">법제처에서 보기 ↗</a></div>\';' +
   '칸.innerHTML=h;' +
   '}).catch(function(err){' +
@@ -247,7 +277,38 @@ function 쪽(제목, 전문) {
     + '<title>' + esc(제목 || '푸른노무법인 주간뉴스레터') + '</title>'
     + '<meta name="robots" content="noindex">'
     + '<style>html,body{margin:0;padding:0;background:#e9e7e3}'
-    + '#wrap{width:' + 폭 + 'px;margin:0 auto}'
+    /* ══════════════════════════════════════════════════════════════════════
+       ★★★ 쪽도 «창(팝업)과 같은 옷»을 입는다 (대표 지시 2026-09-20
+         「현재 팝업디자인이 정말 마음에 든다 이렇게 뉴스레터 화면 바꿔 줄수없나」)
+       ══════════════════════════════════════════════════════════════════════
+       ★ 창이 좋았던 까닭은 둘이다 — ① 갈색 머리띠가 «누가 보낸 것인지»를 먼저
+         말한다 ② 흰 종이가 떠 있어 «한 장»으로 보인다. 그 둘을 쪽에도 입힌다.
+       ⚠⚠ 카드에 overflow:hidden 을 걸지 «말 것». 걸면 안에 있는 차림표의
+         틀고정(position:sticky)이 통째로 죽는다 — 창(#pop .in)에서 베껴 올 때
+         제일 쉽게 딸려 오는 줄이 그것이다. 모서리는 머리·꼬리에 따로 둥글린다.
+       ⚠ 창 뒤의 «큰 PUREUN 글자»는 여기 안 가져온다. 재 보니 그 글자가 550px 인데
+         편지 카드가 982px 라, 어떤 창 너비에서도 카드에 가려 «한 번도 안 보인다».
+         안 보이는 것을 넣어 두면 다음 사람이 「왜 안 나오지」로 시간을 쓴다. */
+    + 'body{padding:24px 0 44px}'
+    /* 떠 있는 흰 종이 — 창의 .in 과 같은 결(그림자는 조금 옅게, 늘 떠 있으므로) */
+    + '#card{position:relative;z-index:1;width:' + 폭 + 'px;margin:0 auto;background:#fff;'
+    + 'border:1px solid #ddd7cf;border-radius:16px;'
+    + 'box-shadow:0 18px 44px rgba(36,26,19,.16),0 2px 6px rgba(36,26,19,.06)}'
+    + '#card .hd{display:flex;align-items:center;gap:10px;padding:14px 20px;'
+    + 'background:#6f5a48;border-radius:15px 15px 0 0}'
+    + '#card .hd .mark{font:bold 11px Georgia,\'Times New Roman\',serif;letter-spacing:2.5px;'
+    + 'color:#e2d3bd;white-space:nowrap}'
+    + '#card .hd .bar{width:1px;align-self:stretch;background:#8a7563}'
+    + '#card .hd b{flex:1;min-width:0;font:bold 15px \'Malgun Gothic\',sans-serif;color:#fff;'
+    + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    /* 살구빛 가는 띠 — 머리와 편지 사이를 한 겹 띄운다(창과 같다) */
+    + '#card .acc{height:5px;background:#fbf4ea;border-bottom:1px solid #efe7dc}'
+    + '#card .ft{display:flex;align-items:center;gap:8px;padding:12px 20px;background:#faf8f5;'
+    + 'border-top:1px solid #eceae6;border-radius:0 0 15px 15px;'
+    + 'font:12px \'Malgun Gothic\',sans-serif;color:#9a938a}'
+    + '#card .ft .nm{font-weight:bold;color:#6f5a48}'
+    + '#card .ft .sp{flex:1}'
+    + '#wrap{width:100%;margin:0 auto}'
     /* ★★ 차림표를 «틀고정» — 굴러도 따라온다 (대표 지시 2026-09-13 「이부분 틀고정 해라」).
        ★ 편지는 표로 짜여 있다. 차림표 칸(꼭지 넷이 든 tr)에 자리표를 붙여 두고
          여기서 그 줄만 붙잡는다 — 편지 «속 글자»는 손대지 않는다.
@@ -277,6 +338,17 @@ function 쪽(제목, 전문) {
     + '.full .tt{font-weight:bold;font-size:14.5px;line-height:1.5;color:#241a13;word-break:keep-all}'
     + '.full .ct{margin-top:3px;font-size:12px;color:#9a938a}'
     + '.full .p{word-break:keep-all}'
+    /* ★ 주문은 «결론»이다 — 판에 얹어 눈에 먼저 들어오게 한다 (news-full.js 쪽() 과 같은 모양) */
+    + '.full .p.key{background:#fbf4ea;border-left:3px solid #6f5a48;padding:10px 12px;'
+    + 'font-weight:bold;color:#241a13}'
+    /* ★★ 긴 이유는 접어 둔다 — 그 자리에서 펴도 쪽이 18장이 되면 안 본다 */
+    + '.full details.fold{margin-top:15px;border-top:1px solid #e0dcd6;padding-top:4px}'
+    + '.full details.fold>summary{cursor:pointer;list-style:none;padding:7px 0;'
+    + 'font-size:11.5px;letter-spacing:1.5px;color:#8a6f57;font-weight:bold}'
+    + '.full details.fold>summary::-webkit-details-marker{display:none}'
+    + '.full details.fold>summary::after{content:" 펴 보기 ▾";font-weight:normal;color:#9a938a}'
+    + '.full details.fold[open]>summary::after{content:" 접기 ▴";font-weight:normal;color:#9a938a}'
+    + '.full details.fold>summary:hover{color:#241a13}'
     + '.full .ld,.full .err{padding:6px 0;font-size:13px;color:#8a837a}'
     + '.full .cut{margin-top:8px;font-size:12px;color:#9a938a}'
     + '.full .src{margin-top:15px;font-size:12px}'
@@ -345,13 +417,31 @@ function 쪽(제목, 전문) {
          비율만 키우면 편지가 정한 결(제목이 본문보다 얼마나 큰가)이 그대로 산다 —
          편지를 손대지 않고 크게 보는 유일한 길이다. */
     + '#pop .bd{overflow:auto;padding:26px 28px;zoom:1.22}'
+    /* ★ 기사 창 아래의 «원문으로 가는 단추» — 창을 연 보람이 여기에 있다.
+         ⚠ 기사 본문은 안 싣는다(남의 저작물). 그래서 단추를 «크게» 둔다 —
+           작은 글씨 「원문 ↗」 하나로는 열어 본 뜻이 없다. */
+    + '#pop .popf{margin-top:18px;padding-top:15px;border-top:1px solid #e0dcd6}'
+    + '#pop .popf a{display:inline-block;background:#6f5a48;color:#fff;'
+    + "font:bold 13px 'Malgun Gothic',sans-serif;text-decoration:none;"
+    + 'padding:10px 18px;border-radius:4px}'
+    + '#pop .popf a:hover{background:#5b4938}'
     /* ★ 꼬리 — 누가 보낸 쪽인지, 궁금하면 어디로 물어야 하는지. 없던 자리다. */
     + '#pop .ft{display:flex;align-items:center;gap:8px;padding:12px 18px;background:#faf8f5;'
     + 'border-top:1px solid #eceae6;font:12px \'Malgun Gothic\',sans-serif;color:#9a938a}'
     + '#pop .ft .nm{font-weight:bold;color:#6f5a48}'
     + '#pop .ft .sp{flex:1}'
     + '</style>'
-    + '</head><body><div id="wrap">' + 전문 + '</div>'
+    + '</head><body>'
+    /* 떠 있는 흰 종이 — 머리띠 · 편지 · 꼬리띠 (창과 같은 차림) */
+    + '<div id="card">'
+    + '<div class="hd"><span class="mark">PUREUN</span><span class="bar"></span>'
+    + '<b>' + esc(꼬리제목(제목) || '주간 노동뉴스레터') + '</b></div>'
+    + '<div class="acc"></div>'
+    + '<div id="wrap">' + 전문 + '</div>'
+    + '<div class="ft"><span class="nm">푸른노무법인</span>'
+    + '<span>' + esc(꼬리제목(제목)) + '</span>'
+    + '<span class="sp"></span><span>문의 041-556-0035</span></div>'
+    + '</div>'
     + '<div id="pop">'
     + '<div class="bg" aria-hidden="true">'
     + '<div class="top"><div class="w">PUREUN</div>'

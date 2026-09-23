@@ -118,11 +118,36 @@
   }
 
   function recordLike(value){ return !!(value&&typeof value==='object'&&!Array.isArray(value)&&(own(value,'id')||own(value,'entityType'))); }
+  /* ★ 「덩어리 자리」 — 레코드가 아니라 «값 하나»(사진·썸네일 base64 글자)가 사는 곳.
+     여기서는 삭제 표식(tombstone)을 남길 수 «없다»:
+       ① 글자 하나에 `_deleted` 를 붙일 자리가 없다 — 레코드가 아니다.
+       ② 남기면 «비우려던 자리가 그대로 남는다». 사진을 창고로 옮기는 일의 뜻이
+          바로 그 자리를 비우는 것인데, 표식을 남기면 한 장마다 다시 들어앉는다.
+       ③ 그 자리를 읽는 화면은 «글자»를 기대한다. 표식(객체)이 들어가면
+          사진이 깨진 값으로 보인다.
+     ⚠ 2026-09-21: 명함 사진 421장을 창고로 옮기는 동안 이 경고가 421번 떠서
+       **진짜 오류(창고 403·CORS)를 덮었다.** 대표님이 콘솔을 보고도 못 찾으셨다.
+     ⚠ 목록을 함부로 늘리지 말 것. 「지워도 되는 곳」이 아니라 «레코드가 아닌 곳»만 적는다.
+       업무 자료(업체·계약·사건…)는 여기 들어올 수 없다 — 그것은 표식을 남겨야 한다. */
+  var BLOB_PATHS = [
+    /(^|\/)pucards\/photos(\/|$)/,
+    /(^|\/)pucards\/thumbs(\/|$)/,
+    /(^|\/)pucards_private\/[^/]+\/photos(\/|$)/,
+    /(^|\/)pucards_private\/[^/]+\/thumbs(\/|$)/,
+    /(^|\/)puphotos\/(u\/[^/]+\/)?(blobs|thumbs)(\/|$)/
+  ];
+  function isBlobPath(path){
+    var p=clean(path);
+    if(!p) return false;
+    for(var i=0;i<BLOB_PATHS.length;i++){ if(BLOB_PATHS[i].test(p)) return true; }
+    return false;
+  }
   function inspectWrite(input){
     input=input||{};
     var mode=resolveMode(input.mode), out=[];
     if(input.kind==='remove'||input.value===null){
-      out.push(issue('physical_delete','물리적 삭제 대신 삭제 표식(tombstone)을 저장해야 합니다.','_deleted'));
+      if(!isBlobPath(input.path))
+        out.push(issue('physical_delete','물리적 삭제 대신 삭제 표식(tombstone)을 저장해야 합니다.','_deleted'));
     }else if(input.kind==='update'&&input.value&&typeof input.value==='object'&&!recordLike(input.value)){
       Object.keys(input.value).forEach(function(k){
         var child=input.value[k],childPath=refPath(input.path,k);

@@ -137,7 +137,12 @@ test('⑧ 계약창 — 단가가 있을 때만 일수 칸을 그린다', () => 
 
 /* 격자를 «실제로» 그려 본다 — 칸 하나만 빠져도 라벨과 입력칸이 한 칸씩 밀린다.
    (오른쪽 CMS·업무요약 검사와 같은 길이다 — 거기는 단가 0 인 경우를 본다) */
-function gridWithDayFee(dayFee, days) {
+/* ⚠ 2026-09-19 세부설정 박스가 CSS Grid(6열)에서 flex(.pu-kbox/.pu-krow)로 바뀌었다
+   (대표 지시 「한 줄로 넣어라」, 목업 승인 contract-detail-box-v2). 그리드 시절엔
+   «칸 개수가 정확히 6의 배수»가 아니면 라벨이 밀리는 깨지기 쉬운 구조라 열 수를
+   셌지만, flex 는 그 걱정이 없다 — 대신 「일수 줄(row2)이 늘 같은 자리에 있고,
+   단가가 있을 때만 그 안에 일수·셈 칸이 실제로 늘어나는가」를 본다. */
+function kboxWithDayFee(dayFee, days) {
   const src = ERP;
   const from = src.indexOf('(f.kinds||[]).map(function(kindV){');
   const to = src.indexOf(',\n        // CMS 자동이체', from);
@@ -150,13 +155,12 @@ function gridWithDayFee(dayFee, days) {
     BRIEF_KINDS: ['case', 'consulting', 'fund', 'other'], BRIEF_MAX: 40, BRIEF_PH: {},
     NumberInput: function NumberInput() {},
     kindInfo() { return { color: '#000', icon: 'X', label: '라벨' }; },
+    kboxColorStyle(hex) { return { borderLeft: '4px solid ' + hex }; },
     getKindTypes() { return [{ code: 'cons-clinic', short: '현클', name: '현장클리닉' }]; },
     setTypeCodeFor() { return function () {}; },
     setAmountFor() { return function () {}; },
     setSimple() { return function () {}; },
     setBriefFor() { return function () {}; },
-    briefCell() { return { tag: 'div', props: { style: { gridColumn: '1 / 3' } }, kids: ['업무 요약'] }; },
-    briefRow() { return { tag: 'div', props: { style: { gridColumn: '1 / -1' } }, kids: [] }; },
     setF() {}, vatIncludedHint() {}, vatFocusHint() {}, vatAmountHint() {},
     consTypeDayFee() { return dayFee; },
     h(tag, props) { return { tag, props: props || {}, kids: Array.prototype.slice.call(arguments, 2) }; }
@@ -167,32 +171,33 @@ function gridWithDayFee(dayFee, days) {
   vm.runInContext('var __arr = ' + expr + ';', ctx);
   return ctx.__arr[0];
 }
-function spanOf(x) {
-  const gc = x && x.props && x.props.style && x.props.style.gridColumn;
-  if (gc === '1 / 3') return 2;
-  if (gc === '1 / -1') return 6;
-  return 1;
+function realKids(node) {
+  return (node && node.kids || []).filter(x => x !== null && x !== undefined && x !== false);
 }
 
-test('⑧-2 ★ 일수 줄이 늘어도 격자가 안 밀린다 (칸 하나만 빠져도 라벨이 어긋난다)', () => {
-  const off = gridWithDayFee(0, 0).kids.filter(x => x !== null && x !== undefined && x !== false);
-  assert.equal(off.reduce((s, x) => s + spanOf(x), 0), 24, '단가가 없으면 예전 그대로 4줄');
+test('⑧-2 ★ 일수 줄(row2)은 컨설팅이면 늘 같은 자리에 있고, 단가가 있을 때만 그 안이 늘어난다', () => {
+  const off = kboxWithDayFee(0, 0);
+  assert.equal(off.props.className, 'pu-kbox', '컨설팅도 새 박스 모양(pu-kbox)을 쓴다');
+  const kidsOff = realKids(off);
+  assert.equal(kidsOff.length, 3, '머리·계약금 줄·잔금 줄 — 셋뿐이다(일수 없어도 잔금 줄은 있다)');
+  assert.equal(kidsOff[2].props.className, 'pu-krow', '잔금 줄도 pu-krow 다');
+  assert.equal(realKids(kidsOff[2]).length, 2, '단가가 없으면 잔금 줄엔 금액칸·부가세알약 둘뿐');
 
-  const on = gridWithDayFee(350000, 3).kids.filter(x => x !== null && x !== undefined && x !== false);
-  const span = on.reduce((s, x) => s + spanOf(x), 0);
-  assert.equal(span % 6, 0, '열을 딱 맞게 채운다');
-  assert.equal(span, 24 + 6 + 6, '일수 줄 6열 + 셈 띠 한 줄이 더 붙는다');
-
-  const wide = on.filter(x => spanOf(x) === 6);
-  assert.equal(wide.length, 1, '한 줄을 통째로 쓰는 칸은 셈 띠 하나뿐');
-  assert.match(JSON.stringify(wide[0].kids), /1,155,000원/, '그 줄에 합계가 적혀 있다');
+  const on = kboxWithDayFee(350000, 3);
+  const kidsOn = realKids(on);
+  assert.equal(kidsOn.length, 3, '단가가 있어도 줄 개수(머리·계약금·잔금) 자체는 안 늘어난다');
+  const row2 = realKids(kidsOn[2]);
+  assert.equal(row2.length, 8, '일수라벨·단가안내·일수칸·「일」·셈 문구·단추·금액칸·부가세알약 = 8');
+  assert.match(JSON.stringify(row2), /1,155,000원/, '그 줄에 합계가 적혀 있다');
 });
 
 test('⑧-3 ★ 일수 칸에 3을 넣으면 셈 띠가 실제로 뜬다 (그리는 자리까지 이어졌나)', () => {
-  const none = gridWithDayFee(350000, 0).kids.filter(x => spanOf(x) === 6);
-  assert.equal(none.length, 0, '일수가 0 이면 띠가 없다');
-  const some = gridWithDayFee(350000, 2).kids.filter(x => spanOf(x) === 6);
-  assert.match(JSON.stringify(some[0].kids), /770,000원/, '2일이면 770,000');
+  const none = realKids(kboxWithDayFee(350000, 0).kids[2]);
+  assert.equal(none.length, 6, '일수가 0 이면 셈 문구·단추 두 칸이 아직 없다(일수라벨·안내·일수칸·「일」·금액칸·부가세알약 = 6)');
+  assert.ok(!/\d,\d{3},\d{3}원/.test(JSON.stringify(none)), '일수가 0 이면 아직 셈할 금액이 없다');
+  const some = realKids(kboxWithDayFee(350000, 2).kids[2]);
+  assert.equal(some.length, 8, '일수가 있으면 셈 문구·단추가 붙어 8칸');
+  assert.match(JSON.stringify(some), /770,000원/, '2일이면 770,000');
 });
 
 test('⑨ 잔금에 넣을 때 「부가세포함」도 함께 켠다 — 안 켜면 뒤에서 또 붙는다', () => {

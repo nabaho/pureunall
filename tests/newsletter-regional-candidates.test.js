@@ -78,7 +78,11 @@ test('매일 수집기는 검토대기함에만 쓰고 회차나 발송을 건�
 test('공공기관 RSS 기본 연결 실패 시 IPv4로 재시도하고 원인을 기록한다', () => {
   assert.match(함수, /function IPv4로글자받기/);
   assert.match(함수, /family:\s*4/);
-  assert.match(함수, /return await IPv4로글자받기\(url\)/);
+  /* ⚠ 2026-09-20 부터 «시간 주머니»를 함께 넘긴다(IPv4로글자받기(url, 0, 둘째제한)) —
+       판례 쪽이 함수 제한 안에 돌아오게 하려는 것이다
+       (tests/newsletter-full-budget.test.js 참고). 규칙은 그대로다:
+       «첫 연결이 실패하면 IPv4 로 한 번 더 읽는다». 넘기는 값까지 못 박지 않는다. */
+  assert.match(함수, /return await IPv4로글자받기\(url\b/);
   assert.match(함수, /기본 연결:[\s\S]*IPv4 연결:/);
 });
 

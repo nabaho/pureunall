@@ -139,6 +139,101 @@
       .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
   }
 
+  /* ── 사람 색 «채워 넣기» (data/staff_colors) ──────────────────────────────
+     캘린더를 한 곳으로 모으기 1걸음. 이 색을 «정하는 곳»이 여태 이알피 법인
+     대시보드 한 곳뿐이라, 그 화면을 걷어내면 새 직원에게 색이 영영 안 생긴다.
+
+     ⚠ 이것만은 «레코드 표»가 아니라 한 덩이 지도다(사번 → 색). 위 여섯 관문
+       (번호·마감·지도형…)이 그대로 맞지 않아 따로 둔다. 대신 이 넷을 본다 —
+       ① 빈 지도는 안 쓴다 — 올리면 서버의 색이 «통째로» 날아간다
+       ② 열쇠는 사번(금지문자 없음), 값은 #rrggbb 만 — 섞이면 읽는 쪽이 깨진다
+       ③ 이알피 dbSet 과 «같은 겉꼴»({v,u})로 쓴다 — 아니면 서로 못 읽는다
+       ④ 통째로 «덮어쓴다» — 부르는 쪽이 「있던 것 + 채운 것」을 다 넘겨야 한다.
+          (그래서 부르는 쪽이 있던 색을 먼저 읽었는지가 중요하다)
+     ⚠ «누가» 쓸 수 있는지는 여기서 안 본다 — 부르는 쪽이 고르고, 마지막 문은
+       서버 규칙(staff_colors 는 관리자·위임관리인만)이다. */
+  var COLORV = /^#[0-9a-fA-F]{6}$/;
+  function saveColors(colors) {
+    if (!_db) return Promise.resolve(fail('no_db', '아직 서버에 붙기 전입니다'));
+    if (!colors || typeof colors !== 'object' || Array.isArray(colors)) {
+      return Promise.resolve(fail('bad_shape', '사람 색은 «사번 → 색» 지도여야 합니다'));
+    }
+    var keys = Object.keys(colors);
+    if (!keys.length) {
+      return Promise.resolve(fail('empty', '빈 색표는 안 올립니다 — 서버의 색이 통째로 날아갑니다'));
+    }
+    for (var i = 0; i < keys.length; i++) {
+      if (BADKEY.test(keys[i])) {
+        return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다: ' + keys[i]));
+      }
+      if (!COLORV.test(String(colors[keys[i]]))) {
+        return Promise.resolve(fail('bad_color',
+          '색이 #rrggbb 꼴이 아닙니다: ' + keys[i] + ' = ' + colors[keys[i]]));
+      }
+    }
+    return _db.ref('data/staff_colors').set({ v: colors, u: Date.now() })
+      .then(function () { return OK; })
+      .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
+  }
+
+  /* ── 구글 계정 ↔ 직원 잇기 (data/gcal_mail_sid) ───────────────────────────
+     캘린더 한 곳으로 모으기 1걸음(나). 이 표를 쓰는 곳도 이알피 법인 대시보드
+     한 곳뿐이었다. 구글 일정에는 «누가 만들었는지»(메일)만 남고 이름이 없어,
+     이어 주지 않으면 그 사람 일정이 담당자·색 없이 뜬다.
+
+     ⚠ 색표(saveColors)와 닮았지만 «빈 것»을 대하는 태도가 다르다 —
+       · 색표가 비면 사고다(모든 사람 색이 날아간다) → 빈 지도를 막는다
+       · 여기서는 「마지막 하나를 끊었다」가 멀쩡한 상태다 → 빈 지도를 허락한다
+     ⚠ 열쇠는 «메일 그대로»가 아니라 점을 쉼표로 바꾼 꼴이다(실시간DB 열쇠 제약).
+       이알피 gcalMailKey 와 «같은 셈»이어야 한다 — 다르면 이은 것을 서로 못 찾는다.
+       그래서 여기서는 «금지문자가 없는지»만 보고, 바꾸는 일은 부르는 쪽이 한다. */
+  function saveMailMap(map) {
+    if (!_db) return Promise.resolve(fail('no_db', '아직 서버에 붙기 전입니다'));
+    if (!map || typeof map !== 'object' || Array.isArray(map)) {
+      return Promise.resolve(fail('bad_shape', '«메일 → 사번» 지도여야 합니다'));
+    }
+    var keys = Object.keys(map);
+    for (var i = 0; i < keys.length; i++) {
+      if (BADKEY.test(keys[i])) {
+        return Promise.resolve(fail('bad_id',
+          '열쇠에 실시간DB 가 못 쓰는 글자가 있습니다(점은 쉼표로 바꿔 주세요): ' + keys[i]));
+      }
+      var sid = map[keys[i]];
+      if (typeof sid !== 'string' || !sid || BADKEY.test(sid)) {
+        return Promise.resolve(fail('bad_sid', '사번이 이상합니다: ' + keys[i] + ' = ' + sid));
+      }
+    }
+    return _db.ref('data/gcal_mail_sid').set({ v: map, u: Date.now() })
+      .then(function () { return OK; })
+      .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
+  }
+
+  /* ── 내부 직원 비고 (data/ieum_notes) ────────────────────────────────────
+     캘린더 한 곳으로 모으기 2걸음. 「개인 요구사항」 메모다.
+     ⚠ 외부 인원의 비고는 여기가 아니라 external_staff 레코드의 note 칸이다 —
+       그쪽은 «레코드 표»라 위의 칸별 저장 문(save)을 그대로 쓴다. 두 자리가
+       갈린 것은 이알피가 그렇게 담아 온 것이라 그대로 따른다(옮기면 옛 글이 사라진다).
+     ⚠ 색표와 달리 «빈 지도»를 허락한다 — 마지막 비고를 지운 것은 멀쩡한 상태다.
+     ⚠ 누가 쓸 수 있는지는 서버 규칙이 정한다(이 칸은 로그인한 직원 누구나 — 이알피와 같다). */
+  function saveNotes(notes) {
+    if (!_db) return Promise.resolve(fail('no_db', '아직 서버에 붙기 전입니다'));
+    if (!notes || typeof notes !== 'object' || Array.isArray(notes)) {
+      return Promise.resolve(fail('bad_shape', '비고는 «사번 → 글» 지도여야 합니다'));
+    }
+    var keys = Object.keys(notes);
+    for (var i = 0; i < keys.length; i++) {
+      if (BADKEY.test(keys[i])) {
+        return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다: ' + keys[i]));
+      }
+      if (typeof notes[keys[i]] !== 'string') {
+        return Promise.resolve(fail('bad_note', '비고는 글이어야 합니다: ' + keys[i]));
+      }
+    }
+    return _db.ref('data/ieum_notes').set({ v: notes, u: Date.now() })
+      .then(function () { return OK; })
+      .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
+  }
+
   /* 한 건 지우기 — 자리를 비운다(v/{번호} = null). */
   function remove(table, id, prev) {
     var g = check(table, id, {}, prev && prev.date);
@@ -168,6 +263,9 @@
     check: check,
     fieldPaths: fieldPaths,
     save: save,
+    saveColors: saveColors,
+    saveMailMap: saveMailMap,
+    saveNotes: saveNotes,
     remove: remove,
     newId: newId
   };

@@ -139,19 +139,21 @@ test('★ 참여사업장이 없으면 손대지 않는다 — 자리표가 틀�
   assert.match(grabFn('fillSignTable'), /if\(!list\.length\) return 0/);
 });
 
+/* 2026-09-20: 표를 «짜는» 일은 signTableHTML 한 곳으로 모았다 — 설립합의서·정관과
+   회의록 뒤쪽 참석위원표가 «같은 모양»이어야 하기 때문이다(대표 지시 「모두 캡쳐1과 같이」). */
 test('★ 모르는 이름은 밑줄로 둔다 — 관청 서류에 이름을 지어낼 수 없다', () => {
-  const fn = grabFn('fillSignTable');
+  const fn = grabFn('signTableHTML');
   assert.match(fn, /＿{3,}/, '빈자리를 밑줄로 그려야 한다');
   assert.ok(!/\|\|\s*'미정'/.test(fn), '없는 이름을 말로 메우면 안 된다');
 });
 
 test('사용자측 칸은 서식이 「대표이사」라 부르므로 회사 대표자가 먼저다', () => {
-  assert.match(grabFn('fillSignTable'), /String\(s\.ceo\|\|''\)\.trim\(\)\|\|u\.name/,
+  assert.match(grabFn('signTableHTML'), /String\(s\.ceo\|\|''\)\.trim\(\)\|\|u\.name/,
     '대표자가 없을 때만 사용자대표로 내려가야 한다');
 });
 
 test('★ 이름과 (인) 은 칸의 오른쪽 끝에 붙는다 — 날인 자리가 세로로 한 줄에 선다', () => {
-  const fn = grabFn('fillSignTable');
+  const fn = grabFn('signTableHTML');
   assert.match(fn, /<div class="right">/, '왼쪽에 두면 회사 이름 길이마다 (인) 자리가 어긋난다');
   /* 서식 CSS 에 이미 있는 이름을 써야 한다 — 화면과 인쇄가 같은 규칙을 봐야 한다 */
   assert.match(SRC, /\+"\.right\{text-align:right\}/, '.right 가 인쇄용 서식 CSS 에 없다');
@@ -159,9 +161,23 @@ test('★ 이름과 (인) 은 칸의 오른쪽 끝에 붙는다 — 날인 자�
 });
 
 test('★ 표 머리와 줄에 번호가 붙는다', () => {
-  const fn = grabFn('fillSignTable');
+  const fn = grabFn('signTableHTML');
   assert.match(fn, /번호/, '번호 칸이 있어야 한다');
   assert.match(fn, /\(i\+1\)/, '줄마다 번호를 매겨야 한다');
+});
+
+test('★★ «회사마다 한 줄» 날인표를 짜는 곳은 하나다 — 둘이면 서식마다 모양이 갈린다', () => {
+  /* 2026-09-20 오후: 회의록 뒤쪽은 «위원마다 한 줄»(attendSignHTML)로 갈라졌다 —
+     회의록의 참석위원은 회사가 아니라 위원이기 때문이다(등기임원이 빠지고 있었다).
+     정관·설립합의서·출연확인서는 회사끼리 맺는 계약이라 그대로 «회사마다 한 줄»이다. */
+  assert.match(grabFn('fillSignTable'), /signTableHTML\(lab,list\)/,
+    '★ 계약 서식의 회사별 날인표가 따로 짜입니다.');
+  assert.match(grabFn('fillAttendSign'), /attendSignHTML\(f,sites,lab\)/,
+    '★ 회의록 참석위원표가 위원 명단에서 안 옵니다.');
+  /* 짜는 코드가 정말 한 곳뿐인지 — 「(인)」을 붙이는 자리가 둘이면 갈라진 것이다 */
+  const 코드 = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.equal((코드.match(/&nbsp;\(인\)/g) || []).length, 1,
+    '★ 날인 자리를 두 곳에서 그립니다 — 한쪽만 고치면 서식마다 달라집니다.');
 });
 
 test('★ 본문까지 한 마디에 든 서식(설립합의서)은 표를 그 마디 «뒤»에 붙인다', () => {
@@ -206,6 +222,57 @@ test('위원 명단은 별지 제7호가 보는 그 명단에서 온다 — 한 
 
 test('격자 줄에 data-cm 을 달아 라벨 채우기가 덮지 않게 한다', () => {
   assert.match(grabFn('fillSignGrid'), /setAttribute\('data-cm','1'\)/);
+});
+
+/* 2026-09-23: 「사내 정관 서명 격자도 오른쪽 정렬」 — 직함은 왼쪽, 이름·인은 오른쪽.
+   ⚠ 서명표(signTableHTML)의 <div class="right"> 를 그대로 옮기면 안 된다 — 그건 블록이라
+     줄을 나눈다. 이 칸은 원래 «한 줄»(25.1pt)이라 줄을 나누면 칸 높이가 배로 는다.
+     대신 한 줄짜리 flex 로 직함·이름을 양끝에 세운다. */
+test('★ 사내 격자도 직함은 왼쪽, 이름·인은 오른쪽으로 — 단 «한 줄»은 유지한다', () => {
+  const fn = grabFn('_gridCell');
+  assert.match(fn, /justify-content:space-between/, '한 줄에서 양끝으로 벌려야 한다');
+  assert.ok(!/<div class="right">/.test(fn),
+    '블록 class="right" 를 쓰면 줄이 나뉘어 칸 높이가 배로 는다(서명표와 다른 칸이다)');
+  assert.match(fn, /t\.indexOf\(m\[0\]\)/, '이름 자리표 뒤를 갈라 오른쪽 칸으로 떼어야 한다');
+});
+
+const GRIDCELL = (() => {
+  const box = {};
+  new Function([
+    'function esc(s){ return String(s==null?"":s); }',
+    grabLine('GRID_NAME'), grabLine('GRID_TITLE'), grabLine('GRID_BLANK'),
+    grabFn('_gridCell'),
+    /* 실제 <td> 대신 «한 곳(_t)만 보는» 자리 — textContent 로 읽고 innerHTML 로 쓰는 것까지
+       실제 DOM 과 같은 순서로 흉내 낸다. */
+    'this.run=function(t,o,keepLabel){',
+    '  var td={_t:t, setAttribute:function(){}};',
+    '  Object.defineProperty(td,"textContent",{get:function(){return td._t;},set:function(v){td._t=v;}});',
+    '  Object.defineProperty(td,"innerHTML",{get:function(){return td._t;},set:function(v){td._t=v;}});',
+    '  _gridCell(td,o,keepLabel);',
+    '  return td._t;',
+    '};',
+  ].join('\n')).call(box);
+  return box;
+})();
+
+test('사내 격자 — 직함의 원본 자간(스페이스로 벌린 글자)은 그대로 둔다', () => {
+  /* 첫 줄(라벨을 그대로 두는 줄) — 「대 표 이 사」의 자간이 살아 있어야 한다 */
+  const out = GRIDCELL.run('대 표 이 사 ○ ○ ○ 인', { name: '김대표' }, true);
+  assert.equal(out,
+    '<div style="display:flex;justify-content:space-between;gap:8px">'
+    + '<span>대 표 이 사</span><span>김대표 인</span></div>');
+});
+
+test('사내 격자 — 이름을 모르면 밑줄, 직책을 모르면 자리표 그대로 둔다', () => {
+  const out = GRIDCELL.run('□ □ □ ○ ○ ○ 인', null, false);
+  assert.match(out, /＿{3,}/, '직책도 이름도 모르면 자리표가 남아야 한다');
+  assert.match(out, /<span>＿{3,} 인<\/span>/, '이름 자리는 밑줄로 오른쪽 칸에 서야 한다');
+});
+
+test('사내 격자 — 한 줄을 유지한다 (block 이 아니라 flex 로 감싼다)', () => {
+  const out = GRIDCELL.run('근로자대표 ○ ○ ○ 인', { name: '박근로' }, true);
+  assert.equal((out.match(/<div/g) || []).length, 1, '줄을 나누는 두 번째 block 이 있으면 안 된다');
+  assert.doesNotMatch(out, /<br/, '줄바꿈을 넣으면 한 줄이 아니다');
 });
 
 /* ══════════ ④ 차례 ══════════ */
@@ -300,9 +367,10 @@ function boot() {
     gF('partyNames'), gF('partyJoin'), gF('_fillWho'), gF('fillPartyList'), gF('fillPartyDates'),
     gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
     gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),
-    gS('MINUTES_AGENDA'), gF('fillMinutesPages'),
+    gS('MINUTES_AGENDA'), gS('MINUTES_PROGRESS_HEAD'), gF('fillMinutesPages'),
     gS('SIGN_L'), gS('SIGN_R'), gS('SIGN_WHO_ONLY_SRC'), gS('SIGN_HEAD'),
-    gF('_signLabels'), gF('fillSignTable'),
+    /* 2026-09-20: 표를 짜는 일은 signTableHTML 한 곳 — 회의록 참석위원표도 같은 것을 쓴다 */
+    gF('_signLabels'), gF('signTableHTML'), gF('fillSignTable'), gF('fillAttendSign'),
     gS('CHARTER_TITLE'), gS('CHARTER_NAME'), gS('CHARTER_BRANCH'), gS('CHARTER_DATELINE'),
     gF('fillCharterHead'),
     gS('GRID_NAME'), gS('GRID_TITLE'), gS('GRID_BLANK'), gF('_gridCell'), gF('fillSignGrid'),

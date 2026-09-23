@@ -232,8 +232,19 @@ t('★ 잔금 칸에서도 부른다',
   /onBlur:function\(e\)\{ vatAmountHint\(f\.balanceFeeVatIncluded, f\.successFee/.test(src), true);
 t('★ 기금·업체 금액 칸에서도 부른다',
   /vatAmountHint\(kindV === 'fund' \? f\.fundVatIncluded : true/.test(src), true);
-t('체크박스 8곳이 모두 말풍선 자리를 넘긴다',
-  (src.match(/vatIncludedHint\(e\.target\.checked, [^;]*, e\.target\)/g) || []).length, 8);
+/* ⚠ 2026-09-19 다시 겨눔 — ContractModal 의 체크박스 셋(계약금·잔금·기금)을
+   vatPill() 한 함수로 묶은 뒤로, 그 셋은 문자로는 «호출 자리»에서 안 보이고
+   vatPill 정의 «안»에 한 번만 남는다(제네릭 매개변수라서). 그래서 전체 문자
+   개수(옛 8)는 더 이상 뜻이 없다 — ContractModal 쪽은 «호출 횟수»로,
+   나머지(CaseEditModal 등)는 그대로 문자로 센다. */
+t('★ ContractModal 은 vatPill 을 4곳에서 부른다(계약금·잔금+성공보수 둘·기금)',
+  (slice('function ContractModal(props){', 'function CaseEditModal(props){')
+    .match(/vatPill\(f\.(contractFeeVatIncluded|balanceFeeVatIncluded|fundVatIncluded)/g) || []).length, 4);
+t('★ vatPill 정의 하나가 늘 말풍선 자리를 넘긴다',
+  /vatIncludedHint\(e\.target\.checked, label, e\.target\)/.test(src), true);
+t('CaseEditModal 의 체크박스는 그대로 문자로 있다(손 안 댔다)',
+  (slice('function CaseEditModal(props){', 'function CaseManagement(props){')
+    .match(/vatIncludedHint\(e\.target\.checked, [^;]*, e\.target\)/g) || []).length >= 3, true);
 // 이름은 "없앴다"는 주석에 남아 있으므로, 정의·호출이 없는지를 본다
 t('★ 창을 막던 알림창 정의가 없다', /window\.showAlertMutable\s*=/.test(src), false);
 t('★ 그것을 부르는 곳도 없다', /showAlertMutable\(/.test(src), false);

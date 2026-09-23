@@ -476,7 +476,11 @@ test('★ 내려받기 링크도 «번호»로 감싸진다 — 누가 받았는
   const 편 = 편지({ policy: [C.자료다듬기(자료한벌[0])] },
     { 설정: { 추적밑주소: 'https://x.example' } });
   assert.ok(편.서식.indexOf('x.example/newsClick?i=') >= 0, '자료 링크가 안 감싸졌다');
-  assert.ok(편.링크들.indexOf(자료한벌[0].파일) >= 0, '파일 주소가 대장에 없다');
+  /* ⚠ 2026-09-20 부터 자료 내려받기는 «{주소, 뒷길}» 꾸러미로 담긴다 — 그 주소가
+       죽었을 때 상세 쪽으로 물러서기 위함이다(tests/newsletter-download-fallback).
+       규칙은 그대로다: «파일 주소가 대장에 있어야 한다». 읽는 꼴만 바뀌었다. */
+  const 대장 = 편.링크들.map((x) => (x && typeof x === 'object') ? x.주소 : x);
+  assert.ok(대장.indexOf(자료한벌[0].파일) >= 0, '파일 주소가 대장에 없다');
   /* ⚠ 목적지 주소를 실으면 누구나 우리 도메인으로 남을 속일 수 있다 */
   assert.ok(편.서식.indexOf('newsClick?i=') >= 0);
   assert.ok(!/newsClick[^"]*(https?%3A|https?:)/.test(편.서식), '감싼 링크에 목적지 주소가 실렸다');

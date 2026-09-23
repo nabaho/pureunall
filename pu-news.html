@@ -31,8 +31,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=29"></script>
-<script src="js/pu-ontology-write.js?v=2" data-mode="observe"></script>
+<script src="js/pu-ontology.js?v=31"></script>
+<script src="js/pu-ontology-write.js?v=3" data-mode="observe"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-whoami.js?v=1"></script>
@@ -43,8 +43,8 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=38"></script>
-<script src="js/pu-news-tpl.js?v=28"></script>
+<script src="js/pu-news-core.js?v=42"></script>
+<script src="js/pu-news-tpl.js?v=35"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -951,9 +951,16 @@ function 불러오기(){
          그러면 기업정보함에서 status 를 바꾸거나 담당자에 left 를 켜면 저절로 빠진다 —
          뉴스레터에서 따로 지울 일이 없다. 한 곳만 고치면 된다. */
     db.ref('data/companies/v').once('value').catch(()=>({val:()=>({})})),
-    db.ref('config/mailBlock').once('value').catch(()=>({val:()=>({})})),
+    /* ★ 공용 수신거부 — 기업정보함이 «쓰는 그 자리»를 읽는다 (2026-09-20 바로잡음)
+         여기는 `pucards/config/mailBlock` 이다. 예전에는 맨 위 `config/mailBlock`
+         을 읽고 있었는데 ① 그런 자리는 아예 없고 ② 규칙에도 없어 permission_denied
+         였다. 아래 `.catch` 가 그것을 조용히 `{}` 로 바꿔 «막은 사람이 없다»처럼
+         보이게 했다 — 아무도 막힌 줄 몰랐다(지금 명단이 비어 있어 실제 피해는 없다).
+       ⚠ 열쇠 모양도 기업정보함과 맞춰야 한다 — 거기는 점을 쉼표로 바꿔 담는다
+         (`emailKey`: a@b.com → a@b,com). 거르개(명단다듬기)가 그 모양도 본다. */
+    db.ref('pucards/config/mailBlock').once('value').catch(()=>({val:()=>({})})),
     /* 뉴스레터만의 수신거부 — 「뉴스레터는 그만」이라 한 곳도 자료 발송은 받아야 한다.
-       그래서 공용 수신거부(config/mailBlock)와 «따로» 둔다. 둘을 합쳐서 본다. */
+       그래서 공용 수신거부와 «따로» 둔다. 둘을 합쳐서 본다. */
     db.ref('newsletter/blocked').once('value').catch(()=>({val:()=>({})})),
     /* 자동으로 담을 밑감 — 매일 07:00 이 모아 두는 자리 */
     db.ref('homepage/newsBrief/모음').once('value').catch(()=>({val:()=>({})})),
@@ -1080,7 +1087,7 @@ async function 판올리기(열쇠, 본판){
 /* 서버에 있는 것으로 이 회차를 다시 읽는다.
    ⚠ 회차를 통째로 읽지 않는다 — 안에 전문과 받는 분들 주소가 있다. */
 async function 회차다시읽기(열쇠){
-  const 칸 = ['회차','상태','안','우리글','범위','지역뉴스','판'];
+  const 칸 = ['회차','상태','안','우리글','우리글초안','범위','지역뉴스','판'];
   const 값들 = await Promise.all(칸.map(k => db.ref('newsletter/issues/' + 열쇠 + '/' + k).once('value')));
   const d = { 열쇠: 열쇠 };
   칸.forEach((k, i) => { const v = 값들[i].val(); if(v != null) d[k] = v; });
@@ -1112,6 +1119,9 @@ async function 회차저장(자료){
   await db.ref('newsletter/issues/' + 자료.열쇠).update({
     회차: 자료.회차, 상태: 자료.상태 || '초안', 안: 자료.안 || {},
     우리글: 자료.우리글 || '',
+    /* ★ 「이 한마디는 기계가 쓴 초안입니다」를 새로 고쳐도 잊지 않게 함께 적는다.
+         대표께서 한 글자라도 고치시면 우리글과 달라져 그 표가 저절로 사라진다. */
+    우리글초안: 자료.우리글초안 || '',
     범위: 자료.범위 || App.설정.범위 || '자문중',
     판: 새판,
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
@@ -1238,7 +1248,10 @@ function 이번회차화면(){
   const d = 지금회차();
   const r = 명단셈();
   const 갈수있나 = Core.보낼수있나(d, r.셈);
-  const 상태딱지 = { 초안:'b-draft', 시험:'b-test', 발송:'b-sent' }[d.상태] || 'b-draft';
+  /* ★ 시험 발송은 «연습 표본이 있어도» 눌러야 한다 — 연습은 시험으로 하는 것이다.
+       진짜 발송·자동발송 예약만 연습에 걸린다(Core.보낼수있나 주석 참고). */
+  const 시험갈수있나 = Core.보낼수있나(d, r.셈, { 시험: true });
+  const 상태딱지 ={ 초안:'b-draft', 시험:'b-test', 발송:'b-sent' }[d.상태] || 'b-draft';
   /* ★ 「실린 것」은 «ㅁ 를 켠 것»이다 (대표 지시 2026-09-08).
        담긴 수를 세면 ㅁ 를 다 꺼 놓고도 「15건 실렸다」로 보인다 — 그러면
        빈 뉴스레터가 그 숫자를 믿고 나간다. 담긴 수는 옆에 함께 적는다. */
@@ -1279,13 +1292,18 @@ function 이번회차화면(){
       ${App.isAdmin?'':'disabled'}>↻ 전문 다시 담기</button>`}
     <!-- ★ 「나에게」가 아니다 (대표 지시 2026-09-13) — 보낼 때 주소를 골라 넣는다.
          법인 메일에서 «개인 메일»로 보내 봐야 진짜로 가는지 안다. -->
-    <button class="btn warn" onclick="시험발송()" ${갈수있나.ok?'':'disabled'}
+    <button class="btn warn" onclick="시험발송()" ${시험갈수있나.ok?'':'disabled'}
       title="받을 주소를 넣어 한 통만 보냅니다 — 거래처에는 나가지 않습니다">✉ 시험 발송</button>
     <!-- ★ 확정본이 낡았는지를 «이 단추 한 줄»로 말한다 (2026-09-13).
-         ⚠ 셋째 줄을 만들지 않는다 — 머리가 늘어나면 대표가 같은 것을 보려고 더 굴린다. -->
-    <button class="btn ${예약.꼴}" onclick="자동발송준비()" title="${esc(예약.곁||'')}"
+         ⚠ 셋째 줄을 만들지 않는다 — 머리가 늘어나면 대표가 같은 것을 보려고 더 굴린다.
+         ⚠⚠ 못 누르는 단추에는 «왜»를 붙인다 — 연습 표본 때문에 잠긴 것을
+           말해 주지 않으면 대표께서 「고장났다」로 보신다. -->
+    <button class="btn ${예약.꼴}" onclick="자동발송준비()"
+      title="${esc(갈수있나.ok ? (예약.곁||'') : 갈수있나.까닭)}"
       ${갈수있나.ok && App.isAdmin?'':'disabled'}>${esc(예약.글)}</button>
-    <button class="btn pri" onclick="진짜보내기()" ${갈수있나.ok && App.isAdmin?'':'disabled'}>
+    <button class="btn pri" onclick="진짜보내기()"
+      title="${esc(갈수있나.ok ? '' : 갈수있나.까닭)}"
+      ${갈수있나.ok && App.isAdmin?'':'disabled'}>
       📨 ${App.유형 ? esc(App.유형)+' ' : ''}${r.셈.보낼곳.toLocaleString()}곳에 보내기</button>
   </div>
   <!-- ⚠ 「아직 못 보냅니다」 알림은 오른쪽 «요약»으로 옮겼다 (대표 지시 2026-09-08
@@ -1402,14 +1420,17 @@ function 편지요약(d, r, 갈수있나){
       + '판례 한 건을 ✕ 로 빼시면 들어갑니다.');
   if(!모.이회차)
     경고.push('<b>이 회차에 드는 기사가 없어</b> 가장 최근 것으로 채웠습니다.');
-  /* ★ 기사는 «우리 말»을 써야 나간다 — 몇 건을 썼는지 여기서 먼저 말한다.
-       안 그러면 「여덟 건 담았는데 편지에 하나도 없다」를 편지에서 찾게 된다. */
+  /* ★ 2026-09-20 부터는 «안 써도 나간다»(원문 제목·매체·링크로) — 대표 지시
+       「검토필요없이 자동으로 원문붙여서 넣자」. 그래서 이 알림도 「안 나갑니다」가
+       아니라 «무엇으로 나가는지»를 말해야 한다. 안 그러면 있지도 않은 문제를
+       고치려 하시게 된다(2026-09-14 「내려받기 표시」 때와 같은 실수). */
   {
     const 기 = (d.안.news || []).filter(x => x && x.갈래 === '기사' && Core.실릴까(x));
     const 쓴것 = 기.filter(x => String(x.우리말||'').trim()).length;
     if(기.length && 쓴것 < 기.length)
       경고.push(`<b>주간노동뉴스 ${기.length}건 가운데 ${쓴것}건만 «우리 말»로 썼습니다</b> — `
-        + `나머지 ${기.length - 쓴것}건은 편지에 안 나갑니다. 줄을 눌러 쓰시면 실립니다.`);
+        + `나머지 ${기.length - 쓴것}건은 원문 제목·매체·링크 그대로 나갑니다. `
+        + `줄을 눌러 쓰시면 그 글로 바뀝니다.`);
   }
   if(첨.넘친것.length)
     경고.push(`<b>한 통 한도(${Core.크기글(첨.한도)})를 넘어 «못 붙는» 첨부 ${첨.넘친것.length}개</b> — `
@@ -1695,14 +1716,26 @@ function 꼭지탭줄(d){
 /* ══════ 보고 있는 꼭지 하나 ══════
    ⚠ 빈 꼭지에는 «왜 비는지»를 그린다(빈꼭지알림) — 탭이 0 인데 칸이 그냥 비어 있으면
      담는 길을 못 찾는다. */
+/* 우리 말은 없고 AI 초안만 있는 기사가 몇 건인가 — 한 번에 옮길 거리 */
+function 옮길초안수(것들){
+  return (것들 || []).filter(function(x){
+    return x && !String(x.우리말||'').trim() && String(x.AI초안||'').trim();
+  }).length;
+}
 function 꼭지칸하나(d){
   const g = Core.꼭지찾기(App.보는꼭지) || Core.꼭지들[0];
   const 것 = d.안[g.키] || [];
   const 셈 = Core.실림셈(d.안, d.우리글).표[g.키] || { 실림:0, 담김:0 };
+  /* ★ 지금 칸에 있는 글이 «기계가 쓴 초안 그대로»인가 (대표 지시 2026-09-20).
+       한 글자라도 고치시면 우리글초안과 달라져 이 표가 저절로 사라진다. */
+  const 한마디초안인가 = !!String(d.우리글초안||'').trim()
+    && String(d.우리글||'').trim() === String(d.우리글초안||'').trim();
   const 글칸 = g.갈래==='우리글' ? `<div class="pad" style="border-bottom:1px solid var(--line)">
      <textarea id="myWrite" class="grow" rows="4" oninput="우리글바뀜(this.value)"
-       placeholder="이번 주 한마디 — 이 칸만 우리가 씁니다.">${esc(d.우리글||'')}</textarea>
-     <div class="hint" style="margin-top:6px">나머지 세 꼭지도 <b>우리가 쓴 글</b>로 나갑니다.
+       placeholder="이번 주 한마디 — 비워 두면 채울 때 AI 가 초안을 지어 놓습니다.">${esc(d.우리글||'')}</textarea>
+     <div class="hint" style="margin-top:6px">
+       ${한마디초안인가 ? '<b style="color:var(--warn)">✨ AI 가 지은 초안입니다 — 읽어 보시고 고쳐 주세요.</b><br>' : ''}
+       나머지 세 꼭지도 <b>우리가 쓴 글</b>로 나갑니다.
        기사 본문·제목은 남의 글이라 옮기지 않고, <b>어느 매체를 참고했는지만</b> 밝힙니다.</div></div>` : '';
   const 줄 = 것.length ? 것.map(function(x,i){
     const 실 = Core.실릴까(x);
@@ -1713,10 +1746,13 @@ function 꼭지칸하나(d){
     const 기사인가 = x && x.갈래 === '기사';
     const 내글 = String((x && x.우리말) || '').trim();
     const AI글 = String((x && x.AI초안) || '').trim();
+    /* ★ 2026-09-20 대표 지시로 «안 써도 실린다» — 딱지도 그것을 말해야 한다.
+         「안 실림」이라 적어 두면 실제로는 나가는데 안 나가는 줄 아시고,
+         있지도 않은 일을 고치려 하신다. */
     const 딱지 = !기사인가 ? ''
       : (내글 ? '<span class="wtag">✎ 우리 말 있음</span>'
-              : (AI글 ? '<span class="wtag no">✨ AI 초안 — 검토 필요</span>'
-                       : '<span class="wtag no">✎ 아직 안 씀 — 안 실림</span>'));
+              : (AI글 ? '<span class="wtag no">✨ AI 초안 — 옮기면 이 글이 나갑니다</span>'
+                       : '<span class="wtag no">↗ 원문 그대로 나갑니다 — 제목·매체·링크</span>'));
     return `<div class="item${실?'':' off'}">
       <input type="checkbox" class="ck" ${실?'checked':''}
         onchange="실음바꾸기('${g.키}',${i})" onclick="event.stopPropagation()"
@@ -1738,6 +1774,14 @@ function 꼭지칸하나(d){
      <span class="sp"></span>
      ${g.키==='news' && 것.length ? `<button class="mini" onclick="AI초안짓기()"
        ${App.AI중?'disabled':''}>✨ ${App.AI중?'AI 작성 중…':'AI '+것.filter(x=>!String(x.우리말||'').trim()).length+'건 초안'}</button>` : ''}
+     ${/* ★ 초안을 «한 번에» 우리 말로 (대표 지시 2026-09-20 「노동뉴스는 사라졌다」).
+            다섯 건이면 다섯 번 눌러야 하던 것을 한 번으로. 묻고 나서 옮긴다. */''}
+     ${g.키==='news' && 옮길초안수(것) ? `<button class="mini" onclick="초안모두우리말()"
+       title="AI 초안을 그대로 우리 말로 옮깁니다 — 옮기면 편지에 실립니다"
+       style="border-color:#fcd34d;color:var(--warn)">✓ 초안 ${옮길초안수(것)}건을 우리 말로</button>` : ''}
+     ${/* ★ 한마디는 «우리글 꼭지»에서 직접 지을 수 있어야 한다 — 채우기를 다시 누르지 않고 */''}
+     ${g.갈래==='우리글' && !String(d.우리글||'').trim() ? `<button class="mini" onclick="한마디초안짓기()"
+       ${App.AI중?'disabled':''}>✨ ${App.AI중?'AI 작성 중…':'한마디 초안'}</button>` : ''}
      ${것.length ? `<button class="mini" onclick="꼭지모두('${g.키}',true)">☑ 모두 싣기</button>
      <button class="mini" onclick="꼭지모두('${g.키}',false)">☐ 모두 빼기</button>` : ''}
      <button class="mini" onclick="손으로담기('${g.키}')">＋ 손으로 담기</button>
@@ -1804,6 +1848,99 @@ async function AI초안짓기(){
   }catch(e){
     toast('AI 초안을 만들지 못했습니다: ' + ((e&&e.message)||e), 12000);
   }finally{ App.AI중=false; render(); }
+}
+
+/* ★★★ 「이번 주 한마디」를 «저절로» 짓는다 (대표 지시 2026-09-20
+     「이번주 한마디도 자동으로 작성되게 해야되는데 왜 안되나 다시 확인해봐라」)
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠ 확인해 보니 «안 되던» 것이 아니라 «없던» 것이었다 — 한마디를 짓는 자리가
+     아예 없었다. AI 단추는 기사에만 있었다.
+
+   ★★ 이 글은 «이 회차에 담긴 것»만 보고 쓴다. 바깥 사실을 끌어오지 않는다 —
+     법인 이름으로 143곳에 나가는 글이라, 지어낸 한 문장이 우리 의견으로 읽힌다.
+     제목과 «우리가 쓴 말»만 보여 준다(남의 기사 본문은 애초에 담겨 있지도 않다).
+   ⚠⚠ 이미 쓰신 글은 «절대 덮지 않는다». 저절로 도는 것이 사람 글을 지우면
+     공들여 쓰신 한마디가 소리 없이 사라지고 되돌릴 길이 없다.
+   ★ 지은 글은 우리글초안 에도 적어 둔다 — 화면이 「이건 기계가 쓴 초안입니다」를
+     말할 수 있어야, 읽어 보지 않고 내보내는 일이 안 생긴다. */
+async function 한마디초안짓기(조용히){
+  const d = 지금회차();
+  if(String(d.우리글||'').trim()){
+    if(!조용히) toast('이미 쓰신 한마디가 있습니다 — 덮어쓰지 않습니다', 7000);
+    return false;                      /* ⚠⚠ 사람 글을 지우지 않는다 */
+  }
+  if(!window.PuAiCall){
+    if(!조용히) toast('AI 호출기를 불러오지 못했습니다', 8000);
+    return false;
+  }
+  /* 담긴 것에서 «우리가 아는 만큼»만 뽑는다 — 꼭지 이름 + 한 줄 */
+  const 거리 = [];
+  Core.꼭지들.forEach(function(g){
+    if(g.갈래 === '우리글') return;
+    (d.안[g.키] || []).forEach(function(x){
+      if(!x) return;
+      const t = String(x.우리말 || x.한줄 || x.제목 || '').replace(/\s+/g,' ').trim();
+      if(t) 거리.push({ 꼭지:g.이름, 글:t.slice(0,180) });
+    });
+  });
+  if(거리.length < 2){
+    if(!조용히) toast('담긴 것이 모자라 한마디를 지을 수 없습니다 — 먼저 채워 주세요', 8000);
+    return false;
+  }
+  App.AI중 = true; if(!조용히) render();
+  try{
+    const 지시 = '당신은 푸른노무법인의 뉴스레터 편집자입니다. 아래는 이번 주 뉴스레터에 '
+      + '실릴 항목들입니다. 이것만 근거로 「이번 주 한마디」를 한국어로 쓰세요.\n'
+      + '· 3~4문장, 존댓말. 사업주와 인사담당자에게 건네는 말투.\n'
+      + '· 이번 주 항목들을 관통하는 흐름 한 가지를 짚고, 사업장에서 확인할 것을 권합니다.\n'
+      + '· 아래 목록에 없는 숫자·날짜·법령·전망을 한 글자도 지어내지 마세요.\n'
+      + '· 특정 기사 제목을 그대로 옮기지 말고, 흐름으로 묶어 쓰세요.\n'
+      + '· 인사말(안녕하세요)과 맺음말(감사합니다)은 넣지 마세요.\n'
+      + '다른 설명 없이 «본문만» 답하세요.\n\n'
+      + JSON.stringify(거리);
+    const 답 = await PuAiCall.ask([{ text:지시 }], {
+      auth:firebase.auth(), fetch:window.fetch.bind(window), app:'news',
+      generationConfig:{ temperature:0.2, maxOutputTokens:1024 }
+    });
+    const 글 = String(PuAiCall.textOf(답) || '').trim().slice(0, 1200);
+    if(!글) throw new Error('AI 가 빈 답을 주었습니다');
+    /* ⚠ 그 사이 대표께서 쓰셨을 수 있다 — 쓰기 «직전»에 한 번 더 본다 */
+    const 이제 = 지금회차();
+    if(String(이제.우리글||'').trim()){
+      if(!조용히) toast('그 사이 한마디를 쓰셨습니다 — 덮어쓰지 않았습니다', 8000);
+      return false;
+    }
+    이제.우리글 = 글;
+    이제.우리글초안 = 글;              /* 「이건 기계가 쓴 것」을 화면이 알 수 있게 */
+    if(!(await 회차저장(이제))) return false;
+    if(!조용히) toast('✨ 이번 주 한마디 초안을 지었습니다 — 읽어 보시고 고쳐 주세요', 12000);
+    return true;
+  }catch(e){
+    if(!조용히) toast('한마디를 짓지 못했습니다: ' + ((e&&e.message)||e), 12000);
+    return false;
+  }finally{ App.AI중 = false; if(!조용히) render(); }
+}
+
+/* ★★ AI 초안을 «한 번에» 우리 말로 옮긴다 (대표 지시 2026-09-20 「노동뉴스는 사라졌다」)
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠ 2026-09-20 실측: 다섯 건이 담겼는데 «실릴 것 0» 이었다. 기사는 우리 말이 있어야
+     편지에 나가는데 다섯 건 다 비어 있어, 주간노동뉴스가 통째로 빠졌다.
+   ⚠⚠ 그렇다고 초안을 «저절로» 우리 말로 만들지는 않는다. 그러면 사람이 한 번도
+     안 읽은 문장이 법인 이름으로 143곳에 나간다 — 그 선은 넘지 않는다.
+   ★ 대신 손을 «한 번»으로 줄인다. 다섯 번 누르던 것을 한 번에, 묻고 나서. */
+async function 초안모두우리말(){
+  const d = 지금회차(), 것 = d.안.news || [];
+  const 대상 = 것.filter(function(x){
+    return x && !String(x.우리말||'').trim() && String(x.AI초안||'').trim();
+  });
+  if(!대상.length) return toast('옮길 AI 초안이 없습니다 — 먼저 ✨ 초안을 만들어 주세요', 8000);
+  if(!confirm('AI 초안 ' + 대상.length + '건을 «우리 말»로 옮깁니다.\n\n'
+    + '⚠ 옮기면 그대로 편지에 실립니다. 법인 이름으로 나가는 글이니\n'
+    + '보내시기 전에 「크게 보기」로 한 번 읽어 주세요.\n\n옮길까요?')) return;
+  대상.forEach(function(x){ x.우리말 = x.AI초안; });
+  if(!(await 회차저장(d))) return;
+  render();
+  toast('✓ ' + 대상.length + '건을 우리 말로 옮겼습니다 — 「크게 보기」로 꼭 읽어 주세요', 14000);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2364,6 +2501,14 @@ function 자동담기(){
       toast(!n ? '이 주치에 모아 둔 것이 없습니다 — 붙여넣어 담거나 손으로 담아 주세요'
            : (앞 ? `⟳ 이미 담긴 ${앞}건은 그대로 두고 ${더}건을 더했습니다 (모두 ${n}건)${찬말}${밀린말}`
                  : `⟳ ${n}건을 담았습니다 — 필요 없는 것은 ✕ 로 빼세요${밀린말}`), 15000);
+      /* ★★ 담은 뒤 「이번 주 한마디」를 «저절로» 짓는다 (대표 지시 2026-09-20).
+         ⚠ 담기는 이미 끝났다 — 한마디가 실패해도 담은 것은 그대로다. 그래서 뒤에 둔다.
+         ⚠ 이미 쓰신 글이 있으면 한마디초안짓기 가 스스로 물러난다(덮지 않는다).
+         ⚠ 조용히 돈다 — 담기 알림 위에 AI 알림이 겹쳐 뜨면 담긴 결과를 못 읽으신다.
+           다 지으면 render() 로 칸에 나타나고, 그 옆에 「AI 초안」 표가 붙는다. */
+      if(n && !String(d.우리글||'').trim()){
+        한마디초안짓기(true).then(function(됐나){ if(됐나) render(); });
+      }
     })
     .catch(e=>toast('담지 못했습니다: ' + ((e&&e.message)||''), 7000));
 }
@@ -2397,7 +2542,15 @@ function 지금편지(미리보기, 받는지역){
        지난 회차에는 안 넘긴다(아래 회차크게·지난미리보기) — 그때 나간 그대로여야 한다. */
   return Tpl.편지짓기(Object.assign({}, d, { 범위: App.설정.범위, 더한분들: App.더한분들 }),
                       App.설정, { 미리보기: 미리보기 === true, 지역: 받는지역 || '',
-                                   요약: true });
+                                   /* ★★★ 되돌렸다 (대표 지시 2026-09-20
+                                        「메일에서 받을때 화면을 캡쳐2로 해라 그게 더 안정적이다」).
+                                      ⚠ 요약판은 자료를 받으려면 «웹으로 한 번 더» 나가야 했다.
+                                        메일이 링크를 막거나 손님이 안 누르면 그대로 끝이다.
+                                        전문판은 내려받기 단추까지 편지 «안»에 있다.
+                                      ⚠⚠ 넓이는 «안 넘긴다» — 메일은 700 이라야 한다.
+                                        웹 폭(980)으로 지으면 아웃룩에서 표가 삐져나간다.
+                                        전문판은 폭을 보고 스스로 둘씩/셋씩을 가른다. */
+                                   요약: false });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2419,7 +2572,10 @@ async function 전문담기(열쇠){
     App.설정, { 미리보기: true, 지역: '전국', 요약: false, 넓이: Tpl.전문넓이 });
   if(!전) return false;
   await db.ref('newsletter/issues/' + 열쇠).update({
-    전문: 전.서식, 제목: 전.제목, 꼴: '요약', 전문담은때: Date.now()
+    /* ⚠ 꼴 은 「이 회차가 어떤 모습으로 나갔나」의 기록이다. 2026-09-20 부터 메일이
+         전문판이므로 여기도 '전문' 이라야, 나중에 다시 그릴 때 보낸 것과 같아진다.
+         지난 회차에 적힌 '요약' 은 그대로 둔다 — 그때는 정말 요약으로 나갔다. */
+    전문: 전.서식, 제목: 전.제목, 꼴: '전문', 전문담은때: Date.now()
   });
   return true;
 }
@@ -4139,7 +4295,7 @@ function 설정화면(){
       </div>
       <div class="w2">
        <label class="f">서산지사 주소</label>
-       <input type="text" id="cfgSeosanAddr" value="${esc(s.서산주소||'충남 서산시 남부순환로 1035, 오성빌딩')}" onchange="설정저장()">
+       <input type="text" id="cfgSeosanAddr" value="${esc(s.서산주소||'충남 서산시 쌍연남1로 37, 썬샤인빌딩 2층')}" onchange="설정저장()">
       </div>
       <div class="w2">
        <label class="f">꼬리 한 줄</label>

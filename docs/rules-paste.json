@@ -231,6 +231,22 @@
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
       },
+      "security_perms": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
+      },
+      "setting_google_vision_api_key": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      },
+      "gcal_mail_sid": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
+      },
+      "ieum_notes": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
+      },
       "cal_view": {
         "$uid": {
           ".read": "auth != null && auth.uid == $uid",
@@ -1190,6 +1206,7 @@
     },
     "esign": {
       "cases": {
+        ".read": "auth != null && auth.token.email != null",
         "$caseId": {
           "meta": {
             ".read": "auth != null",
@@ -1572,6 +1589,18 @@
           }
         }
       }
+    },
+    "login_events": {
+      ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
+    },
+    "login_devices": {
+      ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
+    },
+    "login_countries": {
+      ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
+    },
+    "login_fail_burst": {
+      ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
     }
   }
 }
