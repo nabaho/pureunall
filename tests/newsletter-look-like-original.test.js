@@ -36,7 +36,18 @@ test('★★ 차림표는 «짧은 이름»으로 «한 줄»이다 — 긴 꼭�
   const h = 편지({ news: [{ 갈래: '기사', 제목: 'ㄱ', 우리말: '우리 말', 링크: 'https://n.kr/1' }] });
   const i = h.indexOf('data-stick="1"');
   const 차림 = h.slice(i, h.indexOf('</table>', i));
-  C.꼭지들.forEach((g) => assert.ok(차림.indexOf(g.차림표이름) >= 0, '차림표에 «' + g.차림표이름 + '»이 없다'));
+  /* ⚠ 2026-09-23 부터 차림표는 «실린 꼭지»만 부른다(tests/newsletter-letter 에 까닭).
+       그래서 「넷 다 있는가」가 아니라 «실린 것이 짧은 이름으로 서 있는가»를 본다. */
+  /* ★ 「무엇이 실렸나」를 견본에서 짐작하지 않고 «자리표»에서 읽는다 —
+       실제로 그려진 꼭지에만 id="g-…" 가 붙는다. 스스로 따라오는 잣대다. */
+  const 실린것 = (h.match(/id="g-([a-z]+)"/g) || [])
+    .map((s) => /id="g-([a-z]+)"/.exec(s)[1]);
+  assert.ok(실린것.length, '실린 꼭지가 하나는 있어야 한다');
+  C.꼭지들.forEach((g) => {
+    const 서있나 = 차림.indexOf(g.차림표이름) >= 0;
+    assert.strictEqual(서있나, 실린것.indexOf(g.키) >= 0,
+      '«' + g.차림표이름 + '» — 차림표와 실제 꼭지가 어긋난다(누르면 엉뚱한 데로 내려앉는다)');
+  });
   assert.match(차림, /white-space:nowrap/, '★★ 한 줄로 못 박지 않으면 좁은 폰에서 또 꺾인다');
 });
 

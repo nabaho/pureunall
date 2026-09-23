@@ -43,8 +43,8 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=42"></script>
-<script src="js/pu-news-tpl.js?v=36"></script>
+<script src="js/pu-news-core.js?v=43"></script>
+<script src="js/pu-news-tpl.js?v=37"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -1032,7 +1032,9 @@ function 지금회차(){
   const 회차한벌 = (있는것 && 있는것.회차) || (열쇠 === 회.열쇠 ? 회 : 회차로부터(열쇠));
   return Object.assign({
     열쇠: 열쇠, 회차: 회차한벌, 상태: '초안',
-    안: { news:[], policy:[], case:[], hr:[] }, 우리글: '', 지역뉴스: []
+    /* ⚠ 꼭지 이름을 손으로 적지 않는다(2026-09-23) — 꼭지를 더하면 그 꼭지만
+         «담을 자리 없이» 조용히 사라진다. 목록은 한 곳(Core.꼭지들)에서 온다. */
+    안: Core.꼭지들.reduce((a,g)=>{ a[g.키]=[]; return a; }, {}), 우리글: '', 지역뉴스: []
   }, 있는것 || {});
 }
 /* 열쇠(2026-08-w5)에서 회차 한 벌을 되살린다 — 지난 회차를 열 때 쓴다 */
@@ -2219,11 +2221,20 @@ function 빼기(칸, i){
   const d = 지금회차(); (d.안[칸]||[]).splice(i,1);
   회차저장(d).then(render);
 }
+/* ⚠ 예전에는 «늘 기사»로 담았다(2026-09-23 고침). 판례 꼭지에 손으로 담으면
+     판례 카드가 아니라 기사 한 줄로 그려져, 사건번호도 「전문 보기」도 안 나왔다.
+   ★ 꼭지의 «갈래»를 따른다 — 특별 판례 꼭지가 생기면서 드러난 자리다. */
 function 손으로담기(칸){
+  const g = Core.꼭지찾기(칸) || {};
+  const 판례냐 = g.갈래 === '판례';
   const 제목 = prompt('제목을 적어 주세요'); if(!제목) return;
-  const 링크 = prompt('원문 링크 (없으면 비워 두세요)') || '';
+  const 인용 = 판례냐 ? (prompt('사건번호 (예: 대법원 2026. 8. 27. 선고 2025다301142)') || '') : '';
+  const 링크 = prompt(판례냐 ? '법제처 링크 (있으면 「전문 보기」가 열립니다)'
+                             : '원문 링크 (없으면 비워 두세요)') || '';
   const d = 지금회차();
-  (d.안[칸] = d.안[칸] || []).push({ 갈래:'기사', 제목:제목.slice(0,200), 링크:링크, 언론사:'' });
+  (d.안[칸] = d.안[칸] || []).push(판례냐
+    ? { 갈래:'판례', 딱지:'[판례]', 제목:제목.slice(0,200), 인용:인용.slice(0,120), 링크:링크 }
+    : { 갈래:'기사', 제목:제목.slice(0,200), 링크:링크, 언론사:'' });
   회차저장(d).then(render);
 }
 
