@@ -44,7 +44,7 @@
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
 <script src="js/pu-news-core.js?v=42"></script>
-<script src="js/pu-news-tpl.js?v=35"></script>
+<script src="js/pu-news-tpl.js?v=36"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -1087,7 +1087,7 @@ async function 판올리기(열쇠, 본판){
 /* 서버에 있는 것으로 이 회차를 다시 읽는다.
    ⚠ 회차를 통째로 읽지 않는다 — 안에 전문과 받는 분들 주소가 있다. */
 async function 회차다시읽기(열쇠){
-  const 칸 = ['회차','상태','안','우리글','우리글초안','범위','지역뉴스','판'];
+  const 칸 = ['회차','상태','안','우리글','우리글초안','인사','범위','지역뉴스','판'];
   const 값들 = await Promise.all(칸.map(k => db.ref('newsletter/issues/' + 열쇠 + '/' + k).once('value')));
   const d = { 열쇠: 열쇠 };
   칸.forEach((k, i) => { const v = 값들[i].val(); if(v != null) d[k] = v; });
@@ -1122,6 +1122,9 @@ async function 회차저장(자료){
     /* ★ 「이 한마디는 기계가 쓴 초안입니다」를 새로 고쳐도 잊지 않게 함께 적는다.
          대표께서 한 글자라도 고치시면 우리글과 달라져 그 표가 저절로 사라진다. */
     우리글초안: 자료.우리글초안 || '',
+    /* ★ 명절 인사 — 부정기 칸(2026-09-23). 안 쓴 회차에는 빈 것이 담긴다.
+         편지 쪽이 «빈 것을 아예 안 그리므로» 빈 값이 담겨도 해가 없다. */
+    인사: 자료.인사 || {},
     범위: 자료.범위 || App.설정.범위 || '자문중',
     판: 새판,
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
@@ -1336,6 +1339,11 @@ function 이번회차화면(){
     <button class="btn ${App.길==='region'?'pri':''}" onclick="길바꾸기('region')">
       📍 지역뉴스 <b>${(d.지역뉴스||[]).length||''}</b>건</button>
     <span class="sep"></span>
+    ${/* ★ 인사 — 부정기라 «담겼을 때만» 눈에 띄게 한다(대표 지시 2026-09-23).
+         늘 굵게 두면 마흔여덟 주 동안 「안 쓴 칸」이 도드라진다. */''}
+    <button class="btn ${App.길==='greet'?'pri':''}" onclick="길바꾸기('greet')"
+      >🎁 명절 인사${인사담겼나(d) ? ' <b>●</b>' : ''}</button>
+    <span class="sep"></span>
     <button class="btn" onclick="연습채우기()">🧪 연습용 샘플</button>
     <span class="tail">ⓘ 제목·원문 링크만 싣습니다 ·
       <a onclick="길바꾸기('fwd')">받은 것 그대로 전달</a></span>
@@ -1350,6 +1358,37 @@ function 이번회차화면(){
      ⚠ 안내를 «지운» 것이 아니다 — 위 띠의 ⓘ 안으로 옮겼다.
      ⚠ 「이 회차에 드는 기사가 없다」는 «그때그때의 상태»라 ⓘ(늘 같은 글)에 안 맞는다 —
        오른쪽 요약의 경고 줄로 옮겼다. 거기가 「무엇이 이상한가」를 모아 두는 자리다. -->
+
+  ${/* ★ 명절 인사 — 부정기 칸 (대표 지시 2026-09-23 「추석 설 명절 인사등을 …
+        보내고 싶은데 이부분도 시스템 만들수 있나?」)
+     ⚠ 비워 두면 편지에서 «통째로 사라진다» — 안내에 그 말을 꼭 적는다.
+       안 적으면 「한 번 쓰면 매주 나가나?」를 물어보셔야 한다. */''}
+  ${App.길==='greet' ? `
+   <div class="box" style="margin-top:12px">
+    <h3>명절 인사 — 이번 회차에만 나갑니다</h3>
+    <div class="pad">
+     <label class="f">인사말 제목</label>
+     <input type="text" id="greetTitle" value="${esc((d.인사||{}).제목||'')}"
+       placeholder="예) 풍성한 한가위 되십시오" oninput="인사바뀜()">
+     <label class="f" style="margin-top:10px">인사말</label>
+     <textarea id="greetBody" rows="3" oninput="인사바뀜()"
+       placeholder="예) 올 한 해도 함께해 주셔서 고맙습니다.">${esc((d.인사||{}).글||'')}</textarea>
+     <label class="f" style="margin-top:10px">드림 (없으면 비워 두세요)</label>
+     <input type="text" id="greetSign" value="${esc((d.인사||{}).서명||'')}"
+       placeholder="예) 푸른노무법인 대표노무사 권형하 드림" oninput="인사바뀜()">
+     <label class="f" style="margin-top:10px">그림 주소</label>
+     <input type="text" id="greetImg" value="${esc((d.인사||{}).그림||'')}"
+       placeholder="https://nabaho.github.io/pureunall/img/…" oninput="인사바뀜()">
+     <label class="f" style="margin-top:10px">움직이는 화면 주소 <span style="font-weight:400">(없으면 비워 두세요)</span></label>
+     <input type="text" id="greetShow" value="${esc((d.인사||{}).움직임||'')}"
+       placeholder="비워 두면 ▶ 단추가 안 나옵니다" oninput="인사바뀜()">
+     <div class="hint">
+       ⚠ <b>비워 두면 이 칸은 편지에서 통째로 사라집니다</b> — 다음 주 편지는 평소 그대로 나갑니다.<br>
+       ⚠ 그림은 <b>우리 주소</b>라야 보입니다. 남의 서버 그림은 열람 시각이 새어 나가 막아 두었습니다.<br>
+       ⚠ <b>메일 안에서는 영상이 안 돕니다</b> — 다음메일·아웃룩이 못 틉니다.
+         ▶ 를 누르면 우리 화면으로 가서 거기서 움직입니다.
+     </div>
+    </div></div>` : ''}
 
   ${App.길==='paste' ? `
    <div class="box" style="margin-top:12px">
@@ -2140,6 +2179,26 @@ function 길바꾸기(v){
      주간노동뉴스와 판례가 빈 채로 나갔다.
    ★ 누를 때마다 담는다. «합쳐 담기»라 두 번 눌러도 늘지 않고 지워지지도 않는다. */
   if(v === 'auto') 자동담기();
+}
+
+/* 인사가 담겼나 — 「명절 인사」 단추에 ● 을 붙일지 정한다.
+   ⚠ 서식 쪽(인사칸)과 «같은 잣대»다: 그림도 제목도 글도 없으면 안 담긴 것이다.
+     서명만 있는 것은 «안 담긴 것»으로 친다 — 편지에도 안 나온다. */
+function 인사담겼나(d){
+  const x = (d||{}).인사 || {};
+  return !!(String(x.그림||'').trim() || String(x.제목||'').trim() || String(x.글||'').trim());
+}
+
+/* ⚠ 다섯 칸을 «한꺼번에» 읽어 담는다. 칸마다 따로 저장하면 빨리 치실 때
+     앞 칸 값이 담기기 전에 다음 저장이 덮어 옛 값이 되살아난다. */
+function 인사바뀜(){
+  const d = 지금회차();
+  const g = (id)=>{ const e = document.getElementById(id); return e ? e.value : ''; };
+  d.인사 = { 제목:g('greetTitle'), 글:g('greetBody'), 서명:g('greetSign'),
+             그림:g('greetImg'), 움직임:g('greetShow') };
+  App.회차들[d.열쇠] = d;
+  clearTimeout(인사바뀜._t);
+  인사바뀜._t = setTimeout(()=>{ 회차저장(d).then(render).catch(()=>{}); }, 700);
 }
 
 function 우리글바뀜(v){
