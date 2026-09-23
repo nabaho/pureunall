@@ -805,8 +805,101 @@ exports.sendBulkMail = functions
         return;
       }
     }
+    /* ══ 안내문 — 뉴스레터가 아닌 «한 건 집중» 편지 (대표 지시 2026-09-23) ══════════
+       「뉴스레터 이외에 비정기적인 자료를 푸른노무법인 이름으로 … 집중해서 확인하라는
+        의미로 보내고 싶은데」
+       ★ 회차(주차)와 따로 산다 — newsletter/notices/{번호}. 주차 목록·미열람 셈에 안 섞인다.
+       ⚠⚠ 두 번 보내기를 «서버에서» 막는다 — 뉴스레터와 같은 잠금(NL)이다.
+         143곳에 두 통씩 나가면 되돌릴 수 없다. 화면이 막는 것은 한 PC 안에서뿐이다.
+       ⚠ 추적(받는이 대장·보냄표·링크들)은 «안 쓴다» — 대표 결정 「확인 단추 뺀다」.
+         그래서 뉴스레터 갈래와 섞지 않고 따로 둔다(그쪽 잣대를 흔들지 않게). */
+    const noticeSend = body.noticeSend && typeof body.noticeSend === "object"
+      ? body.noticeSend : null;
+    let noticeId = "", noticeRequestId = "", noticeClaim = null;
+    if (noticeSend) {
+      if (newsletterSend) {
+        res.status(400).json({ ok: false, error: "뉴스레터와 안내문을 한 번에 보낼 수 없습니다." });
+        return;
+      }
+      const role = (await db.ref("uid_roles/" + sender.uid).once("value")).val() || {};
+      if (role.isAdmin !== true) {
+        res.status(403).json({ ok: false, error: "총괄관리자만 안내문을 발송할 수 있습니다." });
+        return;
+      }
+      noticeId = String(noticeSend.id || "");
+      noticeRequestId = String(noticeSend.requestId || "");
+      /* ⚠ 번호가 곧 자리 이름이다 — 파이어베이스가 만든 번호 꼴만 받는다(../ 금지) */
+      if (!/^-?[A-Za-z0-9_-]{8,40}$/.test(noticeId)
+          || !/^[A-Za-z0-9_-]{8,120}$/.test(noticeRequestId)) {
+        res.status(400).json({ ok: false, error: "안내문 발송 요청 번호가 올바르지 않습니다." });
+        return;
+      }
+      const noteRef = db.ref("newsletter/notices/" + noticeId);
+      const lockRef = noteRef.child("발송잠금");
+      const [이미상태, 이미잠금] = await Promise.all([
+        noteRef.child("상태").once("value").then((s) => s.val()),
+        lockRef.once("value").then((s) => s.val()),
+      ]);
+      if (이미상태 == null) {
+        res.status(404).json({ ok: false, error: "그런 안내문이 없습니다 — 저장된 뒤에 보내 주세요." });
+        return;
+      }
+      const 마친내요청 = NL.이미마친내요청인가(이미잠금, noticeRequestId);
+      if (마친내요청) {
+        /* 그물이 끊겨 같은 요청을 다시 물은 것이면 «그때 그 결과»를 준다 */
+        const [받는수, 보낸때] = await Promise.all([
+          noteRef.child("받는수").once("value"), noteRef.child("보낸때").once("value"),
+        ]);
+        const n = Number(받는수.val() || 0);
+        res.json({ ok: true, n: n, batchId: String(이미잠금.batchId || ""),
+          sentAt: Number(보낸때.val() || 0), eta: MB.etaText(n, v.gapMs), duplicate: true });
+        return;
+      }
+      if (이미상태 === "발송") {
+        res.status(409).json({ ok: false, error: "이미 보낸 안내문입니다." });
+        return;
+      }
+      noticeClaim = await lockRef.transaction(
+        (cur) => NL.잠글까(cur, noticeRequestId, Date.now(), sender.email || "") || undefined,
+        undefined, false);
+      if (!noticeClaim.committed) {
+        res.status(409).json({ ok: false, error: "다른 관리자가 이미 이 안내문을 발송하고 있습니다." });
+        return;
+      }
+    }
+
     const batchId = "b" + now.toString(36) + Math.random().toString(36).slice(2, 6);
     const rows = MB.buildQueue(v, now, sender.email || "", batchId);
+
+    if (noticeSend) {
+      try {
+        /* 한 번의 update 로 — 대기열과 «보냈다» 표가 함께 서거나 함께 안 선다 */
+        const upd = {};
+        rows.forEach((row) => {
+          const key = db.ref(MD.CARDS_ROOT + "/scheduled").push().key;
+          upd[MD.CARDS_ROOT + "/scheduled/" + key] = row;
+        });
+        const n = "newsletter/notices/" + noticeId + "/";
+        upd[n + "상태"] = "발송";
+        upd[n + "보낸때"] = now;
+        upd[n + "받는수"] = rows.length;
+        upd[n + "batchId"] = batchId;
+        upd[n + "보낸이"] = sender.email || "";
+        upd[n + "updatedAt"] = now;
+        upd[n + "발송잠금"] = NL.마쳤다(noticeClaim.snapshot.val(), now, batchId);
+        await db.ref().update(upd);
+        res.json({ ok: true, n: rows.length, batchId: batchId, sentAt: now, skipped: v.skipped,
+          firstAt: rows[0].at, lastAt: rows[rows.length - 1].at, eta: MB.etaText(rows.length, v.gapMs) });
+      } catch (e) {
+        const lockRef2 = db.ref("newsletter/notices/" + noticeId + "/발송잠금");
+        await lockRef2.transaction((lock) => {
+          if (!lock || lock.요청열쇠 !== noticeRequestId || lock.상태 !== "거는중") return undefined;
+          return NL.틀어졌다(lock, Date.now(), (e && e.message) || e);
+        }, undefined, false).catch(() => null);
+        res.status(500).json({ ok: false, error: "예약을 걸지 못했습니다: " + String((e && e.message) || e) });
+      }
+      return;
+    }
 
     try {
       // 한 번의 update 로 담는다 — 중간에 끊겨 «절반만 걸린» 상태가 남지 않게.
@@ -3027,6 +3120,27 @@ exports.newsView = functions
         /* 지운 사진이면 «없다» — 굳히지 않는다(다시 올리면 새 열쇠라 상관없지만) */
         const 없다 = e && (e.code === 404 || /No such object/i.test(String(e.message)));
         if (!없다) console.warn("newsView img", (e && e.message) || e);
+        res.status(없다 ? 404 : 500).send(NV.없는쪽("없음"));
+      }
+      return;
+    }
+
+    /* ── ①-2 안내문 첨부 — ?file=<열쇠>&n=<이름> (2026-09-23) ───────────────────
+       그림 갈래와 같은 잣대다: 실시간DB 를 안 열고, 열쇠 모양이 틀리면 창고도 안 연다.
+       ⚠ «내려받게» 준다 — 우리 주소 안에서 문서가 열리면 안 된다(attachment + nosniff). */
+    if (req.query && req.query.file != null) {
+      const 파일 = NV.파일열쇠(req.query.file, req.query.n);
+      if (!파일) { res.status(404).send(NV.없는쪽("없음")); return; }
+      try {
+        const [몸] = await getStorage().bucket(NEWS_IMG_BUCKET).file(파일.자리).download();
+        res.set("Content-Type", "application/octet-stream");
+        res.set("Content-Disposition", NV.내려받기머리(파일.이름));
+        res.set("X-Content-Type-Options", "nosniff");
+        res.set("Cache-Control", "public, max-age=31536000, immutable");
+        res.status(200).send(몸);
+      } catch (e) {
+        const 없다 = e && (e.code === 404 || /No such object/i.test(String(e.message)));
+        if (!없다) console.warn("newsView file", (e && e.message) || e);
         res.status(없다 ? 404 : 500).send(NV.없는쪽("없음"));
       }
       return;

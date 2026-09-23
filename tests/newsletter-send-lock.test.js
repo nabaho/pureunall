@@ -149,13 +149,33 @@ test('★ 잠금을 회차 «통째»에 걸지 않는다', () => {
 });
 
 test('★★ 대기열·발송 상태·완료 잠금을 «한 번»에 확정한다', () => {
+  /* ⚠ 2026-09-23 부터 sendBulkMail 에 «안내문 갈래»가 뉴스레터 갈래 앞에 선다.
+       그래서 «처음 나오는 줄»을 재면 안내문 것을 집는다 — 뉴스레터 갈래의 첫머리
+       (upd[newsletterSend ? …) 에서부터 잰다. 안내문 갈래는 아래에서 따로 본다. */
   const 몸 = 손누름();
-  const 대기열 = 몸.indexOf('MD.CARDS_ROOT + "/scheduled/" + key');
-  const 상태 = 몸.indexOf('upd[issue + "상태"] = "발송"');
-  const 잠금 = 몸.indexOf('NL.마쳤다(');
-  const 한번 = 몸.indexOf('await db.ref().update(upd)');
+  const 첫 = 몸.indexOf('upd[newsletterSend ? (MD.CARDS_ROOT');
+  assert.ok(첫 > 0, '뉴스레터 갈래의 대기열 쓰기를 못 찾았다');
+  const 대기열 = 첫;
+  const 상태 = 몸.indexOf('upd[issue + "상태"] = "발송"', 첫);
+  const 잠금 = 몸.indexOf('NL.마쳤다(', 첫);
+  const 한번 = 몸.indexOf('await db.ref().update(upd)', 첫);
   assert.ok(대기열 >= 0 && 상태 > 대기열 && 잠금 > 상태 && 한번 > 잠금,
     '나눠 쓰면 「걸었는데 상태는 초안」인 회차가 남아 두 번 나간다');
+});
+
+test('★★ 안내문도 대기열·발송 상태·완료 잠금을 «한 번»에 확정한다', () => {
+  const 몸 = 손누름();
+  const 첫 = 몸.indexOf('if (noticeSend) {', 몸.indexOf('const rows'));
+  const 끝 = 몸.indexOf('upd[newsletterSend ? (MD.CARDS_ROOT');
+  assert.ok(첫 > 0 && 끝 > 첫, '안내문 갈래의 대기열 쓰기를 못 찾았다');
+  const g = 몸.slice(첫, 끝);
+  const 대기열 = g.indexOf('MD.CARDS_ROOT + "/scheduled/" + key');
+  const 상태 = g.indexOf('upd[n + "상태"] = "발송"');
+  const 잠금 = g.indexOf('NL.마쳤다(');
+  const 한번 = g.indexOf('await db.ref().update(upd)');
+  assert.ok(대기열 >= 0 && 상태 > 대기열 && 잠금 > 상태 && 한번 > 잠금,
+    '나눠 쓰면 「걸었는데 상태는 초안」인 안내문이 남아 두 번 나간다');
+  assert.strictEqual((g.match(/\.update\(upd\)/g) || []).length, 1, '안내문을 두 번에 나눠 쓴다');
 });
 
 test('★ 링크 목록을 «자리가 밀리게» 손대지 않는다', () => {
