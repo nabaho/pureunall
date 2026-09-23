@@ -37,8 +37,18 @@ test('★★★ 서식을 남의 주소로 보내지 않는다 — 인가·등�
   assert.doesNotMatch(bare, /edwardkim/i, '★ 남의 주소로 iframe 을 띄우면 안 됩니다');
 });
 
+/* 2026-09-23: 편집기 창을 여는 일은 _openHwpBuf «한 곳»으로 모았다 — 등록한 원본(openHwpEditor)과
+   한글 틀에 채운 문서(hwpOpenFilled)가 같이 쓴다. 둘이 따로 편집기를 띄우면, 한쪽만 남의 주소로
+   가는 길이 다시 생길 수 있다. 그래서 «두 입구가 모두 그 한 곳을 지나는지»도 본다. */
+test('★★ 편집기 창을 여는 곳은 하나다 — 두 입구가 모두 _openHwpBuf 를 지난다', () => {
+  assert.match(cutFn(bare, 'function openHwpEditor('), /_openHwpBuf\(/, '★ 등록한 원본이 다른 길로 열립니다.');
+  assert.match(cutFn(bare, 'function hwpOpenFilled('), /_openHwpBuf\(/, '★ 한글 틀에 채운 문서가 다른 길로 열립니다.');
+  assert.equal((bare.match(/import\(\s*['"]\.\/vendor\/rhwp-editor\/index\.js['"]\s*\)/g) || []).length, 1,
+    '★ 편집기 모듈을 부르는 곳이 둘 이상입니다 — 한 곳으로 모으세요.');
+});
+
 test('★★ 편집기는 저장소 안(vendor/rhwp-editor)에서 studioUrl 을 우리 것으로 준다', () => {
-  const fn = cutFn(bare, 'function openHwpEditor(');
+  const fn = cutFn(bare, 'function _openHwpBuf(');
   assert.match(fn, /import\(\s*['"]\.\/vendor\/rhwp-editor\/index\.js['"]\s*\)/,
     '★ 저장소 안 편집기 모듈을 안 부릅니다.');
   assert.match(fn, /studioUrl\s*:\s*['"]vendor\/rhwp-studio\/index\.html['"]/,
@@ -50,7 +60,7 @@ test('★★ 편집기는 저장소 안(vendor/rhwp-editor)에서 studioUrl 을 
 });
 
 test('★★ 편집기·저장(exportFrom)·닫기는 그대로 이어진다 — RhwpEditor 가 같은 모양을 준다', () => {
-  const open = cutFn(bare, 'function openHwpEditor(');
+  const open = cutFn(bare, 'function _openHwpBuf(');
   assert.match(open, /_hwpEditor\s*=\s*editor/, '★ 연 편집기를 _hwpEditor 에 안 담습니다 — 저장·닫기가 못 찾습니다.');
   const exp = cutFn(bare, 'function hwpExport(');
   assert.match(exp, /PureunHwp\.exportFrom\(_hwpEditor,fmt\)/, '★ 저장 길이 바뀌었습니다.');
