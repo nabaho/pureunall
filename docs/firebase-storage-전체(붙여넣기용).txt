@@ -39,9 +39,11 @@ rules_version = '2';
 //     ② pureun-erp-hrphotos    (사진첩 · 증빙 사진 · ★서고 원본 · ★서면함 원본)
 //     콘솔 → Storage → 창고 이름 옆 ▾ → 그 창고 → 규칙 → 게시
 //
-//  ▶ 넣어도 되는 곳: pureun-erp.firebasestorage.app (급여자료)
+//  ▶ 넣어도 되는 곳: pureun-erp.firebasestorage.app (급여자료 · ★뉴스레터 인사 사진)
 //     ⚠ isStaff() 를 조였으므로 «여기도 함께» 넣는 것이 맞습니다 —
 //       급여데이터함의 읽기가 그 함수에 매여 있습니다.
+//     ★ 2026-09-23 부터 뉴스레터 인사 사진(newsletter_img/)도 여기 둡니다 —
+//       이 칸이 없으면 뉴스레터의 «사진 올리기»가 막힙니다.
 //
 //  ▶ 손으로 안 넣으셔도 됩니다: `node scripts/storage-rules-deploy.js --deploy`
 //     가 세 창고에 한 번에 올립니다(사라지는 규칙이 있으면 스스로 멈춥니다).
@@ -226,6 +228,25 @@ service firebase.storage {
                     && request.resource != null
                     && request.resource.size < 25 * 1024 * 1024;
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ── 뉴스레터 명절 인사 사진 (2026-09-23 추가) · 창고 pureun-erp.firebasestorage.app ──
+    //    대표 결정 「창고 + 함수」 — 인사 그림에 «얼굴»이 들어간다.
+    //    공개 저장소(img/)에 두면 인터넷 누구나 보고, 지워도 기록에 영영 남는다.
+    //
+    //    ★ 읽기는 «아무도» 못 한다(false) — 받는 분은 서버 문(newsView?img=)으로 본다.
+    //      서버는 관리자 SDK 라 이 규칙을 지나지 않는다. 그래서 창고 주소(토큰)가
+    //      밖으로 나갈 일이 없다 — 편지에는 우리 서버 주소만 실린다(발송기 IMG_HOST_OK).
+    //    ⚠ 쓰기가 «직원이면 누구나»다 — 창고 규칙은 실시간DB 를 못 읽어 「관리자인가」를
+    //      여기서 볼 수 없다. 그래도 새지 않는다: 올린 사진은 뉴스레터 자료
+    //      (실시간DB newsletter/, 관리자만 씀)에 주소가 적혀야 비로소 편지에 나온다.
+    //    ⚠ 지우기도 직원이면 된다 — 같은 까닭이다. 대표께서 얼굴을 내리실 때 쓴다.
+    //    ⚠ okImage() 를 건다 — 사진만, 10MB 까지. 앱은 1600px 로 줄여 올린다.
+    //    ⚠ 이 칸이 없으면 «사진 올리기»만 막힌다 — 편지·인사말·장면 글은 그대로 된다.
+    match /newsletter_img/{file} {
+      allow read:   if false;
+      allow write:  if isStaff() && okImage();
+      allow delete: if isStaff();
     }
 
     // ── 급여데이터함 (2026-08-13 추가) ──

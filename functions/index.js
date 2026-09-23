@@ -2988,6 +2988,10 @@ exports.newsClick = functions
 //   통째로 읽어 내주면 그것이 그대로 새 나간다. 이 쪽은 로그인이 없다.
 //
 // ⚠ 초안은 안 내준다. 회차 열쇠는 규칙이라 다음 주 것을 누구나 지어 볼 수 있다.
+/* 뉴스레터 그림 창고 — 관리 화면(pu-news.html)의 storageBucket 과 «같은 곳»이다.
+   ⚠ 급여데이터함과 한 창고라 자리를 newsletter_img/ 로 딱 가른다(NV.그림열쇠). */
+const NEWS_IMG_BUCKET = "pureun-erp.firebasestorage.app";
+
 exports.newsView = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 15, memory: "256MB" })
@@ -3001,8 +3005,62 @@ exports.newsView = functions
     const 굳히지말것 = () =>
       res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     굳히지말것();
+
+    /* ── ① 창고 그림 한 장 — ?img=<열쇠> (대표 결정 2026-09-23 「창고 + 함수」) ──────
+       명절 인사의 얼굴 사진이다. 공개 저장소에 두면 지워도 기록에 영영 남는다.
+       ⚠⚠ 실시간DB 를 «안 연다» — 열쇠(32자리 16진수)가 곧 허락이다.
+       ⚠ 열쇠 모양이 틀리면 창고를 «열어 보지도 않는다». 받은 글자를 자리에 끼우면
+         «../» 로 같은 창고의 급여자료를 꺼내 가는 문이 된다(NV.그림열쇠 가 막는다).
+       ★ 이 문을 쓰는 까닭 — 새 함수는 공개 호출 권한을 콘솔에서 손으로 줘야 한다.
+         발송기(IMG_HOST_OK)도 이미 이 주소를 우리 것으로 안다. */
+    if (req.query && req.query.img != null) {
+      const 그림 = NV.그림열쇠(req.query.img);
+      if (!그림) { res.status(404).send(NV.없는쪽("없음")); return; }
+      try {
+        const [몸] = await getStorage().bucket(NEWS_IMG_BUCKET).file(그림.자리).download();
+        res.set("Content-Type", 그림.종류);
+        res.set("X-Content-Type-Options", "nosniff");
+        /* 열쇠는 다시 안 쓴다(바꾸면 새 열쇠) — 그래서 길게 굳혀도 된다 */
+        res.set("Cache-Control", "public, max-age=31536000, immutable");
+        res.status(200).send(몸);
+      } catch (e) {
+        /* 지운 사진이면 «없다» — 굳히지 않는다(다시 올리면 새 열쇠라 상관없지만) */
+        const 없다 = e && (e.code === 404 || /No such object/i.test(String(e.message)));
+        if (!없다) console.warn("newsView img", (e && e.message) || e);
+        res.status(없다 ? 404 : 500).send(NV.없는쪽("없음"));
+      }
+      return;
+    }
+
     const q = NV.읽기(req.query);
     if (!q.ok) { res.status(404).send(NV.없는쪽("없음")); return; }
+
+    /* ── ② 움직이는 화면 — ?i=<회차>&show=1 (대표 결정 2026-09-23 「움직이는 화면」) ──
+       ★ 전문과 같은 길이다: 화면(js/pu-news-show.js)이 지어 회차에 담아 둔 «쇼»를
+         꺼내 줄 뿐이다. 서버가 다시 짓지 않는다.
+       ⚠⚠ 이 길도 «두 칸만» 읽는다(상태·쇼). 회차 안에는 받는 분들의 주소가 있다.
+       ★ 문지기(CSP)를 붙인다 — 누가 쇼 칸을 손으로 고쳐 남의 그림을 넣어도
+         브라우저가 불러오지 않는다. */
+    if (q.쇼) {
+      try {
+        const db = getDatabase();
+        const 밑 = "newsletter/issues/" + q.회차 + "/";
+        const [상태, 쇼] = await Promise.all([
+          db.ref(밑 + "상태").once("value"),
+          db.ref(밑 + "쇼").once("value"),
+        ]);
+        const 판 = NV.쇼볼수있나(상태.val(), 쇼.val());
+        if (!판.ok) { res.status(404).send(NV.없는쪽(판.까닭)); return; }
+        res.set("Content-Security-Policy", NV.쇼보안);
+        res.set("Cache-Control", "public, max-age=300");
+        res.status(200).send(String(쇼.val()));
+      } catch (e) {
+        console.warn("newsView show", (e && e.message) || e);
+        res.status(500).send(NV.없는쪽("없음"));
+      }
+      return;
+    }
+
     try {
       const db = getDatabase();
       const 밑 = "newsletter/issues/" + q.회차 + "/";

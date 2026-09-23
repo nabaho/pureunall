@@ -31,7 +31,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=31"></script>
+<!-- ★ 창고 — 명절 인사 사진을 올린다(2026-09-23 「창고 + 함수」). 얼굴이 들어가서
+     공개 저장소(img/)에 못 둔다. 올리는 자리는 newsletter_img/ 하나뿐이다. -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
+<script src="js/pu-ontology.js?v=32"></script>
 <script src="js/pu-ontology-write.js?v=3" data-mode="observe"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -43,8 +46,10 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=42"></script>
-<script src="js/pu-news-tpl.js?v=35"></script>
+<script src="js/pu-news-core.js?v=43"></script>
+<!-- ⚠ 편지 짓개(tpl)보다 «먼저» 싣는다 — tpl 이 「장면이 있나」를 이것에게 묻는다 -->
+<script src="js/pu-news-show.js?v=1"></script>
+<script src="js/pu-news-tpl.js?v=38"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -829,7 +834,7 @@ const FIREBASE_CONFIG = {
 const BULK_FN_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/sendBulkMail';
 const BULK_GAP_SEC = 15;
 
-const Core = window.PuNewsCore, Tpl = window.PuNewsTpl,
+const Core = window.PuNewsCore, Tpl = window.PuNewsTpl, Show = window.PuNewsShow,
   지역출처 = window.PuNewsRegionalSources, 지역검토 = window.PuNewsReview;
 var db = null;
 var App = {
@@ -1032,7 +1037,9 @@ function 지금회차(){
   const 회차한벌 = (있는것 && 있는것.회차) || (열쇠 === 회.열쇠 ? 회 : 회차로부터(열쇠));
   return Object.assign({
     열쇠: 열쇠, 회차: 회차한벌, 상태: '초안',
-    안: { news:[], policy:[], case:[], hr:[] }, 우리글: '', 지역뉴스: []
+    /* ⚠ 꼭지 이름을 손으로 적지 않는다(2026-09-23) — 꼭지를 더하면 그 꼭지만
+         «담을 자리 없이» 조용히 사라진다. 목록은 한 곳(Core.꼭지들)에서 온다. */
+    안: Core.꼭지들.reduce((a,g)=>{ a[g.키]=[]; return a; }, {}), 우리글: '', 지역뉴스: []
   }, 있는것 || {});
 }
 /* 열쇠(2026-08-w5)에서 회차 한 벌을 되살린다 — 지난 회차를 열 때 쓴다 */
@@ -1087,7 +1094,7 @@ async function 판올리기(열쇠, 본판){
 /* 서버에 있는 것으로 이 회차를 다시 읽는다.
    ⚠ 회차를 통째로 읽지 않는다 — 안에 전문과 받는 분들 주소가 있다. */
 async function 회차다시읽기(열쇠){
-  const 칸 = ['회차','상태','안','우리글','우리글초안','범위','지역뉴스','판'];
+  const 칸 = ['회차','상태','안','우리글','우리글초안','인사','범위','지역뉴스','판'];
   const 값들 = await Promise.all(칸.map(k => db.ref('newsletter/issues/' + 열쇠 + '/' + k).once('value')));
   const d = { 열쇠: 열쇠 };
   칸.forEach((k, i) => { const v = 값들[i].val(); if(v != null) d[k] = v; });
@@ -1122,6 +1129,9 @@ async function 회차저장(자료){
     /* ★ 「이 한마디는 기계가 쓴 초안입니다」를 새로 고쳐도 잊지 않게 함께 적는다.
          대표께서 한 글자라도 고치시면 우리글과 달라져 그 표가 저절로 사라진다. */
     우리글초안: 자료.우리글초안 || '',
+    /* ★ 명절 인사 — 부정기 칸(2026-09-23). 안 쓴 회차에는 빈 것이 담긴다.
+         편지 쪽이 «빈 것을 아예 안 그리므로» 빈 값이 담겨도 해가 없다. */
+    인사: 자료.인사 || {},
     범위: 자료.범위 || App.설정.범위 || '자문중',
     판: 새판,
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
@@ -1336,6 +1346,11 @@ function 이번회차화면(){
     <button class="btn ${App.길==='region'?'pri':''}" onclick="길바꾸기('region')">
       📍 지역뉴스 <b>${(d.지역뉴스||[]).length||''}</b>건</button>
     <span class="sep"></span>
+    ${/* ★ 인사 — 부정기라 «담겼을 때만» 눈에 띄게 한다(대표 지시 2026-09-23).
+         늘 굵게 두면 마흔여덟 주 동안 「안 쓴 칸」이 도드라진다. */''}
+    <button class="btn ${App.길==='greet'?'pri':''}" onclick="길바꾸기('greet')"
+      >🎁 명절 인사${인사담겼나(d) ? ' <b>●</b>' : ''}</button>
+    <span class="sep"></span>
     <button class="btn" onclick="연습채우기()">🧪 연습용 샘플</button>
     <span class="tail">ⓘ 제목·원문 링크만 싣습니다 ·
       <a onclick="길바꾸기('fwd')">받은 것 그대로 전달</a></span>
@@ -1350,6 +1365,12 @@ function 이번회차화면(){
      ⚠ 안내를 «지운» 것이 아니다 — 위 띠의 ⓘ 안으로 옮겼다.
      ⚠ 「이 회차에 드는 기사가 없다」는 «그때그때의 상태»라 ⓘ(늘 같은 글)에 안 맞는다 —
        오른쪽 요약의 경고 줄로 옮겼다. 거기가 「무엇이 이상한가」를 모아 두는 자리다. -->
+
+  ${/* ★ 명절 인사 — 부정기 칸 (대표 지시 2026-09-23 「추석 설 명절 인사등을 …
+        보내고 싶은데 이부분도 시스템 만들수 있나?」)
+     ⚠ 비워 두면 편지에서 «통째로 사라진다» — 안내에 그 말을 꼭 적는다.
+       안 적으면 「한 번 쓰면 매주 나가나?」를 물어보셔야 한다. */''}
+  ${App.길==='greet' ? 인사판(d) : ''}
 
   ${App.길==='paste' ? `
    <div class="box" style="margin-top:12px">
@@ -2142,6 +2163,244 @@ function 길바꾸기(v){
   if(v === 'auto') 자동담기();
 }
 
+/* 인사가 담겼나 — 「명절 인사」 단추에 ● 을 붙일지 정한다.
+   ⚠ 서식 쪽(인사칸)과 «같은 잣대»다: 그림도 제목도 글도 없으면 안 담긴 것이다.
+     서명만 있는 것은 «안 담긴 것»으로 친다 — 편지에도 안 나온다. */
+function 인사담겼나(d){
+  const x = (d||{}).인사 || {};
+  return !!(String(x.그림||'').trim() || String(x.제목||'').trim() || String(x.글||'').trim());
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   명절 인사 판 — 인사말 + 그림 + 움직이는 화면의 장면들 (대표 지시 2026-09-23)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 그림은 «창고»에 올린다(대표 결정 「창고 + 함수」). 얼굴이 들어가서다 —
+     공개 저장소(img/)에 두면 인터넷 누구나 보고, 지워도 기록에 영영 남는다.
+   ★ 움직이는 화면의 주소는 사람이 안 적는다 — 장면이 있으면 편지가 알아서 잇는다.
+   ⚠ 이미 «보낸» 회차는 고치지 못하게 잠근다. 받으신 편지는 이미 나갔고,
+     전문·쇼는 「그때 나간 그대로」다(전문다시담기 가 보낸 회차를 거절한다).
+     ★ 다만 «창고에서 지우기»는 보낸 뒤에도 된다 — 그것이 창고를 고른 까닭이다. */
+function 인사판(d){
+  const x = d.인사 || {};
+  const 잠김 = d.상태 === '발송';
+  const 장 = Array.isArray(x.장면들) ? x.장면들 : [];
+  const 막 = 잠김 ? ' disabled' : '';
+  const 그림칸 = (주소, 어디) => 주소
+    ? `<img src="${esc(주소)}" alt="" style="width:72px;height:48px;object-fit:cover;
+         border-radius:6px;border:1px solid var(--line);vertical-align:middle">
+       ${창고그림인가(주소) ? `<button class="mini" title="창고에서 지웁니다 — 되돌릴 수 없습니다"
+         onclick="창고에서지우기(${JSON.stringify(어디)})">🗑</button>` : ''}`
+    : '<span class="hint" style="margin:0">그림 없음</span>';
+  const 장면줄 = 장.map((s,i)=>`
+     <div class="item" style="align-items:flex-start;gap:8px">
+      <span style="flex:0 0 auto">${그림칸((s||{}).그림, i)}</span>
+      <textarea rows="2" style="flex:1" placeholder="이 장면에 얹을 글 (두 줄 안쪽이 좋습니다)"
+        oninput="장면글바뀜(${i}, this.value)"${막}>${esc((s||{}).글||'')}</textarea>
+      ${잠김 ? '' : `<span style="flex:0 0 auto;display:flex;gap:4px">
+        <label class="mini" style="cursor:pointer">📷<input type="file" accept="image/*"
+          style="display:none" onchange="장면그림올리기(${i}, this.files[0])"></label>
+        <button class="mini" onclick="장면옮기기(${i},-1)">▲</button>
+        <button class="mini" onclick="장면옮기기(${i},1)">▼</button>
+        <button class="x" title="목록에서만 뺍니다 (창고의 사진은 🗑 로 지웁니다)"
+          onclick="장면빼기(${i})">✕</button></span>`}
+     </div>`).join('');
+  return `
+   <div class="box" style="margin-top:12px">
+    <h3>명절 인사 — 이번 회차에만 나갑니다${잠김 ? ' <span class="pill">보낸 회차 — 잠김</span>' : ''}</h3>
+    <div class="pad">
+     <label class="f">인사말 제목</label>
+     <input type="text" id="greetTitle" value="${esc(x.제목||'')}"
+       placeholder="예) 풍성한 한가위 되십시오" oninput="인사바뀜()"${막}>
+     <label class="f" style="margin-top:10px">인사말</label>
+     <textarea id="greetBody" rows="3" oninput="인사바뀜()"${막}
+       placeholder="예) 올 한 해도 함께해 주셔서 고맙습니다.">${esc(x.글||'')}</textarea>
+     <label class="f" style="margin-top:10px">드림 (없으면 비워 두세요)</label>
+     <input type="text" id="greetSign" value="${esc(x.서명||'')}"
+       placeholder="예) 푸른노무법인 대표노무사 권형하 드림" oninput="인사바뀜()"${막}>
+     <label class="f" style="margin-top:10px">인사 그림</label>
+     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${그림칸(x.그림, 'main')}
+      ${잠김 ? '' : `<label class="btn" style="cursor:pointer">📷 사진 올리기<input type="file"
+        id="greetImg" accept="image/*" style="display:none"
+        onchange="인사그림올리기(this.files[0])"></label>
+      ${x.그림 ? '<button class="mini" onclick="인사그림빼기()">✕ 빼기</button>' : ''}`}
+     </div>
+
+     <label class="f" style="margin-top:16px">움직이는 화면 — 장면 ${장.length}/${Show.장면한도}</label>
+     <div>${장면줄 || '<div class="hint">장면을 넣으면 편지 그림 아래에 「▶ 눌러서 보기」가 붙습니다.</div>'}</div>
+     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      ${잠김 ? '' : `<button class="btn" onclick="장면더하기()"
+        ${장.length >= Show.장면한도 ? 'disabled' : ''}>＋ 장면 더하기</button>`}
+      <button class="btn" onclick="쇼미리보기()" ${장.length ? '' : 'disabled'}>▶ 미리 보기</button>
+     </div>
+
+     <div class="hint">
+       ⚠ <b>비워 두면 이 칸은 편지에서 통째로 사라집니다</b> — 다음 주 편지는 평소 그대로 나갑니다.<br>
+       ⚠ <b>메일 안에서는 움직이지 않습니다</b> — 다음메일·아웃룩이 못 틉니다.
+         ▶ 를 누르면 우리 화면으로 가서 거기서 넘어갑니다. 목소리는 못 담깁니다.<br>
+       ⚠ 사진은 <b>창고</b>에 올라갑니다(인터넷 검색에 안 잡힙니다). 올리기 전에 크기를 줄이고
+         <b>찍은 자리(GPS) 정보를 지웁니다.</b><br>
+       ⚠ 🗑 로 지우면 받으신 편지·움직이는 화면에서 그 사진이 빠집니다. 되돌릴 수 없고,
+         받는 분 메일 프로그램이 <b>이미 받아 둔 사본</b>까지는 못 지웁니다.
+     </div>
+    </div></div>`;
+}
+
+/* ⚠ 세 칸을 «한꺼번에» 읽어 담는다. 칸마다 따로 저장하면 빨리 치실 때
+     앞 칸 값이 담기기 전에 다음 저장이 덮어 옛 값이 되살아난다.
+   ⚠ 그림·장면은 여기서 안 읽는다 — 그 둘은 제 손잡이가 따로 담는다. */
+function 인사바뀜(){
+  const d = 지금회차();
+  if(d.상태 === '발송') return;
+  const g = (id)=>{ const e = document.getElementById(id); return e ? e.value : ''; };
+  d.인사 = Object.assign({}, d.인사 || {},
+    { 제목:g('greetTitle'), 글:g('greetBody'), 서명:g('greetSign') });
+  App.회차들[d.열쇠] = d;
+  clearTimeout(인사바뀜._t);
+  인사바뀜._t = setTimeout(()=>{ 회차저장(d).then(render).catch(()=>{}); }, 700);
+}
+
+/* 인사를 곧바로 저장하고 다시 그린다 — 그림·장면처럼 «한 번 누르면 끝»인 일에 */
+function 인사곧저장(고치기){
+  const d = 지금회차();
+  if(d.상태 === '발송') return Promise.resolve(false);
+  d.인사 = Object.assign({}, d.인사 || {});
+  고치기(d.인사);
+  App.회차들[d.열쇠] = d;
+  return 회차저장(d).then(r=>{ render(); return r; });
+}
+
+/* ── 창고에 그림 올리기 ────────────────────────────────────────────────────
+   ★★ 올리기 «전»에 화면에서 한 번 다시 그린다. 까닭 둘:
+     ① 폰 사진에는 «찍은 자리(GPS)»가 사진 속에 같이 들어 있다. 다시 그리면 빠진다.
+        얼굴 사진과 집 주소가 함께 나가는 일을 막는다.
+     ② 폰 사진은 4~8MB 다. 143곳이 열 때마다 그만큼 내려받는다 — 1600px 로 줄인다.
+   ⚠ 움직이는 GIF 는 다시 그리지 않는다(그리면 첫 장만 남는다) — 크기만 막는다.
+   ⚠ 열쇠는 «찍어서 못 맞히는» 32자리다. 이 열쇠가 곧 허락이다(서버는 DB 를 안 본다).
+   ⚠ 주소는 설정의 «추적 밑주소»로 짓는다 — 편지 ▶·전문 보기와 같은 문(newsView)이다.
+     발송기(IMG_HOST_OK)가 그 주소를 우리 것으로 안다. */
+async function 창고에올리기(file){
+  if(!file) return '';
+  if(!/^image\/(jpeg|png|webp|gif|heic|heif)$/.test(file.type||'')){
+    toast('사진만 올릴 수 있습니다 (jpg · png · webp · gif)', 8000); return '';
+  }
+  const 밑 = String((App.설정||{}).추적밑주소||'').trim().replace(/\/+$/,'');
+  if(!밑){ toast('설정의 «추적 밑주소»가 비어 있어 그림 주소를 못 짓습니다 — 설정에서 먼저 넣어 주세요', 10000); return ''; }
+  let 몸 = file, 끝 = 'jpg', 종류 = 'image/jpeg';
+  if(file.type === 'image/gif'){
+    if(file.size > 5*1024*1024){ toast('움직이는 GIF 는 5MB 까지입니다', 8000); return ''; }
+    끝 = 'gif'; 종류 = 'image/gif';
+  } else {
+    try{
+      const 판 = await createImageBitmap(file);
+      const 배 = Math.min(1, 1600 / Math.max(판.width, 판.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(판.width*배)); c.height = Math.max(1, Math.round(판.height*배));
+      const g = c.getContext('2d');
+      g.fillStyle = '#ffffff'; g.fillRect(0,0,c.width,c.height);   /* 투명 PNG 가 검게 안 되게 */
+      g.drawImage(판, 0, 0, c.width, c.height);
+      몸 = await new Promise(r=>c.toBlob(r, 'image/jpeg', 0.86));
+      if(!몸) throw new Error('사진을 다시 그리지 못했습니다');
+    }catch(e){
+      toast('이 사진은 열 수 없습니다 — 다른 사진으로 해 주세요 (' + ((e&&e.message)||'') + ')', 10000);
+      return '';
+    }
+  }
+  const 알 = new Uint8Array(16); crypto.getRandomValues(알);
+  const 열쇠 = Array.from(알, b=>b.toString(16).padStart(2,'0')).join('') + '.' + 끝;
+  try{
+    await firebase.storage().ref('newsletter_img/' + 열쇠).put(몸, { contentType: 종류 });
+  }catch(e){
+    toast('창고에 못 올렸습니다: ' + ((e&&e.code)||(e&&e.message)||''), 10000); return '';
+  }
+  return 밑 + '/newsView?img=' + 열쇠;
+}
+function 창고그림인가(주소){
+  return /\/newsView\?img=[0-9a-f]{32}\.(jpg|png|webp|gif)$/.test(String(주소||''));
+}
+async function 인사그림올리기(file){
+  const 주소 = await 창고에올리기(file); if(!주소) return;
+  await 인사곧저장(x=>{ x.그림 = 주소; });
+  toast('📷 인사 그림을 올렸습니다', 5000);
+}
+function 인사그림빼기(){ 인사곧저장(x=>{ x.그림 = ''; }); }
+function 장면더하기(){
+  인사곧저장(x=>{ x.장면들 = (x.장면들||[]).slice(0, Show.장면한도 - 1).concat([{ 그림:'', 글:'' }]); });
+}
+function 장면글바뀜(i, v){
+  const d = 지금회차(); if(d.상태 === '발송') return;
+  d.인사 = Object.assign({}, d.인사 || {});
+  d.인사.장면들 = (d.인사.장면들||[]).slice();
+  d.인사.장면들[i] = Object.assign({}, d.인사.장면들[i] || {}, { 글: v });
+  App.회차들[d.열쇠] = d;
+  clearTimeout(장면글바뀜._t);
+  장면글바뀜._t = setTimeout(()=>{ 회차저장(d).catch(()=>{}); }, 700);
+}
+async function 장면그림올리기(i, file){
+  const 주소 = await 창고에올리기(file); if(!주소) return;
+  await 인사곧저장(x=>{
+    x.장면들 = (x.장면들||[]).slice();
+    x.장면들[i] = Object.assign({}, x.장면들[i] || {}, { 그림: 주소 });
+  });
+}
+function 장면옮기기(i, 어디){
+  인사곧저장(x=>{
+    const a = (x.장면들||[]).slice(), j = i + 어디;
+    if(j < 0 || j >= a.length) return;
+    const t = a[i]; a[i] = a[j]; a[j] = t; x.장면들 = a;
+  });
+}
+function 장면빼기(i){
+  인사곧저장(x=>{ x.장면들 = (x.장면들||[]).filter((_,k)=>k!==i); });
+}
+
+/* 🗑 창고에서 지우기 — 되돌릴 수 없다. 그래서 무엇이 사라지는지 «그대로» 묻는다.
+   ⚠ 보낸 회차에서도 된다 — 얼굴을 내려야 할 때(퇴사 등)를 위해 창고를 골랐다.
+   ⚠ 목록에서도 함께 뺀다. 안 빼면 빈 그림 칸이 편지·화면에 남는다. */
+async function 창고에서지우기(어디){
+  const d = 지금회차();
+  const x = d.인사 || {};
+  const 주소 = 어디 === 'main' ? x.그림 : ((x.장면들||[])[어디]||{}).그림;
+  const m = /newsView\?img=([0-9a-f]{32}\.(?:jpg|png|webp|gif))$/.exec(String(주소||''));
+  if(!m) return;
+  const 보냄 = d.상태 === '발송';
+  if(!confirm('이 사진을 창고에서 지웁니다.\n\n'
+    + (보냄 ? '⚠ 이미 보낸 회차입니다 — 받으신 편지와 움직이는 화면에서 이 사진이 빠집니다(빈 칸).\n'
+            : '')
+    + '⚠ 되돌릴 수 없습니다.\n'
+    + '⚠ 받는 분 메일 프로그램이 이미 받아 둔 사본까지는 못 지웁니다.\n\n지울까요?')) return;
+  try{
+    await firebase.storage().ref('newsletter_img/' + m[1]).delete();
+  }catch(e){
+    if(!(e && e.code === 'storage/object-not-found')){
+      toast('지우지 못했습니다: ' + ((e&&e.code)||(e&&e.message)||''), 10000); return;
+    }
+  }
+  /* ★ 보낸 회차도 «목록»은 고친다 — 안 고치면 다음에 화면을 열 때 빈 칸이 계속 보인다.
+       ⚠ 담아 둔 전문·쇼는 그대로다(그때 나간 그대로) — 그 안의 그림만 창고에서 사라진다. */
+  d.인사 = Object.assign({}, x);
+  if(어디 === 'main') d.인사.그림 = '';
+  else { d.인사.장면들 = (x.장면들||[]).slice();
+         d.인사.장면들[어디] = Object.assign({}, d.인사.장면들[어디]||{}, { 그림:'' }); }
+  App.회차들[d.열쇠] = d;
+  await 회차저장(d); render();
+  toast('🗑 창고에서 지웠습니다', 6000);
+}
+
+/* ▶ 미리 보기 — 보내기 «전»에 움직이는 화면을 이 PC 에서 띄운다.
+   ★ 받는 분이 보실 것과 «같은 짓개»(PuNewsShow.쇼짓기)로 짓는다. */
+function 쇼미리보기(){
+  const d = 지금회차();
+  const h = Show.쇼짓기(d.인사, { 회사이름: (App.설정||{}).회사이름 });
+  if(!h) return toast('보여 드릴 장면이 없습니다 — 그림이나 글을 넣어 주세요', 8000);
+  /* ⚠ 창에 «이름»을 붙인다 — 이름이 없으면 누를 때마다 탭이 쌓인다
+       (tests/one-window-per-app.test.js 가 앱 창에 대해 지키는 것과 같은 뜻). */
+  const u = URL.createObjectURL(new Blob([h], { type:'text/html' }));
+  const w = window.open(u, 'puNewsShow');
+  if(!w) toast('새 창이 막혔습니다 — 주소창 오른쪽의 «팝업 허용»을 눌러 주세요', 10000);
+  setTimeout(()=>URL.revokeObjectURL(u), 60000);
+}
+
 function 우리글바뀜(v){
   const d = 지금회차(); d.우리글 = v;
   App.회차들[d.열쇠] = d;
@@ -2160,11 +2419,20 @@ function 빼기(칸, i){
   const d = 지금회차(); (d.안[칸]||[]).splice(i,1);
   회차저장(d).then(render);
 }
+/* ⚠ 예전에는 «늘 기사»로 담았다(2026-09-23 고침). 판례 꼭지에 손으로 담으면
+     판례 카드가 아니라 기사 한 줄로 그려져, 사건번호도 「전문 보기」도 안 나왔다.
+   ★ 꼭지의 «갈래»를 따른다 — 특별 판례 꼭지가 생기면서 드러난 자리다. */
 function 손으로담기(칸){
+  const g = Core.꼭지찾기(칸) || {};
+  const 판례냐 = g.갈래 === '판례';
   const 제목 = prompt('제목을 적어 주세요'); if(!제목) return;
-  const 링크 = prompt('원문 링크 (없으면 비워 두세요)') || '';
+  const 인용 = 판례냐 ? (prompt('사건번호 (예: 대법원 2026. 8. 27. 선고 2025다301142)') || '') : '';
+  const 링크 = prompt(판례냐 ? '법제처 링크 (있으면 「전문 보기」가 열립니다)'
+                             : '원문 링크 (없으면 비워 두세요)') || '';
   const d = 지금회차();
-  (d.안[칸] = d.안[칸] || []).push({ 갈래:'기사', 제목:제목.slice(0,200), 링크:링크, 언론사:'' });
+  (d.안[칸] = d.안[칸] || []).push(판례냐
+    ? { 갈래:'판례', 딱지:'[판례]', 제목:제목.slice(0,200), 인용:인용.slice(0,120), 링크:링크 }
+    : { 갈래:'기사', 제목:제목.slice(0,200), 링크:링크, 언론사:'' });
   회차저장(d).then(render);
 }
 
@@ -2571,11 +2839,17 @@ async function 전문담기(열쇠){
     Object.assign({}, d, { 범위: App.설정.범위, 더한분들: App.더한분들 }),
     App.설정, { 미리보기: true, 지역: '전국', 요약: false, 넓이: Tpl.전문넓이 });
   if(!전) return false;
+  /* ★ 움직이는 화면(쇼)도 «같이» 담는다 (2026-09-23). 편지의 ▶ 가 그것을 연다.
+       ⚠ 따로 담게 두면 전문만 새것이고 쇼는 옛것인 회차가 생긴다 — 한 자리에서 한 번에.
+       ⚠ 장면이 없으면 null 을 적는다 = 옛 쇼를 «지운다». 안 지우면 장면을 다 뺀 뒤에도
+         예전 쇼가 남아, ▶ 는 안 나오는데 주소로는 열리는 쪽이 생긴다. */
+  const 쇼 = Show ? Show.쇼짓기(d.인사, { 회사이름: (App.설정||{}).회사이름 }) : null;
   await db.ref('newsletter/issues/' + 열쇠).update({
     /* ⚠ 꼴 은 「이 회차가 어떤 모습으로 나갔나」의 기록이다. 2026-09-20 부터 메일이
          전문판이므로 여기도 '전문' 이라야, 나중에 다시 그릴 때 보낸 것과 같아진다.
          지난 회차에 적힌 '요약' 은 그대로 둔다 — 그때는 정말 요약으로 나갔다. */
-    전문: 전.서식, 제목: 전.제목, 꼴: '전문', 전문담은때: Date.now()
+    전문: 전.서식, 제목: 전.제목, 꼴: '전문', 전문담은때: Date.now(),
+    쇼: 쇼 || null
   });
   return true;
 }
