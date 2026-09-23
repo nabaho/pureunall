@@ -123,6 +123,55 @@ test('★★★ 차림표 칸 수와 자리표 수가 «늘» 맞는다', () => 
   });
 });
 
+/* ═══ 옛 회차 — 이미 보내 전문을 다시 못 담는 것 ═══════════════════════
+   ★★ 틀고정 차림표가 짝을 «이름»으로 맺는지 «돌려» 본다.
+     옛 전문은 차림표 넷 · 자리표 셋(빈 꼭지)이다. 차례로 맺으면 한 칸씩 밀린다. */
+function 차림표돌려보기(칸이름들, 꼭지들) {
+  const NV = require('../functions/news-view.js');
+  const 쪽 = NV.쪽('t', '<div id="wrap"></div>');
+  const 글 = (쪽.match(/<script>([\s\S]*?)<\/script>/g) || [])
+    .map((s) => s.replace(/^<script>|<\/script>$/g, '')).find((s) => s.includes('function 짝('));
+  assert.ok(글, '차림표 스크립트를 못 찾았다');
+  const 간곳 = [];
+  const 칸 = 칸이름들.map((t) => ({ textContent: t, className: '', 손: {},
+    setAttribute() {}, addEventListener(k, f) { this.손[k] = f; } }));
+  const 줄 = { offsetHeight: 40, querySelectorAll: () => 칸 };
+  const 자리 = 꼭지들.map(([id, 제목], i) => ({ id, 제목, y: 300 + i * 500,
+    closest() { return { textContent: this.제목 }; },
+    getBoundingClientRect() { return { top: this.y }; } }));
+  /* ⚠ 한 <script> 안에 창 띄우기·전문 펴기 스크립트가 함께 있다 — 그쪽이 부르는
+       것(getElementById·addEventListener·location)만 빈 흉내로 채운다. */
+  const 짐 = {
+    document: {
+      querySelector: () => 줄,
+      querySelectorAll: () => 자리,
+      getElementById: () => ({}),
+      addEventListener() {}
+    },
+    location: { hash: '', pathname: '', search: '' },
+    window: { scrollY: 0, scrollTo: (o) => 간곳.push(o.top), addEventListener() {} }
+  };
+  vm.createContext(짐);
+  vm.runInContext(글, 짐);
+  return 칸.map((c) => {
+    if (!c.손.click) return c.textContent + '→(못누름)';
+    간곳.length = 0; c.손.click();
+    const y = 간곳[0] + 줄.offsetHeight + 14;
+    const 맞 = 자리.find((a) => Math.abs(a.y - y) <= 1);
+    return c.textContent + '→' + (맞 ? 맞.id : '?');
+  });
+}
+
+test('★★★ 옛 회차(빈 꼭지)의 차림표도 «제 꼭지»로 내려앉는다 — 짝을 이름으로', () => {
+  const r = 차림표돌려보기(
+    ['주간노동뉴스', '고용·노동정책', '판례·재결례', '인사·노무관리'],
+    [['g-news', 'BEST주간노동뉴스'], ['g-case', 'ATTENTION판례·재결례·행정해석'],
+     ['g-hr', 'TREND인사·노무관리']]);
+  assert.deepStrictEqual(r, ['주간노동뉴스→g-news', '고용·노동정책→(못누름)',
+    '판례·재결례→g-case', '인사·노무관리→g-hr'],
+    '차례로 짝지으면 「고용·노동정책」이 판례로 간다 — 그 고장이 되살아났다');
+});
+
 /* 차림표에 «없는 꼭지 이름»이 서 있으면 안 된다 — 거짓말하는 차림표 */
 test('★★ 차림표는 편지에 «실제로 있는» 꼭지만 부른다', () => {
   const r = 편지({ news: [기사], policy: [], case: [], hr: [] });
