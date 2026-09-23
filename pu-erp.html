@@ -2546,13 +2546,9 @@ try {
 } catch(_){}
 (function(){   // fbDb+인증 준비되면 버전 게이트 시작(로그인 여부 무관)
   if(location.protocol === 'file:') return;
-  var tries = 0;
-  var iv = setInterval(function(){
-    tries++;
-    if(typeof fbDb !== 'undefined' && fbDb && typeof fbAuthReady !== 'undefined' && fbAuthReady){
-      clearInterval(iv); try { initVersionGate(); } catch(_){}
-    } else if(tries > 40){ clearInterval(iv); }   // 20초 후 포기
-  }, 500);
+  /* 종전에는 0.5초마다 40번 두드렸다(최대 20초). 이제 준비되는 «그 순간» 받는다.
+     못 오면 20초 뒤 약속이 거짓으로 끝나므로 예전처럼 조용히 포기한다. */
+  erpWhenFbReady(20000).then(function(ok){ if(ok){ try { initVersionGate(); } catch(_){} } });
 })();
 
 // === Firebase 초기화 (있으면 자동 활성화, 없거나 실패해도 LS는 정상 작동) ===
@@ -2568,6 +2564,36 @@ var fbConnected = false;
 var fbInitDone = false;
 var fbAuthUid = null;       // 익명 인증 후 발급된 uid
 var fbAuthReady = false;    // 인증 완료 여부
+/* ══ 「준비될 때까지 두드리기」를 없앤다 (2026-09-23 전체점검 ⑧) ══
+   여기저기서 setInterval 로 «fbDb 와 fbAuthReady 가 됐나» 를 0.5초마다 물어보고 있었다.
+   그런데 준비되는 그 자리(onAuthStateChanged)는 이미 fb_auth_ready 를 «알려 주고» 있다 —
+   묻지 않아도 되는 것을 묻고 있었던 것이다.
+   ⚠ 두드리기의 진짜 값은 「늦게 알기」다. 0.5초마다 물으면 최대 0.5초 늦게 시작한다.
+     알려 주는 쪽을 받으면 «그 순간» 시작한다 — 빨라지기까지 한다.
+   ⚠ 그래도 시계 하나는 남긴다. 인증이 영영 안 오는 판(연결 끊김·규칙 거부)에서도
+     약속이 끝나야 부르는 쪽이 기다림을 접을 수 있다. 없으면 영영 매달린다. */
+var _fbReadyP = null;
+function erpWhenFbReady(ms){
+  if(_fbReadyP) return _fbReadyP;
+  _fbReadyP = new Promise(function(done){
+    /* ⚠ !! 를 꼭 붙인다. 안 붙이면 fbDb 가 null 일 때 이 약속이 «null 로» 끝난다 —
+       부르는 쪽이 if(ok) 로만 보면 티가 안 나지만, 답이 참/거짓이 아닌 약속은
+       다음 사람이 반드시 한 번 헛디딘다. 검사가 이것을 잡았다. */
+    function 됐나(){ return !!(typeof fbDb !== 'undefined' && fbDb && fbAuthReady); }
+    if(됐나()){ done(true); return; }
+    var 끝났나 = false;
+    function 끝(ok){ if(끝났나) return; 끝났나 = true; clearTimeout(t);
+      try { window.removeEventListener('fb_auth_ready', onReady); } catch(_){}
+      done(ok); }
+    /* ⚠ fbDb 가 아직 없을 수도 있다 — 신호는 왔는데 그릇이 안 왔으면 조금 뒤 다시 본다.
+       이 되물음은 «한 번»이고, 못 박힌 기다림이 아니라 신호를 받은 뒤의 확인이다. */
+    function onReady(){ if(됐나()) 끝(true); else setTimeout(function(){ 끝(됐나()); }, 50); }
+    window.addEventListener('fb_auth_ready', onReady);
+    var t = setTimeout(function(){ 끝(됐나()); }, ms || 20000);
+  });
+  return _fbReadyP;
+}
+window.erpWhenFbReady = erpWhenFbReady;
 var _fbSynced = false;      // Firebase 초기 동기화 완료(또는 시도 종료) 여부 — 시드 게이팅용
 function fbSeedAllowed(){ return !fbDb || _fbSynced; }  // 오프라인이거나 동기화 끝난 뒤에만 user_accounts 시드 허용
 // 동기화 제외 키 (메타·세션·임시값)
@@ -87419,15 +87445,16 @@ function App(){
   useEffect(function(){
     if(!isLoggedIn) return;
     try { if(typeof _vgCheckHtml === 'function') _vgCheckHtml(true); } catch(_){}   // 로그인 시 최신 버전 점검
-    var tries = 0;
-    var iv = setInterval(function(){
-      tries++;
-      if(typeof fbDb !== 'undefined' && fbDb && fbAuthReady){
-        clearInterval(iv);
-        try { initPresence(getSessionSid(), CURRENT_USER && CURRENT_USER.name); } catch(_){}
-      } else if(tries > 20){ clearInterval(iv); }   // 10초까지 대기 후 포기
-    }, 500);
-    return function(){ clearInterval(iv); };
+    /* 종전에는 0.5초마다 20번 두드렸다(최대 10초). 위의 버전 게이트와 «똑같은 것»을
+       기다리면서 시계를 따로 돌리고 있었다 — 둘을 한 약속으로 합쳤다.
+       ⚠ 이 자리는 화면에서 사라질 수 있다(로그아웃). 그때 늦게 도착한 답으로
+         접속자 등록이 일어나면 안 되므로 «떠났는지» 를 표로 남겨 막는다. */
+    var 떠났다 = false;
+    erpWhenFbReady(10000).then(function(ok){
+      if(떠났다 || !ok) return;
+      try { initPresence(getSessionSid(), CURRENT_USER && CURRENT_USER.name); } catch(_){}
+    });
+    return function(){ 떠났다 = true; };
   }, [isLoggedIn]);
 
   var isFileProtocol = (typeof location !== 'undefined' && location.protocol === 'file:');
