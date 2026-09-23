@@ -35,7 +35,10 @@ test('★ 설치 화면에 manifest 가 걸려 있다 — 없으면 설치 신�
 });
 
 test('★ 설치 화면으로 «가는 길» 이 있다 — 안 보이면 없는 것이다', () => {
-  assert.match(enter, /id="appInstallBtn"/, '★ 포털에 「앱으로 깔기」 단추가 없습니다.');
+  /* 2026-09-23 머리 카드에서 옮겼다(대표 결정 ③) — 관리자는 설정 창 안, 직원은 폰 ⋯ 안.
+     둘 중 하나만 없어도 그쪽 사람은 깔 길이 사라진다. */
+  assert.match(enter, /id="cfgAppInstall"/, '★ 관리자 설정 창에 「앱으로 깔기」가 없습니다.');
+  assert.match(enter, /id="appInstallFab"/, '★ 직원 폰 ⋯ 에 「앱으로 깔기」가 없습니다 — 설정 창은 관리자 전용입니다.');
   assert.match(enter, /location\.href = 'install\.html'/,
     '★ 신호가 없는 브라우저(아이폰)에서 갈 곳이 없습니다.');
 });
@@ -58,8 +61,9 @@ test('★ 이미 깔았으면 안 띄운다 — 눌러도 할 일이 없는 단�
 
 test('★ 배선이 <head> 에 있다 — 앱이 죽는 날에도 깔 수 있어야 한다', () => {
   const head = enter.slice(0, enter.indexOf('</head>'));
-  assert.ok(head.indexOf("getElementById('appInstallBtn')") > 0,
-    '★ 본문에 두면 파이어베이스가 안 닿는 날 단추가 통째로 사라집니다.');
+  const 배선 = head.slice(head.indexOf('function wireInstall('));
+  assert.match(배선, /'appInstallFab'/, '★ 직원 ⋯ 단추 배선이 <head> 밖에 있습니다.');
+  assert.match(배선, /'cfgAppInstall'/, '★ 관리자 설정 줄 배선이 <head> 밖에 있습니다.');
 });
 
 test('★ 아이콘을 길게 누르면 바로가기가 나온다 — 진짜 앱처럼', () => {
@@ -133,4 +137,52 @@ test('★ 포털·설치·기업정보함이 «같은» 워커를 쓴다 — 다
     '★ 기본 scope 에 서로 다른 워커가 등록됩니다: ' + [...all].join(' · ') + '\n' +
     '  서비스워커는 한 scope 에 하나만 삽니다 — 나중에 연 앱이 앞의 것을 밀어내\n' +
     '  기업정보함·사진첩의 「공유 받기」가 죽습니다.');
+});
+
+/* ══ 2026-09-23 자리 옮김 — 대표 지시 「앱으로 깔기 여기 위에 두지 말고 다른곳에」 → ③ 설정 창 안
+   (직원은 폰 ⋯ 안 — 설정 창은 API 열쇠가 든 관리자 전용이라 직원에게 열지 않는다) ══ */
+
+test('★ 머리 카드에는 더 이상 없다 — PC 에도 떠서 「건의하기」를 카드 밖으로 밀어냈다', () => {
+  const bar = enter.slice(enter.indexOf('<div class="pbar">'), enter.indexOf('<div class="pmeta">'));
+  assert.doesNotMatch(bar, /앱으로 깔기/, '★ 머리 카드에 다시 붙었습니다.');
+});
+
+test('★ 관리자는 설정 창 안, 직원은 폰 ⋯ 안 — 관리자인지 «안 뒤에야» 띄운다', () => {
+  /* 글자가 아니라 «실제로 돌려» 본다 — 진짜 <head> 배선을 가짜 창에 올린다 */
+  function 돌려보기(opt) {
+    const head = enter.slice(0, enter.indexOf('</head>'));
+    const 몸 = head.slice(head.indexOf('var _installEvt = null, _installed = false;'),
+                         head.indexOf('window.puAppInstallSync = syncInstall;'));
+    const 앱인가 = head.slice(head.indexOf('function standalone(){'), head.indexOf('function runInstall('));
+    const row = { hidden: true }, fab = { hidden: true };
+    const win = { innerWidth: opt.width, navigator: { userAgent: opt.ua || '' },
+      matchMedia: (q) => ({ matches: /max-width:520px/.test(q) ? opt.width <= 520 : false }) };
+    if (opt.admin !== undefined) win.__puInstallAdmin = opt.admin;
+    const ctx = { window: win, navigator: win.navigator,
+      document: { getElementById: (id) => (id === 'cfgAppInstallRow' ? row : id === 'appInstallFab' ? fab : null) } };
+    const vm = require('node:vm');
+    vm.createContext(ctx);
+    vm.runInContext(몸 + 앱인가 + '\nsyncInstall();', ctx);
+    return JSON.stringify({ row: !row.hidden, fab: !fab.hidden });
+  }
+  const 폰 = { width: 390, ua: 'Android' };
+  assert.equal(돌려보기({ ...폰 }), '{"row":false,"fab":false}',
+    '★ 관리자 여부를 모를 때도 띄웁니다 — 로그인 직후 관리자에게 직원 단추가 한순간 뜹니다.');
+  assert.equal(돌려보기({ ...폰, admin: true }), '{"row":true,"fab":false}', '★ 관리자는 설정 줄에서만 깔아야 합니다.');
+  assert.equal(돌려보기({ ...폰, admin: false }), '{"row":false,"fab":true}', '★ 직원은 ⋯ 단추로 깔아야 합니다.');
+  assert.equal(돌려보기({ width: 1400, ua: 'Windows', admin: true }), '{"row":false,"fab":false}',
+    '★ PC 에서는 띄우지 않습니다 — 눌러도 할 일이 없던 자리입니다.');
+  /* 설정 창을 여는 쪽이 관리자 여부를 넘겨 줘야 위 판정이 돈다 */
+  assert.match(enter, /window\.__puInstallAdmin = admin;/, '★ 관리자 여부를 넘겨주지 않아 어느 쪽도 안 뜹니다.');
+  assert.match(enter, /DOCK_IDS\s*=\s*\[[^\]]*'appInstallFab'/, '★ 직원 단추가 ⋯ 안으로 안 들어갑니다.');
+});
+
+test('★ ⋯ 안에서도 숨김이 이긴다 — 안 그러면 눌러도 안 되는 단추가 뜬다', () => {
+  /* ⋯ 안 .docked 가 display 를 !important 로 켠다. 숨김이 그보다 세지 않으면
+     직원 폰에 관리자 전용 「⚙ 설정」(눌러도 안 열림)과 관리자용 깔기 단추가 떠 있게 된다. */
+  assert.match(enter, /#moreDock \.docked\[hidden\]\{display:none!important;\}/,
+    '★ ⋯ 안에서 [hidden] 이 안 먹습니다.');
+  assert.match(enter, /\.cfg-tool\[hidden\]\{display:none;\}/,
+    '★ 설정 줄(.cfg-tool 은 display:flex)이 [hidden] 을 이겨 PC 에서도 보입니다.');
+  assert.match(enter, /b\.hidden = !admin;/, '★ 설정 단추에 숨김 표시를 안 걸어, 직원 ⋯ 에 떠 있습니다.');
 });

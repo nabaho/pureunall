@@ -51,17 +51,34 @@
     }
   }catch(e){}
 
-  var _installEvt = null;
+  /* ── 자리 (대표 결정 2026-09-23 「앱으로 깔기 여기 위에 두지 말고」 → ③ 설정 창 안) ──
+     머리 카드에 두었더니 PC 크롬도 「깔 수 있음」 신호를 보내 PC 에도 떴고(누르면 아무 일도
+     없었다), 그 한 칸 때문에 「건의하기」가 카드 밖으로 밀려 나갔다.
+     ★ 관리자는 ⚙ 설정 창 안 한 줄(cfgAppInstallRow), 직원은 폰 ⋯ 안(appInstallFab).
+       설정 창은 API 열쇠가 든 관리자 전용 창이라 직원에게 열지 않는다 — 그래서 둘로 나눴다.
+     ⚠ 관리자 여부를 «알기 전»에는 어느 쪽도 안 띄운다(__puInstallAdmin 이 참/거짓으로 정해진 뒤).
+     ⚠ ⋯ 는 폰 폭(520px 이하)에만 있다 — 그보다 넓은 태블릿의 직원에게는 깔 자리가 없다. */
+  var _installEvt = null, _installed = false;
+  var _narrow = null;
+  try{ _narrow = window.matchMedia ? window.matchMedia('(max-width:520px)') : null; }catch(e){}
+  function phoneDevice(){
+    return (window.innerWidth <= 820) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  }
+  function syncInstall(){
+    var can = phoneDevice() && !standalone() && !_installed;   // PC 이거나 이미 앱이면 뜻이 없다
+    var known = typeof window.__puInstallAdmin === 'boolean', admin = window.__puInstallAdmin === true;
+    var row = document.getElementById('cfgAppInstallRow'), fab = document.getElementById('appInstallFab');
+    if(row) row.hidden = !(known && can && admin);
+    if(fab) fab.hidden = !(known && can && !admin && !!(_narrow && _narrow.matches));
+  }
+  window.puAppInstallSync = syncInstall;
   try{
     window.addEventListener('beforeinstallprompt', function(e){
       e.preventDefault(); _installEvt = e;
-      var b = document.getElementById('appInstallBtn');
-      if(b && !standalone()){ b.hidden = false; b.style.display = 'inline-flex'; }
+      syncInstall();
     });
-    window.addEventListener('appinstalled', function(){
-      var b = document.getElementById('appInstallBtn');
-      if(b){ b.hidden = true; b.style.display = 'none'; }
-    });
+    window.addEventListener('appinstalled', function(){ _installed = true; syncInstall(); });
+    if(_narrow && _narrow.addEventListener) _narrow.addEventListener('change', syncInstall);
   }catch(e){}
   function standalone(){
     try{
@@ -69,26 +86,24 @@
              || window.navigator.standalone === true;
     }catch(e){ return false; }
   }
+  function runInstall(){
+    if(_installEvt){
+      _installEvt.prompt();
+      _installEvt.userChoice.then(function(r){
+        if(r && r.outcome === 'accepted'){ _installed = true; syncInstall(); }
+      })['catch'](function(){});
+      _installEvt = null;
+      return;
+    }
+    /* 신호가 없는 브라우저(아이폰 사파리·카카오 등) — 세 걸음 안내로 보낸다 */
+    location.href = 'install.html';
+  }
   function wireInstall(){
-    var btn = document.getElementById('appInstallBtn');
-    if(!btn) return;
-    var phone = (window.innerWidth <= 820) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-    if(!phone || standalone()) return;      // PC 이거나 이미 앱으로 열렸으면 뜻이 없다
-    btn.hidden = false;
-    btn.style.display = 'inline-flex';
-    btn.title = '홈 화면에 깔면 주소창·탭 없이 앱처럼 열립니다';
-    btn.addEventListener('click', function(){
-      if(_installEvt){
-        _installEvt.prompt();
-        _installEvt.userChoice.then(function(r){
-          if(r && r.outcome === 'accepted'){ btn.hidden = true; btn.style.display = 'none'; }
-        })['catch'](function(){});
-        _installEvt = null;
-        return;
-      }
-      /* 신호가 없는 브라우저(아이폰 사파리·카카오 등) — 세 걸음 안내로 보낸다 */
-      location.href = 'install.html';
+    ['appInstallFab', 'cfgAppInstall'].forEach(function(id){
+      var btn = document.getElementById(id);
+      if(btn) btn.addEventListener('click', runInstall);
     });
+    syncInstall();
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ wireInstall(); });
@@ -246,14 +261,12 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2563eb);
   color:#fff;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;}
 .logout{color:var(--accent);font-weight:700;cursor:pointer;background:none;border:none;font-size:.8rem;font-family:inherit;}
-/* 머리줄 작은 단추 — 지금은 「앱으로 깔기」가 쓴다
-   (PC/폰 전환 단추는 2026-08-30 대표 지시로 없앴다) */
-.pcview{order:3;display:none;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;
-  background:rgba(46,58,140,.08);color:var(--accent);border:none;border-radius:8px;
-  padding:6px 11px;font-size:.72rem;font-weight:700;font-family:inherit;}
-.pcview[hidden]{display:none;}
-/* 앱으로 깔기 — 한 번 하면 사라지는 단추라 눈에 띄어야 한다 */
-.appinst{background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;}
+/* 📲 앱으로 깔기 — 직원 폰 ⋯ 안(appInstallFab) · 관리자 설정 창 안(cfgAppInstallRow).
+   ⚠ ⋯ 안의 .docked 가 display 를 !important 로 켜므로, 숨김([hidden])이 그보다 세야 한다(아래 #moreDock 규칙). */
+#appInstallFab{display:none;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;border:none;
+  border-radius:99px;padding:7px 13px;font-size:.74rem;font-weight:700;font-family:inherit;
+  background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;}
+.cfg-tool[hidden]{display:none;}
 .sec{font-size:.82rem;font-weight:700;color:var(--sub);margin:24px 4px 12px;display:flex;align-items:center;gap:10px;}
 .sec h2{font:inherit;color:inherit;}
 /* 타일 순서 고정 토글 */
@@ -548,6 +561,9 @@ body.portal-mode #moreFab{display:flex;}
 /* 데려온 단추는 제 좌표를 버리고 이 줄에 선다 — 원래 파일의 inline position:fixed 를 덮어야 하므로 !important */
 #moreDock .docked{position:static!important;left:auto!important;right:auto!important;
   top:auto!important;bottom:auto!important;display:inline-flex!important;margin:0!important;}
+/* 숨긴 단추는 ⋯ 안에서도 숨는다 — 위 줄이 display 를 !important 로 켜서, 관리자 전용 「⚙ 설정」이
+   직원 폰 ⋯ 에 눌러도 안 되는 채로 떠 있었다. [hidden] 이 붙은 것만 끈다. */
+#moreDock .docked[hidden]{display:none!important;}
 @media(prefers-reduced-motion:no-preference){
   #moreDock.on > *{animation:dockIn .16s ease both;}
   @keyframes dockIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -974,8 +990,6 @@ body.portal-mode #moreFab{display:flex;}
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
       <button class="logout" id="logoutBtn">로그아웃</button>
-      <!-- 앱으로 깔기 — 폰에서, 아직 안 깔았을 때만 뜬다(JS 가 켠다) -->
-      <button class="pcview appinst" id="appInstallBtn" type="button" hidden>📲 앱으로 깔기</button>
       <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 💰 돈 자리 — 딱지 둘을 «붙여 세운다» (대표 결정 2026-09-12 「다」안).
            ⚠ 상자 자체도 JS 가 켠다(moneyBoxSync) — 둘 다 감춰졌는데 상자만 남으면
@@ -1044,6 +1058,8 @@ body.portal-mode #moreFab{display:flex;}
 
 <!-- ── 시스템 설정 (관리자 전용) — 화면 왼쪽 아래 구석 ── -->
 <button id="cfgFab" type="button" title="시스템 설정 (관리자 전용)">⚙ 설정</button>
+<!-- 📲 직원 폰의 「앱으로 깔기」 — ⋯ 안에 선다(관리자는 ⚙ 설정 창 안에서 깐다) -->
+<button id="appInstallFab" type="button" hidden title="홈 화면에 깔면 주소창·탭 없이 앱처럼 열립니다">📲 앱으로 깔기</button>
 <!-- ⋯ 더보기 — 설정·백업·복구·최신을 여기로 모은다 (dockAdopt) -->
 <div id="fabBar" role="group" aria-label="도구 모음">
   <button id="moreFab" type="button" aria-expanded="false" aria-controls="moreDock"
@@ -1157,6 +1173,16 @@ body.portal-mode #moreFab{display:flex;}
           <span>장애가 생기면 화면 왼쪽 아래에 빨갛게 뜹니다. 평소에 지난 것까지 보려면 여기서 여세요.</span>
         </div>
         <button type="button" id="cfgHealth">열어보기</button>
+      </div>
+
+      <!-- 📲 이 기기에 앱으로 깔기 (대표 결정 2026-09-23 ③안) — 폰에서, 아직 안 깔았을 때만 보인다.
+           저장하는 값이 아니라 «이 기기»에서 하는 일이다. 직원은 폰 ⋯ 안에서 깐다. -->
+      <div class="cfg-tool" id="cfgAppInstallRow" hidden>
+        <div>
+          <b>📲 이 기기에 앱으로 깔기</b>
+          <span>홈 화면에 깔면 주소창·탭 없이 앱처럼 열립니다.</span>
+        </div>
+        <button type="button" id="cfgAppInstall">깔기</button>
       </div>
 
       <label for="cfgGemini">Gemini API 키 <span class="cfg-free">무료</span></label>
@@ -3236,7 +3262,13 @@ body.portal-mode #moreFab{display:flex;}
   var CFG_PATH = 'data/app_config';
   var CFG_FIELDS = [['cfgGemini','geminiKey'], ['cfgNts','ntsKey'], ['cfgVapid','fcmVapidKey'], ['cfgRhwp','rhwpStudioUrl'], ['cfgProxy','aiProxyUrl'], ['cfgIdle','idleMinutes'], ['cfgTileCross','tileCrossRow']];
 
-  function cfgShowFab(){ var b = $('cfgFab'); if(b) b.style.display = sgIsAdmin() ? 'inline-flex' : 'none'; }
+  function cfgShowFab(){
+    var b = $('cfgFab'), admin = sgIsAdmin();
+    if(b){ b.style.display = admin ? 'inline-flex' : 'none'; b.hidden = !admin; }
+    /* 📲 앱으로 깔기 — 관리자는 설정 창 안, 직원은 폰 ⋯ 안. 누가 누군지 안 뒤에야 띄운다 */
+    window.__puInstallAdmin = admin;
+    if(typeof window.puAppInstallSync === 'function') window.puAppInstallSync();
+  }
 
   function cfgOpen(){
     if(!sgIsAdmin()) return;
@@ -4407,7 +4439,7 @@ body.portal-mode #moreFab{display:flex;}
   (function(){
     // ⋯ 안으로 접어 넣는 것 — 자주 안 쓰는 둘만
     /* ✨ TypeSafe(pu-typesafe-review-button)는 PC 에선 「업무 시스템」 줄에 서지만, 폰에서는 여기로 */
-    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'pu-typesafe-review-button'];
+    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'pu-typesafe-review-button', 'appInstallFab'];
     /* 아래 한 줄 바(#fabBar)에 세우는 것 — 자주 쓰거나(백업·복구),
        바로 눈에 띄어야 하는 것(장애 알림·연결 경고).
        이 셋은 각자 파일이 left/right:12px, bottom:12px 를 쓰고 있어 서로, 그리고
