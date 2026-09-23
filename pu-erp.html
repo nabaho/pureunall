@@ -309,8 +309,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-19 계약금·잔금 박스 flex 로 — 컨설팅 4→2줄, 사건 2→1줄';
-var BUILD_SEQ = 183;
+var ERP_BUILD = '2026-09-23 TypeSafe 검토 단추를 포털 머리 카드로 옮김(이알피에서 뺌)';
+var BUILD_SEQ = 184;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -23588,49 +23588,8 @@ function getActiveUsers(){
   return sortUsers(active);
 }
 
-/* ── TypeSafe(Jev) 로 보내기 전 — «우리가 아는» 이름·업체명을 가린다 ─────────────
-   대표 결정 2026-09-20 「이름·업체명 없이 판단해야 하는데」 → 「우리 목록만」(추천안).
-
-   ★ 왜 서버가 아니라 «여기»(화면)에서 하나 — 서버(functions/typesafe-evaluate.js)는
-     번호(주민번호·전화·계좌 등)만 가린다. 번호는 모양이 정해져 있어 기계가 확실히
-     찾지만, 이름·회사 이름은 그런 모양이 없다. 대신 «우리가 이미 아는» 직원 명부·
-     업체관리 이름은 확실히 가릴 수 있는데, 그걸 서버에서 하려면 명부 전체를 서버로
-     넘겨야 한다 — 가리려던 명부 자체가 새는 셈이라 화면에서 끝낸다.
-   ⚠★ 이건 «다 가린다»는 뜻이 아니다. **목록에 없는 사람(외부인·의뢰인)의 이름은
-     이 길로 못 잡는다.** 「우리 회사 사람·거래처는 가린다」는 뜻뿐이다.
-   ⚠ 긴 이름부터 바꾼다 — 짧은 이름이 긴 이름(예: 업체명 일부)을 먼저 망가뜨리면
-     안 된다. 같은 값은 같은 표(placeholder)로 바꿔 문맥이 유지되게 한다
-     (「김보람이 물었는데 김보람에게 답장」 → 「[직원1]이 물었는데 [직원1]에게」). */
-function typeSafeLocalRedact(text){
-  var out = String(text == null ? '' : text);
-  var 후보 = [];
-  var seen = {};
-  function 담기(list, field, 갈래){
-    (list || []).forEach(function(it){
-      var v = it && it[field] != null ? String(it[field]).trim() : '';
-      if(v.length < 2 || seen[갈래+':'+v]) return;
-      seen[갈래+':'+v] = true;
-      후보.push({ value:v, 갈래:갈래 });
-    });
-  }
-  try { 담기(dbGet('user_accounts', USERS_SEED) || [], 'name', '직원'); } catch(_){}
-  try { 담기(dbGet('companies', []) || [], 'name', '업체'); } catch(_){}
-  후보.sort(function(a,b){ return b.value.length - a.value.length; });
-  var placeholderOf = {}; var seq = { 직원:0, 업체:0 }; var hit = { 직원:0, 업체:0 };
-  후보.forEach(function(c){
-    if(out.indexOf(c.value) < 0) return;
-    var key = c.갈래+':'+c.value;
-    if(!placeholderOf[key]){ seq[c.갈래] += 1; placeholderOf[key] = '['+c.갈래+seq[c.갈래]+']'; }
-    var before = out;
-    out = out.split(c.value).join(placeholderOf[key]);
-    if(out !== before) hit[c.갈래] += 1;
-  });
-  var localMaskedKinds = [];
-  if(hit.직원) localMaskedKinds.push('직원 이름 '+hit.직원+'건');
-  if(hit.업체) localMaskedKinds.push('업체명 '+hit.업체+'건');
-  return { text:out, localMaskedKinds:localMaskedKinds };
-}
-window.PU_TYPESAFE_LOCAL_REDACT = typeSafeLocalRedact;
+/* TypeSafe(Jev) 검토 단추·이름 가리기는 2026-09-23 포털(enter.html)로 옮겼다 —
+   가리는 셈은 js/pu-typesafe.js 의 redactNames 한 곳에 있다(대표 지시 「캡쳐3화면으로 옮기고」). */
 
 
 // ── 담당자 정규화 (부팅 시 1회 실행, 멱등): 이름으로 저장된 managerMain/managerSubs를 사번으로 변환 ──
@@ -82330,30 +82289,6 @@ function App(){
   }
   var lgS = useState(isValidSession()); var isLoggedIn = lgS[0]; var setIsLoggedIn = lgS[1];
 
-  /* ── 로그인 전에는 떠 있는 TypeSafe 단추를 감춘다 (2026-09-20 대표 지시) ────
-     「✨ TypeSafe 검토」가 **로그인 화면 위에도 떠 있었다**. 로그인도 안 한 사람에게
-     눌러도 「로그인 후 이용해 주세요」밖에 안 나오는 단추를 보이는 것은,
-     시키는 대로 해도 아무것도 안 달라지는 안내와 같다.
-     ⚠ 파이어베이스 로그인만으로는 못 가른다 — 통합 로그인은 됐는데 직원표에 짝이
-       없어 이 화면에 머무는 동안에도 firebase.auth().currentUser 는 «있다».
-       그래서 이 앱이 아는 «진짜» 로그인(isLoggedIn)을 js/pu-typesafe.js 에 알려 준다.
-     ★ 2026-09-20 뒤로는 여러 화면이 나눠 쓰는 공용 부품(js/pu-typesafe.js)이라
-       그 파일이 정한 이름(PU_TYPESAFE_IS_LOGGED_IN)으로 넘긴다 — body 클래스는
-       이 화면만 아는 이름이라 다른 화면에 그 부품을 붙이면 안 먹는다.
-     ★★ 같은 자리에서 «관리자만 일단쓴다»(대표 결정 2026-09-20)도 함께 넘긴다.
-       이알피는 이미 CURRENT_USER.isAdmin/isSubAdmin 을 알고 있으니, 그 값을 그대로
-       PU_TYPESAFE_IS_ADMIN 에 채워 주면 부품이 굳이 서버(uid_roles)를 다시 안 읽는다.
-       ⚠ 화면 표시일 뿐이다 — 진짜 자격은 서버가 매번 다시 검사한다(functions/index.js
-       typeSafeIsAdmin). CURRENT_USER 는 모듈 전역이라 refreshCurrentUser() 가 이
-       useEffect 보다 먼저 끝나 있다(handleLogin 참고) — 그래서 여기서 읽어도 늦지 않다. */
-  useEffect(function(){
-    try {
-      window.PU_TYPESAFE_IS_LOGGED_IN = function(){ return isLoggedIn; };
-      window.PU_TYPESAFE_IS_ADMIN = function(){ return !!(CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin); };
-      if (window.PuTypeSafe && typeof window.PuTypeSafe.refresh === 'function') window.PuTypeSafe.refresh();
-    } catch(_){}
-  }, [isLoggedIn]);
-
   // 무효 세션 정리 (퇴직·삭제된 사용자의 세션 키가 남아있는 경우)
   useEffect(function(){
     if(getSessionSid() && !buildCurrentUser(getSessionSid())){
@@ -82977,7 +82912,6 @@ document.addEventListener('keydown', function(e){
   setTimeout(rm, 4000);
 })();
 </script>
-<script src="js/pu-typesafe.js?v=4"></script>
 <!-- 리액트 창은 useEscClose 가 걸어 준다. 이 줄은 그 밖의 옛 덮개용이다. -->
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
