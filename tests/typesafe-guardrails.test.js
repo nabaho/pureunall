@@ -10,8 +10,10 @@
  *   ㉢ 하루 한도가 «없었다» — 로그인한 직원 누구나 무제한
  * 셋을 고친 뒤, 대표가 「이알피 안에서만 쓰지 말고 통합시스템 전체에서 쓸 수 있게」라고
  * 하셔서 화면 쪽 코드를 js/pu-typesafe.js(공용 부품)로 뽑았다(pu-gate.js·pu-backup.js 와 같은 길).
- * ⚠ 뽑아낸 것 자체가 «켰다»는 뜻은 아니다 — 지금은 pu-erp.html 만 그 부품을 부른다.
- *   다른 화면에 붙이는 것은 대표 판단 나머지 둘(이름·국외보관)이 끝난 뒤의 걸음이다.
+ * ★ 2026-09-23 대표 지시 「푸른통합시스템 전체로 적용해서 캡쳐3화면으로 옮기고 연결해줘」 →
+ *   목업 ①안 「빼고 포털로만」. 이제 **enter.html(포털)만** 부품을 부르고 이알피에서는 뺐다.
+ *   포털은 떠 있는 단추 자리를 한 곳에서만 정하므로 「업무 시스템」 줄(로그인 후 바로가기 왼쪽)에 선다.
+ *   ⚠ 목업은 건의하기 왼쪽이었지만 관리자 머리 카드는 이미 꽉 차 넘쳐(실측 934→1081px) 옮겼다.
  * 세 판단 가운데 «사용범위»는 2026-09-20 에 정해졌다 — 「관리자만 일단쓴다」.
  * 화면(단추 숨김)과 서버(functions/index.js typeSafeIsAdmin) **둘 다** 본다 —
  * 화면 판정은 표시일 뿐이고, 진짜 자격은 서버가 매번 다시 검사한다.
@@ -33,6 +35,7 @@ const { stripComments, stripJs } = require('./strip-comments');
 const ROOT = path.join(__dirname, '..');
 const FN = fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8');
 const ERP = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
+const PORTAL = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
 const WIDGET = fs.readFileSync(path.join(ROOT, 'js', 'pu-typesafe.js'), 'utf8');
 
 /* 손잡이 하나 — 서버 쪽 판단이 한 곳에 모여 있어야 여기서 볼 수 있다 */
@@ -182,18 +185,43 @@ test('공용 부품은 «혼자서도» 돈다 — 이알피의 전역 도우미
   });
 });
 
-test('이알피는 자기가 아는 «진짜 로그인» 과 «관리자 여부»를 공용 부품에 넘긴다', () => {
-  const bare = stripComments(ERP);
-  assert.match(bare, /window\.PU_TYPESAFE_IS_LOGGED_IN\s*=\s*function\s*\(\s*\)\s*\{\s*return\s+isLoggedIn/,
-    '이알피가 자기만 아는 로그인 상태를 부품에 안 알려 주면, 부품은 파이어베이스 로그인만' +
-    ' 보고 판단해 통합 로그인 중 화면에서도 단추가 보일 수 있습니다.');
-  assert.match(bare, /window\.PU_TYPESAFE_IS_ADMIN\s*=\s*function\s*\(\s*\)\s*\{\s*return\s*!!\(\s*CURRENT_USER\.isAdmin\s*\|\|\s*CURRENT_USER\.isSubAdmin\s*\)/,
-    '이알피가 이미 아는 CURRENT_USER.isAdmin/isSubAdmin 을 부품에 안 넘기면, 이미 아는' +
-    ' 값이 있는데도 부품이 굳이 서버(uid_roles)를 다시 왕복합니다.');
-  assert.match(bare, /PuTypeSafe\.refresh/,
-    '로그인 상태가 바뀐 뒤 부품에 다시 보라고 알려 주지 않으면, 로그아웃해도 단추가 그대로 남습니다.');
-  assert.match(bare, /<script src="js\/pu-typesafe\.js\?v=\d+"><\/script>/,
-    '공용 부품 파일을 안 부르면 위의 넘겨주는 코드가 아무 소용이 없습니다.');
+test('★ 포털이 부품을 부르고 «업무 시스템 줄» 자리를 알려 준다 — 이알피에서는 뺐다(단추는 한 곳)', () => {
+  /* 대표 결정 2026-09-23 ①안 「빼고 포털로만」 — 두 곳에 두면 어디서 눌러야 하는지 헷갈린다. */
+  const bare = stripComments(PORTAL);
+  const 태그 = bare.search(/<script src="js\/pu-typesafe\.js\?v=\d+"><\/script>/);
+  assert.ok(태그 > 0, '포털이 공용 부품을 안 부릅니다 — 옮긴 단추가 아예 안 생깁니다.');
+  const 자리 = bare.search(/window\.PU_TYPESAFE_MOUNT\s*=/);
+  assert.ok(자리 > 0 && 자리 < 태그,
+    '자리(PU_TYPESAFE_MOUNT)를 부품보다 «먼저» 알려 줘야 합니다 — 늦으면 왼쪽 아래에 떠서' +
+    ' 「업·복구」「설정」 자리와 겹칩니다.');
+  assert.match(bare.slice(자리, 태그), /homeBar/, '「업무 시스템」 줄(로그인 후 바로가기 옆)을 자리로 안 줍니다.');
+  assert.doesNotMatch(bare.slice(자리, 태그), /\.pbar/,
+    '머리 카드(.pbar)에 넣으면 관리자 화면에서 카드 밖으로 163px 넘칩니다(2026-09-23 실측).');
+  /* 폰 머리 줄은 좁다 — ⋯ 안으로 데려가는 목록에 있어야 한다 */
+  assert.match(bare, /DOCK_IDS\s*=\s*\[[^\]]*'pu-typesafe-review-button'/,
+    '폰에서 ⋯ 안으로 안 들어가 머리 줄을 밀어냅니다.');
+  assert.match(bare, /addEventListener\(\s*'pu-typesafe-mounted'/,
+    '단추는 「업무 시스템」 줄 안에 생겨 body 지켜보기에 안 걸립니다 — 생겼다는 알림을 안 받으면 폰에서 안 접힙니다.');
+  assert.doesNotMatch(stripComments(ERP), /js\/pu-typesafe\.js/,
+    '이알피가 아직 부품을 부릅니다 — 「옮기고」가 아니라 두 곳이 됐습니다.');
+  /* ★ 폰 → PC 로 돌아갈 때 차례 (2026-09-23 실제로 터졌다) — 폰에서는 옆 자리(로그인 후
+     바로가기)가 머리 카드로 가 있다. 그걸 먼저 되돌리지 않으면 insertBefore 가 죽고,
+     그 한 번에 설정·최신 단추까지 ⋯ 안에 갇힌다. */
+  const 맞추개 = bare.slice(bare.indexOf('function sync(){'), bare.indexOf('function sync(){') + 260);
+  const 되돌림 = 맞추개.indexOf('moveHomeBar(false)'), 풀기 = 맞추개.indexOf('release()');
+  assert.ok(되돌림 > 0 && 풀기 > 0 && 되돌림 < 풀기,
+    'PC 로 돌아갈 때 «로그인 후 바로가기»를 먼저 되돌리지 않습니다 — ⋯ 안 단추들이 갇힙니다.');
+});
+
+test('부품은 호스트가 준 자리에 «떠 있지 않게» 서고, 없으면 예전처럼 뜬다', () => {
+  const bare = stripJs(WIDGET);
+  const 단추개 = cutFn(bare, 'function addButton(');
+  assert.match(단추개, /typeof\s+w\.PU_TYPESAFE_MOUNT\s*===\s*'function'/, '호스트가 준 자리를 안 봅니다.');
+  const 넣는곳 = 단추개.indexOf('insertBefore(b');
+  assert.ok(넣는곳 > 0, '준 자리에 넣지 않습니다.');
+  const 준자리 = 단추개.slice(단추개.lastIndexOf('if (at && at.parent)', 넣는곳), 넣는곳);
+  assert.doesNotMatch(준자리, /position:\s*fixed/, '준 자리에 넣으면서도 화면에 떠 있게 둡니다.');
+  assert.match(단추개, /dispatchEvent\(\s*new CustomEvent\(\s*'pu-typesafe-mounted'/, '생겼다는 알림을 안 보냅니다.');
 });
 
 test('화면은 까닭(why)을 «무엇을 하면 되는지»로 바꿔 보인다', () => {
@@ -232,12 +260,20 @@ test('업체를 부르기 «전»에 이름·업체명을 먼저 가린다', () 
     '가린 결과를 text 에 다시 담지 않으면 원문이 그대로 나갑니다.');
 });
 
-test('호스트가 안 가려 줘도(다른 화면) 죽지 않고 원문을 그대로 쓴다', () => {
+test('호스트가 안 가려 주면(포털) 스스로 목록을 읽어 가리고, 못 읽으면 «못 가렸다»를 밝힌다', () => {
   const bare = stripJs(WIDGET);
-  const 가리개 = cutFn(bare, 'function localRedact(');
-  assert.match(가리개, /typeof\s+w\.PU_TYPESAFE_LOCAL_REDACT\s*!==\s*'function'/,
-    '정의 여부를 가르는 지키개가 없습니다 — 다른 화면(정의 안 함)에서 그냥 죽을 수 있습니다.');
-  assert.match(가리개, /catch/, '가리는 함수가 죽어도 판단 자체는 막지 말아야 하는데, 받는 자리가 없습니다.');
+  const 가리개 = cutFn(bare, 'async function localRedact(');
+  assert.match(가리개, /typeof\s+w\.PU_TYPESAFE_LOCAL_REDACT\s*===\s*'function'/,
+    '호스트가 가려 주는지 가르는 지키개가 없습니다.');
+  assert.match(가리개, /loadNameLists\(\)/,
+    '호스트가 안 가려 줄 때 목록을 스스로 읽지 않습니다 — 번호만 가려진 채 나갑니다.');
+  assert.match(가리개, /catch/, '목록 읽기가 죽어도 판단 자체는 막지 말아야 하는데, 받는 자리가 없습니다.');
+  assert.match(가리개, /namesMissed:\s*true/, '못 읽었을 때 «못 가렸다»는 표시를 안 남깁니다.');
+  const 읽개 = cutFn(bare, 'function loadNameLists(');
+  assert.match(읽개, /'data\/user_accounts\/v'/, '직원 명부를 안 읽습니다.');
+  assert.match(읽개, /'data\/companies\/v'/, '업체관리 목록을 안 읽습니다.');
+  const 함수몸 = cutFn(bare, 'async function run(');
+  assert.match(함수몸, /local\.namesMissed/, '못 가렸다는 사실을 결과에 안 보입니다.');
 });
 
 test('가린 항목 안내에 «우리 목록» 가림과 서버(번호) 가림이 함께 보인다', () => {
@@ -248,11 +284,9 @@ test('가린 항목 안내에 «우리 목록» 가림과 서버(번호) 가림�
     ' 가려졌는지 한쪽만 보이면 나머지는 가려진 줄 착각하기 쉽습니다.');
 });
 
-test('이알피는 우리가 아는 이름·업체명 가리기 함수를 공용 부품에 실제로 넘긴다', () => {
-  const bare = stripComments(ERP);
-  assert.match(bare, /window\.PU_TYPESAFE_LOCAL_REDACT\s*=\s*typeSafeLocalRedact/,
-    '전역에 안 걸면 js/pu-typesafe.js 가 이 함수를 찾지 못해 번호만 가려진 채 나갑니다.');
-  const 가리개 = cutFn(bare, 'function typeSafeLocalRedact(');
-  assert.match(가리개, /dbGet\(\s*'user_accounts'/, '직원 명부를 안 봅니다.');
-  assert.match(가리개, /dbGet\(\s*'companies'/, '업체관리 목록을 안 봅니다.');
+test('가리는 셈은 «한 곳»(부품 redactNames)뿐이다 — 이알피에 옛 벌이 남지 않는다', () => {
+  /* 두 벌이면 한쪽만 고쳐진다(긴 이름부터·한 글자 빼기 같은 방어선이 한쪽에서만 빠진다). */
+  assert.doesNotMatch(stripComments(ERP), /function\s+typeSafeLocalRedact\s*\(/,
+    '이알피에 옛 가리기 함수가 남아 있습니다 — 셈이 두 벌이 됩니다.');
+  assert.match(stripJs(WIDGET), /function\s+redactNames\s*\(/, '부품에 가리는 셈이 없습니다.');
 });
