@@ -46,13 +46,13 @@ function makeSandbox(lockedYms, initialGrants) {
     isPayrollLocked: function (ym) { return (lockedYms || []).indexOf(ym) >= 0; },
     showToast: function (msg) { toasts.push(msg); },
     popConfirm: function () { return Promise.resolve(confirmAnswer); },
-    parseInt: parseInt, Object: Object, Promise: Promise, console: console,
+    parseInt: parseInt, Object: Object, Promise: Promise, console: console, Array: Array, String: String,
   };
   vm.createContext(ctx);
   const saveOverride = cutFn(SRC, 'function saveOverride(){');
   const resetOverride = cutFn(SRC, 'async function resetOverride(){');
   vm.runInContext(
-    saveOverride + '\n' + resetOverride +
+    cutFn(SRC, 'function _erpNameMap(') + '\n' + saveOverride + '\n' + resetOverride +
     '\nvar __api = { saveOverride:saveOverride, resetOverride:resetOverride };',
     ctx
   );
@@ -77,4 +77,16 @@ test('★★ 마감된 해는 되돌리기(resetOverride)도 막는다', async (
   await api.resetOverride();
   assert.ok(store.leave_grants['A-002']['2026'], '잠긴 해인데 지워져 버렸다');
   assert.ok(toasts.some((t) => t.indexOf('마감') >= 0), '잠김 안내 토스트가 없다');
+});
+
+/* 2026-09-23 찾음 — 서버의 휴가부여가 옛 코드에 뭉개져 «번호·사번 없는 배열»로 남아 있었다.
+   그 배열에 사번을 달면 JSON 으로 바꿀 때 조용히 빠져 「수정됨」이라 뜨고 아무것도 안 남았다. */
+test('★★ 휴가부여가 뭉개진 배열로 와도 저장이 실제로 남는다 — 옛 칸도 지우지 않는다', () => {
+  const 뭉갠 = [{ '2025': { total: 16, carryOver: 0 } }, { '2025': { total: 15, carryOver: 0 } }];
+  const { store, api } = makeSandbox([], 뭉갠);
+  api.saveOverride();
+  const 저장된 = JSON.parse(JSON.stringify(store.leave_grants));   // 서버로 갈 때처럼 JSON 을 한 번 거친다
+  assert.ok(저장된['A-002'] && 저장된['A-002']['2026'], '★★ 사번 칸이 JSON 에서 빠졌습니다 — 「수정됨」이라 뜨고 아무것도 안 남습니다');
+  assert.strictEqual(저장된['A-002']['2026'].total, 16);
+  assert.ok(저장된['0'] && 저장된['1'], '★ 옛 칸을 지웠습니다 — 주인을 모를 뿐 자료입니다');
 });

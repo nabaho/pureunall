@@ -4917,7 +4917,7 @@ function dbSet(k, v){
       /* ★ 어느 «줄»을 바꿨는지도 적는다 (2026-09-23) — 표 통째 표시만 두면 나중에
            이 PC 사본 전체가 «못 보낸 변경»으로 읽혀, 남이 넣은 줄은 지우고 남이 지운
            줄은 되살린다. 까닭은 _fbOpsAdd 머리글. */
-      try { if(DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v)){ var _po0 = (window._fbPendingOps = window._fbPendingOps || {}); _po0[k] = _fbOpsAdd(_po0[k], prev, v); } } catch(_){}
+      try { _fbPendRecord(k, prev, v); } catch(_){}   /* 줄(_fbOpsAdd)·열쇠(_fbMapOpsAdd)로 적는다 */
       return true;
     }
     try {
@@ -4934,7 +4934,7 @@ function dbSet(k, v){
       var _markPending = function(){
         try { (window._fbPendingKeys = window._fbPendingKeys || {})[k] = true; } catch(_){}
         /* ★ 이 저장이 «실제로 바꾼 줄»만 못 보낸 것으로 적는다 (2026-09-23, _fbOpsAdd 머리글) */
-        try { if(DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v)){ var _po1 = (window._fbPendingOps = window._fbPendingOps || {}); _po1[k] = _fbOpsAdd(_po1[k], prev, v); } } catch(_){}
+        try { _fbPendRecord(k, prev, v); } catch(_){}   /* 줄(_fbOpsAdd)·열쇠(_fbMapOpsAdd)로 적는다 */
       };
 
       // ── 자동 Diff Sync (핵심 5개 키) — 1단계: 변경 개수 무관 항상 건별 저장 ──
@@ -5184,8 +5184,13 @@ function dbSet(k, v){
           }
           fbDb.ref('data/'+k).transaction(function(cur){
             // 서버가 이미 다른 모양(배열·숫자 등)이면 손대지 않는다 — 병합할 수가 없다
-            if(cur && cur.v !== undefined && cur.v !== null && !erpObjIsMap(cur.v)){ _mGuard = '형태'; return; }
-            var merged = erpObjMerge(cur && cur.v, _md);
+            /* ⚠ 단, 번호 없는 것들의 배열은 옛 코드가 사번 묶음표를 뭉갠 꼴이다(휴가부여 2026-06-29~).
+                 실시간DB 에서 배열은 「0,1,2…」 열쇠 지도와 같은 것이라 그 열쇠 그대로 펴고 얹는다 —
+                 옛 자리는 한 칸도 안 지운다. 이것을 막으면 그 표는 영영 저장이 안 된다. */
+            var _mBase = cur && cur.v;
+            if(Array.isArray(_mBase) && !_mBase.some(function(x){ return x && typeof x === 'object' && x.id != null; })) _mBase = _erpNameMap(_mBase);
+            if(_mBase !== undefined && _mBase !== null && !erpObjIsMap(_mBase)){ _mGuard = '형태'; return; }
+            var merged = erpObjMerge(_mBase, _md);
             var newTs = Math.max(((cur && typeof cur.u === 'number') ? cur.u : 0) + 1, Date.now());
             return { v: merged, u: newTs };
           }, function(err, committed, snap){
@@ -5349,8 +5354,12 @@ function computeArrayDiff(prev, next){
      · 못 보낸 변경을 «줄»로 적는다: { up:{id:줄}, rm:{id:1} }. 이 저장이 실제로 바꾼 것뿐이다.
      · 되살리기·다시 보내기는 그 줄만 한다. 적히지 않은 줄은 «남이 지운 것»으로 본다.
      · 기준(prev)을 모르는 저장이 이름 열쇠 표에 오면 서버 줄을 «하나도» 지우지 않는다.
-   ⚠ 옛 «숫자 열쇠» 모양 표(연장근로·휴가부여·비정기급여 — 각 11~17건)는 줄 단위로 서버에
-     쓸 수 없어 예전 길로 둔다. 이름 열쇠 표(급여·계약·사건·업체·입금 등)가 이 길을 탄다. */
+   ★ 옛 «숫자 열쇠» 모양 표(연장근로·비정기급여)도 이제 같은 뜻을 따른다 (2026-09-23 저녁).
+     서버가 줄마다 경로를 못 가진 꼴이라 경로로는 못 쓰지만, «트랜잭션»으로 서버 지금 값을
+     읽어 적힌 줄만 얹고 그 자리에서 이름 열쇠 꼴로 바꿔 쓴다(_fbReplayOpsTxn).
+     한 번 그렇게 쓰이면 그 뒤로는 보통 길(줄 경로)을 탄다.
+   ★ 사번으로 묶은 표(휴가부여 leave_grants 등)는 «줄»이 아니라 «열쇠»로 적는다(_fbMapOpsAdd).
+     다시 보낼 때도 적힌 열쇠만 서버 지금 값 위에 얹는다(_fbReplayMapOps). */
 function _fbOpsAdd(ops, prev, next){
   ops = ops || { up:{}, rm:{} };
   ops.up = ops.up || {}; ops.rm = ops.rm || {};
@@ -5366,7 +5375,34 @@ function _fbOpsAdd(ops, prev, next){
   return ops;
 }
 function _fbOpsEmpty(ops){
-  return !ops || (!Object.keys(ops.up || {}).length && !Object.keys(ops.rm || {}).length);
+  if(!ops) return true;
+  var m = ops.map;
+  if(m && (Object.keys(m.set || {}).length || Object.keys(m.del || {}).length)) return false;
+  return !Object.keys(ops.up || {}).length && !Object.keys(ops.rm || {}).length;
+}
+/* 사번으로 묶은 표(객체)의 못 보낸 변경 — «바뀐 열쇠»만 적는다.
+   ⚠ 서버가 옛 코드에 뭉개져 배열이 된 표는 이 PC 에도 배열로 온다. 그 배열은
+     「0,1,2…」 열쇠 지도와 같은 것이라(실시간DB 는 배열을 그렇게 담는다) _erpNameMap 으로
+     그 열쇠 그대로 편다 — 그래야 저장이 옛 자리를 «지운 것»으로 오인하지 않는다. */
+function _erpNameMap(x){
+  if(Array.isArray(x)){ var o = {}; x.forEach(function(v, i){ if(v != null) o[String(i)] = v; }); return o; }
+  return (x && typeof x === 'object') ? x : {};
+}
+function _fbMapOpsAdd(ops, prev, next){
+  ops = ops || { up:{}, rm:{} };
+  var m = ops.map = ops.map || { set:{}, del:{} };
+  m.set = m.set || {}; m.del = m.del || {};
+  var d = erpObjDiff(_erpNameMap(prev), next);
+  if(!d) return ops;
+  Object.keys(d.set).forEach(function(key){ m.set[key] = d.set[key]; delete m.del[key]; });
+  d.del.forEach(function(key){ m.del[key] = 1; delete m.set[key]; });
+  return ops;
+}
+/* 못 보낸 저장을 적는 한 자리 — 동기화 전 보류·보내기 실패 둘 다 여기로 온다 */
+function _fbPendRecord(k, prev, v){
+  var po = (window._fbPendingOps = window._fbPendingOps || {});
+  if(DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v)) po[k] = _fbOpsAdd(po[k], prev, v);
+  else if(erpObjIsMap(v)) po[k] = _fbMapOpsAdd(po[k], prev, v);
 }
 /* 적어 둔 줄을 지금 사본에 얹는다 — 적히지 않은 줄은 «손대지 않는다» */
 function _fbOpsApply(arr, ops){
@@ -5425,9 +5461,10 @@ function _fbReplayOps(k){
   var po = window._fbPendingOps || {};
   var ops = po[k];
   if(_fbOpsEmpty(ops)){ delete po[k]; return false; }
-  if(_fbObjForm[k] !== true) return false;
   if(!fbDb || !_fbSynced) return false;
+  if(ops.map) return _fbReplayMapOps(k, ops);
   var cur = dbGet(k, []) || [];
+  if(!Array.isArray(cur)) return false;
   var nRm = Object.keys(ops.rm || {}).length;
   var bulkOk = window._bulkDeleteIntent && (Date.now() - window._bulkDeleteIntent < 15000);
   if(cur.length >= 10 && nRm >= cur.length * 0.5 && !bulkOk){
@@ -5436,6 +5473,8 @@ function _fbReplayOps(k){
     delete po[k]; if(window._fbPendingKeys) delete window._fbPendingKeys[k];
     return true;
   }
+  /* 서버가 옛 «숫자 열쇠» 꼴이면 줄 경로가 없다 — 트랜잭션으로 적힌 줄만 얹는다 */
+  if(_fbObjForm[k] !== true) return _fbReplayOpsTxn(k, ops);
   delete po[k]; if(window._fbPendingKeys) delete window._fbPendingKeys[k];
   var next = _fbOpsApply(cur, ops);
   /* 이 PC 사본에도 얹는다 — 서버 값을 받으며 덮였을 수 있다 */
@@ -5453,13 +5492,105 @@ function _fbReplayOps(k){
     console.log('[동기화보호] 보류됐던 '+k+' 줄 '+(Object.keys(ops.up).length+nRm)+'건만 다시 보냈습니다');
   }).catch(function(e){
     /* 또 못 보냈다 — 줄을 도로 적어 둔다(다음 연결 때 다시) */
-    var p2 = (window._fbPendingOps = window._fbPendingOps || {});
-    var back = p2[k] || { up:{}, rm:{} };
-    Object.keys(ops.up).forEach(function(id){ if(!back.rm[id]) back.up[id] = back.up[id] || ops.up[id]; });
-    Object.keys(ops.rm).forEach(function(id){ if(!back.up[id]) back.rm[id] = 1; });
-    p2[k] = back;
-    (window._fbPendingKeys = window._fbPendingKeys || {})[k] = true;
+    _fbOpsPutBack(k, ops);
     fbSyncFail(e);
+  });
+  return true;
+}
+
+/* 또 못 보냈을 때 적힌 것을 도로 적어 둔다(다음 연결 때 다시). 그 사이 새로 적힌 것이 이긴다. */
+function _fbOpsPutBack(k, ops){
+  var p2 = (window._fbPendingOps = window._fbPendingOps || {});
+  var back = p2[k] || { up:{}, rm:{} };
+  back.up = back.up || {}; back.rm = back.rm || {};
+  Object.keys(ops.up || {}).forEach(function(id){ if(!back.rm[id] && !back.up[id]) back.up[id] = ops.up[id]; });
+  Object.keys(ops.rm || {}).forEach(function(id){ if(!back.up[id]) back.rm[id] = 1; });
+  if(ops.map){
+    var bm = back.map = back.map || { set:{}, del:{} };
+    Object.keys(ops.map.set || {}).forEach(function(key){ if(!bm.del[key] && !(key in bm.set)) bm.set[key] = ops.map.set[key]; });
+    Object.keys(ops.map.del || {}).forEach(function(key){ if(!(key in bm.set)) bm.del[key] = 1; });
+  }
+  p2[k] = back;
+  (window._fbPendingKeys = window._fbPendingKeys || {})[k] = true;
+}
+/* 트랜잭션이 끝난 서버 값을 이 PC 사본에도 그대로 둔다 */
+function _fbTakeServer(k, snap, asArray){
+  try {
+    var sv = snap.val() || {};
+    var val = asArray ? normalizeFbValue(sv.v) : (sv.v === undefined || sv.v === null ? {} : sv.v);
+    _erpStoreSet(k, JSON.stringify(val));
+    localStorage.setItem(KEY+'_meta_'+k, String(typeof sv.u === 'number' ? sv.u : Date.now()));
+    _dbCache[k] = val;
+    _fbObjForm[k] = !!(sv.v && typeof sv.v === 'object' && !Array.isArray(sv.v));
+    try { _scheduleFbChanged(k); } catch(_){}
+  } catch(_e){ window._erpErrLog && window._erpErrLog(_e); }
+}
+/* ★★ 옛 «숫자 열쇠» 꼴 표(연장근로·비정기급여)의 못 보낸 줄 (2026-09-23 저녁)
+     예전에는 이 표들만 «사본을 지우고 dbSet» 하는 옛 길로 갔다 — 급여 40건이 사라진 그 길이다.
+     서버 지금 값을 트랜잭션으로 읽어 «적힌 줄만» 얹는다. 적히지 않은 줄은 서버 그대로다.
+   ★ 쓰는 김에 이름 열쇠 꼴(arrayToIdMap)로 바꾼다 — 그다음부터는 줄 경로 길을 탄다.
+   ⚠ 서버에 번호 없는 줄이 하나라도 있으면 손대지 않는다 — 이름 열쇠 꼴로 바꾸면 그 줄이 빠진다.
+   ⚠ 급감 기준은 보통 저장과 같다(10건 이상에서 절반 아래로). */
+function _fbReplayOpsTxn(k, ops){
+  var po = window._fbPendingOps || {};
+  delete po[k]; if(window._fbPendingKeys) delete window._fbPendingKeys[k];
+  var guard = '';
+  var bulkOk = window._bulkDeleteIntent && (Date.now() - window._bulkDeleteIntent < 15000);
+  fbDb.ref('data/'+k).transaction(function(cur){
+    var arr = [];
+    if(cur && cur.v !== undefined && cur.v !== null){
+      try { arr = normalizeFbValue(cur.v); } catch(_e){ guard = '형태'; return; }
+    }
+    if(!Array.isArray(arr)){ guard = '형태'; return; }
+    if(!arr.every(function(x){ return x && x.id != null && x.id !== ''; })){ guard = '번호 없는 줄'; return; }
+    var merged = _fbOpsApply(arr, ops);
+    if(arr.length >= 10 && merged.length < arr.length * 0.5 && !bulkOk){ guard = '급감'; return; }
+    var newTs = Math.max(((cur && typeof cur.u === 'number') ? cur.u : 0) + 1, Date.now());
+    return { v: arrayToIdMap(merged), u: newTs };
+  }, function(err, committed, snap){
+    if(err || !committed || !snap){
+      console.warn('[동기화보호] '+k+': 보류됐던 줄을 못 보냈습니다' + (guard ? ' ('+guard+' 보호 — 서버는 그대로)' : ''));
+      if(guard === '급감'){
+        try { window.erpAlert && erpAlert('danger', '보류됐던 대량 지우기: '+k, '연결이 끊긴 동안 지운 것으로 적힌 줄이 절반을 넘어 서버에 보내지 않았습니다.', '의도한 것이면 F12 콘솔에 erpAllowBulk() 입력 후 15초 안에 다시 저장하세요.'); } catch(_){}
+        return;
+      }
+      _fbOpsPutBack(k, ops);
+      if(err) fbSyncFail(err);
+      return;
+    }
+    _fbTakeServer(k, snap, true);
+    console.log('[동기화보호] 보류됐던 '+k+' 줄만 서버 지금 값 위에 얹었습니다(옛 꼴 → 이름 열쇠 꼴)');
+  });
+  return true;
+}
+/* ★★ 사번으로 묶은 표(휴가부여 등)의 못 보낸 열쇠 (2026-09-23 저녁)
+     예전에는 사본을 지우고 dbSet 을 불러, 이 PC 에 있는 «모든» 열쇠를 서버에 다시 썼다 —
+     그 사이 남이 고친 사람의 값이 이 PC 의 옛 값으로 되돌아갔다.
+     이제는 적힌 열쇠만 서버 지금 값 위에 얹는다.
+   ⚠ 서버가 뭉개진 배열(번호 없는 것들)이면 그 「0,1,2…」 자리를 그대로 둔 채 얹는다 — 잃는 것이 없다.
+     번호 있는 줄의 배열(목록 표)이면 모양이 다른 것이라 손대지 않는다. */
+function _fbReplayMapOps(k, ops){
+  var po = window._fbPendingOps || {};
+  delete po[k]; if(window._fbPendingKeys) delete window._fbPendingKeys[k];
+  var d = { set: ops.map.set || {}, del: Object.keys(ops.map.del || {}) };
+  var guard = '';
+  fbDb.ref('data/'+k).transaction(function(cur){
+    var base = cur && cur.v;
+    if(Array.isArray(base)){
+      if(base.some(function(x){ return x && typeof x === 'object' && x.id != null; })){ guard = '형태'; return; }
+      base = _erpNameMap(base);
+    } else if(base != null && !erpObjIsMap(base)){ guard = '형태'; return; }
+    var newTs = Math.max(((cur && typeof cur.u === 'number') ? cur.u : 0) + 1, Date.now());
+    return { v: erpObjMerge(base, d), u: newTs };
+  }, function(err, committed, snap){
+    if(err || !committed || !snap){
+      console.warn('[동기화보호] '+k+': 보류됐던 열쇠를 못 보냈습니다' + (guard ? ' ('+guard+' 보호 — 서버는 그대로)' : ''));
+      _fbOpsPutBack(k, ops);
+      if(err) fbSyncFail(err);
+      return;
+    }
+    _fbTakeServer(k, snap, false);
+    console.log('[동기화보호] 보류됐던 '+k+' 열쇠 '+(Object.keys(d.set).length + d.del.length)+'개만 서버 지금 값 위에 얹었습니다');
   });
   return true;
 }
@@ -9967,7 +10098,8 @@ function _fbApplyRecordInner(k, v, opts){
            대부분은 «남이 지운 줄»이다 — 낡은 PC 일수록 많다. 그래서 로그인할 때마다
            지워진 것이 살아났다(2026-09-23 급여 옛 열쇠 41건). */
       var _pOps = (window._fbPendingOps && window._fbPendingOps[k]) || null;
-      var _useOps = !!(_pOps && !_fbOpsEmpty(_pOps) && _fbObjForm[k] === true);
+      /* 옛 숫자 열쇠 꼴·묶음표도 적힌 것만 다시 보낸다(_fbReplayOpsTxn·_fbReplayMapOps) */
+      var _useOps = !!(_pOps && !_fbOpsEmpty(_pOps));
       try {
         if(window._fbPendingKeys && window._fbPendingKeys[k] && Array.isArray(arrValue)){
           var _lb = dbGet(k, null);
@@ -10838,7 +10970,9 @@ if(fbDb){
                서버 표를 사본으로 «통째» 바꿨다 — 낡은 PC 가 남이 넣은 줄을 지운 길이다.
              ⚠ 이름 열쇠 표인데 적힌 줄이 없으면 아무것도 안 민다 — 통째로 밀 까닭이 없다. */
           if(_fbReplayOps(k)) return;
-          if(DIFF_KEYS.indexOf(k) >= 0 && _fbObjForm[k] === true){
+          /* ⚠ 건별 표는 서버 꼴(이름 열쇠·옛 숫자 열쇠)과 상관없이 통째로 안 민다 (2026-09-23 저녁)
+               — 옛 숫자 열쇠 표만 아래 옛 길로 가던 구멍을 닫았다. 사번 묶음표는 열쇠로 적혀 위에서 끝난다. */
+          if(DIFF_KEYS.indexOf(k) >= 0){
             if(window._fbPendingOps) delete window._fbPendingOps[k];
             console.warn('[동기화보호] '+k+': 적힌 줄이 없어 통째로 밀지 않았습니다');
             return;
@@ -73350,7 +73484,9 @@ function LeaveManagement(){
     if(typeof isPayrollLocked==='function' && isPayrollLocked(selYear+'-12')){
       showToast('🔒 '+selYear+'년은 마감되어 부여일수를 고칠 수 없습니다'); return;
     }
-    var g = dbGet('leave_grants',{});
+    /* ⚠ 서버가 뭉개져 배열로 오면 g[사번] 이 JSON 에서 조용히 빠진다 — 「수정됨」이라 뜨고 아무것도
+         안 남았다(2026-09-23 찾음). 그 열쇠 그대로 지도로 펴서 쓴다. */
+    var g = _erpNameMap(dbGet('leave_grants',{}));
     if(!g[modalSid]) g[modalSid]={};
     g[modalSid][selYear]={total:parseInt(mForm.total)||0, carryOver:parseInt(mForm.carryOver)||0};
     dbSet('leave_grants',g);
@@ -73362,7 +73498,7 @@ function LeaveManagement(){
       showToast('🔒 '+selYear+'년은 마감되어 부여일수를 고칠 수 없습니다'); return;
     }
     if(!(await popConfirm('자동 계산값으로 되돌릴까요?'))) return;
-    var g = dbGet('leave_grants',{});
+    var g = _erpNameMap(dbGet('leave_grants',{}));   /* 뭉개진 배열이어도 지도로 (saveOverride 참고) */
     if(g[selSid]&&g[selSid][selYear]) delete g[selSid][selYear];
     dbSet('leave_grants',g);
     setModalSid(null);

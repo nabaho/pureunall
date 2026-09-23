@@ -91,7 +91,10 @@ t('묶음표는 따로 다룬다', SAVE.length > 500, true);
 t('★ 트랜잭션으로 얹는다 (읽고 쓰는 사이에 남이 끼어들어도 안 지워진다)',
   /fbDb\.ref\('data\/'\+k\)\.transaction\(function\(cur\)\{/.test(SAVE), true);
 t('바뀐 열쇠만 계산한다', /var _md = erpObjDiff\(prev, v\);/.test(SAVE), true);
-t('서버 현재값 위에 얹는다', /var merged = erpObjMerge\(cur && cur\.v, _md\);/.test(SAVE), true);
+/* 얹는 바탕이 «서버 지금 값»(cur.v)에서 오는가 — 뭉개진 배열을 지도로 펴는 한 단계가 끼어도 된다 */
+t('서버 현재값 위에 얹는다',
+  /var merged = erpObjMerge\(cur && cur\.v, _md\);/.test(SAVE)
+  || (/var _mBase = cur && cur\.v;/.test(SAVE) && /var merged = erpObjMerge\(_mBase, _md\);/.test(SAVE)), true);
 t('바뀐 게 없으면 아예 안 보낸다', /if\(_md && _md\.n === 0\)\{ _metaRollback\(\); return true; \}/.test(SAVE), true);
 t('서버가 딴 모양이면 손대지 않는다', /_mGuard = '형태'; return;/.test(SAVE), true);
 t('시각은 늘 커진다 (시계가 틀어져도 뒤로 안 간다)',
