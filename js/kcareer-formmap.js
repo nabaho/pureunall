@@ -343,7 +343,8 @@
   function appendAfter(tc, value) {
     var m = tc.match(/(<hp:t(?:\s[^>]*)?>)([\s\S]*?)(<\/hp:t>)/);
     if (!m) return null;
-    return tc.replace(m[0], m[1] + m[2] + ' ' + esc(value) + m[3]);
+    /* 글이 길어지니 옛 줄 정보를 걷는다 — 안 그러면 한글에서 한 줄에 겹친다 */
+    return X.dropLines(tc.replace(m[0], m[1] + m[2] + ' ' + esc(value) + m[3]));
   }
 
   /* ── 한 글자씩 쪼개진 칸 ──

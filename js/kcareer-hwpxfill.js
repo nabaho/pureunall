@@ -287,20 +287,45 @@
   }
   function isEmptyCell(tc) { return cellText(tc) === ''; }
 
-  /* 빈 칸에 값을 넣는다. 실제 한글 파일의 네 가지 빈 칸 모양을 다 받는다:
-     <hp:t></hp:t> · <hp:t/> · run에 t 없음 · 문단에 run 없음.
+  /* ★ 글자를 바꾼 문단의 «줄 정보»(linesegarray)를 걷어낸다 (2026-09-24, 한글로 직접 열어 보고).
+     줄 정보는 «이 문단은 몇째 글자에서 줄을 바꾼다»를 적어 둔 것인데, 한글은 파일에 든
+     것을 그대로 믿고 그린다. 글이 길어졌는데 옛 줄 정보가 남아 있으면 한 줄에 겹쳐 찍힌다
+     (실측: 한 줄짜리 제목에 긴 이름을 넣자 글자가 포개져 못 읽었다).
+     걷어내면 한글도 우리 엔진(rhwp)도 새로 나눠 그린다 — 두 쪽 다 확인했다.
+     ⚠ «바꾼 칸·문단»에서만 걷는다. 손대지 않은 곳은 서식이 정한 모양 그대로 둔다. */
+  function dropLines(s) {
+    return String(s).replace(/<hp:linesegarray\b[^>]*\/>|<hp:linesegarray\b[^>]*>[\s\S]*?<\/hp:linesegarray>/g, '');
+  }
+  /* 맨 안쪽 문단(안에 문단이 또 없는 것)마다 fn 을 돌리고, 글자가 바뀐 문단만 줄 정보를 걷는다.
+     {{토큰}} 바꾸기처럼 «문서 전체»에 글자 바꾸기를 하는 길이 쓴다. */
+  function relineLeaves(xml, fn) {
+    return String(xml).replace(/<hp:p\b(?:(?!<hp:p\b)[\s\S])*?<\/hp:p>/g, function (p) {
+      var q = fn(p);
+      return q === p ? p : dropLines(q);
+    });
+  }
+
+  /* 빈 칸에 값을 넣는다. 실제 한글 파일의 다섯 가지 빈 칸 모양을 다 받는다:
+     <hp:t></hp:t> · <hp:t/> · run에 t 없음 · «스스로 닫힌 run» · 문단에 run 없음.
      못 넣으면 null — 조용히 망가뜨리지 않는다. */
   function fillCell(tc, value) {
     /* ⚠ 안쪽 표가 든 칸은 건드리지 않는다 — 부모 칸을 통째로 손대면 안쪽 표가
        깨진다(코덱스 권고). 그 칸의 값은 «안쪽 표»를 따로 다뤄 넣는다. */
     if (hasInnerTable(tc)) return null;
     var v = esc(value);
-    if (/<hp:t(?:\s[^>]*)?><\/hp:t>/.test(tc)) return tc.replace(/(<hp:t(?:\s[^>]*)?>)(<\/hp:t>)/, '$1' + v + '$2');
-    if (/<hp:t(?:\s[^>]*)?\/>/.test(tc)) return tc.replace(/<hp:t((?:\s[^>]*)?)\/>/, '<hp:t$1>' + v + '</hp:t>');
+    if (/<hp:t(?:\s[^>]*)?><\/hp:t>/.test(tc)) return dropLines(tc.replace(/(<hp:t(?:\s[^>]*)?>)(<\/hp:t>)/, '$1' + v + '$2'));
+    if (/<hp:t(?:\s[^>]*)?\/>/.test(tc)) return dropLines(tc.replace(/<hp:t((?:\s[^>]*)?)\/>/, '<hp:t$1>' + v + '</hp:t>'));
+    /* ★★ 한글이 저장한 빈 칸은 run 이 «스스로 닫혀» 있다 — <hp:run charPrIDRef="0"/>.
+       예전에는 이것을 여는 태그로 보고 그 «뒤»에 <hp:t> 를 붙여, 글자가 run 밖으로 나갔다.
+       우리 엔진은 그래도 글자를 보여 줬지만 «한글은 그 글자를 버렸다» — 채운 파일을
+       한글로 열면 칸이 비어 있었다(실측 2026-09-24, 한글로 만든 표 4칸 모두). */
+    var mSelf = tc.match(/<hp:run\b([^>]*?)\s*\/>/);
     var mRun = tc.match(/<hp:run\b[^>]*>/);
-    if (mRun) return tc.replace(mRun[0], mRun[0] + '<hp:t>' + v + '</hp:t>');
+    if (mSelf && mRun && mSelf.index === mRun.index)
+      return dropLines(tc.replace(mSelf[0], '<hp:run' + mSelf[1] + '><hp:t>' + v + '</hp:t></hp:run>'));
+    if (mRun) return dropLines(tc.replace(mRun[0], mRun[0] + '<hp:t>' + v + '</hp:t>'));
     var mP = tc.match(/<hp:p\b[^>]*>/);
-    if (mP) return tc.replace(mP[0], mP[0] + '<hp:run charPrIDRef="0"><hp:t>' + v + '</hp:t></hp:run>');
+    if (mP) return dropLines(tc.replace(mP[0], mP[0] + '<hp:run charPrIDRef="0"><hp:t>' + v + '</hp:t></hp:run>'));
     return null;
   }
 
@@ -323,7 +348,7 @@
     });
     /* 글자 조각이 하나도 없으면(빈 칸 모양) 넣는 일꾼에게 맡긴다 */
     if (!hit) return fillCell(tc, value);
-    return out;
+    return out === String(tc) ? out : dropLines(out);
   }
 
   /* 표를 통째로 하나씩 — ⚠ 셀 안에 표가 또 있으면(중첩) 정규식이 경계를 잘못 짚으므로 건너뛴다 */
@@ -585,7 +610,7 @@
         return a + next + b;
       });
     });
-    return out;
+    return out === tc ? out : dropLines(out);
   }
 
   /* ===== ① 단일 값: 라벨 칸 → 같은 행의 바로 다음 빈 칸 ===== */
@@ -911,10 +936,11 @@
   /* 문단의 «첫 글자 조각»에 새 글자를 넣고 나머지 조각은 비운다 */
   function setParaText(p, text) {
     var done = false;
-    return p.replace(/(<hp:t(?:\s[^>]*)?>)([\s\S]*?)(<\/hp:t>)/g, function (m, a, inner, b) {
+    var out = p.replace(/(<hp:t(?:\s[^>]*)?>)([\s\S]*?)(<\/hp:t>)/g, function (m, a, inner, b) {
       if (!done) { done = true; return a + esc(text) + b; }
       return a + b;
     });
+    return out === p ? out : dropLines(out);
   }
   function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -1058,7 +1084,9 @@
     replaceCellAt: replaceCellAt,
     /* 「자택:____ 직장:____」 같은 칸 안 라벨 목록 — 입력판(kcareer-formhtml.js)이 같은 자를 쓴다.
        사전을 두 곳에 두면 한쪽만 늘어나 「화면엔 칸이 있는데 안 채워지는」 자리가 생긴다. */
-    incellLabels: function () { return INCELL_LABELS.slice(); }
+    incellLabels: function () { return INCELL_LABELS.slice(); },
+    /* 글자를 바꾼 뒤 옛 줄 정보를 걷는다 — 칸 지도·토큰 바꾸기도 «같은 자»를 쓴다 */
+    dropLines: dropLines, relineLeaves: relineLeaves
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerHwpxFill = api;
