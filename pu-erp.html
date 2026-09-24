@@ -42020,7 +42020,8 @@ function TrashView(){
     { key:'consultings',    label:'컨설팅',     icon:'📊' },
     { key:'funds',          label:'기금',       icon:'🏦' },
     { key:'other_projects', label:'기타사업',   icon:'📋' },
-    { key:'companies',      label:'업체',       icon:'🏢' }
+    { key:'companies',      label:'업체',       icon:'🏢' },
+    { key:'payroll_monthly',label:'급여',       icon:'💰' }
   ];
   var allItems = [];
   STORES.forEach(function(s){
@@ -42088,6 +42089,7 @@ function TrashView(){
                     h('td', null,
                     h('div',{style:{display:'flex',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
                       h('span', { style:{ fontWeight:600, color:'#1e293b' } },
+                        (it._store === 'payroll_monthly' && it.empName) ? (it.empName + ' · ' + (it.ym||'')) :
                         it.companyName || it.name || it.no || '-'),
                       h('span', { style:{ fontSize:'10.5px', color:'#94a3b8' } },
                         it.caseNo || it.id || ''))),
@@ -76082,6 +76084,171 @@ function PayrollHistory(props){
   );
 }
 
+// ============ 급여 겹친 달 정리 (2026-09-24) ============
+// 대표 지시: 「작은 옛 표 3개는 고쳤고, 급여 겹친 달도 만들어 달라」
+// (status/2026-09-23-login-stale-copy-wipes-server.md — 옛 사번정리 도구가
+//  사번 칸만 바꾸고 열쇠는 그대로 둬, 같은 사람의 같은 달 급여가 두 줄 남았다.
+//  실제로 확인해 보니 28건의 «열쇠≠사번칸» 줄이 5개 달에서 겹친다.)
+// ⚠ 자동으로 고르지 않는다(온톨로지: 자동 병합·자동 ID 대입 금지) — 사람이 한 건씩 고른다.
+// ⚠ 물리 삭제가 아니라 TrashBin(=_deleted 표시)으로 지운다 — 되살릴 수 있다.
+var PAYROLL_DUP_IGNORE_FIELDS = ['id', 'empSid', 'ym'];  // 그룹을 가르는 열쇠라 「다른 칸」에서 뺀다
+// 사람이 볼 값 — 이 안에 없는 칸도 있으면 세기는 하되(nDiff) 표에는 curated 만 앞세운다
+var PAYROLL_DUP_FIELD_LABEL = {
+  empName:'이름', status:'상태',
+  baseSalary:'기본급', overtimePay:'연장근로수당', nightPay:'야간근로수당', holidayPay:'휴일근로수당',
+  extraOvertimePay:'추가연장수당', unusedLeavePay:'연차수당', bonus:'상여·성과급',
+  nonTaxableMeal:'식대', nonTaxableCar:'차량유지비', nonTaxableChildcare:'육아수당',
+  subtotal:'지급 소계', grossPay:'지급 합계', taxableIncome:'과세소득',
+  nationalPension:'국민연금', healthInsurance:'건강보험', longTermCare:'장기요양',
+  employmentInsurance:'고용보험', incomeTax:'소득세', localTax:'지방소득세',
+  absentDeduction:'결근공제', otherDeduction:'기타공제', totalDeduction:'공제 합계',
+  netPay:'실지급액', paidDate:'지급일', workHours:'근무시간', hourlyWage:'시급',
+  note:'메모'
+};
+var PAYROLL_DUP_CORE_FIELDS = ['empName','status','baseSalary','overtimePay','grossPay','totalDeduction',
+  'netPay','paidDate','workHours','note'];
+function payrollDupFieldLabel(f){ return PAYROLL_DUP_FIELD_LABEL[f] || f; }
+// 같은 사번·같은 달에 줄이 둘 이상인 묶음을 찾는다. 지운 표시(_deleted)가 있는 줄은 뺀다.
+function payrollDupGroups(rows){
+  var live = (Array.isArray(rows) ? rows : []).filter(function(x){
+    return x && x.id && x.empSid && x.ym && !x._deleted;
+  });
+  var g = {};
+  live.forEach(function(x){
+    var key = x.empSid + '|' + x.ym;
+    (g[key] = g[key] || []).push(x);
+  });
+  return Object.keys(g).filter(function(key){ return g[key].length >= 2; }).sort().map(function(key){
+    var items = g[key].slice().sort(function(a,b){ return String(a.id).localeCompare(String(b.id)); });
+    var keySet = {};
+    items.forEach(function(x){ Object.keys(x).forEach(function(k){ keySet[k] = 1; }); });
+    var fields = Object.keys(keySet).filter(function(k){ return PAYROLL_DUP_IGNORE_FIELDS.indexOf(k) < 0; }).sort();
+    var diffFields = fields.filter(function(f){
+      var vals = items.map(function(x){ return JSON.stringify(x[f]); });
+      return !vals.every(function(v){ return v === vals[0]; });
+    });
+    return { key:key, empSid:items[0].empSid, ym:items[0].ym, empName:items[0].empName || items[0].empSid,
+      items:items, fields:fields, diffFields:diffFields };
+  });
+}
+// keepId 를 남기고 나머지를 TrashBin 으로 지운다(물리 삭제 아님). 지운 id 목록을 돌려준다.
+function payrollDupApply(group, keepId, reason){
+  if(!group || !keepId) return [];
+  var removed = [];
+  group.items.forEach(function(x){
+    if(x.id !== keepId){
+      if(TrashBin.remove('payroll_monthly', x.id, reason || ('겹친 달 정리 — ' + keepId + ' 남김'))) removed.push(x.id);
+    }
+  });
+  if(removed.length && typeof AuditLog !== 'undefined'){
+    AuditLog.write('payroll', keepId, '겹친 달 정리', removed.join(','), keepId, reason || '');
+  }
+  return removed;
+}
+
+function PayrollDupModal(props){
+  useEscClose(props.onClose);
+  var gS = useState(function(){ return payrollDupGroups(dbGet('payroll_monthly', [])); });
+  var groups = gS[0]; var setGroups = gS[1];
+  var iS = useState(0); var idx = iS[0]; var setIdx = iS[1];
+  var kS = useState(''); var keepId = kS[0]; var setKeepId = kS[1];
+  var allS = useState(false); var showAll = allS[0]; var setShowAll = allS[1];  // 전체 칸 보기
+  var doneS = useState(0); var doneN = doneS[0]; var setDoneN = doneS[1];
+
+  var g = groups[idx] || null;
+  useEffect(function(){ setKeepId(''); setShowAll(false); }, [g && g.key]);
+
+  function refresh(){
+    var next = payrollDupGroups(dbGet('payroll_monthly', []));
+    setGroups(next);
+    if(idx >= next.length) setIdx(Math.max(0, next.length - 1));
+  }
+  function doApply(){
+    if(!g || !keepId) return;
+    var removed = payrollDupApply(g, keepId, '겹친 달 정리 — 관리자 확인 후 ' + keepId + ' 남김');
+    if(!removed.length){ refresh(); return; }
+    setDoneN(doneN + 1);
+    showToast('✅ ' + g.empName + ' ' + g.ym + ' — ' + keepId + ' 남기고 ' + removed.length + '건 지운 표시');
+    refresh();
+    if(props.onChanged) props.onChanged();
+  }
+
+  var fmt = function(f, v){
+    if(v == null || v === '') return '';
+    if(f === 'note' || f === 'status' || f === 'empName' || f === 'paidDate') return String(v);
+    if(typeof v === 'number') return v.toLocaleString('ko-KR');
+    return String(v);
+  };
+  // 값이 서로 다른 칸만 색으로 표시한다 — 같은 칸까지 칠하면 눈이 피로하다(중복 업체 정리와 같은 규칙)
+  function cellStyle(f, x){
+    if(!g) return {};
+    var same = g.items.every(function(y){ return JSON.stringify(y[f]) === JSON.stringify(g.items[0][f]); });
+    var base = { padding:'8px 10px', fontSize:'13px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' };
+    if(!same) base.background = '#fffbeb';
+    if(x.id === keepId) base.fontWeight = 700;
+    return base;
+  }
+  var rows = g ? PAYROLL_DUP_CORE_FIELDS.concat(showAll ? g.fields.filter(function(f){ return PAYROLL_DUP_CORE_FIELDS.indexOf(f) < 0; }) : []) : [];
+  var extraDiff = g ? g.diffFields.filter(function(f){ return PAYROLL_DUP_CORE_FIELDS.indexOf(f) < 0; }) : [];
+
+  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target===e.currentTarget) props.onClose(); } },
+    h('div', { className:'modal', style:{ maxWidth:'900px', width:'94vw' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '⚠️ 급여 겹친 달 정리'),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ maxHeight:'70vh', overflow:'auto' } },
+        h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'8px 12px',
+          marginBottom:'12px', fontSize:'12px', color:'#1e40af' } },
+          '사람은 사번 칸으로 찾습니다. 같은 사람의 같은 달 급여가 두 줄 있으면 연간 합계·원천징수에 두 번 잡힐 수 있습니다. '
+          + '남길 줄을 고르면 다른 줄은 지운 표시(휴지통)만 남깁니다 — 물리적으로 지우지 않고, 되살릴 수 있습니다. 아무것도 자동으로 고르지 않습니다.'),
+        !g
+          ? h('div', { style:{ textAlign:'center', padding:'40px', color:'#16a34a', fontSize:'14px' } },
+              '✅ 겹친 달이 없습니다' + (doneN > 0 ? (' — 이번에 ' + doneN + '건 정리했습니다') : ''))
+          : h('div', null,
+              h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px' } },
+                h('span', { style:{ fontSize:'15px', fontWeight:700 } }, g.empName + ' · ' + g.ym),
+                h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '사번 ' + g.empSid + ' · 줄 ' + g.items.length + '개 · 다른 칸 ' + g.diffFields.length + '개'),
+                h('span', { style:{ marginLeft:'auto', fontSize:'12px', color:'#94a3b8' } }, (idx+1) + ' / ' + groups.length)),
+              h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', marginBottom:'10px' } },
+                h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+                  h('thead', null,
+                    h('tr', { style:{ background:'#f8fafc' } },
+                      h('th', { style:{ padding:'8px 10px', fontSize:'12px', color:'#64748b', textAlign:'left', width:'110px' } }, '항목'),
+                      g.items.map(function(x){
+                        return h('th', { key:x.id, style:{ padding:'8px 10px', fontSize:'12px', textAlign:'left' } },
+                          h('label', { style:{ display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontWeight:700 } },
+                            h('input', { type:'radio', name:'pay-dup-keep', checked:keepId===x.id,
+                              onChange:function(){ setKeepId(x.id); } }),
+                            h('span', { style:{ fontFamily:'monospace', fontSize:'11px', color:'#64748b' } }, x.id)));
+                      }))),
+                  h('tbody', null,
+                    rows.map(function(f){
+                      return h('tr', { key:f, style:{ borderTop:'1px solid #f8fafc' } },
+                        h('td', { style:{ padding:'8px 10px', fontSize:'12.5px', color:'#475569' } }, payrollDupFieldLabel(f)),
+                        g.items.map(function(x){
+                          return h('td', { key:x.id, style:cellStyle(f, x) }, fmt(f, x[f]));
+                        }));
+                    })),
+                  !showAll && extraDiff.length > 0 && h('tfoot', null,
+                    h('tr', null, h('td', { colSpan:g.items.length+1, style:{ padding:'6px 10px' } },
+                      h('button', { onClick:function(){ setShowAll(true); },
+                        style:{ fontSize:'11.5px', color:'#2563eb', background:'none', border:'none', cursor:'pointer', padding:0 } },
+                        '표에 없는 다른 칸 ' + extraDiff.length + '개도 보기 →')))))),
+              h('div', { style:{ display:'flex', gap:'8px', alignItems:'center' } },
+                h('button', { className:'btn-secondary', onClick:function(){ setIdx(Math.min(idx+1, groups.length-1)); } }, '건너뛰기'),
+                h('span', { style:{ marginLeft:'auto', fontSize:'11.5px', color:'#94a3b8' } },
+                  keepId ? '' : '남길 줄을 먼저 고르세요'),
+                h('button', { className:'btn-primary', disabled:!keepId, onClick:doApply,
+                  style:!keepId ? { opacity:0.5, cursor:'not-allowed' } : null },
+                  keepId ? (keepId + ' 남기고 나머지 지운 표시') : '남길 줄을 고르세요')))),
+      h('div', { className:'modal-f' },
+        h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginRight:'auto' } },
+          '지운 표시는 되돌릴 수 있습니다'),
+        h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'))
+    ));
+}
+// ============ 급여 겹친 달 정리 끝 ============
+
 // ── 월별급여대장 (전직원 매트릭스) ──
 function PayrollLedger(props){
   var _fill15 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 280px)
@@ -76111,6 +76278,14 @@ function PayrollLedger(props){
   }));
   var rs = useState(rawRecs); var recs = rs[0]; var setRecs = rs[1];
   var bm = useState(false); var bulkModal = bm[0]; var setBulkModal = bm[1];
+  // ★ 급여 겹친 달 정리 — 같은 사람의 같은 달 줄이 둘 이상일 때만 버튼이 보인다
+  var duS = useState(false); var dupOpen = duS[0]; var setDupOpen = duS[1];
+  var dcS = useState(function(){ try{ return payrollDupGroups(rawRecs).length; }
+    catch(e){ console.warn('[겹친달] 집계 실패', e); return 0; } });
+  var dupCount = dcS[0]; var setDupCount = dcS[1];
+  function recountDup(){
+    try{ setDupCount(payrollDupGroups(dbGet('payroll_monthly', [])).length); }catch(e){}
+  }
   var sc = useState(true); var showDeduct = sc[0]; var setShowDeduct = sc[1]; // 공제 컬럼 접기 (기본 펼침)
   // 전월복사 확인 모달 { prevYM, count, newRecs, backup }
   var cm = useState(null); var copyModal = cm[0]; var setCopyModal = cm[1];
@@ -76882,6 +77057,11 @@ function PayrollLedger(props){
             style:{padding:'6px 10px',background:'#fbbf24',color:'#fff',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, '📋 전월복사'),
           copyBackup && copyBackup.ym === props.selYM && h('button', { onClick:undoCopy,
             style:{padding:'6px 10px',background:'#dc2626',color:'#fff',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, '↩ 취소'),
+          // 같은 사람의 같은 달 급여가 두 줄일 때만 나타난다. 정리하면 사라진다. 관리자만 본다.
+          dupCount > 0 && canSuperEdit() && h('button', { onClick:function(){ setDupOpen(true); },
+            title:'같은 사번·같은 달에 급여가 두 줄인 곳이 있습니다',
+            style:{padding:'6px 12px',background:'#fffbeb',color:'#854d0e',border:'1px solid #fde68a',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} },
+            '⚠️ 겹친 달 ' + dupCount),
           h('button',{ onClick:function(){ setEmailModal(true); },
             style:{padding:'6px 10px',background:'#16a34a',color:'#fff',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0,marginLeft:IS_M?undefined:'auto'} }, '📧 이메일 발송'),
           h('div', { 'data-pay-menu':'1', style:{ position:'relative', flexShrink:0 } },
@@ -77463,6 +77643,11 @@ function PayrollLedger(props){
         setRecs(allRecs);
         setBulkModal(false);
       }
+    }),
+    // 급여 겹친 달 정리 모달 (2026-09-24)
+    dupOpen && h(PayrollDupModal, {
+      onChanged: function(){ setRecs(dbGet('payroll_monthly', [])); recountDup(); },
+      onClose: function(){ setDupOpen(false); setRecs(dbGet('payroll_monthly', [])); recountDup(); }
     }),
     // 성과급 출처 모달 (#2)
     // ★ 이메일 발송 모달
