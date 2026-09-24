@@ -1122,11 +1122,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=4"></script>
 <script src="js/pu-doc-read.js?v=48"></script>
-<script src="js/kcareer-hwpxfill.js?v=27"></script>
+<script src="js/kcareer-hwpxfill.js?v=28"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
-<script src="js/kcareer-formmap.js?v=16"></script>
+<script src="js/kcareer-formmap.js?v=17"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
@@ -6543,7 +6543,11 @@ async function generateFilledHWP(d){
       if(zf.dir) continue;
       if(/\.(xml|rels|hpf)$/i.test(fname)){
         var txt=await zf.async('string');
-        Object.keys(_varMap).forEach(function(v){ if(_varMap[v]) txt=txt.split(v).join(_varMap[v]); });
+        /* ★ 바꿀 글자가 든 본문 문단은 옛 줄 정보를 걷는다 — 긴 값이 한글에서 한 줄에 겹치지 않게 */
+        var _vs=Object.keys(_varMap).filter(function(v){ return _varMap[v]; });
+        if(/Contents\/section\d+\.xml$/i.test(fname)&&window.KcareerHwpxFill&&KcareerHwpxFill.relineLeaves)
+          txt=KcareerHwpxFill.relineLeaves(txt,function(p){ return _vs.some(function(v){ return p.indexOf(v)>=0; })?KcareerHwpxFill.dropLines(p):p; });
+        _vs.forEach(function(v){ txt=txt.split(v).join(_varMap[v]); });
         zip.file(fname,txt);
       }
     }
@@ -13507,7 +13511,10 @@ async function hwpxFill(id){ const form=(get('cvforms').find(function(x){return 
   let zip; try{ zip=await JSZip.loadAsync(b64ToAb(f.base64)); }catch(e){ toast('HWPX 열기 실패 — 올바른 hwpx인지 확인'); return; }
   /* ① 기존 {{토큰}} 치환 — 토큰을 심어 둔 양식은 그대로 동작한다(하위호환) */
   const stat={done:0,miss:{}}; const names=Object.keys(zip.files).filter(function(n){return /\.xml$/i.test(n);});
-  for(const n of names){ let s=await zip.file(n).async('string'); if(s.indexOf('{{')<0) continue; s=_fillTokens(s,map,stat); zip.file(n,s); }
+  for(const n of names){ let s=await zip.file(n).async('string'); if(s.indexOf('{{')<0) continue;
+    /* ★ 토큰이 든 문단은 옛 줄 정보를 걷는다 — 긴 값이 들어가면 한글에서 한 줄에 겹친다(2026-09-24 실측) */
+    if(window.KcareerHwpxFill&&KcareerHwpxFill.relineLeaves) s=KcareerHwpxFill.relineLeaves(s,function(p){ return p.indexOf('{{')<0?p:KcareerHwpxFill.dropLines(p); });
+    s=_fillTokens(s,map,stat); zip.file(n,s); }
   /* ② 라벨 채움 — 토큰이 없어도 표의 「성명」「연락처」「학력」「경력」 칸을 알아보고 채운다.
      기관이 준 파일을 손대지 않고 그대로 올리면 된다. 본문(section*.xml)에만 적용한다. */
   const agg={ fields:[], lists:[], kept:[] };

@@ -66,9 +66,18 @@ test('★★ 문서 뼈대를 부수지 않는다 — 글자만 바뀌어야 한
        열기는 하는데 «글자 조각 0개»로 그렸다 — 화면이 하얗게 비었다.
      ⚠ 「글자가 바뀌었나」만 보는 검사는 이것을 못 잡는다. 뼈대 개수를 함께 세야 한다. */
   const r = M.apply(서식, { values: { 't0r1c1': '세종시' } });
-  ['<hp:tc', '</hp:tc>', '<hp:p ', '<hp:run', '<hp:t>', '</hp:t>', '<hp:lineseg'].forEach((tag) => {
+  ['<hp:tc', '</hp:tc>', '<hp:p ', '<hp:run', '<hp:t>', '</hp:t>'].forEach((tag) => {
     assert.equal((r.xml.split(tag).length - 1), (서식.split(tag).length - 1),
       tag + ' 개수가 달라졌습니다 — 뼈대를 부순 것입니다');
+  });
+  /* ★ 줄 정보(<hp:lineseg)는 «고친 칸에서만» 걷힌다 (2026-09-24) — 글을 바꾼 문단에 옛 줄 정보가
+       남으면 한글이 그것을 믿어 한 줄에 겹쳐 그린다. 다른 칸은 한 글자도 달라지면 안 된다. */
+  const 칸 = (x) => x.match(/<hp:tc\b[\s\S]*?<\/hp:tc>/g);
+  const 전 = 칸(서식), 후 = 칸(r.xml);
+  assert.equal(후.length, 전.length);
+  후.forEach((c, i) => {
+    if (i === 3) assert.ok(!c.includes('<hp:lineseg'), '고친 칸은 줄 정보를 걷는다');
+    else assert.equal(c, 전[i], i + '번째 칸이 달라졌습니다 — 손대지 않은 칸은 그대로여야 합니다');
   });
 });
 
