@@ -109,6 +109,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/esign-docs.js?v=1"></script>
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
+<script src="js/esign-hwp-tpl.js?v=1"></script>
 <script>
 'use strict';
 var FB_CONFIG = {
@@ -469,7 +470,152 @@ async function refreshCaseHwp() {
   ['caseHwpOpen', 'caseHwpDownload', 'caseHwpDelete'].forEach(function (id) {
     var btn = caseHwpModal.querySelector('#' + id); if (btn) btn.disabled = !record;
   });
+  refreshCaseHwpTpl(record).catch(function (e) { if (window.console) console.warn('표지 살펴보기 실패', e); });
   return record;
+}
+
+// ── 근로자별로 채우기 (대표 지시 2026-09-24 「문서관리 앱에도 넣어줄수있나」) ──
+// 한글 원본에 {{이름}} 같은 표지가 있으면, 확인된 근로자별로 값을 채운 파일을 만든다.
+// 표지가 없는(누름틀·백지 위임장 그대로인) 파일은 이 칸을 보여주지 않는다 — 기존 [열기]만 쓰면 된다.
+var _esignArrearsLoadedFor = null;
+async function refreshCaseHwpTpl(record) {
+  var box = caseHwpModal && caseHwpModal.querySelector('#caseHwpTplBox');
+  if (!box) return;
+  if (!record) { box.innerHTML = ''; return; }
+  var mk = {};
+  try {
+    var doc = await PureunHwp.openDoc(record.bytes, record.name);
+    try { mk = EsignHwpTpl.markersOf(doc); } finally { try { doc.free(); } catch (e2) {} }
+  } catch (e) { box.innerHTML = ''; return; }
+  var names = Object.keys(mk), total = names.reduce(function (a, k) { return a + mk[k]; }, 0);
+  if (!total) { box.innerHTML = ''; return; }   // 표지가 없다 — 원본을 그대로 여는 길만 쓴다
+  var known = EsignHwpTpl.valuesOf({}, {}, {});
+  var unknown = names.filter(function (k) { return known[k] === undefined; });
+  if (_esignArrearsLoadedFor !== curCaseId) {
+    try {
+      var snap = await db.ref('esign/cases/' + curCaseId + '/arrears').once('value');
+      arrearsCache = snap.val() || {};
+      _esignArrearsLoadedFor = curCaseId;
+    } catch (e) { /* 체불액 없이도 나머지는 채운다 */ }
+  }
+  renderCaseHwpFillBox(box, total, unknown);
+}
+function renderCaseHwpFillBox(box, total, unknown) {
+  var pool = (decrypted || []).filter(function (d) { return d._reviewState !== 'error'; });
+  if (!pool.length) { box.innerHTML = ''; return; }
+  var STATE_COLOR = { confirmed: '#166534', hold: '#854d0e', pending: '#64748b' };
+  var rows = pool.map(function (d) {
+    var a = arrearsCache[d._subId] || {};
+    var sum = (+a.month1 || 0) + (+a.month2 || 0) + (+a.month3 || 0) + (+a.severance || 0);
+    return '<div style="display:flex;gap:8px;align-items:center;padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:12px">'
+      + '<input type="checkbox" class="tplPersonChk" data-sub="' + d._subId + '"' + (d._reviewState === 'confirmed' ? ' checked' : '') + '>'
+      + '<span style="flex:1">' + EsignDocs.esc(d.name) + ' <span style="color:' + (STATE_COLOR[d._reviewState] || '#64748b') + '">' + (RS_LABEL[d._reviewState] || '') + '</span></span>'
+      + '<span>' + (sum ? sum.toLocaleString() : '—') + '</span></div>';
+  }).join('');
+  box.innerHTML = '<div style="border:2px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-top:10px">'
+    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b>근로자별로 채우기</b></div>'
+    + '<div style="font-size:12px;color:#64748b;margin-bottom:8px">채울 자리 ' + total + '곳 알아봄'
+    + (unknown.length ? ' · <span style="color:#854d0e">모르는 이름 ' + unknown.length + '곳 — 밑줄로 남김: ' + unknown.map(function (k) { return EsignDocs.esc(k); }).join(', ') + '</span>' : '')
+    + '</div>'
+    + '<div style="border:1px solid #e2e8f0;border-radius:8px;max-height:220px;overflow:auto">' + rows + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
+    + '<button class="btn btn-sub" id="tplPreviewOne">첫 사람 것 열어 보기</button>'
+    + '<button class="btn btn-pri" id="tplDownloadAll">채워 내려받기 (zip)</button></div></div>';
+  box.querySelector('#tplPreviewOne').onclick = tplPreviewFirst;
+  box.querySelector('#tplDownloadAll').onclick = tplDownloadZip;
+}
+function tplCheckedPeople() {
+  var ids = Array.prototype.map.call(caseHwpModal.querySelectorAll('.tplPersonChk:checked'), function (c) { return c.dataset.sub; });
+  return decrypted.filter(function (d) { return ids.indexOf(d._subId) >= 0; });
+}
+var _esignJsZipP = null;
+function _esignLoadJsZip() {
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  if (_esignJsZipP) return _esignJsZipP;
+  _esignJsZipP = new Promise(function (res, rej) {
+    var s = document.createElement('script'); s.src = 'vendor/jszip.min.js';
+    s.onload = function () { window.JSZip ? res(window.JSZip) : rej(new Error('zip 도구를 못 읽었습니다')); };
+    s.onerror = function () { _esignJsZipP = null; rej(new Error('zip 도구를 못 불러왔습니다')); };
+    document.head.appendChild(s);
+  });
+  return _esignJsZipP;
+}
+/* ★ 줄 다시 나누기 (기금 회의록 #1583·경력관리 #1584 에서 한글로 직접 열어 보고 배운 것) —
+   값을 채운 문단에 옛 줄 정보가 남으면 한글이 그것을 믿어 글자가 겹친다.
+   HWPX 로 내보내 줄 정보를 걷어낸 뒤 다시 읽어 reflowLinesegs 로 새로 나눈다. */
+async function _esignRelayout(doc) {
+  var hx = doc.exportHwpx();
+  var JSZ = await _esignLoadJsZip();
+  var zip = await JSZ.loadAsync(hx);
+  var secs = Object.keys(zip.files).filter(function (n) { return /^Contents\/section\d+\.xml$/.test(n); });
+  await Promise.all(secs.map(function (n) {
+    return zip.file(n).async('string').then(function (x) { zip.file(n, EsignHwpTpl.stripLinesegs(x)); });
+  }));
+  var bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: 'application/hwp+zip' });
+  var d2 = await PureunHwp.openDoc(bytes, 'relayout.hwpx');
+  try { d2.reflowLinesegs(); return d2.exportHwp(); } finally { try { d2.free(); } catch (e) {} }
+}
+async function _esignFillOne(record, meta, person) {
+  var doc = await PureunHwp.openDoc(record.bytes, record.name);
+  var r;
+  try {
+    var V = EsignHwpTpl.valuesOf(person, meta, arrearsCache[person._subId] || {});
+    r = EsignHwpTpl.fillDoc(doc, V);
+  } catch (e) { try { doc.free(); } catch (e2) {} throw e; }
+  try { r.bytes = await _esignRelayout(doc); r.relayoutFailed = false; }
+  catch (e) { r.bytes = doc.exportHwp(); r.relayoutFailed = true; }
+  try { doc.free(); } catch (e) {}
+  return r;
+}
+function _esignSafeName(s) { return String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim() || '사람'; }
+async function tplPreviewFirst() {
+  var people = tplCheckedPeople();
+  if (!people.length) { showToast('채울 사람을 먼저 선택해 주세요'); return; }
+  var record = await PureunHwpStore.get('esign-case', curCaseId);
+  if (!record) return;
+  var meta = (casesCache[curCaseId] || {}).meta || {};
+  showToast('채우는 중…');
+  try {
+    var r = await _esignFillOne(record, meta, people[0]);
+    if (r.unknown.length) showToast('모르는 표지 ' + r.unknown.length + '가지 — 그대로 두었습니다: ' + r.unknown.join(', '), 'warn');
+    if (r.relayoutFailed) showToast('줄 다시 나누기를 못 해 원본 줄 정보로 냈습니다', 'warn');
+    var host = caseHwpModal.querySelector('#caseHwpPreview');
+    host.style.display = 'block';
+    host.innerHTML = '<div style="padding:24px;color:#64748b">한글 문서를 여는 중…</div>';
+    var fname = _esignSafeName(people[0].name) + '.hwp';
+    try {
+      var opened = await PureunHwp.createEditor('#caseHwpPreview', r.bytes, fname);
+      caseHwpEditor = opened.editor;
+    } catch (_) { await PureunHwp.renderPreview(host, r.bytes, fname); }
+  } catch (e) { showToast(e.message || '채우기 실패'); }
+}
+async function tplDownloadZip() {
+  var people = tplCheckedPeople();
+  if (!people.length) { showToast('채울 사람을 먼저 선택해 주세요'); return; }
+  var record = await PureunHwpStore.get('esign-case', curCaseId);
+  if (!record) return;
+  var meta = (casesCache[curCaseId] || {}).meta || {};
+  showToast('서류 채우는 중… (' + people.length + '명)');
+  try {
+    var JSZ = await _esignLoadJsZip();
+    var zip = new JSZ();
+    var unknownAll = {}, relayoutFailN = 0;
+    for (var i = 0; i < people.length; i++) {
+      var r = await _esignFillOne(record, meta, people[i]);
+      r.unknown.forEach(function (k) { unknownAll[k] = 1; });
+      if (r.relayoutFailed) relayoutFailN++;
+      zip.file(_esignSafeName(people[i].name) + '.hwp', r.bytes);
+    }
+    var blob = await zip.generateAsync({ type: 'blob' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = _esignSafeName(meta.title || '사건') + '_채운서류.zip';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    var msgs = ['✅ ' + people.length + '명 채워 내려받음'];
+    if (Object.keys(unknownAll).length) msgs.push('모르는 표지: ' + Object.keys(unknownAll).join(', '));
+    if (relayoutFailN) msgs.push('줄 다시 나누기 실패 ' + relayoutFailN + '건 — 옛 줄 정보로 냄');
+    showToast(msgs.join(' · '));
+  } catch (e) { showToast(e.message || '채워 내려받기 실패'); }
 }
 
 async function previewCaseHwp() {
@@ -503,6 +649,7 @@ async function openCaseHwp() {
     + '<button class="btn btn-sub" id="caseHwpOpen">열기</button>'
     + '<button class="btn btn-sub" id="caseHwpDownload">원본 다운로드</button>'
     + '<button class="btn btn-danger" id="caseHwpDelete">삭제</button></div>'
+    + '<div id="caseHwpTplBox"></div>'
     + '<div id="caseHwpPreview" class="hwp-preview"></div></div>';
   document.body.appendChild(bg);
   caseHwpModal = bg;
