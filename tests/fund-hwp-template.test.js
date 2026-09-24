@@ -5,8 +5,11 @@
  *   → 「원래 있던 한글화일 기준으로 정리하면 안되나 다시 검토해라」
  *   → 틀은 «공용 비공개 저장소»(fund_erp/hwp_tpl)에.
  *
- * 틀 = 원본 .hwp 에서 채울 자리마다 «이름 붙은 누름틀»을 넣은 파일(「기금명#12」 — #앞이 뜻).
+ * 틀 = 원본 .hwp 에서 채울 자리마다 «글자 표지»({{기금명}}, 서명란은 {{근로자위원1}} …)를 넣은 파일.
  * 여기서는 «이름 → 값» 과 «값을 넣는 차례»를 본다. 한글 엔진 자체는 흉내 낸 문서로 대신한다.
+ *
+ * 2026-09-24 한글 프로그램으로 직접 열어 보고 바꾼 것 — 누름틀로 채우면 한글에서 그 자리와 뒤 글자가
+ * 작은 글씨로 나왔고, 긴 글은 옛 줄 정보 때문에 겹쳐 나왔다. 그래서 글자 표지 + 줄 다시 나누기로 간다.
  *
  * ⚠ 이 저장소는 통째로 github.io 로 공개된다 — 여기 이름·금액은 전부 가짜다.
  *   틀 파일(.hwp)은 저장소에 넣지 않는다 — 원본에 남의 기금 자료가 박혀 있었다.
@@ -62,24 +65,36 @@ const API = (() => {
     grabFn('estabSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'),
     grabFn('partyNames'), grabFn('partyJoin'), grabFn('useRate'),
     grabDecl('FTYPE_PAIRS'), grabDecl('FTYPE_GONG_ONLY'),
-    grabDecl('HWP_TPL_KINDS'),
+    grabDecl('HWP_TPL_KINDS'), grabLine('HWP_TPL_BLANK'), grabLine('HWP_TPL_MAXLIST'),
+    grabLine('HWP_MK_OPEN'), grabFn('_hwpMk'),
     grabFn('_hwpTplBase'), grabFn('_bytesToB64'), grabFn('_b64ToBytes'),
-    grabFn('_hwpTplValues'), grabFn('_hwpTypeSwap'), grabFn('_hwpFillDoc'),
+    grabFn('_hwpTplValues'), grabFn('_hwpTypeSwap'), grabFn('_hwpMarkers'), grabFn('_hwpFillDoc'),
+    grabFn('_hwpStripLinesegs'),
     'this.base=_hwpTplBase; this.toB64=_bytesToB64; this.fromB64=_b64ToBytes; this.values=_hwpTplValues;',
-    'this.swap=_hwpTypeSwap; this.fill=_hwpFillDoc; this.KINDS=HWP_TPL_KINDS;',
+    'this.swap=_hwpTypeSwap; this.fill=_hwpFillDoc; this.markers=_hwpMarkers; this.strip=_hwpStripLinesegs;',
+    'this.KINDS=HWP_TPL_KINDS; this.BLANK=HWP_TPL_BLANK;',
   ].join('\n')).call(box);
   return box;
 })();
 
-/* 한글 엔진 문서 흉내 — 누름틀 목록을 주고, 무엇을 어떤 차례로 불렀는지 적는다 */
-function fakeDoc(names) {
+/* 한글 엔진 문서 흉내 — 문단 하나짜리 글. 바꾸기·찾기·글 읽기만 흉내 내고, 무엇을 불렀는지 적는다 */
+function fakeDoc(text) {
   const calls = [];
-  return {
-    calls,
-    getFieldList: () => JSON.stringify(names.map((n, i) => ({ fieldId: i + 1, name: n }))),
-    setFieldValueByName: (n, v) => { calls.push(['set', n, v]); return JSON.stringify({ ok: true }); },
-    replaceAll: (a, b) => { calls.push(['swap', a, b]); return JSON.stringify({ ok: true, count: 1 }); },
+  const d = {
+    text, calls,
+    replaceAll: (a, b) => {
+      let n = 0; d.text = d.text.split(a).map((x, i) => { if (i) n++; return x; }).join(b);
+      calls.push(['rep', a, b, n]);
+      return JSON.stringify({ ok: true, count: n });
+    },
+    searchAllText: (q) => {
+      const hits = []; let i = d.text.indexOf(q);
+      while (i >= 0) { hits.push({ sec: 0, para: 0, charOffset: i, length: q.length }); i = d.text.indexOf(q, i + 1); }
+      return JSON.stringify(hits);
+    },
+    getTextRange: (s, p, off, n) => d.text.substr(off, n),
   };
+  return d;
 }
 
 const F = { name: '가나다공동근로복지기금', fund_type: '공동', address: '서울특별시 종로구 세종대로 1길 11',
@@ -92,20 +107,20 @@ const SITES = [
 
 /* ══════════ ① 이름 → 값 ══════════ */
 
-test('누름틀 이름의 «#번호» 앞이 뜻이다', () => {
-  assert.equal(API.base('기금명#12'), '기금명');
+test('목록 표지는 끝 번호를 떼면 뜻이다 — {{근로자위원2}} → 근로자위원', () => {
+  assert.equal(API.base('근로자위원2'), '근로자위원');
   assert.equal(API.base('회의일'), '회의일');
   assert.equal(API.base(null), '');
 });
 
-test('★★ 회의록 틀의 누름틀 27가지를 «모두» 안다 — 모르는 이름이 생기면 그 자리가 조용히 빈다', () => {
+test('★★ 회의록 틀의 표지 27가지를 «모두» 안다 — 모르는 이름이 생기면 그 자리가 조용히 빈다', () => {
   /* 틀(회의록)에 실제로 든 이름들 — 틀을 만들 때 나온 목록 그대로. 틀이 늘면 여기도 는다. */
   const TPL = ['거래은행', '경과일', '근로자위원', '근로자측이사', '기금명', '기금사용비율', '기금사용액', '기금소재지',
     '목적사업비', '부채', '비용', '사업연도', '사용자위원', '사용자측이사', '수익', '수지차익', '이사수', '일정일',
     '자본', '자산', '참여회사', '출연금', '출연월', '회의일', '회의일짧게', '회의일한글', '회의장소'];
   const V = API.values(F, SITES);
   const missing = TPL.filter((k) => V[k] === undefined);
-  assert.deepEqual(missing, [], '값을 모르는 누름틀: ' + missing.join(', '));
+  assert.deepEqual(missing, [], '값을 모르는 표지: ' + missing.join(', '));
 });
 
 test('회의일은 세 가지 꼴로 — 원본이 자리마다 다르게 적었다', () => {
@@ -163,51 +178,54 @@ test('자료에 없는 날짜·은행은 비워 둔다 — 편집기에서 사�
 
 /* ══════════ ② 값을 넣는 차례 ══════════ */
 
-test('★★ 같은 뜻의 누름틀이 여럿이면 모두 채운다 — 「기금명」은 회의록에 아홉 번 나온다', () => {
-  const d = fakeDoc(['기금명#0', '회의일#1', '기금명#2', '기금명#9']);
+test('★★ 같은 표지가 여럿이면 모두 채운다 — 「기금명」은 회의록에 아홉 번 나온다', () => {
+  const d = fakeDoc('{{기금명}}의 회의 {{회의일}} / {{기금명}} / 끝 {{기금명}}');
   const r = API.fill(d, { 기금명: '가나다', 회의일: '2026. 3. 2.' }, '공동', '공동');
+  assert.equal(d.text, '가나다의 회의 2026. 3. 2. / 가나다 / 끝 가나다');
   assert.equal(r.filled, 4);
-  assert.deepEqual(d.calls.filter((c) => c[0] === 'set').map((c) => c[1]), ['기금명#0', '회의일#1', '기금명#2', '기금명#9']);
 });
 
-test('★ 위원 같은 «목록 값»은 나온 차례대로 한 사람씩', () => {
-  const d = fakeDoc(['근로자위원#1', '근로자위원#2', '사용자위원#3']);
-  API.fill(d, { 근로자위원: ['박근로', '최근로'], 사용자위원: ['김대표', '이대표'] }, '공동', '공동');
-  assert.deepEqual(d.calls.map((c) => c[2]), ['박근로', '최근로', '김대표']);
+test('★ 위원 같은 «목록 값»은 번호 표지에 차례대로 한 사람씩', () => {
+  const d = fakeDoc('{{근로자위원1}}|{{근로자위원2}}|{{사용자위원1}}|{{사용자위원2}}');
+  API.fill(d, { 근로자위원: ['박근로', '최근로'], 사용자위원: ['김대표'] }, '공동', '공동');
+  assert.equal(d.text, '박근로|최근로|김대표|' + API.BLANK, '사람이 모자란 칸은 밑줄');
 });
 
 test('★ 서명칸보다 사람이 많으면 «몇 명 더»인지 알려 준다 — 말없이 빠지면 날인을 못 받는다', () => {
-  const d = fakeDoc(['근로자위원#1', '근로자위원#2']);
+  const d = fakeDoc('{{근로자위원1}} {{근로자위원2}}');
   const r = API.fill(d, { 근로자위원: ['가', '나', '다', '라'] }, '공동', '공동');
   assert.deepEqual(r.over, { 근로자위원: 2 });
 });
 
-test('빈 값은 넣지 않는다 — 누름틀이 비어 있어야 안내글이 보여 사람이 채운다', () => {
-  const d = fakeDoc(['경과일#1', '기금명#2']);
+test('★ 모르는 값은 밑줄로 — 빈 자리로 두면 무엇을 적어야 할지 안 보인다(HTML 서식과 같은 밑줄)', () => {
+  const d = fakeDoc('◦ {{경과일}} : 노사협의회 · {{기금명}}');
   const r = API.fill(d, { 경과일: '', 기금명: '가나다' }, '공동', '공동');
-  assert.equal(r.filled, 1);
-  assert.deepEqual(d.calls.map((c) => c[1]), ['기금명#2']);
+  assert.equal(d.text, '◦ ' + API.BLANK + ' : 노사협의회 · 가나다');
+  assert.equal(r.filled, 1, '밑줄은 «채운 것»으로 세지 않는다');
 });
 
-test('★ 틀에 있는데 앱이 모르는 이름은 «알린다» — 틀과 코드가 어긋났다는 뜻이다', () => {
-  const d = fakeDoc(['기금명#1', '새칸#2']);
+test('★ 틀에 있는데 앱이 모르는 표지는 «알린다» — 틀과 코드가 어긋났다는 뜻이다', () => {
+  const d = fakeDoc('{{기금명}} {{새칸}} {{새칸}}');
   const r = API.fill(d, { 기금명: '가나다' }, '공동', '공동');
   assert.deepEqual(r.unknown, ['새칸']);
 });
 
+test('표지 찾기는 이름만 뽑는다 — 중괄호가 한쪽만 있는 글은 표지가 아니다', () => {
+  const d = fakeDoc('{{기금명}} {{회의일}} {{기금명}} {{ 깨짐 {{');
+  assert.deepEqual(API.markers(d), { 기금명: 2, 회의일: 1 });
+});
+
 /* ══════════ ③ 공동/사내 말 바꾸기 ══════════ */
 
-test('★★ 말 바꾸기는 누름틀을 채우기 «전»에 — 뒤에 하면 기금 이름까지 바뀐다', () => {
-  const d = fakeDoc(['기금명#1']);
+test('★★ 말 바꾸기는 표지를 채우기 «전»에 — 뒤에 하면 기금 이름까지 바뀐다', () => {
+  const d = fakeDoc('{{기금명}}은 공동근로복지기금협의회를 둔다');
   API.fill(d, { 기금명: '가나다공동근로복지기금' }, '공동', '사내');
-  const firstSet = d.calls.findIndex((c) => c[0] === 'set');
-  const lastSwap = d.calls.map((c) => c[0]).lastIndexOf('swap');
-  assert.ok(lastSwap >= 0, '공동 틀을 사내 기금에 쓰면 말을 바꿔야 한다');
-  assert.ok(lastSwap < firstSet, '바꾸기가 채우기보다 먼저여야 한다');
+  assert.equal(d.text, '가나다공동근로복지기금은 사내근로복지기금협의회를 둔다',
+    '기금 이름은 그대로, 틀의 말만 바뀌어야 한다');
 });
 
 test('공동 틀 → 사내 기금: HTML 서식과 같은 짝으로 바꾼다(공동 전용 말까지)', () => {
-  const d = fakeDoc([]);
+  const d = fakeDoc('');
   API.swap(d, '공동', '사내');
   const swaps = d.calls.map((c) => c[1] + '→' + c[2]);
   assert.ok(swaps.includes('공동근로복지기금협의회→사내근로복지기금협의회'));
@@ -218,12 +236,54 @@ test('공동 틀 → 사내 기금: HTML 서식과 같은 짝으로 바꾼다(�
 });
 
 test('사내 틀 → 공동 기금은 거꾸로, 같은 유형이면 손대지 않는다', () => {
-  const d = fakeDoc([]);
+  const d = fakeDoc('');
   API.swap(d, '사내', '공동');
   assert.ok(d.calls.map((c) => c[1] + '→' + c[2]).includes('사내근로복지기금→공동근로복지기금'));
-  const e = fakeDoc([]);
+  const e = fakeDoc('');
   assert.equal(API.swap(e, '공동', '공동'), 0);
   assert.equal(e.calls.length, 0);
+});
+
+/* ══════════ ③-2 줄 다시 나누기 (한글에서 직접 보고 고친 것) ══════════ */
+
+test('★★ 옛 줄 정보(linesegarray)를 걷어낸다 — 한글이 그것을 믿어 긴 글이 겹쳐 나왔다', () => {
+  const x = '<hp:p id="1"><hp:run><hp:t>가나다</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0" vertpos="0"/></hp:linesegarray></hp:p>'
+    + '<hp:p id="2"><hp:run><hp:t>라마</hp:t></hp:run><hp:linesegarray/></hp:p>';
+  const out = API.strip(x);
+  assert.doesNotMatch(out, /linesegarray/);
+  assert.match(out, /<hp:t>가나다<\/hp:t>/, '글은 그대로 남아야 한다');
+  assert.match(out, /<hp:t>라마<\/hp:t>/);
+});
+
+test('★ 채운 뒤 «줄을 다시 나눠» 낸다 — HWPX 로 걷어내고 다시 읽어 reflowLinesegs', () => {
+  const fn = grabFn('_hwpRelayout');
+  assert.match(fn, /exportHwpx\(\)/);
+  assert.match(fn, /_hwpStripLinesegs\(/);
+  assert.match(fn, /reflowLinesegs\(\)/);
+  assert.match(fn, /exportHwp\(\)/, '내보내는 것은 .hwp 다');
+  const fill = grabFn('hwpTplFill');
+  assert.match(fill, /_hwpRelayout\(doc\)/);
+  assert.match(fill, /relayoutFailed=true/, '다시 나누기가 실패해도 문서는 내야 한다(알리고)');
+});
+
+test('★ 표지 여닫는 중괄호를 소스에 «그대로» 쓰지 않는다 — 짝 없는 {{ 가 검사들의 함수 자르기를 깨뜨렸다', () => {
+  ['_hwpMarkers', '_hwpFillDoc'].forEach((n) => {
+    const fn = grabFn(n);    // 잘라 내는 것 자체가 검사다 — 짝이 안 맞으면 여기서 멈춘다
+    const code = fn.replace(/\/\*[\s\S]*?\*\//g, ' ');
+    assert.equal((code.match(/\{/g) || []).length, (code.match(/\}/g) || []).length, n + ' 의 중괄호 짝이 안 맞는다');
+  });
+});
+
+test('zip 도구는 필요할 때 한 번만, 저장소 안의 것으로', () => {
+  const fn = grabFn('_loadJsZip');
+  assert.match(fn, /s\.src='vendor\/jszip\.min\.js'/);
+  assert.ok(fs.existsSync(path.join(ROOT, 'vendor', 'jszip.min.js')));
+});
+
+test('★ 누름틀로 채우는 길은 다시 들이지 않는다 — 한글에서 그 자리와 뒤 글자가 작은 글씨로 나왔다', () => {
+  const code = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.doesNotMatch(code, /setFieldValueByName\(/);
+  assert.doesNotMatch(code, /insertClickHereField/);
 });
 
 /* ══════════ ④ 저장 ══════════ */
