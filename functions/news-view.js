@@ -152,10 +152,24 @@ var 창스크립트 =
   '(function(){' +
   'var p=document.getElementById("pop"),b=document.getElementById("popb"),' +
   't=document.getElementById("popt"),y=0;' +
+  /* ★★ 창 머리에 «꼭지 이름»을 적는다 — 2026-09-26 까지는 영문 딱지가 떴다.
+     ═══════════════════════════════════════════════════════════════════════
+     실측(2026-09-26, 2026-09-w2 회차에서 열다섯 칸을 다 눌러 봤다):
+       한마디 → 「TREND」 · 기사 → 「BEST」 · 자료 → 「ISSUE」 · 판례 → 「ATTENTION」
+     까닭: 자리표(<a id="g-…">) 바로 «다음»이 딱지 칸이고, 꼭지 이름은 그 다음이다.
+       nextElementSibling 하나만 보니 늘 딱지를 집었다.
+     ★ 그래서 자리표 뒤를 «줄띠(table)를 만날 때까지» 훑어 마지막 글칸을 쓴다.
+       딱지 → 이름 → 빈칸 차례라 마지막 «글이 있는» 칸이 곧 이름이다.
+       딱지가 없는 꼭지도 그대로 맞는다(이름 하나뿐이라 그것이 마지막이다).
+     ⚠ 이미 보낸 회차의 담아 둔 전문도 이 길로 고쳐진다 — 편지 글자는 안 건드린다. */
   'function 꼭지이름(el){var 가=document.querySelectorAll("[id^=\'g-\']"),n="";' +
   'for(var i=0;i<가.length;i++){' +
-  'if(가[i].compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING){' +
-  'var s=가[i].nextElementSibling;n=s?s.textContent:n;}}return n;}' +
+  'if(!(가[i].compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING))continue;' +
+  'var s=가[i].nextElementSibling,m="";' +
+  'while(s&&s.tagName!=="TABLE"){' +
+  'if((s.textContent||"").replace(/\\s|\\u00a0/g,""))m=(s.textContent||"").trim();' +
+  's=s.nextElementSibling;}' +
+  'if(m)n=m;}return n;}' +
   'function 열기(el){if(!el)return;b.innerHTML="";' +
   'var c=el.cloneNode(true);c.removeAttribute("id");c.removeAttribute("data-pop");' +
   'c.style.cursor="auto";' +
