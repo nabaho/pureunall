@@ -76,25 +76,48 @@ test('★★★ 발송기를 지난 뒤에도 규칙이 «그대로» 있다', (
 
 /* ═══ ㉢ 문을 넓힌 것이 아니다 ═══════════════════════════════════════
    ⚠⚠ 「받은 것 그대로 전달」로 남의 편지 HTML 이 이 길로 들어온다. */
-test('★★★ 남의 <style> 은 여전히 «하나도» 안 통과한다', () => {
-  const 남 = '<style>body{display:none}.evil{color:red}'
-    + '@media only screen and (max-width:640px){.evil{display:none}}'      /* 남의 반 이름 */
-    + '@media print{.pu-w{display:none}}'                                  /* 인쇄 규칙 */
-    + '@media only screen and (max-width:640px){.pu-w{background:url(https://evil.test/x.png)}}'
-    + '</style><p class="evil pu-w">글</p>';
+/* ⚠⚠ 막는 것을 «하나씩 따로» 본다 (2026-09-26 되돌림 검사에서 드러났다).
+     처음에는 넷을 한 덩이로 넣었는데, 맨 앞의 url( ) 하나가 <style> 을 통째로
+     버려 «뒤의 셋은 재 보지도 못했다» — 고르개·값 가리기를 꺼도 검사가 통과했다.
+   ⚠ 반 이름은 <div> 로 본다. <p> 는 애초에 class 를 안 받아(ATTR_OK) 늘 통과한다. */
+test('★★★ 남의 반 이름은 안 남는다', () => {
+  const 씻 = MS.sanitizeHtml('<div class="evil pu-w">글</div>');
+  assert.ok(씻.indexOf('evil') < 0, '★★★ 남의 반 이름이 남았다');
+  assert.ok(씻.indexOf('pu-w') >= 0, '우리 반 이름까지 버렸다');
+  assert.ok(씻.indexOf('글') >= 0, '글까지 버렸다');
+});
+
+test('★★★ 남의 고르개를 쓴 규칙은 안 통과한다', () => {
+  const 남 = '<style>@media only screen and (max-width:640px){.evil{display:none}}</style>';
+  assert.strictEqual(MS.안전한스타일(남), '', '★★★ 남의 고르개 규칙이 통과했다');
+});
+
+test('★★★ 남의 서버 그림을 부르는 꾸밈은 통째로 버린다 — 열람이 샌다', () => {
+  const 남 = '<style>@media only screen and (max-width:640px){'
+    + '.pu-w{background:url(https://evil.test/x.png)}}</style>';
+  assert.strictEqual(MS.안전한스타일(남), '', '★★★ url( ) 이 통과했다');
+});
+
+test('★★★ 꾸밈 밖 규칙·본문 고르개는 안 통과한다', () => {
+  const 남 = '<style>body{display:none}.evil{color:red}</style><div>글</div>';
   const 씻 = MS.sanitizeHtml(남);
-  assert.ok(씻.indexOf('<style>') < 0, '★★★ 남의 꾸밈이 통과했다');
-  assert.ok(씻.indexOf('evil') < 0, '남의 반 이름이 남았다');
-  assert.ok(씻.indexOf('evil.test') < 0, '★★★ 남의 서버 그림 주소가 남았다 — 열람이 샌다');
+  assert.ok(씻.indexOf('<style>') < 0, '★★★ @media 밖 규칙이 통과했다');
+  assert.ok(씻.indexOf('display:none') < 0, '본문을 숨기는 꾸밈이 남았다');
   assert.ok(씻.indexOf('글') >= 0, '글까지 버렸다');
 });
 
 test('★★ 우리 이름이라도 «@media 밖»이면 안 통과한다 — 데스크톱까지 덮는다', () => {
   const 밖 = '<style>.pu-w{display:none}</style><p>글</p>';
   assert.ok(MS.sanitizeHtml(밖).indexOf('<style>') < 0, '@media 밖 규칙이 통과했다');
-  /* 안에 있어도 값이 허락한 것이 아니면 버린다 */
-  const 나쁜값 = '<style>@media only screen and (max-width:640px){.pu-w{position:fixed}}</style>';
-  assert.strictEqual(MS.안전한스타일(나쁜값), '', '허락하지 않은 꾸밈이 통과했다');
+  /* 안에 있어도 값이 허락한 것이 아니면 버린다 — 자리를 잡는 꾸밈은 받는 화면을 덮는다 */
+  ['position:fixed', 'z-index:9999', 'opacity:0'].forEach((나쁨) => {
+    const 나쁜값 = '<style>@media only screen and (max-width:640px){.pu-w{' + 나쁨 + '}}</style>';
+    assert.strictEqual(MS.안전한스타일(나쁜값), '', '허락하지 않은 꾸밈이 통과했다: ' + 나쁨);
+  });
+  /* 그리고 허락한 것은 «남아야» 한다 — 다 막아 버리면 폰 규칙도 죽는다 */
+  assert.ok(MS.안전한스타일(
+    '<style>@media only screen and (max-width:640px){.pu-w{width:100% !important}}</style>'),
+  '허락한 꾸밈까지 버렸다');
 });
 
 test('★★ 인쇄·장치 규칙은 안 받는다 — 화면 폭을 보는 것만', () => {
