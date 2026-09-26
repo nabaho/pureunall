@@ -261,7 +261,56 @@
        설립 서류는 한 장이 통째로 1칸짜리 표(테두리 상자)라, 칸 안 문단만 베끼면 한 상자에 확인서가 이어 붙는다.
      · 배열이 비면 «한 벌»을 빈 값으로 남긴다 — 서명란이 통째로 사라지면 날인받을 자리가 없다(HTML 과 같다).
      ⚠ 둘째 장부터는 쪽 설정(secPr·단 설정)을 뺀다 — 구역 설정이 여러 번 나오면 한글이 새 구역으로 읽는다. */
-  var RP_RE = /{{([#\/])(쪽:)?([^{}]{1,30})}}/g;
+  var RP_RE = /{{([#\/])(쪽:|행:)?([^{}]{1,30})}}/g;
+  /* ── 표 줄 다루기 — 협의회 명부처럼 «사람 수만큼 줄»이 늘어나는 표 ──
+     ⚠ 겹친 표(표 안의 표)의 줄은 다루지 않는다 — 명부·재산목록은 겹치지 않는다(틀 만들 때 확인).
+     줄을 늘리거나 지우면 그 표의 rowCnt 와, 뒤 줄들의 cellAddr rowAddr 를 함께 고쳐야 한다(안 고치면 한글이 표를 못 읽는다). */
+  function rowOf(xml, pos) {                      // pos 를 품은 <hp:tr>…</hp:tr> 의 [시작, 끝)
+    var a = Math.max(xml.lastIndexOf('<hp:tr>', pos), xml.lastIndexOf('<hp:tr ', pos));
+    var b = xml.indexOf('</hp:tr>', pos);
+    return (a < 0 || b < 0) ? null : { a: a, b: b + '</hp:tr>'.length };
+  }
+  function tableOf(xml, pos) {
+    var a = xml.lastIndexOf('<hp:tbl', pos), b = xml.indexOf('</hp:tbl>', pos);
+    return (a < 0 || b < 0) ? null : { a: a, b: b + '</hp:tbl>'.length };
+  }
+  function shiftRows(chunk, by) {                  // 조각 안 모든 칸의 rowAddr 를 by 만큼
+    return chunk.replace(/(<hp:cellAddr\b[^>]*\browAddr=")(\d+)"/g, function (m, h, n) { return h + (+n + by) + '"'; });
+  }
+  function rowSpan(chunk) {                        // 줄 묶음이 차지하는 줄 수 = <hp:tr> 개수
+    return (chunk.match(/<hp:tr[ >]/g) || []).length;
+  }
+  /* 표에서 [ra, rb) 줄 묶음을 outs(글 조각 배열)로 바꾸고, rowCnt·뒤 줄 번호를 고친다 */
+  function replaceRows(xml, ra, rb, outs) {
+    var t = tableOf(xml, ra); if (!t) return xml;
+    var n0 = rowSpan(xml.slice(ra, rb)), per = n0;
+    var body = outs.map(function (o, i) { return shiftRows(o, i * per); }).join('');
+    var delta = outs.length * per - n0;
+    var tail = shiftRows(xml.slice(rb, t.b), delta);
+    var head = xml.slice(t.a, ra).replace(/(<hp:tbl\b[^>]*\browCnt=")(\d+)"/, function (m, h, n) { return h + (+n + delta) + '"'; });
+    return xml.slice(0, t.a) + head + body + tail + xml.slice(t.b);
+  }
+  /* 틀 만들 때 — 그 칸이 든 표 줄을 통째로 지운다(원본의 둘째 위원 줄처럼 반복이 대신 세울 줄) */
+  /* ⚠ 지울 줄은 «표 시작 + 몇째 줄»로 기억하고 한 줄 지울 때마다 새로 찾는다. 글 자리(위치)로 기억하면,
+       앞서 지운 줄이 표 머리의 줄 수를 「10」→「9」로 한 글자 줄여 다음 자리가 한 칸 밀린다 —
+       그러면 줄은 지워져도 뒤 줄 번호·줄 수가 안 고쳐져 한글이 표를 못 그린다(빈 쪽, 2026-09-26 협의회 명부). */
+  function dropRows(xml, addrs) {
+    var ps = scan(xml), hits = 0, seen = {}, targets = [];
+    ps.filter(function (p) { return addrs.indexOf(p.addr) >= 0; }).forEach(function (p) {
+      var r = rowOf(xml, p.start), t = r && tableOf(xml, r.a); if (!t) return;
+      var k = rowSpan(xml.slice(t.a, r.a)), key = t.a + ':' + k;
+      if (!seen[key]) { seen[key] = 1; targets.push({ t: t.a, k: k }); }
+    });
+    /* 뒤 줄부터 — 앞 줄의 차례·표 시작 자리는 뒤를 지워도 그대로다(바뀌는 줄 수 글자는 표 시작보다 뒤) */
+    targets.sort(function (x, y) { return (y.t - x.t) || (y.k - x.k); });
+    targets.forEach(function (g) {
+      var re = /<hp:tr[ >]/g, m, i = -1; re.lastIndex = g.t;
+      while ((m = re.exec(xml)) && ++i < g.k) { /* 몇째 줄까지 */ }
+      var r = m && rowOf(xml, m.index + 1); if (!r) return;
+      xml = replaceRows(xml, r.a, r.b, []); hits++;
+    });
+    return { xml: xml, hits: hits };
+  }
   function expand(xml, V, opts) {
     opts = opts || {};
     var guard = 0, filled = 0, unknown = {};
@@ -271,23 +320,31 @@
       for (var i = 0; i < ps.length && !end; i++) {
         RP_RE.lastIndex = 0;
         while ((m = RP_RE.exec(ps[i].text))) {
-          if (!start && m[1] === '#') start = { p: ps[i], page: !!m[2], name: m[3] };
+          if (!start && m[1] === '#') start = { p: ps[i], page: m[2] === '쪽:', row: m[2] === '행:', name: m[3] };
           else if (start && m[1] === '/' && m[3] === start.name) { end = { p: ps[i] }; break; }
         }
       }
       if (!start || !end) break;
-      var a, b;
-      if (start.page) {
+      var a, b, rowsA = null;
+      if (start.row) {
+        var r1 = rowOf(xml, start.p.start), r2 = rowOf(xml, end.p.start);
+        if (!r1 || !r2) break;
+        a = r1.a; b = r2.b; rowsA = true;
+      } else if (start.page) {
         /* 묶음을 품은 «맨 바깥» 문단 — 주소에 점이 없는 것(P3) 가운데 그 자리를 품은 것 */
         var tops = ps.filter(function (p) { return /^P\d+$/.test(p.addr); });
         var outer = function (q) { return tops.filter(function (t) { return t.start <= q.start && q.end <= t.end; })[0] || q; };
         a = outer(start.p).start; b = outer(end.p).end;
       } else { a = start.p.start; b = end.p.end; }
       var block = xml.slice(a, b);
-      var tag = function (k) { return '{{' + k + (start.page ? '쪽:' : '') + start.name + '}}'; };
+      var tag = function (k) { return '{{' + k + (start.page ? '쪽:' : start.row ? '행:' : '') + start.name + '}}'; };
       block = replaceText(block, [{ find: tag('#'), to: '', all: true }, { find: tag('/'), to: '', all: true }], { lines: 'keep1' }).xml;
-      var empty = !(Array.isArray(V[start.name]) && V[start.name].length);
-      var list = empty ? [{}] : V[start.name];
+      /* 값이 «숫자»면 그 수만큼 빈 벌(0 이면 묶음째 없앤다) — 명부의 여유 빈 줄처럼 사람 수에 따라 늘고 주는 자리.
+         목록이 비면 빈 한 벌이다(서명란이 사라지면 날인받을 자리가 없다) — 숫자 0 과 다르다 */
+      var cnt = typeof V[start.name] === 'number' ? Math.max(0, Math.floor(V[start.name])) : -1;
+      var empty = cnt < 0 && !(Array.isArray(V[start.name]) && V[start.name].length);
+      var list = cnt >= 0 ? Array.apply(null, Array(cnt)).map(function () { return {}; }) : empty ? [{}] : V[start.name];
+      if (cnt >= 0) empty = true;                                          // 빈 벌의 값 자리는 비운다
       var inBlock = empty ? Object.keys(markers(block)) : [];
       var outs = list.map(function (item, idx) {
         var VV = {}; Object.keys(V).forEach(function (k) { VV[k] = V[k]; });
@@ -303,7 +360,7 @@
         }
         return x;
       });
-      xml = xml.slice(0, a) + outs.join('') + xml.slice(b);
+      xml = rowsA ? replaceRows(xml, a, b, outs) : xml.slice(0, a) + outs.join('') + xml.slice(b);
     }
     return { xml: xml, filled: filled, unknown: Object.keys(unknown) };
   }
@@ -311,7 +368,7 @@
   /* 쉬운 글 뽑기 — 검사·AI 도우미·남의 자료 찾기용 */
   function textOf(xml) { return scan(xml).map(function (p) { return p.text; }).filter(Boolean).join('\n'); }
 
-  var api = { scan: scan, replaceText: replaceText, markers: markers, fill: fill, expand: expand, textOf: textOf,
+  var api = { scan: scan, replaceText: replaceText, markers: markers, fill: fill, expand: expand, dropRows: dropRows, textOf: textOf,
     BLANK: BLANK, atMatch: atMatch, _dec: dec, _enc: enc };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuHwpxFill = api;

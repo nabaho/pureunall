@@ -17,7 +17,7 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=16"></script>
-<script src="js/pu-hwpx-fill.js?v=2"></script>
+<script src="js/pu-hwpx-fill.js?v=3"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <!-- 회사 공용 사진·서류 저장 층 — 사진첩/기업정보함/컨설팅과 같은 파일을 쓴다(판독·보관 방식이 한 곳) -->
@@ -3792,10 +3792,14 @@ function _aiDownload(){
      fund_erp/hwp_tpl/{서식} 에 둔다(로그인한 직원만 읽는다 — 기금 자료와 같은 규칙, 규칙 고칠 것 없음).
    ⚠ 목록 값(서명란 위원)은 번호를 붙인 표지다 — {{근로자위원1}}, {{근로자위원2}} …
    ⚠ 값은 HTML 서식이 쓰던 «같은 함수»에서 온다 — 한글 파일과 화면이 서로 다른 숫자를 말하면 안 된다. */
-var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', agreement:'공동', charter:'공동', contrib:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
+var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', agreement:'공동', charter:'공동', contrib:'공동',
+  reg_apply:'공동', reg_accept:'공동', reg_roster:'공동', reg_seal:'공동', reg_sealpaper:'공동', reg_sealcard:'공동',
+  reg_proxy:'공동', reg_license:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
 var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues,
-  agreement:_hwpAgreementValues, charter:_hwpCharterValues, contrib:_hwpContribValues};
+  agreement:_hwpAgreementValues, charter:_hwpCharterValues, contrib:_hwpContribValues,
+  reg_apply:_hwpRegValues, reg_accept:_hwpRegValues, reg_roster:_hwpRegValues, reg_seal:_hwpRegValues,
+  reg_sealpaper:_hwpRegValues, reg_sealcard:_hwpRegValues, reg_proxy:_hwpRegValues, reg_license:_hwpRegValues};
 /* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다(사내는 HTML 로 둔다) */
 var HWP_TPL_STRICT={charter:1};
 function _hwpTplFits(kind,f){ return !HWP_TPL_STRICT[kind] || ((f&&f.fund_type==='사내')?'사내':'공동')===HWP_TPL_KINDS[kind]; }
@@ -3992,6 +3996,42 @@ function _hwpContribValues(f,sites){
   var V={기금명:String(f.name||''), 확인일:today, 확인서:list};
   if(noAmt) V._note=list.length+'곳 중 '+noAmt+'곳은 출연금이 없어 금액을 비웠습니다 — 참여사업장 › 연도별 기록에 '+S.year+'년 출연금을 넣으세요';
   return V;
+}
+/* ══ ② 법인설립 여덟 가지의 값 ══ (2026-09-26 「계속」) — 서식마다 같은 이름을 쓰므로 한 함수가 낸다.
+   값은 HTML 이 쓰던 곳에서: 대표자=_boss(대표권 있는 이사=이사장), 이사 차례=_prepDirectors(대표 먼저),
+   기본재산=foundContrib, 인가서 도달일=inka_date, 관할 등기소=registry_office(fillDerived 규칙과 같다).
+   ⚠ 주민등록번호는 적지 않는다 — 앱이 담지 않는다(원본에 박혀 있던 남의 주민번호는 틀에서 빈 자리표로 되돌렸다).
+   ⚠ 위임장·보증서면(지배인)·대리인 칸은 채우지 않는다(HTML 과 같다 — 위임을 안 하는 서류다).
+   ⚠ 취임승낙서는 HTML 이 대표 이사 한 장만 채웠다 — 한글 틀은 나머지 이사도 «한 사람에 한 장»씩(명부에 있는 사람만). */
+function _hwpKoDate2(iso,sep){                     // 2026-03-02 → 「2026년 03월 02일」(sep: [년 뒤, 월 뒤] 띄움)
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||'')); if(!m) return '';
+  sep=sep||[' ',' ']; return m[1]+'년'+sep[0]+m[2]+'월'+sep[1]+m[3]+'일';
+}
+function _hwpRegValues(f,sites){
+  f=f||{}; sites=sites||[];
+  var b=_boss(f), dirs=_prepDirectors(f), amt=0; try{ amt=Math.round(foundContrib(f,sites)||0); }catch(e){}
+  var today=_hwpTodayIso(), md=String(f.meeting_date||'');
+  var comm=function(side){ return _prepCommittee(f,side,sites).map(function(o){ return {이름:String(o.name||'')}; }); };
+  /* 날짜를 모르면(인가 전·회의일 없음) 원본처럼 손으로 적을 자리를 남긴다 — 빈 글이면 「연월일 : 」로 끝난다 */
+  var D=function(s){ return s||'      년    월    일'; };
+  var wk=comm('근로자측'), er=comm('사용자측');
+  return {기금명:String(f.name||''), 기금소재지:String(f.address||''), 전화:_dashPhone(f.phone)||String(f.phone||''),
+    대표자:String(b.name||f.chairman||''), 대표자주소:String(b.addr||''),
+    인가도달일:D(_hwpKoDate2(f.inka_date,['   ','  '])), 설립인가일:D(_hwpKoDate2(f.inka_date,['  ','  '])),
+    기본재산:amt>0?amt.toLocaleString():'',
+    등기소:String(f.registry_office||'')||'            지방법원            등기소',   // HTML 은 밑줄(＿) — 원본은 빈칸
+    신청일:_hwpKoDate2(today,['   ','   ']).replace(/^(\d{4})년/,'$1 년'),
+    오늘:_hwpKoDate2(today,[' ',' ']).replace(/^(\d{4})년/,'$1 년'),
+    위임일:_hwpKoDate(today,['   ','    ']),       // 위임장(등기) — 원본 「2020년   월    일」 꼴
+    신고일:_hwpKoDate2(today,[' ','  ']),        // 등록면허세 — 칸이 좁아 원본 꼴(「2020년 04월  27일」) 그대로
+    선임일:D(_hwpKoDate(md,['  ','  '])), 승낙일:_hwpKoDate(today,['   ','   ']).replace(/^(\d{4})년/,'$1 년'),
+    명부일:D(_hwpKoDate(md,['    ','   '])),
+    이사:dirs.slice(1).map(function(o){ return {이름:String(o.name||''), 주소:String(o.addr||'')}; }),
+    승낙:dirs.slice(1).map(function(o){ return {이름:String(o.name||'')}; }),
+    근로자위원:wk, 사용자위원:er,
+    /* 명부의 여유 빈 줄 — 원본은 위원·빈 줄 합쳐 여섯 줄. 위원이 많으면 빈 줄을 줄여 서명부까지 한 쪽에 든다 */
+    빈줄:Math.max(0,6-Math.max(wk.length,1)-Math.max(er.length,1)),
+    여백:(Math.max(wk.length,1)+Math.max(er.length,1))>6?0:1};                  // 더 많으면 표 아래 빈 줄도 걷는다
 }
 /* ★ 2026-09-26 — 채우기를 «한글 XML(HWPX)에서 직접» 한다 (js/pu-hwpx-fill.js).
    대표 「줄칸 간격등 정리가 계속 안된다 … 근본적 해결 … 기존서류와 같이」 → 서식을 원본 한글 틀로 옮기다가,
