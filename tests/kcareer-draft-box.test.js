@@ -211,8 +211,11 @@ function 저장세상(store) {
      친 값까지 안 담긴다. 스텁이 아니라 «진짜 함수»를 넣는다:
      _rhBase 가 비어 있으면 rhBaseSave 는 스스로 넘어가므로 여기 셈은 달라지지 않는다.
      (원본을 담는 규칙 자체는 tests/kcareer-draft-base.test.js 가 못 박는다.) */
-  vm.runInContext('var _rhBase=null; var _rhBaseSaved="";', ctx);
-  ['function _rhBaseId(', 'function rhBaseSave(', 'function rhSideSave(', 'function rhDraftSave(']
+  /* ⚠ 담긴 뒤 「💾 담김」 딱지를 그리는 것도 rhDraftSave 가 «실제로» 부르는 함수다
+     (2026-09-26). 스텁이 아니라 진짜를 넣는다 — 느슨해진 것이 아니다. */
+  vm.runInContext('var _rhBase=null; var _rhBaseSaved=""; var _rhSaveFail=0;', ctx);
+  ['function _rhBaseId(', 'function rhBaseSave(', 'function rhSideSave(',
+   'function rhSaveTag(', 'function rhDraftSave(']
     .forEach((d) => vm.runInContext(cutFn(CODE, d), ctx));
   return ctx;
 }

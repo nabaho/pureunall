@@ -80,7 +80,9 @@ function 세상(store) {
   vm.createContext(ctx);
   vm.runInContext('var RH_DRAFTS="rh_drafts"; var RH_DRAFT_MAX=10;'
     + ' var _rhDraftId=null; var _rhDraftSeq=0;'
-    + ' var _rhBase=null; var _rhBaseSaved=""; var _rhKeepBase=false;', ctx);
+    + ' var _rhBase=null; var _rhBaseSaved=""; var _rhKeepBase=false;'
+    /* 담긴 뒤 「💾 담김」 딱지 — rhDraftSave 가 실제로 부른다(2026-09-26) */
+    + ' var _rhSaveFail=0;', ctx);
   vm.runInContext('var abToB64=' + String(function (buf) {
     let bin = '', b = new Uint8Array(buf), ch = 0x8000;
     for (let i = 0; i < b.length; i += ch) bin += String.fromCharCode.apply(null, b.subarray(i, i + ch));
@@ -94,7 +96,8 @@ function 세상(store) {
   ['function rhDraftAll(', 'function rhDraftPut(', 'function rhDraftFind(',
    'function rhDraftNewId(', 'function rhDraftCells(', 'function _rhBaseId(',
    'function rhBaseSave(', 'async function rhBaseLoad(', 'function rhSideSave(',
-   'async function rhSideLoad(', 'function rhDraftSave(', 'async function rhDraftResume(',
+   'async function rhSideLoad(', 'function rhSaveTag(', 'function rhDraftSave(',
+   'async function rhDraftResume(',
    'async function rhDraftCopy(']
     .forEach((d) => vm.runInContext(cutFn(CODE, d), ctx));
   return ctx;
