@@ -369,7 +369,9 @@
        ⚠ 폭을 «세어서» 나눈다 — 25% 로 박아 두면 꼭지가 다섯이 되는 순간 넘친다. */
     var 폭칸 = Math.round(10000 / 목.length) / 100;
     var 칸 = 목.map(function (g) {
-      return '<td align="center" width="' + 폭칸 + '%" style="padding:11px 2px;font-size:12px;'
+      /* ⚠ 폰에서는 쌓는다 — 다섯 칸에 nowrap 이라 좁은 화면에서는 옆으로 삐져나간다 */
+      return '<td align="center" class="' + 쌓을칸 + ' ' + 차림칸 + '" width="' + 폭칸
+        + '%" style="padding:11px 2px;font-size:12px;'
         + 'white-space:nowrap;font-weight:bold;color:' + (g.강조 ? 색.남색 : 색.딱지) + ';'
         + 'letter-spacing:1px;'
         + 'font-family:' + 폰트 + ';">' + esc(g.차림표이름 || g.이름) + '</td>';
@@ -466,9 +468,11 @@
     var 반 = Math.ceil(목.length / 2);
     var 틈 = Number(사이) || 26;
     return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
-      + '<tr><td width="50%" valign="top" style="width:50%;padding-right:' + Math.round(틈 / 2) + 'px;">'
+      + '<tr><td class="' + 쌓을칸 + ' ' + 틈없이 + '" width="50%" valign="top"'
+      + ' style="width:50%;padding-right:' + Math.round(틈 / 2) + 'px;">'
       + 목.slice(0, 반).join('')
-      + '</td><td width="50%" valign="top" style="width:50%;padding-left:' + Math.round(틈 / 2) + 'px;">'
+      + '</td><td class="' + 쌓을칸 + ' ' + 틈없이 + '" width="50%" valign="top"'
+      + ' style="width:50%;padding-left:' + Math.round(틈 / 2) + 'px;">'
       + 목.slice(반).join('')
       + '</td></tr></table>';
   }
@@ -477,6 +481,35 @@
      ★ 건 목록은 두단표로 가르면 되지만, 한 덩이 문단은 가를 수가 없다(가운데가 끊긴다).
        그래서 그 덩이만 가운데로 모아 읽기 좋은 폭에 둔다.
      ⚠ 표로 한다 — max-width 는 아웃룩이 모른다. */
+  /* ★★ 폰에서 «줄여 보이지» 않게 — 화면 크기별 규칙 (대표 지시 2026-09-26 「폰에서 글자가 작다」)
+     ═══════════════════════════════════════════════════════════════════════
+     편지는 980px 고정 표다. 폰 메일 앱은 그것을 통째로 줄여 보여 주므로 글자가
+     38% 로 작아진다 — 넓혀서 얻은 것을 폰에서 잃는다.
+     ★ @media 는 «아웃룩이 모른다». 그래서 데스크톱 모습은 한 글자도 안 바뀌고,
+       폰·웹메일에서만 칸이 쌓여 폭에 맞는다. 글자 크기는 안 건드린다 —
+       줄이지만 않으면 14px 그대로가 폰에서 읽기 좋은 크기다.
+     ⚠ 발송기가 «이 꼴만» 통과시킨다(functions/mail-send.js 안전한스타일):
+       @media 안 · 고르개는 .pu-… · 값은 STYLE_OK. 여기 이름을 바꾸면 거기도 바꿔야 한다.
+     ⚠ 반 이름은 모두 pu- 로 시작해야 한다 — 발송기가 그것만 남긴다(cleanClass). */
+  var 넓은칸 = 'pu-w';     /* 폰에서 폭을 100% 로 — 편지 표·읽기 칸 */
+  var 쌓을칸 = 'pu-c';     /* 폰에서 한 줄씩 쌓는다 — 자료 카드·두 칸 표·차림표 */
+  /* ⚠ 두 칸 표는 칸 사이를 «안쪽 여백»으로 벌린다. 쌓이고 나면 그 여백이 그대로 남아
+       뒤쪽 줄만 들여쓰기처럼 밀린다(2026-09-26 폰 화면에서 보였다) — 그때만 지운다.
+     ⚠ 자료 카드의 여백은 지우면 안 된다(글이 테두리에 붙는다). 그래서 반을 갈랐다. */
+  var 틈없이 = 'pu-c2';
+  /* 차림표는 폰에서 넷·다섯 줄로 쌓여 첫 화면을 다 먹는다. 메일에서는 눌러도
+     아무 데도 안 가는 줄이라, 쌓되 «얇게» 만든다. */
+  var 차림칸 = 'pu-n';
+  function 반응규칙() {
+    return '<style>@media only screen and (max-width:640px){'
+      + '.' + 넓은칸 + '{width:100% !important;max-width:100% !important}'
+      + '.' + 쌓을칸 + '{display:block !important;width:100% !important;'
+      + 'border-right:0 !important}'
+      + '.' + 틈없이 + '{padding-left:0 !important;padding-right:0 !important}'
+      + '.' + 차림칸 + '{padding-top:5px !important;padding-bottom:5px !important}'
+      + '}</style>';
+  }
+
   var 읽기폭 = 760;
   /* ⚠ 「웹이면 그냥 둔다」는 «이중 잠금»이다 — 부르는 자리(우리글칸)가 이미 단이 없을
        때만 부르므로 웹·넓은 쪽에서는 여기까지 오지 않는다. 그래서 되돌림 검사로는
@@ -484,7 +517,7 @@
        그때는 이 한 줄이 760px 상자를 막는다. */
   function 읽기칸(안, 폭, 웹) {
     if (웹 || Number(폭) < 900) return 안;
-    return '<table role="presentation" align="center" width="' + 읽기폭
+    return '<table role="presentation" align="center" class="' + 넓은칸 + '" width="' + 읽기폭
       + '" cellpadding="0" cellspacing="0" border="0" style="width:' + 읽기폭 + 'px;margin:0 auto;">'
       + '<tr><td>' + 안 + '</td></tr></table>';
   }
@@ -806,7 +839,8 @@
       줄 += '<tr>';
       for (var j = 0; j < 칸수; j++) {
         var 끝칸 = j === 칸수 - 1;
-        줄 += '<td width="' + 몫 + '%" valign="top" style="width:' + 몫 + '%;padding:16px 15px;'
+        줄 += '<td class="' + 쌓을칸 + '" width="' + 몫 + '%" valign="top" style="width:' + 몫
+          + '%;padding:16px 15px;'
           + 테 + (끝칸 ? '' : 'border-right:1px solid ' + 색.줄 + ';') + '">'
           + (것[i + j] ? 자료카드(것[i + j]) : '&nbsp;') + '</td>';
       }
@@ -1439,9 +1473,13 @@
       ? 지역뉴스조각(d.지역뉴스 || [], 옵션.지역)
       : (미리 ? 지역뉴스조각(d.지역뉴스 || [], '전국') : '{지역뉴스}');
     var html =
-      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+      /* ★ 화면 크기별 규칙을 «맨 앞»에 둔다 — 뒤에 두면 어떤 메일 앱은 늦게 읽어
+           한 번 크게 그렸다가 다시 그린다(글이 껑충 뛴다). */
+      반응규칙()
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
       + ' style="background-color:' + 색.바탕 + ';"><tr><td align="center" style="padding:0;">'
-      + '<table role="presentation" width="' + 폭 + '" cellpadding="0" cellspacing="0" border="0"'
+      + '<table role="presentation" class="' + 넓은칸 + '" width="' + 폭
+      + '" cellpadding="0" cellspacing="0" border="0"'
       + ' style="width:' + 폭 + 'px;background-color:#ffffff;">'
       /* ★ 요약판은 «신문 머리» 하나로 연다 (대표 결정 2026-09-17).
            큰 사진 띠(184px)와 차림표(85px)는 요약에서 걷었다 — 차림표는 메일에서
