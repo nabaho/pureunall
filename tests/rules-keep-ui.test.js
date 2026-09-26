@@ -76,7 +76,9 @@ test('사람이 고를 줄이 남으면 저장 단추가 잠긴다 — 제목 �
   assert.match(b, /const KEEP_ASK=\{confirm:1,missing:1,differ:1\}/, '★ 글자 다름(해설이 섞인 조)이 사람 확인 없이 들어간다');
   assert.match(fn(b, 'keepRender'), /go\.disabled=!!pend\|\|/);
   /* 개정에는 검토 화면이 읽은 원문을 함께 넘긴다 — 부품이 원본 파일 글자와 견준다 */
-  assert.match(fn(b, 'keepChanges'), /orig:String\(it\.orig\|\|""\)/);
+  assert.match(fn(b, 'keepChanges'), /orig:cutTail\(it\.orig\)/);
+  /* 조 끝에 붙은 다음 장 머리는 견주고 넣을 때 뗀다 — 안 떼면 원본에 장 머리가 한 번 더 들어간다 */
+  assert.match(fn(b, 'keepChanges'), /const lines=v=>cutTail\(articleText\(v\)\)/);
 });
 
 test('아무 데도 저장하지 않는다 — 내려받기만 한다', () => {
