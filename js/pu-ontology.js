@@ -118,6 +118,8 @@
     rules:{ name:'취업규칙 관리', file:'rules.html', primaryRoots:['chwieop','rules_mgmt'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Policy','Document','ReviewCriterion','LegalProvision'] },
     docs:{ name:'문서관리', file:'docs-esign.html', primaryRoots:['esign'],
+      /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피) */
+      sharedRoots:['data/contract_forms','data/contract_forms_removed'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
     payroll:{ name:'급여관리', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Employment','PayrollRecord','Document'] },

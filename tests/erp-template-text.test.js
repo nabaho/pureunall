@@ -12,7 +12,11 @@
      ⓐ 읽개는 «한 곳»이다 — hwp_extract.js 의 extractDocText.
      ⓑ 확장자가 아니라 «파일 속 표식»으로 가린다.
      ⓒ 못 읽으면 «왜»를 그대로 전한다(암호화·손상은 사람이 할 일이 다르다).
-   ⚠ 알피가 제 읽개를 다시 만들면 안 된다 — 두 벌이 되면 또 갈린다. */
+   ⚠ 알피가 제 읽개를 다시 만들면 안 된다 — 두 벌이 되면 또 갈린다.
+
+   ■ 2026-09-26 — 양식 올리는 화면이 문서관리 › 사무관리서류 › 계약서 양식으로 옮겨 갔다.
+     그래서 «부르는 쪽» 검사(④·⑥·⑦·⑧)는 이제 js/pu-contract-forms.js 를 본다.
+     알피에는 부르개가 «남아 있지 않아야» 한다 — 남으면 두 벌이다(⑤). */
 
 const fs = require('fs');
 const path = require('path');
@@ -20,11 +24,13 @@ const vm = require('vm');
 const zlib = require('zlib');
 const assert = require('assert');
 const { test } = require('node:test');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 const { cutFn } = require('./cut-fn');
 
 const R = path.join(__dirname, '..');
 const ERP = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
+/* 양식을 올리는 화면 — 2026-09-26 부터 문서관리가 싣는 공용 파일 */
+const CF = fs.readFileSync(path.join(R, 'js', 'pu-contract-forms.js'), 'utf8').replace(/\r\n/g, '\n');
 
 /* 진짜 읽개를 그대로 싣는다 — 베껴 적으면 견주는 뜻이 없다 */
 const 읽개 = (function () {
@@ -119,8 +125,8 @@ test('③ ★★ .doc 로 저장된 RTF 를 읽는다 — 예전에는 «미지�
 
 /* ── 알피가 그 읽개를 «실제로 쓰는가» ── */
 
-test('④ ★★ 알피가 공용 읽개를 쓴다 — 제 것을 따로 만들지 않는다', function () {
-  const fn = cutFn(stripComments(ERP), 'function extractTemplateText(');
+test('④ ★★ 양식 화면이 공용 읽개를 쓴다 — 제 것을 따로 만들지 않는다', function () {
+  const fn = cutFn(stripJs(CF), 'function extractTemplateText(');
   assert.match(fn, /extractDocText\(buf\)/,
     '★★ 알피가 또 제 읽개를 만들었습니다 — 두 벌이 되면 화면마다 또 갈립니다');
   /* 「미리보기 글자」로 되돌아가면 안 된다 — 그것이 조용히 틀리던 자리다 */
@@ -129,33 +135,41 @@ test('④ ★★ 알피가 공용 읽개를 쓴다 — 제 것을 따로 만들�
 });
 
 test('⑤ ★★ 옛 읽개가 «파일에서 사라졌다» — 남겨 두면 다음 사람이 그걸 씁니다', function () {
-  const src = stripComments(ERP);
-  ['_extractTemplateText_OLD', '_xmlExtract', 'PrvText'].forEach(function (n) {
-    assert.ok(src.indexOf(n) < 0, '★★ 「' + n + '」 이 아직 남아 있습니다');
+  [[ERP, stripComments], [CF, stripJs]].forEach(function (p) {
+    const src = p[1](p[0]);
+    ['_extractTemplateText_OLD', '_xmlExtract', 'PrvText'].forEach(function (n) {
+      assert.ok(src.indexOf(n) < 0, '★★ 「' + n + '」 이 아직 남아 있습니다');
+    });
   });
+  /* 부르개가 옮겨 갔으니 알피에 남으면 «두 벌»이다 */
+  assert.ok(stripComments(ERP).indexOf('function extractTemplateText(') < 0,
+    '★★ 알피에 글자 뽑기 부르개가 다시 생겼습니다 — 양식 화면은 문서관리에 있습니다');
 });
 
 test('⑥ ★ 읽개를 «그 파일을 열 때만» 받는다 — 모두에게 짐을 지우지 않는다', function () {
-  const src = stripComments(ERP);
-  assert.match(src, /function _ensureDocText\(needPdf, cb\)/, '★ 늦게 받는 자리가 없습니다');
-  /* 머리에 박아 두면 모든 사람이 늘 받는다 */
-  assert.ok(!/<script src="hwp_extract\.js/.test(src),
-    '★ 머리에 박아 두면 이 길로 안 오는 사람도 늘 내려받습니다');
-  assert.ok(!/<script src="vendor\/pako/.test(src), '★ pako 도 마찬가지입니다');
+  assert.match(stripJs(CF), /function _ensureDocText\(needPdf, cb\)/, '★ 늦게 받는 자리가 없습니다');
+  /* 머리에 박아 두면 모든 사람이 늘 받는다 — 알피도, 양식 화면을 싣는 문서관리도 */
+  const DOCS = fs.readFileSync(path.join(R, 'docs-esign.html'), 'utf8');
+  [['알피', ERP], ['문서관리', DOCS]].forEach(function (p) {
+    const src = stripComments(p[1]);
+    assert.ok(!/<script src="hwp_extract\.js/.test(src),
+      '★ ' + p[0] + ' 머리에 박아 두면 이 길로 안 오는 사람도 늘 내려받습니다');
+    assert.ok(!/<script src="vendor\/pako/.test(src), '★ ' + p[0] + ' — pako 도 마찬가지입니다');
+  });
 });
 
 test('⑦ ★★ PDF 일 때만 pdf.js 를 받는다 — 한글 하나 읽자고 1MB 를 받지 않는다', function () {
-  const fn = cutFn(stripComments(ERP), 'function _ensureDocText(');
+  const fn = cutFn(stripJs(CF), 'function _ensureDocText(');
   assert.match(fn, /if\(!needPdf\)\{ cb\(null\); return; \}/,
     '★★ 한글 파일에도 pdf.js 를 받습니다');
   /* 그 판정은 «파일 속 표식»으로 한다 */
-  const look = cutFn(stripComments(ERP), 'function _looksPdf(');
+  const look = cutFn(stripJs(CF), 'function _looksPdf(');
   assert.match(look, /0x25 && u\[1\]===0x50 && u\[2\]===0x44 && u\[3\]===0x46/,
     '★ 이름으로 PDF 를 가립니다 — 속을 봐야 합니다');
 });
 
 test('⑧ ★ 못 읽으면 «왜»를 그대로 전한다 — 암호화와 손상은 할 일이 다르다', function () {
-  const fn = cutFn(stripComments(ERP), 'function extractTemplateText(');
+  const fn = cutFn(stripJs(CF), 'function extractTemplateText(');
   assert.match(fn, /err && err\.message/,
     '★ 까닭을 삼키면 「안 됩니다」만 남습니다');
   assert.match(fn, /cb\(text, text\?null:'본문 텍스트 없음'\)/, '★ 빈손을 성공으로 넘깁니다');
