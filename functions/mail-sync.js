@@ -20,6 +20,7 @@
 'use strict';
 
 const MB = require('./mail-box');
+const AICLASSIFY = require('./mail-ai-classify');   /* 받은메일함 자동분류(Jev) — 기본은 꺼짐 */
 
 const ROOT = 'mailbox';
 
@@ -439,6 +440,27 @@ async function runSync(deps, opts) {
               if (++w % WRITE_BATCH === 0) { await db.ref().update(batch); batch = {}; }
             }
             if (Object.keys(batch).length) await db.ref().update(batch);
+
+            /* ── 받은메일함 자동분류(Jev) — 새로 온 줄만, 이 칸(inbox)에서만 (2026-09-26) ──
+               ⚠ 「back」(옛것 채우기) 방향은 안 본다 — 지금 대표께서 보실 것은 «오늘 온
+                 메일이 어디로 갈까»지, 몇 달 전 메일을 다시 물어볼 일이 아니다.
+               ⚠ 실패해도 절대 던지지 않는다 — Jev 가 죽어도(또는 아직 안 켰어도) 메일
+                 동기화 자체는 멀쩡해야 한다. classifyNewInbox 는 기본이 꺼짐이라
+                 대표가 config/mailAiClassify.on 을 켜기 전에는 아무 일도 안 한다. */
+            if (r.dir === 'fresh' && held.length && MB.folderKind(p.box) === 'inbox') {
+              try {
+                const customFolders = plan
+                  .filter((p2) => MB.folderKind(p2.box) === 'custom')
+                  .map((p2) => ({ slug: p2.slug, name: p2.box.name || p2.box.path }));
+                const ai = await AICLASSIFY.classifyNewInbox(deps, {
+                  slug: p.slug, rows: held.map((g) => g.row),
+                  deadline: deadline, customFolders: customFolders,
+                });
+                if (ai.ran) console.log('mail-ai-classify', JSON.stringify(ai));
+              } catch (e) {
+                console.warn('mail-ai-classify 실패(동기화는 계속합니다):', String((e && e.message) || e));
+              }
+            }
             /* ⚠★ 여기서 «이 칸의 기간»을 재던 자리다 — 걷어냈다 (대표 지적 2026-09-11).
                  held 는 «이번 회차에 받아온 줄»뿐이라, 새 메일 한 통만 온 칸은
                  「담긴 기간 1일」이 되었다. 게다가 바로 아래 nextSync 가 새 그릇을
@@ -1083,7 +1105,9 @@ module.exports = function build(deps) {
        보낸 메일까지 함께 따라오게 하려면 자주 봐야 한다. 붙는 값이 싸다(목록만). */
     syncMailbox: F
       .region(REGION)
-      .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 540, memory: '512MB' })
+      /* ⚠ TYPESAFE_API_KEY — 받은메일함 자동분류(mail-ai-classify)가 쓴다.
+           config/mailAiClassify.on 이 꺼져 있으면 이 열쇠는 «읽히기만 하고 안 쓰인다». */
+      .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY'], timeoutSeconds: 540, memory: '512MB' })
       .pubsub.schedule('every 10 minutes')
       .timeZone('Asia/Seoul')
       .onRun(async () => {
@@ -1096,7 +1120,7 @@ module.exports = function build(deps) {
        10분을 기다리지 않고 사람이 누르는 자리. 화면의 「새로고침 ↻」이 이것을 부른다. */
     pullMailbox: F
       .region(REGION)
-      .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 300, memory: '512MB' })
+      .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY'], timeoutSeconds: 300, memory: '512MB' })
       .https.onRequest((req, res) => gate(req, res, async () => {
         const r = await runSync(deps, { deadlineMs: 230000 });
         reply(res, r.ok ? 200 : 500, Object.assign({ ok: r.ok }, r));
