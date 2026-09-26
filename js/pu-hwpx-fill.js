@@ -181,6 +181,12 @@
       order.forEach(function (ri) {
         var r = rules[ri];
         if (!atMatch(p.addr, r.at)) return;
+        /* drop — 문단을 «통째로» 없앤다(원본의 둘째 회사 서명 줄처럼, 반복 묶음이 대신 세울 줄) */
+        if (r.drop) {
+          if (!r.at || pairs.length || touched) return;
+          edits.push({ s: p.start, e: p.end, raw: '' }); hits[ri]++; touched = '\u0000drop'; return;
+        }
+        if (touched === '\u0000drop') return;
         /* set — 그 문단의 글 «전부»를 바꾼다(표 칸 값 자리). 빈 칸이면 새로 넣는다 */
         if (r.set != null) {
           if (pairs.length || touched) return;              // 한 문단에 set 은 하나만
@@ -202,6 +208,7 @@
           from = i + r.find.length;
         }
       });
+      if (touched === '\u0000drop') return;
       if (pairs.length) edits = edits.concat(paraReplace(p, pairs), lineEdit(p, xml, newTextOf(p, pairs), mode));
       else if (touched) edits = edits.concat(lineEdit(p, xml, touched, mode));
     });
@@ -213,7 +220,7 @@
     var out = {};
     scan(xml).forEach(function (p) {
       var m; MK_RE.lastIndex = 0;
-      while ((m = MK_RE.exec(p.text))) out[m[1]] = (out[m[1]] || 0) + 1;
+      while ((m = MK_RE.exec(p.text))) { if (/^[#\/]/.test(m[1])) continue; out[m[1]] = (out[m[1]] || 0) + 1; }   // 반복 묶음 표시는 이름이 아니다
     });
     return out;
   }
@@ -229,6 +236,7 @@
       var pairs = [], m; MK_RE.lastIndex = 0;
       while ((m = MK_RE.exec(p.text))) {
         var name = m[1], val, known = true;
+        if (/^[#\/]/.test(name)) continue;                  // 반복 묶음 표시 — expand 가 먼저 걷는다
         if (Object.prototype.hasOwnProperty.call(V, name) && !Array.isArray(V[name])) val = V[name];
         else {
           var base = name.replace(/\d+$/, ''), n = +(name.slice(base.length) || 0);
@@ -246,10 +254,64 @@
     return { xml: applyEdits(xml, edits), filled: filled, unknown: Object.keys(unknown), over: over };
   }
 
+  /* ── 반복 묶음 — 회사마다 서명 한 줄, 회사마다 확인서 한 장 ── (2026-09-26)
+     틀에 {{#이름}} 이 든 문단부터 {{/이름}} 이 든 문단까지가 한 묶음이다. V[이름] 이 배열이면
+     그 수만큼 묶음을 베끼고, 베낀 것마다 그 항목의 값(항목 → 없으면 V)으로 채운다.
+     · {{#쪽:이름}} — «장» 단위로 베낀다(묶음을 품은 맨 바깥 문단째로, 둘째부터 새 쪽에서 시작).
+       설립 서류는 한 장이 통째로 1칸짜리 표(테두리 상자)라, 칸 안 문단만 베끼면 한 상자에 확인서가 이어 붙는다.
+     · 배열이 비면 «한 벌»을 빈 값으로 남긴다 — 서명란이 통째로 사라지면 날인받을 자리가 없다(HTML 과 같다).
+     ⚠ 둘째 장부터는 쪽 설정(secPr·단 설정)을 뺀다 — 구역 설정이 여러 번 나오면 한글이 새 구역으로 읽는다. */
+  var RP_RE = /{{([#\/])(쪽:)?([^{}]{1,30})}}/g;
+  function expand(xml, V, opts) {
+    opts = opts || {};
+    var guard = 0, filled = 0, unknown = {};
+    for (;;) {
+      if (++guard > 20) break;
+      var ps = scan(xml), start = null, end = null, m;
+      for (var i = 0; i < ps.length && !end; i++) {
+        RP_RE.lastIndex = 0;
+        while ((m = RP_RE.exec(ps[i].text))) {
+          if (!start && m[1] === '#') start = { p: ps[i], page: !!m[2], name: m[3] };
+          else if (start && m[1] === '/' && m[3] === start.name) { end = { p: ps[i] }; break; }
+        }
+      }
+      if (!start || !end) break;
+      var a, b;
+      if (start.page) {
+        /* 묶음을 품은 «맨 바깥» 문단 — 주소에 점이 없는 것(P3) 가운데 그 자리를 품은 것 */
+        var tops = ps.filter(function (p) { return /^P\d+$/.test(p.addr); });
+        var outer = function (q) { return tops.filter(function (t) { return t.start <= q.start && q.end <= t.end; })[0] || q; };
+        a = outer(start.p).start; b = outer(end.p).end;
+      } else { a = start.p.start; b = end.p.end; }
+      var block = xml.slice(a, b);
+      var tag = function (k) { return '{{' + k + (start.page ? '쪽:' : '') + start.name + '}}'; };
+      block = replaceText(block, [{ find: tag('#'), to: '', all: true }, { find: tag('/'), to: '', all: true }], { lines: 'keep1' }).xml;
+      var empty = !(Array.isArray(V[start.name]) && V[start.name].length);
+      var list = empty ? [{}] : V[start.name];
+      var inBlock = empty ? Object.keys(markers(block)) : [];
+      var outs = list.map(function (item, idx) {
+        var VV = {}; Object.keys(V).forEach(function (k) { VV[k] = V[k]; });
+        inBlock.forEach(function (k) { if (!(k in VV)) VV[k] = ''; });   // 빈 한 벌 — 항목 값 자리는 밑줄로
+        Object.keys(item || {}).forEach(function (k) { VV[k] = item[k]; });
+        VV['번호'] = String(idx + 1);
+        var r = fill(block, VV, opts);
+        filled += r.filled; r.unknown.forEach(function (k) { unknown[k] = 1; });
+        var x = r.xml;
+        if (start.page && idx > 0) {
+          x = x.replace(/<hp:secPr\b[\s\S]*?<\/hp:secPr>/, '').replace(/<hp:ctrl>\s*<hp:colPr\b[^>]*\/>\s*<\/hp:ctrl>/, '')
+            .replace(/<hp:p\b([^>]*?)\bpageBreak="0"/, '<hp:p$1pageBreak="1"');
+        }
+        return x;
+      });
+      xml = xml.slice(0, a) + outs.join('') + xml.slice(b);
+    }
+    return { xml: xml, filled: filled, unknown: Object.keys(unknown) };
+  }
+
   /* 쉬운 글 뽑기 — 검사·AI 도우미·남의 자료 찾기용 */
   function textOf(xml) { return scan(xml).map(function (p) { return p.text; }).filter(Boolean).join('\n'); }
 
-  var api = { scan: scan, replaceText: replaceText, markers: markers, fill: fill, textOf: textOf,
+  var api = { scan: scan, replaceText: replaceText, markers: markers, fill: fill, expand: expand, textOf: textOf,
     BLANK: BLANK, atMatch: atMatch, _dec: dec, _enc: enc };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuHwpxFill = api;
