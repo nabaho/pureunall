@@ -5861,14 +5861,29 @@ async function bankMergeUpload(map,progFn){
     const batch={};
     part.forEach((k,j)=>{
       const c=Object.assign({},map[k]), o=olds[j];
+      const 더할횟수=c.n;                 // 이번에 올린 몫 — 서버 값에 «더할» 크기다
       if(o){
-        c.n=(o.n||0)+c.n;
         if(String(o.y||"")>String(c.y||"")){ c.y=o.y; c.b=o.b; c.t=o.t; }
         const st=(o.st||[]).slice();
         (map[k].st||[]).forEach(x=>{ if(st.length<5&&!st.some(z=>z.site===x.site))st.push(x); });
         c.st=st; c.w=o.w||c.w; if(o.src&&!c.src)c.src=o.src;
       }
-      batch["c/"+k]=c;
+      /* ⚠★ 사용 횟수(n)만은 «서버가 들고 있는 값에 더한다» (2026-09-26 전체점검).
+         ── 무엇이 문제였나
+           읽어 온 값(o.n)에 더해서 통째로 써 넣었다. A 와 B 가 같은 순간에 올리면
+           둘 다 「10」을 읽고 각자 「12」·「13」을 쓴다 — 한쪽이 올린 몫이 사라진다.
+           이 함수의 주석이 스스로 「횟수가 초기화되지 않게 하는 핵심」이라 적어 두었다.
+         ── 그래서
+           increment 는 서버가 «그 자리에서» 더한다. 겹쳐도 둘 다 더해진다.
+           묶음 쓰기(update) 안에서 그대로 쓸 수 있어 왕복이 늘지 않는다.
+         ⚠ 칸을 «하나씩» 적는다. "c/{열쇠}" 와 "c/{열쇠}/n" 을 한 묶음에 같이 넣으면
+           파이어베이스가 «겹친 길»이라며 묶음 전체를 물리친다.
+           그래서 칸 이름을 여기 적어 두는데 — 칸이 늘면 여기도 늘려야 한다.
+           칸은 bankAccum 이 정한다(t·b·y·n·st·w, 그리고 src). */
+      batch["c/"+k+"/t"]=c.t; batch["c/"+k+"/b"]=c.b; batch["c/"+k+"/y"]=c.y;
+      batch["c/"+k+"/st"]=c.st; batch["c/"+k+"/w"]=c.w||0;
+      if(c.src!==undefined) batch["c/"+k+"/src"]=c.src;
+      batch["c/"+k+"/n"]=firebase.database.ServerValue.increment(더할횟수);
       batch["t/"+(fbKey(_tnorm(c.t))||"기타")+"/"+k]=1;
       bankKeysOf(c.t,c.b).forEach(kw=>{ batch["k/"+kw+"/"+k]=1; });
     });

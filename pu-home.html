@@ -2425,14 +2425,41 @@ async function saveRecord(kind, key, next) {
   const base = (kind === 'member') ? 'homepage/members/' : 'homepage/pages/';
   const histKey = (kind === 'member') ? key : 'page:' + key;
   const ref = db.ref(base + key);
-  const before = (await ref.once('value')).val();
-  if (before) {
-    await db.ref('homepage/history/' + histKey + '/' + histStamp())
-      .set({ before: before, updatedBy: currentUserName() });
+  /* ⚠★ 「내가 고치기 시작한 판」이 무엇이었나 (2026-09-26 전체점검)
+     ── 무엇이 문제였나
+       읽고 → 쓰기였다. 같은 사람이 탭 둘을 열어 두었거나 두 사람이 같은 줄을 고치면,
+       A 가 저장한 뒤 B 가 저장하는 순간 **A 의 고침이 말없이 사라진다.**
+       게다가 기록(history)에는 A 의 판이 「B 가 고치기 전」으로 남아 더 헷갈린다.
+     ── 잣대
+       App.members / App.pages 는 이 화면이 «불러온» 판이고, 저장할 때마다 함께 갱신된다.
+       그러니 그 updatedAt 이 곧 「내가 고치기 시작한 판」이다 — 새로 만들 것이 없다.
+     ⚠ 막기만 하고 말없이 끝내지 않는다. 무엇이 일어났는지 말해야 사람이 손쓸 수 있다. */
+  const 바탕 = Number((((kind === 'member') ? App.members : App.pages)[key] || {}).updatedAt || 0);
+  let 남이고침 = null, 이전 = null;
+  const r = await ref.transaction(cur => {
+    if (cur && 바탕 && Number(cur.updatedAt || 0) > 바탕) {
+      남이고침 = cur;            // 그 사이 누군가 고쳤다 — 덮지 않는다
+      return;
+    }
+    /* ★ 「고치기 전」은 «덮기 직전의 서버 값»이다. 화면이 들고 있던 사본으로 적으면,
+       사본이 낡은 날 기록에 엉뚱한 판이 「고치기 전」으로 남는다.
+       ⚠ 트랜잭션 몸통은 여러 번 불릴 수 있다 — 마지막 것이 실제로 덮은 그 판이다. */
+    이전 = cur;
+    return Object.assign({}, next, { updatedAt: Date.now(), updatedBy: currentUserName() });
+  });
+  if (남이고침 || (r && r.committed === false)) {
+    const 누가 = (남이고침 && 남이고침.updatedBy) || '다른 사람';
+    const e = new Error('그 사이 ' + 누가 + ' 님이 이 줄을 고쳤습니다 — 덮어쓰지 않았습니다. '
+      + '새로고침해 그쪽 내용을 본 뒤 다시 고쳐 주세요.');
+    e.code = 'stale';
+    throw e;
   }
-  await ref.set(Object.assign({}, next, {
-    updatedAt: Date.now(), updatedBy: currentUserName()
-  }));
+  /* 기록은 «덮어쓰기가 된 뒤»에 남긴다. 먼저 남기면, 막혀서 안 덮었는데도
+     기록에는 고친 것처럼 한 줄이 쌓인다. */
+  if (이전) {
+    await db.ref('homepage/history/' + histKey + '/' + histStamp())
+      .set({ before: 이전, updatedBy: currentUserName() }).catch(() => {});
+  }
   return next;
 }
 
