@@ -981,6 +981,12 @@ rules.rules_mgmt = {
   worksession: { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } },
   decisions: { '.read': LOGIN, '.write': LOGIN },
   matchfix:  { '.read': LOGIN, '.write': LOGIN },
+  /* ── 법 개정 감시 ─ 2026-09-26 ───────────────────────────────────────
+     서버 함수(rulesLawWatch)가 매일 새벽 법령 저장소를 보고 적는다. 담긴 것은
+     «공개 법령 원문»의 앞뒤 글자와 공포·시행일뿐이다 — 사업장·사람 자료가 없다.
+     그래서 읽기는 규정관리를 쓰는 직원 전부(LOGIN), 쓰기는 «아무도» 못 한다
+     (관리자 SDK 는 규칙을 건너뛰므로 서버만 쓴다). 화면이 고칠 까닭이 없다. */
+  lawwatch: { '.read': LOGIN, '.write': false },
 
   /* ── 서고(사례집) ─ 2026-09-07 · 설계서 §3·§6 ───────────────────────────
      ⚠ 보관함과 «일부러» 갈리는 자리다. 보관함은 「내 것 + 남의 완료본」인데

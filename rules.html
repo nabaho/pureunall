@@ -20,6 +20,8 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-rules-history.js?v=3"></script>
+<script src="js/pu-rules-lawlink.js?v=1"></script>
+<script src="js/pu-rules-lawwatch.js?v=1"></script>
 <script src="js/pu-rules-casebook.js?v=13"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pako.min.js"></script>
@@ -247,6 +249,63 @@ select,input[type=date]{font-family:inherit;font-size:13px;height:36px;padding:0
 .modal h2 .x{margin-left:auto;cursor:pointer;color:var(--mute);font-size:20px;line-height:1}
 .modal .body{overflow:auto;padding:18px 22px}
 .modal .foot{padding:12px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;background:#f8fafc}
+/* ── 법 개정 감시 창 ── 세 칸 깔대기(목업 ② 2026-09-26 승인) */
+.lw-bdg{min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:#dc2626;color:#f8fafc;font-size:11px;display:inline-grid;place-items:center}
+.lw-modal{max-width:1320px}
+.lw-fun{display:grid;grid-template-columns:1fr 22px 1fr 22px 1fr;margin-bottom:12px}
+.lw-fs{border:1px solid #cbd5e1;border-radius:12px;padding:9px 13px;min-width:0;background:#f8fafc}
+.lw-fs .k{color:var(--sub);font-size:12px}
+.lw-fs .n{font-size:21px;font-weight:800}
+.lw-fs .d{color:var(--sub);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lw-fs.a{border-color:#bfdbfe;background:#eff6ff}.lw-fs.a .n{color:#1e40af}
+.lw-fs.b{border-color:#fde68a;background:#fffbeb}.lw-fs.b .n{color:#854d0e}
+.lw-fs.c{border-color:#fecaca;background:#fef2f2}.lw-fs.c .n{color:#991b1b}
+.lw-arr{display:grid;place-items:center;color:#94a3b8;font-size:18px}
+.lw-grid{display:grid;grid-template-columns:280px minmax(0,1fr) 360px;gap:12px;align-items:start}
+.lw-col{border:1px solid #cbd5e1;border-radius:12px;min-width:0;overflow:hidden;background:#f8fafc}
+.lw-h{font-size:13px;font-weight:700;padding:8px 12px;border-bottom:1px solid #e2e8f0;display:flex;gap:6px;align-items:center;min-width:0}
+.lw-h .st{margin-left:auto;font-weight:400;color:var(--sub);font-size:11.5px;white-space:nowrap}
+.lw-ev{padding:9px 12px;border-bottom:1px solid #e2e8f0;cursor:pointer}
+.lw-ev.on{background:#eff6ff;box-shadow:inset 3px 0 0 #2563eb}
+.lw-ev .l1{display:flex;gap:6px;align-items:center;min-width:0}
+.lw-ev .law{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lw-ev .l2{color:var(--sub);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lw-ev .l3{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
+.lw-dd{margin-left:auto;flex:0 0 auto;font-size:11px;padding:1px 7px;border-radius:9px;background:#fef2f2;color:#991b1b;white-space:nowrap}
+.lw-dd.far{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.lw-dd.past{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}
+.lw-tag{font-size:11px;padding:1px 7px;border-radius:9px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;white-space:nowrap}
+.lw-tag.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.lw-tag.warn{background:#fffbeb;border-color:#fde68a;color:#854d0e}
+.lw-tag.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.lw-art{padding:11px 13px;border-bottom:1px solid #e2e8f0}
+.lw-art .hd{display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap}
+.lw-cmp{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-size:12.5px}
+.lw-cmp>div{padding:7px 9px;line-height:1.7;min-width:0;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere}
+.lw-cmp .o{border-right:1px solid #e2e8f0;color:#475569}
+.lw-cmp .cap{font-size:11px;color:var(--mute);margin-bottom:2px;white-space:normal}
+.lw-cmp ins{background:#f0fdf4;color:#166534;text-decoration:none;border-bottom:2px solid #4ade80}
+.lw-cmp del{background:#fef2f2;color:#991b1b}
+.lw-crs{margin-top:8px;display:grid;gap:5px}
+.lw-cr{display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid #e2e8f0;border-radius:8px;min-width:0}
+.lw-cr .id{font-weight:700;color:#1e40af;flex:0 0 auto}
+.lw-cr .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lw-cr .r{margin-left:auto;flex:0 0 auto}
+.lw-flt{display:flex;gap:5px;padding:7px 12px;border-bottom:1px solid #e2e8f0;flex-wrap:wrap}
+.lw-chip{font-size:11.5px;padding:2px 9px;border-radius:12px;border:1px solid #cbd5e1;background:#f8fafc;color:#475569;cursor:pointer;white-space:nowrap}
+.lw-chip.on{background:#1e40af;border-color:#1e40af;color:#f8fafc}
+.lw-site{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 8px;padding:8px 12px;border-bottom:1px solid #e2e8f0;align-items:center}
+.lw-site .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lw-site .nm small{font-weight:400;color:var(--sub);margin-left:6px}
+.lw-site .sub{grid-column:1;color:var(--sub);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lw-site .act{grid-row:1/3;grid-column:2}
+.lw-site.done{opacity:.72}
+.lw-btn{height:26px;padding:0 10px;border-radius:7px;border:1px solid #1e40af;background:#1e40af;color:#f8fafc;font-size:12px;cursor:pointer;white-space:nowrap}
+.lw-empty{padding:18px 12px;color:var(--sub);font-size:12.5px;line-height:1.7}
+.lw-note{margin-top:10px;color:var(--sub);font-size:11.5px;line-height:1.7}
+@media(max-width:1100px){.lw-grid{grid-template-columns:1fr}}
+/* 폰 — 깔대기를 세로로 쌓으면 화면 반을 먹는다. 한 줄 세 칸으로, 설명 줄은 뺀다 */
+@media(max-width:700px){.lw-fun{grid-template-columns:1fr 1fr 1fr;gap:6px}.lw-arr,.lw-fs .d{display:none}.lw-fs{padding:7px 9px}.lw-fs .n{font-size:18px}.lw-fs .k{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 table.daejo{width:100%;border-collapse:collapse;font-size:12px}
 table.daejo th{background:#f8fafc;border:1px solid var(--line);padding:7px;font-weight:600;font-size:11.5px}
 /* 머리행 고정 — 조문이 길어 한참 내려가도 어느 열이 '변경 전'인지 알 수 있어야 한다.
@@ -716,6 +775,8 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
   <!-- 참고 도구 넷 — 매일 쓰는 것이 아니라 서랍 하나 뒤로 접었다(설계서 §4).
        ⚠ 보관함 개수(#ref-cnt)는 «서랍을 안 열어도» 보인다 — 접었다고 몇 건인지까지
          감추면 접기 전보다 나빠진다(설계서 §10). -->
+  <!-- 법 개정 감시 — 서버가 매일 새벽 법령 저장소를 본다. 숫자는 «내 담당» 사업장 중 다시 볼 곳 -->
+  <button class="hbtn" id="lw-open" title="법 개정 감시 — 우리 검토 기준이 기대는 법 조문이 새로 바뀌었는지">⚖ 법 개정<span class="lw-bdg" id="lw-bdg" style="display:none"></span></button>
   <div class="refwrap">
     <button class="hbtn" id="ref-toggle" title="표준규칙 · 문안 은행 · 보관함 · 조문 검색">⋯ 참고 <span id="ref-cnt"></span></button>
   </div>
@@ -1311,6 +1372,24 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
       <div class="empty" id="hist-empty" style="display:none">확정된 취업규칙 회차가 없습니다.<br>
         <span style="font-size:11.5px">검토를 <b>[✅ 완료]</b>로 표시하면 여기에 회차로 쌓입니다.</span></div>
     </div>
+  </div>
+  <div class="foot"><button class="btn ghost" data-close>닫기</button></div>
+</div></div>
+
+<!-- 법 개정 감시 — ① 법이 바뀌었다 › ② 흔들린 검토 기준 › ③ 다시 볼 사업장
+     ⚠ 이 창은 아무것도 저장하지 않는다. 「개정안 만들기」 는 새 회차 길(startNextRevision)로 넘길 뿐이다. -->
+<div class="overlay" id="ov-lw"><div class="modal lw-modal">
+  <h2>⚖ 법 개정 감시 <span class="tag" id="lw-sub" style="font-size:12px;color:var(--mute);font-weight:400"></span><span class="x" data-close>×</span></h2>
+  <div class="body">
+    <div class="lw-fun" id="lw-fun"></div>
+    <div class="lw-grid">
+      <div class="lw-col"><div class="lw-h">① 새 개정 <span class="st">시행 가까운 순</span></div><div id="lw-events"></div></div>
+      <div class="lw-col"><div class="lw-h" id="lw-mid-h">② 무엇이 바뀌었나</div><div id="lw-arts"></div></div>
+      <div class="lw-col"><div class="lw-h" id="lw-site-h">③ 다시 볼 사업장</div><div class="lw-flt" id="lw-flt"></div><div id="lw-sites"></div></div>
+    </div>
+    <div class="lw-note">법령 원문은 legalize-kr(법제처 원문을 조문 단위로 담은 저장소)에서 서버가 매일 새벽 6시에 확인합니다.
+      사업장 판정은 각 사업장의 <b>마지막 완료 회차</b>에 같은 검토 기준을 그 조의 <b>시행일 기준</b>으로 다시 돌린 결과입니다.
+      「개정안 만들기」는 새 회차를 여는 데까지만 합니다 — 저장·확정은 노무사가 합니다.</div>
   </div>
   <div class="foot"><button class="btn ghost" data-close>닫기</button></div>
 </div></div>
@@ -4860,7 +4939,8 @@ function subscribeArch(){if(!FBDB||!FBUSER)return;
     setLocal(mergeStores());
     if(got.done)backfillRulesIndex();             // 색인이 없던 옛 완료 회차를 메운다
     if(document.querySelector("#ov-arch.on"))renderArch($("arch-q").value);
-    updateDoneBtn(); };
+    updateDoneBtn();
+    if(got.done)lwInvalidate(); };                // 법 개정 감시 — 완료 회차가 바뀌면 다시 판정
   FBDB.ref("rules_mgmt/wip/"+FBUSER.uid).on("value",s=>{STORE.wip=s.val()||{};got.wip=true;apply();},
     e=>console.warn("작업중 동기화 실패:",e));
   FBDB.ref("rules_mgmt/done").on("value",s=>{STORE.done=s.val()||{};got.done=true;apply();},
@@ -4927,7 +5007,9 @@ try{if(window.firebase){firebase.initializeApp(FB_CONFIG);FBDB=firebase.database
       checkCloudWorkSession();   // 재로그인 시 계정에 남은 작업 세션 이어받기
       pushWorkToCloud(true);     // 로그인 전 로컬에만 있던 작업을 계정에 올려 다른 기기에서도 이어갈 수 있게
       try{trimOrigLocal();}catch(_){}   // 브라우저에 쌓인 원본 덩어리 걷어내기(서버본이 있는 것만)
-    }else if(FBDB){ ["wip","done"].forEach(k=>FBDB.ref("rules_mgmt/"+k).off()); STORE={wip:{},done:{},legacy:{}}; }});
+      lwLoad();                   // 법 개정 감시 — 사건 몇 건뿐이라 가볍다
+    }else if(FBDB){ ["wip","done"].forEach(k=>FBDB.ref("rules_mgmt/"+k).off()); STORE={wip:{},done:{},legacy:{}};
+      LW.data=null; LW.rows={}; lwBadge(); }});
 }}catch(e){console.warn("Firebase 초기화 건너뜀:",e);}
 
 /* ══════════ 푸른이알피 업체관리(data/companies) 연동 ══════════
@@ -7246,7 +7328,7 @@ function revisedTextOf(){
     +"\n\n부 칙\n"+ad.lines.concat([ad.entry]).join("\n");
 }
 /* 완료 회차 → 다음 개정 시작: 변경후 전문을 새 원본으로 투입하고 바로 검토 */
-async function startNextRevision(id){
+async function startNextRevision(id,opts){
   const r=loadArch().find(x=>x.id===id); if(!r)return;
   const sk=r.siteKey||siteKeyOf(r.id);
   const hasWip=loadArch().some(x=>(x.siteKey||siteKeyOf(x.id))===sk&&x.status==="작업중");
@@ -7268,6 +7350,8 @@ async function startNextRevision(id){
   siteSel.appendChild(opt); siteSel.value=key;
   OPEN_REC=null; setReadOnly(false);
   if(r.size&&$("size"))$("size").value=r.size;
+  /* 법 개정 감시의 「개정안 만들기」 — 그 조의 시행일을 기준일로 검토한다 */
+  if(opts&&opts.asof&&$("asof"))$("asof").value=opts.asof;
   $("ov-arch").classList.remove("on");
   siteSel.dispatchEvent(new Event("change"));      // 검토 화면 초기화 + 원본 미리보기
   await new Promise(res=>setTimeout(res,150));
@@ -7801,6 +7885,162 @@ function closeOverlay(o){ o.classList.remove("on"); const m=o.querySelector(".mo
     });
   }).observe(document.body,{subtree:true,attributes:true,attributeFilter:["class"],attributeOldValue:true});
 })();
+
+/* ══════ 법 개정 감시 (2026-09-26 · 목업 ② 승인 「추천대로」) ══════
+   서버(rulesLawWatch)가 rules_mgmt/lawwatch/events 에 적은 사건을 받아 세 칸으로 좁힌다.
+   셈은 js/pu-rules-lawwatch.js — 여기서는 이 화면의 검토 엔진(evaluate)을 넘겨 주고 그리기만 한다.
+   ⚠ 아무것도 저장하지 않는다. 「개정안 만들기」 는 새 회차 길(startNextRevision)로 넘길 뿐이다. */
+const LW={data:null,sel:"",filt:"open",mine:false,rows:{},showPast:false};
+const LW_ARTS=new WeakMap();      // 회차 → 조문 목록 (같은 회차를 여러 조·사건에 되풀이해 쓴다)
+function lwToday(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,10); }
+function lwE(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function lwArtsOfRec(rec){
+  if(LW_ARTS.has(rec)) return LW_ARTS.get(rec);
+  let arts=null; try{ const t=bankTextOfRecord(rec); arts=t?parseArticles(t):null; }catch(e){ arts=null; }
+  LW_ARTS.set(rec,arts); return arts;
+}
+/* 셈개가 부르는 판정 — 그 회차 전문에 이 화면의 검토 기준을 «그 시행일 기준으로» 돌린다 */
+function lwEval(rec,asof,ids){
+  const arts=lwArtsOfRec(rec); if(!arts||!arts.length) return [];
+  return evaluate(arts,rec.size||"10인이상",new Set(rec.conds||[]),asof||"")
+    .filter(f=>ids.indexOf(f.rule.id)>=0)
+    .map(f=>({id:f.rule.id,status:f.status,found:!!f.hit,loc:f.loc||""}));
+}
+function lwEvents(){ return LW.data?PuRulesLawWatch.sortEvents(LW.data.events):[]; }
+function lwRowsOf(ev){
+  if(!LW.rows[ev.id]) LW.rows[ev.id]=PuRulesLawWatch.sitesFor(ev,PuRulesLawWatch.latestSites(STORE.done||{}),lwEval,RULES,PuRulesLawLink);
+  return LW.rows[ev.id];
+}
+function lwCrit(ev){ return PuRulesLawWatch.criteria(ev,RULES,PuRulesLawLink); }
+/* 「지난 것」 — 걸린 사업장이 모두 반영됐고, 손볼 기준도 없고, 시행일도 지났다 */
+function lwIsOpen(ev){
+  const today=lwToday();
+  if(String(ev.firstEffective||ev.effective||"")>=today) return true;
+  if(lwCrit(ev).some(a=>!a.covered)) return true;
+  return PuRulesLawWatch.counts(lwRowsOf(ev)).open>0;
+}
+function lwLawShort(ev){ const l=PuRulesLawLink.law(ev.lawKey); return (l&&l.alias&&l.alias[0])||ev.lawKey||""; }
+function lwDday(ymd){
+  if(!ymd) return {t:"",c:"past"};
+  const d=PuRulesLawWatch.daysTo(ymd,lwToday());
+  return d<0?{t:"시행됨",c:"past"}:d===0?{t:"오늘 시행",c:""}:{t:"D-"+d,c:d>120?"far":""};
+}
+function lwDot(ymd){ return String(ymd||"").replace(/-0?/g,"."); }
+function lwLoad(){
+  if(!FBDB||!FBUSER||!window.PuRulesLawWatch) return;
+  PuRulesLawWatch.load(FBDB,d=>{ LW.data=d; LW.rows={}; setTimeout(lwBadge,60);
+    if($("ov-lw").classList.contains("on")) lwRender(); });
+}
+/* 완료 회차가 바뀌면 판정을 다시 한다(누가 방금 개정을 확정했을 수 있다) */
+function lwInvalidate(){ LW.rows={}; if(LW.data){ setTimeout(lwBadge,60); if($("ov-lw").classList.contains("on")) lwRender(); } }
+function lwBadge(){
+  const b=$("lw-bdg"); if(!b) return;
+  if(!LW.data||!FBUSER){ b.style.display="none"; return; }
+  let mine=0;
+  try{ lwEvents().forEach(ev=>{ mine+=PuRulesLawWatch.counts(lwRowsOf(ev),FBUSER.uid).mine; }); }catch(e){ console.warn("법 개정 판정 실패:",e); }
+  b.textContent=String(mine); b.style.display=mine?"":"none";
+  $("lw-open").title="법 개정 감시 — "+(mine?"내 담당 사업장 "+mine+"곳을 다시 볼 차례입니다":"다시 볼 내 담당 사업장이 없습니다");
+}
+/* 앞뒤 글자 대조 — 항(줄) 단위로 견주고, 한 줄씩 짝지어 바뀐 줄은 그 안에서 앞뒤 공통을 걷는다 */
+function lwCharDiff(a,b){
+  let i=0; while(i<a.length&&i<b.length&&a[i]===b[i])i++;
+  let j=0; while(j<a.length-i&&j<b.length-i&&a[a.length-1-j]===b[b.length-1-j])j++;
+  const mid=(s,tag)=>s.length?"<"+tag+">"+lwE(s)+"</"+tag+">":"";
+  return { o:lwE(a.slice(0,i))+mid(a.slice(i,a.length-j),"del")+lwE(a.slice(a.length-j)),
+           n:lwE(b.slice(0,i))+mid(b.slice(i,b.length-j),"ins")+lwE(b.slice(b.length-j)) };
+}
+function lwDiff(a,b){
+  const A=String(a||"").split("\n"), B=String(b||"").split("\n");
+  const inA=new Set(A), inB=new Set(B);
+  const oa=A.filter(x=>!inB.has(x)), nb=B.filter(x=>!inA.has(x));
+  const pairO=new Map(), pairN=new Map();
+  if(oa.length===nb.length) oa.forEach((x,k)=>{ const d=lwCharDiff(x,nb[k]); pairO.set(x,d.o); pairN.set(nb[k],d.n); });
+  return { o:A.map(x=>inB.has(x)?lwE(x):(pairO.get(x)||"<del>"+lwE(x)+"</del>")).join("\n"),
+           n:B.map(x=>inA.has(x)?lwE(x):(pairN.get(x)||"<ins>"+lwE(x)+"</ins>")).join("\n") };
+}
+function lwRender(){
+  const evs=lwEvents(), open=evs.filter(lwIsOpen), past=evs.filter(e=>!lwIsOpen(e));
+  const lr=LW.data&&LW.data.lastRun;
+  $("lw-sub").textContent=!LW.data?"불러오는 중…"
+    :!lr?"서버가 아직 한 번도 확인하지 않았습니다 — 매일 새벽 6시에 돕니다"
+    :"마지막 확인 "+new Date(lr.at).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})
+      +" · 법 "+(lr.checked||0)+"개"+(lr.errors?" · ⚠ 못 읽은 법 "+lr.errors+"개("+(lr.errorLaws||[]).join(", ")+")":"");
+  const shown=LW.showPast?evs:open;
+  if(!shown.some(e=>e.id===LW.sel)) LW.sel=shown[0]?shown[0].id:"";
+  /* ── 깔대기 ── */
+  const crit=[].concat(...open.map(lwCrit)), rids={}, upd={};
+  crit.forEach(a=>a.rules.forEach(r=>{ rids[r.id]=1; if(r.state==="update")upd[r.id]=1; }));
+  const siteOpen={}, owners={}; let near="";
+  open.forEach(ev=>{ lwRowsOf(ev).forEach(r=>{ if(r.state!=="done"){ siteOpen[r.siteKey]=1; if(r.ownerName)owners[r.ownerName]=1; } });
+    const f=ev.firstEffective||ev.effective; if(f>=lwToday()&&(!near||f<near))near=f; });
+  const nR=Object.keys(rids).length, nU=Object.keys(upd).length, nS=Object.keys(siteOpen).length;
+  $("lw-fun").innerHTML=
+    `<div class="lw-fs a"><div class="k">① 법이 바뀌었다</div><div class="n">${open.length}건</div><div class="d">${lwE(open.map(lwLawShort).filter((x,i,a)=>a.indexOf(x)===i).join(" · ")||"새 개정 없음")}</div></div><div class="lw-arr">›</div>`+
+    `<div class="lw-fs b"><div class="k">② 흔들린 검토 기준</div><div class="n">${nR}개</div><div class="d">${nU?`⚠ ${nU}개는 기준에 아직 없음 · ${nR-nU}개 반영`:(nR?"모두 기준에 반영돼 있음":"—")}</div></div><div class="lw-arr">›</div>`+
+    `<div class="lw-fs c"><div class="k">③ 다시 볼 사업장</div><div class="n">${nS}곳</div><div class="d">${near?"가장 가까운 시행 "+lwDday(near).t:"—"}${Object.keys(owners).length?" · 담당 노무사 "+Object.keys(owners).length+"명":""}</div></div>`;
+  /* ── ① 사건 목록 ── */
+  let h=shown.map(ev=>{
+    const arts=PuRulesLawWatch.artsOf(ev), dd=lwDday(ev.firstEffective||ev.effective);
+    return `<div class="lw-ev${ev.id===LW.sel?" on":""}" data-ev="${lwE(ev.id)}">
+      <div class="l1"><span class="law" title="${lwE(ev.lawKey)}">${lwE(lwLawShort(ev))}</span><span class="lw-dd ${dd.c}">${lwE(dd.t)}</span></div>
+      <div class="l2">${lwE(lwDot(ev.promulgated))} 공포 · 제${lwE(ev.no)}호 · 바뀐 조 ${arts.length}</div>
+      <div class="l3">${arts.slice(0,4).map(a=>`<span class="lw-tag">${lwE(PuRulesLawWatch.artLabel(a.art))} ${lwE(a.title)} · ${lwE(lwDot(a.effective))}</span>`).join("")}${arts.length>4?`<span class="lw-tag">+${arts.length-4}</span>`:""}</div></div>`;
+  }).join("");
+  if(!evs.length) h=`<div class="lw-empty">${lr?"우리 검토 기준이 기대는 조가 바뀐 새 개정이 없습니다.":"아직 확인한 기록이 없습니다."}</div>`;
+  else if(!shown.length) h=`<div class="lw-empty">다시 볼 새 개정이 없습니다.</div>`;
+  if(past.length) h+=`<div class="lw-empty"><a href="#" id="lw-past">${LW.showPast?"지난 개정 숨기기":"✓ 정리된 지난 개정 "+past.length+"건 보기"}</a></div>`;
+  $("lw-events").innerHTML=h;
+  $("lw-events").querySelectorAll("[data-ev]").forEach(el=>el.onclick=()=>{ LW.sel=el.dataset.ev; lwRender(); });
+  const lp=$("lw-past"); if(lp) lp.onclick=e=>{ e.preventDefault(); LW.showPast=!LW.showPast; lwRender(); };
+  /* ── ② 무엇이 바뀌었나 ── */
+  const ev=evs.find(e=>e.id===LW.sel);
+  if(!ev){ $("lw-mid-h").textContent="② 무엇이 바뀌었나"; $("lw-arts").innerHTML=""; $("lw-site-h").textContent="③ 다시 볼 사업장"; $("lw-flt").innerHTML=""; $("lw-sites").innerHTML=""; return; }
+  $("lw-mid-h").innerHTML=`② 무엇이 바뀌었나 — ${lwE(lwLawShort(ev))} <a class="st" href="${lwE(ev.url)}" target="_blank" rel="noopener">법제처 원문 ↗</a>`;
+  $("lw-arts").innerHTML=lwCrit(ev).map(a=>{
+    const dd=lwDday(a.effective), d=lwDiff(a.before,a.after);
+    const tag=r=>r.state==="covered"?`<span class="lw-tag ok">✓ 이미 있음 · 시행일 같음</span>`
+      :r.state==="coveredBy"?`<span class="lw-tag">${lwE(r.by)} 가 맡음</span>`
+      :`<span class="lw-tag bad">⚠ 기준 손질 필요</span>`;
+    return `<div class="lw-art"><div class="hd"><b>${lwE(PuRulesLawWatch.artLabel(a.art))}(${lwE(a.title)})</b>
+        <span class="lw-tag${a.kind==="신설"?" ok":a.kind==="삭제"?" bad":""}">${lwE(a.kind)}</span>
+        <span class="lw-tag${dd.c===""?" bad":""}">시행 ${lwE(lwDot(a.effective))}${dd.t?" · "+lwE(dd.t):""}</span>
+        ${a.effNote?`<span class="lw-tag warn">${lwE(a.effNote)}</span>`:""}</div>
+      <div class="lw-cmp"><div class="o"><div class="cap">지금</div>${a.beforeUnknown?`<span style="color:var(--mute)">앞 글자를 받지 못했습니다 — <a href="${lwE(ev.url)}" target="_blank" rel="noopener">법제처 원문</a>에서 확인</span>`:(d.o||"(없음)")}</div>
+        <div class="n"><div class="cap">바뀐 뒤</div>${a.beforeUnknown?lwE(a.after):(d.n||"(삭제)")}</div></div>
+      <div class="lw-crs">${a.rules.map(r=>`<div class="lw-cr"><span class="id">${lwE(r.id)}</span><span class="nm" title="${lwE(r.name)}">${lwE(r.name)}</span><span class="r">${tag(r)}</span></div>`).join("")}</div></div>`;
+  }).join("");
+  /* ── ③ 다시 볼 사업장 ── */
+  const rows=lwRowsOf(ev), c=PuRulesLawWatch.counts(rows,FBUSER&&FBUSER.uid);
+  $("lw-site-h").innerHTML=`③ 다시 볼 사업장 <span class="st">${c.open}곳 / 걸린 ${rows.length}곳</span>`;
+  const chips=[["open","다시 볼 곳 "+c.open],["todo","반영 안 됨 "+c.todo],["missing","조항 없음 "+c.missing],["manual","확인 필요 "+c.manual],["done","반영됨 "+c.done]];
+  $("lw-flt").innerHTML=chips.map(([k,t])=>`<span class="lw-chip${LW.filt===k?" on":""}" data-f="${k}">${lwE(t)}</span>`).join("")
+    +`<span class="lw-chip${LW.mine?" on":""}" data-mine="1">내 담당만</span>`;
+  $("lw-flt").querySelectorAll("[data-f]").forEach(el=>el.onclick=()=>{ LW.filt=el.dataset.f; lwRender(); });
+  $("lw-flt").querySelector("[data-mine]").onclick=()=>{ LW.mine=!LW.mine; lwRender(); };
+  const pick=rows.filter(r=>(LW.filt==="open"?r.state!=="done":r.state===LW.filt)&&(!LW.mine||(FBUSER&&r.ownerUid===FBUSER.uid)));
+  const STATE={todo:["반영 안 됨","bad"],missing:["조항 없음","bad"],manual:["확인 필요","warn"],done:["반영됨","ok"]};
+  $("lw-sites").innerHTML=pick.length?pick.map(r=>{
+    const mine=FBUSER&&r.ownerUid===FBUSER.uid;
+    const eff=PuRulesLawWatch.artsOf(ev).filter(a=>!r.arts.length||r.arts.indexOf(a.art)>=0).map(a=>a.effective).filter(Boolean).sort()[0]||ev.effective;
+    const act=r.state==="done"?`<span class="lw-tag ok">반영됨</span>`
+      :mine?`<button class="lw-btn" data-mk="${lwE(r.siteKey)}" data-rv="${lwE(r.rev)}" data-asof="${lwE(eff)}" title="이 사업장의 마지막 회차 전문으로 새 회차를 열고, 기준일 ${lwE(eff)}로 검토합니다">개정안 만들기</button>`
+      :`<span class="lw-tag" title="담당 노무사만 새 회차를 만들 수 있습니다">${lwE(r.ownerName||"담당 미상")}</span>`;
+    return `<div class="lw-site${r.state==="done"?" done":""}"><div class="nm" title="${lwE(r.site)}">${lwE(r.site||"(이름 없음)")}${r.loc?`<small>${lwE(r.loc)}</small>`:""}</div>
+      <div class="sub" title="${lwE(r.why)}"><span class="lw-tag ${STATE[r.state][1]}">${STATE[r.state][0]}</span> 마지막 회차 ${lwE(r.asof||"—")} · 담당 ${lwE(r.ownerName||"—")}</div>
+      <div class="act">${act}</div></div>`;
+  }).join(""):`<div class="lw-empty">${rows.length?"이 칸에 해당하는 사업장이 없습니다.":"이 개정이 걸리는 사업장이 없습니다(완료 회차가 있는 사업장 기준)."}</div>`;
+  $("lw-sites").querySelectorAll("[data-mk]").forEach(b=>b.onclick=async()=>{
+    closeOverlay($("ov-lw"));
+    await startNextRevision(b.dataset.mk+"@"+b.dataset.rv,{asof:b.dataset.asof});
+  });
+}
+$("lw-open").addEventListener("click",()=>{
+  if(!FBDB||!FBUSER){ alert("로그인 후 이용하세요."); return; }
+  $("ov-lw").classList.add("on");
+  if(!LW.data) lwLoad();
+  lwRender();
+});
+
 document.querySelectorAll("[data-close]").forEach(x=>x.onclick=e=>closeOverlay(e.target.closest(".overlay")));
 document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)closeOverlay(o);});
 /* 모달 드래그 이동 — 헤더(h2)를 잡고 팝업 창을 마우스로 옮김. PDF iframe이 이벤트를 삼키지 않게 드래그 중엔 pointer-events 차단 */
