@@ -22,6 +22,7 @@
 <script src="js/pu-rules-history.js?v=3"></script>
 <script src="js/pu-rules-lawlink.js?v=1"></script>
 <script src="js/pu-rules-lawwatch.js?v=1"></script>
+<script src="js/pu-hwp-keep.js?v=1"></script>
 <script src="js/pu-rules-casebook.js?v=13"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pako.min.js"></script>
@@ -303,6 +304,38 @@ select,input[type=date]{font-family:inherit;font-size:13px;height:36px;padding:0
 .lw-btn{height:26px;padding:0 10px;border-radius:7px;border:1px solid #1e40af;background:#1e40af;color:#f8fafc;font-size:12px;cursor:pointer;white-space:nowrap}
 .lw-empty{padding:18px 12px;color:var(--sub);font-size:12.5px;line-height:1.7}
 .lw-note{margin-top:10px;color:var(--sub);font-size:11.5px;line-height:1.7}
+/* ── 원본 살려 고치기 창 (목업 ③) ── */
+.kp-modal{max-width:1180px}
+.kp-steps{display:flex;gap:0;padding:8px 22px;border-bottom:1px solid var(--line);background:#f8fafc;flex-wrap:wrap}
+.kp-st{display:flex;align-items:center;gap:6px;color:var(--sub);font-size:12px;white-space:nowrap}
+.kp-st+.kp-st:before{content:"›";color:#cbd5e1;margin:0 10px}
+.kp-st i{font-style:normal;width:18px;height:18px;border-radius:9px;display:inline-grid;place-items:center;font-size:11px;background:#e2e8f0;color:#475569}
+.kp-st.ok i{background:#16a34a;color:#f8fafc}
+.kp-st.now{color:#1e40af;font-weight:700}.kp-st.now i{background:#2563eb;color:#f8fafc}
+.kp-st.bad{color:#991b1b}.kp-st.bad i{background:#dc2626;color:#f8fafc}
+.kp-body{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:0;padding:0!important}
+.kp-list{border-right:1px solid var(--line);min-width:0}
+.kp-lh{display:flex;gap:6px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);color:var(--sub);font-size:12px}
+.kp-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.kp-row.on{background:#eff6ff}
+.kp-k{font-size:11px;text-align:center;border-radius:6px;padding:2px 0;font-weight:700}
+.kp-k.amd{background:#eff6ff;color:#1e40af}.kp-k.ins{background:#f0fdf4;color:#166534}.kp-k.del{background:#fef2f2;color:#991b1b}.kp-k.add{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.kp-t{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kp-t small{color:var(--sub);margin-left:6px}
+.kp-tag{font-size:11px;padding:1px 8px;border-radius:9px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;white-space:nowrap}
+.kp-tag.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.kp-tag.warn{background:#fffbeb;border-color:#fde68a;color:#854d0e}
+.kp-tag.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.kp-fix{padding:7px 14px 9px 66px;border-bottom:1px solid var(--line);background:#fffbeb;color:#854d0e;font-size:12px;line-height:1.7}
+.kp-fix select{height:26px;border:1px solid #fde68a;border-radius:6px;background:#f8fafc;color:#1e293b;font-size:12px;max-width:100%}
+.kp-pv{background:#e2e8f0;padding:12px;min-width:0;max-height:62vh;overflow:auto}
+.kp-pvh{display:flex;align-items:center;gap:8px;font-size:12px;color:#1e293b;margin-bottom:8px}
+.kp-cmp{display:grid;gap:8px;font-size:12.5px}
+.kp-cmp>div{background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;white-space:pre-wrap;line-height:1.7;overflow-wrap:anywhere}
+.kp-cmp .cap{font-size:11px;color:var(--mute);margin-bottom:2px;white-space:normal}
+.kp-page svg{width:100%;height:auto;background:#f8fafc;border-radius:6px;box-shadow:0 2px 10px rgba(15,23,42,.1)}
+.kp-note{color:var(--sub);font-size:12px;min-width:0}
+@media(max-width:900px){.kp-body{grid-template-columns:1fr}.kp-list{border-right:0}.kp-pv{max-height:none}}
 @media(max-width:1100px){.lw-grid{grid-template-columns:1fr}}
 /* 폰 — 깔대기를 세로로 쌓으면 화면 반을 먹는다. 한 줄 세 칸으로, 설명 줄은 뺀다 */
 @media(max-width:700px){.lw-fun{grid-template-columns:1fr 1fr 1fr;gap:6px}.lw-arr,.lw-fs .d{display:none}.lw-fs{padding:7px 9px}.lw-fs .n{font-size:18px}.lw-fs .k{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
@@ -1064,6 +1097,23 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
     <span class="stepnav" data-step="4"></span>
     <span style="flex:1"></span>
     <button class="btn" id="dl-docset">📎 선택 서류 한 파일로 받기</button>
+  </div>
+</div></div>
+
+<!-- 원본 살려 고치기 — 목업 ③(2026-09-26 승인). 조마다 «원본의 어디에» 넣는지 먼저 보여 주고,
+     고친 뒤 다시 열어 검증을 통과해야 저장된다. ⚠ 원본 파일은 그대로 두고 사본을 고친다. -->
+<div class="overlay" id="ov-keep"><div class="modal kp-modal">
+  <h2>📄 원본에 반영 <span class="tag" id="kp-file" style="font-size:12px;color:var(--mute);font-weight:400"></span><span class="x" data-close>×</span></h2>
+  <div class="kp-steps" id="kp-steps"></div>
+  <div class="body kp-body">
+    <div class="kp-list"><div class="kp-lh" id="kp-lh"></div><div id="kp-rows"></div></div>
+    <div class="kp-pv"><div class="kp-pvh" id="kp-pvh"></div><div id="kp-pv"></div></div>
+  </div>
+  <div class="foot" style="gap:8px;align-items:center">
+    <span class="kp-note" id="kp-note"></span>
+    <span style="flex:1"></span>
+    <button class="btn ghost" id="kp-std" title="지금까지처럼 노동부 표준취업규칙 모양으로 새로 짜서 받습니다">표준 조판으로 대신 받기</button>
+    <button class="btn" id="kp-go"></button>
   </div>
 </div></div>
 
@@ -4423,7 +4473,10 @@ function renderDocset(){
       </label>
       <button class="stbtn" data-pv1="${k}" title="내려받을 한글 파일을 그대로 미리 봅니다" style="flex:0 0 auto;white-space:nowrap">👁 미리보기</button>
       <button class="stbtn" data-dl1="${k}" title="이 서식만 한글 파일로 내려받습니다" style="flex:0 0 auto;white-space:nowrap">⬇ 따로 받기</button>
+      ${k==="full"?keepBtnHtml():""}
     </div>`).join("");
+  $("docset-list").querySelectorAll("[data-keep1]").forEach(b=>b.onclick=e=>{
+    e.preventDefault(); e.stopPropagation(); openKeep(); });
   $("docset-list").querySelectorAll("[data-ds]").forEach(c=>c.onchange=()=>{
     DOCSET[c.dataset.ds]=c.checked; DOCSET._touched=true; renderDocset(); renderStepNav(); });
   $("docset-list").querySelectorAll("[data-dl1]").forEach(b=>b.onclick=e=>{
@@ -8041,6 +8094,204 @@ $("lw-open").addEventListener("click",()=>{
   lwRender();
 });
 
+/* ══════ 원본 살려 고치기 (2026-09-26 · 목업 ③ 승인 「추천대로」) ══════
+   회사 원본 한글 파일에 확정된 신구대조표의 바뀐 조만 넣는다. 고치는 일은 js/pu-hwp-keep.js,
+   여기서는 신구대조표를 그 부품이 읽는 꼴로 바꾸고, 사람이 고를 곳을 보여 주고, 검증을 통과해야 내려 준다.
+   ⚠ 원본(HWP_BUFS)은 건드리지 않는다 — 늘 사본으로 새 문서를 연다.
+   ⚠ .hwp 는 .hwp 로만 낸다(.hwpx 로 바꾸면 띄어쓰기가 어긋났다 — status/2026-09-26-rules-keep-original-test.md). */
+const KEEP={fmt:"",rows:[],run:[],sel:0,out:null,check:null,placed:null,afterRun:null,pages:null,doc:null};
+function keepDot(iso){ const p=String(iso||"").split("-").map(Number); return p[0]?p[0]+". "+p[1]+". "+p[2]+".":String(iso||""); }
+function keepOrigTitle(it){ const m=/^\s*제\s*\d+\s*조(?:\s*의\s*\d+)?\s*[(（]([^)）]*)[)）]/.exec(String(it.orig||"")); return m?m[1].trim():(it.title||""); }
+function keepWhyNot(){
+  if(!window.PuHwpKeep) return "원본 반영 부품을 불러오지 못했습니다";
+  if(!window.PU_RHWP) return "한글 엔진을 불러오지 못했습니다 — 인터넷 연결을 확인하고 새로 고치세요";
+  if(!LAST||!CUR_ITEMS.length) return "먼저 조문 검토·편집을 하세요";
+  const buf=HWP_BUFS[LAST.key];
+  if(!buf) return "원본 한글 파일이 없습니다 — 한글(.hwp·.hwpx)로 올린 원본에만 쓸 수 있습니다";
+  if(!PuHwpKeep.formatOf(new Uint8Array(buf))) return "원본이 한글 파일이 아닙니다(워드 등) — 표준 조판을 쓰세요";
+  if(REV_MODE!=="partial") return "전부개정은 조 번호가 모두 바뀌어 원본에 반영하지 않습니다 — 표준 조판을 쓰세요";
+  if(!changedItems().length) return "바뀐 조가 없습니다";
+  return "";
+}
+function keepBtnHtml(){
+  const why=keepWhyNot();
+  return `<button class="stbtn" data-keep1="1" ${why?"disabled":""} title="${escapeH(why||"회사가 준 원본 한글 파일에 바뀐 조만 넣습니다 — 글꼴·머리말·표·쪽번호 그대로")}" style="flex:0 0 auto;white-space:nowrap">📄 원본 모양 그대로</button>`;
+}
+/* 신구대조표 → 부품이 읽는 꼴. 일부개정만 온다(keepWhyNot). 순서는 numberedView 그대로 —
+   같은 자리에 넣는 신설이 여럿이면 이 순서대로 들어간다 */
+function keepChanges(){
+  const view=numberedView(CUR_ITEMS,"partial").filter(v=>inDaejo(v.it));
+  const existing=CUR_ITEMS.filter(x=>x.orig!=="");
+  const lines=v=>articleText(v).split("\n").map(s=>s.replace(/\s+$/,"")).filter((s,i)=>i===0||s.trim());
+  /* 신설의 앞 조 — 앞이 신설이면 그 신설의 앞 조로 거슬러 간다(원본에는 원본 조만 있다) */
+  const anchorOf=it=>{
+    let aid=it.insertAfter, guard=0;
+    while(aid&&guard++<50){
+      if(aid==="__end__"||aid==="__start__") return {start:aid==="__start__"};
+      const ex=existing.find(x=>x.id===aid);
+      if(ex){ const live=liveAnchor(existing,aid); const an=existing.find(x=>x.id===live); return an&&an.num?{num:an.num,sub:an.sub||0}:{start:true}; }
+      const nw=CUR_ITEMS.find(x=>x.id===aid); if(!nw) return null; aid=nw.insertAfter;
+    }
+    return null;
+  };
+  const out=[];
+  view.forEach(v=>{
+    const it=v.it, kind=itemKind(it);
+    if(kind==="유지"||kind==="검토") return;
+    if(kind==="신설"){
+      if(!String(it.after||"").trim()) return;                     // 문안이 빈 신설은 전문에도 안 넣는다
+      const an=anchorOf(it);
+      out.push({id:it.id,kind:"신설",newNo:v.no,title:it.title||"",label:viewLabel(v).trim(),lines:lines(v),
+        anchor:(an&&an.num)?an:null,anchorStart:!!(an&&an.start)});
+      return;
+    }
+    const base={id:it.id,kind,num:it.num,sub:it.sub||0,title:keepOrigTitle(it),label:viewLabel(v).trim()};
+    if(kind==="삭제") out.push(Object.assign(base,{delText:v.no+" 삭제 <"+keepDot(LAST.asof)+">"}));
+    else out.push(Object.assign(base,{lines:lines(v),orig:String(it.orig||"")}));
+  });
+  return out;
+}
+function keepOpenDoc(){ return new window.PU_RHWP.HwpDocument(new Uint8Array(HWP_BUFS[LAST.key].slice(0))); }
+function openKeep(){
+  const why=keepWhyNot(); if(why){ alert(why); return; }
+  KEEP.fmt=PuHwpKeep.formatOf(new Uint8Array(HWP_BUFS[LAST.key]));
+  if(KEEP.doc){ try{ KEEP.doc.free(); }catch(_){} KEEP.doc=null; }   // 지난번에 열어 둔 고친 사본
+  KEEP.out=null; KEEP.check=null; KEEP.placed=null; KEEP.afterRun=null; KEEP.pages=null; KEEP.sel=0;
+  let doc=null;
+  try{
+    doc=keepOpenDoc();
+    const changes=keepChanges();
+    KEEP.run=PuHwpKeep.pickRun(PuHwpKeep.scan(doc),changes);
+    KEEP.rows=PuHwpKeep.plan(KEEP.run,changes).map(r=>{
+      /* 맨 앞에 넣는 신설은 자리를 사람이 고른다 — 부품은 «앞 조 뒤» 로만 넣는다 */
+      if(r.kind==="신설"&&r.anchorStart){ r.state="confirm"; r.why="맨 앞에 넣는 조 — 어느 조 뒤에 넣을지 고르세요"; r.target=null; }
+      return r;
+    });
+    const ad=composeAddendum();
+    KEEP.addendum=ad.lines.length?{after:ad.lines[ad.lines.length-1],line:ad.entry}:null;
+  }catch(e){ console.warn("원본 읽기 실패:",e); alert("원본을 읽지 못했습니다: "+(e.message||e)); return; }
+  finally{ try{ doc&&doc.free(); }catch(_){} }
+  if(!KEEP.run.length){ alert("원본에서 조문(제○조)을 찾지 못했습니다 — 표준 조판을 쓰세요."); return; }
+  $("kp-file").textContent="📎 "+(SITE_FILE[LAST.key]||"원본")+" · 조 "+KEEP.run.length+"개 찾음";
+  $("ov-keep").classList.add("on");
+  keepRender();
+}
+const KEEP_ASK={confirm:1,missing:1,differ:1};   // 사람이 골라야 넣는 줄
+function keepPending(){ return KEEP.rows.filter(r=>!r.skip&&KEEP_ASK[r.state]&&!r.picked).length; }
+function keepWhere(r){
+  const t=r.target; if(!t) return "";
+  const at=t.base.t==="cell"?"표 안":"본문";
+  return r.kind==="신설"?(t.key.replace(/^(\d+)의(\d+)$/,"제$1조의$2").replace(/^(\d+)$/,"제$1조")+" 뒤 · "+at):(at+" · "+t.lines.length+"문단");
+}
+function keepRender(){
+  const pend=keepPending(), done=!!KEEP.check;
+  const steps=[["원본 읽기","ok"],["자리 찾기 · "+(KEEP.rows.length-pend)+"/"+KEEP.rows.length,pend?"now":"ok"],
+    ["원본에 넣기",done?"ok":(pend?"":"now")],["다시 열어 검증 · 저장",done?(KEEP.check.ok?"now":"bad"):""]];
+  $("kp-steps").innerHTML=steps.map((s,i)=>`<span class="kp-st ${s[1]}"><i>${s[1]==="ok"?"✓":s[1]==="bad"?"!":i+1}</i>${escapeH(s[0])}</span>`).join("");
+  $("kp-lh").innerHTML=`바뀐 조 ${KEEP.rows.length}개${KEEP.addendum?" · 부칙 1줄":""} — 조를 누르면 오른쪽에 원본과 바뀔 글이 뜹니다`;
+  const K={개정:["개정","amd"],신설:["신설","ins"],삭제:["삭제","del"]};
+  const st=r=>r.skip?`<span class="kp-tag">건너뜀</span>`:r.picked?`<span class="kp-tag ok">골랐음</span>`
+    :r.state==="ok"?`<span class="kp-tag ok">찾음</span>`:r.state==="place"?`<span class="kp-tag ok">자리 정함</span>`
+    :r.state==="confirm"?`<span class="kp-tag warn">확인 필요</span>`:r.state==="differ"?`<span class="kp-tag warn">글자 다름</span>`:`<span class="kp-tag bad">못 찾음</span>`;
+  const opts=r=>KEEP.run.map(c=>`<option value="${escapeH(c.key)}"${r.target&&r.target.key===c.key?" selected":""}>원본 ${escapeH(c.key.replace(/^(\d+)의(\d+)$/,"제$1조의$2").replace(/^(\d+)$/,"제$1조"))}(${escapeH(c.title||"")})${r.kind==="신설"?" 뒤에 넣기":""}</option>`).join("");
+  let h="";
+  KEEP.rows.forEach((r,i)=>{
+    h+=`<div class="kp-row${i===KEEP.sel?" on":""}" data-kr="${i}"><span class="kp-k ${K[r.kind][1]}">${K[r.kind][0]}</span>
+      <span class="kp-t" title="${escapeH(r.label||"")}">${escapeH(r.label||"")}<small>${escapeH(keepWhere(r))}</small></span>${st(r)}</div>`;
+    if(KEEP_ASK[r.state]&&!r.picked&&!r.skip||(r.picked&&i===KEEP.sel)){
+      /* 글자가 다르면 자리를 고를 일은 없다 — 넣을지 말지만 */
+      const pick=r.state==="differ"
+        ?`<option value="__force__"${r.picked?" selected":""}>그래도 검토 화면 글로 바꾸기(원본 글자와 다른 곳도 함께 바뀜)</option>`
+        :opts(r);
+      h+=`<div class="kp-fix">${escapeH(r.why||"")}<br>
+        <select data-kpick="${i}"><option value="">— 고르세요 —</option>${pick}<option value="__skip__">이 조는 원본에 넣지 않음(건너뛰기)</option></select></div>`;
+    }
+  });
+  if(KEEP.addendum) h+=`<div class="kp-row"><span class="kp-k add">부칙</span><span class="kp-t">${escapeH(KEEP.addendum.line)}<small>옛 부칙 마지막 줄 뒤</small></span>${
+    KEEP.placed===false?`<span class="kp-tag warn">자리 못 찾음</span>`:KEEP.placed?`<span class="kp-tag ok">넣음</span>`:`<span class="kp-tag">넣을 차례</span>`}</div>`;
+  $("kp-rows").innerHTML=h;
+  $("kp-rows").querySelectorAll("[data-kr]").forEach(el=>el.onclick=()=>{ KEEP.sel=+el.dataset.kr; keepRender(); });
+  $("kp-rows").querySelectorAll("[data-kpick]").forEach(s=>{ s.onclick=e=>e.stopPropagation(); s.onchange=()=>{
+    const r=KEEP.rows[+s.dataset.kpick];
+    if(s.value==="__skip__"){ r.skip=true; r.picked=false; }
+    else if(s.value==="__force__"){ r.picked=true; r.skip=false; }
+    else if(s.value){ r.target=KEEP.run.find(c=>c.key===s.value)||null; r.picked=!!r.target; r.skip=false; }
+    KEEP.check=null; KEEP.out=null; keepRender();
+  }; });
+  keepPreview();
+  /* 발밑 — 무엇을 받게 되는지, 왜 못 받는지 */
+  const base=String(SITE_FILE[LAST.key]||"취업규칙").replace(/\.(hwpx?)$/i,"");
+  const name=`${base}_${String(LAST.asof||"").replace(/-/g,"")}개정.${KEEP.fmt}`;
+  $("kp-note").innerHTML=KEEP.check&&!KEEP.check.ok
+    ?`<b style="color:#991b1b">검증에서 걸렸습니다 — 저장하지 않았습니다.</b> ${escapeH(KEEP.check.issues.slice(0,3).map(x=>x.key+"조: "+x.why).join(" · "))}`
+    :`원본은 그대로 둡니다 · 새 파일 <b>${escapeH(name)}</b> (원본과 같은 .${KEEP.fmt})`
+      +(KEEP.placed===false?` · <b style="color:#854d0e">부칙은 원본에서 자리를 못 찾아 넣지 않았습니다 — 한글에서 직접 넣으세요</b>`:"");
+  const go=$("kp-go");
+  go.disabled=!!pend||(KEEP.check&&!KEEP.check.ok);
+  go.textContent=pend?`확인 ${pend}건 남음 — 저장 못 함`:!KEEP.check?"원본에 넣고 검증하기":KEEP.check.ok?"⬇ 검증 통과 — 내려받기":"검증 실패 — 저장 못 함";
+  go.onclick=()=>{ if(!KEEP.check) keepApply(); else if(KEEP.check.ok) keepSave(name); };
+}
+/* 오른쪽 — 넣기 전엔 원본 글과 바뀔 글, 넣은 뒤엔 «고친 원본» 의 그 쪽을 그대로 그린다 */
+function keepPreview(){
+  const r=KEEP.rows[KEEP.sel]; if(!r){ $("kp-pvh").textContent=""; $("kp-pv").innerHTML=""; return; }
+  const want=r.kind==="삭제"?r.delText:(r.lines||[]).join("\n");
+  const was=r.kind==="신설"?"(새 조)":(r.target?r.target.lines.join("\n"):"(원본에서 못 찾음)");
+  if(KEEP.afterRun&&KEEP.doc){
+    const key=r.kind==="신설"?(r.newNo||"").replace(/^제\s*(\d+)\s*조(?:\s*의\s*(\d+))?.*$/,(m,a,b)=>a+(b?"의"+b:"")):(r.num+(r.sub?"의"+r.sub:""));
+    const a=KEEP.afterRun.find(c=>c.key===key);
+    const pg=a?keepPageOf(a):-1;
+    if(pg>=0){
+      $("kp-pvh").innerHTML=`<b>고친 원본 ${pg+1}쪽</b><span style="color:var(--sub)">— 내려받을 파일 그대로</span>`;
+      try{ $("kp-pv").innerHTML=`<div class="kp-page">${KEEP.doc.renderPageSvg(pg)}</div>`; return; }catch(e){ console.warn("쪽 그리기 실패:",e); }
+    }
+  }
+  /* 글자가 다른 조 — 원본 파일 글과 검토 화면 원문을 나란히(무엇이 섞였는지 사람이 본다) */
+  const read=r.state==="differ"?`<div><div class="cap">검토 화면이 읽은 원문</div>${escapeH(r.orig||"")}</div>`:"";
+  $("kp-pvh").innerHTML=`<b>${escapeH(r.label||"")}</b>`;
+  $("kp-pv").innerHTML=`<div class="kp-cmp"><div><div class="cap">원본 파일 지금</div>${escapeH(was)}</div>${read}<div><div class="cap">원본에 넣을 글</div>${escapeH(want)}</div></div>`;
+}
+/* 그 조가 있는 쪽 — 본문 문단은 문단 위치로, 표 칸은 칸마다의 쪽(getTableCellBboxes)으로 찾는다.
+   ⚠ 쪽 글(getPageText)은 표 안 글자를 안 돌려준다(표준취업규칙에서 빈 글만 왔다) — 그 길로 찾지 말 것 */
+function keepPageOf(a){
+  const d=KEEP.doc, b=a.base;
+  try{
+    if(b.t==="body"){ const o=JSON.parse(d.getPageOfPosition(b.sec,a.k)); return (o&&o.page>=0)?o.page:-1; }
+    const key=b.sec+"|"+b.pp+"|"+b.ci;
+    if(!KEEP.pages) KEEP.pages={};
+    if(!KEEP.pages[key]) KEEP.pages[key]=JSON.parse(d.getTableCellBboxes(b.sec,b.pp,b.ci))||[];
+    const hit=KEEP.pages[key].find(x=>x.cellIdx===b.cell);
+    return hit?hit.pageIndex:-1;
+  }catch(e){ return -1; }
+}
+function keepApply(){
+  let doc=null, re=null;
+  try{
+    doc=keepOpenDoc();
+    const run=PuHwpKeep.pickRun(PuHwpKeep.scan(doc),KEEP.rows);   // 새 사본에서 자리를 다시 잡는다(앞의 사본은 닫았다)
+    const by={}; run.forEach(c=>by[c.key]=c);
+    const rows=KEEP.rows.map(r=>Object.assign({},r,{target:r.target?by[r.target.key]||null:null}));
+    const res=PuHwpKeep.apply(doc,rows,KEEP.addendum);
+    KEEP.placed=KEEP.addendum?res.addendumPlaced:null;
+    const bytes=PuHwpKeep.exportSame(doc,KEEP.fmt);
+    re=new window.PU_RHWP.HwpDocument(new Uint8Array(bytes));
+    KEEP.afterRun=PuHwpKeep.pickRun(PuHwpKeep.scan(re),KEEP.rows);
+    KEEP.check=PuHwpKeep.verify(run,KEEP.afterRun,rows);
+    KEEP.out=KEEP.check.ok?bytes:null;
+    if(KEEP.doc){ try{ KEEP.doc.free(); }catch(_){} }
+    KEEP.doc=re; re=null; KEEP.pages=null;
+  }catch(e){ console.warn("원본 반영 실패:",e); KEEP.check={ok:false,issues:[{key:"—",why:"넣는 중 오류 — "+(e.message||e)}]}; }
+  finally{ try{ doc&&doc.free(); }catch(_){} try{ re&&re.free(); }catch(_){} }
+  keepRender();
+}
+function keepSave(name){
+  if(!KEEP.out||!KEEP.check||!KEEP.check.ok) return;
+  const mime=KEEP.fmt==="hwpx"?"application/hwp+zip":"application/x-hwp";
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([KEEP.out],{type:mime})); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  $("kp-note").innerHTML=`<b style="color:#166534">✓ 내려받았습니다 — ${escapeH(name)}</b> · 원본 파일은 그대로입니다`;
+}
+$("kp-std").addEventListener("click",()=>{ closeOverlay($("ov-keep")); downloadOneDoc("full"); });
+
 document.querySelectorAll("[data-close]").forEach(x=>x.onclick=e=>closeOverlay(e.target.closest(".overlay")));
 document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)closeOverlay(o);});
 /* 모달 드래그 이동 — 헤더(h2)를 잡고 팝업 창을 마우스로 옮김. PDF iframe이 이벤트를 삼키지 않게 드래그 중엔 pointer-events 차단 */
@@ -8219,6 +8470,8 @@ try{
     await mod.default({module_or_path:new URL("./vendor/rhwp-core/rhwp_bg.wasm",import.meta.url)});
   }
   const {HwpDocument}=mod;
+  /* 원본 살려 고치기(js/pu-hwp-keep.js)가 같은 엔진으로 원본을 열어 고친다 — 엔진을 두 번 싣지 않는다 */
+  window.PU_RHWP={HwpDocument, version:(typeof mod.version==="function"?mod.version():"")};
   // maxPages: 표시할 최대 쪽수(기본 3, 0/Infinity=전체). 전체보기는 전 페이지 렌더.
   window.renderHwpPreview=async(buf,container,maxPages=3)=>{
     const doc=new HwpDocument(new Uint8Array(buf));
