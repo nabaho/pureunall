@@ -247,7 +247,7 @@ test('_hwpStripLinesegs — (AI 고치기의 줄 다시 나누기가 쓴다) 줄
 test('★ 틀 채우기는 HWPX(XML)에서 한다 — 표 안의 표까지 닿게(rhwp 찾기·바꾸기는 겹친 표를 못 봤다)', () => {
   const fill = grabFn('hwpTplFill');
   assert.match(fill, /_hwpTplBytes\(t\)/);
-  assert.match(fill, /_hwpxEach\(hx,function\(x\)\{ return _hwpFillXml\(x,V,from,to\); \}\)/);
+  assert.match(fill, /_hwpxEach\(hx,function\(x\)\{ return _hwpFillXml\(x,V,from,to,kind\); \}\)/);
   assert.doesNotMatch(fill, /replaceAll/, 'rhwp 의 replaceAll 길로 돌아가지 않는다');
   assert.match(grabFn('_hwpTplBytes'), /exportHwpx\(\)/, '옛 .hwp 틀도 HWPX 로 바꿔 같은 길을 탄다');
 });

@@ -86,6 +86,42 @@ test('틀 만들 때(keep1)는 한 줄 문단의 줄 정보를 남긴다 — 들
   assert.doesNotMatch(a.xml, /linesegarray/, '보통(auto)은 폭을 넘는 글이면 걷는다');
 });
 
+test('★★ 반복 묶음 {{#서명}}…{{/서명}} — 회사 수만큼 베끼고, 베낀 것마다 그 회사 값으로', () => {
+  const xml = SEC(P(RUN('머리')), P(RUN('{{#서명}}{{회사}} 대표')), P(RUN('{{대표이사}} (인)')), P(RUN('{{/서명}}')), P(RUN('꼬리 {{기금명}}')));
+  const e = X.expand(xml, { 기금명: '가나다', 서명: [{ 회사: 'A사', 대표이사: '김' }, { 회사: 'B사', 대표이사: '이' }] });
+  const r = X.fill(e.xml, { 기금명: '가나다' });
+  assert.equal(X.textOf(r.xml), '머리\nA사 대표\n김 (인)\nB사 대표\n이 (인)\n꼬리 가나다');
+  assert.doesNotMatch(r.xml, /\{\{[#\/]/, '묶음 표시는 남지 않는다');
+});
+
+test('반복 묶음 — 한 문단 안에서 열고 닫아도 된다(정관 서명 줄) · 목록이 비면 «한 벌»을 빈 값으로 남긴다', () => {
+  const xml = SEC(P(RUN('{{#서명}}{{회사}} {{대표이사}} (인){{/서명}}')));
+  assert.equal(X.textOf(X.expand(xml, { 서명: [{ 회사: 'A', 대표이사: '김' }, { 회사: 'B', 대표이사: '이' }] }).xml), 'A 김 (인)\nB 이 (인)');
+  assert.equal(X.textOf(X.expand(xml, { 서명: [] }).xml), X.BLANK + ' ' + X.BLANK + ' (인)', '서명란이 통째로 사라지면 날인받을 자리가 없다');
+});
+
+test('★★ 쪽 단위 반복 {{#쪽:확인서}} — 묶음을 품은 맨 바깥 문단째로 베끼고, 둘째부터 새 쪽 · 쪽 설정은 첫 장에만', () => {
+  const first = '<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0"><hp:secPr id="">쪽설정</hp:secPr><hp:ctrl><hp:colPr id="" type="NEWSPAPER"/></hp:ctrl>'
+    + TBL(TC(P(RUN('{{#쪽:확인서}}{{회사}} 확인') + P(RUN('{{금액}}{{/쪽:확인서}}'))))) + '</hp:run>' + LS + '</hp:p>';
+  const xml = SEC(first, P(RUN('')));
+  const r = X.expand(xml, { 확인서: [{ 회사: 'A', 금액: '1원' }, { 회사: 'B', 금액: '2원' }, { 회사: 'C', 금액: '' }] });
+  assert.equal(X.textOf(r.xml), 'A 확인\n1원\nB 확인\n2원\nC 확인\n' + X.BLANK);
+  assert.equal((r.xml.match(/<hp:secPr/g) || []).length, 1, '구역 설정이 여러 번이면 한글이 새 구역으로 읽는다');
+  assert.equal((r.xml.match(/<hp:colPr/g) || []).length, 1);
+  assert.equal((r.xml.match(/pageBreak="1"/g) || []).length, 2, '둘째·셋째 장은 새 쪽에서');
+});
+
+test('drop — 문단을 통째로 없앤다(원본의 둘째 회사 서명 줄)', () => {
+  const xml = SEC(P(RUN('남김')), P(RUN('둘째 회사 줄')), P(RUN('끝')));
+  const r = X.replaceText(xml, [{ at: 'P1', drop: true }]);
+  assert.equal(X.textOf(r.xml), '남김\n끝');
+  assert.equal(r.xml.split('<hp:p ').length - 1, 2);
+});
+
+test('markers 는 반복 묶음 표시를 이름으로 세지 않는다', () => {
+  assert.deepEqual(X.markers(SEC(P(RUN('{{#서명}}{{회사}}{{/서명}}')))), { 회사: 1 });
+});
+
 test('XML 특수 글자는 안전하게 — 값에 < > & 가 있어도 문서가 안 깨진다', () => {
   const r = X.fill(SEC(P(RUN('{{회사}}'))), { 회사: 'A&B <주>' });
   assert.match(r.xml, /<hp:t>A&amp;B &lt;주&gt;<\/hp:t>/);
