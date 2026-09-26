@@ -723,6 +723,11 @@ body.mailview #pu-backup-admin-button{display:none!important}
    ⚠ 담당자 딱지(.dm-who)보다 «옅게» 둔다 — 둘이 같은 무게면 어느 것이 담당자인지 헷갈린다. */
 .dm-from{flex:none;font-size:10.5px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;
   border-radius:3px;padding:1px 6px;margin-right:8px;white-space:nowrap}
+/* 🤖 「AI가 분류」 — 받은메일함 자동분류(2026-09-26). 사람이 정한 것과 «다르게» 보여야
+   틀렸을 때 눈에 띈다. 팔레트 안 호박색(amber) — 이 화면에서 이미 «확인이 필요하다»는
+   뜻으로 쓰던 색이다(담당자 딱지의 .na 와 같은 결). 새 색을 만들지 않는다(팔레트 규칙). */
+.dm-ai{flex:none;font-size:10.5px;color:#854d0e;background:#fffbeb;border:1px solid #fde68a;
+  border-radius:3px;padding:1px 6px;margin-right:8px;white-space:nowrap}
 
 /* ── 숨겨 둔 칸 되돌리는 자리 (대표 지시 2026-08-26) ──
    ⚠ 되돌릴 길이 없으면 아무도 숨기기를 못 누른다. 숨기기와 «같은 화면»에 둔다. */
@@ -16160,19 +16165,24 @@ const MB_RAW_P = '#';    /* 다음메일 원본 */
 
 let _mbBins = null;      /* {binId:{n:이름, l:이어진폴더slug, o:차례}} — null 이면 아직 안 읽음 */
 let _mbPut  = null;      /* {'slug:uid': binId} — «옮긴 것만» 든다 */
+/* 누가 옮겼나 — {'slug:uid': 'ai'} (2026-09-26, 받은메일함 자동분류).
+   ⚠ 사람이 옮긴 것과 «값을 같은 자리에 안 둔다» — mailPut 은 그대로 두고
+     여기 따로 적어야, 사람이 「분류˅」로 다시 옮기면(mbBinPut) 이 표만 지우면 된다
+     (mbBinPut 은 이 표를 모른다 — 새로 옮기면 그 뒤로는 «사람의 몫»이라는 뜻). */
+let _mbPutBy = null;
 let _mbHide = null;      /* {binId:true} — 안 쓰는 칸(소셜·프로모션…). 우리 화면에서만 치운다 */
 let _mbBinsBusy = false;
 
 /* 두 벌을 한 번에 읽는다 — 왼쪽 한 줄을 그리는 데 둘 다 필요하다.
    ⚠ once() 만 쓴다(2026-08-16 「once 뒤 on」 요금 사고와 같은 결). */
 function mbEnsureBins(cb){
-  if(_mbBins!==null && _mbPut!==null && _mbHide!==null && _mbOwner!==null && _mbSucc!==null
+  if(_mbBins!==null && _mbPut!==null && _mbPutBy!==null && _mbHide!==null && _mbOwner!==null && _mbSucc!==null
      && _mbCo!==null && _mbNotCo!==null && _mbWhoMsg!==null && _mbNoWho!==null
      && _mbNotSpam!==null && _mbSpamOff!==null){
     if(cb) cb(); return;
   }
   if(typeof Store==='undefined' || Store.mode!=='firebase'){
-    _mbBins = _mbBins||{}; _mbPut = _mbPut||{}; _mbHide = _mbHide||{}; _mbOwner = _mbOwner||{};
+    _mbBins = _mbBins||{}; _mbPut = _mbPut||{}; _mbPutBy = _mbPutBy||{}; _mbHide = _mbHide||{}; _mbOwner = _mbOwner||{};
     _mbSucc = _mbSucc||{}; _mbCo = _mbCo||{}; _mbNotCo = _mbNotCo||{}; _mbWhoMsg = _mbWhoMsg||{}; _mbNoWho = _mbNoWho||{};
     _mbNotSpam = _mbNotSpam||{}; _mbSpamOff = (_mbSpamOff===true);
     if(cb) cb(); return;
@@ -16186,6 +16196,8 @@ function mbEnsureBins(cb){
   Promise.all([
     firebase.database().ref(DB_ROOT+'/config/mailBins').once('value'),
     firebase.database().ref(DB_ROOT+'/config/mailPut').once('value'),
+    /* 「AI가 짚었다」 표(2026-09-26) — mailPut 과 «같은 열쇠(slug:uid)」를 쓴다 */
+    firebase.database().ref(DB_ROOT+'/config/mailPutBy').once('value'),
     firebase.database().ref(DB_ROOT+'/config/mailHide').once('value'),
     firebase.database().ref(DB_ROOT+'/config/mailWho').once('value'),
     /* 승계표 — 다른 앱도 읽을 수 있게 config 밑에 둔다(대표 지시 2026-08-26) */
@@ -16202,8 +16214,8 @@ function mbEnsureBins(cb){
          스팸이 아닌 것을 저마다 따로 되돌리게 하면 같은 일을 열 번 한다. */
     firebase.database().ref(DB_ROOT+'/config/mailNotSpam').once('value'),
     firebase.database().ref(DB_ROOT+'/config/mailSpamOff').once('value')
-  ]).then(([b,p,h,w,sc,co,nc,wm,nw,ns,so])=>{
-    _mbBins = b.val()||{}; _mbPut = p.val()||{}; _mbHide = h.val()||{}; _mbOwner = w.val()||{};
+  ]).then(([b,p,pb,h,w,sc,co,nc,wm,nw,ns,so])=>{
+    _mbBins = b.val()||{}; _mbPut = p.val()||{}; _mbPutBy = pb.val()||{}; _mbHide = h.val()||{}; _mbOwner = w.val()||{};
     _mbSucc = sc.val()||{}; _mbCo = co.val()||{}; _mbNotCo = nc.val()||{}; _mbWhoMsg = wm.val()||{}; _mbNoWho = nw.val()||{};
     /* ⚠ 안 적혀 있으면 «켠 것»이다 — 대표께서 「자동으로 거르게」라 하셨다.
          빈 값을 「꺼짐」으로 읽으면 만들어 놓고 아무 일도 안 하는 기능이 된다. */
@@ -16213,7 +16225,7 @@ function mbEnsureBins(cb){
        다음 render 가 다시 가져오게 null 그대로 둔다(폴더 목록과 같은 결). */
     const denied = /permission[_ ]denied/i.test(String((e&&(e.code||e.message))||''));
     if(!(denied && !mbAuthOk())){
-      _mbBins = _mbBins||{}; _mbPut = _mbPut||{}; _mbHide = _mbHide||{}; _mbOwner = _mbOwner||{};
+      _mbBins = _mbBins||{}; _mbPut = _mbPut||{}; _mbPutBy = _mbPutBy||{}; _mbHide = _mbHide||{}; _mbOwner = _mbOwner||{};
       _mbSucc = _mbSucc||{}; _mbCo = _mbCo||{}; _mbNotCo = _mbNotCo||{}; _mbWhoMsg = _mbWhoMsg||{}; _mbNoWho = _mbNoWho||{};
       /* ⚠ 못 읽었으면 스팸 거르기를 «끈 채로» 둔다 — 「스팸 아님」 목록을 못 읽은 채로
            거르면, 대표께서 이미 되돌려 둔 주소를 도로 잡는다. 모르면 안 거른다. */
@@ -19484,19 +19496,32 @@ function mbBinUndo(){
   picked.forEach(v=>{ up[v._key] = null; });
   mbPutWrite(up, `↩ ${picked.length}통을 다음메일 자리로 되돌렸습니다`);
 }
-/* 쪽지를 적는다 — 화면을 먼저 고치고, 저장이 실패하면 되돌린다 */
+/* 쪽지를 적는다 — 화면을 먼저 고치고, 저장이 실패하면 되돌린다.
+   ⚠ 사람이 손대는 자리라 mailPutBy(「AI가 짚었다」표)도 «함께» 지운다(2026-09-26).
+     안 지우면, 사람이 다른 칸으로 다시 옮기거나 되돌려도 배지에는 여전히 AI가
+     짚은 것으로 남아 — 「방금 내가 고쳤는데 왜 아직도 AI 라고 뜨지」가 된다. */
 function mbPutWrite(up, okMsg){
-  const before = {};
-  Object.keys(up).forEach(k=>{ before[k] = (_mbPut||{})[k] || null; });
-  _mbPut = _mbPut || {};
-  Object.keys(up).forEach(k=>{ if(up[k]==null) delete _mbPut[k]; else _mbPut[k] = up[k]; });
+  const before = {}, beforeBy = {};
+  Object.keys(up).forEach(k=>{
+    before[k] = (_mbPut||{})[k] || null;
+    beforeBy[k] = (_mbPutBy||{})[k] || null;
+  });
+  _mbPut = _mbPut || {}; _mbPutBy = _mbPutBy || {};
+  const upBy = {};
+  Object.keys(up).forEach(k=>{
+    if(up[k]==null) delete _mbPut[k]; else _mbPut[k] = up[k];
+    if(_mbPutBy[k]){ delete _mbPutBy[k]; upBy[k] = null; }
+  });
   pickClear('mbox'); closeFolderMenu();
   renderPCSide(); renderMailPage();
   if(typeof Store==='undefined' || Store.mode!=='firebase') return toast(okMsg, 6000);
-  firebase.database().ref(DB_ROOT+'/config/mailPut').update(up)
+  const jobs = [firebase.database().ref(DB_ROOT+'/config/mailPut').update(up)];
+  if(Object.keys(upBy).length) jobs.push(firebase.database().ref(DB_ROOT+'/config/mailPutBy').update(upBy));
+  Promise.all(jobs)
     .then(()=>toast(okMsg, 6000))
     .catch(e=>{
       Object.keys(before).forEach(k=>{ if(before[k]==null) delete _mbPut[k]; else _mbPut[k] = before[k]; });
+      Object.keys(beforeBy).forEach(k=>{ if(beforeBy[k]==null) delete _mbPutBy[k]; else _mbPutBy[k] = beforeBy[k]; });
       renderPCSide(); renderMailPage();
       toast('옮기지 못했습니다 — '+((e&&e.message)||e), 9000);
     });
@@ -20856,6 +20881,13 @@ function mbWhoTag(v){
       title="이 주소가 누구 담당인지 한 번 정해 주시면 다음부터 저절로 갑니다">＋ 담당자</span>`;
   return '';
 }
+/* 이 메일을 이 칸으로 옮긴 것이 «사람»인가 «AI(Jev)」인가 (2026-09-26, 받은메일함 자동분류).
+   ⚠ 짐작을 짐작이라고 적는다 — 2026-09-18 보낸 메일 담당자 갈라보기와 같은 규칙이다.
+     AI가 짚은 줄에 사람이 정한 것과 «같은 차림새»를 주면, 틀렸을 때 아무도 못 잡는다. */
+function mbAiPutTag(key){
+  if(!(_mbPutBy||{})[key]) return '';
+  return `<span class="dm-ai" title="Jev(TypeSafe)가 제목·미리보기만 보고 짚었습니다 — 틀렸으면 「분류˅」로 바로 옮겨 주세요">🤖 AI가 분류</span>`;
+}
 function mbFromTag(v){
   const id = mbNow();
   if(id.charAt(0)===MB_RAW_P || id==='*all' || id==='*tome') return '';
@@ -20864,7 +20896,8 @@ function mbFromTag(v){
   const f = mbFolderBy(v._slug);
   const nm = f ? (MB_KIND_LABEL[f.kind] || String(f.name||f.path)) : '';
   if(!nm) return '';
-  return `<span class="dm-from" title="다음메일에서는 「${esc(nm)}」 에 그대로 있습니다">다음: ${esc(nm)}</span>`;
+  return mbAiPutTag(v._key)
+    + `<span class="dm-from" title="다음메일에서는 「${esc(nm)}」 에 그대로 있습니다">다음: ${esc(nm)}</span>`;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
