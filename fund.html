@@ -17,6 +17,7 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=16"></script>
+<script src="js/pu-hwpx-fill.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <!-- 회사 공용 사진·서류 저장 층 — 사진첩/기업정보함/컨설팅과 같은 파일을 쓴다(판독·보관 방식이 한 곳) -->
@@ -3389,7 +3390,7 @@ function renderForms(){
   if(S._sideKind) sidePreview(S._sideKind);   // 선택된 서식은 재렌더 후에도 오른쪽에 유지
 }
 // 서식 이름 클릭 → 선택 저장 + 목록 하이라이트 + 오른쪽 미리보기
-function selectForm(kind){ S._sideKind=kind; renderForms(); }   // 임베드/자료실 모두 현재 HOST에 재렌더
+function selectForm(kind){ if(S._sideKind!==kind) S._sideHtml=null; S._sideKind=kind; renderForms(); }   // 임베드/자료실 모두 현재 HOST에 재렌더
 // 서식 자료실 좌우 패널 크기 드래그 조절
 var _formDrag=null;
 function startFormDrag(e){ e.preventDefault(); var split=$('formSplit'),left=$('formLeft'); if(!split||!left)return;
@@ -3791,7 +3792,9 @@ function _aiDownload(){
      fund_erp/hwp_tpl/{서식} 에 둔다(로그인한 직원만 읽는다 — 기금 자료와 같은 규칙, 규칙 고칠 것 없음).
    ⚠ 목록 값(서명란 위원)은 번호를 붙인 표지다 — {{근로자위원1}}, {{근로자위원2}} …
    ⚠ 값은 HTML 서식이 쓰던 «같은 함수»에서 온다 — 한글 파일과 화면이 서로 다른 숫자를 말하면 안 된다. */
-var HWP_TPL_KINDS={minutes:'공동'};          // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
+var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동'};          // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
+/* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
+var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues};
 function _hwpTplRef(kind){ return fbDb.ref(NS+'/hwp_tpl/'+kind); }
 function _hwpTplIdxRef(){ return fbDb.ref(NS+'/hwp_tpl_index'); }     // 틀이 «있는지»만 — 틀 30개를 다 받지 않게
 function _hwpDocRef(fid,kind){ return fbDb.ref(NS+'/hwp_docs/'+fid+'/'+kind); }
@@ -3853,47 +3856,117 @@ function _hwpTplValues(f,sites){
 }
 /* 틀이 공동인데 사내 기금이면(또는 거꾸로) 말을 바꾼다 — 표지를 채우기 «전»에.
    채운 «뒤»에 바꾸면 기금 이름(「…공동근로복지기금」)까지 바뀐다. 규칙은 HTML 서식과 같은 짝(FTYPE_*). */
-function _hwpTypeSwap(doc,from,to){
-  if(!from||!to||from===to) return 0;
-  var n=0, rep=function(a,b){ try{ n+=(JSON.parse(doc.replaceAll(a,b,false))||{}).count||0; }catch(e){} };
-  FTYPE_PAIRS.forEach(function(p){ if(from==='공동') rep(p[0],p[1]); else rep(p[1],p[0]); });
-  if(from==='공동') FTYPE_GONG_ONLY.forEach(function(p){ rep(p[0],p[1]); });
-  return n;
+/* ══ 사업계획서 틀의 값 ══ (2026-09-26)
+   값은 HTML 사업계획서가 쓰던 «같은 셈»에서 온다 — bizplanRows(손익예산 열 단계)·bizplanBS(추정재무상태표)·
+   planBudget(협의회가 정한 예산, 없으면 출연금으로 짐작). 한글 파일과 화면이 다른 숫자를 말하면 안 된다.
+   ⚠ 서식이 «천원» 단위다(원본 제출본: 이자 56 = 56,000원). 음수는 △ — 서식의 관례.
+   ⚠ 기금마다 다른 나눔(체육·문화 몫, 등기·회의·일반관리 몫, 자본예산, 1단계 대상인원·금액, 예치 은행·날짜)은
+     «빈칸»(밑줄)으로 둔다 — 원본에 박혀 있던 남의 기금 숫자를 걷어낸 자리다. 지어내지 않는다.
+   ⚠ 추정재무상태표는 «계»만 — 목적사업/기금관리 가름은 기금마다 달라 비운다(HTML 과 같은 결정).
+   이름 약속(틀과 짝): 손N_목·_기·_계 = 손익예산 N번 줄의 목적사업회계·기금관리회계·계 / 대_… = 재무상태표 계 /
+   요_… = 예산총칙 요약 / 입_… 수입예산 / 출_… 비용예산 / 운_… 기금운영 계획서 */
+var BIZ_TPL_ROWS={'1.사업수익':'손1','가.이자수입':'손1가','2.고유목적사업비용':'손2','3.사업총이익':'손3','4.일반관리비':'손4',
+  '5.사업이익':'손5','6.사업외수익':'손6','가.고유목적사업준비금1전입수입':'손6가','나.고유목적사업준비금2전입수입':'손6나',
+  '7.사업외비용':'손7','8.법인세차감전순이익':'손8','9.법인세비용':'손9','10.당기순이익':'손10'};
+var BIZ_TPL_BS={'Ⅰ.유동자산':'대_유동','1.당좌자산':'대_당좌','Ⅱ.비유동자산':'대_비유동','1.투자자산':'대_투자','자산총계':'대_자산계',
+  'Ⅰ.유동부채':'대_유동부채','Ⅱ.비유동부채':'대_비유동부채','부채총계':'대_부채계','Ⅰ.자본금':'대_자본금','1.기본재산':'대_기본재산',
+  '자본총계':'대_자본계','부채와자본총계':'대_부채자본계'};
+function _hwpBizplanValues(f,sites){
+  f=f||{}; sites=sites||[];
+  var yr=(typeof S!=='undefined'&&S.year)||new Date().getFullYear(), V={};
+  var W=function(v){ var n=Math.round((v||0)/1000); if(!n) return '0'; return (n<0?'△':'')+Math.abs(n).toLocaleString(); };
+  var c=0; try{ c=Math.round(foundContrib(f,sites)||0); }catch(e){}
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(f.meeting_date||''));
+  V.사업연도=String(yr||''); V.기금명=String(f.name||''); V.빈칸='';
+  V.작성일=m?(m[1]+'년 '+m[2]+'월 '+m[3]+'일'):'';
+  V.신규출연금=c>0?c.toLocaleString():''; V.신규출연금한글=c>0?korWon(c)+'원':'';
+  V.예치은행=''; V.예치일=''; V.예치금액=c>0?Math.round(c/1000).toLocaleString():'';
+  V.이자율표기='연리'+(Math.round(bizRate(f)*10)/10).toFixed(1)+'%';   // 원본 꼴 「연리2.0%」
+  /* 모르면 비운다 — 이름은 «모두» 먼저 깔아 둔다(틀을 올릴 때 모르는 이름으로 잡히지 않게) */
+  var codes=Object.keys(BIZ_TPL_ROWS).map(function(k){ return BIZ_TPL_ROWS[k]; }).concat(['손7가','손7나']);
+  codes.forEach(function(k){ V[k+'_목']=V[k+'_기']=V[k+'_계']=''; });
+  Object.keys(BIZ_TPL_BS).forEach(function(k){ V[BIZ_TPL_BS[k]]=''; });
+  ['대_현금','대_단기','대_준비금1','대_준비금2','대_이익잉여','대_차기이월','요_비용','요_순이익','요_수익',
+   '입_사업','입_이자','입_외','입_계','출_사업','출_관리','출_예비','출_계',
+   '운_수입','운_전입','운_조달계','운_목적','운_관리','운_예비','운_지출계','운_과부족'].forEach(function(k){ V[k]=''; });
+  var R=null; try{ R=bizplanRows(f,yr,sites); }catch(e){}
+  if(R){
+    var r={}; R.forEach(function(x){ r[x[0]]=x;
+      var k=BIZ_TPL_ROWS[x[0]]; if(k){ V[k+'_목']=W(x[1]); V[k+'_기']=W(x[2]); V[k+'_계']=W(x[1]+x[2]); } });
+    var g=function(l,i){ return (r[l]||[0,0,0])[i]||0; };
+    var interest=g('가.이자수입',2), rev1=g('1.사업수익',1)+g('1.사업수익',2), in2=g('나.고유목적사업준비금2전입수입',1);
+    var pur=g('2.고유목적사업비용',1), adm=g('4.일반관리비',1), spare=g('7.사업외비용',1), fund7=g('7.사업외비용',2);
+    /* 7.사업외비용의 두 갈래 — 기금관리 쪽은 준비금1 전입(=이자), 목적사업 쪽은 예비비(bizplanRows 의 셈 그대로) */
+    V['손7가_목']=W(0); V['손7가_기']=W(fund7); V['손7가_계']=W(fund7);
+    V['손7나_목']=W(spare); V['손7나_기']=W(0); V['손7나_계']=W(spare);
+    V.요_수익=W(rev1+g('6.사업외수익',1)+g('6.사업외수익',2));
+    V.요_비용=W(pur+adm+g('7.사업외비용',1)+g('7.사업외비용',2));
+    V.요_순이익=W(g('10.당기순이익',1)+g('10.당기순이익',2));
+    V.입_사업=W(rev1); V.입_이자=W(interest); V.입_외=W(in2); V.입_계=W(rev1+in2);
+    V.출_사업=W(pur); V.출_관리=W(adm); V.출_예비=W(spare); V.출_계=W(pur+adm+spare);
+    V.운_수입=W(rev1); V.운_전입=W(in2); V.운_조달계=W(rev1+in2);
+    V.운_목적=W(pur); V.운_관리=W(adm); V.운_예비=W(spare); V.운_지출계=W(pur+adm+spare);
+    V.운_과부족=W(rev1+in2-(pur+adm+spare));
+  }
+  var fin=null; try{ fin=_bizFinOf()||(isSetupFund(f)?_bizFinZero():null); }catch(e){}
+  var P=null; try{ if(fin) P=bizplanBS(f,yr,fin,sites); }catch(e){}
+  if(P){
+    BIZ_BS_ROWS.forEach(function(x){ var k=BIZ_TPL_BS[x[0]]; if(k) V[k]=W(x[1](P)); });
+    V.대_현금=W(P.cash); V.대_단기=W(P.savings); V.대_준비금1=W(P.res1); V.대_준비금2=W(P.res2);
+    V.대_이익잉여=W(P.retained); V.대_차기이월=W(P.retained);
+  }
+  return V;
 }
-/* 문서에 남은 표지 이름들 — 본문·표 칸 모두. 채운 «뒤»에 남은 것은 앱이 모르는 이름이다. */
-function _hwpMarkers(doc){
-  var hits=[], out={};
-  try{ hits=JSON.parse(doc.searchAllText(HWP_MK_OPEN,false,true))||[]; }catch(e){ hits=[]; }
-  hits.forEach(function(h){
-    var t='', c=h.cellContext;
-    try{ t=c ? doc.getTextInCell(h.sec,c.parentPara,c.ctrlIdx,c.cellIdx,c.cellPara,h.charOffset,40)
-             : doc.getTextRange(h.sec,h.para,h.charOffset,40); }catch(e){ t=''; }
-    var m=/^\x7b\x7b([^\x7b\x7d]{1,30})\x7d\x7d/.exec(String(t||''));
-    if(m) out[m[1]]=(out[m[1]]||0)+1;
-  });
-  return out;
+/* ★ 2026-09-26 — 채우기를 «한글 XML(HWPX)에서 직접» 한다 (js/pu-hwpx-fill.js).
+   대표 「줄칸 간격등 정리가 계속 안된다 … 근본적 해결 … 기존서류와 같이」 → 서식을 원본 한글 틀로 옮기다가,
+   사업계획서의 «표 안의 표»(기금예치 계획)를 rhwp 의 찾기·바꾸기가 못 보는 것을 알았다(찾기 0건).
+   HWPX 는 ZIP 속 XML 이라 표가 몇 겹이든 글상자든 글자가 전부 <hp:t> 안에 있다 — 거기서 바꾸면 다 닿고,
+   글자 모양도 그대로다. 바꾼 문단만 옛 줄 정보를 걷는다(한글·rhwp 둘 다 그 문단을 새로 나눈다).
+   틀은 한글이 저장한 HWPX 다(옛 .hwp 틀이 오면 rhwp 로 HWPX 로 바꿔 같은 길을 탄다). */
+/* 공동/사내 말 바꾸기 규칙 — 표지를 채우기 «전»에(뒤에 하면 기금 이름까지 바뀐다). 긴 말 먼저.
+   ⚠ HTML 서식의 _ftypeSwap 과 «같게» — 틀이 어느 쪽이든 «기금 유형 쪽으로» 맞춘다.
+     원본 회의록(공동 기금 제출본)의 별지 제13호 제목도 「사내근로복지기금협의회 회의록」으로 적혀 있었다 —
+     틀 유형만 보고 같으면 안 바꾸면, 공동 기금 회의록에 «사내» 제목이 그대로 나간다(한글로 열어 보고 알았다). */
+function _hwpTypeRules(from,to){
+  if(to!=='사내'&&to!=='공동') return [];
+  var R=FTYPE_PAIRS.map(function(p){ return to==='사내'?{find:p[0],to:p[1],all:true}:{find:p[1],to:p[0],all:true}; });
+  if(to==='사내') FTYPE_GONG_ONLY.forEach(function(p){ R.push({find:p[0],to:p[1],all:true}); });
+  return R;
 }
-/* 틀 문서(열어 둔 것)에 값을 넣는다 — 저장소·엔진과 떼어 두어 검사로 돌려 볼 수 있게 */
-function _hwpFillDoc(doc,V,from,to){
-  _hwpTypeSwap(doc,from,to);
-  var filled=0, over={};
-  var rep=function(tok,val){ try{ return (JSON.parse(doc.replaceAll(tok,val,false))||{}).count||0; }catch(e){ return 0; } };
-  var show=function(v){ v=(v==null)?'':String(v); return v===''?HWP_TPL_BLANK:v; };
-  Object.keys(V).forEach(function(k){
-    var v=V[k];
-    if(Array.isArray(v)){
-      var slots=0;
-      for(var i=1;i<=HWP_TPL_MAXLIST;i++){
-        var n=rep(_hwpMk(k+i),show(v[i-1]));
-        if(n){ slots=i; if(v[i-1]) filled+=n; }
-      }
-      if(slots&&v.length>slots) over[k]=v.length-slots;    // 서명칸보다 사람이 많다
-    } else {
-      var n2=rep(_hwpMk(k),show(v));
-      if(v!=null&&String(v)!=='') filled+=n2;
-    }
+/* 틀 XML 한 장(section) 채우기 — 말 바꾸기 → 표지 채우기. 엔진과 저장소를 떼어 두어 검사로 돌려 볼 수 있게 */
+function _hwpFillXml(xml,V,from,to){
+  var rules=_hwpTypeRules(from,to), X=PuHwpxFill;
+  /* ⚠ 규칙을 «하나씩» 차례로 — 한 번에 주면 「공동근로복지기금협의회」와 「공동근로복지기금」이
+       같은 문단에서 겹쳐 짧은 쪽이 먼저 잡힐 수 있다(긴 말 먼저가 규칙이다) */
+  rules.forEach(function(r){ xml=X.replaceText(xml,[r]).xml; });
+  return X.fill(xml,V,{blank:HWP_TPL_BLANK});
+}
+/* 틀(저장된 것) → HWPX 바이트. 한글이 저장한 HWPX 틀이면 그대로, 옛 .hwp 틀이면 rhwp 로 바꾼다 */
+function _hwpTplBytes(t){
+  var bytes=_b64ToBytes(t.b64), fmt='';
+  try{ fmt=PureunHwp.validate(bytes,'').format; }catch(e){ fmt=t.fmt||'hwp'; }
+  if(fmt==='hwpx') return Promise.resolve(bytes);
+  return PureunHwp.openDoc(bytes,'tpl.hwp').then(function(doc){ try{ return doc.exportHwpx(); } finally { try{ doc.free(); }catch(e){} } });
+}
+/* HWPX 바이트 속 section 들을 한 번에 손본다 — fn(xml) → {xml,…} 을 모아 돌려준다 */
+function _hwpxEach(bytes,fn){
+  return _loadJsZip().then(function(JSZ){ return JSZ.loadAsync(bytes); }).then(function(zip){
+    var secs=Object.keys(zip.files).filter(function(n){ return /^Contents\/section\d+\.xml$/.test(n); }).sort();
+    var outs=[], texts=[], changed=false;
+    return secs.reduce(function(p,n){ return p.then(function(){ return zip.file(n).async('string'); })
+        .then(function(x){ var r=fn(x)||{}; outs.push(r); if(r.xml!=null){ zip.file(n,r.xml); changed=true; } texts.push(PuHwpxFill.textOf(r.xml!=null?r.xml:x)); }); }, Promise.resolve())
+      .then(function(){
+        /* 미리보기 글(탐색기·한글 파일 열기 창에 보이는 요약)을 «채운 내용»으로 — 틀의 표지 글이 보이지 않게 */
+        if(changed&&zip.file('Preview/PrvText.txt')) zip.file('Preview/PrvText.txt',texts.join('\n').slice(0,1000));
+        return zip.generateAsync({type:'uint8array',compression:'DEFLATE',mimeType:'application/hwp+zip'}); })
+      .then(function(b){ return {bytes:b, outs:outs}; });
   });
-  return { filled:filled, unknown:Object.keys(_hwpMarkers(doc)), over:over };
+}
+/* 문서(HWPX 바이트)에 든 표지 이름들 */
+function _hwpxMarkers(bytes){
+  var all={};
+  return _hwpxEach(bytes,function(x){ var m=PuHwpxFill.markers(x); Object.keys(m).forEach(function(k){ all[k]=(all[k]||0)+m[k]; }); return {}; })
+    .then(function(){ return all; });
 }
 /* ★ 줄 다시 나누기 (한글에서 직접 보고 고친 것, 2026-09-24)
    원본 .hwp 에는 문단마다 «한글이 전에 나눈 줄 자리»(줄 정보)가 박혀 있고, 한글은 파일을 열 때 그것을 믿는다.
@@ -3923,17 +3996,25 @@ function _hwpRelayout(doc){
   }).then(function(bytes){ return PureunHwp.openDoc(bytes,'relayout.hwpx'); })
     .then(function(d2){ try{ d2.reflowLinesegs(); return d2.exportHwp(); } finally { try{ d2.free(); }catch(e){} } });
 }
+/* 서식마다 «표지 이름 → 값»을 내는 함수. 값은 HTML 서식이 쓰던 같은 셈에서 온다. 틀이 늘면 여기 는다 */
+function _hwpValuesFor(kind,f,sites){
+  var fn=HWP_TPL_VALUES[kind]||_hwpTplValues;
+  return fn(f||{},sites||[]);
+}
+/* 틀 채우기 — 결과는 HWPX 바이트(한글이 바로 연다). 채운 문단만 줄을 새로 나눈다 */
 function hwpTplFill(kind,f,sites){
   return _hwpTplRef(kind).once('value').then(function(sn){
     var t=sn.val();
     if(!t||!t.b64) throw new Error('이 서식의 한글 틀이 아직 없습니다 — [⬆ 한글 틀 올리기]로 먼저 올려 주세요');
-    return PureunHwp.openDoc(_b64ToBytes(t.b64),'tpl.hwp').then(function(doc){
-      var r;
-      try{ r=_hwpFillDoc(doc,_hwpTplValues(f,sites),t.type||HWP_TPL_KINDS[kind]||'공동',(f.fund_type==='사내')?'사내':'공동'); }
-      catch(e){ try{ doc.free(); }catch(_){} throw e; }
-      return _hwpRelayout(doc).then(function(bytes){ r.bytes=bytes; return r; },
-        function(e){ if(window.console) console.warn('줄 다시 나누기 실패 — 옛 줄 정보로 냄',e); r.bytes=doc.exportHwp(); r.relayoutFailed=true; return r; })
-        .then(function(res){ try{ doc.free(); }catch(e){} return res; });
+    var V=_hwpValuesFor(kind,f,sites), from=t.type||HWP_TPL_KINDS[kind]||'공동', to=(f&&f.fund_type==='사내')?'사내':'공동';
+    return _hwpTplBytes(t).then(function(hx){
+      return _hwpxEach(hx,function(x){ return _hwpFillXml(x,V,from,to); });
+    }).then(function(res){
+      var r={bytes:res.bytes, filled:0, unknown:[], over:{}}, u={};
+      res.outs.forEach(function(o){ r.filled+=o.filled||0; (o.unknown||[]).forEach(function(k){ u[k]=1; });
+        Object.keys(o.over||{}).forEach(function(k){ r.over[k]=Math.max(r.over[k]||0,o.over[k]); }); });
+      r.unknown=Object.keys(u);
+      return r;
     });
   });
 }
@@ -3954,7 +4035,6 @@ function hwpOpenFilled(kind){
         return _docExtra(kind,f).catch(function(){ return null; }).then(function(){ return hwpTplFill(kind,f,sites); });
       }).then(function(r){
         if(r.unknown.length) toast('틀에 모르는 표지 '+r.unknown.length+'가지 — 그대로 두었습니다: '+r.unknown.join(', '),'warn');
-        if(r.relayoutFailed) toast('줄 다시 나누기를 못 해 원본 줄 정보로 냈습니다 — 한글에서 긴 글이 겹쳐 보이면 알려 주세요','warn');
         var o=Object.keys(r.over);
         if(o.length) toast('서명칸보다 사람이 많습니다('+o.map(function(k){ return k+' '+r.over[k]+'명 더'; }).join(', ')+') — 편집기에서 줄을 늘려 적어 주세요','warn');
         _openHwpBuf(r.bytes,label,kind);
@@ -3965,31 +4045,32 @@ function hwpOpenFilled(kind){
 function hwpSaveToFund(){
   var kind=_hwpSaveKind, fid=S.formFund;
   if(!_hwpEditor||!kind||!fid){ toast('편집기가 아직 준비되지 않았습니다','warn'); return; }
-  PureunHwp.exportFrom(_hwpEditor,'hwp').then(function(bytes){
+  /* HWPX 로 보관한다 — 틀이 한글이 저장한 HWPX 라, .hwp 로 바꿔 담으면 그만큼 한 번 더 옮겨 적는 셈이다 */
+  PureunHwp.exportFrom(_hwpEditor,'hwpx').then(function(bytes){
     var u=(bytes instanceof Uint8Array)?bytes:new Uint8Array(bytes);
-    return _hwpDocRef(fid,kind).set({b64:_bytesToB64(u),saved:ymd(),fmt:'hwp'});
+    return _hwpDocRef(fid,kind).set({b64:_bytesToB64(u),saved:ymd(),fmt:'hwpx'});
   }).then(function(){ toast('이 기금에 보관했습니다 — 다음에 열 때 그대로 나옵니다'); })
     .catch(function(e){ toast('보관 실패: '+((e&&e.message)||e),'err'); });
 }
-/* [⬆ 한글 틀 올리기] — 글자 표지({{…}})가 든 .hwp 만 받는다. 모르는 이름이 있으면 올리기 전에 보여 준다. */
+/* [⬆ 한글 틀 올리기] — 글자 표지({{…}})가 든 .hwpx(한글이 저장한 것)·.hwp 를 받는다.
+   모르는 이름이 있으면 올리기 전에 보여 준다. */
 function hwpTplUpload(kind){
-  var inp=document.createElement('input'); inp.type='file'; inp.accept='.hwp';
+  var inp=document.createElement('input'); inp.type='file'; inp.accept='.hwpx,.hwp';
   inp.onchange=function(ev){ var file=ev.target.files&&ev.target.files[0]; if(!file) return;
     var rd=new FileReader();
     rd.onload=function(){
-      var bytes=new Uint8Array(rd.result);
-      try{ PureunHwp.validate(bytes,file.name); }catch(e){ toast(e.message,'err'); return; }
-      PureunHwp.openDoc(bytes,file.name).then(function(doc){
-        var mk={}; try{ mk=_hwpMarkers(doc); } finally { try{ doc.free(); }catch(e){} }
+      var bytes=new Uint8Array(rd.result), fmt='';
+      try{ fmt=PureunHwp.validate(bytes,file.name).format; }catch(e){ toast(e.message,'err'); return; }
+      _hwpTplBytes({b64:_bytesToB64(bytes),fmt:fmt}).then(_hwpxMarkers).then(function(mk){
         var names=Object.keys(mk), total=names.reduce(function(a,k){ return a+mk[k]; },0);
         if(!total){ toast('표지({{기금명}} 같은 자리)가 하나도 없는 파일입니다 — 틀로 쓸 수 없습니다','err'); return; }
-        var known=_hwpTplValues({},[]);
+        var known=_hwpValuesFor(kind,{},[]);
         var u=names.filter(function(k){ return known[k]===undefined&&known[_hwpTplBase(k)]===undefined; });
         return confirmM('「'+docLabel(kind)+'」 한글 틀로 올립니다.\n\n· 표지 '+total+'곳 ('+names.length+'가지)'
             +(u.length?'\n· ⚠ 이 앱이 모르는 이름 '+u.length+'가지(채우지 않고 그대로 둡니다): '+u.join(', '):'\n· 이름을 모두 알아봤습니다')
             +'\n\n⚠ 틀에 남의 기금 자료(이름·날짜·주소)가 남아 있지 않은지 한글에서 먼저 확인하셨나요?',{ok:'틀 올리기'})
           .then(function(ok){ if(!ok) return;
-            var meta={name:file.name,type:HWP_TPL_KINDS[kind]||'공동',fields:total,saved:ymd()};
+            var meta={name:file.name,type:HWP_TPL_KINDS[kind]||'공동',fields:total,saved:ymd(),fmt:fmt};
             return _hwpTplRef(kind).set(Object.assign({b64:_bytesToB64(bytes)},meta))
               .then(function(){ return _hwpTplIdxRef().child(kind).set(meta); })
               .then(function(){ S._hwpTplHas=null; _formsRerender(); toast('한글 틀을 올렸습니다 — 이제 [📄 한글로 채워 열기]를 쓸 수 있습니다'); });
@@ -7578,13 +7659,68 @@ function resetDoc(kind){ var c=_docCtx(kind);
   } else { toast('이미 자동생성 원본입니다'); }
 }
 // 서식 자료실 우측 사이드 패널에 렌더(팝업 대신 "옆에서 보기"). #docwrap/#doced 재사용 → 저장·인쇄·HWPX 그대로 동작.
+/* ★ 원본 한글 틀이 있는 서식은 오른쪽에 «원본 모양 그대로» 채운 문서를 보인다 (대표 지시 2026-09-26
+   「줄칸 간격등 정리가 계속 안된다 … 근본적 해결 … 기존서류와 같이 사용할 수 있게」).
+   HTML 로 한글을 흉내 내던 화면은 고칠수록 다른 데가 어긋났다 — 틀이 있으면 그 화면을 거치지 않는다.
+   이 기금에 보관해 둔 한글본(고쳐 둔 것)이 있으면 그것을, 없으면 틀에서 새로 채워 보인다.
+   [HTML 로 보기]는 예전 화면으로 잠깐 돌아가는 길(틀이 아직 없는 서식과 같은 화면)이다. */
+function hwpSidePreview(kind){
+  var side=$('formSide'), f=curForm();
+  if(!side||!f||f._sample||!HWP_TPL_KINDS[kind]||!(S._hwpTplHas||{})[kind]||S._sideHtml===kind) return false;
+  var fid=S.formFund, label=docLabel(kind);
+  S._sideKind=kind; S._hwpSideBytes=null;
+  side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)
+      +' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2>'
+      +'<span id="hwpSideChip" class="chip ok" style="font-size:10px">원본 한글 틀</span>'+hlp('forms.hwptpl')+'<span style="flex:1"></span>'
+      +'<button onclick="S._sideHtml=\''+kind+'\';sidePreview(\''+kind+'\')" style="padding:3px 8px" title="예전 HTML 화면으로 보기">HTML로 보기</button> '
+      +'<button onclick="hwpSideDownload()" style="padding:3px 8px" title="한글(HWPX)로 내려받기 — 한글에서 그대로 열립니다">⬇ 한글</button> '
+      +'<button class="primary" onclick="hwpOpenFilled(\''+kind+'\')" style="padding:3px 10px" title="한글 편집기로 열어 고치고 이 기금에 보관합니다">✏ 한글로 고치기</button></div>'
+      +'<div id="hwpSideNote" class="muted" style="font-size:11px;margin:0 0 6px"></div>'
+      +'<div id="hwpSideView" style="border:1px solid var(--line);border-radius:8px;max-height:72vh;overflow:auto">'+loadingHTML()+'</div>';
+  var note=function(t){ var n=$('hwpSideNote'); if(n) n.textContent=t; };
+  _hwpDocRef(fid,kind).once('value').then(function(sn){
+    var kept=sn.val();
+    if(kept&&kept.b64){
+      var c=$('hwpSideChip'); if(c) c.textContent='이 기금 보관본 · '+(kept.saved||'');
+      note('전에 한글로 고쳐 보관한 것입니다 — 틀에서 새로 채우려면 [✏ 한글로 고치기]에서 고르세요');
+      return _b64ToBytes(kept.b64);
+    }
+    return _loadSites(fid).catch(function(){ return []; }).then(function(sites){
+      return _docExtra(kind,f).catch(function(){ return null; }).then(function(){ return hwpTplFill(kind,f,sites); });
+    }).then(function(r){
+      var msg=[];
+      if(r.unknown.length) msg.push('틀에 모르는 표지 '+r.unknown.length+'가지('+r.unknown.join(', ')+')');
+      var o=Object.keys(r.over); if(o.length) msg.push('서명칸보다 사람이 많음('+o.map(function(k){ return k+' '+r.over[k]+'명 더'; }).join(', ')+')');
+      msg.push('밑줄(＿＿＿)은 자료가 없어 비운 곳 — [✏ 한글로 고치기]에서 적으세요');
+      note(msg.join(' · '));
+      return r.bytes;
+    });
+  }).then(function(bytes){
+    if(S._sideKind!==kind) return;                       // 그새 다른 서식을 눌렀다
+    S._hwpSideBytes=bytes;
+    var v=$('hwpSideView'); if(!v) return;
+    return PureunHwp.renderPreview(v,bytes,label+'.hwpx');
+  }).catch(function(e){
+    var v=$('hwpSideView'); if(v) v.innerHTML='<div style="padding:20px;color:#991b1b;font-size:12px">한글 틀을 채우지 못했습니다: '+esc((e&&e.message)||e)
+      +'<br><button onclick="S._sideHtml=\''+kind+'\';sidePreview(\''+kind+'\')" style="margin-top:8px">HTML로 보기</button></div>';
+  });
+  return true;
+}
+function hwpSideDownload(){
+  if(!S._hwpSideBytes){ toast('아직 채우는 중입니다','warn'); return; }
+  var f=curForm()||{};
+  PureunHwp.download(S._hwpSideBytes,(f.short_name||f.name||'기금')+'_'+docLabel(S._sideKind)+'.hwpx','hwpx');
+}
 function sidePreview(kind){
   var side=$('formSide');
   if(!side){ previewDoc(kind); return; }               // 사이드 패널 없으면 팝업 폴백
+  if(hwpSidePreview(kind)) return;                     // 원본 한글 틀이 있으면 그쪽으로
   var f=curForm();
   S._sideKind=kind; S._docKind=kind; var label=docLabel(kind);
   var ftype=(f.fund_type==='사내')?'사내':'공동', smp=!!f._sample;
-  side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)+' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'
+  var backHwp=(HWP_TPL_KINDS[kind]&&(S._hwpTplHas||{})[kind]&&!smp)
+    ? '<button class="primary" onclick="S._sideHtml=null;sidePreview(\''+kind+'\')" style="padding:3px 8px" title="원본 한글 모양으로 돌아가기">📄 원본 한글로 보기</button> ' : '';
+  side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)+' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'+backHwp
     +'<button onclick="printDoc()" style="padding:3px 8px" title="인쇄/PDF">🖨</button> <button onclick="docToHwpx(\''+kind+'\')" style="padding:3px 8px" title="한글(HWPX)로 저장">📄</button> <button onclick="resetDoc(\''+kind+'\')" style="padding:3px 8px" title="저장본 삭제(개별→공통→자동생성 순으로 되돌림)">↺</button> '
     +'<button '+(smp?'class="primary" ':'')+'onclick="saveDocType(\''+kind+'\')" style="padding:3px 10px" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button>'
     +(smp?'':'<button class="primary" onclick="saveDocEdit(\''+kind+'\')" style="padding:3px 10px" title="이 기금에만 저장">💾 이 기금</button>')+'</div>'
@@ -16113,8 +16249,8 @@ var HELP={
  'forms.hwp':{t:'미리보기·편집 vs HWP 편집',h:'<p><b>👁 미리보기·편집</b> — 데이터를 채운 HTML 초안입니다. 화면에서 수정하고 인쇄·HWPX로 저장합니다.</p>'
    +'<p><b>📄 HWP 편집</b> — 원본 .hwp를 등록하면 rhwp 편집기로 열어 .hwp/.hwpx로 저장합니다. <b>원본 서식 그대로</b> 필요할 때 쓰세요.</p>'
    +'<p>HWP 원본은 <b>이 브라우저에 1회만</b> 등록하면 계속 쓰입니다.</p>'},
- 'forms.hwptpl':{t:'한글로 채워 열기 — 원본 한글 틀',h:'<p><b>원본 한글 파일</b>에서 채울 자리마다 <b>{{기금명}}</b> 같은 표지를 넣어 둔 것이 «틀»입니다. 표지를 이 기금 자료로 바꾸고, 한글과 같은 엔진으로 엽니다 — 줄간격·쪽 나눔·표가 <b>원본 그대로</b>입니다.</p>'
-   +'<p>고친 뒤 <b>[💾 이 기금에 보관]</b>을 누르면 다음에 그대로 열립니다. 제출할 때는 <b>[💾 .hwp로 저장]</b>.</p>'
+ 'forms.hwptpl':{t:'원본 한글 틀',h:'<p><b>원본 한글 파일</b>에서 채울 자리마다 <b>{{기금명}}</b> 같은 표지를 넣어 둔 것이 «틀»입니다. 표지를 이 기금 자료로 바꿔 <b>원본 모양 그대로</b> 보입니다 — 줄간격·쪽 나눔·표(표 안의 표까지)가 원본과 같습니다.</p>'
+   +'<p>서식을 누르면 오른쪽에 채운 문서가 뜹니다. <b>[⬇ 한글]</b>은 한글에서 바로 여는 파일, <b>[✏ 한글로 고치기]</b>는 편집기로 열어 고친 뒤 <b>[💾 이 기금에 보관]</b> — 다음에 그대로 뜹니다.</p>'
    +'<p>틀은 <b>한 번만</b> 올리면 모든 직원·모든 PC가 같이 씁니다(로그인한 직원만 읽습니다). <b>남의 기금 자료가 남지 않은지</b> 한글에서 확인한 뒤 올리세요.</p>'
    +'<p>자료에 없는 자리(경과보고 날짜·은행 등)는 <b>＿＿＿</b> 밑줄로 남습니다 — 편집기에서 직접 적습니다.</p>'},
  'forms.excel':{t:'엑셀로 한 번에 채워받기',h:'<p>공식 제출은 <b>엑셀이 형태를 100% 보존</b>합니다(표·수식·격자·도장란).</p>'
