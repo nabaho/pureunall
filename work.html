@@ -25,6 +25,8 @@
 <script src="js/pu-health.js?v=4"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
+<!-- 옵시디언 금고로 내보낼 때 주민번호를 지운다. 없으면 내보내기가 «멈춘다» -->
+<script src="js/pu-rrn-mask.js?v=4"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-rules-history.js?v=3"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
@@ -1413,6 +1415,7 @@ function shell(){
     +'<div class="sitem nw" onclick="searchModal()" title="노트·회고·기록·지식 본문까지 찾기 (Ctrl+K)">🔎 전체 검색 <span style="opacity:.5;font-size:10px">⌃K</span></div>'
     +'<div class="sitem nw" onclick="puerpModal()" title="자동 연동 상태 확인 · 기준일 이전 백로그 1회 정리">🔗 푸른이알피 연동</div>'
     +'<div class="sitem nw" onclick="importModal()" title="엑셀 이관 JSON 파일 불러오기">📥 엑셀 가져오기</div>'
+    +'<div class="sitem nw" onclick="obsModal()" title="사람·사업장·업무·지식을 markdown 으로 적어 이 PC 옵시디언 금고에 넣습니다 — 한 방향">🪨 옵시디언으로</div>'
     +'<div style="font-size:11px;color:var(--faint);padding:8px">주간 업무기록 · Firebase<br>기록은 자동 저장됩니다</div></div>'
     +'</div>'
     +'<div id="sideOn" onclick="viewToggle(\'nos\')" title="메뉴 다시 펴기">▸</div>'
@@ -8119,6 +8122,17 @@ function tplModal(id){
    않는 글이 화면의 절반을 먹었다. 제목 옆 ⓘ에 넣고 누를 때만 보여준다.
    (오류·주의는 예외 — 그건 눈에 띄어야 하므로 화면에 그대로 둔다) */
 var HELP={
+  obs:'업무관리가 아는 것을 <b>markdown 파일</b>로 적어 이 PC 의 옵시디언 금고에 넣습니다.<br>'
+    +'사람·사업장·업무·지식이 <b>[[연결]]</b>로 서로 묶여, 옵시디언 그래프에서 '
+    +'「이 사람이 무엇을 맡고 있나」가 한눈에 보입니다.<br><br>'
+    +'<b>한 방향입니다.</b> 업무관리 → 금고. 금고에서 고친 것은 돌아오지 않습니다. '
+    +'두 방향으로 하면 정본이 둘이 되어, 언젠가 어느 쪽이 맞는지 아무도 모르게 됩니다.<br><br>'
+    +'<b>지우지 않습니다.</b> 우리가 만든 폴더 안에서도 덮어쓰기만 합니다. '
+    +'업무 이름이 바뀌면 옛 파일이 남는데, 남의 금고에서 파일을 지우는 것보다 낫습니다. '
+    +'깨끗이 다시 만들려면 <b>업무관리</b> 폴더를 직접 지우고 내보내세요.<br><br>'
+    +'<b>주민번호는 지우고 내보냅니다.</b> 금고는 평문 파일이고 옵시디언 동기화로 '
+    +'클라우드에 올라갈 수 있습니다. <b>성과급은 내보내지 않습니다.</b><br><br>'
+    +'폴더는 <b>이 PC 이 브라우저</b>에만 기억됩니다 — 다른 사람 화면에는 영향이 없습니다.',
   steps:'이 업무에서 <b>해야 할 일을 순서대로</b> 깔아 둡니다. 다음에 뭘 할지 찾지 않아도 되고, '
        +'기한을 넣으면 캘린더와 그 주 요일 칸에 함께 표시됩니다.',
   people:'윗줄은 푸른이알피 <b>업체관리</b>에 등록된 담당자입니다 — 여기서는 고칠 수 없습니다.<br>'
@@ -11455,6 +11469,408 @@ function runPuerpImport(){
     fbDb.ref().update(up).then(function(){
       closeM(); toast('🔗 푸른이알피에서 '+n+'건 가져옴'); route();
     }).catch(function(e){ if(msg)msg.textContent='실패: '+e.message; });
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   옵시디언 금고로 내보내기 (대표 지시 2026-09-26 「옵시디언만 우선 연결시켜달라」)
+   ══════════════════════════════════════════════════════════════════════
+   업무관리가 아는 것을 markdown 으로 적어 이 PC 의 옵시디언 금고에 넣는다.
+   사람·사업장·업무·지식이 [[ ]] 로 서로 묶여, 옵시디언 그래프에서
+   「이 사람이 무엇을 맡고 있나」가 한눈에 보인다.
+
+   ★ 한 방향이다 — 업무관리 → 금고. 금고에서 고친 것은 «돌아오지 않는다».
+     두 방향으로 하면 정본이 둘이 되고, 언젠가 어느 쪽이 맞는지 아무도 모른다.
+     온톨로지 1단계가 정한 것과 같은 원칙이다 — 「기존 자료는 계속 정본」.
+
+   ★ 지우지 않는다 — 금고는 «사람 것»이다. 우리가 만든 폴더 안에서도 덮어쓰기만
+     하고 파일을 지우지 않는다. 업무 이름이 바뀌면 옛 파일이 남는데, 그것이
+     남의 금고에서 파일을 지우는 것보다 낫다. 깨끗이 다시 만들려면 사람이 폴더째 지운다.
+
+   ⚠ 주민번호는 지우고 내보낸다. 금고는 «평문 파일»이고 옵시디언 동기화로 클라우드에
+     올라갈 수 있다 — pu-rrn-seal.js 가 백업을 잠그는 것과 같은 까닭이다
+     (「백업은 오래 남고, 옮겨 다니고, 아무도 안 본다」). 내보내기는 그 백업에 가깝다.
+   ⚠ 지우개가 안 실려 있으면 «내보내기를 막는다». 조용히 새는 것보다 시끄럽게 멈춘다
+     (pu-doc-read.js 의 rrnScrub 이 null 을 돌려주는 것과 같은 규칙).
+
+   ⚠ 성과급은 내보내지 않는다. 원본(finance_income)은 재무권한자만 읽고 사본도
+     본인 것인데, 파일로 떠나가면 그 울타리가 통째로 사라진다. 여기서는 아예 안 읽는다.
+
+   ⚠ 폴더에 바로 쓰는 것은 크롬·엣지에서만 된다(File System Access).
+     경력관리(kcareer.html)가 서류 폴더를 붙잡는 데 쓰는 길과 같다. */
+
+var OBS_DIR='업무관리';                 // 금고 뿌리에 흩뿌리지 않는다 — 우리 폴더 안에만 쓴다
+var OBS_SUB={person:'사람',co:'사업장',item:'업무',kb:'지식'};
+var _obsRoot=null;
+
+function obsSupported(){ return typeof window!=='undefined' && typeof window.showDirectoryPicker==='function'; }
+
+/* ── 폴더 손잡이를 기억한다 — 한 번 고르면 다음부터 안 묻는다 ──
+   ⚠ IndexedDB 에 넣는 것은 «손잡이»지 자료가 아니다. 업무 내용은 여기 안 들어간다. */
+function _obsDB(){
+  return new Promise(function(res,rej){
+    var q=indexedDB.open('work_obsidian',1);
+    q.onupgradeneeded=function(e){ e.target.result.createObjectStore('h',{keyPath:'k'}); };
+    q.onsuccess=function(e){ res(e.target.result); };
+    q.onerror=function(){ rej(q.error); };
+  });
+}
+function obsPut(h){
+  return _obsDB().then(function(db){ return new Promise(function(res){
+    var tx=db.transaction('h','readwrite'); tx.objectStore('h').put({k:'vault',h:h});
+    tx.oncomplete=function(){ res(true); }; tx.onerror=function(){ res(false); };
+  }); }).catch(function(){ return false; });
+}
+function obsGet(){
+  return _obsDB().then(function(db){ return new Promise(function(res){
+    var q=db.transaction('h','readonly').objectStore('h').get('vault');
+    q.onsuccess=function(){ res(q.result?q.result.h:null); };
+    q.onerror=function(){ res(null); };
+  }); }).catch(function(){ return null; });
+}
+/* 손잡이가 남아 있어도 허락은 풀릴 수 있다(브라우저를 닫았다 열면 흔하다).
+   ⚠ 다시 묻는 것은 «사람이 누른 순간»에만 된다 — 그래서 ask 는 단추 안에서만 true 다. */
+function obsOk(h,ask){
+  if(!h||!h.queryPermission) return Promise.resolve(false);
+  return h.queryPermission({mode:'readwrite'}).then(function(p){
+    if(p==='granted') return true;
+    if(!ask) return false;
+    return h.requestPermission({mode:'readwrite'}).then(function(p2){ return p2==='granted'; });
+  }).catch(function(){ return false; });
+}
+
+/* ── 글자 다듬기 ───────────────────────────────────────────────────── */
+/* 파일 이름으로 쓸 수 없는 글자를 걷는다.
+   ⚠ 윈도 금지문자에 더해 # ^ [ ] 도 뺀다 — 옵시디언에서 [[ ]] 안의 그 글자는
+     «다른 뜻»이라(문단 가리키기·별명) 연결이 조용히 끊긴다.
+   ⚠ 앞뒤 점도 뗀다 — 앞의 점은 숨김파일, 뒤의 점은 윈도가 아예 못 만든다. */
+function obsName(v){
+  var t=String(v==null?'':v).replace(/[\\/:*?"<>|#^\[\]]/g,' ').replace(/\s+/g,' ').trim();
+  t=t.replace(/^\.+/,'').replace(/\.+$/,'').trim();
+  if(t.length>80) t=t.slice(0,80).trim();
+  return t||'이름없음';
+}
+/* 앞머리(front matter) 값 — 따옴표로 감싸 콜론·＃ 가 들어와도 안 깨지게 한다 */
+function obsYaml(v){
+  return '"'+String(v==null?'':v).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/[\r\n]+/g,' ')+'"';
+}
+/* [[업무관리/사람/김OO]] — «전체 경로»로 건다.
+   ⚠ [[김OO]] 처럼 짧게 걸면 대표님이 금고에 원래 갖고 있던 같은 이름 노트와 엉킨다. */
+function obsLink(sub,name){
+  var n=obsName(name);
+  return n&&n!=='이름없음' ? '[['+OBS_DIR+'/'+sub+'/'+n+']]' : '';
+}
+
+/* ── 파일 이름을 «한 곳»에서 정한다 ──
+   사람·사업장 장에서 [[ ]] 로 가리키는 이름과 업무 장의 파일 이름이 한 글자라도
+   다르면 연결이 끊긴다. 그래서 여기서 정해 it._obsFile 에 달아 두고 모두가 그것만 쓴다.
+   ⚠ 같은 이름이 둘이면 뒤엣것에 (2) 를 붙인다 — 덮어쓰면 한 건이 통째로 사라진다.
+   ⚠ 견줄 때 소문자로 맞춘다 — 윈도는 Abc 와 abc 를 «같은 파일»로 본다. */
+function obsModel(rows,nameOf){
+  var used={}, list=[], people={}, cos={};
+  (rows||[]).forEach(function(it){
+    if(!it) return;
+    var nm=String((nameOf?nameOf(it):'')||'').trim();
+    var co=String(it.company||it.client||'').trim();
+    var base=obsName((co?co+' ':'')+(nm||it.cat||'업무'));
+    var f=base, i=2;
+    while(used[f.toLowerCase()]){ f=obsName(base+' ('+i+')'); i++; }
+    used[f.toLowerCase()]=1;
+    it._obsFile=f;
+    list.push(it);
+    var mg=(it.mgr_main&&it.mgr_main.name)||'';
+    if(mg){ people[mg]=people[mg]||{main:[],sub:[]}; people[mg].main.push(it); }
+    (it.mgr_subs||[]).forEach(function(x){
+      var n=x&&x.name; if(!n) return;
+      people[n]=people[n]||{main:[],sub:[]}; people[n].sub.push(it);
+    });
+    if(co){ cos[co]=cos[co]||[]; cos[co].push(it); }
+  });
+  return {items:list,people:people,cos:cos};
+}
+
+/* ── 한 장씩 markdown 으로 ─────────────────────────────────────────── */
+/* 업무 한 장.
+   ⚠ 앞머리에 구분·상태·담당·기한을 «칸»으로 넣는다. 본문에만 적으면 글자 검색밖에
+     안 되는데, 칸으로 넣으면 옵시디언이 표로 묶고 걸러 낼 수 있다. */
+function obsItemMD(it,logs,meta){
+  meta=meta||{};
+  var L=[], nm=String(meta.name||'').trim();
+  var co=String(it.company||it.client||'').trim();
+  L.push('---');
+  L.push('종류: 업무');
+  L.push('구분: '+obsYaml(it.cat||''));
+  if(nm) L.push('업무명: '+obsYaml(nm));
+  if(co) L.push('사업장: '+obsYaml(co));
+  L.push('상태: '+obsYaml(it.state==='done'?(meta.end||'종료'):'진행'));
+  L.push('담당: '+obsYaml((it.mgr_main&&it.mgr_main.name)||''));
+  if(it.no) L.push('번호: '+obsYaml(it.no));
+  if(it.start) L.push('시작: '+obsYaml(it.start));
+  if(it.due) L.push('기한: '+obsYaml(it.due));
+  L.push('갱신: '+obsYaml(meta.today||''));
+  L.push('---');
+  L.push('');
+  L.push('# '+(co?co+' — ':'')+(nm||'(업무명 없음)'));
+  L.push('');
+  if(co) L.push('- 사업장 :: '+obsLink(OBS_SUB.co,co));
+  var mg=(it.mgr_main&&it.mgr_main.name)||'';
+  if(mg) L.push('- 담당 :: '+obsLink(OBS_SUB.person,mg));
+  var subs=(it.mgr_subs||[]).map(function(x){ return x&&x.name; }).filter(Boolean);
+  if(subs.length) L.push('- 함께 :: '+subs.map(function(n){ return obsLink(OBS_SUB.person,n); }).join(' '));
+  if(it.jur_org) L.push('- 상대기관 :: '+it.jur_org+(it.officer?' ('+it.officer+')':''));
+  if(it.client&&it.client!==co) L.push('- 의뢰인 :: '+it.client);
+  L.push('');
+  if(it.brief){ L.push('## 무슨 일인가'); L.push(''); L.push(String(it.brief).trim()); L.push(''); }
+  var rows=(logs||[]).filter(function(g){ return g&&String(g.t||'').trim(); })
+    .sort(function(a,b){ return String(a.d||'').localeCompare(String(b.d||'')); });
+  if(rows.length){
+    L.push('## 기록 '+rows.length); L.push('');
+    rows.forEach(function(g){
+      L.push('### '+String(g.d||'')+(g.byName?' · '+g.byName:'')+(g.k==='mail'?' · 메일':''));
+      L.push('');
+      L.push(String(g.t).trim());
+      L.push('');
+    });
+  } else if(it.last&&String(it.last.t||'').trim()){
+    /* 기록을 안 싣기로 했거나 아직 못 읽었다 — «최근 한 줄»은 업무 항목 안에 이미 있다 */
+    L.push('## 최근 기록'); L.push('');
+    L.push('### '+String(it.last.d||'')); L.push('');
+    L.push(String(it.last.t).trim()); L.push('');
+  }
+  return L.join('\n');
+}
+/* 사람 한 장 — 맡은 것과 함께 맡은 것. 이 장이 그래프의 «가운데»가 된다. */
+function obsPersonMD(name,box,today){
+  var L=[], main=(box&&box.main)||[], sub=(box&&box.sub)||[];
+  var open=main.filter(function(it){ return it.state!=='done'; });
+  L.push('---');
+  L.push('종류: 사람');
+  L.push('맡은업무: '+open.length);
+  L.push('갱신: '+obsYaml(today||''));
+  L.push('---');
+  L.push('');
+  L.push('# '+String(name||''));
+  L.push('');
+  function lines(arr,head){
+    if(!arr.length) return;
+    L.push('## '+head+' '+arr.length); L.push('');
+    arr.slice().sort(function(a,b){ return String(a.due||'9999').localeCompare(String(b.due||'9999')); })
+      .forEach(function(it){
+        L.push('- '+'[['+OBS_DIR+'/'+OBS_SUB.item+'/'+it._obsFile+']]'
+          +(it.cat?' · '+it.cat:'')
+          +(it.state==='done'?' · 종료':(it.due?' · 기한 '+it.due:'')));
+      });
+    L.push('');
+  }
+  lines(open,'맡은 업무');
+  lines(sub.filter(function(it){ return it.state!=='done'; }),'함께 맡은 업무');
+  lines(main.filter(function(it){ return it.state==='done'; }),'끝난 업무');
+  return L.join('\n');
+}
+/* 사업장 한 장 — 그 회사에 걸린 업무 전부와 누가 맡고 있나. */
+function obsCoMD(co,rows,today){
+  var L=[], arr=(rows||[]).slice();
+  var mg={};
+  arr.forEach(function(it){ var n=(it.mgr_main&&it.mgr_main.name)||''; if(n) mg[n]=1; });
+  var mgs=Object.keys(mg);
+  L.push('---');
+  L.push('종류: 사업장');
+  L.push('업무수: '+arr.filter(function(it){ return it.state!=='done'; }).length);
+  L.push('갱신: '+obsYaml(today||''));
+  L.push('---');
+  L.push('');
+  L.push('# '+String(co||''));
+  L.push('');
+  if(mgs.length) L.push('- 담당 :: '+mgs.map(function(n){ return obsLink(OBS_SUB.person,n); }).join(' '));
+  L.push('');
+  ['진행','종료'].forEach(function(head){
+    var g=arr.filter(function(it){ return head==='진행' ? it.state!=='done' : it.state==='done'; });
+    if(!g.length) return;
+    L.push('## '+head+' '+g.length); L.push('');
+    g.sort(function(a,b){ return String(a.due||'9999').localeCompare(String(b.due||'9999')); })
+     .forEach(function(it){
+       L.push('- '+'[['+OBS_DIR+'/'+OBS_SUB.item+'/'+it._obsFile+']]'
+         +(it.cat?' · '+it.cat:'')
+         +(it.mgr_main&&it.mgr_main.name?' · '+it.mgr_main.name:''));
+     });
+    L.push('');
+  });
+  return L.join('\n');
+}
+/* 지식 한 장 — 사람·업체·유형·기관에 붙은 카드.
+   ⚠ 「지금은 다름」이 붙은 카드는 «맨 위»에 그 사실을 적는다. 금고에서 읽는 사람이
+     그것을 모르고 그대로 믿으면 안 된다. */
+function obsKbMD(c,today){
+  var L=[], kl=String(c.kl||'').trim();
+  var kind=({person:'사람',company:'업체',cat:'유형',office:'기관'})[c._kind]||String(c._kind||'');
+  L.push('---');
+  L.push('종류: 지식');
+  L.push('붙은곳: '+obsYaml(kind));
+  L.push('대상: '+obsYaml(kl));
+  if(c.byName) L.push('적은이: '+obsYaml(c.byName));
+  if(c.at) L.push('적은때: '+obsYaml(String(c.at).slice(0,10)));
+  L.push('갱신: '+obsYaml(today||''));
+  L.push('---');
+  L.push('');
+  L.push('# '+String(c.t||'').trim());
+  L.push('');
+  if((c.flags||[]).length) L.push('> ⚠ 「지금은 다름」 표시가 붙은 카드입니다 — 그대로 믿지 마세요.');
+  if(kl){
+    var sub=(c._kind==='person')?OBS_SUB.person:(c._kind==='company'?OBS_SUB.co:'');
+    L.push('- 대상 :: '+(sub?obsLink(sub,kl):kl));
+  }
+  L.push('');
+  if(String(c.x||'').trim()){ L.push(String(c.x).trim()); L.push(''); }
+  return L.join('\n');
+}
+/* 금고에 남기는 안내 — 이 폴더가 무엇인지 여섯 달 뒤에도 알 수 있게. */
+function obsGuideMD(n,today,who){
+  return ['---','종류: 안내','갱신: '+obsYaml(today||''),'---','',
+    '# '+OBS_DIR+' — 업무관리에서 내보낸 것','',
+    '- 내보낸 때 :: '+String(today||''),
+    '- 내보낸 이 :: '+String(who||''),
+    '- 장수 :: 사람 '+n.person+' · 사업장 '+n.co+' · 업무 '+n.item+' · 지식 '+n.kb,'',
+    '## 알아 두실 것','',
+    '- **한 방향입니다.** 여기서 고친 것은 업무관리로 돌아가지 않습니다.',
+    '  고칠 것은 업무관리에서 고치고 다시 내보내세요.',
+    '- **덮어쓰기만 합니다.** 지우지 않습니다. 업무 이름이 바뀌면 옛 파일이 남습니다 —',
+    '  깨끗이 다시 만들려면 이 **'+OBS_DIR+'** 폴더를 통째로 지우고 다시 내보내세요.',
+    '- **주민번호는 지워서 내보냅니다.** 성과급은 아예 내보내지 않습니다.',
+    '- 이 폴더는 평문입니다. 옵시디언 동기화를 켜면 **클라우드로 올라갑니다** —',
+    '  근로자·의뢰인 정보가 들어 있으니 어디로 올라가는지 확인하고 쓰세요.',''
+  ].join('\n');
+}
+
+/* ── 실제로 쓰는 쪽 ────────────────────────────────────────────────── */
+/* ⚠ 여기가 «마지막 문지기»다. 나가는 글자는 모두 이 한 곳을 지난다.
+   지우개가 없으면 던진다 — 부르는 쪽이 잊어도 주민번호가 파일로 안 나간다. */
+function obsWrite(dir,name,body){
+  var M=(typeof window!=='undefined')&&window.PuRrnMask;
+  if(!M||!M.maskRrnInText) return Promise.reject(new Error('주민번호 지우개(js/pu-rrn-mask.js)가 이 화면에 실려 있지 않습니다 — 그대로 내보내면 주민번호가 파일로 나갑니다'));
+  var txt=M.maskRrnInText(String(body==null?'':body)).text;
+  return dir.getFileHandle(obsName(name)+'.md',{create:true})
+    .then(function(fh){ return fh.createWritable(); })
+    .then(function(w){ return Promise.resolve(w.write(txt)).then(function(){ return w.close(); }); });
+}
+function obsPick(){
+  return window.showDirectoryPicker({id:'work-obsidian',mode:'readwrite'})
+    .then(function(h){ _obsRoot=h; return obsPut(h).then(function(){ return h; }); });
+}
+
+function obsModal(){
+  if(!obsSupported()){
+    showModal('<h2 style="margin:0 0 10px">🪨 옵시디언으로 내보내기</h2>'
+      +'<p class="muted" style="font-size:12.5px;line-height:1.7">이 브라우저는 «폴더에 바로 쓰기»를 지원하지 않습니다.<br>'
+      +'<b>크롬</b>이나 <b>엣지</b>에서 열어 주세요 (사파리·파이어폭스는 아직 안 됩니다).</p>'
+      +'<div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="closeM()">닫기</button></div>');
+    return;
+  }
+  obsGet().then(function(h){
+    _obsRoot=h;
+    var nm=h&&h.name?h.name:'';
+    showModal('<h2 style="margin:0 0 6px">🪨 옵시디언으로 내보내기'+hlp('obs')+'</h2>'
+      +'<p class="muted" style="font-size:12.5px;margin:0 0 12px">사람·사업장·업무·지식을 markdown 으로 적어 금고에 넣습니다. '
+      +'<b>한 방향</b>이고, <b>지우지 않습니다</b>.</p>'
+      +'<div class="row" style="gap:8px;align-items:center;margin-bottom:10px">'
+      +'<button onclick="obsPickBtn()">📁 금고 폴더 고르기</button>'
+      +'<span id="obs-dir" class="muted" style="font-size:12px">'+(nm?'금고: <b>'+esc(nm)+'</b>':'아직 고르지 않았습니다')+'</span></div>'
+      +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;margin-bottom:6px">'
+      +'<input type="checkbox" id="obs-logs" checked> 기록을 모두 넣기 <span class="muted">(끄면 최근 한 줄만 — 훨씬 빠릅니다)</span></label>'
+      +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;margin-bottom:10px">'
+      +'<input type="checkbox" id="obs-done"> 종료된 업무도 넣기</label>'
+      +'<div style="background:var(--warn-bg);border:1px solid #fbbf24;border-radius:9px;padding:9px 12px;font-size:12px;line-height:1.6">'
+      +'주민번호는 지워서 내보냅니다. <b>성과급은 내보내지 않습니다.</b><br>'
+      +'금고는 평문 파일입니다 — 옵시디언 동기화를 켜 두셨으면 클라우드로 올라갑니다.</div>'
+      +'<div id="obs-msg" class="muted" style="font-size:12px;min-height:18px;margin-top:8px"></div>'
+      +'<div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="closeM()">닫기</button>'
+      +'<button class="primary" id="obs-go" onclick="obsRun()">내보내기</button></div>');
+  });
+}
+function obsPickBtn(){
+  var d=$('obs-dir');
+  obsPick().then(function(h){ if(d) d.innerHTML='금고: <b>'+esc(h.name||'')+'</b>'; })
+    .catch(function(e){ if(d&&e&&e.name!=='AbortError') d.textContent='폴더를 못 열었습니다: '+e.message; });
+}
+
+/* 내보내기 한 번.
+   ⚠ 허락을 «여기서» 다시 묻는다 — 사람이 단추를 누른 순간이라야 브라우저가 물어 준다. */
+function obsRun(){
+  var msg=$('obs-msg'), go=$('obs-go');
+  var withLogs=!!(($('obs-logs')||{}).checked);
+  var withDone=!!(($('obs-done')||{}).checked);
+  function say(t){ if(msg) msg.textContent=t; }
+  if(!_obsRoot){ say('먼저 금고 폴더를 고르세요.'); return; }
+  if(go) go.disabled=true;
+  var today=todayStr(), me=(S.me&&S.me.name)||'';
+  var n={person:0,co:0,item:0,kb:0};
+  obsOk(_obsRoot,true).then(function(ok){
+    if(!ok) throw new Error('폴더 쓰기 허락이 없습니다 — [금고 폴더 고르기]를 다시 눌러 주세요');
+    say('업무를 고르는 중…');
+    var rows=allItems().filter(function(it){ return withDone || it.state!=='done'; });
+    if(!rows.length) throw new Error('내보낼 업무가 없습니다');
+    if(!withLogs) return {rows:rows,logs:null};
+    say('기록을 읽는 중… (업무 '+rows.length+'건)');
+    /* ⚠ 업무마다 따로 읽지 않는다 — 수백 번 오가면 몇 분이 걸린다. 한 번에 받아 나눈다. */
+    return fbDb.ref(NS+'/itemlogs').once('value')
+      .then(function(sn){ return {rows:rows,logs:sn.val()||{}}; },
+            function(){ return {rows:rows,logs:null}; });   // 못 읽으면 최근 한 줄로 간다
+  }).then(function(box){
+    var model=obsModel(box.rows,itemName);
+    say('폴더를 만드는 중…');
+    return _obsRoot.getDirectoryHandle(OBS_DIR,{create:true}).then(function(root){
+      return Promise.all([
+        root.getDirectoryHandle(OBS_SUB.person,{create:true}),
+        root.getDirectoryHandle(OBS_SUB.co,{create:true}),
+        root.getDirectoryHandle(OBS_SUB.item,{create:true}),
+        root.getDirectoryHandle(OBS_SUB.kb,{create:true})
+      ]).then(function(d){ return {root:root,person:d[0],co:d[1],item:d[2],kb:d[3],model:model,logs:box.logs}; });
+    });
+  }).then(function(c){
+    /* 한 장씩 차례로 쓴다 — 수백 개를 한꺼번에 열면 브라우저가 버거워한다.
+       ⚠ 스무 장마다 한 번 숨을 돌려 «몇 장째»가 화면에 보이게 한다. */
+    var jobs=[], i;
+    c.model.items.forEach(function(it){
+      var lg=null;
+      if(c.logs){ var o=c.logs[it._id]||{}; lg=Object.keys(o).map(function(k){ return o[k]; }); }
+      var meta={name:itemName(it),end:(END_BY_KEY[endWay(it)]||[])[1]||'종료',today:today};
+      jobs.push([c.item,it._obsFile,obsItemMD(it,lg,meta),'item']);
+    });
+    Object.keys(c.model.people).forEach(function(nm2){
+      jobs.push([c.person,nm2,obsPersonMD(nm2,c.model.people[nm2],today),'person']);
+    });
+    Object.keys(c.model.cos).forEach(function(co){
+      jobs.push([c.co,co,obsCoMD(co,c.model.cos[co],today),'co']);
+    });
+    var cards=[]; try{ cards=kbAll(); }catch(e){ cards=[]; }
+    var kbUsed={};
+    cards.forEach(function(card){
+      var base=obsName(String(card.t||'').trim()||String(card.kl||'').trim()||'지식');
+      var f=base, k=2;
+      while(kbUsed[f.toLowerCase()]){ f=obsName(base+' ('+k+')'); k++; }
+      kbUsed[f.toLowerCase()]=1;
+      jobs.push([c.kb,f,obsKbMD(card,today),'kb']);
+    });
+    var done=0;
+    function step(){
+      if(done>=jobs.length) return Promise.resolve();
+      var j=jobs[done];
+      return obsWrite(j[0],j[1],j[2]).then(function(){
+        n[j[3]]++; done++;
+        if(done%20===0){ say('쓰는 중… '+done+' / '+jobs.length); return new Promise(function(r){ setTimeout(r,0); }).then(step); }
+        return step();
+      });
+    }
+    say('쓰는 중… 0 / '+jobs.length);
+    return step().then(function(){ return c.root; });
+  }).then(function(root){
+    return obsWrite(root,'_안내',obsGuideMD(n,today,me));
+  }).then(function(){
+    closeM();
+    toast('🪨 옵시디언으로 내보냈습니다 — 업무 '+n.item+' · 사람 '+n.person+' · 사업장 '+n.co+' · 지식 '+n.kb);
+  }).catch(function(e){
+    if(go) go.disabled=false;
+    if(e&&e.name==='AbortError'){ say('멈췄습니다.'); return; }
+    say('실패: '+((e&&e.message)||e));
   });
 }
 
