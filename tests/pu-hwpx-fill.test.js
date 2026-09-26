@@ -157,3 +157,42 @@ test('★ 태그는 한 글자도 안 바뀐다 — 글자만 바뀐다(뼈대 �
     assert.equal(r.xml.split(t).length, xml.split(t).length, t + ' 개수가 달라졌다');
   });
 });
+
+/* ── 표 «줄» 반복·지우기 (② 법인설립 — 협의회 명부, 2026-09-26) ── */
+const TR = (r, ...ts) => '<hp:tr>' + ts.map((t, c) => '<hp:tc><hp:subList>' + P(RUN(t)) + '</hp:subList><hp:cellAddr colAddr="' + c + '" rowAddr="' + r + '"/></hp:tc>').join('') + '</hp:tr>';
+const RTBL = (n, ...rows) => SEC(P('<hp:run><hp:tbl id="1" rowCnt="' + n + '" colCnt="2">' + rows.join('') + '</hp:tbl></hp:run>'), P(RUN('꼬리')));
+const rowAddrs = (xml) => [...xml.matchAll(/rowAddr="(\d+)"/g)].map((m) => +m[1]).filter((v, i, a) => i === 0 || v !== a[i - 1]);
+const rowCnt = (xml) => +/rowCnt="(\d+)"/.exec(xml)[1];
+
+test('★ 줄 반복 {{#행:…}} — 사람 수만큼 줄을 베끼고, 뒤 줄 번호와 표의 줄 수를 고친다', () => {
+  const xml = RTBL(3, TR(0, '구분', '위원명'), TR(1, '{{#행:위원}}위원', '{{이름}}{{/행:위원}}'), TR(2, '　', '　'));
+  const r = X.expand(xml, { 위원: [{ 이름: '갑' }, { 이름: '을' }, { 이름: '병' }] });
+  assert.equal(X.textOf(r.xml), '구분\n위원명\n위원\n갑\n위원\n을\n위원\n병\n　\n　\n꼬리');
+  assert.deepEqual(rowAddrs(r.xml), [0, 1, 2, 3, 4], '한글은 줄 번호가 이어지지 않으면 표를 못 그린다(빈 쪽)');
+  assert.equal(rowCnt(r.xml), 5);
+});
+
+test('★★ 줄 지우기 둘 — 첫 지우기가 줄 수를 「10」→「9」로 줄여도 둘째 자리가 밀리지 않는다', () => {
+  /* 실제로 그랬다: 줄 수 글자가 하나 줄어 둘째 지울 자리가 한 칸 밀렸고, 줄은 지워졌는데
+     뒤 줄 번호·줄 수가 안 고쳐져 한글이 명부를 빈 쪽으로 그렸다 */
+  const rows = []; for (let i = 0; i < 10; i++) rows.push(TR(i, 'r' + i, 'x' + i));
+  const xml = RTBL(10, ...rows);
+  const at = (t) => X.scan(xml).find((p) => p.text === t).addr;
+  const r = X.dropRows(xml, [at('r5'), at('r7')]);
+  assert.equal(r.hits, 2);
+  assert.deepEqual(rowAddrs(r.xml), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(rowCnt(r.xml), 8);
+  assert.ok(!/r5|r7/.test(X.textOf(r.xml)) && /r6/.test(X.textOf(r.xml)));
+});
+
+test('반복 값이 «숫자»면 그만큼 빈 벌 — 0 이면 묶음째 없앤다(명부의 여유 빈 줄·표 아래 빈 줄)', () => {
+  const xml = RTBL(3, TR(0, '위원', '갑'), TR(1, '　{{#행:빈줄}}', '　{{/행:빈줄}}'), TR(2, '끝', '끝'));
+  const two = X.expand(xml, { 빈줄: 2 }), none = X.expand(xml, { 빈줄: 0 });
+  assert.equal(X.textOf(two.xml), '위원\n갑\n　\n　\n　\n　\n끝\n끝\n꼬리');
+  assert.deepEqual(rowAddrs(two.xml), [0, 1, 2, 3]); assert.equal(rowCnt(two.xml), 4);
+  assert.equal(X.textOf(none.xml), '위원\n갑\n끝\n끝\n꼬리');
+  assert.deepEqual(rowAddrs(none.xml), [0, 1]); assert.equal(rowCnt(none.xml), 2);
+  const para = X.expand(SEC(P(RUN('가')), P(RUN('{{#여백}}')), P(RUN('{{/여백}}')), P(RUN('나'))), { 여백: 0 });
+  assert.equal(X.textOf(para.xml), '가\n나', '문단 묶음도 0 이면 없앤다');
+  assert.equal(X.textOf(X.expand(xml, { 빈줄: [] }).xml).split('　').length - 1, 2, '빈 «목록»은 여전히 빈 한 벌(서명란)');
+});
