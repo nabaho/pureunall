@@ -89,6 +89,8 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=16"></script>
+<!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
+<script src="js/pu-contract-forms.js?v=1"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -309,8 +311,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-23 TypeSafe 검토 단추를 포털 머리 카드로 옮김(이알피에서 뺌)';
-var BUILD_SEQ = 184;
+var ERP_BUILD = '2026-09-26 계약서 양식 화면을 문서관리 › 사무관리서류로 옮김(환경설정 칸 없앰)';
+var BUILD_SEQ = 185;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -34804,14 +34806,9 @@ function CaseStageCard(){
 }
 
 function BizMasters(){
-  var ts = useState(0); var activeTab = ts[0]; var setActiveTab = ts[1];
   var dg = useState(null); var diag = dg[0]; var setDiag = dg[1];
   // 안내는 한 번 읽으면 그만이라 접어 둔다 — 유형 목록이 화면 위로 올라온다
   var hlp = useState(false); var helpOpen = hlp[0]; var setHelpOpen = hlp[1];
-  var TABS = [
-    { label:'📋 업무유형' },
-    { label:'📄 계약서 양식' }
-  ];
   // ── 유형 정합성 진단: 데이터에 박힌 유형코드 중 현재 목록에 없는 것(미설정) 찾기 ──
   function runTypeDiag(){
     var KINDS = [
@@ -34863,20 +34860,9 @@ function BizMasters(){
     runTypeDiag();
   }
   return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
-    h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px', marginBottom:'8px', borderBottom:'2px solid #e2e8f0' } },
-      TABS.map(function(t, i){
-        var on = activeTab === i;
-        return h('button', { key:i, onClick: function(){ setActiveTab(i); },
-          style:{ padding:'3px 8px', border:'none',
-            borderBottom: on ? '2px solid #1e40af' : '2px solid transparent',
-            background:'transparent', color: on ? '#1e40af' : '#64748b',
-            fontWeight: on ? 700 : 500, fontSize:'11.5px', cursor:'pointer',
-            marginBottom:'-2px', whiteSpace:'nowrap' } }, t.label);
-      })
-    ),
-    activeTab === 1
-      ? h(ContractFormMasters, null)
-      : h('div', null,
+    /* 「📋 업무유형 · 📄 계약서 양식」 두 칸이었다. 계약서 양식은 2026-09-26 문서관리 ›
+       사무관리서류로 옮기고 이 칸은 없앴다(대표 「칸을없앤다」) — 남은 하나에 칸 줄은 두지 않는다. */
+    h('div', null,
     // ── 안내 한 줄 (자세한 것은 접어 둔다) ──
     // 종전에는 파란 박스 세 덩어리가 다섯 줄을 먹어 정작 봐야 할 유형 목록을 아래로 밀었다.
     // 매번 읽을 내용이 아니라 처음 한 번이면 되므로, 요점만 한 줄로 두고 나머지는 접는다.
@@ -36433,7 +36419,7 @@ function AccessPolicySection(){
   );
 }
 
-// ====== 계약서 양식 파일 → 텍스트 추출 (HWP·HWPX·DOCX·ODT·RTF·PDF) ======
+// ====== QR·앱 주소 (계약서 양식 글자 뽑기는 2026-09-26 js/pu-contract-forms.js 로 옮김) ======
 /* QR 만들개 — 앱 받는 주소를 폰 카메라로 찍게 한다.
    ⚠ 처음부터 받아 두지 않는다. 이 창을 여는 사람은 거의 없다 —
      모두에게 짐을 지울 일이 아니다(PDF.js 와 같은 방식). */
@@ -36455,125 +36441,15 @@ function hanaApkUrl(){
   }catch(_e){}
   return 'https://nabaho.github.io/pureunall/hana-bridge.apk';
 }
-function _ensurePdfjs2(cb){
-  if(typeof pdfjsLib!=='undefined'){ cb(null); return; }
-  var s=document.createElement('script');
-  s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-  s.onload=function(){ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; cb(null); };
-  s.onerror=function(){ cb('PDF.js 로드 실패'); };
-  document.head.appendChild(s);
-}
-/* 한글·워드·PDF 에서 글자를 뽑는 «공용 읽개» — hwp_extract.js (2026-09-12).
-   ⚠ 취업규칙·급여데이터함·사진첩·기업정보함이 **이미 이것을 쓴다.** 알피만 제 것을
-     따로 들고 있었고, 그것이 아래 extractTemplateText 의 탈이었다.
-   ⚠ 처음부터 받아 두지 않는다 — 이 길로 오는 사람은 드물다(PDF.js 와 같은 방식).
-   ⚠ XLSX 는 이 화면이 처음부터 싣고 있다(엑셀 가져오기). 여기서는 안 받는다.
-   ⚠ PDF 는 «PDF 일 때만» pdf.js 를 받는다 — 한글 파일 하나 읽자고 1MB 를 받을 일이 아니다. */
-function _ensureDocText(needPdf, cb){
-  var one=function(src, has, next){
-    if(has()){ next(null); return; }
-    var s=document.createElement('script');
-    s.src=src;
-    s.onload=function(){ next(null); };
-    s.onerror=function(){ next(src+' 로드 실패'); };
-    document.head.appendChild(s);
-  };
-  one('vendor/pako.min.js', function(){ return window.pako; }, function(e){
-    if(e){ cb(e); return; }
-    one('hwp_extract.js?v=5', function(){ return window.extractDocText; }, function(e2){
-      if(e2){ cb(e2); return; }
-      if(!needPdf){ cb(null); return; }
-      _ensurePdfjs2(cb);
-    });
-  });
-}
-/* 파일 «속 표식»으로 PDF 인지 본다 — 이름이 아니라 내용으로.
-   .pdf 라고 적힌 한글 파일, 확장자 없는 파일이 실제로 들어온다. */
-function _looksPdf(buf){
-  var u=new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
-  return u[0]===0x25 && u[1]===0x50 && u[2]===0x44 && u[3]===0x46;   // "%PDF"
-}
-/* cb(text, err) — err 있으면 추출 실패(첨부만 저장)
-
-   ⚠⚠ 2026-09-12 에 **읽개를 바꿨다.** 그전에는 이 화면만 `.hwp` 를 「미리보기 글자」
-     (PrvText — 한글이 넣어 두는 맛보기)로 읽었다. 그래서 **같은 파일이 화면마다 다르게
-     읽혔다** — 취업규칙에 넣으면 본문이 다 나오고, 여기 계약 서식에 넣으면 조각만 나오거나
-     「미리보기 텍스트 없음」으로 빈손이 됐다. 조용히 틀리던 자리다.
-   ★ 이제 본문(BodyText)을 통째로 읽는다. 표 안 글자도 같이 온다.
-   ★ 확장자가 아니라 «파일 속 표식»으로 가린다 — `.doc` 로 저장된 RTF 가 실제로 흔한데,
-     예전에는 확장자만 보고 「미지원」으로 돌려보냈다. 이제 읽힌다. */
-function extractTemplateText(file, cb){
-  file.arrayBuffer().then(function(buf){
-    _ensureDocText(_looksPdf(buf), function(e){
-      if(e){ cb('', e); return; }
-      Promise.resolve(extractDocText(buf)).then(function(t){
-        var text=String(t||'').replace(/\n{3,}/g,'\n\n').trim();
-        cb(text, text?null:'본문 텍스트 없음');
-      }).catch(function(err){
-        /* 읽개가 «왜» 못 읽었는지 그대로 전한다 — 암호화·손상은 사람이 할 일이 다르다 */
-        cb('', (err && err.message) || '글자를 뽑지 못했습니다');
-      });
-    });
-  }).catch(function(){ cb('','파일 읽기 실패'); });
-}
-
 // ============ rhwp (HWP/HWPX 정밀 텍스트 + 원본 SVG 미리보기) ============
-// @rhwp/core (ESM+WASM) — jsDelivr CDN 동적 로드. 버전 고정 + 최신확인 버튼.
+// 판 고르기·하루 한 번 자동 갱신만 여기 남는다. 「최신확인」 단추는 문서관리 › 계약서 양식에 있다.
 /* 판 번호는 js/pu-hwp-engine.js 한 곳에서 정한다 — 두 곳에 적으면 반드시 어긋난다 */
 var RHWP_DEFAULT_VER = (window.PureunHwp && PureunHwp.CORE_VERSION) || '0.8.4';
 function rhwpVer(){
   try{ return PureunHwp.pickVer(localStorage.getItem('pureun_v6_rhwp_ver'), RHWP_DEFAULT_VER); }
   catch(e){ return RHWP_DEFAULT_VER; }
 }
-function rhwpSetVer(v){ try{ localStorage.setItem('pureun_v6_rhwp_ver', v); }catch(e){} _rhwpMod=null; _rhwpVerLoaded=null; }
-var _rhwpMod=null, _rhwpVerLoaded=null, _rhwpLoading=null;
-function rhwpEnsure(cb){ // cb(err, mod)
-  var ver = rhwpVer();
-  if(_rhwpMod && _rhwpVerLoaded===ver){ cb(null, _rhwpMod); return; }
-  if(location.protocol==='file:'){ cb('file:// 에서는 rhwp 사용 불가 — https 접속 필요'); return; }
-  if(_rhwpLoading){ _rhwpLoading.push(cb); return; }
-  _rhwpLoading=[cb];
-  if(typeof globalThis.measureTextWidth!=='function'){
-    var _mctx=null, _mfont='';
-    globalThis.measureTextWidth=function(font,text){
-      if(!_mctx) _mctx=document.createElement('canvas').getContext('2d');
-      if(font!==_mfont){ _mctx.font=font; _mfont=font; }
-      return _mctx.measureText(text).width;
-    };
-  }
-  var url='https://cdn.jsdelivr.net/npm/@rhwp/core@'+ver+'/rhwp.js';
-  import(url).then(function(mod){
-    return mod.default().then(function(){ return mod; });
-  }).then(function(mod){
-    _rhwpMod=mod; _rhwpVerLoaded=ver;
-    var q=_rhwpLoading; _rhwpLoading=null;
-    q.forEach(function(f){ f(null, mod); });
-  }).catch(function(err){
-    var q=_rhwpLoading; _rhwpLoading=null;
-    q.forEach(function(f){ f('rhwp 로드 실패: '+(err&&err.message||err)); });
-  });
-}
-function _rhwpDocFromU8(u8, cb){
-  rhwpEnsure(function(err, mod){
-    if(err){ cb(err); return; }
-    try{ cb(null, new mod.HwpDocument(u8), mod); }
-    catch(e){ cb('HWP 파싱 실패: '+(e&&e.message||e)); }
-  });
-}
-function _rhwpDocFromFile(file, cb){
-  var rd=new FileReader();
-  rd.onerror=function(){ cb('파일 읽기 실패'); };
-  rd.onload=function(ev){ _rhwpDocFromU8(new Uint8Array(ev.target.result), cb); };
-  rd.readAsArrayBuffer(file);
-}
-function _rhwpDocFromDataUrl(dataUrl, cb){
-  try{
-    var b64=(dataUrl||'').split(',')[1]||''; var bin=atob(b64); var u=new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
-    _rhwpDocFromU8(u, cb);
-  }catch(e){ cb('데이터 디코드 실패: '+(e&&e.message||e)); }
-}
-
+function rhwpSetVer(v){ try{ localStorage.setItem('pureun_v6_rhwp_ver', v); }catch(e){} }
 // 계약 양식에 첨부된 HWP/HWPX를 공통 엔진으로 안전하게 연다.
 function _erpHwpBytes(dataUrl){
   var b64=String(dataUrl||'').split(',')[1]||'';
@@ -36612,19 +36488,6 @@ function openContractHwpAttachment(att){
     .catch(function(){ return PureunHwp.renderPreview(host,buf,att.name); })
     .catch(function(err){ host.textContent='미리보기를 만들지 못했습니다. 원본 저장 후 한글에서 열어 주세요. ('+(err&&err.message||err)+')'; });
 }
-function rhwpFullText(doc){
-  var sc=doc.getSectionCount(); var parts=[];
-  for(var s=0;s<sc;s++){
-    var pc=doc.getParagraphCount(s);
-    for(var p=0;p<pc;p++){
-      var len=doc.getParagraphLength(s,p);
-      var t=''; try{ t=doc.getTextRange(s,p,0,len)||''; }catch(e){}
-      parts.push(t);
-    }
-    parts.push('');
-  }
-  return parts.join('\n').replace(/\n{3,}/g,'\n\n').trim();
-}
 function rhwpCheckLatest(cb){ // cb(err, latestVer)
   fetchT('https://data.jsdelivr.com/v1/packages/npm/@rhwp/core/resolved', null, 10000)
     .then(function(r){ return r.json(); })
@@ -36647,384 +36510,29 @@ function rhwpAutoUpdate(){
       rhwpSetVer(latest);
       try { showToast('🔄 문서 미리보기 엔진 자동 업데이트 (v'+latest+')'); } catch(e){}
     } else {
-      try { showToast('ℹ️ 문서 엔진 새 버전 v'+latest+' 있음 — 환경설정에서 [최신확인]으로 적용'); } catch(e){}
+      try { showToast('ℹ️ 문서 엔진 새 버전 v'+latest+' 있음 — 문서관리 › 사무관리서류 › 계약서 양식의 [rhwp ⟳]로 적용'); } catch(e){}
     }
   });
 }
 try { setTimeout(rhwpAutoUpdate, 8000); } catch(e){}   // 첫 화면 로딩을 방해하지 않게 8초 뒤
 
-// 최신확인 → 새 버전이면 적용 여부 확인
-function rhwpUpdatePrompt(){
-  showToast('rhwp 최신 버전 확인 중...');
-  rhwpCheckLatest(function(err, latest){
-    if(err){ showToast('❌ '+err); return; }
-    var cur=rhwpVer();
-    if(!latest){ showToast('버전 정보 없음'); return; }
-    if(latest===cur){ showToast('✅ 이미 최신 (v'+cur+')'); return; }
-    if(window.confirm('rhwp 새 버전 발견\n현재: v'+cur+'\n최신: v'+latest+'\n\n적용할까요? (다음 미리보기부터 새 버전 사용)')){
-      rhwpSetVer(latest); showToast('✅ rhwp v'+latest+' 적용됨');
-    }
-  });
-}
-// 원본 SVG 미리보기 오버레이 (+ 정밀텍스트 본문 적용)
-function rhwpOpenPreview(opts){ // {file?|dataUrl?, name?, onApplyText?}
-  var prev=document.getElementById('rhwp-ov'); if(prev) prev.remove();
-  var ov=document.createElement('div'); ov.id='rhwp-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px;';
-  var box=document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:10px;max-width:900px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);';
-  var hd=document.createElement('div');
-  hd.style.cssText='padding:10px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;background:#f8fafc;flex-wrap:wrap;';
-  hd.innerHTML='<span style="font-weight:700;color:#166534;font-size:13px;flex:1;min-width:120px;">🔍 원본 미리보기 — '+((opts.name||'').replace(/</g,'&lt;'))+' <span style="color:#94a3b8;font-weight:400;">(rhwp v'+rhwpVer()+')</span></span>';
-  var btnApply=null;
-  if(opts.onApplyText){
-    btnApply=document.createElement('button');
-    btnApply.textContent='📝 정밀텍스트로 본문 교체';
-    btnApply.style.cssText='background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;padding:5px 10px;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;opacity:.5;';
-    btnApply.disabled=true;
-    hd.appendChild(btnApply);
-  }
-  var btnClose=document.createElement('button');
-  btnClose.textContent='닫기';
-  btnClose.style.cssText='background:#f8fafc;color:#475569;border:1px solid #cbd5e1;padding:5px 12px;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;';
-  btnClose.onclick=function(){ ov.remove(); };
-  hd.appendChild(btnClose);
-  var body=document.createElement('div');
-  body.style.cssText='flex:1;overflow:auto;padding:16px;background:#e2e8f0;text-align:center;';
-  body.innerHTML='<div style="color:#475569;font-size:13px;padding:40px;">📥 rhwp 로딩 중... (최초 1회 약 4.5MB 다운로드)</div>';
-  box.appendChild(hd); box.appendChild(body); ov.appendChild(box);
-  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  document.body.appendChild(ov);
-  function onDoc(err, doc){
-    if(err){ body.innerHTML='<div style="color:#dc2626;font-size:13px;padding:40px;">❌ '+err+'</div>'; return; }
-    try{
-      var n=doc.pageCount(); var html='';
-      for(var i=0;i<n;i++){
-        var svg=''; try{ svg=doc.renderPageSvg(i); }catch(e){ svg='<div style="color:#dc2626">'+(i+1)+'페이지 렌더 실패</div>'; }
-        html+='<div style="background:#fff;display:inline-block;margin:0 auto 14px;box-shadow:0 2px 8px rgba(0,0,0,.15);max-width:100%;">'+svg+'</div>';
-      }
-      body.innerHTML=html||'<div style="padding:40px;color:#475569;">페이지 없음</div>';
-      var svgs=body.querySelectorAll('svg');
-      for(var k=0;k<svgs.length;k++){ svgs[k].style.maxWidth='100%'; svgs[k].style.height='auto'; }
-      if(btnApply){
-        var txt=''; try{ txt=rhwpFullText(doc); }catch(e){}
-        if(txt){ btnApply.disabled=false; btnApply.style.opacity='1';
-          btnApply.onclick=function(){ opts.onApplyText(txt); showToast('✅ rhwp 정밀텍스트 적용됨'); ov.remove(); }; }
-      }
-    }catch(e){ body.innerHTML='<div style="color:#dc2626;padding:40px;">❌ 렌더 실패: '+(e&&e.message||e)+'</div>'; }
-  }
-  if(opts.file) _rhwpDocFromFile(opts.file, onDoc);
-  else if(opts.dataUrl) _rhwpDocFromDataUrl(opts.dataUrl, onDoc);
-  else body.innerHTML='<div style="color:#dc2626;padding:40px;">파일 없음</div>';
-}
-
-// ============ 계약서 양식 관리 ============
-// 6종 카드 (상담사항/업체계약/사건계약/컨설팅계약/기금관리/기타사업)
-// 각 종류별로 양식 다중 등록 가능
-// 양식 = HTML/텍스트 본문 (변수 치환용) + 원본 파일 첨부 (선택)
-// 변수: {{회사명}} {{사업자번호}} {{대표자}} {{주소}} {{대표전화}} {{업태}} {{종목}}
-//       {{계약일}} {{계약금액}} {{성공보수}} {{주담당}} {{부담당}} {{계약번호}}
-
-var CONTRACT_FORM_VARS = [
-  { code:'{{회사명}}',     desc:'의뢰인 회사명' },
-  { code:'{{사업자번호}}', desc:'사업자등록번호' },
-  { code:'{{대표자}}',     desc:'대표자명' },
-  { code:'{{주소}}',       desc:'사업장 주소' },
-  { code:'{{우편번호}}',   desc:'사업장 우편번호' },
-  { code:'{{대표전화}}',   desc:'대표 전화번호' },
-  { code:'{{대표팩스}}',   desc:'대표 팩스번호' },
-  { code:'{{대표이메일}}', desc:'대표 이메일' },
-  { code:'{{업태}}',       desc:'업태' },
-  { code:'{{종목}}',       desc:'종목' },
-  { code:'{{규모}}',       desc:'규모 (소기업/중기업/중견기업/대기업)' },
-  { code:'{{고용가입자수}}',desc:'고용보험 가입자수' },
-  { code:'{{산재가입자수}}',desc:'산재보험 가입자수' },
-  { code:'{{담당자}}',     desc:'기업 주담당자명' },
-  { code:'{{담당자연락처}}',desc:'기업 주담당자 연락처' },
-  { code:'{{담당자이메일}}',desc:'기업 주담당자 이메일' },
-  { code:'{{계약번호}}',   desc:'계약번호' },
-  { code:'{{계약일}}',     desc:'계약일' },
-  { code:'{{계약시작일}}', desc:'계약 시작일 (자문/컨설팅)' },
-  { code:'{{계약종료일}}', desc:'계약 종료일 (자문/컨설팅)' },
-  { code:'{{계약기간}}',   desc:'계약 기간 (시작일~종료일)' },
-  { code:'{{부가세처리}}', desc:'부가세 별도/포함' },
-  { code:'{{납부일}}',     desc:'자문료 납부일/출금일 (예: 15일/말일)' },
-  { code:'{{국민연금관리번호}}', desc:'국민연금 사업장가입자번호' },
-  { code:'{{건강보험번호}}', desc:'건강보험 증번호' },
-  { code:'{{고용보험번호}}', desc:'고용보험 피보험자번호' },
-  { code:'{{산재관리번호}}', desc:'산재보험 관리번호' },
-  { code:'{{법인등록번호}}', desc:'법인등록번호 (업체관리)' },
-  { code:'{{대표생년월일}}', desc:'대표자 생년월일 (업체관리)' },
-  { code:'{{대표자전체}}',   desc:'대표자 전체 (대표1, 대표2 자동결합)' },
-  { code:'{{대표주민번호}}', desc:'대표 주민번호 앞7자리+마스킹 (생년월일+성별)' },
-  { code:'{{계약금액}}',   desc:'계약금액 (콤마 포함)' },
-  { code:'{{계약금액한글}}', desc:'계약금액 한글 표기 (예: 일백만)' },
-  { code:'{{성공보수}}',   desc:'성공보수 (정액/정률)' },
-  { code:'{{주담당}}',     desc:'노무사 주담당' },
-  { code:'{{부담당}}',     desc:'노무사 부담당' },
-  { code:'{{오늘날짜}}',   desc:'오늘 날짜 (YYYY-MM-DD)' },
-  // 의뢰인(근로자) 변수
-  { code:'{{근로자수}}',     desc:'의뢰인(근로자) 인원 수' },
-  { code:'{{근로자이름}}',   desc:'대표 의뢰인 이름' },
-  { code:'{{근로자명단}}',   desc:'전체 근로자 이름 (콤마)' },
-  { code:'{{근로자주민}}',   desc:'대표 의뢰인 주민번호 (마스킹)' },
-  { code:'{{근로자주소}}',   desc:'대표 의뢰인 주소' },
-  { code:'{{근로자연락처}}', desc:'대표 의뢰인 연락처' },
-  { code:'{{근로자상세}}',   desc:'전체 근로자 상세 (이름·주소·연락처 줄바꿈)' }
-];
-
-// 시드 데이터: 6종 × 1개씩 기본 양식
-var CONTRACT_FORM_SEED = [
-  { id:'fm-1', kind:'consult', name:'기본 상담확인서',
-    body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n            상 담 확 인 서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n■ 상담일: {{계약일}}\n■ 의뢰인: {{회사명}} (사업자번호: {{사업자번호}})\n■ 대표자: {{대표자}}\n■ 담당자: {{담당자}} ({{담당자연락처}})\n\n[상담내용]\n\n\n[자문 결과]\n\n\n2026.   .   .\n\n푸른노무법인\n담당노무사: {{주담당}} (인)\n',
-    attachments:[], enabled:true, createdAt:'2026-04-01' },
-  { id:'fm-2', kind:'company', name:'업체 자문계약서 (월정액)',
-    body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          노무자문 위탁계약서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n계약번호: {{계약번호}}\n\n위임인 (이하 "갑")\n   회사명: {{회사명}}\n   사업자번호: {{사업자번호}}\n   대표자: {{대표자}}\n   주소: {{주소}}\n\n수임인 (이하 "을")\n   상호: 푸른노무법인\n   대표자: 권형하 노무사\n   주소: 충남 천안시 동남구\n\n제1조 (목적)\n   "갑"은 "을"에게 노무관리 자문을 위탁하고, "을"은 이를 수임한다.\n\n제2조 (자문료)\n   월 자문료: 금 {{계약금액}}원 (부가세 별도)\n\n제3조 (계약기간)\n   {{계약일}} 부터 1년간\n\n제4조 (담당)\n   주담당 노무사: {{주담당}}\n   부담당: {{부담당}}\n\n2026.   .   .\n\n갑: {{회사명}}  대표자 {{대표자}} (인)\n을: 푸른노무법인  대표자 권형하 (인)\n',
-    attachments:[], enabled:true, createdAt:'2026-04-01' },
-  { id:'fm-3', kind:'case', name:'사건위임계약서 (부당해고)',
-    body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n             사건위임계약서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n사건번호: {{계약번호}}\n\n위임인: {{회사명}} (대표 {{대표자}})\n수임인: 푸른노무법인 (대표 권형하)\n\n제1조 (위임사건)\n   {{회사명}}에 관한 노동사건 일체\n\n제2조 (보수)\n   1. 착수금: 금 {{계약금액}}원 (부가세 별도)\n   2. 성공보수: {{성공보수}}\n\n제3조 (수임담당)\n   주담당노무사: {{주담당}}\n   부담당노무사: {{부담당}}\n\n제4조 (계약일)\n   {{계약일}}\n\n2026.   .   .\n\n위임인: {{회사명}}  대표자 {{대표자}} (인)\n수임인: 푸른노무법인  대표자 권형하 (인)\n',
-    attachments:[], enabled:true, createdAt:'2026-04-01' },
-  { id:'fm-4', kind:'consulting', name:'컨설팅 위탁계약서',
-    body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n           컨설팅 위탁계약서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n계약번호: {{계약번호}}\n\n위탁자: {{회사명}} (대표 {{대표자}})\n   소재지: {{주소}}\n   고용가입자: {{고용가입자수}}명 / 산재가입자: {{산재가입자수}}명\n\n수탁자: 푸른노무법인 (대표 권형하)\n\n제1조 (컨설팅 내용)\n   인사노무 컨설팅 일체\n\n제2조 (계약금액)\n   금 {{계약금액}}원 (부가세 별도)\n\n제3조 (수임담당)\n   주담당: {{주담당}}\n\n제4조 (계약기간)\n   {{계약일}} 부터 1년간\n\n2026.   .   .\n\n위탁자: {{회사명}}  대표자 {{대표자}} (인)\n수탁자: 푸른노무법인  대표자 권형하 (인)\n',
-    attachments:[], enabled:true, createdAt:'2026-04-01' },
-  { id:'fm-5', kind:'fund', name:'공동근로복지기금 설립지원 계약서',
-    body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n     공동근로복지기금 설립지원 계약서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n계약번호: {{계약번호}}\n\n위임인: {{회사명}} (대표 {{대표자}})\n수임인: 푸른노무법인\n\n제1조 (목적)\n   {{회사명}} 공동근로복지기금 설립인가 신청 및 운영 컨설팅\n\n제2조 (수임료)\n   금 {{계약금액}}원 (부가세 별도)\n\n제3조 (담당)\n   주담당노무사: {{주담당}}\n\n2026.   .   .\n\n위임인: {{회사명}} 대표자 {{대표자}} (인)\n수임인: 푸른노무법인 대표자 권형하 (인)\n',
-    attachments:[], enabled:true, createdAt:'2026-04-01' },
-  { id:'fm-6', kind:'other', name:'기타사업 (강의·교육) 계약서',
-    body:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n           강의(교육) 위탁계약서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n계약번호: {{계약번호}}\n\n위탁자: {{회사명}} (대표 {{대표자}})\n수탁자: 푸른노무법인\n\n제1조 (강의내용)\n\n\n제2조 (강의료)\n   금 {{계약금액}}원 (부가세 별도)\n\n제3조 (담당강사)\n   {{주담당}}\n\n제4조 (강의일)\n   {{계약일}}\n\n2026.   .   .\n\n위탁자: {{회사명}} 대표자 {{대표자}} (인)\n수탁자: 푸른노무법인 대표자 권형하 (인)\n',
-    attachments:[], enabled:true, createdAt:'2026-04-01' },
-  // ── 푸른노무법인 표준 양식 6종 (업체계약용) ──
-  { id:'fm-pr-advisory', kind:'company', name:'자문계약서 (푸른 표준)',
-    body:'                    자  문  계  약  서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑"이라 한다)과 푸른노무법인 (이하 "을"이라 한다)은\n   인사노무관리에 대하여 다음과 같이 자문계약을 체결한다.\n\n제1조 【계약의 성립】\n   갑은 을을 노무자문으로 위촉하고 노동관계법령 및 노사관계업무에 관한\n   지도, 상담 등의 사무를 위임하고, 을은 이를 신의와 성실로 공정하게\n   수행할 것을 승낙함으로써 본 계약은 성립한다.\n\n제2조 【자문보수】\n   ① 갑은 을에게 월 자문수수료 매월 금 {{계약금액}}원 (부가세 포함)을\n      지불한다.\n   ② 갑은 전항의 자문수수료를 월별로 해당 월의 자문료를 매월 ____일까지\n      지급한다.\n\n제3조 【특약보수】\n   ① 위임사무와 관련하여 실태조사, 자료수집 등 특별한 연구 및 서비스를\n      요하는 경우 또는 교육훈련을 행하는 경우에는 을은 자문보수 외 별도\n      보수를 청구할 수 있다.\n   ② 보수기준과 청구범위는 갑과 을이 상호 협의하여 정한다.\n\n제4조 【자료제공】\n   갑은 을이 위임사무를 처리하는데 필요한 자료에 적극 조력하며, 을은\n   갑이 제시한 자료의 범위 내에서 책임진다.\n\n제5조 【비밀엄수】\n   을은 본 계약기간 중 또는 만료 후라도 업무와 관련된 갑의 비밀을 정당한\n   이유 없이 타인에게 누설하지 않는다.\n\n제6조 【계약기간】\n   본 계약의 기간은 {{계약시작일}} 부터 {{계약종료일}} 까지 1년으로 하며\n   계약 만료일 1개월 전까지 명시적 의사 표시를 하지 않는 한 본 계약은\n   자동 연장되는 것으로 본다.\n\n제7조 【기한이익의 상실】\n   ① 갑이 임의로 계약을 해지하거나, 계약내용을 위반한 사무를 처리한 때에는\n      기한이익은 상실한다.\n   ② 전항에 의하여 기한이익이 상실된 경우 갑은 기 지불된 보수의 반환을\n      청구할 수 없으며, 계약기간까지의 자문보수도 을이 청구하면 지불한다.\n\n제8조 【기타】\n   ① 본 계약에 명시되지 아니한 사항은 일반관례에 따라 갑과 을이 상호\n      협의하여 결정한다.\n   ② 상기 사항을 증명하기 위하여 본 계약서 2통을 작성하여 각 1통씩 보관한다.\n\n   ※ 입금계좌: 하나은행 680-910005-45904 [푸른노무법인]\n\n                              {{계약일}}\n\n   갑   사업체명: {{회사명}}\n        주    소: {{주소}}\n        대 표 자: {{대표자}}                              (인)\n\n   을   사업소명: 푸른노무법인\n        주    소: 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층\n        대 표 자: 권 형 하                              (인)\n',
-    attachments:[], enabled:true, createdAt:'2026-05-08' },
-  { id:'fm-pr-payroll', kind:'company', name:'급여관리업무 위임계약서 (푸른 표준)',
-    body:'                급여관리업무 위임계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑"이라 한다)과 푸른노무법인 (이하 "을"이라 한다)은\n   민법 제680조에 의해 아래와 같이 위임계약을 체결하고 성실히 이행할 것을\n   약정한다.\n\n                          - 아 래 -\n\n제1조 【위임사무】\n   ① 갑은 을에게 갑의 회사 내 근로자의 급여관리업무를 위임한다.\n   ② 제1항의 급여관리업무란 갑의 급여대장 관리업무이다.\n   ③ 제1항의 급여관리업무에는 4대보험업무를 포함한다. 단, 을이 보험사무\n      대행기관 자격으로 수행할 수 없는 업무는 위임사무에서 제외한다.\n   ④ 제3항의 급여관리업무에는 {{회사명}}을(를) 포함한 부속사업장의 업무도\n      포함한다.\n\n제2조 【보수】\n   ① 갑은 을에게 제1조에서 정한 위임사무에 대한 보수로 매월 금 {{계약금액}}원\n      (부가세 포함)을 지불한다.\n   ② 갑은 을의 계좌로 제1항에 따른 비용을 지급하되, 지급일은 매월 ____일로\n      한다.\n   ③ 제1항의 월 보수액은 갑의 상시 근로자 수 및 사업장의 상황 등에 따라\n      계약기간 도중 혹은 연장시점에 인상될 수 있다. 인상 보수액은 갑과 을이\n      상호 합의하여 결정한다.\n\n제3조 【비용】\n   제1항의 위임사무를 처리하는데 있어서 특별히 소요되는 기타경비는 을이\n   부담한다.\n\n제4조 【자료제출 및 편의제공】\n   ① 갑은 위임사무를 원활히 수행하는데 필요한 각종 자료의 제출요구에 적극\n      조력하여야 하며 을은 갑이 제시한 자료에 따라 위임사무를 처리한다.\n   ② 갑은 위임사무의 원활한 수행에 필요한 시설물의 이용, 사무기기의 사용\n      등에 협조하여야 한다.\n\n제5조 【자료의 보관】\n   갑이 사무 처리를 위하여 제공한 서류와 자료는 위임사무가 종료된 때 갑의\n   요청에 의해 반환하는 것을 원칙으로 하고 반환요청이 없는 경우 을은 3년이\n   경과한 때 이를 폐기할 수 있다.\n\n제6조 【계약기간】\n   ① 위임사무를 수행하는 계약기간은 {{계약시작일}} 부터 {{계약종료일}} 까지로 한다.\n   ② 갑과 을 중 어느 일방이 계약기간 만료 전 1개월 이내에 본 계약과 관련하여\n      이의를 제기하지 아니하는 경우에는 동일 조건으로 1년간 계약을 연장하는\n      것으로 간주한다.\n\n제7조 【계약의 해지】\n   갑과 을이 본 약정서에 정한 의무를 이행하지 않을 때와 갑이 제공한 자료나\n   진술한 사항이 허위인 경우 또는 을이 위임사무를 고의로 지연시킨 경우에는\n   일방이 본 계약을 해지할 수 있다.\n\n제8조 【비밀 준수】\n   을은 위임사무를 통하여 지득한 갑의 비밀을 준수하여야 한다.\n\n제9조 【특약사항】\n   제2조 제2항에 명시한 업무 외의 노무관리업무로서 노동위원회 사건, 노동부\n   진정사건, 업무상 재해 등의 사건처리와 별도의 방문상담이 필요한 업무처리의\n   경우에는 갑은 을에게 별도의 비용을 지불한다.\n\n   본 약정의 성립을 증명하기 위하여 약정서 2부를 작성하여 서명 날인하여\n   계약당사자가 각각 1부씩 보관한다.\n\n                              {{계약일}}\n\n   갑   대 표 자: {{대표자}}        을   대 표 자: 권 형 하\n        주    소: {{주소}}              주    소: 충남 천안시 서북구\n                                                  원두정8길 6, 301호\n        업 체 명: {{회사명}} (인)        업 체 명: 푸른노무법인 (인)\n',
-    attachments:[], enabled:true, createdAt:'2026-05-08' },
-  { id:'fm-pr-pension', kind:'company', name:'국민연금 EDI 업무대행 신청서 (푸른 표준)',
-    body:'              국민연금 웹 EDI 업무대행 신청서\n\n                                                     계약번호: {{계약번호}}\n\n   접수번호: ______________   접수일: ______________   처리기간: 즉시\n\n┌─────────────────────────────────────────────┐\n│ [업무대행기관]                                              │\n│  사업장관리번호: 312-81-52792-0                            │\n│  사업장 명칭   : 푸른노무법인                              │\n│  소 재 지      : 충청남도 천안시 서북구 원두정8길 6, 3층  │\n│  사업자등록번호: 312-81-52792                              │\n│  법인등록번호  : 161571-0000304                            │\n│  사    용    자: 권 형 하  (생년월일: 1975.01.07)         │\n└─────────────────────────────────────────────┘\n\n┌─────────────────────────────────────────────┐\n│ [위탁사업장]                                                │\n│  사업장관리번호: {{사업자번호}}                            │\n│  사업장 명칭   : {{회사명}}                                │\n│  소 재 지      : {{주소}}                                  │\n│  사업자등록번호: {{사업자번호}}                            │\n│  법인등록번호  : ____________________                      │\n│  사    용    자: {{대표자}}  (생년월일: ______________)   │\n└─────────────────────────────────────────────┘\n\n[업무위탁 범위]\n   ▪ 자격의 취득 및 상실 신고\n   ▪ 내용변경 신고\n   ▪ 기준소득월액 변경 등 신고\n   ▪ 신고서 처리결과 및 보험료결정내역 확인\n\n   ※ 증명서 발급에 관한 사항은 업무대행 범위에 포함되지 않음\n\n   위탁사업장은 민법 제114조 규정에 따라 국민연금 웹 EDI 업무대행을 위탁하고,\n   업무대행기관은 대행기관으로서 제반 업무처리에 따른 법적 책임을 부담하며,\n   각 신청인은 개인정보의 부적정사용을 방지하기 위한 조치를 취하고 불법 유출\n   등으로 발생하는 손해배상 등에 대하여 연대하여 책임질 것을 서약하며 업무대행을\n   신청합니다.\n\n                              {{계약일}}\n\n   신청인 (업무대행기관 사용자):\n     푸른노무법인                                       (서명 또는 인)\n\n   신청인 (업무대행 위탁사업장 사용자):\n     {{대표자}}                                         (서명 또는 인)\n\n              국민연금공단  ○○○○ 지사장  귀하\n',
-    attachments:[], enabled:true, createdAt:'2026-05-08' },
-  { id:'fm-pr-health', kind:'company', name:'건강보험 EDI 업무대행 위임장 (푸른 표준)',
-    body:'              건강보험 EDI 업무대행 위임장\n\n                                                     계약번호: {{계약번호}}\n\n┌─────────────────────────────────────────────┐\n│ [업무대행기관]                                              │\n│  사업장관리번호: 312-81-52792-0                            │\n│  기 관 명      : 푸른노무법인                              │\n│  소 재 지      : 충청남도 천안시 서북구 원두정8길 6,      │\n│                  두정빌딩 301호 (전화: 041-556-0035)       │\n│  대 표 자      : 권 형 하                                  │\n│  주 민 번 호   : 750107-1******                            │\n└─────────────────────────────────────────────┘\n\n┌─────────────────────────────────────────────┐\n│ [위탁사업장]                                                │\n│  사업장관리번호 (단위사업장기호): {{사업자번호}}-0         │\n│  사 업 장 명   : {{회사명}}                                │\n│  소 재 지      : {{주소}}                                  │\n│  대 표 자      : {{대표자}}                                │\n│  주 민 번 호   : ______________                            │\n│  사업자등록번호: {{사업자번호}}                            │\n└─────────────────────────────────────────────┘\n\n[위임 업무 범위]\n   공단 웹 EDI 서비스 업무\n\n[작성 방법]\n   - 주민번호: 생년월일 + 성별까지 기재\n\n   민법 제114조(대리행위의 효력)의 규정에 의하여 위와 같이 건강보험 EDI\n   업무대행 대리인 위임을 신청합니다.\n\n                              {{계약일}}\n\n                  위임자: {{대표자}}                (서명 또는 인)\n\n              국민건강보험공단  ○○○○ 지사장  귀하\n',
-    attachments:[], enabled:true, createdAt:'2026-05-08' },
-  { id:'fm-pr-employment', kind:'company', name:'고용·산재 보험사무대행기관 사무위탁서 (푸른 표준)',
-    body:'              보험사무대행기관 사무위탁서\n\n                                                     계약번호: {{계약번호}}\n\n┌─────────────────────────────────────────────┐\n│ 사업장관리번호: {{사업자번호}}-0                           │\n│ 사업장명      : {{회사명}}                                 │\n│ 상시사용근로자수:           명                             │\n│ 소 재 지      : {{주소}}                                   │\n│ 전 화 번 호   : ________________                           │\n│ 대 표 자      : {{대표자}}                                 │\n│ 사업의 종류   : ________________                           │\n└─────────────────────────────────────────────┘\n\n[위탁사항]\n   □ 고용보험 및 산업재해보상보험 (임금채권 및 석면피해구제 포함) 관련 사무\n     1. 보수총액 및 근로자 고용정보 신고에 관한 사무\n     2. 보험료 신고에 관한 사무\n     3. 보험관계 성립, 변경, 소멸 등의 신고에 관한 사무\n     4. 기타 관계 법령 및 규칙 등에 의하여 사업주가 근로복지공단이나\n        지방고용노동관서에 신고 또는 보고하여야 할 보험사무\n     5. 피보험자격의 취득·상실 및 근로내역확인 신고 등 피보험자관리에\n        관한 사무 (고용보험에 한함)\n\n   ※ 보험사무대행기관이 상기 위탁사항의 처리에 필요한 정보를 근로복지공단\n     에서 제공받는 것에 동의함\n\n   사무처리 시작 연월일 (예정): {{계약일}}\n\n   위와 같이 귀 보험사무대행기관에 [√]고용보험 [√]산업재해보상보험\n   (임금채권 및 석면피해구제 포함) 사무의 처리를 위탁합니다.\n\n                              {{계약일}}\n\n   위탁사업주 주소: {{주소}}\n   위탁사업주 성명: {{대표자}}                          (서명 또는 인)\n\n              보험사무대행기관 대표  귀하\n\n   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n   [√]고용보험 [√]산업재해보상보험 관련 사무 수탁을 [√]승낙 [ ]불승낙 합니다.\n\n   불승낙 사유: ________________________________________\n\n   보험가입자 사업장관리번호: 2009-0049-00\n\n                              {{계약일}}\n\n   보험사무대행기관 명칭: 푸른노무법인\n   소 재 지            : 충청남도 천안시 서북구 원두정8길 6\n   대 표 자            : 권 형 하                       (서명 또는 인)\n\n              {{회사명}} 귀하\n',
-    attachments:[], enabled:true, createdAt:'2026-05-08' },
-  { id:'fm-pr-cms', kind:'company', name:'CMS 자동이체 이용신청서 (푸른 표준)',
-    body:'         계좌/신용카드 자동출금 이용신청서 (■신규 □변경 □해지)\n\n                                                     계약번호: {{계약번호}}\n\n※ 전자금융거래법 관련 규정(시행령 10조)에 의거, 자동이체 신청시에는 반드시\n   서면/공동인증서/녹취를 통한 예금주/카드주/휴대폰명의자 본인의 동의가\n   필요합니다.\n※ 신용카드 이용시 카드이용내역서상 카드사에 따라 결제대행기관인 나이스\n   또는 나이스(올더게이트)의 이름으로 청구될 수 있으며, 계좌출금 시에는\n   통장 내역에 수납기관이 지정한 통장기재내역으로 6자 이내 표시됩니다.\n\n◈ 수납기관 및 요금정보 (수납기관 기재란)\n   수납기관명    : 푸른노무법인\n   자동이체사유  : 월 자문료\n   금     액     : {{계약금액}}원\n   비     고     : 통장기재내역: 푸른노무법인\n\n◈ 납부자 정보 (수납기관 기재란)\n   납부자 번호 (고객번호): __________________\n   이체개시 년월         : {{계약시작일}}\n   지정 출금일           : 매월 ___일\n\n◈ 신청인 정보 입력\n   신청인 성명           : {{회사명}}\n   이 메 일             : {{대표이메일}}\n   주     소             : {{주소}}\n   연 락 처              : {{대표전화}}\n   휴대폰번호            : __________________\n\n   결제수단 선택         : ■ 계좌(CMS)  □ 신용카드\n                          *계좌이용시 휴대폰번호 등으로 개설된 평생계좌번호는\n                           이용 불가\n\n   은행명/카드사         : __________________\n   사업자번호            : {{사업자번호}}\n   예금주/카드주 본인명  : __________________\n   계좌/카드번호         : __________________\n   예금주/카드주 본인 주민번호 앞6자리: ______ - *******\n   카드유효기간          : ___/___ (월/년)  *카드 선택시\n\n※ 법인공용카드, 선불카드, 해외발행카드 등 일부 카드는 이용이 불가능할 수\n   있습니다.\n※ 연체, 잔액부족 등의 사유로 납부가 지연되는 경우가 발생하지 않도록 유의\n   하여 주십시오.\n\n[자동이체 서비스 이용 약관 / 개인정보 수집·이용동의 / 개인정보 취급위탁 /\n 문자(SMS) 발송 동의]\n   상기 자동이체 신청과 관련하여 계좌예금주/카드주로서 자동이체서비스\n   이용약관과 개인정보 수집 및 이용동의, 개인정보 취급 위탁에 동의,\n   문자(SMS) 발송에 동의하며, 자동출금이체서비스를 신청합니다.\n\n                              {{계약일}}\n\n   신청인               : {{대표자}}                  (인 또는 서명)\n   예금주/카드주 동의란 :                              (인 또는 서명)\n\n   * 신청인과 예금주/카드주가 상이한 경우에는 예금주/카드주의 동의가 필요\n     하며, 날인 또는 서명은 출금통장의 거래날인, 서명 사용\n',
-    attachments:[], enabled:true, createdAt:'2026-05-08' }
-];
-
-// ── 체당금 사건 양식 시드 (4종) ──
-var CASE_CHEDANG_FORMS = [
-  {
-    id:'fm-case-cd-01', kind:'case', groupName:'체당금',
-    name:'위임약정서-임금체불',
-    body: '위   임   약   정   서\n\n본    인 (위임인)\n  이름 : {{근로자명}}\n  주민번호 : {{주민번호}}\n  주소 : {{근로자주소}}\n  연락처 : {{근로자연락처}}\n  가족연락처(연락두절시) : {{가족연락처}}\n\n위임내용 : 미지급임금 등 체불 처리에 대한 일체의 사항 위임\n\n제1조[사건위임]\n  본인은 귀하에게 상기 사건의 처리에 관한 일체의 사항을 위임하고 대리사건에 관하여는 별도의 위임장에 기재된 권한을 귀하에게 수여한다.\n\n제2조[보수]\n  ① 본인은 사건처리를 위임함에 있어 착수금으로 금 {{착수금}}원(부가세포함)을 선지급한다.\n  ② 귀하는 착수금을 수령한 이후부터 위임사무를 개시한다.\n  ③ 착수금은 약정해지여부 및 사건처리결과에 관계없이 반환을 청구할 수 없으며 아래 제3조 성공보수지급시 공제하지 아니한다.\n\n제3조[성공보수]\n  ① 사건처리결과 성공한 때에는 총 수령금의 {{성공보수율}}(부가세포함)을 성공보수로 지급한다.\n\n제4조[사건을 성공으로 보는 경우] 다음의 경우에는 위임사무가 성공된 것으로 보고 제3조의 성공보수를 지급한다.\n  ① 위임사무 착수 후 본인이 귀하의 동의 없이 임의로 계약해지, 신청(청구)의 포기 및 취하, 화해한 때\n  ② 본인이 이 약정서에 정한 의무를 이행치 않거나 진술한 사실이 허위인 까닭에 귀하가 위임계약을 해지한 때\n  ③ 귀하의 책임없는 사유로 인하여 사건처리가 종결될 때\n\n제5조[자료제출]\n  본인은 위임사무를 원활히 행하는데 필요한 자료제출 요구에 적극 조력하며 귀하는 본인이 제시한 자료의 범위내에서 책임을 진다.\n\n제6조[인장사용] 본인은 위임사무의 필요한 범위에서 인장사용에 대하여 승인한다.\n\n제7조[자료의 보관]\n  ① 본인이 사무처리를 위하여 제공한 서류와 자료는 본인이 이 약정서에 정한 의무를 이행치 않을 때에 귀하가 이를 유치하여도 이의를 제기하지 않는다.\n  ② 위임사무가 종료된 때부터 3년이 경과한 때에는 귀하가 전항의 서류와 자료를 폐기하여도 이의를 제기하지 않는다.\n\n제8조[계약의 해지]\n  본인이 이 약정서에 정한 의무를 이행치 않을 때 또는 위임사무의 내용에 대하여 본인이 진술한 사실이 허위인 때에는 고의가 아닌 경우라도 귀하는 이 위임계약을 해제할 수 있다.\n\n제9조[성공보수 미지급시]\n  ① 위임인은 사건의 성공으로 금품을 지급받은 다음날부터 1주일 이내 수임인에게 성공보수를 지급한다.\n  ② 위임인이 수임인에게 성공보수를 지급하지 않은 경우 금품을 지급받은 다음날로부터 7일후 부터 연 15%의 이자를 지급한다.\n\n제10조[특별사항]\n  퇴직금등 기타 금액에 대하여 대리인이 위임인을 대신하여 수령할 수 있고, 이를 수령한 경우 성공보수를 제하고 위임인에게 지급할 수 있다.\n\n{{계약일}}\n\n위임인 :  {{근로자명}}                  (인)\n\n푸른노무법인 대표 권형하 노무사       (인)',
-    attachments:[], enabled:true, createdAt:'2026-05-08'
-  },
-  {
-    id:'fm-case-cd-02', kind:'case', groupName:'체당금',
-    name:'위임장',
-    body: '위        임        장\n\n사 무 소 명 : 푸른 노무법인\n소   재   지 : 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층\n연   락   처 : TEL 041-556-0035   FAX 041-556-3656\n이메일주소 : 370-6@daum.net\n\n성         명 : 대표 / 공인노무사   권 형 하\n                           공인노무사   박 한 별\n                           공인노무사   김 혜 민\n                           공인노무사   박 재 원\n\n상기인을 공인노무사법 제2조 제1항의 규정에 의하여 대리인으로 선임하고 아래 사항의 처리에 관한 일체의 권한을 위임합니다.\n\n---------------- 아         래 ----------------\n\n미지급임금 등 체불 처리에 대한 일체의 사항 위임\n\n{{계약일}}\n\n위임인 :  {{근로자명}}                  ( 서 명 )\n연락처 :  {{근로자연락처}}',
-    attachments:[], enabled:true, createdAt:'2026-05-08'
-  },
-  {
-    id:'fm-case-cd-03', kind:'case', groupName:'체당금',
-    name:'개인정보 제공 동의서',
-    body: '개인정보 제공 동의서\n\n성         명 : {{근로자명}}\n자 택 주 소 : {{근로자주소}}\n연   락   처 : {{근로자연락처}}\n\n1. 본인은 아래 내용에 대하여 사전에 충분히 인지하였으며, \'개인정보보호법\' 등에 의해 보호되고 있는 본인에 관한 아래 정보자료를 푸른노무법인에서 수집·이용하는 것에 동의합니다.\n\n[개인정보항목]\n  가. 성명\n  나. 주소, 이메일, 연락처\n  다. 학력, 근무경력, 등록번호\n  라. 기타 관련된 개인정보\n\n[수집·이용목적]\n  가. 회원서비스의 기초자료\n  나. 회비산출의 근거자료\n  다. 회원에 대한 추천 등 실적증명자료\n  라. 제도개선, 동향파악등 기초자료\n\n[보유기간] 가입 후 탈퇴시까지\n\n개인정보의 수집·이용에 대해 ( ■ 동의함  □ 동의하지 않음 )\n\n2. 본인은 상기 개인정보에 대한 동의와 별도로 아래의 민감정보와 고유식별정보를 수집·이용하는 것에 동의합니다.\n\n[민감정보 항목]\n  가. 신체장애\n  나. 국가보훈대상\n  다. 병력\n  라. 범죄경력\n\n[수집·이용목적]\n  가. 우선채용대상자격 및 정부지원금(장려금 등)\n  나. 인사이동, 업무적합성판단, 기타 인적자원관리\n\n민감정보 수집·이용에 대해 ( ■ 동의함  □ 동의하지 않음 )\n\n[고유식별정보 항목]\n  가. 주민등록번호(외국인의 경우 외국인등록번호)\n\n[수집·이용목적]\n  가. 개인정보식별\n  나. 자격확인\n\n고유식별정보의 수집·이용에 대해 ( ■ 동의함  □ 동의하지 않음 )\n\n{{계약일}}\n\n서명 또는 (인) :  {{근로자명}}',
-    attachments:[], enabled:true, createdAt:'2026-05-08'
-  },
-  {
-    id:'fm-case-cd-04', kind:'case', groupName:'체당금',
-    name:'효성CMS 자동이체 신청서',
-    body: '효성CMS 자동이체 신청서\n(금융기관 및 결제대행사(효성에프엠에스㈜) 제출용)\n\n◈ 수납업체 및 목적 (수납업체 기재란)\n  수납업체 : 푸른노무법인\n  수납목적 : 사무처리 수수료\n  대표자  : 권형하\n  사업자등록번호 : 312-81-52792\n  주소    : 충남 천안시 원두정8길 6. 두정빌딩 3층 301호\n\n◈ 자동이체 신청내용 (신청고객 기재란)\n\n[신청정보]\n  신청인       : {{근로자명}}\n  예금주와의 관계 : (본인)\n  연락처       : {{근로자연락처}}\n\n[납부금액]\n  □ 고정금액 (             원)\n  □ 변동(추가 계약내용에 따름)\n  납부일 : 매월        일\n  *미납시      일,      일 재출금\n\n[금융거래정보]\n  은행명     : \n  예금주     : {{근로자명}}\n  계좌번호   : \n  예금주 생년월일 (또는 사업자등록번호) :\n  예금주 휴대전화번호 :\n\n◇ 개인정보 수집 및 이용 동의 ◇\n  ◆ 수집 및 이용목적 : 효성CMS 자동이체를 통한 요금 수납\n  ◆ 수집항목 : 성명, 생년월일, 연락처, 은행명, 예금주명, 계좌번호, 예금주 휴대전화번호\n  ◆ 보유 및 이용기간 : 수집/이용 동의일부터 자동이체 종료일(해지일)까지\n  ◆ 신청자는 개인정보의 수집 및 이용을 거부할 수 있습니다. 단, 거부 시 자동이체 신청이 처리되지 않습니다.\n  동의함 ■    동의하지 않음 □\n\n◇ 개인정보 제3자 제공 동의 ◇\n  ◆ 개인정보를 제공받는 자 : 효성에프엠에스㈜, 금융기관, 통신사(SKT, KT, LGU+, CJ헬로비전)등\n  ◆ 자세한 내용은 홈페이지 게시 (www.efnc.co.kr / 제휴사 소개 메뉴 내)\n  ◆ 제공받는 자의 이용 목적 : 자동이체서비스 제공 및 자동이체 동의 사실 통지\n  ◆ 제공하는 개인정보의 항목 : 성명, 생년월일, 연락처, 은행명, 예금주명, 계좌번호, 예금주 휴대전화번호\n  ◆ 보유 및 이용기간 : 동의일부터 자동이체 종료일(해지일)까지. 단, 관계 법령에 의거 일정 기간 보관\n  ◆ 신청자는 개인정보 제3자 제공을 거부할 수 있습니다. 단, 거부 시 자동이체 신청이 처리되지 않습니다.\n  동의함 ■    동의하지 않음 □\n\n# 자동이체 동의여부 통지 안내 : 효성에프엠에스㈜ 및 금융기관은 안전한 서비스의 제공을 위하여 예금주 휴대전화번호로 자동이체 동의 사실을 SMS(또는 LMS)로 통지합니다.\n\n신청인(예금주)은 신청정보, 금융거래정보 등 개인정보의 수집·이용 및 제3자 제공에 동의하며 상기와 같이 효성CMS 자동이체를 신청합니다.\n\n{{계약일}}\n\n신청인 :  {{근로자명}}                       (인) 또는 서명\n(신청인과 예금주가 다를 경우) 예금주 :                      (인) 또는 서명\n\n[안내사항]\n1. 신청인과 예금주가 다른 경우 반드시 예금주의 별도 서명을 받아야 합니다.\n2. 인감 또는 서명은 출금통장의 사용인감 또는 서명을 사용해야 합니다.\n3. 기존 신청내용을 변경하고자 하는 경우에는 자동이체신청서를 신규로 작성하셔야 합니다.\n4. 신청가능은행 : 국민, 우리, 신한, 농협, 하나, SC, 기업, 외환, 씨티, 산업, 새마을, 부산, 대구, 경남, 광주, 전북, 제주, 수협, 신협, 우체국, 동양증권, 삼성증권',
-    attachments:[], enabled:true, createdAt:'2026-05-08'
-  }
-];
-
+// ============ 계약서 양식 (읽기만) ============
+/* 양식을 «고치는» 화면은 2026-09-26 에 문서관리 › 사무관리서류 › 계약서 양식으로 옮겼다
+   (대표 지시 「그대로 빼서 문서관리에 넣어 줄수 있나」 → 환경설정 칸은 「칸을없앤다」).
+   이알피는 「📄 계약서 출력」에서 «읽기만» 한다. 칸 목록·기본 양식·기본 양식 채우기는
+   js/pu-contract-forms.js 한 곳에 있다 — 두 곳에 두면 문서관리와 이알피가 서로 다른 양식을 본다. */
 function getContractForms(){
+  var removed = dbGet('contract_forms_removed', []) || [];
   var arr = dbGet('contract_forms', null);
   if(!arr || !Array.isArray(arr) || arr.length === 0){
-    dbSet('contract_forms', CONTRACT_FORM_SEED);
-    return CONTRACT_FORM_SEED.slice();
+    var seeded = PuContractForms.mergeSeeds([], removed).list;
+    dbSet('contract_forms', seeded);
+    return seeded.slice();
   }
-  // 사용자가 의도적으로 삭제한 시드 양식 ID (되살리지 않음)
-  var removedSeeds = dbGet('contract_forms_removed', []) || [];
-  var removedMap = {};
-  removedSeeds.forEach(function(rid){ removedMap[rid] = true; });
-  // 마이그레이션: 시드의 새 양식 ID가 저장본에 없으면 자동 추가 (사용자 수정본·삭제분은 보존)
-  var existingIds = {};
-  arr.forEach(function(f){ existingIds[f.id] = true; });
-  var added = 0;
-  CONTRACT_FORM_SEED.forEach(function(seed){
-    if(!existingIds[seed.id] && !removedMap[seed.id]){ arr.push(seed); added++; }
-  });
-  CASE_CHEDANG_FORMS.forEach(function(seed){
-    if(!existingIds[seed.id] && !removedMap[seed.id]){ arr.push(seed); added++; }
-  });
-  if(added > 0){ dbSet('contract_forms', arr); }
-  return arr;
-}
-
-function ContractFormModal(props){
-  useEscClose(props.onClose);
-  var init = props.cur || {
-    id:'fm-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-    kind: props.kind || 'consult',
-    name:'', body:'', attachments:[], enabled:true,
-    createdAt: todayYMD()
-  };
-  var s = useState(init); var f = s[0]; var setF = s[1];
-  function set(k){ return function(e){
-    var v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setF(function(prev){ return Object.assign({}, prev, (function(){var x={}; x[k]=v; return x;})()); });
-  }; }
-
-  // 본문에 변수 삽입
-  var bodyRef = useRef(null);
-  function insertVar(code){
-    var ta = bodyRef.current;
-    if(!ta){
-      setF(function(prev){ return Object.assign({}, prev, { body: prev.body + code }); });
-      return;
-    }
-    var start = ta.selectionStart || 0;
-    var end = ta.selectionEnd || 0;
-    var newBody = f.body.slice(0, start) + code + f.body.slice(end);
-    setF(function(prev){ return Object.assign({}, prev, { body: newBody }); });
-    setTimeout(function(){
-      ta.focus();
-      ta.selectionStart = ta.selectionEnd = start + code.length;
-    }, 0);
-  }
-
-  // 파일 첨부
-  function fileToBase64(file, cb){
-    var reader = new FileReader();
-    reader.onload = function(ev){ cb(ev.target.result); };
-    reader.readAsDataURL(file);
-  }
-  function onFileSelect(e){
-    var files = e.target.files; if(!files || files.length === 0) return;
-    var processed = 0;
-    var newAttachments = (f.attachments || []).slice();
-    for(var i=0; i<files.length; i++){
-      (function(file){
-        if(file.size > 1*1024*1024){ showToast(file.name + ': 1MB 초과'); processed++; return; }
-        fileToBase64(file, function(b64){
-          newAttachments.push({
-            id:'at-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5) + '-' + Math.random().toString(36).slice(2,5),
-            name: file.name, size: file.size, type: file.type, data: b64
-          });
-          processed++;
-          if(processed === files.length){
-            setF(function(prev){ return Object.assign({}, prev, { attachments: newAttachments }); });
-          }
-        });
-      })(files[i]);
-    }
-    e.target.value = '';
-  }
-  function removeAttachment(id){
-    setF(function(prev){ return Object.assign({}, prev, { attachments: (prev.attachments||[]).filter(function(a){ return a.id !== id; }) }); });
-  }
-
-  function save(){
-    if(!f.name){ showToast('양식 이름 입력'); return; }
-    if(!f.body){ showToast('본문 입력'); return; }
-    props.onSave(f);
-  }
-
-  var k = kindInfo(f.kind);
-
-  return h('div', { className:'modal-bg', onClick:props.onClose },
-    h('div', { className:'modal', style:{ width:'780px' }, onClick:function(e){ e.stopPropagation(); } },
-      h('div', { className:'modal-h' },
-        h('div', { className:'t' }, (props.cur ? '양식 수정' : '양식 추가') + ' - ' + k.icon + ' ' + k.label),
-        h('button', { className:'x', onClick:props.onClose }, '×')
-      ),
-      h('div', { className:'modal-b', style:{ maxHeight:'70vh', overflowY:'auto', padding:'16px' } },
-        // 양식 이름 + 그룹명 (사건계약일 때 그룹명 활용 - 체당금/해고/산재 등)
-        h('div', { style:{ display:'grid', gridTemplateColumns: f.kind==='case' ? '1fr 180px' : '1fr', gap:'10px', marginBottom:'10px' } },
-          h('div', null,
-            h('label', { style:{ display:'block', fontSize:'12px', fontWeight:600, color:'#475569', marginBottom:'4px' } }, '양식 이름 *'),
-            h('input', { type:'text', value:f.name, onChange:set('name'),
-              placeholder:'예: 위임약정서-임금체불',
-              style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } })),
-          f.kind === 'case' && h('div', null,
-            h('label', { style:{ display:'block', fontSize:'12px', fontWeight:600, color:'#475569', marginBottom:'4px' } }, '그룹명',
-              h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', marginLeft:'4px', fontWeight:400 } }, '(사건유형별 묶음)')),
-            h('input', { type:'text', value:f.groupName||'', onChange:set('groupName'),
-              placeholder:'체당금 / 해고 / 산재',
-              list:'case-form-groups',
-              style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } }),
-            h('datalist', { id:'case-form-groups' },
-              h('option', { value:'체당금' }), h('option', { value:'해고' }),
-              h('option', { value:'산재' }), h('option', { value:'체불' }),
-              h('option', { value:'징계' }), h('option', { value:'노사관계' })))
-        ),
-
-        // 사용여부
-        h('div', { className:'fld' },
-          h('label', { style:{ display:'flex', alignItems:'center', gap:'6px', cursor:'pointer' } },
-            h('input', { type:'checkbox', checked:f.enabled, onChange:set('enabled') }),
-            h('span', null, '활성 (계약서 출력 시 선택 가능)'))),
-
-        // 변수 가이드
-        h('div', { style:{ background:'#f8fafc', border:'1px solid #cbd5e1', borderRadius:'6px', padding:'10px 12px', marginBottom:'10px' } },
-          h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'6px' } }, '🔖 변수 (클릭하면 본문에 삽입됨)'),
-          h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px' } },
-            CONTRACT_FORM_VARS.map(function(v){
-              return h('button', { key:v.code, type:'button', onClick:function(){ insertVar(v.code); },
-                title: v.desc,
-                style:{ background:'#fff', color:'#1e40af', border:'1px solid #bfdbfe', padding:'2px 8px', borderRadius:'4px', fontSize:'10.5px', fontFamily:'monospace', cursor:'pointer' } },
-                v.code);
-            }))
-        ),
-
-        // 본문
-        h('div', { className:'fld' }, h('label', null, '본문 (HTML/텍스트, 변수 치환됨) *'),
-          h('textarea', { ref:bodyRef, value:f.body, onChange:set('body'),
-            placeholder:'예시:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          사건위임계약서\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n위임인: {{회사명}} (대표 {{대표자}})\n착수금: {{계약금액}}원\n주담당노무사: {{주담당}}\n계약일: {{계약일}}',
-            style:{ width:'100%', minHeight:'320px', padding:'10px 12px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'monospace', lineHeight:1.6, resize:'vertical' } })),
-
-        // 원본 파일 첨부
-        h('div', { className:'fld' }, h('label', null, '원본 파일 첨부 (HWPX/DOCX/PDF · 1MB 이하 · 다운로드용, 변수치환 불가)'),
-          h('div', {
-            onDrop:function(e){ e.preventDefault(); e.stopPropagation(); if(e.dataTransfer.files&&e.dataTransfer.files.length) onFileSelect({target:{files:e.dataTransfer.files}}); e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#cbd5e1'; },
-            onDragOver:function(e){ e.preventDefault(); e.currentTarget.style.background='#eff6ff'; e.currentTarget.style.borderColor='#2563eb'; },
-            onDragLeave:function(e){ e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#cbd5e1'; },
-            style:{ border:'1px dashed #cbd5e1', borderRadius:'6px', padding:'10px', background:'#f8fafc', transition:'all 0.15s' } },
-            h('label', { style:{ display:'inline-block', background:'#eff6ff', color:'#1e40af', padding:'5px 12px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', border:'1px solid #bfdbfe' } },
-              '+ 파일 추가 (드래그 가능)',
-              h('input', { type:'file', multiple:true, onChange:onFileSelect, style:{ display:'none' },
-                accept:'.hwpx,.hwp,.docx,.doc,.pdf' })),
-            (f.attachments || []).length === 0
-              ? h('div', { style:{ fontSize:'11px', color:'#94a3b8', marginTop:'6px' } }, '첨부된 파일 없음')
-              : h('div', { style:{ marginTop:'8px' } },
-                  (f.attachments || []).map(function(a){
-                    return h('div', { key:a.id,
-                      style:{ display:'flex', alignItems:'center', gap:'8px', padding:'5px 8px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'4px', marginBottom:'4px', fontSize:'11.5px' } },
-                      h('span', null, '📎'),
-                      h('span', { style:{ flex:1, color:'#1e293b' } }, a.name),
-                      h('span', { style:{ color:'#94a3b8', fontFamily:'monospace', fontSize:'10.5px' } }, (a.size/1024).toFixed(1) + 'KB'),
-                      /\.(hwp|hwpx)$/i.test(a.name||'') && h('button', { type:'button', title:'rhwp 원본 미리보기 + 정밀텍스트',
-                        onClick:function(){ rhwpOpenPreview({ dataUrl:a.data, name:a.name,
-                          onApplyText:function(t){ setF(function(prev){ return Object.assign({}, prev, { body: t }); }); } }); },
-                        style:{ background:'#f0fdf4', color:'#166534', border:'1px solid #bbf7d0', borderRadius:'4px', height:'22px', padding:'0 8px', fontSize:'11px', cursor:'pointer' } }, '🔍'),
-                      h('button', { type:'button', onClick:function(){ removeAttachment(a.id); },
-                        style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'4px', width:'22px', height:'22px', fontSize:'12px', cursor:'pointer' } }, '×')
-                    );
-                  })
-                )
-          ))
-      ),
-      h('div', { className:'modal-f' },
-        h('button', { className:'btn-secondary', onClick:props.onClose }, '취소'),
-        h('button', { className:'btn-primary', onClick:save }, '저장')
-      )
-    )
-  );
+  // 기본 양식 중 저장본에 없는 것만 더한다 (사람이 고친 것·지운 것은 그대로)
+  var m = PuContractForms.mergeSeeds(arr, removed);
+  if(m.added > 0){ dbSet('contract_forms', m.list); }
+  return m.list;
 }
 
 // ============ 계약 데이터 → 변수 치환 ============
@@ -37563,7 +37071,7 @@ function ContractFormPrintModal(props){
           ),
           formsInTab.length === 0
             ? h('div', { style:{ color:'#dc2626', fontSize:'12px', padding:'10px', background:'#fef2f2', borderRadius:'4px', border:'1px solid #fecaca' } },
-                '⚠ ' + kindInfo(kindTab).label + ' 양식 없음 - 환경설정에서 추가')
+                '⚠ ' + kindInfo(kindTab).label + ' 양식 없음 - 문서관리 › 사무관리서류 › 계약서 양식에서 추가')
             : h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'4px 10px', maxHeight:'160px', overflowY:'auto', border:'1px solid #e2e8f0', borderRadius:'4px', padding:'8px 10px', background:'#f8fafc' } },
                 formsInTab.map(function(f){
                   var checked = selectedIds.indexOf(f.id) >= 0;
@@ -37646,370 +37154,6 @@ function ContractFormPrintModal(props){
     )
   );
 }
-
-function ContractFormMasters(){
-  var existing = getContractForms();
-  var s = useState(existing); var forms = s[0]; var setForms = s[1];
-  var m = useState(null); var modal = m[0]; var setModal = m[1];
-  // 사건계약 그룹별 접기 state (key: groupName, value: true=접힘)
-  var cgS = useState({}); var collapsedGroups = cgS[0]; var setCollapsedGroups = cgS[1];
-  // 탭 state: 기본 첫 번째 kind
-  var tabS = useState(CONTRACT_KINDS[0] ? CONTRACT_KINDS[0].v : 'consult');
-  var activeTab = tabS[0]; var setActiveTab = tabS[1];
-  // 미리보기 state
-  var pvS = useState(null); var hoverForm = pvS[0]; var setHoverForm = pvS[1];
-  var ckS = useState(null); var clickedForm = ckS[0]; var setClickedForm = ckS[1];
-  var previewForm = clickedForm || hoverForm;
-  
-  // 미리보기 패널 너비 비율 state (왼쪽 %)
-  var pwS = useState(55); var leftPct = pwS[0]; var setLeftPct = pwS[1];
-  var isDraggingRef = { current: false };
-  function onResizerMouseDown(e){
-    e.preventDefault();
-    isDraggingRef.current = true;
-    var container = e.currentTarget.parentNode;
-    function onMove(ev){
-      if(!isDraggingRef.current) return;
-      var rect = container.getBoundingClientRect();
-      var newPct = Math.round(((ev.clientX - rect.left) / rect.width) * 100);
-      if(newPct >= 25 && newPct <= 80) setLeftPct(newPct);
-    }
-    function onUp(){
-      isDraggingRef.current = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }
-  function toggleGroup(g){
-    var nx = Object.assign({}, collapsedGroups); nx[g] = !nx[g]; setCollapsedGroups(nx);
-  }
-
-  function persist(arr){
-    setForms(arr);
-    if(!dbSet('contract_forms', arr)){
-      showToast('⚠️ 저장 실패: localStorage 용량 초과. 큰 첨부파일을 삭제하세요.');
-    }
-  }
-  function openAdd(kind){ setModal({ mode:'add', kind:kind, cur:null }); }
-  function openEdit(cur){ setModal({ mode:'edit', kind:cur.kind, cur:cur }); }
-  function close(){ setModal(null); }
-  function save(form){
-    if(modal.mode === 'add'){
-      persist(forms.concat([form]));
-      showToast('양식 추가됨');
-    } else {
-      persist(forms.map(function(x){ return x.id === form.id ? form : x; }));
-      showToast('수정됨');
-    }
-    close();
-  }
-  async function del(id){
-    var fm = forms.find(function(x){return x.id===id;});
-    if(!(await popConfirm('"' + (fm?fm.name:'') + '" 양식을 삭제하시겠습니까?'))) return;
-    var _ud=forms.slice();
-    // 시드 양식이면 삭제 기록(마이그레이션 자동복원 방지)
-    var isSeed = CONTRACT_FORM_SEED.concat(CASE_CHEDANG_FORMS).some(function(s){ return s.id === id; });
-    if(isSeed){
-      var rm = dbGet('contract_forms_removed', []) || [];
-      if(rm.indexOf(id) < 0){ rm.push(id); dbSet('contract_forms_removed', rm); }
-    }
-    persist(forms.filter(function(x){ return x.id !== id; }));
-    if(clickedForm && clickedForm.id===id) setClickedForm(null);
-    if(hoverForm && hoverForm.id===id) setHoverForm(null);
-    showToastUndo('🗑️ 양식 삭제됨', function(){
-      if(isSeed){
-        var rm2 = (dbGet('contract_forms_removed', []) || []).filter(function(x){ return x !== id; });
-        dbSet('contract_forms_removed', rm2);
-      }
-      persist(_ud);
-    });
-  }
-
-  // ── 양식 행 렌더 (그룹 헤더 행과 분리) ──
-  
-
-  // 체당금 시드 4개 강제 재등록
-  async function reseedChedang(){
-    if(!(await popConfirm('체당금 양식 4개를 새로 등록(또는 덮어쓰기)합니다.\n\n계속하시겠습니까?'))) return;
-    var existingIds = {};
-    forms.forEach(function(f){ existingIds[f.id] = true; });
-    var newForms = forms.slice();
-    var added = 0;
-    CASE_CHEDANG_FORMS.forEach(function(seed){
-      if(existingIds[seed.id]){
-        // 기존 항목 덮어쓰기
-        newForms = newForms.map(function(f){ return f.id === seed.id ? Object.assign({}, seed) : f; });
-      } else {
-        newForms.push(Object.assign({}, seed));
-        added++;
-      }
-    });
-    persist(newForms);
-    showToast(added>0 ? ('체당금 양식 '+added+'개 추가됨') : '체당금 양식 갱신됨');
-  }
-
-  function quickUpload(kind, files){
-    if(!files || files.length === 0) return;
-    var arr = Array.prototype.slice.call(files);
-    var processed = 0;
-    var newForms = forms.slice();
-    var warns = [];
-    showToast('📎 ' + arr.length + '개 파일 읽는 중...');
-    function done(){
-      processed++;
-      if(processed === arr.length){
-        persist(newForms);
-        showToast(arr.length + '개 양식 등록됨' + (warns.length ? (' · ' + warns.length + '개 본문추출 실패(첨부만 저장)') : ''));
-      }
-    }
-    arr.forEach(function(file){
-      if(file.size > 1*1024*1024){ showToast(file.name + ': 1MB 초과'); done(); return; }
-      var dataUrl = null, bodyText = null, step = 0;
-      function maybePush(){
-        step++;
-        if(step < 2) return;
-        var nameNoExt = file.name.replace(/\.[^.]+$/, '');
-        newForms.push({
-          id:'fm-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5) + '-' + Math.random().toString(36).slice(2,5),
-          kind: kind,
-          name: nameNoExt,
-          body: bodyText || '',
-          attachments: [{
-            id:'at-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5) + '-' + Math.random().toString(36).slice(2,5),
-            name: file.name, size: file.size, type: file.type, data: dataUrl
-          }],
-          enabled: true,
-          createdAt: todayYMD()
-        });
-        done();
-      }
-      var reader = new FileReader();
-      reader.onload = function(ev){ dataUrl = ev.target.result; maybePush(); };
-      reader.onerror = function(){ dataUrl = ''; maybePush(); };
-      reader.readAsDataURL(file);
-      extractTemplateText(file, function(text, err){
-        if(err){ warns.push(file.name); bodyText = ''; }
-        else bodyText = text;
-        maybePush();
-      });
-    });
-  }
-
-  function formsByKind(kindV){
-    return forms.filter(function(x){ return x.kind === kindV; });
-  }
-
-  // 양식 테이블 행 렌더 (마우스오버 시 미리보기)
-  function formRow(fm, idx, group){
-    var isClicked = clickedForm && clickedForm.id === fm.id;
-    var isHover = !isClicked && hoverForm && hoverForm.id === fm.id;
-    var bg = isClicked ? '#eff6ff' : (isHover ? '#eff6ff' : (idx%2===0 ? '#fff' : '#f8fafc'));
-    var borderLeft = isClicked ? '3px solid #2563eb' : (isHover ? '3px solid #bfdbfe' : '3px solid transparent');
-    return h('tr', { key:fm.id || idx,
-      onMouseEnter:function(){ setHoverForm(fm); },
-      onMouseLeave:function(){ setHoverForm(null); },
-      onClick:function(){ setClickedForm(isClicked ? null : fm); },
-      title: isClicked ? '클릭하여 고정 해제' : '클릭하면 고정됩니다',
-      style:{ background:bg, cursor:'pointer', borderLeft:borderLeft } },
-      h('td', { style:{ padding:'6px 8px', textAlign:'center', borderBottom:'1px solid #f8fafc' } },
-        h('span', { style:{ width:'8px', height:'8px', borderRadius:'50%', display:'inline-block',
-          background: fm.enabled !== false ? '#16a34a' : '#e2e8f0' } })
-      ),
-      h('td', { style:{ padding:'6px 8px', borderBottom:'1px solid #f8fafc', fontWeight:500, color:'#1e293b' } },
-        fm.name
-      ),
-      h('td', { style:{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #f8fafc', color:'#64748b', fontFamily:'monospace', fontSize:'10.5px' } },
-        fm.body ? (fm.body.length + '자') : '-'
-      ),
-      h('td', { style:{ padding:'6px 8px', textAlign:'center', borderBottom:'1px solid #f8fafc' } },
-        (fm.attachments && fm.attachments.length > 0)
-          ? h('span', { style:{ background:'#eff6ff', color:'#1e40af', fontSize:'10px', padding:'1px 6px', borderRadius:'8px', fontWeight:700 } }, fm.attachments.length + '개')
-          : h('span', { style:{ color:'#cbd5e1', fontSize:'10px' } }, '-')
-      )
-    );
-  }
-
-  return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
-    (function(){
-      return [
-        h('div', { key:'hdr', style:{ display:'flex', alignItems:'center', gap:'8px', userSelect:'none', marginBottom:'4px', padding:'6px 8px', borderRadius:'6px', border:'1px solid #e2e8f0', background:'#f8fafc' } },
-          h('h3', { style:{ margin:0 } }, '계약서 양식')
-        ),
-        h('div', { key:'desc', className:'desc' }, '계약유형(6종)별로 계약서 양식을 등록·관리합니다. 계약확정 후 [📄 계약서 출력] 시 이 양식이 사용됩니다. 변수 {{회사명}}, {{계약금액}} 등은 계약 데이터로 자동 치환됩니다.'),
-        h('div', { key:'body' },
-    h('div', { style:{ marginTop:'14px' } },
-      // ── 탭 버튼 행 ──
-      h('div', { style:{ display:'flex', gap:'0', borderBottom:'2px solid #e2e8f0', marginBottom:'0', overflowX:'auto' } },
-        CONTRACT_KINDS.map(function(k){
-          var on = activeTab === k.v;
-          var cnt = formsByKind(k.v).length;
-          return h('button', { key:k.v, type:'button',
-            onClick:function(){ setActiveTab(k.v); },
-            style:{ padding:'8px 18px', border:'none', borderBottom: on ? '2px solid '+k.color : '2px solid transparent',
-              marginBottom:'-2px', background:'transparent', color: on ? k.color : '#64748b',
-              fontWeight: on ? 700 : 500, fontSize:'12.5px', cursor:'pointer', whiteSpace:'nowrap',
-              display:'inline-flex', alignItems:'center', gap:'5px' } },
-            h('span', null, k.icon),
-            h('span', null, k.label),
-            h('span', { style:{ background: on ? k.color : '#e2e8f0', color: on ? '#fff' : '#64748b',
-              fontSize:'10px', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, cnt)
-          );
-        })
-      ),
-      // ── 탭 콘텐츠 ──
-      (function(){
-        var k = CONTRACT_KINDS.find(function(x){ return x.v === activeTab; });
-        if(!k) return null;
-        var list = formsByKind(k.v);
-        return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderTop:'none', borderRadius:'0 0 8px 8px', overflow:'hidden' } },
-          // 탭 헤더 (업로드 + 추가 버튼)
-          h('div', { style:{ background:'#f8fafc', borderBottom:'1px solid #e2e8f0', padding:'8px 14px', display:'flex', alignItems:'center', gap:'8px' } },
-            h('span', { style:{ fontSize:'13px' } }, k.icon),
-            h('span', { style:{ fontWeight:700, color:k.color, fontSize:'13px', flex:1 } }, k.label + ' 양식'),
-            h('label', { title:'📎 파일을 이 버튼 위로 끌어다 놓으면 업로드됩니다 (클릭해서 선택도 가능)\n· 지원 형식: HWPX · HWP · DOCX · DOC · PDF\n· 여러 개 한꺼번에 가능 · 파일당 최대 1MB',
-              onDragOver:function(e){e.preventDefault();e.currentTarget.style.background='#bbf7d0';},
-              onDragLeave:function(e){e.currentTarget.style.background='#f0fdf4';},
-              onDrop:function(e){
-                e.preventDefault(); e.currentTarget.style.background='#f0fdf4';
-                var files=e.dataTransfer&&e.dataTransfer.files;
-                if(files&&files.length) quickUpload(k.v, files);
-              },
-              style:{ background:'#f0fdf4', color:'#166534', border:'1px solid #bbf7d0', padding:'4px 10px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'4px' } },
-              '📎 파일 업로드',
-              h('input', { type:'file', multiple:true, style:{ display:'none' },
-                accept:'.hwpx,.hwp,.docx,.doc,.pdf',
-                onChange:function(e){ quickUpload(k.v, e.target.files); e.target.value=''; } })),
-            h('button', { onClick:function(){ openAdd(k.v); },
-              style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', padding:'4px 10px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer' } },
-              '+ 양식 추가'),
-            h('button', { onClick:rhwpUpdatePrompt, title:'rhwp 최신 버전 확인/업데이트',
-              style:{ background:'#f8fafc', color:'#64748b', border:'1px solid #cbd5e1', padding:'4px 10px', borderRadius:'4px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', marginLeft:'4px' } },
-              'rhwp v'+rhwpVer()+' ⟳'),
-            k.v === 'case' && h('button', { onClick:reseedChedang,
-              style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a', padding:'4px 10px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', marginLeft:'4px' } },
-              '📥 체당금 시드')
-          ),
-          // 탭 본문: 왼쪽 목록 + 드래그 핸들 + 오른쪽 미리보기
-          h('div', { style:{ display:'flex', flexDirection: window.innerWidth<=768?'column':'row', minHeight:'320px', userSelect: isDraggingRef.current ? 'none' : 'auto' } },
-            // 왼쪽: 양식 목록
-            h('div', { style:{ flex: window.innerWidth<=768?'none':('0 0 '+leftPct+'%'), width: window.innerWidth<=768?'100%':'auto', borderRight:'none', overflow:'auto', minWidth: window.innerWidth<=768?'0':'200px', maxHeight: window.innerWidth<=768?'40vh':'none' },
-              onDragOver:function(e){ if(e.dataTransfer&&e.dataTransfer.types&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')>=0){ e.preventDefault(); e.currentTarget.style.background='#f0fdf4'; } },
-              onDragLeave:function(e){ e.currentTarget.style.background=''; },
-              onDrop:function(e){ e.currentTarget.style.background=''; if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){ e.preventDefault(); e.stopPropagation(); quickUpload(k.v, e.dataTransfer.files); } } },
-              list.length === 0
-                ? h('div', { style:{ color:'#cbd5e1', fontSize:'11.5px', textAlign:'center', padding:'48px', border:'1px dashed #e2e8f0', margin:'16px', borderRadius:'4px' } }, '양식 없음 — 위 버튼으로 추가하세요')
-                : h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11.5px' } },
-                    h('thead', null,
-                      h('tr', { style:{ background:'#f8fafc', color:'#475569' } },
-                        h('th', { style:{ padding:'7px 8px', textAlign:'center', borderBottom:'1px solid #e2e8f0', fontWeight:700, width:'44px' } }, '상태'),
-                        h('th', { style:{ padding:'7px 8px', textAlign:'left', borderBottom:'1px solid #e2e8f0', fontWeight:700 } }, '양식명'),
-                        h('th', { style:{ padding:'7px 8px', textAlign:'right', borderBottom:'1px solid #e2e8f0', fontWeight:700, width:'60px' } }, '본문'),
-                        h('th', { style:{ padding:'7px 8px', textAlign:'center', borderBottom:'1px solid #e2e8f0', fontWeight:700, width:'44px' } }, '📎')
-                      )
-                    ),
-                    h('tbody', null,
-                      (function(){
-                        var rendered = [];
-                        var rowIdx = 0;
-                        if(k.v === 'case'){
-                          var sorted = list.slice().sort(function(a,b){ return (a.groupName||'미지정').localeCompare(b.groupName||'미지정'); });
-                          var prevGroup = null;
-                          sorted.forEach(function(fm){
-                            var g = fm.groupName || '미지정';
-                            if(g !== prevGroup){
-                              prevGroup = g;
-                              rendered.push(h('tr', { key:'g-'+g,
-                                style:{ background:'#f8fafc', cursor:'pointer' },
-                                onClick:function(){ toggleGroup(g); } },
-                                h('td', { colSpan:6, style:{ padding:'4px 8px', fontWeight:700, fontSize:'10.5px', color:'#64748b',
-                                  borderBottom:'1px solid #e2e8f0' } },
-                                  (collapsedGroups[g] ? '▶' : '▼') + ' 📁 ' + g + ' (' + sorted.filter(function(x){return (x.groupName||'미지정')===g;}).length + '건)'
-                                )
-                              ));
-                            }
-                            if(collapsedGroups[g]) return;
-                            rendered.push(formRow(fm, rowIdx++, g));
-                          });
-                        } else {
-                          list.forEach(function(fm){ rendered.push(formRow(fm, rowIdx++, null)); });
-                        }
-                        return rendered;
-                      })()
-                    )
-                  )
-            ),
-            // 드래그 리사이즈 핸들
-            h('div', {
-              onMouseDown: onResizerMouseDown,
-              title: '드래그하여 크기 조절',
-              style:{ display: window.innerWidth<=768?'none':'block', width:'6px', flexShrink:0, background:'#e2e8f0', cursor:'col-resize', position:'relative',
-                borderLeft:'1px solid #cbd5e1', borderRight:'1px solid #cbd5e1',
-                transition:'background .1s' },
-              onMouseEnter:function(e){ e.currentTarget.style.background='#bfdbfe'; },
-              onMouseLeave:function(e){ e.currentTarget.style.background='#e2e8f0'; }
-            },
-              h('div', { style:{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-                color:'#94a3b8', fontSize:'10px', letterSpacing:'1px', pointerEvents:'none' } }, '⋮')
-            ),
-            // 오른쪽: 미리보기 패널 (폰트 크기 leftPct에 따라 반응)
-            h('div', { style:{ flex:1, width: window.innerWidth<=768?'100%':'auto', padding:'14px', background:'#f8fafc', overflow:'auto', minWidth: window.innerWidth<=768?'0':'160px',
-              fontSize: window.innerWidth<=768 ? '12px' : (Math.max(9, Math.min(15, Math.round(7 + (100-leftPct)/8))) + 'px') } },
-              previewForm
-                ? h('div', null,
-                    h('div', { style:{ fontWeight:700, color:'#1e293b', marginBottom:'8px', fontSize:'12px', borderBottom:'1px solid #e2e8f0', paddingBottom:'6px', display:'flex', alignItems:'center', gap:'6px',
-                      background: clickedForm && clickedForm.id === previewForm.id ? '#eff6ff' : 'transparent',
-                      borderRadius:'4px', padding:'4px 6px 6px' } },
-                      h('span', { style:{ flex:1 } },
-                        (clickedForm && clickedForm.id === previewForm.id ? '📌 ' : '📄 ') + previewForm.name +
-                        (clickedForm && clickedForm.id === previewForm.id ? ' (고정됨)' : '')),
-                      h('button', { type:'button', onClick:function(){ openEdit(previewForm); },
-                        style:{ background:'#1e40af', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '수정'),
-                      h('button', { type:'button', onClick:function(){
-                          var copy = Object.assign({}, previewForm, { id:'fm-copy-'+Date.now(), name:previewForm.name+' (복사)' });
-                          persist(forms.concat([copy]));
-                          showToast('복제됨');
-                        },
-                        style:{ background:'#166534', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '복제'),
-                      h('button', { type:'button', onClick:function(){ del(previewForm.id); },
-                        style:{ background:'#dc2626', color:'#fff', border:'none', padding:'3px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '삭제')
-                    ),
-                    previewForm.attachments && previewForm.attachments.length > 0
-                      ? h('div', { style:{ marginBottom:'8px' } },
-                          previewForm.attachments.map(function(a, ai){
-                            return h('a', { key:ai, href:a.dataUrl, download:a.name,
-                              style:{ display:'inline-flex', alignItems:'center', gap:'4px', background:'#eff6ff', color:'#1e40af', padding:'3px 8px', borderRadius:'4px', fontSize:'10.5px', fontWeight:600, textDecoration:'none', marginRight:'4px', marginBottom:'4px' } },
-                              '📥 ' + a.name);
-                          })
-                        )
-                      : null,
-                    previewForm.body
-                      ? h('div', { style:{ display:'flex', justifyContent:'center' } },
-                          h('pre', { style:{ whiteSpace:'pre-wrap', fontFamily:'"Malgun Gothic","맑은 고딕",monospace', fontSize: Math.max(9, Math.min(15, Math.round(7 + (100-leftPct)/8))) + 'px', color:'#475569', lineHeight:1.8,
-                              background:'#fff', border:'1px solid #e2e8f0', borderRadius:'4px', padding:'20px 24px', margin:'0 auto', maxHeight:'500px', overflow:'auto',
-                              width: window.innerWidth<=768 ? '100%' : 'fit-content', minWidth: window.innerWidth<=768 ? '0' : '55%', maxWidth:'640px', boxSizing:'border-box' } },
-                            previewForm.body))
-                      : h('div', { style:{ color:'#94a3b8', fontSize:'11px', textAlign:'center', marginTop:'40px' } }, '본문 없음')
-                  )
-                : h('div', { style:{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', color:'#94a3b8', gap:'8px' } },
-                    h('span', { style:{ fontSize:'32px' } }, '👆'),
-                    h('span', { style:{ fontSize:'11.5px' } }, '양식 위에 마우스를 올리면'),
-                    h('span', { style:{ fontSize:'11.5px' } }, '미리보기가 표시됩니다')
-                  )
-            )
-          )
-        );
-      })()
-    ),
-
-    modal && h(ContractFormModal, { kind:modal.kind, cur:modal.cur, onSave:save, onClose:close })
-        )
-      ]; // end IIFE return array
-    })()
-  );
-}
-
 
 function PolicyMasters(){
   var ts = useState(0); var activeTab = ts[0]; var setActiveTab = ts[1];
