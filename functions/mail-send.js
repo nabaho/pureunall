@@ -129,12 +129,15 @@ const STYLE_OK = ['color','background-color','background','font-family','font-si
                   'letter-spacing','display'];
 
 /* 태그마다 남길 속성. 여기 없는 속성은 다 버린다(on* 손잡이가 여기서 걸러진다). */
-const TABLE_ATTR = ['style','width','height','align','valign','bgcolor',
+/* ★ class 는 2026-09-26 에 더했다 — 화면 크기별 규칙(@media)이 붙잡을 손잡이다.
+     ⚠ 값은 «우리 이름»(pu-…)만 남긴다(cleanClass). 남의 반 이름을 통과시켜 봐야
+       우리 규칙은 .pu- 만 고르므로 아무 일도 안 하지만, 안 남기는 편이 깨끗하다. */
+const TABLE_ATTR = ['style','class','width','height','align','valign','bgcolor',
                     'cellpadding','cellspacing','border','colspan','rowspan','role'];
 const ATTR_OK = {
   a:    ['href','style'],
   font: ['color','face','size','style'],
-  p:    ['style','align'], div: ['style','align'], span: ['style'],
+  p:    ['style','align'], div: ['style','class','align'], span: ['style'],
   ul:   ['style'], ol: ['style'], li: ['style'], blockquote: ['style'],
   b:['style'], strong:['style'], i:['style'], em:['style'],
   u:['style'], s:['style'], strike:['style'], sub:['style'], sup:['style'],
@@ -146,6 +149,13 @@ const ATTR_OK = {
      편지 폭을 넘는다. alt 는 그림이 안 뜰 때 대신 나오는 글자라 받는다. */
   img: ['src','width','height','alt','style']
 };
+
+/* 반 이름은 «우리 것»(pu-…)만 남긴다 — 화면 크기별 규칙이 붙잡는 손잡이다 */
+function cleanClass(v) {
+  return String(v == null ? '' : v).split(/\s+/)
+    .filter(function (c) { return /^pu-[a-z0-9-]{1,20}$/.test(c); })
+    .slice(0, 4).join(' ');
+}
 
 /* style 한 줄에서 허용한 속성만 남긴다. url( 이 있으면 그 style 을 통째로 버린다 —
    바깥 그림을 불러오면 「언제 읽었나」가 남의 서버에 새 나간다. */
@@ -170,17 +180,85 @@ function cleanHref(v) {
   return /^(https?:\/\/|mailto:)/i.test(s) ? s.replace(/"/g, '&quot;') : '';
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   <style> 가운데 «화면 크기별 규칙»만 되살린다 (2026-09-26)
+   ══════════════════════════════════════════════════════════════════════════
+   위 sanitizeHtml 의 주석에 까닭을 적어 두었다. 여기서는 «어떻게» 만 본다.
+   ⚠ 통과 못 하는 것은 조용히 버린다 — 반만 통과시키면 무너진 CSS 가 나간다.
+   ⚠ 우리가 붙이는 반 이름은 모두 pu- 로 시작한다(js/pu-news-tpl.js).
+     남의 편지에는 그런 반 이름이 없으므로 이 문으로는 아무것도 못 한다. */
+const 반이름 = /^\.pu-[a-z0-9-]{1,20}$/;
+function 꾸밈한줄(본문) {
+  const out = [];
+  String(본문 || '').split(';').forEach(function (part) {
+    const i = part.indexOf(':');
+    if (i < 0) return;
+    const k = part.slice(0, i).trim().toLowerCase();
+    let val = part.slice(i + 1).trim();
+    if (!val || STYLE_OK.indexOf(k) < 0) return;
+    /* !important 는 값이 아니라 «세기»다 — 떼어 보고 다시 붙인다 */
+    let 세게 = '';
+    const m = /^([\s\S]*?)\s*!\s*important$/i.exec(val);
+    if (m) { val = m[1].trim(); 세게 = ' !important'; }
+    if (!val || /url\s*\(|expression\s*\(|[<>{}]/i.test(val)) return;
+    out.push(k + ':' + val + 세게);
+  });
+  return out.join(';');
+}
+function 안전한스타일(html) {
+  const 덩이 = String(html || '').match(/<style\b[^>]*>([\s\S]*?)<\/style>/i);
+  if (!덩이) return '';
+  const 속 = 덩이[1];
+  if (/@import|expression\s*\(|url\s*\(/i.test(속)) return '';
+  const 살림 = [];
+  /* @media (…) { …규칙들… } — 중괄호가 한 겹이라 이 꼴이면 충분하다 */
+  const 미디어 = /()([\s\S]*)/g;
+  let m;
+  while ((m = 미디어.exec(속))) {
+    const 조건 = m[1].trim();
+    /* 조건도 좁게 — 화면 폭을 보는 것만 받는다(장치·인쇄 규칙은 안 받는다) */
+    if (!/^(only\s+screen\s+and\s+)?\(\s*max-width\s*:\s*\d{2,4}px\s*\)$/i.test(조건)) continue;
+    const 규칙들 = [];
+    const 규칙 = /([^{}]+)\{([^{}]*)\}/g;
+    let r;
+    while ((r = 규칙.exec(m[2] + '}'))) {
+      const 고르개 = r[1].trim();
+      if (!고르개.split(',').every(function (x) { return 반이름.test(x.trim()); })) continue;
+      const 몸 = 꾸밈한줄(r[2]);
+      if (몸) 규칙들.push(고르개 + '{' + 몸 + '}');
+    }
+    if (규칙들.length) 살림.push('@media ' + 조건 + '{' + 규칙들.join('') + '}');
+  }
+  return 살림.length ? '<style>' + 살림.join('') + '</style>' : '';
+}
+
 /* 허용한 서식만 남긴다. 모르는 태그는 «글자는 살리고 태그만» 버린다 —
    태그와 함께 글자까지 버리면 편지 내용이 사라진다. */
 function sanitizeHtml(v) {
   let s = String(v == null ? '' : v);
   if (!s) return '';
-  /* script·style 은 안의 글자까지 지운다. 태그만 지우면 코드가 글자로 남는다. */
+  /* ★★ 폰에서 글자가 작지 않게 — «화면 크기별 규칙»만 통과시킨다 (대표 지시 2026-09-26
+       「폰에서 글자가 작다」)
+     ═══════════════════════════════════════════════════════════════════════
+     편지는 980px 고정 표다. 폰은 그것을 통째로 줄여 보여 주므로 글자가 38% 로 작아진다.
+     줄이지 않게 하는 길은 «@media» 하나뿐이다 — 아웃룩은 @media 를 모르므로
+     데스크톱 모습은 한 글자도 안 바뀌고, 폰·웹메일만 칸을 쌓아 폭에 맞춘다.
+   ⚠⚠ 그래도 <style> 은 여전히 «거의 다» 버린다. 통과하는 것은 아래 셋을 모두 지킬 때뿐:
+       ① @media 블록 «안»에 있는 규칙만 (밖에 있으면 데스크톱까지 덮는다)
+       ② 고르개가 «우리가 붙인 반 이름»(.pu-…)일 때만 — 남의 편지를 그대로 전달할 때
+          그쪽 style 이 우리 편지를 건드리지 못한다
+       ③ 값은 inline 과 «같은 잣대»(STYLE_OK) — url()·expression() 은 그대로 막는다
+     ⚠ 이 문을 넓히지 말 것. 넓히는 순간 「받은 것 그대로 전달」로 들어온 남의 CSS 가
+       우리 편지를 덮는다(글을 숨기거나 남의 서버 그림을 부른다). */
+  const 살린꾸밈 = 안전한스타일(s);
   s = s.replace(/<\s*(script|style|iframe|object|embed|template)\b[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
   s = s.replace(/<\s*(script|style|iframe|object|embed|template)\b[^>]*>/gi, '');
   s = s.replace(/<!--[\s\S]*?-->/g, '');
 
-  return s.replace(/<\s*(\/?)\s*([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g,
+  /* ⚠⚠ 되살린 꾸밈은 «태그 거르개를 지난 뒤»에 붙인다. 먼저 붙이면 아래 거르개가
+       <style> 을 다시 버리면서 «속 CSS 를 글자로» 남긴다 — 편지 맨 위에
+       @media only screen… 이 그대로 보인다(2026-09-26 에 실제로 그렇게 됐다). */
+  return 살린꾸밈 + s.replace(/<\s*(\/?)\s*([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g,
     function (whole, slash, rawName, rawAttrs) {
       const name = rawName.toLowerCase();
       if (HTML_OK.indexOf(name) < 0) return '';        // 태그만 버리고 글자는 남긴다
@@ -222,6 +300,7 @@ function sanitizeHtml(v) {
         const val = m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : m[5]);
         if (allow.indexOf(k) < 0) continue;
         if (k === 'style') { const cs = cleanStyle(val); if (cs) keep.push('style="' + cs + '"'); continue; }
+        if (k === 'class') { const cc = cleanClass(val); if (cc) keep.push('class="' + cc + '"'); continue; }
         if (k === 'href')  { const hf = cleanHref(val);  if (hf) keep.push('href="' + hf + '"');  continue; }
         if (/[<>"]/.test(val)) continue;
         keep.push(k + '="' + val + '"');
@@ -315,6 +394,6 @@ module.exports = {
   MAX_TOTAL_BYTES, MAX_TO, MAX_SUBJECT,
   isEmail, parseRecipients, cleanSubject, dataUrlBytes,
   toAttachment, validateSend, sentLogRec, sizeError,
-  sanitizeHtml, htmlToText, cleanStyle, cleanHref,
+  sanitizeHtml, htmlToText, cleanStyle, cleanHref, cleanClass, 안전한스타일,
   HTML_OK, STYLE_OK, SIGN_IMG_OK
 };
