@@ -899,6 +899,21 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
 #rcEditCard.rh-wide #docxEditor{max-height:calc(100vh - 210px)}
 /* 평소에도 너무 짧지 않게 — 한글 편집기는 최소 한 쪽은 보여야 한다 */
 #rhwpEditor{min-height:520px}
+/* ── 🗖 한글 편집기를 «큰 창»으로 (대표 지시 2026-09-26 「너무 내려왔다」) ──────────
+   편집기는 제 도구줄·눈금자·상태줄을 다 들고 온다. 그 위에 우리 탭줄·막대까지 쌓이니
+   실측 1080 화면에서 종이가 보이는 자리가 450px 밖에 안 남았다.
+   ⚠★ 틀(iframe)을 DOM 에서 «옮기지 않는다» — 옮기면 브라우저가 문서를 다시 읽어
+     고치던 것이 통째로 사라진다(만든 쪽 문서에 그렇게 적혀 있다). 그래서 «자리»는
+     그대로 두고 옷(class)만 갈아입힌다. */
+#rhHwpEd.rh-ed-big{position:fixed;inset:0;z-index:80;margin:0;padding:7px 9px;gap:6px;
+  background:var(--card);box-shadow:0 0 0 100vmax rgba(10,20,40,.35)}
+#rhHwpEd.rh-ed-big #rhHwpEdBox{flex:1;min-height:0;border-radius:6px}
+/* 좁은 막대에 긴 안내문은 자리를 먹는다 — 큰 창에서는 접는다 */
+#rhHwpEd.rh-ed-big .rh-ed-note{display:none}
+/* ⛶ 전체 화면 — 브라우저가 크기를 준다. 여기서만 한글 단축키를 온전히 쓸 수 있다 */
+#rhHwpEd:fullscreen{background:var(--card);padding:6px 8px}
+#rhHwpEd:fullscreen #rhHwpEdBox{flex:1;min-height:0}
+#rhHwpEd:fullscreen .rh-ed-note{display:none}
 /* ⚠ 한글 서식만 따로 폭을 풀던 규칙도 뺐다 — .page 가 이미 가로를 다 쓴다 */
 /* ── 개인정보보관을 한 화면에 ──
    대표 요청(2026-08-29): 「개인정보관리 한 화면에 모든 부분 볼 수 있게」,
@@ -1481,8 +1496,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <div id="rhHwpEd" style="display:none;flex-direction:column;gap:8px">
                   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     <button class="btn primary" type="button" onclick="rhHwpEdSave()">💾 고친 것 되받기</button>
+                    <button class="btn" type="button" id="rhEdBigBtn" onclick="rhHwpEdBig()" title="편집기를 화면 통째로 폅니다 — 종이가 다 보입니다">🗖 큰 창</button>
+                    <button class="btn" type="button" id="rhEdFullBtn" onclick="rhHwpEdFull()" title="모니터를 통째로 씁니다. 여기서만 Ctrl+S·Ctrl+W 같은 한글 단축키를 브라우저가 안 가로챕니다">⛶ 전체 화면</button>
+                    <button class="btn" type="button" onclick="rhHwpEdKeys()" title="이 편집기가 아는 한글 단축키를 모두 보여 줍니다">⌨ 단축키</button>
                     <button class="btn" type="button" onclick="rhSetMode('in')">← 입력판으로</button>
-                    <span style="font-size:11.5px;color:var(--text-mute)">고치신 뒤 <b>되받기</b>를 눌러야 반영됩니다 · 편집기는 이 PC 안에서만 돕니다</span>
+                    <span class="rh-ed-note" style="font-size:11.5px;color:var(--text-mute)">고치신 뒤 <b>되받기</b>를 눌러야 반영됩니다 · 편집기는 이 PC 안에서만 돕니다</span>
                   </div>
                   <div id="rhHwpEdBox" style="flex:1;min-height:70vh;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff"></div>
                 </div>
@@ -12005,9 +12023,17 @@ function rhSetMode(m){
     if(sheet) sheet.style.display='none';
     if(ed) ed.style.display='none';
     if(pair) pair.classList.remove('kf-both');
+    /* ★ 한글 편집은 «큰 창»으로 연다 — 이것이 기본이다(대표 지시 2026-09-26
+       「너무 내려왔다」). 「⤡ 작게」로 줄여 두시면 그 뜻을 기억한다.
+       ⚠ 여는 «뒤»에 편다 — rhHwpEdOpen 은 앞머리에서 rhHwpEdClose 를 부르고
+         그것이 큰 창을 거둔다. 순서를 바꾸면 펴자마자 도로 접힌다. */
     _safe(rhHwpEdOpen);
+    _safe(function(){ rhEdBigSet(_rhEdBigWant); });
     return;
   }
+  /* ⚠ 한글 편집에서 나가면 큰 창도 «반드시» 거둔다 — 안 거두면 화면 잠금(overflow:hidden)이
+     남아 아래 목록이 안 굴러간다 */
+  _safe(function(){ rhEdBigSet(false); });
   /* 나란히 — 왼쪽 입력판, 오른쪽 한글. 친 값이 실제로 어떻게 들어갔는지 바로 견준다 */
   if(pair) pair.classList.toggle('kf-both', m==='both');
   if(sheet) sheet.style.display = (m==='hwp')?'none':'flex';
@@ -12088,6 +12114,9 @@ async function rhHwpEdOpen(){
 function rhHwpEdClose(){
   if(_rhHwpEd){ try{ _rhHwpEd.destroy(); }catch(e){} }
   _rhHwpEd=null; _rhHwpEdFor='';
+  /* ⚠ 큰 창·전체 화면을 남기지 않는다 — 편집기가 없는데 검은 화면만 남으면 막다른 길이다 */
+  try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+  _safe(function(){ rhEdBigSet(false); });
   var box=document.getElementById('rhHwpEdBox'); if(box) box.innerHTML='';
   _hwpEdForget();                       /* ⚠ 거둔 «뒤»에 지운다 — 브라우저에 서류를 남기지 않는다 */
 }
@@ -12104,6 +12133,104 @@ async function rhHwpEdSave(){
   var 이름=rhCleanName((_rhBase&&_rhBase.name)||'양식','');
   await rhAdoptBase(new File([bytes], 이름, {type:'application/hwp+zip'}));
   toast('✅ 고치신 것이 이제 바탕입니다 — 입력판에서 이어서 치실 수 있습니다');
+}
+
+/* ── 🗖 큰 창 · ⛶ 전체 화면 · ⌨ 단축키 (대표 지시 2026-09-26) ──────────────────
+   「한글편집화면 너무 내려왔다. 팝업창으로 크게 볼수 있게 해달라.
+     한글단축키와 똑같이 사용할 수 있도록 해달라.」
+
+   ⚠★ «따로 뜨는 창»(window.open)으로는 못 한다 — 재어 보고 알았다.
+     편집기(rhwp-studio)는 제 «부모 문서»가 보낸 것만 받는다
+     (`if(i.source!==e.parentWindow) …` — 실측: 딴 문서에 심으니 편집기는 멀쩡히 떴는데
+      악수(rhwp-connect)가 통째로 무시돼 서류를 넣지도 받지도 못했다).
+     그래서 «같은 문서 안에서» 화면을 통째로 덮는다. 전체 화면은 브라우저 껍데기까지
+     사라지므로 따로 뜨는 창보다 오히려 넓다.
+   ⚠★ 틀(iframe)을 DOM 에서 옮기지 않는다 — 옮기면 브라우저가 문서를 다시 읽어
+     고치던 것이 사라진다. 자리는 그대로 두고 «옷(class)»만 갈아입힌다. */
+var _rhEdBig=false, _rhEdBigWant=true, _rhEdEsc=null, _rhEdFsBound=false;
+/* 브라우저가 늘 가로채는 키 — 전체 화면에서만 «되찾아» 한글에게 준다 */
+var RH_ED_LOCK_KEYS=['KeyW','KeyN','KeyT','KeyP','KeyS','KeyD','F1','F3','F5','F6','F7','F11','Escape'];
+function rhEdBigSet(on){
+  var el=document.getElementById('rhHwpEd'); if(!el) return;
+  _rhEdBig=!!on;
+  el.classList.toggle('rh-ed-big', _rhEdBig);
+  document.body.style.overflow=_rhEdBig?'hidden':'';
+  var b=document.getElementById('rhEdBigBtn'); if(b) b.textContent=_rhEdBig?'⤡ 작게':'🗖 큰 창';
+  /* ⚠ 큰 창은 다른 것을 다 덮는다 — 나갈 길(Esc)이 «늘» 있어야 한다.
+     전체 화면 중의 Esc 는 브라우저가 쓰므로 그때는 비켜 준다.
+     ⚠ 듣는 사람은 한 번만 붙인다 — 누를 때마다 붙으면 쌓인다. */
+  if(_rhEdBig && !_rhEdEsc){
+    _rhEdEsc=function(e){ if(e.key==='Escape' && !document.fullscreenElement) rhEdBigSet(false); };
+    document.addEventListener('keydown', _rhEdEsc);
+  } else if(!_rhEdBig && _rhEdEsc){
+    document.removeEventListener('keydown', _rhEdEsc); _rhEdEsc=null;
+  }
+}
+function rhHwpEdBig(){ _rhEdBigWant=!_rhEdBig; rhEdBigSet(_rhEdBigWant); }
+/* 전체 화면을 드나들 때 뒤처리 — 잠근 키를 «반드시» 푼다.
+   ⚠ 안 풀면 전체 화면을 나온 뒤에도 Ctrl+W 가 브라우저에 안 간다. */
+function _rhEdFsWatch(){
+  if(_rhEdFsBound || typeof document.addEventListener!=='function') return;
+  _rhEdFsBound=true;
+  document.addEventListener('fullscreenchange', function(){
+    var 안=!!document.fullscreenElement;
+    if(!안){ try{ navigator.keyboard && navigator.keyboard.unlock && navigator.keyboard.unlock(); }catch(e){} }
+    var b=document.getElementById('rhEdFullBtn'); if(b) b.textContent=안?'⤡ 전체 화면 끄기':'⛶ 전체 화면';
+  });
+}
+async function rhHwpEdFull(){
+  var el=document.getElementById('rhHwpEd'); if(!el) return;
+  if(document.fullscreenElement){ try{ await document.exitFullscreen(); }catch(e){} return; }
+  _rhEdFsWatch();
+  if(!_rhEdBig) rhEdBigSet(true);        /* 큰 창을 거쳐 간다 — 나올 때 자리가 맞는다 */
+  try{ await el.requestFullscreen(); }
+  catch(e){ toast('전체 화면으로 못 갑니다 — '+String(e&&e.message||e)); return; }
+  var 잠금=false;
+  try{
+    if(navigator.keyboard && navigator.keyboard.lock){
+      await navigator.keyboard.lock(RH_ED_LOCK_KEYS); 잠금=true;
+    }
+  }catch(e){ 잠금=false; }
+  /* ⚠ 무엇이 되고 무엇이 안 되는지 «말한다» — 조용하면 「단축키가 안 된다」로 읽힌다 */
+  toast(잠금
+    ? '⛶ 전체 화면 — 한글 단축키를 그대로 쓰십니다(Ctrl+W·Ctrl+N 까지). 나오시려면 Esc 를 «길게» 누르세요'
+    : '⛶ 전체 화면 — Ctrl+S·Ctrl+B 같은 키는 한글로 갑니다. 다만 Ctrl+W·Ctrl+N 은 이 브라우저가 내주지 않습니다', 6000);
+}
+/* ⌨ 이 편집기가 «실제로» 아는 단축키를 그대로 보여 준다.
+   ⚠★ 목록을 여기 손으로 적지 말 것 — 편집기가 바뀌면 그 자리에서 거짓말이 된다.
+     편집기에게 물어(commands.list) 돌아온 것만 그린다. */
+async function rhHwpEdKeys(){
+  var ed=_rhHwpEd||_hwpViewEd;
+  if(!ed){ toast('편집기가 열려 있지 않습니다'); return; }
+  var cmds=null;
+  try{ cmds=await ed.commands.list(); }
+  catch(e){ toast('단축키를 물어보지 못했습니다 — '+String(e&&e.message||e)); return; }
+  var 있는=(cmds||[]).filter(function(c){ return c && c.shortcutLabel && c.label; });
+  if(!있는.length){ toast('이 편집기는 단축키를 알려 주지 않습니다'); return; }
+  var old=document.getElementById('rhEdKeys'); if(old) old.remove();
+  var d=document.createElement('div'); d.id='rhEdKeys';
+  d.style.cssText='position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.45);display:flex;'
+    +'align-items:center;justify-content:center;padding:20px';
+  var 줄=있는.map(function(c){
+    return '<div style="display:flex;justify-content:space-between;gap:14px;padding:5px 0;'
+      +'border-bottom:1px solid var(--border)"><kbd style="background:var(--hover);'
+      +'border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:11.5px;'
+      +'font-family:monospace;white-space:nowrap">'+escapeHtml(c.shortcutLabel)+'</kbd>'
+      +'<span style="font-size:12.5px;text-align:right">'+escapeHtml(c.label)+'</span></div>';
+  }).join('');
+  d.innerHTML='<div style="background:var(--card);color:var(--text);border-radius:14px;'
+    +'padding:18px 20px;max-width:520px;width:100%;max-height:82vh;overflow:auto;'
+    +'box-shadow:0 20px 60px rgba(0,0,0,.4)">'
+    +'<div style="font-weight:700;font-size:15px;margin-bottom:4px;color:var(--navy)">'
+    +'⌨ 한글 단축키 '+있는.length+'개</div>'
+    +'<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:10px;line-height:1.6">'
+    +'편집기 안에서 그대로 누르시면 됩니다. <b>Ctrl+W·Ctrl+N·Ctrl+T</b> 처럼 브라우저가 늘 '
+    +'가져가는 키는 <b>⛶ 전체 화면</b>에서만 한글로 갑니다.</div>'
+    +줄
+    +'<div style="text-align:right;margin-top:12px">'
+    +'<button class="btn sm" onclick="document.getElementById(\'rhEdKeys\').remove()">닫기</button></div></div>';
+  d.onclick=function(e){ if(e.target===d) d.remove(); };
+  document.body.appendChild(d);
 }
 
 /* 입력판을 그린다 — 서식을 열 때 칸 지도와 함께 만들어진다 */
