@@ -19,6 +19,9 @@
       FinancialTransaction:'입출금', Invoice:'세금계산서', Document:'문서',
       MediaAsset:'사진·첨부', Message:'메일·알림', PayrollRecord:'임금기록',
       Policy:'규정·정책', Submission:'제출·전자송부',
+      /* 취업규칙 검토의 두 끝 (2026-09-26) — 우리 검토 기준 92개와, 그것이 기대는 법 조문.
+         둘 다 업무 기록이 아니라 «참고표» 다(js/pu-rules-lawlink.js). 저장 자리가 없다. */
+      ReviewCriterion:'검토 기준', LegalProvision:'법령 조문',
       /* ⚠ 업무 자료가 아니다 — 「그 사람이 어느 탭·어느 달을 보고 있었나」뿐이다.
          관계 색인에 넣지 않는다(푸른 캘린더의 읽기 어댑터가 in_app 인 까닭). */
       ViewState:'보던 자리'
@@ -41,6 +44,7 @@
       forOrganization:['Task|Document|MediaAsset|Message|PayrollRecord|Policy|Submission','Organization'],
       fulfills:['Submission','Contract|Case|Project'],
       supersedes:['Policy|Document','Policy|Document'],
+      groundedIn:['ReviewCriterion','LegalProvision'],
       /* 인사·급여 기록 → 그 기록의 «주인»(사번). 2026-09-04.
          ⚠ 이 넷(근로계약·근태·휴가·급여)은 «푸른노무법인 직원» 자료다 —
            고객 사업장 자료가 아니다(companyId 칸이 아예 없다).
@@ -112,7 +116,7 @@
     fund:{ name:'기금관리', file:'fund.html', primaryRoots:['data/funds'], sharedRoots:['data/finance_income','pucards/idx','pucards/coInfo'],
       entityTypes:['Organization','Person','Project','FinancialTransaction','Document'] },
     rules:{ name:'취업규칙 관리', file:'rules.html', primaryRoots:['chwieop','rules_mgmt'], sharedRoots:['data/user_dir'],
-      entityTypes:['Organization','Person','Policy','Document'] },
+      entityTypes:['Organization','Person','Policy','Document','ReviewCriterion','LegalProvision'] },
     docs:{ name:'문서관리', file:'docs-esign.html', primaryRoots:['esign'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
     payroll:{ name:'급여관리', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
@@ -303,7 +307,8 @@
     evidencedBy:'업무→증빙 — 사진첩 서류를 업무에 붙이는 일은 다음 단계',
     transferredTo:'업무 인계 — 인계 기록에 영구 ID가 아직 없다',
     fulfills:'계약 이행 — 어떤 일이 계약을 채웠는지 기준이 없다',
-    supersedes:'개정 관계 — 취업규칙 대조표를 통합 화면에서 읽지 않는다'
+    supersedes:'개정 관계 — 취업규칙 대조표를 통합 화면에서 읽지 않는다',
+    groundedIn:'검토 기준→법 조문 — 연결표는 js/pu-rules-lawlink.js 에 있다. 관계 색인(ontology/v1)이 아직 꺼져 있어 색인에는 안 넣는다'
   };
 
   var STORE_TYPES = {
