@@ -19,7 +19,7 @@ const M = require('../js/kcareer-formmap.js');
 const H = require('../hwpx_gen.js');
 
 function tbl(rows) { return H.tablePara(rows, H.cols(rows[0].map(() => 1 / rows[0].length))); }
-const 값 = { fields: { name: '권형하', birth: '1975.01.07', phone: '010-0000-0000',
+const 값 = { fields: { name: '권형하', birth: '1980.01.01', phone: '010-0000-0000',
                       email: 'k@pureun.kr', org: '푸른노무법인', title: '대표' } };
 const 짐작 = (rows) => M.guess(M.scan(tbl(rows)), 값).slots
   .filter((s) => s.guess).map((s) => s.row + ',' + s.col + '=' + s.guess);
@@ -44,7 +44,7 @@ test('★★ 윗칸이 «사전이 아는 라벨»일 때만 인정한다', () =
 });
 
 test('★★ «바로 윗줄»만 본다 — 두 줄 위까지 올라가면 같은 값이 줄줄이 박힌다', () => {
-  const g = 짐작([['성명', '생년월일'], ['권형하', '1975.01.07'], ['', '']]);
+  const g = 짐작([['성명', '생년월일'], ['권형하', '1980.01.01'], ['', '']]);
   assert.ok(g.every((x) => x.indexOf('2,') !== 0),
     '★ 셋째 줄(값 줄 아래)까지 성명·생년월일로 보면 안 됩니다: ' + JSON.stringify(g));
 });

@@ -42,13 +42,13 @@ test('★ 묶인 표에서도 인적사항이 실제로 채워진다 — 「채�
   const g = M.guess(M.scan(xml), {});
   const picks = {};
   g.slots.forEach((s) => { if (s.guess) picks[s.id] = s.guess; });
-  const data = { fields: { name: '홍길동', birth: '1975.01.07', addr: '충남 천안시' },
+  const data = { fields: { name: '홍길동', birth: '1980.01.01', addr: '충남 천안시' },
                  edu: [{ period: '1991~1994', school: '심인고등학교', degree: '졸업' }] };
   const r = M.apply(xml, { picks: picks, lists: { L0: 'edu' }, data: data });
   const 다 = (r.xml.match(/<hp:t[^>]*>([\s\S]*?)<\/hp:t>/g) || [])
     .map((x) => x.replace(/<[^>]*>/g, '')).join(' ');
   assert.ok(다.indexOf('홍길동') >= 0, '성명이 안 들어갔습니다');
-  assert.ok(다.indexOf('1975.01.07') >= 0, '생년월일이 안 들어갔습니다');
+  assert.ok(다.indexOf('1980.01.01') >= 0, '생년월일이 안 들어갔습니다');
   assert.ok(다.indexOf('충남 천안시') >= 0, '주소가 안 들어갔습니다');
   assert.ok(다.indexOf('심인고등학교') >= 0, '학력 목록도 함께 들어가야 합니다');
 });

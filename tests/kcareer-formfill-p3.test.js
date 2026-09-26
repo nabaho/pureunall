@@ -39,8 +39,8 @@ function 칸(t) {
     + t + '</hp:t></hp:run></hp:p></hp:tc>';
 }
 const WHO = { name: '권형하', nameHanja: '權炯河', nameEng: 'KWEON HYEONGHA',
-  birth: '1975.01.07', phone: '010-0000-0000', phoneHome: '041-000-0000',
-  phoneWork: '041-556-0035', license: '공인노무사 제3016호' };
+  birth: '1980.01.01', phone: '010-0000-0000', phoneHome: '041-000-0000',
+  phoneWork: '041-000-0001', license: '공인노무사 제9999호' };
 
 /* ══════ ② 「전 화」 ══════ */
 test('★★ 「전 화」를 알아본다 — 「전화번호?」는 «호»만 optional 이라 못 잡았다', () => {
@@ -101,7 +101,7 @@ test('★★★ 대괄호 라벨이 «둘 이상»이면 한 칸에 여러 값�
 test('★★★ 「[자택](  )  -[직장](  )  -」 — 괄호 빈자리를 삼켜 값으로 바꾼다', () => {
   const out = X.cellText(X.incellFill(칸('[자택](  )  -[직장](  )  -'), WHO));
   assert.ok(out.indexOf('041-000-0000') >= 0, '자택이 안 들어갔습니다: ' + out);
-  assert.ok(out.indexOf('041-556-0035') >= 0, '직장이 안 들어갔습니다: ' + out);
+  assert.ok(out.indexOf('041-000-0001') >= 0, '직장이 안 들어갔습니다: ' + out);
   /* ⚠ 괄호 빈자리를 남기면 「[자택]041-000-0000(  )  -」이 된다 */
   assert.equal(out.indexOf('(  )'), -1, '괄호 빈자리가 남았습니다: ' + out);
 });
@@ -120,20 +120,20 @@ test('★★★ 대괄호가 «하나뿐»이면 건드리지 않는다 — 그 
 test('★ 콜론꼴은 그대로 된다 — 뒷걸음질하지 않는다', () => {
   const out = X.cellText(X.incellFill(칸('자택:            직장:'), WHO));
   assert.ok(out.indexOf('041-000-0000') >= 0, '자택이 안 들어갔습니다: ' + out);
-  assert.ok(out.indexOf('041-556-0035') >= 0, '직장이 안 들어갔습니다: ' + out);
+  assert.ok(out.indexOf('041-000-0001') >= 0, '직장이 안 들어갔습니다: ' + out);
 });
 
 /* ══════ ③ 자격번호가 흩어지던 것 ══════ */
-test('★★★ 숫자로만 된 값일 때만 나눠 넣는다 — 「공인노무사 제3016호」가 3|0|1|6 이 됐다', () => {
-  assert.equal(M.digitsFor('공인노무사 제3016호', 4), '',
-    '★ 글자가 섞인 값을 나눠 넣고 있습니다 — 서류에 「3|0|1|6」이 박힙니다');
-  assert.equal(M.digitsFor('제3016호', 4), '', '앞에 글자가 있으면 나누지 않습니다');
+test('★★★ 숫자로만 된 값일 때만 나눠 넣는다 — 「공인노무사 제9999호」가 9|9|9|9 이 됐다', () => {
+  assert.equal(M.digitsFor('공인노무사 제9999호', 4), '',
+    '★ 글자가 섞인 값을 나눠 넣고 있습니다 — 서류에 「9|9|9|9」이 박힙니다');
+  assert.equal(M.digitsFor('제9999호', 4), '', '앞에 글자가 있으면 나누지 않습니다');
   assert.equal(M.digitsFor('충남 천안시', 6), '');
   /* 숫자 칸은 그대로 되어야 한다 — 뒷걸음질 금지 */
-  assert.equal(M.digitsFor('1975.01.07', 6), '750107');
-  assert.equal(M.digitsFor('1975.01.07', 8), '19750107');
-  assert.equal(M.digitsFor('750107', 6), '750107');
-  assert.equal(M.digitsFor('1975.01.07', 5), '');
+  assert.equal(M.digitsFor('1980.01.01', 6), '800101');
+  assert.equal(M.digitsFor('1980.01.01', 8), '19800101');
+  assert.equal(M.digitsFor('800101', 6), '800101');
+  assert.equal(M.digitsFor('1980.01.01', 5), '');
 });
 
 test('★★★ 칸이 «떨어져» 있으면 숫자 칸이 아니다 — 넓은 칸 넷을 숫자 칸으로 봤다', () => {
@@ -154,7 +154,7 @@ test('★★ 생년월일 숫자 칸은 그대로 된다 — 끝까지 돌려 �
   const r = M.apply(xml, { picks: { t0r0c1: 'birth' }, data: { fields: WHO } });
   const cells = (r.xml.match(/<hp:t[^>]*>([\s\S]*?)<\/hp:t>/g) || [])
     .map(function (x) { return x.replace(/<[^>]*>/g, ''); });
-  assert.deepEqual(cells.slice(1, 7), ['7', '5', '0', '1', '0', '7'],
+  assert.deepEqual(cells.slice(1, 7), ['8', '0', '0', '1', '0', '1'],
     '★ 숫자 칸 나눠 넣기가 망가졌습니다');
 });
 
@@ -166,9 +166,9 @@ test('★★ 자격번호가 «한 칸에 통째로» 들어간다', () => {
   const m = M.guess(M.scan(xml), { fields: WHO });
   const picks = {}; m.slots.forEach(function (s) { if (s.guess) picks[s.id] = s.guess; });
   const r = M.apply(xml, { picks: picks, lists: {}, data: { fields: WHO } });
-  assert.ok(r.xml.indexOf('공인노무사 제3016호') >= 0,
+  assert.ok(r.xml.indexOf('공인노무사 제9999호') >= 0,
     '자격번호가 통째로 안 들어갔습니다: ' + JSON.stringify(r.filled));
-  assert.equal(r.xml.indexOf('>3<'), -1, '★ 한 글자씩 흩어져 들어갔습니다');
+  assert.equal(r.xml.indexOf('>9<'), -1, '★ 한 글자씩 흩어져 들어갔습니다');
 });
 
 /* ══════ ④⑤ 라벨위는 같은 열에서 ══════ */
@@ -266,13 +266,13 @@ test('★★★ 슬롯의 «열 번호»가 실제로 쓰인다 — 떨어진 �
   assert.equal(열.length, 4, '자료 줄이 네 칸이어야 합니다: ' + 열);
   assert.notEqual(열[1], 열[0] + 1, '열이 붙어 있으면 이 검사는 뜻이 없습니다: ' + 열);
 
-  const m = M.guess(M.scan(xml), { fields: { license: '3016' } });
+  const m = M.guess(M.scan(xml), { fields: { license: '9999' } });
   const 첫칸 = m.slots.filter(function (s2) { return s2.row === 1 && s2.col === 0; })[0];
   assert.ok(첫칸, '자리를 못 잡았습니다');
   assert.ok(typeof 첫칸.colAddr === 'number' && 첫칸.colAddr >= 0,
     '★ 슬롯에 진짜 열 번호가 없습니다 — 숫자 칸 잣대가 못 돕니다');
   const r = M.apply(xml, { picks: { 't0r1c0': 'license' }, lists: {},
-                           data: { fields: { license: '3016' } } });
-  assert.ok(r.xml.indexOf('3016') >= 0, '자격번호가 안 들어갔습니다: ' + JSON.stringify(r.filled));
-  assert.equal(r.xml.indexOf('>3<'), -1, '★ 한 글자씩 흩어져 들어갔습니다(3|0|1|6)');
+                           data: { fields: { license: '9999' } } });
+  assert.ok(r.xml.indexOf('9999') >= 0, '자격번호가 안 들어갔습니다: ' + JSON.stringify(r.filled));
+  assert.equal(r.xml.indexOf('>9<'), -1, '★ 한 글자씩 흩어져 들어갔습니다(9|9|9|9)');
 });

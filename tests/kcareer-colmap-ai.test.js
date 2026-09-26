@@ -19,7 +19,7 @@ test('★ 보내는 것은 «머리행 글자»뿐이다 — 개인정보가 나
   const p = A.buildPrompt(HEAD);
   HEAD.forEach((h) => assert.ok(p.indexOf(h) >= 0, h + ' 이(가) 물음에 있어야 합니다'));
   /* 값이 새어 들어갈 자리가 없다 — 프롬프트를 머리행만으로 만든다 */
-  ['권형하', '1975', '@', '충남'].forEach((x) =>
+  ['권형하', '1980', '@', '충남'].forEach((x) =>
     assert.equal(p.indexOf(x), -1, '값이 물음에 섞이면 안 됩니다: ' + x));
 });
 

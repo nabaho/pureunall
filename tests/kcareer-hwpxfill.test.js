@@ -231,8 +231,8 @@ test('칸 이름 확장: 현주소·휴대폰·기관명·부서명·직위·한
 
 test('칸 안에 라벨이 있는 모양 — 「자택:____ 직장:____」을 채운다', () => {
   const xml = tbl([['전화번호', '자택:________  직장:________']]);
-  const r = F.autoFill(xml, { fields: { phoneHome: '041-556-0035', phoneWork: '041-556-3656' } });
-  assert.match(r.xml, /자택:041-556-0035/);
+  const r = F.autoFill(xml, { fields: { phoneHome: '041-000-0001', phoneWork: '041-556-3656' } });
+  assert.match(r.xml, /자택:041-000-0001/);
   assert.match(r.xml, /직장:041-556-3656/);
 });
 
