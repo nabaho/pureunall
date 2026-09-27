@@ -663,6 +663,22 @@ rules.exportSeen = {
   }
 };
 
+/* ── 사진첩 민감 서류 갈래 (2026-09-27 사진첩 점검 ③) ──
+   화면(js/pu-photo-store.js)·서버(functions/photo-view.js)와 «같은 목록»이다.
+   ⚠ 셋 가운데 하나만 고치면 되전달 금지가 그 갈래에서만 빈다. 검사가 셋을 견준다
+     (tests/photos-reshare-rule.test.js). 목록을 고치면 규칙도 다시 올린다.
+   ⚠ 규칙 언어에는 「목록 안에 있나」가 없다 — 갈래마다 !== 를 이어 붙인다. */
+const PHOTO_SENSITIVE_KINDS = ['contract', 'wcontract', 'timesheet', 'payslip', 'cms', 'bankbook',
+  'idcard', 'resident', 'mandate', 'consent'];
+/* shareWith/$who · shareBy/$who 자리에서 본 «그 사진의 판독 갈래».
+   data 는 그 칸, parent() 한 번이 shareWith(shareBy), 두 번이 사진 한 장이다.
+   ⚠ 판독이 없으면 null 이라 모든 !== 를 통과한다 — 판독 전 서류는 «막지 않는다».
+     화면(maskForced)도 판독 뒤 민감일 때만 막는다. 규칙이 더 막으면 화면은
+     「공유했습니다」라고 해 놓고 실제로는 실패한다 — 그보다 나쁜 실패는 없다. */
+const PHOTO_READ_KIND = "data.parent().parent().child('read').child('kind').val()";
+const PHOTO_NOT_SENSITIVE = '(' + PHOTO_SENSITIVE_KINDS
+  .map(function (k) { return PHOTO_READ_KIND + " !== '" + k + "'"; }).join(' && ') + ')';
+
 rules.puphotos = {
   owners: {
     '.read': LOGIN,
@@ -684,16 +700,25 @@ rules.puphotos = {
            규칙만 할 수 있다 — 아니면 한 직원이 남의 사진을 동료에게서 거둬 간다.
          ⚠ 조건은 「**내가 이미 이 사진을 보고 있는가**」다. 안 그러면 아무 사진에나
            명단을 붙일 수 있게 된다. */
+      /* ★ 민감 서류는 «받은 사람»이 못 넘긴다 (대표 지시 2026-09-27 사진첩 점검 ③)
+         화면은 이미 막고 있었다(maskForced — 「민감은 되전달 금지」). 그런데 규칙은 안 막아,
+         로그인한 직원이 개발자 도구로는 넘길 수 있었다. 「화면에서 가리는 것은 보호가
+         아니다」 — 이 저장소가 스스로 적어 둔 원칙이다.
+         ⚠ 주인·총괄관리자는 윗칸(u/$uid .write)이 이미 열어 준다 — 그 둘은 여전히 나눈다.
+           막는 것은 «받은 사람이 다시 넘기는» 길뿐이다.
+         ⚠ 여러 칸을 한 번에 쓰는 update 는 한 칸이라도 막히면 «통째로» 막힌다 —
+           그래서 받는 사람 쪽 가리키는 표(sharedTo)는 따로 안 막아도 같이 안 적힌다. */
       shareWith: { $who: {
         '.write': `(${LOGIN}) && newData.val() === true && ` +
           `root.child('puphotos').child('u').child($uid).child('items').child($year)` +
-          `.child($id).child('shareWith').child(auth.uid).exists()`
+          `.child($id).child('shareWith').child(auth.uid).exists() && ` + PHOTO_NOT_SENSITIVE
       } },
       /* 「누가 넘겼는지」 한 줄 — 있어야 한 다리 건너 퍼져도 자취가 남는다 */
+      /* 「누가 넘겼는지」도 같은 조건이다 — 못 넘긴 사진에 「누가 넘겼다」만 남으면 거짓말이다 */
       shareBy: { $who: {
         '.write': `(${LOGIN}) && newData.isString() && newData.val().length <= 60 && ` +
           `root.child('puphotos').child('u').child($uid).child('items').child($year)` +
-          `.child($id).child('shareWith').child(auth.uid).exists()`
+          `.child($id).child('shareWith').child(auth.uid).exists() && ` + PHOTO_NOT_SENSITIVE
       } }
     } } },
     blobs:  { $year: { $id: { '.read': `(${LOGIN}) && root.child('puphotos').child('u').child($uid).child('items').child($year).child($id).child('shareWith').child(auth.uid).exists()` } } },
