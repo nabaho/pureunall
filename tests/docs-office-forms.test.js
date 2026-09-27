@@ -182,3 +182,35 @@ test('ⓔ ★ 지운 기록을 «실제로» 적는다 — 서버 최신본 위�
   assert.deepStrictEqual(saved.v, ['fm-1', 'fm-2'], '★ 앞서 지운 기록을 잃었습니다');
   assert.ok(saved.u > 3, '★ u 를 안 올렸습니다');
 });
+
+test('★★ 사무관리서류 아래에 계약서 양식 → 트리 칸 → 기업별 → 보관함 순서', function () {
+  const nav = DOCS.slice(DOCS.indexOf('<nav class="side"'), DOCS.indexOf('</nav>'));
+  const at = (s) => nav.indexOf(s);
+  assert.ok(at('사무관리서류') < at('data-pane="forms"'), '계약서 양식이 사무관리서류 아래가 아닙니다');
+  assert.ok(at('data-pane="forms"') < at('id="formsTree"'), '★ 트리 칸이 계약서 양식 아래가 아닙니다');
+  assert.ok(at('id="formsTree"') < at('data-pane="co"') && at('data-pane="co"') < at('data-pane="arc"'), '★ 기업별·보관함 칸이 없거나 순서가 다릅니다');
+});
+
+test('★★ 칸마다 «처음 한 번만» 싣고, 양식 화면에 트리·보관함을 잇는다', function () {
+  const show = cutFn(stripComments(DOCS), 'function showPane(');
+  assert.match(show, /tree:\s*\$\('formsTree'\)/, '★ 트리 칸을 안 넘겨 왼쪽에 양식이 안 나옵니다');
+  assert.match(show, /archive:\s*archiveOriginal/, '★★ 올린 원본이 보관함에 안 남습니다');
+  assert.match(show, /!mounted\.co/); assert.match(show, /!mounted\.arc/);
+  assert.match(show, /PuOfficeDocs\.mountCompanies\(/); assert.match(show, /PuOfficeDocs\.mountArchive\(/);
+});
+
+test('★ 주소 — #forms:{id}·#co·#arc 로 새로고침해도 보던 자리', function () {
+  const src = stripComments(DOCS);
+  const pf = cutFn(src, 'function paneFromHash(');
+  assert.match(pf, /#forms:/); assert.match(pf, /'#co'/); assert.match(pf, /'#arc'/);
+  assert.match(cutFn(src, 'function formFromHash('), /decodeURIComponent/);
+});
+
+test('★ 창고 SDK·보관함 버킷·새 파일을 싣는다', function () {
+  assert.match(DOCS, /firebasejs\/9\.23\.0\/firebase-storage-compat\.js/, '★ 창고 SDK 가 없습니다 — 보관함이 늘 실패합니다');
+  assert.match(DOCS, /storage\('gs:\/\/pureun-erp-hrphotos'\)/, '★ 보관함 버킷이 다릅니다 — 규칙이 있는 창고가 아닙니다');
+  assert.match(DOCS, /<script src="js\/pu-office-store\.js\?v=\d+"><\/script>/);
+  assert.match(DOCS, /<script src="js\/pu-office-docs\.js\?v=\d+"><\/script>/);
+  assert.match(DOCS, /<script src="js\/pu-photo-store\.js\?v=\d+"><\/script>/);
+  assert.match(DOCS, /<script src="js\/pu-contract-forms\.js\?v=([2-9]|\d{2,})"><\/script>/, '★ 캐시 번호를 안 올려 옛 화면이 뜹니다');
+});
