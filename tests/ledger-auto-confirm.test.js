@@ -22,8 +22,12 @@ ok('초록인 줄만 확정 대상에 담는다',
    /st\.state === 'ready'[\s\S]{0,200}?readyRows\.push/.test(src));
 ok('업체가 여럿이면 담지 않는다 (골라야 한다)',
    /st\.state === 'ready' && grp\.length === 1/.test(src));
+/* 2026-09-27 — 확정은 confirmReadyList 한 길이다(일괄 단추 · 🤖 저절로 확정이 함께 쓴다).
+   지킬 규칙은 «단추가 그 목록을 그대로 넘긴다»이지 forEach 라는 꼴이 아니다. */
 ok('단추가 그 목록을 그대로 쓴다 (따로 세지 않는다)',
-   /readyRows\.forEach\(function\(r\)\{/.test(src));
+   /confirmReadyList\(readyRows\)/.test(src));
+ok('저절로 확정도 같은 길을 쓴다 (갈래를 새로 만들지 않는다)',
+   /confirmReadyList\(autoRows\)/.test(src) && (src.match(/function confirmReadyList\(/g) || []).length === 1);
 
 console.log('\n[성과급 — 확정하면 성과가 함께 붙는다]');
 
@@ -74,7 +78,7 @@ ok('계산한 성과를 실제로 저장한다 (perfShares:[] 로 비우지 않�
 ok('확정한 건은 표시가 남는다 (나중에 되돌릴 때 구분)',
    /autoConfirmed:\s*opts\.withPerf\s*\?\s*true/.test(src));
 ok('한 줄 확정도 성과를 나눈다', /function confirmRow[\s\S]{0,400}?withPerf:true/.test(src));
-ok('여러 줄 확정도 성과를 나눈다', /readyRows\.forEach[\s\S]{0,300}?withPerf:true/.test(src));
+ok('여러 줄 확정도 성과를 나눈다', /function confirmReadyList\([\s\S]{0,300}?withPerf:true/.test(src));
 ok('합계 후보 확정도 성과를 나눈다', /function confirmCombo[\s\S]{0,900}?withPerf:true/.test(src));
 ok('과입금 확정도 성과를 나눈다', /function confirmOver[\s\S]{0,1400}?withPerf:true/.test(src));
 
