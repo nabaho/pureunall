@@ -1748,6 +1748,10 @@ async function runPaydataMailOnce() {
             atts: Array.isArray(parsed.attachments) ? parsed.attachments.length : 0,
             took: m.took || 0, seatName: m.seatName || '',
             shared: m.shared === true, why: m.why || '', old: m.old === true,
+            /* 뉴스레터·광고·알림 표 — 머리글만 보고 정한다(MR.isBulkMail).
+               ⚠ 세 갈래 모두에서 이 함수 하나를 지난다. 갈래마다 따로 판정하면
+                 「지난 회차」 것만 표가 없는 일이 생긴다. */
+            bulk: MR.isBulkMail(parsed && parsed.headers),
             companyId: co ? co.id : '', companyName: co ? co.name : ''
           })
         };
@@ -5584,6 +5588,12 @@ exports.probeMailPop = MSYNC.probeMailPop;
 exports.backfillMailbox = MSYNC.backfillMailbox;
 /* 📦 지난 메일 한 통 열기 — 그 자리에서 POP3 로 (직원 누구나, 메일함과 같은 문) */
 exports.readOldMail = MSYNC.readOldMail;
+
+/* 🗑 다음메일에서 «지운» 메일은 업무관리 목록에서도 뺀다 (대표 지시 2026-09-27)
+   ⚠ 실제 코드는 mail-gone.js 에 있다 — index.js 를 더 키우지 않기 위해서다.
+   ⚠ 여기 한 줄을 안 적으면 밖에서 안 보인다(배포가 안 된다). mail-sync 와 같은 까닭. */
+const MGONE = require("./mail-gone")({ functions, getDatabase, MAIL_REGION });
+exports.sweepDeletedMail = MGONE.sweepDeletedMail;
 
 /* ══════════════════════════════════════════════════════════════════════════
    📬 열람 확인 — 보낸 메일의 «보이지 않는 1×1 그림»이 불리는 자리 (대표 결정 2026-09-06)
