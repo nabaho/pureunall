@@ -239,3 +239,22 @@ test('서버 규칙도 관계망 개체·관계의 필수 모양과 불변 판�
     assert.equal(gen[part].$other['.validate'], false);
   }
 });
+
+/* 2026-09-27 — gateway.save 가 «함수 레코드»도 받는다. 남의 자료에 바뀐 칸만 얹어야 하는
+   앱(푸른 캘린더 → 이알피 근태)이 서버의 지금 판을 받아 레코드를 만든다.
+   ⚠ 찬 자리에서는 null 로 먼저 불린다 — 그때도 레코드를 돌려줘야 접히지 않는다. */
+test('gateway.save 는 함수 레코드에 «서버의 지금 판»을 넘긴다 — 바뀐 칸만 얹을 수 있다', async () => {
+  const gateway = W.createGateway({mode:'enforce', actor:'sid-1', now:()=>7});
+  const server = { id:'att-1', entityType:'ScheduleEvent', schemaVersion:Number(O.VERSION)||1, contractVersion:1,
+    createdAt:1, updatedAt:1, revision:2, type:'halfday-am', note:'옛' };
+  const seen = [];
+  let saved = null;
+  const ref = { transaction(fn){ fn(null); saved = fn(JSON.parse(JSON.stringify(server))); return Promise.resolve({committed:true}); } };
+  await gateway.save(ref, (prev) => { seen.push(prev); return Object.assign({}, prev || {}, { id:'att-1', note:'새' }); },
+    { entityType:'ScheduleEvent' });
+  assert.equal(seen[0], null, '찬 자리(null)에서도 불려야 합니다');
+  assert.equal(seen[1].type, 'halfday-am');
+  assert.equal(saved.note, '새');
+  assert.equal(saved.type, 'halfday-am', '서버에만 있던 칸이 사라졌습니다');
+  assert.equal(saved.revision, 3, '수정차수를 서버 판 다음으로 안 올렸습니다');
+});

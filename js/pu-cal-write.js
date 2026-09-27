@@ -97,25 +97,6 @@
     return OK;
   }
 
-  /* ⑤⑥ 보낼 칸을 만든다 — 바뀐 것만 + 번호는 늘 */
-  function fieldPaths(id, fields, prev) {
-    var out = {};
-    Object.keys(fields).forEach(function (f) {
-      var v = fields[f];
-      if (prev && JSON.stringify(prev[f]) === JSON.stringify(v)) return;   // 안 바뀐 칸은 안 보낸다
-      out[id + '/' + f] = (v === undefined ? null : v);
-    });
-    out[id + '/id'] = id;                                                   // ⑥ 그물
-    return out;
-  }
-
-  function stamp(out, id) {
-    out[id + '/updatedAt'] = Date.now();
-    var who = typeof _ctx.who === 'function' ? _ctx.who() : null;
-    if (who) out[id + '/updatedBy'] = who;
-    return out;
-  }
-
   /* 서버에 보낸다. 표의 «시각»(u)도 함께 올려 다른 화면이 바뀐 줄 안다. */
   function send(table, childPaths) {
     var updates = {};
@@ -126,6 +107,29 @@
     return _db.ref().update(updates);
   }
 
+  /* ★ 온톨로지 저장 관문(js/pu-ontology-write.js) — 2026-09-27 에 이리로 옮겼다.
+     푸른 캘린더는 «새 프로그램»이라 관문이 강제(enforce)다. 칸별 update 는 관문이
+     「수정차수를 검증할 수 없다」며 **통째로 거절**했다 — 그래서 달력에서 넣기·고치기·
+     끌어 옮기기가 한 번도 서버에 닿지 않았다(서버 근태의 마지막 손질이 9월 1일이었다).
+     이제 레코드 한 건을 «거래(transaction)»로 쓴다. 그 안에서 서버의 지금 판 위에
+     «바뀐 칸만» 얹으므로 ⑤(남의 칸을 되돌리지 않는다)는 오히려 더 단단해졌다. */
+  function gate() {
+    var OW = (typeof PuOntologyWrite !== 'undefined') ? PuOntologyWrite : require('./pu-ontology-write.js');
+    var who = typeof _ctx.who === 'function' ? (_ctx.who() || '') : '';
+    return OW.createGateway({ mode: 'enforce', actor: who });
+  }
+  /* 서버의 지금 판(없으면 화면이 든 판) 위에 바뀐 칸만 얹는다 — ⑤·⑥ */
+  function overlay(id, fields, prev, server) {
+    var base = (server && typeof server === 'object') ? server : (prev || {});
+    var out = Object.assign({}, base);
+    Object.keys(fields).forEach(function (f) {
+      if (prev && JSON.stringify(prev[f]) === JSON.stringify(fields[f])) return;   // 안 바뀐 칸은 안 건드린다
+      if (fields[f] === undefined) delete out[f]; else out[f] = fields[f];
+    });
+    out.id = id;                                                                    // ⑥ 그물
+    return out;
+  }
+
   /* 한 건 넣기·고치기. prev 는 지금 화면이 들고 있는 그 건(없으면 새것). */
   function save(table, item, prev) {
     if (!item || typeof item !== 'object') return Promise.resolve(fail('no_item', '저장할 것이 없습니다'));
@@ -134,8 +138,16 @@
     Object.keys(item).forEach(function (f) { if (f !== 'id') fields[f] = item[f]; });
     var g = check(table, id, fields, prev && prev.date);
     if (!g.ok) return Promise.resolve(g);
-    var paths = stamp(fieldPaths(id, fields, prev), id);
-    return send(table, paths).then(function () { return OK; })
+    var ref = _db.ref('data/' + table + '/v/' + id);
+    /* 새것이면 «서버에 없어야» 한다(-1) — 같은 번호가 이미 있으면 덮지 않고 멈춘다 */
+    var ctx = { entityType: 'ScheduleEvent' };
+    if (!prev) ctx.expectedRevision = -1;
+    return gate().save(ref, function (server) { return overlay(id, fields, prev, server); }, ctx)
+      .then(function () {
+        /* 표의 시각 — 다른 화면(이알피)이 «바뀐 줄» 알게 한다. 값 하나라 관문을 그대로 지난다 */
+        return _db.ref('data/' + table + '/u').set(Date.now());
+      })
+      .then(function () { return OK; })
       .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
   }
 
@@ -261,7 +273,7 @@
     attach: attach,
     isMapForm: isMapForm,
     check: check,
-    fieldPaths: fieldPaths,
+    overlay: overlay,
     save: save,
     saveColors: saveColors,
     saveMailMap: saveMailMap,
