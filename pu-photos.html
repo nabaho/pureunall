@@ -7141,6 +7141,7 @@ let readBusy = false;
      readRunDone 그중 끝난 장수
      readNowId   지금 읽고 있는 사진 (칸의 🔤 단추를 바꾸려고) */
 let readRunN = 0, readRunDone = 0, readNowId = '';
+let readNowAuto = false;      // 지금 읽는 장이 저절로 건 것인가(㉴) — 띠가 「저절로」라고 말하려고
 
 /* 판독 서버나 창고 요청이 답을 끝내 주지 않으면 readBusy 가 영원히 참으로 남아
    사진첩 전체가 「판독 중」에 걸린 것처럼 보였다(대표 보고 2026-09-27).
@@ -7588,6 +7589,94 @@ function readWaitRun() {
   renderReadAsk();
 }
 
+/* ══ ㉴ 사진첩을 열면 «저절로» 읽는다 (대표 지시 2026-09-27) ══════════════════════
+   「자동으로 니가 분리하고 자동으로 판독할 수 있나 … 비용은 최소로」
+   → 권해 드린 「사진첩 열면 저절로」를 고르셨다(서버 새벽 판독은 판정을 두 벌로
+     만들어 안 골랐다 — functions/index.js readDoc 머리의 「판정은 옮기지 말 것」).
+
+   ★ 9월 8일 「누를 때만」(㉲)으로 바꾼 까닭은 하루 무료 몫이 바닥난 것이었고,
+     그 몫을 태운 것은 «이미 읽은 것을 또 읽기»였다 — 그 길은 따로 막혔다(㉳).
+     이제 판독은 유료 등급(한 장 약 4원)이고 이번 달 한도는 서버가 지킨다.
+   ★ 저절로 «거는» 곳은 여기 한 곳이다. autoReadPending 은 여전히 세기만 한다.
+   ★ 거는 것은 한 번도 안 읽은 것(fresh)뿐이다. 실패한 것·판 번호가 오른 것은
+     안 건다 — 되풀이해 태우던 것이 그쪽이었다. 그 둘은 사람이 누른다.
+   ★ 읽는 길은 사람이 누를 때와 «같다»(queuePhotoRead → readPhoto) — 무료 길 먼저,
+     기업정보함·업체관리·근로자 정보함으로 보내기까지. 다른 것은 「사람이 눌렀다」
+     (manual)를 안 싣는 것 하나다. 그래야 이번 달 한도를 넘었을 때 서버가 막는다.
+   ⚠ 총괄관리자의 PC 에서만 돈다. 직원 화면·폰까지 돌면 같은 서류를 여럿이 동시에
+     읽어 요금이 겹친다. 대표 PC 는 탭이 스물쯤이라 탭끼리는 «찜»으로 가른다.
+   ⚠ 하루 상한은 서버가 센 오늘 사진첩 AI 부름 수 + 이 탭이 그 뒤에 건 장수다.
+     서버 셈은 목록을 읽을 때 한 번 읽으므로 그 사이 건 것은 여기서 센다(autoSince). */
+const AUTO_DAY_CAP = 50;
+const AUTO_CLAIM_LS = 'puphotos_auto_claim';
+/* 찜이 풀리는 시간 — 한 장이 이보다 오래 걸릴 일은 없다(READ_JOB_TIMEOUT_MS 가 90초). */
+const AUTO_CLAIM_MS = 30 * 60000;
+let readTallyOk = false;      // 오늘 셈을 «읽었나» — 못 읽었으면 상한을 모르므로 안 건다
+let autoSince = 0;
+let autoReadTimer = null;     // ⚠ autoTimer 는 카메라 자동 촬영이 이미 쓴다 — 같은 이름이면 화면이 통째로 멎는다
+
+/* 오늘 저절로 더 걸 수 있는 장수 */
+function autoDayLeft() {
+  const 서버 = Number((readTally && readTally.photos && readTally.photos.n) || 0);
+  return Math.max(0, AUTO_DAY_CAP - 서버 - autoSince);
+}
+
+/* 지금 저절로 못 거는 까닭 — 빈 문자열이면 건다. 띠도 이것을 보고 말한다. */
+function autoReadWhyNot() {
+  if (!PuPhotoStore.amAdmin()) return 'staff';
+  if (isPhone()) return 'phone';
+  if (gridOwner === SHARED_OWNER) return 'shared';
+  if (readQuotaOut) return 'quota';
+  if (aiSpend().over) return 'budget';
+  if (!readTallyOk) return 'tally';
+  if (autoDayLeft() <= 0) return 'cap';
+  return '';
+}
+
+/* 탭끼리 나눠 쓰는 찜 — { 사진 id: 건 시각 }. 이 PC 안에서만 쓴다. */
+function autoClaims() {
+  try { return JSON.parse(localStorage.getItem(AUTO_CLAIM_LS) || '{}') || {}; } catch (_) { return {}; }
+}
+function autoClaimsPut(m) {
+  try { localStorage.setItem(AUTO_CLAIM_LS, JSON.stringify(m)); } catch (_) {}
+}
+
+/* ⚠ 곧바로 걸지 않고 조금 기다린다. 다른 직원이 올리면 열린 탭이 «한꺼번에» 목록을
+     다시 읽는데, 같은 순간에 찜을 보면 둘 다 빈 찜을 보고 같은 장을 건다.
+     탭마다 다른 틈을 준다. */
+function autoReadSoon() {
+  clearTimeout(autoReadTimer);
+  autoReadTimer = setTimeout(autoReadGo, 800 + Math.floor(Math.random() * 2400));
+}
+
+function autoReadGo() {
+  if (autoReadWhyNot()) { renderReadAsk(); return; }
+  /* 지금 도는 줄이 있으면 기다린다 — 끝나면 pumpRead 가 다시 부른다 */
+  if (readingNow()) return;
+  const p = autoReadPending();
+  if (!p) return;
+  const now = Date.now();
+  const 찜 = autoClaims();
+  Object.keys(찜).forEach(function (k) {
+    if (now - (Number(찜[k]) || 0) > AUTO_CLAIM_MS) delete 찜[k];
+  });
+  const take = p.fresh
+    .filter(function (it) { return !찜[it.id] && !readingThis(it.id); })
+    .slice(0, Math.min(autoDayLeft(), AUTO_READ_MAX));
+  if (!take.length) { autoClaimsPut(찜); renderReadAsk(); return; }
+  take.forEach(function (it) { 찜[it.id] = now; });
+  autoClaimsPut(찜);
+  autoSince += take.length;
+  take.forEach(function (it) { queuePhotoRead(it.id, { auto: true }); });
+  const el = $('autoNote');
+  if (el) {
+    el.style.display = 'block';
+    el.textContent = '🔤 저절로 읽는 중… ' + take.length + '장';
+  }
+  renderGrid();
+  renderReadAsk();
+}
+
 /* 사진 한 장만 — 칸의 [🔤 판독] 단추.
    ⚠ 여기서도 문지기를 다시 본다. 단추를 그린 뒤 화면이 바뀌었을 수 있다. */
 function readWaitOne(id) {
@@ -7601,11 +7690,12 @@ function readWaitOne(id) {
 }
 
 /* 격자에 있는 사진 한 장을 판독 대기열에 넣는다(올리는 중이 아닌 것). */
-function queuePhotoRead(id) {
+/* how.auto — 저절로 건 것(autoReadGo). 판독 층에 「사람이 눌렀다」를 «안» 싣는다. */
+function queuePhotoRead(id, how) {
   /* ⚠ 같은 사진을 두 번 걸지 않는다 (2026-09-14). 단추를 잠그기 전에 두 번 눌리거나,
      띠와 칸에서 같은 장을 각각 걸면 **한 장을 두 번 읽고 요금도 두 번** 든다. */
   if (readingThis(id)) return;
-  readQ.push({ _photoId: id });
+  readQ.push(how && how.auto ? { _photoId: id, _auto: true } : { _photoId: id });
   readRunN += 1;                 // 단추에 「3/20」을 적으려면 몇 장을 걸었는지 알아야 한다
   pumpRead();
 }
@@ -7626,13 +7716,16 @@ function pumpRead() {
   readBusy = true;
   const job = readQ.shift();
   readNowId = job._photoId || '';
+  readNowAuto = !!job._auto;
   /* 한 장 시작할 때마다 단추를 고쳐 그린다 — 「3/20」이 살아 움직여야
      사람이 「돌고 있구나」를 안다(2026-09-14 대표 지시). */
   renderReadAsk();
   paintReadButton(readNowId, 'reading');
   /* 두 종류가 들어온다 — 방금 올린 것(본문을 손에 들고 있다)과
      이미 올라가 있는 것(본문을 받아 와야 한다). */
-  const work = job._photoId ? readPhoto(job._photoId) : startRead(job);
+  const work = job._photoId
+    ? readPhoto(job._photoId, null, job._auto ? { auto: true } : undefined)
+    : startRead(job);
   let timeoutMessage = '';
   readJobWatch(work).catch(function (e) {
     console.warn('[판독]', e);
@@ -7647,6 +7740,7 @@ function pumpRead() {
     paintReadButton(readNowId, 'done');
     readBusy = false;
     readNowId = '';
+    readNowAuto = false;
     readRunDone += 1;
     if (job) job._queuedRead = false;
     renderUp();
@@ -7662,6 +7756,8 @@ function pumpRead() {
       }
       renderGridBar();
       renderGrid();
+      /* 줄이 비었다 — 오늘 몫이 남았으면 다음 몫을 저절로 건다(㉴) */
+      autoReadSoon();
     }
     renderReadAsk();
     pumpRead();
@@ -7760,8 +7856,12 @@ function loadReadTally() {
   /* ⚠ 달 셈도 함께 읽는다 — 같은 표의 «달 자리»(2026-09)라 읽는 함수가 하나로 된다.
      ⚠ 둘 중 하나가 실패해도 나머지는 살린다. 셈 때문에 띠가 안 뜨면 손해다. */
   return Promise.all([
-    PuPhotoStore.readTally(ymd).then(function (v) { readTally = v; })
-      .catch(function (e) { console.warn('[판독 셈]', e); }),
+    PuPhotoStore.readTally(ymd).then(function (v) {
+      readTally = v;
+      readTallyOk = true;
+      /* 서버가 끝난 것까지 세었다 — 이 탭은 «아직 안 끝난» 저절로 건 것만 따로 센다(㉴) */
+      autoSince = readQ.filter(function (j) { return j && j._auto; }).length + (readBusy ? 1 : 0);
+    }).catch(function (e) { console.warn('[판독 셈]', e); }),
     PuPhotoStore.readTally(ymd.slice(0, 7)).then(function (v) { readTallyMonth = v; })
       .catch(function (e) { console.warn('[무료 판독 달 셈]', e); }),
     /* AI 판독 이번 달 한도 설정 (2026-09-10) — 못 읽으면 기본값으로 물러선다 */
@@ -7979,14 +8079,22 @@ function renderReadAsk() {
        ⚠ 글만 바꾸면 여전히 눌린다 — disabled 를 함께 건다. 한 장에 몇 초씩 걸리는데
          단추가 그대로면 사람은 안 눌린 줄 알고 또 누르고, 그것이 그대로 요금이다. */
     const 도는중 = readingNow();
+    /* ㉴ 저절로 읽는가 — 까닭을 한 곳(autoReadWhyNot)에서 받아 말한다.
+       ⚠ 띠가 따로 판정하면 「곧 읽습니다」라 해 놓고 안 거는 화면이 된다. */
+    const 왜 = autoReadWhyNot();
+    const 말 = 도는중
+      ? (readNowAuto || readQ.some(function (j) { return j && j._auto; }) ? '저절로 읽고 있습니다' : '읽고 있습니다')
+        + ' — <b>끝날 때까지 기다려 주세요</b>'
+      : 왜 === 'cap' ? '오늘 저절로 읽을 몫을 다 썼습니다 — 내일 이어서 읽습니다'
+      : 왜 === 'tally' ? '오늘 몇 번 읽었는지 몰라 저절로 안 읽습니다 — 급하면 눌러 주세요'
+      : !왜 ? '곧 저절로 읽습니다 — 급하면 눌러 주세요'
+      : '관리자 PC 에서 사진첩을 열면 저절로 읽습니다 — 급하면 눌러 주세요';
     el.innerHTML = '<span class="t">🔤 안 읽은 서류</span>' +
       '<span class="n">' + wait.length + '장</span>' +
-      '<span class="d" title="판독은 하루에 쓸 수 있는 수가 정해져 있고, 급여·경력관리까지\n' +
-      '회사 전체가 열쇠 하나를 나눠 씁니다 — 그래서 저절로 읽지 않습니다.\n' +
-      '읽을 것만 눌러 주세요. 칸의 [🔤 판독]으로 한 장씩도 됩니다.">' +
-      (도는중
-        ? '읽고 있습니다 — <b>끝날 때까지 기다려 주세요</b>'
-        : '저절로 읽지 않습니다 — 칸의 🔤 로 한 장씩도 됩니다') + '</span>' +
+      '<span class="d" title="총괄관리자 PC 에서 사진첩을 열면 한 번도 안 읽은 서류를 저절로 읽습니다\n' +
+      '— 하루 ' + AUTO_DAY_CAP + '장까지. 무료 판독을 먼저 쓰고, 안 되면 AI 로 읽습니다.\n' +
+      '실패한 것·이미 읽은 것은 저절로 다시 읽지 않습니다 — 칸의 [🔤 판독]으로 한 장씩 됩니다.">' +
+      말 + '</span>' +
       '<button class="pri"' + (도는중 ? ' disabled title="읽는 중입니다 — 끝나면 다시 눌리게 됩니다"' : '') +
       ' onclick="readWaitRun()">' +
       (도는중 ? readRunText() : '🔤 ' + Math.min(wait.length, AUTO_READ_MAX) + '장 판독') +
@@ -8019,6 +8127,7 @@ function readAskDocs() {
   renderReadAsk();
   renderGrid();
   autoReadPending();
+  autoReadSoon();     /* ㉴ 서류라고 답한 뭉치도 저절로 읽을 차례에 든다 */
 }
 
 /* 「그냥 사진입니다」 — 판독을 안 한다는 것을 **사진에 적어 둔다.**
@@ -10379,8 +10488,9 @@ function loadGrid() {
        건너뛰므로 아무도 안 읽어 주는 사진으로 남는다. */
     resumeCollectIfAny();
     if (gridOwner !== ALL_OWNERS && gridOwner !== SHARED_OWNER) autoReadPending();
-    /* ⑤ 오늘 판독을 몇 번 썼나 — 한 번만 읽는다(숫자 몇 개뿐이다) */
-    loadReadTally();
+    /* ⑤ 오늘 판독을 몇 번 썼나 — 한 번만 읽는다(숫자 몇 개뿐이다).
+       ㉴ 셈을 읽은 «뒤에» 저절로 건다 — 셈 없이 걸면 하루 상한을 모른다. */
+    loadReadTally().then(autoReadSoon);
     /* 업체가 생겼는지 한 번 맞춰 본다 — 계약관리에서 업체가 만들어지면 여기서
        저절로 채워진다(까닭·비용은 coSweep 에 적었다). 기다리는 사진이 없으면
        아무 일도 안 하고, 한 번 열 때 한 번만 한다. */
@@ -10576,8 +10686,8 @@ function renderGrid() {
        ⚠ 「보류」가 이긴다 — 보류인 장은 아직 «물음에 답할» 차례이지 누를 차례가 아니다.
        ⚠ 딱지 자리를 그대로 쓴다(칸 아래 20px 을 또 쓰지 않게, 2026-08-21 규칙). */
     const waitTag = (!holdTag && readWaitOf(it))
-      ? '<span class="tag wait" title="아직 안 읽었습니다 — 눌러야 읽습니다'
-        + ' (판독은 하루 몫이 정해져 있어 저절로 읽지 않습니다)">🔤 판독 필요</span>'
+      ? '<span class="tag wait" title="아직 안 읽었습니다 — 저절로 읽힐 차례를 기다립니다.'
+        + ' 급하면 눌러 주세요">🔤 판독 필요</span>'
       : '';
     const tag = holdTag || waitTag || (hasTag
       ? '<span class="tag' + (mergeWarn ? ' need' : '') + '">' +
@@ -17459,8 +17569,10 @@ function readPhoto(id, masked, opt) {
     /* ⚠ 이 길은 «사람이 누른» 길이다 — 칸의 🔤, 「다시 판독」, 「N장 판독」이 모두
        여기로 온다. 그래서 판독 층에 manual 을 실어 보낸다: 이번 달 한도를 넘었을 때
        서버가 «자동»만 막고 이 길은 통과시킨다(대표 결정 2026-09-10 ⓵㉮).
-       올릴 때 읽는 길(startRead→readDocChunked)은 이것을 «안» 붙인다 — 그쪽이 자동이다. */
-    const 사람이 = { manual: true };
+       올릴 때 읽는 길(startRead→readDocChunked)은 이것을 «안» 붙인다 — 그쪽이 자동이다.
+       ★ 사진첩을 열 때 저절로 건 것(opt.auto, ㉴)도 «안» 붙인다 — 그것도 자동이다.
+         붙이면 한도를 넘은 달에도 서버가 못 막고 저절로 계속 읽는다. */
+    const 사람이 = (opt && opt.auto) ? {} : { manual: true };
     const 있는글자 = tx ? docTextOf(tx) : '';
     if (있는글자) {
       return freeReadTry(있는글자, [], opt).then(function (free) {

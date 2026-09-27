@@ -3,7 +3,9 @@
  *   「문서일 경우 문서는 자동판독 눌러야 된다는 표시 좀 해 달라」
  *
  * ★★ 이 검사가 지키는 것 셋:
- *   ① 저절로 «걸지 않는다» — 하루 몫을 태우던 것이 바로 그것이었다
+ *   ① 세는 함수는 «세기만» 한다 — 거는 곳은 따로 있다
+ *      (2026-09-27 대표 지시로 «저절로 거는 곳»이 다시 생겼다 — 관리자 PC 에서 안 읽은 것만,
+ *       하루 상한과 함께. 그 규칙은 tests/photos-auto-read-on-open.test.js 가 지킨다)
  *   ② 그러면서 «표시»가 있다 — 없으면 이 바꿈은 그냥 「판독 고장」이다
  *   ③ 사람이 누르는 길은 «하나도» 막지 않는다
  *
@@ -25,14 +27,15 @@ const READER = stripJs(fs.readFileSync(path.join(ROOT, 'js', 'pu-doc-read.js'), 
 const IDX = stripJs(fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8'));
 const STORE = stripJs(fs.readFileSync(path.join(ROOT, 'js', 'pu-photo-store.js'), 'utf8'));
 
-/* ══════ ① 저절로 걸지 않는다 ══════════════════════════════════════ */
+/* ══════ ① 세는 함수는 세기만 한다 ══════════════════════════════════ */
 
-test('★★★ 화면을 열 때 «저절로» 판독에 걸지 않는다 — 하루 몫을 태우던 것이 이것이었다', () => {
+test('★★★ 세는 함수(autoReadPending)는 «직접 걸지» 않는다 — 누가 부르든 거기서 판독이 나가면 안 된다', () => {
   const fn = stripJs(cutFn(RAW, 'function autoReadPending('));
   assert.ok(fn, 'autoReadPending 이 없습니다');
   assert.ok(!/queuePhotoRead\(/.test(fn),
-    '★★★ 세는 함수가 아직 «직접 걸고» 있습니다 — 서류는 한 장씩 오므로 '
-    + '올리는 족족 저절로 읽혀 평소 업무가 그대로 하루 몫을 태웁니다.');
+    '★★★ 세는 함수가 «직접 걸고» 있습니다 — 띠를 그리거나 「서류입니다」에 답할 때마다 불리므로 '
+    + '상한·관리자 PC·탭 찜을 모두 건너뛰고 판독이 나갑니다. 거는 곳은 readWaitRun(누를 때)과 '
+    + 'autoReadGo(저절로) 둘입니다.');
 });
 
 test('★★ 거는 일은 «누를 때» 부르는 자리 하나에 모였다', () => {
