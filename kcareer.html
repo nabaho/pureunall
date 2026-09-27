@@ -1155,13 +1155,13 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=29"></script>
+<script src="js/kcareer-hwpxfill.js?v=30"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=18"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
-<script src="js/kcareer-hwpstamp.js?v=2"></script>
+<script src="js/kcareer-hwpstamp.js?v=3"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
@@ -1476,8 +1476,10 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <button class="btn" style="border-color:#fecaca;color:var(--red)" onclick="rhStampDoc()" title="★기본 도장을 「(인)」 자리에 찍습니다 — 글자를 다 확인한 뒤 마지막에">🖋 도장 찍기</button>
                 <button class="btn primary" onclick="rhSaveInput()" id="kfSaveBtn" title="입력판에 친 값을 원본 한글 서식의 그 칸에 넣습니다">💾 원본 한글에 넣기</button>
                 <button class="btn" onclick="openTidy()" id="rhTidyBtn" title="필요 없는 쪽을 빼고, 남은 자리표·예시 글자를 걷어 냅니다 — 한글에서 고쳐 온 파일을 바탕으로 갈아 끼우는 것도 여기입니다">🧹 서식 정리</button>
-                <button class="btn" onclick="rhOpenBigPopup()" id="rhBigBtn" title="올린 한글 서식을 큰 창으로 — 실제 A4 쪽 그대로 보입니다">🔍 큰 창으로 보기</button>
-                <button class="btn" onclick="rhToggleWide()" id="rhWideBtn" title="편집 화면을 넓게 — 아래가 잘려 안 보일 때">⛶ 넓게 보기</button>
+                <!-- ⚠★ 「🔍 큰 창으로 보기」·「⛶ 넓게 보기」를 뺐다 (대표 지시 2026-09-27
+                     「다 삭제해라 한글편집에서 가능하다」). ✏️ 한글 편집의 「🗖 큰 창」·
+                     「⛶ 전체 화면」이 같은 일을 더 잘 한다 — 같은 일을 하는 단추가 넷이면
+                     어느 것을 눌러야 할지 알 수 없다. **이 둘을 되살리지 말 것.** -->
                 <button class="btn" id="rcSaveBtn">💾 완성본 생성</button>
                 <!-- 임시저장·치우기 — 전에는 팝업 안에서만 됐다(대표 지시 2026-08-30).
                      문서를 덮는 창을 열지 않고 이 줄에서 끝낸다. -->
@@ -13146,8 +13148,12 @@ async function rhFillByMap(){
   if(_rhSignedLine){
     try{ 찍음=await rhStampDoc(true); }catch(e){ console.warn('도장 자동', e); }
   }
+  /* ⚠ 도장을 «못» 찍었으면 까닭을 함께 말한다 — 조용히 건너뛰면 도장이 없어서인지
+     자리를 못 찾아서인지 알 길이 없다(대표 제보 2026-09-27 「도장찍기 잘 안된다」). */
+  var 도장말 = 찍음 ? ' · 🖋 도장까지 찍었습니다'
+              : (_rhSignedLine && _rhStampWhy ? ' · 도장은 못 찍었습니다 — '+_rhStampWhy : '');
   toast('✅ '+filled.length+'칸 채웠습니다'+(failed.length?' · '+failed.length+'칸은 못 넣었습니다':'')
-    +(찍음?' · 🖋 도장까지 찍었습니다':''));
+    +도장말, 도장말 ? 6000 : undefined);
   if(failed.length) console.warn('[칸지도] 못 넣은 자리', failed);
 }
 
@@ -13482,8 +13488,12 @@ async function rhPagesRestore(){
 /* quiet=true 면 «못 찍는 까닭»을 알리지 않고 조용히 물러선다.
    채우기 뒤에 이어서 부를 때 쓴다 — 채우기는 잘 됐는데 붉은 알림이 뜨면
    사람은 «채우기가 실패했다»고 읽는다. */
+/* ⚠★ 왜 못 찍었는지 남긴다 — 「내 정보로 채우기」가 조용히 찍기를 건너뛰면
+   대표는 «도장이 없어서»인지 «자리를 못 찾아서»인지 알 길이 없다(2026-09-27 제보). */
+var _rhStampWhy='';
 async function rhStampDoc(quiet){
-  var 말 = function(m){ if(!quiet) toast(m); };
+  var 말 = function(m){ _rhStampWhy=m; if(!quiet) toast(m); };
+  _rhStampWhy='';
   if(!_rhDoc||!_rhDoc.bytes){ 말('먼저 서식을 올려주세요'); return false; }
   if(!window.KcareerHwpStamp){ 말('도장 모듈을 못 불러왔습니다'); return false; }
   /* 이미 찍힌 서식에 또 찍지 않는다 — 도장이 둘 겹친다 */
@@ -13534,6 +13544,7 @@ async function rhStampDoc(quiet){
   rhDraftSave();
   await mountEditor(bytes.buffer.slice(0), _rhDoc.name);
   말('🖋 도장을 찍었습니다 — 자리가 어긋나면 한글에서 옮길 수 있습니다');
+  _rhStampWhy='';                       /* 됐으니 까닭을 지운다 */
   return true;
 }
 

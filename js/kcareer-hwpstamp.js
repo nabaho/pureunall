@@ -57,13 +57,55 @@
   }
 
   /* 도장 자리 — 「(인)」「（인）」「(서명)」「서명 또는 인」「印」.
-     ⚠ 못 찾으면 null 을 돌려준다. 아무 데나 찍지 않는다 — 잘못 날인한 서류는 되돌릴 수 없다. */
+     ⚠ 못 찾으면 null 을 돌려준다. 아무 데나 찍지 않는다 — 잘못 날인한 서류는 되돌릴 수 없다.
+
+     ⚠★★ 날것 XML 에서 찾으면 «거의 못 찾는다» (2026-09-27 대표 제보 「도장찍기 잘 안된다」).
+       한글은 한 낱말을 여러 조각으로 쪼개 담는다 — 「(서명)」이 실제로는
+         <hp:t>(</hp:t> … <hp:t>서명</hp:t> … <hp:t>)</hp:t>
+       처럼 태그를 사이에 두고 흩어져 있다(「충남 천안시 무슨」이 네 조각으로 오던 것과 같다).
+       그래서 «보이는 글자»만 이어 붙여 찾고, 찾은 자리를 XML 자리로 되짚는다. */
   var MARKS = /[（(]\s*(인|서명)\s*[)）]|서명\s*또는\s*인|印/;
+  /* <hp:t>…</hp:t> 안의 글자와 그 XML 자리를 모은다 */
+  function 글자조각(s) {
+    var re = /<hp:t(?:\s[^>]*)?>([\s\S]*?)<\/hp:t>/g, m, out = [];
+    while ((m = re.exec(s))) {
+      out.push({ text: m[1], start: m.index + m[0].indexOf(m[1]), end: re.lastIndex });
+    }
+    return out;
+  }
+  /* &amp; 같은 것은 길이가 달라져 자리가 밀린다 — 길이를 지키며 푼다(한 글자로 바꾼다) */
+  function 엔티티풀기(t) {
+    return String(t).replace(/&[a-zA-Z#0-9]+;/g, function (e) {
+      var v = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'" }[e];
+      return v || ' '.repeat(e.length);   /* 모르는 것은 «같은 길이»의 빈칸으로 — 자리가 안 밀린다 */
+    });
+  }
+  /* ⚠ 고장넣기가 «안 걸리는» 것 셋 — 억지 검사를 지어 붙이지 않고 까닭을 적어 둔다:
+       ① `조각[끝조각].end` → `.start` 로 바꿔도 같다. 한 조각의 처음이든 끝이든
+          «그 다음 `</hp:run>`» 은 같은 것이라 찍히는 자리가 안 달라진다.
+       ② `if (!조각.length) return null;` 을 빼도 같다. 조각이 없으면 이어 붙인 글이
+          빈 글자라 아래 MARKS 가 어차피 못 찾고 null 이 나간다.
+       ③ 모르는 엔티티를 «같은 길이의 빈칸»으로 두든 «지우든» 같다. 자리 지도를
+          «해독한 글자» 하나하나에 붙이므로 길이가 줄어도 글과 지도가 함께 줄어
+          어긋나지 않는다. (처음엔 「자리가 밀린다」고 적었는데 «틀린 까닭»이었다 —
+          고장넣기가 그것을 잡아 주었다.)
+     셋 다 «지금은» 결과가 같다. 읽기 쉬우라고 남겨 둔다. */
   function findSpot(sectionXml) {
     var s = String(sectionXml || '');
-    var m = MARKS.exec(s);
+    var 조각 = 글자조각(s);
+    if (!조각.length) return null;
+    /* 보이는 글자를 이어 붙이고, 글자마다 «어느 조각의 몇 번째»인지 적어 둔다 */
+    var 글 = '', 지도 = [], i, j, t;
+    for (i = 0; i < 조각.length; i++) {
+      t = 엔티티풀기(조각[i].text);
+      for (j = 0; j < t.length; j++) { 글 += t[j]; 지도.push(i); }
+    }
+    var m = MARKS.exec(글);
     if (!m) return null;
-    var end = s.indexOf('</hp:run>', m.index);
+    /* 자리표의 «마지막 글자»가 든 조각 뒤에 찍는다 */
+    var 끝조각 = 지도[Math.min(m.index + m[0].length - 1, 지도.length - 1)];
+    var from = 조각[끝조각].end;
+    var end = s.indexOf('</hp:run>', from);
     if (end < 0) return null;
     return { index: end + '</hp:run>'.length };
   }

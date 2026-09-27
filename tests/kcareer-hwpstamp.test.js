@@ -51,6 +51,61 @@ test('도장 자리가 없으면 «없다»고 한다 — 아무 데나 찍지 �
   assert.equal(S.findSpot('<hp:p><hp:run><hp:t>제출서류 1부</hp:t></hp:run></hp:p>'), null);
 });
 
+/* ══════ ★★★ 쪼개진 자리표 (대표 제보 2026-09-27 「도장찍기 잘 안된다」) ══════
+   한글은 한 낱말을 여러 조각으로 쪼개 담는다 — 「(서명)」이 실제로는
+     <hp:t>(</hp:t> … <hp:t>서명</hp:t> … <hp:t>)</hp:t>
+   처럼 태그를 사이에 두고 흩어져 있다(「충남 천안시 무슨」이 네 조각으로 오던 것과 같다).
+   날것 XML 에서 찾으면 «거의 못 찾는다» — 그것이 도장이 안 찍히던 까닭이었다. */
+const run = (t) => '<hp:run charPrIDRef="0"><hp:t>' + t + '</hp:t></hp:run>';
+
+test('★★★ 조각으로 쪼개진 자리표도 찾는다 — 이것이 「도장이 안 찍힌다」의 까닭이었다', () => {
+  const 쪼갠것 = [
+    ['(서명)', '<hp:p>' + run('신청인 권형하 ') + run('(') + run('서명') + run(')') + '</hp:p>'],
+    ['(인)', '<hp:p>' + run('위임자 ') + run('(') + run('인') + run(')') + '</hp:p>'],
+    ['사이에 빈칸', '<hp:p>' + run('( ') + run('서명') + run(' )') + '</hp:p>'],
+  ];
+  쪼갠것.forEach(([이름, xml]) => {
+    assert.ok(S.findSpot(xml),
+      '★ 쪼개진 「' + 이름 + '」을 못 찾습니다 — 대표 서류에서 도장이 안 찍힙니다');
+  });
+});
+
+test('★★ 도장은 자리표 «뒤»에 들어간다 — 앞에 들어가면 엉뚱한 곳에 찍힌다', () => {
+  const xml = '<hp:p>' + run('신청인 권형하 ') + run('(') + run('서명') + run(')') + '</hp:p>';
+  const out = S.insertPic(xml, '<hp:pic/>', S.findSpot(xml));
+  assert.ok(out.indexOf('<hp:pic/>') > out.lastIndexOf('</hp:t>'),
+    '★ 도장이 자리표 앞에 들어갔습니다');
+  assert.ok(out.indexOf('서명') > 0, '원래 글자는 남아야 합니다');
+});
+
+test('★ 엔티티(&amp;)가 섞여도 자리가 안 밀린다', () => {
+  const xml = '<hp:p>' + run('갑&amp;을 (인)') + '</hp:p>';
+  const at = S.findSpot(xml);
+  assert.ok(at, '★ 엔티티가 있으면 못 찾습니다');
+  const out = S.insertPic(xml, '<hp:pic/>', at);
+  assert.ok(out.indexOf('<hp:pic/>') > out.indexOf('(인)'), '★ 자리가 밀렸습니다');
+});
+
+test('★ «모르는» 엔티티가 섞여도 자리표를 찾는다', () => {
+  /* ⚠ 이 검사는 «찾는가»를 본다. 엔티티를 빈칸으로 두든 지우든 결과는 같다 —
+     자리 지도를 «해독한 글자»마다 붙이므로 길이가 줄어도 어긋나지 않는다
+     (고장넣기가 내 잘못된 짐작을 잡아 주었다. 모듈 주석에 적었다). */
+  const 앞 = '갑&nbsp;&nbsp;&nbsp;을';
+  const xml = '<hp:p>' + run(앞) + run('(') + run('인') + run(')') + run(' 끝') + '</hp:p>';
+  const at = S.findSpot(xml);
+  assert.ok(at, '★ 모르는 엔티티가 있으면 못 찾습니다');
+  const out = S.insertPic(xml, '<hp:pic/>', at);
+  assert.ok(out.indexOf('<hp:pic/>') > out.indexOf('<hp:t>인</hp:t>'),
+    '★ 도장이 「인」보다 앞에 들어갔습니다 — 엔티티 길이가 안 지켜져 자리가 밀렸습니다');
+  assert.ok(out.indexOf('<hp:pic/>') < out.indexOf(' 끝'),
+    '★ 도장이 자리표를 지나쳐 뒤로 갔습니다');
+});
+
+test('★ 조각이 흩어져 있어도 «없는 것»은 없다고 한다', () => {
+  const xml = '<hp:p>' + run('제출') + run('서류') + run(' 1부') + '</hp:p>';
+  assert.equal(S.findSpot(xml), null, '★ 없는 자리를 지어냅니다 — 아무 데나 찍힙니다');
+});
+
 test('그림을 그 자리 문단 안에 넣는다 — 문서가 깨지지 않게 run 으로 감싼다', () => {
   const xml = '<hp:p><hp:run><hp:t>성명 : 권형하   (인)</hp:t></hp:run></hp:p>';
   const out = S.insertPic(xml, '<hp:pic/>', S.findSpot(xml));

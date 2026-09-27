@@ -88,7 +88,14 @@ test('올린 파일 이름을 그대로 쓰지 않는다 — 바로잡은 이름
 test('올리는 것만으로 큰 창이 뜨지는 않는다 — 편집기에 원본이 이미 나온다', () => {
   const body = stripJs(grab('importTemplateFile'));
   assert.doesNotMatch(body, /openHwpViewer\(/, '팝업이 화면을 덮으면 안 됩니다');
-  assert.match(source, /onclick="rhOpenBigPopup\(\)"/, '크게 보고 싶을 때 열 길은 있어야 합니다');
+  /* ⚠ 2026-09-27 대표 지시로 「🔍 큰 창으로 보기」·「⛶ 넓게 보기」를 뺐다 —
+     ✏️ 한글 편집의 「🗖 큰 창」·「⛶ 전체 화면」이 같은 일을 더 잘 한다.
+     겨누는 자리를 옮긴다. «크게 볼 길이 있어야 한다»는 규칙 자체는 그대로다
+     (느슨해진 것이 아니라 그 길이 다른 곳으로 옮겨 갔다). */
+  assert.match(source, /onclick="rhHwpEdBig\(\)"/, '크게 보고 싶을 때 열 길은 있어야 합니다');
+  assert.match(source, /onclick="rhHwpEdFull\(\)"/, '전체 화면으로 갈 길도 있어야 합니다');
+  assert.ok(!/onclick="rhOpenBigPopup\(\)"/.test(source),
+    '★ 뺀 단추가 되살아났습니다 — 같은 일을 하는 단추가 넷이 됩니다');
 });
 
 test('큰 창이 열려 있으면 그 창에서 바로 채울 수 있다', () => {
