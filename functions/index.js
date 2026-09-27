@@ -1075,11 +1075,17 @@ exports.rulesLawWatch = functions
   });
 
 /* 월요일 거래처 뉴스레터 — 화면에서 «확정본 준비»를 한 경우에만 예약 대기열에 건다.
-   기본값은 꺼짐이다. 빈 편지·지난주 준비본·이미 처리한 준비본은 절대 보내지 않는다. */
+   기본값은 꺼짐이다. 빈 편지·지난주 준비본·이미 처리한 준비본은 절대 보내지 않는다.
+   ★ 오전 6시 (대표 지시 2026-09-27 「월요일 6시 자동발송으로 바꿔달라」 — 전에는 8시).
+   ⚠ 정보통신망법 제50조제3항은 오후 9시~오전 8시 «광고성 정보» 전송에 별도 동의를 요구한다.
+     그러나 시행령 제61조제2항이 그 단서의 매체를 «전자우편»으로 정해 메일은 이 제한에서
+     빠진다(2026-09-27 법제처 원문 확인). 문자·카톡으로 바꾸면 이 시각은 안 된다.
+   ⚠ 시각을 바꾸면 화면(pu-news.html)·검토 메일(news-friday.js)·사용액 창(enter.html)의
+     「오전 몇 시」도 함께 — tests/newsletter-send-hour.test.js 가 넷이 같은지 본다. */
 exports.weeklyNewsletterSend = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 180, memory: "512MB" })
-  .pubsub.schedule("every monday 08:00")
+  .pubsub.schedule("every monday 06:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = getDatabase();
