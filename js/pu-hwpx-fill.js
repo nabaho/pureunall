@@ -326,6 +326,14 @@
     });
     return { xml: xml, hits: hits };
   }
+  /* 베낀 장(둘째부터)의 «맨 바깥 문단» 줄 정보를 걷는다 — 옛 쪽 기준 세로 자리를 그대로 두면 한글이 그것을 믿어,
+     재산변동보고서를 두 장으로 베꼈더니 그 뒤 재산목록 장이 통째로 안 그려졌다(2026-09-27, 한글 쪽 수로 좁혀 봄:
+     베낀 문단 줄 정보만 걷으면 3쪽, 그대로면 2쪽). 표 칸 안 문단은 칸 기준이라 그대로 둔다. */
+  function unlineTops(chunk) {
+    var eds = scan(chunk).filter(function (p) { return /^P\d+$/.test(p.addr) && p.lsS >= 0 && p.lsE > p.lsS; })
+      .map(function (p) { return { s: p.lsS, e: p.lsE, raw: '' }; });
+    return eds.length ? applyEdits(chunk, eds) : chunk;
+  }
   function expand(xml, V, opts) {
     opts = opts || {};
     var guard = 0, filled = 0, unknown = {};
@@ -372,6 +380,7 @@
         if (start.page && idx > 0) {
           x = x.replace(/<hp:secPr\b[\s\S]*?<\/hp:secPr>/, '').replace(/<hp:ctrl>\s*<hp:colPr\b[^>]*\/>\s*<\/hp:ctrl>/, '')
             .replace(/<hp:p\b([^>]*?)\bpageBreak="0"/, '<hp:p$1pageBreak="1"');
+          x = unlineTops(x);
         }
         return x;
       });

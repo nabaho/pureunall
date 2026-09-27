@@ -208,3 +208,14 @@ test('★ tail — 문단 끝에 «k번째 조각 모양»의 새 조각을 붙�
   assert.equal(X.textOf(X.fill(r.xml, { 대표자: '홍길동' }).xml), '① 성명(대표자)    홍길동', '붙인 조각도 채워진다');
   assert.equal(X.replaceText(xml, [{ at: 'P9', tail: 'x' }]).hits[0], 0, '주소가 없으면 안 붙는다');
 });
+
+test('★ 쪽 반복 — 둘째 장부터는 맨 바깥 문단의 줄 정보를 걷는다(옛 쪽 자리를 한글이 믿어 뒤 장이 사라졌다)', () => {
+  /* 2026-09-27 재산변동보고서: 보고서를 두 장으로 베꼈더니 뒤의 재산목록 장이 한글에서 통째로 안 그려졌다.
+     베낀 문단의 줄 정보만 걷으면 3쪽이 제대로 나왔다(한글 쪽 수로 좁혀 봄). 첫 장은 원본 그대로 둔다. */
+  const LSV = '<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" horzsize="40000"/></hp:linesegarray>';
+  const xml = SEC(P(RUN('{{#쪽:변경}}보고서 {{일}}{{/쪽:변경}}'), LSV), P(RUN('재산목록'), LSV));
+  const r = X.expand(xml, { 변경: [{ 일: '1' }, { 일: '2' }] });
+  assert.equal(X.textOf(r.xml), '보고서 1\n보고서 2\n재산목록');
+  const ps = X.scan(r.xml).filter((p) => /^P\d+$/.test(p.addr));
+  assert.deepEqual(ps.map((p) => p.lsS >= 0), [true, false, true], '첫 장·뒤 문단은 그대로, 베낀 장만 걷는다');
+});

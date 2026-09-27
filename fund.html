@@ -17,7 +17,7 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=16"></script>
-<script src="js/pu-hwpx-fill.js?v=4"></script>
+<script src="js/pu-hwpx-fill.js?v=5"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <!-- 회사 공용 사진·서류 저장 층 — 사진첩/기업정보함/컨설팅과 같은 파일을 쓴다(판독·보관 방식이 한 곳) -->
@@ -3794,13 +3794,15 @@ function _aiDownload(){
    ⚠ 값은 HTML 서식이 쓰던 «같은 함수»에서 온다 — 한글 파일과 화면이 서로 다른 숫자를 말하면 안 된다. */
 var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', agreement:'공동', charter:'공동', contrib:'공동',
   reg_apply:'공동', reg_accept:'공동', reg_roster:'공동', reg_seal:'공동', reg_sealpaper:'공동', reg_sealcard:'공동',
-  reg_proxy:'공동', reg_license:'공동', tax_bizreg:'공동', tax_sublease:'공동', tax_lease:'공동', tax_hometax:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
+  reg_proxy:'공동', reg_license:'공동', tax_bizreg:'공동', tax_sublease:'공동', tax_lease:'공동', tax_hometax:'공동',
+  ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
 var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues,
   agreement:_hwpAgreementValues, charter:_hwpCharterValues, contrib:_hwpContribValues,
   reg_apply:_hwpRegValues, reg_accept:_hwpRegValues, reg_roster:_hwpRegValues, reg_seal:_hwpRegValues,
   reg_sealpaper:_hwpRegValues, reg_sealcard:_hwpRegValues, reg_proxy:_hwpRegValues, reg_license:_hwpRegValues,
-  tax_bizreg:_hwpTaxValues, tax_sublease:_hwpTaxValues, tax_lease:_hwpTaxValues, tax_hometax:_hwpTaxValues};
+  tax_bizreg:_hwpTaxValues, tax_sublease:_hwpTaxValues, tax_lease:_hwpTaxValues, tax_hometax:_hwpTaxValues,
+  ops_asset_change:_hwpOpsValues, ops_minutes_scope:_hwpOpsValues, ops_minutes_use:_hwpOpsValues};
 /* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다(사내는 HTML 로 둔다) */
 var HWP_TPL_STRICT={charter:1};
 function _hwpTplFits(kind,f){ return !HWP_TPL_STRICT[kind] || ((f&&f.fund_type==='사내')?'사내':'공동')===HWP_TPL_KINDS[kind]; }
@@ -4059,6 +4061,29 @@ function _hwpTaxValues(f,sites){
     임대인:String(f.lease_lessor||''), 임차주소:String(f.lease_addr||f.address||''),
     임대시작:D(_hwpKoDate2(from,[' ',' '])), 계약일:_hwpKoDate2(from||today,[' ',' ']),
     신청일:_hwpKoDate2(today,['   ','   ']), 동의일:_hwpKoDate(today,['   ','   '])};
+}
+/* ④ 운영 셋(재산변동상황보고서·협의회 회의록 사용범위/사용내용) — 대표 선택(2026-09-27) «예전 제출본 모양».
+   재산변동은 HTML 과 같은 장부 숫자(S._docBf — 별지15호 ⑫~⑳ 과 같은 기본재산 분개)로 «변경일마다 한 장»
+   ({{#쪽:변경}}). 이 기금·이 해 것이 아니면 쓰지 않는다(남의 금액을 노동청에 내게 된다).
+   재산목록(둘째 장)의 금액 칸은 비운다 — HTML 도 「따로 만들어 붙이세요」다. */
+function _hwpOpsValues(f,sites){
+  f=f||{}; sites=sites||[];
+  var b=_boss(f), amt=0; try{ amt=Math.round(foundContrib(f,sites)||0); }catch(e){}
+  var today=_hwpTodayIso(), bf=S._docBf, ok=!!(bf&&bf.fid===S.formFund&&bf.yr===S.year), note='';
+  var W=function(v){ return Number(Math.round(v||0)).toLocaleString(); };
+  var dot=function(iso){ var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||'')); return m?m[1]+'. '+m[2]+'. '+m[3]+'.':''; };
+  var days=ok?bf.days:[];
+  if(!ok) note='회계·결산의 기본재산 변동 분개를 아직 못 읽어 변경 내용 칸을 비웠습니다.';
+  else if(!days.length) note=S.year+'년에 기본재산 변동이 없습니다 — 빈 서식입니다.';
+  else if(days.length>1) note=S.year+'년 기본재산 변동 '+days.length+'건 — 변경일마다 한 장씩 만들었습니다.';
+  var last=days.length?days[days.length-1].date:'';
+  return {기금명:String(f.name||''), 기금소재지:String(f.address||''), 전화:_dashPhone(f.phone)||String(f.phone||''),
+    대표자:String(b.name||f.chairman||''), 직책:String(f.rep_position||'이사장'), 인가번호:String(f.inka_no||''),
+    노동청:String(f.labor_office||'').trim()||'고용노동부  00지청',
+    보고일:_hwpKoDate2(today,['  ','  ']), 목록일:dot(last||today),
+    변경:days.map(function(d){ return {변경일:dot(d.date), 변경전:W(d.before), 변경후:W(d.after),
+      변경금액:(d.diff<0?'△ ':'')+W(Math.abs(d.diff)), 변경사유:bfReason(d.items,true)}; }),
+    연도:String(S.year||''), 출연금:amt>0?amt.toLocaleString():'', _note:note};
 }
 /* ★ 2026-09-26 — 채우기를 «한글 XML(HWPX)에서 직접» 한다 (js/pu-hwpx-fill.js).
    대표 「줄칸 간격등 정리가 계속 안된다 … 근본적 해결 … 기존서류와 같이」 → 서식을 원본 한글 틀로 옮기다가,
@@ -14071,16 +14096,17 @@ function bfDays(open,list){
 }
 /* 변경 사유 — 성격별로 묶고 적요를 곁들인다. 적요가 실제 사유를 가장 잘 말해 준다
    (실제 제출본도 「고유목적준비금설정에 따른 기본재산 변경」처럼 적었다). */
-function bfReason(items){
-  var order=BF_KINDS.map(function(x){return x[0];}), by={};
+function bfReason(items,plain){
+  /* plain — 한글 틀용 «글자 그대로»(HTML 이스케이프·<br> 없이, 여러 성격은 한 줄에 「 / 」로) */
+  var order=BF_KINDS.map(function(x){return x[0];}), by={}, E=plain?function(s){ return s; }:esc;
   (items||[]).forEach(function(b){ (by[b.kind]=by[b.kind]||[]).push(b); });
   return order.filter(function(k){ return by[k]; }).map(function(k){
     var lbl=(BF_KINDS.filter(function(x){return x[0]===k;})[0]||['','기타'])[1].replace(/^\S+\s+/,'');
     var tot=by[k].reduce(function(t,b){ return t+b.amount; },0);
     var ms=by[k].map(function(b){ return String(b.memo||'').trim(); }).filter(Boolean);
-    return '- '+esc(lbl)+' '+Number(tot).toLocaleString()+'원'
-      +(ms.length?' ('+esc(ms.slice(0,3).join(' · ')+(ms.length>3?' 외 '+(ms.length-3)+'건':''))+')':'');
-  }).join('<br>');
+    return '- '+E(lbl)+' '+Number(tot).toLocaleString()+'원'
+      +(ms.length?' ('+E(ms.slice(0,3).join(' · ')+(ms.length>3?' 외 '+(ms.length-3)+'건':''))+')':'');
+  }).join(plain?' / ':'<br>');
 }
 function buildF15(arr,fid,yr,rep,sites,welf){
   rep=rep||{}; sites=sites||[]; welf=welf||[];
