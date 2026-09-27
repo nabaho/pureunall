@@ -84,6 +84,29 @@ test('ⓐ ★ 뒤로가기로 칸을 바꾸면 «앱까지» 나가지 않는다
   assert.ok(src.indexOf("addEventListener('popstate'") < src.indexOf('js/pu-back.js'), '★ 뒤로가기 손잡이 차례가 바뀌었습니다');
 });
 
+test('ⓐ ★ 나오지 않는 걸음 — 칸이 그대로면 pushState 없이 다시 그린다', function () {
+  /* 칸이 이미 그 칸이면(예: #forms:x 에서 「계약서 양식」을 다시 누름) showPane 만
+     다시 부르고 pushState 는 안 한다 — 안 그러면 화면은 그대로인 채 걸음만
+     하나 심겨, 뒤로가기가 popstate 만 일으키고 pu-back.js 가 앱을 나가 버린다. */
+  const src = stripComments(DOCS);
+  const nav = cutFn(src, "b.addEventListener('click', function ()");
+  assert.match(nav, /paneFromHash\(\) === name/, '★ 칸이 그대로인지 안 가려 뒤로가기가 앱을 나가 버립니다');
+});
+
+test('ⓐ ★ popstate — 칸은 그대로여도 «고른 양식»이 바뀌었으면 맞춰 준다', function () {
+  const src = stripComments(DOCS);
+  const at = src.indexOf("addEventListener('popstate'");
+  const pop = cutFn(src.slice(at), 'function ()');
+  assert.match(pop, /formsUi\.select\(/, '★ #forms:x → #forms:y 뒤로가기에서 고른 양식을 안 맞춥니다');
+});
+
+test('ⓐ ★ onFormSelect — 다른 칸에 있을 때 null 선택 알림을 무시한다', function () {
+  const src = stripComments(DOCS);
+  const fn = cutFn(src, 'function onFormSelect(');
+  assert.match(fn, /^\s*if \(!id && \$\('paneForms'\)\.hidden\) return;/m,
+    '★ 양식이 지워지며 onSelect(null) 이 불려도 다른 칸을 보고 있으면 양식 칸으로 튕겨서는 안 됩니다');
+});
+
 test('ⓑ ★★ 이알피가 공용 파일을 싣고, 계약서 출력은 그 기본 양식을 쓴다', function () {
   const src = stripComments(ERP);
   const tag = src.search(/<script src="js\/pu-contract-forms\.js\?v=\d+"><\/script>/);
