@@ -120,3 +120,14 @@ test('ⓒ 기업정보함은 읽기만 — idx·coInfo 한 칸, 사진(items)은
   const ofn = forms.slice(oStart, oEnd);
   assert.ok(ofn.indexOf('db.ref') < 0 && ofn.indexOf('changeForms') < 0, '채운 값을 저장하면 안 됩니다');
 });
+
+test('ⓑ 줄 정보는 «값을 넣은 문단만» 걷는다 — 꽉 찬 서식이 넘치지 않게', () => {
+  const x = '<hp:p id="1"><hp:run><hp:t>회사 가나&amp;다</hp:t></hp:run><hp:linesegarray><hp:lineseg a="1"/></hp:linesegarray></hp:p>'
+    + '<hp:p id="2"><hp:run><hp:t>그대로</hp:t></hp:run><hp:linesegarray><hp:lineseg a="2"/></hp:linesegarray></hp:p>';
+  const out = CF.stripLinesegsFor(x, ['가나&다']);
+  assert.ok(out.indexOf('a="1"') < 0, '값을 넣은 문단의 줄 정보가 남았습니다');
+  assert.ok(out.indexOf('a="2"') >= 0, '손대지 않은 문단의 줄 정보까지 걷었습니다');
+  assert.equal(CF.stripLinesegsFor(x, ['1']), x, '한 글자 값은 문단을 가리지 못한다 — 걷지 않는다');
+  const html = read('docs-esign.html');
+  assert.match(html, /PuFormCardFill\.stripLinesegsFor\(x, vals\)/, '채우기가 문단만 걷는 길을 쓰지 않습니다');
+});
