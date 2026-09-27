@@ -21,6 +21,7 @@ const C = require('../js/pu-news-core.js');
 const T = require('../js/pu-news-tpl.js');
 const MB = require('../functions/mail-bulk.js');
 const MS = require('../functions/mail-send.js');
+const N = require('../js/pu-news-notice.js');
 
 const 설정 = {
   회사이름: '푸른노무법인', 회신주소: '370-6@daum.net',
@@ -141,4 +142,55 @@ test('★★ 지역 조각은 «따로 불려도» 막혀 있다 — 화면이 �
     '지역 서식 조각의 { } 가 안 막혀 있다');
   assert.ok(T.지역뉴스평문(뉴, '충남').includes('｛지원금｝'),
     '지역 평문 조각의 { } 가 안 막혀 있다');
+});
+
+/* ═══ ㉣ 주소는 «전각»으로 막으면 안 된다 ════════════════════════════════
+   ⚠⚠ 사람이 손으로 붙여 넣는 주소에 { } 가 들어 있을 수 있다(안내문 링크 더하기,
+     자료 내려받기 주소). 평문에서 그것을 전각 ｛｝ 로 바꾸면 «링크가 죽는다» —
+     막기는 했는데 받는 분은 못 여는 주소를 받는다.
+   ★ 주소 안에서는 퍼센트(%7B·%7D)로 적는다 — 그대로 열리는 주소이면서
+     발송기는 자리로 못 읽는다. */
+test('★★★ 평문의 주소 안 { } 는 «퍼센트»로 적는다 — 전각이면 링크가 죽는다', () => {
+  const 자료 = { 갈래: '자료', 제목: '안내서', 발행처: '고용노동부',
+    링크: 'https://www.moel.go.kr/d1', 파일: 'https://www.moel.go.kr/a{b}c.pdf' };
+  const 편 = T.편지짓기(회차자료({ 안: { news: [], policy: [자료], case: [], hr: [] } }), 설정, {});
+  const 줄 = 편.본문.split('\n').filter((l) => l.indexOf('moel.go.kr/a') >= 0)[0] || '';
+  assert.ok(줄.includes('a%7Bb%7Dc.pdf'), '주소의 { } 가 퍼센트로 안 바뀌었다: ' + 줄);
+  assert.ok(!줄.includes('｛'), '주소에 전각 괄호가 들어가 링크가 죽었다: ' + 줄);
+  assert.ok(발송기통과(편.본문).includes('a%7Bb%7Dc.pdf'), '주소가 발송기에 먹혔다');
+});
+
+/* ═══ ㉤ 안내문도 «같은 잣대» ═══════════════════════════════════════════
+   안내문(js/pu-news-notice.js)은 2026-09-23 에 제목·요점·본문·첨부이름을 막았다.
+   남아 있던 구멍 셋 — 설정값(회사이름·전화)과 첨부 «주소». */
+const 안설 = { 회사이름: '푸른{회사}노무법인', 회신주소: '370-6@daum.net',
+  전화: '041-{전화}-0035' };
+const 안내짓기 = () => N.안내짓기({
+  제목: '육아휴직 급여 안내', 요점: ['시작일이 언제인지'], 기한: '2026-09-30',
+  본문: '가나상사처럼 살펴보실 곳이 있습니다.',
+  첨부: [{ 이름: '안내 자료', 주소: 'https://asia-northeast3-pureun-erp.cloudfunctions.net'
+    + '/newsView?file=' + 'a'.repeat(32) + '.pdf&n=a{b}c', 크기: 320000 }]
+}, 안설, { 범위: '자문중', 날짜: Date.UTC(2026, 8, 23) });
+
+test('★★★ 안내문 — 설정값(회사이름·전화)의 { } 도 안 사라진다', () => {
+  const r = 안내짓기();
+  assert.ok(MB.fill(r.제목, {}).includes('회사'), '제목의 회사이름에서 { } 가 사라졌다');
+  assert.ok(MB.fill(r.본문, {}).includes('회사'), '평문의 회사이름에서 { } 가 사라졌다');
+  assert.ok(MB.fill(r.본문, {}).includes('전화'), '평문의 전화에서 { } 가 사라졌다');
+});
+
+test('★★★ 안내문 — 첨부 주소의 { } 는 퍼센트로, 서식에서는 그대로 열린다', () => {
+  const r = 안내짓기();
+  const 줄 = r.본문.split('\n').filter((l) => l.indexOf('newsView') >= 0)[0] || '';
+  assert.ok(줄.includes('n=a%7Bb%7Dc'), '평문 첨부 주소의 { } 가 퍼센트로 안 바뀌었다: ' + 줄);
+  assert.ok(!줄.includes('｛'), '평문 첨부 주소에 전각 괄호가 들어가 링크가 죽었다: ' + 줄);
+  assert.ok(MB.fill(r.본문, {}).includes('n=a%7Bb%7Dc'), '첨부 주소가 발송기에 먹혔다');
+  assert.ok(MB.fill(r.서식, {}).includes('&#123;b&#125;'), '서식 첨부 주소가 발송기에 먹혔다');
+});
+
+test('★★★ 안내문에서 발송기가 읽을 자리는 {담당문의} 하나뿐이다', () => {
+  const r = 안내짓기();
+  assert.deepStrictEqual(자리들(r.제목), [], '제목에 자리가 생겼다: ' + 자리들(r.제목));
+  assert.deepStrictEqual(자리들(r.서식), ['{담당문의}'], '서식에 딴 자리가 있다: ' + 자리들(r.서식));
+  assert.deepStrictEqual(자리들(r.본문), ['{담당문의}'], '평문에 딴 자리가 있다: ' + 자리들(r.본문));
 });
