@@ -272,9 +272,25 @@ test('서버 문지기', async (t) => {
     assert.equal(r.status, 400, '회의사진까지 서버를 거치면 격자가 통째로 느려집니다.');
   });
 
-  await t.test('★ 판독 전 사진도 서버가 안 다룬다', () => {
-    /* 판독 전에 민감으로 보면 회의사진 수백 장이 죄다 서버를 거친다. */
-    assert.equal(PV.decide({ kind: 'doc' }).ok, false);
+  /* ⚠ 2026-09-27 에 둘로 갈랐다(대표 지시 사진첩 점검 ②).
+     예전 한 줄은 「판독 전 서류도 서버가 안 다룬다」였다. 그 까닭은 «회의사진 수백 장이
+     서버를 거치게 된다»였는데, 회의사진은 «사진»이지 «서류»(kind:'doc')가 아니다.
+     서류는 이제 토큰 주소를 안 적으므로 이 문이 받아 주지 않으면 공유받은 사람이 못 연다.
+     ★ 그래서 서류는 받고, 사진은 예전 그대로 돌려보낸다 — 걱정한 것은 그대로 지킨다. */
+  await t.test('★ 판독 전 «사진»은 서버가 안 다룬다 — 회의사진 수백 장이 서버를 거치지 않게', () => {
+    assert.equal(PV.decide({}).ok, false);
+    assert.equal(PV.decide({ kind: 'photo' }).ok, false);
+    assert.equal(PV.decide({ read: { kind: 'meeting' } }).ok, false);
+  });
+
+  await t.test('★★ 판독 전 «서류»는 서버가 받는다 — 주소를 안 적으니 이 문이 아니면 못 연다', () => {
+    const r = PV.decide({ kind: 'doc' });
+    assert.equal(r.ok, true,
+      '판독 전 서류를 돌려보냈습니다 — 공유받은 사람이 못 엽니다(2026-08-17 「회색 46장」)');
+  });
+
+  await t.test('★ 판독 «뒤» 민감 아닌 서류도 서버가 받는다 — 서류는 늘 이 문이다', () => {
+    assert.equal(PV.decide({ kind: 'doc', read: { kind: 'bizreg' } }).ok, true);
   });
 
   await t.test('★ 지워진 사진은 404', () => {
@@ -379,16 +395,30 @@ test('옛 사진 훑기', async (t) => {
     }
   };
 
-  await t.test('★ 주소가 적힌 민감 서류만 찾는다', () => {
+  /* ⚠ 2026-09-27 — 판독 전 «서류»(p4)도 찾는다. 서류는 이제 늘 서버로 보므로 주소를
+       지워도 된다. 예전 쓸기는 민감 판정만 봐서 판독 전 서류를 «영영» 못 찾았다. */
+  await t.test('★ 주소가 적힌 민감 서류와 «판독 전 서류»를 찾는다', () => {
     const hits = PV.sweep(tree);
-    assert.deepEqual(hits.map(function (h) { return h.id; }).sort(), ['p1', 'q1'],
+    assert.deepEqual(hits.map(function (h) { return h.id; }).sort(), ['p1', 'p4', 'q1'],
       '찾은 것: ' + JSON.stringify(hits));
+  });
+
+  await t.test('★ 회의사진(민감 아닌 사진)은 여전히 안 건드린다', () => {
+    const ids = PV.sweep(tree).map(function (h) { return h.id; });
+    assert.equal(ids.indexOf('p2'), -1, '회의사진 주소까지 지우면 격자가 서버를 거쳐 느려집니다');
+  });
+
+  await t.test('★ 판독이 없는 서류에서도 안 멈춘다 — 갈래는 doc 으로 센다', () => {
+    const p4 = PV.sweep(tree).filter(function (h) { return h.id === 'p4'; })[0];
+    assert.ok(p4, 'p4 를 못 찾았습니다');
+    assert.equal(p4.kind, 'doc');
   });
 
   await t.test('★ fullUrl 만 지운다 — 미리보기는 남긴다', () => {
     const u = PV.clearPaths(PV.sweep(tree), 'puphotos');
     assert.deepEqual(Object.keys(u).sort(), [
       'puphotos/u/a/items/2026/p1/fullUrl',
+      'puphotos/u/a/items/2026/p4/fullUrl',
       'puphotos/u/b/items/2025/q1/fullUrl'
     ]);
     Object.keys(u).forEach(function (k) {
