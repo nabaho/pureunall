@@ -12152,11 +12152,11 @@ function Sidebar(props){
       window.PuObsidian && h('div', {
         className:'sb-menu-item',
         onClick:function(){ try{ window.PuObsidian.show(); }catch(e){} },
-        title:'요약과 ERP 링크만 옵시디언 새 메모로 보냅니다',
+        title:'내 진행 업무를 자동으로 정리해 오늘의 옵시디언 메모를 만들거나 갱신합니다',
         style:{ borderRadius:'6px' }
       },
-        h('span', { className:'mi-icon' }, '📝'),
-        h('span', { className:'mi-text' }, '옵시디언 업무요약')
+        h('span', { className:'mi-icon' }, '🪨'),
+        h('span', { className:'mi-text' }, '옵시디언 자동요약')
       ),
       isMenuPermitted(CURRENT_USER, 'env/settings') && h('div', {
         className:'sb-menu-item' + (current==='env/settings' ? ' active' : ''),
