@@ -3537,6 +3537,7 @@ function _openHwpBuf(buf,label,saveKind){
       +'<b style="font-size:14px">📄 HWP 편집 — '+esc(label)+'</b>'
       +'<span style="font-size:11.5px;color:var(--sub)">한글 편집기(저장소 안) · 자료는 브라우저 밖으로 나가지 않습니다</span><span style="flex:1"></span>'
       +(_hwpSaveKind?'<button class="primary" onclick="hwpSaveToFund()">💾 이 기금에 보관</button>':'')
+      +'<button onclick="hwpPasteClip()" title="복사해 둔 글·그림(서명·도장 등)을 문서에 붙여넣습니다 — 먼저 문서 안을 한 번 클릭해 커서를 두세요. 원본 앱(한글 등)에서 먼저 복사해 두세요.">🖼 붙여넣기</button>'
       +'<button onclick="openHwpAiChat()">🤖 AI로 고치기</button>'
       +'<button'+(_hwpSaveKind?'':' class="primary"')+' onclick="hwpExport(\'hwp\')">💾 .hwp로 저장</button>'
       +'<button onclick="hwpExport(\'hwpx\')">💾 .hwpx로 저장</button>'
@@ -3565,6 +3566,53 @@ function _openHwpBuf(buf,label,saveKind){
       return PureunHwp.renderPreview($('hwpHost'),buf,label+'.'+_hwpOriginalFormat)
         .catch(function(e2){ stat('미리보기 실패: '+(e2&&e2.message||e2)+' · [원본 보관]으로 파일을 내려받으세요.'); });
     });
+}
+/* ★ [🖼 붙여넣기] (대표 지시 2026-09-27 「외부의 한글화일 이나 서명 등 복사 붙여넣기 가능하게 해달라」)
+   ⚠ 편집기(rhwp-studio) 자체는 Ctrl+V(네이티브 paste 이벤트)로 글·그림을 이미 받을 수 있다
+     (2026-09-27 javascript_tool 로 직접 확인 — text/plain·image/png 모두 문서에 들어갔다).
+     그런데도 안 된다고 하면 대개 «포커스»다: 편집기가 iframe «두 겹» 안에 있어서
+     (fund.html → vendor/rhwp-editor iframe → vendor/rhwp-studio 안의 숨은 textarea),
+     Ctrl+V 를 누르는 순간 그 숨은 textarea 가 포커스를 갖고 있어야 브라우저가 네이티브
+     paste 이벤트를 그 안에 보낸다 — 어긋나면 아무 일도 안 일어난다(조용한 실패라 원인을 모른다).
+   ★ 그래서 «단추»를 하나 더 둔다 — navigator.clipboard.read()(눌렀을 때만 허락되는,
+     더 믿을 수 있는 길)로 클립보드를 직접 읽어, 그 textarea 에 paste 이벤트를 «만들어» 보낸다.
+     포커스가 없으면(문서 안을 아직 안 눌렀으면) 사람에게 그렇게 말해 준다 — 지어내지 않는다.
+   ⚠ 원본 앱(한글 등)이 클립보드에 «자기만 아는 개체 형식»만 남기면(그림이 아니라 OLE 개체로
+     복사한 경우) 브라우저가 못 읽는다 — 이건 브라우저의 한계다. 그럴 땐 원본에서 그림으로
+     복사하거나(예: 마우스 오른쪽 › 그림으로 복사) 이미지 파일로 저장한 뒤 그 파일을 여기 붙이라고
+     안내한다. */
+function hwpPasteClip(){
+  if(!navigator.clipboard||!navigator.clipboard.read){
+    toast('이 브라우저는 [붙여넣기] 단추를 지원하지 않습니다 — 문서 안을 클릭하고 Ctrl+V 를 눌러 보세요','warn'); return;
+  }
+  var host=$('hwpHost'), ifr=host&&host.querySelector('iframe'), idoc=null;
+  try{ idoc=ifr&&ifr.contentDocument; }catch(e){}
+  var target=idoc&&idoc.activeElement;
+  if(!target||target===idoc.body){
+    toast('먼저 문서 안(글이 있는 자리)을 한 번 클릭해 커서를 두고 다시 눌러 주세요','warn'); return;
+  }
+  navigator.clipboard.read().then(function(items){
+    if(!items||!items.length) return Promise.reject(new Error('클립보드가 비어 있습니다 — 원본에서 먼저 복사하세요'));
+    var it=items[0];
+    return Promise.all(it.types.map(function(t){ return it.getType(t).then(function(b){ return [t,b]; }); }));
+  }).then(function(pairs){
+    var dt=new DataTransfer(), textPairs=pairs.filter(function(p){ return /^text\//.test(p[0]); });
+    var imgPairs=pairs.filter(function(p){ return /^image\//.test(p[0]); });
+    return Promise.all(textPairs.map(function(p){ return p[1].text().then(function(txt){ dt.setData(p[0],txt); }); }))
+      .then(function(){
+        imgPairs.forEach(function(p){ var ext=(p[0].split('/')[1]||'png').split('+')[0];
+          try{ dt.items.add(new File([p[1]],'clip.'+ext,{type:p[0]})); }catch(e){} });
+        return dt;
+      });
+  }).then(function(dt){
+    var ev=new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true});
+    target.dispatchEvent(ev);
+    toast('붙여넣었습니다 — 자리가 이상하면 편집기 안에서 직접 옮겨 주세요');
+  }).catch(function(e){
+    var msg=(e&&e.message)||String(e);
+    if(/denied|permission/i.test(msg)) msg='브라우저가 클립보드 읽기를 막았습니다 — 주소창 왼쪽 자물쇠에서 클립보드 권한을 허용하세요';
+    toast('붙여넣기 실패: '+msg,'err');
+  });
 }
 function hwpExport(fmt){
   if(!_hwpEditor){ toast('편집기가 아직 준비되지 않았습니다','warn'); return; }
@@ -8067,6 +8115,11 @@ function hwpSidePreview(kind){
       return _docExtra(kind,f).catch(function(){ return null; }).then(function(){ return hwpTplFill(kind,f,sites); });
     }).then(function(r){
       var msg=[];
+      /* ★ 2026-09-27 — 서식에 «다른 사람»이 찍히는 가장 흔한 까닭은 임원 명부의 이사장 줄이
+         「기금 정보」의 대표자 칸과 다르기 때문이다(_boss 가 명부를 먼저 본다) — 미리보기
+         바로 위에서 알린다(officerPanel 의 같은 검사와 짝) — 여기가 실제로 이름이 나오는 자리다. */
+      var _boss2=_boss(f), _bn=String(_boss2.name||'').trim(), _cn=String(f.chairman||'').trim();
+      if(_cn&&_bn&&_cn!==_bn) msg.push('⚠ 임원 명부의 이사장(「'+_bn+'」)이 대표자 칸(「'+_cn+'」)과 달라 이 서식엔 「'+_bn+'」이 찍혔습니다 — [기금 정보] › 임원 명부에서 고치세요');
       if(r.unknown.length) msg.push('틀에 모르는 표지 '+r.unknown.length+'가지('+r.unknown.join(', ')+')');
       var o=Object.keys(r.over); if(o.length) msg.push('서명칸보다 사람이 많음('+o.map(function(k){ return k+' '+r.over[k]+'명 더'; }).join(', ')+')');
       if(r.note) msg.push(r.note);
@@ -9204,9 +9257,20 @@ function govField(f){
 function officerPanel(f){
   var rows=_officersOf(f);
   var aud=_auditorsOf(f);
-  var warn='';
-  if(!rows.length) warn='<span class="chip dg" style="font-size:10px">비어 있음 — 감사보고서·회의록에 이름이 안 들어갑니다</span>';
-  else if(aud.length<2) warn='<span class="chip warn" style="font-size:10px">감사가 '+aud.length+'명 — 정관은 노·사 각 1인입니다</span>';
+  var chips=[];
+  if(!rows.length) chips.push('<span class="chip dg" style="font-size:10px">비어 있음 — 감사보고서·회의록에 이름이 안 들어갑니다</span>');
+  else if(aud.length<2) chips.push('<span class="chip warn" style="font-size:10px">감사가 '+aud.length+'명 — 정관은 노·사 각 1인입니다</span>');
+  /* ★ 2026-09-27 「기존 자료인데 서식마다 이름이 다 잘못돼 있다」 — 명부(officers)의 이사장 줄과
+     「기금 정보」의 대표자(chairman) 칸이 다르면, 겉(대표자 칸)은 맞는데 서식은 다른 사람이 찍힌다.
+     ⚠ _boss(f)가 곧 «서식이 실제로 읽는 값»이다(정의 참고: "대표자 정보를 따로 두지 않는다") —
+       옛 시스템에서 옮겨 온 기금은 명부가 비거나 다른 사람(예: 옮긴 담당자 자신)으로 채워지기
+       쉬운데, 대표자 칸만 보고는 이 어긋남을 알 방법이 없었다. 여기서 두 값을 «맞대어» 본다. */
+  var boss=_boss(f), bossName=String(boss.name||'').trim(), chair=String(f.chairman||'').trim();
+  if(chair&&bossName&&chair!==bossName){
+    chips.push('<span class="chip dg" style="font-size:10px" title="설립인가신청서·등기·회의록 등 거의 모든 서식은 대표자 칸이 아니라 이 명부의 이사장 줄을 읽습니다. 다른 사람이 맞으면 이 줄을 고치세요">'
+      +'⚠ 명부 이사장 「'+esc(bossName)+'」 ≠ 대표자 칸 「'+esc(chair)+'」 — 서식엔 「'+esc(bossName)+'」이 찍힙니다</span>');
+  }
+  var warn=chips.join(' ');
   /* ★ 이름을 「등기임원 명부」로 바꿨다(대표 지시 2026-09-13). 여기 적는 것은 «등기부등본에
        오르는 사람»이다 — 그냥 「임원」이라 하면 협의회 위원과 섞여 읽힌다. */
   /* ★ 2026-09-27 두 줄 설명(등기부등본 그대로 옮기세요 · 감사보고서는 각자 한 장씩)을 걷었다

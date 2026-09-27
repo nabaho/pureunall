@@ -687,7 +687,7 @@ function renderPanel(name, extra) {
     'function bindSiteDocIntake(){}',
     grabFn('dropZoneSlim'),
     (extra || []).join('\n'),
-    grabFn('_primaryContact'), grabFn('_officersOf'), grabFn('_auditorsOf'), grabFn('_offRow'),
+    grabFn('_primaryContact'), grabFn('_officersOf'), grabFn('_auditorsOf'), grabFn('_offRow'), grabFn('_boss'),
     grabFn('_wrepDocRow'), grabFn('_repTable'), grabFn('_addrStack'),
     grabFn(name),
     'this.run=' + name + ';'
