@@ -80,7 +80,9 @@ t('깨진 값도 안 터진다', ctx.dbGet('broken', []), []);
 
 console.log('\n■ 소스가 뿌리에서 막고 있는가');
 t('dbGet 이 _dbAsList 를 거친다',
-  /if\(Array\.isArray\(def\) && !Array\.isArray\(out\)\) return _dbAsList\(out\);/.test(src), true);
+  /* 글자 그대로가 아니라 «목록이 아니면 _dbAsList 로 편다»는 규칙만 본다 — 2026-09-27 에 그 뒤로
+     삭제표시 거르기가 붙으며 return 이 대입으로 바뀌었다(검사고정 금지 규칙) */
+  /if\(Array\.isArray\(def\) && !Array\.isArray\(out\)\)\s*(?:return|out\s*=)\s*_dbAsList\(out\)/.test(src), true);
 t('erpInvoiceMatchAll 이 덩어리에도 안 죽는다 — (incs || []) 를 안 쓴다',
   /function erpInvoiceMatchAll[\s\S]{0,900}?\(incs \|\| \[\]\)\.forEach/.test(src), false);
 t('erpInvoiceMatchAll 이 목록으로 펴서 돈다',
