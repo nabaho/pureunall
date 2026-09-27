@@ -37,17 +37,20 @@
     { key: 'F2',       cmd: 'edit:find',          label: '찾기' },
     { key: 'Ctrl+H',   cmd: 'edit:find-replace',  label: '찾아 바꾸기' },
     { key: 'Ctrl+J',   cmd: 'page:break',         label: '쪽 나누기' },
-    { key: 'Ctrl+N,T', cmd: 'table:create',       label: '표 만들기' }
+    { key: 'Ctrl+N,T', cmd: 'table:create',       label: '표 만들기' },
+    /* ★ 한자로 바꾸기 — 편집기에 «명령이 없어» 우리가 한다(@ 로 시작하면 우리 몫).
+       ⚠ 윈도 「한자」 글쇠는 그대로 산다 — 이것은 «그 밖의» 길이다. */
+    { key: 'F9',       cmd: '@hanja',             label: '한자로 바꾸기' },
+    /* ★ Alt+V — 한글은 「다른 이름으로 저장」인데 편집기는 Alt+V,T(투명 선)를 쓴다.
+       ⚠★ 둘 다 살린다: 혼자 누르면 저장, 이어 T 를 누르면 투명 선을 «우리가» 부른다.
+         한쪽을 버리면 「한글과 같게」와 「편집기 기능 지키기」 중 하나가 깨진다. */
+    { key: 'Alt+V',    cmd: 'file:save-as',       label: '다른 이름으로 저장',
+      after: { T: { cmd: 'view:border-transparent', label: '투명 선' } } }
   ];
 
   /* 한글에는 있는데 «덧댈 수 없는» 것 — 숨기지 않고 밝힌다.
      ⚠ 조용히 빼면 「한글과 같다」는 말이 거짓이 된다. */
-  var MISSING = [
-    { key: 'F9', label: '한자로 바꾸기',
-      why: '편집기에 그 명령이 없다. 윈도 «한자» 글쇠(IME)가 대신하므로 그쪽으로 쓴다.' },
-    { key: 'Alt+V', label: '다른 이름으로 저장',
-      why: '편집기가 Alt+V,T(투명 선)를 이미 쓴다. 가로채면 그 기능이 죽는다.' }
-  ];
+  var MISSING = [];
 
   var MOD = { CTRL: 'Ctrl', ALT: 'Alt', SHIFT: 'Shift' };
 
@@ -138,10 +141,14 @@
     var bind = [], skip = [];
     LIST.forEach(function (r) {
       var c = canon(r.key), 앞 = c.split(',')[0];
+      /* ⚠★ `after` 가 있는 것은 «앞 타가 겹치는 것을 알고» 만든 것이다 —
+         이어지는 글쇠를 우리가 대신 부르므로 편집기 기능이 안 죽는다. 그래서 안 막는다. */
+      var 이어받음 = !!r.after;
       var 막힘 = u[c] ? '편집기가 이미 씁니다'
-                 : (앞쓰임[앞] ? '편집기가 「' + 앞 + '」로 시작하는 단축키를 이미 씁니다' : '');
+                 : ((앞쓰임[앞] && !이어받음)
+                    ? '편집기가 「' + 앞 + '」로 시작하는 단축키를 이미 씁니다' : '');
       if (막힘) skip.push({ key: r.key, label: r.label, cmd: r.cmd, why: 막힘 });
-      else bind.push({ key: c, cmd: r.cmd, label: r.label });
+      else bind.push({ key: c, cmd: r.cmd, label: r.label, after: r.after || null });
     });
     return { bind: bind, skip: skip };
   }
@@ -153,27 +160,43 @@
     var 목록 = bound || [];
     var MS = (opts && opts.ms) || 1500;
     /* ⚠ 기다림은 «이 짝꿍 안에서만» 산다 — 모듈에 두면 편집기 둘이 서로 섞인다 */
-    var 앞타 = '', 때 = 0;
+    var 앞타 = '', 때 = 0, 홀로 = null;
     return function (ev, now) {
       var t = (typeof now === 'number') ? now : 0;
       var k = fromEvent(ev);
       if (!k) return null;
       if (앞타) {
-        var 지남 = t - 때, 앞 = 앞타;
-        앞타 = '';
+        var 지남 = t - 때, 앞 = 앞타, 그홀로 = 홀로;
+        앞타 = ''; 홀로 = null;
         if (지남 >= 0 && 지남 <= MS) {
+          /* ① 이어받기(Alt+V 뒤의 T) — 편집기 것을 «우리가» 대신 부른다 */
+          if (그홀로 && 그홀로.after && 그홀로.after[k]) {
+            var a = 그홀로.after[k];
+            return { key: 앞 + ',' + k, cmd: a.cmd, label: a.label };
+          }
+          /* ② 본디 두 타(Ctrl+N,T) */
           var full = 앞 + ',' + k;
           for (var i = 0; i < 목록.length; i++) if (목록[i].key === full) return 목록[i];
+          /* ③ 이어받기인데 딴 글쇠 — 혼자 누른 것으로 보고 «그것»을 한다 */
+          if (그홀로) return { key: 그홀로.key, cmd: 그홀로.cmd, label: 그홀로.label };
           return null;             /* 두 번째 타가 틀렸다 — 아무것도 안 한다 */
         }
         /* 너무 늦었다 — 첫 타부터 다시 본다(아래로 흘려보낸다) */
       }
       for (var j = 0; j < 목록.length; j++) {
         if (목록[j].key.indexOf(',') > 0 && 목록[j].key.split(',')[0] === k) {
-          앞타 = k; 때 = t; return 'pending';
+          앞타 = k; 때 = t; 홀로 = null; return 'pending';
         }
       }
-      for (var n = 0; n < 목록.length; n++) if (목록[n].key === k) return 목록[n];
+      for (var n = 0; n < 목록.length; n++) {
+        if (목록[n].key !== k) continue;
+        /* 이어질 수 있는 것은 «잠깐 기다렸다가» 혼자면 그것을 한다 */
+        if (목록[n].after) {
+          앞타 = k; 때 = t; 홀로 = 목록[n];
+          return { pending: true, wait: MS, timeout: 목록[n] };
+        }
+        return 목록[n];
+      }
       return null;
     };
   }

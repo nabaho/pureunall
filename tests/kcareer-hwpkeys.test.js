@@ -61,10 +61,7 @@ test('★★ 두 번 누르는 것은 «앞 타»가 이미 쓰이면 안 붙인
   const s = p.skip.filter((x) => x.key === 'Ctrl+N,T')[0];
   assert.ok(s, '물러섰다는 기록이 없습니다');
   assert.match(s.why, /Ctrl\+N/, '★ 무엇 때문에 물러섰는지 안 밝힙니다: ' + s.why);
-  /* 반대로 Alt+V 는 아예 LIST 에 안 넣었다 — 그 까닭이 MISSING 에 적혀 있어야 한다 */
-  assert.ok(!p.bind.some((b) => b.key === 'Alt+V'), 'Alt+V 는 붙이면 안 됩니다');
-  assert.ok(K.MISSING.some((m) => m.key === 'Alt+V' && /Alt\+V,T|투명/.test(m.why)),
-    '★ Alt+V 를 왜 못 붙이는지 안 밝힙니다');
+  /* ⚠ Alt+V 는 «이어받기»를 들고 있어 일부러 안 막는다 — 아래 전용 검사가 본다 */
 });
 
 test('★ 편집기가 나중에 그 글쇠를 쓰기 시작하면 «스스로 물러선다»', () => {
@@ -75,12 +72,53 @@ test('★ 편집기가 나중에 그 글쇠를 쓰기 시작하면 «스스로 �
   p.skip.forEach((s) => assert.match(s.why, /이미/, '까닭이 비었습니다'));
 });
 
-test('지금 편집기에는 여덟 개가 다 붙는다 — 실측과 같아야 한다', () => {
+test('지금 편집기에는 열 개가 다 붙는다 — 실측과 같아야 한다', () => {
   const p = K.plan(편집기가쓰는것);
-  assert.equal(p.bind.length, 8, '붙는 개수가 달라졌습니다: ' + JSON.stringify(p.bind.map(b => b.key)));
+  assert.equal(p.bind.length, 10, '붙는 개수가 달라졌습니다: ' + JSON.stringify(p.bind.map(b => b.key)));
   assert.equal(p.skip.length, 0);
   assert.deepEqual(p.bind.map((b) => b.key).sort(),
-    ['Alt+O', 'Alt+P', 'Alt+S', 'Ctrl+F10', 'Ctrl+H', 'Ctrl+J', 'Ctrl+N,T', 'F2'].sort());
+    ['Alt+O', 'Alt+P', 'Alt+S', 'Alt+V', 'Ctrl+F10', 'Ctrl+H', 'Ctrl+J', 'Ctrl+N,T', 'F2', 'F9'].sort());
+});
+
+/* ══════ ①-2 Alt+V — 한글의 «다른 이름으로 저장»과 편집기의 «투명 선»을 둘 다 살린다 ══════ */
+test('★★★ Alt+V 혼자면 «다른 이름으로 저장» — 한글과 같다', () => {
+  const m = K.makeMatcher(K.plan(편집기가쓰는것).bind);
+  const r = m(ev({ key: 'v', code: 'KeyV', altKey: true }), 0);
+  assert.ok(r && r.pending, '★ 기다리지 않습니다: ' + JSON.stringify(r));
+  assert.ok(r.timeout && r.timeout.cmd === 'file:save-as',
+    '★ 혼자 눌렀을 때 할 일이 «다른 이름으로 저장»이 아닙니다');
+  assert.ok(r.wait > 0, '기다릴 시간을 안 알려 줍니다');
+});
+
+test('★★★ Alt+V 뒤에 T 를 누르면 편집기의 «투명 선» — 그 기능을 안 죽인다', () => {
+  const m = K.makeMatcher(K.plan(편집기가쓰는것).bind);
+  m(ev({ key: 'v', code: 'KeyV', altKey: true }), 0);
+  const r = m(ev({ key: 't', code: 'KeyT' }), 100);
+  assert.ok(r && r.cmd === 'view:border-transparent',
+    '★ Alt+V,T(투명 선)가 죽었습니다: ' + JSON.stringify(r));
+});
+
+test('★ Alt+V 뒤에 엉뚱한 글쇠면 «혼자 누른 것»으로 본다', () => {
+  const m = K.makeMatcher(K.plan(편집기가쓰는것).bind);
+  m(ev({ key: 'v', code: 'KeyV', altKey: true }), 0);
+  const r = m(ev({ key: 'q', code: 'KeyQ' }), 100);
+  assert.ok(r && r.cmd === 'file:save-as', '★ 아무 일도 안 합니다: ' + JSON.stringify(r));
+});
+
+test('★★ 이어받는 것은 «앞 타 겹침»으로 막지 않는다 — 막으면 Alt+V 가 영영 안 붙는다', () => {
+  const p = K.plan(편집기가쓰는것);              /* 편집기가 Alt+V,T 를 쓰는 상태 */
+  const v = p.bind.filter((b) => b.key === 'Alt+V')[0];
+  assert.ok(v, '★ Alt+V 가 겹침으로 걸러졌습니다 — 이어받기를 아는데도 막았습니다');
+  assert.ok(v.after && v.after.T, '★ 이어지는 T 를 어떻게 할지 안 들고 있습니다');
+});
+
+/* ══════ ①-3 F9 한자 ══════ */
+test('★★★ F9 는 «우리가» 한다 — 편집기에 그 명령이 없다', () => {
+  const p = K.plan(편집기가쓰는것);
+  const f9 = p.bind.filter((b) => b.key === 'F9')[0];
+  assert.ok(f9, '★ F9 를 안 붙입니다 — 한글에는 있는 기능입니다');
+  assert.equal(f9.cmd, '@hanja', '★ 편집기 명령을 부르려 합니다 — 그런 명령이 없습니다');
+  assert.match(f9.label, /한자/);
 });
 
 /* ══════ ② 한글로 쓰는 중에도 알아본다 ══════ */
@@ -154,15 +192,94 @@ test('우리 몫이 아닌 글쇠는 그냥 흘려보낸다', () => {
   assert.equal(m(ev({ key: 'a', code: 'KeyA' }), 0), null);
 });
 
-/* ══════ ⑤ 못 하는 것은 밝힌다 ══════ */
-test('★★ 한글에는 있는데 못 덧대는 것을 «숨기지 않는다»', () => {
-  assert.ok(K.MISSING.length >= 2, '못 하는 것을 안 적었습니다');
-  const 한자 = K.MISSING.filter((m) => m.key === 'F9')[0];
-  assert.ok(한자, '★ 한자 변환(F9)을 안 밝힙니다 — 한글에는 있는 기능입니다');
-  assert.match(한자.why, /IME|한자/, '어떻게 쓰면 되는지 안 알려 줍니다');
+/* ══════ ⑤ 못 하는 것이 있으면 밝힌다 ══════ */
+test('★ 못 덧대는 것이 생기면 «숨기지 않고» MISSING 에 적는다', () => {
+  assert.ok(Array.isArray(K.MISSING), 'MISSING 이 없어졌습니다');
   K.MISSING.forEach((m) => {
-    assert.ok(m.label && m.why, '무엇이 왜 안 되는지 비었습니다: ' + JSON.stringify(m));
+    assert.ok(m.key && m.label && m.why,
+      '무엇이 왜 안 되는지 비었습니다: ' + JSON.stringify(m));
   });
+});
+
+/* ══════ ⑥ F9 를 실제로 해내는 코드 ══════ */
+test('★★★ F9 는 «마지막으로 친 음절»을 봐 두었다가 바꾼다', () => {
+  assert.match(CODE, /function rhEdWatchSyllable\(/, '★ 마지막 음절을 안 봐 둡니다');
+  /* ⚠ 함수가 «있나»만 보면 «부르지» 않아도 통과한다(고장넣기가 잡았다) */
+  const f = CODE.slice(CODE.indexOf('async function rhEdHwpKeys('),
+                       CODE.indexOf('async function rhEdHwpKeys(') + 2200);
+  /* ⚠ 그냥 이름만 찾으면 «바로 아래 함수 선언»(function rhEdWatchSyllable(doc){)이
+     걸려 부르는 줄을 지워도 통과했다(고장넣기가 잡았다). «부르는 꼴»을 짚는다. */
+  assert.match(f, /_safe\(function\(\)\{\s*rhEdWatchSyllable\(doc\);\s*\}\);/,
+    '★ 봐 두는 일을 «부르지» 않습니다 — F9 가 늘 「바꿀 글자가 없습니다」가 됩니다');
+  const w = CODE.slice(CODE.indexOf('function rhEdWatchSyllable('),
+                       CODE.indexOf('function rhEdWatchSyllable(') + 900);
+  assert.match(w, /compositionend/, '★ 한글 조합이 끝나는 것을 안 봅니다');
+  assert.match(w, /isHangulSyllable/, '★ 한글 음절인지 안 가립니다');
+  /* ⚠ 「_kcSyl 이라는 글자가 있나」로는 못 잡는다 — 표식을 «남기기»만 해도 통과했다 */
+  assert.match(w, /if\(!ta \|\| ta\._kcSyl\) return;/,
+    '★ 이미 붙였는지 «보고 돌아서지» 않습니다 — 귀가 쌓여 한 번에 여러 번 셉니다');
+});
+
+test('★★★ 한자를 «저절로 고르지 않는다» — 지어 넣으면 틀린 이름이 서류에 박힌다', () => {
+  const h = CODE.slice(CODE.indexOf('function rhEdHanja('),
+                       CODE.indexOf('function rhEdHanja(') + 2600);
+  assert.match(h, /forSyllable/, '한자 사전을 안 봅니다');
+  /* 사람이 누를 자리를 반드시 만든다 */
+  assert.match(h, /onclick\s*=\s*function/, '★ 사람이 고르는 자리가 없습니다 — 저절로 넣고 있습니다');
+  assert.ok(!/후보\[0\]|list\[0\]/.test(h),
+    '★ 첫 한자를 저절로 고릅니다 — 같은 소리에 한자가 여럿입니다');
+});
+
+test('★★ 한자 후보는 «글자 배열»이다 — 감싼 모양으로 읽으면 단추가 0개가 된다', () => {
+  /* 실측으로 잡은 흠이다: forSyllable 이 ["河","夏",…] 를 곧바로 주는데
+     [{list:[…]}] 로 읽어 고르개가 «떴는데 비어» 있었다. */
+  const HJ = require(path.join(R, 'js', 'kcareer-hanja.js'));
+  const 후보 = HJ.forSyllable('하');
+  assert.ok(Array.isArray(후보) && 후보.length > 0, '한자 사전이 「하」를 모릅니다');
+  후보.forEach((h) => assert.equal(typeof h, 'string',
+    '★ 후보가 글자가 아니라 ' + typeof h + ' 입니다 — 그리는 쪽과 어긋납니다'));
+  const h = CODE.slice(CODE.indexOf('function rhEdHanja('),
+                       CODE.indexOf('function rhEdHanja(') + 2600);
+  assert.ok(!/g\.list/.test(h), '★ 감싼 모양(.list)으로 읽습니다 — 후보가 0개가 됩니다');
+  assert.match(h, /후보\.forEach\(function\s*\(h\)/, '★ 후보를 글자로 안 훑습니다');
+});
+
+test('★★ 사전에 없으면 «지어내지 않고» 다른 길을 알려 준다', () => {
+  const h = CODE.slice(CODE.indexOf('function rhEdHanja('),
+                       CODE.indexOf('function rhEdHanja(') + 2600);
+  assert.match(h, /if\(!후보 \|\| !후보\.length\)\{/, '★ 사전에 없을 때를 안 봅니다');
+  /* ⚠ 그 «가지 안»만 본다 — 아래 고르개 글에도 Ctrl+F10 이 있어 통째로 보면
+     안내를 지워도 통과했다(고장넣기가 잡았다). */
+  const 가지 = h.slice(h.indexOf('if(!후보 || !후보.length){'));
+  const 가지끝 = 가지.slice(0, 가지.indexOf('return;') + 7);
+  assert.match(가지끝, /Ctrl\+F10/, '★ 문자표로 가는 길을 안 알려 줍니다(막다른 길)');
+  assert.match(가지끝, /한자/, '★ 윈도 한자 글쇠를 안 알려 줍니다');
+});
+
+test('★★ 바꾸기는 «한 글자 지우고 넣는다» — 실측으로 확인한 그 길', () => {
+  const p = CODE.slice(CODE.indexOf('function _rhEdPut('),
+                       CODE.indexOf('function _rhEdPut(') + 1200);
+  assert.match(p, /Backspace/, '★ 앞 글자를 안 지웁니다 — 「하河」가 됩니다');
+  assert.match(p, /compositionend/, '★ IME 와 같은 차례로 안 넣습니다');
+  /* ⚠ 「return false 가 있나」로는 못 잡는다 — 맨 앞의 빗장에도 있어서 걸림 처리를
+     「됐다」로 바꿔도 통과했다(고장넣기가 잡았다). «걸렸을 때»를 콕 짚는다. */
+  assert.match(p, /catch\(e\)\{[^}]*return false;\s*\}/,
+    '★ 넣다가 걸렸는데 «됐다»고 알립니다 — 안 바뀐 줄 모르고 넘어갑니다');
+});
+
+test('★ 이어받기(Alt+V)는 부르는 쪽이 «시계»로 마무리한다', () => {
+  const f = CODE.slice(CODE.indexOf('async function rhEdHwpKeys('),
+                       CODE.indexOf('async function rhEdHwpKeys(') + 2200);
+  assert.match(f, /r\.pending/, '★ 기다리라는 답을 안 봅니다');
+  assert.match(f, /setTimeout/, '★ 혼자 눌렀을 때를 마무리하지 않습니다 — Alt+V 가 영영 안 됩니다');
+  assert.match(f, /clearTimeout/, '★ 이어지는 글쇠가 와도 기다림을 안 끕니다 — 둘 다 실행됩니다');
+});
+
+test('★ @ 로 시작하는 것은 편집기에 넘기지 않는다 — 그런 명령이 없다', () => {
+  const f = CODE.slice(CODE.indexOf('async function rhEdHwpKeys('),
+                       CODE.indexOf('async function rhEdHwpKeys(') + 2200);
+  assert.match(f, /'@hanja'/, '★ 우리 몫을 안 가려냅니다');
+  assert.match(f, /rhEdHanja\(/, '★ 한자 창을 안 엽니다');
 });
 
 /* ══════ ⑥ 부르는 쪽(kcareer.html) ══════ */
