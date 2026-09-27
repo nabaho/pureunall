@@ -118,13 +118,21 @@ test('⑨ 어두운판에서 「오늘·공휴일·찾음」 칸을 옅게 칠�
   /* 밝은판 갈래(: 뒤)까지 같이 집으면 늘 걸린다(그쪽엔 옅은 칠이 «있는 게 맞다») —
      삼항의 어두운판 갈래(? 와 : 사이)만 정확히 잘라 본다. */
   const 계산 = 함수몸(캘린더, 'function calendarHtml(eumOnly){');
-  const i = 계산.indexOf('어둠 ? (c.other');
-  assert.ok(i >= 0, '어두운판 칸 배경 갈래를 못 찾았습니다');
-  /* ⚠ 줄끝(\r\n · \n)을 못 박지 않는다 — 이 저장소는 CRLF, CI 는 LF 로 받는다
-     (tests-crlf-vs-ci-lf 메모). 공백·줄바꿈은 몇 글자든 건너뛴다. */
-  const m = 계산.slice(i).match(/\)\s*:\s*\(/);
-  assert.ok(m, '어두운판 갈래가 끝나는 자리(: 로 넘어가는 곳)를 못 찾았습니다');
-  const 어둠갈래 = 계산.slice(i, i + m.index);
+  /* 칸 배경을 고르는 줄(var bg = 어둠 ? … : …)에서 «어두운판 갈래»만 잘라 본다.
+     ⚠ 갈래의 꼴(괄호가 있나 없나)을 못 박지 않는다 — 2026-09-27 에 앞뒤 달 칸도 같은
+       색이 되며(구글과 같게) 괄호가 빠졌다. 첫 ? 뒤부터 짝이 맞는 첫 : 까지다. */
+  const i0 = 계산.search(/var bg\s*=\s*어둠\s*\?/);
+  assert.ok(i0 >= 0, '어두운판 칸 배경 갈래를 못 찾았습니다');
+  const i = 계산.indexOf('?', i0) + 1;
+  let 깊이 = 0, j = i;
+  for (; j < 계산.length; j++) {
+    const ch = 계산[j];
+    if (ch === '(') 깊이++;
+    else if (ch === ')') 깊이--;
+    else if (ch === ':' && 깊이 === 0) break;
+  }
+  assert.ok(j < 계산.length, '어두운판 갈래가 끝나는 자리(: 로 넘어가는 곳)를 못 찾았습니다');
+  const 어둠갈래 = 계산.slice(i, j);
   assert.strictEqual(/fffbeb|fef2f2/.test(어둠갈래), false,
     '어두운판 갈래에도 옅은 칠(오늘·공휴일)을 씁니다 — 글자가 안 읽힙니다: ' + 어둠갈래);
 });

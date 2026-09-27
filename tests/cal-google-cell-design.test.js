@@ -52,20 +52,21 @@ test('② 주 보기 — 같은 규칙(칸 배경은 흰색)', () => {
   assert.strictEqual(/fffbeb|fef2f2/.test(m[0]), false, '주 보기에 아직 칠이 남아 있습니다: ' + m[0]);
 });
 
-test('③ 공휴일 띠(.ev.hol) — 칸 옆까지 닿고, 둥글지 않다', () => {
+/* ③ 은 2026-09-27 에 뒤집혔다 (대표 지시 「구글캘린더 화면과 … 공휴일 처리 등 완벽하게 같이」).
+   구글 캡처를 다시 재 보니 「추석」 칩은 옆 칸의 보통 칩과 «같은 자리·같은 모서리»였다
+   (칸 옆까지 번지는 띠가 아니다). 그래서 공휴일에 «따로 모양»을 주지 않는다 —
+   색만 구글 「대한민국의 휴일」 달력 색이다. */
+test('③ 공휴일 칩은 «보통 칩과 같은 모양» — 따로 번지거나 각지지 않는다', () => {
   const i = 캘린더.indexOf('.ev.hol{');
   assert.ok(i >= 0, '.ev.hol 을 못 찾았습니다');
   const rule = 캘린더.slice(i, 캘린더.indexOf('}', i) + 1);
-  assert.match(rule, /border-radius:0\b/, '띠가 아직 둥급니다 — 구글은 각진 띠입니다: ' + rule);
-  /* .day 의 좌우 여백(4px)을 지워야 «칸 옆까지» 닿는다 */
-  assert.match(rule, /margin:0 -4px/, '좌우로 안 번집니다(칸 여백을 안 지웁니다): ' + rule);
-  /* 색 값은 그대로 — 팔레트·이알피 견줌 검사가 이미 이 값을 못 박는다 */
-  assert.match(rule, /background:#fecaca/, '색 값이 바뀌었습니다 — cal-same-as-erp 가 이 값을 봅니다');
-  assert.match(rule, /color:#991b1b/, '글자색이 바뀌었습니다');
+  assert.strictEqual(/margin\s*:|border-radius\s*:|background\s*:/.test(rule), false,
+    '공휴일에 따로 모양·색을 줍니다 — 구글은 보통 칩과 같습니다: ' + rule);
 });
 
 test('④ 「오늘」은 여전히 숫자의 파란 동그라미로 표난다', () => {
-  assert.match(캘린더, /\.dnum\.today\{background:#2563eb;color:#ffffff/,
+  /* 색 값을 못 박지 않는다 — 동그라미에 «바탕 색»과 «흰 글자»가 있는지만 본다 */
+  assert.match(캘린더, /\.dnum\.today\{background:[^;]+;color:#ffffff/,
     '오늘 표시(파란 동그라미)가 사라졌습니다 — 배경 칠을 지웠으니 이것만은 남아야 합니다');
 });
 
@@ -94,7 +95,8 @@ test('⑤ 실제로 그려 본다 — 오늘이면서 공휴일인 칸의 style 
     'function eventsOn(ymd, eumOnly){', 'function passFilter(ev){', 'function matchSearch(e){',
     'function lunarDay(ymd){', 'function 상대밝기(bg){', 'function 대비(a, b){', 'function textOn(bg){',
     'function monthGrid(ym){', 'function ymdOf(y, m, d){', 'function mixHex(hexA, hexB, t){',
-    'function chipHtml(e, ymd){', 'function 펼침Html(eumOnly){', 'function calendarHtml(eumOnly){'];
+    'function chipHtml(e, ymd){', 'function 공휴칩(ymd){', 'function 줄배치(날들, 일들, 용량, 틈){',
+    'function 펼침Html(eumOnly){', 'function calendarHtml(eumOnly){'];
   let 조각 = 'var _lunar = {}; var GCAL = { evs:[], ym:"", loading:false, err:"" };\n'
     + 'function gcalLoad(){ return Promise.resolve(); }\n'
     + 'function weekHtml(){ return ""; }\n'
@@ -102,6 +104,7 @@ test('⑤ 실제로 그려 본다 — 오늘이면서 공휴일인 칸의 style 
     + 'function todayYMD(){ return "2026-10-03"; }\n'
     + (캘린더.match(/var 칩_어둠_누름 = [^;]+;/) || [''])[0] + '\n'
     + (캘린더.match(/var 칩_옅게\s*= [^;]+;/) || [''])[0] + '\n'
+    + (캘린더.match(/var 공휴색 = [^;]+;/) || [''])[0] + '\n'
     + 'function 칸용량(){ return 5; }\n';
   이름들.forEach((h) => { 조각 += 함수몸(캘린더, h) + '\n'; });
   조각 += (캘린더.match(/var ATT_SHOW = \[[\s\S]*?\];/) || [''])[0] + '\n';
