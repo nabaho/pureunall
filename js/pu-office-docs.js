@@ -115,6 +115,30 @@
     return outp;
   }
 
+  /* 사진첩의 계약서 사진 → 가져올 후보 (화면 없이 검사한다)
+     회사명은 사람이 붙인 것(meta.company)이 판독값(read.fields.company)보다 앞선다 */
+  function photoCandidates(byYear, importedIds) {
+    var outp = [];
+    Object.keys(byYear || {}).forEach(function (y) {
+      var items = byYear[y] || {};
+      Object.keys(items).forEach(function (id) {
+        var m = items[id] || {}, r = m.read || {};
+        if (r.kind !== 'contract') return;
+        var f = r.fields || {};
+        var ts = m.upAt || m.takenAt || 0;
+        outp.push({ year: String(y), id: id, company: String(m.company || f.company || '').trim(),
+          title: String(f.docName || '').trim() || '계약서', date: ymdUtc(ts), ts: ts,
+          imported: !!(importedIds && importedIds[id]), loc: m.loc || null });
+      });
+    });
+    return outp.sort(function (a, b) { return b.ts - a.ts; }).map(function (x) { delete x.ts; return x; });
+  }
+  function ymdUtc(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
+  }
+
   /* ══ 원본 보관함 ══ — 지우는 단추는 없다(영구 보관) */
   function mountArchive(root, host) {
     css();
@@ -198,9 +222,235 @@
     return { reload: load };
   }
 
+  /* ══ 기업별 계약서 ══
+     사진첩은 «사람별 잠금»이라 남의 사진을 모아 볼 수 없다 — 그래서 «가져오기 = 공유 보관함으로 사본 복사»다.
+     사진첩 원본은 읽기만 한다. 「이 회사에서 빼기」는 연결만 끊고 파일은 보관함에 남는다. */
+  function mountCompanies(root, host) {
+    css();
+    var store = host.store;
+    var S = { cos: [], sel: null, docs: [], q: '', loaded: false, err: null, denied: false };
+
+    function load(keepSel) {
+      S.err = null;
+      return store.probe().then(function (p) {
+        if (p === 'denied') { S.denied = true; S.loaded = true; draw(); return; }
+        return store.listCo().then(function (cos) {
+          S.cos = cos.filter(function (c) { return c.n > 0; });
+          if (!keepSel || !S.cos.some(function (c) { return c.key === S.sel; })) S.sel = S.cos.length ? S.cos[0].key : null;
+          S.loaded = true;
+          return loadDocs();
+        });
+      }).catch(function (e) { S.err = msg(e); S.loaded = true; draw(); });
+    }
+    function loadDocs() {
+      if (!S.sel) { S.docs = []; draw(); return Promise.resolve(); }
+      return store.listCoDocs(S.sel).then(function (d) { S.docs = d; draw(); });
+    }
+    function coName(key) { var c = S.cos.filter(function (x) { return x.key === key; })[0]; return c ? c.name : ''; }
+    function coList() { return el('datalist', { id: 'pod-cos' }, S.cos.map(function (c) { return el('option', { value: c.name }); })); }
+    function isImg(name) { return /\.(jpe?g|png|heic)$/i.test(name || ''); }
+
+    function modalShell(title, bodyKids, footKids) {
+      var bg = el('div', { 'class': 'pod-mbg' });
+      function close() { w.document.removeEventListener('keydown', onKey); bg.remove(); }
+      function onKey(e) { if (e.key === 'Escape') close(); }
+      w.document.addEventListener('keydown', onKey);
+      bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
+      bg.appendChild(el('div', { 'class': 'pod-m', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, [
+        el('div', { 'class': 'pod-mh' }, [el('span', { text: title }), el('button', { type: 'button', 'class': 'pod-b', 'aria-label': '닫기', text: '×', onclick: close })]),
+        el('div', { 'class': 'pod-mb' }, bodyKids),
+        el('div', { 'class': 'pod-mf' }, footKids(close))
+      ]));
+      w.document.body.appendChild(bg);
+      return close;
+    }
+
+    /* ── 직접 올리기 ── */
+    function openUpload() {
+      var fileIn = el('input', { type: 'file', accept: '.hwp,.hwpx,.pdf,.doc,.docx,.jpg,.jpeg,.png,.heic' });
+      var coIn = el('input', { type: 'text', list: 'pod-cos', placeholder: '회사 이름', value: S.sel ? coName(S.sel) : '' });
+      var tIn = el('input', { type: 'text', placeholder: '예: 자문계약서' });
+      var dIn = el('input', { type: 'date', value: ymd(Date.now()) });
+      fileIn.addEventListener('change', function () { var f = fileIn.files[0]; if (f && !tIn.value) tIn.value = f.name.replace(/\.[^.]+$/, ''); });
+      modalShell('기업별 계약서 올리기', [
+        el('label', { text: '파일 (한글·PDF·워드·사진 · 25MB 미만)' }), fileIn,
+        el('label', { text: '회사 *' }), coIn, coList(),
+        el('label', { text: '제목' }), tIn,
+        el('label', { text: '계약일' }), dIn
+      ], function (close) {
+        var go = el('button', { type: 'button', 'class': 'pod-b p', text: '올리기', onclick: function () {
+          var f = fileIn.files[0], co = coIn.value.trim();
+          if (!f) { toast('파일을 고르세요'); return; }
+          if (!co) { toast('회사 이름을 넣으세요'); coIn.focus(); return; }
+          var chk = store.okDocFile(f.name, f.size); if (!chk.ok) { toast('❌ ' + chk.why); return; }
+          go.disabled = true; go.textContent = '올리는 중…';
+          readBytes(f).then(function (bytes) {
+            return store.putOriginal({ name: f.name, size: f.size, type: f.type || '', bytes: bytes }, { kind: 'co', coKey: store.coKey(co), coName: co });
+          }).then(function (r) {
+            return store.addCoDoc({ coName: co, fileId: r.fileId, title: tIn.value.trim() || f.name, date: dIn.value, src: 'upload' });
+          }).then(function (r) {
+            close(); toast('✅ ' + co + ' 에 올렸습니다'); S.sel = r.coKey; load(true);
+          }).catch(function (e) { go.disabled = false; go.textContent = '올리기'; toast('❌ 올리지 못했습니다 — ' + msg(e)); });
+        } });
+        return [el('button', { type: 'button', 'class': 'pod-b', text: '취소', onclick: close }), go];
+      });
+    }
+
+    /* ── 사진첩에서 가져오기 ── */
+    function openPhotoImport() {
+      var photos = host.photos;
+      if (!photos) { toast('사진첩을 불러오지 못했습니다'); return; }
+      var grid = el('div', { 'class': 'pod-pick' }, [el('div', { 'class': 'pod-empty', style: 'grid-column:1/-1', text: '내 사진첩에서 계약서를 찾는 중…' })]);
+      var coIn = el('input', { type: 'text', list: 'pod-cos', placeholder: '회사 이름' });
+      var tIn = el('input', { type: 'text', placeholder: '예: 자문계약서' });
+      var dIn = el('input', { type: 'date' });
+      var pick = null;
+      var close = modalShell('사진첩에서 가져오기 — 내 사진첩의 «계약서»', [
+        el('div', { style: 'font-size:12px;color:#64748b;margin-bottom:8px', text: '사진첩 원본은 그대로 두고, 사본을 원본 보관함에 담아 회사에 붙입니다. 가져온 것은 전 직원이 봅니다.' }),
+        grid, el('label', { text: '회사 *' }), coIn, coList(), el('label', { text: '제목' }), tIn, el('label', { text: '계약일' }), dIn
+      ], function (cl) {
+        var go = el('button', { type: 'button', 'class': 'pod-b p', text: '가져오기', onclick: function () {
+          if (!pick) { toast('사진을 고르세요'); return; }
+          var co = coIn.value.trim();
+          if (!co) { toast('회사 이름을 넣으세요'); coIn.focus(); return; }
+          go.disabled = true; go.textContent = '가져오는 중…';
+          var it = pick;
+          photos.loadFull(it.year, it.id).then(function (dataUrl) {
+            var bytes = store.dataUrlToBytes(dataUrl);
+            var type = (/^data:([^;,]+)/.exec(dataUrl) || [])[1] || 'image/jpeg';
+            var ext = type === 'image/png' ? '.png' : '.jpg';
+            var title = tIn.value.trim() || it.title;
+            return store.putOriginal({ name: store.safeFileName(title) + ext, size: bytes.length, type: type, bytes: bytes },
+              { kind: 'photo', owner: String(host.uid || ''), year: String(it.year), photoId: String(it.id), coKey: store.coKey(co), coName: co })
+              .then(function (r) { return store.addCoDoc({ coName: co, fileId: r.fileId, title: title, date: dIn.value, src: 'photo' }); });
+          }).then(function (r) {
+            cl(); toast('✅ ' + co + ' 에 가져왔습니다'); S.sel = r.coKey; load(true);
+          }).catch(function (e) { go.disabled = false; go.textContent = '가져오기'; toast('❌ 가져오지 못했습니다 — ' + msg(e)); });
+        } });
+        return [el('button', { type: 'button', 'class': 'pod-b', text: '취소', onclick: cl }), go];
+      });
+      Promise.resolve(host.photosReady).then(function () {
+        return Promise.all([photos.listYears(), store.listOriginals()]);
+      }).then(function (r) {
+        var imported = {};
+        r[1].forEach(function (o) { if (o.from && o.from.kind === 'photo' && o.from.photoId) imported[o.from.photoId] = true; });
+        return Promise.all(r[0].map(function (y) { return photos.listYear(y).then(function (items) { return [y, items]; }, function () { return [y, {}]; }); }))
+          .then(function (pairs) { var by = {}; pairs.forEach(function (p) { by[p[0]] = p[1]; }); return photoCandidates(by, imported); });
+      }).then(function (cands) {
+        grid.innerHTML = '';
+        if (!cands.length) { grid.appendChild(el('div', { 'class': 'pod-empty', style: 'grid-column:1/-1', text: '내 사진첩에 «계약서»로 분류된 사진이 없습니다' })); return; }
+        cands.forEach(function (c) {
+          var th = el('div', { 'class': 'pod-th', text: '🖼' });
+          var card = el('button', { type: 'button', 'class': 'pod-card', onclick: function () {
+            pick = c;
+            Array.prototype.forEach.call(grid.querySelectorAll('.pod-card'), function (x) { x.classList.remove('sel'); });
+            card.classList.add('sel');
+            if (c.company) coIn.value = c.company;
+            tIn.value = c.title; dIn.value = c.date;
+          } }, [th, el('div', { 'class': 'pod-cm' }, [
+            el('b', null, [c.company || '(회사 모름)', c.imported ? el('span', { 'class': 'pod-tag done', text: '가져옴' }) : null]),
+            el('span', { text: c.title + ' · ' + c.date })])]);
+          grid.appendChild(card);
+          photos.loadThumb(c.year, c.id, undefined, c.loc).then(function (src) {
+            if (!src) return; th.textContent = ''; th.appendChild(el('img', { src: src, alt: '' }));
+          }, function () {});
+        });
+      }).catch(function (e) {
+        grid.innerHTML = '';
+        grid.appendChild(el('div', { 'class': 'pod-empty', style: 'grid-column:1/-1;color:#991b1b', text: '사진첩을 읽지 못했습니다 — ' + msg(e) }));
+      });
+      return close;
+    }
+
+    /* ── 큰 보기 ── */
+    function openDoc(d) {
+      var view = el('div', { style: 'min-height:320px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;border-radius:8px', text: '불러오는 중…' });
+      var tIn = el('input', { type: 'text', value: d.title || '' });
+      var dIn = el('input', { type: 'date', value: d.date || '' });
+      var rec = null;
+      modalShell((coName(S.sel) || '') + ' · ' + (d.title || '계약서'), [view,
+        el('label', { text: '제목' }), tIn, el('label', { text: '계약일' }), dIn
+      ], function (close) {
+        return [
+          el('button', { type: 'button', 'class': 'pod-b', text: '이 회사에서 빼기', title: '연결만 끊습니다 — 파일은 원본 보관함에 남습니다', onclick: function () {
+            if (!w.confirm('이 회사 목록에서 뺄까요?\n(파일은 원본 보관함에 그대로 남습니다)')) return;
+            store.unlinkCoDoc(S.sel, d.id).then(function () { close(); toast('뺐습니다 — 파일은 보관함에 남아 있습니다'); load(true); },
+              function (e) { toast('❌ ' + msg(e)); });
+          } }),
+          el('button', { type: 'button', 'class': 'pod-b', text: '📥 내려받기', onclick: function () { host.download(d.fileId, rec ? rec.name : d.title); } }),
+          el('button', { type: 'button', 'class': 'pod-b p', text: '저장', onclick: function () {
+            store.updateCoDoc(S.sel, d.id, { title: tIn.value.trim() || d.title, date: dIn.value }).then(function () { close(); toast('저장했습니다'); loadDocs(); },
+              function (e) { toast('❌ ' + msg(e)); });
+          } })
+        ];
+      });
+      store.getOriginal(d.fileId).then(function (r) {
+        rec = r;
+        if (!r) { view.textContent = '보관함에서 파일을 찾지 못했습니다'; return; }
+        return store.fileUrl(r).then(function (url) {
+          view.textContent = '';
+          if (isImg(r.name)) view.appendChild(el('img', { src: url, alt: d.title || '', style: 'max-width:100%;max-height:60vh' }));
+          else if (/\.pdf$/i.test(r.name)) view.appendChild(el('iframe', { src: url, title: d.title || 'PDF', style: 'width:100%;height:60vh;border:none' }));
+          else view.appendChild(el('div', { style: 'text-align:center;color:#475569' }, [el('div', { style: 'font-size:36px', text: '📄' }), el('div', { text: r.name }), el('div', { style: 'font-size:12px;color:#94a3b8', text: '미리보기가 없는 종류입니다 — 내려받아 여세요' })]));
+        });
+      }).catch(function (e) { view.textContent = '불러오지 못했습니다 — ' + msg(e); });
+    }
+
+    function draw() {
+      root.innerHTML = '';
+      var wrap = el('div', { 'class': 'pod' });
+      wrap.appendChild(el('div', { 'class': 'pod-bar' }, [el('b', { text: '🏢 기업별 계약서' }),
+        el('button', { type: 'button', 'class': 'pod-b g', text: '🖼 사진첩에서 가져오기', onclick: openPhotoImport }),
+        el('button', { type: 'button', 'class': 'pod-b p', text: '📎 업로드', onclick: openUpload })]));
+      if (S.denied) { wrap.appendChild(deniedBanner()); root.appendChild(wrap); return; }
+      if (S.err) { wrap.appendChild(el('div', { 'class': 'pod-empty', style: 'color:#991b1b', text: '불러오지 못했습니다 — ' + S.err })); root.appendChild(wrap); return; }
+      if (!S.loaded) { wrap.appendChild(el('div', { 'class': 'pod-empty', text: '불러오는 중…' })); root.appendChild(wrap); return; }
+      if (!S.cos.length) {
+        wrap.appendChild(el('div', { 'class': 'pod-empty' }, ['사진첩의 계약서를 가져오거나 파일을 올리면 회사별로 모입니다.']));
+        root.appendChild(wrap); return;
+      }
+      var search = el('input', { type: 'search', placeholder: '회사 검색', 'aria-label': '회사 검색', value: S.q, style: 'width:100%;border:none;border-bottom:1px solid #e2e8f0;padding:8px 10px;font-size:12.5px' });
+      var listBox = el('div');
+      function drawList() {
+        listBox.innerHTML = '';
+        var q = S.q.trim().toLowerCase();
+        S.cos.filter(function (c) { return !q || c.name.toLowerCase().indexOf(q) >= 0; }).forEach(function (c) {
+          listBox.appendChild(el('button', { type: 'button', 'class': c.key === S.sel ? 'on' : null, 'aria-current': c.key === S.sel ? 'true' : null,
+            onclick: function () { S.sel = c.key; loadDocs(); } }, [el('span', { text: c.name }), el('i', { text: String(c.n) })]));
+        });
+      }
+      search.addEventListener('input', function () { S.q = search.value; drawList(); });
+      drawList();
+      var grid = el('div', { 'class': 'pod-grid' });
+      S.docs.forEach(function (d) {
+        var th = el('div', { 'class': 'pod-th', text: d.src === 'photo' ? '🖼' : '📄' });
+        grid.appendChild(el('button', { type: 'button', 'class': 'pod-card', onclick: function () { openDoc(d); } }, [th,
+          el('div', { 'class': 'pod-cm' }, [el('b', { title: d.title, text: d.title || '계약서' }),
+            el('span', null, [d.date || '날짜 없음', el('span', { 'class': 'pod-tag ' + (d.src === 'photo' ? 'ph' : 'up'), text: d.src === 'photo' ? '사진첩' : '업로드' })])])]));
+        store.getOriginal(d.fileId).then(function (r) {
+          if (!r || !isImg(r.name)) return;
+          return store.fileUrl(r).then(function (url) { th.textContent = ''; th.appendChild(el('img', { src: url, alt: '', loading: 'lazy' })); });
+        }).catch(function () {});
+      });
+      wrap.appendChild(el('div', { style: 'font-weight:700;margin-bottom:8px' }, [coName(S.sel), el('span', { style: 'font-weight:400;color:#64748b;font-size:12px;margin-left:6px', text: '계약서 ' + S.docs.length + '건' })]));
+      wrap.appendChild(el('div', { 'class': 'pod-co' }, [el('div', { 'class': 'pod-cl' }, [search, listBox]), grid]));
+      root.appendChild(wrap);
+    }
+    draw(); load();
+    return { reload: load };
+  }
+  function readBytes(file) {
+    return new Promise(function (res, rej) {
+      var rd = new FileReader();
+      rd.onload = function (ev) { res(new Uint8Array(ev.target.result)); };
+      rd.onerror = function () { rej(new Error('파일을 읽지 못했습니다')); };
+      rd.readAsArrayBuffer(file);
+    });
+  }
+
   w.PuOfficeDocs = {
-    archiveRows: archiveRows, pendingBackfill: pendingBackfill,
-    mountArchive: mountArchive,
+    archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates,
+    mountArchive: mountArchive, mountCompanies: mountCompanies,
     _el: el, _toast: toast, _fmtSize: fmtSize, _ymd: ymd, _css: css, _deniedBanner: deniedBanner
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -73,3 +73,38 @@ test('backfill() — dataUrlToBytes 오류 처리 (모든 항목이 완료됨)',
   assert.ok(/Promise\.resolve\(\)\.then\(/.test(m), '★★ backfill 에서 Promise.resolve().then( 이 없습니다');
   assert.ok(/\.then\(finish, finish\)/.test(m), '★★ 마지막 then 에 두 핸들러(fulfil, reject)가 없습니다');
 });
+
+test('ⓓ photoCandidates — 계약서만, 최신순, 가져온 것 표시', () => {
+  const D = load();
+  const byYear = {
+    '2026': {
+      p1: { upAt: Date.UTC(2026, 2, 2), read: { kind: 'contract', fields: { company: '가나상사', docName: '자문계약서' } } },
+      p2: { upAt: Date.UTC(2026, 4, 1), read: { kind: 'card', fields: { company: '다라' } } },
+      p3: { upAt: Date.UTC(2026, 5, 9), company: '마바상사', loc: 'storage', read: { kind: 'contract', fields: {} } }
+    },
+    '2025': { p4: { takenAt: Date.UTC(2025, 0, 5), read: { kind: 'contract' } } }
+  };
+  const c = out(D.photoCandidates(byYear, { p1: true }));
+  assert.deepEqual(c.map((x) => x.id), ['p3', 'p1', 'p4']);
+  assert.equal(c[0].company, '마바상사', '사람이 붙인 회사명이 판독값보다 앞선다');
+  assert.equal(c[0].title, '계약서');
+  assert.equal(c[0].loc, 'storage');
+  assert.equal(c[1].company, '가나상사'); assert.equal(c[1].title, '자문계약서'); assert.equal(c[1].imported, true);
+  assert.equal(c[1].date, '2026-03-02');
+  assert.equal(c[2].year, '2025'); assert.equal(c[2].company, '');
+});
+
+test('ⓓ 가져오기는 사진첩을 «읽기만» 한다', () => {
+  const s = stripJs(SRC);
+  const m = cutFn(s, 'function mountCompanies(');
+  assert.match(m, /photos\.loadFull\(/);
+  assert.ok(!/photos\.(save|delete|replace|setShare|addShare|saveRead|move)/i.test(m), '★★ 사진첩 원본을 고칩니다');
+  assert.match(m, /kind: 'photo'/, '보관함 기록에 사진첩에서 왔다는 것을 안 남깁니다');
+  assert.match(m, /String\(/, 'from.year 를 문자열로 안 바꿉니다 — 규칙(from.$f 문자열)에 막힙니다');
+});
+
+test('★ 「이 회사에서 빼기」는 연결만 끊는다', () => {
+  const m = cutFn(stripJs(SRC), 'function mountCompanies(');
+  assert.match(m, /unlinkCoDoc\(/);
+  assert.ok(!/deleteOriginal|originals.*remove/.test(m), '★★ 회사에서 빼면서 보관함 원본을 지웁니다');
+});
