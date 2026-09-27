@@ -2227,6 +2227,13 @@ exports.passkeyLoginStart     = _passkey.passkeyLoginStart;
 exports.passkeyLoginFinish    = _passkey.passkeyLoginFinish;
 exports.passkeyDevices        = _passkey.passkeyDevices;
 
+/* 카카오로 로그인 — 판단은 functions/kakao.js 한 곳에서만 한다(지문과 같은 자리). */
+const _kakao = require('./kakao');
+exports.kakaoAuthUrl      = _kakao.kakaoAuthUrl;
+exports.kakaoLink         = _kakao.kakaoLink;
+exports.kakaoUnlink       = _kakao.kakaoUnlink;
+exports.kakaoLoginFinish  = _kakao.kakaoLoginFinish;
+
 
 // ══════════ 파이어베이스 사용액 받아 적기 (2026-08-15, 대표 지시) ══════════
 // 대표님: "결제한 금액 잔여량이 얼마인지 실시간으로 확인 가능한지, 화면에 넣을 수 있는지."
@@ -2348,8 +2355,8 @@ const DR = require("./doc-read");
 
 // 판독은 **로그인한 직원이면** 할 수 있다.
 // ⚠ requireStaff 를 그대로 쓰지 않는다 — 그건 비밀번호 로그인만 받아서
-//   지문(패스키) 계정이 막힌다. 실시간DB 규칙과 **같은 기준**으로 맞춘다:
-//   password 또는 auth.token.passkey === true.
+//   지문(패스키)·카카오 계정이 막힌다. 실시간DB 규칙과 **같은 기준**으로 맞춘다:
+//   password 또는 auth.token.passkey === true 또는 auth.token.kakao === true.
 async function requireReader(req) {
   const match = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ""));
   if (!match) {
@@ -2359,7 +2366,7 @@ async function requireReader(req) {
   }
   const decoded = await getAuth().verifyIdToken(match[1], true);
   const byPassword = decoded.firebase && decoded.firebase.sign_in_provider === "password";
-  if (!byPassword && decoded.passkey !== true) {
+  if (!byPassword && decoded.passkey !== true && decoded.kakao !== true) {
     const error = new Error("회사 계정으로 로그인해 주세요.");
     error.status = 403;
     throw error;
@@ -5796,9 +5803,12 @@ exports.logLoginAttempt = functions
       /* ⚠⚠ 재검토(2026-09-20 재검토): 증표는 있는데 «이메일 없는» 증표(익명 로그인 등)로
            올 수 있다 — 이 프로젝트는 익명 로그인을 실제로 쓴다(sign.html 등). 그 증표를
            받아 주면 본문 email 로 도로 떨어져 «증표 없을 때와 똑같은 구멍»이 다시 열린다.
-           비밀번호 로그인 증표만, 그리고 이메일이 «증표에 실제로 적혀 있을 때만» 받는다. */
+           비밀번호 로그인 증표, 또는 카카오 로그인 증표(2026-09-27)만 받는다 —
+           그리고 이메일이 «증표에 실제로 적혀 있을 때만» 받는다.
+         ⚠ 지문(패스키)은 여기 안 넣는다 — 화면(enter.html)이 아직 지문 로그인 뒤
+           이 함수를 안 부른다. 부르지도 않는 것을 받아 주는 자리를 넓혀 둘 까닭이 없다. */
       if (verified && (!verified.email
-        || (verified.firebase && verified.firebase.sign_in_provider !== "password"))) {
+        || (verified.firebase && verified.firebase.sign_in_provider !== "password" && verified.kakao !== true))) {
         verified = null;
       }
       if (!verified) { res.status(200).json({ ok: true }); return; }

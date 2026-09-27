@@ -138,6 +138,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
+<script src="js/pu-kakao.js?v=1"></script>
 <script src="js/pu-billing.js?v=11"></script>
 <style>
 :root{
@@ -259,7 +260,9 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 #aiChip[data-tone="over"]{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
 #aiChip[data-tone="over"] .dot{background:#dc2626;}
 .avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2563eb);
-  color:#fff;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;}
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;cursor:pointer;}
+/* 이름·아바타를 누르면 「내 정보」(카카오 연결 등)가 열린다(2026-09-27) */
+.pmeta #userName{cursor:pointer;}
 .logout{color:var(--accent);font-weight:700;cursor:pointer;background:none;border:none;font-size:.8rem;font-family:inherit;}
 /* 📲 앱으로 깔기 — 직원 폰 ⋯ 안(appInstallFab) · 관리자 설정 창 안(cfgAppInstallRow).
    ⚠ ⋯ 안의 .docked 가 display 를 !important 로 켜므로, 숨김([hidden])이 그보다 세야 한다(아래 #moreDock 규칙). */
@@ -747,6 +750,24 @@ body.portal-mode #moreFab{display:flex;}
 #cfgModal label{display:block;font-size:.76rem;font-weight:700;color:#475569;margin:14px 0 5px;}
 #cfgModal label:first-of-type{margin-top:0;}
 #cfgModal input{width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 11px;font-size:.86rem;box-sizing:border-box;font-family:inherit;}
+/* ── 내 정보 · 카카오 연결 (2026-09-27) — cfgModal 과 같은 짜임을 그대로 따른다 ── */
+#kkModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:75;align-items:center;justify-content:center;padding:16px;}
+#kkModal .box{background:#fff;border-radius:16px;width:440px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.3);}
+#kkModal .hd{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #f8fafc;flex-shrink:0;}
+#kkModal .hd b{font-size:1rem;font-weight:800;}
+#kkModal .hd .x{cursor:pointer;color:#94a3b8;font-size:1.2rem;background:none;border:none;}
+#kkModal .bd{padding:14px 18px;overflow-y:auto;}
+#kkAdminModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:75;align-items:center;justify-content:center;padding:16px;}
+#kkAdminModal .box{background:#fff;border-radius:16px;width:560px;max-width:100%;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.3);}
+#kkAdminModal .hd{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #f8fafc;flex-shrink:0;}
+#kkAdminModal .hd b{font-size:1rem;font-weight:800;}
+#kkAdminModal .hd .x{cursor:pointer;color:#94a3b8;font-size:1.2rem;background:none;border:none;}
+#kkAdminModal .bd{padding:14px 18px;overflow-y:auto;}
+#kkAdminModal table{width:100%;border-collapse:collapse;font-size:.78rem;}
+#kkAdminModal th,#kkAdminModal td{padding:7px 8px;border-bottom:1px solid #e2e8f0;text-align:left;white-space:nowrap;}
+#kkAdminModal th{background:#f8fafc;color:#64748b;font-weight:700;font-size:.72rem;}
+#kkAdminModal button.kk-cut{border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;padding:3px 9px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;}
+#kkToast{display:none;position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:.82rem;z-index:9500;max-width:90vw;box-shadow:0 6px 20px rgba(0,0,0,.25);}
 .cfg-row{display:flex;gap:6px;align-items:center;}
 .cfg-eye{flex-shrink:0;padding:8px 12px;border:1.5px solid #e2e8f0;background:#fff;border-radius:9px;font-size:.74rem;font-weight:700;color:#475569;cursor:pointer;font-family:inherit;}
 .cfg-help{font-size:.7rem;color:#94a3b8;margin:4px 0 0;line-height:1.5;}
@@ -980,6 +1001,11 @@ body.portal-mode #moreFab{display:flex;}
            ⚠ 「지문」만 적지 않는다: 휴대폰 설정에 따라 얼굴·잠금번호가 뜬다. -->
       <button class="btn" id="pkBtn" type="button"
         style="display:none;margin-top:8px;background:#166534;">🔒 지문·간편 로그인</button>
+      <!-- 카카오로 로그인 (2026-09-27, 대표 「추천대로」) — 지문과 달리 «이 기기에 등록했는가»가
+           아니라 «내 카카오 계정을 이 직원 계정에 연결했는가» 이므로 기기와 무관하게 늘 보인다.
+           카카오 브랜드 색(#FEE500·검정 글자)은 카카오 쪽 규정이라 팔레트 예외로 둔다. -->
+      <button class="btn" id="kkLoginBtn" type="button"
+        style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;background:#FEE500;color:#191919;">💬 카카오로 로그인</button>
       <div class="err" id="errMsg"></div>
       </form>
     </div>
@@ -1180,6 +1206,15 @@ body.portal-mode #moreFab{display:flex;}
         <button type="button" id="cfgHealth">열어보기</button>
       </div>
 
+      <!-- 💬 카카오 로그인 현황 (2026-09-27) — 누가 연결했나, 관리자가 대신 끊기 -->
+      <div class="cfg-tool">
+        <div>
+          <b>💬 카카오 로그인 현황</b>
+          <span>직원별 카카오 연결 여부를 봅니다. 기기를 잃어버린 직원의 연결은 여기서 대신 끊을 수 있습니다.</span>
+        </div>
+        <button type="button" id="cfgKakao">열어보기</button>
+      </div>
+
       <!-- 📲 이 기기에 앱으로 깔기 (대표 결정 2026-09-23 ③안) — 폰에서, 아직 안 깔았을 때만 보인다.
            저장하는 값이 아니라 «이 기기»에서 하는 일이다. 직원은 폰 ⋯ 안에서 깐다. -->
       <div class="cfg-tool" id="cfgAppInstallRow" hidden>
@@ -1292,6 +1327,25 @@ body.portal-mode #moreFab{display:flex;}
     <div class="ft"><button class="sg-btn" id="sgDoneOk" type="button" style="margin-top:12px">확인</button></div>
   </div>
 </div>
+
+<!-- ── 내 정보 · 카카오 연결 (2026-09-27) — 직원 누구나. 이름·아바타를 눌러 연다.
+     관리자 전용 ⚙ 설정(#cfgModal)과는 다른 문이다 — 여긴 «내 계정» 이야기만 한다. -->
+<div id="kkModal" role="dialog" aria-modal="true" aria-labelledby="kkTitle">
+  <div class="box">
+    <div class="hd"><b id="kkTitle">내 정보</b><button class="x" id="kkClose" type="button" aria-label="닫기">✕</button></div>
+    <div class="bd" id="kkBody"></div>
+  </div>
+</div>
+
+<!-- ── (관리자) 카카오 로그인 현황 ── -->
+<div id="kkAdminModal" role="dialog" aria-modal="true" aria-labelledby="kkAdminTitle">
+  <div class="box" style="width:560px">
+    <div class="hd"><b id="kkAdminTitle">💬 카카오 로그인 현황</b><button class="x" id="kkAdminClose" type="button" aria-label="닫기">✕</button></div>
+    <div class="bd" id="kkAdminBody"></div>
+  </div>
+</div>
+
+<div id="kkToast" role="status" aria-live="polite"></div>
 
 <script>
 (function(){
@@ -1650,6 +1704,147 @@ body.portal-mode #moreFab{display:flex;}
       if(/NotAllowed|취소/i.test(m)) showErr('취소되었습니다. 비밀번호로도 들어올 수 있습니다.');
       else showErr(m + ' — 비밀번호로 로그인해 주세요.');
     }).then(function(){ btn.disabled = false; });
+  }
+
+  /* ══ 카카오로 로그인 (2026-09-27, 대표 「추천대로」) ══════════════════════════
+     ★ 지문과 달리 «이 기기에 등록했나» 가 아니라 «내 카카오 계정을 이 직원 계정에
+       연결했나» 다 — 그래서 로그인 화면 단추는 늘 보이고, 등록·기기 목록도 없다.
+     ★ 관리자 계정은 애초에 서버(kakaoLoginFinish)가 거절한다 — 화면에서도 막을
+       필요는 없지만, 「관리자는 비밀번호로」를 미리 말해 헷갈리지 않게 한다. */
+  function kkToast(msg, ms){
+    var t = $('kkToast'); if(!t) return;
+    t.textContent = msg; t.style.display = 'block';
+    clearTimeout(t._kkT);
+    t._kkT = setTimeout(function(){ t.style.display = 'none'; }, ms || 4000);
+  }
+  function kkLogin(){
+    var btn = $('kkLoginBtn');
+    if(btn) btn.disabled = true;
+    showErr('');
+    _persistenceReady.then(function(){
+      return auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    }).then(function(){
+      return PuKakao.goLogin();          // 여기서 화면이 카카오로 떠난다 — 아래 catch 는 «떠나기 전» 실패만 잡는다
+    }).catch(function(err){
+      showErr((err && err.message) || '카카오 연결에 실패했습니다');
+      if(btn) btn.disabled = false;
+    });
+  }
+  /* 카카오가 돌려보낸 뒤 — 로그인 화면이든 포털이든, 뜨자마자 한 번 확인한다.
+     ⚠ 초를 다투지 않는다: 지문·비밀번호 로그인처럼 즉시 있어야 하는 값이 아니라서
+       auth 상태가 아직 안 굳었어도 잠깐 기다렸다 처리해도 된다. */
+  function kkHandleReturn(){
+    if(!window.PuKakao) return;
+    var p = PuKakao.pending();
+    if(!p) return;
+    if(p.error){ showErr(p.error); return; }
+    if(p.mode === 'login'){
+      _freshLogin = true;
+      PuKakao.loginFinish(p.code).then(function(token){
+        return auth.signInWithCustomToken(token);
+      }).then(function(cred){
+        try {
+          cred.user.getIdToken().then(function(tok){ reportLogin(cred.user.email || '', true, '', tok); }).catch(function(){});
+        } catch(e){}
+      }).catch(function(err){
+        showErr((err && err.message) || '카카오 로그인에 실패했습니다');
+      });
+      return;
+    }
+    if(p.mode === 'link'){
+      // 「연결」은 이미 로그인한 사람만 — 카카오에서 돌아온 뒤 auth 상태가 아직
+      // 안 굳었을 수 있어 한 번은 기다린다(로그아웃된 채면 조용히 포기한다).
+      var wait = auth.currentUser ? Promise.resolve(auth.currentUser) : new Promise(function(resolve){
+        var un = auth.onAuthStateChanged(function(u){ un(); resolve(u); });
+      });
+      wait.then(function(user){
+        if(!user){ kkToast('로그인이 풀렸습니다 — 다시 로그인한 뒤 연결해 주세요'); return; }
+        return user.getIdToken().then(function(tok){
+          return PuKakao.link(p.code, p.sid || window.__myKakaoSid || '', tok);
+        }).then(function(){
+          kkToast('✅ 카카오 로그인을 연결했습니다');
+          kkRefreshOpenModal();
+        });
+      }).catch(function(err){ kkToast('❌ ' + ((err && err.message) || '연결에 실패했습니다')); });
+    }
+  }
+  // 「내 정보」 모달이 열려 있으면 방금 연결·해제한 결과를 곧바로 되비친다
+  function kkRefreshOpenModal(){
+    if($('kkModal').style.display === 'flex') kkOpenProfile();
+  }
+
+  /* ── 내 정보 — 이름·아바타를 눌러 연다(직원 누구나) ── */
+  function kkOpenProfile(){
+    var uid = auth.currentUser && auth.currentUser.uid;
+    var body = $('kkBody');
+    if(!uid || !body) return;
+    $('kkModal').style.display = 'flex';
+    body.innerHTML = '<p style="color:#94a3b8;font-size:.82rem;margin:0">불러오는 중…</p>';
+    db.ref('uid_kakao/' + uid).once('value').then(function(snap){
+      var v = snap.val();
+      var linked = !!(v && v.kakaoId);
+      body.innerHTML =
+        '<div class="cfg-tool" style="margin-bottom:0">'
+        + '<div><b>💬 카카오 로그인</b><span>'
+        + (linked ? ('연결됨 · ' + new Date(v.at).toLocaleDateString('ko-KR') + ' 부터') : '연결하면 다음부터 비밀번호 없이 카카오로 들어옵니다')
+        + '</span></div>'
+        + '<button type="button" id="kkLinkBtn">' + (linked ? '연결 끊기' : '카카오 연결') + '</button>'
+        + '</div>';
+      $('kkLinkBtn').addEventListener('click', function(){
+        if(linked) kkUnlinkSelf(); else kkStartLink();
+      });
+    }).catch(function(){
+      body.innerHTML = '<p style="color:#dc2626;font-size:.82rem;margin:0">불러오지 못했습니다. 다시 열어 주세요.</p>';
+    });
+  }
+  function kkStartLink(){
+    auth.currentUser.getIdToken().then(function(){        // 세션이 살아 있는지만 미리 확인
+      return PuKakao.goLink(window.__myKakaoSid || '');
+    }).catch(function(err){ kkToast('❌ ' + ((err && err.message) || '연결을 시작하지 못했습니다')); });
+  }
+  function kkUnlinkSelf(){
+    if(!confirm('카카오 로그인 연결을 끊을까요?\n\n다음부터는 이 계정으로 카카오 로그인을 쓸 수 없습니다.')) return;
+    auth.currentUser.getIdToken().then(function(tok){
+      return PuKakao.unlink(tok);
+    }).then(function(){ kkToast('연결을 끊었습니다'); kkOpenProfile(); })
+      .catch(function(err){ kkToast('❌ ' + ((err && err.message) || '끊지 못했습니다')); });
+  }
+
+  /* ── (관리자) 카카오 로그인 현황 — 누가 연결했나 한 번에, 대신 끊기 ── */
+  function kkOpenAdmin(){
+    var body = $('kkAdminBody');
+    if(!body) return;
+    $('kkAdminModal').style.display = 'flex';
+    body.innerHTML = '<p style="color:#94a3b8;font-size:.82rem;margin:0">불러오는 중…</p>';
+    db.ref('uid_kakao').once('value').then(function(snap){
+      var all = snap.val() || {};
+      var rows = Object.keys(all).map(function(uid){
+        var v = all[uid] || {};
+        return { uid: uid, sid: String(v.sid || ''), at: v.at || 0 };
+      }).sort(function(a, b){ return b.at - a.at; });
+      if(!rows.length){
+        body.innerHTML = '<p style="color:#94a3b8;font-size:.82rem;margin:0">아직 아무도 연결하지 않았습니다.</p>';
+        return;
+      }
+      // 서버에서 온 값이라도 HTML 로 끼우기 전에 글자로 바꾼다(사번·uid 에 < " 가 섞여도 화면이 안 깨지게)
+      var kkEsc = function(s){ return String(s).replace(/[&<>"']/g, function(c){ return '&#' + c.charCodeAt(0) + ';'; }); };
+      var tr = rows.map(function(r){
+        return '<tr><td>' + kkEsc(r.sid || ('(사번 없음) ' + r.uid.slice(0, 6))) + '</td>'
+          + '<td>' + new Date(r.at).toLocaleDateString('ko-KR') + '</td>'
+          + '<td><button type="button" class="kk-cut" data-uid="' + kkEsc(r.uid) + '">끊기</button></td></tr>';
+      }).join('');
+      body.innerHTML = '<table><tr><th>사번</th><th>연결일</th><th></th></tr>' + tr + '</table>';
+      body.querySelectorAll('.kk-cut').forEach(function(b){
+        b.addEventListener('click', function(){
+          if(!confirm('이 직원의 카카오 로그인 연결을 끊을까요?')) return;
+          auth.currentUser.getIdToken().then(function(tok){ return PuKakao.unlink(tok, b.getAttribute('data-uid')); })
+            .then(function(){ kkToast('연결을 끊었습니다'); kkOpenAdmin(); })
+            .catch(function(err){ kkToast('❌ ' + ((err && err.message) || '끊지 못했습니다')); });
+        });
+      });
+    }).catch(function(){
+      body.innerHTML = '<p style="color:#dc2626;font-size:.82rem;margin:0">불러오지 못했습니다 — 관리자 계정으로 다시 열어 주세요.</p>';
+    });
   }
 
   /* 등록 단추 — 이 기기에 «아직 등록 안 했을 때» 만 보인다.
@@ -2207,6 +2402,7 @@ body.portal-mode #moreFab{display:flex;}
     info = info || {};
     var email = info.email || (auth.currentUser && auth.currentUser.email) || '';
     var mySid = acct ? String(acct.sid || '') : puEmailToSid(email);
+    window.__myKakaoSid = mySid;   // 카카오 「연결」이 어느 사번인지 물을 자리(내 정보·복귀 처리)
     var name = acct ? acct.name : (email || '사용자');
     var role = acct ? acct.role : 'member';
     _curRole = role;   // 바로가기(홈 앱) 권한 판정용
@@ -4511,6 +4707,18 @@ body.portal-mode #moreFab{display:flex;}
     }).catch(function(){ _cfgHealth.textContent = '불러오기 실패 — 다시'; })
       .then(function(){ _cfgHealth.disabled = false; });
   });
+
+  /* 💬 카카오 로그인 (2026-09-27) — 로그인 단추 · 내 정보(누구나) · 관리자 현황 */
+  if($('kkLoginBtn')) $('kkLoginBtn').addEventListener('click', kkLogin);
+  if($('kkClose')) $('kkClose').addEventListener('click', function(){ $('kkModal').style.display = 'none'; });
+  if($('kkAdminClose')) $('kkAdminClose').addEventListener('click', function(){ $('kkAdminModal').style.display = 'none'; });
+  var _cfgKakao = $('cfgKakao');
+  if(_cfgKakao) _cfgKakao.addEventListener('click', kkOpenAdmin);
+  // 이름·아바타를 누르면 「내 정보」 — 로그인 뒤에만 뜻이 있으므로 포털 안에서만 있는 요소지만
+  // 로그인 전에도 눌릴 수는 있어 kkOpenProfile 이 스스로 uid 없음을 가려낸다.
+  if($('userAvatar')) $('userAvatar').addEventListener('click', kkOpenProfile);
+  if($('userName')) $('userName').addEventListener('click', kkOpenProfile);
+  kkHandleReturn();
 
   // ══════════ ⋯ 더보기 — 흩어진 단추를 한 곳으로 ══════════
   //  폰에서만 동작한다. PC는 자리가 넉넉해 지금 그대로 둔다.

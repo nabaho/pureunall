@@ -150,7 +150,11 @@ const allowTop = ['systemAlerts','systemBackups','systemBackupsIndex','systemRes
   'login_events','login_devices','login_countries','login_fail_burst',
   /* 2026-09-27 사무관리서류 개편 — 원본 보관함·기업별 계약서(설계 §4·§6).
      읽기는 재직 직원 전체, originals·hash 는 새로 쓰기만(못 지운다). */
-  'pu_docs'];
+  'pu_docs',
+  /* 2026-09-27 카카오 로그인 — 「연결됨」 표시(functions/kakao.js). 본인·관리자만 읽고,
+     쓰기는 없다(서버 관리자 SDK 전용). 카카오 회원번호 자체(kakao_links)는 지문의
+     passkeys 와 같이 규칙 없는 서버 전용 자리라 여기 안 나온다. */
+  'uid_kakao'];
 
 const keys = Object.keys(R);
 const removed = baseTop.filter(function (k) { return keys.indexOf(k) < 0; });

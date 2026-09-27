@@ -32,7 +32,10 @@
    ★ 그래서 뜻을 바꾼다 — 「비번으로 들어왔고, **등록된 재직자**인가」.
      등록은 uid_roles 에 있고, 그 자리는 아래에서 «스스로 못 쓰게» 묶는다.
      둘이 함께 가야 한다 — 하나만 하면 스스로 재직자가 되어 버린다. */
-const 비번로그인 = "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true)";
+/* 2026-09-27 카카오 로그인 추가 — 지문(passkey)과 같은 자리에 나란히 더한다.
+   ⚠ createCustomToken 이 이 낱말(kakao:true)을 실을 때만 참이다. 함수(kakaoLoginFinish)가
+     관리자 계정에는 애초에 이 표를 안 주므로, 여기서 또 관리자를 가릴 필요는 없다. */
+const 비번로그인 = "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true)";
 const 재직자 = "root.child('uid_roles').child(auth.uid).child('status').val() === 'active'";
 const LOGIN = `${비번로그인} && ${재직자}`;
 const ADMIN = "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true";
@@ -1200,6 +1203,19 @@ rules.fcm_tokens = { $uid: {
     $other: { '.validate': false }
   }
 } };
+
+/* ══ 카카오 로그인 — 「연결됨」 표시만 여기 있다 (2026-09-27) ═════════════════
+   ⚠ 카카오 회원번호(kakao_links, 누구 것인지 거꾸로 찾는 표)는 여기 없다 —
+     지문의 passkeys 와 같은 자리(서버 전용, 규칙 자체가 없어 기본 거부)라
+     최상위 검사(allowTop)에도 안 걸린다. functions/kakao.js 만 관리자 SDK 로 만진다.
+   ⚠ '.write' 가 없다 — 연결·해제는 반드시 kakaoLink·kakaoUnlink(서버) 를 거쳐야
+     한다. 클라이언트가 직접 쓰면 남의 카카오 계정 번호를 자기 것인 양 적어 넣을 수 있다.
+   ⚠ 관리자 읽기는 «맨 위»에 둔다 — 로그인 감시(login_devices 등)와 같은 자리라
+     관리자 설정 화면이 한 번에 「누가 연결했나」 전체를 본다(사람마다 따로 안 읽는다). */
+rules.uid_kakao = {
+  '.read': MGR,
+  $uid: { '.read': "auth != null && auth.uid === $uid" }
+};
 
 /* ══ 로그인 무단시도 감지 ══════════════════════════════════════════════
    설계문서: docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md
