@@ -97,3 +97,30 @@ test('★★ 출연확인서 — 사업장마다 한 장, 금액은 siteContribN
   assert.equal(A.contrib(F, SITES).확인서[1].금액숫자, '50,000,000', '연도별 기록의 그 해 출연금이 첫째 근거');
   A.S._docR = null;
 });
+
+/* ── [별지] 설립준비위원회 위원 명단 — 한글로도 (2026-09-27 「계속」) ── */
+test('★ 별지 명단 — 측마다 번호를 새로(관청이 측별로 센다), 모르는 칸은 빈칸, 인원수', () => {
+  const box = {};
+  new Function(['var S={year:2026};', gS('COMMITTEE_ROWS'), gF('_officersOf'), gF('_boss'), gF('_siteWrep'), gF('_siteUrep'),
+    gF('_isCommittee'), gF('_siteCommittee'), gF('_prepCommittee'), gF('estabSites'), gF('_hwpInkaAnnexValues'),
+    'this.ax=_hwpInkaAnnexValues;'].join('\n')).call(box);
+  const v = box.ax(F, SITES);
+  assert.equal(v.기금명, F.name);
+  const w = v.위원.filter((r, i, a) => i < a.findIndex((x) => x.구분 === '사용자측'));
+  assert.equal(w[0].구분, '근로자측'); assert.equal(w[0].순번, '1');
+  const u0 = v.위원.find((x) => x.구분 === '사용자측');
+  assert.equal(u0.순번, '1', '사용자측도 1부터');
+  assert.equal(v.근로자측수, String(w.length));
+  assert.ok(v.위원.every((r) => typeof r.생년월일 === 'string' && r.생년월일.length > 0), '빈 값은 밑줄이 아니라 빈칸(" ")');
+  assert.ok(!('번호' in v.위원[0]), '엔진이 매기는 {{번호}}(전체 차례)와 겹치지 않게 순번');
+});
+
+test('★ 별지 배선 — 인가신청서 미리보기의 [⬇ 별지 명단] · 묶음 ZIP 에 인가신청서 바로 뒤', () => {
+  const sp = gF('hwpSidePreview');
+  assert.match(sp, /kind==='inka'&&\(S\._hwpTplHas\|\|\{\}\)\.inka_annex&&_cmAnnexNeeded\(f,S\._hwpSideSites\|\|\[\]\)/);
+  assert.match(sp, /hwpAnnexDownload\(\)/);
+  const bu = gF('estabBundleHwp');
+  assert.match(bu, /u\.d\[0\]==='inka'&&\(S\._hwpTplHas\|\|\{\}\)\.inka_annex&&_cmAnnexNeeded\(f,sites\)/);
+  assert.match(bu, /-1\. \[별지\] 설립준비위원회 위원 명단\.hwpx/);
+  assert.match(gF('hwpAnnexDownload'), /hwpTplFill\('inka_annex',f,sites\)/);
+});
