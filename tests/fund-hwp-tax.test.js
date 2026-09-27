@@ -26,7 +26,7 @@ const A = (() => {
 })();
 
 const F = { _id: 'X', name: '가나다공동근로복지기금', fund_type: '공동', chairman: '홍길동', phone: '02-123-4567',
-  address: '서울특별시 종로구 세종대로 1길 11', corp_reg_no: '110171-0000000', tax_id_no: '101-82-00000',
+  address: '서울특별시 종로구 세종대로 1길 11', corp_reg_no: '110171-0000000', tax_id_no: '123-82-00000',
   lease_lessor: '가나기계 주식회사', lease_from: '2026-05-01', lease_deposit: '0',
   officers: [{ role: '이사장', name: '홍길동', addr: '서울 종로구 가상로 1' }] };
 const SITES = [
@@ -48,7 +48,7 @@ test('사업자등록신청서 — 자본금·재무상황=설립 출연금(천�
   assert.equal(v.임대기간, '2026. 05. 01. ~ 2028. 04. 30. ');
   assert.equal(v.보증금, '0원', '적어 둔 값은 0 이라도 넣는다');
   assert.equal(v.월세, '원', '안 적었으면 비운다 — 0원인지 우리는 모른다');
-  assert.equal(v.법인등록번호, '110171-0000000'); assert.equal(v.고유번호, '101-82-00000'); assert.equal(v.사업연도, '2026');
+  assert.equal(v.법인등록번호, '110171-0000000'); assert.equal(v.고유번호, '123-82-00000'); assert.equal(v.사업연도, '2026');
 });
 
 test('임대차계약서 — 임대인·임차 소재지·계약일(시작일), 모르면 손으로 적을 자리', () => {
