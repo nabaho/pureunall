@@ -153,12 +153,12 @@ test('★★ 자리표 «n-꼭지-i» 에 정말 그 i 번째 건이 있다 — 
        그래서 «그 자리에 그 내용이 있는지»를 본다. 큰회차 는 건마다 다른 말을 심어 둔다. */
   const 전 = 짓기(큰회차(), 설정(), { 미리보기: true, 요약: false, 지역: '전국' });
   [0, 1, 2, 3, 4].forEach((i) => {
-    const re = new RegExp('id="n-news-' + i + '"[\\s\\S]{0,300}?이번 주 ' + (i + 1) + '번째');
+    const re = new RegExp('id="n-news-' + i + '"[\\s\\S]{0,900}?이번 주 ' + (i + 1) + '번째');
     assert.match(전.서식, re,
       'n-news-' + i + ' 자리에 ' + (i + 1) + '번째 기사가 없다 — 자리가 밀렸다');
   });
   [0, 1, 2, 3].forEach((i) => {
-    const re = new RegExp('id="n-policy-' + i + '"[\\s\\S]{0,600}?고용노동부 자료 ' + (i + 1));
+    const re = new RegExp('id="n-policy-' + i + '"[\\s\\S]{0,1200}?고용노동부 자료 ' + (i + 1));
     assert.match(전.서식, re,
       'n-policy-' + i + ' 자리에 ' + (i + 1) + '번째 자료가 없다 — 자리가 밀렸다');
   });
@@ -202,7 +202,8 @@ test('★★ 한 줄 제목이 있으면 글 «위에» 굵게 뜬다', () => {
   const 제 = 전.서식.indexOf('우리가 쓴 한 줄');
   const 몸 = 전.서식.indexOf('본문 첫 문장입니다');
   assert.ok(제 >= 0 && 몸 >= 0 && 제 < 몸, '한 줄 제목이 글 아래에 있다');
-  assert.match(전.서식.slice(제 - 200, 제), /font-weight:bold/, '제목이 굵지 않다');
+  /* ⚠ 제목 글자 앞에 원문 링크 태그가 선다(2026-09-27) — 굵기는 그 «바깥 줄»에 있다 */
+  assert.match(전.서식.slice(Math.max(0, 제 - 700), 제), /font-weight:bold/, '제목이 굵지 않다');
 });
 
 test('★★ 한 줄이 없으면 «매체 제목으로 물러서지 않는다» — 제목 없이 글만', () => {
