@@ -198,7 +198,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
-<script src="js/pu-doc-read.js?v=48"></script>
+<script src="js/pu-doc-read.js?v=49"></script>
 <!-- 옵시디언 업무요약 — 떠 있는 단추를 달지 않는다: 왼쪽 메뉴 맨 아래 「⚙ 환경설정」을 덮었다(2026-09-27).
      메뉴 바닥의 한 줄(환경설정 바로 위)에서 연다. -->
 <script>window.PU_OBSIDIAN_NO_FAB = true;</script>
@@ -19457,7 +19457,7 @@ function ContractModal(props){
     if(isLicenseField){
       showToast('🔍 사업자등록증 OCR 분석 중... (로컬 OCR)');
     } else {
-      showToast('🔍 OCR 처리 중... (첫 사용 시 한글 데이터 로드 ~10MB)');
+      showToast('🔍 OCR 처리 중... (첫 사용 시 한국어 OCR 모델 ~30MB 내려받기)');
     }
     ocrExtract(img).then(function(res){
       var ext = res.fields || {};
@@ -19498,7 +19498,7 @@ function ContractModal(props){
         return Object.assign({}, prev, { company: nc });
       });
       setOcrField('');
-      var engineLabel = engine === 'vision' ? '[Google Vision]' : engine === 'claude' ? '[Claude Vision]' : '[Tesseract]';
+      var engineLabel = engine === 'vision' ? '[Google Vision]' : engine === 'claude' ? '[Claude Vision]' : engine === 'ppocr' ? '[한국어 OCR]' : '[Tesseract]';
       if(filled > 0){
         showToast('✅ 사진에서 읽음 '+engineLabel+': '+filledKeys.join('·')+' ('+filled+'개)'
           + (imgOverride ? ' — 사진은 저장하지 않았습니다' : ' — 원본 사진 정리됨') + ', 값 확인·수정');
@@ -19823,7 +19823,7 @@ function ContractModal(props){
               '① OCR 자동 추출\n' +
               '  - 명함·사업자등록증 이미지 첨부\n' +
               '  - [🔍 OCR 추출] 버튼 클릭 → 회사명·사업자번호·대표자·주소·전화 자동\n' +
-              '  - 첫 사용 시 한글 데이터 다운로드 ~10MB (이후 캐시)\n' +
+              '  - 첫 사용 시 한국어 OCR 모델 다운로드 ~30MB (이후 캐시)\n' +
               '  - 인식 결과는 반드시 확인·수정 필요\n\n' +
               '② 엑셀 한 줄 일괄 입력\n' +
               '  - 엑셀 한 행 선택 → Ctrl+C\n' +

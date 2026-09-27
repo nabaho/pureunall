@@ -82,3 +82,29 @@ test('★ 앱 배선 — 새 OCR 먼저, 안 되면 tesseract 로(두 곳: 서�
   assert.match(bw, /viaTess\(cv\)/, '못 쓰거나 글이 없으면 그 장만 tesseract');
   assert.match(bw, /tw\|\|\(tw=_bulkTessWorker/, 'tesseract 일꾼도 한 번만');
 });
+
+/* ── 이알피·전자서명도 같은 길 (대표 2026-09-27 「이알피 전자서명도 바꿔라」) ── */
+test('★ 공용 판독 층(js/pu-doc-read.js) — 브라우저 판독이 한국어 OCR 먼저, 안 되면 tesseract 두 벌 읽기', () => {
+  const R = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-read.js'), 'utf8');
+  const br = R.slice(R.indexOf('function browserRead('), R.indexOf('function browserRead(') + 200);
+  assert.match(br, /krRead\(img, onProgress\)\.catch\(function \(\) \{ return tessRead\(img, onProgress\); \}\)/);
+  assert.match(R, /function tessRead\(img, onProgress\) \{\s*return loadTess\(\)/, '예전 두 벌 읽기는 그대로 남는다');
+  assert.match(R, /engine: 'ppocr'/);
+  assert.match(R, /bizregParse\(text\)/, '칸 이름은 종전 판독기 그대로');
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8'), /engine === 'ppocr' \? '\[한국어 OCR\]'/);
+});
+
+test('★ 전자서명(sign.html) 신분증 — 한국어 OCR 먼저, 기기 안에서만, 안 되면 tesseract', () => {
+  const S = fs.readFileSync(path.join(__dirname, '..', 'sign.html'), 'utf8');
+  const on = S.slice(S.indexOf("$('ocrFile').addEventListener"), S.indexOf("$('ocrFile').addEventListener") + 5000);
+  assert.ok(on.indexOf('PuOcrKr.recognize([cv]') >= 0 && on.indexOf('PuOcrKr.recognize([cv]') < on.indexOf('Tesseract.recognize(cv'), '한국어 OCR 이 먼저');
+  assert.ok(on.includes(".length < 10) {        // 한국어 OCR 을 못 쓰면 예전 길"), '글이 거의 없으면 tesseract');
+  assert.match(on, /cv\.width = 1; cv\.height = 1;/, '사진은 그대로 즉시 폐기');
+});
+
+test('★ 모듈 판은 한 곳 기준 — 앱마다 ?v= 가 갈라지면 한 화면만 옛 모듈을 쓴다', () => {
+  const v = (FUND.match(/js\/pu-ocr-kr\.js\?v=(\d+)/) || [])[1];
+  assert.ok(v);
+  assert.ok(fs.readFileSync(path.join(__dirname, '..', 'sign.html'), 'utf8').includes("'js/pu-ocr-kr.js?v=" + v + "'"), 'sign.html 판');
+  assert.ok(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-read.js'), 'utf8').includes("'pu-ocr-kr.js?v=" + v + "'"), 'pu-doc-read.js 판');
+});
