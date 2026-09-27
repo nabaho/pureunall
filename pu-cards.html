@@ -6038,12 +6038,13 @@ const BULK_FN_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/sendB
    ⚠⚠ BULK_SERVER_VALS 는 **서버 buildQueue 의 vals 와 같아야 한다.**
      한쪽만 고치면 다시 조용히 빈칸이 나간다 —
      tests/cards-bulk-vals.test.js 가 두 곳을 견줘 그 자리에서 잡는다. */
-const BULK_SERVER_VALS = ['이름','회사','직책','name','company','title'];
+const BULK_SERVER_VALS = ['이름','회사','직책','담당자','name','company','title'];
 /* 옛 틀을 살려 준다 — 화면 말 → 서버 말. 사람이 고쳐 둔 문구를 버리지 않는다. */
 const BULK_RENAME = { 받는분:'이름', 회사명:'회사', 직함:'직책' };
 
 /* 묶음에서는 «곳마다 다르지 않은» 칸을 화면이 미리 채운다.
-   ⚠ 담당자는 곳마다 다르다 — 여기서 채우면 모두 한 사람 이름이 된다. 안 채운다. */
+   ⚠ 담당자는 곳마다 다르다 — 여기서 채우면 모두 한 사람 이름이 된다. 안 채운다.
+     서버가 명함마다 실어 보낸 담당(mailTargets staff)으로 통마다 채운다. */
 function bulkLocalVals(c){
   const v = mailVals({ 자료목록: ((c&&c.ids)||[]).map(i=>{ const m=_matMeta[i]||{};
     return '· ' + (m.name||'자료') + (m.desc ? ' — ' + m.desc : ''); }).join('\n') });
@@ -6061,6 +6062,11 @@ function bulkFillKnown(body, vals){
     const v = (vals||{})[String(k).trim()];
     return (v==null) ? m : String(v);
   });
+}
+/* {담당자} 를 쓴 편지에서 담당을 못 찾은 곳이 몇인가 — 안 쓰는 편지면 0 */
+function bulkNoStaffCount(text, targets){
+  if(String(text||'').indexOf('{담당자}') < 0) return 0;
+  return (targets||[]).filter(t=>!String((t&&t.staff)||'').trim()).length;
 }
 /* 아무도 못 채우는 칸 — 그대로 보내면 «빈칸»이 되어 나간다. 이름을 대어 막는다. */
 function bulkUnknownFields(texts){
@@ -6325,7 +6331,15 @@ async function bulkSendAll(){
     + BULK_SERVER_VALS.slice(0,3).map(k=>'{'+k+'}').join(' ') + ' 입니다 — 글을 고쳐 주세요', 16000);
   const names = (c.ids||[]).map(id=>(_matMeta[id]||{}).name||'자료');
   const lines = bulkSummary(c.bulkStat, BULK_GAP_SEC, names).map(x=>`· ${x.k} — ${x.v}`).join('\n');
-  if(!confirm(`${c.bulk.length.toLocaleString()}곳에 한 통씩 보냅니다.\n\n${lines}\n\n`+
+  /* ★ {담당자} 를 쓴 편지인데 담당을 못 찾은 곳이 있으면 «보내기 전에» 센다
+       (대표 지시 2026-09-27). 조용히 빈칸으로 나가면 아무도 모른다 —
+       「수신거부 N」·「퇴사 N」과 같은 결이다. */
+  const 담당빈곳 = bulkNoStaffCount(본문낼것 + ' ' + 제목낼것 + ' ' + 서식낼것, c.bulk);
+  const 담당줄 = 담당빈곳
+    ? `\n⚠ 담당 노무사를 못 찾은 곳 ${담당빈곳.toLocaleString()}곳 — 그 편지에서는 `
+      + `{담당자} 자리가 빈칸으로 나갑니다.\n`
+    : '';
+  if(!confirm(`${c.bulk.length.toLocaleString()}곳에 한 통씩 보냅니다.\n\n${lines}\n${담당줄}\n`+
     `천천히 나가는 이유 — 한꺼번에 보내면 다음메일이 막습니다.\n`+
     `창을 닫아도 서버가 계속 보냅니다. 진행은 「⏰ 예약한 메일」에서 보입니다.\n` +
     (c.bulkCoKeys && c.bulkCoKeys.length
@@ -33652,8 +33666,17 @@ function mailTargets(items, block){
     if(it.noMail || B[emailKey(e)]){ blocked++; return; }
     if(seen[e]){ dup++; return; }
     seen[e] = 1;
+    /* ★ 그 곳을 맡은 «주담당 노무사» — 편지의 {담당자} 가 통마다 이 이름이 된다
+         (대표 지시 2026-09-27 「담당자 이어라」).
+       ⚠ 이름만 싣는다. 전화·주소는 안 싣는다 — 직원 개인 번호를 거래처에 뿌리지 않는다.
+       ⚠ label() 을 쓰면 안 된다. 그것은 배지 글자라 「김보람 +2」가 나온다. */
+    /* ⚠ 담당자 표가 아직 안 왔으면 «빈 글자»다 — leftOfCard 와 같은 잣대(ErpMatch.ready).
+         지어내지 않는다. 몇 곳이 비는지는 보내기 전에 세어 알려 준다. */
+    const 맡은이 = (ErpMatch.ready && ErpMatch.match)
+      ? ((ErpMatch.match(it) || {}).main || '') : '';
     ok.push({ name:it.name||'', email:e, company:it.company||'',
-              title:it.title||'', mobile:it.mobile||it.companyTel||it.tel||'' });
+              title:it.title||'', mobile:it.mobile||it.companyTel||it.tel||'',
+              staff: String(맡은이 || '') });
   });
   return { ok, stat:{ ready:ok.length, noEmail, blocked, dup, left } };
 }
