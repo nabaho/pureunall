@@ -1304,6 +1304,38 @@ function gcalMailColor(mail){
   return uniq[h % uniq.length];
 }
 
+/* ── 🗄 구글 일정 보관함 (data/gcal_archive) ─────────────────────────────
+   대표 지시 2026-09-27 「푸른캘린더에서 별도로 보관」 → 추천대로(지운 일정은 평소 숨김 + 스위치).
+   ★ 서버(gcalArchiveDaily)가 매일 새벽 3시 구글 공용 달력을 여기로 베낀다. 누가 구글에서 지워도
+     보관함에는 남는다(googleDeleted 표). 2017년부터 10,585건.
+   ★ 화면은 «보는 달»만 받는다(date 색인) — 보관함 통째(약 7MB)를 받지 않는다.
+   ★ 쓰는 때 둘:  ① 「🗄 지운 일정」 스위치를 켰을 때 — 지워진 것을 점선·취소선으로
+                  ② 구글에서 못 받았을 때 — 보관본으로 달력을 채운다(빈 달력은 거짓말이다) */
+var ARCH = { key:"", list:[], loading:false };
+function 보관받기(){
+  if(!fbDb) return;
+  var 칸 = monthGrid(S.ym);
+  var 첫날 = 칸[0].date, 끝날 = 칸[칸.length-1].date;
+  var 키 = 첫날 + "~" + 끝날;
+  if(ARCH.key === 키 || ARCH.loading) return;
+  ARCH.loading = true;
+  fbDb.ref("data/gcal_archive").orderByChild("date").startAt(첫날).endAt(끝날).once("value").then(function(snap){
+    var v = snap.val() || {};
+    ARCH.list = Object.keys(v).map(function(k){ return v[k]; }).filter(function(r){ return r && r.date; });
+    ARCH.key = 키; ARCH.loading = false; render();
+  })["catch"](function(e){ ARCH.loading = false; console.warn("[보관함] 못 읽음", e && e.message); });
+}
+/* 보관함 한 건 → 칩. 지워진 것은 kind:"gone"(점선·취소선, 못 옮긴다) */
+function 보관칩(r, 지워짐){
+  var sid = gcalSidByMail(r.creator || "");
+  return { kind: 지워짐 ? "gone" : "gcal", store:"", id:"arch:" + r.id, sid: sid || "GCAL",
+    date:r.date, end:r.end || r.date, time: r.allDay ? "" : (r.time || ""), endTime:r.endTime || "",
+    text: r.summary || "(제목 없음)", movable:false,
+    color: (sid ? colorOf(sid) : "") || gcalMailColor(r.creator || "") || "#94a3b8",
+    tip: (지워짐 ? "🗄 구글에서 지워진 일정 (보관함)" + (r.googleDeletedSeenAt ? " · " + new Date(r.googleDeletedSeenAt).toISOString().slice(0,10) + " 무렵" : "") + "\n" : "🗄 보관본 (구글을 못 받아 보관함에서 보여 줍니다)\n")
+      + (r.summary || "") + (r.location ? "\n📍 " + r.location : "") + (r.creator ? "\n✉ " + r.creator : "") };
+}
+
 /* 그 달(앞뒤 걸친 42칸)의 구글 일정을 받아 둔다.
    ⚠ 달이 바뀔 때만 받는다 — 다시 그릴 때마다 받으면 요금과 깜빡임이 는다. */
 function gcalLoad(force){
@@ -1331,8 +1363,10 @@ function gcalLoad(force){
       색채우기();
     })
     .catch(function(e){
-      /* ⚠ 못 받았으면 «조용히» 비우지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이다 */
+      /* ⚠ 못 받았으면 «조용히» 비우지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이다.
+         보관함에서 그 달 것을 받아 대신 보여 준다(🗄 보관본이라고 말풍선에 적는다). */
       GCAL.loading = false; GCAL.err = (e && e.message) || String(e); render();
+      보관받기();
     });
 }
 
@@ -1485,6 +1519,18 @@ function eventsOn(ymd, eumOnly){
     for(var gi = 0; gi < GCAL.evs.length; gi++){
       var ge = GCAL.evs[gi];
       if(ge.date === ymd || (ge.end && ge.date < ymd && ymd <= ge.end)) out.push(ge);
+    }
+    /* 🗄 보관함 — 구글을 못 받았으면 보관본 전부, 스위치가 켜져 있으면 «지워진 것»만 더한다 */
+    var 보관 = (typeof ARCH !== "undefined" && ARCH.list) ? ARCH.list : [];
+    if(보관.length && (GCAL.err || S.showGone)){
+      var 산것 = {};
+      GCAL.evs.forEach(function(x){ 산것[x.id] = 1; });
+      보관.forEach(function(r){
+        if(!(r.date === ymd || (r.end && r.date < ymd && ymd <= r.end))) return;
+        var 지워짐 = !!r.googleDeleted || (!GCAL.err && !산것[r.id]);
+        if(GCAL.err && !지워짐) out.push(보관칩(r, false));
+        else if(지워짐 && S.showGone) out.push(보관칩(r, true));
+      });
     }
   }
   /* ④ 사건 마감일 · 단계 기한 · 휴직 (5걸음에 되살린 층 셋)
@@ -1661,6 +1707,7 @@ function chipHtml(e, ymd){
   /* 지났나 — 시각이 있으면 «끝난 시각»으로, 없으면 «마지막 날»로 (구글과 같다) */
   var 지남 = e.endAt ? (e.endAt < Date.now()) : ((e.end || ymd) < todayYMD());
   var 공휴 = e.kind === "hol";
+  var 지운것 = e.kind === "gone";
   var 막대 = (e._span || 1) > 1 || (e.end && e.end > e.date);
   /* 폰은 구글 위젯처럼 시각 일정도 색을 꽉 채운다(점 꼴은 좁은 칸에서 안 보인다) */
   var 시각칩 = !!e.time && !막대 && !(typeof 폰 === "function" && 폰());
@@ -1692,6 +1739,11 @@ function chipHtml(e, ymd){
     if(e._cutR) 꼴 += ";border-top-right-radius:0;border-bottom-right-radius:0";
     /* 폰은 구글 위젯처럼 제목만 — 좁은 칸에 시각까지 넣으면 제목이 안 보인다 */
     안 = ((e.time && !(typeof 폰 === "function" && 폰())) ? esc(e.time) + " " : "") + esc(제목);
+  }
+  /* 🗄 구글에서 지워진 일정 — 바탕 없이 점선 테두리 + 취소선(평소엔 안 보인다, 스위치를 켰을 때만) */
+  if(지운것){
+    return '<div class="ev gone" title="' + esc(e.tip || 제목) + '" style="border:1px dashed ' + esc(사람색)
+      + ';color:var(--gsub);background:transparent;text-decoration:line-through">' + esc(제목) + '</div>';
   }
   if(공휴){
     return '<div class="ev hol" title="' + esc(e.tip || 제목) + '" style="' + 꼴 + '">' + 안 + '</div>';
@@ -1863,6 +1915,8 @@ function 폰머리Html(){
     + '</div>';
 }
 function calendarHtml(eumOnly){
+  /* 🗄 스위치가 켜져 있거나 구글을 못 받았으면 보관함도 그 달 것을 받는다(같은 달이면 안 받는다) */
+  if(fbDb && (S.showGone || GCAL.err) && typeof 보관받기 === "function") 보관받기();
   /* 보는 달이 바뀌었으면 구글을 다시 받는다 — 같은 달이면 아무 일도 안 한다(gcalLoad 안에서 가른다) */
   if(fbDb) gcalLoad();
   if(S.view === "week") return weekHtml(eumOnly);
@@ -2114,6 +2168,7 @@ function chipsHtml(eumOnly){
         : GCAL.loading
           ? '<button class="chip" disabled>⏳ 구글 받는 중</button>'
           : '<button class="chip' + (S.filter === "gcal" ? " on" : "") + '" data-f="gcal">구글 ' + 구글수 + '</button>'
+            + '<button class="chip' + (S.showGone ? " on" : "") + '" data-gone="1" title="구글에서 지워진 일정도 보관함에서 꺼내 보여 줍니다">🗄 지운 일정</button>'
             /* 로그인이 필요할 때만 자물쇠 — 누르면 구글 로그인(예전 「🔐 구글 로그인」 단추) */
             + (구글단추Html() ? '<button class="glock" data-glogin="1" title="구글과 이어진 일정을 지우려면 구글 로그인이 필요합니다">🔐</button>' : ''))
   );
@@ -3073,7 +3128,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -3092,6 +3147,12 @@ document.addEventListener('click', function(e){
   }
   if(t.hasAttribute('data-gcalretry')){ gcalLoad(true); return; }
   if(t.hasAttribute('data-mnew')){ openNew(todayYMD()); return; }
+  if(t.hasAttribute('data-gone')){
+    S.showGone = !S.showGone;
+    try{ localStorage.setItem("pu_cal_gone", S.showGone ? "1" : ""); }catch(_){}
+    if(S.showGone) 보관받기();
+    render(); return;
+  }
   if(t.hasAttribute('data-mf')){
     S.filter = S.filter === null || S.filter === undefined ? "shared" : S.filter === "shared" ? "priv" : null;
     render(); return;
@@ -3284,6 +3345,7 @@ function start(user){
       + esc(user.email||'') + ' · ';
     render();
     S.uid = user.uid;
+    try{ S.showGone = localStorage.getItem("pu_cal_gone") === "1"; }catch(_){}
     개인받기();
     /* 구글 달력도 받는다 — 이 달력을 채우는 것이 그쪽이다(9월 126건).
        ⚠ 우리 자료를 먼저 그리고 그 다음 받는다 — 구글이 늦어도 화면은 먼저 뜬다. */

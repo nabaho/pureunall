@@ -363,6 +363,13 @@ rules.data = {
     }
   },
 
+  /* 구글 공용 달력 «보관함» (대표 지시 2026-09-27 「푸른캘린더에서 별도로 보관」).
+     서버(gcalArchiveDaily, 관리자 SDK)만 쓴다 — 화면이 쓰면 보관본이 흔들린다(.write:false).
+     읽기는 구글 공용 달력을 보던 사람과 같다(로그인한 직원) — 보는 사람이 늘지 않는다.
+     date 색인 — 달력은 «보는 달»만 받는다(보관함 통째로 받지 않는다, 약 2MB). */
+  gcal_archive:      { '.read': LOGIN, '.write': false, '.indexOn': ['date'] },
+  gcal_archive_meta: { '.read': LOGIN, '.write': false },
+
   /* ⚠ 여기 이름이 없는 자리는 아래로 떨어져 «재직 직원 누구나» 읽고 쓴다.
      새 자리를 만들 때는 권한을 정해 위에 이름을 적을 것 —
      tests/rules-data-named.test.js 가 이름 없는 자리를 잡는다. */
