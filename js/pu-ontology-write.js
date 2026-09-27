@@ -191,7 +191,12 @@
         if(!ref||typeof ref.transaction!=='function') return Promise.reject(new Error('트랜잭션 저장소가 없습니다.'));
         var transaction=rawTransactions&&rawTransactions.get(ref)||ref.transaction;
         return Promise.resolve(transaction.call(ref,function(previous){
-          var p=prepareRecord(record,Object.assign({actor:actor,now:now(),previous:previous},ctx));
+          /* record 가 함수면 «서버의 지금 판»을 받아 저장할 레코드를 만든다 (2026-09-27).
+             남의 자료(이알피 근태 등)에 «바뀐 칸만» 얹어야 하는 앱이 쓴다 — 밖에서 미리 만든
+             레코드를 넘기면 그사이 남이 고친 칸을 되돌린다. ⚠ 찬 자리에서는 previous 가 null 로
+             먼저 불린다 — 함수는 그때도 레코드를 돌려줘야 한다(접으면 서버에 묻지도 않고 끝난다). */
+          var base=typeof record==='function'?record(previous):record;
+          var p=prepareRecord(base,Object.assign({actor:actor,now:now(),previous:previous},ctx));
           if(!p.ok){failure=p;return undefined;} return p.value;
         })).then(function(result){
           if(failure) throw new Error(failure.issues[0].message);
