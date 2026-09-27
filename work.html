@@ -4089,6 +4089,10 @@ function mlkLink(k,itemId,pin){
 var MLK_BOT=/^(mailer-daemon|postmaster|bounce|bounces|mail-daemon)([+._-]|$)/;
 function mlkAuto(m){
   if(!m) return '';
+  /* 다음메일에서 지운 것 — 서버가 회사 메일함과 견줘 달아 준 표(functions/mail-gone.js).
+     ⚠ 업무관리는 회사 메일함을 직접 안 읽는다(울타리). 그래서 서버가 대신 본다.
+     ⚠ 이 표가 «가장 먼저»다. 지운 메일을 「광고」라고 적으면 왜 빠졌는지 거짓말이 된다. */
+  if(m.gone===true) return '다음메일에서 지움';
   if(m.bulk===true) return '광고';          // 서버가 머리글을 보고 적어 준 표
   var a=_mailAddr(m.from); if(!a) return '';
   return MLK_BOT.test(String(a.split('@')[0]||'')) ? '반송' : '';
@@ -4239,10 +4243,14 @@ function mlkRowHTML(m,tab,up){
       +(mlkIsNo(m)
         ? '<span class="mlkundo" onclick="mlkUnNo(\''+escJ(mlkAddrKey(_mailAddr(m.from)))+'\')" '
           +'title="이 주소 메일이 다시 「이어 줄 것」에 나옵니다">주소 풀기</span>'
-        : '<span class="mlkgone" title="'+esc(m._out==='광고'
-            ? '메일 머리글에 「수신거부」 안내가 붙어 있습니다 — 사람이 한 통 보낸 것이 아니라 여럿에게 뿌린 것입니다'
-            : '보낸 주소가 사람이 아니라 기계입니다 — 사업장 메일일 수가 없습니다')+'">'
-          +(m._out==='광고'?'여럿에게 뿌린 것':'기계 발신')+'</span>');
+        : '<span class="mlkgone" title="'+esc(
+            m._out==='다음메일에서 지움'
+              ? '다음메일에서 이 메일이 안 보입니다 — 지우신 것으로 보고 뺐습니다. 되살리려면 다음메일 휴지통에서 되돌리세요'
+            : m._out==='광고'
+              ? '메일 머리글에 「수신거부」 안내가 붙어 있습니다 — 사람이 한 통 보낸 것이 아니라 여럿에게 뿌린 것입니다'
+              : '보낸 주소가 사람이 아니라 기계입니다 — 사업장 메일일 수가 없습니다')+'">'
+          +(m._out==='다음메일에서 지움'?'메일함에 없음'
+            :(m._out==='광고'?'여럿에게 뿌린 것':'기계 발신'))+'</span>');
   }else if(tab==='none'){
     right='<span class="mlkgone">🗑 치움 · '+esc((L&&L.byName)||'')+' '+esc(String((L&&L.at)||'').slice(5,10))+'</span>'
       +'<span class="mlkundo" onclick="mlkUndo(\''+escJ(k)+'\')" title="다시 「이어 줄 메일」로 돌립니다">되돌리기</span>';

@@ -236,6 +236,42 @@ function pickMailboxes(list, conf) {
 var MAIL_PREVIEW = 160;
 var MAIL_SUBJECT_MAX = 200;
 
+/* 🚫 「여럿에게 뿌린 메일인가」 — 뉴스레터·광고·알림을 가리는 표.
+   ★★ 낱말로는 «안» 가린다. 「대출·광고·무료」 목록은 우리 일에 못 쓴다 —
+     체불·해고 상담 메일에 그 말이 그대로 나온다(2026-09-08 에 6,334통에 대 보고 정한 규칙).
+     여기서 보는 것은 메일 «머리글» 뿐이다. 사람이 쓴 글자는 한 자도 안 본다.
+
+   무엇을 보나
+     · List-Unsubscribe — 「수신거부」 안내. 뉴스레터·광고가 거의 반드시 단다.
+       규약(RFC 2369)이라 보내는 쪽이 제 발로 붙인다. 이것이 가장 또렷하다.
+     · Precedence: bulk|list|junk — 옛 규약. 기계가 뿌린 것이라는 뜻이다.
+     · Auto-Submitted — 자동으로 만들어 보낸 것(부재중 답장·알림 따위).
+       ⚠ 값이 no 면 «사람이 보낸 것»이다. 그 값까지 봐야 한다.
+
+   ⚠ 이 표가 «틀려도» 메일이 사라지지 않는다. 업무관리가 「자동으로 뺀 것」 칸으로
+     보낼 뿐이고 거기서도 업무에 이을 수 있다. 그래서 조금 넓게 잡아도 된다.
+   ⚠ 머리글은 Map 으로도 보통 객체로도 온다(파서·검사). 둘 다 받는다. */
+function headerOf(headers, name) {
+  if (!headers) return '';
+  var v = null;
+  try {
+    if (typeof headers.get === 'function') v = headers.get(name);
+    else v = headers[name] != null ? headers[name] : headers[String(name).toLowerCase()];
+  } catch (e) { return ''; }
+  if (v == null) return '';
+  if (typeof v === 'string') return v.trim();
+  if (Array.isArray(v)) return v.join(' ').trim();
+  if (typeof v === 'object') return String(v.value != null ? v.value : '').trim();
+  return String(v).trim();
+}
+function isBulkMail(headers) {
+  if (headerOf(headers, 'list-unsubscribe')) return true;
+  if (/^(bulk|list|junk)$/i.test(headerOf(headers, 'precedence'))) return true;
+  var auto = headerOf(headers, 'auto-submitted');
+  if (auto && !/^no$/i.test(auto)) return true;
+  return false;
+}
+
 function mailLogRecord(o) {
   o = o || {};
   var subject = String(o.subject == null ? '' : o.subject).replace(/[\r\n]+/g, ' ').trim();
@@ -264,7 +300,11 @@ function mailLogRecord(o) {
        ⚠ 배달(routeFor)과 **같은 함수**(companyOf)로 정한다 — 따로 판단하면
          자료는 A 칸으로 가고 목록엔 B 로 적혀 오간 것이 두 곳으로 갈린다. */
     companyId: String(o.companyId == null ? '' : o.companyId),
-    companyName: String(o.companyName == null ? '' : o.companyName)
+    companyName: String(o.companyName == null ? '' : o.companyName),
+    /* 「여럿에게 뿌린 것」 표 — 업무관리의 「이어 줄 메일」이 이것을 보고 뺀다.
+       ⚠ 아닐 때는 «칸을 아예 안 만든다». 수백 줄에 false 를 적으면 그것도 값이다.
+         읽는 쪽은 bulk===true 인지만 보므로 없는 것과 false 가 같은 뜻이다. */
+    ...(o.bulk === true ? { bulk: true } : {})
   };
 }
 
@@ -749,6 +789,7 @@ module.exports = {
   seatFor, tagFor, routeFor,
   mailFromNote, regroupOne,
   mailConfOf, pickMailboxes, MAILBOX_HINT, boxShare, newestUids,
+  headerOf, isBulkMail,
   trustBox,
   BODY_MAX, bodyTextOf, okBody, bodyFilename,
   seatFromBox,
