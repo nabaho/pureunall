@@ -11,8 +11,9 @@
         요청하지 않는다(카카오 로그인 동의항목을 하나도 안 켠다).
      ② 「연결」은 이미 비밀번호로 들어온 사람만 할 수 있다(requireUser, 지문과 같은 문).
         그래야 남이 자기 카카오 계정을 남의 직원 계정에 붙이지 못한다.
-     ③ 관리자 계정은 카카오로 로그인할 수 없다 — 요금·급여·주민번호까지 보는 문이라,
-        카카오 쪽이 뚫려도 그 문은 안 열리게 한다(대표 결정 「관리자는 비밀번호만」).
+     ③ 관리자도 카카오로 들어온다(대표 지시 2026-09-27 「관리자도 카카오 로그인되게 해라」).
+        처음엔 「관리자는 비밀번호만」이었으나 뒤집혔다 — 그 문의 자물쇠는 이제 대표님
+        카카오 계정이다. 다시 막자고 권하지 말 것.
      ④ code(카카오 인가코드)는 한 번만 쓴다 — 카카오 자체가 재사용을 막아 주지만,
         우리 쪽에서도 토큰 교환 실패를 그대로 실패로 되돌린다(추측으로 성공 처리하지 않는다). */
 
@@ -56,9 +57,7 @@ function pathSafe(s) {
   return String(s || "").replace(/[.#$/[\]]/g, "_").slice(0, 200);
 }
 
-/* 관리자인가 — 보안규칙의 MGR(isAdmin || isSubAdmin)과 같은 잣대다.
-   ⚠ 위임관리인(isSubAdmin)도 넣는다 — 규칙에서 관리자와 같은 자료를 보므로,
-     「관리자는 비밀번호로만」에서 빠지면 그 문이 카카오로 열린다. */
+/* 관리자인가 — 보안규칙의 MGR(isAdmin || isSubAdmin)과 같은 잣대다(남의 연결 끊기에 쓴다). */
 function isManager(role) {
   role = role || {};
   return role.isAdmin === true || role.isSubAdmin === true
@@ -148,12 +147,9 @@ exports.kakaoLink = functions
     const code = (req.body && req.body.code) || "";
     if (!code) return bad(res, 400, "카카오 인가코드가 없습니다");
 
-    /* ⚠ 등록된 재직자만 — 익명 로그인(sign.html 등도 쓴다) 증표로 연결을 만들지 못하게.
-       ⚠ 관리자는 연결 자체를 안 받는다 — 로그인에서 어차피 막히는 연결을 「연결됨」으로
-         남겨 두면 본인도 관리자 현황도 헷갈린다. */
+    /* ⚠ 등록된 재직자만 — 익명 로그인(sign.html 등도 쓴다) 증표로 연결을 만들지 못하게. */
     const role = await roleOf(user.uid);
     if (role.status !== "active") return bad(res, 403, "재직 중인 직원 계정만 카카오를 연결할 수 있습니다");
-    if (isManager(role)) return bad(res, 403, "관리자 계정은 카카오 로그인을 쓸 수 없습니다. 비밀번호로 로그인해 주세요");
 
     let kakaoId;
     try {
@@ -216,10 +212,7 @@ exports.kakaoUnlink = functions.region(REGION).https.onRequest(async (req, res) 
   res.json({ ok: true });
 });
 
-/* ── ④ 카카오로 로그인 — 통과하면 「그 사람 계정」으로 들어갈 표를 준다 ────────
-   ⚠ 관리자 계정은 여기서 막는다(대표 결정) — 비밀번호로만 들어오게.
-   ⚠ 「연결 안 됨」과 「관리자라 막음」을 다른 말로 알려 준다 — 직원 스스로 해결할
-     길(먼저 연결하기)과 관리자가 알아야 할 사실(비밀번호로)이 다르기 때문이다. */
+/* ── ④ 카카오로 로그인 — 통과하면 「그 사람 계정」으로 들어갈 표를 준다 ──────── */
 exports.kakaoLoginFinish = functions
   .region(REGION)
   .runWith({ secrets: ["KAKAO_REST_KEY", "KAKAO_CLIENT_SECRET"] })
@@ -246,9 +239,6 @@ exports.kakaoLoginFinish = functions
     }
 
     const role = await roleOf(link.uid);
-    if (isManager(role)) {
-      return bad(res, 403, "관리자 계정은 카카오 로그인을 쓸 수 없습니다. 비밀번호로 로그인해 주세요");
-    }
     /* 퇴사·휴직 등으로 재직자가 아니면 표를 주지 않는다 — 규칙이 자료는 막지만,
        포털이 「들어온 것처럼」 뜨고 빈 화면이 되면 본인이 까닭을 모른다. */
     if (role.status !== "active") {

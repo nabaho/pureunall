@@ -110,10 +110,16 @@ async function requireStaff(req) {
     throw error;
   }
   const decoded = await getAuth().verifyIdToken(match[1], true);
-  if (decoded.firebase && decoded.firebase.sign_in_provider !== "password") {
+  // 카카오로 들어온 사람도 받는다(대표 지시 2026-09-27) — 카카오 표는 서버가 이미 연결된
+  // 재직자 계정에만 내준다. 보낸이 기록에 쓰는 email 이 표에 없으면 계정에서 채운다.
+  const byKakao = decoded.kakao === true;
+  if (decoded.firebase && decoded.firebase.sign_in_provider !== "password" && !byKakao) {
     const error = new Error("이메일 로그인 계정만 메일을 보낼 수 있습니다.");
     error.status = 403;
     throw error;
+  }
+  if (byKakao && !decoded.email) {
+    decoded.email = (await getAuth().getUser(decoded.uid)).email || "";
   }
   return decoded;
 }

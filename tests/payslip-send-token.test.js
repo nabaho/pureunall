@@ -113,8 +113,9 @@ function 문상자(옵션) {
       verifyIdToken: (tok, checkRevoked) => {
         c.본것 = { tok, checkRevoked };
         if (o.토큰나쁨) return Promise.reject(new Error('토큰이 틀렸습니다'));
-        return Promise.resolve({ uid: 'u1', firebase: { sign_in_provider: o.방식 || 'password' } });
-      }
+        return Promise.resolve(Object.assign({ uid: 'u1', firebase: { sign_in_provider: o.방식 || 'password' } }, o.더 || {}));
+      },
+      getUser: (uid) => Promise.resolve({ uid, email: 'hong@example.com' })
     })
   };
   vm.createContext(c);
@@ -150,6 +151,18 @@ test('★ 이메일 로그인 계정만 보낸다', async () => {
   const c = 문상자({ 방식: 'google.com' });
   await assert.rejects(() => c.requireStaff(요청({ authorization: 'Bearer x' })),
     (e) => e.status === 403, '★ 다른 방식으로 들어온 계정도 메일을 보냅니다');
+  /* 서버가 만든 표(custom)라도 카카오 표시가 없으면 막는다 */
+  const c2 = 문상자({ 방식: 'custom' });
+  await assert.rejects(() => c2.requireStaff(요청({ authorization: 'Bearer x' })),
+    (e) => e.status === 403, '★ 카카오 표시 없는 서버 표도 메일을 보냅니다');
+});
+
+/* 대표 지시 2026-09-27 「관리자도 카카오 로그인되게 해라」 — 카카오로 들어온 대표님이
+   급여명세서·메일을 못 보내면 카카오 로그인이 반쪽이다. */
+test('★★ 카카오로 들어온 사람도 보내고, 보낸이 email 이 채워진다', async () => {
+  const c = 문상자({ 방식: 'custom', 더: { kakao: true } });
+  const who = await c.requireStaff(요청({ authorization: 'Bearer x' }));
+  assert.equal(who.email, 'hong@example.com', '★ 보낸이 기록이 빈칸이 됩니다');
 });
 
 test('★★ 열쇠보다 «먼저» 누구인지 본다', () => {
