@@ -3513,6 +3513,41 @@ function pickHwpBulk(){
   inp.click();
 }
 var _hwpEditor=null, _hwpName='서식', _hwpOriginalBuf=null, _hwpOriginalFormat='hwp', _hwpSaveKind=null;
+/* ★ 2026-09-27 「기존 자료를 불러오면 이름이 모두 다 잘못돼 있다」 — 서식마다 [⬆ 원본 .hwp 등록]·[📁 .hwp 여러 개]로
+   올린 파일은 «옛 서류 그대로»다(과거자료 폴더의 다른 기금 제출본을 올리는 일이 흔하다). [📄 HWP 편집]은 그 파일을
+   손대지 않고 열어서, 이름이 전부 그 옛 기금 것으로 보였다. 채워 주는 길은 [📄 한글로 채워 열기](원본 한글 틀)다.
+   → 열 때 파일 글에서 «우리가 아는 다른 기금 이름»(기금 목록의 이름·약칭·옛 이름, 이 기금의 옛 이름)을 찾아 알린다.
+   ⚠ 이 기금의 지금 이름·약칭을 먼저 지운 뒤 찾는다 — 「…기금2호」 속의 「…기금」(1호)을 남의 이름으로 잘못 잡지 않게.
+   ⚠ 긴 이름부터 찾고 찾은 자리는 지운다(같은 까닭). 약칭은 네 글자 이상만(짧은 약칭은 회사 이름과 겹친다). */
+function _foreignFundNames(text,fid){
+  /* 띄어쓰기는 보지 않는다 — 같은 서류 안에서도 「참살이사내…」·「참살이 사내…」가 섞여 있었다 */
+  var ns=function(x){ return String(x||'').replace(/\s+/g,''); };
+  var me=funds[fid]||{}, t=ns(text), cand=[], seen={};
+  var add=function(n,min,mine){ n=String(n||'').trim(); var k=ns(n); if(k.length>=min&&!seen[k]){ seen[k]=1; cand.push({n:n,k:k,mine:!!mine}); } };
+  add(me.name,2,true); add(me.short_name,2,true);            // 제 이름은 «지우기만» — 알리지 않는다
+  Object.keys(funds).forEach(function(k){
+    var o=funds[k]; if(k===fid||!o||(typeof isTrashed==='function'&&isTrashed(o))) return;
+    add(o.name,3); add(o.short_name,4);
+    nameHistOf(o).forEach(function(x){ add(x.from,3); });
+  });
+  _fundOldNames(me).forEach(function(n){ add(n,3); });
+  /* 긴 이름부터 — 1호 기금에서 2호 서류를 열면 「…2호」가 먼저 잡히고, 2호에서 열면 제 이름이 먼저 지워진다 */
+  cand.sort(function(a,b){ return b.k.length-a.k.length; });
+  var hit=[];
+  cand.forEach(function(c){ if(t.indexOf(c.k)<0) return; if(!c.mine) hit.push(c.n); t=t.split(c.k).join('|'); });
+  return hit.slice(0,5);
+}
+/* 등록한 원본(.hwp/.hwpx)의 글 — HWPX 로 바꿔 section 글자만 뽑는다 */
+function _hwpBufText(buf){
+  var bytes=new Uint8Array(buf), fmt='hwp';
+  try{ fmt=PureunHwp.validate(bytes,'').format; }catch(e){}
+  var hx=(fmt==='hwpx')?Promise.resolve(bytes)
+    :PureunHwp.openDoc(bytes,'orig.hwp').then(function(doc){ try{ return doc.exportHwpx(); } finally { try{ doc.free(); }catch(e){} } });
+  return hx.then(function(b){ return _loadJsZip().then(function(JSZ){ return JSZ.loadAsync(b); }); }).then(function(zip){
+    var secs=Object.keys(zip.files).filter(function(n){ return /^Contents\/section\d+\.xml$/.test(n); }).sort();
+    return Promise.all(secs.map(function(n){ return zip.file(n).async('string'); }));
+  }).then(function(xs){ return xs.map(function(x){ return PuHwpxFill.textOf(x); }).join('\n'); });
+}
 function openHwpEditor(kind){
   idbGet('hwp:'+kind).then(function(buf){
     if(!buf){ toast('먼저 이 서식의 원본 .hwp를 등록하세요','warn'); return; }
@@ -3557,7 +3592,15 @@ function _openHwpBuf(buf,label,saveKind){
       }).then(function(editor){
         return editor.loadFile(buf,label+'.'+_hwpOriginalFormat).then(function(r){
           _hwpEditor=editor;
-          stat('문서 검사 완료 · '+((r&&r.pageCount)||'?')+'쪽 · 편집 후 [💾 저장]으로 .hwp/.hwpx 내려받기');
+          var base='문서 검사 완료 · '+((r&&r.pageCount)||'?')+'쪽 · 편집 후 [💾 저장]으로 .hwp/.hwpx 내려받기';
+          stat(base);
+          /* 등록해 둔 옛 원본만 본다 — 틀에 채운 문서(saveKind)는 이 기금 자료로 만든 것이다 */
+          if(!_hwpSaveKind) _hwpBufText(buf).then(function(t){
+            var who=_foreignFundNames(t,S.formFund); if(!who.length) return;
+            var msg='⚠ 이 파일에 다른 기금 이름 「'+who.join('」·「')+'」이 들어 있습니다 — 옛 서류를 그대로 연 것이라 이름이 이 기금 것이 아닙니다. '
+              +'이 기금 자료로 채운 서식은 서식 목록의 [📄 한글로 채워 열기]로 여세요';
+            stat(msg); toast(msg,'warn');
+          }).catch(function(){});
         });
       });
     }).catch(function(e){
@@ -8045,6 +8088,27 @@ function _docWait(note,head){
     +"잠시 뒤 다시 열거나, 그 해 거래가 승인됐는지 확인해 주세요.</p>"+(head||'')+"</div>";
 }
 // 공통 로더: 자동생성 먼저 표시 → 유형 공통본 → 개별 저장본 순으로 덮어씀(우선순위 역순 적용)
+/* ★ 2026-09-27 「지금 기금인데 기존 자료를 불러오면 이름이 모두 다 잘못돼 있다」 — 실제 자료로 찾았다:
+   이 기금 전용으로 저장해 둔 서식본(doc_edits)에는 저장하던 때의 기금 이름이 «글자로» 박혀 있다.
+   이름을 바꾼 뒤(가칭 → 정식 이름) 그 저장본을 열면 옛 이름이 서식 곳곳에 그대로 찍혔다
+   (제목·제2조 명칭·제3조 소재지…). 이름 바꾸기 창이 「지우기」를 권했지만 「그대로 두기」를 고르면 남았다.
+   ⚠ 옛 이름은 이 기금의 이름 자취(name_hist)에 있는 것만 — 짐작으로 다른 글을 바꾸지 않는다.
+   ⚠ 지금 이름 안에 들어 있는 옛 이름(「가나」→「가나다」)은 바꾸지 않는다 — 바꾸면 「가나다다」가 된다.
+   ⚠ 너무 짧은 이름(두 글자 이하)은 보통 낱말과 겹칠 수 있어 두지 않는다. */
+function _fundOldNames(f){
+  var now=String((f&&f.name)||'').trim(), seen={};
+  return nameHistOf(f).map(function(x){ return String(x.from||'').trim(); })
+    .filter(function(n){ if(n.length<3||!now||now.indexOf(n)>=0||seen[n]) return false; seen[n]=1; return true; })
+    .sort(function(a,b){ return b.length-a.length; });        // 긴 이름 먼저 — 짧은 옛 이름이 긴 옛 이름 속을 먼저 먹지 않게
+}
+function _docFixOldNames(html,f){
+  var s=String(html||''), now=String((f&&f.name)||'').trim(), n=0, hit=[];
+  _fundOldNames(f).forEach(function(old){
+    var k=s.split(old).length-1; if(!k) return;
+    s=s.split(old).join(now); n+=k; hit.push(old);
+  });
+  return {html:s, n:n, names:hit};
+}
 function _loadDocInto(kind){ var c=_docCtx(kind), f=c.f;
   var token=(S._docToken=(S._docToken||0)+1);          // 최신 요청만 화면에 반영(늦은 응답 무시)
   var mine=function(){ return S._docToken===token && S._docKind===kind; };
@@ -8058,7 +8122,11 @@ function _loadDocInto(kind){ var c=_docCtx(kind), f=c.f;
       c.typeRef.once('value').then(function(s){return s.val();}).catch(function(){return null;}),
       c.fundRef?c.fundRef.once('value').then(function(s){return s.val();}).catch(function(){return null;}):Promise.resolve(null)
     ]).then(function(a){ if(!mine())return; var t=a[0],fd=a[1];
-      if(fd&&fd.html){ _showDocHTML(fd.html); _setDocLayer('fund',c.ftype); }
+      if(fd&&fd.html){
+        var fx=_docFixOldNames(fd.html,f);
+        _showDocHTML(fx.html); _setDocLayer('fund',c.ftype);
+        if(fx.n) toast('저장본에 박힌 옛 이름 「'+fx.names.join('」·「')+'」 '+fx.n+'곳을 지금 이름으로 바꿔 보였습니다 — [💾 이 기금]을 누르면 그대로 굳습니다');
+      }
       else if(t&&t.html){ _showDocHTML(t.html); _setDocLayer('type',c.ftype); }
     });
   }).catch(function(e){ if(!mine())return; var w=$('docwrap'); if(w)w.innerHTML='<div class="msg err" style="padding:12px">서식 생성 오류: '+esc((e&&e.message)||e)+'</div>'; });
