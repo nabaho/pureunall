@@ -1179,6 +1179,7 @@ rules.pu_docs = {
   hash: { $h: {
     '.write': `(${LOGIN}) && !data.exists()`,
     '.validate': "$h.matches(/^[0-9a-f]{64}$/) && newData.isString() && root.child('pu_docs/originals').child(newData.val()).exists()"
+      + " && root.child('pu_docs/originals').child(newData.val()).child('sha256').val() === $h"
   } },
   co: { $k: {
     '.write': LOGIN,
@@ -1196,7 +1197,7 @@ rules.pu_docs = {
     date:   { '.validate': 'newData.isString() && newData.val().length <= 10' },
     src:    { '.validate': "newData.val() === 'photo' || newData.val() === 'upload'" },
     at:     { '.validate': 'newData.isNumber()' },
-    by:     { '.validate': 'newData.isString()' },
+    by:     { '.validate': 'newData.val() === auth.uid' },
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     $other: { '.validate': false }
   } } }

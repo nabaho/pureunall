@@ -23,6 +23,7 @@ test('★★ 색인·해시는 새로 쓰기만 — 덮어쓰기·지우기 불�
   assert.ok(p, 'pu_docs 규칙이 없습니다');
   assert.match(p.originals.$id['.write'], /!data\.exists\(\)/, '★★ 보관함 색인을 덮어쓰거나 지울 수 있습니다');
   assert.match(p.hash.$h['.write'], /!data\.exists\(\)/, '★★ 해시를 바꿔 다른 파일을 가리키게 할 수 있습니다');
+  assert.match(p.hash.$h['.validate'], /child\('sha256'\)\.val\(\) === \$h/, '★★ 해시 키가 그 원본의 sha256 과 맞는지 안 봅니다 — 남이 미리 엉뚱한 fileId 에 진짜 해시를 심어 둘 수 있습니다');
   assert.equal(p.originals.$id.$other['.validate'], false, '정해 둔 칸 말고 아무거나 넣을 수 있습니다');
   assert.match(p.originals.$id.by['.validate'], /auth\.uid/, '올린 사람을 남의 것으로 적을 수 있습니다');
   assert.match(p.originals.$id.path['.validate'], /beginsWith\('pu_docs\/originals\/' \+ \$id/, '색인이 엉뚱한 창고 자리를 가리킬 수 있습니다');
@@ -40,6 +41,7 @@ test('★ 기업·연결은 칸을 못 박는다', () => {
   assert.equal(p.co_docs.$k.$d.$other['.validate'], false);
   assert.match(p.co_docs.$k.$d.src['.validate'], /'photo'/);
   assert.match(p.co_docs.$k.$d.fileId['.validate'], /pu_docs\/originals/, '연결이 없는 파일을 가리킬 수 있습니다');
+  assert.match(p.co_docs.$k.$d.by['.validate'], /auth\.uid/, '연결을 남긴 사람을 남의 것으로 적을 수 있습니다');
 });
 
 function seg() {
