@@ -5606,6 +5606,12 @@ exports.readOldMail = MSYNC.readOldMail;
 const MGONE = require("./mail-gone")({ functions, getDatabase, MAIL_REGION });
 exports.sweepDeletedMail = MGONE.sweepDeletedMail;
 
+/* 🗄 구글 공용 달력 «보관함» — 매일 새벽 3시 data/gcal_archive 로 베낀다 (대표 지시 2026-09-27
+   「푸른캘린더에서 별도로 보관」). 실제 코드는 gcal-archive.js. 누가 지운 일정도 보관함엔 남는다. */
+const GARCH = require("./gcal-archive")({ functions, getDatabase, MAIL_REGION,
+  contractVersion: OntologyServerWrite.CONTRACT_VERSION, schemaVersion: 3 });
+exports.gcalArchiveDaily = GARCH.gcalArchiveDaily;
+
 /* ══════════════════════════════════════════════════════════════════════════
    📬 열람 확인 — 보낸 메일의 «보이지 않는 1×1 그림»이 불리는 자리 (대표 결정 2026-09-06)
    ══════════════════════════════════════════════════════════════════════════
