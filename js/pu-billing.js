@@ -104,8 +104,22 @@
        (오후 3시에 보면 하루 평균이 실제의 5분의 3으로 보인다.)
      ⚠ 아는 날이 둘도 안 되면 **내놓지 않는다** — 달 평균으로 되돌아간다.
        하루치로 한 달을 점치면 그날 하루의 튐이 그대로 월말이 된다.
-     ⚠ 이번 달 칸만 센다. 지난 달을 보고 있을 때 그 값으로 이번 달을 밀면 안 된다. */
-  var RECENT_DAYS = 3;
+     ⚠ 이번 달 칸만 센다. 지난 달을 보고 있을 때 그 값으로 이번 달을 밀면 안 된다.
+
+     ■ 2026-09-27 — 「최근 3일 평균」 → «최근 7일 가운데 값» (대표 승인 「추천대로」)
+       3일 평균은 사고 난 이틀이 끼면 통째로 끌려갔다 — 9/18 아침 화면이 월말 ≈₩126,400 을
+       내놓았는데(9/16·17 고장), 실제 9월은 ≈₩46,600 이었다. 가운데 값은 튄 이틀을 안 탄다.
+       ⚠ 단, 최근 사흘이 «모두» 가운데 값보다 싸면 사흘 평균을 쓴다 — 고친 직후에는
+         7일 창의 반이 아직 비싼 날이라 가운데 값이 안 내려온다. 고친 보람은 바로 보여야 한다.
+       ⚠ 반대로 오르는 쪽은 가운데 값이 며칠 늦게 따라간다 — 그것은 하루 폭주 알림
+         (billing/spike, 서버 판정)이 맡는다. 어림이 경보 노릇까지 하려 들면 튄 날마다 흔들린다. */
+  var RECENT_DAYS = 7;
+  var DROP_DAYS = 3;
+  function median(vals) {
+    var a = vals.slice().sort(function (x, y) { return x - y; });
+    var m = Math.floor(a.length / 2);
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  }
 
   function projectRecent(row, buckets, now, opts) {
     if (!row) return null;
@@ -124,9 +138,13 @@
     if (done.length < 2) return null;
 
     var take = done.slice(-RECENT_DAYS);
-    var sum = 0;
-    take.forEach(function (d) { sum += (num(d.total) || 0); });
-    var perDay = sum / take.length;
+    var vals = take.map(function (d) { return num(d.total) || 0; });
+    var perDay = median(vals), how = 'median';
+    var last = vals.slice(-DROP_DAYS);
+    if (vals.length > DROP_DAYS && last.every(function (v) { return v < perDay; })) {
+      var s3 = 0; last.forEach(function (v) { s3 += v; });
+      perDay = s3 / last.length; how = 'drop';
+    }
 
     /* 남은 시간은 «날 수» 가 아니라 **소수 하루** 로 센다 —
        오늘 남은 반나절을 하루로 치면 매일 아침 월말이 뛴다. */
@@ -135,8 +153,34 @@
     var left = (nextMonth - tz * 60000 - t) / 86400000;
     if (left < 0) left = 0;
 
-    return { cost: Math.round(cost + perDay * left), perDay: Math.round(perDay), days: take.length };
+    return { cost: Math.round(cost + perDay * left), perDay: Math.round(perDay), days: take.length,
+             how: how, dropDays: DROP_DAYS };
   }
+
+  /* ── 「그 밖」이 크면 스스로 알린다 (2026-09-27, 대표 승인 「추천대로」 ㉮) ──
+     「그 밖」은 구글 예산을 안 만든 서비스가 통째로 섞이는 칸이라 앱은 그 안을 못 본다.
+     그 안에 하루 ₩557 짜리 Cloud SQL(아무도 안 쓰던 시험 서버)이 8월부터 숨어 있었는데
+     화면은 아무 말도 없었다 — 대표가 「계속 돈이 나간다」고 물으신 뒤에야 결제 보고서로 찾았다.
+     ★ 잣대: 끝난 날 최근 7일 중 5일 이상 「그 밖」이 하루 ₩300 넘게 나가면 알린다.
+       ⚠ 하루 튄 것으로는 안 띄운다(그것은 하루 폭주 알림 몫이다) — «늘 새는 것»만 잡는다.
+       ⚠ 모르는 날(그 밖을 셀 수 없던 날)은 세지 않는다 — 0원으로 치면 거짓말이다. */
+  var ETC_WINDOW = 7, ETC_MIN_DAYS = 5, ETC_DAY_WON = 300;
+  function etcAlert(buckets, now, opts) {
+    var days = dayBuckets(buckets || []);
+    if (!days.length) return null;
+    var t = num(now); if (t === null) return null;
+    var tz = (opts && num(opts.tz) !== null) ? num(opts.tz) : -new Date().getTimezoneOffset();
+    var today = hourKey(t, tz).slice(0, 10);
+    var done = days.filter(function (d) { return d.day < today && d.known && d.known.etc; }).slice(-ETC_WINDOW);
+    var over = done.filter(function (d) { return (num(d.parts.etc) || 0) >= ETC_DAY_WON; });
+    if (over.length < ETC_MIN_DAYS) return null;
+    var etcSum = 0, totSum = 0;
+    done.forEach(function (d) { etcSum += num(d.parts.etc) || 0; if (d.known.total) totSum += num(d.total) || 0; });
+    return { days: over.length, of: done.length, perDay: Math.round(etcSum / done.length),
+             share: totSum > 0 ? Math.round(etcSum / totSum * 100) : null };
+  }
+  /* 「그 밖」의 속은 구글 결제 보고서에서만 보인다 — 서비스별로 묶은 화면으로 곧장 보낸다 */
+  var BILLING_REPORT_URL = 'https://console.cloud.google.com/billing/reports?project=pureun-erp';
 
   /* 쪼갠 칸이 전체보다 얼마나 낡으면 「그 밖」을 못 믿는 값으로 볼까 — 10분.
      구글 예산 알림은 칸마다 따로 오고 20~30분씩 어긋나기도 한다. 전체만 새로 오고
@@ -213,9 +257,10 @@
       parts: parts,
       etcNote: etcNote,
       projected: _pr ? _pr.cost : projectMonthEnd(total, now),
-      projectedBasis: _pr ? { mode: 'recent', days: _pr.days, perDay: _pr.perDay }
+      projectedBasis: _pr ? { mode: 'recent', days: _pr.days, perDay: _pr.perDay, how: _pr.how, dropDays: _pr.dropDays }
                           : { mode: 'month' },
       updatedAt: upd,
+      etcAlert: etcAlert(buckets, now),
       ago: agoText(upd, now),
       stale: isStale(upd, now),
     };
@@ -522,6 +567,8 @@
     summarize: summarize,
     hourKey: hourKey,
     projectRecent: projectRecent,
+    etcAlert: etcAlert,
+    BILLING_REPORT_URL: BILLING_REPORT_URL,
     RECENT_DAYS: RECENT_DAYS,
     hourBuckets: hourBuckets,
     dayBuckets: dayBuckets,
