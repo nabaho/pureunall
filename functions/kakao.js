@@ -234,8 +234,11 @@ exports.kakaoLoginFinish = functions
     }
 
     const link = (await db().ref(DB_LINK + "/" + pathSafe(kakaoId)).once("value")).val();
+    /* needLink — 화면이 「비밀번호로 한 번 들어오면 곧바로 연결을 권한다」로 이어 가는 표시.
+       카카오 회원번호는 싣지 않는다(연결은 로그인 뒤 인가코드를 새로 받아 서버가 다시 확인한다). */
     if (!link || !link.uid) {
-      return bad(res, 400, "연결되지 않은 카카오 계정입니다. 먼저 아이디로 로그인해 「내 정보 › 카카오 연결」을 눌러 주세요");
+      return res.status(400).json({ ok: false, needLink: true,
+        error: "아직 연결되지 않은 카카오 계정입니다. 처음 한 번만 위에서 아이디·비밀번호로 로그인해 주세요 — 로그인하면 카카오 연결을 바로 이어 드립니다" });
     }
 
     const role = await roleOf(link.uid);

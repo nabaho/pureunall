@@ -261,3 +261,105 @@ test('★ 화면 — 카카오로 보낼 때 state 는 맞히기 어려운 값�
   assert.ok(sent && sent.length >= 16 && !/^(link|login)$/.test(sent), 'state 가 뻔한 값이다: ' + sent);
   assert.equal(JSON.parse(c.store.pu_kakao_state).nonce, sent);
 });
+
+/* ── 노란 단추가 «아직 연결 안 됨» 이면 → 비밀번호로 들어오자마자 연결을 권한다 ──
+   2026-09-27 대표님이 노란 단추만 거듭 누르고 「내 정보 › 카카오 연결」 은 끝내 못 찾았다.
+   따로 찾아가야 하는 길은 없는 길과 같다 — 그래서 이어 준다. */
+test('★ 서버 — 연결 안 된 카카오면 needLink 표시만 주고 회원번호는 싣지 않는다', async () => {
+  const K = fresh();
+  const r = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.needLink, true);
+  assert.ok(!JSON.stringify(r.body).includes('111'), '카카오 회원번호가 화면으로 나갔다');
+  assert.equal(issued.length, 0);
+});
+
+test('★ 화면 — 서버의 needLink 표시가 오류에 실려 온다', async () => {
+  const c = clientWith('https://nabaho.github.io/pureunall/enter.html');
+  c.box.fetch = async () => ({ status: 400, text: async () => JSON.stringify({ ok: false, needLink: true, error: 'x' }) });
+  await assert.rejects(() => c.K.loginFinish('C1'), (e) => e.needLink === true);
+  c.box.fetch = async () => ({ status: 400, text: async () => JSON.stringify({ ok: false, error: 'y' }) });
+  await assert.rejects(() => c.K.loginFinish('C1'), (e) => e.needLink === false);
+});
+
+function enterFn(name) {
+  const src = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
+  const at = src.indexOf('function ' + name + '(');
+  assert.ok(at > 0, name + ' 를 못 찾았다');
+  let i = src.indexOf('{', at), depth = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+  }
+  return src.slice(at, i + 1);
+}
+function memStore(seed) {
+  const store = Object.assign({}, seed || {});
+  return { store, api: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } } };
+}
+function afterLoginBox({ want, linked, yes }) {
+  const m = memStore(want != null ? { pu_kakao_want_link: String(want) } : {});
+  const box = {
+    Date, Number, String, Promise,
+    KK_WANT: 'pu_kakao_want_link',
+    sessionStorage: m.api,
+    auth: { currentUser: { uid: 'u1' } },
+    db: { ref: () => ({ once: () => Promise.resolve({ val: () => (linked ? { kakaoId: '111' } : null) }) }) },
+    asked: 0, started: 0,
+  };
+  box.confirm = () => { box.asked++; return yes !== false; };
+  box.kkStartLink = () => { box.started++; };
+  vm.createContext(box);
+  vm.runInContext(enterFn('kkAfterLogin'), box);
+  return { box, store: m.store };
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+test('★★ 화면 — 노란 단추가 «연결 안 됨» 이었으면 비밀번호 로그인 뒤 물어보고 연결을 시작한다', async () => {
+  const a = afterLoginBox({ want: Date.now(), linked: false });
+  a.box.kkAfterLogin(); await tick();
+  assert.equal(a.box.asked, 1, '묻지 않았다');
+  assert.equal(a.box.started, 1, '연결을 시작하지 않았다');
+  assert.equal(a.store.pu_kakao_want_link, undefined, '표시가 남아 다음 로그인에 또 묻는다');
+  a.box.kkAfterLogin(); await tick();
+  assert.equal(a.box.asked, 1, '한 번 물은 뒤 또 물었다');
+});
+
+test('★ 화면 — 묻지 않을 때: 표시 없음 · 15분 넘음 · 이미 연결됨 · 「아니요」', async () => {
+  const cases = [
+    ['표시 없음', { want: null, linked: false }],
+    ['15분 넘음', { want: Date.now() - 16 * 60 * 1000, linked: false }],
+    ['이미 연결됨', { want: Date.now(), linked: true }],
+    ['아니요', { want: Date.now(), linked: false, yes: false }],
+  ];
+  for (const [why, o] of cases) {
+    const a = afterLoginBox(o);
+    a.box.kkAfterLogin(); await tick();
+    assert.equal(a.box.started, 0, why + ' 인데 연결을 시작했다');
+  }
+});
+
+test('★ 화면 — needLink 로 실패했을 때만 표시를 남기고, 포털이 뜰 때 kkAfterLogin 을 부른다', async () => {
+  for (const need of [true, false]) {
+    const m = memStore();
+    const box = {
+      Promise, String, Date,
+      KK_WANT: 'pu_kakao_want_link', _freshLogin: false,
+      sessionStorage: m.api,
+      PuKakao: {
+        pending: () => ({ code: 'C1', mode: 'login' }),
+        loginFinish: () => { const e = new Error('x'); e.needLink = need; return Promise.reject(e); },
+      },
+      auth: {}, reportLogin() {}, shown: '',
+    };
+    box.window = box;
+    box.showErr = (msg) => { box.shown = msg; };
+    vm.createContext(box);
+    vm.runInContext(enterFn('kkHandleReturn'), box);
+    box.kkHandleReturn(); await tick(); await tick();
+    assert.equal('pu_kakao_want_link' in m.store, need, 'needLink=' + need + ' 인데 표시가 어긋났다');
+    assert.equal(box.shown, 'x');
+  }
+  const portal = enterFn('renderPortal').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  assert.match(portal, /kkAfterLogin\(\)/, '포털이 떠도 연결을 권하지 않는다');
+});

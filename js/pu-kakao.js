@@ -39,7 +39,7 @@
       var j = null;
       try { j = JSON.parse(t); } catch (e) { /* 아래에서 까닭을 말한다 */ }
       if (!j) throw new Error(whyNotJson(path, st, t));
-      if (!j.ok) throw new Error(j.error || '실패했습니다');
+      if (!j.ok) { var e = new Error(j.error || '실패했습니다'); e.needLink = j.needLink === true; throw e; }
       return j;
     });
   }
