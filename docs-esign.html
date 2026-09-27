@@ -36,7 +36,7 @@
   /* ⚠ 틀을 가운데로 묶지 않는다 — 1360px 가운데 정렬이었을 때 넓은 화면(1862px)에서 메뉴가
        왼쪽 끝에서 250px 떠 있었다(대표 지적 2026-09-27). 메뉴는 왼쪽 끝, 본문이 남은 폭을 다 쓴다. */
   .shell{display:flex;align-items:flex-start}
-  .side{width:240px;flex:none;position:sticky;top:0;max-height:100vh;min-height:calc(100vh - 44px);overflow-y:auto;padding:14px 8px 24px;background:#fff;border-right:1px solid #e2e8f0}
+  .side{width:240px;flex:none;position:sticky;top:0;max-height:100vh;min-height:calc(100vh - 56px);overflow-y:auto;padding:14px 8px 24px;background:#fff;border-right:1px solid #e2e8f0}
   .nav-tree{margin:2px 0 4px}
   .nav.soon{color:#64748b;cursor:default}.nav.soon:hover{background:none}
   .nav.soon i{font-style:normal;margin-left:auto;font-size:10.5px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;padding:0 7px}
@@ -171,8 +171,8 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=3"></script>
-<script src="js/pu-contract-forms.js?v=5"></script>
+<script src="js/pu-form-cardfill.js?v=4"></script>
+<script src="js/pu-contract-forms.js?v=7"></script>
 <script src="js/pu-photo-store.js?v=30"></script>
 <script src="js/pu-office-store.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=1"></script>
@@ -264,7 +264,10 @@ var _formCardRowsP = null;
 function formCards() {
   return {
     rows: function () {
-      if (!_formCardRowsP) _formCardRowsP = db.ref('pucards/idx').once('value').then(function (s) { return s.val() || {}; },
+      if (!_formCardRowsP) _formCardRowsP = Promise.all([
+        db.ref('pucards/idx').once('value').then(function (s) { return s.val() || {}; }, function () { return {}; }),
+        db.ref('data/companies').once('value').then(function (s) { return s.val() || {}; }, function () { return {}; })
+      ]).then(function (got) { return PuFormCardFill.mergeRows(got[0], got[1]); },
         function (e) { _formCardRowsP = null; throw e; });
       return _formCardRowsP;
     },
@@ -294,7 +297,7 @@ async function formXlsxParts(bytes) {
   return { zip: zip, names: names, xmls: xmls };
 }
 async function formHwpMarkers(bytes, name) {
-  if (formIsXlsx(name)) { var p = await formXlsxParts(bytes); return PuFormCardFill.xlsxMarkers(p.xmls); }
+  if (formIsXlsx(name)) { var p = await formXlsxParts(bytes); return PuFormCardFill.xlsxMarkersParts(p.names, p.xmls); }
   var doc = await PureunHwp.openDoc(bytes, name);
   try { return Object.keys(EsignHwpTpl.markersOf(doc)); } finally { try { doc.free(); } catch (e) {} }
 }
@@ -313,10 +316,10 @@ async function formRelayout(doc, vals) {
 }
 async function formHwpFill(bytes, name, V) {
   if (formIsXlsx(name)) {
-    var p = await formXlsxParts(bytes), filled = 0;
-    p.names.forEach(function (n, i) { var r = PuFormCardFill.xlsxFill(p.xmls[i], V); filled += r.filled; p.zip.file(n, r.xml); });
+    var p = await formXlsxParts(bytes), fr = PuFormCardFill.xlsxFillParts(p.names, p.xmls, V), filled = fr.filled;
+    p.names.forEach(function (n, i) { p.zip.file(n, fr.xmls[i]); });
     var out = await p.zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
-    var left = PuFormCardFill.xlsxMarkers((await formXlsxParts(out)).xmls);
+    var lp = await formXlsxParts(out), left = PuFormCardFill.xlsxMarkers(lp.xmls);
     return { bytes: out, filled: filled, unknown: left, relayoutFailed: false };
   }
   var doc = await PureunHwp.openDoc(bytes, name), r;
@@ -358,7 +361,7 @@ function showPane(name) {
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(),
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
       cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow });
-  }
+  } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
 }
