@@ -192,8 +192,9 @@
   }
 
   /* 구글 일정 하나를 새로 만든다 (2026-09-27 — 폰 «구글 캘린더 위젯»에도 뜨게).
-     ev = { date:'YYYY-MM-DD', time:'HH:MM'(없으면 종일), summary, location, description, source:{kind,id} }
-     ⚠ 시각이 있으면 한 시간짜리로 만든다(끝 시각을 묻지 않는다 — 구글 기본과 같다).
+     ev = { date:'YYYY-MM-DD', time:'HH:MM'(없으면 종일), endTime:'HH:MM'(없으면 한 시간 뒤),
+            summary, location, description, source:{kind,id} }
+     ⚠ 끝 시각이 시작보다 이르면(자정을 넘긴 일정) 끝은 다음 날로 둔다.
      ⚠ 어디서 왔는지(명함 번호)는 extendedProperties 에 남긴다 — 이름으로 잇지 않는다(온톨로지). */
   function createEvent(calId, ev, opt) {
     ev = ev || {};
@@ -205,10 +206,16 @@
     if (ev.description) 몸.description = String(ev.description);
     if (/^\d{2}:\d{2}$/.test(String(ev.time || ''))) {
       var h = +ev.time.slice(0, 2), mi = ev.time.slice(3, 5);
-      var 끝날 = h >= 23 ? addDays(ev.date, 1) : ev.date;
-      var 끝시 = ('0' + ((h + 1) % 24)).slice(-2);
+      var 끝, 끝날;
+      if (/^\d{2}:\d{2}$/.test(String(ev.endTime || ''))) {
+        끝 = ev.endTime;
+        끝날 = 끝 <= ev.time ? addDays(ev.date, 1) : ev.date;
+      } else {
+        끝 = ('0' + ((h + 1) % 24)).slice(-2) + ':' + mi;
+        끝날 = h >= 23 ? addDays(ev.date, 1) : ev.date;
+      }
       몸.start = { dateTime: ev.date + 'T' + ev.time + ':00', timeZone: 'Asia/Seoul' };
-      몸.end = { dateTime: 끝날 + 'T' + 끝시 + ':' + mi + ':00', timeZone: 'Asia/Seoul' };
+      몸.end = { dateTime: 끝날 + 'T' + 끝 + ':00', timeZone: 'Asia/Seoul' };
     } else {
       몸.start = { date: ev.date };
       몸.end = { date: addDays(ev.date, 1) };

@@ -73,3 +73,23 @@ test('①②④ 달 그리기 — 폰 머리·요일 줄·필요한 줄만·「�
   const 머리 = 함수몸(캘린더, 'function 폰머리Html(){');
   ['data-mv="-1"', 'data-mv="1"', 'data-mnew'].forEach((x) => assert.ok(머리.indexOf(x) >= 0, x + ' 가 폰 머리에 없습니다'));
 });
+
+/* ── 자동 회전 (대표 지시 2026-09-27 「자동회전」) ── */
+test('⑥ 바탕화면에 깐 캘린더는 세로로 못 박지 않는다 — 폰을 돌리면 따라 돈다', () => {
+  const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'pu-cal-manifest.json'), 'utf8'));
+  assert.ok(!/^portrait/.test(String(m.orientation || '')), '아직 세로 고정입니다: ' + m.orientation);
+});
+
+test('⑥ 옆으로 눕힌 폰(낮고 손가락 화면)도 폰 꼴이다', () => {
+  const 몸 = 함수몸(캘린더, 'function 폰(){');
+  assert.match(몸, /max-height:500px\) and \(pointer:coarse\)/, '가로로 눕힌 폰을 폰으로 안 봅니다');
+});
+
+test('⑥ 회전은 «자동 회전 · 세로 고정» 중에 고르고, 안 되는 폰에서는 그렇다고 말한다', () => {
+  const 켜기 = 함수몸(캘린더, 'function rotApply(조용히){');
+  assert.match(켜기, /so\.lock\("portrait"\)/, '세로 고정을 걸지 않습니다');
+  assert.match(켜기, /so\.unlock\(\)/, '자동 회전으로 돌아갈 때 고정을 안 풉니다');
+  assert.match(켜기, /\["catch"\]\(function\(\)\{[\s\S]{0,80}toast\(/, '고정이 안 될 때 말하지 않습니다');
+  const 바꾸기 = 함수몸(캘린더, 'function rotToggle(){');
+  assert.match(바꾸기, /localStorage\.setItem\("pu_cal_rotate"/, '고른 것을 기억하지 않습니다');
+});

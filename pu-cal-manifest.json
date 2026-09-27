@@ -6,7 +6,7 @@
   "start_url": "./pu-cal.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",
   "lang": "ko-KR",
