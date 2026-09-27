@@ -3813,14 +3813,14 @@ function _aiDownload(){
      fund_erp/hwp_tpl/{서식} 에 둔다(로그인한 직원만 읽는다 — 기금 자료와 같은 규칙, 규칙 고칠 것 없음).
    ⚠ 목록 값(서명란 위원)은 번호를 붙인 표지다 — {{근로자위원1}}, {{근로자위원2}} …
    ⚠ 값은 HTML 서식이 쓰던 «같은 함수»에서 온다 — 한글 파일과 화면이 서로 다른 숫자를 말하면 안 된다. */
-var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', agreement:'공동', charter:'공동', contrib:'공동',
+var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', inka_annex:'공동', agreement:'공동', charter:'공동', contrib:'공동',
   reg_apply:'공동', reg_accept:'공동', reg_roster:'공동', reg_seal:'공동', reg_sealpaper:'공동', reg_sealcard:'공동',
   reg_proxy:'공동', reg_license:'공동', tax_bizreg:'공동', tax_sublease:'공동', tax_lease:'공동', tax_hometax:'공동',
   ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동',
   sub_required:'공동', subsidy:'공동', sub_welfare_plan:'공동', sub_assets:'공동', sub_payment:'공동',
   sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
-var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues,
+var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues, inka_annex:_hwpInkaAnnexValues,
   agreement:_hwpAgreementValues, charter:_hwpCharterValues, contrib:_hwpContribValues,
   reg_apply:_hwpRegValues, reg_accept:_hwpRegValues, reg_roster:_hwpRegValues, reg_seal:_hwpRegValues,
   reg_sealpaper:_hwpRegValues, reg_sealcard:_hwpRegValues, reg_proxy:_hwpRegValues, reg_license:_hwpRegValues,
@@ -3996,10 +3996,30 @@ function _hwpInkaValues(f,sites){
       V[sd[1]+k+'성명']=over?(k===1?'별지 명단과 같음':' '):(o?String(o.name||''):' ');
       V[sd[1]+k+'생년월일']=none?' ':String(o.birth||''); V[sd[1]+k+'직책']=none?' ':String(o.title||'');
     }
-    if(over) notes.push(sd[0]+' 위원 '+list.length+'명 — 별지 명단은 [HTML로 보기]에서 뽑으세요');
+    if(over) notes.push(sd[0]+' 위원 '+list.length+'명 — 별지 명단은 [⬇ 별지 명단]으로 받으세요(틀이 없으면 [HTML로 보기])');
   });
   if(notes.length) V._note=notes.join(' · ');
   return V;
+}
+/* [별지] 설립준비위원회 위원 명단 — 위원이 격자(세 줄)보다 많을 때 인가신청서에 붙인다(HTML committeeAnnexHTML 과 같은 명단).
+   원본 서식이 없는 종이라 이 PC 한글로 빈 틀을 만들었다(표 한 줄을 {{#행:위원}} 로 사람 수만큼).
+   측마다 번호를 새로 매긴다(관청이 측별로 센다). 생년월일·직책이 없으면 빈칸 — 지어내지 않는다. */
+function _hwpInkaAnnexValues(f,sites){
+  f=f||{}; sites=sites||[];
+  var rows=[], cnt={};
+  ['근로자측','사용자측'].forEach(function(side){
+    var list=_prepCommittee(f,side,sites); cnt[side]=list.length;
+    list.forEach(function(o,i){ rows.push({구분:i===0?side:' ', 순번:String(i+1), 성명:String(o.name||'')||' ',
+      생년월일:String(o.birth||'')||' ', 직책:String(o.title||'')||' ', 소속:String(o.company||'')||' '}); });
+  });
+  return {기금명:String(f.name||''), 위원:rows, 근로자측수:String(cnt['근로자측']), 사용자측수:String(cnt['사용자측'])};
+}
+/* 인가신청서 옆 [⬇ 별지 명단] — 받는 것만(편집·보관은 인가신청서와 같은 길로 하지 않는다: 명단은 명부에서 다시 뽑는 것이 맞다) */
+function hwpAnnexDownload(){
+  var f=curForm(); if(!f||f._sample){ toast('기금을 먼저 고르세요','warn'); return; }
+  _loadSites(S.formFund).then(function(sites){ return hwpTplFill('inka_annex',f,sites); }).then(function(r){
+    PureunHwp.download(r.bytes,(f.short_name||f.name||'기금')+'_별지_설립준비위원회_위원명단.hwpx','hwpx');
+  }).catch(function(e){ toast('별지 명단을 채우지 못했습니다: '+((e&&e.message)||e),'err'); });
 }
 function _hwpAgreementValues(f,sites){
   f=f||{}; sites=sites||[];
@@ -7967,6 +7987,7 @@ function hwpSidePreview(kind){
       return _b64ToBytes(kept.b64);
     }
     return _loadSites(fid).catch(function(){ return []; }).then(function(sites){
+      S._hwpSideSites=sites;
       return _docExtra(kind,f).catch(function(){ return null; }).then(function(){ return hwpTplFill(kind,f,sites); });
     }).then(function(r){
       var msg=[];
@@ -7975,6 +7996,10 @@ function hwpSidePreview(kind){
       if(r.note) msg.push(r.note);
       msg.push('밑줄(＿＿＿)은 자료가 없어 비운 곳 — [✏ 한글로 고치기]에서 적으세요');
       note(msg.join(' · '));
+      /* 위원이 격자보다 많으면 [별지] 명단도 한글로 — 인가신청서 앞장에는 「별지 명단과 같음」만 적힌다 */
+      if(kind==='inka'&&(S._hwpTplHas||{}).inka_annex&&_cmAnnexNeeded(f,S._hwpSideSites||[])){
+        var nn=$('hwpSideNote'); if(nn) nn.insertAdjacentHTML('beforeend',' <button class="primary" onclick="hwpAnnexDownload()" style="padding:2px 8px;font-size:11px" title="설립준비위원회 위원 명단(별지)을 한글로 받습니다">⬇ 별지 명단</button>');
+      }
       return r.bytes;
     });
   }).then(function(bytes){
@@ -8196,6 +8221,11 @@ function estabBundleHwp(phase){
       var pre=DOC_NEEDS_LEDGER[u.d[0]]?_docExtra(u.d[0],f).catch(function(){ return null; }):Promise.resolve();
       return pre.then(function(){ return hwpTplFill(u.d[0],f,sites); }).then(function(res){
         z.file(('0'+(u.i+1)).slice(-2)+'. '+String(u.d[1]).replace(/[\\\/:*?"<>|]/g,'_')+'.hwpx',res.bytes); got++;
+        /* 인가신청서에 「별지 명단과 같음」이 적혔으면 별지를 바로 뒤에 */
+        if(u.d[0]==='inka'&&(S._hwpTplHas||{}).inka_annex&&_cmAnnexNeeded(f,sites))
+          return hwpTplFill('inka_annex',f,sites).then(function(ax){
+            z.file(('0'+(u.i+1)).slice(-2)+'-1. [별지] 설립준비위원회 위원 명단.hwpx',ax.bytes);
+          }).catch(function(){ fail.push((u.i+1)+'-1. [별지] 위원 명단'); });
       }).catch(function(){ fail.push((u.i+1)+'. '+u.d[1]); });
     }); },Promise.resolve()).then(function(){
       if(!got) throw new Error('한 종도 채우지 못했습니다');
