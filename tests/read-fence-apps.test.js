@@ -123,10 +123,11 @@ const SAFE = ['init', 'bizNoDigits', 'bizNoValid', 'fmtBizNo', 'mapTo', 'keysFro
 const GATED = {
   'pu-paydata.html': ['runRead', 'runSheetRead', 'readOneSum'],
   /* ⚠ freeReadTry·freeReadAsk — 무료 판독이 사진을 «우리 서버 대리인»에게 보내는
-       자리다(거기서 구글 Vision 으로 간다). 가림을 «안» 거친다 — 사진첩 자동 판독이
-       예전부터 원본을 그대로 보내고 있고(2026-08-17 대표 결정 「이대로 감수한다」),
-       이 길은 그 감수 범위를 넓히지 않는다: 보내는 사진이 «같은 사진»이고 오히려
-       Gemini 대신 글자만 뽑는 쪽으로 간다.
+       자리다(거기서 구글 Vision 으로 간다).
+     ★ 2026-09-27 부터 사진첩은 «가린 사본»만 보낸다(대표 지시 「주민번호 가리고 구글로 보내라」).
+       예전에는 원본을 그대로 보냈다(2026-08-17 「이대로 감수한다」) — 그 뒤에 신분증·등본·통장이
+       사진첩에 들어와 뒤집었다. 가림 문은 freeReadAsk·imgChunkMakers·readDocChunked 셋이고,
+       못 가리면 보내지 않는다(tests/photos-rrn-mask-send.test.js 가 지킨다).
      ⚠ 이름을 한글로 짓지 «말 것». 아래 fnAround 의 \w 가 한글을 못 읽어 자리가
        「(모름)」이 되고, 그러면 이 목록에 적을 수가 없어 **울타리 밖**에 놓인다
        (freeReadAsk 가 처음엔 「무료판독」이었다가 그래서 이름을 바꿨다). */

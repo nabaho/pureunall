@@ -177,7 +177,24 @@
         if (looksLikeRrn(joined)) { hit = n; break; }
       }
       if (!hit) { i += 1; continue; }
-      var group = list.slice(i, i + hit);
+      /* ★ 묶은 뒤 «앞뒤를 덜어 낸다» (2026-09-27)
+         긴 쪽(세 낱말)부터 보므로, 번호가 한 낱말로 멀쩡히 읽혀도 앞의 두 낱말까지
+         한 칸으로 묶였다. 신분증에서 실제로 「HONG GILDONG 900101-…」의 이름까지
+         까맣게 칠해졌다 — 사진첩이 이 칠한 사본을 구글에 보내 읽게 되면서(같은 날)
+         이름이 안 읽혀 자동 판독이 쓸모없어진다.
+         ⚠⚠ «숫자가 없는» 낱말만 덜어 낸다. 숫자가 든 낱말은 번호의 조각일 수 있다.
+           주민등록등본처럼 번호가 연달아 나오면, 「빼도 번호가 남는다」만 보고 덜어 낼 때
+           «앞 사람의 번호»를 통째로 덜어 내고 뒷사람 것만 칠하게 된다 — 빠뜨리는 쪽이다.
+           하이픈(-) 하나짜리 조각은 가운데에만 오므로 끝에서 덜릴 일이 없다.
+         ⚠ 덜어 낸 뒤에도 번호로 읽혀야만 덜어 낸다(두 겹으로 지킨다). */
+      var a = i, b = i + hit;
+      var noDigit = function (k) { return !/\d/.test(String(list[k].text)); };
+      var joinOf = function (p, q) {
+        return list.slice(p, q).map(function (g) { return String(g.text).trim(); }).join('');
+      };
+      while (b - a > 1 && noDigit(a) && looksLikeRrn(joinOf(a + 1, b))) a++;
+      while (b - a > 1 && noDigit(b - 1) && looksLikeRrn(joinOf(a, b - 1))) b--;
+      var group = list.slice(a, b);
       var x0 = Math.min.apply(null, group.map(function (g) { return Number(g.x0) || 0; }));
       var y0 = Math.min.apply(null, group.map(function (g) { return Number(g.y0) || 0; }));
       var x1 = Math.max.apply(null, group.map(function (g) { return Number(g.x1) || 0; }));
@@ -190,9 +207,24 @@
         h: Math.min(1 - y, (y1 - y0) / imgH + PAD * 2),
         by: 'ai'
       });
-      i += hit;
+      /* ⚠ 덜어 낸 «뒤쪽» 낱말부터 다시 본다(i = b). 거기 다음 번호가 시작될 수 있다.
+         앞쪽에서 덜어 낸 것은 숫자가 없는 낱말이라 번호의 시작일 수 없다. */
+      i = b;
     }
     return out;
+  }
+
+  /* ── 기계가 찾아 «곧장» 칠한 사본 (2026-09-27) ─────────────────────────────
+     사람이 긋는 가림 창(pu-rrn-mask-ui.js maskedDataUrl)은 화면의 창 상태에 묶여 있다.
+     사진첩 «자동 판독»처럼 창 없이 도는 길은 그것을 못 쓴다. 그래서 여기 둔다.
+     ⚠ 칠하는 것은 maskToDataUrl «하나»다. 창 있는 길과 창 없는 길이 같은 붓을 쓴다 —
+       두 벌이 되면 한쪽만 고쳐지고, 가림은 틀리면 주민번호가 그대로 나가는 기능이다.
+     ⚠ words 의 자리는 «글자인식에 넣은 그림»의 크기(ocrW·ocrH) 기준이다. 칸은 비율로
+       나오므로 더 큰 원본(img)에 그대로 얹힌다 — 줄여서 읽고 원본에 칠할 수 있다.
+     돌려주는 것: { boxes, url } — 찾은 것이 없으면 url 은 빈 글자다(칠할 것이 없다). */
+  function autoMask(img, words, ocrW, ocrH, opts) {
+    var boxes = boxesFromWords(words, ocrW, ocrH);
+    return { boxes: boxes, url: boxes.length ? maskToDataUrl(img, boxes, opts) : '' };
   }
 
   global.PuRrnMask = {
@@ -201,6 +233,7 @@
     maskToDataUrl: maskToDataUrl,
     looksLikeRrn: looksLikeRrn,
     maskRrnInText: maskRrnInText,
+    autoMask: autoMask,
     boxesFromWords: boxesFromWords
   };
 })(typeof window !== 'undefined' ? window : globalThis);
