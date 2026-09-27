@@ -579,6 +579,39 @@
   /* ⚠ 어두운판의 :root[data-theme=dark] .day.today 테두리보다 «세게» 써야 이긴다 */
   html body.mob .cal .day.today{outline:none}
   body.mob .day.today .lun{color:var(--gtoday)}
+  /* ── 폰 ㉮ — 칸은 «막대»만, 읽는 것은 아래 «그날 목록»에서 (대표 지시 2026-09-27
+       「폰화면 ui도 구글처럼 사용이 같아야한다」) ──
+     왜: 배포본을 폰 크기(375×812)로 재 보니 날짜 칸이 53px, 칩이 49px 이라
+       한 칩에 «다섯~일곱 글자»만 보였다 — 9월 칩 91개 가운데 86개(95%)가 잘려 있었다.
+       「1730 김현숙 산재 뇌출혈 -산재 상담 (권, 혜민)」이 화면에는 「1730 김」이었다.
+     그래서 칸은 «얼마나 있는지·누구 것인지»만 색으로 알리고, 제목은 아래에서 읽는다.
+   ⚠ 넓은 화면(PC)은 그대로다 — 거기서는 칸이 넓어 글자 칩이 낫다. */
+  body.mob .mhead{flex:none}
+  /* ⚠ #app.fit .cal 이 아이디라 더 세다 — 그것을 이기려면 여기도 #app.fit 을 짚어야 한다.
+     안 짚으면 달력이 flex:1 로 남아 목록이 화면의 3분의 2를 먹는다(2026-09-27 실제로 그랬다). */
+  body.mob #app.fit .cal{flex:3 1 0;min-height:180px}
+  body.mob .ev{font-size:0;line-height:0;height:5px;padding:0;border-radius:3px;overflow:hidden}
+  body.mob .ev > *{display:none}
+  body.mob .evph{height:5px}
+  body.mob .evs{gap:2px}
+  body.mob .more{font-size:9px;line-height:7px;letter-spacing:0;padding:0;text-align:center}
+  /* 고른 날 — 구글처럼 옅은 칠 한 겹(테두리를 두르면 칸이 들쭉날쭉해 보인다) */
+  html body.mob .cal .day.pick{background:var(--acc-soft) !important}
+  /* 그날 목록 — 제목이 안 잘리는 크기(12.5px)로 */
+  body.mob .mlist{flex:2 1 0;min-height:110px;overflow-y:auto;border-top:8px solid var(--bg);
+    padding:9px 12px 16px;background:var(--panel)}
+  body.mob .mlday{font-size:12.5px;font-weight:700;color:var(--gtext);margin-bottom:6px}
+  body.mob .mlday .n{font-weight:400;color:var(--gsub);margin-left:5px}
+  body.mob .mrow{display:flex;gap:8px;align-items:flex-start;padding:7px 0;
+    border-bottom:1px solid var(--gline);cursor:pointer}
+  body.mob .mrow:last-child{border-bottom:none}
+  body.mob .mrow .bd{width:3px;border-radius:2px;flex:none;align-self:stretch;min-height:26px}
+  body.mob .mrow .tm{font-size:11.5px;color:var(--gsub);width:40px;flex:none;padding-top:1px}
+  body.mob .mrow .tx{font-size:12.5px;color:var(--gtext);flex:1;min-width:0;line-height:1.4;
+    overflow-wrap:anywhere}
+  body.mob .mrow.past .tx{color:var(--gsub)}
+  body.mob .mnone{font-size:12.5px;color:var(--gsub);text-align:center;padding:14px 0}
+  body.mob .mnone b{color:var(--gtoday);cursor:pointer;font-weight:700}
   @media (max-width:700px){
     #app{padding:10px 8px 80px}
     #topbar{padding:7px 10px;gap:7px}
@@ -638,7 +671,10 @@ var ME = null;           // 나 (직원 한 줄)
 var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'', open:null, theme:'light',
           scope:'month', showLeft:false, openRows:{},
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
-          view:'month', date:'', q:'' };
+          view:'month', date:'', q:'',
+          /* pick — 폰에서 «고른 날»(그날 목록이 보여 주는 날). 주·일 보기의 date 와 따로 둔다:
+             폰에서 날을 고르는 것 때문에 주·일 보기가 엉뚱한 곳으로 튀면 안 된다. */
+          pick:null };
 
 var $ = function(id){ return document.getElementById(id); };
 
@@ -2083,6 +2119,59 @@ function 폰머리Html(){
     + '<button class="mmenu" data-mmenu="1" title="메뉴">☰</button>'
     + '</div>';
 }
+/* ★ 폰에서 «고른 날» — 구글 폰 달력처럼 «날을 하나 골라 놓고» 그 날을 아래에서 읽는다.
+   안 골랐으면 그 달의 오늘, 오늘이 다른 달이면 그 달 1일. 달을 넘기면 다시 이 셈으로 돌아간다. */
+function 고른날(){
+  if(S.pick && String(S.pick).slice(0,7) === S.ym) return S.pick;
+  var 오늘 = todayYMD();
+  return 오늘.slice(0,7) === S.ym ? 오늘 : S.ym + "-01";
+}
+/* 목록 차례 — 달 칸과 같다: 공휴일 → 여러 날 → 종일 → 시각(이른 것부터) */
+function 목록순(e, ds){
+  if(e.kind === "hol") return 0;
+  if(e.end && e.end > ds) return 1;
+  return e.time ? 3 : 2;
+}
+/* ★ 폰 «그날 목록» — 고른 날의 일을 «안 잘리는 크기»로 늘어놓는다 (대표 지시 2026-09-27
+     「폰화면 ui도 구글처럼 사용이 같아야한다」).
+   왜 있어야 하나: 폰 칸은 49px 이라 칩 글자가 다섯~일곱 자만 보였다(91개 중 86개가 잘림).
+     칸에서 읽기를 포기하고 여기서 읽는다 — 구글 폰 달력이 그렇게 한다.
+   ⚠ 여기서는 그림글자(⚖️·🏛️·🔒)를 «안 걷는다». 칩에서는 걷는다(구글 화면에 없으므로) —
+     그러나 폰에서 칩은 글자 없는 막대라, 이 목록이 글자가 나오는 «유일한 자리»다.
+   ⚠ 누르는 길은 칩과 같게 둔다(data-ev·data-holday) — 두 벌로 나뉘면 한쪽만 고쳐진다. */
+function 폰목록Html(eumOnly){
+  var ds = 고른날();
+  var evs = eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch);
+  var h = 공휴칩(ds);
+  var 것들 = (h ? [h] : []).concat(evs);
+  것들 = 것들.map(function(e, i){ return { e:e, i:i }; }).sort(function(a, b){
+    return (목록순(a.e, ds) - 목록순(b.e, ds))
+      || String(a.e.time || "").localeCompare(String(b.e.time || "")) || (a.i - b.i);
+  }).map(function(x){ return x.e; });
+  var d = new Date(ds + "T00:00:00");
+  var 요일 = ["일","월","화","수","목","금","토"][d.getDay()];
+  var 오늘 = todayYMD();
+  var 줄 = 것들.map(function(e){
+    var 지남 = e.endAt ? (e.endAt < Date.now()) : ((e.end || ds) < 오늘);
+    var 언제 = e.time ? e.time : "종일";
+    var 제목 = String(e.text || "");
+    if(e.kind === "priv") 제목 = "🔒 " + 제목;
+    if(e.end && e.end > ds) 제목 += " (~" + parseInt(e.end.slice(5,7), 10) + "/" + parseInt(e.end.slice(8,10), 10) + ")";
+    return '<div class="mrow' + (지남 ? " past" : "") + '"'
+      + (e.kind === "hol" ? ' data-holday="' + esc(ds) + '"'
+                          : ' data-ev="' + esc(e.store) + ':' + esc(e.id) + '"')
+      + '><i class="bd" style="background:' + esc(e.color || "#70757a") + '"></i>'
+      + '<span class="tm">' + esc(언제) + '</span>'
+      + '<span class="tx">' + esc(제목) + '</span></div>';
+  }).join("");
+  /* ⚠ data-day 를 목록 바깥틀에 둔다 — 「사건 기한·휴직」을 누르면 «어느 날 것인지»를
+     타고 올라가 찾는다(칸에서도 같은 길이다). 빈 자리를 눌러 봐야 이미 고른 날이라 그대로다. */
+  return '<div class="mlist" data-day="' + esc(ds) + '">'
+    + '<div class="mlday">' + parseInt(ds.slice(5,7), 10) + '월 ' + parseInt(ds.slice(8,10), 10) + '일 (' + 요일 + ')'
+    +   '<span class="n">· ' + 것들.length + '건</span></div>'
+    + (줄 || '<div class="mnone">일정이 없습니다 · <b data-mnew="1">＋ 로 넣기</b></div>')
+    + '</div>';
+}
 function calendarHtml(eumOnly){
   /* 🗄 스위치가 켜져 있거나 구글을 못 받았으면 보관함도 그 달 것을 받는다(같은 달이면 안 받는다) */
   if(fbDb && (S.showGone || GCAL.err) && typeof 보관받기 === "function") 보관받기();
@@ -2135,7 +2224,9 @@ function calendarHtml(eumOnly){
     /* 구글처럼 그 달 첫날은 「9월 1일」 — 달이 바뀌는 자리가 눈에 띈다 */
     var 날글 = (c.day === 1 && !폰판) ? (parseInt(c.date.slice(5,7), 10) + "월 1일") : String(c.day);
     var 숨김 = 배치[idx].숨김;
-    return '<div class="day' + (오늘 ? " today" : "") + '" data-day="' + c.date + '"'
+    /* 폰에서 «고른 날»은 옅게 칠한다 — 아래 목록이 어느 날 것인지 눈으로 잇는다 */
+    var 고름 = 폰판 && c.date === 고른날();
+    return '<div class="day' + (오늘 ? " today" : "") + (고름 ? " pick" : "") + '" data-day="' + c.date + '"'
       + ' style="background:' + bg + ';border-right:1px solid ' + 테 + ';border-bottom:1px solid ' + 테
       + (찾음 ? ';outline:2px solid #fbbf24;outline-offset:-2px' : '') + '">'
       + '<div class="dline">'
@@ -2153,7 +2244,9 @@ function calendarHtml(eumOnly){
   if(폰판){
     return 폰머리Html() + '<div class="cal">'
       + '<div class="mhd">' + 요일.map(function(w){ return '<div>' + w + '</div>'; }).join("") + '</div>'
-      + '<div class="calgrid" style="grid-template-rows:repeat(' + (grid.length / 7) + ',1fr)">' + cells + '</div></div>';
+      + '<div class="calgrid" style="grid-template-rows:repeat(' + (grid.length / 7) + ',1fr)">' + cells + '</div></div>'
+      /* 칸에서 못 읽는 것을 여기서 읽는다 — 구글 폰 달력과 같은 쓰임 */
+      + 폰목록Html(eumOnly);
   }
   return '<div class="cal">'
     + '<div class="calgrid">' + cells + '</div></div>';
@@ -3383,6 +3476,44 @@ window.addEventListener('resize', function(){
   _크기타이머 = setTimeout(function(){ _크기타이머 = null; render(); }, 150);
 });
 
+/* ★ 좌우로 밀어 달 넘기기 — 구글 폰 달력과 같은 쓰임 (대표 지시 2026-09-27
+     「폰화면 ui도 구글처럼 사용이 같아야한다」).
+     예전에는 ‹ › 작은 화살표를 «정확히» 눌러야만 달을 넘길 수 있었다.
+   ⚠ 일정 칩을 «끌어 옮기는» 기능과 부딪히지 않게, 밀기는 «빈 자리에서 시작할 때»만 받는다.
+     칩 · 공휴일 · 「•••」 위에서 시작한 손짓은 손도 대지 않는다.
+   ⚠ 민 뒤에는 브라우저가 «눌렀다»고도 알린다 — 그대로 두면 손 뗀 자리의 날이 골라진다.
+     그래서 민 바로 뒤의 누름 하나는 삼킨다(_민때). */
+var _민때 = 0, _민시작 = null;
+function 밀수있나(t){
+  try{
+    if(!폰() || S.view !== 'month' || (S.tab !== 'cal' && S.tab !== 'eumcal')) return false;
+    if(S.modal || S.detail || S.open || S.colors || S.mycolor) return false;
+    if(!t || !t.closest || !t.closest('.calgrid')) return false;
+    return !t.closest('[data-ev],[data-drag],[data-holday],[data-more]');
+  }catch(_){ return false; }
+}
+document.addEventListener('touchstart', function(e){
+  _민시작 = null;
+  if(!밀수있나(e.target)) return;
+  var p = e.touches && e.touches[0];
+  if(p) _민시작 = { x:p.clientX, y:p.clientY, t:Date.now() };
+}, { passive:true });
+document.addEventListener('touchend', function(e){
+  var s = _민시작; _민시작 = null;
+  if(!s) return;
+  var p = e.changedTouches && e.changedTouches[0];
+  if(!p) return;
+  var dx = p.clientX - s.x, dy = p.clientY - s.y;
+  /* 옆으로 60px 넘게 가고, «위아래보다 두 배 이상» 간 것만 밀기로 본다 —
+     아래위로 훑다가 손가락이 조금 비뚤어진 것을 달 넘김으로 오해하지 않게 */
+  if(Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return;
+  if(Date.now() - s.t > 800) return;
+  var d = new Date(S.ym + '-01');
+  d.setMonth(d.getMonth() + (dx < 0 ? 1 : -1));
+  S.ym = ymOf(d); S.pick = null; _민때 = Date.now();
+  render();
+}, { passive:true });
+
 /* 누르는 것은 한 자리에서 받는다 — 단추마다 붙이면 다시 그릴 때 하나씩 샌다 */
 /* 자물쇠 없이 닫는 길 하나 더 — 창이 떠 있을 때 ESC */
 document.addEventListener('keydown', function(e){
@@ -3397,6 +3528,8 @@ document.addEventListener('focusout', function(e){
   }
 });
 document.addEventListener('click', function(e){
+  /* 밀어서 달을 넘긴 직후의 «누름»은 삼킨다 — 안 그러면 손 뗀 자리의 날이 골라진다 */
+  if(_민때 && Date.now() - _민때 < 500){ _민때 = 0; return; }
   /* 펼침 창은 «바깥을 누르면» 닫힌다 — 창 안을 누른 것은 그대로 둔다 */
   if(S.open && !(e.target.closest && e.target.closest(".pop"))
      && !(e.target.closest && e.target.closest("[data-more]"))){
@@ -3430,10 +3563,15 @@ document.addEventListener('click', function(e){
       S.ym = S.date.slice(0,7);
     }
     else { var d=new Date(S.ym+'-01'); d.setMonth(d.getMonth()+mv); S.ym = ymOf(d); }
+    /* 달이 바뀌면 폰의 «고른 날»은 새 달로 다시 잡는다(고른날) — 지난 달 날짜가 남으면
+       아래 목록과 달력이 어긋난다 */
+    S.pick = null;
     render(); return;
   }
   if(t.hasAttribute('data-gcalretry')){ gcalLoad(true); return; }
-  if(t.hasAttribute('data-mnew')){ openNew(todayYMD()); return; }
+  /* ＋ — 폰에서 넣는 «유일한» 길이다. 보고 있는(고른) 날에 넣는다 — 구글과 같다.
+     ⚠ 예전엔 언제나 «오늘»이었다. 다음 달을 펴 놓고 ＋ 를 누르면 오늘 것이 생겼다. */
+  if(t.hasAttribute('data-mnew')){ openNew(폰() && S.view === 'month' ? 고른날() : todayYMD()); return; }
   if(t.hasAttribute('data-gone')){
     S.showGone = !S.showGone;
     try{ localStorage.setItem("pu_cal_gone", S.showGone ? "1" : ""); }catch(_){}
@@ -3532,6 +3670,9 @@ document.addEventListener('click', function(e){
   /* 「+N개 더」 — 그 날을 그 자리에서 펼친다(다른 화면으로 안 간다) */
   if(t.hasAttribute('data-more')){
     var 날 = t.getAttribute('data-more');
+    /* 폰은 「•••」도 «그 날을 고르는» 것이다 — 읽는 자리가 아래 목록 하나여야 한다.
+       작은 화면에서 펼침 창까지 겹쳐 띄우면 달력이 통째로 가려진다. */
+    if(폰() && S.view === 'month'){ S.pick = 날; render(); return; }
     S.open = (S.open === 날) ? null : 날;
     render(); return;
   }
@@ -3555,7 +3696,15 @@ document.addEventListener('click', function(e){
   }
   /* 공휴일 — 이름이 길어 칸에서 잘리는 날이 있다(대체공휴일 등) */
   if(t.hasAttribute('data-holday')){ openDetail(공휴일상세(t.getAttribute('data-holday'))); return; }
-  if(t.hasAttribute('data-day')){ openNew(t.getAttribute('data-day')); return; }
+  /* ★ 날을 누르면 — 폰은 «그 날을 본다»(구글 폰 달력과 같다), 넓은 화면은 여느 때처럼 «새로 넣기».
+     ⚠ 폰에서 예전에는 날을 누르면 바로 새 일정 창이 떴다 — 읽으려고 눌렀는데 쓰는 창이 떠서,
+       일정을 보려면 칸 안의 다섯 글자를 들여다보는 수밖에 없었다(대표 지시 2026-09-27).
+       폰에서 넣는 길은 ＋ 하나다 — 고른 날에 넣는다. */
+  if(t.hasAttribute('data-day')){
+    var 날짜 = t.getAttribute('data-day');
+    if(폰() && S.view === 'month'){ S.pick = 날짜; render(); return; }
+    openNew(날짜); return;
+  }
 });
 
 /* 링크 복사 — 못 하는 자리(https 아님·권한 거절)에서는 «됐다»고 하지 않는다.
