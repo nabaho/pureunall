@@ -127,6 +127,80 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .ways .tail{margin-left:auto;font-size:11px;color:var(--faint)}
 .ways .tail a{color:var(--sub);cursor:pointer;text-decoration:underline}
 .way.on{box-shadow:0 0 0 2px var(--brown-soft)}
+
+/* ★★ 회차 머리 = «폴더 탭» 한 상자 (대표 지시 2026-09-27
+      「추천대로 하되 아래줄로 내려오게 말고 각자 자기줄에 내용이 모두 들어갈수 있게 정렬해라」)
+   ═══════════════════════════════════════════════════════════════════════════
+   윗줄 = 회차 · 보는 손잡이 · 보내는 단추 셋 / 아랫줄 = 담는 법 탭.
+   ⚠⚠ 두 줄 모두 flex-wrap:nowrap — «접히지 않는다». 모자라면 글을 줄인다(아래 @container).
+   ⚠ 가로 굴림(overflow-x)으로 풀지 말 것 — ⓘ 풀이(.tip)가 줄 밖으로 뜨는 창이라
+     굴림 상자 안에 들면 잘려서 안 보인다. 그리고 굴릴 수 있다는 것이 눈에 안 띈다.
+   ⚠ .wrap.who(받는 명단)의 .hdbar 는 건드리지 않는다 — 그래서 .nowtop 아래로만 건다. */
+.nowtop{container:nowtop / inline-size}
+.nowtop .hdbar{flex-wrap:nowrap;gap:8px;margin:0;padding:11px 14px;
+  border-radius:12px 12px 0 0;border-bottom:0}
+.nowtop .hdbar>*{flex:0 0 auto}
+.nowtop .hdbar .no{font-size:17px;white-space:nowrap}
+.nowtop .hdbar .badge{white-space:nowrap}
+.nowtop .hdbar .meta{font-size:12px;color:var(--sub);white-space:nowrap}
+.nowtop .hdbar .sp,.nowtop .ways .sp{flex:1 1 0;min-width:0}
+.nowtop .hdbar .btn{font-size:12.5px;padding:7px 11px;white-space:nowrap}
+.nowtop .lnk{background:none;border:0;border-radius:7px;padding:6px 5px;white-space:nowrap;
+  font-size:12.5px;font-weight:700;color:var(--sub)}
+.nowtop .lnk:hover:not(:disabled){color:var(--ink);background:var(--paper)}
+.nowtop .lnk:disabled{opacity:.45;cursor:not-allowed}
+.nowtop .hdbar .why{color:var(--warn);font-size:11px;cursor:help}
+.nowtop .ways{flex-wrap:nowrap;gap:2px;margin:0;padding:0 8px;align-items:flex-end;
+  border-radius:0 0 12px 12px;background:var(--paper)}
+.nowtop .ways>*{flex:0 0 auto}
+/* ⚠ inline-flex 로 두지 말 것 — 글자 조각(.ful)마다 따로 떨어진 알맹이가 되어
+     gap 만큼 벌어진다(「지역 뉴스」·「이 주치로 채우기」가 띄어 보였다). */
+.nowtop .wt{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;
+  padding:9px 9px 8px;font-size:13px;font-weight:700;color:var(--sub);white-space:nowrap;
+  display:inline-block}
+.nowtop .wt:hover{color:var(--ink)}
+.nowtop .wt.on{color:var(--brown);border-bottom-color:var(--brown);background:#fff}
+.nowtop .cnt{font-size:11px;font-weight:800;border-radius:10px;padding:1px 7px;
+  background:var(--brown-soft);color:var(--brown)}
+.nowtop .wt .dot{color:var(--warn);font-size:9px}
+.nowtop .ways .tipwrap{align-self:center}
+.nowtop .ways .tail{margin-left:0;align-self:center;white-space:nowrap;font-size:11.5px;padding:0 4px}
+.nowtop .ways .tail a{text-decoration:none}
+.nowtop .ways .tail a:hover{text-decoration:underline}
+/* ★ 자리가 모자라면 «글을 줄인다» — 줄은 늘리지 않는다.
+     걷는 차례(덜 아까운 것부터): 기간 → 탭의 긴 이름 → 연도 → 손잡이 글 → 「에 보내기」
+     → 「실린 것」·탭 아이콘. 걷은 글은 모두 title 로 남는다(올려 보면 나온다).
+   ★ 문턱은 «재서» 정했다 (2026-09-27, 머리만 떼어 실제 코드로 그려 10px 마다 잼).
+       덩이 폭 → 윗줄 제폭(보통/가장 긴 것 — 자문 1,143곳·확정본 낡음·128건)
+         다 보일 때 947/962 · 기간 뺌 ≈862/877 · 연도 뺌 ≈817/832 · 글 뺌 582/599 …
+       탭줄은 다 보일 때 870/921 이라 대표님 화면(≈930)에서는 «긴 이름까지 다» 선다.
+     ⚠ 글을 늘리면(단추를 더하면) 문턱을 다시 재야 한다 — 안 재면 조용히 넘친다.
+       tests/newsletter-head-one-line.test.js 는 «규칙»(안 접힌다·걷을 글이 있다)만 본다.
+     ⚠ 폭은 «덩이 폭»이다(화면 폭 아님) — 넓은 화면에서는 두 칸으로 나뉘어 덩이가
+       화면의 반이다. 창 폭으로 재면 1,000px 창에서 넘친다.
+     ⚠ 폰(560 아래)은 아래 폰 규칙이 두 칸 바둑판으로 나눈다 — 거기서는 글을 안 걷는다
+       (자리가 두 줄이라 넉넉하고, 아이콘만 남은 단추는 손가락으로 무엇인지 모른다). */
+@media(min-width:561px){
+  @container nowtop (max-width:969px){ .nowtop .lng{display:none} }
+  @container nowtop (max-width:924px){ .nowtop .ful{display:none} }
+  @container nowtop (max-width:884px){ .nowtop .yr{display:none} }
+  @container nowtop (max-width:839px){
+    .nowtop .t{display:none}
+    .nowtop .hdbar{gap:6px;padding-left:11px;padding-right:11px}
+    .nowtop .hdbar .btn{padding:7px 9px}
+    .nowtop .wt{padding:9px 8px 8px}
+  }
+  @container nowtop (max-width:609px){
+    .nowtop .t2{display:none}
+    .nowtop .hdbar .no{font-size:15.5px}
+    .nowtop .hdbar .btn,.nowtop .lnk{font-size:12px}
+    .nowtop .hdbar .btn{padding:6px 7px}
+    .nowtop .wt{font-size:12px;padding:8px 6px 7px}
+  }
+  @container nowtop (max-width:559px){
+    .nowtop .hdbar .meta,.nowtop .wt .ic{display:none}
+  }
+}
 .law-ok{background:#dcfce7;color:var(--ok)}
 .law-mid{background:#fef3c7;color:var(--warn)}
 .law-bad{background:#fee2e2;color:var(--bad)}
@@ -135,7 +209,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px;
   align-items:start}
 /* 회차 줄이 왼쪽 칸의 «첫 줄»이 되었다 — .cols 가 이미 위 여백을 주므로 겹치지 않게 */
-.colL .hdbar{margin-top:0;margin-bottom:10px}
+.colL .hdbar{margin-top:0;margin-bottom:0}   /* 담는 법 탭과 한 상자다(2026-09-27) */
 
 /* ★★★ 회차 머리 + 담는 법을 «붙여 둔다» (대표 지시 2026-09-14 「이부분 틀고정 해라」)
    ═══════════════════════════════════════════════════════════════════════════
@@ -153,7 +227,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
    ⚠ flex:0 0 auto — 넓은 화면에서 .colL 은 flex 칸이다. 없으면 덩이가 늘어나
      꼭지 자리를 빼앗는다. */
 .colL>.nowtop{position:sticky;top:var(--tophi,0px);z-index:12;
-  flex:0 0 auto;background:var(--paper)}
+  flex:0 0 auto;background:var(--paper);padding-bottom:10px}
 /* ★★★ 꼭지를 «탭»으로 (대표 지시 2026-09-08)
    ═══════════════════════════════════════════════════════════════════════════
    「주간, 고용, 판례 인사 등 각각의 화면으로 각각의 내용을 선택할 수 있게
@@ -588,7 +662,9 @@ table.list tr:hover td{background:#fcfcfd}
      제 한 줄을 통째로 먹고 있어서, 그만큼 아래 꼭지가 밀렸다. */
   /* ⚠ 「>」 하나를 뺀다 — 2026-09-06 부터 회차 줄은 «왼쪽 칸 안»에 있다(손자다).
        바로자식(>)으로 두면 이 규칙이 통째로 안 걸려 줄이 도로 두꺼워진다. */
-  .wrap.now .hdbar{padding-top:7px;padding-bottom:7px;margin-top:0;margin-bottom:10px}
+  /* ⚠ margin-bottom 은 0 — 2026-09-27 부터 회차 줄과 담는 법 탭이 «한 상자»다(폴더 탭).
+       틈을 두면 탭이 상자에서 떨어져 나가 보인다. */
+  .wrap.now .hdbar{padding-top:7px;padding-bottom:7px;margin-top:0;margin-bottom:0}
   .wrap.now .hdbar .no{font-size:16px}
   /* ★★ 얼린 화면에서는 두 칸이 «줄에 맞춰 늘어나야» 한다 (대표 화면 2026-09-06
        「화면아래 잘렸는데 내려가서 확인할 방법도 없다」)
@@ -708,6 +784,15 @@ table.list tr:hover td{background:#fcfcfd}
   .hdbar>.btn{flex:1 1 calc(50% - 4px);justify-content:center;text-align:center;
     font-size:12.5px;padding:9px 6px}
   .hdbar>.btn.pri{flex:1 1 100%}
+  /* ⚠ 폰에서만은 «접는다» — 넓은 화면의 폴더 탭 머리(.nowtop, 2026-09-27)는
+       안 접히게(nowrap) 짜여 있는데, 375px 에 두 줄은 안 들어간다. 여기서 되돌린다.
+       빠지면 단추가 화면 밖으로 밀려 나가 보내기를 못 누른다. */
+  .nowtop .hdbar,.nowtop .ways{flex-wrap:wrap}
+  .nowtop .hdbar .sp,.nowtop .ways .sp{display:none}
+  /* ⚠ 아래 「.ways .tail{display:none}」은 옛 꼬리말(ⓘ 와 같은 말)을 접던 것이다.
+       2026-09-27 부터 꼬리에는 «연습용 샘플·그대로 전달» 길이 산다 — 접으면 폰에서
+       그 길이 통째로 사라진다(removing-a-path). 머리 덩이 안에서는 되살린다. */
+  .nowtop .ways .tail{display:inline-block;padding:8px 6px}
 
   /* ② 담는 법 · 꼭지 도구줄 — 단추를 작게 해 두 줄에 담는다.
        ⚠ 가로로 굴리게 해 봤더니 끝 단추가 «잘린 채» 서서 고장난 것처럼 보였다.
@@ -1254,12 +1339,14 @@ function 명단셈(){
    예전에는 「고치면 다시 준비해야 합니다」라고 «준비할 때 한 번» 적어 두고 말았다 —
    그 뒤로는 아무 데서도 안 보인다. 이제 서버가 낡은 확정본을 «안 보내므로»,
    화면은 「이대로 두면 월요일에 안 나간다」를 말해 주어야 한다. */
+/* ★ 짧은 — 단추에 서는 말 (2026-09-27 「각자 자기줄에 내용이 모두 들어갈수 있게」).
+     긴 말(글)은 단추의 title 로 간다. 긴 말이 단추에 서면 그것만으로 머리가 넘친다. */
 function 예약본상태(d){
-  const 기본 = { 꼴:'', 글:'📅 다음 월요일 자동발송 준비', 곁:'' };
+  const 기본 = { 꼴:'', 글:'📅 다음 월요일 자동발송 준비', 짧은:'📅 월요일 예약', 곁:'' };
   const r = App.예약본;
   if(!r || !r.상태) return 기본;
   if(r.상태 === '어긋남')
-    return { 꼴:'warn', 글:'⚠ 확정본이 낡아 안 나갔습니다 — 다시 준비',
+    return { 꼴:'warn', 글:'⚠ 확정본이 낡아 안 나갔습니다 — 다시 준비', 짧은:'⚠ 다시 준비',
              곁:String(r.오류 || '준비한 뒤에 내용이 바뀌었습니다') };
   if(r.상태 !== '준비')
     return Object.assign({}, 기본, { 곁:'지난 확정본 상태: ' + esc(String(r.상태)) });
@@ -1268,8 +1355,9 @@ function 예약본상태(d){
   const 봉인 = String(r.바탕도장 || '');
   if(봉인 && 봉인 === Core.바탕도장(d))
     return { 꼴:'', 글:'📅 ' + String(r.보낼날||'').slice(5) + ' 확정본 ✔',
+             짧은:'📅 ' + String(r.보낼날||'').slice(5) + ' ✔',
              곁:'준비돼 있습니다 — 다시 누르면 지금 내용으로 새로 준비합니다' };
-  return { 꼴:'warn', 글:'⚠ 확정본이 낡았습니다 — 다시 준비',
+  return { 꼴:'warn', 글:'⚠ 확정본이 낡았습니다 — 다시 준비', 짧은:'⚠ 다시 준비',
            곁:'준비한 뒤에 내용이 바뀌었습니다. 이대로 두면 월요일에 안 나갑니다' };
 }
 
@@ -1304,36 +1392,48 @@ function 이번회차화면(){
        (대표 지시 2026-09-14 「이부분 틀고정 해라」).
      ⚠ 따로따로 붙이면 둘째 것(담는 법)의 top 을 첫째 것의 «높이»로 줘야 한다.
        그 높이는 단추가 두 줄로 접히면 달라져, 창을 좁히면 겹치거나 뜬다. -->
+  <!-- ★★ 머리 두 줄을 «폴더 탭» 한 상자로 (대표 지시 2026-09-27
+       「추천대로 하되 아래줄로 내려오게 말고 각자 자기줄에 내용이 모두 들어갈수 있게 정렬해라」)
+     ═══════════════════════════════════════════════════════════════════════
+     예전에는 단추가 넘쳐 «네 줄»로 접혔다 — 보내기 둘·명절 인사·연습용 샘플이
+     아랫줄로 떨어졌다. 이제 두 줄은 «절대 안 접힌다»(flex-wrap:nowrap).
+     ★ 자리가 모자라면 «줄을 늘리지 않고 글을 줄인다» — 긴 글자(.ful·.t·.lng)를
+       덩이 폭(@container nowtop)에 따라 걷는다. 걷은 글은 title 로 남는다.
+     ⚠ 폰(560px 아래)만은 예외다 — 375px 에 두 줄은 안 들어간다. 거기는
+       예전처럼 두 칸 바둑판으로 나눈다(대표 지시 2026-09-12 「폰화면」). -->
   <div class="nowtop">
   <div class="hdbar">
-    <span class="no">${esc(d.회차.이름)}</span>
+    <span class="no" title="${esc(d.회차.이름 + ' · ' + d.회차.기간 + ' · 실린 것 ' + 실린수)}">${esc(d.회차.이름).replace(/^(\d{4}년\s*)/, '<span class="yr">$1</span>')}</span>
     <span class="badge ${상태딱지}">${esc(d.상태)}</span>
-    <span style="font-size:12px;color:var(--sub)">${esc(d.회차.기간)} · 실린 것 ${실린수}</span>
-    <!-- ★ 단추를 «왼쪽으로» 붙인다 (대표 지시 2026-09-06 「캡쳐3 영역 왼쪽으로 모두 보내고」).
-         예전에는 <span class="sp"> 로 오른쪽 끝까지 밀어 두었다. 1900px 화면에서는
-         회차 이름과 단추 사이가 한 뼘이나 벌어져, 눈이 왼쪽 끝에서 오른쪽 끝까지 건너뛰었다. -->
-    <span style="width:8px"></span>
-    <button class="btn" onclick="크게보기()">👁 크게 보기</button>
+    <span class="meta" title="${esc(d.회차.기간)}"><span class="lng">${esc(String(d.회차.기간||'').replace(/\d{4}-/g, ''))} · </span>실린 것 ${실린수}</span>
+    <!-- ★ 보는 것(크게 보기·다시 담기)은 «글자 손잡이»로 물러나고, 단추 모양은
+         보내는 셋만 갖는다 — 눈이 오른쪽 끝 한 묶음에 모인다. -->
+    <button class="lnk" onclick="크게보기()" title="크게 보기">👁<span class="t"> 크게 보기</span></button>
     <!-- ↻ 전문 다시 담기 — 편지 서식을 고쳐도 «담아 둔 전문»은 안 바뀐다.
          ⚠ 보낸 회차에는 안 보인다. 그 쪽은 「그때 나간 그대로」여야 한다. -->
-    ${d.상태 === '발송' ? '' : `<button class="btn" onclick="전문다시담기()"
-      title="편지 서식을 고친 뒤 「전문 보기」가 옛 모습이면 눌러 주세요"
-      ${App.isAdmin?'':'disabled'}>↻ 전문 다시 담기</button>`}
+    ${d.상태 === '발송' ? '' : `<button class="lnk" onclick="전문다시담기()"
+      title="전문 다시 담기 — 편지 서식을 고친 뒤 「전문 보기」가 옛 모습이면 눌러 주세요"
+      ${App.isAdmin?'':'disabled'}>↻<span class="t"> 다시 담기</span></button>`}
+    <span class="sp"></span>
+    <!-- ⚠⚠ 못 누르는 단추에는 «왜»를 붙인다 — 연습 표본 때문에 잠긴 것을
+           말해 주지 않으면 대표께서 「고장났다」로 보신다. 줄을 늘리지 않게
+           점 하나만 두고 까닭은 올려 보면 나온다(단추의 title 에도 있다). -->
+    ${갈수있나.ok ? '' : `<span class="why" title="${esc(갈수있나.까닭)}">●</span>`}
     <!-- ★ 「나에게」가 아니다 (대표 지시 2026-09-13) — 보낼 때 주소를 골라 넣는다.
          법인 메일에서 «개인 메일»로 보내 봐야 진짜로 가는지 안다. -->
-    <button class="btn warn" onclick="시험발송()" ${시험갈수있나.ok?'':'disabled'}
-      title="받을 주소를 넣어 한 통만 보냅니다 — 거래처에는 나가지 않습니다">✉ 시험 발송</button>
+    <button class="btn" onclick="시험발송()" ${시험갈수있나.ok?'':'disabled'}
+      title="시험 발송 — 받을 주소를 넣어 한 통만 보냅니다. 거래처에는 나가지 않습니다">✉<span class="t"> 시험 발송</span></button>
     <!-- ★ 확정본이 낡았는지를 «이 단추 한 줄»로 말한다 (2026-09-13).
          ⚠ 셋째 줄을 만들지 않는다 — 머리가 늘어나면 대표가 같은 것을 보려고 더 굴린다.
-         ⚠⚠ 못 누르는 단추에는 «왜»를 붙인다 — 연습 표본 때문에 잠긴 것을
-           말해 주지 않으면 대표께서 「고장났다」로 보신다. -->
+         ★ 단추에는 «짧은 말», 긴 말은 title 에 — 긴 말(「확정본이 낡아 안 나갔습니다 —
+           다시 준비」)이 단추에 서면 그것만으로 줄이 넘친다. -->
     <button class="btn ${예약.꼴}" onclick="자동발송준비()"
-      title="${esc(갈수있나.ok ? (예약.곁||'') : 갈수있나.까닭)}"
-      ${갈수있나.ok && App.isAdmin?'':'disabled'}>${esc(예약.글)}</button>
+      title="${esc(예약.글 + ' — ' + (갈수있나.ok ? (예약.곁||'') : 갈수있나.까닭))}"
+      ${갈수있나.ok && App.isAdmin?'':'disabled'}>${esc(예약.짧은 || 예약.글)}</button>
     <button class="btn pri" onclick="진짜보내기()"
       title="${esc(갈수있나.ok ? '' : 갈수있나.까닭)}"
       ${갈수있나.ok && App.isAdmin?'':'disabled'}>
-      📨 ${App.유형 ? esc(App.유형)+' ' : ''}${r.셈.보낼곳.toLocaleString()}곳에 보내기</button>
+      📨 ${App.유형 ? esc(App.유형)+' ' : ''}${r.셈.보낼곳.toLocaleString()}곳<span class="t2">에 보내기</span></button>
   </div>
   <!-- ⚠ 「아직 못 보냅니다」 알림은 오른쪽 «요약»으로 옮겼다 (대표 지시 2026-09-08
        「간략히 핵심만」). 여기 두면 조건에 따라 «셋째 줄»이 생겨 머리가 늘어난다. -->
@@ -1341,10 +1441,11 @@ function 이번회차화면(){
   <!-- ★ 담는 법 — 카드 셋을 한 줄로 (대표 지시 2026-09-05 「크기 좀 줄여라」).
        ⚠ 「그대로 전달」을 «없애지는» 않았다. 지금 그 길로 다니시던 일이라,
          없애면 하던 일이 막힌다 — 작은 글씨 하나로 남겨 둔다. -->
+  <!-- ★ 담는 법은 «책갈피» 탭이다 (2026-09-27) — 단추 다섯이 아니라 한 줄 탭이라
+       «지금 어느 판인지»가 밑줄 하나로 보인다. 색은 갈색 하나, 누른 것에만. -->
   <div class="ways">
-    <span class="lab">담는 법</span>
-    <button class="btn ${App.길==='auto'?'pri':''}" onclick="길바꾸기('auto')">
-      ⟳ 이 주치로 채우기 <span style="opacity:.75">${모음셈().이회차}건</span></button>
+    <button class="wt ${App.길==='auto'?'on':''}" onclick="길바꾸기('auto')"
+      title="이 주치로 채우기"><span class="ic">⟳ </span><span class="ful">이 주치로 </span>채우기${모음셈().이회차 ? ' <span class="cnt">' + 모음셈().이회차 + '</span>' : ''}</button>
     <!-- ★ 안내를 ⓘ 로 (대표 지시 2026-09-08 「간략히 핵심만」).
          예전에는 이 아래에 «셋째 줄»이 열려 「⟳ 다시 채우기」와 두 줄 안내를 담았다.
          그런데 이 단추가 «누를 때마다» 담으므로(길바꾸기) 그 줄은 할 일이 없었다 —
@@ -1353,26 +1454,25 @@ function 이번회차화면(){
       + '손으로 고르신 것은 사라지지 않습니다 — 빼시려면 ✕ 를 누르세요.<br><br>'
       + '지난 한 주(' + esc(d.회차.기간) + ') 기사를 꼭지에 나눠 담습니다.<br>'
       + '모으기가 아침에 도니 <b>회차 끝 뒤 ' + 모음셈().여유일 + '일까지</b> 모인 것도 '
-      + '그 주 것으로 봅니다 (창 ' + 모음셈().창시작 + ' ~ ' + 모음셈().창끝 + ').')}
-    <span class="sep"></span>
-    <button class="btn ${App.길==='paste'?'pri':''}" onclick="길바꾸기('paste')">
-      ↧ 받은 것 붙여넣기</button>
-    <span class="sep"></span>
-    <button class="btn ${App.길==='ilabor'?'pri':''}" onclick="길바꾸기('ilabor')"
-      style="${App.길==='ilabor'?'':'background:var(--brown-soft);border-color:#d9cec1;color:#4a3c2e'}">
-      📥 노무사회 자료 <b>${(App.노무사회||[]).length||''}</b>건</button>
-    <span class="sep"></span>
-    <button class="btn ${App.길==='region'?'pri':''}" onclick="길바꾸기('region')">
-      📍 지역뉴스 <b>${(d.지역뉴스||[]).length||''}</b>건</button>
-    <span class="sep"></span>
+      + '그 주 것으로 봅니다 (창 ' + 모음셈().창시작 + ' ~ ' + 모음셈().창끝 + ').<br><br>'
+      + '편지에는 <b>제목·원문 링크만</b> 싣습니다.')}
+    <button class="wt ${App.길==='paste'?'on':''}" onclick="길바꾸기('paste')"
+      title="받은 것 붙여넣기"><span class="ic">↧ </span><span class="ful">받은 것 </span>붙여넣기</button>
+    ${/* ⚠ 건수가 0 이면 알약을 안 그린다 — 「0」은 아무것도 안 알려 주면서 자리만 먹는다
+         (CLAUDE.md 「표의 한 칸은 한 줄」). */''}
+    <button class="wt ${App.길==='ilabor'?'on':''}" onclick="길바꾸기('ilabor')"
+      title="공인노무사회 자료"><span class="ic">📥 </span>노무사회<span class="ful"> 자료</span>${(App.노무사회||[]).length ? ' <span class="cnt">' + (App.노무사회||[]).length + '</span>' : ''}</button>
+    <button class="wt ${App.길==='region'?'on':''}" onclick="길바꾸기('region')"
+      title="지역뉴스"><span class="ic">📍 </span>지역<span class="ful">뉴스</span>${(d.지역뉴스||[]).length ? ' <span class="cnt">' + (d.지역뉴스||[]).length + '</span>' : ''}</button>
     ${/* ★ 인사 — 부정기라 «담겼을 때만» 눈에 띄게 한다(대표 지시 2026-09-23).
          늘 굵게 두면 마흔여덟 주 동안 「안 쓴 칸」이 도드라진다. */''}
-    <button class="btn ${App.길==='greet'?'pri':''}" onclick="길바꾸기('greet')"
-      >🎁 명절 인사${인사담겼나(d) ? ' <b>●</b>' : ''}</button>
-    <span class="sep"></span>
-    <button class="btn" onclick="연습채우기()">🧪 연습용 샘플</button>
-    <span class="tail">ⓘ 제목·원문 링크만 싣습니다 ·
-      <a onclick="길바꾸기('fwd')">받은 것 그대로 전달</a></span>
+    <button class="wt ${App.길==='greet'?'on':''}" onclick="길바꾸기('greet')"
+      title="명절 인사"><span class="ic">🎁 </span><span class="ful">명절 </span>인사${인사담겼나(d) ? ' <b class="dot">●</b>' : ''}</button>
+    <span class="sp"></span>
+    ${/* ⚠ 「그대로 전달」을 «없애지는» 않았다 — 지금 그 길로 다니시던 일이다.
+         잘 안 쓰는 둘이라 오른쪽 끝 작은 글씨로 둔다. */''}
+    <span class="tail"><a onclick="연습채우기()" title="연습용 샘플로 채우기 — 연습은 「시험 발송」으로만">🧪<span class="t"> 연습<span class="ful">용 샘플</span></span></a>
+      · <a onclick="길바꾸기('fwd')" title="받은 것 그대로 전달">↪<span class="t"> 그대로 전달</span></a></span>
   </div>
   </div><!-- /nowtop — 여기까지가 «붙어 있는» 덩이다 -->
 
