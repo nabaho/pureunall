@@ -6246,7 +6246,7 @@ let ocrKrP=null;
 function loadOcrKr(){
   if(window.PuOcrKr)return Promise.resolve(window.PuOcrKr);
   if(!ocrKrP)ocrKrP=new Promise((ok,no)=>{
-    const s=document.createElement('script'); s.src='js/pu-ocr-kr.js?v=2';
+    const s=document.createElement('script'); s.src='js/pu-ocr-kr.js?v=3';
     s.onload=()=>{ if(window.PuOcrKr)ok(window.PuOcrKr); else{ ocrKrP=null; no(new Error('한국어 글자 인식을 불러오지 못했습니다')); } };
     s.onerror=()=>{ ocrKrP=null; no(new Error('한국어 글자 인식을 내려받지 못했습니다')); };
     document.head.appendChild(s);

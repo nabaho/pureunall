@@ -1954,7 +1954,7 @@
      기금 서류 읽기(#1630)에서 과거 스캔본 55개로 겨뤄 tesseract 보다 판독 칸 31% 많고 번호 오독이 없던 방식.
      브라우저 판독(Vision 이 안 될 때의 무료 길)이 이것을 먼저 쓰고, 못 쓰거나 글이 거의 없으면 예전 tesseract 두 벌 읽기로.
      모듈은 이 파일 옆(js/)에 있다 — 부를 때 한 번만 싣는다(처음 쓸 때 모델 약 18MB + 실행기 14MB, 브라우저 캐시). */
-  var OCR_KR_SRC = 'pu-ocr-kr.js?v=2';
+  var OCR_KR_SRC = 'pu-ocr-kr.js?v=3';
   var SELF_BASE = (function () {
     try { var c = global.document && global.document.currentScript; return c && c.src ? c.src.replace(/[^/]*(\?.*)?$/, '') : 'js/'; }
     catch (e) { return 'js/'; }

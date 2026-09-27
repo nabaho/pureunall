@@ -191,12 +191,15 @@
     if (_ready) return _ready;
     _ready = (typeof ort !== 'undefined' ? Promise.resolve() : loadScript(ORT_BASE + 'ort.wasm.min.js')).then(function () {
       ort.env.wasm.wasmPaths = ORT_BASE;
+      /* 모델(paddle2onnx 변환본)에 안 쓰는 값이 남아 있어 불러올 때마다 경고 수십 줄을 콘솔에 «빨간 글»로 찍는다
+         (쓰는 데는 아무 탈 없다 — kordoc 도 같은 까닭으로 끈다). 진짜 오류만 보이게 */
+      ort.env.logLevel = 'error';
       /* 여러 줄기 실행은 교차 출처 격리 때만 된다(GitHub Pages 는 아니다) — 안 되면 한 줄기 */
       ort.env.wasm.numThreads = (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated) ? Math.min(4, navigator.hardwareConcurrency || 2) : 1;
       return Promise.all([getModel(MODELS.det, onStat), getModel(MODELS.rec, onStat), getModel(MODELS.dict, onStat)]);
     }).then(function (b) {
       onStat && onStat('한국어 OCR 준비 중…');
-      var opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+      var opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all', logSeverityLevel: 3 };
       return Promise.all([ort.InferenceSession.create(new Uint8Array(b[0]), opt), ort.InferenceSession.create(new Uint8Array(b[1]), opt),
         new TextDecoder().decode(b[2])]);
     }).then(function (r) {

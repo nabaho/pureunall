@@ -333,7 +333,7 @@ function loadOcrKr() {
   if (krLoading) return krLoading;
   krLoading = new Promise(function (res, rej) {
     var s = document.createElement('script');
-    s.src = 'js/pu-ocr-kr.js?v=2';
+    s.src = 'js/pu-ocr-kr.js?v=3';
     s.onload = function () { window.PuOcrKr ? res() : rej(new Error('no PuOcrKr')); };
     s.onerror = function () { krLoading = null; rej(new Error('load')); };
     document.head.appendChild(s);
