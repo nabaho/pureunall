@@ -17,6 +17,10 @@ rules_version = '2';
 //     ⚠ 만약 바깥 도메인 계정으로 쓰시는 분이 생기면 사진첩·급여데이터함이
 //       그날로 막힙니다. 그때는 그 계정을 @pureun.kr 로 옮기는 것이 맞습니다.
 //
+//  ▶ 2026-09-27 에 더한 것 — 문서관리 «원본 보관함» 자리(pu_docs/originals/…) 한 칸.
+//     계약서 양식·기업별 계약서에 올린 원본의 사본입니다. «지울 수 없습니다»(update·delete false).
+//     ★ 이 칸이 없으면 보관함만 못 담깁니다 — 계약서 양식 화면은 그대로 됩니다.
+//
 //  ▶ 2026-09-13 에 더한 것 — 서면함의 «원본 파일» 자리(erp_docs/…) 한 칸.
 //     직원이 한글로 쓴 서면(이유서·답변서·내용증명…)의 원본입니다.
 //
@@ -206,6 +210,21 @@ service firebase.storage {
                     && request.resource != null
                     && request.resource.size < 25 * 1024 * 1024;
       allow delete: if isStaff();
+    }
+
+    // ── 문서관리 원본 보관함 ── 2026-09-27 추가 (설계 2026-09-27-사무관리서류-개편-design.md §6)
+    //    창고 pureun-erp-hrphotos
+    //    ★ 읽기는 직원 전체 — 계약서는 법인 업무기록이다(서고와 같은 결).
+    //    ★★ «새로 쓰기만» — update·delete 를 false 로 못 박는다. 원본이 계속 보관되는 것이 목적이다.
+    //       write 를 쓰면 update·delete 까지 열리므로 create 만 쓴다.
+    //    ⚠ 종류 검사(okImage)를 걸지 않는다 — 한글은 브라우저가 종류를 안 알려 준다(서고와 같은 까닭).
+    //      종류는 앱이 올리기 전에 막는다(js/pu-office-store.js okDocFile).
+    match /pu_docs/originals/{fileId}/{file} {
+      allow read:   if isStaff();
+      allow create: if isStaff()
+                    && request.resource != null
+                    && request.resource.size < 25 * 1024 * 1024;
+      allow update, delete: if false;
     }
 
     // ── 경력관리 기관 양식 보관함 (2026-09-21 추가) · 창고 pureun-erp-hrphotos ──

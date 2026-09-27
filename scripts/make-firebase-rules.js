@@ -1150,4 +1150,56 @@ rules.login_devices   = { '.read': MGR };
 rules.login_countries = { '.read': MGR };
 rules.login_fail_burst= { '.read': MGR };
 
+/* ══ 사무관리서류 — 원본 보관함·기업별 계약서 (2026-09-27) ═════════════════
+   설계: docs/superpowers/specs/2026-09-27-사무관리서류-개편-design.md §4·§6
+   ★★ originals·hash 는 «새로 쓰기만» — 원본이 계속 보관되는 것이 대표 지시의 핵심이다.
+      지울 길이 규칙에 없어야 앱 버그·실수로도 못 지운다.
+   ★ 읽기는 재직 직원 전체 — 계약서는 법인 업무기록이다(서고 casebook 과 같은 결).
+   ⚠ co_docs 지우기는 «연결만» 끊는다. 파일은 originals 에 남는다. */
+rules.pu_docs = {
+  '.read': LOGIN,
+  originals: { $id: {
+    '.write': `(${LOGIN}) && !data.exists()`,
+    '.validate': "newData.hasChildren(['name','size','sha256','path','at','by'])",
+    name:   { '.validate': 'newData.isString() && newData.val().length <= 200' },
+    size:   { '.validate': 'newData.isNumber() && newData.val() > 0 && newData.val() < 26214400' },
+    type:   { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    sha256: { '.validate': 'newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)' },
+    path:   { '.validate': "newData.isString() && newData.val().beginsWith('pu_docs/originals/' + $id + '/')" },
+    at:     { '.validate': 'newData.isNumber()' },
+    by:     { '.validate': 'newData.val() === auth.uid' },
+    byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    from:   {
+      '.validate': "newData.hasChild('kind')",
+      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo'" },
+      $f:   { '.validate': 'newData.isString() && newData.val().length <= 200' }
+    },
+    $other: { '.validate': false }
+  } },
+  hash: { $h: {
+    '.write': `(${LOGIN}) && !data.exists()`,
+    '.validate': "$h.matches(/^[0-9a-f]{64}$/) && newData.isString() && root.child('pu_docs/originals').child(newData.val()).exists()"
+  } },
+  co: { $k: {
+    '.write': LOGIN,
+    '.validate': "newData.hasChildren(['name','n'])",
+    name:   { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    n:      { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    lastAt: { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  } },
+  co_docs: { $k: { $d: {
+    '.write': LOGIN,
+    '.validate': "newData.hasChildren(['fileId','title','src','at','by'])",
+    fileId: { '.validate': "newData.isString() && root.child('pu_docs/originals').child(newData.val()).exists()" },
+    title:  { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    date:   { '.validate': 'newData.isString() && newData.val().length <= 10' },
+    src:    { '.validate': "newData.val() === 'photo' || newData.val() === 'upload'" },
+    at:     { '.validate': 'newData.isNumber()' },
+    by:     { '.validate': 'newData.isString()' },
+    byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    $other: { '.validate': false }
+  } } }
+};
+
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

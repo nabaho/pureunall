@@ -145,7 +145,10 @@ const allowTop = ['systemAlerts','systemBackups','systemBackupsIndex','systemRes
   'kcareer_inbox',
   /* 2026-09-20 로그인 무단시도 감지 — 설계문서 docs/superpowers/specs/2026-09-20-login-security-monitoring-design.md.
      클라이언트 쓰기 없음(Admin SDK 전용), 읽기는 관리자·위임관리인만. */
-  'login_events','login_devices','login_countries','login_fail_burst'];
+  'login_events','login_devices','login_countries','login_fail_burst',
+  /* 2026-09-27 사무관리서류 개편 — 원본 보관함·기업별 계약서(설계 §4·§6).
+     읽기는 재직 직원 전체, originals·hash 는 새로 쓰기만(못 지운다). */
+  'pu_docs'];
 
 const keys = Object.keys(R);
 const removed = baseTop.filter(function (k) { return keys.indexOf(k) < 0; });
