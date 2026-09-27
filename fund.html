@@ -3337,10 +3337,10 @@ function renderForms(){
       +'<span onclick="event.stopPropagation()">'
       /* ★ 한글 틀이 있는 서식은 «틀에 채워 여는 것»이 첫째 길이다(2026-09-23) — 원본 한글과 같은 엔진이 그린다 */
       +(tk
-        ? ((S._hwpTplHas||{})[kind]
+        ? (_hwpTplHasFor(kind,cur)
             ? '<button class="primary" onclick="hwpOpenFilled(\''+kind+'\')" style="padding:4px 9px" title="원본 한글 틀에 이 기금 자료를 채워 한글 편집기로 엽니다">📄 한글로 채워 열기</button> '
-              +'<button onclick="hwpTplUpload(\''+kind+'\')" style="padding:4px 8px" title="한글 틀 바꾸기">틀 교체</button>'+hlp('forms.hwptpl')+' '
-            : '<button onclick="hwpTplUpload(\''+kind+'\')" style="padding:4px 9px">⬆ 한글 틀 올리기</button>'+hlp('forms.hwptpl')+' ')
+              +'<button onclick="hwpTplUpload(\''+_hwpTplKey(kind,cur)+'\')" style="padding:4px 8px" title="한글 틀 바꾸기">틀 교체</button>'+hlp('forms.hwptpl')+' '
+            : '<button onclick="hwpTplUpload(\''+_hwpTplKey(kind,cur)+'\')" style="padding:4px 9px">⬆ 한글 틀 올리기</button>'+hlp('forms.hwptpl')+' ')
         : '')
       +(reg?'<span class="chip ok" style="font-size:10px">HWP</span> <button'+(tk?'':' class="primary"')+' onclick="openHwpEditor(\''+kind+'\')" style="padding:4px 9px">📄 HWP 편집</button> <button onclick="pickHwp(\''+kind+'\')" style="padding:4px 8px">교체</button> <button onclick="clearHwp(\''+kind+'\')" style="padding:4px 8px">삭제</button>'
         :(tk?'':'<button onclick="pickHwp(\''+kind+'\')" style="padding:4px 9px">⬆ 원본 .hwp 등록</button>'))
@@ -3813,7 +3813,7 @@ function _aiDownload(){
      fund_erp/hwp_tpl/{서식} 에 둔다(로그인한 직원만 읽는다 — 기금 자료와 같은 규칙, 규칙 고칠 것 없음).
    ⚠ 목록 값(서명란 위원)은 번호를 붙인 표지다 — {{근로자위원1}}, {{근로자위원2}} …
    ⚠ 값은 HTML 서식이 쓰던 «같은 함수»에서 온다 — 한글 파일과 화면이 서로 다른 숫자를 말하면 안 된다. */
-var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', inka_annex:'공동', agreement:'공동', charter:'공동', contrib:'공동',
+var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', inka_annex:'공동', agreement:'공동', charter:'공동', charter_sane:'사내', contrib:'공동',
   reg_apply:'공동', reg_accept:'공동', reg_roster:'공동', reg_seal:'공동', reg_sealpaper:'공동', reg_sealcard:'공동',
   reg_proxy:'공동', reg_license:'공동', tax_bizreg:'공동', tax_sublease:'공동', tax_lease:'공동', tax_hometax:'공동',
   ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동',
@@ -3821,16 +3821,23 @@ var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', inka_annex
   sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
 var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues, inka_annex:_hwpInkaAnnexValues,
-  agreement:_hwpAgreementValues, charter:_hwpCharterValues, contrib:_hwpContribValues,
+  agreement:_hwpAgreementValues, charter:_hwpCharterValues, charter_sane:_hwpCharterSaneValues, contrib:_hwpContribValues,
   reg_apply:_hwpRegValues, reg_accept:_hwpRegValues, reg_roster:_hwpRegValues, reg_seal:_hwpRegValues,
   reg_sealpaper:_hwpRegValues, reg_sealcard:_hwpRegValues, reg_proxy:_hwpRegValues, reg_license:_hwpRegValues,
   tax_bizreg:_hwpTaxValues, tax_sublease:_hwpTaxValues, tax_lease:_hwpTaxValues, tax_hometax:_hwpTaxValues,
   ops_asset_change:_hwpOpsValues, ops_minutes_scope:_hwpOpsValues, ops_minutes_use:_hwpOpsValues,
   sub_required:_hwpSubValues, subsidy:_hwpSubValues, sub_welfare_plan:_hwpSubValues, sub_assets:_hwpSubValues,
   sub_payment:_hwpSubValues, sub_checklist:_hwpSubValues, sub_contrib:_hwpSubValues, sub_oath:_hwpSubValues};
-/* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다(사내는 HTML 로 둔다) */
+/* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다 */
 var HWP_TPL_STRICT={charter:1};
-function _hwpTplFits(kind,f){ return !HWP_TPL_STRICT[kind] || ((f&&f.fund_type==='사내')?'사내':'공동')===HWP_TPL_KINDS[kind]; }
+/* ★ 2026-09-27 사내 정관도 원본 한글 틀로 — 서식 이름(charter)은 하나, 틀만 기금 유형으로 고른다.
+   사내 기금이면 charter_sane(사내 표준 정관 원본, HTML 사내 정관과 같은 출처)을 쓴다. 틀 보관·있나 확인·채우기가 모두 이 열쇠로 */
+function _hwpTplKey(kind,f){ return _dkKeyOf(kind,f); }   // 판갈이 규칙은 한 곳(_dkKeyOf)만
+function _hwpTplHasFor(kind,f){ return !!(S._hwpTplHas||{})[_hwpTplKey(kind,f)]; }
+function _hwpTplFits(kind,f){
+  var k=_hwpTplKey(kind,f); if(k!==kind) return !!HWP_TPL_KINDS[k];
+  return !HWP_TPL_STRICT[kind] || ((f&&f.fund_type==='사내')?'사내':'공동')===HWP_TPL_KINDS[kind];
+}
 function _hwpTplRef(kind){ return fbDb.ref(NS+'/hwp_tpl/'+kind); }
 function _hwpTplIdxRef(){ return fbDb.ref(NS+'/hwp_tpl_index'); }     // 틀이 «있는지»만 — 틀 30개를 다 받지 않게
 function _hwpDocRef(fid,kind){ return fbDb.ref(NS+'/hwp_docs/'+fid+'/'+kind); }
@@ -4035,6 +4042,30 @@ function _hwpCharterValues(f,sites){
   return {기금명:String(f.name||''), 기금소재지:String(f.address||''), 참여회사:partyJoin(partyNames(sites)),
     인가일:ink||'      년    월    일',                       // 인가 전에는 원본처럼 빈 날짜 줄
     정관일:_hwpKoDate(f.meeting_date,['     ','    ']), 서명:_hwpSignRows(sites)};
+}
+/* 사내 정관(charter_sane 틀) — HTML fillCharterHead·fillSignGrid 와 같은 값.
+   서명 격자 첫 줄은 서식이 부르는 사람(근로자대표·대표이사), 다음 줄부터 나머지 위원을 짝지어 한 줄씩.
+   ⚠ 한쪽만 아는 줄은 반대쪽을 밑줄로 — 이름은 지어내지 않는다. 남는 사람이 없으면 줄을 모두 지운다(0). */
+function _hwpCharterSaneValues(f,sites){
+  f=f||{}; sites=sites||[];
+  var s0=estabSites(sites)[0]||{};
+  var hl=_siteWrep(s0).name, hr=String(s0.ceo||'').trim()||_siteUrep(s0).name;
+  var rest=function(side,skip){
+    return _prepCommittee(f,side,sites).filter(function(o){ return String(o.name||'').trim()!==skip; });
+  };
+  var L=rest('근로자측',hl), R=rest('사용자측',hr);
+  if(!hl&&L.length){ hl=L[0].name; L=L.slice(1); }
+  if(!hr&&R.length){ hr=R[0].name; R=R.slice(1); }
+  var n=Math.max(L.length,R.length), rows=[];
+  for(var i=0;i<n;i++){
+    var a=L[i], b=R[i];
+    rows.push({근직책:(a&&String(a.title||'').trim())||'＿＿＿', 근이름:(a&&String(a.name||'').trim())||GRID_BLANK,
+      사직책:(b&&String(b.title||'').trim())||'＿＿＿', 사이름:(b&&String(b.name||'').trim())||GRID_BLANK});
+  }
+  var ink=_hwpKoDate(f.inka_date,['    ','    ']);
+  return {기금명:String(f.name||''), 기금소재지:String(f.address||''), 참여회사:partyJoin(partyNames(sites)),
+    인가일:ink||'      년    월    일', 정관일:_hwpKoDate(f.meeting_date)||'년      월    일',
+    근대표:String(hl||'').trim()||GRID_BLANK, 대표이사:String(hr||'').trim()||GRID_BLANK, 서명:rows.length?rows:0};
 }
 function _hwpContribValues(f,sites){
   f=f||{}; sites=sites||[];
@@ -4304,10 +4335,11 @@ function _hwpValuesFor(kind,f,sites){
 }
 /* 틀 채우기 — 결과는 HWPX 바이트(한글이 바로 연다). 채운 문단만 줄을 새로 나눈다 */
 function hwpTplFill(kind,f,sites){
-  return _hwpTplRef(kind).once('value').then(function(sn){
+  var key=_hwpTplKey(kind,f);                          // 사내 기금의 정관 → charter_sane 틀
+  return _hwpTplRef(key).once('value').then(function(sn){
     var t=sn.val();
     if(!t||!t.b64) throw new Error('이 서식의 한글 틀이 아직 없습니다 — [⬆ 한글 틀 올리기]로 먼저 올려 주세요');
-    var V=_hwpValuesFor(kind,f,sites), from=t.type||HWP_TPL_KINDS[kind]||'공동', to=(f&&f.fund_type==='사내')?'사내':'공동';
+    var V=_hwpValuesFor(key,f,sites), from=t.type||HWP_TPL_KINDS[key]||'공동', to=(f&&f.fund_type==='사내')?'사내':'공동';
     return _hwpTplBytes(t).then(function(hx){
       return _hwpxEach(hx,function(x){ return _hwpFillXml(x,V,from,to,kind); });
     }).then(function(res){
@@ -4367,7 +4399,7 @@ function hwpTplUpload(kind){
         if(!total){ toast('표지({{기금명}} 같은 자리)가 하나도 없는 파일입니다 — 틀로 쓸 수 없습니다','err'); return; }
         var known=_hwpValuesFor(kind,{},[]);
         var u=names.filter(function(k){ return known[k]===undefined&&known[_hwpTplBase(k)]===undefined; });
-        return confirmM('「'+docLabel(kind)+'」 한글 틀로 올립니다.\n\n· 표지 '+total+'곳 ('+names.length+'가지)'
+        return confirmM('「'+(kind==='charter_sane'?docLabel('charter')+'(사내)':docLabel(kind))+'」 한글 틀로 올립니다.\n\n· 표지 '+total+'곳 ('+names.length+'가지)'
             +(u.length?'\n· ⚠ 이 앱이 모르는 이름 '+u.length+'가지(채우지 않고 그대로 둡니다): '+u.join(', '):'\n· 이름을 모두 알아봤습니다')
             +'\n\n⚠ 틀에 남의 기금 자료(이름·날짜·주소)가 남아 있지 않은지 한글에서 먼저 확인하셨나요?',{ok:'틀 올리기'})
           .then(function(ok){ if(!ok) return;
@@ -7967,7 +7999,7 @@ function resetDoc(kind){ var c=_docCtx(kind);
    [HTML 로 보기]는 예전 화면으로 잠깐 돌아가는 길(틀이 아직 없는 서식과 같은 화면)이다. */
 function hwpSidePreview(kind){
   var side=$('formSide'), f=curForm();
-  if(!side||!f||f._sample||!HWP_TPL_KINDS[kind]||!(S._hwpTplHas||{})[kind]||S._sideHtml===kind||!_hwpTplFits(kind,f)) return false;
+  if(!side||!f||f._sample||!HWP_TPL_KINDS[kind]||!_hwpTplHasFor(kind,f)||S._sideHtml===kind||!_hwpTplFits(kind,f)) return false;
   var fid=S.formFund, label=docLabel(kind);
   S._sideKind=kind; S._hwpSideBytes=null;
   side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)
@@ -8025,7 +8057,7 @@ function sidePreview(kind){
   var f=curForm();
   S._sideKind=kind; S._docKind=kind; var label=docLabel(kind);
   var ftype=(f.fund_type==='사내')?'사내':'공동', smp=!!f._sample;
-  var backHwp=(HWP_TPL_KINDS[kind]&&(S._hwpTplHas||{})[kind]&&!smp)
+  var backHwp=(HWP_TPL_KINDS[kind]&&_hwpTplHasFor(kind,f)&&_hwpTplFits(kind,f)&&!smp)
     ? '<button class="primary" onclick="S._sideHtml=null;sidePreview(\''+kind+'\')" style="padding:3px 8px" title="원본 한글 모양으로 돌아가기">📄 원본 한글로 보기</button> ' : '';
   side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)+' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'+backHwp
     +'<button onclick="printDoc()" style="padding:3px 8px" title="인쇄/PDF">🖨</button> <button onclick="docToHwpx(\''+kind+'\')" style="padding:3px 8px" title="한글(HWPX)로 저장">📄</button> <button onclick="resetDoc(\''+kind+'\')" style="padding:3px 8px" title="저장본 삭제(개별→공통→자동생성 순으로 되돌림)">↺</button> '
@@ -8201,7 +8233,7 @@ function sidePreviewAll(){ estabBundle('kinds'); }
 function _bundleHwpPlan(ph,f){
   var has=S._hwpTplHas||{}, use=[], skip=[];
   docsFor(ph[2](),(f&&f.fund_type)||'공동').forEach(function(d,i){
-    if(HWP_TPL_KINDS[d[0]]&&has[d[0]]&&_hwpTplFits(d[0],f)) use.push({i:i,d:d}); else skip.push((i+1)+'. '+d[1]);
+    if(HWP_TPL_KINDS[d[0]]&&has[_hwpTplKey(d[0],f)]&&_hwpTplFits(d[0],f)) use.push({i:i,d:d}); else skip.push((i+1)+'. '+d[1]);
   });
   return {use:use, skip:skip};
 }
