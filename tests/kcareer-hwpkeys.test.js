@@ -72,12 +72,13 @@ test('★ 편집기가 나중에 그 글쇠를 쓰기 시작하면 «스스로 �
   p.skip.forEach((s) => assert.match(s.why, /이미/, '까닭이 비었습니다'));
 });
 
-test('지금 편집기에는 열 개가 다 붙는다 — 실측과 같아야 한다', () => {
+test('지금 편집기에는 열한 개가 다 붙는다 — 실측과 같아야 한다', () => {
   const p = K.plan(편집기가쓰는것);
-  assert.equal(p.bind.length, 10, '붙는 개수가 달라졌습니다: ' + JSON.stringify(p.bind.map(b => b.key)));
+  assert.equal(p.bind.length, 11, '붙는 개수가 달라졌습니다: ' + JSON.stringify(p.bind.map(b => b.key)));
   assert.equal(p.skip.length, 0);
   assert.deepEqual(p.bind.map((b) => b.key).sort(),
-    ['Alt+O', 'Alt+P', 'Alt+S', 'Alt+V', 'Ctrl+F10', 'Ctrl+H', 'Ctrl+J', 'Ctrl+N,T', 'F2', 'F9'].sort());
+    ['Alt+O', 'Alt+P', 'Alt+S', 'Alt+V', 'Ctrl+F10', 'Ctrl+H', 'Ctrl+J', 'Ctrl+N,T',
+     'F2', 'F9', 'HanjaKey'].sort());
 });
 
 /* ══════ ①-2 Alt+V — 한글의 «다른 이름으로 저장»과 편집기의 «투명 선»을 둘 다 살린다 ══════ */
@@ -110,6 +111,46 @@ test('★★ 이어받는 것은 «앞 타 겹침»으로 막지 않는다 — �
   const v = p.bind.filter((b) => b.key === 'Alt+V')[0];
   assert.ok(v, '★ Alt+V 가 겹침으로 걸러졌습니다 — 이어받기를 아는데도 막았습니다');
   assert.ok(v.after && v.after.T, '★ 이어지는 T 를 어떻게 할지 안 들고 있습니다');
+});
+
+/* ══════ ①-2-2 윈도 「한자」 글쇠 ══════ */
+test('★★★ 윈도 «한자» 글쇠도 한자 고르개로 간다 — IME 가 안 받아 줘도 한자가 된다', () => {
+  const p = K.plan(편집기가쓰는것);
+  const h = p.bind.filter((b) => b.key === 'HanjaKey')[0];
+  assert.ok(h, '★ 한자 글쇠를 안 받습니다 — IME 가 안 받아 주면 길이 없습니다');
+  assert.equal(h.cmd, '@hanja');
+  /* 브라우저·자판마다 이름이 다르다 — 넷을 다 알아봐야 한다 */
+  [{ code: 'Lang2' }, { code: 'NonConvert' }, { key: 'HanjaMode' }, { key: 'Hanja' }]
+    .forEach((o) => {
+      assert.ok(K.isHanjaKey(ev(o)), '★ 한자 글쇠를 못 알아봅니다: ' + JSON.stringify(o));
+      assert.equal(K.fromEvent(ev(o)), 'HanjaKey', '★ 한 이름으로 안 모읍니다: ' + JSON.stringify(o));
+    });
+});
+
+test('★★★ 「한/영」 글쇠는 «절대» 건드리지 않는다 — 건드리면 한글 전환이 깨진다', () => {
+  [{ code: 'Lang1', key: 'HangulMode' }, { key: 'HangulMode' }, { code: 'Lang1' }]
+    .forEach((o) => {
+      assert.equal(K.isHanjaKey(ev(o)), false, '★ 한/영을 한자로 봅니다: ' + JSON.stringify(o));
+    });
+  const m = K.makeMatcher(K.plan(편집기가쓰는것).bind);
+  assert.equal(m(ev({ code: 'Lang1', key: 'HangulMode' }), 0), null,
+    '★ 한/영 글쇠를 가로챕니다 — 한글로 못 바꿉니다');
+});
+
+test('★★★ 조합 중에는 «언제나» IME 가 먼저 — 한자 글쇠라도 비켜 준다', () => {
+  const f = CODE.slice(CODE.indexOf('async function rhEdHwpKeys('),
+                       CODE.indexOf('async function rhEdHwpKeys(') + 2400);
+  assert.match(f, /if\(ev\.isComposing\) return;/,
+    '★ 조합 중에 안 비킵니다 — 한글 입력이 깨집니다');
+  /* 한자 글쇠는 229 빗장에서 빼야 «안 받아 준 때» 우리가 대신 뜬다 */
+  assert.match(f, /if\(!한자키 && ev\.keyCode===229\) return;/,
+    '★ 한자 글쇠가 229 로 오면 우리 고르개도 안 뜹니다 — 길이 통째로 막힙니다');
+  /* ⚠ 빗장 «모양»만 보면 한자키를 늘 false 로 두어도 통과한다(고장넣기가 잡았다) —
+     정말 그 글쇠인지 «물어서» 정하는지 짚는다. */
+  assert.match(f, /var 한자키=!!\([^)]*KcareerHwpKeys\.isHanjaKey\(ev\)\);/,
+    '★ 한자 글쇠인지 «묻지» 않습니다 — 늘 아니라고 보면 229 빗장에 그대로 막힙니다');
+  const i = f.indexOf('isComposing'), j = f.indexOf('keyCode===229');
+  assert.ok(i > 0 && j > i, '★ 조합 검사가 뒤에 있습니다 — 차례가 틀렸습니다');
 });
 
 /* ══════ ①-3 F9 한자 ══════ */
@@ -293,7 +334,11 @@ test('★★ 편집기 «안»에 귀를 붙인다 — 밖에서는 글쇠가 �
   const f = CODE.slice(CODE.indexOf('async function rhEdHwpKeys('),
                        CODE.indexOf('async function rhEdHwpKeys(') + 2000);
   assert.match(f, /contentDocument/, '★ 틀 안쪽 문서에 안 붙입니다 — 아무 글쇠도 못 받습니다');
-  assert.match(f, /addEventListener\('keydown'[\s\S]{0,400}true\s*\)/,
+  /* ⚠ 창을 «함수 끝»까지 잡는다 — 400자로 못박았더니 주석이 늘자 헛되이 빨개졌다.
+     「앞 N자」 창을 만들지 말라는 규칙(2026-09-12)과 같은 까닭이다. */
+  const 듣는줄 = f.slice(f.indexOf("addEventListener('keydown'"));
+  assert.ok(듣는줄.indexOf("addEventListener('keydown'") === 0, '듣는 줄을 못 찾았습니다');
+  assert.match(듣는줄.slice(0, 듣는줄.indexOf('return 짠것;')), /\}\s*,\s*true\s*\)/,
     '★ 먼저 듣지(capture) 않습니다 — 편집기가 먼저 먹어 버립니다');
 });
 

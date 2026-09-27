@@ -41,6 +41,9 @@
     /* ★ 한자로 바꾸기 — 편집기에 «명령이 없어» 우리가 한다(@ 로 시작하면 우리 몫).
        ⚠ 윈도 「한자」 글쇠는 그대로 산다 — 이것은 «그 밖의» 길이다. */
     { key: 'F9',       cmd: '@hanja',             label: '한자로 바꾸기' },
+    /* ★ 윈도 «한자» 글쇠 — IME 가 받아 주면 IME 가 이기고(조합 중에는 우리가 비킨다),
+       안 받아 주면 우리 고르개가 대신 뜬다. 어느 쪽이든 한자가 된다. */
+    { key: 'HanjaKey', cmd: '@hanja',             label: '한자로 바꾸기(한자 글쇠)' },
     /* ★ Alt+V — 한글은 「다른 이름으로 저장」인데 편집기는 Alt+V,T(투명 선)를 쓴다.
        ⚠★ 둘 다 살린다: 혼자 누르면 저장, 이어 T 를 누르면 투명 선을 «우리가» 부른다.
          한쪽을 버리면 「한글과 같게」와 「편집기 기능 지키기」 중 하나가 깨진다. */
@@ -104,8 +107,16 @@
     return p.join('+');
   }
 
+  /* 윈도 «한자» 글쇠 — 브라우저·자판마다 이름이 다르다. 한 이름으로 모은다.
+     ⚠ 「한/영」(Lang1·HangulMode)은 «아니다» — 그것까지 잡으면 한글 전환이 깨진다. */
+  function isHanjaKey(ev) {
+    if (!ev) return false;
+    var c = ev.code ? String(ev.code) : '', k = ev.key ? String(ev.key) : '';
+    return c === 'Lang2' || c === 'NonConvert' || k === 'HanjaMode' || k === 'Hanja';
+  }
   /* 눌린 글쇠를 같은 꼴로. ⚠ `code` 를 먼저 본다 — 한글 입력 중 `key` 는 자모로 온다. */
   function 글쇠(ev) {
+    if (isHanjaKey(ev)) return 'HanjaKey';
     var c = ev && ev.code ? String(ev.code) : '';
     if (/^Key[A-Z]$/.test(c)) return c.slice(3);
     if (/^Digit[0-9]$/.test(c)) return c.slice(5);
@@ -202,7 +213,7 @@
   }
 
   return {
-    LIST: LIST, MISSING: MISSING,
+    LIST: LIST, MISSING: MISSING, isHanjaKey: isHanjaKey,
     canon: canon, fromEvent: fromEvent, plan: plan, makeMatcher: makeMatcher
   };
 }));
