@@ -118,7 +118,8 @@
     return out + t.slice(pos);
   }
   function applyEdits(xml, edits) {
-    edits.sort(function (x, y) { return y.s - x.s; });
+    /* 같은 자리면 «넓은 것» 먼저 — 문단 끝 붙이기(길이 0)가 바로 뒤 줄 정보 걷기와 자리가 같다 */
+    edits.sort(function (x, y) { return (y.s - x.s) || (y.e - x.e); });
     var out = xml, lastS = Infinity;
     edits.forEach(function (d) {
       if (d.e > lastS) return;                            // 겹치면 뒤엣것을 버린다(안전)
@@ -197,6 +198,20 @@
             var ins = leaf ? emptyInsert(xml, p, r.set) : null;
             if (ins) { edits.push(ins); touched = r.set; hits[ri]++; }
           }
+          return;
+        }
+        /* tail — 문단 «끝에» 새 조각을 붙인다. 글자 모양은 like 번째 조각의 것.
+           공식 서식은 「① 성명(대표자)」처럼 이름표 안에 작은 글씨 조각이 끼어 있고 값은 그 뒤에 이어 적는다 —
+           찾아 바꾸기로 붙이면 값이 작은 글씨가 되거나, 이름표 전체가 한 모양으로 뭉개진다(2026-09-27 홈택스 신청서) */
+        if (r.tail != null) {
+          if (!r.at || !p.segs.length || xml.slice(p.start + 1, p.end).indexOf('<hp:p') >= 0) return;
+          var sg = p.segs[Math.min(Math.max(r.like || 0, 0), p.segs.length - 1)];
+          var ro = xml.lastIndexOf('<hp:run', sg.s), cp = /charPrIDRef="(\d+)"/.exec(xml.slice(ro, sg.s));
+          var endRun = xml.lastIndexOf('</hp:run>', p.lsS >= 0 ? p.lsS : p.end);
+          if (ro < p.start || !cp || endRun < p.start) return;
+          var at = endRun + '</hp:run>'.length;
+          edits.push({ s: at, e: at, raw: '<hp:run charPrIDRef="' + cp[1] + '"><hp:t>' + enc(r.tail) + '</hp:t></hp:run>' });
+          touched = touched || (p.text + r.tail); hits[ri]++;
           return;
         }
         if (!r.find) return;
