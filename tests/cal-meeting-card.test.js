@@ -113,3 +113,44 @@ test('⑤ 밤 11시 일정은 끝이 다음 날로 넘어간다', async () => {
   const { 몸 } = await 만들어본다({ date: '2026-10-05', time: '23:30', summary: '야간 회의' });
   assert.equal(몸.end.dateTime, '2026-10-06T00:30:00');
 });
+
+/* ── 2026-09-27 대표 보고 「시각은 시작과 끝이 있어야한다 · 기업정보함이 한글로 안읽힌다」 ── */
+function 범위(a, b) {
+  const x = { console, String, parseInt };
+  vm.createContext(x);
+  vm.runInContext(함수몸(캘린더, 'function 시각범위(시작, 끝){'), x);
+  x.__a = [a, b];
+  return JSON.parse(JSON.stringify(vm.runInContext('시각범위(__a[0], __a[1])', x)));
+}
+
+test('⑥ 시각은 «시작 ~ 끝» — 끝을 비우면 한 시간 뒤, 끝이 이르면 막고, 끝만은 안 된다', () => {
+  assert.deepStrictEqual(범위('10:00', '11:30'), { start: '10:00', end: '11:30' });
+  assert.deepStrictEqual(범위('10:00', ''), { start: '10:00', end: '11:00' });
+  assert.deepStrictEqual(범위('', ''), { start: '', end: '' }, '시각 없음은 종일이어야 합니다');
+  assert.ok(범위('11:00', '10:00').err, '끝이 시작보다 이른데 막지 않습니다');
+  assert.ok(범위('', '11:00').err, '끝만 적었는데 막지 않습니다');
+  assert.equal(범위('23:30', '').end, '23:59', '밤 11시 넘어 시작하면 그날 안에서 끝내야 합니다');
+  const 창 = 함수몸(캘린더, 'function modalHtml(){');
+  assert.match(창, /data-m=\\"endTime\\"/, '끝 시각 칸이 없습니다');
+});
+
+test('⑥ 구글에도 «끝 시각»을 그대로 보낸다', async () => {
+  const { 몸 } = await 만들어본다({ date: '2026-10-05', time: '10:00', endTime: '12:30', summary: '가나상사 미팅' });
+  assert.equal(몸.end.dateTime, '2026-10-05T12:30:00');
+});
+
+test('⑦★ 명함 찾기 칸은 칠 때 «창 전체를 다시 그리지 않는다» — 한글 조합이 끊긴다', () => {
+  const { stripJs } = require('./strip-comments');
+  const i = 캘린더.indexOf("e.target.id !== 'cardq'");
+  assert.ok(i >= 0, '명함 찾기 입력 손잡이가 없습니다');
+  const 손잡이 = stripJs(캘린더.slice(i, 캘린더.indexOf('});', i)));
+  assert.strictEqual(/\brender\(\)/.test(손잡이), false, '칠 때마다 창을 통째로 다시 그립니다 — 한글이 안 쳐집니다');
+  assert.match(손잡이, /명함목록고침\(\)/, '목록만 갈아 끼우지 않습니다');
+});
+
+test('⑦ 일정 검색 칸은 한글 조합 중에는 다시 그리지 않고, 조합이 끝나면 찾는다', () => {
+  const i = 캘린더.indexOf("e.target.id !== 'calq') return;");
+  assert.ok(i >= 0);
+  assert.match(캘린더.slice(i, i + 400), /if\(e\.isComposing\) return;/, '조합 중에도 다시 그립니다');
+  assert.match(캘린더, /addEventListener\('compositionend'[\s\S]{0,120}calq/, '조합이 끝났을 때 찾지 않습니다');
+});

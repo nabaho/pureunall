@@ -24,7 +24,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=6"></script>
+<script src="js/pu-gcal-auth.js?v=7"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=1"></script>
@@ -351,6 +351,9 @@
   .crow b{flex-shrink:0}
   .crow .cm{color:var(--sub);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .cmsg{padding:9px 10px;font-size:12px;color:var(--sub)}
+  .trange{display:flex;align-items:center;gap:6px}
+  .trange input{flex:1;min-width:0}
+  .trange span{color:var(--sub)}
   .fld .from{display:inline-block;font-size:10.5px;background:#f0fdf4;color:#166534;border-radius:5px;padding:0 5px;margin-left:4px}
   .fld input,.fld select{width:100%;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;
     font-size:13px;font-family:inherit;background:var(--panel);color:var(--ink)}
@@ -519,6 +522,7 @@
   <span class="brand"><svg viewBox="0 0 100 100" style="width:22px;height:22px;vertical-align:-5px;margin-right:1px"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg> <span class="bt">푸른 캘린더</span></span>
   <span id="tabs"></span>
   <button class="themebtn" id="themeToggle" title="화면 밝기 — 자동·밝게·어둡게">🌗 자동</button>
+  <button class="themebtn" id="rotToggle" title="화면 회전 — 자동 회전·세로 고정">🔄 자동 회전</button>
   <span id="appslot"></span>
   <span class="avawrap">
     <button id="me" data-avatar="1" title="내 계정">·</button>
@@ -619,6 +623,48 @@ function themeApply(){
       + " — 누르면 " + 테마글[다음];
   }
 }
+/* ★ 화면 회전 — «자동 회전 · 세로 고정» 고르기 (대표 지시 2026-09-27 「자동회전」).
+     바탕화면에 깐 캘린더는 예전에 세로로 못 박혀 있었다(pu-cal-manifest.json orientation).
+     이제 기본은 «자동 회전» — 폰을 돌리면 따라 돈다(폰의 자동 회전 설정을 그대로 따른다).
+   ⚠ «세로 고정»은 폰 브라우저가 허락할 때만 된다(바탕화면에 깐 앱·전체 화면일 때).
+     안 되면 그렇다고 말한다 — 된 척하지 않는다. 그때는 폰의 자동 회전 설정을 끄면 된다.
+   ⚠ 고른 것은 이 기기에만 기억한다(pu_cal_rotate). */
+function rotApply(조용히){
+  var so = (typeof screen !== "undefined") ? screen.orientation : null;
+  var b = $("rotToggle");
+  if(b){
+    b.textContent = S.rotate === "portrait" ? "📱 세로 고정" : "🔄 자동 회전";
+    b.title = "화면 회전: " + b.textContent + " — 누르면 " + (S.rotate === "portrait" ? "🔄 자동 회전" : "📱 세로 고정");
+  }
+  if(!so) return;
+  if(S.rotate === "portrait"){
+    if(!so.lock) return 조용히 ? null : toast("이 브라우저는 화면 고정을 못 합니다 — 폰의 «자동 회전» 설정을 꺼 주십시오");
+    Promise.resolve().then(function(){ return so.lock("portrait"); })["catch"](function(){
+      if(!조용히) toast("이 화면에서는 고정이 안 됩니다(바탕화면에 깐 앱에서만 됩니다) — 폰의 «자동 회전» 설정을 꺼 주십시오");
+    });
+  } else {
+    try{ if(so.unlock) so.unlock(); }catch(e){}
+  }
+}
+function rotInit(){
+  var v = null;
+  try{ v = localStorage.getItem("pu_cal_rotate"); }catch(e){}
+  S.rotate = v === "portrait" ? "portrait" : "auto";
+  rotApply(true);
+}
+function rotToggle(){
+  S.rotate = S.rotate === "portrait" ? "auto" : "portrait";
+  try{ localStorage.setItem("pu_cal_rotate", S.rotate); }catch(e){}
+  if(S.rotate === "auto") toast("화면: 🔄 자동 회전 — 폰을 돌리면 따라 돕니다");
+  rotApply(false);
+  if(S.rotate === "portrait" && typeof screen !== "undefined" && screen.orientation && screen.orientation.lock)
+    toast("화면: 📱 세로 고정");
+}
+/* 폰을 돌리면 칸 수·폰 꼴이 바뀐다 — 다시 잰다 */
+try{
+  window.addEventListener("orientationchange", function(){ _칸용량 = 0; _첫줄용량 = 0; setTimeout(render, 250); });
+}catch(e){}
+
 /* 누를 때마다 자동 → 밝게 → 어둡게 → 자동 */
 function themeToggle(){
   S.themeMode = 테마차례[(테마차례.indexOf(S.themeMode) + 1) % 테마차례.length];
@@ -1331,7 +1377,8 @@ function eventsOn(ymd, eumOnly){
       time: (hm && hm !== "00:00") ? hm : "",
       color: colorOf(s.sid) || "#64748b",
       /* 미팅이면 장소·담당자도 말풍선에 (기업정보함에서 불러온 것) */
-      tip: (s.title || "일정") + (s.note ? " · " + s.note : "")
+      tip: (s.title || "일정") + (hm ? " · " + hm + (s.endTime ? "~" + String(s.endTime).slice(0,5) : "") : "")
+           + (s.note ? " · " + s.note : "")
            + (s.place ? "\n📍 " + s.place : "") + (s.contact ? "\n👤 " + s.contact : "") });
   });
   /* ② 근태 — 이알피와 같은 글자·같은 색 */
@@ -1739,7 +1786,10 @@ function 용량재기(){
    ⚠ 폰인지는 여기 한 곳에서만 가른다. typeof 로 본다 — 검사가 함수만 떼어 상자에서 돌 때
      window.matchMedia 가 없다(그때는 넓은 화면으로 친다). */
 function 폰(){
-  try{ return typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(max-width:700px)").matches; }
+  /* 가로로 눕힌 폰(높이 500 이하 + 손가락 화면)도 폰 꼴 — 자동 회전(2026-09-27)으로 옆으로 돌리면
+     넓은 화면 머리줄이 들어가 칸이 두세 줄로 줄어든다 */
+  try{ return typeof window !== "undefined" && !!window.matchMedia
+    && window.matchMedia("(max-width:700px), (max-height:500px) and (pointer:coarse)").matches; }
   catch(e){ return false; }
 }
 function 폰머리Html(){
@@ -2329,7 +2379,7 @@ function openEdit(store, id){
   if(!r){ toast("그 건을 못 찾았습니다 — 새로 받아 오는 중일 수 있습니다"); return; }
   S.modal = { mode:"edit", store:store, id:id, kind:(store==="my_schedules"?"sch":"att"),
     date:r.date||"", sid:r.sid||"", type:r.type||"leave", title:r.title||"", note:r.note||"",
-    time:String(r.time||"").slice(0,5), place:r.place||"", contact:r.contact||"",
+    time:String(r.time||"").slice(0,5), endTime:String(r.endTime||"").slice(0,5), place:r.place||"", contact:r.contact||"",
     hours:r.hours||1, prev:r };
   if(옛방식표(store)) S.modal.err = 옛방식안내(store);
   render();
@@ -2362,7 +2412,12 @@ function modalHtml(){
         + users().map(function(u){ return "<option value=\""+esc(u.sid)+"\""+(u.sid===m.sid?" selected":"")+">"
             + esc(u.name||u.sid)+"</option>"; }).join("") + "</select></div>"
     + (일정
-        ? "<div class=\"fld\"><label>시각</label><input type=\"time\" data-m=\"time\" value=\""+esc(m.time||"")+"\"></div>"
+        /* 시각은 «시작 ~ 끝» (대표 지시 2026-09-27 「시각은 시작과 끝이 있어야한다」) */
+        ? "<div class=\"fld\"><label>시각 (시작 ~ 끝)</label><div class=\"trange\">"
+            + "<input type=\"time\" data-m=\"time\" value=\""+esc(m.time||"")+"\" title=\"시작\">"
+            + "<span>~</span>"
+            + "<input type=\"time\" data-m=\"endTime\" value=\""+esc(m.endTime||"")+"\" title=\"끝 — 비우면 한 시간 뒤\">"
+          + "</div></div>"
           + "<div class=\"fld\"><label>무슨 일" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"title\" value=\""+esc(m.title)+"\" placeholder=\"가나상사 컨설팅 2차\"></div>"
           + "<div class=\"fld\"><label>장소" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"place\" value=\""+esc(m.place||"")+"\" placeholder=\"안 적어도 됩니다\"></div>"
           + "<div class=\"fld\"><label>담당자" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"contact\" value=\""+esc(m.contact||"")+"\" placeholder=\"안 적어도 됩니다\"></div>"
@@ -2398,9 +2453,9 @@ function 명함받기(){
       var x = v[k] || {};
       return { k:k, c:x.c||"", n:x.n||"", ti:x.ti||"", m:x.m||"", t:x.t||"", ct:x.ct||"", ad:x.ad||"" };
     }).filter(function(x){ return x.c || x.n; });
-    명함.loading = false; render(); 명함칸다시잡기();
+    명함.loading = false; 명함목록고침();
   })["catch"](function(e){
-    명함.loading = false; 명함.err = (e && e.message) || String(e); render(); 명함칸다시잡기();
+    명함.loading = false; 명함.err = (e && e.message) || String(e); 명함목록고침();
   });
 }
 /* 회사·이름·전화 어디에 걸려도 — 회사 이름이 앞에서 맞는 것을 먼저 */
@@ -2425,11 +2480,18 @@ function 명함칸Html(m){
       + '<button class="cx" data-cardclear="1" title="불러온 것을 뺍니다">✕ 빼기</button></div>';
   }
   var q = m.cq || "";
-  var 결과 = 명함찾기(q);
   return '<div class="cpull"><span>🏢</span>'
     + '<input id="cardq" class="cq" value="' + esc(q) + '" placeholder="기업정보함에서 불러오기 — 회사·담당자 이름" autocomplete="off">'
     + '</div>'
-    + (q ? '<div class="cres">'
+    + '<div id="cardres">' + 명함결과Html(q) + '</div>';
+}
+/* 찾은 명함 목록 — 칠 때마다 «이 칸만» 새로 그린다.
+   ★ 창 전체를 다시 그리면 한글이 안 쳐진다(대표 보고 2026-09-27 「한글로 안읽힌다」) —
+     「ㄱ+ㅏ→가」로 조합하는 도중에 입력칸이 새것으로 바뀌어 조합이 끊긴다. 그래서 입력칸은
+     그대로 두고 아래 목록만 갈아 끼운다. */
+function 명함결과Html(q){
+  var 결과 = 명함찾기(q);
+  return (q ? '<div class="cres">'
         + (명함.loading ? '<div class="cmsg">명함을 불러오는 중…</div>'
           : 명함.err ? '<div class="cmsg">기업정보함을 못 읽었습니다 — ' + esc(명함.err) + '</div>'
           : !결과.length ? '<div class="cmsg">맞는 명함이 없습니다</div>'
@@ -2458,10 +2520,27 @@ function 명함고르기(k){
   }
   render();
 }
-/* 다시 그린 뒤 찾기 칸에 커서를 돌려 준다 — 안 그러면 한 글자마다 칸이 튄다 */
-function 명함칸다시잡기(){
-  var el = document.getElementById("cardq");
-  if(el && S.modal && S.modal.cq){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} }
+/* 시작 ~ 끝 맞추기 — { start, end, err }. 시각이 없으면 종일(둘 다 비움). */
+function 시각범위(시작, 끝){
+  시작 = String(시작 || "").slice(0,5); 끝 = String(끝 || "").slice(0,5);
+  var 꼴 = /^\d{2}:\d{2}$/;
+  if(!시작 && !끝) return { start:"", end:"" };
+  if(!꼴.test(시작)) return { err:"시작 시각을 적어 주세요(끝만 적을 수는 없습니다)" };
+  if(!끝){
+    var h = (parseInt(시작.slice(0,2), 10) + 1) % 24;
+    끝 = (h < 10 ? "0" : "") + h + ":" + 시작.slice(3,5);
+    if(끝 < 시작) 끝 = "23:59";               /* 밤 11시 넘어 시작 — 그날 안에서 끝낸다 */
+    return { start:시작, end:끝 };
+  }
+  if(!꼴.test(끝)) return { err:"끝 시각이 올바르지 않습니다" };
+  if(끝 <= 시작) return { err:"끝 시각이 시작보다 늦어야 합니다" };
+  return { start:시작, end:끝 };
+}
+/* 목록 칸만 갈아 끼운다 — 입력칸(한글 조합 중일 수 있다)은 건드리지 않는다 */
+function 명함목록고침(){
+  var box = document.getElementById("cardres");
+  if(box && S.modal) box.innerHTML = 명함결과Html(S.modal.cq || "");
+  else render();
 }
 /* 구글 공용 달력에 넣는다 — 폰 구글 캘린더 위젯에 뜨는 길 */
 function 구글에넣기(m){
@@ -2472,7 +2551,7 @@ function 구글에넣기(m){
   if(사람) 설명.push("푸른 담당: " + 사람);
   S.busy = true; m.err = ""; render();
   PuGcalAuth.createEvent(GCAL_CAL_ID, {
-    date: m.date, time: String(m.time||""), summary: String(m.title).trim(),
+    date: m.date, time: String(m.time||""), endTime: String(m.endTime||""), summary: String(m.title).trim(),
     location: String(m.place||"").trim(), description: 설명.join("\n"),
     source: (m.card && m.card.k) ? { kind:"card", id:m.card.k } : null
   }).then(function(){
@@ -2490,7 +2569,7 @@ function 구글에넣기(m){
 /* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
 function modalRead(){
   var m = S.modal; if(!m) return;
-  ["kind","date","sid","type","title","note","hours","time","place","contact"].forEach(function(f){
+  ["kind","date","sid","type","title","note","hours","time","endTime","place","contact"].forEach(function(f){
     var el = document.querySelector("[data-m='"+f+"']");
     if(el) m[f] = el.value;
   });
@@ -2503,6 +2582,12 @@ function doSave(){
   var store = 일정 ? "my_schedules" : "attendance_records";
   if(!m.date){ m.err = "날짜를 골라 주세요"; render(); return; }
   if(일정 && !String(m.title||"").trim()){ m.err = "무슨 일인지 적어 주세요"; render(); return; }
+  /* 시작 ~ 끝: 끝만 적고 시작이 없으면 묻는다, 끝이 비면 한 시간 뒤, 끝이 시작보다 이르면 막는다 */
+  if(일정){
+    var 시끝 = 시각범위(m.time, m.endTime);
+    if(시끝.err){ m.err = 시끝.err; render(); return; }
+    m.time = 시끝.start; m.endTime = 시끝.end;
+  }
   /* ★ 새 일정은 구글 로그인돼 있으면 «구글 공용 달력»에 넣는다 (대표 지시 2026-09-27
        「구글캘린더와 같이 우선」 — 폰은 구글 캘린더 위젯으로 본다). 이 달력도 그것을 읽어
        그리므로 두 곳에 똑같이 뜨고, 두 번 들어가지도 않는다.
@@ -2515,6 +2600,7 @@ function doSave(){
   if(일정){
     item.title = String(m.title).trim();
     item.time = String(m.time||"");
+    item.endTime = String(m.endTime||"");
     item.place = String(m.place||"").trim();
     item.contact = String(m.contact||"").trim();
     /* 어느 명함에서 왔는지 — 이름이 아니라 명함 번호로 잇는다(온톨로지: sourceKind·sourceId 함께) */
@@ -2958,6 +3044,17 @@ function goErp(menu){
      그 칸에 값을 도로 넣고 커서를 끝으로 돌려 준다. 안 그러면 한 글자마다 칸이 튄다. */
 document.addEventListener('input', function(e){
   if(!e.target || e.target.id !== 'calq') return;
+  /* ⚠ 한글 조합 중(ㄱ+ㅏ)에는 다시 그리지 않는다 — 입력칸이 바뀌면 조합이 끊겨 한글이 안 쳐진다.
+     조합이 끝나면(compositionend) 아래 손잡이가 한 번 그린다. */
+  if(e.isComposing) return;
+  S.q = e.target.value;
+  render();
+  var el = document.getElementById('calq');
+  if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} }
+});
+
+document.addEventListener('compositionend', function(e){
+  if(!e.target || e.target.id !== 'calq') return;
   S.q = e.target.value;
   render();
   var el = document.getElementById('calq');
@@ -2967,11 +3064,10 @@ document.addEventListener('input', function(e){
 /* 명함 찾기 칸 — 치는 대로 찾는다(처음 칠 때 색인을 한 번 받는다) */
 document.addEventListener('input', function(e){
   if(!e.target || e.target.id !== 'cardq' || !S.modal) return;
-  modalRead();
+  /* ⚠ 창 전체를 다시 그리지 않는다 — 한글 조합이 끊긴다(명함결과Html 머리글) */
   S.modal.cq = e.target.value;
   명함받기();
-  render();
-  명함칸다시잡기();
+  명함목록고침();
 });
 
 /* 계정 잇기 — 고르면 «바로» 저장한다(따로 저장 단추를 두지 않는다) */
@@ -2996,6 +3092,8 @@ document.addEventListener('keydown', function(e){
 $('goErp').onclick = function(){ goErp(''); };
 $('logout').onclick = function(){ try{ firebase.auth().signOut(); }catch(e){} };
 $('themeToggle').onclick = themeToggle;
+$('rotToggle').onclick = rotToggle;
+rotInit();
 themeInit();
 
 /* ── 시작 ──────────────────────────────────────────────────────────── */
