@@ -27,21 +27,38 @@ const ROOT = path.join(__dirname, '..');
 const W = require(path.join(ROOT, 'js', 'pu-cal-write.js'));
 global.PuWork = require(path.join(ROOT, 'js', 'pu-work-core.js'));
 
-/* 가짜 서버 — 무엇을 보냈는지 그대로 받아 둔다 */
-function 가짜서버() {
+/* 가짜 서버 — 무엇을 보냈는지 그대로 받아 둔다.
+   ★ 실시간DB 처럼 군다: 거래(transaction)는 «찬 자리»라 먼저 null 로 부르고,
+     서버에 값이 있으면 그 값으로 한 번 더 부른다(rtdb-transaction-cold-abort).
+   2026-09-27 — 저장이 칸별 update 에서 «레코드 한 건 거래»로 바뀌었다
+   (칸별 update 는 온톨로지 관문이 통째로 거절해 한 번도 서버에 안 닿았다). */
+function 가짜서버(처음) {
   const 보낸것 = [];
-  return {
-    보낸것,
-    ref() { return { update(u) { 보낸것.push(u); return Promise.resolve(); } }; }
-  };
+  const 서버 = Object.assign({}, 처음 || {});
+  function ref(p) {
+    return {
+      update(u) { 보낸것.push(Object.assign({ __kind: 'update', __path: p }, u)); return Promise.resolve(); },
+      set(v) { 보낸것.push({ __kind: 'set', __path: p, v: v }); 서버[p] = v; return Promise.resolve(); },
+      transaction(fn) {
+        let v = fn(null);
+        if (서버[p] !== undefined) v = fn(JSON.parse(JSON.stringify(서버[p])));
+        if (v === undefined) return Promise.resolve({ committed: false });
+        서버[p] = v;
+        보낸것.push({ __kind: 'transaction', __path: p, v: v });
+        return Promise.resolve({ committed: true, snapshot: { val: () => v } });
+      }
+    };
+  }
+  return { 보낸것, 서버, ref };
 }
+const 자리 = (id) => 'data/attendance_records/v/' + id;
 /* 지도형 표 하나(이미 번호가 열쇠) */
 const 지도형 = { 'att-1': { id: 'att-1', date: '2026-09-15', type: 'leave' } };
 /* 아직 배열인 표 */
 const 배열형 = { 0: { id: 'att-1' }, 1: { id: 'att-2' } };
 
-function 붙이기(opts) {
-  const s = 가짜서버();
+function 붙이기(opts, 처음) {
+  const s = 가짜서버(처음);
   W.attach(s, Object.assign({
     lockedMonths: [],
     formOf: () => 지도형,
@@ -96,7 +113,7 @@ test('③ 마감 안 된 달은 지나간다', async () => {
   const s = 붙이기({ lockedMonths: ['2026-08'] });
   const r = await W.save('attendance_records', { id: 'att-9', date: '2026-09-15', type: 'leave' });
   assert.equal(r.ok, true, r.message);
-  assert.equal(s.보낸것.length, 1);
+  assert.ok(s.보낸것.some((x) => x.__kind === 'transaction'), '마감 안 된 달인데 안 썼습니다');
 });
 
 test('③ 날짜 없는 기록은 막지 않는다 — 막으면 영영 못 고친다', async () => {
@@ -135,55 +152,77 @@ test('④ 생김새 보는 눈 자체가 맞는가', () => {
 });
 
 // ── ⑤ 바뀐 칸만 ───────────────────────────────────────────────────────
-test('⑤ 안 바뀐 칸은 안 보낸다 — 남이 그 칸을 고쳤으면 되돌아간다', async () => {
-  const s = 붙이기();
-  await W.save('attendance_records',
+test('⑤ 안 바뀐 칸은 안 건드린다 — 남이 그 칸을 고쳤으면 그대로 남는다', async () => {
+  /* 화면은 type:leave 를 들고 있는데, 그사이 이알피에서 누가 반차로 고쳤다 */
+  const s = 붙이기({}, { [자리('att-1')]: { id: 'att-1', date: '2026-09-15', type: 'halfday-am', note: '옛 메모' } });
+  const r = await W.save('attendance_records',
     { id: 'att-1', date: '2026-09-15', type: 'leave', note: '새 메모' },
     { id: 'att-1', date: '2026-09-15', type: 'leave', note: '옛 메모' });
-  const u = s.보낸것[0];
-  const 보낸칸 = Object.keys(u).filter(k => k.indexOf('/v/') >= 0).map(k => k.split('/v/')[1]);
-  assert.ok(보낸칸.indexOf('att-1/note') >= 0, '바뀐 칸을 안 보냈습니다');
-  assert.ok(보낸칸.indexOf('att-1/type') < 0, '안 바뀐 칸을 보냈습니다 — 남의 손질을 되돌립니다');
-  assert.ok(보낸칸.indexOf('att-1/date') < 0, '안 바뀐 칸을 보냈습니다');
+  assert.equal(r.ok, true, r.message);
+  const 결과 = s.서버[자리('att-1')];
+  assert.equal(결과.note, '새 메모', '바뀐 칸을 안 썼습니다');
+  assert.equal(결과.type, 'halfday-am', '안 바뀐 칸을 덮었습니다 — 남의 손질을 되돌립니다');
 });
 
-test('⑤ 레코드를 통째로 덮지 않는다', async () => {
-  const s = 붙이기();
-  await W.save('attendance_records', { id: 'att-1', date: '2026-09-15', type: 'leave' });
-  const u = s.보낸것[0];
-  assert.ok(!('data/attendance_records/v/att-1' in u),
-    '레코드를 통째로 덮었습니다 — 칸별로 보내야 합니다');
+test('⑤ 서버에만 있는 칸을 지우지 않는다 — 통째로 덮지 않는다', async () => {
+  const s = 붙이기({}, { [자리('att-1')]: { id: 'att-1', date: '2026-09-15', type: 'leave', gcalEventId: 'g1' } });
+  await W.save('attendance_records', { id: 'att-1', date: '2026-09-16' }, { id: 'att-1', date: '2026-09-15' });
+  const 결과 = s.서버[자리('att-1')];
+  assert.equal(결과.date, '2026-09-16');
+  assert.equal(결과.gcalEventId, 'g1', '화면이 모르는 칸(구글 번호)이 지워졌습니다');
 });
 
 // ── ⑥ 번호 그물 ───────────────────────────────────────────────────────
-test('⑥ 번호를 «늘» 함께 보낸다 — 이 한 줄이 껍데기를 막는다', async () => {
+test('⑥ 번호를 «늘» 함께 쓴다 — 이 한 줄이 껍데기를 막는다', async () => {
   const s = 붙이기();
-  await W.save('attendance_records',
-    { id: 'att-1', note: '메모만 고침' },
-    { id: 'att-1', note: '옛것' });
-  const u = s.보낸것[0];
-  assert.equal(u['data/attendance_records/v/att-1/id'], 'att-1',
-    '번호를 안 보냈습니다 — 서버에 본문 없는 껍데기가 생깁니다');
+  await W.save('attendance_records', { id: 'att-1', note: '메모만 고침' }, { id: 'att-1', note: '옛것' });
+  assert.equal(s.서버[자리('att-1')].id, 'att-1', '번호를 안 썼습니다 — 서버에 본문 없는 껍데기가 생깁니다');
 });
 
-test('⑥ 칸을 하나도 안 고쳤어도 번호는 간다', () => {
-  const p = W.fieldPaths('att-1', { note: '같음' }, { note: '같음' });
-  assert.deepStrictEqual(Object.keys(p), ['att-1/id']);
+test('⑥ 칸을 하나도 안 고쳤어도 번호는 붙고, 서버 값은 그대로다', () => {
+  const r = W.overlay('att-1', { note: '같음' }, { note: '같음' }, { note: '서버에서 고침' });
+  assert.deepStrictEqual(r, { note: '서버에서 고침', id: 'att-1' });
+});
+
+test('★ 새것은 «서버에 없어야» 쓴다 — 같은 번호가 이미 있으면 덮지 않고 멈춘다', async () => {
+  const s = 붙이기({}, { [자리('att-1')]: { id: 'att-1', date: '2026-09-15', type: 'leave', sid: 'P-001' } });
+  const r = await W.save('attendance_records', { id: 'att-1', date: '2026-09-20', type: 'eum-work', sid: 'P-002' }, null);
+  assert.equal(r.ok, false, '이미 있는 번호를 새것으로 덮었습니다');
+  assert.equal(s.서버[자리('att-1')].sid, 'P-001', '남의 기록이 바뀌었습니다');
+});
+
+test('★★ 온톨로지 관문(강제 모드)을 «실제로» 지난다 — 2026-09-27 까지 달력 저장이 전부 여기서 막혔다', async () => {
+  /* 푸른 캘린더는 새 프로그램이라 관문이 강제(enforce)다. 칸별 update 는
+     「수정차수를 검증할 수 없다」며 거절됐다 — 가짜 서버를 진짜 관문으로 감싸 본다. */
+  const OW = require(path.join(ROOT, 'js', 'pu-ontology-write.js'));
+  const 속 = 가짜서버({ [자리('att-1')]: { id: 'att-1', date: '2026-09-15', type: 'leave', sid: 'P-001' } });
+  const fb = { database() { return { ref: (p) => 속.ref(p) }; } };
+  assert.equal(OW.installFirebaseCompat(fb, { mode: 'enforce', program: 'cal' }), true);
+  W.attach(fb.database(), { lockedMonths: [], formOf: () => 지도형, who: () => '홍길동' });
+  const 고침 = await W.save('attendance_records', { id: 'att-1', date: '2026-09-16' }, { id: 'att-1', date: '2026-09-15' });
+  assert.equal(고침.ok, true, '관문이 고치기를 거절합니다: ' + 고침.message);
+  const 새것 = await W.save('attendance_records',
+    { id: 'att-2', date: '2026-09-17', type: 'eum-work', sid: 'P-001', hours: 8, note: '' }, null);
+  assert.equal(새것.ok, true, '관문이 넣기를 거절합니다: ' + 새것.message);
+  const r2 = 속.서버[자리('att-2')];
+  assert.equal(r2.entityType, 'ScheduleEvent', '개체 종류를 안 붙였습니다');
+  assert.ok(r2.revision >= 1 && r2.createdAt > 0, '수정차수·생성 시각이 없습니다');
 });
 
 // ── 곁들여 지켜야 할 것 ───────────────────────────────────────────────
 test('표의 «시각»(u)을 함께 올린다 — 다른 화면이 바뀐 줄 알아야 한다', async () => {
   const s = 붙이기();
   await W.save('attendance_records', { id: 'att-1', date: '2026-09-15' });
-  assert.ok('data/attendance_records/u' in s.보낸것[0], '표 시각을 안 올렸습니다');
+  assert.ok(s.보낸것.some((x) => x.__kind === 'set' && x.__path === 'data/attendance_records/u' && x.v > 0),
+    '표 시각을 안 올렸습니다');
 });
 
 test('누가 고쳤는지 남긴다', async () => {
   const s = 붙이기();
   await W.save('attendance_records', { id: 'att-1', date: '2026-09-15' });
-  const u = s.보낸것[0];
-  assert.equal(u['data/attendance_records/v/att-1/updatedBy'], '홍길동');
-  assert.ok(u['data/attendance_records/v/att-1/updatedAt'] > 0);
+  const 결과 = s.서버[자리('att-1')];
+  assert.equal(결과.updatedBy, '홍길동');
+  assert.ok(결과.updatedAt > 0);
 });
 
 test('지우기는 그 자리만 비운다 — 표를 통째로 다시 쓰지 않는다', async () => {
@@ -191,6 +230,9 @@ test('지우기는 그 자리만 비운다 — 표를 통째로 다시 쓰지 �
   const r = await W.remove('attendance_records', 'att-1', { id: 'att-1', date: '2026-09-15' });
   assert.equal(r.ok, true, r.message);
   assert.strictEqual(s.보낸것[0]['data/attendance_records/v/att-1'], null);
+  /* ⚠ 지우기는 아직 칸을 비우는 update 다 — 온톨로지 관문(강제)은 이것을 «물리 삭제»로 거절한다.
+     삭제 표식(_deleted)으로 바꾸려면 이알피·급여가 표식 붙은 근태를 빼고 세는지부터 확인해야 한다
+     (2026-09-27 남은 일). */
 });
 
 test('지우기도 마감 자물쇠를 지난다', async () => {

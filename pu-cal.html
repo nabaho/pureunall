@@ -17,7 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="js/pu-ontology.js?v=34"></script>
-<script src="js/pu-ontology-write.js?v=3" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
@@ -28,7 +28,7 @@
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=2"></script>
 <script src="js/pu-case-due.js?v=1"></script>
-<script src="js/pu-cal-write.js?v=4"></script>
+<script src="js/pu-cal-write.js?v=5"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -1886,7 +1886,11 @@ function chipsHtml(eumOnly){
         var n = 겹침[p.pk] || 0;
         return '<span class="pwrap">'
           + '<button class="pchip' + (on ? " on" : "") + '" data-f="' + esc(p.pk) + '"'
-          + ' title="' + esc(p.name) + '" style="background:' + esc(p.color) + '">'
+          /* ★ 이음 근무 탭에서는 칩을 날짜 칸으로 «끌어 놓으면» 그날 이음센터 근무가 들어간다
+               (대표 지시 2026-09-27 「이음근무를 마우스로 드레그해서 넣을 수 있게」) */
+          + (eumOnly ? ' draggable="true" data-dragp="' + esc(p.pk) + '"' : '')
+          + ' title="' + esc(p.name) + (eumOnly ? ' — 끌어서 날짜 칸에 놓으면 그날 이음센터 근무가 들어갑니다' : '')
+          + '" style="background:' + esc(p.color) + '">'
           + esc(String(p.name).slice(0,2)) + '</button>'
           + (n ? '<span class="pcount" title="' + esc(p.name) + ' 같은 날 겹친 일정 ' + n + '일">'
                  + (n > 9 ? "9+" : n) + '</span>' : '')
@@ -2322,6 +2326,18 @@ function doDelete(){
    ⚠ 「놓을 수 있다」를 말해 주지 않으면 브라우저가 놓기를 아예 안 받는다 —
      dragover 에서 preventDefault 를 «해야» 놓을 수 있다. 헷갈리기 쉬운 반대다. */
 var _끄는것 = null;
+/* 사람 칩(머리줄)을 끌기 시작 — «새로 넣기»다(옮기기와 갈라 둔다: "eumnew:사람") */
+document.addEventListener('dragstart', function(e){
+  var p = e.target && e.target.closest ? e.target.closest('[data-dragp]') : null;
+  if(!p) return;
+  _끄는것 = 'eumnew:' + p.getAttribute('data-dragp');
+  try{ e.dataTransfer.setData('text/plain', _끄는것); e.dataTransfer.effectAllowed = 'copy'; }catch(x){}
+});
+document.addEventListener('dragend', function(e){
+  if(!(e.target && e.target.closest && e.target.closest('[data-dragp]'))) return;
+  _끄는것 = null;
+  Array.prototype.forEach.call(document.querySelectorAll('.dropon'), function(el){ el.classList.remove('dropon'); });
+});
 function 끌기손잡이(){
   var 판 = $('app'); if(!판 || 판._끌기달림) return;
   판._끌기달림 = true;
@@ -2342,7 +2358,7 @@ function 끌기손잡이(){
     var 칸 = e.target && e.target.closest ? e.target.closest('[data-day]') : null;
     if(!칸) return;
     e.preventDefault();                       /* ⚠ 이것이 있어야 놓을 수 있다 */
-    try{ e.dataTransfer.dropEffect = 'move'; }catch(x){}
+    try{ e.dataTransfer.dropEffect = String(_끄는것).indexOf('eumnew:') === 0 ? 'copy' : 'move'; }catch(x){}
     if(!칸.classList.contains('dropon')){
       Array.prototype.forEach.call(판.querySelectorAll('.dropon'),
         function(el){ el.classList.remove('dropon'); });
@@ -2355,7 +2371,42 @@ function 끌기손잡이(){
     if(!칸 || !끈것) return;
     e.preventDefault();
     _끄는것 = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.dropon'), function(el){ el.classList.remove('dropon'); });
+    if(String(끈것).indexOf('eumnew:') === 0){ 이음넣기(String(끈것).slice(7), 칸.getAttribute('data-day')); return; }
     옮기기(끈것, 칸.getAttribute('data-day'));
+  });
+}
+
+/* 사람 칩을 날짜 칸에 놓았다 — 그 사람의 그날 «이음센터 근무»를 넣는다.
+   ★ 이알피·이 앱이 담아 온 꼴 그대로: 내부 직원은 sid, 외부 노무사·변호사는 externalId(sid 없음),
+     type:'eum-work', hours 는 PuWork 가 정한 수(하루 근무).
+   ⚠ 저장은 반드시 관문(PuCalWrite.save) — 마감된 달은 거기서 막히고, 막히면 그대로 말한다.
+   ⚠ 같은 사람·같은 날이 이미 있으면 안 넣는다 — 두 번 들어가면 근무일이 두 배로 센다.
+   ⚠ 구글 달력에는 안 만든다(로그인이 필요하다) — 달력에는 우리 기록으로 바로 뜬다. */
+function 이음넣기(pk, 날){
+  if(S.busy || !pk || !날) return;
+  var p = ieumPeople().filter(function(x){ return x.pk === pk && !x.left; })[0];
+  if(!p){ toast("그 사람을 명단에서 못 찾았습니다"); return; }
+  var 외부 = p.kind !== "in";
+  var 이미 = arr(D.attendance_records).some(function(r){
+    return r && r.type === "eum-work" && r.date === 날
+      && (외부 ? r.externalId === pk : (r.sid === pk && !r.externalId));
+  });
+  if(이미){ toast("ℹ " + p.name + " 님은 " + 날 + " 에 이미 이음센터 근무가 있습니다"); return; }
+  var item = { id: PuCalWrite.newId("att"), date: 날, type: "eum-work",
+               hours: PuWork.hoursOf("eum-work", 8), note: "" };
+  if(외부) item.externalId = pk; else item.sid = pk;
+  S.busy = true; render();
+  PuCalWrite.save("attendance_records", item, null).then(function(r){
+    S.busy = false;
+    if(!r.ok){ toast("❌ " + (r.message || "넣지 못했습니다")); render(); return; }
+    toast("✅ " + p.name + " · " + 날.slice(5).replace("-", "/") + " 이음센터 근무를 넣었습니다");
+    refreshOne("attendance_records");
+    발행예약();
+  })["catch"](function(err){
+    S.busy = false;
+    toast("❌ 넣지 못했습니다 — " + ((err && err.message) || ""));
+    render();
   });
 }
 
@@ -2737,7 +2788,12 @@ try{
 }
 </script>
 <script src="js/pu-appbar.js?v=13"></script>
-<script>try{ PuAppBar.mount('#appslot', { current:'cal' }); }catch(e){}</script>
+<script>try{
+  /* 대표 지시 2026-09-27 「즐겨찾기도 앱으로 바꿔라」 — 공용 단추(pu-appbar.js)는 그대로 두고
+     이 앱에 붙은 단추의 글자만 바꾼다(공용을 고치면 15개 앱이 함께 바뀐다). */
+  var _앱단추 = PuAppBar.mount('#appslot', { current:'cal' });
+  if(_앱단추) _앱단추.textContent = _앱단추.textContent.replace('즐겨찾기', '앱');
+}catch(e){}</script>
 <script>try{ PuBack.guard(function(){ return false; }); }catch(e){}</script>
 </body>
 </html>
