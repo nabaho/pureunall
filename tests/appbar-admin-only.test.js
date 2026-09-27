@@ -77,7 +77,9 @@ test('포털 타일도 관리자 전용으로 표시돼 있다', () => {
 test('바로가기 목록도 같은 잣대를 쓴다 — 타일에서 감추고 여기서 새면 뜻이 없다', () => {
   const enter = fs.readFileSync(path.join(R, 'enter.html'), 'utf8');
   const i = enter.indexOf('function accessibleApps');
-  assert.ok(i > -1, 'accessibleApps 를 찾지 못했습니다');
+  /* 「로그인 후 바로가기」는 2026-09-28 걷어냈다(대표 「선택 하느거 필요 없다」).
+     목록이 없으면 자동 이동도 없어야 한다 — 되살릴 때는 이 잣대를 다시 쓸 것. */
+  if (i < 0) { assert.doesNotMatch(enter, /function maybeGoHome\(/, '목록 없이 자동 이동만 살아 있습니다'); return; }
   assert.match(enter.slice(i, i + 500), /adminOnly/,
     '바로가기 목록이 관리자 전용을 안 거릅니다');
 });
