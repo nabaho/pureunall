@@ -117,8 +117,9 @@
       entityTypes:['Organization','Person','Project','FinancialTransaction','Document'] },
     rules:{ name:'취업규칙 관리', file:'rules.html', primaryRoots:['chwieop','rules_mgmt'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Policy','Document','ReviewCriterion','LegalProvision'] },
-    docs:{ name:'문서관리', file:'docs-esign.html', primaryRoots:['esign'],
-      /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피) */
+    docs:{ name:'문서관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs'],
+      /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피)
+         2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
       sharedRoots:['data/contract_forms','data/contract_forms_removed'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
     payroll:{ name:'급여관리', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],

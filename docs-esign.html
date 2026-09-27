@@ -34,7 +34,8 @@
   .hwp-preview{display:none;min-height:360px;max-height:58vh;border:1px solid #cbd5e1;border-radius:10px;margin-top:12px;overflow:auto}
   /* ── 왼쪽 목록 (2026-09-26 「사무관리서류 › 계약서 양식」을 더하며) ── */
   .shell{display:flex;align-items:flex-start;max-width:1360px;margin:0 auto}
-  .side{width:196px;flex:none;position:sticky;top:0;padding:20px 8px 20px 16px}
+  .side{width:250px;flex:none;position:sticky;top:0;padding:20px 8px 20px 16px}
+  .nav-tree{max-height:calc(100vh - 230px);overflow-y:auto;margin:2px 0 4px}
   .nav{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:8px 10px;font-size:13px;color:#1e293b;cursor:pointer;font-family:inherit;white-space:nowrap}
   .nav:hover{background:#eff6ff}
   .nav.on{background:#bfdbfe;color:#1e40af;font-weight:700}
@@ -46,7 +47,7 @@
   @media(max-width:700px){
     .shell{display:block}
     .side{position:static;width:auto;display:flex;align-items:center;gap:4px;overflow-x:auto;padding:8px 10px;background:#fff;border-bottom:1px solid #e2e8f0}
-    .nav{width:auto}.nav.sub{padding-left:10px}.nav-grp{padding:0 2px 0 8px}
+    .nav{width:auto}.nav.sub{padding-left:10px}.nav-grp{padding:0 2px 0 8px}.nav-tree{display:none}
     .shell .main{margin:12px auto;padding:0 10px}
     .top{padding:10px 12px;gap:8px;flex-wrap:wrap}.top h1{width:100%;font-size:14px}.top #whoami{margin-right:auto}
     .main{margin:12px auto;padding:0 10px}.card{padding:13px;overflow-x:auto}
@@ -94,6 +95,10 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
   <button type="button" class="nav on" data-pane="esign">📤 집단체불 전자송부</button>
   <div class="nav-grp">🗂 사무관리서류</div>
   <button type="button" class="nav sub" data-pane="forms">📄 계약서 양식</button>
+  <!-- 양식 트리 — 계약서 양식을 처음 열 때 js/pu-contract-forms.js 가 채운다 (2026-09-27) -->
+  <div id="formsTree" class="nav-tree"></div>
+  <button type="button" class="nav sub" data-pane="co">🏢 기업별 계약서</button>
+  <button type="button" class="nav sub" data-pane="arc">🗄 원본 보관함</button>
 </nav>
 <div class="main">
 <div id="paneEsign">
@@ -119,13 +124,27 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
     <div id="formsRoot"></div>
   </div>
 </div>
+<!-- 기업별 계약서 · 원본 보관함 — js/pu-office-docs.js 가 그린다 (2026-09-27) -->
+<div id="paneCo" hidden>
+  <div class="card">
+    <div class="crumb">사무관리서류 › <b>기업별 계약서</b></div>
+    <div id="coRoot"></div>
+  </div>
+</div>
+<div id="paneArc" hidden>
+  <div class="card">
+    <div class="crumb">사무관리서류 › <b>원본 보관함</b></div>
+    <div id="arcRoot"></div>
+  </div>
+</div>
 </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=34"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="js/pu-ontology.js?v=35"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
@@ -142,7 +161,10 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
-<script src="js/pu-contract-forms.js?v=1"></script>
+<script src="js/pu-contract-forms.js?v=2"></script>
+<script src="js/pu-photo-store.js?v=29"></script>
+<script src="js/pu-office-store.js?v=1"></script>
+<script src="js/pu-office-docs.js?v=1"></script>
 <script>
 'use strict';
 var FB_CONFIG = {
@@ -183,43 +205,90 @@ firebase.auth().onAuthStateChanged(function (u) {
   if (!u || !u.email) { PuGate.show(); return; }
   PuGate.hide();
   curUser = u;
+  /* 원본 보관함 — 서면함·서고 원본과 같은 창고(pureun-erp-hrphotos). 창고가 없어도 양식 화면은 돈다 */
+  try { docBucket = firebase.app().storage('gs://pureun-erp-hrphotos'); } catch (e) { docBucket = null; }
+  PuOfficeStore.init({ db: db, storage: docBucket, uid: u.uid, name: u.email.split('@')[0] });
+  if (window.PuPhotoStore) {
+    PuPhotoStore.init({ db: db, storage: docBucket, auth: firebase.auth() });
+    photosReady = PuPhotoStore.signIn(u.uid, u.email, u.email.split('@')[0]).catch(function () {});
+  }
   $('whoami').textContent = u.email.split('@')[0];
   loadCases();
   showPane(paneFromHash());
 });
 
-/* ── 왼쪽 목록: 전자송부 ↔ 사무관리서류 › 계약서 양식 ──
-   주소 끝(#forms)에 적어 두어 새로고침해도 보던 자리로 돌아온다.
-   ⚠ 양식 화면은 «처음 열 때» 한 번만 싣는다 — 전자송부만 쓰는 날엔 양식 표를 받지 않는다. */
-var formsMounted = false;
-function paneFromHash() { return location.hash === '#forms' ? 'forms' : 'esign'; }
+/* ── 왼쪽 목록: 전자송부 ↔ 사무관리서류(계약서 양식 · 기업별 계약서 · 원본 보관함) ──
+   주소 끝(#forms · #forms:{양식} · #co · #arc)에 적어 두어 새로고침해도 보던 자리로 돌아온다.
+   ⚠ 칸마다 «처음 열 때» 한 번만 싣는다 — 전자송부만 쓰는 날엔 양식 표·보관함을 받지 않는다. */
+var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc' };
+var formsMounted = false, formsUi = null, mounted = {};
+var docBucket = null, photosReady = null;
+function paneFromHash() {
+  var h = location.hash;
+  if (h === '#forms' || h.indexOf('#forms:') === 0) return 'forms';
+  if (h === '#co') return 'co';
+  if (h === '#arc') return 'arc';
+  return 'esign';
+}
+function formFromHash() {
+  var h = location.hash;
+  if (h.indexOf('#forms:') !== 0) return null;
+  try { return decodeURIComponent(h.slice(7)) || null; } catch (e) { return null; }
+}
+function archiveOriginal(file, from) { return trackedWrite(PuOfficeStore.putOriginal(file, from)); }
+function downloadOriginal(fileId, name) {
+  return PuOfficeStore.download(fileId, name).catch(function (e) { showToast('내려받지 못했습니다 — ' + ((e && e.message) || e)); });
+}
+function officeHost() {
+  return { store: PuOfficeStore, photos: window.PuPhotoStore || null, photosReady: photosReady, uid: curUser ? curUser.uid : '',
+    download: downloadOriginal, attKey: PuContractForms.attKey,
+    loadForms: function () { return PuContractForms.loadForms(db); },
+    linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
+}
+function onFormSelect(id) {
+  if (!id && $('paneForms').hidden) return;
+  var h = id ? '#forms:' + encodeURIComponent(id) : '#forms';
+  if ($('paneForms').hidden) { history.pushState(null, '', h); showPane('forms'); }
+  else if (location.hash !== h) history.replaceState(null, '', h);
+}
 function showPane(name) {
-  $('paneEsign').hidden = name !== 'esign';
-  $('paneForms').hidden = name !== 'forms';
+  Object.keys(PANES).forEach(function (k) { $(PANES[k]).hidden = k !== name; });
   document.querySelectorAll('.side .nav').forEach(function (b) {
     var on = b.getAttribute('data-pane') === name;
     b.classList.toggle('on', on);
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  if (name === 'forms' && !formsMounted && curUser) {
+  if (!curUser) return;
+  if (name === 'forms' && !formsMounted) {
     formsMounted = true;
-    PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite });
+    formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(),
+      onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal });
   }
+  if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
+  if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
 }
 document.querySelectorAll('.side .nav').forEach(function (b) {
   b.addEventListener('click', function () {
     var name = b.getAttribute('data-pane');
-    var want = name === 'forms' ? '#forms' : '';
+    /* ⚠ 칸이 이미 그 칸이면(예: #forms:x 에서 「계약서 양식」을 다시 누름) 화면은
+       안 바뀐다 — 그런데도 새 걸음을 심으면, 뒤로가기가 «화면이 그대로인 채»
+       popstate 만 일으켜 pu-back.js 가 앱을 나가 버린다(대표 제보). 그럴 땐 그냥
+       다시 그린다 — 걸음을 심지 않는다. */
+    if (paneFromHash() === name) { showPane(name); return; }
+    var want = name === 'esign' ? '' : '#' + name;
     if (location.hash !== want) history.pushState(null, '', want || (location.pathname + location.search));
     showPane(name);
   });
 });
 /* 뒤로가기로 칸을 바꿨으면 «우리가 처리했다»고 알린다 — 안 그러면 js/pu-back.js 가
-   같은 한 번 누름에 앱까지 나간다(칸이 그대로일 때는 그쪽이 덮개를 닫거나 나간다). */
+   같은 한 번 누름에 앱까지 나간다(칸이 그대로일 때는 그쪽이 덮개를 닫거나 나간다).
+   ⚠ 양식 칸에서는 칸은 안 바뀌어도 «고른 양식»이 바뀔 수 있다(#forms:x → #forms:y) —
+     그때도 우리가 처리했다고 알려야 한다(formsUi.current() 로 견준다). */
 window.addEventListener('popstate', function () {
-  var want = paneFromHash();
-  if ($('paneForms').hidden === (want === 'forms')) window.__puBackNav = true;
+  var want = paneFromHash(), fc = want === 'forms' && formsUi && formsUi.current() !== formFromHash();
+  if ($(PANES[want]).hidden || fc) window.__puBackNav = true;
   showPane(want);
+  if (fc) formsUi.select(formFromHash());
 });
 
 // ── 사건 목록 ──

@@ -268,6 +268,81 @@
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
   function kindInfo(v) { return KINDS.filter(function (k) { return k.v === v; })[0] || KINDS[0]; }
+
+  var ATTACH_MAX = 1024 * 1024; // 양식 첨부(base64)는 1MB 까지 — 이알피가 통표로 받는다
+
+  /* 왼쪽 트리의 모양 — 화면 없이 검사한다 */
+  function treeModel(forms) {
+    function leaf(f) { return { id: f.id, name: f.name || '(이름 없음)', enabled: f.enabled !== false }; }
+    return KINDS.map(function (k) {
+      var list = (forms || []).filter(function (f) { return f.kind === k.v; });
+      var groups;
+      if (k.v === 'case') {
+        var by = {};
+        list.forEach(function (f) { var g = f.groupName || '미지정'; (by[g] = by[g] || []).push(f); });
+        groups = Object.keys(by).sort(function (a, b) { return a.localeCompare(b); })
+          .map(function (g) { return { name: g, forms: by[g].map(leaf) }; });
+        if (!groups.length) groups = [{ name: null, forms: [] }];
+      } else groups = [{ name: null, forms: list.map(leaf) }];
+      return { kind: k.v, label: k.label, icon: k.icon, color: k.color, count: list.length, groups: groups };
+    });
+  }
+  /* 본문을 칸({{…}})과 글로 가른다 — 칸만 딱지로 감싸고 나머지는 글 그대로 넣는다 */
+  function splitVars(text) {
+    var s = String(text || ''), re = /\{\{[^{}\n]+\}\}/g, outp = [], at = 0, m;
+    while ((m = re.exec(s))) {
+      if (m.index > at) outp.push({ t: s.slice(at, m.index), v: false });
+      outp.push({ t: m[0], v: true });
+      at = m.index + m[0].length;
+    }
+    if (at < s.length) outp.push({ t: s.slice(at), v: false });
+    return outp;
+  }
+  function attKey(a) { return (a && a.id) || ('n:' + (a && a.name) + '|' + (a && a.size)); }
+  function loadForms(db) {
+    return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value')]).then(function (r) {
+      var cf = r[0].val(), rm = r[1].val();
+      return mergeSeeds(listOf(cf && cf.v), listOf(rm && rm.v)).list;
+    });
+  }
+  /* 보관함 원본을 양식에 잇는다 — 저장 한 길(changeForms)로, 같은 것은 한 번만 */
+  function linkOriginal(db, formId, entry) {
+    return db.ref(PATH_RM).once('value').then(function (s) {
+      var rm = listOf((s.val() || {}).v);
+      return changeForms(db, rm, function (list) {
+        list.forEach(function (f) {
+          if (f.id !== formId) return;
+          var o = Array.isArray(f.originals) ? f.originals : [];
+          var dup = o.some(function (x) { return x.fileId === entry.fileId && (x.attId || '') === (entry.attId || ''); });
+          if (!dup) o.push(entry);
+          f.originals = o;
+        });
+        return list;
+      });
+    });
+  }
+  function readDataUrl(file) {
+    return new Promise(function (res) {
+      var rd = new FileReader();
+      rd.onload = function (ev) { res(ev.target.result); };
+      rd.onerror = function () { res(''); };
+      rd.readAsDataURL(file);
+    });
+  }
+  function readBytes(file) {
+    return new Promise(function (res, rej) {
+      var rd = new FileReader();
+      rd.onload = function (ev) { res(new Uint8Array(ev.target.result)); };
+      rd.onerror = function () { rej(new Error('파일을 읽지 못했습니다')); };
+      rd.readAsArrayBuffer(file);
+    });
+  }
+  function origEntry(fileId, file, attId) {
+    var o = { fileId: fileId, name: file.name, size: file.size };
+    if (attId) o.attId = attId;
+    return o;
+  }
+
   function bytesOfDataUrl(dataUrl) {
     var b64 = String(dataUrl || '').split(',')[1] || '';
     var bin = atob(b64), u = new Uint8Array(bin.length);
@@ -296,33 +371,10 @@
   var CSS = ''
     + '.pcf,.pcf *,.pcf-mbg *,.pcf-hv *{box-sizing:border-box}'
     + '.pcf{font-size:13px;color:#1e293b}'
-    + '.pcf-desc{color:#64748b;font-size:12px;margin:4px 0 12px}'
-    + '.pcf-kinds{display:flex;border-bottom:2px solid #e2e8f0;overflow-x:auto}'
-    + '.pcf-kind{padding:8px 16px;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;color:#64748b;font-size:12.5px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;font-family:inherit}'
-    + '.pcf-kind i{font-style:normal;background:#e2e8f0;color:#64748b;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700}'
-    + '.pcf-box{background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;overflow:hidden}'
-    + '.pcf-bar{background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:8px 14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}'
-    + '.pcf-bar b{flex:1;font-size:13px;white-space:nowrap}'
     + '.pcf-b{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;padding:4px 10px;border-radius:4px;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;font-family:inherit}'
     + '.pcf-b.g{background:#f0fdf4;color:#166534;border-color:#bbf7d0}.pcf-b.b{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}.pcf-b.y{background:#fffbeb;color:#854d0e;border-color:#fde68a}'
-    + '.pcf-split{display:flex;min-height:320px}'
-    + '.pcf-list{overflow:auto;min-width:200px}'
-    + '.pcf-list table{width:100%;border-collapse:collapse;font-size:12px;min-width:0}'
-    + '.pcf-list th{padding:7px 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-weight:700;font-size:11.5px;white-space:nowrap}'
-    + '.pcf-list td{padding:6px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}'
-    + '.pcf-list tr.r{cursor:pointer;border-left:3px solid transparent}.pcf-list tr.r:hover{background:#eff6ff}'
-    + '.pcf-list tr.on{background:#eff6ff;border-left-color:#2563eb}'
-    + '.pcf-list tr.g td{background:#f8fafc;font-weight:700;font-size:11px;color:#64748b;cursor:pointer}'
-    + '.pcf-dot{display:inline-block;width:8px;height:8px;border-radius:50%}'
-    + '.pcf-cnt{background:#eff6ff;color:#1e40af;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700}'
-    + '.pcf-rs{width:6px;flex-shrink:0;background:#e2e8f0;cursor:col-resize;border-left:1px solid #cbd5e1;border-right:1px solid #cbd5e1}.pcf-rs:hover{background:#bfdbfe}'
-    + '.pcf-pv{flex:1;padding:14px;background:#f8fafc;overflow:auto;min-width:160px}'
-    + '.pcf-pvh{font-weight:700;margin-bottom:8px;font-size:12px;border-bottom:1px solid #e2e8f0;padding:4px 6px 6px;display:flex;align-items:center;gap:6px;border-radius:4px}'
-    + '.pcf-pvh span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pcf-act{border:none;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}'
     + '.pcf-att{display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1e40af;padding:3px 8px;border-radius:4px;font-size:10.5px;font-weight:600;text-decoration:none;margin:0 4px 4px 0}'
-    + '.pcf-pre{white-space:pre-wrap;font-family:"Malgun Gothic","맑은 고딕",monospace;color:#475569;line-height:1.8;background:#fff;border:1px solid #e2e8f0;border-radius:4px;padding:20px 24px;margin:0 auto;max-height:500px;overflow:auto;max-width:640px}'
-    + '.pcf-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:200px;color:#94a3b8;gap:8px;font-size:11.5px}'
     + '.pcf-none{color:#94a3b8;font-size:11.5px;text-align:center;padding:48px;border:1px dashed #e2e8f0;margin:16px;border-radius:4px}'
     + '.pcf-mbg{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px}'
     + '.pcf-m{background:#fff;border-radius:12px;width:780px;max-width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden}'
@@ -344,7 +396,29 @@
     + '.pcf-hvh b{flex:1;min-width:120px;color:#166534;font-size:13px}'
     + '.pcf-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:1400;display:flex;gap:12px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}'
     + '.pcf-toast button{background:#fbbf24;color:#1e293b;border:none;border-radius:5px;padding:3px 10px;font-weight:700;cursor:pointer}'
-    + '@media(max-width:768px){.pcf-split{flex-direction:column}.pcf-list{max-height:40vh}.pcf-rs{display:none}.pcf-pre{max-width:100%}}';
+    + '.pcf-tk{display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;border-radius:6px;padding:5px 8px 5px 24px;font-size:12.5px;color:#334155;cursor:pointer;font-family:inherit;text-align:left}'
+    + '.pcf-tk:hover{background:#eff6ff}.pcf-tk .pcf-car{width:10px;color:#94a3b8;font-size:10px}'
+    + '.pcf-tk i{font-style:normal;margin-left:auto;font-size:10.5px;color:#64748b;background:#e2e8f0;border-radius:9px;padding:0 6px}'
+    + '.pcf-tg{padding:4px 8px 2px 40px;font-size:11px;color:#94a3b8}'
+    + '.pcf-tl{display:block;width:100%;background:none;border:none;border-radius:6px;padding:4px 8px 4px 40px;font-size:12px;color:#475569;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit}'
+    + '.pcf-tl:hover{background:#eff6ff}.pcf-tl.on{background:#bfdbfe;color:#1e40af;font-weight:700}.pcf-tl.off{color:#94a3b8;text-decoration:line-through}.pcf-tl.add{color:#2563eb;font-size:11.5px}'
+    + '.pcf-top{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px 8px 0 0;padding:8px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}'
+    + '.pcf-top b{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.pcf-top2{border:1px solid #e2e8f0;border-top:none;padding:6px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#fff}'
+    + '.pcf-top2 .pcf-strip{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:11.5px;color:#64748b}'
+    + '.pcf-ok{background:#dcfce7;color:#166534;border-radius:9px;padding:0 7px;font-size:10.5px;font-weight:700}'
+    + '.pcf-sheetwrap{background:#e2e8f0;padding:24px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px}'
+    + '.pcf-sheet{background:#fff;max-width:820px;margin:0 auto;padding:56px 64px;box-shadow:0 1px 3px rgba(15,23,42,.15);min-height:600px;position:relative}'
+    + '.pcf-offband{background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:6px 10px;border-radius:4px;margin-bottom:16px}'
+    + '.pcf-body{white-space:pre-wrap;font-family:"Malgun Gothic","맑은 고딕",monospace;font-size:13px;line-height:1.85;color:#1e293b;margin:0}'
+    + '.pcf-v{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}'
+    + '.pcf-muted{color:#94a3b8}'
+    + '.pcf-home{border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;padding:40px 20px;text-align:center;color:#64748b}'
+    + '.pcf-home .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;max-width:640px;margin:18px auto 0}'
+    + '.pcf-home button{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:12px;cursor:pointer;font-family:inherit;font-size:12.5px;color:#334155}'
+    + '.pcf-home button:hover{border-color:#93c5fd;background:#eff6ff}'
+    + '.pcf-msel{display:none;gap:6px;margin-bottom:10px}.pcf-msel select{flex:1;min-width:0;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}'
+    + '@media(max-width:700px){.pcf-msel{display:flex}.pcf-sheetwrap{padding:8px}.pcf-sheet{padding:24px 18px;min-height:0}.pcf-body{font-size:12.5px}}';
 
   var _toastT = null;
   function toast(msg, undo) {
@@ -411,6 +485,7 @@
       name: '', body: '', attachments: [], enabled: true, createdAt: todayYMD()
     }));
     if (!Array.isArray(f.attachments)) f.attachments = [];
+    if (!Array.isArray(f.originals)) f.originals = [];
     var k = kindInfo(f.kind);
     var bg = el('div', { 'class': 'pcf-mbg' });
     function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
@@ -431,29 +506,54 @@
       bodyIn.focus(); bodyIn.selectionStart = bodyIn.selectionEnd = s + code.length;
     }
     var attWrap = el('div');
+    var pending = 0; // 올리는 중(보관함·읽기)인 파일 수 — 이게 있는 채로 저장하면 첨부가 통째로 빠진다
     function drawAtts() {
       attWrap.innerHTML = '';
-      if (!f.attachments.length) { attWrap.appendChild(el('div', { style: 'font-size:11px;color:#94a3b8;margin-top:6px', text: '첨부된 파일 없음' })); return; }
+      var arcd = {};
+      f.originals.forEach(function (o) { if (o.attId) arcd[o.attId] = 1; });
+      var only = f.originals.filter(function (o) { return !o.attId; });
+      if (!f.attachments.length && !only.length && !pending) { attWrap.appendChild(el('div', { style: 'font-size:11px;color:#94a3b8;margin-top:6px', text: '첨부된 파일 없음' })); return; }
       f.attachments.forEach(function (a) {
         attWrap.appendChild(el('div', { 'class': 'pcf-arow' }, [
           el('span', { text: '📎' }), el('span', { 'class': 'n', text: a.name, title: a.name }),
+          arcd[attKey(a)] ? el('span', { 'class': 'pcf-ok', text: '보관함' }) : null,
           el('span', { style: 'color:#94a3b8;font-family:monospace;font-size:10.5px', text: ((a.size || 0) / 1024).toFixed(1) + 'KB' }),
           /\.(hwp|hwpx)$/i.test(a.name || '') ? el('button', { type: 'button', 'class': 'pcf-b g', title: '원본 미리보기', text: '🔍',
             onclick: function () { openHwpPreview(a, function (t) { bodyIn.value = t; }); } }) : null,
-          el('button', { type: 'button', 'class': 'pcf-b', style: 'color:#dc2626', text: '×', title: '첨부 빼기',
+          el('button', { type: 'button', 'class': 'pcf-b', style: 'color:#dc2626', text: '×', title: '첨부 빼기 (보관함 사본은 남습니다)',
             onclick: function () { f.attachments = f.attachments.filter(function (x) { return x.id !== a.id; }); drawAtts(); } })
         ]));
       });
+      only.forEach(function (o) {
+        attWrap.appendChild(el('div', { 'class': 'pcf-arow' }, [
+          el('span', { text: '🗄' }), el('span', { 'class': 'n', text: o.name, title: o.name }),
+          el('span', { 'class': 'pcf-ok', text: '보관함에만 (1MB 초과)' }),
+          el('span', { style: 'color:#94a3b8;font-family:monospace;font-size:10.5px', text: ((o.size || 0) / 1024 / 1024).toFixed(1) + 'MB' }),
+          el('button', { type: 'button', 'class': 'pcf-b', style: 'color:#dc2626', text: '×', title: '양식에서 빼기 (보관함 사본은 남습니다)',
+            onclick: function () { f.originals = f.originals.filter(function (x) { return x !== o; }); drawAtts(); } })
+        ]));
+      });
+      if (pending > 0) attWrap.appendChild(el('div', { style: 'font-size:11px;color:#94a3b8;margin-top:4px', text: '⏳ 올리는 중… (' + pending + ')' }));
     }
+    /* 첨부는 «읽기 끝나는 대로» 곧장 넣는다(보관함 응답을 기다리지 않는다) — 안 그러면
+       사람이 그 사이 [저장]을 눌러 첨부 없는 양식이 저장된다(원본 연결만 뒤늦게 붙는다). */
     function addFiles(files) {
       Array.prototype.forEach.call(files || [], function (file) {
-        if (file.size > 1024 * 1024) { toast(file.name + ': 1MB 초과'); return; }
-        var rd = new FileReader();
-        rd.onload = function (ev) {
-          f.attachments.push({ id: newId('at-'), name: file.name, size: file.size, type: file.type, data: ev.target.result });
+        var small = file.size <= ATTACH_MAX;
+        if (!small && !opts.archiveFile) { toast(file.name + ': 1MB 초과'); return; }
+        var attId = newId('at-');
+        var from = { kind: 'form', formId: f.id, formName: nameIn.value.trim() || f.name || file.name, formKind: f.kind };
+        pending++; drawAtts();
+        var dataP = (small ? readDataUrl(file) : Promise.resolve('')).then(function (dataUrl) {
+          if (small) { f.attachments.push({ id: attId, name: file.name, size: file.size, type: file.type, data: dataUrl }); drawAtts(); }
+        });
+        var arcP = (opts.archiveFile ? opts.archiveFile(file, from) : Promise.resolve({ why: '' })).then(function (arc) {
+          if (!small && !arc.fileId) { toast('❌ ' + file.name + ': 1MB 초과 파일은 보관함에만 담을 수 있는데 보관함이 실패했습니다 — ' + arc.why); return; }
+          if (arc.fileId) f.originals.push(origEntry(arc.fileId, file, small ? attId : ''));
+          else if (arc.why) toast('⚠ ' + file.name + ': 보관함 사본을 못 남겼습니다 — ' + arc.why);
           drawAtts();
-        };
-        rd.readAsDataURL(file);
+        });
+        Promise.all([dataP, arcP]).then(function () { pending--; drawAtts(); }, function () { pending--; drawAtts(); });
       });
     }
     var fileIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.docx,.doc,.pdf', style: 'display:none',
@@ -466,6 +566,7 @@
     drawAtts();
 
     function save() {
+      if (pending > 0) { toast('파일을 올리는 중입니다 — 끝나면 저장하세요'); return; }
       f.name = nameIn.value.trim(); f.body = bodyIn.value; f.enabled = onIn.checked;
       if (grpIn) { var g = grpIn.value.trim(); if (g) f.groupName = g; else delete f.groupName; }
       if (!f.name) { toast('양식 이름을 넣어 주세요'); nameIn.focus(); return; }
@@ -490,7 +591,7 @@
           }))
         ]),
         el('label', { 'class': 'l', text: '본문 (칸은 계약 자료로 바뀝니다) *' }), bodyIn,
-        el('label', { 'class': 'l', text: '원본 파일 첨부 (HWPX/HWP/DOCX/PDF · 1MB 이하 · 내려받기용, 칸 바꾸기 안 됨)' }), drop
+        el('label', { 'class': 'l', text: '원본 파일 (HWPX/HWP/DOCX/PDF · 올리면 원본 보관함에 사본이 영구 보관됩니다 · 1MB 초과는 보관함에만)' }), drop
       ]),
       el('div', { 'class': 'pcf-mf' }, [
         el('button', { type: 'button', 'class': 'pcf-b', text: '취소', onclick: close }),
@@ -503,14 +604,23 @@
     setTimeout(function () { nameIn.focus(); }, 0);
   }
 
-  /* ══ 양식 관리 화면 — host: { db, track(promise)?, canEdit? } ══ */
+  /* ══ 양식 관리 화면 — host: { db, track?, tree?, selected?, onSelect?, archive?, downloadOriginal? } ══
+     왼쪽 트리(host.tree)에서 고르고, 오른쪽(root)에 A4 종이 한 장으로 크게 본다 (대표 지시 2026-09-26) */
   function mount(root, host) {
     var db = host.db;
     var track = host.track || function (p) { return p; };
     if (!document.getElementById('pcf-css')) {
       var st = document.createElement('style'); st.id = 'pcf-css'; st.textContent = CSS; document.head.appendChild(st);
     }
-    var S = { forms: [], removed: [], tab: KINDS[0].v, hover: null, pinned: null, closed: {}, leftPct: 55, loaded: false, err: null };
+    var S = { forms: [], removed: [], sel: host.selected || null, kind: 'company', open: loadOpen(), loaded: false, err: null };
+
+    function loadOpen() {
+      try { var v = JSON.parse(localStorage.getItem('pcf_tree_open') || 'null'); if (v && typeof v === 'object') return v; } catch (_) {}
+      var all = {}; KINDS.forEach(function (k) { all[k.v] = true; }); return all;
+    }
+    function saveOpen() { try { localStorage.setItem('pcf_tree_open', JSON.stringify(S.open)); } catch (_) {} }
+    function cur() { return S.sel ? S.forms.filter(function (x) { return x.id === S.sel; })[0] || null : null; }
+    function curKind() { var fm = cur(); return fm ? fm.kind : S.kind; }
 
     function load() {
       S.err = null;
@@ -518,20 +628,37 @@
         var cf = r[0].val(), rm = r[1].val();
         S.removed = listOf(rm && rm.v);
         S.forms = mergeSeeds(listOf(cf && cf.v), S.removed).list;
-        S.loaded = true; draw();
-      }).catch(function (e) { S.err = (e && e.message) || String(e); draw(); });
+        S.loaded = true;
+        var fm = cur();
+        if (S.sel && !fm) { S.sel = null; if (host.onSelect) host.onSelect(null); }
+        if (fm) { S.kind = fm.kind; S.open[fm.kind] = true; }
+        drawTree(); drawMain();
+      }).catch(function (e) { S.err = (e && e.message) || String(e); drawTree(); drawMain(); });
     }
     /* 한 번 고치고 → 서버가 돌려준 목록으로 다시 그린다 */
     function change(fn, okMsg, undo) {
       return track(changeForms(db, S.removed, fn)).then(function (list) {
         S.forms = list;
-        if (S.pinned) S.pinned = list.filter(function (x) { return x.id === S.pinned.id; })[0] || null;
-        S.hover = null; draw();
+        if (S.sel && !cur()) S.sel = null;
+        drawTree(); drawMain();
         if (okMsg) toast(okMsg, undo);
         return list;
       }).catch(function (e) { toast('⚠ 저장 실패 — ' + ((e && e.message) || e)); throw e; });
     }
-    function byKind(v) { return S.forms.filter(function (x) { return x.kind === v; }); }
+    function select(id) {
+      S.sel = id || null;
+      var fm = cur();
+      if (fm) { S.kind = fm.kind; if (!S.open[fm.kind]) { S.open[fm.kind] = true; saveOpen(); } }
+      drawTree(); drawMain();
+      if (host.onSelect) host.onSelect(S.sel);
+    }
+    /* 파일 하나를 보관함에 — 실패는 던지지 않고 {why} 로 돌려준다(양식 저장은 계속한다) */
+    function archiveFile(file, from) {
+      if (!host.archive) return Promise.resolve({ why: '' });
+      return readBytes(file).then(function (bytes) {
+        return host.archive({ name: file.name, size: file.size, type: file.type || '', bytes: bytes }, from);
+      }).then(function (r) { return { fileId: r && r.fileId }; }, function (e) { return { why: (e && e.message) || String(e) }; });
+    }
 
     function save(form, close) {
       change(function (list) {
@@ -539,27 +666,31 @@
         list.forEach(function (x, i) { if (x.id === form.id) at = i; });
         if (at >= 0) list[at] = form; else list.push(form);
         return list;
-      }, '저장했습니다').then(close, function () {});
+      }, '저장했습니다').then(function () { close(); select(form.id); }, function () {});
     }
     function copy(fm) {
       var c = JSON.parse(JSON.stringify(fm)); c.id = 'fm-copy-' + Date.now(); c.name = fm.name + ' (복사)';
-      change(function (list) { return list.concat([c]); }, '복제했습니다').catch(function () {});
+      change(function (list) { return list.concat([c]); }, '복제했습니다').then(function () { select(c.id); }, function () {});
     }
     function del(fm) {
-      if (!w.confirm('"' + fm.name + '" 양식을 지울까요?')) return;
+      if (!w.confirm('"' + fm.name + '" 양식을 지울까요?\n(올린 원본은 원본 보관함에 그대로 남습니다)')) return;
       var seed = isSeedId(fm.id);
       var p = seed ? track(changeRemoved(db, function (rm) { if (rm.indexOf(fm.id) < 0) rm.push(fm.id); return rm; }))
                       .then(function (rm) { S.removed = rm; }) : Promise.resolve();
       p.then(function () {
-        if (S.pinned && S.pinned.id === fm.id) S.pinned = null;
         return change(function (list) { return list.filter(function (x) { return x.id !== fm.id; }); }, '🗑️ 양식을 지웠습니다', function () {
           /* 되돌리기 — «그 한 건»만 다시 넣는다(통째로 되돌리면 그사이 남이 고친 것을 지운다) */
           var q = seed ? track(changeRemoved(db, function (rm) { return rm.filter(function (x) { return x !== fm.id; }); }))
                            .then(function (rm) { S.removed = rm; }) : Promise.resolve();
           q.then(function () {
             return change(function (list) { return list.some(function (x) { return x.id === fm.id; }) ? list : list.concat([fm]); }, '되돌렸습니다');
-          }).catch(function () {});
+          }).then(function () { select(fm.id); }).catch(function () {});
         });
+      }).then(function () {
+        /* ⚠ change() 가 성공한 «뒤에만» 고른 것을 놓는다 — 실패했으면(네트워크 등)
+           양식은 그대로 남아 있으므로 고른 것도 그대로 둔다. */
+        if (S.sel === fm.id) S.sel = null;
+        if (host.onSelect) host.onSelect(S.sel);
       }).catch(function (e) { toast('⚠ 지우지 못했습니다 — ' + ((e && e.message) || e)); });
     }
     function reseedChedang() {
@@ -580,158 +711,167 @@
       if (!arr.length) return;
       toast('📎 ' + arr.length + '개 파일 읽는 중…');
       var jobs = arr.map(function (file) {
-        return new Promise(function (res) {
-          if (file.size > 1024 * 1024) { toast(file.name + ': 1MB 초과'); res(null); return; }
-          var dataUrl = null, text = null, warn = false, step = 0;
-          function one() {
-            if (++step < 2) return;
-            res({ warn: warn, form: {
-              id: newId('fm-'), kind: kind, name: file.name.replace(/\.[^.]+$/, ''), body: text || '',
-              attachments: [{ id: newId('at-'), name: file.name, size: file.size, type: file.type, data: dataUrl }],
-              enabled: true, createdAt: todayYMD() } });
-          }
-          var rd = new FileReader();
-          rd.onload = function (ev) { dataUrl = ev.target.result; one(); };
-          rd.onerror = function () { dataUrl = ''; one(); };
-          rd.readAsDataURL(file);
-          extractTemplateText(file, function (t, err) { if (err) { warn = true; text = ''; } else text = t; one(); });
+        var id = newId('fm-'), name = file.name.replace(/\.[^.]+$/, ''), attId = newId('at-');
+        var small = file.size <= ATTACH_MAX;
+        if (!small && !host.archive) { toast(file.name + ': 1MB 초과'); return Promise.resolve(null); }
+        return Promise.all([
+          small ? readDataUrl(file) : Promise.resolve(''),
+          new Promise(function (res) { extractTemplateText(file, function (t, err) { res(err ? null : (t || '')); }); }),
+          archiveFile(file, { kind: 'form', formId: id, formName: name, formKind: kind })
+        ]).then(function (r) {
+          var arc = r[2];
+          if (!small && !arc.fileId) { toast('❌ ' + file.name + ': 1MB 초과 파일은 보관함에만 담을 수 있는데 보관함이 실패했습니다 — ' + arc.why); return null; }
+          return { warn: r[1] == null, arcWhy: arc.fileId ? '' : (arc.why || ''), form: {
+            id: id, kind: kind, name: name, body: r[1] || '',
+            attachments: small ? [{ id: attId, name: file.name, size: file.size, type: file.type, data: r[0] }] : [],
+            originals: arc.fileId ? [origEntry(arc.fileId, file, small ? attId : '')] : [],
+            enabled: true, createdAt: todayYMD() } };
         });
       });
       Promise.all(jobs).then(function (rs) {
         rs = rs.filter(Boolean);
         if (!rs.length) return;
         var warns = rs.filter(function (r) { return r.warn; }).length;
+        var arcFail = rs.filter(function (r) { return r.arcWhy; });
         change(function (list) { return list.concat(rs.map(function (r) { return r.form; })); },
-          rs.length + '개 양식 등록' + (warns ? ' · ' + warns + '개는 글자를 못 뽑아 첨부만 저장' : '')).catch(function () {});
+          rs.length + '개 양식 등록' + (warns ? ' · ' + warns + '개는 글자를 못 뽑아 첨부만 저장' : '')
+            + (arcFail.length ? ' · ⚠ 보관함 사본 ' + arcFail.length + '개 실패 — ' + arcFail[0].arcWhy : ''))
+          .then(function () { select(rs[rs.length - 1].form.id); }, function () {});
       });
     }
     function filesOf(e) { return e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length ? e.dataTransfer.files : null; }
+    function modal(o) { o.archiveFile = archiveFile; openModal(o); }
 
-    function drawPreview(pv) {
-      var fm = S.pinned || S.hover;
-      pv.innerHTML = '';
-      if (!fm) {
-        pv.appendChild(el('div', { 'class': 'pcf-empty' }, [el('span', { style: 'font-size:32px', text: '👆' }),
-          el('span', { text: '양식 위에 마우스를 올리면' }), el('span', { text: '미리보기가 나옵니다 · 누르면 고정' })]));
-        return;
-      }
-      var pinned = S.pinned && S.pinned.id === fm.id;
-      var fs = Math.max(9, Math.min(15, Math.round(7 + (100 - S.leftPct) / 8)));
-      pv.appendChild(el('div', { 'class': 'pcf-pvh', style: pinned ? 'background:#eff6ff' : '' }, [
-        el('span', { text: (pinned ? '📌 ' : '📄 ') + fm.name + (pinned ? ' (고정됨)' : ''), title: fm.name }),
-        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '수정',
-          onclick: function () { openModal({ kind: fm.kind, cur: fm, onSave: save }); } }),
-        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', text: '복제', onclick: function () { copy(fm); } }),
-        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#dc2626', text: '삭제', onclick: function () { del(fm); } })
-      ]));
-      if (fm.attachments && fm.attachments.length) {
-        pv.appendChild(el('div', { style: 'margin-bottom:8px' }, fm.attachments.map(function (a) {
-          return el('a', { 'class': 'pcf-att', href: a.data || a.dataUrl || '#', download: a.name || '첨부', text: '📥 ' + (a.name || '첨부') });
-        })));
-      }
-      pv.appendChild(fm.body
-        ? el('pre', { 'class': 'pcf-pre', style: 'font-size:' + fs + 'px', text: fm.body })
-        : el('div', { style: 'color:#94a3b8;font-size:11px;text-align:center;margin-top:40px', text: '본문 없음' }));
+    /* ── 왼쪽 트리 ── */
+    function drawTree() {
+      var t = host.tree; if (!t) return;
+      t.innerHTML = '';
+      if (!S.loaded) return;
+      treeModel(S.forms).forEach(function (k) {
+        var open = !!S.open[k.kind];
+        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk', 'aria-expanded': open ? 'true' : 'false',
+          onclick: function () { S.open[k.kind] = !open; saveOpen(); drawTree(); } },
+          [el('span', { 'class': 'pcf-car', text: open ? '▾' : '▸' }), el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(k.count) })]));
+        if (!open) return;
+        k.groups.forEach(function (g) {
+          if (g.name) t.appendChild(el('div', { 'class': 'pcf-tg', text: '📁 ' + g.name }));
+          g.forms.forEach(function (f) {
+            var on = S.sel === f.id;
+            t.appendChild(el('button', { type: 'button', 'class': 'pcf-tl' + (on ? ' on' : '') + (f.enabled ? '' : ' off'),
+              title: f.name + (f.enabled ? '' : ' (사용 안 함)'), 'aria-current': on ? 'true' : null,
+              onclick: function () { select(f.id); } }, [f.name]));
+          });
+        });
+        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tl add', text: '+ 새 양식',
+          onclick: function () { modal({ kind: k.kind, onSave: save }); } }));
+      });
     }
 
-    function draw() {
+    /* ── 오른쪽 ── */
+    function mobileSelects() {
+      var fm = cur(), kv = curKind();
+      var kSel = el('select', { 'aria-label': '계약 종류', onchange: function () {
+        S.kind = kSel.value;
+        var first = S.forms.filter(function (x) { return x.kind === S.kind; })[0];
+        select(first ? first.id : null);
+      } }, KINDS.map(function (k) {
+        var n = S.forms.filter(function (x) { return x.kind === k.v; }).length;
+        return el('option', { value: k.v, text: k.label + ' (' + n + ')', selected: k.v === kv });
+      }));
+      var fSel = el('select', { 'aria-label': '양식', onchange: function () { select(fSel.value || null); } },
+        [el('option', { value: '', text: '— 양식 고르기 —' })].concat(S.forms.filter(function (x) { return x.kind === kv; }).map(function (x) {
+          return el('option', { value: x.id, text: x.name, selected: !!(fm && fm.id === x.id) });
+        })));
+      return el('div', { 'class': 'pcf-msel' }, [kSel, fSel]);
+    }
+    function uploadBtn(kind) {
+      var upIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.docx,.doc,.pdf', style: 'display:none',
+        onchange: function (e) { quickUpload(kind, e.target.files); e.target.value = ''; } });
+      var b = el('label', { 'class': 'pcf-b g', title: '📎 파일을 이 단추 위로 끌어다 놓아도 됩니다\n· HWPX · HWP · DOCX · DOC · PDF\n· 올리면 원본 보관함에 사본이 영구 보관됩니다\n· 1MB 초과는 보관함에만 담깁니다',
+        ondragover: function (e) { e.preventDefault(); b.style.background = '#bbf7d0'; },
+        ondragleave: function () { b.style.background = ''; },
+        ondrop: function (e) { e.preventDefault(); b.style.background = ''; var fl = filesOf(e); if (fl) quickUpload(kind, fl); } },
+        ['📎 파일 업로드', upIn]);
+      return b;
+    }
+    function toolbar(fm) {
+      var kind = curKind(), k = kindInfo(kind);
+      var top = el('div', { 'class': 'pcf-top' }, fm ? [
+        el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' + k.label + ' · ' }), fm.name]),
+        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '수정', onclick: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } }),
+        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', text: '복제', onclick: function () { copy(fm); } }),
+        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#dc2626', text: '삭제', onclick: function () { del(fm); } })
+      ] : [el('b', { text: '계약서 양식' })]);
+      var strip = el('div', { 'class': 'pcf-strip' });
+      if (fm) {
+        var arcd = {};
+        (fm.originals || []).forEach(function (o) { if (o.attId) arcd[o.attId] = 1; });
+        (fm.attachments || []).forEach(function (a) {
+          strip.appendChild(el('a', { 'class': 'pcf-att', href: a.data || a.dataUrl || '#', download: a.name || '첨부', text: '📥 ' + (a.name || '첨부') }));
+          if (/\.(hwp|hwpx)$/i.test(a.name || '')) strip.appendChild(el('button', { type: 'button', 'class': 'pcf-b g', title: '한글 원본 미리보기', text: '🔍', onclick: function () { openHwpPreview(a, null); } }));
+          if (arcd[attKey(a)]) strip.appendChild(el('span', { 'class': 'pcf-ok', text: '✓ 보관함' }));
+        });
+        (fm.originals || []).filter(function (o) { return !o.attId; }).forEach(function (o) {
+          strip.appendChild(el('button', { type: 'button', 'class': 'pcf-att', style: 'border:none;cursor:pointer', title: '원본 보관함에서 내려받기',
+            text: '🗄 ' + o.name, onclick: function () { if (host.downloadOriginal) host.downloadOriginal(o.fileId, o.name); else toast('보관함이 연결되지 않았습니다'); } }));
+        });
+        if (!strip.childNodes.length) strip.appendChild(el('span', { text: '원본 파일 없음' }));
+      } else strip.appendChild(el('span', { text: '왼쪽에서 양식을 고르세요' }));
+      var top2 = el('div', { 'class': 'pcf-top2' }, [strip,
+        uploadBtn(kind),
+        el('button', { type: 'button', 'class': 'pcf-b b', text: '+ 양식 추가', onclick: function () { modal({ kind: kind, onSave: save }); } }),
+        el('button', { type: 'button', 'class': 'pcf-b', title: 'rhwp(한글 미리보기 엔진) 최신 판 확인', text: 'rhwp v' + rhwpVer() + ' ⟳', onclick: rhwpUpdatePrompt }),
+        kind === 'case' ? el('button', { type: 'button', 'class': 'pcf-b y', text: '📥 체당금 시드', onclick: reseedChedang }) : null
+      ]);
+      return el('div', null, [top, top2]);
+    }
+    function paper(fm) {
+      var sheet = el('div', { 'class': 'pcf-sheet' });
+      if (fm.enabled === false) sheet.appendChild(el('div', { 'class': 'pcf-offband', text: '사용 안 함 — 계약서 출력 때 고를 수 없습니다' }));
+      var pre = el('pre', { 'class': 'pcf-body' });
+      var parts = splitVars(fm.body);
+      if (!parts.length) pre.appendChild(el('span', { 'class': 'pcf-muted', text: '본문 없음 — [수정]에서 넣으세요' }));
+      parts.forEach(function (p) {
+        pre.appendChild(p.v ? el('span', { 'class': 'pcf-v', text: p.t }) : document.createTextNode(p.t));
+      });
+      sheet.appendChild(pre);
+      var wrap = el('div', { 'class': 'pcf-sheetwrap',
+        ondragover: function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) e.preventDefault(); },
+        ondrop: function (e) { var fl = filesOf(e); if (fl) { e.preventDefault(); quickUpload(fm.kind, fl); } } }, [sheet]);
+      return wrap;
+    }
+    function home() {
+      return el('div', { 'class': 'pcf-home' }, [
+        el('div', { style: 'font-size:28px', text: '📄' }),
+        el('div', { style: 'margin-top:6px', text: '왼쪽에서 양식을 고르면 여기에 크게 보입니다' }),
+        el('div', { 'class': 'g' }, treeModel(S.forms).map(function (k) {
+          return el('button', { type: 'button', onclick: function () {
+            S.kind = k.kind; S.open[k.kind] = true; saveOpen();
+            var f0 = k.groups.reduce(function (a, g) { return a.concat(g.forms); }, [])[0];
+            select(f0 ? f0.id : null);
+          } }, [el('div', { style: 'font-size:18px', text: k.icon }), el('div', { text: k.label }), el('div', { style: 'font-size:11px;color:#94a3b8', text: k.count + '개' })]);
+        }))
+      ]);
+    }
+    function drawMain() {
       root.innerHTML = '';
       var wrap = el('div', { 'class': 'pcf' });
-      wrap.appendChild(el('div', { 'class': 'pcf-desc', text: '계약유형(6종)별로 계약서 양식을 등록·관리합니다. 푸른이알피 계약관리의 [📄 계약서 출력]이 이 양식을 씁니다. {{회사명}}, {{계약금액}} 같은 칸은 계약 자료로 자동으로 채워집니다.' }));
       if (S.err) {
         wrap.appendChild(el('div', { 'class': 'pcf-none', style: 'color:#991b1b' }, ['양식을 불러오지 못했습니다 — ' + S.err + ' ',
           el('button', { type: 'button', 'class': 'pcf-b', text: '다시 불러오기', onclick: load })]));
         root.appendChild(wrap); return;
       }
       if (!S.loaded) { wrap.appendChild(el('div', { 'class': 'pcf-none', text: '불러오는 중…' })); root.appendChild(wrap); return; }
-
-      wrap.appendChild(el('div', { 'class': 'pcf-kinds', role: 'tablist' }, KINDS.map(function (k) {
-        var on = S.tab === k.v;
-        return el('button', { type: 'button', role: 'tab', 'aria-selected': on ? 'true' : 'false', 'class': 'pcf-kind',
-          style: on ? 'color:' + k.color + ';border-bottom-color:' + k.color + ';font-weight:700' : '',
-          onclick: function () { S.tab = k.v; S.hover = null; S.pinned = null; draw(); } },
-          [el('span', { text: k.icon }), el('span', { text: k.label }),
-           el('i', { style: on ? 'background:' + k.color + ';color:#fff' : '', text: String(byKind(k.v).length) })]);
-      })));
-
-      var k = kindInfo(S.tab), list = byKind(k.v);
-      var upIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.docx,.doc,.pdf', style: 'display:none',
-        onchange: function (e) { quickUpload(k.v, e.target.files); e.target.value = ''; } });
-      var upBtn = el('label', { 'class': 'pcf-b g', title: '📎 파일을 이 단추 위로 끌어다 놓아도 됩니다\n· HWPX · HWP · DOCX · DOC · PDF\n· 여러 개 한꺼번에 · 파일당 1MB 까지',
-        ondragover: function (e) { e.preventDefault(); upBtn.style.background = '#bbf7d0'; },
-        ondragleave: function () { upBtn.style.background = ''; },
-        ondrop: function (e) { e.preventDefault(); upBtn.style.background = ''; var fl = filesOf(e); if (fl) quickUpload(k.v, fl); } },
-        ['📎 파일 업로드', upIn]);
-      var box = el('div', { 'class': 'pcf-box' });
-      box.appendChild(el('div', { 'class': 'pcf-bar' }, [
-        el('span', { text: k.icon }), el('b', { style: 'color:' + k.color, text: k.label + ' 양식' }),
-        upBtn,
-        el('button', { type: 'button', 'class': 'pcf-b b', text: '+ 양식 추가', onclick: function () { openModal({ kind: k.v, onSave: save }); } }),
-        el('button', { type: 'button', 'class': 'pcf-b', title: 'rhwp(한글 미리보기 엔진) 최신 판 확인', text: 'rhwp v' + rhwpVer() + ' ⟳', onclick: rhwpUpdatePrompt }),
-        k.v === 'case' ? el('button', { type: 'button', 'class': 'pcf-b y', text: '📥 체당금 시드', onclick: reseedChedang }) : null
-      ]));
-
-      var split = el('div', { 'class': 'pcf-split' });
-      var left = el('div', { 'class': 'pcf-list', style: 'flex:0 0 ' + S.leftPct + '%',
-        ondragover: function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) { e.preventDefault(); left.style.background = '#f0fdf4'; } },
-        ondragleave: function () { left.style.background = ''; },
-        ondrop: function (e) { left.style.background = ''; var fl = filesOf(e); if (fl) { e.preventDefault(); quickUpload(k.v, fl); } } });
-      var pv = el('div', { 'class': 'pcf-pv' });
-      if (!list.length) left.appendChild(el('div', { 'class': 'pcf-none', text: '양식 없음 — 위 단추로 더하세요' }));
-      else {
-        var tb = el('tbody');
-        function row(fm) {
-          var on = S.pinned && S.pinned.id === fm.id;
-          var att = (fm.attachments || []).length;
-          tb.appendChild(el('tr', { 'class': 'r' + (on ? ' on' : ''), title: on ? '누르면 고정 풀기' : '누르면 고정',
-            onmouseenter: function () { if (!S.pinned) { S.hover = fm; drawPreview(pv); } },
-            onmouseleave: function () { if (!S.pinned) { S.hover = null; drawPreview(pv); } },
-            onclick: function () { S.pinned = on ? null : fm; S.hover = null; draw(); } }, [
-            el('td', { style: 'text-align:center;width:44px' }, [el('span', { 'class': 'pcf-dot', style: 'background:' + (fm.enabled !== false ? '#16a34a' : '#e2e8f0') })]),
-            el('td', { style: 'font-weight:500', text: fm.name, title: fm.name }),
-            el('td', { style: 'text-align:right;width:64px;color:#64748b;font-family:monospace;font-size:10.5px', text: fm.body ? fm.body.length + '자' : '-' }),
-            el('td', { style: 'text-align:center;width:44px' }, [att ? el('span', { 'class': 'pcf-cnt', text: att + '개' }) : el('span', { style: 'color:#cbd5e1', text: '-' })])
-          ]));
-        }
-        if (k.v === 'case') {
-          var sorted = list.slice().sort(function (a, b) { return (a.groupName || '미지정').localeCompare(b.groupName || '미지정'); });
-          var prev = null;
-          sorted.forEach(function (fm) {
-            var g = fm.groupName || '미지정';
-            if (g !== prev) {
-              prev = g;
-              var n = sorted.filter(function (x) { return (x.groupName || '미지정') === g; }).length;
-              tb.appendChild(el('tr', { 'class': 'g', onclick: function () { S.closed[g] = !S.closed[g]; draw(); } },
-                [el('td', { colspan: '4', text: (S.closed[g] ? '▶' : '▼') + ' 📁 ' + g + ' (' + n + '건)' })]));
-            }
-            if (!S.closed[g]) row(fm);
-          });
-        } else list.forEach(row);
-        left.appendChild(el('table', null, [
-          el('thead', null, [el('tr', null, [el('th', { style: 'width:44px', text: '상태' }), el('th', { style: 'text-align:left', text: '양식명' }),
-            el('th', { style: 'text-align:right;width:64px', text: '본문' }), el('th', { style: 'width:44px', text: '📎' })])]),
-          tb]));
-      }
-      var rs = el('div', { 'class': 'pcf-rs', title: '끌어서 넓이 조절', onmousedown: function (e) {
-        e.preventDefault();
-        function mv(ev) {
-          var r = split.getBoundingClientRect();
-          var p = Math.round(((ev.clientX - r.left) / r.width) * 100);
-          if (p >= 25 && p <= 80) { S.leftPct = p; left.style.flex = '0 0 ' + p + '%'; drawPreview(pv); }
-        }
-        function up() { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); }
-        document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
-      } });
-      split.appendChild(left); split.appendChild(rs); split.appendChild(pv);
-      drawPreview(pv);
-      box.appendChild(split);
-      wrap.appendChild(box);
+      var fm = cur();
+      wrap.appendChild(mobileSelects());
+      wrap.appendChild(toolbar(fm));
+      wrap.appendChild(fm ? paper(fm) : home());
       root.appendChild(wrap);
     }
 
-    draw();
+    drawTree(); drawMain();
     load();
-    return { reload: load };
+    return { reload: load, select: select, current: function () { return S.sel; } };
   }
 
   w.PuContractForms = {
@@ -745,6 +885,12 @@
     changeForms: changeForms,
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
+    treeModel: treeModel,
+    splitVars: splitVars,
+    attKey: attKey,
+    loadForms: loadForms,
+    linkOriginal: linkOriginal,
+    ATTACH_MAX: ATTACH_MAX,
     mount: mount
   };
 })(window);
