@@ -262,7 +262,7 @@ test('⑦ ★★ 처음 쓰는 기기면 카카오가 다시 묻게 하고, 카�
   assert.equal(막힘.부탁[0] && 막힘.부탁[0].ask, true, '★ 저장소를 못 읽으면 «묻는 쪽» 이어야 합니다');
 });
 
-function 나가기세상(kakao, 주소실패) {
+function 나가기세상(kakao, 주소실패, 주소) {
   const w = 세상({});
   const 일 = [];
   w.ctx.auth.currentUser = { getIdTokenResult: () => Promise.resolve({ claims: kakao ? { kakao: true } : {} }) };
@@ -272,7 +272,7 @@ function 나가기세상(kakao, 주소실패) {
     set href(v) { 일.push('go:' + v); },
   };
   w.ctx.window.PuKakao = {
-    logoutUrl: () => { 일.push('ask'); return 주소실패 ? Promise.reject(new Error('x')) : Promise.resolve('https://kauth.kakao.com/oauth/logout?x'); },
+    logoutUrl: () => { 일.push('ask'); return 주소실패 ? Promise.reject(new Error('x')) : Promise.resolve(주소 || 'https://kauth.kakao.com/oauth/logout?x'); },
   };
   w.ctx.PuKakao = w.ctx.window.PuKakao;
   싣기(w, ['kkLogoutFlow']);
@@ -301,6 +301,15 @@ test('⑧ ★ 카카오 주소를 못 받아도 로그아웃은 끝난다(멎어
   k.w.ctx.kkLogoutFlow();
   for (let i = 0; i < 6; i++) await 틈();
   assert.deepEqual([...k.일], ['signOut', 'ask', 'reload']);
+});
+
+test('⑧ ★★ 서버가 옛 판이라 «로그인» 주소를 주면 그리로 가지 않는다', async () => {
+  const k = 나가기세상(true, false, 'https://kauth.kakao.com/oauth/authorize?client_id=x');
+  k.w.ctx.kkLogoutFlow();
+  for (let i = 0; i < 6; i++) await 틈();
+  assert.ok(!k.일.some((x) => x.startsWith('go:')),
+    '★★ 로그아웃했는데 카카오 로그인 화면으로 보냈습니다 — 서버가 아직 옛 판일 때 그렇게 됩니다');
+  assert.equal(k.일[k.일.length - 1], 'reload');
 });
 
 test('⑧ 로그아웃 단추가 이 흐름을 부른다', () => {

@@ -3421,6 +3421,9 @@ body.portal-mode #moreFab{display:flex;}
         var t = setTimeout(function(){ if(!done){ done = true; location.reload(); } }, 4000);
         PuKakao.logoutUrl().then(function(url){
           if(done) return; done = true; clearTimeout(t);
+          /* ⚠ 카카오 «로그아웃» 주소일 때만 간다 — 서버가 아직 옛 판이면 kind 를 모르고 «로그인» 주소를
+             돌려준다. 그리로 가면 로그아웃 누른 사람이 카카오 로그인 화면에 서게 된다. */
+          if(!/^https:\/\/kauth\.kakao\.com\/oauth\/logout\?/.test(String(url || ''))) return location.reload();
           location.href = url;
         }).catch(function(){ if(!done){ done = true; clearTimeout(t); location.reload(); } });
       });

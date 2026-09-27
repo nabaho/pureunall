@@ -11,7 +11,10 @@
   내 PC·폰(카카오 쓴 기기)은 그대로 한 번에.
 - 카카오로 들어온 사람(표 `kakao:true`)의 포털 로그아웃 → 파이어베이스를 먼저 끊고, 카카오 로그아웃 주소를 거쳐
   로그인 화면으로 돌아온다. 주소를 4초 안에 못 받으면 그냥 새로 연다. 비밀번호 로그인은 예전 그대로.
-- 서버 `kakaoAuthUrl`: `prompt=login`(그 값만 받음) · `kind=logout`(카카오 로그아웃 주소) — **손으로 배포함**.
+- 서버 `kakaoAuthUrl`: `prompt=login`(그 값만 받음) · `kind=logout`(카카오 로그아웃 주소) — **아직 배포 안 됨**
+  (자동 배포가 권한에서 막혔다 — 사람이 `firebase deploy --only functions:kakaoAuthUrl` 해야 한다).
+  화면은 먼저 올라가도 안전하다: 옛 서버는 prompt 를 모른 채 무시하고, 로그아웃 주소가 «카카오 로그아웃» 이
+  아니면 화면은 그냥 새로 연다.
 - `js/pu-kakao.js` v=3: `goLogin({ask})` · `logoutUrl()`.
 
 ## 사람 손이 필요한 것
