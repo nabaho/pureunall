@@ -70,6 +70,8 @@ const baseTop = ['uid_roles','sid_roles','data','payroll_os','fund_erp','work_er
    ★ 최상위를 일부러 늘렸다면 여기에 적어라. 적지 않으면 아래 검사가 막는다
      (실수로 늘어난 것을 잡는 덫이라 자동으로 넘기지 않는다) */
 const allowTop = ['systemAlerts','systemBackups','systemBackupsIndex','systemRestoreLog',
+  /* 2026-09-27 푸른 캘린더 «나만 보기» 일정 — 본인만 읽고 쓴다(data 아래는 재무 권한자가 다 읽어서 안 된다) */
+  'cal_private',
   /* 2026-09-06 정부컨설팅 「이어는 두되 일정관리에서 진행할지는 따로」 스위치(대표 지시).
      다른 scal_* 과 같은 권한 — 직원은 읽고 쓰고, 지우기는 관리자만. */
   'scal_erpTypeRun',

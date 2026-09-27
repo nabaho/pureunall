@@ -603,6 +603,10 @@ rules.pucards = {
   tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': MAIL } },
   $k: { '.write': pucardsWrite, $k2: { '.write': MAIL } }
 };
+/* 푸른 캘린더 «나만 보기» 일정 (대표 지시 2026-09-27 「본인만 확인가능하고 다른사람은 확인안되게」,
+   추천대로 «관리자도 못 본다»). ⚠ data 아래가 아니다 — data 는 재무 권한자가 통째로 읽는다.
+   본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */
+rules.cal_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
 rules.pucards_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
 
 /* ══ 반출 기록 — 기업정보함에서 «밖으로 나간 것» (대표 지시 2026-08-29) ══

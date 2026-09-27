@@ -73,7 +73,7 @@
        ⚠ 업무 자료의 주인은 «이알피»다. 여기는 그 칸을 빌려 읽는다(sharedRoots).
          일정·근태를 새로 만들 때도 이알피의 칸에 쓴다 — 두 벌로 갈리면 급여가 틀어진다.
        제 것은 «보던 자리»뿐이다(어느 탭·어느 거르개였나) — data 아래 곁방에 둔다. */
-    cal:{ name:'푸른 캘린더', file:'pu-cal.html', primaryRoots:['data/cal_view'],
+    cal:{ name:'푸른 캘린더', file:'pu-cal.html', primaryRoots:['data/cal_view','cal_private'],
       /* pucards/idx — 미팅 넣을 때 기업정보함 명함 «가벼운 색인»을 읽기만 한다(2026-09-27) */
       sharedRoots:['data','pucards/idx'],
       entityTypes:['ScheduleEvent','Person'],
@@ -82,7 +82,9 @@
             반드시 js/pu-cal-write.js 의 관문으로만 쓴다. 그 문이 마감 자물쇠·번호 그물·
             «바뀐 칸만 보내기»·배열인 표 거르기를 한 자리에서 지킨다.
             질러가서 쓰면 이알피와 서로를 덮고, 그 손해는 급여에서 드러난다. */
-      writeContracts:[{path:'data/cal_view/{uid}',entityType:'ViewState'},
+      /* cal_private/{uid}/{id} — «나만 보기» 일정(2026-09-27). 본인만 읽고 쓴다(서버 규칙). */
+      writeContracts:[{path:'cal_private/{uid}/{id}',entityType:'ScheduleEvent'},
+                      {path:'data/cal_view/{uid}',entityType:'ViewState'},
                       {path:'data/my_schedules/v/{id}',entityType:'ScheduleEvent'},
                       {path:'data/attendance_records/v/{id}',entityType:'ScheduleEvent'}] },
     consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting'],

@@ -887,6 +887,12 @@
         }
       }
     },
+    "cal_private": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
     "pucards_private": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",

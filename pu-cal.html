@@ -16,7 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=36"></script>
+<script src="js/pu-ontology.js?v=37"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -28,7 +28,7 @@
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=1"></script>
-<script src="js/pu-cal-write.js?v=6"></script>
+<script src="js/pu-cal-write.js?v=7"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -336,6 +336,43 @@
   .modal h3{margin:0 0 12px;font-size:15px}
   .fld{margin-bottom:10px}
   .fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px;font-weight:700}
+  /* ── 구글 꼴 넣기·고치기 창 (modalHtml 머리글) ── */
+  .modal.gform{width:min(460px,94vw);border-radius:28px;padding:10px 20px 18px;background:var(--panel)}
+  .gform .ghd{display:flex;align-items:center;gap:6px;margin:0 -6px 4px}
+  .gform .ggrip{color:var(--gsub);font-size:14px;padding:0 6px}
+  .gform .gx{border:none;background:transparent;color:var(--gtext);font-size:18px;width:36px;height:36px;border-radius:50%;cursor:pointer}
+  .gform .gx:hover{background:var(--bg)}
+  .gform .gtitle{display:block;width:100%;border:none;border-bottom:2px solid var(--gline);background:transparent;
+    font-size:22px;color:var(--gtext);padding:6px 2px 6px 44px;font-family:inherit;outline:none;margin-bottom:10px}
+  .gform .gtitle:focus{border-bottom-color:var(--gtoday)}
+  .gform .gfrom{margin:-6px 0 8px 44px}
+  .gform .gtabs{display:flex;gap:6px;margin:0 0 10px 44px}
+  .gform .gtabs button{border:none;background:transparent;color:var(--gtext);font-size:13px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit}
+  .gform .gtabs button.on{background:var(--acc-soft);color:var(--acc2);font-weight:700}
+  .gform .grow{display:flex;align-items:flex-start;gap:12px;padding:5px 0}
+  .gform .gi{width:32px;flex-shrink:0;text-align:center;font-size:17px;line-height:34px;color:var(--gsub)}
+  .gform .gbody{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .gform .gbody > input,.gform .gbody > select,.gform .gbody > textarea{flex:1;min-width:0;width:100%;border:none;
+    background:var(--bg);border-radius:6px;padding:9px 10px;font-size:13.5px;color:var(--gtext);font-family:inherit}
+  .gform .gbody input[type=date]{flex:0 1 auto;width:auto}
+  .gform .gbody textarea{resize:vertical}
+  .gform .trange{display:flex;align-items:center;gap:6px}
+  .gform .trange input{border:none;background:var(--bg);border-radius:6px;padding:8px;font-size:13.5px;color:var(--gtext);font-family:inherit;width:auto}
+  .gform .gpill{border:1px solid var(--gline);background:var(--panel);color:var(--acc2);border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit}
+  .gform .glink{border:none;background:transparent;color:var(--acc2);font-size:13px;font-weight:500;cursor:pointer;padding:8px 10px;border-radius:999px;font-family:inherit}
+  .gform .glink:hover{background:var(--acc-soft)}
+  .gform .gsave{border:none;background:#1e40af;color:#ffffff;border-radius:999px;padding:9px 22px;font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit}
+  .gform .gvis{font-weight:500}
+  .gform .ghint{flex-basis:100%;font-size:11.5px;color:var(--gsub);padding-left:2px}
+  .gform .cpull{flex:1;margin-bottom:0}
+  .gform .gbody > #cardres{flex-basis:100%}
+  .gform .mbtns{margin-top:10px}
+  /* 넓게 — 구글의 큰 편집 화면: 위에 제목·저장, 왼쪽 세부, 오른쪽 달력·누구 */
+  .modal.gform.full{left:0;top:0;transform:none;width:100vw;height:100vh;max-height:none;border-radius:0;
+    overflow-y:auto;padding:14px max(18px,calc((100vw - 1100px)/2)) 30px}
+  .gform.full .gtitle{font-size:24px}
+  .gform.full .gcols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:28px}
+  @media (max-width:760px){ .gform.full .gcols{display:block} }
   /* 기업정보함에서 불러오기 — 창 맨 위 한 칸(고르면 초록으로 «불러옴») */
   .cpull{display:flex;align-items:center;gap:8px;border:1.5px solid #bfdbfe;background:var(--acc-soft);
     border-radius:10px;padding:7px 10px;margin-bottom:10px}
@@ -484,6 +521,8 @@
   body.mob .mtt{flex:1;min-width:0;display:flex;flex-direction:column}
   body.mob .mtt b{font-size:22px;font-weight:700;color:var(--gtext);line-height:1.15}
   body.mob .mtt span{font-size:12px;font-weight:700;color:var(--gtext);margin-top:2px}
+  body.mob .mfilt{border:1px solid var(--gline);background:var(--panel);color:var(--gtext);border-radius:999px;
+    font-size:12px;padding:0 10px;height:30px;cursor:pointer;font-family:inherit;white-space:nowrap}
   body.mob .mnav{border:none;background:transparent;font-size:24px;color:var(--gtext);width:40px;height:40px;
     border-radius:50%;cursor:pointer;font-family:inherit}
   body.mob .mplus{border:none;background:var(--gtoday);color:#ffffff;font-size:22px;font-weight:700;width:62px;height:40px;
@@ -1381,6 +1420,18 @@ function eventsOn(ymd, eumOnly){
            + (s.note ? " · " + s.note : "")
            + (s.place ? "\n📍 " + s.place : "") + (s.contact ? "\n👤 " + s.contact : "") });
   });
+  /* ①-2 🔒 나만 보기 — 내 칸(cal_private)에만 있다. 이음 보기에는 안 넣는다 */
+  if(!eumOnly){
+    arr(D.cal_private).forEach(function(p){
+      if(!p || p.date !== ymd || p._deleted) return;
+      var ph = String(p.time || "").slice(0,5);
+      out.push({ kind:"priv", store:"cal_private", id:p.id, sid:(typeof ME !== "undefined" && ME && ME.sid) || "",
+        text: p.title || "일정", time: ph, endTime: String(p.endTime||"").slice(0,5),
+        color: (typeof ME !== "undefined" && ME && colorOf(ME.sid)) || "#616161",
+        tip: "🔒 나만 보기 · " + (p.title || "일정") + (ph ? " · " + ph + (p.endTime ? "~" + String(p.endTime).slice(0,5) : "") : "")
+             + (p.place ? "\n📍 " + p.place : "") + (p.contact ? "\n👤 " + p.contact : "") + (p.note ? "\n" + p.note : "") });
+    });
+  }
   /* ② 근태 — 이알피와 같은 글자·같은 색 */
   arr(D.attendance_records).forEach(function(r){
     if(!r || r.date !== ymd) return;
@@ -1472,6 +1523,9 @@ function passFilter(ev){
   if(f === 'pureun')  return ev.kind !== 'gcal' && !ev.externalId;
   if(f === 'gcal')    return ev.kind === 'gcal';
   if(f === 'eumwork') return ev.kind === 'eum';
+  /* 🔒 개인 · 👥 공용 (대표 지시 2026-09-27 「폰에서도 개인과 공용으로 나눠달라」) */
+  if(f === 'priv')    return ev.kind === 'priv';
+  if(f === 'shared')  return ev.kind !== 'priv';
   return ev.sid === f;
 }
 
@@ -1611,6 +1665,8 @@ function chipHtml(e, ymd){
   var 시각칩 = !!e.time && !막대 && !(typeof 폰 === "function" && 폰());
   /* 칩 머리의 그림글자는 걷는다 — 구글 화면에는 없다 */
   var 제목 = String(e.text || "").replace(/^(?:[☀-➿️‍]|[\uD83C-\uDBFF][\uDC00-\uDFFF])+\s*/, "");
+  /* 🔒 나만 보기 — 내 화면에만 오는 것이지만, 나도 «이건 남이 못 본다»를 알아야 한다 */
+  if(e.kind === "priv") 제목 = "🔒 " + 제목;
   /* ★ 끌어 옮길 수 있는 것과 아닌 것 (5걸음, 대표 지시 2026-09-21)
        옮길 수 있다 — 우리 일정·근태(sch·att·eum)와 구글 일정(gcal)
        옮길 수 없다 — 공휴일 · 사건 마감일 · 단계 기한 · 휴직
@@ -1797,6 +1853,8 @@ function 폰머리Html(){
   var 음력 = lunarRange(S.ym);
   return '<div class="mhead">'
     + '<div class="mtt"><b>' + 달 + '월</b>' + (음력 ? '<span>' + esc(음력) + '</span>' : '') + '</div>'
+    + '<button class="mfilt" data-mf="1" title="누르면 전체 → 공용 → 개인">'
+    +   (S.filter === "priv" ? "🔒 개인" : S.filter === "shared" ? "👥 공용" : "전체") + '</button>'
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
     + '<button class="mplus" data-mnew="1" title="새로 넣기">＋</button>'
@@ -2049,6 +2107,7 @@ function chipsHtml(eumOnly){
   var 뒤 = eumOnly ? '' : (
       '<span class="srcsep"></span>'
     + '<button class="chip' + (S.filter === "pureun" ? " on" : "") + '" data-f="pureun">푸른</button>'
+    + '<button class="chip' + (S.filter === "priv" ? " on" : "") + '" data-f="priv" title="나만 보는 일정만">🔒 개인</button>'
     + (GCAL.err
         ? '<button class="chip warn" data-gcalretry="1" title="' + esc(GCAL.err) + '">⚠ 구글 못 받음 — 다시</button>'
         : GCAL.loading
@@ -2369,17 +2428,19 @@ function recOf(store, id){
   return null;
 }
 function openNew(ymd){
-  S.modal = { mode:"new", kind:"sch", date:ymd, sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1 };
+  S.modal = { mode:"new", kind:"sch", date:ymd, sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1,
+    vis:"shared", timed:false };
   /* 못 쓰는 표면 «열자마자» 알린다 — 다 적고 나서 거절당하는 것이 가장 나쁘다 */
   if(옛방식표("my_schedules")) S.modal.err = 옛방식안내("my_schedules");
   render();
 }
 function openEdit(store, id){
-  var r = recOf(store, id);
+  var r = store === "cal_private" ? 개인하나(id) : recOf(store, id);
   if(!r){ toast("그 건을 못 찾았습니다 — 새로 받아 오는 중일 수 있습니다"); return; }
-  S.modal = { mode:"edit", store:store, id:id, kind:(store==="my_schedules"?"sch":"att"),
+  S.modal = { mode:"edit", store:store, id:id, kind:((store==="my_schedules"||store==="cal_private")?"sch":"att"),
     date:r.date||"", sid:r.sid||"", type:r.type||"leave", title:r.title||"", note:r.note||"",
     time:String(r.time||"").slice(0,5), endTime:String(r.endTime||"").slice(0,5), place:r.place||"", contact:r.contact||"",
+    vis:(store === "cal_private" ? "private" : "shared"), timed:!!r.time,
     hours:r.hours||1, prev:r };
   if(옛방식표(store)) S.modal.err = 옛방식안내(store);
   render();
@@ -2395,45 +2456,65 @@ function closeModal(){ S.modal = null; S.busy = false; render(); }
 function toast(t){ S.toast = t; render(); setTimeout(function(){ if(S.toast===t){ S.toast=""; render(); } }, 3200); }
 
 function modalHtml(){
+  /* ★ 넣기·고치기 창 — 구글 캘린더와 같은 꼴 (대표 지시 2026-09-27 「데이터 입력 및 수정 변경의 양식
+       형태도 구글과 같이 해라 똑같이」). 구글의 빠른 창(제목 · 일정/할 일 · 🕒 날짜·시간 추가 · 👥 ·
+       📍 위치 · ≡ 설명 · 📅 달력 · 옵션 더보기/저장)을 그대로 옮기고, 「옵션 더보기」를 누르면 구글의
+       큰 편집 화면처럼 넓게 편다(폰은 늘 넓게 — 구글 앱이 그렇다).
+     ★ 📅 줄이 «누가 보나»다 — 구글이 «어느 달력에 넣나»를 고르는 그 자리.
+       👥 푸른노무법인(공용·모두 보기) / 🔒 내 일정(나만 보기 — 관리자도 못 본다).
+     ⚠ data-m 이름은 그대로다(modalRead·doSave 가 그것을 읽는다). */
   var m = S.modal; if(!m) return "";
   var 새것 = m.mode==="new";
   var 일정 = m.kind==="sch";
+  var 넓게 = !!m.full || (typeof 폰 === "function" && 폰());
   var 유형들 = PuWork.typesFor("calendar");
-  return "<div class=\"veil\" data-close=\"1\"></div><div class=\"modal\">"
-    + "<h3>"+(새것?"➕ 새로 넣기":"✏️ 고치기")+" — "+esc(m.date||"")+"</h3>"
+  var 불러옴 = m.card ? " <span class=\"from\">불러옴</span>" : "";
+  function 줄(아이콘, 안, 뜻){ return "<div class=\"grow\"><span class=\"gi\" title=\""+esc(뜻||"")+"\">"+아이콘+"</span><div class=\"gbody\">"+안+"</div></div>"; }
+  var 시각 = 일정
+    ? (m.timed
+        ? "<span class=\"trange\"><input type=\"time\" data-m=\"time\" value=\""+esc(m.time||"")+"\" title=\"시작\">"
+          + "<span>–</span><input type=\"time\" data-m=\"endTime\" value=\""+esc(m.endTime||"")+"\" title=\"끝 — 비우면 한 시간 뒤\"></span>"
+          + "<button class=\"glink\" data-mtime=\"0\" title=\"시각을 빼고 하루 종일로\">종일</button>"
+        : "<button class=\"gpill\" data-mtime=\"1\">시간 추가</button>")
+    : (m.type==="leave-hour"
+        ? "<span class=\"trange\"><input type=\"number\" min=\"1\" max=\"8\" data-m=\"hours\" value=\""+esc(m.hours)+"\"><span>시간</span></span>" : "");
+  var 누가 = "<select data-m=\"sid\" title=\"누구\">"
+    + users().map(function(u){ return "<option value=\""+esc(u.sid)+"\""+(u.sid===m.sid?" selected":"")+">"+esc(u.name||u.sid)+"</option>"; }).join("")
+    + "</select>";
+  var 달력 = "<select data-m=\"vis\" class=\"gvis\">"
+    + "<option value=\"shared\""+(m.vis!=="private"?" selected":"")+">👥 푸른노무법인 · 공용 (모두 보기)</option>"
+    + "<option value=\"private\""+(m.vis==="private"?" selected":"")+">🔒 내 일정 · 나만 보기</option></select>"
+    + (m.vis==="private" ? "<div class=\"ghint\">🔒 다른 직원·관리자·폰 구글 위젯에는 안 보입니다.</div>"
+        : "<div class=\"ghint\">구글 공용 달력에도 들어가 폰 구글 캘린더에 뜹니다(구글 로그인했을 때).</div>");
+  return "<div class=\"veil\" data-close=\"1\"></div><div class=\"modal gform"+(넓게?" full":"")+"\">"
+    + "<div class=\"ghd\">"+(넓게 ? "<button class=\"gx\" data-close=\"1\" title=\"닫기\">✕</button>" : "<span class=\"ggrip\">═</span>")
+    +   "<span class=\"sp\"></span>"
+    +   (넓게 ? "<button class=\"gsave\" data-act=\"save\""+(S.busy?" disabled":"")+">"+(S.busy?"저장 중…":"저장")+"</button>"
+             : "<button class=\"gx\" data-close=\"1\" title=\"닫기\">✕</button>")
+    + "</div>"
     + (m.err ? "<div class=\"werr\">"+esc(m.err)+"</div>" : "")
-    /* ★ 기업정보함에서 불러오기 (대표 지시 2026-09-27 「기업이름과 주소 담당자등을 한번에 당겨오기」) */
-    + (일정 && 새것 ? 명함칸Html(m) : "")
-    + (새것 ? "<div class=\"fld\"><label>무엇을</label><select data-m=\"kind\">"
-        + "<option value=\"sch\""+(일정?" selected":"")+">📅 일정</option>"
-        + "<option value=\"att\""+(일정?"":" selected")+">🏖️ 연차·근태</option></select></div>" : "")
-    + "<div class=\"fld\"><label>날짜</label><input type=\"date\" data-m=\"date\" value=\""+esc(m.date)+"\"></div>"
-    + "<div class=\"fld\"><label>누구</label><select data-m=\"sid\">"
-        + users().map(function(u){ return "<option value=\""+esc(u.sid)+"\""+(u.sid===m.sid?" selected":"")+">"
-            + esc(u.name||u.sid)+"</option>"; }).join("") + "</select></div>"
     + (일정
-        /* 시각은 «시작 ~ 끝» (대표 지시 2026-09-27 「시각은 시작과 끝이 있어야한다」) */
-        ? "<div class=\"fld\"><label>시각 (시작 ~ 끝)</label><div class=\"trange\">"
-            + "<input type=\"time\" data-m=\"time\" value=\""+esc(m.time||"")+"\" title=\"시작\">"
-            + "<span>~</span>"
-            + "<input type=\"time\" data-m=\"endTime\" value=\""+esc(m.endTime||"")+"\" title=\"끝 — 비우면 한 시간 뒤\">"
-          + "</div></div>"
-          + "<div class=\"fld\"><label>무슨 일" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"title\" value=\""+esc(m.title)+"\" placeholder=\"가나상사 컨설팅 2차\"></div>"
-          + "<div class=\"fld\"><label>장소" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"place\" value=\""+esc(m.place||"")+"\" placeholder=\"안 적어도 됩니다\"></div>"
-          + "<div class=\"fld\"><label>담당자" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"contact\" value=\""+esc(m.contact||"")+"\" placeholder=\"안 적어도 됩니다\"></div>"
-        : "<div class=\"fld\"><label>유형</label><select data-m=\"type\">"
+        ? "<input class=\"gtitle\" data-m=\"title\" value=\""+esc(m.title)+"\" placeholder=\"제목 및 시간 추가\">"+(m.card?"<div class=\"gfrom\">"+불러옴+"</div>":"")
+        : "<select class=\"gtitle\" data-m=\"type\">"
             + 유형들.map(function(t){ return "<option value=\""+esc(t.code)+"\""+(t.code===m.type?" selected":"")+">"
-                + esc(t.icon+" "+PuWork.labelFor(t.code,"calendar"))+"</option>"; }).join("")
-            + "</select></div>"
-          + (m.type==="leave-hour"
-              ? "<div class=\"fld\"><label>몇 시간</label><input type=\"number\" min=\"1\" max=\"8\" data-m=\"hours\" value=\""+esc(m.hours)+"\"></div>"
-              : ""))
-    + "<div class=\"fld\"><label>메모</label><input data-m=\"note\" value=\""+esc(m.note)+"\" placeholder=\"안 적어도 됩니다\"></div>"
+                + esc(t.icon+" "+PuWork.labelFor(t.code,"calendar"))+"</option>"; }).join("") + "</select>")
+    + (새것 ? "<div class=\"gtabs\"><button data-mk=\"sch\""+(일정?" class=\"on\"":"")+">일정</button>"
+        + "<button data-mk=\"att\""+(일정?"":" class=\"on\"")+">연차·근태</button></div>" : "")
+    + "<div class=\"gcols\"><div class=\"gmain\">"
+    +   줄("🕒", "<input type=\"date\" data-m=\"date\" value=\""+esc(m.date)+"\">" + 시각, "날짜·시각")
+    +   (일정 && 새것 ? 줄("🏢", 명함칸Html(m), "기업정보함에서 불러오기") : "")
+    +   (일정 ? 줄("📍", "<input data-m=\"place\" value=\""+esc(m.place||"")+"\" placeholder=\"위치 추가\">", "장소") : "")
+    +   (일정 ? 줄("👤", "<input data-m=\"contact\" value=\""+esc(m.contact||"")+"\" placeholder=\"담당자 추가 (이름 · 전화)\">", "담당자") : "")
+    +   줄("≡", "<textarea data-m=\"note\" rows=\""+(넓게?6:2)+"\" placeholder=\"설명 추가\">"+esc(m.note||"")+"</textarea>", "설명")
+    + "</div><div class=\"gside\">"
+    +   줄("👥", 누가, "누구")
+    +   (일정 ? 줄("📅", 달력, "누가 보나") : "")
+    + "</div></div>"
     + "<div class=\"mbtns\">"
-    + (새것 ? "" : "<button class=\"btn danger\" data-act=\"del\""+(S.busy?" disabled":"")+">지우기</button>")
-    + "<span class=\"sp\"></span>"
-    + "<button class=\"btn ghost\" data-close=\"1\">그만</button>"
-    + "<button class=\"btn\" data-act=\"save\""+(S.busy?" disabled":"")+">"+(S.busy?"저장 중…":"저장")+"</button>"
+    +   (새것 ? "" : "<button class=\"btn danger\" data-act=\"del\""+(S.busy?" disabled":"")+">지우기</button>")
+    +   "<span class=\"sp\"></span>"
+    +   (넓게 ? "" : "<button class=\"glink\" data-mfull=\"1\">옵션 더보기</button>"
+                 + "<button class=\"gsave\" data-act=\"save\""+(S.busy?" disabled":"")+">"+(S.busy?"저장 중…":"저장")+"</button>")
     + "</div></div>";
 }
 
@@ -2520,6 +2601,48 @@ function 명함고르기(k){
   }
   render();
 }
+/* ── 🔒 나만 보기 일정 (cal_private/{uid}) ──────────────────────────────
+   서버 규칙이 본인 로그인만 읽게 막는다 — 남의 칸은 읽으려 해도 거절된다(관리자도).
+   ⚠ 지운 것은 삭제표시(_deleted)로 남는다 — 받을 때 뺀다. */
+function 개인받기(){
+  if(!fbDb || !S.uid) return Promise.resolve();
+  return fbDb.ref("cal_private/" + S.uid).once("value").then(function(snap){
+    var v = snap.val() || {};
+    D.cal_private = Object.keys(v).map(function(k){
+      var x = v[k]; return (x && typeof x === "object") ? Object.assign({ id:k }, x) : null;
+    }).filter(function(x){ return x && x._deleted !== true; });
+    render();
+  })["catch"](function(e){ console.warn("[개인 일정] 못 읽음", e && e.message); });
+}
+function 개인하나(id){
+  var xs = arr(D.cal_private);
+  for(var i = 0; i < xs.length; i++) if(xs[i] && xs[i].id === id) return xs[i];
+  return null;
+}
+function 개인에넣기(m){
+  if(!S.uid){ m.err = "로그인한 사람을 몰라 나만 보기로 넣을 수 없습니다"; render(); return; }
+  var 고침 = m.mode === "edit" && m.store === "cal_private";
+  var id = 고침 ? m.id : PuCalWrite.newId("prv");
+  var item = { id:id, date:m.date, title:String(m.title).trim(), time:String(m.time||""), endTime:String(m.endTime||""),
+    place:String(m.place||"").trim(), contact:String(m.contact||"").trim(), note:String(m.note||"") };
+  if(m.card && m.card.k){ item.sourceKind = "card"; item.sourceId = m.card.k; }
+  var prev = 고침 ? 개인하나(id) : null;
+  /* 공용이었던 우리 일정을 «나만 보기»로 바꿨다 — 내 칸에 넣고 공용 표의 것은 지운다 */
+  var 공용에서 = (m.mode === "edit" && m.store === "my_schedules") ? { store:m.store, id:m.id, prev:recOf(m.store, m.id) } : null;
+  S.busy = true; m.err = ""; render();
+  PuCalWrite.savePrivate(S.uid, item, prev).then(function(r){
+    S.busy = false;
+    if(!r.ok){ m.err = r.message; render(); return; }
+    if(공용에서) PuCalWrite.remove(공용에서.store, 공용에서.id, 공용에서.prev).then(function(){ refreshOne(공용에서.store); });
+    closeModal();
+    toast(고침 ? "✅ 고쳤습니다 (🔒 나만 보기)" : "✅ 🔒 나만 보기로 넣었습니다 — 다른 사람에게는 안 보입니다");
+    개인받기();
+  });
+}
+function 개인지우기조용히(id){
+  PuCalWrite.removePrivate(S.uid, id, 개인하나(id)).then(function(){ 개인받기(); });
+}
+
 /* 시작 ~ 끝 맞추기 — { start, end, err }. 시각이 없으면 종일(둘 다 비움). */
 function 시각범위(시작, 끝){
   시작 = String(시작 || "").slice(0,5); 끝 = String(끝 || "").slice(0,5);
@@ -2556,6 +2679,7 @@ function 구글에넣기(m){
     source: (m.card && m.card.k) ? { kind:"card", id:m.card.k } : null
   }).then(function(){
     S.busy = false;
+    if(m.옮김) 개인지우기조용히(m.옮김);
     closeModal();
     toast("✅ 구글 공용 달력에 넣었습니다 — 폰 구글 캘린더에도 뜹니다");
     gcalLoad(true);
@@ -2569,7 +2693,7 @@ function 구글에넣기(m){
 /* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
 function modalRead(){
   var m = S.modal; if(!m) return;
-  ["kind","date","sid","type","title","note","hours","time","endTime","place","contact"].forEach(function(f){
+  ["kind","date","sid","type","title","note","hours","time","endTime","place","contact","vis"].forEach(function(f){
     var el = document.querySelector("[data-m='"+f+"']");
     if(el) m[f] = el.value;
   });
@@ -2592,6 +2716,11 @@ function doSave(){
        「구글캘린더와 같이 우선」 — 폰은 구글 캘린더 위젯으로 본다). 이 달력도 그것을 읽어
        그리므로 두 곳에 똑같이 뜨고, 두 번 들어가지도 않는다.
      ⚠ 로그인이 안 돼 있으면 우리 표(my_schedules)에 넣고 «폰 위젯에는 안 뜬다»고 말한다. */
+  if(일정 && !m.timed){ m.time = ""; m.endTime = ""; }
+  /* 🔒 나만 보기 — 구글에도 우리 공용 표에도 안 넣고 «내 칸»에만(PuCalWrite.savePrivate) */
+  if(일정 && m.vis === "private"){ 개인에넣기(m); return; }
+  /* 나만 보기였던 것을 «모두 보기»로 바꿨다 — 공용으로 새로 넣고 내 칸의 것은 지운다 */
+  if(일정 && m.mode === "edit" && m.store === "cal_private"){ m.mode = "new"; m.옮김 = m.id; }
   if(일정 && m.mode === "new" && typeof PuGcalAuth !== "undefined" && PuGcalAuth.hasToken()){
     구글에넣기(m); return;
   }
@@ -2615,6 +2744,7 @@ function doSave(){
     S.busy = false;
     if(!r.ok){ m.err = r.message; render(); return; }
     var 고침 = m.mode==="edit";
+    if(m.옮김) 개인지우기조용히(m.옮김);
     closeModal();
     toast(고침 ? "✅ 고쳤습니다"
       : (일정 ? "✅ 넣었습니다 — 구글 로그인하면 다음부터 폰 구글 캘린더에도 뜹니다" : "✅ 넣었습니다"));
@@ -2627,6 +2757,15 @@ function doSave(){
 function doDelete(){
   var m = S.modal; if(!m || m.mode!=="edit" || S.busy) return;
   if(!confirm("이 건을 지울까요?")) return;
+  if(m.store === "cal_private"){
+    S.busy = true; m.err = ""; render();
+    PuCalWrite.removePrivate(S.uid, m.id, 개인하나(m.id)).then(function(r){
+      S.busy = false;
+      if(!r.ok){ m.err = r.message; render(); return; }
+      closeModal(); toast("🗑 지웠습니다"); 개인받기();
+    });
+    return;
+  }
   var prev = recOf(m.store, m.id) || m.prev;
   S.busy = true; m.err = ""; render();
   /* 구글과 «이어진» 건이면 그쪽도 함께 지운다 — 우리만 지우면 구글에 남는다.
@@ -2933,7 +3072,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -2952,6 +3091,17 @@ document.addEventListener('click', function(e){
   }
   if(t.hasAttribute('data-gcalretry')){ gcalLoad(true); return; }
   if(t.hasAttribute('data-mnew')){ openNew(todayYMD()); return; }
+  if(t.hasAttribute('data-mf')){
+    S.filter = S.filter === null || S.filter === undefined ? "shared" : S.filter === "shared" ? "priv" : null;
+    render(); return;
+  }
+  if(t.hasAttribute('data-mk')){ modalRead(); S.modal.kind = t.getAttribute('data-mk'); render(); return; }
+  if(t.hasAttribute('data-mtime')){
+    modalRead(); S.modal.timed = t.getAttribute('data-mtime') === "1";
+    if(S.modal.timed && !S.modal.time){ S.modal.time = "09:00"; S.modal.endTime = "10:00"; }
+    render(); return;
+  }
+  if(t.hasAttribute('data-mfull')){ modalRead(); S.modal.full = true; render(); return; }
   if(t.hasAttribute('data-mmenu')){ S.mobMenu = !S.mobMenu; render(); return; }
   if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
   if(t.hasAttribute('data-cardclear')){ modalRead(); S.modal.card = null; render(); return; }
@@ -3132,6 +3282,8 @@ function start(user){
       + (ME ? '<span class="role">'+esc(ME.role||ME.position||'')+'</span>' : '') + '</b>'
       + esc(user.email||'') + ' · ';
     render();
+    S.uid = user.uid;
+    개인받기();
     /* 구글 달력도 받는다 — 이 달력을 채우는 것이 그쪽이다(9월 126건).
        ⚠ 우리 자료를 먼저 그리고 그 다음 받는다 — 구글이 늦어도 화면은 먼저 뜬다. */
     gcalLoad();
