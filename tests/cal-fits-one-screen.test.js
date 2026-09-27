@@ -86,6 +86,7 @@ function 그려본다(하루, 건수, 공휴일, 용량) {
     'function lunarDay(ymd){', 'function 상대밝기(bg){', 'function 대비(a, b){', 'function textOn(bg){',
     'function monthGrid(ym){',
     'function ymdOf(y, m, d){', 'function mixHex(hexA, hexB, t){', 'function chipHtml(e, ymd){',
+    'function 공휴칩(ymd){', 'function 줄배치(날들, 일들, 용량, 틈){',
     'function 펼침Html(eumOnly){',
     'function calendarHtml(eumOnly){'];
   let 조각 = 'var _lunar = {}; var GCAL = { evs:[], ym:"", loading:false, err:"" };\n'
@@ -95,6 +96,7 @@ function 그려본다(하루, 건수, 공휴일, 용량) {
     /* chipHtml 이 참조하는 모듈급 상수 — 소스에서 그대로 뽑아 온다 */
     + (캘린더.match(/var 칩_어둠_누름 = [^;]+;/) || [''])[0] + '\n'
     + (캘린더.match(/var 칩_옅게\s*= [^;]+;/) || [''])[0] + '\n'
+    + (캘린더.match(/var 공휴색 = [^;]+;/) || [''])[0] + '\n'
     /* ★ 용량은 검사가 쥐여 준다 — 화면이 없으니 잴 수가 없다.
          잰 값을 «쓰는지»가 규칙이고, 잘 재는지는 따로 본다(⑥). */
     + 'function 칸용량(){ return ' + 용량 + '; }\n';
@@ -108,7 +110,8 @@ function 그려본다(하루, 건수, 공휴일, 용량) {
   assert.ok(i >= 0, 하루 + ' 칸을 못 찾았습니다');
   const 끝 = html.indexOf('data-day="', i + 10);
   const 칸 = html.slice(i, 끝 > 0 ? 끝 : html.length);
-  const 더 = 칸.match(/class="more"[^>]*>\+(\d+)개 더</);
+  /* 글자 꼴(「+3개 더」·「3개 더보기」)을 못 박지 않는다 — 숫자만 읽는다 */
+  const 더 = 칸.match(/class="more"[^>]*>\+?(\d+)개 더/);
   return {
     상자, 전체: html, 칸,
     일정칩: (칸.match(/class="ev"/g) || []).length,

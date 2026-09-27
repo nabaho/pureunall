@@ -113,10 +113,13 @@ function 구글칩(ev, 자료) {
   const 상자 = {
     D: { user_accounts: 자료.명부 || [], staff_colors: 자료.색 || {}, gcal_mail_sid: 자료.메일표 || {} },
     window: { _gcalColors: 자료.구글색표 || {} },
-    Object, Array, String, JSON, Math, parseInt
+    Object, Array, String, JSON, Math, parseInt, Date
   };
   vm.createContext(상자);
   vm.runInContext([
+    /* 여러 날 일정의 끝날을 셈할 때 쓴다(2026-09-27) */
+    'function todayYMD(){ return "2026-09-27"; }',
+    함수몸(캘린더원문, 'function shiftDay(ymd, n){'),
     함수몸(캘린더원문, 'function allUsers(){'),
     함수몸(캘린더원문, 'function users(){'),
     함수몸(캘린더원문, 'function userOf(sid){'),
@@ -176,13 +179,23 @@ test('★ 메일을 열쇠로 바꾸는 셈 — 바뀌면 이어 둔 사람이 �
     '메일 → 열쇠 셈이 바뀌었습니다 — 이어 둔 사람이 안 찾아집니다');
 });
 
-test('종일 일정은 시각을 안 적고, 00:00 도 안 적는다 (이알피와 같다)', () => {
+/* 대표 지시 2026-09-27 「구글캘린더 화면과 … 완벽하게 같이」 — 시각은 구글 화면 그대로 적는다.
+   구글은 시각 일정이면 00:00 이라도 「00:00」을 적고(실제 화면에서 확인), 종일 일정엔 안 적는다. */
+test('종일 일정은 시각을 안 적고, 시각 일정은 구글처럼 「14:30」 꼴로 적는다', () => {
   const a = 구글칩({ id: 'g5', summary: '연차', start: { date: '2026-09-11' } });
   assert.strictEqual(a.time, '', '종일 일정에 시각이 붙었습니다');
   const b = 구글칩({ id: 'g6', summary: '0930 일터', start: { dateTime: '2026-09-11T00:00:00+09:00' } });
-  assert.strictEqual(b.time, '', '00:00 을 시각으로 적었습니다');
+  assert.strictEqual(b.time, '00:00', '구글은 자정 시작 일정에도 「00:00」을 적습니다');
   const c = 구글칩({ id: 'g7', summary: '상담', start: { dateTime: '2026-09-11T14:30:00+09:00' } });
-  assert.strictEqual(c.time, '1430', '시각을 이알피처럼 「1430」 꼴로 안 적습니다');
+  assert.match(c.time, /^\d{2}:\d{2}$/, '시각을 구글처럼 「14:30」 꼴로 안 적습니다: ' + c.time);
+});
+
+test('★ 여러 날 종일 일정은 «마지막 날»을 안다 — 구글 end.date 는 다음 날이라 하루 당긴다', () => {
+  const a = 구글칩({ id: 'g8', summary: '연차', start: { date: '2026-09-21' }, end: { date: '2026-09-24' } });
+  assert.strictEqual(a.date, '2026-09-21');
+  assert.strictEqual(a.end, '2026-09-23', '사흘 연차의 끝날이 틀렸습니다: ' + a.end);
+  const b = 구글칩({ id: 'g9', summary: '하루', start: { date: '2026-09-21' }, end: { date: '2026-09-22' } });
+  assert.strictEqual(b.end, b.date, '하루짜리가 여러 날로 잡혔습니다');
 });
 
 // ── ⑤ 못 받았을 때 ────────────────────────────────────────────────────
