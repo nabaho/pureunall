@@ -103,3 +103,34 @@ test('④ 폰 머리에 전체·공용·개인 고르기가 있다', () => {
   const 머리 = 함수몸(캘린더, 'function 폰머리Html(){');
   assert.match(머리, /data-mf/, '폰에서 개인·공용을 가를 수 없습니다');
 });
+
+/* ── 🔒 나만 보기 → 본인 구글 달력(primary)에도 (대표 지시 2026-09-27 「개인일정도 추천대로」) ── */
+async function 구글부름(일) {
+  const A = require(path.join(ROOT, 'js', 'pu-gcal-auth.js'));
+  globalThis._gcalToken = 'tok'; globalThis._gcalExpiry = Date.now() + 3600e3;
+  const 부름 = [];
+  const f = (url, opt) => { 부름.push({ url, opt }); return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ id: 'g9' }) }); };
+  await 일(A, f);
+  return 부름;
+}
+test('⑤ 본인 구글 달력에는 «비공개»로 넣는다 — 그 달력을 나눠 봐도 내용은 «바쁨»', async () => {
+  const 부름 = await 구글부름((A, f) => A.createEvent('primary', { date: '2026-10-05', time: '14:00', endTime: '15:00',
+    summary: '치과', visibility: 'private' }, { fetch: f }));
+  assert.match(부름[0].url, /\/calendars\/primary\/events/, '회사 공용 달력에 넣었습니다');
+  assert.equal(JSON.parse(부름[0].opt.body).visibility, 'private');
+});
+test('⑤ 고치면 본인 구글 달력도 같이 고친다(PATCH), 번호로 잇는다', async () => {
+  const 부름 = await 구글부름((A, f) => A.updateEvent('primary', 'g9', { date: '2026-10-06', summary: '치과(변경)', visibility: 'private' }, { fetch: f }));
+  assert.equal(부름[0].opt.method, 'PATCH');
+  assert.match(부름[0].url, /\/events\/g9\?/);
+  assert.equal(JSON.parse(부름[0].opt.body).summary, '치과(변경)');
+});
+test('⑤ 화면 — 로그인돼 있을 때만 본인 달력으로, 지우면 거기서도 지운다', () => {
+  const 보냄 = 함수몸(캘린더, 'function 내구글에(item, prev){');
+  assert.match(보냄, /PuGcalAuth\.hasToken\(\)/, '로그인 여부를 안 봅니다');
+  assert.match(보냄, /"primary"/, '본인 달력이 아닌 곳으로 보냅니다');
+  assert.strictEqual(/GCAL_CAL_ID/.test(보냄), false, '나만 보기를 회사 공용 달력에 넣습니다 — 모두가 봅니다');
+  assert.match(보냄, /ownGcalId/, '이어 둔 번호를 안 남깁니다 — 고치기·지우기가 못 따라갑니다');
+  const 지움 = 함수몸(캘린더, 'function doDelete(){');
+  assert.match(지움, /내구글에서지우기\(/, '지워도 본인 구글 달력에 남습니다');
+});
