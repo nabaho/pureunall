@@ -750,6 +750,7 @@
     var coQ = el('input', { type: 'search', placeholder: '회사 이름·사업자번호·대표자', 'aria-label': '회사 찾기' });
     var coList = el('div', { 'class': 'pcf-fl' });
     var coPicked = el('div');
+    var ctQ = el('input', { type: 'search', placeholder: '담당자 이름·회사·직급·전화·이메일', 'aria-label': '담당자 찾기' });
     var ctBox = el('div', { 'class': 'pcf-fl' });
     var wkQ = el('input', { type: 'search', placeholder: '근로자 이름·휴대폰', 'aria-label': '근로자 찾기' });
     var wkList = el('div', { 'class': 'pcf-fl' });
@@ -786,21 +787,27 @@
     function clearEdits(ks) { ks.forEach(function (k) { delete st.edits[k]; }); }
     function drawContacts() {
       ctBox.innerHTML = '';
-      if (!st.co) { ctBox.appendChild(el('div', { 'class': 'pcf-muted', text: '회사를 먼저 고르세요' })); return; }
-      var cs = CF.contactsOf(st.rows || [], st.co);
-      if (!cs.length) { ctBox.appendChild(el('div', { 'class': 'pcf-muted', text: '이 회사 명함이 없습니다 — 오른쪽 칸에 적으세요' })); return; }
+      var cs = CF.searchContacts(st.rows || [], ctQ.value, st.co, 30);
+      if (!st.co && !ctQ.value.trim()) { ctBox.appendChild(el('div', { 'class': 'pcf-muted', text: '회사를 고르거나 담당자를 바로 검색하세요' })); return; }
+      if (!cs.length) { ctBox.appendChild(el('div', { 'class': 'pcf-muted', text: '찾는 명함이 없습니다 — 오른쪽 빈칸에 직접 적으세요' })); return; }
       cs.slice(0, 30).forEach(function (r) {
-        ctBox.appendChild(rowBtn(r.n + (r.ti ? ' ' + r.ti : ''), r.m || r.t || r.e || '', st.contact === r, function () {
-          st.contact = st.contact === r ? null : r; clearEdits(['담당자', '담당자연락처', '담당자이메일']); drawContacts(); drawVals();
+        ctBox.appendChild(rowBtn(r.n + (r.ti ? ' ' + r.ti : ''), [r.c || '', r.d || '', r.m || r.t || '', r.e || ''].filter(Boolean).join(' · '), st.contact === r, function () {
+          var chosen = st.contact === r ? null : r;
+          clearEdits(['담당자', '담당자연락처', '담당자이메일', '담당자직급', '담당자부서', '담당자휴대폰', '담당자전화', '담당자주소']);
+          if (chosen && chosen.c && (!st.co || CF.sameCo(chosen.c) !== CF.sameCo(st.co.c))) {
+            var match = CF.searchCompanies(st.rows || [], chosen.c, 20).filter(function (x) { return CF.sameCo(x.c) === CF.sameCo(chosen.c); })[0];
+            if (match) { pickCo(match, chosen); return; }
+          }
+          st.contact = chosen; ctQ.value = st.contact ? st.contact.n : ''; drawContacts(); drawVals();
         }));
       });
     }
     function coSub(r) {
       return [r.bz ? CF.valuesFrom({ co: r }).사업자번호 : '', r.ceo ? '대표 ' + r.ceo : '', r.k === 'card-co' ? '명함에만 있는 회사' : ''].filter(Boolean).join(' · ');
     }
-    function pickCo(r) {
-      st.co = r; st.coX = {}; st.contact = null;
-      clearEdits(['회사명', '사업자번호', '대표자', '대표자전체', '주소', '대표전화', '대표팩스', '대표이메일', '업태', '종목', '법인등록번호', '규모', '담당자', '담당자연락처', '담당자이메일']);
+    function pickCo(r, chosenContact) {
+      st.co = r; st.coX = {}; st.contact = chosenContact || null; ctQ.value = st.contact ? st.contact.n : '';
+      clearEdits(['회사명', '사업자번호', '대표자', '대표자전체', '주소', '대표전화', '대표팩스', '대표이메일', '업태', '종목', '법인등록번호', '규모', '담당자', '담당자연락처', '담당자이메일', '담당자직급', '담당자부서', '담당자휴대폰', '담당자전화', '담당자주소']);
       coList.innerHTML = ''; coQ.value = '';
       coPicked.innerHTML = '';
       coPicked.appendChild(el('div', { 'class': 'pcf-fpick' }, [
@@ -820,7 +827,7 @@
       host.cards.rows().then(function (rows) { st.rows = CF.rowsOf(rows); note.textContent = ''; fn(st.rows); },
         function (e) { note.textContent = '⚠ ERP 업체정보를 읽지 못했습니다 — ' + ((e && e.message) || e); });
     }
-    var coT = null, wkT = null;
+    var coT = null, ctT = null, wkT = null;
     coQ.addEventListener('input', function () {
       clearTimeout(coT); coT = setTimeout(function () {
         withRows(function (rows) {
@@ -830,6 +837,9 @@
           hits.forEach(function (r) { coList.appendChild(rowBtn(r.c || '(이름 없음)', coSub(r), false, function () { pickCo(r); })); });
         });
       }, 200);
+    });
+    ctQ.addEventListener('input', function () {
+      clearTimeout(ctT); ctT = setTimeout(function () { withRows(function () { drawContacts(); }); }, 150);
     });
     wkQ.addEventListener('input', function () {
       clearTimeout(wkT); wkT = setTimeout(function () {
@@ -926,7 +936,7 @@
         el('div', { 'class': 'pcf-fcols' }, [
           el('div', null, [
             el('div', { 'class': 'pcf-fh', text: '① 회사 — ERP 업체관리에서 찾기' }), coQ, coList, coPicked,
-            el('div', { 'class': 'pcf-fh', text: '② 담당자 — 이 회사 명함' }), ctBox,
+            el('div', { 'class': 'pcf-fh', text: '② 담당자 — 기업정보함에서 찾아오기' }), ctQ, ctBox,
             el('div', { 'class': 'pcf-fh', text: '③ 근로자 본인 — 명함에서 찾기 또는 직접 적기' }), wkQ, wkList
           ]),
           valBox
@@ -1159,7 +1169,7 @@
       return el('div', { 'class': 'pcf-top' }, fm ? [
         el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' + k.label + ' · ' }), fm.name]),
         strip,
-        host.cards ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', title: '기업정보함에서 회사·담당자·근로자를 골라 채웁니다', text: '📝 채워서 받기', onclick: function () { openFill(fm, host); } }) : null,
+        host.cards ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다.', text: '📝 찾아서 채우기', onclick: function () { openFill(fm, host); } }) : null,
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '수정', onclick: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } }),
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', text: '복제', onclick: function () { copy(fm); } }),
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#dc2626', text: '삭제', onclick: function () { del(fm); } })
