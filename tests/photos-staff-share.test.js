@@ -274,8 +274,11 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
        (scripts/make-firebase-rules.js §「사무관리서류 — 원본 보관함·기업별 계약서」).
      ⚠⚠ 아직 콘솔에 «붙여넣지 않았다» — 배포는 사람이 승인한 뒤(Task 7)에만 한다.
        그래서 이 자리가 통째로 새로 생긴 곳으로 걸린다. 콘솔에 게시하고
-       docs/firebase-rules-콘솔원문-….json 을 새 판으로 갈아 끼운 뒤 이 줄을 뺄 것. */
-  const PENDING = ['/pu_docs'];
+       docs/firebase-rules-콘솔원문-….json 을 새 판으로 갈아 끼운 뒤 이 줄을 뺄 것.
+     ★ 2026-09-27 — 콘솔에 올라갔다. 푸른 캘린더 방이 cal_private(나만 보기 일정)를 올릴 때
+       rules-deploy.js 가 main 에 있던 이 자리도 함께 올렸다(새로 생김 2 · 바뀜 0 · 사라짐 0).
+       콘솔 원문도 새 판(2026-09-27)으로 갈아 끼워졌다 — 그래서 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
