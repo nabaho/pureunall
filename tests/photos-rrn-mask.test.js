@@ -76,6 +76,12 @@ function runReadPhoto(masked, opts) {
        그 줄에서 ReferenceError 로 멎어 가림 판독 검사가 통째로 운다 — 이 검사가
        보는 것은 「사본만 판독기로 간다」이지 어디로 보내느냐가 아니다. */
     autoSendCoInfo: function () { return false; },
+    /* 🔒 2026-09-27 — 구글로 보내기 전 «기계 가림»(rrnMaskAll)이 이 길에 끼었다.
+       ⚠ 여기서는 «받은 그대로 돌려주는» 대역을 쓴다. 이 파일이 재는 것은 「사람이 가린
+         사본만 판독기로 가는가」이고, 기계 가림 자체는 photos-rrn-mask-send.test.js 가
+         따로 잰다. 진짜를 실으면 글자인식 도구(브라우저)가 있어야 해 이 상자에서 못 돈다.
+       ⚠ 받은 그대로 돌려주므로, 이 대역을 넣어도 아래 검사들의 답이 «안 바뀐다». */
+    rrnMaskAll: function (l) { return Promise.resolve(l); },
     sendCards: function () { return Promise.resolve(); },
     sendCompany: function () { return Promise.resolve(); },
     sendCoInfo: function () { return Promise.resolve(); },
@@ -153,6 +159,8 @@ function runReadPhoto(masked, opts) {
     cutFn(app, 'function freeOcrPref('),
     cutFn(app, 'function freeReadTry('),
     cutFn(app, 'function freeReadAsk('),
+    /* 가리지 못했을 때의 답 — 문 셋이 «값»으로 쥐고 있어 없으면 ReferenceError 다 */
+    cutFn(app, 'function rrnFail('),
     cutFn(app, 'function markFree('),
     /* ⚠ 2026-09-12 — readPhoto 가 «서류마다» 답을 나눠 주게 되면서 이 둘을 부른다.
        **원본 그대로** 싣는다 — 대역을 만들면 화면과 다른 규칙을 보게 된다. */
