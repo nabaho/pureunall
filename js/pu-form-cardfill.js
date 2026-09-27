@@ -127,12 +127,33 @@
     (markers || []).forEach(function (k) { out[k] = (V && V[k] != null) ? String(V[k]) : ''; });
     return out;
   }
+  /* ★ 값을 넣은 문단만 줄 정보를 걷는다 (HWPX section XML).
+     문서 전체를 걷으면 rhwp 가 모든 줄을 제 자로 다시 나눠, 한 쪽에 꽉 찬 서식(CMS 신청서)이
+     마지막 한 줄만 다음 쪽으로 넘쳤다(한글로 열어 확인 2026-09-27). 경력관리 dropLines 와 같은 생각.
+     줄 정보(linesegarray)는 문단 끝에 있다 — 그 앞 가장 가까운 문단 시작부터의 글에 넣은 값이 있으면 걷는다. */
+  function xmlEsc(v) { return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function stripLinesegsFor(xml, vals) {
+    var want = (vals || []).map(function (v) { return v == null ? '' : String(v); }).filter(function (v) { return v.length >= 2; })
+      .map(xmlEsc);
+    if (!want.length) return String(xml || '');
+    var src = String(xml || ''), out = '', at = 0, re = /<hp:linesegarray(?:\s[^>]*)?(?:\/>|>[\s\S]*?<\/hp:linesegarray>)/g, m;
+    while ((m = re.exec(src))) {
+      var pStart = src.lastIndexOf('<hp:p ', m.index);
+      var seg = src.slice(pStart < 0 ? 0 : pStart, m.index);
+      var text = (seg.match(/<hp:t(?:\s[^>]*)?>[\s\S]*?<\/hp:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ''); }).join('');
+      var hit = want.some(function (v) { return text.indexOf(v) >= 0; });
+      out += src.slice(at, m.index) + (hit ? '' : m[0]);
+      at = m.index + m[0].length;
+    }
+    return out + src.slice(at);
+  }
   function safeName(s) { return String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim() || '서류'; }
 
   var api = {
     BLANK: BLANK, coNorm: coNorm, cardNorm: cardNorm, sameCo: sameCo, coInfoKeys: coInfoKeys, mergeCoInfo: mergeCoInfo,
     rowsOf: rowsOf, searchCompanies: searchCompanies, contactsOf: contactsOf, searchPeople: searchPeople,
-    valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName
+    valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
+    stripLinesegsFor: stripLinesegsFor
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;
