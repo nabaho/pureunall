@@ -118,3 +118,13 @@ test('★ openDoc — 「이 회사에서 빼기」가 연 시점의 회사(key)
   const m = cutFn(stripJs(SRC), 'function openDoc(');
   assert.match(m, /unlinkCoDoc\(key,/, '★★ S.sel 을 직접 써서, 열려 있는 동안 회사가 바뀌면 엉뚱한 회사에서 뺍니다');
 });
+
+test('★ urlFor — 실패는 캐시하지 않는다(한 번 어긋나도 다음에 다시 시도한다)', () => {
+  const m = cutFn(stripJs(SRC), 'function urlFor(');
+  assert.match(m, /delete urlCache\[/, '★★ 실패한 요청도 urlCache 에 박혀 마운트가 살아 있는 내내 썸네일이 죽습니다');
+});
+
+test('★ loadDocs — listCoDocs 가 거절되면 S.err 를 채우고 그린다', () => {
+  const m = cutFn(stripJs(SRC), 'function loadDocs(');
+  assert.match(m, /S\.err\s*=\s*msg\(e\)/, '★★ listCoDocs 실패를 못 받으면 화면이 "불러오는 중…"에 멈춥니다');
+});

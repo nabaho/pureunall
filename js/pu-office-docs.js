@@ -245,20 +245,22 @@
     function loadDocs() {
       var key = S.sel;
       if (!key) { S.docs = []; draw(); return Promise.resolve(); }
-      return store.listCoDocs(key).then(function (d) { if (key !== S.sel) return; S.docs = d; draw(); });
+      return store.listCoDocs(key).then(function (d) { if (key !== S.sel) return; S.docs = d; draw(); },
+        function (e) { if (key !== S.sel) return; S.err = msg(e); draw(); });
     }
     function coName(key) { var c = S.cos.filter(function (x) { return x.key === key; })[0]; return c ? c.name : ''; }
     function coList() { return el('datalist', { id: 'pod-cos' }, S.cos.map(function (c) { return el('option', { value: c.name }); })); }
     function isImg(name) { return /\.(jpe?g|png|heic)$/i.test(name || ''); }
 
-    /* fileId → {rec,url} 을 마운트 동안 캐시한다 — 다시 그릴 때마다 getOriginal+getDownloadURL 을 되풀이하지 않는다 */
+    /* fileId → {rec,url} 을 마운트 동안 캐시한다 — 다시 그릴 때마다 getOriginal+getDownloadURL 을 되풀이하지 않는다.
+       단, 실패는 캐시하지 않는다 — 한 번 어긋난 요청 때문에 마운트가 살아 있는 내내 썸네일이 죽으면 안 된다. */
     var urlCache = {};
     function urlFor(fileId) {
       if (!urlCache[fileId]) {
         urlCache[fileId] = store.getOriginal(fileId).then(function (r) {
           if (!r) return { rec: null, url: null };
           return store.fileUrl(r).then(function (url) { return { rec: r, url: url }; });
-        });
+        })['catch'](function (e) { delete urlCache[fileId]; throw e; });
       }
       return urlCache[fileId];
     }
