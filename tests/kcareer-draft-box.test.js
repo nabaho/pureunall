@@ -214,7 +214,10 @@ function 저장세상(store) {
   /* ⚠ 담긴 뒤 「💾 담김」 딱지를 그리는 것도 rhDraftSave 가 «실제로» 부르는 함수다
      (2026-09-26). 스텁이 아니라 진짜를 넣는다 — 느슨해진 것이 아니다. */
   vm.runInContext('var _rhBase=null; var _rhBaseSaved=""; var _rhSaveFail=0;', ctx);
-  ['function _rhBaseId(', 'function rhBaseSave(', 'function rhSideSave(',
+  /* ⚠ 친 값과 함께 «내보낼 때 얹는 표시»(도장·뺀 쪽)도 담는다(2026-09-27) — rhSideSave 가
+     «실제로» 부르는 두 함수다. 진짜를 넣는다(느슨해진 것이 아니다). */
+  ['function _rhOutPack(', 'function _rhInEd(',
+   'function _rhBaseId(', 'function rhBaseSave(', 'function rhSideSave(',
    'function rhSaveTag(', 'function rhDraftSave(']
     .forEach((d) => vm.runInContext(cutFn(CODE, d), ctx));
   return ctx;

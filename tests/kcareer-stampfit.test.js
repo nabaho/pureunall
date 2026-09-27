@@ -114,7 +114,9 @@ test('★ 망가진 값이 들어 있어도 기본값으로 버틴다', () => {
 
 /* ══════ 찍는 쪽이 그 값을 쓰는가 ══════ */
 test('★★★ 찍는 쪽이 «적어 둔 값»을 쓴다 — 숫자를 다시 박아 두면 안 된다', () => {
-  const st = cutFn(CODE, 'async function rhStampDoc(');
+  /* ⚠ 2026-09-27 실제로 찍는 일은 rhStampZip 이 한다(짓는 길이 매번 찍는다 — 굽지 않는다).
+     규칙은 그대로, 겨누는 자리만 옮겼다. */
+  const st = cutFn(CODE, 'async function rhStampZip(');
   assert.match(st, /stampFit\(st\)/, '★ 적어 둔 크기·자리를 안 읽습니다');
   assert.match(st, /showHU:맞춤\.size/, '★ 크기를 안 씁니다');
   assert.match(st, /offX:맞춤\.dx/, '★ 좌우를 안 씁니다');

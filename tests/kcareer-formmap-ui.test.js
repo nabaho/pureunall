@@ -130,9 +130,13 @@ test('도장 모듈을 읽어 들인다 — 캐시 번호를 붙여서', () => {
 });
 
 test('도장 자리를 못 찾으면 찍지 않고 알린다 — 아무 데나 날인하면 되돌릴 수 없다', () => {
-  const at = bare.indexOf('function rhStampDoc');
-  const fn = bare.slice(at, at + 3000);
-  assert.match(fn, /if\(!done\)/, '자리를 못 찾았을 때의 길이 있어야 합니다');
+  /* ⚠ 2026-09-27 찍는 일은 짓는 길의 rhStampZip 으로 옮겼다(굽지 않고 매번 찍는다).
+     고정 폭(3000자)으로 보면 옆 함수에 닿아 «우연히» 통과하므로 함수 전체를 잘라 본다. */
+  const fn = cutFn(bare, 'async function rhStampZip(');
+  assert.match(fn, /if\(!done\) return \{ ok:false/, '자리를 못 찾았을 때의 길이 있어야 합니다');
+  /* 찍기로 한 쪽은 «못 찍었으면 표시를 거둔다» — 안 거두면 찍힌 줄 안다 */
+  assert.match(cutFn(bare, 'async function rhStampDoc('), /if\(!_rhStampDone\)\{[^}]*_rhStampOn=false/,
+    '못 찍었는데 «찍기로 했다» 표시가 남습니다');
 });
 
 /* ── ✍ 서식 입력판 (대표 제안·승인 2026-08-29) ── */
@@ -156,10 +160,13 @@ test('★ 저장은 «원본 한글»에 넣는다 — HTML 을 그대로 내면
 });
 
 test('저장과 미리보기가 «같은 길»을 쓴다 — 갈라지면 보이는 것과 저장이 어긋난다', () => {
-  ['rhSaveInput', 'rhPreviewHwp'].forEach((fn) => {
-    const at = bare.indexOf('function ' + fn);
-    assert.match(bare.slice(at, at + 800), /rhComposeBytes\(\)/, fn + ' 도 같은 길을 써야 합니다');
+  /* ⚠ 2026-09-27 「💾 원본 한글에 넣기」(rhSaveInput)를 뺐다(대표 승인 목업). 저장은 이제
+     완성본·임시저장·자동 저장이 모두 지나는 exportEditedHwpx 다 — 규칙은 그대로, 겨누는 자리만 옮겼다.
+     ⚠ 고정 폭(800자)으로 보지 않고 «함수 전체»를 본다 — 주석이 길어져도 못 닿는 일이 없게. */
+  ['async function exportEditedHwpx(', 'async function rhPreviewHwp('].forEach((d) => {
+    assert.match(cutFn(bare, d), /rhComposeBytes\(\)/, d + ' 도 같은 길을 써야 합니다');
   });
+  assert.ok(!/function rhSaveInput\(/.test(bare), '뺀 「원본 한글에 넣기」가 되살아났습니다');
 });
 
 test('「내 정보」를 누르면 «지금 짚은 칸»에 들어간다 — 커서 자리가 가장 안 헷갈린다', () => {

@@ -233,37 +233,47 @@ test('★★ 앱이 모듈을 싣고 왼쪽 기둥에 문이 있다', () => {
   assert.match(open, /cs\.length<2/, '★ 못 나누는 서식이면 그렇다고 말해야 합니다');
 });
 
-test('★★★ 되살리기 — 원본(_rhBase)에서 «다시» 만든다', () => {
+/* ⚠★ 2026-09-27 짜임이 바뀌었다 (대표 승인 목업 「목업대로 전부」).
+   전에는 뺀 결과를 «보이는 문서»에 굽고 원본을 지키며(_rhKeepBase) 다시 올렸다. 그런데
+   한글로 보기·완성본·자동 저장은 «원본에서 새로» 지어 뺀 공고문이 되살아났다(실측).
+   이제는 굽지 않고 «표시»(_rhTidy.drop)만 남기고 짓는 길 한 곳이 매번 뺀다 —
+   그래서 원본은 «애초에» 안 건드리고, 되살리기는 표시만 거둔다(친 값도 안 잃는다).
+   아래 셋은 그 새 짜임의 규칙이다. «실제로 돌려» 보는 검사는
+   tests/kcareer-outpath-run.test.js 가 한다(뺀 쪽이 되살아나지 않는지 · 친 값이 남는지). */
+test('★★★ 되살리기 — «표시만» 거둔다: 원본도 친 값도 안 건드린다', () => {
   const fn = SRC.slice(SRC.indexOf('async function rhPagesRestore('), SRC.indexOf('/* ── 도장 찍기 ──'));
-  assert.match(fn, /_rhBase/, '★★★ 원본을 안 보면 되돌릴 수가 없습니다');
-  /* ⚠ 「confirm 이라는 글자가 있나」로는 모자란다 — 죽은 가지에 넣어 둬도 통과한다
-     (고장넣기로 확인했다). «묻고 아니면 돌아서는» 모양을 짚는다. */
-  assert.match(fn, /if\(!confirm\([\s\S]{0,400}?\)\) return;/,
-    '★★ 묻지 않고 되돌리면 친 값이 말없이 사라집니다');
-  assert.match(fn, /값은 지워집니다/, '★★ 무엇을 잃는지 말해야 합니다');
-  assert.match(fn, /mountEditor\(/, '다시 그려야 합니다');
+  assert.match(fn, /_rhTidy\.drop=\{\}/, '★★★ 뺀 표시를 안 거두면 되살아나지 않습니다');
+  assert.match(fn, /rhOutRefresh\(/, '★★ 다시 지어 보여 줘야 합니다');
+  assert.ok(!/_rhVals=\{\}/.test(fn), '★★ 되살리며 친 값을 버립니다 — 이제 버릴 까닭이 없습니다');
+  assert.ok(!/_rhBase=/.test(fn), '★★ 원본을 갈아 끼웁니다');
+  assert.ok(!/mountEditor\(/.test(fn), '★ 바탕을 다시 잡는 길로 가면 표시가 풀립니다');
+  assert.match(fn, /뺀 쪽이 없습니다/, '★ 되살릴 것이 없을 때 조용히 끝나면 안 됩니다');
 });
 
-test('★★★ 뺄 때 원본(_rhBase)을 «지킨다» — 안 지키면 되살리기가 뺀 것으로 돌아간다', () => {
+test('★★★ 뺄 때 «굽지 않는다» — 표시만 남기고 짓는 길이 뺀다', () => {
   const fn = SRC.slice(SRC.indexOf('async function rhPagesApply('), SRC.indexOf('async function rhPagesRestore('));
-  assert.match(fn, /_rhKeepBase=true/, '★★★ 바탕이 갈려 원본이 사라집니다');
-  assert.match(fn, /finally\{ _rhKeepBase=false; \}/,
-    '★★★ 안 풀면 다음 양식이 바탕을 못 잡습니다(2026-09-07 과 같은 덫)');
-  assert.match(fn, /KcareerHwpxPages\.remove\(/, '빼는 것도 모듈이 합니다');
-  /* ⚠ 모두 빼면 빈 문서가 된다 — 화면에서도 막는다 */
+  assert.match(fn, /_rhTidy\.drop=drop/, '★★★ 표시를 안 남기면 다음 짓기에서 되살아납니다');
+  assert.ok(!/_rhDoc=\{/.test(fn), '★★★ 보이는 문서에 굽고 있습니다 — 원본에서 새로 지으면 되살아납니다');
+  assert.ok(!/KcareerHwpxPages\.remove\(/.test(fn), '★★ 여기서 직접 빼면 굽는 것입니다');
+  assert.match(fn, /rhOutRefresh\(true\)/, '★ 뺀 결과를 한글로 보기로 보여 줘야 합니다(입력판은 원본)');
+  /* 빼는 일은 정리하는 자 한 곳 — 짓는 길(rhTidyZip)이 그것을 부른다 */
+  const tz = SRC.slice(SRC.indexOf('async function rhTidyZip('), SRC.indexOf('/* 지금 바탕의 쪽 묶음을 읽어 온다'));
+  assert.match(tz, /T\.dropPages\(xml,뺄\)/, '★★ 짓는 길이 표시를 안 봅니다');
+  /* ⚠ 모두 빼면 빈 문서가 된다 · 한 구역을 통째로 빼면 정리하는 자가 거절한다 — 화면에서 막는다 */
   assert.match(fn, /모두 뺄 수는 없습니다/, '★★ 다 빼면 빈 문서가 됩니다');
   assert.match(fn, /뺄 것이 없습니다/, '★ 아무것도 안 골랐을 때 조용히 끝나면 안 됩니다');
+  assert.match(fn, /구역마다 한 묶음은 남겨야/, '★ 한 구역을 통째로 빼면 말없이 안 빠집니다');
 });
 
 test('★★ 「저절로 지운다」가 아니라 «권한다»고 화면에 밝힌다', () => {
   const fn = SRC.slice(SRC.indexOf('function rhPagesRender('), SRC.indexOf('var _rhDropped'));
   /* ⚠ 「그 글자가 어딘가 있나」로는 모자란다 — 죽은 가지(if(false))에 넣어 둬도 통과한다
      (고장넣기로 확인했다). «어떤 때 보이는지»까지 짚는다. */
-  assert.match(fn, /if\(뺄\) h\+=/, '★★ 뺄 것이 있을 때 「확인해 주세요」가 나와야 합니다');
+  assert.match(fn, /if\(뺄 && !_rhPages\.뺀적\) h\+=/, '★★ 처음 열 때 뺄 것이 있으면 「확인해 주세요」가 나와야 합니다');
   assert.match(fn, /확인해 주세요/, '★★ 사람이 확인하는 단계임을 밝혀야 합니다');
   assert.match(fn, /저절로 지우지 않습니다/);
   assert.match(fn, /되살리기/, '되돌릴 수 있다고 말해야 안심하고 누릅니다');
-  /* ⚠ 이미 값을 쳤으면 «그때» 알린다 — 쪽을 빼면 칸 자리가 바뀐다 */
-  assert.match(fn, /if\(값있음\) h\+=/, '★★ 값을 쳤을 때 알려야 합니다');
-  assert.match(fn, /쪽 정리를 먼저 하고/, '★★ 값 친 뒤에 빼면 자리가 어긋납니다');
+  /* ⚠ 뺀 결과가 입력판에는 안 보인다 — 어디서 보는지 말한다(막다른 길 금지) */
+  assert.match(fn, /한글로 보기<\/b>에서 보입니다/, '★ 뺐는데 입력판이 그대로면 고장으로 읽힙니다');
+  assert.match(fn, /친 값도 그대로 남고/, '★ 친 값이 남는다고 말해야 먼저 빼느라 망설이지 않습니다');
 });

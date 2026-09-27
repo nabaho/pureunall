@@ -441,18 +441,6 @@ body.kc-staff .kc-staff-note{display:flex}
 .td-card{border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:13px}
 .td-h{font-size:13.5px;font-weight:700;color:var(--navy);margin-bottom:3px}
 .td-why{font-size:12px;color:var(--text-mute);margin-bottom:11px;line-height:1.6}
-.td-pages{display:flex;gap:10px;flex-wrap:wrap}
-.td-pg{width:92px;border:2px solid var(--border);border-radius:8px;background:#fff;padding:6px;
-  position:relative;cursor:pointer;text-align:center}
-.td-pg .sheet{height:108px;background:#fff;border:1px solid var(--border);border-radius:3px;
-  padding:7px 6px;overflow:hidden;font-size:8.5px;color:var(--text-mute);text-align:left;line-height:1.45;word-break:break-all}
-.td-pg .no{font-size:11px;color:var(--text-mute);margin-top:5px}
-.td-pg.off{opacity:.45;border-color:var(--red);border-style:dashed}
-.td-pg.off .no{color:var(--red);font-weight:700;text-decoration:line-through}
-.td-pg .x{position:absolute;top:-7px;right:-7px;width:21px;height:21px;border-radius:50%;
-  border:none;background:var(--red);color:#fff;font-size:12px;font-weight:700;cursor:pointer;line-height:1}
-.td-pg.off .x{background:var(--teal)}
-.td-tally{margin-top:11px;font-size:12.5px;color:var(--text-sub)}
 .td-chk{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:4px 0;cursor:pointer}
 .td-n{color:var(--text-mute);font-size:11.5px}
 .td-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px;
@@ -1065,6 +1053,10 @@ input.kf-in.kf-done{background:#f8fafc;border-bottom:1.5px solid var(--teal);fon
 /* ⚠ 기둥 전용 칸은 작업 모드에서만 — 평소 툴바에 세로 이름표가 끼면 줄이 길어진다 */
 .rh-workonly{display:none}
 #rcEditCard.rh-work .rh-workonly{display:block}
+/* ✏️ 한글 편집 중에는 «입력판에만 듣는» 도구를 감춘다 (대표 승인 2026-09-27 목업).
+   ⚠ !important — 되돌리기·쪽 넘김은 코드가 inline 으로 켜고 끈다. 그것보다 앞서야 한다.
+   ⚠ 입력판으로 나가면 다시 보인다(rhSetMode 가 body 표식을 거둔다). */
+body.rh-ed-on .rh-noed{display:none!important}
 /* ⚠ 위에 쌓인 두 줄은 작업 모드에서 감춘다 — 이것이 「세 층」의 나머지 둘이다.
    없애는 것이 아니라 감추는 것이다: 기둥의 「⤢ 작업 모드 끄기」로 언제든 돌아온다. */
 body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
@@ -1447,6 +1439,9 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                    머리가 세 줄이 됐다(대표 지적 2026-08-29). 딱지는 뺀다: 단추가 이미 말해 준다. -->
               <!-- ★ 작업 모드에서만 보이는 «보기 맞춤» — 여기가 A4 를 통째로 보이게 하는 자리다 -->
               <div class="rh-workonly">
+                <!-- ⚠ «보기 맞춤»은 한글 편집 중에 감춘다(rh-noed) — 눌러도 숨은 입력판만 움직인다.
+                     편집기는 제 확대·쪽 넘김이 있다(대표 승인 2026-09-27 목업). -->
+                <div class="rh-noed">
                 <div class="rh-railh">보기 맞춤</div>
                 <div class="rh-fitrow" id="rhFitRow">
                   <button id="rhFitPage" class="on" onclick="rhSetFit('page')" title="A4 한 장이 통째로 들어오게 줄입니다">⬍ 한 장</button>
@@ -1458,6 +1453,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                   <span id="rhPgLabel">1 / 1 쪽</span>
                   <button onclick="rhPageMove(1)" title="다음 쪽">▶</button>
                 </div>
+                </div><!-- .rh-noed -->
                 <div class="rh-railh">보는 방법</div>
               </div>
               <div class="kf-modes" id="kfModes" style="display:none">
@@ -1465,17 +1461,21 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <button class="kf-mode" id="kfM2" onclick="rhSetMode('hwp')">📄 한글로 보기</button>
                 <button class="kf-mode" id="kfM3" onclick="rhSetMode('both')" title="입력판과 한글을 나란히 — 친 값이 실제로 어떻게 들어갔는지 바로 견줍니다">⇄ 나란히</button>
                 <!-- ★ 대표 지시 2026-09-13 「필요하면 직접 타이핑이 가능해야 되는데 그건 왜 안 되나」 -->
-                <button class="kf-mode" id="kfM4" onclick="rhToggleAnyCell()" title="표의 «모든 칸»에 입력칸을 얹습니다 — 서식 문구까지 고치거나 지울 수 있습니다. 기본은 꺼짐입니다(문구 위에 칸이 얹히면 서식을 읽을 수 없습니다)">✍ 아무 칸이나</button>
+                <button class="kf-mode rh-noed" id="kfM4" onclick="rhToggleAnyCell()" title="표의 «모든 칸»에 입력칸을 얹습니다 — 서식 문구까지 고치거나 지울 수 있습니다. 기본은 꺼짐입니다(문구 위에 칸이 얹히면 서식을 읽을 수 없습니다)">✍ 아무 칸이나</button>
                 <!-- ★ 대표 지시 2026-09-21 「붙여라」 — 저장소에 넣어 둔 한글 편집기 -->
                 <button class="kf-mode" id="kfM5" onclick="rhSetMode('edit')" title="한글 프로그램처럼 글자·표·서식을 직접 고칩니다. 편집기는 이 PC 안에서만 돌고 서류는 밖으로 안 나갑니다">✏️ 한글 편집</button>
               </div>
               <div class="rc-actions">
-                <button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 양식 칸에 넣습니다">✨ 내 정보로 채우기</button>
-                <button class="btn" id="rhUndoBtn" style="display:none" onclick="rhUndoFill()" title="채우기 전으로 되돌립니다">↩ 되돌리기</button>
-                <button class="btn" onclick="rhPagesOpen()" title="공고문·평가표처럼 «내지 않을» 쪽을 빼고 낼 것만 남깁니다 — 언제든 모두 되살릴 수 있습니다">✂ 필요 없는 쪽 빼기</button>
-                <button class="btn" style="border-color:#fecaca;color:var(--red)" onclick="rhStampDoc()" title="★기본 도장을 「(인)」 자리에 찍습니다 — 글자를 다 확인한 뒤 마지막에">🖋 도장 찍기</button>
-                <button class="btn primary" onclick="rhSaveInput()" id="kfSaveBtn" title="입력판에 친 값을 원본 한글 서식의 그 칸에 넣습니다">💾 원본 한글에 넣기</button>
-                <button class="btn" onclick="openTidy()" id="rhTidyBtn" title="필요 없는 쪽을 빼고, 남은 자리표·예시 글자를 걷어 냅니다 — 한글에서 고쳐 온 파일을 바탕으로 갈아 끼우는 것도 여기입니다">🧹 서식 정리</button>
+                <!-- ⚠ rh-noed = ✏️ 한글 편집 중에는 감춘다. 이 넷은 «원본»에만 듣고 편집기 화면에는
+                     안 보이며, 나갈 때 편집기 것을 되받으면 그 결과가 사라진다(대표 승인 2026-09-27). -->
+                <button class="btn primary rh-noed" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 양식 칸에 넣습니다">✨ 내 정보로 채우기</button>
+                <button class="btn rh-noed" id="rhUndoBtn" style="display:none" onclick="rhUndoFill()" title="채우기 전으로 되돌립니다">↩ 되돌리기</button>
+                <button class="btn rh-noed" onclick="rhPagesOpen()" title="공고문·평가표처럼 «내지 않을» 쪽을 빼고 낼 것만 남깁니다 — 언제든 모두 되살릴 수 있습니다">✂ 필요 없는 쪽 빼기</button>
+                <button class="btn rh-noed" style="border-color:#fecaca;color:var(--red)" onclick="rhStampDoc()" title="★기본 도장을 「(인)」 자리에 찍습니다 — 한 번 더 누르면 뺄 수 있습니다">🖋 도장 찍기</button>
+                <!-- ⚠★ 「💾 원본 한글에 넣기」를 뺐다 (대표 승인 2026-09-27 목업). 한글로 보기·완성본·
+                     임시저장이 이미 «친 값을 넣어» 새로 짓는다 — 그 단추는 결과를 한 번 더 굳힐 뿐이고,
+                     오히려 ✂ 로 뺀 쪽을 되살리는 자리였다. **되살리지 말 것.** -->
+                <button class="btn rh-noed" onclick="openTidy()" id="rhTidyBtn" title="남은 자리표·예시 글자를 걷어 내고, 쪽마다 갈라 저장합니다 — 한글에서 고쳐 온 파일을 바탕으로 갈아 끼우는 것도 여기입니다">🧹 서식 정리</button>
                 <!-- ⚠★ 「🔍 큰 창으로 보기」·「⛶ 넓게 보기」를 뺐다 (대표 지시 2026-09-27
                      「다 삭제해라 한글편집에서 가능하다」). ✏️ 한글 편집의 「🗖 큰 창」·
                      「⛶ 전체 화면」이 같은 일을 더 잘 한다 — 같은 일을 하는 단추가 넷이면
@@ -1521,10 +1521,10 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                     <button class="btn" type="button" id="rhEdFullBtn" onclick="rhHwpEdFull()" title="모니터를 통째로 씁니다. 여기서만 Ctrl+S·Ctrl+W 같은 한글 단축키를 브라우저가 안 가로챕니다">⛶ 전체 화면</button>
                     <button class="btn" type="button" id="rhEdTidyBtn" onclick="rhEdTidyToggle()" title="편집기 도구줄(아이콘·글꼴줄)을 내려서 봅니다. 올리면 메뉴가 이 한 줄로 합쳐지고 종이가 그만큼 커집니다">🧰 도구줄 내리기</button>
                     <button class="btn" type="button" onclick="rhHwpEdKeys()" title="이 편집기가 아는 한글 단축키를 모두 보여 줍니다">⌨ 단축키</button>
-                    <button class="btn" type="button" onclick="rhSetMode('in')">← 입력판으로</button>
+                    <!-- ⚠ 「← 입력판으로」를 뺐다 — 기둥의 「✍ 입력판」과 같은 단추였다(대표 승인 2026-09-27) -->
                     <!-- ★ 편집기의 파일·편집·보기… 메뉴가 «이 줄 안»으로 들어온다(합침) -->
                     <span class="rh-ed-menus" id="rhEdMenus"></span>
-                    <span class="rh-ed-note" style="font-size:11.5px;color:var(--text-mute)">고치신 뒤 <b>되받기</b>를 눌러야 반영됩니다 · 편집기는 이 PC 안에서만 돕니다</span>
+                    <span class="rh-ed-note" style="font-size:11.5px;color:var(--text-mute)">입력판·한글로 보기로 나가면 고친 것이 <b>저절로</b> 바탕이 됩니다 · 편집기는 이 PC 안에서만 돕니다</span>
                   </div>
                   <div id="rhHwpEdBox" style="flex:1;min-height:70vh;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff"></div>
                 </div>
@@ -2515,13 +2515,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <div class="modal" style="width:760px">
     <div class="modal-h">🧹 서식 정리<span id="tdWho" style="font-size:11.5px;font-weight:400;color:var(--text-mute);margin-left:8px"></span></div>
     <div class="modal-b">
-      <!-- ① 쪽 빼기 -->
-      <div class="td-card">
-        <div class="td-h">📄 필요 없는 쪽 빼기</div>
-        <div class="td-why" id="tdPageWhy">쪽을 눌러 빼 두면 완성본에서 통째로 빠집니다. 원본은 그대로라 언제든 되살립니다.</div>
-        <div class="td-pages" id="tdPages"></div>
-        <div class="td-tally" id="tdPageTally"></div>
-      </div>
+      <!-- ⚠★ 「📄 필요 없는 쪽 빼기」를 여기서 뺐다 (대표 승인 2026-09-27 목업).
+           기둥의 「✂ 필요 없는 쪽 빼기」와 같은 일을 하는 «두 번째 벌»이었고, 둘이 서로를 몰랐다.
+           이제 ✂ 가 고른 것이 이 창의 «갈라 저장»에도 그대로 든다(같은 _rhTidy.drop).
+           **여기에 쪽 빼기를 다시 만들지 말 것.** 길은 알려 준다 — 막다른 길이 안 되게. -->
+      <div class="td-why" style="margin:-2px 0 12px">📄 쪽 빼기는 왼쪽 기둥의 <b>「✂ 필요 없는 쪽 빼기」</b>에서 합니다 — 거기서 뺀 쪽은 아래 «갈라 저장»에도 안 들어갑니다.</div>
       <!-- ② 남은 글자 정리 -->
       <div class="td-card">
         <div class="td-h">🧹 안 채운 자리에 남은 글자</div>
@@ -2547,7 +2545,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <!-- ④ 한글에서 고쳐 오기 -->
       <div class="td-card">
         <div class="td-h">✍️ 한글에서 고친 뒤 이어서 쓰기</div>
-        <div class="td-why">한글 프로그램을 이 화면에서 띄울 수는 없습니다(브라우저가 못 합니다). 대신 <b>파일 자리를 기억</b>해 두었다가, 고쳐 저장하시면 단추 하나로 다시 읽어옵니다.</div>
+        <div class="td-why">이 화면 안에서 고치시려면 <b>「✏️ 한글 편집」</b>을 쓰세요. 여기는 <b>PC 에 깔린 한글 프로그램</b>으로 고칠 때 쓰는 길입니다 — <b>파일 자리를 기억</b>해 두었다가, 고쳐 저장하시면 단추 하나로 다시 읽어옵니다.</div>
         <div class="row" style="gap:8px;flex-wrap:wrap">
           <button class="btn primary" type="button" onclick="rhHwpOut()">📥 한글로 내보내기</button>
           <button class="btn primary" type="button" onclick="rhHwpBack()">📤 고친 것 읽어오기</button>
@@ -4793,6 +4791,14 @@ let _rhwp=null;
    지금 상태는 «원본 + 입력판에 친 값»이다. 그것을 내놓는다(읽기 전용 편집기가 주던 것보다 낫다). */
 async function exportEditedHwpx(){
   if(_rhwp) return await _rhwp.exportHwpx();
+  /* ★★ ✏️ 한글 편집 중이면 «편집기에 있는 것»을 준다 (대표 승인 2026-09-27 목업).
+     완성본·임시저장·30초 자동 저장이 모두 여기를 지난다. 전에는 「되받기」를 누르기 전까지
+     셋 다 편집기에서 고친 것을 몰라 — 잊고 누르면 고친 것이 «조용히» 빠졌다.
+     ⚠ 못 받으면 아래(친 값 + 원본)로 물러선다 — 담는 일이 멈추면 안 된다. */
+  if(_rhHwpEd && _rhMode==='edit'){
+    try{ var e=await _rhHwpEd.exportHwpx(); if(e && e.byteLength) return new Uint8Array(e); }
+    catch(err){ console.warn('편집기에서 받기', err); }
+  }
   try{ var b=await rhComposeBytes(); if(b && b.length) return b; }catch(e){}
   return (_rhDoc && _rhDoc.bytes) ? _rhDoc.bytes : null;
 }
@@ -11602,11 +11608,30 @@ function rhDraftNewId(){
 }
 /* 친 값은 문서와 «같은 곳»에 — 색인에 넣으면 클라우드로 나간다(위 ⚠ 참고) */
 function _rhSideId(id){ return id+'@side'; }
+/* ⚠★ 표시를 읽다 걸려도 «친 값»은 담겨야 한다 — 그래서 따로 떼어 하나하나 조심해 읽는다.
+   (한 줄에 몰아 두면 하나만 없어도 아래 try 가 통째로 삼켜 친 값까지 못 담는다 — 검사가 잡았다) */
+function _rhOutPack(){
+  try{
+    var t=(typeof _rhTidy!=='undefined' && _rhTidy)||{};
+    return { filled:(typeof _rhFilled!=='undefined') && !!_rhFilled,
+             colMap:(typeof _rhColMap!=='undefined' && _rhColMap)||null,
+             stamp:(typeof _rhStampOn!=='undefined') && !!_rhStampOn,
+             tidy:{ drop:t.drop||{}, ph:!!t.ph, italic:!!t.italic, rows:!!t.rows } };
+  }catch(e){ return null; }
+}
+function _rhInEd(){
+  try{ return !!(typeof _rhHwpEd!=='undefined' && _rhHwpEd && _rhMode==='edit'); }catch(e){ return false; }
+}
 function rhSideSave(id){
   try{
     var pack={ vals:_rhVals||{}, picks:_rhPicks||{},
                listPlan:(typeof _rhListPlan!=='undefined'?_rhListPlan:null)||null,
-               fp:(_rhMap&&_rhMap.fp)||'' };
+               fp:(_rhMap&&_rhMap.fp)||'',
+               /* ★ «내보낼 때 얹는 것»도 담는다 (2026-09-27) — 안 담으면 이어서 연 뒤 첫 자동 저장이
+                  원본에서 새로 지어 도장·뺀 쪽·정리가 통째로 사라진다 */
+               out:_rhOutPack(),
+               /* ★ 한글 편집 «안에서» 담긴 것이면 표시한다 — 그 문서가 곧 바탕이다(rhDraftResume) */
+               inEd:_rhInEd() };
     var b=new TextEncoder().encode(JSON.stringify(pack));
     saveFileUnified(_rhSideId(id), { id:_rhSideId(id), name:'side.json', ext:'json',
       size:b.length, base64:abToB64(b.buffer), savedAt:new Date().toISOString() });
@@ -12140,7 +12165,7 @@ var _rhVals = {};      /* {자리이름표(:라벨): 친 글자} */
    ⚠ 두 번 채우지 않게 하려면 되돌려 넣기가 반드시 «원본» 위에서 일어나야 한다.
      _rhDoc(이미 채워진 것) 위에 또 넣으면 「권형하권형하」가 된다.
    ⚠ 목록 표(학력·경력 여러 줄)는 입력칸으로 못 담는다 — 그 계획을 _rhListPlan 에 남겨
-     되돌려 넣을 때 같이 적용한다. 안 남기면 「원본 한글에 넣기」에서 학력·경력이 사라진다. */
+     되돌려 넣을 때 같이 적용한다. 안 남기면 완성본·한글로 보기에서 학력·경력이 사라진다. */
 var _rhBase = null;    /* 처음 올린 원본 {name,ext,bytes} */
 var _rhListPlan = null;/* {섹션이름: {목록이름표: 갈래}} */
 var _rhKeepBase = false;/* 채운 결과를 올릴 때는 바탕을 바꾸지 않는다 */
@@ -12148,7 +12173,18 @@ var _rhSlots = [];     /* 채울 자리(칸 지도) — 겹치기 입력칸이 �
 var _rhMode = 'in';
 
 function rhSetMode(m){
+  /* ★★ 한글 편집에서 «나갈 때» 고친 것을 저절로 되받는다 (대표 결정 2026-09-27 「저절로 되받는다」).
+     전에는 「💾 고친 것 되받기」를 잊고 나가면 고친 것이 바탕에 안 들어갔다.
+     ⚠ 되받는 동안(_rhEdLeaving) 다시 들어오는 부름은 그냥 지나보낸다 —
+       rhAdoptBase 가 입력판을 새로 그리며 rhSetMode("in") 을 부른다. 막지 않으면 두 번 되받는다.
+     ⚠ 못 받으면 «나가지 않는다» — 고친 것을 편집기에 그대로 둔다(rhHwpEdLeave). */
+  if(_rhMode==='edit' && m!=='edit' && _rhHwpEd && !_rhEdLeaving){
+    rhHwpEdLeave(m).catch(function(e){ console.warn('한글 편집 나가기', e); });
+    return;
+  }
   _rhMode=m;
+  /* 한글 편집 중에는 «입력판에만 듣는» 단추를 감춘다(.rh-noed) */
+  try{ document.body.classList.toggle('rh-ed-on', m==='edit'); }catch(e){}
   [['kfM1','in'],['kfM2','hwp'],['kfM3','both'],['kfM5','edit']].forEach(function(p){
     var b=document.getElementById(p[0]); if(b) b.classList.toggle('on', m===p[1]);
   });
@@ -12381,7 +12417,7 @@ async function rhHwpEdOpen(){
   try{
     _rhHwpEd=await _hwpEdCreate(box, bytes, rhCleanName(이름,''));
     _rhHwpEdFor=이름;
-    toast('✏️ 한글 편집기 — 다 고치셨으면 「💾 고친 것 되받기」를 누르세요');
+    toast('✏️ 한글 편집기 — 입력판·한글로 보기로 나가면 고친 것이 저절로 바탕이 됩니다');
   }catch(e){
     console.warn('한글 편집기', e);
     box.innerHTML='<div class="rc-mute" style="padding:22px">한글 편집기를 열지 못했습니다 — '+escapeHtml(String(e&&e.message||e))+'</div>';
@@ -12403,16 +12439,37 @@ function rhHwpEdClose(){
 /* 편집기에서 고친 것을 «바탕»으로 되받는다.
    ⚠ 한글 왕복(rhAdoptBase)과 «같은 길»을 쓴다 — 친 값을 비우고 칸 지도를 다시 세운다.
      두 길로 만들면 한쪽만 고쳐져 어긋난다. */
-async function rhHwpEdSave(){
-  if(!_rhHwpEd){ toast('편집기가 열려 있지 않습니다'); return; }
-  toast('⏳ 고친 것을 받아오는 중…');
+/* quiet=true 는 «나가면서 저절로» 되받을 때 — 알림을 한 번만 띄운다.
+   돌려주는 값: 되받았으면 true. ⚠ false 면 부르는 쪽이 편집기를 «거두지 말아야» 한다. */
+var _rhEdLeaving=false;
+async function rhHwpEdSave(quiet){
+  if(!_rhHwpEd){ if(!quiet) toast('편집기가 열려 있지 않습니다'); return false; }
+  if(!quiet) toast('⏳ 고친 것을 받아오는 중…');
   var bytes;
   try{ bytes=await _rhHwpEd.exportHwpx(); }
-  catch(e){ console.warn('되받기', e); toast('받아오지 못했습니다 — '+String(e&&e.message||e)); return; }
-  if(!bytes||!bytes.byteLength){ toast('받아온 것이 비었습니다'); return; }
-  var 이름=rhCleanName((_rhBase&&_rhBase.name)||'양식','');
-  await rhAdoptBase(new File([bytes], 이름, {type:'application/hwp+zip'}));
-  toast('✅ 고치신 것이 이제 바탕입니다 — 입력판에서 이어서 치실 수 있습니다');
+  catch(e){ console.warn('되받기', e); toast('받아오지 못했습니다 — '+String(e&&e.message||e)); return false; }
+  if(!bytes||!bytes.byteLength){ toast('받아온 것이 비었습니다'); return false; }
+  /* ⚠ 도장이 든 채로 되받으면 바탕 이름에 «_날인»을 남긴다 — 그래야 다시 눌러도 도장이
+     둘 겹치지 않는다(rhStampDoc 가 바탕 이름을 본다). 편집기에 연 것에 도장이 들어 있었다. */
+  var 이름=rhCleanName((_rhBase&&_rhBase.name)||'양식', (_rhStampOn&&_rhStampDone)?'_날인':'');
+  _rhEdLeaving=true;
+  try{ await rhAdoptBase(new File([bytes], 이름, {type:'application/hwp+zip'}), true); }
+  finally{ _rhEdLeaving=false; }
+  /* ★ 편집기는 거둔다 — 바탕이 바뀌었다. 떠 있는 채로 두면 그 뒤 입력판에서 친 값이
+     다시 들어와도 옛 화면이 그대로 보인다. 다시 누르면 새 바탕으로 연다. */
+  rhHwpEdClose();
+  toast('✅ 한글 편집에서 고치신 것이 이제 바탕입니다 — 입력판에서 이어서 치실 수 있습니다');
+  return true;
+}
+/* 한글 편집에서 다른 보기로 나간다 — 먼저 되받고, 된 뒤에야 옮긴다 */
+async function rhHwpEdLeave(m){
+  var 됨=await rhHwpEdSave(true);
+  if(!됨){
+    /* ⚠ 못 받았는데 나가면 고친 것이 사라진다 — 편집기에 그대로 둔다 */
+    toast('⚠ 편집기에서 고친 것을 받지 못해 한글 편집에 그대로 둡니다 — 「💾 완성본 생성」으로 먼저 내려받아 두세요', 7000);
+    return;
+  }
+  rhSetMode(m);
 }
 
 /* ── 🗖 큰 창 · ⛶ 전체 화면 · ⌨ 단축키 (대표 지시 2026-09-26) ──────────────────
@@ -12828,16 +12885,83 @@ async function rhComposeBytes(){
     Object.keys(_rhVals).forEach(function(k){ vals[k]=_rhVals[k]; });
     var xml=await zip.file(n).async('string');
     /* ⚠ 목록 표(학력·경력)는 입력칸으로 못 담는다 — 채울 때 세워 둔 계획을 여기서 같이 적용한다.
-       안 하면 「원본 한글에 넣기」를 누르는 순간 학력·경력 줄이 통째로 사라진다. */
+       안 하면 완성본을 내는 순간 학력·경력 줄이 통째로 사라진다. */
     var lists=(_rhListPlan&&_rhListPlan[n])||null;
-    var r=KcareerFormMap.apply(xml,{ values:vals, data:data, lists:lists||undefined });
-    if(r.changed) zip.file(n,r.xml);
+    /* ★★ 「✨ 내 정보로 채우기」를 눌렀으면 «채우기와 같은 셈»으로 짓는다 (2026-09-27).
+       전에는 여기서 친 값만 넣어, 채우기가 넣은 것 중 입력칸에 안 옮겨진 것(가려 둔 값·
+       AI 열 짝짓기·날짜/서명 «문단»)이 한글로 보기·완성본·30초 자동 저장에서 빠졌다.
+       ⚠ 안 눌렀으면 고른 값(짐작)을 «넣지 않는다» — 누르지도 않았는데 채워지면 안 된다.
+       ⚠ 친 값이 고른 값보다 앞선다(지운 것도) — apply 가 그렇게 한다. */
+    var 채움=!!_rhFilled;
+    var r=KcareerFormMap.apply(xml,{ values:vals, data:data, lists:lists||undefined,
+      picks:채움?rhPicksFor(n):undefined, colMap:채움?(_rhColMap||undefined):undefined,
+      secrets:채움?data.secrets:undefined });
+    var 글=r.xml||xml, 바뀜=r.changed;
+    if(채움){ var p=rhParaFill(글, data); if(p.xml!==글){ 글=p.xml; 바뀜=true; } }
+    if(바뀜) zip.file(n,글);
   }
-  /* ★ 정리(쪽 빼기·남은 글자·빈 줄)는 «내보내는 길» 한 곳에서만 한다 (대표 지시 2026-09-13).
+  /* ★ 정리(쪽 빼기·남은 글자·빈 줄)와 도장은 «내보내는 길» 한 곳에서만 한다
+     (대표 지시 2026-09-13 · 도장·✂ 는 2026-09-27 에 여기로 옮겼다).
      ⚠ 입력판은 «바탕»을 그린다 — 거기서 정리하면 칸이 사라져 값을 못 친다.
        정리는 늘 «마지막 걸음»이다. */
-  await rhTidyZip(zip);
+  await rhFinishZip(zip);
   return new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+}
+
+/* ── 「내보낼 때 얹는 것」 — 한 곳에서 다룬다 (대표 승인 2026-09-27 목업) ──────────
+   ■ 무엇이 문제였나 (실측)
+     🖋 도장과 ✂ 쪽 빼기는 «보이는 문서»(_rhDoc)에만 구워졌다. 그런데 한글로 보기·한글 편집·
+     완성본·30초 자동 저장은 모두 «원본에서 새로» 짓는다(rhComposeBytes) —
+     그래서 도장 그림 1개 → 0개, 뺀 공고문이 도로 살아났다.
+   ■ 고친 법 — 🧹 서식 정리가 이미 잘 남던 그 길을 따른다
+     굽지 않고 «표시»만 남긴다(_rhStampOn · _rhTidy.drop). 짓는 길 한 곳이 매번 얹는다.
+   ⚠★ 차례: 쪽 빼기 «먼저», 도장 «나중» — 도장이 뺄 쪽(공고문)의 「(인)」에 찍히면 안 된다.
+   ⚠ 바탕이 바뀌면(새 서식·되받기) 표시를 모두 놓는다 — rhTidyReset. */
+var _rhFilled=false;     /* 「✨ 내 정보로 채우기」를 눌렀나 — 짓는 길이 고른 값도 넣는다 */
+var _rhColMap=null;      /* 그때 AI 가 짚은 목록 표 열 짝짓기 */
+var _rhStampOn=false;    /* 🖋 도장을 찍기로 했나 */
+var _rhStampDone=false;  /* 마지막으로 지을 때 정말 찍혔나 */
+async function rhFinishZip(zip){
+  await rhTidyZip(zip);
+  _rhStampDone=false;
+  if(!_rhStampOn) return;
+  var s=null;
+  try{ s=await rhStampZip(zip); }
+  catch(e){ s={ ok:false, why:'도장을 찍지 못했습니다 — '+String(e&&e.message||e) }; }
+  _rhStampDone=!!(s&&s.ok);
+  if(!_rhStampDone) _rhStampWhy=(s&&s.why)||'도장을 찍지 못했습니다';
+}
+/* 이 구역에서 «채울 곳»으로 고른 것 — 채우기와 짓는 길이 같이 쓴다(따로 적으면 어긋난다) */
+function rhPicksFor(n){
+  var picks={};
+  if(!_rhMap||!_rhMap.slots) return picks;
+  _rhMap.slots.forEach(function(s){
+    if(s.sec!==n) return;
+    var p=(_rhPicks[s.id]!=null)?_rhPicks[s.id]:s.guess;
+    if(p) picks[s.id]=p;
+  });
+  return picks;
+}
+/* 표 «밖» 문단(「2026년 월 일」·「지원자 ○ ○ ○」) — 채우기와 짓는 길이 같이 쓴다 */
+function rhParaFill(xml, data){
+  if(!window.KcareerHwpxFill || !KcareerHwpxFill.fillParagraphs) return { xml:xml, fields:[] };
+  var rep={ fields:[] };
+  var after=KcareerHwpxFill.fillParagraphs(xml, (data&&data.fields)||{}, rep);
+  return { xml:after, fields:rep.fields||[] };
+}
+/* 보이는 문서의 이름 꼬리 — 무엇이 얹혔는지 이름이 말한다 */
+function rhOutTail(){ return (_rhFilled?'_채움':'')+((_rhStampOn&&_rhStampDone)?'_날인':''); }
+/* 얹을 것이 바뀌었다 — 보이는 문서를 다시 짓고, 보던 화면을 새로 그린다.
+   showHwp=true 면 「📄 한글로 보기」로 옮겨 결과를 곧바로 보여 준다(입력판은 원본이라 안 보인다). */
+async function rhOutRefresh(showHwp){
+  var b=null;
+  try{ b=await rhComposeBytes(); }catch(e){ console.warn('다시 짓기', e); b=null; }
+  if(b) _rhDoc={ name:rhCleanName((_rhDoc&&_rhDoc.name)||(_rhBase&&_rhBase.name)||'양식', rhOutTail()), ext:'hwpx', bytes:b };
+  rhDraftSave();
+  _safe(rhInputBaseNote);
+  if(showHwp) _safe(function(){ rhSetMode('hwp'); });
+  else if(_rhMode==='hwp'||_rhMode==='both') _safe(rhPreviewHwp);
+  return !!b;
 }
 
 /* ── 🧹 서식 정리 ────────────────────────────────────────────────────────
@@ -12848,6 +12972,10 @@ var _rhTidy = { drop:{}, ph:false, italic:false, rows:false };
 function rhTidyReset(){
   _rhTidy={ drop:{}, ph:false, italic:false, rows:false };
   if(typeof rhSplitReset==='function') rhSplitReset();
+  /* ⚠ 바탕이 바뀌면 «내보낼 때 얹는 것»도 모두 놓는다 — 남의 서식에 도장·쪽 번호가 따라오면
+     엉뚱한 쪽이 빠지고, 되받은 바탕(이미 도장이 든 것)에 또 찍힌다. */
+  _rhFilled=false; _rhColMap=null; _rhStampOn=false; _rhStampDone=false;
+  _rhDropped=null; _rhPages=null;
 }
 async function rhTidyZip(zip){
   if(!window.KcareerHwpxTidy) return;
@@ -12906,7 +13034,7 @@ async function openTidy(){
   document.getElementById('tdRows').checked=!!_rhTidy.rows;
   m.classList.add('open');
   rhHwpState();
-  var box=document.getElementById('tdPages');
+  var box=document.getElementById('tdSplit');
   if(box) box.innerHTML='<div class="rc-mute" style="font-size:12px">쪽을 세는 중…</div>';
   _tdPages=await rhTidyPages();
   rhTidyDraw();
@@ -12914,47 +13042,11 @@ async function openTidy(){
 }
 /* 새 서식·바탕이 바뀌면 사람이 고쳐 적은 제목도 놓는다 — 남의 서류 제목이 따라오면 안 된다 */
 function rhSplitReset(){ _tdTitles={}; }
+/* ⚠★ 이 창의 쪽 빼기 칸을 뺐다 (대표 승인 2026-09-27) — 쪽 빼기는 기둥의 ✂ 한 곳이다.
+   여기는 «갈라 저장»만 그린다. ✂ 가 뺀 쪽(_rhTidy.drop)은 갈라 저장에서도 빠진다. */
 function rhTidyDraw(){
-  var box=document.getElementById('tdPages'), why=document.getElementById('tdPageWhy');
-  if(!box) return;
-  if(_tdPages.length<2){
-    /* ⚠★ 「쪽 나누기」가 없는 서식은 갈라진 자리가 파일 안에 없다. 글이 넘쳐 저절로
-       넘어간 쪽은 여기서 알 수 없다 — 못 한다고 «그대로 말한다». 억지로 자르면
-       엉뚱한 데서 끊긴 서류가 나간다. */
-    box.innerHTML='<div class="td-warn" style="margin:0">이 서식에는 <b>「쪽 나누기」가 없습니다.</b> '
-      +'쪽이 글 길이에 따라 저절로 넘어가는 서식이라, 어디서 갈리는지 파일 안에 적혀 있지 않습니다 — '
-      +'그래서 쪽 단위로 뺄 수 없습니다. 한글에서 「쪽 나누기」를 넣어 저장하시면 여기서 뺄 수 있습니다.</div>';
-    if(why) why.style.display='none';
-    var t0=document.getElementById('tdPageTally'); if(t0) t0.textContent='';
-    return;
-  }
-  if(why) why.style.display='';
-  box.innerHTML=_tdPages.map(function(p,i){
-    var off=((_rhTidy.drop[p.sec]||[]).indexOf(p.i)>=0);
-    return '<div class="td-pg'+(off?' off':'')+'" onclick="rhTidyToggle('+i+')">'
-      +'<button class="x" type="button" onclick="event.stopPropagation();rhTidyToggle('+i+')">'+(off?'↩':'✕')+'</button>'
-      +'<div class="sheet">'+escapeHtml(p.head||'(글자 없음)')+'</div>'
-      +'<div class="no">'+(i+1)+'쪽</div></div>';
-  }).join('');
-  var 뺀수=0; Object.keys(_rhTidy.drop).forEach(function(k){ 뺀수+=(_rhTidy.drop[k]||[]).length; });
-  var t=document.getElementById('tdPageTally');
-  if(t) t.innerHTML = 뺀수
-    ? '🗑 <b>'+뺀수+'쪽을 뺐습니다</b> — 완성본은 <b>'+(_tdPages.length-뺀수)+'쪽</b>으로 나갑니다. '
-      +'<button class="btn sm" type="button" onclick="rhTidyAllBack()">↩ 모두 되살리기</button>'
-    : '<span style="color:var(--text-mute)">뺀 쪽이 없습니다 — 모두 '+_tdPages.length+'쪽이 나갑니다.</span>';
-  _safe(rhSplitDraw);          /* 뺀 쪽은 갈라 저장 목록에서도 빠져야 한다 */
+  _safe(rhSplitDraw);
 }
-function rhTidyToggle(i){
-  var p=_tdPages[i]; if(!p) return;
-  var arr=_rhTidy.drop[p.sec]||(_rhTidy.drop[p.sec]=[]);
-  var at=arr.indexOf(p.i);
-  if(at>=0) arr.splice(at,1); else arr.push(p.i);
-  /* ⚠ 한 구역을 통째로 빼려 하면 막는다 — 정리하는 자도 막지만, 여기서 «까닭»을 말해 준다 */
-  var 남은=_tdPages.filter(function(q){ return (_rhTidy.drop[q.sec]||[]).indexOf(q.i)<0; });
-  if(!남은.length){ arr.splice(arr.indexOf(p.i),1); toast('마지막 한 쪽은 남겨야 합니다 — 빈 서류가 나갑니다'); }
-  rhTidyDraw();
-}
-function rhTidyAllBack(){ _rhTidy.drop={}; rhTidyDraw(); }
 function rhTidySet(){
   _rhTidy.ph=document.getElementById('tdPh').checked;
   _rhTidy.italic=document.getElementById('tdIt').checked;
@@ -13134,8 +13226,8 @@ async function rhHwpBack(){
 /* 고쳐 온 파일을 «바탕»으로 삼는다.
    ⚠★ 친 값(_rhVals)을 비운다 — 그 값은 이미 그 파일 «안»에 들어가 있다.
       안 비우면 다음에 저장할 때 같은 값이 한 번 더 들어가 두 번 적힌다. */
-async function rhAdoptBase(file){
-  toast('⏳ 바탕을 갈아 끼우는 중…');
+async function rhAdoptBase(file, quiet){
+  if(!quiet) toast('⏳ 바탕을 갈아 끼우는 중…');
   var u8=new Uint8Array(await file.arrayBuffer());
   var ext=(String(file.name).split('.').pop()||'hwpx').toLowerCase();
   if(!_rhOrig && _rhBase) _rhOrig={ name:_rhBase.name, ext:_rhBase.ext, bytes:_rhBase.bytes };
@@ -13147,7 +13239,7 @@ async function rhAdoptBase(file){
   try{ await rhBuildMap(); }catch(e){ console.warn('adopt map',e); }
   try{ await rhBuildInput(); }catch(e){ console.warn('adopt input',e); }
   rhDraftSave(); rhTidyDraw(); rhHwpState(); _safe(rhTidyCount);
-  toast('✅ 고쳐 오신 파일이 이제 바탕입니다 — 이어서 치시면 됩니다');
+  if(!quiet) toast('✅ 고쳐 오신 파일이 이제 바탕입니다 — 이어서 치시면 됩니다');
 }
 async function rhHwpRestore(){
   if(!_rhOrig){ toast('돌아갈 원래 서식이 없습니다'); return; }
@@ -13163,16 +13255,8 @@ async function rhHwpRestore(){
   toast('↩ 원래 서식으로 되돌렸습니다');
 }
 
-/* 입력판에서 저장 — 원본 한글 파일에 값만 넣는다 */
-async function rhSaveInput(){
-  toast('⏳ 원본 한글에 넣는 중…');
-  var bytes=await rhComposeBytes();
-  if(!bytes){ toast('저장할 수 없습니다 — 한글에서 HWPX로 저장해 올려주세요'); return; }
-  _rhDoc={ name:String(_rhDoc.name).replace(/\.(hwp|hwpx)$/i,'')+'_작성.hwpx', ext:'hwpx', bytes:bytes };
-  rhDraftSave();
-  var cnt=Object.keys(_rhVals).filter(function(k){ return _rhVals[k]; }).length;
-  toast('✅ '+cnt+'칸을 원본 서식에 넣었습니다 — 🖨 PDF·⬇ 저장으로 내세요');
-}
+/* ⚠ 「💾 원본 한글에 넣기」(rhSaveInput)는 뺐다 (대표 승인 2026-09-27) — 한글로 보기·완성본·
+   임시저장이 모두 rhComposeBytes 로 «친 값을 넣어» 새로 짓는다. 따로 굳힐 일이 없다. */
 
 /* 고른 대로 채운 뒤 «보고 있는 편집기»에 다시 올린다.
    ⚠ 다른 창에만 띄우면 편집기는 그대로라 「내가 쳐야 하나」가 된다(대표 제보 2026-08-29). */
@@ -13197,7 +13281,9 @@ async function rhFillByMap(){
   if(!src){ toast('이 형식은 채울 수 없습니다 — 한글에서 HWPX로 저장해 올려주세요'); return; }
   /* ★ 되돌릴 수 있게 «채우기 전»을 먼저 담아 둔다(대표 제보 2026-08-30 — 잘못 들어가도
      되돌릴 방법이 없었다). 원본 그대로를 들고 있어야 「↩ 되돌리기」가 뜻이 있다. */
-  _rhUndo={ name:_rhDoc.name, ext:_rhDoc.ext, bytes:_rhDoc.bytes };
+  _rhUndo={ name:_rhDoc.name, ext:_rhDoc.ext, bytes:_rhDoc.bytes,
+            /* ⚠ 표시도 함께 — 되돌리면 «채움»도 도장도 채우기 전 그대로여야 한다 */
+            filled:_rhFilled, colMap:_rhColMap, stamp:_rhStampOn };
   /* 목록 표의 열 짝짓기를 «AI에게» 물어 둔다 — 사전이 못 알아본 서식을 위해서다.
      ⚠ 못 물어도 그냥 간다(사전으로). AI가 없어도 앱은 돌아야 한다. */
   var colMap=await rhColMap(src);
@@ -13207,12 +13293,8 @@ async function rhFillByMap(){
   _rhSignedLine=false;
   var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
   for(const n of names){
-    var picks={};
-    _rhMap.slots.forEach(function(s){
-      if(s.sec!==n) return;
-      var p=(_rhPicks[s.id]!=null)?_rhPicks[s.id]:s.guess;
-      if(p) picks[s.id]=p;
-    });
+    /* ⚠ 고르는 셈은 rhPicksFor 한 곳 — 짓는 길(rhComposeBytes)도 이것을 쓴다 */
+    var picks=rhPicksFor(n);
     var wantLists={}; _rhMap.lists.forEach(function(l){ if(l.sec===n) wantLists[l.id]=l.guess; });
     /* 되돌려 넣을 때 다시 쓰도록 남긴다 — 목록은 입력칸으로 담을 수 없다 */
     if(!_rhListPlan) _rhListPlan={};
@@ -13229,25 +13311,26 @@ async function rhFillByMap(){
       secrets:data.secrets});
     /* ★ 표 «밖» 문단 — 「2026년 월 일」·「지원자 ○ ○ ○」 (대표 지시 2026-09-05).
        칸 지도는 표만 다룬다. 이 두 줄은 표가 아니라 본문 문단이라 여기서 채운다. */
-    var 문단쓴것=null;
-    if(window.KcareerHwpxFill && KcareerHwpxFill.fillParagraphs){
-      var rep={ fields:[] };
-      var after=KcareerHwpxFill.fillParagraphs(r.xml||xml, data.fields||{}, rep);
-      if(after!==(r.xml||xml)){
-        r.xml=after; r.changed=true;
-        문단쓴것=rep.fields;
-        rep.fields.forEach(function(f){
-          filled.push({ id:'para:'+f.key, key:f.key, value:f.value });
-          if(f.key==='signName') _rhSignedLine=true;
-        });
-      }
+    /* ⚠ 문단 채우기도 rhParaFill 한 곳 — 짓는 길도 이것을 쓴다 */
+    var pr=rhParaFill(r.xml||xml, data);
+    if(pr.xml!==(r.xml||xml)){
+      r.xml=pr.xml; r.changed=true;
+      pr.fields.forEach(function(f){
+        filled.push({ id:'para:'+f.key, key:f.key, value:f.value });
+        if(f.key==='signName') _rhSignedLine=true;
+      });
     }
     if(r.changed) zip.file(n,r.xml);
     filled=filled.concat(r.filled); failed=failed.concat(r.failed);
   }
   if(!filled.length){ toast('채운 칸이 없습니다 — 오른쪽에서 넣을 값을 골라 주세요'); return; }
+  /* ★ 채웠다는 «표시»를 남긴다 — 그래야 한글로 보기·완성본·자동 저장이 «같은 셈»으로 짓는다
+     (rhComposeBytes). 안 남기면 채우기가 넣은 날짜 줄·가려 둔 값이 다음 짓기에서 빠진다. */
+  _rhFilled=true; _rhColMap=colMap||null;
+  /* ★ 쪽 빼기·(이미 찍기로 한) 도장도 여기서 얹는다 — 채우기 결과에서 뺀 쪽이 되살아나면 안 된다 */
+  await rhFinishZip(zip);
   var bytes=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
-  _rhDoc={ name:rhCleanName(바탕.name,'_채움'), ext:'hwpx', bytes:bytes };
+  _rhDoc={ name:rhCleanName(바탕.name,rhOutTail()), ext:'hwpx', bytes:bytes };
   rhMemorySave(_rhMap.fp, _rhPicks, _rhDoc.name);
   rhDraftSave();
   /* ⚠ 바탕을 바꾸지 않고 올린다 — 화면·PDF 는 채워진 것을 보여 주되,
@@ -13436,6 +13519,8 @@ var _rhUndo=null;
 async function rhUndoFill(){
   if(!_rhUndo||!_rhUndo.bytes){ toast('되돌릴 것이 없습니다'); return; }
   _rhDoc={ name:_rhUndo.name, ext:_rhUndo.ext, bytes:_rhUndo.bytes };
+  /* ⚠ 표시도 채우기 전으로 — 안 돌리면 다음 짓기(자동 저장)가 채운 것·도장을 도로 넣는다 */
+  _rhFilled=!!_rhUndo.filled; _rhColMap=_rhUndo.colMap||null; _rhStampOn=!!_rhUndo.stamp;
   _rhUndo=null; _rhVals={};
   rhDraftSave();
   await mountEditor(_rhDoc.bytes.buffer.slice(0), _rhDoc.name);
@@ -13486,8 +13571,14 @@ function rhMemoryLoad(fp){
    ⚠★ 되돌리기는 «원본에서 다시 만드는» 것이다 — _rhBase(처음 올린 원본)를 이미 들고 있다.
      그래서 몇 번을 빼도 한 번에 전부 돌아온다.
    ⚠ 판정은 js/kcareer-hwpxpages.js 한 곳에서 한다 — 여기서 다시 적지 말 것. */
-var _rhPages=null;     /* { xml, name, chunks, keep:{}, secName } */
+var _rhPages=null;     /* { chunks:[{sec,i,key,…}], suggest, keep:{key:bool}, 뺀적 } */
 
+/* ⚠★ 뺄 것을 «굽지 않는다» (대표 승인 2026-09-27 목업) — 표시(_rhTidy.drop)만 남기고,
+   짓는 길 한 곳(rhComposeBytes › rhFinishZip › rhTidyZip)이 매번 뺀다.
+   전에는 «보이는 문서»에만 구워, 다른 단추를 누르는 순간 원본에서 새로 지어 공고문이 돌아왔다.
+   그래서 이제 ✂ 로 뺀 것이 한글로 보기·한글 편집·완성본·임시저장·갈라 저장에 «모두» 남는다.
+   ⚠ 두 모듈(kcareer-hwpxpages · kcareer-hwpxtidy)은 쪽 묶음을 «같은 잣대»(문단 여는 태그의
+     pageBreak="1")로 가른다 — 그래서 여기서 센 번호를 정리하는 자가 그대로 쓴다. */
 async function rhPagesOpen(){
   if(!window.KcareerHwpxPages){ toast('부품을 불러오지 못했습니다 — 새로고침해 주세요'); return; }
   var base=(typeof _rhBase!=='undefined' && _rhBase) || _rhDoc;
@@ -13500,15 +13591,24 @@ async function rhPagesOpen(){
     var zip=await JSZip.loadAsync(src);
     var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
     if(!names.length){ toast('이 파일에서는 쪽을 가를 수 없습니다'); return; }
-    var xml=await zip.file(names[0]).async('string');
-    var cs=KcareerHwpxPages.chunks(xml);
+    /* ★ 구역이 여럿이어도 «모든 구역»을 본다 — 서식 정리 창이 하던 몫까지 여기서 한다 */
+    var cs=[];
+    for(const n of names){
+      var xml=await zip.file(n).async('string');
+      KcareerHwpxPages.chunks(xml).forEach(function(c){ c.sec=n; c.key=n+'#'+c.i; cs.push(c); });
+    }
     if(cs.length<2){
       toast('이 서식은 쪽 묶음이 하나뿐이라 나눌 수 없습니다 — 한글에서 쪽나눔을 넣은 파일이어야 합니다', 7000);
       return;
     }
     var sg=KcareerHwpxPages.suggest(cs), keep={};
-    cs.forEach(function(c,i){ keep[c.i]=!sg[i].drop; });
-    _rhPages={ xml:xml, secName:names[0], chunks:cs, suggest:sg, keep:keep, zipSrc:src };
+    /* ★ 이미 빼 둔 것이 있으면 «그대로» 보여 준다 — 다시 열 때마다 권함으로 돌아가면 헷갈린다 */
+    var 있던=_rhTidy.drop||{};
+    var 뺀적=Object.keys(있던).some(function(k){ return (있던[k]||[]).length; });
+    cs.forEach(function(c,i){
+      keep[c.key] = 뺀적 ? ((있던[c.sec]||[]).indexOf(c.i)<0) : !sg[i].drop;
+    });
+    _rhPages={ chunks:cs, suggest:sg, keep:keep, 뺀적:뺀적 };
     $('modalPages').classList.add('open');
     rhPagesRender();
   }catch(e){ console.warn('쪽 빼기', e); toast('쪽을 살펴보지 못했습니다 — '+(e&&e.message||'')); }
@@ -13518,28 +13618,26 @@ function rhPagesClose(){ var o=$('modalPages'); if(o) o.classList.remove('open')
 function rhPagesRender(){
   var box=document.getElementById('rhPagesBody'); if(!box||!_rhPages) return;
   var cs=_rhPages.chunks, sg=_rhPages.suggest, keep=_rhPages.keep;
-  var 남길=cs.filter(function(c){ return keep[c.i]; }).length;
+  var 남길=cs.filter(function(c){ return keep[c.key]; }).length;
   var 뺄=cs.length-남길;
-  var 뺀적=(typeof _rhDropped!=='undefined' && _rhDropped && _rhDropped.length)?_rhDropped.length:0;
-  var ub=$('rhPagesUndoBtn'); if(ub) ub.style.display=뺀적?'':'none';
-  var 값있음=(typeof _rhVals!=='undefined' && _rhVals) ? Object.keys(_rhVals).filter(function(k){ return _rhVals[k]; }).length : 0;
+  var ub=$('rhPagesUndoBtn'); if(ub) ub.style.display=_rhPages.뺀적?'':'none';
 
   var h='<div style="font-size:13px;margin-bottom:8px">쪽 묶음 <b>'+cs.length+'개</b> 가운데 '
     +'<b style="color:var(--teal)">'+남길+'개를 남기고</b> <b style="color:var(--red)">'+뺄+'개를 뺍니다</b>.</div>';
-  if(뺄) h+='<div style="font-size:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px 9px;margin-bottom:10px;color:#166534">'
+  /* ⚠ 처음 열 때만 «미리 꺼 두었다»고 말한다 — 이미 빼 둔 것을 다시 열면 그것은 사람이 고른 것이다 */
+  if(뺄 && !_rhPages.뺀적) h+='<div style="font-size:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px 9px;margin-bottom:10px;color:#166534">'
     +'🤖 «안 낼 것»으로 보이는 '+뺄+'개를 미리 꺼 두었습니다 — <b>맞는지 확인해 주세요.</b> 저절로 지우지 않습니다.</div>';
-  /* ⚠ 값을 이미 쳤으면 먼저 알린다 — 쪽을 빼면 칸 자리가 바뀐다 */
-  if(값있음) h+='<div style="font-size:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 9px;margin-bottom:10px;color:#854d0e">'
-    +'⚠ 이미 <b>'+값있음+'칸</b>을 치셨습니다. 쪽을 빼면 칸 자리가 바뀌니 <b>쪽 정리를 먼저 하고</b> 값을 채우시는 것이 좋습니다.</div>';
+  if(_rhPages.뺀적) h+='<div style="font-size:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 9px;margin-bottom:10px;color:var(--navy)">'
+    +'지금 빼 두신 대로입니다. 체크를 바꾸고 「✂ 고른 대로 만들기」를 누르시면 바뀝니다.</div>';
 
   h+='<div style="max-height:52vh;overflow:auto"><table class="dt" style="width:100%;font-size:12px"><thead><tr>'
     +'<th style="width:64px">남길까</th><th style="width:52px">묶음</th><th>첫머리</th>'
     +'<th style="width:64px">채울 칸</th><th>판단</th></tr></thead><tbody>';
   cs.forEach(function(c,i){
-    var on=!!keep[c.i], why=sg[i].why;
+    var on=!!keep[c.key], why=sg[i].why;
     h+='<tr'+(on?'':' style="background:#fef2f2"')+'>'
       +'<td><label style="display:flex;gap:5px;align-items:center;white-space:nowrap">'
-        +'<input type="checkbox" class="rhpg-chk" data-i="'+c.i+'"'+(on?' checked':'')+'>'
+        +'<input type="checkbox" class="rhpg-chk" data-k="'+_jsAttr(c.key)+'"'+(on?' checked':'')+'>'
         +'<span>'+(on?'남김':'<b style="color:var(--red)">뺌</b>')+'</span></label></td>'
       +'<td style="white-space:nowrap;color:var(--text-mute)">'+(i+1)+'/'+cs.length+'</td>'
       +'<td style="word-break:break-all">'+escapeHtml(c.이름)+'</td>'
@@ -13549,54 +13647,55 @@ function rhPagesRender(){
   h+='</tbody></table></div>'
     +'<div style="font-size:12px;color:var(--text-mute);margin-top:10px;line-height:1.7">'
     +'⚠ 「쪽 묶음」은 한글의 <b>쪽나눔</b>으로 갈린 덩어리입니다 — 한 묶음이 두 쪽일 수도 있어 «쪽»이라 부르지 않습니다.<br>'
-    +'⚠ <b>원본은 건드리지 않습니다.</b> 만든 뒤에도 <b>↩ 모든 쪽 되살리기</b>로 한 번에 돌아옵니다.</div>';
+    +'⚠ <b>원본은 건드리지 않습니다.</b> 친 값도 그대로 남고, 언제든 <b>↩ 모든 쪽 되살리기</b>로 한 번에 돌아옵니다.<br>'
+    +'✍ 입력판은 원본을 그대로 보여 드립니다 — 뺀 결과는 <b>📄 한글로 보기</b>에서 보입니다.</div>';
   box.innerHTML=h;
   box.querySelectorAll('.rhpg-chk').forEach(function(cb){
-    cb.onchange=function(){ _rhPages.keep[Number(cb.dataset.i)]=cb.checked; rhPagesRender(); };
+    cb.onchange=function(){ _rhPages.keep[cb.dataset.k]=cb.checked; rhPagesRender(); };
   });
 }
 
-/* 고른 대로 새 문서를 만든다. ⚠ 원본(_rhBase)은 그대로 둔다 — 되돌리기의 바탕이다. */
+/* 고른 대로 «표시»를 남긴다. ⚠ 원본(_rhBase)도 친 값(_rhVals)도 건드리지 않는다. */
 var _rhDropped=null;
 async function rhPagesApply(){
   if(!_rhPages) return;
-  var 뺄것=_rhPages.chunks.filter(function(c){ return !_rhPages.keep[c.i]; }).map(function(c){ return c.i; });
+  var keep=_rhPages.keep;
+  var 뺄것=_rhPages.chunks.filter(function(c){ return !keep[c.key]; });
   if(!뺄것.length){ toast('뺄 것이 없습니다 — 뺄 묶음의 체크를 꺼 주세요'); return; }
   if(뺄것.length>=_rhPages.chunks.length){ toast('모두 뺄 수는 없습니다 — 남길 것을 하나 이상 켜 주세요'); return; }
+  /* ⚠ 구역마다 한 묶음은 남아야 한다 — 정리하는 자(dropPages)는 한 구역을 통째로 비우라면
+     «거절»하고 아무것도 안 뺀다. 여기서 막고 까닭을 말한다(말없이 안 빠지면 고장으로 읽힌다). */
+  var 구역={};
+  _rhPages.chunks.forEach(function(c){
+    var g=구역[c.sec]||(구역[c.sec]={ n:0, off:0 });
+    g.n++; if(!keep[c.key]) g.off++;
+  });
+  if(Object.keys(구역).some(function(k){ return 구역[k].off>=구역[k].n; })){
+    toast('구역마다 한 묶음은 남겨야 합니다 — 한 구역을 통째로 뺄 수는 없습니다', 6000); return;
+  }
   var btn=$('rhPagesApplyBtn'); if(btn){ btn.disabled=true; btn.textContent='✂ 만드는 중…'; }
   try{
-    var zip=await JSZip.loadAsync(_rhPages.zipSrc);
-    var 새xml=KcareerHwpxPages.remove(_rhPages.xml, 뺄것);
-    zip.file(_rhPages.secName, 새xml);
-    var bytes=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
-    _rhDropped=뺄것.slice();
-    _rhDoc={ name:rhCleanName((_rhDoc&&_rhDoc.name)||'양식.hwpx','_필요한쪽'), ext:'hwpx', bytes:bytes };
-    rhDraftSave();
-    /* ⚠★ 처음 올린 원본(_rhBase)을 «지키며» 다시 그린다 — mountEditor 는 새 서식이 온 것으로
-       보고 바탕을 갈아 끼운다. 갈리면 「↩ 모든 쪽 되살리기」가 «뺀 것»으로 되돌아간다.
-       ⚠ finally 에서 반드시 푼다 — 안 풀면 다음 양식이 바탕을 못 잡는다(2026-09-07 과 같은 덫). */
-    _rhKeepBase=true;
-    try{ await mountEditor(bytes.buffer.slice(0), _rhDoc.name); }
-    finally{ _rhKeepBase=false; }
+    var drop={};
+    뺄것.forEach(function(c){ (drop[c.sec]||(drop[c.sec]=[])).push(c.i); });
+    _rhTidy.drop=drop;
+    _rhDropped=뺄것.map(function(c){ return c.key; });
+    await rhOutRefresh(true);
     rhPagesClose();
-    toast('✂ '+뺄것.length+'묶음을 뺐습니다 — 마음에 안 들면 「✂ 필요 없는 쪽 빼기 › ↩ 모든 쪽 되살리기」', 7000);
+    toast('✂ '+뺄것.length+'묶음을 뺐습니다 — 한글로 보기·완성본·임시저장에 모두 빠진 채 나갑니다. 되살리려면 「✂ › ↩ 모든 쪽 되살리기」', 7000);
   }catch(e){ console.warn('쪽 빼기 적용', e); toast('만들지 못했습니다 — '+(e&&e.message||'')); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='✂ 고른 대로 만들기'; } }
 }
 
-/* ↩ 되돌리기 — «원본에서 다시» 만든다. 몇 번을 뺐든 한 번에 전부 돌아온다. */
+/* ↩ 되살리기 — 표시만 거둔다. 원본에서 짓는 길이 그대로 모든 쪽을 되살린다.
+   ⚠ 친 값은 «그대로» 남는다 — 쪽을 굽지 않으니 칸 자리가 바뀌지 않았다. */
 async function rhPagesRestore(){
-  var base=(typeof _rhBase!=='undefined' && _rhBase) || null;
-  if(!base || !base.bytes){ toast('처음 올린 원본이 없습니다 — 양식을 다시 올려 주세요'); return; }
-  if(!confirm('↩ 뺀 쪽을 «모두» 되살립니다.\n\n처음 올리신 원본 그대로 돌아갑니다.\n'
-    +'⚠ 그 뒤에 치신 값은 지워집니다(칸 자리가 원래대로 돌아가기 때문입니다).\n\n계속할까요?')) return;
+  var 뺀수=0; Object.keys(_rhTidy.drop||{}).forEach(function(k){ 뺀수+=(_rhTidy.drop[k]||[]).length; });
+  if(!뺀수){ toast('뺀 쪽이 없습니다 — 모두 나가고 있습니다'); rhPagesClose(); return; }
   try{
-    _rhDoc={ name:base.name, ext:base.ext||'hwpx', bytes:base.bytes };
-    rhDraftSave();
-    await mountEditor(base.bytes.buffer.slice(0), base.name);   /* 바탕을 원본으로 되돌린다 */
-    _rhDropped=null; _rhPages=null;
+    _rhTidy.drop={}; _rhDropped=null; _rhPages=null;
+    await rhOutRefresh(true);
     rhPagesClose();
-    toast('↩ 모든 쪽을 되살렸습니다 — 처음 올리신 그대로입니다');
+    toast('↩ 모든 쪽을 되살렸습니다 — 치신 값은 그대로입니다');
   }catch(e){ console.warn('쪽 되살리기', e); toast('되살리지 못했습니다 — '+(e&&e.message||'')); }
 }
 
@@ -13633,42 +13732,74 @@ function rhInputBaseNote(){
     +(도장있음?'':' · 도장은 아직 안 찍혔습니다');
   hint.appendChild(d);
 }
+/* 🖋 도장 찍기 — ⚠★ 이제 «굽지 않는다» (대표 승인 2026-09-27 목업).
+   찍기로 했다는 표시(_rhStampOn)만 남기고, 짓는 길 한 곳(rhFinishZip)이 매번 찍는다.
+   전에는 «보이는 문서»에만 찍혀 한글로 보기 0개 · 완성본 0개였다(실측) —
+   대표께서 여러 번 말씀하신 「도장이 잘 안 된다」의 뿌리다.
+   ⚠ 한 번 더 누르면 «뺄지» 묻는다 — 도장을 뺄 길이 없으면 누르기를 겁낸다. */
 async function rhStampDoc(quiet){
   var 말 = function(m){ _rhStampWhy=m; if(!quiet) toast(m); };
   _rhStampWhy='';
   if(!_rhDoc||!_rhDoc.bytes){ 말('먼저 서식을 올려주세요'); return false; }
   if(!window.KcareerHwpStamp){ 말('도장 모듈을 못 불러왔습니다'); return false; }
-  /* 이미 찍힌 서식에 또 찍지 않는다 — 도장이 둘 겹친다 */
-  if(/_날인\.hwpx$/i.test(String(_rhDoc.name||''))){ 말('이미 도장이 찍혀 있습니다'); return false; }
-  /* ⚠ 채우기가 원본에서 새로 짓기 때문에, 채운 뒤에는 도장이 지워진 상태다 —
-     그래서 채우기 뒤 자동 날인이 «다시» 찍는다. 그것이 맞다(늘 같은 결과). */
-  var st=(typeof getDefaultStamp==='function')?getDefaultStamp():null;
-  if(!st){ 말('먼저 환경설정 › 도장(직인) 보관함에 도장을 올려주세요'); return false; }
-  var f=await getFileAsync(st.id);
-  if(!f||!f.base64){ 말('도장 그림을 찾을 수 없습니다'); return false; }
+  /* ⚠ 바탕 «자체»가 이미 찍힌 서식이면 또 찍지 않는다 — 도장이 둘 겹친다.
+     (한글 편집에서 되받은 것 · 찍어 낸 완성본을 다시 올린 것이 이름에 «_날인»을 단다) */
+  var 바탕=_rhBase||_rhDoc;
+  if(/_날인\.hwpx$/i.test(String(바탕.name||''))){ 말('이미 도장이 찍혀 있습니다'); return false; }
+  if(_rhStampOn){
+    if(quiet) return true;                 /* 이미 찍기로 했다 — 지을 때마다 찍힌다 */
+    if(!confirm('🖋 도장이 이미 찍혀 있습니다.\n\n도장을 뺄까요?')) return false;
+    _rhStampOn=false;
+    await rhOutRefresh(true);
+    toast('🖋 도장을 뺐습니다 — 다시 누르시면 또 찍습니다');
+    return false;
+  }
   try{ await _ensureJSZip(); }catch(e){ 말('모듈을 못 불러왔습니다(인터넷 필요)'); return false; }
-  var src=null;
-  try{ src=await _rhToHwpx(_rhDoc.bytes,_rhDoc.name); }catch(e){ src=null; }
-  if(!src){ 말('이 형식에는 도장을 찍을 수 없습니다 — 한글에서 HWPX로 저장해 올려주세요'); return false; }
+  _rhStampOn=true;
+  var bytes=null;
+  try{ bytes=await rhComposeBytes(); }catch(e){ bytes=null; }
+  if(!bytes){ _rhStampOn=false; 말('이 형식에는 도장을 찍을 수 없습니다 — 한글에서 HWPX로 저장해 올려주세요'); return false; }
+  /* ⚠ 자리를 못 찾으면 «찍지 않는다» — 표시를 도로 거둔다. 잘못 날인한 서류는 되돌릴 수 없다. */
+  if(!_rhStampDone){ var 까닭=_rhStampWhy; _rhStampOn=false; 말(까닭||'도장을 찍지 못했습니다'); return false; }
+  _rhDoc={ name:rhCleanName(_rhDoc.name,rhOutTail()), ext:'hwpx', bytes:bytes };
+  rhDraftSave();
+  _safe(rhInputBaseNote);
+  /* ★ 누르신 것이면 «한글로 보기»로 옮겨 곧바로 보여 드린다 — 입력판은 원본이라 도장이 안 보인다.
+     ⚠ 채우기 뒤에 조용히(quiet) 부를 때는 옮기지 않는다 — 보던 화면이 튀면 안 된다. */
+  if(!quiet) _safe(function(){ rhSetMode('hwp'); });
+  말('🖋 도장을 찍었습니다 — 한글로 보기·완성본에 들어갑니다 · 자리는 환경설정 › 도장 보관함에서 맞춥니다');
+  _rhStampWhy='';                       /* 됐으니 까닭을 지운다 */
+  return true;
+}
 
-  var png=String(f.base64).replace(/^data:[^,]*,/,'');
-  /* 그림의 «본래 크기»를 재 둔다 — 이걸 안 맞추면 도장이 잘려 조각만 그려진다 */
+/* 도장 그림의 «본래 폭»을 재 둔다 — 지을 때마다(30초) 그림을 새로 재지 않게 */
+var _rhStampPxMemo={ key:'', px:300 };
+async function _rhStampPx(id, png){
+  var key=id+':'+png.length;
+  if(_rhStampPxMemo.key===key) return _rhStampPxMemo.px;
   var px=await new Promise(function(res){
     var im=new Image();
     im.onload=function(){ res(im.naturalWidth||300); };
     im.onerror=function(){ res(300); };
     im.src='data:image/png;base64,'+png;
   });
-
-  var zip=await JSZip.loadAsync(src);
+  _rhStampPxMemo={ key:key, px:px };
+  return px;
+}
+/* 짓고 있는 문서(zip)에 도장을 찍는다 — 짓는 길(rhFinishZip) 한 곳만 부른다.
+   돌려주는 것 = { ok, why } */
+async function rhStampZip(zip){
+  var st=(typeof getDefaultStamp==='function')?getDefaultStamp():null;
+  if(!st) return { ok:false, why:'먼저 환경설정 › 도장(직인) 보관함에 도장을 올려주세요' };
+  var f=await getFileAsync(st.id);
+  if(!f||!f.base64) return { ok:false, why:'도장 그림을 찾을 수 없습니다' };
+  var png=String(f.base64).replace(/^data:[^,]*,/,'');
+  /* 그림의 «본래 크기»를 재 둔다 — 이걸 안 맞추면 도장이 잘려 조각만 그려진다 */
+  var px=await _rhStampPx(st.id, png);
   /* ⚠ 그림 이름은 «반드시» image1·image2… — 엔진이 이름 규칙으로 찾는다.
      뜻이 담긴 이름을 쓰면 목록에 href 를 적어 줘도 깨진 상자가 그려진다(실측). */
   var imgId=KcareerHwpStamp.nextImageId(Object.keys(zip.files));
   var href='BinData/'+imgId+'.png';
-  zip.file(href, png, {base64:true});
-  var hpf=await zip.file('Contents/content.hpf').async('string');
-  zip.file('Contents/content.hpf', KcareerHwpStamp.addToManifest(hpf, imgId, href));
-
   var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
   var done=0;
   for(const n of names){
@@ -13684,14 +13815,12 @@ async function rhStampDoc(quiet){
     done++;
     break;   /* 도장은 한 번만 — 여러 장에 찍히면 되돌리기가 어렵다 */
   }
-  if(!done){ 말('도장 자리(「(인)」·「(서명)」)를 못 찾았습니다 — 한글에서 직접 넣어 주세요'); return false; }
-  var bytes=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
-  _rhDoc={ name:rhCleanName(_rhDoc.name,'_채움_날인'), ext:'hwpx', bytes:bytes };
-  rhDraftSave();
-  await mountEditor(bytes.buffer.slice(0), _rhDoc.name);
-  말('🖋 도장을 찍었습니다 — 자리가 어긋나면 한글에서 옮길 수 있습니다');
-  _rhStampWhy='';                       /* 됐으니 까닭을 지운다 */
-  return true;
+  if(!done) return { ok:false, why:'도장 자리(「(인)」·「(서명)」)를 못 찾았습니다 — 한글에서 직접 넣어 주세요' };
+  /* ⚠ 그림은 자리를 «찾은 뒤»에 넣는다 — 못 찾았는데 넣으면 쓰지도 않는 그림이 파일에 남는다 */
+  zip.file(href, png, {base64:true});
+  var hpf=await zip.file('Contents/content.hpf').async('string');
+  zip.file('Contents/content.hpf', KcareerHwpStamp.addToManifest(hpf, imgId, href));
+  return { ok:true };
 }
 
 /* ═══ 한글 서류를 쓰는 동안은 «저절로» 담는다 (대표 지시 2026-09-26 「1분마다」) ═══
@@ -13890,6 +14019,21 @@ async function rhDraftResume(id){
      값이 겹쳐 적힌다(대표 제보 2026-09-06 「푸른노무법인 푸른노무법인 푸른노무법인」). */
   _rhBase=await rhBaseLoad(id);
   _rhBaseSaved=_rhBase ? (id+':'+_rhBase.bytes.length) : '';
+  /* ★ 표시(채움·도장·뺀 쪽·정리)를 되살린다 — 안 되살리면 첫 자동 저장에서 사라진다.
+     ⚠ 원본이 있을 때만 — 원본 없는 옛 자리는 문서에 이미 구워져 있어, 또 얹으면 도장이 둘이 된다.
+     ⚠★ 한글 편집 «안에서» 담긴 자리는 그 문서가 곧 바탕이다(고친 것이 그 안에만 있다).
+       원본에서 새로 지으면 편집기에서 고친 것이 사라진다 → 담긴 문서를 바탕으로 삼는다. */
+  var 표=(side&&side.out)||null;
+  if(_rhBase && side && side.inEd){
+    _rhOrig={ name:_rhBase.name, ext:_rhBase.ext, bytes:_rhBase.bytes };
+    _rhBase={ name:rhCleanName(f.name, (표&&표.stamp)?'_날인':''), ext:'hwpx', bytes:_rhDoc.bytes };
+    _rhVals={}; _rhListPlan=null;          /* ⚠ 값은 이미 그 안에 있다 — 또 넣으면 두 번 적힌다 */
+    rhTidyReset();
+  }else if(_rhBase && 표){
+    _rhFilled=!!표.filled; _rhColMap=표.colMap||null; _rhStampOn=!!표.stamp;
+    var td=표.tidy||{};
+    _rhTidy={ drop:td.drop||{}, ph:!!td.ph, italic:!!td.italic, rows:!!td.rows };
+  }
   rhDraftPanelClose();
   /* ⚠ mountEditor 는 «새 서식이 올라온 것»으로 보고 바탕을 다시 잡는다(_rhVals 도 비운다).
      여기서는 방금 되살린 원본·친 값을 지켜야 하므로 _rhKeepBase 로 막는다. */
