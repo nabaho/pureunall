@@ -311,7 +311,7 @@ $('btnSubmit').onclick = async function () {
   submitting = false;
 };
 
-// ── 신분증 촬영 자동입력 (온디바이스 Tesseract — 외부 서버 전송 없음, 사진 즉시 폐기) ──
+// ── 신분증 촬영 자동입력 (온디바이스 한국어 OCR, 안 되면 Tesseract — 외부 서버 전송 없음, 사진 즉시 폐기) ──
 var tessLoading = null;
 function loadTesseract() { // 지연 로드 (~10MB 한글 데이터, 첫 사용 시)
   if (window.Tesseract) return Promise.resolve();
@@ -324,6 +324,22 @@ function loadTesseract() { // 지연 로드 (~10MB 한글 데이터, 첫 사용 
   });
   return tessLoading;
 }
+/* ★ 2026-09-27 대표 「이알피 전자서명도 바꿔라」 — 한국어 OCR(PP-OCRv5, js/pu-ocr-kr.js)을 먼저 쓴다.
+   기금 서류 읽기(#1630)에서 tesseract 보다 판독 칸 31% 많고 번호 오독이 없던 방식. 이것도 «기기 안»에서만 읽는다
+   (모델·실행기만 받는다 — 처음 한 번 약 30MB, 그 뒤 브라우저 캐시). 못 받거나 글이 거의 없으면 예전 tesseract 로. */
+var krLoading = null;
+function loadOcrKr() {
+  if (window.PuOcrKr) return Promise.resolve();
+  if (krLoading) return krLoading;
+  krLoading = new Promise(function (res, rej) {
+    var s = document.createElement('script');
+    s.src = 'js/pu-ocr-kr.js?v=2';
+    s.onload = function () { window.PuOcrKr ? res() : rej(new Error('no PuOcrKr')); };
+    s.onerror = function () { krLoading = null; rej(new Error('load')); };
+    document.head.appendChild(s);
+  });
+  return krLoading;
+}
 $('btnOcr').onclick = function () { $('ocrFile').click(); };
 $('ocrFile').addEventListener('change', async function () {
   var file = this.files && this.files[0];
@@ -331,10 +347,9 @@ $('ocrFile').addEventListener('change', async function () {
   if (!file) return;
   var st = $('ocrStatus');
   st.style.display = 'block';
-  st.textContent = '인식 준비 중… (첫 사용 시 10초 정도 걸립니다)';
+  st.textContent = '인식 준비 중… (첫 사용 시 약 30MB를 받느라 조금 걸립니다)';
   var cv = null;
   try {
-    await loadTesseract();
     // 다운스케일(최대 1600px) — 속도·메모리 절약
     var img = await createImageBitmap(file);
     var scale = Math.min(1, 1600 / Math.max(img.width, img.height));
@@ -342,11 +357,21 @@ $('ocrFile').addEventListener('change', async function () {
     cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
     img.close();
-    st.textContent = '신분증을 읽는 중…';
-    var out = await Tesseract.recognize(cv, 'kor', {
-      logger: function (m) { if (m.status === 'recognizing text') st.textContent = '신분증을 읽는 중… ' + Math.round(m.progress * 100) + '%'; }
-    });
-    var text = (out && out.data && out.data.text) || '';
+    var text = '';
+    try {
+      await loadOcrKr();
+      text = await PuOcrKr.recognize([cv], function (m) {
+        st.textContent = /내려받/.test(m) ? '인식 준비 중… (첫 사용 시 약 30MB)' : '신분증을 읽는 중…';
+      });
+    } catch (e) { text = ''; }
+    if (String(text).replace(/\s/g, '').length < 10) {        // 한국어 OCR 을 못 쓰면 예전 길
+      await loadTesseract();
+      st.textContent = '신분증을 읽는 중…';
+      var out = await Tesseract.recognize(cv, 'kor', {
+        logger: function (m) { if (m.status === 'recognizing text') st.textContent = '신분증을 읽는 중… ' + Math.round(m.progress * 100) + '%'; }
+      });
+      text = (out && out.data && out.data.text) || '';
+    }
     // 주민번호: 6-7 숫자 패턴
     var mId = text.match(/(\d{6})\s*[-–—]?\s*(\d{7})/);
     if (mId) { $('fIdNo').value = $('fIdNo').value || (mId[1] + '-' + mId[2]); }

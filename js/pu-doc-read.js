@@ -1950,9 +1950,63 @@
     });
   }
 
-  /* 사진 한 장을 브라우저에서 읽는다 — 원본과 손질본 두 벌로 읽어 «긴 쪽»을 쓴다.
+  /* ── 한국어 OCR(PP-OCRv5, js/pu-ocr-kr.js) — ★ 2026-09-27 대표 「이알피 전자서명도 바꿔라」 ──
+     기금 서류 읽기(#1630)에서 과거 스캔본 55개로 겨뤄 tesseract 보다 판독 칸 31% 많고 번호 오독이 없던 방식.
+     브라우저 판독(Vision 이 안 될 때의 무료 길)이 이것을 먼저 쓰고, 못 쓰거나 글이 거의 없으면 예전 tesseract 두 벌 읽기로.
+     모듈은 이 파일 옆(js/)에 있다 — 부를 때 한 번만 싣는다(처음 쓸 때 모델 약 18MB + 실행기 14MB, 브라우저 캐시). */
+  var OCR_KR_SRC = 'pu-ocr-kr.js?v=2';
+  var SELF_BASE = (function () {
+    try { var c = global.document && global.document.currentScript; return c && c.src ? c.src.replace(/[^/]*(\?.*)?$/, '') : 'js/'; }
+    catch (e) { return 'js/'; }
+  })();
+  var krLoading = null;
+  function loadOcrKr() {
+    if (global.PuOcrKr) return Promise.resolve(global.PuOcrKr);
+    if (krLoading) return krLoading;
+    krLoading = new Promise(function (resolve, reject) {
+      var d = global.document;
+      if (!d) { reject(new Error('브라우저가 아닙니다')); return; }
+      var s = d.createElement('script');
+      s.src = SELF_BASE + OCR_KR_SRC;
+      s.onload = function () { if (global.PuOcrKr) resolve(global.PuOcrKr); else { krLoading = null; reject(new Error('한국어 OCR 을 못 불러왔습니다')); } };
+      s.onerror = function () { krLoading = null; reject(new Error('한국어 OCR 을 못 불러왔습니다')); };
+      d.head.appendChild(s);
+    });
+    return krLoading;
+  }
+  /* 사진(데이터 주소) → 캔버스. 큰 사진은 긴 변 3000 으로 줄인다(글자 찾기는 어차피 960 으로 줄여 본다) */
+  function imgToCanvas(src) {
+    return new Promise(function (resolve, reject) {
+      var d = global.document;
+      if (!d || !global.Image) { reject(new Error('브라우저가 아닙니다')); return; }
+      var im = new global.Image();
+      im.onload = function () {
+        var k = Math.min(1, 3000 / Math.max(im.width || 1, im.height || 1));
+        var cv = d.createElement('canvas'); cv.width = Math.max(1, Math.round(im.width * k)); cv.height = Math.max(1, Math.round(im.height * k));
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); resolve(cv);
+      };
+      im.onerror = function () { reject(new Error('사진을 열지 못했습니다')); };
+      im.src = src;
+    });
+  }
+  function krRead(img, onProgress) {
+    return loadOcrKr().then(function (K) {
+      return imgToCanvas(img).then(function (cv) {
+        return K.recognize([cv], function (m) { if (onProgress) onProgress({ status: String(m) }); });
+      });
+    }).then(function (text) {
+      text = String(text || '');
+      if (text.replace(/\s/g, '').length < 20) throw new Error('한국어 OCR 결과가 거의 없습니다');
+      return { text: text, fields: bizregParse(text), engine: 'ppocr' };
+    });
+  }
+
+  /* 사진 한 장을 브라우저에서 읽는다 — 한국어 OCR 먼저(위), 안 되면 tesseract 로 원본과 손질본 두 벌을 읽어 «긴 쪽»을 쓴다.
      돌려주는 칸 이름은 푸른이알피가 쓰던 그대로다(bizregParse 참고). */
   function browserRead(img, onProgress) {
+    return krRead(img, onProgress).catch(function () { return tessRead(img, onProgress); });
+  }
+  function tessRead(img, onProgress) {
     return loadTess().then(function () {
       var 원본 = global.Tesseract.recognize(img, 'kor+eng', {
         logger: function (m) { if (onProgress) onProgress(m); },
