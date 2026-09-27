@@ -27,7 +27,7 @@
 <script src="js/pu-gcal-auth.js?v=8"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
-<script src="js/pu-case-due.js?v=1"></script>
+<script src="js/pu-case-due.js?v=2"></script>
 <script src="js/pu-cal-write.js?v=8"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
@@ -300,6 +300,22 @@
   .ctaken{color:#fff;font-size:15px;font-weight:900;text-shadow:0 0 2px rgba(0,0,0,.6)}
   /* ── 내 색 고르기 (2026-09-27) ──
      색이 서른다섯 가지라 줄로 나열하지 않고 격자로 둔다 — 줄로 두면 창이 길어진다. */
+  /* ── 일정 상세 창 (2026-09-27) ──
+     구글 달력의 상세 창 꼴 — 색 띄 · 제목 · 언제 · 줄줄이 항목 · 아래 단추. */
+  .modal.det{padding:0;overflow:hidden}
+  .dbar{height:5px}
+  .dtop{padding:13px 16px 4px;display:flex;gap:9px;align-items:flex-start}
+  .ddot{width:13px;height:13px;border-radius:3px;flex-shrink:0;margin-top:4px}
+  .dttl{font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}
+  .dwhen{font-size:12.5px;color:var(--gsub);margin-top:2px}
+  .drows{padding:6px 16px 10px}
+  .drow{display:flex;gap:10px;font-size:12.5px;padding:4px 0;align-items:flex-start}
+  .drow .di{width:16px;text-align:center;color:var(--gsub);flex-shrink:0}
+  /* ⚠ 긴 설명이 창을 밀어 넘지지 않게 — 긴 영문 주소 한 줄이 들어오기도 한다 */
+  .drow .dt{flex:1;min-width:0;word-break:break-word;white-space:pre-wrap}
+  .dhint{font-size:11.5px;color:var(--gsub);background:var(--bg);border-radius:6px;
+    padding:7px 10px;margin:0 16px 8px;line-height:1.5}
+  .modal.det .mbtns{padding:9px 13px;border-top:1px solid var(--gline);background:var(--bg);margin:0}
   .mypal{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:8px 0 9px}
   .mysw{width:100%;aspect-ratio:1;border-radius:6px;border:2px solid transparent;cursor:pointer;
     padding:0;position:relative;font-family:inherit}
@@ -1545,6 +1561,10 @@ function gcalToEvent(ev){
     /* 만든이 메일을 남긴다 — 「계정 잇기」 창이 «아직 안 이은 사람»을 여기서 센다 */
     mail:mail, mailSid:mailSid || "",
     color:color, gcalUrl:ev.htmlLink || "",
+    /* ★ 상세 창에 낼 것 — 장소·설명을 «통째로» 들고 온다.
+       tip 은 칩에 마우스를 올렸을 때 쓰는 짧은 글이라 두 줄로 자른다. 상세는 다 보여 준다. */
+    place: ev.location || "",
+    desc: String(ev.description || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim(),
     tip: title + (ev.location ? "\n📍 " + ev.location : "")
          /* 설명 앞 두 줄(담당자 등 — 이 앱이 넣은 미팅이면 「담당자: …」가 첫 줄이다) */
          + (ev.description ? "\n" + String(ev.description).replace(/<[^>]+>/g, "").split("\n").slice(0, 2).join("\n") : "")
@@ -1674,6 +1694,7 @@ function eventsOn(ymd, eumOnly){
       if(S.filter && S.filter !== "pureun" && S.filter !== "eumwork" && c.sid !== S.filter) return;
       if(S.filter === "eumwork") return;
       out.push({ kind:c.kind, store:"", id:c.kind + ":" + c.date + ":" + (c.sid || ""),
+        rows:c.rows || [], hint:c.hint || [],
         sid:c.sid, text:c.text, time:"", color:c.color, tip:c.tip, movable:false });
     });
   }
@@ -1889,7 +1910,9 @@ function chipHtml(e, ymd){
       + ';color:var(--gsub);background:transparent;text-decoration:line-through">' + esc(제목) + '</div>';
   }
   if(공휴){
-    return '<div class="ev hol" title="' + esc(e.tip || 제목) + '" style="' + 꼴 + '">' + 안 + '</div>';
+    /* 눌러서 상세를 볼 수 있게 — 이름이 길어 칸에서 잘리는 날이 있다(대체공휴일 등) */
+    return '<div class="ev hol" data-holday="' + esc(ymd) + '" title="' + esc(e.tip || 제목)
+      + '" style="' + 꼴 + '">' + 안 + '</div>';
   }
   return '<div class="ev" data-ev="' + esc(e.store) + ':' + esc(e.id) + '"'
     + (시각칩 ? ' data-g="t"' : '')
@@ -2652,13 +2675,84 @@ function openEdit(store, id){
   if(옛방식표(store)) S.modal.err = 옛방식안내(store);
   render();
 }
-/* 구글 일정 한 건을 구글 달력에서 연다 */
-function openGcal(id){
-  var found = null;
-  for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === id) found = GCAL.evs[i];
-  if(found && found.gcalUrl){ window.open(found.gcalUrl, "_blank", "noopener"); return; }
-  toast("구글 달력에서 여는 주소가 없습니다");
+/* ── 일정 상세 ────────────────────────────────────────────────────────────
+   대표 지시 2026-09-27 「캘린더 일정 클릭시 상세내역 보이게 해줘」 → 목업 뒤 「추천」.
+
+   ★ 무엇이 비어 있었나 — 누르는 것마다 굴러가는 법이 달랐다.
+     · 우리 일정·근태 → 고치는 창(제목·시각·장소·메모가 다 보인다)
+     · 구글 일정      → «새 탭으로 구글 달력»이 열렸다. 한 달 126건이 이것이라,
+                       일정을 볼 때마다 앱을 떠나고 돌아오면 보던 달을 잃었다.
+     · 사건 기한·마감·휴직·공휴일 → «아무 일도 안 일어났다»
+   ★ 그래서 «여기서 못 고치는 것»에만 상세 창을 단다.
+     우리 일정은 그대로 고치는 창이다(대표 결정 ㉮) — 거기에 이미 다 보이는데
+     상세를 한 겹 더 두면 고치러 갈 때마다 한 번 더 눌러야 한다.
+   ⚠ 「구글에서 열기」 단추는 «남긴다»(대표 결정) — 참석자·반복처럼 구글에서만
+     고칠 수 있는 것이 있다. 우리는 열쇠로 읽기만 하므로 고칠 권한이 아예 없다. */
+function openDetail(어떤것){
+  S.detail = 어떤것 || null;
+  render();
 }
+function closeDetail(){ S.detail = null; render(); }
+
+/* 구글 일정 한 건 → 상세 창에 낼 것 */
+function 구글상세(id){
+  var e = null;
+  for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === id) e = GCAL.evs[i];
+  if(!e) return null;
+  var rows = [];
+  var 누구 = e.mailSid ? nameOf(e.mailSid) : "";
+  if(누구) rows.push({ i:"👤", t:누구 });
+  if(e.place) rows.push({ i:"📍", t:e.place });
+  if(e.desc) rows.push({ i:"≡", t:e.desc });
+  if(e.mail) rows.push({ i:"✉", t:e.mail + " 이 만듦" });
+  return { kind:"gcal", title:e.text, color:e.color, date:e.date, end:e.end || "",
+    time:e.time || "", endAt:e.endAt || 0, rows:rows, hint:[], url:e.gcalUrl || "" };
+}
+/* 기한·마감·휴직 한 건 → 상세 창에 낼 것 (셈이 만들어 준 줄을 그대로 쓴다) */
+function 층상세(ymd, id){
+  var 것 = null;
+  eventsOn(ymd).forEach(function(x){ if(!것 && x.store === "" && x.id === id) 것 = x; });
+  if(!것) return null;
+  return { kind:것.kind, title:것.text, color:것.color, date:ymd, end:"",
+    time:"", endAt:0, rows:것.rows || [], hint:것.hint || [], url:"" };
+}
+/* 공휴일 한 날 → 상세 창에 낼 것 */
+function 공휴일상세(ymd){
+  var 이름 = holidayOf(ymd);
+  if(!이름) return null;
+  return { kind:"hol", title:이름, color:"#d81b60", date:ymd, end:"",
+    time:"", endAt:0, rows:[], hint:[], url:"" };
+}
+function detailHtml(){
+  var d = S.detail; if(!d) return "";
+  var 언제 = 긴날짜(d.date) + (d.time ? " · " + d.time + (d.endAt ? " – " + 시분(d.endAt) : "") : "")
+    + (d.end && d.end !== d.date ? " ~ " + 긴날짜(d.end) : "")
+    + (d.kind === "hol" ? " · 공휴일" : "");
+  return '<div class="veil" data-close="1"></div>'
+    + '<div class="modal det" style="max-width:340px">'
+    + '<div class="dbar" style="background:' + esc(d.color || "#70757a") + '"></div>'
+    + '<div class="dtop"><span class="ddot" style="background:' + esc(d.color || "#70757a") + '"></span>'
+    +   '<div><div class="dttl">' + esc(d.title || "일정") + '</div>'
+    +   '<div class="dwhen">' + esc(언제) + '</div></div></div>'
+    + ((d.rows || []).length
+        ? '<div class="drows">' + d.rows.map(function(r){
+            return '<div class="drow"><span class="di">' + esc(r.i) + '</span>'
+              + '<span class="dt">' + esc(r.t).replace(/\n/g, "<br>") + '</span></div>';
+          }).join("") + '</div>'
+        : "")
+    + (d.hint || []).map(function(h){ return '<div class="dhint">' + esc(h) + '</div>'; }).join("")
+    + '<div class="mbtns"><span class="sp"></span>'
+    + (d.url ? '<button class="btn ghost" data-dgo="1">구글에서 열기</button>' : "")
+    + '<button class="btn" data-close="1">닫기</button></div></div>';
+}
+/* 「2026-09-16 (수)」 — 상세 창 머리에 쓰는 긴 날짜 */
+function 긴날짜(ymd){
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
+  if(!m) return String(ymd || "");
+  var 요일 = ["일","월","화","수","목","금","토"][new Date(+m[1], +m[2]-1, +m[3]).getDay()];
+  return (+m[2]) + "월 " + (+m[3]) + "일 (" + 요일 + ")";
+}
+function 시분(분){ return String(Math.floor(분/60)).padStart(2,"0") + ":" + String(분%60).padStart(2,"0"); }
 function closeModal(){ S.modal = null; S.busy = false; render(); }
 function toast(t){ S.toast = t; render(); setTimeout(function(){ if(S.toast===t){ S.toast=""; render(); } }, 3200); }
 
@@ -3249,6 +3343,7 @@ function render(){
   html += mailmapHtml();
   html += colorsHtml();
   html += myColorHtml();
+  html += detailHtml();
   html += noteHtml();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   $('app').innerHTML = html;
@@ -3320,7 +3415,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -3388,6 +3483,12 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-erp')){ goErp(t.getAttribute('data-erp')); return; }
   /* 비고는 줄 «안»의 단추다 — 줄 펼치기(data-toggle)보다 먼저 잡아야 한다 */
   /* 겹침 창이 떠 있으면 그것부터 받는다 — 뒤 창이 먼저 먹으면 창이 안 닫힌다 */
+  if(t.hasAttribute('data-dgo')){
+    var _u = S.detail && S.detail.url;
+    if(_u) window.open(_u, "_blank", "noopener");
+    else toast("구글 달력에서 여는 주소가 없습니다");
+    return;
+  }
   if(t.hasAttribute('data-dupclose')){ if(S.mycolor){ S.mycolor.겹침 = null; render(); } return; }
   if(t.hasAttribute('data-mycol')){ 내색고르기(t.getAttribute('data-mycol')); return; }
   if(t.hasAttribute('data-myfilter')){
@@ -3414,7 +3515,8 @@ document.addEventListener('click', function(e){
   /* 닫기 — 잇기 창이 열려 있으면 그것부터 닫는다(둘이 겹쳐 뜨지 않는다) */
   if(t.hasAttribute('data-close')){
     if(S.mycolor && S.mycolor.겹침){ S.mycolor.겹침 = null; render(); return; }
-    if(S.note) closeNote();
+    if(S.detail) closeDetail();
+    else if(S.note) closeNote();
     else if(S.mycolor) closeMyColor();
     else if(S.colors) closeColors();
     else if(S.mailmap) closeMailMap();
@@ -3436,12 +3538,23 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-popclose')){ S.open = null; render(); return; }
   if(t.hasAttribute('data-ev')){
     var ev = t.getAttribute('data-ev').split(':');
+    var _id = ev.slice(1).join(':');
     /* 구글에서 온 일정은 «구글에서» 고친다 — 우리가 손대면 두 곳이 갈린다.
-       ⚠ 열쇠로 읽기만 하는 길이라 우리에겐 고칠 권한이 아예 없다. */
-    if(ev[0] === 'gcal'){ openGcal(ev.slice(1).join(':')); return; }
-    openEdit(ev[0], ev.slice(1).join(':'));
+       ⚠ 열쇠로 읽기만 하는 길이라 우리에겐 고칠 권한이 아예 없다.
+       ★ 2026-09-27 — 그래도 «무엇인지»는 여기서 보여 준다. 예전에는 새 탭으로
+         구글 달력을 열어, 일정 하나 보려다 앱을 떠나고 보던 달을 잃었다. */
+    if(ev[0] === 'gcal'){ openDetail(구글상세(_id)); return; }
+    /* 사건 기한·마감·휴직 — 여기서 못 고치는 것들이라 상세만 보여 준다(전엔 아무 일도 없었다) */
+    if(ev[0] === ''){
+      var _d = t.closest ? t.closest('[data-day]') : null;
+      openDetail(층상세(_d ? _d.getAttribute('data-day') : S.date, _id));
+      return;
+    }
+    openEdit(ev[0], _id);
     return;
   }
+  /* 공휴일 — 이름이 길어 칸에서 잘리는 날이 있다(대체공휴일 등) */
+  if(t.hasAttribute('data-holday')){ openDetail(공휴일상세(t.getAttribute('data-holday'))); return; }
   if(t.hasAttribute('data-day')){ openNew(t.getAttribute('data-day')); return; }
 });
 
@@ -3511,6 +3624,8 @@ document.addEventListener('change', function(e){
 /* ESC 로 창을 닫는다 — 뒤로가기 층과 다투지 않게 여기서만 받는다 */
 document.addEventListener('keydown', function(e){
   if(e.key !== 'Escape') return;
+  if(S.detail){ e.preventDefault(); closeDetail(); return; }
+  if(S.mycolor){ e.preventDefault(); if(S.mycolor.겹침){ S.mycolor.겹침 = null; render(); } else closeMyColor(); return; }
   if(S.note){ e.preventDefault(); closeNote(); return; }
   if(S.mailmap){ e.preventDefault(); closeMailMap(); return; }
   if(S.modal){ e.preventDefault(); closeModal(); }

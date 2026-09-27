@@ -18,6 +18,8 @@
      ④ 아직 «확인되지 않은» 기한에는 「(확인)」을 붙이고 색을 달리한다 —
         그대로 믿고 날짜를 넘기면 사고다
      ⑤ 휴직은 «시작일과 종료일에만» 뜬다 — 그 사이를 다 칠하면 달력이 덮인다
+     ⑥ 상세 창에 낼 «줄»(rows)과 «안내»(hint)도 여기서 만든다 — 화면이 tip 글자를
+        도로 쪼개게 하면, 글월을 다듬는 순간 상세 창이 깨진다
 
    ⚠ 여기서 자료를 «읽지» 않는다. 부르는 쪽이 읽어서 넘긴다 —
      앱마다 읽는 길(dbGet · PuCalRead)이 달라서다.
@@ -110,6 +112,13 @@
           date: d.date, sid: 담당, kind: 'case-due',
           text: '⚖️ ' + (c.title || c.caseNo || '사건') + ' 마감',
           color: '#dc2626',
+          /* ⑥ 상세 창에 그대로 낼 줄들 — 빈 것은 넣지 않는다(빈 줄이 자리만 먹는다) */
+          rows: [
+            { i: '📁', t: [c.companyName, c.title || c.caseNo].filter(Boolean).join(' · ') },
+            { i: '👤', t: 이름(담당) },
+            { i: '≡', t: d.note || '' }
+          ].filter(function (r) { return r.t; }),
+          hint: ['사건관리에서 넣은 마감일입니다. 고치려면 그 화면으로 가십시오.'],
           tip: (c.title || c.caseNo || '사건') + ' 마감'
             + (c.companyName ? '\n' + c.companyName : '')
             + (d.note ? '\n' + d.note : '')
@@ -130,6 +139,16 @@
           /* ④ 확인 안 된 기한은 그대로 믿지 않게 «(확인)»을 붙인다 */
           text: '⚖ ' + 이름표 + ' 기한' + (확인됨 ? '' : '(확인)') + ' · ' + 사건이름(c),
           color: 확인됨 ? '#991b1b' : '#d97706',
+          rows: [
+            { i: '📁', t: [c.companyName, c.title || c.caseNo].filter(Boolean).join(' · ') },
+            { i: '👤', t: 이름(담당) },
+            /* «어떻게 나온 날짜인가» — 이것이 없으면 날짜를 믿을 수도 의심할 수도 없다 */
+            { i: '🧮', t: (d.basis === 'result' ? '판정일' : '송달일')
+                + ' ' + ((d.basis === 'result' ? stg.resultDate : stg.noticeDate) || '')
+                + ' + ' + d.days + '일' }
+          ].filter(function (r) { return r.t; }),
+          hint: (확인됨 ? [] : ['⚠ 아직 확인되지 않은 기한입니다 — 법령을 직접 확인하십시오.'])
+            .concat(['계산된 기한이라 여기서 못 고칩니다. 사건 ▸ 심급·단계에서 고칩니다.']),
           tip: 이름표 + ' 기한 · ' + 사건이름(c)
             + '\n' + (d.basis === 'result' ? '판정일' : '송달일') + ' + ' + d.days + '일'
             + (확인됨 ? '' : '\n⚠ 아직 확인되지 않은 기한입니다 — 법령을 직접 확인하십시오')
@@ -149,6 +168,11 @@
         out.push({
           date: 날, sid: l.sid, kind: 'loa',
           text: 머리 + ' ' + 꼬리, color: '#2563eb',
+          rows: [
+            { i: '📅', t: l.startDate + ' ~ ' + (l.endDate || '(미정)') },
+            { i: '👤', t: 누구 }
+          ].filter(function (r) { return r.t; }),
+          hint: ['인사관리 ▸ 휴직에서 고칩니다.'],
           tip: 머리 + ' ' + 꼬리
             + (l.startDate ? '\n' + l.startDate + ' ~ ' + (l.endDate || '(미정)') : '')
             + '\n\n인사관리 ▸ 휴직에서 고칩니다',
