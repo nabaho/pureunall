@@ -193,12 +193,15 @@
     color:var(--faint);text-align:center;background:var(--bg)}
   .reppair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:560px){.reppair{grid-template-columns:1fr}}
-  /* 소재지 — 우편번호+검색 한 줄, 도로명주소 다음 줄(대표 지시 「세로로 한줄로 할 필요없다」) */
-  .addrstack{display:flex;flex-direction:column;gap:6px}
-  .addrstack .ar1{display:flex;gap:6px}
-  .addrstack .ar1 .zip{width:120px;flex:none}
+  /* 소재지 — 우편번호+검색+도로명주소를 «한 줄»로(대표 지시 2026-09-27 「소재지는 한줄로
+     만들면 안되나」 → 승인. 2026-09-21 의 2줄 안은 이걸로 갈아탄다). 좁은 화면에서는
+     flex-wrap 으로 다음 줄로 흘러내리게 두어 넘치지 않게 한다. */
+  .addrstack{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .addrstack .ar1{display:flex;gap:6px;flex:none}
+  .addrstack .ar1 .zip{width:96px;flex:none}
   .addrstack .ar1 .zip input{font-family:monospace;text-align:center;background:var(--bg);color:var(--sub)}
-  .addrstack .ar1 button{white-space:nowrap;padding:0 12px;font-size:12.5px}
+  .addrstack .ar1 button{white-space:nowrap;padding:0 10px;font-size:12.5px}
+  .addrstack>input{flex:1;min-width:180px}
   .msg{margin:12px 0;padding:9px 13px;border-radius:8px;font-size:12.5px;display:none}
   .msg.ok{display:block;background:var(--ok-bg);color:var(--ok)}.msg.err{display:block;background:var(--danger-bg);color:var(--danger)}
   /* ⚠ warn 이 빠져 있었다 — class="msg warn" 을 쓰면 .msg 의 display:none 에 걸려
@@ -413,12 +416,19 @@ function dueItemsOf(f,fy,annualOfFund,today){
 var SUB_FIELDS=[['notice','공고·신청 메모','text'],['request_amount','신청액(원)','num'],
   ['decided_amount','결정액(원)','num'],['paid_date','교부·입금일','date'],['spent_amount','집행액(원)','num']];
 
-var FIELDS=[['name','기금법인명','text'],['short_name','약칭','text'],['fund_type','유형','select'],['region','지역','text'],
-  ['manager','담당','text'],['chairman','대표자','text'],['inka_no','인가번호','text'],['inka_date','인가일','date'],
+/* ★ 2026-09-27 이름표를 한글 원본 서식이 쓰는 말로 맞췄다(대표 지시 「한글 화일의 이름을
+     기준으로 캡쳐의 용어나 단어를 변경할 수 있나」) — 기금법인명→기금법인 명칭,
+     대표자→대표자 성명, 인가번호→기금인가번호, 인가일→인가일자, 관할 노동청→관할 지방고용노동청,
+     전화→전화번호, 소재지→주사무소 소재지, 설립준비위 회의일→설립준비위원회 회의일. 키(f.name 등)는
+     그대로다 — 화면에 보이는 글자만 바뀌었으니 자료·서식은 안 건드린다.
+   ★ 같은 지시로 자리도 서식(별지 제7호: 명칭→주사무소 소재지→전화번호) 차례에 맞췄다 —
+     소재지·우편번호·전화번호를 「기본」 묶음으로, 관할 세 칸은 노동청·등기소·세무서 차례로. */
+var FIELDS=[['name','기금법인 명칭','text'],['short_name','약칭','text'],['fund_type','유형','select'],['region','지역','text'],
+  ['address','주사무소 소재지','text'],['zipcode','우편번호','text'],['phone','전화번호','text'],
+  ['manager','담당','text'],['chairman','대표자 성명','text'],['inka_no','기금인가번호','text'],['inka_date','인가일자','date'],
   ['corp_reg_no','법인등록번호','text'],['reg_date','설립등기일','date'],['tax_id_no','고유번호','text'],
-  ['tax_office','관할세무서','text'],['registry_office','관할등기소','text'],
-  ['labor_office','관할 노동청','text'],['phone','전화','text'],['address','소재지','text'],
-  ['zipcode','우편번호','text'],
+  ['labor_office','관할 지방고용노동청','text'],['registry_office','관할등기소','text'],
+  ['tax_office','관할세무서','text'],
   /* 사무소 임대차 — 임대차계약서·사업자등록신청서·전대동의서가 묻는다. 없으면 그 서식들이 손으로 남았다.
      ⚠ 임대인의 주민등록번호는 두지 않는다 — 남의 것이다. 상호(성명)만 받는다.
      ⚠ 기간은 시작일 하나만 받는다 — 서식이 「＿부터 2년간」이라 끝은 셈한다. */
@@ -433,7 +443,7 @@ var FIELDS=[['name','기금법인명','text'],['short_name','약칭','text'],['f
        인가일을 따로 본다 — 여기 값은 1월 1일에 시작하지 않는 기금을 위한 것이다. */
   ['contribution_total','설립 출연금 총액(원)','text'],['contrib_per_worker','1인당 출연단가(원)','text'],
   ['rep_org','대표회사·사무국','text'],['estab_date','출연 예정일','date'],
-  ['meeting_date','설립준비위 회의일','date'],['meeting_place','회의 장소','text'],
+  ['meeting_date','설립준비위원회 회의일','date'],['meeting_place','회의 장소','text'],
   ['rep_position','대표자 직책','text'],['worker_rep','근로자대표','text'],
   ['fy_start_md','회계연도 시작(MM-DD)','text'],['fy_end_md','회계연도 종료(MM-DD)','text'],
   /* ── 첫해 예산을 출연금에서 세우는 데 쓰는 두 칸(2026-09-12, 대표 판단) ──
@@ -8135,15 +8145,15 @@ var ESTAB_PHASES=[
 var ESTAB_NEED=[
   ['chairman','대표자 성명','기금 정보 › 인가·등기','별지7호·등기·인감·세무',function(f){ return !String(f.chairman||'').trim(); }],
   ['rep_position','대표자 직책','기금 정보 › 설립','별지7호·재산변동보고서',function(f){ return !String(f.rep_position||'').trim(); }],
-  ['address','주사무소 소재지','기금 정보 › 관할·연락','별지7호·등기·세무·정관',function(f){ return !String(f.address||'').trim(); }],
-  ['phone','전화','기금 정보 › 관할·연락','별지7호·등기·세무',function(f){ return !String(f.phone||'').trim(); }],
-  ['inka_no','인가번호','기금 정보 › 인가·등기','재산변동보고서·지원신청서',function(f){ return !String(f.inka_no||'').trim(); }],
-  ['inka_date','인가일','기금 정보 › 인가·등기','등기신청서(인가서도달 연월일)',function(f){ return !String(f.inka_date||'').trim(); }],
+  ['address','주사무소 소재지','기금 정보 › 기본','별지7호·등기·세무·정관',function(f){ return !String(f.address||'').trim(); }],
+  ['phone','전화번호','기금 정보 › 기본','별지7호·등기·세무',function(f){ return !String(f.phone||'').trim(); }],
+  ['inka_no','기금인가번호','기금 정보 › 인가·등기','재산변동보고서·지원신청서',function(f){ return !String(f.inka_no||'').trim(); }],
+  ['inka_date','인가일자','기금 정보 › 인가·등기','등기신청서(인가서도달 연월일)',function(f){ return !String(f.inka_date||'').trim(); }],
   ['corp_reg_no','법인등록번호','기금 정보 › 인가·등기','임대차계약서·세무',function(f){ return !String(f.corp_reg_no||'').trim(); }],
   ['tax_id_no','고유번호','기금 정보 › 인가·등기','지원금 서식·청구',function(f){ return !String(f.tax_id_no||'').trim(); }],
-  ['registry_office','관할등기소','기금 정보 › 관할·연락','등기신청서(귀중)',function(f){ return !String(f.registry_office||'').trim(); }],
-  ['labor_office','관할 노동청','기금 정보 › 관할·연락','별지7호·재산변동보고서(귀하)',function(f){ return !String(f.labor_office||'').trim(); }],
-  ['meeting_date','설립준비위 회의일','기금 정보 › 설립','설립합의서·회의록',function(f){ return !String(f.meeting_date||'').trim(); }],
+  ['registry_office','관할등기소','기금 정보 › 관할','등기신청서(귀중)',function(f){ return !String(f.registry_office||'').trim(); }],
+  ['labor_office','관할 지방고용노동청','기금 정보 › 관할','별지7호·재산변동보고서(귀하)',function(f){ return !String(f.labor_office||'').trim(); }],
+  ['meeting_date','설립준비위원회 회의일','기금 정보 › 설립','설립합의서·회의록',function(f){ return !String(f.meeting_date||'').trim(); }],
   ['officers','임원 명부','기금 정보 › 임원 명부','취임승낙서·등기·인감·협의회 명부',function(f){ return !_officersOf(f).length; }],
   ['lease_lessor','사무소 임대인','기금 정보 › 사무소 임대차','임대차계약서·전대동의서',function(f){ return !String(f.lease_lessor||'').trim(); }]
 ];
@@ -9045,15 +9055,20 @@ function finishSetup(){ var _fid=S.fundId, f0=funds[_fid]; if(!f0) return;
 }
 /* 기금 정보 칸을 넷으로 묶는다 — 6열로 촘촘히 깔면 묶음 표시가 없으면 읽기 어렵다.
    키가 여기 있으면 그 칸 «앞»에 묶음 이름 줄을 넣는다. */
-var INFO_SECS={name:'기본',manager:'담당',chairman:'인가·등기',tax_office:'관할·연락',lease_lessor:'사무소 임대차',
-  contribution_total:'설립 (합의서·회의록·정관·등기·세무 서식이 읽는 값)'};
+/* ★ 2026-09-27 주사무소 소재지·전화번호를 「기본」으로 옮기면서 «관할·연락»에는 관할 세 칸만
+     남았다 — 이름을 「관할」로 줄이고, 묶음 머리도 그 세 칸의 «첫 칸»(labor_office)으로 옮긴다.
+     차례도 서식이 묻는 순서(노동청·등기소·세무서)로 맞춘다(대표 지시). */
+var INFO_SECS={name:'기본',manager:'담당',chairman:'인가·등기',labor_office:'관할',lease_lessor:'사무소 임대차',
+  contribution_total:'설립'};
 /* ★ 접어 두는 묶음 (대표 지시 2026-09-13 「너무 정신 없는데 좀 깔끔하게 … 너무 복잡하다」)
    스물다섯 칸이 한꺼번에 펼쳐져 있어 «지금 볼 것»이 묻혔다.
    ⚠ 자료를 «지우는 것이 아니다» — 접어 둘 뿐이고, 값이 하나라도 들어 있으면 «펼친 채»로 연다.
      빈 채로 접혀 있으면 채울 것이 있는 줄도 모른다.
-   ⚠ 「기본·담당·인가·등기·관할」은 안 접는다 — 늘 보는 칸이다. */
-var INFO_FOLD={lease_lessor:'사무소 임대차 — 임대차계약서·사업자등록신청서가 읽습니다',
-  contribution_total:'설립 — 설립 중인 기금에서만 씁니다'};
+   ⚠ 「기본·담당·인가·등기·관할」은 안 접는다 — 늘 보는 칸이다.
+   ⚠ 여기 적는 말은 머리에서 «묶음 이름 뒤»에 붙는다(g.label+' · '+g.fold) — 묶음 이름을
+     다시 적으면 「사무소 임대차 · 사무소 임대차 — …」처럼 겹친다(2026-09-27 걷어냄). */
+var INFO_FOLD={lease_lessor:'임대차계약서·사업자등록신청서가 읽습니다',
+  contribution_total:'새로 세우는 기금에서만 씁니다'};
 var INFO_W2={tax_office:1,registry_office:1,labor_office:1};   // 안에 단추가 붙어 두 칸 폭이 필요한 칸
 /* 접힌 묶음을 펴고 접는다 — 화면만 바뀌고 자료는 그대로다(저장과 상관없다) */
 function toggleInfoSec(k){
@@ -9194,11 +9209,12 @@ function officerPanel(f){
   else if(aud.length<2) warn='<span class="chip warn" style="font-size:10px">감사가 '+aud.length+'명 — 정관은 노·사 각 1인입니다</span>';
   /* ★ 이름을 「등기임원 명부」로 바꿨다(대표 지시 2026-09-13). 여기 적는 것은 «등기부등본에
        오르는 사람»이다 — 그냥 「임원」이라 하면 협의회 위원과 섞여 읽힌다. */
+  /* ★ 2026-09-27 두 줄 설명(등기부등본 그대로 옮기세요 · 감사보고서는 각자 한 장씩)을 걷었다
+       — hlp('officers') 가 이미 말한다(설명은 ⓘ, 화면은 컴팩트). 거기 없는 «소속 회사» 안내만
+       한 줄 남긴다. */
   return '<div class="panel"><div class="row"><h2 style="margin:0">👥 등기임원 명부</h2>'+warn+hlp('officers')+'</div>'
-    +'<p class="muted" style="font-size:11.5px;margin:6px 0 10px">등기부등본 「임원에 관한 사항」을 그대로 옮기세요. '
-    +'<b>감사보고서는 감사가 각자 한 장씩</b> 쓰므로 노·사 감사를 모두 넣어야 두 장이 나옵니다.<br>'
-    +'<b>사용자대표·근로자대표</b>는 직위에서 골라 넣고, <b>소속 회사</b>를 함께 적으세요 — '
-    +'공동기금은 위원이 <b>여러 회사에서</b> 나오므로 같은 회사일 수도, 다른 회사일 수도 있습니다.</p>'
+    +'<p class="muted" style="font-size:11.5px;margin:6px 0 10px">공동기금은 위원이 <b>여러 회사</b>에서 나올 수 있으니 '
+    +'<b>소속 회사</b>를 함께 적으세요.</p>'
     /* 생년월일·직책·주소는 «설립인가신청서(별지 제7호)»가 위원마다 요구하는 칸이다.
        여기 없으면 그 서식을 손으로 채워야 한다 — 그래서 사람 한 줄에 함께 담는다.
        ⚠ 개인정보다. 비워 두어도 되고, 채우면 서식에 자동으로 들어간다. */
@@ -11615,9 +11631,10 @@ function _repTable(colHeads,rows){
   rows.forEach(function(r){ out+='<div class="rl">'+esc(r[0])+'</div>'+r[1].join(''); });
   return out+'</div>';
 }
-/* 소재지 — 우편번호+검색 한 줄, 도로명주소 다음 줄(대표 지시 2026-09-21 「세로로 한줄로
-   할 필요없다 2줄 또는 3줄로 나눠도 된다」 → 2줄 안 승인). onSearchFn 은 [🔍 검색]이 부를
-   함수 이름 — 문서(모달)마다 검색 뒤 처리가 달라 밖에서 정한다. */
+/* 소재지 — 우편번호+검색+도로명주소를 «한 줄»로(2026-09-21 에는 2줄 안을 승인했으나,
+   2026-09-27 「소재지는 한줄로 만들면 안되나」 → 한 줄로 갈아탐. 자리(HTML 구조)는 그대로고
+   CSS(.addrstack)만 가로로 바꿨다 — 좁은 화면은 flex-wrap 으로 다음 줄로 흘러내린다).
+   onSearchFn 은 [🔍 검색]이 부를 함수 이름 — 문서(모달)마다 검색 뒤 처리가 달라 밖에서 정한다. */
 function _addrStack(prefix,s,onSearchFn){
   return '<div class="addrstack"><div class="ar1"><div class="zip">'
     +'<input id="'+prefix+'zipcode" type="text" value="'+esc(s.zipcode||'')+'" readonly placeholder="우편번호"></div>'
@@ -16646,7 +16663,8 @@ var HELP={
    +'<p>정관 제25조에 따라 <b>이사는 노·사 각 1~3인, 감사는 노·사 각 1인</b>입니다.</p>'
    +'<p>이 명부가 <b>감사보고서</b>와 <b>협의회 회의록</b>의 이름을 만듭니다. '
    +'감사보고서는 감사가 <b>각자 한 장씩</b> 쓰므로, 노·사 감사를 모두 넣어야 두 장이 나옵니다.</p>'
-   +'<p>회의록의 근로자위원·사용자위원 칸도 여기서 갈라 채웁니다 — 직위에 「근로자측」·「사용자측」이 들어 있어야 갈립니다.</p>'},
+   +'<p>회의록의 근로자위원·사용자위원 칸도 여기서 갈라 채웁니다 — 직위에 「근로자측」·「사용자측」이 들어 있어야 갈립니다.</p>'
+   +'<p>공동기금은 위원이 <b>여러 회사</b>에서 나옵니다 — <b>소속 회사</b>를 함께 적어야 어느 회사 사람인지 압니다.</p>'},
  'life':{t:'계약관계 바꾸기',h:'<p>계약이 끝났거나 기금이 해산된 경우 상태를 바꾸면 목록의 <b>종료기금</b>으로 이동하고 집계·오늘 할 일에서 제외됩니다.</p><p>기록은 보존됩니다.</p>'},
  'bulk.office':{t:'관할 기관 일괄 추정',h:'<p>소재지의 <b>시·군·구</b>로 관할 <b>노동청·세무서·등기소</b>를 한 번에 추정합니다. 셋 다 같은 주소에서 나오므로 따로 돌릴 이유가 없습니다.</p>'
    +'<p><b>비어 있는 칸만</b> 채웁니다 — 이미 값이 있으면 그대로 둡니다. 표에 없는 지역은 빈 칸으로 남기고 몇 건인지 알려 줍니다(짐작으로 채우지 않습니다).</p>'
