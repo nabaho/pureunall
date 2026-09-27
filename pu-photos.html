@@ -385,6 +385,21 @@ button{font-family:inherit;cursor:pointer}
 #readAskBar.out .tly{color:#991b1b}
 #readAskBar.out .t,#readAskBar.out .d{color:#991b1b}
 #readAskBar.out .n{background:#991b1b}
+/* ⚠⚠ 두 띠(#readAskBar·#collectBar)는 #home «안»에 있다 (대표 화면 2026-09-27).
+     #home .pri(너비 100%·넓은 여백·15px — 「사진 올리기」 큰 단추 것)가 띠의 파란 단추에
+     새어 들어와, 「📄 서류입니다」가 남은 폭을 통째로 먹고 「🖼 그냥 사진」은 화면 밖으로
+     밀려났다. PC 의 긴 파란 「판독 중… 1/16」 막대도 같은 까닭이었다.
+   ★ id 두 개로 이겨 둔다 — #home .pri 보다 세다. 띠 규칙을 고칠 때 여기도 함께 볼 것. */
+#home #readAskBar button,#home #collectBar button{width:auto;border-radius:7px}
+#home #readAskBar button{padding:4px 11px;font-size:12px}
+#home #collectBar button{padding:6px 13px;font-size:12.5px;border-radius:8px}
+/* 폰 — 긴 설명·셈은 접는다. 단추 글이 곧 물음이다(「📄 서류입니다 · 🖼 그냥 사진」).
+   ⚠ 제목도 줄어들 수 있게 둔다 — 한도 띠의 긴 제목이 단추를 밀어내지 않게. */
+@media (max-width:560px){
+  #readAskBar{gap:6px;padding:5px 8px}
+  #readAskBar .d,#readAskBar .tly,#readAskBar .lg{display:none}
+  #readAskBar .t{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+}
 /* ⏸ 판독 보류 딱지 — 「서류」 딱지와 **같은 자리**를 쓴다(칸 아래 20px 을 또 쓰지 않게).
    색은 위 띠와 같은 주황이라, 띠와 칸이 «같은 일»을 말하는 것으로 읽힌다. */
 #grid .cell .tag.hold{background:#854d0e;color:#fff}
@@ -8141,8 +8156,9 @@ function renderReadAsk() {
     '회사 전체가 열쇠 하나를 나눠 씁니다 — 사진이면 안 읽는 편이 낫습니다.\n' +
     '대답할 때까지 이 사진들은 판독에 가지 않습니다.">' +
     '서류입니까? <b>답할 때까지 판독에 안 갑니다</b></span>' +
-    '<button class="pri" onclick="readAskDocs()">📄 서류입니다</button>' +
-    '<button onclick="readAskPics()">🖼 그냥 사진</button>' + readTallyLine();
+    /* .lg 는 폰에서 접힌다 — 「📄 서류 · 🖼 사진」만 남아 제목이 온전히 보인다 */
+    '<button class="pri" onclick="readAskDocs()">📄 서류<span class="lg">입니다</span></button>' +
+    '<button onclick="readAskPics()">🖼 <span class="lg">그냥 </span>사진</button>' + readTallyLine();
 }
 
 /* 「서류입니다」 — **지금 묻고 있던 그 뭉치들만** 읽는다.
