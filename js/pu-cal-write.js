@@ -188,6 +188,39 @@
       .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
   }
 
+  /* ── «제 색» 하나만 고치기 (data/staff_colors/v/<사번>) ───────────
+     대표 지시 2026-09-27 — 담당자가 제 색을 스스로 고른다.
+
+     ★ 왜 saveColors 를 안 쓰나 — 그것은 `data/staff_colors` «통째로» 갈아 끼운다.
+       서버 규칙은 그 통째 쓰기를 관리자에게만 허락하므로, 직원이 부르면 거절된다.
+       그리고 통째로 쓰면 «내가 보던 색표»를 그대로 올려, 그사이 남이 고친 색을 덮는다.
+     ★ 그래서 «그 칸 하나»만 적는다. 남의 칸은 손도 못 대게 서버가 막고 있다.
+     ⚠ u(시각)는 안 건드린다 — 읽는 쪽은 v 만 보고, 열어 두면 아무나 흔든다.
+     ⚠ 내가 누구인지는 부르는 쪽이 넘긴다 — 여기서 추측하지 않는다.
+       맞는지는 서버가 uid_roles 의 사번과 대조해 정한다(화면을 속여도 안 된다). */
+  function saveMyColor(sid, color) {
+    if (!_db) return Promise.resolve(fail('no_db', '아직 서버에 붙기 전입니다'));
+    if (!sid || typeof sid !== 'string') {
+      return Promise.resolve(fail('bad_id', '누구의 색인지 모릅니다'));
+    }
+    if (BADKEY.test(sid)) {
+      return Promise.resolve(fail('bad_id', '사번에 쓸 수 없는 글자가 있습니다: ' + sid));
+    }
+    if (!COLORV.test(String(color))) {
+      return Promise.resolve(fail('bad_color', '색이 #rrggbb 꼴이 아닙니다: ' + color));
+    }
+    return _db.ref('data/staff_colors/v/' + sid).set(String(color))
+      .then(function () { return OK; })
+      .catch(function (e) {
+        var m = (e && e.message) || String(e);
+        /* 서버가 거절했을 때 «왜»를 사람 말로 — PERMISSION_DENIED 만 보여 주면 모른다 */
+        if (/permission|PERMISSION_DENIED/i.test(m)) {
+          return fail('denied', '제 색만 고칠 수 있습니다 — 서버가 거절했습니다');
+        }
+        return fail('server', m);
+      });
+  }
+
   /* ── 구글 계정 ↔ 직원 잇기 (data/gcal_mail_sid) ───────────────────────────
      캘린더 한 곳으로 모으기 1걸음(나). 이 표를 쓰는 곳도 이알피 법인 대시보드
      한 곳뿐이었다. 구글 일정에는 «누가 만들었는지»(메일)만 남고 이름이 없어,
@@ -329,6 +362,7 @@
     overlay: overlay,
     save: save,
     saveColors: saveColors,
+    saveMyColor: saveMyColor,
     saveMailMap: saveMailMap,
     saveNotes: saveNotes,
     remove: remove,
