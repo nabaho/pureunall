@@ -136,22 +136,24 @@
       if (S.busy) return;
       S.busy = true; draw();
       var ok = 0, fail = 0, why = '';
-      S.pend.reduce(function (p, it) {
-        return p.then(function () {
-          var bytes = store.dataUrlToBytes(it.att.data || it.att.dataUrl);
-          return store.putOriginal({ name: it.att.name || '첨부', size: bytes.length, type: it.att.type || '', bytes: bytes },
-            { kind: 'form', formId: it.formId, formName: it.formName || '', formKind: it.formKind || '' })
-            .then(function (r) {
-              var entry = { fileId: r.fileId, name: it.att.name || '첨부', size: bytes.length, attId: host.attKey(it.att) };
-              return host.linkOriginal(it.formId, entry);
-            })
-            .then(function () { ok++; }, function (e) { fail++; why = msg(e); });
-        });
-      }, Promise.resolve()).then(function () {
+      var finish = function () {
         S.busy = false;
         toast('보관함에 ' + ok + '개 담았습니다' + (fail ? ' · ' + fail + '개 실패 — ' + why : ''));
         load();
-      });
+      };
+      S.pend.reduce(function (p, it) {
+        return p.then(function () {
+          return Promise.resolve().then(function () {
+            var bytes = store.dataUrlToBytes(it.att.data || it.att.dataUrl);
+            return store.putOriginal({ name: it.att.name || '첨부', size: bytes.length, type: it.att.type || '', bytes: bytes },
+              { kind: 'form', formId: it.formId, formName: it.formName || '', formKind: it.formKind || '' })
+              .then(function (r) {
+                var entry = { fileId: r.fileId, name: it.att.name || '첨부', size: bytes.length, attId: host.attKey(it.att) };
+                return host.linkOriginal(it.formId, entry);
+              });
+          }).then(function () { ok++; }, function (e) { fail++; why = msg(e); });
+        });
+      }, Promise.resolve()).then(finish, finish);
     }
     function draw() {
       root.innerHTML = '';

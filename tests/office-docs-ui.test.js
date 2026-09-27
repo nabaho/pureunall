@@ -67,3 +67,9 @@ test('ⓔ 사용자 값을 innerHTML 에 조립하지 않는다', () => {
   const bad = s.split('\n').filter((l) => /innerHTML\s*=\s*[^'"\s;]/.test(l) || /innerHTML\s*\+=/.test(l));
   assert.deepEqual(bad, [], '★★ innerHTML 에 값을 조립합니다: ' + bad.join(' | '));
 });
+
+test('backfill() — dataUrlToBytes 오류 처리 (모든 항목이 완료됨)', () => {
+  const m = cutFn(stripJs(SRC), 'function backfill(');
+  assert.ok(/Promise\.resolve\(\)\.then\(/.test(m), '★★ backfill 에서 Promise.resolve().then( 이 없습니다');
+  assert.ok(/\.then\(finish, finish\)/.test(m), '★★ 마지막 then 에 두 핸들러(fulfil, reject)가 없습니다');
+});
