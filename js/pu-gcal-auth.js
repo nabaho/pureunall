@@ -177,8 +177,7 @@
       return { moved: true, id: r.id };
     });
   }
-  /* 종일 일정의 끝날 — 하루 뒤. UTC 로만 센다(지역 시간이면 하루 밀린다). */
-  function addDay(ymd) { return addDays(ymd, 1); }
+  /* 날짜 더하기 — UTC 로만 센다(지역 시간이면 하루 밀린다). */
   function addDays(ymd, n) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
     var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) + n * 86400000);
