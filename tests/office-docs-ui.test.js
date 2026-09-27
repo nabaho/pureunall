@@ -108,3 +108,13 @@ test('★ 「이 회사에서 빼기」는 연결만 끊는다', () => {
   assert.match(m, /unlinkCoDoc\(/);
   assert.ok(!/deleteOriginal|originals.*remove/.test(m), '★★ 회사에서 빼면서 보관함 원본을 지웁니다');
 });
+
+test('★ loadDocs — 늦게 도착한 응답이 다른 회사를 덮지 않는다', () => {
+  const m = cutFn(stripJs(SRC), 'function loadDocs(');
+  assert.match(m, /key !== S\.sel/, '★★ 회사를 빨리 두 번 바꾸면 늦게 온 listCoDocs 응답이 다른 회사 화면을 덮습니다');
+});
+
+test('★ openDoc — 「이 회사에서 빼기」가 연 시점의 회사(key)로 unlink 한다', () => {
+  const m = cutFn(stripJs(SRC), 'function openDoc(');
+  assert.match(m, /unlinkCoDoc\(key,/, '★★ S.sel 을 직접 써서, 열려 있는 동안 회사가 바뀌면 엉뚱한 회사에서 뺍니다');
+});

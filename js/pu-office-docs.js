@@ -243,12 +243,25 @@
       }).catch(function (e) { S.err = msg(e); S.loaded = true; draw(); });
     }
     function loadDocs() {
-      if (!S.sel) { S.docs = []; draw(); return Promise.resolve(); }
-      return store.listCoDocs(S.sel).then(function (d) { S.docs = d; draw(); });
+      var key = S.sel;
+      if (!key) { S.docs = []; draw(); return Promise.resolve(); }
+      return store.listCoDocs(key).then(function (d) { if (key !== S.sel) return; S.docs = d; draw(); });
     }
     function coName(key) { var c = S.cos.filter(function (x) { return x.key === key; })[0]; return c ? c.name : ''; }
     function coList() { return el('datalist', { id: 'pod-cos' }, S.cos.map(function (c) { return el('option', { value: c.name }); })); }
     function isImg(name) { return /\.(jpe?g|png|heic)$/i.test(name || ''); }
+
+    /* fileId → {rec,url} 을 마운트 동안 캐시한다 — 다시 그릴 때마다 getOriginal+getDownloadURL 을 되풀이하지 않는다 */
+    var urlCache = {};
+    function urlFor(fileId) {
+      if (!urlCache[fileId]) {
+        urlCache[fileId] = store.getOriginal(fileId).then(function (r) {
+          if (!r) return { rec: null, url: null };
+          return store.fileUrl(r).then(function (url) { return { rec: r, url: url }; });
+        });
+      }
+      return urlCache[fileId];
+    }
 
     function modalShell(title, bodyKids, footKids) {
       var bg = el('div', { 'class': 'pod-mbg' });
@@ -313,12 +326,13 @@
           if (!pick) { toast('사진을 고르세요'); return; }
           var co = coIn.value.trim();
           if (!co) { toast('회사 이름을 넣으세요'); coIn.focus(); return; }
+          if (pick.imported && !w.confirm('이미 가져온 사진입니다. 한 번 더 붙일까요?')) return;
           go.disabled = true; go.textContent = '가져오는 중…';
           var it = pick;
           photos.loadFull(it.year, it.id).then(function (dataUrl) {
             var bytes = store.dataUrlToBytes(dataUrl);
             var type = (/^data:([^;,]+)/.exec(dataUrl) || [])[1] || 'image/jpeg';
-            var ext = type === 'image/png' ? '.png' : '.jpg';
+            var ext = type === 'image/png' ? '.png' : (type === 'image/heic' ? '.heic' : '.jpg');
             var title = tIn.value.trim() || it.title;
             return store.putOriginal({ name: store.safeFileName(title) + ext, size: bytes.length, type: type, bytes: bytes },
               { kind: 'photo', owner: String(host.uid || ''), year: String(it.year), photoId: String(it.id), coKey: store.coKey(co), coName: co })
@@ -364,35 +378,35 @@
 
     /* ── 큰 보기 ── */
     function openDoc(d) {
+      var key = S.sel;
       var view = el('div', { style: 'min-height:320px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;border-radius:8px', text: '불러오는 중…' });
       var tIn = el('input', { type: 'text', value: d.title || '' });
       var dIn = el('input', { type: 'date', value: d.date || '' });
       var rec = null;
-      modalShell((coName(S.sel) || '') + ' · ' + (d.title || '계약서'), [view,
+      modalShell((coName(key) || '') + ' · ' + (d.title || '계약서'), [view,
         el('label', { text: '제목' }), tIn, el('label', { text: '계약일' }), dIn
       ], function (close) {
         return [
           el('button', { type: 'button', 'class': 'pod-b', text: '이 회사에서 빼기', title: '연결만 끊습니다 — 파일은 원본 보관함에 남습니다', onclick: function () {
             if (!w.confirm('이 회사 목록에서 뺄까요?\n(파일은 원본 보관함에 그대로 남습니다)')) return;
-            store.unlinkCoDoc(S.sel, d.id).then(function () { close(); toast('뺐습니다 — 파일은 보관함에 남아 있습니다'); load(true); },
+            store.unlinkCoDoc(key, d.id).then(function () { close(); toast('뺐습니다 — 파일은 보관함에 남아 있습니다'); load(true); },
               function (e) { toast('❌ ' + msg(e)); });
           } }),
           el('button', { type: 'button', 'class': 'pod-b', text: '📥 내려받기', onclick: function () { host.download(d.fileId, rec ? rec.name : d.title); } }),
           el('button', { type: 'button', 'class': 'pod-b p', text: '저장', onclick: function () {
-            store.updateCoDoc(S.sel, d.id, { title: tIn.value.trim() || d.title, date: dIn.value }).then(function () { close(); toast('저장했습니다'); loadDocs(); },
+            store.updateCoDoc(key, d.id, { title: tIn.value.trim() || d.title, date: dIn.value }).then(function () { close(); toast('저장했습니다'); loadDocs(); },
               function (e) { toast('❌ ' + msg(e)); });
           } })
         ];
       });
-      store.getOriginal(d.fileId).then(function (r) {
-        rec = r;
-        if (!r) { view.textContent = '보관함에서 파일을 찾지 못했습니다'; return; }
-        return store.fileUrl(r).then(function (url) {
-          view.textContent = '';
-          if (isImg(r.name)) view.appendChild(el('img', { src: url, alt: d.title || '', style: 'max-width:100%;max-height:60vh' }));
-          else if (/\.pdf$/i.test(r.name)) view.appendChild(el('iframe', { src: url, title: d.title || 'PDF', style: 'width:100%;height:60vh;border:none' }));
-          else view.appendChild(el('div', { style: 'text-align:center;color:#475569' }, [el('div', { style: 'font-size:36px', text: '📄' }), el('div', { text: r.name }), el('div', { style: 'font-size:12px;color:#94a3b8', text: '미리보기가 없는 종류입니다 — 내려받아 여세요' })]));
-        });
+      urlFor(d.fileId).then(function (u) {
+        rec = u.rec;
+        if (!u.rec) { view.textContent = '보관함에서 파일을 찾지 못했습니다'; return; }
+        var url = u.url, r = u.rec;
+        view.textContent = '';
+        if (isImg(r.name)) view.appendChild(el('img', { src: url, alt: d.title || '', style: 'max-width:100%;max-height:60vh' }));
+        else if (/\.pdf$/i.test(r.name)) view.appendChild(el('iframe', { src: url, title: d.title || 'PDF', style: 'width:100%;height:60vh;border:none' }));
+        else view.appendChild(el('div', { style: 'text-align:center;color:#475569' }, [el('div', { style: 'font-size:36px', text: '📄' }), el('div', { text: r.name }), el('div', { style: 'font-size:12px;color:#94a3b8', text: '미리보기가 없는 종류입니다 — 내려받아 여세요' })]));
       }).catch(function (e) { view.textContent = '불러오지 못했습니다 — ' + msg(e); });
     }
 
@@ -427,9 +441,9 @@
         grid.appendChild(el('button', { type: 'button', 'class': 'pod-card', onclick: function () { openDoc(d); } }, [th,
           el('div', { 'class': 'pod-cm' }, [el('b', { title: d.title, text: d.title || '계약서' }),
             el('span', null, [d.date || '날짜 없음', el('span', { 'class': 'pod-tag ' + (d.src === 'photo' ? 'ph' : 'up'), text: d.src === 'photo' ? '사진첩' : '업로드' })])])]));
-        store.getOriginal(d.fileId).then(function (r) {
-          if (!r || !isImg(r.name)) return;
-          return store.fileUrl(r).then(function (url) { th.textContent = ''; th.appendChild(el('img', { src: url, alt: '', loading: 'lazy' })); });
+        urlFor(d.fileId).then(function (u) {
+          if (!u.rec || !isImg(u.rec.name)) return;
+          th.textContent = ''; th.appendChild(el('img', { src: u.url, alt: '', loading: 'lazy' }));
         }).catch(function () {});
       });
       wrap.appendChild(el('div', { style: 'font-weight:700;margin-bottom:8px' }, [coName(S.sel), el('span', { style: 'font-weight:400;color:#64748b;font-size:12px;margin-left:6px', text: '계약서 ' + S.docs.length + '건' })]));
