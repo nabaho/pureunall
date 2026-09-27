@@ -99,7 +99,7 @@ test('★★ act 타일도 «같은 길»로 그린다 (그림·글자가 하나
   /* ★ 타일 그리는 곳에 a.innerHTML 이 «하나»여야 한다 —
      둘이면 act 타일과 보통 타일이 따로 그려져, 「PC 전용」 경고 같은 것이
      한쪽에만 남는다(실제로 그럴 뻔했다). */
-  const build = cut('APPS.forEach(function(app){', 'buildHomeBar();');
+  const build = cut('APPS.forEach(function(app){', 'hideEmptyRows();');
   assert.strictEqual((build.match(/a\.innerHTML =/g) || []).length, 1,
     '★★ act 타일을 «따로» 그린다 — 그림·글자가 두 벌이 되면 한쪽만 낡는다');
 });

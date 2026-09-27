@@ -64,21 +64,15 @@ test('아래 왼쪽 단추는 모두 한 줄 바에 모은다', () => {
   assert.match(enter, /#fabBar\{[^}]*max-width:calc\(100vw[^}]*\)/);
 });
 
-test('폰에서는 한 화면에 다 넣는다 — 바로가기는 헤더 안, 겹치는 제목은 숨김', () => {
+test('폰에서는 한 화면에 다 넣는다 — 겹치는 제목은 숨김', () => {
   /* 폰 브라우저는 위아래 바를 빼면 쓸 수 있는 높이가 760px 안팎이다.
      타일 4줄을 그 안에 넣으려면 위쪽에서 줄을 벌어야 한다:
        · 「업무 시스템」 제목 줄(.sec)은 아래 「업무지원·직접업무」와 겹치는 안내라 숨긴다
-       · 「로그인 후 바로가기」는 헤더 카드 안으로 옮긴다(moveHomeBar) */
+       (「로그인 후 바로가기」는 헤더 카드로 옮겨 두었다가 2026-09-28 통째로 걷어냈다
+        — 대표 「선택 하느거 필요 없다」. 걷어낸 것은 tests/portal-phone-landing.test.js 가 지킨다) */
   /* @media(max-width:520px) 블록이 파일에 여러 개라 첫 블록만 보면 놓친다 — 전체에서 찾는다.
      두 선택자 모두 폰용 블록에만 쓰이므로 이걸로 충분하다. */
   assert.match(enter, /\.sec\{display:none;\}/);
-  assert.match(enter, /\.pbar #homeBar\{/);
-  assert.match(enter, /function moveHomeBar\(toHeader\)/);
-  /* ⚠ 부르는 «글자»(moveHomeBar(phone.matches))를 박지 않는다 — 2026-09-23 차례를 바꿔
-     (PC 로 갈 땐 바로가기를 먼저 되돌림) 적는 모양이 달라졌다. 지키는 것은 «폰에선 넣고 PC 에선 뺀다». */
-  const 맞추개 = enter.slice(enter.indexOf('function sync(){'), enter.indexOf('function sync(){') + 300);
-  assert.match(맞추개, /moveHomeBar\((true|phone\.matches)\)/, '폰에서 바로가기를 헤더에 안 넣습니다.');
-  assert.match(맞추개, /moveHomeBar\((false|phone\.matches)\)/, 'PC로 넓히면 제자리로 돌아가야 합니다');
   /* ⚠ 못 박는 것은 «한 줄에 넷» 이지 그것을 적는 «글자» 가 아니다.
      여기 repeat(4,1fr) 을 글자 그대로 박아 두었더니, 좁은 폰에서 타일이 화면 밖으로
      나가던 것을 repeat(4,minmax(0,1fr)) 로 고치자 «멀쩡한 개선» 때문에 깨졌다

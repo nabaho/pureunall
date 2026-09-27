@@ -33,14 +33,16 @@ test('★ 타일 판정이 «그릴 때 이미 손에 있는» role 을 본다',
 
 test('★ 바로가기 판정도 늦게 채워지는 값만 보지 않는다', () => {
   const i = enter.indexOf('function accessibleApps');
-  assert.ok(i > -1, 'accessibleApps 를 찾지 못했습니다');
+  /* 「로그인 후 바로가기」는 2026-09-28 걷어냈다(대표 「선택 하느거 필요 없다」).
+     목록이 없으면 자동 이동도 없어야 한다 — 되살릴 때는 이 잣대를 다시 쓸 것. */
+  if (i < 0) { assert.doesNotMatch(enter, /function maybeGoHome\(/, '목록 없이 자동 이동만 살아 있습니다'); return; }
   const 대목 = enter.slice(i, i + 700);
   assert.match(대목, /_curRole\s*===\s*'admin'/,
     '바로가기가 _curRole 을 안 보고 있습니다');
 });
 
 test('두 곳 다 sgIsAdmin() 만으로 판정하지 않는다 — 그것은 보조여야 한다', () => {
-  [판정대목('app.adminOnly'), enter.slice(enter.indexOf('function accessibleApps'), enter.indexOf('function accessibleApps') + 700)]
+  [판정대목('app.adminOnly'), enter.indexOf('function accessibleApps') < 0 ? '' : enter.slice(enter.indexOf('function accessibleApps'), enter.indexOf('function accessibleApps') + 700)]
     .forEach(function (대목) {
       /* sgIsAdmin 을 쓰는 것 자체는 괜찮다(보조). 다만 «그것만» 보면 안 된다. */
       if (/sgIsAdmin/.test(대목)) {

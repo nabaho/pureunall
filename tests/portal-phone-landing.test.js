@@ -1,7 +1,8 @@
-/* 폰에서 로그인하면 포털 화면에 머문다
+/* 로그인하면 포털 화면에 머문다
    '로그인 후 바로가기'(homeApp)는 서버에 저장돼 기기 간 공유된다.
    그래서 PC 에서 '푸른이알피'로 잡아 두면 폰에서도 로그인할 때마다 이알피로 넘어갔고,
-   배너의 '포털 머무르기'는 1.5초 안에 눌러야 해서 폰에서는 사실상 못 막았다. */
+   배너의 '포털 머무르기'는 1.5초 안에 눌러야 해서 폰에서는 사실상 못 막았다.
+   → 2026-08 폰만 막았다가, 2026-09-28 대표 지시 「선택 하느거 필요 없다」로 PC·폰 모두 걷어냈다. */
 const fs = require('fs'), path = require('path');
 const en = fs.readFileSync(process.argv[2] || path.join(__dirname, '..', 'enter.html'), 'utf8');
 const NS = s => s.replace(/\s/g, '');
@@ -17,15 +18,17 @@ function cut(a, b) {
   return en.slice(i, j);
 }
 
-/* ── 폰에서는 자동 이동하지 않는다 ── */
+/* ── 「로그인 후 바로가기」는 걷어냈다 (대표 지시 2026-09-28 「선택 하느거 필요 없다」) ──
+   ★ 고르개만 지우고 자동 이동을 남기면, 예전에 골라 둔 사람은 «끌 길 없이» 계속 튕겨 나간다.
+     그래서 고르개·자동 이동·안내 배너를 «함께» 본다. 주석은 걷고 본다. */
 (function () {
-  const fn = cut('function maybeGoHome(){', '\n  }');
-  ok('★ 폰이면 자동 이동을 하지 않는다', /if\(isMobile\(\)\)return;/.test(NS(fn)));
-  ok('★ 그 검사가 바로가기 설정을 읽기 전에 온다',
-     NS(fn).indexOf('if(isMobile())return;') < NS(fn).indexOf('tilePrefs.homeApp'));
-  ok('왜 그런지 코드에 적어 뒀다',
-     fn.indexOf('기기 간에 공유') > 0 && fn.indexOf('포털 머무르기') > 0);
-  ok('PC 동작은 그대로 (배너 경로가 살아 있다)', /showHomeBanner\(app\)/.test(fn));
+  const bare = en.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  ok('★★ 로그인 뒤 저절로 다른 앱으로 넘어가는 길이 없다',
+     !/function maybeGoHome|function showHomeBanner|id='homeBanner'|bn\.id = 'homeBanner'/.test(bare));
+  ok('★ 고르개(⚡ 로그인 후 바로가기)가 화면에 없다',
+     !/id="homeBar"|homeAppSel|로그인 후 바로가기<\/span>/.test(bare));
+  ok('★ 예전에 골라 둔 값은 지우지 않고 그대로 싣고 다닌다(쓰지만 않는다)',
+     /homeApp: p\.homeApp \|\| null/.test(bare));
 })();
 
 /* ── 설정이 기기 간 공유된다는 전제가 맞는지 (이 전제가 깨지면 위 수정의 근거가 바뀐다) ── */
@@ -59,28 +62,6 @@ function cut(a, b) {
   ok('★★ 옛 저장값이 «지금 없는 줄»이면 앱의 제자리로 보낸다 (타일이 사라지면 안 된다)',
      /savedRowOf\(t\.dataset\.key, t\.dataset\.row\)/.test(apply)
      && /function savedRowOf[\s\S]{0,200}?rowExists\(r\) \? r : dflt/.test(en));
-})();
-
-/* ── 폰에서는 설명이 셀을 밀어내지 않고 툴팁으로 남는다 ── */
-(function () {
-  const bar = cut('function buildHomeBar(){', '\n  }');
-  ok('★ 좁은 화면의 별도 안내 칸은 비워 둔다', /var phoneNote = '<span class="hb-hint"><\/span>';/.test(bar));
-  ok('폰용 툴팁도 다르게', bar.indexOf('PC 에서 로그인할 때만 적용됩니다') > 0);
-  ok('PC 에서는 종전 툴팁 그대로', bar.indexOf('선택하면 로그인 후 그 앱으로 바로 이동합니다') > 0);
-})();
-
-/* ── 설정 변경 안내도 잠시 뒤 숨겨 셀 줄이 겹치지 않는다 ── */
-(function () {
-  const h = cut("$('homeAppSel').addEventListener('change'", '\n  }');
-  ok('★ 4초 뒤 안내를 숨긴다', /hint\.style\.display='none';/.test(NS(h)));
-  ok('폰에서 고른 값의 뜻을 알려 준다', h.indexOf('폰은 이 화면 유지') > 0);
-})();
-
-/* ── 로그아웃 뒤 같은 탭에서 다시 로그인해도 포털에 머문다 ── */
-(function () {
-  const h = cut("$('logoutBtn').addEventListener('click'", '\n  });');
-  ok('★ 로그아웃 때 바로가기 건너뛰기 표식을 남긴다',
-     /sessionStorage\.setItem\('pu_skip_home','1'\)/.test(h));
 })();
 
 /* ── 포털이 홈화면 앱의 시작 화면인지 (이건 이미 맞았다 — 회귀 방지로 고정) ── */
