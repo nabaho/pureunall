@@ -72,6 +72,28 @@
     });
     return { owner: clean(me.name || users[me.sid] || ''), sid: clean(me.sid), tasks: all, counts: counts };
   }
+  function collectAll() {
+    var users = {}, rows = {};
+    readStore('user_accounts').forEach(function (u) {
+      if (u && u.sid) { users[String(u.sid)] = clean(u.name || u.sid); rows[String(u.sid)] = []; }
+    });
+    STORE_DEF.forEach(function (def) {
+      readStore(def[0]).filter(function (x) { return !isClosed(x); }).forEach(function (x) {
+        var one = [x.managerMain, x.managerSid, x.assigneeSid, x.manager, x.ownerSid].filter(Boolean).map(String);
+        var many = arrayOf(x.managerSubs || x.assignees || x.managers).map(String);
+        one.concat(many).filter(Boolean).forEach(function (sid) {
+          if (!rows[sid]) rows[sid] = [];
+          rows[sid].push(taskOf(x, def[1], users));
+        });
+      });
+    });
+    var groups = Object.keys(rows).map(function (sid) {
+      var tasks = rows[sid];
+      tasks.sort(function (a, b) { return (a.due || '9999-99-99').localeCompare(b.due || '9999-99-99'); });
+      return { sid: sid, owner: clean(users[sid] || sid), tasks: tasks };
+    }).filter(function (g) { return g.tasks.length; }).sort(function (a, b) { return a.owner.localeCompare(b.owner, 'ko'); });
+    return { owner: '전체 담당자', sid: '', tasks: [], groups: groups, counts: {} };
+  }
   function autoSummary(data) {
     var tasks = (data && data.tasks) || [];
     if (!tasks.length) return '현재 로그인 담당자로 연결된 진행 업무를 찾지 못했습니다. ERP의 담당자 지정을 확인해 주세요.';
@@ -110,6 +132,22 @@
       '> ERP의 경량 업무 정보로 자동 생성했습니다. 주민번호·계좌·연락처·첨부파일·문서 본문은 포함하지 않습니다.');
     return { title: title, file: '푸른업무/' + title + '.md', body: body.join('\n'), count: tasks.length };
   }
+  function allNote(data) {
+    var today = day(), body = ['---', 'source: 푸른이알피', 'created: ' + today, 'updated: ' + today,
+      'status: 자동 생성 · 검토 전', 'owner: 전체 담당자', 'tags:', '  - 푸른이알피', '  - 담당자별업무', '---', '',
+      '# 푸른 ERP 담당자별 업무 요약', '', '자동 생성일: ' + today, ''];
+    (data.groups || []).forEach(function (g) {
+      body.push('## ' + esc(g.owner) + ' · ' + g.tasks.length + '건', '');
+      g.tasks.slice(0, 50).forEach(function (t) {
+        body.push('- [ ] ' + (esc(t.company || t.title) || '이름 없는 업무') + ' · ' + esc(t.label),
+          '  - 업무: ' + (esc(t.summary || t.title || t.kind) || '내용 확인 필요'),
+          '  - 기한: ' + (esc(t.due) || '미지정'), '  - 구분: ' + (esc(t.kind || t.label) || '미지정')); });
+      body.push('');
+    });
+    if (!data.groups || !data.groups.length) body.push('- 담당자 연결 업무가 없습니다.', '');
+    body.push('> ERP의 경량 업무 정보로 자동 생성했습니다. 민감정보·첨부파일·문서 본문은 포함하지 않습니다.');
+    return { title: '담당자별 ERP 업무 요약', file: '푸른업무/담당자별 ERP 업무 요약.md', body: body.join('\n'), count: (data.groups || []).reduce(function (n, g) { return n + g.tasks.length; }, 0) };
+  }
   function openNote(fields) {
     var n = note(fields);
     var uri = 'obsidian://new?file=' + encodeURIComponent(n.file) + '&content=' + encodeURIComponent(n.body) + '&overwrite=true';
@@ -117,6 +155,11 @@
     a.href = uri; a.rel = 'noopener'; a.style.display = 'none';
     d.body.appendChild(a); a.click(); a.remove();
     return n;
+  }
+  function openAllNote() {
+    var n = allNote(collectAll());
+    var uri = 'obsidian://new?file=' + encodeURIComponent(n.file) + '&content=' + encodeURIComponent(n.body) + '&overwrite=true';
+    var a = d.createElement('a'); a.href = uri; a.rel = 'noopener'; a.style.display = 'none'; d.body.appendChild(a); a.click(); a.remove(); return n;
   }
   function copy(text) {
     if (w.navigator.clipboard && w.navigator.clipboard.writeText) return w.navigator.clipboard.writeText(text);
@@ -130,7 +173,7 @@
     shade.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px;';
     var box = d.createElement('div'); box.style.cssText = 'background:#fff;border-radius:12px;width:min(620px,100%);max-height:90vh;overflow:auto;padding:18px;box-shadow:0 18px 45px rgba(15,23,42,.28);font-family:system-ui,sans-serif;';
     box.innerHTML = '<h2 style="margin:0 0 4px">🪨 옵시디언 자동 업무요약</h2>'
-      + '<p style="font-size:12px;color:#64748b;margin:0 0 10px">ERP에서 <b>' + data.tasks.length + '건</b>을 자동으로 불러왔습니다. 민감정보와 첨부는 읽지 않습니다.</p>'
+      + '<p style="font-size:12px;color:#64748b;margin:0 0 10px">내 업무 <b>' + data.tasks.length + '건</b>을 자동으로 불러왔습니다. 민감정보와 첨부는 읽지 않습니다.</p>'
       + '<label style="display:block;font-size:12px;color:#475569">자동 요약 미리보기</label>'
       + '<textarea name="summary" rows="5" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #cbd5e1;border-radius:7px"></textarea>';
     box.querySelector('[name="summary"]').value = autoSummary(data);
@@ -141,7 +184,10 @@
       var n = openNote({ data: data, summary: box.querySelector('[name="summary"]').value, url: w.location.href });
       copy(n.body).then(function () { send.textContent = n.count + '건 저장 요청 완료'; setTimeout(function () { send.textContent = '자동 요약 저장'; }, 2200); });
     };
-    actions.appendChild(cancel); actions.appendChild(send); box.appendChild(actions); shade.appendChild(box); d.body.appendChild(shade);
+    var all = d.createElement('button'); all.type = 'button'; all.textContent = '전체 담당자 저장'; all.style.cssText = 'padding:8px 12px;border:1px solid #1e40af;border-radius:7px;background:#fff;color:#1e40af;font-weight:700;';
+    all.title = '모든 담당자의 진행 업무를 한 문서로 저장합니다';
+    all.onclick = function () { var n = openAllNote(); copy(n.body).then(function () { all.textContent = n.count + '건 전체 저장 완료'; }); };
+    actions.appendChild(cancel); actions.appendChild(all); actions.appendChild(send); box.appendChild(actions); shade.appendChild(box); d.body.appendChild(shade);
   }
   /* ⚠ 떠 있는 단추(왼쪽 아래 고정)는 «자리를 스스로 못 정하는 화면»에만 단다 (2026-09-27).
      푸른이알피에 붙인 날 이 단추가 왼쪽 메뉴 맨 아래 「⚙ 환경설정」을 통째로 덮어,
@@ -155,6 +201,6 @@
     b.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:1200;border:0;border-radius:999px;padding:10px 14px;background:#1e40af;color:#fff;font-weight:700;box-shadow:0 5px 14px rgba(15,23,42,.25);cursor:pointer;';
     d.body.appendChild(b);
   }
-  w.PuObsidian = { clean: clean, arrayOf: arrayOf, isClosed: isClosed, dueOf: dueOf, mine: mine, taskOf: taskOf, collect: collect, autoSummary: autoSummary, note: note, openNote: openNote, show: show };
+  w.PuObsidian = { clean: clean, arrayOf: arrayOf, isClosed: isClosed, dueOf: dueOf, mine: mine, taskOf: taskOf, collect: collect, collectAll: collectAll, autoSummary: autoSummary, note: note, allNote: allNote, openNote: openNote, openAllNote: openAllNote, show: show };
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', mount); else mount();
 })(window, document);
