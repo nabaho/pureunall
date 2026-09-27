@@ -199,7 +199,10 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
 <script src="js/pu-doc-read.js?v=48"></script>
-<script src="js/pu-obsidian.js?v=1"></script>
+<!-- 옵시디언 업무요약 — 떠 있는 단추를 달지 않는다: 왼쪽 메뉴 맨 아래 「⚙ 환경설정」을 덮었다(2026-09-27).
+     메뉴 바닥의 한 줄(환경설정 바로 위)에서 연다. -->
+<script>window.PU_OBSIDIAN_NO_FAB = true;</script>
+<script src="js/pu-obsidian.js?v=2"></script>
 <script>
 (function(){
 'use strict';
@@ -312,8 +315,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-26 계약서 양식 화면을 문서관리 › 사무관리서류로 옮김(환경설정 칸 없앰)';
-var BUILD_SEQ = 185;
+var ERP_BUILD = '2026-09-27 옵시디언 단추가 환경설정을 덮던 것 — 메뉴 바닥 한 줄로';
+var BUILD_SEQ = 186;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -12140,11 +12143,22 @@ function Sidebar(props){
         );
       })(),
     ),
-    // ── 환경설정 하단 고정 ──
-    isMenuPermitted(CURRENT_USER, 'env/settings') && h('div', {
+    // ── 메뉴 바닥 고정: 옵시디언 업무요약 · 환경설정 ──
+    /* 옵시디언은 떠 있는 단추였다 — 이 바닥 줄(환경설정)을 덮어 「환경관리가 사라졌다」(2026-09-27).
+       ⚠ 환경설정 권한이 없는 사람도 옵시디언은 쓴다 — 바닥 줄은 둘 중 하나만 있어도 그린다. */
+    (isMenuPermitted(CURRENT_USER, 'env/settings') || window.PuObsidian) && h('div', {
       style:{ borderTop:'1px solid #1e293b', padding:'8px 10px', marginTop:'auto', flexShrink:0 }
     },
-      h('div', {
+      window.PuObsidian && h('div', {
+        className:'sb-menu-item',
+        onClick:function(){ try{ window.PuObsidian.show(); }catch(e){} },
+        title:'요약과 ERP 링크만 옵시디언 새 메모로 보냅니다',
+        style:{ borderRadius:'6px' }
+      },
+        h('span', { className:'mi-icon' }, '📝'),
+        h('span', { className:'mi-text' }, '옵시디언 업무요약')
+      ),
+      isMenuPermitted(CURRENT_USER, 'env/settings') && h('div', {
         className:'sb-menu-item' + (current==='env/settings' ? ' active' : ''),
         onClick:function(){ onSelect('env/settings'); },
         style:{ borderRadius:'6px' }

@@ -79,7 +79,12 @@
     actions.appendChild(cancel); actions.appendChild(send); box.appendChild(actions); shade.appendChild(box); d.body.appendChild(shade);
     box.querySelector('[name="title"]').focus();
   }
+  /* ⚠ 떠 있는 단추(왼쪽 아래 고정)는 «자리를 스스로 못 정하는 화면»에만 단다 (2026-09-27).
+     푸른이알피에 붙인 날 이 단추가 왼쪽 메뉴 맨 아래 「⚙ 환경설정」을 통째로 덮어,
+     대표가 「환경관리가 사라졌다」고 하셨다. 자리가 있는 화면은 PU_OBSIDIAN_NO_FAB 를
+     참으로 두고 제 메뉴에서 PuObsidian.show() 를 부른다. */
   function mount() {
+    if (w.PU_OBSIDIAN_NO_FAB) return;
     if (d.getElementById('pu-obsidian-button')) return;
     var b = d.createElement('button'); b.id = 'pu-obsidian-button'; b.type = 'button'; b.textContent = '📝 옵시디언 업무요약';
     b.title = '요약과 ERP 링크만 옵시디언 새 메모로 보냅니다'; b.onclick = show;
