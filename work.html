@@ -5725,7 +5725,7 @@ function completeItem(id){
       ?'<label style="display:flex;gap:8px;align-items:flex-start;background:var(--acc-soft);border:1px solid #bfdbfe;border-radius:9px;padding:10px 12px;font-size:12.5px;cursor:pointer">'
         +'<input type="checkbox" id="cl-pe" checked style="margin-top:3px">'
         +'<span>푸른이알피의 <b>'+esc(kind)+(it.no?' '+esc(it.no):'')+'</b>와 <b>양방향 동기화</b>'
-        +'<div class="muted" style="font-size:11px;margin-top:3px">누군가 푸른이알피 <b>나의 업무</b>를 열 때 맞춰집니다. '
+        +'<div class="muted" style="font-size:11px;margin-top:3px">누군가 푸른이알피를 켜 두고 있으면 곧 맞춰집니다. '
         +'어느 쪽에서 종료·재개해도 반대쪽이 따라오고, 이미 같은 상태면 아무것도 바꾸지 않습니다. '
         +'체크를 풀면 이 업무는 앞으로 푸른이알피와 연동하지 않습니다.</div></span></label>'
       :'')
@@ -8287,9 +8287,9 @@ var HELP={
     +'다음에 같은 대상을 만나면 업무를 열 때 여기로 자동으로 따라옵니다.',
   note:'평소에 조금씩 적어 두는 인수인계 자료입니다. 갑자기 자리를 비우게 되어도 '
       +'남은 사람이 그대로 이어받을 수 있습니다.',
-  ppnote:'푸른이알피 <b>「나의 업무」 진행 모달</b>의 메모 칸입니다. 거기서만 고칠 수 있습니다.<br>'
-        +'⚠ 상태·다음 할 일은 두 곳이 자동으로 맞춰지지만, <b>메모는 그렇지 않습니다</b> — '
-        +'푸른이알피에 적은 메모는 여기로 저절로 오지 않습니다. 그래서 <b>✎ 기록에 담기</b>를 둡니다.<br>'
+  ppnote:'예전에 푸른이알피 <b>「나의 업무」</b>에 적어 두었던 메모입니다.<br>'
+        +'⚠ 그 적는 창은 2026-09-27 에 없앴습니다 — 이제 진행 기록은 <b>여기(업무관리) 한 곳</b>에만 적습니다. '
+        +'옛 메모를 기록으로 남기려면 <b>✎ 기록에 담기</b>를 누르세요.<br>'
         +'담으면 <b>「🔗 푸른이알피 메모 — …」</b> 한 줄이 그 주 기록으로 들어가, '
         +'주간표·팀 전체·전체 검색에서 다른 기록과 똑같이 찾힙니다.<br>'
         +'메모를 <b>고치면 다시 담을 수 있습니다</b> — 담은 글이 달라지면 단추가 다시 나옵니다.',
@@ -10177,7 +10177,7 @@ function peSyncBadge(it){
   var st=(pesync[it.ref.type+'-'+peSyncKey(it.ref.id)]
         ||pesync[it.ref.type+'-'+safeKey(it.ref.id)]||{});
   if(st.synced_at&&st.pe_closed===true) return '<span class="pesync done" title="푸른이알피도 종료됨 · '+esc((st.synced_at||'').slice(0,10))+'">🔗 반영됨</span>';
-  return '<span class="pesync wait" title="푸른이알피 나의 업무를 열 때 반영됩니다">🔗 반영 대기</span>';
+  return '<span class="pesync wait" title="푸른이알피를 켜 둔 사람이 있으면 곧 반영됩니다">🔗 반영 대기</span>';
 }
 function arReset(){ S.arMgr=''; S.arCat=''; S.arPeriod=''; S.q=''; S.arWay=''; S.arRes=''; renderArchive(); }
 /* 표 높이를 창 아래까지 채운다. 종전에는 100vh-250px 로 못 박아 두어, 머리를
