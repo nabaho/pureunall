@@ -279,8 +279,50 @@
     return prefix + '-' + Date.now().toString(36) + '-' + r.slice(0, 8);
   }
 
+  /* ── 나만 보는 일정 (cal_private/{uid}/{id}) ─────────────────────────────
+     대표 지시 2026-09-27 「개인일정을 넣을 수 도 있다 … 본인만 확인가능하고 다른사람은 확인안되게」
+     → 추천대로 «관리자도 못 본다». data 아래에 두면 재무 권한자(대표 포함)가 data 를 통째로
+     읽을 수 있어 안 된다 — 그래서 최상위 cal_private, 서버 규칙이 본인 로그인만 읽고 쓰게 막는다.
+     ⚠ 이알피 근태가 아니다 — 마감 자물쇠·배열 표 거르기 대상이 아니다. 번호·칸 이름 금지문자만 본다.
+     ⚠ 지우기도 삭제표시(_deleted)다 — 온톨로지 관문이 물리 삭제를 거절한다. 읽는 쪽이 뺀다. */
+  function privRef(uid, id) { return _db.ref('cal_private/' + uid + '/' + id); }
+  function privCheck(uid, id, fields) {
+    if (!_db) return fail('no_server', '서버에 아직 안 붙었습니다');
+    if (!uid || BADKEY.test(uid)) return fail('no_uid', '로그인한 사람을 모릅니다');
+    if (typeof id !== 'string' || !id || BADKEY.test(id)) return fail('no_id', '번호 없는 항목은 저장하지 않습니다');
+    var bad = '';
+    Object.keys(fields || {}).forEach(function (f) { if (BADKEY.test(f)) bad = f; });
+    if (bad) return fail('bad_field', '「' + bad + '」 칸 이름에 쓸 수 없는 글자가 있습니다');
+    return OK;
+  }
+  function savePrivate(uid, item, prev) {
+    if (!item || typeof item !== 'object') return Promise.resolve(fail('no_item', '저장할 것이 없습니다'));
+    var id = item.id, fields = {};
+    Object.keys(item).forEach(function (f) { if (f !== 'id') fields[f] = item[f]; });
+    var g = privCheck(uid, id, fields);
+    if (!g.ok) return Promise.resolve(g);
+    var ctx = { entityType: 'ScheduleEvent' };
+    if (!prev) ctx.expectedRevision = -1;
+    return gate().save(privRef(uid, id), function (server) { return overlay(id, fields, prev, server); }, ctx)
+      .then(function () { return OK; })
+      .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
+  }
+  function removePrivate(uid, id, prev) {
+    var g = privCheck(uid, id, {});
+    if (!g.ok) return Promise.resolve(g);
+    var who = typeof _ctx.who === 'function' ? (_ctx.who() || '') : '';
+    return gate().save(privRef(uid, id), function (server) {
+      var base = (server && typeof server === 'object') ? server : (prev || {});
+      return Object.assign({}, base, { id: id, _deleted: true, deletedAt: Date.now(), deletedBy: who });
+    }, { entityType: 'ScheduleEvent' })
+      .then(function () { return OK; })
+      .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
+  }
+
   var api = {
     BADKEY: BADKEY,
+    savePrivate: savePrivate,
+    removePrivate: removePrivate,
     attach: attach,
     isMapForm: isMapForm,
     check: check,
