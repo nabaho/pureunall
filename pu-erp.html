@@ -315,8 +315,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-27 나의 업무: 기록은 업무관리 한 곳(+입력 창 없앰) · 업무관리 동기화 되살림';
-var BUILD_SEQ = 187;
+var ERP_BUILD = '2026-09-27 푸른ERP AI 도우미 걷어냄(대표 지시)';
+var BUILD_SEQ = 188;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -13064,7 +13064,7 @@ function Header(props){
     /* ⋯ — 폰에서만 보인다. 오른쪽 묶음이 화면 밖으로 나가 있던 것을 여기에 접는다.
        ⚠ 없애는 것이 아니다. PC 는 .hd-fold 가 display:contents 라 «한 겹이 없는 것»과
          같아 자리가 하나도 안 바뀐다. */
-    window.IS_MOBILE && h('button', { className:'hd-more', title:'더보기 (PC화면·다크모드·상담·도우미·비밀번호)',
+    window.IS_MOBILE && h('button', { className:'hd-more', title:'더보기 (PC화면·다크모드·상담·비밀번호)',
       onClick:function(e){ e.stopPropagation(); setHdPop(!hdPop); } }, '⋯'),
     h('div', { className:'hd-fold' + (hdPop ? ' on' : ''),
                onClick:function(){ if(hdPop) setHdPop(false); } },
@@ -13100,9 +13100,6 @@ function Header(props){
       h('button', { onClick:function(){ setShowChangePw(true); }, title:'비밀번호 변경',
         style:{ marginLeft:'2px', padding:'2px 5px', fontSize:'10px', cursor:'pointer',
           background:'#f8fafc', border:'1px solid #cbd5e1', borderRadius:'4px', color:'#475569', title:'비밀번호 변경' } }, '🔑'),
-      h('button', { onClick:props.onHelpOpen, title:'AI 도우미 열기 (단축키: ? )', 'data-tour':'help',
-        style:{ marginLeft:'2px', padding:'3px 8px', fontSize:'11px', fontWeight:700, cursor:'pointer',
-          background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'4px', color:'#1e40af', display:'inline-flex', alignItems:'center', gap:'3px' } }, '🤖', h('span', {style:{fontSize:'10.5px'}}, '도우미')),
       h('button', { onClick:props.onTourOpen, title:'사용법 둘러보기 (인앱 투어)',
         style:{ marginLeft:'2px', padding:'3px 7px', fontSize:'11px', fontWeight:700, cursor:'pointer',
           background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'4px', color:'#166534', title:'사용법 둘러보기' } }, '🎓'),
@@ -57382,236 +57379,9 @@ function CardExcelImportModal(props){
 
 // ============ 재무관리 - 세금계산서 ============
 
-// ============================================================
-// 🤖 푸른ERP AI 도우미 (HelpBot)
-// ============================================================
-var HELP_SYSTEM_PROMPT = `당신은 푸른노무법인 ERP v6의 전문 도우미입니다. 처음 사용하는 직원도 쉽게 이해하도록 친절하고 간결하게 안내합니다.
-
-## ERP 전체 구조 (5폴더 23화면)
-**1. 대시보드**
-- 법인대시보드: 전체 매출·미수금·계약현황·직원 성과 한눈에
-- 나의업무: 내 담당 업무·일정·할일 모아보기
-
-**2. 사무관리 (7화면)**
-- 계약관리: 신규계약 등록·진행상태 관리(계약협의→진행→종료). 칸반보드 형식
-- 업체관리: 361개 거래처 CRM. 업태/종목 필터, 자문료·계약현황 한눈에
-- 사건관리: 노동위원회·법원 사건. 착수금·성공보수 관리
-- 컨설팅관리: 기초컨설팅·일터상생·중장년 등 종류별 관리
-- 기금관리: 공동근로복지기금 신청·운영 관리
-- 기타사업: 정부지원사업 등
-- 종료관리: 종료·취소된 모든 건 아카이브. 구분/업체명/담당자/금액 필터
-
-**3. 인사관리 (7화면)**
-- 근로자명부: 직원 기본정보·계약정보. 입사예정(D-day배너)·재직·휴직·퇴직 상태관리
-- 성과관리: 입금 연동 성과급 자동 계산. 담당자 성과율 적용
-- 월별급여: 전직원 매트릭스 급여대장. 2025년 실데이터 탑재. 입사일/퇴사일 자동 필터
-- 근태관리: 출퇴근·초과근무 기록
-- 휴가관리: 연차·육아·병가 등 법정 휴가 관리
-- 급여이력: 직원별 연간 급여 추이
-- 퇴직정산: 퇴직금·정산 내역
-
-**4. 재무관리 (6화면)**
-- 입금관리: 자문료·사건·컨설팅·기금 입금 확정. 성과관리 자동 연동
-- 출금관리: 지출·경비 관리. 자동이체 설정
-- 세금계산서: 2025년 2,154건 실데이터. 업체명·대표자·이메일 CRM 포함
-- 미수금관리: 미납 자문료 추적
-- 예상부가세: 분기별 부가세 자동 계산
-
-**5. 환경설정**
-- 임금항목·보험요율·사용자계정·회사정보 등 기준 데이터 관리
-
-## 주요 업무 흐름
-**자문 계약 흐름**: 업체관리(거래처 등록) → 계약관리(계약 등록) → 입금관리(자문료 확정) → 세금계산서(발행)
-**성과급 흐름**: 입금 확정 → 담당자 성과율(%) 자동 적용 → 월별급여 성과급 셀 자동 반영
-**입사 처리**: 근로자명부에서 상태 '입사예정'으로 등록 → 입사일 도래 시 자동 '재직' 전환 → 월별급여 자동 노출
-**퇴직 처리**: 근로자명부 상태 '퇴직' 변경 → 퇴사일 이후 급여대장 자동 미표시 → 퇴직정산
-
-## 자주 하는 질문
-- Q: 새 거래처 어디서 등록? → 업체관리 > + 업체 등록
-- Q: 급여 입력 어떻게? → 인사관리 > 월별급여 > 해당 월 선택 > 직접 입력 또는 CSV 가져오기
-- Q: 세금계산서 발행? → 재무관리 > 세금계산서 > + 세금계산서 발행
-- Q: 미수금 어떻게 확인? → 재무관리 > 미수금관리 (빨간 배지 = 미납 업체 수)
-- Q: 성과급 왜 안 보여? → 입금관리에서 입금 확정이 되어야 성과급 자동 계산됨
-- Q: 퇴직자 급여 왜 나옴? → 근로자명부에서 퇴직일 입력 필요 (퇴사일 이후 자동 숨김)
-`;
-
-var SCREEN_GUIDE = {
-  'biz/contract':   '계약관리 화면입니다. 좌측 탭(상담사항·업체계약·사건계약·컨설팅계약·기금·기타)으로 유형별 관리. 상단 + 계약 등록으로 신규 등록. 하위종류 필터로 세부 검색 가능.',
-  'biz/company':    '업체관리 화면입니다. 상단 탭(전체활성·사무대행·자문·급여·노조·기금)으로 구분. 테이블 헤더의 업태·종목 드롭다운으로 필터링. 업체명 클릭 시 상세정보.',
-  'biz/case':       '사건관리 화면입니다. 부당해고·임금체불·산재 등 노동위/법원 사건 관리. 착수금·성공보수 입력.',
-  'biz/consulting': '컨설팅관리 화면입니다. 종류별(기초컨설팅·일터상생·중장년 등) 탭으로 구분.',
-  'biz/fund':       '기금관리 화면입니다. 공동근로복지기금 신청·운영 관리. 부가세 포함 여부 체크박스.',
-  'biz/closed':     '종료관리 화면입니다. 구분(계약/업체/사건/컨설팅/기금)·업체명·담당자·금액 필터로 검색.',
-  'hr/staff':       '근로자명부입니다. 직원 기본정보·계약정보 관리. 상태: 입사예정(D-day 표시)→재직→휴직→퇴직. 입사일 도래 시 자동 재직 전환.',
-  'hr/performance': '성과관리 화면입니다. 입금확정 건의 담당자별 성과급 자동 계산. 조회 전용(수정은 입금관리에서).',
-  'hr/payroll':     '월별급여 화면입니다. 전직원 급여 매트릭스. 2025년 실데이터 탑재. 입사일 이전/퇴사일 이후 직원 자동 숨김. ⭐성과급 셀은 입금연동 자동값.',
-  'fin/ledger':     '거래내역 화면입니다. 하나은행 통장·하나카드 Excel 업로드 → 입출금 자동 파싱 → 입금관리·출금관리 연결.',
-  'fin/income':     '입금관리 화면입니다. 자문료·사건·컨설팅·기금 입금 확정. 확정 즉시 성과관리에 자동 반영.',
-  'fin/expense':    '출금관리 화면입니다. 경비·지출 기록. 자동이체 반복 설정 가능.',
-  'fin/invoice':    '세금계산서 화면입니다. 2025년 2,154건 실데이터. 업체명·대표자·이메일·품목 검색. + 발행 버튼으로 신규 발행.',
-  'fin/recv':       '미수금관리 화면입니다. 자문료 미납 업체 추적. 빨간 배지 = 미납 건수.',
-  'fin/vat':        '예상부가세 화면입니다. 분기별 부가세 자동 계산. 세금계산서 발행 내역 기반.',
-  'fin/close':      '월말 마감 화면입니다. 근태·휴가 → 급여 → 비정규직 → 계약 → 입금 → 출금 순으로 잠급니다. 앞 단계가 잠겨야 다음이 열리고, 해제는 뒤에서부터만 됩니다.',
-  'dashboard':      '대시보드입니다. 이번 달 매출·미수금·만료 임박 계약 한눈에. 나의업무 탭에서 내 담당 업무 확인.',
-};
-
-// ── 내장 FAQ 도우미 (인터넷·API 불필요, 즉시 답변) ─────────────────
-var HELP_FAQ = [
-  { k:['입금','확정','입금확정','수금','돈받'], a:'💰 입금 확정 방법\n재무관리(또는 사건·컨설팅 등 해당 업무 화면)에서 해당 건을 찾아 [입금 확정]을 누릅니다.\n확정하면 ① 매출이 재무관리에 자동으로 잡히고 ② 성과가 주담당·부담당에게 자동 분배됩니다.' },
-  { k:['성과','성과급','분배','보너스','왜안나'], a:'📊 성과급이 안 보일 때\n성과는 "입금이 확정"되어야 분배됩니다. 계약에 주담당(필수)·부담당이 지정돼 있는지, 입금이 확정됐는지 확인하세요. 분배 비율은 성과관리 설정을 따릅니다.' },
-  { k:['직원','계정','아이디','비번','비밀번호','입사','사번'], a:'👤 새 직원 등록\n환경설정 → 사용자 관리 → [사용자 추가].\n사번(P-/A-)은 직책에 따라 자동, 로그인 아이디는 이름으로 자동, 초기 비밀번호는 123456입니다. 직원이 첫 로그인 시 비밀번호를 바꾸게 됩니다.' },
-  { k:['계약','계약추가','신규계약','계약등록'], a:'📄 계약 추가\n계약관리 화면 오른쪽 위 [＋ 계약 추가]. 회사명·사업자번호를 넣으면 업체관리 정보가 자동으로 채워집니다. 자세한 단계는 계약관리 화면의 [❓ 사용법] 버튼을 보세요.' },
-  { k:['이관','넘기'], a:'➡ 이관\n계약이 "계약확정(서명)" 상태가 되면 카드의 [➡ 이관] 버튼으로 해당 업무 화면(사건·컨설팅 등)으로 보냅니다. 이관해야 그 업무가 담당 화면에 나타납니다.' },
-  { k:['업체','거래처','회사등록','사업자','업체등록'], a:'🏢 업체 등록\n업체관리 화면에서 추가합니다. 여기에 등록된 사업자번호·주소·대표·관리번호가 계약관리에서 자동으로 불러와집니다. 그래서 업체를 먼저 등록하면 편합니다.' },
-  { k:['세금계산서','계산서','이카운트','세금'], a:'🧾 세금계산서\n세금계산서 발행 연동(이카운트)은 준비 중입니다. 현재는 기존 방식대로 발행하시고, 연동이 준비되면 안내드리겠습니다.' },
-  { k:['휴가','연차','근태','반차'], a:'🌴 휴가·근태\n인사관리(근태/휴가) 화면에서 신청·관리합니다. 연차는 실제 근무 시작일 기준으로 계산됩니다.' },
-  { k:['급여','월급','명세서','급여대장'], a:'💵 급여\n인사관리 → 월별 급여에서 관리합니다. 성과관리에서 넘어온 성과급이 급여에 반영됩니다.' },
-  { k:['금액','안보','안나와','숨'], a:'🔒 금액이 안 보일 때\n전사 금액은 관리자만 보고, 직원은 본인이 담당한 업무의 금액만 보이도록 설정돼 있습니다(권한 정책).' },
-  { k:['로그인','비번변경','비밀번호변경','접속'], a:'🔑 로그인\nhttps 주소(nabaho.github.io)로 접속해야 동기화가 됩니다. 첫 로그인 시 비밀번호를 바꿔야 하며, 이후 환경설정에서 변경할 수 있습니다.' }
-];
-function findHelpAnswer(text, screenCtx){
-  var t = (text||'').toLowerCase().replace(/\s/g,'');
-  if(!t) return null;
-  if(/(이화면|이페이지|어떻게써|사용법|뭐하는|어떻게쓰)/.test(t)){
-    return (screenCtx||'현재 화면입니다.') + '\n\n더 구체적으로 물어보셔도 됩니다. 예) 입금 확정, 이관, 새 직원 등록, 업체 등록';
-  }
-  var best=null, bestHit=0;
-  HELP_FAQ.forEach(function(f){
-    var hit=0;
-    f.k.forEach(function(kw){ if(t.indexOf(kw.toLowerCase())>=0) hit++; });
-    if(hit>bestHit){ bestHit=hit; best=f; }
-  });
-  return bestHit>0 ? best.a : null;
-}
-
-function HelpBot(props){
-  var current = props.current || 'dashboard';
-  var ms = useState([]); var messages = ms[0]; var setMessages = ms[1];
-  var inp = useState(''); var input = inp[0]; var setInput = inp[1];
-  var ld = useState(false); var loading = ld[0]; var setLoading = ld[1];
-  var chatRef = useRef(null);
-
-  useEffect(function(){
-    if(chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages]);
-
-  var screenCtx = SCREEN_GUIDE[current] || '현재 화면입니다.';
-
-  async function send(){
-    var text = input.trim();
-    if(!text || loading) return;
-    setInput('');
-    var newMsgs = messages.concat([{role:'user', content:text}]);
-    setMessages(newMsgs);
-    setLoading(true);
-    try{
-      // 1) 내장 FAQ에서 먼저 찾기 (인터넷·API 불필요, 즉시 답변)
-      var localAns = findHelpAnswer(text, screenCtx);
-      if(localAns){
-        setMessages(newMsgs.concat([{role:'assistant', content:localAns}]));
-        setLoading(false);
-        return;
-      }
-      var proxyUrl = erpAiProxyUrl();   // AI 요약과 «같은» 설정을 읽는다 (따로 읽으면 한쪽만 고쳐진다)
-      if(!proxyUrl){
-        setMessages(newMsgs.concat([{role:'assistant', content:'아직 제가 아는 답에 없는 질문이에요. 아래 자주 묻는 질문 버튼을 눌러보시거나, 키워드로 다시 물어봐 주세요. (예: 입금, 이관, 직원, 업체, 급여, 휴가)'}]));
-        setLoading(false);
-        return;
-      }
-      var body = {
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: HELP_SYSTEM_PROMPT + '\n\n## 현재 사용자 위치\n' + screenCtx,
-        messages: newMsgs
-      };
-      // 답이 안 오면 「생각 중…」에 갇힌다 — 45초에서 끊고 사람에게 말해 준다
-      var res = await fetchT(proxyUrl,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(body)
-      }, 45000);
-      var data = await res.json();
-      var reply = data.reply || data.text || (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
-      if(!reply) reply = '죄송합니다, 잠시 후 다시 시도해주세요.';
-      setMessages(newMsgs.concat([{role:'assistant', content:reply}]));
-    }catch(e){
-      // 시간이 지난 것과 연결이 안 된 것은 다음에 할 일이 다르다
-      setMessages(newMsgs.concat([{role:'assistant', content: (e && e.timeout)
-        ? '⏱ 45초 동안 답이 오지 않았습니다. 질문을 조금 짧게 줄여 다시 물어봐 주세요.'
-        : '연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요.'}]));
-    }
-    setLoading(false);
-  }
-
-  function handleKey(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } }
-
-  var QUICK = ['이 화면 어떻게 써요?','입금 확정 어떻게 해요?','성과급 왜 안 나와요?','새 직원 등록 방법','세금계산서 발행하려면?'];
-
-  return h('div', {style:{display:'flex', flexDirection:'column', height:'100%', background:'#f8fafc'}},
-    // 헤더
-    h('div', {style:{padding:'14px 16px', background:'linear-gradient(135deg,#1e293b,#2563eb)', color:'#fff', borderRadius:'0'}},
-      h('div', {style:{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}},
-        h('span', {style:{fontSize:'18px'}}, '🤖'),
-        h('span', {style:{fontWeight:700, fontSize:'14px'}}, '푸른ERP 도우미'),
-        h('span', {style:{marginLeft:'auto', fontSize:'10.5px', background:'rgba(255,255,255,0.2)', padding:'2px 7px', borderRadius:'10px'}}, 'AI')
-      ),
-      h('div', {style:{fontSize:'10.5px', opacity:0.85}}, screenCtx.slice(0,40)+'...')
-    ),
-    // 빠른 질문 버튼
-    messages.length === 0 && h('div', {style:{padding:'12px', borderBottom:'1px solid #e2e8f0'}},
-      h('div', {style:{fontSize:'10px', color:'#94a3b8', marginBottom:'6px', fontWeight:600}}, '자주 묻는 질문'),
-      h('div', {style:{display:'flex', flexWrap:'wrap', gap:'4px'}},
-        QUICK.map(function(q, i){
-          return h('button', {key:i, onClick:function(){setInput(q); setTimeout(function(){send();},50);},
-            style:{fontSize:'10.5px', padding:'4px 9px', borderRadius:'14px', border:'1px solid #bfdbfe',
-              background:'#eff6ff', color:'#1e40af', cursor:'pointer', fontWeight:500}}, q);
-        })
-      )
-    ),
-    // 메시지 영역
-    h('div', {ref:chatRef, style:{flex:1, overflowY:'auto', padding:'12px', display:'flex', flexDirection:'column', gap:'10px'}},
-      messages.length === 0 && h('div', {style:{textAlign:'center', color:'#94a3b8', fontSize:'11.5px', marginTop:'20px'}},
-        h('div', {style:{fontSize:'32px', marginBottom:'8px'}}, '💬'),
-        h('div', null, '무엇이든 물어보세요!'),
-        h('div', {style:{fontSize:'10px', marginTop:'4px'}}, '현재 화면 기준으로 안내해 드립니다')
-      ),
-      messages.map(function(m, i){
-        var isUser = m.role === 'user';
-        return h('div', {key:i, style:{display:'flex', justifyContent: isUser?'flex-end':'flex-start'}},
-          h('div', {style:{
-            maxWidth:'85%', padding:'8px 12px', borderRadius: isUser?'14px 14px 4px 14px':'14px 14px 14px 4px',
-            background: isUser?'#2563eb':'#fff',
-            color: isUser?'#fff':'#1e293b',
-            fontSize:'12px', lineHeight:'1.55',
-            boxShadow:'0 1px 3px rgba(0,0,0,0.08)',
-            border: isUser?'none':'1px solid #e2e8f0',
-            whiteSpace:'pre-wrap'
-          }}, m.content)
-        );
-      }),
-      loading && h('div', {style:{display:'flex', gap:'4px', padding:'8px 12px', background:'#fff', borderRadius:'10px', border:'1px solid #e2e8f0', width:'fit-content'}},
-        [0,1,2].map(function(i){
-          return h('div', {key:i, style:{width:'6px', height:'6px', borderRadius:'50%', background:'#94a3b8',
-            animation:'bounce 1s infinite', animationDelay:(i*0.2)+'s'}});
-        })
-      )
-    ),
-    // 입력창
-    h('div', {style:{padding:'10px 12px', borderTop:'1px solid #e2e8f0', background:'#fff', display:'flex', gap:'8px', alignItems:'flex-end'}},
-      h('textarea', {
-        value:input, onChange:function(e){setInput(e.target.value);}, onKeyDown:handleKey,
-        placeholder:'질문을 입력하세요... (Enter로 전송)',
-        rows:2,
-        style:{flex:1, resize:'none', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'7px 10px',
-          fontSize:'12px', fontFamily:'inherit', outline:'none', lineHeight:'1.4'}
-      }),
-      h('button', {onClick:send, disabled:loading || !input.trim(),
-        style:{padding:'7px 14px', borderRadius:'8px', background: (loading||!input.trim())?'#e2e8f0':'#2563eb',
-          color:(loading||!input.trim())?'#94a3b8':'#fff', border:'none', cursor: (loading||!input.trim())?'default':'pointer',
-          fontSize:'12px', fontWeight:700, whiteSpace:'nowrap'}}, '전송')
-    )
-  );
-}
+// ── (2026-09-27) 「🤖 푸른ERP AI 도우미」를 걷어냈다 — 대표 지시 「필요가 없다 삭제해라
+//    추후에 통합시스템 전반에 대한 챗봇이 필요할 것 같다」. 이알피 한 화면용 도우미는 다시 만들지 않는다.
+//    AI 로 보내는 길(erpAiProxyUrl)은 상담 «AI 요약»이 계속 쓴다 — 지우지 말 것.
 
 // 끌어온 것이 '파일'인지 — 글자·표 안의 셀을 끌 때는 반응하지 않게
 function invDragHasFile(ev){
@@ -81090,7 +80860,6 @@ function OnboardingTour(props){
     { sel:'.sb-grp-h[data-grp-id="hr"]', title:'👥 인사관리', body:'직원관리·월별급여·성과관리·근태·휴가를 처리합니다. 급여명세서와 비정규직 지급도 여기서 관리합니다.', place:'right' },
     { sel:'.sb-grp-h[data-grp-id="fin"]', title:'💵 재무관리', body:'입금과 출금을 관리합니다. 입금을 확정하면 담당자(주담당/부담당) 성과가 성과관리에 자동 반영됩니다.', place:'right' },
     { sel:'.sb-grp-h[data-grp-id="env"]', title:'⚙️ 환경설정', body:'권한·정책, 자동 로그아웃, 백업 등 시스템 설정을 변경합니다.', place:'right' },
-    { sel:'[data-tour="help"]', title:'🤖 도움말', body:'화면 사용법이 막힐 때는 도움말 버튼으로 AI 도우미에게 물어보세요.', place:'bottom' },
     { sel:null, title:'✅ 둘러보기 끝!', body:'이제 직접 사용해 보세요. 도움말 옆 🎓 둘러보기 버튼으로 언제든 다시 볼 수 있습니다.' }
   ];
   var stepsState = useState(function(){
@@ -81331,18 +81100,7 @@ function ERPMain(props){
   // #menu= 해시는 권한·모바일 검사를 통과할 때만 사용, 아니면 시작화면으로 fallback
   var defaultMenu = _menuAllowed(hashMenu) ? hashMenu : startMenu;
   var s = useState(defaultMenu); var current = s[0]; var setCurrent = s[1];
-  var hbS = useState(false); var helpOpen = hbS[0]; var setHelpOpen = hbS[1];
   var tourS = useState(false); var showTour = tourS[0]; var setShowTour = tourS[1];
-  useEffect(function(){
-    function onHelpKey(e){
-      if(e.key !== '?') return;
-      var t = e.target || {}; var tag = (t.tagName||'').toUpperCase();
-      if(tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || t.isContentEditable) return;
-      e.preventDefault(); setHelpOpen(function(v){ return !v; });
-    }
-    window.addEventListener('keydown', onHelpKey);
-    return function(){ window.removeEventListener('keydown', onHelpKey); };
-  }, []);
   var _fpRaw = localStorage.getItem('pureun_v6_force_pw') || '';
   // 저장된 force_pw가 현재 로그인 사용자와 다르면 이전 사용자 잔재 → 무시·삭제
   if(_fpRaw && CURRENT_USER && _fpRaw !== CURRENT_USER.sid){
@@ -81642,7 +81400,6 @@ function ERPMain(props){
         onBack: menuHistory.length > 0 ? goBack : null,
         onNavigate: selectMenu,
         onLogout: onLogout,
-        onHelpOpen: function(){ setHelpOpen(true); },
         onTourOpen: function(){ setShowTour(true); },
         startMenuActive: (dbGet('start_menu_'+(CURRENT_USER.sid||''), null) === current),
         onSetStart: function(){
@@ -81675,26 +81432,6 @@ function ERPMain(props){
     },
       h('span', null, '📱'),
       h('span', null, '모바일 모드 · 재무 정보 차단')
-    ),
-    // 🤖 AI 도우미 사이드 패널
-    helpOpen && h('div', null,
-      h('div', { onClick:function(){ setHelpOpen(false); },
-        style:{ position:'fixed', inset:0, background:'rgba(0,0,0,0.3)', zIndex:9998 } }),
-      h('div', { style:{
-        position:'fixed', top:0, right:0, width:'370px', height:'100vh',
-        background:'#fff', boxShadow:'-4px 0 24px rgba(0,0,0,0.18)',
-        zIndex:9999, display:'flex', flexDirection:'column'
-      }},
-        h('div', { style:{ display:'flex', alignItems:'center',
-          padding:'10px 14px', background:'#1e293b', color:'#fff', gap:'8px' }},
-          h('span', {style:{fontSize:'15px'}}, '🤖'),
-          h('span', {style:{fontWeight:700, fontSize:'13px', flex:1}}, '푸른ERP AI 도우미'),
-          h('button', { onClick:function(){ setHelpOpen(false); },
-            style:{ background:'rgba(255,255,255,0.15)', border:'none', color:'#fff',
-              width:'24px', height:'24px', borderRadius:'50%', cursor:'pointer', fontSize:'14px', lineHeight:1 } }, '×')
-        ),
-        h(HelpBot, { current: current })
-      )
     ),
     showTour && h(OnboardingTour, { onClose:function(){ setShowTour(false); localStorage.setItem('pureun_v6_erp_tour_done_v1','1'); } }),
     forcePwSid && h(ChangePasswordModal, {

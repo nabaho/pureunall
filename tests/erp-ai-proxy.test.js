@@ -5,6 +5,8 @@
 //     열쇠를 안 실었으니 401 이고, 열쇠를 실었다면 화면 소스에 그대로 드러난다.
 //     게다가 그 주소는 브라우저에서 CORS 로 막힌다 — 어느 쪽이든 늘 실패했다.
 //     옆의 AI 도우미(대화)는 프록시를 제대로 쓰고 있었다.
+//     (2026-09-27 그 도우미는 대표 지시로 걷어냈다 — 이제 프록시를 부르는 곳은 AI 요약 하나다.
+//      다시 AI 를 부르는 곳이 생기면 «같은 erpAiProxyUrl» 을 써야 한다 — 아래 검사가 본다.)
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -46,13 +48,10 @@ test('AI 요약도 프록시로 보낸다', () => {
 test('★ 설정을 읽는 곳이 하나다', () => {
   // 각자 읽으면 한쪽만 고쳐진다
   assert.equal((app.match(/function erpAiProxyUrl\(\)/g) || []).length, 1);
-  assert.equal((app.match(/erpAiProxyUrl\(\)/g) || []).length, 3, '정의 1 + 부르는 곳 2(요약·도우미)');
+  /* 부르는 곳 수는 못 박지 않는다 — AI 를 부르는 곳이 늘어도 «이 함수만» 읽으면 된다 */
+  assert.ok((app.match(/erpAiProxyUrl\(\)/g) || []).length >= 2, '정의 1 + 부르는 곳이 적어도 하나(AI 요약)');
   assert.ok(app.indexOf("dbGet('setting_ai_proxy_url','') || localStorage") < 0
     || (app.match(/setting_ai_proxy_url/g) || []).length === 1, '설정 열쇠는 한 곳에서만 읽는다');
-});
-
-test('AI 도우미도 같은 함수를 쓴다', () => {
-  assert.match(app, /var proxyUrl = erpAiProxyUrl\(\);/);
 });
 
 test('설정을 읽는 순서는 종전 그대로', () => {
@@ -98,10 +97,10 @@ test('빈 답이 와도 「완료」라고 하지 않는다', () => {
   assert.ok(SUM.indexOf("if(!text){") < SUM.indexOf("upd('summary', text)"), '비었으면 덮어쓰지 않는다');
 });
 
-test('답 읽는 순서가 AI 도우미와 같다', () => {
-  // 프록시가 돌려주는 모양은 서버마다 다르다 — 두 곳이 다르게 읽으면 한쪽만 된다
+test('답 읽는 순서 — reply → text → content', () => {
+  // 프록시가 돌려주는 모양은 서버마다 다르다 — 한 가지만 읽으면 어떤 서버에서는 늘 빈 답이 된다
   assert.match(SUM, /var text = d\.reply \|\| d\.text/);
-  assert.match(app, /var reply = data\.reply \|\| data\.text/);
+  assert.match(SUM, /\(d\.content\|\|\[\]\)\.filter/);
 });
 
 test('시간 제한과 갇힘 방지는 그대로', () => {
