@@ -197,14 +197,21 @@ test('★★★ 사진첩이 data/contracts 에 «직접 쓰지 않는다»', ()
   assert.ok(!/data\/contracts/.test(사진첩몸통),
     '★★★ 계약을 여기서 만들면 업체 연결 검증·중복 검사·월 잠금을 통째로 건너뜁니다.\n' +
     '  계약은 계약관리의 저장 길이 만듭니다 — 여기서는 창을 채워 열 뿐입니다.');
-  const fn = stripJs(cutFn(PHOTOS, 'function makeContractFromDoc(') || '');
-  assert.ok(fn, 'makeContractFromDoc 이 없습니다');
-  assert.match(fn, /sessionStorage\.setItem\('pu_new_contract'/,
-    '★★ 넘기는 것은 쪽지 한 장입니다 — 주소에 실으면 주소창·기록에 회사 정보가 남습니다');
+  /* ⚠ 2026-09-27 다시 겨눔 — 옛 길(makeContractFromDoc · sessionStorage 쪽지)은 9월 19일
+       「계약 등록 요청」(sendContractRequest)으로 바뀐 뒤 아무도 안 불러 걷어냈다.
+       지킬 것은 그대로다: 회사 정보를 «주소에 싣지 않는다». */
+  const fn = stripJs(cutFn(PHOTOS, 'function sendContractRequest(') || '');
+  assert.ok(fn, 'sendContractRequest 가 없습니다');
+  assert.match(fn, /PuDocFile\.requestContract\(/,
+    '★★ 계약 요청은 등록 층(요청 한 줄)으로 넘깁니다');
+  const url = (fn.match(/const url = ([^;]*);/) || ['', ''])[1];
+  assert.ok(url && !/company|encodeURIComponent/.test(url),
+    '★★ 주소에 회사 정보를 실으면 주소창·기록에 남습니다: ' + url);
 });
 
 test('★★★ 금액·기간을 «지어내지 않는다» — 신청서에 안 적혀 있다', () => {
-  const fn = stripJs(cutFn(PHOTOS, 'function makeContractFromDoc(') || '');
+  const fn = stripJs(cutFn(PHOTOS, 'function sendContractRequest(') || '');
+  assert.ok(fn, 'sendContractRequest 가 없습니다');
   assert.ok(!/contractAmount|amounts|startDate|endDate|signDate/.test(fn),
     '★★★ 신청서에 없는 금액·기간을 채우면 계약관리의 숫자가 거짓이 됩니다');
 });
@@ -226,7 +233,8 @@ test('★★ 회사 이름조차 없으면 단추를 «안» 낸다 — 눌러�
 });
 
 test('★ 어느 사진에서 왔는지 남긴다 — 「이 값 어디서 나왔지」에 답해야 한다', () => {
-  const fn = stripJs(cutFn(PHOTOS, 'function makeContractFromDoc(') || '');
+  const fn = stripJs(cutFn(PHOTOS, 'function sendContractRequest(') || '');
+  assert.ok(fn, 'sendContractRequest 가 없습니다');
   assert.match(fn, /srcPhoto/);
 });
 
