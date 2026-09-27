@@ -678,7 +678,6 @@
       var p = seed ? track(changeRemoved(db, function (rm) { if (rm.indexOf(fm.id) < 0) rm.push(fm.id); return rm; }))
                       .then(function (rm) { S.removed = rm; }) : Promise.resolve();
       p.then(function () {
-        if (S.sel === fm.id) S.sel = null;
         return change(function (list) { return list.filter(function (x) { return x.id !== fm.id; }); }, '🗑️ 양식을 지웠습니다', function () {
           /* 되돌리기 — «그 한 건»만 다시 넣는다(통째로 되돌리면 그사이 남이 고친 것을 지운다) */
           var q = seed ? track(changeRemoved(db, function (rm) { return rm.filter(function (x) { return x !== fm.id; }); }))
@@ -687,8 +686,12 @@
             return change(function (list) { return list.some(function (x) { return x.id === fm.id; }) ? list : list.concat([fm]); }, '되돌렸습니다');
           }).then(function () { select(fm.id); }).catch(function () {});
         });
-      }).then(function () { if (host.onSelect) host.onSelect(S.sel); })
-        .catch(function (e) { toast('⚠ 지우지 못했습니다 — ' + ((e && e.message) || e)); });
+      }).then(function () {
+        /* ⚠ change() 가 성공한 «뒤에만» 고른 것을 놓는다 — 실패했으면(네트워크 등)
+           양식은 그대로 남아 있으므로 고른 것도 그대로 둔다. */
+        if (S.sel === fm.id) S.sel = null;
+        if (host.onSelect) host.onSelect(S.sel);
+      }).catch(function (e) { toast('⚠ 지우지 못했습니다 — ' + ((e && e.message) || e)); });
     }
     function reseedChedang() {
       if (!w.confirm('체당금 양식 4개를 새로 등록(또는 덮어쓰기)합니다.\n\n계속할까요?')) return;
@@ -868,7 +871,7 @@
 
     drawTree(); drawMain();
     load();
-    return { reload: load, select: select };
+    return { reload: load, select: select, current: function () { return S.sel; } };
   }
 
   w.PuContractForms = {

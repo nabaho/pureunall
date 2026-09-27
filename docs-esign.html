@@ -144,7 +144,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=34"></script>
+<script src="js/pu-ontology.js?v=35"></script>
 <script src="js/pu-ontology-write.js?v=3" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
@@ -221,7 +221,7 @@ firebase.auth().onAuthStateChanged(function (u) {
    주소 끝(#forms · #forms:{양식} · #co · #arc)에 적어 두어 새로고침해도 보던 자리로 돌아온다.
    ⚠ 칸마다 «처음 열 때» 한 번만 싣는다 — 전자송부만 쓰는 날엔 양식 표·보관함을 받지 않는다. */
 var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc' };
-var formsMounted = false, mounted = {};
+var formsMounted = false, formsUi = null, mounted = {};
 var docBucket = null, photosReady = null;
 function paneFromHash() {
   var h = location.hash;
@@ -246,6 +246,7 @@ function officeHost() {
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
 function onFormSelect(id) {
+  if (!id && $('paneForms').hidden) return;
   var h = id ? '#forms:' + encodeURIComponent(id) : '#forms';
   if ($('paneForms').hidden) { history.pushState(null, '', h); showPane('forms'); }
   else if (location.hash !== h) history.replaceState(null, '', h);
@@ -260,7 +261,7 @@ function showPane(name) {
   if (!curUser) return;
   if (name === 'forms' && !formsMounted) {
     formsMounted = true;
-    PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(),
+    formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(),
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal });
   }
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
@@ -269,17 +270,25 @@ function showPane(name) {
 document.querySelectorAll('.side .nav').forEach(function (b) {
   b.addEventListener('click', function () {
     var name = b.getAttribute('data-pane');
+    /* ⚠ 칸이 이미 그 칸이면(예: #forms:x 에서 「계약서 양식」을 다시 누름) 화면은
+       안 바뀐다 — 그런데도 새 걸음을 심으면, 뒤로가기가 «화면이 그대로인 채»
+       popstate 만 일으켜 pu-back.js 가 앱을 나가 버린다(대표 제보). 그럴 땐 그냥
+       다시 그린다 — 걸음을 심지 않는다. */
+    if (paneFromHash() === name) { showPane(name); return; }
     var want = name === 'esign' ? '' : '#' + name;
     if (location.hash !== want) history.pushState(null, '', want || (location.pathname + location.search));
     showPane(name);
   });
 });
 /* 뒤로가기로 칸을 바꿨으면 «우리가 처리했다»고 알린다 — 안 그러면 js/pu-back.js 가
-   같은 한 번 누름에 앱까지 나간다(칸이 그대로일 때는 그쪽이 덮개를 닫거나 나간다). */
+   같은 한 번 누름에 앱까지 나간다(칸이 그대로일 때는 그쪽이 덮개를 닫거나 나간다).
+   ⚠ 양식 칸에서는 칸은 안 바뀌어도 «고른 양식»이 바뀔 수 있다(#forms:x → #forms:y) —
+     그때도 우리가 처리했다고 알려야 한다(formsUi.current() 로 견준다). */
 window.addEventListener('popstate', function () {
-  var want = paneFromHash();
-  if ($(PANES[want]).hidden) window.__puBackNav = true;
+  var want = paneFromHash(), fc = want === 'forms' && formsUi && formsUi.current() !== formFromHash();
+  if ($(PANES[want]).hidden || fc) window.__puBackNav = true;
   showPane(want);
+  if (fc) formsUi.select(formFromHash());
 });
 
 // ── 사건 목록 ──

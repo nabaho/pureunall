@@ -205,13 +205,13 @@
         if (!rows.length) { tableBox.appendChild(el('div', { 'class': 'pod-empty', text: S.rows.length ? '찾는 파일이 없습니다' : '아직 보관된 원본이 없습니다 — 계약서 양식이나 기업별 계약서에 파일을 올리면 여기 쌓입니다' })); return; }
         tableBox.appendChild(el('table', null, [
           el('thead', null, [el('tr', null, [el('th', { style: 'width:34%', text: '파일' }), el('th', { text: '연결' }),
-            el('th', { style: 'width:70px', text: '크기' }), el('th', { style: 'width:92px', text: '올린 날' }), el('th', { style: 'width:80px', text: '올린 사람' }), el('th', { style: 'width:56px', text: '' })])]),
+            el('th', { style: 'width:70px', text: '크기' }), el('th', { style: 'width:92px', text: '올린 날' }), el('th', { style: 'width:80px', text: '올린 사람' }), el('th', { style: 'width:64px', text: '' })])]),
           el('tbody', null, rows.map(function (r) {
             return el('tr', null, [
               el('td', { title: r.name, text: '📄 ' + r.name }),
               el('td', { 'class': r.gone ? 'gone' : null, title: r.link, text: r.link }),
               el('td', { text: fmtSize(r.size) }), el('td', { text: ymd(r.at) }), el('td', { text: r.byName }),
-              el('td', null, [el('button', { type: 'button', 'class': 'pod-b', title: '내려받기', 'aria-label': r.name + ' 내려받기', text: '📥', onclick: function () { host.download(r.id, r.name); } })])
+              el('td', { style: 'overflow:visible' }, [el('button', { type: 'button', 'class': 'pod-b', title: '내려받기', 'aria-label': r.name + ' 내려받기', text: '📥', onclick: function () { host.download(r.id, r.name); } })])
             ]);
           }))
         ]));
