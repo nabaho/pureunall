@@ -5688,9 +5688,50 @@ const PDF_WORKER_HERE = 'vendor/pdf.worker.min.js';
 const PDF_LIB_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const PDF_WORKER_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+/* ══════ 외부 예비 길의 «지문» (대표 지시 2026-09-27 사진첩 점검 ④) ══════
+   외부 서버(cdnjs·unpkg·jsdelivr)가 털리면, 신분증을 다루는 이 화면에서 남의 코드가 돈다.
+   지문(SRI)을 달면 브라우저가 받은 파일을 이 값과 견주고, 한 바이트라도 다르면 «실행하지 않는다».
+   ★ 부품 아홉은 저장소 사본(vendor/)을 «먼저» 싣는다. 외부는 사본을 못 읽었을 때만 가는
+     예비 길이다 — 평소에는 외부를 안 거친다. 이 표는 그 예비 길을 잠근다.
+   ★ 값은 2026-09-27 에 외부에서 받아 뽑았다. 그리고 저장소 사본(git 원본)과 «한 바이트까지
+     같음»을 확인했다 — 서로 따로 받아 둔 두 곳이 같으니 받는 도중 끼어든 것이 없다.
+     검사가 사본으로 이 값을 다시 셈한다(tests/photos-cdn-sri.test.js).
+   ⚠ 판 번호를 올리면 이 값도 바꿔야 한다. 안 바꾸면 예비 길이 «막힌다»(새지는 않는다).
+   ⚠ 지문을 못 다는 것 — PDF 일꾼(PDF_WORKER_CDN)은 pdf.js 가 new Worker 로 연다.
+     글자인식 도구(Tesseract)도 본체만 잠근다: 본체가 스스로 받는 일꾼·core·글자 사전은
+     구조상 지문을 못 단다. 셋 다 «판이 정확히 고정»돼 있어 몰래 새 판이 끼어들지는 않는다. */
+const CDN_SRI = {
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js':
+    'sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e',
+  'https://unpkg.com/heic2any@0.0.4/dist/heic2any.min.js':
+    'sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL',
+  'https://unpkg.com/utif@3.1.0/UTIF.js':
+    'sha384-RyBmXHdfZ/Uon+ud+/AqSyWpUWnKYt2tkRG/P4gWoRUGDU+qIAV3tGBPNlYTBZEF',
+  'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js':
+    'sha384-rNlaE5fs9dGIjmxWDALQh/RBAaGRYT5ChrzHo6tRfgrZ36iRFAiquP5g41Jsv+0j',
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js':
+    'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG',
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js':
+    'sha384-jrOgQzBlDeUNdmQn3rUt/PZD+pdcRBdWd/HWRqRo+n2OR2QtGyjSaJC0GiCeH+ir',
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css':
+    'sha384-6LFfkTKLRlzFtgx8xsWyBdKGpcMMQTkv+dB7rAbugeJAu1Ym2q1Aji1cjHBG12Xh',
+  'https://cdn.jsdelivr.net/npm/fabric@7.4.0/dist/index.min.js':
+    'sha384-T2IWa4YW4tn/gJpR880CrMehXQvwxwaRgQszdzYPA6jBbKH9sPZuTf9YrN/PqNP6',
+  'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js':
+    'sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F'
+};
+function sriOf(url) { return CDN_SRI[String(url || '')] || ''; }
+/* 지문을 단다 — 교차 출처로 받아야 브라우저가 견줄 수 있다(없으면 지문이 있어도 막힌다) */
+function sriPut(el, url) {
+  const h = sriOf(url);
+  if (!h) return;
+  el.integrity = h;
+  el.crossOrigin = 'anonymous';
+}
 function loadScriptOnce(src) {
   return new Promise(function (res, rej) {
     const s = document.createElement('script');
+    sriPut(s, src);                          // 🔒 외부면 지문을 단다(저장소 사본은 표에 없다)
     s.src = src;
     s.onload = res;
     s.onerror = function () { rej(new Error(src)); };
@@ -8607,6 +8648,7 @@ function rrnOcrLoad() {
   if (_rrnLibP) return _rrnLibP;
   _rrnLibP = new Promise(function (res, rej) {
     const sc = document.createElement('script');
+    sriPut(sc, RRN_OCR_LIB);                 // 🔒 신분증 원본을 읽는 도구다 — 본체를 잠근다
     sc.src = RRN_OCR_LIB;
     sc.onload = function () {
       if (window.Tesseract) { res(window.Tesseract); return; }
@@ -17998,6 +18040,7 @@ function loadCssOnce(href) {
   return new Promise(function (res, rej) {
     if (document.querySelector('link[data-css="' + href + '"]')) { res(); return; }
     const l = document.createElement('link');
+    sriPut(l, href);                         // 🔒 외부면 지문을 단다
     l.rel = 'stylesheet'; l.href = href; l.setAttribute('data-css', href);
     l.onload = function () { res(); };
     l.onerror = function () { rej(new Error(href)); };
