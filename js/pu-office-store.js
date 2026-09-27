@@ -158,12 +158,9 @@
   }
   function updateCoDoc(key, docId, patch) {
     needDb();
-    return deps.db.ref(ROOT + '/co_docs/' + key + '/' + docId).transaction(function (cur) {
-      var updates = clean({
-        title: patch.title == null ? undefined : String(patch.title).slice(0, 120),
-        date: patch.date == null ? undefined : String(patch.date).slice(0, 10) });
-      return Object.assign({}, cur || {}, updates);
-    });
+    return deps.db.ref(ROOT + '/co_docs/' + key + '/' + docId).update(clean({
+      title: patch.title == null ? undefined : String(patch.title).slice(0, 120),
+      date: patch.date == null ? undefined : String(patch.date).slice(0, 10) }));
   }
   function unlinkCoDoc(key, docId) {
     needDb();

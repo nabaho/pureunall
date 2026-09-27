@@ -39,12 +39,25 @@ function fakeDb() {
     return Object.keys(o);
   }
   function get(p) {
-    if (store[p] !== undefined) return JSON.parse(JSON.stringify(store[p]));
+    let result = store[p];
+    if (result !== undefined) {
+      result = JSON.parse(JSON.stringify(result));
+    }
     const ks = kids(p);
-    if (!ks.length) return null;
-    const o = {};
-    ks.forEach((k) => { o[k] = get(p + '/' + k); });
-    return o;
+    if (!ks.length) {
+      if (result !== undefined) return result;
+      return null;
+    }
+    // We have child keys — merge with parent if it exists
+    if (result === undefined) {
+      const o = {};
+      ks.forEach((k) => { o[k] = get(p + '/' + k); });
+      return o;
+    } else {
+      // Merge: overlay child keys on parent object
+      ks.forEach((k) => { result[k] = get(p + '/' + k); });
+      return result;
+    }
   }
   function put(p, v) {
     Object.keys(store).forEach((k) => { if (k === p || k.indexOf(p + '/') === 0) delete store[k]; });
@@ -195,6 +208,20 @@ test('빈 회사 이름은 거절', async () => {
   const S = load(); const db = fakeDb();
   S.init({ db, storage: fakeStorage(), uid: 'u1', name: '' });
   await assert.rejects(S.addCoDoc({ coName: '  ', fileId: 'x', title: 't', date: '', src: 'upload' }), /회사/);
+});
+
+test('updateCoDoc 는 title 만 바꾸고 fileId·src·date 는 그대로', async () => {
+  const S = load(); const db = fakeDb(); const st = fakeStorage();
+  S.init({ db, storage: st, uid: 'u1', name: '홍길동' });
+  const f = await S.putOriginal(file('c.pdf', 'c'), { kind: 'co', coKey: S.coKey('가나상사'), coName: '가나상사' });
+  const a = await S.addCoDoc({ coName: '가나상사', fileId: f.fileId, title: '원본 계약서', date: '2026-03-02', src: 'upload' });
+  // 제목만 바꿈
+  await S.updateCoDoc(a.coKey, a.docId, { title: '수정된 계약서' });
+  const doc = out(await S.listCoDocs(a.coKey)).filter((d) => d.id === a.docId)[0];
+  assert.equal(doc.title, '수정된 계약서', '제목이 바뀌어야 함');
+  assert.equal(doc.fileId, f.fileId, '★ fileId가 사라졌습니다');
+  assert.equal(doc.src, 'upload', '★ src가 사라졌습니다');
+  assert.equal(doc.date, '2026-03-02', '★ date가 사라졌습니다');
 });
 
 test('isDenied — 권한 거절을 알아본다', () => {
