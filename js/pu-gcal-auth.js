@@ -191,6 +191,38 @@
     return Math.round((Date.UTC(+y[1], +y[2] - 1, +y[3]) - Date.UTC(+x[1], +x[2] - 1, +x[3])) / 86400000);
   }
 
+  /* 구글 일정 하나를 새로 만든다 (2026-09-27 — 폰 «구글 캘린더 위젯»에도 뜨게).
+     ev = { date:'YYYY-MM-DD', time:'HH:MM'(없으면 종일), summary, location, description, source:{kind,id} }
+     ⚠ 시각이 있으면 한 시간짜리로 만든다(끝 시각을 묻지 않는다 — 구글 기본과 같다).
+     ⚠ 어디서 왔는지(명함 번호)는 extendedProperties 에 남긴다 — 이름으로 잇지 않는다(온톨로지). */
+  function createEvent(calId, ev, opt) {
+    ev = ev || {};
+    if (!calId) return Promise.reject(new Error('달력을 모릅니다'));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ev.date || ''))) return Promise.reject(new Error('날짜가 올바르지 않습니다'));
+    if (!String(ev.summary || '').trim()) return Promise.reject(new Error('무슨 일인지가 없습니다'));
+    var 몸 = { summary: String(ev.summary).trim() };
+    if (ev.location) 몸.location = String(ev.location);
+    if (ev.description) 몸.description = String(ev.description);
+    if (/^\d{2}:\d{2}$/.test(String(ev.time || ''))) {
+      var h = +ev.time.slice(0, 2), mi = ev.time.slice(3, 5);
+      var 끝날 = h >= 23 ? addDays(ev.date, 1) : ev.date;
+      var 끝시 = ('0' + ((h + 1) % 24)).slice(-2);
+      몸.start = { dateTime: ev.date + 'T' + ev.time + ':00', timeZone: 'Asia/Seoul' };
+      몸.end = { dateTime: 끝날 + 'T' + 끝시 + ':' + mi + ':00', timeZone: 'Asia/Seoul' };
+    } else {
+      몸.start = { date: ev.date };
+      몸.end = { date: addDays(ev.date, 1) };
+    }
+    if (ev.source && ev.source.kind && ev.source.id) {
+      몸.extendedProperties = { private: { puSourceKind: String(ev.source.kind), puSourceId: String(ev.source.id) } };
+    }
+    return apiCall('POST', '/calendars/' + encodeURIComponent(calId) + '/events?sendUpdates=none', 몸, opt)
+      .then(function (r) {
+        if (!r || !r.id) throw new Error('구글이 만들었다고 대답하지 않았습니다');
+        return { created: true, id: r.id };
+      });
+  }
+
   /* 이어진 구글 일정을 지운다. 이어진 것이 없으면 «할 일이 없다»(성공으로 본다). */
   function deleteEvent(calId, eventId, opt) {
     if (!eventId || !calId) return Promise.resolve({ skipped: true });
@@ -202,6 +234,6 @@
 
   return {
     hasToken: hasToken, token: token, capture: capture,
-    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent
+    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent
   };
 });
