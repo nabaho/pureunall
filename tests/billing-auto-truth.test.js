@@ -47,9 +47,22 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
      2026-09-09 거래처 뉴스레터 월요일 자동발송(확정본이 있을 때만)이 늘어 여덟이 됐다.
      2026-09-11 지역뉴스 검토후보 수집(아침 7:10)이 늘어 아홉이 됐다.
      2026-09-26 취업규칙 법 개정 확인(새벽 6:00, rulesLawWatch)이 늘어 열이 됐다.
+     2026-09-27 메일 열기 따뜻하게 두기(업무 시간 3분마다, mailKeepWarm)가 늘어 열하나가 됐다 —
+       대표 지시 「메일을 열면 늦게 나온다 — 완전히 고쳐라」. 업무 시간에만 돌아 아래 292 에는 안 넣고
+       화면에 «따로» 적었다.
      화면 문구도 같이 고쳤다. 다음에 또 늘면 여기와 화면을 함께 고쳐야 한다. */
   const all = (FIDX + FSYNC).match(/\.pubsub\.schedule\(/g) || [];
-  assert.strictEqual(all.length, 10, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  assert.strictEqual(all.length, 11, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  /* ☕ 따뜻하게 두기 — 화면에 적힌 «언제·몇 분마다·하루 몇 번»이 코드와 같아야 한다 */
+  const kw = FSYNC.slice(FSYNC.indexOf('mailKeepWarm: F'), FSYNC.indexOf('mailKeepWarm: F') + 900);
+  const cron = (kw.match(/\.pubsub\.schedule\('(\*\/(\d+) (\d+)-(\d+) \* \* 1-6)'\)/) || []);
+  assert.ok(cron[1], '따뜻하게 두기 주기를 못 읽음: ' + kw.slice(0, 200));
+  const every = +cron[2], h0 = +cron[3], h1 = +cron[4];
+  const perDayWarm = Math.round(60 / every) * (h1 - h0 + 1);
+  assert.ok(ENTER.indexOf('업무 시간(월~토 ' + h0 + '~' + (h1 + 1) + '시)') >= 0, '따뜻하게 두기 시간대가 화면과 다르다');
+  assert.ok(ENTER.indexOf(every + '분마다 하루 <b>' + perDayWarm + '번</b>') >= 0
+    || ENTER.indexOf(every + '분마다 하루 ' + perDayWarm + '번') >= 0,
+    '따뜻하게 두기 횟수가 화면과 다르다 (코드 셈: ' + every + '분마다 하루 ' + perDayWarm + '번)');
   assert.ok(ENTER.indexOf('거래처 뉴스레터 월요일 한 번') >= 0,
     '새 자동 일정이 화면 설명에 없습니다');
   assert.ok(ENTER.indexOf('지역뉴스 후보 모으기 하루 한 번') >= 0,

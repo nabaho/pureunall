@@ -729,10 +729,25 @@ async function runSync(deps, opts) {
 /* ── 폴더 하나를 열어 무엇인가 하기 ──
    ⚠ write 를 켜지 않으면 읽음 표시도, 옮기기도 못 한다. 그래서 부르는 쪽이
      「고칠 일이 있는가」를 밝혀야 한다. 기본은 읽기 전용이다 — 실수로 켜지지 않게. */
+/* ★ 폴더 주소를 «그릇 안에» 잠깐 담아 둔다 (2026-09-27, 대표 지시 「메일을 열면 늦게 나온다」).
+     실시간DB 는 미국(us-central1)에 있고 이 함수는 서울에서 돈다 — 메일 한 통을 열 때마다
+     «폴더 주소 묻기» 왕복(150~300ms)이 본문보다 먼저 줄을 섰다. 주소는 폴더 이름을
+     바꾸지 않는 한 그대로다.
+   ⚠ 오래 담지 않는다(10분) — 대표가 다음메일에서 폴더 이름을 바꾸면 곧 따라가야 한다.
+   ⚠ 틀린 주소로 실패하면 곧바로 버린다(withFolder 가 folderPathForget 을 부른다) —
+     다음 부름은 새로 묻는다. 낡은 주소 때문에 «계속» 실패하는 일은 없다. */
+const PATH_TTL_MS = 10 * 60 * 1000;
+const _pathCache = new Map();          /* slug → { path, at } */
+function folderPathForget(slug) {
+  if (slug === undefined) _pathCache.clear(); else _pathCache.delete(String(slug));
+}
 async function folderPath(deps, slug) {
+  const hit = _pathCache.get(String(slug));
+  if (hit && (nowMs() - hit.at) < PATH_TTL_MS) return hit.path;
   const snap = await deps.getDatabase().ref(ROOT + '/folders/' + slug + '/path').once('value');
   const path = String(snap.val() || '');
-  if (!path) { const e = new Error('그 폴더를 찾지 못했습니다'); e.status = 404; throw e; }
+  if (!path) { _pathCache.delete(String(slug)); const e = new Error('그 폴더를 찾지 못했습니다'); e.status = 404; throw e; }
+  _pathCache.set(String(slug), { path: path, at: nowMs() });
   return path;
 }
 
@@ -832,8 +847,10 @@ async function withFolder(deps, slug, fn, opts) {
       }
     } catch (e) {
       lastErr = e;
-      /* 물려받은 것이 죽어 실패했을 때만 다시 해 본다 — 새로 붙어서도 실패했으면 진짜다 */
-      if (!got.reused || attempt >= 1) throw e;
+      /* 물려받은 것이 죽어 실패했을 때만 다시 해 본다 — 새로 붙어서도 실패했으면 진짜다.
+         ⚠ 진짜 실패면 담아 둔 폴더 주소를 «버린다» — 폴더 이름이 바뀌어 낡은 주소로
+           실패했을 수 있다. 안 버리면 10분 내내 같은 자리에서 넘어진다. */
+      if (!got.reused || attempt >= 1) { folderPathForget(slug); throw e; }
       console.warn('withFolder 물려받은 연결이 죽어 다시 붙습니다:', String((e && e.message) || e));
     } finally {
       if (!warmDone(client, ok)) {
@@ -1100,6 +1117,76 @@ module.exports = function build(deps) {
     }
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     ☕ «따뜻하게 두기» (2026-09-27, 대표 지시 「메일을 열면 전송이 늦어 메일이 늦게 나온다
+        — 완전히 고쳐라」)
+     ══════════════════════════════════════════════════════════════════════════
+     ★ 실측 2026-09-27 (서버 기록 MB_TIME)
+         식은 그릇 · 새로 붙음    connect 784~911ms · 전체 2,558~2,799ms
+         따뜻한 그릇 · 물려받음   connect 0ms        · 전체   691~  791ms
+       메일함은 하루에 몇 번 여는 자리라 «거의 매번 식어 있었다». 그릇이 깨어나는 값(서버
+       묶음 싣기 0.9초+)과 다음메일에 새로 붙는 값(0.8초)을 사람이 그대로 기다렸다.
+     ★ 업무 시간에만 3분마다 메일 열기 함수를 «살짝» 두드린다(mailKeepWarm).
+       두드리면 ①그릇이 식지 않고 ②붙어 둔 다음메일 연결이 NOOP 으로 살아 있고
+       (WARM_IDLE_MS 4분 안) ③폴더 주소가 미리 담긴다.
+     ⚠ 아무나 두드리지 못하게 «서명»을 본다 — 서명은 다음메일 비밀번호로 만든 HMAC 이다.
+       비밀번호를 아는 쪽(우리 서버)만 만들 수 있고, 서명에서 비밀번호는 거꾸로 안 나온다.
+       두드림이 하는 일은 «연결을 살려 두기»뿐이라 새어 나갈 것도 없다(메일을 안 읽는다).
+     ⚠ 1세대 함수는 한 그릇에 한 부름씩이다 — 두드림은 NOOP 한 번(수십 ms)이라
+       사람의 부름과 부딪힐 일이 드물고, 부딪혀도 새 그릇이 하나 더 뜰 뿐이다. */
+  const WARM_MSG = 'pu-mail-warm-v1';
+  function warmSig() {
+    const pass = deps.mailPass();
+    if (!pass) return '';
+    return require('crypto').createHmac('sha256', pass).update(WARM_MSG).digest('hex');
+  }
+  function warmAsked(req) {
+    return !!(req && req.method === 'POST' && req.headers && req.headers['x-pu-warm']);
+  }
+  function warmSigOk(req) {
+    const want = warmSig();
+    const got = String((req.headers && req.headers['x-pu-warm']) || '');
+    if (!want || got.length !== want.length) return false;
+    try { return require('crypto').timingSafeEqual(Buffer.from(got), Buffer.from(want)); }
+    catch (_) { return false; }
+  }
+  /* 폴더 주소를 통째로 한 번 담는다 — 메일 열 때 «폴더 주소 묻기» 왕복이 아예 없어진다.
+     ⚠ 담은 지 절반(5분)이 지났을 때만 새로 읽는다 — 3분마다 7KB 를 미국에서 받을 까닭은 없다. */
+  async function warmPaths() {
+    let oldest = Infinity;
+    _pathCache.forEach((v) => { if (v.at < oldest) oldest = v.at; });
+    if (_pathCache.size && (nowMs() - oldest) < PATH_TTL_MS / 2) return 0;
+    const all = (await deps.getDatabase().ref(ROOT + '/folders').once('value')).val() || {};
+    let n = 0;
+    Object.keys(all).forEach((slug) => {
+      const p = String((all[slug] || {}).path || '');
+      if (p) { _pathCache.set(String(slug), { path: p, at: nowMs() }); n++; }
+    });
+    return n;
+  }
+  async function warmReply(req, res) {
+    if (!warmSigOk(req)) { reply(res, 403, { ok: false, warm: true }); return; }
+    const out = { ok: false, warm: true, reused: false, paths: 0 };
+    try { out.paths = await warmPaths(); } catch (e) { /* 폴더 주소는 열 때 물어도 된다 */ }
+    const user = await deps.mailUserAsync();
+    const pass = deps.mailPass();
+    if (!user || !pass) { reply(res, 200, out); return; }
+    let got = null;
+    try {
+      got = await warmConnect(deps, user, pass);
+      out.reused = !!got.reused;
+      await got.client.noop();
+      out.ok = true;
+    } catch (e) {
+      console.warn('mailKeepWarm 연결을 못 살렸습니다:', String((e && e.message) || e).slice(0, 200));
+    } finally {
+      if (got && !warmDone(got.client, out.ok)) {
+        try { await got.client.logout(); } catch (_) { /* 이미 끊겼다 */ }
+      }
+    }
+    reply(res, 200, out);
+  }
+
   return {
     /* ══════ 자동 — 10분마다 ══════
        보낸 메일까지 함께 따라오게 하려면 자주 봐야 한다. 붙는 값이 싸다(목록만). */
@@ -1113,6 +1200,34 @@ module.exports = function build(deps) {
       .onRun(async () => {
         const r = await runSync(deps, { deadlineMs: 460000 });
         console.log('syncMailbox', r);
+        return null;
+      }),
+
+    /* ══════ ☕ 메일 열기 함수를 따뜻하게 (2026-09-27) — 까닭은 위 warmReply 머리글 ══════
+       ⚠ 업무 시간에만 돈다(월~토 08:00~19:57) — 밤에 두드리면 아무도 안 여는 메일을 위해
+         연결만 붙들고 있는 셈이다.
+       ⚠ 3분마다다 — 붙어 둔 연결을 버리는 잣대(WARM_IDLE_MS 4분)보다 짧아야 연결이 산다.
+       ⚠ 요금은 사실상 0 — 한 달 약 6천 번 × NOOP 한 번이라 무료 몫(200만 번) 안이다.
+       ⚠ 실패해도 아무 일 없다 — 다음 3분 뒤에 또 두드린다. 메일 열기는 예전처럼 저절로 붙는다. */
+    mailKeepWarm: F
+      .region(REGION)
+      .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 60, memory: '256MB' })
+      .pubsub.schedule('*/3 8-19 * * 1-6')
+      .timeZone('Asia/Seoul')
+      .onRun(async () => {
+        const sig = warmSig();
+        if (!sig) { console.warn('mailKeepWarm 비밀값이 없습니다'); return null; }
+        const project = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'pureun-erp';
+        const url = 'https://' + REGION + '-' + project + '.cloudfunctions.net/readMailMessage';
+        try {
+          const r = await fetch(url, { method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-pu-warm': sig },
+            body: JSON.stringify({ warm: 1 }) });
+          const j = await r.json().catch(() => ({}));
+          console.log('mailKeepWarm', r.status, JSON.stringify(j));
+        } catch (e) {
+          console.warn('mailKeepWarm 두드리지 못했습니다:', String((e && e.message) || e).slice(0, 200));
+        }
         return null;
       }),
 
@@ -1133,7 +1248,9 @@ module.exports = function build(deps) {
     readMailMessage: F
       .region(REGION)
       .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 120, memory: '512MB' })
-      .https.onRequest((req, res) => gate(req, res, async () => {
+      /* ☕ 서명 붙은 두드림(mailKeepWarm)은 문지기(gate) «앞»에서 받는다 — 직원 증표가 없는
+           서버끼리의 부름이다. 서명이 틀리면 403 이고, 맞아도 메일은 한 글자도 안 읽는다. */
+      .https.onRequest((req, res) => warmAsked(req) ? warmReply(req, res) : gate(req, res, async () => {
         const b = req.body || {};
         const slug = String(b.slug || '');
         const uid = String(b.uid || '');
@@ -1152,12 +1269,20 @@ module.exports = function build(deps) {
              ★ peek 이면 «아무것도 안 건드린다» (2026-08-30) — 앱이 다음·이전 통을
                미리 받아 둘 때 쓰는 길이다. 미리 받았다고 안 읽은 메일이 읽음으로
                바뀌면, 대표께서 열어 보시지도 않은 메일이 조용히 사라진 것처럼 된다. */
+          /* ★ 목록 쪽 표시(실시간DB)는 본문과 «함께» 적는다 (2026-09-27, 대표 지시
+               「메일을 열면 전송이 늦어 메일이 늦게 나온다」). 실시간DB 는 미국에 있어
+               한 번 적는 데 150~300ms 인데, 예전에는 그것을 «다 기다린 뒤에야» 본문을
+               받으러 갔다 — 사람은 읽음 표시가 아니라 본문을 기다리고 있다.
+             ⚠ 기다리기는 한다(맨 끝 markDb) — 1세대 함수는 답을 보낸 뒤의 일을
+               끝까지 해 준다는 보장이 없다. 다만 «본문 받는 동안» 같이 간다. */
+          let markDb = null;
           if (!peek) {
             try { await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true }); } catch (_) { /* 표시만 못 했다 */ }
-            try {
-              await deps.getDatabase().ref(ROOT + '/msgs/' + slug + '/' + uid + '/r').set(1);
-            } catch (_) { /* 목록 쪽 표시는 다음 회차에 맞춰진다 */ }
+            markDb = Promise.resolve()
+              .then(() => deps.getDatabase().ref(ROOT + '/msgs/' + slug + '/' + uid + '/r').set(1))
+              .catch(() => { /* 목록 쪽 표시는 다음 회차에 맞춰진다 */ });
           }
+          const done = async (o) => { if (markDb) await markDb; return o; };
 
           /* ── 첨부 목록은 «한 벌»로 만든다 (2026-08-27) ──
              ⚠ 예전에는 작은 메일은 mailparser 가, 첨부를 내려받는 쪽은 pickParts 가
@@ -1173,7 +1298,7 @@ module.exports = function build(deps) {
             const { simpleParser } = require('mailparser');
             const one = await client.fetchOne(uid, { uid: true, source: true }, { uid: true });
             const p = await simpleParser(one.source);
-            return { html: p.html || '', text: String(p.text || ''), atts: atts, full: true };
+            return done({ html: p.html || '', text: String(p.text || ''), atts: atts, full: true });
           }
 
           /* 큰 메일 — 본문 부분만.
@@ -1188,7 +1313,7 @@ module.exports = function build(deps) {
             const d = await client.download(uid, parts.text, { uid: true });
             text = MB.toText(await drain(d.content, BODY_FULL_MAX), parts.textCs);
           }
-          return { html: html, text: text, atts: atts, full: false };
+          return done({ html: html, text: text, atts: atts, full: false });
         }, { write: true });
 
         reply(res, 200, Object.assign({ ok: true }, got));
@@ -1212,6 +1337,8 @@ module.exports = function build(deps) {
         if (['create', 'rename', 'delete'].indexOf(act) < 0) {
           reply(res, 400, { ok: false, error: '알 수 없는 작업입니다.' }); return;
         }
+        /* 폴더가 바뀌는 자리다 — 담아 둔 폴더 주소(folderPath)를 이 그릇에서는 통째로 버린다 */
+        folderPathForget();
         const db = deps.getDatabase();
         const all = (await db.ref(ROOT + '/folders').once('value')).val() || {};
         /* 구분자는 폴더 기록에서 가져온다 — 서버마다 다르다(/ 인 곳도, . 인 곳도). */

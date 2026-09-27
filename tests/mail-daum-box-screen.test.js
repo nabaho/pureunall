@@ -669,8 +669,19 @@ test('★ 별을 누를 수 있다 — 보이는데 안 눌리면 고장으로 �
 });
 
 test('★ 읽음을 되돌릴 수 있다 — 열면 읽음이 되는데 되돌릴 길이 없었다', () => {
+  /* ⚠ 2026-09-27 — 다음메일처럼 「읽음 표시 ˅」 한 단추에 두 갈래(읽음 / 안 읽음)를 담았다.
+       지킬 것은 «안 읽음으로 되돌릴 길이 목록에 있다»이지 단추가 그 말을 곧장 부르느냐가 아니다. */
   const c = load({ folders: FOLDERS, msgs: MSGS });
-  assert.ok(c.mbBoxHtml().indexOf('mbReadMark(false)') > 0, '안읽음으로 되돌릴 길이 없다');
+  const html = c.mbBoxHtml();
+  const direct = html.indexOf('mbReadMark(false)') > 0;
+  const viaMenu = html.indexOf('mbReadMenu(') > 0 && /mbReadMark\(false\)/.test(src.slice(src.indexOf('function mbReadMenu('), src.indexOf('function mbReadMenu(') + 900));
+  assert.ok(direct || viaMenu, '안읽음으로 되돌릴 길이 없다');
+});
+
+test('★★ 「읽음 표시 ˅」 는 «읽음으로»도 된다 — 쌓인 안 읽은 메일을 한꺼번에 치운다 (2026-09-27)', () => {
+  const m = src.slice(src.indexOf('function mbReadMenu('), src.indexOf('function mbReadMenu(') + 900);
+  assert.match(m, /mbReadMark\(true\)/, '★ 읽음으로 표시하는 갈래가 없다 — 다음메일에는 있다');
+  assert.match(m, /mbReadMark\(false\)/, '★ 안 읽음으로 되돌리는 갈래가 없다');
 });
 
 test('★ 답장은 「RE:」를 겹쳐 붙이지 않는다 — RE: RE: RE: 가 쌓인다', () => {

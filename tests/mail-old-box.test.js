@@ -75,7 +75,10 @@ test('★★★ 주소 규칙이 걸린 지난 메일이 «어느 칸에도 안 
 /* ══════ ③ POP3 창구 ══════ */
 
 test('★★ 본문은 POP3 창구로 간다 — IMAP 에는 그 메일이 없다', () => {
-  const f = sliceFn(app, 'function mbFetchBody(').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  /* ⚠ 2026-09-27 — 「받는 중인 통은 한 번만」(mbFetchBody) 과 «실제로 부르기»(mbFetchBodyNow)를
+       갈랐다. 창구를 고르는 자리는 부르는 쪽이다 — 두 함수를 함께 본다. */
+  const f = (sliceFn(app, 'function mbFetchBody(') + '\n' + sliceFn(app, 'function mbFetchBodyNow('))
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
   const iOld = f.indexOf('slug === MB_OLD_ID');
   const iImap = f.indexOf("readMailMessage");
   assert.ok(iOld > 0, '지난 메일을 안 가릅니다');

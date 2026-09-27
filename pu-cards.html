@@ -4086,7 +4086,8 @@ const Store = {
           }
           /* 익명 세션은 건드리지 않음 — 컨설팅 등 다른 앱이 읽기용으로 쓰는 세션을
              여기서 signOut하면 그 앱이 다시 익명 로그인 → 무한 핑퐁으로 전체가 튕김 */
-          else { showCardsLogin(); }
+          /* 📬 다른 앱에서 로그아웃해도(통합 로그인) 메일 씨앗은 지운다 */
+          else { try{ if(!u) mbSeedDrop(); }catch(_){ } showCardsLogin(); }
         });
       } else subscribe();
     } else {
@@ -5048,6 +5049,8 @@ const _canon = s => String(s||'').replace(/^\s*\d+\s*[.)\-]?\s*/,'').replace(/\s
 function showCardsLogin(){ const el=$('cardsLogin'); if(el) el.style.display='none'; PuGate.show(); }
 function hideCardsLogin(){ const el=$('cardsLogin'); if(el) el.style.display='none'; PuGate.hide(); }
 function doLogoutCards(){
+  /* 📬 메일 씨앗은 로그아웃하면 지운다 — 메일 제목에는 남의 사건 내용이 든다(mbSeedGet 머리글) */
+  try{ mbSeedDrop(); }catch(_){ }
   try{ firebase.auth().signOut().finally(()=>location.replace('enter.html?v='+Date.now())); }
   catch(e){ location.replace('enter.html'); }
 }
@@ -5641,10 +5644,51 @@ function openMailWindow(id){
   const q = 'view=mail&to=' + encodeURIComponent(email)
           + '&name=' + encodeURIComponent(it.name || it.company || '')
           + '&card=' + encodeURIComponent(it.id);
+  /* ★★ 이미 떠 있는 메일 창은 «다시 싣지 않는다» (2026-09-27, 대표 지시 「팝업창이 너무 늦게 나온다」).
+       예전에는 window.open(주소, 이름) 으로 열었다 — 이름이 같으면 창은 하나로 유지되지만,
+       브라우저는 그 창을 «그 주소로 새로 싣는다». 곧 이메일을 누를 때마다 메일 창이
+       앱 전체(2MB)를 처음부터 다시 띄우고 로그인·자료 읽기를 되풀이했다.
+     ★ 이름만으로 먼저 창을 잡는다(window.open('', 이름) — 떠 있으면 «그대로» 돌려준다).
+       그 창이 우리 메일 창이고 로그인까지 되어 있으면, 받는 사람만 바꿔 쓰기를 연다
+       (puMailComposeTo). 아니면 예전처럼 주소를 싣는다.
+     ⚠ 딴 주소로 떠나 있는 창이면 location 을 읽는 순간 막힌다 — 그때도 주소를 싣는다. */
   let w = null;
-  try{ w = window.open('pu-cards.html?' + q, MAIL_WIN); }catch(_){}
+  try{ w = window.open('', MAIL_WIN); }catch(_){}
   if(!w) return openSendMaterials(id);        /* 팝업이 막혔다 — 예전 길로 */
+  let reused = false;
+  try{
+    if(w !== window && typeof w.puMailComposeTo === 'function')
+      reused = !!w.puMailComposeTo({ card: it.id, to: email, name: it.name || it.company || '' });
+  }catch(_){ reused = false; }
+  if(!reused){
+    try{ w.location.href = 'pu-cards.html?' + q; }
+    catch(_){ try{ w = window.open('pu-cards.html?' + q, MAIL_WIN) || w; }catch(__){} }
+  }
   try{ w.focus(); }catch(_){}
+}
+/* 떠 있는 메일 창이 받는 쪽 — 다른 창(openMailWindow)이 부른다.
+   ⚠ 로그인 전이면 «못 받는다»(false) — 부른 쪽이 주소를 새로 싣게 둔다.
+   ⚠ 쓰던 글은 버리지 않고 임시저장에 넘긴다 — 다음에 [메일쓰기]로 들어오면 「이어서 쓸까요?」로
+     되찾는다. 예전(창을 새로 싣던 때)에는 자동저장 틈에 쓴 글이 그대로 사라졌다.
+   ⚠ 여는 길은 restoreLastScreen 의 to= 갈래와 «똑같다» — 두 벌로 만들면 한쪽만 고친다. */
+function puMailComposeTo(o){
+  try{
+    if(!myUid && !myEmail) return false;
+    const card = String((o && o.card) || ''), to = String((o && o.to) || ''), name = String((o && o.name) || '');
+    if(!to) return false;
+    try{ if(_compose && composeTouched(_compose)) saveDraft(true); }catch(_){}
+    try{ history.replaceState(null, '', 'pu-cards.html?view=mail&to=' + encodeURIComponent(to)
+      + '&name=' + encodeURIComponent(name) + '&card=' + encodeURIComponent(card)); }catch(_){}
+    _compose = null;
+    mailComposeOpen({ card:card, to:to, name:name });
+    return true;
+  }catch(_){ return false; }
+}
+try{ window.puMailComposeTo = puMailComposeTo; }catch(_){}
+/* to= 로 들어온 쓰기를 여는 «한 곳» — 새로 실린 창(restoreLastScreen)과 떠 있던 창(puMailComposeTo)이 함께 쓴다 */
+function mailComposeOpen(t){
+  if(t.card && state.items && state.items[t.card]){ openSendMaterials(t.card, { asked:true }); return; }
+  openMailPage({ cardId:t.card, to:t.to, name:t.name, company:'', ids:[] });
 }
 /* opt.asked — 「이미 물어본 길」. 딴 창(openMailWindow)으로 건너온 뒤에는 다시 묻지
    않는다. 사람이 「메일」을 눌러 창까지 열린 뒤에 「메일을 쓸까요?」를 또 묻는 것은
@@ -10313,11 +10357,7 @@ function restoreLastScreen(){
            「메일을 쓸까요?」를 또 묻는 것은 뜻이 없다.
          ⚠ 명함이 아직 없으면(씨앗 없이 메일 문으로 바로 들어온 길) 예전 그대로
            openMailPage 로 간다 — 자료 고르기는 명함 없이는 못 연다. */
-      if(_to.card && state.items && state.items[_to.card]){
-        openSendMaterials(_to.card, { asked:true });
-        return;
-      }
-      openMailPage({ cardId:_to.card, to:_to.to, name:_to.name, company:'', ids:[] });
+      mailComposeOpen({ card:_to.card, to:_to.to, name:_to.name });
       return;
     }
     /* ★ 「이 사업장과 오간 것」으로 건너온 길 (?view=mail&mail=co&co=…).
@@ -16117,6 +16157,142 @@ function mbErrTell(){
   return '아직 볼 수 없습니다 — 파이어베이스 콘솔에 규칙을 넣어야 합니다 ('+_mbErr+')';
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   📬 메일함 씨앗 — 지난번 목록을 기기에 담아 두고 «먼저» 그린다
+   (2026-09-27, 대표 지시 「푸른메일함은 계속 팝업창이 너무 늦게 나온다 — 완전히 고쳐라」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 실측 2026-09-27 — 메일 창을 열면 «전체메일» 한 화면을 그리려고 받은 칸 25개에서
+     100통씩, 한 줄 437바이트 × 약 2,000줄 ≈ «1MB» 를 미국(us-central1) 실시간DB 에서
+     받아야 했다. 폴더 목록 → 쪽지(분류) 12자리 → 줄, 세 걸음이 끝나기 전까지 화면은
+     「읽고 있습니다…」였다. 캐시가 있으면 앱 자체는 0.37초에 서는데도 그랬다.
+   ★ 명함 씨앗(cardCacheGet)과 같은 길 — 지난번 받은 것을 기기(IndexedDB)에 두었다가
+     로그인이 붙자마자 그것으로 «먼저» 그리고, 최신본은 뒤에서 받아 갈아 끼운다.
+   ⚠ 그리는 것은 «로그인이 붙은 뒤»다(openMailBox 가 mbAuthOk 뒤에서 부른다) —
+     로그인 화면 뒤로 메일 목록이 먼저 비치면 안 된다.
+   ⚠ «본문 미리보기(p)»는 담지 않는다 — 기기에 남는 것을 줄인다. 제목·보낸이·때만 담고,
+     미리보기는 최신본이 오면 채워진다(1~2초).
+   ⚠ 로그아웃하면 지운다(mbSeedDrop) — 명함 씨앗과 달리 메일은 남의 사건 내용이 제목에 든다.
+   ⚠ 이레보다 오래된 씨앗은 안 쓴다 — 그렇게 묵은 목록은 먼저 보여 줘도 도움이 안 된다.
+   ⚠ 씨앗으로 그린 동안에도 메일은 열린다 — 여는 것은 폴더·번호로 서버에 직접 묻는다.
+     씨앗에 있던 메일이 그 사이 지워졌으면 「그 메일이 없습니다」가 뜨고, 1~2초 뒤 목록이
+     최신본으로 바뀐다. */
+const MB_SEED_KEY = 'mail-v1';
+const MB_SEED_MAX_AGE = 7 * 24 * 3600 * 1000;
+const MB_SEED_ROWS = 100;                 /* 칸마다 담는 줄 — 한 쪽 분량 */
+const MB_SEED_EVERY = 5 * 60 * 1000;      /* 이보다 자주 담지 않는다 — 1MB 를 매번 쓰면 화면이 멈칫한다 */
+let _mbSeeded = false;                    /* 지금 화면이 «씨앗»으로 그려져 있다 — 최신본을 받는 중 */
+let _mbSeedTried = false;                 /* 이 창에서 씨앗을 이미 한 번 찾아봤다 */
+let _mbSeedSavedAt = 0;
+let _mbSeedT = null;
+function mbSeedIdb(mode, fn){
+  try{
+    const rq = indexedDB.open('pu-cards-cache', 1);
+    rq.onupgradeneeded = e=>{ e.target.result.createObjectStore('kv'); };
+    rq.onsuccess = e=>{
+      const db = e.target.result;
+      try{ fn(db.transaction('kv', mode).objectStore('kv'), ()=>{ try{ db.close(); }catch(_){ } }); }
+      catch(_){ try{ db.close(); }catch(__){ } fn(null, ()=>{}); }
+    };
+    rq.onerror = ()=>fn(null, ()=>{});
+    rq.onblocked = ()=>fn(null, ()=>{});
+  }catch(_){ fn(null, ()=>{}); }
+}
+function mbSeedGet(cb){
+  let done = false; const fin = v=>{ if(!done){ done = true; cb(v); } };
+  /* ⚠ 기다림에 끝을 둔다 — 씨앗은 빠르게 하는 덤이지, 늦는다고 문이 잠기면 안 된다 */
+  setTimeout(()=>fin(null), 400);
+  mbSeedIdb('readonly', (st, close)=>{
+    if(!st){ fin(null); return; }
+    const g = st.get(MB_SEED_KEY);
+    g.onsuccess = ()=>{ const r = g.result; close();
+      fin(r && r.folders && r.msgs && (Date.now() - Number(r.at||0)) < MB_SEED_MAX_AGE ? r : null); };
+    g.onerror = ()=>{ close(); fin(null); };
+  });
+}
+function mbSeedDrop(){
+  mbSeedIdb('readwrite', (st, close)=>{ try{ if(st) st.delete(MB_SEED_KEY); }catch(_){ } setTimeout(close, 300); });
+}
+/* 담는다 — 받은 칸의 «최신 한 쪽»만, 미리보기는 빼고 */
+function mbSeedSave(){
+  if(_mbSeeded || !_mbFolders || _mbBins===null || _mbPut===null) return;   /* 씨앗 위에 씨앗을 담지 않는다 */
+  if(!mbAuthOk()) return;
+  _mbSeedSavedAt = Date.now();
+  const msgs = {};
+  Object.keys(_mbMsgs||{}).forEach(slug=>{
+    if(slug === MB_OLD_ID) return;                   /* 지난 메일은 제 칸에서 따로 읽는다 */
+    const box = _mbMsgs[slug] || {};
+    const keys = Object.keys(box).sort((a,b)=>Number(a)-Number(b)).slice(-MB_SEED_ROWS);
+    const o = {};
+    keys.forEach(k=>{ const v = box[k]; if(!v) return;
+      const c = Object.assign({}, v); delete c.p; o[k] = c; });
+    msgs[slug] = o;
+  });
+  const rec = { at: Date.now(), folders: _mbFolders, meta: _mbMeta || {}, msgs: msgs,
+    cfg: { bins:_mbBins, put:_mbPut, putBy:_mbPutBy, hide:_mbHide, owner:_mbOwner, succ:_mbSucc,
+           co:_mbCo, notCo:_mbNotCo, whoMsg:_mbWhoMsg, noWho:_mbNoWho, notSpam:_mbNotSpam,
+           spamOff:_mbSpamOff } };
+  mbSeedIdb('readwrite', (st, close)=>{ try{ if(st) st.put(rec, MB_SEED_KEY); }catch(_){ } setTimeout(close, 800); });
+}
+function mbSeedSaveSoon(){
+  if(Date.now() - _mbSeedSavedAt < MB_SEED_EVERY) return;
+  clearTimeout(_mbSeedT);
+  _mbSeedT = setTimeout(mbSeedSave, 1500);          /* 그리기가 끝난 뒤 조용할 때 */
+}
+/* 씨앗을 손에 들린 자리로 옮긴다 — 이미 받은 것이 있으면 안 덮는다 */
+function mbSeedApply(s){
+  if(!s || _mbFolders !== null) return false;
+  const c = s.cfg || {};
+  _mbFolders = s.folders || {}; _mbMeta = s.meta || {};
+  if(_mbBins === null){
+    _mbBins = c.bins||{}; _mbPut = c.put||{}; _mbPutBy = c.putBy||{}; _mbHide = c.hide||{};
+    _mbOwner = c.owner||{}; _mbSucc = c.succ||{}; _mbCo = c.co||{}; _mbNotCo = c.notCo||{};
+    _mbWhoMsg = c.whoMsg||{}; _mbNoWho = c.noWho||{}; _mbNotSpam = c.notSpam||{};
+    _mbSpamOff = (c.spamOff === true);
+    _mbBinsFromSeed = true;
+  }
+  Object.keys(s.msgs||{}).forEach(slug=>{ if(!_mbMsgs[slug]) _mbMsgs[slug] = s.msgs[slug] || {}; });
+  _mbSeeded = true;
+  return true;
+}
+/* 씨앗으로 그린 뒤 — 최신본을 받아 «갈아 끼운다». 받는 대로 다시 그린다.
+   ⚠ 값을 null 로 비웠다가 채우지 않는다 — 비우는 순간 화면이 「읽고 있습니다…」로 돌아간다.
+     새 값이 오면 «그 자리에서» 바꿔 넣는다(loadMailFolders·mbEnsureBins·loadMailBox 가 그렇게 한다). */
+function mbSeedRefresh(){
+  if(!_mbSeeded) return;
+  const again = ()=>{ if(state.view==='mail'){ renderPCSide(); renderMailPage(); } };
+  let left = 3;
+  const fin = ()=>{
+    if(--left) return;
+    _mbSeeded = false;
+    /* 씨앗 뒤에 새로 생긴 칸이 있으면 마저 받는다 */
+    if(state.view==='mail' && state.mailSent==='box' && !state.mbOpen) mbFillNeed(mbNow());
+    again();
+    _mbSeedSavedAt = 0; mbSeedSaveSoon();
+  };
+  loadMailFolders(()=>{ again(); fin(); });
+  /* ⚠ 쪽지는 openMailBox 가 씨앗을 찾기 «전»에 이미 떠나보냈을 수 있다 — 그러면 그 끝을
+       기다리기만 한다(mbEnsureBins 가 받는 중이면 끝난 뒤 되부른다). 씨앗 값이 그대로
+       남아 있을 때만 한 번 더 읽는다. */
+  if(_mbBinsFromSeed && !_mbBinsBusy) _mbBinsForce = true;
+  mbEnsureBins(()=>fin());
+  const slugs = Object.keys(_mbMsgs||{}).filter(s=>s !== MB_OLD_ID);
+  let n = slugs.length;
+  if(!n){ fin(); return; }
+  slugs.forEach(s=>loadMailBox(s, mbPageSize(), ()=>{ if(--n) return; again(); fin(); }));
+}
+/* 이 칸을 그리는 데 모자란 폴더를 채운다 (openMailBox 끝자락과 같은 일) */
+function mbFillNeed(id){
+  const need = mbNeedSlugs(id).filter(s=>s && !_mbMsgs[s]);
+  if(!need.length) return false;
+  let left = need.length;
+  need.forEach(s=>loadMailBox(s, mbPageSize(), ()=>{
+    if(--left) return;
+    if(state.view==='mail' && state.mailSent==='box'){ renderPCSide(); renderMailPage(); }
+    mbSeedSaveSoon();
+  }));
+  return true;
+}
+
 function loadMailFolders(cb){
   if(Store.mode!=='firebase'){ _mbFolders = _mbFolders||{}; if(cb) cb(); return; }
   Promise.all([
@@ -16254,11 +16430,15 @@ let _mbPut  = null;      /* {'slug:uid': binId} — «옮긴 것만» 든다 */
 let _mbPutBy = null;
 let _mbHide = null;      /* {binId:true} — 안 쓰는 칸(소셜·프로모션…). 우리 화면에서만 치운다 */
 let _mbBinsBusy = false;
+/* 씨앗으로 채워 둔 값을 «새로 받아» 갈아 끼울 때 켠다(mbSeedRefresh) — 켜져 있으면 이미 값이
+   있어도 한 번 더 읽는다. 읽기가 시작되면 곧바로 끈다. */
+let _mbBinsForce = false;
+let _mbBinsFromSeed = false;   /* 지금 쪽지 값이 «씨앗에서» 왔다 — 최신본을 한 번 받아야 한다 */
 
 /* 두 벌을 한 번에 읽는다 — 왼쪽 한 줄을 그리는 데 둘 다 필요하다.
    ⚠ once() 만 쓴다(2026-08-16 「once 뒤 on」 요금 사고와 같은 결). */
 function mbEnsureBins(cb){
-  if(_mbBins!==null && _mbPut!==null && _mbPutBy!==null && _mbHide!==null && _mbOwner!==null && _mbSucc!==null
+  if(!_mbBinsForce && _mbBins!==null && _mbPut!==null && _mbPutBy!==null && _mbHide!==null && _mbOwner!==null && _mbSucc!==null
      && _mbCo!==null && _mbNotCo!==null && _mbWhoMsg!==null && _mbNoWho!==null
      && _mbNotSpam!==null && _mbSpamOff!==null){
     if(cb) cb(); return;
@@ -16275,6 +16455,7 @@ function mbEnsureBins(cb){
      (폴더 목록과 같은 경주 — mbAuthOk 머리글) */
   if(!mbAuthOk()) return;
   _mbBinsBusy = true;
+  _mbBinsForce = false;
   Promise.all([
     firebase.database().ref(DB_ROOT+'/config/mailBins').once('value'),
     firebase.database().ref(DB_ROOT+'/config/mailPut').once('value'),
@@ -16297,6 +16478,7 @@ function mbEnsureBins(cb){
     firebase.database().ref(DB_ROOT+'/config/mailNotSpam').once('value'),
     firebase.database().ref(DB_ROOT+'/config/mailSpamOff').once('value')
   ]).then(([b,p,pb,h,w,sc,co,nc,wm,nw,ns,so])=>{
+    _mbBinsFromSeed = false;
     _mbBins = b.val()||{}; _mbPut = p.val()||{}; _mbPutBy = pb.val()||{}; _mbHide = h.val()||{}; _mbOwner = w.val()||{};
     _mbSucc = sc.val()||{}; _mbCo = co.val()||{}; _mbNotCo = nc.val()||{}; _mbWhoMsg = wm.val()||{}; _mbNoWho = nw.val()||{};
     /* ⚠ 안 적혀 있으면 «켠 것»이다 — 대표께서 「자동으로 거르게」라 하셨다.
@@ -20457,6 +20639,19 @@ function openMailBox(id){
   /* 📦 지난 메일 — 다음메일 폴더가 아니라 우리가 따로 담아 둔 자리에서 읽는다.
      ⚠ 아래 폴더 사슬을 «타지 않는다». 타면 「*old 폴더를 열어 달라」가 되어 오류가 난다. */
   if(id === MB_OLD_ID){ mbOldLoad(); return; }
+  /* 📬 이 창에서 처음 여는 것이면 «씨앗»부터 본다 — 있으면 그것으로 곧바로 그리고,
+       최신본은 뒤에서 받아 갈아 끼운다(mbSeedRefresh). 까닭은 mbSeedGet 머리글.
+     ⚠ 한 번만 찾는다(_mbSeedTried) — 없으면 예전 길 그대로다. */
+  if(_mbFolders===null && !_mbSeedTried && typeof indexedDB !== 'undefined'){
+    _mbSeedTried = true;
+    /* 씨앗을 찾는 동안에도 폴더·분류는 먼저 떠나보낸다 — 씨앗이 없을 때 한 걸음도 안 늦어진다 */
+    mbEnsureBins();
+    mbSeedGet(seed=>{
+      if(seed && mbSeedApply(seed)){ openMailBox(id); mbSeedRefresh(); return; }
+      openMailBox(id);
+    });
+    return;
+  }
   /* ⚠ 폴더와 분류(쪽지)를 «나란히» 가져온다 (대표 보고 2026-08-29 「로그인이 늦다」).
      예전에는 폴더가 다 온 «뒤에야» 분류를 가지러 갔다 — 서버 왕복이 하나 더 들었다.
      여기서 분류를 먼저 «걸어만 두면»(mbEnsureBins, 기다리지 않음) 폴더와 같은 시간에
@@ -20472,6 +20667,7 @@ function openMailBox(id){
   need.forEach(s=>loadMailBox(s, mbPageSize(), ()=>{
     if(--left) return;
     if(state.view==='mail' && state.mailSent==='box'){ renderPCSide(); renderMailPage(); }
+    mbSeedSaveSoon();          /* 📬 다음에 창을 열 때 이것으로 먼저 그린다 */
   }));
 }
 /* 지금 보는 칸에 «모두» 몇 통 있나 — 서버가 폴더마다 적어 둔 값이다.
@@ -21219,7 +21415,9 @@ function mbListHtml(){
         `<button onclick="mbBinUndo()"
           title="옮긴 메일을 다음메일에 있는 제자리로 되돌립니다">원래대로 ↩</button>`}
       ${/* 열면 읽음이 되는데 «되돌릴 길»이 없었다 — 나중에 다시 볼 것을 표시해 두는 자리다 */''}
-      <button onclick="mbReadMark(false)" title="고른 메일을 안 읽음으로 되돌립니다">안읽음</button>
+      ${/* 「읽음 표시 ˅」 — 다음메일과 같은 자리·같은 두 갈래 (2026-09-27). 예전에는 「안읽음」
+            하나뿐이라, 쌓인 안 읽은 메일을 한꺼번에 «읽음»으로 치울 길이 없었다. */''}
+      <button onclick="mbReadMenu(event)" title="고른 메일을 읽음 / 안 읽음으로 표시합니다 — 다음메일에도 함께 바뀝니다">읽음 표시 ˅</button>
       <button ${_mbBusy?'disabled':''} onclick="mbPull()"
         title="다음메일에 지금 붙어 목록을 새로 가져옵니다">${_mbBusy?'가져오는 중…':'새로고침 ↻'}</button>
       <span class="sp"></span>
@@ -21359,7 +21557,10 @@ function mbShowDetail(){
     + `칸 · ${mbBoxName(mbNow())}\n거르개 · ${f}\n`
     + `찾는 말 · ${state.mbQ||'(없음)'}\n보인 통수 · ${mbVisibleRows().length.toLocaleString()}\n\n`
     + `이 목록은 다음메일(${mbMyAddr()||'회사 주소'})을 그대로 비춘 것입니다.\n`
-    + `답장·폴더 만들기는 다음메일에서 하시고, 여기서는 읽기·전달·다시보내기·휴지통 옮기기를 하십니다.`);
+    /* ⚠ 2026-09-27 — 「답장·폴더 만들기는 다음메일에서」라고 적혀 있었다. 둘 다 여기서 된다.
+         틀린 안내를 걷고 «정말로 다음메일에서만 되는 것»만 남긴다. */
+    + `읽기·답장·전달·스팸신고·휴지통·분류는 여기서 하십니다.\n`
+    + `자동 분류 규칙(필터)·수신 차단·부재중 응답은 다음메일 설정에서 하십니다.`);
 }
 
 /* ══════ 메일 한 통 열기 ══════
@@ -21401,9 +21602,27 @@ function mbBodyPut(slug, uid, o){
 }
 /* 한 통을 손에 넣는다 — 담아 둔 것이 있으면 «서버를 안 부른다».
    peek 이면 읽음 표시를 안 건드린다(미리 받기 전용). */
+/* ★ 받는 중인 통은 «한 번만» 부른다 (2026-09-27, 대표 지시 「메일을 열면 늦게 나온다」).
+     실측 2026-09-27 08:04 — 줄에 마우스를 올려 미리 받기(peek)가 떠난 사이 그 줄을 누르면,
+     같은 메일을 «한 번 더» 불렀다. 서버(1세대 함수)는 한 그릇에 한 부름씩이라 두 번째가
+     첫 번째 뒤에 «줄을 서서» 2.5초 + 0.7초를 기다렸다. 누른 사람은 미리 받기 덕을 못 보고
+     오히려 더 늦게 받았다.
+   ⚠ 떠나 있는 것을 그대로 기다린다 — 끝나면 담긴 것이 곧바로 펼쳐진다.
+   ⚠ 미리 받기로 받은 것은 «읽음 표시가 안 된» 본문이다 — 여는 쪽(mbOpenMsg)이 따로 적는다. */
+let _mbBodyWait = {};           /* 'slug:uid' → { p:Promise, peek:bool } */
+function mbBodyPending(slug, uid){ return _mbBodyWait[mbBodyKey(slug, uid)] || null; }
 function mbFetchBody(slug, uid, peek){
   const hit = mbBodyGet(slug, uid);
   if(hit) return Promise.resolve(hit);
+  const k = mbBodyKey(slug, uid);
+  if(_mbBodyWait[k]) return _mbBodyWait[k].p;
+  const p = mbFetchBodyNow(slug, uid, peek);
+  _mbBodyWait[k] = { p:p, peek:!!peek };
+  const clear = ()=>{ if(_mbBodyWait[k] && _mbBodyWait[k].p === p) delete _mbBodyWait[k]; };
+  p.then(clear, clear);
+  return p;
+}
+function mbFetchBodyNow(slug, uid, peek){
   const u = firebase.auth().currentUser;
   if(!u) return Promise.reject(new Error('로그인이 필요합니다'));
   /* 📦 지난 메일은 다음메일 폴더에 없다 — 그 자리에서 POP3 로 받아 온다.
@@ -21490,8 +21709,29 @@ function mbPrefetchNear(){
     mbFetchBody(n._slug, n.u, true).catch(()=>{}).then(()=>{ _mbPreBusy--; });
   });
 }
+/* ★ 미리 받아 둔 본문으로 열었을 때 «다음메일에도» 읽음을 적는다 (2026-09-27).
+     미리 받기(peek)는 일부러 읽음을 안 건드린다 — 그래서 그 본문으로 펼치면 서버는
+     «열었다»는 것을 끝내 몰랐다. 화면에서만 굵기를 풀어 두었고, 다음 동기화(표시 훑기)가
+     다음메일의 «안 읽음»을 도로 가져와 방금 읽은 메일이 다시 굵게 돌아왔다.
+     「안 읽음으로」를 눌러 두었다가 다시 열 때도 같았다(담긴 본문으로 열렸다).
+   ⚠ 기다리지 않는다 — 본문은 이미 손에 있다. 뒤에서 조용히 적는다.
+   ⚠ 실패해도 말하지 않는다 — 다음에 열거나 다음메일에서 열면 맞춰진다. 본문을 보는 일을
+     읽음 표시 하나 때문에 막지 않는다(서버 쪽 readMailMessage 와 같은 결). */
+function mbReadMarkBg(slug, uid){
+  if(slug === MB_OLD_ID) return;                       /* 지난 메일은 다음메일 폴더에 없다 */
+  const u = firebase.auth && firebase.auth().currentUser; if(!u) return;
+  u.getIdToken().then(tok=>fetch(MB_FN+'flagMailMessages', { method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
+    body: JSON.stringify({ slug:slug, uids:[String(uid)], flag:'read', on:true }) }))
+    .catch(()=>{ /* 조용히 — 위 머리글 */ });
+}
 function mbOpenMsg(slug, uid){
   state.mailSent='box';
+  /* 이 통이 «아직 안 읽음»이었나 — 미리 받은 본문으로 열면 서버에 따로 알려야 한다 */
+  const row0 = (_mbMsgs[slug]||{})[String(uid)];
+  const wasUnread = !!(row0 && !Number(row0.r||0));
+  const wait0 = mbBodyPending(slug, uid);
+  const viaPeek = !!mbBodyGet(slug, uid) || !!(wait0 && wait0.peek);
   /* 담아 둔 것이 있으면 «기다림 없이» 그 자리에서 펼친다 */
   const hit = mbBodyGet(slug, uid);
   state.mbOpen = hit
@@ -21509,6 +21749,7 @@ function mbOpenMsg(slug, uid){
          ⚠ 담아 둔 것으로 펼쳤을 때도 여기를 지난다 — 미리 받기(peek)로 담긴 통은
            아직 «안 읽음»이라, 여기서 처음으로 읽음이 된다. */
       const box = _mbMsgs[slug]; if(box && box[uid]) box[uid].r = 1;
+      if(wasUnread && viaPeek) mbReadMarkBg(slug, uid);
       /* ★ 「누가 열어봤나」를 남긴다 (대표 지시 2026-08-29).
          ⚠ 본문이 «실제로 손에 온 뒤»에 적는다 — 누르자마자 적으면 못 연 것도 「봤다」가 된다.
          ⚠ 먼저 본 사람이 이미 있으면 안 덮는다(mbSeenMark 가 지킨다). */
@@ -21578,6 +21819,56 @@ function mbTrashOne(slug, uid){
   if(!confirm(`「${v.s||'(제목 없음)'}」 를 휴지통으로 옮깁니다.\n\n`
     + `⚠ 다음메일함에서도 휴지통으로 갑니다(되돌릴 수 있습니다).\n진행할까요?`)) return;
   mbMoveTo([v], trash.slug, '휴지통');
+}
+/* ══ 읽는 자리의 스팸신고 · 이동 · 인쇄 (2026-09-27, 대표 지시 「다음메일에 비해 부족한 것을 찾아 고쳐라」) ══
+   다음메일 읽기 화면에는 [답장·전체답장·전달·삭제·스팸신고·이동˅] 와 오른쪽 🖨 가 있다.
+   우리는 스팸신고·이동이 «목록에만» 있어, 읽다가 스팸이면 목록으로 나가 다시 골라야 했다.
+   ⚠ 셋 다 «이 한 통»에 한다 — 목록에서 골라 둔 것을 건드리지 않는다(mbTrashOne 과 같은 결). */
+function mbSpamReportOne(slug, uid){
+  const v = mbOneRow(slug, uid); if(!v) return toast('그 메일을 찾지 못했습니다');
+  mbSpamReport([v]);
+}
+function mbMoveOne(slug, uid, ev){
+  state.mbOneAct = { slug:String(slug), uid:String(uid) };   /* mbPicked 가 이 한 통을 돌려준다 */
+  mbMove(ev);
+}
+/* 인쇄 — 본문을 «숨은 틀»에 옮겨 그것만 인쇄한다.
+   ⚠ 새 창을 안 연다(앱끼리 창은 하나 — one-window-per-app). 앱 화면 전체를 인쇄하면
+     옆줄·단추까지 종이에 찍힌다.
+   ⚠ 본문은 화면에 넣을 때와 «같은» 거름(mbCleanHtml)을 거친 것만 옮긴다. */
+function mbPrintOne(){
+  const o = state.mbOpen || {};
+  if(o.loading) return toast('본문을 아직 받는 중입니다 — 잠시 뒤 다시 눌러 주세요', 4000);
+  const v = (_mbMsgs[o.slug]||{})[o.uid] || {};
+  const body = o.html ? mbCleanHtml(o.html)
+    : '<pre style="white-space:pre-wrap;font-family:inherit;margin:0">' + esc(o.text||'') + '</pre>';
+  const to = String(v.t||'').split(',').filter(Boolean).join(', ');
+  const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(v.s||'메일') + '</title>'
+    + '<style>body{font-family:"Malgun Gothic",sans-serif;font-size:13px;color:#1e293b;padding:18px}'
+    + 'h1{font-size:17px;margin:0 0 10px}.m{font-size:12px;color:#475569;border-bottom:1px solid #cbd5e1;'
+    + 'padding-bottom:8px;margin-bottom:12px}.m div{margin:2px 0}img{max-width:100%}</style></head><body>'
+    + '<h1>' + esc(v.s||'(제목 없음)') + '</h1><div class="m">'
+    + '<div><b>보낸사람</b> ' + esc(mbNameOf(v.e, v.f)||'') + (v.e ? ' &lt;' + esc(v.e) + '&gt;' : '') + '</div>'
+    + '<div><b>받는사람</b> ' + esc(to) + '</div>'
+    + '<div><b>받은 때</b> ' + esc(fmtDate(v.d) + ' ' + new Date(Number(v.d||0)).toTimeString().slice(0,5)) + '</div>'
+    + '</div>' + body + '</body></html>';
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(f);
+  const w = f.contentWindow;
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(()=>{ try{ w.focus(); w.print(); }catch(_){ toast('인쇄 창을 열지 못했습니다', 5000); }
+    setTimeout(()=>{ try{ f.remove(); }catch(_){ } }, 60000); }, 250);
+}
+/* 목록의 「읽음 표시 ˅」 — 다음메일과 같은 자리·같은 두 갈래(읽음 / 안 읽음) */
+function mbReadMenu(ev){
+  const picked = mbPicked(); if(!picked.length) return toast('고른 것이 없습니다');
+  const m = $('folderMenu'); if(!m) return;
+  m.innerHTML = `<div class="fmhead">${picked.length.toLocaleString()}통을
+      <span>다음메일에도 함께 바뀝니다</span></div>
+    <div class="fmi" onclick="closeFolderMenu();mbReadMark(true)">📖 읽음으로 표시</div>
+    <div class="fmi" onclick="closeFolderMenu();mbReadMark(false)">✉ 안 읽음으로 표시</div>`;
+  mbPlaceMenu(m, ev);
 }
 
 
@@ -22165,6 +22456,10 @@ function mbReadHtml(){
         <button class="rbtn" onclick="mbReply(true)">전체답장</button>
         <button class="rbtn" onclick="mbForwardOne('${o.slug}','${o.uid}')">전달</button>
         <button class="rbtn" onclick="mbTrashOne('${o.slug}','${o.uid}')">삭제</button>
+        ${mbSentBox(o.slug) ? '' : `<button class="rbtn" onclick="mbSpamReportOne('${o.slug}','${o.uid}')"
+          title="다음메일에 «스팸으로 신고»합니다 — 스팸함으로 실제로 옮겨집니다">스팸신고</button>`}
+        <button class="rbtn" onclick="mbMoveOne('${o.slug}','${o.uid}',event)"
+          title="이 메일을 푸른 분류 칸으로 옮깁니다 — 다음메일은 그대로입니다">이동 ˅</button>
         <span class="rsep"></span>
         <button class="rbtn" title="중요 표시 — 다음메일에도 함께 켜집니다"
           onclick="mbStar('${o.slug}','${o.uid}')">${Number(v.g||0)?'★ 중요':'☆ 중요'}</button>
@@ -22198,7 +22493,8 @@ function mbReadHtml(){
           return `<button class="rbtn nav" onclick="mbStep(-1)" ${up?'':'disabled'}
               title="${up ? '윗 메일 — '+esc(String(up.s||'(제목 없음)')).slice(0,40) : '첫 메일입니다'}">▲ 위</button>
             <button class="rbtn nav" onclick="mbStep(1)" ${dn?'':'disabled'}
-              title="${dn ? '아랫 메일 — '+esc(String(dn.s||'(제목 없음)')).slice(0,40) : '마지막 메일입니다'}">▼ 아래</button>`;
+              title="${dn ? '아랫 메일 — '+esc(String(dn.s||'(제목 없음)')).slice(0,40) : '마지막 메일입니다'}">▼ 아래</button>
+            <button class="rbtn nav" onclick="mbPrintOne()" title="이 메일만 인쇄합니다">🖨</button>`;
         })()}
       </div>
     </div>
@@ -22256,9 +22552,10 @@ function mbReadHtml(){
     <div class="body">${o.loading ? '<div class="wait">본문을 가져오고 있습니다…</div>'
       : o.err ? '<div class="wait">열지 못했습니다 — '+esc(o.err)+'</div>'
       : (bodyHtml || '<div class="wait">본문이 없습니다.</div>')}</div>
-    <div class="note">답장은 <b>다음메일에서</b> 하십니다 — 여기 목록은 다음메일을 비추는 거울이라,
-      두 곳에서 따로 고치면 어느 쪽이 맞는지 알 수 없습니다.
-      이 자리에서는 <b>전달·다시보내기</b>(우리 회사 주소로 새로 씀)와 <b>휴지통 옮기기</b>를 하십니다.</div>
+    ${/* ⚠ 여기 「답장은 다음메일에서 하십니다 … 이 자리에서는 전달·다시보내기와 휴지통
+         옮기기를 하십니다」라는 안내가 있었다 — 2026-09-27 에 걷었다. 위 줄에 [답장]·
+         [전체답장]이 이미 있어(2026-08-25~) «틀린 말»이 되어 있었다. 어긋난 안내는 없는 것보다
+         나쁘다 — 읽은 사람이 멀쩡한 단추를 안 누른다. */''}
   </div>`;
 }
 
@@ -22904,6 +23201,14 @@ function mbReply(all){
 /* 고른 것들. ☐ 를 안 눌렀어도 방향키로 짚어 둔 줄이 있으면 그것을 고른 것으로 본다 —
    짚어 놓고 [전달]을 눌렀는데 「고른 것이 없습니다」가 뜨면 사람은 무엇이 잘못인지 모른다. */
 function mbPicked(){
+  /* 읽는 자리의 「이동 ˅」은 «지금 펼친 이 한 통»에 한다(mbMoveOne) — 목록에서 골라 둔 것을
+     건드리면 엉뚱한 메일이 옮겨진다. ⚠ 펼친 메일이 그 통일 때만 따른다 — 목록으로 나갔으면
+     예전처럼 고른 것이다. */
+  const one = state.mbOneAct, op = state.mbOpen;
+  if(one && op && String(op.slug) === String(one.slug) && String(op.uid) === String(one.uid)){
+    const v = mbOneRow(one.slug, one.uid);
+    return v ? [v] : [];
+  }
   const rows = mbVisibleRows();
   const sel = pickOf('mbox');
   const on = rows.filter(v=>pickOn(sel, v._key));
@@ -23022,8 +23327,9 @@ function mbTrash(){
    ⚠ 「우리가 낸 칸」(보낸메일함·임시보관함·내게쓴메일함·예약메일함)의 메일은
      신고 대상에서 뺀다 — 서버도 거절한다(reportMailSpam). 전체메일처럼 여러 칸이
      섞인 곳에서 골랐을 때를 대비해 «조용히 걸러내고» 몇 통을 뺐는지 알린다. */
-function mbSpamReport(){
-  const all = mbPicked(); if(!all.length) return toast('고른 것이 없습니다');
+/* rows — 읽는 자리에서 «이 한 통»을 넘길 때(mbSpamReportOne). 안 주면 목록에서 고른 것이다. */
+function mbSpamReport(rows){
+  const all = (rows && rows.length) ? rows : mbPicked(); if(!all.length) return toast('고른 것이 없습니다');
   if(mbOldBlock(all, '스팸으로 신고할')) return;
   const picked = all.filter(v=>{
     const f = mbFolderBy(v._slug);

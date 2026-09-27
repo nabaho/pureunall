@@ -609,12 +609,22 @@ const CARDS_ROOT = MD.CARDS_ROOT;
 // 보내는 주소. 비밀이 아니므로 **기업정보함 화면(자료함 → 메일 본문)에서 넣는다** —
 // 파일에만 둘 수도 있지만, 그러면 주소 하나 바꾸려고 다시 배포해야 한다.
 // 환경변수가 있으면 그것을 먼저 쓴다(예전 방식 호환).
+/* ★ 계정 주소를 «그릇 안에» 잠깐 담아 둔다 (2026-09-27, 대표 지시 「메일을 열면 늦게 나온다」).
+     DAUM_MAIL_USER 환경값이 안 걸려 있어서, 메일 한 통을 열 때마다 미국 실시간DB 에
+     «주소가 뭐였지»를 물었다(150~300ms). 주소는 몇 달에 한 번 바뀔까 말까다.
+   ⚠ 10분만 담는다 — 설정에서 주소를 바꾸면 곧 따라간다.
+   ⚠ 빈 값은 안 담는다 — 못 읽은 것을 10분 동안 「주소 없음」으로 굳히면 그동안 메일이 통째로 멈춘다. */
+const MAIL_USER_TTL_MS = 10 * 60 * 1000;
+let _mailUserHit = null;               /* { v, at } */
 async function mailUserAsync() {
   const env = String(process.env.DAUM_MAIL_USER || "").trim();
   if (env) return env;
+  if (_mailUserHit && (Date.now() - _mailUserHit.at) < MAIL_USER_TTL_MS) return _mailUserHit.v;
   try {
     const s = await getDatabase().ref(CARDS_ROOT + "/config/matMail/from").once("value");
-    return String(s.val() || "").trim();
+    const v = String(s.val() || "").trim();
+    if (v) _mailUserHit = { v: v, at: Date.now() };
+    return v;
   } catch (e) { return ""; }
 }
 /* 보내는 주소에 맞는 열쇠를 준다 (2026-09-05).
@@ -5573,6 +5583,7 @@ const MSYNC = require("./mail-sync")({
 exports.syncMailbox = MSYNC.syncMailbox;
 exports.pullMailbox = MSYNC.pullMailbox;
 exports.readMailMessage = MSYNC.readMailMessage;
+exports.mailKeepWarm = MSYNC.mailKeepWarm;   /* ☕ 업무 시간 3분마다 메일 열기 함수를 따뜻하게 */
 exports.readMailAttachment = MSYNC.readMailAttachment;
 exports.searchMailbox = MSYNC.searchMailbox;
 exports.mailAttToPaydata = MSYNC.mailAttToPaydata;
