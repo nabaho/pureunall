@@ -32,10 +32,13 @@ test('중요 변경은 사용자가 체크해도 자동배포하지 않는다', 
   assert.match(issue.body, /비공개 참고 캡처: `2개`/);
 });
 
-test('대표 개인정보 확인과 개발 지시 없이는 실행하지 않는다', () => {
-  assert.throws(() => server.validateExecute({ suggestionId: 'a', title: 't', instruction: 'i' }), /개인정보/);
-  assert.throws(() => server.validateExecute({ suggestionId: 'a', title: 't', instruction: '', privacyConfirmed: true }), /개발 지시/);
-  assert.equal(server.validateExecute({ suggestionId: 'a', title: 't', instruction: '고쳐주세요', privacyConfirmed: true }), true);
+/* ⚠ 예전에는 「개인정보 공개 여부를 확인했다」는 대표의 «체크»를 요구했다(privacyConfirmed).
+   2026-09-11 에 없앴다 — 사람 눈에 기댄 방어였고, 실제 건의는 체크할 수 없는 것이었다.
+   이제 공개 글에 건의 내용이 아예 안 실리므로 확인할 것이 없다(아래 검사들이 지킨다). */
+test('건의 ID·제목·개발 지시 없이는 실행하지 않는다', () => {
+  assert.throws(() => server.validateExecute({ title: 't', instruction: 'i' }), /건의 ID/);
+  assert.throws(() => server.validateExecute({ suggestionId: 'a', title: 't', instruction: '' }), /개발 지시/);
+  assert.equal(server.validateExecute({ suggestionId: 'a', title: 't', instruction: '고쳐주세요' }), true);
 });
 
 test('복귀 키는 원문이 아니라 소금값을 포함한 해시로 확인한다', () => {
@@ -87,4 +90,6 @@ test('자동개발 작업 파일과 참고 캡처는 커밋 대상에서 제외�
   const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
   assert.match(ignore, /^\.codex-task\.md$/m);
   assert.match(ignore, /^\.codex-input\/$/m);
+  /* ★ 검문에 넘기는 비밀 낱말 — 이것이 커밋되면 막으려던 것을 스스로 올리는 셈이다 */
+  assert.match(ignore, /^\.codex-guard\.json$/m);
 });

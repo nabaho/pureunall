@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>목업 8 — 최종 제안</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
+    --line:#e2e8f0;--panel:#fff;--bg:#e2e8f0;--radius:11px;--ok-bg:#f8fafc}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);background:#f1f5f9;font-size:14px;padding:20px 16px 60px}
+  .wrap{max-width:640px;margin:0 auto}
+  h1{font-size:17px;margin:0 0 4px}
+  .muted{color:var(--sub);font-size:12.5px}
+  button{font-family:inherit;font-size:13px;padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;color:var(--ink)}
+  button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+  .row{display:flex;align-items:center;gap:10px}
+  /* ★ 라벨 — 작고 흐리게, 칸에 «붙어» 보이도록(대표 지시 2026-09-21 「니가 추천하는대로」) */
+  .fld{display:flex;flex-direction:column;gap:1px}
+  .fld label{font-size:9.5px;color:var(--faint);font-weight:700;letter-spacing:.01em;margin-left:1px}
+  .fld input{padding:6px 9px 7px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%}
+  .gridw{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px 14px}
+  .gridw .fld.full{grid-column:1/-1}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px}
+  .boxhead{font-size:12.5px;font-weight:800;color:var(--acc2);display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--acc-soft)}
+  .boxhead .d{font-weight:400;font-size:11px;color:var(--sub)}
+  .reppair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:520px){.reppair{grid-template-columns:1fr}}
+  .subbox{background:var(--bg);border-radius:9px;padding:10px 12px}
+  .subhead{font-size:11.5px;font-weight:700;color:var(--sub);margin-bottom:8px}
+  .addrstack{display:flex;flex-direction:column;gap:6px}
+  .addrstack .r1{display:flex;gap:6px}
+  .addrstack .r1 .zip{width:130px;flex:none}
+  .addrstack .r1 .zip input{font-family:monospace;text-align:center;background:#f8fafc;color:var(--sub)}
+  .fake-modal{background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 8px 30px rgba(0,0,0,.12);border:1px solid var(--line)}
+  .cap{font-size:11.5px;color:var(--sub);text-align:center;margin:8px 0 0;font-weight:700}
+  .note{background:#fff;border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:9px;padding:12px 14px;margin-top:14px;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>목업 8 — 최종 제안 (제가 권하는 대로)</h1>
+<p class="muted">네 가지를 모두 제가 권하는 쪽으로 정해 그렸습니다. 이대로 만들어도 되면 「이대로」라고만
+말씀해 주시면 됩니다. 바꿀 곳이 있으면 그 부분만 짚어 주십시오.</p>
+
+<div class="fake-modal">
+  <div class="row" style="margin:0 0 12px"><h2 style="margin:0;font-size:15px">사업장 편집</h2>
+    <span style="flex:1"></span><button title="기업정보함에서 채우기">🏢 기업정보함에서</button></div>
+
+  <div class="box">
+    <div class="boxhead">🏢 기업정보 <span class="d">— 상호·번호·규모 등</span></div>
+    <div class="gridw">
+      <div class="fld"><label>연번</label><input value="1-1"></div>
+      <div class="fld"><label>상호</label><input value="가나기계(주)"></div>
+      <div class="fld"><label>사업자등록번호</label><input value="123-81-12595"></div>
+      <div class="fld"><label>법인등록번호</label><input value=""></div>
+      <div class="fld"><label>업종</label><input value="제조(방수재)"></div>
+      <div class="fld"><label>상시근로자수</label><input value="16"></div>
+      <div class="fld full">
+        <label>소재지</label>
+        <div class="addrstack">
+          <div class="r1"><div class="zip"><input value="000-000" readonly></div>
+            <div><button class="primary">🔍 우편번호 검색</button></div></div>
+          <div><input value="○○시 ○○구 ○○로 00"></div>
+        </div>
+      </div>
+      <div class="fld"><label>회사 전화</label><input value=""></div>
+      <div class="fld"><label>개업일</label><input value=""></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="boxhead">👤 대표자 · 담당자 <span class="d">— 협의회 위원과는 다를 수 있습니다</span></div>
+    <div class="gridw">
+      <div class="fld"><label>대표자</label><input value="홍길동"></div>
+      <div class="fld"><label>담당자명</label><input value="이담당"></div>
+      <div class="fld"><label>직급</label><input value="부장"></div>
+      <div class="fld"><label>담당자 전화</label><input value=""></div>
+      <div class="fld"><label>회사 팩스</label><input value=""></div>
+      <div class="fld"><label>담당자 핸드폰</label><input value="010-1234-5678"></div>
+      <div class="fld"><label>담당자 이메일</label><input value="name@example.com"></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="boxhead">⚖️ 사용자 대표 · 근로자 대표 <span class="d">— 협의회 구성 인원</span></div>
+    <div class="reppair">
+      <div class="subbox">
+        <div class="subhead">사용자 대표</div>
+        <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:8px;cursor:pointer">
+          <input type="checkbox" checked> 대표자와 같은 사람입니다
+        </label>
+        <div class="gridw" style="grid-template-columns:1fr">
+          <div class="fld"><label>성명</label><input value="홍길동" disabled></div>
+          <div class="fld"><label>직위</label><input value=""></div>
+        </div>
+      </div>
+      <div class="subbox">
+        <div class="subhead">근로자 대표</div>
+        <div class="gridw" style="grid-template-columns:1fr">
+          <div class="fld"><label>성명</label><input value=""></div>
+          <div class="fld"><label>직위</label><input value=""></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="boxhead">🏷️ 중소기업 <span class="d">— 지원금 심사에 씁니다</span></div>
+    <div class="gridw">
+      <div class="fld"><label>기업규모</label><input value=""></div>
+      <div class="fld"><label>중소기업 여부</label><input value=""></div>
+    </div>
+  </div>
+</div>
+<p class="cap">칸마다 무엇인지 항상 보이면서, 라벨은 작고 흐려 자료가 먼저 눈에 들어옵니다</p>
+
+<div class="note">
+<b>제가 정한 넷</b><br>
+① 소재지 — <b>A안(2줄)</b>: 우편번호+검색, 그 아래 도로명주소(이어 적기 가능). 새 칸은 우편번호 하나뿐.<br>
+② 사용자대표·근로자대표 — <b>나란히(좌우)</b>: 협의회 구성원 둘을 한눈에 견줘 봅니다. 좁은 화면(휴대폰)에서는 자동으로 위아래로 바뀝니다.<br>
+③ 기금 자체 소재지(사무소 주소) — <b>같이 붙입니다</b>: 관할 노동청·세무서·등기소 추정이 더 정확한 주소로 이뤄집니다. 같은 우편번호 검색 기능을 그대로 재사용하니 품이 더 들지 않습니다.<br>
+④ 중소기업 — <b>상자로 나눕니다</b>: 혼자 남겨두면 튀어 보이고, 그대로 두어도 자료는 안 바뀝니다.<br>
+⑤ 라벨 — <b>작고 흐리게 칸 위에 남깁니다</b>(캡쳐처럼 완전히 없애지 않음): 값이 채워져도 무슨 칸인지 항상 보이면서, 라벨이 크게 눈에 띄지 않아 자료가 먼저 보입니다.
+</div>
+</div>
+</body>
+</html>

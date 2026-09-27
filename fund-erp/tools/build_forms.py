@@ -54,13 +54,13 @@ FORMS = [
 ]
 
 # 실사례 상호·기금명(빈 양식에 있으면 안 됨) — 발견 시 토큰으로 치환
-REAL_NAMES = ['비앤오소프트', '이벌브소프트', '이비공동근로복지기금', '이비공동',
+REAL_NAMES = ['비앤오소프트', '라온소프트', '가나공동근로복지기금', '가나공동',
               '더행복한충남공동근로복지기금', '충남공동근로복지기금', '경기공동근로복지기금',
-              '참살이', '안전공사', '청신공동', '배경공동', '일원공동', '현재기업', '캔탑스']
+              'T공동', 'Y공동', 'X공동', 'Z공동', 'V공동', 'N사내', 'P사내']
 WATCH = REAL_NAMES + ['충남', '경기', '더행복한']        # 치환 후 잔존 경고용
 RRN = re.compile(r'\b\d{6}\s*-\s*[1-4]\d{6}\b')          # 주민등록번호
 
-# ── 실사례(이비공동기금 등)에서 딸려온 개인정보·실체정보 ──
+# ── 실사례(가나공동기금 등)에서 딸려온 개인정보·실체정보 ──
 # 원본 서식이 '작성 예시'라 실제 임원 성명·주소·연락처·법인번호가 박혀 있다. 빈 양식이 되도록 마스킹.
 # 이름·단체명은 원본에서 '전    석    정'처럼 글자마다 공백이 끼어 있다.
 # 고정 문자열로 지우면 그 변형이 그대로 남는다(2026-08-03 reg_seal에서 실제로 남아 있었음) → 정규식으로 처리.
@@ -138,7 +138,10 @@ def main():
 
     js = "// 자동생성 — 원본 .hwp 변환 법정서식(빈 양식). 재생성: python fund-erp/tools/build_forms.py\n"
     js += "window.HWP_FORMS = " + json.dumps(out, ensure_ascii=False, indent=0) + ";\n"
-    dest = r"C:\Users\fair0\Documents\pureunall\fund_forms.js"
+    # 이 파일이 있는 저장소에 쓴다 — 작업 공간(worktree)마다 제 것에 써야 한다.
+    # 예전에는 경로가 박혀 있어, 딴 공간에서 돌려도 늘 본 저장소를 덮었다.
+    dest = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__)))), 'fund_forms.js')
     open(dest, 'w', encoding='utf-8').write(js)
     print('=' * 78)
     print('서식 %d종 → %s (%d bytes)' % (len(out), dest, os.path.getsize(dest)))

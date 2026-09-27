@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>문서관리 — 집단체불 계약서 전자송부</title>
+<title>문서관리</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📤</text></svg>">
 <!-- 관리자(노무사) 페이지: 사건 관리·제출 취합·서류 생성. 로그인 필수. -->
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:#f1f5f9;color:#1e293b;font-size:14px}
+  body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:#f8fafc;color:#1e293b;font-size:14px}
   .top{background:#1e293b;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px}
   .top h1{font-size:16px;flex:1}
   .top a{color:#cbd5e1;font-size:12.5px;text-decoration:none}
@@ -15,40 +16,93 @@
   .card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(15,23,42,.08);padding:18px;margin-bottom:14px}
   .btn{padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
   .btn-pri{background:#1e40af;color:#fff}
-  .btn-sub{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1}
-  .btn-danger{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}
+  .btn-sub{background:#f8fafc;color:#475569;border:1px solid #cbd5e1}
+  .btn-danger{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
   table{width:100%;border-collapse:collapse}
-  th,td{padding:9px 10px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:13px}
+  th,td{padding:9px 10px;border-bottom:1px solid #e2e8f0;text-align:left;font-size:13px}
   th{background:#f8fafc;color:#475569;font-size:12px}
   input,select{padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:13.5px}
-  label{display:block;font-size:12.5px;font-weight:700;color:#334155;margin:12px 0 4px}
+  label{display:block;font-size:12.5px;font-weight:700;color:#1e293b;margin:12px 0 4px}
   .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
   .modal{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:22px;max-height:90vh;overflow-y:auto}
   .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:700}
-  .b-active{background:#dcfce7;color:#166534}.b-closed{background:#f1f5f9;color:#64748b}
+  .b-active{background:#f0fdf4;color:#166534}.b-closed{background:#f8fafc;color:#64748b}
   .save-state{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border:1px solid #475569;border-radius:99px;padding:3px 8px;font-size:11px;font-weight:700;color:#cbd5e1}
-  .save-state::before{content:'';width:7px;height:7px;border-radius:50%;background:#94a3b8}.save-state.saving::before{background:#fbbf24}.save-state.saved::before{background:#4ade80}.save-state.failed::before{background:#fb7185}
+  .save-state::before{content:'';width:7px;height:7px;border-radius:50%;background:#94a3b8}.save-state.saving::before{background:#fbbf24}.save-state.saved::before{background:#4ade80}.save-state.failed::before{background:#f87171}
+  .hwp-local-note{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:10px 12px;font-size:12px;line-height:1.55;margin:10px 0}
+  .hwp-file-card{border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin:10px 0;background:#f8fafc}
+  .hwp-preview{display:none;min-height:360px;max-height:58vh;border:1px solid #cbd5e1;border-radius:10px;margin-top:12px;overflow:auto}
+  /* ── 왼쪽 목록 (2026-09-26 「사무관리서류 › 계약서 양식」을 더하며) ── */
+  .shell{display:flex;align-items:flex-start;max-width:1360px;margin:0 auto}
+  .side{width:196px;flex:none;position:sticky;top:0;padding:20px 8px 20px 16px}
+  .nav{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:8px 10px;font-size:13px;color:#1e293b;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .nav:hover{background:#eff6ff}
+  .nav.on{background:#bfdbfe;color:#1e40af;font-weight:700}
+  .nav:focus-visible{outline:2px solid #1e40af;outline-offset:1px}
+  .nav-grp{padding:12px 10px 4px;font-size:12.5px;font-weight:700;color:#475569;white-space:nowrap}
+  .nav.sub{padding-left:24px}
+  .shell .main{flex:1;min-width:0;max-width:none;margin:20px 0;padding:0 16px 0 8px}
+  .crumb{font-size:12px;color:#64748b;margin-bottom:4px}.crumb b{color:#1e293b}
   @media(max-width:700px){
+    .shell{display:block}
+    .side{position:static;width:auto;display:flex;align-items:center;gap:4px;overflow-x:auto;padding:8px 10px;background:#fff;border-bottom:1px solid #e2e8f0}
+    .nav{width:auto}.nav.sub{padding-left:10px}.nav-grp{padding:0 2px 0 8px}
+    .shell .main{margin:12px auto;padding:0 10px}
     .top{padding:10px 12px;gap:8px;flex-wrap:wrap}.top h1{width:100%;font-size:14px}.top #whoami{margin-right:auto}
     .main{margin:12px auto;padding:0 10px}.card{padding:13px;overflow-x:auto}
     .card>div:first-child{min-width:0;gap:8px}.card>div:first-child b{min-width:0}
     table{min-width:640px}#viewDetail{overflow-x:auto}
     .modal-bg{padding:10px;align-items:flex-start;overflow-y:auto}.modal{padding:17px;max-height:none;margin:8px 0;overflow-x:auto}
     .modal input,.modal select{max-width:100%}.btn{padding:9px 12px}
+    .hwp-preview{min-height:300px;max-height:none}.hwp-actions{display:grid!important;grid-template-columns:1fr 1fr}.hwp-actions .btn{width:100%}
   }
 </style>
+<!-- 프로그램 사이 이동 (공용 앱바) — 이 한 줄이 빠져 있어서
+     문서관리에만 오른쪽 「즐겨찾기」 손잡이가 없었다(대표 보고 2026-08-13) -->
+<!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
+<script src="js/pu-gate.js?v=3"></script>
+<!-- 「준비중」 판단에 «지금 로그인한 사람의 역할»이 필요하다 (2026-09-23) -->
+<script src="js/pu-whoami.js?v=1"></script>
+<!-- ⚠ 이 화면은 머리줄 #whoami 를 «스스로» 채운다(loadAll 안). 자리를 안 알려 주면
+     부품이 떠 있는 표를 따로 그려 그 위에 겹친다 — 다른 셋(급여데이터함·급여관리·
+     취업규칙)과 같은 길로 「그리지 말라」고 한다. tests/whoami-mount.test.js 가 지킨다. -->
+<script>
+(function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script>
+/* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
+   포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
+   주소창에 docs-esign.html 를 직접 친 사람을 막는다. 둘 중 하나만 있으면 뚫린다.
+   ⚠ 잣대는 포털(enter.html appIsSoon)과 «같은 것» — 명부의 role === 'admin'.
+     사번으로 박지 않는다(바뀌는 날 대표님이 잠긴다).
+   ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
+try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
+</script>
+<script src="js/pu-appbar.js?v=13"></script>
 </head>
 <body>
 <div class="top">
-  <h1>📄 문서관리 — 집단체불 계약서 전자송부</h1>
+  <h1>📄 문서관리</h1>
   <span id="whoami" style="font-size:12.5px;color:#94a3b8"></span>
   <span id="saveState" class="save-state saved" role="status" aria-live="polite">저장 완료</span>
   <a href="enter.html">← 포털</a>
 </div>
+<div class="shell">
+<!-- 왼쪽 목록 — 「사무관리서류」 아래에 서류 종류를 더해 간다(대표 지시 2026-09-26) -->
+<nav class="side" aria-label="문서관리 메뉴">
+  <button type="button" class="nav on" data-pane="esign">📤 집단체불 전자송부</button>
+  <div class="nav-grp">🗂 사무관리서류</div>
+  <button type="button" class="nav sub" data-pane="forms">📄 계약서 양식</button>
+</nav>
 <div class="main">
+<div id="paneEsign">
   <div class="card" id="viewList">
     <div style="display:flex;align-items:center;margin-bottom:12px">
       <b style="flex:1;font-size:15px">사건 목록</b>
+      <!-- 목록이 once 로만 받으므로(비용 절감, 2026-08-13) 다른 직원이 만들거나
+           마감한 사건은 스스로 안 나타난다 — 눌러서 새로 받는 길을 열어 둔다. -->
+      <button class="btn btn-sub" id="btnRefreshCases" title="다른 직원이 만들거나 마감한 사건도 봅니다" style="margin-right:8px">🔄 새로고침</button>
       <button class="btn btn-pri" id="btnNewCase">+ 새 사건</button>
     </div>
     <table>
@@ -58,21 +112,37 @@
   </div>
   <div id="viewDetail" style="display:none"></div> <!-- Task 10 -->
 </div>
+<!-- 계약서 양식 — 이알피 환경설정에서 옮겨 왔다(2026-09-26). 화면은 js/pu-contract-forms.js 가 그린다 -->
+<div id="paneForms" hidden>
+  <div class="card">
+    <div class="crumb">사무관리서류 › <b>계약서 양식</b></div>
+    <div id="formsRoot"></div>
+  </div>
+</div>
+</div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-resilience.js"></script>
-<script src="js/pu-health.js"></script>
-<script src="js/pu-version.js"></script>
-<script src="js/pu-backup.js"></script>
+<script src="js/pu-ontology.js?v=34"></script>
+<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-resilience.js?v=3"></script>
+<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-version.js?v=8"></script>
+<script src="js/pu-rrn-seal.js?v=2"></script>
+<script src="js/pu-backup.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/esign-crypto.js"></script>
-<script src="js/esign-docs.js"></script>
+<script src="js/utils.js?v=2"></script>
+<script src="js/esign-crypto.js?v=1"></script>
+<script src="js/esign-docs.js?v=1"></script>
+<script src="js/pu-hwp-engine.js?v=16"></script>
+<script src="js/pu-hwp-store.js?v=1"></script>
+<script src="js/esign-hwp-tpl.js?v=1"></script>
+<script src="js/pu-contract-forms.js?v=1"></script>
 <script>
 'use strict';
 var FB_CONFIG = {
@@ -107,35 +177,99 @@ function trackedWrite(promise) {
 
 // ── 로그인 가드 (직원 이메일 계정 필수 — 익명/미로그인은 포털로) ──
 firebase.auth().onAuthStateChanged(function (u) {
-  if (!u || !u.email) { location.href = 'enter.html'; return; }
+  /* ⚠★ 포털로 «튕기지» 않는다 (대표 지시 2026-09-14 「모두 캡쳐1의 모습으로」).
+     튕기면 로그인 창이 뜨는데, 대표는 자기가 무엇을 누르다 그리로 갔는지 알 수가 없다.
+     자물쇠 화면을 보이고 「🏠 통합시스템으로 이동」을 «누르게» 한다. */
+  if (!u || !u.email) { PuGate.show(); return; }
+  PuGate.hide();
   curUser = u;
   $('whoami').textContent = u.email.split('@')[0];
   loadCases();
+  showPane(paneFromHash());
+});
+
+/* ── 왼쪽 목록: 전자송부 ↔ 사무관리서류 › 계약서 양식 ──
+   주소 끝(#forms)에 적어 두어 새로고침해도 보던 자리로 돌아온다.
+   ⚠ 양식 화면은 «처음 열 때» 한 번만 싣는다 — 전자송부만 쓰는 날엔 양식 표를 받지 않는다. */
+var formsMounted = false;
+function paneFromHash() { return location.hash === '#forms' ? 'forms' : 'esign'; }
+function showPane(name) {
+  $('paneEsign').hidden = name !== 'esign';
+  $('paneForms').hidden = name !== 'forms';
+  document.querySelectorAll('.side .nav').forEach(function (b) {
+    var on = b.getAttribute('data-pane') === name;
+    b.classList.toggle('on', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  if (name === 'forms' && !formsMounted && curUser) {
+    formsMounted = true;
+    PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite });
+  }
+}
+document.querySelectorAll('.side .nav').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var name = b.getAttribute('data-pane');
+    var want = name === 'forms' ? '#forms' : '';
+    if (location.hash !== want) history.pushState(null, '', want || (location.pathname + location.search));
+    showPane(name);
+  });
+});
+/* 뒤로가기로 칸을 바꿨으면 «우리가 처리했다»고 알린다 — 안 그러면 js/pu-back.js 가
+   같은 한 번 누름에 앱까지 나간다(칸이 그대로일 때는 그쪽이 덮개를 닫거나 나간다). */
+window.addEventListener('popstate', function () {
+  var want = paneFromHash();
+  if ($('paneForms').hidden === (want === 'forms')) window.__puBackNav = true;
+  showPane(want);
 });
 
 // ── 사건 목록 ──
+// 캐시(casesCache)를 화면 표로 그린다. once 로 받은 뒤에도, 내가 한 일(사건
+// 생성·마감·파기)로 캐시를 직접 고친 다음에도 이 함수 하나로 다시 그린다.
+function renderCaseList() {
+  var ids = Object.keys(casesCache).sort(function (a, b) {
+    return ((casesCache[b].meta || {}).createdAt || 0) - ((casesCache[a].meta || {}).createdAt || 0);
+  });
+  var tb = $('caseRows');
+  if (!ids.length) { tb.innerHTML = '<tr><td colspan="6" style="color:#94a3b8">사건이 없습니다. [+ 새 사건]으로 시작하세요.</td></tr>'; return; }
+  tb.innerHTML = ids.map(function (id) {
+    var c = casesCache[id], m = c.meta || {};
+    var n = Object.keys(c.submissions || {}).length;
+    return '<tr>'
+      + '<td><a href="javascript:void(0)" onclick="openCase(\'' + id + '\')" style="color:#1e40af;font-weight:700">' + EsignDocs.esc(m.title || '(제목 없음)') + '</a></td>'
+      + '<td>' + EsignDocs.esc(m.company || '') + '</td>'
+      + '<td><b>' + n + '</b>명</td>'
+      + '<td><span class="badge b-' + (m.status === 'active' ? 'active' : 'closed') + '">' + EsignDocs.esc(m.status || '') + '</span></td>'
+      + '<td>' + (m.createdAt ? localYMD(new Date(m.createdAt)) : '') + '</td>'
+      + '<td><button class="btn btn-sub" onclick="shareCase(\'' + id + '\')">🔗 링크</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+/* ── 사건 목록 받기 (대표 지시 2026-08-13, 비용 조사) ──
+   "비용을 최소화할 수 있는 방향 검토해 달라" — 8/1~8/11 실시간DB 내려받기
+   ₩28,833(청구서의 93%).
+
+   ⚠ .on('value') 로 esign/cases 를 통째 구독하면, 그 아래 **모든 사건의 모든
+     제출**(암호문 + 서명 그림)까지 실시간DB 가 그대로 실어 보낸다. 화면은 그중
+     meta 와 제출 **개수**만 쓴다 — 나머지(제출 내용)는 내려받고서 버린다.
+     사건이 늘고 제출이 쌓일수록, **아무 관계 없는 사건의 제출 하나만 늘어도**
+     구독 중인 모든 탭에 전체가 다시 내려간다.
+   그래서 once 로 한 번만 받는다. 그 뒤로는 **내가 한 일**(사건 생성·마감·
+   파기)만 casesCache 를 직접 고쳐 화면을 바꾼다 — 서버에 다시 묻지 않는다.
+   ⚠ 다른 직원이 사건을 만들거나 마감한 것은 스스로 안 보인다 — [🔄 새로고침]을
+     눌러야 한다. 이 화면은 개인정보가 걸린 소수 사건을 다루는 관리자용 목록이라
+     실시간 협업(다른 직원 변경을 곧바로 보는 것)이 꼭 필요하지 않다고 봤다. */
 function loadCases() {
-  db.ref('esign/cases').on('value', function (snap) {
+  return db.ref('esign/cases').once('value').then(function (snap) {
     casesCache = snap.val() || {};
-    var ids = Object.keys(casesCache).sort(function (a, b) {
-      return ((casesCache[b].meta || {}).createdAt || 0) - ((casesCache[a].meta || {}).createdAt || 0);
-    });
+    renderCaseList();
+  }).catch(function (e) {
     var tb = $('caseRows');
-    if (!ids.length) { tb.innerHTML = '<tr><td colspan="6" style="color:#94a3b8">사건이 없습니다. [+ 새 사건]으로 시작하세요.</td></tr>'; return; }
-    tb.innerHTML = ids.map(function (id) {
-      var c = casesCache[id], m = c.meta || {};
-      var n = Object.keys(c.submissions || {}).length;
-      return '<tr>'
-        + '<td><a href="javascript:void(0)" onclick="openCase(\'' + id + '\')" style="color:#1e40af;font-weight:700">' + EsignDocs.esc(m.title || '(제목 없음)') + '</a></td>'
-        + '<td>' + EsignDocs.esc(m.company || '') + '</td>'
-        + '<td><b>' + n + '</b>명</td>'
-        + '<td><span class="badge b-' + (m.status === 'active' ? 'active' : 'closed') + '">' + EsignDocs.esc(m.status || '') + '</span></td>'
-        + '<td>' + (m.createdAt ? localYMD(new Date(m.createdAt)) : '') + '</td>'
-        + '<td><button class="btn btn-sub" onclick="shareCase(\'' + id + '\')">🔗 링크</button></td>'
-        + '</tr>';
-    }).join('');
+    tb.innerHTML = '<tr><td colspan="6" style="color:#991b1b">사건 목록을 불러오지 못했습니다 — '
+      + EsignDocs.esc(String((e && e.message) || e)) + '</td></tr>';
   });
 }
+$('btnRefreshCases').onclick = loadCases;
 
 // ── 새 사건 생성 ──
 $('btnNewCase').onclick = function () {
@@ -148,7 +282,7 @@ $('btnNewCase').onclick = function () {
     + '<label>대표자/주소 등</label><input id="ncResp" style="width:100%">'
     + '<label>사건 비밀번호 * (제출 열람용)</label><input id="ncPw" type="password" style="width:100%">'
     + '<label>사건 비밀번호 확인 *</label><input id="ncPw2" type="password" style="width:100%">'
-    + '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-top:12px;font-size:12.5px;color:#b91c1c">'
+    + '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-top:12px;font-size:12.5px;color:#991b1b">'
     + '⚠ 이 비밀번호를 잊으면 <b>제출된 개인정보를 영구히 복구할 수 없습니다.</b> 안전한 곳에 별도 보관하세요.</div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
     + '<button class="btn btn-sub" id="ncCancel">취소</button>'
@@ -166,14 +300,22 @@ $('btnNewCase').onclick = function () {
       var keys = await EsignCrypto.generateCaseKeys();
       var prot = await EsignCrypto.protectPrivKey(keys.privKeyJwk, pw);
       var ref = db.ref('esign/cases').push();
-      await trackedWrite(ref.child('meta').set({
+      var linkToken = EsignCrypto.randomToken();
+      var meta = {
         title: title, company: company, respondent: $('ncResp').value.trim(),
         ownerSid: curUser.email.split('@')[0],
-        pubKey: keys.pubKeyJwk, linkToken: EsignCrypto.randomToken(),
+        pubKey: keys.pubKeyJwk, linkToken: linkToken,
         createdAt: firebase.database.ServerValue.TIMESTAMP, status: 'active'
-      }));
+      };
+      await trackedWrite(ref.child('meta').set(meta));
       await trackedWrite(ref.child('secret/encPrivKey').set(prot));
       bg.remove();
+      /* ⚠ 목록을 once 로만 받으므로(비용 절감) 여기서 캐시에 직접 넣어야
+         한다 — 안 넣으면 [🔄 새로고침]을 누르기 전까지 방금 만든 사건이
+         목록에 안 보인다. createdAt 은 서버 시각을 몰라 지금 시각으로
+         어림한다(정렬에만 쓰인다 — 서버 값은 다음 새로고침 때 정확해진다). */
+      casesCache[ref.key] = { meta: Object.assign({}, meta, { createdAt: Date.now() }) };
+      renderCaseList();
       showToast('✅ 사건이 생성되었습니다 — [🔗 링크]로 근로자에게 공유하세요');
     } catch (e) {
       this.textContent = '사건 생성'; this.disabled = false;
@@ -270,7 +412,7 @@ function renderDetail() {
     + '</div>'
     + '<table><thead><tr><th>#</th><th>성명</th><th>주민등록번호</th><th>연락처</th><th>제출일시</th><th>상태</th><th></th></tr></thead><tbody>'
     + decrypted.map(function (d, i) {
-      var dup = d.idNo && cnt[d.idNo] > 1 ? ' <span class="badge" style="background:#fef3c7;color:#92400e">중복</span>' : '';
+      var dup = d.idNo && cnt[d.idNo] > 1 ? ' <span class="badge" style="background:#fffbeb;color:#854d0e">중복</span>' : '';
       return '<tr>'
         + '<td>' + (i + 1) + '</td>'
         + '<td style="font-weight:700">' + EsignDocs.esc(d.name) + dup + '</td>'
@@ -327,7 +469,7 @@ function showPerson(subId) {
     + '<tr><th>입사일</th><td>' + (d.joinDate ? EsignDocs.esc(d.joinDate) : '-') + '</td></tr>'
     + '<tr><th>퇴사일</th><td>' + (d.leaveDate ? EsignDocs.esc(d.leaveDate) : '-') + '</td></tr>'
     + '<tr><th>동의일시</th><td>' + EsignDocs.esc(String(d.consentAt || '').replace('T', ' ').slice(0, 16)) + '</td></tr>'
-    + '<tr><th>서명</th><td>' + (okSig ? '<img src="' + d.sigPng + '" style="height:70px;border:1px solid #e5e7eb;border-radius:6px">' : '-') + '</td></tr>'
+    + '<tr><th>서명</th><td>' + (okSig ? '<img src="' + d.sigPng + '" style="height:70px;border:1px solid #e2e8f0;border-radius:6px">' : '-') + '</td></tr>'
     + '</table>'
     + '<div style="text-align:right;margin-top:12px"><button class="btn btn-sub" onclick="this.closest(\'.modal-bg\').remove()">닫기</button></div></div>';
   document.body.appendChild(bg);
@@ -359,10 +501,254 @@ function renderDetailActions() {
   var m = (casesCache[curCaseId] || {}).meta || {};
   $('detailActions').innerHTML =
     '<button class="btn btn-sub" onclick="openArrears()">💰 체불내역</button> '
+    + '<button class="btn btn-sub" onclick="openCaseHwp()">📄 한글 원본</button> '
     + '<button class="btn btn-pri" onclick="genDocs()">📑 서류 일괄 생성</button> '
     + (m.status === 'active'
       ? '<button class="btn btn-sub" onclick="closeCase()">사건 마감</button>'
       : '<button class="btn btn-danger" onclick="purgeCase()">🗑 제출 데이터 파기</button>');
+}
+
+// 사건별 HWP/HWPX 원본은 관리자 기기의 브라우저에만 보관한다.
+// 공개 근로자 서명 화면(sign.html)과 RTDB에는 파일을 전송하지 않는다.
+var caseHwpModal = null;
+var caseHwpEditor = null;
+
+function closeCaseHwp() {
+  if (caseHwpEditor && typeof caseHwpEditor.destroy === 'function') {
+    try { caseHwpEditor.destroy(); } catch (_) {}
+  }
+  caseHwpEditor = null;
+  if (caseHwpModal) caseHwpModal.remove();
+  caseHwpModal = null;
+}
+
+function hwpFileSummary(record) {
+  if (!record) return '<b>등록된 한글 원본이 없습니다.</b><div style="color:#64748b;margin-top:4px">HWP 또는 HWPX 파일을 선택해 주세요.</div>';
+  var kb = Math.max(1, Math.round((record.size || 0) / 1024));
+  var when = record.savedAt ? new Date(record.savedAt).toLocaleString('ko-KR') : '';
+  return '<b>' + EsignDocs.esc(record.name || '한글 원본') + '</b>'
+    + '<div style="color:#64748b;margin-top:4px">' + String(record.format || '').toUpperCase() + ' · ' + kb.toLocaleString() + 'KB · ' + EsignDocs.esc(when) + '</div>';
+}
+
+async function refreshCaseHwp() {
+  if (!caseHwpModal) return null;
+  var record = await PureunHwpStore.get('esign-case', curCaseId);
+  var status = caseHwpModal.querySelector('#caseHwpStatus');
+  if (status) status.innerHTML = hwpFileSummary(record);
+  ['caseHwpOpen', 'caseHwpDownload', 'caseHwpDelete'].forEach(function (id) {
+    var btn = caseHwpModal.querySelector('#' + id); if (btn) btn.disabled = !record;
+  });
+  refreshCaseHwpTpl(record).catch(function (e) { if (window.console) console.warn('표지 살펴보기 실패', e); });
+  return record;
+}
+
+// ── 근로자별로 채우기 (대표 지시 2026-09-24 「문서관리 앱에도 넣어줄수있나」) ──
+// 한글 원본에 {{이름}} 같은 표지가 있으면, 확인된 근로자별로 값을 채운 파일을 만든다.
+// 표지가 없는(누름틀·백지 위임장 그대로인) 파일은 이 칸을 보여주지 않는다 — 기존 [열기]만 쓰면 된다.
+var _esignArrearsLoadedFor = null;
+async function refreshCaseHwpTpl(record) {
+  var box = caseHwpModal && caseHwpModal.querySelector('#caseHwpTplBox');
+  if (!box) return;
+  if (!record) { box.innerHTML = ''; return; }
+  var mk = {};
+  try {
+    var doc = await PureunHwp.openDoc(record.bytes, record.name);
+    try { mk = EsignHwpTpl.markersOf(doc); } finally { try { doc.free(); } catch (e2) {} }
+  } catch (e) { box.innerHTML = ''; return; }
+  var names = Object.keys(mk), total = names.reduce(function (a, k) { return a + mk[k]; }, 0);
+  if (!total) { box.innerHTML = ''; return; }   // 표지가 없다 — 원본을 그대로 여는 길만 쓴다
+  var known = EsignHwpTpl.valuesOf({}, {}, {});
+  var unknown = names.filter(function (k) { return known[k] === undefined; });
+  if (_esignArrearsLoadedFor !== curCaseId) {
+    try {
+      var snap = await db.ref('esign/cases/' + curCaseId + '/arrears').once('value');
+      arrearsCache = snap.val() || {};
+      _esignArrearsLoadedFor = curCaseId;
+    } catch (e) { /* 체불액 없이도 나머지는 채운다 */ }
+  }
+  renderCaseHwpFillBox(box, total, unknown);
+}
+function renderCaseHwpFillBox(box, total, unknown) {
+  var pool = (decrypted || []).filter(function (d) { return d._reviewState !== 'error'; });
+  if (!pool.length) { box.innerHTML = ''; return; }
+  var STATE_COLOR = { confirmed: '#166534', hold: '#854d0e', pending: '#64748b' };
+  var rows = pool.map(function (d) {
+    var a = arrearsCache[d._subId] || {};
+    var sum = (+a.month1 || 0) + (+a.month2 || 0) + (+a.month3 || 0) + (+a.severance || 0);
+    return '<div style="display:flex;gap:8px;align-items:center;padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:12px">'
+      + '<input type="checkbox" class="tplPersonChk" data-sub="' + d._subId + '"' + (d._reviewState === 'confirmed' ? ' checked' : '') + '>'
+      + '<span style="flex:1">' + EsignDocs.esc(d.name) + ' <span style="color:' + (STATE_COLOR[d._reviewState] || '#64748b') + '">' + (RS_LABEL[d._reviewState] || '') + '</span></span>'
+      + '<span>' + (sum ? sum.toLocaleString() : '—') + '</span></div>';
+  }).join('');
+  box.innerHTML = '<div style="border:2px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-top:10px">'
+    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b>근로자별로 채우기</b></div>'
+    + '<div style="font-size:12px;color:#64748b;margin-bottom:8px">채울 자리 ' + total + '곳 알아봄'
+    + (unknown.length ? ' · <span style="color:#854d0e">모르는 이름 ' + unknown.length + '곳 — 밑줄로 남김: ' + unknown.map(function (k) { return EsignDocs.esc(k); }).join(', ') + '</span>' : '')
+    + '</div>'
+    + '<div style="border:1px solid #e2e8f0;border-radius:8px;max-height:220px;overflow:auto">' + rows + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
+    + '<button class="btn btn-sub" id="tplPreviewOne">첫 사람 것 열어 보기</button>'
+    + '<button class="btn btn-pri" id="tplDownloadAll">채워 내려받기 (zip)</button></div></div>';
+  box.querySelector('#tplPreviewOne').onclick = tplPreviewFirst;
+  box.querySelector('#tplDownloadAll').onclick = tplDownloadZip;
+}
+function tplCheckedPeople() {
+  var ids = Array.prototype.map.call(caseHwpModal.querySelectorAll('.tplPersonChk:checked'), function (c) { return c.dataset.sub; });
+  return decrypted.filter(function (d) { return ids.indexOf(d._subId) >= 0; });
+}
+var _esignJsZipP = null;
+function _esignLoadJsZip() {
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  if (_esignJsZipP) return _esignJsZipP;
+  _esignJsZipP = new Promise(function (res, rej) {
+    var s = document.createElement('script'); s.src = 'vendor/jszip.min.js';
+    s.onload = function () { window.JSZip ? res(window.JSZip) : rej(new Error('zip 도구를 못 읽었습니다')); };
+    s.onerror = function () { _esignJsZipP = null; rej(new Error('zip 도구를 못 불러왔습니다')); };
+    document.head.appendChild(s);
+  });
+  return _esignJsZipP;
+}
+/* ★ 줄 다시 나누기 (기금 회의록 #1583·경력관리 #1584 에서 한글로 직접 열어 보고 배운 것) —
+   값을 채운 문단에 옛 줄 정보가 남으면 한글이 그것을 믿어 글자가 겹친다.
+   HWPX 로 내보내 줄 정보를 걷어낸 뒤 다시 읽어 reflowLinesegs 로 새로 나눈다. */
+async function _esignRelayout(doc) {
+  var hx = doc.exportHwpx();
+  var JSZ = await _esignLoadJsZip();
+  var zip = await JSZ.loadAsync(hx);
+  var secs = Object.keys(zip.files).filter(function (n) { return /^Contents\/section\d+\.xml$/.test(n); });
+  await Promise.all(secs.map(function (n) {
+    return zip.file(n).async('string').then(function (x) { zip.file(n, EsignHwpTpl.stripLinesegs(x)); });
+  }));
+  var bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: 'application/hwp+zip' });
+  var d2 = await PureunHwp.openDoc(bytes, 'relayout.hwpx');
+  try { d2.reflowLinesegs(); return d2.exportHwp(); } finally { try { d2.free(); } catch (e) {} }
+}
+async function _esignFillOne(record, meta, person) {
+  var doc = await PureunHwp.openDoc(record.bytes, record.name);
+  var r;
+  try {
+    var V = EsignHwpTpl.valuesOf(person, meta, arrearsCache[person._subId] || {});
+    r = EsignHwpTpl.fillDoc(doc, V);
+  } catch (e) { try { doc.free(); } catch (e2) {} throw e; }
+  try { r.bytes = await _esignRelayout(doc); r.relayoutFailed = false; }
+  catch (e) { r.bytes = doc.exportHwp(); r.relayoutFailed = true; }
+  try { doc.free(); } catch (e) {}
+  return r;
+}
+function _esignSafeName(s) { return String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim() || '사람'; }
+async function tplPreviewFirst() {
+  var people = tplCheckedPeople();
+  if (!people.length) { showToast('채울 사람을 먼저 선택해 주세요'); return; }
+  var record = await PureunHwpStore.get('esign-case', curCaseId);
+  if (!record) return;
+  var meta = (casesCache[curCaseId] || {}).meta || {};
+  showToast('채우는 중…');
+  try {
+    var r = await _esignFillOne(record, meta, people[0]);
+    if (r.unknown.length) showToast('모르는 표지 ' + r.unknown.length + '가지 — 그대로 두었습니다: ' + r.unknown.join(', '), 'warn');
+    if (r.relayoutFailed) showToast('줄 다시 나누기를 못 해 원본 줄 정보로 냈습니다', 'warn');
+    var host = caseHwpModal.querySelector('#caseHwpPreview');
+    host.style.display = 'block';
+    host.innerHTML = '<div style="padding:24px;color:#64748b">한글 문서를 여는 중…</div>';
+    var fname = _esignSafeName(people[0].name) + '.hwp';
+    try {
+      var opened = await PureunHwp.createEditor('#caseHwpPreview', r.bytes, fname);
+      caseHwpEditor = opened.editor;
+    } catch (_) { await PureunHwp.renderPreview(host, r.bytes, fname); }
+  } catch (e) { showToast(e.message || '채우기 실패'); }
+}
+async function tplDownloadZip() {
+  var people = tplCheckedPeople();
+  if (!people.length) { showToast('채울 사람을 먼저 선택해 주세요'); return; }
+  var record = await PureunHwpStore.get('esign-case', curCaseId);
+  if (!record) return;
+  var meta = (casesCache[curCaseId] || {}).meta || {};
+  showToast('서류 채우는 중… (' + people.length + '명)');
+  try {
+    var JSZ = await _esignLoadJsZip();
+    var zip = new JSZ();
+    var unknownAll = {}, relayoutFailN = 0;
+    for (var i = 0; i < people.length; i++) {
+      var r = await _esignFillOne(record, meta, people[i]);
+      r.unknown.forEach(function (k) { unknownAll[k] = 1; });
+      if (r.relayoutFailed) relayoutFailN++;
+      zip.file(_esignSafeName(people[i].name) + '.hwp', r.bytes);
+    }
+    var blob = await zip.generateAsync({ type: 'blob' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = _esignSafeName(meta.title || '사건') + '_채운서류.zip';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    var msgs = ['✅ ' + people.length + '명 채워 내려받음'];
+    if (Object.keys(unknownAll).length) msgs.push('모르는 표지: ' + Object.keys(unknownAll).join(', '));
+    if (relayoutFailN) msgs.push('줄 다시 나누기 실패 ' + relayoutFailN + '건 — 옛 줄 정보로 냄');
+    showToast(msgs.join(' · '));
+  } catch (e) { showToast(e.message || '채워 내려받기 실패'); }
+}
+
+async function previewCaseHwp() {
+  try {
+    var record = await PureunHwpStore.get('esign-case', curCaseId);
+    if (!record) { showToast('먼저 한글 원본을 등록해 주세요'); return; }
+    var host = caseHwpModal.querySelector('#caseHwpPreview');
+    host.style.display = 'block';
+    host.innerHTML = '<div style="padding:24px;color:#64748b">한글 문서를 여는 중…</div>';
+    try {
+      var opened = await PureunHwp.createEditor('#caseHwpPreview', record.bytes, record.name);
+      caseHwpEditor = opened.editor;
+    } catch (_) {
+      await PureunHwp.renderPreview(host, record.bytes, record.name);
+    }
+  } catch (e) { showToast(e.message || '문서를 열지 못했습니다'); }
+}
+
+async function openCaseHwp() {
+  if (!curCaseId) return;
+  closeCaseHwp();
+  var bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = '<div class="modal" style="max-width:920px">'
+    + '<div style="display:flex;align-items:center;gap:10px"><h3 style="flex:1">📄 사건 한글 원본</h3><button class="btn btn-sub" id="caseHwpClose">닫기</button></div>'
+    + '<div class="hwp-local-note"><b>관리자 전용</b> · 이 파일은 현재 PC의 이 브라우저에만 보관되며 근로자 서명 링크에는 전송되지 않습니다.</div>'
+    + '<div id="caseHwpStatus" class="hwp-file-card">불러오는 중…</div>'
+    + '<input id="caseHwpInput" type="file" accept=".hwp,.hwpx" hidden>'
+    + '<div class="hwp-actions" style="display:flex;flex-wrap:wrap;gap:8px">'
+    + '<button class="btn btn-pri" id="caseHwpChoose">HWP/HWPX 등록</button>'
+    + '<button class="btn btn-sub" id="caseHwpOpen">열기</button>'
+    + '<button class="btn btn-sub" id="caseHwpDownload">원본 다운로드</button>'
+    + '<button class="btn btn-danger" id="caseHwpDelete">삭제</button></div>'
+    + '<div id="caseHwpTplBox"></div>'
+    + '<div id="caseHwpPreview" class="hwp-preview"></div></div>';
+  document.body.appendChild(bg);
+  caseHwpModal = bg;
+  bg.querySelector('#caseHwpClose').onclick = closeCaseHwp;
+  bg.onclick = function (e) { if (e.target === bg) closeCaseHwp(); };
+  var input = bg.querySelector('#caseHwpInput');
+  bg.querySelector('#caseHwpChoose').onclick = function () { input.click(); };
+  input.onchange = async function () {
+    if (!input.files || !input.files[0]) return;
+    try {
+      await PureunHwpStore.putFile('esign-case', curCaseId, input.files[0]);
+      await refreshCaseHwp();
+      showToast('한글 원본을 이 기기에 보관했습니다');
+    } catch (e) { showToast(e.message || '한글 원본을 등록하지 못했습니다'); }
+    input.value = '';
+  };
+  bg.querySelector('#caseHwpOpen').onclick = previewCaseHwp;
+  bg.querySelector('#caseHwpDownload').onclick = async function () {
+    var record = await PureunHwpStore.get('esign-case', curCaseId);
+    if (record) PureunHwp.download(record.bytes, record.name, record.format);
+  };
+  bg.querySelector('#caseHwpDelete').onclick = function () {
+    customConfirm('이 기기에 보관된 사건 한글 원본을 삭제할까요?', async function () {
+      await PureunHwpStore.remove('esign-case', curCaseId);
+      var host = bg.querySelector('#caseHwpPreview'); if (host) { host.style.display = 'none'; host.innerHTML = ''; }
+      await refreshCaseHwp();
+      showToast('한글 원본을 삭제했습니다');
+    });
+  };
+  try { await refreshCaseHwp(); }
+  catch (e) { $('caseHwpStatus').textContent = e.message || '한글 원본 보관함을 열지 못했습니다.'; }
 }
 
 // 서류 4종 생성 — 확인(confirmed)된 제출만 (없으면 오류 제외 전체)
@@ -398,6 +784,10 @@ async function genDocs() {
 function closeCase() {
   customConfirm('사건을 마감할까요?\n마감하면 근로자 링크로 더 이상 제출할 수 없습니다.', function () {
     trackedWrite(db.ref('esign/cases/' + curCaseId + '/meta/status').set('closed')).then(function () {
+      /* 목록을 once 로만 받으므로 캐시도 직접 고친다 — 안 고치면 목록으로
+         돌아갔을 때 마감했는데도 「진행중」으로 보인다. */
+      if (casesCache[curCaseId] && casesCache[curCaseId].meta) casesCache[curCaseId].meta.status = 'closed';
+      renderCaseList();
       showToast('사건이 마감되었습니다'); renderDetail();
     }).catch(function () {
       showToast('마감 실패 — 다시 시도해 주세요');
@@ -413,6 +803,14 @@ function purgeCase() {
       db.ref('esign/cases/' + curCaseId + '/arrears').remove(),
       db.ref('esign/cases/' + curCaseId + '/meta/status').set('purged')
     ])).then(function () {
+      /* 목록을 once 로만 받으므로 캐시도 직접 고친다 — 안 고치면 제출 개수가
+         지운 뒤에도 목록에 그대로 남는다. */
+      var c = casesCache[curCaseId];
+      if (c) {
+        if (c.meta) c.meta.status = 'purged';
+        delete c.submissions; delete c.arrears;
+      }
+      renderCaseList();
       showToast('제출 데이터가 파기되었습니다');
       closeDetail();
     }).catch(function () {
@@ -477,5 +875,11 @@ async function openArrears() {
   };
 }
 </script>
+<!-- ── 폰 뒤로가기 — 창을 한 걸음씩 닫는다 (대표 지시 2026-08-30) ──
+     「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
+     ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
+        tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
+<script src="js/pu-back.js?v=2"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

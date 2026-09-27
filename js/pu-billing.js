@@ -1,0 +1,539 @@
+/* 파이어베이스 사용액 보기 — 값 다루는 부분만 (화면)
+   실시간DB `billing/current` 에 서버가 적어 둔 금액을, 화면에 그대로 쓸 모양으로
+   바꾼다. 여기서는 그리지 않는다 — 그려야 확인되는 코드는 검사를 못 한다.
+
+   ⚠ 이 값은 **어림수**다. 확정 청구액은 월말에 정산된다.
+   ⚠ 「남은 금액」은 만들 수 없다. Blaze 는 미리 넣고 까먹는 방식이 아니라
+     쓴 만큼 다음 달에 청구되는 후불이라, 구글 쪽에 남은 돈이라는 숫자가 없다.
+     그래서 이 파일은 **이번 달 지금까지 쓴 금액**만 다룬다. */
+(function (global) {
+  'use strict';
+
+  var ROOT = 'billing/current';
+  /* 쪼개 보여 줄 항목 (전체는 따로).
+     ⚠ 예산이 안 걸린 칸은 값이 안 와서 «조용히 빠진다»(summarize 가 건너뛴다) —
+       그래서 여기 미리 적어 두어도 화면이 깨지지 않는다. 대표님이 콘솔에서
+       그 이름의 예산을 만드시는 순간부터 줄이 생긴다.
+     ⚠ 'ai' 는 2026-08-29 에 넣었다 — 서류 판독·사진 지우개(제미나이) 요금이
+       그동안 「그 밖」에 섞여 **얼마나 쓰는지 볼 수가 없었다.** */
+  var PARTS = ['storage', 'database', 'functions', 'ai'];
+
+  /* 얼마나 지나야 「갱신이 멈춘 것 같다」고 말할까 — 26시간.
+     ⚠ 3시간으로 잡았다가 늘렸다. 구글은 **금액이 움직일 때만** 쏘기 때문에
+       밤새 아무도 안 쓰면 몇 시간씩 조용한 것이 정상이다. 3시간이면 거의 매일 아침
+       거짓 경고가 뜨고, 매일 뜨는 경고는 곧 아무도 안 본다.
+       하루를 통째로 넘겨도 소식이 없으면 그때는 진짜 멈춘 것이다. */
+  var STALE_MS = 26 * 60 * 60 * 1000;
+
+  /* ⚠ `Number(null)` 은 0 이고 `Number('')` 도 0 이다. 그냥 Number 로 바꾸면
+     **없는 금액이 ₩0 으로 둔갑한다** — 그리고 ₩0 은 「안 썼다」로 읽힌다.
+     이 화면에서 없는 값과 0 원을 섞는 것이 가장 나쁜 실수라, 여기서 막는다. */
+  function num(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var n = Number(v);
+    return isFinite(n) ? n : null;
+  }
+
+  function fmtWon(v) {
+    var n = num(v);
+    if (n === null) return '—';
+    return '₩' + Math.round(n).toLocaleString('ko-KR');
+  }
+
+  /* 눈금 대비 얼마나 찼나. 눈금이 없으면 null — 막대를 아예 안 그린다.
+     ⚠ 0 을 돌려주면 「하나도 안 썼다」로 그려진다. 없는 것과 0 은 다르다. */
+  function ratio(row) {
+    if (!row) return null;
+    var b = num(row.budget), c = num(row.cost);
+    if (b === null || b <= 0 || c === null) return null;
+    return c / b;
+  }
+
+  function tone(r) {
+    if (r === null || r === undefined) return 'none';
+    if (r >= 1) return 'over';
+    if (r >= 0.8) return 'warn';
+    return 'ok';
+  }
+
+  function agoText(updatedAt, now) {
+    var t = num(updatedAt);
+    if (t === null) return '갱신 기록 없음';
+    var d = Math.max(0, num(now) - t);
+    var m = Math.floor(d / 60000);
+    if (m < 1) return '방금 전';
+    if (m < 60) return m + '분 전';
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + '시간 전';
+    return Math.floor(h / 24) + '일 전';
+  }
+
+  /* 소식이 끊겼나. 끊겼는데 조용히 두면 **옛 금액이 최신인 척** 남는다 —
+     이게 이 화면에서 제일 나쁜 상태라, 모를 때는 모른다고 밝힌다. */
+  function isStale(updatedAt, now) {
+    var t = num(updatedAt);
+    if (t === null) return true;
+    return (num(now) - t) > STALE_MS;
+  }
+
+  /* 이 추세면 월말에 얼마쯤. **참고용이다** — 지금까지 속도가 그대로 간다는 가정이라
+     월말에 몰아 쓰면 어긋난다. 달이 막 시작해 잰 시간이 너무 짧으면 아예 안 내놓는다
+     (첫날 몇 시간으로 한 달을 점치면 터무니없는 숫자가 나온다). */
+  function projectMonthEnd(row, now) {
+    if (!row) return null;
+    var cost = num(row.cost), start = num(row.intervalStart), t = num(now);
+    if (cost === null || start === null || t === null) return null;
+
+    var elapsed = t - start;
+    var DAY = 86400000;
+    if (elapsed < DAY) return null;           // 하루는 지나야 추세라 부를 수 있다
+
+    var d = new Date(start);
+    var days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    var whole = days * DAY;
+    if (elapsed >= whole) return cost;        // 이미 달을 다 채웠다
+    return Math.round(cost / elapsed * whole);
+  }
+
+  /* ── 월말 어림 ② : «최근 며칠» 의 하루 평균으로 민다 (대표 확인 2026-08-29) ──
+     ⚠ 달 평균(projectMonthEnd)으로 밀면 **이미 끝난 «비싸던 시기»가 월말까지 따라붙는다.**
+       8월이 그랬다 — 첫 16일은 하루 ₩5,448 이었는데 8/27 에 새던 곳을 막아
+       하루 ₩585 로 내려갔다. 그런데도 화면은 여전히 「월말 ₩113,241」을 내놓았다.
+       **고친 보람이 안 보이면 아무도 고치지 않는다.** 그래서 최근 쪽에 무게를 둔다.
+     ⚠ «오늘» 은 빼고 센다 — 아직 안 끝난 하루를 온전한 하루로 치면 낮게 나온다.
+       (오후 3시에 보면 하루 평균이 실제의 5분의 3으로 보인다.)
+     ⚠ 아는 날이 둘도 안 되면 **내놓지 않는다** — 달 평균으로 되돌아간다.
+       하루치로 한 달을 점치면 그날 하루의 튐이 그대로 월말이 된다.
+     ⚠ 이번 달 칸만 센다. 지난 달을 보고 있을 때 그 값으로 이번 달을 밀면 안 된다. */
+  var RECENT_DAYS = 3;
+
+  function projectRecent(row, buckets, now, opts) {
+    if (!row) return null;
+    var cost = num(row.cost), t = num(now);
+    if (cost === null || t === null) return null;
+
+    var days = dayBuckets(buckets || []);
+    if (!days.length) return null;
+
+    var tz = (opts && num(opts.tz) !== null) ? num(opts.tz) : -new Date().getTimezoneOffset();
+    var today = hourKey(t, tz).slice(0, 10);
+    var ym = today.slice(0, 7);
+    var done = days.filter(function (d) {
+      return d.day.slice(0, 7) === ym && d.day < today && d.known && d.known.total;
+    });
+    if (done.length < 2) return null;
+
+    var take = done.slice(-RECENT_DAYS);
+    var sum = 0;
+    take.forEach(function (d) { sum += (num(d.total) || 0); });
+    var perDay = sum / take.length;
+
+    /* 남은 시간은 «날 수» 가 아니라 **소수 하루** 로 센다 —
+       오늘 남은 반나절을 하루로 치면 매일 아침 월말이 뛴다. */
+    var d0 = new Date(t + tz * 60000);
+    var nextMonth = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() + 1, 1);
+    var left = (nextMonth - tz * 60000 - t) / 86400000;
+    if (left < 0) left = 0;
+
+    return { cost: Math.round(cost + perDay * left), perDay: Math.round(perDay), days: take.length };
+  }
+
+  /* 쪼갠 칸이 전체보다 얼마나 낡으면 「그 밖」을 못 믿는 값으로 볼까 — 10분.
+     구글 예산 알림은 칸마다 따로 오고 20~30분씩 어긋나기도 한다. 전체만 새로 오고
+     실시간DB 칸이 낡아 있으면, 실시간DB가 오른 몫이 뺄셈에서 「그 밖」으로 새어
+     들어간다 — 2026-08-16 밤 실제로 그랬다(그 밖이 ₩3,725인데 ₩6,379로 보였고,
+     대표가 엉뚱한 칸을 의심하셨다). */
+  var PART_LAG_MS = 10 * 60 * 1000;
+
+  /* 화면이 쓸 한 덩어리로 묶는다.
+     ⚠ 쪼갠 항목을 더한 값이 전체와 같지 않다 — 예산을 안 건 서비스가 남기 때문이다.
+       모자란 만큼을 「그 밖」으로 내놓는다. 안 그러면 쪼갠 것을 더해 보신 대표님이
+       전체와 안 맞는 것을 발견하시고, 그때부터 이 화면 전체를 못 믿게 된다.
+     ⚠ 그런데 그 뺄셈은 **칸들이 같은 시각일 때만** 맞다. 어느 칸이 전체보다
+       10분 넘게 낡았으면 「그 밖」에 approx 표시를 얹고, 어느 칸을 기다리는
+       중인지(etcNote) 함께 내놓는다 — 화면이 ≈와 안내를 그릴 수 있게. */
+  /* buckets 는 hourBuckets() 의 결과(선택). 있으면 «최근 며칠» 기준으로 월말을 밀고,
+     없거나 모자라면 달 평균으로 되돌아간다 — 화면은 어느 쪽으로 밀었는지
+     projectedBasis 로 알 수 있어야 한다(안 밝히면 숫자를 못 믿는다). */
+  function summarize(current, now, buckets) {
+    var cur = (current && typeof current === 'object') ? current : {};
+    var total = cur.total || null;
+    var totalUpd = total ? num(total.updatedAt) : null;
+
+    var parts = [];
+    var sum = 0;
+    var lagged = [];   // 전체보다 10분 넘게 낡은 칸들의 이름표
+    for (var i = 0; i < PARTS.length; i++) {
+      var row = cur[PARTS[i]];
+      if (!row || num(row.cost) === null) continue;
+      var label = row.label || PARTS[i];
+      parts.push({ key: PARTS[i], label: label, cost: num(row.cost) });
+      sum += num(row.cost);
+      var pu = num(row.updatedAt);
+      /* ⚠ 금액이 사실상 0원인 칸은 낡아도 의심하지 않는다(2026-08-17 아침 실사례).
+         구글은 금액이 움직일 때만 알림을 쏘므로 ₩0 칸은 영영 「낡은」 채다 —
+         그걸 매일 「갱신 대기 중」이라 하면 경고가 상시등이 되어 아무도 안 본다.
+         0원이 움직이기 시작하면 30분 안에 제 알림이 오고, 그때부터는 잡힌다. */
+      if (totalUpd !== null && num(row.cost) >= 100
+          && (pu === null || totalUpd - pu > PART_LAG_MS)) lagged.push(label);
+    }
+
+    var totalCost = total ? num(total.cost) : null;
+    var etcNote = null;
+    if (totalCost !== null && parts.length) {
+      var rest = totalCost - sum;
+      // 1원 단위 반올림 차이로 「그 밖 3원」이 뜨는 것은 잡음이다.
+      if (rest > 1) {
+        var etc = { key: 'etc', label: '그 밖', cost: rest };
+        if (lagged.length) {
+          etc.approx = true;
+          etcNote = lagged.join('·') + ' 갱신 대기 중 — 그 몫이 「그 밖」에 섞여 보일 수 있습니다';
+        }
+        parts.push(etc);
+      }
+    }
+
+    /* ⚠ 눈금은 **구글 예산액이 아니다.**
+       구글 예산은 「이 금액을 넘으면 알려 달라」는 알림 방아쇠일 뿐이라 실제로는
+       넉넉히 잡아 둔다. 그 숫자를 눈금으로 그리면 대표님은 늘 「2% 썼다」만 보게 된다.
+       화면 눈금은 대표님이 따로 정하시는 `billing/limit` 하나뿐이고, 안 정하셨으면
+       막대를 안 그린다(대표 결정 2026-08-15: 첫 달은 한 달 지켜보고 정한다). */
+    var limit = num(cur.limit);
+    var upd = total ? num(total.updatedAt) : null;
+    var r = ratio({ cost: totalCost, budget: limit });
+
+    var _pr = projectRecent(total, buckets, now);
+
+    return {
+      has: totalCost !== null,
+      cost: totalCost,
+      budget: limit,
+      ratio: r,
+      tone: tone(r),
+      parts: parts,
+      etcNote: etcNote,
+      projected: _pr ? _pr.cost : projectMonthEnd(total, now),
+      projectedBasis: _pr ? { mode: 'recent', days: _pr.days, perDay: _pr.perDay }
+                          : { mode: 'month' },
+      updatedAt: upd,
+      ago: agoText(upd, now),
+      stale: isStale(upd, now),
+    };
+  }
+
+  /* 금액을 지켜본다 — **읽기만 한다.**
+     ⚠ 화면이 `db.ref(...)` 를 직접 부르지 못하게 막혀 있다(2026-07 실데이터 사고 뒤로,
+       tests/pu-photos-html.test.js 가 지킨다). 읽기라고 예외를 두면 그 자리가 다시
+       열리므로 부르는 길을 여기 하나로 모은다 — 이 파일에는 set·update·remove 가 없다.
+     ⚠ 실패 콜백을 반드시 받아 넘긴다. 빠뜨리면 규칙에 막혔을 때 콘솔에 빨간 오류만
+       남고 화면은 영영 빈 채로 있는다. */
+  function watch(db, onValue, onError) {
+    if (!db || typeof db.ref !== 'function') return function () { };
+    var ref = db.ref(ROOT);
+    var cb = ref.on('value', function (snap) { onValue(snap.val()); },
+      function (e) { if (onError) onError(e); });
+    return function () { try { ref.off('value', cb); } catch (e) { /* 이미 끊겼다 */ } };
+  }
+
+  /* ══ 시간별 기록 (2026-08-17 대표 지시) ═══════════════════════════════
+     대표 지시: "몇 시에 체크 시 얼마 그리고 얼마 상승 … 각 항목마다 시간당 얼마씩".
+
+     ★ 왜 «한 시간 칸» 으로 묶나 —
+       구글은 「금액이 움직일 때만」 쏜다. 어떤 때는 2분 만에, 어떤 때는 4시간 만에 온다.
+       그 간격으로 시간당을 내면 2분짜리 기록에서 «30배로 부풀어» 보이고,
+       그 숫자를 보고 놀라게 된다. 한 시간 칸으로 묶으면
+       「17시에 3,640원 늘었다」가 곧 「그 시간에 시간당 3,640원」이라 셈이 필요 없다.
+
+     ★ 왜 «0 과 「모른다」를 가르나» —
+       쪽지가 없는 시간은 「안 썼다」가 아니라 「구글이 안 쏴서 모른다」다.
+       0 으로 적으면 「그 시간엔 공짜였다」로 읽힌다. 이 저장소에서 없는 값을
+       0 으로 둔갑시켜 여러 번 당했다(위 num() 이 그것 때문에 있다). */
+
+  // 그 시각이 속한 시간 칸 이름. tz 는 시간대 옮김(분) — 검사는 0 으로 고정해 흔들리지 않게 한다.
+  function hourKey(ms, tzMin) {
+    var d = new Date(num(ms) + (num(tzMin) || 0) * 60000);
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0')
+      + '-' + String(d.getUTCDate()).padStart(2, '0') + 'T' + String(d.getUTCHours()).padStart(2, '0');
+  }
+
+  /* 항목별 시계열({ts:금액}) → 한 시간 칸별 증가분.
+     history: { total:{…}, storage:{…}, database:{…}, functions:{…} } */
+  function hourBuckets(history, opts) {
+    if (!history || typeof history !== 'object') return [];
+    var tz = (opts && num(opts.tz) !== null) ? num(opts.tz) : -new Date().getTimezoneOffset();
+    var KEYS = ['total'].concat(PARTS);
+
+    // ① 항목마다 「그 칸의 마지막 값」을 모은다
+    var last = {};        // last[key][hour] = 금액
+    var hours = {};
+    KEYS.forEach(function (k) {
+      last[k] = {};
+      var series = history[k];
+      if (!series || typeof series !== 'object') return;
+      Object.keys(series).forEach(function (ts) {
+        var v = num(series[ts]);
+        if (v === null) return;
+        var h = hourKey(ts, tz);
+        hours[h] = 1;
+        // 같은 칸에 여러 쪽지 → 나중 것이 이긴다 (ts 가 클수록 나중)
+        var prev = last[k][h];
+        if (!prev || num(ts) >= prev.ts) last[k][h] = { ts: num(ts), v: v };
+      });
+    });
+
+    var have = Object.keys(hours).sort();
+    if (!have.length) return [];
+
+    /* 쪽지가 온 시간만 늘어놓으면 «소식 없던 시간이 화면에서 사라진다».
+       그러면 「13시엔 아무 일도 없었나?」를 알 수 없고, 시간당 평균도 부풀어 보인다.
+       ★ 처음과 끝 사이의 «모든 시간 칸» 을 채우고, 쪽지 없는 칸은 「모른다」로 남긴다. */
+    var order = [];
+    (function () {
+      var toMs = function (h) { return Date.parse(h.slice(0, 10) + 'T' + h.slice(11) + ':00:00Z'); };
+      var a = toMs(have[0]), b = toMs(have[have.length - 1]);
+      for (var t = a; t <= b; t += 3600000) order.push(hourKey(t - (num(tz) || 0) * 60000, tz));
+    })();
+
+    /* ② 칸마다 「앞서 알던 값」과 견줘 증가분을 낸다.
+       ⚠ 앞이 없으면(첫 칸) 증가분을 «모른다» — 0 이 아니다. */
+    var seen = {};        // seen[key] = 마지막으로 알던 금액
+    var out = [];
+    order.forEach(function (h) {
+      var row = { hour: h, total: null, cum: null, cumKnown: false, parts: {}, known: {} };
+      KEYS.forEach(function (k) {
+        var cur = last[k][h];
+        if (!cur) { row.known[k] = false; if (k !== 'total') row.parts[k] = null; return; }
+        /* 「몇 시에 «얼마»」 — 그 시각의 누적 전체액.
+           ⚠ 증가분(row.total)과 «다른 것» 이다. 증가분은 앞 칸을 알아야 나오지만
+             누적액은 쪽지 하나로 알 수 있다 — 그래서 «첫 칸에도» 뜬다.
+           ⚠ 쪽지 없는 칸은 앞 값을 끌어다 쓰지 않는다. 「그 시각에 그랬다」가 아니라
+             「그 뒤로 소식이 없다」일 뿐이고, 실제로는 그 이상일 수 있다. */
+        if (k === 'total') { row.cum = cur.v; row.cumKnown = true; }
+        var was = seen[k];
+        if (was === undefined) { row.known[k] = false; if (k !== 'total') row.parts[k] = null; }
+        else {
+          var d = cur.v - was;
+          row.known[k] = true;
+          if (k === 'total') row.total = d; else row.parts[k] = d;
+        }
+        seen[k] = cur.v;
+      });
+      /* 「그 밖」 = 전체 − (쪼갠 것 합).
+         ⚠ 음수면 0 으로 깎는다 — 낡은 칸 몫이 새어 마이너스로 보이던 일이 있었다
+           (2026-08-16 「그 밖 착시」). 마이너스 지출은 사람이 이해할 수 없다. */
+      if (row.known.total) {
+        var s = 0, anyPart = false;
+        PARTS.forEach(function (k) { if (row.known[k]) { s += row.parts[k] || 0; anyPart = true; } });
+        row.parts.etc = Math.max(0, row.total - s);
+        row.known.etc = anyPart || s === 0;
+      } else {
+        row.parts.etc = null; row.known.etc = false;
+      }
+      out.push(row);
+    });
+    return out;
+  }
+
+  /* 항목별 시간당 평균.
+     ⚠ 나누는 것은 «아는 칸 수» 다. 소식 없는 칸을 0 으로 치고 나누면
+       시간당이 실제보다 «낮게» 나와 안심하게 된다. */
+  /* 시간 칸 → «날» 칸 (대표 지시 2026-08-20 「일별 정산금액도 표시해줘」).
+     ⚠ 「그 날 얼마 늘었나」는 시간 칸 증가분을 그냥 더하면 된다 — 증가분은
+       «앞서 알던 값과의 차이» 라 이어 붙으면(telescoping) 결국
+       「그 날 마지막으로 아는 값 − 어제 마지막으로 아는 값」과 같아진다.
+       소식 없던 시간이 사이에 끼어 있어도 값이 새지 않는다.
+     ⚠ 「모른다」는 그대로 「모른다」다. 아는 칸이 하나도 없는 날은 0 이 아니라 —.
+       (첫날은 견줄 앞 값이 없어 늘 «모른다»가 된다. 0 으로 적으면 거짓말이다.) */
+  function dayBuckets(buckets) {
+    if (!buckets || !buckets.length) return [];
+    var byDay = {}, order = [];
+    buckets.forEach(function (b) {
+      var d = String(b.hour || '').slice(0, 10);
+      if (!d) return;
+      if (!byDay[d]) {
+        var r = { day: d, total: 0, cum: null, cumKnown: false, parts: {}, known: { total: false } };
+        PARTS.concat('etc').forEach(function (k) { r.parts[k] = 0; r.known[k] = false; });
+        byDay[d] = r; order.push(d);
+      }
+      var row = byDay[d];
+      if (b.known && b.known.total) { row.total += (num(b.total) || 0); row.known.total = true; }
+      PARTS.concat('etc').forEach(function (k) {
+        if (b.known && b.known[k]) { row.parts[k] += (num(b.parts[k]) || 0); row.known[k] = true; }
+      });
+      /* 그 날 «마지막으로 아는» 누적액. 칸이 시간 오름차순이라 덮어쓰면 그것이 마지막이다. */
+      if (b.cumKnown) { row.cum = b.cum; row.cumKnown = true; }
+    });
+    return order.map(function (d) { return byDay[d]; });
+  }
+
+  /* 여러 줄(시간 칸이든 날 칸이든)을 하나로 합친다 — 표 맨 아래 「합계」 줄에 쓴다.
+     (대표 지시 2026-08-20 「일별 토탈금액 볼 수 있게 해달라」)
+
+     ⚠ «아는 칸» 만 더한다. 모르는 칸을 0 으로 치면 「그때 안 썼다」는 거짓말이 되고,
+       그 거짓말이 합계에서는 눈에 띄지도 않는다.
+     ⚠ 「전체(누적)」는 더하지 않는다 — 누적끼리 더하면 아무 뜻도 없는 수가 나온다.
+       합계 줄의 「전체」는 «가장 나중에 아는 누적액» 이다.
+     ⚠ 늘어난 돈의 합은 이어 붙어(telescoping) 「끝 누적 − 앞 누적」과 같아진다 —
+       사이에 소식 없던 칸이 있어도 값이 새지 않는다. */
+  function sumBuckets(rows) {
+    var res = { rows: 0, total: 0, cum: null, cumKnown: false,
+                parts: {}, known: { total: false }, unknownRows: 0 };
+    var KEYS = PARTS.concat('etc');
+    KEYS.forEach(function (k) { res.parts[k] = 0; res.known[k] = false; });
+    if (!rows || !rows.length) return res;
+    rows.forEach(function (b) {
+      if (!b) return;
+      res.rows++;
+      if (b.known && b.known.total) { res.total += (num(b.total) || 0); res.known.total = true; }
+      else res.unknownRows++;
+      KEYS.forEach(function (k) {
+        if (b.known && b.known[k]) { res.parts[k] += (num((b.parts || {})[k]) || 0); res.known[k] = true; }
+      });
+      /* 가장 «나중» 누적액을 남긴다. 넘겨받는 차례가 오름차순일 수도, 내림차순일 수도
+         있으므로 날짜·시각 열쇠로 견준다(줄 차례에 기대지 않는다). */
+      if (b.cumKnown) {
+        var key = String(b.hour || b.day || '');
+        if (!res.cumKnown || key >= res._at) { res.cum = b.cum; res.cumKnown = true; res._at = key; }
+      }
+    });
+    delete res._at;
+    return res;
+  }
+
+  function hourlyRates(buckets) {
+    var res = { total: null, parts: {}, hours: 0 };
+    if (!buckets || !buckets.length) return res;
+    var KEYS = ['total'].concat(PARTS).concat(['etc']);
+    var sum = {}, cnt = {};
+    KEYS.forEach(function (k) { sum[k] = 0; cnt[k] = 0; });
+    buckets.forEach(function (b) {
+      if (!b || !b.known) return;
+      KEYS.forEach(function (k) {
+        if (!b.known[k]) return;
+        var v = (k === 'total') ? b.total : (b.parts || {})[k];
+        if (num(v) === null) return;
+        sum[k] += num(v); cnt[k]++;
+      });
+    });
+    res.hours = cnt.total;
+    res.total = cnt.total ? Math.round(sum.total / cnt.total) : null;
+    PARTS.concat(['etc']).forEach(function (k) {
+      res.parts[k] = cnt[k] ? Math.round(sum[k] / cnt[k]) : null;
+    });
+    return res;
+  }
+
+  /* ══ 🤖 AI 판독 이번 달 한도 (대표 결정 2026-09-10) ═════════════════════
+       「3만원으로 하고 만약 25000원 넘으면 경고해 달라」
+
+     ★ 위쪽 billing/* 과 «다른 자리»다. 그쪽은 구글이 준 **진짜 요금**이고
+       이쪽은 판독 횟수 × 단가로 낸 **어림**이다. 진짜 요금은 하루 늦게 오는데
+       그것으로 막으면 이미 다 쓴 뒤에 막는다. 그래서 우리가 센 횟수로 미리 막고,
+       며칠 뒤 진짜 요금이 찍히면 설정에서 단가를 그 값에 맞춘다.
+     ⚠⚠ 계산식은 **세 곳이 같은 답**을 내야 한다 —
+       ① 서버 functions/doc-read.js(aiSpentWon·aiBudgetOf) ② 사진첩 pu-photos.html
+       ③ 포털(여기). 하나만 달라지면 화면은 「남았다」는데 서버가 막는다.
+       tests/ai-spend-cap.test.js 가 셋을 나란히 세워 견준다 — 고칠 때 함께 고친다.
+     ⚠ 0 은 «끔»이다. 한도 0 이면 아무것도 안 막는다(경고선도 같다). */
+  var AI_TALLY_ROOT = 'ai_read_tally';
+  var AI_BUDGET_ROOT = 'ai_read_budget';
+  /* 2026-09-17 대표 「5만원으로 재조정」 — 서버(functions/doc-read.js)와 «똑같아야» 한다 */
+  var AI_BUDGET_DEFAULT = { limit: 50000, warn: 45000, wonPerRead: 4 };
+
+  /* 한국 달 이름(2026-09) — 서버(doc-read.js 의 ymKST)와 «같은 칸»을 봐야 숫자가 맞는다.
+     ⚠ 브라우저 시간대를 믿지 않는다. 해외에서 열어도 회사 달로 세야 한다. */
+  function aiYm(now) {
+    var t = num(now);
+    var k = new Date((t === null ? Date.now() : t) + 9 * 60 * 60 * 1000);
+    return k.getUTCFullYear() + '-' + String(k.getUTCMonth() + 1).padStart(2, '0');
+  }
+
+  /* 설정이 없거나 망가졌으면 기본값으로 물러선다 — 서버 aiBudgetOf 와 같은 규칙이다.
+     ⚠ 0 으로 채우지 «말 것». 「한도 0원」이 되어 판독이 통째로 막힌 것처럼 보인다. */
+  function aiBudgetOf(raw) {
+    var b = (raw && typeof raw === 'object') ? raw : {};
+    var pick = function (v, d) {
+      var n = Number(v);
+      return (isFinite(n) && n >= 0) ? n : d;
+    };
+    return {
+      limit: pick(b.limit, AI_BUDGET_DEFAULT.limit),
+      warn: pick(b.warn, AI_BUDGET_DEFAULT.warn),
+      wonPerRead: pick(b.wonPerRead, AI_BUDGET_DEFAULT.wonPerRead)
+    };
+  }
+
+  /* 이번 달 판독이 얼마나 됐나. 셈을 못 읽었으면 has:false — **아무것도 안 그린다**.
+     ⚠ 「못 읽었다」를 ₩0 으로 적지 말 것. 다 쓴 것을 「아직 안 썼다」로 읽는다. */
+  function aiSummarize(budgetRaw, monthTally) {
+    var b = aiBudgetOf(budgetRaw);
+    var reads = (monthTally && monthTally._all) ? num(monthTally._all.n) : null;
+    if (reads === null || reads < 0) {
+      return { has: false, reads: null, spent: null, limit: b.limit, warn: b.warn,
+        wonPerRead: b.wonPerRead, free: b.wonPerRead === 0, over: false, near: false, tone: 'none' };
+    }
+    var spent = Math.round(reads * b.wonPerRead);
+    var over = b.limit > 0 && spent >= b.limit;
+    var near = b.warn > 0 && spent >= b.warn;
+    /* ★ 단가가 0 이면 «무료로 쓰는 중»이다 — 그때는 금액을 그리지 않는다
+         (대표 지시 2026-09-12 「무료는 횟수만 보이게」).
+       ⚠ ₩0 을 띄우면 「안 썼다」로 읽힌다. 실제로는 썼고 «돈이 안 들 뿐»이다.
+         그래서 금액을 감추고 «몇 번 썼나»를 대신 보인다 — 셈은 그대로 쌓인다.
+       ⚠ 무료라고 셈을 멈추지 말 것. 유료로 바뀌는 날 단가만 채워 넣으면
+         그날부터 금액이 맞게 나온다(그때 지난 횟수도 근거가 된다). */
+    return { has: true, reads: reads, spent: spent, limit: b.limit, warn: b.warn,
+      wonPerRead: b.wonPerRead, free: b.wonPerRead === 0, over: over, near: near,
+      tone: over ? 'over' : near ? 'warn' : 'ok' };
+  }
+
+  /* 셈과 설정 둘을 함께 지켜본다 — 하나가 바뀌면 같이 다시 그린다.
+     ⚠ 설정 읽기에 실패해도 셈은 살린다(그 반대도). 기본 한도로 그리는 편이
+       아무것도 안 그리는 것보다 낫다. */
+  function watchAi(db, now, onValue, onError) {
+    if (!db || typeof db.ref !== 'function') return function () { };
+    var ym = aiYm(now);
+    var tally = null, budget = null;
+    var fire = function () { onValue(aiSummarize(budget, tally)); };
+    var tRef = db.ref(AI_TALLY_ROOT + '/' + ym);
+    var bRef = db.ref(AI_BUDGET_ROOT);
+    var tCb = tRef.on('value', function (s) { tally = s.val(); fire(); },
+      function (e) { if (onError) onError(e); });
+    var bCb = bRef.on('value', function (s) { budget = s.val(); fire(); },
+      function (e) { if (onError) onError(e); });
+    return function () {
+      try { tRef.off('value', tCb); } catch (e) { /* 이미 끊겼다 */ }
+      try { bRef.off('value', bCb); } catch (e) { /* 이미 끊겼다 */ }
+    };
+  }
+
+  global.PuBilling = {
+    ROOT: ROOT,
+    HISTORY_ROOT: 'billing/history',
+    watch: watch,
+    PARTS: PARTS,
+    STALE_MS: STALE_MS,
+    PART_LAG_MS: PART_LAG_MS,
+    fmtWon: fmtWon,
+    ratio: ratio,
+    tone: tone,
+    agoText: agoText,
+    isStale: isStale,
+    projectMonthEnd: projectMonthEnd,
+    summarize: summarize,
+    hourKey: hourKey,
+    projectRecent: projectRecent,
+    RECENT_DAYS: RECENT_DAYS,
+    hourBuckets: hourBuckets,
+    dayBuckets: dayBuckets,
+    sumBuckets: sumBuckets,
+    hourlyRates: hourlyRates,
+    /* 🤖 AI 판독 이번 달 한도 (2026-09-10) — 까닭은 aiSummarize 머리에 */
+    AI_TALLY_ROOT: AI_TALLY_ROOT,
+    AI_BUDGET_ROOT: AI_BUDGET_ROOT,
+    AI_BUDGET_DEFAULT: AI_BUDGET_DEFAULT,
+    aiYm: aiYm,
+    aiBudgetOf: aiBudgetOf,
+    aiSummarize: aiSummarize,
+    watchAi: watchAi,
+  };
+})(typeof window !== 'undefined' ? window : globalThis);

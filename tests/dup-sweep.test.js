@@ -55,12 +55,12 @@ const K = (g) => g.verdict + ':' + g.kindLabel + ':' + g.coName + ':' + g.rows.l
     c.dupSweepCoKey({ bizNo:'1234567890', companyName:'가나' }),
     c.dupSweepCoKey({ bizNo:'123-45-67890', companyName:'가나상사' }));
   t('★ (주) 표기 차이는 무시한다',
-    c.dupSweepCoKey({ companyName:'(주)유원에프앤비' }),
-    c.dupSweepCoKey({ companyName:'유원에프앤비' }));
-  t('★ 주식회사 표기도 같게', c.dupSweepCoKey({ companyName:'주식회사 남양인텍' }),
-    c.dupSweepCoKey({ companyName:'남양인텍' }));
-  t('공백·기호 차이도 같게', c.dupSweepCoKey({ companyName:'가야 엔지니어링' }),
-    c.dupSweepCoKey({ companyName:'가야엔지니어링' }));
+    c.dupSweepCoKey({ companyName:'(주)자차에프앤비' }),
+    c.dupSweepCoKey({ companyName:'자차에프앤비' }));
+  t('★ 주식회사 표기도 같게', c.dupSweepCoKey({ companyName:'주식회사 아자인텍' }),
+    c.dupSweepCoKey({ companyName:'아자인텍' }));
+  t('공백·기호 차이도 같게', c.dupSweepCoKey({ companyName:'카타 엔지니어링' }),
+    c.dupSweepCoKey({ companyName:'카타엔지니어링' }));
   t('★ 다른 회사는 다른 열쇠',
     c.dupSweepCoKey({ companyName:'가나상사' }) === c.dupSweepCoKey({ companyName:'다라기업' }), false);
   t('사업자번호가 짧으면 이름으로 떨어진다',
@@ -99,12 +99,12 @@ const K = (g) => g.verdict + ':' + g.kindLabel + ':' + g.coName + ':' + g.rows.l
 // 같은 사업장 · 같은 세부 종류 · 둘 다 진행 중 → 진짜 중복
 {
   const r = scan({ contracts:[
-    { id:'c1', companyName:'유원에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
+    { id:'c1', companyName:'자차에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
       kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' }, status:'signed' },
-    { id:'c2', companyName:'(주)유원에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
+    { id:'c2', companyName:'(주)자차에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
       kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' }, status:'signed' }
   ]});
-  t('★ 같은 세부 종류가 둘 다 진행 중이면 진짜 중복', r.groups.map(K), ['dup:계약:유원에프앤비:2']);
+  t('★ 같은 세부 종류가 둘 다 진행 중이면 진짜 중복', r.groups.map(K), ['dup:계약:자차에프앤비:2']);
   t('진행 중 건수를 센다', r.groups[0].openN, 2);
   t('집계', [r.counts.dup, r.counts.again, r.counts.unknown], [1, 0, 0]);
   t('훑은 건수', r.counts.scanned, 2);
@@ -113,12 +113,12 @@ const K = (g) => g.verdict + ':' + g.kindLabel + ':' + g.coName + ':' + g.rows.l
 // 앞의 것이 종료 → 재계약
 {
   const r = scan({ contracts:[
-    { id:'c1', companyName:'가야엔지니어링', signDate:'2025-06-02', kinds:['advisory'],
+    { id:'c1', companyName:'카타엔지니어링', signDate:'2025-06-02', kinds:['advisory'],
       typeCodes:{ advisory:'adv-month' }, status:'closed' },
-    { id:'c2', companyName:'가야엔지니어링', signDate:'2026-06-01', kinds:['advisory'],
+    { id:'c2', companyName:'카타엔지니어링', signDate:'2026-06-01', kinds:['advisory'],
       typeCodes:{ advisory:'adv-month' }, status:'signed' }
   ]});
-  t('★ 앞이 종료면 재계약', r.groups.map(K), ['again:계약:가야엔지니어링:2']);
+  t('★ 앞이 종료면 재계약', r.groups.map(K), ['again:계약:카타엔지니어링:2']);
   t('진행 중 1건', r.groups[0].openN, 1);
 }
 // closedDate 로도 종료를 본다
@@ -212,18 +212,18 @@ const K = (g) => g.verdict + ':' + g.kindLabel + ':' + g.coName + ':' + g.rows.l
 /* ═══ 4. 사건·일반업무 ═══ */
 {
   const r = scan({ cases:[
-    { id:'k1', companyName:'남양인텍', receiveDate:'2026-02-01', caseNo:'부해-001',
+    { id:'k1', companyName:'아자인텍', receiveDate:'2026-02-01', caseNo:'부해-001',
       typeCodes:{ case:'case-dismiss' }, status:'progress' },
-    { id:'k2', companyName:'남양인텍', receiveDate:'2026-05-01', caseNo:'부해-014',
+    { id:'k2', companyName:'아자인텍', receiveDate:'2026-05-01', caseNo:'부해-014',
       typeCodes:{ case:'case-dismiss' }, status:'progress' }
   ]});
-  t('★ 사건도 훑는다', r.groups.map(K), ['dup:사건:남양인텍:2']);
+  t('★ 사건도 훑는다', r.groups.map(K), ['dup:사건:아자인텍:2']);
   t('사건은 접수일로 정렬', r.groups[0].rows.map(x => x.rec.caseNo), ['부해-001','부해-014']);
 }
 {
   const r = scan({ cases:[
-    { id:'k1', companyName:'남양인텍', receiveDate:'2026-02-01', typeCodes:{ case:'case-dismiss' }, status:'closed' },
-    { id:'k2', companyName:'남양인텍', receiveDate:'2026-05-01', typeCodes:{ case:'case-dismiss' }, status:'progress' }
+    { id:'k1', companyName:'아자인텍', receiveDate:'2026-02-01', typeCodes:{ case:'case-dismiss' }, status:'closed' },
+    { id:'k2', companyName:'아자인텍', receiveDate:'2026-05-01', typeCodes:{ case:'case-dismiss' }, status:'progress' }
   ]});
   t('종결된 사건이 있으면 재계약 갈래', r.groups[0].verdict, 'again');
 }
@@ -362,16 +362,16 @@ function renderSweep(result, filter){
 }
 {
   const r = scan({ contracts:[
-    { id:'c1', companyName:'유원에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
+    { id:'c1', companyName:'자차에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
       kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' } },
-    { id:'c2', companyName:'유원에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
+    { id:'c2', companyName:'자차에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
       kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' } }
   ]});
   let threw = '', v = null;
   try { v = renderSweep(r); } catch(e){ threw = String(e && e.message); }
   t('★ 창이 터지지 않고 그려진다', threw, '');
   if(!v){ console.log('렌더 실패 — 이후 생략'); process.exit(1); }
-  t('업체명이 보인다', v.all.indexOf('유원에프앤비') >= 0, true);
+  t('업체명이 보인다', v.all.indexOf('자차에프앤비') >= 0, true);
   t('갈래 이름이 보인다', v.all.indexOf('계약') >= 0, true);
   t('관리번호가 둘 다 보인다',
     v.all.indexOf('계약-041') >= 0 && v.all.indexOf('계약-172') >= 0, true);

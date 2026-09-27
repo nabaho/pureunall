@@ -1,0 +1,407 @@
+#!/usr/bin/env node
+'use strict';
+/* 창고(Storage) 규칙 올리개 — 안전장치 딸림 (2026-09-08)
+ *
+ * ★★ 왜 만들었나 — 실시간DB 규칙은 `scripts/rules-deploy.js` 가 «살아 있는 콘솔»을
+ *   읽어 견주고 사라질 규칙이 있으면 멈춘다. 그런데 «창고 규칙에는 그것이 아예 없었다».
+ *   그래서 여태 사람이 콘솔에 붙여넣게 했고, 그 붙여넣기가 밀려 서고 원본·메일 첨부가
+ *   담기지 못한 채 남았다.
+ *
+ * ⚠⚠ 창고 규칙은 «CLI 로 읽을 수 없다». `firebase deploy --only storage` 는 있는데
+ *   「지금 규칙 보기」가 없다(실시간DB 의 `database:get /.settings/rules` 같은 것이 없다).
+ *   그래서 기준은 «대표님이 콘솔에서 옮겨 주신 파일»이다 —
+ *   docs/firebase-storage-콘솔원문-YYYY-MM-DD.txt 중 가장 최신 것.
+ *   ★ 이것이 실시간DB 쪽보다 약한 안전장치임을 «숨기지 않는다» — 화면에 그대로 적는다.
+ *
+ * 안전장치 둘:
+ *   ① 기준에 있던 «칸·허락·보조함수»가 하나라도 사라지면 멈춘다(종료코드 2)
+ *   ② 앱이 실제로 쓰는 창고 자리가 «덮이지 않으면» 멈춘다
+ *      — 누가 파일을 손보다 pu_photos 를 빠뜨리면 사진첩이 통째로 멎는다
+ *
+ * ⚠ 루트 firebase.json 에 storage 를 «넣지 말 것» — 넣으면 다른 세션이 그냥
+ *   `firebase deploy` 할 때 창고 규칙이 함께 나간다(CLAUDE.md 가 database 로 이미 겪었다).
+ *   그래서 이 스크립트는 «임시 설정 파일»을 만들어 --config 로 넘긴다.
+ */
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const cp = require('child_process');
+
+const ROOT = path.join(__dirname, '..');
+const 올릴것 = path.join(ROOT, 'docs', 'firebase-storage-전체(붙여넣기용).txt');
+const 승인길 = path.join(ROOT, 'docs', 'firebase-storage-보조함수-고침승인.txt');
+
+/* 규칙을 넣어야 하는 창고들 — 앱마다 창고가 다르다.
+   ⚠ 이름을 «코드에서 확인한 것»으로 둔다(pu-photos.html · pu-cards.html · pu-paydata.html
+     의 storageBucket). 여기가 틀리면 엉뚱한 창고에 규칙이 나간다. */
+const BUCKETS = [
+  { name: 'pureun-erp-hrphotos', 쓰는곳: '사진첩 · 서고 원본 · 자문 증빙' },
+  { name: 'pureun-erp-photos', 쓰는곳: '기업정보함(명함) · 메일 첨부' },
+  { name: 'pureun-erp.firebasestorage.app', 쓰는곳: '급여데이터함' }
+];
+
+/* 앱이 실제로 쓰는 창고 자리 — 덮이지 않으면 그 기능이 통째로 멎는다.
+ *
+ * ⚠⚠ «앞토막»(pu_photos/u/)으로 적지 말 것. 처음에 그렇게 했더니 좁은 규칙이
+ *   넓은 자리를 덮는 것으로 세어졌다 — `pu_photos/u/{uid}/origs/**` 하나가 남아 있으면
+ *   사진 담는 칸(`…/blobs/…`)을 빼도 「덮였다」로 통과했다. 사진첩이 통째로 멎는데.
+ * ★ 그래서 «실제로 쓰는 한 길»을 그대로 적고, 규칙이 그 길에 맞는지 본다.
+ *   여기 적은 것은 코드에서 확인한 모양이다 — 새 자리를 쓰는 기능을 붙이면 여기도 적는다. */
+const 쓰는자리 = [
+  ['pu_photos/u/UID/blobs/2026/K.jpg', '사진첩 사진 담기 (js/pu-photo-store.js BUCKET_ROOT)'],
+  ['pu_photos/u/UID/thumbs/2026/K.jpg', '사진첩 미리보기'],
+  ['pu_photos/u/UID/origs/2026/K.hwp', '사진첩 한글 원본'],
+  ['pu_photos/_probe/1757000000.txt', '사진첩 쓰기 확인 (probePath)'],
+  ['pucards/photos/PID', '기업정보함 명함'],
+  ['pucards/mailout/UID/F.pdf', '메일에 붙일 내 PC 파일'],
+  ['pu_paydata/UID/202608/F.pdf', '급여데이터함'],
+  ['casebook/site_X/2019/after.hwp', '취업규칙 서고 원본'],
+  ['erp_docs/UID/D123/reason.hwp', '옛 서면함 자리 — 화면은 2026-09-14 에 뺐고 규칙만 남겼다'],
+  ['gov_evidence/SID/F.png', '자문관리 증빙'],
+  ['kcareer_forms/UID/CVFORM123.hwpx', '경력관리 기관 양식 (kcareer.html kcFormPath)']
+];
+
+/* 규칙 한 칸이 «이 길»에 맞나 — 창고 규칙의 짝짓기를 그대로 흉내낸다.
+     {이름}         한 토막에 맞는다
+     {이름=**}      남은 토막 «전부»에 맞는다(한 토막 이상)
+     그 밖          글자 그대로 같아야 한다
+   ⚠ 맨 아래 `/{allPaths=**}`(다 막는 칸)는 «덮는 것으로 세지 않는다» —
+     그것은 `allow read, write: if false` 라서, 세면 모든 길이 덮인 것이 된다. */
+function 칸이맞나(칸길, 길) {
+  const r = String(칸길).replace(/^\//, '').split('/');
+  const p = String(길).split('/');
+  let i = 0;
+  for (; i < r.length; i++) {
+    const 토막 = r[i];
+    if (/^\{[^}]*=\*\*\}$/.test(토막)) return p.length > i;   // 남은 것 전부(하나 이상)
+    if (i >= p.length) return false;
+    if (/^\{[^}]*\}$/.test(토막)) continue;                    // 한 토막
+    if (토막 !== p[i]) return false;
+  }
+  return i === p.length;
+}
+
+function 최신기준() {
+  const dir = path.join(ROOT, 'docs');
+  const 것들 = fs.readdirSync(dir)
+    .filter(function (f) { return /^firebase-storage-콘솔원문-\d{4}-\d{2}-\d{2}\.txt$/.test(f); })
+    .sort();
+  if (!것들.length) return null;
+  return path.join(dir, 것들[것들.length - 1]);
+}
+
+/* ── ★ 기준이 «낡았나» (2026-09-13 대표 지시 「넷 고쳐」) ─────────────────
+   ⚠⚠ 이것이 이 스크립트의 가장 약한 자리다. 창고 규칙은 읽을 길이 없어
+     (`firebase` 에 `storage:rules:get` 같은 것이 없다 — 2026-09-13 에 다시 확인했다),
+     「지금 콘솔에 무엇이 있나」를 우리는 «영영» 모른다. 아는 것은 「마지막으로
+     사람이 옮겨 적어 준 것」뿐이다.
+
+   그래서 할 수 있는 정직한 일은 하나다 — **그 기준이 며칠 된 것인지 세어 말하고,
+   너무 오래됐으면 올리지 않는 것.** 올릴 때마다 새 기준을 남기므로, 이 날수가
+   커진다는 말은 곧 「오랫동안 아무도 안 올렸다」는 뜻이고, 그동안 콘솔에서 손으로
+   고친 것이 있어도 우리는 모른다. 그 상태로 올리면 남의 손질을 말없이 덮는다.
+
+   ⚠ 날수를 늘려 피하지 말 것. 막히면 콘솔을 열어 «지금 있는 것»을 그대로
+     새 날짜 파일로 옮겨 적으면 된다 — 그것이 이 안전장치가 바라는 전부다. */
+const 기준낡음날수 = 30;
+
+function 기준날짜(길) {
+  const m = /firebase-storage-콘솔원문-(\d{4}-\d{2}-\d{2})\.txt$/.exec(String(길 || '').replace(/\\/g, '/'));
+  return m ? m[1] : null;
+}
+
+function 며칠됐나(날짜, 오늘) {
+  if (!날짜) return null;
+  const a = Date.parse(날짜 + 'T00:00:00Z');
+  const b = Date.parse(String(오늘 || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z');
+  if (!isFinite(a) || !isFinite(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
+
+/* 올려도 되나 — 화면에서 떼어 낸다(검사가 이 판단을 «정말 돌려» 볼 수 있게) */
+function 낡아서막나(날수) {
+  if (날수 == null) return null;                       /* 날짜를 못 읽으면 여기서는 안 막는다 */
+  if (날수 <= 기준낡음날수) return null;
+  return { 날수: 날수, 말: '기준이 ' + 날수 + '일 된 것입니다(' + 기준낡음날수 + '일이 넘습니다)' };
+}
+
+/* ── 보조 함수 «고침 승인» ─────────────────────────────────────────────
+   안전장치가 여태 «더하기»만 허락했다. 보조 함수를 한 글자라도 고치면 무조건
+   멈추므로, `isStaff()` 를 **조이는** 일조차 할 수가 없었다. 그러면 다음 사람이
+   결국 `--force` 를 만든다 — 이 파일이 스스로 「만들지 말라」고 적어 둔 그것이다.
+   그래서 우회로 대신 «적어 두고 지나가는» 길을 낸다.
+
+   ★★ 이것은 --force 가 아니다. **옛 몸도 새 몸도 «글자까지» 맞아야** 지나간다 —
+     승인한 그 고침 하나만 지나가고, 그 뒤의 어떤 흔들림도 다시 멈춘다.
+     그래서 승인 파일은 「한 번 열어 두는 문」이 아니라, 콘솔이 그 모양이 될 때까지
+     «지금 무엇을 바꾸는 중인가»를 적어 두는 자리다.
+
+   파일 모양 (docs/firebase-storage-보조함수-고침승인.txt):
+     [isStaff]
+     왜: 가입만 한 사람이 통과했다
+     옛: return …;
+     새: return …;
+*/
+function 승인읽기(글) {
+  const out = {};
+  let 이름 = null;
+  String(글 == null ? '' : 글).split(/\r?\n/).forEach(function (l) {
+    const t = l.trim();
+    if (!t || t.charAt(0) === '#') return;
+    const 머리 = /^\[([A-Za-z_$][\w$]*)\]$/.exec(t);
+    if (머리) { 이름 = 머리[1]; out[이름] = { 왜: '', 옛: '', 새: '' }; return; }
+    if (!이름) return;
+    const 칸 = /^(왜|옛|새)\s*:\s*([\s\S]*)$/.exec(t);
+    if (칸) out[이름][칸[1]] = 칸[2].replace(/\s+/g, ' ').trim();
+  });
+  return out;
+}
+
+/* 기준과 새것의 보조 함수를 견준다 — «멈출 까닭»과 «승인되어 지나간 것»을 돌려준다.
+   ⚠ 여기에 화면이 없다. 그래야 검사가 돈다(이 저장소 규칙). */
+function 함수바뀜(기준함수, 새것함수, 승인) {
+  const 멈출까 = [];
+  const 지나간것 = [];
+  const 기준 = 기준함수 || {}, 새것 = 새것함수 || {}, 표 = 승인 || {};
+  Object.keys(기준).forEach(function (f) {
+    if (새것[f] === undefined) { 멈출까.push('보조 함수가 사라집니다: ' + f + '()'); return; }
+    if (새것[f] === 기준[f]) return;                       /* 안 바뀌었다 */
+    const a = 표[f];
+    if (a && a.옛 === 기준[f] && a.새 === 새것[f]) {
+      지나간것.push({ 이름: f, 옛: a.옛, 새: a.새, 왜: a.왜 });
+      return;
+    }
+    멈출까.push('보조 함수가 «달라집니다»: ' + f + '()\n'
+      + '      기준: ' + 기준[f] + '\n      새것: ' + 새것[f] + '\n'
+      + (a ? '      ⚠ 승인 파일에 ' + f + ' 가 있지만 «글자가 안 맞습니다» —\n'
+           + '        승인 옛: ' + a.옛 + '\n        승인 새: ' + a.새
+          : '      → 조이는 고침이라면 docs/firebase-storage-보조함수-고침승인.txt 에\n'
+           + '        옛 몸과 새 몸을 그대로 적어 두세요. --force 를 만들지 마세요.'));
+  });
+  return { 멈출까: 멈출까, 지나간것: 지나간것 };
+}
+
+/* 주석을 걷는다 — 주석 안의 글귀가 「규칙이 있다」로 읽히면 안 된다
+   (저장소 규칙: 소스를 글자로 보는 검사는 주석을 먼저 걷는다). */
+function 주석걷기(s) {
+  return String(s || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+}
+
+/* 규칙 글을 «칸 → 허락 줄» 로 읽는다. 여기에 화면도 Firebase 도 없다 — 검사가 돈다.
+ *
+ * ⚠⚠ 정규식 하나로 `match … { … }` 를 잡으려 하지 «말 것». 처음에 그렇게 했다가
+ *   겉 칸(`/b/{bucket}/o {`)이 게으른 짝짓기로 «첫 안쪽 칸을 통째로 삼켰다» —
+ *   그래서 pucards/photos 가 없는 것으로 읽혔고, 안전장치가 «멀쩡한 파일»을 물었다.
+ *   중괄호를 세어야 한다. 규칙은 중첩되므로 이것 말고는 길이 없다.
+ * ⚠ 칸 이름에 `{uid}` 같은 것이 들어 있어 `{` 로 끊어도 안 된다 —
+ *   여는 중괄호는 «줄 끝의 것»이다.
+ */
+function 뜯기(src) {
+  const s = 주석걷기(src);
+  const 줄 = s.split(/\r?\n/);
+  const 칸 = {};
+  const 함수 = {};
+  const 쌓임 = [];            // 지금 열려 있는 칸 이름들(겉에서 안으로)
+  let 깊이 = 0;
+  let 함수이름 = null, 함수몸 = [], 함수깊이 = -1;
+
+  줄.forEach(function (l) {
+    const 여는것 = /^\s*match\s+(.+?)\s*\{\s*$/.exec(l);
+    const 함수여는것 = /^\s*function\s+([a-zA-Z_$][\w$]*)\s*\(\)\s*\{\s*$/.exec(l);
+
+    if (여는것) { 쌓임.push({ 길: 여는것[1], 깊이: 깊이 }); }
+    else if (함수여는것) { 함수이름 = 함수여는것[1]; 함수몸 = []; 함수깊이 = 깊이; }
+    else if (함수이름 !== null && !/\}/.test(l)) { 함수몸.push(l.trim()); }
+    else if (쌓임.length) {
+      /* ⚠ 허락 한 줄을 «줄 단위로» 읽으면 안 된다 — 여러 줄로 쓴 것이 흔하다
+           (origs·casebook·mailout 이 그렇다). 줄에서 바로 뽑으면 그것들이 통째로
+           빠지고, 기준이 여러 줄로 바뀐 날 «헛멈춤»이 난다. 헛멈춤은 다음 사람이
+           --force 를 만들게 하므로, 없는 것보다 나쁘다.
+         ★ 그래서 «가장 안쪽 열린 칸»에 줄을 쌓아 두고, 닫힐 때 한꺼번에 뽑는다. */
+      const 안쪽 = 쌓임[쌓임.length - 1];
+      (안쪽.몸 || (안쪽.몸 = [])).push(l);
+    }
+
+    /* 중괄호를 센다 — 여는 것을 먼저 세면 같은 줄에서 열고 닫는 것이 어긋난다 */
+    const 열림 = (l.match(/\{/g) || []).length;
+    const 닫힘 = (l.match(/\}/g) || []).length;
+    깊이 += 열림 - 닫힘;
+
+    if (함수이름 !== null && 깊이 <= 함수깊이) {
+      함수[함수이름] = 함수몸.join(' ').replace(/\s+/g, ' ').trim();
+      함수이름 = null; 함수몸 = []; 함수깊이 = -1;
+    }
+    while (쌓임.length && 깊이 <= 쌓임[쌓임.length - 1].깊이) {
+      const 닫힌것 = 쌓임.pop();
+      const 몸글 = (닫힌것.몸 || []).join('\n');
+      const 허락 = (몸글.match(/allow[^;]*;/g) || [])
+        .map(function (x) { return x.replace(/\s+/g, ' ').trim(); });
+      /* 같은 칸이 두 번 나오면 «합친다» — 나중 것이 앞것을 지우지 않는다 */
+      if (허락.length) 칸[닫힌것.길] = (칸[닫힌것.길] || []).concat(허락);
+      else if (!칸[닫힌것.길]) 칸[닫힌것.길] = [];
+    }
+  });
+  return { 칸: 칸, 함수: 함수 };
+}
+
+function main() {
+  const argv = process.argv.slice(2);
+  const 올린다 = argv.indexOf('--deploy') >= 0;
+
+  if (!fs.existsSync(올릴것)) {
+    console.error('올릴 규칙 파일이 없습니다: ' + 올릴것);
+    process.exit(1);
+  }
+  const 새것글 = fs.readFileSync(올릴것, 'utf8');
+  const 새것 = 뜯기(새것글);
+
+  const 기준길 = 최신기준();
+  const 날수 = 며칠됐나(기준날짜(기준길));
+  console.log('');
+  if (기준길) {
+    console.log('기준: ' + path.basename(기준길) + ' (대표님이 콘솔에서 옮겨 주신 것)'
+      + (날수 == null ? '' : ' — ' + (날수 === 0 ? '오늘' : 날수 + '일 전')));
+  } else {
+    console.log('⚠ 기준 파일이 없습니다 — 사라지는 규칙을 «가려낼 수가 없습니다».');
+  }
+  console.log('⚠ 창고 규칙은 CLI 로 읽을 수 없어, 실시간DB 쪽보다 «약한» 안전장치입니다.');
+  if (날수 != null && 날수 > 기준낡음날수) {
+    console.log('⚠⚠ 그 기준이 ' + 날수 + '일 된 것입니다 — 그 사이 콘솔에서 손으로 고친 것이 있으면');
+    console.log('   이 배포가 «말없이 덮습니다». 올리려면 먼저 지금 콘솔을 옮겨 적어야 합니다.');
+  }
+  console.log('');
+
+  const 멈출까 = [];
+
+  /* ── 안전장치 ① 기준에 있던 것이 사라지지 않는가 ───────────────── */
+  if (기준길) {
+    const 기준 = 뜯기(fs.readFileSync(기준길, 'utf8'));
+    const 사라진칸 = Object.keys(기준.칸).filter(function (k) { return !새것.칸[k]; });
+    사라진칸.forEach(function (k) { 멈출까.push('칸이 사라집니다: ' + k); });
+
+    Object.keys(기준.칸).forEach(function (k) {
+      if (!새것.칸[k]) return;
+      기준.칸[k].forEach(function (a) {
+        if (새것.칸[k].indexOf(a) < 0) 멈출까.push('허락이 사라집니다: ' + k + ' — ' + a);
+      });
+    });
+
+    const 승인 = fs.existsSync(승인길) ? 승인읽기(fs.readFileSync(승인길, 'utf8')) : {};
+    const 함수결과 = 함수바뀜(기준.함수, 새것.함수, 승인);
+    함수결과.멈출까.forEach(function (x) { 멈출까.push(x); });
+
+    /* ★ 승인되어 지나간 고침은 «크게» 적는다. 조용히 지나가면 승인 파일이
+         곧 아무도 안 읽는 종이가 된다 — 그러면 --force 와 다를 것이 없다. */
+    if (함수결과.지나간것.length) {
+      console.log('');
+      console.log('★★ 승인된 «보조 함수 고침» ' + 함수결과.지나간것.length + '개 — 이대로 나갑니다');
+      함수결과.지나간것.forEach(function (x) {
+        console.log('   · ' + x.이름 + '()  ' + (x.왜 || ''));
+        console.log('       옛: ' + x.옛);
+        console.log('       새: ' + x.새);
+      });
+      console.log('   ⚠ 올린 뒤 콘솔 원문을 새 날짜 파일로 남기고, 이 승인 줄은 지우세요 —');
+      console.log('     그때부터는 새 몸이 «기준»이라, 남겨 두면 다음 사람이 헷갈립니다.');
+      console.log('');
+    }
+
+    const 새칸 = Object.keys(새것.칸).filter(function (k) { return !기준.칸[k]; });
+    console.log('■ 새로 생기는 칸 ' + 새칸.length + '개');
+    새칸.forEach(function (k) { console.log('   + ' + k); });
+    console.log('■ 사라지는 것 ' + 멈출까.length + '개');
+  }
+
+  /* ── 안전장치 ② 앱이 쓰는 자리가 덮이는가 ─────────────────────── */
+  const 안덮인것 = 쓰는자리.filter(function (쌍) {
+    return !Object.keys(새것.칸).some(function (k) {
+      if (k === '/{allPaths=**}' || k === '/b/{bucket}/o') return false;   // 다 막는 칸·겉 칸
+      return 칸이맞나(k, 쌍[0]);
+    });
+  });
+  안덮인것.forEach(function (쌍) {
+    멈출까.push('앱이 쓰는 자리가 안 덮입니다: ' + 쌍[0] + '  (' + 쌍[1] + ')');
+  });
+  console.log('■ 앱이 쓰는 자리 ' + 쓰는자리.length + '곳 가운데 안 덮인 것 ' + 안덮인것.length + '곳');
+  console.log('');
+
+  if (멈출까.length) {
+    console.error('✖ 멈췄습니다 — 올리지 않았습니다.');
+    멈출까.forEach(function (x) { console.error('   · ' + x); });
+    console.error('');
+    console.error('  고칠 곳은 docs/firebase-storage-전체(붙여넣기용).txt 하나입니다.');
+    console.error('  기준에 있던 것을 «지우지 말고» 더하세요 — 창고 규칙은 통째로 갈아 끼웁니다.');
+    console.error('  ⚠ --force 같은 길을 만들지 마세요. 이 멈춤 하나가 안전장치 전부입니다.');
+    process.exit(2);
+  }
+
+  /* ── 안전장치 ③ 기준이 너무 낡았으면 «올리지 않는다» ─────────────── */
+  const 낡음 = 올린다 ? 낡아서막나(날수) : null;
+  if (낡음) {
+    console.error('✖ 올리지 않았습니다 — ' + 낡음.말 + '.');
+    console.error('');
+    console.error('  창고 규칙은 읽을 길이 없어, 우리가 아는 것은 «마지막으로 옮겨 적은 것»뿐입니다.');
+    console.error('  그 사이 콘솔에서 손으로 고친 것이 있으면 이 배포가 말없이 덮습니다.');
+    console.error('');
+    console.error('  ▶ 이렇게 푸세요 — 콘솔에서 Storage › 창고 › 규칙 을 열어 «지금 있는 것»을');
+    console.error('    그대로 복사해 이 파일로 저장한 뒤 다시 돌리세요:');
+    console.error('      docs/firebase-storage-콘솔원문-'
+      + new Date().toISOString().slice(0, 10) + '.txt');
+    console.error('  ⚠ 날수를 늘려서 피하지 마세요 — 그러면 안전장치가 없는 것과 같습니다.');
+    process.exit(3);
+  }
+
+  if (!올린다) {
+    console.log('여기까지가 «보여만 주는» 단계입니다. 올리려면:');
+    console.log('   node scripts/storage-rules-deploy.js --deploy');
+    console.log('올릴 창고 ' + BUCKETS.length + '곳:');
+    BUCKETS.forEach(function (b) { console.log('   · ' + b.name + '  (' + b.쓰는곳 + ')'); });
+    return;
+  }
+
+  /* ── 올린다 ─────────────────────────────────────────────────────
+     ⚠ 창고마다 «따로» 올린다. 한 곳이 실패해도 나머지는 올라가야 하고,
+       무엇이 올라가고 무엇이 안 올라갔는지 «그대로» 말해야 한다. */
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pu-storage-'));
+  const 규칙사본 = path.join(tmp, 'storage.rules');
+  fs.writeFileSync(규칙사본, 새것글, 'utf8');
+
+  const 결과 = [];
+  BUCKETS.forEach(function (b) {
+    const cfg = path.join(tmp, 'firebase-' + b.name.replace(/[^\w.-]/g, '_') + '.json');
+    fs.writeFileSync(cfg, JSON.stringify({
+      storage: [{ bucket: b.name, rules: 규칙사본 }]
+    }, null, 2), 'utf8');
+    console.log('⏳ ' + b.name + ' 에 올리는 중…');
+    const r = cp.spawnSync('npx', ['firebase-tools@latest', 'deploy', '--only', 'storage',
+      '--project', 'pureun-erp', '--config', cfg, '--non-interactive'],
+      { cwd: ROOT, encoding: 'utf8', shell: true, timeout: 600000 });
+    const 됐나 = r.status === 0;
+    결과.push({ name: b.name, 됐나: 됐나, 말: String((r.stderr || '') + (r.stdout || '')).slice(-600) });
+    console.log(됐나 ? '   ✅ 올렸습니다' : '   ✖ 실패했습니다');
+  });
+
+  console.log('');
+  const 성공 = 결과.filter(function (x) { return x.됐나; });
+  console.log('창고 ' + 성공.length + ' / ' + 결과.length + ' 곳에 올렸습니다.');
+  결과.filter(function (x) { return !x.됐나; }).forEach(function (x) {
+    console.log('');
+    console.log('✖ ' + x.name + ' — 올리지 못했습니다:');
+    console.log(x.말);
+  });
+  if (성공.length !== 결과.length) {
+    console.log('');
+    console.log('⚠ 일부만 올라갔습니다. «어느 창고가 안 올라갔는지» 위에 그대로 적혀 있습니다 —');
+    console.log('  그 창고를 쓰는 기능만 옛 규칙으로 돕니다.');
+    process.exitCode = 1;
+    return;
+  }
+  console.log('');
+  console.log('✅ 다 올렸습니다. 콘솔에서 눈으로 한 번 확인해 주세요: Storage › 창고 › 규칙');
+  console.log('⚠ 다음에 콘솔 규칙을 손으로 고치시면 그 내용을');
+  console.log('   docs/firebase-storage-콘솔원문-<날짜>.txt 로 남겨 주세요 — 그것이 다음 기준입니다.');
+}
+
+if (require.main === module) main();
+module.exports = { 뜯기: 뜯기, 주석걷기: 주석걷기, 칸이맞나: 칸이맞나, BUCKETS: BUCKETS,
+                   쓰는자리: 쓰는자리, 최신기준: 최신기준, 승인읽기: 승인읽기, 함수바뀜: 함수바뀜,
+                   기준날짜: 기준날짜, 며칠됐나: 며칠됐나, 낡아서막나: 낡아서막나, 기준낡음날수: 기준낡음날수 };

@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const rules = JSON.parse(
   fs.readFileSync(
-    path.join(__dirname, '..', 'docs', 'firebase-rules-3순위-포털권한.json'),
+    path.join(__dirname, '..', 'docs', 'firebase-rules-전체-적용본.json'),
     'utf8',
   ),
 ).rules;
@@ -35,13 +35,28 @@ class Snap {
   }
 }
 
+/* ★ 2026-09-12 — 「직원」의 뜻이 바뀌었다.
+   옛 규칙은 「비번으로 로그인했나」만 봤다. 그런데 파이어베이스 가입이 열려 있어
+   «아무나» 계정을 만들 수 있었다. 이제는 uid_roles 에 status:'active' 로
+   **등록된 사람**이라야 직원이다(scripts/make-firebase-rules.js 의 LOGIN).
+   그래서 이 모형에도 status 를 적는다 — 실제 재직자는 다 갖고 있는 칸이다. */
 const roleData = {
-  adminUid: { isAdmin: true, isSubAdmin: false },
-  subUid: { isAdmin: false, isSubAdmin: true },
-  staffUid: { isAdmin: false, isSubAdmin: false },
-  otherUid: { isAdmin: false, isSubAdmin: false },
+  adminUid: { isAdmin: true, isSubAdmin: false, status: 'active', sid: 'P-001' },
+  subUid: { isAdmin: false, isSubAdmin: true, status: 'active', sid: 'P-003' },
+  staffUid: { isAdmin: false, isSubAdmin: false, status: 'active', sid: 'A-001' },
+  otherUid: { isAdmin: false, isSubAdmin: false, status: 'active', sid: 'A-002' },
+  /* ★ 퇴사자 — 계정은 살아 있어도 자료는 안 열려야 한다 */
+  retiredUid: { isAdmin: false, isSubAdmin: false, status: 'retired', sid: 'P-002' },
+  /* ★ 바깥 사람 — 스스로 가입만 한 사람. uid_roles 에 «아예 없다» */
 };
-const root = new Snap({ uid_roles: roleData });
+const root = new Snap({
+  uid_roles: roleData,
+  /* 관리자만 쓰는 사번 명단 — uid_roles 를 스스로 못 쓰게 견주는 근거다 */
+  sid_roles: {
+    'P-001': { status: 'active', loginEmail: 'adminUid@pureun.kr' },
+    'A-001': { status: 'active', loginEmail: 'staffUid@pureun.kr' },
+  },
+});
 
 function auth(uid) {
   return {
@@ -66,10 +81,11 @@ function evaluate(expression, options = {}) {
   return Function(...names, `"use strict"; return Boolean(${expression});`)(...values);
 }
 
-test('역할표: 포털 개인 설정은 본인만 허용한다', () => {
-  const rule = rules.data.portal_prefs_uid.$uid['.write'];
-  assert.equal(evaluate(rule, { auth: auth('staffUid'), $uid: 'staffUid' }), true);
-  assert.equal(evaluate(rule, { auth: auth('otherUid'), $uid: 'staffUid' }), false);
+/* ⚠ data/portal_prefs_uid 칸이 규칙에서 사라졌다 — firebase-rules-stage3 의 같은 검사 참고 */
+/* 2026-08-29 — 이름을 적었다(권한은 그대로). 좁히기는 대표 판단으로 남아 있다. */
+test('역할표: 포털 개인 설정 자리에 이름이 있다', () => {
+  assert.ok(rules.data.portal_prefs_uid,
+    '★ 이름이 없어졌다 — $other 로 떨어져 무엇이 열렸는지 셀 수 없게 된다');
 });
 
 test('역할표: 일반 직원은 본인 UID로 건의를 새로 등록할 수 있다', () => {
@@ -124,8 +140,26 @@ test('역할표: 서버 백업은 관리자와 위임관리인만 허용한다',
   assert.equal(evaluate(rule, { auth: auth('staffUid') }), false);
 });
 
-test('역할표: 일반 직원은 fin과 hr 권한을 스스로 true로 바꾸지 못한다', () => {
-  for (const field of ['fin', 'hr']) {
+test('역할표: 장애 알림은 총괄관리자만 조회하고 처리한다', () => {
+  const readRule = rules.systemAlerts['.read'];
+  const writeRule = rules.systemAlerts.$uid.$id['.write'];
+  const event = { uid: 'staffUid', kind: 'save', message: 'failed', page: 'work.html', createdAt: 1, status: 'new' };
+
+  assert.equal(evaluate(readRule, { auth: auth('adminUid') }), true);
+  /* 2026-08-29 — 위임관리인도 «보게» 열었다. 장애는 빨리 봐야 한다.
+     고치는 것은 아래처럼 본인과 관리자뿐이다. */
+  assert.equal(evaluate(readRule, { auth: auth('subUid') }), true);
+  assert.equal(evaluate(writeRule, { auth: auth('staffUid'), $uid: 'staffUid', data: undefined, newData: event }), true);
+  /* 위임관리인도 «처리»까지 한다 — 보기만 되고 처리는 못 하면 알림이 쌓이기만 한다 */
+  assert.equal(evaluate(writeRule, { auth: auth('subUid'), $uid: 'staffUid', data: event, newData: { ...event, status: 'resolved' } }), true);
+  /* ★ 그래도 «남의 알림을 새로 만드는 것»은 여전히 안 된다 — 이것이 남은 알맹이다 */
+  assert.equal(evaluate(writeRule, { auth: auth('otherUid'), $uid: 'staffUid', data: undefined, newData: { ...event, uid: 'otherUid' } }), false);
+  assert.equal(evaluate(writeRule, { auth: auth('adminUid'), $uid: 'staffUid', data: event, newData: { ...event, status: 'resolved' } }), true);
+});
+
+/* ⚠ hr 칸은 규칙에서 없어졌다(2026-08-29). 남은 권한 칸만 본다. */
+test('역할표: 일반 직원은 권한을 스스로 true로 바꾸지 못한다', () => {
+  for (const field of ['fin', 'isAdmin', 'isSubAdmin']) {
     const validation = rules.uid_roles.$uid[field]['.validate'];
     assert.equal(
       evaluate(validation, { auth: auth('staffUid'), data: false, newData: true }),
@@ -139,6 +173,17 @@ test('역할표: 일반 직원은 fin과 hr 권한을 스스로 true로 바꾸�
       evaluate(validation, { auth: auth('adminUid'), data: false, newData: true }),
       true,
     );
+  }
+});
+
+test('역할표: 로그인 감지 기록은 관리자·위임관리인만 읽고, 클라이언트는 아무도 못 쓴다', () => {
+  const paths = ['login_events', 'login_devices', 'login_countries', 'login_fail_burst'];
+  for (const p of paths) {
+    assert.ok(rules[p], p + ' 규칙이 없습니다');
+    assert.equal(evaluate(rules[p]['.read'], { auth: auth('adminUid') }), true, p + ' 관리자 읽기');
+    assert.equal(evaluate(rules[p]['.read'], { auth: auth('subUid') }), true, p + ' 위임관리인 읽기');
+    assert.equal(evaluate(rules[p]['.read'], { auth: auth('staffUid') }), false, p + ' 일반 직원은 못 읽음');
+    assert.equal(rules[p]['.write'], undefined, p + ' 클라이언트 쓰기 규칙이 있으면 안 됨(서버 전용)');
   }
 });
 

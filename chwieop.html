@@ -3,26 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>취업규칙 작성기 · 푸른노무법인</title>
+<title>옛 취업규칙 작성기</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📝</text></svg>">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-resilience.js"></script>
-<script src="js/pu-health.js"></script>
-<script src="js/pu-version.js"></script>
-<script src="js/pu-backup.js"></script>
+<!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-ontology.js?v=34"></script>
+<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-resilience.js?v=3"></script>
+<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-version.js?v=8"></script>
+<script src="js/pu-rrn-seal.js?v=2"></script>
+<script src="js/pu-backup.js?v=2"></script>
+<script src="js/pu-rules-history.js?v=3"></script>
+<script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
 <script src="rules_std.js?v=1"></script>
-<script src="hwpx_gen.js?v=13"></script>
+<script src="hwpx_gen.js?v=14"></script>
+<script src="hwpx_doc.js?v=2"></script>
 <style>
-:root{--navy:#1B2A4A;--teal:#0E7C66;--orange:#e67e22;--line:#e2e8f0;--bg:#eef1f7;--card:#fff;--mute:#64748b;--txt:#1e293b}
+:root{--navy:#1e293b;--teal:#166534;--orange:#d97706;--line:#e2e8f0;--bg:#f8fafc;--card:#fff;--mute:#64748b;--txt:#1e293b}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;font-family:'Malgun Gothic','맑은 고딕',-apple-system,sans-serif;color:var(--txt);background:var(--bg)}
 button{font-family:inherit;cursor:pointer}
 .app{display:flex;flex-direction:column;height:100dvh}
 /* 상단 바 */
 .top{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--navy);color:#fff;flex-shrink:0}
-.top .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#1e40af,#7c6ce0);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.top .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#1e40af,#2563eb);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
 .top h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.3px}
 .top .sp{flex:1}
 .top button{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:7px 11px;font-size:12.5px;font-weight:600}
@@ -31,7 +40,7 @@ button{font-family:inherit;cursor:pointer}
 /* 본문: 좌 설정 / 우 미리보기 */
 .body{flex:1;display:flex;min-height:0}
 .panel{width:400px;flex-shrink:0;background:var(--card);border-right:1px solid var(--line);overflow-y:auto;padding:14px}
-.preview{flex:1;overflow-y:auto;padding:26px 20px;background:#f1f5f9;display:flex;justify-content:center}
+.preview{flex:1;overflow-y:auto;padding:26px 20px;background:#f8fafc;display:flex;justify-content:center}
 .paper{background:#fff;width:100%;max-width:820px;min-height:100%;padding:44px 52px;box-shadow:0 2px 18px rgba(0,0,0,.10);line-height:1.75;font-size:14px}
 /* 설정 패널 */
 .sec{font-size:12px;font-weight:800;color:var(--teal);margin:16px 0 8px;letter-spacing:.3px}
@@ -45,21 +54,21 @@ button{font-family:inherit;cursor:pointer}
 .chaphd .cx{flex:1;cursor:pointer}
 .chaphd .tog{font-size:11px;color:var(--mute)}
 .arts{padding:2px 0}
-.art{display:flex;align-items:flex-start;gap:8px;padding:7px 11px;border-top:1px solid #f1f5f9;font-size:12.5px}
+.art{display:flex;align-items:flex-start;gap:8px;padding:7px 11px;border-top:1px solid #f8fafc;font-size:12.5px}
 .art input[type=checkbox]{margin-top:2px;width:15px;height:15px;flex-shrink:0}
 .art .at{flex:1;min-width:0}
 .art .an{font-weight:600;color:var(--txt)}
-.art .req{font-size:10px;color:#b91c1c;font-weight:700;margin-left:4px}
+.art .req{font-size:10px;color:#991b1b;font-weight:700;margin-left:4px}
 .art .edit{font-size:11px;color:var(--teal);background:none;border:none;padding:2px 4px;font-weight:700;flex-shrink:0}
 .art.off{opacity:.42}
 /* 미리보기 문서 */
 .paper .doc-title{text-align:center;font-size:24px;font-weight:800;letter-spacing:8px;margin:6px 0 4px}
-.paper .doc-sub{text-align:center;font-size:14px;color:#334155;margin-bottom:30px}
+.paper .doc-sub{text-align:center;font-size:14px;color:#1e293b;margin-bottom:30px}
 .paper .ch{font-size:16px;font-weight:800;margin:26px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--navy)}
 .paper .ar{margin:0 0 13px}
 .paper .ar .h{font-weight:700;margin-bottom:2px}
-.paper .ar .b{white-space:pre-wrap;color:#1f2937}
-.paper .mf{background:#fff7ed;border-bottom:1px dashed var(--orange);padding:0 2px;font-weight:700;color:#b45309}
+.paper .ar .b{white-space:pre-wrap;color:#1e293b}
+.paper .mf{background:#f8fafc;border-bottom:1px dashed var(--orange);padding:0 2px;font-weight:700;color:#854d0e}
 .paper .foot{margin-top:40px;text-align:center;font-size:14px;line-height:2.2}
 .paper .stamp{margin-top:26px;text-align:right;font-size:14px;line-height:2}
 .empty{color:var(--mute);text-align:center;padding:60px 20px;font-size:13px;line-height:1.9}
@@ -75,7 +84,7 @@ button{font-family:inherit;cursor:pointer}
 .mbd input.ti{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-weight:600;margin-bottom:10px;font-family:inherit}
 .mbd textarea{width:100%;min-height:230px;padding:11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;line-height:1.7;font-family:inherit;resize:vertical}
 .mbd .mf-help{font-size:11.5px;color:var(--mute);margin-top:8px;line-height:1.7}
-.mbd .mf-help code{background:#fff7ed;color:#b45309;padding:1px 5px;border-radius:4px;font-weight:700}
+.mbd .mf-help code{background:#f8fafc;color:#854d0e;padding:1px 5px;border-radius:4px;font-weight:700}
 .mft{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
 .mft button{flex:1;padding:11px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:14px;font-weight:700}
 .mft button.pri{background:var(--teal);color:#fff;border-color:var(--teal)}
@@ -85,9 +94,9 @@ button{font-family:inherit;cursor:pointer}
 #loadList .li .nm{flex:1;font-weight:600;font-size:14px}
 #loadList .li .dt{font-size:11px;color:var(--mute)}
 #loadList .li button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:600}
-#loadList .li button.del{color:#b91c1c;border-color:#fecaca}
+#loadList .li button.del{color:#991b1b;border-color:#fecaca}
 /* 토스트 */
-#toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#111827;color:#fff;padding:11px 18px;border-radius:9px;font-size:13.5px;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 6px 22px rgba(0,0,0,.3)}
+#toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:11px 18px;border-radius:9px;font-size:13.5px;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 6px 22px rgba(0,0,0,.3)}
 #toast.on{opacity:.96}
 /* 모바일 */
 .mtoggle{display:none}
@@ -114,8 +123,8 @@ button{font-family:inherit;cursor:pointer}
 </style>
 </head>
 <body>
-<div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#eef1f7;display:flex;align-items:center;justify-content:center">
-  <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#7c6ce0);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px">푸</div>
+<div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">
+  <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px">푸</div>
 </div>
 
 <div class="app">
@@ -174,6 +183,16 @@ button{font-family:inherit;cursor:pointer}
    ══════════════════════════════════════════════════════════════ */
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var FB_APPCHECK_KEY='6Ldu1hEtAAAAABB9lH9EMEyd7uBLEy9H5HxJoua_';
+/* ⚠ App Check 를 끈 채로 둔다 (대표 지시 2026-08-28 「걷어냄」)
+   전체를 훑어 보니 직원용 16화면 중 11곳만 켜고 5곳(포털 포함)은 안 켜고 있었다.
+   그런데 안 켠 화면도 멀쩡히 돌아간다 — 콘솔에서 App Check «강제»가 꺼져 있다는 뜻이다.
+   즉 켜 둔 11곳도 지키는 것 없이 reCAPTCHA 실패만 만들고 있었다
+   (푸른이알피는 2026-08-08 에 「20~30초짜리 실패만 두 번」이라며 이미 껐다).
+   자료는 Rules 의 auth != null 이 계속 지킨다.
+
+   ★ 콘솔에서 강제를 켤 때는 아래를 true 로 되돌려야 한다.
+     되돌리지 않으면 모든 읽기·쓰기가 막힌다. */
+var FB_APPCHECK_ON = false;
 var DB_ROOT='chwieop';
 var fbDb=null, fbUser=null;
 
@@ -188,7 +207,7 @@ STD.forEach(function(ch,ci){ ch.id='c'+ci; ch.arts.forEach(function(a,ai){ a.id=
 var doc = blankDoc();
 function blankDoc(){
   return {
-    id:'', info:{ company:'', ceo:'', addr:'', biz:'', workers:'', effDate:'', rep:'' },
+    id:'', info:{ company:'', ceo:'', bizno:'', addr:'', biz:'', workers:'', effDate:'', rep:'' },
     off:{},        /* {장id 또는 조id : true} = 제외 */
     over:{},       /* {조id : {t,b}} = 표준문구 수정 */
     updatedAt:0, by:''
@@ -197,7 +216,12 @@ function blankDoc(){
 
 /* ── 유틸 ── */
 function $(id){ return document.getElementById(id); }
-function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+/* ⚠ 큰따옴표·작은따옴표까지 막는다 (2026-08-28)
+   이 함수의 결과가 <input value="…"> 안으로 들어간다(fld·fldDate).
+   따옴표를 안 막고 있어서 회사명에 「주식회사 "푸른"」 처럼 따옴표가 들어가면
+   칸이 그 자리에서 끊겨 «입력칸이 깨졌다». 저장한 문서를 다른 직원이 열면
+   남이 심어 둔 글이 그 사람 화면에서 돌 수도 있었다. */
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(function(){ t.classList.remove('on'); },2000); }
 function artOf(id){ for(var i=0;i<STD.length;i++){ var a=STD[i].arts.find(function(x){return x.id===id;}); if(a) return a; } return null; }
 function chapOn(ch){ return !doc.off[ch.id]; }
@@ -235,10 +259,11 @@ function applyMergeText(text){
 function renderPanel(){
   var i=doc.info;
   var h='';
-  h+='<div class="hint">📌 회사정보를 입력하면 미리보기의 <b style="color:#b45309">노란 표시</b>가 자동으로 채워집니다. 조항은 회사 실정에 맞게 켜고/끄거나 <b style="color:#0E7C66">✎ 편집</b>할 수 있습니다. 최종본은 담당 노무사가 최신 개정법령에 맞게 검토하세요.</div>';
+  h+='<div class="hint">📌 회사정보를 입력하면 미리보기의 <b style="color:#854d0e">노란 표시</b>가 자동으로 채워집니다. 조항은 회사 실정에 맞게 켜고/끄거나 <b style="color:#166534">✎ 편집</b>할 수 있습니다. 최종본은 담당 노무사가 최신 개정법령에 맞게 검토하세요.</div>';
   h+='<div class="sec">회사 정보</div>';
   h+=fld('회사명(법인명)','company',i.company,'예) 주식회사 푸른');
-  h+='<div class="grid2">'+fld('대표자','ceo',i.ceo,'홍길동')+fld('업종','biz',i.biz,'예) 서비스업')+'</div>';
+  h+='<div class="grid2">'+fld('사업자등록번호','bizno',i.bizno,'000-00-00000')+fld('대표자','ceo',i.ceo,'홍길동')+'</div>';
+  h+=fld('업종','biz',i.biz,'예) 서비스업');
   h+=fld('사업장 소재지','addr',i.addr,'예) 충남 천안시 …');
   h+='<div class="grid2">'+fld('상시근로자수','workers',i.workers,'예) 25')+fldDate('시행일','effDate',i.effDate)+'</div>';
   h+=fld('근로자대표(의견청취)','rep',i.rep,'예) 근로자대표 김○○');
@@ -255,7 +280,7 @@ function renderPanel(){
       var on=artOn(ch,a); var edited=!!doc.over[a.id];
       h+='<div class="art'+(on?'':' off')+'">';
       h+='<input type="checkbox" '+(on?'checked':'')+(con?'':' disabled')+' onchange="toggleArt(\''+a.id+'\',this.checked)">';
-      h+='<div class="at"><div class="an">'+esc(curTitle(a))+(a.req?'<span class="req">필수</span>':'')+(edited?' <span style="font-size:10px;color:#0E7C66;font-weight:700">✎수정됨</span>':'')+'</div></div>';
+      h+='<div class="at"><div class="an">'+esc(curTitle(a))+(a.req?'<span class="req">필수</span>':'')+(edited?' <span style="font-size:10px;color:#166534;font-weight:700">✎수정됨</span>':'')+'</div></div>';
       h+='<button class="edit" onclick="openEdit(\''+a.id+'\')">✎ 편집</button>';
       h+='</div>';
     });
@@ -321,20 +346,133 @@ function toggleView(){ document.body.classList.toggle('showprev');
   b.innerHTML=document.body.classList.contains('showprev')?'✎<span class="lbl"> 편집</span>':'👁<span class="lbl"> 미리보기</span>';
 }
 
+/* ══════ 제정 이력 남기기 ══════
+   예전에는 저장할 때마다 updatedAt·by 를 «덮어써서» 「누가 언제 처음 만들었는지」가
+   남지 않았다. 취업규칙을 처음 만든 것도 개정과 마찬가지로 사건이므로,
+   규정관리가 개정 회차를 쌓는 그 자리에 「제정」 회차로 함께 쌓는다.
+   → 기업정보함·취업규칙 이력 화면이 제정과 개정을 한 줄기로 보여 준다.
+
+   자리는 규정관리와 똑같다:
+     rules_mgmt/done/{사업장키}/{회차}   회차 원본(대조표 자리는 비어 있다 — 제정이라 견줄 것이 없다)
+     rules_mgmt/index/{사업장키}/{회차}  가벼운 색인 (다른 화면이 읽는 것)
+     rules_mgmt/orig/{사업장키@회차}     제정 당시 전문 — 나중에 이 원문으로 개정 검토를 시작할 수 있다 */
+function chwSiteKey(){
+  var i=doc.info, base=(i.bizno||'').replace(/[^0-9]/g,'')||String(i.company||'');
+  return 'site_'+String(base).replace(/[.#$\[\]\/\s]/g,'_').slice(0,120);
+}
+/* 제정 회차 하나 = 이 문서를 지금 저장한 시점. 같은 시행일이면 덮어쓴다
+   (같은 날 두 번 저장했다고 회차가 둘일 수는 없다). */
+function chwRevId(){
+  var eff=String(doc.info.effDate||'').replace(/-/g,'')||'00000000';
+  return 'r'+eff+'_enact';
+}
+function chwArtTitles(){
+  var out=[], n=0;
+  STD.forEach(function(ch){
+    ch.arts.forEach(function(a){
+      if(!artOn(ch,a)) return;
+      n++;
+      if(out.length<4) out.push('제'+n+'조('+applyMergeText(curTitle(a))+')');
+    });
+  });
+  return { arts:out, total:n, more:Math.max(0,n-out.length) };
+}
+/* 저장한 사람 이름 — 로그인 계정에서 직원 이름을 찾는다(포털과 같은 규칙) */
+var CHW_NAME='';
+function chwWho(){ return CHW_NAME || (fbUser && (fbUser.displayName||fbUser.email)) || ''; }
+function chwResolveName(){
+  if(!fbDb || !fbUser || !fbUser.email) return;
+  var em=String(fbUser.email).toLowerCase();
+  var pick=function(raw){
+    var list=(raw && raw.v!==undefined)?raw.v:raw;
+    if(list && !Array.isArray(list) && typeof list==='object') list=Object.keys(list).map(function(k){return list[k];});
+    if(!Array.isArray(list)) return null;
+    return list.filter(Boolean).find(function(x){
+      return String(x.sid||'').toLowerCase().replace(/-/g,'')+'@pureun.kr'===em; })||null;
+  };
+  fbDb.ref('data/user_dir').once('value').then(function(s){
+    var a=pick(s.val()); if(a && a.name) CHW_NAME=a.name;
+  }).catch(function(){});
+}
+/* 제정 회차를 남긴다 — 회사명과 시행일이 있어야 회사·시점에 이을 수 있다 */
+function chwSaveEnactment(){
+  if(!fbDb || !fbUser) return Promise.resolve(false);
+  var i=doc.info;
+  if(!i.company || !i.effDate) return Promise.resolve(false);
+  var sk=chwSiteKey(), rev=chwRevId(), id=sk+'@'+rev;
+  var t=chwArtTitles();
+  var now=new Date().toISOString().slice(0,16).replace('T',' ');
+  var who=chwWho();
+  var common={
+    site:i.company, bizno:i.bizno||'', asof:i.effDate,
+    savedAt:now, savedBy:who, doneAt:now, doneBy:who,
+    ownerUid:fbUser.uid||'', owner:fbUser.email||'', ownerName:who,
+    enacted:true, from:'chwieop'
+  };
+  /* 회차 원본 — 규정관리 보관함이 읽는 모양 그대로. summary 가 없으면 목록이 깨진다. */
+  var rec=Object.assign({}, common, {
+    id:id, year:String(i.effDate).slice(0,4), status:'완료',
+    size:String(i.workers||''), conds:[], mode:'full', changed:t.total,
+    summary:{위반의심:0,누락:0,수동확인:0,시행예정:0},
+    items:[], addendum:'', file:'취업규칙_'+i.company+'.txt'
+  });
+  /* 색인은 서버 규칙이 칸마다 잣대를 들이대므로 «허용된 칸만, 한도 안으로» 넣는다.
+     common 을 그대로 부으면 owner·enacted 가 따라붙어 규칙에 막히고, 회사명이나
+     조 제목이 길면 길이에 막힌다 — 둘 다 그 회차 저장을 «통째로» 물리친다.
+     맞추는 일은 공용 읽개 한 곳(PuRulesHistory.fit)에서 하므로
+     규정관리와 작성기가 서로 다른 값을 넣을 수가 없다. */
+  var idx=PuRulesHistory.fit({
+    site:i.company, bizno:i.bizno, asof:i.effDate, from:'chwieop',
+    changed:t.total, arts:t.arts, artsMore:t.more,
+    savedAt:now, savedBy:who, doneAt:now, doneBy:who,
+    ownerUid:fbUser.uid||'', ownerName:who
+  });
+  var up={};
+  up['rules_mgmt/done/'+sk+'/'+rev]=rec;
+  up['rules_mgmt/index/'+sk+'/'+rev]=idx;
+  /* 제정 당시 전문 — 나중에 이 원문으로 개정 검토를 시작할 수 있다 */
+  up['rules_mgmt/orig/'+id]={
+    name:'취업규칙_'+i.company+'.txt', ext:'txt', text:chwFullText(),
+    b64:null, isPdf:false, truncated:false,
+    ownerUid:fbUser.uid||'', owner:fbUser.email||''
+  };
+  return fbDb.ref().update(up).then(function(){ return true; })
+    .catch(function(e){ console.warn('제정 이력 저장 실패:', (e&&e.message)||e); return false; });
+}
+/* 규정관리에 넘길 때와 같은 전문 — 두 곳이 다른 글을 넘기면 안 된다 */
+function chwFullText(){
+  var txt='취 업 규 칙\n'+(doc.info.company||'')+'\n\n', artNo=0;
+  STD.forEach(function(ch){
+    if(!chapOn(ch)) return;
+    var onArts=ch.arts.filter(function(a){ return artOn(ch,a); });
+    if(!onArts.length) return;
+    txt+=(ch.c==='부칙'?'부      칙':ch.c)+'\n';
+    onArts.forEach(function(a){ artNo++;
+      txt+='제'+artNo+'조('+applyMergeText(curTitle(a))+') '+applyMergeText(curBody(a))+'\n'; });
+    txt+='\n';
+  });
+  return txt;
+}
+
 /* ══════ 새 문서 ══════ */
 function newDoc(){ if(doc.info.company && !confirm('현재 작성 중인 내용을 지우고 새 문서를 시작할까요?')) return;
   doc=blankDoc(); renderAll(); document.body.classList.remove('showprev'); toast('새 문서를 시작합니다');
 }
 
 /* ══════ 저장 / 불러오기 (Firebase, 로컬 폴백) ══════ */
-function docStore(){ return fbDb ? 'fb' : 'local'; }
 function saveDoc(){
   if(!doc.info.company){ toast('회사명을 먼저 입력하세요'); return; }
   doc.updatedAt=Date.now(); doc.by=(fbUser&&fbUser.email)||'';
   if(!doc.id) doc.id='r'+doc.updatedAt+Math.floor(Math.random()*1000);
   if(fbDb){
-    fbDb.ref(DB_ROOT+'/docs/'+doc.id).set(doc).then(function(){ toast('💾 클라우드에 저장했습니다'); })
-      .catch(function(e){ toast('저장 실패: '+((e&&e.message)||e)); });
+    fbDb.ref(DB_ROOT+'/docs/'+doc.id).set(doc).then(function(){
+      /* 문서 자체는 덮어써도, 「누가 언제 제정했는지」는 회차로 따로 남는다 */
+      return chwSaveEnactment();
+    }).then(function(kept){
+      toast(kept ? '💾 저장했습니다 — 제정 이력에 남겼습니다'
+                 : (doc.info.effDate ? '💾 클라우드에 저장했습니다'
+                                     : '💾 저장했습니다 — 시행일을 넣으면 제정 이력에도 남습니다'));
+    }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e)); });
   } else {
     var all=lsDocs(); all[doc.id]=doc; localStorage.setItem('chwieop_docs',JSON.stringify(all)); toast('💾 이 기기에 저장했습니다');
   }
@@ -368,26 +506,35 @@ function delDoc(id){ if(!confirm('이 취업규칙을 삭제할까요?')) return
   else { var all=lsDocs(); delete all[id]; localStorage.setItem('chwieop_docs',JSON.stringify(all)); openLoad(); toast('삭제했습니다'); }
 }
 
-/* ══════ 한글(.hwpx) 내보내기 — A4 세로 기준. 규정관리(rules.html)와 같은 생성기 사용 ══════ */
+/* ══════ 한글(.hwpx) 내보내기 — 노동부 표준취업규칙과 같은 조판 ══════
+   조 제목만 굵게, 조 제목과 첫 항을 한 문단으로 붙여 쓰고, 항·호는 내어쓰기.
+   줄 폭·줄간격·자간은 rule 용지 프리셋이 원본 실측값을 쓴다.
+   예전엔 조마다 「제N조 (제목) 본문」을 한 문단에 통째로 넣고 빈 줄로 띄웠다 —
+   원본과 줄간격·들여쓰기가 달라 한글에서 다시 손봐야 했다. */
 function exportHwpx(){
   if(countOn()===0){ toast('포함할 조항이 없습니다'); return; }
-  if(!window.HWPX){ toast('한글 생성기를 불러오지 못했습니다 — 워드로 저장하세요'); return; }
+  if(!window.HWPX||!window.HWPXDOC){ toast('한글 생성기를 불러오지 못했습니다 — 워드로 저장하세요'); return; }
   try{
-    var H=window.HWPX; H.setPage({landscape:false});           // 취업규칙 전문은 A4 세로
+    var H=window.HWPX, D=window.HWPXDOC;
+    var page=D.begin('rule');                                  // 표준취업규칙 본문 폭·여백
     var co=doc.info.company||'';
-    var body=H.para('취 업 규 칙',H.BOLD)+H.para(co)+H.para('');
+    var body=H.docTitle('취 업 규 칙')+(co?H.docSub(co):'')+H.spacer();
     var artNo=0;
     STD.forEach(function(ch){ if(!chapOn(ch))return;
       var onArts=ch.arts.filter(function(a){return artOn(ch,a);}); if(!onArts.length)return;
-      body+=H.para(ch.c==='부칙'?'부      칙':ch.c,H.BOLD)+H.para('');
+      body+=H.chapter(ch.c==='부칙'?'부      칙':ch.c);
       onArts.forEach(function(a){ artNo++;
-        body+=H.para('제'+artNo+'조 ('+applyMergeText(curTitle(a))+') '+applyMergeText(curBody(a)))+H.para('');
+        /* 조 제목과 첫 항은 한 문단, 그 뒤 항(①·1.)은 줄마다 한 문단 */
+        var txt=applyMergeText(curBody(a)).replace(/\r\n?/g,'\n');
+        var lines=txt.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+        body+=H.articleRun({title:'제'+artNo+'조('+applyMergeText(curTitle(a))+')', rest:' '+(lines.shift()||'')}, lines);
       });
     });
-    body+=H.para('')+H.para(applyMergeText('{시행일}')+' 제정')+H.para(co+'  대표 '+(doc.info.ceo||'')+' (인)');
+    body+=H.spacer()+H.bodyPara(applyMergeText('{시행일}')+' 제정')
+      +D.signBlock([[co+'  대표', doc.info.ceo||'']], page);
     var safe=String(co||'회사').replace(/[()\s—📄🏢\/\\:*?"<>|]/gu,'');
-    H.download(body,'취업규칙_'+safe+'.hwpx');
-    toast('📕 한글 파일을 내려받았습니다 (A4 세로)');
+    H.download([{body:body, landscape:false, margin:page.margin}],'취업규칙_'+safe+'.hwpx');
+    toast('📕 한글 파일을 내려받았습니다 (표준취업규칙 조판)');
   }catch(e){ console.warn('hwpx 생성 실패:',e); toast('한글 생성 실패 — 워드로 저장하세요'); }
 }
 /* ══════ 규정관리(검토)로 넘기기 — 작성한 취업규칙을 92항목 자동 검토에 태운다 ══════ */
@@ -406,7 +553,8 @@ function sendToReview(){
   });
   try{
     localStorage.setItem('pureun_rules_handoff_v1',JSON.stringify({
-      name:'취업규칙_'+(co||'작성본')+'.txt', site:co, text:txt, at:new Date().toISOString()
+      name:'취업규칙_'+(co||'작성본')+'.txt', site:co, bizno:doc.info.bizno||'',
+      text:txt, at:new Date().toISOString()
     }));
     toast('규정관리로 넘깁니다 — 자동 검토가 실행됩니다');
     if(!EMBED) setTimeout(function(){ location.href='rules.html'; },600);   // 임베드면 부모(규정관리)가 전환
@@ -421,7 +569,7 @@ function exportWord(){
   var artNo=0;
   STD.forEach(function(ch){ if(!chapOn(ch)) return;
     var onArts=ch.arts.filter(function(a){return artOn(ch,a);}); if(!onArts.length) return;
-    body+='<h2 style="border-bottom:2px solid #1B2A4A;padding-bottom:4px">'+esc(ch.c==='부칙'?'부      칙':ch.c)+'</h2>';
+    body+='<h2 style="border-bottom:2px solid #1e293b;padding-bottom:4px">'+esc(ch.c==='부칙'?'부      칙':ch.c)+'</h2>';
     onArts.forEach(function(a){ artNo++;
       body+='<p style="margin:8px 0"><b>제'+artNo+'조 ('+esc(applyMergeText(curTitle(a)))+')</b><br>'
         + esc(applyMergeText(curBody(a))).replace(/\n/g,'<br>')+'</p>';
@@ -438,24 +586,20 @@ function exportWord(){
 
 /* ══════ 통합 로그인(공유 SSO) ══════ */
 function _rmSplash(){ var b=$('pu-boot-splash'); if(b) b.remove(); }
-function authGate(){
-  _rmSplash();
-  var g=$('authGate'); if(!g){ g=document.createElement('div'); g.id='authGate';
-    g.style.cssText='position:fixed;inset:0;z-index:99999;background:#fff;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
-    g.innerHTML='<div><div style="font-size:52px;margin-bottom:14px">🔒</div><div style="font-size:18px;font-weight:700;color:#1B2A4A;margin-bottom:8px">통합시스템 로그인이 필요합니다</div><div style="font-size:13px;color:#667;line-height:1.7;margin-bottom:20px">푸른 통합시스템에서 로그인한 뒤 이용하세요.</div><a href="enter.html" style="display:inline-block;text-decoration:none;background:#0E7C66;color:#fff;padding:11px 24px;border-radius:8px;font-size:14px;font-weight:600">🏠 통합시스템으로 이동</a></div>';
-    document.body.appendChild(g);
-  } g.style.display='flex';
-}
-function authOk(){ _rmSplash(); var g=$('authGate'); if(g) g.style.display='none'; }
+/* ⚠★ 사본을 걷었다 (대표 지시 2026-09-14) — 여기 것은 「로그아웃되었거나 세션이
+   만료되었습니다」 한 줄이 «빠져» 있었다. 사본이 갈라진다는 말이 바로 이것이다.
+   이제 모든 앱이 js/pu-gate.js 하나를 쓴다. */
+function authGate(){ _rmSplash(); try{ PuGate.show(); }catch(e){} }
+function authOk(){ _rmSplash(); try{ PuGate.hide(); }catch(e){} }
 function fbInit(){
   if(location.protocol==='file:'){ _rmSplash(); return; }  /* 로컬 파일: 오프라인 편집 허용 */
   if(typeof firebase==='undefined'||!firebase.initializeApp){ _rmSplash(); return; }
   try{
     if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-    if(FB_APPCHECK_KEY && firebase.appCheck){ try{ firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(FB_APPCHECK_KEY),true); }catch(e){} }
+    if(FB_APPCHECK_KEY && firebase.appCheck){ try{ FB_APPCHECK_ON && firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(FB_APPCHECK_KEY),true); }catch(e){} }
     try{ if(firebase.auth().setPersistence) firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
     firebase.auth().onAuthStateChanged(function(u){
-      if(u && u.email){ fbUser=u; fbDb=firebase.database(); authOk(); }
+      if(u && u.email){ fbUser=u; fbDb=firebase.database(); chwResolveName(); authOk(); }
       else authGate();
     });
   }catch(e){ _rmSplash(); }

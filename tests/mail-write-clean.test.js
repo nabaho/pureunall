@@ -1,0 +1,190 @@
+'use strict';
+/* 메일 쓰기 화면을 비웠다 (대표 지시 2026-08-30)
+   "메일작성시 이내용 필요없다. 삭제해라
+    자료서랍은 추후에 만든다 여기에 필요없다. 추후에 자료함에서 찾아서 가지고 오면된다."
+
+   ★ 여기서 못 박는 것 — 하나라도 깨지면 대표께서 매번 손으로 지우셔야 한다
+     ① 새 메일의 본문은 «비어» 있다 — 자료함 틀이 저절로 들어오지 않는다
+     ② 그래도 «되살릴 수 있다» — 도구줄 [문구]가 살아 있다
+     ③ 쓰기 화면에 자료 «서랍»이 없다
+     ④ 그런데 자료를 «붙이는 길»은 살아 있다 (자료함에서 골라 오기 · 파일 첨부하기)
+     ⑤ 죽은 손잡이를 안 남겼다 — 없앤 함수를 부르는 단추가 없다
+     ⑥ 옆줄에서 자료 갈래를 누르면 «자료함»으로 간다 (예전 목적지인 서랍이 없어졌다)
+     ⑦ 아래 안내글이 「틀에서 채워졌습니다」라고 «거짓말»하지 않는다
+
+   ⚠ 글자·개수를 못 박지 않는다(docs/검사-못박지-않기.md).
+     ①은 «채우는 코드가 없는가»를 보지, 어떤 문장인지는 안 본다. */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const ROOT = path.join(__dirname, '..');
+const raw = fs.readFileSync(path.join(ROOT, 'pu-cards.html'), 'utf8').replace(/\r\n/g, '\n');
+/* ⚠ 주석을 걷고 본다 — 잘 쓴 «설명»이 검사를 통과시키면 안 된다 */
+const src = raw.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+function fnBody(name) {
+  const i = src.indexOf('\nfunction ' + name + '(');
+  assert.ok(i >= 0, name + ' 를 찾을 수 없습니다');
+  return src.slice(i, src.indexOf('\n}', i) + 2);
+}
+
+
+/* ⚠ openMailPage 는 2026-08-30 에 앞뒤로 «갈렸다» — 앞(openMailPage)은 「쓰다 만 글이
+     있는데 이어서 쓸까요」를 물어보고, 뒤(mailPageBuild)가 실제로 편지를 «짓는다».
+     가운데 물음 창(puAsk)이 confirm 과 달리 JS를 안 멈춰서 그렇게 갈랐다.
+     «무엇을 짓는지» 보는 검사는 둘을 함께 봐야 한다 — 나뉜 것은 짜임새일 뿐 한 흐름이다. */
+function openFlow(){ return fnBody('openMailPage') + fnBody('mailPageBuild'); }
+/* ══════ ① 제목도 본문도 비어서 열린다 ══════ */
+/* ⚠ 2026-08-30 대표께서 본문에 이어 「제목」이라고 짚으셨다 — 둘 다 비운다. */
+function emptyInit(which) {
+  const fn = openFlow();
+  const m = fn.match(new RegExp('const\\s+' + which + '\\s*=([\\s\\S]*?);'));
+  assert.ok(m, 'openMailPage 에서 ' + which + ' 를 찾지 못했습니다');
+  const rhs = m[1].trim();
+  assert.ok(!/mailFill|MAIL_TPL_DEFAULT|tpl\./.test(rhs),
+    '★ 다시 틀로 채웁니다(' + which + ' = ' + rhs + ') — 대표께서 매번 지우셔야 합니다');
+  assert.ok(/^(''|""|``)$/.test(rhs), '★ ' + which + ' 가 빈 글이 아닙니다: ' + rhs);
+}
+test('★★ 새 메일의 본문은 «비어» 있다 — 자료함 틀이 저절로 안 들어온다', () => {
+  emptyInit('body0');
+});
+
+test('★★ 새 메일의 제목도 «비어» 있다 (대표 지시 2026-08-30 「제목」)', () => {
+  emptyInit('subject0');
+});
+
+test('★★ 빈 제목으로는 못 보낸다 — 비워 두는 대신 나갈 때 막아야 한다', () => {
+  /* 제목을 안 채우기로 했으니, 「제목 없음」으로 고객에게 나가는 길이 열리면 안 된다.
+     막는 자리는 composeCheck 하나다 — 화면이 아니라 여기서 막아야 묶음 발송도 걸린다. */
+  const fn = fnBody('composeCheck');
+  assert.match(fn, /p\.subject[\s\S]*?ok:\s*false/,
+    '★ 제목이 비어도 보내집니다 — 「제목 없음」이 고객에게 나갑니다');
+});
+
+/* ⚠ 여기 있던 검사 「제목 칸에 무엇을 적을지 일러 준다」를 «뒤집었다»
+     (대표 지시 2026-08-31 「제목에 내용 없애고」).
+     예전에는 안내 글자가 없으면 고장으로 보일까 봐 두게 했는데, 그 안내가
+     「제목을 적으세요 — 자료를 보내실 때는 아래 [문구]에서…」라는 긴 문장이라
+     편지를 쓸 때마다 «제목이 이미 적혀 있는 것처럼» 보였다.
+   ⚠ 안내를 뺀 자리는 tests/mail-write-hints.test.js 가 지킨다 — 「제목 칸에는
+     안내가 없다」와 「[문구] 길은 그대로 있다」를 함께 본다. 이 줄을 지우지 말 것:
+     지우면 다음 사람이 「친절하게」 안내를 도로 넣고, 같은 지시가 또 온다. */
+test('★★ 제목 칸에 안내 글자를 «도로 넣지 않는다» (대표 지시 2026-08-31)', () => {
+  const fn = fnBody('mailWriteHtml');
+  const i = fn.indexOf('id="cpSubj"');
+  assert.ok(i > 0, '제목 칸을 찾지 못했습니다');
+  const tag = fn.slice(i, fn.indexOf('>', i) + 1);
+  assert.ok(!/placeholder=/.test(tag),
+    '★ 제목 칸에 안내 글자가 돌아왔습니다: ' + tag);
+});
+
+test('★ 전달·다시보내기는 안 깨진다 — 넘어온 제목·본문이 빈 값을 덮어쓴다', () => {
+  const fn = openFlow();
+  assert.match(fn, /if\(p\.subject\)/, '★ 전달할 제목이 빈 값에 덮여 사라집니다');
+  assert.match(fn, /if\(p\.body\)/, '★ 전달할 본문이 빈 값에 덮여 사라집니다');
+});
+
+test('서명은 그대로 따라간다 — 본문을 비운다고 서명까지 날리면 안 된다', () => {
+  /* ⚠ 「어딘가에 signBlockHtml 이 있다」로는 모자란다 — 전달 갈래(p.body)에도 있어서
+       «새 편지»의 서명을 빼도 그 검사는 통과한다(되돌리기에서 실제로 안 걸렸다).
+       새 편지가 쓰는 html0 을 콕 집어 본다. */
+  const m = openFlow().match(/const\s+html0\s*=([^;]*);/);
+  assert.ok(m, 'html0 을 찾지 못했습니다');
+  assert.match(m[1], /signBlockHtml\(\)/,
+    '★ 새 편지에 서명이 안 들어갑니다 (대표 지시 2026-08-24 「한번 저장하면 계속 보낼수 있게」)');
+});
+
+/* ══════ ② 되살릴 길 ══════ */
+test('★ [문구] 서랍이 살아 있다 — 지운 것이 아니라 «채우기»를 그만둔 것이다', () => {
+  assert.match(src, /onclick="tplPick\(event\)"/,
+    '★ 문구 서랍 단추가 없습니다 — 옛 문구를 되살릴 길이 사라졌습니다');
+  assert.ok(raw.indexOf('자료 송부') > 0,
+    '★ 「자료 송부」 문구 씨앗이 없습니다 — 되살려도 옛 글이 안 나옵니다');
+});
+
+/* ══════ ③ 서랍이 없다 ══════ */
+test('★★ 쓰기 화면에 자료 서랍이 없다', () => {
+  const fn = fnBody('mailWriteHtml');
+  for (const k of ['mdrawer', 'mgrip', 'mdlist', 'mdrow', 'mdsearch', 'toggleMailDrawer']) {
+    assert.ok(fn.indexOf(k) < 0, '★ 서랍 조각이 남아 있습니다: ' + k);
+  }
+});
+
+test('★ 서랍을 부리던 함수들이 통째로 사라졌다 — 반쯤 지우면 다음 사람이 되살린다', () => {
+  for (const n of ['drawerGroups', 'drawerCatOpen', 'toggleDrawerCat', 'focusDrawerQ',
+    'setDrawerW', 'loadDrawerW', 'initMailGrip', 'drawerMax',
+    'previewInDrawer', 'closeDrawerPreview', 'toggleMailDrawer']) {
+    assert.ok(src.indexOf('\nfunction ' + n + '(') < 0, '★ ' + n + ' 이 남아 있습니다');
+  }
+});
+
+test('★ 서랍이 쓰던 state 값도 함께 없앴다 — 남으면 「왜 안 되나」로 하루를 쓴다', () => {
+  for (const k of ['state.mailDrawer', 'state.drawerQ', 'state.drawerW', 'state.drawerOpen']) {
+    assert.ok(src.indexOf(k) < 0, '★ ' + k + ' 가 남아 있습니다');
+  }
+});
+
+test('★ 서랍 CSS 도 없앴다 — 안 쓰는 규칙이 남으면 다음 사람이 자리를 찾다 헤맨다', () => {
+  for (const c of ['.mdrawer', '.mgrip', '.mdrow', '.mdprev', '.mdcath', '.mresizing']) {
+    assert.ok(src.indexOf(c) < 0, '★ ' + c + ' 규칙이 남아 있습니다');
+  }
+});
+
+/* ══════ ④ 붙이는 길은 살아 있다 ══════ */
+test('★★ 자료함에서 «골라 온 것»은 그대로 붙는다 — 서랍을 없앴다고 첨부가 막히면 안 된다', () => {
+  assert.match(fnBody('openCompose'), /openMailPage\(\{[\s\S]*ids:\s*ids/,
+    '★ 고른 자료가 쓰기 화면으로 안 넘어갑니다');
+  assert.match(openFlow(), /ids:\s*p\.ids/,
+    '★ 넘어온 자료를 편지에 안 담습니다');
+});
+
+test('★ 붙은 자료가 «첨부 칸에 보인다» — 안 보이면 붙은 줄 모르고 보낸다', () => {
+  const fn = fnBody('mailWriteHtml');
+  assert.match(fn, /c\.ids\.map\(/, '★ 붙은 자료 딱지를 안 그립니다');
+  assert.match(fn, /dropAttach\(/, '★ 붙은 자료를 뺄 길이 없습니다');
+});
+
+test('★ 이번 편지에만 쓸 파일은 그대로 붙일 수 있다', () => {
+  assert.match(fnBody('mailWriteHtml'), /addLocalFiles\(this\)/,
+    '★ [파일 첨부하기] 가 사라졌습니다 — 붙일 길이 하나도 안 남습니다');
+});
+
+/* ══════ ⑤ 죽은 손잡이 없음 ══════ */
+test('★★ 없앤 함수를 부르는 단추가 하나도 없다', () => {
+  const dead = ['toggleMailDrawer', 'previewInDrawer', 'closeDrawerPreview',
+    'toggleDrawerCat', 'focusDrawerQ'];
+  const hits = [];
+  const re = /on[a-z]+="([^"]*)"/g;
+  let m;
+  while ((m = re.exec(src))) {
+    for (const d of dead) if (m[1].indexOf(d) >= 0) hits.push(d);
+  }
+  assert.deepEqual(hits, [], '★ 눌러도 아무 일이 안 일어나는 단추: ' + hits.join(', '));
+});
+
+/* ══════ ⑥ 갈래는 자료함으로 ══════ */
+test('★★ 옆줄에서 자료 갈래를 누르면 «자료함»이 열린다 — 예전 목적지(서랍)가 없어졌다', () => {
+  const fn = fnBody('pickMatCat');
+  assert.match(fn, /openMatPage\(\)/, '★ 갈 곳이 없습니다 — 눌러도 아무 일이 안 일어납니다');
+  assert.ok(fn.indexOf('openMailPage()') < 0,
+    '★ 아직 쓰기 화면으로 갑니다 — 거기엔 이제 서랍이 없어 아무 변화가 없습니다');
+  assert.match(fn, /state\.matCat/,
+    '★ 자료함을 «그 갈래»로 열지 않습니다 — 전체가 나오면 다시 찾아야 합니다');
+});
+
+/* ══════ ⑦ 화면에 «거짓말»이 없다 ══════ */
+test('★ 「틀에서 채워졌습니다」라고 «거짓말»하는 자리가 없다', () => {
+  /* ⚠ 예전에는 아래 안내글(cphint)이 그렇게 적고 있어 그 글을 고쳤다.
+       2026-08-30 에 대표 지시(「불필요한 설명 필요없다」)로 안내글 자체를 뺐다 —
+       거짓말할 자리도 함께 없어졌다. 지킬 것은 «어느 글이냐»가 아니라
+       「본문이 안 채워지는데 채워졌다고 하지 않는가」다. */
+  const fn = fnBody('mailWriteHtml');
+  assert.ok(fn.indexOf('채워졌습니다') < 0,
+    '★ 본문은 이제 안 채워지는데 「채워졌습니다」라고 적힌 자리가 있습니다');
+  /* 설명을 뺀 것이지 «길»을 없앤 것이 아니다 — 자료함으로 가는 길은 남아 있어야 한다 */
+  const src2 = fnBody('pickMatCat') + fnBody('mailSideHtml');
+  assert.ok(/openMatPage\(\)/.test(fn + src2),
+    '★ 자료함으로 가는 길이 아예 사라졌습니다 — 설명만 빼야 합니다');
+});

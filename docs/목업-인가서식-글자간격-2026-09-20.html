@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8">
+<title>목업 — ① 인가 서식 글자크기·줄간격 재검토</title>
+<!--
+  대표 지시 2026-09-20 「나머지 서류들도 서식 다시확인하고 글자크기 줄간격 모두 검토 다시해라」
+
+  ★ 이 목업의 글·회사 이름·사람 이름은 «전부 가짜»다. 이 저장소는 통째로 공개된다.
+  ★ 숫자(원본 실측값)는 첨부해 주신 2024년 한글 파일 6종을 .hwpx 로 풀어
+    header.xml 의 charPr height(1/100pt)·paraPr lineSpacing 을 직접 읽은 값이다.
+-->
+<style>
+  :root{
+    --bg:#eef2f7; --card:#fff; --line:#e2e8f0; --ink:#1e293b; --sub:#64748b;
+    --warn:#92400e; --warn-bg:#fffbeb; --bad:#991b1b; --bad-bg:#fef2f2;
+    --ok:#065f46; --ok-bg:#ecfdf5; --accent:#1d4ed8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px;background:var(--bg);color:var(--ink);
+    font:14px/1.6 -apple-system,'Malgun Gothic','맑은 고딕',sans-serif}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 18px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;margin:0 0 16px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  h2{font-size:15px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  table.cmp{border-collapse:collapse;width:100%;font-size:12.5px}
+  table.cmp th,table.cmp td{border:1px solid var(--line);padding:7px 9px;text-align:center}
+  table.cmp th{background:#f8fafc;font-weight:700}
+  table.cmp td.n{text-align:left}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:11px;font-weight:700}
+  .t-bad{background:var(--bad-bg);color:var(--bad)}
+  .t-warn{background:var(--warn-bg);color:var(--warn)}
+  .t-ok{background:var(--ok-bg);color:var(--ok)}
+  .note{background:var(--warn-bg);border:1px solid #fde68a;color:var(--warn);
+    border-radius:8px;padding:9px 12px;font-size:12px;margin:10px 0 0;line-height:1.7}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .col h3{font-size:12.5px;margin:0 0 7px;color:var(--sub);font-weight:700}
+  .col h3 b{color:var(--ink)}
+  /* A4 축소판 — 종이 한 장을 그대로 줄여 보여 준다 */
+  .a4{background:#fff;border:1px solid var(--line);box-shadow:0 1px 6px rgba(0,0,0,.12);
+    width:100%;aspect-ratio:210/297;padding:8%;overflow:hidden;
+    font-family:'Batang','바탕',serif;color:#1e293b}
+  .a4 .ttl{text-align:center;font-weight:700;letter-spacing:5px;margin:0 0 14px}
+  .a4 p{margin:5px 0;text-align:justify;text-indent:1em}
+  .a4 .jo{padding-left:1.6em;text-indent:-1.6em;margin:9px 0 3px}
+  .a4 .hang{margin:2px 0 2px 1em;padding-left:1.3em;text-indent:-1.3em}
+  /* 지금 모양 */
+  .now{font-size:7.2px;line-height:1.6}
+  .now .ttl{font-size:11px}
+  /* 제안 모양 — 원본 실측대로 */
+  .new{font-size:8.6px;line-height:2.0}
+  .new .ttl{font-size:11px}
+  .runon{font-size:7.2px;line-height:1.3;text-indent:1em;text-align:justify}
+  .fixed p{margin:4px 0}
+  .fixed{font-size:8px;line-height:1.6}
+  .mini{font-size:11px;color:var(--sub);margin:6px 0 0}
+  .k{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;
+    background:#f1f5f9;padding:1px 5px;border-radius:4px}
+</style>
+<body>
+<div class="wrap">
+
+  <h1>① 인가 서식 6종 — 글자크기·줄간격 재검토</h1>
+  <p class="lead">
+    첨부해 주신 한글 파일 6종을 풀어 <b>원본 값을 직접 쟀습니다.</b>
+    아래 숫자는 짐작이 아니라 파일에서 읽은 값입니다.
+    이 목업의 회사·사람 이름은 전부 가짜입니다.
+  </p>
+
+  <!-- ══ 1. 한눈에 ══ -->
+  <div class="panel">
+    <h2>1. 원본과 지금 화면을 나란히</h2>
+    <table class="cmp">
+      <tr>
+        <th rowspan="2" style="width:22%">서식</th>
+        <th colspan="2">원본 한글 파일 (실측)</th>
+        <th colspan="2">지금 우리 화면</th>
+        <th rowspan="2" style="width:19%">무엇이 다른가</th>
+      </tr>
+      <tr><th>글자</th><th>줄간격</th><th>글자</th><th>줄간격</th></tr>
+
+      <tr><td class="n">1. 설립인가신청서<br><span style="color:#64748b">(별지 제7호)</span></td>
+        <td>8pt<br><span style="color:#64748b">≈11px</span></td><td>140%</td>
+        <td>12.5px</td><td>1.40</td>
+        <td><span class="tag t-warn">글자 큼</span><br><span style="font-size:11px">칸이 넘칠 수 있음</span></td></tr>
+
+      <tr><td class="n">2. 설립합의서</td>
+        <td>13pt<br><span style="color:#64748b">≈17.5px</span></td><td>160%</td>
+        <td>13.5px</td><td>1.30</td>
+        <td><span class="tag t-bad">본문이 한 덩이</span><br><span style="font-size:11px">아래 3번 참고</span></td></tr>
+
+      <tr><td class="n">3. 정관</td>
+        <td>12pt<br><span style="color:#64748b">≈16px</span></td><td><b>200%</b></td>
+        <td>13.5px</td><td>1.60</td>
+        <td><span class="tag t-bad">가장 빽빽</span><br><span style="font-size:11px">글자·줄 둘 다 좁음</span></td></tr>
+
+      <tr><td class="n">4. 설립준비위원회 회의록</td>
+        <td>10pt<br><span style="color:#64748b">≈13.3px</span></td><td>160%</td>
+        <td>13.5px</td><td>1.60</td>
+        <td><span class="tag t-ok">거의 맞음</span></td></tr>
+
+      <tr><td class="n">5. 기금출연확인서</td>
+        <td>14pt<br><span style="color:#64748b">≈19px</span></td><td>220%</td>
+        <td>19px</td><td>2.20</td>
+        <td><span class="tag t-ok">이미 맞춤</span><br><span style="font-size:11px">어제 고친 것</span></td></tr>
+
+      <tr><td class="n">6. 사업계획서(연도)</td>
+        <td>12pt<br><span style="color:#64748b">≈16px</span></td><td>180%</td>
+        <td>12.5px</td><td>1.60</td>
+        <td><span class="tag t-bad">글자 많이 작음</span></td></tr>
+    </table>
+
+    <div class="note" style="background:var(--bad-bg);border-color:#fecaca;color:var(--bad)">
+      <b>※ 바로잡음 (2026-09-20, 만든 뒤 고침)</b> — 위 「원본」 칸은 <b>대표가 첨부한 2024년
+      제출본</b> 값입니다. 그 뒤에 원본이 <b>두 벌</b>이라는 것을 알았습니다:
+      우리 <span class="k">fund_forms.js</span> 는 <b>빈 양식</b>(설립관련과거자료\1. 노동부인가시필요서류)에서
+      만들어진 것이라, 우리가 그리는 글은 곧 그 빈 양식입니다.
+      <b>그래서 빈 양식 값을 따랐습니다.</b> 같은 잣대(표 안/밖을 갈라서)로 재면 본문 글자가
+      <br>신청서 10 ↔ 10(같음) · 합의서 13 ↔ 12 · 정관 11 ↔ 12 · 회의록 13 ↔ 14 · 사업계획서 12 ↔ 14 (pt)
+      <br>1~2pt 차이라 어느 쪽이든 크게 다르지 않지만, <b>글자는 이 문서·줄간격은 저 문서</b>로
+      섞으면 아무 원본과도 안 맞게 되므로 한 문서로 맞췄습니다.
+      <br><b>실제로 넣은 값</b>(본문/표 칸): 신청서 13.5/11px · 합의서 17.5/16px ·
+      정관 15/15px · 회의록 17.5/15px · 출연확인서 19/19px · 사업계획서 16/15px.
+    </div>
+    <div class="note">
+      <b>왜 이렇게 됐나</b> — 한글 파일을 HTML 로 옮기는 변환기가
+      <span class="k">정렬</span>·<span class="k">줄간격</span>·<span class="k">칸 높이</span>만 옮기고
+      <b>글자 크기는 아예 안 옮깁니다</b>(<span class="k">hwp2html.py</span> 의 <span class="k">_style()</span> 확인).
+      그래서 원본이 8pt든 14pt든 전부 우리 기본 글자(13.5px) 하나로 눌렸습니다.
+      서식마다 글자 크기가 다른 데는 까닭이 있습니다 — 신청서는 칸이 빽빽해 작게,
+      정관·출연확인서는 읽히라고 크게 쓴 것입니다.
+    </div>
+  </div>
+
+  <!-- ══ 2. 정관 ══ -->
+  <div class="panel">
+    <h2>2. 정관 — 글자·줄 둘 다 좁다 (가장 크게 달라지는 서식)</h2>
+    <div class="cols">
+      <div class="col">
+        <h3>지금 — <b>13.5px / 줄간격 1.6</b></h3>
+        <div class="a4 now">
+          <div class="ttl">가나공동근로복지기금 정관</div>
+          <p class="jo">제1조(명칭) 이 법인은 가나공동근로복지기금법인이라 한다.</p>
+          <p class="jo">제2조(목적) 이 법인은 근로복지기본법에 따라 근로자의 생활 안정과
+            복지 증진에 이바지함을 목적으로 한다.</p>
+          <p class="jo">제3조(사무소) 이 법인의 주된 사무소는 경기도 어딘가시에 둔다.</p>
+          <p class="jo">제4조(사업) 이 법인은 제2조의 목적을 이루기 위하여 다음 각 호의
+            사업을 한다.</p>
+          <p class="hang">1. 근로자의 주택 구입 자금 보조</p>
+          <p class="hang">2. 근로자의 장학금 지급</p>
+          <p class="hang">3. 근로자의 재해 구호금 지급</p>
+          <p class="jo">제5조(재산) 이 법인의 재산은 출연받은 재산과 그 재산에서 생기는
+            수익금으로 이루어진다.</p>
+        </div>
+        <p class="mini">여섯 장 — 줄이 붙어 읽기 답답합니다.</p>
+      </div>
+      <div class="col">
+        <h3>제안 — <b>16px / 줄간격 2.0</b> <span style="color:#1d4ed8">(원본 그대로)</span></h3>
+        <div class="a4 new">
+          <div class="ttl">가나공동근로복지기금 정관</div>
+          <p class="jo">제1조(명칭) 이 법인은 가나공동근로복지기금법인이라 한다.</p>
+          <p class="jo">제2조(목적) 이 법인은 근로복지기본법에 따라 근로자의 생활 안정과
+            복지 증진에 이바지함을 목적으로 한다.</p>
+          <p class="jo">제3조(사무소) 이 법인의 주된 사무소는 경기도 어딘가시에 둔다.</p>
+          <p class="jo">제4조(사업) 이 법인은 제2조의 목적을 이루기 위하여 다음 각 호의
+            사업을 한다.</p>
+          <p class="hang">1. 근로자의 주택 구입 자금 보조</p>
+          <p class="hang">2. 근로자의 장학금 지급</p>
+        </div>
+        <p class="mini">여덟 장 — 원본과 같은 짜임입니다.</p>
+      </div>
+    </div>
+    <div class="note">
+      <b>장수가 6장 → 8장으로 늘어납니다.</b> 원본이 줄간격 200% 로 그만큼 쓰던 서류라
+      원본대로 맞추면 늘어나는 것이 맞습니다. 늘어나는 것이 싫으시면
+      글자만 키우고 줄간격은 1.6 그대로 두는 길(7장)도 있습니다 — 골라 주세요.
+    </div>
+  </div>
+
+  <!-- ══ 3. 설립합의서 ══ -->
+  <div class="panel" style="border-color:#fecaca">
+    <div class="note" style="background:var(--bad-bg);border-color:#fecaca;color:var(--bad)">
+      <b>※ 바로잡음 (2026-09-20, 만든 뒤 고침)</b> — 아래 「지금」 칸은 <b>틀렸습니다.</b>
+      채우기 함수를 안 돌린 <b>날것 템플릿</b>을 그려 놓고 「줄이 안 나뉜다」고 적었습니다.
+      실제 화면에서는 <code class="k">fillSignTable()</code> 이 서명란을 <b>번호 붙인 표</b>로
+      이미 다시 짜 줍니다 — 참여사업장 대표자 이름도 그 표에 들어갑니다.
+      <br>실제로 손본 것은 <b>본문뿐</b>입니다(제목·전문·합의사항 3줄·날짜를 문단으로 세움).
+      <b>서명란은 건드리지 않았습니다</b> — 쪼갰더니 그 함수가 자리를 못 찾아 서명 표가
+      통째로 사라졌고, <code class="k">check_derived.js</code> 가 7건으로 잡았습니다.
+    </div>
+    <h2>3. 설립합의서 — 본문이 한 덩이로 뭉쳐 있었다</h2>
+    <div class="cols">
+      <div class="col">
+        <h3>지금 — 문단 <b>1개</b>, 표 <b>0개</b></h3>
+        <div class="a4">
+          <div class="ttl" style="font-size:11px">공동근로복지기금법인 설립 합의서</div>
+          <div class="runon">○○주식회사 및 ○○주식회사와 ○○주식회사 및 ○○주식회사 근로자측은
+            ○○○○. ○○. ○○ 임시 노사협의회를 개최하고 의제로 상정한 안건 중 공동근로복지기금법인
+            설립 건에 관하여 협의한 결과 다음과 같이 합의한다. 1. 사업주는 기금 출연에 적극
+            협조한다. 2. 근로자측은 기금 운영에 협력한다. 3. 기금법인의 설립준비위원회를 구성한다.
+            4. 설립준비위원은 노사 동수로 한다. 5. 위 합의사항을 증명하기 위하여 합의서 2통을
+            작성하여 노사 각 1통씩 보관한다. ○○○○년 ○○월 ○○일 사업주측 대표 ○○○ (인)
+            근로자측 대표 ○○○ (인)</div>
+        </div>
+        <p class="mini">문단·표가 모두 녹아 한 덩이가 됐습니다. 합의 항목도, 서명란도 줄이 안 섭니다.</p>
+      </div>
+      <div class="col">
+        <h3>제안 — 원본처럼 <b>문단 35개 · 표 2개</b></h3>
+        <div class="a4 fixed">
+          <div class="ttl" style="font-size:11px">공동근로복지기금법인 설립 합의서</div>
+          <p>○○주식회사 및 ○○주식회사 근로자측은 ○○○○. ○○. ○○ 임시 노사협의회를
+            개최하고, 공동근로복지기금법인 설립 건에 관하여 다음과 같이 합의한다.</p>
+          <p class="hang">1. 사업주는 기금 출연에 적극 협조한다.</p>
+          <p class="hang">2. 근로자측은 기금 운영에 협력한다.</p>
+          <p class="hang">3. 기금법인의 설립준비위원회를 구성한다.</p>
+          <p class="hang">4. 설립준비위원은 노사 동수로 한다.</p>
+          <p style="text-align:center;margin-top:10px">○○○○년 ○○월 ○○일</p>
+          <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:7.5px">
+            <tr><td style="border:1px solid #1e293b;padding:4px">사업주측 대표</td>
+                <td style="border:1px solid #1e293b;padding:4px">○ ○ ○ &nbsp;(인)</td></tr>
+            <tr><td style="border:1px solid #1e293b;padding:4px">근로자측 대표</td>
+                <td style="border:1px solid #1e293b;padding:4px">○ ○ ○ &nbsp;(인)</td></tr>
+          </table>
+        </div>
+        <p class="mini">합의 항목이 한 줄씩 서고, 서명란이 표로 섭니다.</p>
+      </div>
+    </div>
+    <div class="note">
+      <b>실제로 한 것</b> — 템플릿의 <span class="k">&lt;br&gt;</span> 자리에서 갈라
+      제목·전문·합의사항 3줄·날짜를 각각 제 문단으로 세웠습니다.
+      <b>말은 한 글자도 새로 짓거나 지우지 않았습니다</b>(276자 → 276자, 날인 자리 4곳 그대로).
+      딱 하나, 한글이 줄을 바꾸며 낱말 가운데를 벌려 놓은
+      「동수　　　로」만 「동수로」로 붙였습니다.
+      <br><b>서명란은 손대지 않았습니다</b> — 그 자리는 화면에서 표로 갈아 끼워집니다.
+    </div>
+  </div>
+
+  <!-- ══ 4. 나머지 ══ -->
+  <div class="panel">
+    <h2>4. 나머지 셋</h2>
+    <table class="cmp">
+      <tr><th style="width:24%">서식</th><th style="width:30%">제안</th><th>까닭</th></tr>
+      <tr><td class="n">1. 설립인가신청서</td>
+        <td>12.5px → <b>11px</b><br>줄간격 1.4 그대로</td>
+        <td class="n">원본이 8pt 입니다. 칸이 빽빽한 관공서 서식이라 일부러 작게 쓴 것이고,
+          지금처럼 키우면 칸 밖으로 밀립니다. <b>작아지는 것이라 따로 여쭙습니다.</b></td></tr>
+      <tr><td class="n">4. 회의록</td>
+        <td>13.5px / 1.6 <b>그대로</b></td>
+        <td class="n">원본(10pt/160%)과 이미 거의 같습니다. 건드리지 않겠습니다.</td></tr>
+      <tr><td class="n">6. 사업계획서</td>
+        <td>12.5px → <b>16px</b><br>줄간격 1.6 → <b>1.8</b></td>
+        <td class="n">원본이 12pt/180% 인데 표 칸 글자(12.5px)로 눌려 가장 작게 나옵니다.
+          10장 → 11장이 됩니다.</td></tr>
+    </table>
+  </div>
+
+  <!-- ══ 5. 여쭐 것 ══ -->
+  <div class="panel" style="border-color:#bfdbfe;background:#f8fbff">
+    <h2 style="border-color:#bfdbfe">5. 골라 주실 것</h2>
+    <table class="cmp">
+      <tr><th style="width:34%">고를 것</th><th>길</th></tr>
+      <tr><td class="n"><b>가.</b> 정관 줄간격</td>
+        <td class="n">① <b>원본대로 200%</b> (6장→8장) &nbsp;/&nbsp; ② 글자만 키우고 1.6 유지 (6장→7장)</td></tr>
+      <tr><td class="n"><b>나.</b> 설립인가신청서 글자</td>
+        <td class="n">① <b>원본대로 11px 로 줄임</b> (칸 안 넘침) &nbsp;/&nbsp; ② 지금 12.5px 유지 (읽기 편함)</td></tr>
+      <tr><td class="n"><b>다.</b> 설립합의서 줄 나누기</td>
+        <td class="n">① <b>원본에서 모양 다시 입히기</b> &nbsp;/&nbsp; ② 지금은 그대로 두고 나중에</td></tr>
+    </table>
+    <div class="note" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+      아무 말씀 없으시면 <b>가-①, 나-①, 다-①</b>(전부 원본대로)로 하겠습니다.
+      관공서에 내는 서류는 원본과 같은 모양이 가장 탈이 없습니다.
+    </div>
+  </div>
+
+</div>
+</body></html>

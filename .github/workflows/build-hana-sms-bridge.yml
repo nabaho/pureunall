@@ -1,0 +1,66 @@
+name: 권형하 휴대폰 하나문자 앱 만들기
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'android/hana-sms-bridge/**'
+      - '.github/workflows/build-hana-sms-bridge.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'android/hana-sms-bridge/**'
+      - '.github/workflows/build-hana-sms-bridge.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android/hana-sms-bridge
+    # 서명키는 저장소에 두지 않는다 — 금고에서 꺼내 쓴다 (대표 결정 2026-08-29 「안전하게」).
+    # 금고가 비어 있어도 빌드는 돌아간다(옛날처럼 임시 키). 다만 아래에서 크게 알린다.
+    # ⚠★ 금고에 «이미 들어 있는» 이름을 부른다 (2026-08-30 에 고침).
+    #   2026-08-23 에 HANA_RELEASE_* 넷이 등록돼 있었는데, 2026-08-29 에 이 자리를
+    #   새로 쓰면서 «있는지 보지 않고» HANA_KEYSTORE_* 라는 다른 이름을 불렀다.
+    #   금고는 차 있는데 빌드는 「비었다」로 읽어 임시 키로 서명했고, 그래서
+    #   대표 폰에서 덮어쓰기 설치가 계속 막혔다 —「앱이 설치되지 않았습니다」.
+    #   새 앱이 한 번도 안 깔린 것이 「하나 문자가 안 들어온다」의 진짜 까닭이었다.
+    # ⚠ 이름을 지을 때는 `gh secret list` 로 금고에 무엇이 있는지 «먼저» 본다.
+    #   금고가 비어도 빌드는 조용히 성공하므로, 잘못 부른 것을 아무도 못 알아챈다.
+    env:
+      HANA_KEYSTORE_B64: ${{ secrets.HANA_RELEASE_KEYSTORE_BASE64 }}
+      HANA_KEYSTORE_PASSWORD: ${{ secrets.HANA_RELEASE_STORE_PASSWORD }}
+      HANA_KEY_ALIAS: ${{ secrets.HANA_RELEASE_KEY_ALIAS }}
+      HANA_KEY_PASSWORD: ${{ secrets.HANA_RELEASE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: 서명키 꺼내기 (금고에 있을 때만)
+        run: |
+          if [ -n "$HANA_KEYSTORE_B64" ]; then
+            printf '%s' "$HANA_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/hana.jks"
+            echo "HANA_KEYSTORE_FILE=$RUNNER_TEMP/hana.jks" >> "$GITHUB_ENV"
+            echo "고정 서명키를 꺼냈습니다 — 덮어쓰기 설치가 되는 APK 가 나옵니다."
+          else
+            echo "::warning::고정 서명키가 금고에 없습니다. 임시 키로 서명되어 «덮어쓰기 설치가 안 되는» APK 가 나옵니다 — 깔면 연결이 지워져 연결번호를 다시 넣어야 합니다."
+          fi
+
+      - name: APK 만들기
+        run: gradle :app:assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pureun-hana-message-android
+          path: android/hana-sms-bridge/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

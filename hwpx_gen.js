@@ -397,7 +397,9 @@ function build(input){
   const files=[
     {name:"mimetype",data:"application/hwp+zip",store:true},
     {name:"version.xml",data:TPL_VERSION,store:true},
-    {name:"Contents/header.xml",data:TPL_HEADER}
+    /* secCnt 는 구역 수와 반드시 같아야 한다 — 1로 두면 한글이 section1 이후를
+       통째로 무시한다(파일에는 있는데 문서에는 안 나온다) */
+    {name:"Contents/header.xml",data:TPL_HEADER.replace('secCnt="1"','secCnt="'+secs.length+'"')}
   ];
   secs.forEach(function(sc,i){
     files.push({name:"Contents/section"+i+".xml",data:sectionXml(sc.body,sc.landscape,sc.margin)});
@@ -412,10 +414,17 @@ function build(input){
 }
 function download(input,fname){
   const u8=build(input);
+  const common=(typeof globalThis!=="undefined")&&globalThis.PureunHwp;
+  if(common){
+    common.validate(u8,fname);
+    common.download(u8,fname,"hwpx");
+    return u8;
+  }
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([u8],{type:"application/hwp+zip"}));
   a.download=fname;a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href);},1500);
+  return u8;
 }
 /* 열 비율(합 1)을 본문 폭에 맞춘 실제 열폭으로 변환 */
 function cols(ratios){

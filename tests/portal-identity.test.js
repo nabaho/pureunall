@@ -1,0 +1,121 @@
+/* 포털 로그인 신원 — 누구로 들어왔는지 «보이게» 한다
+   (2026-08-10) 박재원 계정으로 접수된 제보: "박은비로 로그인했지만 박재원으로 뜸 (핸드폰)".
+   사번이 P005(박재원)·A005(박은비)처럼 «숫자가 같고 앞글자만 다르다».
+   아이디를 잘못 넣어도, 같은 사번이 두 사람에게 붙어 있어도, 남의 세션이 남은 폰이어도 —
+   화면에는 이름 하나만 떠서 본인이 알아챌 길이 없었다.
+   고침: ① 이름 옆에 사번 표시 ② 사번 겹침을 크게 경고 ③ 자동 로그인임을 알림
+        ④ 명부에 없으면 없다고 말함. 판단은 사람이 하고, 화면은 사실을 보여준다. */
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const src = fs.readFileSync(path.join(__dirname, '..', 'enter.html'), 'utf8').replace(/\r\n/g, '\n');
+
+let pass = 0, fail = 0;
+function t(name, got, want){
+  const G = JSON.stringify(got), W = JSON.stringify(want);
+  if(G === W){ pass++; console.log('  PASS ' + name + '  (' + G + ')'); }
+  else { fail++; console.log('  FAIL ' + name + '\n    받음 ' + G + '\n    기대 ' + W); }
+}
+
+const ctx = { console:console };
+ctx.window = ctx;
+vm.createContext(ctx);
+const grab = (from, to) => src.slice(src.indexOf(from), src.indexOf(to));
+vm.runInContext(grab('function sidToEmail(sid)', 'function isMobile()'), ctx);
+
+console.log('\n[① 사번 ↔ 이메일 — 표시용 되돌리기]');
+t('사번 → 이메일', ctx.sidToEmail('P005'), 'p005@pureun.kr');
+t('줄표가 있어도 같은 이메일 (P-005 와 P005 는 같은 계정이다)', ctx.sidToEmail('P-005'), 'p005@pureun.kr');
+t('이메일 → 표시용 사번', ctx.puEmailToSid('p005@pureun.kr'), 'P005');
+t('a005 는 A005 로', ctx.puEmailToSid('a005@pureun.kr'), 'A005');
+t('이메일이 아니면 빈 값', ctx.puEmailToSid('관리자'), '');
+t('빈 값도 안 터진다', ctx.puEmailToSid(null), '');
+
+console.log('\n[② 명부에서 찾기 — 겹침을 조용히 묻지 않는다]');
+const roster = [
+  { sid:'P005', name:'박재원', title:'노무사', role:'member', status:'active' },
+  { sid:'A005', name:'박은비', title:'주임',   role:'member', status:'active' },
+  { sid:'A003', name:'김보람', title:'과장',   role:'member', status:'active' }
+];
+t('박재원 이메일은 박재원', ctx.puDirMatch(roster, 'p005@pureun.kr').acct.name, '박재원');
+t('★ 박은비 이메일은 박은비 (숫자가 같아도 앞글자가 다르면 다른 사람)',
+  ctx.puDirMatch(roster, 'a005@pureun.kr').acct.name, '박은비');
+t('정상이면 잡힌 사람은 한 명', ctx.puDirMatch(roster, 'a005@pureun.kr').all.length, 1);
+t('명부에 없으면 없다고 한다', ctx.puDirMatch(roster, 'x999@pureun.kr').acct, null);
+t('빈 명부도 안 터진다', ctx.puDirMatch(null, 'a005@pureun.kr').acct, null);
+
+/* 같은 사번이 두 사람에게 — 관리자 실수(줄 복사 뒤 사번 안 바꿈)로 실제로 생길 수 있다 */
+const dupRoster = [
+  { sid:'P005', name:'박재원', status:'active' },
+  { sid:'p-005', name:'박은비', status:'active' }   // 줄표·대소문자만 달라도 같은 계정이다
+];
+const dup = ctx.puDirMatch(dupRoster, 'p005@pureun.kr');
+t('★ 겹침을 겹쳤다고 돌려준다 (find 하나면 조용히 첫 사람이 뜬다)', dup.all.length, 2);
+t('겹친 두 사람의 이름이 다 있다', dup.all.map(function(x){ return x.name; }), ['박재원', '박은비']);
+
+/* 퇴사자와 겹치면 재직자를 고른다 — 사번 재사용(퇴사자 사번을 새 직원에게) 대비 */
+const reused = [
+  { sid:'A003', name:'김보람', status:'left' },
+  { sid:'A003', name:'박은비', status:'active' }
+];
+t('★ 퇴사자와 겹치면 재직자가 뜬다', ctx.puDirMatch(reused, 'a003@pureun.kr').acct.name, '박은비');
+t('그래도 겹침은 알린다 (명부를 정리해야 한다)', ctx.puDirMatch(reused, 'a003@pureun.kr').all.length, 2);
+t('전원 퇴사면 그중 첫 사람이라도 (이름이 아예 안 뜨는 것보다 낫다)',
+  ctx.puDirMatch([{ sid:'A003', name:'김보람', status:'left' }], 'a003@pureun.kr').acct.name, '김보람');
+
+console.log('\n[③ 화면 — 이름 옆에 사번이 뜬다]');
+/* ⚠ 글월 한 줄을 그대로 찾지 않는다 — 2026-08-20 에 「(admin)」만 폰에서 접으려고
+   span 으로 감싸면서 이 줄이 바뀌었고, 멀쩡한 고침이 걸렸다.
+   지켜야 할 것은 «머리에 이름·직책·역할·사번이 함께 뜨는가»다. */
+t('★ 머리에 사번을 함께 적는다', (function(){
+  var m = /\$\('userName'\)\.(?:textContent|innerHTML) =([\s\S]*?);/.exec(src);
+  if(!m) return false;
+  var line = m[1];
+  return /\bname\b/.test(line) && /\btitle\b/.test(line)
+      && /\brole\b/.test(line) && /mySid[\s\S]*toUpperCase\(\)/.test(line);
+})(), true);
+/* ⚠ 덧말을 «글자 그대로» 박지 않는다 — 2026-09-12 에 (admin)을 머리줄에서 접고
+   덧말로 옮기면서 앞에 이름·직책·권한이 붙었다. 지켜야 할 것은
+   「마우스를 올리면 로그인 계정을 알 수 있다」이고, 그 값은 email 이다. */
+t('마우스를 올리면 로그인 이메일이 보인다',
+  /\.title = [\s\S]{0,220}?로그인 계정: ' \+ email;/.test(src), true);
+/* 접은 것은 덧말에 «반드시» 남는다 — 안 그러면 권한을 확인할 길이 없어진다 */
+t('접은 (admin) 도 덧말에 남는다', /\$\('userName'\)\.title = [\s\S]{0,200}?role/.test(src), true);
+t('명부에 없어도 이메일에서 사번을 만들어 보여준다', /var mySid = acct \? String\(acct\.sid \|\| ''\) : puEmailToSid\(email\);/.test(src), true);
+
+console.log('\n[④ 신원 안내 띠 — 이상할 때는 크게 말한다]');
+t('겹침이면 빨간 띠', /dupAll\.length > 1\)\{/.test(src) && /여러 명에게 등록되어 있습니다/.test(src), true);
+t('겹친 사람 이름을 모두 적는다', /dupAll\.map\(function\(x\)\{ return \(x\.name \|\| '\?'\)/.test(src), true);
+/* 글자만 보면 조건을 false 로 막아도 통과한다 — «갈림길 자체» 를 못 박는다 */
+t('명부에 없으면 노란 띠 (조건까지)', /\} else if\(!acct\)\{/.test(src), true);
+t('명부에 없으면 노란 띠', /직원명부에서 <b>' \+ email \+ '<\/b> 을 찾지 못했습니다/.test(src), true);
+/* ★ (2026-08-10) 「자동 로그인되었습니다 — 본인이 아니면 로그아웃」 띠는 걷어냈다.
+   대표 지시: "본인이 아니면 .. 로그아웃 후 이문구 안나오게 해라".
+   자동 로그인은 «늘» 일어나는 정상 동작이라, 들어올 때마다 뜨는 경고가 되어 버렸다.
+   날마다 보는 경고는 읽히지 않고 화면만 가린다.
+   신원 확인은 머리의 «이름 · 사번» 이 맡는다 — 늘 떠 있고 자리를 안 차지한다. */
+t('★ 자동 로그인 안내 띠를 안 그린다', /님으로 자동 로그인되었습니다/.test(src), false);
+t('그 띠의 닫기 단추도 없앴다', /puIdBandX/.test(src), false);
+/* ★ 사번은 «절대» 감추지 않는다. P005·A005 처럼 숫자가 같은 사번이 있어,
+   사번이 안 보이면 엉뚱한 계정으로 들어간 것을 알아챌 길이 없다.
+   폰에서 머리 카드를 한 줄로 줄일 때도 사번만은 남겨 두었다(2026-08-20). */
+t('★ 그래도 사번은 늘 떠 있다 (신원 확인은 이것이 맡는다)',
+  /mySid \? ' · ' \+ (?:_e\()?mySid\.toUpperCase\(\)/.test(src)
+  && !/#userName[^{]*\{[^}]*display:none/.test(src), true);
+t('이상할 때는 여전히 알린다 — 겹침·명부 없음', /dupAll\.length > 1\)\{/.test(src) && /\} else if\(!acct\)\{/.test(src), true);
+t('띠는 하나만 그린다 (다시 그리면 갈아 끼움)', /var el = document\.getElementById\('puIdBand'\);\s*\n\s*if\(!el\)\{/.test(src), true);
+
+console.log('\n[⑤ 「방금 로그인」과 「자동 진입」을 가른다]');
+t('로그인 단추를 누르면 표시등을 켠다', /_freshLogin = true;\s*\/\/ 이번 진입은/.test(src), true);
+t('진입할 때 읽고 바로 끈다 (다음 자동 복귀와 섞이지 않게)',
+  /var _via = _freshLogin \? 'login' : 'auto';\s*\n\s*_freshLogin = false;/.test(src), true);
+t('renderPortal 에 어느 길인지 넘긴다', /renderPortal\(m\.acct, \{ email:\(user\.email\|\|''\), all:m\.all, via:_via \}\)/.test(src), true);
+
+console.log('\n[⑥ 명부 찾기가 겹침 정보를 끝까지 들고 간다]');
+t('서버 명부도 puDirMatch 로 본다', /function _match\(list\)\{ return puDirMatch\(list, user\.email \|\| ''\); \}/.test(src), true);
+t('로컬 폴백도 같은 꼴로 돌려준다', /catch\(e\)\{ return \{ acct:null, all:\[\] \}; \}/.test(src), true);
+t('건의함에도 같은 사람이 전달된다 (팝업과 머리가 다른 이름을 말하면 안 된다)',
+  /if\(window\.sgSetUser\) window\.sgSetUser\(acct\);/.test(src), true);
+
+console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===\n');
+process.exit(fail ? 1 : 0);

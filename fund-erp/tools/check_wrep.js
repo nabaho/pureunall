@@ -1,0 +1,206 @@
+/* 참여사업장의 «근로자 대표» — 자료·화면·서식이 한 사람을 가리키나.
+
+   한 사업장에 사람이 셋 나오고, 셋이 «다 다른 사람»인 경우가 많다:
+     대표자(사업주) · 담당자(실무 연락) · 근로자대표(노사 합의에 서명하는 사람)
+
+   ⚠ 별지 제7호 첨부서류 2번이 「기금법인 설립준비위원의 재직증명서나 그 밖에 신분을
+     증명하는 서류(근로계약서 등 소속 근로자임을 증명하는 서류)」를 요구한다 —
+     근로자대표가 «그 사업장 근로자가 맞는지»를 서류로 확인해 둬야 한다.
+
+   ⚠ 재직증명서는 «해»가 아니라 «사람»에 붙는다. 지원금 제출서류(연도별)에 두면
+     해가 바뀔 때마다 없는 서류가 되고, 사람이 바뀌어도 옛 서류가 남는다.
+
+   ⚠ 저장이 update 가 아니라 set 으로 바뀌거나, 고칠 칸 목록에 wrep_doc 이 끼면
+     사업장을 저장할 때마다 재직증명서 연결이 조용히 사라진다.
+
+   실행: node fund-erp/tools/check_wrep.js */
+const fs = require('fs'), path = require('path');
+const W = path.resolve(__dirname, '..', '..');
+const src = fs.readFileSync(path.join(W, 'fund.html'), 'utf8');
+let JSDOM = null;
+/* jsdom 이 없는 곳에서 이 한 줄이 저장소의 «모든 앱» 배포를 막지 않게 한다 */
+try { JSDOM = require('jsdom').JSDOM; } catch (e) { JSDOM = null; }
+
+let bad = 0;
+const ok = (n, c, w) => { if (c) console.log('  · ' + n); else { bad++; console.log('  ✗ ' + n + (w ? '  — ' + w : '')); } };
+function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음 '+n);let d=0;
+  for(let k=src.indexOf('{',i);k<src.length;k++){if(src[k]==='{')d++;else if(src[k]==='}'){d--;if(!d)return src.slice(i,k+1);}}}
+/* 상수도 실어야 한다 — 별첨 명부의 지자체 열이 _SIDO_ABBR 를 본다(2026-09-13) */
+function gV(n){const i=src.indexOf('var '+n+'=');if(i<0)throw Error('없음 '+n);
+  let d=0,on=false;for(let j=src.indexOf('=',i);j<src.length;j++){const c=src[j];
+    if(c==='{'||c==='['){d++;on=true;}else if(c==='}'||c===']'){d--;if(on&&!d)return src.slice(i,j+1)+';';}}
+  throw Error('끝 못 찾음 '+n);}
+
+global.esc = v => String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+global.num = v => (v==null||v===''?'':Math.round(Number(String(v).replace(/[^0-9.-]/g,''))||0));
+/* 재직증명서 줄이 «읽는 길»을 갖게 되면서 쓰는 것이 늘었다(2026-09-11) */
+global.hlp = k => '<i>' + k + '</i>';
+(0, eval)(gF('_siteWrep'));
+(0, eval)(gF('dropZoneSlim'));
+(0, eval)(gF('_wrepDocRow'));
+
+const SITE = { _id:'S1', name:'가나기계(주)', ceo:'홍길동', biz_no:'000-00-00000',
+  contacts:[{name:'이담당', mobile:'010-0000-0000', isPrimary:true}],
+  wrep_name:'박노측', wrep_title:'생산1팀 대리', wrep_mobile:'010-1111-1111', wrep_birth:'1980-01-01',
+  wrep_doc:{ owner:'U1', year:'2026', id:'PH-1', at:'2026-09-06' } };
+
+console.log('■ 사람 셋을 «따로» 둔다');
+const wf = src.match(/var WREP_FIELDS=\[[\s\S]*?\];/);
+ok('근로자대표 칸이 따로 있다', !!wf);
+const wkeys = wf ? (wf[0].match(/'(wrep_\w+)'/g) || []).map(x => x.slice(1, -1)) : [];
+ok('성명·직위·연락처를 받는다', ['wrep_name','wrep_title','wrep_mobile'].every(k => wkeys.includes(k)), wkeys.join(','));
+/* 별지 제7호 위원 격자가 «생년월일»을 묻는다 — 신분을 가리려면 받아 둬야 한다 */
+ok('생년월일도 받는다 (별지 제7호 위원 격자가 묻는다)', wkeys.includes('wrep_birth'), wkeys.join(','));
+const sf = src.match(/var SITE_FIELDS=\[[\s\S]*?\];/);
+/* SITE_FIELDS 는 엑셀 일괄 가져오기의 «열 차례»이기도 하다 — 사람 칸을 끼우면
+   이미 만들어 둔 붙여넣기 자료가 통째로 한 칸씩 밀린다 */
+ok('사업장 칸 목록에 «안» 섞는다 (엑셀 열 차례가 안 흔들린다)',
+   !!sf && !/wrep_/.test(sf[0]), '엑셀 붙여넣기 열이 밀린다');
+const w = _siteWrep(SITE);
+ok('한 곳에서 읽는다 (_siteWrep)', w.name === '박노측' && w.title === '생산1팀 대리' && !!w.doc, JSON.stringify(w));
+ok('빈 사업장에도 안 터진다', (function(){ try { const e = _siteWrep(null); return e.name === '' && !e.doc; } catch (x) { return false; } })());
+
+console.log('\n■ 편집 화면');
+const es = gF('editSite');
+ok('재직증명서 줄을 붙인다', /_wrepDocRow\(sid,s\)/.test(es));
+
+/* ★ 근로자대표 칸이 «실제로 그려지는지»는 소스 모양(WREP_FIELDS.map 같은 특정 형태)이
+   아니라 «진짜로 돌려서» 확인한다(2026-09-21, 사용자대표·근로자대표를 표로 묶으며
+   UREP_FIELDS 와 짝지어 그리는 식으로 바뀌었다 — 소스 정규식은 구현이 바뀔 때마다 깨진다). */
+global.S = { sites: { S1: SITE }, fundId: 'F1' };
+let modalHTML = '';
+global.showModal = (h) => { modalHTML = h; };
+global.closeM = () => {};
+global.bindSiteDocIntake = () => {};
+(0, eval)(gV('SITE_FIELDS'));
+(0, eval)(gV('CONTACT_FIELDS'));
+(0, eval)(gV('WREP_FIELDS'));
+(0, eval)(gV('UREP_FIELDS'));
+(0, eval)(gV('SME_FIELDS'));
+(0, eval)(gV('SME_OPTS'));
+(0, eval)(gF('_primaryContact'));
+(0, eval)(gF('_siteSme'));
+(0, eval)(gF('_siteUrep'));
+(0, eval)(gF('_smeChip'));
+(0, eval)(gF('_repTable'));
+(0, eval)(gF('_addrStack'));
+(0, eval)(gF('editSite'));
+try {
+  editSite('S1');
+  ok('근로자대표 칸을 그린다',
+     wkeys.length > 0 && wkeys.every(k => modalHTML.indexOf('id="sw-' + k + '"') >= 0),
+     wkeys.join(','));
+  const ckeys = (CONTACT_FIELDS || []).map(c => c[0]);
+  ok('담당자와 «다른 이름»으로 그린다 (sw- / sc-)',
+     ckeys.length > 0 && ckeys.every(k => modalHTML.indexOf('id="sc-' + k + '"') >= 0)
+       && wkeys.every(k => modalHTML.indexOf('id="sw-' + k + '"') >= 0),
+     'sc:' + ckeys.join(',') + ' / sw:' + wkeys.join(','));
+} catch (e) {
+  ok('근로자대표 칸을 그린다', false, 'editSite 실행 실패: ' + (e && e.message || e));
+  ok('담당자와 «다른 이름»으로 그린다 (sw- / sc-)', false, 'editSite 실행 실패');
+}
+
+console.log('\n■ 재직증명서 — 이어 두면 볼 수 있나');
+if (!JSDOM) {
+  console.log('SKIP: jsdom 이 없어 «그린 줄» 확인은 건너뜁니다 (npm i jsdom --no-save)');
+} else {
+  const doc = new JSDOM('<body><div id=x></div>').window.document;
+  const put = (h) => { doc.getElementById('x').innerHTML = h; return doc.getElementById('x'); };
+  const all = (el) => [].slice.call(el.querySelectorAll('button,[onclick]'))
+    .map(b => b.getAttribute('onclick') || '');
+  const on = put(_wrepDocRow('S1', SITE));
+  const btns = all(on);
+  ok('이어 두면 [원본]을 볼 수 있다', btns.some(x => /openWrepDoc\('S1'\)/.test(x)), btns.join(' | '));
+  ok('연결을 끊을 수 있다', btns.some(x => /unlinkWrepDoc\('S1'\)/.test(x)), btns.join(' | '));
+  ok('언제 이었는지 보인다', /2026-09-06/.test(on.textContent), on.textContent);
+  /* 2026-09-11 — 이 줄은 이제 «읽는» 줄이다. 이름을 손으로 치지 않게 하는 것이 알맹이다. */
+  /* ★ 2026-09-13 — 읽는 길은 [👤 사람] 보기로 «옮겼다»(대표 지시 「깔끔하게」). 이 줄에는
+     별지 제7호가 첨부하라는 «원본»의 상태만 남는다. 옮긴 것과 없앤 것은 다르다 —
+     읽는 길이 살아 있는지는 아래 「사람 보기에서 읽는다」가 따로 지킨다. */
+  ok('판독 줄이 편집 창에 다시 안 들어왔다', !btns.some(x => /siteRepAlbum\(\)/.test(x)), btns.join(' | '));
+  ok('파일 올리는 자리도 편집 창에서 빠졌다', !on.querySelector('#dz-siterep'));
+
+  const off = put(_wrepDocRow('S1', Object.assign({}, SITE, { wrep_doc: null })));
+  const b2 = all(off);
+  ok('원본이 없으면 「없음」이라 말한다', /없음/.test(off.textContent), off.textContent);
+  ok('원본이 없으면 [원본]을 안 준다 (누를 것이 없다)', !b2.some(x => /openWrepDoc/.test(x)), b2.join(' | '));
+  ok('어디서 이어야 하는지 말해 준다', /사람/.test(off.textContent), off.textContent);
+
+  /* 새 사업장은 아직 «이을» 자리(사업장 열쇠)가 없다 — 그래도 «읽기»는 된다.
+     조용히 안 되는 단추만 주지 않으면 된다. */
+  const nw = put(_wrepDocRow('', {}));
+  const b3 = all(nw);
+  ok('새 사업장에 안 되는 단추를 안 준다', !b3.some(x => /openWrepDoc|unlinkWrepDoc/.test(x)), b3.join(' | '));
+  ok('새 사업장에는 «저장한 뒤 이어진다»고 말해 준다', /저장한 뒤/.test(nw.textContent), nw.textContent);
+  ok('새 사업장에 안 되는 단추는 안 준다',
+    !b3.some(x => /openWrepDoc|unlinkWrepDoc/.test(x)), b3.join(' | '));
+}
+
+console.log('\n■ 저장해도 연결이 살아남나');
+const ss = gF('saveSite');
+ok('근로자대표를 담는다', /WREP_FIELDS\.forEach/.test(ss));
+ok('고칠 때도 담는다', /SITE_FIELDS\.concat\(WREP_FIELDS\)/.test(ss), ss.slice(0, 300));
+/* set(전체 덮어쓰기)으로 바꾸면 저장할 때마다 재직증명서 연결이 사라진다 */
+ok('있는 사업장은 update 로 고친다', /sites\/'\+_fid\+'\/'\+sid\)\.update\(patch\)/.test(ss), ss.slice(-400));
+ok('고칠 칸 목록에 wrep_doc 을 넣지 않는다 (연결이 안 지워진다)', !/patch\.wrep_doc|'wrep_doc'/.test(ss));
+
+console.log('\n■ 재직증명서가 사는 자리');
+const sw = gF('saveWrepDocRef');
+ok('사업장 기록에 붙인다', /sites\/'\+fid\+'\/'\+sid\+'\/wrep_doc/.test(sw), sw.slice(0, 300));
+/* 그쪽은 «그 해에 낸 서류»를 세는 자리다. 사람에 붙는 서류를 거기 두면
+   해가 바뀔 때마다 없는 서류가 되고, 사람이 바뀌어도 옛 서류가 남는다. */
+ok('연도별 제출서류 자리에 두지 않는다', !/subsidy_chk/.test(sw), sw);
+ok('한 자리로 되돌려 준다 (하던 일을 잃지 않게)', /editSite\(sid\)/.test(sw));
+const ap = gF('openAlbumPick');
+ok('근로자대표 갈래에서는 sid 를 비운다', /sid:wrepSid\?'':\(sid\|\|''\)/.test(ap), ap.slice(0, 400));
+ok('무엇을 고르는지 이름을 보여 준다', /재직증명서/.test(ap));
+const use = src.slice(src.indexOf('if(_pick.shelf){'), src.indexOf('function _dataUrlToFile'));
+const iW = use.indexOf('_pick.wrep'), iS = use.indexOf('_pick.sid');
+/* 뒤에 오면 «연도별 제출서류» 자리에 먼저 걸려 엉뚱한 곳에 저장된다 */
+ok('근로자대표 갈래가 제출서류 갈래보다 «먼저» 온다', iW >= 0 && iW < iS, iW + ' vs ' + iS);
+ok('이름표가 있다', /wrep:'근로자대표 재직증명서'/.test(src));
+
+console.log('\n■ 설립합의서 — 노사가 함께 선다');
+if (!JSDOM) {
+  console.log('SKIP: jsdom 이 없어 서식 확인은 건너뜁니다');
+} else {
+  global.S = { year: 2026 };
+  global.hwpFormHTML = () => '';
+  (0, eval)(gF('dgV')); (0, eval)(gF('dgWon')); (0, eval)(gF('dgToday'));
+  (0, eval)(gF('_officersOf'));
+  /* ★ 설립합의서 별첨 명부에 «사용자대표» 열이 생겼다(2026-09-13) — 안 실으면
+     CI 에서만 「_siteUrep is not defined」로 통째로 죽는다(jsdom 은 CI 에만 있다). */
+  (0, eval)(gF('_siteUrep'));
+  /* 별첨 명부에 지자체 열이 생겼다(2026-09-13) */
+  (0, eval)(gV('_SIDO_ABBR')); (0, eval)(gF('_addrParts'));
+  /* 설립합의서 제3조 출연금은 «한 줄기»(foundContrib)에서 온다 — 2026-09-10 */
+  (0, eval)(gF('estabSites')); (0, eval)(gF('siteContribOf'));
+  (0, eval)(gF('foundContribOf')); (0, eval)(gF('foundContrib'));
+  (0, eval)(gF('docBody'));
+  const F = { name:'가나공동근로복지기금', chairman:'홍길동', fund_type:'공동', contribution_total:10000000 };
+  const sites = [SITE, { name:'나다전자(주)', ceo:'최사장', biz_no:'111-11-11111', wrep_name:'김노측' }];
+  const doc = new JSDOM('<body><div id=y></div>').window.document;
+  doc.getElementById('y').innerHTML = docBody('agreement', F, sites);
+  const tbls = [].slice.call(doc.querySelectorAll('table'));
+  const t = tbls[tbls.length - 1];
+  const head = [].slice.call(t.querySelectorAll('th')).map(x => (x.textContent || '').trim());
+  const row1 = [].slice.call(t.querySelectorAll('tr')[1].children).map(x => (x.textContent || '').trim());
+  console.log('   별첨 머리: ' + head.join(' | '));
+  ok('별첨 명부에 근로자대표 칸이 있다', head.indexOf('근로자대표') >= 0, head.join('|'));
+  ok('머리와 몸통의 칸 수가 같다', head.length === row1.length, head.length + ' vs ' + row1.length);
+  const at = (n, r) => { const k = head.indexOf(n); return k < 0 ? '(칸 없음)' : r[k]; };
+  ok('근로자대표 칸에 근로자대표', at('근로자대표', row1) === '박노측', at('근로자대표', row1));
+  ok('대표자 칸에 대표자', at('대표자', row1) === '홍길동', at('대표자', row1));
+  const row2 = [].slice.call(t.querySelectorAll('tr')[2].children).map(x => (x.textContent || '').trim());
+  ok('둘째 줄도 제자리', at('근로자대표', row2) === '김노측' && at('대표자', row2) === '최사장',
+     at('대표자', row2) + ' / ' + at('근로자대표', row2));
+  /* 없는 사람을 지어내면 안 된다 — 빈 줄(＿)로 두어 사람이 채우게 한다 */
+  const sites2 = [Object.assign({}, SITE, { wrep_name: '' })];
+  doc.getElementById('y').innerHTML = docBody('agreement', F, sites2);
+  const t2 = [].slice.call(doc.querySelectorAll('table')).pop();
+  const r2 = [].slice.call(t2.querySelectorAll('tr')[1].children).map(x => (x.textContent || '').trim());
+  ok('근로자대표가 없으면 «빈칸»으로 둔다 (지어내지 않는다)', /^[＿_]+$/.test(at('근로자대표', r2)), at('근로자대표', r2));
+}
+
+console.log(bad ? '\nFAILURES ' + bad : '\nALL PASS (근로자대표가 자료·화면·서식에서 한 사람을 가리킨다)');
+process.exit(bad ? 1 : 0);

@@ -59,7 +59,7 @@ const UID = { u1: 'AUID1', u2: 'AUID2', u3: 'AUID3' };
 function it(o) {
   return Object.assign({
     fiId: 'f1', category: 'matched', amount: 100000, pct: 20, role: '주담당',
-    date: '2026-08-03', sourceKind: 'case', sourceId: 'c1', companyName: '㈜신흥', kind: '부당해고',
+    date: '2026-08-03', sourceKind: 'case', sourceId: 'c1', companyName: '㈜새힘', kind: '부당해고',
     baseAmount: 500000, grossAmount: 550000
   }, o);
 }
@@ -108,12 +108,12 @@ ok('0원만 있는 퇴사자는 빈 배열', ctx.pcfRetiredHolds([EMP[4]], USERS
    3. 정산 처리 — perfSettleShare
    ───────────────────────────────────────────────────────────── */
 const FIX = [
-  { id: 'f1', date: '2026-08-10', amount: 1000000, companyName: '㈜신흥',
+  { id: 'f1', date: '2026-08-10', amount: 1000000, companyName: '㈜새힘',
     perfShares: [
       { sid: 'u9', name: '이퇴사', amount: 100000, pct: 20, role: '주담당', baseAmount: 500000 },
       { sid: 'u2', name: '박한별', amount: 50000, pct: 10, role: '부담당', baseAmount: 500000 }
     ] },
-  { id: 'f2', date: '2026-08-20', amount: 700000, companyName: '㈜대한',
+  { id: 'f2', date: '2026-08-20', amount: 700000, companyName: '㈜다솔',
     perfShares: [{ sid: 'u9', name: '이퇴사', amount: 70000, pct: 20, role: '주담당', baseAmount: 350000 }] },
   { id: 'f3', date: '2026-08-25', amount: 300000, companyName: '㈜무배분' }   // perfShares 없음
 ];

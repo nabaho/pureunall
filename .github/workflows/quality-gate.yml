@@ -25,6 +25,22 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
+      # ── 화면을 «진짜로 그려 보는» 검사를 위해 jsdom 을 깐다 ──
+      # 이 저장소에는 package.json 이 없어 CI 가 아무것도 설치하지 않는다. 그래서
+      # jsdom 을 쓰는 검사기 다섯(check_forms·check_backup·check_cols·check_siterow·
+      # check_docview)이 «CI 에서 한 번도 돌지 않고» SKIP 으로 지나갔다.
+      # 문자열만 보는 검사는 「단추는 있는데 창이 안 뜨는 것」·「열이 한 칸 밀린 것」·
+      # 「서식이 빈 채 나가는 것」을 못 잡는다 — 그러라고 만든 것이 그 다섯이다.
+      #
+      # ⚠ || true 를 뗄 것 — npm 이 잠깐 죽었다고 배포까지 멎으면 안 된다.
+      #   못 깔면 검사기들이 스스로 SKIP 으로 물러난다(그 관례는 그대로 둔다).
+      - name: Install jsdom for the checks that actually render the page
+        run: npm i jsdom --no-save --no-audit --no-fund || true
       - name: Run all automated checks
-        run: node --test tests/*.test.js
+        # ⚠ functions/ 검사도 함께 돈다 (2026-08-29).
+        #   여태 tests/ 만 돌아서 functions/hana-message.test.js 가 빨강인 채로
+        #   남아 있었다 — 2026-08-26 에 규칙이 뒤집혔는데 아무도 못 봤다.
+        #   ★ 폰 거르개 검사가 «이 파일의 표본을 읽어» 쓴다. 여기가 썩으면
+        #     폰 쪽 그물도 같이 헐거워진다.
+        run: node --test tests/*.test.js functions/*.test.js
 

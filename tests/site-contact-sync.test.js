@@ -108,7 +108,7 @@ ok('mergeCompanyContacts 가 있다', typeof merge === 'function');
 /* 2026-08-03 규칙 바뀜 — 대표 지적으로 되돌렸다.
    종전: 이름이 같아도 한쪽 전화가 비면 '딴 사람일 수 있다'며 새 줄로 넣었다.
    실제로는 전화가 아직 안 적힌 같은 사람이라, 똑같은 이름이 두 줄로 붙었다
-   (가야엔지니어링 최상윤 대표가 #1·#2 로 중복).
+   (카타엔지니어링 한지우 대표가 #1·#2 로 중복).
    지금: 새 줄을 만들지 않고 그냥 넘긴다. 있는 줄을 고치지도 않는다
    (대표 결정 '없는 사람만 추가, 있는 사람은 그대로'를 둘 다 지킨다). */
 (function () {
@@ -132,11 +132,11 @@ ok('mergeCompanyContacts 가 있다', typeof merge === 'function');
   eq('이름도 전화도 없으면 담지 않는다', [r.added, r.skipped, r.contacts.length], [0, 2, 0]);
 })();
 
-// pcId(명함첩 출처)는 지킨다 / 명함 사진은 옮기지 않는다
+// pcId(기업정보함 출처)는 지킨다 / 명함 사진은 옮기지 않는다
 (function () {
   const r = merge([], [{ name: '박영희', phone: '010-3333-4444', pcId: 'pc-abc', pcAt: '2026-08-01',
     cardImg: 'data:image/png;base64,AAAA', sameAsCeo: true }]);
-  eq('★ pcId 를 지킨다 (명함첩 출처 추적)', r.contacts[0].pcId, 'pc-abc');
+  eq('★ pcId 를 지킨다 (기업정보함 출처 추적)', r.contacts[0].pcId, 'pc-abc');
   eq('pcAt 도 지킨다', r.contacts[0].pcAt, '2026-08-01');
   eq('명함 사진(cardImg)은 업체관리로 옮기지 않는다', r.contacts[0].cardImg, undefined);
   eq('계약 화면 전용 표시(sameAsCeo)도 옮기지 않는다', r.contacts[0].sameAsCeo, undefined);
@@ -208,7 +208,7 @@ ok('담당자가 하나도 없으면 두 칸 모두 지운다',
 ok('빈 줄은 저장하지 않는다', ctSave.indexOf("return c&&(c.name||c.rank||c.phone);") > 0);
 ok('★ 직책은 rank(옛 칸)와 position(공통 칸) 둘 다 적는다',
    ctSave.indexOf("rank:c.rank||'', position:c.rank||''") > 0);
-ok('명함첩에서 고른 사람도 position 을 함께 적는다',
+ok('기업정보함에서 고른 사람도 position 을 함께 적는다',
    wkCount('rank:_rk, position:_rk') === 1);
 ok('푸른이알피 연동도 position 을 함께 적는다',
    peCount('{ name:scn, rank:scr, position:scr, phone:scp }') === 1);
@@ -237,7 +237,7 @@ ok('줄마다 인덱스가 붙은 저장 핸들러를 쓴다',
    dPeople.indexOf('saveContactAt(') > 0 && dPeople.indexOf("id=\"ct-nm-'+ri+'\"") > 0);
 ok('입력칸 세 개(이름·직급·연락처)가 줄마다 있다',
    dPeople.indexOf("id=\"ct-rk-'+ri+'\"") > 0 && dPeople.indexOf("id=\"ct-ph-'+ri+'\"") > 0);
-ok('명함첩에서 찾기 버튼은 그대로 있다', dPeople.indexOf('📇 명함첩에서 찾기') > 0);
+ok('기업정보함에서 찾기 버튼은 그대로 있다', dPeople.indexOf('📇 기업정보함에서 찾기') > 0);
 ok('✕ 비우기 버튼은 그대로 있다', dPeople.indexOf('✕ 비우기') > 0);
 ok('읽기 전용 푸른이알피 담당자 목록이 그 위에 남아 있다',
    dPeople.indexOf('coContacts(it)') > 0 && dPeople.indexOf("<span class=\"src\">") > 0);
@@ -252,9 +252,14 @@ ok('아무도 안 부르는 옛 saveContact 는 남기지 않았다 (빈 화면�
    wkCount('function saveContact(id){') === 0 && wkCount("saveContact('") === 0);
 ok('★ 줄이 화면에 없으면 저장하지 않는다 (빈 화면으로 담당자를 지우지 않는다)',
    ctSave.indexOf("if(!$('ct-nm-0')) return Promise.resolve(false);") > 0);
-ok('빈 목록이어도 늘 한 줄은 적을 수 있다',
+/* 2026-09-05 대표 지시 「화면이 너무 정신없다」 — 예전에는 «늘» 빈 줄 하나를 깔았다.
+   사업장 담당자가 이미 있는데도 그 밑에 빈 칸 셋이 붙어 서랍이 어수선했다.
+   ⚠ 적을 길은 그대로다 — [＋ 담당자 추가]가 한 줄을 만든다(바로 아래 검사).
+   ⚠ 빈 화면으로 담당자를 지우는 사고는 위 ct-nm-0 검사가 막는다. */
+ok('비어 있으면 빈 줄을 안 깐다 (적을 때는 [＋ 담당자 추가])',
    wkCount('function _ctRowCount(id){') === 1
-   && wkCount('Math.max(1, itemContacts(items[id]||{}).length+((S._ctAdd&&S._ctAdd[id])||0))') === 1);
+   && wkCount('return itemContacts(items[id]||{}).length+((S._ctAdd&&S._ctAdd[id])||0);') === 1
+   && wkCount('Math.max(1, itemContacts(items[id]||{}).length') === 0);
 ok('★ 그리는 쪽과 [＋ 담당자 추가]가 같은 줄 셈을 본다 (어긋나면 눌러도 안 늘어난다)',
    dPeople.indexOf('_ctRowCount(id)') > 0 && wkCount('var shown=_ctRowCount(id);') === 1
    && wkCount('S._ctAdd[id]=(shown+1)-itemContacts(items[id]||{}).length;') === 1);
@@ -264,7 +269,7 @@ ok('원래 비어 있으면 쓸데없이 쓰지 않는다',
    ctSave.indexOf("if(!clean.length&&!itemContacts(items[id]||{}).length) return Promise.resolve(true);") > 0);
 ok('여러 명일 때 비우기는 한 번 묻는다', wkCount('이 건 담당자 \'+n+\'명을 모두 비웁니다.') === 1);
 ok('비우기는 contact·contacts 를 모두 지운다', wkCount('{contact:null,contacts:null}') === 1);
-ok('명함첩에서 고른 사람은 한 명 더로 붙는다 (덮어쓰지 않는다)',
+ok('기업정보함에서 고른 사람은 한 명 더로 붙는다 (덮어쓰지 않는다)',
    wkCount('arr.push(rec);') === 1 && wkCount('patchItem(id,{contacts:arr,contact:arr[0]||null})') === 1);
 ok('같은 사람을 두 번 넣지 않는다', wkCount('이미 담당자로 들어 있습니다') === 1);
 ok('저장 전 빈 줄은 화면에만 둔다 (S._ctAdd)', wkCount('S._ctAdd') >= 4);
@@ -296,14 +301,23 @@ ok('helpers 가 window 에 노출돼 있다',
    && peCount('window._normPersonKey = _normPersonKey;') === 1);
 ok('업체관리 표의 직책도 contactRole 로 읽는다',
    peCount('contactRole(primary)') === 2 && peCount('contactRole(second)') === 2);
+/* ⚠ 2026-08-26 다시 겨눔 — 개수를 못 박고 있었다.
+   지켜야 할 규칙은 「직책은 contactRole 로 읽는다」이지 «몇 번 쓰였나»가 아니다.
+   새로 읽는 자리가 생길 때마다(계약창 접힘 줄 등) 이 검사가 «까닭 없이» 빨개졌다. */
 ok('상세보기의 직책도 contactRole 로 읽는다',
-   peCount('contactRole(primaryContact)') === 2 && peCount('contactRole(p)') === 2);
+   peCount('contactRole(primaryContact)') === 2 && peCount('contactRole(p)') >= 2);
 ok('편집칸은 그대로 position 을 쓴다 (읽기만 통일했다)',
    peCount("value:c.position || ''") === 1);
 ok('근로자(workers)의 직책은 건드리지 않았다', peCount('wk.position') >= 1);
 
 /* ══ ⑦ pu-erp 배선 — 중복 배너 접기·닫기 ══ */
-const banner = peSlice('// 동일 회사 계약 실시간 안내 (종류별 구분)', "h('div', { className:'fld' }, h('label', null, '대표자 (1 / 2)')");
+/* ⚠ 끝 표지로 «옆 칸의 이름»을 쓰지 않는다 — 2026-09-18 에 대표자 칸이 위 줄로
+   옮겨 가며 이 표지가 사라졌고, 배너는 멀쩡한데 검사가 통째로 멎었다.
+   지금은 «다음 묶음 상자가 열리는 곳»으로 끊는다 — 칸이 오가도 안 흔들린다.
+   ⚠ 2026-09-19 다시 겨눔 — 계약창이 pu-g4 에서 pu-g6(라벨 없는 6칸)로 바뀌며
+   끝 표지가 또 못 찾아졌다. 못 찾으면 다음 grid 까지 «훨씬 멀리» 잘려 다른
+   화면의 localStorage 까지 끌려 들어와 아래 검사가 «까닭 없이» 빨개졌다. */
+const banner = peSlice('// 동일 회사 계약 실시간 안내 (종류별 구분)', "className:'pu-g6'");
 ok('★ 한 줄로 접힌다 (점 · 몇 건)', banner.indexOf("dotIcon + ' 같은 사업장 ' + dupContracts.length + '건'") > 0);
 ok('한 줄 결론이 붙는다', banner.indexOf("String(conclusion).replace(/^→\\s*/, '')") > 0);
 ok('[자세히] 버튼이 있다', banner.indexOf("dupDetail ? '접기' : '자세히'") > 0);
@@ -344,7 +358,7 @@ ok('결론 한 줄도 카드 안에 남아 있다',
 
 
 /* ══════════════════════════════════════════════════════════════
-   추가: 검색키 전체 담당자 · 담당자를 명함첩에서 찾기 (사업장 이름 자동검색)
+   추가: 검색키 전체 담당자 · 담당자를 기업정보함에서 찾기 (사업장 이름 자동검색)
    ══════════════════════════════════════════════════════════════ */
 
 /* ── 1. 업무관리 검색이 담당자 전원을 본다 ── */
@@ -358,8 +372,8 @@ ok('결론 한 줄도 카드 안에 남아 있다',
   const mq = ctxQ.matchQ;
 
   const it3 = { company:'가나상사', contacts:[
-    { name:'하서윤', rank:'실장',    phone:'010-3110-9468' },
-    { name:'이근혜', position:'차장', phone:'010-2822-1998' },
+    { name:'하서윤', rank:'실장',    phone:'010-1200-0005' },
+    { name:'이근혜', position:'차장', phone:'010-1200-0004' },
     { name:'송금석', role:'대표자',  phone:'041-575-7994' } ]};
   it3.contact = it3.contacts[0];
   ok('검색: 1번째 담당자',        mq(it3, '하서윤'));
@@ -367,8 +381,8 @@ ok('결론 한 줄도 카드 안에 남아 있다',
   ok('검색: 3번째 담당자',        mq(it3, '송금석'));
   ok('검색: 2번째 담당자 직책',   mq(it3, '차장'));
   ok('검색: 3번째 담당자 직책',   mq(it3, '대표자'));
-  ok('검색: 전화 하이픈 그대로',  mq(it3, '010-2822-1998'));
-  ok('검색: 전화 숫자만',         mq(it3, '01028221998'));
+  ok('검색: 전화 하이픈 그대로',  mq(it3, '010-1200-0004'));
+  ok('검색: 전화 숫자만',         mq(it3, '01012000004'));
   ok('검색: 없는 이름은 안 걸림', !mq(it3, '없는사람'));
 
   const legacy = { company:'다라기업', contact:{ name:'옛담당', rank:'과장', phone:'010-1111-2222' } };
@@ -388,12 +402,12 @@ ok('지식카드 이름 목록이 itemContacts 를 쓴다 (2곳)',
 ok('지식카드에서 옛 단수 참조가 사라졌다',
    wk.indexOf('[it.officer,it.client,(it.contact&&it.contact.name)]') < 0);
 
-/* ── 3. 공용 담당자 편집기(업체관리·컨설팅·기금·기타)에 명함첩 버튼 ── */
+/* ── 3. 공용 담당자 편집기(업체관리·컨설팅·기금·기타)에 기업정보함 버튼 ── */
 (function(){
   const cut = cutter(pe, 'pu-erp.html');
   const ce = cut('function ContactsEditor(props){', '\nfunction ');
   const ceNs = ce.replace(/\s/g, '');
-  ok('공용 편집기에 명함첩 버튼', ce.indexOf("'📇 명함첩'") > 0);
+  ok('공용 편집기에 기업정보함 버튼', ce.indexOf("'📇 기업정보함'") > 0);
   ok('공용 편집기가 companyName 을 초기검색으로 넘긴다',
      /initialQuery:props\.companyName\|\|''/.test(ceNs));
   // 2026-08-03: 화면마다 따로 만들던 것을 pcToContact 하나로 통일했다.
@@ -415,7 +429,7 @@ ok('컨설팅·기금·기타가 사업장명을 넘긴다', /companyName: f\.co
   const cut = cutter(pe, 'pu-erp.html');
   const cm = cut('function CaseEditModal(props){', '\nfunction CaseManagement(props){');
   const cmNs = cm.replace(/\s/g, '');
-  ok('사건 카드에 명함첩 버튼', cm.indexOf("'📇 명함첩'") > 0);
+  ok('사건 카드에 기업정보함 버튼', cm.indexOf("'📇 기업정보함'") > 0);
   ok('사건 카드가 사업장명으로 먼저 찾는다', /initialQuery:f\.companyName\|\|''/.test(cmNs));
   ok('사건 카드도 정식 변환기를 쓴다 (팩스 칸은 유지)',
      /pcToContact\(p,arr\.length===0,p\.id\)/.test(cmNs) && /fax:''/.test(cmNs));
@@ -424,17 +438,21 @@ ok('컨설팅·기금·기타가 사업장명을 넘긴다', /companyName: f\.co
   ok('사건 카드의 + 추가 는 그대로', cm.indexOf("'+ 추가'") > 0);
 })();
 
-/* ── 6. 명함첩 찾기 창을 여는 모든 곳이 초기검색을 넘긴다 ── */
+/* ── 6. 기업정보함 찾기 창을 여는 모든 곳이 초기검색을 넘긴다 ── */
 (function(){
-  // 세는 방법: 'h(PucardsContactPickerModal, {' 가 있는 줄의 바로 다음 줄에 initialQuery 가 있는지
+  /* ⚠ 「바로 다음 줄」로 못 박지 않는다 — 2026-08-31 에 «왜 그렇게 넘기는지» 적은
+       주석 한 덩이를 앞에 넣었더니 여기서 깨졌다. 기능은 멀쩡했다.
+       볼 것은 «그 창을 여는 곳마다 초기검색을 넘기는가» 이지 몇째 줄인가가 아니다.
+       열두 줄 안이면 같은 속성 목록으로 본다 — 그보다 멀면 다른 것을 보고 있는 것이다. */
   const lines = pe.split('\n');
   let mounts = 0, withQ = 0; const missing = [];
   lines.forEach(function(L, i){
     if(L.indexOf('h(PucardsContactPickerModal, {') < 0) return;
     mounts++;
-    if((lines[i+1] || '').indexOf('initialQuery') >= 0) withQ++; else missing.push(i + 1);
+    if(lines.slice(i + 1, i + 13).join('\n').indexOf('initialQuery') >= 0) withQ++;
+    else missing.push(i + 1);
   });
-  ok('명함첩 찾기 창을 여는 곳이 4군데', mounts === 4, '실제 ' + mounts + '곳');
+  ok('기업정보함 찾기 창을 여는 곳이 4군데', mounts === 4, '실제 ' + mounts + '곳');
   ok('네 곳 모두 초기검색을 넘긴다', withQ === mounts, '빠진 줄: ' + missing.join(','));
 })();
 

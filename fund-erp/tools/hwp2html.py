@@ -1,7 +1,18 @@
 # -*- coding: utf-8 -*-
-"""HWP 5.0 → HTML 변환 (문단 + 표 격자 복원)
+"""HWP 5.0 → HTML 변환 (문단 + 표 격자 + 문단모양 복원)
    레코드 트리: TABLE(77) 아래 LIST_HEADER(72)마다 셀 좌표(col,row,colspan,rowspan),
-   그 안의 PARA_TEXT(67)가 셀 내용. 레벨(level)로 표 안/밖을 구분한다."""
+   그 안의 PARA_TEXT(67)가 셀 내용. 레벨(level)로 표 안/밖을 구분한다.
+
+   ── 문단모양(2026-09-12) ──
+   원본에는 «가운데 맞춤·줄간격·칸 높이»가 다 들어 있는데 예전에는 하나도 안 읽었다.
+   그래서 화면에 나온 서식이 원본과 딴판이었다(대표 지적). 이제 읽는다:
+     · DocInfo 의 PARA_SHAPE(25) → 정렬(양쪽·왼쪽·오른쪽·가운데)·줄간격(%)
+     · BodyText 의 PARA_HEADER(66) 8번째 바이트 → 그 문단이 쓰는 모양 번호
+     · LIST_HEADER(72) 16~23 → 칸 너비·높이(HWPUNIT = 1/7200 인치, pt = 값/100)
+
+   ⚠ 정렬은 «칸(td)·문단(p)» 에만 건다. 칸 안을 <div> 로 또 감싸면 서식을 채우는
+     코드가 보는 「덩이」가 달라져 조용히 깨진다(2026-09-11 에 실제로 그랬다).
+     한 칸에 정렬이 섞여 있으면 «맨 처음 글» 의 정렬을 칸 전체에 쓴다."""
 import io, sys, os, zlib, struct, json, html
 import olefile
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -11,6 +22,43 @@ T_PARA_TEXT   = 67
 T_CTRL_HEADER = 71
 T_LIST_HEADER = 72
 T_TABLE       = 77
+T_PARA_SHAPE  = 25          # DocInfo
+
+# 정렬: PARA_SHAPE attribute1 의 2~4비트
+ALIGN_CSS = {0: '', 1: 'left', 2: 'right', 3: 'center', 4: 'justify', 5: 'justify'}
+HWPUNIT_PT = 100.0          # 1pt = 100 HWPUNIT (1/7200 인치)
+
+
+def para_shapes(f, comp):
+    """DocInfo → 문단모양 목록 [{align, ls}] (ls = 줄간격 %, 없으면 None)"""
+    try:
+        di = f.openstream('DocInfo').read()
+    except Exception:
+        return []
+    if comp:
+        try: di = zlib.decompress(di, -15)
+        except Exception: return []
+    out = []
+    for tag, lvl, pay in records(di):
+        if tag != T_PARA_SHAPE or len(pay) < 28:
+            continue
+        a1 = struct.unpack_from('<I', pay, 0)[0]
+        align = ALIGN_CSS.get((a1 >> 2) & 0b111, '')
+        lstype = a1 & 0b11
+        ls = struct.unpack_from('<i', pay, 24)[0]          # 5.0.2.5 미만 자리
+        if len(pay) >= 54:                                  # 5.0.2.5 이상은 끝에 다시 적힌다
+            ls = struct.unpack_from('<I', pay, 50)[0]
+        # 「글자에 따라(%)」일 때만 쓴다 — 고정값·여백만은 글꼴에 매여 옮길 수 없다
+        out.append({'align': align, 'ls': ls if (lstype == 0 and 50 <= ls <= 400) else None})
+    return out
+
+
+def _style(align, ls, height=None):
+    b = []
+    if align: b.append('text-align:' + align)
+    if ls:    b.append('line-height:%d%%' % ls)
+    if height: b.append('height:%.1fpt' % height)
+    return (' style="' + ';'.join(b) + '"') if b else ''
 
 def records(data):
     i = 0
@@ -46,8 +94,10 @@ def convert(path):
     f = olefile.OleFileIO(path)
     hdr = f.openstream('FileHeader').read()
     comp = bool(hdr[36] & 1)
+    SHAPES = para_shapes(f, comp)
     secs = sorted([d for d in f.listdir() if d[0] == 'BodyText'], key=lambda x: x[1])
-    blocks = []          # 최종 블록 목록: ('p', text) | ('table', grid)
+    blocks = []          # 최종 블록 목록: ('p', text, shape) | ('table', grid)
+    pend = None          # 바로 다음 PARA_TEXT 가 쓸 문단모양
     for s in secs:
         data = f.openstream(s).read()
         if comp:
@@ -80,11 +130,15 @@ def convert(path):
                 cur_cell = {'col': col, 'row': row, 'cs': max(1, cs), 'rs': max(1, rs),
                             'w': w, 'h': h, 'text': []}
                 tstack[-1]['cells'].append(cur_cell)
+            elif tag == T_PARA_HEADER and len(pay) >= 10:
+                i = struct.unpack_from('<H', pay, 8)[0]
+                pend = SHAPES[i] if i < len(SHAPES) else None
             elif tag == T_PARA_TEXT:
                 t = clean_text(pay)
+                sh, pend = pend, None            # 한 문단에 한 번만 쓴다
                 if not t: continue
-                if tstack and cur_cell is not None: cur_cell['text'].append(t)
-                elif not tstack: blocks.append(('p', t))
+                if tstack and cur_cell is not None: cur_cell['text'].append((t, sh))
+                elif not tstack: blocks.append(('p', t, sh))
         while tstack:
             fr = tstack.pop()
             if fr.get('pcell') is not None: fr['pcell']['text'].append(('table', fr))
@@ -99,7 +153,10 @@ def cell_html(cell):
 
     문단끼리는 항상 <br>로 나눈다. 중첩 표가 있으면 예전에는 전부 ''로 이어붙여
     '보 증 서 면위 신고하는 인감은…'처럼 제목과 본문이 한 덩어리가 됐다(인감신고서).
-    표는 블록이라 구분자가 필요 없으므로, 글은 <br>로 잇고 표는 따로 붙인다."""
+    표는 블록이라 구분자가 필요 없으므로, 글은 <br>로 잇고 표는 따로 붙인다.
+
+    ⚠ 여기서 <div>·<span> 으로 감싸지 않는다 — 서식을 채우는 코드가 「한 덩이」를
+      td 로 보는데, 한 겹을 더 끼우면 그 판단이 조용히 달라진다. 정렬은 td 에 건다."""
     out, buf = [], []
 
     def flush():
@@ -112,25 +169,45 @@ def cell_html(cell):
             flush()
             out.append(render_table(item[1]))
         else:
-            s = str(item).strip()
+            s, _sh = item if isinstance(item, tuple) else (item, None)
+            s = str(s).strip()
             if s: buf.append(esc(s))
     flush()
     return ''.join(out)
 
+
+def cell_shape(cell):
+    """칸의 정렬·줄간격 — 맨 처음 «글이 든» 문단의 모양을 칸 전체에 쓴다"""
+    for item in cell['text']:
+        if isinstance(item, tuple) and item[0] == 'table':
+            continue
+        s, sh = item if isinstance(item, tuple) else (item, None)
+        if str(s).strip() and sh:
+            return sh
+    return None
+
 def render_table(v):
     # 1x1 표(제목 감싼 글상자/레이아웃용)는 내용만 펼침
     if v['rows'] == 1 and v['cols'] == 1:
-        return ''.join('<p>' + cell_html(c) + '</p>' for c in v['cells'] if cell_html(c))
+        ps = []
+        for c in v['cells']:
+            h = cell_html(c)
+            if h:
+                sh = cell_shape(c) or {}
+                ps.append('<p%s>%s</p>' % (_style(sh.get('align'), sh.get('ls')), h))
+        return ''.join(ps)
     rows, cols = v['rows'], v['cols']
     return _grid_html(v, rows, cols)
 
 def to_html(blocks):
     out = []
-    for kind, v in blocks:
+    for b in blocks:
+        kind, v = b[0], b[1]
         if kind == 'p':
             t = v.strip()
             if not t: continue
-            out.append('<p>' + esc(t) + '</p>')
+            sh = (b[2] if len(b) > 2 else None) or {}
+            out.append('<p%s>%s</p>' % (_style(sh.get('align'), sh.get('ls')), esc(t)))
         else:
             out.append(render_table(v))
     return '\n'.join(out)
@@ -177,6 +254,14 @@ def _grid_html(v, rows, cols):
                     attr = ''
                     if cell['cs'] > 1: attr += ' colspan="%d"' % cell['cs']
                     if cell['rs'] > 1: attr += ' rowspan="%d"' % cell['rs']
+                    # 칸 높이는 원본이 정한 «최소» 높이다 — 글이 길면 브라우저가 알아서 늘린다.
+                    # 세로 병합 칸은 건너뛴다(합친 높이를 한 줄에 걸면 표가 밀린다).
+                    sh = cell_shape(cell) or {}
+                    ht = None
+                    if cell.get('h') and cell['rs'] == 1:
+                        pt = cell['h'] / HWPUNIT_PT
+                        if 6 <= pt <= 400: ht = pt
+                    attr += _style(sh.get('align'), sh.get('ls'), ht)
                     tds.append('<td%s>%s</td>' % (attr, cell_html(cell)))
                 if tds: trs.append('<tr>' + ''.join(tds) + '</tr>')
             out.append('<table>' + cg + ''.join(trs) + '</table>')
@@ -185,8 +270,8 @@ def _grid_html(v, rows, cols):
 if __name__ == '__main__':
     for p in sys.argv[1:]:
         blocks = convert(p)
-        nt = sum(1 for k, _ in blocks if k == 'table')
-        np_ = sum(1 for k, _ in blocks if k == 'p')
+        nt = sum(1 for b in blocks if b[0] == 'table')
+        np_ = sum(1 for b in blocks if b[0] == 'p')
         print('=' * 70)
         print(os.path.basename(p), '→ 문단 %d, 표 %d' % (np_, nt))
         print('=' * 70)

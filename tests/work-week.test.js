@@ -71,6 +71,7 @@ function $(id) { return null; }
 eval(gvar('WDS') + '\n' + gvar('WKSPLIT_KEY') + '\n' + gvar('NAV_KEYS') + '\n' + gvar('KEYS') + '\n'
   + gvar('_KCODE') + '\n'
   + ['stepsOf', '_cut', 'wkDays', 'wkMarks', 'wkHeadHTML', 'wkCellHTML',
+     'isPlanDay', 'planRowHTML',
      'wkPut', 'wkFocus', 'wkMove', 'wkSide',
      '_inTyping', '_ime', '_k', '_kNum', 'canLog'].map(grab).join('\n'));
 // 화면 전체 자판 처리기를 그대로 실어 실제 분기를 태운다
@@ -100,17 +101,20 @@ ok('머리행에 요일과 날짜, 오늘 표시',
 ok('머리행과 본문이 같은 칸 수 (다르면 줄이 어긋난다)',
   /repeat\((\d+),1fr\)/.exec(wkHeadHTML())[1] === /repeat\((\d+),1fr\)/.exec(wkCellHTML({ _id: 'W1' }, [], 0))[1]);
 
-/* ── 그 날 표시 = 달력을 줄 안으로 ── */
-steps = { W1: { s1: { t: '서면 제출', due: '2026-07-30', o: 1 } } };
+/* ── 그 날 표시 = 달력을 줄 안으로 ──
+   ⚠ 단계 기한 필드는 d 다 (due 아님). stepAdd·stepDate·드로어 날짜칸·캘린더가
+     모두 d 를 쓴다. 예전에 이 붙박이 자료를 due 로 적어 두어, wkMarks 가 due 를
+     보던 결함을 검사가 못 잡았다 — 검사가 코드와 같은 실수를 하고 있었다. */
+steps = { W1: { s1: { t: '서면 제출', d: '2026-07-30', o: 1 } } };
 const IT = { _id: 'W1', due: '2026-07-27', next: { date: '2026-07-28', text: '조사관 통화' } };
 ok('기한·다음 할 일·진행 단계가 그 요일에 뜬다',
   wkMarks(IT, '2026-07-27').indexOf('기한') > 0
   && wkMarks(IT, '2026-07-28').indexOf('조사관 통화') > 0
   && wkMarks(IT, '2026-07-30').indexOf('서면 제출') > 0
   && wkMarks(IT, '2026-07-29') === '');
-steps = { W1: { s1: { t: '자료수집', due: '2026-07-29', done: 1, o: 1 } } };
+steps = { W1: { s1: { t: '자료수집', d: '2026-07-29', done: 1, o: 1 } } };
 ok('끝낸 단계는 표시하지 않는다', wkMarks({ _id: 'W1' }, '2026-07-29') === '');
-steps = { W1: { s1: { t: '자료수집', due: '2026-07-29', o: 1 }, s2: { t: '서면 작성', due: '2026-07-29', o: 2 } } };
+steps = { W1: { s1: { t: '자료수집', d: '2026-07-29', o: 1 }, s2: { t: '서면 작성', d: '2026-07-29', o: 2 } } };
 ok('같은 날 여럿이면 하나만 보이고 +N', (function () {
   const m = wkMarks({ _id: 'W1' }, '2026-07-29');
   return m.indexOf('+1') > 0 && m.indexOf('자료수집') > 0;
@@ -176,9 +180,19 @@ ok('줄 표식이 없으면 좌우로 옮기지 않는다', wkSide({ getAttribut
 
 const WK = grab('wkKey');
 ok('↑↓는 저장하지 않고 칸만 옮긴다',
-  WK.indexOf("e.key==='ArrowDown'||e.key==='ArrowUp'") > 0 && WK.indexOf('wkMove') < WK.indexOf('addLog'));
+  WK.indexOf("e.key==='ArrowDown'||e.key==='ArrowUp'") > 0
+  && WK.indexOf('wkMove') < WK.indexOf('wkSave'));   // 저장은 wkSave 가 맡는다(날짜에 따라 할 일/기록)
 ok('좌우는 빈 칸에서만 (글자가 있으면 커서를 움직여야 한다)',
   WK.indexOf("(e.key==='ArrowLeft'||e.key==='ArrowRight')&&!inp.value") > 0);
+
+/* ── Enter 는 그 칸에 머문다 — 같은 날에 여럿을 연달아 넣기 위함 ── */
+ok('저장한 뒤 그 칸에 머문다', WK.indexOf('wkPut(same[k3]); return;') > 0);
+ok('빈 칸에서 Enter 는 아랫줄로 (지금과 같다)',
+  WK.indexOf('if(!txt.trim()){ wkMove(inp,step); return; }') > 0);
+ok('Shift+Enter 는 윗줄로 (지금과 같다)',
+  WK.indexOf('e.shiftKey?-1:1') > 0 && WK.indexOf('if(!e.shiftKey){') > 0);
+ok('아랫줄로 가려면 ↓ 다', WK.indexOf("e.key==='ArrowDown'") > 0);
+ok('한글 조합 중 Enter 는 글자를 확정할 뿐이다', WK.indexOf('if(_ime(e)) return;') > 0);
 ok('Shift+Enter 는 윗줄로', WK.indexOf('var step=e.shiftKey?-1:1') > 0);
 ok('빈 칸에서 Enter 는 저장 없이 넘어간다', WK.indexOf('if(!txt.trim()){ wkMove(inp,step); return; }') > 0);
 ok('요일 칸에 적으면 그 날짜로 저장된다',
@@ -215,7 +229,8 @@ ok('영문 대소문자 모두',
   fire({ key: 'N', code: 'KeyN' })[0][0] === 'itemModal'
   && fire({ key: 'n', code: 'KeyN' })[0][0] === 'itemModal');
 ok('1~6 이 왼쪽 차례대로',
-  [1, 2, 3, 4, 5, 6].every((n, i) => fire({ key: String(n), code: 'Digit' + n })[0][1] === NAV_KEYS[i]));
+  /* 숫자 몇 개인지는 NAV_KEYS 가 정한다 — 메뉴가 늘거나 줄 때 여기서 안 깨지게 */
+  NAV_KEYS.every((k, i) => fire({ key: String(i + 1), code: 'Digit' + (i + 1) })[0][1] === k));
 ok('7 이상은 아무 화면도 아니다',
   fire({ key: '7', code: 'Digit7' }).length === 0 && fire({ key: '0', code: 'Digit0' }).length === 0);
 ok('숫자패드로도', fire({ key: '2', code: 'Numpad2' })[0][1] === 'team');
@@ -223,7 +238,7 @@ ok('[ ] 로 지난 주·다음 주, T 로 이번 주',
   fire({ key: '[', code: 'BracketLeft' })[0][1] === -1
   && fire({ key: ']', code: 'BracketRight' })[0][1] === 1
   && fire({ key: 't', code: 'KeyT' })[0][0] === 'setWeek');
-S.view = 'kb';
+S.view = 'perf';   // 2026-09-06: 지식 화면이 없어져 다른 «주간 표 없는» 화면으로 바꿨다
 ok('주간 표가 없는 화면에서는 주를 옮기지 않는다',
   fire({ key: '[', code: 'BracketLeft' }).length === 0);
 S.view = 'my';
@@ -281,7 +296,26 @@ ok('지울 때는 건별 사본도 함께 읽어 고아 기록을 남기지 않�
 /* ── 켜고 끄기 ── */
 ok('요일별·한 칸을 오갈 수 있고 그 선택을 기억한다',
   grab('wkSplitToggle').indexOf('WKSPLIT_KEY') > 0
-  && grab('wkSplitOn').indexOf("v!=='0'") > 0);
+  && grab('wkSplitOn').indexOf('WKSPLIT_KEY') > 0);
+/* 2026-09-06 대표 지시 「기본값 바꿔」 — 처음에는 한 칸이다.
+   요일로 쪼개면 빈 「기록…」 칸 다섯이 340px 넘게 먹어, 정작 업무명 칸이 밀려 눌렸다
+   (대표 보고 「어디에서 뭘하는가 안보인다」). */
+ok('★★ 저장값에 따라 갈린다 — 처음 여는 사람(저장값 없음)은 요일별', (function () {
+  const vm2 = require('node:vm');
+  const one = (v) => {
+    const b = { S: {}, console,
+      localStorage: { getItem: () => v },
+      WKSPLIT_KEY: 'work_wk_split' };
+    vm2.createContext(b);
+    vm2.runInContext(grab('wkSplitOn') + '\nthis.r = wkSplitOn();', b);
+    return b.r;
+  };
+  /* 2026-09-06 되돌림 — 대표 「왜 사라졌나」.
+     하루하루 무엇을 했는지 적는 자리가 이 화면의 뼈대다. */
+  return one(null) === true       // ★ 처음 여는 사람 — 요일별
+    && one('0') === false         // 한 칸으로 «손수 고른» 사람의 뜻은 그대로
+    && one('1') === true;
+})());
 ok('요일별일 때만 쪼갠 칸을 그린다',
   grab('rowHTML').indexOf('wkSplitOn()?wkCellHTML(it,logs,rowIdx||0)') > 0);
 ok('팀 전체는 예전 그대로 (남의 업무를 요일별로 적을 일은 없다)',

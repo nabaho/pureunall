@@ -226,21 +226,35 @@ t('금액 0원 비정규직을 지적', irrIss.some(x => /금액이 0원인 비�
 
 // 계약 — 금액은 c.amounts[종류] 에 있다
 ctx.__reset({ contracts:[
-  { id:'c1', signDate:'2026-07-05', companyName:'유원에프앤비', managerMain:'권형하', amounts:{ consult:500000 } },
-  { id:'c2', signDate:'2026-07-06', companyName:'가야엔지니어링', managerMain:'',      amounts:{ consult:300000 } },
-  { id:'c3', signDate:'2026-07-07', companyName:'남양인텍',      managerMain:'권형하', amounts:{} },
+  { id:'c1', signDate:'2026-07-05', companyName:'자차에프앤비', managerMain:'권형하', amounts:{ consult:500000 } },
+  { id:'c2', signDate:'2026-07-06', companyName:'카타엔지니어링', managerMain:'',      amounts:{ consult:300000 } },
+  { id:'c3', signDate:'2026-07-07', companyName:'아자인텍',      managerMain:'권형하', amounts:{} },
   { id:'c4', signDate:'2026-07-08', companyName:'옛계약',        managerMain:'권형하', contractAmount:900000 },
   { id:'c5', signDate:'2026-06-30', companyName:'지난달',        managerMain:'',       amounts:{} }
 ]});
 const ctIss = ctx.monthCloseIssues('contract', YM);
 t('★ 계약금액을 amounts 에서 읽는다', ctIss.some(x => /계약금액이 0원인 계약 1건/.test(x)), true);
-t('금액 없는 계약 이름', ctIss.some(x => /남양인텍/.test(x)), true);
+t('금액 없는 계약 이름', ctIss.some(x => /아자인텍/.test(x)), true);
 t('옛 계약의 contractAmount 도 인정', ctIss.some(x => /옛계약/.test(x)), false);
 t('담당자 빈 계약을 지적', ctIss.some(x => /담당자가 비어 있는 계약 1건/.test(x)), true);
 t('★ 지난달 계약은 세지 않는다', ctIss.some(x => /지난달/.test(x)), false);
 // 성공보수만 있는 사건 계약은 계약금액 0원이어도 정상이다
 ctx.__reset({ contracts:[ { id:'c1', signDate:'2026-07-05', companyName:'사건건', managerMain:'권형하', amounts:{}, successFee:3000000 } ]});
 t('성공보수가 있으면 0원으로 지적하지 않는다', ctx.monthCloseIssues('contract', YM), []);
+
+// 입금
+ctx.__reset({ finance_income:[
+  { id:'i1', date:'2026-07-01', amount:100000, companyName:'자차에프앤비' },
+  { id:'i2', date:'2026-07-02', amount:50000,  companyName:'' }
+]});
+t('업체 빈 입금을 지적', ctx.monthCloseIssues('income', YM).some(x => /업체가 비어 있는 입금 1건/.test(x)), true);
+
+// 보류함(가수금) — 달로 자르지 않고 잔량 전체로 경고한다
+ctx.__reset({ finance_income:[ { id:'i1', date:'2026-07-01', amount:100000, companyName:'자차에프앤비' } ],
+  ledger_held:[ { k:'h1', amount:30000, date:'2026-06-20' } ] });
+t('★ 보류함에 남은 입금을 지적', ctx.monthCloseIssues('income', YM).some(x => /보류함에 남아 있는 입금 1건/.test(x)), true);
+ctx.__reset({ finance_income:[ { id:'i1', date:'2026-07-01', amount:100000, companyName:'자차에프앤비' } ], ledger_held:[] });
+t('보류함이 비었으면 지적하지 않는다', ctx.monthCloseIssues('income', YM).some(x => /보류함/.test(x)), false);
 
 // 출금
 ctx.__reset({ finance_expense:[
@@ -300,10 +314,12 @@ function gateCtx(){
     _recStamp(x){ return x; },
     _recCanDirect(){ return false; },
     _REC_BADKEY: /[.#$/[\]]/,
-    isAttendLocked(ym){ return (store.locked_attend_months || []).indexOf(ym) >= 0; }
+    isAttendLocked(ym){ return (store.locked_attend_months || []).indexOf(ym) >= 0; },
+    /* 자물쇠 «대상표»도 공용 파일에서 온다 — 상자 안에도 같은 것을 넣어 준다 */
+    PuWork: require('../js/pu-work-core.js')
   };
   vm.createContext(c);
-  vm.runInContext(slice('// ── 근태·휴가 마감월 관문', '// ── Phase 0 셀프테스트'), c);
+  vm.runInContext(slice('// ── 근태·휴가 마감월 관문', '\nfunction erpNormName('), c);
   c.__store = () => store;
   c.__toasts = toasts;
   return c;
@@ -400,11 +416,16 @@ t('★ 화면에서 직접 해제하는 자리가 없다',
 t('근태관리에 마감 버튼이 있다', /isAttendLocked\(selYM\)/.test(src), true);
 
 // 이음센터 이관이 마감월을 건드리지 않는가 — 그리고 못 옮긴 일정을 지우지 않는가
-t('이음센터 이관이 마감월을 건너뛴다', /eumLocked/.test(src), true);
-// 지우는 그 자리에서 _moved 를 확인해야 한다 (대입만 있고 안 쓰면 못 옮긴 일정이 사라진다)
-t('★ 이관하지 못한 일정을 지우지 않는다',
-  /s\.type !== 'eum-work' \|\| !_moved\[s\.id\]/.test(src), true);
-
+/* ⚠ 2026-09-20(4걸음) — 「이음센터 이관」 검사 둘을 뺐다.
+   그 이관은 이음센터 화면을 열 때마다 돌던 «한 번짜리 옮기기»였고,
+   4걸음에서 그 화면을 걷어냈다.
+   ★ 지우면서 서버를 재 보았다 — my_schedules 25건이 «전부» eum-work 이고,
+     날짜가 2026-03·06·07 로 모두 마감된 달이다. 그래서 이 이관은
+     돌 때마다 「마감된 달이라 안 옮겼다」고 알리고 끝났다 — «영영 끝나질 수 없는» 일이었다.
+   ★ 그 25건은 그대로 있고, 푸른 캘린더가 my_schedules 를 읽어 그린다 —
+     화면에서 사라지는 것은 없다.
+   ⚠ 마감된 달을 건너뛰는 규칙 자체는 살아 있다 — js/pu-cal-write.js 의 쓰는 문이
+     마감 달을 거절한다(tests/cal-write-gate.test.js). 여기서만 빠졌다. */
 /* ═══ 11. ★ 화면이 실제로 그려지는가 (없는 변수를 부르면 여기서 터진다) ═══ */
 function renderMonthClose(store, showYM){
   const ym = showYM || YM;

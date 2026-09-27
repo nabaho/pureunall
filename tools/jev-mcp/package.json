@@ -1,0 +1,11 @@
+{
+  "name": "pureun-jev-mcp",
+  "private": true,
+  "version": "1.0.0",
+  "description": "푸른 ERP용 Jev 읽기 전용 판단 MCP",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "3.25.76"
+  }
+}

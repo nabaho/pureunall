@@ -30,14 +30,14 @@ test('판독 층이 window에 붙는다', () => {
 
 test('사업자등록번호 체크섬 — 유효/무효를 가른다', () => {
   const R = loadRead();
-  assert.equal(R.bizNoValid('220-81-62517'), true);
-  assert.equal(R.bizNoValid('2208162517'), true);
+  assert.equal(R.bizNoValid('123-81-20031'), true);
+  assert.equal(R.bizNoValid('1238120031'), true);
   assert.equal(R.bizNoValid('220 81 62517'), true);
   // 한 자리만 틀리면 걸러진다 — AI 오인식을 잡는 지점
-  assert.equal(R.bizNoValid('220-81-62518'), false);
+  assert.equal(R.bizNoValid('123-81-20177'), false);
   // 자리 수가 안 맞거나 값이 없으면 false
   assert.equal(R.bizNoValid('220-81-6251'), false);
-  assert.equal(R.bizNoValid('220-81-625171'), false);
+  assert.equal(R.bizNoValid('123-81-200311'), false);
   assert.equal(R.bizNoValid('가나다'), false);
   assert.equal(R.bizNoValid(''), false);
   assert.equal(R.bizNoValid(null), false);
@@ -46,10 +46,10 @@ test('사업자등록번호 체크섬 — 유효/무효를 가른다', () => {
 
 test('사업자등록번호 표기 정리', () => {
   const R = loadRead();
-  assert.equal(R.bizNoDigits('220-81-62517'), '2208162517');
+  assert.equal(R.bizNoDigits('123-81-20031'), '1238120031');
   assert.equal(R.bizNoDigits(null), '');
-  assert.equal(R.fmtBizNo('2208162517'), '220-81-62517');
-  assert.equal(R.fmtBizNo('220-81-62517'), '220-81-62517');
+  assert.equal(R.fmtBizNo('1238120031'), '123-81-20031');
+  assert.equal(R.fmtBizNo('123-81-20031'), '123-81-20031');
   // 이상한 값이 와도 터지지 않는다
   assert.equal(R.fmtBizNo(''), '');
   assert.equal(R.fmtBizNo(null), '');
@@ -57,18 +57,18 @@ test('사업자등록번호 표기 정리', () => {
 });
 
 /* ── 앱별 필드 이름 변환 ──
-   같은 사업자등록번호를 앱마다 다르게 부른다(명함첩 bizno · 푸른이알피 bizNo ·
+   같은 사업자등록번호를 앱마다 다르게 부른다(기업정보함 bizno · 푸른이알피 bizNo ·
    기금관리 biz_no). 변환이 틀리면 조용히 안 붙고 아무도 모른다. */
 
-test('사업자등록증 → 명함첩 필드', () => {
+test('사업자등록증 → 기업정보함 필드', () => {
   const R = loadRead();
   const out = R.mapTo('cards', 'bizreg', {
-    company: '가나상사', ceo: '홍길동', bizno: '220-81-62517',
+    company: '가나상사', ceo: '홍길동', bizno: '123-81-20031',
     openDate: '2020-01-02', bizType: '제조업', bizItem: '금속가공', address: '천안시'
   });
-  assert.equal(out.kind, 'biz');       // 명함첩은 종류 칸이 있다
+  assert.equal(out.kind, 'biz');       // 기업정보함은 종류 칸이 있다
   assert.equal(out.company, '가나상사');
-  assert.equal(out.bizno, '220-81-62517');
+  assert.equal(out.bizno, '123-81-20031');
   assert.equal(out.bizItem, '금속가공');
   assert.equal(out.openDate, '2020-01-02');
 });
@@ -76,11 +76,11 @@ test('사업자등록증 → 명함첩 필드', () => {
 test('사업자등록증 → 사업장 정보(푸른이알피) 필드', () => {
   const R = loadRead();
   const out = R.mapTo('erp', 'bizreg', {
-    company: '가나상사', ceo: '홍길동', bizno: '2208162517',
+    company: '가나상사', ceo: '홍길동', bizno: '1238120031',
     bizType: '제조업', bizItem: '금속가공', address: '천안시', companyTel: '041-000-0000'
   });
   assert.equal(out.name, '가나상사');        // 회사명은 name
-  assert.equal(out.bizNo, '220-81-62517');   // 대문자 N + 보기 좋은 꼴
+  assert.equal(out.bizNo, '123-81-20031');   // 대문자 N + 보기 좋은 꼴
   assert.equal(out.bizCategory, '금속가공');  // 종목은 bizCategory
   assert.equal(out.bizType, '제조업');
   assert.equal(out.phone, '041-000-0000');
@@ -92,15 +92,15 @@ test('사업자등록증 → 사업장 정보(푸른이알피) 필드', () => {
 test('사업자등록증 → 기금 참여사업장 필드', () => {
   const R = loadRead();
   const out = R.mapTo('fund', 'bizreg', {
-    company: '가나상사', ceo: '홍길동', bizno: '2208162517', bizType: '제조업', address: '천안시'
+    company: '가나상사', ceo: '홍길동', bizno: '1238120031', bizType: '제조업', address: '천안시'
   });
   assert.equal(out.name, '가나상사');
-  assert.equal(out.biz_no, '220-81-62517'); // 기금은 스네이크
+  assert.equal(out.biz_no, '123-81-20031'); // 기금은 스네이크
   assert.equal(out.biz_type, '제조업');
   assert.equal(out.address, '천안시');
 });
 
-test('명함 → 명함첩 필드는 이름이 그대로다', () => {
+test('명함 → 기업정보함 필드는 이름이 그대로다', () => {
   const R = loadRead();
   const out = R.mapTo('cards', 'card', { name: '홍길동', company: '가나상사', mobile: '010-1234-5678' });
   assert.equal(out.kind, 'card');
@@ -110,9 +110,9 @@ test('명함 → 명함첩 필드는 이름이 그대로다', () => {
 
 test('중소기업확인서 → 사업장 정보 필드 (기업규모가 들어간다)', () => {
   const R = loadRead();
-  const out = R.mapTo('erp', 'sme', { company: '가나상사', bizno: '2208162517', smeType: '소기업', industry: '금속가공' });
+  const out = R.mapTo('erp', 'sme', { company: '가나상사', bizno: '1238120031', smeType: '소기업', industry: '금속가공' });
   assert.equal(out.name, '가나상사');
-  assert.equal(out.bizNo, '220-81-62517');
+  assert.equal(out.bizNo, '123-81-20031');
   assert.equal(out.companySize, '소기업');
   assert.equal(out.industry, '금속가공');
 });
@@ -157,7 +157,7 @@ const DUMMY_IMG = 'data:image/jpeg;base64,AAAA';
 test('사업자등록증을 읽고 번호 검증까지 한다', async () => {
   const R = loadRead();
   R.init({
-    fetch: fakeFetch('```json\n{"kind":"bizreg","company":"가나상사","ceo":"홍길동","bizno":"220-81-62517"}\n```'),
+    fetch: fakeFetch('```json\n{"kind":"bizreg","company":"가나상사","ceo":"홍길동","bizno":"123-81-20031"}\n```'),
     getKey: () => Promise.resolve('KEY')
   });
   const r = await R.read(DUMMY_IMG);
@@ -173,7 +173,7 @@ test('사업자등록증을 읽고 번호 검증까지 한다', async () => {
 
 test('번호가 한 자리 틀리면 검증에 걸린다 — 자동 입력하면 안 되는 경우', async () => {
   const R = loadRead();
-  R.init({ fetch: fakeFetch('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62518"}'),
+  R.init({ fetch: fakeFetch('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20177"}'),
            getKey: () => Promise.resolve('KEY') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.bizNoOk, false);
@@ -190,14 +190,14 @@ test('명함은 번호 검증 대상이 아니다 (null, false 아님)', async (
 
 test('중소기업확인서는 유효기간을 읽는다', async () => {
   const R = loadRead();
-  R.init({ fetch: fakeFetch('{"kind":"sme","company":"가나상사","bizno":"2208162517","smeType":"소기업","expiry":"2027-03-31"}'),
+  R.init({ fetch: fakeFetch('{"kind":"sme","company":"가나상사","bizno":"1238120031","smeType":"소기업","expiry":"2027-03-31"}'),
            getKey: () => Promise.resolve('KEY') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.kind, 'sme');
   assert.equal(r.fields.expiry, '2027-03-31');
   assert.equal(r.fields.smeType, '소기업');
   assert.equal(r.bizNoOk, true);
-  assert.equal(r.fields.bizno, '220-81-62517', '번호를 보기 좋은 꼴로 정리해야 합니다');
+  assert.equal(r.fields.bizno, '123-81-20031', '번호를 보기 좋은 꼴로 정리해야 합니다');
 });
 
 test('서류가 아니면 other 로 두고 억지로 맞추지 않는다', async () => {
@@ -223,6 +223,37 @@ test('프롬프트에 세 종류와 읽을 항목이 모두 들어 있다', () =
   }
   assert.match(p, /JSON으로만|JSON 외/, 'JSON만 답하라는 지시가 없습니다');
   assert.match(p, /추측하지/, '사업자번호를 추측하지 말라는 지시가 없습니다');
+});
+
+/* 한글 우선(2026-08-07 대표 지시) — 명함에 한글·영문이 나란히 있으면 한글을 담는다.
+   영문을 담으면 기업정보함·업체관리에서 한글로 찾는 사람이 못 찾고 같은 회사가 두 벌로 쌓인다. */
+test('★ 한글과 영문이 함께 있으면 한글을 담으라고 지시한다', () => {
+  const p = loadRead().PROMPTS.all;
+  assert.ok(/한글 우선/.test(p), '한글 우선 지시가 없습니다.');
+  assert.ok(/한글 표기를 \*\*담으세요|한글 표기를 담으세요|한글 쪽을 고릅니다/.test(p),
+    '무엇을 고를지가 분명하지 않습니다.');
+  assert.ok(/한글이 없을 때만 영문/.test(p),
+    '한글이 없는 칸까지 비우면 정보를 잃습니다.');
+});
+
+test('★ 없는 한글을 지어내지 말라고 못 박는다', () => {
+  const p = loadRead().PROMPTS.all;
+  assert.ok(/번역하거나 소리나는 대로 옮겨 적지 마세요/.test(p),
+    '영문을 한글로 옮겨 적으면 실제와 다른 회사명이 업체관리에 들어갑니다.');
+});
+
+test('이메일·홈페이지는 한글 우선에서 빼 둔다', () => {
+  const p = loadRead().PROMPTS.all;
+  assert.ok(/이메일·홈페이지는 원래 영문/.test(p),
+    '이 단서가 없으면 AI가 메일 주소까지 한글로 바꾸려 듭니다.');
+});
+
+/* ⚠ 프롬프트를 고치면 판독 번호를 반드시 올려야 한다 — 안 올리면 이미 읽어 둔
+   사진은 옛 방식(영문) 그대로 굳는다. 2026-08-06 에 실제로 당했다(회의사진 0장). */
+test('★ 프롬프트를 고쳤으면 판독 번호가 올라가 있다', () => {
+  const R = loadRead();
+  assert.ok(R.READ_VERSION >= 3,
+    '번호를 안 올리면 이미 읽은 명함이 영문 그대로 굳습니다.');
 });
 
 test('AI 키가 없으면 부르지 않고 한국어로 알려준다', async () => {
@@ -273,7 +304,7 @@ const noWait = function (fn) { fn(); };
 
 test('AI가 바쁘면(429) 기다렸다 스스로 다시 시도한다', async () => {
   const R = loadRead();
-  const f = flakyFetch(2, 429, '{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}');
+  const f = flakyFetch(2, 429, '{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}');
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), delay: noWait });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.kind, 'bizreg', '다시 시도해서 읽어냈어야 합니다');
@@ -378,7 +409,7 @@ test('첫 모델이 계속 바쁘면(429) 다음 모델로 넘어간다', async 
   const R = loadRead();
   const first = R.MODELS[0];
   const behavior = {}; behavior[first] = 429;
-  const f = modelFetch(behavior, '{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}');
+  const f = modelFetch(behavior, '{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}');
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), delay: noWait });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.kind, 'bizreg');
@@ -472,7 +503,7 @@ function fakeBoth(geminiText, ntsResult, opts) {
 
 test('국세청 키가 있으면 조회해서 상태를 담는다', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}',
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}',
     { data: [{ b_stt: '계속사업자' }] });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
@@ -483,7 +514,7 @@ test('국세청 키가 있으면 조회해서 상태를 담는다', async () => 
 
 test('체크섬에서 이미 걸린 번호는 국세청에 묻지 않는다', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62518"}', { data: [] });
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20177"}', { data: [] });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(f.seen.nts, 0, '틀린 번호로 국세청을 부르면 헛일입니다');
@@ -500,7 +531,7 @@ test('명함은 국세청에 묻지 않는다', async () => {
 
 test('국세청 조회가 실패해도 판독 결과는 살린다', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}', null, { ntsFail: true });
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}', null, { ntsFail: true });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.fields.company, '가나상사');
@@ -511,7 +542,7 @@ test('국세청 조회가 실패해도 판독 결과는 살린다', async () => 
 
 test('국세청에 자료가 없어도 판독 결과는 살린다', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}', { data: [] });
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}', { data: [] });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
   assert.equal(r.bizNoOk, true);
@@ -520,7 +551,7 @@ test('국세청에 자료가 없어도 판독 결과는 살린다', async () => 
 
 test('폐업자로 나오면 상태를 그대로 남긴다 (판단은 부르는 쪽이 한다)', async () => {
   const R = loadRead();
-  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"220-81-62517"}',
+  const f = fakeBoth('{"kind":"bizreg","company":"가나상사","bizno":"123-81-20031"}',
     { data: [{ b_stt: '폐업자' }] });
   R.init({ fetch: f, getKey: () => Promise.resolve('KEY'), getNtsKey: () => Promise.resolve('NTS') });
   const r = await R.read(DUMMY_IMG);
@@ -563,7 +594,7 @@ test('명함 — 검증할 것이 없으므로 자동', () => {
 test('이름도 회사도 못 읽었으면 자동으로 넣지 않는다', () => {
   const R = loadRead();
   assert.equal(R.autoOk({ kind: 'card', fields: {}, bizNoOk: null, error: null }).auto, false);
-  assert.equal(R.autoOk({ kind: 'bizreg', fields: { bizno: '220-81-62517' }, bizNoOk: true, error: null }).auto, false);
+  assert.equal(R.autoOk({ kind: 'bizreg', fields: { bizno: '123-81-20031' }, bizNoOk: true, error: null }).auto, false);
 });
 
 test('중소기업확인서 — 유효기간이 지났으면 사람 확인', () => {
@@ -604,39 +635,36 @@ function fakeDbKeys(map) {
   };
 }
 
-test('AI 키 — 이 기기 → 명함첩 공유 → 포털 공용 순서로 찾는다', async () => {
+/* ⚠ 2026-08-17 — 여기 있던 검사 셋(「이 기기 → 기업정보함 공유 → 포털 공용 순서로 찾는다」
+   등)은 **없앤 기능**을 재고 있었다. 열쇠는 이제 금고(Secret Manager)에 있고 서버만
+   안다. 기업정보함 공유 자리·포털 공용 설정은 규칙상 **로그인한 모든 직원이 읽는** 자리라
+   그것이 바로 구멍이었다 — 그 자리의 열쇠도 지웠다.
+   그래서 「어떤 순서로 찾는가」가 아니라 **「아예 안 찾는다」**를 못 박는다. */
+test('★ AI 키를 브라우저로 «가져다 주지 않는다» — 열쇠는 서버만 안다', async () => {
   const R = loadRead({ window: { localStorage: { getItem: () => 'LOCAL' } } });
   const db = fakeDbKeys({ 'pucards/config/geminiKey': 'SHARED', 'data/app_config/geminiKey': 'PORTAL' });
-  assert.equal(await R.keysFrom(db).getKey(), 'LOCAL');
-
-  const R2 = loadRead({ window: { localStorage: { getItem: () => null } } });
-  assert.equal(await R2.keysFrom(db).getKey(), 'SHARED');
-
-  const R3 = loadRead({ window: { localStorage: { getItem: () => null } } });
-  assert.equal(await R3.keysFrom(fakeDbKeys({ 'data/app_config/geminiKey': 'PORTAL' })).getKey(), 'PORTAL');
+  const keys = R.keysFrom(db);
+  assert.equal(typeof keys.getKey, 'undefined',
+    '★ 열쇠를 돌려주면 그 순간 다시 브라우저로 내려옵니다.');
+  assert.ok(db.asked.every(p => p.indexOf('geminiKey') < 0),
+    '★ 실시간DB 의 열쇠 자리를 읽었습니다: ' + db.asked.join(', '));
 });
 
-test('AI 키 — 아무 데도 없으면 빈 문자열 (예외를 던지지 않는다)', async () => {
-  const R = loadRead({ window: { localStorage: { getItem: () => null } } });
-  assert.equal(await R.keysFrom(fakeDbKeys({})).getKey(), '');
-});
-
-test('AI 키 — 실시간DB 읽기가 막혀도 예외를 던지지 않는다', async () => {
-  const R = loadRead({ window: { localStorage: { getItem: () => null } } });
-  const badDb = { ref: () => ({ once: () => Promise.reject(new Error('권한 없음')) }) };
-  assert.equal(await R.keysFrom(badDb).getKey(), '');
+test('★ 이 기기에 옛 열쇠가 남아 있어도 쓰지 않는다', async () => {
+  /* 「내 열쇠를 넣으면 옛 길로 돈다」가 남으면 구멍이 그대로다. */
+  const R = loadRead({ window: { localStorage: { getItem: () => 'LOCAL' } } });
+  assert.equal(typeof R.keysFrom(fakeDbKeys({})).getKey, 'undefined');
 });
 
 test('국세청 키는 포털 공용 설정에서만 찾는다', async () => {
   const R = loadRead({ window: { localStorage: { getItem: () => null } } });
   const db = fakeDbKeys({ 'data/app_config/ntsKey': 'NTS' });
   assert.equal(await R.keysFrom(db).getNtsKey(), 'NTS');
-  assert.ok(db.asked.every(p => p.indexOf('pucards') < 0), '국세청 키를 명함첩에서 찾고 있습니다');
+  assert.ok(db.asked.every(p => p.indexOf('pucards') < 0), '국세청 키를 기업정보함에서 찾고 있습니다');
 });
 
 test('키 함수는 db 가 없어도 터지지 않는다', async () => {
   const R = loadRead({ window: { localStorage: { getItem: () => null } } });
-  assert.equal(await R.keysFrom(null).getKey(), '');
   assert.equal(await R.keysFrom(null).getNtsKey(), '');
 });
 

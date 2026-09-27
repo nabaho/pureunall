@@ -1,7 +1,8 @@
 {
   "name": "푸른카메라",
-  "short_name": "푸른카메라",
-  "description": "푸른노무법인 명함 촬영 — 찍으면 명함첩에 자동 등록",
+  "short_name": "카메라",
+  "description": "푸른노무법인 사진·서류 촬영 — 찍으면 푸른사진첩에 자동 저장",
+  "id": "/pureunall/pu-camera.html",
   "start_url": "./pu-camera.html",
   "scope": "./",
   "display": "standalone",
@@ -9,7 +10,17 @@
   "background_color": "#101010",
   "theme_color": "#101010",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icon-camera-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-camera-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
   ]
 }

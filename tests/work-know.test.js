@@ -42,8 +42,13 @@ function peRec(it) { return (it && it.ref && peRecMap[it.ref.id]) || null; }
 let PATCHED = null, LOGGED = [];
 function patchItem(id, f) { PATCHED = { id: id, f: f }; return Promise.resolve(true); }
 function addLog(id, t, d, k) { LOGGED.push([id, t, k]); return Promise.resolve(true); }
-let ONCE = {};
-const fbDb = { ref: (p) => ({ once: () => Promise.resolve({ val: () => ONCE[p] || null }) }) };
+let ONCE = {}, UPDATED = null, CONFIRM = false;
+// 확인 대화 — CONFIRM 값을 그대로 돌려준다
+function confirmM() { return Promise.resolve(CONFIRM); }
+const fbDb = { ref: (p) => ({
+  once: () => Promise.resolve({ val: () => ONCE[p] || null }),
+  update: (u) => { UPDATED = u; return Promise.resolve(); }
+}) };
 
 eval(gvar('HO_FIELDS') + '\n' + gvar('RETRO_FIELDS') + '\n'
   + gvar('HO_OVERDUE_DAYS') + '\n' + gvar('KB_KINDS') + '\n'
@@ -53,6 +58,7 @@ eval(gvar('HO_FIELDS') + '\n' + gvar('RETRO_FIELDS') + '\n'
      'kbKey', 'kbCoKey', 'kbCards', 'kbAll', 'kbStale', 'kbBad', 'kbRelated',
      '_hit', 'matchQ', 'searchAll', 'noteDone', 'hoPendingToMe', 'hoOverdue', 'isAdmin',
      'activeLeavings', 'hoBadgeCount', 'leavingItems', 'confirmHo',
+     'mgrSubNames', 'orphanSubs', 'dropSubAll',
      'excelImported', 'excelWipePaths'].map(grab).join('\n'));
 
 /* ══ 지식 카드 ══ */
@@ -61,9 +67,9 @@ ok('카드 갈래는 사람·업체·유형·기관',
 ok('키는 저장할 수 있는 글자로 바꾼다 (점·슬래시가 있으면 경로가 깨진다)',
   kbKey('천안/지청.1') === '천안_지청_1' && kbKey('  통상임금  ') === '통상임금');
 ok('기업 키는 사업자 ID 가 있으면 그것 (이름을 고쳐도 카드가 안 흩어진다)',
-  kbCoKey({ co_id: 'CO1', company: '나래산업' }) === 'CO1');
+  kbCoKey({ co_id: 'CO1', company: '새롬산업' }) === 'CO1');
 ok('ID 가 없으면 (주)·공백을 뗀 이름',
-  kbCoKey({ company: '(주) 나래 산업' }) === kbCoKey({ company: '나래산업' }));
+  kbCoKey({ company: '(주) 새롬 산업' }) === kbCoKey({ company: '새롬산업' }));
 
 kb = {
   cat: { 부당해고: {
@@ -71,7 +77,7 @@ kb = {
     k2: { t: '', x: '제목 없음' },
     k3: 'not-an-object'
   } },
-  company: { 나래산업: { k4: { t: '이 회사 관행', at: '2026-06-01' } } },
+  company: { 새롬산업: { k4: { t: '이 회사 관행', at: '2026-06-01' } } },
   person: { 강감독관: { k5: { t: '연락은 오전에', at: '2020-01-01' } } },
   office: { 천안지청: { k6: { t: '접수 창구', kl: '천안지청', at: '2026-07-20' } } }
 };
@@ -93,9 +99,9 @@ ok('틀렸다고 표시된 카드는 따로 본다',
   kbBad({ flags: [{ by: 'u2' }] }) === true && kbBad({ flags: [] }) === false && kbBad({}) === false);
 
 const IT = {
-  ptype: '부당해고', cat: '사건', company: '나래산업', title: '천안지청 진정 건',
+  ptype: '부당해고', cat: '사건', company: '새롬산업', title: '천안지청 진정 건',
   officer: '강감독관', client: '홍길동',
-  contacts: [{ name: '이차장', phone: '010-8284-7994', position: '인사팀장' }]
+  contacts: [{ name: '이차장', phone: '010-1200-0026', position: '인사팀장' }]
 };
 let rel = kbRelated(IT).map(c => c._id);
 ok('업무 유형 카드가 붙는다', rel.indexOf('k1') >= 0);
@@ -119,8 +125,8 @@ ok('업무가 없으면 빈 목록 (터지지 않는다)', kbRelated(null).lengt
 
 /* ══ 전체 검색 ══ */
 items = {
-  W1: { company: '나래산업', title: '부당해고 구제신청', mgr_main: { name: '김동현' },
-        contacts: [{ name: '이차장', phone: '010-8284-7994' }, { name: '박대리', phone: '01099998888' }],
+  W1: { company: '새롬산업', title: '부당해고 구제신청', mgr_main: { name: '김동현' },
+        contacts: [{ name: '이차장', phone: '010-1200-0026' }, { name: '박대리', phone: '01099998888' }],
         mgr_subs: [{ name: '권형하' }],
         ho_note: { sit: '통상임금 다툼이 있었다', todo: '', qa: [{ q: '무엇이 남았나', a: '자료 정리' }],
                    retro: { diff: '초기 대응이 빨랐다' } } },
@@ -132,7 +138,7 @@ ok('한 글자로는 찾지 않는다 (다 걸린다)', (function () {
   const r = searchAll('나');
   return r.items.length === 0 && r.cards.length === 0 && r.logs.length === 0;
 })());
-let R = searchAll('나래');
+let R = searchAll('새롬');
 ok('업무 정보에서 찾는다', R.items.length === 1 && R.items[0].where.indexOf('업무 정보') >= 0);
 R = searchAll('통상임금');
 ok('인수인계 노트 본문에서도 찾는다', R.items.length === 1 && R.items[0].where.length > 0);
@@ -161,7 +167,7 @@ ok('기록은 최근 것이 위로', (function () {
 /* ── 찾기 규칙 ── */
 ok('두 번째 담당자 이름으로도 찾힌다', matchQ(items.W1, '박대리') === true);
 ok('전화는 하이픈이 있든 없든 찾힌다',
-  matchQ(items.W1, '010-8284-7994') === true && matchQ(items.W1, '01082847994') === true);
+  matchQ(items.W1, '010-1200-0026') === true && matchQ(items.W1, '01012000026') === true);
 ok('부담당 이름으로도 찾힌다', matchQ(items.W1, '권형하') === true);
 ok('빈 검색어는 다 통과', matchQ(items.W1, '') === true);
 ok('없는 말은 안 찾힌다', matchQ(items.W1, '없는말') === false);
@@ -229,6 +235,68 @@ PATCHED = null;
 confirmHo('없는건');
 ok('없는 건에는 아무 일도 안 한다', PATCHED === null);
 
+/* ══ 명단에 없는 사람이 부담당으로만 남은 건 ══
+   주담당이 빠지는 것은 「후임 지정」이 맡는다. 부담당은 넘길 일이 없고 이름만
+   떼면 되는데, 주담당만 보는 목록이 이것을 못 잡아 팀 전체 담당 목록에 퇴사자
+   이름이 계속 남아 있었다. */
+const STAFF = [{ sid: 'u1', name: '김동현' }, { sid: 'u2', name: '권형하' }];
+const SUBFIX = () => ({
+  A: { mgr_main: { name: '김동현' }, mgr_subs: [{ sid: 'u9', name: '임혜미' }] },
+  B: { mgr_main: { name: '권형하' }, mgr_subs: [{ name: '김동현' }, { sid: 'u9', name: '임혜미' }] },
+  C: { mgr_main: { name: '김동현' }, mgr_subs: [{ name: '권형하' }] },
+  D: { state: 'done', mgr_main: { name: '김동현' }, mgr_subs: [{ sid: 'u9', name: '임혜미' }] },
+  E: { mgr_main: { name: '임혜미' } },
+  F: { mgr_main: { name: '김동현' }, mgr_subs: [{ name: '박지호' }] }
+});
+items = SUBFIX();
+let OS = orphanSubs(STAFF);
+ok('명단에 없는 사람만 모은다', OS.map(o => o.name).join() === '박지호,임혜미');
+ok('재직자는 부담당이어도 안 모은다', OS.every(o => o.name !== '김동현' && o.name !== '권형하'));
+ok('그 사람이 부담당인 건만 센다', OS.filter(o => o.name === '임혜미')[0].items.map(i => i._id).join() === 'A,B');
+ok('종료된 건은 세지 않는다 (그때 함께 했다는 기록이다)',
+  OS.filter(o => o.name === '임혜미')[0].items.every(i => i._id !== 'D'));
+ok('주담당으로만 남은 사람은 여기 안 온다 (후임 지정이 맡는다)',
+  OS.every(o => o.items.every(i => i._id !== 'E')));
+ok('이름순으로 준다', OS.map(o => o.name).join() === '박지호,임혜미');
+ok('아무도 없으면 빈 목록', orphanSubs([{ sid: 'u9', name: '임혜미' }, { name: '박지호' }].concat(STAFF)).length === 0);
+// 명단이 비면 부담당 전원이 "명단에 없는 사람"이 된다 — 터지지만 않으면 된다
+ok('명단이 비어도 터지지 않는다',
+  orphanSubs([]).map(o => o.name).join() === '권형하,김동현,박지호,임혜미'
+  && orphanSubs(null).length === 4);
+
+// 확인 대화가 Promise 라 결과는 다음 차례에 온다. 파일의 마무리는 엑셀 묶음이
+// 쥐고 있으므로 여기서 끝내지 않고, 그 마지막 콜백에서 이 함수를 부른다.
+function subTests(done) {
+  items = SUBFIX();                 // 엑셀 묶음이 items 를 바꿔 놓았으므로 다시 깐다
+  CONFIRM = false; UPDATED = null;
+  dropSubAll('임혜미');
+  setTimeout(function () {
+    ok('확인을 누르지 않으면 아무것도 안 쓴다', UPDATED === null);
+    CONFIRM = true; UPDATED = null;
+    dropSubAll('임혜미');
+    setTimeout(function () { subCheck(); done(); }, 0);
+  }, 0);
+}
+function subCheck() {
+  ok('진행 중인 두 건에서만 뗀다',
+    UPDATED && UPDATED['work_erp/items/A/mgr_subs'] === null
+    && !('work_erp/items/D/mgr_subs' in UPDATED));
+  ok('같이 있던 다른 부담당은 남긴다', (function () {
+    const b = UPDATED['work_erp/items/B/mgr_subs'];
+    return b && b.length === 1 && b[0].name === '김동현';
+  })());
+  ok('마지막 한 명이면 칸을 비운다 (빈 배열을 남기지 않는다)',
+    UPDATED['work_erp/items/A/mgr_subs'] === null);
+  ok('주담당은 건드리지 않는다',
+    !('work_erp/items/A/mgr_main' in UPDATED) && !('work_erp/items/E/mgr_main' in UPDATED));
+  ok('상관없는 건은 손대지 않는다',
+    !('work_erp/items/C/mgr_subs' in UPDATED) && !('work_erp/items/F/mgr_subs' in UPDATED));
+  ok('손댄 시각을 남긴다', !!UPDATED['work_erp/items/A/up_at']);
+  UPDATED = null;
+  dropSubAll('없는사람');
+  ok('뗄 건이 없으면 아무것도 안 한다', UPDATED === null);
+}
+
 /* ══ 엑셀 가져오기 ══ */
 const RUN = grab('runImport');
 ok('키가 겹치거나 없으면 아예 넣지 않는다 (그만큼 서로 덮어써 사라진다)',
@@ -258,7 +326,10 @@ excelWipePaths(null).then(function (w) {
   items = { N1: { src: 'puerp' } };
   excelWipePaths(null).then(function (e) {
     ok('이관분이 하나도 없으면 빈 결과', e.n === 0 && Object.keys(e.paths).length === 0);
-    console.log('\n' + (fail ? 'FAILED ' + fail + '/' + (pass + fail) : 'ALL ' + pass + ' PASS'));
-    process.exit(fail ? 1 : 0);
+    // 부담당 떼기는 확인 대화를 거치므로 여기서 이어 돌리고 마지막에 마무리한다
+    subTests(function () {
+      console.log('\n' + (fail ? 'FAILED ' + fail + '/' + (pass + fail) : 'ALL ' + pass + ' PASS'));
+      process.exit(fail ? 1 : 0);
+    });
   });
 });

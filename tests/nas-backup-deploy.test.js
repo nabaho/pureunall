@@ -1,0 +1,164 @@
+'use strict';
+/* 나스 자동 백업 올리개 — 「올렸다」와 「된다」는 다르다 (2026-09-18 대표 지시 「올려라」)
+   ─────────────────────────────────────────────────────────────────────────
+   ■ 왜 이것이 생겼나
+     대표님이 「올려라」고 하셨는데 클라우드에서 도는 방에는 파이어베이스 로그인이 없다
+     (토큰·gcloud·서비스계정 전부 없음을 확인했고, CI 에도 함수 배포 경로가 없다).
+     그래서 «로그인된 자리»에서 한 줄로 끝나게 만든다. 손으로 할 일이 셋이었다 —
+     열쇠 만들기 · 서버에 넣기 · 함수 올리기.
+
+   ★ 못 박는 것 — 값이 아니라 규칙이다
+     ① 기본은 «보여만» 준다 — 실수로 돌려도 아무 일이 안 일어난다
+     ② 함수 «하나만» 올린다 — 다른 함수를 건드리면 메일·급여가 함께 흔들린다
+     ③ 열쇠가 이미 있으면 다시 만들지 않는다 — 새로 만들면 나스의 옛 열쇠가 조용히 죽는다
+     ④ 열쇠를 파일로 남기지 않는다 — 남으면 그 하나로 백업 전부를 받아 갈 수 있다
+     ⑤ 올린 뒤 실제로 한 번 받아 본다 — 「올렸다」와 「된다」는 다르다
+     ⑥ 로그인이 없으면 그 자리에서 멈추고 «무엇을 하라»고 말한다 */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { stripJs } = require('./strip-comments.js');
+
+const ROOT = path.join(__dirname, '..');
+const RAW = fs.readFileSync(path.join(ROOT, 'scripts', 'nas-backup-deploy.js'), 'utf8');
+const SRC = stripJs(RAW);   // ⚠ 조각·.js 에는 stripJs — 주석의 낱말을 코드로 읽지 않게
+
+test('①★★ 기본은 «보여만» 준다 — 실수로 돌려도 아무 일이 안 일어난다', () => {
+  assert.match(SRC, /const 올린다 = process\.argv\.includes\('--deploy'\)/,
+    '★ 문이 없으면 그냥 돌린 것이 곧 배포가 된다');
+  const i = SRC.indexOf('if (!올린다)');
+  const j = SRC.indexOf('올리기();');
+  assert.ok(i > -1 && j > i,
+    '★★ 「보여만 준다」가 올리기 «뒤»에 있으면 이미 올린 뒤다');
+  assert.match(SRC.slice(i, j), /return;/, '★ 보여 준 뒤 돌아서지 않으면 그대로 올린다');
+});
+
+test('②★★ 함수 «하나만» 올린다 — 다른 함수를 건드리면 메일·급여가 함께 흔들린다', () => {
+  assert.match(SRC, /'--only', 'functions:' \+ 함수/,
+    '★★ --only 가 없으면 functions 전부가 다시 올라간다. 열쇠가 빠진 함수는 그 자리에서 멎는다');
+  assert.ok(!/deploy'\]\s*\)/.test(SRC) , '★ 맨 deploy 를 부르는 길이 남아 있다');
+});
+
+test('③★ 열쇠가 이미 있으면 다시 만들지 않는다', () => {
+  assert.match(SRC, /secrets:access/,
+    '★ 있는지 안 보고 만들면 나스에 넣어 둔 옛 열쇠가 조용히 죽는다 — 다음 주 새벽에야 안다');
+  const i = SRC.indexOf('if (기존값 && !새열쇠강제)');
+  const j = SRC.indexOf('randomBytes');
+  assert.ok(i > -1 && j > i, '★★ 만들기가 «있는지» 검사보다 앞이면 검사한 뜻이 없다');
+  assert.match(SRC.slice(i, j), /return 기존값;/, '★ 있는데도 이어 가면 덮어쓴다');
+});
+
+test('③-2★★ 「이미 있다」고 값을 «버리지» 않는다 — 두 번째 --deploy 부터도 붙여넣을 것을 준다', () => {
+  /* 2026-09-19 대표 화면: 처음 --deploy 했을 때는 클립보드에 완성 스크립트가 담겼다.
+     나스 화면을 만지시다 클립보드가 다른 것으로 덮이자 「다시 올려달라」고 다시 돌리셨는데,
+     이번엔 아무것도 안 담겼다 — 존재를 확인하며 «이미 받아 온 진짜 값»을 그냥 버리고
+     null 을 돌려줬기 때문이다. 값을 손에 쥐고도 몰라서 못 준다고 한 것이다. */
+  const f = SRC.slice(SRC.indexOf('function 열쇠준비('), SRC.indexOf('function 올리기('));
+  assert.doesNotMatch(f, /return null;/,
+    '★★ 이미 있는 열쇠를 확인하려고 받아 온 진짜 값을 버리고 null 을 돌려주면,\n' +
+    '  두 번째부터는 나스에 붙여넣을 것을 영영 못 만든다');
+  assert.match(f, /기존값 = \(out && out\.trim\(\)\) \? out\.trim\(\) : null;/,
+    '★ 존재 확인에 쓴 그 값을 그대로 재사용해야 한다 — 다시 부르면 서버에 한 번 더 물어보는 것이다');
+});
+
+test('④-2★★ 클립보드만 믿지 않는다 — 성공해도 화면에 그대로 한 번 더 찍는다', () => {
+  /* 2026-09-19 대표 화면: 「복사해 두었습니다」라고 나와서 믿고 나스로 건너가셨는데
+     Ctrl+V 를 눌러도 반응이 없었다. 몇 분 사이 클립보드가 다른 것으로 덮인 것이다.
+     클립보드는 «지금 이 순간»만 보장한다 — 화면에 한 번도 안 찍었으니 되찾을 길이 없었다. */
+  /* ⚠ indexOf 를 «0부터» 찾으면 파일 앞쪽의 다른 if/else 에 걸린다 — 반드시 이 대목의
+     시작 위치 «뒤에서부터» 찾는다. */
+  const 시작 = SRC.indexOf("if (열쇠 && 열쇠 !== '(올릴 때 만듭니다)')");
+  const 내부else = SRC.indexOf('} else {', 시작);        // if(됐나){…} 의 짝
+  const 바깥else = SRC.indexOf('} else {', 내부else + 1); // if(열쇠…){…} 의 짝
+  const 성공칸 = SRC.slice(시작, 내부else);
+  const 뒷칸 = SRC.slice(내부else, 바깥else);
+  assert.ok(!/말\(완성\)/.test(성공칸),
+    '★ 성공 갈래 «안에서» 한 번 더 찍으면 실패 갈래와 겹쳐 두 벌이 된다 — 밖에서 한 번만 찍어야 한다');
+  assert.match(뒷칸, /말\(완성\);/,
+    '★★ 성공/실패 갈래를 다 지나온 «뒤»에 말(완성) 이 없으면, 성공했을 때는 화면에 안 찍혀\n' +
+    '  클립보드가 나중에 지워지면 되찾을 길이 없다');
+});
+
+test('④★★ 열쇠를 파일로 남기지 않는다', () => {
+  assert.ok(!/writeFileSync|appendFileSync|createWriteStream/.test(SRC),
+    '★★ 열쇠를 파일로 적으면 그 파일 하나로 백업 전부를 받아 갈 수 있다');
+  assert.match(SRC, /이 화면에만 있습니다|열쇠가 들어 있습니다/,
+    '★ 열쇠가 «지금 어디에» 있는지 말해 줘야 사람이 지킨다');
+  /* ★ 완성본을 건네는 길도 파일이 아니라 «클립보드»다 — 잠깐 있다 사라진다 */
+  assert.match(SRC, /function 클립보드에\(/,
+    '★★ 완성된 스크립트를 파일로 떨어뜨리면 열쇠가 든 파일이 PC 에 남는다');
+  const i = SRC.indexOf('function 나스스크립트만들기(');
+  const j = SRC.indexOf('function 클립보드에(');
+  assert.ok(i > -1 && j > i && !/writeFileSync/.test(SRC.slice(i, j)),
+    '★ 만드는 대목에서 파일로 쓰고 있다');
+  /* 서버에 넣을 때도 명령줄이 아니라 «들어가는 물길»로 준다 — ps 에 안 보이게 */
+  assert.match(SRC, /'--data-file', '-'/,
+    '★★ 열쇠를 명령줄 인자로 주면 같은 PC 의 다른 프로그램이 ps 로 그대로 본다');
+  assert.match(SRC, /input: 새열쇠/);
+});
+
+test('⑤★ 올린 뒤 실제로 한 번 받아 본다 — 「올렸다」와 「된다」는 다르다', () => {
+  assert.match(SRC, /function 받아보기\(/);
+  /* ⚠ 자리를 «부르는 곳»으로 잡는다 — 정의(function 받아보기…)는 위에 있으니
+     그것으로 견주면 늘 깨진다(처음에 그랬다). */
+  const i = SRC.indexOf('\n  올리기();');
+  const j = SRC.indexOf('await 받아보기(');
+  assert.ok(i > -1 && j > i, '★ 받아보기가 올리기보다 앞이면 옛 함수를 시험한 것이다');
+  assert.match(SRC, /'X-Nas-Key'/, '★ 열쇠 없이 두드리면 403 만 보고 「됐다」를 못 가린다');
+});
+
+test('⑥ 로그인이 없으면 그 자리에서 멈추고 «무엇을 하라»고 말한다', () => {
+  assert.match(SRC, /firebase-tools login/,
+    '★ 「로그인하세요」만 있고 무엇을 치라는 말이 없으면 받는 사람은 멈춘다');
+  const i = SRC.indexOf('로그인확인();');
+  const j = SRC.indexOf('열쇠준비();');
+  assert.ok(i > -1 && j > i, '★★ 로그인도 안 된 채로 열쇠를 만들면 엉뚱한 곳에 넣는다');
+});
+
+test('⑦ 나스에 넣을 두 줄을 끝에 그대로 찍는다 — 사람이 옮겨 적을 것이 없게', () => {
+  assert.match(SRC, /NAS_KEY="/, '★ 스크립트가 쓰는 이름 그대로 찍어야 붙여넣기만 하면 된다');
+  assert.match(SRC, /URL="/);
+  const sh = fs.readFileSync(path.join(ROOT, 'docs', '나스-백업-스크립트.sh'), 'utf8');
+  assert.match(sh, /^NAS_KEY=/m, '★★ 올리개가 찍는 이름과 나스 스크립트의 이름이 어긋나면 붙여넣어도 안 된다');
+  assert.match(sh, /^URL=/m);
+});
+
+test('⑧★★ 윈도우에서 npx 를 못 찾던 자리 — shell:true 를 준다 (대표 화면 2026-09-18)', () => {
+  /* 대표님 PC 에서 실제로 이렇게 걸렸다:
+       ✗ 파이어베이스 CLI 를 못 불렀습니다 — 인터넷과 npx 를 확인하세요.
+         spawnSync npx ENOENT
+     npx 는 있었다 — 윈도우의 npx 는 실제로 npx.cmd 라 shell:true 없이는
+     Node 의 spawnSync·execFileSync 가 그 확장자를 못 찾는다(Node 자체의 한계다). */
+  const npx호출 = SRC.match(/(?:execFileSync|spawnSync)\('npx',[\s\S]{0,220}?\}\)/g) || [];
+  assert.ok(npx호출.length >= 3, '★ npx 를 부르는 자리를 못 찾았다 — 검사가 헛돈다');
+  npx호출.forEach((call, i) => {
+    assert.match(call, /shell:\s*true/,
+      '★★ ' + (i + 1) + '번째 npx 호출에 shell:true 가 없다 — 윈도우에서 ENOENT 로 그 자리에서 멎는다.\n' +
+      '  ' + call.slice(0, 80));
+  });
+});
+
+test('⑨★★ 열쇠를 «갈아 끼우는» 길이 있다 — 한 번 드러난 열쇠는 바꿀 수 있어야 한다', () => {
+  /* 2026-09-19 저녁, 완성본이 그대로 채팅에 붙으며 NAS_KEY 가 드러났다.
+     그런데 평소 흐름은 「이미 있으면 그대로 쓴다」라서 «바꿀 길이 없었다».
+     드러난 열쇠를 바꿀 수 없으면, 그 열쇠는 영영 드러난 채로 산다. */
+  assert.match(SRC, /const 새열쇠강제 = process\.argv\.includes\('--new-key'\)/,
+    '★ 갈아 끼우는 문이 없으면 드러난 열쇠를 되돌릴 길이 없다');
+  assert.match(SRC, /if \(기존값 && !새열쇠강제\)/,
+    '★★ 「이미 있으면 그대로」가 --new-key 보다 앞서면 갈아 끼우기가 영영 안 닿는다');
+  /* ⚠ 갈아 끼운 «뒤»에 올려야 옛 열쇠가 죽는다 — 함수는 올릴 때의 판을 물고 돈다 */
+  const i = SRC.indexOf('열쇠준비();');
+  const j = SRC.indexOf('올리기();', i);
+  assert.ok(i > -1 && j > i,
+    '★★ 올리기가 열쇠 넣기보다 «앞»이면 새 열쇠가 안 실려, 옛 열쇠가 그대로 살아 있다');
+});
+
+test('⑩★ 열쇠가 찍히는 «바로 앞»에 경고가 있다 — 아래쪽 경고는 스크롤 밖으로 밀린다', () => {
+  const 찍는곳 = SRC.indexOf('말(완성);');
+  assert.ok(찍는곳 > -1);
+  /* 글이 길면 위쪽 경고는 화면 밖으로 밀려 안 읽힌다 — 위험한 것 바로 앞에 적는다 */
+  const 바로앞 = SRC.slice(SRC.lastIndexOf('말(', SRC.lastIndexOf('말(', 찍는곳 - 1) - 1), 찍는곳);
+  assert.match(바로앞, /붙여넣지 마세요|어디에도/,
+    '★★ 열쇠가 찍히기 «바로 앞»에 경고가 없으면, 2026-09-19 처럼 그대로 채팅에 붙는다');
+});

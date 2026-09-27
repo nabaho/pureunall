@@ -30,7 +30,7 @@ ok('아이콘 파일이 실제로 있다', (mf.icons || []).every(function (i) {
 }).map(function (i) { return i.src; }).join(','));
 
 /* pu-erp 의 manifest 는 절대경로(/pureunall/…)라 배포 위치에 묶인다.
-   업무관리는 카메라·명함첩처럼 상대경로로 둔다 — 어디에 올려도 그대로 된다 */
+   업무관리는 카메라·기업정보함처럼 상대경로로 둔다 — 어디에 올려도 그대로 된다 */
 ok('경로가 상대경로다 (배포 위치에 안 묶임)',
   mf.start_url.indexOf('/') !== 0 && mf.scope.indexOf('/') !== 0
   && (mf.icons || []).every(function (i) { return i.src.indexOf('/') !== 0; }));
@@ -42,10 +42,14 @@ ok('아이폰 홈화면 아이콘', /<link[^>]+rel="apple-touch-icon"/.test(html
 ok('아이폰에서 앱처럼 뜬다', /apple-mobile-web-app-capable"[^>]+content="yes"/.test(html));
 ok('아이폰 앱 이름', /apple-mobile-web-app-title"[^>]+content="업무관리"/.test(html));
 ok('viewport 가 있다', /<meta[^>]+name="viewport"/.test(html));
-ok('서비스워커를 등록한다', /navigator\.serviceWorker\.register\('work-sw\.js'\)/.test(html));
+/* ⚠ 2026-08-08 다시 겨눔 — 워커가 `pu-sw.js` **하나로 통합**됐다(ccae985).
+   서비스워커는 한 자리에 하나만 살아남아서, 앱마다 제 워커를 등록하면 나중에 연
+   앱이 앞의 것을 밀어냈다(사진첩을 열면 기업정보함 공유가 죽었다).
+   지켜야 할 것은 **파일 이름**이 아니라 「등록한다·https 에서만·실패해도 안 죽는다」다. */
+ok('서비스워커를 등록한다', /navigator\.serviceWorker\.register\('pu-sw\.js'\)/.test(html));
 ok('https 에서만 등록한다 (file:// 에서 오류 안 남)',
-  /location\.protocol==='https:'[\s\S]{0,120}register\('work-sw\.js'\)/.test(html));
-ok('등록 실패해도 앱이 죽지 않는다', /register\('work-sw\.js'\)\.catch\(/.test(html));
+  /location\.protocol==='https:'[\s\S]{0,120}register\('pu-sw\.js'\)/.test(html));
+ok('등록 실패해도 앱이 죽지 않는다', /register\('pu-sw\.js'\)\.catch\(/.test(html));
 
 /* ── 서비스워커: 캐시를 두면 안 된다 ── */
 /* 캐시를 두면 pu-version.js 의 '새 버전 자동 적용'과 싸워 옛 화면이 남는다.

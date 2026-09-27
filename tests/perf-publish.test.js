@@ -20,7 +20,7 @@ const USERS = [{ sid:'u1', name:'권형하' }, { sid:'u2', name:'박한별' }, {
 const UID = { u1:'AUID1', u2:'AUID2' };            // u3 는 로그인한 적 없음
 
 function it(o){ return Object.assign({ fiId:'f1', category:'matched', amount:100000, pct:20, role:'주담당',
-  date:'2026-08-03', sourceKind:'case', sourceId:'c1', companyName:'㈜신흥', kind:'부당해고',
+  date:'2026-08-03', sourceKind:'case', sourceId:'c1', companyName:'㈜새힘', kind:'부당해고',
   baseAmount:500000, grossAmount:550000 }, o); }
 
 /* ── 0원·미반영은 안 나간다 ── */
@@ -204,6 +204,17 @@ ok('이미 마감된 달은 또 못 한다', ctx.pcfCanClose(Object.assign({}, M
 ok('사람이 없으면 마감 대상 아님', ctx.pcfCanClose({ ym:'x', p:{} }) === false);
 ok('마감 경로가 그 달 아래', ctx.pcfLockPath('2026-06') === 'data/perf_confirm/2026-06/lock');
 
+/* ★★ 규칙이 옳은 것만으로는 모자란다 — 화면이 그 규칙을 «부르는지» 본다.
+   2026-08-23: pcfCanClose 는 「사람이 하나도 없으면 마감 대상 아님」까지 제대로
+   따지고 있었는데, 정작 화면(stateChip)은 그 함수를 안 부르고 규칙을 다시 적어
+   두었다. 그 사본에 「사람 0명」 검사가 빠져 있어서, 아무도 없는 빈 달에도
+   「마감하기」 단추가 떴다. 규칙을 두 곳에 적으면 반드시 한쪽이 뒤처진다. */
+/* stateChip 은 화면 부품 쪽(발행 창 뒤)이라 위 src 범위 밖이다 — 따로 떠 온다 */
+const chip = html.slice(html.indexOf('function stateChip(m){'), html.indexOf("}, '마감하기');"));
+ok('★ 마감 단추를 그릴 때 pcfCanClose 에게 물어본다', /pcfCanClose\(m\)/.test(chip));
+ok('★ 물어본 답이 아니면 단추를 안 낸다 (빈 달에 마감하기가 뜨지 않는다)',
+   chip.indexOf('pcfCanClose(m)') < chip.length && /if\(!pcfCanClose\(m\)\) return/.test(chip));
+
 /* ── 이의 펴기 ── */
 const OB = ctx.pcfOpenObjections({ ym:'x', p:{
   u1:{ name:'권형하', items:{ f1:{date:'2026-06-03',coName:'가',amount:100} },
@@ -228,9 +239,16 @@ ok('마감을 풀면 푼 기록이 남는다', /unlocked: \{ at:new Date\(\)\.to
 ok('마감 풀 때 사유를 받는다', /왜 푸는지 적어 주세요/.test(html));
 ok('★ 마감된 달은 발행이 막힌다', /if\(busy \|\| !sent\.length \|\| lock\) return;/.test(html));
 ok('마감된 달은 단추 글자도 바뀐다', /lock \? '마감된 달입니다'/.test(html));
-ok('대표 답변은 직원이 못 쓰는 자리에 넣는다',
-   /'\/items\/' \+ fiId \+ '\/reply'/.test(html));
-ok('답변하면 그 이의는 닫힌다', /state:'done'/.test(html));
+/* 이의 답변은 업무관리(work.html)로 옮겼다 — 역할 나누기.
+   여기는 계산·조정·발행·마감을 맡는다. 답변칸이 두 곳에 있으면 어디서 손댔는지 알 수 없다. */
+ok('★ 여기서는 답변을 쓰지 않는다', !/\/reply'\)\.set\(/.test(html) && html.indexOf('function pcfReply(') < 0);
+ok('★ 답변 입력칸이 남아 있지 않다',
+   html.indexOf('답변을 적어주세요') < 0 && html.indexOf('답변하고 닫기') < 0);
+ok('어디서 답하는지 알려 준다', /답변은 업무관리에서 합니다/.test(html));
+ok('금액을 고치는 길은 여기 그대로 남는다', /입금 건 보기 ↗/.test(html));
+/* 읽는 쪽은 그대로 — 무엇이라 답했는지는 여기서도 보여야 판단이 된다 */
+ok('답한 내용은 여기서도 보인다', /o\.closed && o\.it\.reply/.test(html));
+ok('이의 내용도 그대로 보인다', /o\.ob\.text \|\| ''/.test(html));
 ok('원천으로 가는 길은 기존 방식을 쓴다',
    /sessionStorage\.setItem\('global_search_focus'/.test(html) && /window\.navigateTo\(menu\)/.test(html));
 ok('보낼 사람만 골라 쓴다', /pcfMergeAll\(sent, prev/.test(html));

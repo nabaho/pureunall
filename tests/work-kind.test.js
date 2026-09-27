@@ -53,6 +53,8 @@ eval("var END_WAYS=[['done','종료','x','closed'],['cancel','취소','x','cance
   + gvar('KIND_SET') + '\n' + gvar('KIND_ALIAS') + '\n'
   + gvar('PE_DEF') + '\n' + gvar('PE_KEYS') + '\n' + gvar('PE_MIRROR') + '\n'
   + gvar('PE_TKEY') + '\n' + gvar('NO_PREFIX_SKIP') + '\n' + gvar('PE_ST_LABEL') + '\n'
+  + gvar('PE_CKIND') + '\n'   // 계약 종류(업체계약·컨설팅계약…) — peType 이 쓴다
+
   + ['catNorm', 'isKind', 'catColor', 'catList', 'catBadge',
      'peTypeName', '_peRawType', 'peType', 'peStatus', 'peEndWay', '_peClosed', '_peDue',
      'briefTrim', 'itemName', 'ptOf', 'needBrief', 'nameCell',
@@ -81,15 +83,23 @@ ok('컨설팅도 마찬가지',
   peType('consulting', { typeCodes: { consulting: 'cons-a' } }, '') === '일터혁신 상생 컨설팅');
 ok('typeCode 한 칸만 있는 옛 자료도 푼다',
   peType('case', { typeCode: 'case-a' }, '') === '부당해고');
+/* 계약은 「종류」(업체계약·컨설팅계약…)를 앞에 두고 세부 유형을 뒤에 붙인다.
+   종전에는 세부 유형만 찾아, 유형 코드가 비면 업무명이 통째로 비어 「—」였다 —
+   계약인 것은 알아도 무슨 계약인지 알 수가 없었다. */
 ok('계약은 붙어 있는 종류를 모두 이어 준다',
   peType('contract', { kinds: ['company', 'case'], typeCodes: { company: 'co-a', case: 'case-a' } }, '')
-    === '취업규칙 · 부당해고');
+    === '업체계약 취업규칙 · 사건계약 부당해고');
 ok('같은 이름이 두 번 나오지 않는다',
-  peType('contract', { kinds: ['company', 'case'], typeCodes: { company: '점검', case: '점검' } }, '') === '점검');
+  peType('contract', { kinds: ['company', 'company'], typeCodes: { company: '점검' } }, '') === '업체계약 점검');
 ok('kind 한 개짜리 옛 자료도 읽는다',
-  peType('contract', { kind: 'company', typeCodes: { company: 'co-b' } }, '') === '새마을금고 점검');
+  peType('contract', { kind: 'company', typeCodes: { company: 'co-b' } }, '') === '업체계약 새마을금고 점검');
 ok('마스터에 없으면 예전 칸으로 내려간다',
-  peType('contract', { kinds: ['consulting'], consultingType: '현장클리닉' }, '') === '현장클리닉');
+  peType('contract', { kinds: ['consulting'], consultingType: '현장클리닉' }, '') === '컨설팅계약 현장클리닉');
+/* ⚠ 이것이 이번 수술의 요점 — 세부 유형이 없어도 종류는 남아야 한다.
+   여기가 비면 화면에 「—」만 뜨고 무슨 계약인지 알 수 없다. */
+ok('세부 유형이 없어도 종류는 남는다',
+  peType('contract', { kinds: ['consulting'] }, '') === '컨설팅계약'
+  && peType('contract', { kinds: ['company', 'fund'] }, '') === '업체계약 · 기금관리');
 ok('기타사업은 관리번호 접두어가 업무명',
   peType('other', { projectNo: '기술보호-2026-006' }, '') === '기술보호');
 ok('접두어가 구분과 같은 말이면 버린다 ("계약"은 무슨 일인지 알려 주지 않는다)',
@@ -101,9 +111,10 @@ ok('한 글자 접두어는 유형으로 쓰지 않는다', peType('other', { no
 ok('내부 ID가 섞인 예전 칸도 쓰지 않는다',
   peType('case', { caseType: 'case-mpz7pd42ogb' }, '') === '');
 
-/* ── 구분 = 사무관리 5종, 옛 이름은 계약으로 ── */
-ok('라벨 5종이 계약·사건·컨설팅·기금·기타사업',
-  PE_DEF.map(d => d[1]).join() === '계약,사건,컨설팅,기금,기타사업');
+/* ── 구분 = 사무관리 갈래, 옛 이름은 계약으로 ──
+   2026-09-05 「자문」이 여섯째로 들어왔다 (푸른이알피 업체관리가 원본). */
+ok('라벨 6종이 계약·사건·컨설팅·기금·기타사업·자문',
+  PE_DEF.map(d => d[1]).join() === '계약,사건,컨설팅,기금,기타사업,자문');
 ok('옛 이름 업체는 계약으로 읽는다',
   catNorm('업체') === '계약' && isKind('업체') && isKind('계약'));
 ok('다른 이름은 건드리지 않는다',
@@ -114,18 +125,18 @@ ok('업체·계약이 같은 색', CATS['업체'][0] === CATS['계약'][0]);
 items = { A: { cat: '업체' }, B: { cat: '계약' }, C: { cat: '기술보호' } };
 ok('구분 목록에 업체가 두 번 서지 않는다',
   catList().filter(x => x === '계약').length === 1 && catList().indexOf('업체') < 0);
-ok('사무관리 5종이 맨 앞', catList().slice(0, 5).join() === Object.keys(KIND_SET).join());
+ok('사무관리 갈래가 맨 앞', catList().slice(0, 7).join() === Object.keys(KIND_SET).join());
 ok('실제로 쓰인 값도 뒤에 붙는다', catList().indexOf('기술보호') > 0);
 ok('목록에 없는 이름도 색이 나오고 늘 같은 색',
   catColor('기술보호')[0] === catColor('기술보호')[0] && catColor('')[0]);
 
 /* ── 후보 만들기 ── */
 _peU2N = { u1: '김동현' };
-peMaster = { contract: [{ id: 'k1', companyName: '케이블루', contractNo: '계약-2026-027', managerMain: 'u1' }] };
+peMaster = { contract: [{ id: 'k1', companyName: '가람블루', contractNo: '계약-2026-027', managerMain: 'u1' }] };
 let c = puerpCandidates()[0];
 ok('계약관리 건은 구분이 계약', c.cat === '계약');
 ok('회사명을 업무명으로 쓰지 않는다 (기업 칸과 겹치고 마스터가 더러워진다)', c.title === '');
-peMaster = { case: [{ id: 'c1', companyName: '나래', title: '부당해고 구제신청', managerMain: 'u1' }] };
+peMaster = { case: [{ id: 'c1', companyName: '새롬', title: '부당해고 구제신청', managerMain: 'u1' }] };
 ok('푸른이알피 업무명이 있으면 그대로', puerpCandidates()[0].title === '부당해고 구제신청');
 
 /* ── 목록에 보일 이름 ── */
@@ -133,7 +144,7 @@ ok('한 줄 이름은 요약 → 업무명 → 유형 차례',
   itemName({ brief: '기술보호 컨설팅', title: 'T', ptype: '기술보호' }) === '기술보호 컨설팅'
   && itemName({ brief: '', title: '부당해고 구제신청', ptype: '부해' }) === '부당해고 구제신청'
   && itemName({ brief: '', title: '', ptype: '현장클리닉' }) === '현장클리닉'
-  && itemName({ brief: '', title: '', ptype: '', cat: '계약', company: '케이블루' }) === '');
+  && itemName({ brief: '', title: '', ptype: '', cat: '계약', company: '가람블루' }) === '');
 ok('공백만 있는 값은 없는 것으로 본다',
   itemName({ brief: '   ', title: '  ', ptype: '현장클리닉' }) === '현장클리닉');
 ok('업무명 필터가 묶는 기준은 유형',
@@ -154,8 +165,8 @@ ok('요약만 있으면 요약을 올려 쓴다 (같은 말을 두 번 쓰지 �
 })());
 ok('셋 다 비면 바로 적을 수 있는 버튼', nameCell({ _id: 'W1' }).indexOf('이름 적기') > 0);
 ok('회사명·구분은 업무 칸에 절대 안 나온다', (function () {
-  const h = nameCell({ _id: 'W1', cat: '계약', company: '케이블루' });
-  return h.indexOf('케이블루') < 0 && h.indexOf('계약') < 0;
+  const h = nameCell({ _id: 'W1', cat: '계약', company: '가람블루' });
+  return h.indexOf('가람블루') < 0 && h.indexOf('계약') < 0;
 })());
 ok('작은따옴표가 든 업무ID도 핸들러가 안 깨진다', nameCell({ _id: "W'1" }).indexOf("W\\'1") > 0);
 ok('채울 대상은 셋 다 빈 것만',

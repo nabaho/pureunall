@@ -1,4 +1,4 @@
-/* 업무관리 사람·캘린더·화면 — 명함첩 찾기 · 담당 표시 · 캘린더 분할 · 설명 ⓘ · 넓게 쓰기
+/* 업무관리 사람·캘린더·화면 — 기업정보함 찾기 · 담당 표시 · 캘린더 분할 · 설명 ⓘ · 넓게 쓰기
    ⚠ 원래 임시 폴더에만 두었다가 한 번 날아갔다. 저장소에 둔다. */
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -35,6 +35,15 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '
 function escJ(s) { return esc(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
 function toast(m, k) { TOASTS.push([m, k]); }
 function closeM() {} function renderDrawer() {} function route() { RENDERED++; }
+// 캘린더에서 그 날을 고르면 그 주로 함께 옮긴다 — 옮겼는지 여기서 지켜본다
+let WEEKSET = null;
+function setWeek(m) { WEEKSET = m; }
+function mondayOf(d) { const t = new Date(d); t.setDate(t.getDate() - ((t.getDay() + 6) % 7)); return t; }
+function inWeek(dateStr, mon) {
+  if (!mon) return false;
+  const d = new Date(dateStr + 'T00:00:00'), e = new Date(mon); e.setDate(e.getDate() + 7);
+  return d >= mon && d < e;
+}
 function showModal() {} function calPanel() { return '<CALPANEL>'; }
 function calBuild() { return MAP; }
 function openDrawer(id) { ROWS._opened = id; }
@@ -74,20 +83,20 @@ eval(gvar('MAIL_COMMON') + '\n' + gvar('cardIdx') + '\n' + gvar('HELP') + '\n'
      'calWidth', 'splitOn', 'splitOpen', 'splitClose', 'calEvHTML',
      'calDaySet', 'calDayHas', 'calDayOnly'].map(grab).join('\n'));
 
-/* ── 명함첩: 무엇을 내주고 무엇을 빼는가 ── */
+/* ── 기업정보함: 무엇을 내주고 무엇을 빼는가 ── */
 const ITEMS = {
-  c1: { name: '홍길동', company: '별표수세미', title: '과장', dept: '인사팀', mobile: '010-1111-2222', email: 'h@trista.co.kr' },
-  c2: { name: '김안전', company: '(주)별표수세미', title: '차장', tel: '041-555-1234' },
-  c3: { name: '김계열', company: '별표수세미산업' },
-  c4: { name: '박같은메일', company: '트리스타', email: 'p@trista.co.kr' },
+  c1: { name: '홍길동', company: '타파수세미', title: '과장', dept: '인사팀', mobile: '010-1111-2222', email: 'h@trista.co.kr' },
+  c2: { name: '김안전', company: '(주)타파수세미', title: '차장', tel: '041-555-1234' },
+  c3: { name: '김계열', company: '타파수세미산업' },
+  c4: { name: '박같은메일', company: '벼리스타', email: 'p@trista.co.kr' },
   c5: { name: '남남', company: '전혀다른곳', email: 'x@naver.com' },
-  c6: { name: 'ㄱ어머니', company: '', mobile: '010-4675-4601' },
-  c7: { name: '', company: '별표수세미', kind: 'biz', bizno: '123-45-67890' },
-  c8: { name: '숨은이', company: '별표수세미', scope: 'private' }
+  c6: { name: 'ㄱ어머니', company: '', mobile: '010-1200-0011' },
+  c7: { name: '', company: '타파수세미', kind: 'biz', bizno: '123-45-67890' },
+  c8: { name: '숨은이', company: '타파수세미', scope: 'private' }
 };
 const load = () => { cardIdx = Object.keys(ITEMS).map(k => _cardRow(k, ITEMS[k], false)).filter(Boolean); };
 load();
-ok("명함첩에서 '개인'으로 숨긴 사람은 나오지 않는다", cardIdx.every(c => c.n !== '숨은이'));
+ok("기업정보함에서 '개인'으로 숨긴 사람은 나오지 않는다", cardIdx.every(c => c.n !== '숨은이'));
 ok('사업자등록증은 사람이 아니라 뺀다', cardIdx.every(c => c.k !== 'biz'));
 ok('이름도 회사도 없는 빈 명함은 뺀다',
   _cardRow('x', { name: '  ', company: '' }, false) === null
@@ -95,17 +104,17 @@ ok('이름도 회사도 없는 빈 명함은 뺀다',
 ok('색인 모양으로 와도 같은 칸으로 읽는다',
   _cardRow('z', { n: '색인이', c: '회사', m: '010', k: 'card' }, true).n === '색인이');
 
-let r = cardFind('', '별표수세미');
+let r = cardFind('', '타파수세미');
 ok('담당 회사 사람이 앞줄에', r.mine.map(c => c.n).sort().join() === '김안전,홍길동');
-ok('(주)·공백이 달라도 같은 회사', cardFind('', '(주) 별표수세미').mine.length === 2);
+ok('(주)·공백이 달라도 같은 회사', cardFind('', '(주) 타파수세미').mine.length === 2);
 ok('비슷한 회사를 따로 낸다 (계열사 담당자가 함께 맡는다)',
   r.akin.map(c => c.n).sort().join() === '김계열,박같은메일');
 ok('검색 전에는 그 밖의 사람을 늘어놓지 않는다', r.rest.length === 0);
 ok('이름이 서로를 품으면 같은 무리',
-  coAkin('별표수세미', '별표수세미산업') === true && coAkin('나래', '나래테크') === true
-  && coAkin('별표수세미', '별표수세미') === false && coAkin('별표수세미', '전혀다른곳') === false);
+  coAkin('타파수세미', '타파수세미산업') === true && coAkin('새롬', '새롬테크') === true
+  && coAkin('타파수세미', '타파수세미') === false && coAkin('타파수세미', '전혀다른곳') === false);
 ok('두 글자 미만으로는 묶지 않는다 (아무 데나 걸린다)',
-  coAkin('가', '가나다라') === false && coAkin('', '나래') === false);
+  coAkin('가', '가나다라') === false && coAkin('', '새롬') === false);
 ok('메일 도메인이 같으면 같은 무리',
   mailDom('a@trista.co.kr') === 'trista.co.kr' && mailDom('b@TRISTA.CO.KR') === 'trista.co.kr');
 ok('공용 메일로는 묶지 않는다 (남남이 한 무리가 된다)',
@@ -170,12 +179,12 @@ S = {}; PATCHED = null; TOASTS = [];
 cardPick('z');
 ok('어느 업무에 넣을지 모르면 아무것도 하지 않는다', PATCHED === null);
 cardIdx = saveIdx;
-ok('명함첩은 읽기만 한다 (명함은 명함첩에서 고친다)',
+ok('기업정보함은 읽기만 한다 (명함은 기업정보함에서 고친다)',
   !/\.set\(|\.update\(|\.remove\(/.test(grab('cardLoad')));
 ok('본문을 먼저 읽는다 (색인은 저장할 때만 갱신돼 빠진 사람이 생긴다)',
   grab('cardLoad').indexOf("'pucards/items'") < grab('cardLoad').indexOf("'pucards/idx'"));
-ok('명함첩 본문이 pucards/items 에 있고 지운 것은 trash 로 간다',
-  C.indexOf("this.db.ref(DB_ROOT+'/items').on('value'") > 0 && C.indexOf('`${DB_ROOT}/trash/${id}`') > 0);
+ok('기업정보함 본문이 pucards/items 에 있고 지운 것은 trash 로 간다',
+  C.indexOf("const _itemsRef = this.db.ref(DB_ROOT+'/items');") > 0 && C.indexOf('`${DB_ROOT}/trash/${id}`') > 0);
 
 /* ── 담당 표시: 주담당·부담당 ── */
 const IT = { mgr_main: { sid: 'P-001', name: '권형하' },
@@ -262,7 +271,7 @@ ok('너무 좁거나 넓게는 못 만들고, 값이 이상하면 기본으로',
 
 /* ── 캘린더에서 무엇을 누르느냐 ── */
 ok('우리 업무는 글자·✏️·⤢ 셋이 각각 다른 일', (function () {
-  const h = calEvHTML({ k: 'due', t: '📅 케이블루', c: '#dc2626', it: 'W1', drag: 1 });
+  const h = calEvHTML({ k: 'due', t: '📅 가람블루', c: '#dc2626', it: 'W1', drag: 1 });
   return h.indexOf("calGo('W1')") > 0 && h.indexOf("calQuick('W1'") > 0
       && h.indexOf("openDrawer('W1')") > 0 && h.indexOf('draggable="true"') > 0;
 })());
@@ -286,6 +295,36 @@ S = { calDay: '2026-08-03' }; calDayHas({ _id: 'W1' }); calDayOnly('2026-08-04')
 ok('날을 바꾸면 다시 센다 (예전 날 것이 남으면 안 된다)',
   calDayHas({ _id: 'W2' }) && !calDayHas({ _id: 'W1' }));
 
+/* 고른 날이 보고 있는 주 밖이면 그 주로 함께 옮긴다.
+   예전에는 걸러만 놓고 주는 그대로 두어, 8/12 를 고르면 표는 8.3~8.7 을 보여 준
+   채 한 건도 안 남아 자료가 통째로 사라진 것처럼 보였다. */
+S = { calDay: '', week: new Date('2026-08-03T00:00:00') };   // 8.3~8.9 주
+WEEKSET = null; RENDERED = 0;
+calDayOnly('2026-08-12');
+ok('다른 주의 날을 고르면 그 주로 옮긴다 (안 그러면 고른 날이 표에 없다)',
+  WEEKSET && WEEKSET.getDate() === 10 && WEEKSET.getMonth() === 7);
+S = { calDay: '', week: new Date('2026-08-03T00:00:00') };
+WEEKSET = null; RENDERED = 0;
+calDayOnly('2026-08-05');
+ok('같은 주 안이면 주를 옮기지 않는다 (보던 자리를 지킨다)',
+  WEEKSET === null && RENDERED === 1);
+S = { calDay: '2026-08-12', week: new Date('2026-08-10T00:00:00') };
+WEEKSET = null;
+calDayOnly('2026-08-12');
+ok('해제할 때는 주를 옮기지 않는다', WEEKSET === null && S.calDay === '');
+
+/* 고른 날 칸으로 커서까지 옮긴다 — 날짜를 누르고 바로 적기 시작할 수 있게 */
+S = { calDay: '', week: new Date('2026-08-10T00:00:00') };
+calDayOnly('2026-08-12');
+ok('고른 날을 커서 옮길 자리로 남긴다', S._calFocus === '2026-08-12');
+S = { calDay: '2026-08-12', week: new Date('2026-08-10T00:00:00') };
+calDayOnly('2026-08-12');
+ok('해제할 때는 커서를 옮기지 않는다', S._calFocus === '');
+S = { calDay: '', week: new Date('2026-08-10T00:00:00'), view: 'team' };
+calDayOnly('2026-08-12');
+ok('팀 전체에는 요일 칸이 없으므로 표시를 남기지 않는다 (뒤늦게 잡히면 안 된다)',
+  S._calFocus === '');
+
 /* ── 화면 넓게 쓰기 ── */
 STORE = {}; S = {}; CLS = {};
 ok('처음에는 둘 다 꺼져 있다', viewPref().cmp === false && viewPref().nos === false);
@@ -301,8 +340,12 @@ S = {}; STORE = {};
 ok('칩이 지금 상태를 보여준다', (function () {
   const off = viewChips(); STORE = { [VIEW_KEY]: 'cs' }; S = {};
   const on = viewChips();
-  return off.indexOf('빽빽하게') > 0 && off.indexOf('chipbtn on') < 0
-      && on.indexOf('✓ 빽빽하게') > 0 && (on.match(/chipbtn on/g) || []).length === 2;
+  /* ⚠ 글자 「chipbtn on」을 그대로 찾지 않는다 — 2026-08-20 에 손잡이 class 를
+     더하면서(vc-cmp·vc-nos) 사이에 낱말이 끼었고, 멀쩡한 고침이 이 검사에 걸렸다.
+     보는 것은 «켠 칩에 on 이 붙는가»이지 class 를 어떻게 적었는가가 아니다. */
+  const onN = (s) => (s.match(/class="chipbtn[^"]*\bon\b/g) || []).length;
+  return off.indexOf('빽빽하게') > 0 && onN(off) === 0
+      && on.indexOf('✓ 빽빽하게') > 0 && onN(on) === 2;
 })());
 ok('접었을 때 다시 펼 손잡이가 남는다 (없으면 되돌릴 수가 없다)',
   W.indexOf('id="sideOn"') > 0 && /body\.nos #sideOn\{display:block\}/.test(W)

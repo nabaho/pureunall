@@ -1,0 +1,2799 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563eb">
+<title>푸른 캘린더</title>
+<link rel="manifest" href="pu-cal-manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20x%3D%2215%22%20y%3D%2224%22%20width%3D%2270%22%20height%3D%2262%22%20rx%3D%229%22%20fill%3D%22%23ffffff%22%20stroke%3D%22%23cbd5e1%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M15%2033a9%209%200%200%201%209-9h52a9%209%200%200%201%209%209v11H15z%22%20fill%3D%22%23dc2626%22%2F%3E%3Ccircle%20cx%3D%2231%22%20cy%3D%2258%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2258%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3Ccircle%20cx%3D%2269%22%20cy%3D%2258%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3Ccircle%20cx%3D%2231%22%20cy%3D%2272%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2272%22%20r%3D%225%22%20fill%3D%22%23bfdbfe%22%2F%3E%3C%2Fsvg%3E">
+<!-- 아이폰 홈화면 아이콘 — 탭 아이콘과 다른 것이다. 여기는 PNG 여야 한다(SVG 를 안 읽는다) -->
+<link rel="apple-touch-icon" href="icon-cal-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="푸른 캘린더">
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="js/pu-ontology.js?v=34"></script>
+<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-resilience.js?v=3"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-version.js?v=8"></script>
+<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-work-core.js?v=1"></script>
+<script src="js/pu-gcal-auth.js?v=5"></script>
+<script src="js/pu-ieum-public.js?v=1"></script>
+<script src="js/pu-cal-read.js?v=2"></script>
+<script src="js/pu-case-due.js?v=1"></script>
+<script src="js/pu-cal-write.js?v=5"></script>
+<style>
+  :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
+    --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
+    --danger:#dc2626;--radius:11px;
+    /* 구글 캘린더의 글자·선 색 — 대표 지시 2026-09-27 「구글캘린더 화면과 완벽하게 같이」.
+       구글이 쓰는 «바로 그 값»이다(팔레트 예외는 tests/color-palette-apps.test.js 에 까닭과 함께). */
+    --gtext:#3c4043;--gsub:#70757a;--gline:#dadce0;--gtoday:#1a73e8}
+  /* 어두운판 — 수동 전환(대표 지시 2026-09-19 「2번 수동」). 밝은판 값은 위 그대로 두고
+     여기서 «덧씌운다». 색은 전부 이미 쓰는 27색 + 흰/검 안에서 고른다(팔레트 검사).
+     ⚠ 판(--panel)이 바탕(--bg)보다 «밝다» — 밝은판의 관계(카드가 바탕보다 밝다)를
+       그대로 뒤집어 지킨다. --acc·--acc2·--danger 는 검게 배경 위에서도 잘 읽혀
+       그대로 둔다(실측: 대비 5.9~6.1:1). */
+  :root[data-theme="dark"]{--ink:#f8fafc;--sub:#94a3b8;--faint:#64748b;--line:#475569;
+    --panel:#1e293b;--bg:#000000;--acc-soft:rgba(37,99,235,.16);--ok:#4ade80;
+    --warn:#fbbf24;--warn-bg:#1e293b;
+    --gtext:#f8fafc;--gsub:#94a3b8;--gline:#475569;--gtoday:#60a5fa}
+  *{box-sizing:border-box}
+  /* ★ 화면 한 장에 담는다 (대표 지시 2026-09-19 「한화면에 나오게」).
+     문서가 굴러가지 않게 몸통을 «세로 세 칸»으로 세운다 — 머리줄·탭줄·본문.
+     본문만 제 안에서 굴러간다(달력 탭에서는 그것조차 안 굴러간다). */
+  html,body{height:100%}
+  body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
+    background:var(--bg);font-size:14px;-webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;overflow:hidden}
+
+  /* ── 머리줄 ──
+     ⚠ 한 줄이다. 낱말 가운데서 잘려 두 줄이 되면 폰에서 화면을 갉아먹는다.
+        넘치면 «줄이는» 것이지 «내리는» 것이 아니다. */
+  /* sticky 가 필요 없어졌다 — 몸통이 안 굴러가므로 늘 맨 위다 */
+  /* ★ 머리는 «한 줄»이다 (대표 지시 2026-09-27 「캡쳐3 이부분 1줄로 … 중복되는부분 합치고」).
+     구글 캘린더 머리줄 차례 그대로: 이름 · 탭 · [오늘] ‹ › 2026년 9월 … 사람 칩 · 거르개 ·
+     🔍 · 월|주|일 · 🌙 · 즐겨찾기 · (내 동그라미). 예전 세 줄(머리줄·탭줄·달 이동줄)을 합쳤다.
+     ⚠ 좁으면 «줄이고»(음력 범위 → 탭 글자) 안 내린다 — 두 줄이 되면 달력이 그만큼 밀린다. */
+  #topbar{flex:none;z-index:15;background:var(--panel);border-bottom:1px solid var(--gline);
+    padding:6px 12px;display:flex;align-items:center;gap:8px;white-space:nowrap;position:relative}
+  #topbar .brand{font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;flex-shrink:0}
+  #topbar .sp{margin-left:auto}
+  #conn{font-size:12px;color:var(--sub)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#cbd5e1;margin-right:5px}
+  .dot.on{background:#16a34a}
+  /* 내 동그라미 — 구글처럼 이름 첫 글자. 초록 점 = 서버와 이어짐. 누르면 메일·로그아웃 창 */
+  .avawrap{position:relative;flex-shrink:0}
+  #me{width:32px;height:32px;border-radius:50%;border:none;background:#7986cb;color:#ffffff;font-weight:700;
+    font-size:13px;cursor:pointer;font-family:inherit;position:relative;padding:0}
+  #me::after{content:"";position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
+    background:#cbd5e1;border:2px solid var(--panel)}
+  #me.on::after{background:#16a34a}
+  .avamenu{position:absolute;right:0;top:40px;min-width:250px;background:var(--panel);border-radius:10px;
+    box-shadow:0 8px 28px rgba(0,0,0,.18);padding:8px 0;z-index:30;white-space:normal}
+  .avamenu[hidden]{display:none}
+  .avamenu .who{padding:6px 16px 8px;font-size:12.5px;color:var(--gtext)}
+  .avamenu .who b{display:block;font-size:13px}
+  .avamenu .who .role{color:var(--gsub);font-weight:400;margin-left:4px}
+  .avamenu hr{border:none;border-top:1px solid var(--gline);margin:4px 0}
+  .avamenu .mi{display:block;width:100%;text-align:left;border:none;background:transparent;padding:8px 16px;
+    font-size:12.5px;color:var(--gtext);cursor:pointer;font-family:inherit}
+  .avamenu .mi:hover{background:var(--bg)}
+  /* 동그라미 단추(🔍·🌙) — 테두리 없이, 누르는 자리만 옅게 */
+  .ib{width:34px;height:34px;border-radius:50%;border:none;background:transparent;color:var(--gtext);
+    font-size:15px;cursor:pointer;flex-shrink:0;padding:0;font-family:inherit}
+  .ib:hover{background:var(--bg)}
+  .lnk{font-size:12.5px;padding:5px 11px;border:1px solid var(--line);color:var(--sub);background:var(--panel);
+    border-radius:8px;cursor:pointer;font-weight:700;flex-shrink:0}
+  .lnk.go{border-color:#bfdbfe;color:var(--acc2)}
+
+  /* ── 탭 · 달 이동 · 사람 칩 · 도구 — 머리줄 «안»에 든다(예전엔 따로 한 줄이었다) ──
+     ⚠ 넘치면 옆으로 밀어 본다(두 줄로 안 내린다). */
+  #tabs{flex:1;min-width:0;display:flex;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;
+    white-space:nowrap;scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
+  .gl{font-size:10px;color:var(--faint);font-weight:700;margin:0 3px 0 0;flex-shrink:0}
+  .tab{padding:6px 11px;border-radius:999px;font-size:12.5px;color:var(--gtext);cursor:pointer;
+    border:none;background:transparent;font-family:inherit;flex-shrink:0}
+  .tab:hover{background:var(--bg)}
+  .tab.on{background:var(--acc-soft);color:var(--acc2);font-weight:700}
+  .tsep{width:1px;height:18px;background:#cbd5e1;margin:0 7px;flex-shrink:0}
+  /* 탭 줄에 얹은 사람 칩 — 오른쪽 끝에 붙는다(왼쪽 탭과 안 섞이게) */
+  .tabchips{margin-left:auto;display:flex;align-items:center;flex-shrink:0;padding-left:12px}
+  .tabchips .chips{margin-bottom:0;flex-wrap:nowrap}
+
+  #app{flex:1;min-height:0;overflow-y:auto;width:100%;padding:14px 16px 90px;max-width:1500px;margin:0 auto}
+  /* ★ 달력 탭 — 한 화면에 «딱» 맞춘다. 좌우도 꽉 채운다(1500px 뚜껑을 벗긴다).
+     칸에 안 들어가는 일정은 「+N개 더」로 접고, 누르면 그 자리에서 펼쳐 보인다
+     (대표 지시 「달력안에 모든 내용 안보여도 된다. 펼서 볼수 있게 하면 된다」). */
+  #app.fit{overflow:hidden;display:flex;flex-direction:column;max-width:none;padding:10px 12px 12px}
+  #app.fit .calwrap{flex:1;min-height:0;display:flex;flex-direction:column}
+  #app.fit .calhead{flex:none}
+  #app.fit .cal{flex:1;min-height:0;display:flex;flex-direction:column}
+  #app.fit .calgrid{flex:1;min-height:0;grid-template-rows:repeat(6,1fr)}
+  #app.fit .day{min-height:0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
+  .note{background:var(--warn-bg);border:1px solid #fde68a;border-radius:9px;padding:9px 13px;
+    font-size:12px;color:var(--warn);margin-bottom:11px;display:flex;align-items:center;gap:9px}
+  .note .sp{margin-left:auto}
+  .btn{border:none;border-radius:7px;font-size:12px;font-weight:700;padding:6px 13px;cursor:pointer;
+    font-family:inherit;background:var(--acc);color:#ffffff}
+  .btn.ghost{background:var(--panel);color:var(--acc2);border:1px solid #bfdbfe}
+  .muted{color:var(--sub)}
+
+  /* ── 달력 — 치수는 이알피(법인 대시보드)에서 그대로 가져왔다 ──
+     ⚠ 눈대중으로 고치지 말 것. 두 화면이 갈리면 대표님이 같은 것을 두 모양으로 보신다. */
+  .calwrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px 10px}
+
+  /* 사람 칩 줄 — 색 동그라미 + 이름 두 글자 */
+  .chips{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:7px}
+  .allchip{padding:3px 9px;border:none;border-radius:10px;cursor:pointer;font-size:10.5px;font-weight:700;
+    font-family:inherit;flex-shrink:0;background:var(--bg);color:#475569}
+  .allchip.on{background:#1e293b;color:#ffffff}
+  .pwrap{position:relative;flex-shrink:0;display:inline-flex}
+  .pchip{width:26px;height:26px;border-radius:50%;border:2.5px solid transparent;color:#ffffff;
+    font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;
+    align-items:center;justify-content:center;box-sizing:border-box;padding:0;transition:transform .1s}
+  .pchip.on{border-color:var(--ink);transform:scale(1.15)}
+  /* 겹친 날 표 — 이알피와 같은 호박 바탕이다. 파랑이면 「좋은 소식」처럼 보인다.
+     ⚠ 글자는 흰색이 아니라 «짙은 호박»이다 — 이알피는 흰 글자인데 호박 위 흰 글자는
+       1.7:1 이라 사실상 안 읽힌다(색 검사가 잡았다). 뜻이 같은 색을 쓰되 읽히게 한다. */
+  .pcount{position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;
+    background:#fbbf24;color:#854d0e;font-size:10px;font-weight:800;display:flex;align-items:center;
+    justify-content:center;border:1.5px solid var(--panel);pointer-events:none;line-height:1;box-sizing:border-box}
+  .chip{font-size:10.5px;border:1px solid #cbd5e1;border-radius:20px;padding:2px 10px;color:var(--sub);
+    background:var(--panel);cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}
+  .chip.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700}
+  .chip.warn{background:#fef2f2;border-color:#fecaca;color:#991b1b;font-weight:700}
+  .chip[disabled]{opacity:.6;cursor:default}
+  .srcsep{width:1px;height:18px;background:#cbd5e1;margin:0 4px;flex-shrink:0}
+
+  /* 머리줄 — ◀ 2026-09 ▶ · 음력 · 오늘 · 월|주|일 · 사람 칩 … 검색(맨 오른쪽)
+     ★ 셋을 «한 줄»에 둔다 (대표 지시 2026-09-19). 쌓으면 달력이 그만큼 아래로 밀린다. */
+  .calhead{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-bottom:0;flex-shrink:0}
+  .calhead .monthbar,.calhead .chips{margin-bottom:0}
+  .ctools{display:flex;align-items:center;gap:4px;flex-shrink:0}
+  /* ⚠ 검색을 margin-left:auto 로 오른쪽 끝에 밀지 않는다 — 줄이 차면 그것만
+       «둘째 줄로 떨어져» 도로 두 줄이 된다(2026-09-19 미리보기에서 그랬다).
+       달바 바로 뒤에 붙여 두면 칩이 남는 자리를 먹고, 모자라면 칩부터 접힌다. */
+  .monthbar{display:flex;align-items:center;gap:7px;white-space:nowrap;flex-wrap:wrap}
+  /* ★ 구글 캘린더 머리줄 꼴 (대표 지시 2026-09-27) — [오늘] ‹ › 2026년 9월
+     「오늘」은 둥근 알약, 화살표는 테두리 없는 동그라미, 달 이름은 굵지 않은 큰 글자. */
+  .monthbar .ym{font-size:20px;font-weight:400;color:var(--gtext);font-variant-numeric:tabular-nums;margin:0 4px}
+  .monthbar .lunrange{font-size:11px;color:var(--gsub)}
+  .mv{border:none;background:transparent;border-radius:50%;width:30px;height:30px;
+    cursor:pointer;color:var(--gtext);font-size:18px;line-height:1;font-family:inherit;padding:0;
+    display:inline-flex;align-items:center;justify-content:center}
+  .mv:hover{background:var(--bg)}
+  .todaybtn{padding:0 16px;height:32px;border:1px solid var(--gline);background:var(--panel);border-radius:999px;
+    cursor:pointer;font-size:13px;font-weight:500;color:var(--gtext);font-family:inherit}
+  .todaybtn:hover{background:var(--bg)}
+  .seg{display:inline-flex;border:1px solid var(--gline);border-radius:999px;overflow:hidden;margin-left:4px}
+  .seg button{padding:0 14px;height:30px;font-size:12.5px;font-weight:500;background:var(--panel);color:var(--gtext);
+    border:none;border-right:1px solid var(--gline);cursor:pointer;font-family:inherit}
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:var(--acc-soft);color:var(--acc2)}
+  /* 검색 — 구글처럼 돋보기 하나. 누르면(또는 찾는 말이 있으면) 그 자리에서 칸이 펼쳐진다 */
+  .srch{position:relative;display:inline-flex;align-items:center;flex-shrink:0}
+  .srch .ic{position:absolute;left:7px;font-size:10px;pointer-events:none}
+  .srch input{padding:4px 10px 4px 24px;font-size:11.5px;border:1px solid var(--line);border-radius:10px;
+    width:130px;background:var(--panel);box-sizing:border-box;font-family:inherit;color:var(--ink)}
+
+  /* 달력 몸통 */
+  /* 구글처럼 — 판 둘레는 옅은 회색 한 줄, 요일은 작은 회색 글자(일·토도 색을 안 입힌다) */
+  .cal{border:1px solid var(--gline);border-radius:9px;overflow:hidden;background:var(--panel)}
+  .calhd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--panel);font-size:11px;
+    font-weight:500;color:var(--gsub);text-align:center}
+  .calhd div{padding:6px 0 2px;border-right:1px solid var(--gline)}
+  .calhd div:last-child{border-right:none}
+  /* 여섯 줄 고정 — 달마다 표 높이가 들썩이지 않게 */
+  /* ★ 여섯 줄을 «남은 높이»로 똑같이 나눈다 (대표 지시 2026-09-19 「한화면에 나오게」).
+     한때는 줄이 내용에 따라 늘어났는데, 그러면 바쁜 달이 화면 밖으로 내려갔다.
+     이제 판의 높이가 먼저 정해지고, 칸은 «들어가는 만큼»만 보인다(나머지는 펼쳐 본다).
+     ⚠ 바닥값(minmax)을 다시 두지 말 것 — 그 순간 여섯 줄이 화면을 넘긴다.
+     ⚠ «세로 칸(열)»은 반대로 minmax(0,1fr) 여야 한다 — 그냥 1fr 이면 긴 제목·여러 날 막대가
+       그 열을 밀어 넓혀, 일곱 칸 너비가 제각각이 된다(2026-09-27 미리보기에서 그랬다). */
+  .calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(6,1fr)}
+  /* ⚠ 옆으로는 «넘치게» 둔다(overflow-x:visible) — 여러 날 막대가 옆 칸 위로 건너가야 한다.
+       아래로만 자른다(clip — hidden 과 달리 옆 방향까지 끌고 가지 않는다). */
+  .day{min-height:104px;padding:2px 8px 2px 2px;overflow-x:visible;overflow-y:clip;box-sizing:border-box;position:relative}
+  /* 날짜 줄 — 칸 «가운데»에 「25 (13)」 처럼 날짜와 음력을 나란히 */
+  .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:2px;padding:0 2px;flex-wrap:wrap}
+  /* 요일 — 구글처럼 따로 줄이 아니라 «첫 줄 칸 안» 날짜 위에 */
+  .dline .wd{flex-basis:100%;text-align:center;font-size:11px;font-weight:500;color:var(--gsub);line-height:15px;margin-left:6px}
+  /* 대표 지시 2026-09-20 「한글과 숫자가 좀더 진했으면」 — 400(보통)은 12px 에서
+     연해 보인다. 600(약간 굵게)으로 올렸다. 색(--ink #1e293b)은 이미 짙어서 안 바꿨다. */
+  .dnum{min-width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;
+    padding:0 4px;font-size:12px;font-weight:500;cursor:pointer;color:var(--gtext);background:transparent}
+  .dnum:hover{background:var(--bg)}
+  /* 오늘 동그라미는 «숫자에만» — 음력까지 감싸면 알약처럼 길어진다 */
+  .dnum.today{background:var(--gtoday);color:#ffffff;font-weight:500}
+  .dnum.today:hover{background:var(--gtoday)}
+  /* 구글은 앞뒤 달 날짜를 흐리게 안 한다 — 같은 색 그대로 */
+  .dnum.other{color:var(--gtext)}
+  .lun{font-size:10.5px;color:var(--gsub);line-height:1}
+  .lun.other{color:var(--gsub)}
+  .evs{display:flex;flex-direction:column;gap:2px}
+  /* 한 칸은 «한 줄»이다 — 넘치면 … 로 줄이고 전문은 손대면 뜬다 */
+  /* ★ 일정 칩 — 구글 캘린더 월 보기와 같은 꼴 (대표 지시 2026-09-27)
+       종일 일정 = 색을 «꽉» 채운 둥근 네모 + 흰 글자 (지난 것은 옅게 + 회색 글자)
+       시각 일정 = 바탕 없이 «색 점 · 시각 · 제목» (data-g="t")
+     ⚠ 두 꼴의 높이가 같아야 한다 — 칸 용량을 첫 칩 하나로 재기 때문이다. */
+  .ev{padding:1px 6px;border-radius:4px;font-size:12px;font-weight:500;line-height:18px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;flex:none}
+  .ev[data-g="t"]{padding:1px 4px;font-weight:400;background:transparent}
+  .ev[data-g="t"]:hover{background:var(--bg)}
+  .ev .gdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
+  .ev .gtm{margin-right:4px}
+  /* 여러 날 막대가 지나가는 칸의 «빈 자리» — 막대 밑에 깔려 줄을 맞춘다 */
+  .evph{height:20px;flex:none}
+  /* ── 끌어 옮기기 (5걸음) ──
+     ⚠ «잡을 수 있는 것»과 아닌 것이 손끝에서 갈려야 한다 — 잡히지도 않는 것을
+       한참 끌어 보고서야 아는 것이 제일 나쁘다. */
+  .ev[draggable="true"]{cursor:grab}
+  .ev[draggable="true"]:active{cursor:grabbing}
+  .ev.dragging{opacity:.4}
+  /* 놓을 칸 — 테두리만 준다. 바탕을 칠하면 그 칸의 칩 색이 안 보인다. */
+  .day.dropon,.wcol.dropon,.dayview.dropon{outline:2px solid #2563eb;outline-offset:-2px}
+  /* 공휴일은 칸 맨 위에 «띠»로 — 구글은 둥근 칩이 아니라 칸 옆까지 꽉 채운 띠를 쓴다
+     (대표 지시 2026-09-20 「구글과 완벽하게 같게」 — 실제 화면을 재서 확인했다).
+     .day 의 좌우 여백(4px)을 음수 마진으로 지워 옆까지 닿게 한다. 색 값(#fecaca·
+     #991b1b)은 그대로다 — 팔레트·tests/cal-same-as-erp.test.js 가 색만 못 박는다. */
+  /* 공휴일도 구글처럼 «보통 칩»이다(대한민국의 휴일 달력 색). 색은 chipHtml 이 칠한다. */
+  .ev.hol{cursor:default}
+  .detailgrid.one{grid-template-columns:1fr}
+  .lawcnt{font-size:12px;color:var(--sub)}
+  .lawcnt b{color:var(--ink);font-size:12.5px}
+  .notebtn{border:none;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;width:100%}
+  .notebtn:hover .dash{color:var(--acc);text-decoration:underline}
+  .modal textarea{width:100%;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel);color:var(--ink);resize:vertical}
+  .pubmsg{font-size:11.5px;color:var(--ok);margin-left:9px}
+  .pubat{font-size:11px;color:var(--faint);margin-left:9px}
+  /* 계정 잇기 — 할 일이 있을 때만 머리줄에 뜬다(없으면 아예 안 그린다) */
+  .glogin{font-size:11.5px;padding:4px 10px;border:1px solid #bfdbfe;background:var(--acc-soft);
+    color:var(--acc2);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
+    white-space:nowrap;flex-shrink:0;margin-left:auto}
+
+  .linkacct{font-size:11.5px;padding:4px 10px;border:1px solid #fde68a;background:var(--warn-bg);
+    color:var(--warn);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
+    white-space:nowrap;flex-shrink:0}
+  .linkacct:hover{background:#fde68a}
+  /* 구글 칩 옆 자물쇠 — 로그인이 필요할 때만 뜬다(예전 「🔐 구글 로그인」 단추를 합쳤다) */
+  .glock{border:none;background:transparent;cursor:pointer;font-size:11px;padding:0 2px;margin-left:-2px;flex-shrink:0}
+  /* 검색칸이 맨 오른쪽 — 잇기 단추가 왼쪽으로 밀어 준다 */
+
+  .mmnote{font-size:11.5px;color:var(--warn);background:var(--warn-bg);border:1px solid #fde68a;
+    border-radius:8px;padding:7px 10px;margin-bottom:10px;line-height:1.5}
+  .mmlist{max-height:52vh;overflow-y:auto;margin-bottom:4px}
+  .mmrow{display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid var(--line)}
+  .mmwho{flex:1;min-width:0}
+  .mmmail{display:block;font-size:12px;font-weight:700;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mmn{display:block;font-size:10.5px;color:var(--sub);margin-top:1px}
+  .mmrow select{width:148px;flex-shrink:0;padding:5px 7px;font-size:11.5px;font-family:inherit;
+    border:1px solid var(--line);border-radius:6px;background:var(--warn-bg);color:var(--ink)}
+  .mmrow select.on{background:#f0fdf4}
+  .mmempty{font-size:12.5px;color:var(--sub);padding:18px 4px;text-align:center}
+  /* 사람 색 바꾸기 — 지금 색 동그라미 하나, 누르면 그 줄 아래에 색표가 펼쳐진다.
+     ⚠ 색은 «구글이 준 것»을 그대로 칠한다(style 로 들어온다) — 여기서 색을 정하지 않는다. */
+  .cdot{width:26px;height:26px;flex-shrink:0;border-radius:50%;border:2px solid var(--line);
+    cursor:pointer;padding:0}
+  .cdot.on{border-color:var(--ink)}
+  .cdot:disabled{cursor:default;opacity:.5}
+  .cpal{flex-basis:100%;display:flex;flex-wrap:wrap;gap:5px;padding:7px 0 3px}
+  .cswatch{width:22px;height:22px;border-radius:5px;border:2px solid transparent;cursor:pointer;
+    padding:0;line-height:1;position:relative}
+  .cswatch:hover{border-color:var(--ink)}
+  .cswatch.cur{border-color:var(--ink);box-shadow:0 0 0 2px var(--bg) inset}
+  /* 남이 쓰는 색에 점 하나 — 막지는 않는다(같은 색을 일부러 줄 일도 있다) */
+  .ctaken{color:#fff;font-size:15px;font-weight:900;text-shadow:0 0 2px rgba(0,0,0,.6)}
+  /* 접힌 것이 몇인지 — 누르면 그 자리에서 펼쳐 보인다 */
+  /* 「N개 더보기」 — 구글처럼 바탕 없는 짙은 회색 글자 */
+  .more{font-size:12px;color:var(--gtext);padding:0 6px;cursor:pointer;line-height:18px;
+    font-weight:500;border-radius:4px;background:transparent;flex:none;white-space:nowrap}
+  .more:hover{background:var(--bg)}
+  /* 펼침 창 — 화면에 못 박아 띄운다(칸 안에 두면 달력 테두리에 잘린다) */
+  /* 펼침 창 — 구글의 「더보기」 창 꼴: 위에 요일(작게)·날짜(크게), 오른쪽 위 ✕ */
+  .pop{position:fixed;z-index:40;background:var(--panel);border:none;border-radius:8px;
+    box-shadow:0 24px 38px 3px rgba(0,0,0,.14),0 9px 46px 8px rgba(0,0,0,.12),0 11px 15px -7px rgba(0,0,0,.2);
+    padding:10px 10px 12px;min-width:236px;max-width:340px;max-height:62vh;overflow-y:auto}
+  .pop .ph{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:8px}
+  .pop .ph .wd{font-size:11px;font-weight:500;color:var(--gsub)}
+  .pop .ph .big{font-size:26px;font-weight:400;color:var(--gtext);line-height:1.1}
+  .pop .ph .n{color:var(--gsub);font-weight:400;font-size:11px}
+  .pop .ph .x{position:absolute;right:0;top:0;border:none;background:transparent;cursor:pointer;color:var(--gsub);
+    font-size:15px;line-height:1;padding:4px 6px;border-radius:50%;font-family:inherit}
+  .pop .ph .x:hover{background:var(--bg)}
+  .pop .evs{gap:2px}
+
+  /* 주 보기 */
+  .wgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-height:420px}
+  .wcol{border-right:1px solid var(--gline);padding:0 3px 6px;overflow-x:visible;overflow-y:clip}
+  .wcol:last-child{border-right:none}
+  .whd{text-align:center;font-size:11px;font-weight:500;color:var(--gsub);padding:5px 0 4px;border-bottom:1px solid var(--gline);
+    margin-bottom:5px;display:flex;flex-direction:column;align-items:center;gap:1px}
+  .whd .dnum{margin:0 auto}
+  /* 일 보기 */
+  .dayview{padding:12px;display:flex;flex-direction:column;gap:3px;min-height:320px}
+  .dayview .ev{font-size:13px;line-height:24px;padding:2px 9px;border-radius:6px}
+  .dayview .evph{display:none}
+
+  /* ── 넣고 고치는 창 ── */
+  .veil{position:fixed;inset:0;background:#1e293b;opacity:.45;z-index:40}
+  .modal{position:fixed;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92vw);
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;max-height:88vh;overflow:auto}
+  .modal h3{margin:0 0 12px;font-size:15px}
+  .fld{margin-bottom:10px}
+  .fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px;font-weight:700}
+  .fld input,.fld select{width:100%;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;
+    font-size:13px;font-family:inherit;background:var(--panel);color:var(--ink)}
+  .mbtns{display:flex;gap:7px;margin-top:14px;align-items:center}
+  .mbtns .sp{margin-left:auto}
+  .btn.danger{background:#dc2626}
+  .btn[disabled]{opacity:.55;cursor:default}
+  .werr{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:7px;
+    padding:8px 11px;font-size:12px;margin-bottom:10px;white-space:pre-line}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:50;background:#1e293b;
+    color:#ffffff;border-radius:9px;padding:9px 16px;font-size:12.5px;font-weight:700}
+  /* ── 이음센터 인원 현황 — 이알피(IeumPeopleTab)와 같은 치수 ── */
+  .ieumbar{display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(16,30,70,.04);flex-wrap:wrap}
+  .scopepilot{display:flex;flex-direction:column;justify-content:center;gap:7px;padding:10px 14px;
+    background:var(--bg);border-right:1px solid var(--bg);flex-shrink:0;min-width:196px}
+  .scopenav{display:flex;align-items:center;gap:7px;justify-content:center}
+  .scopetitle{font-size:13px;font-weight:800;min-width:96px;text-align:center;color:var(--ink);letter-spacing:-0.01em}
+  .segpill{display:inline-flex;background:var(--bg);border-radius:8px;padding:2px;gap:2px;justify-content:center}
+  .segpill button{flex:1;padding:3px 9px;font-size:10.5px;font-weight:600;border:none;border-radius:6px;
+    cursor:pointer;background:transparent;color:var(--sub);font-family:inherit;white-space:nowrap}
+  .segpill button.on{background:var(--panel);font-weight:800;color:#1e40af;box-shadow:0 1px 2px rgba(16,30,70,.10)}
+  .kcell{flex:1;display:flex;align-items:center;gap:10px;padding:12px 16px;border-right:1px solid var(--bg);min-width:140px}
+  .kdot{width:8px;height:8px;border-radius:3px;flex-shrink:0}
+  .klabel{font-size:11.5px;font-weight:600;color:var(--sub);white-space:nowrap}
+  .kval{margin-left:auto;font-size:17px;font-weight:800;white-space:nowrap;letter-spacing:-0.02em;color:var(--ink)}
+  .kval small{font-size:10.5px;color:var(--faint);font-weight:600;margin-left:1px}
+  .ppltable{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+  .ppltable table{width:100%;border-collapse:collapse;min-width:640px}
+  .ppltable th{text-align:left;font-size:10.5px;font-weight:800;color:var(--faint);letter-spacing:0.04em;
+    padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--bg)}
+  .ppltable th.no{width:34px;text-align:center}
+  .ppltable th.ublue{box-shadow:inset 0 -2px 0 #2563eb}
+  .ppltable th.uamber{box-shadow:inset 0 -2px 0 #d97706}
+  .ppltable td{padding:8px 10px;border-bottom:1px solid var(--bg);vertical-align:middle;white-space:nowrap;font-size:12px}
+  .ppltable td.no{text-align:center;color:var(--faint);font-weight:700;font-size:11px}
+  .ppltable tr.prow{cursor:pointer}
+  .ppltable tr.prow:hover{background:var(--bg)}
+  .ppltable tr.prow.open{background:var(--acc-soft)}
+  .pname{display:flex;align-items:center;gap:8px}
+  .avatar{width:26px;height:26px;border-radius:8px;color:#ffffff;display:inline-flex;align-items:center;
+    justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+  .avatar.sm{width:22px;height:22px;border-radius:6px;font-size:10px;margin-right:7px;vertical-align:middle}
+  .nm{font-weight:800;font-size:12.5px}
+  .leftbadge{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--bg);
+    color:var(--faint);border:1px dashed var(--line);white-space:nowrap}
+  .rolechip{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap}
+  .dash{color:#cbd5e1}
+  .barwrap{display:flex;align-items:center;gap:7px;min-width:110px}
+  .barnum{font-size:12.5px;font-weight:800;white-space:nowrap}
+  .barnum small{font-size:10px;color:var(--faint);font-weight:600}
+  .bartrack{flex:1;height:7px;border-radius:20px;background:var(--bg);overflow:hidden;min-width:46px}
+  .barfill{display:block;height:100%;border-radius:20px}
+  .tel{text-decoration:none;margin-right:6px}
+  .notecell span{font-size:11px;color:var(--sub);max-width:170px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;display:inline-block}
+  .chev{color:var(--faint);font-size:11px}
+  tr.prow.open .chev{transform:rotate(90deg);display:inline-block}
+  tr.detail td{background:var(--bg);padding:13px 18px;border-bottom:1px solid var(--line);white-space:normal}
+  .detailgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:880px}
+  .dtitle{font-size:10.5px;font-weight:800;color:var(--faint);margin-bottom:7px}
+  .drow{display:flex;align-items:flex-start;gap:8px;padding:3px 0;font-size:11.5px}
+  .dm{width:40px;font-weight:700;flex-shrink:0}
+  .dchips{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+  .dchip{background:#eff6ff;color:#2563eb;font-weight:700;border-radius:4px;padding:1px 6px;font-size:10.5px}
+  .dchip.law{background:#fffbeb;color:#d97706}
+  .dcnt{font-weight:800;flex-shrink:0}
+  .dnone{font-size:11.5px;color:var(--faint)}
+  .lrow{display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:11.5px}
+  .ldate{color:var(--sub);font-weight:700;width:44px;flex-shrink:0}
+  .ltitle{font-weight:600;flex:1}
+  .dhint{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:10.5px;color:var(--faint)}
+  .linklike{border:none;background:none;color:#1e40af;font-weight:700;font-size:10.5px;cursor:pointer;padding:0;font-family:inherit}
+  /* ── 외부 공유 뷰 — 이알피(IeumShareTab)와 같은 치수 ── */
+  .sharecard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;max-width:860px}
+  .sctitle{font-size:13.5px;font-weight:800;margin-bottom:6px}
+  .sctitle.sm{font-size:12.5px;margin-bottom:10px}
+  .scdesc{font-size:12px;color:var(--sub);line-height:1.8;margin-bottom:10px}
+  .linktable{width:100%;border-collapse:collapse;font-size:12px}
+  .linktable th{text-align:left;font-size:10.5px;font-weight:800;color:var(--faint);padding:6px 8px;
+    border-bottom:1px solid var(--line)}
+  .linktable td{padding:8px;border-bottom:1px solid var(--bg)}
+  .linktable td.right{text-align:right;white-space:nowrap}
+  .issued{font-size:10.5px;color:#16a34a;font-weight:700}
+  .notissued{font-size:10.5px;color:var(--faint)}
+  .sharefoot{font-size:10.5px;color:var(--faint);text-align:center}
+  .btn.ghost.sm{padding:5px 10px;font-size:11px}
+  .later{text-align:center;padding:40px 18px;color:var(--sub)}
+  .later h2{font-size:16px;margin:0 0 7px;color:var(--ink)}
+  .later p{margin:0 0 16px;font-size:12.5px}
+
+  /* ── 어두운판 ② — CSS 변수로 못 옮기는 나머지 ──────────────────────
+     탭·칸 배경 같은 큰 자리는 위 --panel/--bg 하나로 다 끌려간다. 여기는
+     자기 색을 «직접 든» 자리만 손으로 하나씩 덧씌운다. */
+  :root[data-theme="dark"] .allchip.on{background:var(--acc2)}
+  :root[data-theme="dark"] .chip{border-color:var(--line)}
+  :root[data-theme="dark"] .chip.warn{background:var(--panel);border-color:#991b1b;color:#f87171}
+  :root[data-theme="dark"] .srcsep{background:var(--line)}
+  :root[data-theme="dark"] .note{border-color:#854d0e}
+  :root[data-theme="dark"] .werr{background:var(--panel);border-color:#991b1b;color:var(--ink)}
+  :root[data-theme="dark"] .fld input,:root[data-theme="dark"] .fld select{border-color:var(--line);background:var(--panel);color:var(--ink)}
+  :root[data-theme="dark"] .issued{color:var(--ok)}
+  :root[data-theme="dark"] .linklike{color:#60a5fa}
+  :root[data-theme="dark"] .dchip{background:rgba(37,99,235,.18);color:#60a5fa}
+  :root[data-theme="dark"] .dchip.law{background:rgba(217,119,6,.18);color:var(--warn)}
+  :root[data-theme="dark"] .dash{color:var(--faint)}
+  /* 오늘 칸은 «칠하지 않는다» — 낮은판의 옅은 노랑칠(#fffbeb)은 어두운판에서 글자가
+     안 읽힌다. 대신 칸 테두리를 살짝 파랗게 둘러 「오늘」을 표한다(파랑 원은 그대로). */
+  :root[data-theme="dark"] .day.today{outline:1.5px solid var(--acc);outline-offset:-1.5px}
+  :root[data-theme="dark"] .wcol.today{outline:1.5px solid var(--acc);outline-offset:-1.5px}
+
+  /* 좁으면 «줄인다» — 음력 범위부터, 그다음 탭 글자 */
+  @media (max-width:1600px){ #topbar .lunrange{display:none} }
+  @media (max-width:1400px){
+    .tab{padding:6px 7px;font-size:12px} #topbar .brand .bt{display:none}
+    #topbar{gap:5px;padding:6px 8px} #tabs{gap:2px}
+    .chips{gap:2px} .tabchips{padding-left:6px} .pchip{width:24px;height:24px;font-size:9.5px}
+    .todaybtn{padding:0 11px} .monthbar .ym{font-size:18px;margin:0 2px} .mv{width:26px}
+    .seg button{padding:0 10px}
+  }
+  @media (max-width:700px){
+    #app{padding:10px 8px 80px}
+    #topbar{padding:7px 10px;gap:7px}
+    #topbar .brand{font-size:13px}
+    #conn span.t{display:none}
+    .day{min-height:66px}
+    .ev{font-size:9.5px}
+  }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="brand"><svg viewBox="0 0 100 100" style="width:22px;height:22px;vertical-align:-5px;margin-right:1px"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg> <span class="bt">푸른 캘린더</span></span>
+  <span id="tabs"></span>
+  <button class="ib" id="themeToggle" title="어두운 화면으로 바꿉니다">🌙</button>
+  <span id="appslot"></span>
+  <span class="avawrap">
+    <button id="me" data-avatar="1" title="내 계정">·</button>
+    <div class="avamenu" id="avamenu" hidden>
+      <div class="who"><span id="whoName"></span><span id="conn"><span class="dot"></span><span class="t">연결 중…</span></span></div>
+      <hr>
+      <div id="avaTools"></div>
+      <button class="mi" id="goErp" title="푸른이알피로 갑니다">← 푸른이알피로</button>
+      <hr>
+      <button class="mi" id="logout">로그아웃</button>
+    </div>
+  </span>
+</div>
+<div id="app"><div class="panel muted">불러오는 중…</div></div>
+
+<script>
+/* 푸른 캘린더 — 법인 대시보드 + 이음센터를 이알피에서 떼어 낸 앱 (1걸음)
+   ────────────────────────────────────────────────────────────────────────
+   대표 지시 2026-09-18 「법인대시보드와 이음센터만 완전히 따로 빼서 캘린더를 만들고 싶다」
+
+   ⚠ 1걸음은 «읽기»까지다. 일정·근태를 넣고 고치는 것은 아직 이알피가 한다.
+     까닭: 근태 저장은 마감 자물쇠·번호 규칙·안전 병합을 모두 지나야 하는데,
+     그 문을 여기 다시 지으면 «두 벌»이 된다 — 그러면 마감한 달이 한쪽에서 뚫리고
+     급여가 조용히 틀어진다. 그 문을 공용으로 빼낸 뒤에 붙인다(1걸음-나).
+     그래서 이 화면은 고치는 자리마다 이알피로 보낸다 — «못 한다»가 아니라 «저기서 한다».
+
+   ⚠ 이알피는 그대로 둔다. 한 달은 두 곳에서 같은 달력이 보인다(2걸음).
+     새 앱에서만 생기는 문제를 잡은 뒤에야 이알피 쪽을 뺀다(3걸음). */
+'use strict';
+
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',storageBucket:'pureun-erp.firebasestorage.app',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+
+var fbDb = null;
+var D = {};              // 읽어 온 표들
+var FAILED = {};         // 못 읽은 표 — «빈 것»과 갈라 둔다
+var ME = null;           // 나 (직원 한 줄)
+/* open — 「+N개 더」를 눌러 «펼쳐 둔» 날. 달을 옮기거나 다른 데를 누르면 닫는다. */
+/* theme — 밝은판·어두운판. 수동으로만 바뀐다(대표 지시 2026-09-19 「2번 수동」) —
+   자동(prefers-color-scheme)으로 넘어가지 않는다. */
+var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'', open:null, theme:'light',
+          scope:'month', showLeft:false, openRows:{},
+          /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
+          view:'month', date:'', q:'' };
+
+var $ = function(id){ return document.getElementById(id); };
+
+/* ── 어두운 모드 (수동 전환) ──────────────────────────────────────
+   ⚠ 시스템 설정을 안 따라간다(대표 지시 「2번 수동」) — prefers-color-scheme 을
+     안 듣는다. 켠 채로 남기려면 이 기기에서만 기억한다(localStorage) —
+     사람 계정이 아니라 «이 화면»의 취향이라 device-local 이 맞다. */
+function themeInit(){
+  var v = null;
+  try{ v = localStorage.getItem("pu_cal_theme"); }catch(e){}
+  S.theme = (v === 'dark') ? 'dark' : 'light';
+  themeApply();
+}
+function themeApply(){
+  document.documentElement.setAttribute("data-theme", S.theme);
+  var b = $("themeToggle");
+  if(b){
+    b.textContent = S.theme === 'dark' ? '☀️' : '🌙';
+    b.title = S.theme === 'dark' ? '밝은 화면으로 바꿉니다' : '어두운 화면으로 바꿉니다';
+  }
+}
+function themeToggle(){
+  S.theme = (S.theme === 'dark') ? 'light' : 'dark';
+  themeApply();
+  try{ localStorage.setItem("pu_cal_theme", S.theme); }catch(e){}
+  /* 칸·칩 배경은 그릴 때 «미리 정해» 넣는다(인라인) — CSS 변수만으로는 안 따라오니
+     판을 바꾼 뒤에는 다시 그려야 한다. 지금 탭이 달력이 아니어도 해롭지 않다. */
+  render();
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function ymOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function shiftDay(ymd, n){
+  var d = new Date((ymd||todayYMD())+'T00:00:00'); d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function todayYMD(){ var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function arr(v){ return Array.isArray(v) ? v : []; }
+
+/* ── 어느 탭이 있는가 ──────────────────────────────────────────────────
+   대표 결정 2026-09-18: 법인 셋과 이음 셋을 «한 줄»에 두 묶음으로 둔다.
+   지금은 옆 메뉴를 갔다 와야 오가는데, 여기서는 한 번 누르면 된다 — 그것이 옮기는 뜻이다.
+   ⚠ 「직원별 업무」·「분석」은 뺐다(대표 지시 2026-09-20 「필요없다 여기 넣지 마라」).
+     여태는 «다음 걸음에 옮긴다»는 안내 탭(laterHtml)으로 자리만 잡아 뒀는데,
+     아예 필요 없다는 뜻이라 탭 자체를 없앤다. 이알피 옆 메뉴에는 그대로 있다. */
+var TABS = [
+  /* 대표 지시 2026-09-27 — 묶음 글자(법인·이음센터)와 그림글자를 빼고 이름만.
+     「이음 근무」가 예전 「근무 캘린더」다(캘린더 안의 「이음」 거르개를 여기로 합쳤다). */
+  { v:'cal',      g:'법인',    label:'캘린더',    ready:true },
+  { v:'eumcal',   g:'이음센터', label:'이음 근무', ready:true },
+  { v:'eumppl',   g:'이음센터', label:'인원 현황', ready:true },
+  { v:'eumshare', g:'이음센터', label:'외부 공유', ready:true }
+];
+
+/* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
+   ⚠ 필요한 것만 읽는다 — 안 쓰는 큰 표를 받으면 요금과 깜빡임이 늘어난다. */
+var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors',
+            'locked_attend_months','ieum_members','ieum_notes',
+            /* 구글 만든이 메일 → 사번. 이것이 있어야 구글 일정이 «그 사람 색»으로 칠해진다 */
+            'gcal_mail_sid',
+            /* ★ 5걸음 — 달력에 «날짜로 뜨는» 것들(대표 지시 2026-09-21 「둘다」).
+               4걸음에서 법인 대시보드와 함께 사라진 층 셋을 되살린다.
+               ⚠ cases 는 54KB 로 근태표만 하다 — 가볍지 않다. 그래도 켤 때 한 번이고,
+                 그 뒤로는 바뀐 것만 받는다(PuCalRead.watch). */
+            'cases','biz_case_stages','leave_of_absence'];
+
+/* ── 사람 ──────────────────────────────────────────────────────────── */
+/* ⚠ 직원 명부는 «배열»로도, «사번이 열쇠인 지도»로도 올 수 있다.
+   배열만 받으면 지도로 왔을 때 조용히 빈 목록이 되고 화면에 이름 대신 사번(S001)이 뜬다 —
+   틀린 화면이 아니라 «맞는 척하는» 화면이라 더 나쁘다. 그래서 두 꼴을 다 받는다. */
+/* 명부 전부 — 그만둔 사람까지. «이름을 찾을 때»만 쓴다. */
+function allUsers(){
+  var v = D.user_accounts;
+  var list = Array.isArray(v) ? v
+    : (v && typeof v === "object") ? Object.keys(v).map(function(k){
+        var u = v[k];
+        return (u && typeof u === "object") ? (u.sid ? u : Object.assign({ sid:k }, u)) : null;
+      })
+    : [];
+  return list.filter(function(u){ return u && u.sid; });
+}
+/* ★ 현직만 — 칩·고르는 목록은 «반드시» 이것을 쓴다 (이알피 getActiveUsers 와 같은 기준).
+   ⚠ 2026-09-18 대표 화면에서 사람 칩이 «서른셋» 나왔다. 명부 32명 가운데 현직은
+     열뿐인데 그만둔 스물둘이 다 섞였다 — 이알피는 늘 열만 보여 준다.
+     그만둔 사람을 칩에 두면 고를 수는 있는데 아무것도 안 나오고, 줄이 넘쳐
+     정작 현직을 못 찾는다. */
+function users(){
+  return allUsers().filter(function(u){ return u.status === "active"; });
+}
+function userOf(sid){
+  var us = allUsers();
+  for(var i=0;i<us.length;i++) if(us[i].sid===sid) return us[i];
+  return null;
+}
+/* ⚠ 이름은 «그만둔 사람까지» 찾는다 — 이알피도 그렇게 한다.
+     지나간 이음 근무에 「장한돌 이음센터」라고 적혀 있어야지, 사번만 뜨면 못 읽는다. */
+function nameOf(sid){ var u=userOf(sid); return u ? (u.name||sid) : sid; }
+function externalOf(id){
+  var xs = arr(D.external_staff);
+  for(var i=0;i<xs.length;i++) if(xs[i] && xs[i].id===id) return xs[i];
+  return null;
+}
+/* 직원 색 — 이알피가 정한 것을 그대로 쓴다. 여기서 새로 정하지 않는다
+   (같은 사람이 두 앱에서 다른 색이면 그 색은 아무 뜻도 없어진다). */
+function colorOf(sid){
+  var m = D.staff_colors;
+  if(m && typeof m==='object' && !Array.isArray(m) && m[sid]){
+    /* 옛 구글 색(#a4bdfc …)으로 담긴 것은 구글 화면과 같은 요즘 색으로 읽는다(gcalLoadColors) */
+    var 옛새 = (typeof window !== "undefined" && window._gcalOldNew) || null;
+    return (옛새 && 옛새[String(m[sid]).toLowerCase()]) || m[sid];
+  }
+  return null;
+}
+
+/* ── 공휴일 ────────────────────────────────────────────────────────── */
+function holidayOf(ymd){
+  var hs = D.holidays;
+  if(Array.isArray(hs)){
+    for(var i=0;i<hs.length;i++){ if(hs[i] && hs[i].date===ymd) return hs[i].name||'공휴일'; }
+    return '';
+  }
+  if(hs && typeof hs==='object' && hs[ymd]) return (hs[ymd].name||hs[ymd]) || '공휴일';
+  return '';
+}
+
+/* ── 그 날의 일들 ──────────────────────────────────────────────────── */
+/* ── 구글 캘린더 ──────────────────────────────────────────────────────
+   ★ 이알피 달력을 «채우는 것»이 바로 이것이다. 2026-09 에만 126건이 있고,
+     우리 서버(my_schedules)에는 25건뿐인 옛 기록만 있다.
+     2026-09-18 대표 화면이 텅 비어 보였던 까닭이 이것이다 — 우리가 안 읽고 있었다.
+   ⚠ 읽기는 «열쇠 하나»로 된다(로그인 필요 없음). 이 달력은 회사 공용이라
+     API 열쇠로 공개 읽기가 열려 있다. 넣고 고치는 것만 구글 로그인이 필요하다 —
+     그것은 아직 이알피에서 한다.
+   ⚠ 값은 이알피와 «같은 것»이어야 한다. 달력 주소가 다르면 다른 달력을 보게 된다.
+     tests/cal-gcal-same-as-erp.test.js 가 이알피 소스와 맞대 본다. */
+var GCAL_API_KEY = "AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo";
+var GCAL_CAL_ID  = "euh07th7tvlco9corqen9lqpts@group.calendar.google.com";
+var GCAL = { evs:[], ym:"", loading:false, err:"" };
+
+/* 구글이 쓰는 색표 — 사람이 구글에서 «고른» 색을 그대로 쓰려면 이 표가 있어야 한다.
+   ⚠ 색표를 «먼저» 받고 일정을 받는다 — 순서가 뒤바뀌면 첫 그림에 색이 빠진다. */
+/* ★ 구글 화면이 «실제로 칠하는» 열한 색 (대표 지시 2026-09-27 「구글캘린더와 완벽하게 같이」).
+   구글 색표 API 는 2012년 옛 색(#a4bdfc 같은 연한 색)을 아직 돌려준다. 그런데 구글 캘린더
+   화면은 같은 번호를 요즘 색(1번 라벤더 #7986cb …)으로 칠한다 — 옛 색을 그대로 쓴 것이
+   우리 화면이 구글보다 «물 빠져» 보이던 까닭이다.
+   번호가 열쇠다: 옛 색표의 n번 = 요즘 색 n번. 저장해 둔 옛 색도 이 번호로 요즘 색이 된다.
+   ⚠ 이 열한 색은 컨설팅일정(gov-consulting GCAL11)과 «같은 값»이다 — 두 앱이 같은 사람을
+     같은 색으로 보인다. */
+var 구글요즘색 = { "1":"#7986cb", "2":"#33b679", "3":"#8e24aa", "4":"#e67c73", "5":"#f6bf26",
+  "6":"#f4511e", "7":"#039be5", "8":"#616161", "9":"#3f51b5", "10":"#0b8043", "11":"#d50000" };
+function gcalLoadColors(){
+  if(window._gcalColors) return Promise.resolve(window._gcalColors);
+  return fetch("https://www.googleapis.com/calendar/v3/colors?key=" + GCAL_API_KEY)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var m = {}, 옛새 = {}, ev = (d && d.event) || {};
+      Object.keys(ev).forEach(function(k){
+        if(!ev[k] || !ev[k].background) return;
+        var 새 = 구글요즘색[String(k)] || ev[k].background;
+        m[String(k)] = 새;
+        /* 옛 색으로 저장된 사람 색을 요즘 색으로 읽는 길 — 저장값은 안 고친다(읽을 때만 바꾼다) */
+        옛새[String(ev[k].background).toLowerCase()] = 새;
+      });
+      window._gcalOldNew = 옛새;
+      window._gcalColors = m; return m;
+    })
+    .catch(function(){ window._gcalColors = {}; return window._gcalColors; });
+}
+/* 색을 고를 때 쓰는 목록 — 구글 색표에서 중복을 뺀 것.
+   ⚠ 새 색을 만들지 않는다. 같은 사람이 볼 때마다 색이 바뀌면 색으로 사람을 못 알아본다. */
+function gcalPalette(){
+  var m = window._gcalColors;
+  if(!m) return null;
+  var ks = Object.keys(m).sort(function(a,b){ return (parseInt(a,10)||0) - (parseInt(b,10)||0); });
+  var out = [];
+  ks.forEach(function(k){ if(m[k] && out.indexOf(m[k]) < 0) out.push(m[k]); });
+  return out.length ? out : null;
+}
+/* ── 사람 색 «채워 넣기» ────────────────────────────────────────────────
+   캘린더를 한 곳으로 모으기 1걸음 (대표 지시 2026-09-20 「0부터 순서대로」).
+
+   ★ 왜 여기로 왔나
+     data/staff_colors 를 «쓰는 곳»이 이알피 법인 대시보드 한 곳뿐이었다.
+     그 화면을 걷어내면 새로 온 직원에게 색이 영영 안 생기고, 컨설팅일정도
+     같은 자리를 읽으므로 두 앱이 함께 회색이 된다.
+
+   ★ 이알피처럼 «다시 셈해 통째로» 올리지 않는다 — «빠진 사람만» 채운다.
+     이알피는 그 PC 에만 있는 손수 고른 색(localStorage)을 섞어 셈한다.
+     그것을 흉내 내 통째로 올리면 대표님이 다른 자리에서 고른 색을 덮는다.
+     없는 칸만 채우면 남의 것을 건드릴 일이 없어, 두 앱이 함께 돌아도 안 싸운다.
+
+   ★ 고르는 법 — «아직 아무도 안 쓰는» 색을 앞에서부터. 그래야 새로 온 사람이
+     옆자리와 같은 색으로 뜨지 않는다. 색을 새로 만들지 않는다(구글 색표 안에서만).
+
+   ⚠ 구글 색표가 아직 «안 왔으면» 아무것도 안 한다. 되돌아갈 색을 올리면 서버의
+     진짜 색을 덮는다 — 이알피가 그 자리에서 한 번 데었다.
+   ⚠ 관리자만 쓸 수 있다(서버 규칙). 명부의 role 로 가르므로 «위임관리인»은 여기서
+     못 채운다 — 서버는 허락하지만 조용히 실패하느니 아예 안 한다. */
+function 빠진색채우기(있는색, 사람들, 색표){
+  var 쓰는색 = {};
+  Object.keys(있는색 || {}).forEach(function(k){
+    if(!있는색[k]) return;
+    var c = String(있는색[k]).toLowerCase();
+    /* 옛 색으로 담긴 사람도 «요즘 색을 쓰는 사람»으로 센다 — 안 그러면 같은 색을 또 준다 */
+    var 옛새 = (typeof window !== "undefined" && window._gcalOldNew) || {};
+    쓰는색[c] = 1;
+    if(옛새[c]) 쓰는색[String(옛새[c]).toLowerCase()] = 1;
+  });
+  var 새로 = {};
+  (사람들 || []).forEach(function(u){
+    if(!u || !u.sid || (있는색 && 있는색[u.sid])) return;
+    var 고름 = "";
+    for(var i=0;i<색표.length;i++){
+      if(!쓰는색[String(색표[i]).toLowerCase()]){ 고름 = 색표[i]; break; }
+    }
+    /* 색표를 다 썼으면 처음부터 다시 — 겹치더라도 «없는 것»보다 낫다 */
+    if(!고름) 고름 = 색표[Object.keys(새로).length % 색표.length];
+    if(!고름) return;
+    새로[u.sid] = 고름;
+    쓰는색[String(고름).toLowerCase()] = 1;
+  });
+  return 새로;
+}
+function 색채우기(){
+  try{
+    if(!(ME && ME.role === "admin")) return;            /* 관리자만 */
+    var 색표 = gcalPalette();
+    if(!색표 || !색표.length) return;                    /* 색표가 안 왔으면 손대지 않는다 */
+    var 있는색 = (D.staff_colors && typeof D.staff_colors === "object"
+                  && !Array.isArray(D.staff_colors)) ? D.staff_colors : {};
+    var 현직 = users().filter(function(u){ return u && u.status === "active"; });
+    if(!현직.length) return;                             /* 사람이 없으면 아무 일도 안 한다 */
+    var 새로 = 빠진색채우기(있는색, 현직, 색표);
+    if(!Object.keys(새로).length) return;                /* 채울 사람이 없으면 안 올린다 */
+    var 합친것 = Object.assign({}, 있는색, 새로);
+    PuCalWrite.saveColors(합친것).then(function(r){
+      if(r && r.ok){
+        D.staff_colors = 합친것;
+        console.log("[사람색] 빠진 " + Object.keys(새로).length + "명을 채웠습니다: "
+          + Object.keys(새로).map(function(s){ return nameOf(s) + "=" + 새로[s]; }).join(", "));
+        render();
+      }
+    })["catch"](function(){});
+  }catch(e){}
+}
+
+/* ── 사람 색 «바꾸기» ────────────────────────────────────────────────────
+   캘린더를 한 곳으로 모으기 4걸음 (대표 지시 2026-09-20).
+
+   ★ 왜 여기로 왔나 — 안 옮기면 «온 시스템에서» 색을 바꿀 길이 사라진다.
+     색을 고르는 자리가 이알피 법인 대시보드 한 곳뿐이었다(사람 칩에 마우스를
+     올리면 뜨던 팔레트). 그 화면을 걷어내는데 그대로 두면, 빠진 사람은
+     채워지지만(색채우기) «이미 있는 색을 바꾸는 일»은 아무 데서도 못 한다.
+     data/staff_colors 는 컨설팅일정도 읽는 자리라 손해가 이 앱에서 안 그친다.
+
+   ★ 이알피와 다른 점 — «이 PC 에만» 담지 않는다.
+     이알피는 고른 색을 그 PC 브라우저(localStorage)에 담고, 화면을 그릴 때마다
+     다시 셈해 통째로 올렸다. 그래서 다른 PC 에서 열면 순번 색으로 돌아갔다.
+     여기서는 고른 그 칸 하나만 서버에 적는다 — 담는 데가 한 곳이라 어긋날 수 없다.
+
+   ⚠ 색을 «새로 만들지» 않는다 — 구글 색표 안에서만 고른다. 우리가 만든 색은
+     구글 화면에서 다르게 보여, 같은 일정이 두 앱에서 다른 색이 된다.
+   ⚠ 색표가 아직 안 왔으면 고르게 하지 않는다. 그때 고른 색은 «되돌아갈 색»이라
+     서버의 진짜 색을 덮는다 — 이알피가 그 자리에서 한 번 데었다. */
+function openColors(){ S.colors = { pick:"", busy:false, err:"" }; render(); }
+function closeColors(){ S.colors = null; render(); }
+function colorsHtml(){
+  var m = S.colors; if(!m) return "";
+  var 색표 = gcalPalette() || [];
+  var 현직 = users().filter(function(u){ return u && u.status === "active"; });
+  var 쓰임 = {};
+  현직.forEach(function(u){ var c = colorOf(u.sid); if(c) 쓰임[String(c).toLowerCase()] = u.sid; });
+  return '<div class="veil" data-close="1"></div><div class="modal" style="max-width:560px">'
+    + '<h3>🎨 사람 색 바꾸기</h3>'
+    + '<div class="mmnote">여기서 정한 색은 컨설팅일정에서도 같이 보입니다. '
+    +   '구글 색표 안에서만 고릅니다 — 새 색을 만들면 구글 화면과 달라집니다.</div>'
+    + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : "")
+    + (!색표.length
+        ? '<div class="mmempty">구글 색표를 아직 못 받았습니다 — 잠시 뒤에 다시 열어 주십시오. '
+          + '(색표 없이 고르면 서버의 진짜 색을 덮습니다)</div>'
+        : '<div class="mmlist">' + 현직.map(function(u){
+            var 지금 = colorOf(u.sid) || "";
+            var 열림 = m.pick === u.sid;
+            return '<div class="mmrow" style="flex-wrap:wrap">'
+              + '<div class="mmwho"><span class="mmmail">' + esc(u.name || u.sid) + '</span>'
+              +   '<span class="mmn">' + (지금 ? esc(지금) : "아직 색이 없습니다") + '</span></div>'
+              + '<button class="cdot' + (열림 ? " on" : "") + '" data-copen="' + esc(u.sid) + '"'
+              +   (m.busy ? " disabled" : "")
+              +   ' title="눌러서 색을 고릅니다" style="background:' + esc(지금 || "#cbd5e1") + '"></button>'
+              + (열림
+                  ? '<div class="cpal">' + 색표.map(function(c){
+                      var 임자 = 쓰임[String(c).toLowerCase()];
+                      var 남의것 = 임자 && 임자 !== u.sid;
+                      return '<button class="cswatch' + (String(c).toLowerCase() === String(지금).toLowerCase() ? " cur" : "") + '"'
+                        + ' data-cset="' + esc(u.sid) + '|' + esc(c) + '"'
+                        + ' style="background:' + esc(c) + '"'
+                        + ' title="' + (남의것 ? esc(nameOf(임자)) + ' 님이 쓰는 색입니다' : esc(c)) + '">'
+                        + (남의것 ? '<span class="ctaken">·</span>' : "") + '</button>';
+                    }).join("") + '</div>'
+                  : "")
+              + '</div>';
+          }).join("") + '</div>')
+    + '<div class="mbtns"><span class="sp"></span>'
+    + '<button class="btn ghost" data-close="1">닫기</button></div></div>';
+}
+function 색고르기(sid, 색){
+  var m = S.colors; if(!m || m.busy) return;
+  var 있는색 = (D.staff_colors && typeof D.staff_colors === "object"
+                && !Array.isArray(D.staff_colors)) ? D.staff_colors : {};
+  /* 비교는 «보이는 색»으로 — 옛 색으로 담긴 사람이 같은 요즘 색을 다시 고른 것도 제자리다 */
+  if(String(colorOf(sid) || "").toLowerCase() === String(색).toLowerCase()){ m.pick = ""; render(); return; }
+  /* ⚠ 고른 «그 칸 하나»만 바꾼다 — 통째로 다시 셈해 올리면 다른 자리에서 고른 색을 덮는다 */
+  var 다음 = Object.assign({}, 있는색); 다음[sid] = 색;
+  m.busy = true; m.err = ""; render();
+  PuCalWrite.saveColors(다음).then(function(r){
+    m.busy = false;
+    if(r && r.ok){ D.staff_colors = 다음; m.pick = ""; }
+    else m.err = (r && r.message) || "저장하지 못했습니다";
+    render();
+  })["catch"](function(e){
+    m.busy = false; m.err = (e && e.message) || String(e); render();
+  });
+}
+/* 「색」 단추 — 관리자·위임관리인에게만. 할 일이 «늘» 있는 일이라 숫자는 안 붙인다. */
+function 색단추Html(){
+  if(!관리자인가()) return "";
+  return '<button class="linkacct" data-copen-all="1" title="사람마다의 색을 바꿉니다.'
+    + ' 여기서 정한 색은 컨설팅일정에서도 같이 보입니다.">🎨 색</button>';
+}
+
+/* ── 구글 계정 ↔ 직원 잇기 ──────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 1걸음(나).
+
+   ★ 왜 여기로 왔나
+     구글 일정에는 «누가 만들었는지»(메일)만 남고 이름이 없다. 이어 주지 않으면
+     그 사람 일정이 담당자·색 없이 뜬다(메일로 늘 같은 색을 주긴 하지만 대표님이
+     고른 그 사람 색은 아니다). 이어 주는 화면이 이알피 법인 대시보드 한 곳뿐이라,
+     그 화면을 걷어내면 남은 사람을 영영 못 잇는다.
+
+   ★ 이알피와 «같은 열쇠»를 쓴다 — gcalMailKey(점 → 쉼표). 다르면 이어 둔 것을
+     서로 못 찾는다. 그래서 그 함수를 그대로 쓴다(새로 짓지 않는다).
+   ⚠ 관리자만 쓸 수 있다(서버 규칙). 색 채우기와 같은 잣대를 쓴다. */
+/* ⚠ typeof 로 본다 — 검사가 머리줄만 떼어 상자에 넣고 돌 때 ME 가 없다(chipHtml 과 같은 까닭) */
+/* 관리자·위임관리인인가 — 서버 규칙의 MGR 와 «같게» 맞춘다.
+   data/gcal_mail_sid 와 data/staff_colors 둘 다 쓰기가 MGR 이라 잣대가 하나다.
+   ⚠ 화면이 규칙보다 넓으면 눌러 놓고 조용히 거절당하고, 좁으면 될 사람이 못 한다.
+   ⚠ 잣대를 두 벌로 만들지 말 것 — 한쪽만 고치면 어느 쪽이 맞는지 아무도 모른다. */
+function 관리자인가(){
+  if(typeof ME === "undefined" || !ME) return false;
+  return ME.role === "admin" || ME.isAdmin === true || ME.isSubAdmin === true;
+}
+function 잇기할수있나(){
+  return 관리자인가();
+}
+/* 지금 달력에 뜬 구글 일정에서 «만든이»를 모은다 — 많이 만든 사람부터 */
+function 메일줄들(){
+  var 셈 = {};
+  (GCAL.evs || []).forEach(function(e){
+    if(!e || !e.mail) return;
+    var k = gcalMailKey(e.mail);
+    if(!셈[k]) 셈[k] = { key:k, mail:e.mail, n:0 };
+    셈[k].n++;
+  });
+  var mp = gcalMailMap();
+  return Object.keys(셈).map(function(k){
+    var r = 셈[k]; r.sid = mp[k] || ""; return r;
+  }).sort(function(a,b){ return b.n - a.n; });
+}
+function 안이은수(){ return 메일줄들().filter(function(r){ return !r.sid; }).length; }
+function openMailMap(){ S.mailmap = { busy:false, err:"" }; render(); }
+function closeMailMap(){ S.mailmap = null; render(); }
+function mailmapHtml(){
+  var m = S.mailmap; if(!m) return "";
+  var 줄 = 메일줄들();
+  var 현직 = users().filter(function(u){ return u && u.status === "active"; });
+  return '<div class="veil" data-close="1"></div><div class="modal" style="max-width:560px">'
+    + '<h3>👤 구글 계정 ↔ 직원 잇기</h3>'
+    + '<div class="mmnote">한 번 이어 주면 그 뒤로 담당자 색과 거르기가 정확해집니다. '
+    +   '다른 PC 에서도 같이 보입니다.</div>'
+    + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : '')
+    + (줄.length
+        ? '<div class="mmlist">' + 줄.map(function(r){
+            return '<div class="mmrow">'
+              + '<div class="mmwho"><span class="mmmail" title="' + esc(r.mail) + '">' + esc(r.mail) + '</span>'
+              +   '<span class="mmn">' + r.n + '건 · ' + (r.sid ? esc(nameOf(r.sid)) + ' 이어짐' : '아직 안 이음') + '</span></div>'
+              + '<select data-mm="' + esc(r.key) + '"' + (m.busy ? ' disabled' : '')
+              +   ' class="' + (r.sid ? 'on' : '') + '">'
+              +   '<option value="">— 고르세요 —</option>'
+              +   현직.map(function(u){
+                    return '<option value="' + esc(u.sid) + '"' + (u.sid === r.sid ? ' selected' : '') + '>'
+                      + esc(u.name || u.sid) + '</option>';
+                  }).join("")
+              + '</select></div>';
+          }).join("") + '</div>'
+        : '<div class="mmempty">이 달에 구글 일정이 없습니다 — 달을 옮기면 그 달의 계정이 뜹니다.</div>')
+    + '<div class="mbtns"><span class="sp"></span>'
+    + '<button class="btn ghost" data-close="1">닫기</button></div></div>';
+}
+function 잇기저장(메일열쇠, sid){
+  var m = S.mailmap; if(!m || m.busy) return;
+  var 다음 = Object.assign({}, gcalMailMap());
+  if(sid) 다음[메일열쇠] = sid; else delete 다음[메일열쇠];
+  m.busy = true; m.err = ""; render();
+  PuCalWrite.saveMailMap(다음).then(function(r){
+    m.busy = false;
+    if(r && r.ok){
+      D.gcal_mail_sid = 다음;
+      /* 색을 다시 칠하려면 일정을 다시 «해석»해야 한다 — 받아 둔 것을 다시 그린다 */
+      gcalLoad(true);
+    } else {
+      m.err = (r && r.message) || "저장하지 못했습니다";
+    }
+    render();
+  })["catch"](function(e){
+    m.busy = false; m.err = (e && e.message) || String(e); render();
+  });
+}
+
+/* ── 구글 로그인 (지우기용) ──────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 3걸음-나. 「옮긴다」(대표 지시 2026-09-20).
+
+   ★ 읽기와 쓰기는 «다른 자격»이다
+     달력을 «읽는» 것은 열쇠 하나로 되고 로그인이 필요 없다. 그런데 이어진 구글
+     일정을 «지우려면» 그 사람 자격이 있어야 한다 — 그래서 로그인이 따로 필요하다.
+   ★ 그래서 단추는 «필요할 때만» 뜬다 — 이어진 건이 화면에 있는데 아직 로그인을
+     안 했을 때. 늘 띄우면 아무도 안 누르고 머리줄만 좁아진다.
+   ⚠ 되돌아올 주소가 구글 콘솔에 «등록»돼 있어야 한다(pu-cal.html).
+     등록 전에는 구글이 redirect_uri_mismatch 로 막는다 — 그때는 이알피에서
+     로그인하고 오면 같은 창의 토큰을 그대로 쓴다. */
+var GCAL_OAUTH_ID = "30712196914-1qc61a41ptmo6u7hbk71i70g00k3a8lk.apps.googleusercontent.com";
+var GCAL_SCOPE    = "https://www.googleapis.com/auth/calendar.events";
+function 구글로그인(){
+  location.href = PuGcalAuth.signInUrl({
+    clientId: GCAL_OAUTH_ID, scope: GCAL_SCOPE,
+    fallbackRedirect: "https://nabaho.github.io/pureunall/pu-cal.html"
+  });
+}
+/* 지금 화면에 «구글과 이어진» 건이 있나 — 있으면 지울 때 로그인이 필요하다 */
+function 이어진건있나(){
+  return arr(D.attendance_records).some(function(r){ return r && r.gcalEventId; });
+}
+function 구글단추Html(){
+  if(typeof PuGcalAuth === "undefined") return "";
+  if(PuGcalAuth.hasToken()) return "";
+  if(!이어진건있나()) return "";
+  return '<button class="glogin" data-glogin="1" title="구글과 이어진 일정을 지우려면'
+    + ' 구글 로그인이 필요합니다. 로그인 없이 지우면 구글 쪽에 일정이 남습니다.">'
+    + '🔐 구글 로그인</button>';
+}
+
+/* ── 비고(개인 요구사항) 고치기 ──────────────────────────────────────────
+   캘린더 한 곳으로 모으기 2걸음(다). 이알피로 보내던 마지막 자리다.
+
+   ⚠ 담기는 자리가 둘이다 — 이알피가 그렇게 담아 온 것을 그대로 따른다.
+     · 외부 인원: external_staff 레코드의 note 칸 → «레코드 표»라 칸별 저장 문(save)
+     · 내부 직원: data/ieum_notes 의 { 사번: 글 } → 한 덩이 지도라 saveNotes
+     옮겨서 한 자리로 합치고 싶어도 지금 하지 않는다 — 옮기다 옛 글을 잃는다.
+   ⚠ 관리자만이 아니다. 서버 규칙이 «로그인한 직원 누구나»로 열려 있고,
+     이알피도 「전 직원 수정 가능」이 확정 사양이었다. 같게 둔다. */
+function openNote(pk){
+  var p = ieumPeople().filter(function(x){ return x.pk === pk; })[0];
+  if(!p) return;
+  S.note = { pk:pk, kind:p.kind, name:p.name, text:p.note || "", busy:false, err:"" };
+  render();
+}
+function closeNote(){ S.note = null; render(); }
+function noteHtml(){
+  var m = S.note; if(!m) return "";
+  return '<div class="veil" data-close="1"></div><div class="modal" style="max-width:420px">'
+    + '<h3>📝 비고 — ' + esc(m.name) + '</h3>'
+    + '<div class="mmnote">그 사람에게만 해당하는 요구사항을 적습니다. '
+    +   '예: 「2·4주 금요일만」·「오전만」. 달력 칩을 손대면 뜨는 설명에도 같이 보입니다.</div>'
+    + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : '')
+    + '<div class="fld"><textarea data-note="1" rows="3" placeholder="안 적어도 됩니다"'
+    +   (m.busy ? ' disabled' : '') + '>' + esc(m.text) + '</textarea></div>'
+    + '<div class="mbtns"><span class="sp"></span>'
+    + '<button class="btn ghost" data-close="1">그만</button>'
+    + '<button class="btn" data-noteact="save"' + (m.busy ? ' disabled' : '') + '>'
+    +   (m.busy ? '저장 중…' : '저장') + '</button></div></div>';
+}
+function saveNote(){
+  var m = S.note; if(!m || m.busy) return;
+  var el = document.querySelector('[data-note]');
+  var 글 = el ? String(el.value || "").trim() : m.text;
+  m.busy = true; m.err = ""; render();
+  var 끝 = function(r){
+    m.busy = false;
+    if(r && r.ok){
+      closeNote(); toast("✅ 비고를 적었습니다");
+      refreshOne(m.kind === "in" ? "ieum_notes" : "external_staff");
+    } else {
+      m.err = (r && r.message) || "저장하지 못했습니다"; render();
+    }
+  };
+  if(m.kind === "in"){
+    var 다음 = Object.assign({}, (D.ieum_notes && typeof D.ieum_notes === "object") ? D.ieum_notes : {});
+    if(글) 다음[m.pk] = 글; else delete 다음[m.pk];
+    PuCalWrite.saveNotes(다음).then(function(r){ if(r && r.ok) D.ieum_notes = 다음; 끝(r); })
+      ["catch"](function(e){ 끝({ ok:false, message:(e && e.message) || String(e) }); });
+  } else {
+    var x = arr(D.external_staff).filter(function(e){ return e && e.id === m.pk; })[0];
+    PuCalWrite.save("external_staff", { id:m.pk, note:글 }, x).then(function(r){
+      if(r && r.ok && x) x.note = 글;
+      끝(r);
+    })["catch"](function(e){ 끝({ ok:false, message:(e && e.message) || String(e) }); });
+  }
+}
+
+/* ── 외부 공유 뷰 «발행» ────────────────────────────────────────────────
+   캘린더 한 곳으로 모으기 2걸음.
+
+   ★ 여기서 고친 진짜 고장
+     공개 일정(ieum_public)을 만드는 일이 이알피에만 걸려 있었다. 그런데 이음 근무를
+     «푸른 캘린더에서도» 고치게 되면서(1걸음), 캘린더에서 고친 것은 공개 뷰에 안
+     따라갔다 — 외부 변호사가 받은 링크에 옛 일정이 그대로 떠 있었다.
+     이알피 이음센터 화면을 열어야만 다시 발행됐기 때문이다.
+
+   ★ 만드는 셈은 js/pu-ieum-public.js «한 곳»이다 — 이알피도 그 파일을 부른다.
+     여기서 다시 셈하지 말 것(두 벌이 되면 두 화면의 공개 일정이 갈린다).
+   ⚠ 발행은 «덮어쓰기»다. 원본은 근태라 언제든 다시 만들 수 있다. */
+function 발행자료(){
+  return {
+    attendance: arr(D.attendance_records),
+    users: allUsers(),
+    externals: arr(D.external_staff),
+    year: new Date().getFullYear()
+  };
+}
+function 발행하기(조용히){
+  if(typeof PuIeumPublic === "undefined" || !fbDb) return;
+  if(!조용히){ S.pub = { busy:true, msg:"" }; render(); }
+  return PuIeumPublic.publish(fbDb, 발행자료()).then(function(만든것){
+    var 날수 = Object.keys(만든것.roster || {}).length;
+    S.pub = { busy:false, msg:"✅ 발행했습니다 — " + 날수 + "일치", at:Date.now() };
+    if(!조용히) render();
+  })["catch"](function(e){
+    S.pub = { busy:false, msg:"발행하지 못했습니다: " + ((e && e.message) || e) };
+    if(!조용히) render();
+  });
+}
+/* 일정을 고치면 «저절로» 발행한다 — 이알피와 같은 요령(3초 모아서 한 번).
+   ⚠ 고칠 때마다 바로 올리면 끌어놓기로 여러 건을 잇따라 고칠 때 그만큼 올라간다. */
+var _발행타이머 = null;
+function 발행예약(){
+  if(typeof PuIeumPublic === "undefined" || !fbDb) return;
+  clearTimeout(_발행타이머);
+  _발행타이머 = setTimeout(function(){ 발행하기(true); }, 3000);
+}
+function 발행시각Html(){
+  var at = (S.pub && S.pub.at) || 0;
+  if(!at) return "";
+  var d = new Date(at);
+  return '<span class="pubat">마지막 발행 ' + String(d.getHours()).padStart(2,"0")
+    + ":" + String(d.getMinutes()).padStart(2,"0") + '</span>';
+}
+
+/* ── 개인 공유 링크 발급·재발급 ──────────────────────────────────────────
+   ⚠ 재발급하면 «지금 링크가 그때부터 안 열린다». 되돌릴 수 없으니 한 번 묻는다.
+   ⚠ 외부 인원 표(external_staff)는 지도형이라 칸별 저장 문을 그대로 쓴다 —
+     그 사람의 shareKey 칸 하나만 고친다(다른 칸·다른 사람을 안 건드린다). */
+function 링크발급(extId){
+  if(!잇기할수있나()) return;
+  var x = arr(D.external_staff).filter(function(e){ return e && e.id === extId; })[0];
+  if(!x) return;
+  var 다시 = !!x.shareKey;
+  if(다시 && !window.confirm(x.name + "님의 링크를 재발급할까요?\n지금 링크는 그때부터 열리지 않습니다."))
+    return;
+  var 새열쇠 = PuIeumPublic.newShareKey();
+  PuCalWrite.save("external_staff", { id: extId, shareKey: 새열쇠 }, x).then(function(r){
+    if(r && r.ok){
+      x.shareKey = 새열쇠;                     /* 화면이 든 것도 함께 고친다 */
+      toast(다시 ? "🔑 재발급했습니다 — 새 링크를 전해 주세요" : "🔑 발급했습니다");
+      발행하기(true);                          /* people 목록이 바뀌었으니 다시 올린다 */
+      render();
+    } else {
+      toast("발급하지 못했습니다: " + ((r && r.message) || ""));
+    }
+  })["catch"](function(e){ toast("발급하지 못했습니다: " + ((e && e.message) || e)); });
+}
+
+/* 실시간DB 열쇠에는 점(.)을 못 쓴다 — 이메일에는 점이 있어 쉼표로 바꿔 담는다.
+   ⚠ 이알피와 «같은 셈»이어야 한다. 다르면 이어 둔 사람이 안 찾아진다. */
+function gcalMailKey(m){ return String(m || "").trim().toLowerCase().replace(/[.#$\[\]\/]/g, ","); }
+function gcalMailMap(){
+  var v = D.gcal_mail_sid;
+  return (v && typeof v === "object" && !Array.isArray(v)) ? v : {};
+}
+/* 만든이 메일 → 직원 사번.
+   ★ 사람이 «한 번 이어 준 것»이 가장 확실하다 — 명부 대조보다 먼저 본다.
+     명부에는 gmail 이 없어(로그인아이디는 사번@… 꼴) 이 표가 없으면 맞출 길이 없다. */
+function gcalSidByMail(mail){
+  var k = gcalMailKey(mail);
+  if(!k) return "";
+  var mp = gcalMailMap();
+  if(mp[k]) return mp[k];
+  var us = users();
+  for(var i = 0; i < us.length; i++){
+    var u = us[i] || {};
+    var cands = [u.loginId, u.email, u.gmail, u.googleEmail];
+    for(var j = 0; j < cands.length; j++){
+      if(cands[j] && gcalMailKey(cands[j]) === k) return u.sid;
+    }
+  }
+  return "";
+}
+/* 이어 준 사람이 없을 때 — 메일로 «늘 같은» 색 하나를 고른다 */
+function gcalMailColor(mail){
+  var k = gcalMailKey(mail);
+  if(!k) return "";
+  var uniq = gcalPalette() || ["#2563eb","#16a34a","#dc2626","#d97706","#64748b","#1e40af"];
+  var h = 0;
+  for(var i = 0; i < k.length; i++){ h = (h * 131 + k.charCodeAt(i)) >>> 0; }
+  return uniq[h % uniq.length];
+}
+
+/* 그 달(앞뒤 걸친 42칸)의 구글 일정을 받아 둔다.
+   ⚠ 달이 바뀔 때만 받는다 — 다시 그릴 때마다 받으면 요금과 깜빡임이 는다. */
+function gcalLoad(force){
+  var 칸 = monthGrid(S.ym);
+  var 첫날 = 칸[0].date, 끝날 = shiftDay(칸[칸.length-1].date, 1);
+  var 키 = 첫날 + "~" + 끝날;
+  if(!force && GCAL.ym === 키) return Promise.resolve();
+  GCAL.ym = 키; GCAL.loading = true; GCAL.err = "";
+  var url = "https://www.googleapis.com/calendar/v3/calendars/"
+    + encodeURIComponent(GCAL_CAL_ID) + "/events?key=" + GCAL_API_KEY
+    + "&timeMin=" + encodeURIComponent(첫날 + "T00:00:00+09:00")
+    + "&timeMax=" + encodeURIComponent(끝날 + "T00:00:00+09:00")
+    + "&singleEvents=true&orderBy=startTime&maxResults=500";
+  return gcalLoadColors()
+    .then(function(){ return fetch(url); })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.error){ throw new Error(d.error.message || "구글 달력 오류"); }
+      GCAL.evs = (d.items || [])
+        .filter(function(ev){ return ev.start && (ev.start.date || ev.start.dateTime); })
+        .map(gcalToEvent);
+      GCAL.loading = false; render();
+      /* 색표가 이제 손에 있다 — 색이 없는 직원이 있으면 이때 채운다(1걸음).
+         ⚠ 그리기가 끝난 «뒤»다. 색 채우다 실패해도 달력은 이미 떠 있다. */
+      색채우기();
+    })
+    .catch(function(e){
+      /* ⚠ 못 받았으면 «조용히» 비우지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이다 */
+      GCAL.loading = false; GCAL.err = (e && e.message) || String(e); render();
+    });
+}
+
+/* 구글 일정 한 건 → 우리 칩.
+   ★ 색 고르는 차례 — 앞이 있으면 뒤로 안 넘어간다(이알피와 같다):
+     ①구글에서 그 일정에 «고른» 색  ②만든이가 이어져 있으면 그 직원 색
+     ③제목에 현직 이름이 있으면 그 직원 색  ④만든이 메일로 늘 같은 색  ⑤기본 */
+function gcalToEvent(ev){
+  var date = (ev.start.date || ev.start.dateTime || "").slice(0,10);
+  var timeStr = ev.start.dateTime ? ev.start.dateTime.slice(11,16) : "";
+  var title = (ev.summary || "").trim()
+    || (ev.description || "").replace(/<[^>]+>/g, "").slice(0,20).trim();
+  if(!title && timeStr) title = timeStr + " 일정";
+  if(!title) title = "일정";
+  var gColor = (window._gcalColors && ev.colorId) ? (window._gcalColors[String(ev.colorId)] || "") : "";
+  var mail = (ev.creator && ev.creator.email) || (ev.organizer && ev.organizer.email) || "";
+  var mailSid = gcalSidByMail(mail);
+  var color = gColor || (mailSid ? (colorOf(mailSid) || "") : "")
+    || gcalMailColor(mail) || (ev.summary ? "#2563eb" : "#94a3b8");
+  var sid = mailSid || "GCAL";
+  var us = users();
+  for(var ui = 0; ui < us.length; ui++){
+    var u = us[ui];
+    if(u.name && title.indexOf(u.name) >= 0){
+      /* ⚠ 구글 색이 있으면 «그것이 이긴다» — 앱 색으로 덮으면 구글 화면과 달라진다.
+         ⚠ 만든이가 이미 찾아졌으면 그것이 더 확실하다 — 제목의 이름은 「권형하에게
+           보고」처럼 «남의 이름»일 수도 있다. */
+      if(!gColor && !mailSid) color = colorOf(u.sid) || color;
+      if(!mailSid) sid = u.sid;
+      break;
+    }
+  }
+  /* 끝날 — 구글처럼 여러 날 일정을 «한 줄 막대»로 잇는 데 쓴다(대표 지시 2026-09-27).
+     ⚠ 종일 일정의 end.date 는 «다음 날»이다(끝 안 듦) — 하루 당겨야 마지막 날이 된다.
+     ⚠ 시각 일정이 자정에 끝나면(…T00:00) 그 날은 안 든다 — 이것도 하루 당긴다. */
+  var 끝 = date;
+  if(ev.end && ev.end.date) 끝 = shiftDay(String(ev.end.date).slice(0,10), -1);
+  else if(ev.end && ev.end.dateTime){
+    끝 = String(ev.end.dateTime).slice(0,10);
+    if(String(ev.end.dateTime).slice(11,16) === "00:00" && 끝 > date) 끝 = shiftDay(끝, -1);
+  }
+  if(!끝 || 끝 < date) 끝 = date;
+  var 끝시각 = (ev.end && ev.end.dateTime) ? Date.parse(ev.end.dateTime) : 0;
+  /* ⚠ 아이콘을 안 붙인다 — 구글 화면에는 없다(kind 로 이미 갈린다) */
+  return { kind:"gcal", store:"gcal", id:ev.id, sid:sid, date:date, end:끝,
+    endAt: 끝시각 > 0 ? 끝시각 : 0,
+    /* 시각은 구글 화면처럼 「10:30」 — 제목에 사람이 적은 「1030」과 갈려 보여야 한다 */
+    text:title, time: ev.start.dateTime ? timeStr : "",
+    /* 만든이 메일을 남긴다 — 「계정 잇기」 창이 «아직 안 이은 사람»을 여기서 센다 */
+    mail:mail, mailSid:mailSid || "",
+    color:color, gcalUrl:ev.htmlLink || "",
+    tip: title + (ev.location ? "\n📍 " + ev.location : "")
+         + (mail ? "\n✉ " + mail : "") };
+}
+
+/* 그 날의 일들 — 칩의 «글자와 색»은 이알피와 글자 하나까지 같다.
+   ⚠ 여기서 예쁘게 바꾸지 말 것. 대표님이 두 화면을 나란히 놓고 보신다.
+     고칠 일이 생기면 이알피부터 고치고 그 다음 여기를 맞춘다
+     (tests/cal-same-as-erp.test.js 가 두 쪽을 맞대 본다). */
+function eventsOn(ymd, eumOnly){
+  var out = [];
+  /* ① 일정 — 외부 협력자 일정은 ⚖️·🤝 를 앞에 붙이고 그 사람 색으로 */
+  arr(D.my_schedules).forEach(function(s){
+    if(!s || s.date !== ymd) return;
+    if(s.externalId){
+      var ext = externalOf(s.externalId);
+      if(!ext || ext.active === false) return;
+      var prefix = ext.role === "변호사" ? "⚖️" : "🤝";
+      out.push({ kind:"sch", store:"my_schedules", id:s.id, sid:"EXT_"+s.externalId, externalId:s.externalId,
+        text: prefix + " " + ext.name + (s.title ? " · " + s.title : ""),
+        time:"", color: ext.color || "#2563eb",
+        tip: ext.name + (ext.role ? " (" + ext.role + ")" : "") + (ext.contact ? "\n☎ " + ext.contact : "")
+             + (ext.note ? "\n📝 요구사항: " + ext.note : "") });
+      return;
+    }
+    var hm = String(s.time || "").slice(0,5);
+    out.push({ kind:"sch", store:"my_schedules", id:s.id, sid:s.sid,
+      text: s.title || "일정",
+      /* 시각은 구글 화면처럼 「10:30」 (대표 지시 2026-09-27 「구글캘린더와 완벽하게 같이」) */
+      time: (hm && hm !== "00:00") ? hm : "",
+      color: colorOf(s.sid) || "#64748b",
+      tip: (s.title || "일정") + (s.note ? " · " + s.note : "") });
+  });
+  /* ② 근태 — 이알피와 같은 글자·같은 색 */
+  arr(D.attendance_records).forEach(function(r){
+    if(!r || r.date !== ymd) return;
+    if(ATT_SHOW.indexOf(r.type) < 0) return;
+    var who = nameOf(r.sid) ? " (" + nameOf(r.sid) + ")" : "";
+    var 글 = r.type === "leave" ? "🏖️ 연차" + who
+      : r.type === "halfday-am" ? "🌅 오전반차" + who
+      : r.type === "halfday-pm" ? "🌇 오후반차" + who
+      : r.type === "leave-hour" ? "⏱️ 시간연차" + who
+      : r.type === "special-leave" ? "🎁 특별휴가" + who
+      : r.type === "maternity" ? "🤱 출산휴가" + who
+      : r.type === "parental-leave" ? "👶 육아휴직" + who
+      : r.type === "sick" ? "🤒 병가" + who + (r.note ? " " + r.note : "")
+      : r.type === "trip" ? "🚗 출장" + who + (r.note ? " " + r.note : "")
+      : r.type === "telework" ? "🏠 재택" + who + (r.note ? " " + r.note : "")
+      : r.type === "eum-work" ? (function(){
+          var t = r.startTime ? r.startTime.replace(":","") + "-" + String(r.endTime||"").replace(":","") + " " : "";
+          if(r.externalId){
+            var ex = externalOf(r.externalId);
+            if(ex) return "🏛️ " + t + ex.name + " 이음센터" + (r.note ? " " + r.note : "");
+          }
+          var nm = nameOf(r.sid);
+          return "🏛️ " + t + (nm ? nm + " 이음센터" : "이음센터") + (r.note ? " " + r.note : "");
+        })()
+      : "";
+    /* 색 — 이알피와 같은 차례. 이음센터는 «그 직원 색», 사람을 모르면 회색이다
+       (외부 협력자의 이음 근무가 회색인 까닭 — 이알피도 그 사람 색을 쓰지 않는다). */
+    var col = r.type === "trip" ? "#1e40af"
+      : r.type === "telework" ? "#2563eb"
+      : r.type === "eum-work" ? (colorOf(r.sid) || "#94a3b8")
+      : r.type === "sick" ? "#dc2626"
+      : (colorOf(r.sid) || "#64748b");
+    var tip = 글;
+    if(r.type === "eum-work" && r.externalId){
+      var e2 = externalOf(r.externalId);
+      if(e2) tip = e2.name + (e2.role ? " (" + e2.role + ")" : "")
+        + (e2.contact ? "\n☎ " + e2.contact : "") + (e2.note ? "\n📝 요구사항: " + e2.note : "");
+    }
+    out.push({ kind: r.type === "eum-work" ? "eum" : "att", store:"attendance_records", id:r.id,
+      sid:r.sid, externalId:r.externalId, type:r.type,
+      text:글, time:"", color:col, tip:tip });
+  });
+  /* ③ 구글 캘린더 — 이알피 달력을 채우는 것이 이것이다(9월 126건).
+     ⚠ 이음 보기에서는 안 보탠다 — 거기는 이음 근무만 보는 자리다.
+     ⚠★ 거르개가 「전체」나 「구글」일 때만 섞는다 — 이알피와 «같은 규칙»이다
+        (pu-erp.html: calFilter === null || calFilter === 'gcal').
+        사람을 고른 채로 구글까지 섞으면 칩에 붙는 「겹친 날」 숫자가 두 앱에서 달라진다. */
+  if(!eumOnly && (S.filter === null || S.filter === "gcal")){
+    /* 여러 날 일정은 «걸친 날마다» 든다 — 구글처럼 막대로 잇는 것은 그리는 쪽(줄배치)이 한다 */
+    for(var gi = 0; gi < GCAL.evs.length; gi++){
+      var ge = GCAL.evs[gi];
+      if(ge.date === ymd || (ge.end && ge.date < ymd && ymd <= ge.end)) out.push(ge);
+    }
+  }
+  /* ④ 사건 마감일 · 단계 기한 · 휴직 (5걸음에 되살린 층 셋)
+     ⚠ 이음 보기에는 안 넣는다 — 거기는 이음 근무만 보는 자리다(구글과 같은 까닭).
+     ⚠ 「구글만」 거르개일 때도 안 넣는다 — 구글에서 온 것만 보자는 뜻이다.
+     ⚠ 셋 다 movable:false 다. 계산된 값이거나 다른 화면이 주인이라,
+       여기서 끌어 옮기면 그 화면과 어긋난다. */
+  /* ⚠ typeof 로 본다 — 검사가 eventsOn 만 떼어 상자에 넣고 도는 자리가 여럿 있다
+     (chipHtml 의 ME 와 같은 까닭). 없으면 그 층만 안 그린다 — 나머지는 멀줦하다.
+     진짜로 도는지는 tests/case-due-chips.test.js 가 따로 재서 본다. */
+  if(!eumOnly && S.filter !== "gcal" && typeof 기한칩 === "function"){
+    기한칩(ymd).forEach(function(c){
+      /* 사람 거르개 — 담당자가 그 사람인 것만. 휴직은 그 사람 것만. */
+      if(S.filter && S.filter !== "pureun" && S.filter !== "eumwork" && c.sid !== S.filter) return;
+      if(S.filter === "eumwork") return;
+      out.push({ kind:c.kind, store:"", id:c.kind + ":" + c.date + ":" + (c.sid || ""),
+        sid:c.sid, text:c.text, time:"", color:c.color, tip:c.tip, movable:false });
+    });
+  }
+  if(eumOnly) out = out.filter(function(e){ return e.kind === "eum"; });
+  return out;
+}
+/* 달력에 그리는 근태 — 이알피와 같은 목록이다(지각·조퇴·결근·공가는 달력에 안 뜬다) */
+var ATT_SHOW = ["leave","halfday-am","halfday-pm","leave-hour","special-leave","sick",
+                "maternity","parental-leave","trip","telework","eum-work"];
+
+/* 거르개 — null=전체 · 'pureun'=푸른 직원만 · 'eumwork'=이음 근무만 · sid=그 사람만 */
+/* 거르개 — 이알피와 같은 뜻으로 가른다.
+     null      = 전체
+     'pureun'  = 푸른 직원 것만 (구글·외부인 제외)
+     'gcal'    = 구글 달력에서 온 것만
+     'eumwork' = 이음센터 근무만
+     사번      = 그 사람 것만 */
+function passFilter(ev){
+  var f = S.filter;
+  if(!f) return true;
+  if(f === 'pureun')  return ev.kind !== 'gcal' && !ev.externalId;
+  if(f === 'gcal')    return ev.kind === 'gcal';
+  if(f === 'eumwork') return ev.kind === 'eum';
+  return ev.sid === f;
+}
+
+/* ── 달력 그리기 ───────────────────────────────────────────────────── */
+/* ── 달력 — 이알피(법인 대시보드)와 «같은 꼴» ─────────────────────────
+   대표 지시 2026-09-18 「대시보드 제외한 화면은 똑같이 만들어라」.
+   그래서 여기서 정하는 것은 우리 취향이 아니라 «이알피가 하던 그대로»다:
+     · 날짜 옆 괄호는 음력 날짜 — 구글 달력 위젯이 「25 (13)」로 붙여 주는 그 숫자
+     · 오늘은 숫자에만 파란 동그라미(음력까지 감싸면 알약처럼 길어진다)
+     · 공휴일은 칸 맨 위에 «칩»으로 (오른쪽 위 작은 글씨가 아니다)
+     · 한 칸에 넷까지 보이고 나머지는 접는다 — 셋이면 더보기가 너무 자주 뜬다
+     · 시각은 「1030」처럼 콜론 없이 붙여 쓴다 — 좁은 칸에서 제목이 두 글자쯤 더 보인다
+     · 여섯 줄 고정(6×7) — 달마다 표 높이가 들썩이지 않게
+   ⚠ 값을 바꾸고 싶으면 이알피부터 보라. 두 화면이 갈리는 것이 여기서 가장 나쁘다. */
+
+/* 음력 — 표를 손으로 들고 있지 않는다. 브라우저에 든 단기(檀紀)력을 쓴다.
+   ⚠ 42칸을 다시 그릴 때마다 새로 세면 느리다 — 한 번 센 것은 적어 둔다. */
+var _lunar = {};
+function lunarDay(ymd){
+  if(!ymd) return "";
+  if(_lunar[ymd] !== undefined) return _lunar[ymd];
+  var out = "";
+  try{
+    out = new Intl.DateTimeFormat("ko-KR-u-ca-dangi", {day:"numeric", timeZone:"UTC"})
+            .format(new Date(ymd + "T00:00:00Z")).replace(/[^0-9]/g, "");
+  }catch(e){ out = ""; }
+  _lunar[ymd] = out;
+  return out;
+}
+/* 머리글의 「병오년8월 – 9월」 — 그 달 첫날·끝날의 음력 달.
+   ⚠ 간지(병오)는 era:"long" 을 켜야 나온다. year:"numeric" 만 주면 2026 만 온다. */
+function lunarRange(ym){
+  try{
+    var y = +String(ym).slice(0,4), m = +String(ym).slice(5,7);
+    if(!y || !m) return "";
+    var a = new Date(Date.UTC(y, m-1, 1)), b = new Date(Date.UTC(y, m, 0));
+    var fm = new Intl.DateTimeFormat("ko-KR-u-ca-dangi", {era:"long", year:"numeric", month:"numeric", timeZone:"UTC"});
+    function pick(d, t){ var ps = fm.formatToParts(d); for(var i=0;i<ps.length;i++) if(ps[i].type===t) return ps[i].value; return ""; }
+    var yn = pick(a,"yearName"), m1 = pick(a,"month"), m2 = pick(b,"month");
+    if(!m1) return "";
+    return yn + "년" + m1 + (m2 && m2 !== m1 ? " – " + m2 : "");
+  }catch(e){ return ""; }
+}
+
+/* WCAG 상대밝기 — «글자가 읽히는가»를 재는 데 쓴다.
+   ⚠ 사람 눈 어림(0.299/0.587/0.114)과 다르다. 그 어림으로 흰/검을 고르면
+     초록(#51b749) 위에 짙은 글자가 붙어 2.55:1 까지 떨어진다 — 안 읽힌다.
+     이알피 calTextOn 이 아직 그 셈이다(거기도 같은 구멍 — 따로 고칠 일). */
+function 상대밝기(bg){
+  var hex = String(bg || "").replace("#", "");
+  if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  if(hex.length !== 6) return 1;
+  var c = [0,2,4].map(function(i){
+    var v = parseInt(hex.slice(i,i+2),16) / 255;
+    return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4);
+  });
+  return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
+}
+function 대비(a, b){
+  var x = 상대밝기(a), y = 상대밝기(b);
+  return (Math.max(x,y) + 0.05) / (Math.min(x,y) + 0.05);
+}
+/* 바탕색 위에 어떤 글자색이 읽히나 — 흰·검 둘을 «실제로 재서» 나은 쪽을 고른다.
+   ⚠ 고르는 두 색은 흰과 검뿐이다(팔레트 규율 — tests/color-palette-apps.test.js).
+     실측 최악: 밝은판 4.76:1 · 어두운판 4.59:1(사람 색 22 + 붙박이 색 5). */
+function textOn(bg){
+  return 대비(bg, "#ffffff") >= 대비(bg, "#000000") ? "#ffffff" : "#000000";
+}
+/* 색 둘을 섞는다(t=0 이면 원색 그대로, t=1 이면 완전히 두번째 색) —
+   일정 칩의 «옅은 바탕»을 만드는 데 쓴다. 사람 색 값 자체는 안 바꾼다(colorOf 그대로),
+   여기서는 «그리는 방법»만 바꾼다. */
+function mixHex(hexA, hexB, t){
+  function rgb(h){
+    h = String(h || "").replace("#", "");
+    if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    if(h.length !== 6) h = "64748b";
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  }
+  var a = rgb(hexA), b = rgb(hexB), out = [0,1,2].map(function(i){
+    return Math.round(Math.max(0, Math.min(255, a[i] + (b[i]-a[i]) * t)));
+  });
+  return "#" + out.map(function(v){ return v.toString(16).padStart(2,"0"); }).join("");
+}
+
+/* 여섯 줄 고정 격자 — 이알피 buildMonthGrid 와 같다 */
+function monthGrid(ym){
+  var year = parseInt(ym.slice(0,4),10), month = parseInt(ym.slice(5,7),10) - 1;
+  var first = new Date(year, month, 1), startDay = first.getDay();
+  var lastDate = new Date(year, month+1, 0).getDate();
+  var prevLast = new Date(year, month, 0).getDate();
+  var grid = [], k;
+  for(k = startDay-1; k >= 0; k--){
+    var pd = prevLast - k, pm = new Date(year, month-1, 1);
+    grid.push({ date: ymdOf(pm.getFullYear(), pm.getMonth()+1, pd), day:pd, other:true });
+  }
+  for(k = 1; k <= lastDate; k++) grid.push({ date: ymdOf(year, month+1, k), day:k, other:false });
+  var n = 1;
+  while(grid.length < 42){
+    var nm = new Date(year, month+1, 1);
+    grid.push({ date: ymdOf(nm.getFullYear(), nm.getMonth()+1, n), day:n, other:true }); n++;
+  }
+  return grid;
+}
+function ymdOf(y, m, d){
+  return y + "-" + String(m).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+}
+
+/* 일정 칩 하나 — 월·주·일 보기가 «같은 규칙»을 쓴다(보기를 바꿀 때 색이 튀지 않게).
+   ═══════════════════════════════════════════════════════════════════════════
+   ★ 다섯 판을 거쳤다. 되돌리기 전에 먼저 읽을 것.
+     ① 원색 채우기 — 하루에 대여섯 줄이 늘어서면 원색 띠가 부딪혀 눈이 시렸다.
+     ② 옅게 칠하고 왼쪽에 띠(85% 흰섞기) — 색 자체가 지워졌다.
+     ③ 글자 자체를 그 사람 색으로 — 색이 어두운 구석으로 뭉쳤다.
+     ④ 내 일정은 채우고 남의 일정은 옅게+왼쪽 띠.
+     ⑤ 지금 — 대표 지시 2026-09-27 「캘린더 ui 와 화면을 구글캘린더 화면과 글자색·테두리·
+       글자형태로 완벽하게 같이」. 구글 캘린더 월 보기를 재서 그대로 옮겼다:
+   ★ 규칙 (tests/cal-google-look.test.js)
+     ㉮ 종일 일정은 그 사람 색으로 «꽉» 채우고 글자는 흰색, 테두리·왼쪽 띠가 없다.
+     ㉯ 시각이 있는 일정은 바탕 없이 «색 점 · 시각(10:30) · 제목» — 글자는 짙은 회색.
+     ㉰ 지난 일정은 구글처럼 옅게 — 바탕(점)을 판 색 쪽으로 70% 옮기고 글자는 회색.
+        70% 는 구글 화면의 같은 색 칩(지난 것·올 것)을 픽셀로 견주어 얻은 값이다.
+     ㉱ 「내 일정」을 따로 칠하지 않는다 — 구글 화면에 그런 구별이 없다.
+     ㉲ 칩 머리의 그림글자(🏛️·🏖️ …)는 칩에 안 그린다 — 구글 화면에 없다(말풍선엔 남는다).
+   ⚠ 사람 색 «값»은 여기서 안 바꾼다(colorOf). 여기서는 «그리는 법»만 정한다.
+   ⚠ 여러 날 막대는 줄배치가 e._span(몇 칸)·e._gap(칸 사이 틈)·e._cutL/_cutR(주 끝에서
+     잘렸나)을 얹어 부른다 — 부르는 모양(chipHtml(e, ymd))은 안 바꾼다. */
+function chipHtml(e, ymd){
+  var 옅게 = .7;
+  var 사람색 = e.color || "#64748b";
+  var 어둠 = S.theme === "dark";
+  var 판 = 어둠 ? "#1e293b" : "#ffffff";
+  /* 지났나 — 시각이 있으면 «끝난 시각»으로, 없으면 «마지막 날»로 (구글과 같다) */
+  var 지남 = e.endAt ? (e.endAt < Date.now()) : ((e.end || ymd) < todayYMD());
+  var 공휴 = e.kind === "hol";
+  var 막대 = (e._span || 1) > 1 || (e.end && e.end > e.date);
+  var 시각칩 = !!e.time && !막대;
+  /* 칩 머리의 그림글자는 걷는다 — 구글 화면에는 없다 */
+  var 제목 = String(e.text || "").replace(/^(?:[☀-➿️‍]|[\uD83C-\uDBFF][\uDC00-\uDFFF])+\s*/, "");
+  /* ★ 끌어 옮길 수 있는 것과 아닌 것 (5걸음, 대표 지시 2026-09-21)
+       옮길 수 있다 — 우리 일정·근태(sch·att·eum)와 구글 일정(gcal)
+       옮길 수 없다 — 공휴일 · 사건 마감일 · 단계 기한 · 휴직
+     ⚠ 사건 기한은 «계산된 값»이고 휴직은 인사관리가 주인이다. 달력에서 옮기면
+       그 화면과 어긋난다 — 그래서 아예 못 잡게 한다(잡히면 사람은 된다고 믿는다).
+     ⚠ 잠긴 달은 «여기서» 막지 않는다. 막는 자리는 저장 문(pu-cal-write) 하나여야
+       두 곳이 어긋나지 않는다 — 놓은 뒤에 「잠긴 달입니다」라고 분명히 말한다. */
+  var 옮길수있나 = !공휴 && (e.movable !== false) && !!e.store && !!e.id;
+  var 꼴, 안;
+  if(시각칩){
+    꼴 = "color:" + (지남 ? "var(--gsub)" : "var(--gtext)");
+    안 = '<i class="gdot" style="background:' + esc(지남 ? mixHex(사람색, 판, 옅게) : 사람색) + '"></i>'
+      + '<span class="gtm">' + esc(e.time) + '</span>' + esc(제목);
+  } else {
+    꼴 = "background:" + esc(지남 ? mixHex(사람색, 판, 옅게) : 사람색)
+      + ";color:" + (지남 ? "var(--gsub)" : "#ffffff");
+    var n = e._span || 1;
+    /* 막대 — 칸 n 개를 건너간다. 100% 는 한 칸의 속 너비, 칸 사이 틈(여백·테두리)을 더한다.
+       position+z-index 로 «옆 칸 위에» 그린다(옆 칸 바탕이 막대를 덮지 않게). */
+    if(n > 1) 꼴 += ";width:calc(" + (n * 100) + "% + " + ((n - 1) * (e._gap || 0)) + "px);position:relative;z-index:1";
+    if(e._cutL) 꼴 += ";border-top-left-radius:0;border-bottom-left-radius:0";
+    if(e._cutR) 꼴 += ";border-top-right-radius:0;border-bottom-right-radius:0";
+    안 = (e.time ? esc(e.time) + " " : "") + esc(제목);
+  }
+  if(공휴){
+    return '<div class="ev hol" title="' + esc(e.tip || 제목) + '" style="' + 꼴 + '">' + 안 + '</div>';
+  }
+  return '<div class="ev" data-ev="' + esc(e.store) + ':' + esc(e.id) + '"'
+    + (시각칩 ? ' data-g="t"' : '')
+    + (옮길수있나 ? ' draggable="true" data-drag="' + esc(e.store) + ':' + esc(e.id) + '"' : '')
+    + ' title="' + esc(e.tip) + (옮길수있나 ? ' (끌어서 다른 날로 옮길 수 있습니다)' : '') + '"'
+    + ' style="' + 꼴 + '">' + 안 + '</div>';
+}
+
+/* 공휴일 한 건 → 칩 자료. 구글 「대한민국의 휴일」 달력과 같은 색으로 «보통 칩»처럼 그린다
+   (대표 지시 2026-09-27). 옮길 수 없다(movable:false). */
+var 공휴색 = "#d81b60";
+function 공휴칩(ymd){
+  var h = holidayOf(ymd);
+  return h ? { kind:"hol", store:"", id:"hol:" + ymd, date:ymd, end:ymd, text:h, tip:h,
+               color:공휴색, time:"", movable:false } : null;
+}
+
+/* ── 한 주를 «구글처럼» 늘어놓는다 ──────────────────────────────────────
+   대표 지시 2026-09-27 「구글캘린더 화면과 완벽하게 같이」.
+   ★ 여러 날 일정(연차 사흘 등)은 칸마다 따로 찍지 않고 «한 줄 막대»로 칸을 가로지른다.
+     그러려면 막대가 걸친 날들에서 «같은 높이(줄)»에 있어야 한다 — 그래서 한 주를
+     통째로 보고 줄을 먼저 나눈다(아래 차례는 구글과 같다):
+       ① 여러 날 막대 — 먼저 시작하는 것, 같으면 긴 것이 윗줄
+       ② 하루짜리 — 공휴일 · 종일 · 시각 순(시각은 이른 것부터). 막대 사이 빈 줄을 먼저 메운다.
+   ★ 칸이 모자라면 «용량»에서 한 줄을 「N개 더보기」에 내준다(칸용량 — 재서 나온 수).
+     막대는 «보이는 날들»까지만 잇고, 가려진 날에서 끊는다(더보기 글자를 안 덮는다).
+   날들: 날짜 7개(주 보기·월 보기 한 줄) · 일들: 날마다의 일 목록 · 용량: 한 칸 줄 수(없으면 안 접음)
+   틈: 칸 사이 폭(좌우 여백 + 테두리 px) — 막대 너비 셈에 쓴다.
+   돌려주는 것: 날마다 { html, 숨김 } */
+function 줄배치(날들, 일들, 용량, 틈){
+  if(!(용량 > 0)) 용량 = Infinity;
+  var 여러 = [], 본 = {};
+  일들.forEach(function(evs, di){
+    evs.forEach(function(e){
+      if(!(e.end && e.end > e.date)) return;
+      var k = e.store + ":" + e.id;
+      if(본[k]) return;
+      본[k] = 1;
+      var t = di;
+      while(t + 1 < 날들.length && 날들[t + 1] <= e.end) t++;
+      여러.push({ e:e, s:di, t:t, cutL: e.date < 날들[di], cutR: e.end > 날들[t] });
+    });
+  });
+  여러.sort(function(a, b){ return (a.s - b.s) || ((b.t - b.s) - (a.t - a.s)); });
+  var 점유 = [];
+  여러.forEach(function(g){
+    for(var l = 0; ; l++){
+      점유[l] = 점유[l] || [];
+      var 빔 = true;
+      for(var d = g.s; d <= g.t; d++) if(점유[l][d]){ 빔 = false; break; }
+      if(빔){ g.l = l; for(d = g.s; d <= g.t; d++) 점유[l][d] = g; break; }
+    }
+  });
+  var 줄들 = 날들.map(function(ds, di){
+    var 홑 = 일들[di].map(function(e, i){ return { e:e, i:i }; })
+      .filter(function(x){ return !(x.e.end && x.e.end > x.e.date); });
+    홑.sort(function(a, b){
+      function 차(e){ return e.kind === "hol" ? 0 : e.time ? 2 : 1; }
+      return (차(a.e) - 차(b.e)) || String(a.e.time || "").localeCompare(String(b.e.time || "")) || (a.i - b.i);
+    });
+    var 칸 = [], hi = 0, 끝줄 = -1, l;
+    for(l = 0; l < 점유.length; l++) if(점유[l][di]) 끝줄 = l;
+    for(l = 0; l <= 끝줄; l++){
+      if(점유[l][di]) 칸.push({ g:점유[l][di] });
+      else if(hi < 홑.length) 칸.push({ e:홑[hi++].e });
+      else 칸.push(null);
+    }
+    while(hi < 홑.length) 칸.push({ e:홑[hi++].e });
+    var 보임 = 칸.length <= 용량 ? 칸.length : Math.max(0, 용량 - 1);
+    var 숨김 = 0;
+    for(var p = 보임; p < 칸.length; p++) if(칸[p]) 숨김++;
+    return { 칸:칸, 보임:보임, 숨김:숨김, 막대:{} };
+  });
+  /* 막대를 «보이는 날끼리» 이어 붙인다 — 가려진 날에서 끊고, 다시 보이면 새로 시작 */
+  여러.forEach(function(g){
+    var d = g.s;
+    while(d <= g.t){
+      if(g.l >= 줄들[d].보임){ d++; continue; }
+      var a = d;
+      while(d + 1 <= g.t && g.l < 줄들[d + 1].보임) d++;
+      줄들[a].막대[g.l] = { n: d - a + 1, cutL: a > g.s || g.cutL, cutR: d < g.t || g.cutR };
+      d++;
+    }
+  });
+  return 줄들.map(function(z, di){
+    var html = "";
+    for(var p = 0; p < z.보임; p++){
+      var x = z.칸[p];
+      if(!x) { html += '<div class="evph"></div>'; continue; }
+      if(x.e){ html += chipHtml(x.e, 날들[di]); continue; }
+      var m = z.막대[p];
+      if(!m){ html += '<div class="evph"></div>'; continue; }
+      html += chipHtml(Object.assign({}, x.g.e, { _span:m.n, _gap:틈, _cutL:m.cutL, _cutR:m.cutR }), 날들[di]);
+    }
+    return { html: html, 숨김: z.숨김 };
+  });
+}
+
+/* ── 한 칸에 «몇 개»가 들어가나 ──
+   못 박은 수를 쓰지 않는다. 판이 화면에 맞춰 늘고 줄므로, 그려 놓고 «재서» 정한다.
+   ⚠ 재기 전 첫 그림에는 어림값(5)을 쓴다. 그린 뒤 재서 달라졌으면 «한 번만» 다시 그린다
+     — 값이 같아지면 다시 그리지 않으므로 돌고 돌지 않는다. */
+var _칸용량 = 0;
+var _첫줄용량 = 0;   /* 첫 줄(요일 글자가 얹힌 줄)의 칸 용량 — 용량재기가 잰다 */
+function 칸용량(){
+  if(_칸용량) return _칸용량;
+  /* ⚠ 아직 «못 쟀을 때»의 어림이다. 한때 여기에 5 를 못 박아 두었더니,
+     못 재는 판(창이 숨어 있을 때 등)에서는 그 5 가 그대로 남아 칸마다 넘쳤다.
+     못 박은 수 대신 화면 높이에서 뽑는다 — 200 은 머리(위 띠·탭줄·머리줄·요일줄)와
+     아래 여백이 먹는 몫, 30 은 칸 안의 날짜줄과 여백, 19.5 는 칩 하나와 틈이다.
+     재고 나면 이 값은 곧 «잰 값»으로 바뀐다(용량재기). */
+  var 남은 = (window.innerHeight || 800) - 200;
+  return Math.max(2, Math.floor((남은 / 6 - 30) / 19.5));
+}
+function 용량재기(){
+  var g = document.querySelector(".calgrid");
+  if(!g || !g.clientHeight) return false;
+  var 칸 = g.querySelector(".day");
+  if(!칸) return false;
+  /* ⚠ 높이를 «짐작»하지 않는다. 처음에 날짜줄 22·칩 17.5 로 어림했더니 칸마다 11px 씩
+     넘쳐 「+N개 더」가 잘렸다 — 날짜 동그라미는 24px 이고 칩은 테두리까지 18px 이다.
+     꾸밈을 한 줄만 고쳐도 어림값은 또 틀어진다. 그래서 그려 놓은 것을 실제로 잰다. */
+  var 줄 = g.clientHeight / 6;
+  var cs = getComputedStyle(칸);
+  var 여백 = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  function 날짜줄(c){
+    var dl = c && c.querySelector(".dline");
+    return dl ? dl.offsetHeight + (parseFloat(getComputedStyle(dl).marginBottom) || 0) : 0;
+  }
+  var ev = g.querySelector(".ev");
+  var 칩 = ev ? ev.offsetHeight + 2 : 22;          /* 칩 하나 + 사이 틈(gap 2px) */
+  if(!칩) return false;
+  /* ★ 첫 줄은 요일 글자가 얹혀 날짜줄이 높다 — 둘째 줄(8번째 칸)로 «보통 줄»을 잰다 */
+  var 보통 = g.querySelectorAll(".day")[7] || 칸;
+  var n = Math.max(1, Math.floor((줄 - 여백 - 날짜줄(보통)) / 칩));
+  var n0 = Math.max(1, Math.floor((줄 - 여백 - 날짜줄(칸)) / 칩));
+  if(n === _칸용량 && n0 === _첫줄용량) return false;
+  _칸용량 = n; _첫줄용량 = n0;
+  return true;
+}
+
+function calendarHtml(eumOnly){
+  /* 보는 달이 바뀌었으면 구글을 다시 받는다 — 같은 달이면 아무 일도 안 한다(gcalLoad 안에서 가른다) */
+  if(fbDb) gcalLoad();
+  if(S.view === "week") return weekHtml(eumOnly);
+  if(S.view === "day")  return dayHtml(eumOnly);
+  var grid = monthGrid(S.ym), today = todayYMD();
+  /* ★ 한 칸에 «들어가는 만큼» 그린다 (대표 지시 2026-09-19
+       「한화면에 나오게하고 달력안에 모든 내용 안보여도 된다. 펼서 볼수 있게 하면 된다」).
+     넷이라는 «못 박은 수»가 아니다 — 판의 높이를 재서 나온 수다(칸용량).
+     화면이 크면 여덟이 보이고 작으면 넷이 보인다. 남는 것은 「+N개 더」로 접고,
+     누르면 그 자리에서 펼쳐 전부 보인다 — 다른 데로 데려가지 않는다.
+   ⚠ 앞선 지시(「맞다 늘려라」)로 한때 아무것도 안 접었다. 그랬더니 바쁜 달이
+     화면 밖으로 내려갔고(「너무 내려왔다」), 이 지시가 그것을 고친 것이다.
+     되돌리려면 두 지시를 함께 볼 것 — tests/cal-cell-shows-all.test.js 가 막는다. */
+  var 용량 = 칸용량();
+  /* 날마다의 일 — 공휴일은 구글처럼 «보통 칩» 하나로 맨 앞에 든다(줄배치가 차례를 정한다) */
+  var 일들 = grid.map(function(c){
+    var evs = eventsOn(c.date, eumOnly).filter(passFilter).filter(matchSearch);
+    var h = 공휴칩(c.date);
+    return h ? [h].concat(evs) : evs;
+  });
+  /* 한 주씩(일곱 칸) 늘어놓는다 — 여러 날 막대가 한 주 안에서 이어진다.
+     11 = 칸 왼쪽 여백(2) + 오른쪽 여백(8) + 오른쪽 테두리(1) — .day 의 padding 을 바꾸면 이것도 바꾼다.
+     ★ 첫 줄은 요일 글자(일 월 화…)만큼 낮다 — 따로 잰 수(_첫줄용량)를 쓴다.
+       ⚠ typeof 로 본다 — 검사가 calendarHtml 만 떼어 상자에 넣고 돌 때 이 값이 없다. */
+  var 첫줄 = (typeof _첫줄용량 === "number" && _첫줄용량 > 0) ? _첫줄용량 : 용량;
+  var 배치 = [];
+  for(var w = 0; w < grid.length; w += 7){
+    배치 = 배치.concat(줄배치(grid.slice(w, w + 7).map(function(c){ return c.date; }),
+                          일들.slice(w, w + 7), w === 0 ? 첫줄 : 용량, 11));
+  }
+  var 요일 = ["일","월","화","수","목","금","토"];
+  var cells = grid.map(function(c, idx){
+    var evs = 일들[idx].filter(function(e){ return e.kind !== "hol"; });
+    var 오늘 = c.date === today;
+    var 찾음 = !!(S.q && evs.length);
+    /* ⚠ 칸 전체를 칠하지 않는다 — 구글 실제 화면을 재 보니(대표 지시 2026-09-20)
+       «오늘»도 «공휴일»도 «앞뒤 달»도 칸 배경은 흰색 그대로였다(픽셀로 확인: 255,255,255).
+       「오늘」은 숫자의 파란 동그라미(.dnum.today)만, 「공휴일」은 공휴일 칩만 맡는다.
+       「찾음」은 이 앱만의 기능이라(구글에 없다) outline+옅은 칠을 그대로 둔다. */
+    var 어둠 = S.theme === "dark";
+    var bg = 어둠 ? "#1e293b" : (찾음 ? "#fffbeb" : "#ffffff");
+    var 테 = "var(--gline)";
+    /* 구글처럼 그 달 첫날은 「9월 1일」 — 달이 바뀌는 자리가 눈에 띈다 */
+    var 날글 = c.day === 1 ? (parseInt(c.date.slice(5,7), 10) + "월 1일") : String(c.day);
+    var 숨김 = 배치[idx].숨김;
+    return '<div class="day' + (오늘 ? " today" : "") + '" data-day="' + c.date + '"'
+      + ' style="background:' + bg + ';border-right:1px solid ' + 테 + ';border-bottom:1px solid ' + 테
+      + (찾음 ? ';outline:2px solid #fbbf24;outline-offset:-2px' : '') + '">'
+      + '<div class="dline">'
+      /* 요일은 구글처럼 «첫 줄 칸 안»에 — 따로 줄을 두면 그만큼 달력이 낮아진다 */
+      +   (idx < 7 ? '<span class="wd">' + 요일[idx] + '</span>' : '')
+      +   '<div class="dnum' + (오늘 ? " today" : "") + (c.other ? " other" : "") + '">' + 날글 + '</div>'
+      +   '<span class="lun' + (c.other ? " other" : "") + '">(' + lunarDay(c.date) + ')</span>'
+      + '</div>'
+      + '<div class="evs">'
+      +   배치[idx].html
+      +   (숨김 > 0 ? '<div class="more" data-more="' + c.date + '" title="눌러서 그 날을 펼쳐 봅니다">'
+            + 숨김 + '개 더보기</div>' : '')
+      + '</div></div>';
+  }).join("");
+  return '<div class="cal">'
+    + '<div class="calgrid">' + cells + '</div></div>';
+}
+
+/* ── 펼침 창 ── 접힌 날을 «그 자리에서» 전부 보여 준다.
+   ⚠ 다른 화면으로 데려가지 않는다 — 한 칸을 보려고 보던 달을 잃으면 안 된다.
+     자리잡기는 그린 뒤에 한다(펼침자리) — 칸이 어디 있는지는 그려 봐야 안다. */
+function 펼침Html(eumOnly){
+  if(!S.open) return "";
+  var evs = eventsOn(S.open, eumOnly).filter(passFilter).filter(matchSearch);
+  var h = 공휴칩(S.open);
+  var d = new Date(S.open + "T00:00:00");
+  /* 차례는 달 칸과 같다(여러 날 → 공휴일 → 종일 → 시각) — 줄배치를 하루짜리로 부른다 */
+  var 안 = 줄배치([S.open], [h ? [h].concat(evs) : evs], Infinity, 0)[0].html;
+  /* 구글 「더보기」 창처럼 — 요일(작게) · 날짜(크게) · ✕ */
+  return '<div class="pop" id="pop">'
+    + '<div class="ph"><span class="wd">' + ["일","월","화","수","목","금","토"][d.getDay()] + '</span>'
+    +   '<span class="big">' + d.getDate() + '</span>'
+    +   '<span class="n">' + evs.length + '건</span>'
+    +   '<button class="x" data-popclose="1" title="닫기">✕</button></div>'
+    + '<div class="evs">'
+    +   안
+    +   (evs.length ? "" : '<div style="font-size:11.5px;color:var(--sub);padding:4px 2px">이 날은 비어 있습니다</div>')
+    + '</div></div>';
+}
+function 펼침자리(){
+  var p = document.getElementById("pop");
+  if(!p) return;
+  var 칸 = document.querySelector('.day[data-day="' + S.open + '"]');
+  if(!칸){ S.open = null; p.parentNode.removeChild(p); return; }
+  var r = 칸.getBoundingClientRect();
+  var w = p.offsetWidth, h = p.offsetHeight;
+  /* 칸 위에 겹쳐 띄우되, 화면 밖으로 나가면 안쪽으로 당긴다 */
+  var x = r.left - 2, y = r.top - 2;
+  if(x + w > window.innerWidth - 8) x = window.innerWidth - w - 8;
+  if(y + h > window.innerHeight - 8) y = window.innerHeight - h - 8;
+  p.style.left = Math.max(8, x) + "px";
+  p.style.top  = Math.max(8, y) + "px";
+}
+
+/* ── 주 보기 ── 이레를 나란히, 하루씩 위에서 아래로. 여러 날 일정은 달 보기처럼 막대로 잇는다 */
+function weekDays(ymd){
+  var d = new Date(ymd + "T00:00:00"), out = [];
+  d.setDate(d.getDate() - d.getDay());
+  for(var i=0;i<7;i++){ out.push(ymdOf(d.getFullYear(), d.getMonth()+1, d.getDate())); d.setDate(d.getDate()+1); }
+  return out;
+}
+function weekHtml(eumOnly){
+  var days = weekDays(S.date), today = todayYMD();
+  var 일들 = days.map(function(ds){
+    var evs = eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch);
+    var h = 공휴칩(ds);
+    return h ? [h].concat(evs) : evs;
+  });
+  /* 7 = .wcol 좌우 여백(3+3) + 오른쪽 테두리(1). 주 보기는 접지 않는다(Infinity). */
+  var 배치 = 줄배치(days, 일들, Infinity, 7);
+  var cols = days.map(function(ds, i){
+    var 오늘 = ds === today;
+    var d = new Date(ds + "T00:00:00");
+    var 어둠 = S.theme === "dark";
+    /* 주 보기도 달 보기와 같은 잣대다 — 오늘·공휴일 모두 칸 배경은 흰색 그대로다 */
+    var wbg = 어둠 ? "#1e293b" : "#ffffff";
+    return '<div class="wcol' + (오늘 ? " today" : "") + '" data-day="' + ds + '" style="background:' + wbg + '">'
+      + '<div class="whd">'
+      +   ["일","월","화","수","목","금","토"][d.getDay()]
+      +   '<div class="dnum' + (오늘 ? " today" : "") + '">' + d.getDate() + '</div>'
+      +   '<span class="lun">(' + lunarDay(ds) + ')</span></div>'
+      + '<div class="evs">' + 배치[i].html + '</div></div>';
+  }).join("");
+  return '<div class="cal"><div class="wgrid">' + cols + '</div></div>';
+}
+
+/* ── 일 보기 ── 하루치를 한 줄씩 크게 */
+function dayHtml(eumOnly){
+  var ds = S.date;
+  var evs = eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch);
+  var h = 공휴칩(ds);
+  return '<div class="cal"><div class="dayview" data-day="' + ds + '">'
+    + (h ? chipHtml(h, ds) : '')
+    + (evs.length ? 줄배치([ds], [evs], Infinity, 0)[0].html
+                  : '<div class="later"><p>이 날에는 아무것도 없습니다. 눌러서 넣으세요.</p></div>')
+    + '</div></div>';
+}
+
+/* ── 위 줄 ── ◀ 2026-09 ▶ · 병오년8월 – 9월 · 오늘 · [월|주|일] · 🔍 일정 검색 */
+/* 달력 머리줄 — 달 이동·보기·검색. «한 줄»이다 (대표 지시 2026-09-19 「한줄로 정리해라」).
+   ★ 사람 칩은 여기 없다 — 탭 줄로 올렸다(대표 지시 「캡쳐1은 캡쳐2 줄에 넣어라」).
+     탭 줄은 오른쪽이 통째로 비어 있었고, 칩을 한 줄 따로 두면 달력이 그만큼 내려간다.
+   ⚠ 좁은 화면에서는 접힌다(flex-wrap). 못 들어가는 것을 우겨 넣으면 글자가 잘린다.
+   ⚠ eumOnly 를 그대로 받는다 — 쓰지 않아도 부르는 쪽 모양을 바꾸지 않는다. */
+/* 달 이동 — 머리줄 «안»에 든다(renderTabs). 달력 판 위에 따로 줄을 두지 않는다. */
+function calheadHtml(eumOnly){
+  return '<div class="calhead">' + monthbarHtml() + '</div>';
+}
+function monthbarHtml(){
+  /* 구글 머리줄 꼴 (대표 지시 2026-09-27) — [오늘] ‹ › 2026년 9월 · 음력 · 월|주|일 */
+  var 요일 = ["일","월","화","수","목","금","토"];
+  function 달글(ymd){ return parseInt(ymd.slice(5,7),10) + "월 " + parseInt(ymd.slice(8,10),10) + "일"; }
+  var 가운데 = S.view === "month" ? (S.ym.slice(0,4) + "년 " + parseInt(S.ym.slice(5,7),10) + "월")
+    : S.view === "week" ? (function(){ var w = weekDays(S.date); return 달글(w[0]) + " – " + 달글(w[6]); })()
+    : (S.date.slice(0,4) + "년 " + 달글(S.date) + " (" + 요일[new Date(S.date + "T00:00:00").getDay()] + ")");
+  var 음력 = S.view === "month" ? lunarRange(S.ym) : "";
+  return '<div class="monthbar">'
+    + '<button class="todaybtn" data-mv="0">오늘</button>'
+    + '<button class="mv" data-mv="-1" title="이전">‹</button>'
+    + '<button class="mv" data-mv="1" title="다음">›</button>'
+    + '<span class="ym">' + esc(가운데) + '</span>'
+    + (음력 ? '<span class="lunrange">' + esc(음력) + '</span>' : '')
+    + '</div>';
+}
+/* 월 | 주 | 일 — 구글처럼 머리줄 오른쪽 끝 */
+function segHtml(){
+  return '<span class="seg">'
+    + [["month","월"],["week","주"],["day","일"]].map(function(v){
+        return '<button data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>';
+      }).join("")
+    + '</span>';
+}
+
+/* 검색칸 — 줄 맨 오른쪽 끝에 붙는다(.calhead .srch 의 margin-left:auto).
+   ⚠ 달바 안에 두면 월|주|일 바로 옆에 붙어 오른쪽이 통째로 빈다. */
+function srchHtml(){
+  /* ★ 구글 로그인·사람 색 단추는 «내 동그라미» 창으로 옮겼다(창도구Html) — 겹치던 것을 합쳤다.
+     계정 잇기는 «할 일이 있을 때만» 뜨는 알림이라 여기 그대로 둔다. */
+  var 열림 = !!(S.srch || S.q);
+  return 잇기단추Html()
+    + (열림
+        ? '<span class="srch"><span class="ic">🔍</span>'
+          + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>'
+        : '<button class="ib" data-srch="1" title="일정 검색">🔍</button>');
+}
+/* 「계정 잇기」 단추 — 아직 안 이은 사람이 있을 때만, 관리자에게만 보인다.
+   ⚠ 할 일이 없으면 안 보인다. 늘 떠 있으면 머리줄만 좁아지고 아무도 안 누른다. */
+function 잇기단추Html(){
+  if(!잇기할수있나()) return "";
+  var 남음 = 안이은수();
+  if(!남음) return "";
+  return '<button class="linkacct" data-mmopen="1" title="구글 일정에는 «누가 만들었는지»만 남습니다.'
+    + ' 한 번 이어 주면 그 뒤로 담당자 색이 정확해집니다.">👤 계정 잇기 ' + 남음 + '명</button>';
+}
+
+/* 검색 — 제목·메모·사람 이름 어디에 걸려도 남긴다 */
+function matchSearch(e){
+  if(!S.q) return true;
+  return String(e.tip || e.text || "").toLowerCase().indexOf(S.q.toLowerCase()) >= 0;
+}
+
+/* ── 사람 칩 ── 이알피처럼 «색 동그라미 + 이름 두 글자».
+   ⚠ 색은 이알피가 정한 것을 그대로 쓴다 — 같은 사람이 두 앱에서 다른 색이면
+     그 색은 아무 뜻도 없어진다. 여기서 새로 정하지 않는다. */
+function chipsHtml(eumOnly){
+  var 사람 = eumOnly ? ieumPeople().filter(function(p){ return !p.left; }) : users().map(function(u){
+    return { pk:u.sid, name:u.name || u.sid, color: colorOf(u.sid) || "#64748b" };
+  });
+  /* 배지 숫자의 «뜻» — 이알피와 같다: 총 건수가 아니라 «같은 날에 두 건 넘게 잡힌 날이 며칠인가».
+     ⚠ 총 건수를 적으면 바쁜 사람일수록 큰 숫자가 붙어 아무 뜻도 없다.
+       겹친 날을 세면 「이 사람 그날 두 탕이다」가 눈에 띈다 — 그게 봐야 할 것이다. */
+  var 겹침 = {};
+  monthDates().forEach(function(ds){
+    var 하루 = {};
+    eventsOn(ds, eumOnly).forEach(function(e){
+      var k = e.externalId || e.sid; if(!k) return;
+      하루[k] = (하루[k] || 0) + 1;
+    });
+    Object.keys(하루).forEach(function(k){ if(하루[k] >= 2) 겹침[k] = (겹침[k] || 0) + 1; });
+  });
+  /* 원천 칩 — 이알피 머리줄의 「푸른 · 이음 · 구글(126)」과 같은 뜻.
+     ⚠ 구글 칩에 «몇 건인지»를 적는다. 0 이면 못 받은 것인지 없는 것인지 갈라 적는다 —
+       빈 달력을 말없이 보여 주는 것이 가장 나쁘다(2026-09-18 에 그래서 텅 비어 보였다). */
+  /* 이알피와 «같은 수»를 적는다 — 이알피는 받아 온 것 전부를 센다(앞뒤 달에 걸친
+     42칸 어치). 이 달 것만 세면 이알피 화면과 숫자가 달라 보인다. */
+  var 구글수 = GCAL.evs.length;
+  var 앞 = '<button class="allchip' + (S.filter === null ? " on" : "") + '" data-f="">전체</button>';
+  var 뒤 = eumOnly ? '' : (
+      '<span class="srcsep"></span>'
+    + '<button class="chip' + (S.filter === "pureun" ? " on" : "") + '" data-f="pureun">푸른</button>'
+    + (GCAL.err
+        ? '<button class="chip warn" data-gcalretry="1" title="' + esc(GCAL.err) + '">⚠ 구글 못 받음 — 다시</button>'
+        : GCAL.loading
+          ? '<button class="chip" disabled>⏳ 구글 받는 중</button>'
+          : '<button class="chip' + (S.filter === "gcal" ? " on" : "") + '" data-f="gcal">구글 ' + 구글수 + '</button>'
+            /* 로그인이 필요할 때만 자물쇠 — 누르면 구글 로그인(예전 「🔐 구글 로그인」 단추) */
+            + (구글단추Html() ? '<button class="glock" data-glogin="1" title="구글과 이어진 일정을 지우려면 구글 로그인이 필요합니다">🔐</button>' : ''))
+  );
+  return '<div class="chips">' + 앞
+    + 사람.map(function(p){
+        var on = S.filter === p.pk;
+        var n = 겹침[p.pk] || 0;
+        return '<span class="pwrap">'
+          + '<button class="pchip' + (on ? " on" : "") + '" data-f="' + esc(p.pk) + '"'
+          /* ★ 이음 근무 탭에서는 칩을 날짜 칸으로 «끌어 놓으면» 그날 이음센터 근무가 들어간다
+               (대표 지시 2026-09-27 「이음근무를 마우스로 드레그해서 넣을 수 있게」) */
+          + (eumOnly ? ' draggable="true" data-dragp="' + esc(p.pk) + '"' : '')
+          + ' title="' + esc(p.name) + (eumOnly ? ' — 끌어서 날짜 칸에 놓으면 그날 이음센터 근무가 들어갑니다' : '')
+          + '" style="background:' + esc(p.color) + '">'
+          + esc(String(p.name).slice(0,2)) + '</button>'
+          + (n ? '<span class="pcount" title="' + esc(p.name) + ' 같은 날 겹친 일정 ' + n + '일">'
+                 + (n > 9 ? "9+" : n) + '</span>' : '')
+          + '</span>';
+      }).join("")
+    + 뒤 + '</div>';
+}
+
+/* 지금 보고 있는 범위의 날짜들 — 칩 옆 건수를 그 범위로만 센다 */
+/* 지금 «보이는» 첫 날과 마지막 날 — 앞뒤 달에 걸친 줄까지 넣는다.
+   ⚠ 그 달의 1일~말일로 자르면, 달력 첫 줄·끝 줄에 걸친 앞뒤 달 날짜가 빈 채로 뜬다. */
+function 보이는범위(){
+  if(S.view === "day") return { from:S.date, to:S.date };
+  if(S.view === "week"){ var w = weekDays(S.date); return { from:w[0], to:w[w.length-1] }; }
+  var g = monthGrid(S.ym);
+  return { from:g[0].date, to:g[g.length-1].date };
+}
+/* 사건 기한·휴직 칩 — 한 번 셈해 날짜별로 모아 둔다(칸마다 다시 셈하면 42번 돈다).
+   ⚠ 셈은 js/pu-case-due.js 한 곳이다. 여기서 다시 짜지 말 것 —
+     이알피 「나의 업무」의 D-day 도 같은 셈을 쓴다. */
+var _기한칩 = { 열쇠:"", 표:{} };
+function 기한칩(ymd){
+  var r = 보이는범위();
+  var 열쇠 = r.from + "~" + r.to + "|" + (D.cases ? arr(D.cases).length : 0)
+    + "|" + (D.leave_of_absence ? arr(D.leave_of_absence).length : 0);
+  if(_기한칩.열쇠 !== 열쇠){
+    var 표 = {};
+    if(typeof PuCaseDue !== "undefined"){
+      PuCaseDue.chips({
+        cases: arr(D.cases), stageCatalog: arr(D.biz_case_stages),
+        loa: arr(D.leave_of_absence), users: users(),
+        from: r.from, to: r.to
+      }).forEach(function(c){ (표[c.date] = 표[c.date] || []).push(c); });
+    }
+    _기한칩 = { 열쇠:열쇠, 표:표 };
+  }
+  return _기한칩.표[ymd] || [];
+}
+
+function monthDates(){
+  if(S.view === "day") return [S.date];
+  if(S.view === "week") return weekDays(S.date);
+  return monthGrid(S.ym).filter(function(c){ return !c.other; }).map(function(c){ return c.date; });
+}
+
+/* 못 읽은 칸이 있으면 숨기지 않는다 — 빈 달력은 「일정이 없다」는 거짓말이 된다. */
+function failedHtml(){
+  var ks = Object.keys(FAILED);
+  if(!ks.length) return '';
+  return '<div class="note"><span>⚠ 못 읽은 자료가 있습니다 — 달력이 다 차 보이지 않을 수 있습니다: '
+    + esc(ks.join(' · ')) + '</span></div>';
+}
+
+/* 어느 표가 아직 «배열»이면 그 표는 여기서 못 고친다 — 쓰면 표가 깨진다.
+   ⚠ 이 말을 달력 «맨 위»에 띠로 두지 않는다 — 달력은 이알피와 같아야 하고,
+     아직 아무것도 안 하려는 사람에게 못 하는 것부터 말하면 화면만 좁아진다.
+     대신 «고치려고 창을 연 그 순간» 그 자리에서 말한다(못 한다가 아니라 저기서 한다).
+     (대표 지시 2026-09-18 「대시보드 제외한 화면은 똑같이 만들어라」) */
+function 옛방식표(store){
+  return !PuCalWrite.isMapForm(PuCalRead.rawForm(store));
+}
+function 옛방식안내(store){
+  var 이름 = store === 'my_schedules' ? '일정' : '근태';
+  return '⚠ ' + 이름 + '은(는) 아직 옛 방식(배열)으로 담겨 있어 여기서 못 고칩니다.\n'
+    + '푸른이알피에서 고쳐 주세요 — 여기서 쓰면 표가 깨집니다.';
+}
+/* 마감된 달을 보고 있으면 미리 알린다 — 눌러 보고 나서 거절당하는 것보다 낫다 */
+function lockNote(){
+  if(arr(D.locked_attend_months).indexOf(S.ym) < 0) return '';
+  return '<div class="note"><span>🔒 '+esc(S.ym)+' 근태·휴가는 마감됐습니다 — 연차·근태는 고칠 수 없습니다'
+    + ' (일정은 됩니다).</span></div>';
+}
+
+/* ── 이음센터 · 인원 현황 ─────────────────────────────────────────────
+   「누가 몇 번 이음센터에 나갔나」를 사람별로 센다.
+   ⚠ 이 화면은 «읽기»다. 한도·비고·강의 기록을 고치는 것은 아직 이알피에서 한다 —
+     그 세 자리는 한 줄짜리 기록이 아니라 «표 통째»로 담겨 있어, 우리 저장 관문
+     (칸별로 보내기)이 그대로 못 쓴다. 억지로 통째 저장을 흉내 내면 두 사람이
+     같은 순간에 고칠 때 한쪽이 통째로 날아간다. */
+var IEUM_START_YEAR = 2024;
+/* 이알피의 같은 이름과 «같은 값»이어야 한다 — 다르면 밖으로 나간 링크가 갈린다.
+   tests/cal-ieum-view.test.js 가 두 값을 맞대 본다. */
+var IEUM_VIEW_BASE = 'https://nabaho.github.io/pureunall/ieum-view.html';
+
+/* 사람 목록 — 내부 노무사 → 외부 노무사 → 변호사 → 그만둔 사람(기록이 있는 경우만).
+   ⚠ 그만둔 사람을 지우지 않는다 — 지나간 근무 기록이 사라지면 셈이 틀어진다. */
+function ieumPeople(){
+  var ext = arr(D.external_staff);
+  var att = arr(D.attendance_records);
+  var 살아있는외부 = ext.filter(function(x){ return x && x.active !== false; });
+  var 이음근무있나 = function(pred){ return att.some(function(r){ return r.type === "eum-work" && pred(r); }); };
+  var 수동명단 = Array.isArray(D.ieum_members) ? D.ieum_members : null;
+  var rows = [];
+  /* 내부: 노무사는 늘 넣는다. 수동 명단이 있으면 그것을, 없으면 이음근무 기록이 있는 사람을. */
+  users().forEach(function(u){
+    var 노무사 = (String(u.title||"") + String(u.role||"")).indexOf("노무사") >= 0;
+    var 수동 = 수동명단 && 수동명단.indexOf(u.sid) >= 0;
+    var 기록 = !수동명단 && 이음근무있나(function(r){ return r.sid === u.sid && !r.externalId; });
+    if(!(노무사 || 수동 || 기록)) return;
+    /* ⚠ 현직만 이 줄에 넣는다 — 이알피와 같은 기준(status === "active").
+       그만둔 사람은 아래에서 «회색으로» 따로 넣는다. 여기 섞으면 그만둔 노무사가
+       현직처럼 보이고, 이음 근무를 배정할 사람 목록에까지 오른다.
+       (검사 tests/cal-ieum-same-as-erp.test.js 가 실제로 돌려 본다 — 처음엔 섞여 있었다) */
+    if(u.status !== "active") return;
+    rows.push({ pk:u.sid, name:u.name||u.sid, kind:"in", roleLabel:"내부 노무사",
+      color:colorOf(u.sid) || "#1e40af", note:(D.ieum_notes && D.ieum_notes[u.sid]) || "",
+      phone:u.phone||u.contact||"" });
+  });
+  var 변호사인가 = function(x){ return String(x.role||"").indexOf("변호사") >= 0; };
+  살아있는외부.filter(function(x){ return !변호사인가(x); }).forEach(function(x){
+    rows.push({ pk:x.id, name:x.name, kind:"ex", roleLabel:"외부 노무사", color:x.color||"#d97706", note:x.note||"", phone:x.contact||"" });
+  });
+  살아있는외부.filter(변호사인가).forEach(function(x){
+    rows.push({ pk:x.id, name:x.name, kind:"law", roleLabel:"변호사", color:x.color||"#16a34a", note:x.note||"", phone:x.contact||"" });
+  });
+  /* 그만둔 사람 — 기록이 있을 때만, 회색으로 */
+  var 이미 = {}; rows.forEach(function(r){ 이미[r.pk] = 1; });
+  users().forEach(function(u){
+    if(이미[u.sid] || u.status === "active") return;
+    if(!이음근무있나(function(r){ return r.sid === u.sid && !r.externalId; })) return;
+    rows.push({ pk:u.sid, name:u.name||u.sid, kind:"in", roleLabel:"내부 노무사", color:"#94a3b8", left:true, note:"" });
+  });
+  ext.filter(function(x){ return x && x.active === false; }).forEach(function(x){
+    if(이미[x.id]) return;
+    if(!이음근무있나(function(r){ return r.externalId === x.id; })) return;
+    rows.push({ pk:x.id, name:x.name, kind:변호사인가(x)?"law":"ex", roleLabel:변호사인가(x)?"변호사":"외부 노무사",
+      color:"#94a3b8", left:true, note:x.note||"" });
+  });
+  return rows;
+}
+
+/* 범위 안인가 — 월 / 연 / 전체 */
+function inScope(ds){
+  if(!ds) return false;
+  if(S.scope === "year") return ds.slice(0,4) === S.ym.slice(0,4);
+  if(S.scope === "all")  return true;
+  return ds.slice(0,7) === S.ym;
+}
+
+/* ── 이음센터 · 인원 현황 ─────────────────────────────────────────────────
+   대표 지시 2026-09-18 (/goal) 「대시보드 제외한 화면은 똑같이 만들어라」로
+   이알피(IeumPeopleTab)와 같은 꼴로 지었다.
+
+   ★ 2026-09-20 «연간 한도»와 «이음강의 기록»을 걷어냈다 (대표 지시 「정리 지워라」).
+     두 기능은 만들어만 두고 **아무도 한 번도 안 썼다** — 서버의 ieum_caps ·
+     ieum_lectures 가 둘 다 비어 있었다(실측). 안 쓰는 칸이 표에 넉 줄(법률상담 잔여 ·
+     이음강의 · 이음강의 잔여 · 강의 이력)을 차지하고 늘 「—」만 뜨고 있었다.
+     ⚠ 되살리지 말 것. 다시 필요해지면 «쓸 사람과 함께» 새로 짓는다.
+   ⚠ 비고를 «고치는» 것은 아직 이알피에서 한다(다음 걸음). 여기서는 보여만 준다. */
+var ROLE_CHIP = { in:{bg:"#eff6ff",fg:"#2563eb"}, ex:{bg:"#eff6ff",fg:"#2563eb"}, law:{bg:"#fffbeb",fg:"#d97706"} };
+function ieumKcell(color, label, val, unit, last){
+  return '<div class="kcell"' + (last ? ' style="border-right:none"' : '') + '>'
+    + '<span class="kdot" style="background:' + color + '"></span>'
+    + '<span class="klabel">' + esc(label) + '</span>'
+    + '<span class="kval">' + esc(String(val)) + '<small>' + esc(unit) + '</small></span></div>';
+}
+
+function peopleHtml(){
+  var rows = ieumPeople();
+  var att = arr(D.attendance_records);
+  var duty = {};
+  att.forEach(function(r){
+    if(!r || r.type !== "eum-work" || !inScope(r.date)) return;
+    var pk = r.externalId || r.sid; if(!pk) return;
+    var mm = r.date.slice(0,7), dd = parseInt(r.date.slice(8,10),10);
+    if(!duty[pk]) duty[pk] = { total:0, byMonth:{} };
+    if(!duty[pk].byMonth[mm]) duty[pk].byMonth[mm] = [];
+    duty[pk].byMonth[mm].push(dd); duty[pk].total++;
+  });
+  Object.keys(duty).forEach(function(pk){ Object.keys(duty[pk].byMonth).forEach(function(mm){ duty[pk].byMonth[mm].sort(function(a,b){return a-b;}); }); });
+  var dutyTotal = 0, lawUsedTotal = 0;
+  rows.forEach(function(p){
+    var t = (duty[p.pk]||{}).total || 0;
+    if(p.kind === "law") lawUsedTotal += t; else dutyTotal += t;
+  });
+  var visible = S.showLeft ? rows : rows.filter(function(p){ return !p.left; });
+  var maxDuty = 1; rows.forEach(function(p){ var t=(duty[p.pk]||{}).total||0; if(t>maxDuty) maxDuty=t; });
+  var scopeSfx = S.scope === "month" ? "(" + parseInt(S.ym.slice(5,7),10) + "월)" : S.scope === "year" ? "(" + S.ym.slice(0,4) + ")" : "(전체)";
+  var 범위말 = S.scope === "year" ? S.ym.slice(0,4) + "년" : S.scope === "all" ? "전체 (" + IEUM_START_YEAR + "~)" : S.ym;
+  var 그만둔수 = rows.filter(function(p){ return p.left; }).length;
+
+  var 행들 = visible.map(function(p, idx){
+    var d = duty[p.pk] || { total:0, byMonth:{} };
+    var isLaw = p.kind === "law";
+    var open = S.openRows && S.openRows[p.pk];
+    var chip = ROLE_CHIP[p.kind] || ROLE_CHIP.in;
+    var dutyPct = Math.round((d.total||0) / maxDuty * 100);
+    var 줄 = '<tr class="prow' + (open ? " open" : "") + '" data-toggle="' + esc(p.pk) + '" style="opacity:' + (p.left ? ".55" : "1") + '">'
+      + '<td class="no">' + (idx+1) + '</td>'
+      + '<td><div class="pname"><span class="avatar" style="background:' + esc(p.color) + '">' + esc(String(p.name||"?").charAt(0)) + '</span>'
+      +   '<span class="nm">' + esc(p.name) + '</span>'
+      +   (p.left ? '<span class="leftbadge">🚪 ' + (p.kind==="in"?"퇴사":"종료") + '</span>' : "") + '</div></td>'
+      + '<td><span class="rolechip" style="background:' + chip.bg + ';color:' + chip.fg + '">' + esc(p.roleLabel) + '</span></td>'
+      + '<td>' + ((!isLaw && d.total) ? ('<div class="barwrap"><span class="barnum">' + d.total + '<small>일</small></span>'
+          + '<div class="bartrack"><span class="barfill" style="width:' + dutyPct + '%;background:' + p.color + '"></span></div></div>')
+          : '<span class="dash">—</span>') + '</td>'
+      /* 법률상담 — 변호사의 이음 근무를 센 것이다(한도는 2026-09-20 에 걷어냈다) */
+      + '<td>' + (isLaw
+          ? ('<span class="lawcnt"><b>' + (d.total || 0) + '</b>회</span>')
+          : '<span class="dash">—</span>') + '</td>'
+      + '<td>' + (p.phone ? ('<a class="tel" href="tel:' + esc(String(p.phone).replace(/[^0-9]/g,"")) + '" onclick="event.stopPropagation()">📞</a> ' + esc(p.phone)) : '<span class="dash">—</span>') + '</td>'
+      /* 비고 — 눌러서 그 자리에서 고친다(2걸음까지는 이알피로 보내던 자리다).
+         ⚠ 줄 전체를 누르면 «펼치기»라, 여기서는 퍼짐을 멈춘다(끌리는 것 안의 끌기와 같은 덫). */
+      + '<td class="notecell"><button class="notebtn" data-note-open="' + esc(p.pk) + '" title="눌러서 고칩니다">'
+      +   (p.note ? '<span title="' + esc(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dash">＋ 입력</span>')
+      +   '</button></td>'
+      + '<td class="chev">›</td></tr>';
+    if(open){
+      var months = Object.keys(d.byMonth).sort();
+      줄 += '<tr class="detail"><td colspan="8"><div class="detailgrid one">'
+        + '<div><div class="dtitle">' + (isLaw ? "월별 법률상담 일자" : "월별 이음근무 일자") + '</div>'
+        + (months.length ? months.map(function(mm){
+            var lbl = parseInt(mm.slice(5),10) + "월";
+            return '<div class="drow"><span class="dm">' + lbl + '</span><span class="dchips">'
+              + d.byMonth[mm].map(function(dd){ return '<span class="dchip ' + (isLaw ? "law" : "") + '">' + dd + '</span>'; }).join("")
+              + '</span><span class="dcnt">' + d.byMonth[mm].length + '회</span></div>';
+          }).join("") : '<div class="dnone">' + 범위말 + ' 기록 없음</div>')
+        + '</div></div></td></tr>';
+    }
+    return 줄;
+  }).join("");
+
+  return '<div class="ieumbar">'
+    + '<div class="scopepilot">'
+    + '<div class="scopenav">'
+    + '<button class="mv" data-mv="-1">‹</button>'
+    + '<span class="scopetitle">' + esc(범위말) + '</span>'
+    + '<button class="mv" data-mv="1">›</button>'
+    + '</div>'
+    + '<div class="segpill">' + ["month","year","all"].map(function(v){
+        var 이름 = v === "month" ? "월" : v === "year" ? "연" : "전체";
+        return '<button data-scope="' + v + '"' + (S.scope === v ? ' class="on"' : '') + '>' + 이름 + '</button>';
+      }).join("") + '</div></div>'
+    + ieumKcell("#2563eb","이음근무",dutyTotal,"일")
+    + ieumKcell("#d97706","법률상담",lawUsedTotal,"회")
+    + ieumKcell("#16a34a","활동 인원",rows.filter(function(p){return !p.left;}).length,"명",true)
+    + '</div>'
+    + (그만둔수 ? '<button class="chip' + (S.showLeft ? " on" : "") + '" data-left="1">🚪 퇴사·종료 ' + 그만둔수 + '명 ' + (S.showLeft ? "숨기기" : "포함") + '</button>' : "")
+    + '<div class="ppltable">'
+    + (행들
+        ? '<table><thead><tr><th class="no">No.</th><th>인원</th><th>구분</th>'
+          + '<th class="ublue">이음근무 ' + esc(scopeSfx) + '</th><th class="uamber">법률상담 ' + esc(scopeSfx) + '</th>'
+          + '<th>연락처</th><th>비고</th></tr></thead>'
+          + '<tbody>' + 행들 + '</tbody></table>'
+        : '<div class="later"><p>이 범위에 이음센터 사람이 없습니다.</p></div>')
+    + '</div>';
+}
+
+/* ── 이음센터 · 외부 공유 뷰 — 이알피(IeumShareTab)와 «똑같은 꼴» ─────────
+   외부 노무사·변호사에게 «제 근무일만» 보여 주는 개인 링크다.
+   ⚠ 링크를 «새로 만드는» 것과 공개 일정을 «내보내는» 것은 서버에 쓰는 일이라
+     아직 이알피에서 한다. 이미 있는 링크를 «복사»하는 것은 서버에 아무것도
+     안 쓰므로 여기서 바로 된다 — 이알피와 같은 동작이다. */
+function shareHtml(){
+  var ext = arr(D.external_staff).filter(function(x){ return x && x.active !== false; });
+  var base = (location.protocol === "https:")
+    ? location.origin + location.pathname.replace(/[^\/]*$/, "ieum-view.html")
+    : IEUM_VIEW_BASE;
+  var 줄 = ext.map(function(x){
+    var url = x.shareKey ? (base + "?k=" + encodeURIComponent(x.shareKey)) : "";
+    return '<tr><td><span class="avatar sm" style="background:' + esc(x.color||"#2563eb") + '">' + esc(String(x.name||"?").charAt(0)) + '</span>' + esc(x.name) + '</td>'
+      + '<td class="muted">' + esc(x.role||"외부") + '</td>'
+      + '<td>' + (x.shareKey ? '<span class="issued">● 발급됨</span>' : '<span class="notissued">미발급</span>') + '</td>'
+      + '<td class="right">'
+      + (x.shareKey
+          ? ('<button class="btn ghost sm" data-copy="' + esc(url) + '">📋 링크 복사</button>'
+             + (잇기할수있나()
+                 ? ' <button class="btn ghost sm" data-newkey="' + esc(x.id) + '"'
+                   + ' title="새 링크를 만듭니다 — 지금 링크는 그때부터 안 열립니다">🔑 재발급</button>'
+                 : ''))
+          : (잇기할수있나()
+              ? '<button class="btn ghost sm" data-newkey="' + esc(x.id) + '">🔑 발급</button>'
+              : '<span class="muted">관리자만 발급</span>'))
+      + '</td></tr>';
+  }).join("");
+  return '<div class="sharecard">'
+    + '<div class="sctitle">🔗 외부인용 읽기전용 일정 페이지</div>'
+    + '<div class="scdesc">외부 변호사·노무사에게 개인 고유 링크를 보내면 로그인 없이 본인 근무일정을 확인할 수 있습니다.<br>'
+    + '공개되는 정보는 이름·날짜·구분뿐이며, 연락처 등 개인정보는 포함되지 않습니다.<br>'
+    + '일정을 고치면 <b>저절로 발행</b>됩니다 — 아래 단추는 바로 올리고 싶을 때만 쓰세요.</div>'
+    + '<button class="btn" data-pub="1"' + (S.pub && S.pub.busy ? ' disabled' : '') + '>'
+    +   (S.pub && S.pub.busy ? '발행 중…' : '📤 지금 발행') + '</button>'
+    + (S.pub && S.pub.msg ? '<span class="pubmsg">' + esc(S.pub.msg) + '</span>' : '')
+    + 발행시각Html()
+    + '</div>'
+    + '<div class="sharecard">'
+    + '<div class="sctitle sm">개인 링크 목록</div>'
+    + (줄 ? '<table class="linktable"><thead><tr><th>이름</th><th>구분</th><th>링크 상태</th><th></th></tr></thead><tbody>' + 줄 + '</tbody></table>'
+          : '<div class="later"><p>등록된 외부 인원이 없습니다.</p></div>')
+    + '</div>'
+    + '<div class="sharefoot">※ 근무 문자 발송 시 개인 링크가 자동으로 첨부됩니다 (링크 발급된 인원만)</div>';
+}
+/* ── 넣고 고치기 ──────────────────────────────────────────────────────
+   ⚠ 저장은 반드시 js/pu-cal-write.js 의 관문을 지난다. 여기서 질러가지 말 것 —
+     마감된 달 · 번호 없는 항목 · 아직 배열인 표가 그 문에서만 걸린다. */
+function recOf(store, id){
+  var list = arr(D[store]);
+  for(var i=0;i<list.length;i++) if(list[i] && list[i].id===id) return list[i];
+  return null;
+}
+function openNew(ymd){
+  S.modal = { mode:"new", kind:"sch", date:ymd, sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1 };
+  /* 못 쓰는 표면 «열자마자» 알린다 — 다 적고 나서 거절당하는 것이 가장 나쁘다 */
+  if(옛방식표("my_schedules")) S.modal.err = 옛방식안내("my_schedules");
+  render();
+}
+function openEdit(store, id){
+  var r = recOf(store, id);
+  if(!r){ toast("그 건을 못 찾았습니다 — 새로 받아 오는 중일 수 있습니다"); return; }
+  S.modal = { mode:"edit", store:store, id:id, kind:(store==="my_schedules"?"sch":"att"),
+    date:r.date||"", sid:r.sid||"", type:r.type||"leave", title:r.title||"", note:r.note||"",
+    hours:r.hours||1, prev:r };
+  if(옛방식표(store)) S.modal.err = 옛방식안내(store);
+  render();
+}
+/* 구글 일정 한 건을 구글 달력에서 연다 */
+function openGcal(id){
+  var found = null;
+  for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === id) found = GCAL.evs[i];
+  if(found && found.gcalUrl){ window.open(found.gcalUrl, "_blank", "noopener"); return; }
+  toast("구글 달력에서 여는 주소가 없습니다");
+}
+function closeModal(){ S.modal = null; S.busy = false; render(); }
+function toast(t){ S.toast = t; render(); setTimeout(function(){ if(S.toast===t){ S.toast=""; render(); } }, 3200); }
+
+function modalHtml(){
+  var m = S.modal; if(!m) return "";
+  var 새것 = m.mode==="new";
+  var 일정 = m.kind==="sch";
+  var 유형들 = PuWork.typesFor("calendar");
+  return "<div class=\"veil\" data-close=\"1\"></div><div class=\"modal\">"
+    + "<h3>"+(새것?"➕ 새로 넣기":"✏️ 고치기")+" — "+esc(m.date||"")+"</h3>"
+    + (m.err ? "<div class=\"werr\">"+esc(m.err)+"</div>" : "")
+    + (새것 ? "<div class=\"fld\"><label>무엇을</label><select data-m=\"kind\">"
+        + "<option value=\"sch\""+(일정?" selected":"")+">📅 일정</option>"
+        + "<option value=\"att\""+(일정?"":" selected")+">🏖️ 연차·근태</option></select></div>" : "")
+    + "<div class=\"fld\"><label>날짜</label><input type=\"date\" data-m=\"date\" value=\""+esc(m.date)+"\"></div>"
+    + "<div class=\"fld\"><label>누구</label><select data-m=\"sid\">"
+        + users().map(function(u){ return "<option value=\""+esc(u.sid)+"\""+(u.sid===m.sid?" selected":"")+">"
+            + esc(u.name||u.sid)+"</option>"; }).join("") + "</select></div>"
+    + (일정
+        ? "<div class=\"fld\"><label>무슨 일</label><input data-m=\"title\" value=\""+esc(m.title)+"\" placeholder=\"가나상사 컨설팅 2차\"></div>"
+        : "<div class=\"fld\"><label>유형</label><select data-m=\"type\">"
+            + 유형들.map(function(t){ return "<option value=\""+esc(t.code)+"\""+(t.code===m.type?" selected":"")+">"
+                + esc(t.icon+" "+PuWork.labelFor(t.code,"calendar"))+"</option>"; }).join("")
+            + "</select></div>"
+          + (m.type==="leave-hour"
+              ? "<div class=\"fld\"><label>몇 시간</label><input type=\"number\" min=\"1\" max=\"8\" data-m=\"hours\" value=\""+esc(m.hours)+"\"></div>"
+              : ""))
+    + "<div class=\"fld\"><label>메모</label><input data-m=\"note\" value=\""+esc(m.note)+"\" placeholder=\"안 적어도 됩니다\"></div>"
+    + "<div class=\"mbtns\">"
+    + (새것 ? "" : "<button class=\"btn danger\" data-act=\"del\""+(S.busy?" disabled":"")+">지우기</button>")
+    + "<span class=\"sp\"></span>"
+    + "<button class=\"btn ghost\" data-close=\"1\">그만</button>"
+    + "<button class=\"btn\" data-act=\"save\""+(S.busy?" disabled":"")+">"+(S.busy?"저장 중…":"저장")+"</button>"
+    + "</div></div>";
+}
+
+/* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
+function modalRead(){
+  var m = S.modal; if(!m) return;
+  ["kind","date","sid","type","title","note","hours"].forEach(function(f){
+    var el = document.querySelector("[data-m='"+f+"']");
+    if(el) m[f] = el.value;
+  });
+}
+
+function doSave(){
+  modalRead();
+  var m = S.modal; if(!m || S.busy) return;
+  var 일정 = m.kind==="sch";
+  var store = 일정 ? "my_schedules" : "attendance_records";
+  if(!m.date){ m.err = "날짜를 골라 주세요"; render(); return; }
+  if(일정 && !String(m.title||"").trim()){ m.err = "무슨 일인지 적어 주세요"; render(); return; }
+  var id = m.mode==="edit" ? m.id : PuCalWrite.newId(일정 ? "sch" : "att");
+  var item = { id:id, date:m.date, sid:m.sid, note:String(m.note||"") };
+  if(일정) item.title = String(m.title).trim();
+  else { item.type = m.type; item.hours = PuWork.hoursOf(m.type, m.hours); }
+  /* 고치는 것이면 «내가 보던 판»을 함께 넘긴다 — 바뀐 칸만 보내고,
+     원래 있던 달이 잠겼는지도 그것으로 본다. */
+  var prev = m.mode==="edit" ? (recOf(store, id) || m.prev) : null;
+  S.busy = true; m.err = ""; render();
+  PuCalWrite.save(store, item, prev).then(function(r){
+    S.busy = false;
+    if(!r.ok){ m.err = r.message; render(); return; }
+    var 고침 = m.mode==="edit";
+    closeModal();
+    toast(고침 ? "✅ 고쳤습니다" : "✅ 넣었습니다");
+    refreshOne(store);
+    /* 이음 근무가 바뀌면 외부 공유 뷰도 따라가야 한다 — 안 걸면 옛 일정이 그대로 뜬다 */
+    if(store === "attendance_records") 발행예약();
+  });
+}
+
+function doDelete(){
+  var m = S.modal; if(!m || m.mode!=="edit" || S.busy) return;
+  if(!confirm("이 건을 지울까요?")) return;
+  var prev = recOf(m.store, m.id) || m.prev;
+  S.busy = true; m.err = ""; render();
+  /* 구글과 «이어진» 건이면 그쪽도 함께 지운다 — 우리만 지우면 구글에 남는다.
+     ⚠ 이어진 근태가 지금 30건 있다(2026-09-20 실측). 이알피가 만들면서 이어 둔 것이다.
+     ⚠ 구글부터 지운다. 우리 것을 먼저 지우면 «무엇을 지워야 하는지»를 잃는다.
+     ⚠ 구글에서 못 지워도 우리 것은 지운다 — 그 대신 «못 지웠다»고 분명히 말한다
+       (이알피가 여기서 데었다: 안 지워졌는데 「삭제됨」이라고 했다). */
+  var 구글번호 = prev && prev.gcalEventId;
+  var 구글말 = "";
+  var 구글먼저 = (구글번호 && typeof PuGcalAuth !== "undefined")
+    ? PuGcalAuth.deleteEvent(GCAL_CAL_ID, 구글번호)
+        .then(function(){ 구글말 = ""; })
+        ["catch"](function(e){
+          구글말 = " ⚠ 구글 쪽은 못 지웠습니다(" + ((e && e.message) || "") + ")";
+        })
+    : Promise.resolve();
+
+  구글먼저.then(function(){
+    return PuCalWrite.remove(m.store, m.id, prev);
+  }).then(function(r){
+    S.busy = false;
+    if(!r.ok){ m.err = r.message; render(); return; }
+    var st = m.store;
+    closeModal(); toast("🗑 지웠습니다" + 구글말); refreshOne(st);
+    if(st === "attendance_records") 발행예약();
+  });
+}
+
+/* ── 끌어서 다른 날로 옮기기 ─────────────────────────────────────────────
+   대표 지시 2026-09-21 「둘다」 — 4걸음에서 법인 대시보드와 함께 사라진 것을 되살린다.
+
+   ★ 어디에 손잡이를 다나 — 판(app) 한 곳이다. 칩마다 달면 다시 그릴 때마다 새로 달아야
+     하고, 하나라도 빠지면 «어떤 것은 안 끌리는» 화면이 된다.
+   ⚠ dragstart 는 거품처럼 위로 올라온다 — 바깥에서 preventDefault 를 하면 안쪽 끌기가
+     통째로 죽는다(컨설팅일정이 이 덫에 일주일 걸렸다). 여기서는 바깥에서 막지 않는다.
+   ⚠ 「놓을 수 있다」를 말해 주지 않으면 브라우저가 놓기를 아예 안 받는다 —
+     dragover 에서 preventDefault 를 «해야» 놓을 수 있다. 헷갈리기 쉬운 반대다. */
+var _끄는것 = null;
+/* 사람 칩(머리줄)을 끌기 시작 — «새로 넣기»다(옮기기와 갈라 둔다: "eumnew:사람") */
+document.addEventListener('dragstart', function(e){
+  var p = e.target && e.target.closest ? e.target.closest('[data-dragp]') : null;
+  if(!p) return;
+  _끄는것 = 'eumnew:' + p.getAttribute('data-dragp');
+  try{ e.dataTransfer.setData('text/plain', _끄는것); e.dataTransfer.effectAllowed = 'copy'; }catch(x){}
+});
+document.addEventListener('dragend', function(e){
+  if(!(e.target && e.target.closest && e.target.closest('[data-dragp]'))) return;
+  _끄는것 = null;
+  Array.prototype.forEach.call(document.querySelectorAll('.dropon'), function(el){ el.classList.remove('dropon'); });
+});
+function 끌기손잡이(){
+  var 판 = $('app'); if(!판 || 판._끌기달림) return;
+  판._끌기달림 = true;
+  판.addEventListener('dragstart', function(e){
+    var t = e.target && e.target.closest ? e.target.closest('[data-drag]') : null;
+    if(!t){ _끄는것 = null; return; }
+    _끄는것 = t.getAttribute('data-drag');
+    t.classList.add('dragging');
+    try{ e.dataTransfer.setData('text/plain', _끄는것); e.dataTransfer.effectAllowed = 'move'; }catch(x){}
+  });
+  판.addEventListener('dragend', function(){
+    _끄는것 = null;
+    Array.prototype.forEach.call(판.querySelectorAll('.dragging,.dropon'),
+      function(el){ el.classList.remove('dragging','dropon'); });
+  });
+  판.addEventListener('dragover', function(e){
+    if(!_끄는것) return;
+    var 칸 = e.target && e.target.closest ? e.target.closest('[data-day]') : null;
+    if(!칸) return;
+    e.preventDefault();                       /* ⚠ 이것이 있어야 놓을 수 있다 */
+    try{ e.dataTransfer.dropEffect = String(_끄는것).indexOf('eumnew:') === 0 ? 'copy' : 'move'; }catch(x){}
+    if(!칸.classList.contains('dropon')){
+      Array.prototype.forEach.call(판.querySelectorAll('.dropon'),
+        function(el){ el.classList.remove('dropon'); });
+      칸.classList.add('dropon');
+    }
+  });
+  판.addEventListener('drop', function(e){
+    var 칸 = e.target && e.target.closest ? e.target.closest('[data-day]') : null;
+    var 끈것 = _끄는것;
+    if(!칸 || !끈것) return;
+    e.preventDefault();
+    _끄는것 = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.dropon'), function(el){ el.classList.remove('dropon'); });
+    if(String(끈것).indexOf('eumnew:') === 0){ 이음넣기(String(끈것).slice(7), 칸.getAttribute('data-day')); return; }
+    옮기기(끈것, 칸.getAttribute('data-day'));
+  });
+}
+
+/* 사람 칩을 날짜 칸에 놓았다 — 그 사람의 그날 «이음센터 근무»를 넣는다.
+   ★ 이알피·이 앱이 담아 온 꼴 그대로: 내부 직원은 sid, 외부 노무사·변호사는 externalId(sid 없음),
+     type:'eum-work', hours 는 PuWork 가 정한 수(하루 근무).
+   ⚠ 저장은 반드시 관문(PuCalWrite.save) — 마감된 달은 거기서 막히고, 막히면 그대로 말한다.
+   ⚠ 같은 사람·같은 날이 이미 있으면 안 넣는다 — 두 번 들어가면 근무일이 두 배로 센다.
+   ⚠ 구글 달력에는 안 만든다(로그인이 필요하다) — 달력에는 우리 기록으로 바로 뜬다. */
+function 이음넣기(pk, 날){
+  if(S.busy || !pk || !날) return;
+  var p = ieumPeople().filter(function(x){ return x.pk === pk && !x.left; })[0];
+  if(!p){ toast("그 사람을 명단에서 못 찾았습니다"); return; }
+  var 외부 = p.kind !== "in";
+  var 이미 = arr(D.attendance_records).some(function(r){
+    return r && r.type === "eum-work" && r.date === 날
+      && (외부 ? r.externalId === pk : (r.sid === pk && !r.externalId));
+  });
+  if(이미){ toast("ℹ " + p.name + " 님은 " + 날 + " 에 이미 이음센터 근무가 있습니다"); return; }
+  var item = { id: PuCalWrite.newId("att"), date: 날, type: "eum-work",
+               hours: PuWork.hoursOf("eum-work", 8), note: "" };
+  if(외부) item.externalId = pk; else item.sid = pk;
+  S.busy = true; render();
+  PuCalWrite.save("attendance_records", item, null).then(function(r){
+    S.busy = false;
+    if(!r.ok){ toast("❌ " + (r.message || "넣지 못했습니다")); render(); return; }
+    toast("✅ " + p.name + " · " + 날.slice(5).replace("-", "/") + " 이음센터 근무를 넣었습니다");
+    refreshOne("attendance_records");
+    발행예약();
+  })["catch"](function(err){
+    S.busy = false;
+    toast("❌ 넣지 못했습니다 — " + ((err && err.message) || ""));
+    render();
+  });
+}
+
+/* 「store:id」와 새 날짜. 우리 것이면 저장 문으로, 구글 것이면 구글로. */
+function 옮기기(끈것, 새날){
+  if(S.busy) return;
+  var i = String(끈것).indexOf(":");
+  var store = String(끈것).slice(0, i), id = String(끈것).slice(i + 1);
+  if(!store || !id || !새날) return;
+
+  /* ── 구글 일정 ── */
+  if(store === "gcal"){
+    var ev = null;
+    for(var k = 0; k < GCAL.evs.length; k++){ if(GCAL.evs[k].id === id){ ev = GCAL.evs[k]; break; } }
+    if(!ev) return;
+    if(ev.date === 새날) return;                    /* 제자리에 놓았다 */
+    if(typeof PuGcalAuth === "undefined" || !PuGcalAuth.hasToken()){
+      /* ⚠ 조용히 실패하지 않는다 — 안 옮겨졌는데 옮겨진 줄 알면 그날 사람이 안 온다 */
+      toast("🔐 구글 로그인이 필요합니다 — 일정은 옮기지 못했습니다");
+      return;
+    }
+    S.busy = true; render();
+    PuGcalAuth.moveEvent(GCAL_CAL_ID, id, 새날).then(function(){
+      S.busy = false;
+      /* 받아 둔 것을 고쳐 바로 보인다 — 여러 날 일정은 «길이 그대로» 끝날도 민다 */
+      if(ev.end && ev.end > ev.date){
+        var 길이 = Math.round((Date.parse(ev.end + "T00:00:00Z") - Date.parse(ev.date + "T00:00:00Z")) / 86400000);
+        ev.end = shiftDay(새날, 길이);
+      } else ev.end = 새날;
+      ev.date = 새날;
+      toast("✅ 구글 일정을 " + 새날 + " 로 옮겼습니다");
+      render();
+      gcalLoad(true);                               /* 진짜로 그리 됐는지 다시 받아 맞춘다 */
+    })["catch"](function(err){
+      S.busy = false;
+      toast("❌ 구글 일정을 옮기지 못했습니다 — " + ((err && err.message) || ""));
+      render();
+    });
+    return;
+  }
+
+  /* ── 우리 일정·근태 ── */
+  var prev = recOf(store, id);
+  if(!prev) return;
+  if(prev.date === 새날) return;
+  S.busy = true; render();
+  /* ⚠ 바뀐 칸만 보낸다(date). 저장 문이 «옛 달·새 달»을 둘 다 보고 잠금을 판단한다. */
+  PuCalWrite.save(store, { id:id, date:새날 }, prev).then(function(r){
+    S.busy = false;
+    if(!r.ok){ toast("❌ " + (r.message || "옮기지 못했습니다")); render(); return; }
+    toast("✅ " + 새날 + " 로 옮겼습니다");
+    refreshOne(store);
+    if(store === "attendance_records") 발행예약();
+  })["catch"](function(err){
+    S.busy = false;
+    toast("❌ 옮기지 못했습니다 — " + ((err && err.message) || ""));
+    render();
+  });
+}
+
+/* 바뀐 표 하나만 다시 받는다 — 나머지는 그대로 둔다 */
+function refreshOne(store){
+  PuCalRead.readOnce(store).then(function(v){ D[store]=v; render(); }).catch(function(){});
+}
+
+/* ── 그리기 ────────────────────────────────────────────────────────── */
+function renderTabs(){
+  var 탭들 = TABS.map(function(t){
+    return '<button class="tab'+(S.tab===t.v?' on':'')+'" data-t="'+esc(t.v)+'">'+esc(t.label)+'</button>';
+  }).join('');
+  var 달력탭 = (S.tab === 'cal' || S.tab === 'eumcal');
+  /* ★ 사람 칩을 탭 줄 «오른쪽 끝»에 얹는다 (대표 지시 2026-09-19 「캡쳐1은 캡쳐2 줄에 넣어라」).
+     탭은 왼쪽 절반도 안 쓰는데 칩은 제 줄을 따로 차지하고 있었다 — 한 줄을 통째로 아낀다.
+     ⚠ 달력을 보는 탭에서만 얹는다. 직원별 업무·분석에는 «걸러 낼 것»이 없어
+       칩이 아무 일도 안 하면서 자리만 먹는다. */
+  var 칩 = 달력탭
+    ? '<span class="tabchips">' + chipsHtml(S.tab === 'eumcal') + '</span>' : '';
+  /* ★ 달 이동([오늘] ‹ › 2026년 9월)도 이 한 줄에 — 예전엔 달력 위에 따로 한 줄이었다.
+     도구(계정 잇기 · 🔍 · 월|주|일)는 사람 칩 «뒤», 오른쪽 끝(구글과 같은 차례). */
+  var 머리 = 달력탭 ? '<span class="srcsep"></span>' + calheadHtml(S.tab === 'eumcal') : '';
+  var 도구 = 달력탭 ? '<span class="ctools">' + srchHtml() + segHtml() + '</span>' : '';
+  $('tabs').innerHTML = 탭들 + 머리 + 칩 + 도구;
+  /* 내 동그라미 창 안의 도구 — 관리자 일(색 바꾸기)·구글 연결은 여기로 모았다 */
+  var 창도구 = (typeof document !== "undefined") ? document.getElementById('avaTools') : null;
+  if(창도구) 창도구.innerHTML = 창도구Html();
+}
+/* 내 동그라미 창에 들어가는 것 — 없으면 빈 칸(줄도 안 그린다) */
+function 창도구Html(){
+  var out = '';
+  var g = 구글단추Html();
+  if(g) out += g.replace('class="glogin"', 'class="mi"');
+  var c = 색단추Html();
+  if(c) out += c.replace('class="linkacct"', 'class="mi"').replace('🎨 색', '🎨 사람 색 바꾸기');
+  return out ? out + '<hr>' : '';
+}
+
+function render(){
+  renderTabs();
+  var tab = TABS.filter(function(t){ return t.v===S.tab; })[0] || TABS[0];
+  var html;
+  if(tab.v==='cal' || tab.v==='eumcal'){
+    var eumOnly = tab.v==='eumcal';
+      /* ⚠ 맨 위 띠를 안 둔다 — 달력은 이알피와 «같아야» 한다(대표 지시 2026-09-18).
+         못 고치는 까닭은 «고치려 할 때» 그 자리에서 말한다(창 안에서). */
+    html = failedHtml() + lockNote()
+      + '<div class="calwrap">' + calendarHtml(eumOnly) + '</div>';
+  } else if(tab.v==='eumppl'){
+    html = failedHtml() + peopleHtml();
+  } else if(tab.v==='eumshare'){
+    html = failedHtml() + shareHtml();
+  }
+  var 달력 = (tab.v === "cal" || tab.v === "eumcal");
+  if(달력) html += 펼침Html(tab.v === "eumcal");
+  html += modalHtml();
+  html += mailmapHtml();
+  html += colorsHtml();
+  html += noteHtml();
+  if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
+  $('app').innerHTML = html;
+  끌기손잡이();   /* 판이 새로 그려져도 손잡이는 한 번만 달린다 */
+  /* 달력 탭에서만 화면에 «딱» 맞춘다 — 다른 탭은 여느 때처럼 제 안에서 굴러간다 */
+  $('app').className = 달력 ? 'fit' : '';
+  if(달력){
+    펼침자리();
+    /* 그려 놓고 재서, 한 칸에 들어가는 수가 달라졌으면 «한 번만» 다시 그린다.
+       ⚠ 용량재기() 는 값이 바뀔 때만 참이다 — 그래서 돌고 돌지 않는다.
+         그래도 빗장을 하나 더 건다(창 크기가 계속 바뀌는 동안을 위해). */
+    if(!_다시그리는중){
+      if(용량재기()){
+        _다시그리는중 = true;
+        try{ render(); } finally{ _다시그리는중 = false; }
+      } else if(!_칸용량){
+        /* ⚠ «첫 그림»에서는 판의 높이가 아직 0 이라 못 잰다 — 그러면 어림값(5)이
+           그대로 남아 칸이 넘친다(2026-09-19 에 실제로 그랬다).
+           다음 칸에 한 번 더 재 본다. 그때는 자리가 잡혀 있다. */
+        requestAnimationFrame(function(){ if(!_다시그리는중 && 용량재기()) render(); });
+      }
+    }
+  }
+}
+var _다시그리는중 = false;
+
+/* 창 크기가 바뀌면 한 칸에 들어가는 수도 바뀐다 — 잦은 신호라 한 박자 쉬고 그린다 */
+var _크기타이머 = null;
+window.addEventListener('resize', function(){
+  if(_크기타이머) clearTimeout(_크기타이머);
+  _크기타이머 = setTimeout(function(){ _크기타이머 = null; render(); }, 150);
+});
+
+/* 누르는 것은 한 자리에서 받는다 — 단추마다 붙이면 다시 그릴 때 하나씩 샌다 */
+/* 자물쇠 없이 닫는 길 하나 더 — 창이 떠 있을 때 ESC */
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && S.open){ S.open = null; render(); }
+  /* 비어 있는 검색칸은 ESC 로 도로 돋보기가 된다 */
+  if(e.key === 'Escape' && S.srch && !S.q){ S.srch = false; render(); }
+});
+/* 검색칸에서 손을 떼었는데 비어 있으면 도로 돋보기 — 빈 칸이 머리줄 자리를 먹지 않게 */
+document.addEventListener('focusout', function(e){
+  if(e.target && e.target.id === 'calq' && !S.q){
+    setTimeout(function(){ if(!S.q && document.activeElement && document.activeElement.id !== 'calq'){ S.srch = false; render(); } }, 150);
+  }
+});
+document.addEventListener('click', function(e){
+  /* 펼침 창은 «바깥을 누르면» 닫힌다 — 창 안을 누른 것은 그대로 둔다 */
+  if(S.open && !(e.target.closest && e.target.closest(".pop"))
+     && !(e.target.closest && e.target.closest("[data-more]"))){
+    S.open = null; render();
+  }
+  /* 내 동그라미 창 — 누르면 열고, 창 밖을 누르면 닫는다(창 안의 단추는 제 일을 하고 닫힌다) */
+  var 창 = document.getElementById('avamenu');
+  if(e.target.closest && e.target.closest('[data-avatar]')){
+    if(창) 창.hidden = !창.hidden;
+    return;
+  }
+  if(창 && !창.hidden && !(e.target.closest && e.target.closest('#avamenu .who'))) 창.hidden = true;
+  /* 🔍 — 누르면 그 자리에서 검색칸이 펼쳐진다 */
+  if(e.target.closest && e.target.closest('[data-srch]')){
+    S.srch = true; render();
+    var q = document.getElementById('calq'); if(q) q.focus();
+    return;
+  }
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
+  if(!t) return;
+  if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
+  if(t.hasAttribute('data-mv')){
+    var mv = +t.getAttribute('data-mv');
+    if(mv===0){ S.ym = ymOf(new Date()); S.date = todayYMD(); }
+    else if(S.tab==='eumppl' && S.scope==='year'){
+      var y=new Date(S.ym+'-01'); y.setFullYear(y.getFullYear()+mv); S.ym = ymOf(y);
+    }
+    /* 달력에서는 보기에 따라 옮기는 폭이 다르다 — 월은 한 달, 주는 이레, 일은 하루 */
+    else if((S.tab==='cal'||S.tab==='eumcal') && S.view!=='month'){
+      S.date = shiftDay(S.date, S.view==='week' ? mv*7 : mv);
+      S.ym = S.date.slice(0,7);
+    }
+    else { var d=new Date(S.ym+'-01'); d.setMonth(d.getMonth()+mv); S.ym = ymOf(d); }
+    render(); return;
+  }
+  if(t.hasAttribute('data-gcalretry')){ gcalLoad(true); return; }
+  if(t.hasAttribute('data-view')){
+    S.view = t.getAttribute('data-view');
+    if(!S.date) S.date = todayYMD();
+    /* 주·일에서 월로 돌아오면 «보고 있던 날»의 달을 편다 — 엉뚱한 달로 튀지 않게 */
+    if(S.view==='month') S.ym = S.date.slice(0,7);
+    render(); return;
+  }
+  if(t.hasAttribute('data-scope')){ S.scope = t.getAttribute('data-scope'); render(); return; }
+  if(t.hasAttribute('data-left')){ S.showLeft = !S.showLeft; render(); return; }
+  /* 인원 현황 — 행을 누르면 그 사람의 월별 상세를 편다. 연락처·비고 칸 클릭은 걸러 준다 */
+  if(t.hasAttribute('data-toggle')){
+    var pk = t.getAttribute('data-toggle');
+    var n2 = Object.assign({}, S.openRows); n2[pk] = !n2[pk]; S.openRows = n2;
+    render(); return;
+  }
+  if(t.hasAttribute('data-copy')){ copyLink(t.getAttribute('data-copy')); return; }
+  if(t.hasAttribute('data-open')){ window.open(t.getAttribute('data-open'), '_blank', 'noopener'); return; }
+  if(t.hasAttribute('data-f')){ modalRead(); var f=t.getAttribute('data-f'); S.filter = f || null; render(); return; }
+  if(t.hasAttribute('data-erp')){ goErp(t.getAttribute('data-erp')); return; }
+  /* 비고는 줄 «안»의 단추다 — 줄 펼치기(data-toggle)보다 먼저 잡아야 한다 */
+  if(t.hasAttribute('data-copen-all')){ openColors(); return; }
+  if(t.hasAttribute('data-copen')){
+    var _cs = t.getAttribute('data-copen');
+    if(S.colors){ S.colors.pick = (S.colors.pick === _cs) ? "" : _cs; render(); }
+    return;
+  }
+  if(t.hasAttribute('data-cset')){
+    var _cv = String(t.getAttribute('data-cset')).split('|');
+    색고르기(_cv[0], _cv[1]);
+    return;
+  }
+  if(t.hasAttribute('data-note-open')){ e.stopPropagation(); openNote(t.getAttribute('data-note-open')); return; }
+  if(t.hasAttribute('data-noteact')){ saveNote(); return; }
+  if(t.hasAttribute('data-glogin')){ 구글로그인(); return; }
+  if(t.hasAttribute('data-mmopen')){ openMailMap(); return; }
+  if(t.hasAttribute('data-pub')){ 발행하기(false); return; }
+  if(t.hasAttribute('data-newkey')){ 링크발급(t.getAttribute('data-newkey')); return; }
+  /* 닫기 — 잇기 창이 열려 있으면 그것부터 닫는다(둘이 겹쳐 뜨지 않는다) */
+  if(t.hasAttribute('data-close')){ if(S.note) closeNote(); else if(S.colors) closeColors(); else if(S.mailmap) closeMailMap(); else closeModal(); return; }
+  if(t.hasAttribute('data-act')){
+    if(t.getAttribute('data-act')==='save') doSave(); else doDelete();
+    return;
+  }
+  /* 일을 누르면 그 건을 연다. 칸의 빈 자리를 누르면 새로 넣는다.
+     ⚠ 일 쪽을 «먼저» 본다 — 일은 칸 «안»에 있어 칸도 함께 걸린다. */
+  /* 「+N개 더」 — 그 날을 그 자리에서 펼친다(다른 화면으로 안 간다) */
+  if(t.hasAttribute('data-more')){
+    var 날 = t.getAttribute('data-more');
+    S.open = (S.open === 날) ? null : 날;
+    render(); return;
+  }
+  if(t.hasAttribute('data-popclose')){ S.open = null; render(); return; }
+  if(t.hasAttribute('data-ev')){
+    var ev = t.getAttribute('data-ev').split(':');
+    /* 구글에서 온 일정은 «구글에서» 고친다 — 우리가 손대면 두 곳이 갈린다.
+       ⚠ 열쇠로 읽기만 하는 길이라 우리에겐 고칠 권한이 아예 없다. */
+    if(ev[0] === 'gcal'){ openGcal(ev.slice(1).join(':')); return; }
+    openEdit(ev[0], ev.slice(1).join(':'));
+    return;
+  }
+  if(t.hasAttribute('data-day')){ openNew(t.getAttribute('data-day')); return; }
+});
+
+/* 링크 복사 — 못 하는 자리(https 아님·권한 거절)에서는 «됐다»고 하지 않는다.
+   「복사됐습니다」는 말만 뜨고 실제로는 안 붙는 것이 가장 나쁘다. */
+function copyLink(url){
+  function 실패(){ toast('복사가 안 됩니다 — 링크를 길게 눌러 직접 복사해 주세요'); }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(function(){ toast('📋 링크를 복사했습니다'); }, 실패);
+      return;
+    }
+  }catch(e){}
+  실패();
+}
+
+/* 이알피로 — 창은 «하나»만 쓴다(새 탭을 자꾸 만들지 않는다) */
+function goErp(menu){
+  var url = 'pu-erp.html?sso=1' + (menu ? '#menu='+encodeURIComponent(menu) : '');
+  try { if(window.PuAppBar && PuAppBar.goApp){ PuAppBar.goApp(url, 'erp'); return; } } catch(e){}
+  location.href = url;
+}
+/* 유형을 시간연차로 바꾸면 «몇 시간» 칸이 생긴다 — 바뀔 때 다시 그린다.
+   ⚠ 다시 그리기 전에 지금 적힌 것을 먼저 담는다(안 그러면 적던 것이 날아간다). */
+/* 일정 검색 — 치는 대로 거른다.
+   ⚠ 다시 그리면 칸이 새로 생겨 «적던 글자와 커서»를 잃는다. 그래서 그린 뒤
+     그 칸에 값을 도로 넣고 커서를 끝으로 돌려 준다. 안 그러면 한 글자마다 칸이 튄다. */
+document.addEventListener('input', function(e){
+  if(!e.target || e.target.id !== 'calq') return;
+  S.q = e.target.value;
+  render();
+  var el = document.getElementById('calq');
+  if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} }
+});
+
+/* 계정 잇기 — 고르면 «바로» 저장한다(따로 저장 단추를 두지 않는다) */
+document.addEventListener('change', function(e){
+  if(!S.mailmap || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-mm')) return;
+  잇기저장(e.target.getAttribute('data-mm'), e.target.value);
+});
+document.addEventListener('change', function(e){
+  if(!S.modal || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-m')) return;
+  var f = e.target.getAttribute('data-m');
+  if(f !== 'type' && f !== 'kind') return;
+  modalRead(); render();
+});
+/* ESC 로 창을 닫는다 — 뒤로가기 층과 다투지 않게 여기서만 받는다 */
+document.addEventListener('keydown', function(e){
+  if(e.key !== 'Escape') return;
+  if(S.note){ e.preventDefault(); closeNote(); return; }
+  if(S.mailmap){ e.preventDefault(); closeMailMap(); return; }
+  if(S.modal){ e.preventDefault(); closeModal(); }
+});
+
+$('goErp').onclick = function(){ goErp(''); };
+$('logout').onclick = function(){ try{ firebase.auth().signOut(); }catch(e){} };
+$('themeToggle').onclick = themeToggle;
+themeInit();
+
+/* ── 시작 ──────────────────────────────────────────────────────────── */
+function setConn(on, text){
+  var c = $('conn');
+  c.innerHTML = '<span class="dot'+(on?' on':'')+'"></span><span class="t">'+esc(text)+'</span>';
+  /* 동그라미의 초록 점 — 예전 「● 연결됨」 글자를 합쳤다 */
+  var m = $('me'); if(m) m.className = on ? 'on' : '';
+}
+
+function start(user){
+  PuCalRead.attach(fbDb);
+  /* 저장 관문이 봐야 할 셋을 넘긴다 —
+     ① 어느 달이 마감됐나 ② 그 표가 아직 배열인가 ③ 누가 고쳤나 */
+  PuCalWrite.attach(fbDb, {
+    lockedMonths: function(){ return arr(D.locked_attend_months); },
+    formOf: function(k){ return PuCalRead.rawForm(k); },
+    who: function(){ return (ME && ME.name) || (ME && ME.sid) || ''; }
+  });
+  /* 구글 로그인에서 돌아왔으면 주소 꼬리에서 토큰을 꺼낸다(주소는 깨끗이 지운다) */
+  try{ if(typeof PuGcalAuth !== "undefined" && PuGcalAuth.capture()) toast("✅ 구글에 연결됐습니다"); }catch(e){}
+  S.ym = ymOf(new Date()); S.date = todayYMD();
+  setConn(true, '연결됨');
+  PuCalRead.readMany(KEYS).then(function(r){
+    D = r.data; FAILED = r.failed;
+    ME = (function(){
+      var us = users();
+      for(var i=0;i<us.length;i++){ if(us[i].uid===user.uid || us[i].email===user.email) return us[i]; }
+      return null;
+    })();
+    /* 구글처럼 이름 첫 글자 동그라미 — 이름·직함·메일은 누르면 뜨는 창에 (예전엔 머리줄에 늘 떠 있었다) */
+    var 이름 = (ME && ME.name) || (user.email || '?');
+    $('me').textContent = String(이름).slice(0, 1);
+    $('me').title = 이름 + (user.email ? ' · ' + user.email : '');
+    $('whoName').innerHTML = '<b>' + esc(ME ? (ME.name||'') : '')
+      + (ME ? '<span class="role">'+esc(ME.role||ME.position||'')+'</span>' : '') + '</b>'
+      + esc(user.email||'') + ' · ';
+    render();
+    /* 구글 달력도 받는다 — 이 달력을 채우는 것이 그쪽이다(9월 126건).
+       ⚠ 우리 자료를 먼저 그리고 그 다음 받는다 — 구글이 늦어도 화면은 먼저 뜬다. */
+    gcalLoad();
+    /* 바뀐 한 건만 받아 다시 그린다 — 큰 표를 통째로 다시 받지 않는다 */
+    ['attendance_records','my_schedules'].forEach(function(k){
+      S.unwatch.push(PuCalRead.watch(k, function(){
+        PuCalRead.readOnce(k).then(function(v){ D[k]=v; render(); }).catch(function(){});
+      }));
+    });
+  }).catch(function(e){
+    $('app').innerHTML = '<div class="panel"><h2 style="color:#dc2626">자료를 못 읽었습니다</h2>'
+      + '<p class="muted">'+esc(e && e.message || e)+'</p>'
+      + '<button class="btn" onclick="location.reload()">다시 열기</button></div>';
+  });
+}
+
+try{
+  firebase.initializeApp(FB_CONFIG);
+  fbDb = firebase.database();
+  firebase.auth().onAuthStateChanged(function(u){
+    if(u) start(u); else PuGate.show();
+  });
+}catch(e){
+  $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
+}
+</script>
+<script src="js/pu-appbar.js?v=13"></script>
+<script>try{
+  /* 대표 지시 2026-09-27 「즐겨찾기도 앱으로 바꿔라」 — 공용 단추(pu-appbar.js)는 그대로 두고
+     이 앱에 붙은 단추의 글자만 바꾼다(공용을 고치면 15개 앱이 함께 바뀐다). */
+  var _앱단추 = PuAppBar.mount('#appslot', { current:'cal' });
+  if(_앱단추) _앱단추.textContent = _앱단추.textContent.replace('즐겨찾기', '앱');
+}catch(e){}</script>
+<script>try{ PuBack.guard(function(){ return false; }); }catch(e){}</script>
+</body>
+</html>

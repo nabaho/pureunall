@@ -1,9 +1,18 @@
 {
-  "database": {
-    "rules": "docs/firebase-rules-3순위-포털권한.json"
-  },
   "functions": {
     "source": "functions",
-    "runtime": "nodejs20"
+    "runtime": "nodejs22"
+  },
+  "hosting": {
+    "public": "hosting",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/newsView", "function": { "functionId": "newsView", "region": "asia-northeast3" } },
+      { "source": "/newsClick", "function": { "functionId": "newsClick", "region": "asia-northeast3" } },
+      { "source": "/newsOpen", "function": { "functionId": "newsOpen", "region": "asia-northeast3" } },
+      { "source": "/newsFullPage", "function": { "functionId": "newsFullPage", "region": "asia-northeast3" } },
+      { "source": "/newsFull", "function": { "functionId": "newsFull", "region": "asia-northeast3" } },
+      { "source": "**", "destination": "/index.html" }
+    ]
   }
 }

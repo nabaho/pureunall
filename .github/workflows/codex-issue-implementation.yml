@@ -68,9 +68,21 @@ jobs:
           allow-users: nabaho
           output-file: codex-output.md
 
+      # ══ 공개 전 검문 — 대표 지시 2026-09-11 「깃허브에는 모두 공개하면 안된다」 ══
+      # AI 가 만든 코드·주석·검사 자료에 사람 이름·업체명·번호가 섞였으면 여기서 멈춘다.
+      # ⚠ 반드시 «밀어 올리기 전»이다 — 한 번 올라가면 되돌려도 이력에 남는다.
+      # ⚠ 이미 저장소에 있던 낱말은 통과시킨다. 새로 새는 것만 막는다
+      #   (안 그러면 늘 걸리고, 늘 걸리는 검문은 아무도 안 본다).
+      # 비밀 낱말은 .codex-guard.json 에 있고, 바로 아래 청소 단계가 지운다.
+      - name: Block personal information from going public
+        shell: bash
+        run: |
+          git add -A
+          git diff --cached -U0 | node scripts/autodev-privacy-gate.js
+
       - name: Remove protected task material
         if: always()
-        run: rm -rf .codex-input .codex-task.md codex-output.md
+        run: rm -rf .codex-input .codex-task.md codex-output.md .codex-guard.json
 
       - name: Check whether Codex made changes
         id: changed
@@ -105,7 +117,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PR_URL=$(gh pr create --base main --head "$(git branch --show-current)" --title "자동개발: $ISSUE_TITLE" --body "Closes #${ISSUE_NUMBER}\n\n총괄관리자가 포털에서 승인한 자동개발 변경안입니다. 전체 자동검사 통과 전에는 병합되지 않습니다.")
+          # ⚠ PR 제목에 이슈 «제목»을 쓰지 않는다 — 제목 한 줄에 업체명이 들어가는 일이
+          #   흔하다. 번호만으로 충분히 찾을 수 있다 (대표 지시 2026-09-11).
+          PR_URL=$(gh pr create --base main --head "$(git branch --show-current)" --title "자동개발: 건의 #${ISSUE_NUMBER}" --body "Closes #${ISSUE_NUMBER}\n\n총괄관리자가 포털에서 승인한 자동개발 변경안입니다. 전체 자동검사 통과 전에는 병합되지 않습니다.\n건의 내용은 이 PR·이슈 어디에도 없습니다 — 보호된 통로로만 전달됐습니다.")
           PR_NUMBER=${PR_URL##*/}
           gh pr edit "$PR_NUMBER" --add-label ai-generated
           if [ "${{ steps.task.outputs.risk }}" = "low" ] && [ "${{ steps.task.outputs.auto_deploy }}" = "true" ]; then

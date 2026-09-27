@@ -31,7 +31,13 @@ const gvar = n => {
 
 /* ── 문법·안전 ── */
 const blocks = W.match(/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/g) || [];
-ok('인라인 스크립트가 한 덩어리', blocks.length === 1, blocks.length + '개');
+/* ⚠ 2026-08-30 에 이 줄을 고쳤다. 예전에는 «덩어리 수가 정확히 1» 이었는데,
+   폰 뒤로가기 배선(여섯 줄)을 </body> 앞에 더하자 깨졌다 — 기능이 망가져서가 아니다.
+   지켜야 할 것은 「앱 «본체»가 흩어지지 않는다」이지 「덩어리가 하나다」가 아니다.
+   작은 배선 한두 줄은 늘 붙을 수 있다. 문법은 바로 아래에서 덩어리마다 본다. */
+const 본체 = blocks.filter(b => b.length > 2000);
+ok('앱 본체가 한 덩어리 (배선용 짧은 것은 셈에서 뺀다)', 본체.length === 1,
+   본체.length + '개 · 전체 ' + blocks.length + '개');
 blocks.forEach(function (b, i) {
   const js = b.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '');
   let e = null;
@@ -66,7 +72,16 @@ ok('배지도 계약으로 나온다', grab('catBadge').indexOf('catNorm(cat)') 
 /* ── 담당: 주담당·부담당을 함께 세운다 ── */
 ok('차례는 푸른이알피 sortOrder 를 쓴다', grab('_normStaff').indexOf('u.sortOrder') > 0);
 ok('내 업무에는 나를 뺀 나머지가 나온다', grab('rowHTML').indexOf("mgrLine(it,'other')") > 0);
-ok('팀 전체는 묶어 볼 때 부담당만', grab('renderTeam').indexOf("mgrLine(it,perGroup?'sub':'all'") > 0);
+/* 주담당·부담당 둘 다 제 열로 뺐다 — 기업명 옆에 붙여 두면 이름 길이에 따라
+   줄이 들쭉날쭉해 세로로 훑을 수가 없다. 주담당 열은 평면일 때만 낸다
+   (묶어 볼 때는 묶음 머리에 이미 있다). */
+ok('팀 전체 주담당은 평면일 때 제 열에 그린다',
+  /showMain\?'<td>'\+mgrCell\(/.test(grab('renderTeam'))
+  && /var showMain=!!S\.teamFlat/.test(grab('renderTeam')));
+ok('기업 칸에는 담당 이름을 더 안 붙인다 (열로 갔다)',
+  grab('renderTeam').indexOf("mgrLine(it,'main'") < 0);
+ok('부담당은 제 열에 그린다', grab('renderTeam').indexOf("colTD('team','sub',subCell(it))") > 0);
+ok('주담당만 그리는 길이 실제로 있다', grab('mgrLine').indexOf("(mode==='main')?[]") > 0);
 ok('혼자 하는 업무에는 빈 줄을 그리지 않는다', grab('mgrLine').indexOf("return h?") > 0);
 
 /* ── 남의 건 가져오기 = 부담당으로 붙는다 ── */
@@ -75,7 +90,19 @@ ok('주담당은 바꾸지 않는다 (원본은 푸른이알피)', PULL.indexOf(
 ok('참여 요청을 푸른이알피에도 넘긴다', PULL.indexOf('rec.pe_addsub=[me.sid') > 0);
 ok('이미 있는 건이면 새로 만들지 않는다', PULL.indexOf("if(c._have){") > 0);
 ok('이미 붙어 있으면 아무것도 쓰지 않는다', PULL.indexOf('openDrawer(it._id); return;') > 0);
-const ENG = P.slice(P.indexOf('// ── 업무시트 ↔ 푸른이알피'), P.indexOf('function refreshDash()'));
+/* 엔진은 MyDeskV2 밖으로 나가 top-level wsSyncRun 이 됐다(그 화면을 열어야만 돌던 것을
+   앱 켤 때와 업무관리 신호에도 돌게 하려고). 주석 표시로 자르면 옮길 때마다 깨지므로
+   함수 본문을 괄호로 잡는다. */
+const ENG = (function () {
+  const i = P.indexOf('function wsSyncRun(');
+  if (i < 0) throw new Error('wsSyncRun 못 찾음');
+  let d = 0, st = false;
+  for (let j = i; j < P.length; j++) {
+    if (P[j] === '{') { d++; st = true; }
+    else if (P[j] === '}') { d--; if (st && !d) return P.slice(i, j + 1); }
+  }
+  throw new Error('wsSyncRun 끝 못 찾음');
+})();
 ok('엔진이 요청을 읽어 공동담당에 더한다',
   ENG.indexOf('Array.isArray(w.pe_addsub)') > 0
   && ENG.indexOf('dbPatch(t.store, t.id, { managerSubs:t.subs })') > 0);
@@ -85,11 +112,11 @@ ok('처리한 요청은 지운다', ENG.indexOf("/pe_addsub'] = null") > 0);
 ok('기준선만 찍고 돌아가는 분기보다 앞에 둔다',
   ENG.indexOf('부담당 참여 요청') < ENG.indexOf("note:'기준선'"));
 
-/* ── 명함첩에서 담당자 찾기 ── */
-ok('명함첩 본문을 먼저 읽는다 (색인은 저장할 때만 갱신된다)',
+/* ── 기업정보함에서 담당자 찾기 ── */
+ok('기업정보함 본문을 먼저 읽는다 (색인은 저장할 때만 갱신된다)',
   grab('cardLoad').indexOf("'pucards/items'") < grab('cardLoad').indexOf("'pucards/idx'"));
-ok('명함첩은 읽기만 한다', !/\.set\(|\.update\(|\.remove\(/.test(grab('cardLoad')));
-ok('명함첩 본문이 pucards/items 에 있다', C.indexOf("this.db.ref(DB_ROOT+'/items').on('value'") > 0);
+ok('기업정보함은 읽기만 한다', !/\.set\(|\.update\(|\.remove\(/.test(grab('cardLoad')));
+ok('기업정보함 본문이 pucards/items 에 있다', C.indexOf("const _itemsRef = this.db.ref(DB_ROOT+'/items');") > 0);
 ok("'개인'으로 숨긴 사람은 내보내지 않는다", grab('_cardRow').indexOf("r.sc==='private'") > 0);
 ok('사업자등록증은 사람이 아니라 뺀다', grab('_cardRow').indexOf("r.k==='biz'") > 0);
 const CF = grab('cardFind');
@@ -133,6 +160,31 @@ ok('상자마다 깔려 있던 안내문이 사라졌다',
   ['업체 담당자와 다르면 여기에 적습니다', '부담당도 이 업무의 기록을 씁니다']
     .every(s => W.indexOf(s) < 0));
 ok('오류·주의 안내는 화면에 그대로 둔다', W.indexOf('업무 칸이 비어') > 0);
+
+/* ── 종료 즉시 반영 — 되돌아가면 안 되는 세 가지 ──
+   엔진을 MyDeskV2 밖으로 빼고, 업무관리가 찍는 신호로 곧바로 돌게 했다.
+   아래 셋은 어기면 조용히 망가진다 — 화면만 보아서는 알 수 없다. */
+
+// ① 신호는 종료 저장과 따로 보낸다. 한 묶음이면 이 자리 쓰기가 규칙에 막히는
+//    순간 묶음 전체가 실패해 종료 자체가 안 된다.
+ok('종료 저장 묶음에 신호를 섞지 않는다',
+  !/up\[NS\s*\+\s*'\/sync_ping'\]/.test(W)
+  && /fbDb\.ref\(NS\s*\+\s*'\/sync_ping'\)\.set\(/.test(W));
+ok('신호가 실패해도 종료는 살아 있다 (조용히 넘긴다)',
+  /sync_ping'\)\.set\(\{at:Date\.now\(\),itemId:id\}\)\.catch\(function\(\)\{\}\)/.test(W));
+
+// ② 엔진은 work_erp/items 에도 쓴다. items 를 들으면 제가 쓴 걸 제가 듣고 끝없이 돈다.
+ok('푸른이알피는 items 가 아니라 sync_ping 만 지켜본다',
+  P.indexOf("fbDb.ref('work_erp/sync_ping')") > 0
+  && !/fbDb\.ref\('work_erp\/items'\)\.on\(/.test(P));
+ok('엔진이 items 에 쓰는 것은 그대로다 (되먹임을 막아야 하는 이유)',
+  ENG.indexOf("up['work_erp/items/'") > 0);
+
+// ③ 신호가 연달아 와도 엔진이 겹쳐 돌면 같은 것을 두 번 쓴다.
+ok('엔진에 겹침 방지 자물쇠가 있다',
+  /var _wsBusy = false;/.test(P) && ENG.indexOf('if(_wsBusy)') > 0
+  && ENG.indexOf('_wsBusy = true;') > 0);
+ok('어느 길로 끝나도 자물쇠를 푼다', (ENG.match(/fin\(\)/g) || []).length >= 4);
 
 console.log('\n' + (fail ? 'FAILED ' + fail + '/' + (pass + fail) : 'ALL ' + pass + ' PASS'));
 process.exit(fail ? 1 : 0);

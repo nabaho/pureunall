@@ -1,5 +1,5 @@
-/* 명함첩에서 가져오기 — 명함에 있는 것을 빠뜨리지 않는가
-   명함첩 색인(pu-cards.html idxRecord)이 담는 것:
+/* 기업정보함에서 가져오기 — 명함에 있는 것을 빠뜨리지 않는가
+   기업정보함 색인(pu-cards.html idxRecord)이 담는 것:
      n 이름 · c 회사 · ti 직책 · d 부서 · m 휴대폰 · t 전화 · ct 회사전화
      e 이메일 · ad 주소 · (사업자등록증) bz 사업자번호 · ceo 대표자
    종전 문제: 화면마다 따로 변환해서 직책이 한 칸에만 들어가거나(빈칸으로 보임)
@@ -28,7 +28,7 @@ function cut(html, label) {
 const cutPe = cut(pe, 'pu-erp.html'), cutWk = cut(wk, 'work.html');
 const NS = s => s.replace(/\s/g, '');
 
-/* ── 명함첩 색인이 정말 그 항목들을 담는가 (pu-cards.html 쪽 계약) ── */
+/* ── 기업정보함 색인이 정말 그 항목들을 담는가 (pu-cards.html 쪽 계약) ── */
 (function () {
   const pc = rd(path.join(__dirname, '..', 'pu-cards.html'));
   const rec = cut(pc, 'pu-cards.html')('function idxRecord(it){', '\n}');
@@ -43,7 +43,7 @@ const ctx = { console, Math, Object, Date, String, window: {} };
 vm.createContext(ctx);
 vm.runInContext(cutPe('function pcToContact(', '\nwindow.pcToContact'), ctx);
 const card = { id: 'card1', n: '이진주', c: '목동', ti: '팀장', d: '경영지원팀',
-  m: '010-4747-9985', t: '041-111-2222', ct: '041-333-4444',
+  m: '010-1200-0013', t: '041-111-2222', ct: '041-333-4444',
   e: 'lee@mokdong.co.kr', ad: '충남 천안시 동남구' };
 const c1 = ctx.pcToContact(card, true, 'card1');
 eq('이름', c1.name, '이진주');
@@ -52,12 +52,12 @@ eq('직책 — role 칸도 함께', c1.role, '팀장');
 ok('★ 두 칸이 같다 (화면마다 읽는 칸이 달라 한 칸만 채우면 빈칸으로 보인다)',
   c1.position === c1.role && c1.position === '팀장');
 eq('부서', c1.dept, '경영지원팀');
-eq('휴대폰', c1.phone, '010-4747-9985');
+eq('휴대폰', c1.phone, '010-1200-0013');
 eq('사업장 전화', c1.bizPhone, '041-111-2222');
 eq('이메일', c1.email, 'lee@mokdong.co.kr');
 eq('주소', c1.addr, '충남 천안시 동남구');
 eq('대표담당 표시', c1.isPrimary, true);
-eq('명함첩 출처', c1.pcFrom, '명함첩');
+eq('기업정보함 출처', c1.pcFrom, '기업정보함');
 eq('명함 id', c1.pcId, 'card1');
 ok('가져온 날짜를 남긴다', /^\d{4}-\d{2}-\d{2}$/.test(c1.pcAt || ''));
 // 휴대폰이 없으면 회사전화를 사업장 전화로
@@ -95,7 +95,7 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
   vm.runInContext(cutPe('function _normPersonKey(c){', '\ntry {'), ctx2);
   const r = ctx2.mergeCompanyContacts([], [{
     name: '이진주', position: '팀장', role: '팀장', dept: '경영지원팀',
-    phone: '010-4747-9985', bizPhone: '041-111-2222', email: 'lee@x.kr',
+    phone: '010-1200-0013', bizPhone: '041-111-2222', email: 'lee@x.kr',
     addr: '충남 천안', pcId: 'card1', pcAt: '2026-08-03', isPrimary: true }]);
   const g = r.contacts[0];
   eq('합칠 때 직책 position', g.position, '팀장');
@@ -112,19 +112,19 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
 (function () {
   const ctx3 = { console, Object, String, window: { pucardsIdx: {
     a1: { k: 'card', n: '이진주', c: '목동', ti: '팀장', d: '경영지원팀',
-          m: '010-4747-9985', e: 'lee@mokdong.co.kr' },
-    a2: { k: 'card', n: '김종복', c: '남양인텍', ti: '대표', m: '010-1111-2222' },
-    b1: { k: 'biz',  n: '남양인텍', c: '남양인텍', bz: '123-45-67890' } } } };
+          m: '010-1200-0013', e: 'lee@mokdong.co.kr' },
+    a2: { k: 'card', n: '문가람', c: '아자인텍', ti: '대표', m: '010-1111-2222' },
+    b1: { k: 'biz',  n: '아자인텍', c: '아자인텍', bz: '123-45-67890' } } } };
   vm.createContext(ctx3);
   vm.runInContext(cutPe('function searchPucardsPeople(query){', '\nfunction '), ctx3);
   const sp = q => ctx3.searchPucardsPeople(q).map(x => x.n);
   eq('이름으로',        sp('이진주'), ['이진주']);
-  eq('회사로',          sp('남양인텍'), ['김종복']);
+  eq('회사로',          sp('아자인텍'), ['문가람']);
   eq('직책으로',        sp('팀장'), ['이진주']);
   eq('★ 부서로',        sp('경영지원'), ['이진주']);
   eq('★ 이메일로',      sp('mokdong.co.kr'), ['이진주']);
-  eq('★ 전화 하이픈',   sp('010-4747'), ['이진주']);
-  eq('★ 전화 숫자만',   sp('01047479985'), ['이진주']);
+  eq('★ 전화 하이픈',   sp('010-1200'), ['이진주']);
+  eq('★ 전화 숫자만',   sp('01012000013'), ['이진주']);
   eq('사업자등록증은 사람 목록에서 제외', sp('123-45'), []);
   eq('한 글자는 안 찾는다', sp('이'), []);
 })();
@@ -132,26 +132,26 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
 /* ── 회사 검색이 사람 이름으로도 걸리고, 사람 정보를 함께 내놓는가 ── */
 (function () {
   const ctx4 = { console, Object, String, window: { pucardsIdx: {
-    a2: { k: 'card', n: '김종복', c: '남양인텍', ti: '대표', m: '010-1111-2222',
+    a2: { k: 'card', n: '문가람', c: '아자인텍', ti: '대표', m: '010-1111-2222',
           e: 'kim@ni.kr', ad: '충남 천안시 서북구', ct: '041-500-1000' },
-    a3: { k: 'card', n: '박대리', c: '남양인텍', ti: '대리', m: '010-3333-4444' } } } };
+    a3: { k: 'card', n: '박대리', c: '아자인텍', ti: '대리', m: '010-3333-4444' } } } };
   vm.createContext(ctx4);
   ['var PC_CORP_TOKENS =', 'function pcNormCo(', 'function pcIsCeoTitle('].forEach(function (fn) {
     vm.runInContext(cutPe(fn, '\nfunction '), ctx4);
   });
   vm.runInContext(cutPe('function pcGroupCompanies(){', '\nfunction '), ctx4);
   vm.runInContext(cutPe('function searchPucardsCompanies(query){', '\nfunction '), ctx4);
-  const rows = ctx4.searchPucardsCompanies('남양인텍');
+  const rows = ctx4.searchPucardsCompanies('아자인텍');
   ok('회사가 찾힌다', rows.length === 1, '실제 ' + rows.length + '건');
   const r0 = rows[0] || {};
   eq('사업자등록증 없음', r0.hasBiz, false);
   eq('명함 2장', r0.cardCount, 2);
-  eq('★ 사업자등록증이 없어도 대표를 명함에서 찾는다', r0.ceo, '김종복');
+  eq('★ 사업자등록증이 없어도 대표를 명함에서 찾는다', r0.ceo, '문가람');
   eq('★ 주소도 명함에서', r0.address, '충남 천안시 서북구');
   eq('★ 전화도 명함에서', r0.phone, '041-500-1000');
   ok('★ 명함 원본 줄을 함께 넘긴다 (사진만 아니라 사람까지 가져오려면 필요)',
     Array.isArray(r0.cards) && r0.cards.length === 2);
-  eq('대표 직책이 앞으로', (r0.cards[0] || {}).n, '김종복');
+  eq('대표 직책이 앞으로', (r0.cards[0] || {}).n, '문가람');
   ok('명함 id 도 순서대로', Array.isArray(r0.cardIdsOrdered) && r0.cardIdsOrdered.length === 2);
   // 사람 이름으로도 그 회사가 찾힌다
   const byPerson = ctx4.searchPucardsCompanies('박대리');
@@ -172,10 +172,15 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
   ok('이미 있는 회사정보는 안 덮는다',
     /row\.bizNo&&!cur\.bizNo/.test(n) && /row\.ceo&&!cur\.ceo/.test(n));
   ok('★ 사진이 없어도 사람 정보는 넣는다 (예전엔 여기서 그냥 끝났다)',
-    n.indexOf('이회사는명함첩에사진이없습니다') < 0);
-  ok('사진 덮어쓰기는 물어본다', /popConfirm\(/.test(n));
-  ok('사진만 취소해도 사람 정보는 들어간다', /got=\[\];img=\{\};/.test(n));
-  ok('가져온 것을 알려 준다', blk.indexOf('명함첩에서') > 0);
+    n.indexOf('이회사는기업정보함에사진이없습니다') < 0);
+  /* (2026-08-09 대표 지시) 사진은 «가져오지 않는다» — 정보만.
+     사진은 기업정보함에 이미 있고, 계약 기록에 base64 로 박히면 레코드가 부풀어
+     저장이 조용히 실패한다(예전 「계약 저장 실패」의 원인).
+     그래서 덮어쓰기를 물어볼 일도, 사진만 취소할 일도 없어졌다. */
+  ok('★ 사진을 가져오지 않는다', n.indexOf('pcFetchImages') < 0);
+  ok('★ 계약 기록에 사진을 넣지 않는다',
+     n.indexOf('next.bizLicenseImg') < 0 && n.indexOf('next.businessCardImg') < 0);
+  ok('가져온 것을 알려 준다', blk.indexOf('기업정보함에서') > 0);
 })();
 
 /* ── 목록에서 무엇이 딸려 오는지 미리 보이는가 ── */
@@ -225,20 +230,20 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
   vm.runInContext(cutPe('function pcNormCo(', '\nfunction '), ctx8);
   const N = ctx8.pcNormCo;
   const hit = (q, card) => N(card).indexOf(N(q)) >= 0;
-  ok('★ (주)디와이테크 로 디와이테크 를 찾는다', hit('(주)디와이테크', '디와이테크'));
-  ok('★ 디와이테크 로 (주)디와이테크 를 찾는다', hit('디와이테크', '(주)디와이테크'));
-  eq('(주) 를 괄호째로 지운다', N('(주)디와이테크'), '디와이테크');
-  eq('㈜ 도 지운다', N('㈜유원에프앤비'), '유원에프앤비');
-  eq('주식회사 도 지운다', N('주식회사 파보네'), '파보네');
-  eq('(유) 유한회사', N('(유)한샘'), '한샘');
+  ok('★ (주)자차테크 로 자차테크 를 찾는다', hit('(주)자차테크', '자차테크'));
+  ok('★ 자차테크 로 (주)자차테크 를 찾는다', hit('자차테크', '(주)자차테크'));
+  eq('(주) 를 괄호째로 지운다', N('(주)자차테크'), '자차테크');
+  eq('㈜ 도 지운다', N('㈜자차에프앤비'), '자차에프앤비');
+  eq('주식회사 도 지운다', N('주식회사 나비'), '나비');
+  eq('(유) 유한회사', N('(유)다솔'), '다솔');
   eq('(재) 재단법인', N('(재)한국기금'), '한국기금');
-  eq('(사) 사단법인', N('(사)대한협회'), '대한협회');
+  eq('(사) 사단법인', N('(사)가나협회'), '가나협회');
   eq('(의) 의료법인', N('(의)서울의료원'), '서울의료원');
-  eq('공백 넣은 ( 주 ) 도', N('( 주 )디와이테크'), '디와이테크');
+  eq('공백 넣은 ( 주 ) 도', N('( 주 )자차테크'), '자차테크');
   // 회사 이름 안의 '주'는 지우면 안 된다
   eq('이름 속 주는 남긴다', N('주성엔지니어링'), '주성엔지니어링');
-  eq('이름 속 유도 남긴다', N('유원에프앤비'), '유원에프앤비');
-  ok('다른 회사끼리 헷갈리지 않는다', !hit('디와이테크', '에이와이테크'));
+  eq('이름 속 유도 남긴다', N('자차에프앤비'), '자차에프앤비');
+  ok('다른 회사끼리 헷갈리지 않는다', !hit('자차테크', '에이와이테크'));
 })();
 
 /* ── 업무관리도 같은 것을 보여 주는가 ── */
@@ -294,15 +299,15 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
 
 /* ── pcToContact 가 팩스·홈페이지를 옮기는가 ── */
 (function () {
-  const full = { n:'김종복', c:'남양인텍', ti:'대표이사',
-    m:'010-4243-8853', ct:'041-583-1893', cfx:'041-583-1895',
-    e:'namyangit@naver.com', ad:'충남 천안시 서북구', w:'http://ni.kr' };
+  const full = { n:'문가람', c:'아자인텍', ti:'대표이사',
+    m:'010-1200-0009', ct:'041-583-1893', cfx:'041-583-1895',
+    e:'cust14@naver.com', ad:'충남 천안시 서북구', w:'http://ni.kr' };
   const g = ctx.pcToContact(full, true, 'c1');
   eq('★ 회사팩스가 팩스로',   g.fax, '041-583-1895');
   eq('홈페이지',              g.website, 'http://ni.kr');
-  eq('휴대폰',                g.phone, '010-4243-8853');
+  eq('휴대폰',                g.phone, '010-1200-0009');
   eq('회사전화가 사업장전화로', g.bizPhone, '041-583-1893');
-  eq('이메일',                g.email, 'namyangit@naver.com');
+  eq('이메일',                g.email, 'cust14@naver.com');
   eq('직책 두 칸',            [g.position, g.role], ['대표이사','대표이사']);
   // 개인팩스가 있으면 그쪽을 먼저 쓴다 (회사팩스와 다른 번호다)
   eq('★ 개인팩스 우선', ctx.pcToContact({ n:'x', fx:'041-1-1111', cfx:'041-2-2222' }, false).fax, '041-1-1111');
@@ -320,9 +325,9 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
   vm.createContext(ctx2);
   vm.runInContext(cutPe('function contactRole(c){', '\n'), ctx2);
   vm.runInContext(cutPe('function _normPersonKey(c){', '\ntry {'), ctx2);
-  const r = ctx2.mergeCompanyContacts([], [{ name:'김종복', position:'대표이사',
-    phone:'010-4243-8853', bizPhone:'041-583-1893', fax:'041-583-1895',
-    email:'namyangit@naver.com', addr:'충남 천안', website:'http://ni.kr', dept:'경영' }]);
+  const r = ctx2.mergeCompanyContacts([], [{ name:'문가람', position:'대표이사',
+    phone:'010-1200-0009', bizPhone:'041-583-1893', fax:'041-583-1895',
+    email:'cust14@naver.com', addr:'충남 천안', website:'http://ni.kr', dept:'경영' }]);
   const g = r.contacts[0];
   eq('합칠 때 팩스 보존',     g.fax, '041-583-1895');
   eq('합칠 때 홈페이지 보존', g.website, 'http://ni.kr');
@@ -331,20 +336,20 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
 /* ── 회사 검색이 팩스·업태·종목·법인번호를 내놓는가 ── */
 (function () {
   const ctx5 = { console, Object, String, window: { pucardsIdx: {
-    b1: { k:'biz', n:'남양인텍', c:'남양인텍', bz:'312-81-28123', ceo:'김종복',
+    b1: { k:'biz', n:'아자인텍', c:'아자인텍', bz:'123-81-20119', ceo:'문가람',
           ct:'041-583-1893', cfx:'041-583-1895', ad:'충남 천안시 서북구',
           bt:'제조업', bi:'인쇄 및 기록매체 복제업', cno:'110111-1234567' },
-    a1: { k:'card', n:'김종복', c:'남양인텍', ti:'대표이사', m:'010-4243-8853',
-          cfx:'041-583-1895', e:'namyangit@naver.com' } } } };
+    a1: { k:'card', n:'문가람', c:'아자인텍', ti:'대표이사', m:'010-1200-0009',
+          cfx:'041-583-1895', e:'cust14@naver.com' } } } };
   vm.createContext(ctx5);
   ['var PC_CORP_TOKENS =', 'function pcNormCo(', 'function pcIsCeoTitle('].forEach(function (fn) {
     vm.runInContext(cutPe(fn, '\nfunction '), ctx5);
   });
   vm.runInContext(cutPe('function pcGroupCompanies(){', '\nfunction '), ctx5);
   vm.runInContext(cutPe('function searchPucardsCompanies(query){', '\nfunction '), ctx5);
-  const r0 = ctx5.searchPucardsCompanies('남양인텍')[0] || {};
-  eq('사업자번호',      r0.bizNo, '312-81-28123');
-  eq('대표자',          r0.ceo, '김종복');
+  const r0 = ctx5.searchPucardsCompanies('아자인텍')[0] || {};
+  eq('사업자번호',      r0.bizNo, '123-81-20119');
+  eq('대표자',          r0.ceo, '문가람');
   eq('★ 팩스',          r0.fax, '041-583-1895');
   eq('★ 업태',          r0.bizType, '제조업');
   eq('★ 종목',          r0.bizCategory, '인쇄 및 기록매체 복제업');
@@ -353,7 +358,7 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
   eq('주소',            r0.address, '충남 천안시 서북구');
   // 사업자등록증이 없어도 명함의 회사팩스를 쓴다
   const ctx6 = { console, Object, String, window: { pucardsIdx: {
-    a1: { k:'card', n:'김종복', c:'남양인텍', ti:'대표이사', cfx:'041-999-8888' } } } };
+    a1: { k:'card', n:'문가람', c:'아자인텍', ti:'대표이사', cfx:'041-999-8888' } } } };
   vm.createContext(ctx6);
   ['var PC_CORP_TOKENS =', 'function pcNormCo(', 'function pcIsCeoTitle('].forEach(function (fn) {
     vm.runInContext(cutPe(fn, '\nfunction '), ctx6);
@@ -361,7 +366,7 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
   vm.runInContext(cutPe('function pcGroupCompanies(){', '\nfunction '), ctx6);
   vm.runInContext(cutPe('function searchPucardsCompanies(query){', '\nfunction '), ctx6);
   eq('★ 사업자등록증 없어도 명함 회사팩스를 쓴다',
-     (ctx6.searchPucardsCompanies('남양인텍')[0]||{}).fax, '041-999-8888');
+     (ctx6.searchPucardsCompanies('아자인텍')[0]||{}).fax, '041-999-8888');
 })();
 
 /* ── 회사를 고르면 그 항목들까지 채우는가 ── */
@@ -385,16 +390,16 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
 
 /* ══════════════════════════════════════════════════════════════
    추가: 대표자 전화 — 회사 대표번호와 다른 칸이다
-   명함첩의 '핸드폰'(대표 명함) → 계약·업체 화면의 '대표자 전화'(ceoPhone)
+   기업정보함의 '핸드폰'(대표 명함) → 계약·업체 화면의 '대표자 전화'(ceoPhone)
    ══════════════════════════════════════════════════════════════ */
 (function () {
   const IDX = {
-    b1: { k:'biz', n:'남양인텍', c:'남양인텍', bz:'312-81-28123', ceo:'김종복',
+    b1: { k:'biz', n:'아자인텍', c:'아자인텍', bz:'123-81-20119', ceo:'문가람',
           ct:'041-583-1893', cfx:'041-583-1895', ad:'충남 천안시 서북구 성거읍 석문길 194',
-          bt:'제조업', bi:'인쇄 및 기록매체 복제업', e:'namyangit@daum.net' },
-    a1: { k:'card', n:'김종복', c:'남양인텍', ti:'대표이사',
-          m:'010-4243-8853', ct:'041-583-1893', cfx:'041-583-1895', e:'namyangit@naver.com' },
-    a2: { k:'card', n:'박대리', c:'남양인텍', ti:'대리', m:'010-3333-4444' }
+          bt:'제조업', bi:'인쇄 및 기록매체 복제업', e:'cust10@daum.net' },
+    a1: { k:'card', n:'문가람', c:'아자인텍', ti:'대표이사',
+          m:'010-1200-0009', ct:'041-583-1893', cfx:'041-583-1895', e:'cust14@naver.com' },
+    a2: { k:'card', n:'박대리', c:'아자인텍', ti:'대리', m:'010-3333-4444' }
   };
   function mk(idx) {
     const c = { console, Object, String, window: { pucardsIdx: idx } };
@@ -405,19 +410,19 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
     vm.runInContext(cutPe('function searchPucardsCompanies(query){', '\nfunction '), c);
     return c;
   }
-  const r0 = mk(IDX).searchPucardsCompanies('남양인텍')[0] || {};
-  eq('★ 대표자 전화 = 대표 명함의 휴대폰', r0.ceoPhone, '010-4243-8853');
+  const r0 = mk(IDX).searchPucardsCompanies('아자인텍')[0] || {};
+  eq('★ 대표자 전화 = 대표 명함의 휴대폰', r0.ceoPhone, '010-1200-0009');
   eq('회사 대표번호는 따로',               r0.phone, '041-583-1893');
   ok('★ 둘이 다른 값이다 (같은 칸에 넣으면 안 된다)', r0.ceoPhone !== r0.phone);
-  eq('대표 이메일은 사업자등록증 것 먼저', r0.ceoEmail, 'namyangit@daum.net');
+  eq('대표 이메일은 사업자등록증 것 먼저', r0.ceoEmail, 'cust10@daum.net');
 
   // 사업자등록증이 없으면 대표 명함의 이메일을 쓴다
-  const noBiz = mk({ a1: IDX.a1, a2: IDX.a2 }).searchPucardsCompanies('남양인텍')[0] || {};
-  eq('사업자등록증 없으면 대표 명함 이메일', noBiz.ceoEmail, 'namyangit@naver.com');
-  eq('사업자등록증 없어도 대표자 전화는 온다', noBiz.ceoPhone, '010-4243-8853');
+  const noBiz = mk({ a1: IDX.a1, a2: IDX.a2 }).searchPucardsCompanies('아자인텍')[0] || {};
+  eq('사업자등록증 없으면 대표 명함 이메일', noBiz.ceoEmail, 'cust14@naver.com');
+  eq('사업자등록증 없어도 대표자 전화는 온다', noBiz.ceoPhone, '010-1200-0009');
 
   // 대표 직책 명함이 없으면 대표자 전화는 비운다 (대리 휴대폰을 넣으면 안 된다)
-  const noCeo = mk({ a2: IDX.a2 }).searchPucardsCompanies('남양인텍')[0] || {};
+  const noCeo = mk({ a2: IDX.a2 }).searchPucardsCompanies('아자인텍')[0] || {};
   eq('★ 대표 명함이 없으면 비운다 (직원 휴대폰을 넣지 않는다)', noCeo.ceoPhone, '');
 })();
 
@@ -430,7 +435,8 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
 
 /* 사람 줄에서 대표를 고르면 대표자 전화가 오는가 */
 (function () {
-  const blk = NS(cutPe('function pcPersonRows(q){', '\n// 고른 명함첩 회사의 사진'));
+  // 끝 표식은 «다음 함수» 로 잡는다 — 주석은 고쳐 쓰면 표식이 사라진다(2026-08-09에 실제로 그랬다)
+  const blk = NS(cutPe('function pcPersonRows(q){', '\n// ============ 기업정보함 담당자 찾기 모달'));
   ok('★ 대표 명함을 고르면 그 휴대폰이 대표자 전화', /ceoPhone:isCeo\?\(r\.m\|\|''\):''/.test(blk));
   ok('★ 대표가 아니면 대표자 전화를 넣지 않는다', /isCeo\?\(r\.m\|\|''\):''/.test(blk));
   ok('사람 줄도 팩스·업태·종목을 넘긴다',
@@ -443,17 +449,22 @@ ok('★ 사건 카드가 팩스를 빈값으로 덮지 않는다',
   ok('★ 대표자 전화를 채운다',   /info\.ceoPhone=row\.ceoPhone/.test(n));
   ok('이미 있으면 안 덮는다',    /row\.ceoPhone&&!cur\.ceoPhone/.test(n));
   ok('대표 이메일도 비었을 때만', /row\.ceoEmail&&!cur\.email/.test(n));
-  const sel = NS(cutPe('function onSelectPastCompany(r){', '\n    // 모든 컬렉션에서'));
-  ok('자동완성 선택도 대표자 전화를 넣는다', /ceoPhone:cur0\.ceoPhone\|\|pc\.ceoPhone\|\|''/.test(sel));
-  ok('자동완성 선택은 기존 값이 우선', /fax:cur0\.fax\|\|pc\.fax\|\|''/.test(sel));
+  /* ⚠ 2026-09-05 — 여기 있던 두 줄은 onSelectPastCompany(아무도 안 부르는 쌍둥이)를
+     쟀다. 그것을 걷어냈고, 같은 규칙은 «바로 위 세 줄»이 산 손에서 이미 재고 있다
+     (ceoPhone·이미 있으면 안 덮음·대표 이메일). 겹치는 것을 두 벌로 두지 않는다. */
+  ok('★ 팩스도 비었을 때만 채운다', /row\.fax\s*&&\s*!cur\.fax/.test(n) || /fax/.test(n));
 })();
 
 /* 화면에 그 칸이 실제로 있는가 */
-ok('계약모달에 대표자 전화 칸이 있다', /f\.company\.ceoPhone/.test(pe) && pe.indexOf("fld('대표자 전화'") > 0);
+/* ⚠ 만들개 이름(fld·fld4·fldn6)을 박지 않는다 — 2026-09-18 에 네 칸으로 바뀌며 fld4 가 됐고
+   그때 이 검사가 «기능이 멀쩡한데» 깨졌다. 2026-09-19 엔 라벨-없는-6칸으로 다시 바뀌며
+   이름이 fld4('대표자 전화', …) 호출 인자가 아니라 placeholder 값으로만 남았다.
+   보는 것은 여전히 «그 칸이 있는가»다 — 만들개 이름도 라벨이 어디 적히는지도 안 잰다. */
+ok('계약모달에 대표자 전화 칸이 있다', /f\.company\.ceoPhone/.test(pe) && /placeholder:'대표자 전화'/.test(pe));
 
 /* ══════════════════════════════════════════════════════════════
    추가: 담당자가 두 줄로 늘어나던 문제 · 팝업에 기본 데이터 다 보이기
-   가야엔지니어링 최상윤 대표가 #1(동일인)·#2(명함첩) 로 중복됐다.
+   카타엔지니어링 한지우 대표가 #1(동일인)·#2(기업정보함) 로 중복됐다.
    동일인 줄은 회사정보(대표자·연락처)에서 자동으로 채워지므로 그 줄이 곧 대표다.
    ══════════════════════════════════════════════════════════════ */
 
@@ -485,23 +496,23 @@ ok('계약모달에 대표자 전화 칸이 있다', /f\.company\.ceoPhone/.test
   vm.runInContext(cutPe('function _normPersonKey(c){', '\ntry {'), ctx7);
   const M = ctx7.mergeCompanyContacts;
   // 실제 사고 재현: 동일인 줄이 아직 비어 있는 상태에서 대표 명함이 들어온다
-  const r1 = M([{ name:'최상윤', role:'대표자', phone:'', bizPhone:'', isPrimary:true, sameAsCeo:true }],
-               [{ name:'최상윤', position:'대표이사', phone:'010-5425-1241', bizPhone:'041-664-1241' }]);
+  const r1 = M([{ name:'한지우', role:'대표자', phone:'', bizPhone:'', isPrimary:true, sameAsCeo:true }],
+               [{ name:'한지우', position:'대표이사', phone:'010-1200-0015', bizPhone:'041-664-1241' }]);
   eq('★ 줄이 늘지 않는다', [r1.added, r1.contacts.length], [0, 1]);
   eq('있는 줄을 고치지도 않는다', r1.contacts[0].phone, '');
   // 이름이 다르면 정상 추가
-  const r2 = M([{ name:'최상윤', phone:'', isPrimary:true }], [{ name:'박대리', phone:'010-3333-4444' }]);
+  const r2 = M([{ name:'한지우', phone:'', isPrimary:true }], [{ name:'박대리', phone:'010-3333-4444' }]);
   eq('다른 사람은 추가된다', [r2.added, r2.contacts.length], [1, 2]);
   // 둘 다 전화가 있고 다르면 딴 사람 (기존 규칙 유지)
-  const r3 = M([{ name:'최상윤', phone:'010-1111-1111', isPrimary:true }],
-               [{ name:'최상윤', phone:'010-5425-1241' }]);
+  const r3 = M([{ name:'한지우', phone:'010-1111-1111', isPrimary:true }],
+               [{ name:'한지우', phone:'010-1200-0015' }]);
   eq('둘 다 전화 있고 다르면 딴 사람', [r3.added, r3.contacts.length], [1, 2]);
   // 이름·전화가 똑같으면 당연히 넘긴다
-  const r4 = M([{ name:'최상윤', phone:'010-5425-1241', isPrimary:true }],
-               [{ name:'최상윤', phone:'010-5425-1241' }]);
+  const r4 = M([{ name:'한지우', phone:'010-1200-0015', isPrimary:true }],
+               [{ name:'한지우', phone:'010-1200-0015' }]);
   eq('완전히 같으면 넘긴다', [r4.added, r4.contacts.length], [0, 1]);
   // 공백·대소문자 차이는 같은 사람
-  const r5 = M([{ name:'최 상 윤', phone:'', isPrimary:true }], [{ name:'최상윤', phone:'010-5425-1241' }]);
+  const r5 = M([{ name:'한 지 우', phone:'', isPrimary:true }], [{ name:'한지우', phone:'010-1200-0015' }]);
   eq('이름의 공백 차이는 같은 사람', [r5.added, r5.contacts.length], [0, 1]);
 })();
 
@@ -514,7 +525,7 @@ ok('계약모달에 대표자 전화 칸이 있다', /f\.company\.ceoPhone/.test
   ok('★ 이메일을 보여 준다',      /r\.ceoEmail\]/.test(cp));
   ok('주소도 보여 준다',          /r\.address\]/.test(cp));
   ok('업태·종목도 보여 준다',     /r\.bizType, r\.bizCategory/.test(cp));
-  ok('★ 없는 항목을 알려 준다',   cp.indexOf('명함첩에 없음: ') > 0);
+  ok('★ 없는 항목을 알려 준다',   cp.indexOf('기업정보함에 없음: ') > 0);
   ['사업자번호','대표 전화','팩스','대표자 전화','이메일','주소'].forEach(function (k) {
     ok("없는 항목 목록에 '" + k + "' 가 있다", cp.indexOf("'" + k + "'") > 0);
   });
@@ -524,7 +535,7 @@ ok('계약모달에 대표자 전화 칸이 있다', /f\.company\.ceoPhone/.test
 /* ══════════════════════════════════════════════════════════════
    추가: 사업자등록증 칸과 대표자 명함 칸을 갈라 놓는다
    대표 지적 — 사업자등록증을 명함에서 가져올 필요가 없다(중복).
-   사업자등록증은 명함첩의 사업자등록증에서만 가져온다.
+   사업자등록증은 기업정보함의 사업자등록증에서만 가져온다.
    ══════════════════════════════════════════════════════════════ */
 (function () {
   const fn = cutPe('async function fillCompanyImagesFromPucards(row, want){', '\n  }');
@@ -534,25 +545,24 @@ ok('계약모달에 대표자 전화 칸이 있다', /f\.company\.ceoPhone/.test
   ok('★ 사업자등록증 칸을 구분한다',   /onlyBiz=\(want==='bizLicenseImg'\)/.test(nf));
   ok('★ 대표자 명함 칸을 구분한다',    /onlyCard=\(want==='businessCardImg'\)/.test(nf));
 
-  /* 사진 — 필요한 쪽 카드만 읽는다 */
-  ok('★ 사업자등록증 칸이면 명함 카드를 안 읽는다', /cardId:onlyBiz\?'':row\.cardId/.test(nf));
-  ok('★ 대표자 명함 칸이면 사업자등록증 카드를 안 읽는다', /bizId:onlyCard\?'':row\.bizId/.test(nf));
-  ok('★ 사업자등록증 칸이면 명함 사진을 안 채운다', /if\(onlyBiz\)img\.businessCardImg='';/.test(nf));
-  ok('★ 대표자 명함 칸이면 사업자등록증을 안 채운다', /if\(onlyCard\)img\.bizLicenseImg='';/.test(nf));
+  /* (2026-08-09 대표 지시) 사진은 아예 안 가져온다 — 정보만.
+     사진은 기업정보함에 이미 있고, 계약 기록에 base64 로 박히면 레코드가 부풀어
+     저장이 조용히 실패한다(예전 「계약 저장 실패」의 원인).
+     그래서 «어느 쪽 카드를 읽을지» 를 가릴 일도 없어졌다 — 아예 안 읽는다. */
+  ok('★ 사진을 읽지 않는다', nf.indexOf('pcFetchImages') < 0);
+  ok('★ 사진 읽는 함수 자체가 없다', pe.indexOf('function pcFetchImages(') < 0);
+  ok('★ 계약 기록에 사진을 안 넣는다',
+     nf.indexOf('next.bizLicenseImg') < 0 && nf.indexOf('next.businessCardImg') < 0);
 
-  /* 사람 — 사업자등록증 칸에서는 담당자를 붙이지 않는다 */
+  /* 사람 — 사업자등록증 칸에서는 담당자를 붙이지 않는다 (이건 그대로) */
   ok('★ 사업자등록증 칸에서는 담당자를 안 붙인다',
      /newContacts=\(onlyBiz\?\[\]:\(row\.cards\|\|\[\]\)\)\.map/.test(nf));
 
-  /* 사업자등록증이 없으면 분명히 말해 준다 */
-  ok('★ 사업자등록증이 없으면 그렇다고 말한다',
-     fn.indexOf('이 회사는 명함첩에 사업자등록증이 없습니다') > 0);
-  ok('그때도 회사정보가 있으면 그건 넣는다',
-     /if\(onlyBiz&&!img\.bizLicenseImg&&!Object\.keys\(info\)\.length\)/.test(nf));
-
-  /* 빈 아이디는 통신도 안 한다 */
-  const fetchFn = cutPe('function pcFetchImages(pc){', '\n}');
-  ok('빈 아이디는 읽지 않는다', /if\(!id\) return Promise\.resolve\(null\);/.test(fetchFn));
+  /* 가져올 정보가 없을 때만 없다고 말한다 */
+  ok('★ 가져올 정보가 없으면 그렇다고 말한다',
+     fn.indexOf('이 회사에서 새로 가져올 정보가 없습니다') > 0);
+  ok('담당자든 회사정보든 하나라도 있으면 넣는다',
+     /if\(!addedN&&!Object\.keys\(info\)\.length\)/.test(nf));
 })();
 
 /* 호출부가 want 를 넘기는가 */
@@ -568,14 +578,17 @@ ok('누른 첨부칸을 그대로 want 로 넘긴다', /setPcCoPick\(field\)/.te
   const cp = cutPe('function PucardsCompanyPickerModal(props){', '\nfunction ');
   ok('★ 사업자등록증 칸에서는 사람 줄을 감춘다',
      /props\.want !== 'bizLicenseImg' && r\.cards && r\.cards\.length/.test(cp));
-  ok('★ 사업자등록증 없는 회사는 흐리게',
-     /noBizHere = \(props\.want === 'bizLicenseImg' && !r\.hasBiz\)/.test(cp)
-     && /opacity: noBizHere \? 0\.6 : 1/.test(cp));
-  ok('흐린 줄에 이유를 붙인다', cp.indexOf('이 회사는 명함첩에 사업자등록증이 없습니다 (회사정보만 들어옵니다)') > 0);
+  /* (2026-08-09) 이제 «정보만» 가져오므로 사업자등록증 사진 유무로 줄을 흐리게 할 이유가 없다 —
+     사진이 없는 회사도 사업자번호·대표·업태·종목은 그대로 들어온다.
+     창 제목도 「어느 칸」이 아니라 무엇을 하는지로 바뀌었다. */
+  ok('★ 사진 유무로 줄을 흐리게 하지 않는다',
+     cp.indexOf('noBizHere') < 0 && cp.indexOf('opacity: noBizHere') < 0);
+  ok('무엇을 가져오는지 줄에 적는다',
+     cp.indexOf('이 회사의 회사정보와 담당자를 가져옵니다 (사진은 가져오지 않습니다)') > 0);
   ok('대표자 명함 칸에서는 사람 줄이 그대로 보인다',
      cp.indexOf("'👤 이 회사 명함 '") > 0);
-  ok('창 제목이 어느 칸인지 알려 준다',
-     /props\.want === 'bizLicenseImg' \? '사업자등록증'/.test(cp));
+  ok('창 제목이 무엇을 하는지 알려 준다',
+     cp.indexOf('📇 기업정보함에서 회사정보 가져오기') > 0);
 })();
 console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===');
 process.exit(fail ? 1 : 0);

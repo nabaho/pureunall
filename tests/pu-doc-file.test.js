@@ -2,7 +2,7 @@
 // js/pu-doc-file.js 단위 검사 — 실행: node --test tests/*.test.js
 //   (이 환경의 node는 --test 에 디렉터리 인자를 주면 죽는다. 반드시 glob으로 파일을 넘긴다.)
 //
-// 등록 층은 판독 결과를 명함첩에 넣는 층이다. 실데이터를 만지는 층이므로
+// 등록 층은 판독 결과를 기업정보함에 넣는 층이다. 실데이터를 만지는 층이므로
 // 검사에서는 가짜 db 만 쓴다 — 실서버에 절대 붙지 않는다.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -44,10 +44,10 @@ function fakeDb(map) {
 
 const CARD = { name: '홍길동', company: '가나상사', mobile: '010-1234-5678', title: '과장', email: 'a@b.c' };
 const BIZ = {
-  company: '가나상사', ceo: '홍길동', bizno: '220-81-62517', corpno: '160111-0371859',
+  company: '가나상사', ceo: '홍길동', bizno: '123-81-20031', corpno: '160111-0371859',
   openDate: '2014-05-07', bizType: '제조업', bizItem: '금속가공', address: '천안시'
 };
-/* 이미 모든 칸이 찬 명함첩 레코드 — 채울 것이 없는 '진짜 중복'을 만들 때 쓴다. */
+/* 이미 모든 칸이 찬 기업정보함 레코드 — 채울 것이 없는 '진짜 중복'을 만들 때 쓴다. */
 const FULL_BIZ = Object.assign({}, BIZ);
 
 test('등록 층이 window에 붙는다', () => {
@@ -68,8 +68,8 @@ test('휴대폰 번호가 같은 명함을 찾는다 — 표기가 달라도', a
 test('사업자등록번호가 같은 사업자등록증을 찾는다', async () => {
   const F = loadFile();
   F.init({ db: fakeDb({ 'pucards/idx': {
-    b1: { c: '가나상사', bz: '220-81-62517', k: 'biz' } } }) });
-  assert.equal((await F.findExisting('bizreg', { bizno: '2208162517' })).id, 'b1');
+    b1: { c: '가나상사', bz: '123-81-20031', k: 'biz' } } }) });
+  assert.equal((await F.findExisting('bizreg', { bizno: '1238120031' })).id, 'b1');
   assert.equal(await F.findExisting('bizreg', { bizno: '123-45-67890' }), null);
 });
 
@@ -77,8 +77,8 @@ test('종류가 다르면 같은 번호라도 다른 것으로 본다', async ()
   // 명함과 사업자등록증은 다른 물건이다 — 섞으면 한쪽이 다른 쪽을 덮는다
   const F = loadFile();
   F.init({ db: fakeDb({ 'pucards/idx': {
-    b1: { c: '가나상사', bz: '220-81-62517', k: 'biz' } } }) });
-  assert.equal(await F.findExisting('card', { mobile: '220-81-62517' }), null);
+    b1: { c: '가나상사', bz: '123-81-20031', k: 'biz' } } }) });
+  assert.equal(await F.findExisting('card', { mobile: '123-81-20031' }), null);
 });
 
 test('찾을 열쇠가 없으면 찾지 않는다 — 아무거나 붙이면 안 된다', async () => {
@@ -89,7 +89,7 @@ test('찾을 열쇠가 없으면 찾지 않는다 — 아무거나 붙이면 안
   assert.equal(await F.findExisting('bizreg', { company: '가나상사' }), null);
 });
 
-test('명함첩이 비어 있어도 터지지 않는다', async () => {
+test('기업정보함이 비어 있어도 터지지 않는다', async () => {
   const F = loadFile();
   F.init({ db: fakeDb({}) });
   assert.equal(await F.findExisting('card', { mobile: '010-1234-5678' }), null);
@@ -101,15 +101,15 @@ test('빈 칸만 채운다 — 기존 값은 절대 덮지 않는다', () => {
   const F = loadFile();
   const out = F.fillGaps(
     { company: '가나상사', ceo: '김대표', bizno: '', bizType: '' },
-    { company: '가나상사(주)', ceo: '홍길동', bizno: '220-81-62517', bizType: '제조업' });
-  assert.deepEqual({ ...out }, { bizno: '220-81-62517', bizType: '제조업' });
+    { company: '가나상사(주)', ceo: '홍길동', bizno: '123-81-20031', bizType: '제조업' });
+  assert.deepEqual({ ...out }, { bizno: '123-81-20031', bizType: '제조업' });
   assert.ok(!('ceo' in out), '기존 대표자를 덮으려 합니다');
   assert.ok(!('company' in out), '기존 회사명을 덮으려 합니다');
 });
 
 test('채울 것이 없으면 빈 변경분 — 쓸데없는 쓰기를 하지 않는다', () => {
   const F = loadFile();
-  assert.deepEqual({ ...F.fillGaps({ bizno: '220-81-62517' }, { bizno: '220-81-62517' }) }, {});
+  assert.deepEqual({ ...F.fillGaps({ bizno: '123-81-20031' }, { bizno: '123-81-20031' }) }, {});
   assert.deepEqual({ ...F.fillGaps({}, {}) }, {});
 });
 
@@ -124,7 +124,7 @@ test('kind 는 채움 대상이 아니다 — 종류를 바꾸면 다른 물건�
   assert.ok(!('kind' in out), '레코드 종류를 바꾸려 합니다');
 });
 
-/* ── 명함첩에 넣기 ── */
+/* ── 기업정보함에 넣기 ── */
 
 test('새로 만들 때 레코드·검색 인덱스·사진을 한 번에 쓴다', async () => {
   const F = loadFile();
@@ -139,7 +139,7 @@ test('새로 만들 때 레코드·검색 인덱스·사진을 한 번에 쓴다
   const keys = Object.keys(u).sort();
   assert.ok(keys.some(k => /^pucards\/items\//.test(k)), '레코드를 안 썼습니다');
   assert.ok(keys.some(k => /^pucards\/idx\//.test(k)), '검색 인덱스를 안 썼습니다 — 다른 앱이 못 찾습니다');
-  assert.ok(keys.some(k => /^pucards\/photos\//.test(k)), '사진을 안 보냈습니다 — 명함첩에서 못 봅니다');
+  assert.ok(keys.some(k => /^pucards\/photos\//.test(k)), '사진을 안 보냈습니다 — 기업정보함에서 못 봅니다');
 });
 
 test('상위 노드를 통째로 쓰지 않는다 — 남의 명함이 지워진다', async () => {
@@ -148,12 +148,15 @@ test('상위 노드를 통째로 쓰지 않는다 — 남의 명함이 지워진
   F.init({ db });
   await F.sendToCards({ kind: 'card', fields: CARD, full: 'F', thumb: 'T', photoId: 'p1' });
   assert.equal(db.calls.update[0].path, '', '루트에서 다중 경로 update 를 해야 합니다');
+  /* 지키는 것은 「칸 하나씩 쓴다」이지 칸 이름의 목록이 아니다.
+     2026-08-09 bykey(번호 → 명함번호) 를 더하며 목록도 함께 늘렸다 —
+     새 칸이 생길 때마다 여기서 막히면 그 자체가 배포를 세운다. */
   for (const k of Object.keys(db.calls.update[0].u)) {
-    assert.match(k, /^pucards\/(items|idx|photos)\/[^/]+$/, '위험한 경로입니다: ' + k);
+    assert.match(k, /^pucards\/(items|idx|photos|bykey)\/[^/]+$/, '위험한 경로입니다: ' + k);
   }
 });
 
-test('명함 레코드에 명함첩이 쓰는 이름으로 담긴다', async () => {
+test('명함 레코드에 기업정보함이 쓰는 이름으로 담긴다', async () => {
   const F = loadFile();
   const db = fakeDb({});
   F.init({ db });
@@ -164,7 +167,7 @@ test('명함 레코드에 명함첩이 쓰는 이름으로 담긴다', async () 
   assert.equal(rec.name, '홍길동');
   assert.equal(rec.company, '가나상사');
   assert.equal(rec.mobile, '010-1234-5678');
-  assert.equal(rec.thumb, 'T', '목록용 미리보기가 없으면 명함첩 격자가 빕니다');
+  assert.equal(rec.thumb, 'T', '목록용 미리보기가 없으면 기업정보함 격자가 빕니다');
   assert.equal(rec.photoId, 'p1', '사진첩 사진과 잇는 고리가 없습니다');
   assert.equal(rec.createdAt, 1000, '촬영 시각을 받은 날로 써야 합니다');
   assert.equal(rec.source, 'pu-photos');
@@ -178,14 +181,14 @@ test('사업자등록증 레코드는 kind 가 biz 이고 사업자번호가 들
   const u = db.calls.update[0].u;
   const rec = u[Object.keys(u).find(k => /^pucards\/items\//.test(k))];
   assert.equal(rec.kind, 'biz');
-  assert.equal(rec.bizno, '220-81-62517');
+  assert.equal(rec.bizno, '123-81-20031');
   assert.equal(rec.ceo, '홍길동');
   assert.equal(rec.bizItem, '금속가공');
   assert.equal(rec.openDate, '2014-05-07');
 });
 
-test('검색 인덱스는 명함첩이 쓰는 약어 이름으로 담긴다', async () => {
-  // 이름이 다르면 명함첩·푸른이알피의 검색이 이 명함을 못 찾는다
+test('검색 인덱스는 기업정보함이 쓰는 약어 이름으로 담긴다', async () => {
+  // 이름이 다르면 기업정보함·푸른이알피의 검색이 이 명함을 못 찾는다
   const F = loadFile();
   const db = fakeDb({});
   F.init({ db });
@@ -202,7 +205,7 @@ test('검색 인덱스는 명함첩이 쓰는 약어 이름으로 담긴다', as
   await F.sendToCards({ kind: 'bizreg', fields: BIZ, full: 'F', thumb: 'T', photoId: 'p2' });
   u = db2.calls.update[0].u;
   idx = u[Object.keys(u).find(k => /^pucards\/idx\//.test(k))];
-  assert.equal(idx.bz, '220-81-62517', '사업자번호가 인덱스에 없으면 번호로 못 찾습니다');
+  assert.equal(idx.bz, '123-81-20031', '사업자번호가 인덱스에 없으면 번호로 못 찾습니다');
   assert.equal(idx.ceo, '홍길동');
   assert.equal(idx.k, 'biz');
 });
@@ -210,8 +213,8 @@ test('검색 인덱스는 명함첩이 쓰는 약어 이름으로 담긴다', as
 test('이미 있으면 새로 만들지 않고 빈 칸만 채운다', async () => {
   const F = loadFile();
   const db = fakeDb({
-    'pucards/idx': { b1: { c: '가나상사', bz: '220-81-62517', k: 'biz' } },
-    'pucards/items/b1': { id: 'b1', kind: 'biz', company: '가나상사', bizno: '220-81-62517', ceo: '', thumb: 'OLD' }
+    'pucards/idx': { b1: { c: '가나상사', bz: '123-81-20031', k: 'biz' } },
+    'pucards/items/b1': { id: 'b1', kind: 'biz', company: '가나상사', bizno: '123-81-20031', ceo: '', thumb: 'OLD' }
   });
   F.init({ db });
   const r = await F.sendToCards({ kind: 'bizreg', fields: BIZ, full: 'F', thumb: 'T', photoId: 'p2' });
@@ -234,7 +237,7 @@ test('이미 있으면 새로 만들지 않고 빈 칸만 채운다', async () =
 test('사진이 없던 명함이면 이 사진이 첫 사진이 된다', async () => {
   const F = loadFile();
   const db = fakeDb({
-    'pucards/idx': { b1: { c: '가나상사', bz: '220-81-62517', k: 'biz' } },
+    'pucards/idx': { b1: { c: '가나상사', bz: '123-81-20031', k: 'biz' } },
     'pucards/items/b1': Object.assign({ id: 'b1', kind: 'biz' }, FULL_BIZ)
   });
   F.init({ db });
@@ -250,7 +253,7 @@ test('사진이 없던 명함이면 이 사진이 첫 사진이 된다', async (
 test('이미 있고 채울 것도 없으면 아무것도 쓰지 않는다', async () => {
   const F = loadFile();
   const db = fakeDb({
-    'pucards/idx': { b1: { c: '가나상사', bz: '220-81-62517', k: 'biz' } },
+    'pucards/idx': { b1: { c: '가나상사', bz: '123-81-20031', k: 'biz' } },
     'pucards/items/b1': Object.assign({ id: 'b1', kind: 'biz', thumb: 'OLD' }, FULL_BIZ)
   });
   F.init({ db });
@@ -267,7 +270,7 @@ test('중복이면 언제 저장된 것과 겹쳤는지 알려준다', async () 
   const F = loadFile();
   const when = new Date(2026, 6, 12, 14, 3).getTime();
   const db = fakeDb({
-    'pucards/idx': { b1: { c: '가나상사', bz: '220-81-62517', k: 'biz' } },
+    'pucards/idx': { b1: { c: '가나상사', bz: '123-81-20031', k: 'biz' } },
     'pucards/items/b1': Object.assign({ id: 'b1', kind: 'biz', thumb: 'OLD', createdAt: when }, FULL_BIZ)
   });
   F.init({ db });
@@ -283,8 +286,8 @@ test('빈 칸을 채운 중복도 중복이라고 알린다 — 다만 치울 �
   const F = loadFile();
   const when = new Date(2026, 6, 12, 14, 3).getTime();
   const db = fakeDb({
-    'pucards/idx': { b1: { c: '가나상사', bz: '220-81-62517', k: 'biz' } },
-    'pucards/items/b1': { id: 'b1', kind: 'biz', company: '가나상사', bizno: '220-81-62517', ceo: '', thumb: 'OLD', createdAt: when }
+    'pucards/idx': { b1: { c: '가나상사', bz: '123-81-20031', k: 'biz' } },
+    'pucards/items/b1': { id: 'b1', kind: 'biz', company: '가나상사', bizno: '123-81-20031', ceo: '', thumb: 'OLD', createdAt: when }
   });
   F.init({ db });
   const r = await F.sendToCards({ kind: 'bizreg', fields: BIZ, full: 'F', thumb: 'T', photoId: 'p2' });
@@ -296,7 +299,7 @@ test('빈 칸을 채운 중복도 중복이라고 알린다 — 다만 치울 �
 test('때가 없는 옛 명함이면 때 없이 알린다 — 1970년을 보여주지 않는다', async () => {
   const F = loadFile();
   const db = fakeDb({
-    'pucards/idx': { b1: { c: '가나상사', bz: '220-81-62517', k: 'biz' } },
+    'pucards/idx': { b1: { c: '가나상사', bz: '123-81-20031', k: 'biz' } },
     'pucards/items/b1': Object.assign({ id: 'b1', kind: 'biz', thumb: 'OLD' }, FULL_BIZ)
   });
   F.init({ db });
@@ -325,7 +328,7 @@ test('읽어낸 것이 없으면 보내지 않는다 — 빈 껍데기를 만들
   assert.equal(db.calls.update.length, 0);
 });
 
-test('서류가 아닌 것은 명함첩에 보내지 않는다', async () => {
+test('서류가 아닌 것은 기업정보함에 보내지 않는다', async () => {
   const F = loadFile();
   const db = fakeDb({});
   F.init({ db });
@@ -340,14 +343,14 @@ test('결과 문구가 사람이 읽을 한국어다', async () => {
   const r = await F.sendToCards({ kind: 'bizreg', fields: BIZ, full: 'F', thumb: 'T', photoId: 'p2' });
   assert.ok(r.message && r.message.length > 0, '결과 문구가 없습니다');
   assert.ok(!/[A-Za-z]{5,}/.test(r.message), '영어 내부 용어가 노출됩니다: ' + r.message);
-  assert.match(r.message, /명함첩/);
+  assert.match(r.message, /기업정보함/);
 });
 
 /* ══════════ 업체관리에 넣기 ══════════
    여기서 잘못하면 실데이터가 망가진다. 못 박아 둘 것 셋:
    ① 업체를 새로 만들지 않는다  ② 빈 칸만 채운다  ③ 목록을 통째로 쓰지 않는다 */
 
-const SME = { company: '가나상사', bizno: '220-81-62517', ceo: '홍길동',
+const SME = { company: '가나상사', bizno: '123-81-20031', ceo: '홍길동',
   smeType: '소기업', industry: '금속가공', expiry: '2027-03-31',
   issueNo: 'S2026-1234', issueDate: '2026-04-01' };
 
@@ -358,9 +361,9 @@ function coArr(rec) { return { 'data/companies': { v: [null, rec], u: 100 } }; }
 test('사업자번호로 기존 업체를 찾는다 — 하이픈이 달라도', async () => {
   const F = loadFile();
   F.init({ db: fakeDb({ 'data/companies': { v: {
-    c1: { id: 'c1', name: '가나상사', bizNo: '220-81-62517' },
+    c1: { id: 'c1', name: '가나상사', bizNo: '123-81-20031' },
     c2: { id: 'c2', name: '다라상사', bizNo: '1234567890' } } } }) });
-  assert.equal((await F.findCompanyByBizNo('2208162517')).id, 'c1');
+  assert.equal((await F.findCompanyByBizNo('1238120031')).id, 'c1');
   assert.equal((await F.findCompanyByBizNo('123-45-67890')).id, 'c2');
   assert.equal(await F.findCompanyByBizNo('999-99-99999'), null);
   assert.equal(await F.findCompanyByBizNo(''), null, '번호가 없으면 찾지 않는다');
@@ -368,8 +371,8 @@ test('사업자번호로 기존 업체를 찾는다 — 하이픈이 달라도',
 
 test('배열형 목록에서도 찾는다 — 자리번호를 열쇠로 쓴다', async () => {
   const F = loadFile();
-  F.init({ db: fakeDb(coArr({ id: 'c9', name: '가나상사', bizNo: '2208162517' })) });
-  const hit = await F.findCompanyByBizNo('220-81-62517');
+  F.init({ db: fakeDb(coArr({ id: 'c9', name: '가나상사', bizNo: '1238120031' })) });
+  const hit = await F.findCompanyByBizNo('123-81-20031');
   assert.equal(hit.id, 'c9');
   assert.equal(hit.at, '1', '배열 자리번호를 못 잡으면 칸 경로를 만들 수 없습니다');
 });
@@ -381,7 +384,11 @@ test('업체를 찾지 못하면 새로 만들지 않는다 — 유령 업체 �
   const r = await F.sendToCompany({ kind: 'bizreg', fields: BIZ });
   assert.equal(r.found, false);
   assert.equal(db.calls.update.length, 0, '업체를 만들었습니다');
-  assert.match(r.message, /업체를 먼저 만들어/, '무엇을 해야 하는지 알려주지 않습니다: ' + r.message);
+  /* ⚠ 2026-08-23 문구가 바뀌었다: 「업체를 먼저 만들어 주세요」→「계약이 만들어지면
+     저절로 들어갑니다」. **업체는 계약이 만든다**는 대표 결정 때문이다 — 사진첩에서
+     업체를 만들면 갈래를 짐작해야 하고, 상담으로 받아 둔 서류까지 업체가 된다.
+     이 검사가 지키는 것은 「무엇을 기다리는지 알려 준다」이지 그 문구가 아니다. */
+  assert.match(r.message, /계약이 만들어지면/, '무엇을 기다리는지 알려주지 않습니다: ' + r.message);
 });
 
 test('사업자번호를 못 읽었으면 찾지도 않는다', async () => {
@@ -396,7 +403,7 @@ test('사업자번호를 못 읽었으면 찾지도 않는다', async () => {
 
 test('찾은 업체의 빈 칸만 채운다 — 기존 값은 덮지 않는다', async () => {
   const F = loadFile();
-  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '2208162517',
+  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '1238120031',
     ceo: '기존대표', address: '', bizType: '' }));
   F.init({ db });
   const r = await F.sendToCompany({ kind: 'bizreg', fields: BIZ, byName: '권형하' });
@@ -410,7 +417,7 @@ test('찾은 업체의 빈 칸만 채운다 — 기존 값은 덮지 않는다',
 
 test('업체 목록을 통째로 쓰지 않는다 — 남이 넣은 업체가 지워진다', async () => {
   const F = loadFile();
-  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '2208162517' }));
+  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '1238120031' }));
   F.init({ db });
   await F.sendToCompany({ kind: 'bizreg', fields: BIZ });
   const u = db.calls.update[0].u;
@@ -424,7 +431,7 @@ test('업체 목록을 통째로 쓰지 않는다 — 남이 넣은 업체가 �
 test('찾는 열쇠(사업자번호)를 다시 쓰지 않는다', async () => {
   // 열쇠를 다시 쓰면 표기만 바뀌어 다음 번에 못 찾을 수 있다.
   const F = loadFile();
-  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '2208162517' }));
+  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '1238120031' }));
   F.init({ db });
   await F.sendToCompany({ kind: 'bizreg', fields: BIZ });
   assert.equal(db.calls.update[0].u['data/companies/v/c1/bizNo'], undefined);
@@ -432,7 +439,7 @@ test('찾는 열쇠(사업자번호)를 다시 쓰지 않는다', async () => {
 
 test('갱신시각을 함께 쓴다 — 안 쓰면 푸른이알피 화면에 안 나타난다', async () => {
   const F = loadFile();
-  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '2208162517' }));
+  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '1238120031' }));
   F.init({ db });
   await F.sendToCompany({ kind: 'bizreg', fields: BIZ });
   assert.ok(db.calls.update[0].u['data/companies/u'] > 0);
@@ -440,7 +447,7 @@ test('갱신시각을 함께 쓴다 — 안 쓰면 푸른이알피 화면에 안
 
 test('고친 때·고친 이를 남긴다 — 동시 편집 판단이 이걸 본다', async () => {
   const F = loadFile();
-  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '2208162517' }));
+  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '1238120031' }));
   F.init({ db });
   await F.sendToCompany({ kind: 'bizreg', fields: BIZ, byName: '권형하' });
   const u = db.calls.update[0].u;
@@ -450,7 +457,7 @@ test('고친 때·고친 이를 남긴다 — 동시 편집 판단이 이걸 본
 
 test('채울 것이 없으면 아무것도 쓰지 않는다 — 업체관리도', async () => {
   const F = loadFile();
-  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '2208162517',
+  const db = fakeDb(coObj({ id: 'c1', name: '가나상사', bizNo: '1238120031',
     ceo: '홍길동', corpNo: '160111-0371859', openDate: '2014-05-07',
     bizType: '제조업', bizCategory: '금속가공', address: '천안시' }));
   F.init({ db });
@@ -463,7 +470,7 @@ test('채울 것이 없으면 아무것도 쓰지 않는다 — 업체관리도'
 test('중소기업확인서는 기업규모와 유효기간만 채운다', async () => {
   // 상호·대표자는 사업자등록증이 더 정확한 원본이다 — 확인서로 건드리지 않는다.
   const F = loadFile();
-  const db = fakeDb(coObj({ id: 'c1', name: '', bizNo: '2208162517', ceo: '',
+  const db = fakeDb(coObj({ id: 'c1', name: '', bizNo: '1238120031', ceo: '',
     companySize: '', industry: '', smeExpiry: '' }));
   F.init({ db });
   const r = await F.sendToCompany({ kind: 'sme', fields: SME });

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>목업 7 — 설명을 셀 안에</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
+    --line:#e2e8f0;--panel:#fff;--bg:#e2e8f0;--radius:11px;--warn-bg:#fffbeb}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);background:#f1f5f9;font-size:14px;padding:20px 16px 60px}
+  .wrap{max-width:640px;margin:0 auto}
+  h1{font-size:17px;margin:0 0 4px}
+  .muted{color:var(--sub);font-size:12.5px}
+  button{font-family:inherit;font-size:13px;padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;color:var(--ink)}
+  button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+  .row{display:flex;align-items:center;gap:10px}
+  /* ★ 이번에 바뀐 것 — 칸 위 라벨을 없애고 칸 «안»에 설명을 넣는다(placeholder).
+     값이 있으면 그 값이 보이고, 비어 있으면 회색 설명 글자가 보인다 — 캡쳐로 보여주신 것과 같은 방식. */
+  .fld input{padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%}
+  .fld input::placeholder{color:var(--faint)}
+  .gridw{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px 14px}
+  .gridw .fld.full{grid-column:1/-1}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px}
+  .boxhead{font-size:12.5px;font-weight:800;color:var(--acc2);display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--acc-soft)}
+  .boxhead .d{font-weight:400;font-size:11px;color:var(--sub)}
+  .reppair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .subbox{background:var(--bg);border-radius:9px;padding:10px 12px}
+  .subhead{font-size:11.5px;font-weight:700;color:var(--sub);margin-bottom:8px}
+  .addrstack{display:flex;flex-direction:column;gap:6px}
+  .addrstack .r1{display:flex;gap:6px}
+  .addrstack .r1 .zip{width:130px;flex:none}
+  .addrstack .r1 .zip input{font-family:monospace;text-align:center;background:#f8fafc;color:var(--sub)}
+  .fake-modal{background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 8px 30px rgba(0,0,0,.12);border:1px solid var(--line)}
+  .cap{font-size:11.5px;color:var(--sub);text-align:center;margin:8px 0 0;font-weight:700}
+  .warn{background:var(--warn-bg);border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:9px;padding:12px 14px;margin-top:14px;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>목업 7 — 칸 위 설명을 칸 «안»으로</h1>
+<p class="muted">보여주신 캡쳐처럼 라벨을 칸 위에 따로 안 두고, 칸 안(placeholder)에 넣었습니다.
+목업 1과 같은 화면인데 이 부분만 바꿔 다시 그렸습니다.</p>
+
+<div class="fake-modal">
+  <div class="row" style="margin:0 0 12px"><h2 style="margin:0;font-size:15px">사업장 편집</h2>
+    <span style="flex:1"></span><button title="기업정보함에서 채우기">🏢 기업정보함에서</button></div>
+
+  <div class="box">
+    <div class="boxhead">🏢 기업정보 <span class="d">— 상호·번호·규모 등</span></div>
+    <div class="gridw">
+      <div class="fld"><input placeholder="연번" value="1-1"></div>
+      <div class="fld"><input placeholder="상호" value="가나기계(주)"></div>
+      <div class="fld"><input placeholder="사업자등록번호" value="123-81-12595"></div>
+      <div class="fld"><input placeholder="법인등록번호" value=""></div>
+      <div class="fld"><input placeholder="업종" value="제조(방수재)"></div>
+      <div class="fld"><input placeholder="상시근로자수" value="16"></div>
+      <div class="fld full">
+        <div class="addrstack">
+          <div class="r1"><div class="zip"><input placeholder="우편번호" value="000-000" readonly></div>
+            <div><button class="primary">🔍 우편번호 검색</button></div></div>
+          <div><input placeholder="소재지(도로명주소)" value="○○시 ○○구 ○○로 00"></div>
+        </div>
+      </div>
+      <div class="fld"><input placeholder="회사 전화" value=""></div>
+      <div class="fld"><input placeholder="개업일" value=""></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="boxhead">👤 대표자 · 담당자 <span class="d">— 협의회 위원과는 다를 수 있습니다</span></div>
+    <div class="gridw">
+      <div class="fld"><input placeholder="대표자" value="홍길동"></div>
+      <div class="fld"><input placeholder="담당자명" value="이담당"></div>
+      <div class="fld"><input placeholder="직급" value="부장"></div>
+      <div class="fld"><input placeholder="담당자 전화" value=""></div>
+      <div class="fld"><input placeholder="회사 팩스" value=""></div>
+      <div class="fld"><input placeholder="담당자 핸드폰" value="010-1234-5678"></div>
+      <div class="fld"><input placeholder="담당자 이메일" value="name@example.com"></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="boxhead">⚖️ 사용자 대표 · 근로자 대표 <span class="d">— 협의회 구성 인원</span></div>
+    <div class="reppair">
+      <div class="subbox">
+        <div class="subhead">사용자 대표</div>
+        <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:8px;cursor:pointer">
+          <input type="checkbox" checked> 대표자와 같은 사람입니다
+        </label>
+        <div class="gridw" style="grid-template-columns:1fr">
+          <div class="fld"><input placeholder="성명" value="홍길동" disabled></div>
+          <div class="fld"><input placeholder="직위" value=""></div>
+        </div>
+      </div>
+      <div class="subbox">
+        <div class="subhead">근로자 대표</div>
+        <div class="gridw" style="grid-template-columns:1fr">
+          <div class="fld"><input placeholder="성명" value=""></div>
+          <div class="fld"><input placeholder="직위" value=""></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="boxhead">🏷️ 중소기업 <span class="d">— 지원금 심사에 씁니다</span></div>
+    <div class="gridw">
+      <div class="fld"><input placeholder="기업규모" value=""></div>
+      <div class="fld"><input placeholder="중소기업 여부" value=""></div>
+    </div>
+  </div>
+</div>
+<p class="cap">칸 위 라벨이 없어져 더 깔끔합니다</p>
+
+<div class="warn">
+<b>확인해 두실 점 하나</b> — 「상호」·「담당자명」처럼 <b>값이 이미 채워진 칸</b>은 그 순간부터
+설명 글자(placeholder)가 사라지고 <b>값만</b> 보입니다. 위 그림의 "가나기계(주)" 칸도 지금
+「이게 상호인지 무슨 칸인지」는 자리(맨 왼쪽 위)로만 짐작할 수 있습니다 — 칸이 많고 값이 다 채워진
+사업장일수록 이 효과가 커집니다. 캡쳐 주신 화면도 <b>대부분 빈 칸</b>이라 설명이 잘 보였던 것으로
+보입니다. 그래도 이대로 가시겠으면 이 모양으로 만들겠습니다.
+</div>
+</div>
+</body>
+</html>

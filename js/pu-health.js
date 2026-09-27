@@ -30,9 +30,32 @@
     return (hash >>> 0).toString(36);
   }
 
+  /* ── 장애가 «아닌» 잔소리 (2026-09-16, 대표 제보 「계속 깜빡이며 경고가 반복된다」) ──
+     ★ 무슨 일이 있었나 — 대표 화면의 빨간 「장애 알림 7」이 켤 때마다 다시 켜졌다.
+       열린 7건을 서버에서 읽어 보니 «전부» 기금 화면이 10분마다 올린
+       「ResizeObserver loop completed with undelivered notifications.」였다(누적 69건).
+       이것은 크롬이 «이번 칸에 그림을 한 번 더 그린다»고 알려 주는 말이지 고장이 아니다.
+       그런데 오류 그물(window.error)이 이것을 장애로 세어 10분마다 새 건을 만들었고,
+       새 건이 생길 때마다 배지를 다시 칠해 «깜빡였다».
+     ★ 「Script error.」도 같다 — 다른 출처의 스크립트가 낸 오류를 브라우저가 «내용 없이»
+       알려 주는 말이다(37건). 무엇이 났는지 알 길이 없어 처리할 것도 없다.
+     ⚠ 두 곳에서 «함께» 거른다 — 새로 올릴 때(enqueue)와 읽어 셀 때(flattenAlerts).
+       올릴 때만 거르면 이미 서버에 쌓인 것이 계속 배지를 켠다. 읽을 때만 거르면
+       서버에는 영영 쌓인다. */
+  var NOISE = [
+    /ResizeObserver loop/i,
+    /^Script error\.?$/i
+  ];
+  function isNoise(message) {
+    var m = String(message == null ? '' : message).trim();
+    for (var i = 0; i < NOISE.length; i++) { if (NOISE[i].test(m)) return true; }
+    return false;
+  }
+
   function enqueue(kind, error, extra) {
     extra = extra || {};
     var message = safeText(error && (error.message || error.reason) || error || '알 수 없는 오류');
+    if (isNoise(message)) return false;           /* 잔소리는 장애가 아니다 — 세지도 올리지도 않는다 */
     var page = window.location.pathname.split('/').pop() || 'enter.html';
     var id = fingerprint(kind, message, page);
     var dedupe = readJson(DEDUPE_KEY, {});
@@ -52,6 +75,12 @@
       status: 'new'
     });
     writeJson(STORE_KEY, pending.slice(-MAX_PENDING));
+    /* ★ 방금 장애가 났다 — 이제 «열린 것이 있다»는 것을 안다.
+       평소에는 세어 보지 않아 조용하지만(모르면 안 띄운다), 여기서는 확실히
+       아니까 그 자리에서 빨간불을 켠다. 관리자 화면이 아니면 paintAdminBadge 가
+       알아서 넘긴다 — 여기서 관리자인지 따지지 않는다(판단은 한 곳에서만). */
+    knownOpen = (knownOpen || 0) + 1;
+    paintAdminBadge(window.document.getElementById('pu-health-admin-badge'));
     flush();
     return true;
   }
@@ -90,10 +119,56 @@
     Object.keys(value || {}).forEach(function (uid) {
       Object.keys(value[uid] || {}).forEach(function (id) {
         var item = value[uid][id] || {};
-        if (item.status === 'new') list.push(Object.assign({ uid: uid, id: id }, item));
+        if (item.status !== 'new') return;
+        if (isNoise(item.message)) return;        /* 예전에 쌓인 잔소리도 세지 않는다 — 배지가 그것으로 켜졌다 */
+        list.push(Object.assign({ uid: uid, id: id }, item));
       });
     });
     return list.sort(function (a, b) { return Number(b.createdAt || 0) - Number(a.createdAt || 0); });
+  }
+
+  /* ── 장애가 없으면 화면에 «아무것도» 없다 (대표 지시 2026-08-23, 두 번째) ──
+     「장애알림 표시가 장애가 없을경우 필요없다 … 이 문구 없애달라」
+     「장애알림 글자 왜 안없어지냐 피시와 폰에서 여전히 나온다」
+
+     처음엔 관리자면 늘 빨간 단추를 띄웠다. 다음엔 0건이면 감추되 «아직 안 세어
+     봤을 때»는 조용한 회색 단추를 남겼다 — 그런데 세는 것은 «눌렀을 때»뿐이라,
+     실제로는 그 회색 단추가 모든 화면에 늘 떠 있었다. 고친 게 아니라 색만 바꾼 것이다.
+
+     이제 규칙은 하나다: 열린 건이 «1건 이상인 것을 아는 때»에만 뜬다.
+       · 모른다(null)  → 안 뜬다
+       · 0건            → 안 뜬다
+       · 1건 이상       → 빨갛게 뜬다
+     늘 켜져 있는 등은 아무것도 알려 주지 못한다 — 이 저장소가 금액 경고에서
+     이미 겪은 실수다. 이제 빨간불이 뜨면 그 자체로 «지금 무슨 일이 있다»는 뜻이 된다.
+
+     ⚠ 그러면 평소에 관리자는 어떻게 들여다보나 — 포털(enter.html)의 [⚙ 설정]
+       안에 「시스템 장애 알림」 줄을 두었다. 늘 떠 있는 단추를 하나 더 만드는
+       대신, 이미 있는 관리자 서랍에 넣는다. 화면을 한 뼘도 차지하지 않는다.
+     ⚠ 미리 세어 두지 않는 까닭 — 그러려면 장애 이력 전체(지금 191건·156KB)를
+       화면을 띄울 때마다 내려받아야 한다. 싸게 알려면 «열린 건수»만 담는 작은
+       자리가 따로 있어야 하고, 그건 규칙(콘솔)에 새 경로를 여는 일이라 대표 확인이
+       필요하다. 그때까지는 «모르면 조용히 있는다»가 옳다. */
+  var HEALTH_ALARM = 'position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:2147483646;border:0;border-radius:999px;padding:10px 14px;background:#b42318;color:#fff;font:800 12px/1.2 system-ui,sans-serif;box-shadow:0 6px 22px #0003;cursor:pointer;';
+
+  /* 아는 열린 건수. null = 아직 안 세어 봐서 «모른다». 모르면 안 띄운다. */
+  var knownOpen = null;
+  /* 총괄관리자로 확인됐는가 — 이 값이 참일 때만 단추가 뜬다.
+     예전에는 monitorAdmin 이 직접 hidden 을 만졌는데, 그러면 「0건이라 감췄다」를
+     곧바로 되돌려 버린다. 판단은 paintAdminBadge 한 곳으로 모은다. */
+  var isAdminUser = false;
+
+  function paintAdminBadge(badge) {
+    if (!badge) return;
+    /* 보이고 감추는 판단은 «여기 한 곳»에서만 한다. 두 곳에서 하면 서로 되돌린다
+       — monitorAdmin 이 hidden=false 로 덮어써 0건인데도 다시 뜨는 식이다.
+       ★ knownOpen > 0 «만» 띄운다. null(모름)도 0 과 똑같이 감춘다 —
+         !== 0 으로 적으면 모름일 때 또 떠서 처음 문제로 되돌아간다. */
+    if (!isAdminUser || !(knownOpen > 0)) { badge.hidden = true; return; }
+    badge.hidden = false;
+    badge.style.cssText = HEALTH_ALARM;
+    badge.textContent = '⚠ 장애 알림 ' + knownOpen;
+    badge.title = '처리할 장애 알림이 ' + knownOpen + '건 있습니다';
   }
 
   function ensureAdminBadge(app) {
@@ -103,14 +178,41 @@
       badge.id = 'pu-health-admin-badge';
       badge.type = 'button';
       badge.hidden = true;
-      badge.style.cssText = 'position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:2147483646;border:0;border-radius:999px;padding:10px 14px;background:#b42318;color:#fff;font:800 12px/1.2 system-ui,sans-serif;box-shadow:0 6px 22px #0003;cursor:pointer;';
       badge.onclick = function () { showAdminPanel(app); };
       window.document.body.appendChild(badge);
     }
+    paintAdminBadge(badge);
     return badge;
   }
 
+  /* 장애 이력은 오래될수록 커진다. 관리자 탭마다 전체 루트를 실시간 구독하면
+     오류 한 건이 생길 때마다 과거 이력까지 다시 내려온다. 평소에는 읽지 않고,
+     총괄관리자가 단추를 눌렀을 때 한 번만 최근 미처리 목록을 가져온다. */
   function showAdminPanel(app) {
+    app = app || activeApp();
+    if (!app) return Promise.resolve(false);
+    var badge = ensureAdminBadge(app);
+    badge.disabled = true;
+    badge.textContent = '장애 알림 불러오는 중…';
+    /* ★ 결과를 돌려준다 — 포털 [⚙ 설정] 의 「시스템 장애 알림」 줄이 이걸 기다렸다가
+       제 단추에 「불러오는 중…」 을 띄운다. 안 돌려주면 부르는 쪽이 끝을 모른다. */
+    return app.database().ref('systemAlerts').once('value').then(function (alertsSnapshot) {
+      adminAlerts = flattenAlerts(alertsSnapshot.val());
+      knownOpen = adminAlerts.length;      // 이제 «안다» — 색이 뜻을 갖는다
+      renderAdminPanel(app);
+    }).catch(function () {
+      /* 못 읽었으면 «모르는 것»이지 «없는 것»이 아니다 — 0 으로 적어 두면
+         진짜 장애가 있어도 조용해진다. 모름(null)으로 되돌린다. */
+      knownOpen = null;
+      window.alert('장애 알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }).then(function () {
+      badge.disabled = false;
+      paintAdminBadge(badge);
+      return knownOpen;
+    });
+  }
+
+  function renderAdminPanel(app) {
     var old = window.document.getElementById('pu-health-panel');
     if (old) old.remove();
     var panel = window.document.createElement('div');
@@ -120,13 +222,19 @@
     box.style.cssText = 'width:min(680px,100%);max-height:min(720px,90vh);overflow:auto;background:#fff;border-radius:16px;padding:18px;color:#172033;box-shadow:0 20px 60px #0005;';
     var title = window.document.createElement('div');
     title.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:17px;margin-bottom:12px;';
-    title.innerHTML = '<span>시스템 장애 알림 (' + adminAlerts.length + ')</span><button type="button" aria-label="닫기" style="border:0;background:#eef2f7;border-radius:8px;padding:6px 10px;cursor:pointer">닫기</button>';
+    title.innerHTML = '<span></span><button type="button" aria-label="닫기" style="border:0;background:#eef2f7;border-radius:8px;padding:6px 10px;cursor:pointer">닫기</button>';
+    var titleText = title.querySelector('span');
     title.querySelector('button').onclick = function () { panel.remove(); };
     box.appendChild(title);
     if (!adminAlerts.length) {
       var empty = window.document.createElement('p'); empty.textContent = '처리할 장애 알림이 없습니다.'; box.appendChild(empty);
     }
-    adminAlerts.slice(0, 30).forEach(function (item) {
+    // 창에 실제로 그려 넣은 줄 수 — 마지막 한 줄을 처리하면 «닫기»만 남은 빈 창을 남기지 않는다.
+    // adminAlerts 는 서버 청취기가 뒤늦게 갱신하므로 세어서 쓸 수 없다.
+    var shown = adminAlerts.slice(0, 30);
+    var left = shown.length;
+    titleText.textContent = '시스템 장애 알림 (' + adminAlerts.length + ')';
+    shown.forEach(function (item) {
       var row = window.document.createElement('div');
       row.style.cssText = 'border:1px solid #dce3ec;border-radius:10px;padding:11px;margin:8px 0;font-size:12px;line-height:1.5;';
       var when = new Date(Number(item.createdAt || 0)).toLocaleString('ko-KR');
@@ -136,7 +244,21 @@
       resolve.style.cssText = 'float:right;border:0;border-radius:7px;background:#17365f;color:#fff;padding:5px 9px;cursor:pointer;';
       resolve.onclick = function () {
         resolve.disabled = true;
-        app.database().ref('systemAlerts/' + item.uid + '/' + item.id).update({ status: 'resolved', resolvedAt: Date.now(), resolvedBy: app.auth().currentUser.uid }).then(function () { row.remove(); });
+        app.database().ref('systemAlerts/' + item.uid + '/' + item.id).update({ status: 'resolved', resolvedAt: Date.now(), resolvedBy: app.auth().currentUser.uid }).then(function () {
+          row.remove();
+          adminAlerts = adminAlerts.filter(function (x) { return !(x.uid === item.uid && x.id === item.id); });
+          left -= 1;
+          /* 처리한 만큼 단추도 함께 내린다 — 창을 닫고 나서 빨간불만 남으면
+             「처리했는데 왜 아직 빨갛나」가 된다(건의함 배지에서 겪은 것과 같은 일). */
+          knownOpen = left;
+          paintAdminBadge(window.document.getElementById('pu-health-admin-badge'));
+          if (left <= 0) { panel.remove(); return; }   // 다 처리했으면 창도 함께 닫는다
+          titleText.textContent = '시스템 장애 알림 (' + left + ')';
+        }).catch(function () {
+          // 못 지웠으면 다시 누를 수 있어야 한다 — 영영 잠긴 단추를 남기지 않는다
+          resolve.disabled = false;
+          resolve.textContent = '처리 실패 — 다시';
+        });
       };
       row.appendChild(resolve); box.appendChild(row);
     });
@@ -151,14 +273,9 @@
   function monitorAdmin(app, user) {
     app.database().ref('uid_roles/' + user.uid).once('value').then(function (snapshot) {
       var role = snapshot.val() || {};
-      if (!role.isAdmin && !role.isSubAdmin) return;
-      var badge = ensureAdminBadge(app);
-      app.database().ref('systemAlerts').on('value', function (alertsSnapshot) {
-        adminAlerts = flattenAlerts(alertsSnapshot.val());
-        badge.hidden = adminAlerts.length === 0;
-        badge.textContent = '장애 알림 ' + adminAlerts.length + '건';
-        window.document.title = adminAlerts.length ? '⚠ ' + window.document.title.replace(/^⚠\s*/, '') : window.document.title.replace(/^⚠\s*/, '');
-      });
+      if (!role.isAdmin) return;
+      isAdminUser = true;
+      ensureAdminBadge(app);   // 보임·색·글자는 모두 paintAdminBadge 가 정한다
     }).catch(function () {});
   }
 
@@ -188,6 +305,8 @@
     return true;
   }
 
-  window.PUHealth = { install: install, report: enqueue, flush: flush, _flattenAlerts: flattenAlerts };
+  /* openAdminPanel — 늘 떠 있는 단추 없이도 관리자가 들여다볼 수 있는 유일한 문.
+     포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄이 이것을 부른다. */
+  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _flattenAlerts: flattenAlerts, _isNoise: isNoise };
   install();
 })(typeof window !== 'undefined' ? window : null);

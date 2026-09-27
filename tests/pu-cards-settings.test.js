@@ -1,4 +1,4 @@
-/* 명함첩 환경설정 — 정리 탭을 다른 탭과 같은 모양으로, 사이드바 버튼 간격
+/* 기업정보함 환경설정 — 정리 탭을 다른 탭과 같은 모양으로, 사이드바 버튼 간격
    ★ 폰(모바일 시트)에서 부르는 경로는 예전 그대로여야 한다 — 여기서 절대 바뀌면 안 된다.
    ★ 안 보이던 글자 버그(--ink 변수가 밝은 화면에 안 덮어써짐)를 고쳤는지도 함께 확인한다. */
 const fs = require('fs');
@@ -39,11 +39,22 @@ function makeCtx(counts, panelTarget){
     mojibakeTargets(){ return new Array(counts.moji || 0); },
     nameFixList(){ return new Array(counts.nameFix || 0); },
     mixedFixList(){ return new Array(counts.mixedFix || 0); },
+    /* 2026-09-18 — 휴지통은 «열 때» 읽으므로 건수도 이 함수로 묻는다.
+       여기서는 이미 읽어 둔 셈치고 실제 건수를 돌려준다
+       (아직 안 읽었을 때의 «…» 는 tests/cards-trash-lazy.test.js 가 본다). */
+    trashCount(){ return Object.keys(trashObj).length; },
+    /* 📋 등록증 → 기업상세 (2026-09-18). 세는 «규칙»은
+       tests/cards-bizfill-coinfo.test.js 가 가짜 서버에 물려 본다 — 여기서는 숫자만 준다. */
+    bizFillCount(){ return counts.bizFill || 0; },
     toast(){}
   };
   vm.createContext(c);
   vm.runInContext("const esc = s => String(s??'').replace(/[&<>\"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[ch]));", c);
-  vm.runInContext(slice("let _panelTarget='modal';", "const SET_TABS="), c);
+  // ★ classifyPlan (규칙 분류, Task 3) 은 이 슬라이스 범위 안에 함께 딸려 오는데,
+  //   _canon 은 그 범위 밖(파일 앞쪽)에 있어 여기서 별도로 심어 준다.
+  vm.runInContext("const _canon = s => String(s||'').replace(/^\\s*\\d+\\s*[.)\\-]?\\s*/,'').replace(/\\s/g,'');", c);
+  vm.runInContext(/* ⚠ 2026-09-05: 「const SET_TABS=」가 사라졌다(탭을 없앴다) — 새 표식으로 자른다 */
+    slice("let _panelTarget='modal';", "/* ══════ ⚙️ 환경설정 — 탭을 없애고"), c);
   vm.runInContext(slice('function openCleanupCenter(){', 'async function mergeSimilar'), c);
   // ★ _panelTarget 은 let 으로 선언돼 컨텍스트 객체의 속성으로 안 보인다 —
   //   밖에서 c._panelTarget = ... 로 대입해도 실제 스크립트가 보는 값은 안 바뀐다.
@@ -106,7 +117,10 @@ function makeCtx(counts, panelTarget){
   t('★ 이상 없음은 초록', /color:var\(--green\)">✓ 이상 없음/.test(h), true);
 }
 {
-  const { c, written } = makeCtx({ dup: 7, sim: 12, empty: 2, moji: 1, nameFix: 3, mixedFix: 4, trash: 5 }, 'inline');
+  const { c, written } = makeCtx({ dup: 7, sim: 12, empty: 2, moji: 1, nameFix: 3, mixedFix: 4, trash: 5, bizFill: 9 }, 'inline');
+  // ★ 규칙 분류(Task 3) 항목도 걸리는 게 있어야 이 줄만 "이상 없음"으로 남지 않는다 —
+  //   기본 규칙(CLASSIFY_DEFAULTS)의 '노무' 단어가 걸리도록 미분류 명함 하나를 심는다.
+  c.state.items = { x1: { id:'x1', kind:'card', company:'노무법인테스트', group:'' } };
   c.openCleanupCenter();
   const h = written.inline;
   t('건수가 있으면 이상 없음이 하나도 안 보인다', /이상 없음/.test(h), false);
@@ -131,9 +145,14 @@ t('★ 인라인일 때 setbtn 을 만드는 코드가 있다', /class="setbtn" 
 t('설명에서 태그를 지우는 정리 함수가 있다', /const plain = s=>String\(s\)\.replace\(\/<\[\^>\]\+>\/g,''\);/.test(src), true);
 
 /* ═══ 7. ★ 안 보이던 글자 — CSS 변수 덮어쓰기가 환경설정 화면까지 간다 ═══ */
+/* 2026-08-30 색을 팔레트로 줄이며 값이 바뀌었다 — «어떤 색»이 아니라
+   「밝은 테마 변수가 두 곳에 함께 걸린다 · 모달만 밝은 바탕과 짙은 글자를 갖는다」를 본다 */
+const CP = require('./lib-palette.js');
 t('★ 밝은 색 변수가 #pcSettings 에도 적용된다',
-  /body\.pc \.modal,body\.pc #pcSettings\{\s*\n\s*--ink:#1b2536;/.test(src), true);
-t('모달 전용 배경·글자색은 그대로 모달에만', /body\.pc \.modal\{background:#fff;border-color:#e4e8f0;color:#1b2536\}/.test(src), true);
+  /body\.pc \.modal,body\.pc #pcSettings\{\s*\n\s*--ink:#[0-9a-fA-F]{3,6};/.test(src), true);
+const pcModal = (src.match(/body\.pc \.modal\{([^}]*background[^}]*)\}/) || [])[1] || '';
+t('모달 전용 배경·글자색은 그대로 모달에만',
+  !!pcModal && CP.isLight(CP.colorOf(pcModal, 'background')) && CP.isDark(CP.colorOf(pcModal, 'color')), true);
 
 /* ═══ 8. 사이드바 — 자료함·환경설정 사이 간격 ═══ */
 t('★ 사이드바 설정 버튼에 아래쪽 여백이 생겼다', /\.pcside-settings\{[^}]*margin-bottom:8px/.test(src), true);

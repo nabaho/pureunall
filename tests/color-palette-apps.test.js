@@ -1,0 +1,169 @@
+/* 색 팔레트 — 푸른이알피 말고 «다른 앱»도 지킨다 (대표 지시 2026-08-30)
+ *
+ * ★ 왜 필요한가
+ *   2026-08-09 에 푸른이알피를 5계열 27색으로 정리했는데, 그것을 지키는 검사
+ *   (tests/color-palette.test.js)가 «pu-erp.html 한 파일만» 봤다.
+ *   그래서 한 해 동안 나머지 앱에 색이 계속 늘어 — 재 보니 열한 앱에 1,349가지,
+ *   그중 1,196가지가 팔레트 밖이었다. 「위험·삭제」 빨강 하나에도 넉 점이 섞여 있었다.
+ *   정리만 하고 이 검사를 안 넓히면 «다시 늘어난다».
+ *
+ * ★ 무엇을 못 박나 — 색값이 아니라 규칙 둘
+ *   ① 그 앱이 쓰는 색은 팔레트 안에 있다 (정한 예외만 빼고)
+ *   ② 같은 규칙 안 바탕·글자는 사람이 읽을 만큼 갈라진다
+ */
+const fs = require('fs');
+const path = require('path');
+const test = require('node:test');
+const assert = require('node:assert');
+const P = require('./lib-palette.js');
+const { stripComments } = require('./strip-comments');
+
+/* ⚠ 소스를 «글자로» 보는 검사라 주석을 먼저 걷는다 (2026-09-03).
+   안 걷으면 주석에 적은 색이 «쓰는 색»으로 잡힌다 — 실제로 걸렸다:
+   팔레트 밖 색을 팔레트 안 색으로 바꾸고 「무엇을 무엇으로 바꿨나」를 주석에 적었더니,
+   바꾼 뒤인데도 옛 색 셋이 그대로 세어져 검사가 계속 빨간불이었다.
+   그러면 «까닭을 적는 일»이 벌 받는 셈이 된다 — 이 저장소는 까닭을 적는 곳이다.
+   ⚠ 손으로 지우지 말 것(마크업의 accept="image/별표" 를 주석 시작으로 읽는다) — 공용 걷개를 쓴다. */
+const R = (f) => stripComments(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'));
+
+/* 정리를 마친 앱들. ★ 새 앱을 정리했으면 여기에 더한다 —
+   더하지 않으면 그 앱은 아무도 안 지킨다. */
+const DONE = [
+  ['gov-consulting.html', '정부컨설팅'],
+  ['kcareer.html', '경력관리'],
+  ['work.html', '업무관리'],
+  ['pu-cal.html', '푸른캘린더'],
+  ['pu-cards.html', '기업정보함'],
+  ['pu-photos.html', '푸른사진첩'],
+  ['rules.html', '취업규칙'],
+  ['enter.html', '푸른포털'],
+  ['fund.html', '근로복지기금'],
+  ['pu-paydata.html', '급여데이터함'],
+  ['pu-home.html', '푸른홈'],
+  ['payroll-os.html', '급여OS'],
+  ['docs-esign.html', '전자서명'],
+  ['chwieop.html', '취업규칙작성'],
+  ['fund-poc.html', '기금시안'],
+  ['sign.html', '서명'],
+  ['ieum-view.html', '이음보기'],
+  ['install.html', '설치안내'],
+];
+
+/* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */
+const EXCEPT = {
+  'gov-consulting.html': new Set([
+    /* 「구글 캘린더처럼」은 따로 승인된 결정이다(tests/gov-cal-google-look).
+       구글 화면과 같아 보이려고 «구글이 쓰는 바로 그 색»을 박아 둔 것이라
+       팔레트로 옮기면 그 결정이 조용히 뒤집힌다. */
+    '#dadce0', '#3c4043', '#70757a', '#1a73e8', '#7b8089', '#e8eaed',
+    /* 이 앱이 오래 써 온 제 색(테두리·바탕·위험·성공) — 화면 전체의 뼈대다 */
+    '#b3cde8', '#e3f0fb', '#e94560', '#2a9d8f',
+    /* 2026-09-02 사업 색을 다시 고르는 색표(GCAL11 — 구글 캘린더 열한 색).
+       ★ 왜 팔레트 밖인가 — 사업 색이 지는 일은 «뜻»이 아니라 «가르기»다.
+         27색은 뜻으로 짜여 있어(파랑=정보, 빨강=위험) 아홉 사업을 서로 갈라 놓기에
+         모자란다. 실제로 지금 색 아홉 중 못 가르는 짝이 여덟이었다(거리 36).
+         구글 캘린더 열한 색은 «서로 갈리라고» 만들어진 것이라 이 일에 맞는다.
+       ★ 대표 결정 2026-08-30 「가」 — 사람·사업 색은 팔레트에 안 매어 둔다.
+       ⚠ 이 열한 색은 «사업 색 고르개»에만 쓴다. 화면 뼈대(바탕·글자·테두리)에
+         끌어다 쓰지 말 것 — 그러면 팔레트가 무너진다. */
+    '#d50000', '#e67c73', '#f4511e', '#f6bf26', '#33b679',
+    '#0b8043', '#039be5', '#3f51b5', '#7986cb', '#8e24aa', '#616161',
+  ]),
+  'pu-cards.html': new Set([
+    '#ffaabb',   // 실제로는 색이 아니라 id 이름(#fab) 이다 — 바꾸면 그 화면이 깨진다
+  ]),
+  'work.html': new Set([]),
+  /* 세 앱은 예외가 «하나도 없다» — 팔레트만으로 다 됐다는 뜻이다.
+     ⚠ 여기에 색을 채워 넣어 통과시키지 말 것. 예외가 늘면 팔레트가 무너진다. */
+  'pu-photos.html': new Set([]),
+  'rules.html': new Set([]),
+  'enter.html': new Set([]),
+  'fund.html': new Set([]),
+  'pu-paydata.html': new Set([]),
+  'pu-home.html': new Set([]),
+  'payroll-os.html': new Set([]),
+  'docs-esign.html': new Set([]),
+  'chwieop.html': new Set([]),
+  'fund-poc.html': new Set([]),
+  'sign.html': new Set([]),
+  'ieum-view.html': new Set([]),
+  'install.html': new Set([]),
+  /* ⚠ DONE 에 든 파일은 EXCEPT 에도 칸이 있어야 한다 — 없으면 팔레트 밖 색이
+     나왔을 때 «무엇이 잘못됐는지 말하는 대신» TypeError 로 터진다(2026-09-19 에 그랬다). */
+  /* 대표 지시 2026-09-27 「캘린더 ui 와 화면을 구글캘린더 화면과 글자색·테두리·글자형태로
+     완벽하게 같이」 — 컨설팅일정(gov-consulting)과 «같은 까닭·같은 값»이다.
+     ★ 글자·선 넷(#3c4043 #70757a #dadce0 #1a73e8)은 구글 화면의 뼈대 색 그대로다.
+       27색의 슬레이트 회색은 푸른빛이 돌아, 나란히 놓으면 «다른 달력»으로 보였다.
+       이 넷은 CSS 변수(--gtext·--gsub·--gline·--gtoday) 한 곳에만 적는다.
+     ★ 열한 색은 구글 캘린더 화면이 사람·일정을 칠하는 색(GCAL11)이다. 구글 색표 API 는
+       2012년 옛 연한 색을 돌려주는데, 구글 화면은 같은 번호를 이 색으로 칠한다 —
+       그 어긋남이 우리 달력이 «물 빠져» 보인 까닭이었다.
+     ★ #d81b60 은 구글 「대한민국의 휴일」 달력 색이다(공휴일 칩).
+     ⚠ 이 열여섯 색을 달력 «밖»(탭·단추·창)에 끌어다 쓰지 말 것 — 그러면 팔레트가 무너진다. */
+  'pu-cal.html': new Set([
+    '#3c4043', '#70757a', '#dadce0', '#1a73e8',
+    '#d50000', '#e67c73', '#f4511e', '#f6bf26', '#33b679',
+    '#0b8043', '#039be5', '#3f51b5', '#7986cb', '#8e24aa', '#616161',
+    '#d81b60',
+  ]),
+  'kcareer.html': new Set([]),
+};
+
+const HEX = /#[0-9a-fA-F]{3,8}\b/g;
+const PALETTE_SET = new Set([].concat(...Object.values(P.PALETTE), '#ffffff', '#000000'));
+
+for (const [f, ko] of DONE) {
+  const src = R(f);
+
+  test('★★ ' + ko + ' — 팔레트 밖 색을 쓰지 않는다', () => {
+    const out = new Map();
+    for (const m of src.matchAll(HEX)) {
+      if (![4, 7, 9].includes(m[0].length)) continue;
+      const c = P.norm(m[0]);
+      if (PALETTE_SET.has(c) || EXCEPT[f].has(c)) continue;
+      out.set(c, (out.get(c) || 0) + 1);
+    }
+    const list = [...out.entries()].sort((a, b) => b[1] - a[1])
+      .slice(0, 8).map(([c, n]) => c + '(' + n + ')').join(' ');
+    assert.strictEqual(out.size, 0,
+      ko + ' 에 팔레트 밖 색이 ' + out.size + '가지 생겼다: ' + list
+      + '\n  → 새 색을 만들지 말고 5계열 27색에서 고르세요.'
+      + ' 일부러 넣은 것이면 이 파일 EXCEPT 에 «까닭과 함께» 적으세요.');
+  });
+
+  test('★★ ' + ko + ' — 바탕 위 글자가 읽힌다', () => {
+    /* 한 CSS 규칙 안에 background 와 color 가 함께 있으면 그건 확실한 «짝»이다.
+       색을 옮기다 밝기 차례가 뒤집히면 글자가 바탕에 묻힌다 — 그것만 잡는다.
+       ⚠ <style> 안만 본다. 파일 전체에서 `{…}` 를 찾으면 «자바스크립트 덩이»가
+         규칙으로 잡혀, 서로 상관없는 바탕과 글자가 짝으로 묶인다(실제로 그랬다).
+       ⚠ 투명도가 붙은 바탕(#1e293b20)은 건너뛴다 — 실제로 비치는 색은 훨씬 옅어서
+         여기 셈으로는 「묻혔다」가 되지만 화면에서는 잘 읽힌다. */
+    const css = [...src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
+    const bad = [];
+    for (const m of css.matchAll(/\{([^{}]{0,400})\}/g)) {
+      const r = m[1];
+      if (/background\s*:\s*#[0-9a-fA-F]{8}\b/.test(r)) continue;   // 투명도 붙은 바탕
+      const bg = P.colorOf(r, 'background'), fg = P.colorOf(r, 'color');
+      if (!bg || !fg) continue;
+      const c = P.contrast(fg, bg);
+      if (c < 3.0) bad.push(fg + ' on ' + bg + ' (' + c.toFixed(1) + ':1)');
+    }
+    assert.strictEqual(bad.length, 0,
+      ko + ' 에 글자가 묻히는 자리가 ' + bad.length + '곳: ' + bad.slice(0, 6).join(' · '));
+  });
+}
+
+test('★ 정리한 앱 목록이 비어 있지 않다 — 이 검사의 밑돌', () => {
+  assert.ok(DONE.length >= 4, '지키는 앱이 줄었다 — 목록에서 빠지면 아무도 안 지킨다');
+});
+
+test('★ 예외 목록이 늘지 않았다 — 예외가 늘면 팔레트가 무너진다', () => {
+  /* 2026-09-27 기준 서른여덟. 2026-08-30 에는 열하나였고, 사업 색 고르개(GCAL11 —
+     구글 캘린더 열한 색)를 들이며 스물둘로, 푸른캘린더를 구글 화면과 똑같이 맞추며
+     (대표 지시 2026-09-27) 열여섯이 늘었다. 까닭은 위 EXCEPT 에 적었다.
+     늘리려면 이 숫자와 «까닭»을 함께 고쳐야 한다 —
+     검사고정-허용: 예외 개수는 「값」이 아니라 그 자체가 규칙이다. */
+  const n = Object.values(EXCEPT).reduce((a, s) => a + s.size, 0);
+  assert.strictEqual(n, 38,
+    '예외가 ' + n + '개다. 늘렸다면 왜 팔레트로 못 옮기는지 여기에 적고 이 숫자를 고치세요.');
+});

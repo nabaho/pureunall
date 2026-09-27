@@ -1,0 +1,526 @@
+﻿/* 설립 서식 — «자료는 있는데 배선이 없던» 자리가 정말 채워지는가. 그리고 지어내지 않는가.
+
+   서식 18종을 «자료가 다 있는 기금»으로 실제로 그려 보고(2026-09-06), 그래도 비는 자리
+   52개를 갈랐다. 여기서 보는 것은 그중 «자료는 있는데 잇지 않아» 비던 자리들이다:
+     회의록의 이사 수·출연금·기금사용·연도·손익예산·목적사업, 등기신청서의 인가일·기본재산·
+     이사 성명·주소·본점·전화·관할등기소, 취임승낙서의 선임일, 인감 서식의 이사 성명,
+     사업자등록신청서의 대표자·전화·자본금·사업연도·자산, 임대차계약서의 법인번호 …
+
+   ⚠ 실제로 그려 본다(jsdom). 소스에 글자가 있는지가 아니라 «그린 서식에 값이 서는지»를 본다.
+   ⚠ 원본 글의 「금 액」「본 점」 사이는 붙임공백( )이다 — 보통 공백으로 찍은 규칙은
+     눈으로는 같아 보여도 하나도 안 맞았다. 그래서 규칙의 공백은 \s* 다. 여기서도 그 자리를 본다.
+   ⚠ 값이 없으면 «손대지 않는다». 빈 밑줄이 틀린 값보다 낫다 — 관청에 나가는 서류다.
+   ⚠ 원본에 «글자로» 박힌 남의 것 둘 — 관할 등기소 「서울남부지방법원」, 주소 끝 「1004호」 —
+     밑줄이 아니라 걷어내기가 못 잡았다. 우리 값으로 바꾸거나 걷는다.
+
+   실행: node fund-erp/tools/check_derived.js */
+const fs = require('fs'), path = require('path');
+const W = path.resolve(__dirname, '..', '..');
+const src = fs.readFileSync(path.join(W, 'fund.html'), 'utf8');
+let JSDOM;
+/* jsdom 이 없는 곳에서 이 한 줄이 저장소의 «모든 앱» 배포를 막지 않게 한다 */
+try { JSDOM = require('jsdom').JSDOM; }
+catch (e) { console.log('SKIP: jsdom 이 없어 서식 채움 검사를 건너뜁니다 (npm i jsdom --no-save)'); process.exit(0); }
+const dom = new JSDOM('<!doctype html><body></body>');
+global.window = dom.window; global.document = dom.window.document;
+(0, eval)(fs.readFileSync(path.join(W, 'fund_forms.js'), 'utf8'));
+function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음 '+n);let d=0;
+  for(let k=src.indexOf('{',i);k<src.length;k++){if(src[k]==='{')d++;else if(src[k]==='}'){d--;if(!d)return src.slice(i,k+1);}}}
+function gV(n){const i=src.indexOf('var '+n+'=');if(i<0)throw Error('없음 '+n);let d=0;
+  for(let k=src.indexOf('=',i);k<src.length;k++){const c=src[k];
+    if(c==='{'||c==='[')d++;else if(c==='}'||c===']'){d--;if(!d)return src.slice(i,src.indexOf(';',k)+1);}}}
+/* 줄째로 꺼내기 — gV 는 {·[ 로 시작하는 값만 잡는다(글자 하나짜리 상수는 못 잡는다) */
+const gS = n => (src.match(new RegExp('var ' + n + '=[^\\n]*?;')) || [])[0] || '';
+global.esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+global.num = v => { if (v === '' || v == null) return ''; const n = Number(String(v).replace(/,/g,'')); return isFinite(n) ? n : '' };
+global.BAKE_BLANK = (src.match(/var BAKE_BLANK='([^']*)'/) || [])[1];
+global.S = { fundId: 'X', year: 2026, f15Close: null };
+global.funds = {};
+(0, eval)([gV('OFFICER_ROLES'), gV('FORM_FILL'), gV('BIZ_BS_ROWS'), gV('BUDGET_KEYS'), gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'), gV('_K'),
+  gF('_officersOf'), gF('_boss'), gF('_isBlankCell'), gF('_isLabelCell'), gF('_bakeText'), gF('_isRateRow'), gF('stripBaked'),
+  gF('korWon'), gF('_docRok'), gF('_siteWrep'), gF('_isCommittee'),
+ /* 2026-09-14: 참여사업장의 사용자대표·근로자대표도 위원이다 — 그 길도 실어야 채움이 돈다 */
+ gF('_siteUrep'), gF('_siteCommittee'), gF('_prepCommittee'),
+ /* 2026-09-14: 위원이 격자(세 줄)보다 많으면 이름을 별지로 뺀다 — 그 길도 실어야 채움이 돈다.
+    ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
+ (/var COMMITTEE_ROWS=\d+;/.exec(src) || [''])[0],
+ gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmSeeAnnex'), gF('committeeAnnexHTML'),
+ /* 2026-09-20: 확인서 한 장의 모양(제목·가운데 배치·회사이름·날인 자리)을 하나로 모았다 */
+ gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dotDate'), gF('contribCertHTML'), gF('fillContribDoc'), gF('fillChecklistDoc'),
+  gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'), gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'),
+  gF('fillCommittee'), gF('fillRoster'), gF('fillSubsidyDoc'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
+  /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10).
+     hwpFormHTML 이 정관·설립합의서에서 fillPartyList 를, fillDerived 가 foundContrib 를 부른다 —
+     여기 없으면 「foundContrib is not defined」로 이 검사가 통째로 죽는다.
+     ⚠ gV 는 {·[ 로 시작하는 값만 잡는다. 글자 하나짜리 상수는 줄째로 꺼낸다. */
+  gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
+  gF('estabSites'), gF('siteContribOf'), gF('siteContribNow'), gF('foundContribOf'), gF('foundContrib'),
+  gF('partyNames'), gF('partyJoin'), gF('_fillWho'), gF('fillPartyList'), gF('fillPartyDates'),
+  /* 원본 줄맞춤 자국 걷어내기 + 이름 자리표(2026-09-14) — hwpFormHTML 이 부른다.
+     여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
+  gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
+  /* 2026-09-19: 노동조합대표자→근로자대표 · 홀로 선 날짜 자리 · 작성 예 제외 */
+  gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),
+  /* 2026-09-19: 회의록 의안마다 새 장 · 2026-09-20: 경과보고 본문도 새 장에서 시작 */
+  gS('MINUTES_AGENDA'), gS('MINUTES_PROGRESS_HEAD'), gF('fillMinutesPages'),
+  /* 2026-09-19: 서명란을 번호 붙인 표로 · 정관 머리와 제3조 손보기 */
+  gS('SIGN_L'), gS('SIGN_R'), gS('SIGN_WHO_ONLY_SRC'), gS('SIGN_HEAD'),
+  /* 2026-09-20: 연명 날인표를 짜는 일은 signTableHTML 한 곳으로 모았다 —
+    설립합의서·정관과 회의록 뒤쪽 참석위원표가 같은 모양이어야 한다 */
+ /* 2026-09-20 오후: 회의록 뒤쪽은 «위원마다 한 줄»(attendSignHTML)로 갈라졌다 */
+ gF('_signLabels'), gF('signTableHTML'), gF('fillSignTable'),
+ gF('_cmWho'), gF('attendSignHTML'), gF('fillAttendSign'),
+  gS('CHARTER_TITLE'), gS('CHARTER_NAME'), gS('CHARTER_BRANCH'), gS('CHARTER_DATELINE'),
+  gF('fillCharterHead'),
+  /* 2026-09-19: 사내 정관의 서명 격자(원본이 이미 표다 — 이름만 비어 있었다) */
+  gS('GRID_NAME'), gS('GRID_TITLE'), gS('GRID_BLANK'), gF('_gridCell'), gF('fillSignGrid'),
+  /* 공동/사내 말 고르기(2026-09-11) — hwpFormHTML 이 맨 먼저 부른다.
+     여기 없으면 「fillFundTypeWords is not defined」로 이 검사가 통째로 죽는다. */
+  gV('FTYPE_SKIP'), gV('FTYPE_PAIRS'), gV('FTYPE_GONG_ONLY'),
+  gF('ftypeSkipDoc'), gS('FTYPE_PICK_SRC'), gF('_ftypeSwap'), gF('_ftypeWords'), gF('_isTypePickBox'), gF('fillFundTypeWords'),
+  /* 출연금 하나로 세우는 첫해 예산(2026-09-12) — fillBizplanDoc 이 부른다.
+     여기 없으면 「planBudget is not defined」로 이 검사가 통째로 죽는다. */
+  gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
+  gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
+  gF('isSetupFund'), gF('_bizFinZero'), gF('fillBizplanHead'),
+  gF('fillDerived'), gF('fillFoundContribDoc'), gF('hwpFormHTML')].join('\n'));
+
+let bad = 0;
+const ok = (n, c, w) => { if (c) console.log('  · ' + n); else { bad++; console.log('  ✗ ' + n + (w ? '  — ' + w : '')); } };
+const T = t => String(t || '').replace(/\s+/g, ' ');
+/* ⚠ 칸(td) 사이에 공백을 끼운다 — textContent 는 칸을 그냥 이어 붙여 「자본금10,000천원」이 되고,
+     한 칸 안의 값과 두 칸에 걸친 값을 가를 수 없다.
+   ⚠ 2026-09-19: </div> 도 같이 띄운다. 서명표의 이름 줄이 <br> 에서 <div class="right"> 로
+     바뀌면서 「근로자대표박근로」로 붙어 버렸다 — 검사가 «화면에 보이는 대로» 읽어야 한다. */
+const draw = (kind, f, sites) => { const d = dom.window.document.createElement('div');
+  d.innerHTML = hwpFormHTML(kind, f, sites || [])
+    .replace(/<\/t[dh]>/g, ' $&').replace(/<div[^>]*>|<\/div>/g, ' $&').replace(/<br\s*\/?>/g, ' ');
+  return T(d.textContent); };
+/* 공백을 «접지 않은» 글 — 자간 벌림이 살아 있는지 보려면 T() 를 거치면 안 된다
+   (T 가 모든 연속 공백을 한 칸으로 만들어, 무엇이 남았는지 알 수 없다). */
+/* 글자가 아니라 «짜임»을 보려면 원소 그대로 돌려준다 — 제목 크기·가운데 배치·
+   회사이름·날인 자리가 제대로 붙었는지는 텍스트만 봐서는 알 수 없다(2026-09-20). */
+const drawEl = (kind, f, sites) => { const d = dom.window.document.createElement('div');
+  d.innerHTML = hwpFormHTML(kind, f, sites || []); return d; };
+const drawRaw = (kind, f, sites) => { const d = dom.window.document.createElement('div');
+  d.innerHTML = hwpFormHTML(kind, f, sites || []).replace(/<\/t[dh]>/g, ' $&').replace(/<br\s*\/?>/g, '\n');
+  return String(d.textContent || ''); };
+
+/* «자료가 다 있는» 기금 */
+const F = { name:'가나공동근로복지기금', fund_type:'공동', chairman:'홍길동', inka_date:'2026-01-02',
+  corp_reg_no:'000000-0000000', registry_office:'어느지방법원 등기소', phone:'041-000-0000',
+  address:'충남 어느시 어느구 어느로 1', contribution_total:10000000, meeting_date:'2026-01-05',
+  officers:[
+    {role:'이사장',name:'홍길동',birth:'1975-03-11',title:'대표이사',addr:'충남 어느시 온천대로 1'},
+    {role:'근로자측 이사',name:'박노측',birth:'1986-11-25',title:'생산팀장'},
+    {role:'사용자측 이사',name:'최사측',birth:'1980-07-02',title:'관리부장'},
+    {role:'근로자측 감사',name:'정감사'},{role:'사용자측 감사',name:'오감사'}],
+  years:{2026:{budget:{rev_contrib:10000000, rev_interest:56000, exp_purpose:5000000, exp_admin:500000, exp_etc:275000}}} };
+global.funds.X = F;
+const SITES = [
+  { name:'가나기계', ceo:'김가나', contrib:6000000, status:'active' },
+  { name:'다라전자', ceo:'이다라', contrib:4000000, status:'active' },
+  { name:'닫은곳', ceo:'없음', contrib:9000000, status:'closed' } ];
+
+console.log('■ 회의록 — 명부·출연금·예산에서 온다');
+{ const t = draw('minutes', F);
+  ok('이사 선임 : 각 1 명 (노·사 각 1명이 명부에 있다)', /이사 선임 : 각 1 명/.test(t), t.match(/이사 선임[^가-힣]{0,20}/) && t.match(/이사 선임[^\n]{0,20}/)[0]);
+  ok('기금 출연 금액 10,000,000원', /금 액 : 10,000,000원/.test(t));
+  ok('기금사용 = 출연금의 80% = 8,000,000원', /기금사용 : 8,000,000원/.test(t));
+  ok('사업계획 연도 2026', /2026년 사업계획\(안\)/.test(t) && /2026년도 사업계획\(안\)/.test(t));
+  /* 사업계획서 손익예산 그대로: 수익 = 이자 56 + 사업외수익(예비비 275 − (0 − 목적사업 5,000 − 관리비 500)) = 5,831천원
+     비용 = 5,000 + 500 + 275 + 56 = 5,831천원. 두 회계가 «따로» 0 으로 맞물리므로 수지차익은 0 이다. */
+  ok('손익예산 수익·비용이 사업계획서와 같다', /손익예산 : 수익 5,831천원, 비용 5,831천원, 수지차익 0천원/.test(t),
+     (t.match(/손익예산[^가]{0,60}/) || [''])[0]);
+  ok('목적사업 5,000천원', /목적사업 : 5,000천원/.test(t));
+  /* 추정대차대조표는 확정 결산 스냅샷이 있어야 한다 — 없으면 «비워 둔다» */
+  ok('추정대차대조표는 스냅샷이 없으면 비워 둔다', /추정대차대조표 : 자산 [＿_]+천원/.test(t)); }
+
+console.log('\n■ 기금출연확인서 — 사업장마다 한 장');
+/* 2026-09-20: 회사마다 한 장 «모양»을 contribCertHTML 로 다시 짰다 —
+   제목은 이제 자간을 CSS(.fmtitle)로 벌리고 글자 사이엔 공백을 안 둔다.
+   그래서 페이지 수는 옛 스페이스 낀 제목이 아니라 「기금출연확인서」 자체를 센다. */
+{ const t = draw('contrib', F, SITES);
+  ok('사업장마다 한 장 (닫은 곳은 뺀다)', (t.match(/기금출연확인서/g) || []).length === 2, (t.match(/기금출연확인서/g) || []).length + '장');
+  ok('금액이 한글·숫자로 선다', /육백만원정\(￦ 6,000,000\)/.test(t) && /사백만원정\(￦ 4,000,000\)/.test(t), t.slice(0, 200));
+  ok('사업장·대표자가 선다', /가나기계 대표이사 김가나/.test(t) && /다라전자 대표이사 이다라/.test(t));
+  ok('원본 자리표 「0000(주) 대표이사 0 0 0」이 안 남는다', !/0000\(주\)|0 0 0/.test(t));
+  const t0 = draw('contrib', F, []);
+  ok('참여사업장이 아예 없으면 지어내지 않고 까닭을 남긴다',
+    /참여사업장이 없어 확인서를 만들지 못했습니다/.test(t0) && /￦ [＿_]+/.test(t0));
+  /* ★ 금액이 없어도 «사업장마다 한 장» 만든다 (대표 화면 2026-09-14) — 종전에는 약정액이
+       적힌 곳만 골라, 열여섯 곳이 등록돼 있어도 빈 한 장만 나갔다. */
+  const NOAMT = [{ name: '가나기계', ceo: '김가나', status: 'active' },
+    { name: '다라전자', ceo: '이다라', status: 'active' },
+    { name: '마바산업', ceo: '최마바', status: 'active' }];
+  const tn = draw('contrib', Object.assign({}, F, { contrib_per_worker: 0 }), NOAMT);
+  ok('약정액이 없어도 사업장 수만큼 장이 나온다', (tn.match(/기금출연확인서/g) || []).length === 3,
+    (tn.match(/기금출연확인서/g) || []).length + '장');
+  ok('약정액이 없어도 회사·대표자는 찍힌다',
+    /가나기계 대표이사 김가나/.test(tn) && /마바산업 대표이사 최마바/.test(tn));
+  ok('금액 자리는 비워 둔다 (지어내지 않는다)', /￦ [＿_]+/.test(tn) && !/원정/.test(tn));
+  /* ★ 한 장의 «짜임» (대표 지시 2026-09-20 「줄간격 글자크기 회사이름 날인 위치를 조정」) —
+     목업대로 제목은 fmtitle, 본문 덩이는 지면 가운데(cbwrap), 회사 이름·도장 자리가
+     따로 도드라져야 한다. 텍스트만 보면 이 넷을 구별할 수 없어 원소를 직접 본다. */
+  const el = drawEl('contrib', F, SITES);
+  const wraps = [].slice.call(el.querySelectorAll('.cbwrap'));
+  ok('회사마다 지면 가운데로 내리는 덩이(.cbwrap)가 선다', wraps.length === 2, wraps.length + '개');
+  ok('제목은 fmtitle(굵게·자간)을 쓴다 — 다른 서식과 통일', el.querySelectorAll('.cbwrap .fmtitle').length === 2);
+  ok('회사 이름이 따로 도드라진다(.cbco)', el.querySelectorAll('.cbco').length === 2);
+  ok('도장 자리가 표시된다(.cbseal)', el.querySelectorAll('.cbseal').length === 2
+    && [].slice.call(el.querySelectorAll('.cbseal')).every((x) => x.textContent === '인'));
+  ok('둘째 장부터 새 장에서 시작한다', el.querySelectorAll(':scope > [data-newpage]').length === 1,
+    '첫 장에 표시가 있으면 앞에 빈 장이 생긴다');
+  /* 2026-09-19: 그 해 출연금(참여사업장 › 연도별 기록)까지 보게 되어 안내문 글귀가 바뀌었다 */
+  ok('몇 곳이 비었는지 말해 준다', /3곳 중 3곳은 출연금이 적혀 있지 않아/.test(tn),
+    (tn.match(/※[^※]{0,60}/) || [''])[0]);
+  ok('어느 칸을 채우면 되는지 짚어 준다', /연도별 기록/.test(tn) && /1인당 출연단가/.test(tn),
+    (tn.match(/※[^※]{0,160}/) || [''])[0]); }
+
+console.log('\n■ 사업계획서·등기신청서·취임승낙서·인감·등록면허세');
+{ const t = draw('bizplan', F);
+  ok('사업계획서 예산편성 연도', /Ⅱ\. 2026년 예산편성/.test(t));
+  const r = draw('reg_apply', F);
+  ok('인가서 도달 연월일 = 인가일', /인가서도달 연월일 : 2026\. 1\. 2\./.test(r));
+  ok('기본재산 = 출연금', /기본재산은 금 10,000,000원/.test(r));
+  ok('대표권 있는 이사가 먼저, 제한규정에도 그 이름', /이사 홍길동 \(/.test(r) && /제한규정 : 이사 홍길동 이외에는/.test(r));
+  ok('다음 이사가 이어 선다', /이사 박노측 \(/.test(r));
+  /* 등기신청서엔 이사 자리가 둘뿐이라 «셋째부터»는 그려도 안 보인다 — 목록 자체를 본다.
+     (감사를 끼워 넣는 되돌림이 그래서 안 잡혔다) */
+  const dnames = _prepDirectors(F).map(o => o.name).join(',');
+  ok('이사 차례 = 이사장 → 나머지 이사, 감사는 없다', dnames === '홍길동,박노측,최사측', dnames);
+  ok('이사장 주소가 선다', /주소 : 충남 어느시 온천대로 1/.test(r));
+  /* 남의 주소 끝 「1004호」가 우리 주소 뒤에 붙어 나갔다 */
+  ok('남의 호수 잔재 「1004호」가 안 남는다', !/1004호/.test(r), (r.match(/.{0,20}1004호.{0,10}/) || [''])[0]);
+  ok('본점·신청인 이사 성명·전화가 선다', /본 점 충남 어느시 어느구 어느로 1/.test(r) && /이사 성 명 홍길동 \(인\)/.test(r) && /전화 :041-000-0000/.test(r));
+  ok('관할 등기소가 «우리 것»이다 (서울남부가 아니다)', /어느지방법원 등기소 귀중/.test(r) && !/서울남부/.test(r));
+  const a = draw('reg_accept', F);
+  ok('취임승낙서 선임일 = 설립준비위원회 회의일', /본인은 2026\. 1\. 5\. 가나/.test(a));
+  ok('대표권 있는 이사 장에만 이사장 이름', (a.match(/위 이사 홍길동 \(개인인감\)/g) || []).length === 1 && /위 이사 [＿_]+ \(개인인감\)/.test(a));
+  ok('협의회 명부 대표자', /대표자 : 홍길동 \(법인인감\)/.test(draw('reg_roster', F)));
+  ok('인감신고서·인감대지 이사 성명', /이사 홍길동/.test(draw('reg_seal', F)) && /자격 및 성명 : 이사 홍길동/.test(draw('reg_sealpaper', F)));
+  const l = draw('reg_license', F);
+  ok('등록면허세 전화·신고인', /041-000-0000/.test(l) && /신고인 홍길동\(서명/.test(l)); }
+
+console.log('\n■ 고유번호증 서식');
+{ const b = draw('tax_bizreg', F);
+  ok('대표자·전화', /홍길동 \(공동대표\)/.test(b) && /\(사업장\) 041-000-0000/.test(b));
+  ok('자본금 = 출연금(천원) · 사업연도', /자본금 10,000천원/.test(b) && /사업연도 2026년도/.test(b));
+  /* 설립등기신청서에 「기본재산은 금 N원」이라 적은 그 재산이 설립 시점의 자산이다 */
+  /* ⚠ 머리줄부터 박는다 — 값 줄만 보면 셋째·넷째 칸까지 채운 되돌림도 옆으로 밀려 맞았다 */
+  ok('자산 계·유동자산 = 기본재산, 고정자산·부채·종업원수는 비워 둔다',
+     /자산 계 유동자산 고정자산 부채 계 유동부채 고정부채 종업원수 10,000천원 10,000천원 [＿_]+천원 [＿_]+천원 [＿_]+천원 [＿_]+천원 [＿_]+명/.test(b),
+     (b.match(/자산 계 유동자산.{0,120}/) || [''])[0]);
+  ok('신청인', /신 청 인 홍길동 \(인\)/.test(b));
+  ok('임대차계약서 법인번호', /000000-0000000/.test(draw('tax_lease', F)));
+  ok('전대동의서 날짜', /\d{4}년 \d{1,2}월 \d{1,2}일/.test(draw('tax_sublease', F)));
+  ok('홈택스 신청인 이사', /이사 홍길동 \(서명 또는 인\)/.test(draw('tax_hometax', F))); }
+
+console.log('\n■ (나) 주민등록번호 — 명부에 적으면 등기·세무 서식 다섯에 선다');
+{ const R = Object.assign({}, F, { officers: F.officers.map((o, i) => i === 0 ? Object.assign({}, o, { rrn: '750311-1234567' }) : o) });
+  global.funds.X = R;
+  ok('등기신청서 이사장 이름 옆에 번호가 선다', /이사 홍길동 \(750311-1234567\)/.test(draw('reg_apply', R)));
+  ok('번호가 없는 이사는 자리표를 그대로 둔다', /이사 박노측 \(_{6}-_{7}\)/.test(draw('reg_apply', R)));
+  ok('인감신고서·인감카드의 주민등록번호 칸', /주민등록번호 750311-1234567/.test(draw('reg_seal', R)) && /주민등록번호 750311-1234567/.test(draw('reg_sealcard', R)));
+  ok('인감대지', /주민등록번호 : 750311-1234567/.test(draw('reg_sealpaper', R)));
+  /* 사업자등록신청서는 그 칸에 자리표가 둘 붙어 있다(대표자·공동대표) — 첫 것만 채우고 둘째는 둔다 */
+  const bz = draw('tax_bizreg', R);
+  ok('사업자등록신청서 대표자 번호 (둘째 자리표는 둔다)', /750311-1234567_{6}-_{7}/.test(bz), (bz.match(/주민등록번호.{0,40}/) || [''])[0]);
+  /* 임대차계약서의 「주민번호」는 임대인 것이다 — 우리 번호를 넣으면 안 된다 */
+  ok('임대인 주민번호 자리에 우리 번호를 넣지 않는다', !/750311-1234567/.test(draw('tax_lease', R)));
+  global.funds.X = F; }
+
+console.log('\n■ (나) 사무소 임대차 — 기금 정보의 묶음에서 온다');
+{ const Lz = Object.assign({}, F, { lease_lessor: '가나기계', lease_addr: '충남 어느시 어느구 어느로 1', lease_from: '2026-03-01', lease_deposit: 5000000, lease_rent: 300000 });
+  global.funds.X = Lz;
+  const tl = draw('tax_lease', Lz);
+  ok('임대차계약서 기간 시작일', /기간은 2026\. 3\. 1\.부터 2년간/.test(tl));
+  ok('임대인 상호', /임대인 가나기계\(인\)/.test(tl));
+  const bz = draw('tax_bizreg', Lz);
+  ok('사업자등록신청서 임대차기간 = 시작일부터 2년 (끝은 하루 전)', /2026\. 3\. 1\. ~ 2028\. 2\. 29\./.test(bz), (bz.match(/2026\. 3\. 1\..{0,40}/) || [''])[0]);
+  ok('보증금·월세가 적혀 있으면 넣는다', /5,000,000원 300,000원/.test(bz));
+  /* 보증금·월세를 안 적었으면 원본의 「0원」을 그대로 둔다 — 0원인지 우리는 모른다 */
+  const Lz0 = Object.assign({}, Lz, { lease_deposit: '', lease_rent: '' }); global.funds.X = Lz0;
+  ok('보증금·월세를 안 적었으면 원본 그대로 둔다', /2028\. 2\. 29\. 0원 0원/.test(draw('tax_bizreg', Lz0)));
+  ok('기금 정보에 임대차 묶음이 있다', /\['lease_lessor','임대인\(상호·성명\)','text'\]/.test(src) && /lease_lessor:'사무소 임대차'/.test(src));
+  ok('임대인 주민등록번호 칸은 두지 않는다 (남의 것)', !/lease_lessor_rrn|lease_rrn/.test(src));
+  ok('명부에 주민등록번호 칸이 있다', /class="off-rrn"/.test(gF('_offRow')) && /\['birth','company','title','rrn','addr'\]/.test(gF('_readOfficers')));
+  global.funds.X = F; }
+
+console.log('\n■ 밑줄이 «없는» 빈 칸 — 화면으로 보고서야 찾은 자리');
+/* 앞서 훑기는 ＿ 만 세어, 원본이 «그냥 빈 채로» 둔 칸을 통째로 놓쳤다.
+   설립등기신청서의 「주사무소」가 그래서 빈 줄로 나가고 있었다. */
+{ const Lz = Object.assign({}, F, { lease_lessor: '가나기계(주)', lease_addr: '충남 어느시 어느구 어느로 1, 2층', lease_from: '2026-03-01' });
+  global.funds.X = Lz;
+  ok('설립등기신청서 주사무소', /주사무소 충남 어느시 어느구 어느로 1/.test(draw('reg_apply', Lz)));
+  /* 기타사항의 「1. 설립인허가연월일」 다음 줄은 앞뒤 글이 없는 밑줄 한 마디다 — 앞 마디를 보고 채운다 */
+  ok('기타사항 설립인허가연월일', /설립인허가연월일 2026\. 1\. 2\./.test(draw('reg_apply', Lz)),
+     (draw('reg_apply', Lz).match(/설립인허가연월일.{0,20}/) || [''])[0]);
+  /* 두 번 붙이지 않는다 — 서식 흐름에서는 걷어내기가 밑줄 마디를 «지워» 이 갈래를 안 타지만,
+     원본이 바뀌어 값이 남는 날 두 번 찍히면 안 된다. 그 갈래만 따로 걸어 본다. */
+  { const cell = dom.window.document.createElement('div');
+    cell.innerHTML = '<table><tbody><tr><td>기타사항</td><td>1. 설립인허가연월일<br>2020. 9. 9.</td></tr></tbody></table>';
+    fillDerived(cell, Lz, [], 'reg_apply');
+    ok('이미 값이 있으면 두 번 붙이지 않는다', !/2026\. 1\. 2\./.test(cell.textContent), T(cell.textContent)); }
+  ok('인감신고서·인감카드 본점(주사무소)', /본점\(주사무소\) 충남 어느시/.test(draw('reg_seal', Lz)) && /본점\(주사무소\) 충남 어느시/.test(draw('reg_sealcard', Lz)));
+  ok('인감카드 자격 / 성명', /자격 \/ 성명 이사 홍길동/.test(draw('reg_sealcard', Lz)));
+  ok('사업자등록신청서 사업장(단체)소재지', /사업장\(단체\)소재지 충남 어느시/.test(draw('tax_bizreg', Lz)));
+  /* 「주소」 이름표가 임대인 줄과 임차인 줄에 «둘 다» 있다 — 줄로 갈라야 한다.
+     ⚠ 납작하게 편 글로는 못 본다. 안 채운 ＿ 칸은 stripBaked 가 «빈 칸»으로 만들어(원래 동작)
+       「주소 대표자」처럼 이어 붙는다 — 처음에 그걸 밑줄로 기대해 검사가 틀렸다. 칸으로 본다. */
+  const lrow = (function () { const d = dom.window.document.createElement('div');
+    d.innerHTML = hwpFormHTML('tax_lease', Lz, []);
+    const o = {}; [].slice.call(d.querySelectorAll('tr')).forEach((tr) => {
+      const c = [].slice.call(tr.children).map((x) => (x.textContent || '').trim());
+      if (c.length >= 4 && /^임(대|차)인/.test(c[0].replace(/\s/g, ''))) o[c[0].replace(/\s/g, '')] = c;
+      if (c.length >= 4 && c[0].replace(/\s/g, '') === '대표자') o['대표자'] = c;
+    }); return o; })();
+  /* 임대인 칸에 원본의 «남의 회사 이름»이 박혀 있었다 — 지우고 적어 둔 임대인을 넣는다 */
+  ok('임대차계약서 임대인 = 적어 둔 임대인', (lrow['임대인(갑)'] || [])[1] === '가나기계(주)', JSON.stringify(lrow['임대인(갑)']));
+  ok('임차인 주소를 채운다', (lrow['임차인(을)'] || [])[3] === '충남 어느시 어느구 어느로 1, 2층', JSON.stringify(lrow['임차인(을)']));
+  ok('임대인 주소는 비워 둔다 (남의 것)', (lrow['임대인(갑)'] || [])[3] === '', JSON.stringify(lrow['임대인(갑)']));
+  ok('임대인 대표자·주민번호는 손대지 않는다',
+     (lrow['대표자'] || [])[1] === '' && /^_{6}-_{7}$/.test((lrow['대표자'] || [])[3] || ''), JSON.stringify(lrow['대표자']));
+  global.funds.X = F; }
+/* 공개 배포되는 파일이라 «파일 자체»에도 남의 이름이 없어야 한다 */
+{ const raw = fs.readFileSync(path.join(W, 'fund_forms.js'), 'utf8');
+  ok('공개 서식 파일에 남의 회사 이름이 없다', !/이볼브|이벌브/.test(raw)); }
+
+console.log('\n■ 값이 없으면 «지어내지 않는다»');
+{ const E = { name:'빈기금', fund_type:'공동', officers:[], years:{} }; global.funds.X = E;
+  const all = ['minutes','reg_apply','reg_accept','reg_roster','reg_seal','reg_sealpaper','reg_license','tax_bizreg','tax_lease','tax_hometax','bizplan']
+    .map(k => k + ':' + draw(k, E)).join('\n');
+  ok('undefined·NaN·null 이 어디에도 없다', !/undefined|NaN|null/.test(all));
+  /* 「금 액 : 0원」 — 앞서 `금 0원`으로 찍어 «액 :»이 사이에 끼는 자리를 못 물었다(되돌림이 헛돌았다) */
+  ok('0원·0천원을 지어 넣지 않는다', !/금 액 : 0원|기금사용 : 0원|기본재산은 금 0원|자본금 0천원|이사 선임 : 각 0 명|목적사업 : 0천원/.test(all),
+     (all.match(/.{0,20}(: 0원|금 0원|0천원|각 0 명).{0,10}/) || [''])[0]);
+  ok('이사 성명 자리는 밑줄로 남는다', /이사 성 명 [＿_]+ \(인\)/.test(all));
+  ok('임대인이 없으면 「임대인 ＿(인)」 그대로 (빈 이름을 채우지 않는다)', /임대인 [＿_]+\(인\)/.test(all));
+  ok('주민등록번호가 없으면 자리표 그대로', /\(_{6}-_{7}\)/.test(all) && /주민등록번호 _{6}-_{7}/.test(all));
+  ok('관할 등기소가 없으면 남의 것 대신 밑줄', /[＿_]+ 귀중/.test(all) && !/서울남부/.test(all));
+  global.funds.X = F; }
+
+console.log('\n■ 배선');
+/* 2026-09-20: 안내 줄에 docnote 표를 달았다 — 화면에 올릴 때 용지 밖으로 옮겨진다
+   (제출 서류에 「원본 서식 그대로 변환…」이 인쇄되고 저장본에까지 박히던 것을 고쳤다). */
+ok('hwpFormHTML 이 마지막에 fillDerived 를 부른다',
+  /fillDerived\(d,f,sites,kind\);[\s\S]{0,600}?return "<p class='note docnote'>/.test(gF('hwpFormHTML')));
+ok('안내 줄이 용지 밖으로 빠지게 표를 단다(docnote)',
+  (gF('hwpFormHTML').match(/class='note docnote'/g) || []).length === 1);
+/* 「바로 앞줄인가」가 아니라 «앞서 도는가»를 본다 — 2026-09-10 에 그 사이로 자리표 채우기가
+   들어왔다(정관·설립합의서). 붙어 있기를 요구하면 새 채움을 넣을 때마다 이 검사가 깨진다. */
+(() => {
+  const h = gF('hwpFormHTML');
+  const a = h.indexOf("if(kind==='contrib') fillFoundContribDoc(d,f,sites);");
+  const b = h.indexOf('stripBaked(d);');
+  ok('설립 출연확인서는 걷어내기 «앞에» 다시 짠다', a >= 0 && b > a);
+  const p = h.indexOf('fillPartyList');
+  ok('정관·설립합의서 자리표도 걷어내기 «앞에» 채운다', p >= 0 && p < b);
+})();
+/* 규칙의 공백은 \s* 여야 한다 — 원본은 붙임공백이다 */
+ok('규칙의 공백을 붙임공백에도 맞춘다 (_rx)', /var _rx=function\(p\)\{ return new RegExp\(String\(p\)\.replace\(\/ \/g,'\\\\s\*'\)\); \};/.test(gF('fillDerived')));
+
+/* ══ 정관·설립합의서에 참여사업장이 «정말» 들어가는가 ══ (2026-09-10)
+   2026-09-10 이전에는 여기 한 글자도 안 들어갔다 — 원본 변환본에 「○○주식회사」 자리표만 있고
+   채우는 길이 없었다. 사업장 명부를 잘 채우는 화면 생성본이 있지만 변환본이 «먼저 이겨서»
+   한 번도 쓰이지 않는다. 그래서 이 검사는 «그린 서식»을 보고, 소스 글자를 보지 않는다. */
+console.log('\n■ 정관·설립합의서 — 참여사업장이 이름으로 선다');
+{
+  const live = SITES.filter(s => s.status !== 'closed');
+  ['agreement', 'charter'].forEach((k) => {
+    const t = draw(k, F, SITES);
+    live.forEach(s => ok(k + ' 에 ' + s.name + ' 이 선다', t.indexOf(s.name) >= 0));
+    ok(k + ' 에 자리표 ○○주식회사·○○회사가 안 남는다', !/(?:○○|XX)\s*(?:주식회사|회사)/.test(t), t.slice(0, 120));
+    /* 탈퇴한 사업장은 설립 서류에 설 수 없다 — 나간 회사의 출연 약정을 적을 수 없다 */
+    ok(k + ' 에 탈퇴한 사업장은 안 선다', t.indexOf('닫은곳') < 0);
+  });
+  /* 서명란은 회사마다 한 줄이어야 한다 — 날인을 회사마다 받기 때문이다 */
+  const ag = draw('agreement', F, SITES);
+  live.forEach(s => ok('설립합의서 서명란에 ' + s.name + ' 이 있다',
+    new RegExp(s.name + '\\s*근로자대표').test(ag)));   /* 2026-09-19: 「근로자측대표」→「근로자대표」 */
+  /* 사업장이 없으면 손대지 않는다 — 자리표가 틀린 이름보다 낫다 */
+  const none = draw('agreement', F, []);
+  ok('사업장이 없으면 자리표를 그대로 둔다', /(?:○○|XX)\s*주식회사/.test(none));
+}
+
+/* ══ 서명란 — 근로자대표·사용자대표가 «사업장에서» 온다 ══ (대표 지시 2026-09-14)
+   「캡쳐 3의 참여 회사 대표등은 설립합의서·설립준비위원회 회의록·기금출연확인서 모두
+     동기화 되어야한다. 이부분의 데이터는 참여사업장의 근로자대표·사용자대표에 모두
+     연결되어 동기화 되어야한다.」
+
+   ⚠ 정관 서명란은 자리표 모양이 달라 한 번도 안 채워졌다 — 둘째 줄이 「□□주식회사」,
+     이름 자리가 「○○○」 이다(설립합의서는 「○○주식회사」·「× × ×」). */
+console.log('\n■ 서명란 — 근로자대표·사용자대표가 사업장에서 온다');
+{
+  const P = [
+    { name: '가나기계', ceo: '김가나', wrep_name: '박근로', status: 'active' },
+    { name: '다라전자', ceo: '이다라', wrep_name: '최근로', status: 'active' },
+    { name: '마바산업', ceo: '정마바', wrep_name: '한근로', status: 'active' },
+  ];
+  ['charter', 'agreement'].forEach((k) => {
+    const t = draw(k, F, P);
+    P.forEach((s) => {
+      ok(k + ' — ' + s.name + ' 의 근로자대표 ' + s.wrep_name + ' 가 선다', t.indexOf(s.wrep_name) >= 0,
+        (t.match(new RegExp(s.name + '.{0,80}')) || [''])[0]);
+      ok(k + ' — ' + s.name + ' 의 대표자 ' + s.ceo + ' 가 선다', t.indexOf(s.ceo) >= 0);
+    });
+    ok(k + ' — 이름 자리표 ○○○·× × × 가 안 남는다', !/○○○|×\s*×\s*×/.test(t),
+      (t.match(/.{0,40}(?:○○○|×\s*×\s*×).{0,20}/) || [''])[0]);
+    ok(k + ' — 회사 자리표 □□주식회사가 안 남는다', t.indexOf('□□') < 0);
+  });
+  /* 서식의 줄이 사업장보다 «많으면» 남는 자리표 줄은 지운다 — 있지도 않은 회사의
+     날인란이 관청에 나가면 안 된다. 정관 원본은 서명 줄이 두 쌍이다. */
+  const ONE = [{ name: '가나기계', ceo: '김가나', wrep_name: '박근로', status: 'active' }];
+  const t1 = draw('charter', F, ONE);
+  /* 2026-09-19 대표 지시로 「노동조합대표자」를 «근로자대표»로 고쳤다 —
+     참여회사에 노조가 «없는» 곳이 많고, 법 제55조제2항을 준용해 «선출»하는 사람이다. */
+  ok('정관 — 「노동조합대표자」가 «근로자대표»로 바뀐다', t1.indexOf('노동조합') < 0,
+    (t1.match(/.{0,20}노동조합.{0,16}/) || [''])[0]);
+  /* 2026-09-19 대표 지시로 서명란을 «번호 붙인 표»로 다시 짰다 —
+     이제 「근로자대표」는 표 머리에 한 번, 사업장마다 한 번 나온다. 사업장이 하나면 둘. */
+  ok('정관 — 사업장이 하나면 날인 줄도 하나 (표 머리 + 한 줄)',
+    (t1.match(/근로자대표 /g) || []).length === 2, (t1.match(/근로자대표 /g) || []).length + '번');
+  ok('정관 — 서명표에 번호가 붙는다', /1 가나기계 근로자대표/.test(t1),
+    (t1.match(/.{0,20}가나기계 근로자대표.{0,20}/) || [''])[0]);
+  /* 근로자대표를 안 적어 둔 사업장은 그 자리를 «비워» 둔다 — 지어내지 않는다.
+     ⚠ 표로 바꾸면서 빈자리 표시가 「× × ×」에서 «밑줄»로 바뀌었다(칸 너비가 정해져 있어
+       자리표를 그대로 쓰면 열이 다시 어긋난다). */
+  const NOW = [{ name: '가나기계', ceo: '김가나', status: 'active' }];
+  const t2 = draw('agreement', F, NOW);
+  ok('근로자대표가 없으면 그 자리는 빈칸(밑줄)으로 남는다', /＿{3,}/.test(t2),
+    (t2.match(/가나기계 근로자대표.{0,20}/) || [''])[0]);
+  ok('그래도 대표자는 찍힌다', t2.indexOf('김가나') >= 0);
+}
+
+/* ══ 원본 한글의 «줄맞춤 자국» ══ (대표 지시 2026-09-14 「정관안에 줄칸 등 모두 정렬해달라」)
+   원본을 쓴 사람이 줄 끝을 맞추려고 낱말 사이에 공백을 여러 칸 넣어, 폭이 다른 화면에서는
+   문장 한가운데 구멍이 났다(「각 1인의 위원으로 구    성한다」). */
+console.log('\n■ 정관 — 줄맞춤 자국이 걷혔다');
+{
+  const t = draw('charter', F, SITES);
+  ok('「구    성한다」가 「구성한다」로 붙는다', t.indexOf('위원으로 구성한다') >= 0,
+    (t.match(/1인의 위원.{0,24}/) || [''])[0]);
+  ok('「사용자를    대표하는」의 구멍이 메워진다', t.indexOf('사용자를 대표하는') >= 0);
+  /* ⚠ 「된다」는 온전한 서술어다 — 앞말과 «띄어» 써야 한다. 구멍만 메우고 붙이지는 않는다. */
+  ok('「의장이     된다」의 구멍만 메워진다 (붙이지는 않는다)', t.indexOf('대표하는 의장이 된다') >= 0,
+    (t.match(/호선하여.{0,40}/) || [''])[0]);
+  /* 긴 본문 문단에는 두 칸 이상 공백이 남으면 안 된다 — 그것이 곧 구멍이다 */
+  const raw = drawRaw('charter', F, SITES);
+  const body = (raw.match(/제19조[\s\S]{0,500}/) || [''])[0];
+  ok('본문에 두 칸 이상 공백이 안 남는다', !/[가-힣] {2,}[가-힣]/.test(body),
+    (body.match(/[가-힣] {2,}[가-힣]/) || [''])[0]);
+  /* ⚠ 제목의 «자간 벌림»은 건드리면 안 된다 — 한글 문서가 일부러 벌려 쓴 것이다 */
+  const m = drawRaw('minutes', F, SITES);
+  ok('회의록 제목의 자간 벌림은 그대로 둔다', /의 {1,3}결 {1,3}주 {1,3}문/.test(m),
+    (m.match(/의 {0,3}결[^:\n]{0,14}/) || [''])[0]);
+  ok('사업계획서 표 머리의 자간 벌림도 그대로', /차 {2,}변/.test(drawRaw('bizplan', F, SITES)));
+  /* 서명란의 «두 단 벌림»(근로자측 ↔ 사용자측)도 남아야 한다 — 여기까지 메우면 두 단이 붙는다.
+     ⚠ 참여사업장이 있으면 그 줄은 «표»가 대신하므로 사라진다(2026-09-19). 그래서 빈 손으로 그린다 —
+       보려는 것은 fillFlowText 가 두 단을 붙이지 «않는다»는 것이지, 그 줄이 남느냐가 아니다. */
+  const raw0 = drawRaw('charter', F, []);
+  ok('서명란 두 단 벌림은 그대로 둔다', / {6,}/.test((raw0.match(/근로자측 위 원[\s\S]{0,120}/) || [''])[0]),
+    (raw0.match(/근로자측 위 원.{0,40}/) || [''])[0]);
+}
+
+/* ══ 공동/사내 — 서식 «전부»가 같은 말을 하는가 ══ (2026-09-11)
+   원본 .hwp 들은 한 집에서 베껴 쓴 탓에 «제목은 공동인데 본문은 사내»라고 적힌 자리가
+   흩어져 있었다. 소스 글자가 아니라 «그린 서식»을 봐야 잡힌다 — 자리는 원본 안에 있고
+   우리 소스에는 없기 때문이다. */
+console.log('\n■ 공동/사내 — 서식 전부가 같은 말을 한다');
+{
+  /* 오염되어 있던 서식들. 공동 기금이면 「사내」가, 사내 기금이면 「공동」이 남으면 안 된다. */
+  const DIRTY = ['agreement', 'minutes', 'bizplan', 'reg_license', 'tax_lease',
+    'ops_asset_change', 'ops_minutes_scope'];
+  /* ⚠ 기금 «이름»에 유형이 들어 있다(가나공동근로복지기금). 사내 쪽 시험은 이름을 바꿔
+       들고 와야 한다 — 아니면 이름 때문에 「공동이 남았다」고 잘못 잡힌다. */
+  const G = Object.assign({}, F, { fund_type: '공동', name: '가나공동근로복지기금' });
+  const N = Object.assign({}, F, { fund_type: '사내', name: '가나사내근로복지기금' });
+  DIRTY.forEach((k) => {
+    const g = draw(k, G, SITES);
+    ok(k + ' — 공동 기금에 「사내근로복지기금」이 안 남는다', g.indexOf('사내근로복지기금') < 0,
+      (g.match(/.{0,24}사내근로복지기금.{0,24}/) || [''])[0]);
+    const n = draw(k, N, SITES);
+    ok(k + ' — 사내 기금에 「공동근로복지기금」이 안 남는다', n.indexOf('공동근로복지기금') < 0,
+      (n.match(/.{0,24}공동근로복지기금.{0,24}/) || [''])[0]);
+  });
+  /* 등기신청서 목적란은 정관을 그대로 옮겨 적는 자리다 — 공동 전용 줄임말까지 따라와야 한다 */
+  const ra = draw('reg_apply', N, SITES);
+  ok('reg_apply — 사내 기금에 「공동기금법인」이 안 남는다', ra.indexOf('공동기금법인') < 0,
+    (ra.match(/.{0,24}공동기금법인.{0,24}/) || [''])[0]);
+  /* ① 설립인가신청서는 «고르는 칸»이다 — 둘 다 적혀 있어야 하고 표만 옮긴다 */
+  const ig = draw('inka', G, SITES), inn = draw('inka', N, SITES);
+  ok('inka — 공동이어도 두 갈래가 모두 적혀 있다', /사내근로복지기금법인/.test(ig) && /공동근로복지기금법인/.test(ig));
+  ok('inka — 사내이어도 두 갈래가 모두 적혀 있다', /사내근로복지기금법인/.test(inn) && /공동근로복지기금법인/.test(inn));
+  ok('inka — 사내면 사내 쪽에 표가 선다', /\[V\]\s*사내근로복지기금법인/.test(inn), inn.slice(0, 80));
+  ok('inka — 공동이면 공동 쪽에 표가 선다', /\[V\]\s*공동근로복지기금법인/.test(ig), ig.slice(0, 80));
+  /* ② 정관은 공동본·사내본 원본이 따로 있다 — 골라 올 뿐 말을 바꾸지 않는다 */
+  ok('charter — 사내 기금은 사내본 원본이 온다', draw('charter', N, SITES).indexOf('사내근로복지기금') >= 0);
+  ok('charter — 공동 기금은 공동본 원본이 온다', draw('charter', G, SITES).indexOf('공동근로복지기금') >= 0);
+  /* ③ 지원사업 서식은 공동 전용이다 — 사내로 열어도 제목을 바꾸지 않는다 */
+  ok('sub_checklist — 공동 전용 제목을 사내로 고쳐 쓰지 않는다',
+    draw('sub_checklist', N, SITES).indexOf('공동근로복지기금 지원사업') >= 0);
+  /* 기금 이름 뒤에 유형이 두 번 서던 자리 */
+  ok('ops_minutes_scope — 기금 이름 뒤 겹말이 사라졌다',
+    !/근로복지기금\s+(?:공동|사내)근로복지기금/.test(draw('ops_minutes_scope', G, SITES)));
+  /* ★ 기금 «이름»은 절대 고쳐 쓰지 않는다 — 이름이 「가나공동…」인 기금을 사내로 바꿨을 때
+       서식 속 이름까지 「가나사내…」가 되면 아무도 시키지 않은 개명이 관청에 나간다. */
+  const keep = Object.assign({}, F, { fund_type: '사내', name: '가나공동근로복지기금' });
+  ['agreement', 'minutes', 'ops_minutes_scope'].forEach((k) => {
+    const t = draw(k, keep, SITES);
+    ok(k + ' — 사내로 바꿔도 기금 이름은 그대로다', t.indexOf('가나공동근로복지기금') >= 0
+      && t.indexOf('가나사내근로복지기금') < 0, (t.match(/.{0,16}가나사내근로복지기금.{0,16}/) || [''])[0]);
+  });
+}
+
+/* ══ 사업계획서 — 출연예정금 «하나»로 표가 선다 ══ (2026-09-12)
+   예전에는 예산 칸이 비면 한 줄도 안 채웠다. 설립 중인 기금은 예산이 늘 비어 있으니
+   설립 첫해 사업계획서가 통째로 빈 종이로 나갔다(대표 화면이 그랬다). */
+console.log('\n■ 사업계획서 — 출연금 하나로 채워진다');
+{
+  /* 예산을 «한 칸도» 안 적은, 설립 중인 기금. 출연금은 참여사업장 약정액에서 온다. */
+  const N = { name: '가나공동근로복지기금', fund_type: '공동', setup_stage: '설립준비',
+    chairman: '홍길동', officers: F.officers, years: {} };
+  global.funds.X = N; global.S.f15Close = null;
+  const t = draw('bizplan', N, SITES);
+  /* 참여사업장 약정액 600만 + 400만 = «1,000만»(닫은 곳 900만은 안 센다).
+     공동이라 그해 쓸 몫 90% = 900만 · 기본재산 100만 · 이자 2% = 2만
+     목적사업 810만 · 관리비 45만 · 예비비 45만. 서식은 «천원» 단위다. */
+  ok('예산이 비어 있어도 표가 선다', /1\.사업수익/.test(t) && !/1\.사업수익 [＿_]/.test(t));
+  ok('목적사업비 8,100천원', /2\.고유목적사업비용 8,100/.test(t),
+    (t.match(/2\.고유목적사업비용[^가]{0,30}/) || [''])[0]);
+  ok('일반관리비 450천원', /4\.일반관리비 450/.test(t), (t.match(/4\.일반관리비[^5]{0,30}/) || [''])[0]);
+  /* 「가.이자수입」과 「나.대부이자수입」은 원본에서 «한 칸»에 들어 있다 — 라벨이 이어 붙는다 */
+  ok('이자수입 20천원', /가\.이자수입 나\.대부이자수입 0 20 20/.test(t),
+    (t.match(/가\.이자수입.{0,34}/) || [''])[0]);
+  ok('첫머리 「신규 출연기금」에 금액이 선다', /신규 출연기금 : 10,000,000원/.test(t),
+    (t.match(/신규 출연기금[^-]{0,40}/) || [''])[0]);
+  ok('한글 금액도 적는다', /\(일천만원\)/.test(t), (t.match(/신규 출연기금[^-]{0,50}/) || [''])[0]);
+  ok('기금예치 계획 금액 10,000천원', /00 은행 10,000/.test(t), (t.match(/00 은행[^2]{0,26}/) || [''])[0]);
+  /* 설립 첫해는 기초가 0 이라 추정재무상태표도 선다 — 자산총계 = 현금 1천만 + … */
+  ok('설립 첫해는 추정재무상태표도 채운다', !/자산총계 [＿_]+/.test(t), (t.match(/자산총계[^가]{0,30}/) || [''])[0]);
+  /* 손으로 적은 예산이 있으면 «그것»이 이긴다 */
+  const H = Object.assign({}, N, { years: { 2026: { budget: { exp_purpose: 7000000 } } } });
+  global.funds.X = H;
+  const t2 = draw('bizplan', H, SITES);
+  ok('협의회가 적은 예산이 짐작을 이긴다', /2\.고유목적사업비용 7,000/.test(t2) && t2.indexOf('8,100') < 0,
+    (t2.match(/2\.고유목적사업비용[^가]{0,30}/) || [''])[0]);
+  /* 출연금이 아예 없으면 «지어내지 않는다» */
+  global.funds.X = N;
+  const t0 = draw('bizplan', Object.assign({}, N), []);
+  ok('출연금이 없으면 빈 채로 둔다', t0.indexOf('8,100') < 0 && t0.indexOf('10,000,000원') < 0);
+  /* 사내 중소기업은 80% — 한도가 유형에 따라 갈린다. 1,000만 × 80% × 90% = 720만 */
+  const M = Object.assign({}, N, { fund_type: '사내', sme: '중소기업', name: '가나사내근로복지기금' });
+  global.funds.X = M;
+  const t3 = draw('bizplan', M, SITES);
+  ok('중소기업 사내기금은 80%를 쓴다 (목적사업 7,200천원)', /2\.고유목적사업비용 7,200/.test(t3),
+    (t3.match(/2\.고유목적사업비용[^가]{0,30}/) || [''])[0]);
+  /* 그냥 사내면 50% — 1,000만 × 50% × 90% = 450만 */
+  const M2 = Object.assign({}, M, { sme: '중소기업 아님' });
+  global.funds.X = M2;
+  ok('중소기업이 아닌 사내기금은 50%다 (목적사업 4,500천원)',
+    /2\.고유목적사업비용 4,500/.test(draw('bizplan', M2, SITES)));
+  global.funds.X = F; global.S.f15Close = null;
+}
+
+console.log(bad ? '\nFAILURES ' + bad : '\nALL PASS (자료가 있는 자리는 서식에 선다, 없는 자리는 비어 있다)');
+process.exit(bad ? 1 : 0);

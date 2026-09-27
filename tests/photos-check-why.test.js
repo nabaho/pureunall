@@ -1,0 +1,154 @@
+/* 왜 확인이 필요한가 — 대표 보고 2026-08-10
+   "확인필요 3장 클릭했는데 어떻게 하라는 건가. 상황에 대한 판단이 안 선다"
+
+   걸리는 이유가 여섯 가지인데 화면에는 ⚠ 표 하나뿐이었다. 한 장씩 열어 봐야
+   무엇을 해야 하는지 알 수 있었다.
+
+   ⚠ 여기서 가장 중요한 것: **needsCheck 와 checkWhy 의 판정 순서가 같아야 한다.**
+      어긋나면 「걸린 이유」와 「적힌 이유」가 달라져 엉뚱한 일을 하게 된다.
+      그래서 모양이 아니라 **두 함수를 같은 자료로 함께 돌려** 견준다. */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const html = fs.readFileSync(path.join(__dirname, '..', 'pu-photos.html'), 'utf8');
+
+/* 두 함수와 그들이 쓰는 것만 떼어 내 돌린다 */
+function load() {
+  const grab = (re, what) => {
+    const m = html.match(re);
+    assert.ok(m, what + ' 를 찾지 못했습니다.');
+    return m[0];
+  };
+  const src = [
+    'const CARD_KINDS = { card: 1, bizreg: 1 };',
+    'const CO_KINDS = { bizreg: 1, sme: 1 };',
+    grab(/function readAnyField\([\s\S]*?\n\}/, 'readAnyField'),
+    /* ⚠ 2026-08-11 — 업체관리 판정을 coFilledOk 한 곳으로 모았다(filled 가 실시간DB
+       에서 사라져 화면이 멎던 사고). **진짜 함수를 함께 넣는다** — 가짜로 두면
+       그 판정이 틀려도 아래 「할 일과 이유가 어긋나지 않는다」가 못 잡는다. */
+    grab(/function coFilledOk\(read\)[\s\S]*?\n\}/, 'coFilledOk'),
+    /* ⚠ 2026-08-23 — 「업체가 아직 없다」는 기다림이지 할 일이 아니라는 판정이
+       coTodo 로 갈라졌다. 진짜 함수를 함께 넣는다 — 없으면 needsCheck 가 멎는다. */
+    grab(/function coTodo\(read\)[\s\S]*?\n\}/, 'coTodo'),
+    /* ⚠ 2026-08-13 — 원본이 작은 서류 판정(tooSmall)도 **진짜 함수를 넣는다.**
+       가짜로 두면 그 판정이 틀려도 아래 「할 일과 이유가 어긋나지 않는다」가 못 잡는다. */
+    grab(/^const MIN_READ_EDGE = \{[\s\S]*?\n\};/m, 'MIN_READ_EDGE').replace('const ', 'var '),
+    grab(/function tooSmall\(it\)[\s\S]*?\n\}/, 'tooSmall'),
+    /* ⚠ 2026-08-23 — 「작아도 기계가 확인한 것은 통과」가 붙었다. 이것도 **진짜
+       함수를 넣는다** — 없으면 needsCheck 가 그 자리에서 멎는다(실제로 멎었다). */
+    grab(/^const TEL_SHAPE = [^\n]*;$/m, 'TEL_SHAPE').replace('const ', 'var '),
+    grab(/^const MAIL_SHAPE = [^\n]*;$/m, 'MAIL_SHAPE').replace('const ', 'var '),
+    grab(/function smallCheckedOk\(r\)[\s\S]*?\n\}/, 'smallCheckedOk'),
+    /* ⚠ 2026-08-15 — 「보관만 하는 갈래」 목록이 새로 생겼다(계약서가 영영 ⚠ 로
+       남던 사고). 화면에서 **그대로 가져온다** — 여기 베껴 적으면 갈래를 늘릴 때
+       검사만 옛 목록을 보게 된다. */
+    grab(/^const KEEP_ONLY = \{[^}]*\};/m, 'KEEP_ONLY').replace('const ', 'var '),
+    /* ⚠ 2026-08-24 — 판독 실패는 까닭을 갈라 「무엇을 해야 하나」로 적는다.
+       **진짜 규칙표와 진짜 함수를 넣는다** — 가짜로 두면 갈래를 잘못 가려도
+       아래 「할 일과 이유가 어긋나지 않는다」가 못 잡는다. */
+    grab(/^const READ_FAIL_RULES = \[[\s\S]*?\n\];$/m, 'READ_FAIL_RULES').replace('const ', 'var '),
+    grab(/^const FAIL_GIVEUP = \d+;$/m, 'FAIL_GIVEUP').replace('const ', 'var '),
+    grab(/function readFailKind\(read\)[\s\S]*?\n\}/, 'readFailKind'),
+    grab(/function readFailAdvice\(read\)[\s\S]*?\n\}/, 'readFailAdvice'),
+    /* ⚠ 2026-08-24 — 서식·대화캡처는 「사람이 해서 달라지는 것이 있을 때만」 할 일이다.
+       **진짜 함수를 넣는다** — 가짜로 두면 그 판정이 틀려도 아래 「할 일과 이유가
+       어긋나지 않는다」가 못 잡는다. canSendCoInfo 도 함께 떠 온다(formTodo 가 쓴다). */
+    grab(/function canSendCoInfo\(read\)[\s\S]*?\n\}/, 'canSendCoInfo'),
+    grab(/function formTodo\(read\)[\s\S]*?\n\}/, 'formTodo'),
+    grab(/function chatTodo\(read\)[\s\S]*?\n\}/, 'chatTodo'),
+    /* ⚠ 2026-09-01 근로자 서류 넷 — 안 실으면 checkWhy 가 그 줄에서 ReferenceError 로 멎는다 */
+    grab(/^const WORKER_KINDS = \{[^}]*\};/m, 'WORKER_KINDS').replace('const ', 'var '),
+    grab(/function canSendWorker\(read\)[\s\S]*?\n\}/, 'canSendWorker'),
+    grab(/function workerWhyNot\(read\)[\s\S]*?\n\}/, 'workerWhyNot'),
+    /* ⚠ 2026-09-02 💰 임금 확인 — 안 실으면 checkWhy 가 그 줄에서 멎는다 */
+    grab(/function wageRead\(read\)[\s\S]*?\n\}/, 'wageRead'),
+    grab(/function wageOkOf\(read\)[\s\S]*?\n\}/, 'wageOkOf'),
+    grab(/function wageBoxOn\(read\)[\s\S]*?\n\}/, 'wageBoxOn'),
+    grab(/function wageNeedsOk\(read\)[\s\S]*?\n\}/, 'wageNeedsOk'),
+    grab(/function checkWhy\(it\)[\s\S]*?\n\}/, 'checkWhy'),
+    grab(/function needsCheck\(it\)[\s\S]*?\n\}/, 'needsCheck')
+  ].join('\n');
+  const ctx = { Number, Math, String, RegExp, Object, Array };
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  return ctx;
+}
+
+const it = (read) => ({ meta: { read } });
+
+/* ── 이유마다 말이 붙는가 ── */
+const CASES = [
+  ['급여서류', { kind: 'payslip', fields: {} }, /지워/],
+  ['판독 실패', { kind: 'card', error: 'AI 응답 없음', fields: {} }, /다시 판독/],
+  /* ⚠ 2026-08-13 다시 겨눔 — 「비었습니다 · 지워 주세요」였다. 지우라고 하면
+     멀쩡히 읽어 둔 값까지 함께 잃는다(사진만 다시 올리면 되는 상황이다).
+     이 검사가 지키는 것은 「할 일이 적혀 있다」이지 그 문구가 아니다. */
+  ['본문이 빈 사진', { kind: 'card', error: '사진 본문을 불러오지 못했습니다', fields: {} }, /다시 올려/],
+  ['종류를 못 가림', { kind: 'other', fields: { name: '홍길동' } }, /분류 지정/],
+  ['검증에 걸림', { kind: 'bizreg', auto: false, fields: { bizNo: '123' } }, /미덥지/],
+  ['기업정보함에 아직 안 감', { kind: 'card', auto: true, fields: {} }, /기업정보함/],
+  ['업체관리에 못 넣음', { kind: 'sme', auto: true, fields: {} }, /업체관리/]
+];
+
+for (const [name, read, want] of CASES) {
+  test('★ ' + name + ' — 무엇을 해야 하는지 적는다', () => {
+    const c = load();
+    const photo = it(read);
+    assert.equal(vm.runInContext('needsCheck', c)(photo), true, name + ' 이 할 일로 안 잡힙니다.');
+    const why = vm.runInContext('checkWhy', c)(photo);
+    assert.match(why, want, name + ' 의 설명이 다릅니다: ' + why);
+  });
+}
+
+/* ── 순서가 어긋나지 않는가 (이 검사가 핵심) ── */
+test('★ 할 일이면 반드시 이유가 있고, 할 일이 아니면 이유가 없다', () => {
+  const c = load();
+  const need = vm.runInContext('needsCheck', c);
+  const why = vm.runInContext('checkWhy', c);
+  /* 있을 법한 조합을 두루 만들어 둘을 함께 돌린다 */
+  const kinds = ['card', 'bizreg', 'sme', 'payslip', 'meeting', 'other'];
+  const cases = [];
+  for (const kind of kinds) {
+    for (const auto of [true, false]) {
+      for (const ack of [true, false]) {
+        for (const err of ['', '판독 실패']) {
+          for (const f of [{}, { name: '홍길동' }]) {
+            for (const filed of [null, { id: 'x' }]) {
+              cases.push({ kind, auto, ack, error: err, fields: f, filed: filed });
+            }
+          }
+        }
+      }
+    }
+  }
+  let checked = 0;
+  for (const read of cases) {
+    /* 원본 크기도 함께 훑는다(2026-08-13) — 작은 서류 판정이 한쪽에만 들어가면
+       「⚠ 는 떴는데 이유가 빈 칸」이 된다. 크기를 모르던 옛 사진(0)도 함께. */
+    for (const size of [{ w: 0, h: 0 }, { w: 512, h: 755 }, { w: 2480, h: 3508 }]) {
+      const photo = { meta: { w: size.w, h: size.h, read: read } };
+      const n = need(photo), w = why(photo);
+      assert.equal(!!w, !!n,
+        '어긋났습니다 — 할 일=' + n + ' 인데 이유="' + w + '" (' +
+        size.w + '×' + size.h + ' ' + JSON.stringify(read) + ')');
+      checked++;
+    }
+  }
+  assert.ok(checked > 100, '충분히 훑지 못했습니다: ' + checked);
+});
+
+test('읽은 것이 없으면 할 일도 이유도 없다', () => {
+  const c = load();
+  assert.equal(vm.runInContext('needsCheck', c)({ meta: {} }), false);
+  assert.equal(vm.runInContext('checkWhy', c)({ meta: {} }), '');
+});
+
+/* ── 화면에 실제로 나오는가 ── */
+test('★ 「확인 필요」만 볼 때 칸에 이유가 적힌다', () => {
+  assert.ok(/needOnly \? '<span class="wn why">' \+ esc\(checkWhy\(it\)\)/.test(html),
+    '평소에는 ⚠ 만, 확인 필요를 볼 때는 이유를 적어야 합니다.');
+  assert.ok(/#grid \.cell \.wn\.why\{/.test(html), '이유 줄을 담을 자리가 없습니다.');
+});

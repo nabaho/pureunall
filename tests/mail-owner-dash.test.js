@@ -1,0 +1,1867 @@
+/* 담당자 대시보드 — 같은 메일을 «사람»으로도 본다 (대표 지시 2026-08-26)
+   "푸른분류는 대시보드 두개로 나누어서 담당자, 업무별 로 나눠서 보게" (「안 1 걸러 보기」)
+   "이메일정보 입력함도"
+
+   ★ 여기서 지키는 것은 «모양»이 아니라 이 다섯이다.
+     1. 담당자 칸은 «자리»가 아니라 «거르개»다 — 업무 칸 통수가 줄지 않는다
+     2. 사람이 정해 준 것이 기계보다 «늘 먼저»다 — 기계가 사람을 덮으면 고칠 길이 없다
+     3. 공용 도메인(naver 등)은 도메인으로 잇지 않는다 — 온 세상이 한 사람 것이 된다
+     4. 이어도 다음메일에는 아무것도 쓰지 않는다
+     5. 「담당 모름」을 줄일 길이 «목록 안»에 있다 — 딴 화면에 있으면 아무도 안 한다
+
+   ⚠ 글자·개수를 못 박지 않는다(docs/검사-못박지-않기.md). */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+
+const src = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
+function cut(from, to){
+  const i = src.indexOf(from);
+  assert.ok(i > 0, from + ' 를 찾지 못했습니다');
+  const j = src.indexOf(to, i + from.length);
+  assert.ok(j > i, to + ' 를 찾지 못했습니다');
+  return src.slice(i, j);
+}
+
+const FOLDERS = {
+  B_INBOX: { path:'INBOX', name:'INBOX', kind:'inbox', order:1, total:1, unseen:0 },
+  B_JAMUN: { path:'1.자문사답변', name:'1.자문사답변', kind:'custom', order:7, total:4, unseen:1 },
+  B_PAY:   { path:'2.급여', name:'2.급여', kind:'custom', order:7, total:1, unseen:0 },
+  B_AD:    { path:'기타광고', name:'기타광고', kind:'custom', order:7, total:1, unseen:1 }
+};
+const M = (u,e,s,r) => ({ u:u, f:'보낸이', e:e, t:'370-6@daum.net', s:s, d:1756000000+u, r:r, g:0, a:0, z:1 });
+const MSGS = {
+  B_INBOX: { '1': M(1,'noreply@x.com','받은 것',1) },
+  B_JAMUN: {
+    '10': M(10,'a@hanbit.co.kr','한빛 문의',1),      /* 명함 → 박한별 */
+    '11': M(11,'b@hanbit.co.kr','한빛 추가 문의',0), /* 도메인 → 박한별 */
+    '12': M(12,'kim@naver.com','개인 주소에서',1),   /* 아무 데도 없다 */
+    '13': M(13,'c@daehan.kr','대한 문의',1)          /* 명함 → 김혜민 */
+  },
+  B_PAY: { '20': M(20,'a@hanbit.co.kr','급여 자료',1) },
+  B_AD:  { '30': M(30,'ad@spam.kr','광고',0) }
+};
+/* 기업정보함(items) — 주소와 회사가 든 명함 */
+const ITEMS = {
+  i1: { id:'i1', email:'a@hanbit.co.kr', company:'한빛물산' },
+  i2: { id:'i2', email:'c@daehan.kr',    company:'마루산업' }
+};
+/* ErpMatch 자리 — 회사 → 담당 노무사 */
+const BYNAME = {
+  '한빛물산': { company:'한빛물산', main:'박한별', subs:[] },
+  '마루산업': { company:'마루산업', main:'김혜민', subs:[] }
+};
+
+function load(over){
+  const o = over || {};
+  const held = { wrote:{}, fetched:0, toasts:[] };
+  const state = Object.assign({
+    view:'mail', mailSent:'box', mbBox:'', tab:'card', group:'all', owner:'all',
+    isAdmin:true, groups:{}, pick:{}, matPick:'', sentBox:{}, schedBox:{},
+    mbQ:'', mbFilter:'', mbTab:'', mbCursor:-1, mbOpen:null, mbDash:'who', items: ITEMS
+  }, o.state || {});
+  const dbRef = (p) => ({
+    once: () => Promise.resolve({ val: () => null }),
+    set: (v) => { held.wrote[p] = v; return Promise.resolve(); },
+    update: (v) => { held.wrote[p] = Object.assign(held.wrote[p]||{}, v); return Promise.resolve(); },
+    remove: () => { held.wrote[p] = null; return Promise.resolve(); }
+  });
+  const dummy = { set innerHTML(v){ dummy._h = v; }, get innerHTML(){ return dummy._h||''; },
+    style:{}, offsetHeight:120, value:'', focus(){}, select(){}, contains:()=>false, scrollTop:0 };
+  const ctx = {
+    console, Object, Array, String, Number, Math, JSON, RegExp, Set, Date, Promise,
+    setTimeout: (fn)=>{ if(fn) fn(); }, atob:()=>'',
+    state,
+    esc: s => String(s == null ? '' : s).replace(/[&<>"']/g,
+      c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+    Store: { mode:'firebase' },
+    matMailCfg: () => ({ from:'370-6@daum.net' }),
+    matList: () => [], matCat: () => '', MAT_CATS_NOW: () => [], _matMeta: {},
+    schedList: () => [], staffName: b => String(b||''),
+    fmtDate: () => '2026.08.26', fmtMB: n => n + 'B',
+    allItems: () => ITEMS, allGroups: () => ({}),
+    isPrivGroup: () => false, canSeeGroup: () => true,
+    coList: () => [], coTagList: () => [], coFTabList: () => [],
+    coFTabCounts: () => ({all:0,byTab:{}}), _coFolders:{}, _coTagHidden:{},
+    toast: m => held.toasts.push(String(m)), confirm: () => true, prompt: () => null,
+    closeFolderMenu(){}, DB_ROOT:'pucards',
+    toggleSidebar(){}, openSettingsPage(){}, openMatPage(){}, openMailPage(){},
+    openSentBox(){}, openSchedBox(){}, openInbox(){}, closeMailPage(){},
+    openPrivateVault(){}, migrateLockedFolders(){},
+    inboxBoxHtml: () => '', schedBoxHtml: () => '', sentBoxHtml: () => '', mailWriteHtml: () => '',
+    wireMailWrite(){},
+    pickOf: k => (state.pick[k] = state.pick[k] || {}),
+    pickOn: (sel,id) => !!(sel && sel[id]),
+    pickList: (sel,ids) => (ids||[]).filter(i => !!(sel && sel[i])),
+    pickAllOn: (sel,ids) => !!(ids&&ids.length) && ids.every(i => !!(sel&&sel[i])),
+    pickClear: k => { state.pick[k] = {}; },
+    pickHit(){}, pickToggleAll(){}, pickRedraw(){},
+    renderPCSide(){}, renderMailPage(){}, render(){},
+    document: { getElementById: () => null, addEventListener(){}, removeEventListener(){} },
+    $: () => dummy,
+    window: { innerWidth:1600, innerHeight:900 },
+    /* ★ 다음메일에 손대는 유일한 길 — 여기가 울리면 원본이 바뀐 것이다 */
+    fetch: () => { held.fetched++; return Promise.resolve({ json:()=>Promise.resolve({ok:true}) }); },
+    firebase: {
+      auth: () => ({ currentUser: { getIdToken: () => Promise.resolve('T') } }),
+      database: () => ({ ref: (p) => dbRef(p) })
+    }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(cut('const ErpMatch = {', '\nfunction autoFolderFlush('), ctx);
+  vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
+  vm.runInContext(
+    '_mbFolders = ' + JSON.stringify(o.folders || FOLDERS) + ';' +
+    '_mbMsgs = ' + JSON.stringify(o.msgs || MSGS) + ';' +
+    '_mbBins = {}; _mbPut = {};' +
+    '_mbHide = ' + JSON.stringify(o.hide || {}) + ';' +
+    '_mbOwner = ' + JSON.stringify(o.owner || {}) + ';' +
+    '_mbOrder = {}; _mbWhoOrder = ' + JSON.stringify(o.whoOrder || {}) + ';' +
+    '_mbMeta = { at: 1, ok: true };', ctx);
+  /* ⚠ 덩어리 안의 const 는 밖에서 못 만진다(lexical) — 안에서 꺼내 온다 */
+  const EM = vm.runInContext('ErpMatch', ctx);
+  const byName = {};
+  Object.keys(BYNAME).forEach(n => { byName[EM._norm(n)] = BYNAME[n]; });
+  EM.byName = byName; EM.byBiz = {}; EM.ready = true;
+  EM.companies = Object.keys(BYNAME).map(n => ({ name:n, managerMain:BYNAME[n].main }));
+  ctx.ErpMatch = EM;
+  ctx._held = held;
+  ctx.__owner = () => vm.runInContext('JSON.stringify(_mbOwner)', ctx);
+  return ctx;
+}
+const boxN = (c, id) => { c.state.mbBox = id; return c.mbAllRows().length; };
+/* ⚠ 배열로 견주지 않는다 — 덩어리 안에서 만든 배열은 바깥과 «다른 종류»다(vm 의 결) */
+const subjects = (c, id) => { c.state.mbBox = id; return c.mbAllRows().map(v=>v.s).sort().join(' | '); };
+
+/* ══════ 하나 — 담당자 칸은 «거르개»다 ══════ */
+
+test('★ 담당자로 갈라도 업무 칸 통수는 줄지 않는다 — 이것이 「안 1」의 요점', () => {
+  const c = load();
+  const before = boxN(c, '~B_JAMUN');
+  assert.ok(boxN(c, '@박한별') > 0, '담당자 칸이 비어 있다');
+  assert.equal(boxN(c, '~B_JAMUN'), before, '담당자 칸을 본 뒤 업무 칸이 줄었다');
+  assert.ok(subjects(c, '~B_JAMUN').indexOf('한빛 문의') >= 0, '메일이 업무 칸에서 빠졌다');
+});
+
+test('★ 한 통을 두 눈으로 본다 — 주제로도, 사람으로도', () => {
+  const c = load();
+  assert.ok(subjects(c, '@박한별').indexOf('한빛 문의') >= 0, '사람 칸에 없다');
+  assert.ok(subjects(c, '~B_JAMUN').indexOf('한빛 문의') >= 0, '주제 칸에 없다');
+});
+
+test('★ 담당자 칸은 «여러 업무 칸을 가로지른다» — 한 폴더만 보면 늘 0통이 된다', () => {
+  const c = load();
+  const s = subjects(c, '@박한별');
+  assert.ok(s.indexOf('한빛 문의') >= 0 && s.indexOf('급여 자료') >= 0,
+    '다른 업무 칸에 있는 그 사람 메일이 안 보인다');
+});
+
+/* ══════ 둘 — 누가 담당인지 어떻게 아나 ══════ */
+
+test('★ 기업정보함 주소로 담당자를 짚는다', () => {
+  const c = load();
+  assert.equal(c.mbWhoOfRow({ e:'a@hanbit.co.kr' }), '박한별');
+  assert.equal(c.mbWhoOfRow({ e:'c@daehan.kr' }), '김혜민');
+});
+
+test('★ 회사 도메인으로도 짚는다 — 사람이 바뀌어도 회사는 그대로다', () => {
+  const c = load();
+  assert.equal(c.mbWhoOfRow({ e:'b@hanbit.co.kr' }), '박한별', '같은 회사 다른 사람을 못 짚었다');
+});
+
+test('★ 공용 도메인은 «절대» 도메인으로 잇지 않는다 — naver 를 주면 온 세상이 한 사람 것이 된다', () => {
+  const items = Object.assign({}, ITEMS, { i9:{ id:'i9', email:'boss@naver.com', company:'한빛물산' } });
+  const c = load({ state:{ items } });
+  assert.equal(c.mbWhoOfRow({ e:'boss@naver.com' }), '박한별', '적어 둔 그 주소는 짚어야 한다');
+  assert.equal(c.mbWhoOfRow({ e:'someone-else@naver.com' }), '', 'naver 를 통째로 한 사람에게 줬다');
+});
+
+test('★ 사람이 정해 준 것이 «늘 먼저»다 — 기계가 사람을 덮으면 고칠 길이 없다', () => {
+  const c = load({ owner: { 'a@hanbit,co,kr': '김혜민' } });
+  assert.equal(c.mbWhoOfRow({ e:'a@hanbit.co.kr' }), '김혜민', '기계가 사람의 판단을 덮었다');
+});
+
+test('★ 열쇠 규칙이 포털과 같다 — 점을 그대로 쓰면 서버가 400 으로 거절한다', () => {
+  const c = load();
+  assert.equal(c.mbWhoKey('A.b@Han.co.kr'), 'a,b@han,co,kr');
+  assert.ok(c.mbWhoKey('x@y.kr').indexOf('.') < 0, '점이 남아 있다');
+  ['#','$','[',']','/'].forEach(ch =>
+    assert.ok(c.mbWhoKey('a'+ch+'b@c.kr').indexOf(ch) < 0, ch + ' 이 남아 있다'));
+});
+
+test('짚지 못하면 「담당 모름」으로 간다 — 조용히 아무 데나 넣지 않는다', () => {
+  const c = load();
+  assert.equal(c.mbWhoOfRow({ e:'kim@naver.com' }), '');
+  assert.ok(subjects(c, '@?').indexOf('개인 주소에서') >= 0, '담당 모름에 없다');
+});
+
+/* ══════ 셋 — 울타리 ══════ */
+
+test('★ 담당자 칸은 «업무 칸에 든 것»만 본다 — 받은메일함까지 넣으면 담당 모름이 광고로 찬다', () => {
+  const c = load();
+  assert.ok(subjects(c, '@?').indexOf('받은 것') < 0, '받은메일함 메일이 담당 모름에 들어왔다');
+});
+
+test('★ 숨긴 칸은 담당자 대시보드에도 안 나온다 — 치운 것이 딴 데서 되살아나면 안 된다', () => {
+  const a = load();
+  const b = load({ hide: { B_AD: true } });
+  assert.ok(a.mbWhoNoneCount().n > b.mbWhoNoneCount().n, '숨긴 칸의 광고가 담당 모름에 남았다');
+  assert.ok(subjects(b, '@?').indexOf('광고') < 0, '숨긴 칸의 메일이 담당 모름에 있다');
+});
+
+/* ══════ 넷 — 이어도 다음메일은 그대로 ══════ */
+
+test('★ 담당자를 이어도 다음메일 서버를 부르지 않는다', () => {
+  const c = load();
+  c.mbWhoSet('kim@naver.com', '박재원', false);
+  assert.equal(c._held.fetched, 0, '다음메일 서버를 불렀다');
+  Object.keys(c._held.wrote).forEach(p => assert.ok(p.indexOf('mailbox') < 0,
+    '다음메일 자리에 적으려 했다: ' + p));
+  assert.match(c.__owner(), /박재원/, '이은 것이 안 적혔다');
+  assert.equal(c.mbWhoOfRow({ e:'kim@naver.com' }), '박재원', '이었는데 안 잡힌다');
+});
+
+test('★ 이어도 업무 칸 통수는 그대로 — 담당자 칸만 는다', () => {
+  const c = load();
+  const before = boxN(c, '~B_JAMUN');
+  const naBefore = c.mbWhoNoneCount().n;
+  c.mbWhoSet('kim@naver.com', '박재원', false);
+  assert.equal(boxN(c, '~B_JAMUN'), before, '업무 칸이 줄었다');
+  assert.equal(c.mbWhoNoneCount().n, naBefore - 1, '담당 모름이 안 줄었다');
+});
+
+test('정한 것을 지우면 다시 기계가 짚는다 — 되돌릴 길이 있어야 한다', () => {
+  const c = load({ owner: { 'a@hanbit,co,kr': '김혜민' } });
+  assert.equal(c.mbWhoOfRow({ e:'a@hanbit.co.kr' }), '김혜민');
+  c.mbWhoSet('a@hanbit.co.kr', '', false);
+  assert.equal(c.mbWhoOfRow({ e:'a@hanbit.co.kr' }), '박한별', '기계 판단으로 안 돌아갔다');
+});
+
+/* ══════ 다섯 — 화면 ══════ */
+
+test('★ 옆줄에 대시보드 둘을 바꿔 끼우는 칩이 있다', () => {
+  const c = load({ state:{ mbDash:'who' } });
+  const h = c.mailSideHtml();
+  assert.ok(h.indexOf("mbSetDash('who')") > 0, '담당자 칩이 없다');
+  assert.ok(h.indexOf("mbSetDash('topic')") > 0, '업무별 칩이 없다');
+});
+
+test('★ 담당자 대시보드에 「담당 모름」과 「이메일 잇기」로 가는 길이 있다', () => {
+  const c = load({ state:{ mbDash:'who' } });
+  const h = c.mailSideHtml();
+  assert.ok(h.indexOf('담당 모름') > 0, '담당 모름 칸이 없다');
+  assert.ok(h.indexOf('openWhoPage()') > 0, '이메일 잇는 화면으로 갈 길이 없다');
+});
+
+test('업무별 대시보드에서는 업무 칸이 나온다 — 칩이 실제로 갈라야 한다', () => {
+  const c = load({ state:{ mbDash:'topic' } });
+  const h = c.mailSideHtml();
+  assert.ok(h.indexOf('1.자문사답변') > 0, '업무 칸이 안 나온다');
+  assert.ok(h.indexOf("openMailBox('@") < 0, '업무별인데 담당자 칸이 섞여 있다');
+});
+
+test('★ 「담당 모름」을 줄일 길이 «목록 안»에 있다 — 딴 화면에 있으면 아무도 안 한다', () => {
+  const c = load({ state:{ mbDash:'who', mbBox:'@?' } });
+  const h = c.mbBoxHtml();
+  assert.ok(h.indexOf('mbWhoAsk(') > 0, '줄에서 담당자를 정할 길이 없다');
+});
+
+test('★ 담당자 칸에서는 «어느 업무 칸의 메일인가»를 적어 준다 — 안 적으면 이름만 남는다', () => {
+  const c = load({ state:{ mbDash:'who', mbBox:'@박한별' } });
+  const h = c.mbBoxHtml();
+  assert.ok(h.indexOf('1.자문사답변') > 0, '어느 업무 칸인지 안 나온다');
+});
+
+test('★ 업무 칸에서는 «누구 담당인가»를 적어 준다', () => {
+  const c = load({ state:{ mbDash:'topic', mbBox:'~B_JAMUN' } });
+  const h = c.mbBoxHtml();
+  assert.ok(h.indexOf('박한별') > 0, '담당자가 안 나온다');
+  assert.ok(h.indexOf('mbWhoAsk(') > 0, '모르는 것을 정할 길이 없다');
+});
+
+/* ══════ 여섯 — 자문사 이메일 잇기 화면 ══════ */
+
+test('★ 「많이 온 주소부터」 늘어놓는다 — 21통짜리 하나가 363줄보다 크다', () => {
+  const c = load();
+  const list = c.whoUnknownSenders();
+  assert.ok(list.length, '못 잡은 보낸이가 안 모인다');
+  for(let i = 1; i < list.length; i++)
+    assert.ok(list[i-1].n >= list[i].n, '많이 온 순이 아니다');
+  assert.ok(list.every(o => o.e), '주소가 빈 줄이 있다');
+});
+
+test('★ 잇기 화면에 두 갈래가 다 있다 — 주소부터 · 자문사부터', () => {
+  const c = load({ state:{ mailSent:'who', whoTab:'addr' } });
+  const a = c.whoPageHtml();
+  assert.ok(a.indexOf('mbWhoAsk(') > 0, '주소에서 담당자를 정할 길이 없다');
+  assert.ok(a.indexOf("whoTab('co')") > 0, '자문사 갈래로 갈 길이 없다');
+  c.state.whoTab = 'co';
+  const b = c.whoPageHtml();
+  assert.ok(b.indexOf('whoAddPrompt(') > 0, '자문사에 주소를 이을 길이 없다');
+  assert.ok(b.indexOf('한빛물산') > 0, '자문사 목록이 안 나온다');
+});
+
+test('★ 이은 것은 우리 앱에만 남는다고 화면이 말해 준다 — 안 적으면 다음메일도 바뀌는 줄 안다', () => {
+  const c = load({ state:{ mailSent:'who', whoTab:'addr' } });
+  assert.match(c.whoPageHtml(), /우리 앱에만/, '어디까지 바뀌는지 안 적혀 있다');
+});
+
+test('잇기 화면에서 메일함으로 돌아갈 길이 있다 — 없으면 갇힌다', () => {
+  const c = load({ state:{ mailSent:'who', whoTab:'addr' } });
+  assert.ok(c.whoPageHtml().indexOf('openMailBox(') > 0, '돌아갈 길이 없다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   담당자 목록 — 퇴사자 빼기 · 사번순 · 노무사/직원 가르기 (대표 지시 2026-08-26)
+   ══════════════════════════════════════════════════════════════════════════
+   "퇴사자는 자동으로 빠지게해라 있으면 안된다. 그리고 사번에 따라 정렬해주고
+    노무사와 직원을 따로 분류할 수 있게도 해달라."
+
+   ⚠ 명부는 data/user_dir 이 «진짜»다 — pureun_v6_user_accounts 는 낡아서 퇴사자도
+     status=active 로 남아 있다(실측 2026-08-26: 박성수·임혜미가 그랬다).
+     그래서 이 검사는 «명부에 retired 로 적혀 있으면 빠진다»를 본다. */
+const DIR = [
+  { sid:'P-001', name:'권형하', sortOrder:10,  role:'admin',  title:'대표노무사', status:'active'  },
+  { sid:'P-002', name:'박성수', sortOrder:20,  role:'member', title:'노무사',    status:'retired' },
+  { sid:'P-003', name:'박한별', sortOrder:30,  role:'member', title:'노무사',    status:'active'  },
+  { sid:'A-001', name:'최기운', sortOrder:80,  role:'staff',  title:'사무장',    status:'active'  },
+  { sid:'A-003', name:'김보람', sortOrder:100, role:'staff',  title:'과장',      status:'active'  },
+  { sid:'A-006', name:'김석우', sortOrder:130, role:'staff',  title:'사무직',    status:'leave'   },
+  { sid:'T-002', name:'김동근', sortOrder:150, role:'member', title:'노무사',    status:'retired' }
+];
+/* 회사 → 담당자. 퇴사자가 담당인 회사도 둔다(실제로 그런 회사가 있다). */
+const BYNAME2 = {
+  '한빛물산': { company:'한빛물산', main:'박한별', subs:[] },
+  '마루산업': { company:'마루산업', main:'최기운', subs:[] },
+  '옛거래처': { company:'옛거래처', main:'박성수', subs:[] },   /* 퇴사자가 담당 */
+  '휴직담당': { company:'휴직담당', main:'김석우', subs:[] },
+  '과장담당': { company:'과장담당', main:'김보람', subs:[] }
+};
+const ITEMS2 = {
+  a: { id:'a', email:'a@hanbit.co.kr', company:'한빛물산' },
+  b: { id:'b', email:'b@daehan.kr',    company:'마루산업' },
+  c: { id:'c', email:'c@old.kr',       company:'옛거래처' },
+  d: { id:'d', email:'d@leave.kr',     company:'휴직담당' },
+  e: { id:'e', email:'e@gwa.kr',       company:'과장담당' }
+};
+const FOLDERS2 = {
+  B_JAMUN: { path:'1.자문사답변', name:'1.자문사답변', kind:'custom', order:7, total:4, unseen:0 }
+};
+const M2 = (u,e,s) => ({ u:u, f:'보낸이', e:e, t:'370-6@daum.net', s:s, d:1756000000+u, r:1, g:0, a:0, z:1 });
+const MSGS2 = { B_JAMUN: {
+  '1': M2(1,'a@hanbit.co.kr','한빛'),
+  '2': M2(2,'b@daehan.kr','대한'),
+  '3': M2(3,'c@old.kr','옛거래처 — 퇴사자 담당'),
+  '4': M2(4,'d@leave.kr','휴직자 담당')
+}};
+
+function loadStaff(over){
+  const o = over || {};
+  const held = { wrote:{}, toasts:[] };
+  const state = Object.assign({
+    view:'mail', mailSent:'box', mbBox:'', items: ITEMS2, pick:{}, mbDash:'who',
+    mbQ:'', mbFilter:'', mbCursor:-1, mbOpen:null
+  }, o.state || {});
+  const dbRef = (p) => ({
+    once: () => Promise.resolve({ val: () => null }),
+    set: (v) => { held.wrote[p] = v; return Promise.resolve(); },
+    remove: () => { held.wrote[p] = null; return Promise.resolve(); },
+    child(k){ return dbRef(p + '/' + k); },
+    update: (v) => { held.wrote[p] = Object.assign(held.wrote[p]||{}, v); return Promise.resolve(); }
+  });
+  const dummy = { set innerHTML(v){ dummy._h = v; }, get innerHTML(){ return dummy._h||''; },
+    style:{}, offsetHeight:120, value:'', focus(){}, select(){}, contains:()=>false, scrollTop:0 };
+  const ctx = {
+    console, Object, Array, String, Number, Math, JSON, RegExp, Set, Date, Promise,
+    setTimeout: (fn)=>{ if(fn) fn(); }, atob:()=>'',
+    state,
+    esc: s => String(s == null ? '' : s).replace(/[&<>"']/g,
+      c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+    Store: { mode:'firebase' }, DB_ROOT:'pucards',
+    matMailCfg: () => ({ from:'370-6@daum.net' }),
+    matList: () => [], matCat: () => '', MAT_CATS_NOW: () => [], _matMeta: {},
+    schedList: () => [], staffName: b => String(b||''),
+    fmtDate: () => '2026.08.26', fmtMB: n => n + 'B',
+    allItems: () => ITEMS2, allGroups: () => ({}),
+    isPrivGroup: () => false, canSeeGroup: () => true,
+    coList: () => [], coTagList: () => [], coFTabList: () => [],
+    coFTabCounts: () => ({all:0,byTab:{}}), _coFolders:{}, _coTagHidden:{},
+    toast: m => held.toasts.push(String(m)), confirm: () => true, prompt: () => null,
+    closeFolderMenu(){}, toggleSidebar(){}, openSettingsPage(){}, openMatPage(){},
+    openMailPage(){}, openSentBox(){}, openSchedBox(){}, openInbox(){}, closeMailPage(){},
+    openPrivateVault(){}, migrateLockedFolders(){},
+    inboxBoxHtml: () => '', schedBoxHtml: () => '', sentBoxHtml: () => '', mailWriteHtml: () => '',
+    wireMailWrite(){},
+    pickOf: k => (state.pick[k] = state.pick[k] || {}),
+    pickOn: (sel,id) => !!(sel && sel[id]),
+    pickList: (sel,ids) => (ids||[]).filter(i => !!(sel && sel[i])),
+    pickAllOn: (sel,ids) => !!(ids&&ids.length) && ids.every(i => !!(sel&&sel[i])),
+    pickClear: k => { state.pick[k] = {}; },
+    pickHit(){}, pickToggleAll(){}, pickRedraw(){},
+    renderPCSide(){}, renderMailPage(){}, render(){},
+    document: { getElementById: () => null, addEventListener(){}, removeEventListener(){} },
+    $: () => dummy,
+    window: { innerWidth:1600, innerHeight:900 },
+    fetch: () => Promise.resolve({ json:()=>Promise.resolve({ok:true}) }),
+    firebase: { auth: () => ({ currentUser:null }), database: () => ({ ref: p => dbRef(p) }) }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(cut('const ErpMatch = {', '\nfunction autoFolderFlush('), ctx);
+  vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
+  vm.runInContext(
+    '_mbFolders = ' + JSON.stringify(FOLDERS2) + ';' +
+    '_mbMsgs = ' + JSON.stringify(MSGS2) + ';' +
+    '_mbBins = {}; _mbPut = {}; _mbHide = {}; _mbOwner = ' + JSON.stringify(o.owner || {}) + ';' +
+    '_mbOrder = {}; _mbWhoOrder = ' + JSON.stringify(o.whoOrder || {}) + ';' +
+    '_mbMeta = { at:1, ok:true };', ctx);
+  const EM = vm.runInContext('ErpMatch', ctx);
+  const byName = {}, staff = {};
+  Object.keys(BYNAME2).forEach(n => { byName[EM._norm(n)] = BYNAME2[n]; });
+  (o.dir || DIR).forEach(u => {
+    staff[EM._norm(u.name)] = { sid:u.sid, name:u.name, ord:u.sortOrder,
+      role:u.role, title:u.title, status:u.status };
+  });
+  EM.byName = byName; EM.byBiz = {}; EM.staff = staff; EM.ready = true;
+  ctx.ErpMatch = EM;
+  ctx._held = held;
+  return ctx;
+}
+const names = c => c.mbWhoList().map(w => w.name);
+
+test('★ 퇴사자는 담당자 목록에 «없다» — 대표 지시 「있으면 안된다」', () => {
+  const c = loadStaff();
+  const ns = names(c);
+  ['박성수','김동근'].forEach(n => assert.ok(ns.indexOf(n) < 0, n + '(퇴사)이 목록에 있다'));
+  assert.ok(ns.indexOf('박한별') >= 0, '재직자가 빠졌다');
+});
+
+test('★ 퇴사자 담당이던 메일은 «사라지지 않는다» — 「담당 모름」으로 온다', () => {
+  const c = loadStaff();
+  c.state.mbBox = '@?';
+  const subs = c.mbAllRows().map(v => v.s).join(' | ');
+  assert.ok(subs.indexOf('퇴사자 담당') >= 0,
+    '퇴사자 담당이던 메일이 어느 칸에도 없다 — 화면에서 통째로 사라졌다');
+  assert.ok(c.mbWhoNoneCount().ret > 0, '퇴사자 담당이던 통수를 세지 않는다');
+});
+
+test('★ 옆줄이 «왜 담당 모름이 늘었는지» 말해 준다 — 안 적으면 아무도 모른다', () => {
+  const c = loadStaff({ state:{ mbDash:'who' } });
+  const h = c.mailSideHtml();
+  assert.ok(h.indexOf('퇴사자') > 0, '퇴사자 담당이던 것이 여기 왔다고 안 알린다');
+});
+
+test('★ 휴직자는 «남는다» — 퇴사가 아니고 돌아온다', () => {
+  const c = loadStaff();
+  assert.equal(c.mbRetired('김석우'), false, '휴직을 퇴사로 봤다');
+  assert.ok(names(c).indexOf('김석우') >= 0, '휴직자가 목록에서 빠졌다');
+});
+
+test('★ 차례는 «사번 순»이다 — 통수 순이면 날마다 자리가 바뀌어 눈이 못 익힌다', () => {
+  const c = loadStaff();
+  const list = c.mbWhoList();
+  for(let i = 1; i < list.length; i++)
+    assert.ok(list[i-1].ord <= list[i].ord,
+      '사번 순이 아니다: ' + list[i-1].name + '(' + list[i-1].ord + ') → '
+      + list[i].name + '(' + list[i].ord + ')');
+  /* P-003 박한별이 A-001 최기운보다 앞이어야 한다 — 사번이 그렇다 */
+  const ns2 = names(c);
+  assert.ok(ns2.indexOf('박한별') < ns2.indexOf('최기운'), '사번이 앞인 사람이 뒤에 있다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   노무사 / 직원 갈래는 «없앴다» (대표 지시 2026-08-29)
+   ══════════════════════════════════════════════════════════════════════════
+   "노무사 직원구분 없애고 항상 로그인하는 본인이 제일 위에 있고 나머지는 사번순서로"
+
+   담당자 쪽에만 머리줄이 셋(내 메일·노무사·직원) 있어서, 담당자 ↔ 업무별을 번갈아
+   누를 때마다 옆줄이 통째로 다시 짜였다.
+   ⚠ 되살리려면 «업무별 쪽에도 같은 머리줄»을 넣어야 한다 — 한쪽에만 넣으면
+     오늘 고친 흔들림이 그대로 돌아온다. */
+test('★ 갈래 머리줄이 «없다» — 한 덩어리로 늘어놓는다', () => {
+  const c = loadStaff({ state:{ mbDash:'who' } });
+  const h = c.mailSideHtml();
+  assert.ok(h.indexOf('dm-whogrp') < 0,
+    '갈래 머리줄이 되살아났다 — 업무별 쪽에도 같은 머리줄이 있어야 한다');
+  /* 사람은 그대로 다 나온다 — 머리줄만 걷은 것이지 사람을 뺀 것이 아니다 */
+  ['박한별', '최기운', '김보람'].forEach(nm =>
+    assert.ok(h.indexOf('>' + nm) > 0, nm + ' 이 옆줄에서 사라졌다'));
+});
+
+test('★ 갈래 표(kind)를 더 이상 만들지 않는다 — 안 쓰는 갈래가 남으면 다시 가르고 싶어진다', () => {
+  const c = loadStaff();
+  const w = c.mbWhoList()[0];
+  assert.equal(w.kind, undefined,
+    '갈래 표가 남아 있다 — 옆줄이 안 쓰는데 셈만 한다');
+  assert.equal(typeof c.mbWhoKind, 'undefined', 'mbWhoKind 가 되살아났다');
+});
+
+test('명부에 없는 이름은 «지우지 않는다» — 모른다고 지우면 그 메일이 사라진다', () => {
+  const c = loadStaff({ owner: { 'z@z,kr':'모르는사람' } });
+  assert.equal(c.mbRetired('모르는사람'), false, '모르는 사람을 퇴사로 봤다');
+  assert.ok(names(c).indexOf('모르는사람') >= 0, '명부에 없다고 빼 버렸다');
+});
+
+test('명부에 없는 사람은 «뒤로» 온다 — 앞에 끼우면 사번 순이 깨져 보인다', () => {
+  const c = loadStaff({ owner: { 'z@z,kr':'모르는사람' } });
+  const list = c.mbWhoList();
+  assert.equal(list[list.length-1].name, '모르는사람', '명부에 없는 사람이 앞에 왔다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   자문종료 칸 · 퇴사자 이어받기 (대표 지시 2026-08-26)
+   ══════════════════════════════════════════════════════════════════════════
+   "자문종료의 경우 종료업체로 별도로 관리할 수 있나 자문종료 메일로 모두 이동되게"
+   "퇴사자의 이메일은 승계받은 담당자가 자동으로 본인 메일함으로 정렬되게 해달라"
+
+   ★ 세어 보고 알게 된 것 (2026-08-26 실시간DB)
+     · 퇴사자가 담당인 25곳 가운데 «24곳이 이미 종료»였다 — 승계가 아니라 종료 칸으로 간다
+     · 정말 이어받아야 하는 곳은 1곳(충원종합관리㈜ · 담당 임혜미)
+     · 기업 371곳 = active 205 · closed 100 · suboffice 66
+       ⚠ suboffice 는 «지사»다 — 끝난 것이 아니다 */
+const ENDF = {
+  B_JAMUN: { path:'1.자문사답변', name:'1.자문사답변', kind:'custom', order:7, total:5, unseen:0 }
+};
+const ENDM = (u,e,s) => ({ u:u, f:'보낸이', e:e, t:'370-6@daum.net', s:s, d:1756000000+u, r:1, g:0, a:0, z:1 });
+const ENDMSGS = { B_JAMUN: {
+  '1': ENDM(1,'a@live.kr',   '살아 있는 자문사'),
+  '2': ENDM(2,'b@ended.kr',  '끝난 자문사'),
+  '3': ENDM(3,'c@retire.kr', '퇴사자가 담당'),
+  '4': ENDM(4,'d@sub.kr',    '지사 — 끝난 것이 아니다'),
+  '5': ENDM(5,'e@nobody.kr', '아무 데도 없는 곳')
+}};
+const ENDITEMS = {
+  a: { id:'a', email:'a@live.kr',   company:'살아있는회사' },
+  b: { id:'b', email:'b@ended.kr',  company:'끝난회사' },
+  c: { id:'c', email:'c@retire.kr', company:'퇴사자회사' },
+  d: { id:'d', email:'d@sub.kr',    company:'지사회사' }
+};
+/* ⚠ 실제 ErpMatch 처럼 left(끝났다)를 함께 만든다 — 빠뜨리면 종료 칸이 늘 0이 된다 */
+const ENDCOS = [
+  { name:'살아있는회사', main:'박한별', status:'active'    },
+  { name:'끝난회사',     main:'박한별', status:'closed'    },
+  { name:'퇴사자회사',   main:'박성수', status:'active'    },
+  { name:'지사회사',     main:'김혜민', status:'suboffice' }
+];
+const ENDDIR = [
+  { sid:'P-002', name:'박성수', sortOrder:20, role:'member', title:'노무사', status:'retired' },
+  { sid:'P-003', name:'박한별', sortOrder:30, role:'member', title:'노무사', status:'active'  },
+  { sid:'P-004', name:'김혜민', sortOrder:40, role:'member', title:'노무사', status:'active'  }
+];
+
+function loadEnd(over){
+  const o = over || {};
+  const held = { wrote:{}, toasts:[], fetched:0 };
+  const state = Object.assign({
+    view:'mail', mailSent:'box', mbBox:'', items: ENDITEMS, pick:{}, mbDash:'who',
+    mbQ:'', mbFilter:'', mbCursor:-1, mbOpen:null, whoTab:'succ'
+  }, o.state || {});
+  const dbRef = (p) => ({
+    once: () => Promise.resolve({ val: () => null }),
+    set: (v) => { held.wrote[p] = v; return Promise.resolve(); },
+    remove: () => { held.wrote[p] = null; return Promise.resolve(); },
+    child(k){ return dbRef(p + '/' + k); },
+    update: (v) => { held.wrote[p] = Object.assign(held.wrote[p]||{}, v); return Promise.resolve(); }
+  });
+  const dummy = { set innerHTML(v){ dummy._h = v; }, get innerHTML(){ return dummy._h||''; },
+    style:{}, offsetHeight:120, value:'', focus(){}, select(){}, contains:()=>false, scrollTop:0 };
+  const ctx = {
+    console, Object, Array, String, Number, Math, JSON, RegExp, Set, Date, Promise,
+    setTimeout: (fn)=>{ if(fn) fn(); }, atob:()=>'',
+    state,
+    esc: s => String(s == null ? '' : s).replace(/[&<>"']/g,
+      c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+    Store: { mode:'firebase' }, DB_ROOT:'pucards',
+    matMailCfg: () => ({ from:'370-6@daum.net' }),
+    matList: () => [], matCat: () => '', MAT_CATS_NOW: () => [], _matMeta: {},
+    schedList: () => [], staffName: b => String(b||''),
+    fmtDate: () => '2026.08.26', fmtMB: n => n + 'B',
+    allItems: () => ENDITEMS, allGroups: () => ({}),
+    isPrivGroup: () => false, canSeeGroup: () => true,
+    coList: () => [], coTagList: () => [], coFTabList: () => [],
+    coFTabCounts: () => ({all:0,byTab:{}}), _coFolders:{}, _coTagHidden:{},
+    toast: m => held.toasts.push(String(m)), confirm: () => true, prompt: () => null,
+    closeFolderMenu(){}, toggleSidebar(){}, openSettingsPage(){}, openMatPage(){},
+    openMailPage(){}, openSentBox(){}, openSchedBox(){}, openInbox(){}, closeMailPage(){},
+    openPrivateVault(){}, migrateLockedFolders(){},
+    inboxBoxHtml: () => '', schedBoxHtml: () => '', sentBoxHtml: () => '', mailWriteHtml: () => '',
+    wireMailWrite(){},
+    pickOf: k => (state.pick[k] = state.pick[k] || {}),
+    pickOn: (sel,id) => !!(sel && sel[id]),
+    pickList: (sel,ids) => (ids||[]).filter(i => !!(sel && sel[i])),
+    pickAllOn: (sel,ids) => !!(ids&&ids.length) && ids.every(i => !!(sel&&sel[i])),
+    pickClear: k => { state.pick[k] = {}; },
+    pickHit(){}, pickToggleAll(){}, pickRedraw(){},
+    renderPCSide(){}, renderMailPage(){}, render(){},
+    document: { getElementById: () => null, addEventListener(){}, removeEventListener(){} },
+    $: () => dummy,
+    window: { innerWidth:1600, innerHeight:900 },
+    fetch: () => { held.fetched++; return Promise.resolve({ json:()=>Promise.resolve({ok:true}) }); },
+    firebase: { auth: () => ({ currentUser:null }), database: () => ({ ref: p => dbRef(p) }) }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(cut('const ErpMatch = {', '\nfunction autoFolderFlush('), ctx);
+  vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
+  vm.runInContext(
+    '_mbFolders = ' + JSON.stringify(ENDF) + ';' +
+    '_mbMsgs = ' + JSON.stringify(ENDMSGS) + ';' +
+    '_mbBins = {}; _mbPut = {}; _mbHide = {}; _mbOwner = {}; _mbOrder = {};' +
+    '_mbSucc = ' + JSON.stringify(o.succ || {}) + ';' +
+    '_mbMeta = { at:1, ok:true };', ctx);
+  const EM = vm.runInContext('ErpMatch', ctx);
+  const byName = {}, staff = {};
+  ENDCOS.forEach(c => {
+    const st = String(c.status||'');
+    byName[EM._norm(c.name)] = { company:c.name, main:c.main, subs:[], type:'자문',
+      status:st, left:(st==='inactive'||st==='terminated'||st==='closed'),
+      ceo:'', contacts:[], bizNo:'' };
+  });
+  (o.dir || ENDDIR).forEach(u => {
+    staff[EM._norm(u.name)] = { sid:u.sid, name:u.name, ord:u.sortOrder,
+      role:u.role, title:u.title, status:u.status };
+  });
+  EM.byName = byName; EM.byBiz = {}; EM.staff = staff; EM.ready = true;
+  EM.companies = ENDCOS.map(c => ({ name:c.name, managerMain:c.main, status:c.status }));
+  ctx.ErpMatch = EM;
+  ctx._held = held;
+  ctx.__succ = () => vm.runInContext('JSON.stringify(_mbSucc)', ctx);
+  return ctx;
+}
+const endSubs = (c, id) => { c.state.mbBox = id; return c.mbAllRows().map(v=>v.s).sort().join(' | '); };
+
+/* ══════ 자문종료 ══════ */
+
+test('★ 자문이 끝난 업체의 메일은 「자문종료」 칸으로 간다', () => {
+  const c = loadEnd();
+  assert.ok(endSubs(c, '@!').indexOf('끝난 자문사') >= 0, '종료 칸에 안 들어왔다');
+});
+
+test('★ 종료 메일은 담당자 칸에서 «빠진다» — 한 통이 두 곳에 있으면 몇 통인지 모른다', () => {
+  const c = loadEnd();
+  const s = endSubs(c, '@박한별');
+  assert.ok(s.indexOf('살아 있는 자문사') >= 0, '살아 있는 자문사 메일이 사라졌다');
+  assert.ok(s.indexOf('끝난 자문사') < 0, '끝난 업체 메일이 담당자 칸에 남아 있다');
+});
+
+test('★ 종료 메일은 「담당 모름」에도 안 들어간다', () => {
+  const c = loadEnd();
+  assert.ok(endSubs(c, '@?').indexOf('끝난 자문사') < 0, '담당 모름에 겹쳐 들어왔다');
+});
+
+test('★ 「지사」는 끝난 것이 아니다 — 넣으면 지사가 통째로 종료로 간다', () => {
+  const c = loadEnd();
+  assert.ok(endSubs(c, '@!').indexOf('지사') < 0, '지사가 종료 칸으로 갔다');
+  assert.ok(endSubs(c, '@김혜민').indexOf('지사') >= 0, '지사 메일이 담당자 칸에서 사라졌다');
+});
+
+test('종료 칸에도 이름이 있다 — 이름 없는 칸은 어디인지 알 수 없다', () => {
+  const c = loadEnd();
+  assert.match(c.mbBoxName('@!'), /자문종료/);
+});
+
+test('★ 옆줄에 「자문종료」 줄이 있다 — 메일이 0통이어도 갈 길은 있어야 한다', () => {
+  const c = loadEnd({ state:{ mbDash:'who' } });
+  const h = c.mailSideHtml();
+  assert.ok(h.indexOf('자문종료') > 0, '종료 칸으로 갈 길이 없다');
+});
+
+test('★ 종료업체 목록에 «이메일이 없는 곳»이 위로 온다 — 채워야 할 곳이 먼저 보여야 한다', () => {
+  const c = loadEnd();
+  const rows = c.mbEndedCos();
+  assert.ok(rows.length, '종료업체 목록이 비었다');
+  for(let i = 1; i < rows.length; i++)
+    assert.ok(rows[i-1].addrs.length <= rows[i].addrs.length, '이메일 없는 곳이 아래로 갔다');
+  assert.ok(rows.every(r => r.name !== '지사회사'), '지사가 종료업체 목록에 있다');
+});
+
+/* ══════ 퇴사자 이어받기 ══════ */
+
+test('★ 이어받은 사람이 있으면 그 사람 칸으로 «저절로» 간다', () => {
+  const c = loadEnd({ succ: { 'P-002':'P-003' } });   /* 박성수 → 박한별 */
+  assert.ok(endSubs(c, '@박한별').indexOf('퇴사자가 담당') >= 0, '이어받은 사람 칸에 안 왔다');
+  assert.ok(endSubs(c, '@?').indexOf('퇴사자가 담당') < 0, '담당 모름에 그대로 남았다');
+});
+
+test('★ 안 이었으면 「담당 모름」에 남는다 — 사라지지 않는다', () => {
+  const c = loadEnd();
+  assert.ok(endSubs(c, '@?').indexOf('퇴사자가 담당') >= 0, '메일이 어느 칸에도 없다');
+});
+
+test('★ 이어받은 사람도 퇴사했으면 «또 이어받은 사람»을 찾는다 — 두 번까지', () => {
+  const dir = ENDDIR.concat([{ sid:'T-009', name:'중간사람', sortOrder:200,
+    role:'member', title:'노무사', status:'retired' }]);
+  const c = loadEnd({ dir: dir, succ: { 'P-002':'T-009', 'T-009':'P-003' } });
+  assert.equal(c.mbSuccOf('박성수'), '박한별', '두 다리 건너서 못 찾았다');
+});
+
+test('★ 서로 가리키면 «멈춘다» — 한없이 따라가면 화면이 얼어붙는다', () => {
+  const dir = ENDDIR.concat([{ sid:'T-009', name:'중간사람', sortOrder:200,
+    role:'member', title:'노무사', status:'retired' }]);
+  const c = loadEnd({ dir: dir, succ: { 'P-002':'T-009', 'T-009':'P-002' } });
+  assert.equal(c.mbSuccOf('박성수'), '', '서로 가리키는데 사람을 내놓았다');
+});
+
+test('★ 이어받아도 다음메일 서버를 부르지 않는다 — 우리 쪽 표일 뿐이다', () => {
+  const c = loadEnd();
+  c.mbSuccSet('P-002', 'P-003');
+  assert.equal(c._held.fetched, 0, '다음메일 서버를 불렀다');
+  Object.keys(c._held.wrote).forEach(p => assert.ok(p.indexOf('mailbox') < 0,
+    '다음메일 자리에 적으려 했다: ' + p));
+  assert.match(c.__succ(), /P-003/, '이어받기가 안 적혔다');
+});
+
+test('★ 열쇠는 «사번»이다 — 이름은 같을 수 있고 바뀔 수도 있다', () => {
+  const c = loadEnd();
+  c.mbSuccSet('P-002', 'P-003');
+  const st = JSON.parse(c.__succ());
+  assert.equal(st['P-002'], 'P-003', '사번이 아니라 다른 것으로 적었다');
+});
+
+test('자기 자신에게는 못 넘긴다 — 넘기면 영영 못 찾는다', () => {
+  const c = loadEnd();
+  c.mbSuccSet('P-002', 'P-002');
+  assert.equal(c.__succ(), '{}', '자기 자신에게 넘겼다');
+});
+
+test('이어받기를 지우면 다시 「담당 모름」으로 간다 — 되돌릴 길이 있어야 한다', () => {
+  const c = loadEnd({ succ: { 'P-002':'P-003' } });
+  c.mbSuccSet('P-002', '');
+  assert.equal(c.__succ(), '{}', '안 지워졌다');
+  assert.ok(endSubs(c, '@?').indexOf('퇴사자가 담당') >= 0, '제자리로 안 돌아왔다');
+});
+
+test('★ 이어받기 목록에서 «끝난 업체»는 뺀다 — 그건 승계가 아니라 종료다', () => {
+  const c = loadEnd();
+  const pend = c.mbSuccPending();
+  const park = pend.find(p => p.name === '박성수');
+  assert.ok(park, '이어받을 퇴사자가 안 나온다');
+  assert.ok(park.cos.indexOf('끝난회사') < 0, '끝난 업체가 이어받기 목록에 있다');
+});
+
+test('★ 잇기 화면에 갈래 넷이 다 있다 — 주소·자문사·이어받기·종료업체', () => {
+  const c = loadEnd({ state:{ mailSent:'who' } });
+  ['addr','co','succ','end'].forEach(t => {
+    c.state.whoTab = t;
+    const h = c.whoPageHtml();
+    assert.ok(h.length > 300, t + ' 갈래가 안 그려진다');
+  });
+  c.state.whoTab = 'succ';
+  assert.ok(c.whoPageHtml().indexOf('mbSuccSet(') > 0, '이어받을 사람을 고를 길이 없다');
+  /* ★★ 「고를 «길»이 있나」가 아니라 「고를 «사람»이 있나」를 본다.
+     2026-08-29 에 노무사/직원 갈래를 없애면서 이 칸이 아직 x.kind 로 거르고 있어
+     두 갈래가 «둘 다 비었고», 화면에는 상자만 남고 고를 사람이 한 명도 없었다.
+     옛 검사는 mbSuccSet( 만 찾아서 그대로 통과했다 — 빈 상자를 못 본 것이다. */
+  const sel = (c.whoPageHtml().match(/<select onchange="mbSuccSet[\s\S]*?<\/select>/) || [''])[0];
+  const opts = (sel.match(/<option value="[^"]+"/g) || []);
+  assert.ok(opts.length > 0,
+    '★ 이어받을 «사람»이 하나도 없습니다 — 상자만 있고 고를 것이 없습니다');
+  c.state.whoTab = 'end';
+  assert.ok(c.whoPageHtml().indexOf('자문종료') > 0, '종료업체 갈래가 종료를 말하지 않는다');
+});
+
+/* ══════ 옆줄이 «일관되게» 생겼나 (대표 지시 2026-08-26) ══════ */
+
+test('★ 대시보드를 옮겨도 머리줄 색이 «안 바뀐다» — 바뀌면 다른 화면처럼 보인다', () => {
+  const a = loadEnd({ state:{ mbDash:'who' } }).mailSideHtml();
+  const b = loadEnd({ state:{ mbDash:'topic' } }).mailSideHtml();
+  const head = h => (h.match(/<div class="dm-fsec[^"]*"/) || [''])[0];
+  assert.equal(head(a), head(b), '대시보드에 따라 머리줄 클래스가 바뀐다');
+});
+
+test('★ 두 칩이 «같은 모양»이다 — 한쪽만 다른 색이면 옮길 때마다 옆줄이 흔들린다', () => {
+  const h = loadEnd({ state:{ mbDash:'who' } }).mailSideHtml();
+  const seg = (h.match(/<div class="dm-seg">[\s\S]*?<\/div>/) || [''])[0];
+  const cls = (seg.match(/<button class="([^"]*)"/g) || []).map(x => x.replace(/on/g,'').trim());
+  assert.ok(cls.length === 2, '칩이 둘이 아니다');
+  assert.equal(cls[0].replace(/["\s]/g,''), cls[1].replace(/["\s]/g,'').replace(/class=button/,''),
+    '두 칩의 꾸밈이 다르다');
+  assert.ok(src.indexOf('.dm-seg button.on.g{') < 0, '칩 색이 아직 둘이다');
+});
+
+test('★ 칩이 두 줄로 깨지지 않는다 — 「담당/자」로 잘려 보였다', () => {
+  assert.match(src, /\.dm-seg button\{[^}]*white-space:nowrap/, '칩이 줄바꿈된다');
+  assert.match(src, /\.dm-seg button\{[^}]*flex:1 1 0/, '칩 폭이 글자 수에 따라 달라진다');
+});
+
+test('★ 메일 옆줄을 조금 넓혔다 — 240px 에서는 칸 이름이 잘렸다', () => {
+  assert.match(src, /#pcRoot\.mailmode #pcSide\{[^}]*width:274px/, '옆줄이 안 넓어졌다');
+});
+
+test('★ 담당자 줄과 업무 줄의 «아이콘 폭»이 같다 — 다르면 칩을 옮길 때 이름이 밀린다', () => {
+  /* ⚠ 선택자 «모양»을 못 박지 않는다. 2026-08-29 에 둘을 한 줄로 묶으면서
+       (.dm-f .ic,.dm-f .dot{width:17px}) 규칙은 그대로인데 이 검사만 깨졌다.
+     지킬 것은 「두 아이콘 상자의 폭이 같다」이지, 어느 선택자가 그것을 적었는가가 아니다. */
+  /* ⚠ 옆줄의 «줄»(.dm-f) 안으로만 본다. 그냥 「.ic 가 든 규칙」을 다 세면 폰 서랍
+       (.dmm-f .ic 20px)·기업정보함 폴더(.pcfold .ic 11px)까지 잡혀 엉뚱한 답이 나온다
+       — 실제로 그렇게 잡혀 「11px vs 17px」이라고 틀리게 말했다. */
+  /* ⚠ 주석을 «먼저 걷는다». 규칙 위의 설명 주석이 선택자 자리에 묻어 들어와,
+       걸러 내려다 규칙 자체를 놓쳤다(내가 실제로 그렇게 틀렸다). */
+  const cssOnly = src.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const widthOf = (name) => {
+    const re = new RegExp('([^{}]*\\.dm-f[^{}]*\\' + name + '[^{}]*)\\{([^}]*)\\}', 'g');
+    let m, found = null;
+    while ((m = re.exec(cssOnly))) {
+      const w = /width:\s*(\d+)px/.exec(m[2]);
+      if (w) found = Number(w[1]);            /* 뒤에 나온 것이 이긴다(CSS 결) */
+    }
+    return found;
+  };
+  /* ⚠ 2026-08-30 부터 아이콘 칸 이름이 «하나»(.ic)다 — 두 이름이 남아 있으면
+     언젠가 한쪽만 바뀐다. 그래서 폭도 한 곳에서만 정한다. */
+  const ic = widthOf('.ic'), dot = ic;
+  assert.ok(ic, '담당자 줄 아이콘 폭을 정한 곳이 없습니다');
+  assert.ok(dot, '업무 줄 아이콘 폭을 정한 곳이 없습니다');
+  assert.equal(ic, dot,
+    '두 아이콘 상자 폭이 다릅니다(담당자 ' + ic + 'px · 업무 ' + dot + 'px) — 이름이 밀립니다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   로그인한 «나»부터 보인다 (대표 지시 2026-08-27)
+   ══════════════════════════════════════════════════════════════════════════
+   "각자 담당자가 로그인 하는경우 본인 이름이 가장 위에 와서 본인위주로 검토할 수 있게"
+   "로그인 할 경우 본인 이름과 본인메일을 맨 먼저 볼 수 있는 시스템"
+
+   ★ 지키는 것 넷
+     1. 내 줄이 «맨 첫 줄»이다 (2026-08-29 갈래 머리줄을 없앤 뒤로는 말 그대로 첫 줄)
+     2. 내 줄은 «한 번만» 나온다 — 두 줄이면 통수를 두 번 센 줄 안다
+     3. 남의 차례는 «안 흔들린다» — 사번 순 그대로
+     4. 내 칸이 비어 있으면 그리로 «안 보낸다» — 빈 칸을 먼저 보이면 「메일함이 비었다」가 된다 */
+function loadMe(myName, over){
+  const c = load(over || {});
+  /* myEmail·staffName 은 덩어리 밖에 있다 — 안에서 만들어 준다.
+     ⚠ 실제 앱과 «같은 규칙»이어야 한다: 사번의 붙임표를 떼고 @pureun.kr (ErpMatch.nameByEmail) */
+  vm.runInContext('myEmail = "me@pureun.kr";', c);
+  vm.runInContext('function staffName(e){ return (e === "me@pureun.kr") ? '
+    + JSON.stringify(myName || '') + ' : String(e||""); }', c);
+  return c;
+}
+
+test('★ 내 줄이 «맨 첫 줄»이다 — 머리줄이 없어졌으니 첫 줄이 곧 나여야 한다', () => {
+  const c = loadMe('박한별', { state:{ mbDash:'who' } });
+  const rows = c.mailSideHtml().match(/<div class="dm-f sub whobin[\s\S]*?<\/div>/g) || [];
+  assert.ok(rows.length > 1, '담당자 줄이 하나뿐이라 차례를 볼 수 없다 — 밑그림이 틀렸다');
+  assert.match(rows[0], /meTag/, '첫 줄이 내 줄이 아니다: ' + rows[0].slice(0, 120));
+  rows.slice(1).forEach(r => assert.ok(r.indexOf('meTag') < 0, '내 줄이 아래에도 또 있다'));
+});
+
+test('★ 내 줄은 «한 번만» 나온다 — 두 줄이면 통수를 두 번 센 줄 안다', () => {
+  const c = loadMe('박한별', { state:{ mbDash:'who' } });
+  const h = c.mailSideHtml();
+  const n = (h.match(/openMailBox\('@박한별'\)/g) || []).length;
+  assert.equal(n, 1, '내 칸으로 가는 줄이 ' + n + '개다');
+});
+
+test('★ 내 줄에 «나» 표가 붙는다 — 위에만 두면 그냥 첫 줄로 읽힌다', () => {
+  const c = loadMe('박한별', { state:{ mbDash:'who' } });
+  const h = c.mailSideHtml();
+  assert.ok(h.indexOf('meTag') > 0, '「나」 표가 없다');
+  assert.ok(h.indexOf('meRow') > 0, '내 줄이 눈에 띄게 칠해지지 않았다');
+});
+
+test('★ 남의 차례는 «안 흔들린다» — 사번 순 그대로', () => {
+  const c = loadMe('박한별', { state:{ mbDash:'who' } });
+  const rest = c.mbWhoList().filter(w => !w.me);
+  for(let i = 1; i < rest.length; i++)
+    assert.ok(rest[i-1].ord <= rest[i].ord,
+      '사번 순이 깨졌다: ' + rest[i-1].name + '(' + rest[i-1].ord + ') → '
+      + rest[i].name + '(' + rest[i].ord + ')');
+  assert.ok(c.mbWhoList()[0].me, '내가 맨 위가 아니다');
+});
+
+test('★ 처음 열면 «내 칸»이 열린다', () => {
+  const c = loadMe('박한별');
+  c.state.mbBox = '';
+  assert.equal(c.mbNow(), '@박한별', '열린 칸: ' + c.mbNow());
+});
+
+test('★ 처음 열면 «담당자» 대시보드가 먼저다', () => {
+  const c = loadMe('박한별', { state:{ mbDash:'' } });
+  const h = c.mailSideHtml();
+  /* 담당자 칩이 켜져 있어야 한다 */
+  assert.match(h, /<button class="on"[^>]*onclick="mbSetDash\('who'\)"/,
+    '담당자 칩이 안 켜져 있다');
+});
+
+test('★ 내가 담당인 메일이 «한 통도 없으면» 내 칸으로 안 보낸다', () => {
+  /* 이 harness 에서 최기운은 담당 메일이 없다 */
+  const c = loadMe('최기운');
+  c.state.mbBox = '';
+  assert.notEqual(c.mbNow(), '@최기운', '빈 칸으로 보냈다');
+  assert.equal(c.mbMyBox(), '', '빈 칸을 내 칸으로 내놓았다');
+});
+
+test('로그인한 사람을 못 찾으면 예전 그대로다 — 아무것도 안 깨진다', () => {
+  const c = loadMe('');
+  c.state.mbBox = '';
+  assert.equal(c.mbMyName(), '', '찾은 이름: ' + c.mbMyName());
+  assert.equal(c.mbMyBox(), '');
+  assert.ok(c.mbNow(), '열 칸이 없다');
+});
+
+test('★ 이름 대신 «주소»가 오면 안 쓴다 — 옆줄에 p003@… 가 뜨면 안 된다', () => {
+  const c = loadMe('p003@pureun.kr');
+  assert.equal(c.mbMyName(), '', '주소를 이름으로 썼다: ' + c.mbMyName());
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   기업정보함이 «늦게» 와도 담당자가 잡혀야 한다 (2026-08-27 검토에서 나옴)
+   ══════════════════════════════════════════════════════════════════════════
+   ⚠ 담당자 표(mbWhoIndex)는 기업정보함을 훑어 한 번 만들어 두고 쓴다. 그런데 기업정보함은
+     watchCardMap 으로 «흘러 들어온다» — 메일 화면이 먼저 그려지면 그때는 0장이다.
+     예전에는 그 «빈 표»가 그대로 굳어, 새로고침을 하기 전까지 담당자가 전부
+     「담당 모름」으로 보였다.
+   ★ 이런 고장은 화면만 봐서는 무엇이 틀렸는지 알 길이 없다 — 아무 데도 빨간 것이 없고,
+     그냥 «답이 틀릴» 뿐이다. 그래서 검사로 못 박는다. */
+
+test('★ 기업정보함이 늦게 들어와도 담당자가 잡힌다 — 빈 표가 굳으면 전부 「담당 모름」이 된다', () => {
+  /* ① 메일 화면이 먼저 그려졌다 — 그때 기업정보함은 아직 0장이다 */
+  const c = load({ state: { items: {} } });
+  const before = c.mbWhoList().map(w => w.name);
+  assert.equal(before.length, 0, '기업정보함이 비었는데 담당자가 잡혔습니다 — 검사 밑그림이 틀렸습니다');
+
+  /* ② 이제 기업정보함이 흘러 들어온다(watchCardMap 이 state.items 를 채운다) */
+  c.state.items = ITEMS;
+
+  /* ③ 다시 물으면 «그때 들어온 것»으로 답해야 한다 */
+  const after = c.mbWhoList().map(w => w.name);
+  assert.ok(after.length > 0,
+    '기업정보함이 들어왔는데도 담당자가 안 잡힙니다 — 빈 표가 굳었습니다(새로고침해야 보입니다)');
+});
+
+test('기업정보함이 처음부터 있던 것과 «같은 답»이 나온다 — 늦게 왔다고 답이 달라지면 안 된다', () => {
+  const late = load({ state: { items: {} } });
+  late.mbWhoList();                      /* 빈 채로 한 번 물어 본다(여기서 굳던 자리다) */
+  late.state.items = ITEMS;
+
+  const early = load();                  /* 처음부터 다 있던 경우 */
+  assert.equal(late.mbWhoList().map(w => w.name).sort().join(','),
+               early.mbWhoList().map(w => w.name).sort().join(','),
+               '늦게 온 쪽과 처음부터 있던 쪽의 답이 다릅니다');
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   푸른이알피에 적힌 주소도 담당자에게 잇는다 (대표 지시 2026-08-28)
+   ══════════════════════════════════════════════════════════════════════════
+   "메일함에 담당자로 되어 있을경우 푸른이알피에서 담당자 메일이나 기업정보함에있는
+    담당자 메일 주소등이 자동으로 법인내 담당자에게 자동으로 연결되게 해달라."
+
+   ★ 세어 보고 넣었다(실측 2026-08-28) — 업체 371곳 가운데 메일이 적힌 곳 116곳,
+     이을 수 있는 주소 123개, 그 가운데 **100개가 무료메일**이다. 바로 그것들이
+     지금 「담당 모름」으로 떨어지던 주소다(회사 도메인이 없어 도메인으로는 못 잇고,
+     명함에도 없다). 메일 353통 → 749통이 잡힌다.
+   ⚠ 주소가 «세 군데»에 흩어져 있다(email · primaryContactEmail · contacts[].email
+     — 실측 10·101·137건). 하나만 보면 대부분을 놓친다. */
+
+/* 푸른이알피 업체 자료를 끼워 넣는다.
+   ⚠ 담당자·종료 판정은 앱과 «같은 길»(ErpMatch.byName)로 받는다 — 여기서 따로
+     셈하면 검사만 통과하고 화면은 다르게 움직인다. */
+function loadErp(over){
+  const o = over || {};
+  const c = loadStaff(o);
+  (o.recs || []).forEach(r => { c.ErpMatch.byName[c.ErpMatch._norm(r.company)] = r; });
+  c.ErpMatch.companies = o.companies || [];
+  c.mbWhoBust();
+  return c;
+}
+const whoOfAddr = (c, em) => c.mbWhoOfRow({ e: em });
+
+test('★ 업체 메일 · 담당자 메일 · 담당자 카드 — «세 군데» 모두 본다', () => {
+  /* ⚠ 처음에는 세 주소를 모두 @hanbit.co.kr 로 두었는데, 그 도메인은 기업정보함
+       명함에도 있어서 «도메인으로» 잡혔다 — 세 군데 가운데 둘을 꺼도 검사가 통과했다.
+       그래서 주소마다 «겹치지 않는 도메인»을 준다. 이 길로만 잡힐 수 있게. */
+  const c = loadErp({ companies: [{
+    name: '한빛물산',                       /* 담당 박한별 (BYNAME2) */
+    email: 'office@only-co.kr',
+    primaryContactEmail: 'contact@only-pc.kr',
+    contacts: [{ name: '김과장', email: 'kimpersonal@naver.com' }]   /* 무료메일 */
+  }] });
+  [['업체 메일', 'office@only-co.kr'],
+   ['담당자 메일', 'contact@only-pc.kr'],
+   ['담당자 카드', 'kimpersonal@naver.com']].forEach(([where, a]) => {
+    assert.equal(whoOfAddr(c, a), '박한별', where + '(' + a + ')를 안 보고 있습니다');
+  });
+});
+
+test('★ 무료메일 주소가 이어진다 — 지금 「담당 모름」으로 떨어지던 바로 그것들이다', () => {
+  const c = loadErp({ companies: [{
+    name: '한빛물산', contacts: [{ name: '박부장', email: 'parkboss@naver.com' }] }] });
+  assert.equal(whoOfAddr(c, 'parkboss@naver.com'), '박한별', '무료메일 주소가 안 이어집니다');
+  /* ⚠ 그렇다고 naver.com «도메인 전체»를 그 사람에게 주면 안 된다 — 온 세상이 그 사람 것이 된다 */
+  assert.equal(whoOfAddr(c, 'stranger@naver.com'), '',
+    '무료메일 도메인을 통째로 한 사람에게 주고 있습니다');
+});
+
+test('★ 업체 자료가 «늦게» 와도 다시 만든다 — 빈 표가 굳으면 전부 담당 모름이 된다', () => {
+  const c = loadErp({ companies: [] });
+  assert.equal(whoOfAddr(c, 'late@naver.com'), '', '검사 밑그림이 틀렸습니다');
+  /* ErpMatch.load 가 이제 끝났다 */
+  c.ErpMatch.companies = [{ name: '한빛물산',
+    contacts: [{ name: '박부장', email: 'late@naver.com' }] }];
+  assert.equal(whoOfAddr(c, 'late@naver.com'), '박한별',
+    '업체 자료가 들어왔는데도 표가 옛것 그대로입니다(새로고침해야 보입니다)');
+});
+
+test('★ 자문이 «끝난» 업체 주소는 담당자 칸이 아니라 종료 칸으로 (대표 결정 2026-08-28)', () => {
+  /* ⚠ 처음에 이 검사를 mbWhoOfRow 로 겨눴다가 틀렸다 — 그 함수는 끝난 업체에도
+       담당자 이름을 그대로 준다(누가 맡던 곳인지는 알아야 하니 맞다).
+       «어느 칸에 들어가는가»를 정하는 것은 mbRowFits 다. 규칙이 사는 자리를 겨눈다. */
+  const c = loadErp({
+    recs: [{ company: '종료업체', main: '박한별', subs: [], left: true }],
+    companies: [{ name: '종료업체',
+      contacts: [{ name: '이과장', email: 'ended@naver.com' }] }]
+  });
+  const row = { e: 'ended@naver.com', _slug: 'B_JAMUN', _key: 'B_JAMUN:9' };
+  assert.ok(c.mbEndedOfRow(row), '끝난 업체로 안 잡힙니다');
+  assert.equal(c.mbRowFits(row, '@박한별'), false,
+    '끝난 업체 메일이 담당자 칸에 들어갑니다 — 한 통이 두 곳에 겹칩니다');
+  assert.equal(c.mbRowFits(row, '@?'), false, '「담당 모름」에도 겹쳐 들어갑니다');
+  assert.equal(c.mbRowFits(row, '@!'), true, '종료 칸에 안 들어갑니다');
+});
+
+test('메일 주소 꼴이 아닌 것은 안 담는다 — 빈칸·쓰레기가 표를 더럽힌다', () => {
+  const c = loadErp({ companies: [{
+    name: '한빛물산', email: '', primaryContactEmail: '없음',
+    contacts: [{ name: '가', email: '   ' }, { name: '나', email: 'ok2@hanbit.co.kr' }] }] });
+  assert.equal(whoOfAddr(c, 'ok2@hanbit.co.kr'), '박한별');
+  assert.equal(whoOfAddr(c, '없음'), '');
+});
+
+test('담당자가 «없는» 업체의 주소는 아무에게도 안 붙는다', () => {
+  const c = loadErp({
+    recs: [{ company: '담당없음', main: '', subs: [], left: false }],
+    companies: [{ name: '담당없음', contacts: [{ name: '가', email: 'nobody@naver.com' }] }]
+  });
+  assert.equal(whoOfAddr(c, 'nobody@naver.com'), '');
+});
+
+/* 명부가 든 대역 + 로그인한 나 — 차례 셋을 한꺼번에 보려면 둘 다 있어야 한다 */
+function loadMeStaff(myName, over){
+  const c = loadStaff(over || {});
+  vm.runInContext('myEmail = "me@pureun.kr";', c);
+  vm.runInContext('function staffName(e){ return (e === "me@pureun.kr") ? '
+    + JSON.stringify(myName || '') + ' : String(e||""); }', c);
+  return c;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   사람 이름 차례를 «손으로» 옮긴다 (대표 지시 2026-08-29)
+   ══════════════════════════════════════════════════════════════════════════
+   "내가 사람이름 위치 변경할 수 있게 해라"
+
+   ★ 차례를 정하는 것이 «셋»이고, 그 앞뒤가 규칙이다.
+       ① 로그인한 나 — 늘 맨 위, 끌어도 안 내려간다
+       ② 손으로 옮긴 자리 — 대표님이 끌어 둔 것이 이긴다
+       ③ 사번 순 — 안 옮긴 사람은 예전 그대로
+     ⚠ ②가 ③보다 «앞»이어야 한다. 뒤집으면 끌어 놓아도 사번 순으로 되돌아가
+       「끌리긴 하는데 안 옮겨진다」가 된다 — 고장처럼 보이지도 않아 더 나쁘다. */
+function whoNames(c){ return c.mbWhoList().map(w => w.name).join(' '); }
+
+test('★ 손으로 옮긴 차례가 «사번 순보다 앞선다»', () => {
+  /* 사번 순이면 박한별(30) → 최기운(80) → 김보람(100).
+     최기운을 맨 앞으로 옮겨 둔다. */
+  const c = loadStaff({ whoOrder: { '최기운':0, '박한별':1, '김보람':2 } });
+  const ns = whoNames(c);
+  assert.ok(ns.indexOf('최기운') < ns.indexOf('박한별'),
+    '★ 옮긴 차례가 무시되고 사번 순으로 돌아갔습니다: ' + ns);
+});
+
+test('★ 안 옮긴 사람은 «사번 순 그대로» — 한 사람 옮겼다고 나머지가 흩어지면 안 된다', () => {
+  const c = loadStaff({ whoOrder: { '김보람':0 } });
+  const rest = c.mbWhoList().filter(w => w.pos >= 9999);
+  for(let i = 1; i < rest.length; i++)
+    assert.ok(rest[i-1].ord <= rest[i].ord,
+      '안 옮긴 사람들의 사번 순이 깨졌습니다: ' + rest.map(w=>w.name+'('+w.ord+')').join(' '));
+  assert.equal(c.mbWhoList()[0].name, '김보람', '맨 앞으로 옮긴 사람이 앞에 없습니다');
+});
+
+test('★★ «나»는 옮긴 차례보다도 위다 — 끌어도 안 내려간다', () => {
+  /* 남을 0번으로 옮겨 두어도 내가 위여야 한다 */
+  const c = loadMeStaff('박한별', { whoOrder: { '최기운':0, '김보람':1 } });
+  const list = c.mbWhoList();
+  assert.equal(list[0].name, '박한별',
+    '★ 내가 맨 위가 아닙니다 — 차례: ' + list.map(w=>w.name).join(' '));
+  assert.ok(list[0].me, '맨 윗줄에 「나」 표가 없습니다');
+});
+
+test('★ 내 줄은 «끌 수 없다» — 자기 줄을 아래로 내려놓고 못 찾는 일을 막는다', () => {
+  const c = loadMeStaff('박한별', { state:{ mbDash:'who' } });
+  const rows = c.mailSideHtml().match(/<div class="dm-f sub whobin[\s\S]*?<\/div>/g) || [];
+  assert.ok(rows.length > 1, '검사 밑그림이 틀렸습니다');
+  assert.ok(rows[0].indexOf('draggable') < 0, '★ 내 줄을 끌 수 있습니다');
+  assert.ok(rows[1].indexOf('draggable="true"') > 0, '남의 줄을 못 끕니다');
+});
+
+test('★ 끌어다 놓으면 그 자리에 들어가고, 그 차례가 «저장»된다', () => {
+  const c = loadStaff();
+  const before = c.mbWhoList().map(w => w.name);
+  const from = before[before.length - 1], to = before[0];
+  assert.notEqual(from, to, '검사 밑그림이 틀렸습니다 — 사람이 하나뿐입니다');
+  c.mbWhoDragStart({ dataTransfer:{ setData(){} } }, from);
+  c.mbWhoDrop({ preventDefault(){} }, to, null);
+  assert.equal(c.mbWhoList()[0].name, from,
+    '끌어다 놓은 사람이 맨 앞에 없습니다: ' + whoNames(c));
+  /* ⚠ 저장까지 봐야 한다 — 화면만 바뀌고 안 적히면 새로고침에 되돌아간다 */
+  const w = c._held.wrote['pucards/config/mailWhoOrder'];
+  assert.ok(w && typeof w === 'object', '★ 차례를 저장하지 않았습니다');
+  assert.equal(Number(w[from]), 0, '저장된 차례가 화면과 다릅니다: ' + JSON.stringify(w));
+});
+
+test('★ «나»는 저장되는 차례에 «안 들어간다» — 자리를 다투면 남이 사라진 것처럼 보인다', () => {
+  const c = loadMeStaff('박한별');
+  const rest = c.mbWhoList().filter(w => !w.me).map(w => w.name);
+  c.mbWhoDragStart({ dataTransfer:{ setData(){} } }, rest[rest.length-1]);
+  c.mbWhoDrop({ preventDefault(){} }, rest[0], null);
+  const w = c._held.wrote['pucards/config/mailWhoOrder'] || {};
+  assert.equal('박한별' in w, false, '★ 「나」가 차례표에 들어갔습니다: ' + JSON.stringify(w));
+  assert.equal(c.mbWhoList()[0].name, '박한별', '옮긴 뒤 내가 맨 위에서 밀렸습니다');
+});
+
+test('메일을 사람 줄에 떨어뜨려도 «아무 일도 없다» — 옮겨진 척하면 안 된다', () => {
+  const c = loadStaff();
+  const before = whoNames(c);
+  c.state.mbDrag = { kind:'mail' };
+  c.mbWhoDrop({ preventDefault(){} }, c.mbWhoList()[0].name, null);
+  assert.equal(whoNames(c), before, '메일을 떨어뜨렸는데 사람 차례가 바뀌었습니다');
+  assert.equal(c._held.wrote['pucards/config/mailWhoOrder'], undefined, '엉뚱한 것을 저장했습니다');
+});
+
+test('★ 차례를 두는 자리가 업무 칸 차례와 «나란히» 있다 — mailbox 에는 못 쓴다', () => {
+  /* mailbox 는 규칙이 아무도 못 쓰게 막혀 있다(적는 것은 서버뿐).
+     ⚠ 사람마다 따로 두지 않는다 — 대표님이 정리해 둔 차례를 직원이 못 보면
+       「내 화면만 이상하다」가 된다. */
+  assert.match(src, /config\/mailWhoOrder/, '담당자 차례를 두는 자리가 없습니다');
+  assert.ok(src.indexOf('mailbox/config/mailWhoOrder') < 0,
+    '★ 아무도 못 쓰는 곳(mailbox)에 차례를 적고 있습니다');
+  assert.ok(!/mailWhoOrder\/'\s*\+\s*(myEmail|uid)/.test(src),
+    '★ 사람마다 따로 두면 남이 정리한 차례를 못 봅니다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   주소를 «자문사»에 잇는다 (대표 승인 목업 2026-08-29 · 「자문사만 이으면 된다」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 왜 사람이 아니라 회사인가
+     주소에 «사람 이름»을 박으면 푸른이알피에서 담당을 바꿔도 메일은 옛사람에게 간다.
+     회사에 이어 두면 담당자가 회사에서 따라온다 — 고칠 곳이 한 곳으로 준다.
+     ⚠ 이 검사의 고갱이가 그것이다: «담당을 바꾸면 메일도 따라가는가».
+
+   ★ 실측 2026-08-29 (메일 5,686통) — 왜 필요했나
+     · 담당자가 있는 자문사 215곳 가운데 주소를 아는 곳이 71곳(33%)뿐이었다
+     · 「담당 모름」 5,320통 가운데 1,932통(187곳)은 상공회의소·노동청·공단이라
+       자문사가 아니다 — 치우지 않으면 정작 할 일이 목록 아래에 묻힌다 */
+function loadCo(over){
+  const o = over || {};
+  const c = loadStaff(o);
+  vm.runInContext('_mbCo = ' + JSON.stringify(o.co || {}) + ';'
+    + '_mbNotCo = ' + JSON.stringify(o.notco || {}) + ';', c);
+  return c;
+}
+/* 이 harness 의 자문사: 한빛물산(박한별) · 마루산업(최기운) · 옛거래처(박성수·퇴사) */
+const ROW = e => ({ e: e, r: 1, _slug: 'B_JAMUN', _key: 'B_JAMUN:9' });
+
+test('★★ 자문사에 이으면 «담당자는 회사에서 따라온다»', () => {
+  const c = loadCo({ co: { 'zzz@nowhere,kr': '한빛물산' } });
+  assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '박한별',
+    '자문사에 이었는데 담당자가 안 따라왔다');
+});
+
+test('★★ 담당자가 바뀌면 «메일도 따라간다» — 이것이 사람 이름을 안 박는 까닭이다', () => {
+  const c = loadCo({ co: { 'zzz@nowhere,kr': '한빛물산' } });
+  assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '박한별');
+  /* 푸른이알피에서 한빛물산 담당을 최기운으로 바꿨다고 두자 */
+  const EM = c.ErpMatch;
+  /* ⚠ 기록을 «손대지» 않고 갈아 끼운다 — BYNAME2 는 검사 파일 공용이라
+     손대면 뒤따르는 검사까지 물든다(실제로 다음 검사가 최기운을 받았다). */
+  EM.byName[EM._norm('한빛물산')] = Object.assign({}, EM.byName[EM._norm('한빛물산')], { main:'최기운' });
+  c.mbWhoBust();
+  assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '최기운',
+    '★ 담당을 바꿨는데 메일은 옛사람에게 그대로 간다 — 회사로 이은 값어치가 없다');
+});
+
+test('★ 도메인으로도 이을 수 있다 — 그 회사에서 오는 것이 모두 간다', () => {
+  const c = loadCo({ co: { '@nowhere,kr': '한빛물산' } });
+  assert.equal(c.mbWhoOfRow(ROW('aaa@nowhere.kr')), '박한별');
+  assert.equal(c.mbWhoOfRow(ROW('bbb@nowhere.kr')), '박한별', '같은 도메인 다른 사람을 못 짚었다');
+});
+
+test('★ «사람으로 박은 것»이 회사보다 세다 — 사람이 못 박은 것을 기계가 덮으면 고칠 길이 없다', () => {
+  const c = loadCo({ co: { 'zzz@nowhere,kr': '한빛물산' },
+                     owner: { 'zzz@nowhere,kr': '김보람' } });
+  assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '김보람',
+    '사람이 박은 것을 회사가 덮었다');
+});
+
+test('★ «끝난» 자문사에 이으면 담당자 칸이 아니라 자문종료로 간다', () => {
+  /* ⚠ 이것을 빼먹으면 「자문종료로 옮겼는데 왜 아직 내 칸에 있나」가 된다 */
+  const c = loadCo({ co: { 'zzz@nowhere,kr': '끝난회사' } });
+  /* ⚠ 옛거래처는 «담당자가 퇴사»한 곳이지 «자문이 끝난» 곳이 아니다 — 둘은 다르다 */
+  c.ErpMatch.byName[c.ErpMatch._norm('끝난회사')] =
+    { company:'끝난회사', main:'박한별', subs:[], left:true };
+  c.mbWhoBust();
+  assert.equal(c.mbEndedOfRow(ROW('zzz@nowhere.kr')), true, '끝난 회사인데 종료로 안 갔다');
+  assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '', '끝난 회사가 담당자 칸을 가져갔다');
+});
+
+test('★ 담당자가 «없는» 자문사에 이어도 막지 않는다 — 담당을 적는 순간 저절로 간다', () => {
+  const c = loadCo({ co: { 'zzz@nowhere,kr': '새롬산업' } });
+  assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '', '없는 담당자를 지어냈다');
+  const EM = c.ErpMatch;
+  EM.byName[EM._norm('새롬산업')] = { company:'새롬산업', main:'김보람', subs:[], left:false };
+  c.mbWhoBust();
+  assert.equal(c.mbWhoOfRow(ROW('zzz@nowhere.kr')), '김보람', '담당을 적었는데 안 갔다');
+});
+
+/* ── 「자문사 아님」 ── */
+
+test('★★ 「자문사 아님」은 «목록에서만» 치운다 — 메일은 그대로 있다', () => {
+  const c = loadCo({ notco: { '@old,kr': 1 } });
+  /* 목록에서는 빠진다 */
+  const shown = c.whoUnknownSenders().map(o=>o.e).join(' ');
+  assert.ok(shown.indexOf('@old.kr') < 0, '치웠는데 잇기 목록에 그대로 있다');
+  /* ★ 그러나 메일은 «어딘가에» 그대로 있어야 한다 —
+     목록에서 지운다고 메일을 감추면 그 메일은 아무 데서도 못 본다.
+     ⚠ 2026-08-30 대표 지시로 그 자리가 「담당 모름」에서 「그 밖」(@#)으로 옮겼다.
+       치운 곳이 담당 모름에 쌓여 있어(실측 1,932통) 정작 이어야 할 자문사가
+       그 속에 묻혔기 때문이다. 지킬 규칙은 그대로 — «못 보게 되면 안 된다». */
+  c.state.mbBox = '@#';
+  assert.ok(c.mbAllRows().length > 0,
+    '★ 치웠더니 메일까지 사라졌다 — 그 메일은 이제 아무 데서도 못 봅니다');
+  /* 그리고 담당 모름에서는 «빠져야» 한다 — 그것이 이번에 고친 것이다 */
+  c.mbMemoClear();
+  c.state.mbBox = '@?';
+  const na = c.mbAllRows().map(v=>String(v.e||'').toLowerCase()).join(' ');
+  assert.ok(na.indexOf('@old.kr') < 0,
+    '치운 곳이 「담당 모름」에 그대로 남아 있습니다 — 이어야 할 자문사가 묻힙니다');
+});
+
+test('★ 치운 것을 «되돌릴 길»이 있다 — 되돌릴 수 없는 단추는 아무도 안 누른다', () => {
+  const c = loadCo({ notco: { '@old,kr': 1 }, state:{ mailSent:'who', whoTab:'notco' } });
+  const h = c.whoPageHtml();
+  assert.match(h, /mbNotCoSet\([^)]*false/, '되돌리는 길이 화면에 없다');
+  assert.ok(c.whoUnknownSenders({ all:true }).some(o=>o.hid),
+    '치운 것을 다시 꺼내 볼 수가 없다');
+});
+
+/* ── 「이 회사 아닌가요?」 ── */
+
+test('★ 이름이 조금 다른 자문사를 «짚어» 준다 — 다만 혼자 잇지 않는다', () => {
+  /* 실제로 겪은 모양(2026-08-29 실측): 명함은 「가나글로벌」, 자문사는
+     「주식회사 가나글로벌당진공장」 — 한쪽이 다른 쪽을 품고 있다.
+     ⚠ 두 글자로는 안 짚는다(아래 검사) — 여기 이름은 세 글자를 넘겨야 한다. */
+  const items = { z: { id:'z', email:'z@han.kr', company:'한빛물산당진공장' } };
+  const c = loadCo({ state:{ items: Object.assign({}, ITEMS2, items) } });
+  const g = c.mbCoGuess('z@han.kr');
+  assert.ok(g, '짚어 주지 않는다');
+  assert.equal(g.name, '한빛물산', '엉뚱한 회사를 짚었다: ' + JSON.stringify(g));
+  /* ★ 짚기만 하고 «잇지는 않는다» — 이름이 겹치는 회사가 있어(서산시 ↔ 서산시시설관리공단)
+       혼자 이으면 틀린다. 사람이 눌러야 이어진다. */
+  assert.equal(c.mbWhoOfRow(ROW('z@han.kr')), '',
+    '★ 기계가 «혼자» 이었습니다 — 사람이 고르기 전에 이으면 안 됩니다');
+});
+
+test('두 글자짜리 이름으로는 안 짚는다 — 엉뚱한 회사가 걸린다', () => {
+  const items = { z: { id:'z', email:'z@ab.kr', company:'한빛' } };
+  const c = loadCo({ state:{ items: Object.assign({}, ITEMS2, items) } });
+  const EM = c.ErpMatch;
+  EM.byName['한'] = { company:'한', main:'박한별', subs:[], left:false };
+  c.mbWhoBust();
+  const g = c.mbCoGuess('z@ab.kr');
+  assert.ok(!g || g.name !== '한', '두 글자 이름으로 짚었다');
+});
+
+/* ── 저장 ── */
+
+test('★ 이으면 «저장»된다 — 화면만 바뀌면 새로고침에 사라진다', () => {
+  const c = loadCo();
+  c.mbCoSet('zzz@nowhere.kr', '한빛물산', false);
+  const w = c._held.wrote['pucards/config/mailCo/zzz@nowhere,kr'];
+  /* ⚠ 담기는 꼴이 바뀌었다(2026-09-03) — 예전에는 자문사 «이름 글자»만 담았는데,
+       이제 업체 «열쇠(id)»를 함께 담는다. 온톨로지 규칙이 「업체명을 관계 열쇠로
+       쓰지 않는다」이기 때문이다.
+     ★ 지키는 규칙은 그대로다: «이으면 저장된다». 이름은 여전히 들어 있어야 한다. */
+  assert.ok(w, '이은 것이 저장되지 않았다: ' + JSON.stringify(c._held.wrote));
+  const nm = (w && typeof w === 'object') ? w.n : w;
+  assert.equal(nm, '한빛물산', '이은 자문사 이름이 안 담겼다: ' + JSON.stringify(w));
+  assert.ok(typeof w === 'object' && 'id' in w,
+    '업체 열쇠(id)를 안 담았다 — 이름이 바뀌면 이은 것이 끊긴다: ' + JSON.stringify(w));
+});
+
+test('★ 개인 메일은 «도메인으로» 못 잇는다 — 네이버 하나로 온 세상이 한 회사가 된다', () => {
+  const c = loadCo();
+  c.mbCoSet('someone@naver.com', '한빛물산', true);
+  assert.equal(c._held.wrote['pucards/config/mailCo/@naver,com'], undefined,
+    '★ 무료 메일 도메인을 통째로 이었습니다');
+  assert.ok(c._held.toasts.join(' ').indexOf('개인') >= 0, '왜 안 되는지 말해 주지 않는다');
+});
+
+test('★ 두 표 모두 «전 직원 공용»이다 — 사람마다 따로 두면 남이 이어 둔 것을 못 본다', () => {
+  assert.match(src, /config\/mailCo/, '자문사 표를 두는 자리가 없다');
+  assert.match(src, /config\/mailNotCo/, '치운 것을 두는 자리가 없다');
+  assert.ok(!/mail(Not)?Co\/'\s*\+\s*(myEmail|uid)/.test(src),
+    '★ 사람마다 따로 두면 대표님이 이어 둔 것을 직원이 못 봅니다');
+  assert.ok(src.indexOf('mailbox/config/mailCo') < 0,
+    '★ 아무도 못 쓰는 곳(mailbox)에 적고 있습니다');
+});
+
+test('★ 자문사 갈래가 «메일함에서 이은 주소»도 센다 — 안 세면 이은 것이 어디 갔는지 모른다', () => {
+  const c = loadCo({ co: { 'zzz@nowhere,kr': '한빛물산' } });
+  const a = c.whoAddrOfName('한빛물산').join(' ');
+  assert.ok(a.indexOf('zzz@nowhere.kr') >= 0,
+    '이었는데 그 회사 주소로 안 잡힌다: ' + a);
+});
+
+test('★★ 잇기 화면이 «가볍다» — 줄마다 자문사를 통째로 넣으면 브라우저가 멈춘다', () => {
+  /* 2026-08-29 대표 보고 「눌렀는데 안이어 진다」의 까닭이 이것이었다.
+     줄 200개 × 자문사 212곳 = <option> 42,400개, 화면 하나가 «2MB» 였다.
+     논리는 맞는데 브라우저가 그리다 멈춰 아무 일도 안 일어났다.
+     ★ 자문사 목록은 datalist 로 «한 벌만» 둔다. */
+  const c = loadCo({ state:{ mailSent:'who', whoTab:'addr' } });
+  const h = c.whoPageHtml();
+  const rows = (h.match(/class="dm-row"/g) || []).length;
+  const opts = (h.match(/<option /g) || []).length;
+  assert.ok(rows > 0, "검사 밑그림이 틀렸다 — 이을 줄이 없다");
+  /* 줄 수와 «상관없이» 목록은 한 벌이다 — 줄마다 넣으면 줄 수에 곱해진다 */
+  const cos = c.mbCoNames().length;
+  assert.ok(opts <= cos + 5,
+    "★ 자문사 목록이 줄마다 들어갔습니다 — option " + opts + "개(자문사 " + cos
+    + "곳 × 줄 " + rows + "개). 브라우저가 그리다 멈춥니다");
+});
+
+test('★ 자문사 «목록에 없는» 이름은 안 잇는다 — 오타가 조용히 저장되면 안 된다', () => {
+  const c = loadCo();
+  c.mbCoSet('zzz@nowhere.kr', '있지도않은회사이름', false);
+  assert.equal(c._held.wrote['pucards/config/mailCo/zzz@nowhere,kr'], undefined,
+    '★ 목록에 없는 이름이 저장되었습니다');
+  assert.ok(c._held.toasts.join(' ').indexOf('목록에 없습니다') >= 0,
+    '왜 안 되는지 말해 주지 않는다');
+});
+
+test('★ 자문사 칸이 «짜부라지지» 않는다 — 이 줄은 flex 라 칸이 눌린다', () => {
+  const c = loadCo({ state:{ mailSent:'who', whoTab:'addr' } });
+  const h = c.whoPageHtml();
+  const i = h.indexOf('<input list="mbCoDL"');
+  assert.ok(i > 0, '자문사 고르는 칸이 없다');
+  const box = h.slice(i, i + 420);
+  assert.match(box, /flex:none/, '★ flex:none 이 없어 칸이 짜부라집니다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   공동작업 — 같이 보이고, 누가 먼저 봤는지 남는다 (대표 지시 2026-08-29)
+   ══════════════════════════════════════════════════════════════════════════
+   "공동 작업의 경우 … 같이보이는것으로 하고 싶은데"
+   "누군가가 먼저 확인했다는것을 기록 남기고 싶은데"
+   "주담당 부담당만 본 기록 남게 하면 된다. 나머지는 기록은 권형하만 확인이 된다."
+
+   ★ 지키는 것 다섯
+     1. 부담당 칸에도 «같이» 보인다 — 다만 주담당이 없으면 부담당만으로는 안 넣는다
+     2. 옆줄 «숫자»와 칸에 «담기는 통수»가 같다 — 어긋나면 「4통이라는데 열면 1통」
+     3. 「열어봄」은 먼저 본 사람을 «안 덮는다» — 덮으면 「누가 먼저」를 잃는다
+     4. 공동이면 공용 자리, 아니면 «대표 전용 자리» — 어디에 적을지는 한 곳에서만 정한다
+     5. 볼 자격이 없으면 «아무것도 안 그린다» — 「기록이 있다」는 것조차 힌트가 된다 */
+function loadSeen(over){
+  const o = over || {};
+  const c = loadStaff(o);
+  vm.runInContext('_mbCo = ' + JSON.stringify(o.co || {}) + ';'
+    + '_mbNotCo = ' + JSON.stringify(o.notco || {}) + ';'
+    + '_mbSeen = ' + JSON.stringify(o.seen || {}) + ';'
+    + '_mbSeenSolo = ' + JSON.stringify(o.solo || {}) + ';', c);
+  if(o.me){
+    vm.runInContext('myEmail = "me@pureun.kr";', c);
+    vm.runInContext('function staffName(e){ return (e === "me@pureun.kr") ? '
+      + JSON.stringify(o.me) + ' : String(e||""); }', c);
+  }
+  /* 부담당을 붙인다 — 푸른이알피 업체관리의 managerSubs 가 ErpMatch 에서 이 모양이 된다 */
+  if(o.subs){
+    const EM = c.ErpMatch;
+    Object.keys(o.subs).forEach(co=>{
+      const k = EM._norm(co);
+      EM.byName[k] = Object.assign({}, EM.byName[k], { subs: o.subs[co] });
+    });
+    c.mbWhoBust();
+  }
+  return c;
+}
+const SROW = e => ({ e: e, r: 1, _slug: 'B_JAMUN', _key: 'B_JAMUN:9' });
+
+/* ── ① 같이 보인다 ── */
+
+test('★★ 공동작업이면 «부담당 칸에도» 같이 보인다', () => {
+  const c = loadSeen({ co: { 'zzz@nowhere,kr': '한빛물산' },
+                       subs: { '한빛물산': ['최기운'] } });
+  assert.equal(c.mbWhoOfRow(SROW('zzz@nowhere.kr')), '박한별', '주담당이 안 잡힌다');
+  assert.equal(c.mbSubsOfRow(SROW('zzz@nowhere.kr')).join(' '), '최기운', '부담당이 안 잡힌다');
+  assert.equal(c.mbRowFits(SROW('zzz@nowhere.kr'), '@최기운'), true,
+    '★ 부담당 칸에 안 보입니다');
+  assert.equal(c.mbRowFits(SROW('zzz@nowhere.kr'), '@박한별'), true, '주담당 칸에서 사라졌다');
+});
+
+test('★ 맡지 «않은» 사람 칸에는 안 보인다 — 공동이라고 온 세상에 보이면 안 된다', () => {
+  const c = loadSeen({ co: { 'zzz@nowhere,kr': '한빛물산' },
+                       subs: { '한빛물산': ['최기운'] } });
+  assert.equal(c.mbRowFits(SROW('zzz@nowhere.kr'), '@김보람'), false,
+    '★ 아무 상관 없는 사람 칸에 보입니다');
+});
+
+test('★ 주담당이 «없으면» 부담당만으로는 안 넣는다 — 덜 채워진 자료지 맡은 것이 아니다', () => {
+  const c = loadSeen({ co: { 'zzz@nowhere,kr': '새롬산업' },
+                       subs: { '새롬산업': ['최기운'] } });
+  assert.equal(c.mbWhoOfRow(SROW('zzz@nowhere.kr')), '', '검사 밑그림이 틀렸다 — 주담당이 있다');
+  assert.equal(c.mbRowFits(SROW('zzz@nowhere.kr'), '@최기운'), false,
+    '★ 주담당 없이 부담당 칸에만 들어갔습니다');
+});
+
+test('★ 퇴사한 부담당은 «뺀다»', () => {
+  const c = loadSeen({ co: { 'zzz@nowhere,kr': '한빛물산' },
+                       subs: { '한빛물산': ['박성수'] } });   /* 박성수 = 퇴사 */
+  assert.equal(c.mbSubsOfRow(SROW('zzz@nowhere.kr')).length, 0, '퇴사자가 부담당으로 남았다');
+});
+
+test('★★ 옆줄 «숫자»와 칸에 «담기는 통수»가 같다 — 어긋나면 「4통이라는데 열면 1통」', () => {
+  const c = loadSeen({ subs: { '한빛물산': ['최기운'] } });
+  const row = c.mbWhoList().find(w => w.name === '최기운');
+  assert.ok(row, '최기운이 목록에 없다');
+  c.state.mbBox = '@최기운';
+  assert.equal(c.mbAllRows().length, row.n,
+    '★ 옆줄은 ' + row.n + '통이라는데 칸에는 ' + c.mbAllRows().length + '통입니다');
+});
+
+/* ── ② 누가 봤나 ── */
+
+test('★ 열면 「누가 열어봤나」가 남는다', () => {
+  const c = loadSeen({ me: '박한별', subs: { '한빛물산': ['최기운'] } });
+  const v = SROW('a@hanbit.co.kr');
+  c.mbSeenMark(v, 'open');
+  const seen = c.mbSeenOf(v);
+  assert.equal(seen.length, 1, '기록이 안 남았다');
+  assert.equal(seen[0].n, '박한별');
+  assert.equal(seen[0].k, 'open');
+});
+
+test('★★ 「열어봄」은 «먼저 본 사람을 안 덮는다» — 덮으면 「누가 먼저」를 잃는다', () => {
+  /* ⚠ 「두 번 적고 시각을 견준다」로는 못 잡는다 — 같은 밀리초면 시각이 같아서
+       덮어써도 통과한다(실제로 그렇게 통과했다). 그래서 «옛 시각»을 미리 심어 둔다. */
+  const c = loadSeen({ me: '박한별', subs: { '한빛물산': ['최기운'] },
+    seen: { 'b_jamun:9': { 'P-003': { k:'open', at: 100, n:'박한별' } } } });
+  const v = SROW('a@hanbit.co.kr');
+  c.mbSeenMark(v, 'open');
+  assert.equal(c.mbSeenOf(v)[0].at, 100,
+    '★ 나중에 연 것이 먼저 본 때를 덮었습니다 (' + c.mbSeenOf(v)[0].at + ')');
+});
+
+test('★ 「내가 봤다」(처리함)는 «열어봄»을 덮는다 — 그쪽이 더 센 말이다', () => {
+  const c = loadSeen({ me: '박한별', subs: { '한빛물산': ['최기운'] } });
+  const v = SROW('a@hanbit.co.kr');
+  c.mbSeenMark(v, 'open');
+  c.mbSeenMark(v, 'done');
+  assert.equal(c.mbSeenOf(v)[0].k, 'done', '처리함이 안 남았다');
+});
+
+test('★ 먼저 본 사람이 «앞»에 온다 — 늦게 본 사람이 앞에 서면 뜻이 뒤집힌다', () => {
+  const c = loadSeen({ me: '박한별',
+    subs: { '한빛물산': ['최기운'] },
+    seen: { 'b_jamun:9': { 'A-001': { k:'open', at: 100, n:'최기운' } } } });
+  const v = SROW('a@hanbit.co.kr');
+  c.mbSeenMark(v, 'open');
+  const seen = c.mbSeenOf(v);
+  assert.equal(seen[0].n, '최기운', '먼저 본 사람이 앞이 아니다: ' + seen.map(x=>x.n).join(' '));
+});
+
+/* ── ③ 어디에 적히나 · 누가 보나 ── */
+
+test('★★ 공동이면 «공용 자리», 아니면 «대표 전용 자리»', () => {
+  const c = loadSeen({ me: '박한별', subs: { '한빛물산': ['최기운'] } });
+  const shared = SROW('a@hanbit.co.kr');       /* 한빛물산 — 부담당 있음 */
+  const solo   = SROW('b@daehan.kr');          /* 마루산업 — 부담당 없음 */
+  assert.equal(c.mbSeenShared(shared), true, '공동인데 공동이 아니라고 한다');
+  assert.equal(c.mbSeenShared(solo), false, '단독인데 공동이라고 한다');
+  assert.match(c.mbSeenPath(shared), /pucards/, '공동 기록이 공용 자리가 아니다');
+  assert.doesNotMatch(c.mbSeenPath(solo), /^pucards/,
+    '★ 단독 기록이 «전 직원이 읽는» pucards 밑에 적힙니다 — 대표님만 보셔야 합니다');
+});
+
+test('★★ 볼 자격 — 대표님 · 그 메일을 맡은 사람만', () => {
+  const shared = SROW('a@hanbit.co.kr');
+  const boss = loadSeen({ me: '권형하', subs: { '한빛물산': ['최기운'] }, state:{ isAdmin:true } });
+  assert.equal(boss.mbSeenCanSee(shared), true, '대표님이 못 보신다');
+  const main = loadSeen({ me: '박한별', subs: { '한빛물산': ['최기운'] } });
+  assert.equal(main.mbSeenCanSee(shared), true, '주담당이 못 본다');
+  const sub = loadSeen({ me: '최기운', subs: { '한빛물산': ['최기운'] } });
+  assert.equal(sub.mbSeenCanSee(shared), true, '부담당이 못 본다');
+  const other = loadSeen({ me: '김보람', subs: { '한빛물산': ['최기운'] } });
+  assert.equal(other.mbSeenCanSee(shared), false,
+    '★ 맡지 않은 사람이 「누가 봤나」를 봅니다');
+});
+
+test('★ 볼 자격이 없으면 «아무것도 안 그린다» — 「기록이 있다」는 것조차 힌트다', () => {
+  const c = loadSeen({ me: '김보람', subs: { '한빛물산': ['최기운'] },
+    seen: { 'b_jamun:9': { 'P-003': { k:'done', at: 100, n:'박한별' } } } });
+  assert.equal(c.mbSeenTag(SROW('a@hanbit.co.kr')), '',
+    '★ 맡지 않은 사람 목록에 「누가 봤나」가 보입니다');
+});
+
+test('★ 자리를 고르는 판단이 «한 곳»에만 있다 — 두 곳이면 언젠가 어긋난다', () => {
+  /* 어디에 적을지를 여러 곳에서 따지면, 한 곳만 고쳤을 때 단독 기록이 공용 자리로 샌다.
+     규칙이 못 막는 자리이므로(쓰기는 규칙이 못 가린다) 코드가 지켜야 한다. */
+  /* ⚠ 주석을 걷고 센다 — 설명에 적은 이름이 «쓰인 곳»으로 세이면 안 된다 */
+  const body = src.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const n = (body.match(/MB_SEEN_SOLO/g) || []).length;
+  assert.ok(n <= 4, '단독 자리 이름이 ' + n + '곳에서 쓰입니다 — 한 곳으로 모아 주세요');
+  assert.match(body, /function mbSeenPath/, '자리를 정하는 함수가 없습니다');
+});
+
+test('★ 규칙을 콘솔에 붙여넣으라는 안내가 저장소에 있다', () => {
+  /* 이 규칙이 없으면 단독 기록이 아예 안 적힌다 — 왜 안 적히는지 적어 둘 자리가 필요하다 */
+  const doc = path.join(__dirname, '..', 'docs', '메일-확인기록-콘솔붙여넣기.md');
+  assert.ok(fs.existsSync(doc), '★ 콘솔에 붙여넣을 안내 문서가 없습니다');
+  const t = fs.readFileSync(doc, 'utf8');
+  assert.match(t, /pu_mailseen/, '붙여넣을 규칙 원문이 없습니다');
+  assert.match(t, /isAdmin/, '대표님만 읽는다는 조건이 없습니다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   「담당자 보내기」 — 다음메일의 「이동」 자리 (대표 승인 목업 2026-08-29)
+   ══════════════════════════════════════════════════════════════════════════
+   "푸른메일함에도 캡쳐2 기능 만들어달라. 담당자 보내기로"
+
+   ★ 지키는 것 다섯
+     1. 메일이 «안 움직인다» — 업무 칸 통수가 그대로여야 한다(담당자 칸은 거르개다)
+     2. 낱개로 박은 것이 «주소 규칙보다 세다» — 안 그러면 그 단추가 아무 뜻이 없다
+     3. 체크를 안 켜면 «고른 것만» — 다른 메일까지 따라가면 안 된다
+     4. 「지난 것도」는 지금 보는 칸이 아니라 «온 메일함»을 뒤진다
+     5. 되돌리면 «주소 규칙도» 지운다 — 안 지우면 도로 그 사람에게 간다 */
+function loadMv(over){
+  const o = over || {};
+  const c = loadCo(o);
+  /* ⚠ 이 대역에는 업무 칸이 «하나»뿐이라 「지난 메일도 함께」를 잴 수가 없다 —
+       같은 주소에서 온 메일이 한 통밖에 없기 때문이다.
+       그래서 «다른 업무 칸»에 같은 보낸이의 지난 메일을 한 통 더 심는다. */
+  vm.runInContext('_mbWhoMsg = ' + JSON.stringify(o.msg || {}) + ';'
+    + '_mbFolders.B_PAY = { path:"2.급여", name:"2.급여", kind:"custom", order:7, total:1, unseen:0 };'
+    + '_mbMsgs.B_PAY = { "20": { u:20, f:"보낸이", e:"a@hanbit.co.kr", t:"370-6@daum.net",'
+    + ' s:"지난 급여 자료", d:1755000000, r:1, g:0, a:0, z:1 } };', c);
+  c.state.mbOwnKeep = !!o.keep;
+  c.state.mbOwnPast = !!o.past;
+  return c;
+}
+/* 고른 «척» 한다.
+   ⚠ 줄 번호(rows[0])로 고르면 안 된다 — 목록은 «최신순»이라 엉뚱한 보낸이가 잡힌다.
+     실제로 그렇게 잡아서 검사 둘이 헛돌았다. 보낸이 «주소»로 찾는다. */
+function pick(c, email){
+  /* ⚠ '~B_JAMUN' 로 고르면 안 된다 — 이 대역은 _mbBins 가 비어 있어 그 칸이 늘 0통이다.
+     '*all' 은 칸을 안 따지므로 어느 대역에서나 줄이 보인다. */
+  c.state.mbBox = '*all';
+  const rows = c.mbAllRows();
+  const v = rows.find(x => String(x.e||'').toLowerCase() === String(email).toLowerCase());
+  assert.ok(v, '검사 밑그림이 틀렸다 — ' + email + ' 에서 온 메일이 없다: '
+    + rows.map(r=>r.e).join(' '));
+  c.state.pick.mbox = {}; c.state.pick.mbox[v._key] = 1;
+  return v;
+}
+
+test('★★ 낱개로 박은 것이 «주소 규칙보다 세다»', () => {
+  const c = loadMv({ owner: { 'a@hanbit,co,kr': '김보람' },
+                     msg: { 'b_jamun:1': '최기운' } });
+  const v = { e:'a@hanbit.co.kr', _key:'B_JAMUN:1', _slug:'B_JAMUN' };
+  assert.equal(c.mbWhoOfRow(v), '최기운',
+    '★ 주소 규칙이 낱개로 박은 것을 덮었습니다 — 그러면 「담당자 보내기」가 아무 뜻이 없습니다');
+});
+
+test('★ 낱개로 박으면 그 사람 칸에 «담긴다»', () => {
+  const c = loadMv({ msg: { 'b_jamun:1': '김보람' } });
+  const v = { e:'a@hanbit.co.kr', r:1, _key:'B_JAMUN:1', _slug:'B_JAMUN' };
+  assert.equal(c.mbRowFits(v, '@김보람'), true, '박은 사람 칸에 안 담긴다');
+  assert.equal(c.mbRowFits(v, '@박한별'), false, '옛 담당자 칸에도 남아 있다');
+});
+
+test('★★ 메일이 «안 움직인다» — 업무 칸 통수가 그대로다', () => {
+  const before = (() => { const c = loadMv(); c.state.mbBox = '~B_JAMUN';
+    return c.mbAllRows().length; })();
+  const c = loadMv({ msg: { 'b_jamun:1': '김보람' } });
+  c.state.mbBox = '~B_JAMUN';
+  assert.equal(c.mbAllRows().length, before,
+    '★ 담당자를 보냈더니 업무 칸에서 메일이 사라졌습니다 — 담당자 칸은 «거르개»입니다');
+});
+
+test('★ 체크를 안 켜면 «고른 것만» 간다 — 같은 주소의 다른 메일은 그대로', () => {
+  const c = loadMv();
+  pick(c, 'a@hanbit.co.kr');
+  c.mbOwnerPut('김보람');
+  const w = c._held.wrote['pucards'] || {};
+  const keys = Object.keys(w).filter(k=>/mailWhoMsg/.test(k));
+  assert.equal(keys.length, 1, '고른 것 말고도 박았습니다: ' + keys.join(' '));
+  assert.ok(!Object.keys(w).some(k=>/mailWho\//.test(k)),
+    '★ 체크를 안 켰는데 «주소 규칙»을 남겼습니다');
+});
+
+test('★★ 「앞으로 오는 것도」를 켜면 «주소 규칙»을 남긴다', () => {
+  const c = loadMv({ keep: true });
+  pick(c, 'a@hanbit.co.kr');
+  c.mbOwnerPut('김보람');
+  const w = c._held.wrote['pucards'] || {};
+  assert.ok(Object.keys(w).some(k=>/^config\/mailWho\//.test(k)),
+    '★ 주소 규칙이 안 남았습니다: ' + Object.keys(w).join(' '));
+});
+
+test('★★ 「지난 메일도」는 «온 메일함»을 뒤진다 — 지금 보는 칸만 보면 반쪽이다', () => {
+  /* a@hanbit.co.kr 은 B_JAMUN 과 B_PAY 두 칸에 있다 */
+  const c = loadMv({ past: true });
+  pick(c, 'a@hanbit.co.kr');
+  c.mbOwnerPut('김보람');
+  const w = c._held.wrote['pucards'] || {};
+  const keys = Object.keys(w).filter(k=>/mailWhoMsg/.test(k));
+  assert.ok(keys.length >= 2,
+    '★ 다른 칸에 있는 지난 메일을 안 박았습니다 (' + keys.length + '개): ' + keys.join(' '));
+  assert.ok(keys.some(k=>/b_pay/.test(k)), '다른 업무 칸의 지난 메일이 빠졌습니다');
+});
+
+test('★ 되돌리면 «주소 규칙도» 지운다 — 안 지우면 도로 그 사람에게 간다', () => {
+  const c = loadMv({ owner: { 'a@hanbit,co,kr': '김보람' }, msg: { 'b_jamun:1': '김보람' } });
+  pick(c, 'a@hanbit.co.kr');
+  c.mbOwnerPut('');
+  const w = c._held.wrote['pucards'] || {};
+  assert.equal(w['config/mailWho/a@hanbit,co,kr'], null,
+    '★ 주소 규칙이 남아 있어 되돌려도 도로 갑니다: ' + JSON.stringify(w));
+});
+
+test('★ 창에 «메일이 안 움직인다»는 말이 있다 — 없으면 옮겨진 줄 안다', () => {
+  const c = loadMv();
+  pick(c, 'a@hanbit.co.kr');
+  let html = '';
+  c.$ = () => ({ set innerHTML(v){ html = v; }, get innerHTML(){ return html; },
+    style:{}, getBoundingClientRect:()=>({}), classList:{ add(){}, remove(){} } });
+  vm.runInContext('$ = ' + 'globalThis.$', c);
+  /* 창을 그리는 것만 본다 — 자리 잡기(mbPlaceMenu)는 화면이 있어야 한다 */
+  try{ c.mbOwnerMove({ }); }catch(_){ }
+  assert.match(html, /움직이지 않습니다/, '★ 「메일이 안 움직인다」는 말이 창에 없습니다');
+  assert.match(html, /자문사로 잇기/, '더 나은 길(자문사로 잇기)을 안 알려 줍니다');
+  assert.match(html, /지난 메일도 함께/, '다음메일의 둘째 체크가 없습니다');
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   메일함 «전용» 환경설정 (대표 보고 2026-08-29)
+   ══════════════════════════════════════════════════════════════════════════
+   "환경설정 클릭시 왜 기업정보함으로 이동하나 메일함의 환경설정은 별도로 구축해야된다"
+   "다음메일에 있는 환경설정이다 필요한 부분이 있는지 모두 검토하고 반영해 달라"
+
+   ★ 지키는 것 다섯
+     1. 메일 창의 ⚙ 는 «메일» 설정으로 간다 (cards-mail-own-window 가 옆줄 쪽을 지킨다)
+     2. 단축키 목록이 «거짓말하지 않는다» — 적어 둔 키는 mbKeyNav 가 정말 해야 한다
+     3. 다음메일이 주인인 설정은 «그리로 보낸다» — 「여기서 못 한다」로 끝내면 헤맨다
+     4. IMAP 을 끄면 메일함이 멈춘다는 것을 «반드시» 적는다
+     5. 본문 미리보기는 «새로 받아 오지 않는다» — 이미 온 값(row.p)을 쓴다 */
+function loadSet(over){
+  const c = loadCo(over || {});
+  c.state.mailSent = 'set';
+  return c;
+}
+
+test('★★ 단축키 목록이 «거짓말하지 않는다» — 적은 키는 정말 되어야 한다', () => {
+  /* 안 되는 키를 적어 두면 그 자리에서 거짓말이 된다. 목록과 손잡이(mbKeyNav)를 맞대 본다.
+     ⚠ 주석을 걷고 본다 — 「Delete 는 일부러 안 넣었다」 같은 설명이 «되는 것»으로 세인다. */
+  const nav = src.slice(src.indexOf('function mbKeyNav'),
+                        src.indexOf('function mbShowDetail'))
+                 .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const c = loadSet();
+  /* ⚠ 덩어리 안의 const 는 밖에서 못 본다(vm 의 결) — 안에서 꺼내 온다 */
+  const keys = vm.runInContext('MB_KEYS', c).map(x => x[0]);
+  assert.ok(keys.length >= 5, '단축키 목록이 너무 짧다');
+  const HAS = {
+    '↑ ↓':       /ArrowDown/.test(nav) && /ArrowUp/.test(nav),
+    'Enter':     /'Enter'/.test(nav),
+    'Space':     /' '|Spacebar/.test(nav),
+    'U':         /'u'|'U'/.test(nav),
+    'S':         /'s'|'S'/.test(nav),
+    'C':         /'c'|'C'/.test(nav),
+    'Esc':       /'Escape'/.test(nav),
+    'Shift + A': /shiftKey/.test(nav) && /'A'|'a'/.test(nav),
+    'Shift + /': /'\?'/.test(nav)
+  };
+  keys.forEach(k => {
+    assert.ok(k in HAS, '★ 「' + k + '」 는 이 검사가 모르는 키입니다 — 정말 되는지 확인해 주세요');
+    assert.ok(HAS[k], '★ 「' + k + '」 를 적어 놓고 mbKeyNav 는 그 일을 안 합니다');
+  });
+});
+
+test('★ 삭제(Delete)는 «일부러» 안 넣었다 — 키 하나로 다음메일 휴지통까지 가면 안 된다', () => {
+  const c = loadSet();
+  assert.ok(!vm.runInContext('MB_KEYS', c).some(x => /Delete/i.test(x[0])),
+    '★ Delete 를 넣었습니다 — 우리 삭제는 다음메일 휴지통까지 건드립니다(단추에는 물음이 있습니다)');
+});
+
+test('★★ 다음메일이 «주인»인 설정은 그리로 보낸다 — 여섯 자리 다', () => {
+  const c = loadSet();
+  const h = c.mailSetHtml();
+  ['setting/Folder', 'setting/Filter', 'setting/Spam',
+   'setting/Imap', 'setting/Account', 'setting/Absence'].forEach(u => {
+    assert.ok(h.indexOf(u) > 0, '★ 다음메일 「' + u + '」 로 가는 길이 없습니다');
+  });
+});
+
+test('★★ IMAP 을 끄면 «메일함이 멈춘다»는 말이 있다 — 이것을 안 적으면 언젠가 끈다', () => {
+  const c = loadSet();
+  const h = c.mailSetHtml();
+  const i = h.indexOf('setting/Imap');
+  assert.ok(i > 0, 'IMAP 줄이 없다');
+  const near = h.slice(Math.max(0, i - 400), i + 600);
+  assert.match(near, /멈춥니다|멈춘다/,
+    '★ IMAP 을 끄면 우리 메일함이 통째로 멈춘다는 경고가 없습니다');
+});
+
+test('★ 안 만든 것은 «까닭»과 함께 적는다 — 안 적으면 빠뜨린 것으로 보인다', () => {
+  const c = loadSet();
+  const h = c.mailSetHtml();
+  assert.match(h, /안 만들었습니다/, '안 만든 것을 적지 않았다');
+  /* 스팸은 «안 가져온다»는 결정이 있었다 — 그 말이 이 화면에 있어야 한다 */
+  assert.match(h, /스팸함을 <b>아예 안 가져옵니다<\/b>|스팸함을 아예 안 가져옵니다/,
+    '스팸을 왜 안 가져오는지 안 적혀 있다');
+});
+
+test('★ 흩어져 있던 것을 한자리에 모았다 — 몇 통씩·숨긴 칸·자문사 잇기', () => {
+  const c = loadSet();
+  const h = c.mailSetHtml();
+  assert.ok(h.indexOf('mbSetPageSize(') > 0, '몇 통씩이 없다');
+  assert.ok(h.indexOf('mbToggleHidden()') > 0, '숨긴 칸 되돌리기가 없다');
+  assert.ok(h.indexOf('openWhoPage()') > 0, '자문사 이메일 잇기가 없다');
+  assert.ok(h.indexOf('openMailBox(') > 0, '메일함으로 돌아갈 길이 없다 — 갇힌다');
+});
+
+test('★ 보내는 주소 바꾸기는 대표님만 — 직원 화면에는 단추가 없다', () => {
+  const boss = loadSet({ state:{ isAdmin:true } });
+  assert.ok(boss.mailSetHtml().indexOf('editMailFrom()') > 0, '대표님이 못 바꾸신다');
+  const staff = loadSet({ state:{ isAdmin:false } });
+  assert.ok(staff.mailSetHtml().indexOf('editMailFrom()') < 0,
+    '★ 직원 화면에 보내는 주소 바꾸기가 있습니다');
+});
+
+test('★★ 본문 미리보기는 «새로 받아 오지 않는다» — 이미 온 값을 쓴다', () => {
+  /* 서버가 목록과 함께 미리보기(row.p)를 적어 둔다. 실측 2026-08-29: 7,361통 중 6,328통(86%).
+     ⚠ 여기서 본문을 새로 부르면(readMailMessage) 목록 한 번에 100번을 부른다. */
+  /* ⚠ 글자 수로 창을 자르면 안 된다 — 줄이 늘면 조용히 반만 본다.
+       미리보기를 그리는 «그 줄»을 찾아 언저리만 본다. */
+  const i = src.indexOf('class="pre"');
+  assert.ok(i > 0, '목록에 미리보기 줄이 없다');
+  const body = src.slice(Math.max(0, i - 700), i + 400);
+  assert.match(body, /v\.p/, '미리보기가 이미 온 값(row.p)을 안 씁니다');
+  assert.ok(body.indexOf('readMailMessage') < 0,
+    '★ 목록에서 본문을 새로 부릅니다 — 한 화면에 100번을 부르게 됩니다');
+});
+
+test('★ 미리보기 켜기는 «이 기계에만» 담는다 — 한 사람이 켠 것이 열 사람 화면을 바꾸면 안 된다', () => {
+  const body = src.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const i = body.indexOf('function mbPreviewSet');
+  assert.ok(i > 0, '미리보기 켜기가 없다');
+  const fn = body.slice(i, i + 400);
+  assert.match(fn, /localStorage/, '이 기계에 안 담는다');
+  assert.ok(fn.indexOf('firebase') < 0 && fn.indexOf('DB_ROOT') < 0,
+    '★ 미리보기 취향을 전 직원 공용으로 저장합니다');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   사무관리(컨설팅·사건·기금)의 부담당도 «같이» 본다 (대표 지시 2026-08-29)
+   ══════════════════════════════════════════════════════════════════════════
+   "푸른이알피에서 사무관리 업무를 주담당 부담당으로 같이 업무처리하는경우
+    이부분도 같이 본인들이 볼수 있게 가능한가?"
+
+   ★ 지키는 것 다섯
+     1. 진행 중인 건의 부담당은 그 회사 메일을 «같이» 본다
+     2. «끝난» 건의 부담당은 안 본다 — 저절로 빠져야 사람이 잊어도 안전하다
+     3. 담당자가 «사번»으로 적혀 있어도 이름으로 푼다 — 안 풀면 옆줄에 P-007 이 뜬다
+     4. 퇴사자는 뺀다 · 주담당과 같은 사람은 두 번 안 센다
+     5. 옆줄 «숫자»와 칸에 «담기는 통수»가 같다 */
+function loadBiz(over){
+  const o = over || {};
+  const c = loadCo(o);
+  /* ⚠ 업체 부담당(o.subs)은 loadCo 가 안 심는다 — loadSeen 에만 있었다.
+       안 심으면 「업체 + 사무관리 둘 다」를 못 잰다(실제로 못 쟀다). */
+  if(o.subs){
+    const EM = c.ErpMatch;
+    Object.keys(o.subs).forEach(co=>{ const k = EM._norm(co);
+      EM.byName[k] = Object.assign({}, EM.byName[k], { subs: o.subs[co] }); });
+    c.mbWhoBust();
+  }
+  /* 사무관리 표를 심는다 — 앱은 loadErpCaseCons 가 채우지만, 여기서는 결과만 넣는다 */
+  vm.runInContext('_mbBizSubs = ' + JSON.stringify(o.biz || {}) + ';', c);
+  return c;
+}
+const BROW = e => ({ e: e, r: 1, _slug: 'B_JAMUN', _key: 'B_JAMUN:9' });
+
+test('★★ 사무관리 건의 부담당이 그 회사 메일을 «같이» 본다', () => {
+  /* a@hanbit.co.kr → 한빛물산(주담당 박한별). 컨설팅 부담당이 최기운이라고 두자. */
+  const c = loadBiz({ biz: { '한빛물산': ['최기운'] } });
+  const v = BROW('a@hanbit.co.kr');
+  assert.equal(c.mbWhoOfRow(v), '박한별', '주담당이 안 잡힌다 — 검사 밑그림이 틀렸다');
+  assert.equal(c.mbSubsOfRow(v).join(' '), '최기운', '사무관리 부담당이 안 잡힌다');
+  assert.equal(c.mbRowFits(v, '@최기운'), true, '★ 부담당 칸에 안 보입니다');
+  assert.equal(c.mbRowFits(v, '@박한별'), true, '주담당 칸에서 사라졌다');
+});
+
+test('★ 업체 부담당과 «함께» 잡힌다 — 한쪽이 다른 쪽을 밀어내면 안 된다', () => {
+  const c = loadBiz({ subs: { '한빛물산': ['김보람'] }, biz: { '한빛물산': ['최기운'] } });
+  const got = c.mbSubsOfRow(BROW('a@hanbit.co.kr')).sort().join(' ');
+  assert.equal(got, '김보람 최기운', '둘 다 안 잡힌다: ' + got);
+});
+
+test('★★ 주담당과 «같은 사람»이면 두 번 안 센다', () => {
+  const c = loadBiz({ biz: { '한빛물산': ['박한별'] } });
+  assert.equal(c.mbSubsOfRow(BROW('a@hanbit.co.kr')).length, 0,
+    '★ 주담당이 부담당으로도 잡혀 그 사람 칸에서 두 번 셉니다');
+});
+
+test('★ 퇴사자는 뺀다', () => {
+  const c = loadBiz({ biz: { '한빛물산': ['박성수'] } });   /* 박성수 = 퇴사 */
+  assert.equal(c.mbSubsOfRow(BROW('a@hanbit.co.kr')).length, 0, '퇴사자가 남았다');
+});
+
+test('★ 자문이 «끝난» 회사면 사무관리 부담당도 안 본다', () => {
+  const c = loadBiz({ co: { 'zzz@nowhere,kr': '끝난회사' }, biz: { '끝난회사': ['최기운'] } });
+  c.ErpMatch.byName[c.ErpMatch._norm('끝난회사')] =
+    { company:'끝난회사', main:'박한별', subs:[], left:true };
+  c.mbWhoBust();
+  assert.equal(c.mbSubsOfRow(BROW('zzz@nowhere.kr')).length, 0,
+    '★ 끝난 회사인데 부담당이 계속 봅니다');
+});
+
+test('★★ 옆줄 «숫자»와 칸에 «담기는 통수»가 같다 — 어긋나면 「4통이라는데 열면 1통」', () => {
+  const c = loadBiz({ biz: { '한빛물산': ['최기운'] } });
+  const row = c.mbWhoList().find(w => w.name === '최기운');
+  assert.ok(row, '최기운이 목록에 없다');
+  c.state.mbBox = '@최기운';
+  assert.equal(c.mbAllRows().length, row.n,
+    '★ 옆줄은 ' + row.n + '통이라는데 칸에는 ' + c.mbAllRows().length + '통입니다');
+});
+
+/* ── 표를 만드는 쪽 ── */
+
+test('★★ «끝난» 사무관리 건은 표에 안 담는다 — 코드로 확인', () => {
+  /* 표를 채우는 곳(mbBizSubsLoad)이 status 를 걸러야 한다.
+     ⚠ 주석을 걷고 본다 — 설명에 적은 「종료」가 코드로 세이면 안 된다. */
+  const body = src.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const i = body.indexOf('function mbBizSubsLoad');
+  assert.ok(i > 0, '표를 채우는 곳이 없다');
+  const fn = body.slice(i, i + 1400);
+  assert.match(fn, /종료|closed/, '★ 끝난 건을 안 거릅니다 — 끝난 컨설팅 부담당이 계속 봅니다');
+  assert.match(fn, /nameBySid/, '★ 사번을 이름으로 안 풉니다 — 옆줄에 P-007 이 뜹니다');
+  assert.match(fn, /mbRetired/, '퇴사자를 안 거릅니다');
+});
+
+test('★ 새로 받아 오는 자료가 «없다» — 앱이 이미 읽는 것을 쓴다', () => {
+  /* 사무관리 기록은 기업 상세 이력을 그리려고 이미 읽고 있다(loadErpCaseCons).
+     여기서 또 받아 오면 앱을 켤 때마다 같은 것을 두 번 받는다. */
+  const body = src.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const i = body.indexOf('function mbBizSubsLoad');
+  const fn = body.slice(i, i + 1400);
+  assert.match(fn, /loadErpCaseCons/, '이미 있는 길을 안 씁니다');
+  assert.ok(fn.indexOf("ref('data/") < 0 && fn.indexOf('once(') < 0,
+    '★ 같은 자료를 다시 받아 옵니다');
+});
+
+test('★ 사번 → 이름 표를 «한 곳»에서만 만든다', () => {
+  /* 두 곳에서 만들면 한쪽만 고쳐지는 날이 온다. */
+  const body = src.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const n = (body.match(/nameBySid\[u\.sid\]/g) || []).length;
+  assert.equal(n, 1, '사번→이름 표를 ' + n + '곳에서 만듭니다');
+  assert.match(body, /ErpMatch\.nameBySid = nameBySid/, '밖에서 쓸 수 있게 안 내놓습니다');
+});
