@@ -1566,7 +1566,17 @@ function keepBox(member) {
         (/history/.test(p) ? ctx.hist : ctx.saved).push({ path: p, value: v });
         return Promise.resolve();
       },
-      once: () => Promise.resolve({ val: () => (/members\//.test(p) ? member : null) })
+      once: () => Promise.resolve({ val: () => (/members\//.test(p) ? member : null) }),
+      /* ⚠ 진짜 ref 에는 transaction 이 «늘» 있다. 없는 대역을 쓰면, 덮어쓰기를
+         트랜잭션으로 바꾸는 날 검사가 «기능이 멀쩡한데» 깨진다 —
+         2026-09-26 saveRecord 를 고치자 여기서 넷이 그렇게 깨졌다.
+         대역은 실물에 «있는 것»을 빠뜨려도 안 된다. */
+      transaction: fn => {
+        const cur = /members\//.test(p) ? member : null;
+        const out = fn(cur);
+        if (out !== undefined) (/history/.test(p) ? ctx.hist : ctx.saved).push({ path: p, value: out });
+        return Promise.resolve({ committed: out !== undefined, snapshot: { val: () => out } });
+      }
     })
   };
   dlgStubs(ctx);
@@ -1652,7 +1662,13 @@ test('★ 되돌리기도 「남기기」 표시를 지우지 않는다', async 
         val: () => (/history/.test(p)
           ? { name: '장한돌', position1: '세종지사장', position2: '공인노무사', srl: '320', careers: ['現 가'] }
           : 지금)
-      })
+      }),
+      /* ⚠ 위 keepBox 의 대역과 같은 까닭 — 진짜 ref 에는 transaction 이 늘 있다 */
+      transaction: fn => {
+        const out = fn(/history/.test(p) ? null : 지금);
+        if (out !== undefined) (/history/.test(p) ? ctx.hist : ctx.saved).push({ path: p, value: out });
+        return Promise.resolve({ committed: out !== undefined, snapshot: { val: () => out } });
+      }
     })
   };
   run(ctx, fnSource('todayString') + '\n' + fnSource('currentUserName') + '\n' + fnSource('histStamp') + '\n'

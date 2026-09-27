@@ -44,7 +44,9 @@ function 편지(안, 옵션) {
     Object.assign({ 미리보기: true, 요약: false }, 옵션 || {}));
 }
 /* 차림표 칸 — 폭이 몇 %든 세어진다(칸 수가 바뀌면 폭도 바뀌므로 폭을 박지 않는다) */
-const 차림표칸 = (h) => (h.match(/<td align="center" width="\d+(?:\.\d+)?%"/g) || []).length;
+/* ⚠ 속성 사이에 «다른 것이 끼어도» 세어야 한다 — 2026-09-26 에 반 이름(class)이
+     끼면서 이 글자가 안 맞아 검사가 깨졌다. 기능은 멀쩡한데 검사만 깨지는 자리다. */
+const 차림표칸 = (h) => (h.match(/<td align="center"[^>]*\swidth="\d+(?:\.\d+)?%"/g) || []).length;
 const 자리표 = (h) => (h.match(/id="g-([a-z]+)"/g) || [])
   .map((s) => /id="g-([a-z]+)"/.exec(s)[1]);
 
@@ -115,7 +117,7 @@ test('★★★ 차림표 칸 수와 자리표 수가 «늘» 맞는다', () => 
     assert.ok(칸 > 0, 이름 + ' : 차림표가 있어야 한다');
     /* ⚠ 폭이 «합해서 한 줄»이라야 한다. 25% 로 박아 두면 꼭지가 다섯이 되는 순간
          125% 가 되어 마지막 칸이 아래로 떨어진다 — 메일에서는 표가 그렇게 무너진다. */
-    const 폭 = (r.서식.match(/<td align="center" width="(\d+(?:\.\d+)?)%"/g) || [])
+    const 폭 = (r.서식.match(/<td align="center"[^>]*\swidth="(\d+(?:\.\d+)?)%"/g) || [])
       .map((s) => Number(/width="(\d+(?:\.\d+)?)%"/.exec(s)[1]))
       .reduce((a, b) => a + b, 0);
     assert.ok(Math.abs(폭 - 100) <= 1,

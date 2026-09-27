@@ -152,14 +152,23 @@
     return apiCall('GET', 길, null, opt).then(function (ev) {
       if (!ev || !ev.start) throw new Error('구글에서 그 일정을 찾지 못했습니다');
       var 고칠것;
+      /* ⚠ 여러 날 일정은 «길이를 지켜» 옮긴다 (2026-09-27).
+         예전엔 끝날을 늘 «새 날 + 하루»로 적어, 사흘 연차를 끌어 옮기면 하루짜리가 됐다
+         — 달력이 구글처럼 막대를 그리게 되면서 실제로 끌 수 있게 된 자리다. */
+      var 날수;
       if (ev.start.date) {
-        고칠것 = { start: { date: newDate }, end: { date: addDay(newDate) } };
+        날수 = (ev.end && ev.end.date) ? dayDiff(ev.start.date, ev.end.date) : 1;
+        if (!(날수 >= 1)) 날수 = 1;
+        고칠것 = { start: { date: newDate }, end: { date: addDays(newDate, 날수) } };
       } else {
         var s = ev.start.dateTime ? String(ev.start.dateTime).slice(11, 16) : '09:00';
         var e = (ev.end && ev.end.dateTime) ? String(ev.end.dateTime).slice(11, 16) : '10:00';
+        날수 = (ev.end && ev.end.dateTime)
+          ? dayDiff(String(ev.start.dateTime).slice(0, 10), String(ev.end.dateTime).slice(0, 10)) : 0;
+        if (!(날수 >= 0)) 날수 = 0;
         고칠것 = {
           start: { dateTime: newDate + 'T' + s + ':00', timeZone: 'Asia/Seoul' },
-          end: { dateTime: newDate + 'T' + e + ':00', timeZone: 'Asia/Seoul' }
+          end: { dateTime: addDays(newDate, 날수) + 'T' + e + ':00', timeZone: 'Asia/Seoul' }
         };
       }
       return apiCall('PATCH', 길 + '?sendUpdates=none', 고칠것, opt);
@@ -168,12 +177,18 @@
       return { moved: true, id: r.id };
     });
   }
-  /* 종일 일정의 끝날 — 하루 뒤. UTC 로만 센다(지역 시간이면 하루 밀린다). */
-  function addDay(ymd) {
+  /* 날짜 더하기 — UTC 로만 센다(지역 시간이면 하루 밀린다). */
+  function addDays(ymd, n) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
-    var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) + 86400000);
+    var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) + n * 86400000);
     return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2)
       + '-' + ('0' + d.getUTCDate()).slice(-2);
+  }
+  /* 두 날짜 사이 날 수 (b - a). UTC 로만 센다. */
+  function dayDiff(a, b) {
+    var x = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(a || '')), y = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(b || ''));
+    if (!x || !y) return NaN;
+    return Math.round((Date.UTC(+y[1], +y[2] - 1, +y[3]) - Date.UTC(+x[1], +x[2] - 1, +x[3])) / 86400000);
   }
 
   /* 이어진 구글 일정을 지운다. 이어진 것이 없으면 «할 일이 없다»(성공으로 본다). */

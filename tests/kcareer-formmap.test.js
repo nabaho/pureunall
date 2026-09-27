@@ -152,7 +152,7 @@ test('사전에 없는 말은 «모름»으로 남긴다 — 지어내지 않는
 });
 
 /* ── 되돌려 넣기와 서식 지문 ── */
-const WHO = { fields: { name: '권형하', nameHanja: '權炯河', birth: '1975.01.07',
+const WHO = { fields: { name: '권형하', nameHanja: '權炯河', birth: '1980.01.01',
   phone: '010-1234-5678', addr: '충남 천안시', org: '푸른노무법인', title: '대표노무사' },
   career: [{ period: '2025', org: '충청남도', role: '노동권익보호관' }] };
 
@@ -261,14 +261,14 @@ test('★ 라벨 뒤에 «좁은 빈 칸이 여럿» 이어지면 한 글자씩 
   assert.equal(run.length, 6, '빈 칸 여섯이 이어져 있습니다');
 });
 
-test('날짜에서 숫자만 뽑아 칸 수에 맞춘다 — 1975.01.07 → 750107', () => {
-  assert.equal(M.digitsFor('1975.01.07', 6), '750107');
-  assert.equal(M.digitsFor('1975.01.07', 8), '19750107');
-  assert.equal(M.digitsFor('750107', 6), '750107');
+test('날짜에서 숫자만 뽑아 칸 수에 맞춘다 — 1980.01.01 → 800101', () => {
+  assert.equal(M.digitsFor('1980.01.01', 6), '800101');
+  assert.equal(M.digitsFor('1980.01.01', 8), '19800101');
+  assert.equal(M.digitsFor('800101', 6), '800101');
 });
 
 test('칸 수가 안 맞으면 «나눠 넣지 않는다» — 어긋나게 적느니 비워 둔다', () => {
-  assert.equal(M.digitsFor('1975.01.07', 5), '');
+  assert.equal(M.digitsFor('1980.01.01', 5), '');
   assert.equal(M.digitsFor('충남 천안시', 6), '', '숫자가 아닌 값은 나누지 않습니다');
 });
 
@@ -277,12 +277,12 @@ test('★ 실제로 한 칸에 한 글자씩 들어간다', () => {
   const r = M.apply(xml, { picks: { t0r0c1: 'birth' }, data: WHO });
   const cells = (r.xml.match(/<hp:t[^>]*>([\s\S]*?)<\/hp:t>/g) || [])
     .map((x) => x.replace(/<[^>]*>/g, ''));
-  assert.deepEqual(cells.slice(1, 7), ['7', '5', '0', '1', '0', '7']);
+  assert.deepEqual(cells.slice(1, 7), ['8', '0', '0', '1', '0', '1']);
 });
 
 test('보통 칸에는 그대로 통째로 넣는다 — 나누기가 끼어들면 안 된다', () => {
   const r = M.apply(tbl([['생년월일', '']]), { picks: { t0r0c1: 'birth' }, data: WHO });
-  assert.ok(r.xml.indexOf('1975.01.07') > 0);
+  assert.ok(r.xml.indexOf('1980.01.01') > 0);
 });
 
 test('★ AI 짝짓기가 있으면 «목록 표가 없다고 적혀 있어도» 채운다', () => {

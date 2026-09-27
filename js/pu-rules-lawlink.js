@@ -32,9 +32,12 @@
 
   /* 법 한 벌 — key 는 정식 제명, id 는 법제처 법령ID, src 는 legalize-kr 의 폴더 이름.
      promulgated·effective 는 SNAPSHOT 을 받은 날 그 저장소가 가진 최신 공포본이다
-     (시행일이 아직 안 온 공포본일 수 있다 — 조문 제목을 대조하는 데는 문제없다). */
+     (시행일이 아직 안 온 공포본일 수 있다 — 조문 제목을 대조하는 데는 문제없다).
+     file 은 그 폴더 안의 현행 법률 파일이다 — 적지 않으면 '법률.md'.
+     ⚠ 근로기준법 폴더의 '법률.md' 는 1997년에 «폐지된» 옛 근로기준법이다(법령ID 001769).
+       현행은 '법률(법률).md' 다 — 이름만 보고 고르면 폐지 법을 감시하게 된다. */
   var LAWS = [
-    { key:'근로기준법', id:'001872', src:'근로기준법', promulgated:'2026-06-09', effective:'2027-06-10', alias:['근로기준법'] },
+    { key:'근로기준법', id:'001872', src:'근로기준법', file:'법률(법률).md', promulgated:'2026-06-09', effective:'2027-06-10', alias:['근로기준법'] },
     { key:'최저임금법', id:'000129', src:'최저임금법', promulgated:'2026-04-07', effective:'2026-12-08', alias:['최저임금법'] },
     { key:'남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률', id:'000130', src:'남녀고용평등과일ㆍ가정양립지원에관한법률',
       promulgated:'2026-05-26', effective:'2026-11-27', alias:['남녀고용평등법'] },
@@ -46,10 +49,10 @@
       promulgated:'2022-06-10', effective:'2022-06-10', alias:['고령자고용법'] },
     { key:'근로자퇴직급여 보장법', id:'009883', src:'근로자퇴직급여보장법', promulgated:'2026-03-17', effective:'2026-07-01',
       alias:['근로자퇴직급여 보장법','퇴직급여법'] },
-    { key:'노동조합 및 노동관계조정법', id:'000143', src:'노동조합및노동관계조정법', promulgated:'2025-09-09', effective:'2026-03-10',
+    { key:'노동조합 및 노동관계조정법', id:'000143', src:'노동조합및노동관계조정법', file:'법률(법률).md', promulgated:'2025-09-09', effective:'2026-03-10',
       alias:['노동조합법','노조법'] },
     { key:'산업안전보건법', id:'001766', src:'산업안전보건법', promulgated:'2026-07-07', effective:'2027-01-08', alias:['산업안전보건법'] },
-    { key:'근로자참여 및 협력증진에 관한 법률', id:'000141', src:'근로자참여및협력증진에관한법률',
+    { key:'근로자참여 및 협력증진에 관한 법률', id:'000141', src:'근로자참여및협력증진에관한법률', file:'법률(법률).md',
       promulgated:'2022-06-10', effective:'2022-12-11', alias:['근로자참여법'] },
     { key:'개인정보 보호법', id:'011357', src:'개인정보보호법', promulgated:'2026-09-08', effective:'2027-03-09', alias:['개인정보보호법'] },
     { key:'민법', id:'001706', src:'민법', promulgated:'2026-03-17', effective:'2026-03-17', alias:['민법'] },
@@ -253,6 +256,27 @@
     });
     return hit;
   }
+  /* 그 조를 «콕 집어» 적은 규칙만 — 법 개정 감시가 쓴다.
+     ⚠ 법 전체에 기댄 규칙(「근로기준법 개정(2025.10.23)」 같은 것)은 뺀다. 넣으면 근로기준법의
+       어느 조가 바뀌어도 그 규칙이 «흔들린 기준» 으로 떠서, 정작 봐야 할 것이 묻힌다. */
+  function rulesForArticle(law, art, rules) {
+    var key = lawOf(law) || law;
+    return (ensure(rules).byArticle[key + '|' + String(art || '')] || []).slice();
+  }
+  /* 감시할 목록 — 법마다 «우리 규칙이 콕 집어 적은 조» 만. 서버 함수가 이 목록을 받아 쓴다
+     (scripts/make-lawwatch-list.js 가 functions/rules-lawwatch-laws.json 으로 옮긴다). */
+  function watchList(rules) {
+    var b = ensure(rules), by = {};
+    b.links.forEach(function (l) {
+      if (!l.art) return;
+      (by[l.law] = by[l.law] || []).indexOf(l.art) < 0 && by[l.law].push(l.art);
+    });
+    var num = function (a) { var m = /^(\d+)(?:의(\d+))?$/.exec(a); return m ? (+m[1]) * 100 + (+(m[2] || 0)) : 0; };
+    return LAWS.filter(function (l) { return by[l.key]; }).map(function (l) {
+      return { key: l.key, id: l.id, src: l.src, file: l.file || '법률.md',
+        arts: by[l.key].sort(function (x, y) { return num(x) - num(y); }) };
+    });
+  }
   function articlesOf(ruleId, rules) {
     var r = ensure(rules).byRule[ruleId];
     return r ? r.refs.slice() : [];
@@ -275,7 +299,8 @@
 
   root.PuRulesLawLink = {
     LAWS: LAWS, TITLES: TITLES, SNAPSHOT_AT: SNAPSHOT_AT,
-    parse: parse, build: build, rulesFor: rulesFor, articlesOf: articlesOf,
+    parse: parse, build: build, rulesFor: rulesFor, rulesForArticle: rulesForArticle,
+    watchList: watchList, articlesOf: articlesOf,
     lawOf: lawOf, titleOf: titleOf, label: label, joCode: joCode, sourceUrl: sourceUrl,
     law: function (name) { return BY_KEY[lawOf(name) || name] || null; }
   };

@@ -48,6 +48,8 @@ function geoip나라(ip) {
 }
 const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
+const RulesLawWatch = require("./rules-lawwatch");
+const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 
 if (!getApps().length) initializeApp();
 
@@ -1023,6 +1025,43 @@ exports.sendScheduledMail = functions
     return null;
   });
 
+/* 취업규칙 — 법 개정 감시 (2026-09-26, 대표 지시 「추천대로」: 서버가 매일 새벽 한 번)
+   우리 검토 기준이 콕 집어 적은 87개 조가 새 공포로 바뀌었는지 legalize-kr 에서 본다.
+   ⚠ 적는 곳은 rules_mgmt/lawwatch 하나다(법령 원문 요약뿐 — 사업장 자료를 안 읽고 안 쓴다).
+   ⚠ 날마다 도는 길은 GitHub API 를 안 부른다(현행 파일 하나 + 기준 판 비교). 자세한 까닭은
+     functions/rules-lawwatch.js 머리말. */
+exports.rulesLawWatch = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .pubsub.schedule("every day 06:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const root = db.ref("rules_mgmt/lawwatch");
+    const [bSnap, eSnap] = await Promise.all([
+      root.child("base").once("value"),
+      root.child("events").once("value"),
+    ]);
+    const headers = { "User-Agent": RulesLawWatch.UA };
+    const get = async (url, as) => {
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return as === "json" ? res.json() : res.text();
+    };
+    const nowIso = new Date().toISOString();
+    const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
+    const result = await RulesLawWatch.run({
+      list: RULES_LAWWATCH_LIST, base: bSnap.val() || {}, today, nowIso,
+      contractVersion: OntologyServerWrite.CONTRACT_VERSION,
+      fetchText: (u) => get(u, "text"), fetchJson: (u) => get(u, "json"),
+      onNote: (n) => console.log("[법 개정 감시]", n),
+    });
+    const upd = RulesLawWatch.updatesOf(result, eSnap.val() || {}, nowIso);
+    await root.update(upd);
+    console.log("[법 개정 감시]", { checked: result.checked, events: result.events.length, errors: result.errors });
+    return null;
+  });
+
 /* 월요일 거래처 뉴스레터 — 화면에서 «확정본 준비»를 한 경우에만 예약 대기열에 건다.
    기본값은 꺼짐이다. 빈 편지·지난주 준비본·이미 처리한 준비본은 절대 보내지 않는다. */
 exports.weeklyNewsletterSend = functions
@@ -1709,6 +1748,10 @@ async function runPaydataMailOnce() {
             atts: Array.isArray(parsed.attachments) ? parsed.attachments.length : 0,
             took: m.took || 0, seatName: m.seatName || '',
             shared: m.shared === true, why: m.why || '', old: m.old === true,
+            /* 뉴스레터·광고·알림 표 — 머리글만 보고 정한다(MR.isBulkMail).
+               ⚠ 세 갈래 모두에서 이 함수 하나를 지난다. 갈래마다 따로 판정하면
+                 「지난 회차」 것만 표가 없는 일이 생긴다. */
+            bulk: MR.isBulkMail(parsed && parsed.headers),
             companyId: co ? co.id : '', companyName: co ? co.name : ''
           })
         };
@@ -5545,6 +5588,12 @@ exports.probeMailPop = MSYNC.probeMailPop;
 exports.backfillMailbox = MSYNC.backfillMailbox;
 /* 📦 지난 메일 한 통 열기 — 그 자리에서 POP3 로 (직원 누구나, 메일함과 같은 문) */
 exports.readOldMail = MSYNC.readOldMail;
+
+/* 🗑 다음메일에서 «지운» 메일은 업무관리 목록에서도 뺀다 (대표 지시 2026-09-27)
+   ⚠ 실제 코드는 mail-gone.js 에 있다 — index.js 를 더 키우지 않기 위해서다.
+   ⚠ 여기 한 줄을 안 적으면 밖에서 안 보인다(배포가 안 된다). mail-sync 와 같은 까닭. */
+const MGONE = require("./mail-gone")({ functions, getDatabase, MAIL_REGION });
+exports.sweepDeletedMail = MGONE.sweepDeletedMail;
 
 /* ══════════════════════════════════════════════════════════════════════════
    📬 열람 확인 — 보낸 메일의 «보이지 않는 1×1 그림»이 불리는 자리 (대표 결정 2026-09-06)

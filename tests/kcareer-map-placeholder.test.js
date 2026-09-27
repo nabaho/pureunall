@@ -41,7 +41,7 @@ function 채우기(xml, data) {
 
 const 나 = {
   fields: { name: '권형하', nameHanja: '權炯夏', nameEng: 'KWON HYUNG HA',
-    birth: '1975.01.07', addr: '충남 천안시 용곡4길 20', phone: '010-1200-0003' },
+    birth: '1980.01.01', addr: '충남 천안시 무슨길 20', phone: '010-1200-0003' },
   edu: [{ period: '1996.03 ~ 1999.02', school: '천안고등학교', major: '인문계', degree: '졸업' },
     { period: '1999.03 ~ 2003.02', school: '영남대학교', major: '법과대학 법학부', degree: '학사' }],
   career: [{ period: '2016.01 ~ 현재', org: '푸른노무법인', title: '대표노무사', role: '노무자문' }]
@@ -103,7 +103,7 @@ test('★★ 값이 «옆 칸»으로 밀려 들어가지 않는다', () => {
   const 줄1 = 칸(r.xml, 0, 1);
   assert.equal(줄1[0], '', '0번 칸(세로 병합 라벨 자리)에 값이 들어갔다: ' + JSON.stringify(줄1));
   assert.equal(줄1[1], '', '1번 칸에 값이 들어갔다: ' + JSON.stringify(줄1));
-  assert.equal(줄1[3], '충남 천안시 용곡4길 20', '주소가 제자리에 없다: ' + JSON.stringify(줄1));
+  assert.equal(줄1[3], '충남 천안시 무슨길 20', '주소가 제자리에 없다: ' + JSON.stringify(줄1));
   /* 첫 줄도 그대로여야 한다 — 밀리면 여기부터 어그러진다 */
   assert.equal(칸(r.xml, 0, 0)[0], '사진부착', '다른 줄이 바뀌었다');
 });

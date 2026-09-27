@@ -128,7 +128,7 @@ test('위촉시작·종료·번호도 본다', () => {
                         { id: 'b', periodStart: '2021.01.01' }]).ok, false, '위촉시작');
   assert.equal(G.check([{ id: 'a', periodEnd: '2020.12.31' },
                         { id: 'b', periodEnd: '2021.12.31' }]).ok, false, '위촉종료');
-  assert.equal(G.check([{ id: 'a', num: '제3016호' }, { id: 'b', num: '제9999호' }]).ok, false, '번호');
+  assert.equal(G.check([{ id: 'a', num: '제1000호' }, { id: 'b', num: '제9999호' }]).ok, false, '번호');
 });
 
 /* ══════ 다른 화면의 칸도 본다 ══════ */

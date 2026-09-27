@@ -68,10 +68,10 @@ test('★★ 자동 채우기는 주민등록번호를 «절대» 안 쓴다 —
   const r = X.autoFill(xml, {
     fields: { name: '권형하' },
     /* 실수로 secrets 를 통째로 넘겨도 autoFill 은 fields 만 본다 */
-    secrets: { rrn: '750107-1234567' }
+    secrets: { rrn: '800101-1234567' }
   });
   assert.ok(글자(r.xml).indexOf('권형하') >= 0, '성명은 채워야 합니다');
-  assert.equal(글자(r.xml).indexOf('750107'), -1,
+  assert.equal(글자(r.xml).indexOf('800101'), -1,
     '주민등록번호가 저절로 나가면 안 됩니다 — 잘못 낸 서류는 되돌릴 수 없습니다');
 });
 
@@ -91,16 +91,16 @@ test('★ 사람이 «직접 고른» 자리에는 들어간다 — 담아 둔 �
   const r = M.apply(xml, {
     picks: { 't0r0c1': 'rrn' },
     data: { fields: {} },
-    secrets: { rrn: '750107-1234567' }
+    secrets: { rrn: '800101-1234567' }
   });
-  assert.ok(글자(r.xml).indexOf('750107-1234567') >= 0,
+  assert.ok(글자(r.xml).indexOf('800101-1234567') >= 0,
     '골랐는데도 안 들어가면 담아 둔 뜻이 없습니다');
 });
 
 test('★ 고르지 않으면 안 들어간다 — secrets 가 있어도 저절로는 아니다', () => {
   const xml = 표([['주민등록번호', '']]);
-  const r = M.apply(xml, { picks: {}, data: { fields: {} }, secrets: { rrn: '750107-1234567' } });
-  assert.equal(글자(r.xml).indexOf('750107'), -1);
+  const r = M.apply(xml, { picks: {}, data: { fields: {} }, secrets: { rrn: '800101-1234567' } });
+  assert.equal(글자(r.xml).indexOf('800101'), -1);
 });
 
 test('★ 칸 지도는 주민등록번호를 «미리 골라 두지» 않는다', () => {

@@ -163,7 +163,12 @@ function overLimitError(seen) {
       : ("오늘 사무실 전체 몫 " + ALL_DAY_LIMIT + "번을 다 썼습니다 — 내일 다시 쓸 수 있습니다.") };
 }
 
-async function evaluate(fetchFn, key, text) {
+/* qs — 물음 모양을 바꿔 끼운다(2026-09-26, 메일 자동분류가 처음 쓴다).
+   ⚠ 안 주면 예전 그대로 questions() 다. 업무 검토용 물음(긴급도·경로…)과
+     메일함 분류용 물음(어느 칸인가)은 «묻는 것 자체»가 다르다 — 여기를 하나로
+     묶어 두면 딴 일이 하나를 고칠 때 서로 발을 밟는다. 열쇠·가리기·실패 갈래는
+     «같은 길»을 타야 두 군데가 어긋나지 않는다(대표 결정 「이알피와 같은 기준」). */
+async function evaluate(fetchFn, key, text, qs) {
   const masked = redact(text);
   if (!masked.text) return { ok: false, why: "empty", status: 400, error: "판단할 내용이 없습니다." };
   let response;
@@ -171,7 +176,7 @@ async function evaluate(fetchFn, key, text) {
     response = await fetchFn("https://api.typesafe.ai/v1/systemone", {
       method: "POST",
       headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-      body: JSON.stringify({ state: masked.text, model: "jev-latest", questions: questions() }),
+      body: JSON.stringify({ state: masked.text, model: "jev-latest", questions: qs || questions() }),
     });
   } catch (e) { return unreachable(e); }
   let body = {};
