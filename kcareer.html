@@ -1162,6 +1162,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-hwpxpages.js?v=1"></script>
 <!-- 한글 문서에서 «글자»를 뽑아 판독으로 보낸다 — 한글 파일은 스캔이 아니다(kcareer-hwptext.js) -->
 <script src="js/kcareer-hwptext.js?v=1"></script>
+<script src="js/kcareer-hwpkeys.js?v=1"></script>
 <script src="js/kcareer-overlay.js?v=3"></script>
 <!-- AI 판독 호출기 — 열쇠는 회사 서버가 든다(브라우저는 모른다) -->
 <script src="js/pu-ai-call.js?v=3"></script>
@@ -12094,7 +12095,39 @@ async function _hwpEdCreate(box, bytes, name){
      ⚠ 메뉴줄(파일·편집·표…)은 «남긴다» — 다 접으면 단축키를 모르는 기능은 길이 없어진다.
      실측(틀 630px): 머리 120 → 28px · 문서 칸 488 → 580px(+19%). */
   _safe(function(){ rhEdChromeApply(ed); });
+  /* ★ 한글과 «같은» 단축키를 덧댄다. ⚠ 여기서 기다리지 않는다 — 단축키를 못 붙여도
+     서류는 열려야 한다. 그래서 걸림은 삼키되 «조용히»는 아니고 기록에 남긴다. */
+  _safe(function(){ rhEdHwpKeys(ed).catch(function(e){ console.warn('한글 단축키', e); }); });
   return ed;
+}
+
+/* ── ⌨ 한글과 같은 단축키를 편집기 «안»에 덧댄다 (대표 지시 2026-09-27) ──────────
+   ⚠★ 글쇠는 틀(iframe) 밖으로 «올라오지 않는다» — 우리 쪽에서 들으면 한 개도 못 잡는다.
+     편집기는 우리와 «같은 출처»라 그 안쪽 document 에 직접 귀를 붙일 수 있다.
+   ⚠★ 편집기가 이미 쓰는 글쇠는 손대지 않는다(KcareerHwpKeys.plan 이 걸러 낸다) —
+     가로채면 편집기 제 기능이 조용히 죽는다.
+   ⚠ 창을 여는 명령이라 allowDialog 를 켠다 — 안 켜면 문자표가 열리지 않는다. */
+async function rhEdHwpKeys(ed){
+  if(!ed || !ed.element || !window.KcareerHwpKeys) return null;
+  var doc=null; try{ doc=ed.element.contentDocument; }catch(e){ doc=null; }
+  if(!doc || doc._kcHwpKeys) return null;        /* ⚠ 한 번만 붙인다 — 다시 붙으면 두 번 실행된다 */
+  var 쓰는것=[];
+  try{ 쓰는것=(await ed.commands.list()||[]).map(function(c){ return c&&c.shortcutLabel; }).filter(Boolean); }
+  catch(e){ return null; }                        /* 못 물어보면 «아무것도 안 붙인다» — 겹칠 수 있다 */
+  var 짠것=KcareerHwpKeys.plan(쓰는것);
+  if(!짠것.bind.length) return 짠것;
+  var 맞추개=KcareerHwpKeys.makeMatcher(짠것.bind);
+  doc._kcHwpKeys=짠것;
+  doc.addEventListener('keydown', function(ev){
+    /* ⚠ 글자를 조합하는 중(한글·한자)에는 비켜 준다 — 가로채면 입력이 깨진다 */
+    if(ev.isComposing || ev.keyCode===229) return;
+    var r=맞추개(ev, Date.now());
+    if(!r) return;
+    ev.preventDefault(); ev.stopPropagation();
+    if(r==='pending') return;                    /* 두 번 누르는 것의 앞 타 */
+    try{ ed.commands.execute(r.cmd, {}, { allowDialog:true }); }catch(e){ console.warn('한글 단축키', e); }
+  }, true);
+  return 짠것;
 }
 
 var _rhHwpEd=null, _rhHwpEdFor='';
