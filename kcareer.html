@@ -914,6 +914,24 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
 #rhHwpEd:fullscreen{background:var(--card);padding:6px 8px}
 #rhHwpEd:fullscreen #rhHwpEdBox{flex:1;min-height:0}
 #rhHwpEd:fullscreen .rh-ed-note{display:none}
+/* ── 편집기 메뉴줄을 «우리 줄 안»으로 합쳤다 (대표 지시 2026-09-27 「캡쳐3을 합치는건 안되나?」)
+   편집기가 제 메뉴 구조를 그대로 내준다(commands.menuModel) — 그것을 우리 막대에 그린다.
+   그래서 머리가 «두 줄»에서 «한 줄»이 된다.
+   ⚠★ 우리 메뉴가 «세워진 뒤에만» 편집기 메뉴줄을 감춘다 — 못 세웠는데 감추면
+     파일·편집·표로 들어갈 길이 통째로 사라진다(막다른 길 금지). */
+.rh-ed-menus{display:inline-flex;gap:1px;align-items:center;flex-wrap:wrap}
+.rh-ed-menu{position:relative}
+.rh-ed-menu>button{padding:5px 9px;border:1px solid transparent;background:none;border-radius:7px;
+  font-size:12.5px;cursor:pointer;color:var(--text)}
+.rh-ed-menu>button:hover,.rh-ed-menu.on>button{background:var(--hover);border-color:var(--border)}
+.rh-ed-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:95;min-width:215px;max-height:62vh;
+  overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 14px 40px rgba(10,20,40,.28);padding:5px}
+.rh-ed-pop button{display:block;width:100%;text-align:left;padding:6px 10px;border:0;background:none;
+  border-radius:6px;font-size:12.5px;cursor:pointer;color:var(--text);white-space:nowrap}
+.rh-ed-pop button:hover:not(:disabled){background:var(--hover)}
+.rh-ed-pop button:disabled{color:var(--text-mute);cursor:default;opacity:.5}
+.rh-ed-pop .rh-ed-sub{font-size:10.5px;color:var(--text-mute);padding:6px 10px 2px;font-weight:700}
 /* ⚠ 한글 서식만 따로 폭을 풀던 규칙도 뺐다 — .page 가 이미 가로를 다 쓴다 */
 /* ── 개인정보보관을 한 화면에 ──
    대표 요청(2026-08-29): 「개인정보관리 한 화면에 모든 부분 볼 수 있게」,
@@ -1499,9 +1517,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                     <button class="btn primary" type="button" onclick="rhHwpEdSave()">💾 고친 것 되받기</button>
                     <button class="btn" type="button" id="rhEdBigBtn" onclick="rhHwpEdBig()" title="편집기를 화면 통째로 폅니다 — 종이가 다 보입니다">🗖 큰 창</button>
                     <button class="btn" type="button" id="rhEdFullBtn" onclick="rhHwpEdFull()" title="모니터를 통째로 씁니다. 여기서만 Ctrl+S·Ctrl+W 같은 한글 단축키를 브라우저가 안 가로챕니다">⛶ 전체 화면</button>
-                    <button class="btn" type="button" id="rhEdTidyBtn" onclick="rhEdTidyToggle()" title="편집기의 아이콘줄·글꼴줄을 접습니다. 메뉴줄과 단축키는 그대로 — 종이가 그만큼 커집니다">🧰 도구줄 펴기</button>
+                    <button class="btn" type="button" id="rhEdTidyBtn" onclick="rhEdTidyToggle()" title="편집기 도구줄(아이콘·글꼴줄)을 내려서 봅니다. 올리면 메뉴가 이 한 줄로 합쳐지고 종이가 그만큼 커집니다">🧰 도구줄 내리기</button>
                     <button class="btn" type="button" onclick="rhHwpEdKeys()" title="이 편집기가 아는 한글 단축키를 모두 보여 줍니다">⌨ 단축키</button>
                     <button class="btn" type="button" onclick="rhSetMode('in')">← 입력판으로</button>
+                    <!-- ★ 편집기의 파일·편집·보기… 메뉴가 «이 줄 안»으로 들어온다(합침) -->
+                    <span class="rh-ed-menus" id="rhEdMenus"></span>
                     <span class="rh-ed-note" style="font-size:11.5px;color:var(--text-mute)">고치신 뒤 <b>되받기</b>를 눌러야 반영됩니다 · 편집기는 이 PC 안에서만 돕니다</span>
                   </div>
                   <div id="rhHwpEdBox" style="flex:1;min-height:70vh;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff"></div>
@@ -12094,6 +12114,9 @@ async function _hwpEdCreate(box, bytes, name){
      ⚠ 접어도 명령·단축키는 그대로 돈다 — 실측: 접은 뒤에도 명령 189개, format:bold 켜짐.
      ⚠ 메뉴줄(파일·편집·표…)은 «남긴다» — 다 접으면 단축키를 모르는 기능은 길이 없어진다.
      실측(틀 630px): 머리 120 → 28px · 문서 칸 488 → 580px(+19%). */
+  /* ★ 편집기 메뉴를 «우리 줄»에 합쳐 세운다 — 세워진 뒤라야 편집기 메뉴줄을 감출 수 있다.
+     ⚠ 순서를 바꾸지 말 것: 감추기(rhEdChromeApply)가 «세웠나»(_rhEdMenuOk)를 보고 정한다. */
+  try{ await rhEdMenuBuild(ed); }catch(e){ console.warn('편집기 메뉴 합치기', e); }
   _safe(function(){ rhEdChromeApply(ed); });
   /* ★ 한글과 «같은» 단축키를 덧댄다. ⚠ 여기서 기다리지 않는다 — 단축키를 못 붙여도
      서류는 열려야 한다. 그래서 걸림은 삼키되 «조용히»는 아니고 기록에 남긴다. */
@@ -12254,6 +12277,10 @@ function rhHwpEdClose(){
   /* ⚠ 큰 창·전체 화면을 남기지 않는다 — 편집기가 없는데 검은 화면만 남으면 막다른 길이다 */
   try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
   _safe(function(){ rhEdBigSet(false); });
+  /* ⚠ 합쳐 둔 메뉴도 거둔다 — 편집기가 없는데 파일·편집이 남아 있으면 눌러도 아무 일이 없다 */
+  _safe(function(){ rhEdMenuClose(); });
+  var mb=document.getElementById('rhEdMenus'); if(mb) mb.innerHTML='';
+  _rhEdMenuOk=false;
   var box=document.getElementById('rhHwpEdBox'); if(box) box.innerHTML='';
   _hwpEdForget();                       /* ⚠ 거둔 «뒤»에 지운다 — 브라우저에 서류를 남기지 않는다 */
 }
@@ -12294,22 +12321,98 @@ async function rhHwpEdSave(){
      들어갈 길이 통째로 사라진다(막다른 길 금지). 아이콘줄·글꼴줄만 접는다.
    실측(틀 630px): 머리 120 → 28px · 문서 칸 488 → **580px**(+19%). */
 var _rhEdTidy=true;            /* 기본은 «접힘» — 대표가 정리해 달라 하셨다 */
+var _rhEdMenuOk=false;         /* 우리 메뉴를 세웠나 — 세워야만 편집기 메뉴줄을 감춘다 */
+
+/* ── 편집기 메뉴(파일·편집·보기…)를 «우리 줄»에 그린다 ────────────────────
+   대표 물음 2026-09-27 「캡쳐3을 합치는건 안되나?」 — 된다.
+   편집기가 `commands.menuModel()` 로 제 메뉴를 그대로 내준다. 그것을 우리 막대에 그리면
+   머리가 «두 줄 → 한 줄»이 된다. 누르면 편집기의 그 명령을 그대로 부른다.
+   ⚠★ 우리가 «세운 뒤에만» 편집기 메뉴줄을 감춘다 — 못 세웠는데 감추면 막다른 길이다.
+   ⚠ 열 때마다 다시 물어본다 — 할 수 있나 없나(enabled)가 문서 상태에 따라 바뀐다. */
+async function rhEdMenuBuild(ed){
+  var box=document.getElementById('rhEdMenus');
+  _rhEdMenuOk=false;
+  if(!box || !ed || !ed.commands) return false;
+  var mm=null;
+  try{ mm=await ed.commands.menuModel(); }catch(e){ console.warn('편집기 메뉴', e); }
+  if(!mm || !mm.length){ box.innerHTML=''; return false; }
+  box.innerHTML='';
+  mm.forEach(function(m){
+    var wrap=document.createElement('span'); wrap.className='rh-ed-menu';
+    var b=document.createElement('button'); b.type='button'; b.textContent=m.label||'';
+    b.onclick=function(e){ e.stopPropagation(); rhEdMenuOpen(ed, wrap, m.menuId); };
+    wrap.appendChild(b); box.appendChild(wrap);
+  });
+  _rhEdMenuOk=true;
+  /* 바깥을 누르면 닫는다 — 한 번만 묶는다 */
+  if(!box.dataset.bound){
+    box.dataset.bound='1';
+    document.addEventListener('click', function(){ rhEdMenuClose(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') rhEdMenuClose(); });
+  }
+  return true;
+}
+function rhEdMenuClose(){
+  var box=document.getElementById('rhEdMenus'); if(!box) return;
+  box.querySelectorAll('.rh-ed-menu').forEach(function(w){ w.classList.remove('on'); });
+  box.querySelectorAll('.rh-ed-pop').forEach(function(p){ p.remove(); });
+}
+async function rhEdMenuOpen(ed, wrap, menuId){
+  var 열려있었나=wrap.classList.contains('on');
+  rhEdMenuClose();
+  if(열려있었나) return;                       /* 같은 것을 또 누르면 닫는다 */
+  var mm=null;
+  try{ mm=await ed.commands.menuModel(); }catch(e){ toast('메뉴를 못 불러왔습니다'); return; }
+  var m=(mm||[]).filter(function(x){ return x.menuId===menuId; })[0];
+  if(!m){ toast('메뉴가 사라졌습니다 — 편집기를 다시 열어 주세요'); return; }
+  var pop=document.createElement('div'); pop.className='rh-ed-pop';
+  pop.onclick=function(e){ e.stopPropagation(); };
+  var 그리기=function(items, 깊이){
+    (items||[]).forEach(function(it){
+      if(it.submenu){
+        var h=document.createElement('div'); h.className='rh-ed-sub'; h.textContent=it.label||'';
+        pop.appendChild(h); 그리기(it.submenu, 1); return;
+      }
+      var b=document.createElement('button'); b.type='button';
+      b.textContent=(깊이?'　':'')+(it.label||'');
+      b.disabled=!it.enabled || !it.commandId;
+      if(!b.disabled) b.onclick=function(){
+        rhEdMenuClose();
+        /* ⚠ 창을 여는 것이 많다 — allowDialog 를 켜야 열린다 */
+        try{ ed.commands.execute(it.commandId, {}, { allowDialog:true }); }
+        catch(e){ toast('「'+(it.label||'')+'」을(를) 못 했습니다'); }
+      };
+      pop.appendChild(b);
+    });
+  };
+  그리기(m.items, 0);
+  wrap.appendChild(pop); wrap.classList.add('on');
+}
 function rhEdChromeApply(ed){
   /* ⚠ `!ed.chrome` 을 빼도 아래 try/catch 가 같은 답을 낸다 — 고장넣기가 «안 걸리는»
      까닭이 이것이다(억지 검사를 지어 붙이지 않고 여기 적어 둔다). 그래도 남겨 둔다:
      없는 것을 부르지 않는 편이 읽기 쉽고, 뒷날 catch 를 좁히면 이 줄이 일한다. */
   if(!ed || !ed.chrome) return;
-  /* 접을 때도 메뉴줄은 true — 아이콘줄(toolbar)·상태줄만 접는다 */
-  try{ ed.chrome.set({ menu:true, toolbar:!_rhEdTidy, statusbar:!_rhEdTidy }); }catch(e){}
+  /* ⚠★ 메뉴줄과 아이콘줄은 편집기의 «같은 머리(header)» 안에 있다 — 실측으로 알았다.
+     그래서 메뉴를 감추면 아이콘줄도 함께 사라져 「내려서 보기」가 안 된다.
+     → 두 모습을 «통째로» 갈아 끼운다:
+       · 접힘(기본) = 우리 줄 하나. 편집기 머리를 통째로 감춘다(실측 120 → 0px).
+       · 펴기       = 편집기 제 머리(메뉴·아이콘줄·글꼴줄·상태줄)를 «내려서» 본다.
+                     이때는 우리가 합친 메뉴를 감춘다 — 안 그러면 메뉴가 두 벌이 된다.
+     ⚠★ 우리 메뉴를 «못 세웠으면» 합치지 않는다 — 편집기 것을 반드시 남긴다(막다른 길 금지). */
+  var 합침 = _rhEdMenuOk && _rhEdTidy;
+  try{ ed.chrome.set({ menu:!합침, toolbar:!_rhEdTidy, statusbar:!_rhEdTidy }); }catch(e){}
+  var mb=document.getElementById('rhEdMenus');
+  if(mb) mb.style.display = 합침 ? '' : 'none';
   var b=document.getElementById('rhEdTidyBtn');
-  if(b) b.textContent=_rhEdTidy?'🧰 도구줄 펴기':'🧹 도구줄 접기';
+  if(b) b.textContent=_rhEdTidy?'🧰 도구줄 내리기':'🧹 도구줄 올리기';
 }
 function rhEdTidyToggle(){
   _rhEdTidy=!_rhEdTidy;
   rhEdChromeApply(_rhHwpEd||_hwpViewEd);
   toast(_rhEdTidy
-    ? '🧹 아이콘줄을 접었습니다 — 메뉴줄과 단축키는 그대로입니다'
-    : '🧰 아이콘줄을 폈습니다');
+    ? '🧹 도구줄을 올렸습니다 — 메뉴는 위 한 줄에 있고 단축키도 그대로입니다'
+    : '🧰 편집기 도구줄을 내렸습니다 — 아이콘·글꼴줄을 그대로 쓰실 수 있습니다');
 }
 var _rhEdBig=false, _rhEdBigWant=true, _rhEdEsc=null, _rhEdFsBound=false;
 /* 브라우저가 늘 가로채는 키 — 전체 화면에서만 «되찾아» 한글에게 준다 */

@@ -64,10 +64,12 @@ function 세상(opt) {
   const 막대 = mk('rhHwpEd');
   const 큰단추 = { id: 'rhEdBigBtn', textContent: '🗖 큰 창', style: {} };
   const 전체단추 = { id: 'rhEdFullBtn', textContent: '⛶ 전체 화면', style: {} };
-  const 접기단추 = { id: 'rhEdTidyBtn', textContent: '🧰 도구줄 펴기', style: {} };
+  const 접기단추 = { id: 'rhEdTidyBtn', textContent: '🧰 도구줄 내리기', style: {} };
+  const 메뉴칸 = { id: 'rhEdMenus', innerHTML: '', style: {}, dataset: {},
+    querySelectorAll: () => [], appendChild: () => {} };
   const body = { style: {}, appendChild: (el) => { 붙인것.push(el); } };
   const 있는것 = { rhHwpEd: 막대, rhEdBigBtn: 큰단추, rhEdFullBtn: 전체단추,
-    rhEdTidyBtn: 접기단추 };
+    rhEdTidyBtn: 접기단추, rhEdMenus: 메뉴칸 };
 
   const ctx = {
     console, JSON, String, Number, Array, Object, Error, Date, Boolean, Set, Promise,
@@ -95,6 +97,7 @@ function 세상(opt) {
     escapeHtml: (x) => String(x == null ? '' : x),
     _safe: (f) => { try { return f(); } catch (e) { ctx._safeErr = String(e); } },
     _막대: 막대, _옷: mk._set, _큰단추: 큰단추, _전체단추: 전체단추, _접기단추: 접기단추,
+    _메뉴칸: 메뉴칸,
     _body: body, _들은것: 들은것, _알림: 알림, _붙인것: 붙인것, _있는것: 있는것
   };
   ctx.window = ctx; ctx.globalThis = ctx;
@@ -110,6 +113,7 @@ function 세상(opt) {
   const 접힘줄 = CODE.match(/var\s+_rhEdTidy\s*=\s*\w+\s*;/);
   assert.ok(접힘줄, '_rhEdTidy 를 찾지 못했습니다');
   vm.runInContext(접힘줄[0], ctx);
+  vm.runInContext('var _rhEdMenuOk=' + (opt.메뉴세움 === false ? 'false' : 'true') + ';', ctx);
   ['function rhEdChromeApply(', 'function rhEdTidyToggle(',
    'function rhEdBigSet(', 'function rhHwpEdBig(', 'function _rhEdFsWatch(',
    'async function rhHwpEdFull(', 'async function rhHwpEdKeys(']
@@ -355,27 +359,36 @@ test('★★ 편집기를 «접은 채» 연다 — 문서 시작 자리가 120p
   assert.equal(받은것[0].statusbar, false, '★ 상태줄이 그대로입니다');
 });
 
-test('★★★ 접어도 «메뉴줄은 남긴다» — 다 접으면 단축키 모르는 기능은 길이 없어진다', () => {
-  const ctx = 세상({});
-  const { 받은것, ed } = 가짜편집기();
-  ctx._ed = ed;
-  vm.runInContext('rhEdChromeApply(_ed)', ctx);
-  assert.equal(받은것[0].menu, true,
-    '★ 메뉴줄까지 접었습니다 — 파일·편집·표 로 들어갈 길이 통째로 사라집니다(막다른 길)');
+test('★★★ 어느 모습이든 «메뉴로 갈 길»이 반드시 하나는 있다 — 막다른 길 금지', () => {
+  /* 규칙이 바뀌었다(2026-09-27 합치기): 편집기 메뉴줄을 감출 수 있게 됐지만,
+     그것은 «우리가 합쳐 세웠을 때»뿐이다. 둘 다 없는 상태가 «절대» 없어야 한다. */
+  [{}, { 메뉴세움: false }].forEach((경우) => {
+    [true, false].forEach((접힘) => {
+      const ctx = 세상(경우);
+      const { 받은것, ed } = 가짜편집기();
+      ctx._ed = ed;
+      vm.runInContext('_rhEdTidy=' + 접힘 + '; rhEdChromeApply(_ed)', ctx);
+      const 편집기메뉴 = 받은것[받은것.length - 1].menu;
+      const 우리메뉴 = ctx._메뉴칸.style.display !== 'none';
+      assert.ok(편집기메뉴 || 우리메뉴,
+        '★ 메뉴가 «양쪽 다» 없습니다 — 파일·편집·표로 갈 길이 통째로 사라집니다'
+        + ' (메뉴세움=' + (경우.메뉴세움 !== false) + ' 접힘=' + 접힘 + ')');
+      assert.ok(!(편집기메뉴 && 우리메뉴), '★ 메뉴가 «두 벌»입니다');
+    });
+  });
 });
 
-test('★ 펴면 셋 다 돌아온다 · 딱지도 바뀐다', () => {
+test('★ 내리면 셋 다 돌아온다 · 딱지도 바뀐다 · 무엇이 바뀌었는지 말한다', () => {
   const ctx = 세상({});
   const { 받은것, ed } = 가짜편집기();
   ctx._ed = ed; vm.runInContext('_rhHwpEd=_ed;', ctx);
   vm.runInContext('rhEdChromeApply(_ed)', ctx);
-  assert.equal(ctx._접기단추.textContent, '🧰 도구줄 펴기', '접힌 상태의 딱지가 틀립니다');
+  assert.equal(ctx._접기단추.textContent, '🧰 도구줄 내리기', '올린 상태의 딱지가 틀립니다');
   vm.runInContext('rhEdTidyToggle()', ctx);
-  assert.equal(받은것[받은것.length - 1].toolbar, true, '★ 펴지지 않습니다');
-  assert.equal(받은것[받은것.length - 1].statusbar, true);
-  assert.equal(받은것[받은것.length - 1].menu, true, '메뉴줄은 늘 켜져 있어야 합니다');
-  assert.equal(ctx._접기단추.textContent, '🧹 도구줄 접기', '★ 딱지가 안 바뀝니다');
-  assert.match(ctx._알림[0].m, /단축키는 그대로|폈습니다/, '무엇이 바뀌었는지 안 말합니다');
+  const r = 받은것[받은것.length - 1];
+  assert.deepEqual([r.menu, r.toolbar, r.statusbar], [true, true, true], '★ 안 내려옵니다');
+  assert.equal(ctx._접기단추.textContent, '🧹 도구줄 올리기', '★ 딱지가 안 바뀝니다');
+  assert.match(ctx._알림[0].m, /내렸습니다|올렸습니다/, '무엇이 바뀌었는지 안 말합니다');
 });
 
 test('★ 접었다 폈다 해도 어긋나지 않는다', () => {
@@ -408,6 +421,97 @@ test('★★ 접는 자리는 «한 곳»(_hwpEdCreate) — 두 입구가 같이
   /* 우리가 CSS 로 가리지 않는다 — 편집기 안쪽 셈이 어긋난다 */
   assert.ok(!/rhwp-chrome-no-/.test(CODE),
     '★ 편집기 안쪽 class 를 우리가 직접 건드립니다 — chrome.set 으로만 해야 합니다');
+});
+
+/* ══════ ⑦-2 메뉴줄을 «우리 줄»로 합치기 (2026-09-27 「캡쳐3을 합치는건 안되나?」) ══════ */
+test('★★★ 우리 메뉴를 세웠으면 편집기 머리를 «통째로» 감춘다 — 줄이 하나가 된다', () => {
+  const ctx = 세상({});                       /* _rhEdMenuOk = true, _rhEdTidy = true */
+  const { 받은것, ed } = 가짜편집기();
+  ctx._ed = ed;
+  vm.runInContext('rhEdChromeApply(_ed)', ctx);
+  assert.equal(받은것[0].menu, false, '★ 편집기 메뉴줄이 남습니다 — 줄이 둘 그대로입니다');
+  assert.equal(받은것[0].toolbar, false);
+  assert.equal(받은것[0].statusbar, false);
+  assert.notEqual(ctx._메뉴칸.style.display, 'none', '★ 합쳐 놓고 우리 메뉴를 감춥니다');
+});
+
+test('★★★ 우리 메뉴를 «못 세웠으면» 편집기 메뉴줄을 반드시 남긴다 — 막다른 길 금지', () => {
+  const ctx = 세상({ 메뉴세움: false });
+  const { 받은것, ed } = 가짜편집기();
+  ctx._ed = ed;
+  vm.runInContext('rhEdChromeApply(_ed)', ctx);
+  assert.equal(받은것[0].menu, true,
+    '★ 우리 메뉴도 없고 편집기 메뉴도 감췄습니다 — 파일·편집·표로 갈 길이 없습니다');
+  assert.equal(ctx._메뉴칸.style.display, 'none', '★ 빈 메뉴 자리가 남아 있습니다');
+});
+
+test('★★★ 「도구줄 내리기」는 편집기 머리를 되살리고 «우리 메뉴는 감춘다» — 두 벌 금지', () => {
+  const ctx = 세상({});
+  const { 받은것, ed } = 가짜편집기();
+  ctx._ed = ed; vm.runInContext('_rhHwpEd=_ed;', ctx);
+  vm.runInContext('rhEdTidyToggle()', ctx);       /* 내리기 */
+  const r = 받은것[받은것.length - 1];
+  assert.equal(r.menu, true, '★ 아이콘줄이 «머리 안»에 있어 메뉴를 켜야 같이 내려옵니다');
+  assert.equal(r.toolbar, true, '★ 도구줄이 안 내려옵니다');
+  assert.equal(r.statusbar, true);
+  assert.equal(ctx._메뉴칸.style.display, 'none',
+    '★ 우리 메뉴가 남아 «메뉴가 두 벌»이 됩니다');
+  assert.equal(ctx._접기단추.textContent, '🧹 도구줄 올리기', '딱지가 안 바뀝니다');
+});
+
+test('★ 다시 올리면 도로 한 줄이 된다', () => {
+  const ctx = 세상({});
+  const { 받은것, ed } = 가짜편집기();
+  ctx._ed = ed; vm.runInContext('_rhHwpEd=_ed;', ctx);
+  vm.runInContext('rhEdTidyToggle(); rhEdTidyToggle();', ctx);
+  const r = 받은것[받은것.length - 1];
+  assert.deepEqual([r.menu, r.toolbar, r.statusbar], [false, false, false]);
+  assert.notEqual(ctx._메뉴칸.style.display, 'none');
+  assert.equal(ctx._접기단추.textContent, '🧰 도구줄 내리기');
+});
+
+test('★★ 메뉴는 편집기에게 «물어서» 그린다 — 손으로 적지 않는다', () => {
+  const b = cutFn(CODE, 'async function rhEdMenuBuild(');
+  assert.match(b, /commands\.menuModel\(\)/, '★ 편집기에게 안 묻습니다');
+  assert.ok(!/'파일'|'편집'|'보기'|'서식'/.test(b),
+    '★ 메뉴 이름을 손으로 적었습니다 — 편집기가 바뀌면 거짓말이 됩니다');
+  assert.match(b, /_rhEdMenuOk\s*=\s*true/, '★ 세웠다는 표시를 안 남깁니다');
+  assert.match(b, /_rhEdMenuOk\s*=\s*false/, '★ 못 세웠을 때를 안 적습니다');
+  /* ⚠ 표시를 «남기나»만 보면, 빈 답이 와도 「세웠다」고 하는 코드가 통과한다
+     (고장넣기가 잡았다). 빈 답에서 «돌아서는지» 짚는다. */
+  assert.match(b, /if\(!mm \|\| !mm\.length\)\{[^}]*return false;\s*\}/,
+    '★ 메뉴가 «비어 왔는데» 세웠다고 합니다 — 편집기 메뉴까지 감춰 막다른 길이 됩니다');
+  const i = b.indexOf('if(!mm || !mm.length)'), j = b.indexOf('_rhEdMenuOk=true');
+  assert.ok(i > 0 && i < j, '★ 빈 답 빗장이 «세웠다» 뒤에 있습니다 — 소용이 없습니다');
+});
+
+test('★★ 메뉴를 열 때마다 «다시» 물어본다 — 할 수 있나 없나가 바뀐다', () => {
+  const o = cutFn(CODE, 'async function rhEdMenuOpen(');
+  assert.match(o, /commands\.menuModel\(\)/, '★ 열 때 안 묻습니다 — 회색이 그대로 굳습니다');
+  assert.match(o, /b\.disabled\s*=\s*!it\.enabled/, '★ 못 하는 것을 못 누르게 안 합니다');
+  assert.match(o, /allowDialog\s*:\s*true/, '★ 창이 안 열립니다');
+  /* ⚠ 「열려있었나 라는 «글자»가 있나」로는 못 잡는다 — 변수를 두기만 하고 «보지»
+     않아도 통과했다(고장넣기가 잡았다). 보고 돌아서는지 짚는다. */
+  assert.match(o, /if\(열려있었나\)\s*return;/,
+    '★ 같은 메뉴를 또 눌러도 «안 닫힙니다» — 열고 닫기가 안 됩니다');
+  assert.match(o, /rhEdMenuClose\(\)/, '★ 열 때 앞것을 안 닫습니다 — 창이 겹쳐 쌓입니다');
+});
+
+test('★ 편집기를 거두면 합친 메뉴도 거둔다 — 눌러도 아무 일 없는 메뉴가 남으면 안 된다', () => {
+  const c = cutFn(CODE, 'function rhHwpEdClose(');
+  assert.match(c, /rhEdMenuClose\(\)/, '★ 열린 메뉴가 떠 있습니다');
+  assert.match(c, /rhEdMenus[\s\S]{0,80}innerHTML=''/, '★ 메뉴 단추가 남습니다');
+  assert.match(c, /_rhEdMenuOk=false/, '★ 세웠다는 표시가 남아 다음에 잘못 감춥니다');
+});
+
+test('★★ 메뉴를 «세운 뒤»에 감추기를 부른다 — 순서가 바뀌면 메뉴가 통째로 사라진다', () => {
+  const c = cutFn(CODE, 'async function _hwpEdCreate(');
+  const i = c.indexOf('rhEdMenuBuild(ed)');
+  const j = c.indexOf('rhEdChromeApply(ed)');
+  assert.ok(i > 0, '★ 메뉴를 안 세웁니다');
+  assert.ok(j > 0, '★ 감추기를 안 부릅니다');
+  assert.ok(i < j, '★ 감추기가 먼저입니다 — 아직 못 세운 상태로 편집기 메뉴를 감춥니다');
+  assert.match(c.slice(i - 60, i + 60), /await/, '★ 세워지길 안 기다립니다');
 });
 
 /* ══════ ⑧ 옛 빗장은 그대로 ══════ */
