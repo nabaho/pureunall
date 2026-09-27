@@ -33,9 +33,13 @@
   .hwp-file-card{border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin:10px 0;background:#f8fafc}
   .hwp-preview{display:none;min-height:360px;max-height:58vh;border:1px solid #cbd5e1;border-radius:10px;margin-top:12px;overflow:auto}
   /* ── 왼쪽 목록 (2026-09-26 「사무관리서류 › 계약서 양식」을 더하며) ── */
-  .shell{display:flex;align-items:flex-start;max-width:1360px;margin:0 auto}
-  .side{width:250px;flex:none;position:sticky;top:0;padding:20px 8px 20px 16px}
-  .nav-tree{max-height:calc(100vh - 230px);overflow-y:auto;margin:2px 0 4px}
+  /* ⚠ 틀을 가운데로 묶지 않는다 — 1360px 가운데 정렬이었을 때 넓은 화면(1862px)에서 메뉴가
+       왼쪽 끝에서 250px 떠 있었다(대표 지적 2026-09-27). 메뉴는 왼쪽 끝, 본문이 남은 폭을 다 쓴다. */
+  .shell{display:flex;align-items:flex-start}
+  .side{width:240px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto;padding:14px 8px 24px;background:#fff;border-right:1px solid #e2e8f0}
+  .nav-tree{margin:2px 0 4px}
+  .nav.soon{color:#64748b;cursor:default}.nav.soon:hover{background:none}
+  .nav.soon i{font-style:normal;margin-left:auto;font-size:10.5px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;padding:0 7px}
   .nav{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:8px 10px;font-size:13px;color:#1e293b;cursor:pointer;font-family:inherit;white-space:nowrap}
   .nav:hover{background:#eff6ff}
   .nav.on{background:#bfdbfe;color:#1e40af;font-weight:700}
@@ -46,7 +50,8 @@
   .crumb{font-size:12px;color:#64748b;margin-bottom:4px}.crumb b{color:#1e293b}
   @media(max-width:700px){
     .shell{display:block}
-    .side{position:static;width:auto;display:flex;align-items:center;gap:4px;overflow-x:auto;padding:8px 10px;background:#fff;border-bottom:1px solid #e2e8f0}
+    .side{position:static;width:auto;height:auto;display:flex;align-items:center;gap:4px;overflow-x:auto;padding:8px 10px;background:#fff;border-right:none;border-bottom:1px solid #e2e8f0}
+    .nav.soon{display:none}
     .nav{width:auto}.nav.sub{padding-left:10px}.nav-grp{padding:0 2px 0 8px}.nav-tree{display:none}
     .shell .main{margin:12px auto;padding:0 10px}
     .top{padding:10px 12px;gap:8px;flex-wrap:wrap}.top h1{width:100%;font-size:14px}.top #whoami{margin-right:auto}
@@ -92,11 +97,15 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <div class="shell">
 <!-- 왼쪽 목록 — 「사무관리서류」 아래에 서류 종류를 더해 간다(대표 지시 2026-09-26) -->
 <nav class="side" aria-label="문서관리 메뉴">
-  <button type="button" class="nav on" data-pane="esign">📤 집단체불 전자송부</button>
+  <!-- 메뉴는 «묶음 › 메뉴» 두 단(이알피 메뉴와 같은 모양). 계약유형(3단)까지만 두고 양식 이름은 본문 목록 (C안 2026-09-27) -->
+  <div class="nav-grp">📤 전자송부</div>
+  <button type="button" class="nav sub on" data-pane="esign">✍ 집단체불 위임장</button>
   <div class="nav-grp">🗂 사무관리서류</div>
   <button type="button" class="nav sub" data-pane="forms">📄 계약서 양식</button>
-  <!-- 양식 트리 — 계약서 양식을 처음 열 때 js/pu-contract-forms.js 가 채운다 (2026-09-27) -->
+  <!-- 계약유형 6종 — 계약서 양식을 처음 열 때 js/pu-contract-forms.js 가 채운다 -->
   <div id="formsTree" class="nav-tree"></div>
+  <!-- 서식집 — 노무사 검토(Phase 1) 전이라 누를 수 없다. data-pane 이 없어 칸 오가기에 끼지 않는다 -->
+  <div class="nav sub soon" aria-disabled="true" title="노무사 검토가 끝나면 열립니다">📚 서식집<i>검토 후</i></div>
   <button type="button" class="nav sub" data-pane="co">🏢 기업별 계약서</button>
   <button type="button" class="nav sub" data-pane="arc">🗄 원본 보관함</button>
 </nav>
@@ -161,7 +170,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
-<script src="js/pu-contract-forms.js?v=2"></script>
+<script src="js/pu-contract-forms.js?v=3"></script>
 <script src="js/pu-photo-store.js?v=29"></script>
 <script src="js/pu-office-store.js?v=1"></script>
 <script src="js/pu-office-docs.js?v=1"></script>
@@ -253,7 +262,7 @@ function onFormSelect(id) {
 }
 function showPane(name) {
   Object.keys(PANES).forEach(function (k) { $(PANES[k]).hidden = k !== name; });
-  document.querySelectorAll('.side .nav').forEach(function (b) {
+  document.querySelectorAll('.side .nav[data-pane]').forEach(function (b) {
     var on = b.getAttribute('data-pane') === name;
     b.classList.toggle('on', on);
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
@@ -267,7 +276,7 @@ function showPane(name) {
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
 }
-document.querySelectorAll('.side .nav').forEach(function (b) {
+document.querySelectorAll('.side .nav[data-pane]').forEach(function (b) {
   b.addEventListener('click', function () {
     var name = b.getAttribute('data-pane');
     /* ⚠ 칸이 이미 그 칸이면(예: #forms:x 에서 「계약서 양식」을 다시 누름) 화면은
