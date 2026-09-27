@@ -74,6 +74,16 @@ test('ⓑ 담당자 — 이름이 조금 달라도 같은 회사 명함', () => 
   assert.deepEqual(CF.searchPeople(rows, '3333').map((r) => r.n), ['박근로']);
 });
 
+test('ⓑ 담당자 검색 — 회사 안팎의 명함과 ERP 주담당자를 기본정보로 찾는다', () => {
+  const rows = CF.mergeRows(IDX, { v: { co1: { id:'co1', name:'가나시험상사', bizNo:'1234567890',
+    primaryContactName:'ERP주담당', primaryContactPhone:'010-9999-8888', primaryContactEmail:'main@example.com' } } });
+  const co = CF.searchCompanies(rows, '가나')[0];
+  assert.deepEqual(CF.searchContacts(rows, '', co).map((r) => r.n).sort(), ['ERP주담당', '김담당', '이사원']);
+  assert.equal(CF.searchContacts(rows, '과장', co)[0].n, '김담당');
+  assert.equal(CF.searchContacts(rows, '다른회사', co)[0].n, '박근로', '다른 회사 담당자도 직접 검색할 수 있어야 합니다');
+  assert.equal(CF.searchContacts(rows, '99998888', co)[0].n, 'ERP주담당');
+});
+
 test('ⓑ 값 — 회사·담당자·근로자, 주민번호는 비운다', () => {
   const rows = CF.rowsOf(IDX);
   const co = Object.assign({ sme: '소기업' }, CF.searchCompanies(rows, '가나')[0]);
@@ -84,6 +94,7 @@ test('ⓑ 값 — 회사·담당자·근로자, 주민번호는 비운다', () =
   assert.equal(V.주소, '충남 천안시 시험로 1');
   assert.equal(V.업태, '제조'); assert.equal(V.규모, '소기업');
   assert.equal(V.담당자, '김담당'); assert.equal(V.담당자연락처, '010-0000-1111'); assert.equal(V.담당자이메일, 'kim@example.com');
+  assert.equal(V.담당자직급, '과장'); assert.equal(V.담당자휴대폰, '010-0000-1111');
   assert.equal(V.근로자명, '박근로'); assert.equal(V.근로자이름, '박근로'); assert.equal(V.근로자연락처, '010-0000-3333');
   assert.equal(V.근로자주소, '천안시 시험동 2');
   assert.equal(V.주민번호, ''); assert.equal(V.근로자주민, '');
@@ -183,6 +194,17 @@ test('ⓑ 엑셀 — 표시 없는 기존 서식도 항목명 오른쪽 빈칸�
   assert.match(r.xmls[0], /<c r="F1"><f>1\+1<\/f><v>2<\/v><\/c>/, '수식은 건드리면 안 됩니다');
 });
 
+test('ⓑ 엑셀 — 글꼴·줄바꿈·행높이 XML을 보존하고 글자만 바꾼다', () => {
+  const rich = '<worksheet><sheetData><row r="4" ht="31.5" customHeight="1"><c r="B4" s="9" t="inlineStr"><is>'
+    + '<r><rPr><b/><sz val="11"/></rPr><t>{{회사명}}</t></r><r><rPr><i/></rPr><t> 귀중</t></r>'
+    + '</is></c></row></sheetData></worksheet>';
+  const out = CF.xlsxFill(rich, { 회사명:'가나상사' }).xml;
+  assert.match(out, /<row r="4" ht="31\.5" customHeight="1">/, '행 높이를 바꾸면 안 됩니다');
+  assert.match(out, /<c r="B4" s="9" t="inlineStr">/, '셀 스타일을 바꾸면 안 됩니다');
+  assert.match(out, /<rPr><b\/><sz val="11"\/><\/rPr><t>가나상사<\/t>/, '첫 글꼴 꾸밈을 보존해야 합니다');
+  assert.match(out, /<rPr><i\/><\/rPr><t> 귀중<\/t>/, '표지가 아닌 글자와 꾸밈을 보존해야 합니다');
+});
+
 test('ⓒ 엑셀 배선 — 양식 창이 xlsx 원본을 고르고, 문서관리가 엑셀 길로 보낸다', () => {
   const forms = read('js/pu-contract-forms.js'), html = read('docs-esign.html');
   assert.match(forms, /hwp\|hwpx\|xlsx/, '엑셀 원본을 채울 원본으로 고르지 않습니다');
@@ -196,4 +218,7 @@ test('ⓒ 문서관리는 ERP 업체관리와 기업정보함을 함께 읽고 �
   assert.match(html, /ref\('data\/companies'\)/, 'ERP 업체관리를 읽지 않습니다');
   assert.match(html, /PuFormCardFill\.mergeRows/, 'ERP 업체와 명함을 한 검색목록으로 합치지 않습니다');
   assert.match(forms, /다른 보관본을 확인하는 중/, '선택한 원본이 없어질 때 대체본을 찾지 않습니다');
+  assert.match(forms, /placeholder: '담당자 이름·회사·직급·전화·이메일'/, '담당자 검색칸이 없습니다');
+  assert.match(forms, /CF\.searchContacts\(/, '기업정보함 담당자 검색을 실제로 부르지 않습니다');
+  assert.match(forms, /찾는 명함이 없습니다 — 오른쪽 빈칸에 직접 적으세요/, '검색 결과가 없을 때 직접 입력 안내가 없습니다');
 });

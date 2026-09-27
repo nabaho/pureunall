@@ -112,6 +112,26 @@
     }).slice(0, limit || 20);
   }
 
+  /* 담당자 찾기 — 고른 회사 사람이 먼저, 이름·회사·직급·부서·전화·메일로 찾는다. */
+  function searchContacts(rows, q, company, limit) {
+    q = String(q || '').trim(); var qn = cardNorm(q), qd = digits(q), coKey = sameCo(company && company.c);
+    var pool = (rows || []).filter(function (r) { return r.k === 'card' && r.n; }).slice();
+    (rows || []).filter(function (r) { return r.k === 'erp' && r.primaryContactName; }).forEach(function (r) {
+      pool.push({ k:'erp-contact', c:r.c, n:r.primaryContactName, m:r.primaryContactPhone || '', e:r.primaryContactEmail || '' });
+    });
+    var seen = {}, list = pool.filter(function (r) {
+      var unique = sameCo(r.c) + '|' + cardNorm(r.n) + '|' + digits(r.m || r.t); if (seen[unique]) return false; seen[unique] = 1;
+      if (!q) return coKey && sameCo(r.c) === coKey;
+      if (qd.length >= 3 && digits((r.m || '') + (r.t || '')).indexOf(qd) >= 0) return true;
+      return [r.n, r.c, r.ti, r.d, r.e].some(function (v) { return qn && cardNorm(v).indexOf(qn) >= 0; });
+    });
+    list.sort(function (a, b) {
+      var aa = coKey && sameCo(a.c) === coKey ? 0 : 1, bb = coKey && sameCo(b.c) === coKey ? 0 : 1;
+      return aa - bb;
+    });
+    return list.slice(0, limit || 20);
+  }
+
   function fmtBizNo(s) { var d = digits(s); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5) : String(s || ''); }
   function pad2(n) { return String(n).padStart(2, '0'); }
   function ymd(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
@@ -128,6 +148,7 @@
       주소: s(co.ad), 대표전화: s(co.ct), 대표팩스: s(co.cfx || co.fx), 대표이메일: s(co.e),
       업태: s(co.bt), 종목: s(co.bi), 법인등록번호: s(co.cno), 규모: s(co.sme),
       담당자: s(ct.n), 담당자연락처: s(ct.m || ct.t), 담당자이메일: s(ct.e),
+      담당자직급: s(ct.ti), 담당자부서: s(ct.d), 담당자휴대폰: s(ct.m), 담당자전화: s(ct.t), 담당자주소: s(ct.ad),
       근로자명: s(wk.n), 근로자이름: s(wk.n), 이름: s(wk.n), 근로자명단: s(wk.n),
       근로자연락처: s(wk.m || wk.t), 근로자주소: s(wk.ad),
       근로자수: wk.n ? '1' : '',
@@ -205,6 +226,22 @@
     return /^-?\d+(\.\d+)?$/.test(t) && t.length < 16 && !/^0\d/.test(t) ? +t : null;
   }
   var ONE = /^\x7b\x7b([^\x7b\x7d\n]{1,30})\x7d\x7d$/;
+  function replaceRichText(xml, rep) {
+    var changed = false;
+    var out = String(xml || '').replace(/(<t(?:\s[^>]*)?>)([\s\S]*?)(<\/t>)/g, function (all, o, t, c) {
+      var u = unescXml(t); RE.lastIndex = 0;
+      if (!RE.test(u)) { RE.lastIndex = 0; return all; }
+      RE.lastIndex = 0; changed = true; return o + xmlEsc(rep(u)) + c;
+    });
+    if (changed) return out;
+    var combined = '';
+    String(xml || '').replace(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g, function (all, t) { combined += unescXml(t); return all; });
+    RE.lastIndex = 0; if (!RE.test(combined)) { RE.lastIndex = 0; return String(xml || ''); } RE.lastIndex = 0;
+    var filledText = rep(combined), first = true;
+    return String(xml || '').replace(/(<t(?:\s[^>]*)?>)([\s\S]*?)(<\/t>)/g, function (all, o, t, c) {
+      var value = first ? filledText : ''; first = false; return o + xmlEsc(value) + c;
+    });
+  }
   function xlsxFill(xml, V) {
     var filled = 0;
     var val = function (k) { var v = V && V[k]; return v == null ? '' : String(v); };
@@ -220,13 +257,10 @@
       }
       if (!RE.test(text)) { RE.lastIndex = 0; return all; }
       RE.lastIndex = 0;
-      return '<c ' + a1 + 't="inlineStr"' + a2 + '><is><t xml:space="preserve">' + xmlEsc(rep(text)) + '</t></is></c>';
+      return '<c ' + a1 + 't="inlineStr"' + a2 + '><is>' + replaceRichText(is, rep) + '</is></c>';
     });
-    /* 공유 글자(sharedStrings) 속 표지 — 글자로만 바꾼다 */
-    out = out.replace(/(<t(?:\s[^>]*)?>)([\s\S]*?)(<\/t>)/g, function (all, o, t, c) {
-      var u = unescXml(t); if (u.indexOf('\x7b\x7b') < 0) return all;
-      return o + xmlEsc(rep(u)) + c;
-    });
+    /* 공유 글자도 si 안의 글꼴·줄바꿈·간격 노드를 그대로 둔다. */
+    out = out.replace(/<si(?:\s[^>]*)?>[\s\S]*?<\/si>/g, function (si) { return replaceRichText(si, rep); });
     return { xml: out, filled: filled };
   }
   /* 표시({{회사명}})가 없는 기존 엑셀도 「상호/사업자번호/대표자…」 오른쪽의 빈 서식칸을 채운다.
@@ -235,7 +269,9 @@
     '회사명':'회사명','상호':'회사명','사업장명':'회사명','업체명':'회사명','사업자번호':'사업자번호','사업자등록번호':'사업자번호',
     '대표자':'대표자','대표자명':'대표자','소재지':'주소','사업장주소':'주소','주소':'주소','전화번호':'대표전화','대표전화':'대표전화',
     '팩스':'대표팩스','팩스번호':'대표팩스','이메일':'대표이메일','업태':'업태','종목':'종목','법인등록번호':'법인등록번호',
-    '담당자':'담당자','담당자명':'담당자','담당자연락처':'담당자연락처','담당자이메일':'담당자이메일'
+    '담당자':'담당자','담당자명':'담당자','담당자연락처':'담당자연락처','담당자이메일':'담당자이메일',
+    '담당자직급':'담당자직급','직급':'담당자직급','담당자부서':'담당자부서','부서':'담당자부서',
+    '담당자휴대폰':'담당자휴대폰','휴대폰':'담당자휴대폰','담당자전화':'담당자전화','담당자주소':'담당자주소'
   };
   function xlLabel(text) { return XL_LABELS[String(text || '').replace(/[\s:：·ㆍ()\[\]]/g, '')] || ''; }
   function sharedTexts(xml) {
@@ -287,7 +323,8 @@
 
   var api = {
     BLANK: BLANK, coNorm: coNorm, cardNorm: cardNorm, sameCo: sameCo, coInfoKeys: coInfoKeys, mergeCoInfo: mergeCoInfo,
-    rowsOf: rowsOf, erpRows: erpRows, mergeRows: mergeRows, searchCompanies: searchCompanies, contactsOf: contactsOf, searchPeople: searchPeople,
+    rowsOf: rowsOf, erpRows: erpRows, mergeRows: mergeRows, searchCompanies: searchCompanies, contactsOf: contactsOf,
+    searchPeople: searchPeople, searchContacts: searchContacts,
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
     stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
     xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate
