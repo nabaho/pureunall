@@ -184,7 +184,11 @@ function runZip(fail) {
     },
   };
   vm.createContext(ctx);
-  vm.runInContext(fnOf('loadScriptOnce') + '\n' +
+  /* ⚠ 2026-09-27 — loadScriptOnce 가 외부 주소에 지문(SRI)을 단다(sriPut). 여기엔 «빈 표»를 준다:
+       이 검사가 재는 것은 「사본 먼저 → 안 되면 바깥」 «차례»이고, 지문은
+       photos-cdn-sri.test.js 가 따로 잰다. 빈 표면 sriPut 이 아무것도 안 해 차례가 그대로다. */
+  vm.runInContext('var CDN_SRI = {};\n' + fnOf('sriOf') + '\n' + fnOf('sriPut') + '\n' +
+    fnOf('loadScriptOnce') + '\n' +
     app.match(/const ZIP_LIB_HERE[\s\S]*?\n\}/)[0], ctx);
   return ctx.loadZipLib().then(
     function () { return { tried: tried }; },
