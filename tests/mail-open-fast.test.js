@@ -236,7 +236,21 @@ test('★ index.js 가 mailKeepWarm 을 내보낸다 — 안 하면 두드리는
 
 /* ══════ ⑤ 지문 로그인 부품은 «부를 때» ══════ */
 
-test('★★★ passkey.js 를 실어도 @simplewebauthn/server 는 «안» 실린다 — 모든 함수가 깨어날 때마다 0.4초', () => {
+test('★★★ @simplewebauthn/server 는 «부르는 함수 안»에서만 싣는다 — 파일 맨 위에서 싣지 않는다', () => {
+  /* ⚠ 아래 «실어 보는» 검사는 functions/node_modules 가 있어야 돈다(CI 에는 없다).
+       그래서 글자로도 한 번 본다 — 이 부품을 싣는 자리는 swa() 하나뿐이어야 한다. */
+  const b = strip(PK);
+  const hits = b.split('require("@simplewebauthn/server")').length - 1;
+  assert.equal(hits, 1, '★★★ 지문 로그인 부품을 싣는 자리가 ' + hits + '곳입니다');
+  assert.match(b, /function swa\(\) \{ return _swa \|\| \(_swa = require\("@simplewebauthn\/server"\)\); \}/,
+    '★★★ 부품을 파일 맨 위에서 싣습니다 — 모든 서버 함수가 깨어날 때마다 0.4초');
+  assert.match(b, /let _swa = null;/, '★★ 처음부터 실어 둡니다');
+});
+
+let _ffOk = true;
+try { require.resolve('firebase-functions/v1', { paths: [path.join(ROOT, 'functions')] }); } catch (_) { _ffOk = false; }
+test('★★★ passkey.js 를 실어도 @simplewebauthn/server 는 «안» 실린다 — 모든 함수가 깨어날 때마다 0.4초',
+  { skip: _ffOk ? false : 'functions/node_modules 가 없다(CI) — 위 글자 검사가 대신 지킨다' }, () => {
   const pk = path.join(ROOT, 'functions', 'passkey.js');
   Object.keys(require.cache).forEach((k) => { if (/simplewebauthn|passkey\.js$/.test(k)) delete require.cache[k]; });
   require(pk);
