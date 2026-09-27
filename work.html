@@ -8469,7 +8469,8 @@ function calLoadSrc(){
   if(_calLoading) return _calLoading;
   _calLoading=Promise.all(Object.keys(CAL_SRC).map(function(k){
     return fbDb.ref('data/'+CAL_SRC[k]+'/v').once('value')
-      .then(function(s){ return [k,_peArr(s.val())]; })
+      /* 삭제표시(_deleted) 줄은 뺀다 — 푸른 캘린더에서 지운 근태·일정이 여기 남지 않게 (2026-09-27) */
+      .then(function(s){ var a=_peArr(s.val()); return [k,Array.isArray(a)?a.filter(function(x){ return x && !x._deleted; }):a]; })
       .catch(function(){ return [k,_ls(CAL_SRC[k])]; });
   })).then(function(rows){
     rows.forEach(function(r){ calSrc[r[0]]=r[1]||[]; });

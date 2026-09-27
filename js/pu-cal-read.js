@@ -105,7 +105,9 @@
       var raw = s.val();
       var v = (raw && typeof raw === 'object' && 'v' in raw) ? raw.v : raw;
       _raw[key] = v;
-      return normalize(v);
+      /* 삭제표시(_deleted) 줄은 화면 자료가 아니다 — 이 앱의 지우기가 표시만 남긴다 (2026-09-27) */
+      var n = normalize(v);
+      return Array.isArray(n) ? n.filter(function (x) { return !(x && x._deleted === true); }) : n;
     });
   }
 

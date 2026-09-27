@@ -2854,6 +2854,19 @@ function _dbAsList(v){
   return out;
 }
 if(typeof window !== 'undefined'){ window._dbAsList = _dbAsList; }
+/* ★ 삭제표시(_deleted)가 붙은 줄을 «화면·계산 자료로 안 쓰는» 표 (2026-09-27).
+   푸른 캘린더는 온톨로지 관문이 강제라 근태·일정을 물리 삭제할 수 없고 삭제표시만 남긴다.
+   그 줄이 이알피에서 살아 있는 것처럼 읽히면 연차 사용일·근태 집계·급여에 «지운 연차»가
+   그대로 센다. 그래서 두 겹으로 막는다 —
+     ① 받는 세 길(통째 _fbApplyRecordInner · 건별 _fbApplyOne · 묶음 _fbApplyMany)에서 뺀다
+     ② 어떤 길로든 로컬에 들어와 있어도 dbGet 이 돌려주지 않는다(아래) — 마지막 그물
+   서버에는 표시가 남는다(원본을 지우지 않는다는 온톨로지 규칙).
+   ⚠ 계약·업체처럼 «휴지통»이 있는 표는 넣지 말 것 — 그 표는 표시 붙은 줄을 로컬에 두고
+     휴지통 화면이 보여 준다(TrashBin). 여기 넣으면 휴지통이 텅 빈다.
+   ⚠ 이 자리(dbGet 위)에 둔다 — 스크립트가 켜지는 도중에도 dbGet 이 불린다. */
+var _FB_HIDE_DELETED = { ledger_batches:1, attendance_records:1, my_schedules:1 };
+/* ⚠ 쓰는 자리마다 typeof 로 본다 — 검사가 dbGet·받는 함수만 떼어 상자에 넣고 돌 때 이 표가 없다
+   (ReferenceError 로 죽으면 안 된다). 표가 없으면 예전처럼 장부 묶음만 거른다. */
 function dbGet(k, def){
   var out;
   if(_dbCache.hasOwnProperty(k)){
@@ -2871,7 +2884,14 @@ function dbGet(k, def){
       if(_t0 && window.erpBlameMark) window.erpBlameMark('처음 읽기 '+k, _t0);
     } catch(e){ return def; }
   }
-  if(Array.isArray(def) && !Array.isArray(out)) return _dbAsList(out);
+  if(Array.isArray(def) && !Array.isArray(out)) out = _dbAsList(out);
+  /* ② 마지막 그물 — 삭제표시 줄은 돌려주지 않는다(_FB_HIDE_DELETED 머리글).
+     ⚠ 표시 줄이 없으면 «같은 배열»을 그대로 준다 — 늘 새 배열을 주면 옛 코드의
+       「같은 것인가(===)」 비교가 전부 «바뀌었다»로 읽혀 다시 그리기가 는다. */
+  if((typeof _FB_HIDE_DELETED !== "undefined" ? !!_FB_HIDE_DELETED[k] : k === "ledger_batches") && Array.isArray(out)
+     && out.some(function(x){ return x && x._deleted === true; })){
+    return out.filter(function(x){ return !(x && x._deleted === true); });
+  }
   return out;
 }
 
@@ -10077,7 +10097,7 @@ function _fbApplyRecordInner(k, v, opts){
       var arrValue = normalizeFbValue(v.v);
       /* 통째 동기화 되돌림 모드에서도 삭제표시는 화면 자료로 풀지 않는다.
          건별 모드는 _fbApplyOne 이 같은 처리를 한다. */
-      if(k === 'ledger_batches' && Array.isArray(arrValue)){
+      if((typeof _FB_HIDE_DELETED !== "undefined" ? !!_FB_HIDE_DELETED[k] : k === "ledger_batches") && Array.isArray(arrValue)){
         arrValue = arrValue.filter(function(b){ return b && !b._deleted; });
       }
       try { // [버그수정] 정규식 근사 제거 — 최상위 항목 수만 비교 (_fbLocalCountForShrink 참고)
@@ -10432,11 +10452,12 @@ function _fbRecordUpdate(k, diff, ts){
   return u;
 }
 
+/* _FB_HIDE_DELETED — 삭제표시 줄을 받을 때 빼는 표. 정의는 dbGet 바로 위(일찍 읽혀야 한다). */
 /* 건 하나를 로컬 배열에 끼워 넣는다(있으면 갈아 끼우고, 없으면 더한다). */
 function _fbApplyOne(k, id, val){
   /* 삭제표시는 서버에는 남지만 화면 자료는 아니다. 오래된 기기도 이 표시를 받는 즉시
      해당 묶음을 로컬에서 빼므로, 삭제한 자료가 다시 살아나는 일을 막는다. */
-  if(k === 'ledger_batches' && val && val._deleted){ _fbRemoveOne(k, id); return; }
+  if((typeof _FB_HIDE_DELETED !== "undefined" ? !!_FB_HIDE_DELETED[k] : k === "ledger_batches") && val && val._deleted){ _fbRemoveOne(k, id); return; }
   if(!val || typeof val !== 'object') return;
   var arr = _fbLocalArr(k);
   var at = -1;
@@ -10454,15 +10475,18 @@ function _fbApplyMany(k, pending){
   for(var i=0;i<arr.length;i++){
     if(arr[i] && arr[i].id != null && pos[String(arr[i].id)] === undefined) pos[String(arr[i].id)] = i;
   }
-  var changed = false;
+  var changed = false, 뺄 = Object.create(null);
   ids.forEach(function(id){
     var val = pending[id];
     if(!val || typeof val !== 'object') return;
+    /* 삭제표시 줄은 넣지 않고, 이미 있으면 뺀다(_FB_HIDE_DELETED 머리글) */
+    if((typeof _FB_HIDE_DELETED !== "undefined" ? !!_FB_HIDE_DELETED[k] : k === "ledger_batches") && val._deleted){ 뺄[id] = 1; changed = true; return; }
     var at = pos[id];
     if(at === undefined){ pos[id] = arr.length; arr.push(val); }
     else arr[at] = val;
     changed = true;
   });
+  if(Object.keys(뺄).length) arr = arr.filter(function(x){ return !(x && x.id != null && 뺄[String(x.id)]); });
   if(changed) _fbWriteArr(k, arr, _fbServerU[k]);
 }
 

@@ -225,14 +225,29 @@ test('누가 고쳤는지 남긴다', async () => {
   assert.ok(결과.updatedAt > 0);
 });
 
-test('지우기는 그 자리만 비운다 — 표를 통째로 다시 쓰지 않는다', async () => {
-  const s = 붙이기();
+/* 2026-09-27 — 지우기는 칸을 비우지 않고 «삭제표시»를 남긴다(온톨로지 규칙: 물리 삭제 금지).
+   표시 붙은 줄은 읽는 쪽이 모두 뺀다 — tests/deleted-mark-hidden.test.js 가 그쪽을 지킨다. */
+test('지우기는 «삭제표시»를 남긴다 — 칸을 비우지 않고, 그 한 건만 건드린다', async () => {
+  const s = 붙이기({}, { [자리('att-1')]: { id: 'att-1', date: '2026-09-15', type: 'leave', sid: 'P-001', gcalEventId: 'g1' } });
   const r = await W.remove('attendance_records', 'att-1', { id: 'att-1', date: '2026-09-15' });
   assert.equal(r.ok, true, r.message);
-  assert.strictEqual(s.보낸것[0]['data/attendance_records/v/att-1'], null);
-  /* ⚠ 지우기는 아직 칸을 비우는 update 다 — 온톨로지 관문(강제)은 이것을 «물리 삭제»로 거절한다.
-     삭제 표식(_deleted)으로 바꾸려면 이알피·급여가 표식 붙은 근태를 빼고 세는지부터 확인해야 한다
-     (2026-09-27 남은 일). */
+  const 결과 = s.서버[자리('att-1')];
+  assert.ok(결과, '서버에서 통째로 지웠습니다 — 표시만 남겨야 합니다');
+  assert.equal(결과._deleted, true, '삭제표시가 없습니다');
+  assert.ok(결과.deletedAt > 0 && 결과.deletedBy === '홍길동', '언제·누가 지웠는지가 없습니다');
+  assert.equal(결과.gcalEventId, 'g1', '다른 칸이 사라졌습니다');
+  assert.ok(!s.보낸것.some((x) => x.__kind === 'update'), '칸 비우기(update)를 보냈습니다 — 관문이 거절합니다');
+});
+
+test('★★ 지우기도 온톨로지 관문(강제)을 «실제로» 지난다', async () => {
+  const OW = require(path.join(ROOT, 'js', 'pu-ontology-write.js'));
+  const 속 = 가짜서버({ [자리('att-1')]: { id: 'att-1', date: '2026-09-15', type: 'leave', sid: 'P-001' } });
+  const fb = { database() { return { ref: (p) => 속.ref(p) }; } };
+  OW.installFirebaseCompat(fb, { mode: 'enforce', program: 'cal' });
+  W.attach(fb.database(), { lockedMonths: [], formOf: () => 지도형, who: () => '홍길동' });
+  const r = await W.remove('attendance_records', 'att-1', { id: 'att-1', date: '2026-09-15' });
+  assert.equal(r.ok, true, '관문이 지우기를 거절합니다: ' + r.message);
+  assert.equal(속.서버[자리('att-1')]._deleted, true);
 });
 
 test('지우기도 마감 자물쇠를 지난다', async () => {
