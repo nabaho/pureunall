@@ -7633,13 +7633,35 @@ function autoReadWhyNot() {
   return '';
 }
 
-/* 탭끼리 나눠 쓰는 찜 — { 사진 id: 건 시각 }. 이 PC 안에서만 쓴다. */
+/* 탭끼리 나눠 쓰는 찜 — { 사진 id: { t: 건 탭, at: 건 시각 } }. 이 PC 안에서만 쓴다. */
 function autoClaims() {
   try { return JSON.parse(localStorage.getItem(AUTO_CLAIM_LS) || '{}') || {}; } catch (_) { return {}; }
 }
 function autoClaimsPut(m) {
   try { localStorage.setItem(AUTO_CLAIM_LS, JSON.stringify(m)); } catch (_) {}
 }
+/* ── 찜은 «이 탭»의 이름표를 단다 — 떠날 때 제 것만 푼다 (2026-09-27 원인 조사) ──
+   새 판이 배포되면 js/pu-version.js 가 손을 놓은 탭을 저절로 새로 연다(이날 배포 15번).
+   그때 찜이 남아 있으면 새로 열린 화면이 «제가 건 서류»를 30분 동안 못 건다 —
+   15:16 에 판독이 끊긴 뒤 한 장도 안 이어진 까닭이 이것이었다.
+   ⚠ 남의 탭 찜은 안 건드린다 — 그 탭은 아직 읽고 있을 수 있다. */
+const AUTO_TAB = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+function autoClaimAt(c) { return Number(c && typeof c === 'object' ? c.at : c) || 0; }
+function autoClaimsDrop(ids) {
+  if (!ids || !ids.length) return;
+  const 찜 = autoClaims();
+  ids.forEach(function (id) {
+    const c = 찜[id];
+    if (c && typeof c === 'object' && c.t === AUTO_TAB) delete 찜[id];
+  });
+  autoClaimsPut(찜);
+}
+function autoClaimsDropMine() {
+  const 찜 = autoClaims();
+  autoClaimsDrop(Object.keys(찜));
+}
+/* pagehide — 새로 열기·닫기·다른 곳으로 가기 모두 여기로 온다(unload 보다 확실하다) */
+window.addEventListener('pagehide', autoClaimsDropMine);
 
 /* ⚠ 곧바로 걸지 않고 조금 기다린다. 다른 직원이 올리면 열린 탭이 «한꺼번에» 목록을
      다시 읽는데, 같은 순간에 찜을 보면 둘 다 빈 찜을 보고 같은 장을 건다.
@@ -7658,13 +7680,13 @@ function autoReadGo() {
   const now = Date.now();
   const 찜 = autoClaims();
   Object.keys(찜).forEach(function (k) {
-    if (now - (Number(찜[k]) || 0) > AUTO_CLAIM_MS) delete 찜[k];
+    if (now - autoClaimAt(찜[k]) > AUTO_CLAIM_MS) delete 찜[k];
   });
   const take = p.fresh
     .filter(function (it) { return !찜[it.id] && !readingThis(it.id); })
     .slice(0, Math.min(autoDayLeft(), AUTO_READ_MAX));
   if (!take.length) { autoClaimsPut(찜); renderReadAsk(); return; }
-  take.forEach(function (it) { 찜[it.id] = now; });
+  take.forEach(function (it) { 찜[it.id] = { t: AUTO_TAB, at: now }; });
   autoClaimsPut(찜);
   autoSince += take.length;
   take.forEach(function (it) { queuePhotoRead(it.id, { auto: true }); });
@@ -7732,6 +7754,9 @@ function pumpRead() {
     if (e && e.readTimeout) {
       const left = readQ.splice(0);
       left.forEach(function (j) { if (j) j._queuedRead = false; });
+      /* 시작도 못 한 장들의 찜은 푼다 — 멈춘 것은 그 한 장이지 이 장들이 아니다 */
+      autoClaimsDrop(left.filter(function (j) { return j && j._auto; })
+        .map(function (j) { return j._photoId; }));
       timeoutMessage = '판독 응답이 늦어 남은 ' + left.length
         + '장을 멈췄습니다 — 화면은 계속 사용할 수 있습니다. 잠시 뒤 다시 눌러 주세요.';
       toast(timeoutMessage, 9000);
@@ -7741,6 +7766,10 @@ function pumpRead() {
     readBusy = false;
     readNowId = '';
     readNowAuto = false;
+    /* 끝난 장의 찜을 푼다 — 읽혔으면 더는 «안 읽은 것»이 아니고, 실패했으면 실패 기록이
+       남아 저절로 다시 안 걸린다. ⚠ 늦어서 멈춘 장은 «안 푼다» — 풀면 다음 몫에 또 걸려
+       같은 자리에서 되풀이해 멈춘다. 찜 시간이 지나면 그때 다시 걸린다. */
+    if (job && job._auto && !timeoutMessage) autoClaimsDrop([job._photoId]);
     readRunDone += 1;
     if (job) job._queuedRead = false;
     renderUp();

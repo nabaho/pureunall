@@ -60,12 +60,15 @@ function tab(opts) {
   vm.createContext(ctx);
   vm.runInContext([
     constLine('AUTO_DAY_CAP'), constLine('AUTO_CLAIM_LS'), constLine('AUTO_CLAIM_MS'),
-    constLine('AUTO_READ_MAX'),
+    constLine('AUTO_READ_MAX'), constLine('AUTO_TAB'),
     'var autoSince = ' + (o.since || 0) + ';',
     cutFn(RAW, 'function autoDayLeft('),
     cutFn(RAW, 'function autoReadWhyNot('),
     cutFn(RAW, 'function autoClaims('),
     cutFn(RAW, 'function autoClaimsPut('),
+    cutFn(RAW, 'function autoClaimAt('),
+    cutFn(RAW, 'function autoClaimsDrop('),
+    cutFn(RAW, 'function autoClaimsDropMine('),
     cutFn(RAW, 'function autoReadGo(')
   ].join('\n'), ctx);
   return ctx;
@@ -206,6 +209,43 @@ test('★ 찜은 시간이 지나면 풀린다 — 창을 닫고 떠난 탭의 �
   const t = tab({ ls: ls, fresh: ['p0'] });
   t.autoReadGo();
   assert.equal(t._queued.length, 1, '★ 오래된 찜이 안 풀려 그 서류가 영영 저절로 안 읽힙니다');
+});
+
+/* ══ 2026-09-27 원인 조사 — 배포 때 화면이 저절로 새로 열리면 찜이 남아 30분 동안 못 이었다 ══ */
+
+test('★★★ 화면이 새로 열리면 이어서 읽는다 — 떠난 탭의 찜이 남아 30분 동안 막지 않게', () => {
+  const ls = fakeLs();
+  const 옛화면 = tab({ ls: ls, fresh: ids(4) });
+  옛화면.autoReadGo();
+  assert.equal(옛화면._queued.length, 4);
+  옛화면.autoClaimsDropMine();                      // pagehide — 새로 열기 직전
+  const 새화면 = tab({ ls: ls, fresh: ids(4) });
+  새화면.autoReadGo();
+  assert.equal(새화면._queued.length, 4,
+    '★★★ 새로 열린 화면이 제가 걸던 서류를 못 겁니다 — 배포 한 번에 30분씩 판독이 멎습니다');
+});
+
+test('★★ 떠나는 탭은 «제 찜만» 푼다 — 아직 읽는 다른 탭의 서류를 또 걸면 두 번 읽는다', () => {
+  const ls = fakeLs();
+  const a = tab({ ls: ls, fresh: ['a1', 'a2'] });
+  const b = tab({ ls: ls, fresh: ['b1', 'b2'] });
+  a.autoReadGo(); b.autoReadGo();
+  a.autoClaimsDropMine();
+  const c = tab({ ls: ls, fresh: ['a1', 'a2', 'b1', 'b2'] });
+  c.autoReadGo();
+  assert.deepEqual(c._queued.map(function (q) { return q.id; }).sort(), ['a1', 'a2'],
+    '★★ 떠난 탭이 남의 찜까지 풀었습니다 — 그 탭이 읽고 있는 서류를 또 겁니다');
+});
+
+test('★★ 화면을 떠날 때 찜을 푸는 줄이 «실제로 걸려» 있다', () => {
+  assert.match(RAW, /addEventListener\('pagehide', autoClaimsDropMine\)/,
+    '★★ 푸는 함수를 만들어 놓고 떠날 때 안 부릅니다');
+});
+
+test('★★ 한 장이 끝나면 그 장 찜을 푼다 — 멈춘 장(늦음)은 안 푼다', () => {
+  const pump = stripJs(cutFn(RAW, 'function pumpRead('));
+  assert.match(pump, /job\._auto && !timeoutMessage\) autoClaimsDrop\(\[job\._photoId\]\)/,
+    '★★ 끝난 장의 찜을 안 풀거나, 늦어서 멈춘 장까지 풀어 같은 자리에서 되풀이해 멈춥니다');
 });
 
 test('★ 탭마다 틈을 두고 건다 — 같은 순간에 찜을 보면 둘 다 빈 찜을 본다', () => {
