@@ -5,7 +5,7 @@
      글자로만 보면 조건 하나가 빠져도 이름만 맞으면 통과해 버린다.
 
    못 박는 것(규칙):
-   ① 관리자(위임관리인 포함)는 카카오로 로그인도 연결도 못 한다 — 비밀번호로만.
+   ① 관리자(위임관리인 포함)도 카카오로 연결·로그인한다(대표 지시 2026-09-27 뒤집음).
    ② 재직자가 아니면(익명 로그인·퇴사) 연결도 로그인도 안 된다.
    ③ 다른 카카오로 «바꿔» 연결하면 옛 카카오 길이 지워진다.
    ④ 사번은 화면이 보낸 값이 아니라 명부(uid_roles)에서 꺼낸다.
@@ -136,19 +136,20 @@ test('★ 로그인 안 한 사람은 연결 못 한다', async () => {
   assert.equal(r.status, 401);
 });
 
-test('★★ 관리자·위임관리인은 연결도 로그인도 못 한다', async () => {
+/* 대표 지시 2026-09-27 「관리자도 카카오 로그인되게 해라」 — 처음엔 막았으나 뒤집혔다. */
+test('★★ 관리자·위임관리인도 연결하고 카카오로 들어온다', async () => {
   const K = fresh();
+  const codeOf = { boss: 'cA', deputy: 'cB' };
   for (const uid of ['boss', 'deputy']) {
-    const r = await call(K.kakaoLink, { token: uid, body: { code: 'cA' } });
-    assert.equal(r.status, 403, uid + ' 가 연결됐다');
+    const r = await call(K.kakaoLink, { token: uid, body: { code: codeOf[uid] } });
+    assert.equal(r.body.ok, true, uid + ' 가 연결을 못 했다');
   }
-  /* 연결이 (옛 판에서) 이미 있어도 로그인 표는 안 준다 */
-  const K2 = fresh({ kakao_links: { '111': { uid: 'deputy' }, '222': { uid: 'boss' } } });
-  for (const code of ['cA', 'cB']) {
-    const r = await call(K2.kakaoLoginFinish, { body: { code } });
-    assert.equal(r.status, 403, code + ' 로 관리자 표가 나갔다');
+  for (const uid of ['boss', 'deputy']) {
+    const r = await call(K.kakaoLoginFinish, { body: { code: codeOf[uid] } });
+    assert.equal(r.body.ok, true, uid + ' 가 카카오로 못 들어왔다');
   }
-  assert.equal(issued.length, 0);
+  assert.deepEqual(issued.map((x) => x.uid), ['boss', 'deputy']);
+  assert.equal(issued[0].claims.sid, 'P-001');
 });
 
 test('★ 재직자가 아니면(익명·퇴사) 연결도 로그인도 안 된다', async () => {

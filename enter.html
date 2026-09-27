@@ -1709,8 +1709,7 @@ body.portal-mode #moreFab{display:flex;}
   /* ══ 카카오로 로그인 (2026-09-27, 대표 「추천대로」) ══════════════════════════
      ★ 지문과 달리 «이 기기에 등록했나» 가 아니라 «내 카카오 계정을 이 직원 계정에
        연결했나» 다 — 그래서 로그인 화면 단추는 늘 보이고, 등록·기기 목록도 없다.
-     ★ 관리자 계정은 애초에 서버(kakaoLoginFinish)가 거절한다 — 화면에서도 막을
-       필요는 없지만, 「관리자는 비밀번호로」를 미리 말해 헷갈리지 않게 한다. */
+     ★ 관리자도 카카오로 들어온다(대표 지시 2026-09-27). */
   function kkToast(msg, ms){
     var t = $('kkToast'); if(!t) return;
     t.textContent = msg; t.style.display = 'block';
