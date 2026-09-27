@@ -90,6 +90,10 @@
   .ib{width:34px;height:34px;border-radius:50%;border:none;background:transparent;color:var(--gtext);
     font-size:15px;cursor:pointer;flex-shrink:0;padding:0;font-family:inherit}
   .ib:hover{background:var(--bg)}
+  /* 화면 밝기 고르기 — 지금 무엇인지 글자로 보인다(자동·밝게·어둡게) */
+  .themebtn{border:1px solid var(--gline);background:var(--panel);color:var(--gtext);border-radius:999px;
+    padding:0 11px;height:30px;font-size:12px;cursor:pointer;flex-shrink:0;white-space:nowrap;font-family:inherit}
+  .themebtn:hover{background:var(--bg)}
   .lnk{font-size:12.5px;padding:5px 11px;border:1px solid var(--line);color:var(--sub);background:var(--panel);
     border-radius:8px;cursor:pointer;font-weight:700;flex-shrink:0}
   .lnk.go{border-color:#bfdbfe;color:var(--acc2)}
@@ -514,7 +518,7 @@
 <div id="topbar">
   <span class="brand"><svg viewBox="0 0 100 100" style="width:22px;height:22px;vertical-align:-5px;margin-right:1px"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg> <span class="bt">푸른 캘린더</span></span>
   <span id="tabs"></span>
-  <button class="ib" id="themeToggle" title="어두운 화면으로 바꿉니다">🌙</button>
+  <button class="themebtn" id="themeToggle" title="화면 밝기 — 자동·밝게·어둡게">🌗 자동</button>
   <span id="appslot"></span>
   <span class="avawrap">
     <button id="me" data-avatar="1" title="내 계정">·</button>
@@ -565,24 +569,63 @@ var $ = function(id){ return document.getElementById(id); };
    ⚠ 시스템 설정을 안 따라간다(대표 지시 「2번 수동」) — prefers-color-scheme 을
      안 듣는다. 켠 채로 남기려면 이 기기에서만 기억한다(localStorage) —
      사람 계정이 아니라 «이 화면»의 취향이라 device-local 이 맞다. */
+/* ★ 화면 밝기 — «자동 · 밝게 · 어둡게» 셋 중에 고른다 (대표 지시 2026-09-27
+     「폰에서 화면변동 자동화 기능 만들고 선택할 수 도 있게해라」).
+     예전(2026-09-19 「2번 수동」)에는 단추로만 켜고 껐다 — 이제 «자동»이 하나 더 있다.
+     자동 = 폰(컴퓨터)의 밤 모드 설정을 그대로 따른다. 폰이 밤에 어두워지면 달력도 따라간다.
+   ★ 처음 여는 사람: 폰은 «자동», 컴퓨터는 «밝게»(예전 그대로). 한 번 고르면 그것을 기억한다.
+   ⚠ CSS @media 로 바꾸지 않는다 — 칸·칩 색은 그릴 때 인라인으로 정해져서 CSS 만 바꾸면
+     반쯤만 바뀐다. 그래서 스크립트가 설정을 읽어 data-theme 을 달고 다시 그린다(themeResolve). */
+var 테마차례 = ["auto", "light", "dark"];
+var 테마글 = { auto:"🌗 자동", light:"☀️ 밝게", dark:"🌙 어둡게" };
+function 기기가어둡나(){
+  try{ return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches); }
+  catch(e){ return false; }
+}
+function themeResolve(){
+  S.theme = S.themeMode === "dark" ? "dark"
+    : S.themeMode === "auto" ? (기기가어둡나() ? "dark" : "light") : "light";
+}
 function themeInit(){
   var v = null;
   try{ v = localStorage.getItem("pu_cal_theme"); }catch(e){}
-  S.theme = (v === 'dark') ? 'dark' : 'light';
+  S.themeMode = (v === "auto" || v === "light" || v === "dark") ? v
+    : ((typeof 폰 === "function" && 폰()) ? "auto" : "light");
+  themeResolve();
   themeApply();
+  /* 자동일 때 — 폰이 밤 모드로 바뀌면 그 자리에서 따라간다(다시 열 필요 없다) */
+  try{
+    var mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+    var 따라가기 = function(){
+      if(S.themeMode !== "auto") return;
+      var 전 = S.theme; themeResolve();
+      if(S.theme !== 전){ themeApply(); render(); }
+    };
+    if(mq && mq.addEventListener) mq.addEventListener("change", 따라가기);
+    else if(mq && mq.addListener) mq.addListener(따라가기);
+    /* ⚠ 바뀜 알림이 안 오는 기기·브라우저가 있다(미리보기에서 실제로 안 왔다) —
+       화면이 다시 앞으로 올 때(앱 전환·잠금 풀기)도 한 번 더 본다 */
+    document.addEventListener("visibilitychange", function(){ if(!document.hidden) 따라가기(); });
+    window.addEventListener("focus", 따라가기);
+  }catch(e){}
 }
 function themeApply(){
   document.documentElement.setAttribute("data-theme", S.theme);
   var b = $("themeToggle");
   if(b){
-    b.textContent = S.theme === 'dark' ? '☀️' : '🌙';
-    b.title = S.theme === 'dark' ? '밝은 화면으로 바꿉니다' : '어두운 화면으로 바꿉니다';
+    var 다음 = 테마차례[(테마차례.indexOf(S.themeMode) + 1) % 테마차례.length];
+    b.textContent = 테마글[S.themeMode] || 테마글.light;
+    b.title = "화면: " + (테마글[S.themeMode] || "") + (S.themeMode === "auto" ? " (폰·컴퓨터의 밤 모드를 따라갑니다)" : "")
+      + " — 누르면 " + 테마글[다음];
   }
 }
+/* 누를 때마다 자동 → 밝게 → 어둡게 → 자동 */
 function themeToggle(){
-  S.theme = (S.theme === 'dark') ? 'light' : 'dark';
+  S.themeMode = 테마차례[(테마차례.indexOf(S.themeMode) + 1) % 테마차례.length];
+  themeResolve();
   themeApply();
-  try{ localStorage.setItem("pu_cal_theme", S.theme); }catch(e){}
+  try{ localStorage.setItem("pu_cal_theme", S.themeMode); }catch(e){}
+  toast("화면: " + 테마글[S.themeMode] + (S.themeMode === "auto" ? " — 폰 설정을 따라갑니다" : ""));
   /* 칸·칩 배경은 그릴 때 «미리 정해» 넣는다(인라인) — CSS 변수만으로는 안 따라오니
      판을 바꾼 뒤에는 다시 그려야 한다. 지금 탭이 달력이 아니어도 해롭지 않다. */
   render();

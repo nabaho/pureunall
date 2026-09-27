@@ -84,11 +84,14 @@ test('① mixHex — 원색을 그대로 안 쓴다(옅게 섞는다)', () => {
    내 일정/남의 일정 두 갈래를 따로 봐야 한다 — 그 파일이 그것을 한다. */
 
 
-test('⑥ 어두운판은 «수동»으로만 켜진다 — CSS 미디어로 자동 전환하지 않는다', () => {
+/* 2026-09-27 — 「수동만」은 뒤집혔다(대표 지시 「폰에서 화면변동 자동화 기능 만들고 선택할 수 도 있게」).
+   이제 자동·밝게·어둡게 셋 중에 고른다 — tests/cal-theme-auto.test.js 가 그 규칙을 본다.
+   여기서 지키는 것은 «CSS @media 로 바꾸지 않는다»(칸·칩 인라인 색이 반쯤만 바뀐다)뿐이다. */
+test('⑥ 자동 전환도 CSS 미디어가 아니라 스크립트(data-theme)로 한다 — 칸·칩 색이 함께 바뀌게', () => {
   /* ⚠ 글자 그대로 찾지 않는다 — 「수동으로 간다」를 설명하는 주석 안에도 이 낱말이
      나온다(2026-09-19 에 그래서 한 번 샜다). «CSS 미디어 자리에서 실제로 쓰는지»만 본다. */
   assert.strictEqual(/@media[^{]*prefers-color-scheme/.test(캘린더), false,
-    '@media (prefers-color-scheme…) 로 자동 전환하는 CSS 가 들어왔습니다 — 대표 지시는 수동입니다');
+    '@media (prefers-color-scheme…) 로 바꾸는 CSS 가 들어왔습니다 — 인라인으로 칠한 칸·칩은 안 따라옵니다');
   assert.ok(캘린더.indexOf('id="themeToggle"') >= 0, '단추(id=themeToggle)가 없습니다');
   assert.ok(캘린더.indexOf("$('themeToggle').onclick") >= 0, '단추에 누름 손잡이를 안 겁니다');
   assert.match(캘린더, /setAttribute\("data-theme", S\.theme\)/, '켜고 끄는 표(data-theme)를 안 답니다');
