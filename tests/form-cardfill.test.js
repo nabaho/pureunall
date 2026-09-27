@@ -131,3 +131,33 @@ test('ⓑ 줄 정보는 «값을 넣은 문단만» 걷는다 — 꽉 찬 서식
   const html = read('docs-esign.html');
   assert.match(html, /PuFormCardFill\.stripLinesegsFor\(x, vals\)/, '채우기가 문단만 걷는 길을 쓰지 않습니다');
 });
+
+test('ⓑ 엑셀 — 표지 하나뿐인 칸은 숫자·날짜로, 섞인 글은 글자로, 공유 글자도 바꾼다', () => {
+  const O = '{{', C = '}}', m = (k) => O + k + C;
+  const sheet = '<row r="3"><c r="B3" s="5" t="inlineStr"><is><t xml:space="preserve">' + m('회사명') + '</t></is></c>'
+    + '<c r="D3" s="6" t="inlineStr"><is><t>' + m('계약일') + '</t></is></c>'
+    + '<c r="K3" t="inlineStr"><is><t>' + m('계약금액') + '</t></is></c>'
+    + '<c r="J3" t="inlineStr"><is><t>' + m('담당자') + ' ' + m('담당자연락처') + '</t></is></c>'
+    + '<c r="F3" t="inlineStr"><is><t>' + m('주민번호') + '</t></is></c></row>';
+  const sst = '<sst><si><t>계약자 ' + m('회사명') + '</t></si></sst>';
+  assert.deepEqual(CF.xlsxMarkers([sheet, sst]), ['회사명', '계약일', '계약금액', '담당자', '담당자연락처', '주민번호']);
+  const V = { 회사명: '가나&상사', 계약일: '2026-09-27', 계약금액: '220,000', 담당자: '김', 담당자연락처: '010', 주민번호: '900101-1000000' };
+  const r = CF.xlsxFill(sheet, V);
+  assert.match(r.xml, /<c r="B3" s="5" t="inlineStr"><is><t xml:space="preserve">가나&amp;상사<\/t>/);
+  assert.match(r.xml, /<c r="D3" s="6"><v>46292<\/v><\/c>/, '날짜는 엑셀 날짜 번호로 — 서식의 EDATE 가 셈한다');
+  assert.match(r.xml, /<c r="K3"><v>220000<\/v><\/c>/, '금액은 숫자로');
+  assert.match(r.xml, /김 010/);
+  assert.match(r.xml, /900101-1000000/, '주민번호는 숫자로 바꾸지 않는다(- 가 있다)');
+  assert.equal(CF.xlsxFill(sst, V).xml, '<sst><si><t>계약자 가나&amp;상사</t></si></sst>');
+  assert.equal(CF.excelDate('2026년 9월 27일'), 46292);
+  assert.equal(CF.valuesFrom({ co: { ad: '천안시' } }).우편주소, '(     ) 천안시', '엑셀 틀은 주소 앞 8글자를 우편번호로 자른다');
+  assert.equal(CF.valuesFrom({ co: { ad: '(31000) 천안시' } }).우편주소, '(31000) 천안시');
+});
+
+test('ⓒ 엑셀 배선 — 양식 창이 xlsx 원본을 고르고, 문서관리가 엑셀 길로 보낸다', () => {
+  const forms = read('js/pu-contract-forms.js'), html = read('docs-esign.html');
+  assert.match(forms, /hwp\|hwpx\|xlsx/, '엑셀 원본을 채울 원본으로 고르지 않습니다');
+  assert.match(forms, /accept: '\.hwpx,\.hwp,\.xlsx/, '엑셀을 올릴 수 없습니다');
+  assert.match(html, /if \(formIsXlsx\(name\)\)/, '엑셀을 한글 엔진으로 엽니다');
+  assert.match(read('js/pu-office-store.js'), /'xlsx', 'xls'/, '원본 보관함이 엑셀을 받지 않습니다');
+});

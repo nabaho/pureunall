@@ -18,14 +18,14 @@
 
   var ROOT = 'pu_docs';
   var MAX_BYTES = 25 * 1024 * 1024;
-  var OK_EXT = ['hwp', 'hwpx', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'heic'];
+  var OK_EXT = ['hwp', 'hwpx', 'xlsx', 'xls', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'heic'];
 
   function extOf(name) {
     var m = /\.([a-z0-9]+)$/i.exec(String(name || ''));
     return m ? m[1].toLowerCase() : '';
   }
   function okDocFile(name, size) {
-    if (OK_EXT.indexOf(extOf(name)) < 0) return { ok: false, why: '올릴 수 없는 종류입니다 (한글·PDF·워드·사진만)' };
+    if (OK_EXT.indexOf(extOf(name)) < 0) return { ok: false, why: '올릴 수 없는 종류입니다 (한글·엑셀·PDF·워드·사진만)' };
     if (!(size > 0)) return { ok: false, why: '빈 파일입니다' };
     if (size >= MAX_BYTES) return { ok: false, why: '25MB 를 넘습니다' };
     return { ok: true };

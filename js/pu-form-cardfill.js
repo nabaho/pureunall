@@ -101,8 +101,11 @@
       근로자수: wk.n ? '1' : '',
       /* 기업정보함에 없는 값 — 사람이 적는다 */
       주민번호: '', 근로자주민: '', 주민등록번호: '', 가족연락처: '',
-      오늘날짜: today, 오늘: today, 작성일: today
+      오늘날짜: today, 오늘: today, 작성일: today, 계약일: today
     };
+    /* 엑셀 틀(급여위임계약서_양식)은 주소를 MID(주소,8,…) 로 잘라 쓴다 — 앞 8글자가 「(31068) 」 꼴이라 여긴다.
+       우편번호가 없으면 같은 길이의 빈 괄호를 붙여 글자가 잘리지 않게 한다. */
+    V.우편주소 = !V.주소 ? '' : (/^\(\d{5}\) /.test(V.주소) ? V.주소 : '(     ) ' + V.주소);
     V.근로자상세 = [V.근로자명, V.근로자주소, V.근로자연락처].filter(Boolean).join(' · ');
     return V;
   }
@@ -147,13 +150,60 @@
     }
     return out + src.slice(at);
   }
+  /* ══ 엑셀(.xlsx) 채우기 — XML 을 직접 고친다(모양·수식·그림은 그대로) ══
+     SheetJS 로 다시 저장하면 칸 모양이 날아가서 쓰지 않는다. 틀은 「명단 한 줄에 표지」 꼴 —
+     서식 시트들이 그 줄을 수식으로 끌어오고, 틀에 fullCalcOnLoad 가 있어 엑셀이 열 때 다시 계산한다.
+     · 표지 하나만 든 글자 칸(inlineStr)은 값이 숫자면 숫자 칸, 날짜면 날짜 일련번호로 바꾼다
+       (계약체결일을 EDATE 로 더하고, 공급대가를 셈에 쓰기 때문).
+     · 모르는 값은 빈칸 — 엑셀 서식은 제 밑줄·칸이 있다(한글처럼 밑줄 글자를 넣지 않는다). */
+  function unescXml(s) { return String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&'); }
+  function xlsxMarkers(xmls) {
+    var txt = (xmls || []).map(function (x) {
+      return (String(x || '').match(/<t(?:\s[^>]*)?>[\s\S]*?<\/t>/g) || []).map(function (t) { return unescXml(t.replace(/<[^>]+>/g, '')); }).join('\n');
+    }).join('\n');
+    return markersIn(txt);
+  }
+  function excelDate(v) {
+    var m = /^(\d{4})[-.\/년]\s*(\d{1,2})[-.\/월]\s*(\d{1,2})일?$/.exec(String(v).trim());
+    if (!m) return null;
+    return Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 30)) / 86400000);
+  }
+  function excelNum(v) {
+    var t = String(v).trim().replace(/,/g, '');
+    return /^-?\d+(\.\d+)?$/.test(t) && t.length < 16 && !/^0\d/.test(t) ? +t : null;
+  }
+  var ONE = /^\x7b\x7b([^\x7b\x7d\n]{1,30})\x7d\x7d$/;
+  function xlsxFill(xml, V) {
+    var filled = 0;
+    var val = function (k) { var v = V && V[k]; return v == null ? '' : String(v); };
+    var rep = function (text) {
+      return text.replace(RE, function (_, k) { var v = val(k); if (v !== '') filled++; return v; });
+    };
+    var out = String(xml || '').replace(/<c ([^>]*?)t="inlineStr"([^>]*)><is>([\s\S]*?)<\/is><\/c>/g, function (all, a1, a2, is) {
+      var text = unescXml((is.match(/<t(?:\s[^>]*)?>[\s\S]*?<\/t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ''); }).join(''));
+      var m = ONE.exec(text.trim());
+      if (m) {
+        var v = val(m[1]), n = v === '' ? null : (excelDate(v) != null ? excelDate(v) : excelNum(v));
+        if (n != null) { filled++; return '<c ' + (a1 + a2).replace(/\s+$/, '') + '><v>' + n + '</v></c>'; }
+      }
+      if (!RE.test(text)) { RE.lastIndex = 0; return all; }
+      RE.lastIndex = 0;
+      return '<c ' + a1 + 't="inlineStr"' + a2 + '><is><t xml:space="preserve">' + xmlEsc(rep(text)) + '</t></is></c>';
+    });
+    /* 공유 글자(sharedStrings) 속 표지 — 글자로만 바꾼다 */
+    out = out.replace(/(<t(?:\s[^>]*)?>)([\s\S]*?)(<\/t>)/g, function (all, o, t, c) {
+      var u = unescXml(t); if (u.indexOf('\x7b\x7b') < 0) return all;
+      return o + xmlEsc(rep(u)) + c;
+    });
+    return { xml: out, filled: filled };
+  }
   function safeName(s) { return String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim() || '서류'; }
 
   var api = {
     BLANK: BLANK, coNorm: coNorm, cardNorm: cardNorm, sameCo: sameCo, coInfoKeys: coInfoKeys, mergeCoInfo: mergeCoInfo,
     rowsOf: rowsOf, searchCompanies: searchCompanies, contactsOf: contactsOf, searchPeople: searchPeople,
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
-    stripLinesegsFor: stripLinesegsFor
+    stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill, excelDate: excelDate
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;
