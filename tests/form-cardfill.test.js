@@ -52,6 +52,20 @@ test('ⓑ 회사 찾기 — 등록증 먼저, 명함에만 있는 회사도 한 
   assert.deepEqual(CF.searchCompanies(rows, ''), []);
 });
 
+test('ⓑ ERP 업체관리가 회사 원본이고 기업정보함은 담당자를 보충한다', () => {
+  const companies = { v: { co1: { id: 'co1', name: '가나시험상사', bizNo: '123-45-67890', ceo: 'ERP대표',
+    zipcode: '31000', address: '천안시 ERP로 1', phone: '041-111-2222', fax: '041-111-2223', email: 'erp@example.com',
+    bizType: '서비스', bizCategory: '자문', companySize: '소기업', primaryContactName: '주담당', primaryContactPhone: '010-1111-2222' } } };
+  const rows = CF.mergeRows(IDX, companies);
+  const hit = CF.searchCompanies(rows, '가나')[0];
+  assert.equal(hit.k, 'erp'); assert.equal(hit.companyId, 'co1'); assert.equal(hit.ceo, 'ERP대표');
+  assert.equal(hit.ad, '(31000) 천안시 ERP로 1'); assert.equal(hit.bi, '자문');
+  assert.equal(CF.searchCompanies(rows, 'ERP대표')[0].companyId, 'co1', 'ERP 대표자 이름으로도 찾아야 합니다');
+  const contacts = CF.contactsOf(rows, hit);
+  assert.ok(contacts.some((x) => x.n === '주담당'), 'ERP 주담당자가 빠졌습니다');
+  assert.ok(contacts.some((x) => x.n === '김담당'), '기업정보함 명함 담당자가 빠졌습니다');
+});
+
 test('ⓑ 담당자 — 이름이 조금 달라도 같은 회사 명함', () => {
   const rows = CF.rowsOf(IDX);
   const co = CF.searchCompanies(rows, '가나')[0];
@@ -154,10 +168,32 @@ test('ⓑ 엑셀 — 표지 하나뿐인 칸은 숫자·날짜로, 섞인 글은
   assert.equal(CF.valuesFrom({ co: { ad: '(31000) 천안시' } }).우편주소, '(31000) 천안시');
 });
 
+test('ⓑ 엑셀 — 표시 없는 기존 서식도 항목명 오른쪽 빈칸을 자동으로 채운다', () => {
+  const names = ['xl/worksheets/sheet1.xml', 'xl/sharedStrings.xml'];
+  const sheet = '<worksheet><sheetData><row r="1">'
+    + '<c r="A1" t="s"><v>0</v></c><c r="B1" s="2"/>'
+    + '<c r="C1" t="inlineStr"><is><t>사업자등록번호</t></is></c><c r="D1" s="3"></c>'
+    + '<c r="E1" t="inlineStr"><is><t>계산식</t></is></c><c r="F1"><f>1+1</f><v>2</v></c>'
+    + '</row></sheetData></worksheet>';
+  const sst = '<sst><si><t>상호</t></si></sst>';
+  assert.deepEqual(CF.xlsxMarkersParts(names, [sheet, sst]), ['회사명', '사업자번호']);
+  const r = CF.xlsxFillParts(names, [sheet, sst], { 회사명: '가나&상사', 사업자번호: '123-45-67890' });
+  assert.match(r.xmls[0], /r="B1" s="2" t="inlineStr"[\s\S]*가나&amp;상사/);
+  assert.match(r.xmls[0], /r="D1" s="3" t="inlineStr"[\s\S]*123-45-67890/);
+  assert.match(r.xmls[0], /<c r="F1"><f>1\+1<\/f><v>2<\/v><\/c>/, '수식은 건드리면 안 됩니다');
+});
+
 test('ⓒ 엑셀 배선 — 양식 창이 xlsx 원본을 고르고, 문서관리가 엑셀 길로 보낸다', () => {
   const forms = read('js/pu-contract-forms.js'), html = read('docs-esign.html');
   assert.match(forms, /hwp\|hwpx\|xlsx/, '엑셀 원본을 채울 원본으로 고르지 않습니다');
   assert.match(forms, /accept: '\.hwpx,\.hwp,\.xlsx/, '엑셀을 올릴 수 없습니다');
   assert.match(html, /if \(formIsXlsx\(name\)\)/, '엑셀을 한글 엔진으로 엽니다');
   assert.match(read('js/pu-office-store.js'), /'xlsx', 'xls'/, '원본 보관함이 엑셀을 받지 않습니다');
+});
+
+test('ⓒ 문서관리는 ERP 업체관리와 기업정보함을 함께 읽고 원본 누락 시 다른 보관본을 찾는다', () => {
+  const html = read('docs-esign.html'), forms = read('js/pu-contract-forms.js');
+  assert.match(html, /ref\('data\/companies'\)/, 'ERP 업체관리를 읽지 않습니다');
+  assert.match(html, /PuFormCardFill\.mergeRows/, 'ERP 업체와 명함을 한 검색목록으로 합치지 않습니다');
+  assert.match(forms, /다른 보관본을 확인하는 중/, '선택한 원본이 없어질 때 대체본을 찾지 않습니다');
 });

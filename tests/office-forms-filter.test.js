@@ -116,3 +116,23 @@ test('★ 칩에 가려진 양식을 고르면 칩을 푼다', () => {
   const m = cutFn(stripJs(CF), 'function mount(');
   assert.match(cutFn(m, 'function select('), /shown\(\)\.indexOf\(fm\) < 0/, '고른 양식이 목록에 없는데 칩이 그대로입니다');
 });
+
+/* ── 한 화면에 (대표 지적 2026-09-27 「문서관리 내용이 너무 많이 내려왔다. 한번에 화면 볼수 있게」) ──
+   위에 줄이 다섯(제목·첨부·측 칩·사건유형 칩·찾기) 쌓여 종이가 화면 가운데서 시작했다. */
+test('★★ 위 줄은 둘 — 제목 줄 하나, 칩·찾기·도구 줄 하나', () => {
+  const m = cutFn(stripJs(CF), 'function mount(');
+  const tb = cutFn(m, 'function toolbar(');
+  assert.ok(!/pcf-top2/.test(tb), '★ 첨부 줄이 따로 한 줄을 더 씁니다');
+  const fb = cutFn(m, 'function filterBar(');
+  assert.equal((fb.match(/'class': 'pcf-crow'/g) || []).length, 1, '★ 칩·찾기가 여러 줄로 갈렸습니다');
+  assert.match(fb, /uploadBtn\(/, '파일 업로드·양식 추가가 칩 줄로 안 왔습니다');
+});
+
+test('★★ 목록·종이는 화면 높이에 맞추고 안에서 스크롤 — 페이지가 아래로 늘어나지 않는다', () => {
+  const m = cutFn(stripJs(CF), 'function mount(');
+  assert.match(cutFn(m, 'function drawBody('), /fitHeight\(/, '본문 높이를 화면에 안 맞춥니다');
+  const fit = cutFn(m, 'function fitHeight(');
+  assert.match(fit, /innerHeight/);
+  assert.match(fit, /innerWidth\s*<=\s*700/, '휴대폰(세로로 쌓는 화면)까지 높이를 묶습니다');
+  assert.match(CF, /\.pcf-cols \.pcf-sheetwrap\{[^}]*overflow-y:auto/, '종이 칸이 안에서 스크롤되지 않습니다');
+});

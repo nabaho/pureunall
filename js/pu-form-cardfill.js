@@ -39,12 +39,41 @@
     return out;
   }
 
-  /* idx 객체({id: 줄}) → 배열. 사업자등록증(biz)·명함(card)만 */
+  /* ERP 업체관리(data/companies/v)를 기업정보함 검색줄과 같은 꼴로 바꾼다.
+     문서의 회사 원본은 ERP 업체관리이고, 명함은 담당자 보충자료다. */
+  function erpRows(raw) {
+    var v = raw && raw.v !== undefined ? raw.v : raw;
+    var list = Array.isArray(v) ? v : Object.keys(v || {}).map(function (k) {
+      var x = Object.assign({}, (v || {})[k] || {}); if (!x.id) x.id = k; return x;
+    });
+    return list.filter(function (x) { return x && !x._deleted && (x.name || x.bizNo); }).map(function (x) {
+      var contacts = Array.isArray(x.contacts) ? x.contacts : [];
+      var main = contacts.filter(function (c) { return c && (c.primary || c.isPrimary); })[0] || contacts[0] || {};
+      return { k: 'erp', companyId: x.id || '', c: x.name || '', bz: x.bizNo || '', ceo: x.ceo || '', ceo2: x.ceo2 || '',
+        ad: [x.zipcode ? '(' + String(x.zipcode).replace(/[()]/g, '') + ')' : '', x.address || ''].filter(Boolean).join(' '),
+        ct: x.phone || '', cfx: x.fax || '', e: x.email || '', bt: x.bizType || '', bi: x.bizCategory || x.industry || '',
+        cno: x.corpRegNo || x.corpNo || '', sme: x.companySize || '', wk: x.employmentInsuredCount || '',
+        primaryContactName: x.primaryContactName || main.name || main.n || '',
+        primaryContactPhone: x.primaryContactPhone || main.phone || main.mobile || main.m || '',
+        primaryContactEmail: x.primaryContactEmail || main.email || main.e || '', _erp: x };
+    });
+  }
+  function mergeRows(idx, companies) {
+    var cards = rowsOf(idx), erp = erpRows(companies), out = erp.slice(), claimed = {};
+    erp.forEach(function (r) { var b = digits(r.bz), n = sameCo(r.c); if (b) claimed['b' + b] = 1; if (n) claimed['n' + n] = 1; });
+    cards.forEach(function (r) {
+      if (r.k === 'biz' && (claimed['b' + digits(r.bz)] || claimed['n' + sameCo(r.c)])) return;
+      out.push(r);
+    });
+    return out;
+  }
+
+  /* idx 객체({id: 줄}) → 배열. 사업자등록증(biz)·명함(card)과 ERP 변환줄(erp) */
   function rowsOf(idx) {
     if (Array.isArray(idx)) return idx;
     var v = idx || {};
     return Object.keys(v).map(function (k) { var r = Object.assign({}, v[k] || {}); r._id = k; return r; })
-      .filter(function (r) { return (r.k === 'biz' || r.k === 'card') && (r.c || r.bz || r.n); });
+      .filter(function (r) { return (r.k === 'biz' || r.k === 'card' || r.k === 'erp') && (r.c || r.bz || r.n); });
   }
 
   /* 회사 찾기 — 사업자등록증이 있으면 그것, 없으면 명함에만 있는 회사도 한 줄로 */
@@ -53,9 +82,9 @@
     var qn = cardNorm(q), qd = digits(q), seen = {}, out = [];
     function hit(r) {
       if (qd.length >= 3 && digits(r.bz).indexOf(qd) >= 0) return true;
-      return qn && (sameCo(r.c).indexOf(qn) >= 0 || cardNorm(r.c).indexOf(qn) >= 0 || (r.k === 'biz' && cardNorm(r.ceo).indexOf(qn) >= 0));
+      return qn && (sameCo(r.c).indexOf(qn) >= 0 || cardNorm(r.c).indexOf(qn) >= 0 || ((r.k === 'biz' || r.k === 'erp') && cardNorm(r.ceo).indexOf(qn) >= 0));
     }
-    rows.filter(function (r) { return r.k === 'biz' && hit(r); }).forEach(function (r) {
+    rows.filter(function (r) { return (r.k === 'erp' || r.k === 'biz') && hit(r); }).sort(function (a, b) { return a.k === b.k ? 0 : (a.k === 'erp' ? -1 : 1); }).forEach(function (r) {
       var key = sameCo(r.c) || digits(r.bz); if (seen[key]) return; seen[key] = 1; out.push(r);
     });
     rows.filter(function (r) { return r.k === 'card' && r.c && hit(r); }).forEach(function (r) {
@@ -67,7 +96,10 @@
   /* 그 회사 명함들(담당자 고르기) */
   function contactsOf(rows, co) {
     var key = sameCo(co && co.c); if (!key) return [];
-    return rows.filter(function (r) { return r.k === 'card' && r.n && sameCo(r.c) === key; });
+    var out = rows.filter(function (r) { return r.k === 'card' && r.n && sameCo(r.c) === key; });
+    if (co && co.primaryContactName && !out.some(function (r) { return cardNorm(r.n) === cardNorm(co.primaryContactName); }))
+      out.unshift({ k: 'erp-contact', c: co.c, n: co.primaryContactName, m: co.primaryContactPhone || '', e: co.primaryContactEmail || '' });
+    return out;
   }
   /* 사람 찾기(근로자 본인) — 명함 이름·휴대폰 */
   function searchPeople(rows, q, limit) {
@@ -197,13 +229,68 @@
     });
     return { xml: out, filled: filled };
   }
+  /* 표시({{회사명}})가 없는 기존 엑셀도 「상호/사업자번호/대표자…」 오른쪽의 빈 서식칸을 채운다.
+     셀을 새로 만들지는 않고, 이미 서식이 잡힌 바로 다음 빈 셀만 쓴다. 수식은 절대 덮지 않는다. */
+  var XL_LABELS = {
+    '회사명':'회사명','상호':'회사명','사업장명':'회사명','업체명':'회사명','사업자번호':'사업자번호','사업자등록번호':'사업자번호',
+    '대표자':'대표자','대표자명':'대표자','소재지':'주소','사업장주소':'주소','주소':'주소','전화번호':'대표전화','대표전화':'대표전화',
+    '팩스':'대표팩스','팩스번호':'대표팩스','이메일':'대표이메일','업태':'업태','종목':'종목','법인등록번호':'법인등록번호',
+    '담당자':'담당자','담당자명':'담당자','담당자연락처':'담당자연락처','담당자이메일':'담당자이메일'
+  };
+  function xlLabel(text) { return XL_LABELS[String(text || '').replace(/[\s:：·ㆍ()\[\]]/g, '')] || ''; }
+  function sharedTexts(xml) {
+    return (String(xml || '').match(/<si(?:\s[^>]*)?>[\s\S]*?<\/si>/g) || []).map(function (si) {
+      return unescXml((si.match(/<t(?:\s[^>]*)?>[\s\S]*?<\/t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ''); }).join(''));
+    });
+  }
+  function cellText(cell, shared) {
+    if (/\st="s"/.test(cell)) { var m = /<v>(\d+)<\/v>/.exec(cell); return m ? (shared[+m[1]] || '') : ''; }
+    return unescXml((cell.match(/<t(?:\s[^>]*)?>[\s\S]*?<\/t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ''); }).join(''));
+  }
+  function blankCell(cell) { return !/<f(?:\s|>)/.test(cell) && !/<v>[^<]+<\/v>/.test(cell) && !/<t(?:\s[^>]*)?>[\s\S]*?\S[\s\S]*?<\/t>/.test(cell); }
+  function putCell(cell, value) {
+    var open = /^<c\b([^>]*?)(?:\/>|>)/.exec(cell), attrs = open ? open[1] : '';
+    attrs = attrs.replace(/\s+t="[^"]*"/g, '');
+    var n = value === '' ? null : (excelDate(value) != null ? excelDate(value) : excelNum(value));
+    if (n != null) return '<c' + attrs + '><v>' + n + '</v></c>';
+    return '<c' + attrs + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(value) + '</t></is></c>';
+  }
+  function xlsxFillParts(names, xmls, V) {
+    var out = (xmls || []).slice(), filled = 0, si = (names || []).indexOf('xl/sharedStrings.xml');
+    out = out.map(function (x) { var r = xlsxFill(x, V); filled += r.filled; return r.xml; });
+    var shared = sharedTexts(si >= 0 ? out[si] : '');
+    (names || []).forEach(function (name, ni) {
+      if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) return;
+      out[ni] = out[ni].replace(/<row\b[^>]*>[\s\S]*?<\/row>/g, function (row) {
+        var cells = row.match(/<c\b[^>]*\/>|<c\b[^>]*>[\s\S]*?<\/c>/g) || [], changed = false;
+        for (var i = 0; i + 1 < cells.length; i++) {
+          var key = xlLabel(cellText(cells[i], shared)), value = key && V && V[key] != null ? String(V[key]) : '';
+          if (!key || !value || !blankCell(cells[i + 1])) continue;
+          var newer = putCell(cells[i + 1], value); row = row.replace(cells[i + 1], newer); cells[i + 1] = newer; filled++; changed = true;
+        }
+        return row;
+      });
+    });
+    return { xmls: out, filled: filled };
+  }
+  function xlsxMarkersParts(names, xmls) {
+    var out = xlsxMarkers(xmls), seen = {}; out.forEach(function (k) { seen[k] = 1; });
+    var si = (names || []).indexOf('xl/sharedStrings.xml'), shared = sharedTexts(si >= 0 ? xmls[si] : '');
+    (names || []).forEach(function (name, ni) {
+      if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) return;
+      var cells = String(xmls[ni] || '').match(/<c\b[^>]*\/>|<c\b[^>]*>[\s\S]*?<\/c>/g) || [];
+      cells.forEach(function (cell) { var k = xlLabel(cellText(cell, shared)); if (k && !seen[k]) { seen[k] = 1; out.push(k); } });
+    });
+    return out;
+  }
   function safeName(s) { return String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim() || '서류'; }
 
   var api = {
     BLANK: BLANK, coNorm: coNorm, cardNorm: cardNorm, sameCo: sameCo, coInfoKeys: coInfoKeys, mergeCoInfo: mergeCoInfo,
-    rowsOf: rowsOf, searchCompanies: searchCompanies, contactsOf: contactsOf, searchPeople: searchPeople,
+    rowsOf: rowsOf, erpRows: erpRows, mergeRows: mergeRows, searchCompanies: searchCompanies, contactsOf: contactsOf, searchPeople: searchPeople,
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
-    stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill, excelDate: excelDate
+    stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
+    xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;
