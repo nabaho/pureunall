@@ -237,3 +237,39 @@ test('★ 창고 SDK·보관함 버킷·새 파일을 싣는다', function () {
   assert.match(DOCS, /<script src="js\/pu-photo-store\.js\?v=\d+"><\/script>/);
   assert.match(DOCS, /<script src="js\/pu-contract-forms\.js\?v=([2-9]|\d{2,})"><\/script>/, '★ 캐시 번호를 안 올려 옛 화면이 뜹니다');
 });
+
+/* ── C안 뼈대 (대표 지적 2026-09-27 「왜 대시보드를 왼쪽끝으로 정리 안했나?」) ──
+   틀(.shell)이 1360px 가운데 정렬이라 넓은 화면(1862px)에서 메뉴가 왼쪽 끝에서 250px 떠 있었다. */
+test('★★ 왼쪽 메뉴는 화면 왼쪽 끝에 붙는다 — 틀을 가운데로 묶지 않는다', function () {
+  const css = DOCS.slice(DOCS.indexOf('<style>'), DOCS.indexOf('</style>'));
+  const shell = (css.match(/\.shell\{[^}]*\}/) || [''])[0];
+  assert.ok(shell, '.shell 규칙이 없습니다');
+  assert.ok(!/max-width\s*:\s*\d/.test(shell), '★★ 틀 폭을 묶었습니다 — 넓은 화면에서 메뉴가 왼쪽 끝에서 뜹니다: ' + shell);
+  assert.ok(!/margin\s*:\s*0\s+auto/.test(shell), '★★ 틀을 가운데 정렬했습니다: ' + shell);
+  const side = (css.match(/\.side\{[^}]*\}/) || [''])[0];
+  assert.match(side, /background/, '메뉴 바탕이 없어 본문과 구분되지 않습니다');
+  assert.match(side, /border-right/, '메뉴와 본문 사이 선이 없습니다');
+});
+
+test('★ 메뉴 묶음 — 전자송부 › 집단체불 위임장 / 사무관리서류 › 계약서 양식·서식집(검토 후)·기업별·보관함', function () {
+  const nav = DOCS.slice(DOCS.indexOf('<nav class="side"'), DOCS.indexOf('</nav>'));
+  const at = (s) => nav.indexOf(s);
+  assert.ok(at('전자송부') >= 0 && at('전자송부') < at('data-pane="esign"'), '전자송부가 묶음 머리가 아닙니다');
+  assert.ok(at('data-pane="esign"') < at('사무관리서류'));
+  assert.ok(at('id="formsTree"') < at('서식집') && at('서식집') < at('data-pane="co"'), '서식집 자리가 없거나 순서가 다릅니다');
+  assert.match(nav, /서식집[\s\S]{0,200}aria-disabled="true"|aria-disabled="true"[\s\S]{0,200}서식집/, '서식집은 검토 전이라 누를 수 없어야 합니다');
+});
+
+test('★ 누를 수 없는 메뉴(서식집)는 칸 오가기에 끼지 않는다', function () {
+  const src = stripComments(DOCS);
+  assert.ok(src.indexOf("querySelectorAll('.side .nav')") < 0, "data-pane 없는 메뉴까지 집어 '#null' 로 갑니다 — '.side .nav[data-pane]' 로 고르세요");
+  assert.ok(src.indexOf("querySelectorAll('.side .nav[data-pane]')") >= 0);
+});
+
+test('★★ 뒤로가기 — 주소에 양식이 없으면(#forms) «다른 양식»으로 보지 않는다', function () {
+  /* 첫 화면은 첫 양식을 «조용히» 보여 준다(주소는 #forms 그대로). 이것을 다른 양식으로 보면
+     pu-back 의 첫 빈 걸음을 삼켜 뒤로가기가 한 번 헛돈다(검토 2026-09-27). */
+  const src = stripComments(DOCS);
+  const at = src.indexOf("addEventListener('popstate'");
+  assert.match(src.slice(at, at + 500), /formFromHash\(\) != null/);
+});

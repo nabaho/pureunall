@@ -287,6 +287,66 @@
       return { kind: k.v, label: k.label, icon: k.icon, color: k.color, count: list.length, groups: groups };
     });
   }
+  /* ── C안 거르기 (대표 결정 2026-09-27) — 메뉴는 계약유형까지, 측·사건유형은 본문 위 칩 ──
+     ⚠ 사건유형 이름은 이알피 BIZ_CASE_SEED 와 «같은 이름·같은 순서»다(tests/office-forms-filter.test.js 가 견준다).
+       이알피 「계약서 출력」이 양식 그룹명을 계약의 사건유형 이름과 맞춰 자동 체크하기 때문이다.
+       그래서 새 칸을 만들지 않고 그룹명을 이 목록에서 고르게 한다. */
+  var CASE_TYPES = ['인사', '부해등', '체불', '체당금', '산재등', '산안', '노사', '지원', '교육', '조사', '행심', '징계', '기타'];
+  var SIDES = [{ v: 'worker', label: '근로자측' }, { v: 'employer', label: '사용자측' }, { v: 'both', label: '공통' }];
+  var NO_GROUP = '(미지정)';
+  /* 측 — 사건계약에만. 적힌 값이 먼저, 없으면 본문 칸으로 짐작한다(근로자 칸이 있으면 근로자측:
+     근로자측 양식도 상대 회사 {{회사명}} 을 적는 일이 흔하다). */
+  function sideOf(f) {
+    if (!f || f.kind !== 'case') return null;
+    if (f.side === 'worker' || f.side === 'employer' || f.side === 'both') return f.side;
+    var b = String(f.body || '');
+    if (/\{\{근로자/.test(b)) return 'worker';
+    if (/\{\{(회사명|대표자)\}\}/.test(b)) return 'employer';
+    return 'both';
+  }
+  function groupOf(f) { return (f && String(f.groupName || '').trim()) || NO_GROUP; }
+  function groupRank(g) {
+    var i = CASE_TYPES.indexOf(g);
+    return i >= 0 ? i : (g === NO_GROUP ? 1000 : 500);
+  }
+  /* o = { kind, side?:'all'|'worker'|'employer'|'both', grp?:'all'|이름, q?:검색어 } */
+  function filterForms(forms, o) {
+    o = o || {};
+    var q = String(o.q || '').trim().toLowerCase();
+    var isCase = o.kind === 'case';
+    return (forms || []).filter(function (f) {
+      if (f.kind !== o.kind) return false;
+      if (isCase && o.side && o.side !== 'all' && sideOf(f) !== o.side) return false;
+      if (isCase && o.grp && o.grp !== 'all' && groupOf(f) !== o.grp) return false;
+      if (q && String(f.name || '').toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    }).sort(function (a, b) {
+      if (isCase) {
+        var ga = groupOf(a), gb = groupOf(b), d = groupRank(ga) - groupRank(gb);
+        if (d) return d;
+        if (ga !== gb) return ga.localeCompare(gb);
+      }
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+  }
+  /* 칩 개수 — 측 칩은 사건계약 전체에서, 사건유형 칩은 «고른 측 안에서» 센다 */
+  function facetCounts(forms, kind, side) {
+    var list = (forms || []).filter(function (f) { return f.kind === kind; });
+    var sides = { all: list.length, worker: 0, employer: 0, both: 0 };
+    var by = {};
+    list.forEach(function (f) {
+      var s = sideOf(f);
+      if (s) sides[s]++;
+      if (kind !== 'case') return;
+      if (side && side !== 'all' && s !== side) return;
+      var g = groupOf(f);
+      by[g] = (by[g] || 0) + 1;
+    });
+    var groups = Object.keys(by).sort(function (a, b) { return (groupRank(a) - groupRank(b)) || a.localeCompare(b); })
+      .map(function (g) { return { name: g, count: by[g] }; });
+    return { sides: sides, groups: groups };
+  }
+
   /* 본문을 칸({{…}})과 글로 가른다 — 칸만 딱지로 감싸고 나머지는 글 그대로 넣는다 */
   function splitVars(text) {
     var s = String(text || ''), re = /\{\{[^{}\n]+\}\}/g, outp = [], at = 0, m;
@@ -397,11 +457,28 @@
     + '.pcf-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:1400;display:flex;gap:12px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25)}'
     + '.pcf-toast button{background:#fbbf24;color:#1e293b;border:none;border-radius:5px;padding:3px 10px;font-weight:700;cursor:pointer}'
     + '.pcf-tk{display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;border-radius:6px;padding:5px 8px 5px 24px;font-size:12.5px;color:#334155;cursor:pointer;font-family:inherit;text-align:left}'
-    + '.pcf-tk:hover{background:#eff6ff}.pcf-tk .pcf-car{width:10px;color:#94a3b8;font-size:10px}'
+    + '.pcf-tk:hover{background:#eff6ff}.pcf-tk.on{background:#dbeafe;color:#1e40af;font-weight:700}'
     + '.pcf-tk i{font-style:normal;margin-left:auto;font-size:10.5px;color:#64748b;background:#e2e8f0;border-radius:9px;padding:0 6px}'
-    + '.pcf-tg{padding:4px 8px 2px 40px;font-size:11px;color:#94a3b8}'
-    + '.pcf-tl{display:block;width:100%;background:none;border:none;border-radius:6px;padding:4px 8px 4px 40px;font-size:12px;color:#475569;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit}'
-    + '.pcf-tl:hover{background:#eff6ff}.pcf-tl.on{background:#bfdbfe;color:#1e40af;font-weight:700}.pcf-tl.off{color:#94a3b8;text-decoration:line-through}.pcf-tl.add{color:#2563eb;font-size:11.5px}'
+    + '.pcf-fbar{border:1px solid #e2e8f0;border-top:none;background:#f8fafc;padding:6px 12px;display:flex;flex-direction:column;gap:6px}'
+    + '.pcf-crow{display:flex;flex-wrap:wrap;gap:5px;align-items:center}'
+    + '.pcf-chip{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:99px;padding:3px 11px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap}'
+    + '.pcf-chip:hover{border-color:#93c5fd}.pcf-chip.on{background:#1e40af;border-color:#1e40af;color:#fff;font-weight:700}'
+    + '.pcf-q{flex:1;min-width:140px;max-width:320px;padding:5px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12.5px;font-family:inherit}'
+    + '.pcf-vt{display:flex;gap:4px;margin-left:auto}'
+    + '.pcf-cols{display:flex;align-items:flex-start}'
+    + '.pcf-cols .pcf-sheetwrap{flex:1;min-width:0}'
+    + '.pcf-list{width:250px;flex:none;border:1px solid #e2e8f0;border-top:none;border-right:none;background:#fff;max-height:calc(100vh - 200px);overflow-y:auto;position:sticky;top:0;align-self:flex-start;padding:4px}'
+    + '.pcf-lg{font-size:11px;color:#94a3b8;padding:8px 8px 2px;font-weight:700}'
+    + '.pcf-li{display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;border-radius:6px;padding:6px 8px;font-size:12.5px;color:#334155;cursor:pointer;text-align:left;font-family:inherit}'
+    + '.pcf-li:hover{background:#eff6ff}.pcf-li.on{background:#dbeafe;color:#1e40af;font-weight:700}.pcf-li.off .pcf-ln{color:#94a3b8;text-decoration:line-through}.pcf-li.add{color:#2563eb;font-size:12px}'
+    + '.pcf-ln{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.pcf-sd{flex:none;font-size:10.5px;font-weight:700;border-radius:9px;padding:0 6px}'
+    + '.pcf-sd.worker{background:#dcfce7;color:#166534}.pcf-sd.employer{background:#fef3c7;color:#92400e}.pcf-sd.both{background:#f1f5f9;color:#64748b}'
+    + '.pcf-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;background:#e2e8f0;padding:14px}'
+    + '.pcf-card{border:1px solid #e2e8f0;border-radius:6px;background:#fff;padding:0;cursor:pointer;text-align:left;font-family:inherit;overflow:hidden}'
+    + '.pcf-card:hover{border-color:#93c5fd}.pcf-card.on{outline:2px solid #2563eb}'
+    + '.pcf-thumb{height:150px;overflow:hidden;white-space:pre-wrap;font-family:"Malgun Gothic","맑은 고딕",monospace;font-size:8.5px;line-height:1.5;color:#64748b;padding:12px 14px;border-bottom:1px solid #f1f5f9}'
+    + '.pcf-cn{display:flex;align-items:center;gap:6px;padding:7px 10px;font-size:12px;color:#1e293b}'
     + '.pcf-top{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px 8px 0 0;padding:8px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}'
     + '.pcf-top b{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.pcf-top2{border:1px solid #e2e8f0;border-top:none;padding:6px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#fff}'
@@ -413,12 +490,12 @@
     + '.pcf-body{white-space:pre-wrap;font-family:"Malgun Gothic","맑은 고딕",monospace;font-size:13px;line-height:1.85;color:#1e293b;margin:0}'
     + '.pcf-v{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}'
     + '.pcf-muted{color:#94a3b8}'
-    + '.pcf-home{border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;padding:40px 20px;text-align:center;color:#64748b}'
-    + '.pcf-home .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;max-width:640px;margin:18px auto 0}'
-    + '.pcf-home button{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:12px;cursor:pointer;font-family:inherit;font-size:12.5px;color:#334155}'
-    + '.pcf-home button:hover{border-color:#93c5fd;background:#eff6ff}'
     + '.pcf-msel{display:none;gap:6px;margin-bottom:10px}.pcf-msel select{flex:1;min-width:0;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}'
-    + '@media(max-width:700px){.pcf-msel{display:flex}.pcf-sheetwrap{padding:8px}.pcf-sheet{padding:24px 18px;min-height:0}.pcf-body{font-size:12.5px}}';
+    + '@media(max-width:700px){.pcf-msel{display:flex}.pcf-cols{flex-direction:column;align-items:stretch}'
+    + '.pcf-list{width:auto;position:static;max-height:40vh;border-right:1px solid #e2e8f0}'
+    + '.pcf-crow{flex-wrap:nowrap;overflow-x:auto}.pcf-q{max-width:none}'
+    + '.pcf-cards{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px}'
+    + '.pcf-sheetwrap{padding:8px}.pcf-sheet{padding:24px 18px;min-height:0}.pcf-body{font-size:12.5px}}';
 
   var _toastT = null;
   function toast(msg, undo) {
@@ -493,9 +570,21 @@
     document.addEventListener('keydown', onKey);
 
     var nameIn = el('input', { type: 'text', placeholder: '예: 위임약정서-임금체불' }); nameIn.value = f.name || '';
-    var grpIn = null;
+    var grpIn = null, sideBox = null, sideV = null, sideTouched = false;
     if (f.kind === 'case') {
-      grpIn = el('input', { type: 'text', placeholder: '체당금 / 해고 / 산재', list: 'pcf-case-groups' }); grpIn.value = f.groupName || '';
+      /* 그룹명 = 이알피 사건유형 이름 — 이알피 「계약서 출력」이 이 이름으로 자동 체크한다. 옛 값은 그대로 둔다(직접 입력 가능).
+         ⚠ 보기는 이알피 기본 목록(BIZ_CASE_SEED)이다. 이알피에서 사건유형 이름을 바꾸면 여기 보기에는 안 나온다(직접 입력). */
+      grpIn = el('input', { type: 'text', placeholder: '체당금 / 부해등 / 산재등', list: 'pcf-case-groups' }); grpIn.value = f.groupName || '';
+      /* ⚠ 짐작한 측은 «굳히지» 않는다 — 사람이 단추를 눌렀을 때만 적는다. 안 그러면 새 양식이 빈 본문의
+           짐작(공통)으로 굳어, 나중에 {{근로자명}} 을 넣어도 근로자측 칩에 영영 안 나온다. */
+      sideTouched = f.side === 'worker' || f.side === 'employer' || f.side === 'both';
+      sideV = sideOf(f);
+      sideBox = el('div', { role: 'radiogroup', 'aria-label': '측', style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, SIDES.map(function (s) {
+        var r = el('input', { type: 'radio', name: 'pcf-side', value: s.v });
+        r.checked = s.v === sideV;
+        r.addEventListener('change', function () { if (r.checked) { sideV = s.v; sideTouched = true; } });
+        return el('label', { style: 'display:inline-flex;align-items:center;gap:4px;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12.5px;cursor:pointer' }, [r, s.label]);
+      }).concat(sideTouched ? [] : [el('span', { style: 'font-size:11.5px;color:#64748b', text: '지금은 본문 칸으로 짐작한 값입니다 — 누르면 정해집니다' })]));
     }
     var onIn = el('input', { type: 'checkbox' }); onIn.checked = f.enabled !== false;
     var bodyIn = el('textarea', { placeholder: '예시:\n━━━━━━━━━━━━━━━━━━━━\n        사건위임계약서\n━━━━━━━━━━━━━━━━━━━━\n\n위임인: {{회사명}} (대표 {{대표자}})\n계약금액: {{계약금액}}원' });
@@ -569,6 +658,7 @@
       if (pending > 0) { toast('파일을 올리는 중입니다 — 끝나면 저장하세요'); return; }
       f.name = nameIn.value.trim(); f.body = bodyIn.value; f.enabled = onIn.checked;
       if (grpIn) { var g = grpIn.value.trim(); if (g) f.groupName = g; else delete f.groupName; }
+      if (sideBox && sideTouched && sideV) f.side = sideV;
       if (!f.name) { toast('양식 이름을 넣어 주세요'); nameIn.focus(); return; }
       if (!f.body) { toast('본문을 넣어 주세요'); bodyIn.focus(); return; }
       opts.onSave(f, close);
@@ -580,9 +670,10 @@
       el('div', { 'class': 'pcf-mb' }, [
         el('div', { style: 'display:grid;grid-template-columns:' + (grpIn ? '1fr 180px' : '1fr') + ';gap:10px' }, [
           el('div', null, [el('label', { 'class': 'l', text: '양식 이름 *' }), nameIn]),
-          grpIn ? el('div', null, [el('label', { 'class': 'l', text: '그룹명 (사건유형별 묶음)' }), grpIn,
-            el('datalist', { id: 'pcf-case-groups' }, ['체당금', '해고', '산재', '체불', '징계', '노사관계'].map(function (g) { return el('option', { value: g }); }))]) : null
+          grpIn ? el('div', null, [el('label', { 'class': 'l', text: '사건유형 (이알피 사건유형과 같은 이름)' }), grpIn,
+            el('datalist', { id: 'pcf-case-groups' }, CASE_TYPES.map(function (g) { return el('option', { value: g }); }))]) : null
         ]),
+        sideBox ? el('div', null, [el('label', { 'class': 'l', text: '측 (누가 의뢰하는 계약인가)' }), sideBox]) : null,
         el('label', { style: 'display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:10px;font-size:12.5px' }, [onIn, '활성 (계약서 출력 때 고를 수 있음)']),
         el('div', { 'class': 'pcf-vars' }, [
           el('div', { style: 'font-size:11.5px;font-weight:700;color:#475569;margin-bottom:6px', text: '🔖 칸 (누르면 본문 커서 자리에 들어갑니다)' }),
@@ -612,15 +703,16 @@
     if (!document.getElementById('pcf-css')) {
       var st = document.createElement('style'); st.id = 'pcf-css'; st.textContent = CSS; document.head.appendChild(st);
     }
-    var S = { forms: [], removed: [], sel: host.selected || null, kind: 'company', open: loadOpen(), loaded: false, err: null };
+    /* C안 — 메뉴(host.tree)는 계약유형 6종까지, 측·사건유형은 본문 위 칩, 양식은 본문 목록 (대표 결정 2026-09-27) */
+    var S = { forms: [], removed: [], sel: host.selected || null, kind: 'company', side: 'all', grp: 'all', q: '',
+      view: loadView(), loaded: false, err: null, bodyEl: null };
 
-    function loadOpen() {
-      try { var v = JSON.parse(localStorage.getItem('pcf_tree_open') || 'null'); if (v && typeof v === 'object') return v; } catch (_) {}
-      var all = {}; KINDS.forEach(function (k) { all[k.v] = true; }); return all;
-    }
-    function saveOpen() { try { localStorage.setItem('pcf_tree_open', JSON.stringify(S.open)); } catch (_) {} }
+    function loadView() { try { return localStorage.getItem('pcf_view') === 'card' ? 'card' : 'list'; } catch (_) { return 'list'; } }
+    function saveView() { try { localStorage.setItem('pcf_view', S.view); } catch (_) {} }
     function cur() { return S.sel ? S.forms.filter(function (x) { return x.id === S.sel; })[0] || null : null; }
-    function curKind() { var fm = cur(); return fm ? fm.kind : S.kind; }
+    function curKind() { return S.kind; }
+    function shown() { return filterForms(S.forms, { kind: S.kind, side: S.side, grp: S.grp, q: S.q }); }
+    function resetFilters() { S.side = 'all'; S.grp = 'all'; S.q = ''; }
 
     function load() {
       S.err = null;
@@ -631,7 +723,9 @@
         S.loaded = true;
         var fm = cur();
         if (S.sel && !fm) { S.sel = null; if (host.onSelect) host.onSelect(null); }
-        if (fm) { S.kind = fm.kind; S.open[fm.kind] = true; }
+        if (fm) S.kind = fm.kind;
+        /* 고른 것이 없으면 첫 양식을 «보여만» 준다 — host 에 알리지 않는다(다른 칸을 보는 중이면 끌려온다) */
+        else { var f0 = shown()[0]; S.sel = f0 ? f0.id : null; }
         drawTree(); drawMain();
       }).catch(function (e) { S.err = (e && e.message) || String(e); drawTree(); drawMain(); });
     }
@@ -640,6 +734,8 @@
       return track(changeForms(db, S.removed, fn)).then(function (list) {
         S.forms = list;
         if (S.sel && !cur()) S.sel = null;
+        /* 마지막 양식이 지워지거나 옮겨 가 사라진 사건유형 칩을 계속 누른 채로 두지 않는다 */
+        if (S.grp !== 'all' && !facetCounts(S.forms, S.kind, S.side).groups.some(function (g) { return g.name === S.grp; })) S.grp = 'all';
         drawTree(); drawMain();
         if (okMsg) toast(okMsg, undo);
         return list;
@@ -648,9 +744,24 @@
     function select(id) {
       S.sel = id || null;
       var fm = cur();
-      if (fm) { S.kind = fm.kind; if (!S.open[fm.kind]) { S.open[fm.kind] = true; saveOpen(); } }
+      if (fm && fm.kind !== S.kind) { S.kind = fm.kind; resetFilters(); }
+      /* 칩(측·사건유형)에 가려진 양식을 골랐으면 칩을 푼다 — 종이에는 뜨는데 목록에는 없는 일이 없게.
+         (이름 찾기로 가려진 것은 그대로 둔다 — 글자를 칠 때마다 선택이 바뀌면 안 된다) */
+      if (fm && (S.side !== 'all' || S.grp !== 'all') && shown().indexOf(fm) < 0) { S.side = 'all'; S.grp = 'all'; }
       drawTree(); drawMain();
       if (host.onSelect) host.onSelect(S.sel);
+    }
+    function pickKind(v) {
+      S.kind = v; resetFilters();
+      var f0 = shown()[0];
+      select(f0 ? f0.id : null);
+    }
+    /* 칩을 바꾸면 — 고른 양식이 목록에서 빠졌으면 목록 첫 양식으로 옮긴다 */
+    function setFilter(p) {
+      Object.keys(p).forEach(function (k) { S[k] = p[k]; });
+      var list = shown(), fm = cur();
+      if (!fm || list.indexOf(fm) < 0) { select(list[0] ? list[0].id : null); return; }
+      drawMain();
     }
     /* 파일 하나를 보관함에 — 실패는 던지지 않고 {why} 로 돌려준다(양식 저장은 계속한다) */
     function archiveFile(file, from) {
@@ -742,47 +853,26 @@
     function filesOf(e) { return e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length ? e.dataTransfer.files : null; }
     function modal(o) { o.archiveFile = archiveFile; openModal(o); }
 
-    /* ── 왼쪽 트리 ── */
+    /* ── 왼쪽 메뉴 — 계약유형만(양식 이름은 본문 목록) ── */
     function drawTree() {
       var t = host.tree; if (!t) return;
       t.innerHTML = '';
       if (!S.loaded) return;
-      treeModel(S.forms).forEach(function (k) {
-        var open = !!S.open[k.kind];
-        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk', 'aria-expanded': open ? 'true' : 'false',
-          onclick: function () { S.open[k.kind] = !open; saveOpen(); drawTree(); } },
-          [el('span', { 'class': 'pcf-car', text: open ? '▾' : '▸' }), el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(k.count) })]));
-        if (!open) return;
-        k.groups.forEach(function (g) {
-          if (g.name) t.appendChild(el('div', { 'class': 'pcf-tg', text: '📁 ' + g.name }));
-          g.forms.forEach(function (f) {
-            var on = S.sel === f.id;
-            t.appendChild(el('button', { type: 'button', 'class': 'pcf-tl' + (on ? ' on' : '') + (f.enabled ? '' : ' off'),
-              title: f.name + (f.enabled ? '' : ' (사용 안 함)'), 'aria-current': on ? 'true' : null,
-              onclick: function () { select(f.id); } }, [f.name]));
-          });
-        });
-        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tl add', text: '+ 새 양식',
-          onclick: function () { modal({ kind: k.kind, onSave: save }); } }));
+      KINDS.forEach(function (k) {
+        var n = S.forms.filter(function (f) { return f.kind === k.v; }).length;
+        var on = S.kind === k.v;
+        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
+          onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
       });
     }
 
     /* ── 오른쪽 ── */
     function mobileSelects() {
-      var fm = cur(), kv = curKind();
-      var kSel = el('select', { 'aria-label': '계약 종류', onchange: function () {
-        S.kind = kSel.value;
-        var first = S.forms.filter(function (x) { return x.kind === S.kind; })[0];
-        select(first ? first.id : null);
-      } }, KINDS.map(function (k) {
+      var kSel = el('select', { 'aria-label': '계약 종류', onchange: function () { pickKind(kSel.value); } }, KINDS.map(function (k) {
         var n = S.forms.filter(function (x) { return x.kind === k.v; }).length;
-        return el('option', { value: k.v, text: k.label + ' (' + n + ')', selected: k.v === kv });
+        return el('option', { value: k.v, text: k.icon + ' ' + k.label + ' (' + n + ')', selected: k.v === S.kind });
       }));
-      var fSel = el('select', { 'aria-label': '양식', onchange: function () { select(fSel.value || null); } },
-        [el('option', { value: '', text: '— 양식 고르기 —' })].concat(S.forms.filter(function (x) { return x.kind === kv; }).map(function (x) {
-          return el('option', { value: x.id, text: x.name, selected: !!(fm && fm.id === x.id) });
-        })));
-      return el('div', { 'class': 'pcf-msel' }, [kSel, fSel]);
+      return el('div', { 'class': 'pcf-msel' }, [kSel]);
     }
     function uploadBtn(kind) {
       var upIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.docx,.doc,.pdf', style: 'display:none',
@@ -816,7 +906,7 @@
             text: '🗄 ' + o.name, onclick: function () { if (host.downloadOriginal) host.downloadOriginal(o.fileId, o.name); else toast('보관함이 연결되지 않았습니다'); } }));
         });
         if (!strip.childNodes.length) strip.appendChild(el('span', { text: '원본 파일 없음' }));
-      } else strip.appendChild(el('span', { text: '왼쪽에서 양식을 고르세요' }));
+      } else strip.appendChild(el('span', { text: '목록에서 양식을 고르세요' }));
       var top2 = el('div', { 'class': 'pcf-top2' }, [strip,
         uploadBtn(kind),
         el('button', { type: 'button', 'class': 'pcf-b b', text: '+ 양식 추가', onclick: function () { modal({ kind: kind, onSave: save }); } }),
@@ -840,18 +930,69 @@
         ondrop: function (e) { var fl = filesOf(e); if (fl) { e.preventDefault(); quickUpload(fm.kind, fl); } } }, [sheet]);
       return wrap;
     }
-    function home() {
-      return el('div', { 'class': 'pcf-home' }, [
-        el('div', { style: 'font-size:28px', text: '📄' }),
-        el('div', { style: 'margin-top:6px', text: '왼쪽에서 양식을 고르면 여기에 크게 보입니다' }),
-        el('div', { 'class': 'g' }, treeModel(S.forms).map(function (k) {
-          return el('button', { type: 'button', onclick: function () {
-            S.kind = k.kind; S.open[k.kind] = true; saveOpen();
-            var f0 = k.groups.reduce(function (a, g) { return a.concat(g.forms); }, [])[0];
-            select(f0 ? f0.id : null);
-          } }, [el('div', { style: 'font-size:18px', text: k.icon }), el('div', { text: k.label }), el('div', { style: 'font-size:11px;color:#94a3b8', text: k.count + '개' })]);
-        }))
-      ]);
+    function sideShort(v) { return v === 'worker' ? '근로자' : v === 'employer' ? '사용자' : '공통'; }
+    function chip(label, on, fn) {
+      return el('button', { type: 'button', 'class': 'pcf-chip' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', onclick: fn }, [label]);
+    }
+    /* 칩 줄 — 사건계약: 측 칩 + 사건유형 칩(고른 측 안에서 센 수). 모든 종류: 이름 찾기 · 목록/카드 */
+    function filterBar() {
+      var bar = el('div', { 'class': 'pcf-fbar' });
+      if (S.kind === 'case') {
+        var fc = facetCounts(S.forms, 'case', S.side);
+        bar.appendChild(el('div', { 'class': 'pcf-crow', role: 'group', 'aria-label': '측' },
+          [chip('전체 ' + fc.sides.all, S.side === 'all', function () { setFilter({ side: 'all', grp: 'all' }); })].concat(SIDES.map(function (sd) {
+            return chip(sd.label + ' ' + fc.sides[sd.v], S.side === sd.v, function () { setFilter({ side: sd.v, grp: 'all' }); });
+          }))));
+        bar.appendChild(el('div', { 'class': 'pcf-crow', role: 'group', 'aria-label': '사건유형' },
+          [chip('모든 유형', S.grp === 'all', function () { setFilter({ grp: 'all' }); })].concat(fc.groups.map(function (g) {
+            return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
+          }))));
+      }
+      var q = el('input', { type: 'search', 'class': 'pcf-q', placeholder: '양식 이름 찾기', 'aria-label': '양식 이름 찾기', value: S.q });
+      /* 글자를 칠 때마다 본문만 다시 그린다 — 칩 줄까지 그리면 찾기 칸 커서가 사라진다 */
+      q.addEventListener('input', function () { S.q = q.value; drawBody(); });
+      bar.appendChild(el('div', { 'class': 'pcf-crow' }, [q, el('div', { 'class': 'pcf-vt', role: 'group', 'aria-label': '보기' }, [
+        chip('목록', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
+        chip('카드', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })])]));
+      return bar;
+    }
+    function listCol(list) {
+      var col = el('div', { 'class': 'pcf-list' });
+      if (!list.length) col.appendChild(el('div', { 'class': 'pcf-muted', style: 'padding:14px;font-size:12px', text: '맞는 양식이 없습니다' }));
+      var prev = null;
+      list.forEach(function (f) {
+        if (S.kind === 'case') {
+          var g = groupOf(f);
+          if (g !== prev) { prev = g; col.appendChild(el('div', { 'class': 'pcf-lg', text: g })); }
+        }
+        var on = S.sel === f.id, sd = sideOf(f);
+        col.appendChild(el('button', { type: 'button', 'class': 'pcf-li' + (on ? ' on' : '') + (f.enabled === false ? ' off' : ''),
+          title: f.name + (f.enabled === false ? ' (사용 안 함)' : ''), 'aria-current': on ? 'true' : null, onclick: function () { select(f.id); } }, [
+          el('span', { 'class': 'pcf-ln', text: f.name }),
+          sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null]));
+      });
+      col.appendChild(el('button', { type: 'button', 'class': 'pcf-li add', text: '+ 새 양식', onclick: function () { modal({ kind: S.kind, onSave: save }); } }));
+      return col;
+    }
+    function cardGrid(list) {
+      var grid = el('div', { 'class': 'pcf-cards' });
+      if (!list.length) grid.appendChild(el('div', { 'class': 'pcf-none', style: 'grid-column:1/-1', text: '맞는 양식이 없습니다' }));
+      list.forEach(function (f) {
+        var sd = sideOf(f);
+        grid.appendChild(el('button', { type: 'button', 'class': 'pcf-card' + (S.sel === f.id ? ' on' : ''), title: f.name + ' — 누르면 크게 봅니다',
+          onclick: function () { S.view = 'list'; saveView(); select(f.id); } }, [
+          el('div', { 'class': 'pcf-thumb', text: String(f.body || '본문 없음').slice(0, 260) }),
+          el('div', { 'class': 'pcf-cn' }, [el('span', { 'class': 'pcf-ln', text: f.name }), sd ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null])]));
+      });
+      return grid;
+    }
+    function drawBody() {
+      var box = S.bodyEl; if (!box) return;
+      box.innerHTML = '';
+      var list = shown(), fm = cur();
+      if (S.view === 'card') { box.appendChild(cardGrid(list)); return; }
+      box.appendChild(el('div', { 'class': 'pcf-cols' }, [listCol(list),
+        fm ? paper(fm) : el('div', { 'class': 'pcf-sheetwrap' }, [el('div', { 'class': 'pcf-none', text: '목록에서 양식을 고르세요' })])]));
     }
     function drawMain() {
       root.innerHTML = '';
@@ -862,11 +1003,13 @@
         root.appendChild(wrap); return;
       }
       if (!S.loaded) { wrap.appendChild(el('div', { 'class': 'pcf-none', text: '불러오는 중…' })); root.appendChild(wrap); return; }
-      var fm = cur();
       wrap.appendChild(mobileSelects());
-      wrap.appendChild(toolbar(fm));
-      wrap.appendChild(fm ? paper(fm) : home());
+      wrap.appendChild(toolbar(cur()));
+      wrap.appendChild(filterBar());
+      S.bodyEl = el('div');
+      wrap.appendChild(S.bodyEl);
       root.appendChild(wrap);
+      drawBody();
     }
 
     drawTree(); drawMain();
@@ -886,6 +1029,11 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
+    CASE_TYPES: CASE_TYPES,
+    SIDES: SIDES,
+    sideOf: sideOf,
+    filterForms: filterForms,
+    facetCounts: facetCounts,
     splitVars: splitVars,
     attKey: attKey,
     loadForms: loadForms,
