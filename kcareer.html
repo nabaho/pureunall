@@ -1161,7 +1161,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=18"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
-<script src="js/kcareer-hwpstamp.js?v=3"></script>
+<script src="js/kcareer-hwpstamp.js?v=4"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
@@ -10640,6 +10640,41 @@ function seedStamps(){ try{ if(LS.get(NS+'_stampseed')) return; if(get('stamps')
     arr.push({id:id,name:s.label+'.png',label:s.label,ext:'png',def:i===0,savedAt:new Date().toISOString()}); });
   set('stamps',arr); LS.set(NS+'_stampseed','1'); }catch(e){ console.error('seedStamps',e); } }
 function getDefaultStamp(){ const arr=get('stamps'); return arr.find(function(s){return s.def;})||arr[0]||null; }
+
+/* ── 도장 «크기·자리»를 기억한다 (대표 제보 2026-09-27 「도장과 위치등이 제대로 저장이 안된다」) ──
+   여태 크기(3400)와 위아래(-700)가 «코드에 박혀» 있었다. 그래서 한글에서 옮겨 놓아도
+   다음에 찍으면 또 같은 자리였다 — 서식마다 (인) 칸 크기가 달라 늘 어긋난다.
+   → 도장마다 따로 적어 두고 다음부터 그 값으로 찍는다.
+   ⚠ 값은 도장 기록에 담는다 — 클라우드로 함께 오가서 다른 기기에서도 같다.
+   ⚠ 한 번도 안 고쳤으면 «여태 쓰던 값» 그대로다(오늘 되던 것이 뒷걸음질하면 안 된다). */
+var STAMP_FIT_DEF = { size:3400, dx:0, dy:-700 };
+function stampFit(s){
+  s = s || {};
+  var f = s.fit || {};
+  var n = function(v, d){ v = Number(v); return isFinite(v) ? v : d; };
+  return { size:n(f.size, STAMP_FIT_DEF.size),
+           dx:n(f.dx, STAMP_FIT_DEF.dx),
+           dy:n(f.dy, STAMP_FIT_DEF.dy) };
+}
+/* 한 칸 = 약 1mm(360 HWPUNIT). 크기는 5~40mm 안에서만 — 밖으로 나가면 종이를 벗어난다 */
+function stampFitNudge(id, 무엇, 걸음){
+  var arr=get('stamps'), s=arr.filter(function(x){ return x.id===id; })[0];
+  if(!s){ toast('도장을 찾을 수 없습니다'); return; }
+  var f=stampFit(s);
+  f[무엇] = f[무엇] + 걸음*360;
+  if(f.size < 1800) f.size = 1800;          /* 5mm */
+  if(f.size > 14400) f.size = 14400;        /* 40mm */
+  if(f.dx < -7200) f.dx = -7200; if(f.dx > 7200) f.dx = 7200;
+  if(f.dy < -7200) f.dy = -7200; if(f.dy > 7200) f.dy = 7200;
+  set('stamps', arr.map(function(x){ return x.id===id ? Object.assign({}, x, {fit:f}) : x; }));
+  renderStamps();
+}
+function stampFitReset(id){
+  var arr=get('stamps');
+  set('stamps', arr.map(function(x){ return x.id===id ? Object.assign({}, x, {fit:null}) : x; }));
+  renderStamps(); toast('도장 크기·자리를 처음대로 돌렸습니다');
+}
+function _stampMm(hu){ return Math.round(Number(hu||0)/360*10)/10; }
 const _STAMP_CHK='background-image:linear-gradient(45deg,#e2e8f0 25%,transparent 25%),linear-gradient(-45deg,#e2e8f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e2e8f0 75%),linear-gradient(-45deg,transparent 75%,#e2e8f0 75%);background-size:14px 14px;background-position:0 0,0 7px,7px -7px,-7px 0';
 function renderStamps(){ const grid=document.getElementById('stampGrid'); if(!grid) return;
   const arr=get('stamps'); const cnt=document.getElementById('stampCnt'); if(cnt) cnt.textContent=arr.length?arr.length+'개 · ★ = 기본 도장':'';
@@ -10650,7 +10685,24 @@ function renderStamps(){ const grid=document.getElementById('stampGrid'); if(!gr
     +'<div style="display:flex;align-items:center;gap:4px;padding:5px 6px">'
     +'<button class="btn sm" title="기본 도장으로 지정" style="font-size:12px;padding:2px 6px;'+(s.def?'color:var(--teal)':'color:var(--text-mute)')+'" onclick="setDefaultStamp(\''+s.id+'\')">'+(s.def?'★':'☆')+'</button>'
     +'<span style="flex:1;min-width:0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text" title="이름 변경" onclick="renameStamp(\''+s.id+'\')">'+escapeHtml(s.label||s.name||'도장')+'</span>'
-    +'<button class="btn sm" style="color:var(--red);font-size:11px;padding:2px 6px" onclick="delStamp(\''+s.id+'\',this)">🗑</button></div></div>'; }).join('');
+    +'<button class="btn sm" style="color:var(--red);font-size:11px;padding:2px 6px" onclick="delStamp(\''+s.id+'\',this)">🗑</button></div>'
+    /* ★ 크기·자리 — 여기서 고친 값이 «다음에 찍을 때» 그대로 쓰인다(대표 제보 2026-09-27) */
+    +'<div style="border-top:1px dashed var(--border);padding:5px 6px;font-size:10.5px;color:var(--text-mute)">'
+      +'<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px">'
+        +'<span style="width:26px">크기</span>'
+        +'<button class="btn sm" style="padding:0 6px" onclick="stampFitNudge(\''+s.id+'\',\'size\',-1)">−</button>'
+        +'<b style="min-width:34px;text-align:center">'+_stampMm(stampFit(s).size)+'mm</b>'
+        +'<button class="btn sm" style="padding:0 6px" onclick="stampFitNudge(\''+s.id+'\',\'size\',1)">+</button>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:3px">'
+        +'<span style="width:26px">자리</span>'
+        +'<button class="btn sm" style="padding:0 5px" title="왼쪽으로" onclick="stampFitNudge(\''+s.id+'\',\'dx\',-1)">◀</button>'
+        +'<button class="btn sm" style="padding:0 5px" title="오른쪽으로" onclick="stampFitNudge(\''+s.id+'\',\'dx\',1)">▶</button>'
+        +'<button class="btn sm" style="padding:0 5px" title="위로" onclick="stampFitNudge(\''+s.id+'\',\'dy\',-1)">▲</button>'
+        +'<button class="btn sm" style="padding:0 5px" title="아래로" onclick="stampFitNudge(\''+s.id+'\',\'dy\',1)">▼</button>'
+        +'<button class="btn sm" style="padding:0 5px;margin-left:auto" title="처음대로" onclick="stampFitReset(\''+s.id+'\')">↩</button>'
+      +'</div></div>'
+    +'</div>'; }).join('');
   arr.forEach(function(s){ fileURLAsync(s.id).then(function(u){ if(!u) return; const img=grid.querySelector('img[data-sid="'+s.id+'"]'); if(img) img.src=u; }); }); }
 function _whiteToTransparent(dataURL,cb){ const img=new Image(); img.onload=function(){ try{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const x=c.getContext('2d'); x.drawImage(img,0,0); const d=x.getImageData(0,0,c.width,c.height); const p=d.data; for(let i=0;i<p.length;i+=4){ if(p[i]>232&&p[i+1]>232&&p[i+2]>232) p[i+3]=0; } x.putImageData(d,0,0); cb(c.toDataURL('image/png')); }catch(e){ cb(dataURL); } }; img.onerror=function(){ cb(dataURL); }; img.src=dataURL; }
 async function addStamps(files){ const list=Array.from(files||[]).filter(function(f){ return /^image\//.test(f.type); });
@@ -13561,7 +13613,11 @@ async function rhStampDoc(quiet){
     var xml=await zip.file(n).async('string');
     var at=KcareerHwpStamp.findSpot(xml);
     if(!at) continue;
-    var pic=KcareerHwpStamp.picXml({ id:imgId, orgPx:px, showHU:3400, offY:-700 });
+    /* ★ 크기·자리는 «환경설정 › 도장 보관함»에 적어 둔 값을 쓴다(2026-09-27).
+       ⚠ 여기 숫자를 다시 박지 말 것 — 박으면 대표가 맞춰 둔 자리가 무시된다. */
+    var 맞춤=stampFit(st);
+    var pic=KcareerHwpStamp.picXml({ id:imgId, orgPx:px,
+      showHU:맞춤.size, offX:맞춤.dx, offY:맞춤.dy });
     zip.file(n, KcareerHwpStamp.insertPic(xml, pic, at));
     done++;
     break;   /* 도장은 한 번만 — 여러 장에 찍히면 되돌리기가 어렵다 */
