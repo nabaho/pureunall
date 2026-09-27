@@ -315,8 +315,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-27 푸른ERP AI 도우미 걷어냄(대표 지시)';
-var BUILD_SEQ = 188;
+var ERP_BUILD = '2026-09-27 입금 알림 ↔ 거래내역 잇기 · 출금 저절로 등록 모든 PC 공통';
+var BUILD_SEQ = 189;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -45316,8 +45316,12 @@ function FinanceLedger(props){
        지출을 장부에 적는 것은 사람 대신 하는 일이라, 묻지도 않고 시작하지 않는다.
      ⚠ 켜도 «배운 것»만 등록한다. 처음 보는 적요는 그대로 남아 대표가 고른다.
   */
-  var expAutoS = usePersistedState('ledger_exp_auto_reg', false);
-  var expAutoReg = expAutoS[0]; var setExpAutoReg = expAutoS[1];
+  /* ★ 2026-09-27 — PC 마다 따로(localStorage)였다. 대표가 한 PC 에서 켜도 다른 PC 는 꺼진 채라
+       출금 미처리가 609건까지 쌓였다. 이제 «모든 PC 공통»(app_settings.ledgerExpAutoReg — 이미 모든 PC 가 받는 칸) — 켜는 것은 여전히 사람이다. */
+  var _expAutoLocal = usePersistedState('ledger_exp_auto_reg', false);
+  var expAutoRegS = useState(function(){ var st = dbGet('app_settings', {}) || {}; return (typeof st.ledgerExpAutoReg === 'boolean') ? st.ledgerExpAutoReg : !!_expAutoLocal[0]; });
+  var expAutoReg = expAutoRegS[0];
+  function setExpAutoReg(v){ v = !!v; expAutoRegS[1](v); _expAutoLocal[1](v); var cur = dbGet('app_settings', {}) || {}; dbSet('app_settings', Object.assign({}, cur, { ledgerExpAutoReg:v })); }
   var dragS=useState(false);   var dragOver=dragS[0];   var setDragOver=dragS[1];
   var sugOpenS=useState({});   var sugOpen=sugOpenS[0]; var setSugOpen=sugOpenS[1]; // 후보 펼침 (행별)
   /* 입금/출금 탭 — 평소에는 «마지막에 보던 탭» 을 기억한다.
@@ -45730,6 +45734,53 @@ function FinanceLedger(props){
     }
   }
 
+  /* ══ 입금 알림 ↔ 거래내역 잇기 (대표 「추천대로」 2026-09-27) ══
+     ■ 무엇이 있었나 — 문자 입금 알림(「💰 입금 사업장 확인」)과 거래내역이 따로 놀았다.
+       「확인 완료」는 알림만 닫고 입금 기록은 안 만들었고, 거래내역에서 같은 입금을 확정해도
+       알림은 그대로였다 — 같은 입금을 두 번 손봐야 했다(2026-09-27 51건이 쌓여 있었다).
+     ★ 거래내역에서 «같은 날·같은 금액» 입금이 처리(확정·등록)되거나 보류되면 그 알림을 닫는다.
+       ⚠ 메모로 잇지 않는다 — 문자 메모(「계좌번호 680******… 가나상사」)와 은행 엑셀 메모는
+         꼴이 달라 같은 입금이 다른 열쇠가 된다(9/27 실측: 처리 기록 447건 중 문자 꼴 0건).
+       ⚠ 같은 날·같은 금액 알림이 처리 기록보다 많으면 «아무것도 안 닫는다» — 어느 것인지 모른다.
+       ⚠ 알림을 닫을 뿐이다. 입금 기록·사무관리 자료는 거래내역 확정이 만든다(여기서 안 만든다). */
+  function _hanaDA(date, amount){ return String(date||'').replace(/[.\/]/g,'-').slice(0,10) + '|' + (parseInt(amount,10)||0); }
+  var hanaSettleBusy = useRef(false);
+  async function hanaSettleFromLedger(list){
+    if(!_meNow().isAdmin || hanaSettleBusy.current) return;
+    list = (list || []).filter(function(a){ return a && a.alertKey && a.status !== 'resolved'; });
+    if(!list.length) return;
+    var done = {};
+    try{
+      var st = erpBankProcessedStore();
+      Object.keys(st).forEach(function(k){ var v = st[k]; if(v && v.kind === 'income'){ var dk = _hanaDA(v.date, v.amount); done[dk] = (done[dk]||0) + 1; } });
+      (dbGet('ledger_held', []) || []).forEach(function(hd){ if(hd){ var dk = _hanaDA(hd.date, hd.amount); done[dk] = (done[dk]||0) + 1; } });
+    }catch(_e){ return; }
+    var need = {};
+    list.forEach(function(a){ var dk = _hanaDA(a.date, a.amount); (need[dk] = need[dk] || []).push(a); });
+    var close = [];
+    Object.keys(need).forEach(function(dk){ if((done[dk]||0) >= need[dk].length) close = close.concat(need[dk]); });
+    if(!close.length) return;
+    hanaSettleBusy.current = true;
+    var shut = {};
+    for(var i = 0; i < close.length; i++){
+      try{ await hanaSmsCall('adminResolve',{alertKey:close[i].alertKey,resolution:'ledger'}); shut[close[i].alertKey] = 1; }catch(_re){ }
+    }
+    hanaSettleBusy.current = false;
+    var n = Object.keys(shut).length;
+    if(n){
+      setHanaAlerts(function(prev){ return (prev||[]).filter(function(x){ return !shut[x.alertKey]; }); });
+      showToast('🔗 거래내역에서 처리한 입금 ' + n + '건의 알림을 닫았습니다');
+    }
+  }
+  useEffect(function(){ hanaSettleFromLedger(hanaAlerts); }, [hanaAlerts.length, rows]);
+  /* 알림에서 「거래내역에서 이 입금 보기」 — 그 입금 줄을 열어 짝 맞추기 추천을 바로 보인다.
+     ⚠ 거르개(오늘만·상태·달)를 풀어야 줄이 보인다. 못 찾으면 까닭을 말한다(조용히 안 넘어간다). */
+  var hanaJumpS = useState(null); var hanaJump = hanaJumpS[0]; var setHanaJump = hanaJumpS[1];
+  function hanaJumpTo(a){
+    setHanaAlertOpen(false);
+    setLdTab('inc'); setFileType('bank'); setLdStF(''); setLdOnlyToday(false); setIncMon('');
+    setHanaJump({ txId:String(a.txId||''), dk:_hanaDA(a.date, a.amount), at:Date.now() });
+  }
   async function resolveHanaAdminAlert(item){
     if(!item || !item.alertKey) return;
     try{
@@ -47171,6 +47222,20 @@ function FinanceLedger(props){
     window.addEventListener('keydown', onKey, true);
     return function(){ window.removeEventListener('keydown', onKey, true); };
   });
+  /* 알림에서 넘어온 입금 줄 찾기 — 문자 번호(originId)가 먼저, 없으면 같은 날·같은 금액이 «하나뿐»일 때 */
+  useEffect(function(){
+    if(!hanaJump) return;
+    var idx = -1;
+    for(var i = 0; i < incList.length; i++){ if(hanaJump.txId && incList[i].originId === hanaJump.txId){ idx = i; break; } }
+    if(idx < 0){
+      var same = [];
+      incList.forEach(function(r, j){ if(_hanaDA(r.date, r.amount) === hanaJump.dk) same.push(j); });
+      if(same.length === 1) idx = same[0];
+    }
+    setHanaJump(null);
+    if(idx < 0){ showToast('이 입금 줄을 거래내역에서 못 찾았습니다 — 아직 안 들어왔거나 같은 날 같은 금액이 여럿입니다'); return; }
+    setLdCur(idx); setOpenRow(incList[idx]._k);
+  }, [hanaJump, incList.length]);
   // 커서가 화면 밖에 있으면 따라 구른다 — 안 보이는 줄을 Enter 로 확정하면 안 된다
   useEffect(function(){
     if(ldCur < 0) return;
@@ -47816,7 +47881,7 @@ function FinanceLedger(props){
         h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',marginBottom:'12px'}},
           h('div',null,
             h('strong',{style:{fontSize:'19px',color:'#1e293b'}},'💰 입금 사업장 확인 '+hanaAlerts.length+'건'),
-            h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'3px'}},'총괄관리자 전용 · 거래내역에서 확인 후 완료 처리하세요')),
+            h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'3px'}},'총괄관리자 전용 · 거래내역에서 확정하면 저절로 닫힙니다')),
           h('button',{onClick:function(){setHanaAlertOpen(false);},'aria-label':'닫기',style:{border:0,background:'#f8fafc',borderRadius:'9px',width:'34px',height:'34px',cursor:'pointer',fontSize:'18px'}},'×')),
         !hanaAlerts.length && h('div',{style:{padding:'28px 8px',textAlign:'center',color:'#64748b'}},'확인할 새 입금이 없습니다.'),
         hanaAlerts.map(function(a){
@@ -47830,7 +47895,9 @@ function FinanceLedger(props){
             h('div',{style:{marginTop:'9px',fontSize:'13px',fontWeight:800,color:missing?'#854d0e':'#1e40af'}},
               missing?'사무관리에서 내용을 입력 또는 확인해야 합니다.':('입금 사업장 후보: '+String(a.companyName||'확인 필요'))),
             h('div',{style:{display:'flex',gap:'7px',marginTop:'11px',flexWrap:'wrap'}},
-              missing && h('button',{onClick:function(){setHanaAlertOpen(false);window.navigateTo('biz/contract');},style:{flex:'1 1 150px',padding:'9px',border:'1px solid #fbbf24',background:'#fff',color:'#854d0e',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'사무관리 입력·확인'),
+              /* 2026-09-27 — 짝 맞추기 추천은 거래내역에 있다. 그 줄을 바로 연다 */
+              h('button',{onClick:function(){hanaJumpTo(a);},title:'거래내역에서 이 입금 줄을 열어 짝 맞추기 추천을 봅니다',style:{flex:'1 1 150px',padding:'9px',border:'1px solid #bfdbfe',background:'#eff6ff',color:'#1e40af',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'거래내역에서 이 입금 보기'),
+              a.officeStatus==='missing' && h('button',{onClick:function(){setHanaAlertOpen(false);window.navigateTo('biz/contract');},title:'맞는 계약이 아직 없으면 먼저 만듭니다',style:{flex:'1 1 150px',padding:'9px',border:'1px solid #fbbf24',background:'#fff',color:'#854d0e',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'계약 먼저 만들기'),
               h('button',{onClick:function(){resolveHanaAdminAlert(a);},style:{flex:'1 1 130px',padding:'9px',border:0,background:'#2563eb',color:'#fff',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'확인 완료'))
           );
         })
