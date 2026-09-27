@@ -742,6 +742,8 @@ const MB = require("./mail-bulk");
 const NL = require("./news-lock");
 /* 자동발송 확정본이 «준비한 그때 그대로»인지 재는 자 — 다르면 안 보낸다 */
 const NR = require("./news-ready");
+/* 금요일 13시 자동 준비 · 월요일 다시 봉인 (대표 지시 2026-09-27) — functions/news-friday.js */
+const NF = require("./news-friday");
 
 exports.sendBulkMail = functions
   .region(MAIL_REGION)
@@ -1086,7 +1088,8 @@ exports.weeklyNewsletterSend = functions
       db.ref("newsletter/weeklyReady").once("value"),
     ]);
     const config = cSnap.val() || {};
-    const ready = rSnap.val() || {};
+    /* ⚠ let — 자동 확정본을 «지금 내용»으로 다시 봉인하면 이 값이 바뀐다(아래 NF.확정본다시짓기) */
+    let ready = rSnap.val() || {};
     const today = NewsletterWeekly.todaySeoul(Date.now());
     const gate = NewsletterWeekly.check(config, ready, today);
     if (!gate.ok) {
@@ -1127,7 +1130,29 @@ exports.weeklyNewsletterSend = functions
       const 바탕 = {};
       (await Promise.all(바탕칸.map((k) => issueRef.child(k).once("value"))))
         .forEach((s, i) => { 바탕[바탕칸[i]] = s.val(); });
-      const 볼까 = NR.내보낼까(ready, 바탕);
+      let 볼까 = NR.내보낼까(ready, 바탕);
+      /* ★★ 금요일 «자동» 확정본인데 주말에 고치셨으면 «지금 내용»으로 다시 봉인한다
+           (대표 지시 2026-09-27 「금요일에 … 알림 주고 검토해달라고 해라」).
+         검토해 달라고 해 놓고 고치신 것을 «안 보내면» 거꾸로다 — 고치셨는데 아무것도
+         안 나가고, 대표님은 나간 줄 아신다.
+         ⚠ «사람이» 준비한 확정본(자동 아님)은 예전 그대로 안 보낸다 — 거기서는 누르신
+           그 순간의 편지가 약속이다.
+         ⚠ 다시 지을 때도 AI·담기는 안 한다 — 고치신 그대로를 봉인할 뿐이다. */
+      if (!볼까.ok && 볼까.다름 && ready.자동 === true) {
+        const 새 = await NF.확정본다시짓기({ db, 회차열쇠: ready.회차열쇠, 보낼날: ready.보낼날, now: Date.now() });
+        if (새.ok) {
+          const 다시 = Object.assign({}, 새.확정본, { 상태: "거는중" });
+          await db.ref("newsletter/weeklyReady").set(다시);
+          ready = 다시;
+          const 새바탕 = {};
+          (await Promise.all(바탕칸.map((k) => issueRef.child(k).once("value"))))
+            .forEach((s, i) => { 새바탕[바탕칸[i]] = s.val(); });
+          볼까 = NR.내보낼까(ready, 새바탕);
+          console.log("[뉴스레터 자동발송] 주말에 고친 내용으로 다시 봉인했습니다 — " + (볼까.ok ? "맞음" : 볼까.까닭));
+        } else {
+          볼까 = { ok: false, 까닭: "고친 내용으로 다시 짓지 못했습니다 — " + (새.까닭 || "") };
+        }
+      }
       if (!볼까.ok) {
         await db.ref("newsletter/weeklyReady").update({
           상태: "어긋남", 어긋난때: Date.now(), 오류: 볼까.까닭,
@@ -1189,6 +1214,61 @@ exports.weeklyNewsletterSend = functions
       });
       throw e;
     }
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   금요일 13시 — 월요일 뉴스레터를 서버가 준비하고 대표님께 검토 메일 (2026-09-27)
+   ══════════════════════════════════════════════════════════════════════════
+   대표 지시 「매주 금요일 13시에 자동으로 기사와 내용을 정리해서 저장하고 월요일에
+   자동으로 보낼수 있게」 · 「금요일에 370-6 메일로 보내서 월요일 보낼것이라는 알림 주고
+   검토해달라고 해라」. 하는 일은 functions/news-friday.js 머리말.
+   ⚠ 끄는 곳: newsletter/config/금요일준비 = false (설정 화면). 월요일 발송은 따로
+     newsletter/config/자동발송 이 켜져 있어야 나간다 — 꺼져 있으면 검토 메일이 그렇게 말한다.
+   ⚠ AI 는 readDoc 과 «같은 문»을 지난다 — 같은 열쇠 · 같은 달 한도 · 같은 셈(app:news).
+     한도가 차면 AI 만 건너뛰고 나머지는 한다(검토 메일에 적힌다).
+   ⚠ 배포는 이름을 찍어서: firebase deploy --only functions:weeklyNewsletterPrepare */
+exports.weeklyNewsletterPrepare = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 540, memory: "1GB",
+             secrets: ["GEMINI_KEY", "DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"] })
+  .pubsub.schedule("every friday 13:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const ai = async (글, cfg) => {
+      const 몫 = await aiMonthSpend();
+      if (몫.known && 몫.over) throw new Error("이번 달 AI 한도를 다 썼습니다");
+      const key = await readGeminiKey();
+      if (!key) throw new Error("AI 키가 없습니다");
+      const r = await DR.callGemini(fetch, key, [{ text: 글 }], null, cfg || {});
+      await bumpReadTally("news", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+      if (!r.ok) throw new Error(r.why || ("AI 오류 " + (r.status || "")));
+      const parts = (r.json && r.json.candidates && r.json.candidates[0]
+        && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
+      return parts.map((p) => (p && p.text) || "").join("").replace(/```json|```/g, "").trim();
+    };
+    const 메일 = async (편) => {
+      const MBhere = require("./mail-bulk");
+      const 계정주소 = await mailUserAsync();
+      const 설정 = (await db.ref("newsletter/config").once("value")).val() || {};
+      const from = MBhere.보내는주소고르기(설정.보내는주소, 계정주소);
+      return MD.deliver({ db, body: 편, from, pass: mailPass(from),
+        envId: process.env.DAUM_MAIL_ID, byEmail: NF.준비한이,
+        deps: { getStorage: getStorage }, uid: "" });
+    };
+    const 보고 = await NF.금요일준비({ db, ai, 메일, now: Date.now() });
+    /* 한 줄 기록 — 화면이 「금요일 준비가 돌았나」를 볼 수 있게. 글·주소는 안 남긴다. */
+    await db.ref("newsletter/fridayLog/" + 보고.오늘).set({
+      때: Date.now(), 회차: 보고.열쇠, 보낼날: 보고.보낼날,
+      건너뜀: 보고.건너뜀 || null, 확정본: 보고.확정본됨 === true, 받는수: 보고.받는수 || 0,
+      AI기사: 보고.AI기사 || 0, AI한마디: 보고.AI한마디 === true,
+      자동발송켜짐: 보고.자동발송켜짐 === true, 알림: (보고.알림들 || []).slice(0, 5),
+      못한까닭: 보고.못한까닭 || null,
+      메일: 보고.메일 ? (보고.메일.ok ? "보냄" : String(보고.메일.error || "실패").slice(0, 200)) : null
+    }).catch((e) => console.warn("[금요일 준비] 기록 못 남김", e.message));
+    console.log("[금요일 준비]", JSON.stringify({ 회차: 보고.열쇠, 건너뜀: 보고.건너뜀, 확정본: 보고.확정본됨,
+      받는수: 보고.받는수, AI기사: 보고.AI기사, AI한마디: 보고.AI한마디, 메일: 보고.메일 && 보고.메일.ok }));
+    return null;
   });
 
 // ═══ 사진첩 — 서버 쪽 사진 이사 (2026-08-13, PR #192 뒤) ═══

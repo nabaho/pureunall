@@ -50,9 +50,17 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
      2026-09-27 메일 열기 따뜻하게 두기(업무 시간 3분마다, mailKeepWarm)가 늘어 열하나가 됐다 —
        대표 지시 「메일을 열면 늦게 나온다 — 완전히 고쳐라」. 업무 시간에만 돌아 아래 292 에는 안 넣고
        화면에 «따로» 적었다.
+     2026-09-27 거래처 뉴스레터 금요일 준비(오후 1:00, weeklyNewsletterPrepare)가 늘어 열둘이 됐다 —
+       대표 지시 「매주 금요일 13시에 자동으로 기사와 내용을 정리해서 저장하고 월요일에 자동으로
+       보낼수 있게」. ★ AI 로 기사·한마디를 정리하므로 «비용이 드는» 자동이다 — 그래서 화면에
+       「(AI 정리)」를 붙여 적었다. 주 1회라 아래 292 에는 안 넣는다.
      화면 문구도 같이 고쳤다. 다음에 또 늘면 여기와 화면을 함께 고쳐야 한다. */
   const all = (FIDX + FSYNC).match(/\.pubsub\.schedule\(/g) || [];
-  assert.strictEqual(all.length, 11, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  assert.strictEqual(all.length, 12, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
+  assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
+    && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
+    '금요일 준비가 화면 설명에 없거나, AI 를 쓴다는 말이 빠졌다');
   /* ☕ 따뜻하게 두기 — 화면에 적힌 «언제·몇 분마다·하루 몇 번»이 코드와 같아야 한다 */
   const kw = FSYNC.slice(FSYNC.indexOf('mailKeepWarm: F'), FSYNC.indexOf('mailKeepWarm: F') + 900);
   const cron = (kw.match(/\.pubsub\.schedule\('(\*\/(\d+) (\d+)-(\d+) \* \* 1-6)'\)/) || []);
@@ -79,6 +87,17 @@ test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에�
     '★ 주간 브리핑이 월요일에 도는 것이 아니다 — 화면의 하루 횟수가 틀려진다');
   assert.ok(ENTER.indexOf('주간 브리핑 월요일 한 번') >= 0,
     '화면이 「주간 브리핑 월요일 한 번」이라 안 말한다');
+});
+
+test('★★ 뉴스레터 금요일 준비는 «하루 셈에 안 든다» — 금요일에만 돈다', () => {
+  /* 이것이 날마다로 바뀌면 화면의 「하루 292번」이 조용히 틀려지고, AI 비용도 일곱 배가 된다.
+     ⚠ 본문을 «다음 exports. 앞»까지로 자른다 — 고정 길이로 자르면 다음 함수까지 넘쳐 헛통과한다. */
+  const i = FIDX.indexOf('exports.weeklyNewsletterPrepare');
+  assert.ok(i >= 0, 'weeklyNewsletterPrepare 를 못 찾음');
+  const j = FIDX.indexOf(String.fromCharCode(10) + 'exports.', i + 10);
+  const fn = FIDX.slice(i, j > i ? j : FIDX.length);
+  assert.ok(/\.pubsub\.schedule\(["']every friday 13:00["']\)/.test(fn),
+    '★ 금요일 준비가 «금요일 한 번»이 아니다 — 화면의 하루 횟수와 AI 비용이 틀려진다');
 });
 
 test('★★ 반출 기록 정리는 «하루 셈에 안 든다» — 달마다 1일에만 돈다', () => {

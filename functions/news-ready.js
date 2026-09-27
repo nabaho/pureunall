@@ -52,16 +52,30 @@ function _도장수(s) {
 
 /* 편지에 «실리는 칸»만 잰다 — 상태·고친때·전문·받는이가 바뀌었다고 확정본을
    버리면, 시험 한 통 보낸 것만으로 확정본이 날아간다(상태가 초안→시험이 된다). */
+/* 꼭지 목록을 «DB 에서 읽은 꼴»과 같게 편다 — js/pu-news-core.js 의 _도장목록 과 «똑같이» */
+function _도장목록(v) {
+  if (Array.isArray(v)) return v.filter((x) => x != null);
+  if (v && typeof v === 'object') {
+    return Object.keys(v).sort((a, b) => Number(a) - Number(b))
+      .map((k) => v[k]).filter((x) => x != null);
+  }
+  return [];
+}
+
 function 바탕도장(회차) {
   const d = (회차 && typeof 회차 === 'object') ? 회차 : {};
   const 조각 = ['회차=' + _도장글(d.회차), '범위=' + _도장글(d.범위),
     '우리글=' + _도장글(d.우리글)];
   const 안 = (d.안 && typeof d.안 === 'object') ? d.안 : {};
   Object.keys(안).sort().forEach((키) => {
-    const 목 = Array.isArray(안[키]) ? 안[키] : [];
+    const 목 = _도장목록(안[키]);
+    /* ★★ 빈 꼭지는 «없는 꼭지»와 같다 (2026-09-27) — 파이어베이스는 빈 목록을 저장하지
+         않는다. 화면(기억 속 hr:[])과 서버(DB 에서 읽어 hr 없음)의 도장이 «아무것도 안
+         고쳐도» 달랐다. 담기가 늘 hr:[] 을 남기므로 확정본이 매번 버려질 판이었다. */
+    if (!목.length) return;
     조각.push('꼭지' + 키 + '=' + 목.map(_줄도장).join('|'));
   });
-  const 지 = Array.isArray(d.지역뉴스) ? d.지역뉴스 : [];
+  const 지 = _도장목록(d.지역뉴스);
   조각.push('지역=' + 지.map(_줄도장).join('|'));
   const 글 = 조각.join('\n');
   return _도장수(글) + '-' + 글.length;

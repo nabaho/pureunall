@@ -46,7 +46,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=43"></script>
+<script src="js/pu-news-core.js?v=44"></script>
 <!-- ⚠ 편지 짓개(tpl)보다 «먼저» 싣는다 — tpl 이 「장면이 있나」를 이것에게 묻는다 -->
 <script src="js/pu-news-show.js?v=1"></script>
 <script src="js/pu-news-tpl.js?v=44"></script>
@@ -1081,7 +1081,12 @@ function 불러오기(){
     db.ref('newsletter/notices').once('value').catch(()=>({val:()=>({})})),
     /* ★ 직원 명부 — 안내문 문의 줄의 «담당 노무사 이름»을 찾는다(사번 → 이름).
          ⚠ 연락처는 여기 «없다»(일부러 뺀 명부다). 이름만 쓴다. */
-    db.ref('data/user_dir').once('value').catch(()=>({val:()=>({})}))
+    db.ref('data/user_dir').once('value').catch(()=>({val:()=>({})})),
+    /* ★ 금요일 13시 자동 준비의 «마지막 기록» (대표 지시 2026-09-27).
+         서버가 혼자 도는 일이라, 여기서 안 보여 주면 돌았는지·왜 멈췄는지 알 길이 없다.
+       ⚠ 맨 끝에 붙인다 — 위 차례(v[0]…)가 밀리면 다른 칸이 엉뚱한 값을 받는다. */
+    db.ref('newsletter/fridayLog').orderByKey().limitToLast(1).once('value')
+      .catch(()=>({val:()=>({})}))
   ]).then(function(v){
     App.설정  = v[0].val() || {};
     App.회차들 = v[1].val() || {};
@@ -1094,6 +1099,9 @@ function 불러오기(){
     App.수집결과 = v[9].val() || {};
     App.안내문들 = v[10].val() || {};
     App.명부 = 명부지도(v[11].val());
+    /* 마지막 금요일 기록 한 줄 — {날짜: 기록} 꼴로 오므로 값 하나만 꺼낸다 */
+    App.금요일기록 = (function(o){ o = o || {}; const k = Object.keys(o).sort().pop();
+      return k ? Object.assign({ 날: k }, o[k]) : null; })(v[12] && v[12].val());
     if(!App.설정.회사이름) App.설정.회사이름 = '푸른노무법인';
     if(!App.설정.회신주소) App.설정.회신주소 = '370-6@daum.net';
     if(!App.설정.범위)    App.설정.범위 = '자문중';
@@ -1353,10 +1361,28 @@ function 예약본상태(d){
   if(String(r.회차열쇠||'') !== String(d.열쇠||''))
     return Object.assign({}, 기본, { 곁:'준비된 확정본은 다른 회차입니다 (' + String(r.회차열쇠||'') + ')' });
   const 봉인 = String(r.바탕도장 || '');
+  const 날 = String(r.보낼날||'').slice(5);
+  /* ⚠ 자동발송이 꺼져 있으면 확정본이 있어도 안 나간다 — 단추가 「✔」만 말하면
+       나가는 줄 아신다. 곁말(단추 title)에 한 줄 덧붙인다. */
+  const 꺼짐말 = (App.설정 || {}).자동발송 === true ? ''
+    : ' · ⚠ 설정의 「월요일 오전 8시 자동발송」이 꺼져 있어 이대로는 안 나갑니다';
+  /* ★★ 금요일 «자동» 확정본은 고쳐도 낡지 않는다 (대표 지시 2026-09-27).
+       월요일 서버가 보내기 직전에 «지금 내용»으로 다시 봉인한다(functions/news-friday.js
+       확정본다시짓기). 그런데 화면이 사람 확정본과 똑같이 「⚠ 낡았다 — 다시 준비」를
+       띄우면, 검토하고 고치신 뒤 «안 나갈까 봐» 다시 누르시게 된다 — 거짓 경고다.
+     ⚠ 사람이 준비한 확정본은 예전 그대로다 — 거기서는 누르신 순간의 편지가 약속이다. */
+  if(r.자동 === true){
+    const 같음 = !!봉인 && 봉인 === Core.바탕도장(d);
+    return { 꼴:'', 글:'🤖 ' + 날 + ' 금요일 자동 준비 ✔',
+             짧은:'🤖 ' + 날 + ' ✔',
+             곁:(같음 ? '금요일에 자동으로 준비했습니다 — 이대로 나갑니다'
+                     : '금요일 준비 뒤에 고치셨습니다 — 월요일 보내기 직전에 «고치신 내용으로» 다시 지어 나갑니다')
+                + 꺼짐말 };
+  }
   if(봉인 && 봉인 === Core.바탕도장(d))
-    return { 꼴:'', 글:'📅 ' + String(r.보낼날||'').slice(5) + ' 확정본 ✔',
-             짧은:'📅 ' + String(r.보낼날||'').slice(5) + ' ✔',
-             곁:'준비돼 있습니다 — 다시 누르면 지금 내용으로 새로 준비합니다' };
+    return { 꼴:'', 글:'📅 ' + 날 + ' 확정본 ✔',
+             짧은:'📅 ' + 날 + ' ✔',
+             곁:'준비돼 있습니다 — 다시 누르면 지금 내용으로 새로 준비합니다' + 꺼짐말 };
   return { 꼴:'warn', 글:'⚠ 확정본이 낡았습니다 — 다시 준비', 짧은:'⚠ 다시 준비',
            곁:'준비한 뒤에 내용이 바뀌었습니다. 이대로 두면 월요일에 안 나갑니다' };
 }
@@ -1893,7 +1919,13 @@ function 꼭지칸하나(d){
     /* ★ 2026-09-20 대표 지시로 «안 써도 실린다» — 딱지도 그것을 말해야 한다.
          「안 실림」이라 적어 두면 실제로는 나가는데 안 나가는 줄 아시고,
          있지도 않은 일을 고치려 하신다. */
+    /* ★★ 금요일 자동 준비가 AI 글을 «사람 손 없이» 우리 말로 옮긴 줄 (2026-09-27).
+         우리 말 칸에 들어 있어 예전 딱지로는 「✎ 우리 말 있음」— 사람이 쓴 것과 똑같이
+         보였다. 법인 이름으로 나가는 글이라 날짜·사건번호를 사람이 봐야 한다.
+       ★ 줄을 열어 «저장»하시면 이 표가 사라진다(우리말저장) — 읽으셨다는 뜻이다. */
+    const 자동글 = 기사인가 && 내글 && x.자동옮김 === true;
     const 딱지 = !기사인가 ? ''
+      : 자동글 ? '<span class="wtag no" title="금요일 자동 준비가 AI 초안을 그대로 실었습니다 — 눌러서 읽고 저장하시면 표가 사라집니다">🤖 AI 가 쓴 글 — 아직 안 읽음</span>'
       : (내글 ? '<span class="wtag">✎ 우리 말 있음</span>'
               : (AI글 ? '<span class="wtag no">✨ AI 초안 — 옮기면 이 글이 나갑니다</span>'
                        : '<span class="wtag no">↗ 원문 그대로 나갑니다 — 제목·매체·링크</span>'));
@@ -2261,6 +2293,9 @@ function 우리말저장(){
   if(!x) return 줄창닫기();
   const v = String(($('rowW') && $('rowW').value) || '').trim();
   if(v){ x.우리말 = v; delete x.AI초안; } else delete x.우리말;
+  /* ★ 사람이 열어 저장했다 = 읽었다. 금요일 자동 준비가 붙인 「🤖 아직 안 읽음」 표를 걷는다.
+       ⚠ 글을 한 글자도 안 고치고 저장하셔도 걷는다 — 「읽고 이대로 두겠다」도 검토다. */
+  delete x.자동옮김;
   /* ★ 한 줄 제목도 «함께» 담는다 (대표 지시 2026-09-12).
      ⚠ 칸이 없는 갈래(자료·판례)에서는 건드리지 않는다 — 없는 칸을 읽어 지우면
        다른 갈래의 값이 조용히 날아간다. */
@@ -5063,6 +5098,20 @@ function 설정화면(){
        </select>
       </div>
       <div>
+       <label class="f">금요일 13시 자동 준비 ${도움(
+         '<b>매주 금요일 오후 1시</b>에 서버가 월요일 뉴스레터를 준비합니다.<br>'
+         + '① 모아 둔 기사·자료·판례를 담고 ② 우리 말이 없는 기사와 이번 주 한마디를 '
+         + '<b>AI 가 씁니다</b> ③ 확정본을 봉인하고 ④ <b>370-6@hanmail.net</b> 으로 '
+         + '「월요일에 이대로 나갑니다 — 검토해 주십시오」 메일을 보냅니다.<br>'
+         + '⚠ 사람이 쓴 글은 덮지 않습니다. AI 가 쓴 줄은 목록에 <b>🤖</b> 로 표시됩니다.<br>'
+         + '주말에 고치시면 월요일에 <b>고치신 내용으로</b> 다시 지어 나갑니다.')}</label>
+       <select id="cfgFri" onchange="설정저장()">
+        <option value="y" ${s.금요일준비===false?'':'selected'}>켜짐 — 정리하고 검토 메일을 보냄</option>
+        <option value="n" ${s.금요일준비===false?'selected':''}>꺼짐 — 손으로 준비함</option>
+       </select>
+       ${금요일기록줄()}
+      </div>
+      <div>
        <label class="f">월요일 오전 8시 자동발송</label>
        <select id="cfgAuto" onchange="설정저장()">
         <option value="n" ${s.자동발송===true?'':'selected'}>꺼짐 — 준비만 하고 보내지 않음</option>
@@ -5300,6 +5349,35 @@ async function 노무사회가져오기(방식){
     if(바쁨) 바쁨.textContent = '';
   }
 }
+/* ★ 금요일 자동 준비 «마지막 한 번»을 한 줄로 (대표 지시 2026-09-27).
+     서버가 혼자 도는 일이다 — 여기서 말해 주지 않으면 「돌았나? 왜 안 왔지?」를 알 길이 없다.
+   ⚠ 기록은 서버가 쓴 값이다. 그대로 심지 말고 반드시 씻는다(esc). */
+function 금요일기록줄(){
+  const b = App.금요일기록;
+  const 틀 = (말, 색) => '<div class="hint" style="margin-top:5px;line-height:1.6;color:'
+    + (색 || 'var(--faint)') + '">' + 말 + '</div>';
+  if(!b) return 틀('아직 한 번도 안 돌았습니다 — 첫 준비는 <b>돌아오는 금요일 오후 1시</b>입니다.');
+  const 때 = b.때 ? new Date(b.때) : null;
+  const 날 = 때 ? (때.getMonth()+1) + '/' + 때.getDate() + ' '
+    + String(때.getHours()).padStart(2,'0') + ':' + String(때.getMinutes()).padStart(2,'0')
+    : esc(String(b.날||''));
+  if(b.건너뜀) return 틀('⏸ 지난 금요일(' + 날 + ') — 건너뜀: ' + esc(String(b.건너뜀)));
+  const 조각 = [];
+  if(b.확정본){
+    조각.push('✔ 확정본 봉인 · ' + Number(b.받는수||0).toLocaleString() + '곳');
+    if(b.AI기사) 조각.push('🤖 AI 기사 ' + Number(b.AI기사) + '건');
+    if(b.AI한마디) 조각.push('🤖 AI 한마디');
+  } else {
+    조각.push('⚠ 확정본을 못 만들었습니다 — ' + esc(String(b.못한까닭||'까닭 모름')));
+  }
+  조각.push(b.메일 === '보냄' ? '검토 메일 보냄'
+    : ('<span style="color:var(--warn)">⚠ 검토 메일 못 보냄' + (b.메일 ? ' — ' + esc(String(b.메일)) : '') + '</span>'));
+  const 알림 = (Array.isArray(b.알림) ? b.알림 : []).slice(0, 2)
+    .map(m => '<br>⚠ ' + esc(String(m))).join('');
+  const 색 = (!b.확정본 || b.메일 !== '보냄') ? 'var(--warn)' : '';
+  return 틀('지난 금요일(' + 날 + ') — ' + 조각.join(' · ') + 알림, 색);
+}
+
 function 설정저장(){
   const g = id => { const el=$(id); return el ? el.value : ''; };
   App.설정 = Object.assign({}, App.설정, {
@@ -5314,6 +5392,9 @@ function 설정저장(){
     서산전화: g('cfgSeosanTel'),
     보내는주소: g('cfgFrom'),
     대표자도: g('cfgCeo') !== 'n',
+    /* ⚠ «꺼짐을 고른 때만» false — 칸이 없는 화면(옛 판)에서 저장해도 켜진 채로 둔다.
+         서버(functions/news-friday.js)도 «=== false 일 때만» 건너뛴다. 둘이 같은 잣대다. */
+    금요일준비: g('cfgFri') !== 'n',
     자동발송: g('cfgAuto') === 'y',
     추적밑주소: g('cfgTrack'),
     뉴스그림: g('cfgNews'),
