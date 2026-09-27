@@ -246,7 +246,7 @@
       var key = S.sel;
       if (!key) { S.docs = []; draw(); return Promise.resolve(); }
       return store.listCoDocs(key).then(function (d) { if (key !== S.sel) return; S.docs = d; draw(); },
-        function (e) { if (key !== S.sel) return; S.err = msg(e); draw(); });
+        function (e) { if (key !== S.sel) return; S.docs = []; draw(); toast('❌ 이 회사 계약서를 불러오지 못했습니다 — ' + msg(e)); });
     }
     function coName(key) { var c = S.cos.filter(function (x) { return x.key === key; })[0]; return c ? c.name : ''; }
     function coList() { return el('datalist', { id: 'pod-cos' }, S.cos.map(function (c) { return el('option', { value: c.name }); })); }
@@ -260,7 +260,7 @@
         urlCache[fileId] = store.getOriginal(fileId).then(function (r) {
           if (!r) return { rec: null, url: null };
           return store.fileUrl(r).then(function (url) { return { rec: r, url: url }; });
-        })['catch'](function (e) { delete urlCache[fileId]; throw e; });
+        }).catch(function (e) { delete urlCache[fileId]; throw e; });
       }
       return urlCache[fileId];
     }

@@ -124,7 +124,8 @@ test('★ urlFor — 실패는 캐시하지 않는다(한 번 어긋나도 다�
   assert.match(m, /delete urlCache\[/, '★★ 실패한 요청도 urlCache 에 박혀 마운트가 살아 있는 내내 썸네일이 죽습니다');
 });
 
-test('★ loadDocs — listCoDocs 가 거절되면 S.err 를 채우고 그린다', () => {
+test('★ loadDocs — listCoDocs 가 거절되면 토스트만 띄우고 회사 목록은 잠그지 않는다', () => {
   const m = cutFn(stripJs(SRC), 'function loadDocs(');
-  assert.match(m, /S\.err\s*=\s*msg\(e\)/, '★★ listCoDocs 실패를 못 받으면 화면이 "불러오는 중…"에 멈춥니다');
+  assert.ok(!/S\.err\s*=/.test(m), '★★ S.err 를 채우면 draw() 가 오류 화면만 그려서 다른 회사로 못 바꿉니다');
+  assert.match(m, /toast\(/, '실패를 사용자에게 알려야 합니다');
 });
