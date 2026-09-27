@@ -12,7 +12,7 @@
      ③ 저장      — 회차(newsletter/issues/{열쇠}) · 전문(웹 보기용)
      ④ 확정본    — 받는 명단과 편지를 봉인한다(newsletter/weeklyReady, 자동:true)
      ⑤ 검토 메일 — 370-6@hanmail.net 으로 «월요일에 이대로 나갑니다»와 편지 그대로
-   ■ 월요일 08시는 예전 그대로 weeklyNewsletterSend 가 보낸다.
+   ■ 월요일 06시는 weeklyNewsletterSend 가 보낸다(2026-09-27 대표 지시로 8시 → 6시).
      ★ 대표님이 주말에 고치시면 도장이 달라진다. 자동 확정본(자동:true)이면 그때
        «지금 내용»으로 다시 봉인해 보낸다(확정본다시짓기) — 고치신 것이 나간다.
        고치셨는데 «안 나가는» 일이 없게 한다. 사람이 준비한 확정본은 예전처럼 안 보낸다.
@@ -35,6 +35,10 @@ const 기본보내는주소 = '370-6@hanmail.net';
 const BULK_GAP_SEC = 15;                    /* 화면(pu-news.html)과 같은 값 */
 const 관리화면 = 'https://nabaho.github.io/pureunall/pu-news.html';
 const 준비한이 = '금요일 자동 준비';
+/* 월요일 몇 시에 나가나 — 검토 메일이 말하는 시각. ⚠ functions/index.js 의
+   weeklyNewsletterSend 예약(every monday HH:MM)과 «같아야» 한다.
+   tests/newsletter-send-hour.test.js 가 넷(서버·검토 메일·화면·사용액 창)을 견준다. */
+const 보내는시각말 = '오전 6시';
 
 /* 서울 날짜 — 'YYYY-MM-DD' */
 function 서울오늘(now) {
@@ -297,17 +301,17 @@ function 검토메일짓기(보고) {
   const 이름 = (b.회차 && b.회차.이름) || b.열쇠;
   const 나감 = b.확정본됨 && b.자동발송켜짐;
   const 제목 = '[뉴스레터 검토] ' + 이름 + ' — '
-    + (나감 ? 날말(b.보낼날) + ' 오전 8시에 ' + b.받는수.toLocaleString('ko-KR') + '곳으로 나갑니다'
+    + (나감 ? 날말(b.보낼날) + ' ' + 보내는시각말 + '에 ' + b.받는수.toLocaleString('ko-KR') + '곳으로 나갑니다'
       : (b.확정본됨 ? '⚠ 자동발송이 꺼져 있어 월요일에 안 나갑니다' : '⚠ 월요일에 안 나갑니다 — ' + (b.못한까닭 || '확인 필요')));
   const 줄 = (말, 색) => '<tr><td style="padding:5px 0;font-size:14px;line-height:1.7;color:' + (색 || '#33302c')
     + ';font-family:\'Malgun Gothic\',sans-serif;">' + 말 + '</td></tr>';
   const 칸들 = [];
   칸들.push(줄('<b style="font-size:17px;">' + _e(이름) + ' 뉴스레터를 준비했습니다.</b>'));
   if (나감) {
-    칸들.push(줄('<b>' + _e(날말(b.보낼날)) + ' 오전 8시</b>에 <b>' + b.받는수.toLocaleString('ko-KR')
+    칸들.push(줄('<b>' + _e(날말(b.보낼날)) + ' ' + 보내는시각말 + '</b>에 <b>' + b.받는수.toLocaleString('ko-KR')
       + '곳</b>으로 자동으로 나갑니다. 아래 편지를 검토해 주십시오.'));
   } else if (b.확정본됨) {
-    칸들.push(줄('⚠ 설정의 <b>「월요일 오전 8시 자동발송」이 꺼져 있어</b> 이대로는 안 나갑니다. '
+    칸들.push(줄('⚠ 설정의 <b>「월요일 ' + 보내는시각말 + ' 자동발송」이 꺼져 있어</b> 이대로는 안 나갑니다. '
       + '보내시려면 뉴스레터 관리 › 설정에서 켜 주십시오.', '#b45309'));
   } else {
     칸들.push(줄('⚠ <b>월요일에 안 나갑니다</b> — ' + _e(b.못한까닭 || ''), '#b91c1c'));
@@ -327,7 +331,7 @@ function 검토메일짓기(보고) {
   (b.알림들 || []).forEach((m) => 칸들.push(줄('⚠ ' + _e(m), '#b45309')));
   칸들.push(줄('<b>고치시려면</b> — <a href="' + 관리화면 + '" style="color:#1b3a6b;font-weight:bold;">뉴스레터 관리</a>'
     + '에서 고치시면 됩니다. 월요일 보내기 직전에 <b>고치신 내용으로 다시 지어</b> 나갑니다.'));
-  칸들.push(줄('<b>멈추시려면</b> — 뉴스레터 관리 › 설정 › 「월요일 오전 8시 자동발송」을 «꺼짐»으로 바꾸십시오.'));
+  칸들.push(줄('<b>멈추시려면</b> — 뉴스레터 관리 › 설정 › 「월요일 ' + 보내는시각말 + ' 자동발송」을 «꺼짐»으로 바꾸십시오.'));
   const 머리 = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
     + ' style="background-color:#fdf8ee;border:2px solid #d9c9a8;"><tr><td style="padding:18px 22px;">'
     + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' + 칸들.join('')
@@ -468,5 +472,5 @@ module.exports = {
   금요일준비, 확정본다시짓기, 확정본만들기, 검토메일짓기,
   서울오늘, 다음월요일, 값어치순, 최근것, 한마디거리, 한마디지시, 기사초안지시,
   기사초안받기, 한마디다듬기, 명단짓기, 새추적번호, 밑줄지시,
-  검토받는곳, 준비한이
+  검토받는곳, 준비한이, 보내는시각말
 };
