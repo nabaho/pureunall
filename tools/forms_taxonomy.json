@@ -1,0 +1,25 @@
+{
+  "_comment": "서식 분류 사전 — Python 프리필터(forms_corpus.py)와 Node 분류(forms_lib.js)가 공유한다. 정규식은 JS/Python 양쪽에서 동작하는 문법만 쓴다(룩비하인드 금지).",
+  "tracks": [
+    { "name": "임금체불·진정", "domain": "wageArrears",
+      "re": "진정|체불|취하서|반의사|확인원|체불금품" },
+    { "name": "대지급금", "domain": "wageArrears",
+      "re": "체당금|대지급금|도산등사실|간이대지급|별지\\s*제?3호" },
+    { "name": "민사·집행", "domain": "wageArrears",
+      "re": "지급명령|배당요구|채권계산|가압류|보정서|변론기일|이의신청|소장|준비서면" },
+    { "name": "수임·위임", "domain": "wageArrears",
+      "re": "위임장|위임약정|약정서|선임|수임" },
+    { "name": "동의·수납", "domain": "wageArrears",
+      "re": "개인정보|동의서|[Cc][Mm][Ss]|자동이체|계좌" },
+    { "name": "노동위원회", "domain": "laborCommission",
+      "re": "부당해고|부당징계|부당전보|부당정직|구제신청|이유서|답변서|노동위|대리인선임신고" },
+    { "name": "산재", "domain": "industrialAccident",
+      "re": "산재|요양|장해|진폐|업무상질병" },
+    { "name": "컨설팅·근로계약", "domain": "consulting",
+      "re": "근로계약|취업규칙|임금대장|급여명세|합의서|서약서|확약서" },
+    { "name": "기금", "domain": "fund",
+      "re": "기금|복지기금" },
+    { "name": "교섭·노조", "domain": "bargaining",
+      "re": "단체협약|교섭|노동조합|쟁의" }
+  ]
+}

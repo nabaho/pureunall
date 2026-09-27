@@ -104,6 +104,9 @@ GEMINI_API_KEY*
 .codex-guard.json
 node_modules/
 
+# --- 서식집 스캔 중간산출물 (실주민번호·계좌 포함 → 커밋 금지) ---
+_forms_out/
+
 # --- 도구가 남기는 기록 (경로·계정이 들어갈 수 있어 올리지 않는다) ---
 firebase-debug.log
 firebase-debug.*.log
