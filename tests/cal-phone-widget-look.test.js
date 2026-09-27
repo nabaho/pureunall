@@ -123,3 +123,25 @@ test('⑧ 칸 용량은 «그려진 줄 수»로 잰다 — 폰(5줄)에서 6으
   assert.strictEqual(/clientHeight \/ 6\b/.test(몸), false, '아직 6줄로 나눕니다');
   assert.match(몸, /querySelectorAll\("\.day"\)\.length \/ 7/, '그려진 줄 수를 안 셉니다');
 });
+
+/* ── 폰 ㉮ «칸은 막대 · 그날 목록 · 밀어 넘기기» (대표 지시 2026-09-27 「폰화면 ui도 구글처럼 사용이
+   같아야한다」 — 다른 방에서 짓던 것을 이어 마무리) ── */
+test('⑨ 폰 달 보기 아래에 «고른 날 목록»이 붙는다 — 칸에서 못 읽는 제목을 여기서 읽는다', () => {
+  const 몸 = 함수몸(캘린더, 'function calendarHtml(eumOnly){');
+  assert.match(몸, /폰목록Html\(eumOnly\)/, '폰에 그날 목록이 없습니다');
+  const 목록 = 함수몸(캘린더, 'function 폰목록Html(eumOnly){');
+  assert.match(목록, /data-ev=/, '목록 줄을 눌러 여는 길이 칩과 다릅니다');
+  assert.match(목록, /data-mnew/, '빈 날에 넣는 길이 없습니다');
+});
+test('⑨ 폰에서 날을 누르면 «그 날을 본다» — 새로 넣기 창을 바로 띄우지 않는다(넓은 화면은 그대로)', () => {
+  const i = 캘린더.indexOf("if(t.hasAttribute('data-day')){");
+  assert.ok(i >= 0);
+  const 길 = 캘린더.slice(i, i + 300);
+  assert.match(길, /폰\(\) && S\.view === 'month'\)\{ S\.pick = 날짜;/, '폰에서 날을 누르면 바로 쓰는 창이 뜹니다');
+  assert.match(길, /openNew\(날짜\)/, '넓은 화면의 새로 넣기가 사라졌습니다');
+});
+test('⑨ 좌우로 밀어 달을 넘기되, 칩(끌어 옮기기) 위에서 시작한 손짓은 안 받는다', () => {
+  const 몸 = 함수몸(캘린더, 'function 밀수있나(t){');
+  assert.match(몸, /\[data-ev\],\[data-drag\]/, '칩 위의 손짓도 달 넘김으로 받습니다 — 끌어 옮기기와 부딪힙니다');
+  assert.match(캘린더, /Math\.abs\(dx\) < 60 \|\| Math\.abs\(dx\) < Math\.abs\(dy\) \* 2/, '살짝 비뚤어진 세로 훑기도 달 넘김으로 봅니다');
+});

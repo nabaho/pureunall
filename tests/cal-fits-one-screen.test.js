@@ -168,11 +168,16 @@ test('⑥ 펼침은 «그 자리»에 뜬다 — 보던 달을 잃지 않는다'
      한때 그 길이 「그 날로 간다(S.view=day)」였다 — 한 칸 보려고 달을 잃었다. */
   const i = 캘린더.indexOf("t.hasAttribute('data-more')");
   assert.ok(i >= 0, '「+N개 더」를 누르는 길이 없습니다');
-  const 끝 = 캘린더.indexOf('}', 캘린더.indexOf('{', i));
+  /* 중괄호를 세어 «그 갈래 전체»를 떼어 낸다 — 폰 갈래(「•••」=그 날 고르기, 2026-09-27)가
+     첫 줄에 들어오며 «첫 }» 까지만 보면 넓은 화면 갈래를 못 보게 됐다 */
+  const 열 = 캘린더.indexOf('{', i);
+  let 깊 = 0, 끝 = 열;
+  for (; 끝 < 캘린더.length; 끝++) { if (캘린더[끝] === '{') 깊++; else if (캘린더[끝] === '}') { 깊--; if (깊 === 0) break; } }
   const 길 = 캘린더.slice(i, 끝);
   assert.match(길, /S\.open\s*=/, '펼침을 안 켭니다');
-  assert.strictEqual(/S\.view\s*=/.test(길), false, '다른 보기로 데려갑니다 — 보던 달을 잃습니다');
-  assert.strictEqual(/S\.ym\s*=/.test(길), false, '보던 달을 바꿉니다');
+  /* 「S.view === 'month'」(견주기)는 바꾸기가 아니다 — 대입(=)만 본다 */
+  assert.strictEqual(/S\.view\s*=(?!=)/.test(길), false, '다른 보기로 데려갑니다 — 보던 달을 잃습니다');
+  assert.strictEqual(/S\.ym\s*=(?!=)/.test(길), false, '보던 달을 바꿉니다');
 });
 
 test('⑦ 여섯 줄을 «남은 높이»로 나눈다 — 줄이 제멋대로 늘면 화면을 넘긴다', () => {
