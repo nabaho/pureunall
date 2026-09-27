@@ -13,7 +13,7 @@ const gV = (n) => { const i = SRC.indexOf('var ' + n + '='); assert.ok(i >= 0, '
 
 const A = (() => {
   const box = {};
-  new Function(['var S={_hwpTplHas:null};', gV('HWP_TPL_KINDS'), gV('HWP_TPL_STRICT'), gF('_hwpTplFits'), gF('docsFor'), gF('_bundleHwpPlan'),
+  new Function(['var S={_hwpTplHas:null};', gV('HWP_TPL_KINDS'), gV('HWP_TPL_STRICT'), gF('_dkKeyOf'), gF('_hwpTplKey'), gF('_hwpTplFits'), gF('docsFor'), gF('_bundleHwpPlan'),
     'this.plan=_bundleHwpPlan; this.S=S;'].join('\n')).call(box);
   return box;
 })();
@@ -25,8 +25,16 @@ test('★ 틀이 올라가 있고 기금 유형에 맞는 서식만 — 나머�
   assert.deepEqual(p.use.map((u) => [u.i, u.d[0]]), [[0, 'minutes'], [1, 'charter'], [3, 'inka']], '번호는 묶음 안 차례 그대로');
   assert.deepEqual(p.skip, ['3. 틀 없는 서식']);
   const s = A.plan(PH, { fund_type: '사내' });
-  assert.ok(!s.use.some((u) => u.d[0] === 'charter'), '정관 틀은 공동 기금에만(HWP_TPL_STRICT) — 사내는 HTML 로');
-  assert.ok(s.skip.includes('2. 정관') && s.skip.includes('3. 정관(사내)'));
+  assert.ok(!s.use.some((u) => u.d[0] === 'charter'), '사내 틀(charter_sane)이 없으면 공동 정관 틀을 사내 기금에 쓰지 않는다');
+  assert.ok(s.skip.includes('2. 정관'));
+});
+
+test('★ 사내 기금의 정관 — 사내 틀(charter_sane)이 올라가 있으면 그 틀로 받는다(서식 이름은 「정관」 그대로)', () => {
+  A.S._hwpTplHas = { minutes: true, charter_sane: true, inka: true };
+  const s = A.plan(PH, { fund_type: '사내' });
+  assert.ok(s.use.some((u) => u.i === 1 && u.d[0] === 'charter'), '사내 정관이 한글 원본 묶음에서 빠졌다');
+  const g = A.plan(PH, { fund_type: '공동' });
+  assert.ok(!g.use.some((u) => u.d[0] === 'charter'), '공동 기금이 사내 틀을 받으면 안 된다');
 });
 
 test('틀 목록을 아직 못 읽었으면 아무것도 안 고른다(단추도 안 뜬다)', () => {

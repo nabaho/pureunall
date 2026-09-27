@@ -309,7 +309,7 @@ test('★★ 틀이 있는 서식은 오른쪽에 «원본 한글 모양»으로
   const side = grabFn('sidePreview');
   assert.match(side, /if\(hwpSidePreview\(kind\)\) return;/);
   const hp = grabFn('hwpSidePreview');
-  assert.match(hp, /\(S\._hwpTplHas\|\|\{\}\)\[kind\]/, '틀이 올라가 있을 때만');
+  assert.match(hp, /_hwpTplHasFor\(kind,f\)/, '틀이 올라가 있을 때만(사내 정관은 사내 틀로 본다)');
   assert.match(hp, /_hwpDocRef\(fid,kind\)\.once\('value'\)/, '이 기금에 고쳐 보관한 것이 있으면 그것을 보인다');
   assert.match(hp, /hwpTplFill\(kind,f,sites\)/);
   assert.match(hp, /PureunHwp\.renderPreview\(v,bytes/);

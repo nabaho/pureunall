@@ -23,8 +23,10 @@ const A = (() => {
     gF('_cmSeeAnnex'), gF('estabSites'), gF('siteContribOf'), gF('_docRok'), gF('siteContribNow'), gF('partyNames'), gF('partyJoin'),
     gF('_dotDate'), gF('_hwpKoDate'), gF('_hwpTodayIso'), gF('_hwpSignRows'),
     gF('_hwpInkaValues'), gF('_hwpAgreementValues'), gF('_hwpCharterValues'), gF('_hwpContribValues'),
-    gV('HWP_TPL_KINDS'), gV('HWP_TPL_STRICT'), gF('_hwpTplFits'),
+    gV('HWP_TPL_KINDS'), gV('HWP_TPL_STRICT'), gF('_dkKeyOf'), gF('_hwpTplKey'), gF('_hwpTplFits'),
+    gS('GRID_BLANK'), gF('_hwpCharterSaneValues'),
     'this.inka=_hwpInkaValues; this.agr=_hwpAgreementValues; this.charter=_hwpCharterValues; this.contrib=_hwpContribValues;',
+    'this.sane=_hwpCharterSaneValues; this.key=_hwpTplKey;',
     'this.fits=_hwpTplFits; this.S=S;',
   ].join('\n')).call(box);
   return box;
@@ -80,10 +82,37 @@ test('정관 — 인가 전에는 원본처럼 빈 날짜 줄, 인가일이 있�
   assert.equal(A.charter(F, SITES).정관일, '2026년     3월    2일');
 });
 
-test('★ 정관 틀은 «같은 유형»에만 — 사내 정관은 아예 다른 문서라 HTML 로 둔다', () => {
+test('★ 정관 틀은 기금 유형으로 고른다 — 공동은 charter, 사내는 charter_sane(서식 이름은 「정관」 하나)', () => {
   assert.equal(A.fits('charter', F), true);
-  assert.equal(A.fits('charter', { fund_type: '사내' }), false);
+  assert.equal(A.key('charter', F), 'charter');
+  assert.equal(A.key('charter', { fund_type: '사내' }), 'charter_sane');
+  assert.equal(A.key('inka', { fund_type: '사내' }), 'inka', '정관 말고는 틀이 하나');
+  assert.equal(A.fits('charter', { fund_type: '사내' }), true, '사내 정관도 사내 원본 틀로 받는다');
   assert.equal(A.fits('inka', { fund_type: '사내' }), true, '인가신청서는 체크로 두 유형을 다 받는다');
+});
+
+const SANE = Object.assign({}, F, { name: '가나기계사내근로복지기금', fund_type: '사내' });
+test('★★ 사내 정관 — 첫 줄은 서식이 부르는 사람(근로자대표·대표이사), 나머지 위원은 짝지어 한 줄씩 (HTML fillSignGrid 와 같다)', () => {
+  const v = A.sane(SANE, [SITES[0]]);
+  assert.equal(v.기금명, '가나기계사내근로복지기금'); assert.equal(v.참여회사, '가나기계 주식회사');
+  assert.equal(v.근대표, '박근로'); assert.equal(v.대표이사, '김대표');
+  assert.equal(v.서명, 0, '남는 위원이 없으면 격자 줄을 모두 지운다 — 없는 사람의 날인란이 관청에 간다');
+  assert.equal(v.인가일.trim(), '년    월    일');
+  assert.equal(v.정관일, '2026년 3월 2일');
+  const more = Object.assign({}, SANE, { officers: F.officers.concat([
+    { role: '근로자측 이사', name: '정위원', title: '대리' }, { role: '근로자측 이사', name: '한위원', title: '주임' },
+    { role: '사용자측 이사', name: '오위원', title: '상무' }]) });
+  const w = A.sane(more, [SITES[0]]);
+  assert.ok(Array.isArray(w.서명) && w.서명.length === 2, '나머지 위원 수(근로자측 둘)만큼 줄');
+  assert.deepEqual(w.서명.map((r) => r.근이름), ['정위원', '한위원'], '첫 줄에 선 근로자대표는 다음 줄에 다시 나오지 않는다');
+  assert.equal(w.서명[0].사이름, '오위원'); assert.equal(w.서명[0].사직책, '상무');
+  assert.match(w.서명[1].사이름, /^＿+$/, '한쪽이 비면 밑줄 — 이름을 지어내지 않는다');
+  assert.equal(w.근대표, '박근로'); assert.equal(w.대표이사, '김대표');
+});
+
+test('사내 정관 — 사람을 하나도 모르면 첫 줄도 밑줄(자리표가 틀린 이름보다 낫다)', () => {
+  const v = A.sane({ name: '가', fund_type: '사내' }, []);
+  assert.match(v.근대표, /^＿+$/); assert.match(v.대표이사, /^＿+$/); assert.equal(v.서명, 0);
 });
 
 test('★★ 출연확인서 — 사업장마다 한 장, 금액은 siteContribNow(그 해 출연금 우선) · 없으면 비우고 알린다', () => {
