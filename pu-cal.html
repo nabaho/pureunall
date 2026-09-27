@@ -16,7 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=35"></script>
+<script src="js/pu-ontology.js?v=36"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -24,7 +24,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=5"></script>
+<script src="js/pu-gcal-auth.js?v=6"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=1"></script>
@@ -332,6 +332,22 @@
   .modal h3{margin:0 0 12px;font-size:15px}
   .fld{margin-bottom:10px}
   .fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px;font-weight:700}
+  /* 기업정보함에서 불러오기 — 창 맨 위 한 칸(고르면 초록으로 «불러옴») */
+  .cpull{display:flex;align-items:center;gap:8px;border:1.5px solid #bfdbfe;background:var(--acc-soft);
+    border-radius:10px;padding:7px 10px;margin-bottom:10px}
+  .cpull.filled{border-color:#bbf7d0;background:#f0fdf4}
+  .cpull .cq{flex:1;min-width:0;border:none;background:transparent;font-size:13px;color:var(--ink);outline:none;
+    font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cpull .cx{border:none;background:transparent;color:var(--danger);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .cres{border:1px solid var(--line);border-radius:10px;margin:-4px 0 10px;overflow:hidden;max-height:260px;overflow-y:auto}
+  .crow{display:flex;gap:8px;align-items:center;width:100%;text-align:left;border:none;border-bottom:1px solid var(--line);
+    background:var(--panel);padding:7px 10px;font-size:12.5px;color:var(--ink);cursor:pointer;font-family:inherit;white-space:nowrap}
+  .crow:last-child{border-bottom:none}
+  .crow:hover{background:var(--acc-soft)}
+  .crow b{flex-shrink:0}
+  .crow .cm{color:var(--sub);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .cmsg{padding:9px 10px;font-size:12px;color:var(--sub)}
+  .fld .from{display:inline-block;font-size:10.5px;background:#f0fdf4;color:#166534;border-radius:5px;padding:0 5px;margin-left:4px}
   .fld input,.fld select{width:100%;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;
     font-size:13px;font-family:inherit;background:var(--panel);color:var(--ink)}
   .mbtns{display:flex;gap:7px;margin-top:14px;align-items:center}
@@ -1208,6 +1224,8 @@ function gcalToEvent(ev){
     mail:mail, mailSid:mailSid || "",
     color:color, gcalUrl:ev.htmlLink || "",
     tip: title + (ev.location ? "\n📍 " + ev.location : "")
+         /* 설명 앞 두 줄(담당자 등 — 이 앱이 넣은 미팅이면 「담당자: …」가 첫 줄이다) */
+         + (ev.description ? "\n" + String(ev.description).replace(/<[^>]+>/g, "").split("\n").slice(0, 2).join("\n") : "")
          + (mail ? "\n✉ " + mail : "") };
 }
 
@@ -1237,7 +1255,9 @@ function eventsOn(ymd, eumOnly){
       /* 시각은 구글 화면처럼 「10:30」 (대표 지시 2026-09-27 「구글캘린더와 완벽하게 같이」) */
       time: (hm && hm !== "00:00") ? hm : "",
       color: colorOf(s.sid) || "#64748b",
-      tip: (s.title || "일정") + (s.note ? " · " + s.note : "") });
+      /* 미팅이면 장소·담당자도 말풍선에 (기업정보함에서 불러온 것) */
+      tip: (s.title || "일정") + (s.note ? " · " + s.note : "")
+           + (s.place ? "\n📍 " + s.place : "") + (s.contact ? "\n👤 " + s.contact : "") });
   });
   /* ② 근태 — 이알피와 같은 글자·같은 색 */
   arr(D.attendance_records).forEach(function(r){
@@ -2202,6 +2222,7 @@ function openEdit(store, id){
   if(!r){ toast("그 건을 못 찾았습니다 — 새로 받아 오는 중일 수 있습니다"); return; }
   S.modal = { mode:"edit", store:store, id:id, kind:(store==="my_schedules"?"sch":"att"),
     date:r.date||"", sid:r.sid||"", type:r.type||"leave", title:r.title||"", note:r.note||"",
+    time:String(r.time||"").slice(0,5), place:r.place||"", contact:r.contact||"",
     hours:r.hours||1, prev:r };
   if(옛방식표(store)) S.modal.err = 옛방식안내(store);
   render();
@@ -2224,6 +2245,8 @@ function modalHtml(){
   return "<div class=\"veil\" data-close=\"1\"></div><div class=\"modal\">"
     + "<h3>"+(새것?"➕ 새로 넣기":"✏️ 고치기")+" — "+esc(m.date||"")+"</h3>"
     + (m.err ? "<div class=\"werr\">"+esc(m.err)+"</div>" : "")
+    /* ★ 기업정보함에서 불러오기 (대표 지시 2026-09-27 「기업이름과 주소 담당자등을 한번에 당겨오기」) */
+    + (일정 && 새것 ? 명함칸Html(m) : "")
     + (새것 ? "<div class=\"fld\"><label>무엇을</label><select data-m=\"kind\">"
         + "<option value=\"sch\""+(일정?" selected":"")+">📅 일정</option>"
         + "<option value=\"att\""+(일정?"":" selected")+">🏖️ 연차·근태</option></select></div>" : "")
@@ -2232,7 +2255,10 @@ function modalHtml(){
         + users().map(function(u){ return "<option value=\""+esc(u.sid)+"\""+(u.sid===m.sid?" selected":"")+">"
             + esc(u.name||u.sid)+"</option>"; }).join("") + "</select></div>"
     + (일정
-        ? "<div class=\"fld\"><label>무슨 일</label><input data-m=\"title\" value=\""+esc(m.title)+"\" placeholder=\"가나상사 컨설팅 2차\"></div>"
+        ? "<div class=\"fld\"><label>시각</label><input type=\"time\" data-m=\"time\" value=\""+esc(m.time||"")+"\"></div>"
+          + "<div class=\"fld\"><label>무슨 일" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"title\" value=\""+esc(m.title)+"\" placeholder=\"가나상사 컨설팅 2차\"></div>"
+          + "<div class=\"fld\"><label>장소" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"place\" value=\""+esc(m.place||"")+"\" placeholder=\"안 적어도 됩니다\"></div>"
+          + "<div class=\"fld\"><label>담당자" + (m.card ? " <span class=\"from\">불러옴</span>" : "") + "</label><input data-m=\"contact\" value=\""+esc(m.contact||"")+"\" placeholder=\"안 적어도 됩니다\"></div>"
         : "<div class=\"fld\"><label>유형</label><select data-m=\"type\">"
             + 유형들.map(function(t){ return "<option value=\""+esc(t.code)+"\""+(t.code===m.type?" selected":"")+">"
                 + esc(t.icon+" "+PuWork.labelFor(t.code,"calendar"))+"</option>"; }).join("")
@@ -2249,10 +2275,115 @@ function modalHtml(){
     + "</div></div>";
 }
 
+/* ── 기업정보함 명함 불러오기 ────────────────────────────────────────────
+   ★ 기업정보함의 «가벼운 색인»(pucards/idx — 이름·회사·전화·주소만, 약 1MB)을 읽는다.
+     푸른이알피 계약창이 회사·담당자를 찾을 때 쓰는 바로 그것이다. 명함 본문·사진은 안 받는다.
+   ⚠ 읽기만 한다 — 기업정보함 자료를 고치지 않는다.
+   ⚠ 창에서 처음 칠 때 «한 번만» 받는다(요금). 같은 창·다음 창은 받아 둔 것을 쓴다.
+   ⚠ 보는 사람이 늘지 않는다 — 이 색인은 원래 로그인한 직원 누구나 읽는 자리다(서버 규칙). */
+var 명함 = { list:null, loading:false, err:"" };
+function 명함받기(){
+  if(명함.list || 명함.loading || !fbDb) return;
+  명함.loading = true; 명함.err = "";
+  fbDb.ref("pucards/idx").once("value").then(function(s){
+    var v = s.val() || {};
+    명함.list = Object.keys(v).map(function(k){
+      var x = v[k] || {};
+      return { k:k, c:x.c||"", n:x.n||"", ti:x.ti||"", m:x.m||"", t:x.t||"", ct:x.ct||"", ad:x.ad||"" };
+    }).filter(function(x){ return x.c || x.n; });
+    명함.loading = false; render(); 명함칸다시잡기();
+  })["catch"](function(e){
+    명함.loading = false; 명함.err = (e && e.message) || String(e); render(); 명함칸다시잡기();
+  });
+}
+/* 회사·이름·전화 어디에 걸려도 — 회사 이름이 앞에서 맞는 것을 먼저 */
+function 명함찾기(q){
+  q = String(q || "").trim().toLowerCase();
+  if(!q || !명함.list) return [];
+  var 숫자 = q.replace(/[^0-9]/g, "");
+  var out = [];
+  명함.list.forEach(function(x){
+    var 회사 = x.c.toLowerCase(), 이름 = x.n.toLowerCase();
+    var 점 = 회사.indexOf(q) === 0 ? 0 : 회사.indexOf(q) > 0 ? 1 : 이름.indexOf(q) >= 0 ? 2
+      : (숫자.length >= 4 && (x.m + x.t + x.ct).replace(/[^0-9]/g, "").indexOf(숫자) >= 0) ? 3 : -1;
+    if(점 >= 0) out.push({ x:x, 점:점 });
+  });
+  out.sort(function(a, b){ return a.점 - b.점 || a.x.c.localeCompare(b.x.c); });
+  return out.slice(0, 8).map(function(o){ return o.x; });
+}
+function 명함칸Html(m){
+  if(m.card){
+    return '<div class="cpull filled"><span>🏢</span><span class="cq"><b>' + esc(m.card.c || m.card.n) + '</b>'
+      + (m.card.n ? ' · ' + esc(m.card.n) + (m.card.ti ? ' ' + esc(m.card.ti) : '') : '') + '</span>'
+      + '<button class="cx" data-cardclear="1" title="불러온 것을 뺍니다">✕ 빼기</button></div>';
+  }
+  var q = m.cq || "";
+  var 결과 = 명함찾기(q);
+  return '<div class="cpull"><span>🏢</span>'
+    + '<input id="cardq" class="cq" value="' + esc(q) + '" placeholder="기업정보함에서 불러오기 — 회사·담당자 이름" autocomplete="off">'
+    + '</div>'
+    + (q ? '<div class="cres">'
+        + (명함.loading ? '<div class="cmsg">명함을 불러오는 중…</div>'
+          : 명함.err ? '<div class="cmsg">기업정보함을 못 읽었습니다 — ' + esc(명함.err) + '</div>'
+          : !결과.length ? '<div class="cmsg">맞는 명함이 없습니다</div>'
+          : 결과.map(function(x){
+              var 전화 = x.m || x.t || x.ct;
+              return '<button class="crow" data-cardpick="' + esc(x.k) + '"><b>' + esc(x.c || "(회사 없음)") + '</b>'
+                + '<span>' + esc(x.n) + (x.ti ? ' ' + esc(x.ti) : '') + '</span>'
+                + '<span class="cm">' + esc([전화, x.ad].filter(Boolean).join(" · ")) + '</span></button>';
+            }).join(""))
+        + '</div>' : '');
+}
+/* 명함 하나를 고르면 무슨 일·장소·담당자를 한꺼번에 채운다.
+   ⚠ 이미 적어 둔 «무슨 일»은 안 덮는다 — 사람이 쓴 것이 이긴다. */
+function 명함고르기(k){
+  var m = S.modal; if(!m || !명함.list) return;
+  modalRead();
+  var x = null;
+  for(var i = 0; i < 명함.list.length; i++){ if(명함.list[i].k === k){ x = 명함.list[i]; break; } }
+  if(!x) return;
+  m.card = x; m.cq = "";
+  if(!String(m.title || "").trim()) m.title = (x.c || x.n) + " 미팅";
+  if(!String(m.place || "").trim()) m.place = x.ad;
+  if(!String(m.contact || "").trim()){
+    var 전화 = x.m || x.t || x.ct;
+    m.contact = [x.n + (x.ti ? " " + x.ti : ""), 전화].filter(function(v){ return String(v).trim(); }).join(" · ");
+  }
+  render();
+}
+/* 다시 그린 뒤 찾기 칸에 커서를 돌려 준다 — 안 그러면 한 글자마다 칸이 튄다 */
+function 명함칸다시잡기(){
+  var el = document.getElementById("cardq");
+  if(el && S.modal && S.modal.cq){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} }
+}
+/* 구글 공용 달력에 넣는다 — 폰 구글 캘린더 위젯에 뜨는 길 */
+function 구글에넣기(m){
+  var 설명 = [];
+  if(String(m.contact||"").trim()) 설명.push("담당자: " + String(m.contact).trim());
+  if(String(m.note||"").trim()) 설명.push(String(m.note).trim());
+  var 사람 = nameOf(m.sid);
+  if(사람) 설명.push("푸른 담당: " + 사람);
+  S.busy = true; m.err = ""; render();
+  PuGcalAuth.createEvent(GCAL_CAL_ID, {
+    date: m.date, time: String(m.time||""), summary: String(m.title).trim(),
+    location: String(m.place||"").trim(), description: 설명.join("\n"),
+    source: (m.card && m.card.k) ? { kind:"card", id:m.card.k } : null
+  }).then(function(){
+    S.busy = false;
+    closeModal();
+    toast("✅ 구글 공용 달력에 넣었습니다 — 폰 구글 캘린더에도 뜹니다");
+    gcalLoad(true);
+  })["catch"](function(e){
+    S.busy = false;
+    m.err = "구글에 못 넣었습니다 — " + ((e && e.message) || "") + " (다시 로그인해 보십시오)";
+    render();
+  });
+}
+
 /* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
 function modalRead(){
   var m = S.modal; if(!m) return;
-  ["kind","date","sid","type","title","note","hours"].forEach(function(f){
+  ["kind","date","sid","type","title","note","hours","time","place","contact"].forEach(function(f){
     var el = document.querySelector("[data-m='"+f+"']");
     if(el) m[f] = el.value;
   });
@@ -2265,9 +2396,23 @@ function doSave(){
   var store = 일정 ? "my_schedules" : "attendance_records";
   if(!m.date){ m.err = "날짜를 골라 주세요"; render(); return; }
   if(일정 && !String(m.title||"").trim()){ m.err = "무슨 일인지 적어 주세요"; render(); return; }
+  /* ★ 새 일정은 구글 로그인돼 있으면 «구글 공용 달력»에 넣는다 (대표 지시 2026-09-27
+       「구글캘린더와 같이 우선」 — 폰은 구글 캘린더 위젯으로 본다). 이 달력도 그것을 읽어
+       그리므로 두 곳에 똑같이 뜨고, 두 번 들어가지도 않는다.
+     ⚠ 로그인이 안 돼 있으면 우리 표(my_schedules)에 넣고 «폰 위젯에는 안 뜬다»고 말한다. */
+  if(일정 && m.mode === "new" && typeof PuGcalAuth !== "undefined" && PuGcalAuth.hasToken()){
+    구글에넣기(m); return;
+  }
   var id = m.mode==="edit" ? m.id : PuCalWrite.newId(일정 ? "sch" : "att");
   var item = { id:id, date:m.date, sid:m.sid, note:String(m.note||"") };
-  if(일정) item.title = String(m.title).trim();
+  if(일정){
+    item.title = String(m.title).trim();
+    item.time = String(m.time||"");
+    item.place = String(m.place||"").trim();
+    item.contact = String(m.contact||"").trim();
+    /* 어느 명함에서 왔는지 — 이름이 아니라 명함 번호로 잇는다(온톨로지: sourceKind·sourceId 함께) */
+    if(m.card && m.card.k){ item.sourceKind = "card"; item.sourceId = m.card.k; }
+  }
   else { item.type = m.type; item.hours = PuWork.hoursOf(m.type, m.hours); }
   /* 고치는 것이면 «내가 보던 판»을 함께 넘긴다 — 바뀐 칸만 보내고,
      원래 있던 달이 잠겼는지도 그것으로 본다. */
@@ -2278,7 +2423,8 @@ function doSave(){
     if(!r.ok){ m.err = r.message; render(); return; }
     var 고침 = m.mode==="edit";
     closeModal();
-    toast(고침 ? "✅ 고쳤습니다" : "✅ 넣었습니다");
+    toast(고침 ? "✅ 고쳤습니다"
+      : (일정 ? "✅ 넣었습니다 — 구글 로그인하면 다음부터 폰 구글 캘린더에도 뜹니다" : "✅ 넣었습니다"));
     refreshOne(store);
     /* 이음 근무가 바뀌면 외부 공유 뷰도 따라가야 한다 — 안 걸면 옛 일정이 그대로 뜬다 */
     if(store === "attendance_records") 발행예약();
@@ -2588,7 +2734,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear]') : null;
   if(!t) return;
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
@@ -2606,6 +2752,8 @@ document.addEventListener('click', function(e){
     render(); return;
   }
   if(t.hasAttribute('data-gcalretry')){ gcalLoad(true); return; }
+  if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
+  if(t.hasAttribute('data-cardclear')){ modalRead(); S.modal.card = null; render(); return; }
   if(t.hasAttribute('data-view')){
     S.view = t.getAttribute('data-view');
     if(!S.date) S.date = todayYMD();
@@ -2699,6 +2847,16 @@ document.addEventListener('input', function(e){
   render();
   var el = document.getElementById('calq');
   if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} }
+});
+
+/* 명함 찾기 칸 — 치는 대로 찾는다(처음 칠 때 색인을 한 번 받는다) */
+document.addEventListener('input', function(e){
+  if(!e.target || e.target.id !== 'cardq' || !S.modal) return;
+  modalRead();
+  S.modal.cq = e.target.value;
+  명함받기();
+  render();
+  명함칸다시잡기();
 });
 
 /* 계정 잇기 — 고르면 «바로» 저장한다(따로 저장 단추를 두지 않는다) */
