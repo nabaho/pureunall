@@ -315,8 +315,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-27 입금 알림 ↔ 거래내역 잇기 · 출금 저절로 등록 모든 PC 공통';
-var BUILD_SEQ = 189;
+var ERP_BUILD = '2026-09-27 거래내역 저절로 확정(세 조건) — 후보 수 보이기 · 켜기는 대표';
+var BUILD_SEQ = 190;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -45321,6 +45321,11 @@ function FinanceLedger(props){
   var _expAutoLocal = usePersistedState('ledger_exp_auto_reg', false);
   var expAutoRegS = useState(function(){ var st = dbGet('app_settings', {}) || {}; return (typeof st.ledgerExpAutoReg === 'boolean') ? st.ledgerExpAutoReg : !!_expAutoLocal[0]; });
   var expAutoReg = expAutoRegS[0];
+  /* 입금 «저절로 확정» 켜기 — 처음에는 꺼져 있다. 켜는 것은 대표가 정한다(돈을 사람 대신 적는 일).
+     ⚠ 모든 PC 공통(app_settings.ledgerAutoTidy) — 한 PC 에서 켜면 다 켜진다. */
+  var autoTidyS = useState(function(){ var st = dbGet('app_settings', {}) || {}; return st.ledgerAutoTidy === true; });
+  var autoTidyOn = autoTidyS[0];
+  function setAutoTidyOn(v){ v = !!v; autoTidyS[1](v); var cur = dbGet('app_settings', {}) || {}; dbSet('app_settings', Object.assign({}, cur, { ledgerAutoTidy:v })); }
   function setExpAutoReg(v){ v = !!v; expAutoRegS[1](v); _expAutoLocal[1](v); var cur = dbGet('app_settings', {}) || {}; dbSet('app_settings', Object.assign({}, cur, { ledgerExpAutoReg:v })); }
   var dragS=useState(false);   var dragOver=dragS[0];   var setDragOver=dragS[1];
   var sugOpenS=useState({});   var sugOpen=sugOpenS[0]; var setSugOpen=sugOpenS[1]; // 후보 펼침 (행별)
@@ -47072,6 +47077,47 @@ function FinanceLedger(props){
       readyRows.push({ row:row, pItem:p, fee:st.fee });
     }
   });
+  /* ── 저절로 확정 후보 (2026-09-27, 대표 「추천대로」) ──
+     ★ 초록(확정 가능) 줄 가운데 «이미 있던 세 조건 검사» erpAutoTidyOk 를 통과한 것만.
+       ① 같은 업체로 3번 넘게 사람이 확정한 입금자 이름(CMS 적요는 근거가 못 된다)
+       ② 금액이 청구와 꼭 같다(부가세 ×1.1 포함)  ③ 추천 점수 90 이상.
+       그 달에 이미 받은 자문료는 미입금 후보에서 빠지므로 두 번 받을 일이 없다.
+     ⚠ 사람이 골라 둔 줄(picked)·수수료를 뺀 줄은 넣지 않는다 — 사람이 보는 몫이다.
+     ⚠ 이 검사는 2026-09 초에 만들어져 있었으나 «아무 데서도» 안 불리고 있었다. */
+  var autoRows = readyRows.filter(function(r){
+    var i = rowInfo[r.row._k]; var g = i && i.grp && i.grp[0];
+    if(!g || g.picked || !g.head || r.fee) return false;
+    return erpAutoTidyOk(g.head, r.row.memo || r.row.note || '', r.row.amount);
+  });
+  var autoKeys = {}; autoRows.forEach(function(r){ autoKeys[r.row._k] = 1; });
+  /* 초록 줄 확정 — 일괄 확정 단추와 저절로 확정이 «같은 길»을 쓴다.
+     ⚠ 갈래가 둘이면 저장 내용이 어긋난다(2026-08 에 실제로 그랬다 — 단추마다 저장하는 것이 달랐다). */
+  function confirmReadyList(list){
+    var ok=0, ng=0, done=[];
+    (list||[]).forEach(function(r){
+      try{
+        saveIncome(r.row, r.pItem, { withPerf:true, feeAmount:r.fee,
+          feeCat:(r.row.src==='card'||r.row.src==='nicebill')?'exp-cardfee':'exp-bankfee' });
+        erpLearnPayerAlias(r.row.memo||r.row.note||'', r.pItem);
+        erpMarkBankRowProcessed(r.row,'income',r.pItem.companyName+' '+(r.pItem.label||'')
+          +(r.fee?' (수수료차감)':''));
+        ok++; done.push(r.row._k);
+      }catch(_e){ ng++; if(window._erpErrLog) window._erpErrLog(_e); }
+    });
+    done.forEach(function(k){ removeRow(k,'inc'); });
+    return { ok:ok, ng:ng };
+  }
+  /* 켜 두었으면 거래내역을 열 때 후보를 저절로 확정한다 — 관리자 화면에서만, 추천 셈이 «끝난 뒤»에만.
+     ⚠ 추천이 계산 중(_sugComputing)이면 기다린다 — 옛 추천으로 확정하면 방금 받은 것을 또 받는다.
+     ⚠ 같은 추천 지문(_sugSig)으로는 한 번만 돈다 — 다시 그릴 때마다 돌면 실패한 줄을 되풀이한다. */
+  var _autoTidyDone = useRef('');
+  useEffect(function(){
+    if(!autoTidyOn || !_meNow().isAdmin || ldTabEff !== 'inc' || _sugComputing || !autoRows.length) return;
+    if(_autoTidyDone.current === _sugSig) return;
+    _autoTidyDone.current = _sugSig;
+    var _r = confirmReadyList(autoRows);
+    if(_r.ok) showToast('🤖 저절로 확정 '+_r.ok+'건 — 입금자·금액이 지난 확정과 꼭 같은 것 · 「확정 이력」에서 되돌릴 수 있습니다'+(_r.ng?(' · 실패 '+_r.ng+'건'):''));
+  });
   /* ── 제목 클릭 정렬 ──
      값을 꺼내는 법을 한 곳에 모은다 — 머리줄과 실제 정렬이 «같은 값» 을 봐야 한다.
      rowInfo(이미 계산한 묶음·상태)를 그대로 쓰므로 정렬하느라 다시 계산하지 않는다.
@@ -47092,6 +47138,7 @@ function FinanceLedger(props){
      거르기 전 목록으로 끝냈으므로 숫자는 흔들리지 않는다. */
   var ldStFAll = incList.length;
   if(ldStF) incList = incList.filter(function(r){
+    if(ldStF === 'auto') return !!autoKeys[r._k];          // 🤖 저절로 확정 후보만
     var i = rowInfo[r._k];
     return !!(i && i.st && i.st.state === ldStF);
   });
@@ -48484,24 +48531,27 @@ function FinanceLedger(props){
            전에는 넷이었다(고신뢰·일괄·자동 정리·⚡자동확정 + 자문료 일괄확인).
            갈래마다 저장하는 내용이 조금씩 달라 결과가 어긋났고, 무엇을 눌러야 하는지
            사람이 알 수 없었다. 이제 줄 상태(erpRowState)가 초록인 것만 한 번에 확정한다. */
+        /* 🤖 저절로 확정 — 후보 수를 늘 보인다(켜기 전에 «몇 건이 저절로 되는지» 를 눈으로 보고 정한다) */
+        ldTabEff==='inc' && autoRows.length>0 && h('button',{key:'autoc',
+          onClick:function(){ setLdStF(ldStF==='auto' ? '' : 'auto'); },
+          title:'입금자가 같은 업체로 3번 넘게 확정됐고 금액이 청구와 꼭 같은 줄 — 누르면 그 줄만 봅니다',
+          style:{padding:'4px 10px',background:ldStF==='auto'?'#1e40af':'#eff6ff',color:ldStF==='auto'?'#fff':'#1e40af',
+            border:'1px solid #bfdbfe',borderRadius:'6px',fontSize:'11px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}},
+          '🤖 저절로 확정 후보 '+autoRows.length+'건'),
+        ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autot',
+          title:'켜면 거래내역을 열 때 위 후보를 저절로 확정합니다 — 「확정 이력」에서 되돌릴 수 있습니다',
+          style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'11px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',
+            padding:'3px 8px',borderRadius:'6px',color:autoTidyOn?'#166534':'#64748b',
+            background:autoTidyOn?'#f0fdf4':'#f8fafc',border:'1px solid '+(autoTidyOn?'#bbf7d0':'#e2e8f0')}},
+          h('input',{type:'checkbox',checked:!!autoTidyOn,onChange:function(){ setAutoTidyOn(!autoTidyOn); }}),
+          autoTidyOn ? '🤖 저절로 확정 (켜짐)' : '🤖 저절로 확정'),
         ldTabEff==='inc' && readyRows.length>0 && h('button',{
           onClick:async function(){
             if(!(await popConfirm('확정 가능 '+readyRows.length+'건을 확정합니다.\n\n'
               +'→ 입금관리 기록 · 항목 입금표시 · 성과급 분배까지 한 번에 됩니다\n'
               +'→ 잘못되면 「확정 이력」에서 되돌릴 수 있습니다'))) return;
-            var ok=0, ng=0, done=[];
-            readyRows.forEach(function(r){
-              try{
-                saveIncome(r.row, r.pItem, { withPerf:true, feeAmount:r.fee,
-                  feeCat:(r.row.src==='card'||r.row.src==='nicebill')?'exp-cardfee':'exp-bankfee' });
-                erpLearnPayerAlias(r.row.memo||r.row.note||'', r.pItem);
-                erpMarkBankRowProcessed(r.row,'income',r.pItem.companyName+' '+(r.pItem.label||'')
-                  +(r.fee?' (수수료차감)':''));
-                ok++; done.push(r.row._k);
-              }catch(_e){ ng++; if(window._erpErrLog) window._erpErrLog(_e); }
-            });
-            done.forEach(function(k){ removeRow(k,'inc'); });
-            showToast('✅ '+ok+'건 확정'+(ng?(' · 실패 '+ng+'건'):''));
+            var _r = confirmReadyList(readyRows);
+            showToast('✅ '+_r.ok+'건 확정'+(_r.ng?(' · 실패 '+_r.ng+'건'):''));
           },
           title:'신호등이 초록인 줄만 확정합니다 — 확인이 필요한 줄(노랑)은 그대로 남습니다',
           className:'ld-bar-go',
