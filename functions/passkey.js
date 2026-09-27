@@ -20,12 +20,17 @@ const functions = require("firebase-functions/v1");
 const { getAuth } = require("firebase-admin/auth");
 const { getDatabase: getRawDatabase } = require("firebase-admin/database");
 const OntologyServerWrite = require("./ontology-write-server");
-const {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
-  generateAuthenticationOptions,
-  verifyAuthenticationResponse,
-} = require("@simplewebauthn/server");
+/* ⚠ @simplewebauthn/server 는 «부를 때» 싣는다 (2026-09-27, 대표 지시 「메일이 늦게 나온다」).
+     이 파일은 index.js 가 늘 싣는다 — 그래서 위에서 바로 require 하면, 지문 로그인을 한 번도
+     안 쓰는 함수(메일 열기·동기화 …)까지 «깨어날 때마다» 이 꾸러미를 읽었다.
+     실측: 이것 하나가 약 0.4초 — 서버 묶음(index.js) 전체 1.25초의 3분의 1이었다.
+   ★ 아래 네 이름은 부를 때 한 번 싣고 그 뒤로는 담아 둔 것을 쓴다(node 가 알아서 담는다). */
+let _swa = null;
+function swa() { return _swa || (_swa = require("@simplewebauthn/server")); }
+const generateRegistrationOptions = (o) => swa().generateRegistrationOptions(o);
+const verifyRegistrationResponse = (o) => swa().verifyRegistrationResponse(o);
+const generateAuthenticationOptions = (o) => swa().generateAuthenticationOptions(o);
+const verifyAuthenticationResponse = (o) => swa().verifyAuthenticationResponse(o);
 
 /* 패스키는 «주소에 묶인다». 여기를 바꾸면 이미 등록한 지문이 전부 무효가 되어
    전 직원이 다시 등록해야 한다 — 그래서 대표가 도메인을 먼저 정했다(나바호). */

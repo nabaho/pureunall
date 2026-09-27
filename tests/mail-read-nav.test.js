@@ -39,7 +39,10 @@ function fnBody(name, from) {
 
 /* ══════ ① 담아 둔다 ══════ */
 test('★★ 한 번 받은 본문은 담아 둔다 — 다시 열 때 «서버를 안 부른다»', () => {
-  const fn = fnBody('mbFetchBody');
+  /* ⚠ 2026-09-27 — 「받는 중인 통은 한 번만」을 넣으며 서버를 «실제로 부르는» 일을
+       mbFetchBodyNow 로 뺐다. 지킬 것은 «담아 둔 것을 먼저 본다»는 차례다 — 부르는 함수를
+       이어 붙여 그 차례를 본다. */
+  const fn = fnBody('mbFetchBody') + '\n' + fnBody('mbFetchBodyNow');
   const iHit = fn.indexOf('mbBodyGet(');
   const iFetch = fn.indexOf('fetch(');
   assert.ok(iHit > 0, '★ 담아 둔 것을 찾아보지 않습니다');

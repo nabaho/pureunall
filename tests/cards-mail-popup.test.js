@@ -43,9 +43,24 @@ function box(opt){
     normEmail: v => String(v || '').trim().toLowerCase(),
     toast: m => { ctx._toast = m; },
     openSendMaterials: id => { ctx._fellBack = id; },
-    window: { open: (url, name) => { opened.push({ url, name }); return o.blocked ? null : { focus(){ ctx._focused = true; } }; } },
-    _opened: opened
+    /* ⚠ 2026-09-27 — 창을 «이름으로 먼저» 잡고(open('', 이름)), 떠 있는 메일 창이면 다시
+         싣지 않고 받는 사람만 바꾼다(대표 지시 「팝업창이 너무 늦게 나온다」). 그래서 가짜
+         창에도 진짜처럼 location 이 있어야 한다 — 주소를 싣는 것은 이제 location.href 다.
+       o.live — 그 창이 «이미 떠서 로그인까지 된» 메일 창이다(puMailComposeTo 가 있다). */
+    window: { open: (url, name) => {
+      opened.push({ url, name });
+      if (o.blocked) return null;
+      const w = { focus(){ ctx._focused = true; },
+        location: { get href(){ return 'about:blank'; }, set href(v){ ctx._nav.push(String(v)); } } };
+      if (o.live) w.puMailComposeTo = (x) => { ctx._composed = x; return o.live !== 'cold'; };
+      return w;
+    } },
+    _opened: opened,
+    _nav: []
   };
+  /* 창에 «실제로 실린» 주소 — 이름으로 잡은 뒤 location 으로 싣거나, 처음부터 주소로 열었거나 */
+  ctx._went = () => ctx._nav.length ? ctx._nav[ctx._nav.length - 1]
+    : ((opened.filter(x => x.url).slice(-1)[0] || {}).url || '');
   vm.createContext(ctx);
   vm.runInContext('const MAIL_WIN = ' + JSON.stringify((src.match(/const MAIL_WIN = '([^']+)'/) || [])[1] || '')
     + ';\n' + fn('openMailWindow'), ctx);
@@ -55,10 +70,39 @@ function box(opt){
 test('★ 이메일을 누르면 «딴 창»이 열린다', () => {
   const c = box();
   c.openMailWindow('c1');
-  assert.equal(c._opened.length, 1, '창이 안 열렸다');
-  assert.match(c._opened[0].url, /view=mail/, '메일 화면으로 안 간다');
-  assert.match(c._opened[0].url, /to=cust11%40naver\.com/, '★ 받는 사람이 안 실렸다 — 빈 편지지가 열린다');
-  assert.match(c._opened[0].url, /card=c1/, '어느 명함에서 왔는지가 안 실렸다');
+  assert.ok(c._opened.length >= 1, '창이 안 열렸다');
+  const u = c._went();
+  assert.match(u, /view=mail/, '메일 화면으로 안 간다');
+  assert.match(u, /to=cust11%40naver\.com/, '★ 받는 사람이 안 실렸다 — 빈 편지지가 열린다');
+  assert.match(u, /card=c1/, '어느 명함에서 왔는지가 안 실렸다');
+});
+
+test('★★★ 이미 떠 있는 메일 창은 «다시 싣지 않는다» — 받는 사람만 바꾼다 (2026-09-27)', () => {
+  /* 대표 지시 「팝업창이 너무 늦게 나온다」 — 예전에는 누를 때마다 떠 있던 창이
+     앱 전체(2MB)를 처음부터 다시 실었다. */
+  const c = box({ live: true });
+  c.openMailWindow('c2');
+  assert.equal(c._nav.length, 0, '★★★ 떠 있는 창을 또 새로 싣는다 — 누를 때마다 앱을 처음부터 띄운다');
+  assert.ok(c._composed, '★★ 떠 있는 창에 받는 사람을 안 넘겼다');
+  assert.equal(c._composed.to, 'cust05@hanmail.net');
+  assert.equal(c._composed.card, 'c2', '★ 어느 명함인지 안 넘겼다 — 자료 고르기로 못 간다');
+  assert.equal(c._focused, true, '★ 앞으로 안 끌어왔다 — 뒤에 가려 있어 반응 없어 보인다');
+});
+
+test('★★ 떠 있는 창이 «아직 받을 수 없으면»(로그인 전) 예전처럼 주소를 싣는다', () => {
+  const c = box({ live: 'cold' });
+  c.openMailWindow('c1');
+  assert.match(c._went(), /to=cust11%40naver\.com/, '★★ 받지 못한 창을 그대로 둔다 — 아무 일도 안 일어난다');
+});
+
+test('★★ 떠 있는 창이 받는 쪽(puMailComposeTo)은 «새로 실린 창과 같은 길»로 쓰기를 연다', () => {
+  const body = code(fn('puMailComposeTo'));
+  assert.match(body, /mailComposeOpen\(/, '★★ 떠 있는 창만 딴 길로 연다 — 두 벌이면 한쪽만 고쳐진다');
+  assert.match(body, /if\(!myUid && !myEmail\) return false/, '★ 로그인 전에도 받는다 — 빈 창에 쓰기가 열린다');
+  assert.match(body, /saveDraft\(/, '★ 쓰던 글을 임시저장에 안 넘긴다 — 새 사람을 누르면 쓰던 글이 사라진다');
+  const open = code(fn('mailComposeOpen'));
+  assert.match(open, /openSendMaterials\(t\.card, \{ asked:true \}\)/, '★ 명함이 있으면 자료 고르기로 — 다시 묻지 않고');
+  assert.match(open, /openMailPage\(/, '★ 명함이 없으면 편지 쓰기로');
 });
 
 test('★★ 여러 번 눌러도 창은 «하나»다 — 이름이 같아야 한다', () => {
@@ -131,7 +175,8 @@ test('★ 메일 창이 뜰 때 to 가 있으면 «쓰기», 없으면 받은메
   const bx = b.indexOf('openMailBox(');
   assert.ok(at > 0, '★ 메일 창이 「누구에게」를 안 본다 — 이메일을 눌러도 받은메일함이 열린다');
   assert.ok(at < bx, '★ 받은메일함을 «먼저» 열어 버린다 — to 를 먼저 봐야 한다');
-  assert.match(b.slice(at, bx), /openMailPage\(|openSendMaterials\(/,
+  /* ⚠ 2026-09-27 — 쓰기를 여는 길이 mailComposeOpen 한 곳으로 모였다(떠 있는 창도 같은 길) */
+  assert.match(b.slice(at, bx), /openMailPage\(|openSendMaterials\(|mailComposeOpen\(/,
     'to 가 있을 때 쓰기 화면으로 안 간다');
 });
 

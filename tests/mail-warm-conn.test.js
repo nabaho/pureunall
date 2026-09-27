@@ -57,7 +57,9 @@ test('★★ 물려받은 것이 죽어 실패하면 «한 번» 새로 붙어 �
   const i = src.indexOf('async function withFolder');
   const seg = src.slice(i, src.indexOf('\nasync function drain', i));
   assert.match(seg, /attempt\s*<\s*2/, '다시 해 보지 않습니다 — 죽은 연결 하나에 그대로 실패합니다');
-  assert.match(seg, /if \(!got\.reused \|\| attempt >= 1\) throw e/,
+  /* ⚠ 2026-09-27 — 진짜 실패면 담아 둔 폴더 주소를 버리고 던진다({ folderPathForget; throw }).
+       지킬 것은 «새로 붙어서도 실패하면 더 안 돈다»이지 그 줄의 모양이 아니다. */
+  assert.match(seg, /if \(!got\.reused \|\| attempt >= 1\) (throw e|\{[^}]*throw e;?\s*\})/,
     '새로 붙어서도 실패했는데 또 다시 합니다 — 영원히 돕니다');
 });
 
