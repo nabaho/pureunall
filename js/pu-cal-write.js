@@ -247,11 +247,22 @@
   }
 
   /* 한 건 지우기 — 자리를 비운다(v/{번호} = null). */
+  /* 지우기 — 칸을 비우지 않고 «삭제표시»를 남긴다 (2026-09-27).
+     온톨로지 관문(강제)은 물리 삭제를 거절한다(_deleted·deletedAt·deletedBy 를 남기라는 규칙).
+     ★ 표시 붙은 줄은 읽는 쪽이 모두 뺀다 — 이알피 받는 세 길(_FB_HIDE_DELETED)·업무관리 달력·
+       이 앱(pu-cal-read). 그래서 지운 연차가 사용일·급여에 세지 않는다.
+     ⚠ 서버의 지금 판 위에 표시만 얹는다 — 그사이 남이 고친 칸을 되돌리지 않는다. */
   function remove(table, id, prev) {
     var g = check(table, id, {}, prev && prev.date);
     if (!g.ok) return Promise.resolve(g);
-    var paths = {}; paths[id] = null;
-    return send(table, paths).then(function () { return OK; })
+    var who = typeof _ctx.who === 'function' ? (_ctx.who() || '') : '';
+    var ref = _db.ref('data/' + table + '/v/' + id);
+    return gate().save(ref, function (server) {
+      var base = (server && typeof server === 'object') ? server : (prev || {});
+      return Object.assign({}, base, { id: id, _deleted: true, deletedAt: Date.now(), deletedBy: who });
+    }, { entityType: 'ScheduleEvent' })
+      .then(function () { return _db.ref('data/' + table + '/u').set(Date.now()); })
+      .then(function () { return OK; })
       .catch(function (e) { return fail('server', (e && e.message) || String(e)); });
   }
 
