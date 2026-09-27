@@ -536,7 +536,7 @@
   body.mob .mhd div:last-child{border-right:none}
   body.mob .day{padding:3px 2px 1px}
   body.mob .dline{margin-bottom:2px}
-  body.mob .dnum{min-width:20px;height:20px;font-size:11.5px;padding:0 3px}
+  body.mob .dnum{min-width:20px;height:20px;font-size:11.5px;padding:0 3px;font-weight:400}
   body.mob .lun{font-size:11px}
   body.mob .ev{font-size:11px;line-height:16px;padding:1px 3px;border-radius:3px;font-weight:500;text-overflow:clip}
   body.mob .evph{height:18px}
@@ -1611,8 +1611,24 @@ function lunarRange(ym){
     var a = new Date(Date.UTC(y, m-1, 1)), b = new Date(Date.UTC(y, m, 0));
     var fm = new Intl.DateTimeFormat("ko-KR-u-ca-dangi", {era:"long", year:"numeric", month:"numeric", timeZone:"UTC"});
     function pick(d, t){ var ps = fm.formatToParts(d); for(var i=0;i<ps.length;i++) if(ps[i].type===t) return ps[i].value; return ""; }
-    var yn = pick(a,"yearName"), m1 = pick(a,"month"), m2 = pick(b,"month");
+    /* ⚠ 브라우저마다 꼴이 다르다 (2026-09-27 대표 폰 캡처 「년M07 – M08」).
+         컴퓨터 크롬: 간지 「병오」 · 달 「8월」 / 폰 크롬(안드로이드): 간지 없음 · 달 「M07」(윤달 「M07L」).
+       그래서 «숫자만» 꺼내 우리 꼴(「7월」·「윤7월」)로 다시 쓰고, 간지가 없으면 우리가 셈한다. */
+    function 달글(v){
+      v = String(v || "");
+      var n = parseInt(v.replace(/[^0-9]/g, ""), 10);
+      if(!n) return "";
+      return (/L|윤/.test(v) ? "윤" : "") + n + "월";
+    }
+    var yn = pick(a,"yearName"), m1 = 달글(pick(a,"month")), m2 = 달글(pick(b,"month"));
     if(!m1) return "";
+    if(!yn || /[0-9]/.test(yn)){
+      /* 간지 셈 — 그 음력 해(relatedYear, 없으면 양력 해에서 음력 달이 더 크면 한 해 앞) */
+      var ry = parseInt(pick(a,"relatedYear"), 10);
+      if(!ry){ ry = y; if(parseInt(m1, 10) > m) ry = y - 1; }
+      var 천간 = "갑을병정무기경신임계", 지지 = "자축인묘진사오미신유술해";
+      yn = 천간.charAt(((ry - 4) % 10 + 10) % 10) + 지지.charAt(((ry - 4) % 12 + 12) % 12);
+    }
     return yn + "년" + m1 + (m2 && m2 !== m1 ? " – " + m2 : "");
   }catch(e){ return ""; }
 }
@@ -1869,7 +1885,10 @@ function 용량재기(){
   /* ⚠ 높이를 «짐작»하지 않는다. 처음에 날짜줄 22·칩 17.5 로 어림했더니 칸마다 11px 씩
      넘쳐 「+N개 더」가 잘렸다 — 날짜 동그라미는 24px 이고 칩은 테두리까지 18px 이다.
      꾸밈을 한 줄만 고쳐도 어림값은 또 틀어진다. 그래서 그려 놓은 것을 실제로 잰다. */
-  var 줄 = g.clientHeight / 6;
+  /* ⚠ 줄 수를 «그려진 칸»으로 센다 — 폰은 그 달에 필요한 줄만(5줄) 그린다. 6 으로 나누면
+       한 줄 높이를 작게 재어 칸이 비어 있는데도 「•••」로 접는다(2026-09-27 대표 폰 캡처) */
+  var 줄수 = Math.max(1, Math.round(g.querySelectorAll(".day").length / 7));
+  var 줄 = g.clientHeight / 줄수;
   var cs = getComputedStyle(칸);
   var 여백 = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
   function 날짜줄(c){

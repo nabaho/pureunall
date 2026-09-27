@@ -93,3 +93,33 @@ test('⑥ 회전은 «자동 회전 · 세로 고정» 중에 고르고, 안 되
   const 바꾸기 = 함수몸(캘린더, 'function rotToggle(){');
   assert.match(바꾸기, /localStorage\.setItem\("pu_cal_rotate"/, '고른 것을 기억하지 않습니다');
 });
+
+/* ── 음력 범위 — 폰 브라우저 꼴 (대표 폰 캡처 2026-09-27 「년M07 – M08」) ── */
+function 음력범위(부분) {
+  const b = { String, parseInt, Date, Intl: { DateTimeFormat: function () {
+    return { formatToParts: (d) => 부분(d) };
+  } } };
+  vm.createContext(b);
+  vm.runInContext(함수몸(캘린더, 'function lunarRange(ym){'), b);
+  return vm.runInContext('lunarRange("2026-09")', b);
+}
+test('⑦★ 폰 브라우저 꼴(간지 없음 · 「M07」)이어도 「병오년7월 – 8월」로 적는다', () => {
+  const r = 음력범위((d) => [{ type: 'relatedYear', value: '2026' },
+    { type: 'month', value: d.getUTCDate() === 1 ? 'M07' : 'M08' }]);
+  assert.equal(r, '병오년7월 – 8월');
+});
+test('⑦ 컴퓨터 브라우저 꼴(간지 「병오」 · 「7월」)은 그대로', () => {
+  const r = 음력범위((d) => [{ type: 'yearName', value: '병오' },
+    { type: 'month', value: d.getUTCDate() === 1 ? '7월' : '8월' }]);
+  assert.equal(r, '병오년7월 – 8월');
+});
+test('⑦ 윤달(「M06L」)은 「윤6월」', () => {
+  const r = 음력범위((d) => [{ type: 'relatedYear', value: '2025' },
+    { type: 'month', value: d.getUTCDate() === 1 ? 'M06L' : 'M07' }]);
+  assert.match(r, /윤6월/);
+});
+test('⑧ 칸 용량은 «그려진 줄 수»로 잰다 — 폰(5줄)에서 6으로 나누면 빈 칸에도 접는다', () => {
+  const 몸 = 함수몸(캘린더, 'function 용량재기(){');
+  assert.strictEqual(/clientHeight \/ 6\b/.test(몸), false, '아직 6줄로 나눕니다');
+  assert.match(몸, /querySelectorAll\("\.day"\)\.length \/ 7/, '그려진 줄 수를 안 셉니다');
+});
