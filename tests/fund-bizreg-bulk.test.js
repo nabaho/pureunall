@@ -140,7 +140,7 @@ test('멈추기를 누르면 더 읽지 않는다 · 기금을 옮겨도 멈춘�
 test('PDF 로 올린 사업자등록증도 읽는다', () => {
   // 소스 안에서는 정규식 리터럴이라 빗금이 이스케이프돼 있다(data:application\/pdf)
   assert.match(grabFn('_bulkCanvases'), /data:application\\\/pdf/);
-  assert.match(grabFn('_bulkCanvases'), /pdfPageCanvases\(buf,1\)/);
+  assert.match(grabFn('_bulkCanvases'), /pdfPageCanvases\(buf,1,true\)/);   // true = 회색 그대로(한국어 OCR, 2026-09-27)
 });
 
 /* ══════════ ④ 확인 표를 «정말 그려» 본다 ══════════ */
