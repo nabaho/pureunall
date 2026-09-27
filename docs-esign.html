@@ -171,7 +171,8 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
-<script src="js/pu-contract-forms.js?v=3"></script>
+<script src="js/pu-form-cardfill.js?v=1"></script>
+<script src="js/pu-contract-forms.js?v=4"></script>
 <script src="js/pu-photo-store.js?v=30"></script>
 <script src="js/pu-office-store.js?v=1"></script>
 <script src="js/pu-office-docs.js?v=1"></script>
@@ -255,6 +256,47 @@ function officeHost() {
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
+/* ── 계약서 양식 › 📝 채워서 받기 (대표 지시 2026-09-27) — 규칙은 js/pu-form-cardfill.js ──
+   기업정보함 읽기는 기금관리(fund.html loadCardIdx·loadCardCo)와 같다:
+   pucards/idx(가벼운 검색목록)만 통째로 · coInfo 는 고른 회사 한 칸씩 · pucards/items(사진)는 안 읽는다 · 쓰기 금지.
+   한글 채우기는 위 「근로자별로 채우기」와 같은 엔진(EsignHwpTpl.fillDoc + _esignRelayout). 채운 값은 저장하지 않는다. */
+var _formCardRowsP = null;
+function formCards() {
+  return {
+    rows: function () {
+      if (!_formCardRowsP) _formCardRowsP = db.ref('pucards/idx').once('value').then(function (s) { return s.val() || {}; },
+        function (e) { _formCardRowsP = null; throw e; });
+      return _formCardRowsP;
+    },
+    coInfo: function (keys) {
+      return Promise.all(keys.map(function (k) {
+        return db.ref('pucards/coInfo/' + k).once('value').then(function (s) { return s.val() || {}; }, function () { return {}; });
+      }));
+    }
+  };
+}
+async function formHwpBytes(src) {
+  if (src.data) return PuOfficeStore.dataUrlToBytes(src.data);
+  var rec = await PuOfficeStore.getOriginal(src.fileId);
+  if (!rec) throw new Error('보관함에 없는 파일입니다');
+  var url = await PuOfficeStore.fileUrl(rec);
+  var r = await fetch(url);
+  if (!r.ok) throw new Error('원본을 받지 못했습니다 (HTTP ' + r.status + ')');
+  return new Uint8Array(await r.arrayBuffer());
+}
+async function formHwpMarkers(bytes, name) {
+  var doc = await PureunHwp.openDoc(bytes, name);
+  try { return Object.keys(EsignHwpTpl.markersOf(doc)); } finally { try { doc.free(); } catch (e) {} }
+}
+async function formHwpFill(bytes, name, V) {
+  var doc = await PureunHwp.openDoc(bytes, name), r;
+  try { r = EsignHwpTpl.fillDoc(doc, V); } catch (e) { try { doc.free(); } catch (e2) {} throw e; }
+  try { r.bytes = await _esignRelayout(doc); r.relayoutFailed = false; }
+  catch (e) { r.bytes = doc.exportHwp(); r.relayoutFailed = true; }
+  try { doc.free(); } catch (e) {}
+  return r;
+}
+function formHwpShow(host, bytes, name) { return PureunHwp.renderPreview(host, bytes, name); }
 function onFormSelect(id) {
   if (!id && $('paneForms').hidden) return;
   var h = id ? '#forms:' + encodeURIComponent(id) : '#forms';
@@ -272,7 +314,8 @@ function showPane(name) {
   if (name === 'forms' && !formsMounted) {
     formsMounted = true;
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(),
-      onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal });
+      onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
+      cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow });
   }
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }

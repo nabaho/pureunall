@@ -490,6 +490,21 @@
     + '.pcf-body{white-space:pre-wrap;font-family:"Malgun Gothic","맑은 고딕",monospace;font-size:13px;line-height:1.85;color:#1e293b;margin:0}'
     + '.pcf-v{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}'
     + '.pcf-muted{color:#94a3b8}'
+    /* 채워서 받기 창 */
+    + '.pcf-fcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px}'
+    + '.pcf-fcols input[type=search],.pcf-frow input{width:100%;padding:6px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:12.5px;font-family:inherit}'
+    + '.pcf-fh{font-size:12px;color:#64748b;font-weight:700;margin:10px 0 4px}'
+    + '.pcf-fl{display:flex;flex-direction:column;gap:2px;margin-top:4px;max-height:180px;overflow:auto}'
+    + '.pcf-fi{display:flex;gap:8px;align-items:baseline;text-align:left;background:none;border:1px solid transparent;border-radius:6px;padding:5px 8px;cursor:pointer;font-family:inherit;font-size:12.5px;color:#1e293b}'
+    + '.pcf-fi:hover{background:#eff6ff}.pcf-fi.on{background:#dbeafe;border-color:#bfdbfe;color:#1e40af}'
+    + '.pcf-fi span{color:#64748b;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.pcf-fpick{display:flex;gap:8px;align-items:center;background:#dbeafe;color:#1e40af;border-radius:6px;padding:6px 8px;margin-top:6px;font-size:12.5px}'
+    + '.pcf-fpick span{flex:1;min-width:0;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.pcf-frow{display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;align-items:center;margin-bottom:5px;font-size:12px}'
+    + '.pcf-frow span{color:#1e40af;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pcf-frow span.miss{color:#854d0e}'
+    + '.pcf-fnote{font-size:12px;color:#854d0e;margin-top:10px;min-height:1em}'
+    + '.pcf-fprev{margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;max-height:60vh;overflow:auto;background:#e2e8f0;padding:12px}'
+    + '@media(max-width:700px){.pcf-fcols{grid-template-columns:1fr}}'
     + '.pcf-msel{display:none;gap:6px;margin-bottom:10px}.pcf-msel select{flex:1;min-width:0;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}'
     + '@media(max-width:700px){.pcf-msel{display:flex}.pcf-cols{flex-direction:column;align-items:stretch}'
     + '.pcf-list{width:auto;position:static;max-height:40vh;border-right:1px solid #e2e8f0}'
@@ -695,14 +710,237 @@
     setTimeout(function () { nameIn.focus(); }, 0);
   }
 
+  /* ── 📝 채워서 받기 — 기업정보함에서 회사·담당자·근로자를 골라 채운다 (대표 지시 2026-09-27, 목업 승인) ──
+     규칙·값 함수는 js/pu-form-cardfill.js(순수). 여기는 그리기만.
+     host.cards.rows()        → 기업정보함 검색목록(pucards/idx) 줄들 (한 번 읽고 캐시)
+     host.cards.coInfo(keys)  → 고른 회사 딸림정보 한 칸씩 [값…]
+     host.hwpBytes(src)       → 한글 원본 바이트 (첨부 data 또는 보관함 fileId)
+     host.hwpMarkers(u8,name) → 문서 속 표지 이름들
+     host.hwpFill(u8,name,V)  → { bytes, unknown, relayoutFailed }
+     host.hwpShow(el,u8,name) → 채운 파일 미리보기
+     ⚠ 채운 값은 저장하지 않는다 — 내려받는 파일에만 들어간다. 기업정보함에는 쓰지 않는다. */
+  function ensureCss() {
+    if (document.getElementById('pcf-css')) return;
+    var st = document.createElement('style'); st.id = 'pcf-css'; st.textContent = CSS; document.head.appendChild(st);
+  }
+  function hwpSources(fm) {
+    var out = [];
+    (fm.attachments || []).forEach(function (a) {
+      if (/\.(hwp|hwpx)$/i.test(a.name || '') && (a.data || a.dataUrl)) out.push({ name: a.name, data: a.data || a.dataUrl });
+    });
+    (fm.originals || []).forEach(function (o) {
+      if (/\.(hwp|hwpx)$/i.test(o.name || '') && o.fileId && !out.some(function (x) { return x.name === o.name; }))
+        out.push({ name: o.name, fileId: o.fileId });
+    });
+    return out;
+  }
+  function openFill(fm, host) {
+    var CF = w.PuFormCardFill;
+    if (!CF || !host.cards) { toast('기업정보함 연결을 불러오지 못했습니다'); return; }
+    ensureCss();
+    var srcs = hwpSources(fm), src = srcs[0] || null;
+    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, markers: CF.markersIn(fm.body), edits: {}, hwp: null };
+    var bg = el('div', { 'class': 'pcf-mbg' });
+    function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+
+    var coQ = el('input', { type: 'search', placeholder: '회사 이름·사업자번호·대표자', 'aria-label': '회사 찾기' });
+    var coList = el('div', { 'class': 'pcf-fl' });
+    var coPicked = el('div');
+    var ctBox = el('div', { 'class': 'pcf-fl' });
+    var wkQ = el('input', { type: 'search', placeholder: '근로자 이름·휴대폰', 'aria-label': '근로자 찾기' });
+    var wkList = el('div', { 'class': 'pcf-fl' });
+    var valBox = el('div');
+    var note = el('div', { 'class': 'pcf-fnote' });
+    var prevBox = el('div', { 'class': 'pcf-fprev', hidden: true });
+
+    function values() {
+      var co = st.co ? Object.assign({}, st.coX, st.co) : {};
+      var V = CF.valuesFrom({ co: co, contact: st.contact, worker: st.worker });
+      Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });
+      return V;
+    }
+    function allMarkers() {
+      var seen = {}, out = [];
+      st.markers.concat(st.hwp ? st.hwp.markers : []).forEach(function (k) { if (!seen[k]) { seen[k] = 1; out.push(k); } });
+      return out;
+    }
+    function drawVals() {
+      valBox.innerHTML = '';
+      var V = values(), ks = allMarkers();
+      if (!ks.length) { valBox.appendChild(el('div', { 'class': 'pcf-muted', text: '이 양식에는 채울 자리가 없습니다' })); return; }
+      valBox.appendChild(el('div', { 'class': 'pcf-fh', text: '채울 자리 ' + ks.length + '곳 — 고칠 수 있습니다' }));
+      ks.forEach(function (k) {
+        var inp = el('input', { type: 'text', 'aria-label': k, placeholder: CF.BLANK + ' (비워 두면 밑줄)' });
+        inp.value = V[k] == null ? '' : V[k];
+        inp.addEventListener('input', function () { st.edits[k] = inp.value; });
+        valBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { 'class': V[k] ? '' : 'miss', text: k }), inp]));
+      });
+    }
+    function rowBtn(label, sub, on, fn) {
+      return el('button', { type: 'button', 'class': 'pcf-fi' + (on ? ' on' : ''), onclick: fn }, [el('b', { text: label }), sub ? el('span', { text: sub }) : null]);
+    }
+    function clearEdits(ks) { ks.forEach(function (k) { delete st.edits[k]; }); }
+    function drawContacts() {
+      ctBox.innerHTML = '';
+      if (!st.co) { ctBox.appendChild(el('div', { 'class': 'pcf-muted', text: '회사를 먼저 고르세요' })); return; }
+      var cs = CF.contactsOf(st.rows || [], st.co);
+      if (!cs.length) { ctBox.appendChild(el('div', { 'class': 'pcf-muted', text: '이 회사 명함이 없습니다 — 오른쪽 칸에 적으세요' })); return; }
+      cs.slice(0, 30).forEach(function (r) {
+        ctBox.appendChild(rowBtn(r.n + (r.ti ? ' ' + r.ti : ''), r.m || r.t || r.e || '', st.contact === r, function () {
+          st.contact = st.contact === r ? null : r; clearEdits(['담당자', '담당자연락처', '담당자이메일']); drawContacts(); drawVals();
+        }));
+      });
+    }
+    function coSub(r) {
+      return [r.bz ? CF.valuesFrom({ co: r }).사업자번호 : '', r.ceo ? '대표 ' + r.ceo : '', r.k === 'card-co' ? '명함에만 있는 회사' : ''].filter(Boolean).join(' · ');
+    }
+    function pickCo(r) {
+      st.co = r; st.coX = {}; st.contact = null;
+      clearEdits(['회사명', '사업자번호', '대표자', '대표자전체', '주소', '대표전화', '대표팩스', '대표이메일', '업태', '종목', '법인등록번호', '규모', '담당자', '담당자연락처', '담당자이메일']);
+      coList.innerHTML = ''; coQ.value = '';
+      coPicked.innerHTML = '';
+      coPicked.appendChild(el('div', { 'class': 'pcf-fpick' }, [
+        el('b', { text: r.c || '(이름 없음)' }), el('span', { text: coSub(r) }),
+        el('button', { type: 'button', 'class': 'pcf-b', text: '바꾸기', onclick: function () { st.co = null; st.contact = null; coPicked.innerHTML = ''; drawContacts(); drawVals(); coQ.focus(); } })
+      ]));
+      drawContacts(); drawVals();
+      var keys = CF.coInfoKeys(r);
+      if (keys.length) host.cards.coInfo(keys).then(function (vals) {
+        if (st.co !== r) return;
+        st.coX = CF.mergeCoInfo(vals); drawVals();
+      }, function () {});
+    }
+    function withRows(fn) {
+      if (st.rows) { fn(st.rows); return; }
+      note.textContent = '기업정보함 불러오는 중…';
+      host.cards.rows().then(function (rows) { st.rows = CF.rowsOf(rows); note.textContent = ''; fn(st.rows); },
+        function (e) { note.textContent = '⚠ 기업정보함을 읽지 못했습니다 — ' + ((e && e.message) || e); });
+    }
+    var coT = null, wkT = null;
+    coQ.addEventListener('input', function () {
+      clearTimeout(coT); coT = setTimeout(function () {
+        withRows(function (rows) {
+          coList.innerHTML = '';
+          var hits = CF.searchCompanies(rows, coQ.value, 12);
+          if (coQ.value.trim() && !hits.length) coList.appendChild(el('div', { 'class': 'pcf-muted', text: '찾는 회사가 없습니다' }));
+          hits.forEach(function (r) { coList.appendChild(rowBtn(r.c || '(이름 없음)', coSub(r), false, function () { pickCo(r); })); });
+        });
+      }, 200);
+    });
+    wkQ.addEventListener('input', function () {
+      clearTimeout(wkT); wkT = setTimeout(function () {
+        withRows(function (rows) {
+          wkList.innerHTML = '';
+          var hits = CF.searchPeople(rows, wkQ.value, 10);
+          if (wkQ.value.trim() && !hits.length) wkList.appendChild(el('div', { 'class': 'pcf-muted', text: '없습니다 — 오른쪽 칸에 바로 적으세요' }));
+          hits.forEach(function (r) {
+            wkList.appendChild(rowBtn(r.n, [r.c || '', r.m || ''].filter(Boolean).join(' · '), false, function () {
+              st.worker = r; clearEdits(['근로자명', '근로자이름', '이름', '근로자명단', '근로자연락처', '근로자주소', '근로자수', '근로자상세']);
+              wkList.innerHTML = ''; wkQ.value = r.n; drawVals();
+            }));
+          });
+        });
+      }, 200);
+    });
+
+    var srcSel = null;
+    if (srcs.length > 1) {
+      srcSel = el('select', { 'aria-label': '채울 한글 원본', onchange: function () { src = srcs[+srcSel.value]; loadHwp(); } },
+        srcs.map(function (s, i) { return el('option', { value: String(i), text: s.name }); }));
+    }
+    function loadHwp() {
+      st.hwp = null; drawVals();
+      if (!src) return;
+      note.textContent = '한글 원본 살펴보는 중…';
+      var my = src;
+      host.hwpBytes(src).then(function (u8) {
+        return host.hwpMarkers(u8, my.name).then(function (ks) { return { bytes: u8, markers: ks || [] }; });
+      }).then(function (h) {
+        if (src !== my) return;
+        st.hwp = h;
+        note.textContent = h.markers.length ? '' : '⚠ 한글 원본에 채울 자리(회사명 같은 표시)가 없습니다 — 원본에 표시를 넣으면 채워집니다';
+        drawVals();
+      }, function (e) { note.textContent = '⚠ 한글 원본을 읽지 못했습니다 — ' + ((e && e.message) || e); });
+    }
+    function fillHwp() {
+      if (!st.hwp) return Promise.reject(new Error(src ? '한글 원본을 아직 읽는 중입니다' : '이 양식에는 한글 원본이 없습니다'));
+      return host.hwpFill(st.hwp.bytes, src.name, CF.hwpValues(st.hwp.markers, values()));
+    }
+    function outName() {
+      var V = values();
+      return CF.safeName(fm.name + (V.회사명 ? '_' + V.회사명 : '') + (V.근로자명 ? '_' + V.근로자명 : '')) + '.hwp';
+    }
+    function warnOf(r) {
+      if (r.unknown && r.unknown.length) toast('⚠ 못 채운 자리 ' + r.unknown.length + '곳(표 속 표일 수 있음): ' + r.unknown.join(', '));
+      else if (r.relayoutFailed) toast('⚠ 줄 다시 나누기를 못 해 원본 줄 정보로 냈습니다');
+    }
+    function doPreview() {
+      if (!src) {   // 한글 원본이 없으면 글자 본문을 채워 보여 준다
+        prevBox.hidden = false; prevBox.innerHTML = '';
+        prevBox.appendChild(el('pre', { 'class': 'pcf-body', text: CF.fillText(fm.body, values()) }));
+        return;
+      }
+      note.textContent = '채우는 중…';
+      fillHwp().then(function (r) {
+        note.textContent = ''; warnOf(r);
+        prevBox.hidden = false; prevBox.innerHTML = '';
+        return host.hwpShow(prevBox, r.bytes, outName());
+      }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
+    function doDownload() {
+      note.textContent = '채우는 중…';
+      fillHwp().then(function (r) {
+        note.textContent = ''; warnOf(r);
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.bytes], { type: 'application/x-hwp' }));
+        a.download = outName(); document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+        toast('내려받았습니다 — ' + a.download);
+      }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
+    function copyText() {
+      var t = CF.fillText(fm.body, values());
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject(new Error('복사 기능이 없습니다')))
+        .then(function () { toast('채운 본문을 복사했습니다'); }, function (e) { toast('⚠ ' + ((e && e.message) || e)); });
+    }
+
+    var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '채워서 받기', style: 'width:980px' }, [
+      el('div', { 'class': 'pcf-mh' }, [el('span', { text: '📝 채워서 받기 · ' + (fm.name || '') }),
+        el('small', { style: 'font-weight:400;color:#64748b;margin-right:8px', text: src ? '원본: ' + src.name : '한글 원본 없음 — 글자 본문을 채웁니다' }),
+        el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })]),
+      el('div', { 'class': 'pcf-mb' }, [
+        srcSel ? el('div', { style: 'margin-bottom:8px' }, [el('span', { 'class': 'pcf-fh', text: '채울 한글 원본 ' }), srcSel]) : null,
+        el('div', { 'class': 'pcf-fcols' }, [
+          el('div', null, [
+            el('div', { 'class': 'pcf-fh', text: '① 회사 — 기업정보함에서 찾기' }), coQ, coList, coPicked,
+            el('div', { 'class': 'pcf-fh', text: '② 담당자 — 이 회사 명함' }), ctBox,
+            el('div', { 'class': 'pcf-fh', text: '③ 근로자 본인 — 명함에서 찾기 또는 직접 적기' }), wkQ, wkList
+          ]),
+          valBox
+        ]),
+        note, prevBox
+      ]),
+      el('div', { 'class': 'pcf-mf' }, [
+        el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }),
+        fm.body ? el('button', { type: 'button', 'class': 'pcf-b', text: '본문 복사', onclick: copyText }) : null,
+        el('button', { type: 'button', 'class': 'pcf-b', text: src ? '한글로 열어 보기' : '채운 본문 보기', onclick: doPreview }),
+        src ? el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', text: '한글 파일 내려받기', onclick: doDownload }) : null
+      ])
+    ]);
+    bg.appendChild(m);
+    bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
+    document.body.appendChild(bg);
+    drawContacts(); drawVals(); loadHwp();
+    setTimeout(function () { coQ.focus(); }, 0);
+  }
+
   /* ══ 양식 관리 화면 — host: { db, track?, tree?, selected?, onSelect?, archive?, downloadOriginal? } ══
      왼쪽 트리(host.tree)에서 고르고, 오른쪽(root)에 A4 종이 한 장으로 크게 본다 (대표 지시 2026-09-26) */
   function mount(root, host) {
     var db = host.db;
     var track = host.track || function (p) { return p; };
-    if (!document.getElementById('pcf-css')) {
-      var st = document.createElement('style'); st.id = 'pcf-css'; st.textContent = CSS; document.head.appendChild(st);
-    }
+    ensureCss();
     /* C안 — 메뉴(host.tree)는 계약유형 6종까지, 측·사건유형은 본문 위 칩, 양식은 본문 목록 (대표 결정 2026-09-27) */
     var S = { forms: [], removed: [], sel: host.selected || null, kind: 'company', side: 'all', grp: 'all', q: '',
       view: loadView(), loaded: false, err: null, bodyEl: null };
@@ -888,6 +1126,7 @@
       var kind = curKind(), k = kindInfo(kind);
       var top = el('div', { 'class': 'pcf-top' }, fm ? [
         el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' + k.label + ' · ' }), fm.name]),
+        host.cards ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', title: '기업정보함에서 회사·담당자·근로자를 골라 채웁니다', text: '📝 채워서 받기', onclick: function () { openFill(fm, host); } }) : null,
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '수정', onclick: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } }),
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', text: '복제', onclick: function () { copy(fm); } }),
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#dc2626', text: '삭제', onclick: function () { del(fm); } })
@@ -1039,6 +1278,8 @@
     loadForms: loadForms,
     linkOriginal: linkOriginal,
     ATTACH_MAX: ATTACH_MAX,
+    hwpSources: hwpSources,
+    openFill: openFill,
     mount: mount
   };
 })(window);
