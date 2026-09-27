@@ -124,11 +124,25 @@ exports.kakaoAuthUrl = functions
     if (req.method === "OPTIONS") return res.status(204).send("");
     const restKey = restKeyOf();
     if (!restKey) return bad(res, 500, KEY_BAD);
+    /* ★ 「로그아웃」 주소 — 포털 로그아웃이 «이 브라우저의 카카오» 도 함께 끊게 (2026-09-28 대표 「추천대로」).
+       ⚠ 끊지 않으면: 공용 PC 에서 홍길동이 카카오로 들어왔다 포털만 로그아웃하면, 카카오 쪽 로그인이
+         브라우저에 남아 다음 사람(임꺽정)이 노란 단추를 누르는 순간 «홍길동으로» 들어간다.
+       ⚠ 돌아올 주소(REDIRECT_URI)가 카카오 콘솔 「로그아웃 리다이렉트 URI」 에 등록돼 있어야 한다 —
+         안 돼 있으면 카카오가 오류 화면을 띄운다(파이어베이스 쪽은 이미 끊긴 뒤라 들어가지는 못한다). */
+    if (String((req.query && req.query.kind) || "") === "logout") {
+      return res.json({ ok: true, url: "https://kauth.kakao.com/oauth/logout"
+        + "?client_id=" + encodeURIComponent(restKey)
+        + "&logout_redirect_uri=" + encodeURIComponent(REDIRECT_URI) });
+    }
     const state = String((req.query && req.query.state) || "");
+    /* ★ 처음 쓰는 기기에서는 카카오가 «늘 다시 묻게» 한다(prompt=login) — 브라우저에 누군가의
+       카카오 로그인이 남아 있어도 그대로 통과하지 않는다. 값은 'login' 하나만 받는다(다른 것은 버린다). */
+    const prompt = String((req.query && req.query.prompt) || "") === "login";
     const url = "https://kauth.kakao.com/oauth/authorize"
       + "?client_id=" + encodeURIComponent(restKey)
       + "&redirect_uri=" + encodeURIComponent(REDIRECT_URI)
       + "&response_type=code"
+      + (prompt ? "&prompt=login" : "")
       + (state ? "&state=" + encodeURIComponent(state) : "");
     res.json({ ok: true, url });
   });

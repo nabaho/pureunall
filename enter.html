@@ -138,7 +138,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
-<script src="js/pu-kakao.js?v=2"></script>
+<script src="js/pu-kakao.js?v=3"></script>
 <script src="js/pu-billing.js?v=11"></script>
 <style>
 :root{
@@ -1731,7 +1731,12 @@ body.portal-mode #moreFab{display:flex;}
     _persistenceReady.then(function(){
       return auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     }).then(function(){
-      return PuKakao.goLogin();          // 여기서 화면이 카카오로 떠난다 — 아래 catch 는 «떠나기 전» 실패만 잡는다
+      /* ★ 처음 쓰는 기기(카카오로 들어온 적 없음)면 카카오가 «다시 묻게» 한다 (2026-09-28 대표 「추천대로」).
+           공용 PC 에 남의 카카오 로그인이 남아 있으면 그대로 그 사람으로 들어가 버린다.
+           ⚠ 저장소를 못 읽으면 «묻는 쪽» 으로 — 안전한 쪽이 기본이다. */
+      var used = false;
+      try { used = localStorage.getItem(KK_USED_KEY) === '1'; } catch(e){}
+      return PuKakao.goLogin({ ask: !used });   // 여기서 화면이 카카오로 떠난다 — 아래 catch 는 «떠나기 전» 실패만 잡는다
     }).catch(function(err){
       showErr((err && err.message) || '카카오 연결에 실패했습니다');
       if(btn) btn.disabled = false;
@@ -3395,8 +3400,32 @@ body.portal-mode #moreFab{display:flex;}
     stopPortalHanaAlerts();
     try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(e){}
     broadcastLogout();
-    auth.signOut().then(function(){ location.reload(); });
+    kkLogoutFlow();
   });
+  /* 로그아웃 — 카카오로 들어온 사람이면 «이 브라우저의 카카오» 도 끊는다 (2026-09-28 대표 「추천대로」)
+     ⚠ 포털만 끊으면 카카오 로그인이 브라우저에 남는다 → 공용 PC 에서 다음 사람이 노란 단추를 누르면
+       «앞 사람으로» 들어간다. 그래서 카카오 표(kakao:true)로 들어온 사람은 카카오 로그아웃 주소를 거쳐
+       이 화면으로 돌아온다.
+     ★ 파이어베이스는 «먼저» 끊는다 — 카카오 쪽이 느리거나 실패해도 포털에는 이미 못 들어간다.
+     ★ 카카오 주소를 4초 안에 못 받으면 그냥 새로 연다(로그아웃이 멎어 보이면 안 된다).
+     비밀번호로 들어온 사람은 예전 그대로다(카카오를 건드리지 않는다). */
+  function kkLogoutFlow(){
+    var u = auth.currentUser;
+    var isKk = u ? u.getIdTokenResult().then(function(r){ return !!(r && r.claims && r.claims.kakao === true); })
+                                       .catch(function(){ return false; })
+                 : Promise.resolve(false);
+    isKk.then(function(kk){
+      return auth.signOut().then(function(){
+        if(!kk || !window.PuKakao || !PuKakao.logoutUrl) return location.reload();
+        var done = false;
+        var t = setTimeout(function(){ if(!done){ done = true; location.reload(); } }, 4000);
+        PuKakao.logoutUrl().then(function(url){
+          if(done) return; done = true; clearTimeout(t);
+          location.href = url;
+        }).catch(function(){ if(!done){ done = true; clearTimeout(t); location.reload(); } });
+      });
+    }).catch(function(){ location.reload(); });
+  }
   /* 포털 탭도 얼어 있다 깨어날 수 있다 — 다른 탭(이알피 등)에서 나간 뒤면 여기도 끊는다 */
   document.addEventListener('visibilitychange', function(){
     if(document.hidden) return;
