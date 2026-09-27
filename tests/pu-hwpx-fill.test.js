@@ -196,3 +196,15 @@ test('반복 값이 «숫자»면 그만큼 빈 벌 — 0 이면 묶음째 없�
   assert.equal(X.textOf(para.xml), '가\n나', '문단 묶음도 0 이면 없앤다');
   assert.equal(X.textOf(X.expand(xml, { 빈줄: [] }).xml).split('　').length - 1, 2, '빈 «목록»은 여전히 빈 한 벌(서명란)');
 });
+
+test('★ tail — 문단 끝에 «k번째 조각 모양»의 새 조각을 붙인다(이름표 안 작은 글씨 조각을 안 건드린다)', () => {
+  /* 홈택스 신청서 「① 성명(대표자)」 — 「(대표자)」만 작은 글씨다. 찾아 바꾸기로 값을 붙이면
+     값이 작은 글씨가 되거나 이름표가 한 모양으로 뭉개졌다(2026-09-27, 한글로 봄) */
+  const xml = SEC(P(RUN('① 성명', 7) + RUN('(대표자) ', 8)));
+  const r = X.replaceText(xml, [{ at: 'P0', tail: '   {{대표자}}', like: 0 }]);
+  assert.equal(r.hits[0], 1);
+  assert.equal(X.textOf(r.xml), '① 성명(대표자)    {{대표자}}');
+  assert.match(r.xml, /charPrIDRef="8"><hp:t>\(대표자\) <\/hp:t><\/hp:run><hp:run charPrIDRef="7"><hp:t>   \{\{대표자\}\}<\/hp:t><\/hp:run>/);
+  assert.equal(X.textOf(X.fill(r.xml, { 대표자: '홍길동' }).xml), '① 성명(대표자)    홍길동', '붙인 조각도 채워진다');
+  assert.equal(X.replaceText(xml, [{ at: 'P9', tail: 'x' }]).hits[0], 0, '주소가 없으면 안 붙는다');
+});
