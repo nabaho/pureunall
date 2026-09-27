@@ -17,6 +17,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { stripComments } = require('./strip-comments');
 
 const R = path.join(__dirname, '..');
@@ -148,6 +149,70 @@ test('⑦ 완전삭제하면 창고에서도 비운다 — 아무도 못 꺼내�
   const 담기 = cutFn(CODE, 'function kcTrashPut(');
   assert.ok(!/stPath/.test(담기) || !/delete\(\)/.test(담기),
     '★ 휴지통에 넣을 때 창고를 지우고 있습니다 — 되살려도 원본이 없습니다');
+});
+
+/* ── 서류 보관함 (대표 결정 2026-09-27 「서류 보관함도 다른 PC 에서 열리게」) ── */
+
+test('⑨★ 완성 서류를 담을 때 창고에 올리고 «제 칸»에 자리를 적는다', () => {
+  const fn = cutFn(CODE, 'async function confirmResumeSave(');
+  assert.match(fn, /kcFormUpload\(\s*genFileId/, '★ 완성본을 창고에 안 올립니다 — 다른 PC 에서 안 열립니다');
+  assert.match(fn, /kcFormUpload\(\s*origFileId/, '★ 쓴 양식 원본을 창고에 안 올립니다');
+  assert.match(fn, /entry\.genStPath\s*=/, '완성본 자리를 안 적습니다');
+  assert.match(fn, /entry\.origStPath\s*=/, '쓴 양식 자리를 안 적습니다');
+  /* 이 PC 에 «먼저» 담고 나서 올린다 — 못 올려도 담기는 성공이어야 한다.
+     ⚠ 갈래가 둘이다(편집기에서 만든 것 · 파일 올리기). «첫» 담기만 보면 다른 갈래에서
+       순서가 뒤집혀도 못 잡는다(2026-09-27 고장넣기로 잡음) — «모든» 담기 뒤에 올리는지 본다. */
+  assert.ok(fn.lastIndexOf('saveFileUnified(') < fn.indexOf('kcFormUpload('),
+    '★ 어느 갈래에서 창고에 먼저 올립니다 — 못 올리면 이 PC 에도 안 담깁니다');
+});
+
+test('⑩★ 데려오는 곳은 «한 곳»이 양식·서류를 다 안다 — 돌려서 본다', () => {
+  const ctx = {
+    get: (k) => ({
+      cvforms: [{ id: 'F1', name: '양식.hwpx', ext: 'hwpx', stPath: 'P/F1' }],
+      resume:  [{ id: 'R1', genFileId: 'R1', genName: '이력서.hwpx', genStPath: 'P/R1',
+                  origFileId: 'R1_orig', origName: '쓴양식.hwp', origStPath: 'P/R1_orig' }],
+      certdoc: [{ id: 'C1', genFileId: 'C1', genName: '경력증명서.hwpx' }]     /* 아직 안 올린 것 */
+    }[k] || [])
+  };
+  vm.createContext(ctx);
+  vm.runInContext('var KC_DOC_STORES=["resume","profile","certdoc"];', ctx);
+  vm.runInContext(cutFn(CODE, 'function _kcCloudRowOf('), ctx);
+  const 봐 = (id) => vm.runInContext('JSON.stringify(_kcCloudRowOf(' + JSON.stringify(id) + '))', ctx);
+
+  assert.match(봐('F1'), /"stPath":"P\/F1"/, '양식 자리를 못 찾습니다');
+  assert.match(봐('R1'), /"stPath":"P\/R1"/, '★ 완성본 자리를 못 찾습니다 — 다른 PC 에서 안 열립니다');
+  assert.match(봐('R1'), /이력서\.hwpx/, '완성본 이름이 틀렸습니다');
+  assert.match(봐('R1_orig'), /"stPath":"P\/R1_orig"/, '★ 쓴 양식 자리를 못 찾습니다');
+  assert.match(봐('R1_orig'), /"ext":"hwp"/, '★ 쓴 양식의 형식을 완성본 것으로 적었습니다 — 열 때 엉뚱한 형식이 됩니다');
+  assert.equal(봐('C1'), 'null', '안 올린 것을 올린 것으로 봅니다 — 없는 파일을 받으러 갑니다');
+
+  /* getFileAsync 가 그 한 곳을 거친다 */
+  const 데려오기 = cutFn(CODE, 'async function kcFormFromCloud(');
+  assert.match(데려오기, /_kcCloudRowOf\(/, '★ 데려오기가 한 곳을 안 씁니다 — 서류 자리를 모릅니다');
+});
+
+test('⑪★★ 공용 첨부 길(신분증·통장사본)은 창고에 «절대» 안 올린다', () => {
+  /* saveAttach 는 경력 첨부·통장사본·개인서류·«신분증»이 함께 쓰는 길이다.
+     여기에 올리기를 붙이면 신분증이 창고로 나간다 — 이 앱은 신분증을 PIN 으로 잠가 따로 둔다.
+     대표가 고른 것은 «내가 만든 서류»뿐이다(첨부 원본은 고르지 않으셨다). */
+  /* ⚠ 창고에만 있는 부름으로 본다 — 파일 담개의 «IndexedDB put» 을 창고로 잘못 세지 않게 */
+  const 창고부름 = /kcFormUpload|kcFormStorage|\.storage\(|putString\(|\.ref\(/;
+  const 첨부 = cutFn(CODE, 'async function saveAttach(');
+  assert.ok(!창고부름.test(첨부),
+    '★★ 공용 첨부 길이 창고에 올립니다 — 신분증·통장사본이 창고로 나갑니다');
+  /* 파일 담개 자체에도 붙이면 안 된다 — 그러면 모든 파일이 나간다 */
+  const 담개 = cutFn(CODE, 'function saveFileUnified(');
+  assert.ok(!창고부름.test(담개),
+    '★★ 파일 담개가 창고에 올립니다 — 신분증까지 모든 파일이 나갑니다');
+  /* 데려오는 곳도 신분증 통을 보지 않는다 */
+  assert.ok(!/id_docs/.test(cutFn(CODE, 'function _kcCloudRowOf(')), '★★ 데려오는 곳이 신분증 통을 봅니다');
+});
+
+test('⑫ 완성 서류를 완전삭제하면 창고의 두 칸도 비운다', () => {
+  const 비우기 = cutFn(CODE, 'function kcTrashPurge(');
+  ['genStPath', 'origStPath'].forEach((k) => assert.ok(비우기.indexOf(k) >= 0,
+    '★ ' + k + ' 를 안 비웁니다 — 아무도 못 꺼내는 파일이 창고에 쌓입니다'));
 });
 
 test('⑧★ 창고 SDK 가 실려 있다 — 없으면 이 기능 전체가 조용히 안 돈다', () => {

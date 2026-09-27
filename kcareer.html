@@ -2136,12 +2136,13 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
             <div id="mmBox"></div>
           </div>
           <!-- ☁ 옛 양식 한꺼번에 올리기 (대표 지시 2026-09-21) -->
-          <div class="card" style="margin-bottom:12px"><div class="rc-h">☁ 양식 창고 올리기 — 다른 PC 에서도 열리게</div>
+          <div class="card" style="margin-bottom:12px"><div class="rc-h">☁ 양식·서류 창고 올리기 — 다른 PC 에서도 열리게</div>
             <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">
-              2026-09-21 <b>전에</b> 담아 두신 기관 양식은 <b>이 PC 에만</b> 있습니다.
-              창고에 올리면 다른 PC 로 로그인해도 그대로 열립니다.
-              <br>⚠ 올리는 것은 <b>이 PC 에 원본이 있는 것</b>만입니다 — 다른 PC 에서 담은 양식은
+              전에 담아 두신 <b>기관 양식</b>(2026-09-21 전)과 <b>내가 만든 서류</b>(2026-09-27 전)는
+              <b>이 PC 에만</b> 있습니다. 창고에 올리면 다른 PC 로 로그인해도 그대로 열립니다.
+              <br>⚠ 올리는 것은 <b>이 PC 에 원본이 있는 것</b>만입니다 — 다른 PC 에서 담은 것은
               그 PC 에서 이 단추를 누르셔야 합니다.
+              <br>⚠ 받은 서류(스캔·첨부)와 신분증·통장사본은 <b>올리지 않습니다</b>.
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
               <button class="btn primary" type="button" id="cvCloudBtn" onclick="cvCloudRun()">☁ 안 올라간 것 올리기</button>
@@ -3152,8 +3153,31 @@ function _kcFormMime(ext){
       2026-09-21 실측: 같은 주소가 localhost 에서는 「Failed to fetch」,
       진짜 주소(nabaho.github.io)에서는 200 · 75,956바이트로 내려왔다.
       ⚠ 고장이 아니다. 창고 설정을 건드리지 말 것 — 올리기는 localhost 에서도 된다. */
-async function kcFormFromCloud(id){
+/* ★ 창고 자리를 «아는» 것은 레코드다 — 이 함수 한 곳에서만 찾는다 (2026-09-27)
+     · 기관 양식     : cvforms 한 줄의 stPath
+     · 내가 만든 서류 : 서류 보관함(resume·profile·certdoc) 한 건의
+                       genStPath(완성본 genFileId) · origStPath(쓴 양식 원본 origFileId)
+   ⚠ 받은 서류(스캔·첨부)와 신분증·통장사본은 «여기 없다» — 일부러다.
+     그것들은 공용 첨부 길(saveAttach)로 들어오며, 신분증은 어떤 경우에도 창고에 올리지 않는다.
+   ⚠ 새 보관함이 창고를 쓰게 되면 «여기에» 더한다. 따로 데려오는 길을 만들지 말 것. */
+var KC_DOC_STORES=['resume','profile','certdoc'];
+function _kcCloudRowOf(id){
   var 줄=(get('cvforms')||[]).filter(function(x){ return x && x.id===id && x.stPath; })[0];
+  if(줄) return { stPath:줄.stPath, name:줄.name||'양식', ext:줄.ext||'hwpx', savedAt:줄.savedAt };
+  for(var i=0;i<KC_DOC_STORES.length;i++){
+    var arr=get(KC_DOC_STORES[i])||[];
+    for(var j=0;j<arr.length;j++){
+      var r=arr[j]; if(!r) continue;
+      if(r.genFileId===id && r.genStPath) return { stPath:r.genStPath, name:r.genName||'서류',
+        ext:(String(r.genName||'').split('.').pop()||'hwpx').toLowerCase(), savedAt:r.savedAt };
+      if(r.origFileId===id && r.origStPath) return { stPath:r.origStPath, name:r.origName||'원본',
+        ext:(String(r.origName||'').split('.').pop()||'').toLowerCase(), savedAt:r.savedAt };
+    }
+  }
+  return null;
+}
+async function kcFormFromCloud(id){
+  var 줄=_kcCloudRowOf(id);
   if(!줄) return null;
   var st=kcFormStorage(); if(!st) return null;
   try{
@@ -5907,18 +5931,27 @@ async function confirmResumeSave(){ if(!_docCtx) return; const {domain,mode,file
   const kind=document.getElementById('rsKind').value, year=document.getElementById('rsYear').value.trim(), org=document.getElementById('rsOrg').value.trim(), memo=document.getElementById('rsMemo').value.trim();
   if(!kind||!year){ toast('종류·연도는 필수'); return; }
   const id=domain+'_'+Date.now(); const now=new Date().toISOString();
-  let genFileId=id, genName, origFileId=null, origName=null;
+  let genFileId=id, genName, origFileId=null, origName=null, genB64='', origB64='';
   if(mode==='generate'){
     const bytes=await exportEditedHwpx(); if(!bytes){ toast('편집 중인 문서가 없습니다'); return; }
     const blob=new Blob([bytes],{type:'application/vnd.hancom.hwpx'}); genName=`${D.label}_${org||'무제'}_${year}.hwpx`;
-    saveFileUnified(id,{id,name:genName,ext:'hwpx',size:blob.size,base64:abToB64(await blob.arrayBuffer()),savedAt:now});
-    if(_lastOriginal){ origFileId=id+'_orig'; origName=_lastOriginal.name;
-      saveFileUnified(origFileId,{id:origFileId,name:origName,ext:(origName.split('.').pop()||'').toLowerCase(),size:0,base64:_lastOriginal.b64,savedAt:now}); }
+    genB64=abToB64(await blob.arrayBuffer());
+    saveFileUnified(id,{id,name:genName,ext:'hwpx',size:blob.size,base64:genB64,savedAt:now});
+    if(_lastOriginal){ origFileId=id+'_orig'; origName=_lastOriginal.name; origB64=_lastOriginal.b64||'';
+      saveFileUnified(origFileId,{id:origFileId,name:origName,ext:(origName.split('.').pop()||'').toLowerCase(),size:0,base64:origB64,savedAt:now}); }
   } else {
     if(!file){ toast('파일 없음'); return; } genName=file.name;
-    saveFileUnified(id,{id,name:genName,ext:(genName.split('.').pop()||'').toLowerCase(),size:file.size,base64:abToB64(await file.arrayBuffer()),savedAt:now});
+    genB64=abToB64(await file.arrayBuffer());
+    saveFileUnified(id,{id,name:genName,ext:(genName.split('.').pop()||'').toLowerCase(),size:file.size,base64:genB64,savedAt:now});
   }
+  /* ☁ 다른 PC 에서도 열리게 창고에 올린다 (대표 결정 2026-09-27 「서류 보관함도」)
+     ⚠ 이 PC 에 «먼저» 담고 나서 올린다 — 못 올려도 담기는 성공이다(자리만 안 적힌다).
+     ⚠ 레코드에는 «자리»만 적는다. 데려오는 곳은 _kcCloudRowOf 한 곳이다. */
+  const genSt = await kcFormUpload(genFileId, genB64, (genName.split('.').pop()||'').toLowerCase());
+  const origSt = origFileId ? await kcFormUpload(origFileId, origB64, (origName.split('.').pop()||'').toLowerCase()) : '';
   const arr=get(D.store); const entry={id,kind,year,org,memo,genFileId,genName,origFileId,origName,submits:[],savedAt:now};
+  if(genSt) entry.genStPath=genSt;
+  if(origSt) entry.origStPath=origSt;
   (D.extra||[]).forEach(f=>{ const el=document.getElementById('rsx-'+f.key); entry[f.key]=el?el.value.trim():''; });
   arr.unshift(entry); set(D.store,arr);
   /* ★ 완성본을 냈으면 그 자리를 «지난 작성»으로 내린다 (대표 결정 2026-09-06 「남긴다」).
@@ -5931,7 +5964,7 @@ async function confirmResumeSave(){ if(!_docCtx) return; const {domain,mode,file
     toast(D.label+' 저장됨 — 다음 파일 진행 (남은 '+_docQueue.length+'개)');
     setTimeout(_nextDocQueue,300);
   } else {
-    toast(D.label+' 보관함에 저장됨');
+    toast(D.label+' 보관함에 저장됨'+(genSt?' — 다른 PC 에서도 열립니다':' (이 PC 에만 — 창고에 못 올렸습니다)'));
   }
 }
 function delDoc(domain,id,btn){
@@ -8611,8 +8644,12 @@ function kcTrashPurge(tid){
   /* ⚠ 창고에 올린 양식도 함께 비운다 — 안 비우면 아무도 못 꺼내는 파일이 창고에
      영영 쌓이고 요금만 나간다. «완전삭제»일 때만이다(휴지통에 있는 동안은 그대로 둔다 —
      되살릴 수 있어야 하니까). 실패해도 지우기는 그대로 성공시킨다. */
-  try{ var 자리=e.rec&&e.rec.stPath; var st=자리?kcFormStorage():null;
-       if(st) st.ref(자리).delete().catch(function(){}); }catch(err){}
+  /* 양식(stPath)과 완성 서류(genStPath·origStPath) 모두 — 자리가 적힌 것만 지운다 */
+  try{ var st=null;
+       ['stPath','genStPath','origStPath'].forEach(function(k){
+         var 자리=e.rec&&e.rec[k]; if(!자리) return;
+         st=st||kcFormStorage(); if(st) st.ref(자리).delete().catch(function(){});
+       }); }catch(err){}
   set(TRASH_STORE, rest);
   return 1;
 }
@@ -11261,19 +11298,41 @@ async function cvFormPut(id, rec){
      (서버로 밀어 올리는 것은 2.5초 모아치기라 여러 번 저장해도 한 번만 나간다.) */
 var _cvCloudStop = false;
 var CV_CLOUD_MAX = 25 * 1024 * 1024;   /* 창고 규칙이 25MB 미만만 받는다 */
+/* ★ 올릴 «칸»을 모두 센다 — 양식 한 줄은 칸 하나, 완성 서류 한 건은 칸 둘(완성본·쓴 양식)
+   (2026-09-27 서류 보관함을 더했다). 칸마다 «어느 통·어느 건·어느 칸에 자리를 적나»를 들고 다닌다.
+   ⚠ 받은 서류(스캔·첨부, genFileId 없음)는 세지 않는다 — 대표가 고르지 않은 «첨부 원본»이다. */
+function _cvCloudSlots(){
+  var 칸=[];
+  (get('cvforms')||[]).forEach(function(r){
+    if(r && r.id) 칸.push({ store:'cvforms', recId:r.id, fileId:r.id, field:'stPath',
+                            name:r.name, ext:r.ext, kind:'양식', 줄:r });
+  });
+  KC_DOC_STORES.forEach(function(store){
+    (get(store)||[]).forEach(function(r){
+      if(!r || !r.id) return;
+      if(r.genFileId) 칸.push({ store:store, recId:r.id, fileId:r.genFileId, field:'genStPath',
+        name:r.genName, ext:(String(r.genName||'').split('.').pop()||'').toLowerCase(), kind:'서류', 줄:r });
+      if(r.origFileId) 칸.push({ store:store, recId:r.id, fileId:r.origFileId, field:'origStPath',
+        name:r.origName, ext:(String(r.origName||'').split('.').pop()||'').toLowerCase(), kind:'서류', 줄:r });
+    });
+  });
+  return 칸;
+}
 async function cvCloudStat(){
-  var arr = get('cvforms') || [];
-  var 올림=0, 올릴것=[], 파일없음=0, 너무큼=0;
-  for (var i=0;i<arr.length;i++){
-    var r = arr[i]; if(!r||!r.id) continue;
-    if(r.stPath){ 올림++; continue; }
+  var 칸 = _cvCloudSlots();
+  var 올림=0, 올릴것=[], 파일없음=0, 너무큼=0, 양식=0, 서류=0;
+  for (var i=0;i<칸.length;i++){
+    var c = 칸[i];
+    if(c.kind==='양식') 양식++; else 서류++;
+    if(c.줄[c.field]){ 올림++; continue; }
     var f = null;
-    try{ f = await getFileAsync(r.id); }catch(e){}
+    try{ f = await getFileAsync(c.fileId); }catch(e){}
     if(!f || !f.base64){ 파일없음++; continue; }
     if(f.base64.length * 0.75 >= CV_CLOUD_MAX){ 너무큼++; continue; }
-    올릴것.push({ 줄:r, 파일:f });
+    c.파일 = f;
+    올릴것.push(c);
   }
-  return { 전체:arr.length, 올림:올림, 올릴것:올릴것, 파일없음:파일없음, 너무큼:너무큼 };
+  return { 전체:칸.length, 양식:양식, 서류:서류, 올림:올림, 올릴것:올릴것, 파일없음:파일없음, 너무큼:너무큼 };
 }
 async function cvCloudDraw(){
   var box = document.getElementById('cvCloudBox'); if(!box) return;
@@ -11281,10 +11340,10 @@ async function cvCloudDraw(){
   box.innerHTML = '<div style="font-size:12.5px;color:var(--text-mute);padding:6px 0">세는 중…</div>';
   var s = await cvCloudStat();
   var 칸 = [];
-  칸.push(['양식 전부', s.전체 + '건']);
+  칸.push(['올릴 파일 전부', s.전체 + '건 <span style="color:var(--text-mute)">(양식 ' + s.양식 + ' · 내가 만든 서류 ' + s.서류 + ')</span>']);
   칸.push(['창고에 올라간 것', s.올림 + '건']);
   칸.push(['올릴 수 있는 것', '<b style="color:var(--navy)">' + s.올릴것.length + '건</b>']);
-  if(s.파일없음) 칸.push(['이 PC 에 원본이 없어 못 올림', s.파일없음 + '건 <span style="color:var(--text-mute)">— 그 양식을 담은 PC 에서 눌러 주세요</span>']);
+  if(s.파일없음) 칸.push(['이 PC 에 원본이 없어 못 올림', s.파일없음 + '건 <span style="color:var(--text-mute)">— 그 파일을 담은 PC 에서 눌러 주세요</span>']);
   if(s.너무큼) 칸.push(['너무 커서 못 올림(25MB 이상)', s.너무큼 + '건']);
   box.innerHTML = '<table style="font-size:12.5px;border-collapse:collapse">'
     + 칸.map(function(c){ return '<tr><td style="padding:2px 12px 2px 0;color:var(--text-mute)">'+c[0]+'</td><td style="padding:2px 0">'+c[1]+'</td></tr>'; }).join('')
@@ -11312,14 +11371,16 @@ async function cvCloudRun(){
     if(_cvCloudStop) break;
     var 한건 = s.올릴것[i];
     if(box) box.innerHTML = '<div style="font-size:12.5px;padding:6px 0">☁ ' + (i+1) + ' / ' + s.올릴것.length
-      + ' — ' + escapeHtml(한건.줄.name || '') + ' 올리는 중…</div>';
-    var 자리 = await kcFormUpload(한건.줄.id, 한건.파일.base64, 한건.줄.ext || 한건.파일.ext);
+      + ' — ' + escapeHtml(한건.name || '') + ' 올리는 중…</div>';
+    var 자리 = await kcFormUpload(한건.fileId, 한건.파일.base64, 한건.ext || 한건.파일.ext);
     if(자리){
-      /* ⚠ 목록을 «그때그때» 다시 읽는다 — 올리는 동안 다른 화면이 양식을 담았을 수 있다 */
-      var arr = get('cvforms') || [];
+      /* ⚠ 목록을 «그때그때» 다시 읽는다 — 올리는 동안 다른 화면이 담았을 수 있다.
+         ⚠ 자리는 «그 칸»(stPath·genStPath·origStPath)에 적는다 — 칸을 헷갈리면
+           완성본 자리로 쓴 양식을 데려온다. */
+      var arr = get(한건.store) || [];
       var 있나 = false;
-      for (var j=0;j<arr.length;j++) if(arr[j] && arr[j].id === 한건.줄.id){ arr[j].stPath = 자리; 있나 = true; break; }
-      if(있나) set('cvforms', arr);
+      for (var j=0;j<arr.length;j++) if(arr[j] && arr[j].id === 한건.recId){ arr[j][한건.field] = 자리; 있나 = true; break; }
+      if(있나) set(한건.store, arr);
       됨++;
     } else 안됨++;
   }
@@ -11327,6 +11388,7 @@ async function cvCloudRun(){
   if(stop) stop.style.display = 'none';
   await cvCloudDraw();
   _safe(renderFormLib);
+  _safe(function(){ KC_DOC_STORES.forEach(function(d){ if(typeof renderDocStore==='function') renderDocStore(d); }); });
   toast(_cvCloudStop ? ('✋ 멈췄습니다 — ' + 됨 + '건 올렸습니다')
         : (안됨 ? ('☁ ' + 됨 + '건 올렸습니다 · ' + 안됨 + '건은 못 올렸습니다')
                 : ('✅ ' + 됨 + '건 모두 올렸습니다 — 이제 다른 PC 에서도 열립니다')));
