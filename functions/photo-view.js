@@ -160,9 +160,24 @@ function canSee(o) {
      서버를 거치게 하면 격자가 느려지고 요금이 는다.
    ⚠ 관리자가 받아 가는 것도 **열람 기록에 남는다**(photoNoteView) — 그것이
      「관리가 필요하다」의 짝이다. 누가 남의 사진을 받아 갔는지 답할 수 있어야 한다. */
+/* ── 서류는 판독 «전»이든 «뒤»든 늘 이 문을 지난다 (대표 지시 2026-09-27 사진첩 점검 ②) ──
+   민감 여부는 판독이 정한다(위 ① 참고). 그래서 판독 «전»의 신분증은 민감이 아니었고,
+   화면은 올리는 순간 만료 없는 토큰 주소를 적어 두었다. 자동 판독은 한도를 넘으면
+   멈추므로, 그 뒤에 올린 서류는 «영영» 판독이 안 되고 주소가 그대로 남았다.
+   ★ 이제 화면이 서류(kind:'doc')에는 토큰 주소를 «아예 안 적는다»(pu-photo-store.js).
+     그러면 관리자·공유받은 사람은 창고가 403 이라 이 문으로만 볼 수 있다 —
+     여기서 「민감 아니다」로 돌려보내면 2026-08-17 「남의 회의사진 46장 회색」이
+     서류에서 그대로 되풀이된다. 그래서 서류는 민감 판정과 상관없이 받는다.
+   ⚠ 사진(kind 가 doc 이 아닌 것)은 예전 그대로다 — 주소로 본다.
+   ⚠ «격자가 느려진다»는 걱정(위 주석)은 서류에 안 걸린다. 격자는 240px 미리보기
+     주소(thumbUrl)를 쓰고 이 문을 안 지난다. 서류를 «크게 열 때»만 여기를 지난다.
+   ⚠ 서류를 여는 것은 모두 열람 기록에 남는다 — 판독 전 신분증도 누가 열었는지 답할 수 있다. */
+function isDocItem(item) {
+  return !!(item && item.kind === "doc");
+}
 function decide(item, as) {
   if (!item) return { ok: false, why: "사진 정보를 찾을 수 없습니다 — 지워졌을 수 있습니다", status: 404 };
-  if (!isSensitiveItem(item)) {
+  if (!isSensitiveItem(item) && !isDocItem(item)) {
     if (as === "admin") return { ok: true };
     return { ok: false, why: "민감 서류가 아닙니다 — 적힌 주소로 보십시오", status: 400 };
   }
@@ -182,9 +197,14 @@ function sweep(tree) {
       var items = years[year] || {};
       Object.keys(items).forEach(function (id) {
         var it = items[id];
-        if (!isSensitiveItem(it)) return;
+        /* ★ 서류도 찾는다(2026-09-27) — 판독 전 서류는 민감으로 안 잡혀, 옛 쓸기로는
+             «영영» 못 찾았다. 서류는 이제 늘 서버(위 decide)로 보므로 주소를 지워도 된다.
+           ⚠ 판독이 없는 서류는 read 가 비어 있다 — read.kind 를 곧장 읽으면 여기서 멈춘다.
+             그때 갈래는 'doc' 으로 센다(대표께 올리는 셈에 「판독 전 서류 N장」으로 보인다). */
+        if (!isSensitiveItem(it) && !isDocItem(it)) return;
         if (typeof it.fullUrl !== "string" || !it.fullUrl) return;
-        hits.push({ owner: uid, year: String(year), id: id, kind: it.read.kind });
+        hits.push({ owner: uid, year: String(year), id: id,
+          kind: (it.read && it.read.kind) || "doc" });
       });
     });
   });
@@ -203,6 +223,6 @@ function clearPaths(hits, dbRoot) {
 module.exports = {
   SENSITIVE_KINDS, BUCKET_ROOT,
   isSensitiveKind, isSensitiveItem,
-  storagePath, badPart, validate, canSee, decide, sweep, clearPaths,
+  storagePath, badPart, validate, canSee, decide, sweep, clearPaths, isDocItem,
   logRow, logPath
 };
