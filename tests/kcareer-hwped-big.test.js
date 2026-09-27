@@ -64,8 +64,10 @@ function 세상(opt) {
   const 막대 = mk('rhHwpEd');
   const 큰단추 = { id: 'rhEdBigBtn', textContent: '🗖 큰 창', style: {} };
   const 전체단추 = { id: 'rhEdFullBtn', textContent: '⛶ 전체 화면', style: {} };
+  const 접기단추 = { id: 'rhEdTidyBtn', textContent: '🧰 도구줄 펴기', style: {} };
   const body = { style: {}, appendChild: (el) => { 붙인것.push(el); } };
-  const 있는것 = { rhHwpEd: 막대, rhEdBigBtn: 큰단추, rhEdFullBtn: 전체단추 };
+  const 있는것 = { rhHwpEd: 막대, rhEdBigBtn: 큰단추, rhEdFullBtn: 전체단추,
+    rhEdTidyBtn: 접기단추 };
 
   const ctx = {
     console, JSON, String, Number, Array, Object, Error, Date, Boolean, Set, Promise,
@@ -92,7 +94,7 @@ function 세상(opt) {
     toast: (m, ms) => { 알림.push({ m: String(m), ms }); },
     escapeHtml: (x) => String(x == null ? '' : x),
     _safe: (f) => { try { return f(); } catch (e) { ctx._safeErr = String(e); } },
-    _막대: 막대, _옷: mk._set, _큰단추: 큰단추, _전체단추: 전체단추,
+    _막대: 막대, _옷: mk._set, _큰단추: 큰단추, _전체단추: 전체단추, _접기단추: 접기단추,
     _body: body, _들은것: 들은것, _알림: 알림, _붙인것: 붙인것, _있는것: 있는것
   };
   ctx.window = ctx; ctx.globalThis = ctx;
@@ -104,7 +106,12 @@ function 세상(opt) {
   vm.runInContext(키줄[0], ctx);
   vm.runInContext('var _rhEdBig=false,_rhEdBigWant=true,_rhEdEsc=null,_rhEdFsBound=false;'
     + ' var _rhHwpEd=null, _hwpViewEd=null;', ctx);
-  ['function rhEdBigSet(', 'function rhHwpEdBig(', 'function _rhEdFsWatch(',
+  /* 접힘 기본값도 «소스에 적힌 그대로» — 여기 다시 적으면 소스가 바뀌어도 모른다 */
+  const 접힘줄 = CODE.match(/var\s+_rhEdTidy\s*=\s*\w+\s*;/);
+  assert.ok(접힘줄, '_rhEdTidy 를 찾지 못했습니다');
+  vm.runInContext(접힘줄[0], ctx);
+  ['function rhEdChromeApply(', 'function rhEdTidyToggle(',
+   'function rhEdBigSet(', 'function rhHwpEdBig(', 'function _rhEdFsWatch(',
    'async function rhHwpEdFull(', 'async function rhHwpEdKeys(']
     .forEach((d) => vm.runInContext(cutFn(CODE, d), ctx));
   /* 전체 화면 들어가기는 브라우저 일이라 가짜로 — 부르면 그렇다고 적어 둔다 */
@@ -332,7 +339,78 @@ test('★ 물어보다 걸리면 조용히 넘기지 않는다', async () => {
   assert.match(ctx._알림[0].m, /단축키를 물어보지 못했습니다/);
 });
 
-/* ══════ ⑦ 옛 빗장은 그대로 ══════ */
+/* ══════ ⑦ 🧹 편집기 «제» 도구줄 접기 (2026-09-27) ══════ */
+function 가짜편집기() {
+  const 받은것 = [];
+  return { 받은것, ed: { chrome: { set: (v) => { 받은것.push(v); return Promise.resolve(v); } } } };
+}
+
+test('★★ 편집기를 «접은 채» 연다 — 문서 시작 자리가 120px 아래였다', () => {
+  const ctx = 세상({});
+  const { 받은것, ed } = 가짜편집기();
+  ctx._ed = ed;
+  vm.runInContext('rhEdChromeApply(_ed)', ctx);
+  assert.equal(받은것.length, 1, '★ 도구줄을 안 접습니다');
+  assert.equal(받은것[0].toolbar, false, '★ 아이콘줄이 그대로 펴져 있습니다');
+  assert.equal(받은것[0].statusbar, false, '★ 상태줄이 그대로입니다');
+});
+
+test('★★★ 접어도 «메뉴줄은 남긴다» — 다 접으면 단축키 모르는 기능은 길이 없어진다', () => {
+  const ctx = 세상({});
+  const { 받은것, ed } = 가짜편집기();
+  ctx._ed = ed;
+  vm.runInContext('rhEdChromeApply(_ed)', ctx);
+  assert.equal(받은것[0].menu, true,
+    '★ 메뉴줄까지 접었습니다 — 파일·편집·표 로 들어갈 길이 통째로 사라집니다(막다른 길)');
+});
+
+test('★ 펴면 셋 다 돌아온다 · 딱지도 바뀐다', () => {
+  const ctx = 세상({});
+  const { 받은것, ed } = 가짜편집기();
+  ctx._ed = ed; vm.runInContext('_rhHwpEd=_ed;', ctx);
+  vm.runInContext('rhEdChromeApply(_ed)', ctx);
+  assert.equal(ctx._접기단추.textContent, '🧰 도구줄 펴기', '접힌 상태의 딱지가 틀립니다');
+  vm.runInContext('rhEdTidyToggle()', ctx);
+  assert.equal(받은것[받은것.length - 1].toolbar, true, '★ 펴지지 않습니다');
+  assert.equal(받은것[받은것.length - 1].statusbar, true);
+  assert.equal(받은것[받은것.length - 1].menu, true, '메뉴줄은 늘 켜져 있어야 합니다');
+  assert.equal(ctx._접기단추.textContent, '🧹 도구줄 접기', '★ 딱지가 안 바뀝니다');
+  assert.match(ctx._알림[0].m, /단축키는 그대로|폈습니다/, '무엇이 바뀌었는지 안 말합니다');
+});
+
+test('★ 접었다 폈다 해도 어긋나지 않는다', () => {
+  const ctx = 세상({});
+  const { 받은것, ed } = 가짜편집기();
+  ctx._ed = ed; vm.runInContext('_rhHwpEd=_ed;', ctx);
+  for (let i = 0; i < 4; i++) vm.runInContext('rhEdTidyToggle()', ctx);
+  assert.equal(받은것.length, 4);
+  assert.equal(받은것[3].toolbar, false, '★ 네 번 누르면 처음 상태로 돌아와야 합니다');
+});
+
+test('★ 편집기가 없거나 chrome 을 모르면 «조용히» 넘어간다 — 열기가 막히면 안 된다', () => {
+  const ctx = 세상({});
+  assert.doesNotThrow(() => vm.runInContext('rhEdChromeApply(null)', ctx));
+  ctx._ed = {};
+  assert.doesNotThrow(() => vm.runInContext('rhEdChromeApply(_ed)', ctx));
+  ctx._ed2 = { chrome: { set: () => { throw new Error('옛 편집기'); } } };
+  assert.doesNotThrow(() => vm.runInContext('rhEdChromeApply(_ed2)', ctx),
+    '★ 옛 편집기에서 열기가 통째로 막힙니다');
+});
+
+test('★★ 접는 자리는 «한 곳»(_hwpEdCreate) — 두 입구가 같이 쓴다', () => {
+  const c = cutFn(CODE, 'async function _hwpEdCreate(');
+  assert.match(c, /rhEdChromeApply\(ed\)/,
+    '★ 편집기를 짓는 곳에서 안 접습니다 — 입구마다 따로 접으면 한쪽이 빠집니다');
+  /* 부르는 입구 둘이 다 이 한 곳을 지나는지 */
+  ['async function rhHwpEdOpen(', 'async function hwpViewEdit('].forEach((d) => {
+    assert.match(cutFn(CODE, d), /_hwpEdCreate\(/, d + ' 가 그 한 곳을 안 지납니다');
+  });
+  /* 우리가 CSS 로 가리지 않는다 — 편집기 안쪽 셈이 어긋난다 */
+  assert.ok(!/rhwp-chrome-no-/.test(CODE),
+    '★ 편집기 안쪽 class 를 우리가 직접 건드립니다 — chrome.set 으로만 해야 합니다');
+});
+
+/* ══════ ⑧ 옛 빗장은 그대로 ══════ */
 test('★★ 편집기를 짓는 곳은 여전히 «한 곳»이고 studioUrl 빗장이 살아 있다', () => {
   const c = cutFn(CODE, 'async function _hwpEdCreate(');
   assert.match(c, /studioUrl:\s*'vendor\/rhwp-studio\/index\.html'/,
