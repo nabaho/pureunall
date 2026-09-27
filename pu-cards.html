@@ -6020,6 +6020,56 @@ function bulkTestOne(targets, myAddr){
 /* ══════ 여러 곳에 한 통씩 — 화면 ══════ */
 
 const BULK_FN_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/sendBulkMail';
+
+/* ══════ 묶음 편지의 «칸 이름» — 화면과 서버가 서로 다른 말을 쓰고 있었다 ══════
+   (2026-09-27에 드러남)
+
+   화면(mailVals)이 아는 칸 : 받는분 · 회사명 · 자료목록 · 오늘 · 담당자 · 보낸이 · 이번달 · 지난달
+   서버(functions/mail-bulk.js buildQueue)가 아는 칸 : 이름 · 회사 · 직책
+   **겹치는 것이 하나도 없었다.**
+
+   그래서 자료함 기본 틀(「{받는분} 님, 안녕하세요 … {자료목록}」)을 그대로 묶음으로
+   보내면, 서버가 모르는 칸을 «빈 글자»로 지워 받는 분은 이렇게 받으셨다:
+
+       「 님, 안녕하세요.  …  아래 자료를 첨부합니다.  (빈 줄)  …」
+
+   오류도 안 나고 메일은 잘 나간다. 「등록증 요청」 글({이름}·{회사})만 우연히 옳았다.
+
+   ⚠⚠ BULK_SERVER_VALS 는 **서버 buildQueue 의 vals 와 같아야 한다.**
+     한쪽만 고치면 다시 조용히 빈칸이 나간다 —
+     tests/cards-bulk-vals.test.js 가 두 곳을 견줘 그 자리에서 잡는다. */
+const BULK_SERVER_VALS = ['이름','회사','직책','name','company','title'];
+/* 옛 틀을 살려 준다 — 화면 말 → 서버 말. 사람이 고쳐 둔 문구를 버리지 않는다. */
+const BULK_RENAME = { 받는분:'이름', 회사명:'회사', 직함:'직책' };
+
+/* 묶음에서는 «곳마다 다르지 않은» 칸을 화면이 미리 채운다.
+   ⚠ 담당자는 곳마다 다르다 — 여기서 채우면 모두 한 사람 이름이 된다. 안 채운다. */
+function bulkLocalVals(c){
+  const v = mailVals({ 자료목록: ((c&&c.ids)||[]).map(i=>{ const m=_matMeta[i]||{};
+    return '· ' + (m.name||'자료') + (m.desc ? ' — ' + m.desc : ''); }).join('\n') });
+  return { 자료목록:v.자료목록, 오늘:v.오늘, 보낸이:v.보낸이, 이번달:v.이번달, 지난달:v.지난달 };
+}
+/* 보내기 직전 한 번 — 화면 말을 서버 말로 바꾸고, 화면 몫의 칸을 채운다 */
+function bulkReady(text, c){
+  let out = String(text==null?'':text);
+  Object.keys(BULK_RENAME).forEach(k=>{ out = out.split('{'+k+'}').join('{'+BULK_RENAME[k]+'}'); });
+  return bulkFillKnown(out, bulkLocalVals(c));
+}
+/* tplFill 과 달리 «모르는 칸은 그대로 둔다» — 서버가 채울 칸을 여기서 지우면 안 된다 */
+function bulkFillKnown(body, vals){
+  return String(body||'').replace(/\{([^{}\n]{1,20})\}/g, (m,k)=>{
+    const v = (vals||{})[String(k).trim()];
+    return (v==null) ? m : String(v);
+  });
+}
+/* 아무도 못 채우는 칸 — 그대로 보내면 «빈칸»이 되어 나간다. 이름을 대어 막는다. */
+function bulkUnknownFields(texts){
+  const out=[], seen={};
+  (texts||[]).forEach(t=>{ (String(t||'').match(/\{[^{}\n]{1,20}\}/g)||[]).forEach(h=>{
+    const k=h.slice(1,-1).trim();
+    if(k && !seen[k] && BULK_SERVER_VALS.indexOf(k)<0){ seen[k]=1; out.push(k); } }); });
+  return out;
+}
 const BULK_GAP_SEC = 15;   /* 통 사이 간격 — 서버 기본값과 같게 둔다 */
 
 async function postBulkMail(payload){
@@ -6112,9 +6162,13 @@ function bulkMailStart(){
   /* ⚠ 회사 열쇠를 «지금» 적어 둔다 — 보낼 때는 mailTargets 가 돌려준 줄만 남고
        거기에는 명함 번호가 없다(서버로 나가는 값이라 일부러 적다). */
   const 고른것 = Object.keys(state.sel||{}).map(id=>state.items[id]).filter(Boolean);
+  /* ⚠ 자료함 틀은 «화면 말»({받는분}·{회사명})로 적혀 있다 — 묶음은 서버가 채우므로
+       여기서 서버 말로 바꿔 둔다. 안 바꾸면 이름 자리가 빈 채로 나간다. */
+  const 틀바꾸기 = (t)=>{ let o=String(t||'');
+    Object.keys(BULK_RENAME).forEach(k=>{ o=o.split('{'+k+'}').join('{'+BULK_RENAME[k]+'}'); }); return o; };
   _compose = {
     cardId:'', to:'', cc:'', bcc:'',
-    subject: tpl.subject || '', body: tpl.body || '',
+    subject: 틀바꾸기(tpl.subject || ''), body: 틀바꾸기(tpl.body || ''),
     ids: [], files: [], picking: true,
     bulk: r.ok, bulkStat: r.stat,
     bulkCoKeys: bulkCoKeys(고른것, r.ok, coCardKeyMap())
@@ -6243,7 +6297,12 @@ async function bulkTestSend(){
   if(!confirm(`첫 곳(${c.bulk[0].company||c.bulk[0].name||''}) 기준으로 만든 편지를\n`+
               `내 주소(${myEmail})로 한 통만 보냅니다.\n\n실제 기업에는 나가지 않습니다.`)) return;
   try{
-    await postBulkMail({ to:[one], subject:c.subject, body:c.body, matIds:c.ids, spacingSec: 5 });
+    const 제 = bulkReady(c.subject, c), 본 = bulkReady(c.body, c), 서 = bulkReady(c.html||'', c);
+    const 모를칸 = bulkUnknownFields([제, 본, 서]);
+    if(모를칸.length) return toast('이 칸은 아무도 못 채웁니다 — 그대로 보내면 «빈칸»이 됩니다: '
+      + 모를칸.map(k=>'{'+k+'}').join(' ') + '\n곳마다 바뀌는 칸은 '
+      + BULK_SERVER_VALS.slice(0,3).map(k=>'{'+k+'}').join(' ') + ' 입니다', 14000);
+    await postBulkMail({ to:[one], subject:제, body:본, html:서, matIds:c.ids, spacingSec: 5 });
     toast('✉️ 시험 메일을 걸었습니다 — 1분 안에 내 메일함에서 확인하세요', 9000);
   }catch(e){ toast('시험 발송 실패: '+((e&&e.message)||''), 9000); }
 }
@@ -6255,6 +6314,15 @@ async function bulkSendAll(){
   const c=_compose; if(!c || !c.bulk) return;
   if(!String(c.subject||'').trim()) return toast('제목을 적어 주세요');
   if(!String(c.body||'').trim()) return toast('본문을 적어 주세요');
+  /* ⚠ 화면 말을 서버 말로 바꾸고, 아무도 못 채우는 칸이 있으면 «보내기 전에» 막는다.
+       한 번 걸리면 곳마다 빈칸이 찍힌 편지가 수백 통 나간다 — 되돌릴 길이 없다. */
+  const 제목낼것 = bulkReady(c.subject, c);
+  const 본문낼것 = bulkReady(c.body, c);
+  const 서식낼것 = bulkReady(c.html || '', c);
+  const 모를칸 = bulkUnknownFields([제목낼것, 본문낼것, 서식낼것]);
+  if(모를칸.length) return toast('이 칸은 아무도 못 채웁니다 — 그대로 보내면 «빈칸»이 됩니다: '
+    + 모를칸.map(k=>'{'+k+'}').join(' ') + '\n곳마다 바뀌는 칸은 '
+    + BULK_SERVER_VALS.slice(0,3).map(k=>'{'+k+'}').join(' ') + ' 입니다 — 글을 고쳐 주세요', 16000);
   const names = (c.ids||[]).map(id=>(_matMeta[id]||{}).name||'자료');
   const lines = bulkSummary(c.bulkStat, BULK_GAP_SEC, names).map(x=>`· ${x.k} — ${x.v}`).join('\n');
   if(!confirm(`${c.bulk.length.toLocaleString()}곳에 한 통씩 보냅니다.\n\n${lines}\n\n`+
@@ -6265,8 +6333,8 @@ async function bulkSendAll(){
     `\n진행할까요?`)) return;
   _sending = true; lockSendButtons(true);
   try{
-    const r = await postBulkMail({ to:c.bulk, subject:c.subject, body:c.body,
-                                   html: c.html || '',   /* 묶음도 서식을 그대로 (대표 지시 2026-08-24) */
+    const r = await postBulkMail({ to:c.bulk, subject:제목낼것, body:본문낼것,
+                                   html: 서식낼것,   /* 묶음도 서식을 그대로 (대표 지시 2026-08-24) */
                                    matIds:c.ids, spacingSec: BULK_GAP_SEC });
     /* 등록증 요청이었으면 「청했다」를 적는다 — 같은 요청이 두 번 가면 그 뒤로 아무도 안 연다.
        ⚠ «걸린 뒤»에만 적는다. 누르기만 하고 실패했으면 안 적어야 다시 청할 수 있다. */
