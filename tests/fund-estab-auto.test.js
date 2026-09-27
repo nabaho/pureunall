@@ -431,7 +431,10 @@ function renderBundle(phase) {
     'var funds={}; var S={};',
     grabDecl('DOC_KINDS'), grabDecl('DOC_REG'), grabDecl('DOC_TAX'),
     grabDecl('DOC_OPS'), grabDecl('DOC_SUB'), grabDecl('DOC_NEEDS_LEDGER'),
-    grabFn('docsFor'), grabDecl('ESTAB_PHASES'), grabFn('estabBundle'),
+    grabFn('docsFor'), grabDecl('ESTAB_PHASES'),
+    /* 2026-09-27: 묶음 머리에 [⬇ 한글 원본 전부] — 틀 목록으로 고른다(견본이면 단추를 안 띄운다) */
+    grabDecl('HWP_TPL_KINDS'), grabDecl('HWP_TPL_STRICT'), grabFn('_hwpTplFits'), grabFn('_bundleHwpPlan'),
+    grabFn('estabBundle'),
     'this.run=estabBundle;',
   ].join('\n');
   new Function('HOST', code).call(box, host);
