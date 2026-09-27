@@ -46,7 +46,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=44"></script>
+<script src="js/pu-news-core.js?v=45"></script>
 <!-- ⚠ 편지 짓개(tpl)보다 «먼저» 싣는다 — tpl 이 「장면이 있나」를 이것에게 묻는다 -->
 <script src="js/pu-news-show.js?v=1"></script>
 <script src="js/pu-news-tpl.js?v=44"></script>
@@ -341,6 +341,21 @@ table.list .chk,table.list #chkAll{width:15px;height:15px;cursor:pointer;accent-
   background:var(--brown-soft);border:1px solid var(--brown);border-radius:10px;
   padding:8px 13px;font-size:13px;color:var(--ink)}
 .picked .sp{flex:1}
+/* ══ 표 머리 틀고정 (대표 지시 2026-09-27 「캡쳐2 틀고정」) ══
+   「🏢 사업장 114 …」 제목줄과 「☐ # 유형 회사 대표자 담당자」 머리줄을 «한 덩이(thead)»로
+   묶어 붙인다. 114줄을 내려가면 어느 열이 대표자고 어느 열이 담당자인지 잃는다.
+   ⚠ 제목(h3)과 머리줄을 «따로» 붙이면 둘째 것의 top 을 첫째 것의 «높이»(px)로 줘야 한다 —
+     그 높이는 글자가 접히면 달라져 겹치거나 뜬다. 한 덩이로 붙이면 숫자가 필요 없다.
+   ⚠ 붙는 자리는 가장 가까운 «구르는 칸»(.whorest)이다 — .box 에 overflow 를 걸면
+     그 상자에 갇혀 안 붙는다. 폰(.box 가 옆으로 구른다)에서는 원래 안 붙는다. 괜찮다. */
+table.list.fz>thead{position:sticky;top:0;z-index:3}
+table.list.fz>thead th{box-shadow:inset 0 -1px 0 var(--line)}
+table.list.fz th.cap{background:#fff;font-size:14px;font-weight:800;color:var(--ink);
+  padding:12px 15px;white-space:normal}
+table.list.fz th.cap .cnt{font-size:11px;font-weight:800;color:var(--sub);background:var(--paper);
+  padding:2px 8px;border-radius:99px}
+/* 주소 없는 곳 탭 — 찾는 칸 */
+.nafind{width:auto!important;flex:0 1 260px;padding:6px 10px!important;line-height:1.4!important}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .grid2 .wide{grid-column:1 / -1}
 @media(max-width:700px){.grid2{grid-template-columns:1fr}}
@@ -564,18 +579,27 @@ table.list tr:hover td{background:#fcfcfd}
 #rowbox.on{display:flex;align-items:center;justify-content:center}
 /* 📇 명함에서 담는 창 — 줄창(#rowbox)과 «같은 옷»을 입힌다. 두 창이 다르게 생기면
    같은 앱에서 온 것으로 안 보인다. 안쪽은 표라서 흰 바탕으로 둔다. */
-#cardbox{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:82;padding:22px}
-#cardbox.on{display:flex;align-items:center;justify-content:center}
-#cardbox .in{background:#fff;border-radius:14px;width:min(1000px,96vw);max-height:92vh;
+/* 🔍 비슷한 명함 창(#simbox, 2026-09-27)도 «같은 옷»이다 — 규칙을 둘로 베끼지 않고 함께 건다 */
+#cardbox,#simbox{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:82;padding:22px}
+#cardbox.on,#simbox.on{display:flex;align-items:center;justify-content:center}
+#cardbox .in,#simbox .in{background:#fff;border-radius:14px;width:min(1000px,96vw);max-height:92vh;
   display:flex;flex-direction:column;overflow:hidden}
-#cardbox .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
+#cardbox .in h4,#simbox .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
   display:flex;align-items:center;gap:8px;margin:0;background:var(--brown-soft);color:#4a3c2e}
-#cardbox .in h4 .sp{flex:1}
-#cardbox .bd{overflow:auto;flex:1;min-height:0;padding:0}
-#cardbox .ft{display:flex;align-items:center;gap:8px;padding:11px 16px;
-  border-top:1px solid var(--line);background:var(--paper)}
-#cardbox .ft .sp{flex:1}
-#cardbox .ft .hint{font-size:12px;color:var(--sub)}
+#cardbox .in h4 .sp,#simbox .in h4 .sp{flex:1}
+#cardbox .bd,#simbox .bd{overflow:auto;flex:1;min-height:0;padding:0}
+#cardbox .ft,#simbox .ft{display:flex;align-items:center;gap:8px;padding:11px 16px;
+  border-top:1px solid var(--line);background:var(--paper);flex-wrap:wrap}
+#cardbox .ft .sp,#simbox .ft .sp{flex:1}
+#cardbox .ft .hint,#simbox .ft .hint{font-size:12px;color:var(--sub)}
+/* 찾는 말 줄 · 직접 넣기 줄 — 칸과 단추가 한 줄에 선다 */
+#simbox .qrow{display:flex;gap:8px;align-items:center;padding:11px 16px;
+  border-bottom:1px solid var(--line);background:#fff;flex-wrap:wrap}
+#simbox .qrow input[type=text]{flex:1 1 220px;width:auto;padding:7px 10px;line-height:1.4}
+#simbox .qrow select{width:auto;flex:0 0 auto;padding:6px 8px;line-height:1.4}
+#simbox .qrow .lab{font-size:12px;font-weight:800;color:var(--sub);flex:0 0 auto}
+#simbox td select{width:auto;padding:3px 6px;line-height:1.3;font-size:12px}
+#simbox .닮{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:99px;white-space:nowrap}
 #rowbox .in{background:#ece9e5;border-radius:14px;width:min(900px,96vw);max-height:92vh;
   display:flex;flex-direction:column;overflow:hidden}
 #rowbox .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
@@ -771,7 +795,11 @@ table.list tr:hover td{background:#fcfcfd}
        굴려서 찾게 두지 말고 «다 보이게» 줄인다 — 폰에서는 가로로 굴릴 수 있다는 것이
        눈에 안 띄어, 없는 탭으로 여기게 된다. */
   #tabs{padding:0 3px;gap:0}
-  #tabs button{flex:1 1 0;min-width:0;padding:11px 3px;font-size:12px;white-space:nowrap}
+  /* ⚠ 탭이 일곱이 되자(2026-09-27 「주소 없는 곳」) 한 칸이 53px 이다. 「주소 없는 곳 13」은
+       87px 라 nowrap 이면 옆 탭 위로 넘쳐 겹친다(「받는 명단 60」도 71px 로 이미 넘치고 있었다).
+     ★ 긴 이름은 «두 줄로 접는다» — 낱말째(keep-all)로. 줄이는 것보다 읽힌다. */
+  #tabs button{flex:1 1 0;min-width:0;padding:9px 3px;font-size:12px;white-space:normal;
+    word-break:keep-all;line-height:1.25}
   #tabs button span{font-size:10px}
   #bar{padding:10px 12px}
   #bar .logo{font-size:16px}
@@ -855,6 +883,9 @@ table.list tr:hover td{background:#fcfcfd}
     <!-- ★ 안내문 — 뉴스레터가 아닌 «한 건 집중» 편지 (대표 지시 2026-09-23) -->
     <button data-t="note">안내문 <span id="cNote" style="color:var(--faint)"></span></button>
     <button data-t="who">받는 명단 <span id="cWho" style="color:var(--faint)"></span></button>
+    <!-- ★ 주소 없는 곳 — 받는 명단 맨 아래 상자였던 것을 제 탭으로 (대표 지시 2026-09-27
+         「주소가 없어 못보내는곳은 별도로 탭을 만들어 달라. 거기서 정리하고 찾을 수 있게」) -->
+    <button data-t="noaddr">주소 없는 곳 <span id="cNoaddr" style="color:var(--faint)"></span></button>
     <button data-t="res">보낸 결과 <span id="cRes" style="color:var(--faint)"></span></button>
     <button data-t="cfg">설정</button>
   </div>
@@ -906,6 +937,34 @@ table.list tr:hover td{background:#fcfcfd}
   </div>
 </div></div>
 
+<!-- 🔍 비슷한 명함 창 — 주소 없는 곳 «한 곳»을 두고 명함을 찾는다 (대표 지시 2026-09-27
+     「명함이 있을 경우 기업정보함에서 찾기보다 팝업창으로 유사찾기 기능 만들어달라」) -->
+<div id="simbox"><div class="in">
+  <h4><span id="simT">🔍 비슷한 명함</span><span class="sp"></span>
+    <button class="mini" onclick="유사창닫기()">닫기</button></h4>
+  <div class="qrow">
+    <span class="lab">찾는 말</span>
+    <input type="text" id="simQ" onkeydown="if(event.key==='Enter')유사찾기다시()"
+      placeholder="회사 이름 — 「주식회사」·㈜ 는 빼고 봅니다">
+    <button class="mini" onclick="유사찾기다시()">🔍 찾기</button>
+  </div>
+  <div class="bd" id="simB"></div>
+  <div class="qrow" style="border-top:1px solid var(--line);border-bottom:0;background:var(--paper)">
+    <span class="lab">✎ 직접 넣기</span>
+    <select id="simWho"><option value="담당자">🧑‍💼 담당자</option><option value="대표자">👔 대표자</option></select>
+    <input type="text" id="simName" placeholder="이름" style="flex:0 1 130px">
+    <input type="text" id="simMail" placeholder="이메일" onkeydown="if(event.key==='Enter')유사직접넣기()">
+    <button class="mini" onclick="유사직접넣기()">넣기</button>
+  </div>
+  <div class="ft">
+   <span class="hint" id="simHint"></span>
+   <span class="sp"></span>
+   <button class="btn" id="simCards">📇 기업정보함에서 열기</button>
+   <button class="btn" onclick="유사창닫기()">닫기</button>
+   <button class="btn pri" onclick="유사담기()">고른 것 담기</button>
+  </div>
+</div></div>
+
 <div id="ilbox"><div class="in">
   <h4><span id="ilT">📥 공인노무사회 자료</span><span class="sp"></span>
     <button class="mini" onclick="노무사회읽기()">⟳ 다시 읽기</button>
@@ -946,6 +1005,9 @@ var App = {
   /* 고른 것 — «주소»를 열쇠로 지닌다. 번호나 줄 위치로 지니면 유형 칩을 누르는 순간
      엉뚱한 곳이 골라진다(표가 다시 그려지기 때문이다). */
   고른것: {},
+  /* 주소 없는 곳 탭 (2026-09-27) — 고른 것은 «사업장 열쇠»로 지닌다(주소가 없으니).
+     빈곳명함: ''|'있음'|'없음' 칩 · 빈곳찾기: 찾는 말 · 유사: 비슷한 명함 창이 연 곳 */
+  빈곳고름: {}, 빈곳명함: '', 빈곳찾기: '', 유사: null,
   지금열쇠: '', 길: 'auto', 보내는중: false, AI중: false,
   /* 고른 유형(자문·급여·노조·기금). 빈 값이면 전체.
      ★★ 첫 값은 «전체»다 (대표 결정 2026-09-07 「116곳 전부」).
@@ -1258,7 +1320,9 @@ function render(){
   /* ⚠ 탭 숫자는 «거르기 전» 전체다. 걸러낸 수를 쓰면 자문 칩을 눌렀을 때 탭이 27 로
        바뀌어 «전체가 27 인 줄로» 보인다(실제로는 114). 탭은 늘 같은 것을 말해야 한다.
        대표 지시 2026-09-03 「버튼을 누르면 받는명단의 숫자도 바뀐다 이부분 수정해라」 */
-  $('cWho').textContent  = ((명단셈().전체 || []).length) || '';
+  { const 셈 = 명단셈();
+    $('cWho').textContent  = ((셈.전체 || []).length) || '';
+    const el = $('cNoaddr'); if(el) el.textContent = ((셈.주소없는곳 || []).length) || ''; }
   /* 보낸 회차가 없으면 숫자를 안 붙인다 — 0 을 띄우면 「뭔가 잘못됐나」로 읽힌다 */
   { const n = Object.keys(App.회차들).filter(k=>(App.회차들[k]||{}).상태==='발송').length;
     const el = $('cRes'); if(el) el.textContent = n || ''; }
@@ -1267,12 +1331,14 @@ function render(){
   m.classList.toggle('now', App.tab==='now');
   /* 받는 명단도 위(머리+유형 칩)를 얼린다 — 대표 지시 2026-09-03 「캡쳐1 틀고정」.
      ⚠ 얼릴 자리 아래에 «구르는 칸»(.whorest)이 반드시 있어야 한다. 없으면 표가 잘린다. */
-  m.classList.toggle('who', App.tab==='who');
+  /* ★ 주소 없는 곳도 같은 껍데기(위를 얼리고 .whorest 만 구른다)를 쓴다 */
+  m.classList.toggle('who', App.tab==='who' || App.tab==='noaddr');
   if(App.tab==='now')  m.innerHTML = 이번회차화면();
   if(App.tab==='past') m.innerHTML = 지난회차화면();
   if(App.tab==='note') m.innerHTML = 안내문화면();
   { const el = $('cNote'); if(el) el.textContent = Object.keys(App.안내문들||{}).length || ''; }
   if(App.tab==='who'){ 명함읽기(); m.innerHTML = 명단화면(); }
+  if(App.tab==='noaddr'){ 명함읽기(); m.innerHTML = 주소없는곳화면(); }
   if(App.tab==='res')  m.innerHTML = 결과화면();
   if(App.tab==='cfg')  m.innerHTML = 설정화면();
   /* ⚠ 미리보기는 이제 팝업(크게보기)뿐이다 — 여기서 그릴 것이 없다 */
@@ -4539,26 +4605,6 @@ function 명단화면(){
   const 칩묶음 = '<div class="chips tight">' + 칩
     + '<span class="cut"></span>' + 누구칩 + '</div>';
 
-  /* 주소가 없는 곳 — «기업정보함에 있나»를 함께 보여 준다. 없다고만 하면 할 일이 안 보인다. */
-  const 후보있는곳 = {};
-  if(후보) (후보.대표자||[]).concat(후보.담당자||[]).forEach(function(c){
-    후보있는곳[c.사업장] = (후보있는곳[c.사업장]||0) + 1;
-  });
-  const 빈곳 = (r.주소없는곳||[]).map(function(c){
-    const n = 후보있는곳[c.id] || 0;
-    return '<tr><td><b>' + esc(c.name||'') + '</b></td>'
-      + '<td>' + 글칸(c.대표자) + '</td>'
-      + '<td style="text-align:right">' + (n
-          ? '<span class="badge b-sent">명함 ' + n + '장</span>'
-          : '<span class="badge b-draft">명함 없음</span>')
-      /* ★ 길을 함께 둔다 (대표 지시 2026-09-13 「주소가 없어 못보내는곳은
-           기업정보함에 찾을 수 있게 해달라」).
-         ⚠ 예전에는 「채우시면 저절로 들어옵니다」라고만 했다 — 어디서 채우는지는
-           안 알려 주고 85곳을 손으로 찾게 두고 있었다. */
-      + ' <button class="mini" onclick="기업정보함에서찾기(\'' + esc(c.name||'') + '\')">'
-      + '📇 기업정보함에서 찾기</button></td></tr>';
-  }).join('');
-
   return `
   <div class="hdbar">
     <span class="no">받는 곳 ${r.셈.보낼곳.toLocaleString()}곳${App.유형||App.누구 ? ' <span style="font-size:13px;color:var(--brown)">('+esc([App.유형,App.누구].filter(Boolean).join(' · '))+')</span>' : ''}</span>
@@ -4602,14 +4648,16 @@ function 명단화면(){
          「전체」를 누르면 다시 다 보입니다.</div>`
       : '<div class="note bad">보낼 곳이 없습니다 — 기업정보함에 담당자 이메일이 있어야 합니다.</div>') : ''}
 
+  ${/* ★ 제목줄과 머리줄을 thead «한 덩이»로 붙인다 (대표 지시 2026-09-27 「캡쳐2 틀고정」).
+        ⚠ 제목 칸의 colspan 은 «실제 열 수»로 준다 — 크게(99) 주면 보이지 않는 빈 열이
+          생겨 줄 밑금이 끝까지 안 간다. 열 수는 누구 칩에 따라 4~6 이다. */''}
   ${집표 ? `<div class="box">
-    <h3>🏢 사업장 <span class="cnt">${집줄들.length}</span>
+    <table class="list fz"><thead><tr><th class="cap" colspan="${4 + (대표볼까?1:0) + (담당볼까?1:0)}">🏢 사업장 <span class="cnt">${집줄들.length}</span>
       <span style="font-size:11.5px;font-weight:500;color:var(--sub)">한 줄에 대표자와 담당자가 함께 —
-       대표자 ${대표줄들.length} · 담당자 ${담당줄들.length}</span></h3>
-    <table class="list"><tr>
+       대표자 ${대표줄들.length} · 담당자 ${담당줄들.length}</span></th></tr><tr>
       ${머리체크}<th class="n">#</th><th>유형</th><th>회사</th>
       ${대표볼까 ? '<th>👔 대표자</th>' : ''}
-      ${담당볼까 ? '<th>🧑‍💼 담당자</th>' : ''}</tr>${집표}</table>
+      ${담당볼까 ? '<th>🧑‍💼 담당자</th>' : ''}</tr></thead>${집표}</table>
     <div class="pad hint" style="padding-bottom:0">
      <b>「회사 메일」</b> 딱지가 붙은 줄은 대표자 본인 주소가 아닐 수 있습니다 —
      <b>✎ 바꾸기</b>로 대표자 이메일을 채우시면 그것이 이깁니다.<br>
@@ -4634,12 +4682,15 @@ function 명단화면(){
      「동의 아직」이 한 줄이라도 있으면 <b>(광고) 표기가 저절로 켜집니다.</b></div>
    </div>` : ''}
 
-  ${빈곳 ? `<div class="box">
-    <h3>⚠ 주소가 없어 못 보내는 곳 <span class="cnt">${r.주소없는곳.length}</span></h3>
-    <div class="pad hint" style="padding-bottom:0">기업정보함에서 이 곳들의 <b>담당자 이메일</b>이나
-     업체관리의 <b>대표자 이메일</b>을 채우시면 다음부터 저절로 들어옵니다.
-     「명함 N장」이라 적힌 곳은 위의 <b>명함에서 보기</b>로 담으실 수 있습니다.</div>
-    <table class="list"><tr><th>회사</th><th>대표자</th><th></th></tr>${빈곳}</table></div>` : ''}
+  ${/* ★ 주소 없는 곳은 «제 탭»으로 옮겼다 (대표 지시 2026-09-27 「별도로 탭을 만들어 달라」).
+        ⚠ 여기서 아주 지우지는 않는다 — 몇 곳이 빠지는지는 받는 명단을 보는 눈에도 보여야
+          한다. 한 줄로 알리고 길만 둔다. */''}
+  ${(r.주소없는곳||[]).length ? `<div class="note one">
+    <b>⚠ 주소가 없어 못 보내는 곳 ${r.주소없는곳.length}곳</b>
+    <span class="t2">명함 찾기·직접 넣기는 따로 탭에서 합니다</span>
+    <span class="sp1"></span>
+    <button class="mini" onclick="App.tab='noaddr';render()">→ 주소 없는 곳 탭</button>
+   </div>` : ''}
 
   ${!App.유형 ? '' : `<div class="note"><b>지금 기본은 「전체」입니다</b>
    (대표 결정 2026-09-07 「116곳 전부」). 지금은 <b>${esc(App.유형)}</b>만 보고 계십니다 —
@@ -4663,6 +4714,324 @@ function 누구칩누르기(v){
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   ⚠ 주소 없는 곳 — 제 탭 (대표 지시 2026-09-27)
+   ══════════════════════════════════════════════════════════════════════════
+   「받는명단 왼쪽에 ㅁ 와 넘버링 해라 … 주소가 없어 못보내는곳은 별도로 탭을 만들어
+    달라. 거기서 정리하고 찾을 수 있게」
+   예전에는 받는 명단 «맨 아래» 상자였다. 114줄을 다 내려가야 보였고, 번호도 체크칸도
+   찾는 칸도 없어 85곳을 눈으로 훑어야 했다.
+   ★ 사본을 두지 않는다 — 명단셈() 의 주소없는곳 을 그대로 쓴다. 주소를 채우면 저절로
+     여기서 빠지고 받는 명단으로 넘어간다.
+   ★ 명함이 있는 곳은 «비슷한 명함 창»이 먼저다 — 기업정보함은 새 탭이라 오가야 한다.
+     명함이 없는 곳도 그 창을 연다. 이름이 조금 달라 «똑같은 이름»으로 못 맞춘 명함이
+     있을 수 있다(「푸른건설」↔「푸른종합건설」). */
+function 빈곳줄들(){
+  const r = 명단셈();
+  const 후보 = 명함후보();
+  const 장수 = {};
+  if(후보) (후보.대표자||[]).concat(후보.담당자||[]).forEach(function(c){
+    장수[c.사업장] = (장수[c.사업장]||0) + 1;
+  });
+  const 차례 = Core.유형들.reduce(function(m,t,i){ m[t.키]=i; return m; }, {});
+  return (r.주소없는곳||[]).map(function(c){
+    const co = (App.사업장들||{})[c.id] || {};
+    /* 명함 -1 = 아직 기업정보함을 읽는 중 — 「명함 없음」으로 말하면 거짓이다 */
+    return { id:String(c.id||''), 회사:String(c.name||''), 대표자:String(c.대표자||''),
+             유형:Core.유형고르기(co.typeCode), 명함: 후보 ? (장수[c.id]||0) : -1 };
+  }).sort(function(a,b){
+    const d = (차례[a.유형]||0) - (차례[b.유형]||0);
+    return d !== 0 ? d : a.회사.localeCompare(b.회사, 'ko');
+  });
+}
+/* 칩(명함 있음·없음)과 찾는 말로 거른다. ⚠ 띄어쓰기는 빼고 견준다 —
+   「한진 철관」으로 찾아도 「㈜한진철관」이 나와야 한다. */
+function 빈곳거르기(줄들){
+  const q = String(App.빈곳찾기||'').replace(/\s+/g,'').toLowerCase();
+  return 줄들.filter(function(x){
+    if(App.빈곳명함 === '있음' && !(x.명함 > 0)) return false;
+    if(App.빈곳명함 === '없음' && x.명함 !== 0) return false;
+    if(q && (x.회사 + x.대표자).replace(/\s+/g,'').toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+}
+/* ★ 번호는 «보이는 차례»다 — 거르면 다시 1번부터(받는 명단과 같은 잣대).
+   ⚠ 체크칸의 class 는 chk3 이다 — 받는 명단의 .chk 는 «주소»를 값으로 지녀 고른것엑셀·
+     고른것수신거부가 읽는다. 여기 줄은 주소가 없으니 섞이면 그쪽 셈이 틀어진다. */
+function 빈곳표줄(보일){
+  if(!보일.length) return '<tr><td colspan="7" class="empty">찾는 곳이 없습니다 — '
+    + '찾는 말을 지우시거나 「📊 전체」를 누르십시오.</td></tr>';
+  const 빈칸 = '<span style="color:var(--faint)">—</span>';
+  return 보일.map(function(x,i){
+    const t = Core.유형들.find(function(v){ return v.키 === x.유형; }) || Core.유형들[0];
+    const 딱 = x.명함 < 0 ? '<span class="badge b-draft">명함 읽는 중</span>'
+      : x.명함 > 0 ? '<span class="badge b-sent">명함 ' + x.명함 + '장</span>'
+      : '<span class="badge b-draft">명함 없음</span>';
+    const 명함있음 = x.명함 > 0;
+    return '<tr><td class="ck"><input type="checkbox" class="chk3" value="' + esc(x.id) + '"'
+      + (App.빈곳고름[x.id] ? ' checked' : '') + ' onchange="빈곳고름바뀜(this)"></td>'
+      + '<td class="n">' + (i+1) + '</td>'
+      + '<td><span class="ty" style="background:' + t.연한빛 + ';color:' + t.진한빛 + '">'
+        + t.표시 + ' ' + esc(t.키) + '</span></td>'
+      + '<td class="co"><b>' + esc(x.회사) + '</b></td>'
+      + '<td>' + (x.대표자 ? esc(x.대표자) : 빈칸) + '</td>'
+      + '<td>' + 딱 + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">'
+      /* ★ 명함이 있는 곳은 창이 «먼저»다 — 단추를 짙게 칠해 눈이 거기로 간다 */
+      + '<button class="mini' + (명함있음 ? ' on' : '') + '" onclick="유사창열기(\'' + esc(x.id) + '\')"'
+      + ' title="회사 이름이 비슷한 명함을 찾아 이 자리에서 담습니다">🔍 '
+      + (명함있음 ? '명함에서 담기' : '비슷한 명함') + '</button> '
+      + '<button class="mini" onclick="빈곳기업정보함(\'' + esc(x.id) + '\')"'
+      + ' title="기업정보함을 새 탭으로 열어 이 회사를 찾습니다">📇 기업정보함</button>'
+      + '</td></tr>';
+  }).join('');
+}
+function 주소없는곳화면(){
+  const 모두 = 빈곳줄들();
+  const 보일 = 빈곳거르기(모두);
+  const n있음 = 모두.filter(function(x){ return x.명함 > 0; }).length;
+  const n없음 = 모두.filter(function(x){ return x.명함 === 0; }).length;
+  const 골랐수 = Object.keys(App.빈곳고름).length;
+  const 칩 = function(v, 글, 뜻){
+    return '<button class="chip' + ((App.빈곳명함||'') === v ? ' on' : '') + '"'
+      + ' onclick="빈곳칩(\'' + v + '\')" title="' + 뜻 + '">' + 글 + '</button>';
+  };
+  return `
+  <div class="hdbar">
+    <span class="no">⚠ 주소 없는 곳 ${모두.length}곳</span>
+    <span style="font-size:12px;color:var(--sub)">받는 명단 범위(${esc(App.설정.범위||'자문중')}) 안에서
+      담당자·대표자 주소가 하나도 없는 곳 · 주소를 채우면 저절로 받는 명단으로 넘어갑니다</span>
+    <span class="sp"></span>
+    <button class="mini" onclick="빈곳엑셀(false)">↧ 엑셀</button>
+    <button class="mini" onclick="다시읽기()">⟳ 다시 읽기</button>
+  </div>
+
+  <div class="chips tight">
+    ${칩('', '📊 전체 ' + 모두.length, '모두 봅니다')}${칩('있음', '📇 명함 있음 ' + n있음, '회사 이름이 같은 명함이 기업정보함에 있는 곳')}${칩('없음', '명함 없음 ' + n없음, '같은 이름의 명함이 없는 곳 — 🔍 비슷한 명함으로 찾아보십시오')}
+    <span class="cut"></span>
+    <input type="text" class="nafind" id="naQ" value="${esc(App.빈곳찾기||'')}"
+      placeholder="🔍 회사·대표자 이름으로 찾기" oninput="빈곳찾기(this.value)">
+  </div>
+
+  ${골랐수 ? `<div class="picked na">
+    <b>${골랐수}곳</b> 골랐습니다
+    <span class="sp"></span>
+    <button class="mini" onclick="빈곳엑셀(true)">↧ 고른 것만 엑셀</button>
+    <button class="mini" onclick="빈곳고름지우기()">✕ 선택 풀기</button>
+   </div>` : ''}
+
+  <div class="whorest">
+   <div class="box">
+    <table class="list fz"><thead><tr><th class="cap" colspan="7">⚠ 주소가 없어 못 보내는 곳
+      <span class="cnt" id="naCnt">${보일.length}</span>
+      <span style="font-size:11.5px;font-weight:500;color:var(--sub)">명함이 있는 곳은
+       <b>🔍 명함에서 담기</b> — 이 자리에서 창으로 보고 담습니다</span></th></tr>
+    <tr><th class="ck"><input type="checkbox" onchange="빈곳전체(this)" title="이 표에 보이는 것 모두"></th>
+      <th class="n">#</th><th>유형</th><th>회사</th><th>대표자</th><th>명함</th><th></th></tr></thead>
+    <tbody id="naBody">${빈곳표줄(보일)}</tbody></table>
+    <div class="pad hint" style="padding-bottom:0">
+     <b>🔍 명함에서 담기 / 비슷한 명함</b> — 회사 이름이 같거나 비슷한 명함을 창으로 띄웁니다.
+     골라 담으면 <b>업체관리 자료에 함께</b> 들어갑니다(대표자 → 대표자 이메일 칸 · 담당자 → 담당자 목록).
+     명함이 없으면 창 아래 <b>✎ 직접 넣기</b>로 주소를 적으시면 됩니다.<br>
+     ⚠ 이름으로 맞춘 것입니다 — <b>같은 회사인지 한 장씩 보고</b> 고르십시오.
+     「비슷」 명함을 담을 때는 한 번 더 묻습니다.</div>
+   </div>
+  </div>`;
+}
+function 빈곳칩(v){ App.빈곳명함 = (App.빈곳명함 === v) ? '' : String(v || ''); render(); }
+/* 찾는 말 — «표 몸통만» 고쳐 그린다. render() 를 부르면 찾는 칸이 새로 생겨
+   글자를 치는 도중에 커서가 날아간다. */
+function 빈곳찾기(v){
+  App.빈곳찾기 = String(v || '');
+  const 보일 = 빈곳거르기(빈곳줄들());
+  const b = $('naBody'); if(b) b.innerHTML = 빈곳표줄(보일);
+  const c = $('naCnt'); if(c) c.textContent = 보일.length;
+}
+function 빈곳기업정보함(id){
+  const co = (App.사업장들 || {})[id] || {};
+  기업정보함에서찾기(co.name || '');
+}
+function 빈곳고름바뀜(el){
+  const k = String(el && el.value || '');
+  if(!k) return;
+  if(el.checked) App.빈곳고름[k] = 1; else delete App.빈곳고름[k];
+  빈곳띠고치기();
+}
+/* 이 표에 «보이는 것» 모두 — 칩·찾는 말로 걸러진 줄만이다 */
+function 빈곳전체(el){
+  const 안 = (el && el.closest) ? (el.closest('table') || document) : document;
+  안.querySelectorAll('.chk3').forEach(function(c){
+    c.checked = !!el.checked;
+    const k = String(c.value || '');
+    if(!k) return;
+    if(el.checked) App.빈곳고름[k] = 1; else delete App.빈곳고름[k];
+  });
+  빈곳띠고치기();
+}
+function 빈곳고름지우기(){ App.빈곳고름 = {}; render(); }
+/* 띠만 고친다 — 없던 띠를 띄우거나 있던 띠를 걷을 때만 다시 그린다 */
+function 빈곳띠고치기(){
+  const n = Object.keys(App.빈곳고름).length;
+  const 띠 = document.querySelector('.picked.na');
+  if((!띠 && n) || (띠 && !n)) { render(); return; }
+  if(띠) { const b = 띠.querySelector('b'); if(b) b.textContent = n + '곳'; }
+}
+/* 엑셀 — 정리할 목록을 들고 전화로 묻거나 나눠 맡길 때 쓴다.
+   ⚠ «지금 보이는 것»(칩·찾는 말로 거른 것)을 내보낸다 — 화면과 파일이 달라지지 않게. */
+function 빈곳엑셀(고른것만){
+  let 줄 = 빈곳거르기(빈곳줄들());
+  if(고른것만) 줄 = 줄.filter(function(x){ return App.빈곳고름[x.id]; });
+  if(!줄.length) return toast(고른것만 ? '고른 곳이 없습니다' : '내보낼 곳이 없습니다');
+  if(!window.XLSXGEN) return toast('엑셀 도구를 못 읽었습니다 — 새로 고쳐 보세요', 8000);
+  try{
+    XLSXGEN.download({
+      sheet:'주소없는곳', title:'푸른노무법인 뉴스레터 — 주소가 없어 못 보내는 곳' + (고른것만 ? ' (고른 것)' : ''),
+      sub:줄.length + '곳 · ' + 오늘() + ' · 범위 ' + (App.설정.범위||'자문중'),
+      headers:['번호','유형','회사','대표자','명함'],
+      rows:줄.map(function(x,i){
+        return [String(i+1), x.유형, x.회사, x.대표자,
+                x.명함 > 0 ? x.명함 + '장' : (x.명함 === 0 ? '없음' : '')];
+      }),
+      colRatios:[1,2,6,3,2], landscape:false
+    }, '뉴스레터-주소없는곳' + (고른것만 ? '-고른것' : '') + '-' + 오늘() + '.xlsx');
+    toast('📗 ' + 줄.length + '곳을 엑셀로 받았습니다', 8000);
+  }catch(e){ toast('엑셀을 만들지 못했습니다: ' + ((e&&e.message)||''), 8000); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   🔍 비슷한 명함 창 — 한 곳을 두고 명함을 찾아 «그 자리에서» 담는다
+   ══════════════════════════════════════════════════════════════════════════
+   대표 지시 2026-09-27: 「명함이 있을 경우 기업정보함에서 찾기보다 팝업창으로
+     유사찾기 기능 만들어달라」
+   ★ 닮음은 Core.비슷한명함찾기 가 매긴다(같은 이름 1 · 품기 0.8~0.9 · 두 글자 겹침).
+   ⚠⚠ 이름으로 맞춘 «후보»다 — 저절로 담지 않는다. 「같은 이름」이 아닌 명함을 담을 때는
+     한 번 더 묻는다. 이름만 보고 옮겨 남의 업체에 들어간 일이 있다(2026-09-05).
+   ★ 담는 곳은 «업체관리 자료»다(명함담기 와 같은 길 — 명함을사업장에). */
+function 유사창열기(id){
+  const co = (App.사업장들 || {})[id];
+  if(!co) return toast('업체관리에서 이 사업장을 못 찾았습니다', 6000);
+  if(!App.명함들) return toast('기업정보함을 읽는 중입니다 — 잠시 뒤에 다시 눌러 주세요');
+  App.유사 = { id:String(id), 회사:String(co.name || ''), 것들:[], 누구들:[], 고름:{} };
+  $('simQ').value = App.유사.회사;
+  $('simName').value = ''; $('simMail').value = ''; $('simWho').value = '담당자';
+  $('simCards').onclick = function(){ 기업정보함에서찾기(App.유사 ? App.유사.회사 : ''); };
+  유사찾기다시();
+  $('simbox').classList.add('on');
+}
+function 유사창닫기(){ App.유사 = null; $('simbox').classList.remove('on'); }
+/* 찾는 말을 고쳐 다시 찾는다 — 「주식회사 푸른종합건설」을 「푸른」으로 줄여 보는 식 */
+function 유사찾기다시(){
+  const u = App.유사; if(!u) return;
+  const q = String($('simQ').value || '').trim() || u.회사;
+  u.것들 = Core.비슷한명함찾기(q, App.명함들, { 최대: 40 });
+  u.누구들 = u.것들.map(function(c){ return c.누구; });
+  u.고름 = {};
+  유사창그리기();
+}
+function 유사창그리기(){
+  const u = App.유사; if(!u) return;
+  $('simT').textContent = '🔍 ' + u.회사 + ' — 비슷한 명함 ' + u.것들.length + '장';
+  const 닮딱 = function(c){
+    if(c.같은이름) return '<span class="닮" style="background:#dcfce7;color:var(--ok)">같은 이름</span>';
+    return '<span class="닮" style="background:#fef3c7;color:#92400e"'
+      + ' title="회사 이름이 닮은 정도입니다 — 같은 회사인지 꼭 보십시오">비슷 '
+      + Math.round(c.닮음 * 100) + '%</span>';
+  };
+  const 자리 = function(i){
+    const v = u.누구들[i];
+    return '<select onchange="유사자리(' + i + ',this.value)">'
+      + '<option value="담당자"' + (v === '담당자' ? ' selected' : '') + '>🧑‍💼 담당자</option>'
+      + '<option value="대표자"' + (v === '대표자' ? ' selected' : '') + '>👔 대표자</option></select>';
+  };
+  $('simB').innerHTML =
+    '<div class="pad hint" style="border-bottom:1px solid var(--line)">'
+    + '<b>회사 이름</b>이 같거나 비슷한 명함입니다 — <b>같은 회사인지 한 장씩 보고</b> 고르십시오. '
+    + '담으면 업체관리에 함께 들어갑니다(대표자 → 대표자 이메일 칸 · 담당자 → 담당자 목록).</div>'
+    + (u.것들.length
+      ? '<table class="list"><tr><th class="ck"></th><th class="n">#</th><th>닮음</th>'
+        + '<th>명함의 회사</th><th>이름</th><th>직책</th><th>명함의 주소</th><th>넣을 자리</th></tr>'
+        + u.것들.map(function(c, i){
+            return '<tr><td class="ck"><input type="checkbox" class="ck4" value="' + i + '"'
+              + (u.고름[i] ? ' checked' : '') + ' onchange="유사고름(this.value, this.checked)"></td>'
+              + '<td class="n">' + (i+1) + '</td>'
+              + '<td>' + 닮딱(c) + '</td>'
+              + '<td><b>' + esc(c.회사) + '</b></td>'
+              + '<td>' + esc(c.이름) + '</td>'
+              + '<td>' + esc(c.직책) + '</td>'
+              + '<td>' + esc(c.주소) + '</td>'
+              + '<td>' + 자리(i) + '</td></tr>';
+          }).join('')
+        + '</table>'
+      : '<div class="empty">비슷한 명함이 없습니다. 위 <b>찾는 말</b>을 줄여 보시거나'
+        + '(예: 회사 이름의 앞 두세 글자), 아래 <b>✎ 직접 넣기</b>로 주소를 적으십시오.</div>');
+  유사창셈();
+}
+function 유사고름(i, on){
+  const u = App.유사; if(!u) return;
+  if(on) u.고름[i] = 1; else delete u.고름[i];
+  유사창셈();
+}
+function 유사자리(i, v){ const u = App.유사; if(u) u.누구들[i] = (v === '대표자') ? '대표자' : '담당자'; }
+function 유사창셈(){
+  const u = App.유사;
+  const n = u ? Object.keys(u.고름).length : 0;
+  const el = $('simHint');
+  if(el) el.textContent = n ? (n + '장을 ' + u.회사 + '에 담습니다') : '담을 명함을 고르십시오';
+}
+async function 유사담기(){
+  const u = App.유사; if(!u) return;
+  const 고른 = Object.keys(u.고름).map(Number)
+    .map(function(i){ return { c: u.것들[i], 누구: u.누구들[i] }; })
+    .filter(function(x){ return x.c; });
+  if(!고른.length) return toast('담을 명함을 고르십시오');
+  /* ⚠ 대표자 주소는 «한 칸»이다 — 둘을 고르면 뒤엣것이 앞엣것을 말없이 덮는다 */
+  if(고른.filter(function(x){ return x.누구 === '대표자'; }).length > 1)
+    return toast('대표자 주소는 한 곳에 하나입니다 — 대표자는 한 장만 고르십시오', 7000);
+  const 닮기만 = 고른.filter(function(x){ return !x.c.같은이름; });
+  if(닮기만.length && !window.confirm('「같은 이름」이 아닌 명함이 ' + 닮기만.length + '장 있습니다.\n\n'
+      + 닮기만.map(function(x){ return '· ' + x.c.회사 + ' ' + x.c.이름; }).join('\n')
+      + '\n\n' + u.회사 + ' 와(과) 같은 회사가 맞습니까?')) return;
+  try{
+    for(const x of 고른){
+      await 명함을사업장에(u.id, { 이름:x.c.이름, 직책:x.c.직책, 주소:x.c.주소, 전화:x.c.전화 }, x.누구);
+    }
+    const 회사 = u.회사;
+    App.명함후보캐시 = null;
+    유사창닫기();
+    render();
+    toast(회사 + ' — ' + 고른.length + '장을 담았습니다 (업체관리에도 함께 들어갔습니다)', 8000);
+  }catch(e){ toast('담지 못했습니다: ' + ((e&&e.message)||''), 7000); }
+}
+/* ✎ 직접 넣기 — 명함이 없을 때. 사람바꾸기 와 같은 칸을 고친다(업체관리 자료).
+   ⚠ 빈 주소로 덮지 않는다 · 칸 하나만 update 한다. */
+async function 유사직접넣기(){
+  const u = App.유사; if(!u) return;
+  const 누구 = $('simWho').value === '대표자' ? '대표자' : '담당자';
+  const 이름 = String($('simName').value || '').trim();
+  const 주소 = String($('simMail').value || '').trim();
+  if(!주소) return toast('이메일을 적어 주십시오');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(주소)) return toast('이메일 꼴이 아닙니다: ' + 주소, 6000);
+  const co = (App.사업장들 || {})[u.id];
+  if(!co) return toast('업체관리에서 이 사업장을 못 찾았습니다', 6000);
+  try{
+    if(누구 === '담당자' && String(co.primaryContactEmail || '').trim()){
+      /* 주담당 칸이 이미 차 있으면 «덮지 않고» 담당자 목록에 더한다 */
+      await 명함을사업장에(u.id, { 이름:이름, 직책:'', 주소:주소, 전화:'' }, '담당자');
+    }else{
+      const 고칠것 = { updatedAt: Date.now() };
+      if(누구 === '대표자'){ 고칠것.ceoEmail = 주소; if(이름) 고칠것.ceo = 이름; }
+      else { 고칠것.primaryContactEmail = 주소; if(이름) 고칠것.primaryContactName = 이름; }
+      await db.ref('data/companies/v/' + u.id).update(고칠것);
+      Object.keys(고칠것).forEach(function(k){ co[k] = 고칠것[k]; });
+    }
+    const 회사 = u.회사;
+    App.명함후보캐시 = null;
+    유사창닫기();
+    render();
+    toast(회사 + ' — ' + 누구 + ' ' + 주소 + ' 를 넣었습니다 (업체관리에도 함께 들어갔습니다)', 8000);
+  }catch(e){ toast('넣지 못했습니다: ' + ((e&&e.message)||''), 7000); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    📇 기업정보함 명함에서 «후보»를 찾는다 — 담지는 않는다
    ══════════════════════════════════════════════════════════════════════════
    실측 2026-09-09: 자문중 208곳 가운데 지금 명단에 «없는» 주소가
@@ -4677,7 +5046,7 @@ function 명함읽기(){
     App.명함들 = s.val() || {};
     App.명함읽는중 = false;
     App.명함후보캐시 = null;
-    if(App.tab === 'who') render();
+    if(App.tab === 'who' || App.tab === 'noaddr') render();
   }).catch(function(){ App.명함들 = {}; App.명함읽는중 = false; });
 }
 /* 후보를 한 번만 셈해 둔다 — 표를 다시 그릴 때마다 명함 6,669장을 훑지 않게 */
@@ -4741,7 +5110,26 @@ function 명함창그리기(){
 }
 /* ★ 여기서 «업체관리 자료»를 고친다 (대표 결정 2026-09-09 「업체관리에 대표자
      이메일 칸을 새로 만든다」). 임자가 한 곳이라야 계약이 끝날 때 저절로 빠진다.
-   ⚠ 칸 하나만 update 한다 — set 으로 통째 쓰면 다른 방이 같은 업체를 고치던 것을 덮는다. */
+   ⚠ 칸 하나만 update 한다 — set 으로 통째 쓰면 다른 방이 같은 업체를 고치던 것을 덮는다.
+   ★ 명함 한 장 넣기는 명함을사업장에 «한 곳»이 한다 — 명함담기(받는 명단)와
+     유사담기(주소 없는 곳 창)가 함께 쓴다. 두 벌이면 한쪽만 고쳐져 어긋난다. */
+async function 명함을사업장에(사업장, c, 누구){
+  const co = (App.사업장들 || {})[사업장];
+  /* ⚠ 사업장을 못 찾으면 멈춘다 — 빈 것에서 contacts 를 만들어 update 하면
+       그 집의 담당자 목록이 «한 사람짜리로» 덮인다. */
+  if(!co) throw new Error('업체관리에서 사업장을 못 찾았습니다 (' + 사업장 + ')');
+  if(누구 === '대표자'){
+    await db.ref('data/companies/v/' + 사업장).update({ ceoEmail: c.주소, updatedAt: Date.now() });
+    co.ceoEmail = c.주소;
+  }else{
+    /* 담당자는 contacts 에 한 사람을 «더한다» — 있던 사람을 지우지 않는다 */
+    const 이제 = Array.isArray(co.contacts) ? co.contacts.slice()
+      : (co.contacts ? Object.keys(co.contacts).map(k=>co.contacts[k]) : []);
+    이제.push({ name: c.이름, position: c.직책, email: c.주소, phone: c.전화 || '' });
+    await db.ref('data/companies/v/' + 사업장).update({ contacts: 이제, updatedAt: Date.now() });
+    co.contacts = 이제;
+  }
+}
 async function 명함담기(){
   const 후 = 명함후보(); if(!후) return;
   const 것들 = 후[App.명함창] || [];
@@ -4751,18 +5139,7 @@ async function 명함담기(){
   try{
     for(const c of 고른){
       if(!c.사업장) continue;
-      if(대표){
-        await db.ref('data/companies/v/' + c.사업장).update({ ceoEmail: c.주소, updatedAt: Date.now() });
-        const co = App.사업장들[c.사업장]; if(co) co.ceoEmail = c.주소;
-      }else{
-        /* 담당자는 contacts 에 한 사람을 «더한다» — 있던 사람을 지우지 않는다 */
-        const co = App.사업장들[c.사업장] || {};
-        const 이제 = Array.isArray(co.contacts) ? co.contacts.slice()
-          : (co.contacts ? Object.keys(co.contacts).map(k=>co.contacts[k]) : []);
-        이제.push({ name: c.이름, position: c.직책, email: c.주소, phone: c.전화 || '' });
-        await db.ref('data/companies/v/' + c.사업장).update({ contacts: 이제, updatedAt: Date.now() });
-        co.contacts = 이제;
-      }
+      await 명함을사업장에(c.사업장, c, 대표 ? '대표자' : '담당자');
     }
     App.명함후보캐시 = null;
     명함창닫기();
