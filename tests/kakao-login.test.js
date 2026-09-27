@@ -87,8 +87,8 @@ global.fetch = async (url, opts) => {
   }
   throw new Error('예상 밖 주소: ' + url);
 };
-process.env.KAKAO_REST_KEY = 'rest';
-process.env.KAKAO_CLIENT_SECRET = 'secret';
+process.env.KAKAO_REST_KEY = '0123456789abcdef0123456789abcdef';   // 가짜 — 모양만 진짜 키와 같다
+process.env.KAKAO_CLIENT_SECRET = 'FakeSecretForTests1234567890';
 
 function call(handler, { token, body } = {}) {
   return new Promise((resolve) => {
@@ -189,6 +189,39 @@ test('카카오가 인가코드를 거절하면 성공 처리하지 않는다', 
   const r = await call(K.kakaoLoginFinish, { body: { code: 'nope' } });
   assert.equal(r.status, 400);
   assert.equal(issued.length, 0);
+});
+
+test('★★ 서버 비밀값이 깨져 있으면(???+줄바꿈) 카카오로 보내지 않고 까닭을 말한다', async () => {
+  const K = fresh();
+  const keep = [process.env.KAKAO_REST_KEY, process.env.KAKAO_CLIENT_SECRET];
+  try {
+    process.env.KAKAO_REST_KEY = '???_????\r\n';
+    const r1 = await new Promise((resolve) => {
+      const res = { _s: 200, set() {}, status(s) { this._s = s; return this; }, json(j) { resolve({ status: this._s, body: j }); }, send() {} };
+      K.kakaoAuthUrl({ method: 'GET', headers: {}, query: { state: 'x' } }, res);
+    });
+    assert.equal(r1.status, 500);
+    assert.ok(!r1.body.url, '깨진 키로 카카오 주소를 내줬다');
+    assert.match(r1.body.error, /KAKAO_REST_KEY/);
+    process.env.KAKAO_REST_KEY = keep[0];
+    process.env.KAKAO_CLIENT_SECRET = '???_????';
+    const r2 = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
+    assert.equal(r2.status, 500);
+    assert.equal(issued.length, 0);
+  } finally { process.env.KAKAO_REST_KEY = keep[0]; process.env.KAKAO_CLIENT_SECRET = keep[1]; }
+});
+
+test('앞뒤 줄바꿈만 붙은 진짜 키는 걷어서 쓴다', async () => {
+  const K = fresh();
+  const keep = process.env.KAKAO_REST_KEY;
+  try {
+    process.env.KAKAO_REST_KEY = keep + '\r\n';
+    const r = await new Promise((resolve) => {
+      const res = { _s: 200, set() {}, status(s) { this._s = s; return this; }, json(j) { resolve({ status: this._s, body: j }); }, send() {} };
+      K.kakaoAuthUrl({ method: 'GET', headers: {}, query: { state: 'x' } }, res);
+    });
+    assert.equal(new URL(r.body.url).searchParams.get('client_id'), keep);
+  } finally { process.env.KAKAO_REST_KEY = keep; }
 });
 
 /* ── 화면 (js/pu-kakao.js) ──────────────────────────────────────────── */
