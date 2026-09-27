@@ -315,8 +315,8 @@ var Component = React.Component;
 /* ⚠ 배포할 때 이 두 줄을 함께 올려 주세요 (안 올리면 다른 사람 화면이 옛 코드로 남습니다).
    ※ 잊어도 되도록 파일 길이로도 새 배포를 알아채게 해 두었지만(_vgCheckHtml),
      여기 적어 두면 무엇이 바뀐 배포인지 알 수 있어 문제를 찾기 쉽습니다. */
-var ERP_BUILD = '2026-09-27 옵시디언 단추가 환경설정을 덮던 것 — 메뉴 바닥 한 줄로';
-var BUILD_SEQ = 186;
+var ERP_BUILD = '2026-09-27 나의 업무: 기록은 업무관리 한 곳(+입력 창 없앰) · 업무관리 동기화 되살림';
+var BUILD_SEQ = 187;
 // === 자동 최신화 — 아래 '버전 게이트' 모듈로 이동(로그인·탭 복귀·다른 탭 알림 시 작동) ===
 (function(){
   try{
@@ -59266,6 +59266,11 @@ var _wsPendingId = null;
     up[P + 'state_at'] = now;
   }
   function wsSyncRun(onDone,onlyWid){
+    /* ★★ 이 판을 켠 사람 — 2026-08-16 엔진을 MyDeskV2 밖으로 옮기며 이 줄이 따라오지 않아
+       아래 `sid` 가 정의되지 않은 채였다. 첫 건에서 ReferenceError → `.catch(fin)` 이 삼켜
+       6주 동안 «아무것도 안 하고» 끝났다(마지막 기록 2026-08-10, 2026-09-27 모의 실행으로 확인).
+       ⚠ 로그인 전이면 빈 값 — 그때는 «자기 것» 갈래(mine)가 안 돌 뿐 나머지는 돈다. */
+    var sid = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) || '';
     if(_wsBusy){ _wsPendingId=onlyWid||null; return; } // 겹치면 마지막 변경 한 건만 뒤이어 처리
     _wsBusy = true;
     var fin = function(){
@@ -59427,40 +59432,13 @@ var _wsPendingId = null;
           // ── 진행 필드(상태·다음 액션·다음 날짜) 양방향 ──
           var sst = wst, snt = wnt, snd = wnd, spg = (pct === null ? '' : String(pct));
           if(mine && !want){                                // 종료된 건은 진행 필드를 맞추지 않는다
-            var wNewer = String(w.up_at || w.state_at || '') > String((pp && pp.updatedAt) || '');
-            var nst = pick3(snap.st, wst, pst, wNewer);
-            var nnt = pick3(snap.nt, wnt, pnt, wNewer);
-            var nnd = pick3(snap.nd, wnd, pnd, wNewer);
-            var pf = {};
-            if(nst !== null){ sst = nst;
-              if(nst !== wst){ up['work_erp/items/' + wid + '/status'] = nst; toWs++; }
-              if(nst !== pst) pf.status = nst; }
-            if(nnt !== null || nnd !== null){
-              var fnt = (nnt === null ? wnt : nnt), fnd = (nnd === null ? wnd : nnd);
-              snt = fnt; snd = fnd;
-              if(fnt !== wnt || fnd !== wnd){
-                up['work_erp/items/' + wid + '/next'] = (fnt || fnd) ? { text:fnt, date:fnd } : null;
-                toWs++;
-              }
-              if(fnt !== pnt) pf.nextAction = fnt;
-              if(fnd !== pnd) pf.nextDate = fnd;
-            }
-            // 진행률은 업무시트의 진행 단계에서 계산한다 — 단계가 있을 때만 밀어 넣는다.
-            // (단계가 없으면 푸른이알피에서 손으로 넣은 값을 그대로 둔다)
-            if(pct !== null && pp && Number(pp.progress || 0) !== pct) pf.progress = pct;
-            if(pct !== null && !pp) pf.progress = pct;
-            // 메모는 비어 있을 때만 최근 기록 한 줄로 채운다 — 사람이 쓴 메모를 덮지 않는다
-            if(w.last && w.last.t && !(pp && String(pp.note || '').trim())) pf.note = String(w.last.t);
-            /* ── 진행 메모 → 업무관리 (한 방향) ────────────────────────────
-               상태·다음 할 일은 위에서 양방향으로 맞추는데 «메모»만 여기서 끊겨 있었다.
-               그래서 담당자가 여기 적은 메모는 업무관리로 영영 가지 않았고,
-               같은 이야기를 두 곳에 쓰라는 꼴이라 업무관리 주간 기록이 비어 있었다.
-               ⚠ 업무관리는 이 칸을 «보여주기만» 한다. 기록으로 남길지는 사람이 고른다 —
-                 메모는 덮어쓰는 한 칸이라 돌 때마다 기록을 만들면 같은 줄이 쌓인다.
-               ⚠ «자기 것»만 내려보낸다. project_progress 는 사람별 기록이라
-                 남의 행을 대신 옮기면 안 된다(위 mine 조건 안이라 이미 그렇다).
-               ⚠ 사건 단계 기한(pe_due)과 같은 길이다 — 새 배관을 놓지 않는다. */
-            var _noteNow=String((pf.note!==undefined?pf.note:(pp&&pp.note))||'').trim();
+            /* ✂ 2026-09-27 — 상태·다음 할 일·진행률을 이알피(project_progress)와 «주고받던» 갈래를 뺐다.
+               대표 결정(①안): 기록은 업무관리 한 곳, 이알피 「나의 업무」는 보여 주기만 한다(「+ 입력」 창 없앰).
+               ⚠ 그대로 켰다면 해로웠다 — 두 쪽 상태말이 달라(in-progress ↔ 진행중) 이알피 빈 상태가
+                 업무관리 «진행중»을 빈칸으로 지웠다(모의 실행: 직원별 1~6건).
+               ⚠ 남긴 것은 아래 «메모 한 줄 내려보내기»뿐이다 — 옛 메모를 업무관리에서 보고 기록에 담을 수 있게.
+                 project_progress 는 지우지도 고치지도 않는다(옛 기록 그대로 둔다). */
+            var _noteNow=String((pp&&pp.note)||'').trim();
             var _noteWas=(w.pe_notes&&w.pe_notes[sid])||null;
             if(String((_noteWas&&_noteWas.t)||'')!==_noteNow){
               up['work_erp/items/' + wid + '/pe_notes/' + sid] = _noteNow
@@ -59468,19 +59446,6 @@ var _wsPendingId = null;
                     id:String((pp && pp.id) || ''), pg:(pct === null ? null : pct) }
                 : null;
               toWs++;
-            }
-            if(Object.keys(pf).length){
-              if(pi >= 0) PP[pi] = Object.assign({}, pp, pf, { updatedAt:now });
-              else PP.unshift(Object.assign({
-                id:'pp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-                sid:sid, projectType:w.ref.type, projectId:w.ref.id,
-                projectNo:(pe.caseNo || pe.contractNo || pe.consultNo || pe.fundNo || pe.projectNo || pe.no || ''),
-                projectName:(pe.title || pe.caseName || pe.programName || ''),
-                companyName:(pe.companyName || pe.fundName || pe.targetName || ''),
-                progress:0, status:'', nextAction:'', nextDate:'', note:'',
-                createdAt:now
-              }, pf, { updatedAt:now }));
-              ppDirty = 1; toPg++;
             }
           }
           // ── 업무 요약 양방향 ──
@@ -59902,7 +59867,7 @@ function MyDeskV2(props){
         var v = snap.val() || {}; var map = {};
         Object.keys(v).forEach(function(k){
           var w = v[k];
-          if(w && w.ref && w.ref.type && w.ref.id) map[w.ref.type + '|' + w.ref.id] = { wid:k, last:w.last||null };
+          if(w && w.ref && w.ref.type && w.ref.id) map[w.ref.type + '|' + w.ref.id] = { wid:k, last:w.last||null, status:String(w.status||'') };
         });
         setWsLogs(map);
       }).catch(function(){});
@@ -60662,6 +60627,9 @@ function MyDeskV2(props){
                             (function(){
                               var sMap = { progress:'진행중', pending:'대기', review:'검토중', open:'진행중', closed:'완료', done:'완료', cancelled:'취소', hold:'보류',
                                            consult:'상담접수', negotiate:'협의중', confirmed:'계약확정', signed:'최종확정', active:'진행중' };
+                              /* 업무관리에 적힌 상태가 먼저다(2026-09-27 ①안 — 기록은 업무관리 한 곳) */
+                              var _wsx = wsLogs[it.type + '|' + it.id];
+                              if(_wsx && _wsx.status) return _wsx.status;
                               var raw = it.status||'';
                               return sMap[raw] || raw;
                             })()),
@@ -60708,24 +60676,17 @@ function MyDeskV2(props){
                                     style:{padding:'3px 8px',background:'#f8fafc',border:'1px solid #cbd5e1',
                                       color:'#475569',borderRadius:'4px',cursor:'pointer',fontSize:'10.5px',fontWeight:600}},
                                     '🗄️ 종료'))
-                              : h('button', {
-                              onClick:function(){
-                                setProgressModal({
-                                  type:it.type, id:it.id, no:it.no, name:it.name, company:it.company,
-                                  role:it.role,
-                                  progress: it.progress,
-                                  status: (it.progressData && it.progressData.status) || '',
-                                  nextAction: (it.progressData && it.progressData.nextAction) || '',
-                                  nextDate: (it.progressData && it.progressData.nextDate) || '',
-                                  note: (it.progressData && it.progressData.note) || '',
-                                  isNew: !it.progressData
-                                });
-                              },
-                              style:{ padding:'3px 8px', background: it.progressData?'#eff6ff':'#fff',
-                                border:'1px solid '+(it.progressData?'#bfdbfe':'#cbd5e1'),
-                                color: it.progressData?'#1e40af':'#475569',
-                                borderRadius:'4px', cursor:'pointer', fontSize:'10.5px', fontWeight:600 } },
-                              it.progressData ? '📝 메모' : '+ 입력')
+                              /* 2026-09-27 ①안 — 「+ 입력」·「📝 메모」 창을 없앴다. 기록은 업무관리 한 곳에 적는다.
+                                 누르면 업무관리의 그 건이 바로 열린다(같은 창, PuAppBar.goApp). */
+                              : (function(){
+                                  var _w = wsLogs[it.type + '|' + it.id];
+                                  if(!_w) return h('span', { title:'업무관리에 아직 이어지지 않은 건입니다 — 업무관리를 한 번 열면 이어집니다',
+                                    style:{ fontSize:'10px', color:'#94a3b8', whiteSpace:'nowrap' } }, '연결 전');
+                                  return h('button', { onClick:function(){ wsOpen(_w.wid); }, title:'업무관리에서 이 건의 기록을 적습니다',
+                                    style:{ padding:'3px 8px', background:'#eff6ff', border:'1px solid #bfdbfe', color:'#1e40af',
+                                      borderRadius:'4px', cursor:'pointer', fontSize:'10.5px', fontWeight:700, whiteSpace:'nowrap' } },
+                                    '업무관리에서 기록 →');
+                                })()
                           )
                         );
                       })
@@ -60736,7 +60697,7 @@ function MyDeskV2(props){
             // 안내
             h('div', { style:{ marginTop:'8px', fontSize:'10.5px', color:'#94a3b8', lineHeight:'1.6' } },
               '💡 사무관리에서 ',h('strong',null,'주담당/부담당'),'으로 지정되면 자동 표시됩니다. ',
-              h('strong',null,'[+ 입력]'),' 또는 ',h('strong',null,'[📝 메모]'),'로 진행률·상태·다음 액션을 기록하세요. ',
+              '진행 기록은 ',h('strong',null,'[업무관리에서 기록 →]'),'으로 업무관리 한 곳에 적습니다. ',
               '제목 클릭 시 해당 메뉴로 이동합니다.'
             )
           );
