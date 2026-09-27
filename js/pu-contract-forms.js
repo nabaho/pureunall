@@ -660,7 +660,7 @@
         Promise.all([dataP, arcP]).then(function () { pending--; drawAtts(); }, function () { pending--; drawAtts(); });
       });
     }
-    var fileIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.docx,.doc,.pdf', style: 'display:none',
+    var fileIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.xlsx,.xls,.docx,.doc,.pdf', style: 'display:none',
       onchange: function (e) { addFiles(e.target.files); e.target.value = ''; } });
     var drop = el('div', { 'class': 'pcf-drop',
       ondragover: function (e) { e.preventDefault(); drop.style.background = '#eff6ff'; },
@@ -697,7 +697,7 @@
           }))
         ]),
         el('label', { 'class': 'l', text: '본문 (칸은 계약 자료로 바뀝니다) *' }), bodyIn,
-        el('label', { 'class': 'l', text: '원본 파일 (HWPX/HWP/DOCX/PDF · 올리면 원본 보관함에 사본이 영구 보관됩니다 · 1MB 초과는 보관함에만)' }), drop
+        el('label', { 'class': 'l', text: '원본 파일 (HWPX/HWP/XLSX/DOCX/PDF · 올리면 원본 보관함에 사본이 영구 보관됩니다 · 1MB 초과는 보관함에만)' }), drop
       ]),
       el('div', { 'class': 'pcf-mf' }, [
         el('button', { type: 'button', 'class': 'pcf-b', text: '취소', onclick: close }),
@@ -726,10 +726,10 @@
   function hwpSources(fm) {
     var out = [];
     (fm.attachments || []).forEach(function (a) {
-      if (/\.(hwp|hwpx)$/i.test(a.name || '') && (a.data || a.dataUrl)) out.push({ name: a.name, data: a.data || a.dataUrl });
+      if (/\.(hwp|hwpx|xlsx)$/i.test(a.name || '') && (a.data || a.dataUrl)) out.push({ name: a.name, data: a.data || a.dataUrl });
     });
     (fm.originals || []).forEach(function (o) {
-      if (/\.(hwp|hwpx)$/i.test(o.name || '') && o.fileId && !out.some(function (x) { return x.name === o.name; }))
+      if (/\.(hwp|hwpx|xlsx)$/i.test(o.name || '') && o.fileId && !out.some(function (x) { return x.name === o.name; }))
         out.push({ name: o.name, fileId: o.fileId });
     });
     return out;
@@ -845,9 +845,9 @@
       }, 200);
     });
 
-    var srcSel = null;
+    var srcSel = null, btnPrev = null, btnDown = null;
     if (srcs.length > 1) {
-      srcSel = el('select', { 'aria-label': '채울 한글 원본', onchange: function () { src = srcs[+srcSel.value]; loadHwp(); } },
+      srcSel = el('select', { 'aria-label': '채울 원본', onchange: function () { src = srcs[+srcSel.value]; loadHwp(); syncBtns(); } },
         srcs.map(function (s, i) { return el('option', { value: String(i), text: s.name }); }));
     }
     function loadHwp() {
@@ -860,17 +860,19 @@
       }).then(function (h) {
         if (src !== my) return;
         st.hwp = h;
-        note.textContent = h.markers.length ? '' : '⚠ 한글 원본에 채울 자리(회사명 같은 표시)가 없습니다 — 원본에 표시를 넣으면 채워집니다';
+        note.textContent = h.markers.length ? '' : '⚠ ' + kindWord() + ' 원본에 채울 자리(회사명 같은 표시)가 없습니다 — 원본에 표시를 넣으면 채워집니다';
         drawVals();
       }, function (e) { note.textContent = '⚠ 한글 원본을 읽지 못했습니다 — ' + ((e && e.message) || e); });
     }
+    function isXl() { return !!src && /\.xlsx$/i.test(src.name || ''); }
+    function kindWord() { return isXl() ? '엑셀' : '한글'; }
     function fillHwp() {
       if (!st.hwp) return Promise.reject(new Error(src ? '한글 원본을 아직 읽는 중입니다' : '이 양식에는 한글 원본이 없습니다'));
       return host.hwpFill(st.hwp.bytes, src.name, CF.hwpValues(st.hwp.markers, values()));
     }
     function outName() {
       var V = values();
-      return CF.safeName(fm.name + (V.회사명 ? '_' + V.회사명 : '') + (V.근로자명 ? '_' + V.근로자명 : '')) + '.hwp';
+      return CF.safeName(fm.name + (V.회사명 ? '_' + V.회사명 : '') + (V.근로자명 ? '_' + V.근로자명 : '')) + (isXl() ? '.xlsx' : '.hwp');
     }
     function warnOf(r) {
       if (r.unknown && r.unknown.length) toast('⚠ 못 채운 자리 ' + r.unknown.length + '곳(표 속 표일 수 있음): ' + r.unknown.join(', '));
@@ -893,7 +895,7 @@
       note.textContent = '채우는 중…';
       fillHwp().then(function (r) {
         note.textContent = ''; warnOf(r);
-        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.bytes], { type: 'application/x-hwp' }));
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.bytes], { type: isXl() ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/x-hwp' }));
         a.download = outName(); document.body.appendChild(a); a.click();
         setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
         toast('내려받았습니다 — ' + a.download);
@@ -910,7 +912,7 @@
         el('small', { style: 'font-weight:400;color:#64748b;margin-right:8px', text: src ? '원본: ' + src.name : '한글 원본 없음 — 글자 본문을 채웁니다' }),
         el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })]),
       el('div', { 'class': 'pcf-mb' }, [
-        srcSel ? el('div', { style: 'margin-bottom:8px' }, [el('span', { 'class': 'pcf-fh', text: '채울 한글 원본 ' }), srcSel]) : null,
+        srcSel ? el('div', { style: 'margin-bottom:8px' }, [el('span', { 'class': 'pcf-fh', text: '채울 원본 ' }), srcSel]) : null,
         el('div', { 'class': 'pcf-fcols' }, [
           el('div', null, [
             el('div', { 'class': 'pcf-fh', text: '① 회사 — 기업정보함에서 찾기' }), coQ, coList, coPicked,
@@ -924,10 +926,14 @@
       el('div', { 'class': 'pcf-mf' }, [
         el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }),
         fm.body ? el('button', { type: 'button', 'class': 'pcf-b', text: '본문 복사', onclick: copyText }) : null,
-        el('button', { type: 'button', 'class': 'pcf-b', text: src ? '한글로 열어 보기' : '채운 본문 보기', onclick: doPreview }),
-        src ? el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', text: '한글 파일 내려받기', onclick: doDownload }) : null
+        btnPrev = el('button', { type: 'button', 'class': 'pcf-b', text: src ? kindWord() + '로 열어 보기' : '채운 본문 보기', onclick: doPreview }),
+        btnDown = src ? el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', text: kindWord() + ' 파일 내려받기', onclick: doDownload }) : null
       ])
     ]);
+    function syncBtns() {
+      if (btnPrev && src) btnPrev.textContent = kindWord() + '로 열어 보기';
+      if (btnDown) btnDown.textContent = kindWord() + ' 파일 내려받기';
+    }
     bg.appendChild(m);
     bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
     document.body.appendChild(bg);
@@ -1113,9 +1119,9 @@
       return el('div', { 'class': 'pcf-msel' }, [kSel]);
     }
     function uploadBtn(kind) {
-      var upIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.docx,.doc,.pdf', style: 'display:none',
+      var upIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.xlsx,.xls,.docx,.doc,.pdf', style: 'display:none',
         onchange: function (e) { quickUpload(kind, e.target.files); e.target.value = ''; } });
-      var b = el('label', { 'class': 'pcf-b g', title: '📎 파일을 이 단추 위로 끌어다 놓아도 됩니다\n· HWPX · HWP · DOCX · DOC · PDF\n· 올리면 원본 보관함에 사본이 영구 보관됩니다\n· 1MB 초과는 보관함에만 담깁니다',
+      var b = el('label', { 'class': 'pcf-b g', title: '📎 파일을 이 단추 위로 끌어다 놓아도 됩니다\n· HWPX · HWP · XLSX · DOCX · DOC · PDF\n· 올리면 원본 보관함에 사본이 영구 보관됩니다\n· 1MB 초과는 보관함에만 담깁니다',
         ondragover: function (e) { e.preventDefault(); b.style.background = '#bbf7d0'; },
         ondragleave: function () { b.style.background = ''; },
         ondrop: function (e) { e.preventDefault(); b.style.background = ''; var fl = filesOf(e); if (fl) quickUpload(kind, fl); } },
