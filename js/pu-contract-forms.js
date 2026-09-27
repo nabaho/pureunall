@@ -371,14 +371,8 @@
   var CSS = ''
     + '.pcf,.pcf *,.pcf-mbg *,.pcf-hv *{box-sizing:border-box}'
     + '.pcf{font-size:13px;color:#1e293b}'
-    + '.pcf-desc{color:#64748b;font-size:12px;margin:4px 0 12px}'
-    + '.pcf-box{background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;overflow:hidden}'
-    + '.pcf-bar{background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:8px 14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}'
-    + '.pcf-bar b{flex:1;font-size:13px;white-space:nowrap}'
     + '.pcf-b{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;padding:4px 10px;border-radius:4px;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;font-family:inherit}'
     + '.pcf-b.g{background:#f0fdf4;color:#166534;border-color:#bbf7d0}.pcf-b.b{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}.pcf-b.y{background:#fffbeb;color:#854d0e;border-color:#fde68a}'
-    + '.pcf-dot{display:inline-block;width:8px;height:8px;border-radius:50%}'
-    + '.pcf-cnt{background:#eff6ff;color:#1e40af;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700}'
     + '.pcf-act{border:none;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}'
     + '.pcf-att{display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1e40af;padding:3px 8px;border-radius:4px;font-size:10.5px;font-weight:600;text-decoration:none;margin:0 4px 4px 0}'
     + '.pcf-none{color:#94a3b8;font-size:11.5px;text-align:center;padding:48px;border:1px dashed #e2e8f0;margin:16px;border-radius:4px}'
@@ -512,12 +506,13 @@
       bodyIn.focus(); bodyIn.selectionStart = bodyIn.selectionEnd = s + code.length;
     }
     var attWrap = el('div');
+    var pending = 0; // 올리는 중(보관함·읽기)인 파일 수 — 이게 있는 채로 저장하면 첨부가 통째로 빠진다
     function drawAtts() {
       attWrap.innerHTML = '';
       var arcd = {};
       f.originals.forEach(function (o) { if (o.attId) arcd[o.attId] = 1; });
       var only = f.originals.filter(function (o) { return !o.attId; });
-      if (!f.attachments.length && !only.length) { attWrap.appendChild(el('div', { style: 'font-size:11px;color:#94a3b8;margin-top:6px', text: '첨부된 파일 없음' })); return; }
+      if (!f.attachments.length && !only.length && !pending) { attWrap.appendChild(el('div', { style: 'font-size:11px;color:#94a3b8;margin-top:6px', text: '첨부된 파일 없음' })); return; }
       f.attachments.forEach(function (a) {
         attWrap.appendChild(el('div', { 'class': 'pcf-arow' }, [
           el('span', { text: '📎' }), el('span', { 'class': 'n', text: a.name, title: a.name }),
@@ -538,22 +533,27 @@
             onclick: function () { f.originals = f.originals.filter(function (x) { return x !== o; }); drawAtts(); } })
         ]));
       });
+      if (pending > 0) attWrap.appendChild(el('div', { style: 'font-size:11px;color:#94a3b8;margin-top:4px', text: '⏳ 올리는 중… (' + pending + ')' }));
     }
+    /* 첨부는 «읽기 끝나는 대로» 곧장 넣는다(보관함 응답을 기다리지 않는다) — 안 그러면
+       사람이 그 사이 [저장]을 눌러 첨부 없는 양식이 저장된다(원본 연결만 뒤늦게 붙는다). */
     function addFiles(files) {
       Array.prototype.forEach.call(files || [], function (file) {
         var small = file.size <= ATTACH_MAX;
         if (!small && !opts.archiveFile) { toast(file.name + ': 1MB 초과'); return; }
         var attId = newId('at-');
         var from = { kind: 'form', formId: f.id, formName: nameIn.value.trim() || f.name || file.name, formKind: f.kind };
-        var arcP = opts.archiveFile ? opts.archiveFile(file, from) : Promise.resolve({ why: '' });
-        Promise.all([arcP, small ? readDataUrl(file) : Promise.resolve('')]).then(function (r) {
-          var arc = r[0];
+        pending++; drawAtts();
+        var dataP = (small ? readDataUrl(file) : Promise.resolve('')).then(function (dataUrl) {
+          if (small) { f.attachments.push({ id: attId, name: file.name, size: file.size, type: file.type, data: dataUrl }); drawAtts(); }
+        });
+        var arcP = (opts.archiveFile ? opts.archiveFile(file, from) : Promise.resolve({ why: '' })).then(function (arc) {
           if (!small && !arc.fileId) { toast('❌ ' + file.name + ': 1MB 초과 파일은 보관함에만 담을 수 있는데 보관함이 실패했습니다 — ' + arc.why); return; }
-          if (small) f.attachments.push({ id: attId, name: file.name, size: file.size, type: file.type, data: r[1] });
           if (arc.fileId) f.originals.push(origEntry(arc.fileId, file, small ? attId : ''));
           else if (arc.why) toast('⚠ ' + file.name + ': 보관함 사본을 못 남겼습니다 — ' + arc.why);
           drawAtts();
         });
+        Promise.all([dataP, arcP]).then(function () { pending--; drawAtts(); }, function () { pending--; drawAtts(); });
       });
     }
     var fileIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.docx,.doc,.pdf', style: 'display:none',
@@ -566,6 +566,7 @@
     drawAtts();
 
     function save() {
+      if (pending > 0) { toast('파일을 올리는 중입니다 — 끝나면 저장하세요'); return; }
       f.name = nameIn.value.trim(); f.body = bodyIn.value; f.enabled = onIn.checked;
       if (grpIn) { var g = grpIn.value.trim(); if (g) f.groupName = g; else delete f.groupName; }
       if (!f.name) { toast('양식 이름을 넣어 주세요'); nameIn.focus(); return; }
@@ -629,7 +630,7 @@
         S.forms = mergeSeeds(listOf(cf && cf.v), S.removed).list;
         S.loaded = true;
         var fm = cur();
-        if (S.sel && !fm) S.sel = null;
+        if (S.sel && !fm) { S.sel = null; if (host.onSelect) host.onSelect(null); }
         if (fm) { S.kind = fm.kind; S.open[fm.kind] = true; }
         drawTree(); drawMain();
       }).catch(function (e) { S.err = (e && e.message) || String(e); drawTree(); drawMain(); });
@@ -653,10 +654,10 @@
     }
     /* 파일 하나를 보관함에 — 실패는 던지지 않고 {why} 로 돌려준다(양식 저장은 계속한다) */
     function archiveFile(file, from) {
-      if (!host.archive) return Promise.resolve({ why: '보관함이 연결되지 않았습니다' });
+      if (!host.archive) return Promise.resolve({ why: '' });
       return readBytes(file).then(function (bytes) {
         return host.archive({ name: file.name, size: file.size, type: file.type || '', bytes: bytes }, from);
-      }).then(function (r) { return { fileId: r.fileId }; }, function (e) { return { why: (e && e.message) || String(e) }; });
+      }).then(function (r) { return { fileId: r && r.fileId }; }, function (e) { return { why: (e && e.message) || String(e) }; });
     }
 
     function save(form, close) {

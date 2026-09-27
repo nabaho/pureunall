@@ -79,6 +79,12 @@ test('ⓒⓓ 올리기는 보관함을 거친다', () => {
   assert.match(cutFn(stripJs(CF), 'function openModal('), /archiveFile/, '★ 수정 창에서 붙인 파일이 보관함에 안 남습니다');
 });
 
+test('★★ 저장은 «올리는 중»엔 막는다 — 보관함 응답을 기다리다 첨부 없이 저장되면 안 된다', () => {
+  const openModal = cutFn(stripJs(CF), 'function openModal(');
+  const save = cutFn(openModal, 'function save(');
+  assert.match(save, /pending/, '★★ 저장이 올리는 중(pending)을 안 봅니다 — 첨부가 빠진 채 저장될 수 있습니다');
+});
+
 test('ⓔ linkOriginal — 서버 최신본 위에 한 건만, 두 번 넣지 않는다', async () => {
   const P = loadCF();
   const db = fakeDb({ 'data/contract_forms': { v: [{ id: 'fm-x', kind: 'company', name: '가나상사 자문', body: 'b' }, { id: 'fm-y', kind: 'fund', name: 'y', body: 'b' }], u: 5 } });
