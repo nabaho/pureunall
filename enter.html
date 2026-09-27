@@ -138,7 +138,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
-<script src="js/pu-billing.js?v=10"></script>
+<script src="js/pu-billing.js?v=11"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -585,6 +585,8 @@ body.portal-mode #moreFab{display:flex;}
 #billModal .r .k{color:#64748b;}
 #billModal .r .v{font-weight:700;font-variant-numeric:tabular-nums;}
 #billModal .pbasis{font-size:.68rem;color:#94a3b8;padding:0 0 2px;line-height:1.5;}
+#billModal .bshare{color:#dc2626;font-weight:700;font-size:.68rem;margin-left:3px;}
+#billModal .betc a{color:#1e40af;font-weight:700;text-decoration:none;white-space:nowrap;}
 #billModal .memo{margin-top:12px;font-size:.71rem;color:#854d0e;background:#fffbeb;border-left:3px solid #fbbf24;padding:7px 10px;border-radius:0 6px 6px 0;line-height:1.6;}
 /* 하루 폭주 (2026-08-29) — 「갱신 대기」 같은 노란 알림보다 «세게». 다른 것이다:
    노랑은 「기다리는 중」이고 이것은 「지금 돈이 나가고 있다」이다. */
@@ -1082,6 +1084,8 @@ body.portal-mode #moreFab{display:flex;}
            평소에는 아예 없다. 늘 떠 있는 경고는 곧 아무도 안 본다. -->
       <div class="bspike" id="billSpike" style="display:none;"></div>
       <div class="memo" id="billMemo" style="display:none;"></div>
+      <!-- 「그 밖」이 늘 새면 (2026-09-27) — 평소에는 없다 -->
+      <div class="memo betc" id="billEtc" style="display:none;"></div>
       <div id="billItems"></div>
       <div class="rows" id="billRows"></div>
       <div class="foot">어림수입니다 — 확정 청구액은 월말에 정산됩니다.<br>
@@ -2581,8 +2585,11 @@ body.portal-mode #moreFab{display:flex;}
          실제로 그런 일이 있었다(달 평균이라 이미 끝난 비싸던 시기가 따라붙고 있었다). */
       var bs = s.projectedBasis || {};
       var note = document.createElement('div'); note.className = 'pbasis';
+      /* 2026-09-27 가운데 값으로 바꿨다 — 무엇으로 밀었는지 그대로 밝힌다 */
       note.textContent = (bs.mode === 'recent')
-        ? '최근 ' + bs.days + '일 기준 · 하루 ' + B.fmtWon(bs.perDay)
+        ? (bs.how === 'drop'
+            ? '최근 ' + bs.dropDays + '일 평균 · 하루 ' + B.fmtWon(bs.perDay) + ' — 최근 사흘이 모두 더 쌌습니다'
+            : '최근 ' + bs.days + '일 가운데 값 · 하루 ' + B.fmtWon(bs.perDay) + ' — 튄 날은 덜 탑니다')
         : '이번 달 평균 기준 — 온전한 하루가 이틀은 쌓여야 최근 기준으로 바뀝니다';
       rows.appendChild(note);
     }
@@ -2590,7 +2597,22 @@ body.portal-mode #moreFab{display:flex;}
     if(s.etcNote){ memo.textContent = s.etcNote; memo.style.display = 'block'; }
     else memo.style.display = 'none';
     billPaintSpike();
+    billPaintEtc(s);
     billPaintItems();
+  }
+
+  /* 「그 밖」이 늘 새면 알린다 (2026-09-27) — 셈은 PuBilling.etcAlert 한 곳.
+     ⚠ 평소에는 안 그린다. 늘 떠 있는 경고는 곧 아무도 안 읽는다.
+     ⚠ 결제 보고서는 구글 콘솔(우리 앱 밖)이라 새 탭으로 연다 — 요금 창을 잃지 않게. */
+  function billPaintEtc(s){
+    var box = $('billEtc'); if(!box) return;
+    var a = s && s.etcAlert;
+    if(!a){ box.style.display = 'none'; box.textContent = ''; return; }
+    var B = window.PuBilling;
+    box.innerHTML = '⚠ 「그 밖」이 <b>최근 ' + a.of + '일 중 ' + a.days + '일</b> 하루 ₩300 넘게 나갑니다'
+      + ' (하루 평균 <b>' + B.fmtWon(a.perDay) + '</b>' + (a.share !== null ? ' · 전체의 ' + a.share + '%' : '') + ').'
+      + ' 앱은 이 안을 못 봅니다. <a target="_blank" rel="noopener" href="' + B.BILLING_REPORT_URL + '">구글 결제 보고서에서 서비스별로 보기 →</a>';
+    box.style.display = 'block';
   }
 
   /* 하루 폭주 한 줄. 평소에는 **아예 안 그린다** —
@@ -2628,7 +2650,9 @@ body.portal-mode #moreFab{display:flex;}
       return B.fmtWon(v);
     }
     (_billSum.parts || []).forEach(function(p){
-      t += '<tr><td>' + p.label + '</td>'
+      /* 「그 밖」이 전체의 20% 를 넘으면 몫을 붙인다 — 숨은 것이 크다는 신호 (2026-09-27) */
+      var share = (p.key === 'etc' && _billSum.cost > 0) ? Math.round(p.cost / _billSum.cost * 100) : 0;
+      t += '<tr><td>' + p.label + (share >= 20 ? ' <span class="bshare">' + share + '%</span>' : '') + '</td>'
         + '<td>' + (p.approx ? '≈ ' : '') + B.fmtWon(p.cost) + '</td>'
         + '<td>' + rate(p.key) + '</td></tr>';
     });
