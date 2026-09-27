@@ -58,31 +58,55 @@
      ⚠ 한 줄이다. 낱말 가운데서 잘려 두 줄이 되면 폰에서 화면을 갉아먹는다.
         넘치면 «줄이는» 것이지 «내리는» 것이 아니다. */
   /* sticky 가 필요 없어졌다 — 몸통이 안 굴러가므로 늘 맨 위다 */
-  #topbar{flex:none;z-index:15;background:var(--panel);border-bottom:1px solid var(--line);
-    padding:8px 16px;display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}
+  /* ★ 머리는 «한 줄»이다 (대표 지시 2026-09-27 「캡쳐3 이부분 1줄로 … 중복되는부분 합치고」).
+     구글 캘린더 머리줄 차례 그대로: 이름 · 탭 · [오늘] ‹ › 2026년 9월 … 사람 칩 · 거르개 ·
+     🔍 · 월|주|일 · 🌙 · 즐겨찾기 · (내 동그라미). 예전 세 줄(머리줄·탭줄·달 이동줄)을 합쳤다.
+     ⚠ 좁으면 «줄이고»(음력 범위 → 탭 글자) 안 내린다 — 두 줄이 되면 달력이 그만큼 밀린다. */
+  #topbar{flex:none;z-index:15;background:var(--panel);border-bottom:1px solid var(--gline);
+    padding:6px 12px;display:flex;align-items:center;gap:8px;white-space:nowrap;position:relative}
   #topbar .brand{font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;flex-shrink:0}
   #topbar .sp{margin-left:auto}
-  #conn{font-size:12px;color:var(--sub);flex-shrink:0}
+  #conn{font-size:12px;color:var(--sub)}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#cbd5e1;margin-right:5px}
   .dot.on{background:#16a34a}
-  #me{font-size:12.5px;font-weight:700;flex-shrink:0;overflow:hidden;text-overflow:ellipsis}
-  #me .role{color:var(--sub);font-weight:500;margin-left:4px}
+  /* 내 동그라미 — 구글처럼 이름 첫 글자. 초록 점 = 서버와 이어짐. 누르면 메일·로그아웃 창 */
+  .avawrap{position:relative;flex-shrink:0}
+  #me{width:32px;height:32px;border-radius:50%;border:none;background:#7986cb;color:#ffffff;font-weight:700;
+    font-size:13px;cursor:pointer;font-family:inherit;position:relative;padding:0}
+  #me::after{content:"";position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
+    background:#cbd5e1;border:2px solid var(--panel)}
+  #me.on::after{background:#16a34a}
+  .avamenu{position:absolute;right:0;top:40px;min-width:250px;background:var(--panel);border-radius:10px;
+    box-shadow:0 8px 28px rgba(0,0,0,.18);padding:8px 0;z-index:30;white-space:normal}
+  .avamenu[hidden]{display:none}
+  .avamenu .who{padding:6px 16px 8px;font-size:12.5px;color:var(--gtext)}
+  .avamenu .who b{display:block;font-size:13px}
+  .avamenu .who .role{color:var(--gsub);font-weight:400;margin-left:4px}
+  .avamenu hr{border:none;border-top:1px solid var(--gline);margin:4px 0}
+  .avamenu .mi{display:block;width:100%;text-align:left;border:none;background:transparent;padding:8px 16px;
+    font-size:12.5px;color:var(--gtext);cursor:pointer;font-family:inherit}
+  .avamenu .mi:hover{background:var(--bg)}
+  /* 동그라미 단추(🔍·🌙) — 테두리 없이, 누르는 자리만 옅게 */
+  .ib{width:34px;height:34px;border-radius:50%;border:none;background:transparent;color:var(--gtext);
+    font-size:15px;cursor:pointer;flex-shrink:0;padding:0;font-family:inherit}
+  .ib:hover{background:var(--bg)}
   .lnk{font-size:12.5px;padding:5px 11px;border:1px solid var(--line);color:var(--sub);background:var(--panel);
     border-radius:8px;cursor:pointer;font-weight:700;flex-shrink:0}
   .lnk.go{border-color:#bfdbfe;color:var(--acc2)}
 
-  /* ── 탭 한 줄 — 법인 셋 · 이음 셋 ── */
-  #tabs{flex:none;display:flex;align-items:center;gap:3px;padding:7px 14px;background:var(--panel);
-    border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
+  /* ── 탭 · 달 이동 · 사람 칩 · 도구 — 머리줄 «안»에 든다(예전엔 따로 한 줄이었다) ──
+     ⚠ 넘치면 옆으로 밀어 본다(두 줄로 안 내린다). */
+  #tabs{flex:1;min-width:0;display:flex;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;
+    white-space:nowrap;scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
   .gl{font-size:10px;color:var(--faint);font-weight:700;margin:0 3px 0 0;flex-shrink:0}
-  .tab{padding:5px 11px;border-radius:7px;font-size:12px;color:var(--sub);cursor:pointer;
+  .tab{padding:6px 11px;border-radius:999px;font-size:12.5px;color:var(--gtext);cursor:pointer;
     border:none;background:transparent;font-family:inherit;flex-shrink:0}
   .tab:hover{background:var(--bg)}
-  .tab.eum{color:#2563eb}
-  .tab.on{background:var(--acc2);color:#ffffff;font-weight:700}
+  .tab.on{background:var(--acc-soft);color:var(--acc2);font-weight:700}
   .tsep{width:1px;height:18px;background:#cbd5e1;margin:0 7px;flex-shrink:0}
   /* 탭 줄에 얹은 사람 칩 — 오른쪽 끝에 붙는다(왼쪽 탭과 안 섞이게) */
-  .tabchips{margin-left:auto;display:flex;align-items:center;flex-shrink:0;padding-left:16px}
+  .tabchips{margin-left:auto;display:flex;align-items:center;flex-shrink:0;padding-left:12px}
   .tabchips .chips{margin-bottom:0;flex-wrap:nowrap}
 
   #app{flex:1;min-height:0;overflow-y:auto;width:100%;padding:14px 16px 90px;max-width:1500px;margin:0 auto}
@@ -93,7 +117,6 @@
   #app.fit .calwrap{flex:1;min-height:0;display:flex;flex-direction:column}
   #app.fit .calhead{flex:none}
   #app.fit .cal{flex:1;min-height:0;display:flex;flex-direction:column}
-  #app.fit .calhd{flex:none}
   #app.fit .calgrid{flex:1;min-height:0;grid-template-rows:repeat(6,1fr)}
   #app.fit .day{min-height:0}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
@@ -134,8 +157,9 @@
 
   /* 머리줄 — ◀ 2026-09 ▶ · 음력 · 오늘 · 월|주|일 · 사람 칩 … 검색(맨 오른쪽)
      ★ 셋을 «한 줄»에 둔다 (대표 지시 2026-09-19). 쌓으면 달력이 그만큼 아래로 밀린다. */
-  .calhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px}
+  .calhead{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-bottom:0;flex-shrink:0}
   .calhead .monthbar,.calhead .chips{margin-bottom:0}
+  .ctools{display:flex;align-items:center;gap:4px;flex-shrink:0}
   /* ⚠ 검색을 margin-left:auto 로 오른쪽 끝에 밀지 않는다 — 줄이 차면 그것만
        «둘째 줄로 떨어져» 도로 두 줄이 된다(2026-09-19 미리보기에서 그랬다).
        달바 바로 뒤에 붙여 두면 칩이 남는 자리를 먹고, 모자라면 칩부터 접힌다. */
@@ -156,7 +180,8 @@
     border:none;border-right:1px solid var(--gline);cursor:pointer;font-family:inherit}
   .seg button:last-child{border-right:none}
   .seg button.on{background:var(--acc-soft);color:var(--acc2)}
-  .srch{position:relative;display:inline-flex;align-items:center}
+  /* 검색 — 구글처럼 돋보기 하나. 누르면(또는 찾는 말이 있으면) 그 자리에서 칸이 펼쳐진다 */
+  .srch{position:relative;display:inline-flex;align-items:center;flex-shrink:0}
   .srch .ic{position:absolute;left:7px;font-size:10px;pointer-events:none}
   .srch input{padding:4px 10px 4px 24px;font-size:11.5px;border:1px solid var(--line);border-radius:10px;
     width:130px;background:var(--panel);box-sizing:border-box;font-family:inherit;color:var(--ink)}
@@ -178,9 +203,11 @@
   .calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(6,1fr)}
   /* ⚠ 옆으로는 «넘치게» 둔다(overflow-x:visible) — 여러 날 막대가 옆 칸 위로 건너가야 한다.
        아래로만 자른다(clip — hidden 과 달리 옆 방향까지 끌고 가지 않는다). */
-  .day{min-height:104px;padding:2px 4px 2px;overflow-x:visible;overflow-y:clip;box-sizing:border-box;position:relative}
+  .day{min-height:104px;padding:2px 8px 2px 2px;overflow-x:visible;overflow-y:clip;box-sizing:border-box;position:relative}
   /* 날짜 줄 — 칸 «가운데»에 「25 (13)」 처럼 날짜와 음력을 나란히 */
-  .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:2px;padding:0 2px}
+  .dline{display:flex;justify-content:center;align-items:center;gap:2px;margin-bottom:2px;padding:0 2px;flex-wrap:wrap}
+  /* 요일 — 구글처럼 따로 줄이 아니라 «첫 줄 칸 안» 날짜 위에 */
+  .dline .wd{flex-basis:100%;text-align:center;font-size:11px;font-weight:500;color:var(--gsub);line-height:15px;margin-left:6px}
   /* 대표 지시 2026-09-20 「한글과 숫자가 좀더 진했으면」 — 400(보통)은 12px 에서
      연해 보인다. 600(약간 굵게)으로 올렸다. 색(--ink #1e293b)은 이미 짙어서 안 바꿨다. */
   .dnum{min-width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;
@@ -233,13 +260,15 @@
   .glogin{font-size:11.5px;padding:4px 10px;border:1px solid #bfdbfe;background:var(--acc-soft);
     color:var(--acc2);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
     white-space:nowrap;flex-shrink:0;margin-left:auto}
-  .glogin + .linkacct{margin-left:6px}
+
   .linkacct{font-size:11.5px;padding:4px 10px;border:1px solid #fde68a;background:var(--warn-bg);
     color:var(--warn);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:700;
-    white-space:nowrap;flex-shrink:0;margin-left:auto}
+    white-space:nowrap;flex-shrink:0}
   .linkacct:hover{background:#fde68a}
+  /* 구글 칩 옆 자물쇠 — 로그인이 필요할 때만 뜬다(예전 「🔐 구글 로그인」 단추를 합쳤다) */
+  .glock{border:none;background:transparent;cursor:pointer;font-size:11px;padding:0 2px;margin-left:-2px;flex-shrink:0}
   /* 검색칸이 맨 오른쪽 — 잇기 단추가 왼쪽으로 밀어 준다 */
-  .calhead .linkacct + .srch{margin-left:8px}
+
   .mmnote{font-size:11.5px;color:var(--warn);background:var(--warn-bg);border:1px solid #fde68a;
     border-radius:8px;padding:7px 10px;margin-bottom:10px;line-height:1.5}
   .mmlist{max-height:52vh;overflow-y:auto;margin-bottom:4px}
@@ -413,6 +442,15 @@
   :root[data-theme="dark"] .day.today{outline:1.5px solid var(--acc);outline-offset:-1.5px}
   :root[data-theme="dark"] .wcol.today{outline:1.5px solid var(--acc);outline-offset:-1.5px}
 
+  /* 좁으면 «줄인다» — 음력 범위부터, 그다음 탭 글자 */
+  @media (max-width:1600px){ #topbar .lunrange{display:none} }
+  @media (max-width:1400px){
+    .tab{padding:6px 7px;font-size:12px} #topbar .brand .bt{display:none}
+    #topbar{gap:5px;padding:6px 8px} #tabs{gap:2px}
+    .chips{gap:2px} .tabchips{padding-left:6px} .pchip{width:24px;height:24px;font-size:9.5px}
+    .todaybtn{padding:0 11px} .monthbar .ym{font-size:18px;margin:0 2px} .mv{width:26px}
+    .seg button{padding:0 10px}
+  }
   @media (max-width:700px){
     #app{padding:10px 8px 80px}
     #topbar{padding:7px 10px;gap:7px}
@@ -426,16 +464,22 @@
 <body>
 
 <div id="topbar">
-  <span class="brand"><svg viewBox="0 0 100 100" style="width:17px;height:17px;vertical-align:-3px;margin-right:1px"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg> 푸른 캘린더</span>
-  <button class="lnk go" id="goErp" title="푸른이알피로 갑니다">← 푸른이알피</button>
-  <span class="sp"></span>
-  <span id="conn"><span class="dot"></span><span class="t">연결 중…</span></span>
-  <span id="me"></span>
-  <button class="lnk" id="themeToggle" title="어두운 화면으로 바꿉니다">🌙</button>
-  <button class="lnk" id="logout">로그아웃</button>
+  <span class="brand"><svg viewBox="0 0 100 100" style="width:22px;height:22px;vertical-align:-5px;margin-right:1px"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg> <span class="bt">푸른 캘린더</span></span>
+  <span id="tabs"></span>
+  <button class="ib" id="themeToggle" title="어두운 화면으로 바꿉니다">🌙</button>
+  <span id="appslot"></span>
+  <span class="avawrap">
+    <button id="me" data-avatar="1" title="내 계정">·</button>
+    <div class="avamenu" id="avamenu" hidden>
+      <div class="who"><span id="whoName"></span><span id="conn"><span class="dot"></span><span class="t">연결 중…</span></span></div>
+      <hr>
+      <div id="avaTools"></div>
+      <button class="mi" id="goErp" title="푸른이알피로 갑니다">← 푸른이알피로</button>
+      <hr>
+      <button class="mi" id="logout">로그아웃</button>
+    </div>
+  </span>
 </div>
-
-<div id="tabs"></div>
 <div id="app"><div class="panel muted">불러오는 중…</div></div>
 
 <script>
@@ -514,10 +558,12 @@ function arr(v){ return Array.isArray(v) ? v : []; }
      여태는 «다음 걸음에 옮긴다»는 안내 탭(laterHtml)으로 자리만 잡아 뒀는데,
      아예 필요 없다는 뜻이라 탭 자체를 없앤다. 이알피 옆 메뉴에는 그대로 있다. */
 var TABS = [
-  { v:'cal',      g:'법인',    label:'📅 캘린더',      ready:true },
-  { v:'eumcal',   g:'이음센터', label:'📅 근무 캘린더', ready:true },
-  { v:'eumppl',   g:'이음센터', label:'👤 인원 현황',   ready:true },
-  { v:'eumshare', g:'이음센터', label:'🔗 외부 공유 뷰', ready:true }
+  /* 대표 지시 2026-09-27 — 묶음 글자(법인·이음센터)와 그림글자를 빼고 이름만.
+     「이음 근무」가 예전 「근무 캘린더」다(캘린더 안의 「이음」 거르개를 여기로 합쳤다). */
+  { v:'cal',      g:'법인',    label:'캘린더',    ready:true },
+  { v:'eumcal',   g:'이음센터', label:'이음 근무', ready:true },
+  { v:'eumppl',   g:'이음센터', label:'인원 현황', ready:true },
+  { v:'eumshare', g:'이음센터', label:'외부 공유', ready:true }
 ];
 
 /* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
@@ -1551,6 +1597,7 @@ function 줄배치(날들, 일들, 용량, 틈){
    ⚠ 재기 전 첫 그림에는 어림값(5)을 쓴다. 그린 뒤 재서 달라졌으면 «한 번만» 다시 그린다
      — 값이 같아지면 다시 그리지 않으므로 돌고 돌지 않는다. */
 var _칸용량 = 0;
+var _첫줄용량 = 0;   /* 첫 줄(요일 글자가 얹힌 줄)의 칸 용량 — 용량재기가 잰다 */
 function 칸용량(){
   if(_칸용량) return _칸용량;
   /* ⚠ 아직 «못 쟀을 때»의 어림이다. 한때 여기에 5 를 못 박아 두었더니,
@@ -1572,15 +1619,19 @@ function 용량재기(){
   var 줄 = g.clientHeight / 6;
   var cs = getComputedStyle(칸);
   var 여백 = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-  var 날짜줄 = 0;
-  var dl = 칸.querySelector(".dline");
-  if(dl) 날짜줄 = dl.offsetHeight + (parseFloat(getComputedStyle(dl).marginBottom) || 0);
+  function 날짜줄(c){
+    var dl = c && c.querySelector(".dline");
+    return dl ? dl.offsetHeight + (parseFloat(getComputedStyle(dl).marginBottom) || 0) : 0;
+  }
   var ev = g.querySelector(".ev");
-  var 칩 = ev ? ev.offsetHeight + 1.5 : 19.5;      /* 칩 하나 + 사이 틈 */
+  var 칩 = ev ? ev.offsetHeight + 2 : 22;          /* 칩 하나 + 사이 틈(gap 2px) */
   if(!칩) return false;
-  var n = Math.max(1, Math.floor((줄 - 여백 - 날짜줄) / 칩));
-  if(n === _칸용량) return false;
-  _칸용량 = n;
+  /* ★ 첫 줄은 요일 글자가 얹혀 날짜줄이 높다 — 둘째 줄(8번째 칸)로 «보통 줄»을 잰다 */
+  var 보통 = g.querySelectorAll(".day")[7] || 칸;
+  var n = Math.max(1, Math.floor((줄 - 여백 - 날짜줄(보통)) / 칩));
+  var n0 = Math.max(1, Math.floor((줄 - 여백 - 날짜줄(칸)) / 칩));
+  if(n === _칸용량 && n0 === _첫줄용량) return false;
+  _칸용량 = n; _첫줄용량 = n0;
   return true;
 }
 
@@ -1606,12 +1657,16 @@ function calendarHtml(eumOnly){
     return h ? [h].concat(evs) : evs;
   });
   /* 한 주씩(일곱 칸) 늘어놓는다 — 여러 날 막대가 한 주 안에서 이어진다.
-     9 = 칸 좌우 여백(4+4) + 오른쪽 테두리(1) — .day 의 padding 을 바꾸면 이것도 바꾼다. */
+     11 = 칸 왼쪽 여백(2) + 오른쪽 여백(8) + 오른쪽 테두리(1) — .day 의 padding 을 바꾸면 이것도 바꾼다.
+     ★ 첫 줄은 요일 글자(일 월 화…)만큼 낮다 — 따로 잰 수(_첫줄용량)를 쓴다.
+       ⚠ typeof 로 본다 — 검사가 calendarHtml 만 떼어 상자에 넣고 돌 때 이 값이 없다. */
+  var 첫줄 = (typeof _첫줄용량 === "number" && _첫줄용량 > 0) ? _첫줄용량 : 용량;
   var 배치 = [];
   for(var w = 0; w < grid.length; w += 7){
     배치 = 배치.concat(줄배치(grid.slice(w, w + 7).map(function(c){ return c.date; }),
-                          일들.slice(w, w + 7), 용량, 9));
+                          일들.slice(w, w + 7), w === 0 ? 첫줄 : 용량, 11));
   }
+  var 요일 = ["일","월","화","수","목","금","토"];
   var cells = grid.map(function(c, idx){
     var evs = 일들[idx].filter(function(e){ return e.kind !== "hol"; });
     var 오늘 = c.date === today;
@@ -1630,6 +1685,8 @@ function calendarHtml(eumOnly){
       + ' style="background:' + bg + ';border-right:1px solid ' + 테 + ';border-bottom:1px solid ' + 테
       + (찾음 ? ';outline:2px solid #fbbf24;outline-offset:-2px' : '') + '">'
       + '<div class="dline">'
+      /* 요일은 구글처럼 «첫 줄 칸 안»에 — 따로 줄을 두면 그만큼 달력이 낮아진다 */
+      +   (idx < 7 ? '<span class="wd">' + 요일[idx] + '</span>' : '')
       +   '<div class="dnum' + (오늘 ? " today" : "") + (c.other ? " other" : "") + '">' + 날글 + '</div>'
       +   '<span class="lun' + (c.other ? " other" : "") + '">(' + lunarDay(c.date) + ')</span>'
       + '</div>'
@@ -1640,9 +1697,6 @@ function calendarHtml(eumOnly){
       + '</div></div>';
   }).join("");
   return '<div class="cal">'
-    + '<div class="calhd">' + ["일","월","화","수","목","금","토"].map(function(w){
-        return '<div>' + w + '</div>';
-      }).join("") + '</div>'
     + '<div class="calgrid">' + cells + '</div></div>';
 }
 
@@ -1732,8 +1786,9 @@ function dayHtml(eumOnly){
      탭 줄은 오른쪽이 통째로 비어 있었고, 칩을 한 줄 따로 두면 달력이 그만큼 내려간다.
    ⚠ 좁은 화면에서는 접힌다(flex-wrap). 못 들어가는 것을 우겨 넣으면 글자가 잘린다.
    ⚠ eumOnly 를 그대로 받는다 — 쓰지 않아도 부르는 쪽 모양을 바꾸지 않는다. */
+/* 달 이동 — 머리줄 «안»에 든다(renderTabs). 달력 판 위에 따로 줄을 두지 않는다. */
 function calheadHtml(eumOnly){
-  return '<div class="calhead">' + monthbarHtml() + srchHtml() + '</div>';
+  return '<div class="calhead">' + monthbarHtml() + '</div>';
 }
 function monthbarHtml(){
   /* 구글 머리줄 꼴 (대표 지시 2026-09-27) — [오늘] ‹ › 2026년 9월 · 음력 · 월|주|일 */
@@ -1749,20 +1804,28 @@ function monthbarHtml(){
     + '<button class="mv" data-mv="1" title="다음">›</button>'
     + '<span class="ym">' + esc(가운데) + '</span>'
     + (음력 ? '<span class="lunrange">' + esc(음력) + '</span>' : '')
-    + '<span class="seg">'
+    + '</div>';
+}
+/* 월 | 주 | 일 — 구글처럼 머리줄 오른쪽 끝 */
+function segHtml(){
+  return '<span class="seg">'
     + [["month","월"],["week","주"],["day","일"]].map(function(v){
         return '<button data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>';
       }).join("")
-    + '</span>'
-    + '</div>';
+    + '</span>';
 }
 
 /* 검색칸 — 줄 맨 오른쪽 끝에 붙는다(.calhead .srch 의 margin-left:auto).
    ⚠ 달바 안에 두면 월|주|일 바로 옆에 붙어 오른쪽이 통째로 빈다. */
 function srchHtml(){
-  return 구글단추Html() + 색단추Html() + 잇기단추Html()
-    + '<span class="srch"><span class="ic">🔍</span>'
-    + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>';
+  /* ★ 구글 로그인·사람 색 단추는 «내 동그라미» 창으로 옮겼다(창도구Html) — 겹치던 것을 합쳤다.
+     계정 잇기는 «할 일이 있을 때만» 뜨는 알림이라 여기 그대로 둔다. */
+  var 열림 = !!(S.srch || S.q);
+  return 잇기단추Html()
+    + (열림
+        ? '<span class="srch"><span class="ic">🔍</span>'
+          + '<input type="search" id="calq" placeholder="일정 검색" value="' + esc(S.q) + '"></span>'
+        : '<button class="ib" data-srch="1" title="일정 검색">🔍</button>');
 }
 /* 「계정 잇기」 단추 — 아직 안 이은 사람이 있을 때만, 관리자에게만 보인다.
    ⚠ 할 일이 없으면 안 보인다. 늘 떠 있으면 머리줄만 좁아지고 아무도 안 누른다. */
@@ -1809,12 +1872,13 @@ function chipsHtml(eumOnly){
   var 뒤 = eumOnly ? '' : (
       '<span class="srcsep"></span>'
     + '<button class="chip' + (S.filter === "pureun" ? " on" : "") + '" data-f="pureun">푸른</button>'
-    + '<button class="chip' + (S.filter === "eumwork" ? " on" : "") + '" data-f="eumwork">이음</button>'
     + (GCAL.err
         ? '<button class="chip warn" data-gcalretry="1" title="' + esc(GCAL.err) + '">⚠ 구글 못 받음 — 다시</button>'
         : GCAL.loading
           ? '<button class="chip" disabled>⏳ 구글 받는 중</button>'
-          : '<button class="chip' + (S.filter === "gcal" ? " on" : "") + '" data-f="gcal">구글 (' + 구글수 + ')</button>')
+          : '<button class="chip' + (S.filter === "gcal" ? " on" : "") + '" data-f="gcal">구글 ' + 구글수 + '</button>'
+            /* 로그인이 필요할 때만 자물쇠 — 누르면 구글 로그인(예전 「🔐 구글 로그인」 단추) */
+            + (구글단추Html() ? '<button class="glock" data-glogin="1" title="구글과 이어진 일정을 지우려면 구글 로그인이 필요합니다">🔐</button>' : ''))
   );
   return '<div class="chips">' + 앞
     + 사람.map(function(p){
@@ -2359,21 +2423,33 @@ function refreshOne(store){
 
 /* ── 그리기 ────────────────────────────────────────────────────────── */
 function renderTabs(){
-  var last = '';
   var 탭들 = TABS.map(function(t){
-    var head = '';
-    if(t.g !== last){ head = (last ? '<span class="tsep"></span>' : '') + '<span class="gl">'+esc(t.g)+'</span>'; last = t.g; }
-    /* 이음 쪽은 글자를 파랗게 — 금 하나만으로는 어느 묶음인지 눈이 못 가른다 */
-    var eum = t.g === '이음센터' ? ' eum' : '';
-    return head + '<button class="tab'+eum+(S.tab===t.v?' on':'')+'" data-t="'+esc(t.v)+'">'+esc(t.label)+'</button>';
+    return '<button class="tab'+(S.tab===t.v?' on':'')+'" data-t="'+esc(t.v)+'">'+esc(t.label)+'</button>';
   }).join('');
+  var 달력탭 = (S.tab === 'cal' || S.tab === 'eumcal');
   /* ★ 사람 칩을 탭 줄 «오른쪽 끝»에 얹는다 (대표 지시 2026-09-19 「캡쳐1은 캡쳐2 줄에 넣어라」).
      탭은 왼쪽 절반도 안 쓰는데 칩은 제 줄을 따로 차지하고 있었다 — 한 줄을 통째로 아낀다.
      ⚠ 달력을 보는 탭에서만 얹는다. 직원별 업무·분석에는 «걸러 낼 것»이 없어
        칩이 아무 일도 안 하면서 자리만 먹는다. */
-  var 칩 = (S.tab === 'cal' || S.tab === 'eumcal')
+  var 칩 = 달력탭
     ? '<span class="tabchips">' + chipsHtml(S.tab === 'eumcal') + '</span>' : '';
-  $('tabs').innerHTML = 탭들 + 칩;
+  /* ★ 달 이동([오늘] ‹ › 2026년 9월)도 이 한 줄에 — 예전엔 달력 위에 따로 한 줄이었다.
+     도구(계정 잇기 · 🔍 · 월|주|일)는 사람 칩 «뒤», 오른쪽 끝(구글과 같은 차례). */
+  var 머리 = 달력탭 ? '<span class="srcsep"></span>' + calheadHtml(S.tab === 'eumcal') : '';
+  var 도구 = 달력탭 ? '<span class="ctools">' + srchHtml() + segHtml() + '</span>' : '';
+  $('tabs').innerHTML = 탭들 + 머리 + 칩 + 도구;
+  /* 내 동그라미 창 안의 도구 — 관리자 일(색 바꾸기)·구글 연결은 여기로 모았다 */
+  var 창도구 = (typeof document !== "undefined") ? document.getElementById('avaTools') : null;
+  if(창도구) 창도구.innerHTML = 창도구Html();
+}
+/* 내 동그라미 창에 들어가는 것 — 없으면 빈 칸(줄도 안 그린다) */
+function 창도구Html(){
+  var out = '';
+  var g = 구글단추Html();
+  if(g) out += g.replace('class="glogin"', 'class="mi"');
+  var c = 색단추Html();
+  if(c) out += c.replace('class="linkacct"', 'class="mi"').replace('🎨 색', '🎨 사람 색 바꾸기');
+  return out ? out + '<hr>' : '';
 }
 
 function render(){
@@ -2385,7 +2461,7 @@ function render(){
       /* ⚠ 맨 위 띠를 안 둔다 — 달력은 이알피와 «같아야» 한다(대표 지시 2026-09-18).
          못 고치는 까닭은 «고치려 할 때» 그 자리에서 말한다(창 안에서). */
     html = failedHtml() + lockNote()
-      + '<div class="calwrap">' + calheadHtml(eumOnly) + calendarHtml(eumOnly) + '</div>';
+      + '<div class="calwrap">' + calendarHtml(eumOnly) + '</div>';
   } else if(tab.v==='eumppl'){
     html = failedHtml() + peopleHtml();
   } else if(tab.v==='eumshare'){
@@ -2433,12 +2509,33 @@ window.addEventListener('resize', function(){
 /* 자물쇠 없이 닫는 길 하나 더 — 창이 떠 있을 때 ESC */
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape' && S.open){ S.open = null; render(); }
+  /* 비어 있는 검색칸은 ESC 로 도로 돋보기가 된다 */
+  if(e.key === 'Escape' && S.srch && !S.q){ S.srch = false; render(); }
+});
+/* 검색칸에서 손을 떼었는데 비어 있으면 도로 돋보기 — 빈 칸이 머리줄 자리를 먹지 않게 */
+document.addEventListener('focusout', function(e){
+  if(e.target && e.target.id === 'calq' && !S.q){
+    setTimeout(function(){ if(!S.q && document.activeElement && document.activeElement.id !== 'calq'){ S.srch = false; render(); } }, 150);
+  }
 });
 document.addEventListener('click', function(e){
   /* 펼침 창은 «바깥을 누르면» 닫힌다 — 창 안을 누른 것은 그대로 둔다 */
   if(S.open && !(e.target.closest && e.target.closest(".pop"))
      && !(e.target.closest && e.target.closest("[data-more]"))){
     S.open = null; render();
+  }
+  /* 내 동그라미 창 — 누르면 열고, 창 밖을 누르면 닫는다(창 안의 단추는 제 일을 하고 닫힌다) */
+  var 창 = document.getElementById('avamenu');
+  if(e.target.closest && e.target.closest('[data-avatar]')){
+    if(창) 창.hidden = !창.hidden;
+    return;
+  }
+  if(창 && !창.hidden && !(e.target.closest && e.target.closest('#avamenu .who'))) 창.hidden = true;
+  /* 🔍 — 누르면 그 자리에서 검색칸이 펼쳐진다 */
+  if(e.target.closest && e.target.closest('[data-srch]')){
+    S.srch = true; render();
+    var q = document.getElementById('calq'); if(q) q.focus();
+    return;
   }
   var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-act],[data-ev],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose]') : null;
   if(!t) return;
@@ -2581,6 +2678,8 @@ themeInit();
 function setConn(on, text){
   var c = $('conn');
   c.innerHTML = '<span class="dot'+(on?' on':'')+'"></span><span class="t">'+esc(text)+'</span>';
+  /* 동그라미의 초록 점 — 예전 「● 연결됨」 글자를 합쳤다 */
+  var m = $('me'); if(m) m.className = on ? 'on' : '';
 }
 
 function start(user){
@@ -2603,8 +2702,13 @@ function start(user){
       for(var i=0;i<us.length;i++){ if(us[i].uid===user.uid || us[i].email===user.email) return us[i]; }
       return null;
     })();
-    $('me').innerHTML = ME ? esc(ME.name||'') + '<span class="role">'+esc(ME.role||ME.position||'')+'</span>'
-                           : '<span class="role">'+esc(user.email||'')+'</span>';
+    /* 구글처럼 이름 첫 글자 동그라미 — 이름·직함·메일은 누르면 뜨는 창에 (예전엔 머리줄에 늘 떠 있었다) */
+    var 이름 = (ME && ME.name) || (user.email || '?');
+    $('me').textContent = String(이름).slice(0, 1);
+    $('me').title = 이름 + (user.email ? ' · ' + user.email : '');
+    $('whoName').innerHTML = '<b>' + esc(ME ? (ME.name||'') : '')
+      + (ME ? '<span class="role">'+esc(ME.role||ME.position||'')+'</span>' : '') + '</b>'
+      + esc(user.email||'') + ' · ';
     render();
     /* 구글 달력도 받는다 — 이 달력을 채우는 것이 그쪽이다(9월 126건).
        ⚠ 우리 자료를 먼저 그리고 그 다음 받는다 — 구글이 늦어도 화면은 먼저 뜬다. */
@@ -2633,7 +2737,7 @@ try{
 }
 </script>
 <script src="js/pu-appbar.js?v=13"></script>
-<script>try{ PuAppBar.mount('#topbar', { current:'cal' }); }catch(e){}</script>
+<script>try{ PuAppBar.mount('#appslot', { current:'cal' }); }catch(e){}</script>
 <script>try{ PuBack.guard(function(){ return false; }); }catch(e){}</script>
 </body>
 </html>
