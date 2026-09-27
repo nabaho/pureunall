@@ -251,10 +251,11 @@ test('★★ 왼쪽 메뉴는 화면 왼쪽 끝에 붙는다 — 틀을 가운�
   assert.match(side, /border-right/, '메뉴와 본문 사이 선이 없습니다');
 });
 
-test('★ 메뉴 묶음 — 전자송부 › 집단체불 위임장 / 사무관리서류 › 계약서 양식·서식집(검토 후)·기업별·보관함', function () {
+test('★ 메뉴 묶음 — 사건관리 › 집단체불 위임장 / 사무관리서류 › 계약서 양식·서식집(검토 후)·기업별·보관함', function () {
   const nav = DOCS.slice(DOCS.indexOf('<nav class="side"'), DOCS.indexOf('</nav>'));
   const at = (s) => nav.indexOf(s);
-  assert.ok(at('전자송부') >= 0 && at('전자송부') < at('data-pane="esign"'), '전자송부가 묶음 머리가 아닙니다');
+  assert.ok(at('⚖ 사건관리') >= 0 && at('⚖ 사건관리') < at('data-pane="esign"'), '사건관리가 위임장 묶음 머리가 아닙니다');
+  assert.ok(at('📤 전자송부') < 0, '옛 묶음 이름(전자송부)이 남아 있습니다');
   assert.ok(at('data-pane="esign"') < at('사무관리서류'));
   assert.ok(at('id="formsTree"') < at('서식집') && at('서식집') < at('data-pane="co"'), '서식집 자리가 없거나 순서가 다릅니다');
   assert.match(nav, /서식집[\s\S]{0,200}aria-disabled="true"|aria-disabled="true"[\s\S]{0,200}서식집/, '서식집은 검토 전이라 누를 수 없어야 합니다');
