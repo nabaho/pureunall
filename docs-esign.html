@@ -85,7 +85,7 @@
    ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
 try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 </script>
-<script src="js/pu-appbar.js?v=13"></script>
+<script src="js/pu-appbar.js?v=14"></script>
 </head>
 <body>
 <div class="top">
@@ -98,7 +98,8 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <!-- 왼쪽 목록 — 「사무관리서류」 아래에 서류 종류를 더해 간다(대표 지시 2026-09-26) -->
 <nav class="side" aria-label="문서관리 메뉴">
   <!-- 메뉴는 «묶음 › 메뉴» 두 단(이알피 메뉴와 같은 모양). 계약유형(3단)까지만 두고 양식 이름은 본문 목록 (C안 2026-09-27) -->
-  <div class="nav-grp">📤 전자송부</div>
+  <!-- 집단체불 위임장은 사건 일이라 「사건관리」 묶음 (대표 지시 2026-09-27, 옛 이름 「전자송부」) -->
+  <div class="nav-grp">⚖ 사건관리</div>
   <button type="button" class="nav sub on" data-pane="esign">✍ 집단체불 위임장</button>
   <div class="nav-grp">🗂 사무관리서류</div>
   <button type="button" class="nav sub" data-pane="forms">📄 계약서 양식</button>
@@ -226,9 +227,9 @@ firebase.auth().onAuthStateChanged(function (u) {
   showPane(paneFromHash());
 });
 
-/* ── 왼쪽 목록: 전자송부 ↔ 사무관리서류(계약서 양식 · 기업별 계약서 · 원본 보관함) ──
+/* ── 왼쪽 목록: 사건관리(집단체불 위임장) ↔ 사무관리서류(계약서 양식 · 기업별 계약서 · 원본 보관함) ──
    주소 끝(#forms · #forms:{양식} · #co · #arc)에 적어 두어 새로고침해도 보던 자리로 돌아온다.
-   ⚠ 칸마다 «처음 열 때» 한 번만 싣는다 — 전자송부만 쓰는 날엔 양식 표·보관함을 받지 않는다. */
+   ⚠ 칸마다 «처음 열 때» 한 번만 싣는다 — 위임장만 쓰는 날엔 양식 표·보관함을 받지 않는다. */
 var PANES = { esign: 'paneEsign', forms: 'paneForms', co: 'paneCo', arc: 'paneArc' };
 var formsMounted = false, formsUi = null, mounted = {};
 var docBucket = null, photosReady = null;
