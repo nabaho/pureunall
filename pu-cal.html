@@ -24,7 +24,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=7"></script>
+<script src="js/pu-gcal-auth.js?v=8"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=1"></script>
@@ -2559,7 +2559,11 @@ function modalHtml(){
   var 달력 = "<select data-m=\"vis\" class=\"gvis\">"
     + "<option value=\"shared\""+(m.vis!=="private"?" selected":"")+">👥 푸른노무법인 · 공용 (모두 보기)</option>"
     + "<option value=\"private\""+(m.vis==="private"?" selected":"")+">🔒 내 일정 · 나만 보기</option></select>"
-    + (m.vis==="private" ? "<div class=\"ghint\">🔒 다른 직원·관리자·폰 구글 위젯에는 안 보입니다.</div>"
+    + (m.vis==="private"
+        ? "<div class=\"ghint\">🔒 다른 직원·관리자에게는 안 보입니다. "
+          + ((typeof PuGcalAuth !== "undefined" && PuGcalAuth.hasToken())
+              ? "내 구글 달력에도 «비공개»로 들어가 <b>내 폰 구글 캘린더</b>에만 뜹니다.</div>"
+              : "구글 로그인하면 내 폰 구글 캘린더에도 뜹니다 — <button class=\"glink\" data-glogin=\"1\">구글 로그인</button> (적던 것은 저장 뒤에)</div>")
         : "<div class=\"ghint\">구글 공용 달력에도 들어가 폰 구글 캘린더에 뜹니다(구글 로그인했을 때).</div>");
   return "<div class=\"veil\" data-close=\"1\"></div><div class=\"modal gform"+(넓게?" full":"")+"\">"
     + "<div class=\"ghd\">"+(넓게 ? "<button class=\"gx\" data-close=\"1\" title=\"닫기\">✕</button>" : "<span class=\"ggrip\">═</span>")
@@ -2710,12 +2714,46 @@ function 개인에넣기(m){
     if(!r.ok){ m.err = r.message; render(); return; }
     if(공용에서) PuCalWrite.remove(공용에서.store, 공용에서.id, 공용에서.prev).then(function(){ refreshOne(공용에서.store); });
     closeModal();
-    toast(고침 ? "✅ 고쳤습니다 (🔒 나만 보기)" : "✅ 🔒 나만 보기로 넣었습니다 — 다른 사람에게는 안 보입니다");
+    var 이어짐 = 내구글에(item, prev);
+    toast((고침 ? "✅ 고쳤습니다 (🔒 나만 보기)" : "✅ 🔒 나만 보기로 넣었습니다 — 다른 사람에게는 안 보입니다")
+      + (이어짐 ? " · 내 구글 달력에도" : " · 구글 로그인하면 내 폰 구글 캘린더에도 뜹니다"));
     개인받기();
   });
 }
 function 개인지우기조용히(id){
-  PuCalWrite.removePrivate(S.uid, id, 개인하나(id)).then(function(){ 개인받기(); });
+  var 옛것 = 개인하나(id);
+  PuCalWrite.removePrivate(S.uid, id, 옛것).then(function(){ 내구글에서지우기(옛것); 개인받기(); });
+}
+/* ── 🔒 나만 보기 → «본인» 구글 달력(primary)에도 (대표 지시 2026-09-27 「개인일정도 추천대로」)
+     ★ 회사 공용 달력이 아니라 로그인한 그 사람의 구글 달력이다 — 그 사람 폰 구글 위젯에만 뜬다.
+       visibility:'private' 로 넣어, 그 달력을 누구와 나눠 보더라도 내용은 «바쁨»으로만 보인다.
+     ★ 이어 둔 구글 번호(ownGcalId)를 내 칸 기록에 남겨 고치기·지우기를 따라가게 한다.
+     ⚠ 구글 로그인이 안 돼 있으면 우리 쪽에만 둔다(그렇다고 말한다). 구글이 실패해도 우리 기록은 남는다.
+     돌려주는 것: 구글로 보냈나(참/거짓) */
+function 내구글몸(item){
+  return { date:item.date, time:item.time || "", endTime:item.endTime || "", summary:item.title,
+    location:item.place || "", description:[item.contact ? "담당자: " + item.contact : "", item.note || ""].filter(Boolean).join("\n"),
+    visibility:"private", source:{ kind:"cal_private", id:item.id } };
+}
+function 내구글에(item, prev){
+  if(typeof PuGcalAuth === "undefined" || !PuGcalAuth.hasToken() || !PuGcalAuth.createEvent) return false;
+  var 옛번호 = prev && prev.ownGcalId;
+  var 일 = 옛번호 ? PuGcalAuth.updateEvent("primary", 옛번호, 내구글몸(item))
+                 : PuGcalAuth.createEvent("primary", 내구글몸(item));
+  일.then(function(r){
+    if(!옛번호 && r && r.id){
+      /* 이어 둔 번호를 내 칸에 적는다 — 다음에 고치거나 지울 때 구글도 따라간다 */
+      var 지금 = 개인하나(item.id) || item;
+      PuCalWrite.savePrivate(S.uid, { id:item.id, ownGcalId:r.id }, 지금).then(function(){ 개인받기(); });
+    }
+  })["catch"](function(e){ toast("⚠ 내 구글 달력에는 못 넣었습니다 — " + ((e && e.message) || "") + " (푸른 캘린더에는 들어 있습니다)"); });
+  return true;
+}
+function 내구글에서지우기(옛것){
+  if(!옛것 || !옛것.ownGcalId || typeof PuGcalAuth === "undefined" || !PuGcalAuth.hasToken()) return;
+  PuGcalAuth.deleteEvent("primary", 옛것.ownGcalId)["catch"](function(e){
+    toast("⚠ 내 구글 달력의 일정은 못 지웠습니다 — " + ((e && e.message) || ""));
+  });
 }
 
 /* 시작 ~ 끝 맞추기 — { start, end, err }. 시각이 없으면 종일(둘 다 비움). */
@@ -2834,10 +2872,12 @@ function doDelete(){
   if(!confirm("이 건을 지울까요?")) return;
   if(m.store === "cal_private"){
     S.busy = true; m.err = ""; render();
-    PuCalWrite.removePrivate(S.uid, m.id, 개인하나(m.id)).then(function(r){
+    var 옛것 = 개인하나(m.id);
+    PuCalWrite.removePrivate(S.uid, m.id, 옛것).then(function(r){
       S.busy = false;
       if(!r.ok){ m.err = r.message; render(); return; }
-      closeModal(); toast("🗑 지웠습니다"); 개인받기();
+      내구글에서지우기(옛것);
+      closeModal(); toast("🗑 지웠습니다" + (옛것 && 옛것.ownGcalId ? " (내 구글 달력에서도)" : "")); 개인받기();
     });
     return;
   }

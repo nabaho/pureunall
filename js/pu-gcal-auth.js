@@ -196,12 +196,12 @@
             summary, location, description, source:{kind,id} }
      ⚠ 끝 시각이 시작보다 이르면(자정을 넘긴 일정) 끝은 다음 날로 둔다.
      ⚠ 어디서 왔는지(명함 번호)는 extendedProperties 에 남긴다 — 이름으로 잇지 않는다(온톨로지). */
-  function createEvent(calId, ev, opt) {
-    ev = ev || {};
-    if (!calId) return Promise.reject(new Error('달력을 모릅니다'));
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ev.date || ''))) return Promise.reject(new Error('날짜가 올바르지 않습니다'));
-    if (!String(ev.summary || '').trim()) return Promise.reject(new Error('무슨 일인지가 없습니다'));
+  /* 만들기·고치기가 같이 쓰는 «구글에 보낼 몸» — 한 곳에서만 셈한다.
+     ev.visibility:'private' — 본인 구글 달력에 넣는 «나만 보기»(2026-09-27). 그 달력을 누구와
+     나눠 보더라도 내용은 «바쁨»으로만 보인다. */
+  function 몸만들기(ev) {
     var 몸 = { summary: String(ev.summary).trim() };
+    if (ev.visibility === 'private') 몸.visibility = 'private';
     if (ev.location) 몸.location = String(ev.location);
     if (ev.description) 몸.description = String(ev.description);
     if (/^\d{2}:\d{2}$/.test(String(ev.time || ''))) {
@@ -223,10 +223,37 @@
     if (ev.source && ev.source.kind && ev.source.id) {
       몸.extendedProperties = { private: { puSourceKind: String(ev.source.kind), puSourceId: String(ev.source.id) } };
     }
+    return 몸;
+  }
+  function 몸검사(calId, ev) {
+    if (!calId) return '달력을 모릅니다';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ev.date || ''))) return '날짜가 올바르지 않습니다';
+    if (!String(ev.summary || '').trim()) return '무슨 일인지가 없습니다';
+    return '';
+  }
+  function createEvent(calId, ev, opt) {
+    ev = ev || {};
+    var 틀림 = 몸검사(calId, ev);
+    if (틀림) return Promise.reject(new Error(틀림));
+    var 몸 = 몸만들기(ev);
     return apiCall('POST', '/calendars/' + encodeURIComponent(calId) + '/events?sendUpdates=none', 몸, opt)
       .then(function (r) {
         if (!r || !r.id) throw new Error('구글이 만들었다고 대답하지 않았습니다');
         return { created: true, id: r.id };
+      });
+  }
+
+  /* 이어진 구글 일정을 고친다(제목·시각·장소·설명 통째로) — 나만 보기 일정을 고칠 때 본인 달력도 같이 */
+  function updateEvent(calId, eventId, ev, opt) {
+    ev = ev || {};
+    if (!eventId) return Promise.reject(new Error('고칠 구글 일정을 모릅니다'));
+    var 틀림 = 몸검사(calId, ev);
+    if (틀림) return Promise.reject(new Error(틀림));
+    return apiCall('PATCH', '/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(eventId)
+      + '?sendUpdates=none', 몸만들기(ev), opt)
+      .then(function (r) {
+        if (!r || !r.id) throw new Error('구글이 고쳤다고 대답하지 않았습니다');
+        return { updated: true, id: r.id };
       });
   }
 
@@ -241,6 +268,6 @@
 
   return {
     hasToken: hasToken, token: token, capture: capture,
-    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent
+    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent, updateEvent: updateEvent
   };
 });
