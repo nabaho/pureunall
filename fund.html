@@ -3816,7 +3816,7 @@ function _aiDownload(){
 var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', inka_annex:'공동', agreement:'공동', charter:'공동', charter_sane:'사내', contrib:'공동',
   reg_apply:'공동', reg_accept:'공동', reg_roster:'공동', reg_seal:'공동', reg_sealpaper:'공동', reg_sealcard:'공동',
   reg_proxy:'공동', reg_license:'공동', tax_bizreg:'공동', tax_sublease:'공동', tax_lease:'공동', tax_hometax:'공동',
-  ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동',
+  ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동', ops_audit:'공동', ops_minutes_close:'공동',
   sub_required:'공동', subsidy:'공동', sub_welfare_plan:'공동', sub_assets:'공동', sub_payment:'공동',
   sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
@@ -3826,6 +3826,7 @@ var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpI
   reg_sealpaper:_hwpRegValues, reg_sealcard:_hwpRegValues, reg_proxy:_hwpRegValues, reg_license:_hwpRegValues,
   tax_bizreg:_hwpTaxValues, tax_sublease:_hwpTaxValues, tax_lease:_hwpTaxValues, tax_hometax:_hwpTaxValues,
   ops_asset_change:_hwpOpsValues, ops_minutes_scope:_hwpOpsValues, ops_minutes_use:_hwpOpsValues,
+  ops_audit:_hwpAuditValues, ops_minutes_close:_hwpCloseValues,
   sub_required:_hwpSubValues, subsidy:_hwpSubValues, sub_welfare_plan:_hwpSubValues, sub_assets:_hwpSubValues,
   sub_payment:_hwpSubValues, sub_checklist:_hwpSubValues, sub_contrib:_hwpSubValues, sub_oath:_hwpSubValues};
 /* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다 */
@@ -4164,6 +4165,33 @@ function _hwpOpsValues(f,sites){
     변경:days.map(function(d){ return {변경일:dot(d.date), 변경전:W(d.before), 변경후:W(d.after),
       변경금액:(d.diff<0?'△ ':'')+W(Math.abs(d.diff)), 변경사유:bfReason(d.items,true)}; }),
     연도:String(S.year||''), 출연금:amt>0?amt.toLocaleString():'', _note:note};
+}
+/* 감사보고서(ops_audit 틀) — 예전 제출본 모양: 한 장에 감사 모두, 서명 줄은 감사 수만큼(HTML 은 감사마다 한 장).
+   값은 HTML _auditSheet 와 같은 곳에서 — 감사 명단 _auditorsOf, 회계연도 _fyRange, 의견 문구 AUDIT_OP. */
+function _hwpAuditValues(f){
+  f=f||{};
+  var auds=_auditorsOf(f), fy=_fyRange(f);
+  return {기금명:String(f.name||''), 본인:auds.length===1?'본인은':'본인 등은', 시작일:fy.start, 종료일:fy.end,
+    감사의견:AUDIT_OP['적정'], 작성일:_hwpKoDate(_hwpTodayIso(),['       ','       ']),
+    대표자:String(f.chairman||'').trim()||String(_boss(f).name||''),
+    감사:auds.length?auds.map(function(a){ return {감사명:a.name}; }):2,     // 명부에 감사가 없으면 원본처럼 빈 서명 줄 둘
+    _note:auds.length?'':'임원 명부에 감사가 없어 서명 줄을 비웠습니다 — [기금 정보] › 임원 명부에 노·사 감사를 넣으세요'};
+}
+/* 협의회 회의록(결산 승인, ops_minutes_close 틀) — HTML 과 같은 명단(임원 명부의 근로자·사용자 쪽)과 같은 결산 수치(_closeFigVals).
+   ⚠ 이사장은 명부에 측이 없어 참석위원 칸에 넣지 않는다(HTML 과 같은 까닭) — 안내로 알린다. */
+function _hwpCloseValues(f){
+  f=f||{};
+  var offs=_officersOf(f), yr=S.year, notes=[];
+  var side=function(re){ return offs.filter(function(o){ return re.test(o.role||''); })
+    .map(function(o){ return String(o.name||'').trim(); }).filter(Boolean); };
+  var wk=side(/근로자/), er=side(/사용자/);
+  var lead=offs.filter(function(o){ return /이사장/.test(o.role||''); })[0], ln=lead?String(lead.name||'').trim():'';
+  if(ln&&wk.concat(er).indexOf(ln)<0) notes.push('이사장('+ln+')은 명부에 측이 없어 참석위원 칸에 넣지 않았습니다 — 한글에서 알맞은 쪽에 적으세요');
+  var fig=_closeFigVals();
+  if(!fig) notes.push('회계·결산 탭에서 '+yr+'년을 확정하면 결산 수치(재원·집행·잔액)가 협의사항에 들어갑니다');
+  var ppl=function(a){ return a.length?a.map(function(n){ return {이름:n}; }):[{이름:' '}]; };
+  return {연도:String(yr||''), 회의장소:String(f.address||'').trim()||'회사 내 회의실',
+    결산:fig?[fig]:0, 근위원:ppl(wk), 사위원:ppl(er), _note:notes.join(' · ')};
 }
 /* ⑤ 지원금 여덟(필요서류·지원신청서·복지사업계획서·재산목록표·지급신청서·자율체크리스트·출연확인서·서약서).
    HTML 과 같은 곳에서: 장부·목적사업(_docRok — 별지15호 buildF15 와 같은 산출), 그 해 지원금 기록(f.years[yr].subsidy),
@@ -7049,16 +7077,22 @@ function _auditSheet(f,a,fy){
 /* 회의록에 붙이는 결산 수치 — **확정한 해**만 넣는다.
    확정 전 숫자를 회의록에 박아 두면, 뒤에 거래를 고쳤을 때 승인받은 숫자와 서류가 달라진다.
    서식(별지 제13호)에는 없는 표라 지워도 되게 따로 감싼다. */
-function _closeFigures(yr){
+/* 확정한 해의 결산 수치(천원) — 없으면 null. HTML 회의록과 한글 틀이 같은 값을 쓴다 */
+function _closeFigVals(){
   var c=(S.f15Close||{}), fin=c.fin||{};
-  if(!c.locked||fin.f15_rest==null)
+  if(S.f15For&&S.formFund&&S.f15For!==S.formFund+'/'+S.year) return null;   // 결산 탭에서 본 «다른 기금·다른 해» 숫자
+  if(!c.locked||fin.f15_rest==null) return null;
+  var w=function(v){ return (Math.round(num(v)||0)).toLocaleString(); };
+  return {재원:w(fin.f15_src_total), 집행:w(fin.f15_total), 잔액:w(fin.f15_rest)};
+}
+function _closeFigures(yr){
+  var g=_closeFigVals();
+  if(!g)
     return "<p class='note'>회계·결산 탭에서 <b>"+yr+"년을 확정</b>하면 재원·지출·잔액이 여기 자동으로 들어옵니다. "
       +"확정 전 숫자는 넣지 않습니다 — 나중에 거래를 고치면 승인받은 숫자와 달라지기 때문입니다.</p>";
-  var w=function(v){ return (Math.round(num(v)||0)).toLocaleString(); };
-  var used=(num(fin.f15_total)||0);
-  return "<table><tr><th style='width:220px'>기금사업 재원 (㉟)</th><td class='right'>"+w(fin.f15_src_total)+" 천원</td></tr>"
-    +"<tr><th>사업 집행액 합계</th><td class='right'>"+w(used)+" 천원</td></tr>"
-    +"<tr><th>잔액</th><td class='right'>"+w(fin.f15_rest)+" 천원</td></tr></table>"
+  return "<table><tr><th style='width:220px'>기금사업 재원 (㉟)</th><td class='right'>"+g.재원+" 천원</td></tr>"
+    +"<tr><th>사업 집행액 합계</th><td class='right'>"+g.집행+" 천원</td></tr>"
+    +"<tr><th>잔액</th><td class='right'>"+g.잔액+" 천원</td></tr></table>"
     +"<p class='note'>※ 별지 제13호 서식에는 없는 표입니다 — 승인 근거를 남기려고 더한 것이니 필요 없으면 지우세요.</p>";
 }
 /* ★ 서식 안내는 «종이 밖»에 (대표 지시 2026-09-20 「캡쳐2 내용 삭제」) —

@@ -47,7 +47,7 @@ const G = {
   document: { querySelectorAll: () => [] },
 };
 const preamble = [grabDecl('OFFICER_ROLES'), grabDecl('AUDIT_OP')].join('\n') + '\n'
-  + ['_officersOf', '_auditorsOf', '_fyRange', '_auditSheet', '_closeFigures', '_setAuditOp'].map(grabFn).join('\n');
+  + ['_officersOf', '_auditorsOf', '_fyRange', '_auditSheet', '_closeFigVals', '_closeFigures', '_setAuditOp'].map(grabFn).join('\n');
 /* docBody 는 서식이 수십 가지라 통째로 쓴다. 원본 .hwp 변환분(hwpFormHTML)과 note 는
    이 시험에서 다룰 대상이 아니므로 떼어 낸다 — 나머지 갈래는 원본 그대로 돈다. */
 const body = grabFn('docBody');
