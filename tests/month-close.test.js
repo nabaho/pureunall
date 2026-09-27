@@ -395,7 +395,7 @@ t('해제하면 삭제된다', g.dbRemove('attendance_records', 'a1'), true);
 t('메뉴에 월말 마감이 있다', /\{ id:'fin\/close',\s+icon:'🔐', text:'월말 마감' \}/.test(src), true);
 t('라우터가 MonthClose 를 연결한다', /current === 'fin\/close'[\s\S]{0,120}h\(MonthClose/.test(src), true);
 t('MonthClose 화면이 있다', /^function MonthClose\(props\)\{/m.test(src), true);
-t('도움말이 있다', /'fin\/close':\s+'월말 마감 화면입니다/.test(src), true);
+/* 「도움말이 있다」(AI 도우미의 화면 안내 SCREEN_GUIDE)는 2026-09-27 도우미째 걷어내며 뺐다 */
 t('새 잠금 키가 동기화 목록에 있다', /'locked_attend_months'/.test(src.slice(0, src.indexOf('FB_APPCHECK_KEY'))), true);
 t('마감 기록 키가 동기화 목록에 있다', /'month_close_log',/.test(src.slice(0, src.indexOf('FB_APPCHECK_KEY'))), true);
 

@@ -36,10 +36,10 @@ test('★ 시간 제한 없이 바깥으로 나가는 부름이 하나도 없다
   assert.ok(left.length >= 1, '감싸개가 진짜 fetch 를 부르는 줄이 사라졌습니다.');
 });
 
-test('AI 부름 두 곳 다 걸렸다', () => {
-  // 둘 다 프록시로 나간다 (api.anthropic.com 직접 호출은 걷어냈다)
+test('AI 부름이 걸렸다', () => {
+  // 프록시로 나간다 (api.anthropic.com 직접 호출은 걷어냈다).
+  // AI 도우미 대화는 2026-09-27 대표 지시로 화면째 걷어냈다 — 남은 것은 AI 요약.
   assert.match(app, /fetchT\(_proxy,\{/, 'AI 요약');
-  assert.match(app, /var res = await fetchT\(proxyUrl,\{/, 'AI 도우미 대화');
 });
 
 test('구글·국세청·NAS 도 걸렸다', () => {
@@ -157,13 +157,15 @@ test('끊을 수 없는 옛 브라우저는 그냥 지나간다', async () => {
 /* ── 사람에게 뭐라고 하나 ── */
 test('AI 는 시간이 지났을 때와 실패했을 때를 갈라 말한다', () => {
   assert.match(app, /⏱ AI 요약이 45초 안에 오지 않았습니다 — 다시 눌러 주세요/);
-  assert.match(app, /⏱ 45초 동안 답이 오지 않았습니다\. 질문을 조금 짧게 줄여 다시 물어봐 주세요\./);
-  assert.match(app, /연결 오류가 발생했습니다\. 인터넷 연결을 확인해주세요\./, '연결 실패 말은 그대로 둔다');
+  /* AI 도우미 대화(「질문을 짧게 줄여…」·「연결 오류…」)는 2026-09-27 대표 지시로 걷어냈다 */
+  const ai = app.slice(app.indexOf('function aiSummarize(){'), app.indexOf('function aiSummarize(){') + 2600);
+  assert.match(ai, /e && e\.timeout/, '★ 끊긴 것과 실패한 것을 갈라 말하지 않습니다');
 });
 
 test('AI 는 넉넉히 45초를 준다 (기본 20초로는 짧다)', () => {
   assert.match(app, /\}, 45000\)/);
-  assert.equal((app.match(/\}, 45000\)/g) || []).length, 2, 'AI 두 곳');
+  /* 개수는 못 박지 않는다 — AI 부름이 늘거나 줄어도(2026-09-27 도우미 걷어냄) 뜻은 같다 */
+  assert.ok((app.match(/\}, 45000\)/g) || []).length >= 1, 'AI 요약');
 });
 
 test('★ 급여 메일은 «다시 걸지» 않는다 — 다시 걸면 30초를 또 기다린다', () => {
@@ -189,7 +191,5 @@ test('화면이 갇히지 않는다 — 끝나면 반드시 푼다', () => {
   // 시간 제한이 있어도 로딩 표시를 안 풀면 화면은 그대로 갇힌다
   const ai = app.slice(app.indexOf('function aiSummarize(){'), app.indexOf('function aiSummarize(){') + 2200);
   assert.match(ai, /\.finally\(function\(\)\{ setAiLoading\(false\); \}\)/);
-  const chat = app.slice(app.indexOf('var res = await fetchT(proxyUrl,{') - 1800,
-                         app.indexOf('function handleKey(e){ if(e.key===\'Enter\''));
-  assert.match(chat, /\}\s*\n\s*setLoading\(false\);/, 'try/catch 밖에서 반드시 푼다');
+  /* AI 도우미 대화의 풀기 검사는 그 화면째 걷어내며 뺐다(2026-09-27) */
 });
