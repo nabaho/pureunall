@@ -103,3 +103,16 @@ test('ⓑ 수정 창 — 사건계약이면 측을 고르고, 그룹명 보기�
   assert.match(o, /CASE_TYPES/, '★ 그룹명 보기가 이알피 사건유형이 아닙니다');
   assert.ok(!/'해고', '산재', '체불'/.test(o), '옛 보기(해고·산재…)가 남아 있습니다');
 });
+
+test('★★ 짐작한 측을 «굳히지» 않는다 — 사람이 고른 때만 적는다', () => {
+  const o = cutFn(stripJs(CF), 'function openModal(');
+  const save = cutFn(o, 'function save(');
+  assert.match(save, /sideTouched/, '★★ 수정 창이 짐작한 측을 늘 저장합니다 — 새 양식은 빈 본문의 「공통」으로 굳습니다');
+  assert.ok(!/if \(sideBox && sideV\) f\.side = sideV/.test(save), '옛 저장 줄이 남아 있습니다');
+  assert.match(o, /sideTouched = true/, '단추를 눌렀다는 표시가 없습니다');
+});
+
+test('★ 칩에 가려진 양식을 고르면 칩을 푼다', () => {
+  const m = cutFn(stripJs(CF), 'function mount(');
+  assert.match(cutFn(m, 'function select('), /shown\(\)\.indexOf\(fm\) < 0/, '고른 양식이 목록에 없는데 칩이 그대로입니다');
+});

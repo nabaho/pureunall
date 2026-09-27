@@ -570,17 +570,21 @@
     document.addEventListener('keydown', onKey);
 
     var nameIn = el('input', { type: 'text', placeholder: '예: 위임약정서-임금체불' }); nameIn.value = f.name || '';
-    var grpIn = null, sideBox = null, sideV = null;
+    var grpIn = null, sideBox = null, sideV = null, sideTouched = false;
     if (f.kind === 'case') {
-      /* 그룹명 = 이알피 사건유형 이름 — 이알피 「계약서 출력」이 이 이름으로 자동 체크한다. 옛 값은 그대로 둔다(직접 입력 가능). */
+      /* 그룹명 = 이알피 사건유형 이름 — 이알피 「계약서 출력」이 이 이름으로 자동 체크한다. 옛 값은 그대로 둔다(직접 입력 가능).
+         ⚠ 보기는 이알피 기본 목록(BIZ_CASE_SEED)이다. 이알피에서 사건유형 이름을 바꾸면 여기 보기에는 안 나온다(직접 입력). */
       grpIn = el('input', { type: 'text', placeholder: '체당금 / 부해등 / 산재등', list: 'pcf-case-groups' }); grpIn.value = f.groupName || '';
+      /* ⚠ 짐작한 측은 «굳히지» 않는다 — 사람이 단추를 눌렀을 때만 적는다. 안 그러면 새 양식이 빈 본문의
+           짐작(공통)으로 굳어, 나중에 {{근로자명}} 을 넣어도 근로자측 칩에 영영 안 나온다. */
+      sideTouched = f.side === 'worker' || f.side === 'employer' || f.side === 'both';
       sideV = sideOf(f);
-      sideBox = el('div', { role: 'radiogroup', 'aria-label': '측', style: 'display:flex;gap:6px;flex-wrap:wrap' }, SIDES.map(function (s) {
+      sideBox = el('div', { role: 'radiogroup', 'aria-label': '측', style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, SIDES.map(function (s) {
         var r = el('input', { type: 'radio', name: 'pcf-side', value: s.v });
         r.checked = s.v === sideV;
-        r.addEventListener('change', function () { if (r.checked) sideV = s.v; });
+        r.addEventListener('change', function () { if (r.checked) { sideV = s.v; sideTouched = true; } });
         return el('label', { style: 'display:inline-flex;align-items:center;gap:4px;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12.5px;cursor:pointer' }, [r, s.label]);
-      }));
+      }).concat(sideTouched ? [] : [el('span', { style: 'font-size:11.5px;color:#64748b', text: '지금은 본문 칸으로 짐작한 값입니다 — 누르면 정해집니다' })]));
     }
     var onIn = el('input', { type: 'checkbox' }); onIn.checked = f.enabled !== false;
     var bodyIn = el('textarea', { placeholder: '예시:\n━━━━━━━━━━━━━━━━━━━━\n        사건위임계약서\n━━━━━━━━━━━━━━━━━━━━\n\n위임인: {{회사명}} (대표 {{대표자}})\n계약금액: {{계약금액}}원' });
@@ -654,7 +658,7 @@
       if (pending > 0) { toast('파일을 올리는 중입니다 — 끝나면 저장하세요'); return; }
       f.name = nameIn.value.trim(); f.body = bodyIn.value; f.enabled = onIn.checked;
       if (grpIn) { var g = grpIn.value.trim(); if (g) f.groupName = g; else delete f.groupName; }
-      if (sideBox && sideV) f.side = sideV;
+      if (sideBox && sideTouched && sideV) f.side = sideV;
       if (!f.name) { toast('양식 이름을 넣어 주세요'); nameIn.focus(); return; }
       if (!f.body) { toast('본문을 넣어 주세요'); bodyIn.focus(); return; }
       opts.onSave(f, close);
@@ -730,6 +734,8 @@
       return track(changeForms(db, S.removed, fn)).then(function (list) {
         S.forms = list;
         if (S.sel && !cur()) S.sel = null;
+        /* 마지막 양식이 지워지거나 옮겨 가 사라진 사건유형 칩을 계속 누른 채로 두지 않는다 */
+        if (S.grp !== 'all' && !facetCounts(S.forms, S.kind, S.side).groups.some(function (g) { return g.name === S.grp; })) S.grp = 'all';
         drawTree(); drawMain();
         if (okMsg) toast(okMsg, undo);
         return list;
@@ -739,6 +745,9 @@
       S.sel = id || null;
       var fm = cur();
       if (fm && fm.kind !== S.kind) { S.kind = fm.kind; resetFilters(); }
+      /* 칩(측·사건유형)에 가려진 양식을 골랐으면 칩을 푼다 — 종이에는 뜨는데 목록에는 없는 일이 없게.
+         (이름 찾기로 가려진 것은 그대로 둔다 — 글자를 칠 때마다 선택이 바뀌면 안 된다) */
+      if (fm && (S.side !== 'all' || S.grp !== 'all') && shown().indexOf(fm) < 0) { S.side = 'all'; S.grp = 'all'; }
       drawTree(); drawMain();
       if (host.onSelect) host.onSelect(S.sel);
     }
@@ -967,7 +976,7 @@
     }
     function cardGrid(list) {
       var grid = el('div', { 'class': 'pcf-cards' });
-      if (!list.length) grid.appendChild(el('div', { 'class': 'pcf-none', text: '맞는 양식이 없습니다' }));
+      if (!list.length) grid.appendChild(el('div', { 'class': 'pcf-none', style: 'grid-column:1/-1', text: '맞는 양식이 없습니다' }));
       list.forEach(function (f) {
         var sd = sideOf(f);
         grid.appendChild(el('button', { type: 'button', 'class': 'pcf-card' + (S.sel === f.id ? ' on' : ''), title: f.name + ' — 누르면 크게 봅니다',

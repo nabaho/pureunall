@@ -36,7 +36,7 @@
   /* ⚠ 틀을 가운데로 묶지 않는다 — 1360px 가운데 정렬이었을 때 넓은 화면(1862px)에서 메뉴가
        왼쪽 끝에서 250px 떠 있었다(대표 지적 2026-09-27). 메뉴는 왼쪽 끝, 본문이 남은 폭을 다 쓴다. */
   .shell{display:flex;align-items:flex-start}
-  .side{width:240px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto;padding:14px 8px 24px;background:#fff;border-right:1px solid #e2e8f0}
+  .side{width:240px;flex:none;position:sticky;top:0;max-height:100vh;min-height:calc(100vh - 44px);overflow-y:auto;padding:14px 8px 24px;background:#fff;border-right:1px solid #e2e8f0}
   .nav-tree{margin:2px 0 4px}
   .nav.soon{color:#64748b;cursor:default}.nav.soon:hover{background:none}
   .nav.soon i{font-style:normal;margin-left:auto;font-size:10.5px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;padding:0 7px}
@@ -50,7 +50,7 @@
   .crumb{font-size:12px;color:#64748b;margin-bottom:4px}.crumb b{color:#1e293b}
   @media(max-width:700px){
     .shell{display:block}
-    .side{position:static;width:auto;height:auto;display:flex;align-items:center;gap:4px;overflow-x:auto;padding:8px 10px;background:#fff;border-right:none;border-bottom:1px solid #e2e8f0}
+    .side{position:static;width:auto;height:auto;max-height:none;min-height:0;display:flex;align-items:center;gap:4px;overflow-x:auto;padding:8px 10px;background:#fff;border-right:none;border-bottom:1px solid #e2e8f0}
     .nav.soon{display:none}
     .nav{width:auto}.nav.sub{padding-left:10px}.nav-grp{padding:0 2px 0 8px}.nav-tree{display:none}
     .shell .main{margin:12px auto;padding:0 10px}
@@ -294,7 +294,7 @@ document.querySelectorAll('.side .nav[data-pane]').forEach(function (b) {
    ⚠ 양식 칸에서는 칸은 안 바뀌어도 «고른 양식»이 바뀔 수 있다(#forms:x → #forms:y) —
      그때도 우리가 처리했다고 알려야 한다(formsUi.current() 로 견준다). */
 window.addEventListener('popstate', function () {
-  var want = paneFromHash(), fc = want === 'forms' && formsUi && formsUi.current() !== formFromHash();
+  var want = paneFromHash(), fc = want === 'forms' && formsUi && formFromHash() != null && formsUi.current() !== formFromHash();
   if ($(PANES[want]).hidden || fc) window.__puBackNav = true;
   showPane(want);
   if (fc) formsUi.select(formFromHash());

@@ -265,3 +265,11 @@ test('★ 누를 수 없는 메뉴(서식집)는 칸 오가기에 끼지 않는�
   assert.ok(src.indexOf("querySelectorAll('.side .nav')") < 0, "data-pane 없는 메뉴까지 집어 '#null' 로 갑니다 — '.side .nav[data-pane]' 로 고르세요");
   assert.ok(src.indexOf("querySelectorAll('.side .nav[data-pane]')") >= 0);
 });
+
+test('★★ 뒤로가기 — 주소에 양식이 없으면(#forms) «다른 양식»으로 보지 않는다', function () {
+  /* 첫 화면은 첫 양식을 «조용히» 보여 준다(주소는 #forms 그대로). 이것을 다른 양식으로 보면
+     pu-back 의 첫 빈 걸음을 삼켜 뒤로가기가 한 번 헛돈다(검토 2026-09-27). */
+  const src = stripComments(DOCS);
+  const at = src.indexOf("addEventListener('popstate'");
+  assert.match(src.slice(at, at + 500), /formFromHash\(\) != null/);
+});
