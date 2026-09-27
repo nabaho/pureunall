@@ -108,3 +108,13 @@ test('★ 모듈 판은 한 곳 기준 — 앱마다 ?v= 가 갈라지면 한 �
   assert.ok(fs.readFileSync(path.join(__dirname, '..', 'sign.html'), 'utf8').includes("'js/pu-ocr-kr.js?v=" + v + "'"), 'sign.html 판');
   assert.ok(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-doc-read.js'), 'utf8').includes("'pu-ocr-kr.js?v=" + v + "'"), 'pu-doc-read.js 판');
 });
+
+test('★ 취업규칙 서고(rules.html) — 한국어 OCR 먼저, 이 창 안에서만, 안 되면 예전 읽개로 처음부터', () => {
+  const H = fs.readFileSync(path.join(__dirname, '..', 'rules.html'), 'utf8');
+  const i = H.indexOf('async function cbOcrRun'), body = H.slice(i, i + 7000);
+  assert.ok(body.indexOf('K.recognize([쪽.pages[i]]') > 0 && body.indexOf('K.recognize([쪽.pages[i]]') < body.indexOf('worker.recognize('), '한국어 OCR 이 먼저');
+  assert.ok(body.includes('글=""; 엔진="tesseract.js kor+eng";'), '넘어갈 때 읽던 글을 버리고 처음부터');
+  assert.ok(body.includes('engine:엔진'), '어느 읽개로 읽었는지 남긴다');
+  const v = (FUND.match(/js\/pu-ocr-kr\.js\?v=(\d+)/) || [])[1];
+  assert.ok(H.includes("s.src='js/pu-ocr-kr.js?v=" + v + "'"), 'rules.html 모듈 판이 fund.html 과 같다');
+});
