@@ -68,6 +68,21 @@ async function roleOf(uid) {
   return (await db().ref("uid_roles/" + pathSafe(uid)).once("value")).val() || {};
 }
 
+/* 서버 비밀값(카카오 앱 키)을 꺼낸다 — 앞뒤 빈칸·줄바꿈은 걷는다.
+   ⚠ 2026-09-27 실제로 세 값 모두 「???_????」+줄바꿈(한글 안내문이 PowerShell 에서
+     깨진 것)으로 들어가 있었고, 직원은 카카오 쪽 「KOE101 앱 관리자 설정 오류」 화면으로
+     튕겨 나갔다. 키 모양이 아니면 카카오로 보내지 않고 여기서 까닭을 말한다.
+   REST API 키는 16진수 32자다. Client Secret 은 영숫자(카카오가 만들어 준 값). */
+const KEY_BAD = "카카오 앱 키가 제대로 등록되지 않았습니다 — 관리자가 서버 비밀값(KAKAO_REST_KEY·KAKAO_CLIENT_SECRET)을 다시 넣어야 합니다";
+function restKeyOf() {
+  const k = String(process.env.KAKAO_REST_KEY || "").trim();
+  return /^[0-9a-f]{32}$/i.test(k) ? k : "";
+}
+function clientSecretOf() {
+  const k = String(process.env.KAKAO_CLIENT_SECRET || "").trim();
+  return /^[A-Za-z0-9]{16,}$/.test(k) ? k : "";
+}
+
 /* 인가코드를 카카오 토큰으로, 토큰을 카카오 회원번호로 바꾼다.
    ⚠ 여기서 실패하면 그대로 던진다 — 「그런 셈 쳐 준다」가 없다. */
 async function kakaoIdFromCode(code, restKey, clientSecret) {
@@ -108,8 +123,8 @@ exports.kakaoAuthUrl = functions
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") return res.status(204).send("");
-    const restKey = String(process.env.KAKAO_REST_KEY || "");
-    if (!restKey) return bad(res, 500, "카카오 연결이 아직 설정되지 않았습니다");
+    const restKey = restKeyOf();
+    if (!restKey) return bad(res, 500, KEY_BAD);
     const state = String((req.query && req.query.state) || "");
     const url = "https://kauth.kakao.com/oauth/authorize"
       + "?client_id=" + encodeURIComponent(restKey)
@@ -142,7 +157,9 @@ exports.kakaoLink = functions
 
     let kakaoId;
     try {
-      kakaoId = await kakaoIdFromCode(code, process.env.KAKAO_REST_KEY, process.env.KAKAO_CLIENT_SECRET);
+      const rk = restKeyOf(), cs = clientSecretOf();
+      if (!rk || !cs) return bad(res, 500, KEY_BAD);
+      kakaoId = await kakaoIdFromCode(code, rk, cs);
     } catch (e) {
       return bad(res, 400, String((e && e.message) || e));
     }
@@ -216,7 +233,9 @@ exports.kakaoLoginFinish = functions
 
     let kakaoId;
     try {
-      kakaoId = await kakaoIdFromCode(code, process.env.KAKAO_REST_KEY, process.env.KAKAO_CLIENT_SECRET);
+      const rk = restKeyOf(), cs = clientSecretOf();
+      if (!rk || !cs) return bad(res, 500, KEY_BAD);
+      kakaoId = await kakaoIdFromCode(code, rk, cs);
     } catch (e) {
       return bad(res, 400, String((e && e.message) || e));
     }
