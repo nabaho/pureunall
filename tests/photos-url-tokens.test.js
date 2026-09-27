@@ -148,14 +148,30 @@ function loadStore(opts) {
   return { S, calls, sandbox };
 }
 
-test('★ 올릴 때 주소를 정보에 함께 적는다 — 남이 곧바로 볼 수 있게', async () => {
+/* ⚠ 2026-09-27 — 여기서 올리던 것이 «서류»(kind:'doc')였다. 그런데 서류는 이제 원본 주소를
+     «안 적는다»(사진첩 점검 ② — 판독 전 신분증에 만료 없는 주소가 평생 남던 문제).
+     그래서 이 검사는 «사진»으로 잰다 — 사진에는 이 말(주소가 없으면 403)이 여전히 맞다.
+     서류는 서버 문(photoView)이 판독 전이든 뒤든 받도록 먼저 넓혀 두었다(#1650).
+     서류 쪽 약속은 아래 검사와 photos-doc-no-token.test.js 가 못 박는다. */
+test('★ 올릴 때 «사진»은 주소를 정보에 함께 적는다 — 남이 곧바로 볼 수 있게', async () => {
   const { S, calls } = loadStore();
-  await S.savePhoto({ id: 'p1', full: 'data:image/jpeg;base64,AAA', thumb: 'data:image/jpeg;base64,BBB', meta: { upAt: 1, by: 'ME', kind: 'doc' } });
+  await S.savePhoto({ id: 'p1', full: 'data:image/jpeg;base64,AAA', thumb: 'data:image/jpeg;base64,BBB', meta: { upAt: 1, by: 'ME', kind: 'photo' } });
   const metaWrite = calls.updates.find(u => Object.keys(u).some(k => /items\/\d+\/p1$/.test(k)));
   assert.ok(metaWrite, '정보 쓰기를 찾지 못했습니다');
   const rec = metaWrite[Object.keys(metaWrite).find(k => /items\/\d+\/p1$/.test(k))];
   assert.match(String(rec.fullUrl), /^https:\/\/sdk\//, '★ 주소가 없으면 관리자·공유 화면에서 403 입니다');
   assert.match(String(rec.thumbUrl), /^https:\/\/sdk\//);
+  assert.equal(rec.loc, 'storage');
+});
+
+test('★ 올릴 때 «서류»는 원본 주소를 안 적는다 — 미리보기 주소는 적는다', async () => {
+  const { S, calls } = loadStore();
+  await S.savePhoto({ id: 'p1', full: 'data:image/jpeg;base64,AAA', thumb: 'data:image/jpeg;base64,BBB', meta: { upAt: 1, by: 'ME', kind: 'doc' } });
+  const metaWrite = calls.updates.find(u => Object.keys(u).some(k => /items\/\d+\/p1$/.test(k)));
+  assert.ok(metaWrite, '정보 쓰기를 찾지 못했습니다');
+  const rec = metaWrite[Object.keys(metaWrite).find(k => /items\/\d+\/p1$/.test(k))];
+  assert.equal(rec.fullUrl, undefined, '서류에 만료 없는 원본 주소를 적었습니다');
+  assert.match(String(rec.thumbUrl), /^https:\/\/sdk\//, '미리보기까지 막으면 격자가 서버를 거쳐 느려집니다');
   assert.equal(rec.loc, 'storage');
 });
 

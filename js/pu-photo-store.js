@@ -484,9 +484,21 @@
   /* 창고 저장 성공 뒤 — 실시간DB에는 **정보만** 남긴다(본문·미리보기는 창고에 있다).
      ⚠ loc:'storage' 를 반드시 적는다. 안 적으면 지우기·복원·용량 계산이
        본문이 실시간DB에 있는 줄 알고 없는 자리를 헤맨다. */
+  /* 서류인가 — 서류(kind:'doc')는 원본 토큰 주소를 «안 적는다» (대표 지시 2026-09-27 사진첩 점검 ②)
+     ★ 왜: 민감 여부는 «판독 뒤»에 정해진다. 그래서 올리는 순간에는 신분증도 민감이 아니었고,
+       만료도 로그인도 없는 주소가 그대로 적혔다. 자동 판독은 한도를 넘으면 멈추므로,
+       그 뒤에 올린 서류는 영영 판독이 안 되고 주소가 «평생» 남았다.
+     ★ 이제 서류는 처음부터 주소를 안 적는다. 보는 길은 셋 다 살아 있다:
+       주인은 창고에서 곧장, 관리자·공유받은 사람은 서버 문(photoView)으로 —
+       그 문은 서류를 판독 전이든 뒤든 받도록 «먼저» 넓혀 두었다(#1650, 배포 끝).
+       ⚠ 순서가 거꾸로면 2026-08-17 「남의 회의사진 46장 회색」이 서류에서 되풀이된다.
+     ⚠ 미리보기(thumbUrl)는 그대로 적는다 — 240px 라 글씨를 못 읽고, 격자가 서버를
+       거치면 통째로 느려진다(photo-view.js 머리말 ③).
+     ⚠ 사진(회의사진 등)은 예전 그대로 주소를 적는다. */
+  function isDocKind(kind) { return String(kind == null ? '' : kind) === 'doc'; }
   function saveMetaOnly(p, year, fullUrl, thumbUrl) {
     var extra = { loc: 'storage' };
-    if (fullUrl) extra.fullUrl = fullUrl;
+    if (fullUrl && !isDocKind(p && p.meta && p.meta.kind)) extra.fullUrl = fullUrl;
     if (thumbUrl) extra.thumbUrl = thumbUrl;
     var u = {};
     u[metaPath(year, p.id)] = Object.assign({}, p.meta, extra);
@@ -826,11 +838,17 @@
              이 갈래를 빠뜨리면 사진을 한 번 돌리는 것만으로 지워 둔 주소가
              되살아난다 — 판독 때 지운 것이 조용히 무효가 된다.
              한 번 더 읽는 값이지만 돌리기는 드문 일이라 값이 싸다. */
-          return readOnce(metaPath(year, id, owner) + '/read').catch(function () { return null; })
-            .then(function (read) {
+          /* ⚠ 서류인지도 함께 본다 (2026-09-27) — 안 보면 서류를 «한 번 돌리는 것»만으로
+               올릴 때 안 적은 주소가 여기서 되살아난다. 한 번 더 읽지만 돌리기는 드문 일이다. */
+          return Promise.all([
+            readOnce(metaPath(year, id, owner) + '/read').catch(function () { return null; }),
+            readOnce(metaPath(year, id, owner) + '/kind').catch(function () { return null; })
+          ]).then(function (got) {
+              var read = got[0], kind = got[1];
               var u = {};
               u[metaPath(year, id, owner) + '/loc'] = 'storage';
-              u[metaPath(year, id, owner) + '/fullUrl'] = isSensitiveRead(read) ? null : (urls[0] || null);
+              u[metaPath(year, id, owner) + '/fullUrl'] =
+                (isSensitiveRead(read) || isDocKind(kind)) ? null : (urls[0] || null);
               u[metaPath(year, id, owner) + '/thumbUrl'] = urls[1] || null;
               u[blobPath(year, id, owner)] = null;
               u[thumbPath(year, id, owner)] = null;
@@ -2361,6 +2379,7 @@
        ⚠ 화면이 저마다 목록을 적으면 두 벌이 되어 한쪽만 고쳐진다. */
     SENSITIVE_KINDS: SENSITIVE_KINDS,
     isSensitiveRead: isSensitiveRead,
+    isDocKind: isDocKind,
     listKindLabels: listKindLabels,
     listHiddenKinds: listHiddenKinds,
     renameFixedKind: renameFixedKind,
