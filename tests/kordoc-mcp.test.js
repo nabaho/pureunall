@@ -35,9 +35,12 @@ test('ⓑⓒ 바깥 통신을 막고, 읽을 폴더를 묶을 자리가 있다',
 test('앱(배포되는 js/·html)은 kordoc 을 부르지 않는다', () => {
   const root = path.join(__dirname, '..');
   const hits = [];
+  /* 주석은 뺀다 — js/pu-ocr-kr.js 는 kordoc 의 OCR 핵심을 브라우저로 «옮겨 온» 것이라 출처(MIT)를 주석에 적는다.
+     부르는 것이 아니다(모델·실행기만 받고 서류는 브라우저 안에서 읽는다). 코드 줄에 kordoc 이 나오면 여전히 걸린다. */
+  const code = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\'"])\/\/.*$/gm, '$1');
   const scan = (dir) => {
     for (const f of fs.readdirSync(dir)) {
-      if (/\.(js|html)$/.test(f) && /kordoc/i.test(fs.readFileSync(path.join(dir, f), 'utf8'))) hits.push(f);
+      if (/\.(js|html)$/.test(f) && /kordoc/i.test(code(fs.readFileSync(path.join(dir, f), 'utf8')))) hits.push(f);
     }
   };
   scan(root);

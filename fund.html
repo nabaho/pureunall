@@ -18,6 +18,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="js/pu-hwpx-fill.js?v=5"></script>
+<script src="js/pu-ocr-kr.js?v=2"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <!-- 회사 공용 사진·서류 저장 층 — 사진첩/기업정보함/컨설팅과 같은 파일을 쓴다(판독·보관 방식이 한 곳) -->
@@ -3183,21 +3184,22 @@ function _binarize(cv,thr){
   }
   g.putImageData(im,0,0); return cv;
 }
-// PDF 첫 N쪽 → 2치화 캔버스 배열
-function pdfPageCanvases(buf,maxPages){
+/* PDF 첫 N쪽 → 2치화 캔버스 배열. gray=true 면 2치화하지 않는다 — 한국어 OCR(PP-OCRv5)은 회색 그대로가 낫다
+   (tesseract 로 넘어갈 때는 ocrCanvases 가 흑백 사본을 만든다) */
+function pdfPageCanvases(buf,maxPages,gray){
   return pdfjsLib.getDocument({ isEvalSupported: false, data:_pdfCopy(buf)}).promise.then(function(doc){
     var n=Math.min(doc.numPages,maxPages||2), jobs=[];
     for(var i=1;i<=n;i++) jobs.push(doc.getPage(i).then(function(pg){
       var vp=pg.getViewport({scale:3});                 // 3배 ≈ 216dpi
       var cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
-      return pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise.then(function(){ return _binarize(cv); });
+      return pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise.then(function(){ return gray?cv:_binarize(cv); });
     }));
     var fin=function(){ try{ doc.destroy(); }catch(e){} };
     return Promise.all(jobs).then(function(r){ fin(); return r; },function(e){ fin(); throw e; });
   });
 }
-// 이미지 파일 → 2치화 캔버스
-function imgCanvas(file){
+// 이미지 파일 → 2치화 캔버스(gray=true 면 그대로 — 위와 같은 까닭)
+function imgCanvas(file,gray){
   return new Promise(function(res,rej){
     var img=new Image(), url=URL.createObjectURL(file);
     img.onload=function(){
@@ -3205,14 +3207,33 @@ function imgCanvas(file){
       var W=img.width||1, k=W>2200?(2200/W):(W<1400?1.6:1);
       var w=Math.max(1,Math.round(W*k)), h=Math.max(1,Math.round((img.height||1)*k));
       var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-      cv.getContext('2d').drawImage(img,0,0,w,h); URL.revokeObjectURL(url); res(_binarize(cv));
+      cv.getContext('2d').drawImage(img,0,0,w,h); URL.revokeObjectURL(url); res(gray?cv:_binarize(cv));
     };
     img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error('이미지를 열 수 없습니다')); };
     img.src=url;
   });
 }
-// 캔버스들 OCR → 합친 텍스트
+/* 캔버스들 OCR → 합친 텍스트
+   ★ 2026-09-27 대표 「앱 안에 넣기」 — 한국어 OCR(PP-OCRv5, js/pu-ocr-kr.js)을 먼저 쓴다.
+     과거 고객 서류 스캔본 58개로 겨뤄 보니 tesseract 보다 판독 칸이 31% 많고(등기부 1.8배) 번호 오독이 없었다.
+     실행기·모델을 못 받거나(인터넷·차단) 글이 거의 안 나오면 예전 tesseract 로 다시 읽는다 — 서류 읽기가 멈추지 않게.
+     tesseract 는 흑백 2치화 그림이 필요하다(_binCopies — 한국어 OCR 은 회색 그대로가 낫다). */
 function ocrCanvases(cvs,onStat){
+  var old=function(why){ if(why) onStat&&onStat(why); return _ocrTesseract(_binCopies(cvs),onStat); };
+  if(typeof PuOcrKr==='undefined') return old('');
+  return PuOcrKr.recognize(cvs,onStat).then(function(t){
+    if(String(t||'').replace(/\s/g,'').length>=20) return t;
+    return old('한국어 OCR 결과가 거의 없어 예전 방식으로 다시 읽습니다…');
+  },function(e){ return old('한국어 OCR 을 못 써서 예전 방식으로 읽습니다… ('+((e&&e.message)||e)+')'); });
+}
+/* tesseract 용 흑백 사본 — 원본 캔버스는 건드리지 않는다(이미 2치화된 것이면 결과가 같다) */
+function _binCopies(cvs){
+  return (cvs||[]).map(function(cv){
+    var c=document.createElement('canvas'); c.width=cv.width; c.height=cv.height;
+    c.getContext('2d').drawImage(cv,0,0); return _binarize(c);
+  });
+}
+function _ocrTesseract(cvs,onStat){
   return ocrReady().then(function(){
     onStat&&onStat('OCR 엔진 준비 중…');
     return Tesseract.createWorker('kor+eng',1,{logger:function(m){
@@ -9823,7 +9844,7 @@ function bizregBulkPick(){
   if(!S.fundId){ toast('기금을 먼저 고르세요','warn'); return; }
   openAlbumPick('','bizreg','','','','',true);
 }
-function bulkOcrWorker(onStat){
+function _bulkTessWorker(onStat){
   return ocrReady().then(function(){
     return Tesseract.createWorker('kor+eng',1,{logger:function(m){
       if(m.status==='recognizing text') onStat&&onStat('글자 인식 '+Math.round((m.progress||0)*100)+'%');
@@ -9831,12 +9852,30 @@ function bulkOcrWorker(onStat){
     }});
   });
 }
+/* 일괄 읽기 일꾼 — ★ 2026-09-27 한국어 OCR(js/pu-ocr-kr.js) 먼저. 모델·실행기는 한 번 준비하면 장마다 다시 안 만든다.
+   tesseract 와 같은 모양({recognize(cv)→{data:{text}}, terminate()})으로 감싸, 읽는 쪽은 그대로다.
+   한국어 OCR 을 못 쓰거나 한 장의 글이 거의 없으면 그 장만 tesseract 로(그 일꾼도 한 번만 만든다). */
+function bulkOcrWorker(onStat){
+  var tw=null, tess=function(){ return tw||(tw=_bulkTessWorker(onStat)); };
+  var viaTess=function(cv){ return tess().then(function(w){ return w.recognize(_binCopies([cv])[0]); }); };
+  var wrap=function(kr){
+    return { recognize:function(cv){
+        if(!kr) return viaTess(cv);
+        return PuOcrKr.recognize([cv],onStat).then(function(t){
+          return String(t||'').replace(/\s/g,'').length>=20 ? {data:{text:t}} : viaTess(cv);
+        },function(){ return viaTess(cv); });
+      },
+      terminate:function(){ return tw ? tw.then(function(w){ return w.terminate(); }).catch(function(){}) : Promise.resolve(); } };
+  };
+  if(typeof PuOcrKr==='undefined') return Promise.resolve(wrap(false));
+  return PuOcrKr.ready(onStat).then(function(){ return wrap(true); },function(){ return wrap(false); });
+}
 /* 사진첩 원본 한 장 → OCR 할 캔버스들. PDF 로 올린 서류도 있다. */
 function _bulkCanvases(src){
   if(/^data:application\/pdf/i.test(String(src||'')))
     return fetch(src).then(function(r){ return r.arrayBuffer(); })
-      .then(function(buf){ return pdfPageCanvases(buf,1); });
-  return _dataUrlToFile(src,'bizreg.jpg').then(function(f){ return imgCanvas(f); }).then(function(cv){ return [cv]; });
+      .then(function(buf){ return pdfPageCanvases(buf,1,true); });
+  return _dataUrlToFile(src,'bizreg.jpg').then(function(f){ return imgCanvas(f,true); }).then(function(cv){ return [cv]; });
 }
 function bizregBulkRun(){
   var ids=Object.keys(_pick.sel||{}).filter(function(k){ return _pick.sel[k]; });
@@ -10687,7 +10726,7 @@ function readDocInto(zid,kind,file,fromAlbum){
   var fail=function(e){ stat('<span style="color:var(--danger)">읽기 실패: '+esc((e&&e.message)||e)+'</span>'); };
   var ocrPath=function(bufOrFile){    // 스캔 → 그림을 글자로
     stat('<span class="muted">스캔 문서 — OCR 시작…</span>');
-    var prep = isPdf ? pdfPageCanvases(bufOrFile,2) : imgCanvas(bufOrFile).then(function(c){return [c];});
+    var prep = isPdf ? pdfPageCanvases(bufOrFile,2,true) : imgCanvas(bufOrFile,true).then(function(c){return [c];});
     prep.then(function(cvs){ return ocrCanvases(cvs,function(m){ stat('<span class="muted">'+esc(m)+'</span>'); }); })
         .then(function(t){ done(t,true); }).catch(fail);
   };
