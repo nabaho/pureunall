@@ -63,9 +63,19 @@
     });
     return r;
   }
+  /* 규칙(pu_docs/originals/$id/byName ≤60, from/$f ≤200)이 «색인 쓰기 자체»를
+     거절하면, 창고에는 이미 파일이 올라간 뒤라 고아가 남는다 — 여기서 미리 잘라
+     규칙이 거절할 일을 없앤다(대표가 회사명·양식명을 길게 적어도 그대로 담긴다). */
+  function clampStr(v, max) { return typeof v === 'string' ? v.slice(0, max) : v; }
+  function clampFrom(o) {
+    if (!o || typeof o !== 'object') return o;
+    var r = {};
+    Object.keys(o).forEach(function (k) { r[k] = clampStr(o[k], 200); });
+    return r;
+  }
   function originalRecord(o) {
     return clean({ name: o.name, size: o.size, type: o.type || '', sha256: o.sha256, path: o.path,
-      at: o.at, by: o.by, byName: o.byName || '', from: o.from });
+      at: o.at, by: o.by, byName: clampStr(o.byName || '', 60), from: clampFrom(o.from) });
   }
   function isDenied(e) {
     var s = String((e && (e.code || '')) + ' ' + (e && e.message || ''));
@@ -100,8 +110,21 @@
               name: String(file.name).slice(0, 200), size: file.size, type: String(file.type || '').slice(0, 120),
               sha256: h, path: p, at: Date.now(), by: deps.uid, byName: deps.name, from: from }));
           })
-          .then(function () { return deps.db.ref(ROOT + '/hash/' + h).set(fileId); })
-          .then(function () { return { fileId: fileId, sha256: h, reused: false }; });
+          .then(function () {
+            return deps.db.ref(ROOT + '/hash/' + h).set(fileId).then(function () {
+              return { fileId: fileId, sha256: h, reused: false };
+            }, function (setErr) {
+              /* ⚠ 겹쳐 쓰기 — 다른 탭·사람이 같은 순간 같은 해시로 먼저 hash/{h} 를
+                 심었으면(규칙이 «새로 쓰기만» 이라 우리 것은 거절된다) 진 게 아니다.
+                 다시 읽어 그 fileId 를 쓰면 된다 — 우리가 창고에 올린 것은 고아로
+                 남지만(정직하게 감수), 화면은 먼저 심긴 쪽을 그대로 쓰면 된다. */
+              return deps.db.ref(ROOT + '/hash/' + h).once('value').then(function (s2) {
+                var have2 = s2.val();
+                if (have2) return { fileId: have2, sha256: h, reused: true };
+                throw setErr;
+              });
+            });
+          });
       });
     });
   }
@@ -148,7 +171,7 @@
     var ref = deps.db.ref(ROOT + '/co_docs/' + key).push();
     var docId = ref.key;
     return ref.set(clean({ fileId: o.fileId, title: String(o.title || '계약서').slice(0, 120), date: String(o.date || '').slice(0, 10),
-      src: o.src === 'photo' ? 'photo' : 'upload', at: Date.now(), by: deps.uid, byName: deps.name }))
+      src: o.src === 'photo' ? 'photo' : 'upload', at: Date.now(), by: deps.uid, byName: clampStr(deps.name, 60) }))
       .then(function () {
         return deps.db.ref(ROOT + '/co/' + key).transaction(function (cur) {
           return { name: (cur && cur.name) || name.slice(0, 120), n: ((cur && cur.n) || 0) + 1, lastAt: Date.now() };

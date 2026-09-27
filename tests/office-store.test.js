@@ -64,13 +64,22 @@ function fakeDb() {
     if (v !== null) store[p] = JSON.parse(JSON.stringify(v));
   }
   const db = {
-    store, failSetAt: null,
+    store, failSetAt: null, failSetOnceAt: null, onFailedSet: null,
     ref(p) {
       return {
         key: p.split('/').pop(),
         push() { seq++; const k = 'k' + String(seq).padStart(4, '0'); return db.ref(p + '/' + k); },
         once() { return Promise.resolve({ val: () => get(p), exists: () => get(p) != null }); },
-        set(v) { noUndef(v, p); if (db.failSetAt && p.indexOf(db.failSetAt) === 0) return Promise.reject(new Error('PERMISSION_DENIED')); put(p, v); return Promise.resolve(); },
+        set(v) {
+          noUndef(v, p);
+          if (db.failSetOnceAt && p === db.failSetOnceAt) {
+            db.failSetOnceAt = null;
+            if (typeof db.onFailedSet === 'function') db.onFailedSet(p);
+            return Promise.reject(new Error('PERMISSION_DENIED'));
+          }
+          if (db.failSetAt && p.indexOf(db.failSetAt) === 0) return Promise.reject(new Error('PERMISSION_DENIED'));
+          put(p, v); return Promise.resolve();
+        },
         update(v) { noUndef(v, p); Object.keys(v).forEach((k) => put(p + '/' + k, v[k])); return Promise.resolve(); },
         remove() { put(p, null); return Promise.resolve(); },
         transaction(fn) { const next = fn(get(p)); noUndef(next, p); put(p, next); return Promise.resolve({ committed: true, snapshot: { val: () => get(p) } }); },
@@ -170,6 +179,46 @@ test('ⓒ 색인에서 끊기면 해시가 없어 다음 시도가 새로 담는
   const r = await S.putOriginal(file('a.pdf', 'y'), { kind: 'co', coKey: 'k', coName: '가나상사' });
   assert.equal(r.reused, false);
   assert.ok(await S.getOriginal(r.fileId));
+});
+
+test('ⓕ 해시 쓰기가 겹치면(다른 탭이 같은 순간 먼저 심었으면) 그 fileId 로 reused 처리', async () => {
+  const S = load(); const db = fakeDb(); const st = fakeStorage();
+  S.init({ db, storage: st, uid: 'u1', name: '홍길동' });
+  const h = await S.sha256Hex(new Uint8Array(Buffer.from('race')));
+  const hashPath = 'pu_docs/hash/' + h;
+  // ⚠ hash/{h} 를 미리 심어 두면 맨 처음 once('value') 에서 걸려 창고를 두드리지도
+  //   않는다 — 진짜 겹쳐 쓰기는 «우리가 읽었을 땐 없었는데 우리가 쓰려던 그 순간
+  //   먼저 심겼다»이므로, 우리 set() 이 거절되는 바로 그때 다른 탭의 값이 심기는
+  //   것을 흉내 낸다(onFailedSet).
+  db.failSetOnceAt = hashPath;
+  db.onFailedSet = (p) => { if (p === hashPath) db.store[p] = 'other-file-id'; };
+  const r = await S.putOriginal(file('race.pdf', 'race'), { kind: 'co', coKey: 'k', coName: '가나상사' });
+  assert.equal(r.reused, true, '★ 겹쳐 쓰기를 reused 로 처리하지 않았습니다');
+  assert.equal(r.fileId, 'other-file-id', '★ 먼저 심긴 fileId 를 돌려주지 않았습니다');
+  assert.equal(r.sha256, h);
+  assert.equal(st.puts, 1, '창고에는 한 번 올라갑니다(고아 하나는 감수한다는 설계)');
+});
+
+test('ⓖ 해시 쓰기가 실패했는데 다른 값도 안 심겨 있으면 원래 오류를 던진다', async () => {
+  const S = load(); const db = fakeDb(); const st = fakeStorage();
+  S.init({ db, storage: st, uid: 'u1', name: '홍길동' });
+  const h = await S.sha256Hex(new Uint8Array(Buffer.from('race2')));
+  db.failSetOnceAt = 'pu_docs/hash/' + h;
+  await assert.rejects(S.putOriginal(file('race2.pdf', 'race2'), { kind: 'co', coKey: 'k', coName: '가나상사' }), /PERMISSION_DENIED/);
+});
+
+test('byName·from 이 규칙 한도(60·200자)를 넘으면 잘라서 담는다', async () => {
+  const S = load(); const db = fakeDb(); const st = fakeStorage();
+  const longName = '홍'.repeat(80);       // byName ≤60 을 넘는 길이
+  const longCoName = '가'.repeat(250);    // from.coName ≤200 을 넘는 길이
+  S.init({ db, storage: st, uid: 'u1', name: longName });
+  const f = await S.putOriginal(file('long.pdf', 'long'), { kind: 'co', coKey: 'k', coName: longCoName });
+  const rec = out(await S.getOriginal(f.fileId));
+  assert.ok(rec.byName.length <= 60, '★ originals byName 이 60자를 넘습니다');
+  assert.ok(rec.from.coName.length <= 200, '★ from.coName 이 200자를 넘습니다');
+  const a = await S.addCoDoc({ coName: longCoName, fileId: f.fileId, title: 't', date: '2026-01-01', src: 'upload' });
+  const doc = out(await S.listCoDocs(a.coKey)).filter((d) => d.id === a.docId)[0];
+  assert.ok(doc.byName.length <= 60, '★ co_docs byName 이 60자를 넘습니다');
 });
 
 test('거절되는 파일은 창고를 안 두드린다', async () => {

@@ -62,10 +62,19 @@ test('ⓐ 보관함에 지우기 단추가 없다', () => {
   assert.ok(!/삭제|지우기|\.remove\(\)|unlink/.test(m.replace(/양식 삭제됨/g, '')), '★★ 보관함 화면에 지우는 길이 있습니다');
 });
 
+/* ⚠ innerHTML 을 비우는 것( = '' )만 봐준다 — 그 밖엔 뭘 붙였든(따옴표로 시작해도)
+   걸어야 한다. 옛 잣대는 «= 뒤 첫 글자가 따옴표가 아닐 때»만 봤는데, 그러면
+   `root.innerHTML = '<b>' + x` 처럼 따옴표로 시작해 문자열을 잇는 조립은 빠져나갔다. */
+const RX_BAD_INNER = /innerHTML\s*\+=|innerHTML\s*=(?!\s*''\s*[;,)])/;
 test('ⓔ 사용자 값을 innerHTML 에 조립하지 않는다', () => {
   const s = stripJs(SRC);
-  const bad = s.split('\n').filter((l) => /innerHTML\s*=\s*[^'"\s;]/.test(l) || /innerHTML\s*\+=/.test(l));
+  const bad = s.split('\n').filter((l) => RX_BAD_INNER.test(l));
   assert.deepEqual(bad, [], '★★ innerHTML 에 값을 조립합니다: ' + bad.join(' | '));
+});
+
+test('ⓔ 잣대 자체 — 비우기는 봐주고, 조립은 잡는다', () => {
+  assert.equal(RX_BAD_INNER.test("root.innerHTML = '';"), false, '★ innerHTML 비우기까지 걸렸습니다');
+  assert.equal(RX_BAD_INNER.test("x.innerHTML = '<b>' + y;"), true, '★★ 따옴표로 시작하는 조립을 못 잡습니다');
 });
 
 test('backfill() — dataUrlToBytes 오류 처리 (모든 항목이 완료됨)', () => {
@@ -100,7 +109,9 @@ test('ⓓ 가져오기는 사진첩을 «읽기만» 한다', () => {
   assert.match(m, /photos\.loadFull\(/);
   assert.ok(!/photos\.(save|delete|replace|setShare|addShare|saveRead|move)/i.test(m), '★★ 사진첩 원본을 고칩니다');
   assert.match(m, /kind: 'photo'/, '보관함 기록에 사진첩에서 왔다는 것을 안 남깁니다');
-  assert.match(m, /String\(/, 'from.year 를 문자열로 안 바꿉니다 — 규칙(from.$f 문자열)에 막힙니다');
+  assert.match(m, /year: String\(it\.year\)/, 'from.year 를 문자열로 안 바꿉니다 — 규칙(from.$f 문자열)에 막힙니다');
+  assert.match(m, /photoId: String\(it\.id\)/, 'from.photoId 를 문자열로 안 바꿉니다 — 규칙(from.$f 문자열)에 막힙니다');
+  assert.match(m, /owner: String\(host\.uid/, 'from.owner 를 문자열로 안 바꿉니다 — 규칙(from.$f 문자열)에 막힙니다');
 });
 
 test('★ 「이 회사에서 빼기」는 연결만 끊는다', () => {
