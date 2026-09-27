@@ -3795,14 +3795,18 @@ function _aiDownload(){
 var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', agreement:'공동', charter:'공동', contrib:'공동',
   reg_apply:'공동', reg_accept:'공동', reg_roster:'공동', reg_seal:'공동', reg_sealpaper:'공동', reg_sealcard:'공동',
   reg_proxy:'공동', reg_license:'공동', tax_bizreg:'공동', tax_sublease:'공동', tax_lease:'공동', tax_hometax:'공동',
-  ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
+  ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동',
+  sub_required:'공동', subsidy:'공동', sub_welfare_plan:'공동', sub_assets:'공동', sub_payment:'공동',
+  sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
 var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues,
   agreement:_hwpAgreementValues, charter:_hwpCharterValues, contrib:_hwpContribValues,
   reg_apply:_hwpRegValues, reg_accept:_hwpRegValues, reg_roster:_hwpRegValues, reg_seal:_hwpRegValues,
   reg_sealpaper:_hwpRegValues, reg_sealcard:_hwpRegValues, reg_proxy:_hwpRegValues, reg_license:_hwpRegValues,
   tax_bizreg:_hwpTaxValues, tax_sublease:_hwpTaxValues, tax_lease:_hwpTaxValues, tax_hometax:_hwpTaxValues,
-  ops_asset_change:_hwpOpsValues, ops_minutes_scope:_hwpOpsValues, ops_minutes_use:_hwpOpsValues};
+  ops_asset_change:_hwpOpsValues, ops_minutes_scope:_hwpOpsValues, ops_minutes_use:_hwpOpsValues,
+  sub_required:_hwpSubValues, subsidy:_hwpSubValues, sub_welfare_plan:_hwpSubValues, sub_assets:_hwpSubValues,
+  sub_payment:_hwpSubValues, sub_checklist:_hwpSubValues, sub_contrib:_hwpSubValues, sub_oath:_hwpSubValues};
 /* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다(사내는 HTML 로 둔다) */
 var HWP_TPL_STRICT={charter:1};
 function _hwpTplFits(kind,f){ return !HWP_TPL_STRICT[kind] || ((f&&f.fund_type==='사내')?'사내':'공동')===HWP_TPL_KINDS[kind]; }
@@ -4085,6 +4089,84 @@ function _hwpOpsValues(f,sites){
       변경금액:(d.diff<0?'△ ':'')+W(Math.abs(d.diff)), 변경사유:bfReason(d.items,true)}; }),
     연도:String(S.year||''), 출연금:amt>0?amt.toLocaleString():'', _note:note};
 }
+/* ⑤ 지원금 여덟(필요서류·지원신청서·복지사업계획서·재산목록표·지급신청서·자율체크리스트·출연확인서·서약서).
+   HTML 과 같은 곳에서: 장부·목적사업(_docRok — 별지15호 buildF15 와 같은 산출), 그 해 지원금 기록(f.years[yr].subsidy),
+   참여사업장 연도별 출연금(sy). 이 기금·이 해 것이 아니면 숫자를 비우고 안내한다.
+   ⚠ 계좌·착안사항(해당/비해당)·제출서류 확인란은 비운다 — 사람이 보고 적을 일이다(HTML 과 같다).
+   ⚠ 지원신청서의 복지사업 종류·지원받은 사실 체크는 지운다 — 기금마다 다르다. 「둘 이상의 기업이 공동기금에 출연」만 둔다. */
+function _hwpSubValues(f,sites,kind){
+  f=f||{}; sites=sites||[];
+  var b=_boss(f), x=_docRok(), yr=S.year, su=((f.years||{})[yr]||{}).subsidy||{}, notes=[];
+  var today=_hwpTodayIso(), dot=_hwpKoDate2(today,[' ',' ']).replace(/년 |월 /g,'. ').replace('일','.');
+  var K=function(v){ return Number(Math.round(v||0)).toLocaleString(); };
+  var W=function(v){ return v?K(v)+'원':'원'; };
+  /* 복지사업 개요 표는 원본이 «천원» 단위다(머리 「(천원)」, 값 「6,500원」) — 원 단위로 넣었더니 좁은 칸에서 꺾였다 */
+  var WK=function(v){ return v?K(v/1000)+'원':'원'; };
+  var act=(sites.length?sites:(x&&x.sites)||[]).filter(function(s){ return s.status!=='closed'; });
+  if(!x&&(!kind||DOC_NEEDS_LEDGER[kind])) notes.push('회계·결산과 목적사업 숫자를 아직 못 읽어 금액 칸을 비웠습니다.');
+  /* 복지사업 — 대부사업은 자산이라 빼고, 예산(없으면 집행액)이 있는 것만 */
+  var amt=x?subAmounts(x.welf,'budget'):null;
+  var plans=x?(x.welf||[]).filter(function(w){ return w.category!=='대부사업'&&(num(w.budget)||num(w.spent)); }):[];
+  var cats=x?(x.welf||[]).map(function(w){ return String(w.category||''); }).filter(function(c){ return c&&c!=='대부사업'; }):[];
+  cats=cats.filter(function(v,i){ return cats.indexOf(v)===i; });
+  /* 재산목록 — 기본재산은 별지15호 ㉑~㉘ 기금 운용 방법, 보통재산 = 자산 총계 - 기본재산 */
+  var basic=[], ord=0;
+  if(x){
+    var R=x.R;
+    /* [이름 칸, 금액, 종류 칸] — 원본 이름 칸은 두세 글자 폭이다(「현금 │ 보통예금」). HTML 의 긴 이름
+       (「금융회사 예입ㆍ예탁」)을 넣었더니 네 줄로 꺾여 서명까지 둘째 쪽으로 밀렸다(한글로 봄). 뜻은 같게, 짧게 */
+    basic=[['현금',R.run.deposit,'보통예금'],['신탁',R.run.trust,'수익증권'],['증권',R.run.secu,'유가증권'],
+      ['주식',R.run.own,'자사주'],['주식',R.run.reit,'리츠'],['기타',R.run.etc,'기타운용'],['대부',R.run.loan,'근로자대부']]
+      .filter(function(r){ return r[1]>0; });
+    ord=Math.max(Math.round(x.fin.totalAssets)-Math.round(R.bfEnd),0);
+    if(basic.length>5&&(!kind||kind==='sub_assets')) notes.push('기본재산 운용이 '+basic.length+'가지라 재산목록표 줄(다섯)이 모자랍니다 — 여섯째부터는 손으로 적어 주세요.');
+  }
+  var bSum=basic.reduce(function(t,r){ return t+r[1]; },0);
+  var col=function(i){ return basic.map(function(r){ return i===1?K(r[1]):i===3?'1':i===4?'출연금':String(r[i]||''); }); };
+  var pad=function(a){ a=a.slice(0,5); while(a.length<5) a.push(' '); return a; };
+  /* 출연 — 그 해 연도별 기록의 출연금(확인서·체크리스트), 없으면 사업장 기본 출연금(지원신청서) */
+  var sy=(x&&x.sy)||{}, cOf=function(s){ return num((sy[s._id]||{}).contrib)||0; };
+  var givers=act.map(function(s){ return {회사:String(s.name||''), 대표이사:String(s.ceo||''), n:cOf(s)}; })
+    .filter(function(c){ return c.n>0; });
+  if(x&&!givers.length&&(!kind||kind==='sub_contrib')) notes.push(yr+'년에 출연한 사업장이 없어 기금출연확인서를 빈 한 장으로 두었습니다.');
+  var con=givers.reduce(function(t,c){ return t+c.n; },0);
+  var A=num(su.decided_amount)||0, B=su.paid_date?A:0;
+  var biz=act.map(function(s){ return String(s.biz_type||'').trim(); }).filter(Boolean);
+  biz=biz.filter(function(v,i){ return biz.indexOf(v)===i; });
+  var emp=act.reduce(function(t,s){ return t+(num(s.company_size)||0); },0);
+  var V={기금명:String(f.name||''), 기금소재지:String(f.address||''), 전화:_dashPhone(f.phone)||String(f.phone||''),
+    대표자:String(b.name||f.chairman||''), 인가번호:String(f.inka_no||''), 법인등록번호:String(f.corp_reg_no||''),
+    신청일:dot, 신청일2:_hwpKoDate(today,[' ',' ']),
+    /* 지원신청서 */
+    지원신청금액:num(su.request_amount)?K(su.request_amount)+'원':'',
+    /* 복지사업계획서 — 총지출·항목 여덟(SUB_ROWS 차례) */
+    총지출:WK(amt&&amt._total),
+    사업:plans.map(function(w){ var v=num(w.budget)||num(w.spent)||0, c=num(w.beneficiaries)||0;
+      return {사업명:String(w.name||''), 목적:String(w.purpose||'근로자 복지 증진'), 대상인원:c?c+'명':'',
+        소요금액:v?K(v)+'원':'', 산출근거:(v&&c)?(c+'명 × '+K(Math.round(v/c))+'원'):'', 방법:String(w.method||'')}; }),
+    /* 재산목록표 */
+    기본종류:pad(col(0)), 기본수량:pad(col(3)), 기본금액:pad(col(1)), 기본구분:pad(col(2)), 기본원인:pad(col(4)),
+    기본계:x?K(bSum):'', 보통종류:ord?'운영':'', 보통수량:ord?'1':'', 보통금액:ord?K(ord):'', 보통계:x?K(ord):'', 재산합계:x?K(bSum+ord):'',
+    /* 지급신청서 */
+    결정액:A?K(A):'', 받은액:B?K(B):'0', 남은액:A?K(A-B):'',
+    /* 자율체크리스트 */
+    지역:String(f.region||''), 참여회사:act.map(function(s){ return s.name; }).filter(Boolean).join(', '),
+    인가일:f.inka_date?_dotDate(f.inka_date):'', 업종:biz.join(', '), 근로자수:emp?emp+'명':'',
+    기금규모:x?K(x.R.bfEnd/1000):'', 지원내용:cats.join(', '), 출연금액:con?K(con):'',
+    신청금액2:num(su.request_amount)?K(su.request_amount):'',
+    /* 출연확인서 — 한 곳에 한 장 */
+    확인서:givers.map(function(c){ return {회사:c.회사, 대표이사:c.대표이사, 금액한글:korWon(c.n), 금액숫자:K(c.n)}; })};
+  if(amt) SUB_ROWS.forEach(function(r,i){ V['항목'+(i+1)]=WK(amt[r[0]]); });
+  else SUB_ROWS.forEach(function(r,i){ V['항목'+(i+1)]='원'; });
+  if((!kind||kind==='sub_assets')&&Math.round(bSum)&&x&&Math.round(bSum)!==Math.round(x.R.bfEnd))
+    notes.push('재산목록표 기본재산 합계 '+K(bSum)+'원이 기본재산 총액 '+K(x.R.bfEnd)+'원과 다릅니다 — 운영상황보고서 ㉑~㉘ 을 확인해 주세요.');
+  if(kind==='sub_payment') notes.push('항목별 칸은 지원결정금액을 어떻게 나눠 쓸지입니다 — 결정 내용을 보고 적어 주세요'
+    +(amt&&amt._total?' (참고: '+yr+'년 복지사업 계획 '+SUB_ROWS.filter(function(r){ return amt[r[0]]; })
+      .map(function(r){ return r[0]+' '+K(amt[r[0]])+'원'; }).join(' · ')+')':'')+'. 계좌는 통장을 보고 직접 적어 주세요.');
+  if(kind==='sub_checklist') notes.push('착안사항·제출서류 확인란은 비워 두었습니다 — 서류를 보고 사람이 판단할 일입니다.');
+  if(notes.length) V._note=notes.join(' · ');
+  return V;
+}
 /* ★ 2026-09-26 — 채우기를 «한글 XML(HWPX)에서 직접» 한다 (js/pu-hwpx-fill.js).
    대표 「줄칸 간격등 정리가 계속 안된다 … 근본적 해결 … 기존서류와 같이」 → 서식을 원본 한글 틀로 옮기다가,
    사업계획서의 «표 안의 표»(기금예치 계획)를 rhwp 의 찾기·바꾸기가 못 보는 것을 알았다(찾기 0건).
@@ -4173,7 +4255,7 @@ function _hwpRelayout(doc){
 /* 서식마다 «표지 이름 → 값»을 내는 함수. 값은 HTML 서식이 쓰던 같은 셈에서 온다. 틀이 늘면 여기 는다 */
 function _hwpValuesFor(kind,f,sites){
   var fn=HWP_TPL_VALUES[kind]||_hwpTplValues;
-  return fn(f||{},sites||[]);
+  return fn(f||{},sites||[],kind);                     // kind — 여러 서식이 한 값 함수를 쓸 때 서식별 안내를 가르려고
 }
 /* 틀 채우기 — 결과는 HWPX 바이트(한글이 바로 연다). 채운 문단만 줄을 새로 나눈다 */
 function hwpTplFill(kind,f,sites){
