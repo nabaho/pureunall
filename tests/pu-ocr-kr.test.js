@@ -118,3 +118,9 @@ test('★ 취업규칙 서고(rules.html) — 한국어 OCR 먼저, 이 창 안�
   const v = (FUND.match(/js\/pu-ocr-kr\.js\?v=(\d+)/) || [])[1];
   assert.ok(H.includes("s.src='js/pu-ocr-kr.js?v=" + v + "'"), 'rules.html 모듈 판이 fund.html 과 같다');
 });
+
+test('실행기 경고를 끈다 — 모델에 남은 안 쓰는 값 때문에 콘솔이 빨간 글 수십 줄로 덮인다(진짜 오류가 묻힌다)', () => {
+  const M = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-ocr-kr.js'), 'utf8');
+  assert.match(M, /ort\.env\.logLevel = 'error';/);
+  assert.match(M, /logSeverityLevel: 3/);
+});
