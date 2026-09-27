@@ -80,13 +80,14 @@ test('★ 문서에 적은 모델이 코드와 같다', () => {
 
 test('★ 문서에 적은 max_tokens 가 코드와 같다', () => {
   assert.match(erp, /max_tokens:800/);
-  assert.match(erp, /max_tokens: 1000/);
+  /* 1000(도우미)은 2026-09-27 도우미째 걷어냈다 */
   assert.match(work, /max_tokens:8000/);
-  assert.match(doc, /800\(요약\) · 1000\(도우미\) · 8000\(업무관리\)/);
+  assert.match(doc, /800\(요약\) · 8000\(업무관리\)/);
+  assert.ok(doc.indexOf('1000(도우미)') < 0, '걷어낸 도우미를 문서가 아직 안내합니다');
 });
 
 test('★ 문서에 적은 시간 제한이 코드와 같다', () => {
-  assert.equal((erp.match(/\}, 45000\)/g) || []).length, 2, '푸른이알피 두 곳 45초');
+  assert.ok((erp.match(/\}, 45000\)/g) || []).length >= 1, '푸른이알피 45초(AI 요약)');
   assert.match(work, /var AI_WAIT_MS=60000;/);
   assert.match(doc, /45초\(푸른이알피\)·60초\(업무관리\)/);
 });
