@@ -22,6 +22,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { cutFn } = require('./cut-fn.js');
+const { stripJs } = require('./strip-comments.js');
 
 const ROOT = path.join(__dirname, '..');
 const STORE = fs.readFileSync(path.join(ROOT, 'js', 'pu-photo-store.js'), 'utf8');
@@ -242,10 +244,10 @@ test('내 사진은 관리자가 아니어도 내가 연다', async () => {
 });
 
 test('★★ 판독이 끝나는 길목(saveRead) 한 곳에서 걸린다', () => {
-  const src = STORE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
-  const from = src.indexOf('function saveRead(');
-  assert.ok(from > 0, 'saveRead 를 못 찾았습니다');
-  const body = src.slice(from, from + 700);
+  /* ⚠ 고정 폭(700자)으로 자르지 않는다 — saveRead 가 길어지자 끝 11자를 못 봤다
+       (tests/test-cut-truncation.test.js 가 잡았다). 함수 «전체»를 본다. */
+  const body = stripJs(cutFn(STORE, 'function saveRead(') || '');
+  assert.ok(body, 'saveRead 를 못 찾았습니다');
   assert.match(body, /govQueue\(/,
     '판독 결과를 저장하는 자리에서 안 걸립니다 — 부르는 쪽마다 걸면 꼭 한 곳이 빠집니다');
 });
