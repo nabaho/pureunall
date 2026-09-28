@@ -105,13 +105,18 @@ test('⑦ 켠 채로 기억한다 — 이 기기에서만(localStorage), 서버�
   assert.match(전환, /render\(\)/, '판을 바꾼 뒤 다시 안 그립니다 — 칸·칩 색이 안 따라옵니다');
 });
 
-test('⑧ 어두운판 값도 팔레트 27색 + 흰/검 안에서만 고른다', () => {
+/* 2026-09-28 — 어두운판을 구글 캘린더 어두운 화면 값으로 바꿨다(대표 「추천대로」). 그 값들은
+   tests/color-palette-apps.test.js 의 pu-cal 예외에 까닭과 함께 올라 있다 — 여기서도 «그 목록 안»이면 된다.
+   그 밖의 새 색은 여전히 막는다. */
+const 구글어둠 = ['#131314', '#1b1b1d', '#e3e3e3', '#9aa0a6', '#80868b', '#8ab4f8', '#3c4043'];
+test('⑧ 어두운판 값도 팔레트 27색 + 흰/검 + 구글 어두운 화면 값 안에서만 고른다', () => {
   const 뿌리다크 = (캘린더.match(/:root\[data-theme="dark"\]\{([^}]*)\}/) || [])[1];
   assert.ok(뿌리다크, '어두운판 뿌리 색표(:root[data-theme="dark"])가 없습니다');
   const 밖 = [];
   for (const m of 뿌리다크.matchAll(/#[0-9a-fA-F]{3,8}\b/g)) {
     const c = P.norm(m[0]);
-    const 있음 = [].concat(...Object.values(P.PALETTE)).includes(c) || c === '#ffffff' || c === '#000000';
+    const 있음 = [].concat(...Object.values(P.PALETTE)).includes(c) || c === '#ffffff' || c === '#000000'
+      || 구글어둠.includes(c);
     if (!있음) 밖.push(c);
   }
   assert.strictEqual(밖.length, 0, '팔레트 밖 색: ' + 밖.join(', '));
@@ -138,4 +143,24 @@ test('⑨ 어두운판에서 「오늘·공휴일·찾음」 칸을 옅게 칠�
   const 어둠갈래 = 계산.slice(i, j);
   assert.strictEqual(/fffbeb|fef2f2/.test(어둠갈래), false,
     '어두운판 갈래에도 옅은 칠(오늘·공휴일)을 씁니다 — 글자가 안 읽힙니다: ' + 어둠갈래);
+});
+
+test('⑩ 어두운판에서는 앞으로의 칩을 원색보다 «조금» 눅인다 — 밝은판은 원색 그대로 (2026-09-28)', () => {
+  const vm2 = require('node:vm');
+  function 칩(theme) {
+    const b = { console, String, Object, Array, JSON, Math, Date, S: { theme },
+      todayYMD: () => '2026-09-01', esc: (s) => String(s == null ? '' : s) };
+    vm2.createContext(b);
+    ['function mixHex(hexA, hexB, t){', 'function chipHtml(e, ymd){'].forEach((h) => vm2.runInContext(함수몸(캘린더, h), b));
+    b.__e = { store: 'gcal', id: 'a', date: '2026-10-05', end: '2026-10-05', color: '#33b679', text: '가나상사', tip: '' };
+    return vm2.runInContext('chipHtml(__e, "2026-10-05")', b);
+  }
+  assert.match(칩('light'), /background:#33b679/, '밝은판 원색이 바뀌었습니다');
+  const 어둠 = 칩('dark');
+  const bg = (어둠.match(/background:(#[0-9a-f]{6})/) || [])[1];
+  assert.ok(bg && bg !== '#33b679', '어두운판에서도 원색 그대로입니다 — 어두운 바탕에서 부십니다');
+  const 밝기 = (h) => { const n = parseInt(h.slice(1), 16); return (n >> 16 & 255) + (n >> 8 & 255) + (n & 255); };
+  assert.ok(밝기(bg) > 밝기('#33b679') * 0.7, '너무 눅여 색이 묻혔습니다: ' + bg);
+  assert.strictEqual(/#1e293b/.test((캘린더.match(/:root\[data-theme="dark"\]\{([^}]*)\}/) || [])[1]), false,
+    '어두운판 판색이 남색으로 되돌아왔습니다 — 바깥과 테가 다시 번쩍입니다');
 });

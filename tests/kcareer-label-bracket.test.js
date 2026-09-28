@@ -57,6 +57,11 @@ test('★★ 「소속·직위」는 둘을 «이어» 쓴다 — 한쪽만 넣�
       getProfileInfo: () => info, get: () => [], workPeriod: () => '',
       formatDate: (x) => x || '', isAwardType: () => false };
     vm2.createContext(ctx);
+    /* ⚠ 어학 가르개(2026-09-28)는 _cvFillData 가 «실제로» 부르는 함수다 — 진짜를 넣는다 */
+    const lh = bare.indexOf('function _isLangCert(');
+    let li = bare.indexOf('{', lh), ld = 0;
+    for (; li < bare.length; li++) { if (bare[li] === '{') ld++; else if (bare[li] === '}') { ld--; if (!ld) break; } }
+    vm2.runInContext(bare.slice(lh, li + 1), ctx);
     vm2.runInContext(bare.slice(head, i + 1), ctx);
     return vm2.runInContext('_cvFillData()', ctx).fields;
   };

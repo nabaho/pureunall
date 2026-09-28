@@ -46,10 +46,10 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/pu-news-core.js?v=46"></script>
+<script src="js/pu-news-core.js?v=47"></script>
 <!-- ⚠ 편지 짓개(tpl)보다 «먼저» 싣는다 — tpl 이 「장면이 있나」를 이것에게 묻는다 -->
 <script src="js/pu-news-show.js?v=1"></script>
-<script src="js/pu-news-tpl.js?v=44"></script>
+<script src="js/pu-news-tpl.js?v=45"></script>
 <!-- ⚠ 편지 짓개(tpl) «다음»에 싣는다 — 안내문이 그 빛깔(Tpl.색)을 빌린다 -->
 <script src="js/pu-news-notice.js?v=3"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
@@ -126,7 +126,6 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .ways .sep{width:1px;height:16px;background:var(--line)}
 .ways .tail{margin-left:auto;font-size:11px;color:var(--faint)}
 .ways .tail a{color:var(--sub);cursor:pointer;text-decoration:underline}
-.way.on{box-shadow:0 0 0 2px var(--brown-soft)}
 
 /* ★★ 회차 머리 = «폴더 탭» 한 상자 (대표 지시 2026-09-27
       「추천대로 하되 아래줄로 내려오게 말고 각자 자기줄에 내용이 모두 들어갈수 있게 정렬해라」)
@@ -201,9 +200,6 @@ input,select,textarea{font-family:inherit;font-size:14px}
     .nowtop .hdbar .meta,.nowtop .wt .ic{display:none}
   }
 }
-.law-ok{background:#dcfce7;color:var(--ok)}
-.law-mid{background:#fef3c7;color:var(--warn)}
-.law-bad{background:#fee2e2;color:var(--bad)}
 
 /* 대표 지시 2026-09-02: 「좌측에 채울것과 우측에 나갈 모습 크게 5:5로」 */
 .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px;
@@ -356,11 +352,6 @@ table.list.fz th.cap .cnt{font-size:11px;font-weight:800;color:var(--sub);backgr
   padding:2px 8px;border-radius:99px}
 /* 주소 없는 곳 탭 — 찾는 칸 */
 .nafind{width:auto!important;flex:0 1 260px;padding:6px 10px!important;line-height:1.4!important}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
-.grid2 .wide{grid-column:1 / -1}
-@media(max-width:700px){.grid2{grid-template-columns:1fr}}
-.sect{font-size:12px;font-weight:800;color:var(--brown);background:var(--brown-soft);
-  padding:6px 15px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .hint{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.65}
 
 .pv{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;position:sticky;top:12px}
@@ -403,10 +394,6 @@ table.list.fz th.cap .cnt{font-size:11px;font-weight:800;color:var(--sub);backgr
 .pv iframe{width:100%;border:0;background:#fff;display:block}
 
 table.list{width:100%;border-collapse:collapse;font-size:13px}
-/* ── 설정 3열 격자 (대표 결정 2026-09-03 「가」) ──
-   ⚠ 좁은 화면에서는 두 열 → 한 열로 접힌다. 3열을 그대로 밀어붙이면
-     노트북·폰에서 칸이 짜부라져 주소가 안 보인다. */
-.pad.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 12px}
 /* ★ 설정이 «반 폭»으로 들어갔다 (대표 지시 2026-09-07)
      「뉴스레터 설정 화면은 정리해서 왼쪽절반에 넣고 자료 가지고 오는것은 오른쪽절반으로」
    ⚠ 그 폭에 3열을 밀면 칸이 짜부라진다 — 반 폭에서는 «2열»이다.
@@ -467,12 +454,6 @@ details.fold .in{padding:0 12px 12px;display:grid;gap:10px 12px;
 details.fold .in .w2{grid-column:span 2}
 @media(max-width:560px){ details.fold .in{grid-template-columns:1fr}
   details.fold .in .w2{grid-column:span 1} }
-.pad.g3 .w2{grid-column:span 2}
-.pad.g3 .w3{grid-column:span 3}
-@media(max-width:900px){ .pad.g3{grid-template-columns:1fr 1fr}
-  .pad.g3 .w2,.pad.g3 .w3{grid-column:span 2} }
-@media(max-width:560px){ .pad.g3{grid-template-columns:1fr}
-  .pad.g3 .w2,.pad.g3 .w3{grid-column:span 1} }
 /* ── ⓘ 말풍선 — 사용액 창(enter.html .btip)과 «같은 결» ──
    ★ 안내를 지우는 것이 아니라 «접는» 것이다. 칸 9개에 안내가 617자였다.
    ⚠ 폰에는 마우스 올리기가 없다 — 눌러서(focus-within) 도 펴지게 둔다.
@@ -1062,19 +1043,6 @@ function toast(msg, ms){
 }
 /* 이메일을 자리 열쇠로 — 파이어베이스가 못 쓰는 글자가 있다: . # $ / [ ] */
 function 주소열쇠(e){ return String(e||'').trim().toLowerCase().replace(/[.#$/[\]]/g,'_'); }
-
-/* 받는 분을 부를 «뜻 없는 번호» (대표 지시 2026-09-03 「고쳐라」).
-   ⚠ 예전에는 편지의 추적 주소에 메일 주소가 그대로 실렸다(?e=hong_example_kr).
-     받는 쪽 메일 프로그램·중계 서버·우리 서버 기록에 «누구인지»가 남았다.
-   ★ 짐작할 수 있으면 안 된다 — 짐작하면 남의 열람 표를 켤 수 있다. 넉넉히 길게 만든다.
-   ★ 서버(functions/news-track.js 새번호)와 «같은 모양»이어야 한다 —
-     대장에 적는 쪽과 찾는 쪽이 다르면 열람이 한 건도 안 잡힌다.
-   ⚠ 자리 이름이 되므로 파이어베이스가 쓸 수 있는 글자만 쓴다(영문·숫자). */
-function 새추적번호(){
-  let s = '';
-  while(s.length < 22) s += Math.floor(Math.random() * Math.pow(36, 8)).toString(36);
-  return s.slice(0, 22);
-}
 
 /* ══════════════════════════════════════════════════════════════════════════
    시작
@@ -1787,7 +1755,7 @@ async function 창고자리채움(){
 async function 판례거리읽기(){
   try{
     const v = await db.ref('homepage/newsPrec/모음').once('value');
-    App.판례거리 = 최근것(v.val(), 6);
+    App.판례거리 = Core.최근것(v.val(), 6);
     render();
   }catch(e){ /* 조용히 */ }
 }
@@ -2072,16 +2040,7 @@ async function AI초안짓기(){
        ★ 그래서 «참고가 있는 것과 없는 것을 갈라» 시킨다.
          참고 있음 → 두 문장(참고에서 «확인되는» 사실 + 실무 포인트)
          참고 없음 → 제목을 우리 말로 옮긴 «한 문장»만. 없는 사실을 한 글자도 안 보탠다. */
-    const 지시 = '당신은 푸른노무법인의 뉴스레터 편집자입니다. 아래 공개 기사 정보만 근거로 '
-      + '각 항목을 한국어로 정리하세요.\n'
-      + '· 「참고」가 있는 항목: 2문장. 첫 문장은 참고에서 확인되는 사실, '
-      + '둘째 문장은 사업주·인사담당자가 확인할 실무 포인트.\n'
-      + '· 「참고」가 비어 있는 항목: 제목을 우리 말로 바꾼 1문장만. '
-      + '제목에 없는 사실·숫자·전망을 한 글자도 보태지 마세요.\n'
-      + '주어진 정보에 없는 숫자·날짜·판단은 절대 만들지 말고, 정보가 부족하면 단정하지 마세요. '
-      + '원문 문장을 그대로 복사하지 마세요. '
-      + '다른 설명 없이 JSON 배열만 답하세요. 모양: [{"번호":0,"초안":"..."}]\n\n'
-      + JSON.stringify(자료);
+    const 지시 = Core.기사초안지시(자료);    /* 「참고」 있는 것·없는 것을 갈라 시키는 규칙은 거기 */
     const 답 = await PuAiCall.ask([{ text:지시 }], {
       auth:firebase.auth(), fetch:window.fetch.bind(window), app:'news',
       generationConfig:{ temperature:0, maxOutputTokens:4096 }
@@ -2116,11 +2075,8 @@ async function AI초안짓기(){
      공들여 쓰신 한마디가 소리 없이 사라지고 되돌릴 길이 없다.
    ★ 지은 글은 우리글초안 에도 적어 둔다 — 화면이 「이건 기계가 쓴 초안입니다」를
      말할 수 있어야, 읽어 보지 않고 내보내는 일이 안 생긴다. */
-/* ★★ 핵심에 밑줄 (대표 지시 2026-09-27 「인사노무관리에서 핵심내용은 아랫줄 표시 했으면 좋겠다」)
-     글 속 __핵심__ 이 편지에서 밑줄이 된다(PuNewsTpl 의 밑줄그리기). 짓는 지시와
-     「밑줄 긋기」 단추가 «같은 말»을 쓰도록 한 곳에 둔다. */
-const 밑줄지시 = '· 사업장이 꼭 챙겨야 할 핵심 2~3곳을 «한 구절씩» __ 와 __ 로 감싸세요'
-  + ' (예: __10월 1일부터 시행__). 문장 전체나 첫머리를 감싸지 마세요.\n';
+/* ★★ 핵심에 밑줄 (대표 지시 2026-09-27) — 글 속 __핵심__ 이 편지에서 밑줄이 된다(PuNewsTpl.밑줄그리기).
+     짓는 지시와 「밑줄 긋기」가 같은 말을 쓰도록 Core.밑줄지시 «한 곳»에 둔다. */
 
 /* 이미 쓴 한마디에 밑줄«만» 긋는다 — 글자는 한 자도 안 바꾼다.
    ⚠⚠ 법률 글이다. AI 가 «밑줄을 긋는 김에» 날짜 하나라도 고치면 그대로 143곳에 나간다.
@@ -2136,7 +2092,7 @@ async function 한마디밑줄긋기(){
   try{
     const 지시 = '아래는 푸른노무법인 뉴스레터의 「이번 주 한마디」입니다.\n'
       + '★ 글자·띄어쓰기·문장부호를 한 자도 바꾸지 말고, 밑줄 표만 넣어서 그대로 돌려주세요.\n'
-      + 밑줄지시
+      + Core.밑줄지시
       + '다른 설명 없이 «본문만» 답하세요.\n\n' + 원문;
     const 답 = await PuAiCall.ask([{ text:지시 }], {
       auth:firebase.auth(), fetch:window.fetch.bind(window), app:'news',
@@ -2178,27 +2134,9 @@ async function 한마디초안짓기(조용히){
        AI 는 법률 사항을 쓸 수가 없다(날짜·사건번호를 모르니 지어내거나 뭉갠다).
      ⚠⚠ 빈 칸은 «아예 안 넘긴다». 빈 칸을 넘기면 AI 가 그 자리를 채우려 든다 —
        회차에 적힌 것만 있어야 「지어내지 마세요」가 지켜진다. */
-  const 거리 = [];
-  const 넣 = (o, k, v, 한도) => {
-    const s = String(v == null ? '' : v).replace(/\s+/g,' ').trim();
-    if(s) o[k] = s.slice(0, 한도 || 80);
-  };
-  Core.꼭지들.forEach(function(g){
-    if(g.갈래 === '우리글') return;
-    (d.안[g.키] || []).forEach(function(x){
-      if(!x) return;
-      const t = String(x.우리말 || x.한줄 || x.제목 || '').replace(/\s+/g,' ').trim();
-      if(!t) return;
-      const 한 = { 꼭지:g.이름, 글:t.slice(0,180) };
-      넣(한, '갈래', x.갈래);
-      넣(한, '시행일', x.시행일);          /* 법령 — 「언제부터」가 법률 사항의 알맹이다 */
-      넣(한, '사건번호', x.인용);          /* 판례·행정해석 — 어느 사건이 정한 것인가 */
-      넣(한, '딱지', x.딱지);              /* [판례] / [행정해석] — 무게가 다르다 */
-      넣(한, '발행처', x.발행처);
-      넣(한, '요지', x.요지, 160);
-      거리.push(한);
-    });
-  });
+  /* ⚠ 뽑는 규칙(빈 칸은 안 넘긴다 · 한마디 꼭지 자신은 뺀다)은 Core.한마디거리 한 곳에 있다 —
+       금요일 자동 준비(서버)도 같은 것을 부른다. */
+  const 거리 = Core.한마디거리(d);
   if(거리.length < 2){
     if(!조용히) toast('담긴 것이 모자라 한마디를 지을 수 없습니다 — 먼저 채워 주세요', 8000);
     return false;
@@ -2211,23 +2149,7 @@ async function 한마디초안짓기(조용히){
          법률 글은 틀리면 더 나쁘다: 시행일 하루만 어긋나도 사업장이 그대로 따라 한다.
        ★ 그래서 「없으면 그 대목을 통째로 빼라」를 따로 못 박는다. 이것이 없으면
          AI 는 빈 칸을 채우려고 그럴듯한 날짜를 지어낸다. */
-    const 지시 = '당신은 푸른노무법인의 뉴스레터 편집자입니다. 아래는 이번 주 뉴스레터에 '
-      + '실릴 항목들입니다. 이것만 근거로 「이번 주 한마디」를 한국어로 쓰세요.\n'
-      + '★ 이 글의 중심은 «이번 주 노동법률 사항»입니다. 다음 차례로 씁니다.\n'
-      + '  ① 이번 주에 바뀌거나 시행되는 법령·제도 — 무엇이, 언제부터\n'
-      + '  ② 판례·행정해석이 정한 기준 — 어느 사건이, 무엇을\n'
-      + '  ③ 그래서 사업장에서 확인할 것\n'
-      + '⚠ 아래 목록에 ①이나 ②에 해당하는 것이 없으면 그 대목은 «통째로 빼세요». '
-      + '없는 것을 만들어 넣지 마세요.\n'
-      + '· 5~7문장, 존댓말. 사업주와 인사담당자에게 건네는 말투.\n'
-      + '· 시행일·사건번호는 아래 목록에 «적힌 그대로»만 쓰세요. 없으면 적지 마세요.\n'
-      + '· 아래 목록에 없는 숫자·날짜·법령 이름·전망을 한 글자도 지어내지 마세요.\n'
-      + '· 「곧」·「예정」처럼 목록에 근거가 없는 앞날 이야기를 쓰지 마세요.\n'
-      + '· 특정 기사 제목을 그대로 옮기지 말고, 흐름으로 묶어 쓰세요.\n'
-      + '· 인사말(안녕하세요)과 맺음말(감사합니다)은 넣지 마세요.\n'
-      + 밑줄지시
-      + '다른 설명 없이 «본문만» 답하세요.\n\n'
-      + JSON.stringify(거리);
+    const 지시 = Core.한마디지시(거리);      /* 법률 글의 선(지어내지 말 것·없으면 통째로 뺄 것)은 거기 */
     const 답 = await PuAiCall.ask([{ text:지시 }], {
       auth:firebase.auth(), fetch:window.fetch.bind(window), app:'news',
       /* ⚠ 1024 → 1536 (2026-09-26). 5~7문장 + 법령·사건번호라 예전 한도에서는
@@ -2238,12 +2160,7 @@ async function 한마디초안짓기(조용히){
          예전 한도(1,200자)에 닿을 수 있는데, 글자 수로 뚝 자르면 「…시행일은」에서
          끊긴 채 편지에 실린다. 끝맺은 데까지만 남기는 편이 낫다.
        ⚠ 문장 끝을 못 찾으면 그때는 글자 수로 자른다 — 안 그러면 통째로 버리게 된다. */
-    let 글 = String(PuAiCall.textOf(답) || '').trim();
-    if(글.length > 1600){
-      const 자른 = 글.slice(0, 1600);
-      const 끝 = Math.max(자른.lastIndexOf('다.'), 자른.lastIndexOf('다!'), 자른.lastIndexOf('요.'));
-      글 = 끝 > 200 ? 자른.slice(0, 끝 + 2) : 자른;
-    }
+    const 글 = Core.한마디다듬기(PuAiCall.textOf(답));
     if(!글) throw new Error('AI 가 빈 답을 주었습니다');
     /* ⚠ 그 사이 대표께서 쓰셨을 수 있다 — 쓰기 «직전»에 한 번 더 본다 */
     const 이제 = 지금회차();
@@ -3003,32 +2920,6 @@ function 연습채우기(){
   }).catch(e=>toast('담지 못했습니다: ' + ((e&&e.message)||''), 8000));
 }
 
-/* 모아 둔 것(열쇠→칸)에서 «최근 모은 것»부터 몇 개.
-   ⚠ Object.keys 차례를 믿지 않는다 — 파이어베이스가 주는 차례는 열쇠 순이지 날짜 순이 아니다. */
-/* 자료 줄 세우기 — «값어치 먼저, 그 다음 최근».
-   ★ 값어치는 모으는 쪽이 매겨 record 에 적어 둔다(functions/news-docs.js).
-   ⚠ 옛 자료에는 그 칸이 없다 — 그때는 0 으로 본다. 보도자료(-1)보다는 위,
-     가이드(4)보다는 아래다. 새로 모으면 저절로 제자리를 찾는다.
-   ⚠ 값어치가 같으면 최근 것이 위다 — 같은 값어치끼리는 새것이 낫다. */
-function 값어치순(모아둔것, 몇개){
-  const 값 = x => { const v = Number(x && x.값어치); return isFinite(v) ? v : 0; };
-  return Object.keys(모아둔것 || {})
-    .map(k => (모아둔것||{})[k])
-    .filter(Boolean)
-    .sort((a,b) => (값(b) - 값(a))
-      || String(b.모은날||'').localeCompare(String(a.모은날||''))
-      || String(b.발행일||'').localeCompare(String(a.발행일||'')))
-    .slice(0, 몇개 || 8);
-}
-
-function 최근것(모아둔것, 몇개){
-  return Object.keys(모아둔것 || {})
-    .map(k => (모아둔것||{})[k])
-    .filter(Boolean)
-    .sort((a,b) => String(b.모은날||'').localeCompare(String(a.모은날||'')))
-    .slice(0, 몇개 || 8);
-}
-
 function 자동담기(){
   const d = 지금회차();
   /* 세 곳에서 «저마다» 온다 (대표 지시 2026-09-05):
@@ -3052,8 +2943,8 @@ function 자동담기(){
          ⚠ 모으는 쪽은 값어치를 매겨 두는데(functions/news-docs.js 자료값어치)
            화면이 그것을 통째로 버리고 있었다. 값을 매겨 놓고 안 쓰면 없는 것과 같다.
          ★ 판례는 그대로 «최근 순»이다 — 거기는 값어치 잣대가 없고, 새 판결이 곧 값이다. */
-      const 자료 = 값어치순(v[1].val(), 8);
-      const 판례 = 최근것(v[2].val(), 6);
+      const 자료 = Core.값어치순(v[1].val(), 8);
+      const 판례 = Core.최근것(v[2].val(), 6);
       App.판례거리 = 판례;                       /* 무엇이 밀렸는지 알림·요약에서 쓴다 */
       const 새것 = Core.자동으로담기(App.브리핑, {
         법령: Array.isArray(법령) ? 법령 : [], 자료: 자료, 판례: 판례
@@ -3207,16 +3098,6 @@ function 지역뉴스붙인명단(명단, d){
       regionHtml: Tpl.지역뉴스조각((d&&d.지역뉴스)||[], 지역),
       regionText: Tpl.지역뉴스평문((d&&d.지역뉴스)||[], 지역)
     });
-  });
-}
-
-/* 대량발송은 서버가 통마다 치환하지만 시험메일은 즉시발송 길을 쓴다.
-   추적 링크는 실제와 같게 둔 채 지역 자리만 여기서 한 번 치환한다. */
-function 지역판씌우기(편, d, 지역){
-  const 지역코드 = String(지역||'전국');
-  return Object.assign({}, 편, {
-    서식:String(편.서식||'').split('{지역뉴스}').join(Tpl.지역뉴스조각((d&&d.지역뉴스)||[], 지역코드)),
-    본문:String(편.본문||'').split('{지역뉴스평문}').join(Tpl.지역뉴스평문((d&&d.지역뉴스)||[], 지역코드))
   });
 }
 
@@ -3483,7 +3364,7 @@ async function 자동발송준비(){
   const 받는이 = {}, 보냄표 = {};
   const to = 지역뉴스붙인명단(r.ok, d).map(function(x){
     const 열 = String(x.email||'').trim().toLowerCase().replace(/[.#$/[\]]/g,'_');
-    const 번호 = 새추적번호();
+    const 번호 = Core.새추적번호();
     if(열){ 받는이[번호] = 열; 보냄표[열] = { 보냄:true }; }
     return Object.assign({}, x, { track:번호 });
   });
@@ -3508,7 +3389,7 @@ async function 시험발송(){
   /* 시험 주소는 자문사 명단에 없으므로 전국판을 넣는다. 지금편지()는 실제와 같은
      추적 링크를 유지하고, 대량발송 서버를 안 거치는 지역 자리만 직접 치환한다. */
   let 편 = 지금편지(); if(!편) return toast('실을 것이 없습니다');
-  편 = 지역판씌우기(편, 지금회차(), '전국');
+  편 = Tpl.지역판씌우기(편, 지금회차(), '전국');
   /* ★★ 보낼 때 «주소를 고른다» (대표 지시 2026-09-13
        「시험발송에서 샘플로 메일 주소 넣고 보낼수 있게 할 수 있나」
         「법인에서 권형하에게 개인에게 보내서 잘 가는지 확인하고 싶다」).
@@ -3671,7 +3552,7 @@ async function 진짜보내기(){
     보낼명단.forEach(function(x){
       const 열 = String(x.email||'').trim().toLowerCase().replace(/[.#$/[\]]/g,'_');
       if(!열) return;
-      x.track = 새추적번호();
+      x.track = Core.새추적번호();
       대장[x.track] = 열;
     });
     if(Object.keys(대장).length){
@@ -4387,16 +4268,10 @@ function 명단화면(){
   const 후보 = 명함후보();
 
   /* ★ 번호는 «보이는 차례»로 1번부터 붙인다 (대표 지시 2026-09-03 「넘버링해달라」).
-       유형 → 회사 이름 차례로 늘어놓아, 같은 유형이 붙어 보인다.
+       유형 → 회사 이름 차례로 늘어놓아, 같은 유형이 붙어 보인다(아래 사업장으로묶기 가 세운다).
      ⚠ 번호는 «이름표가 아니라 세는 수»다 — 거르면 다시 1번부터다.
        업체 번호처럼 고정된 것으로 여기면 「3번이 어제와 다르다」가 된다. */
   const 차례 = Core.유형들.reduce(function(m,t,i){ m[t.키]=i; return m; }, {});
-  function 늘어놓기(줄들){
-    return 줄들.slice().sort(function(a,b){
-      const d = (차례[a.유형]||0) - (차례[b.유형]||0);
-      return d !== 0 ? d : String(a.company||'').localeCompare(String(b.company||''), 'ko');
-    });
-  }
   /* 사람 칸을 «셋으로 갈랐다» — 이름 · 직책 · 연락처.
      대표 지시 2026-09-03: 「연락처를 아래에 두지말고 옆에두고 열을 일치시켜라」
      ⚠ 예전에는 연락처를 이름 «아래»에 작게 붙였다. 그러면 줄마다 높이가 달라지고

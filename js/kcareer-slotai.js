@@ -134,7 +134,7 @@
     if (!한도) {
       /* 자리가 없으면 «세기만» 한다 — 조용히 빠지면 「채웠다는데 비어 있다」가 된다 */
       (slots || []).forEach(function (s2) {
-        if (!s2 || s2.guess || s2.kind === '글자칸' || s2.hint === 'rrn') return;
+        if (!s2 || s2.guess || s2.kind === '글자칸' || s2.hint === 'rrn' || s2.byList) return;
         cut++;
       });
       return { items: [], cut: cut };
@@ -142,6 +142,8 @@
     (slots || []).forEach(function (s) {
       if (!s || s.guess) return;                     /* 사전이 짚었다 — 그대로 둔다 */
       if (s.kind === '글자칸') return;
+      /* ⚠ 자격·상벌 목록이 채울 칸은 묻지 않는다 — AI 가 낱개로 짚으면 목록 줄이 밀린다 */
+      if (s.byList) return;
       if (s.hint === 'rrn') return;                  /* 주민번호 자리는 묻지 않는다 */
       if (items.length >= 한도) { cut++; return; }
       var line = rows[s.tbl + ':' + s.row] || [];
@@ -269,6 +271,7 @@
     (slots || []).forEach(function (s) {
       if (!s || s.guess) return;
       if (s.kind === '글자칸') return;
+      if (s.byList) return;                          /* 자격·상벌 목록이 채운다(묻지도 얹지도 않는다) */
       /* ⚠ 구역까지 맞춰 찾는다 — 이름표만 보면 남의 구역 답을 얹는다 */
       var k = picks[자리이름(s)];
       if (!k || k === 'none') return;

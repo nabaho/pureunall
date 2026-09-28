@@ -60,6 +60,8 @@ function 채울값(법인, 개인) {
     firmInfo: () => 법인 || {}
   };
   vm.createContext(ctx);
+  /* ⚠ 어학 가르개(2026-09-28)는 _cvFillData 가 «실제로» 부르는 함수다 — 진짜를 넣는다(느슨해진 것이 아니다) */
+  vm.runInContext(cutFn(CODE, 'function _isLangCert('), ctx);
   vm.runInContext(cutFn(CODE, 'function _cvFillData('), ctx);
   return vm.runInContext('_cvFillData()', ctx);
 }

@@ -23,12 +23,19 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stripComments } = require('./strip-comments');
+const { stripComments, stripJs } = require('./strip-comments');
 
 const ROOT = path.join(__dirname, '..');
 const 날글 = fs.readFileSync(path.join(ROOT, 'pu-news.html'), 'utf8').replace(/\r\n/g, '\n');
 const news = stripComments(날글);
 const B = require('../functions/news-brief.js');
+/* ⚠ 한마디 지시·거리는 2026-09-28 부터 Core «한 벌»이다(금요일 자동 준비도 같이 부른다) */
+const 코어 = stripJs(fs.readFileSync(path.join(ROOT, 'js', 'pu-news-core.js'), 'utf8').replace(/\r\n/g, '\n'));
+const 코어함수 = (이름) => {
+  const i = 코어.indexOf('function ' + 이름 + '(');
+  assert.ok(i > 0, 'Core.' + 이름 + ' 을 못 찾음');
+  return 코어.slice(i, 코어.indexOf('\n  }', i));
+};
 
 const 함수 = (이름) => {
   const i = news.indexOf('function ' + 이름 + '(');
@@ -67,9 +74,11 @@ test('★★★ 한마디는 «이 회차에 담긴 것»만 보고 쓴다 — �
   /* ⚠⚠ 법인 이름으로 143곳에 나가는 글이다. 담긴 것 밖의 숫자·날짜·전망을
        한 글자라도 지어내면, 그것이 우리 의견으로 읽힌다. */
   const fn = 함수('한마디초안짓기');
-  assert.ok(/지어내|보태지|만들지/.test(fn),
+  assert.ok(/Core\.한마디지시\(/.test(fn) && /Core\.한마디거리\(d\)/.test(fn),
+    '★★ 화면이 한 벌 지시·거리(Core)를 안 부른다');
+  assert.ok(/지어내|보태지|만들지/.test(코어함수('한마디지시')),
     '★★★ 지어내지 말라는 말이 AI 지시에 없다');
-  assert.ok(/d\.안|안\[/.test(fn),
+  assert.ok(/d\.안|안\[/.test(코어함수('한마디거리')),
     '★★★ 이 회차에 담긴 것을 안 보고 쓴다');
 });
 

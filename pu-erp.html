@@ -154,7 +154,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=11">
+<link rel="stylesheet" href="css/pu-erp.css?v=12">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -20751,6 +20751,16 @@ function ContractModal(props){
                 } }),
               h('span', null, '🧾 부가세포함'));
           }
+          /* 🔚 오른쪽 끝 묶음 — (이름) + 금액 + 부가세포함 을 한 덩이로 줄 맨 끝에 붙인다
+             (대표 지시 2026-09-28 「금액이나 부가세 포함등의 정리는 모두 오른쪽끝으로 두고
+             … 모두 형태를 일치시켜라」, 목업 승인 contract-amount-right).
+             ⚠ 칸마다 marginLeft:auto 를 주던 때는 줄이 좁아지면 금액만 다음 줄 «왼쪽» 으로
+               떨어지고 부가세포함은 따로 놀았다(사건계약 성공보수). 한 덩이(.pu-kend, 줄바꿈 없음)
+               로 묶으면 떨어져도 셋이 함께 떨어지고, 늘 오른쪽 끝에 선다. */
+          function kEnd(){
+            return h.apply(null, ['span', { className:'pu-kend' }].concat(Array.prototype.slice.call(arguments)));
+          }
+          function kLabel(t){ return h('span', { className:'pu-daylabel' }, t); }
           // 업무 요약 — 이관 대상 종류에만. 값이 없어도 자리를 안 차지하지 않는다(flex 라 상관없다).
           function briefInput(kv){
             if(BRIEF_KINDS.indexOf(kv) < 0) return null;
@@ -20774,33 +20784,41 @@ function ContractModal(props){
                   onChange:setTypeCodeFor(kindV) },
                   typesArr.map(function(t){ return h('option', { key:t.code, value:t.code }, '['+t.short+'] '+t.name); })),
                 briefInput(kindV),
-                h(NumberInput, { className:'pu-w-amt', value: f.amounts[kindV] || 0,
-                  style:{ marginLeft:'auto' },
-                  onChange:setAmountFor(kindV),
-                  placeholder: isConsulting ? '계약금' : '착수금',
-                  // 커서가 들어올 때: 넣기 전에 「부가세 포함으로」 / 벗어날 때: 넣은 금액의 공급가·부가세
-                  onFocus:function(e){ vatFocusHint(f.contractFeeVatIncluded,
-                    isConsulting ? '계약금' : '착수금', e.target); },
-                  onBlur:function(e){ vatAmountHint(f.contractFeeVatIncluded, f.amounts[kindV],
-                    isConsulting ? '계약금' : '착수금', e.target); } }),
-                vatPill(f.contractFeeVatIncluded, 'contractFeeVatIncluded', isConsulting ? '계약금' : '착수금'),
-                // 사건·기타는 성공보수까지 이 줄에 이어 붙인다(잔금 줄을 따로 안 둔다)
-                (isCase || isOther) && (f.successFeeType === 'percent'
-                  // 소수점을 칠 수 있는 칸 (54.5% 처럼) — 보통 number 칸은 「54.」에서 점이 지워진다
-                  ? h(PercentInput, { className:'pu-w-amt', value:f.successFee,
-                      onChange:function(e){ setF(function(prev){ return Object.assign({}, prev, { successFee: e.target.value }); }); },
-                      placeholder:'성공보수', min:0, max:100 })
-                  : h(NumberInput, { className:'pu-w-amt', value:f.successFee, onChange:setSimple('successFee'),
-                      placeholder:'성공보수',
-                      // % 모드는 금액이 아니라 비율이라 안내가 뜻이 없다 — 원 모드에서만 알린다
-                      onFocus:function(e){ vatFocusHint(f.balanceFeeVatIncluded, '성공보수', e.target); },
-                      onBlur:function(e){ vatAmountHint(f.balanceFeeVatIncluded, f.successFee, '성공보수', e.target); } })),
-                (isCase || isOther) && h('div', { className:'pu-toggle2' },
-                  h('span', { className: f.successFeeType !== 'percent' ? 'on' : '',
-                    onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { successFeeType:'amount', successFee:0 }); }); } }, '원'),
-                  h('span', { className: f.successFeeType === 'percent' ? 'on' : '',
-                    onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { successFeeType:'percent', successFee:0 }); }); } }, '%')),
-                (isCase || isOther) && vatPill(f.balanceFeeVatIncluded, 'balanceFeeVatIncluded', '성공보수')
+                kEnd(
+                  kLabel(isConsulting ? '계약금' : '착수금'),
+                  h(NumberInput, { className:'pu-w-amt', value: f.amounts[kindV] || 0,
+                    onChange:setAmountFor(kindV),
+                    placeholder: isConsulting ? '계약금' : '착수금',
+                    // 커서가 들어올 때: 넣기 전에 「부가세 포함으로」 / 벗어날 때: 넣은 금액의 공급가·부가세
+                    onFocus:function(e){ vatFocusHint(f.contractFeeVatIncluded,
+                      isConsulting ? '계약금' : '착수금', e.target); },
+                    onBlur:function(e){ vatAmountHint(f.contractFeeVatIncluded, f.amounts[kindV],
+                      isConsulting ? '계약금' : '착수금', e.target); } }),
+                  vatPill(f.contractFeeVatIncluded, 'contractFeeVatIncluded', isConsulting ? '계약금' : '착수금'))
+              ),
+              /* ─── 줄 2 (사건·기타): 성공보수 — 제 줄로 뗐다 (대표 지시 2026-09-28, 목업 승인).
+                 전에는 착수금 줄에 이어 붙여, 자리가 모자라면 둘째 줄 «왼쪽» 으로 떨어졌다.
+                 컨설팅 「잔금」 줄과 같은 모양: 이름은 왼쪽, 원/%·금액·부가세포함은 오른쪽 끝.
+                 원/% 는 금액 «앞» — 그래야 금액 칸이 윗줄 금액 칸과 같은 세로줄에 선다. */
+              (isCase || isOther) && h('div', { className:'pu-krow' },
+                kLabel('🏆 성공보수'),
+                kEnd(
+                  h('div', { className:'pu-toggle2' },
+                    h('span', { className: f.successFeeType !== 'percent' ? 'on' : '',
+                      onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { successFeeType:'amount', successFee:0 }); }); } }, '원'),
+                    h('span', { className: f.successFeeType === 'percent' ? 'on' : '',
+                      onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { successFeeType:'percent', successFee:0 }); }); } }, '%')),
+                  f.successFeeType === 'percent'
+                    // 소수점을 칠 수 있는 칸 (54.5% 처럼) — 보통 number 칸은 「54.」에서 점이 지워진다
+                    ? h(PercentInput, { className:'pu-w-amt', value:f.successFee,
+                        onChange:function(e){ setF(function(prev){ return Object.assign({}, prev, { successFee: e.target.value }); }); },
+                        placeholder:'성공보수', min:0, max:100 })
+                    : h(NumberInput, { className:'pu-w-amt', value:f.successFee, onChange:setSimple('successFee'),
+                        placeholder:'성공보수',
+                        // % 모드는 금액이 아니라 비율이라 안내가 뜻이 없다 — 원 모드에서만 알린다
+                        onFocus:function(e){ vatFocusHint(f.balanceFeeVatIncluded, '성공보수', e.target); },
+                        onBlur:function(e){ vatAmountHint(f.balanceFeeVatIncluded, f.successFee, '성공보수', e.target); } }),
+                  vatPill(f.balanceFeeVatIncluded, 'balanceFeeVatIncluded', '성공보수'))
               ),
               /* ─── 줄 2 (컨설팅만): 일수 계산 + 잔금 — «다른 이야기」라 한 줄로 안 합친다.
                  「3일」만 치면 =3×350,000+부가세105,000=1,155,000원 이 뜨고 잔금으로 간다.
@@ -20833,12 +20851,13 @@ function ContractModal(props){
                   : h('button', { type:'button', className:'pu-goBtn', onClick:function(){ _applyDayCalc(_dayCalc); },
                       title:'잔금에 ' + _dayCalc.total.toLocaleString() + '원을 넣고 「부가세포함」을 켭니다.\n지금 적힌 금액은 지워집니다.' },
                       '잔금에 넣기')),
-                h(NumberInput, { className:'pu-w-amt', value:f.successFee, onChange:setSimple('successFee'),
-                  style:{ marginLeft:'auto' },
-                  placeholder:'잔금',
-                  onFocus:function(e){ vatFocusHint(f.balanceFeeVatIncluded, '잔금', e.target); },
-                  onBlur:function(e){ vatAmountHint(f.balanceFeeVatIncluded, f.successFee, '잔금', e.target); } }),
-                vatPill(f.balanceFeeVatIncluded, 'balanceFeeVatIncluded', '잔금')
+                kEnd(
+                  kLabel('잔금'),
+                  h(NumberInput, { className:'pu-w-amt', value:f.successFee, onChange:setSimple('successFee'),
+                    placeholder:'잔금',
+                    onFocus:function(e){ vatFocusHint(f.balanceFeeVatIncluded, '잔금', e.target); },
+                    onBlur:function(e){ vatAmountHint(f.balanceFeeVatIncluded, f.successFee, '잔금', e.target); } }),
+                  vatPill(f.balanceFeeVatIncluded, 'balanceFeeVatIncluded', '잔금'))
               )
             );
           }
@@ -20852,17 +20871,17 @@ function ContractModal(props){
                 onChange:setTypeCodeFor(kindV) },
                 typesArr.map(function(t){ return h('option', { key:t.code, value:t.code }, '['+t.short+'] '+t.name); })),
               briefInput(kindV),
-              h(NumberInput, { className:'pu-w-amt', value: f.amounts[kindV] || 0,
-                style:{ marginLeft:'auto' },
-                onChange:setAmountFor(kindV),
-                placeholder:'금액',
-                // 기금은 체크박스로 정하고, 나머지(업체·상담)는 늘 부가세포함이라 항상 알린다
-                onFocus:function(e){ vatFocusHint(kindV === 'fund' ? f.fundVatIncluded : true, '금액', e.target); },
-                onBlur:function(e){ vatAmountHint(kindV === 'fund' ? f.fundVatIncluded : true,
-                  f.amounts[kindV], '금액', e.target); } }),
-              kindV === 'fund'
-                ? vatPill(f.fundVatIncluded, 'fundVatIncluded', '금액')
-                : h('span', { className:'pu-vatpill on' }, '🧾 부가세포함')
+              kEnd(
+                h(NumberInput, { className:'pu-w-amt', value: f.amounts[kindV] || 0,
+                  onChange:setAmountFor(kindV),
+                  placeholder:'금액',
+                  // 기금은 체크박스로 정하고, 나머지(업체·상담)는 늘 부가세포함이라 항상 알린다
+                  onFocus:function(e){ vatFocusHint(kindV === 'fund' ? f.fundVatIncluded : true, '금액', e.target); },
+                  onBlur:function(e){ vatAmountHint(kindV === 'fund' ? f.fundVatIncluded : true,
+                    f.amounts[kindV], '금액', e.target); } }),
+                kindV === 'fund'
+                  ? vatPill(f.fundVatIncluded, 'fundVatIncluded', '금액')
+                  : h('span', { className:'pu-vatpill on' }, '🧾 부가세포함'))
             )
           );
         }),
@@ -21601,6 +21620,22 @@ window.regIsToday   = regIsToday;
 window.regDayOf     = regDayOf;
 window.regTimeText  = regTimeText;
 window.regSort      = regSort;
+
+/* 🏢 카드에 «보여 주는» 회사명 — 「주식회사」·「(주)」를 ㈜ 한 글자로 (대표 지시 2026-09-28
+   「등록에 회사이름이 안보인다」 → 목업 가안). 좁은 카드에서 「주식…」 으로 잘려 회사가 안 보였다.
+   ⚠ «보이는 글자만» 바꾼다 — 저장·검색·이관·중복 판정은 원래 이름(c.companyName)을 쓴다.
+     그래서 이 값을 저장하거나 견주는 데 쓰지 말 것. title 에는 원래 이름을 둔다.
+   ⚠ 앞·뒤에 붙은 것만 줄인다 — 가운데 끼인 것(「가나 주식회사 서울지점」)은 이름의 일부일 수 있다. */
+function coDisplayName(name){
+  var s = String(name == null ? '' : name).trim();
+  if(!s) return '';
+  var m = s.match(/^(?:주식회사|\(주\)|㈜)\s*(.+)$/);
+  if(m) return '㈜' + m[1];
+  m = s.match(/^(.+?)\s*(?:주식회사|\(주\)|㈜)$/);
+  if(m) return m[1] + '㈜';
+  return s;
+}
+window.coDisplayName = coDisplayName;
 
 function arvClear(store, id, after){
   if(dbPatch(store, id, { arrivedAt:null, arrivedFrom:null, arrivedNo:null })){
@@ -23320,7 +23355,7 @@ function ContractManagement(props){
           // 계약번호
           h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0 } }, c.contractNo),
           // 의뢰인
-          h('span', { style:{ fontSize:'13.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, c.companyName),
+          h('span', { style:{ fontSize:'13.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }, title:c.companyName }, coDisplayName(c.companyName)),
           // 담당자 (주담당 / 부담당 풀 이름)
           h('span', { style:{ fontSize:'11px', color:'#64748b', whiteSpace:'nowrap', flexShrink:0 } },
             '👤 ' + [userName(c.managerMain)].concat((c.managerSubs||[]).map(userName)).filter(Boolean).join(' / ')),
@@ -23368,7 +23403,7 @@ function ContractManagement(props){
         h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', minWidth:0 } },
           kindsArr.length > 0 && h('span', { style:{ background:mk0.bg||'#f8fafc', color:mk0.color, fontSize:'9.5px', padding:'1px 6px', borderRadius:'9px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0, border:'1px solid '+mk0.color+'33' } },
             mk0.label + (kindsArr.length>1 ? ' +'+(kindsArr.length-1) : '')),
-          h('span', { style:{ flex:1, minWidth:0, fontSize:'12.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, c.companyName),
+          h('span', { style:{ flex:1, minWidth:0, fontSize:'12.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }, title:c.companyName }, coDisplayName(c.companyName)),
           c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ fontSize:'9.5px', background:'#fffbeb', color:'#854d0e', padding:'0 5px', borderRadius:'5px', fontWeight:700, flexShrink:0 } }, '성공'+c.successFee+'%'),
           totalAmount > 0 && h('span', { style:{ fontFamily:'monospace', fontSize:'10.5px', color:'#475569', fontWeight:700, flexShrink:0 }, title: totalAmount.toLocaleString()+'원' }, fmtManExact(totalAmount))
         ),
@@ -23415,13 +23450,23 @@ function ContractManagement(props){
               k0.icon + ' ' + k0.label);
           })
         ),
-        h('span', { style:{ fontSize:'13.5px', fontWeight:700, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }, title:c.companyName },
-          c.companyName, arvBadge(c, 'contracts', refreshContracts)),
+        /* ★ 회사명은 «안 줄어든다» (대표 지시 2026-09-28 「등록에 회사이름이 안보인다」, 목업 가안).
+             전에는 이 줄에서 종류·세부종류·「오늘 13:47」·번호가 모두 안 줄어들게 되어 있어,
+             자리가 모자라면 회사명만 「주식…」 으로 잘렸다. 이제 모자라면 세부종류가 먼저 줄어든다.
+           ⚠ maxWidth:100% — 회사명 자체가 줄보다 길 때만 「…」(title 에 원래 이름). */
+        h('span', { style:{ fontSize:'13.5px', fontWeight:700, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flexShrink:0, maxWidth:'100%' }, title:c.companyName },
+          coDisplayName(c.companyName), arvBadge(c, 'contracts', refreshContracts)),
         (function(){
-          // 세부 종류 — 회사명 옆에 «작게» 붙인다(종류가 같아도 사업이 다르면 여기로 갈린다)
+          // 세부 종류 — 회사명 옆에 «작게» 붙인다(종류가 같아도 사업이 다르면 여기로 갈린다).
+          // 자리가 모자라면 «이것이 먼저» 줄어든다(마우스를 올리면 전문).
           var subs = kindsArr.map(function(kv){ return kindSubLabel(c, kv); }).filter(Boolean).join(' / ');
-          return subs && h('span', { style:{ fontSize:'10px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'140px', flexShrink:0 }, title:subs }, subs);
-        })(),
+          return subs && h('span', { style:{ fontSize:'10px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flex:'1 1 0', minWidth:0 }, title:subs }, subs);
+        })()
+      ),
+      /* 둘째 줄: 담당자 · 오늘 시각 · 번호 · 메모 + 금액 + 버튼 — 매 카드 반복되는 자리라 한 줄로 합친다.
+         ★ 「오늘 13:47」·계약번호는 첫 줄에서 여기로 내렸다(2026-09-28) — 첫 줄은 «어느 회사» 자리다. */
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', color:'#64748b', flexWrap:'wrap' } },
+        h('span', { style:{ whiteSpace:'nowrap', flexShrink:0 } }, '👤 ' + [userName(c.managerMain)].concat((c.managerSubs||[]).map(userName)).filter(Boolean).join(' / ')),
         // 오늘 등록한 건 — 등록 시각까지 붙여 같은 날 여러 건의 순서를 눈으로 확인한다
         regIsToday(c) ? h('span', { key:'reg',
           title:'오늘 새로 등록한 계약입니다 · ' + regTimeText(c) + ' 등록\n날짜가 바뀌면 이 표시는 저절로 사라집니다',
@@ -23429,12 +23474,7 @@ function ContractManagement(props){
             border:'1px solid #bbf7d0', borderRadius:'10px', padding:'1px 7px',
             fontSize:'10px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } },
           '🆕 오늘 ' + regTimeText(c)) : null,
-        h('div', { style:{ flex:1, minWidth:'4px' } }),
-        h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0 } }, c.contractNo)
-      ),
-      // 둘째 줄: 담당자 + 메모(있으면 title) + 금액 + 버튼 — 매 카드 반복되는 자리라 한 줄로 합친다
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', color:'#64748b', flexWrap:'wrap' } },
-        h('span', { style:{ whiteSpace:'nowrap', flexShrink:0 } }, '👤 ' + [userName(c.managerMain)].concat((c.managerSubs||[]).map(userName)).filter(Boolean).join(' / ')),
+        h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0, whiteSpace:'nowrap' } }, c.contractNo),
         c.note && h('span', { title:c.note, style:{ fontSize:'10.5px', color:'#94a3b8' } }, '📝'),
         h('div', { style:{ flex:1, minWidth:'4px' } }),
         c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ background:'#fffbeb', color:'#854d0e', fontSize:'10px', padding:'1px 6px', borderRadius:'5px', fontWeight:700, whiteSpace:'nowrap' } },
