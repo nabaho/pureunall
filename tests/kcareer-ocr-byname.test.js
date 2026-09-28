@@ -134,12 +134,29 @@ test('★ 비용 두 화면 — 구분은 서식 기본값 · 금액은 비움 �
 
 test('★ 옛 화면(위촉장 등)의 되돌림은 그대로 — 이번 빗장은 새 일곱 화면에만', () => {
   const m = 무대();
-  for (const page of ['wiccok', 'award', 'license', 'complete', 'edu', 'work', 'personal_doc', 'account', 'id_doc']) {
+  /* ⚠ 계좌(account)는 2026-09-28 에 따로 옮겼다 — 아래 검사가 본다(은행 칸에 파일 이름이 들어가던 것) */
+  for (const page of ['wiccok', 'award', 'license', 'complete', 'edu', 'work', 'personal_doc', 'id_doc']) {
     const p = m.이름('2024 충청남도 위원.pdf', page);
     assert.ok(p, page + ' 되돌림이 사라졌습니다');
     assert.ok(!p._byName, '★ ' + page + ' 의 겹침 판정까지 바뀌었습니다 — 한 번에 하나씩');
   }
   assert.equal(m.이름('a.pdf', '없는화면'), null, '모르는 화면은 담지 않는다');
+});
+
+test('★★ 통장사본 판독이 안 되면 — 은행 칸을 «비우고» 파일 이름은 메모에, 겹침은 같은 파일로만', async () => {
+  /* 대표 제보 2026-09-28 「통장사본 입력이 안된다」 뒤에 함께 고쳤다.
+     예전에는 파일 이름이 «은행» 칸에 들어가 「은행: 통장사본 스캔」이 됐고,
+     은행·번호가 비면 중복 열쇠(은행|번호)가 모두 같아져 둘째 통장부터 막힐 수 있었다. */
+  const m = 무대();
+  const p = m.이름('통장사본 농협.jpg', 'account');
+  assert.equal(p.bank, '', '★★ 파일 이름을 은행 칸에 넣습니다 — 사실과 다른 은행이 적힙니다');
+  assert.match(p.memo, /통장사본 농협/, '★ 파일 이름을 남기지 않습니다(무엇이었는지 모릅니다)');
+  assert.match(p.memo, /확인해 주세요/, '★ 읽은 것처럼 보입니다 — 확인하라고 말해야 합니다');
+  await m.담기('account', '통장사본 농협.jpg');
+  await m.담기('account', '통장사본 국민.jpg');
+  assert.equal(m.통.account.length, 2, '★★ 판독 못 한 통장 둘이 한 건으로 막혔습니다');
+  await m.담기('account', '통장사본 농협.jpg');
+  assert.equal(m.통.account.length, 2, '★ 같은 파일을 또 넣었는데 쌓였습니다');
 });
 
 test('★ 끌어놓기의 두 되돌림 자리가 모두 이 길을 쓴다 — 한글 · 그림/PDF', () => {
