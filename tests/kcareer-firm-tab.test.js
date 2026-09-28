@@ -73,11 +73,14 @@ test('★★ 탭 — 이알피에 값이 있는 칸은 «읽기 전용», 없는
   const ctx = 세상({ name: '푸른노무법인', tel: '041-000-0001', at: Date.now() }, { tel: '041-999-9999' });
   vm.runInContext('renderFirmTab()', ctx);
   const 칸 = ctx._칸들;
-  /* 설립일·자본금(2026-09-28)까지 열 칸 */
-  assert.equal(칸.length, 10, '법인 칸 열이 다 있어야 합니다(설립일·자본금 포함)');
+  /* 설립일·자본금 + 우편번호·거래 은행·법인 계좌번호·예금주(2026-09-28)까지 열네 칸 */
+  assert.equal(칸.length, 14, '법인 칸 열이 다 있어야 합니다(설립일·자본금·우편번호·계좌 포함)');
   assert.ok(칸[0].ro && !칸[0].key, '★★ 이알피가 채운 법인명을 여기서 고칠 수 있게 두었습니다');
   assert.equal(칸[0].value, '푸른노무법인');
-  assert.ok(칸.filter((c) => !c.ro).length === 8, '이알피에 없는 여덟 칸은 적을 수 있어야 합니다');
+  assert.ok(칸.filter((c) => !c.ro).length === 12, '이알피에 없는 열두 칸은 적을 수 있어야 합니다');
+  ['zip', 'bank', 'acctNo', 'acctHolder'].forEach((k) => {
+    assert.ok(칸.some((c) => c.key === k), '★★ 「' + k + '」 칸이 없습니다 — 법인 우편번호·계좌를 적을 곳이 없습니다');
+  });
   assert.match(ctx._grid.innerHTML, /firm-src erp">이알피/, '출처를 안 밝힙니다');
   assert.match(ctx._grid.innerHTML, /firm-src none">비어 있음/);
   assert.match(ctx._grid.innerHTML, /「041-999-9999」는 쓰이지 않습니다/, '★ 여기 적은 값이 안 쓰인다는 것을 말하지 않습니다');

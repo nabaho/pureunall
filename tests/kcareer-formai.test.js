@@ -307,7 +307,18 @@ test('★ AI 가 고를 수 있는 열쇠는 «실제로 값이 있는» 열쇠�
   assert.ok(Array.isArray(X.FIELD_FILL_KEYS) && X.FIELD_FILL_KEYS.length);
   const 자리 = SRC.indexOf('fields:{ name:info.name');
   assert.ok(자리 > 0, '_cvFillData 의 fields 를 못 찾았습니다 — 이 검사를 손봐야 합니다');
-  const 토막 = SRC.slice(자리, 자리 + 2000);
+  /* ⚠ 「앞 N자」 창으로 자르지 않는다 — 칸이 늘면 뒤쪽이 창 밖으로 밀려 «있는데도» 빨갛게 뜨고,
+     창을 늘리면 다음 함수까지 삼켜 «없는데도» 통과한다(2026-09-28 법인 우편번호·계좌를 더하자 실제로 떴다).
+     중괄호를 세어 fields 묶음 «전체»만 본다. */
+  const 토막 = (function () {
+    let i = SRC.indexOf('{', 자리), d = 0;
+    for (let p = i; p < SRC.length; p++) {
+      if (SRC[p] === '{') d++;
+      else if (SRC[p] === '}') { d--; if (!d) return SRC.slice(자리, p + 1); }
+    }
+    return '';
+  })();
+  assert.ok(토막.length > 100, 'fields 묶음을 못 잘랐습니다');
   X.FIELD_FILL_KEYS.forEach(function (k) {
     assert.ok(new RegExp('\\b' + k + '\\s*:').test(토막),
       '★ AI 가 「' + k + '」를 고를 수 있는데 _cvFillData 는 그 값을 내놓지 않습니다');
