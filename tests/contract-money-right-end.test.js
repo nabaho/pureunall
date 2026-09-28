@@ -6,8 +6,10 @@
    넣어라」, 목업 승인 옵션A — https://claude.ai/artifact/Kr1jnf4guw7rBEsxdi83DD)
 
    ★ 못 박는 것은 «차례»(유형선택·업무요약이 먼저, 금액+부가세포함이 나중=오른쪽)
-   와 «오른쪽 끝으로 미는 장치(marginLeft:auto)» 가 있는가이다. 색·글꼴 같은
-   «지금 값»은 아니다. */
+   와 «오른쪽 끝으로 미는 장치» 가 있는가이다. 색·글꼴 같은 «지금 값»은 아니다.
+   ★ 2026-09-28 부터 그 장치는 칸마다 붙인 marginLeft:auto 가 아니라 «오른쪽 끝 묶음»
+     (kEnd → .pu-kend{margin-left:auto}) 이다 — 대표 「모두 오른쪽끝으로 … 형태를 일치시켜라」.
+     칸마다 따로 밀면 좁은 줄에서 금액만 다음 줄 왼쪽으로 떨어졌다(사건계약 성공보수). */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -18,6 +20,20 @@ const { stripJs } = require('./strip-comments');
 
 const RAW = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
 const MODAL = stripJs(cutFn(RAW, 'function ContractModal(props)'));
+const CSS = fs.readFileSync(path.join(__dirname, '..', 'css', 'pu-erp.css'), 'utf8');
+/* 금액칸 바로 앞(같은 묶음 안)에 kEnd( 가 열려 있는가 — 사이에 다른 줄(pu-krow)이 끼면 안 된다 */
+function 묶음안(idx, why) {
+  const 앞 = MODAL.slice(Math.max(0, idx - 1200), idx);
+  const k = 앞.lastIndexOf('kEnd(');
+  assert.ok(k >= 0, why + ' — 오른쪽 끝 묶음(kEnd) 안에 없습니다. 줄 끝까지 안 밀립니다.');
+  assert.doesNotMatch(앞.slice(k), /className:'pu-krow'/, why + ' — 묶음과 금액 사이에 다른 줄이 끼었습니다.');
+}
+test('오른쪽 끝 묶음(.pu-kend)이 실제로 줄 끝으로 민다(margin-left:auto) · 줄바꿈 없이 붙어 다닌다', () => {
+  const m = CSS.match(/\.pu-kend\s*\{([^}]*)\}/);
+  assert.ok(m, '.pu-kend 규칙이 없습니다');
+  assert.match(m[1], /margin-left:\s*auto/, '묶음이 오른쪽 끝으로 안 밀립니다');
+  assert.match(m[1], /white-space:\s*nowrap|flex:\s*none/, '묶음이 쪼개져 금액만 따로 떨어질 수 있습니다');
+});
 
 test('계약금/착수금 줄 — 유형선택·업무요약이 먼저, 금액(오른쪽 끝)이 나중', () => {
   const briefIdx = MODAL.indexOf('briefInput(kindV),');
@@ -25,17 +41,19 @@ test('계약금/착수금 줄 — 유형선택·업무요약이 먼저, 금액(�
   assert.ok(briefIdx > 0 && amtIdx > 0, '계약금 줄의 briefInput·금액칸을 못 찾았습니다.');
   assert.ok(briefIdx < amtIdx, '업무요약이 금액보다 뒤에 있습니다 — 금액이 오른쪽 끝으로 안 갔습니다.');
 
-  const 앞부분 = MODAL.slice(Math.max(0, amtIdx - 200), amtIdx);
-  assert.match(앞부분, /marginLeft:\s*'auto'/,
-    '계약금 칸에 marginLeft:auto 가 없습니다 — 줄 끝까지 밀려가지 않습니다.');
+  묶음안(amtIdx, '계약금 칸');
 });
 
-test('잔금 줄(컨설팅 일수 행) — 금액이 marginLeft:auto 로 오른쪽 끝에 있다', () => {
+test('잔금 줄(컨설팅 일수 행) — 금액이 오른쪽 끝 묶음 안에 있다', () => {
   const idx = MODAL.indexOf("placeholder:'잔금'");
   assert.ok(idx > 0, '잔금 칸을 못 찾았습니다.');
-  const 앞부분 = MODAL.slice(Math.max(0, idx - 200), idx);
-  assert.match(앞부분, /marginLeft:\s*'auto'/,
-    '잔금 칸에 marginLeft:auto 가 없습니다 — 일수 계산 뒤로 밀려 있을 뿐 줄 끝은 아닙니다.');
+  묶음안(idx, '잔금 칸');
+});
+
+test('성공보수(사건·기타) — 제 줄에서 원/%·금액·부가세포함이 오른쪽 끝 묶음 안에 있다', () => {
+  const idx = MODAL.indexOf("placeholder:'성공보수'");
+  assert.ok(idx > 0, '성공보수 칸을 못 찾았습니다.');
+  묶음안(idx, '성공보수 칸');
 });
 
 test('기금·업체·상담 줄 — 업무요약이 먼저, 금액(오른쪽 끝)이 나중', () => {
@@ -44,9 +62,7 @@ test('기금·업체·상담 줄 — 업무요약이 먼저, 금액(오른쪽 �
   assert.ok(briefIdx > 0 && amtIdx > 0, '기금 등 줄의 briefInput·금액칸을 못 찾았습니다.');
   assert.ok(briefIdx < amtIdx, '업무요약이 금액보다 뒤에 있습니다.');
 
-  const 앞부분 = MODAL.slice(Math.max(0, amtIdx - 200), amtIdx);
-  assert.match(앞부분, /marginLeft:\s*'auto'/,
-    '금액 칸에 marginLeft:auto 가 없습니다.');
+  묶음안(amtIdx, '금액 칸');
 });
 
 test('📷 계약서 찾기 단추가 아래 「원본·판독 보기」와 같은 한 줄(div) 안에 있다', () => {
