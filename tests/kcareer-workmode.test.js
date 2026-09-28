@@ -48,12 +48,12 @@ test('★★ 쌓인 높이는 «재서» 쓴다 — 고정값을 박으면 좁�
   assert.match(source, /height:calc\(100vh - var\(--rhTop,170px\) - 14px\)/);
 });
 
-test('★★ 「한 장 맞춤」이 기본이다 — 폭만 맞추면 세로가 넘친다', () => {
-  /* 폭 맞춤만 있던 것이 「A4 전체가 안 나온다」의 나머지 절반이었다. */
-  assert.match(source, /var _rhFit='page', _rhPage=0;/);
+test('★★ 「폭 맞춤」이 기본이다 — 긴 서식을 한 장 높이에 억지로 맞춰 찌그러져 보이지 않게', () => {
+  assert.match(source, /var _rhFit='width', _rhPage=0;/);
   const fn = cutFn(bare, 'function rhApplyFit(');
   assert.match(fn, /Math\.min\(availW\/pw, availH\/ph\)/, '★ 가로·세로 중 빡빡한 쪽에 맞춰야 합니다');
-  assert.match(source, /id="rhFitPage" class="on"/, '처음 켜진 단추도 「한 장」이어야 합니다');
+  assert.match(source, /id="rhFitWidth" class="on"/, '처음 켜진 단추는 「폭」이어야 합니다');
+  assert.doesNotMatch(source, /id="rhFitPage" class="on"/, '긴 서식이 다시 지나치게 작아집니다');
 });
 
 test('★★ 크기는 zoom 으로 준다 — 종이 위 입력칸이 함께 줄어야 한다', () => {
