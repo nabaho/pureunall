@@ -68,7 +68,12 @@ test('★★★ 빛깔이 뜻과 맞는다 — 폐업은 빨강, 휴업은 주�
   assert.equal(c.coNtsCls('폐업자'), 'gone');
   assert.equal(c.coNtsCls('휴업자'), 'soon');
   assert.equal(c.coNtsCls('계속사업자'), 'ok');
-  assert.equal(c.coNtsCls('국세청에 등록되지 않은 사업자등록번호입니다.'), 'dim',
+  /* ⚠ 2026-09-28: 「등록되지 않은 번호」는 «모른다»가 아니라 «없다»는 답이다 — 가짜·오타 번호를
+     찾는 것이 국세청 훑기의 까닭이라(앞서 찾은 가짜 번호 건) 따로 가른다(none). 폐업(gone)과는 다른 갈래다. */
+  assert.equal(c.coNtsCls('국세청에 등록되지 않은 사업자등록번호입니다.'), 'none',
+    '★★ 없는 번호를 흐리게 두면 훑기가 받아 적고도 어느 목록에도 안 뜹니다');
+  assert.notEqual(c.coNtsCls('국세청에 등록되지 않은 사업자등록번호입니다.'), 'gone', '★ 없는 번호를 폐업이라 하면 안 됩니다');
+  assert.equal(c.coNtsCls('알 수 없는 답'), 'dim',
     '★★ 「모른다」를 나쁜 빛으로 칠하면 멀쩡한 곳이 폐업처럼 보인다');
   assert.equal(c.coNtsCls(''), '');
 });
