@@ -172,7 +172,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=5"></script>
-<script src="js/pu-contract-forms.js?v=8"></script>
+<script src="js/pu-contract-forms.js?v=9"></script>
 <script src="js/pu-photo-store.js?v=31"></script>
 <script src="js/pu-office-store.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=1"></script>
@@ -330,6 +330,13 @@ async function formHwpFill(bytes, name, V) {
   try { doc.free(); } catch (e) {}
   return r;
 }
+/* 묶음 채우기 — 채운 파일들을 .zip 하나로 (브라우저 안에서만 묶는다. 채운 값은 서버로 안 간다) */
+async function formZip(files) {
+  var JSZ = await _esignLoadJsZip();
+  var z = new JSZ();
+  files.forEach(function (f) { z.file(f.name, f.bytes); });
+  return z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+}
 function formHwpShow(host, bytes, name) {
   if (!formIsXlsx(name)) return PureunHwp.renderPreview(host, bytes, name);
   /* 엑셀 — 서식 시트는 수식이라 엑셀이 열 때 계산된다. 여기서는 채운 명단(첫 시트)만 보여 준다 */
@@ -360,7 +367,7 @@ function showPane(name) {
     formsMounted = true;
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(),
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
-      cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow });
+      cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
