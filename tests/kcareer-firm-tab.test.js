@@ -73,10 +73,11 @@ test('★★ 탭 — 이알피에 값이 있는 칸은 «읽기 전용», 없는
   const ctx = 세상({ name: '푸른노무법인', tel: '041-000-0001', at: Date.now() }, { tel: '041-999-9999' });
   vm.runInContext('renderFirmTab()', ctx);
   const 칸 = ctx._칸들;
-  assert.equal(칸.length, 8, '법인 칸 여덟이 다 있어야 합니다');
+  /* 설립일·자본금(2026-09-28)까지 열 칸 */
+  assert.equal(칸.length, 10, '법인 칸 열이 다 있어야 합니다(설립일·자본금 포함)');
   assert.ok(칸[0].ro && !칸[0].key, '★★ 이알피가 채운 법인명을 여기서 고칠 수 있게 두었습니다');
   assert.equal(칸[0].value, '푸른노무법인');
-  assert.ok(칸.filter((c) => !c.ro).length === 6, '이알피에 없는 여섯 칸은 적을 수 있어야 합니다');
+  assert.ok(칸.filter((c) => !c.ro).length === 8, '이알피에 없는 여덟 칸은 적을 수 있어야 합니다');
   assert.match(ctx._grid.innerHTML, /firm-src erp">이알피/, '출처를 안 밝힙니다');
   assert.match(ctx._grid.innerHTML, /firm-src none">비어 있음/);
   assert.match(ctx._grid.innerHTML, /「041-999-9999」는 쓰이지 않습니다/, '★ 여기 적은 값이 안 쓰인다는 것을 말하지 않습니다');
@@ -125,6 +126,42 @@ test('★ 화면 — 환경설정에 탭·패널이 있고 열 때 그린다', (
   assert.match(CODE, /'firm': \(\)=>\{ _safe\(renderFirmTab\);/, '★ 탭을 열 때 그리지 않습니다');
   assert.match(CODE, /onclick="firmTabSave\(\)"/);
   assert.match(CODE, /onclick="firmTabPull\(\)"/);
+});
+
+/* ══════ 설립일·자본금 (대표 지시 2026-09-28 「법인의 경우 설립일 자본금을 넣을 수 있게 해라」) ══════ */
+test('★★ 설립일·자본금 — 탭에서 적고, 이알피에 있으면 받아 온다(이알피 먼저)', async () => {
+  const ctx = 세상(null, { estDate: '2016.01.04', capital: '50,000,000원' });
+  const f = vm.runInContext('firmInfo()', ctx);
+  assert.equal(f.estDate, '2016.01.04', '★★ 여기서 적은 설립일이 안 쓰입니다');
+  assert.equal(f.capital, '50,000,000원', '★★ 여기서 적은 자본금이 안 쓰입니다');
+  vm.runInContext('renderFirmTab()', ctx);
+  assert.match(ctx._grid.innerHTML, /<label>설립일 /, '설립일 칸이 없습니다');
+  assert.match(ctx._grid.innerHTML, /<label>자본금 /, '자본금 칸이 없습니다');
+  /* 이알피 회사정보에 있으면 그쪽 — 흔한 이름(openDate)도 받는다 */
+  ctx.fbDb.ref = () => ({ once: async () => ({ val: () => ({ name: '푸른노무법인', openDate: '2015.12.01', capital: '1억원' }) }) });
+  await vm.runInContext('loadFirmInfo()', ctx);
+  const g = vm.runInContext('firmInfo()', ctx);
+  assert.equal(g.estDate, '2015.12.01', '★★ 이알피의 설립일(openDate)을 안 받습니다');
+  assert.equal(g.capital, '1억원', '★★ 이알피의 자본금이 먼저여야 합니다');
+});
+
+test('★★ 서식의 「설립일」·「자본금」 칸을 알아보고 채운다 — 「개업일」은 사람 것일 수 있어 안 본다', () => {
+  const X = require('../js/kcareer-hwpxfill.js');
+  ['설립일', '설 립 일', '설립연월일', '법인설립일'].forEach((t) => assert.equal(X.fieldKeyOf(t), 'firmEst', t));
+  ['자본금', '자 본 금', '납입자본금'].forEach((t) => assert.equal(X.fieldKeyOf(t), 'firmCapital', t));
+  assert.equal(X.fieldKeyOf('개업일'), '', '★ 공인노무사 «개업일»을 법인 설립일로 봅니다');
+  assert.ok(X.FIELD_FILL_KEYS.indexOf('firmEst') >= 0 && X.FIELD_FILL_KEYS.indexOf('firmCapital') >= 0, '채울 열쇠에 없습니다');
+  /* AI 가 칸을 짚을 때 «법인» 것임을 안다 */
+  const A = require('../js/kcareer-slotai.js');
+  ['firmName', 'firmCeo', 'firmCorpNo', 'firmBizNo', 'firmEst', 'firmCapital'].forEach((k) =>
+    assert.ok(A.MEANING[k], '★ AI 에게 ' + k + ' 의 뜻을 안 알려 줍니다'));
+  const ctx = 세상({ name: '푸른노무법인' }, { estDate: '2016.01.04', capital: '5천만원' });
+  Object.assign(ctx, { get: () => [], getProfileInfo: () => ({}), formatDate: (x) => x || '', isAwardType: () => false, workPeriod: () => '' });
+  vm.runInContext(cutFn(CODE, 'function _isLangCert('), ctx);
+  vm.runInContext(cutFn(CODE, 'function _cvFillData('), ctx);
+  const fl = vm.runInContext('_cvFillData()', ctx).fields;
+  assert.equal(fl.firmEst, '2016.01.04', '★★ 설립일이 서식 채우기로 안 갑니다');
+  assert.equal(fl.firmCapital, '5천만원', '★★ 자본금이 서식 채우기로 안 갑니다');
 });
 
 test('★★ 서식 채우기가 «합친 값»을 쓴다 — 여기 적은 팩스가 서식의 팩스 칸에 간다', () => {

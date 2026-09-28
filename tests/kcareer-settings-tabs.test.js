@@ -54,8 +54,18 @@ test('탭 단추마다 짝이 되는 패널이 있다 — id 는 tab-<이름>', 
 const src = lines.join('\n');
 const bare = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' ');
 
+/* 개인정보보관 패널 «하나만» — ⚠ 예전 끝 표지 id="tab-account" 는 계좌가 신분증 탭으로 합쳐지며
+   없어져(indexOf −1) 파일 끝까지 보고 있었다. 그러면 아래 신분증·계좌 탭의 pi-side 까지 걸려
+   보관함이 옮겨져도 통과한다(2026-09-28 에 찾아 좁혔다 — 느슨해진 것이 아니라 엄해졌다). */
+function 개인탭() {
+  const s = src.indexOf('id="tab-personal"');
+  assert.ok(s > 0, '개인정보보관 패널이 없습니다');
+  const e = src.indexOf('class="tabpanel"', s + 10);
+  assert.ok(e > s, '개인정보보관 패널의 끝(다음 패널)을 찾지 못했습니다');
+  return src.slice(s, e);
+}
 test('사진 보관함과 도장 보관함이 «한 줄에 둘»이다 — 세로로 늘어놓으면 매번 스크롤한다', () => {
-  const seg = src.slice(src.indexOf('id="tab-personal"'), src.indexOf('id="tab-account"'));
+  const seg = 개인탭();
   assert.match(seg, /class="pi-side"/, '두 보관함을 한 줄에 묶는 칸이 있어야 합니다');
   const side = seg.slice(seg.indexOf('class="pi-side"'));
   assert.ok(side.indexOf('id="galleryCard"') > 0 && side.indexOf('id="stampCard"') > 0,
@@ -66,7 +76,7 @@ test('사진 보관함과 도장 보관함이 «한 줄에 둘»이다 — 세�
 
 test('기본정보와 보관함이 «옆으로» 놓인다 — 한 화면에 다 보이게', () => {
   assert.match(src, /\.pi-two\{[^}]*display:grid/);
-  const seg = src.slice(src.indexOf('id="tab-personal"'), src.indexOf('id="tab-account"'));
+  const seg = 개인탭();
   assert.match(seg, /class="pi-two"/);
 });
 

@@ -62,7 +62,11 @@
     { re: /^(명칭|법인명|법인명칭|상호|법인상호|노무법인|노무법인명|법인체명)$/, key: 'firmName' },
     { re: /^(대표노무사|대표공인노무사|법인대표|대표자노무사)$/, key: 'firmCeo' },
     { re: /^(법인번호|법인등록번호)$/, key: 'firmCorpNo' },
-    { re: /^(사업자번호|사업자등록번호)$/, key: 'firmBizNo' }
+    { re: /^(사업자번호|사업자등록번호)$/, key: 'firmBizNo' },
+    /* ★ 설립일·자본금 (대표 지시 2026-09-28 「법인의 경우 설립일 자본금을 넣을 수 있게」).
+       ⚠ 「개업일」은 넣지 않는다 — 노무사 서식의 개업일은 «사람»(공인노무사 개업)일 때가 많다. */
+    { re: /^(설립일|설립일자|설립연월일|설립년월일|법인설립일|설립년도|설립연도)$/, key: 'firmEst' },
+    { re: /^(자본금|자본총액|납입자본금|자본금액)$/, key: 'firmCapital' }
   ];
   /* 칸 안에 「자택:______ 직장:______」처럼 라벨과 빈자리가 함께 있는 양식이 많다.
      이런 자리는 라벨 바로 뒤(밑줄·공백)를 값으로 바꾼다. */
@@ -105,7 +109,7 @@
                          'military', 'militaryBranch', 'militaryRank', 'militaryPeriod',
                          'veteran', 'disability',
                          /* 우리 법인 것 — 이알피 법인정보에서 온다 */
-                         'firmName', 'firmCeo', 'firmCorpNo', 'firmBizNo'];
+                         'firmName', 'firmCeo', 'firmCorpNo', 'firmBizNo', 'firmEst', 'firmCapital'];
 
   var COL_LABELS = [
     { re: /^(기간|연도|년도|재직기간|재학기간|활동기간|기간근무년수|근무기간|수행기간|위촉기간|참여기간|교육기간|근무연월|활동연도|기간년월)$/, key: 'period' },

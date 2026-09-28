@@ -1158,7 +1158,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=33"></script>
+<script src="js/kcareer-hwpxfill.js?v=34"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
@@ -1169,7 +1169,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
-<script src="js/kcareer-slotai.js?v=3"></script>
+<script src="js/kcareer-slotai.js?v=4"></script>
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
@@ -1477,6 +1477,10 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                      안 보이며, 나갈 때 편집기 것을 되받으면 그 결과가 사라진다(대표 승인 2026-09-27). -->
                 <button class="btn primary rh-noed" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 양식 칸에 넣습니다">✨ 내 정보로 채우기</button>
                 <button class="btn rh-noed" id="rhUndoBtn" style="display:none" onclick="rhUndoFill()" title="채우기 전으로 되돌립니다">↩ 되돌리기</button>
+                <!-- ★ 처음부터 다시 (대표 지시 2026-09-28 「넣었던 서식 지우고 새롭게 다시 넣고 싶다.
+                     다시 정보 채우기 할 수 있게」) — 채운 값·도장·사진·뺀 쪽을 비우고 «빈 서식»에서 다시 채운다.
+                     원본이 없는 옛 자리면 빈 서식 파일을 한 번 다시 고르게 한다(겹쳐 적히는 것을 끝낸다). -->
+                <button class="btn rh-noed" onclick="rhRestart()" title="채워 둔 값·도장·사진·뺀 쪽을 모두 비우고, 빈 서식에서 「내 정보로 채우기」를 다시 합니다">🔄 처음부터 다시 채우기</button>
                 <button class="btn rh-noed" style="border-color:#fecaca;color:var(--red)" onclick="rhStampDoc()" title="★기본 도장을 「(인)」 자리에 찍습니다 — 한 번 더 누르면 뺄 수 있습니다">🖋 도장 찍기</button>
                 <!-- ★ 사진 (대표 물음 2026-09-07 「사진 … 왜 입력이 안되나?」) — 「사진」 칸에 증명사진을 넣는다.
                      사진은 환경설정 › 사진 보관함(빠른 이력서에서 고른 것이 먼저). 한 번 더 누르면 뺄 수 있다. -->
@@ -11909,6 +11913,8 @@ var RH_KEYS = [
      ⚠ 「대표 노무사」는 «법인의 대표»다. 내는 사람은 위쪽 '성명' 이다 — 직원이 낼 때 갈린다. */
   ['firmName','노무법인 명칭'],['firmCeo','대표 노무사'],
   ['firmCorpNo','법인등록번호'],['firmBizNo','사업자번호'],
+  /* ★ 설립일·자본금 (2026-09-28) — 서식이 낯설어 사전이 못 알아볼 때 손으로 짚는 길 */
+  ['firmEst','법인 설립일'],['firmCapital','법인 자본금'],
   /* ★ 주민등록번호는 «이 목록에서 골랐을 때만» 들어간다 — 자동 채우기는 건드리지 않는다.
      골라야 나가므로 목록 맨 끝에 두고, 고를 때 무슨 값인지 알도록 이름을 그대로 적는다. */
   ['rrn','주민등록번호 🔒']
@@ -13637,6 +13643,39 @@ async function rhUndoFill(){
   toast('↩ 채우기 전으로 되돌렸습니다');
   rhUndoBtn();
 }
+/* ── 🔄 처음부터 다시 채우기 (대표 지시 2026-09-28) ──────────────────────────
+   「넣었던 서식 지우고 새롭게 다시 넣고 싶다. 다시 정보 채우기 할 수 있게」.
+   ■ 원본(_rhBase)이 있으면 — 친 값·도장·사진·뺀 쪽·정리를 모두 비우고 그 빈 서식에서 다시 채운다.
+     ⚠ 사람이 고른 칸 짝(_rhPicks)은 «남긴다» — 짝은 서식에 대한 판단이지 값이 아니다.
+   ■ 원본이 «없는» 옛 자리면 — 채워진 문서밖에 없어 거기서 다시 채우면 값이 겹친다
+     (「기관명 : 푸른노무법인 푸른노무법인」). 그래서 «빈 서식 파일»을 한 번 다시 고르게 하고,
+     같은 작성 자리(_rhDraftId)를 그 서식으로 갈아 끼운 뒤 채운다 — 다음부터는 원본이 함께 담긴다.
+   ⚠ 묻고 한다 — 친 값이 사라진다. 남기려면 사본을 먼저 뜨라고 말한다. */
+async function rhRestart(){
+  if(!_rhDoc || !_rhDoc.bytes){ toast('먼저 서식을 올려주세요'); return; }
+  var 원본=(_rhBase && _rhBase.bytes) ? _rhBase : null;
+  if(원본){
+    if(!confirm('🔄 처음부터 다시 채웁니다.\n\n지금 들어간 값·도장·사진·뺀 쪽을 모두 비우고,\n처음 올리신 빈 서식에서 「✨ 내 정보로 채우기」를 다시 합니다.\n(고르신 칸 짝은 그대로 둡니다)\n\n지금 것을 남기려면 먼저 「📂 작성 중 › ⧉ 사본」을 떠 두세요.\n\n계속할까요?')) return;
+    _rhDoc={ name:원본.name, ext:원본.ext||'hwpx', bytes:원본.bytes };
+    _rhVals={}; _rhUndo=null;
+    _safe(rhTidyReset);                 /* 도장·사진·뺀 쪽·채움 표시를 모두 놓는다(바탕은 그대로) */
+    _safe(rhUndoBtn);
+    _rhKeepBase=true;
+    try{ await mountEditor(원본.bytes.buffer.slice(0), 원본.name); }
+    finally{ _rhKeepBase=false; }
+  }else{
+    if(!confirm('🔄 이 자리에는 «처음 올린 빈 서식»이 없습니다(옛 자리).\n\n기관에서 받은 «빈» 한글 서식 파일을 한 번 다시 골라 주시면,\n이 자리를 그 서식으로 바꾸고 「✨ 내 정보로 채우기」를 다시 합니다.\n(지금 채워진 문서는 이 자리에서 빠집니다 — 남기려면 먼저 사본을 떠 두세요)\n\n빈 서식 파일을 고를까요?')) return;
+    var f=await _rhPickOne();
+    if(!f) return;
+    var u8=new Uint8Array(await f.arrayBuffer());
+    /* ⚠ 바탕을 «새로» 잡게 한다 — _rhDoc 을 놓으면 mountEditor 가 새 서식으로 보고 바탕·값·표시를 새로 잡는다 */
+    _rhDoc=null; _rhVals={}; _rhUndo=null;
+    await mountEditor(u8.buffer.slice(0), f.name);
+  }
+  rhDraftSave();                        /* 같은 작성 자리에 — 이제 원본도 함께 담긴다 */
+  toast('🔄 빈 서식으로 돌아왔습니다 — 내 정보로 다시 채웁니다');
+  await rhAutoFillDoc();
+}
 function rhUndoBtn(){
   var b=document.getElementById('rhUndoBtn'); if(!b) return;
   b.style.display=(_rhUndo&&_rhUndo.bytes)?'':'none';
@@ -14253,7 +14292,7 @@ async function rhDraftResume(id){
   if(_rhBase) toast('이어서 합니다 — '+f.name);
   else toast('이어서 합니다 — '+f.name+' · ⚠ 이 자리에는 «처음 올린 원본»이 없습니다(옛 자리)'
     +' — 「✨ 내 정보로 채우기」를 다시 누르면 값이 겹쳐 적힐 수 있습니다.'
-    +' 겹치면 양식을 새로 올려 주세요.', 11000);
+    +' 「🔄 처음부터 다시 채우기」로 빈 서식 파일을 한 번 다시 고르시면 이 자리에서 새로 채웁니다.', 11000);
 }
 
 /* ⧉ 사본 — 지금 상태를 복사해 새 자리로. 비슷한 서류를 여러 곳에 낼 때 */
@@ -14352,6 +14391,8 @@ var FIRM_CACHE='firm_info';
    ⚠ 이알피 자료(data/company_info)에는 절대 쓰지 않는다 — 그쪽은 이알피의 것이다. */
 var FIRM_LOCAL='firm_local';
 var FIRM_FIELDS=[['name','법인명'],['ceo','대표노무사'],['corpNo','법인등록번호'],['bizNo','사업자등록번호'],
+                 /* ★ 설립일·자본금 (대표 지시 2026-09-28) — 이알피에 있으면 그것이 먼저, 없으면 여기서 적는다 */
+                 ['estDate','설립일'],['capital','자본금'],
                  ['addr','주소'],['tel','전화'],['fax','팩스'],['email','이메일']];
 function _firmObj(key){
   try{ var o=JSON.parse(LS.get(NS+key)||'{}'); return (o&&typeof o==='object'&&!Array.isArray(o))?o:{}; }
@@ -14427,7 +14468,10 @@ function firmShape(v){
            bizNo:String((v&&v.bizno)||'').trim(), corpNo:String((v&&v.corpNo)||'').trim(),
            addr:[고르기(br.addr, v&&v.addr), 고르기(br.addrDetail, v&&v.addrDetail)].filter(Boolean).join(' '),
            tel:고르기(br.tel, v&&v.tel), fax:고르기(br.fax, v&&v.fax),
-           email:고르기(br.email, v&&v.email) };
+           email:고르기(br.email, v&&v.email),
+           /* 설립일·자본금 — 이알피 회사정보에 있으면 받는다(이름이 무엇이든 흔한 것을 본다). 없으면 탭에서 적는다 */
+           estDate:고르기(v&&v.estDate, 고르기(v&&v.openDate, v&&v.foundDate)),
+           capital:String((v&&v.capital)||'').trim() };
 }
 async function loadFirmInfo(){
   if(typeof fbDb==='undefined'||!fbDb) return firmInfo();
@@ -14517,6 +14561,8 @@ function _cvFillData(){
                 ⚠ 법인등록번호는 이알피에 적어 두어야 나온다(회사정보 › 법인등록번호). */
              firmName:법인.name||'', firmCeo:법인.ceo||'',
              firmCorpNo:법인.corpNo||'', firmBizNo:법인.bizNo||'',
+    /* ★ 설립일·자본금 (2026-09-28) — 환경설정 › 🏢 법인정보 */
+    firmEst:법인.estDate||'', firmCapital:법인.capital||'',
              /* ★ 「소속·직위」처럼 «둘을 묶어» 묻는 칸이 있다 — 사람이 쓰듯 이어 쓴다.
                 ⚠ 한쪽만 넣으면 서류에 직위가 빠진 채로 나간다.
                 ⚠ 하나만 있으면 그 하나만 — 「푸른노무법인 」처럼 꼬리가 남으면 안 된다. */
