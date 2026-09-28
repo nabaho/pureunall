@@ -290,6 +290,7 @@ test('⑦-2 다른 메뉴에 있으면 계약관리로 옮긴다 · 창이 열�
 const ESC = (CARDS.match(/const esc = s => [^\n]+/) || [''])[0];
 const NORM = (CARDS.match(/const _norm = s => [^\n]+/) || [''])[0];
 const TYPES = (CARDS.match(/const CARD_ERP_TYPES = [^;]+;\nconst CARD_ERP_SEED_KEY = [^;]+;/) || [''])[0];
+const SYNC_CONSTS = (CARDS.match(/const CARD_ERP_ENDED = [^;]+;\nconst CARD_ERP_AUTO = [^;]+;/) || [''])[0];
 function cards(extra) {
   const calls = { toasts: [], goApp: [], html: {}, bgOpen: false, fb: 0 };
   const ctx = Object.assign({
@@ -302,10 +303,14 @@ function cards(extra) {
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext([ESC.replace('const esc', 'var esc'), NORM.replace('const _norm', 'var _norm'),
-    TYPES.replace(/const /g, 'var '),
-    cutFn(CARDS, 'function erpNormBiz('), cutFn(CARDS, 'function cardErpBizOf('),
+    TYPES.replace(/const /g, 'var '), SYNC_CONSTS.replace(/const /g, 'var '),
+    cutFn(CARDS, 'function erpNormName('), cutFn(CARDS, 'function erpNormBiz('), cutFn(CARDS, 'function cardErpBizOf('),
+    cutFn(CARDS, 'function cardErpPerson('), cutFn(CARDS, 'function cardErpFind('),
+    cutFn(CARDS, 'function cardErpNewRec('), cutFn(CARDS, 'function cardErpNoteLine('),
+    cutFn(CARDS, 'function cardErpMerge('), cutFn(CARDS, 'function cardErpStaffOpts('),
+    cutFn(CARDS, 'async function cardErpSync('), cutFn(CARDS, 'function cardErpDone('),
     cutFn(CARDS, 'function cardErpSeed('), cutFn(CARDS, 'function cardErpHtml('),
-    'var _cardErpId = "";',
+    'var _cardErpId = ""; var _cardErpPicked = [];',
     cutFn(CARDS, 'function sendToErp('), cutFn(CARDS, 'function closeCardErp('),
     cutFn(CARDS, 'function cardErpGo(')].join('\n'), ctx);
   return { ctx, calls };
@@ -366,13 +371,15 @@ test('고르는 창 — 업체관리에 있는지·끝났는지·못 읽었는�
   const html = (m) => ctx.cardErpHtml(CARD, m, null);
   assert.match(html(null), /업체관리에 <b>없는<\/b> 회사/);
   assert.match(html({ company: '가온', type: '컨설팅', left: false }), /이미 있습니다[\s\S]*이어 붙입니다/);
-  assert.match(html({ company: '가온', type: '자문', left: true }), /끝난 업체[\s\S]*유형으로 바꿔 넣기/);
+  assert.match(html({ company: '가온', type: '자문', left: true }), /끝난 업체[\s\S]*다시 일하는 업체로/);
   assert.match(html(undefined), /아직 못 읽었습니다/);
   const h = html(null);
   assert.equal((h.match(/name="cardErpT"/g) || []).length, 4, '자문·급여·노조·기금 네 칸');
   assert.match(h, /사업자번호가 없습니다/, '★ 번호 없이 보내면 같은 회사가 두 번 생길 수 있다고 알려야 합니다');
   assert.ok(!/사업자번호가 없습니다/.test(ctx.cardErpHtml(Object.assign({}, CARD, { bizno: '1234567891' }), null, null)));
-  assert.match(h, /아무것도 저장하지 않습니다/);
+  assert.match(h, /cardErpSync\('c1'\)">🏢 업체관리에 올리기/, '★★ 올리는 단추가 없습니다');
+  assert.match(h, /cardErpGo\('c1'\)"[^>]*>📋 계약 창만/, '계약 창만 여는 길도 남아 있어야 한다');
+  assert.match(h, /<select id="cardErpSid"/, '주담당 고르개');
   const bad = ctx.cardErpHtml(Object.assign({}, CARD, { company: '<img src=x onerror=alert(1)>' }), null, null);
   assert.ok(!/<img src=x/.test(bad), '★ 회사명을 그대로 넣으면 그 안의 태그가 실행됩니다');
 });

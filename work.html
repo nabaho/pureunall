@@ -10906,7 +10906,13 @@ function peWatch(){
   if(_peWatching) return; _peWatching=true;
   // data/{키}/u = 그 키의 변경 타임스탬프 1개. 본문 대신 이것만 구독해 트래픽을 줄인다.
   PE_DEF.forEach(function(d){
-    fbDb.ref('data/'+PE_KEYS[d[0]]+'/u').on('value',function(){ peBump(); },function(){});
+    fbDb.ref('data/'+PE_KEYS[d[0]]+'/u').on('value',function(){
+      /* ★ 업체 명단이 바뀌면 «들고 있던 사본»을 버린다 (2026-09-28).
+         peLoadAll 은 업체 잇기용 사본(coSrc)이 있으면 다시 안 읽는다 — 그래서 기업정보함에서
+         새로 올린 자문사가 새로고침 전까지 업무관리에 «영영» 안 떴다(u 는 울리는데 사본 그대로). */
+      if(d[0]==='companies') coSrc=null;
+      peBump();
+    },function(){});
   });
   peBump();                                        // u 노드가 없는 경우에도 최초 1회는 돌린다
 }
