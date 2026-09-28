@@ -86,8 +86,8 @@ test('★★ 한글 서식을 열면 작업 모드로 들어간다 — 이것이
 test('★★ 감춘 두 줄로 «돌아가는 길»이 있다 — 없으면 다른 양식을 못 올린다', () => {
   /* 작업 모드에서 보관함 줄·올리기 줄을 감춘다. 감추기만 하고 길을 안 내면 막다른 길이 된다. */
   assert.match(source, /body\.rh-work-on #rcTplLib,body\.rh-work-on #rhUploadBar\{display:none!important\}/);
-  assert.match(source, /id="rhWorkBtn" onclick="rhWorkToggle\(\)"/, '켜고 끄는 단추가 있어야 합니다');
-  assert.match(cutFn(bare, 'function rhWorkSet('), /rhWorkBtn[\s\S]{0,120}작업 모드 끄기/);
+  assert.doesNotMatch(source, /id="rhWorkBtn"/, '기본 화면과 작업 화면을 오가는 중복 단추가 다시 나타났습니다');
+  assert.match(source, /onclick="rhRailUpload\(\)"/, '기둥에서 다른 양식을 올릴 길이 있어야 합니다');
   /* 올리기는 «감춰 둔 진짜 단추»를 대신 누른다 — 새로 만들면 끌어놓기·보관함 담기가 갈라진다 */
   assert.match(cutFn(bare, 'function rhRailUpload('), /getElementById\('rcDrop'\)[\s\S]{0,40}click\(\)/);
 });
