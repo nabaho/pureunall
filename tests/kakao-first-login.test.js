@@ -48,8 +48,10 @@ function 저장소(초기, 막힘) {
 function 세상(opt) {
   opt = opt || {};
   const els = {};
-  ['pwFold', 'pwFoldBtn', 'kkRegRow', 'kkRegBtn', 'kkRegLater', 'loginId', 'errMsg', 'kkToast', 'kkModal']
+  ['pwFold', 'pwFoldBtn', 'kkRegRow', 'kkRegBtn', 'kkRegLater', 'loginId', 'errMsg', 'kkToast', 'kkModal',
+    'pu-boot-splash', 'pu-boot-msg']
     .forEach((id) => { els[id] = 요소(id); });
+  els['pu-boot-splash'].remove = function () { this.걷힘 = true; };
   els.kkModal.style.display = 'none';
   const 기록 = { 연결시작: 0, 오류: [] };
   const ctx = {
@@ -156,9 +158,60 @@ function 복귀세상(성공) {
   w.ctx.auth.signInWithCustomToken = () => Promise.resolve({ user: { email: '', getIdToken: () => Promise.resolve('t') } });
   w.ctx.reportLogin = () => {};
   w.ctx._freshLogin = false;
-  싣기(w, ['kkMarkUsed', 'kkUnfoldPw', 'kkHandleReturn']);
+  w.ctx.window.__kkReturning = true;   // 카카오에서 막 돌아온 참(첫 줄이 세운 표시)
+  싣기(w, ['kkMarkUsed', 'kkUnfoldPw', '_rmBootSplash', 'kkEndReturn', 'kkHandleReturn']);
   return w;
 }
+
+/* ── ⑨ 카카오에서 돌아온 몇 초 — 로그인 화면을 보이지 않는다 (대표 보고 2026-09-28
+   「로그인 했는데도 계속 이렇게 나오다가 화면으로 넘어간다」) ───────────────────────── */
+function 첫줄() {
+  const 덩이 = [...화면.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1])
+    .filter((s) => s.includes("getElementById('pu-boot-splash')") && s.includes('__kkReturning = true'));
+  assert.equal(덩이.length, 1, '스플래시를 정하는 첫 줄이 한 곳에 있어야 합니다');
+  return 덩이[0];
+}
+function 첫줄세상(search) {
+  const w = 세상({});
+  w.ctx.location = { search };
+  vm.runInContext(첫줄(), w.ctx);
+  return w;
+}
+
+test('⑨ ★★ 카카오에서 돌아오면 로그인 화면 대신 「카카오로 로그인하는 중」 을 보인다', () => {
+  const w = 첫줄세상('?code=AAA&state=BBB');
+  assert.equal(w.els['pu-boot-splash'].style.display, 'flex',
+    '★★ 카카오 확인 중에 로그인 화면이 그대로 보입니다 — 「로그인 했는데 또 로그인 화면」 으로 보입니다');
+  assert.equal(w.els['pu-boot-msg'].style.display, 'block', '무엇을 기다리는지 말하지 않습니다');
+  assert.equal(w.ctx.window.__kkReturning, true);
+});
+
+test('⑨ 그냥 열었을 때(로그인 기록 없음)는 로그인 화면 그대로다', () => {
+  const w = 첫줄세상('');
+  assert.notEqual(w.els['pu-boot-splash'].style.display, 'flex');
+  assert.notEqual(w.ctx.window.__kkReturning, true);
+  /* 취소하고 돌아온 것(error)도 로그인 화면이어야 한다 — 기다릴 것이 없다 */
+  const 취소 = 첫줄세상('?error=access_denied&state=BBB');
+  assert.notEqual(취소.els['pu-boot-msg'].style.display, 'block');
+});
+
+test('⑨ ★★ «아직 로그인 전» 신호가 와도 카카오 확인 중이면 스플래시를 걷지 않는다', () => {
+  assert.match(화면, /if\(!window\.__kkReturning\)\s*_rmBootSplash\(\)/,
+    '★★ 로그인 전 신호가 스플래시를 걷어 로그인 화면이 드러납니다');
+});
+
+test('⑨ ★ 카카오가 실패하면 스플래시를 걷어 까닭을 보이고, 성공이면 포털이 걷게 둔다', async () => {
+  const 실패 = 복귀세상(false);
+  실패.ctx = 실패.ctx; 실패.ctx.kkHandleReturn();
+  await 틈(); await 틈();
+  assert.equal(실패.els['pu-boot-splash'].걷힘, true, '★ 실패했는데 스플래시가 20초 동안 가립니다 — 까닭이 안 보입니다');
+  assert.equal(실패.ctx.window.__kkReturning, false);
+  const 성공 = 복귀세상(true);
+  성공.ctx.kkHandleReturn();
+  await 틈(); await 틈(); await 틈();
+  assert.notEqual(성공.els['pu-boot-splash'].걷힘, true, '성공했는데 포털이 그려지기 전에 걷어 로그인 화면이 번쩍입니다');
+  assert.equal(성공.ctx.window.__kkReturning, false);
+});
 
 test('④ ★★ 카카오 로그인이 실패하면 접힌 비밀번호 칸을 편다', async () => {
   const w = 복귀세상(false);
