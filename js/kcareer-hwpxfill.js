@@ -95,7 +95,7 @@
      담게 되면 그때 더한다. 지금 더하면 빈 값이 들어가 자리만 차지한다. */
   var LIST_FILL_KEYS = ['period', 'school', 'major', 'area', 'degree',
                         'org', 'dept', 'title', 'role',
-                        'certName', 'gotAt', 'awardWhat', 'awardOrg'];
+                        'certName', 'gotAt', 'awardWhat', 'awardOrg', 'grade'];
   /* 낱개 칸(인적사항)에 실제로 써 넣을 수 있는 열쇠.
      ⚠ rrn(주민등록번호)은 «없다» — 사람이 손으로 고를 때만 나간다(secrets). */
   var FIELD_FILL_KEYS = ['name', 'nameHanja', 'nameEng', 'birth', 'gender',
@@ -766,11 +766,15 @@
     return map.indexOf('school') >= 0 ? 'edu'
       : (map.indexOf('org') >= 0 && (map.indexOf('role') >= 0 || map.indexOf('title') >= 0
           || map.indexOf('dept') >= 0 || map.indexOf('period') >= 0)) ? 'career'
-      : (!어학 && (자격 || 상벌)) ? 'certaward' : '';
+      : (!어학 && (자격 || 상벌)) ? 'certaward'
+      /* ★ 어학 (2026-09-28) — 「자격증명 | 성적(등급)」. 재료는 자격증의 성적 칸(_cvFillData.lang).
+         ⚠ 상벌이 섞인 머리줄은 어학으로 보지 않는다 — 상벌은 자격·상벌 표의 몫이다. */
+      : (어학 && 자격 && !상벌) ? 'lang' : '';
   }
   /* 사람이 읽는 목록 이름 — ⚠ 「학력이 아니면 경력」으로 두면 자격·상벌이 «경력»이라 적힌다 */
   function listName(kind) {
-    return kind === 'edu' ? '학력' : kind === 'career' ? '경력' : kind === 'certaward' ? '자격·상벌' : '목록';
+    return kind === 'edu' ? '학력' : kind === 'career' ? '경력' : kind === 'certaward' ? '자격·상벌'
+      : kind === 'lang' ? '어학' : '목록';
   }
   /* ── 여기서부터는 «남의 자리» ──
      ① 다음 머리행 — 열 이름이 둘 이상 잡히면 새 목록 표가 시작된 것이다
@@ -846,7 +850,7 @@
        달라, 바로 아래 rowShape 빗장이 어차피 멈춘다(열 번호가 있어야 이 함수가 도는데,
        열 번호가 있으면 rowShape 도 돈다). 읽기 쉬우라고 남겨 둔다. */
   function 손친자료줄(head, cells) {
-    if (!head || head.kind !== 'certaward' || !head.byCol || cells.length < 2) return false;
+    if (!head || (head.kind !== 'certaward' && head.kind !== 'lang') || !head.byCol || cells.length < 2) return false;
     var 머리칸 = 0;
     for (var i = 0; i < cells.length; i++) {
       var ca = colAddrOf(cells[i]);
@@ -857,7 +861,7 @@
   }
   function fillList(tbl, data, report, opts) {
     var rows = splitRows(tbl);
-    var newTbl = tbl;
+    var newTbl = tbl, 어학보고됨 = false;
     for (var r = 0; r < rows.length; r++) {
       var head = detectHeader(splitCells(rows[r]), opts && opts.colMap);
       if (!head) continue;
@@ -985,7 +989,55 @@
           else 남은.shift();
         }
       }
-      if (items.length) {
+      /* ★★ 자격·상벌 표 «안에 끼인» 어학 머리줄 (2026-09-28).
+         ■ 실물: 16줄 = 「어학(세로) | 자격증명 | 성적(등급) | (상벌 빈 칸) | (상벌 빈 칸)」.
+           오른쪽이 상벌 빈 칸이라 «머리행에는 빈 칸이 없다» 빗장에 걸려 머리줄로 안 잡혔다
+           — 그래서 어학은 재료가 있어도 한 줄도 못 들어간다.
+         ■ 잣대 — 그 줄이 «자격증명(certName)과 성적(grade)»을 갖고, 빈 칸은 «모두 앞에서 쓴 상벌 열»일 때만
+           어학 머리줄로 본다. 그 아래 줄의 어학 열(진짜 열 번호)이 모두 있고 모두 비었으면 한 줄씩 넣는다.
+         ⚠ 상벌 칸은 건드리지 않는다(위 이어 채우기의 몫).
+         ⚠★ 「보통 머리줄이면 바깥 고리에 맡긴다」로 두지 말 것 — 상벌 이어 채우기가 그 줄 오른쪽을 채우면
+           빈 칸이 사라져 «보통 머리줄»처럼 보이는데, 그 아래 줄도 상벌 글자가 들어 «빈 줄»이 아니라
+           바깥 고리는 한 줄도 못 넣는다(검사가 잡았다). 여기서 넣으면 바깥 고리는 찬 줄로 보고 건너뛴다.
+         ⚠ 어학 재료(data.lang)가 없으면 아무것도 안 한다 — 지어내지 않는다. */
+      var 어학들 = (data && data.lang) || [];
+      if (head.kind === 'certaward' && head.byCol && q < rows.length && 어학들.length) {
+        var hc = splitCells(rows[q]), 어학열 = {}, 됨 = true, 키 = {};
+        /* 상벌 열은 «머리줄»에서 읽는다 — 자격·상벌 재료가 하나도 없는 분도 어학은 넣어야 한다 */
+        var 상벌자리 = {};
+        Object.keys(head.byCol).forEach(function (a) { if (/^award/.test(head.byCol[a])) 상벌자리[a] = true; });
+        for (var hi = 0; hi < hc.length && 됨; hi++) {
+          var hca = colAddrOf(hc[hi]), ht = cellText(hc[hi]);
+          if (hca < 0) { 됨 = false; break; }
+          if (!ht) { if (!상벌자리[hca]) 됨 = false; continue; }
+          var hk = colKeyOf(ht);
+          if (hk === 'certName' || hk === 'grade' || hk === 'gotAt') { 어학열[hca] = hk; 키[hk] = true; }
+        }
+        var 어학머리 = 됨 && 키.certName && 키.grade;
+        if (어학머리) {
+          var 열들 = Object.keys(어학열), 다음 = 0, 넣은어학 = 0;
+          for (var q3 = q + 1; q3 < rows.length && 다음 < 어학들.length; q3++) {
+            var cs3 = splitCells(rows[q3]), 자리3 = {};
+            for (var c3 = 0; c3 < cs3.length; c3++) { var a3 = colAddrOf(cs3[c3]); if (어학열[a3]) 자리3[a3] = c3; }
+            var 맞다 = 열들.every(function (a) { return 자리3[a] != null && !cellText(cs3[자리3[a]]); });
+            if (!맞다) break;
+            var 이어학 = 어학들[다음++], tr3 = rows[q3], 넣3 = false;
+            열들.forEach(function (a) {
+              var v3 = 이어학[어학열[a]];
+              if (v3 == null || v3 === '') return;
+              var f3 = fillCell(cs3[자리3[a]], v3);
+              if (!f3) return;
+              tr3 = replaceCellAt(tr3, 자리3[a], f3); cs3[자리3[a]] = f3; 넣3 = true;
+            });
+            if (넣3) { newTbl = replaceRowAt(newTbl, q3, tr3); rows[q3] = tr3; 넣은어학++; }
+          }
+          report.lists.push({ kind: 'lang', put: 넣은어학, total: 어학들.length });
+          어학보고됨 = true;
+        }
+      }
+      /* ⚠ 끼인 어학이 이미 보고했으면 바깥 고리의 어학 구역은 또 보고하지 않는다 —
+         「어학 2줄 · 어학 0/2줄(칸 부족)」처럼 두 번 적혀 모자란 줄 안다 */
+      if (items.length && !(head.kind === 'lang' && 어학보고됨)) {
         var 넣은수 = Object.keys(donePick).length;
         report.lists.push({ kind: head.kind, put: 넣은수, total: items.length });
       }

@@ -115,6 +115,8 @@ test('★★ 자격 표에는 «자격증만» 간다 — 수료증은 자격이
     workPeriod: () => ''
   };
   vm.createContext(c2);
+  /* ⚠ 어학 가르개(2026-09-28)는 _cvFillData 가 «실제로» 부르는 함수다 — 진짜를 넣는다 */
+  vm.runInContext(cutFn(CODE, 'function _isLangCert('), c2);
   vm.runInContext(cutFn(CODE, 'function _cvFillData('), c2);
   const d = vm.runInContext('_cvFillData()', c2);
   const 자격들 = Array.prototype.map.call(d.certaward, (r) => r.certName).filter(Boolean);

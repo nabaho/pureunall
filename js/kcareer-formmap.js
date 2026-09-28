@@ -115,6 +115,8 @@
          ⚠ 가르는 자는 채우는 쪽의 것(X.listKind)을 빌린다 — 여기서 다시 적지 말 것.
          ⚠ 학력·경력 잣대는 «그대로» 둔다(한 번에 하나씩 — 넓히면 다른 서식의 칸 지도가 바뀐다). */
       if (!kind && X.listKind && X.listKind(keys) === 'certaward') kind = 'certaward';
+      /* ★ 어학 표도 (2026-09-28) — 「자격증명 | 성적(등급)」. 자격·상벌과 같은 대접(손 칠 자리 유지). */
+      if (!kind && X.listKind && X.listKind(keys) === 'lang') kind = 'lang';
       if (!kind) continue;
       /* ★★ 구역은 머리줄 + «이어지는 채울 수 있는 줄»까지다 — 표 끝까지가 아니다.
          표 끝까지 세면 학력 4줄이 「빈 10줄」이 되고(대표 화면 실측 2026-09-06),
@@ -171,14 +173,18 @@
          예전에는 목록이 하나라도 있으면 표를 통째로 건너뛰어, 인적사항과 학력이
          «한 표»인 서식에서 성명·생년월일·주소가 아예 안 잡혔다. */
       var Ls = detectLists(grid, ti);
-      var 목록줄 = {}, 자격줄 = {};
+      var 목록줄 = {}, 자격줄 = {}, 자격종류 = {};
       Ls.forEach(function (L) {
         lists.push(L);
         /* ⚠★ 자격·상벌 구역은 줄을 «빼지 않는다» (2026-09-28) — 그 칸들은 사람이 손으로 칠
            자리로 남아야 하고(list-swallow 사고 뒤 규칙), 자격증 기록이 없는 분에게는 예전처럼
            기본정보의 자격이 그 칸에 들어가야 한다(2db41877). 대신 «목록 안» 표식만 붙인다 —
            기록이 있으면 guess 가 그 칸의 짐작을 비워 목록에 맡긴다. */
-        if (L.kind === 'certaward') { for (var q2 = L.head + 1; q2 < L.end; q2++) 자격줄[q2] = L.id; return; }
+        /* ⚠ 어학(lang)도 같다 — 자격증에 담은 성적이 채우고, 없으면 손으로 친다 */
+        if (L.kind === 'certaward' || L.kind === 'lang') {
+          for (var q2 = L.head + 1; q2 < L.end; q2++) { 자격줄[q2] = L.id; 자격종류[q2] = L.kind; }
+          return;
+        }
         for (var q = L.head; q < L.end; q++) 목록줄[q] = true;
       });
       grid.forEach(function (cells, ri) {
@@ -260,7 +266,7 @@
                        kind: kind, text: String(txt || '').trim(),
                        left: 왼, up: 위, guess: '',
                        /* 자격·상벌 목록 안의 칸이면 그 목록 이름 — guess·AI 가 본다 */
-                       inList: 자격줄[ri] || '' });
+                       inList: 자격줄[ri] || '', inKind: 자격종류[ri] || '' });
         });
       });
       return tbl;   /* 훑기만 한다 — 여기서는 아무것도 안 바꾼다 */
@@ -295,9 +301,10 @@
        안 비우면 첫 칸에 기본정보의 자격이 먼저 박히고, 그 줄이 «찬 줄»이 되어 목록은
        둘째 줄부터 넣는다(한 줄씩 밀린 자격표가 된다).
        ⚠ 기록이 «없으면» 그대로 — 예전처럼 기본정보의 자격이 그 칸에 들어간다(뒷걸음질 금지). */
-    var 자격재료 = !!(data && data.certaward && data.certaward.length);
+    /* ⚠ 목록마다 «제 재료»로 본다 — 자격·상벌은 certaward, 어학은 lang */
+    var 재료 = function (k) { var a = data && data[k || 'certaward']; return !!(a && a.length); };
     map.slots.forEach(function (s) {
-      if (s.inList && 자격재료) { s.guess = ''; s.byList = true; return; }
+      if (s.inList && 재료(s.inKind)) { s.guess = ''; s.byList = true; return; }
       /* ★ 글자칸은 «자동으로는 절대» 안 채운다 — 사람이 눌러 고칠 때만 바뀐다.
          여기서 열쇠를 주면 기관이 적어 둔 안내문까지 덮어쓴다. */
       /* ⚠ '아무칸'도 같다 — 사람이 켠 것뿐이지 「채워도 된다」는 뜻이 아니다.
@@ -541,7 +548,7 @@
          ⚠ 없으면 사전으로 간다 — AI가 없어도 앱은 그대로 돌아야 한다. */
       /* ⚠ 자격·상벌(certaward) 재료도 넘긴다 — 빠뜨려 칸 지도 길에서는 한 줄도 안 들어갔다 */
       var r2 = X.autoFill(xml, { fields: {}, edu: data.edu || [], career: data.career || [],
-                                 certaward: data.certaward || [] },
+                                 certaward: data.certaward || [], lang: data.lang || [] },
                           { colMap: plan.colMap });
       if (r2.changed) {
         xml = r2.xml;

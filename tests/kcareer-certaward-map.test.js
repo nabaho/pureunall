@@ -31,13 +31,23 @@ function 서식(opt) {
   opt = opt || {};
   줄번호 = 0;
   const 빈4 = () => tr(tc('', 1, 4), tc('', 5, 2), tc(opt.채운칸 && 줄번호 === 4 ? '이미 적힘' : '', 10, 5), tc('', 15, 6));
+  /* 어학 머리줄 — 미끼로 바꿔 끼울 수 있다(고장넣기가 «따로따로» 걸리게) */
+  const 어학머리 = opt.어학자리 === '자격'
+    ? () => tr(tc('기타', 0, 1, 3), tc('자격증명', 1, 4), tc('취득일', 5, 2), tc('', 10, 5), tc('', 15, 6))      /* 성적 없음 — 어학이 아니다 */
+    : opt.어학자리 === '딴빈칸'
+      ? () => tr(tc('어학', 0, 1, 3), tc('자격증명', 1, 4), tc('성적(등급)', 5, 2), tc('', 8, 2), tc('', 15, 6)) /* 8번 = 상벌 열이 아니다 */
+      : () => tr(tc('어학', 0, 1, 3), tc('자격증명', 1, 4), tc('성적(등급)', 5, 2), tc('', 10, 5), tc('', 15, 6));
+  const 어학줄 = () => (opt.어학친칸 && 줄번호 === 4)
+    ? tr(tc('손친 어학', 1, 4), tc('', 5, 2), tc('', 10, 5), tc('', 15, 6)) : 빈4();
   const rows = [
     tr(tc('자격및면허', 0, 1, 3), tc('종 류', 1, 4), tc('취득년월일', 5, 2), tc('상벌', 7, 3, 6), tc('상벌사항', 10, 5), tc('상벌기관', 15, 6)),
     빈4(), 빈4(),
-    tr(tc('어학', 0, 1, 3), tc('자격증명', 1, 4), tc('성적(등급)', 5, 2), tc('', 10, 5), tc('', 15, 6)),
-    빈4(), 빈4(),
+    어학머리(),
+    어학줄(), 어학줄(),
     /* 반쪽줄 — 상벌 열 «하나만»(10번) 있는 줄. 상벌 한 벌(사항+기관)이 못 들어가는 자리다 */
     opt.반쪽줄 ? tr(tc('', 1, 9), tc('', 10, 11)) : tr(tc('', 0, 21)),
+    /* 구분선 뒤 빈 줄 — 남의 구역이다(어학·상벌이 넘어오면 안 된다) */
+    ...(opt.구분선뒤빈줄 ? [빈4()] : []),
     tr(tc('경력사항', 0, 1, 3), tc('근무기간', 1, 4), tc('근 무 처', 5, 3), tc('직 위', 8, 4), tc('담당업무', 12, 9)),
     tr(tc('년 월 ~ 년 월', 1, 4), tc('', 5, 3), tc('', 8, 4), tc('', 12, 9)),
     tr(tc('년 월 ~ 년 월', 1, 4), tc('', 5, 3), tc('', 8, 4), tc('', 12, 9))
@@ -239,13 +249,122 @@ test('★★ 목록 종류를 가르는 자는 «한 곳» — 칸 지도가 채
   assert.match(src, /X\.listKind\(keys\) === 'certaward'/, '★★ 칸 지도가 자격·상벌을 제 나름대로 가릅니다');
   assert.equal(X.listKind(['certName', 'gotAt']), 'certaward');
   assert.equal(X.listKind(['awardWhat', 'awardOrg']), 'certaward');
-  assert.equal(X.listKind(['certName', 'grade']), '', '어학 표는 채우지 않는다(자료가 없다)');
+  /* ⚠ 2026-09-28 어학을 담게 됐다(자격증의 성적 칸) — 어학 표는 이제 «제 목록»이다.
+     ⚠ 상벌이 섞이면 어학이 아니다(자격·상벌 표의 몫) */
+  assert.equal(X.listKind(['certName', 'grade']), 'lang', '어학 표를 목록으로 모릅니다');
+  assert.equal(X.listKind(['certName', 'grade', 'awardWhat']), '', '상벌이 섞인 줄을 어학으로 봅니다');
   assert.equal(X.listKind(['period', 'school']), 'edu');
   /* ⚠ 채울 때 certaward 재료를 넘긴다 — 빠뜨려 0줄이었다 */
   assert.match(src, /certaward: data\.certaward \|\| \[\]/, '★★★ 채울 때 자격·상벌 재료를 안 넘깁니다');
 });
 
+/* ══════ 어학 (2026-09-28) — 자격증의 「성적(등급)」 칸이 재료 ══════ */
+const 어학 = (n) => [{ certName: 'TOEIC', grade: '850', gotAt: '2019.05.01' },
+  { certName: 'JLPT', grade: 'N2', gotAt: '2015.07.01' }, { certName: 'HSK', grade: '5급', gotAt: '2012.01.01' }].slice(0, n);
+test('★★★ 자격·상벌 표 «안에 끼인» 어학 머리줄 — 그 아래 어학 열에 넣는다', () => {
+  const data = Object.assign(자료(2, 5), { lang: 어학(2) });
+  const { r } = 채우기(서식(), data);
+  const 표 = 펼치기(r.xml);
+  assert.deepEqual([표[4][1], 표[4][5]], ['TOEIC', '850'], '★★★ 어학이 안 들어갔습니다: ' + JSON.stringify(표[4]));
+  assert.deepEqual([표[5][1], 표[5][5]], ['JLPT', 'N2']);
+  assert.deepEqual([표[3][1], 표[3][5]], ['자격증명', '성적(등급)'], '★★ 어학 머리줄을 고쳤습니다');
+  /* 상벌 이어 채우기는 그대로 */
+  assert.deepEqual([표[4][10], 표[4][15]], ['공로패', '아산시'], '★★ 어학을 넣다 상벌이 밀렸습니다');
+  /* 보고는 한 번 — 「어학 2줄 · 어학 0/2줄(칸 부족)」처럼 두 번 적히면 모자란 줄 안다 */
+  const 어학보고 = r.filled.filter((f) => f.key === 'lang');
+  assert.deepEqual(어학보고.map((f) => f.value), ['2줄'], '★★ 어학 보고가 두 번이거나 틀렸습니다: ' + JSON.stringify(어학보고));
+});
+
+test('★★ 자격·상벌 기록이 «없어도» 어학은 들어간다 — 상벌 열은 머리줄에서 읽는다', () => {
+  const data = { fields: {}, edu: [], career: [], certaward: [], lang: 어학(1) };
+  const { r } = 채우기(서식(), data);
+  assert.deepEqual([펼치기(r.xml)[4][1], 펼치기(r.xml)[4][5]], ['TOEIC', '850'], '★★ 자격·상벌이 없으면 어학도 빠집니다');
+});
+
+test('★★ 어학 재료가 없으면 비워 둔다 — 지어내지 않는다 · 「어학 0줄」이라고도 안 한다', () => {
+  const { r } = 채우기(서식(), 자료(2, 2));
+  const 표 = 펼치기(r.xml);
+  [4, 5].forEach((i) => assert.deepEqual([표[i][1], 표[i][5]], ['', ''], '★★ 어학 칸에 무엇을 넣었습니다'));
+  assert.ok(!r.filled.some((f) => f.key === 'lang'), '★ 어학 재료도 없는데 「어학 0줄」을 보고합니다');
+});
+
+/* 끼인 어학 머리줄 잣대가 «따로따로» 일하는지 — 미끼마다 하나씩 */
+const 어학넣기 = (opt) => 펼치기(채우기(서식(opt), Object.assign(자료(2, 2), { lang: 어학(3) })).r.xml);
+test('★★ 「성적」 없는 소머리줄은 어학이 아니다 — 자격증명·취득일 칸에 어학을 넣지 않는다', () => {
+  const 표 = 어학넣기({ 어학자리: '자격' });
+  assert.ok(!/TOEIC|JLPT|850/.test(JSON.stringify(표)), '★★ 어학이 아닌 줄 아래에 어학을 넣었습니다');
+});
+test('★★ 머리줄의 빈 칸이 «상벌 열이 아닌» 곳에 있으면 끼인 어학 머리줄이 아니다', () => {
+  const 표 = 어학넣기({ 어학자리: '딴빈칸' });
+  assert.ok(!/TOEIC/.test(JSON.stringify(표)), '★★ 모양이 다른 줄을 어학 머리줄로 봤습니다');
+});
+test('★★ 어학 줄에 이미 친 글자가 있으면 «덮지도 건너뛰지도» 않고 멈춘다', () => {
+  const 표 = 어학넣기({ 어학친칸: true });
+  assert.equal(표[4][1], '손친 어학', '★★ 손으로 친 어학을 덮었습니다(또는 덧붙였습니다)');
+  assert.equal(표[5][1], '', '★★ 막힌 줄을 건너뛰고 그 아래에 넣었습니다');
+});
+test('★★ 어학이 넘쳐도 구분선 «뒤» 빈 줄로 넘어가지 않는다', () => {
+  const 표 = 어학넣기({ 구분선뒤빈줄: true });
+  assert.ok(!/HSK/.test(JSON.stringify(표.slice(6))), '★★ 넘친 어학이 구분선을 넘어 남의 줄에 들어갔습니다');
+});
+
+test('★★ 어학이 넘쳐도 구분선에서 멈춘다 — 경력 표로 새지 않는다', () => {
+  const data = Object.assign(자료(2, 2), { lang: 어학(3) });
+  const { r } = 채우기(서식(), data);
+  assert.ok(!/HSK/.test(JSON.stringify(펼치기(r.xml).slice(6))), '★★ 넘친 어학이 경력 표로 샜습니다');
+});
+
+test('★★ 따로 떨어진 어학 표도 목록이다 — 칸은 손 칠 자리로 남고, 재료가 있을 때만 목록이 채운다', () => {
+  줄번호 = 0;
+  const xml = '<hs:sec><hp:p><hp:run><hp:tbl>'
+    + tr(tc('자격증명', 0, 2), tc('성적', 2, 2), tc('취득일', 4, 2))
+    + tr(tc('', 0, 2), tc('', 2, 2), tc('', 4, 2)) + tr(tc('', 0, 2), tc('', 2, 2), tc('', 4, 2))
+    + '</hp:tbl></hp:run></hp:p></hs:sec>';
+  const 지도 = M.scan(xml);
+  /* (준비) 머리줄 이름을 사전이 알아야 이 검사가 뜻이 있다 — ⚠ 모르면 «건너뛰지 말고» 실패한다
+     (처음엔 「외국어명」을 써서 사전이 몰랐고, 조용히 return 해 아무것도 안 봤다) */
+  assert.deepEqual(['자격증명', '성적', '취득일'].map(X.colKeyOf), ['certName', 'grade', 'gotAt'], '(준비) 사전이 머리줄을 모릅니다');
+  assert.ok(지도.lists.some((l) => l.kind === 'lang'), '★★ 어학 표를 목록으로 모릅니다');
+  assert.ok(지도.slots.some((s) => s.inList && s.inKind === 'lang'), '★ 어학 칸이 손 칠 자리에서 빠졌습니다');
+  const { r } = 채우기(xml, { fields: {}, edu: [], career: [], certaward: [], lang: 어학(2) });
+  const 표 = 펼치기(r.xml);
+  assert.deepEqual([표[1][0], 표[1][2], 표[1][4]], ['TOEIC', '850', '2019.05.01']);
+});
+
+test('★★ 어학 기록이 «없으면» 어학 칸 짐작을 비우지 않는다 · 있으면 비운다(목록 몫)', () => {
+  const 없음 = M.guess(M.scan(서식()), 자료(2, 2));
+  assert.ok(!없음.slots.some((s) => s.inKind === 'lang' && s.byList), '재료도 없는데 어학 칸을 목록 몫으로 돌렸습니다');
+  /* 자격·상벌 칸은 제 재료(certaward)로만 본다 — 어학 재료가 있어도 자격 재료가 없으면 비우지 않는다 */
+  const 어학만 = M.guess(M.scan(서식()), { fields: { license: '공인노무사 제9999호' }, edu: [], career: [], certaward: [], lang: 어학(1) });
+  assert.ok(어학만.slots.some((s) => s.inKind === 'certaward' && s.guess === 'license'),
+    '★★ 어학 재료 때문에 자격 칸의 옛 짐작(기본정보의 자격)이 사라졌습니다');
+});
+
+test('★★ 어학 시험 가르기(_isLangCert) — 성적이 있거나 시험 이름일 때만 · 자격 목록에서는 뺀다', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'kcareer.html'), 'utf8');
+  const i = app.indexOf('function _isLangCert(');
+  const fn = new Function(app.slice(i, app.indexOf('\nfunction _cvFillData(', i)) + '\nreturn _isLangCert;')();
+  assert.equal(fn({ title: '공인노무사' }), false);
+  assert.equal(fn({ title: 'TOEIC' }), true);
+  assert.equal(fn({ title: '토익 스피킹', grade: '' }), true);
+  assert.equal(fn({ title: '무슨 시험', grade: '850' }), true, '성적이 적혀 있으면 어학입니다');
+  assert.equal(fn({ title: '영어교육지도사' }), false, '★ 「영어」가 든 자격을 어학으로 봅니다');
+  const cv = app.slice(app.indexOf('function _cvFillData('), app.indexOf('function _cvFillData(') + 6000);
+  assert.match(cv, /const 어학목록=_자격\.filter\(_isLangCert\)/, '어학 목록이 가르개를 안 씁니다');
+  assert.match(cv, /const 자격목록=_자격\.filter\(function\(r\)\{ return !_isLangCert\(r\); \}\)/,
+    '★★ 토익이 자격 표와 어학 표에 두 번 적힙니다');
+  assert.match(cv, /lang:어학목록/, '채우기에 어학 재료를 안 넘깁니다');
+});
+
+test('★ 자격증 서식·OCR 이 성적을 담는다 — 새 칸을 한쪽에만 두면 「못 읽었다」가 된다', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'kcareer.html'), 'utf8');
+  assert.match(app, /\{key:'grade',label:'성적\(등급\)/, '자격증 서식에 성적 칸이 없습니다');
+  assert.match(app, /"grade":"«어학 시험»/, 'OCR 이 성적을 안 읽습니다');
+  assert.match(app, /grade:parsed\.grade\|\|''/, 'OCR 이 읽은 성적을 안 담습니다');
+});
+
 test('★ 이름표 — 자격·상벌을 «경력»이라 적지 않는다', () => {
+  assert.equal(X.listName('lang'), '어학');
   assert.equal(X.listName('certaward'), '자격·상벌');
   assert.equal(X.listName('edu'), '학력');
   assert.equal(X.listName('career'), '경력');

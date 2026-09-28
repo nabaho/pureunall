@@ -1147,11 +1147,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=31"></script>
+<script src="js/kcareer-hwpxfill.js?v=32"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
-<script src="js/kcareer-formmap.js?v=19"></script>
+<script src="js/kcareer-formmap.js?v=20"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=4"></script>
 <script src="js/kcareer-hwpxphoto.js?v=1"></script>
@@ -6907,6 +6907,10 @@ const FORM_DEFS={
     {key:'issuer',label:'발급자(기관장)'},
     {key:'date',label:'취득일',date:true},
     {key:'num',label:'자격번호'},
+    /* ★ 어학 성적 (2026-09-28) — 기관 서식의 「어학」 표(자격증명·성적(등급))를 채울 재료.
+       ⚠ 새 화면을 만들지 않고 자격증에 담는다 — 토익·JLPT 도 «증명서가 있는 자격»이다.
+       성적이 적혀 있거나 이름이 어학 시험이면 채우기가 «어학»으로 보낸다(_cvFillData). */
+    {key:'grade',label:'성적(등급) — 어학 시험일 때(예: 850, N1)'},
     {key:'note',label:'비고',full:true}]},
   complete:{title:'수료증',store:'cert',prefix:'C',fields:[
     {key:'title',label:'과정명',required:true},
@@ -7382,10 +7386,10 @@ const CAREER_CFG={
       <td>${formatDate(r.issueDate)||r.year||'-'}</td>
       <td style="font-size:11px;color:var(--text-mute)">${r.note||'-'}</td><td onclick="event.stopPropagation()">${rowActions(r.id,'wiccok',r.org||r.titleVal,p,r)}</td></tr>`},
   license:{store:'cert',filter:r=>!/수료|이수/.test(r.title||''),qFields:['title','org','issuer','num'],
-    cols:['ID','자격명','발급기관','발급자','취득일','자격번호','관리'],
+    cols:['ID','자격명','발급기관','발급자','취득일','자격번호·성적','관리'],
     row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.title||'-'}</strong></td>
       <td>${r.org||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.issuer||'-'}</td>
-      <td>${formatDate(r.date)||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.num||'-'}</td>
+      <td>${formatDate(r.date)||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${[r.num,r.grade].filter(Boolean).join(' · ')||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'cert',r.title,p,r)}</td></tr>`},
   complete:{store:'cert',filter:r=>/수료|이수/.test(r.title||''),qFields:['title','org','issuer'],
     cols:['ID','과정명','발급기관','발급자','수료일','이수시간','관리'],
@@ -9718,7 +9722,7 @@ const PAGE_OCR_PROMPT={
   award:`이 표창장/포상장/감사장을 아주 꼼꼼히 읽고 JSON으로만 답하세요. 날짜는 문서 그대로 정확히(YYYY.MM.DD).\n{"docType":"표창/포상/감사장 중 해당","org":"상을 «준» 기관의 전체 명칭 — 보통 맨 아래 서명 줄에 있다(예: 충청남도노사민정협의회)","issuer":"상을 준 사람의 직위와 이름(예: 위원장 김태흠). 없으면 빈칸","recipient":"상을 «받은» 대상 — 문서 위쪽에 적힌 개인·단체 이름","titleVal":"표창 사유·공적 내용을 한 줄로(예: 2025년 지역 노사민정협력활성화 추진 실적 평가 우수)","issueDate":"수여일 YYYY.MM.DD","year":"YYYY","note":"문서번호(제○호)"}\n⚠ org 는 «주는 쪽»입니다. 받는 쪽(recipient)을 org 에 넣지 마세요. 둘을 바꾸면 기록이 뒤집힙니다.\n⚠ titleVal 에 「표창장」 같은 문서 이름만 적지 말고 «무엇으로 받았는지»를 적으세요.\n없는 항목만 빈 문자열. 지어내지 마세요. JSON만.`,
   /* ⚠ 자격증 아래에는 「고용노동부장관」처럼 «직명»이 찍혀 있다 — 그걸 기관명으로
        담으면 목록이 「고용노동부장관」으로 남는다. 기관명(고용노동부)으로 되돌려 적게 한다. */
-  license:`이 자격증/면허증을 아주 꼼꼼히 읽고 JSON으로만 답하세요. 날짜·번호는 그대로 정확히.\n{"title":"자격·면허 명칭만(예: 공인노무사, 정보처리기사, 경영지도사). 「자격증」·「합격증서」 같은 문서 이름은 빼세요","org":"발급한 «기관 이름»(예: 고용노동부, 한국산업인력공단, 한국공인노무사회). 아래에 「고용노동부장관」처럼 직명으로 찍혀 있으면 기관 이름(고용노동부)으로 적으세요 — 직명을 그대로 담지 마세요","date":"취득·발급일 YYYY.MM.DD","num":"자격증·등록 번호(제○호의 숫자까지 그대로)","note":"등급·종별·비고"}\n없는 항목만 빈 문자열. 지어내지 마세요. JSON만.`,
+  license:`이 자격증/면허증을 아주 꼼꼼히 읽고 JSON으로만 답하세요. 날짜·번호는 그대로 정확히.\n{"title":"자격·면허 명칭만(예: 공인노무사, 정보처리기사, 경영지도사). 「자격증」·「합격증서」 같은 문서 이름은 빼세요","org":"발급한 «기관 이름»(예: 고용노동부, 한국산업인력공단, 한국공인노무사회). 아래에 「고용노동부장관」처럼 직명으로 찍혀 있으면 기관 이름(고용노동부)으로 적으세요 — 직명을 그대로 담지 마세요","date":"취득·발급일 YYYY.MM.DD","num":"자격증·등록 번호(제○호의 숫자까지 그대로)","grade":"«어학 시험»(토익·토플·JLPT·HSK 등)이면 점수·등급(예: 850, N1). 어학이 아니면 빈칸","note":"등급·종별·비고"}\n없는 항목만 빈 문자열. 지어내지 마세요. JSON만.`,
   /* ⚠ 수료증에는 주관기관과 위탁·운영기관이 «둘 다» 적혀 있는 것이 많다
        (실측: 「한국산업인력공단」이 주관하고 「HRDCONTENTS」가 운영한 NCS 교육).
        org 에 어느 쪽을 담느냐로 같은 서류가 남남처럼 갈라져 중복이 됐다 →
@@ -9817,6 +9821,7 @@ async function saveOCRRecord(page,parsed,file,ext,b64){
     var _nt=parsed.note||'', _hr=String(parsed.hours||'').replace(/[^0-9]/g,'');
     if(_hr) _nt=(_nt?_nt+' · ':'')+_hr+'시간';
     rec={id:recId,title:parsed.title||'',org:parsed.org||'',date:parsed.date||'',num:parsed.num||'',
+         grade:parsed.grade||'',
          hours:_hr,note:_nt,fname:file.name,savedAt:new Date().toISOString()};
   } else if(page==='work'){ store='work'; recId=nextId('W','work');
     /* ⚠ period(근무기간)를 여기서 만들어 담지 않는다 — 화면이 입사일·퇴사일에서
@@ -14312,6 +14317,13 @@ async function loadFirmInfo(){
     return 것;
   }catch(e){ console.warn('firmInfo', e); return firmInfo(); }
 }
+/* 어학 시험인가 — 성적이 적혀 있거나 이름이 어학 시험 이름이다 (2026-09-28).
+   ⚠ «이름만»으로 보는 낱말은 시험 이름으로 좁힌다 — 「영어교육지도사」 같은 자격이 어학으로 가면 안 된다. */
+function _isLangCert(r){
+  if(!r) return false;
+  if(String(r.grade||'').trim()) return true;
+  return /(TOEIC|TOEFL|TEPS|OPIc|IELTS|JLPT|JPT|HSK|DELF|DALF|DELE|TOPIK|G-?TELP|FLEX|토익|토플|텝스|오픽|아이엘츠|지텔프|토픽|일본어능력시험|한어수평고시)/i.test(String(r.title||''));
+}
 function _cvFillData(){
   const info=(typeof getProfileInfo==='function'?getProfileInfo():get('profile_info'))||{};
   /* ★ 사무소에 관한 칸은 «이알피가 이긴다» (대표 결정 2026-09-13).
@@ -14334,8 +14346,14 @@ function _cvFillData(){
        첫 줄만 상벌이 차고 나머지 두 줄의 상벌 칸은 빈다 — 그것이 맞다.
      ⚠ 수료증은 «자격이 아니다» — 자격 표에 넣지 않는다(목록 화면도 그렇게 가른다).
      ⚠ 징계는 담는 자료가 없다. 상벌 표의 징계 칸은 빈 채로 둔다 — 지어내지 않는다. */
-  const 자격목록=get('cert').filter(function(r){ return !/수료|이수/.test(r.title||''); })
-    .slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); })
+  /* ★ 어학 (2026-09-28) — 성적이 적혀 있거나 이름이 어학 시험이면 «어학»이다.
+     ⚠ 자격 목록에서는 뺀다 — 토익이 자격 표와 어학 표에 두 번 적히면 안 된다.
+     ⚠ 잣대는 여기 한 곳(_isLangCert) — 목록·채우기가 따로 가르면 어긋난다. */
+  const _자격=get('cert').filter(function(r){ return !/수료|이수/.test(r.title||''); })
+    .slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+  const 어학목록=_자격.filter(_isLangCert)
+    .map(function(r){ return { certName:r.title||'', grade:r.grade||'', gotAt:formatDate(r.date)||'' }; });
+  const 자격목록=_자격.filter(function(r){ return !_isLangCert(r); })
     .map(function(r){ return { certName:r.title||'', gotAt:formatDate(r.date)||'' }; });
   const 상벌목록=get('wiccok').filter(function(r){ return typeof isAwardType==='function' && isAwardType(r.type); })
     .slice().sort(function(a,b){ return String(b.issueDate||'').localeCompare(String(a.issueDate||'')); })
@@ -14385,7 +14403,7 @@ function _cvFillData(){
              military:info.military||'', militaryBranch:info.militaryBranch||'',
              militaryRank:info.militaryRank||'', militaryPeriod:info.militaryPeriod||'',
              veteran:info.veteran||'', disability:info.disability||'' },
-    certaward:certaward,
+    certaward:certaward, lang:어학목록,
     /* ★ 주민등록번호는 fields 에 «담지 않는다» — 담으면 자동 채우기가 알아서 써 낸다.
        사람이 칸 지도에서 그 자리에 「주민등록번호」를 직접 고를 때만 여기서 꺼내 간다.
        (대표 지시 2026-08-30 「넣어라」 + 「누를 때만 꺼내 쓰는 방식으로」) */

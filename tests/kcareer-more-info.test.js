@@ -175,6 +175,8 @@ test('★ 집 주소를 안 적었으면 «오늘까지 되던 대로» 사무�
       getProfileInfo: () => info, get: () => [], workPeriod: () => '',
       formatDate: (x) => x || '', isAwardType: () => false };
     vm2.createContext(ctx);
+    /* ⚠ 어학 가르개(2026-09-28)는 _cvFillData 가 «실제로» 부르는 함수다 — 진짜를 넣는다 */
+    vm2.runInContext(cutFn(bare, 'function _isLangCert('), ctx);
     vm2.runInContext(cutFn(bare, 'function _cvFillData('), ctx);
     return vm2.runInContext('_cvFillData()', ctx).fields;
   };
