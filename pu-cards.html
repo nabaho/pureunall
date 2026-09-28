@@ -730,6 +730,20 @@ body.mailview #pu-backup-admin-button{display:none!important}
    뜻으로 쓰던 색이다(담당자 딱지의 .na 와 같은 결). 새 색을 만들지 않는다(팔레트 규칙). */
 .dm-ai{flex:none;font-size:10.5px;color:#854d0e;background:#fffbeb;border:1px solid #fde68a;
   border-radius:3px;padding:1px 6px;margin-right:8px;white-space:nowrap}
+/* 📁 진행 중인 사건·컨설팅 (대표 승인 목업 2026-09-28) — «업무»의 초록.
+   ⚠ 한 줄 — 넘치면 「…」, 전부는 마우스를 올리면 보인다(한 칸은 한 줄 규칙).
+   ⚠ .with 는 «건 담당 칸에서 함께 보는» 줄이다 — 내 업체가 아니라는 뜻이라 옅게 둔다. */
+.dm-work{flex:none;max-width:260px;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;
+  color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:3px;padding:1px 6px;
+  margin-right:8px;white-space:nowrap;cursor:pointer}
+.dm-work:hover{background:#bbf7d0}
+.dm-work.with{color:#64748b;background:#f8fafc;border-color:#e2e8f0}
+/* 🏢 제목 속 업체 — «짐작»이라 호박색(담당자 딱지 .na 와 같은 결) */
+.dm-guess{flex:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;
+  color:#854d0e;background:#fffbeb;border:1px solid #fde68a;border-radius:3px;padding:1px 6px;
+  white-space:nowrap;cursor:pointer}
+.dm-guess:hover{background:#fde68a}
+.dm-guess b{font-weight:700}
 
 /* ── 숨겨 둔 칸 되돌리는 자리 (대표 지시 2026-08-26) ──
    ⚠ 되돌릴 길이 없으면 아무도 숨기기를 못 누른다. 숨기기와 «같은 화면»에 둔다. */
@@ -18248,6 +18262,11 @@ function mbWhoWhy(em0, idx0){
     const c1 = mbWhoLive(coRec.main);
     if(c1) return { who:c1, why:'co' };
   }
+  /* ①-3 이알피 «진행 중» 사건·컨설팅에 이 주소가 그대로 적혀 있다 → 그 건 주담당
+     (대표 승인 목업 2026-09-28). ⚠ ②(기업정보함)보다 앞이다 — 명함은 이름으로 업체를
+     짚은 것이고, 이것은 담당이 그 건에 «직접 적은 주소»다. ⚠ 사람이 정한 ①·①-2 보다는 뒤. */
+  const wk = mbWorkMgrOfAddr(em);
+  if(wk) return { who:wk, why:'work' };
   const idx = idx0 || mbWhoIndex();
   const a1 = mbWhoLive(idx.byAddr[em]);
   if(a1) return { who:a1, why:'card' };                   /* ② 기업정보함 주소 */
@@ -18503,6 +18522,58 @@ function mbGuessOf(v){
     co: String(rec.company||''), id: String(rec.id||''), who: String(rec.main||''),
     from: from, txt: String(txt||'').replace(/\s+/g,' ').trim() } : null;
   return mk(mbGuessIn(v.s), '제목', v.s) || mk(mbGuessIn(v.p), '본문', v.p);
+}
+/* ── 🏢 줄마다 «제목 속 업체» (대표 승인 목업 2026-09-28) ──
+   ★ 한 통만 보고 띄우지 않는다 — 그 «주소의 메일 전부»를 보고, 업체 이름이 «한 곳만»
+     나올 때만 띄운다. 공인노무사회·세무사무소처럼 여러 업체를 말하는 주소는 안 띄운다
+     (mbGuessRow 가 섞인 것을 null 로 돌려준다 — 「한 번에 나누기」와 «같은 잣대»다).
+   ⚠ 표는 그리는 동안만 산다(mbMemoOf) — 새 메일이 오면 다음 그림에서 저절로 다시 센다.
+   ⚠ 주소별 묶음은 «필요할 때 한 번»만 만든다. 담당 모름 칸을 열 때만 불린다. */
+function mbGuessAddr(em){
+  const m = mbMemoOf();
+  const by = m.gAddr = m.gAddr || {};
+  if(by[em] !== undefined) return by[em];
+  let rows = m.rowsByAddr;
+  if(!rows){
+    rows = m.rowsByAddr = {};
+    Object.keys(_mbMsgs||{}).forEach(slug=>{
+      const box = _mbMsgs[slug] || {};
+      Object.keys(box).forEach(uid=>{
+        const r = box[uid]; if(!r) return;
+        const e = String(r.e||'').trim().toLowerCase();
+        if(e) (rows[e] = rows[e] || []).push(r);
+      });
+    });
+  }
+  const a = { n:0, votes:{}, ev:{}, name:'' };
+  (rows[em] || []).forEach(r=>{
+    a.n++;
+    if(!a.name && r.n) a.name = String(r.n);
+    const g = mbGuessOf(r);
+    if(!g || !g.who) return;
+    const k = g.id || g.co;
+    a.votes[k] = (a.votes[k]||0) + 1;
+    if(!a.ev[k]) a.ev[k] = g;
+  });
+  return (by[em] = mbGuessRow(em, a));
+}
+/* 이 줄에 🏢 을 띄울까 — 이 한 통이 말하는 업체가 그 주소 전체와 같을 때만 */
+function mbGuessChip(v){
+  const em = String((v&&v.e)||'').trim().toLowerCase();
+  if(!em || mbGuessOurs(em)) return null;
+  const g = mbGuessOf(v);
+  if(!g || !g.who) return null;
+  const r = mbGuessAddr(em);
+  return (r && r.co === g.co) ? r : null;
+}
+function mbGuessChipGo(em){
+  const e = String(em||'').trim().toLowerCase();
+  const r = mbGuessAddr(e);
+  if(!r) return toast('이 주소는 여러 업체 이름이 섞여 있습니다 — 한 통씩 보고 정해 주세요', 8000);
+  if(!confirm(`이 주소를 「${r.co}」에 잇습니다\n\n${e} — 이 주소의 메일 ${r.n.toLocaleString()}통(앞으로 올 것도)이 `
+    + `${r.co} 담당 ${r.who} 칸으로 갑니다.\n\n근거: 제목·첫 줄에 「${r.co}」 ${r.v}통 · 다른 업체 이름 0통\n`
+    + `⚠ 메일은 움직이지 않습니다 — 잘못 이은 것은 「자문사 이메일 잇기」에서 무를 수 있습니다.`)) return;
+  mbCoSet(e, r.co, false, r.name);
 }
 /* 우리 식구 주소인가 — 우리가 보낸 메일은 「이 주소는 그 업체」로 이을 것이 아니다 */
 function mbGuessOurs(em){
@@ -18797,6 +18868,11 @@ function mbBizSubsLoad(){
     if(m && m.byBiz) Object.keys(m.byBiz).forEach(k=>
       (m.byBiz[k]||[]).forEach(r=>put(r.companyName||r.company||r.name||'', r)));
     _mbBizSubs = map;
+    /* 📁 진행 중인 사건·컨설팅 표도 «같은 자료»로 만든다 (대표 승인 목업 2026-09-28) —
+       새로 읽는 것이 없다. */
+    _mbWork = mbWorkBuild(m, nameBySid,
+      (typeof ErpMatch!=='undefined' && ErpMatch.byId) || {},
+      (typeof ErpMatch!=='undefined' && ErpMatch.byBiz) || {});
     if(state.view==='mail'){ mbWhoBust(); renderPCSide(); renderMailPage(); }
   });
 }
@@ -18837,6 +18913,18 @@ function mbSubsOfRow(v, idx0){
       if(!n || mbRetired(n)) return;
       if(n !== main && out.indexOf(n) < 0) out.push(n);
     });
+    /* ★ 📁 진행 중인 사건·컨설팅의 «주담당»도 함께 본다 (대표 승인 목업 2026-09-28)
+       업체 담당(자문)과 건 담당이 다를 때, 건 담당 칸에도 그 메일이 보인다 —
+       부담당과 «같은 길»이라 세는 곳(mbWhoTally)·거르는 곳(mbRowFits)이 저절로 맞는다.
+       ⚠ 메일 담당(w)은 뺀다 — 주소로 잡힌 건(①-3)은 업체가 없어 main 이 비어 있다.
+         안 빼면 한 사람 칸에 같은 메일이 두 번 세어진다. 건이 걸린 줄에서만 묻는다. */
+    const ws = mbWorkOfRow(v, idx0);
+    if(ws.length){
+      const w = mbWhoOfRow(v, idx0);
+      mbWorkMgrs(ws).forEach(n=>{
+        if(n !== main && n !== w && out.indexOf(n) < 0) out.push(n);
+      });
+    }
   }
   return out;
 }
@@ -18846,6 +18934,130 @@ function mbWhoAllOfRow(v, idx0){
   const w = mbWhoOfRow(v, idx);
   if(!w) return [];
   return [w].concat(mbSubsOfRow(v, idx));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   📁 진행 중인 사건·컨설팅 — 메일함에서 바로 본다 (대표 승인 목업 2026-09-28)
+   ══════════════════════════════════════════════════════════════════════════
+   「현재 진행중인사건이나 컨설팅의 경우 푸른이알피에서는 지정되어 있는데
+    메일함에서는 직접 확인하기가 어려운데」
+
+   ★ 실측 2026-09-28 (최근 90일, 업무 메일 1,232통)
+       · 담당 모름인데 보낸 주소가 진행 중 사건·컨설팅 기록에 «그대로» 적힌 것  68통
+       · 업체 담당 ≠ 그 업체 사건·컨설팅 담당                                   62통
+   ★ 잇는 열쇠는 셋뿐이다 — 주소(글자 그대로) · 업체 id(companyId) · 사업자번호.
+     ⚠ 업체 «이름»으로는 잇지 않는다(온톨로지 규칙). 이름으로 짚으면 같은 이름 다른
+       회사의 담당이 붙는다. 컨설팅 업체는 대부분 업체관리에 없어 id 가 비어 있다 —
+       그래서 «주소»가 가장 많이 닿는다.
+   ⚠ 「진행 중」만 본다. 끝난 건은 저절로 빠져야 사람이 잊어도 안전하다.
+   ⚠ 이알피 원장은 «읽기만» 한다 — 여기서 아무것도 쓰지 않는다. */
+let _mbWork = null;       /* {byAddr:{주소:[건]}, byCo: Map(업체 기록 → [건])} */
+const MB_WORK_KIND = { case:'사건', consulting:'컨설팅' };
+/* 끝난 건인가 — 사업마다 낱말이 조금씩 다르다(closed·done, 종료·완료) */
+function mbWorkLive(r){
+  if(!r || r._deleted || r.permanentArchived || r.closedDate) return false;
+  const s = String(r.status||'').trim().toLowerCase();
+  if(/^(closed|done|complete|completed|cancel|cancelled|canceled|inactive)$/.test(s)) return false;
+  return !/종료|완료|취소/.test(s);
+}
+/* 사무관리 자료(loadErpCaseCons 가 준 것) → 표. 순수 함수 — 검사가 그대로 부른다.
+   ⚠ byId·byBiz 는 ErpMatch 의 업체 기록이다. 같은 «기록 하나»를 열쇠로 쓰므로
+     나중에 메일 쪽에서 찾은 업체 기록과 그대로 맞춰진다(이름을 거치지 않는다). */
+function mbWorkBuild(m, nameBySid, byId, byBiz){
+  const byAddr = {}, byCo = new Map();
+  if(!m) return { byAddr, byCo };
+  const seen = {};
+  const recs = [];
+  [m.byBiz, m.byName].forEach(g=>{
+    Object.keys(g||{}).forEach(k=>(g[k]||[]).forEach(r=>{ if(r) recs.push(r); }));
+  });
+  const person = (s)=> String((nameBySid||{})[String(s||'')] || s || '').trim();
+  const push = (tbl, key, w)=>{ const a = tbl[key] = tbl[key] || [];
+    if(!a.some(x=>x.kind===w.kind && x.id===w.id)) a.push(w); };
+  recs.forEach(r=>{
+    if(!MB_WORK_KIND[r._kind] || !mbWorkLive(r)) return;
+    const id = String(r.id||'');
+    const sk = r._kind + ':' + (id || JSON.stringify([r.companyName, r.title, r.managerMain]));
+    if(seen[sk]) return; seen[sk] = 1;
+    const w = { kind:r._kind, id:id, mgr:person(r.managerMain),
+      co:String(r.companyName||r.company||''),
+      title:String(r.title||r.typeName||r.brief||r.programName||'') };
+    [r.email, r.primaryContactEmail].concat((r.contacts||[]).filter(c=>c && !c.left).map(c=>c.email))
+      .forEach(e=>{
+        e = String(e||'').trim().toLowerCase();
+        if(e.indexOf('@') < 1 || /@pureun\.kr$/.test(e)) return;   /* 우리 주소는 아니다 */
+        push(byAddr, e, w);
+      });
+    const coRec = (r.companyId && (byId||{})[String(r.companyId)])
+      || (digits(r.bizNo).length >= 10 ? (byBiz||{})[digits(r.bizNo)] : null);
+    if(coRec){ const a = byCo.get(coRec) || []; if(!a.some(x=>x.kind===w.kind && x.id===w.id)) a.push(w); byCo.set(coRec, a); }
+  });
+  return { byAddr, byCo };
+}
+/* 주소가 사건·컨설팅에 «그대로» 적혀 있으면 그 건의 주담당 — mbWhoWhy ①-3.
+   ⚠ 담당이 둘로 갈리면(두 건 두 사람) 정하지 않는다 — 딱지만 둘 다 보여 준다. */
+function mbWorkMgrOfAddr(em){
+  const a = ((_mbWork && _mbWork.byAddr) || {})[em] || [];
+  const ms = [];
+  a.forEach(w=>{ const n = mbWhoLive(w.mgr); if(n && ms.indexOf(n) < 0) ms.push(n); });
+  return ms.length === 1 ? ms[0] : '';
+}
+/* 이 메일에 걸린 진행 중인 건 «모두» — 주소로 + 업체로(id·사업자번호) */
+function mbWorkOfRow(v, idx0){
+  if(!_mbWork) return [];
+  const em = String((v&&v.e)||'').trim().toLowerCase();
+  if(!em) return [];
+  const out = (_mbWork.byAddr[em] || []).slice();
+  /* 업체는 mbSubsOfRow 와 «같은 길»로 찾는다 — 사람이 이은 자문사가 먼저 */
+  let rec = mbCoRec(mbCoOf(em));
+  if(!rec){
+    const idx = idx0 || mbWhoIndex();
+    const co = (idx.coAddr||{})[em];
+    rec = co ? mbCoRec(co) : null;
+  }
+  if(rec && !rec.left) (_mbWork.byCo.get(rec) || []).forEach(w=>{
+    if(!out.some(x=>x.kind===w.kind && x.id===w.id)) out.push(w);
+  });
+  return out;
+}
+/* 그 건을 맡은 사람들(살아 있는 사람만, 퇴사자는 이어받은 사람) */
+function mbWorkMgrs(ws){
+  const out = [];
+  (ws||[]).forEach(w=>{ const n = mbWhoLive(w.mgr); if(n && out.indexOf(n) < 0) out.push(n); });
+  return out;
+}
+/* 📁 딱지 — 목록 줄(wide=false)과 읽는 화면(wide=true)이 함께 쓴다.
+   ⚠ 한 칸은 한 줄 — 건이 여럿이면 「📁 컨설팅 2」로 줄이고 전부는 마우스를 올리면 보인다. */
+function mbWorkTag(v, wide){
+  const id = mbNow();
+  if(id.charAt(0)===MB_RAW_P || mbSentBox(id)) return '';
+  const ws = mbWorkOfRow(v);
+  if(!ws.length) return '';
+  const kinds = [];
+  ws.forEach(w=>{ const k = MB_WORK_KIND[w.kind]; if(kinds.indexOf(k) < 0) kinds.push(k); });
+  const label = kinds.join('·') + (ws.length > 1 ? ' ' + ws.length : '');
+  const w0 = mbWhoOfRow(v);
+  const mgrs = mbWorkMgrs(ws);
+  const tip = ws.map(w=>`${MB_WORK_KIND[w.kind]} · ${w.co}${w.title?' · '+w.title:''} · 담당 ${mbWhoLive(w.mgr)||'없음'}`).join('\n')
+    + `\n누르면 푸른이알피 ${MB_WORK_KIND[ws[0].kind]}관리가 열립니다`;
+  const go = `event.stopPropagation();mbWorkGo('${ws[0].kind==='case'?'case':'consulting'}')`;
+  /* 그 건 담당의 칸에서 보면 — 업체 담당이 따로 있다는 것을 밝힌다 */
+  const me = id.charAt(0)===MB_WHO_P ? id.slice(1) : '';
+  if(me && w0 && me !== w0 && mgrs.indexOf(me) >= 0)
+    return `<span class="dm-work with" onclick="${go}" title="${esc(tip)}"
+      >📁 ${esc(kinds.join('·'))}으로 함께 · ${esc(w0)} 업체</span>`;
+  const other = mgrs.filter(n=>n !== w0);
+  const who = other.length ? ' · ' + other[0] + (other.length > 1 ? ' +' + (other.length - 1) : '') : '';
+  const more = wide && ws.length === 1 && ws[0].title ? ' — ' + ws[0].title : '';
+  return `<span class="dm-work" onclick="${go}" title="${esc(tip)}">📁 ${esc(label + who + more)}</span>`;
+}
+/* 이알피 그 메뉴로 — 창은 공용 층이 고른다(한 앱 한 창).
+   ⚠ 「계약 등록」과 같은 결로 «따로 이름 붙은 창»을 쓴다 — 보던 이알피 화면을 덮지 않는다.
+   ⚠ 이알피에는 아직 «한 건을 바로 여는» 주소가 없다 — 그 메뉴까지 간다. */
+function mbWorkGo(kind){
+  const url = 'pu-erp.html#menu=' + (kind === 'case' ? 'biz/case' : 'biz/consulting');
+  if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(url, '사무관리 보기');
+  else location.href = url;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -21577,9 +21789,16 @@ function mbWhoTag(v){
       title="${esc(w)} 담당 — 눌러서 바꿀 수 있습니다">👤 ${esc(w)}</span>`;
   /* 모르는 것은 «업무 칸»과 「담당 모름」에서만 물어본다. 전체메일에까지 노란 딱지가
      줄줄이 붙으면 목록이 시끄럽다. */
-  if(id.charAt(0)===MB_BIN_P || id === MB_WHO_NA)
+  if(id.charAt(0)===MB_BIN_P || id === MB_WHO_NA){
+    /* 🏢 제목 속 업체를 «그 줄에» 바로 (대표 승인 목업 2026-09-28) — 「📄 한 번에 나누기」
+       창을 따로 안 열어도 된다. ⚠ 저절로 잇지 않는다 — 누르면 확인을 거쳐 잇는다. */
+    const g = mbGuessChip(v);
+    if(g) return `<span class="dm-guess" onclick="event.stopPropagation();mbGuessChipGo('${esc(em)}')"
+      title="이 주소의 메일 ${g.v}통에 「${esc(g.co)}」이(가) 적혀 있습니다 — 눌러서 이 주소를 ${esc(g.co)}에 잇습니다(담당 ${esc(g.who)})"
+      >🏢 <b>${esc(g.co)}?</b> 잇기</span>`;
     return `<span class="dm-who na" onclick="event.stopPropagation();mbWhoAsk('${esc(em)}',event)"
       title="이 주소가 누구 담당인지 한 번 정해 주시면 다음부터 저절로 갑니다">＋ 담당자</span>`;
+  }
   return '';
 }
 /* 이 메일을 이 칸으로 옮긴 것이 «사람»인가 «AI(Jev)」인가 (2026-09-26, 받은메일함 자동분류).
@@ -21779,6 +21998,7 @@ function mbListHtml(){
         <button class="dm-notspam" onclick="event.stopPropagation();mbNotSpam('${esc(String(v.e||''))}')"
           title="이 주소는 다시는 안 걸립니다 — 전 직원에게 함께 적용됩니다">스팸 아님</button>` : ''}
       ${mbWhoTag(v)}
+      ${mbWorkTag(v)}
       ${mbOpenTag(v)}
       ${mbSeenTag(v)}
       ${mbFromTag(v)}
@@ -22896,6 +23116,7 @@ function mbReadHtml(){
         <button class="rbtn" title="이 메일 «한 통»의 담당자를 정합니다 — 메일은 움직이지 않습니다"
           onclick="mbOwnerOne('${o.slug}','${o.uid}',event)">${
           mbWhoOfRow(v) ? '👤 ' + esc(mbWhoOfRow(v)) : '👤 담당자'}</button>
+        ${mbWorkTag(v, true)}
         <button class="rbtn" title="나중에 다시 보려고 안 읽음으로 되돌립니다 — 다음메일에도 함께 바뀝니다"
           onclick="mbUnreadOne('${o.slug}','${o.uid}')">✉ 안 읽음으로</button>
         ${/* ── 「내가 봤다」 (대표 지시 2026-08-29) ──
