@@ -6376,22 +6376,133 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
   if(!rows.length){ body.innerHTML=cdBar+'<div class="empty"><div class="emp-ico">📭</div>보관된 '+D.label+'이(가) 없습니다</div>'; return; }
   if(D.tableView){ body.innerHTML=cdBar+_cdTable(rows,D); return; }
   const years=[...new Set(rows.map(r=>r.year))].sort().reverse();
-  body.innerHTML=years.map(y=>{ const items=rows.filter(r=>r.year===y).sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
+  /* ★ № 넘버링 + ㅁ 고르기 (대표 지시 2026-09-28) — 번호는 해를 «통틀어» 이어 센다
+     (해마다 1번이 있으면 가리킬 수 없다 — 작성 중 목록과 같은 까닭). 옷은 목록 화면과 같다. */
+  let 번호=0;
+  const dsBar='<div class="sel-bar" id="dsSel-'+domain+'" style="display:none;position:static;margin:4px 0 8px">'
+    +'<b id="dsSelCnt-'+domain+'">0건 선택</b>'
+    +'<button class="btn sm" type="button" onclick="docSelAll(\''+domain+'\',true)">전체 선택</button>'
+    +'<button class="btn sm" type="button" onclick="docSelAll(\''+domain+'\',false)">선택 해제</button>'
+    +'<span style="flex:1"></span>'
+    +'<button class="btn sm" type="button" onclick="docSelDl(\''+domain+'\')">⬇ 선택 내려받기</button>'
+    +'<button class="btn sm" type="button" style="color:var(--red)" onclick="docSelDel(\''+domain+'\',this)">🗑 선택 삭제</button></div>';
+  const allChk='<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mute);cursor:pointer;margin-top:6px">'
+    +'<input type="checkbox" class="ds-all" onchange="docSelAll(\''+domain+'\',this.checked)"> 전체 선택</label>';
+  body.innerHTML=allChk+dsBar+years.map(y=>{ const items=rows.filter(r=>r.year===y).sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
     return `<div style="margin-top:16px"><div style="font-weight:700;color:var(--navy);font-size:15px;margin-bottom:8px">${escapeHtml(y)} <span style="font-size:12px;color:var(--text-mute);font-weight:400">(${items.length}건)</span></div>`
-      + items.map(r=>{ const n=(r.submits||[]).length;
+      + items.map(r=>{ const n=(r.submits||[]).length; 번호++;
         const extraTxt=(D.extra||[]).map(f=>r[f.key]?`${f.label.split('(')[0]}: ${escapeHtml(r[f.key])}`:'').filter(Boolean).join(' · ');
-        return `<div class="card" style="margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        return `<div class="card ds-card" data-id="${_jsAttr(r.id)}" style="margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <label class="rn-chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="row-chk" value="${_jsAttr(r.id)}" onchange="docSelSync('${domain}')"><span class="ds-no" style="font-weight:700;color:var(--navy);min-width:22px;font-size:12.5px">${번호}</span></label>
           <div style="flex:1;min-width:180px"><div style="font-weight:600">${escapeHtml(r.kind||'-')}${r.org?` · ${escapeHtml(r.org)}`:''}</div>
           ${extraTxt?`<div style="font-size:11px;color:var(--navy);margin-top:2px">${extraTxt}</div>`:''}
-          <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHtml(r.memo||'')}</div></div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHtml(r.memo||'')}</div>
+          ${_docDlTag(domain,r)}</div>
           ${_cdSrc(r)==='received'
             ? `<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄 원본</button>`
-            : `<button class="btn sm" onclick="showBig('${r.genFileId}')" onmouseenter="hoverThumb('${r.genFileId}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📄 ${D.label}</button><button class="btn sm" onclick="downloadFile('${r.genFileId}')">⬇</button>`
-              + (r.origFileId?`<button class="btn sm" onclick="showBig('${r.origFileId}')" onmouseenter="hoverThumb('${r.origFileId}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📎 원본</button><button class="btn sm" onclick="downloadFile('${r.origFileId}')">⬇</button>`:'')}
+            : `<button class="btn sm" onclick="showBig('${r.genFileId}')" onmouseenter="hoverThumb('${r.genFileId}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📄 ${D.label}</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','gen')" title="내려받기 — 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇</button>`
+              + (r.origFileId?`<button class="btn sm" onclick="showBig('${r.origFileId}')" onmouseenter="hoverThumb('${r.origFileId}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📎 원본</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="원본 양식 내려받기 — 기록이 남습니다">⬇</button>`:'')}
           <button class="btn sm" onclick="openSubmitLog('${domain}','${r.id}')">🧾 제출기록${n?`(${n})`:''}</button>
           <button class="btn sm" onclick="delDoc('${domain}','${r.id}',this)" style="color:#dc2626">삭제</button>
         </div>`; }).join('') + '</div>';
   }).join('');
+  _safe(function(){ bindDragSel(body, function(){ docSelSync(domain); }); });
+}
+/* ── ⬇ 내려받기 기록 (대표 지시 2026-09-28 「다운받을 경우 내용과 다운받은 날짜등이 저장되어야 한다」) ──
+   무엇을(이력서/원본 양식 · 파일 이름 · 종류·기관) «언제» 내려받았는지 그 서류 줄에 남긴다(downloads).
+   ⚠ 파일을 «정말 꺼냈을 때만» 적는다 — 없는 파일을 눌렀는데 기록이 남으면 거짓 기록이다.
+   ⚠ 50건까지만 쥔다 — 끝없이 쌓이면 줄이 무거워져 동기화가 느려진다. */
+var DOC_DL_MAX=50;
+function _docDlTag(domain,r){
+  var d=(r&&r.downloads)||[]; if(!d.length) return '';
+  var t=new Date(d[0].at);
+  var 때=isNaN(t)?'':(t.getFullYear()+'.'+('0'+(t.getMonth()+1)).slice(-2)+'.'+('0'+t.getDate()).slice(-2)+' '+('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2));
+  return '<div style="margin-top:3px"><a href="#" onclick="openDocDlLog(\''+domain+'\',\''+_jsAttr(r.id)+'\');return false"'
+    +' style="font-size:11px;color:var(--teal);text-decoration:none">⬇ 내려받음 '+d.length+'회 · 마지막 '+escapeHtml(때)+' ('+escapeHtml(d[0].what||'')+')</a></div>';
+}
+async function docDl(domain,id,which,quiet){
+  var D=DOMAINS[domain]; if(!D) return false;
+  var r=get(D.store).find(function(x){ return x.id===id; }); if(!r){ toast('이미 지워졌습니다'); return false; }
+  var fid=(which==='orig')?r.origFileId:r.genFileId;
+  if(!fid){ toast('내려받을 파일이 없습니다'); return false; }
+  var f=getFile(fid)||await getFileAsync(fid);
+  if(!f||!f.base64){ toast('원본 없음 — 이 기기에 파일이 없습니다'); return false; }
+  var 이름=f.name||((which==='orig')?r.origName:r.genName)||fid;
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([b64ToAb(f.base64)])); a.download=이름; a.click();
+  /* ⚠ 기록은 «다시 읽은» 목록에 적는다 — 내려받는 사이 다른 곳에서 바뀌었을 수 있다 */
+  var db=get(D.store), 줄=db.find(function(x){ return x.id===id; });
+  if(줄){
+    var 내용=[줄.kind||'', 줄.org||''].filter(Boolean).join(' · ');
+    줄.downloads=[{ at:new Date().toISOString(), what:(which==='orig')?'원본 양식':(D.label||'서류'), name:이름, about:내용 }]
+      .concat(줄.downloads||[]).slice(0,DOC_DL_MAX);
+    set(D.store,db);
+  }
+  _safe(function(){ _logCv(D.label||'서류','내려받기'); });
+  if(!quiet){ renderDocStore(domain); toast('⬇ 「'+이름+'」 — 내려받은 기록을 남겼습니다'); }
+  return true;
+}
+function openDocDlLog(domain,id){
+  var D=DOMAINS[domain]; var r=get(D.store).find(function(x){ return x.id===id; }); if(!r) return;
+  var d=r.downloads||[];
+  var old=document.getElementById('docDlPop'); if(old) old.remove();
+  var p=document.createElement('div'); p.id='docDlPop';
+  p.style.cssText='position:fixed;inset:0;z-index:130;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:16px';
+  p.innerHTML='<div style="background:var(--card);color:var(--text);border-radius:14px;padding:16px 18px;max-width:620px;width:100%;max-height:80vh;overflow:auto">'
+    +'<div style="font-weight:700;color:var(--navy);margin-bottom:8px">⬇ 내려받은 기록 — '+escapeHtml([r.kind,r.org].filter(Boolean).join(' · '))+'</div>'
+    +(d.length?'<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:4px">№</th><th style="text-align:left;padding:4px">내려받은 때</th><th style="text-align:left;padding:4px">무엇</th><th style="text-align:left;padding:4px">파일 이름</th></tr></thead><tbody>'
+      +d.map(function(x,i){ var t=new Date(x.at);
+        return '<tr><td style="padding:4px;border-top:1px solid var(--border)">'+(i+1)+'</td>'
+          +'<td style="padding:4px;border-top:1px solid var(--border);white-space:nowrap">'+escapeHtml(isNaN(t)?'':t.toLocaleString('ko-KR'))+'</td>'
+          +'<td style="padding:4px;border-top:1px solid var(--border)">'+escapeHtml(x.what||'')+'</td>'
+          +'<td style="padding:4px;border-top:1px solid var(--border);word-break:break-all">'+escapeHtml(x.name||'')+'</td></tr>'; }).join('')
+      +'</tbody></table>':'<div class="empty">아직 내려받은 적이 없습니다</div>')
+    +'<div style="text-align:right;margin-top:10px"><button class="btn sm" onclick="document.getElementById(\'docDlPop\').remove()">닫기</button></div></div>';
+  p.onclick=function(e){ if(e.target===p) p.remove(); };
+  document.body.appendChild(p);
+}
+/* ── ㅁ 고른 것 — 목록 화면·작성 중 목록과 같은 얼개 ── */
+function _docSelBox(domain){ var D=DOMAINS[domain]; return D?document.getElementById(D.body):null; }
+function docSelIds(domain){
+  var b=_docSelBox(domain); if(!b) return [];
+  return [].slice.call(b.querySelectorAll('.row-chk:checked')).map(function(c){ return c.value; });
+}
+function docSelSync(domain){
+  var b=_docSelBox(domain); if(!b) return;
+  var 전부=b.querySelectorAll('.row-chk'), 고른=docSelIds(domain);
+  [].forEach.call(전부, function(c){ var card=c.closest('.ds-card'); if(card) card.classList.toggle('sel-on', c.checked); });
+  var bar=document.getElementById('dsSel-'+domain); if(bar) bar.style.display=고른.length?'':'none';
+  var cnt=document.getElementById('dsSelCnt-'+domain); if(cnt) cnt.textContent=고른.length+'건 선택';
+  var all=b.querySelector('.ds-all'); if(all){ all.checked=!!전부.length && 고른.length===전부.length; all.indeterminate=고른.length>0 && 고른.length<전부.length; }
+}
+function docSelAll(domain,on){
+  var b=_docSelBox(domain); if(!b) return;
+  [].forEach.call(b.querySelectorAll('.row-chk'), function(c){ c.checked=!!on; });
+  docSelSync(domain);
+}
+async function docSelDl(domain){
+  var ids=docSelIds(domain); if(!ids.length){ toast('고른 것이 없습니다'); return; }
+  var 됨=0;
+  for(var i=0;i<ids.length;i++){
+    if(await docDl(domain, ids[i], 'gen', true)) 됨++;
+    await new Promise(function(r){ setTimeout(r,300); });   /* 한꺼번에 내리면 브라우저가 막는다 */
+  }
+  renderDocStore(domain);
+  toast('⬇ '+됨+'건 내려받았습니다'+(됨<ids.length?' ('+(ids.length-됨)+'건은 파일이 없어 건너뜀)':'')+' — 기록을 남겼습니다', 5000);
+}
+function docSelDel(domain,btn){
+  var D=DOMAINS[domain]; var ids=docSelIds(domain); if(!ids.length){ toast('고른 것이 없습니다'); return; }
+  var 줄들=get(D.store).filter(function(x){ return ids.indexOf(x.id)>=0; });
+  kcAskDelete(btn, { title:'🗑 고른 '+줄들.length+'건을 지웁니다',
+      detail:줄들.slice(0,4).map(function(r){ return escapeHtml(kcTrashLabel(r)); }).join('<br>')
+        +(줄들.length>4?'<br>… 외 '+(줄들.length-4)+'건':'')
+        +'<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다</b>(환경설정 › 🗑 휴지통).' },
+    function(){
+      var e=null;
+      줄들.forEach(function(r){ e=kcTrashPut(D.store, '', r, D.label||'서류'); });
+      set(D.store, get(D.store).filter(function(x){ return ids.indexOf(x.id)<0; }));
+      renderDocStore(domain); kcTrashDone(e, '🗑 '+줄들.length+'건을 휴지통으로 옮겼습니다');
+    });
 }
 function initDocStore(domain){ const D=DOMAINS[domain]; const s=document.getElementById(D.search); if(!s) return;
   s.oninput=()=>renderDocStore(domain); document.getElementById(D.orgFilter).onchange=()=>renderDocStore(domain);
@@ -8104,7 +8215,20 @@ function hoverThumb(id,ev){ const ext=fileExt(id); if(!isPrev(ext)) return; cons
 function moveThumb(ev){ const box=document.getElementById('hoverPrev'); if(box.style.display!=='block') return;
   var x=ev.clientX+16, y=ev.clientY+16; if(x+260>window.innerWidth) x=ev.clientX-260; if(y+320>window.innerHeight) y=Math.max(8,window.innerHeight-330); box.style.left=x+'px'; box.style.top=y+'px'; }
 function hideThumb(){ document.getElementById('hoverPrev').style.display='none'; }
-function showBig(id){ const ext=fileExt(id), u=fileURL(id); if(!u){
+function showBig(id){ const ext=fileExt(id);
+  /* ★ 한글(.hwp·.hwpx)은 «한글 뷰어»로 연다 (대표 화면 2026-09-28 — 서류 보관함 「📎 원본」이
+     「이 형식은 미리보기를 지원하지 않습니다」로 막혔다). 앱에 한글 엔진이 있는데 안내문만 띄웠다
+     (631dd824 편집창·d46e4b8 과 같은 잘못). ⚠ 사람이 «누른» 길이라 7MB 엔진을 받아도 된다. */
+  if(/^(hwp|hwpx)$/i.test(ext)){
+    hideThumb();
+    (async function(){
+      var f=getFile(id)||await getFileAsync(id);
+      if(!f||!f.base64){ toast('원본 없음'); return; }
+      openHwpViewer(new Uint8Array(b64ToAb(f.base64)), f.name||('문서.'+ext));
+    })();
+    return;
+  }
+  const u=fileURL(id); if(!u){
   getFileAsync(id).then(function(f){ if(f){ delete _furl[id]; showBig(id); } else toast('원본 없음'); }); return; } hideThumb();
   const box=document.getElementById('imgBody');
   if(ext==='pdf'){
