@@ -31318,6 +31318,71 @@ function coNtsCls(word){
   if(w.indexOf('등록되지 않은') >= 0) return 'none';
   return 'dim';                     /* 그 밖의 알 수 없는 답 — 좋지도 나쁘지도 않다 */
 }
+/* ══════ 폐업으로 나왔는데 «실제로는 영업 중»일 때 (대표 지시 2026-09-28 「폐업자가 아닌데도 폐업으로 있으면」) ══
+   국세청은 «번호»로만 답한다. 영업 중인 곳이 폐업으로 나오면 대개 우리 번호가 옛것이다
+   (개인→법인 전환·이전으로 새 번호가 났다 · 등록증을 잘못 읽었다 · 옛 등록증만 있다).
+   국세청 이 기능은 «이름으로 못 찾는다» — 새 번호는 사람이 받아 와야 한다.
+   ① 🔢 새 번호 넣기 — 그 자리에서 국세청에 묻고 «계속사업자일 때만» 적는다(ntsNewNo).
+      ⚠ 사업자등록증 카드의 번호는 «안 바꾼다». 사진에 옛 번호가 찍혀 있고, 그 번호가
+        회사를 묶는 열쇠라 바꾸면 한 회사가 둘로 갈린다. 새 등록증이 오면 그때 올린다.
+   ② ✓ 영업 중 확인함 — 사람이 확인했다고 적는다(ntsOkAt·ntsOkBy).
+      ★ «그때의 국세청 답»(ntsOkOf = 상태|폐업일)과 함께 적는다. 다음 훑기에서 답이 그대로면
+        계속 빠져 있고, 답이 바뀌면 다시 올라온다 — 사람의 확인이 새 사실을 덮지 않게. */
+function coNtsEnd(row){
+  const d = digits((row && row.end_dt) || '');
+  return d.length === 8 ? d.slice(0,4) + '-' + d.slice(4,6) + '-' + d.slice(6) : '';
+}
+function coNtsOkOf(o){ return coVal(o, 'ntsState') + '|' + coVal(o, 'ntsEndDt'); }
+function coNtsHandled(o){
+  if(coVal(o, 'ntsNewNo') && coNtsCls(coVal(o, 'ntsNewState')) === 'ok') return 'newno';
+  if(coVal(o, 'ntsOkAt') && coVal(o, 'ntsOkOf') === coNtsOkOf(o)) return 'ok';
+  return '';
+}
+function coNtsFixBtns(key){
+  const k = esc(String(key).replace(/'/g,"\\'"));
+  return `<button class="conbask" onclick="event.stopPropagation();coNtsNewNoAsk('${k}')"
+      title="바뀐 사업자번호를 넣으면 국세청에 바로 물어봅니다 — 등록증 카드의 번호는 안 바뀝니다">🔢 새 번호 넣기</button>
+    <button class="conbask" onclick="event.stopPropagation();coNtsOkMark('${k}')"
+      title="영업 중인 것을 사람이 확인했다고 적습니다 — 국세청 답이 바뀌면 다시 올라옵니다">✓ 영업 중 확인함</button>`;
+}
+async function coNtsNewNoAsk(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const svc = String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim();
+  if(!svc){ toast('국세청 조회 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」를 넣어 주세요(공공데이터포털, 무료)', 10000); return; }
+  const v = prompt(`「${o.name || ''}」의 새 사업자번호\n(지금 번호 ${o.bizno || '없음'} — 이 번호는 그대로 둡니다)`, '');
+  if(v == null) return;
+  const no = digits(v);
+  if(no.length !== 10){ toast('사업자번호는 숫자 열 자리입니다', 6000); return; }
+  if(!bizNoOk(no)){ toast('검산이 안 맞는 번호입니다 — 한 글자씩 다시 봐 주세요', 7000); return; }
+  if(no === digits(o.bizno || '')){ toast('지금 번호와 같습니다 — 바뀐 번호를 넣어 주세요', 6000); return; }
+  toast('국세청에 물어보는 중…', 3000);
+  let word = '';
+  try{
+    const r = await fetch(NTS_STATUS_URL + encodeURIComponent(svc), { method:'POST',
+      headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ b_no:[no] }) });
+    if(!r.ok) throw new Error('응답 ' + r.status);
+    const j = await r.json();
+    word = coNtsWord(j && j.data && j.data[0]);
+  }catch(e){ toast('국세청에 못 물어봤습니다 — ' + ((e && e.message) || '연결을 확인해 주세요'), 8000); return; }
+  if(!word){ toast('국세청이 아무 말도 주지 않았습니다 — 번호를 다시 확인해 주세요', 7000); return; }
+  /* ⚠ 새 번호도 계속사업자가 아니면 «적지 않는다» — 적으면 다른 폐업 번호로 폐업을 덮는 셈이다 */
+  if(coNtsCls(word) !== 'ok'){
+    toast(`🏛 새 번호 ${no}: 국세청 「${coNtsCls(word) === 'none' ? '국세청에 없는 번호' : word}」 — 적지 않았습니다`, 9000); return;
+  }
+  if(!confirm(`🏛 새 번호 ${no.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3')} — 국세청 「${word}」\n\n이 번호를 기업정보에 적어 두고 「확인 필요」에서 뺄까요?\n(사업자등록증 카드의 번호는 그대로입니다)`)) return;
+  coSaveInfoPatch(k, { ntsNewNo: no, ntsNewState: word, ntsNewAt: todayYmd() }, `🏛 새 번호 ${no} — 계속사업자로 적어 두었습니다`);
+}
+function coNtsOkMark(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  if(!confirm(`「${o.name || ''}」이 영업 중인 것을 확인했다고 적습니다.\n\n`
+    + `· 「확인 필요」와 국세청 목록에서 빠집니다\n`
+    + `· 다음 훑기에서 국세청 답이 바뀌면 다시 올라옵니다\n\n계속할까요?`)) return;
+  let me = '';
+  try{ const w = window.PuWhoami && PuWhoami.get && PuWhoami.get(); me = (w && w.name) || ''; }catch(_){}
+  coSaveInfoPatch(k, { ntsOkAt: todayYmd(), ntsOkBy: me, ntsOkOf: coNtsOkOf(o) }, '🏛 영업 중으로 확인했다고 적었습니다');
+}
 function coNtsChipHtml(o){
   /* 사업자번호가 없으면 물어볼 길이 없다 — 눌러도 안 되는 단추를 두지 않는다 */
   if(!o || digits(o.bizno || '').length < 10) return '';
@@ -31331,8 +31396,23 @@ function coNtsChipHtml(o){
                   '':'#64748b;background:#f8fafc;border-color:#e2e8f0' }[coNtsCls(word)];
   /* 국세청 원문(「국세청에 등록되지 않은 사업자등록번호입니다.」)은 딱지에 넣기엔 길다 — 뜻만 짧게 */
   const 말 = coNtsCls(word) === 'none' ? '국세청에 없는 번호' : word;
+  const end = coNtsCls(word) === 'gone' ? coVal(o, 'ntsEndDt') : '';
+  const 처리 = coNtsHandled(o);
+  if(처리){
+    /* 사람이 처리한 곳 — 무엇으로 처리했는지를 말한다. 누르면 옛 번호를 다시 묻는다 */
+    const nn = coVal(o, 'ntsNewNo');
+    const t = 처리 === 'newno'
+      ? `🏛 새 번호 ${esc(nn.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3'))} · ${esc(coVal(o, 'ntsNewState'))}`
+      : `🏛 영업 중 · ${esc(coVal(o, 'ntsOkAt'))}${coVal(o, 'ntsOkBy') ? ' ' + esc(coVal(o, 'ntsOkBy')) : ''} 확인`;
+    const c2 = 처리 === 'newno' ? '#1e40af;background:#eff6ff;border-color:#bfdbfe'
+                                : '#166534;background:#f0fdf4;border-color:#bbf7d0';
+    return `<span onclick="event.stopPropagation();coAskNts('${key}')"
+      title="국세청은 옛 번호(${esc(o.bizno || '')})를 「${esc(말)}」이라 했습니다 — 사람이 처리했습니다. 눌러서 옛 번호를 다시 확인합니다"
+      style="cursor:pointer;font-size:11px;font-weight:700;
+      border:1px solid;border-radius:9px;padding:1px 8px;white-space:nowrap;color:${c2}">${t}</span>`;
+  }
   const 글 = word
-    ? `🏛 ${esc(말)}${at ? ` · ${esc(at)} 확인` : ''}`
+    ? `🏛 ${esc(말)}${end ? ` · ${esc(end)} 폐업` : ''}${at ? ` · ${esc(at)} 확인` : ''}`
     : '🏛 국세청 확인';
   return `<span onclick="event.stopPropagation();coAskNts('${key}')"
     title="${word ? '국세청에 물어본 그때의 상태입니다 — 눌러서 다시 확인합니다'
@@ -31364,7 +31444,9 @@ async function coAskNts(key){
   }
   const word = coNtsWord(row);
   if(!word){ toast('국세청이 아무 말도 주지 않았습니다 — 번호를 다시 확인해 주세요', 7000); return; }
-  coSaveInfoPatch(k, { ntsState: word, ntsAt: todayYmd() }, `🏛 국세청 「${word}」 — 오늘 확인했습니다`);
+  const patch = { ntsState: word, ntsAt: todayYmd() };
+  const end = coNtsEnd(row); if(end) patch.ntsEndDt = end;
+  coSaveInfoPatch(k, patch, `🏛 국세청 「${word}」${end ? ' (' + end + ' 폐업)' : ''} — 오늘 확인했습니다`);
 }
 
 /* ══════ 🧾 등록증 대조 — 국세청 «진위확인»(/validate) (대표 지시 2026-09-28 「자동으로 검토하고 확인하고 처리」) ══
@@ -31495,7 +31577,9 @@ async function coNtsAutoOne(key){
   try{
     const r = await fetch(NTS_STATUS_URL + encodeURIComponent(svc), { method:'POST',
       headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ b_no:[no] }) });
-    if(r.ok){ const j = await r.json(); word = coNtsWord(j && j.data && j.data[0]); }
+    if(r.ok){ const j = await r.json(); const row = j && j.data && j.data[0];
+      word = coNtsWord(row); const end = coNtsEnd(row);
+      if(word && end) upd['coInfo/' + key + '/ntsEndDt'] = end; }
   }catch(_){}
   if(word){ upd['coInfo/' + key + '/ntsState'] = word; upd['coInfo/' + key + '/ntsAt'] = day; }
   const q = coNtsMatchReq(o);
@@ -31645,6 +31729,8 @@ function coNtsTargets(now){
     if(digits(o.bizno || '').length < 10) return false;
     const at = coVal(o, 'ntsAt');
     if(!at) return true;                       /* 한 번도 안 물어봤다 */
+    /* 폐업인데 폐업일이 없다 — 2026-09-28 전에 받아 둔 줄이다. 날짜를 받으러 한 번 더 묻는다 */
+    if(coNtsCls(coVal(o, 'ntsState')) === 'gone' && !coVal(o, 'ntsEndDt')) return true;
     const d = coSmeDays(at, today);
     if(d == null) return true;                 /* 날짜를 못 읽었다 — 다시 묻는다 */
     return (-d) >= NTS_SKIP_DAYS;
@@ -31673,7 +31759,8 @@ function coNtsMatch(chunk, rows){
     const no = digits((r && r.b_no) || '');
     const word = coNtsWord(r);
     if(!no || !word || !byNo[no]) return;
-    byNo[no].forEach(function(k){ out.push({ key:k, state:word }); });
+    const end = coNtsEnd(r);
+    byNo[no].forEach(function(k){ const h = { key:k, state:word }; if(end) h.end = end; out.push(h); });
   });
   return out;
 }
@@ -31686,6 +31773,8 @@ function coNtsWrites(hits, day, chunk){
     hits.slice(i, i + size).forEach(function(h){
       upd['coInfo/' + h.key + '/ntsState'] = h.state;
       upd['coInfo/' + h.key + '/ntsAt'] = day;
+      /* 폐업일 — 국세청이 줄 때만 적는다. 몇 해 전이면 대개 «번호가 바뀐 것»이라 사람이 판단할 근거다 */
+      if(h.end) upd['coInfo/' + h.key + '/ntsEndDt'] = h.end;
     });
     out.push(upd);
   }
@@ -31695,7 +31784,7 @@ function coNtsWrites(hits, day, chunk){
 function coNtsBadList(){
   return (coList() || []).filter(function(o){
     const c = coNtsCls(coVal(o, 'ntsState'));
-    return c === 'gone' || c === 'none' || c === 'soon';
+    return (c === 'gone' || c === 'none' || c === 'soon') && !coNtsHandled(o);
   }).map(function(o){
     return { o:o, key:o.key, name:o.name || '', state:coVal(o, 'ntsState'),
              at:coVal(o, 'ntsAt'), cls:coNtsCls(coVal(o, 'ntsState')) };
@@ -31709,7 +31798,7 @@ function coNtsBadList(){
 function coNtsBadCount(){ return coNtsBadList().length; }
 function coNtsNeeds(o){
   const c = coNtsCls(coVal(o, 'ntsState'));
-  return c === 'gone' || c === 'none' || c === 'soon';
+  return (c === 'gone' || c === 'none' || c === 'soon') && !coNtsHandled(o);
 }
 /* 목록 위 알림 띠 — 0곳이면 «아예 안 띄운다»(확인서·계약 띠와 같은 규칙) */
 function coNtsBarHtml(){
@@ -31755,9 +31844,11 @@ function coNtsHtml(){
       <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
           title="${esc(x.name)} 상세를 엽니다">
         <div class="sk">${esc(x.name || '(이름 없음)')}${x.cls === 'none' && x.o.bizno ? ` <span class="se">${esc(x.o.bizno)}</span>` : ''}</div>
-        <div class="sv"><span class="sd ${x.cls}">${esc(x.cls === 'none' ? '국세청에 없는 번호' : x.state)}</span>
+        <div class="sv"><span class="sd ${x.cls}">${esc(x.cls === 'none' ? '국세청에 없는 번호' : x.state)}${
+            x.cls === 'gone' && coVal(x.o, 'ntsEndDt') ? ` · ${esc(coVal(x.o, 'ntsEndDt'))} 폐업` : ''}</span>
           <span class="se">${esc(x.at || '날짜 모름')} 확인</span>
           ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
+        <div class="sv" style="gap:6px;margin-top:4px">${coNtsFixBtns(x.key)}</div>
       </div>`).join('')}</div>`;
 }
 /* ── 훑기 — 묻고, 자르고, 모아 쓰고, 그만둘 수 있다 ─────────────────────── */
@@ -32709,8 +32800,10 @@ function coNeedHtml(o){
   if(linkBad) body += coErpPinHtml(o);
   if(ntsSt){
     const w = coVal(o, 'ntsState');
+    const endTxt = coNtsCls(w) === 'gone' && coVal(o, 'ntsEndDt') ? ' · ' + coVal(o, 'ntsEndDt') + ' 폐업' : '';
     body += `<div class="coneed"><span>🏛</span>
-      <span class="t">국세청: ${esc(coNtsCls(w) === 'none' ? '국세청에 없는 번호' : w)} (${esc(coVal(o, 'ntsAt') || '날짜 모름')} 확인)</span>
+      <span class="t">국세청: ${esc(coNtsCls(w) === 'none' ? '국세청에 없는 번호' : w)}${esc(endTxt)} (${esc(coVal(o, 'ntsAt') || '날짜 모름')} 확인)</span>
+      ${coNtsFixBtns(o.key)}
       <button onclick="coAskNts('${key}')" title="국세청에 다시 물어봅니다">다시 확인</button></div>`;
   }
   if(ntsM === 'bad' || ntsM === 'name'){

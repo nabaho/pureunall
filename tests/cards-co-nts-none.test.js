@@ -37,7 +37,7 @@ function load(list) {
     ...['function coNtsCeo(', 'function coNtsDay(', 'function coNtsName(', 'function coNtsNameVariants(',
       'function coNtsMatchOf(', 'function coNtsMatchReq(', 'function coNtsMatchState(',
       'function coNtsMatchTargets(', 'function coNtsMatchPartHtml('].map((d) => cutFn(SRC, d)),
-    ...['function coVal(', 'function coSmeDays(', 'function coNtsWord(', 'function coNtsCls(',
+    ...['function coVal(', 'function coSmeDays(', 'function coNtsWord(', 'function coNtsCls(', 'function coNtsEnd(', 'function coNtsOkOf(', 'function coNtsHandled(', 'function coNtsFixBtns(',
       'function coNtsTargets(', 'function coNtsBadList(', 'function coNtsBadCount(', 'function coNtsNeeds(',
       'function coNtsBarHtml(', 'function coNtsHtml(', 'function coNtsChipHtml('].map((d) => cutFn(SRC, d))
   ].join('\n'), ctx);

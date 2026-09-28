@@ -46,6 +46,8 @@ function load(list) {
     SRC.match(/^const NTS_SKIP_DAYS = [^\n]*$/m)[0].replace('const ', 'var '),
     cutFn(SRC, 'function coVal('), cutFn(SRC, 'function coSmeDays('),
     cutFn(SRC, 'function coNtsWord('), cutFn(SRC, 'function coNtsCls('),
+    /* 2026-09-28: 폐업일(end_dt)·사람이 처리함 — «진짜»를 싣는다 */
+    cutFn(SRC, 'function coNtsEnd('), cutFn(SRC, 'function coNtsOkOf('), cutFn(SRC, 'function coNtsHandled('),
     cutFn(SRC, 'function coNtsTargets('), cutFn(SRC, 'function coNtsChunks('),
     cutFn(SRC, 'function coNtsMatch('), cutFn(SRC, 'function coNtsWrites('),
     cutFn(SRC, 'function coNtsBadList('), cutFn(SRC, 'function coNtsNeeds(')
@@ -218,6 +220,8 @@ function 훑어보기(over) {
     'var _coNtsStop = false, _coNtsRun = null;',
     cutFn(SRC, 'function coVal('), cutFn(SRC, 'function coSmeDays('),
     cutFn(SRC, 'function coNtsWord('), cutFn(SRC, 'function coNtsCls('),
+    /* 2026-09-28: 폐업일(end_dt)·사람이 처리함 — «진짜»를 싣는다 */
+    cutFn(SRC, 'function coNtsEnd('), cutFn(SRC, 'function coNtsOkOf('), cutFn(SRC, 'function coNtsHandled('),
     cutFn(SRC, 'function coNtsTargets('), cutFn(SRC, 'function coNtsChunks('),
     cutFn(SRC, 'function coNtsMatch('), cutFn(SRC, 'function coNtsWrites('),
     cutFn(SRC, 'function coNtsBadList('), cutFn(SRC, 'function coNtsBadCount('),

@@ -69,6 +69,8 @@ function panelDeps(app) {
     (app.match(/^const digits = [^\n]*;$/m) || [])[0] || '',
     cutFn(app, 'function coNtsWord('),
     cutFn(app, 'function coNtsCls('),
+    cutFn(app, 'function coNtsEnd('), cutFn(app, 'function coNtsOkOf('), cutFn(app, 'function coNtsHandled('),
+    cutFn(app, 'function coNtsFixBtns('),
     cutFn(app, 'function coNtsChipHtml('),
     /* 2026-09-28: 🧾 등록증 대조 딱지와 「확인 필요」의 국세청 줄이 붙었다.
        ⚠ «진짜»를 싣는다 — 견준 뒤 값이 바뀌면 옛 판정을 숨기는 잣대(coNtsMatchOf)라
