@@ -2317,7 +2317,9 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           </div>
           <div class="card">
             <div class="rc-h">계좌 보관</div>
-            <div class="ocr-zone" data-store="account" style="margin-bottom:10px">📎 통장사본·계좌 캡처를 끌어놓으면 OCR 자동 입력 / 클릭해서 선택</div>
+            <!-- ⚠ id 로 잇는다(acOcrZone) — 탭 경로(#tab-account)로 찾다가 계좌가 신분증 탭으로 옮겨진 뒤
+                 이 칸이 «아무 데도» 안 이어져 끌어놓아도·눌러도 아무 일이 없었다(대표 제보 2026-09-28). -->
+            <div class="ocr-zone" id="acOcrZone" data-store="account" style="margin-bottom:10px">📎 통장사본·계좌 캡처를 끌어놓으면 OCR 자동 입력 + 원본 저장 / 클릭해서 선택</div>
             <input type="file" id="acFileInput" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none">
             <div class="toolbar" style="margin-bottom:8px">
               <span class="cnt" id="acCnt" style="font-size:11px;color:var(--text-mute)"></span>
@@ -14873,11 +14875,17 @@ function initSettings(){
   const piAdd=document.getElementById('piAddDoc'); if(piAdd) piAdd.onclick=()=>{ openForm('personal_doc'); setTimeout(renderPersonalDocs,200); };
   const piDup=document.getElementById('piDupBtn'); if(piDup) piDup.onclick=()=>openDupManager('personal_doc');
   const piFile=document.getElementById('piFileInput'); if(piFile){ piFile.onchange=async()=>{ await ocrDrop(piFile.files,'personal_doc'); renderPersonalDocs(); piFile.value=''; }; }
-  const piZone=document.querySelector('#tab-personal .ocr-zone'); if(piZone){ piZone.onclick=()=>{ const inp=document.getElementById('piFileInput'); if(inp) inp.click(); }; piZone.ondragover=e=>{ e.preventDefault(); piZone.classList.add('drag'); }; piZone.ondragleave=()=>piZone.classList.remove('drag'); piZone.ondrop=async e=>{ e.preventDefault(); piZone.classList.remove('drag'); await ocrDrop(e.dataTransfer.files,'personal_doc'); renderPersonalDocs(); }; }
+  /* ⚠ 개인서류 칸은 id 로만 찾는다 — 예전 선택자(#tab-personal .ocr-zone)는 그 칸이 옮겨진 뒤
+     «사진 보관함 칸»(galleryDrop)을 잡고 있었다. 바로 아래 사진 보관함 코드가 덮어써서 드러나지 않았을 뿐,
+     순서가 바뀌면 사진이 신분증으로 판독된다. 없으면 아무것도 안 붙인다. */
+  const piZone=document.getElementById('piOcrZone'); if(piZone){ piZone.onclick=()=>{ const inp=document.getElementById('piFileInput'); if(inp) inp.click(); }; piZone.ondragover=e=>{ e.preventDefault(); piZone.classList.add('drag'); }; piZone.ondragleave=()=>piZone.classList.remove('drag'); piZone.ondrop=async e=>{ e.preventDefault(); piZone.classList.remove('drag'); await ocrDrop(e.dataTransfer.files,'personal_doc'); renderPersonalDocs(); }; }
   const acAdd=document.getElementById('acAdd'); if(acAdd) acAdd.onclick=()=>{ openForm('account'); setTimeout(renderAccounts,200); };
   const acDup=document.getElementById('acDupBtn'); if(acDup) acDup.onclick=()=>openDupManager('account');
   const acFile=document.getElementById('acFileInput'); if(acFile){ acFile.onchange=async()=>{ await ocrDrop(acFile.files,'account'); renderAccounts(); acFile.value=''; }; }
-  const acZone=document.querySelector('#tab-account .ocr-zone'); if(acZone){ acZone.onclick=()=>{ const inp=document.getElementById('acFileInput'); if(inp) inp.click(); }; acZone.ondragover=e=>{ e.preventDefault(); acZone.classList.add('drag'); }; acZone.ondragleave=()=>acZone.classList.remove('drag'); acZone.ondrop=async e=>{ e.preventDefault(); acZone.classList.remove('drag'); await ocrDrop(e.dataTransfer.files,'account'); renderAccounts(); }; }
+  /* ★ 계좌 칸 — id 로 잇는다(대표 제보 2026-09-28 「통장사본 입력이 안된다」).
+     ⚠ 탭 경로로 찾지 말 것: 계좌가 신분증 탭(idmgr)으로 옮겨진 뒤 #tab-account 가 없어져
+       이 칸이 «아무 데도» 안 이어졌다. 판독(OCR)과 원본 저장은 ocrDrop › saveOCRRecord 가 함께 한다. */
+  const acZone=document.getElementById('acOcrZone'); if(acZone){ acZone.onclick=()=>{ const inp=document.getElementById('acFileInput'); if(inp) inp.click(); }; acZone.ondragover=e=>{ e.preventDefault(); acZone.classList.add('drag'); }; acZone.ondragleave=()=>acZone.classList.remove('drag'); acZone.ondrop=async e=>{ e.preventDefault(); acZone.classList.remove('drag'); await ocrDrop(e.dataTransfer.files,'account'); renderAccounts(); }; }
   const dt=document.getElementById('dtReseed'); if(dt) dt.onclick=reseed;
   const olc=document.getElementById('origLockChk'); if(olc){ olc.checked=origLocked(); olc.onchange=function(){ LS.set(NS+'orig_lock', olc.checked?'1':'0'); toast(olc.checked?'🔒 원본 보호 켜짐':'🔓 원본 보호 꺼짐 — 이제 원본 삭제 가능'); }; }
   // 사진 보관함

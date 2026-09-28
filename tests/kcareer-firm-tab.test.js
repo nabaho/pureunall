@@ -128,7 +128,7 @@ test('★ 화면 — 환경설정에 탭·패널이 있고 열 때 그린다', (
 });
 
 test('★★ 서식 채우기가 «합친 값»을 쓴다 — 여기 적은 팩스가 서식의 팩스 칸에 간다', () => {
-  const ctx = 세상({ name: '푸른노무법인', tel: '041-000-0001', at: 1 }, { fax: '041-000-0002', corpNo: '164714-0000000' });
+  const ctx = 세상({ name: '푸른노무법인', tel: '041-000-0001', at: 1 }, { fax: '041-000-0002', corpNo: '000000-0000000' });
   Object.assign(ctx, { get: () => [], getProfileInfo: () => ({ fax: '개인팩스' }), formatDate: (x) => x || '',
     isAwardType: () => false, workPeriod: () => '' });
   vm.runInContext(cutFn(CODE, 'function _isLangCert('), ctx);
@@ -137,5 +137,5 @@ test('★★ 서식 채우기가 «합친 값»을 쓴다 — 여기 적은 팩�
   assert.equal(f.firmName, '푸른노무법인');
   assert.equal(f.phoneWork, '041-000-0001', '★★ 사무실 전화가 이알피 것이 아닙니다');
   assert.equal(f.fax, '041-000-0002', '★★ 여기서 적은 법인 팩스가 서식에 안 갑니다');
-  assert.equal(f.firmCorpNo, '164714-0000000', '★★ 여기서 적은 법인등록번호가 서식에 안 갑니다');
+  assert.equal(f.firmCorpNo, '000000-0000000', '★★ 여기서 적은 법인등록번호가 서식에 안 갑니다');
 });
