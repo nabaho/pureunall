@@ -66,6 +66,7 @@ function load(open){
      이 검사는 «접고 펴기»를 보므로 칩 자체는 대역으로 둔다 — 칩의 잣대는
      tests/cards-co-nts.test.js 가 따로 본다. */
   ctx.coNtsChipHtml = () => '';
+  ctx.coNtsMatchChipHtml = () => '';   /* 2026-09-28 🧾 등록증 대조 — 잣대는 tests/cards-co-nts-match.test.js 가 본다 */
   vm.runInContext(fnBody('coSmeDays') + '\n' + fnBody('coSmeState') + '\n'
     + fnBody('coSmeChipHtml') + '\n'
     + fnBody('coInfoSummary') + '\n' + fnBody('coInfoBoxHtml'), ctx);

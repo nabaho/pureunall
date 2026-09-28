@@ -179,7 +179,8 @@ test('★★★ ⑥㉯ 기업 상세를 열면 그 칸을 지운다 — 상세�
     coDetailPanelHtml: () => '<i>몸통</i>',
     state: { coPick: '1238620021' },
     loadErpCaseCons: () => {}, renderCoErpHistory: () => {},
-    loadCoSent: () => {}, coSentHtml: () => '', coHeadRepaint: () => {} };
+    loadCoSent: () => {}, coSentHtml: () => '', coHeadRepaint: () => {},
+    coNtsAutoOnOpen: () => {} };   /* 국세청 자동 물음 — 밖으로 나가는 일이라 대역이다 */
   vm.createContext(ctx);
   vm.runInContext('var _coHistSum=null,_coLeftDocsN=null,_coRowDocsOpen={};\n'
     + cutFn(SRC, 'function openCoDetailPanel('), ctx);

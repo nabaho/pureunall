@@ -32,7 +32,11 @@ function load(list) {
   vm.createContext(ctx);
   vm.runInContext([
     SRC.match(/^const NTS_SKIP_DAYS = [^\n]*$/m)[0].replace('const ', 'var '),
-    'var _coNtsRun = null;',
+    'var _coNtsRun = null, _coNtsMatchRun = null;',
+    /* 2026-09-28: 창 안에 🧾 등록증 대조 칸이 붙었다 — «진짜»를 싣는다 */
+    ...['function coNtsCeo(', 'function coNtsDay(', 'function coNtsName(', 'function coNtsNameVariants(',
+      'function coNtsMatchOf(', 'function coNtsMatchReq(', 'function coNtsMatchState(',
+      'function coNtsMatchTargets(', 'function coNtsMatchPartHtml('].map((d) => cutFn(SRC, d)),
     ...['function coVal(', 'function coSmeDays(', 'function coNtsWord(', 'function coNtsCls(',
       'function coNtsTargets(', 'function coNtsBadList(', 'function coNtsBadCount(', 'function coNtsNeeds(',
       'function coNtsBarHtml(', 'function coNtsHtml(', 'function coNtsChipHtml('].map((d) => cutFn(SRC, d))

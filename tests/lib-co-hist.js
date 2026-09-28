@@ -70,6 +70,17 @@ function panelDeps(app) {
     cutFn(app, 'function coNtsWord('),
     cutFn(app, 'function coNtsCls('),
     cutFn(app, 'function coNtsChipHtml('),
+    /* 2026-09-28: 🧾 등록증 대조 딱지와 「확인 필요」의 국세청 줄이 붙었다.
+       ⚠ «진짜»를 싣는다 — 견준 뒤 값이 바뀌면 옛 판정을 숨기는 잣대(coNtsMatchOf)라
+         대역을 넣으면 그 규칙이 틀려도 검사가 모른다.
+       ⚠ 상세를 열 때의 «자동 물음»(coNtsAutoOnOpen)만 대역이다 — 밖(국세청)으로 나가는 일이다. */
+    cutFn(app, 'function coNtsNeeds('),
+    cutFn(app, 'function coNtsCeo('), cutFn(app, 'function coNtsDay('), cutFn(app, 'function coNtsName('),
+    cutFn(app, 'function coNtsMatchOf('), cutFn(app, 'function coNtsMatchState('),
+    cutFn(app, 'function coNtsMatchNeeds('),
+    (app.match(/^const NTS_MATCH_WORD = [^\n]*$/m) || [])[0] || '',
+    cutFn(app, 'function coNtsMatchChipHtml('),
+    'function coNtsAutoOnOpen(){}',
     /* 2026-09-18: 이름 옆에 ✏ 상호 고치기가 붙었다(대표 지시 「보성 → 부성」).
        ⚠ «진짜»를 싣는다 — 이 함수가 「고칠 서류가 있나」를 가려 ✏ 를 띄울지 정한다.
          대역으로 0을 돌려주면 ✏ 가 사라져도 검사가 아무 말을 안 한다.
