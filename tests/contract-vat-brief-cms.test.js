@@ -98,13 +98,30 @@ function findByClass(kids, cls){ return kids.find(x => x && x.props && x.props.c
   t('★ 계약금 줄엔 원/% 토글이 없다 (컨설팅 잔금은 금액 고정)', !!findByClass(row1, 'pu-toggle2'), false);
 }
 {
-  // 사건·기타 — 착수금과 성공보수가 «한 줄»에 함께 있어야 한다
+  /* 사건·기타 — 성공보수는 «제 줄» 이다 (대표 지시 2026-09-28 「모두 오른쪽끝으로 … 형태를 일치시켜라」).
+     전에는 착수금 줄에 이어 붙어, 자리가 모자라면 둘째 줄 왼쪽으로 떨어졌다. */
   ['case','other'].forEach(function(kv){
     const kids = realKids(kboxCtx(kv));
-    t('★ ' + kv + ' 은 머리·한 줄 = 2줄', kids.length, 2);
-    const row1 = realKids(kids[1]);
-    t('★ ' + kv + ' 줄에 원/% 토글이 있다', !!findByClass(row1, 'pu-toggle2'), true);
-    t('★ ' + kv + ' 줄에 업무 요약도 함께 있다', !!findByClass(row1, 'pu-grow'), true);
+    const rows = kids.filter(x => x.props && x.props.className === 'pu-krow');
+    t('★ ' + kv + ' 은 착수금 줄과 성공보수 줄이 따로다', rows.length >= 2, true);
+    t('★ ' + kv + ' 착수금 줄에 업무 요약이 있다', !!findByClass(realKids(rows[0]), 'pu-grow'), true);
+    const end2 = findByClass(realKids(rows[1]), 'pu-kend');
+    t('★ ' + kv + ' 성공보수의 원/% 는 오른쪽 끝 묶음 안에 있다', !!(end2 && findByClass(realKids(end2), 'pu-toggle2')), true);
+  });
+}
+{
+  /* ★★ 다섯 종류 모두 «같은 모양» — 금액이 있는 줄은 오른쪽 끝 묶음(pu-kend)으로 끝나고,
+     그 묶음 안에 금액칸과 부가세포함 알약이 함께 있다. */
+  ['company','case','consulting','fund','other','consult'].forEach(function(kv){
+    const rows = realKids(kboxCtx(kv)).filter(x => x.props && x.props.className === 'pu-krow');
+    rows.forEach(function(r, i){
+      const rk = realKids(r);
+      const last = rk[rk.length - 1];
+      t('★★ ' + kv + ' ' + (i + 1) + '번째 줄이 오른쪽 끝 묶음으로 끝난다', !!(last && last.props && last.props.className === 'pu-kend'), true);
+      const inside = realKids(last);
+      t('★ ' + kv + ' ' + (i + 1) + '번째 줄 묶음에 금액칸이 있다', inside.some(x => x.props && x.props.className === 'pu-w-amt'), true);
+      t('★ ' + kv + ' ' + (i + 1) + '번째 줄 묶음에 부가세포함이 있다', inside.some(x => x.props && /pu-vatpill/.test(x.props.className || '')), true);
+    });
   });
 }
 {

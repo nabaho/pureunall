@@ -181,22 +181,26 @@ test('⑧-2 ★ 일수 줄(row2)은 컨설팅이면 늘 같은 자리에 있고,
   const kidsOff = realKids(off);
   assert.equal(kidsOff.length, 3, '머리·계약금 줄·잔금 줄 — 셋뿐이다(일수 없어도 잔금 줄은 있다)');
   assert.equal(kidsOff[2].props.className, 'pu-krow', '잔금 줄도 pu-krow 다');
-  assert.equal(realKids(kidsOff[2]).length, 2, '단가가 없으면 잔금 줄엔 금액칸·부가세알약 둘뿐');
+  /* ⚠ 칸 «개수» 를 박지 않는다 — 2026-09-28 금액·부가세를 오른쪽 끝 묶음으로 모으자 개수가 바뀌었다.
+     지킬 것은 「단가가 없으면 일수 칸이 없고, 잔금은 오른쪽 끝 묶음에 있다」다. */
+  assert.ok(!/pu-w-day/.test(JSON.stringify(kidsOff[2])), '단가가 없는데 일수 칸이 떴습니다');
+  assert.match(JSON.stringify(kidsOff[2]), /"className":"pu-kend"/, '잔금이 오른쪽 끝 묶음에 없습니다');
 
   const on = kboxWithDayFee(350000, 3);
   const kidsOn = realKids(on);
   assert.equal(kidsOn.length, 3, '단가가 있어도 줄 개수(머리·계약금·잔금) 자체는 안 늘어난다');
   const row2 = realKids(kidsOn[2]);
-  assert.equal(row2.length, 8, '일수라벨·단가안내·일수칸·「일」·셈 문구·단추·금액칸·부가세알약 = 8');
+  assert.match(JSON.stringify(row2), /pu-w-day/, '단가가 있는데 일수 칸이 없습니다');
   assert.match(JSON.stringify(row2), /1,155,000원/, '그 줄에 합계가 적혀 있다');
+  assert.equal(row2[row2.length - 1].props.className, 'pu-kend', '잔금이 줄 맨 끝 묶음에 있어야 합니다');
 });
 
 test('⑧-3 ★ 일수 칸에 3을 넣으면 셈 띠가 실제로 뜬다 (그리는 자리까지 이어졌나)', () => {
-  const none = realKids(kboxWithDayFee(350000, 0).kids[2]);
-  assert.equal(none.length, 6, '일수가 0 이면 셈 문구·단추 두 칸이 아직 없다(일수라벨·안내·일수칸·「일」·금액칸·부가세알약 = 6)');
+  const none = realKids(realKids(kboxWithDayFee(350000, 0))[2]);
+  assert.ok(!/pu-calc|pu-goBtn|pu-okTag/.test(JSON.stringify(none)), '일수가 0 이면 셈 문구·단추가 아직 없어야 합니다');
   assert.ok(!/\d,\d{3},\d{3}원/.test(JSON.stringify(none)), '일수가 0 이면 아직 셈할 금액이 없다');
-  const some = realKids(kboxWithDayFee(350000, 2).kids[2]);
-  assert.equal(some.length, 8, '일수가 있으면 셈 문구·단추가 붙어 8칸');
+  const some = realKids(realKids(kboxWithDayFee(350000, 2))[2]);
+  assert.match(JSON.stringify(some), /pu-calc/, '일수가 있으면 셈 문구가 붙어야 합니다');
   assert.match(JSON.stringify(some), /770,000원/, '2일이면 770,000');
 });
 

@@ -231,8 +231,15 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 .pu-okTag { flex: none; font-size: 10.5px; color: #166534; font-weight: 700; white-space: nowrap; }
 .pu-daylabel { font-size: 11px; color: #475569; font-weight: 700; white-space: nowrap; flex: none; }
 .pu-daysub { font-size: 10.5px; color: #64748b; white-space: nowrap; flex: none; }
+/* 🔚 오른쪽 끝 묶음 — (이름)+금액+부가세포함 한 덩이 (대표 지시 2026-09-28 「모두 오른쪽끝으로
+   … 형태를 일치시켜라」). 줄바꿈 없이 붙어 다니고, margin-left:auto 로 줄 끝에 선다.
+   ⚠ 묶음을 풀어 칸마다 따로 두면 좁은 줄에서 금액만 다음 줄 왼쪽으로 떨어진다. */
+.pu-kend { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; flex: none; white-space: nowrap; }
 @media (max-width: 560px) {
   .pu-w-type, .pu-w-amt { width: auto; flex: 1 1 45%; }
+  /* 폰: 묶음이 제 줄을 통째로 쓰고 그 안에서 오른쪽에 붙는다 */
+  .pu-kend { flex: 1 1 100%; justify-content: flex-end; }
+  .pu-kend .pu-w-amt { flex: 0 1 130px; min-width: 0; }
 }
 
 .env-actions { margin-top: 24px; display: flex; gap: 8px; }
