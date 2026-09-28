@@ -1154,6 +1154,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-formmap.js?v=18"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=4"></script>
+<script src="js/kcareer-hwpxphoto.js?v=1"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
@@ -1472,6 +1473,9 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <button class="btn rh-noed" id="rhUndoBtn" style="display:none" onclick="rhUndoFill()" title="채우기 전으로 되돌립니다">↩ 되돌리기</button>
                 <button class="btn rh-noed" onclick="rhPagesOpen()" title="공고문·평가표처럼 «내지 않을» 쪽을 빼고 낼 것만 남깁니다 — 언제든 모두 되살릴 수 있습니다">✂ 필요 없는 쪽 빼기</button>
                 <button class="btn rh-noed" style="border-color:#fecaca;color:var(--red)" onclick="rhStampDoc()" title="★기본 도장을 「(인)」 자리에 찍습니다 — 한 번 더 누르면 뺄 수 있습니다">🖋 도장 찍기</button>
+                <!-- ★ 사진 (대표 물음 2026-09-07 「사진 … 왜 입력이 안되나?」) — 「사진」 칸에 증명사진을 넣는다.
+                     사진은 환경설정 › 사진 보관함(빠른 이력서에서 고른 것이 먼저). 한 번 더 누르면 뺄 수 있다. -->
+                <button class="btn rh-noed" onclick="rhPhotoDoc()" title="서식의 「사진」 칸에 사진 보관함의 증명사진을 넣습니다 — 한 번 더 누르면 뺄 수 있습니다">🖼 사진 넣기</button>
                 <!-- ⚠★ 「💾 원본 한글에 넣기」를 뺐다 (대표 승인 2026-09-27 목업). 한글로 보기·완성본·
                      임시저장이 이미 «친 값을 넣어» 새로 짓는다 — 그 단추는 결과를 한 번 더 굳힐 뿐이고,
                      오히려 ✂ 로 뺀 쪽을 되살리는 자리였다. **되살리지 말 것.** -->
@@ -11616,6 +11620,7 @@ function _rhOutPack(){
     return { filled:(typeof _rhFilled!=='undefined') && !!_rhFilled,
              colMap:(typeof _rhColMap!=='undefined' && _rhColMap)||null,
              stamp:(typeof _rhStampOn!=='undefined') && !!_rhStampOn,
+             photo:(typeof _rhPhotoOn!=='undefined') && !!_rhPhotoOn,
              tidy:{ drop:t.drop||{}, ph:!!t.ph, italic:!!t.italic, rows:!!t.rows } };
   }catch(e){ return null; }
 }
@@ -12921,8 +12926,22 @@ var _rhFilled=false;     /* 「✨ 내 정보로 채우기」를 눌렀나 — �
 var _rhColMap=null;      /* 그때 AI 가 짚은 목록 표 열 짝짓기 */
 var _rhStampOn=false;    /* 🖋 도장을 찍기로 했나 */
 var _rhStampDone=false;  /* 마지막으로 지을 때 정말 찍혔나 */
+var _rhPhotoOn=false;    /* 🖼 사진을 넣기로 했나 */
+var _rhPhotoDone=false;  /* 마지막으로 지을 때 정말 들어갔나 */
+var _rhPhotoWhy='', _rhPhotoNoCell=false;   /* 못 넣은 까닭 · 서식에 사진 칸이 «없어서»인가 */
 async function rhFinishZip(zip){
   await rhTidyZip(zip);
+  /* ★ 사진은 쪽 빼기 «뒤»·도장 «앞» — 뺀 쪽의 사진 칸에 넣으면 사라지고,
+     도장보다 먼저 넣어야 그림 번호(image1·image2)가 겹치지 않는다(도장은 남은 번호를 쓴다). */
+  _rhPhotoDone=false; _rhPhotoNoCell=false;
+  if(_rhPhotoOn){
+    var ph=null;
+    try{ ph=await rhPhotoZip(zip); }
+    catch(e){ ph={ ok:false, why:'사진을 넣지 못했습니다 — '+String(e&&e.message||e) }; }
+    _rhPhotoDone=!!(ph&&ph.ok);
+    _rhPhotoNoCell=!!(ph&&ph.noCell);
+    if(!_rhPhotoDone) _rhPhotoWhy=(ph&&ph.why)||'사진을 넣지 못했습니다';
+  }
   _rhStampDone=false;
   if(!_rhStampOn) return;
   var s=null;
@@ -12975,6 +12994,7 @@ function rhTidyReset(){
   /* ⚠ 바탕이 바뀌면 «내보낼 때 얹는 것»도 모두 놓는다 — 남의 서식에 도장·쪽 번호가 따라오면
      엉뚱한 쪽이 빠지고, 되받은 바탕(이미 도장이 든 것)에 또 찍힌다. */
   _rhFilled=false; _rhColMap=null; _rhStampOn=false; _rhStampDone=false;
+  _rhPhotoOn=false; _rhPhotoDone=false;
   _rhDropped=null; _rhPages=null;
 }
 async function rhTidyZip(zip){
@@ -13283,7 +13303,7 @@ async function rhFillByMap(){
      되돌릴 방법이 없었다). 원본 그대로를 들고 있어야 「↩ 되돌리기」가 뜻이 있다. */
   _rhUndo={ name:_rhDoc.name, ext:_rhDoc.ext, bytes:_rhDoc.bytes,
             /* ⚠ 표시도 함께 — 되돌리면 «채움»도 도장도 채우기 전 그대로여야 한다 */
-            filled:_rhFilled, colMap:_rhColMap, stamp:_rhStampOn };
+            filled:_rhFilled, colMap:_rhColMap, stamp:_rhStampOn, photo:_rhPhotoOn };
   /* 목록 표의 열 짝짓기를 «AI에게» 물어 둔다 — 사전이 못 알아본 서식을 위해서다.
      ⚠ 못 물어도 그냥 간다(사전으로). AI가 없어도 앱은 돌아야 한다. */
   var colMap=await rhColMap(src);
@@ -13327,8 +13347,19 @@ async function rhFillByMap(){
   /* ★ 채웠다는 «표시»를 남긴다 — 그래야 한글로 보기·완성본·자동 저장이 «같은 셈»으로 짓는다
      (rhComposeBytes). 안 남기면 채우기가 넣은 날짜 줄·가려 둔 값이 다음 짓기에서 빠진다. */
   _rhFilled=true; _rhColMap=colMap||null;
-  /* ★ 쪽 빼기·(이미 찍기로 한) 도장도 여기서 얹는다 — 채우기 결과에서 뺀 쪽이 되살아나면 안 된다 */
+  /* ★ 사진 칸이 있으면 사진도 넣는다 — 「내 정보로 채우기」에는 증명사진도 든다(대표 물음 2026-09-07).
+     ⚠ 사진 칸이 없는 서식이 대부분이다 — 그때는 표시를 «조용히» 거둔다(실패라고 말하지 않는다).
+     ⚠ 칸은 있는데 사진이 없으면 그 까닭은 말한다(아래 사진말). */
+  var 사진새로=!_rhPhotoOn;
+  if(사진새로) _rhPhotoOn=true;
+  /* ★ 쪽 빼기·사진·(이미 찍기로 한) 도장도 여기서 얹는다 — 채우기 결과에서 뺀 쪽이 되살아나면 안 된다 */
   await rhFinishZip(zip);
+  var 사진말='';
+  if(_rhPhotoDone) 사진말=' · 🖼 사진까지 넣었습니다';
+  else if(사진새로){
+    _rhPhotoOn=false;
+    if(!_rhPhotoNoCell && _rhPhotoWhy) 사진말=' · 사진은 못 넣었습니다 — '+_rhPhotoWhy;
+  }
   var bytes=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
   _rhDoc={ name:rhCleanName(바탕.name,rhOutTail()), ext:'hwpx', bytes:bytes };
   rhMemorySave(_rhMap.fp, _rhPicks, _rhDoc.name);
@@ -13355,7 +13386,7 @@ async function rhFillByMap(){
   var 도장말 = 찍음 ? ' · 🖋 도장까지 찍었습니다'
               : (_rhSignedLine && _rhStampWhy ? ' · 도장은 못 찍었습니다 — '+_rhStampWhy : '');
   toast('✅ '+filled.length+'칸 채웠습니다'+(failed.length?' · '+failed.length+'칸은 못 넣었습니다':'')
-    +도장말, 도장말 ? 6000 : undefined);
+    +사진말+도장말, (도장말||사진말) ? 6000 : undefined);
   if(failed.length) console.warn('[칸지도] 못 넣은 자리', failed);
 }
 
@@ -13521,6 +13552,7 @@ async function rhUndoFill(){
   _rhDoc={ name:_rhUndo.name, ext:_rhUndo.ext, bytes:_rhUndo.bytes };
   /* ⚠ 표시도 채우기 전으로 — 안 돌리면 다음 짓기(자동 저장)가 채운 것·도장을 도로 넣는다 */
   _rhFilled=!!_rhUndo.filled; _rhColMap=_rhUndo.colMap||null; _rhStampOn=!!_rhUndo.stamp;
+  _rhPhotoOn=!!_rhUndo.photo;
   _rhUndo=null; _rhVals={};
   rhDraftSave();
   await mountEditor(_rhDoc.bytes.buffer.slice(0), _rhDoc.name);
@@ -13823,6 +13855,102 @@ async function rhStampZip(zip){
   return { ok:true };
 }
 
+/* ── 🖼 사진 넣기 (대표 물음 2026-09-07 「사진 … 왜 입력이 안되나?」 — 넣는 길이 «아예» 없었다) ──
+   도장과 «같은 길»이다: 굽지 않고 표시(_rhPhotoOn)만 남기고, 짓는 길(rhFinishZip)이 매번 넣는다.
+   ⚠ 어느 칸에 넣을지는 모듈 한 곳(js/kcareer-hwpxphoto.js)이 가른다 — 여기서 다시 적지 말 것.
+   ⚠ 사진 칸이 없는 서식이 대부분이다 — 그때는 «조용히» 물러선다(채우기가 실패한 것처럼 말하지 않는다). */
+/* 쓸 사진 — 빠른 이력서에서 고른 것(cvPhoto)이 먼저, 없으면 사진 보관함의 첫 장 */
+function rhPhotoSrc(){
+  var g=[]; try{ g=get('gallery')||[]; }catch(e){ g=[]; }
+  var id=''; try{ id=(piObj()||{}).cvPhoto||''; }catch(e){ id=''; }
+  /* ⚠ 고른 사진이 보관함에서 지워졌으면 첫 장으로 — 없는 사진을 붙들면 영영 못 넣는다 */
+  if(id && !g.some(function(x){ return x && x.id===id; })) id='';
+  if(!id && g.length && g[0] && g[0].id) id=g[0].id;
+  return id||null;
+}
+/* 사진을 칸 «비율로» 가운데를 잘라 PNG 로 — 칸과 비율이 다르면 찌그러지거나 칸 밖으로 나간다.
+   ⚠ 600px 높이로 줄인다 — 3.5×4.5cm 를 300dpi 로 찍어도 531px 이면 된다(파일이 불지 않게). */
+var _rhPhotoMemo={ key:'', v:null };
+async function _rhPhotoPng(id, ratio){
+  var f=await getFileAsync(id);
+  if(!f||!f.base64) return null;
+  var src=String(f.base64);
+  if(!/^data:/.test(src)) src='data:image/'+(String(f.ext||'png').replace(/^jpg$/i,'jpeg'))+';base64,'+src;
+  var key=id+':'+src.length+':'+Number(ratio).toFixed(4);
+  if(_rhPhotoMemo.key===key) return _rhPhotoMemo.v;
+  var im=await new Promise(function(res){
+    var i=new Image(); i.onload=function(){ res(i); }; i.onerror=function(){ res(null); }; i.src=src;
+  });
+  if(!im || !im.naturalWidth || !im.naturalHeight) return null;
+  var W=im.naturalWidth, H=im.naturalHeight, sw=W, sh=H;
+  if(W/H > ratio) sw=Math.round(H*ratio); else sh=Math.round(W/ratio);
+  var oh=Math.min(sh, 600), ow=Math.max(1, Math.round(oh*ratio));
+  var cv=document.createElement('canvas'); cv.width=ow; cv.height=oh;
+  cv.getContext('2d').drawImage(im, Math.round((W-sw)/2), Math.round((H-sh)/2), sw, sh, 0, 0, ow, oh);
+  var v={ png:cv.toDataURL('image/png').replace(/^data:[^,]*,/,''), w:ow, h:oh };
+  _rhPhotoMemo={ key:key, v:v };
+  return v;
+}
+/* 짓고 있는 문서(zip)의 「사진」 칸에 넣는다 — 짓는 길(rhFinishZip) 한 곳만 부른다.
+   돌려주는 것 = { ok, why, noCell } */
+async function rhPhotoZip(zip){
+  if(!window.KcareerHwpxPhoto || !window.KcareerHwpStamp) return { ok:false, why:'사진 부품을 못 불러왔습니다 — 새로고침해 주세요' };
+  var P=KcareerHwpxPhoto;
+  var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
+  var 칸=null, sec='', xml='';
+  for(const n of names){
+    var x=await zip.file(n).async('string');
+    var c=P.findCell(x);
+    if(c){ 칸=c; sec=n; xml=x; break; }
+  }
+  if(!칸) return { ok:false, noCell:true, why:'이 서식에는 「사진」 칸이 없습니다' };
+  /* ⚠ 이미 그림이 든 칸 — 한글 편집에서 되받은 바탕이면 사진이 둘 겹친다 */
+  if(칸.hasPic) return { ok:false, why:'「사진」 칸에 이미 그림이 들어 있습니다' };
+  var id=rhPhotoSrc();
+  if(!id) return { ok:false, why:'사진 보관함이 비어 있습니다 — 환경설정 › 사진 보관함에 증명사진을 올려 주세요' };
+  var b=P.box(칸);
+  if(!b.w || !b.h) return { ok:false, why:'「사진」 칸의 크기를 읽지 못했습니다' };
+  var 그림=await _rhPhotoPng(id, b.w/b.h);
+  if(!그림) return { ok:false, why:'사진을 읽지 못했습니다 — JPG·PNG 로 다시 올려 주세요' };
+  /* ⚠ 그림 이름·목록은 도장과 같은 규칙(image1·image2…) — 엔진이 이름으로 찾는다 */
+  var imgId=KcareerHwpStamp.nextImageId(Object.keys(zip.files));
+  var href='BinData/'+imgId+'.png';
+  zip.file(sec, P.place(xml, 칸, P.picXml({ id:imgId, orgW:그림.w, orgH:그림.h, w:b.w, h:b.h })));
+  zip.file(href, 그림.png, {base64:true});
+  var hpf=await zip.file('Contents/content.hpf').async('string');
+  zip.file('Contents/content.hpf', KcareerHwpStamp.addToManifest(hpf, imgId, href));
+  return { ok:true };
+}
+/* 🖼 사진 넣기 — 표시만 켜고 끈다. 한 번 더 누르면 «뺄지» 묻는다. */
+async function rhPhotoDoc(quiet){
+  var 말 = function(m){ _rhPhotoWhy=m; if(!quiet) toast(m, 6000); };
+  _rhPhotoWhy='';
+  if(!_rhDoc||!_rhDoc.bytes){ 말('먼저 서식을 올려주세요'); return false; }
+  if(!window.KcareerHwpxPhoto){ 말('사진 부품을 못 불러왔습니다 — 새로고침해 주세요'); return false; }
+  if(_rhPhotoOn){
+    if(quiet) return true;
+    if(!confirm('🖼 사진이 이미 들어 있습니다.\n\n사진을 뺄까요?')) return false;
+    _rhPhotoOn=false;
+    await rhOutRefresh(true);
+    toast('🖼 사진을 뺐습니다 — 다시 누르시면 또 넣습니다');
+    return false;
+  }
+  try{ await _ensureJSZip(); }catch(e){ 말('모듈을 못 불러왔습니다(인터넷 필요)'); return false; }
+  _rhPhotoOn=true;
+  var bytes=null;
+  try{ bytes=await rhComposeBytes(); }catch(e){ bytes=null; }
+  if(!bytes){ _rhPhotoOn=false; 말('이 형식에는 사진을 넣을 수 없습니다 — 한글에서 HWPX로 저장해 올려주세요'); return false; }
+  /* ⚠ 못 넣었으면 표시를 거둔다 — 남기면 넣은 줄 안다 */
+  if(!_rhPhotoDone){ var 까닭=_rhPhotoWhy; _rhPhotoOn=false; 말(까닭||'사진을 넣지 못했습니다'); return false; }
+  _rhDoc={ name:rhCleanName(_rhDoc.name,rhOutTail()), ext:'hwpx', bytes:bytes };
+  rhDraftSave();
+  _safe(rhInputBaseNote);
+  if(!quiet) _safe(function(){ rhSetMode('hwp'); });
+  말('🖼 사진을 넣었습니다 — 한글로 보기·완성본에 들어갑니다 · 다른 사진은 빠른 이력서의 「🖼 사진」에서 고릅니다');
+  _rhPhotoWhy='';
+  return true;
+}
+
 /* ═══ 한글 서류를 쓰는 동안은 «저절로» 담는다 (대표 지시 2026-09-26 「1분마다」) ═══
    30초마다 담는다 — 지시하신 1분보다 잦다. ⚠ 이 사이를 늘리지 말 것(RH_AUTO_MS).
 
@@ -14030,7 +14158,7 @@ async function rhDraftResume(id){
     _rhVals={}; _rhListPlan=null;          /* ⚠ 값은 이미 그 안에 있다 — 또 넣으면 두 번 적힌다 */
     rhTidyReset();
   }else if(_rhBase && 표){
-    _rhFilled=!!표.filled; _rhColMap=표.colMap||null; _rhStampOn=!!표.stamp;
+    _rhFilled=!!표.filled; _rhColMap=표.colMap||null; _rhStampOn=!!표.stamp; _rhPhotoOn=!!표.photo;
     var td=표.tidy||{};
     _rhTidy={ drop:td.drop||{}, ph:!!td.ph, italic:!!td.italic, rows:!!td.rows };
   }

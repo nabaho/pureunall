@@ -27,6 +27,7 @@ const Map_ = require(path.join(R, 'js', 'kcareer-formmap.js'));
 const Tidy = require(path.join(R, 'js', 'kcareer-hwpxtidy.js'));
 const Pages = require(path.join(R, 'js', 'kcareer-hwpxpages.js'));
 const Stamp = require(path.join(R, 'js', 'kcareer-hwpstamp.js'));
+const Photo = require(path.join(R, 'js', 'kcareer-hwpxphoto.js'));
 
 const SEC = 'Contents/section0.xml';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -47,10 +48,24 @@ const 서식XML = '<?xml version="1.0" encoding="UTF-8"?><hs:sec xmlns:hs="s" xm
   + para('평가기준표', true)
   + '</hs:sec>';
 
-async function 서식zip() {
+/* 사진 칸이 든 서식 — 대표님 실물(지방공기업평가원 지원서)과 같은 모양:
+   글자 「사진부착 / (3.5cm x 4.5cm)」 · 세로 가운데 · 칸 10072×13404 · 여백 141 */
+const 사진칸 = '<hp:tc><hp:subList vertAlign="CENTER"><hp:p id="41"><hp:run charPrIDRef="36"><hp:t>사진부착</hp:t></hp:run>'
+  + '<hp:linesegarray><hp:lineseg textpos="0" vertpos="0"/></hp:linesegarray></hp:p>'
+  + '<hp:p id="42"><hp:run charPrIDRef="36"><hp:t>(3.5cm x 4.5cm)</hp:t></hp:run>'
+  + '<hp:linesegarray><hp:lineseg textpos="0" vertpos="1500"/></hp:linesegarray></hp:p></hp:subList>'
+  + '<hp:cellSz width="10072" height="13404"/><hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>';
+const 사진서식XML = '<?xml version="1.0" encoding="UTF-8"?><hs:sec xmlns:hs="s" xmlns:hp="p">'
+  + para('모집 공고문 — 담당자 확인 (인)')
+  + para('지원서', true)
+  + '<hp:p><hp:run charPrIDRef="0"><hp:tbl><hp:tr>' + 사진칸 + tc('성   명') + tc('') + '</hp:tr></hp:tbl></hp:run></hp:p>'
+  + para('지원자 ○ ○ ○ (인)')
+  + para('평가기준표', true)
+  + '</hs:sec>';
+async function 서식zip(xml) {
   const z = new JSZip();
   z.file('mimetype', 'application/hwp+zip');
-  z.file(SEC, 서식XML);
+  z.file(SEC, xml || 서식XML);
   z.file('Contents/content.hpf', '<opf:package><opf:manifest><opf:item id="header"/></opf:manifest></opf:package>');
   return new Uint8Array(await z.generateAsync({ type: 'arraybuffer' }));
 }
@@ -103,7 +118,7 @@ function 세상(opt) {
   vm.runInContext('var _rhFilled=false,_rhColMap=null,_rhStampOn=false,_rhStampDone=false,'
     + '_rhStampWhy="",_rhDropped=null,_rhPages=null,_rhMode="in",_rhHwpEd=null,_rhEdLeaving=false,'
     + '_rhwp=null,_rhMap=null,_rhPicks={},_rhVals={},_rhListPlan=null,_rhBase=null,_rhDoc=null,'
-    + '_rhUndo=null,_rhEdBigWant=true,'
+    + '_rhUndo=null,_rhEdBigWant=true,_rhPhotoOn=false,_rhPhotoDone=false,_rhPhotoWhy="",_rhPhotoNoCell=false,'
     + '_rhTidy={drop:{},ph:false,italic:false,rows:false};', ctx);
   vm.runInContext(RAW.match(/var STAMP_FIT_DEF = \{[^}]*\};/)[0], ctx);
   vm.runInContext(RAW.match(/var _rhStampPxMemo=\{[^}]*\};/)[0], ctx);
@@ -115,13 +130,19 @@ function 세상(opt) {
    'async function rhPagesApply(', 'async function rhPagesRestore(',
    'async function exportEditedHwpx(', 'function rhSetMode(', 'async function rhHwpEdSave(',
    'async function rhHwpEdLeave(', 'async function rhUndoFill(', 'function _rhOutPack(',
-   'function _rhInEd(']
+   'function _rhInEd(', 'function rhPhotoSrc(', 'async function rhPhotoZip(', 'async function rhPhotoDoc(']
     .forEach((d) => vm.runInContext(cutFn(CODE, d), ctx));
+  /* 사진을 잘라 PNG 로 만드는 일은 캔버스가 있어야 한다 — 여기서는 «그 결과»만 흉내 낸다 */
+  ctx._자른비율 = [];
+  ctx._rhPhotoPng = async (id, ratio) => { ctx._자른비율.push(ratio); return opt.사진못읽음 ? null : { png: PNG, w: 300, h: Math.round(300 / ratio) }; };
+  ctx.get = (k) => (k === 'gallery' ? (opt.사진없음 ? [] : [{ id: 'G1' }, { id: 'G2' }]) : []);
+  ctx.piObj = () => ({ cvPhoto: opt.고른사진 || '' });
+  ctx.KcareerHwpxPhoto = Photo;
   return ctx;
 }
 async function 올린세상(opt) {
   const ctx = 세상(opt);
-  const b = await 서식zip();
+  const b = await 서식zip(opt && opt.xml);
   ctx._rhBase = { name: '지원서류.hwpx', ext: 'hwpx', bytes: b };
   ctx._rhDoc = { name: '지원서류.hwpx', ext: 'hwpx', bytes: b };
   return ctx;
@@ -290,9 +311,10 @@ test('★★ 채운 뒤에는 짓는 길도 고른 값·서명 줄을 넣는다 
 
 test('★★ 되돌리기는 «표시»도 채우기 전으로 — 안 돌리면 다음 자동 저장이 도로 넣는다', async () => {
   const ctx = await 올린세상();
-  ctx._rhUndo = { name: '지원서류.hwpx', ext: 'hwpx', bytes: ctx._rhBase.bytes, filled: false, colMap: null, stamp: false };
-  ctx._rhFilled = true; ctx._rhStampOn = true; ctx._rhColMap = { a: 1 };
+  ctx._rhUndo = { name: '지원서류.hwpx', ext: 'hwpx', bytes: ctx._rhBase.bytes, filled: false, colMap: null, stamp: false, photo: false };
+  ctx._rhFilled = true; ctx._rhStampOn = true; ctx._rhColMap = { a: 1 }; ctx._rhPhotoOn = true;
   await vm.runInContext('rhUndoFill()', ctx);
+  assert.equal(ctx._rhPhotoOn, false, '★★ 채우기가 넣은 사진 표시가 남았습니다');
   assert.equal(ctx._rhFilled, false, '★★ 채움 표시가 남았습니다');
   assert.equal(ctx._rhStampOn, false, '★★ 도장 표시가 남았습니다');
   assert.equal(ctx._rhColMap, null);
@@ -301,18 +323,20 @@ test('★★ 되돌리기는 «표시»도 채우기 전으로 — 안 돌리면
 test('★★ 바탕이 바뀌면 표시를 모두 놓는다 — 남의 서식에 도장·쪽 번호가 따라오면 안 된다', async () => {
   const ctx = await 올린세상();
   ctx._rhFilled = true; ctx._rhStampOn = true; ctx._rhStampDone = true; ctx._rhColMap = {};
+  ctx._rhPhotoOn = true; ctx._rhPhotoDone = true;
   ctx._rhTidy.drop = { [SEC]: [0] }; ctx._rhDropped = ['x']; ctx._rhPages = {};
   vm.runInContext('rhTidyReset()', ctx);
-  assert.deepEqual([ctx._rhFilled, ctx._rhStampOn, ctx._rhStampDone, ctx._rhColMap, ctx._rhDropped, ctx._rhPages],
-    [false, false, false, null, null, null]);
+  assert.deepEqual([ctx._rhFilled, ctx._rhStampOn, ctx._rhStampDone, ctx._rhColMap, ctx._rhDropped, ctx._rhPages,
+                    ctx._rhPhotoOn, ctx._rhPhotoDone],
+    [false, false, false, null, null, null, false, false], '★★ 남의 서식에 사진·도장 표시가 따라옵니다');
   assert.deepEqual(JSON.parse(JSON.stringify(ctx._rhTidy.drop)), {});
 });
 
 test('★ 임시저장에 표시도 담는다 — 안 담으면 이어서 연 뒤 첫 자동 저장에서 사라진다', async () => {
   const ctx = await 올린세상();
-  ctx._rhFilled = true; ctx._rhStampOn = true; ctx._rhTidy.drop = { [SEC]: [0] }; ctx._rhTidy.ph = true;
+  ctx._rhFilled = true; ctx._rhStampOn = true; ctx._rhPhotoOn = true; ctx._rhTidy.drop = { [SEC]: [0] }; ctx._rhTidy.ph = true;
   const p = JSON.parse(JSON.stringify(vm.runInContext('_rhOutPack()', ctx)));
-  assert.deepEqual(p, { filled: true, colMap: null, stamp: true,
+  assert.deepEqual(p, { filled: true, colMap: null, stamp: true, photo: true,
     tidy: { drop: { [SEC]: [0] }, ph: true, italic: false, rows: false } });
   assert.equal(vm.runInContext('_rhInEd()', ctx), false);
   ctx._rhHwpEd = {}; ctx._rhMode = 'edit';
@@ -430,7 +454,7 @@ function 채우는세상(opt) {
     });
     vm.runInContext('var _rhSignedLine=false;', ctx);
     vm.runInContext(cutFn(CODE, 'async function rhFillByMap('), ctx);
-    const 지도 = Map_.guess(Map_.scan(서식XML), 나);
+    const 지도 = Map_.guess(Map_.scan((opt && opt.xml) || 서식XML), 나);
     ctx._rhMap = { fp: 'x', slots: 지도.slots.map((s) => Object.assign({}, s, { sec: SEC })), lists: [] };
     return ctx;
   });
@@ -497,4 +521,119 @@ test('★★★ 한글 편집 «안에서» 담긴 자리는 그 문서가 바�
   assert.equal(ctx._rhStampOn, false, '★★ 도장이 든 문서에 또 찍습니다');
   assert.match(ctx._rhBase.name, /_날인\.hwpx$/, '★ 도장이 든 바탕인 줄 모르게 됩니다');
   assert.ok(ctx._rhOrig && ctx._rhOrig.name === '지원서류.hwpx', '처음 원본으로 돌아갈 길이 사라졌습니다');
+});
+
+/* ══════ ⑦ 🖼 사진 (대표 물음 2026-09-07 「사진 … 왜 입력이 안되나?」 — 넣는 길이 아예 없었다) ══════ */
+/* 사진 칸 — 글자는 비워지므로 «칸 크기»로 찾는다 */
+const 사진칸글 = (x) => { const a = x.lastIndexOf('<hp:tc>', x.indexOf('<hp:cellSz width="10072" height="13404"')); return x.slice(a, x.indexOf('</hp:tc>', a) + 8); };
+test('★★★ 「사진」 칸에 사진이 들어가고 한글로 보기·완성본에 «남는다»', async () => {
+  const ctx = await 올린세상({ xml: 사진서식XML });
+  assert.equal(await vm.runInContext('rhPhotoDoc(true)', ctx), true, '못 넣었습니다: ' + ctx._rhPhotoWhy);
+  for (const 어디 of ['보이는 문서', '다시 지은 것', '완성본']) {
+    const x = 어디 === '보이는 문서' ? await 본문(ctx._rhDoc.bytes)
+      : 어디 === '완성본' ? await 본문(await vm.runInContext('exportEditedHwpx()', ctx)) : await 지어(ctx);
+    assert.equal(도장수(x), 1, '★★★ ' + 어디 + '에 사진이 ' + 도장수(x) + '장입니다');
+    const 칸 = 사진칸글(x);
+    assert.match(칸, /<hp:pic\b/, '★★ 사진이 「사진」 칸 밖에 들어갔습니다(' + 어디 + ')');
+    assert.match(칸, /vertAlign="TOP"/, '★★ 칸이 가운데 정렬 그대로라 사진이 칸 아래로 삐져나갑니다');
+    assert.ok(!/사진부착/.test(칸), '★ 칸 글자가 남아 사진 위로 비칩니다(' + 어디 + ')');
+  }
+  assert.match(await 본문(ctx._rhBase.bytes), /사진부착/, '★★ 원본을 고쳤습니다 — 사진을 빼면 글자가 안 돌아옵니다');
+  const z = await JSZip.loadAsync(await vm.runInContext('rhComposeBytes()', ctx));
+  assert.ok(z.file('BinData/image1.png'), '사진 그림이 파일에 없습니다');
+  assert.match(await z.file('Contents/content.hpf').async('string'), /id="image1"/, '그림 목록에 없습니다 — 한글이 못 찾습니다');
+  /* 칸 «안쪽» 비율로 잘라 달라고 했나 — 9790 / 13122 */
+  assert.ok(Math.abs(ctx._자른비율[0] - 9790 / 13122) < 0.001, '★★ 칸 비율로 안 잘랐습니다 — 찌그러집니다: ' + ctx._자른비율[0]);
+  /* 크기는 칸 안쪽 그대로 */
+  assert.match(사진칸글(await 지어(ctx)), /<hp:sz width="9790" height="13122"/, '★★ 사진 크기가 칸에 안 맞습니다');
+});
+
+test('★★ 사진과 도장을 함께 — 그림 번호가 겹치지 않는다(image1 · image2)', async () => {
+  const ctx = await 올린세상({ xml: 사진서식XML });
+  await vm.runInContext('rhPhotoDoc(true)', ctx);
+  await vm.runInContext('rhStampDoc(true)', ctx);
+  const b = await vm.runInContext('rhComposeBytes()', ctx);
+  const x = await 본문(b);
+  assert.equal(도장수(x), 2, '사진 + 도장 = 그림 둘이어야 합니다');
+  const 번호 = (x.match(/binaryItemIDRef="(image\d+)"/g) || []).map((s) => s.slice(17, -1));
+  assert.deepEqual(번호.slice().sort(), ['image1', 'image2'], '★★ 그림 번호가 겹칩니다 — 하나가 다른 것을 덮습니다: ' + 번호);
+  const hpf = await (await JSZip.loadAsync(b)).file('Contents/content.hpf').async('string');
+  assert.ok(/id="image1"/.test(hpf) && /id="image2"/.test(hpf), '그림 목록에 둘 다 있어야 합니다');
+});
+
+test('★★ 사진 칸이 없는 서식에는 «안» 넣는다 — 아무 칸에나 박지 않는다', async () => {
+  const ctx = await 올린세상();                           /* 서식XML: 사진 칸 없음 */
+  assert.equal(await vm.runInContext('rhPhotoDoc(false)', ctx), false);
+  assert.equal(ctx._rhPhotoOn, false, '★ 못 넣었는데 표시가 남았습니다');
+  assert.match(ctx._알림.join(' '), /「사진」 칸이 없습니다/, '까닭을 말하지 않습니다');
+  assert.equal(도장수(await 지어(ctx)), 0);
+});
+
+test('★★ 사진 보관함이 비었거나 사진을 못 읽으면 «말하고» 안 넣는다', async () => {
+  const ctx = await 올린세상({ xml: 사진서식XML, 사진없음: true });
+  assert.equal(await vm.runInContext('rhPhotoDoc(false)', ctx), false);
+  assert.match(ctx._알림.join(' '), /사진 보관함이 비어 있습니다/, '★ 어디에 올리면 되는지 말하지 않습니다(막다른 길)');
+  assert.equal(ctx._rhPhotoOn, false);
+  const c2 = await 올린세상({ xml: 사진서식XML, 사진못읽음: true });
+  assert.equal(await vm.runInContext('rhPhotoDoc(false)', c2), false);
+  assert.match(c2._알림.join(' '), /사진을 읽지 못했습니다/);
+});
+
+test('★ 쓸 사진 — 빠른 이력서에서 고른 것이 먼저, 보관함에서 지워졌으면 첫 장', async () => {
+  const a = await 올린세상({ 고른사진: 'G2' });
+  assert.equal(vm.runInContext('rhPhotoSrc()', a), 'G2', '★ 고르신 사진을 안 씁니다');
+  const b = await 올린세상({ 고른사진: '지워진것' });
+  assert.equal(vm.runInContext('rhPhotoSrc()', b), 'G1', '★ 없는 사진을 붙들고 있습니다');
+  const c = await 올린세상({ 사진없음: true });
+  assert.equal(vm.runInContext('rhPhotoSrc()', c), null);
+});
+
+test('★★ 한 번 더 누르면 «뺄지» 묻고 — 빼면 모든 길에서 빠진다', async () => {
+  const ctx = await 올린세상({ xml: 사진서식XML });
+  await vm.runInContext('rhPhotoDoc(true)', ctx);
+  await vm.runInContext('rhPhotoDoc(false)', ctx);
+  assert.equal(ctx._rhPhotoOn, false);
+  const x = await 지어(ctx);
+  assert.equal(도장수(x), 0, '★ 뺐는데 지으면 도로 들어갑니다');
+  assert.match(사진칸글(x), /vertAlign="CENTER"/, '뺐는데 칸 정렬이 바뀐 채입니다');
+  assert.match(사진칸글(x), /사진부착/, '★★ 뺐는데 칸 글자가 안 돌아옵니다');
+});
+
+test('★★ 이미 사진이 든 바탕(한글 편집에서 되받은 것)에는 또 넣지 않는다 — 둘 겹친다', async () => {
+  const 든것 = 사진서식XML.replace('<hp:t>사진부착</hp:t>', '<hp:t>사진부착</hp:t></hp:run><hp:run charPrIDRef="36"><hp:pic id="9"/>');
+  const ctx = await 올린세상({ xml: 든것 });
+  assert.equal(await vm.runInContext('rhPhotoDoc(false)', ctx), false);
+  assert.match(ctx._알림.join(' '), /이미 그림이 들어 있습니다/);
+  assert.equal(도장수(await 지어(ctx)), 1, '★★ 사진이 둘이 됐습니다');
+});
+
+test('★★ 사진 칸이 든 쪽을 빼면 사진도 안 들어간다 — 쪽 빼기 «뒤»에 넣는다', async () => {
+  const ctx = await 올린세상({ xml: 사진서식XML });
+  ctx._rhTidy.drop = { [SEC]: [1] };            /* 지원서(사진 칸) 쪽을 뺀다 */
+  assert.equal(await vm.runInContext('rhPhotoDoc(true)', ctx), false);
+  assert.equal(ctx._rhPhotoOn, false);
+  assert.ok(!/<hp:pic/.test(await 지어(ctx)));
+});
+
+test('★★★ 「✨ 내 정보로 채우기」가 사진도 넣는다 — 사진 칸이 있을 때만, 없으면 조용히', async () => {
+  const ctx = await 채우는세상({ xml: 사진서식XML });
+  await vm.runInContext('rhFillByMap()', ctx);
+  assert.equal(ctx._rhPhotoOn, true, '★★★ 채우기가 사진을 안 넣었습니다 — 「사진 … 왜 입력이 안되나?」');
+  assert.match(사진칸글(await 본문(ctx._rhDoc.bytes)), /<hp:pic\b/, '채운 문서에 사진이 없습니다');
+  assert.match(ctx._알림.join(' '), /사진까지 넣었습니다/, '넣었다고 말하지 않습니다');
+  /* 사진 칸이 «없는» 서식 — 조용히 거둔다(실패라고 말하지 않는다) */
+  const c2 = await 채우는세상();
+  await vm.runInContext('rhFillByMap()', c2);
+  assert.equal(c2._rhPhotoOn, false, '★★ 사진 칸도 없는데 표시가 남았습니다');
+  assert.ok(!/사진은 못 넣었습니다/.test(c2._알림.join(' ')), '★★ 사진 칸도 없는데 「못 넣었다」고 합니다 — 채우기가 실패한 줄 압니다');
+  /* 칸은 있는데 사진이 없으면 — 말한다 */
+  const c3 = await 채우는세상({ xml: 사진서식XML, 사진없음: true });
+  await vm.runInContext('rhFillByMap()', c3);
+  assert.equal(c3._rhPhotoOn, false);
+  assert.match(c3._알림.join(' '), /사진은 못 넣었습니다 — 사진 보관함이 비어 있습니다/, '★ 칸이 있는데 왜 비었는지 말하지 않습니다');
+});
+
+test('★ 이어서 열면 사진 표시도 돌아온다', async () => {
+  const ctx = await 이어서세상({ vals: {}, out: { photo: true, tidy: {} } }, true);
+  assert.equal(ctx._rhPhotoOn, true, '★ 이어서 연 뒤 첫 자동 저장에서 사진이 사라집니다');
 });
