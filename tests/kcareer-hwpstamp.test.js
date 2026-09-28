@@ -40,8 +40,8 @@ test('그림 이름표를 가리킨다 — BinData 의 파일과 이어져야 �
   assert.match(S.picXml({ id: 'image7', orgPx: 300, showHU: 3400 }), /binaryItemIDRef="image7"/);
 });
 
-test('도장 자리를 찾는다 — (인)·（인）·(서명)·서명 또는 인·印', () => {
-  ['(인)', '（인）', '(서명)', '서명 또는 인', '印'].forEach((mark) => {
+test('도장 자리를 찾는다 — (인)·(서명)·(날인)·서명란·날인란·印', () => {
+  ['(인)', '（인）', '(서명)', '(날인)', '서명 또는 인', '서명 및 인', '서명란', '날인란', '印'].forEach((mark) => {
     const xml = '<hp:p><hp:run><hp:t>성명 : 권형하   ' + mark + '</hp:t></hp:run></hp:p>';
     assert.ok(S.findSpot(xml), mark + ' 을(를) 도장 자리로 알아봐야 합니다');
   });
@@ -111,6 +111,12 @@ test('그림을 그 자리 문단 안에 넣는다 — 문서가 깨지지 않�
   const out = S.insertPic(xml, '<hp:pic/>', S.findSpot(xml));
   assert.match(out, /<hp:run[^>]*><hp:pic\/><\/hp:run>/);
   assert.ok(out.indexOf('(인)') > 0, '원래 글자는 남아야 합니다 — 도장은 «덮는» 것이지 «지우는» 것이 아니다');
+});
+
+test('도장 run은 자리표의 글자 모양을 이어받는다 — 기본 모양 때문에 줄 높이가 바뀌지 않게', () => {
+  const xml = '<hp:p><hp:run charPrIDRef="27"><hp:t>신청인 (인)</hp:t></hp:run></hp:p>';
+  const out = S.insertPic(xml, '<hp:pic/>', S.findSpot(xml));
+  assert.match(out, /<hp:run charPrIDRef="27"><hp:pic\/><\/hp:run>/);
 });
 
 test('자리가 없으면 문서를 그대로 돌려준다 — 조용히 망가뜨리지 않는다', () => {

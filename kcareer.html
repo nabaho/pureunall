@@ -1147,13 +1147,13 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=30"></script>
+<script src="js/kcareer-hwpxfill.js?v=31"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=18"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
-<script src="js/kcareer-hwpstamp.js?v=4"></script>
+<script src="js/kcareer-hwpstamp.js?v=5"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
@@ -11553,7 +11553,8 @@ async function rhAutoFillDoc_사전(){
   }
   if(!agg.fields.length && !agg.lists.some(function(l){ return l.put>0; })){
     toast('채울 칸을 찾지 못했습니다 — 칸 이름이 특이하면 알려주세요(사전에 추가합니다)'); return; }
-  const filled=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+  const filled0=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+  const filled=(typeof rhFinalizeHwpx==='function')?await rhFinalizeHwpx(filled0):filled0;
   /* 채운 결과를 편집 중인 문서로 바꿔 둔다 — 이어서 손볼 수 있다 */
   _rhDoc={ name:String(_rhDoc.name||'양식').replace(/\.(hwp|hwpx)$/i,'')+'_채움.hwpx', ext:'hwpx', bytes:filled };
   /* ⚠ 이 예비 길은 값을 _rhVals 에 담지 않는다(칸 지도가 없어서다) —
@@ -12905,7 +12906,35 @@ async function rhComposeBytes(){
      ⚠ 입력판은 «바탕»을 그린다 — 거기서 정리하면 칸이 사라져 값을 못 친다.
        정리는 늘 «마지막 걸음»이다. */
   await rhFinishZip(zip);
-  return new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+  var made=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+  return (typeof rhFinalizeHwpx==='function')?await rhFinalizeHwpx(made):made;
+}
+
+/* 자동 채움은 바뀐 문단의 옛 linesegarray를 걷는다. 옛 정보를 그대로 두면 긴 이름이
+   포개지지만, 걷은 채 곧바로 저장하면 한글과 웹 편집기가 각자 줄을 다시 잡아 화면이
+   달라질 수 있다. 공용 한글 엔진으로 완성본 전체의 줄·쪽 배치를 한 번 다시 계산하고,
+   다시 연 파일까지 검사한 뒤 내보낸다. 실패하면 원본 사본을 돌려 문서를 잃지 않는다. */
+async function rhFinalizeHwpx(bytes){
+  var u8=(bytes instanceof Uint8Array)?bytes:new Uint8Array(bytes||0);
+  if(!u8.length || !window.PureunHwp || typeof PureunHwp.openDoc!=='function') return u8;
+  var doc=null, check=null;
+  try{
+    doc=await PureunHwp.openDoc(u8,'경력관리-완성본.hwpx');
+    if(typeof doc.reflowLinesegs==='function') doc.reflowLinesegs();
+    var out=(typeof doc.exportHwpx==='function')?doc.exportHwpx():null;
+    var fixed=(out instanceof Uint8Array)?out:new Uint8Array(out||0);
+    if(!fixed.length) return u8;
+    /* 한글 프로그램에 넘기기 전에 실제로 다시 열리는 파일인지 확인한다. */
+    check=await PureunHwp.openDoc(fixed,'경력관리-검사.hwpx');
+    if(typeof check.pageCount==='function') check.pageCount();
+    return fixed;
+  }catch(e){
+    console.warn('한글 줄 배치 재계산',e);
+    return u8;
+  }finally{
+    try{ if(check&&typeof check.free==='function') check.free(); }catch(e){}
+    try{ if(doc&&typeof doc.free==='function') doc.free(); }catch(e){}
+  }
 }
 
 /* ── 「내보낼 때 얹는 것」 — 한 곳에서 다룬다 (대표 승인 2026-09-27 목업) ──────────
@@ -13329,7 +13358,8 @@ async function rhFillByMap(){
   _rhFilled=true; _rhColMap=colMap||null;
   /* ★ 쪽 빼기·(이미 찍기로 한) 도장도 여기서 얹는다 — 채우기 결과에서 뺀 쪽이 되살아나면 안 된다 */
   await rhFinishZip(zip);
-  var bytes=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+  var bytes0=new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+  var bytes=(typeof rhFinalizeHwpx==='function')?await rhFinalizeHwpx(bytes0):bytes0;
   _rhDoc={ name:rhCleanName(바탕.name,rhOutTail()), ext:'hwpx', bytes:bytes };
   rhMemorySave(_rhMap.fp, _rhPicks, _rhDoc.name);
   rhDraftSave();

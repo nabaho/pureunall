@@ -64,7 +64,7 @@
          <hp:t>(</hp:t> … <hp:t>서명</hp:t> … <hp:t>)</hp:t>
        처럼 태그를 사이에 두고 흩어져 있다(「충남 천안시 무슨」이 네 조각으로 오던 것과 같다).
        그래서 «보이는 글자»만 이어 붙여 찾고, 찾은 자리를 XML 자리로 되짚는다. */
-  var MARKS = /[（(]\s*(인|서명)\s*[)）]|서명\s*또는\s*인|印/;
+  var MARKS = /[（(]\s*(인|서명|날인)\s*[)）]|서명\s*(?:또는|및)\s*인|서명란|날인란|印/;
   /* <hp:t>…</hp:t> 안의 글자와 그 XML 자리를 모은다 */
   function 글자조각(s) {
     var re = /<hp:t(?:\s[^>]*)?>([\s\S]*?)<\/hp:t>/g, m, out = [];
@@ -113,7 +113,13 @@
   function insertPic(sectionXml, pic, at) {
     var s = String(sectionXml || '');
     if (!at) return s;                    /* 자리가 없으면 문서를 그대로 — 망가뜨리지 않는다 */
-    return s.slice(0, at.index) + '<hp:run charPrIDRef="0">' + pic + '</hp:run>' + s.slice(at.index);
+    /* 도장 run 도 자리표가 쓰던 글자 모양을 물려받는다. 기본 모양(0)을 박으면
+       일부 한글 문서에서 문단 높이·줄 간격을 다시 계산하며 도장 위치가 밀렸다. */
+    var before=s.slice(0,at.index), runs=before.match(/<hp:run\b[^>]*\bcharPrIDRef="[^"]+"[^>]*>/g);
+    var last=runs&&runs.length?runs[runs.length-1]:'';
+    var cm=/\bcharPrIDRef="([^"]+)"/.exec(last);
+    var charPr=cm?cm[1]:'0';
+    return before + '<hp:run charPrIDRef="' + charPr + '">' + pic + '</hp:run>' + s.slice(at.index);
   }
 
   /* 그림 목록(content.hpf)에 항목을 더한다 — 목록에 없으면 한글이 그림을 못 찾는다.

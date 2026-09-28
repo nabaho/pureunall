@@ -296,6 +296,13 @@
   function dropLines(s) {
     return String(s).replace(/<hp:linesegarray\b[^>]*\/>|<hp:linesegarray\b[^>]*>[\s\S]*?<\/hp:linesegarray>/g, '');
   }
+  /* 빈 칸에 새 run 을 만들어야 할 때도 그 문단의 글자 모양을 물려받는다.
+     charPrIDRef="0"을 박으면 원본이 바탕·함초롬바탕·좁은 자간을 쓰더라도
+     채운 값만 기본 글꼴로 바뀌어 한글에서 줄 폭과 높이가 달라졌다. */
+  function inheritedCharPr(s) {
+    var m = /<hp:run\b[^>]*\bcharPrIDRef="([^"]+)"[^>]*>/.exec(String(s || ''));
+    return m ? m[1] : '0';
+  }
   /* 맨 안쪽 문단(안에 문단이 또 없는 것)마다 fn 을 돌리고, 글자가 바뀐 문단만 줄 정보를 걷는다.
      {{토큰}} 바꾸기처럼 «문서 전체»에 글자 바꾸기를 하는 길이 쓴다. */
   function relineLeaves(xml, fn) {
@@ -325,7 +332,7 @@
       return dropLines(tc.replace(mSelf[0], '<hp:run' + mSelf[1] + '><hp:t>' + v + '</hp:t></hp:run>'));
     if (mRun) return dropLines(tc.replace(mRun[0], mRun[0] + '<hp:t>' + v + '</hp:t>'));
     var mP = tc.match(/<hp:p\b[^>]*>/);
-    if (mP) return dropLines(tc.replace(mP[0], mP[0] + '<hp:run charPrIDRef="0"><hp:t>' + v + '</hp:t></hp:run>'));
+    if (mP) return dropLines(tc.replace(mP[0], mP[0] + '<hp:run charPrIDRef="' + inheritedCharPr(tc) + '"><hp:t>' + v + '</hp:t></hp:run>'));
     return null;
   }
 
@@ -1069,6 +1076,7 @@
     /* ⚠ AI 에게 물을 때 고를 수 있는 열쇠는 «이것»을 쓴다 — 따로 적으면 어긋난다 */
     LIST_FILL_KEYS: LIST_FILL_KEYS, FIELD_FILL_KEYS: FIELD_FILL_KEYS,
     cellText: cellText, isEmptyCell: isEmptyCell, fillCell: fillCell, setCellText: setCellText,
+    inheritedCharPr: inheritedCharPr,
     /* 중첩 표를 다루는 자 — 칸 지도도 «같은 것»을 쓴다 */
     tagBlocks: tagBlocks, hasInnerTable: hasInnerTable, ownPart: ownPart,
     /* 자리표 자·문단 채우기 — 검사와 칸 지도가 «같은 자»를 쓰게 내보낸다 */
