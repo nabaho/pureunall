@@ -61,3 +61,24 @@ test('④ 머리글도 같은 여백(th1)을 쓴다', () => {
   assert.doesNotMatch(head, /Object\.assign\(\{\},thS,/, '머리글이 옛 여백을 써 칸이 도로 벌어집니다');
   assert.match(BARE, /var th1 = Object\.assign\(\{\}, thS, \{/, 'th1 이 없습니다');
 });
+
+/* ⑤ 금액·통장 칸도 한 줄 (대표 「추천대로」 2026-09-28) — 전에는 일부 받은 줄에 「◐ 받음·남음」,
+   통장이 맞은 줄에 「적요 …」 가 «둘째 줄(div)» 로 붙어 그 줄만 높아졌다. */
+test('⑤ ★★ 일부 받은 금액은 금액 «옆에» — 둘째 줄(div)로 안 붙는다, 전문은 title', () => {
+  const { body } = 표();
+  const at = body.indexOf('(p.paidSoFar > 0) &&');
+  assert.ok(at > 0, '일부 받은 표시를 못 찾았습니다');
+  const 조각 = body.slice(at, at + 400);
+  assert.doesNotMatch(조각, /^\(p\.paidSoFar > 0\) && h\('div'/, '★★ 남은 돈이 금액 밑 둘째 줄로 붙습니다');
+  assert.match(조각, /title:/, '받은 돈·남은 돈 전문을 볼 길이 없습니다');
+  assert.match(조각, /남음/, '남은 돈을 안 보여 줍니다 — 55만 받고도 통째로 미수처럼 보입니다');
+});
+
+test('⑤ ★★ 통장 칸은 적요를 둘째 줄로 그리지 않는다 — 칸 title 에 있다', () => {
+  const { body } = 표();
+  const at = body.indexOf("var hit = hitOf(p);");
+  const end = body.indexOf('})()', at);
+  const 칸 = body.slice(at, end);
+  assert.doesNotMatch(칸, /\}, '적요 '\+/, '★★ 적요가 둘째 줄로 그려져 그 줄만 높아집니다');
+  assert.match(칸, /title:'적요 「'/, '적요를 볼 길(title)이 없습니다');
+});
