@@ -224,3 +224,36 @@ test('★ 사흘 연차를 끌어 옮겨도 «사흘 그대로»다 — 하루�
     return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(j) }); } });
   assert.strictEqual(JSON.parse(보낸2[1].body).end.date, '2026-10-06', '하루짜리의 끝날이 틀렸습니다');
 });
+
+/* ── 선명도 (대표 지시 2026-09-28 「색감이나 느낌 선명도 … 여전히 구글이 더 명확하다 … 글자의 색강도 등
+   구글과 똑같이」). 두 캡처를 한 점씩 재 보니 우리 글자가 «한 단계 옅었다». ── */
+function 글자(html) { const m = html.match(/^<div[^>]*?style="[^"]*?(?:^|;)color:(#[0-9a-f]{6})/i); return m ? m[1].toLowerCase() : ''; }
+test('⑪ 지난 일정 글자는 «검정을 바탕에 녹인 색» — 칩 색마다 글자가 따라간다(회색 한 가지로 칠하지 않는다)', () => {
+  const b = 상자();
+  const 지난 = (c) => 칩(b, Object.assign({}, 올일, { color: c, date: '2026-09-01', end: '2026-09-01' }), '2026-09-01');
+  const 가 = 지난('#33b679'), 나 = 지난('#8e24aa');
+  const ga = 글자(가), na = 글자(나);
+  assert.ok(ga && na, '지난 칩 글자색을 셈하지 않습니다(변수 한 가지?): ' + 가);
+  assert.notStrictEqual(ga, na, '칩 색이 달라도 글자가 같습니다 — 칩마다 떠 보입니다');
+  /* 글자는 바탕보다 어둡되(읽힌다) 검정보다는 밝다(지난 것이라 물러난다) */
+  [[가, ga], [나, na]].forEach(([h, g]) => {
+    assert.ok(밝기(g) < 밝기(바탕(h)) - 40, '지난 칩 글자가 바탕과 너무 가깝습니다: ' + h);
+    assert.ok(밝기(g) > 밝기('#1f1f1f') + 40, '지난 칩 글자가 앞으로의 것만큼 진합니다: ' + h);
+  });
+});
+test('⑪ 어두운판의 지난 글자는 전처럼 회색 변수 — 밝은판 셈을 어두운판에 끌고 가지 않는다', () => {
+  const h = 칩(상자('dark'), Object.assign({}, 올일, { date: '2026-09-01', end: '2026-09-01' }), '2026-09-01');
+  assert.match(h, /color:var\(--gsub\)/, h);
+});
+test('⑫ 밝은판 글자가 구글만큼 진하다 — 본문은 날짜보다, 날짜는 음력보다 진하다', () => {
+  const 밝은 = (캘린더.match(/:root\{[\s\S]*?\}/) || [''])[0];
+  const 값 = (k) => ((밝은.match(new RegExp('--' + k + ':(#[0-9a-f]{6})', 'i')) || [])[1] || '').toLowerCase();
+  const 본문 = 값('gtext'), 날짜 = 값('gdate'), 음력 = 값('gfaint');
+  assert.ok(본문 && 날짜 && 음력, '밝은판에 --gtext · --gdate · --gfaint 가 다 없습니다');
+  /* 검사고정-허용: 구글 캘린더 화면을 실측한 «그 값» 이 규칙이다(2026-09-28 캡처 두 장 대조) */
+  assert.strictEqual(본문, '#1f1f1f', '본문 글자가 구글(#1f1f1f)보다 옅습니다');
+  assert.ok(밝기(본문) < 밝기(날짜) && 밝기(날짜) < 밝기(음력), '진하기 차례가 어긋났습니다');
+  const 날짜칸 = (캘린더.match(/\.dnum\{[^}]*\}/) || [''])[0];
+  assert.match(날짜칸, /color:var\(--gdate\)/, '날짜 숫자가 날짜 색 변수를 안 씁니다');
+  assert.match((캘린더.match(/\.lun\{[^}]*\}/) || [''])[0], /var\(--gfaint\)/, '음력이 날짜만큼 진해 다툽니다');
+});
