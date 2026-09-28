@@ -35,7 +35,16 @@
     --danger:#dc2626;--radius:11px;
     /* 구글 캘린더의 글자·선 색 — 대표 지시 2026-09-27 「구글캘린더 화면과 완벽하게 같이」.
        구글이 쓰는 «바로 그 값»이다(팔레트 예외는 tests/color-palette-apps.test.js 에 까닭과 함께). */
-    --gtext:#3c4043;--gsub:#70757a;--gline:#dadce0;--gtoday:#1a73e8}
+    /* ★ 2026-09-28 — 구글 캘린더 «요즘 화면»(2024 새 단장) 값으로 한 번 더 맞췄다
+         (대표 「색감이나 느낌 선명도 … 여전히 구글이 더 명확하다 … 글자의 색강도 등 구글과 똑같이」).
+         두 캡처를 한 점씩 재서 찾은 차이 — 우리 글자가 «한 단계 옅었다»:
+           본문 글자     3c4043 → 1f1f1f (거의 검정 — 「N개 더보기」·시각 일정·제목)
+           날짜·요일     70757a → 444746
+           칸 선         dadce0 → dde3ea (푸른 기가 도는 옅은 선)
+           오늘 동그라미 1a73e8 → 0b57d0
+           제목 「2026년 9월」 20px → 22px (구글과 같은 크기)
+         음력은 구글에 없는 우리 것이라 한 단계 옅게(--gfaint) 둔다 — 날짜와 다투지 않게. */
+    --gtext:#1f1f1f;--gsub:#444746;--gline:#dde3ea;--gtoday:#0b57d0;--gdate:#444746;--gfaint:#70757a}
   /* 어두운판 — 수동 전환(대표 지시 2026-09-19 「2번 수동」). 밝은판 값은 위 그대로 두고
      여기서 «덧씌운다». 색은 전부 이미 쓰는 27색 + 흰/검 안에서 고른다(팔레트 검사).
      ⚠ 판(--panel)이 바탕(--bg)보다 «밝다» — 밝은판의 관계(카드가 바탕보다 밝다)를
@@ -50,7 +59,7 @@
   :root[data-theme="dark"]{--ink:#e3e3e3;--sub:#9aa0a6;--faint:#80868b;--line:#3c4043;
     --panel:#1b1b1d;--bg:#131314;--acc-soft:rgba(138,180,248,.16);--ok:#4ade80;
     --warn:#fbbf24;--warn-bg:#1b1b1d;
-    --gtext:#e3e3e3;--gsub:#9aa0a6;--gline:#3c4043;--gtoday:#8ab4f8}
+    --gtext:#e3e3e3;--gsub:#9aa0a6;--gline:#3c4043;--gtoday:#8ab4f8;--gdate:#e3e3e3;--gfaint:#9aa0a6}
   *{box-sizing:border-box}
   /* ★ 화면 한 장에 담는다 (대표 지시 2026-09-19 「한화면에 나오게」).
      문서가 굴러가지 않게 몸통을 «세로 세 칸»으로 세운다 — 머리줄·탭줄·본문.
@@ -176,7 +185,7 @@
   .monthbar{display:flex;align-items:center;gap:7px;white-space:nowrap;flex-wrap:wrap}
   /* ★ 구글 캘린더 머리줄 꼴 (대표 지시 2026-09-27) — [오늘] ‹ › 2026년 9월
      「오늘」은 둥근 알약, 화살표는 테두리 없는 동그라미, 달 이름은 굵지 않은 큰 글자. */
-  .monthbar .ym{font-size:20px;font-weight:400;color:var(--gtext);font-variant-numeric:tabular-nums;margin:0 4px}
+  .monthbar .ym{font-size:22px;font-weight:400;color:var(--gtext);font-variant-numeric:tabular-nums;margin:0 4px}
   .monthbar .lunrange{font-size:11px;color:var(--gsub)}
   .mv{border:none;background:transparent;border-radius:50%;width:30px;height:30px;
     cursor:pointer;color:var(--gtext);font-size:18px;line-height:1;font-family:inherit;padding:0;
@@ -221,15 +230,15 @@
   /* 대표 지시 2026-09-20 「한글과 숫자가 좀더 진했으면」 — 400(보통)은 12px 에서
      연해 보인다. 600(약간 굵게)으로 올렸다. 색(--ink #1e293b)은 이미 짙어서 안 바꿨다. */
   .dnum{min-width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;
-    padding:0 4px;font-size:12px;font-weight:500;cursor:pointer;color:var(--gtext);background:transparent}
+    padding:0 4px;font-size:12px;font-weight:500;cursor:pointer;color:var(--gdate);background:transparent}
   .dnum:hover{background:var(--bg)}
   /* 오늘 동그라미는 «숫자에만» — 음력까지 감싸면 알약처럼 길어진다 */
   .dnum.today{background:var(--gtoday);color:#ffffff;font-weight:500}
   .dnum.today:hover{background:var(--gtoday)}
   /* 구글은 앞뒤 달 날짜를 흐리게 안 한다 — 같은 색 그대로 */
-  .dnum.other{color:var(--gtext)}
-  .lun{font-size:10.5px;color:var(--gsub);line-height:1}
-  .lun.other{color:var(--gsub)}
+  .dnum.other{color:var(--gdate)}
+  .lun{font-size:10.5px;color:var(--gfaint);line-height:1}
+  .lun.other{color:var(--gfaint)}
   .evs{display:flex;flex-direction:column;gap:2px}
   /* 한 칸은 «한 줄»이다 — 넘치면 … 로 줄이고 전문은 손대면 뜬다 */
   /* ★ 일정 칩 — 구글 캘린더 월 보기와 같은 꼴 (대표 지시 2026-09-27)
@@ -1934,14 +1943,18 @@ function chipHtml(e, ymd){
      ⚠ 잠긴 달은 «여기서» 막지 않는다. 막는 자리는 저장 문(pu-cal-write) 하나여야
        두 곳이 어긋나지 않는다 — 놓은 뒤에 「잠긴 달입니다」라고 분명히 말한다. */
   var 옮길수있나 = !공휴 && (e.movable !== false) && !!e.store && !!e.id;
+  /* 지난 일정의 글자 — 구글은 «검정 글자를 38% 만» 올린다(캡처 실측: 옅은 칩 #e5e1dd 위 글자 #9a9795,
+     흰 바탕 위 #aaaaaa). 회색 한 가지(#70757a)로 칠하면 칩마다 글자가 떠 보여 흐릿했다.
+     바탕에 녹여 셈하므로 칩 색이 달라도 늘 같은 «옅기»다. 어두운판은 전처럼 회색 글자. */
+  function 지난글자(바탕){ return 어둡나 ? "var(--gsub)" : mixHex("#1f1f1f", 바탕, .62); }
   var 꼴, 안;
   if(시각칩){
-    꼴 = "color:" + (지남 ? "var(--gsub)" : "var(--gtext)");
+    꼴 = "color:" + (지남 ? 지난글자(판) : "var(--gtext)");
     안 = '<i class="gdot" style="background:' + esc(지남 ? mixHex(사람색, 판, 옅게) : 사람색) + '"></i>'
       + '<span class="gtm">' + esc(e.time) + '</span>' + esc(제목);
   } else {
-    꼴 = "background:" + esc(지남 ? mixHex(사람색, 판, 옅게) : (눅임 ? mixHex(사람색, 판, 눅임) : 사람색))
-      + ";color:" + (지남 ? "var(--gsub)" : "#ffffff");
+    var 칩바탕 = 지남 ? mixHex(사람색, 판, 옅게) : (눅임 ? mixHex(사람색, 판, 눅임) : 사람색);
+    꼴 = "background:" + esc(칩바탕) + ";color:" + (지남 ? 지난글자(칩바탕) : "#ffffff");
     var n = e._span || 1;
     /* 막대 — 칸 n 개를 건너간다. 100% 는 한 칸의 속 너비, 칸 사이 틈(여백·테두리)을 더한다.
        position+z-index 로 «옆 칸 위에» 그린다(옆 칸 바탕이 막대를 덮지 않게). */
