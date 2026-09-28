@@ -364,6 +364,10 @@ body.kc-staff .kc-staff-note{display:flex}
 .rc-mute{color:var(--text-mute);font-size:12.5px;font-weight:400}
 .rc-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}
 .rc-actions{display:flex;gap:8px}
+.rh-more{width:100%;margin-top:3px;border-top:1px solid var(--border);padding-top:5px}
+.rh-more summary{cursor:pointer;color:var(--text-mute);font-size:12px;padding:6px 2px;list-style-position:inside}
+.rh-more[open]{display:flex;flex-direction:column;gap:5px}
+.rh-more[open] summary{color:var(--navy);font-weight:700}
 .btn{padding:7px 10px;font-size:13px;border:1px solid var(--border);background:#fff;color:var(--text);border-radius:7px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--hover)}
 .btn.primary{background:var(--teal);color:#fff;border-color:var(--teal)}
@@ -1459,11 +1463,6 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
               </div>
               <div class="kf-modes" id="kfModes" style="display:none">
                 <button class="kf-mode on" id="kfM1" onclick="rhSetMode('in')">✍ 입력판</button>
-                <button class="kf-mode" id="kfM2" onclick="rhSetMode('hwp')">📄 한글로 보기</button>
-                <button class="kf-mode" id="kfM3" onclick="rhSetMode('both')" title="입력판과 한글을 나란히 — 친 값이 실제로 어떻게 들어갔는지 바로 견줍니다">⇄ 나란히</button>
-                <!-- ★ 대표 지시 2026-09-13 「필요하면 직접 타이핑이 가능해야 되는데 그건 왜 안 되나」 -->
-                <button class="kf-mode rh-noed" id="kfM4" onclick="rhToggleAnyCell()" title="표의 «모든 칸»에 입력칸을 얹습니다 — 서식 문구까지 고치거나 지울 수 있습니다. 기본은 꺼짐입니다(문구 위에 칸이 얹히면 서식을 읽을 수 없습니다)">✍ 아무 칸이나</button>
-                <!-- ★ 대표 지시 2026-09-21 「붙여라」 — 저장소에 넣어 둔 한글 편집기 -->
                 <button class="kf-mode" id="kfM5" onclick="rhSetMode('edit')" title="한글 프로그램처럼 글자·표·서식을 직접 고칩니다. 편집기는 이 PC 안에서만 돌고 서류는 밖으로 안 나갑니다">✏️ 한글 편집</button>
               </div>
               <div class="rc-actions">
@@ -1471,7 +1470,6 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                      안 보이며, 나갈 때 편집기 것을 되받으면 그 결과가 사라진다(대표 승인 2026-09-27). -->
                 <button class="btn primary rh-noed" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 양식 칸에 넣습니다">✨ 내 정보로 채우기</button>
                 <button class="btn rh-noed" id="rhUndoBtn" style="display:none" onclick="rhUndoFill()" title="채우기 전으로 되돌립니다">↩ 되돌리기</button>
-                <button class="btn rh-noed" onclick="rhPagesOpen()" title="공고문·평가표처럼 «내지 않을» 쪽을 빼고 낼 것만 남깁니다 — 언제든 모두 되살릴 수 있습니다">✂ 필요 없는 쪽 빼기</button>
                 <button class="btn rh-noed" style="border-color:#fecaca;color:var(--red)" onclick="rhStampDoc()" title="★기본 도장을 「(인)」 자리에 찍습니다 — 한 번 더 누르면 뺄 수 있습니다">🖋 도장 찍기</button>
                 <!-- ★ 사진 (대표 물음 2026-09-07 「사진 … 왜 입력이 안되나?」) — 「사진」 칸에 증명사진을 넣는다.
                      사진은 환경설정 › 사진 보관함(빠른 이력서에서 고른 것이 먼저). 한 번 더 누르면 뺄 수 있다. -->
@@ -1479,18 +1477,18 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <!-- ⚠★ 「💾 원본 한글에 넣기」를 뺐다 (대표 승인 2026-09-27 목업). 한글로 보기·완성본·
                      임시저장이 이미 «친 값을 넣어» 새로 짓는다 — 그 단추는 결과를 한 번 더 굳힐 뿐이고,
                      오히려 ✂ 로 뺀 쪽을 되살리는 자리였다. **되살리지 말 것.** -->
-                <button class="btn rh-noed" onclick="openTidy()" id="rhTidyBtn" title="남은 자리표·예시 글자를 걷어 내고, 쪽마다 갈라 저장합니다 — 한글에서 고쳐 온 파일을 바탕으로 갈아 끼우는 것도 여기입니다">🧹 서식 정리</button>
                 <!-- ⚠★ 「🔍 큰 창으로 보기」·「⛶ 넓게 보기」를 뺐다 (대표 지시 2026-09-27
                      「다 삭제해라 한글편집에서 가능하다」). ✏️ 한글 편집의 「🗖 큰 창」·
                      「⛶ 전체 화면」이 같은 일을 더 잘 한다 — 같은 일을 하는 단추가 넷이면
                      어느 것을 눌러야 할지 알 수 없다. **이 둘을 되살리지 말 것.** -->
                 <button class="btn" id="rcSaveBtn">💾 완성본 생성</button>
-                <!-- 임시저장·치우기 — 전에는 팝업 안에서만 됐다(대표 지시 2026-08-30).
-                     문서를 덮는 창을 열지 않고 이 줄에서 끝낸다. -->
-                <button class="btn" onclick="rhDraftNow()" title="지금까지 친 것을 담아 둡니다 — 다음에 「↩ 이어서」로 돌아옵니다">💾 임시저장</button>
-                <button class="btn" onclick="rhCloseDoc()" title="화면에서 치웁니다 — 담아 둔 것은 지우지 않습니다">✕ 치우기</button>
                 <button class="btn" id="rcDocxSaveBtn" style="display:none" onclick="exportDocxFile()">💾 DOCX 저장</button>
-                <button class="btn" id="rhWorkBtn" onclick="rhWorkToggle()" title="도구를 왼쪽 기둥으로 보내고 문서를 화면 가득 폅니다">⤢ 작업 모드</button>
+                <details class="rh-more rh-noed">
+                  <summary>추가 작업</summary>
+                  <button class="btn" onclick="rhPagesOpen()" title="공고문·평가표처럼 내지 않을 쪽을 뺍니다">✂ 필요 없는 쪽 빼기</button>
+                  <button class="btn" onclick="openTidy()" id="rhTidyBtn" title="남은 자리표·예시 글자를 걷어 내고 쪽마다 갈라 저장합니다">🧹 서식 정리</button>
+                  <button class="btn" onclick="rhCloseDoc()" title="자동 저장한 뒤 현재 문서를 닫습니다">✕ 문서 닫기</button>
+                </details>
               </div>
               <!-- ★ 자동 저장 딱지 — 작업 모드에서는 위 줄(#rhUploadBar)이 통째로 감춰져
                    「담겼다」는 말이 «아무 데도» 안 보였다(대표 물음 2026-09-26 「1분마다
@@ -12108,14 +12106,8 @@ function rhWorkSet(on){
   var card=document.getElementById('rcEditCard'); if(!card) return;
   card.classList.toggle('rh-work', !!on);
   document.body.classList.toggle('rh-work-on', !!on);
-  var b=document.getElementById('rhWorkBtn');
-  if(b) b.textContent = on ? '⤢ 작업 모드 끄기' : '⤢ 작업 모드';
   if(on) rhWorkTop(); else document.documentElement.style.removeProperty('--rhTop');
   rhApplyFit();
-}
-function rhWorkToggle(){
-  var card=document.getElementById('rcEditCard');
-  rhWorkSet(!(card && card.classList.contains('rh-work')));
 }
 /* 감춰 둔 「양식 올리기」를 기둥에서 대신 누른다 — 단추를 새로 만들지 않는다.
    ⚠ 새로 만들면 끌어놓기·보관함에도 담기 같은 딸린 동작이 갈라진다. */

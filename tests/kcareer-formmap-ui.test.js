@@ -145,10 +145,12 @@ test('입력판 모듈을 읽어 들인다 — 캐시 번호를 붙여서', () =
   assert.match(source, /js\/kcareer-formhtml\.js\?v=\d+/);
 });
 
-test('입력판과 「한글로 보기」를 오갈 수 있다 — 친 값이 진짜 A4에 어떻게 들어갔는지 본다', () => {
+test('입력판에서 곧바로 한글 편집으로 간다 — 중간 보기 단계를 대시보드에서 뺐다', () => {
   assert.match(bare, /function rhSetMode/);
   assert.match(source, /id="kfSheet"/);
   assert.match(bare, /function rhPreviewHwp/);
+  assert.match(source, /id="kfM5"[^>]*rhSetMode\('edit'\)/);
+  assert.doesNotMatch(source, /id="kfM2"|id="kfM3"/);
 });
 
 test('★ 저장은 «원본 한글»에 넣는다 — HTML 을 그대로 내면 서식이 달라진다', () => {
@@ -181,10 +183,9 @@ test('못 그리는 것(글상자·칸 안의 표)을 화면에 적는다', () =
   assert.match(fn, /nested/);
 });
 
-test('★ 입력판과 한글을 «나란히» 볼 수 있다 — 눈을 옮기지 않고 견준다', () => {
-  assert.match(source, /id="kfM3"/);
+test('나란히 보기 엔진은 기존 문서 호환을 위해 남기되 대시보드 단추는 보이지 않는다', () => {
+  assert.doesNotMatch(source, /id="kfM3"/);
   assert.match(source, /id="kfPair"/);
-  assert.match(bare, /rhSetMode\('both'\)/);
   assert.match(source, /#kfPair\.kf-both\{display:grid;grid-template-columns:1fr 1fr/);
 });
 
