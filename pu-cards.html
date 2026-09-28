@@ -1671,6 +1671,11 @@ table.sbox.tight td.none{padding:26px 8px}
 .cpabbtn{flex:none;border:1px solid #e2e8f0;background:#f8fafc;color:#1e293b;border-radius:7px;
   padding:7px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .cpabbtn:hover{background:#f8fafc;border-color:#bfdbfe}
+/* 받는사람 옆 «누구인지» (2026-09-28) — 한 줄, 넘치면 「…」, 비면 자리도 안 차지한다 */
+.cptowho{flex:0 1 auto;max-width:48%;align-self:center;font-size:12.5px;color:#475569;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
+.cptowho i{font-style:normal;color:#94a3b8}
+.cptowho:empty{display:none}
 .ablist{max-height:46vh;overflow:auto;border:1px solid #f8fafc;border-radius:9px;margin-bottom:10px}
 .abrow{display:flex;align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid #f8fafc;
   cursor:pointer;font-size:12.5px}
@@ -7869,6 +7874,8 @@ function mailWriteHtml(){
                 placeholder="이름·회사·이메일로 찾거나 주소를 직접 적으세요">
               <div id="cpSug" class="cpsug"></div>
             </div>
+            ${/* 주소 옆 «누구인지» — cpWhoPaint 가 채운다(비면 안 보인다) */''}
+            <span id="cpToWho" class="cptowho"></span>
             ${/* 다음메일과 같은 자리의 「주소록」. 줄 안 자동완성은 «아는 사람을 빨리»,
                  주소록은 «훑어보며 고르는» 길이다 — 다음메일에 둘 다 있다. */''}
             <button class="cpabbtn" onclick="openAddrBook()"
@@ -8733,12 +8740,62 @@ function initMailDrop(){
     await addLocalFiles({ files: (e.dataTransfer&&e.dataTransfer.files)||[] });
   });
 }
+/* ══ 받는사람 옆 «누구인지» (대표 지시 2026-09-28 「받는사람 이메일주소옆에 이름 회사 등 정보가 같이보였으면 좋겠다」) ══
+   주소만 보고는 「dhgustnr1004@korea.kr」가 누구인지 모른다 — 잘못 보내도 보내기 전에는 알 길이 없다.
+   ★ 찾는 차례: ① 우리 직원 ② 명함(이름·직책·회사) ③ 기업정보함 담당자(업체 담당·대표 메일)
+     — 명함이 가장 자세하고(직책까지), 업체 담당은 이름이 비어 있기도 하다.
+   ⚠ 못 찾으면 «아무것도 안 그린다» — 「알 수 없음」을 적으면 한 줄만 길어진다(한 칸은 한 줄 규칙).
+   ⚠ 자리를 떠난 담당(left)은 «전임»이라고 밝힌다 — 그 사람에게 보내는 것이 맞는지 한 번 더 보게. */
+function cpWhoOne(email){
+  const e = String(email||'').trim().toLowerCase();
+  if(!e || e.indexOf('@') < 1) return null;
+  try{
+    if(typeof ErpMatch!=='undefined' && ErpMatch.nameByEmail && ErpMatch.nameByEmail[e])
+      return { name:String(ErpMatch.nameByEmail[e]), role:'', co:'우리 직원' };
+  }catch(_){ }
+  const c = mbWhoMap()[e];
+  if(c && (c.name || c.company)) return { name:c.name, role:c.title||'', co:c.company };
+  try{
+    const cos = (typeof ErpMatch!=='undefined' && ErpMatch.companies) ? ErpMatch.companies : [];
+    for(const co of cos){
+      if(!co) continue;
+      const hit = (co.contacts||[]).find(x=>x && String(x.email||'').trim().toLowerCase() === e);
+      if(hit) return { name:String(hit.name||'').trim(), role:String(hit.role||'').trim(),
+                       co:String(co.name||''), left:!!hit.left };
+      if(String(co.email||'').trim().toLowerCase() === e
+         || String(co.primaryContactEmail||'').trim().toLowerCase() === e)
+        return { name:String(co.primaryContactName||'').trim(), role:'', co:String(co.name||'') };
+    }
+  }catch(_){ }
+  return null;
+}
+function cpWhoText(w){
+  if(!w) return '';
+  const who = [w.name, w.role].filter(Boolean).join(' ');
+  return [who, w.co].filter(Boolean).join(' · ') + (w.left ? ' (전임)' : '');
+}
+/* 받는사람 칸 전체 — 여럿이면 둘까지 보이고 나머지는 「외 N명」, 다 보려면 마우스를 올린다 */
+function cpWhoLine(list){
+  const arr = String(list||'').split(/[,;]/).map(s=>s.trim()).filter(Boolean);
+  const known = arr.map(a=>({ a:a, t:cpWhoText(cpWhoOne(a)) })).filter(x=>x.t);
+  if(!known.length) return { html:'', title:'' };
+  const shown = known.slice(0, 2).map(x=>esc(x.t)).join(' <i>/</i> ');
+  const more = known.length > 2 ? ' <i>외 ' + (known.length - 2) + '명</i>' : '';
+  return { html: shown + more, title: known.map(x=>x.a + ' — ' + x.t).join('\n') };
+}
+function cpWhoPaint(){
+  const to = $('cpTo'), box = $('cpToWho'); if(!to || !box) return;
+  const r = cpWhoLine(to.value);
+  box.innerHTML = r.html; box.title = r.title;
+}
 /* 받는사람 칸에 자동 찾기를 붙인다 — 화면을 새로 그릴 때마다 다시 매단다 */
 function wireMailWrite(){
   initMailDrop();
   const to=$('cpTo'), sug=$('cpSug'); if(!to||!sug) return;
   const close=()=>{ sug.innerHTML=''; sug.classList.remove('on'); };
+  cpWhoPaint();                                   /* 그릴 때 이미 적힌 주소(명함에서 건너온 것)부터 */
   to.addEventListener('input', ()=>{
+    cpWhoPaint();
     if(_compose) _compose.to = to.value;
     /* 마지막 쉼표 뒤의 말로만 찾는다 — 여러 명을 적는 중일 수 있다 */
     const tail = to.value.split(/[,;]/).pop().trim();
@@ -19408,7 +19465,9 @@ function mbWhoMap(){
     const it = all[k]; if(!it) return;
     const e = String(it.email||'').trim().toLowerCase();
     if(!e || m[e]) return;
-    m[e] = { name: String(it.name||'').trim(), company: String(it.company||'').trim() };
+    m[e] = { name: String(it.name||'').trim(), company: String(it.company||'').trim(),
+             /* 직책 — 메일쓰기 받는사람 옆 「누구인지」가 쓴다(cpWhoOne) */
+             title: String(it.title||it.position||it.dept||'').trim() };
   });
   _mbWho = { obj: all, rev: _mbCardsRev, map: m };
   return m;
