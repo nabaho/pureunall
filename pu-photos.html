@@ -39,6 +39,7 @@
      새것이라 제목 자리만 비어 보인다 — 고친 것이 통째로 묻힌 것처럼 된다.
      tests/photos-doc-title.test.js 가 둘이 어긋나지 않는지 지킨다. -->
 <script src="js/pu-doc-read.js?v=50"></script>
+<script src="js/pu-photo-look.js?v=1"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-doc-file.js?v=36"></script>
@@ -7142,6 +7143,8 @@ function laneOf(it) {
      **아예 옮길 수가 없다**(끌어서 옮기기가 통째로 헛돈다). */
   if (r && r.kind === 'other' && !r.ack && !readAnyField(r)) return 'pic';
   if (m.kind === 'photo') return 'pic';
+  /* ㉵ 안 읽은 채 그림 모양이 확실히 사진이면 사진 칸 */
+  if (!m.read && it && it._lookAs === 'pic') return 'pic';
   if (r && LANE_PIC_KINDS[r.kind]) return 'pic';
   return 'doc';
 }
@@ -7394,7 +7397,72 @@ function readHoldOf(it) {
      없는 것을 0 으로 세면 서로 남남인 옛 사진들이 한 뭉치로 묶여 통째로 붙잡힌다 —
      묻는 띠에 「50장」이 뜨고, 사람은 무슨 50장인지 알 수가 없다. */
   if (!m.upAt) return false;
+  /* ㉵ 그림 모양으로 확실히 가른 것은 묻지 않는다(애매한 것만 묻는다) */
+  if (it._lookAs === 'doc' || it._lookAs === 'pic') return false;
   return (batchSizes()[upBatchKey(it)] || 1) >= READ_ASK_MIN;
+}
+
+/* ══ ㉵ 한꺼번에 올린 뭉치를 «그림 모양»으로 먼저 가른다 (대표 지시 2026-09-28 「확실한 것만」) ══
+   브라우저 안에서만 잰다(js/pu-photo-look.js — 셈법·검증 수치는 거기) — 구글로 안 가고 0원.
+   서류 → 저절로 읽을 차례 / 사진 → 안 읽고 사진 칸 / 애매 → 지금처럼 묻는다.
+   ⚠ 물음에 걸린 뭉치(10장+)만. 저장하지 «않는다» — 열 때마다 다시 잰다. */
+const photoLook = {};          // 사진 id → 서류 확률(못 쟀으면 null = 모름)
+let lookBusy = false;
+const LOOK_ROUND = 40;         // 한 번에 재는 장수 — 다 재면 다음 몫을 잇는다
+
+/* 가를 대상인가 — readHoldOf 가 «물음에 거는» 조건 그대로(그림 모양 판정만 빼고) */
+function lookCandidate(it) {
+  const m = (it && it.meta) || {};
+  if (m.read || m.kind === 'photo') return false;
+  if (m.doc && m.doc.group) return false;
+  if (m.hasText) return false;
+  if (!m.upAt) return false;
+  if (readAskSaid[upBatchKey(it)]) return false;
+  return (batchSizes()[upBatchKey(it)] || 1) >= READ_ASK_MIN;
+}
+
+/* 잰 값을 사진에 붙인다 — 판정은 읽기 쉬운 표(_lookAs: doc|pic)로. 목록을 다시 읽을 때도 부른다. */
+function lookAttach() {
+  const L = window.PuPhotoLook;
+  gridItems.forEach(function (it) {
+    const p = photoLook[it.id];
+    const v = (L && p != null && lookCandidate(it)) ? L.verdict(p) : '';
+    if (v) it._lookAs = v; else delete it._lookAs;
+  });
+}
+
+function lookSweep() {
+  const L = window.PuPhotoLook;
+  if (lookBusy || !L) return;
+  const todo = gridItems.filter(function (it) { return lookCandidate(it) && !(it.id in photoLook); });
+  if (!todo.length) { lookAttach(); return; }
+  lookBusy = true;
+  const round = todo.slice(0, LOOK_ROUND);
+  let nDoc = 0, nPic = 0;
+  round.reduce(function (chain, it) {
+    return chain.then(function () {
+      /* ⚠ 적힌 thumbUrl 을 그대로 읽는다 — loadThumb 는 실패하면 주소를 지운다(가르기는 읽기만). */
+      const u = it.meta && it.meta.thumbUrl;
+      return Promise.resolve(typeof u === 'string' && u.indexOf('https://') === 0 ? L.lookOf(u) : null)
+        .catch(function () { return null; })
+        .then(function (p) {
+          photoLook[it.id] = p;
+          const v = L.verdict(p);
+          if (v === 'doc') nDoc++; else if (v === 'pic') nPic++;
+        });
+    });
+  }, Promise.resolve()).then(function () {
+    lookBusy = false;
+    lookAttach();
+    renderGrid();
+    renderReadAsk();
+    autoReadSoon();              // 서류로 가른 것이 저절로 읽을 차례에 든다
+    if (nDoc || nPic) {
+      toast('🖼 한꺼번에 올린 것을 그림으로 갈랐습니다 — 서류 ' + nDoc + '장은 읽을 차례에, 사진 '
+        + nPic + '장은 판독 안 함 (잘못 간 것은 골라서 🔍 판독)');
+    }
+    if (todo.length > round.length) lookSweep();
+  });
 }
 
 /* 이 칸에 «그림이 붙어 있나» — 판독은 그림이 있어야 할 수 있다.
@@ -7408,6 +7476,8 @@ function hasPic(m) {
 function readSkipWhy(it) {
   const m = (it && it.meta) || {};
   if (m.kind === 'photo') return 'pic';      // ① 사람이 「그냥 사진」이라고 했다
+  /* ①′ 한꺼번에 올린 뭉치에서 그림 모양이 «확실히 사진»이다 — 구글로 안 보낸다(㉵) */
+  if (!m.read && it && it._lookAs === 'pic') return 'pic';
   const r = m.read;
   /* ② 이미 사진으로 읽혔다 — 다시 읽어도 같은 답이고 요금만 든다.
      ⚠ 'other' 는 넣지 않는다 — 종류를 못 가려 굳은 사진을 되살리는 것이
@@ -10709,6 +10779,7 @@ function loadGrid() {
     const keepThumb = {};
     gridItems.forEach(function (o) { if (o && o.thumb) keepThumb[o.id] = o.thumb; });
     gridItems = itemsToGrid(items, keepThumb);
+    lookAttach();          // ㉵ 이번 화면에서 잰 그림 모양을 새 목록에도 다시 붙인다
     /* 최신본이 왔다 — 이제 이것을 씨앗으로 담는다(다음에 열 때 곧바로 그린다).
        ⚠ 씨앗으로 그린 것을 다시 담으면 «그 사이 지워진 사진»이 영영 살아남는다. */
     _gridSeeded = false;
@@ -10728,6 +10799,7 @@ function loadGrid() {
     /* ⑤ 오늘 판독을 몇 번 썼나 — 한 번만 읽는다(숫자 몇 개뿐이다).
        ㉴ 셈을 읽은 «뒤에» 저절로 건다 — 셈 없이 걸면 하루 상한을 모른다. */
     loadReadTally().then(autoReadSoon);
+    lookSweep();           // ㉵ 한꺼번에 올린 뭉치를 그림 모양으로 가른다(끝나면 저절로 판독을 다시 부른다)
     /* 업체가 생겼는지 한 번 맞춰 본다 — 계약관리에서 업체가 만들어지면 여기서
        저절로 채워진다(까닭·비용은 coSweep 에 적었다). 기다리는 사진이 없으면
        아무 일도 안 하고, 한 번 열 때 한 번만 한다. */

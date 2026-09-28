@@ -50,6 +50,9 @@ function loadCtx(over) {
     renderGrid: function () {}, fillThumbs: function () {},
     openAskedPhoto: function () {}, resumeCollectIfAny: function () {},
     autoReadPending: function () {}, coSweep: function () {},
+    /* ⚠ 2026-09-28 — 목록을 읽으면 그림 모양 가르기(㉵)를 붙이고 부른다. 여기서 재는 것은
+         미리보기·씨앗이라 빈 자리만 댄다(가르기는 tests/photos-look-sort.test.js 가 본다). */
+    lookAttach: function () {}, lookSweep: function () {},
     /* 씨앗 층 — 여기서는 «담기만» 본다(그리는 쪽은 아래 따로 본다) */
     gridSeedKey: function () { return 'K'; },
     drawGridSeed: function () { seeded.push('draw'); },
