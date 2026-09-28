@@ -47,7 +47,7 @@ function 폼그리기(f, sites) {
   const box = {};
   new Function('F', 'SITES', [
     grabDecl('FIELDS'), grabDecl('INFO_SECS'), grabDecl('INFO_FOLD'),
-    grabDecl('INFO_W2'), grabDecl('SELECT_OPTS'),
+    grabDecl('INFO_W2'), grabDecl('INFO_SHORT'), grabDecl('SELECT_OPTS'),
     /* 대표사업장 안내(2026-09-14)가 사업장을 찾아본다 — 그 길도 실어야 «정말 그려» 진다 */
     'var S={fundId:"F1",sitesFor:"F1",sites:SITES};',
     'var _allSites={F1:SITES||{}};',
@@ -83,9 +83,31 @@ test('★★ ① 저장이 «맨 위»에 있다 — 칸 스물다섯을 지나 
   assert.equal((h.match(/saveInfo\(\)/g) || []).length, 1, '★ 저장 단추가 둘이다.');
 });
 
-test('★ ② 아래에는 «저장이 위에 있다»는 한 줄을 남긴다 — 화면이 길면 못 찾는다', () => {
+/* ② 예전에는 아래에 「저장은 맨 위 [💾 저장] · Ctrl+S 로도 됩니다」 한 줄을 남겼다.
+   2026-09-28 대표 「불필요한 내용도 중복」 — 단추의 올림말(Ctrl+S)과 같은 말이라 걷었다(정리안 A 승인). */
+test('★ ② 아래에 저장 안내 줄을 또 깔지 않는다 — 단추 올림말에 Ctrl+S 가 있다', () => {
   const h = 폼그리기(빈기금).html;
-  assert.ok(/맨 위/.test(h.slice(h.lastIndexOf('id="fd-'))), '★ 아래에 안내 한 줄이 없다.');
+  assert.ok(!/맨 위 \[💾 저장\]/.test(h), '★ 저장 안내 줄이 아직 화면에 깔려 있다.');
+  assert.match(h, /title="Ctrl\+S 로도 저장됩니다"/, '★ Ctrl+S 안내가 사라졌다.');
+});
+
+test('★★ 묶음마다 상자 — 머리(.bh)가 상자 «안»에 있어 칸 이름과 겹치지 않는다 (정리안 A)', () => {
+  const h = 폼그리기(채운기금).html;
+  assert.equal((h.match(/class="secbox infobox"/g) || []).length, 5, '★ 묶음 상자가 다섯(기본·인가등기·관할·임대차·설립)이 아니다');
+  assert.ok(!/<div class="sec[ "]/.test(h), '★ 상자 밖 맨 글자 묶음 머리(.sec)가 아직 있다 — 칸 이름 위에 겹쳐 보인다');
+  assert.match(h, /<label>지방고용노동청<\/label>/, '★ 「관할」 상자 안에서 「관할」을 또 적는다');
+  assert.equal((h.match(/🔍 소재지로/g) || []).length, 1, '★ [🔍 소재지로] 단추가 아직 여럿이다');
+  assert.match(h, /fillOfficesAll\(\)/);
+});
+
+test('★★ 운영 중인 기금(인가일 있음)은 「설립」을 접는다 — 설립 중이면 편다', () => {
+  const 운영 = 폼그리기({ name: '가', inka_date: '2021-05-25', meeting_date: '2021-05-20' }).html;
+  const i = 운영.indexOf('id="sec-contribution_total"');
+  assert.match(운영.slice(i, i + 60), /display:none/, '★ 운영 중인데 「설립」이 펼쳐져 있다');
+  assert.match(운영.slice(i - 500, i), /운영 중인 기금이라 접어 둠/);
+  const 설립 = 폼그리기({ name: '가', setup_stage: '설립준비', inka_date: '2026-01-01', meeting_date: '2026-01-01' }).html;
+  const j = 설립.indexOf('id="sec-contribution_total"');
+  assert.ok(!/^[^>]*display:none/.test(설립.slice(j)), '★ 설립 중인 기금에서 「설립」을 접었다');
 });
 
 test('★★ ③ 값이 «있으면» 접는 묶음도 펼쳐 둔다 — 접힌 채면 채운 줄도 모른다', () => {
