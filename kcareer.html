@@ -229,6 +229,13 @@ body.has-gtabs #main{padding-bottom:var(--gtabH,56px)}
 }
 @media (max-width:780px){ .scroll-hint{display:block;text-align:center;font-size:11px;color:var(--text-mute);margin-top:6px} }
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+/* 🏢 법인정보 — 칸마다 «어디서 온 값인지» (2026-09-28) */
+.firm-src{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:4px}
+.firm-src.erp{background:#eff6ff;color:#1e40af}
+.firm-src.loc{background:#f0fdf4;color:#166534}
+.firm-src.none{background:#fffbeb;color:#854d0e}
+.field input.firm-ro{background:var(--soft);color:var(--text-sub)}
+.firm-note{font-size:11px;color:#854d0e;margin-top:3px}
 /* 기본정보 묶음 — 열여덟 칸을 한 줄로 늘어놓으면 어디가 어딘지 안 보인다.
    ⚠ 묶음들도 #piGrid 의 두 칸 격자에 «나란히» 앉는다(사람|연락 / 주소|일).
      일부러 그렇게 둔 것이다 — 세로로 세우면 개인정보 화면이 두 배로 길어져
@@ -2052,6 +2059,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
         <h2>환경설정</h2><div class="desc">개인정보·계좌·API·데이터·백업 관리</div>
         <div class="tabrow">
           <button class="tab active" data-tab="personal">개인정보보관</button>
+          <!-- ★ 법인정보 (대표 지시 2026-09-28 「환경설정에 법인정보도 필요하다 탭만들어서 넣을수 있게」) -->
+          <button class="tab" data-tab="firm">🏢 법인정보</button>
           <button class="tab" data-tab="idmgr">🔒 신분증·계좌</button>
           <button class="tab" data-tab="api">API키 설정</button>
           <button class="tab" data-tab="data">데이터 관리</button>
@@ -2230,6 +2239,25 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
               </div>
             </div>
             <div id="trashBody"></div>
+          </div>
+        </div>
+        <!-- ★ 🏢 법인정보 (대표 지시 2026-09-28).
+             ⚠★ «이알피가 이긴다»(2026-09-13 결정)는 그대로다 — 이알피 회사정보에 값이 있으면 그것을 쓰고
+                그 칸은 여기서 못 고친다(고치는 곳은 이알피 한 곳 — 두 곳이면 한쪽이 반드시 낡는다).
+             ★ 여기서 적는 것은 «이알피에 없는 칸»을 메운다. 이알피 자료(data/)에는 절대 안 쓴다. -->
+        <div class="tabpanel" id="tab-firm">
+          <div class="card">
+            <div class="rc-bar">
+              <div class="rc-h" style="margin:0">🏢 법인정보 — 우리 노무법인</div>
+              <div class="tb-spacer"></div>
+              <button class="btn" type="button" onclick="firmTabPull()">🔄 이알피에서 다시 받기</button>
+              <button class="btn primary" type="button" onclick="firmTabSave()">💾 법인정보 저장</button>
+            </div>
+            <div class="desc" style="margin:6px 0 12px">기관 서식의 <b>노무법인·소속·사무실 전화·주소</b> 칸에 들어갑니다.
+              <b>푸른이알피 회사정보에 적힌 값이 먼저</b>입니다(한 곳만 고치면 모든 서류가 따라옵니다) —
+              이알피에 <b>없는 칸만</b> 여기서 적어 두시면 됩니다.</div>
+            <div class="field-grid" id="firmGrid"></div>
+            <div id="firmState" style="font-size:11.5px;color:var(--text-mute);margin-top:10px;line-height:1.6"></div>
           </div>
         </div>
         <div class="tabpanel" id="tab-staff">
@@ -10407,6 +10435,8 @@ function initTabs(){
     /* 신분증과 계좌는 한 탭이다 — 둘 다 그려야 한다(2026-08-29 합침) */
     'idmgr': ()=>{ _safe(initIDSecurity); _safe(renderIDDocs); _safe(renderAccounts); },
     'personal': ()=>{ _safe(renderPersonal); _safe(renderStamps); },
+    /* 🏢 법인정보 — 열 때 이알피에서 한 번 더 받아 그린다 */
+    'firm': ()=>{ _safe(renderFirmTab); _safe(function(){ firmTabPull(true); }); },
     /* 'account' 탭은 신분증 탭으로 합쳐졌다 — 단추가 없으니 여기 남겨 둘 필요가 없다 */
     'staff': ()=>{ _safe(renderStaffMgr); _safe(function(){ fbLoadStaff(false); }); },
     'api': ()=>{ _safe(initApiTab); },
@@ -14314,9 +14344,78 @@ function workPeriod(r){
    ⚠ 사본은 이 기기에만 둔다(FB_SKIP) — 되올리면 이알피의 진짜 값을 덮는다.
    ⚠ 못 읽어도 조용히 지나간다 — 법인 칸이 비는 것이 서식 채우기 전체가 멎는 것보다 낫다. */
 var FIRM_CACHE='firm_info';
-function firmInfo(){
-  try{ var o=JSON.parse(LS.get(NS+FIRM_CACHE)||'{}'); return (o&&typeof o==='object'&&!Array.isArray(o))?o:{}; }
+/* ★ 여기서 적는 법인정보 (대표 지시 2026-09-28 「환경설정에 법인정보도 … 넣을수 있게」).
+   ⚠★ 이알피 사본(FIRM_CACHE)과 «다른 자리»다 — 사본은 이알피가 덮어쓰고 클라우드로 안 올라가지만,
+      이것은 대표가 적은 «원본»이라 클라우드로 함께 오간다(다른 기기에서도 같다).
+   ⚠ 이알피 자료(data/company_info)에는 절대 쓰지 않는다 — 그쪽은 이알피의 것이다. */
+var FIRM_LOCAL='firm_local';
+var FIRM_FIELDS=[['name','법인명'],['ceo','대표노무사'],['corpNo','법인등록번호'],['bizNo','사업자등록번호'],
+                 ['addr','주소'],['tel','전화'],['fax','팩스'],['email','이메일']];
+function _firmObj(key){
+  try{ var o=JSON.parse(LS.get(NS+key)||'{}'); return (o&&typeof o==='object'&&!Array.isArray(o))?o:{}; }
   catch(e){ return {}; }
+}
+function firmErp(){ return _firmObj(FIRM_CACHE); }
+function firmLocal(){ return _firmObj(FIRM_LOCAL); }
+/* 서식 채우기가 쓰는 법인정보 — ⚠★ 칸마다 «이알피 먼저, 없으면 여기서 적은 것» (2026-09-13 결정 그대로).
+   이알피에 값이 생기면 저절로 그쪽이 쓰인다 — 여기 적어 둔 것이 이알피를 가리지 않는다. */
+function firmInfo(){
+  var e=firmErp(), l=firmLocal(), out={};
+  FIRM_FIELDS.forEach(function(p){
+    var k=p[0];
+    out[k]=String(e[k]==null?'':e[k]).trim() || String(l[k]==null?'':l[k]).trim();
+  });
+  if(e.at) out.at=e.at;
+  return out;
+}
+/* 🏢 법인정보 탭 — 칸마다 어디서 온 값인지 밝힌다.
+   ⚠ 이알피에 값이 있는 칸은 «읽기 전용» — 여기서 고쳐도 안 쓰이므로 고칠 수 있게 두면 헷갈린다. */
+function renderFirmTab(){
+  var g=document.getElementById('firmGrid'); if(!g) return;
+  var e=firmErp(), l=firmLocal();
+  g.innerHTML=FIRM_FIELDS.map(function(p){
+    var k=p[0], ev=String(e[k]==null?'':e[k]).trim(), lv=String(l[k]==null?'':l[k]).trim();
+    var 출처=ev ? '<span class="firm-src erp">이알피</span>'
+      : (lv ? '<span class="firm-src loc">여기서 적음</span>' : '<span class="firm-src none">비어 있음</span>');
+    var wide=(k==='addr')?' style="grid-column:1/-1"':'';
+    var 칸=ev
+      ? '<input class="firm-ro" readonly value="'+_jsAttr(ev)+'" title="푸른이알피 회사정보에서 옵니다 — 고치려면 이알피에서 고치세요">'
+      : '<input data-firm="'+k+'" value="'+_jsAttr(lv)+'" placeholder="이알피에 없습니다 — 여기서 적어 두세요">';
+    /* 여기 적어 둔 것이 이알피와 다르면 «쓰이지 않는다»고 말한다 — 모르면 적은 값이 나갈 줄 안다 */
+    var 쪽지=(ev && lv && lv!==ev) ? '<div class="firm-note">여기 적어 둔 「'+escapeHtml(lv)+'」는 쓰이지 않습니다 — 이알피 값이 먼저입니다</div>' : '';
+    return '<div class="field"'+wide+'><label>'+p[1]+' '+출처+'</label>'+칸+쪽지+'</div>';
+  }).join('');
+  var st=document.getElementById('firmState');
+  if(st){
+    var 이알피수=FIRM_FIELDS.filter(function(p){ return String(e[p[0]]||'').trim(); }).length;
+    st.innerHTML=(e.at
+      ? '이알피에서 마지막으로 받은 때: <b>'+new Date(e.at).toLocaleString('ko-KR')+'</b> · 이알피가 채운 칸 '+이알피수+'/'+FIRM_FIELDS.length
+      : '⚠ 아직 이알피에서 받은 적이 없습니다 — 로그인되어 있으면 「🔄 이알피에서 다시 받기」를 눌러 보세요.')
+      +'<br>이알피 값을 고치려면 <b>푸른이알피 › 회사정보</b>에서 고치세요 — 그러면 모든 서류가 함께 바뀝니다.';
+  }
+}
+/* 💾 저장 — 이알피에 값이 «없는» 칸만 담는다(읽기 전용 칸은 안 건드린다) */
+function firmTabSave(){
+  var l=firmLocal(), n=0;
+  document.querySelectorAll('#firmGrid input[data-firm]').forEach(function(el){
+    var k=el.getAttribute('data-firm'), v=String(el.value||'').trim();
+    if(String(l[k]||'')!==v) n++;
+    if(v) l[k]=v; else delete l[k];
+  });
+  l.savedAt=Date.now();
+  try{ LS.set(NS+FIRM_LOCAL, JSON.stringify(l)); }
+  catch(e){ toast('⚠ 저장하지 못했습니다 — '+String(e&&e.message||e)); return; }
+  renderFirmTab();
+  toast(n ? '💾 법인정보를 저장했습니다 — 기관 서식 채우기에 씁니다' : '바뀐 칸이 없습니다');
+}
+/* 🔄 이알피에서 다시 받기 — quiet 는 탭을 열 때(알림 없이) */
+async function firmTabPull(quiet){
+  var 전=firmErp().at||0;
+  try{ await loadFirmInfo(); }catch(e){}
+  renderFirmTab();
+  if(quiet) return;
+  var 후=firmErp().at||0;
+  toast(후 && 후!==전 ? '🔄 이알피에서 법인정보를 받았습니다' : '⚠ 이알피에서 받지 못했습니다 — 로그인·인터넷을 확인해 주세요', 5000);
 }
 function firmShape(v){
   /* 천안 본사가 기준이다 — 지사별 칸이 없던 옛 자료는 위쪽(평탄)에 있다. */
