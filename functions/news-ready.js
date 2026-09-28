@@ -14,78 +14,23 @@
    ★ 도장이 아예 없는 확정본(옛 화면이 준비한 것)도 안 보낸다 — 견줄 것이 없으면
      「같다」고 말할 수 없다. 다시 누르시면 한 번에 준비된다.
 
-   ⚠⚠ 바탕도장 은 js/pu-news-core.js 에 «똑같이» 있다. 서버 배포에는 js/ 가
-     안 올라가서 나눠 둔 것이다. 둘이 어긋나면 멀쩡한 확정본이 매주 버려진다 —
-     tests/newsletter-ready-stamp.test.js 가 둘을 같은 값으로 견준다.      */
+   ★★ 도장은 «한 벌»이다 (2026-09-28 정리). 예전에는 js/pu-news-core.js 와 여기에 똑같은
+     셈이 두 벌 있었다 — 서버 배포에 js/ 가 안 올라가서다. 그래서 한쪽만 고치면 멀쩡한
+     확정본이 매주 버려질 판이었다(2026-09-27 빈 목록 고장이 바로 그것이었다).
+     이제 서버에도 Core 사본(functions/news-lib/)이 있어 그것을 부른다.
+   ⚠ 사본은 scripts/sync-news-lib.js 로 옮기고, tests/news-lib-in-sync.test.js 가 지킨다. */
 
-/* ⚠ 칸에 «객체»가 들어 있을 수 있다(회차는 {이름,기간} 이다). String() 으로 뭉개면
-     무엇이 바뀌어도 늘 "[object Object]" 라 도장이 눈을 감는다 — 속까지 펼쳐 읽는다.
-     자리 이름은 차례를 정해 둔다. 같은 내용이 담긴 차례만 달라도 다른 도장이 되면,
-     아무 일도 없는데 확정본이 버려진다. */
-function _도장글(v) {
-  if (v == null) return '';
-  if (Array.isArray(v)) return '[' + v.map(_도장글).join(',') + ']';
-  if (typeof v === 'object') {
-    return '{' + Object.keys(v).sort().map((k) => k + ':' + _도장글(v[k])).join(',') + '}';
-  }
-  return String(v).trim();
-}
+const Core = require('./news-lib/pu-news-core.js');
 
-function _줄도장(x) {
-  const o = (x && typeof x === 'object') ? x : {};
-  return [o.제목, o.한줄, o.우리말, o.링크, o.언론사, o.지역, o.상태,
-    o.안실음 === true ? '뺌' : ''].map(_도장글).join('␟');
-}
-
-/* 짧고 고른 숫자로 줄인다(cyrb53) — 길이도 함께 붙여 겹칠 틈을 더 좁힌다 */
-function _도장수(s) {
-  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
-}
-
-/* 편지에 «실리는 칸»만 잰다 — 상태·고친때·전문·받는이가 바뀌었다고 확정본을
-   버리면, 시험 한 통 보낸 것만으로 확정본이 날아간다(상태가 초안→시험이 된다). */
-/* 꼭지 목록을 «DB 에서 읽은 꼴»과 같게 편다 — js/pu-news-core.js 의 _도장목록 과 «똑같이» */
-function _도장목록(v) {
-  if (Array.isArray(v)) return v.filter((x) => x != null);
-  if (v && typeof v === 'object') {
-    return Object.keys(v).sort((a, b) => Number(a) - Number(b))
-      .map((k) => v[k]).filter((x) => x != null);
-  }
-  return [];
-}
-
-function 바탕도장(회차) {
-  const d = (회차 && typeof 회차 === 'object') ? 회차 : {};
-  const 조각 = ['회차=' + _도장글(d.회차), '범위=' + _도장글(d.범위),
-    '우리글=' + _도장글(d.우리글)];
-  const 안 = (d.안 && typeof d.안 === 'object') ? d.안 : {};
-  Object.keys(안).sort().forEach((키) => {
-    const 목 = _도장목록(안[키]);
-    /* ★★ 빈 꼭지는 «없는 꼭지»와 같다 (2026-09-27) — 파이어베이스는 빈 목록을 저장하지
-         않는다. 화면(기억 속 hr:[])과 서버(DB 에서 읽어 hr 없음)의 도장이 «아무것도 안
-         고쳐도» 달랐다. 담기가 늘 hr:[] 을 남기므로 확정본이 매번 버려질 판이었다. */
-    if (!목.length) return;
-    조각.push('꼭지' + 키 + '=' + 목.map(_줄도장).join('|'));
-  });
-  const 지 = _도장목록(d.지역뉴스);
-  조각.push('지역=' + 지.map(_줄도장).join('|'));
-  const 글 = 조각.join('\n');
-  return _도장수(글) + '-' + 글.length;
-}
+/* 편지에 «실리는 칸»만 잰다 — 상태·고친때·전문·받는이가 바뀌었다고 확정본을 버리면
+   시험 한 통 보낸 것만으로 확정본이 날아간다. 셈은 Core.바탕도장 에 있다. */
+const 바탕도장 = Core.바탕도장;
 
 /* 이 확정본을 지금 내보내도 되나 — 된다면 {ok:true}, 아니면 사람이 읽을 까닭.
    ⚠ 「모르겠으면 보낸다」가 아니라 «모르겠으면 안 보낸다». */
 function 내보낼까(확정본, 지금회차) {
   const r = (확정본 && typeof 확정본 === 'object') ? 확정본 : {};
-  const 봉인 = _도장글(r.바탕도장);
+  const 봉인 = String(r.바탕도장 == null ? '' : r.바탕도장).trim();
   if (!봉인) {
     return { ok: false, 까닭: '확정본에 바탕 도장이 없습니다 — 지금 내용과 같은지 확인할 길이 없습니다. 「다음 월요일 자동발송 준비」를 다시 눌러 주세요.' };
   }

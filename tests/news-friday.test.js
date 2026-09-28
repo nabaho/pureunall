@@ -283,39 +283,39 @@ test('★★ 금요일 13시 · 서울 시각으로 걸려 있다', () => {
   assert.match(몸, /DAUM_MAIL_PASSWORD/, '메일 비밀번호를 안 받는다 — 검토 메일이 못 나간다');
 });
 
-test('★★★ AI 지시에 법률 글의 선이 다 있다 — 화면과 같은 선', () => {
+test('★★★ AI 지시에 법률 글의 선이 다 있다 — 서버가 쓰는 그 지시에', () => {
+  /* ⚠ 규칙 문구 자체는 tests/newsletter-weekly-law-word 가 Core 에서 본다. 여기서는
+       «서버(금요일)가 부르는 지시»에도 그 선이 살아 있는지를 본다. */
   const 한 = NF.한마디지시([{ 꼭지: '판례', 글: 'ㄱ' }]);
   ['노동법률', '지어내', '통째로', '적힌 그대로', '예정', '__'].forEach(function (말) {
     assert.ok(한.indexOf(말) >= 0, '★★★ 서버 한마디 지시에 「' + 말 + '」 선이 없다');
-    assert.ok(함수몸(화면, '한마디초안짓기').indexOf(말) >= 0 || 말 === '__',
-      '화면 한마디 지시에 「' + 말 + '」 선이 없다 — 두 곳이 달라졌다');
   });
   const 기 = NF.기사초안지시([]);
   ['JSON 배열만', '보태지', '만들지', '복사하지'].forEach(function (말) {
     assert.ok(기.indexOf(말) >= 0, '★★★ 서버 기사 지시에 「' + 말 + '」 선이 없다');
-    assert.ok(함수몸(화면, 'AI초안짓기').indexOf(말) >= 0, '화면 기사 지시에 「' + 말 + '」 선이 없다');
   });
 });
 
-test('★★ 줄 세우기·한마디 거리는 화면과 «같은 셈»이다', () => {
-  const 짐 = { Core: C };
-  vm.createContext(짐);
-  vm.runInContext(함수몸(화면, '값어치순') + '\n' + 함수몸(화면, '최근것'), 짐);
+test('★★★ 화면과 서버가 «같은 한 벌»을 부른다 — 베낀 두 벌이 아니다 (2026-09-28 정리)', () => {
+  /* ⚠ 예전에는 서버가 화면 코드를 베껴 들고, 이 검사가 둘이 «같은 값»인지 견줬다.
+       이제는 한 벌이다 — 서버의 것이 Core 사본(news-lib)의 «바로 그 함수»인지 본다. */
+  const 사본 = require('../functions/news-lib/pu-news-core.js');
+  const 이름들 = ['값어치순', '최근것', '한마디거리', '한마디지시', '기사초안지시', '한마디다듬기', '새추적번호', '밑줄지시'];
+  이름들.forEach(function (n) {
+    assert.ok(NF[n] !== undefined, 'NF.' + n + ' 가 없다');
+    assert.strictEqual(NF[n], 사본[n], '★★★ 서버의 ' + n + ' 이 Core 한 벌이 아니다 — 또 베꼈다');
+    /* ⚠ \b 는 한글 이름 뒤에서 안 먹는다(한글은 «낱말 글자»가 아니다) — 경계를 손으로 적는다 */
+    assert.ok(new RegExp('Core\\.' + n + '(?![가-힣A-Za-z0-9_$])').test(화면), '★★ 화면이 Core.' + n + ' 를 안 부른다');
+    assert.ok(!new RegExp('function ' + n + '\\(').test(화면), '★★ 화면에 ' + n + ' 가 또 한 벌 있다');
+  });
+  const 서버글 = fs.readFileSync(path.join(__dirname, '..', 'functions', 'news-friday.js'), 'utf8');
+  이름들.concat(['지역판씌우기']).forEach(function (n) {
+    assert.ok(!new RegExp('function ' + n + '\\(').test(서버글), '★★ 서버(news-friday)에 ' + n + ' 를 또 베꼈다');
+  });
+  assert.ok(/Tpl\.지역판씌우기\(/.test(서버글), '검토 메일이 한 벌 지역판 끼우기를 안 부른다');
+  /* 줄 세우기가 실제로 «값어치 먼저»로 돈다 */
   const 모음 = { a: { 제목: '가', 값어치: 1, 모은날: '2026-09-29' }, b: { 제목: '나', 값어치: 4, 모은날: '2026-09-28' },
     c: { 제목: '다', 모은날: '2026-09-30' }, d: { 제목: '라', 값어치: 4, 모은날: '2026-09-30' } };
-  짐.모음 = 모음;
-  assert.strictEqual(JSON.stringify(vm.runInContext('값어치순(모음, 8)', 짐)), JSON.stringify(NF.값어치순(모음, 8)),
-    '★★ 자료 줄 세우기가 화면과 다르다 — 금요일 편지와 화면 편지가 다른 자료를 담는다');
-  assert.strictEqual(JSON.stringify(vm.runInContext('최근것(모음, 2)', 짐)), JSON.stringify(NF.최근것(모음, 2)),
-    '판례 줄 세우기가 화면과 다르다');
-  /* 한마디 거리 — 화면 함수 안의 대목을 그대로 돌려 견준다 */
-  const 몸 = 함수몸(화면, '한마디초안짓기');
-  const i = 몸.indexOf('const 거리 = [];'), j = 몸.indexOf('if(거리.length');
-  const 안 = { news: [{ 갈래: '기사', 제목: 'ㄱ', 우리말: '우리 말' }],
-    case: [{ 갈래: '판례', 딱지: '[판례]', 제목: '판례', 인용: '대법원 2025다1', 요지: '요지' }] };
-  const 짐2 = { Core: C, d: { 안: 안 }, 거리: null };
-  vm.createContext(짐2);
-  vm.runInContext('const d = this.d;' + 몸.slice(i, j) + 'this.거리 = 거리;', 짐2);
-  assert.strictEqual(JSON.stringify(짐2.거리), JSON.stringify(NF.한마디거리({ 안: 안 })),
-    '★★ 한마디 거리가 화면과 다르다');
+  assert.deepStrictEqual(NF.값어치순(모음, 8).map((x) => x.제목), ['라', '나', '가', '다'], '값어치 먼저 → 최근 순이 아니다');
+  assert.deepStrictEqual(NF.최근것(모음, 2).map((x) => x.제목), ['다', '라'], '판례가 최근 순이 아니다');
 });
