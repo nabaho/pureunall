@@ -7,6 +7,13 @@ const H = require('../hwpx_gen.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
+test('run 없는 빈 칸도 주변 글자 모양을 이어받는다', () => {
+  const tc = '<hp:tc><hp:subList><hp:p paraPrIDRef="4"><hp:run charPrIDRef="19"/></hp:p></hp:subList></hp:tc>';
+  const out = F.fillCell(tc, '권형하');
+  assert.match(out, /<hp:run charPrIDRef="19"><hp:t>권형하<\/hp:t><\/hp:run>/);
+  assert.doesNotMatch(out, /charPrIDRef="0"[^>]*><hp:t>권형하/);
+});
+
 function tbl(rows) { return H.tablePara(rows, H.cols(rows[0].map(() => 1 / rows[0].length))); }
 const FIELDS = { name: '권형하', birth: '1970.01.01', phone: '010-1234-5678', email: 'k@pureun.kr', org: '푸른노무법인' };
 
