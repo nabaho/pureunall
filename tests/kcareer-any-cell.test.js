@@ -151,10 +151,10 @@ test('⑧★ 넣는 쪽(apply)은 «늘» 모든 칸을 훑는다 — 좁게 훑
     '넣는 쪽이 좁게 훑습니다 — 「아무 칸이나」로 친 값이 「그런 자리가 없습니다」로 사라집니다');
 });
 
-test('⑨ 화면에서 켜고 끌 수 있고, 서식을 새로 올리면 꺼진다', () => {
+test('⑨ 옛 문서 호환 기능은 남기되 한글 편집과 겹치는 대시보드 단추는 없고, 새 서식에서 꺼진다', () => {
   assert.match(CODE, /var\s+_rhAnyCell\s*=\s*false/, '기본이 꺼짐이 아닙니다');
   assert.match(CODE, /function rhToggleAnyCell\(/, '켜고 끄는 길이 없습니다');
-  assert.match(CODE, /id="kfM4"/, '단추가 없습니다');
+  assert.doesNotMatch(CODE, /id="kfM4"/, '한글 편집과 겹치는 단추가 다시 나타났습니다');
   /* 두 길(칸 지도·입력판)이 «함께» 이 값을 봐야 한다 — 한쪽만 보면 화면과 결과가 어긋난다 */
   const n = (CODE.match(/scan\(xml,\{all:_rhAnyCell\}\)/g) || []).length;
   assert.equal(n, 2, '칸 지도와 입력판 두 곳이 모두 이 값을 봐야 합니다 (지금 ' + n + '곳)');

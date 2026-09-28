@@ -427,22 +427,19 @@ test('★★ 뺀 단추 셋이 되살아나지 않는다 — 원본 한글에 �
   assert.ok(!/띄울 수는 없습니다/.test(창), '한글 편집이 생겼는데 「띄울 수 없다」고 합니다');
 });
 
-test('★★ 한글 편집 중 감출 것에 표식이 달렸다 — 채우기·되돌리기·쪽 빼기·도장·정리·아무 칸·보기 맞춤', () => {
+test('★★ 한글 편집 중 감출 것에 표식이 달렸다 — 채우기·되돌리기·추가 작업·도장·보기 맞춤', () => {
   assert.match(CODE, /body\.rh-ed-on \.rh-noed\{display:none!important\}/, '감추는 규칙이 없습니다');
   [/<button class="btn primary rh-noed" onclick="rhAutoFillDoc\(\)"/,
    /<button class="btn rh-noed" id="rhUndoBtn"/,
-   /<button class="btn rh-noed" onclick="rhPagesOpen\(\)"/,
    /<button class="btn rh-noed"[^>]*onclick="rhStampDoc\(\)"/,
-   /<button class="btn rh-noed" onclick="openTidy\(\)"/,
-   /<button class="kf-mode rh-noed" id="kfM4"/].forEach((re) => {
+   /<details class="rh-more rh-noed">/].forEach((re) => {
     assert.match(CODE, re, '★ 표식이 빠졌습니다: ' + re);
   });
   const 기둥 = CODE.slice(CODE.indexOf('<div class="rh-noed">'), CODE.indexOf('<div class="rh-railh">보는 방법</div>'));
   assert.match(기둥, /id="rhFitRow"/, '★ 보기 맞춤이 감추는 칸 밖에 있습니다');
   assert.match(기둥, /id="rhPgRow"/, '★ 쪽 넘김이 감추는 칸 밖에 있습니다');
-  /* ⚠ 저장·치우기는 감추지 않는다 — 한글 편집 중에도 편집기 것을 담는다 */
+  /* ⚠ 완성본은 감추지 않는다 — 한글 편집 중에도 편집기 것을 담는다 */
   assert.ok(!/rh-noed[^>]*id="rcSaveBtn"|id="rcSaveBtn"[^>]*rh-noed/.test(CODE), '★ 완성본 단추를 감췄습니다');
-  assert.ok(!/rh-noed[^>]*rhDraftNow/.test(CODE), '★ 임시저장 단추를 감췄습니다');
 });
 
 /* ══════ ⑥ 채우기 «실행» · 이어서 하기 — 표시가 제대로 켜지고 되살아나나 ══════ */

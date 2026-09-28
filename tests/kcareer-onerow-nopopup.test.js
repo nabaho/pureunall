@@ -82,8 +82,9 @@ test('치우면 편집 카드가 «내려간다» — 빈 화면이 남으면 �
   assert.match(fn, /rh-doc-on/, '한글 서식 넓은 배치도 풀어야 합니다');
 });
 
-test('★ 임시저장을 «눌러서» 할 수 있다 — 저절로 되는 것은 눈에 안 보인다', () => {
-  assert.match(source, /onclick="rhDraftNow\(\)"/);
+test('★ 임시저장은 30초 자동 저장으로 안내하고 중복 단추는 두지 않는다', () => {
+  assert.doesNotMatch(source, /onclick="rhDraftNow\(\)"/);
+  assert.match(source, /30초마다 저절로 담깁니다/);
   const fn = cutFn(bare, 'async function rhDraftNow(');
   assert.match(fn, /exportEditedHwpx\(\)/, '지금 편집기에 있는 그대로를 담아야 합니다');
   assert.match(fn, /rhDraftSave\(\)/);
