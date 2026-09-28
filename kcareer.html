@@ -9750,6 +9750,18 @@ function quickParseFilename(fname,page){ const y=(fname.match(/(20\d{2})/)||[])[
   if(page==='personal_doc') return {kind:'기타',name:clean.slice(0,30),number:'',memo:''};
   if(page==='account') return {bank:clean.slice(0,20),number:'',holder:'',memo:''};
   if(page==='id_doc') return {kind:'기타',name:clean.slice(0,20),number:'',expiry:'',memo:''};
+  /* ★ 실적 네 화면·강의·비용 둘 — 판독이 «아예» 안 될 때도 파일은 담는다 (2026-09-28).
+     여태 이 일곱 화면만 되돌림이 없어 「실패」로 세어졌다 — 파일을 끌어놓았는데 아무 데도 없었다.
+     ⚠★ 파일 이름은 «내용» 칸에만 넣는다 — 고객사·기관 칸에 넣으면 문서에 대한 «주장»이 된다
+        (유형을 지어내지 않는 것과 같은 까닭). 유형도 «비워 둔다»(상태만 서식 기본값).
+     ⚠★ _byName — 이 줄은 «같은 파일 이름»으로만 겹침을 본다(saveOCRRecord). 중복 열쇠는
+        내용 앞 6자라 「2024 일터혁신 컨설팅 결과_가사 / _나사」가 한 건으로 막힌다.
+     ⚠ 비고에 «파일 이름으로 등록»이라 적는다 — 읽은 것처럼 보이면 확인을 안 한다. */
+  var 확인='파일 이름으로 등록 — 내용을 확인해 주세요';
+  if(page==='consult'||page==='case'||page==='fund'||page==='etc')
+    return {org:'',project:clean.slice(0,60),type:'',status:'',agency:'',main:'',amt:'',note:확인,year:y,_byName:true};
+  if(page==='lecture') return {topic:clean.slice(0,60),org:'',date:'',note:확인,year:y,_byName:true};
+  if(page==='meetfee'||page==='etcfee') return {content:clean.slice(0,60),date:'',type:'',amt:'',org:'',year:y,_byName:true};
   return null; }
 /* 읽어 온 답이 «쓸 만한가» — 한 칸이라도 뜻 있는 값이 들어왔나.
    ⚠★ 예전에는 org·title·school·name·bank·kind «여섯»만 봤다. 그래서 비용 화면은
@@ -9932,7 +9944,11 @@ async function saveOCRRecord(page,parsed,file,ext,b64){
   }
   const db=get(store);
   var _k=dupKey(rec);
-  var _same=db.find(function(r){ return r && dupKey(r)===_k; });
+  /* ⚠ 파일 이름으로만 담는 줄(_byName)은 «같은 파일»일 때만 같은 서류다 — 내용 앞 6자가
+     같은 다른 파일이 막히면 안 된다(quickParseFilename 참고). */
+  var _same=(parsed && parsed._byName)
+    ? db.find(function(r){ return r && r.fname===file.name; })
+    : db.find(function(r){ return r && dupKey(r)===_k; });
   if(_same){
     var _added=false;
     if(!hasOriginal(_same)){
