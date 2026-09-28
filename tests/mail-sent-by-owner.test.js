@@ -38,6 +38,7 @@ function run(opt){
     _mbMsgs: o.msgs || {},
     _mbOwner: o.owner || {},
     _mbWhoMsg: o.msgWho || {},
+    _mbWork: null,
     MB_SENT_NA: '*na',
     MB_SENT_GAP_MAX: 8,
     MB_PUB_DOM: ['naver.com','daum.net','hanmail.net','gmail.com','nate.com'],
@@ -60,7 +61,8 @@ function run(opt){
   };
   ctx.mbMemoOf = () => ctx._memo;
   vm.createContext(ctx);
-  ['mbWhoLive','mbWhoWhy','mbSentTo','mbSentBox','mbSentWho','mbSentTally',
+  /* mbWhoWhy ①-3(사건·컨설팅 주소)도 «진짜»를 싣는다 — 자료가 없으면(_mbWork=null) 아무 일도 안 한다 */
+  ['mbWhoLive','mbWhoWhy','mbWorkMgrOfAddr','mbSentTo','mbSentBox','mbSentWho','mbSentTally',
    'mbSentWhoList','mbSentGapList','mbSentPick','mbSentWhoLineHtml','mbSentGapHtml']
     .forEach(n => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   return ctx;
