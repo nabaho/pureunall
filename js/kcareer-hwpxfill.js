@@ -752,14 +752,25 @@
        처음에는 「자격은 취득년월일도 있어야」라는 빗장을 더 두었는데, 고장넣기에서
        그것이 «있으나 마나»임이 드러났다(어차피 grade 가 가른다).
        빗장이 둘이면 어느 것이 일하는지 알 수 없고 검사도 이빨을 못 가진다. */
+    var kind = listKind(map);
+    return kind ? { kind: kind, map: map, lead: lead, byCol: 있다 ? byCol : null } : null;
+  }
+  /* ★ 머리줄 열쇠들 → 목록 종류. ⚠★ 가르는 자는 «여기 한 곳»이다 (2026-09-28).
+     칸 지도(kcareer-formmap.js)가 자격·상벌을 몰라 따로 가르다가 «버렸다» — 그래서
+     2026-09-13 에 만든 자격·상벌 채우기가 지금 쓰는 칸 지도 길에서는 한 줄도 안 들어갔다
+     (실물 「지방공기업평가원 지원서」로 확인). 두 곳이 다르게 가르면 또 이렇게 된다. */
+  function listKind(map) {
     var 어학 = map.indexOf('grade') >= 0;
     var 자격 = map.indexOf('certName') >= 0;
     var 상벌 = map.indexOf('awardWhat') >= 0;
-    var kind = map.indexOf('school') >= 0 ? 'edu'
+    return map.indexOf('school') >= 0 ? 'edu'
       : (map.indexOf('org') >= 0 && (map.indexOf('role') >= 0 || map.indexOf('title') >= 0
           || map.indexOf('dept') >= 0 || map.indexOf('period') >= 0)) ? 'career'
       : (!어학 && (자격 || 상벌)) ? 'certaward' : '';
-    return kind ? { kind: kind, map: map, lead: lead, byCol: 있다 ? byCol : null } : null;
+  }
+  /* 사람이 읽는 목록 이름 — ⚠ 「학력이 아니면 경력」으로 두면 자격·상벌이 «경력»이라 적힌다 */
+  function listName(kind) {
+    return kind === 'edu' ? '학력' : kind === 'career' ? '경력' : kind === 'certaward' ? '자격·상벌' : '목록';
   }
   /* ── 여기서부터는 «남의 자리» ──
      ① 다음 머리행 — 열 이름이 둘 이상 잡히면 새 목록 표가 시작된 것이다
@@ -823,6 +834,27 @@
        · 첫 머리행이 학력인데 학력이 비면 표 전체를 포기해 경력이 안 들어갔고
        · 경력이 잡히면 자격증 표까지 죽 채워 «잘못 낸 서류»가 됐다.
      이제 구역마다 머리행을 찾고, 그 구역의 «연속된 빈 행»만 채운다. */
+  /* ★ 자격·상벌 줄에 «사람이 한 칸만» 쳐 두었을 때 (2026-09-28).
+     isBoundary 는 「한 칸에만 글자가 있고 나머지가 빈 줄」을 소제목으로 보고 멈춘다. 그런데
+     자격·상벌 칸은 손으로 칠 자리로 남겨 두었으므로(kcareer-formmap), 한 칸을 고쳐 치는 순간
+     그 줄이 소제목으로 읽혀 «나머지 자격·상벌이 통째로» 사라졌다(검사가 잡았다).
+     → 그 줄의 칸이 «둘 이상»이고 «모두 이 목록의 열»(열 번호)에 있으면 자료 줄이다.
+     ⚠ 소제목(한 칸짜리 줄)·다른 머리줄(목록 밖 열이 있다)은 그대로 경계다.
+     ⚠ 자격·상벌만 — 학력·경력 줄은 손으로 칠 자리가 아니라 이 일이 안 생긴다(한 번에 하나씩).
+     ⚠ 고장넣기가 «안 걸리는» 것 하나 — 억지 검사를 짓지 않고 까닭을 적어 둔다:
+       `cells.length < 2` 를 빼도 결과가 같다. 한 칸짜리 줄은 자료 줄과 «모양»(칸 수·첫 열)이
+       달라, 바로 아래 rowShape 빗장이 어차피 멈춘다(열 번호가 있어야 이 함수가 도는데,
+       열 번호가 있으면 rowShape 도 돈다). 읽기 쉬우라고 남겨 둔다. */
+  function 손친자료줄(head, cells) {
+    if (!head || head.kind !== 'certaward' || !head.byCol || cells.length < 2) return false;
+    var 머리칸 = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var ca = colAddrOf(cells[i]);
+      if (ca < 0 || head.byCol[ca] == null) return false;
+      if (colKeyOf(cellText(cells[i]))) 머리칸++;
+    }
+    return 머리칸 < 2;                                /* 열 이름이 둘 이상이면 다른 머리줄이다 */
+  }
   function fillList(tbl, data, report, opts) {
     var rows = splitRows(tbl);
     var newTbl = tbl;
@@ -830,12 +862,12 @@
       var head = detectHeader(splitCells(rows[r]), opts && opts.colMap);
       if (!head) continue;
       var items = data[head.kind] || [];
-      var put = 0, donePick = {};
+      var put = 0, donePick = {}, 상벌칸 = {};
       /* 이 구역의 끝까지만 — 다음 머리행이나 소제목을 만나면 남의 자리다 */
       var q = r + 1, 모양 = null;
       for (; q < rows.length; q++) {
         var cells = splitCells(rows[q]);
-        if (isBoundary(cells)) break;
+        if (isBoundary(cells) && !손친자료줄(head, cells)) break;
         /* ★★ «자료 줄의 모양»이 바뀌면 그 구역은 끝났다 (대표 제보 2026-09-07).
            실측: 학력 구역(칸 5개·첫 열 1번)이 끝난 뒤 빈 줄 하나를 지나 「자격및면허」
            머리줄이 오는데 그 줄이 경계로 안 잡혀, 그 아래 빈 줄에 학력이 박혔다.
@@ -879,6 +911,15 @@
           pick = put;
         }
         var item = items[pick], newTr = rows[q], ok = false, used = {};
+        /* 상벌 열의 «진짜 열 번호»를 적어 둔다 — 아래 «이어 채우기»가 같은 열을 찾는다 */
+        if (head.kind === 'certaward' && head.byCol) {
+          for (var ac = 0; ac < lim; ac++) {
+            if (keys[ac] === 'awardWhat' || keys[ac] === 'awardOrg') {
+              var 번호 = colAddrOf(cells[ac]);
+              if (번호 >= 0) 상벌칸[번호] = keys[ac];
+            }
+          }
+        }
         for (var c = 0; c < lim; c++) {
           var k = keys[c];
           if (!k) continue;
@@ -906,6 +947,43 @@
         }
         /* ⚠ 글자로 찾지 않는다 — 빈 줄끼리는 똑같아서 맨 앞 것이 바뀐다(위 replaceRowAt 참고) */
         if (ok) { newTbl = replaceRowAt(newTbl, q, newTr); donePick[pick] = true; if (pick === put) put++; }
+      }
+      /* ★★ 상벌 «이어 채우기» — 라벨 없는 칸을 «열 번호»로 잇는다 (2026-09-28).
+         ■ 실물(지방공기업평가원 지원서): 한 표 안에 왼쪽은 자격(2줄)·어학(머리줄+2줄),
+           오른쪽은 상벌(5줄, 세로 라벨 「상벌」 6줄 병합)이다. 왼쪽이 「어학」 머리줄로 바뀌는
+           자리에서 구역이 끝나 «상벌 셋째 줄부터» 말없이 빠졌다.
+         ■ 잇는 잣대 — 남은 상벌을 아래 줄에 넣되, 그 줄에:
+             ① 앞에서 쓴 상벌 열(진짜 열 번호)이 «모두» 있고 ② 그 칸이 «모두 비어» 있을 때만.
+           하나라도 어긋나면 멈춘다(구분선 줄 0+21 은 그 열이 없어 저절로 멈춘다).
+         ⚠ 상벌 칸에만 넣는다 — 그 줄 왼쪽(어학 칸)은 절대 건드리지 않는다(어학 자료는 없다).
+         ⚠ 자격 칸이 모자라 못 들어간 자격은 여기서도 못 넣는다 — 지어낸 자리에 넣지 않는다. */
+      var 상벌열 = Object.keys(상벌칸);
+      if (head.kind === 'certaward' && 상벌열.length) {
+        var 남은 = [];
+        for (var ri = 0; ri < items.length; ri++) {
+          if (donePick[ri]) continue;
+          if (items[ri] && (items[ri].awardWhat || items[ri].awardOrg)) 남은.push(ri);
+        }
+        for (var q2 = q; q2 < rows.length && 남은.length; q2++) {
+          var cs2 = splitCells(rows[q2]), 자리 = {};
+          for (var ci2 = 0; ci2 < cs2.length; ci2++) {
+            var ca2 = colAddrOf(cs2[ci2]);
+            if (상벌칸[ca2]) 자리[ca2] = ci2;
+          }
+          var 다있다 = 상벌열.every(function (a) { return 자리[a] != null; });
+          var 다비었다 = 다있다 && 상벌열.every(function (a) { return !cellText(cs2[자리[a]]); });
+          if (!다비었다) break;
+          var 이것 = items[남은[0]], tr2 = rows[q2], 넣음 = false;
+          상벌열.forEach(function (a) {
+            var v = 이것[상벌칸[a]];
+            if (v == null || v === '') return;
+            var f2 = fillCell(cs2[자리[a]], v);
+            if (!f2) return;
+            tr2 = replaceCellAt(tr2, 자리[a], f2); cs2[자리[a]] = f2; 넣음 = true;
+          });
+          if (넣음) { newTbl = replaceRowAt(newTbl, q2, tr2); rows[q2] = tr2; donePick[남은.shift()] = true; }
+          else 남은.shift();
+        }
       }
       if (items.length) {
         var 넣은수 = Object.keys(donePick).length;
@@ -1057,7 +1135,7 @@
     var parts = [];
     if (report.fields.length) parts.push('인적 ' + report.fields.length + '칸');
     (report.lists || []).forEach(function (l) {
-      var name = l.kind === 'edu' ? '학력' : '경력';
+      var name = listName(l.kind);
       parts.push(name + ' ' + (l.put < l.total ? (l.put + '/' + l.total + '줄(칸 부족)') : (l.put + '줄')));
     });
     return parts.length ? parts.join(' · ') : '알아본 칸이 없습니다';
@@ -1082,6 +1160,8 @@
     isHeaderish: 머리행답나, isHeaderishText: 머리행답나글자,
     /* 「여기부터 남의 자리」 판정 — 검사가 «머리줄을 머리줄로 아는지» 직접 볼 수 있게 */
     isBoundary: isBoundary,
+    /* ⚠ 목록 종류를 가르는 자·이름표는 «이 하나»다 — 칸 지도·화면이 같은 자를 쓴다 */
+    listKind: listKind, listName: listName,
     incellFill: function (tc, fields) {
       /* 검사용 — 칸 하나에 칸 안 라벨을 채워 본다 */
       var rep = { fields: [], lists: [], kept: [] };

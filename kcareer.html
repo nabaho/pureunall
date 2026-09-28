@@ -1147,18 +1147,18 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=30"></script>
+<script src="js/kcareer-hwpxfill.js?v=31"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
-<script src="js/kcareer-formmap.js?v=18"></script>
+<script src="js/kcareer-formmap.js?v=19"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=4"></script>
 <script src="js/kcareer-hwpxphoto.js?v=1"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
-<script src="js/kcareer-slotai.js?v=2"></script>
+<script src="js/kcareer-slotai.js?v=3"></script>
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
@@ -12044,12 +12044,15 @@ function rhRenderMap(){
     +(aiCnt?' <span style="color:var(--blue)">(그 중 🤖 AI가 짚은 것 '+aiCnt+')</span>':'')
     +' · 골라 줄 것 '+(shown.length-known)+'</div>';
 
+  /* ⚠ 목록 이름은 채우는 쪽의 이름표(listName) 하나 — 「학력이 아니면 경력」으로 두면
+     자격·상벌 표가 «경력 표»라 적힌다(2026-09-28 자격·상벌이 지도에 들어오며 생긴 자리) */
+  var _lnm=function(k){ return (window.KcareerHwpxFill && KcareerHwpxFill.listName) ? KcareerHwpxFill.listName(k) : (k==='edu'?'학력':'경력'); };
   html+=_rhMap.lists.map(function(l){
-    var nm=(l.kind==='edu'?'학력 표':'경력 표');
+    var nm=_lnm(l.kind)+' 표';
     return '<div class="rh-slot ok"><div class="r1"><span class="nm">'+nm+'</span>'
       +'<span class="loc">빈 '+l.blank+'줄</span></div>'
       +'<div style="font-size:11px;color:var(--text-mute)">아래 빈 줄에 '
-      +(l.kind==='edu'?'학력':'경력')+'을 채웁니다</div></div>';
+      +_lnm(l.kind)+(l.kind==='certaward'?'(자격증·표창)':'')+'을 채웁니다</div></div>';
   }).join('');
 
   html+=shown.map(function(s){
