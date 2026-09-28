@@ -213,8 +213,9 @@ test('기금 정보 폼은 화면 폭을 다 쓴다 — 760px 2열에 갇히지 
      「설립」은 2026-09-10 에 더했다 — 합의서·회의록·정관·등기·세무 서식이 읽는데 넣을 칸이 «없던» 열 가지다.
      ★ 2026-09-27 「관할」 묶음 머리를 tax_office→labor_office 로 옮겼다 — 소재지·전화번호가 「기본」으로
        가면서 관할 세 칸(노동청·등기소·세무서, 서식이 묻는 차례)만 남았고, 그 첫 칸이 labor_office 다. */
-  assert.deepEqual(Object.keys(box.S), ['name','manager','chairman','labor_office','lease_lessor','contribution_total'],
-    '묶음 머리가 정해진 여섯(기본·담당·인가등기·관할·사무소 임대차·설립)이 아니다');
+  /* ★ 2026-09-28 정리안 A — 「담당」은 칸 하나뿐이라 «기본» 상자에 넣었다(머리 「담당」 + 칸 「주담당·부담당」이 겹쳤다) */
+  assert.deepEqual(Object.keys(box.S), ['name','chairman','labor_office','lease_lessor','contribution_total'],
+    '묶음 머리가 정해진 다섯(기본·인가등기·관할·사무소 임대차·설립)이 아니다');
   const fields = SRC.slice(SRC.indexOf('var FIELDS='), SRC.indexOf('];', SRC.indexOf('var FIELDS=')));
   Object.keys(box.S).forEach(k => assert.ok(fields.includes("'" + k + "'"), 'FIELDS 에 없는 칸에 묶음 머리를 걸었다: ' + k));
   /* 여러 칸 폭이 필요한 칸(단추가 붙는 관할 3칸·담당 한 줄)은 넓게, 단 «자리가 있을 때만».
