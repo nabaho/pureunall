@@ -232,3 +232,88 @@ test('⑥ ★ 「나중에」 는 사번마다 따로다 — 여럿이 쓰는 PC
 test('⑤ 포털이 그릴 때 권유 줄을 부른다', () => {
   assert.match(화면, /kkSetupRegRow\(mySid\)/, '★ renderPortal 이 kkSetupRegRow 를 안 부릅니다 — 줄이 영영 안 뜹니다');
 });
+
+/* ── ⑦⑧ 공용 PC (대표 「제3의 장소에서 로그인할 경우 어떻게하나?」 → 「추천대로」 2026-09-28) ──
+   ⑦ 처음 쓰는 기기면 노란 단추가 카카오에게 «다시 묻게» 한다(앞 사람 카카오로 안 들어가게).
+   ⑧ 카카오로 들어온 사람의 로그아웃은 파이어베이스를 «먼저» 끊고, 카카오도 끊으러 간다. */
+function 단추세상(opt) {
+  const w = 세상(opt);
+  const 부탁 = [];
+  w.ctx._persistenceReady = Promise.resolve();
+  w.ctx.firebase = { auth: { Auth: { Persistence: { LOCAL: 'local' } } } };
+  w.ctx.auth.setPersistence = () => Promise.resolve();
+  w.ctx.window.PuKakao = { goLogin: (o) => { 부탁.push(o || {}); return Promise.resolve(); } };
+  w.ctx.PuKakao = w.ctx.window.PuKakao;
+  w.els.kkLoginBtn = 요소('kkLoginBtn');
+  싣기(w, ['kkLogin']);
+  return { w, 부탁 };
+}
+
+test('⑦ ★★ 처음 쓰는 기기면 카카오가 다시 묻게 하고, 카카오를 쓴 기기면 안 묻는다', async () => {
+  const 처음 = 단추세상({});
+  처음.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
+  assert.equal(처음.부탁[0] && 처음.부탁[0].ask, true,
+    '★★ 처음 쓰는 기기인데 안 묻습니다 — 공용 PC 에 남은 앞 사람 카카오로 들어갑니다');
+  const 내것 = 단추세상({ 저장: { pu_kakao_used: '1' } });
+  내것.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
+  assert.equal(내것.부탁[0] && 내것.부탁[0].ask, false, '★ 내 기기에서도 매번 카카오 비밀번호를 묻습니다');
+  const 막힘 = 단추세상({ 막힘: true });
+  막힘.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
+  assert.equal(막힘.부탁[0] && 막힘.부탁[0].ask, true, '★ 저장소를 못 읽으면 «묻는 쪽» 이어야 합니다');
+});
+
+function 나가기세상(kakao, 주소실패, 주소) {
+  const w = 세상({});
+  const 일 = [];
+  w.ctx.auth.currentUser = { getIdTokenResult: () => Promise.resolve({ claims: kakao ? { kakao: true } : {} }) };
+  w.ctx.auth.signOut = () => { 일.push('signOut'); return Promise.resolve(); };
+  w.ctx.location = {
+    reload: () => 일.push('reload'),
+    set href(v) { 일.push('go:' + v); },
+  };
+  w.ctx.window.PuKakao = {
+    logoutUrl: () => { 일.push('ask'); return 주소실패 ? Promise.reject(new Error('x')) : Promise.resolve(주소 || 'https://kauth.kakao.com/oauth/logout?x'); },
+  };
+  w.ctx.PuKakao = w.ctx.window.PuKakao;
+  싣기(w, ['kkLogoutFlow']);
+  return { w, 일 };
+}
+
+test('⑧ ★★ 카카오로 들어온 사람은 파이어베이스를 먼저 끊고 카카오도 끊으러 간다', async () => {
+  const k = 나가기세상(true);
+  k.w.ctx.kkLogoutFlow();
+  for (let i = 0; i < 6; i++) await 틈();
+  const 끊기 = k.일.indexOf('signOut');
+  const 가기 = k.일.findIndex((x) => x.startsWith('go:https://kauth.kakao.com/oauth/logout'));
+  assert.ok(가기 >= 0, '★★ 카카오 로그인이 브라우저에 남습니다 — 다음 사람이 노란 단추로 «앞 사람으로» 들어갑니다');
+  assert.ok(끊기 >= 0 && 끊기 < 가기, '★ 카카오로 떠나기 전에 포털부터 끊어야 합니다 — 카카오가 멎으면 로그인된 채 남습니다');
+});
+
+test('⑧ ★ 비밀번호로 들어온 사람은 예전 그대로 — 카카오를 건드리지 않는다', async () => {
+  const p = 나가기세상(false);
+  p.w.ctx.kkLogoutFlow();
+  for (let i = 0; i < 6; i++) await 틈();
+  assert.deepEqual([...p.일], ['signOut', 'reload'], '비밀번호 로그인의 로그아웃이 달라졌습니다');
+});
+
+test('⑧ ★ 카카오 주소를 못 받아도 로그아웃은 끝난다(멎어 보이지 않는다)', async () => {
+  const k = 나가기세상(true, true);
+  k.w.ctx.kkLogoutFlow();
+  for (let i = 0; i < 6; i++) await 틈();
+  assert.deepEqual([...k.일], ['signOut', 'ask', 'reload']);
+});
+
+test('⑧ ★★ 서버가 옛 판이라 «로그인» 주소를 주면 그리로 가지 않는다', async () => {
+  const k = 나가기세상(true, false, 'https://kauth.kakao.com/oauth/authorize?client_id=x');
+  k.w.ctx.kkLogoutFlow();
+  for (let i = 0; i < 6; i++) await 틈();
+  assert.ok(!k.일.some((x) => x.startsWith('go:')),
+    '★★ 로그아웃했는데 카카오 로그인 화면으로 보냈습니다 — 서버가 아직 옛 판일 때 그렇게 됩니다');
+  assert.equal(k.일[k.일.length - 1], 'reload');
+});
+
+test('⑧ 로그아웃 단추가 이 흐름을 부른다', () => {
+  const at = 화면.indexOf("$('logoutBtn').addEventListener('click'");
+  assert.ok(at > 0);
+  assert.match(화면.slice(at, 화면.indexOf('});', at)), /kkLogoutFlow\(\)/, '★ 로그아웃 단추가 카카오 끊기를 안 부릅니다');
+});

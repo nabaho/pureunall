@@ -365,3 +365,48 @@ test('★ 화면 — needLink 로 실패했을 때만 표시를 남기고, 포�
   const portal = enterFn('renderPortal').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   assert.match(portal, /kkAfterLogin\(\)/, '포털이 떠도 연결을 권하지 않는다');
 });
+
+/* ── 공용 PC — 앞 사람의 카카오로 들어가지 않는다 (대표 「추천대로」 2026-09-28) ──────────
+   ① 처음 쓰는 기기에서는 카카오가 «다시 묻게» 한다(prompt=login).
+   ② 로그아웃은 «이 브라우저의 카카오» 도 끊는다(카카오 로그아웃 주소). */
+function authUrl(K, query) {
+  return new Promise((resolve) => {
+    const res = { _s: 200, set() {}, status(s) { this._s = s; return this; }, json(j) { resolve({ status: this._s, body: j }); }, send() {} };
+    K.kakaoAuthUrl({ method: 'GET', headers: {}, query }, res);
+  });
+}
+
+test('★★ 서버 — prompt=login 을 달라면 카카오 주소에 싣고, 안 달라면 안 싣는다', async () => {
+  const K = fresh();
+  const ask = await authUrl(K, { state: 'x', prompt: 'login' });
+  assert.equal(new URL(ask.body.url).searchParams.get('prompt'), 'login',
+    '★★ 처음 쓰는 기기인데 카카오가 안 묻는다 — 공용 PC 에 남은 앞 사람 카카오로 들어간다');
+  const plain = await authUrl(K, { state: 'x' });
+  assert.equal(new URL(plain.body.url).searchParams.get('prompt'), null, '내 기기에서까지 매번 묻는다');
+  /* 'login' 밖의 값(none·consent 등)은 버린다 — 화면이 보낸 것을 그대로 카카오에 넘기지 않는다 */
+  const odd = await authUrl(K, { state: 'x', prompt: 'none' });
+  assert.equal(new URL(odd.body.url).searchParams.get('prompt'), null, '모르는 prompt 값을 그대로 넘겼다');
+});
+
+test('★★ 서버 — 로그아웃 주소는 카카오 로그아웃으로 가서 포털로 돌아온다', async () => {
+  const K = fresh();
+  const r = await authUrl(K, { kind: 'logout' });
+  const u = new URL(r.body.url);
+  assert.equal(u.origin + u.pathname, 'https://kauth.kakao.com/oauth/logout', '카카오 로그아웃 주소가 아니다');
+  assert.equal(u.searchParams.get('client_id'), process.env.KAKAO_REST_KEY);
+  assert.equal(u.searchParams.get('logout_redirect_uri'), 'https://nabaho.github.io/pureunall/enter.html',
+    '돌아올 곳이 로그인 복귀 주소와 다르다 — 카카오 콘솔에 등록한 곳과 어긋난다');
+});
+
+test('★ 화면 부품 — goLogin({ask}) 은 prompt=login 을 서버에 부탁하고, logoutUrl 은 로그아웃 주소를 묻는다', async () => {
+  const c = clientWith('https://nabaho.github.io/pureunall/enter.html');
+  const asked = [];
+  c.box.fetch = async (u) => { asked.push(u); return { status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x' }) }; };
+  await c.K.goLogin({ ask: true });
+  await c.K.goLogin();
+  await c.K.logoutUrl();
+  assert.equal(new URL(asked[0]).searchParams.get('prompt'), 'login', '「다시 묻기」를 서버에 안 부탁한다');
+  assert.equal(new URL(asked[1]).searchParams.get('prompt'), null);
+  assert.equal(new URL(asked[2]).searchParams.get('kind'), 'logout');
+});
+

@@ -158,5 +158,15 @@ test('the user can still explicitly log out from the portal', () => {
   assert.notEqual(start, -1, 'portal logout button handler is missing');
   const end = source.indexOf('});', start);
   assert.ok(end > start, 'portal logout button handler is incomplete');
-  assert.match(source.slice(start, end + 3), /auth\.signOut\(\)/);
+  const handler = source.slice(start, end + 3);
+  /* 2026-09-28: 카카오로 들어온 사람은 카카오도 끊도록 kkLogoutFlow() 로 넘긴다 —
+     그 흐름 «안» 에서 파이어베이스를 끊는지까지 따라가 본다(이름만 부르고 안 끊으면 운다). */
+  if (/kkLogoutFlow\(\)/.test(handler)) {
+    const fs0 = source.indexOf('function kkLogoutFlow(');
+    assert.notEqual(fs0, -1, 'kkLogoutFlow is called but not defined');
+    const body = source.slice(fs0, source.indexOf('\n  }', fs0));
+    assert.match(body, /auth\.signOut\(\)/, 'kkLogoutFlow must sign out of Firebase');
+  } else {
+    assert.match(handler, /auth\.signOut\(\)/);
+  }
 });

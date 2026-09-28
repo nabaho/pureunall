@@ -57,15 +57,20 @@
     (global.crypto || global.msCrypto).getRandomValues(a);
     return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
   }
-  function goToKakao(mode, sid) {
+  function goToKakao(mode, sid, ask) {
     var n = nonce();
-    return call('kakaoAuthUrl', { method: 'GET', query: 'state=' + encodeURIComponent(n) }).then(function (j) {
+    var q = 'state=' + encodeURIComponent(n) + (ask ? '&prompt=login' : '');
+    return call('kakaoAuthUrl', { method: 'GET', query: q }).then(function (j) {
       try { sessionStorage.setItem(STATE_KEY, JSON.stringify({ mode: mode, sid: sid || '', nonce: n, at: Date.now() })); } catch (e) {}
       global.location.href = j.url;
     });
   }
-  /* 로그인 화면에서 — 아직 아무도 로그인하지 않은 상태로 카카오에 간다 */
-  function goLogin() { return goToKakao('login'); }
+  /* 로그인 화면에서 — 아직 아무도 로그인하지 않은 상태로 카카오에 간다.
+     opts.ask 가 참이면 카카오가 «이미 로그인돼 있어도» 다시 묻는다 — 처음 쓰는 기기(공용 PC 등)에서
+     브라우저에 남은 남의 카카오 로그인으로 들어가지 않게 한다(2026-09-28). */
+  function goLogin(opts) { return goToKakao('login', '', !!(opts && opts.ask)); }
+  /* 이 브라우저의 카카오 로그인까지 끊는 주소 — 포털 로그아웃이 카카오로 들어온 사람일 때 쓴다 */
+  function logoutUrl() { return call('kakaoAuthUrl', { method: 'GET', query: 'kind=logout' }).then(function (j) { return j.url; }); }
   /* 내 정보 화면에서 — 이미 비밀번호로 들어온 사람이 자기 계정에 잇는다 */
   function goLink(sid) { return goToKakao('link', sid); }
 
@@ -100,6 +105,7 @@
 
   global.PuKakao = {
     goLogin: goLogin,
+    logoutUrl: logoutUrl,
     goLink: goLink,
     pending: pending,
     link: link,
