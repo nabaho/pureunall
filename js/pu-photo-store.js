@@ -1070,6 +1070,166 @@
     }).catch(function () { return items; });
   }
 
+  /* ══ 정부사업일정 — 「그 날 그 일정의 담당끼리」 저절로 열기 (대표 결정 2026-09-28) ══
+     "사진첩에 올라온 사진은 왜 정부사업에 실시간으로 공유가 안되나?"
+
+     ★ 조사해 보니 **열어 주는 길이 아예 없었다.** 정부사업일정은 읽기만 하고
+       (addShare 를 한 번도 안 부른다), 사진첩의 자동 공유는 «업체를 달 때»만 돈다.
+       그런데 회의·현장 사진에는 판독이 읽을 상호가 없다 — 실측으로 김동현 321장 가운데
+       업체가 달린 것이 2장. 그래서 그 방아쇠는 영영 안 당겨졌고, 2026년 회의·현장
+       373장 가운데 열린 것이 31장(8.3%)뿐이었다. 나머지는 손으로 한 장씩 연 것이다.
+
+     ★ 대신 쓰는 열쇠는 «그 날 내 일정»이다. 사진 촬영일과 정부사업일정을 맞춰
+       그 일정의 주담당·부담당에게만 연다. 실측 373장 가운데 371장이 맞아떨어졌다.
+
+     ⚠ **판독이 「회의·현장」이라고 확정한 것만** 연다. 안 읽은 사진을 기본값으로
+       회의·현장 취급하면 급여서류·신분증이 그대로 열린다 — 갈래를 «모르는» 것과
+       «회의·현장인» 것은 다른 말이다.
+     ⚠ 직원을 **이름으로 새로 만들지 않고, 동명이인이면 아예 안 고른다.** 사번이 먼저다
+       (정부사업일정 직원 여섯 가운데 셋은 아직 사번이 안 이어져 이름으로만 맞는다).
+     ⚠ **더하기만** 한다(addShare) — 손으로 넣어 둔 공유를 끊지 않는다.
+     ⚠ 남의 사진에 권한을 거는 것은 규칙이 **주인과 총괄관리자**에게만 허락한다. */
+
+  var _govCache = null;
+  function govRows(v) {
+    if (!v) return [];
+    var a = Array.isArray(v) ? v : Object.keys(v).map(function (k) { return v[k]; });
+    return a.filter(Boolean);
+  }
+  function govNm(s) { return String(s || '').replace(/\s/g, ''); }
+  function govDay(ts) {
+    var n = Number(ts);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    var d = new Date(n), p = function (x) { return (x < 10 ? '0' : '') + x; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  /* 순수 — 정부사업일정 자료를 «쓰기 좋은 표»로 바꾼다 (검사 대상).
+     roster 는 listStaff() 가 주는 { uid: {sid, name} } — 재직자만 들어 있다. */
+  function govBuild(staffV, schedV, cosV, roster) {
+    var staff = govRows(staffV), people = roster || {};
+    var bySid = {}, byName = {}, uidOf = {}, staffOf = {}, coName = {};
+    staff.forEach(function (a) {
+      if (!a || !a.id) return;
+      if (a.erpSid) bySid[normSid(a.erpSid)] = a;
+      var n = govNm(a.name);
+      /* 같은 이름이 둘이면 «DUP» 으로 막는다 — 엉뚱한 사람에게 사진이 열린다 */
+      if (n) byName[n] = byName[n] ? 'DUP' : a;
+    });
+    Object.keys(people).forEach(function (uid) {
+      var p = people[uid] || {};
+      var a = (p.sid && bySid[normSid(p.sid)]) || null;
+      if (!a) { var h = byName[govNm(p.name)]; a = (h && h !== 'DUP') ? h : null; }
+      if (!a) return;
+      staffOf[uid] = a.id;
+      if (!uidOf[a.id]) uidOf[a.id] = uid;
+    });
+    govRows(cosV).forEach(function (c) { if (c && c.id) coName[c.id] = c.name || ''; });
+    return { scheds: govRows(schedV), uidOf: uidOf, staffOf: staffOf, coName: coName };
+  }
+
+  /* 순수 — 사진 한 장을 누구에게 열까 (검사 대상) */
+  function govPlan(meta, ownerUid, gov) {
+    var none = { uids: [], why: '' };
+    var m = meta || {}, r = m.read;
+    if (!gov || !r || r.kind !== 'meeting') return none;
+    var me = gov.staffOf[ownerUid];
+    if (!me) return none;
+    var day = govDay(m.takenAt);
+    if (!day) return none;
+    var mine = gov.scheds.filter(function (s) {
+      return s && s.date === day &&
+        (s.attId === me || (s.coAttIds || []).indexOf(me) >= 0);
+    });
+    if (!mine.length) return none;
+    var had = m.shareWith || {}, seen = {}, uids = [], names = [];
+    mine.forEach(function (s) {
+      [s.attId].concat(s.coAttIds || []).forEach(function (a) {
+        if (!a || a === me) return;
+        var u = gov.uidOf[a];
+        if (!u || u === ownerUid || seen[u] || had[u]) return;
+        seen[u] = 1; uids.push(u);
+      });
+      var nm = gov.coName[s.coId] || '';
+      if (nm && names.indexOf(nm) < 0) names.push(nm);
+    });
+    if (!uids.length) return none;
+    var p = day.split('-');
+    var head = names.slice(0, 2).join('·') + (names.length > 2 ? ' 외' : '');
+    return { uids: uids, why: (head ? head + ' ' : '') + (+p[1]) + '/' + (+p[2]) + ' 일정 담당' };
+  }
+
+  function govLoad() {
+    if (_govCache) return Promise.resolve(_govCache);
+    if (!deps.db) return Promise.resolve(null);
+    var one = function (p) {
+      return deps.db.ref(p).once('value').then(function (s) { return s.val(); })
+        .catch(function () { return null; });
+    };
+    /* 한 번 읽고 쥔다 — 사진 삼백 장을 훑을 때마다 읽으면 그만큼 돈이 든다 */
+    return Promise.all([one('scal_staff'), one('scal_scheds'), one('scal_cos'), listStaff()])
+      .then(function (r) {
+        _govCache = govBuild(r[0], r[1], r[2], r[3]);
+        return _govCache;
+      });
+  }
+
+  /* 여러 장을 한꺼번에 — 열 것이 없으면 아무 일도 안 한다.
+     rows: [{ id, year, meta, owner }] · 돌려주는 것 { photos, opened, byWho, rest } */
+  var GOV_CAP = 200;     // 한 판에 이만큼만 — 남은 것은 다음에 열 때 이어 한다
+  function govShare(rows) {
+    var list = (rows || []).filter(function (x) { return x && x.id && x.year; });
+    var nil = { photos: 0, opened: 0, byWho: {}, rest: 0 };
+    if (!list.length) return Promise.resolve(nil);
+    return govLoad().then(function (gov) {
+      if (!gov) return nil;
+      var jobs = [];
+      list.forEach(function (x) {
+        var owner = x.owner || deps.uid;
+        if (owner !== deps.uid && !deps.isAdmin) return;
+        var p = govPlan(x.meta, owner, gov);
+        if (p.uids.length) jobs.push({ id: x.id, year: String(x.year), owner: owner, p: p });
+      });
+      if (!jobs.length) return nil;
+      var rest = Math.max(0, jobs.length - GOV_CAP);
+      jobs = jobs.slice(0, GOV_CAP);
+      var out = { photos: 0, opened: 0, byWho: {}, rest: rest };
+      return jobs.reduce(function (chain, j) {
+        return chain.then(function () {
+          return addShare(j.year, j.id, j.p.uids, j.owner, j.p.why)
+            .then(function (added) {
+              if (!(added || []).length) return;
+              out.photos++; out.opened += added.length;
+              added.forEach(function (u) { out.byWho[u] = (out.byWho[u] || 0) + 1; });
+            })
+            /* 한 장이 막혀도 나머지는 열려야 한다 — 그 한 장 때문에 다 멈추면 안 된다 */
+            .catch(function (e) { console.warn('[일정 담당 공유]', j.id, e && e.message); });
+        });
+      }, Promise.resolve()).then(function () { return out; });
+    }).catch(function (e) {
+      console.warn('[일정 담당 공유]', e && e.message);
+      return nil;
+    });
+  }
+
+  /* 판독이 끝나는 «그 자리»에서 건다 — saveRead 한 곳이 모든 길의 길목이다.
+     ⚠ 한 장씩 보내면 스무 장에 알림이 스무 번 뜬다. 잠깐 모았다 한 번에 연다. */
+  var _govQ = [], _govT = null, _govCb = null;
+  function onGovShare(fn) { _govCb = fn; }
+  function govQueue(year, id, read, owner, meta) {
+    if (!read || read.kind !== 'meeting') return;
+    var m = meta || {};
+    _govQ.push({ id: id, year: String(year), owner: owner,
+      meta: { takenAt: m.takenAt, shareWith: m.shareWith, read: read } });
+    if (_govT) clearTimeout(_govT);
+    _govT = setTimeout(function () {
+      var rows = _govQ; _govQ = []; _govT = null;
+      govShare(rows).then(function (r) {
+        if (r && r.photos && _govCb) { try { _govCb(r); } catch (e) { /* 알림이 막혀도 공유는 됐다 */ } }
+      });
+    }, 1500);
+  }
+
   /* owner 를 넘기면 **그 사람 자리**에 쓴다.
      ⚠ 이 인자가 없던 동안, 관리자가 남의 사진을 판독하면 결과가 자기 자리의
        없는 사진 밑으로 들어갔다. 그래서 화면이 판독 자체를 잠갔고, 결국 다른
@@ -1116,11 +1276,21 @@
   }
 
   function saveRead(year, id, read, owner) {
-    return updateAlive(year, id, owner, function (path) {
+    /* ⚠ 지워진 사진이면 build 가 아예 안 불린다 — 그때는 seen 이 null 로 남아
+       아래에서 공유도 안 건다. 없는 사진을 열어 줄 수는 없다. */
+    var seen = null;
+    return updateAlive(year, id, owner, function (path, meta) {
+      seen = meta;                      // 촬영일·이미 열린 사람을 아래에서 본다
       var u = {};
       u[path + '/read'] = read;
       if (isSensitiveRead(read)) u[path + '/fullUrl'] = null;
       return u;
+    }).then(function (r) {
+      /* 「회의·현장」으로 확정됐다 — 그 날 그 일정의 담당에게 저절로 연다.
+         ⚠ 여기가 판독 길 여럿이 모이는 **유일한 길목**이다. 부르는 쪽마다 걸면
+           꼭 한 곳이 빠지고, 그 길로 올린 사진만 영영 안 열린다. */
+      if (seen) govQueue(year, id, read, owner || deps.uid, seen);
+      return r;
     });
   }
 
@@ -2359,6 +2529,11 @@
     setShare: setShare,
     addShare: addShare,
     uidBySid: uidBySid,
+    /* 정부사업일정 — 그 날 그 일정의 담당끼리 (govBuild·govPlan 은 검사가 쓴다) */
+    govShare: govShare,
+    govBuild: govBuild,
+    govPlan: govPlan,
+    onGovShare: onGovShare,
     listSharedToMe: listSharedToMe,
     watchSharedCount: watchSharedCount,
     fillSharedNames: fillSharedNames,
