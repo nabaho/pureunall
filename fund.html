@@ -199,7 +199,10 @@
   .addrstack{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
   .addrstack .ar1{display:flex;gap:6px;flex:none}
   .addrstack .ar1 .zip{width:96px;flex:none}
-  .addrstack .ar1 .zip input{font-family:monospace;text-align:center;background:var(--bg);color:var(--sub)}
+  /* ⚠ width:100% — 없으면 input 이 브라우저 기본 폭(약 170px)으로 96px 칸을 넘쳐, 옆 [우편번호 검색] 단추가
+     그 위에 겹쳐 앉았다(2026-09-28 대표 캡쳐 「이상하다」). 단추 높이도 칸과 같게 늘인다. */
+  .addrstack .ar1{align-items:stretch}
+  .addrstack .ar1 .zip input{width:100%;font-family:monospace;text-align:center;background:var(--bg);color:var(--sub)}
   .addrstack .ar1 button{white-space:nowrap;padding:0 10px;font-size:12.5px}
   .addrstack>input{flex:1;min-width:180px}
   .msg{margin:12px 0;padding:9px 13px;border-radius:8px;font-size:12.5px;display:none}
