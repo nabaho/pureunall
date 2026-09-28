@@ -146,13 +146,19 @@ test('★★★ AI 초안이 «제목만 보고 두 문장»을 쓰게 시키지
        한 문장」을 요구했다. 둘째 문장은 «지어낼 수밖에» 없다 —
        법인 이름으로 114곳에 나가는 글이라 지어낸 한 문장이 크게 아프다.
      ★ 참고가 있는 것과 없는 것을 갈라서 시켜야 한다. */
+  /* ⚠ 지시문은 2026-09-28 부터 Core.기사초안지시 «한 곳»에 있다(금요일 자동 준비도 같이 부른다).
+       화면이 «그것을 부르는지»와 «그 지시가 갈라 시키는지»를 둘 다 본다. */
   const i = news.indexOf('async function AI초안짓기(');
   assert.ok(i > 0, 'AI초안짓기 를 못 찾음');
-  const fn = news.slice(i, i + 3000);
+  const 부름 = news.slice(i, i + 3000);
+  assert.ok(부름.indexOf('Core.기사초안지시(') >= 0, '★★ 화면이 한 벌 지시(Core.기사초안지시)를 안 부른다');
+  assert.ok(부름.indexOf('참고:') >= 0, 'AI 에 참고를 안 넘긴다');
+  const j = core.indexOf('function 기사초안지시(');
+  assert.ok(j > 0, 'Core.기사초안지시 를 못 찾음');
+  const fn = core.slice(j, j + 1600);
   assert.ok(fn.indexOf('「참고」가 비어 있는 항목') >= 0,
     '★★★ 참고가 없을 때를 안 갈라 시킨다 — 제목만 보고 두 문장을 지어낸다');
   assert.ok(fn.indexOf('한 글자도 보태지 마세요') >= 0, '보태지 말라고 안 한다');
-  assert.ok(fn.indexOf('참고:') >= 0, 'AI 에 참고를 안 넘긴다');
 });
 
 test('★★★ AI 결과는 «우리말에 바로 안 들어간다» — 사람이 확인해야 편지에 실린다', () => {
@@ -183,9 +189,9 @@ test('★★ 화면이 자료를 «값어치 순»으로 줄 세운다 — 모�
   const fn = news.slice(i, i + 2400);
   assert.ok(fn.indexOf('값어치순(') >= 0,
     '★★ 자료를 값어치로 안 세운다 — 홍보성 보도자료가 가이드를 밀어낸다');
-  assert.ok(news.indexOf('function 값어치순(') >= 0, '값어치순 이 없다');
+  assert.ok(core.indexOf('function 값어치순(') >= 0, '값어치순 이 없다(Core 한 벌 — 2026-09-28)');
   /* 판례는 그대로 최근 순 — 거기는 값어치 잣대가 없고 새 판결이 곧 값이다 */
-  assert.ok(/판례 = 최근것\(/.test(fn), '판례까지 값어치로 세우고 있다');
+  assert.ok(/판례 = (Core\.)?최근것\(/.test(fn), '판례까지 값어치로 세우고 있다');
 });
 
 test('★ 값어치를 «적어 두는» 쪽이 있다 — 화면만 고치면 늘 0 이 된다', () => {
@@ -198,9 +204,10 @@ test('★ 값어치를 «적어 두는» 쪽이 있다 — 화면만 고치면 �
 test('값어치가 없는 «옛 자료»도 줄에서 빠지지 않는다', () => {
   /* ⚠ 0 으로 보아 보도자료(-1)보다는 위, 가이드(4)보다는 아래에 선다.
        빼 버리면 새로 모으기 전까지 창고의 절반이 안 보인다. */
-  const i = news.indexOf('function 값어치순(');
-  const 끝 = news.indexOf(String.fromCharCode(10) + '}', i);
-  const fn = news.slice(i, 끝 > i ? 끝 : i + 800);
+  /* ⚠ 줄 세우기는 2026-09-28 부터 Core 한 벌이다 — 화면도 서버(금요일)도 그것을 부른다 */
+  const i = core.indexOf('function 값어치순(');
+  assert.ok(i > 0, 'Core.값어치순 을 못 찾음');
+  const fn = core.slice(i, core.indexOf('function 최근것(', i) > i ? core.indexOf('function 최근것(', i) : i + 800);
   assert.ok(/isFinite\(v\) \? v : 0/.test(fn), '옛 자료를 0 으로 안 본다');
   assert.ok(fn.indexOf('.filter(Boolean)') >= 0, '빈 칸을 안 거른다');
 });
