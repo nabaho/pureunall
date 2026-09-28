@@ -217,6 +217,7 @@ function drawTodo(lack, on){
     /* 2026-09-12: 거르개에 「확인서 갱신」이 늘었다 — 이 검사는 「정보부족」 줄만 보므로
        세는 일은 대역으로 둔다(잣대는 tests/cards-co-sme-due.test.js 가 본다). */
     coSmeCount: () => 0, coCtCount: () => 0, coNtsBadCount: () => 0,
+    coNtsMatchBadCount: () => 0,
     closeFolderMenu(){}, renderCoAny(){}, setTimeout(){},
     document: { addEventListener(){} }, window: { innerWidth: 1600 },
     $: () => box };
