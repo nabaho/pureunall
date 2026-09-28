@@ -1684,8 +1684,9 @@ body.portal-mode #moreFab{display:flex;}
       } else {
         // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시
         try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
-        // 카카오 확인 중에는 «아직 로그인 전» 이 당연하다 — 여기서 걷으면 로그인 화면이 드러난다
-        if(!window.__kkReturning) _rmBootSplash();
+        // 카카오 확인 중에는 «아직 로그인 전» 이 당연하다 — 여기서 걷으면 로그인 화면이 드러난다.
+        // 다른 앱에서 나간 카카오 사용자의 흔적이 있으면 카카오 쪽부터 정리하러 간다(kkClearStale).
+        if(!window.__kkReturning && !kkClearStale()) _rmBootSplash();
         if(_persistenceBootError){
           showErr('자동로그인 저장소를 열 수 없습니다. 삼성 인터넷 또는 Chrome에서 다시 로그인해 주세요.');
         }
@@ -1773,6 +1774,7 @@ body.portal-mode #moreFab{display:flex;}
       }).then(function(cred){
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
         kkMarkUsed();
+        kkNoteSession(true);            // 이 기기에 «카카오로 들어와 있음» — 어디서 나가든 로그인 화면이 카카오를 정리한다
         try {
           cred.user.getIdToken().then(function(tok){ reportLogin(cred.user.email || '', true, '', tok); }).catch(function(){});
         } catch(e){}
@@ -1833,6 +1835,39 @@ body.portal-mode #moreFab{display:flex;}
   var KK_LATER_KEY = 'pu_kakao_later:';          // 뒤에 사번을 붙인다 — 여럿이 쓰는 PC 에서 남의 「나중에」가 내 것을 가리지 않게
   var KK_LATER_MS = 7 * 24 * 60 * 60 * 1000;     // 「나중에」 → 7일 동안 안 뜬다 (목업대로)
   function kkMarkUsed(){ try { localStorage.setItem(KK_USED_KEY, '1'); } catch(e){} }
+
+  /* ── 어느 앱에서 나가든 카카오도 풀린다 (대표 「추천대로」 2026-09-28) ─────────────────────
+     로그아웃하는 길이 앱마다 제각각이다(15개 앱 · 20곳 남짓, 60분 자동 로그아웃 포함). 하나하나
+     고치면 반드시 빠진다. 그래서 «길목 한 곳» — 포털 로그인 화면 — 에서 막는다:
+       다음 사람이 노란 단추를 누르려면 이 화면을 반드시 거친다.
+     ① 카카오로 들어오면 이 기기에 표시(KK_SESSION_KEY)를 남긴다.
+     ② 로그인 화면이 «로그인 안 됨» 으로 떴는데 그 표시가 남아 있으면 → 앞 사람이 어딘가에서
+        나갔고 카카오 쪽 로그인은 브라우저에 남아 있을 수 있다 → 카카오 로그아웃을 거쳐 돌아온다.
+     ⚠ 표시는 가기 «전에» 지운다 — 카카오 쪽이 오류를 내도 되풀이해 튕기지 않게(한 번만 간다).
+     ⚠ 카카오에서 막 돌아온 참(__kkReturning)이면 안 간다 — 그건 «들어오는 중» 이다. */
+  var KK_SESSION_KEY = 'pu_kakao_session';
+  function kkNoteSession(on){
+    try { if(on) localStorage.setItem(KK_SESSION_KEY, '1'); else localStorage.removeItem(KK_SESSION_KEY); } catch(e){}
+  }
+  function kkClearStale(){
+    var f = false;
+    try { f = localStorage.getItem(KK_SESSION_KEY) === '1'; } catch(e){}
+    if(!f || window.__kkReturning || !window.PuKakao || !PuKakao.logoutUrl) return false;
+    kkNoteSession(false);
+    // 로그인 화면이 잠깐 비쳤다 튀지 않게 스플래시로 가리고 까닭을 적는다
+    var s = $('pu-boot-splash'), m = $('pu-boot-msg');
+    if(s) s.style.display = 'flex';
+    if(m){ m.textContent = '🔒 앞서 쓴 카카오 로그인을 정리하는 중…'; m.style.display = 'block'; }
+    var done = false;
+    var t = setTimeout(function(){ if(!done){ done = true; _rmBootSplash(); } }, 4000);
+    PuKakao.logoutUrl().then(function(url){
+      if(done) return; done = true; clearTimeout(t);
+      // 카카오 «로그아웃» 주소일 때만 간다(옛 서버는 로그인 주소를 돌려준다 — kkLogoutFlow 와 같은 막이)
+      if(!/^https:\/\/kauth\.kakao\.com\/oauth\/logout\?/.test(String(url || ''))) return _rmBootSplash();
+      location.href = url;
+    }).catch(function(){ if(!done){ done = true; clearTimeout(t); _rmBootSplash(); } });
+    return true;
+  }
   function kkUnfoldPw(){
     var f = $('pwFold'), b = $('pwFoldBtn');
     if(f) f.style.display = '';
@@ -2505,6 +2540,13 @@ body.portal-mode #moreFab{display:flex;}
     try { pkSetupRegister(mySid, name); } catch(e){}
     try { kkAfterLogin(); } catch(e){}
     try { kkSetupRegRow(mySid); } catch(e){}
+    /* 이번 판 전에 이미 카카오로 들어와 있던 사람은 표시가 없다 — 표(kakao:true)를 보고 남긴다.
+       비밀번호로 들어온 사람이면 지운다(남의 흔적으로 다음 로그인 화면이 괜히 카카오에 가지 않게). */
+    try {
+      auth.currentUser && auth.currentUser.getIdTokenResult().then(function(r){
+        kkNoteSession(!!(r && r.claims && r.claims.kakao === true));
+      }).catch(function(){});
+    } catch(e){}
     try { billStart(role); } catch(e){}   // 💳 사용액 — 관리자일 때만 안이 돈다
     var title = acct ? (acct.title || '') : '';
     /* ★ 이름 옆에 «사번» 을 함께 적는다 (2026-08-10 제보의 핵심 고침).
@@ -3444,6 +3486,9 @@ body.portal-mode #moreFab{display:flex;}
           /* ⚠ 카카오 «로그아웃» 주소일 때만 간다 — 서버가 아직 옛 판이면 kind 를 모르고 «로그인» 주소를
              돌려준다. 그리로 가면 로그아웃 누른 사람이 카카오 로그인 화면에 서게 된다. */
           if(!/^https:\/\/kauth\.kakao\.com\/oauth\/logout\?/.test(String(url || ''))) return location.reload();
+          /* 지금 카카오까지 끊으러 가므로, 돌아온 로그인 화면이 한 번 더 가지 않게 표시를 지운다.
+             ⚠ 여기서만 지운다 — 주소를 못 받아 그냥 새로 열면 표시가 남아, 로그인 화면이 대신 정리하러 간다. */
+          kkNoteSession(false);
           location.href = url;
         }).catch(function(){ if(!done){ done = true; clearTimeout(t); location.reload(); } });
       });
