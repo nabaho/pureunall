@@ -17611,7 +17611,22 @@ function erpCoTransferGap(contract, target){
   var norm = function(v){ return base(String(v == null ? '' : v).replace(/[（(]\s*[주유재사]\s*[)）]/g, ' ')); };
   if(out.ctName && out.coName && norm(out.ctName) !== norm(out.coName)) out.nameGap = true;
   if(out.ctType && out.coType && out.ctType !== out.coType) out.typeGap = true;
-  out.differs = out.nameGap || out.typeGap;
+  /* ★ 끝난 업체에 새 업체계약이 오는 것 — 「예전엔 자문사가 아니었다가 자문사가 된다」
+     (대표 지시 2026-09-28). 이관은 «빈 칸만» 채우므로 상태(종료)는 그대로 남고,
+     업체관리는 일하는 곳만 보여 주니 이관하고도 «어디에도 안 보인다». 그래서 여기서 멈춰 묻는다. */
+  out.coStatus = String((target && target.status) || '');
+  out.ended = { closed:1, inactive:1, terminated:1 }[out.coStatus] === 1;
+  out.differs = out.nameGap || out.typeGap || out.ended;
+  /* 「유형을 바꿔 넣기」를 내놓아도 되는가 — «같은 회사»일 때만.
+     · 지금 유형이 컨설팅 자동 등록으로 붙은 「컨설팅」이다 (진짜 업체계약 유형이 아니다)
+     · 또는 끝난 업체다 (다시 계약한다)
+     ⚠ 이름이 다르면 절대 안 내놓는다 — 새롬(자문 계약이 기금 업체로 들어간 일)이 그 자리다.
+     ⚠ 일하는 중인 진짜 유형(급여 등)을 바꾸는 길은 안 연다 — 그 업체가 하던 일을 지운다.
+     ※ 「컨설팅」·「company-auto-consult」 는 컨설팅 자동 등록(CompanyRef.registerIfMissing)이
+       붙이는 유형이다 — 이름과 코드 둘 다 쓰인다. 표는 함수 «안»에 둔다(밖에 두면
+       이 함수만 떼어 돌리는 검사가 못 돈다). */
+  out.canPromote = !out.nameGap && !!out.ctType
+    && ((out.typeGap && { '컨설팅':1, 'company-auto-consult':1 }[out.coType] === 1) || out.ended);
   return out;
 }
 /* 견줌표를 «만들어진 DOM 노드»로 짓는다 — popConfirm 은 문자열 HTML 을 안 받는다.
@@ -17619,7 +17634,8 @@ function erpCoTransferGap(contract, target){
 function erpCoTransferGapNode(gap, typeName){
   var wrap = document.createElement('div');
   var head = document.createElement('div');
-  head.textContent = '고르신 업체가 계약서와 다릅니다';
+  head.textContent = (gap.nameGap || gap.typeGap) ? '고르신 업체가 계약서와 다릅니다'
+    : '고르신 업체는 «끝난 업체»입니다';
   Object.assign(head.style, { fontWeight:'700', color:'#991b1b', marginBottom:'8px' });
   wrap.appendChild(head);
   var tbl = document.createElement('table');
@@ -17639,11 +17655,17 @@ function erpCoTransferGapNode(gap, typeName){
   row('', '계약서', '고르신 업체', false);
   row('업체명', gap.ctName || '-', gap.coName || '-', gap.nameGap);
   row('유형', typeName(gap.ctType) || '-', typeName(gap.coType) || '-', gap.typeGap);
+  if(gap.ended) row('상태', '일하는 중', '끝난 업체', true);
   wrap.appendChild(tbl);
   var tail = document.createElement('div');
-  tail.textContent = '이대로 이관하면 「' + (gap.coName || '') + '」 안으로 들어갑니다. '
-    + '빈 칸이 계약서 값으로 채워지고, 이미 값이 있는 업체명·유형은 «안 바뀝니다» — '
-    + '한 업체 안에 두 회사가 섞입니다.';
+  tail.textContent = gap.canPromote
+    ? '같은 회사로 보입니다. 「유형으로 바꿔 넣기」를 누르면 이 업체를 「' + (typeName(gap.ctType) || '') + '」 유형으로'
+      + (gap.ended ? ', 상태를 「일하는 중」으로' : '') + ' 바꾸고 빈 칸을 채웁니다. '
+      + '업체관리의 「↩ 계약관리로 복귀」로 되돌릴 수 있습니다. '
+      + '「그래도 이 업체에 넣기」는 유형·상태를 «안 바꿉니다».'
+    : '이대로 이관하면 「' + (gap.coName || '') + '」 안으로 들어갑니다. '
+      + '빈 칸이 계약서 값으로 채워지고, 이미 값이 있는 업체명·유형은 «안 바뀝니다» — '
+      + '한 업체 안에 두 회사가 섞입니다.';
   Object.assign(tail.style, { marginTop:'9px', fontSize:'11.5px', color:'#854d0e',
     background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 10px', lineHeight:'1.7' });
   wrap.appendChild(tail);
@@ -17853,6 +17875,72 @@ function erpContractDupBlock(form, contracts){
   });
 }
 
+/* ══════ 「새 계약」 쪽지 — 다른 화면이 계약 창을 «채워서 열어 달라»고 남긴 것 ══════
+   (사진첩 2026-09-18 · 회사 한 장 2026-09-18 · 기업정보함 명함 2026-09-28)
+
+   ■ 쪽지 자리가 «둘»이다.
+     · sessionStorage — 이 탭 안에서 건너올 때 (회사 한 장 → 계약관리)
+     · localStorage   — 다른 탭에서 올 때 (기업정보함 명함 → 푸른이알피)
+   ⚠⚠ 기업정보함은 sessionStorage 로 못 넘긴다 — 탭마다 따로라서, 푸른이알피가
+     이미 열려 있으면(대개 그렇다) 쪽지가 그 탭에 «안 닿는다». 눌러도 빈 창이 뜬다.
+   ⚠ 한 번 쓰고 «지운다». 안 지우면 계약관리를 열 때마다 등록 창이 다시 뜬다.
+   ⚠ 오래된 쪽지는 버린다 — 어제 눌러 둔 것이 오늘 갑자기 뜨면 무슨 일인지 알 수 없다.
+   ⚠ 계약을 «만들지는» 않는다. 창을 열 뿐이고, 저장은 여느 계약과 똑같이
+     업체 연결 검증·중복 검사·잠금 검사를 지난다. */
+var ERP_CT_SEED_KEY = 'pu_new_contract';
+var ERP_CT_SEED_TTL = 10 * 60 * 1000;
+function erpTakeContractSeed(stores, now){
+  var list = stores || [];
+  for(var i = 0; i < list.length; i++){
+    var st = list[i], raw = '';
+    if(!st) continue;
+    try { raw = st.getItem(ERP_CT_SEED_KEY) || ''; } catch(_){ continue; }
+    if(!raw) continue;
+    try { st.removeItem(ERP_CT_SEED_KEY); } catch(_){}
+    var seed = null;
+    try { seed = JSON.parse(raw); } catch(_){ continue; }
+    if(!seed || !seed.company) continue;
+    if(!seed.at || now - seed.at > ERP_CT_SEED_TTL) continue;
+    return seed;
+  }
+  return null;
+}
+/* 명함에서 «업체계약»으로 왔을 때, 그 유형이 «지금» 유형표에 있는가.
+   ⚠ 없으면 null — 사람이 고른다. 지웠거나 숨긴 유형을 찍어 넣으면 드롭다운에 없는
+     값이 저장되고, 업체관리 어느 탭에도 안 나온다. */
+function erpSeedCompanyType(seed, types){
+  var want = String(((seed && seed.typeCodes) || {}).company || '').trim();
+  if(!want) return null;
+  return (types || []).find(function(t){
+    return t && !t.hidden && (t.code === want || t.name === want);
+  }) || null;
+}
+/* 쪽지에 실려 온 담당자 줄 — 사람이 있는 줄만, 첫 줄이 대표 담당자다 */
+function erpSeedContacts(list){
+  var out = [];
+  (Array.isArray(list) ? list : []).forEach(function(c){
+    if(!c) return;
+    var row = { id:'mc-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+      name:String(c.name || '').trim(), role:String(c.role || '').trim(),
+      phone:String(c.phone || '').trim(), bizPhone:String(c.bizPhone || '').trim(),
+      fax:String(c.fax || '').trim(), email:String(c.email || '').trim(), isPrimary:false };
+    if(!row.name && !row.phone && !row.email) return;
+    out.push(row);
+  });
+  if(out.length) out[0].isPrimary = true;
+  return out;
+}
+/* 담당자 줄이 «빈 줄뿐»인가 — 빈 서식은 빈 줄 하나를 들고 있다 */
+function erpContactsBlank(list){
+  return !(Array.isArray(list) ? list : []).some(function(c){
+    return c && (String(c.name || '').trim() || String(c.phone || '').trim() || String(c.email || '').trim());
+  });
+}
+/* 새 계약 임시저장 열쇠 — 계약 창과 쪽지 받는 자리가 «같은 열쇠»를 봐야 한다 */
+function erpContractDraftKey(cur){
+  return 'pureun_v6_contract_draft_' + (CURRENT_USER ? CURRENT_USER.sid : 'anon') + '_' + (cur ? cur.id : 'new');
+}
+
 /* 두 번 겹쳐 돌지 않게 — 화면이 다시 그려져도 처리는 한 번이다.
    ⚠ 겹쳐 돌면 같은 요청으로 계약이 둘 생긴다(요청을 지우기 «전»에 둘째가 읽는다). */
 var _erpCtReqBusy = false;
@@ -17866,9 +17954,7 @@ function ContractModal(props){
   var firstMgr = '';  // 신규 계약은 주담당 미선택 - 사용자가 직접 선택해야 함
 
   // draft LS 키 (신규=user별 1개, 수정=계약id별)
-  var DRAFT_KEY = 'pureun_v6_contract_draft_' +
-    (CURRENT_USER ? CURRENT_USER.sid : 'anon') + '_' +
-    (props.cur ? props.cur.id : 'new');
+  var DRAFT_KEY = erpContractDraftKey(props.cur);
 
   // 동시편집 가드: 모달 진입 시점의 updatedAt 캡처
   var origUpdatedAt = (props.cur && props.cur.updatedAt) || 0;
@@ -17906,6 +17992,18 @@ function ContractModal(props){
       init.kinds = ['consulting'];
       init.typeCodes = Object.assign({}, init.typeCodes, props.seed.typeCodes);
     }
+    /* ★ 명함에서 «업체계약»(자문·급여·노조·기금)으로 왔을 때 (대표 지시 2026-09-28).
+       유형은 받는 자리가 유형표로 확인한 것만 여기 온다(erpSeedCompanyType) — 근거는
+       사람이 명함 창에서 «직접 고른 것»이다. */
+    else if(props.seed.typeCodes && props.seed.typeCodes.company){
+      init.kinds = ['company'];
+      init.typeCodes = Object.assign({}, init.typeCodes, { company: props.seed.typeCodes.company });
+    }
+    if(props.seed.note && !init.note) init.note = String(props.seed.note);
+    /* 담당자 — 빈 서식의 담당자 칸은 «빈 줄 하나»(배열)라 위의 빈 칸 얹기로는 안 들어간다.
+       ⚠ 이미 누가 적혀 있으면 안 바꾼다. */
+    var seedPeople = erpSeedContacts(props.seed.company.contacts);
+    if(seedPeople.length && erpContactsBlank(init.company.contacts)) init.company.contacts = seedPeople;
   }
   // 옛 데이터 호환
   if(!init.kinds){
@@ -21729,7 +21827,8 @@ function arvBadge(x, store, onDone){
 
 // contract.kinds 배열을 돌면서 각 종류별로 데이터 생성
 // 반환: [{type, no, id}, ...] 결과 배열
-function transferContract(contract){
+/* opt.promote — 막이 창에서 「유형 바꿔 넣기」를 고른 것(doTransfer). 없으면 예전 그대로 빈 칸만 채운다. */
+function transferContract(contract, opt){
   contract=erpPrepareContractTransfer(contract);
   if(!contract)return [];
   var kinds = (contract.kinds && contract.kinds.length) ? contract.kinds.slice() : (contract.kind ? [contract.kind] : []);
@@ -21848,9 +21947,32 @@ function transferContract(contract){
           undoBefore.contacts = (exist.contacts || []).slice();
           undoAfter.contacts = mg.contacts;
         }
-        var kept = filledKeys.length
-          ? '빈 칸 ' + filledKeys.length + '개를 채웠습니다'
-          : '이미 다 들어 있어 그대로 두었습니다';
+        /* ★ 「유형 바꿔 넣기」 — 사람이 막이 창에서 골랐을 때만 (2026-09-28).
+           컨설팅만 하던 곳·끝난 곳이 자문 등으로 오면, 빈 칸만 채워서는 유형·상태가 그대로라
+           업체관리의 그 탭에 «안 나온다». 이 둘만은 값이 있어도 바꾼다.
+           ⚠ 되돌릴 자리(before/after)에 함께 적는다 — 「↩ 계약관리로 복귀」가 옛 값으로 돌린다.
+           ⚠ 부르는 쪽이 opt 를 줬어도 «여기서 한 번 더» 본다 — 이름이 다른 업체의 유형을
+             바꾸면 새롬 같은 일이 «유형까지» 덮어쓰며 일어난다. */
+        var blankN = filledKeys.length;   // 「빈 칸 N개」는 바꾼 것을 빼고 센다
+        var promoted = [];
+        var _pg = (opt && opt.promote) ? erpCoTransferGap(contract, exist) : null;
+        if(_pg && _pg.canPromote){
+          var promo = {};
+          if(item.typeCode && exist.typeCode !== item.typeCode) promo.typeCode = item.typeCode;
+          if(_pg.ended) promo.status = 'active';
+          Object.keys(promo).forEach(function(k){
+            if(filledKeys.indexOf(k) < 0) filledKeys.push(k);
+            undoBefore[k] = exist[k] === undefined ? '' : exist[k];
+            undoAfter[k] = promo[k];
+            patch[k] = promo[k];
+          });
+          if(promo.typeCode) promoted.push('유형 「' + (exist.typeCode || '-') + '」→「' + promo.typeCode + '」');
+          if(promo.status) promoted.push('상태 「' + (exist.status || '-') + '」→「일하는 중」');
+        }
+        var kept = (blankN
+          ? '빈 칸 ' + blankN + '개를 채웠습니다'
+          : '이미 다 들어 있어 그대로 두었습니다')
+          + (promoted.length ? ' · 바꾼 것: ' + promoted.join(', ') : '');
         patch.note = String(exist.note || '') +
           (exist.note ? '\n' : '') + '계약(' + contract.contractNo + ') 이관 — ' + kept;
         patch.xferUndo = { mode:'merged', contractNo:contract.contractNo, contractId:contract.id,
@@ -22553,27 +22675,72 @@ function ContractManagement(props){
      ⚠ 오래된 쪽지는 버린다 — 어제 눌러 둔 것이 오늘 갑자기 뜨면 무슨 일인지 알 수 없다.
      ⚠ 계약을 «만들지는» 않는다. 창을 열 뿐이고, 저장은 여느 계약과 똑같이
        업체 연결 검증·중복 검사·잠금 검사를 지난다. */
-  useEffect(function(){
-    var raw = '';
-    try { raw = sessionStorage.getItem('pu_new_contract') || ''; } catch(_){ return; }
-    if(!raw) return;
-    try { sessionStorage.removeItem('pu_new_contract'); } catch(_){}
-    var seed = null;
-    try { seed = JSON.parse(raw); } catch(_){ return; }
-    if(!seed || !seed.company) return;
-    if(!seed.at || Date.now() - seed.at > 10 * 60 * 1000) return;   // 10분 지난 쪽지는 버린다
+  /* 쪽지를 꺼내는 것은 erpTakeContractSeed «한 곳»이다(자리가 둘인 까닭은 그 머리글).
+     ⚠ 창이 열려 있을 때는 안 꺼낸다 — 쓰던 계약 창이 명함 쪽 창으로 «바뀌어» 버린다.
+       쪽지는 그대로 두고, 창을 닫으면 아래 [modal] 효과가 다시 꺼낸다. */
+  var modalOpenRef = useRef(false);
+  modalOpenRef.current = !!modal;
+  async function takeNewContractSeed(){
+    var stores = [];
+    try { stores.push(window.sessionStorage); } catch(_){}
+    try { stores.push(window.localStorage); } catch(_){}
+    var seed = erpTakeContractSeed(stores, Date.now());
+    if(!seed) return;
+    var nm = String((seed.company && seed.company.name) || '').trim() || '새 회사';
     /* ★ 서류 이름으로 컨설팅 «유형»까지 미리 고른다 (대표 지시 2026-09-18).
        ⚠ 못 찾으면 아무것도 안 얹는다 — 사람이 고른다. 이름이 비슷한 유형이 둘이면
          하나를 찍는 순간 절반은 틀린다(erpConsTypeByDocName 머리의 실측 참고).
        ⚠ 골랐으면 **무엇으로 골랐는지 말한다** — 말없이 골라 두면 대표님이 그 유형을
-         손수 고르신 줄 알고 지나치신다. */
+         손수 고르신 줄 알고 지나치신다.
+       ★ 명함에서 온 «업체계약»은 사람이 고른 유형을 들고 온다 — 유형표에 있는지만 본다. */
     var docName = (seed.srcPhoto && seed.srcPhoto.name) || '';
-    var ty = docName ? erpConsTypeByDocName(docName, dbGet('biz_cons_types', BIZ_CONS_SEED)) : null;
-    if(ty && ty.code) seed.typeCodes = { consulting: ty.code };
+    var ty = null, coTy = null;
+    if(seed.typeCodes && seed.typeCodes.company){
+      coTy = erpSeedCompanyType(seed, dbGet('biz_company_types', COMPANY_TYPE_SEED));
+      seed.typeCodes = coTy ? { company: coTy.code } : {};
+    } else {
+      ty = docName ? erpConsTypeByDocName(docName, dbGet('biz_cons_types', BIZ_CONS_SEED)) : null;
+      if(ty && ty.code) seed.typeCodes = { consulting: ty.code };
+    }
+    /* ⚠ 쓰다 만 새 계약이 있으면 «묻는다». 계약 창은 쓰다 만 것을 먼저 되살린다(DRAFT_KEY) —
+       안 물으면 명함에서 눌렀는데 «다른 회사»가 들어 있는 창이 뜨고, 가져온 것은 조용히 사라진다. */
+    var dk = erpContractDraftKey(null), old = null;
+    try { old = JSON.parse(localStorage.getItem(dk) || 'null'); } catch(_){ old = null; }
+    if(old && old.__savedAt){
+      var oldNm = String(old.companyName || (old.company && old.company.name) || '').trim();
+      var fresh = await popConfirm('쓰다 만 새 계약' + (oldNm ? ' 「' + oldNm + '」' : '') + '이 있습니다.\n\n'
+        + '「' + nm + '」 새 계약으로 시작하면 쓰다 만 것은 지워집니다.',
+        { okText:'「' + nm + '」 새 계약으로 시작', cancelText:'쓰다 만 것 이어 쓰기', danger:false });
+      if(!fresh){
+        openAdd(null);
+        showToast('쓰다 만 계약을 열었습니다 — 「' + nm + '」 정보는 쓰지 않았습니다. 다시 누르면 됩니다', 8000);
+        return;
+      }
+      try { localStorage.removeItem(dk); } catch(_){}
+    }
     openAdd(seed);
-    showToast(ty && ty.code
+    showToast(coTy
+      ? '🏢 「' + nm + '」 정보를 「' + (coTy.name || coTy.code) + '」 업체계약으로 채웠습니다 — 주담당·기간·금액만 넣어 주세요'
+        + (seed.note ? ' · 메모도 확인해 주세요' : '')
+      : (seed.typeCodes && seed.typeCodes.consulting && ty)
       ? '📋 「' + docName + '」 으로 유형을 「' + (ty.name || '') + '」 으로 골라 뒀습니다 — 기간·금액만 넣어 주세요'
-      : '📋 신청서의 회사 정보를 채웠습니다 — 유형·기간·금액을 골라 주세요', 8000);
+      : '📋 「' + nm + '」 의 회사 정보를 채웠습니다 — 유형·기간·금액을 골라 주세요', 9000);
+  }
+  /* 처음 열 때, 그리고 계약 창을 «닫을 때마다» 쪽지를 본다 */
+  useEffect(function(){ if(!modal) takeNewContractSeed(); }, [modal]);
+  /* ★ 푸른이알피가 «이미 열려 있을 때» — 다른 탭(기업정보함)이 쪽지를 놓으면 여기서 듣는다.
+     안 들으면 새로고침하기 전까지 아무 일도 안 일어난다. */
+  useEffect(function(){
+    function onSeed(ev){
+      if(!ev || ev.key !== ERP_CT_SEED_KEY || !ev.newValue) return;
+      if(modalOpenRef.current){
+        showToast('📋 명함에서 계약 요청이 왔습니다 — 지금 쓰던 계약 창을 닫으면 열립니다', 9000);
+        return;
+      }
+      takeNewContractSeed();
+    }
+    window.addEventListener('storage', onSeed);
+    return function(){ window.removeEventListener('storage', onSeed); };
   }, []);
   /* ══════ 사진첩 「계약 등록 요청」 자동 처리 (대표 지시 2026-09-19 「가」) ══════
      「신청서 캡처가 OCR 된 뒤 담당자만 고르면 계약관리에 자동으로 올라가게」
@@ -23046,6 +23213,9 @@ function ContractManagement(props){
     /* ⓒ 이관 막이 — 고른 업체가 계약서와 다르면 여기서 한 번 멈춘다 (erpCoTransferGap 주석 참조).
        ⚠ 「그래도 넣기」를 기본 단추로 두지 않는다. 기본은 «그만두기»다 —
          엔터를 눌러 넘기다 두 회사를 섞는 일이 이 막이를 만든 까닭이다. */
+    /* ★ 「유형 바꿔 넣기」 — 컨설팅만 하던 곳·끝난 곳이 업체계약(자문 등)으로 오는 것 (2026-09-28).
+       ⚠ 바꿔도 되는지는 erpCoTransferGap 이 정한다(canPromote). 여기서 따로 따지지 않는다. */
+    var _xferOpt = null;
     if(kindsList.indexOf('company') >= 0 && ct.companyId){
       var _coTgt = (dbGet('companies', []) || []).find(function(x){ return x && !x._deleted && x.id === ct.companyId; });
       var _gap = _coTgt ? erpCoTransferGap(ct, _coTgt) : null;
@@ -23055,10 +23225,13 @@ function ContractManagement(props){
           var t = ts.find(function(x){ return x && x.code === code; });
           return t ? t.name : code;
         };
+        var _choices = [{ key:'force', label:'그래도 이 업체에 넣기' }];
+        if(_gap.canPromote) _choices.unshift({ key:'promote', label:'「' + _tn(_gap.ctType) + '」 유형으로 바꿔 넣기' });
         var _go = await popConfirm('', { node:erpCoTransferGapNode(_gap, _tn),
           cancelText:'← 그만두기',
-          choices:[{ key:'force', label:'그래도 이 업체에 넣기' }] });
-        if(_go !== 'force') return;
+          choices:_choices });
+        if(_go === 'promote' && _gap.canPromote) _xferOpt = { promote:true };
+        else if(_go !== 'force') return;
       }
     }
     if(!(await popConfirm('계약 ' + ct.contractNo + ' (' + ct.companyName + ')을 이관하시겠습니까?\n\n→ ' + labels + '\n→ 상태: 이관완료\n→ 칸반에서 사라짐'))) return;
@@ -23066,7 +23239,7 @@ function ContractManagement(props){
     var _unlockTransfer = function(){ try { delete window._transferInFlight[id]; } catch(_u){} };
     var results;
     try {
-      results = transferContract(ct);
+      results = transferContract(ct, _xferOpt);
     } catch(err){
       console.error('[이관 오류]', err);
       showToast('❌ 이관 처리 중 오류: ' + (err && err.message ? err.message : '알 수 없는 오류'));
@@ -81365,6 +81538,24 @@ function ERPMain(props){
 
   // 전역 노출: IncomeDetailModal 등 깊은 컴포넌트에서 메뉴 이동 가능하도록
   window.navigateTo = selectMenu;
+
+  /* ★ 다른 탭(기업정보함 명함)이 「새 계약」 쪽지를 놓았을 때 — 계약관리로 옮긴다 (2026-09-28).
+     쪽지를 «꺼내는» 것은 계약관리 화면이다(erpTakeContractSeed). 여기는 옮기기만 한다.
+     ⚠ 어느 창이든 열려 있으면 «안 옮긴다» — 옮기면 그 화면이 내려가며 쓰던 것이 사라진다.
+       쪽지는 10분 동안 기다린다. 계약관리를 열면 그때 뜬다. */
+  useEffect(function(){
+    function onSeed(ev){
+      if(!ev || ev.key !== ERP_CT_SEED_KEY || !ev.newValue) return;
+      if(current === 'biz/contract') return;          // 계약관리가 제 귀로 듣는다
+      if(document.querySelector('.modal-bg')){
+        showToast('📋 명함에서 계약 요청이 왔습니다 — 열린 창을 닫고 계약관리를 열면 뜹니다', 10000);
+        return;
+      }
+      selectMenu('biz/contract');
+    }
+    window.addEventListener('storage', onSeed);
+    return function(){ window.removeEventListener('storage', onSeed); };
+  }, [current]);
 
   function goBack(){
     if(menuHistory.length === 0){ showToast('이전 메뉴가 없습니다'); return; }

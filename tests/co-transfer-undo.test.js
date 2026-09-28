@@ -297,7 +297,7 @@ test('⑯ 막이가 실제로 이관 길목에 걸려 있다 — 함수만 있�
   assert.match(doT, /erpCoTransferGap\(/, '★ 막이를 부르지 않습니다');
   assert.match(doT, /if\(_go !== 'force'\) return;/, '★ 「그래도 넣기」가 아니면 멈춰야 합니다');
   const gapAt = doT.indexOf('erpCoTransferGap(');
-  const runAt = doT.indexOf('transferContract(ct)');
+  const runAt = doT.indexOf('transferContract(ct, _xferOpt)');
   assert.ok(gapAt > 0 && runAt > 0 && gapAt < runAt, '★ 이관이 끝난 뒤에 묻고 있습니다');
 });
 

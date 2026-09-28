@@ -90,7 +90,7 @@ function transfer(){
      흉내를 세우지 않고 진짜 함수를 실어야 여기서만 맞는 일이 안 생긴다. */
   const cf=erp.indexOf('function erpContractToCoFields(ct){');
   new vm.Script(erp.slice(cf,erp.indexOf('\n}',cf)+2)).runInContext(ctx);
-  const start=erp.indexOf('function transferContract(contract){');
+  const start=erp.indexOf('function transferContract(contract, opt){');
   new vm.Script(erp.slice(start,erp.indexOf('// ============ 계약관리로 복귀',start))).runInContext(ctx);
   return env;
 }
@@ -152,4 +152,93 @@ test('일부 이관 흔적이나 번호 단독 연결이 있으면 실제 재이
     await ctx.doTransfer('CT1');assert.equal(calls.writes.length,0);assert.equal(calls.removes.length,0);
     assert.ok(calls.toasts.some(x=>x.includes('완료 처리')));
   }
+});
+
+/* ══════ 「유형 바꿔 넣기」 — 컨설팅만 하던 곳·끝난 곳이 업체계약(자문 등)으로 올 때 (2026-09-28) ══════
+   대표 지시 「명함에 기존에는 자문사가 아니었다가 자문사로 바뀌는 경우 … 자문·급여·기금·노조로 연결」
+   이관은 «빈 칸만» 채운다. 그래서 업체가 「컨설팅」(자동 등록) 이거나 끝난 업체면
+   이관하고도 유형·상태가 그대로라 업체관리의 그 탭에 «안 나왔다». 실제로 돌려 본다. */
+function promoteEnv(co){
+  const env=transfer();Object.assign(env.data.companies[0],co);
+  env.data.contracts[0].kinds=['company'];return env;
+}
+test('유형 바꿔 넣기 ① 컨설팅만 하던 업체가 자문 계약으로 오면 유형이 바뀌고 되돌릴 자리가 남는다',()=>{
+  const {ctx,data}=promoteEnv({typeCode:'컨설팅',status:'active'});
+  assert.equal(ctx.transferContract(data.contracts[0],{promote:true}).length,1);
+  const a=data.companies[0];
+  assert.equal(a.typeCode,'ADV','★ 유형이 그대로면 자문 탭에 안 나옵니다');
+  assert.equal(a.xferUndo.before.typeCode,'컨설팅','★ 옛 유형을 안 남기면 되돌릴 때 컨설팅으로 못 돌아갑니다');
+  assert.equal(a.xferUndo.after.typeCode,'ADV');
+  assert.ok(a.xferUndo.keys.includes('typeCode'),'★ 되돌리기 목록에 없으면 되돌리기가 이 칸을 건너뜁니다');
+  assert.equal(a.monthlyAdvisoryFee,500,'★ 유형만 바꾼다 — 이미 있는 자문료를 덮으면 안 됩니다');
+  assert.match(a.note,/바꾼 것: 유형 「컨설팅」→「ADV」/,'★ 바꾼 것을 말하지 않습니다');
+});
+test('유형 바꿔 넣기 ② 사람이 고르지 않으면(opt 없음) 예전처럼 빈 칸만 채운다',()=>{
+  const {ctx,data}=promoteEnv({typeCode:'컨설팅',status:'active'});
+  ctx.transferContract(data.contracts[0]);
+  assert.equal(data.companies[0].typeCode,'컨설팅','★ 묻지 않고 유형을 바꾸고 있습니다');
+});
+test('유형 바꿔 넣기 ③ 끝난 업체는 «일하는 중»으로 돌아온다',()=>{
+  const {ctx,data}=promoteEnv({typeCode:'ADV',status:'closed'});
+  ctx.transferContract(data.contracts[0],{promote:true});
+  const a=data.companies[0];
+  assert.equal(a.status,'active','★ 끝난 채로 두면 업체관리 어디에도 안 나옵니다');
+  assert.equal(a.xferUndo.before.status,'closed','★ 되돌리면 다시 끝난 업체가 되어야 합니다');
+});
+test('유형 바꿔 넣기 ④ ★ 일하는 중인 진짜 유형(급여)은 opt 가 와도 안 바꾼다 — 하던 일이 지워진다',()=>{
+  const {ctx,data}=promoteEnv({typeCode:'급여',status:'active'});
+  ctx.transferContract(data.contracts[0],{promote:true});
+  assert.equal(data.companies[0].typeCode,'급여','★ 부르는 쪽이 잘못 보내도 여기서 막아야 합니다');
+});
+test('유형 바꿔 넣기 ⑤ ★★ 이름이 다른 업체는 끝났어도 안 바꾼다 — 새롬(자문 계약이 기금 업체로) 자리',()=>{
+  const {ctx,data}=promoteEnv({name:'새롬사내근로복지기금',typeCode:'기금',status:'closed'});
+  assert.equal(ctx.transferContract(data.contracts[0],{promote:true}).length,1,'이관 자체는 되어야 이 검사가 뜻이 있습니다');
+  assert.equal(data.companies[0].typeCode,'기금','★★ 남의 업체 유형을 덮었습니다');
+  assert.equal(data.companies[0].status,'closed','★★ 남의 업체를 되살렸습니다');
+});
+test('유형 바꿔 넣기 ⑥ 막이가 «바꿔도 되는 때»를 가른다 (erpCoTransferGap.canPromote)',()=>{
+  const {ctx}=context();
+  const g=(ct,co)=>ctx.erpCoTransferGap(Object.assign({companyName:'기업',typeCodes:{company:'자문'}},ct),Object.assign({name:'기업'},co));
+  assert.equal(g({},{typeCode:'컨설팅',status:'active'}).canPromote,true,'컨설팅 → 자문');
+  assert.equal(g({},{typeCode:'company-auto-consult'}).canPromote,true,'자동 유형은 코드로도 적힌다');
+  assert.equal(g({},{typeCode:'급여',status:'active'}).canPromote,false,'★ 일하는 급여 업체');
+  assert.equal(g({},{typeCode:'자문',status:'active'}).differs,false,'같은 유형·일하는 중이면 묻지도 않는다');
+  const ended=g({},{typeCode:'자문',status:'terminated'});
+  assert.equal(ended.differs,true,'★ 끝난 업체면 멈춰 물어야 합니다 — 안 물으면 이관해도 안 보입니다');
+  assert.equal(ended.canPromote,true);
+  assert.equal(g({companyName:'다른회사'},{typeCode:'컨설팅'}).canPromote,false,'★★ 이름이 다르면 절대 안 됩니다');
+  assert.equal(g({typeCodes:{}},{status:'closed'}).canPromote,false,'계약 유형이 없으면 바꿀 것이 없다');
+});
+test('유형 바꿔 넣기 ⑦ 이관 창의 단추가 실제로 opt 를 넘긴다 — 고르지 않으면 안 넘긴다',async()=>{
+  const run=async(answer,co)=>{
+    const env=promoteEnv(co),{ctx,data,calls}=env;const seen=[];
+    const start=erp.indexOf('  async function doTransfer(id){');
+    new vm.Script(erp.slice(start,erp.indexOf('  // 필터 (다중 kinds',start))).runInContext(ctx);
+    const asked=[];
+    Object.assign(ctx,{contracts:data.contracts,CONTRACT_KINDS:[{v:'company',icon:'🏢',label:'업체'}],
+      kindInfo:()=>({icon:'🏢',label:'업체'}),COMPANY_TYPE_SEED:[],erpCoTransferGapNode:()=>({}),
+      popConfirm:async(m,o)=>{asked.push(o||{});return asked.length===1?answer:false;},
+      transferContract:(ct,opt)=>{seen.push(opt);return [];}});
+    await ctx.doTransfer('CT1');
+    return {seen,asked,calls};
+  };
+  const r=await run('promote',{typeCode:'컨설팅'});
+  assert.ok((r.asked[0].choices||[]).some(c=>c.key==='promote'),'★ 바꿀 수 있는데 단추를 안 내놓습니다');
+  const r2=await run('promote',{typeCode:'급여',status:'active'});
+  assert.ok(!(r2.asked[0].choices||[]).some(c=>c.key==='promote'),'★ 바꿀 수 없는 업체에 바꾸기 단추가 뜹니다');
+  const go=async(answer,co)=>{
+    const env=promoteEnv(co),{ctx,data}=env;const seen=[];
+    const start=erp.indexOf('  async function doTransfer(id){');
+    new vm.Script(erp.slice(start,erp.indexOf('  // 필터 (다중 kinds',start))).runInContext(ctx);
+    Object.assign(ctx,{contracts:data.contracts,CONTRACT_KINDS:[{v:'company',icon:'🏢',label:'업체'}],
+      kindInfo:()=>({icon:'🏢',label:'업체'}),COMPANY_TYPE_SEED:[],erpCoTransferGapNode:()=>({}),
+      popConfirm:async(m,o)=>(o&&o.choices)?answer:true,
+      transferContract:(ct,opt)=>{seen.push(opt);return [];}});
+    await ctx.doTransfer('CT1');return seen;
+  };
+  assert.deepEqual(clone(await go('promote',{typeCode:'컨설팅'})),[{promote:true}],'★ 「유형 바꿔 넣기」를 눌렀는데 안 넘깁니다');
+  assert.deepEqual(clone(await go('force',{typeCode:'컨설팅'})),[null],'★ 「그래도 넣기」는 바꾸면 안 됩니다');
+  assert.deepEqual(clone(await go(false,{typeCode:'컨설팅'})),[],'★ 「그만두기」인데 이관합니다');
+  /* 바꿀 수 없는 곳에서 «promote» 가 와도(단추가 없으니 올 수 없지만) 넘기지 않는다 */
+  assert.deepEqual(clone(await go('promote',{typeCode:'급여',status:'active'})),[],'★ 바꿀 수 없는 업체에 바꾸기를 넘깁니다');
 });

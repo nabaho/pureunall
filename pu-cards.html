@@ -3048,6 +3048,20 @@ body.pc #pcDetail{display:flex}
 .coerprow:hover{background:#eff6ff}
 .coerprow .dim{font-size:11.5px;color:#64748b;margin-top:2px}
 .coerpnone{font-size:12.5px;color:#64748b;padding:22px 6px;line-height:1.7;text-align:center}
+/* 🏢 명함 → 푸른이알피 고르는 창 (2026-09-28) */
+/* ⚠ 색은 화면 변수로 — 이 앱은 어두운 바탕이다. #1e293b 로 박으면 어두운 창에서 글자가 묻힌다(실측) */
+.cerp-where{font-size:12.5px;color:var(--ink);line-height:1.7;
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px}
+.cerp-where b{color:var(--orange)}
+.cerp-q{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:8px}
+.cerp-ts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.cerp-t{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink);cursor:pointer;
+  border:1px solid var(--line);border-radius:10px;padding:8px 14px}
+.cerp-t:hover{border-color:var(--orange)}
+.cerp-t:has(input:checked){border-color:var(--orange);color:var(--orange);font-weight:700}
+.cerp-note{font-size:11.5px;color:var(--sub);line-height:1.7;margin-bottom:8px}
+.cerp-warn{font-size:12px;color:#854d0e;line-height:1.7;background:#fffbeb;
+  border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-bottom:8px}
 /* ══════ 👷 근로자 정보함 (대표 지시 2026-09-01) ══════
    ⚠ 표 한 칸은 «한 줄»이다 — 자리가 넓어도 두 줄로 만들지 않는다. 넘치면 …로 자른다.
    ⚠ 빈 값(0·없음)은 그리지 않는다 — 화면에 «없다»가 쌓이면 있는 것이 안 보인다. */
@@ -3240,6 +3254,8 @@ try {
 <div class="modalbg" id="coNbAskBg" onclick="if(event.target===this)closeCoNoBizAsk()"><div class="modal" id="coNbAskM" style="max-width:760px"></div></div>
 <!-- 🔗 이알피 업체 고르기 (대표 지시 2026-09-02 회사 열쇠) -->
 <div class="modalbg" id="coErpPickBg" onclick="if(event.target===this)closeCoErpPicker()"><div class="modal" id="coErpPickM" style="max-width:460px"></div></div>
+<!-- 🏢 명함 → 푸른이알피 (2026-09-28) — 무엇으로 맡을지 고르면 계약 창을 채워서 연다(sendToErp) -->
+<div class="modalbg" id="cardErpBg" onclick="if(event.target===this)closeCardErp()"><div class="modal" id="cardErpM" style="max-width:440px"></div></div>
 
 <div id="pcRoot" hidden>
   <button id="sideToggle" onclick="toggleSidebar()" title="메뉴 펼치기">▶</button>
@@ -12220,7 +12236,7 @@ function openDetail(id, backCo){
       <a href="#" onclick="openMailWindow('${id}');return false" class="${it.email?'':'off'}">📧 메일</a>
       <a href="#" onclick="downloadVcf('${id}');return false">📇 연락처</a>
     </div>
-    <button class="btn ghost" style="width:100%;margin-bottom:12px" onclick="sendToErp('${id}')">🏢 ERP 거래처로 등록</button>` : '';
+    <button class="btn ghost" style="width:100%;margin-bottom:12px" onclick="sendToErp('${id}')" title="자문·급여·노조·기금으로 맡게 되었을 때 — 푸른이알피 계약 창을 채워서 엽니다">🏢 푸른이알피로 (계약)</button>` : '';
     /* ⚠ 「📎 자료 보내기」를 지웠다(2026-08-10). 바로 위 「📧 메일」과 같은 함수를
        불러서, 두 개를 두면 서로 다른 일을 하는 줄 알고 헤맨다(대표 지시). */
   $('detailM').innerHTML=`
@@ -12414,7 +12430,7 @@ function openPcDetail(id, backCo){
       <button onclick="downloadVcf('${id}')" title="휴대폰 연락처로 저장 (vCard 파일)">📇 연락처 저장</button>
       <button onclick="downloadPhoto('${id}')" title="명함 원본 사진 내려받기">📥 원본 사진</button>
       ${ photoBackBtn(it) }
-      <button onclick="sendToErp('${id}')" title="이 명함을 ERP 거래처로 등록">🏢 ERP 거래처</button>
+      <button onclick="sendToErp('${id}')" title="자문·급여·노조·기금으로 맡게 되었을 때 — 푸른이알피 계약 창을 채워서 엽니다">🏢 푸른이알피로</button>
       <button onclick="closeDetail();openEditor(state.items['${id}'])" title="이 명함 고치기">✏️ 수정</button>
       <button onclick="toggleNoMail('${id}')" class="${it.noMail?'nomail-on':''}"
         title="${it.noMail?'수신거부를 풉니다':'단체 발송에서 뺍니다 — 「보내지 마세요」 회신이 왔을 때'}"
@@ -12676,42 +12692,129 @@ function erpNormName(s){ return String(s||'')
   .replace(/\s+/g,'').replace(/[·.,'"`()]/g,'').toLowerCase(); }
 function erpNormBiz(s){ const d=String(s||'').replace(/\D/g,''); return d.length>=10?d.slice(0,10):''; }
 
-async function sendToErp(id){
-  const it=state.items[id]; if(!it || it.kind!=='card') return;
-  if (Store.mode!=='firebase') return toast('ERP 연동은 Firebase 연결 후 가능합니다');
-  if (!it.company) return toast('회사명이 없어 거래처로 등록할 수 없습니다');
-  try{
-    /* 푸른이알피 업체는 data/companies/{v:목록, u:갱신시각} 에 있다.
-       예전에는 루트 companies 에 썼는데 그 노드는 아무도 읽지 않아 등록해도 나타나지 않았다. */
-    const db = firebase.database();
-    const snap = await db.ref('data/companies').once('value');
-    const wrap = snap.val();
-    const raw  = (wrap && wrap.v !== undefined) ? wrap.v : wrap;   // 배열형·객체형 둘 다 쓰인다
-    const list = Array.isArray(raw) ? raw.filter(Boolean)
-               : (raw && typeof raw === 'object' ? Object.keys(raw).map(k=>raw[k]).filter(Boolean) : []);
-    const nBiz=erpNormBiz(it.bizno), nName=erpNormName(it.company);
-    const exist = list.find(c=> (nBiz && erpNormBiz(c.bizNo)===nBiz) || (nName && erpNormName(c.name)===nName));
-    if (exist) return toast(`이미 ERP 거래처에 있습니다: ${exist.name}`);
-    /* 사업자번호 없이 등록하면 이름으로만 이어져 나중에 같은 회사가 두 번 생긴다 — 미리 알린다 */
-    const warn = nBiz ? '' : '\n\n⚠ 이 명함에는 사업자번호가 없습니다.\n사업자번호 없이 등록하면 나중에 같은 회사가 두 번 생길 수 있습니다.\n업체관리에서 사업자번호를 채워 주세요.';
-    if (!confirm(`'${it.company}'를 ERP 거래처로 등록할까요?${warn}`)) return;
-    /* ERP companies 레코드 형태(필드명 일치): name·bizNo·ceo·phone·email·address·manager */
-    const now = Date.now();
-    const rec = { id:'co-'+now.toString(36)+Math.random().toString(36).slice(2,6),
-      name: it.company, bizNo: it.bizno||'', ceo: '',
-      phone: it.tel || it.mobile || '', email: it.email||'',
-      address: it.address||'', manager: it.owner||'',
-      _fromCard: it.id, createdAt: now, updatedAt: now };
-    const up = {};
-    if (raw && !Array.isArray(raw) && typeof raw === 'object'){
-      up['data/companies/v/'+rec.id] = rec;              // 객체형 — 건별 쓰기(푸른이알피 dbUpsert와 동일)
-    } else {
-      up['data/companies/v'] = list.concat([rec]);       // 배열형 — 통째 쓰기(푸른이알피 dbSet과 동일)
-    }
-    up['data/companies/u'] = now;                        // 갱신시각 — 푸른이알피가 이걸 보고 다시 읽는다
-    await db.ref().update(up);
-    toast(`✅ ERP 거래처로 등록했습니다: ${it.company}`);
-  }catch(e){ console.error(e); toast('ERP 등록 실패 — 권한 또는 연결을 확인하세요'); }
+/* ══════ 🏢 명함 → 푸른이알피 (대표 지시 2026-09-28) ══════════════════════════
+   「명함에 기존에는 자문사가 아니었다가 자문사로 바뀌는 경우가 있다. 이럴 경우 어떻게
+    선택해서 자문, 급여, 기금, 노조 관리 등으로 푸른이알피와 연결시킬 수 있게」
+
+   ■ 예전 「🏢 ERP 거래처로 등록」은 업체관리(data/companies)에 «직접» 한 줄을 썼다.
+     그런데 유형(typeCode)도 상태(status)도 비워 두어서 업체관리 «어느 탭에도» 안 나오고,
+     명함도 「업체관리」 폴더로 안 갔다 — 누르면 «안 보이는 반쪽 업체»가 생겼다.
+     담당자·기간·자문료도 없었고, 계약관리가 하는 업체 연결·사업자번호 충돌 검사도 건너뛰었다.
+   ■ 이제는 «아무것도 쓰지 않는다». 무엇으로 맡을지 고르면 계약 창을 «채워서 열» 뿐이다.
+     사람이 주담당·기간·금액을 넣고 저장 → 이관하면 업체관리의 그 탭에 올라가고,
+     명함은 자동 분류가 「업체관리」 폴더로 옮긴다(이미 있는 길).
+     이미 있는 업체(컨설팅만 하던 곳·끝난 곳)는 계약 창이 사업자번호로 찾아 잇고,
+     이관할 때 「유형 바꿔 넣기」로 그 업체가 자문 등으로 바뀐다(pu-erp.html erpCoTransferGap).
+   ⚠ 쪽지는 localStorage 에 둔다 — sessionStorage 는 탭마다 따로라, 푸른이알피가 이미
+     열려 있으면 «안 닿는다»(pu-erp.html erpTakeContractSeed 머리글).
+   ⚠ 업체관리의 유형은 «하나»다. 여럿 고르면 첫째(자문→급여→노조→기금)를 유형으로 하고
+     나머지는 계약 메모에 적는다 — 사람이 계약 창에서 보고 정한다. */
+const CARD_ERP_TYPES = ['자문','급여','노조','기금'];
+const CARD_ERP_SEED_KEY = 'pu_new_contract';
+
+/* 이 명함 회사의 사업자등록증 — 명함에는 사업자번호·대표자가 거의 없다.
+   ⚠ «하나로 딱 떨어질 때만» 쓴다. 이름이 같은 등록증이 번호가 다르게 둘이면
+     (지점·법인 전환) 아무거나 집으면 남의 번호가 계약에 들어간다. */
+function cardErpBizOf(it, items){
+  if(!it) return null;
+  const want = erpNormBiz(it.bizno);
+  const nm = _norm(it.company || '');
+  const pool = Object.values(items || {}).filter(x => x && x.kind === 'biz' && erpNormBiz(x.bizno));
+  const hits = want
+    ? pool.filter(x => erpNormBiz(x.bizno) === want)
+    : (nm ? pool.filter(x => _norm(x.company || '') === nm) : []);
+  const nums = {};
+  hits.forEach(x => { nums[erpNormBiz(x.bizno)] = 1; });
+  return Object.keys(nums).length === 1 ? hits[0] : null;
+}
+
+/* 계약 창에 넘길 쪽지 — 값이 있는 칸만 싣는다.
+   ⚠ 빈 글자를 실으면 받는 쪽이 「이미 채워진 칸」으로 읽어 빈 칸이 영영 안 채워진다.
+   ⚠ 명함의 전화·팩스·메일은 «그 사람» 것이다 — 회사 칸이 아니라 담당자 줄로 보낸다.
+     회사 칸에는 회사 대표번호·회사 팩스·회사 주소만 간다. */
+function cardErpSeed(it, picked, biz, now){
+  const types = CARD_ERP_TYPES.filter(t => (picked || []).indexOf(t) >= 0);
+  if(!it || !types.length) return null;
+  const s = v => String(v == null ? '' : v).trim();
+  const b = biz || {};
+  const co = {};
+  const put = (k, v) => { const x = s(v); if(x) co[k] = x; };
+  put('name', it.company);
+  put('bizNo', it.bizno || b.bizno);
+  put('ceo', b.ceo);
+  put('phone', it.companyTel || b.companyTel);
+  put('fax', it.companyFax || b.companyFax);
+  put('address', it.companyAddr || b.address);
+  put('bizType', b.bizType);
+  put('bizCategory', b.bizItem);
+  const person = { name: s(it.name), role: [s(it.title), s(it.dept)].filter(Boolean).join(' · '),
+    phone: s(it.mobile), bizPhone: s(it.tel), fax: s(it.fax), email: s(it.email) };
+  if(person.name || person.phone || person.email) co.contacts = [person];
+  const main = types[0], also = types.slice(1);
+  const note = '🏢 기업정보함 명함에서 가져옴 (' + (person.name || '이름 없음') + ')'
+    + (also.length
+      ? '\n함께 맡기로 한 일: ' + also.join('·') + ' — 업체관리 유형은 하나라 「' + main + '」 하나로 올립니다'
+      : '');
+  return { company: co, typeCodes: { company: main }, also: also, note: note,
+           from: 'cards', cardId: String(it.id || ''), at: now };
+}
+
+/* 고르는 창. m = ErpMatch.match(it) (못 읽었으면 undefined), biz = cardErpBizOf 결과 */
+function cardErpHtml(it, m, biz){
+  const id = esc(String(it.id || ''));
+  const bizNo = String(it.bizno || (biz && biz.bizno) || '');
+  const where = m === undefined
+    ? '푸른이알피 업체관리를 아직 못 읽었습니다 — 계약 창이 사업자번호로 찾아 잇습니다.'
+    : !m
+    ? '푸른이알피 업체관리에 <b>없는</b> 회사입니다. 계약을 저장하고 이관하면 그때 새로 생깁니다.'
+    : m.left
+    ? `업체관리에 <b>끝난 업체</b>로 있습니다 (${esc(m.company || '')} · ${esc(m.type || '유형 없음')}).<br>`
+      + '이관할 때 「… 유형으로 바꿔 넣기」를 누르면 다시 일하는 업체가 됩니다.'
+    : `업체관리에 <b>${esc(m.company || '')}</b> (${esc(m.type || '유형 없음')}) 로 이미 있습니다.<br>`
+      + '새로 만들지 않고 그 업체에 이어 붙입니다.';
+  const boxes = CARD_ERP_TYPES.map(t =>
+    `<label class="cerp-t"><input type="checkbox" name="cardErpT" value="${esc(t)}"> ${esc(t)}</label>`).join('');
+  return `
+    <div class="mhead"><b>🏢 푸른이알피로 — ${esc(it.company || '')}</b>
+      <button class="iconbtn" onclick="closeCardErp()">✕</button></div>
+    <div class="cerp-where">${where}</div>
+    <div class="cerp-q">무엇으로 맡기로 했나요?</div>
+    <div class="cerp-ts">${boxes}</div>
+    <div class="cerp-note">업체관리는 한 회사에 유형을 <b>하나</b>만 둡니다. 여럿 고르시면 첫째를 유형으로 하고,
+      나머지는 계약 메모에 적어 둡니다.</div>
+    ${bizNo ? '' : `<div class="cerp-warn">⚠ 사업자번호가 없습니다. 계약 창에서 채워 주세요 —
+      없으면 같은 회사가 업체관리에 두 번 생길 수 있습니다.</div>`}
+    <div class="cerp-note">여기서는 아무것도 저장하지 않습니다. 푸른이알피 계약 창이 회사·담당자 정보가
+      채워진 채로 열리고, 주담당·기간·금액을 넣어 저장하시면 됩니다.</div>
+    <div class="mfoot">
+      <button class="btn ghost" onclick="closeCardErp()">취소</button>
+      <button class="btn primary" onclick="cardErpGo('${id}')">📋 계약 창 열기</button></div>`;
+}
+
+let _cardErpId = '';
+function sendToErp(id){
+  const it = state.items[id]; if(!it || it.kind !== 'card') return;
+  if(!it.company) return toast('회사명이 없어 푸른이알피로 보낼 수 없습니다 — 먼저 회사를 적어 주세요', 6000);
+  _cardErpId = String(id);
+  const m = ErpMatch.ready ? ErpMatch.match(it) : undefined;
+  $('cardErpM').innerHTML = cardErpHtml(it, m, cardErpBizOf(it, state.items));
+  $('cardErpBg').classList.add('open');
+}
+function closeCardErp(){ $('cardErpBg').classList.remove('open'); _cardErpId = ''; }
+function cardErpGo(id){
+  const it = state.items[id]; if(!it || String(id) !== _cardErpId) return;
+  const picked = Array.from(document.querySelectorAll('#cardErpM input[name="cardErpT"]:checked')).map(x => x.value);
+  if(!picked.length) return toast('자문·급여·노조·기금 가운데 하나를 골라 주세요', 5000);
+  const seed = cardErpSeed(it, picked, cardErpBizOf(it, state.items), Date.now());
+  if(!seed) return toast('보낼 내용을 만들지 못했습니다', 5000);
+  try{ localStorage.setItem(CARD_ERP_SEED_KEY, JSON.stringify(seed)); }
+  catch(e){ return toast('푸른이알피로 넘기지 못했습니다: ' + ((e && e.message) || e), 7000); }
+  closeCardErp();
+  /* 사진첩의 「계약 등록」과 «같은 창»을 쓴다 — 보던 푸른이알피 화면(쓰던 창)을 덮지 않는다 */
+  const url = 'pu-erp.html#menu=biz/contract';
+  if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(url, '계약 등록');
+  else location.href = url;
+  toast('📋 푸른이알피 계약 창을 엽니다 — 주담당·기간·금액을 넣고 저장해 주세요', 7000);
 }
 
 /* ════════════ 설정 ════════════
