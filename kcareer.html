@@ -1118,6 +1118,29 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 #hwpViewEdBox iframe{width:100%;height:100%;border:0;display:block}
 @media(max-width:900px){ #modalHwpView .modal{height:100vh;max-height:100vh} }
 @media(max-width:1180px){ .cv-pnum{right:6px} }
+/* ===== 빠른 이력서 — 오른쪽 한글 미리보기 (안 A, 대표 승인 2026-09-28) =====
+   왼쪽 시트는 그대로 두고(210mm), 남는 폭을 한글 엔진이 그린 A4 에 준다.
+   ⚠ 오른쪽 칸은 붙어 따라온다(sticky) — 긴 이력서를 내려 치는 동안에도 보여야 한다.
+   ⚠ 미리보기가 켜지면 왼쪽 «n / N 쪽» 딱지를 감춘다 — 쪽 수는 한글 값 «하나»만 보인다
+     (예전엔 같은 내용이 「화면 6장 · 한글 7장」으로 두 숫자였다). */
+.cv-split{display:grid;grid-template-columns:minmax(0,210mm) minmax(340px,1fr);gap:14px;align-items:start}
+.cv-split.pv-off{grid-template-columns:minmax(0,1fr)}
+.cv-split.pv-off .cv-hwp-pane{display:none}
+.cv-split:not(.pv-off) .cv-pnum{display:none}
+.cv-hwp-pane{position:sticky;top:8px;display:flex;flex-direction:column;min-width:0;
+  max-height:calc(100vh - 200px);background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.cv-hwp-head{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--navy)}
+.cv-hwp-state{font-size:11px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cv-hwp-pgno{font-size:11.5px;font-weight:700;color:var(--navy);min-width:44px;text-align:center}
+.cv-hwp-body{flex:1;min-height:240px;overflow:auto;background:#e2e8f0;padding:12px}
+.cv-hwp-body canvas{display:block;background:#fff;margin:0 auto 12px;box-shadow:0 2px 8px rgba(0,0,0,.18);max-width:100%;height:auto!important}
+.cv-hwp-tmp{position:absolute;left:-99999px;top:0;visibility:hidden}
+/* 좁은 화면(노트북 1280px 아래·폰)에서는 위아래로 쌓는다 — 한 줄에 두 장이 안 들어간다 */
+@media(max-width:1279px){
+  .cv-split{grid-template-columns:minmax(0,1fr)}
+  .cv-hwp-pane{position:static;max-height:none}
+  .cv-hwp-body{max-height:80vh}
+}
 @media print{
   body *{visibility:hidden!important}
   #cvSheet,#cvSheet *{visibility:visible!important}
@@ -1403,7 +1426,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                   <button class="btn" type="button" onclick="cvClearAll()" style="color:var(--red)">🧹 비우기</button>
                 </div>
               </div>
-              <button class="btn primary" onclick="printCV()">🖨 PDF</button>
+              <button class="btn" type="button" id="cvPvBtn" onclick="cvPvToggle()" title="오른쪽 한글 미리보기를 끄고 켭니다">⏸ 미리보기 끄기</button>
+              <button class="btn primary" onclick="printCV()" title="한글 문서에서 뽑습니다 — 글자가 살아 있는 PDF">🖨 PDF</button>
             </div>
         </div><!-- .rh-topbar -->
 
@@ -1413,10 +1437,25 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
              양식 드롭다운과 똑같은 일을 하는 같은 화면 안 중복이었다(goCV는 다른 화면에서 쓴다). -->
         <!-- ⚠ 시트 «밖»에 둔다 — 안에 넣으면 renderQuickCV 가 지우고 PDF 에도 찍힌다 -->
         <div id="cvNeedInfo" style="display:none"></div>
+        <!-- ★ 안 A (대표 승인 2026-09-28): 왼쪽에서 치고, 오른쪽에 «한글 엔진이 그린 진짜 모양»이 늘 보인다.
+             ⚠ 오른쪽 칸은 #cvSheet «밖»이다 — 안에 넣으면 renderQuickCV 가 지우고 HWPX 에도 들어간다. -->
+        <div class="cv-split" id="cvSplit">
         <div class="cv-sheet-scroll"><div class="cv-sheet-wrap">
           <div id="cvSheet" class="cv-sheet" ondragover="event.preventDefault()" ondrop="cvDrop(event)" oninput="cvGuideSoon()"></div>
           <div class="cv-pguide" id="cvPageGuide" aria-hidden="true"></div>
         </div></div>
+        <aside class="cv-hwp-pane" id="cvHwpPane" aria-label="한글 미리보기">
+          <div class="cv-hwp-head">
+            <b>👁 한글 모양</b>
+            <span id="cvHwpState" class="cv-hwp-state"></span>
+            <span style="flex:1"></span>
+            <button type="button" class="btn sm" onclick="cvPvPage(-1)" title="앞 쪽">◀</button>
+            <span id="cvHwpPgNo" class="cv-hwp-pgno">– / –</span>
+            <button type="button" class="btn sm" onclick="cvPvPage(1)" title="다음 쪽">▶</button>
+          </div>
+          <div class="cv-hwp-body" id="cvHwpBody"></div>
+        </aside>
+        </div>
         <div id="cvPalettePop" class="cv-pop" style="display:none">
           <div class="cv-pop-h" id="cvPopHead">📋 데이터 끌어넣기 <span style="font-weight:400;font-size:10px;opacity:.85">(드래그 또는 클릭)</span><button type="button" onclick="document.getElementById('cvPalettePop').style.display='none'" style="float:right;background:none;border:none;color:#fff;cursor:pointer;font-size:14px;line-height:1">✕</button></div>
           <div class="cv-pop-b" id="cvPaletteBody"></div>
@@ -4127,10 +4166,12 @@ async function hwpViewPdfFile(){
      KcareerSvgText.mergeGlyphs 가 줄 단위로 되붙이고 공백을 되살린다. 안 거치면
      PDF 에서 「권형하」 검색이 빗나간다.
    ⚠ 실패하면 «조용히 옛 그림 길»로 간다 — 인쇄 자체가 막히면 안 된다. */
-async function _hwpSvgPages(){
-  if(!_hwpView || !_hwpView.bytes) return null;
+/* v = {bytes,name} — 안 주면 큰 창의 문서(_hwpView). 빠른 이력서 🖨 PDF 는 제 문서를 준다. */
+async function _hwpSvgPages(v){
+  v = v || _hwpView;
+  if(!v || !v.bytes) return null;
   if(!window.PureunHwp || !window.KcareerSvgText) return null;
-  var doc = await PureunHwp.openDoc(_hwpView.bytes, _hwpView.name);
+  var doc = await PureunHwp.openDoc(v.bytes, v.name);
   try{
     if(typeof doc.renderPageSvg!=='function') return null;
     var n=doc.pageCount(), out=[];
@@ -5391,6 +5432,8 @@ function rhTab(tabId, btn){
   var cb=document.getElementById('cvToolbar');
   if(cb){ var _on=(tabId==='dm-quick'); cb.style.display=_on?'flex':'none'; cb.classList.toggle('is-off', !_on); }
   if(tabId==='dm-quick') _safe(renderQuickCV);
+  /* ★ 오른쪽 한글 미리보기 — 이 탭이 «보일 때» 곧바로 그린다(대표 승인 2026-09-28, 안 A) */
+  if(tabId==='dm-quick'){ _safe(cvPvUI); _safe(function(){ if(cvPvActive()) cvPvRender(); }); }
 }
 function rhSetDomain(domain){
   _rhDomain=domain;
@@ -11067,6 +11110,13 @@ function cvRenderGuide(){
      ⚠ 여기서 cvHwpCount를 바로 부르지 말 것 — 타이핑할 때마다 문서 전체를 다시 만들고
      WASM으로 파싱해 긴 이력서에서 끊긴다. 잠잠해진 뒤 한 번만 센다. */
   var badge=document.getElementById('cvPageCnt');
+  /* ★ 오른쪽 미리보기가 켜져 있으면 «그쪽이» 한글로 세어 배지를 채운다 — 여기서 또 세지 않는다
+     (같은 문서를 두 번 짓고 두 번 읽게 된다). 화면 어림값도 안 쓴다 — 쪽 수는 한글 값 하나다. */
+  if(badge && cvPvActive()){
+    if(!_cvPvPages){ badge.textContent='A4 … · 한글'; badge.style.color=''; }
+    cvPvSoon();
+    return;
+  }
   if(badge){
     if(!_hwpEngineReady){
       badge.textContent='A4 '+n+'장 · 화면';
@@ -11118,6 +11168,123 @@ function cvGoPage(no){
   var b=g.querySelectorAll('.cv-pnum')[no-1]; if(!b) return;
   b.scrollIntoView({ block:'start', behavior:'smooth' });
 }
+
+/* ── 오른쪽 한글 미리보기 (안 A, 대표 승인 2026-09-28) ─────────────────────────
+   왼쪽에서 친 것을 한글 문서로 지어(_cvBuildHwpx) 한글 엔진이 그린 A4 를 늘 보여 준다.
+   ■ 엔진(7MB)을 «이 화면에서만» 곧바로 받는다 — 대표가 이 화면에 한해 승인하셨다.
+     ⚠ 그래서 «보이는 동안»에만 그린다(cvPvActive) — 부팅 때 숨은 화면에서 그리면
+       어느 화면에서나 7MB 를 받게 된다. 다른 곳의 「누를 때만」 규칙(cvHwpCount 빗장)은 그대로다.
+   ■ 치고 1초 잠잠해진 뒤 한 번만 다시 그린다 — 칠 때마다 지으면 긴 이력서에서 끊긴다.
+     ⚠ 겹쳐 돌지 않는다(_cvPvBusy). 도는 중에 또 바뀌면 «끝난 뒤 한 번 더»(_cvPvAgain) —
+       안 그러면 마지막으로 친 글자가 미리보기에 영영 안 나온다.
+   ■ 새 그림은 보이지 않는 칸에 먼저 그리고 «다 그린 뒤» 바꿔 끼운다 — 깜빡이지 않고,
+     보던 쪽 자리도 지킨다. */
+var CV_PV_KEY='kc_cv_pv_off';          /* ⚠ NS 접두사를 안 붙인다 — 화면 취향이라 클라우드로 보낼 것이 아니다 */
+var _cvPvT=null, _cvPvBusy=false, _cvPvAgain=false, _cvPvPages=0;
+function cvPvOn(){ try{ return localStorage.getItem(CV_PV_KEY)!=='1'; }catch(e){ return true; } }
+function cvPvActive(){
+  if(!cvPvOn()) return false;
+  var p=document.getElementById('dm-quick'), body=document.getElementById('cvHwpBody');
+  return !!(p && body && p.classList.contains('active') && p.offsetParent!==null);
+}
+function cvPvSoon(){
+  if(!cvPvActive()) return;
+  clearTimeout(_cvPvT);
+  _cvPvT=setTimeout(function(){ cvPvRender(); }, 1000);
+}
+function _cvPvState(s){ var e=document.getElementById('cvHwpState'); if(e) e.textContent=s||''; }
+function cvPvUI(){
+  var on=cvPvOn();
+  var sp=document.getElementById('cvSplit'); if(sp) sp.classList.toggle('pv-off', !on);
+  var b=document.getElementById('cvPvBtn'); if(b) b.textContent=on?'⏸ 미리보기 끄기':'▶ 미리보기 켜기';
+}
+function cvPvToggle(){
+  var on=!cvPvOn();
+  try{ if(on) localStorage.removeItem(CV_PV_KEY); else localStorage.setItem(CV_PV_KEY,'1'); }catch(e){}
+  cvPvUI();
+  if(on){ _cvPvPages=0; cvPvRender(); }
+  else{
+    /* ⚠ 끄면 캔버스를 비운다 — A4 한 장이 크다. 배지는 옛 길(화면 어림값·누르면 한글로 셈)로 돌아간다 */
+    clearTimeout(_cvPvT);
+    var body=document.getElementById('cvHwpBody'); if(body) body.innerHTML='';
+    _cvPvPages=0;
+    _safe(cvRenderGuide);
+  }
+}
+function _cvPvFit(){
+  var body=document.getElementById('cvHwpBody'); if(!body) return;
+  var avail=body.clientWidth-24; if(avail<200) return;
+  Array.prototype.forEach.call(body.querySelectorAll('canvas'), function(cv){
+    cv.style.width=Math.round(Math.min(avail, 1100))+'px';
+  });
+}
+function _cvPvPageNo(){
+  var body=document.getElementById('cvHwpBody'), e=document.getElementById('cvHwpPgNo');
+  if(!body||!e) return;
+  var cs=body.querySelectorAll('canvas'); if(!cs.length){ e.textContent='– / –'; return; }
+  var top=body.getBoundingClientRect().top, 지금=1;
+  for(var i=0;i<cs.length;i++){ if(cs[i].getBoundingClientRect().top-top<=body.clientHeight/3) 지금=i+1; }
+  e.textContent=지금+' / '+cs.length;
+}
+function cvPvPage(d){
+  var body=document.getElementById('cvHwpBody'); if(!body) return;
+  var cs=body.querySelectorAll('canvas'); if(!cs.length) return;
+  var e=document.getElementById('cvHwpPgNo');
+  var 지금=parseInt((e&&e.textContent)||'1',10)||1;
+  var 갈=Math.max(1, Math.min(cs.length, 지금+d));
+  body.scrollTop=cs[갈-1].offsetTop-12;
+  if(e) e.textContent=갈+' / '+cs.length;
+}
+function _cvPvBadge(n){
+  var badge=document.getElementById('cvPageCnt'); if(!badge) return;
+  badge.textContent='A4 '+n+'장 · 한글';
+  badge.title='한글이 센 실제 쪽 수입니다 — 오른쪽이 그 모양입니다. 누르면 큰 창으로 봅니다';
+  badge.style.color=(n>3?'var(--red)':'');
+}
+async function cvPvRender(){
+  var body=document.getElementById('cvHwpBody');
+  if(!body || !cvPvActive() || !window.PureunHwp) return;
+  if(_cvPvBusy){ _cvPvAgain=true; return; }
+  _cvPvBusy=true;
+  var tmp=null;
+  try{
+    var built;
+    try{ built=_cvBuildHwpx(); }catch(e){ _cvPvState('한글 문서를 못 만들었습니다 — '+((e&&e.message)||'')); return; }
+    if(!built) return;
+    _cvPvState(_hwpEngineReady?'그리는 중…':'한글 엔진을 받는 중(처음 한 번, 약 7MB)…');
+    tmp=document.createElement('div');
+    tmp.className='cv-hwp-tmp';
+    tmp.style.width=body.clientWidth+'px';
+    document.body.appendChild(tmp);
+    var r=await PureunHwp.renderPreview(tmp, built.bytes, built.name);
+    _hwpEngineReady=true;
+    if(!cvPvActive()) return;                  /* 그리는 사이 화면을 떠났다 — 끼우지 않는다 */
+    var 자리=body.scrollTop;
+    body.innerHTML='';
+    Array.prototype.slice.call(tmp.querySelectorAll('canvas')).forEach(function(cv){ body.appendChild(cv); });
+    _cvPvFit();
+    body.scrollTop=자리;
+    _cvPvPages=(r&&r.pageCount)||body.querySelectorAll('canvas').length;
+    _cvPvBadge(_cvPvPages);
+    _cvPvPageNo();
+    var t=new Date();
+    _cvPvState('한글 '+_cvPvPages+'장 · '+('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2));
+  }catch(e){
+    console.warn('한글 미리보기', e);
+    /* ⚠ 조용히 넘기지 않는다 — 빈 칸은 고장으로 읽힌다. 큰 창·HWPX 저장 길은 그대로 있다 */
+    _cvPvState('그리지 못했습니다 — ⋯ 더보기 › 👁 한글로 보기로 열어 보세요');
+  }finally{
+    if(tmp && tmp.parentNode) tmp.parentNode.removeChild(tmp);
+    _cvPvBusy=false;
+    if(_cvPvAgain){ _cvPvAgain=false; cvPvSoon(); }
+  }
+}
+(function(){
+  document.addEventListener('scroll', function(ev){
+    if(ev.target && ev.target.id==='cvHwpBody') _cvPvPageNo();
+  }, true);
+  window.addEventListener('resize', function(){ if(cvPvActive()) _cvPvFit(); });
+})();
 /* 타이핑 중에는 나눔만 다시 한다 — cvApplyPages를 부르면 zoom이 바뀌며 커서가 튄다.
    창 크기가 바뀔 때는 배치가 달라지므로 축소 맞춤까지 다시 한다. */
 var _cvGuideT=null;
@@ -11223,7 +11390,28 @@ function cvSetPhoto(id){ _cvPhotoId=id; const info=piObj(); info.cvPhoto=id; set
 function printCV(){ const sheet=document.getElementById('cvSheet'); const tpl=(document.getElementById('cvTpl')||{}).value||'resume';
   if(sheet&&tpl==='resume'){ const note=sheet.querySelector('div[contenteditable][style*="min-height:80px"]'); if(note){ const info=piObj(); info.cvNote=(note.textContent||'').trim(); set('profile_info',info); } }
   if(typeof _logCv==='function') _logCv(tpl==='cert'?'경력증명서':'이력서','PDF(인쇄)');
-  window.print(); }
+  /* ★ PDF 는 «한글 문서에서» 뽑는다 (안 A, 대표 승인 2026-09-28) — 기관에 내는 한글 파일과
+     같은 모양·같은 쪽 수이고, 글자가 살아 있다(기관 양식 채우기와 같은 길: _hwpSvgPages).
+     ⚠ 창을 «먼저» 연다 — 기다린 뒤에 열면 브라우저가 팝업으로 보고 막는다.
+     ⚠ 못 하면 «조용히» 옛 길(화면 인쇄)로 간다 — PDF 자체가 막히면 안 된다. */
+  if(!window.PureunHwp || !window.KcareerSvgText){ window.print(); return; }
+  var w=window.open('','_blank');
+  if(!w){ toast('팝업이 막혀 화면 그대로 인쇄합니다 — 한글 모양 PDF는 주소창의 팝업 허용 뒤 다시 눌러 주세요', 6000); window.print(); return; }
+  try{ w.document.write('<!doctype html><meta charset="utf-8"><body style="font:14px sans-serif;padding:24px">⏳ 한글 문서로 만드는 중…</body>'); }catch(e){}
+  (async function(){
+    var built=null, svgs=null;
+    try{ built=_cvBuildHwpx(); if(built) svgs=await _hwpSvgPages({ bytes:built.bytes, name:built.name }); }
+    catch(e){ console.warn('한글 PDF', e); svgs=null; }
+    if(!svgs){
+      try{ w.close(); }catch(e){}
+      toast('한글 모양 PDF를 만들지 못해 화면 그대로 인쇄합니다');
+      window.print(); return;
+    }
+    _hwpEngineReady=true;
+    w.document.open(); w.document.write(KcareerSvgText.printHtml(svgs, String(built.name).replace(/\.hwpx$/i,''))); w.document.close();
+    w.onload=function(){ setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 250); };
+  })();
+}
 async function _ensureJSZip(){ if(window.JSZip) return; await new Promise(function(res,rej){ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 function _cvBuildHwpx(){
   const sheet=document.getElementById('cvSheet'); if(!sheet) return null;
