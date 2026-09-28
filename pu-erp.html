@@ -21621,6 +21621,22 @@ window.regDayOf     = regDayOf;
 window.regTimeText  = regTimeText;
 window.regSort      = regSort;
 
+/* 🏢 카드에 «보여 주는» 회사명 — 「주식회사」·「(주)」를 ㈜ 한 글자로 (대표 지시 2026-09-28
+   「등록에 회사이름이 안보인다」 → 목업 가안). 좁은 카드에서 「주식…」 으로 잘려 회사가 안 보였다.
+   ⚠ «보이는 글자만» 바꾼다 — 저장·검색·이관·중복 판정은 원래 이름(c.companyName)을 쓴다.
+     그래서 이 값을 저장하거나 견주는 데 쓰지 말 것. title 에는 원래 이름을 둔다.
+   ⚠ 앞·뒤에 붙은 것만 줄인다 — 가운데 끼인 것(「가나 주식회사 서울지점」)은 이름의 일부일 수 있다. */
+function coDisplayName(name){
+  var s = String(name == null ? '' : name).trim();
+  if(!s) return '';
+  var m = s.match(/^(?:주식회사|\(주\)|㈜)\s*(.+)$/);
+  if(m) return '㈜' + m[1];
+  m = s.match(/^(.+?)\s*(?:주식회사|\(주\)|㈜)$/);
+  if(m) return m[1] + '㈜';
+  return s;
+}
+window.coDisplayName = coDisplayName;
+
 function arvClear(store, id, after){
   if(dbPatch(store, id, { arrivedAt:null, arrivedFrom:null, arrivedNo:null })){
     if(typeof after === 'function') after();
@@ -23339,7 +23355,7 @@ function ContractManagement(props){
           // 계약번호
           h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0 } }, c.contractNo),
           // 의뢰인
-          h('span', { style:{ fontSize:'13.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, c.companyName),
+          h('span', { style:{ fontSize:'13.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }, title:c.companyName }, coDisplayName(c.companyName)),
           // 담당자 (주담당 / 부담당 풀 이름)
           h('span', { style:{ fontSize:'11px', color:'#64748b', whiteSpace:'nowrap', flexShrink:0 } },
             '👤 ' + [userName(c.managerMain)].concat((c.managerSubs||[]).map(userName)).filter(Boolean).join(' / ')),
@@ -23387,7 +23403,7 @@ function ContractManagement(props){
         h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', minWidth:0 } },
           kindsArr.length > 0 && h('span', { style:{ background:mk0.bg||'#f8fafc', color:mk0.color, fontSize:'9.5px', padding:'1px 6px', borderRadius:'9px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0, border:'1px solid '+mk0.color+'33' } },
             mk0.label + (kindsArr.length>1 ? ' +'+(kindsArr.length-1) : '')),
-          h('span', { style:{ flex:1, minWidth:0, fontSize:'12.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, c.companyName),
+          h('span', { style:{ flex:1, minWidth:0, fontSize:'12.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }, title:c.companyName }, coDisplayName(c.companyName)),
           c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ fontSize:'9.5px', background:'#fffbeb', color:'#854d0e', padding:'0 5px', borderRadius:'5px', fontWeight:700, flexShrink:0 } }, '성공'+c.successFee+'%'),
           totalAmount > 0 && h('span', { style:{ fontFamily:'monospace', fontSize:'10.5px', color:'#475569', fontWeight:700, flexShrink:0 }, title: totalAmount.toLocaleString()+'원' }, fmtManExact(totalAmount))
         ),
@@ -23434,13 +23450,23 @@ function ContractManagement(props){
               k0.icon + ' ' + k0.label);
           })
         ),
-        h('span', { style:{ fontSize:'13.5px', fontWeight:700, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }, title:c.companyName },
-          c.companyName, arvBadge(c, 'contracts', refreshContracts)),
+        /* ★ 회사명은 «안 줄어든다» (대표 지시 2026-09-28 「등록에 회사이름이 안보인다」, 목업 가안).
+             전에는 이 줄에서 종류·세부종류·「오늘 13:47」·번호가 모두 안 줄어들게 되어 있어,
+             자리가 모자라면 회사명만 「주식…」 으로 잘렸다. 이제 모자라면 세부종류가 먼저 줄어든다.
+           ⚠ maxWidth:100% — 회사명 자체가 줄보다 길 때만 「…」(title 에 원래 이름). */
+        h('span', { style:{ fontSize:'13.5px', fontWeight:700, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flexShrink:0, maxWidth:'100%' }, title:c.companyName },
+          coDisplayName(c.companyName), arvBadge(c, 'contracts', refreshContracts)),
         (function(){
-          // 세부 종류 — 회사명 옆에 «작게» 붙인다(종류가 같아도 사업이 다르면 여기로 갈린다)
+          // 세부 종류 — 회사명 옆에 «작게» 붙인다(종류가 같아도 사업이 다르면 여기로 갈린다).
+          // 자리가 모자라면 «이것이 먼저» 줄어든다(마우스를 올리면 전문).
           var subs = kindsArr.map(function(kv){ return kindSubLabel(c, kv); }).filter(Boolean).join(' / ');
-          return subs && h('span', { style:{ fontSize:'10px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'140px', flexShrink:0 }, title:subs }, subs);
-        })(),
+          return subs && h('span', { style:{ fontSize:'10px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flex:'1 1 0', minWidth:0 }, title:subs }, subs);
+        })()
+      ),
+      /* 둘째 줄: 담당자 · 오늘 시각 · 번호 · 메모 + 금액 + 버튼 — 매 카드 반복되는 자리라 한 줄로 합친다.
+         ★ 「오늘 13:47」·계약번호는 첫 줄에서 여기로 내렸다(2026-09-28) — 첫 줄은 «어느 회사» 자리다. */
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', color:'#64748b', flexWrap:'wrap' } },
+        h('span', { style:{ whiteSpace:'nowrap', flexShrink:0 } }, '👤 ' + [userName(c.managerMain)].concat((c.managerSubs||[]).map(userName)).filter(Boolean).join(' / ')),
         // 오늘 등록한 건 — 등록 시각까지 붙여 같은 날 여러 건의 순서를 눈으로 확인한다
         regIsToday(c) ? h('span', { key:'reg',
           title:'오늘 새로 등록한 계약입니다 · ' + regTimeText(c) + ' 등록\n날짜가 바뀌면 이 표시는 저절로 사라집니다',
@@ -23448,12 +23474,7 @@ function ContractManagement(props){
             border:'1px solid #bbf7d0', borderRadius:'10px', padding:'1px 7px',
             fontSize:'10px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } },
           '🆕 오늘 ' + regTimeText(c)) : null,
-        h('div', { style:{ flex:1, minWidth:'4px' } }),
-        h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0 } }, c.contractNo)
-      ),
-      // 둘째 줄: 담당자 + 메모(있으면 title) + 금액 + 버튼 — 매 카드 반복되는 자리라 한 줄로 합친다
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', color:'#64748b', flexWrap:'wrap' } },
-        h('span', { style:{ whiteSpace:'nowrap', flexShrink:0 } }, '👤 ' + [userName(c.managerMain)].concat((c.managerSubs||[]).map(userName)).filter(Boolean).join(' / ')),
+        h('span', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace', flexShrink:0, whiteSpace:'nowrap' } }, c.contractNo),
         c.note && h('span', { title:c.note, style:{ fontSize:'10.5px', color:'#94a3b8' } }, '📝'),
         h('div', { style:{ flex:1, minWidth:'4px' } }),
         c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ background:'#fffbeb', color:'#854d0e', fontSize:'10px', padding:'1px 6px', borderRadius:'5px', fontWeight:700, whiteSpace:'nowrap' } },
