@@ -201,6 +201,8 @@ rules.data = {
        고치는 화면(문서관리)은 관리자만 열리지만, 그것은 화면 문이지 자료 문이 아니다. */
   contract_forms:         { '.read': LOGIN, '.write': LOGIN },
   contract_forms_removed: { '.read': LOGIN, '.write': LOGIN },
+  /* 서식 묶음 세트(2026-09-28 설계 서식-묶음-채우기 §2-1) — 양식 id 목록뿐, 개인정보 없음. 양식과 같은 권한 */
+  contract_form_sets:     { '.read': LOGIN, '.write': LOGIN },
   consultings:   { '.read': LOGIN, '.write': LOGIN },   /* 컨설팅 사업(금액 포함) */
   /* 사건 기록. 여태 이름이 없어 $other 로 떨어져 있었다 — 권한은 «그대로»
      재직 직원 전원이고, 이름을 붙여 어디에 무엇이 있는지 드러낸 것뿐이다.
