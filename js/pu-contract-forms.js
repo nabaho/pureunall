@@ -347,6 +347,64 @@
     return { sides: sides, groups: groups };
   }
 
+  /* ── 묶음 세트 (설계 2026-09-28-서식-묶음-채우기 §2-1) ──
+     data/contract_form_sets = { v:[세트…], rm:[지운 기본 세트 id…], u } — 계약서 양식과 같은 통표·거래 방식.
+     ⚠ 저장은 changeSets 한 길 — 들고 있던 사본을 통째로 밀면 그사이 남이 만든 세트를 지운다. */
+  var PATH_SETS = 'data/contract_form_sets';
+  var SET_SEED = [
+    { id: 'fs-chedang', name: '체당금 접수 세트', kind: 'case', side: 'worker', groupName: '체당금',
+      formIds: ['fm-case-cd-01', 'fm-case-cd-02', 'fm-case-cd-03', 'fm-case-cd-04'] }
+  ];
+  function setsOf(doc) {
+    var list = listOf(doc && doc.v).slice(), rm = listOf(doc && doc.rm), have = {};
+    list.forEach(function (s) { if (s && s.id) have[s.id] = 1; });
+    SET_SEED.forEach(function (s) { if (!have[s.id] && rm.indexOf(s.id) < 0) list.push(JSON.parse(JSON.stringify(s))); });
+    return list;
+  }
+  function changeSets(db, fn) {
+    return new Promise(function (res, rej) {
+      var out = null;
+      db.ref(PATH_SETS).transaction(function (cur) {
+        var doc = fn({ v: listOf(cur && cur.v).slice(), rm: listOf(cur && cur.rm).slice() });
+        out = { v: doc.v, rm: doc.rm, u: nextU(cur) };
+        return out;
+      }, function (err, committed) {
+        if (err || !committed) { rej(err || new Error('저장이 끝나지 않았습니다')); return; }
+        res(setsOf(out));
+      });
+    });
+  }
+  function isSeedSet(id) { return SET_SEED.some(function (s) { return s.id === id; }); }
+  /* 양식들의 채울 자리 합집합 — items:[{name, markers:[…]}] → [{key, forms:[양식 이름…]}] (나온 차례) */
+  function bundleMarkers(items) {
+    var outp = [], at = {};
+    (items || []).forEach(function (it) {
+      (it.markers || []).forEach(function (k) {
+        if (at[k] == null) { at[k] = outp.length; outp.push({ key: k, forms: [] }); }
+        var f = outp[at[k]].forms;
+        if (f.indexOf(it.name) < 0) f.push(it.name);
+      });
+    });
+    return outp;
+  }
+  /* 파일 이름에 못 쓰는 글자·제어 글자·방향 바꾸는 글자(U+202E 등)를 걷는다.
+     길이는 자른다 — 한글은 한 글자가 3바이트라 양식·회사·근로자 이름이 길면 255바이트를 넘는다 */
+  function fileSafe(s) { return String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f‪-‮⁦-⁩]/g, '_').trim(); }
+  function whoTail(V) {
+    return [V && V.회사명, V && V.근로자명].map(function (x) { return fileSafe(x).slice(0, 30); }).filter(Boolean).join('_');
+  }
+  /* 묶음 속 파일 이름 — 01_양식_회사_근로자.hwp (번호가 붙어 같은 이름 양식 둘도 안 겹친다) */
+  function bundleFileNames(items, V) {
+    var tail = whoTail(V);
+    return (items || []).map(function (it, i) {
+      return ('0' + (i + 1)).slice(-2) + '_' + (fileSafe(it.name).slice(0, 40) || '양식') + (tail ? '_' + tail : '') + (it.ext || '');
+    });
+  }
+  function zipName(title, V) {
+    var head = fileSafe(title).replace(/^\.+/, '').slice(0, 40), tail = whoTail(V);
+    return (head || '서식묶음') + (tail ? '_' + tail : '') + '.zip';
+  }
+
   /* 본문을 칸({{…}})과 글로 가른다 — 칸만 딱지로 감싸고 나머지는 글 그대로 넣는다 */
   function splitVars(text) {
     var s = String(text || ''), re = /\{\{[^{}\n]+\}\}/g, outp = [], at = 0, m;
@@ -481,6 +539,11 @@
     + '.pcf-card:hover{border-color:#93c5fd}.pcf-card.on{outline:2px solid #2563eb}'
     + '.pcf-thumb{height:150px;overflow:hidden;white-space:pre-wrap;font-family:"Malgun Gothic","맑은 고딕",monospace;font-size:8.5px;line-height:1.5;color:#64748b;padding:12px 14px;border-bottom:1px solid #f1f5f9}'
     + '.pcf-cn{display:flex;align-items:center;gap:6px;padding:7px 10px;font-size:12px;color:#1e293b}'
+    + '.pcf-lr{display:flex;align-items:center;gap:2px}.pcf-lr input{flex:none;margin:0 2px 0 6px;cursor:pointer}.pcf-lr .pcf-li{flex:1;min-width:0}'
+    + '.pcf-set{padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit;background:#fff;color:#1e293b;max-width:170px}'
+    + '.pcf-bbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid #bfdbfe;border-top:none;background:#eff6ff;color:#1e40af;padding:6px 12px;font-size:12.5px}'
+    + '.pcf-bbar[hidden]{display:none}.pcf-bbar b{white-space:nowrap}'
+    + '.pcf-bnames{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#475569;font-size:12px}'
     + '.pcf-top{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px 8px 0 0;padding:8px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}'
     + '.pcf-top b{flex:0 1 auto;min-width:0;max-width:38%;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.pcf-top .pcf-strip{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:11.5px;color:#64748b}'
@@ -503,6 +566,7 @@
     + '.pcf-fpick{display:flex;gap:8px;align-items:center;background:#dbeafe;color:#1e40af;border-radius:6px;padding:6px 8px;margin-top:6px;font-size:12.5px}'
     + '.pcf-fpick span{flex:1;min-width:0;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pcf-frow{display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;align-items:center;margin-bottom:5px;font-size:12px}'
+    + '.pcf-fu{display:block;font-size:10.5px;color:#94a3b8;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.pcf-frow span{color:#1e40af;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pcf-frow span.miss{color:#854d0e}'
     + '.pcf-fnote{font-size:12px;color:#854d0e;margin-top:10px;min-height:1em}'
     + '.pcf-fprev{margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;max-height:60vh;overflow:auto;background:#e2e8f0;padding:12px}'
@@ -736,12 +800,22 @@
     });
     return out;
   }
-  function openFill(fm, host) {
+  /* 채우기 창 — 양식 «하나 또는 여러 개» (설계 2026-09-28-서식-묶음-채우기 §2-2).
+     회사·담당자·근로자는 한 번 고르고, 채울 자리는 양식들의 합집합이다(bundleMarkers).
+     하나면 지금처럼 그 파일 하나, 여럿이면 host.zip 으로 묶어 .zip 하나를 받는다.
+     ⚠ 채운 값은 저장하지 않는다 — 내려받는 파일에만 들어간다. db 를 만지지 않는다. */
+  function openFill(fms, host, title) {
     var CF = w.PuFormCardFill;
     if (!CF || !host.cards) { toast('ERP 업체정보 연결을 불러오지 못했습니다'); return; }
+    fms = (fms || []).filter(Boolean);
+    if (!fms.length) return;
     ensureCss();
-    var srcs = hwpSources(fm), src = srcs[0] || null;
-    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, markers: CF.markersIn(fm.body), edits: {}, hwp: null };
+    var one = fms.length === 1;
+    var items = fms.map(function (fm) {
+      var srcs = hwpSources(fm);
+      return { fm: fm, srcs: srcs, src: srcs[0] || null, hwp: null, text: CF.markersIn(fm.body), err: '' };
+    });
+    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0 };
     var bg = el('div', { 'class': 'pcf-mbg' });
     function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
     function onKey(e) { if (e.key === 'Escape') close(); }
@@ -764,21 +838,27 @@
       Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });
       return V;
     }
+    function markersOf(it) {
+      var seen = {}, outp = [];
+      it.text.concat(it.hwp ? it.hwp.markers : []).forEach(function (k) { if (!seen[k]) { seen[k] = 1; outp.push(k); } });
+      return outp;
+    }
     function allMarkers() {
-      var seen = {}, out = [];
-      st.markers.concat(st.hwp ? st.hwp.markers : []).forEach(function (k) { if (!seen[k]) { seen[k] = 1; out.push(k); } });
-      return out;
+      return bundleMarkers(items.map(function (it) { return { name: it.fm.name || '양식', markers: markersOf(it) }; }));
     }
     function drawVals() {
       valBox.innerHTML = '';
       var V = values(), ks = allMarkers();
-      if (!ks.length) { valBox.appendChild(el('div', { 'class': 'pcf-muted', text: '이 양식에는 채울 자리가 없습니다' })); return; }
-      valBox.appendChild(el('div', { 'class': 'pcf-fh', text: '채울 자리 ' + ks.length + '곳 — 고칠 수 있습니다' }));
-      ks.forEach(function (k) {
+      if (!ks.length) { valBox.appendChild(el('div', { 'class': 'pcf-muted', text: one ? '이 양식에는 채울 자리가 없습니다' : '이 양식들에는 채울 자리가 없습니다' })); return; }
+      var blank = ks.filter(function (x) { return !V[x.key]; }).length;
+      valBox.appendChild(el('div', { 'class': 'pcf-fh', text: '채울 자리 ' + ks.length + '곳' + (one ? '' : ' (양식 ' + items.length + '개 합쳐서)') + (blank ? ' · 빈 칸 ' + blank + '곳' : '') + ' — 고칠 수 있습니다' }));
+      ks.forEach(function (x) {
+        var k = x.key;
         var inp = el('input', { type: 'text', 'aria-label': k, placeholder: CF.BLANK + ' (비워 두면 밑줄)' });
         inp.value = V[k] == null ? '' : V[k];
         inp.addEventListener('input', function () { st.edits[k] = inp.value; });
-        valBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { 'class': V[k] ? '' : 'miss', text: k }), inp]));
+        var used = one ? null : el('small', { 'class': 'pcf-fu', title: x.forms.join(', '), text: x.forms.length === items.length ? '모든 양식' : x.forms[0] + (x.forms.length > 1 ? ' 외 ' + (x.forms.length - 1) : '') });
+        valBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { 'class': V[k] ? '' : 'miss' }, [k, used]), inp]));
       });
     }
     function rowBtn(label, sub, on, fn) {
@@ -857,80 +937,161 @@
       }, 200);
     });
 
-    var srcSel = null, btnPrev = null, btnDown = null;
-    if (srcs.length > 1) {
-      srcSel = el('select', { 'aria-label': '채울 원본', onchange: function () { src = srcs[+srcSel.value]; loadHwp(); syncBtns(); } },
-        srcs.map(function (s, i) { return el('option', { value: String(i), text: s.name }); }));
+    /* 원본 살피기 — 양식마다 «하나씩 차례로»(한글 엔진은 문서를 열 때 메모리를 크게 쓴다).
+       한 벌을 못 찾으면 같은 양식의 다른 첨부본·보관본을 차례로 본다.
+       안내·단추는 «양식마다의 상태»에서 만든다 — 개수만 세면 늦게 끝난 옛 불러오기가 안내를 멈춘 채 남긴다.
+       it.state: none(원본 없음) · wait · loading · ok · nofield(채울 자리 없음) · fail */
+    var busy = false;   // 묶음을 만드는 중 — 받기를 두 번 누르면 채우기가 겹쳐 돈다
+    items.forEach(function (it) { it.state = it.src ? 'wait' : 'none'; });
+    function nameOf(it) { return it.fm.name || '양식'; }
+    function tagOf(it) { return it.state === 'none' ? ' (원본 없음 — 본문)' : it.state === 'fail' ? ' (원본 못 찾음)' : it.state === 'nofield' ? ' (채울 자리 없음)' : ''; }
+    function loadingCount() { return items.filter(function (it) { return it.state === 'wait' || it.state === 'loading'; }).length; }
+    function refresh() {
+      var n = loadingCount();
+      if (btnDown) btnDown.disabled = n > 0 || busy;
+      if (busy) return;
+      var re = items.filter(function (it) { return it.retry && it.state === 'loading'; })[0];
+      if (re) { note.textContent = (one ? '' : nameOf(re) + ' — ') + '고른 원본을 찾지 못해 다른 보관본을 확인하는 중…'; return; }
+      if (n > 0) { note.textContent = (one ? '한글 원본' : '원본 ' + n + '개') + ' 살펴보는 중…'; return; }
+      var bad = items.filter(function (it) { return it.state === 'fail'; });
+      var empty = items.filter(function (it) { return it.state === 'nofield'; });
+      var msgs = [];
+      if (bad.length) msgs.push('⚠ 원본을 찾지 못했습니다' + (one ? ' — 양식 수정에서 원본 파일을 다시 올려 주세요 (' + bad[0].err + ')'
+        : ' — ' + bad.map(nameOf).join(', ') + ' (양식 수정에서 원본을 다시 올리거나, 받을 때 채운 본문으로 넣을 수 있습니다)'));
+      if (empty.length) msgs.push('⚠ ' + (one ? kindWord(empty[0]) : empty.map(nameOf).join(', ')) + ' 원본에 채울 자리(회사명 같은 표시)가 없습니다 — 원본에 표시를 넣으면 채워집니다');
+      note.textContent = msgs.join(' / ');
+      if (pickSel) items.forEach(function (it, i) { var o = pickSel.options[i]; if (o) o.textContent = (i + 1) + '. ' + nameOf(it) + tagOf(it); });
     }
-    function loadHwp(tried) {
-      st.hwp = null; drawVals();
-      if (!src) return;
-      note.textContent = '한글 원본 살펴보는 중…';
-      var my = src;
-      host.hwpBytes(src).then(function (u8) {
+    function loadHwp(it, tried) {
+      it.hwp = null; it.err = '';
+      if (!it.src) { it.state = 'none'; refresh(); return Promise.resolve(); }
+      var my = it.src;
+      it.state = 'loading'; refresh();
+      return host.hwpBytes(my).then(function (u8) {
         return host.hwpMarkers(u8, my.name).then(function (ks) { return { bytes: u8, markers: ks || [] }; });
       }).then(function (h) {
-        if (src !== my) return;
-        st.hwp = h;
-        note.textContent = h.markers.length ? '' : '⚠ ' + kindWord() + ' 원본에 채울 자리(회사명 같은 표시)가 없습니다 — 원본에 표시를 넣으면 채워집니다';
-        drawVals();
+        if (it.src !== my) return;   // 그사이 다른 원본으로 바꿨다 — 새 불러오기가 상태를 정한다
+        it.hwp = h; it.retry = false; it.state = h.markers.length ? 'ok' : 'nofield';
+        refresh(); drawVals();
       }, function (e) {
-        var used = tried || [], next = srcs.filter(function (s) { return used.indexOf(s) < 0 && s !== my; })[0];
-        if (src !== my) return;
+        if (it.src !== my) return;
+        var used = tried || [], next = it.srcs.filter(function (s) { return used.indexOf(s) < 0 && s !== my; })[0];
         if (next) {
-          note.textContent = '원본 한 벌을 못 찾아 다른 보관본을 확인하는 중…'; src = next;
-          if (srcSel) srcSel.value = String(srcs.indexOf(next)); syncBtns(); loadHwp(used.concat([my])); return;
+          it.src = next;
+          it.retry = true;   // 안내에 «다른 보관본을 보는 중»을 띄운다 (refresh)
+          if (srcSel) srcSel.value = String(it.srcs.indexOf(next));
+          syncBtns();
+          return loadHwp(it, used.concat([my]));
         }
-        note.textContent = '⚠ 원본을 찾지 못했습니다 — 양식 수정에서 원본 파일을 다시 올려 주세요 (' + ((e && e.message) || e) + ')';
+        it.err = (e && e.message) || String(e); it.retry = false; it.state = 'fail';
+        refresh();
       });
     }
-    function isXl() { return !!src && /\.xlsx$/i.test(src.name || ''); }
-    function kindWord() { return isXl() ? '엑셀' : '한글'; }
-    function fillHwp() {
-      if (!st.hwp) return Promise.reject(new Error(src ? '한글 원본을 아직 읽는 중입니다' : '이 양식에는 한글 원본이 없습니다'));
-      return host.hwpFill(st.hwp.bytes, src.name, CF.hwpValues(st.hwp.markers, values()));
+    function loadAll() {
+      return items.reduce(function (p, it) { return p.then(function () { return it.state === 'wait' ? loadHwp(it) : null; }); }, Promise.resolve());
     }
-    function outName() {
+    function isXl(it) { return !!it.src && /\.xlsx$/i.test(it.src.name || ''); }
+    function kindWord(it) { return isXl(it) ? '엑셀' : '한글'; }
+    function extOf(it) { return it.src ? (isXl(it) ? '.xlsx' : '.hwp') : '.txt'; }
+    /* 채운 본문 — UTF-8 표시(BOM)를 붙인다. 없으면 한글 등 옛 도구가 CP949 로 읽어 글자가 깨진다 */
+    function textBytes(s) {
+      var b = new TextEncoder().encode(s), o = new Uint8Array(b.length + 3);
+      o[0] = 0xEF; o[1] = 0xBB; o[2] = 0xBF; o.set(b, 3);
+      return o;
+    }
+    /* 한 양식 채우기 → { bytes, ext, unknown, relayoutFailed }. 원본이 없거나 asText 면 채운 본문(.txt) */
+    function fillOne(it, asText) {
       var V = values();
-      return CF.safeName(fm.name + (V.회사명 ? '_' + V.회사명 : '') + (V.근로자명 ? '_' + V.근로자명 : '')) + (isXl() ? '.xlsx' : '.hwp');
+      if (!it.src || asText) return Promise.resolve({ bytes: textBytes(CF.fillText(it.fm.body, V)), ext: '.txt', unknown: [] });
+      if (!it.hwp) return Promise.reject(new Error(nameOf(it) + ': ' + (it.state === 'fail' ? '원본을 찾지 못했습니다' : '원본을 아직 읽는 중입니다')));
+      return host.hwpFill(it.hwp.bytes, it.src.name, CF.hwpValues(it.hwp.markers, V)).then(function (r) { r.ext = extOf(it); return r; });
     }
-    function warnOf(r) {
-      if (r.unknown && r.unknown.length) toast('⚠ 못 채운 자리 ' + r.unknown.length + '곳(표 속 표일 수 있음): ' + r.unknown.join(', '));
-      else if (r.relayoutFailed) toast('⚠ 줄 다시 나누기를 못 해 원본 줄 정보로 냈습니다');
+    function outName(it) {
+      var V = values();
+      return CF.safeName(nameOf(it) + (V.회사명 ? '_' + V.회사명 : '') + (V.근로자명 ? '_' + V.근로자명 : '')) + extOf(it);
+    }
+    function warnOf(rs) {
+      var unk = [], relay = false;
+      rs.forEach(function (r) { (r.unknown || []).forEach(function (k) { if (unk.indexOf(k) < 0) unk.push(k); }); if (r.relayoutFailed) relay = true; });
+      if (unk.length) toast('⚠ 못 채운 자리 ' + unk.length + '곳(표 속 표일 수 있음): ' + unk.join(', '));
+      else if (relay) toast('⚠ 줄 다시 나누기를 못 해 원본 줄 정보로 냈습니다');
+    }
+    function save(bytes, name, type) {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: type }));
+      a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      toast('내려받았습니다 — ' + name);
     }
     function doPreview() {
-      if (!src) {   // 한글 원본이 없으면 글자 본문을 채워 보여 준다
+      var it = items[st.pick] || items[0];
+      if (!it.src || it.state === 'fail') {   // 원본이 없거나 못 찾았으면 글자 본문을 채워 보여 준다
         prevBox.hidden = false; prevBox.innerHTML = '';
-        prevBox.appendChild(el('pre', { 'class': 'pcf-body', text: CF.fillText(fm.body, values()) }));
+        prevBox.appendChild(el('pre', { 'class': 'pcf-body', text: CF.fillText(it.fm.body, values()) }));
         return;
       }
       note.textContent = '채우는 중…';
-      fillHwp().then(function (r) {
-        note.textContent = ''; warnOf(r);
+      fillOne(it).then(function (r) {
+        refresh(); warnOf([r]);
         prevBox.hidden = false; prevBox.innerHTML = '';
-        return host.hwpShow(prevBox, r.bytes, outName());
+        return host.hwpShow(prevBox, r.bytes, outName(it));
       }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
     function doDownload() {
-      note.textContent = '채우는 중…';
-      fillHwp().then(function (r) {
-        note.textContent = ''; warnOf(r);
-        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.bytes], { type: isXl() ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/x-hwp' }));
-        a.download = outName(); document.body.appendChild(a); a.click();
-        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-        toast('내려받았습니다 — ' + a.download);
-      }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
+      if (busy) return;
+      if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다 — 끝나면 받을 수 있습니다'; return; }
+      if (one) {
+        var it = items[0];
+        busy = true; refresh(); note.textContent = '채우는 중…';
+        fillOne(it).then(function (r) {
+          busy = false; refresh(); warnOf([r]);
+          save(r.bytes, outName(it), isXl(it) ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/x-hwp');
+        }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
+        return;
+      }
+      if (!host.zip) { note.textContent = '⚠ 묶음 만들기(압축) 도구가 연결되지 않았습니다'; return; }
+      /* 원본을 못 찾은 양식은 «채우기 전에» 한꺼번에 묻는다 — 앞 양식을 다 채운 뒤에 멈추지 않게 */
+      var bad = items.filter(function (x) { return x.state === 'fail'; });
+      if (bad.length && !w.confirm('원본을 찾지 못한 양식이 ' + bad.length + '개 있습니다:\n  ' + bad.map(nameOf).join('\n  ')
+        + '\n\n이 양식은 채운 본문(.txt)으로 넣고 계속할까요?')) return;
+      var asText = items.map(function (x) { return x.state === 'fail'; });
+      /* 한 벌씩 차례로 — 한글 엔진은 문서 하나를 열 때 메모리를 크게 쓴다 */
+      var V = values(), rs = [], k = 0;
+      var names = bundleFileNames(items.map(function (x, i) { return { name: x.fm.name, ext: asText[i] ? '.txt' : extOf(x) }; }), V);
+      busy = true; refresh();
+      function next() {
+        if (k >= items.length) return Promise.resolve();
+        note.textContent = '채우는 중… (' + (k + 1) + '/' + items.length + ')';
+        return fillOne(items[k], asText[k]).then(function (r) { rs.push(r); k++; return next(); });
+      }
+      next().then(function () {
+        return host.zip(rs.map(function (r, i) { return { name: names[i], bytes: r.bytes }; }));
+      }).then(function (zipBytes) {
+        busy = false; refresh(); warnOf(rs);
+        save(zipBytes, zipName(title || '서식묶음', V), 'application/zip');
+      }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
     function copyText() {
-      var t = CF.fillText(fm.body, values());
+      var t = CF.fillText(items[0].fm.body, values());
       (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject(new Error('복사 기능이 없습니다')))
         .then(function () { toast('채운 본문을 복사했습니다'); }, function (e) { toast('⚠ ' + ((e && e.message) || e)); });
     }
 
-    var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '채워서 받기', style: 'width:980px' }, [
-      el('div', { 'class': 'pcf-mh' }, [el('span', { text: '📝 채워서 받기 · ' + (fm.name || '') }),
-        el('small', { style: 'font-weight:400;color:#64748b;margin-right:8px', text: src ? '원본: ' + src.name : '한글 원본 없음 — 글자 본문을 채웁니다' }),
-        el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })]),
+    var srcSel = null, pickSel = null, btnPrev = null, btnDown = null, fm0 = items[0].fm;
+    if (one && items[0].srcs.length > 1) {
+      srcSel = el('select', { 'aria-label': '채울 원본', onchange: function () { items[0].src = items[0].srcs[+srcSel.value]; loadHwp(items[0]); syncBtns(); } },
+        items[0].srcs.map(function (s, i) { return el('option', { value: String(i), text: s.name }); }));
+    }
+    if (!one) {
+      pickSel = el('select', { 'aria-label': '열어 볼 양식', onchange: function () { st.pick = +pickSel.value; syncBtns(); } },
+        items.map(function (it, i) { return el('option', { value: String(i), text: (i + 1) + '. ' + (it.fm.name || '양식') + (it.src ? '' : ' (원본 없음 — 본문)') }); }));
+    }
+    var head = one
+      ? [el('span', { text: '📝 채워서 받기 · ' + (fm0.name || '') }),
+        el('small', { style: 'font-weight:400;color:#64748b;margin-right:8px', text: items[0].src ? '원본: ' + items[0].src.name : '한글 원본 없음 — 글자 본문을 채웁니다' })]
+      : [el('span', { text: '📦 묶음 채우기 · ' + (title || '고른 양식') + ' (' + items.length + '개)' }),
+        el('small', { style: 'font-weight:400;color:#64748b;margin-right:8px', text: '회사·담당자·근로자를 한 번 고르면 모두 채웁니다' })];
+    var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': one ? '채워서 받기' : '묶음 채우기', style: 'width:980px' }, [
+      el('div', { 'class': 'pcf-mh' }, head.concat([el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })])),
       el('div', { 'class': 'pcf-mb' }, [
         srcSel ? el('div', { style: 'margin-bottom:8px' }, [el('span', { 'class': 'pcf-fh', text: '채울 원본 ' }), srcSel]) : null,
         el('div', { 'class': 'pcf-fcols' }, [
@@ -945,19 +1106,23 @@
       ]),
       el('div', { 'class': 'pcf-mf' }, [
         el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }),
-        fm.body ? el('button', { type: 'button', 'class': 'pcf-b', text: '본문 복사', onclick: copyText }) : null,
-        btnPrev = el('button', { type: 'button', 'class': 'pcf-b', text: src ? kindWord() + '로 열어 보기' : '채운 본문 보기', onclick: doPreview }),
-        btnDown = src ? el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', text: kindWord() + ' 파일 내려받기', onclick: doDownload }) : null
+        one && fm0.body ? el('button', { type: 'button', 'class': 'pcf-b', text: '본문 복사', onclick: copyText }) : null,
+        pickSel,
+        btnPrev = el('button', { type: 'button', 'class': 'pcf-b', onclick: doPreview }),
+        btnDown = (one && !items[0].src) ? null : el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', onclick: doDownload })
       ])
     ]);
     function syncBtns() {
-      if (btnPrev && src) btnPrev.textContent = kindWord() + '로 열어 보기';
-      if (btnDown) btnDown.textContent = kindWord() + ' 파일 내려받기';
+      var it = items[st.pick] || items[0];
+      if (btnPrev) btnPrev.textContent = it.src ? kindWord(it) + '로 열어 보기' : '채운 본문 보기';
+      if (btnDown) btnDown.textContent = one ? kindWord(items[0]) + ' 파일 내려받기' : '📦 ' + items.length + '개 묶음 받기 (.zip)';
     }
+    syncBtns();
     bg.appendChild(m);
     bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
     document.body.appendChild(bg);
-    drawContacts(); drawVals(); loadHwp();
+    drawContacts(); drawVals();
+    refresh(); loadAll();
     setTimeout(function () { coQ.focus(); }, 0);
   }
 
@@ -969,7 +1134,9 @@
     ensureCss();
     /* C안 — 메뉴(host.tree)는 계약유형 6종까지, 측·사건유형은 본문 위 칩, 양식은 본문 목록 (대표 결정 2026-09-27) */
     var S = { forms: [], removed: [], sel: host.selected || null, kind: 'company', side: 'all', grp: 'all', q: '',
-      view: loadView(), loaded: false, err: null, bodyEl: null };
+      view: loadView(), loaded: false, err: null, bodyEl: null,
+      /* 묶음 채우기 — checked 는 고른 차례대로의 양식 id, setId 는 세트로 골랐을 때 그 세트(손대면 풀린다) */
+      sets: setsOf(null), checked: [], setId: null, barEl: null };
 
     function loadView() { try { return localStorage.getItem('pcf_view') === 'card' ? 'card' : 'list'; } catch (_) { return 'list'; } }
     function saveView() { try { localStorage.setItem('pcf_view', S.view); } catch (_) {} }
@@ -991,6 +1158,8 @@
         /* 고른 것이 없으면 첫 양식을 «보여만» 준다 — host 에 알리지 않는다(다른 칸을 보는 중이면 끌려온다) */
         else { var f0 = shown()[0]; S.sel = f0 ? f0.id : null; }
         drawTree(); drawMain();
+        /* 세트는 따로 받는다 — 못 받아도 양식 화면은 그대로 쓴다(기본 세트만 보인다) */
+        db.ref(PATH_SETS).once('value').then(function (s) { S.sets = setsOf(s.val()); drawMain(); }, function () {});
       }).catch(function (e) { S.err = (e && e.message) || String(e); drawTree(); drawMain(); });
     }
     /* 한 번 고치고 → 서버가 돌려준 목록으로 다시 그린다 */
@@ -1169,7 +1338,7 @@
       return el('div', { 'class': 'pcf-top' }, fm ? [
         el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' + k.label + ' · ' }), fm.name]),
         strip,
-        host.cards ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다.', text: '📝 찾아서 채우기', onclick: function () { openFill(fm, host); } }) : null,
+        host.cards ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다.', text: '📝 찾아서 채우기', onclick: function () { openFill([fm], host); } }) : null,
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '수정', onclick: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } }),
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', text: '복제', onclick: function () { copy(fm); } }),
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#dc2626', text: '삭제', onclick: function () { del(fm); } })
@@ -1202,7 +1371,7 @@
     /* 칩 줄 «하나» — 사건계약: 측 칩 | 사건유형 칩(고른 측 안에서 센 수). 모든 종류: 이름 찾기 · 목록/카드 · 올리기·추가 도구.
        넓은 화면에서는 한 줄, 좁으면 줄바꿈한다(한 화면에 보이게, 2026-09-27) */
     function filterBar() {
-      var kind = S.kind, row = [];
+      var kind = S.kind, row = [setPicker()];
       if (kind === 'case') {
         var fc = facetCounts(S.forms, 'case', S.side);
         row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '측' },
@@ -1227,6 +1396,104 @@
         el('button', { type: 'button', 'class': 'pcf-b b', text: '+ 양식 추가', onclick: function () { modal({ kind: kind, onSave: save }); } })]));
       return el('div', { 'class': 'pcf-fbar' }, [el('div', { 'class': 'pcf-crow' }, row)]);
     }
+    /* ── 묶음 채우기 (설계 2026-09-28 §2-2) — 체크(2-A) · 세트(2-B) · 아래 막대 ── */
+    function checkedForms() {
+      return S.checked.map(function (id) { return S.forms.filter(function (f) { return f.id === id; })[0]; }).filter(Boolean);
+    }
+    function toggleCheck(id, on) {
+      var at = S.checked.indexOf(id);
+      if (on && at < 0) S.checked.push(id);
+      if (!on && at >= 0) S.checked.splice(at, 1);
+      S.setId = null;   // 세트에서 하나라도 빼거나 더하면 «그 세트»가 아니다
+      drawBar();
+    }
+    function setById(id) { return S.sets.filter(function (s) { return s.id === id; })[0] || null; }
+    function applySet(id) {
+      var st = setById(id); if (!st) return;
+      var have = {}; S.forms.forEach(function (f) { have[f.id] = 1; });
+      S.checked = (st.formIds || []).filter(function (x) { return have[x]; });
+      S.setId = st.id;
+      if (!S.checked.length) { toast('이 세트의 양식이 모두 지워졌습니다'); drawMain(); return; }
+      if (S.checked.length < (st.formIds || []).length) toast('세트 양식 ' + ((st.formIds || []).length - S.checked.length) + '개는 지워져 뺐습니다');
+      var first = S.forms.filter(function (f) { return f.id === S.checked[0]; })[0];
+      if (first && (first.kind !== S.kind || shown().indexOf(first) < 0)) select(first.id); else drawMain();
+    }
+    function saveAsSet() {
+      var ids = checkedForms().map(function (f) { return f.id; }); if (!ids.length) return;   // 그사이 지워진 양식은 넣지 않는다
+      var name = w.prompt('세트 이름 (예: 부당해고 구제 세트)', '');
+      if (name == null) return;
+      name = String(name).trim().slice(0, 40);
+      if (!name) { toast('세트 이름을 넣어 주세요'); return; }
+      var fs0 = S.forms.filter(function (f) { return f.id === ids[0]; })[0] || {};
+      var ns = { id: newId('fs-'), name: name, formIds: ids, kind: fs0.kind || S.kind, at: Date.now() };
+      track(changeSets(db, function (doc) { doc.v.push(ns); return doc; })).then(function (list) {
+        S.sets = list; S.setId = ns.id; drawMain(); toast('세트를 저장했습니다 — ' + name);
+      }, function (e) { toast('⚠ 세트를 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
+    }
+    /* 이름 바꾸기·지우기. 기본 세트를 지우면 rm 에 남긴다(안 남기면 다음에 도로 생긴다) */
+    function editSet(id, rename) {
+      var st = setById(id); if (!st) return;
+      var name = null;
+      if (rename) {
+        name = w.prompt('새 세트 이름', st.name || '');
+        if (name == null) return;
+        name = String(name).trim().slice(0, 40);
+        if (!name) { toast('세트 이름을 넣어 주세요'); return; }
+      } else if (!w.confirm('"' + st.name + '" 세트를 지울까요?\n(양식은 지워지지 않습니다)')) return;
+      var gone = false;
+      track(changeSets(db, function (doc) {
+        var at = -1;
+        gone = false;
+        doc.v.forEach(function (s, i) { if (s && s.id === id) at = i; });
+        if (rename) {
+          if (at >= 0) doc.v[at].name = name;
+          /* 기본 세트를 처음 고치면 저장본에 옮겨 담는다 — 단, 그사이 누가 지웠으면 되살리지 않는다 */
+          else if (isSeedSet(id) && doc.rm.indexOf(id) < 0) { var cp = JSON.parse(JSON.stringify(st)); cp.name = name; doc.v.push(cp); }
+          else gone = true;
+        } else {
+          if (at >= 0) doc.v.splice(at, 1);
+          if (isSeedSet(id) && doc.rm.indexOf(id) < 0) doc.rm.push(id);
+        }
+        return doc;
+      })).then(function (list) {
+        S.sets = list; if (!rename && S.setId === id) S.setId = null; drawMain();
+        toast(gone ? '이미 지워진 세트입니다' : rename ? '이름을 바꿨습니다' : '세트를 지웠습니다');
+      }, function (e) { toast('⚠ 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
+    }
+    function setPicker() {
+      var sel = el('select', { 'class': 'pcf-set', 'aria-label': '묶음 세트', onchange: function () {
+        var v = sel.value; sel.value = '';
+        if (v.indexOf('ren:') === 0) editSet(v.slice(4), true);
+        else if (v.indexOf('del:') === 0) editSet(v.slice(4), false);
+        else if (v) applySet(v);
+      } }, [el('option', { value: '', text: '📚 세트' })]
+        .concat(S.sets.map(function (s) { return el('option', { value: s.id, text: s.name + ' (' + (s.formIds || []).length + ')' }); }))
+        .concat(S.sets.length ? [el('option', { value: '', disabled: true, text: '──────' })] : [])
+        .concat(S.sets.map(function (s) { return el('option', { value: 'ren:' + s.id, text: '✏ 이름 바꾸기 — ' + s.name }); }))
+        .concat(S.sets.map(function (s) { return el('option', { value: 'del:' + s.id, text: '🗑 지우기 — ' + s.name }); })));
+      return sel;
+    }
+    /* 아래 막대 — 하나라도 고르면 뜬다. 막대만 다시 그린다(목록 스크롤이 튀지 않게) */
+    function bundleBar() {
+      S.barEl = el('div', { 'class': 'pcf-bbar', hidden: true, role: 'region', 'aria-label': '묶음' });
+      drawBar();
+      return S.barEl;
+    }
+    function drawBar() {
+      var b = S.barEl; if (!b) return;
+      var fms = checkedForms();
+      b.innerHTML = '';
+      b.hidden = !fms.length;
+      if (!fms.length) { fitHeight(); return; }
+      var st = S.setId ? setById(S.setId) : null;
+      b.appendChild(el('b', { text: (st ? '📚 ' + st.name + ' · ' : '☑ ') + fms.length + '개 골랐습니다' }));
+      b.appendChild(el('span', { 'class': 'pcf-bnames', title: fms.map(function (f) { return f.name; }).join(', '), text: fms.map(function (f) { return f.name; }).join(' · ') }));
+      if (!st) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '세트로 저장', onclick: saveAsSet }));
+      b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '선택 풀기', onclick: function () { S.checked = []; S.setId = null; drawMain(); } }));
+      if (host.cards) b.appendChild(el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '📦 ' + fms.length + '개 채워서 받기',
+        onclick: function () { openFill(checkedForms(), host, st ? st.name : '고른 양식'); } }));
+      fitHeight();
+    }
     function listCol(list) {
       var col = el('div', { 'class': 'pcf-list' });
       if (!list.length) col.appendChild(el('div', { 'class': 'pcf-muted', style: 'padding:14px;font-size:12px', text: '맞는 양식이 없습니다' }));
@@ -1237,10 +1504,15 @@
           if (g !== prev) { prev = g; col.appendChild(el('div', { 'class': 'pcf-lg', text: g })); }
         }
         var on = S.sel === f.id, sd = sideOf(f);
-        col.appendChild(el('button', { type: 'button', 'class': 'pcf-li' + (on ? ' on' : '') + (f.enabled === false ? ' off' : ''),
-          title: f.name + (f.enabled === false ? ' (사용 안 함)' : ''), 'aria-current': on ? 'true' : null, onclick: function () { select(f.id); } }, [
-          el('span', { 'class': 'pcf-ln', text: f.name }),
-          sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null]));
+        /* 체크 칸은 줄 단추 «밖»에 둔다 — 안에 두면 체크할 때마다 그 양식이 골라진다 */
+        var ck = el('input', { type: 'checkbox', 'aria-label': f.name + ' 묶음에 넣기', title: '묶음에 넣기' });
+        ck.checked = S.checked.indexOf(f.id) >= 0;
+        ck.addEventListener('change', function () { toggleCheck(f.id, ck.checked); });
+        col.appendChild(el('div', { 'class': 'pcf-lr' }, [ck,
+          el('button', { type: 'button', 'class': 'pcf-li' + (on ? ' on' : '') + (f.enabled === false ? ' off' : ''),
+            title: f.name + (f.enabled === false ? ' (사용 안 함)' : ''), 'aria-current': on ? 'true' : null, onclick: function () { select(f.id); } }, [
+            el('span', { 'class': 'pcf-ln', text: f.name }),
+            sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null])]));
       });
       col.appendChild(el('button', { type: 'button', 'class': 'pcf-li add', text: '+ 새 양식', onclick: function () { modal({ kind: S.kind, onSave: save }); } }));
       return col;
@@ -1291,6 +1563,7 @@
       wrap.appendChild(mobileSelects());
       wrap.appendChild(toolbar(cur()));
       wrap.appendChild(filterBar());
+      wrap.appendChild(bundleBar());
       S.bodyEl = el('div');
       wrap.appendChild(S.bodyEl);
       root.appendChild(wrap);
@@ -1319,6 +1592,11 @@
     sideOf: sideOf,
     filterForms: filterForms,
     facetCounts: facetCounts,
+    setsOf: setsOf,
+    changeSets: changeSets,
+    bundleMarkers: bundleMarkers,
+    bundleFileNames: bundleFileNames,
+    zipName: zipName,
     splitVars: splitVars,
     attKey: attKey,
     loadForms: loadForms,

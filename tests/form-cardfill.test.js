@@ -128,7 +128,8 @@ test('ⓒ 배선 — 문서관리가 모듈을 싣고 창에 연결한다', () =
   ['cards: formCards()', 'hwpBytes: formHwpBytes', 'hwpMarkers: formHwpMarkers', 'hwpFill: formHwpFill', 'hwpShow: formHwpShow']
     .forEach((s) => assert.ok(html.indexOf(s) >= 0, s + ' 연결이 없습니다'));
   const forms = read('js/pu-contract-forms.js');
-  assert.match(forms, /openFill\(fm, host\)/, '[채워서 받기] 단추가 없습니다');
+  /* 2026-09-28 — 채우기 창이 양식 «여러 개»를 받도록 넓어졌다(묶음 채우기). 한 장은 [fm] 으로 부른다 */
+  assert.match(forms, /openFill\(\[fm\], host\)/, '[채워서 받기] 단추가 없습니다');
   ['cards.rows()', 'cards.coInfo(', 'hwpBytes(', 'hwpMarkers(', 'hwpFill(', 'hwpShow('].forEach((s) =>
     assert.ok(forms.indexOf('host.' + s) >= 0, 'host.' + s + ' 를 부르지 않습니다'));
 });
