@@ -387,17 +387,21 @@
     });
     return outp;
   }
-  function fileSafe(s) { return String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim(); }
-  function whoTail(V) { return [V && V.회사명, V && V.근로자명].filter(Boolean).map(fileSafe).join('_'); }
+  /* 파일 이름에 못 쓰는 글자·제어 글자·방향 바꾸는 글자(U+202E 등)를 걷는다.
+     길이는 자른다 — 한글은 한 글자가 3바이트라 양식·회사·근로자 이름이 길면 255바이트를 넘는다 */
+  function fileSafe(s) { return String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f‪-‮⁦-⁩]/g, '_').trim(); }
+  function whoTail(V) {
+    return [V && V.회사명, V && V.근로자명].map(function (x) { return fileSafe(x).slice(0, 30); }).filter(Boolean).join('_');
+  }
   /* 묶음 속 파일 이름 — 01_양식_회사_근로자.hwp (번호가 붙어 같은 이름 양식 둘도 안 겹친다) */
   function bundleFileNames(items, V) {
     var tail = whoTail(V);
     return (items || []).map(function (it, i) {
-      return ('0' + (i + 1)).slice(-2) + '_' + fileSafe(it.name || '양식') + (tail ? '_' + tail : '') + (it.ext || '');
+      return ('0' + (i + 1)).slice(-2) + '_' + (fileSafe(it.name).slice(0, 40) || '양식') + (tail ? '_' + tail : '') + (it.ext || '');
     });
   }
   function zipName(title, V) {
-    var head = fileSafe(title), tail = whoTail(V);
+    var head = fileSafe(title).replace(/^\.+/, '').slice(0, 40), tail = whoTail(V);
     return (head || '서식묶음') + (tail ? '_' + tail : '') + '.zip';
   }
 
@@ -933,51 +937,78 @@
       }, 200);
     });
 
-    /* 원본 살피기 — 양식마다. 한 벌을 못 찾으면 같은 양식의 다른 첨부본·보관본을 차례로 본다 */
-    var pending = 0;
-    function showLoading() {
-      if (pending > 0) note.textContent = (one ? '한글 원본' : '원본 ' + pending + '개') + ' 살펴보는 중…';
-      else if (note.textContent.indexOf('살펴보는 중') >= 0 || note.textContent.indexOf('확인하는 중') >= 0) note.textContent = '';
+    /* 원본 살피기 — 양식마다 «하나씩 차례로»(한글 엔진은 문서를 열 때 메모리를 크게 쓴다).
+       한 벌을 못 찾으면 같은 양식의 다른 첨부본·보관본을 차례로 본다.
+       안내·단추는 «양식마다의 상태»에서 만든다 — 개수만 세면 늦게 끝난 옛 불러오기가 안내를 멈춘 채 남긴다.
+       it.state: none(원본 없음) · wait · loading · ok · nofield(채울 자리 없음) · fail */
+    var busy = false;   // 묶음을 만드는 중 — 받기를 두 번 누르면 채우기가 겹쳐 돈다
+    items.forEach(function (it) { it.state = it.src ? 'wait' : 'none'; });
+    function nameOf(it) { return it.fm.name || '양식'; }
+    function tagOf(it) { return it.state === 'none' ? ' (원본 없음 — 본문)' : it.state === 'fail' ? ' (원본 못 찾음)' : it.state === 'nofield' ? ' (채울 자리 없음)' : ''; }
+    function loadingCount() { return items.filter(function (it) { return it.state === 'wait' || it.state === 'loading'; }).length; }
+    function refresh() {
+      var n = loadingCount();
+      if (btnDown) btnDown.disabled = n > 0 || busy;
+      if (busy) return;
+      var re = items.filter(function (it) { return it.retry && it.state === 'loading'; })[0];
+      if (re) { note.textContent = (one ? '' : nameOf(re) + ' — ') + '고른 원본을 찾지 못해 다른 보관본을 확인하는 중…'; return; }
+      if (n > 0) { note.textContent = (one ? '한글 원본' : '원본 ' + n + '개') + ' 살펴보는 중…'; return; }
+      var bad = items.filter(function (it) { return it.state === 'fail'; });
+      var empty = items.filter(function (it) { return it.state === 'nofield'; });
+      var msgs = [];
+      if (bad.length) msgs.push('⚠ 원본을 찾지 못했습니다' + (one ? ' — 양식 수정에서 원본 파일을 다시 올려 주세요 (' + bad[0].err + ')'
+        : ' — ' + bad.map(nameOf).join(', ') + ' (양식 수정에서 원본을 다시 올리거나, 받을 때 채운 본문으로 넣을 수 있습니다)'));
+      if (empty.length) msgs.push('⚠ ' + (one ? kindWord(empty[0]) : empty.map(nameOf).join(', ')) + ' 원본에 채울 자리(회사명 같은 표시)가 없습니다 — 원본에 표시를 넣으면 채워집니다');
+      note.textContent = msgs.join(' / ');
+      if (pickSel) items.forEach(function (it, i) { var o = pickSel.options[i]; if (o) o.textContent = (i + 1) + '. ' + nameOf(it) + tagOf(it); });
     }
     function loadHwp(it, tried) {
-      it.hwp = null; it.err = ''; drawVals();
-      if (!it.src) return;
+      it.hwp = null; it.err = '';
+      if (!it.src) { it.state = 'none'; refresh(); return Promise.resolve(); }
       var my = it.src;
-      pending++; showLoading();
-      host.hwpBytes(my).then(function (u8) {
+      it.state = 'loading'; refresh();
+      return host.hwpBytes(my).then(function (u8) {
         return host.hwpMarkers(u8, my.name).then(function (ks) { return { bytes: u8, markers: ks || [] }; });
       }).then(function (h) {
-        pending--;
-        if (it.src !== my) return;
-        it.hwp = h; showLoading();
-        if (!h.markers.length) note.textContent = '⚠ ' + (one ? '' : (it.fm.name || '양식') + ': ') + kindWord(it) + ' 원본에 채울 자리(회사명 같은 표시)가 없습니다 — 원본에 표시를 넣으면 채워집니다';
-        drawVals();
+        if (it.src !== my) return;   // 그사이 다른 원본으로 바꿨다 — 새 불러오기가 상태를 정한다
+        it.hwp = h; it.retry = false; it.state = h.markers.length ? 'ok' : 'nofield';
+        refresh(); drawVals();
       }, function (e) {
-        pending--;
-        var used = tried || [], next = it.srcs.filter(function (s) { return used.indexOf(s) < 0 && s !== my; })[0];
         if (it.src !== my) return;
+        var used = tried || [], next = it.srcs.filter(function (s) { return used.indexOf(s) < 0 && s !== my; })[0];
         if (next) {
-          note.textContent = '원본 한 벌을 못 찾아 다른 보관본을 확인하는 중…'; it.src = next;
-          if (srcSel && one) srcSel.value = String(it.srcs.indexOf(next)); syncBtns(); loadHwp(it, used.concat([my])); return;
+          it.src = next;
+          it.retry = true;   // 안내에 «다른 보관본을 보는 중»을 띄운다 (refresh)
+          if (srcSel) srcSel.value = String(it.srcs.indexOf(next));
+          syncBtns();
+          return loadHwp(it, used.concat([my]));
         }
-        it.err = (e && e.message) || String(e);
-        note.textContent = '⚠ ' + (one ? '' : (it.fm.name || '양식') + ': ') + '원본을 찾지 못했습니다 — 양식 수정에서 원본 파일을 다시 올려 주세요 (' + it.err + ')';
-        showLoading();
+        it.err = (e && e.message) || String(e); it.retry = false; it.state = 'fail';
+        refresh();
       });
+    }
+    function loadAll() {
+      return items.reduce(function (p, it) { return p.then(function () { return it.state === 'wait' ? loadHwp(it) : null; }); }, Promise.resolve());
     }
     function isXl(it) { return !!it.src && /\.xlsx$/i.test(it.src.name || ''); }
     function kindWord(it) { return isXl(it) ? '엑셀' : '한글'; }
     function extOf(it) { return it.src ? (isXl(it) ? '.xlsx' : '.hwp') : '.txt'; }
-    /* 한 양식 채우기 → { bytes, ext, unknown, relayoutFailed } — 원본이 없으면 채운 본문(.txt) */
-    function fillOne(it) {
+    /* 채운 본문 — UTF-8 표시(BOM)를 붙인다. 없으면 한글 등 옛 도구가 CP949 로 읽어 글자가 깨진다 */
+    function textBytes(s) {
+      var b = new TextEncoder().encode(s), o = new Uint8Array(b.length + 3);
+      o[0] = 0xEF; o[1] = 0xBB; o[2] = 0xBF; o.set(b, 3);
+      return o;
+    }
+    /* 한 양식 채우기 → { bytes, ext, unknown, relayoutFailed }. 원본이 없거나 asText 면 채운 본문(.txt) */
+    function fillOne(it, asText) {
       var V = values();
-      if (!it.src) return Promise.resolve({ bytes: new TextEncoder().encode(CF.fillText(it.fm.body, V)), ext: '.txt', unknown: [] });
-      if (!it.hwp) return Promise.reject(new Error((it.fm.name || '양식') + ': ' + (it.err ? '원본을 찾지 못했습니다' : '원본을 아직 읽는 중입니다')));
+      if (!it.src || asText) return Promise.resolve({ bytes: textBytes(CF.fillText(it.fm.body, V)), ext: '.txt', unknown: [] });
+      if (!it.hwp) return Promise.reject(new Error(nameOf(it) + ': ' + (it.state === 'fail' ? '원본을 찾지 못했습니다' : '원본을 아직 읽는 중입니다')));
       return host.hwpFill(it.hwp.bytes, it.src.name, CF.hwpValues(it.hwp.markers, V)).then(function (r) { r.ext = extOf(it); return r; });
     }
     function outName(it) {
       var V = values();
-      return CF.safeName((it.fm.name || '양식') + (V.회사명 ? '_' + V.회사명 : '') + (V.근로자명 ? '_' + V.근로자명 : '')) + extOf(it);
+      return CF.safeName(nameOf(it) + (V.회사명 ? '_' + V.회사명 : '') + (V.근로자명 ? '_' + V.근로자명 : '')) + extOf(it);
     }
     function warnOf(rs) {
       var unk = [], relay = false;
@@ -993,43 +1024,51 @@
     }
     function doPreview() {
       var it = items[st.pick] || items[0];
-      if (!it.src) {   // 원본이 없으면 글자 본문을 채워 보여 준다
+      if (!it.src || it.state === 'fail') {   // 원본이 없거나 못 찾았으면 글자 본문을 채워 보여 준다
         prevBox.hidden = false; prevBox.innerHTML = '';
         prevBox.appendChild(el('pre', { 'class': 'pcf-body', text: CF.fillText(it.fm.body, values()) }));
         return;
       }
       note.textContent = '채우는 중…';
       fillOne(it).then(function (r) {
-        note.textContent = ''; warnOf([r]);
+        refresh(); warnOf([r]);
         prevBox.hidden = false; prevBox.innerHTML = '';
         return host.hwpShow(prevBox, r.bytes, outName(it));
       }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
     function doDownload() {
+      if (busy) return;
+      if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다 — 끝나면 받을 수 있습니다'; return; }
       if (one) {
         var it = items[0];
-        note.textContent = '채우는 중…';
+        busy = true; refresh(); note.textContent = '채우는 중…';
         fillOne(it).then(function (r) {
-          note.textContent = ''; warnOf([r]);
+          busy = false; refresh(); warnOf([r]);
           save(r.bytes, outName(it), isXl(it) ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/x-hwp');
-        }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
+        }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
         return;
       }
       if (!host.zip) { note.textContent = '⚠ 묶음 만들기(압축) 도구가 연결되지 않았습니다'; return; }
+      /* 원본을 못 찾은 양식은 «채우기 전에» 한꺼번에 묻는다 — 앞 양식을 다 채운 뒤에 멈추지 않게 */
+      var bad = items.filter(function (x) { return x.state === 'fail'; });
+      if (bad.length && !w.confirm('원본을 찾지 못한 양식이 ' + bad.length + '개 있습니다:\n  ' + bad.map(nameOf).join('\n  ')
+        + '\n\n이 양식은 채운 본문(.txt)으로 넣고 계속할까요?')) return;
+      var asText = items.map(function (x) { return x.state === 'fail'; });
       /* 한 벌씩 차례로 — 한글 엔진은 문서 하나를 열 때 메모리를 크게 쓴다 */
       var V = values(), rs = [], k = 0;
-      var names = bundleFileNames(items.map(function (it) { return { name: it.fm.name, ext: extOf(it) }; }), V);
+      var names = bundleFileNames(items.map(function (x, i) { return { name: x.fm.name, ext: asText[i] ? '.txt' : extOf(x) }; }), V);
+      busy = true; refresh();
       function next() {
         if (k >= items.length) return Promise.resolve();
         note.textContent = '채우는 중… (' + (k + 1) + '/' + items.length + ')';
-        return fillOne(items[k]).then(function (r) { rs.push(r); k++; return next(); });
+        return fillOne(items[k], asText[k]).then(function (r) { rs.push(r); k++; return next(); });
       }
       next().then(function () {
         return host.zip(rs.map(function (r, i) { return { name: names[i], bytes: r.bytes }; }));
       }).then(function (zipBytes) {
-        note.textContent = ''; warnOf(rs);
+        busy = false; refresh(); warnOf(rs);
         save(zipBytes, zipName(title || '서식묶음', V), 'application/zip');
-      }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
+      }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
     function copyText() {
       var t = CF.fillText(items[0].fm.body, values());
@@ -1083,7 +1122,7 @@
     bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
     document.body.appendChild(bg);
     drawContacts(); drawVals();
-    items.forEach(function (it) { loadHwp(it); });
+    refresh(); loadAll();
     setTimeout(function () { coQ.focus(); }, 0);
   }
 
@@ -1380,7 +1419,7 @@
       if (first && (first.kind !== S.kind || shown().indexOf(first) < 0)) select(first.id); else drawMain();
     }
     function saveAsSet() {
-      var ids = S.checked.slice(); if (!ids.length) return;
+      var ids = checkedForms().map(function (f) { return f.id; }); if (!ids.length) return;   // 그사이 지워진 양식은 넣지 않는다
       var name = w.prompt('세트 이름 (예: 부당해고 구제 세트)', '');
       if (name == null) return;
       name = String(name).trim().slice(0, 40);
@@ -1401,12 +1440,16 @@
         name = String(name).trim().slice(0, 40);
         if (!name) { toast('세트 이름을 넣어 주세요'); return; }
       } else if (!w.confirm('"' + st.name + '" 세트를 지울까요?\n(양식은 지워지지 않습니다)')) return;
+      var gone = false;
       track(changeSets(db, function (doc) {
         var at = -1;
+        gone = false;
         doc.v.forEach(function (s, i) { if (s && s.id === id) at = i; });
         if (rename) {
           if (at >= 0) doc.v[at].name = name;
-          else { var cp = JSON.parse(JSON.stringify(st)); cp.name = name; doc.v.push(cp); }   // 기본 세트를 처음 고치면 저장본에 옮겨 담는다
+          /* 기본 세트를 처음 고치면 저장본에 옮겨 담는다 — 단, 그사이 누가 지웠으면 되살리지 않는다 */
+          else if (isSeedSet(id) && doc.rm.indexOf(id) < 0) { var cp = JSON.parse(JSON.stringify(st)); cp.name = name; doc.v.push(cp); }
+          else gone = true;
         } else {
           if (at >= 0) doc.v.splice(at, 1);
           if (isSeedSet(id) && doc.rm.indexOf(id) < 0) doc.rm.push(id);
@@ -1414,7 +1457,7 @@
         return doc;
       })).then(function (list) {
         S.sets = list; if (!rename && S.setId === id) S.setId = null; drawMain();
-        toast(rename ? '이름을 바꿨습니다' : '세트를 지웠습니다');
+        toast(gone ? '이미 지워진 세트입니다' : rename ? '이름을 바꿨습니다' : '세트를 지웠습니다');
       }, function (e) { toast('⚠ 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
     }
     function setPicker() {

@@ -116,3 +116,26 @@ test('문서관리가 묶음 압축 함수를 양식 화면에 넘긴다 — 브
   assert.match(fn, /_esignLoadJsZip\(\)/);
   assert.ok(!/fetch\(|db\.ref|\.set\(|\.push\(/.test(fn), '채운 파일을 어디로도 보내면 안 됩니다');
 });
+
+/* ── 검토 반영 (2026-09-28) ── */
+test('★★ 불러오기 안내는 양식마다 상태에서 — 멈춘 안내·숨은 실패가 없다', () => {
+  const f = cutFn(stripJs(CF), 'function openFill(');
+  const rf = cutFn(f, 'function refresh(');
+  assert.match(rf, /btnDown\.disabled = n > 0 \|\| busy/, '★ 불러오는 중·묶는 중에 받기 단추가 잠기지 않습니다');
+  assert.match(rf, /state === 'fail'/, '실패한 양식을 모아 알리지 않습니다');
+  assert.ok(!/pending\s*[-+]{2}/.test(f), '★ 개수 세기가 남아 있습니다 — 늦게 끝난 옛 불러오기가 안내를 멈춰 둡니다');
+  assert.match(cutFn(f, 'function loadAll('), /reduce\(/, '원본을 한꺼번에 엽니다 — 하나씩 차례로 열어야 메모리가 안 부풉니다');
+  const dl = cutFn(f, 'function doDownload(');
+  assert.ok(dl.indexOf("w.confirm(") < dl.indexOf('function next('), '★ 원본 못 찾은 양식을 채우기 «전에» 묻지 않습니다');
+  assert.match(dl, /if \(busy\) return;/, '받기를 두 번 누르면 채우기가 겹쳐 돕니다');
+});
+
+test('파일 이름 — 방향 바꾸는 글자·앞 점·지나친 길이를 걷는다', () => {
+  const P = loadCF();
+  const long = '가'.repeat(100);
+  const n = out(P.bundleFileNames([{ name: long + '‮', ext: '.hwp' }], { 회사명: long, 근로자명: '   ' }))[0];
+  assert.ok(!/‮/.test(n), '방향 바꾸는 글자가 남았습니다');
+  assert.ok(n.length <= 2 + 1 + 40 + 1 + 30 + 4, '이름이 너무 깁니다: ' + n.length);
+  assert.ok(!/_\.hwp$|__/.test(n), '빈 근로자 이름이 빈 조각을 남겼습니다: ' + n);
+  assert.equal(P.zipName('..숨김', {}), '숨김.zip');
+});
