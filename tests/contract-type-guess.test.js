@@ -192,7 +192,12 @@ test('★★★ 고른 유형을 «창에 넘긴다» — 골라 놓고 안 넘�
   const fn = 몸통;
   assert.match(fn, /if\(ty && ty\.code\) seed\.typeCodes = \{ consulting: ty\.code \};/,
     '★★★ 고른 유형을 씨앗에 안 얹으면 창은 옛날 그대로 뜹니다');
-  assert.match(fn, /seed\.typeCodes = \{ consulting: ty\.code \};[\s\S]{0,80}openAdd\(seed\);/,
+  /* ⚠ 사이에 「쓰다 만 계약」 묻기가 들어섰다(2026-09-28) — 글자 거리 대신 «차례»를 본다.
+     실제로 창에 넘어가는지는 card-to-erp-contract.test.js 가 돌려서 본다. */
+  const take = cutFn(ERP, 'async function takeNewContractSeed(');
+  const setAt = take.indexOf('seed.typeCodes = { consulting: ty.code };');
+  const openAt = take.indexOf('openAdd(seed);');
+  assert.ok(setAt > 0 && openAt > setAt,
     '★★★ 창을 «연 뒤»에 얹으면 이미 그려진 창은 그것을 못 봅니다');
 });
 

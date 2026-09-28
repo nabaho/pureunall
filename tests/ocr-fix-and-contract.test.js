@@ -272,10 +272,23 @@ test('★★ 빈 칸만 채운다 — 사람이 적어 둔 것을 덮지 않는�
 });
 
 test('★★★ 쪽지를 «한 번 쓰고 지운다» — 안 지우면 열 때마다 등록 창이 뜬다', () => {
-  assert.match(이알피, /sessionStorage\.removeItem\('pu_new_contract'\)/,
-    '★★★ 지우지 않으면 계약관리를 열 때마다 새 계약 창이 다시 뜹니다');
-  assert.match(이알피, /Date\.now\(\) - seed\.at > 10 \* 60 \* 1000/,
-    '★★ 어제 눌러 둔 쪽지가 오늘 뜨면 무슨 일인지 알 수 없습니다');
+  /* 글자로 보지 않고 «실제로 꺼내 본다» — 꺼내는 곳은 erpTakeContractSeed 한 곳이다(2026-09-28) */
+  const vm = require('vm');
+  const ctx = {};
+  vm.createContext(ctx);
+  const m = ERP.match(/var ERP_CT_SEED_KEY = [^;]+;\s*var ERP_CT_SEED_TTL = [^;]+;/);
+  assert.ok(m, '쪽지 열쇠·유효시간을 못 찾았습니다');
+  vm.runInContext(m[0] + '\n' + cutFn(ERP, 'function erpTakeContractSeed('), ctx);
+  const box = (v) => { const d = { pu_new_contract: v };
+    return { d, getItem: (k) => (k in d ? d[k] : null), removeItem: (k) => { delete d[k]; } }; };
+  const now = 1000 * 60 * 60 * 24;
+  const s = box(JSON.stringify({ company: { name: '가' }, at: now - 1000 }));
+  assert.ok(ctx.erpTakeContractSeed([s], now), '쪽지를 못 꺼냅니다');
+  assert.ok(!('pu_new_contract' in s.d), '★★★ 지우지 않으면 계약관리를 열 때마다 새 계약 창이 다시 뜹니다');
+  assert.equal(ctx.erpTakeContractSeed([s], now), null, '★★★ 두 번째에도 뜹니다');
+  const old = box(JSON.stringify({ company: { name: '가' }, at: now - 11 * 60 * 1000 }));
+  assert.equal(ctx.erpTakeContractSeed([old], now), null, '★★ 어제 눌러 둔 쪽지가 오늘 뜨면 무슨 일인지 알 수 없습니다');
+  assert.ok(!('pu_new_contract' in old.d), '★ 버린 쪽지도 지워야 합니다');
 });
 
 test('★★★ 씨앗은 «빈 칸에만» 얹고, 고치는 계약에는 손대지 않는다', () => {

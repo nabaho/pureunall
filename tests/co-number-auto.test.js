@@ -127,7 +127,7 @@ test('⑧ ★ 이관이 끝나면 «곧바로» 준다', function () {
   /* ⚠ 기다리면 이관 완료 알림이 서버 왕복만큼 늦는다 — await 를 붙이지 않는다 */
   assert.ok(!/await coAutoNumber\(/.test(doT), '★ 번호통을 기다리느라 이관 알림이 늦습니다');
   const at = doT.indexOf('coAutoNumber([_arrivedCo.id])');
-  const ok = doT.indexOf('transferContract(ct)');
+  const ok = doT.indexOf('transferContract(ct, _xferOpt)');
   assert.ok(at > ok, '★ 업체가 생기기도 전에 번호를 주려 합니다');
 });
 
