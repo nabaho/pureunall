@@ -2490,6 +2490,7 @@ td.mgr .mgours{color:#94a3b8;font-size:11px}
 .cosmerow .sd{font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;white-space:nowrap}
 .cosmerow .sd.gone{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
 .cosmerow .sd.soon{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
+.cosmerow .sd.none{background:#fef2f2;color:#991b1b;border:1px dashed #991b1b}
 .cosmerow .se{color:#64748b}
 .cosmerow .sm{color:#94a3b8;margin-left:auto}
 /* 기업 상세(데스크톱 표·폰 목록·상세 패널)에서도 같은 배지를 쓴다(대표 지시 2026-08-24) —
@@ -27958,7 +27959,7 @@ function coFilters(){
     { k: 'coOnlyCtOld',      icon: '📅', label: '계약 갱신', count: () => coCtCount(),
       title: '30일 안에 끝나거나 막 지난(30일 안) 회사만 봅니다 — 오래 지난 곳(자동 연장)과 계약해지(🚪)는 뺍니다' },
     /* ⚠ 「물어본 그때」의 상태다 — 계약해지(🚪)와 다른 말이다 */
-    { k: 'coOnlyNtsBad',     icon: '🏛', label: '폐업·휴업', count: () => coNtsBadCount(),
+    { k: 'coOnlyNtsBad',     icon: '🏛', label: '폐업·휴업·없는 번호', count: () => coNtsBadCount(),
       title: '국세청에 물어본 결과가 폐업·휴업인 회사만 봅니다 — 물어본 그때의 상태입니다' }
   ];
 }
@@ -28548,7 +28549,7 @@ function pickCoNoFolder(){
 const CO_TODO_LABEL = { coOnlyClosed:'🚪 종료', coOnlyNoBiz:'🔢 번호 없음',
                         coOnlyIncomplete:'📋 정보부족', coOnlyUid:'🏛 고유번호증',
                         coOnlySme:'🏅 확인서 갱신', coOnlyCtOld:'📅 계약 갱신',
-                        coOnlyNtsBad:'🏛 폐업·휴업',
+                        coOnlyNtsBad:'🏛 폐업·휴업·없는 번호',
                         coNoFolder:'📂 아직 안 담음' };
 function clearCoTodo(k){ state[k] = false; state.coPage = 0; renderCoAny(); }
 /* ⚠ 띠 모양은 condChipHtml 한 곳에만 있다 (점검 A3) — 여기 다시 적으면 두 벌이 된다 */
@@ -31022,7 +31023,12 @@ function coNtsCls(word){
   if(w.indexOf('폐업') >= 0) return 'gone';
   if(w.indexOf('휴업') >= 0) return 'soon';
   if(w.indexOf('계속') >= 0) return 'ok';
-  return 'dim';                     /* 등록되지 않은 번호 등 — 좋지도 나쁘지도 않다 */
+  /* ★ 국세청에 «없는» 번호 — 가짜이거나 잘못 적힌 번호다 (대표 지시 2026-09-28 「국세청 훑기」).
+     ⚠ 예전에는 회색(dim, 「좋지도 나쁘지도 않다」)으로 두어 훑기가 받아 적고도 «어느 목록에도»
+       안 보였다. 이 훑기를 돌리는 까닭이 바로 이 번호를 찾는 것이었다(앞서 찾은 가짜 번호 건).
+       고칠 대상이라 폐업·휴업과 한 목록에 띄운다. */
+  if(w.indexOf('등록되지 않은') >= 0) return 'none';
+  return 'dim';                     /* 그 밖의 알 수 없는 답 — 좋지도 나쁘지도 않다 */
 }
 function coNtsChipHtml(o){
   /* 사업자번호가 없으면 물어볼 길이 없다 — 눌러도 안 되는 단추를 두지 않는다 */
@@ -31030,12 +31036,15 @@ function coNtsChipHtml(o){
   const word = coVal(o, 'ntsState'), at = coVal(o, 'ntsAt');
   const key = esc(String(o.key).replace(/'/g,"\\'"));
   const color = { gone:'#991b1b;background:#fef2f2;border-color:#fecaca',
+                  none:'#991b1b;background:#fef2f2;border-color:#fecaca',
                   soon:'#854d0e;background:#fffbeb;border-color:#fde68a',
                   ok:'#1e40af;background:#eff6ff;border-color:#bfdbfe',
                   dim:'#64748b;background:#f8fafc;border-color:#e2e8f0',
                   '':'#64748b;background:#f8fafc;border-color:#e2e8f0' }[coNtsCls(word)];
+  /* 국세청 원문(「국세청에 등록되지 않은 사업자등록번호입니다.」)은 딱지에 넣기엔 길다 — 뜻만 짧게 */
+  const 말 = coNtsCls(word) === 'none' ? '국세청에 없는 번호' : word;
   const 글 = word
-    ? `🏛 ${esc(word)}${at ? ` · ${esc(at)} 확인` : ''}`
+    ? `🏛 ${esc(말)}${at ? ` · ${esc(at)} 확인` : ''}`
     : '🏛 국세청 확인';
   return `<span onclick="event.stopPropagation();coAskNts('${key}')"
     title="${word ? '국세청에 물어본 그때의 상태입니다 — 눌러서 다시 확인합니다'
@@ -31137,32 +31146,35 @@ function coNtsWrites(hits, day, chunk){
   }
   return out;
 }
-/* 훑은 뒤 «무엇이 나왔나» — 폐업·휴업만 추린다(계속사업자는 챙길 일이 없다) */
+/* 훑은 뒤 «무엇이 나왔나» — 폐업·국세청에 없는 번호·휴업을 추린다(계속사업자는 챙길 일이 없다) */
 function coNtsBadList(){
   return (coList() || []).filter(function(o){
     const c = coNtsCls(coVal(o, 'ntsState'));
-    return c === 'gone' || c === 'soon';
+    return c === 'gone' || c === 'none' || c === 'soon';
   }).map(function(o){
     return { o:o, key:o.key, name:o.name || '', state:coVal(o, 'ntsState'),
              at:coVal(o, 'ntsAt'), cls:coNtsCls(coVal(o, 'ntsState')) };
   }).sort(function(a,b){
-    /* 폐업이 휴업보다 앞 — 급한 순이다 */
-    if(a.cls !== b.cls) return a.cls === 'gone' ? -1 : 1;
+    /* 급한 순 — 폐업, 국세청에 없는 번호(번호부터 틀렸다), 휴업 */
+    const r = { gone:1, none:2, soon:3 };
+    if(a.cls !== b.cls) return r[a.cls] - r[b.cls];
     return String(a.name).localeCompare(String(b.name), 'ko');
   });
 }
 function coNtsBadCount(){ return coNtsBadList().length; }
 function coNtsNeeds(o){
   const c = coNtsCls(coVal(o, 'ntsState'));
-  return c === 'gone' || c === 'soon';
+  return c === 'gone' || c === 'none' || c === 'soon';
 }
 /* 목록 위 알림 띠 — 0곳이면 «아예 안 띄운다»(확인서·계약 띠와 같은 규칙) */
 function coNtsBarHtml(){
   const list = coNtsBadList();
   if(!list.length) return '';
   const gone = list.filter(x => x.cls === 'gone').length;
-  const soon = list.length - gone;
+  const none = list.filter(x => x.cls === 'none').length;
+  const soon = list.filter(x => x.cls === 'soon').length;
   const bits = [ gone ? `폐업 <b>${gone.toLocaleString()}곳</b>` : '',
+                 none ? `없는 번호 <b>${none.toLocaleString()}곳</b>` : '',
                  soon ? `휴업 <b>${soon.toLocaleString()}곳</b>` : '' ].filter(Boolean).join(' · ');
   return `<div class="contsbar" onclick="openCoNts()"
       title="국세청에 물어본 결과입니다 — 물어본 «그때»의 상태입니다">
@@ -31184,16 +31196,20 @@ function coNtsHtml(){
       ${남은 ? `<button class="conbask" onclick="coNtsSweepAsk()"
         title="사업자번호를 국세청에 보내 상태를 받아 옵니다">🏛 전체 훑기</button>` : ''}</p>`;
   if(!list.length) return `<div class="mhead"><b>🏛 국세청 사업자 상태</b>${_closeBtn()}</div>
-    ${훑기}<p class="cpnone" style="padding:16px 2px">폐업·휴업으로 나온 곳이 없습니다 👍</p>`;
-  return `<div class="mhead"><b>🏛 국세청 — 폐업·휴업 ${list.length}곳</b>${_closeBtn()}</div>
+    ${훑기}<p class="cpnone" style="padding:16px 2px">폐업·휴업·국세청에 없는 번호로 나온 곳이 없습니다 👍</p>`;
+  const noneN = list.filter(x => x.cls === 'none').length;
+  return `<div class="mhead"><b>🏛 국세청 — 챙길 곳 ${list.length}곳</b>${_closeBtn()}</div>
     ${훑기}
     <p class="setnote" style="margin:0 0 10px">⚠ <b>물어본 «그때»의 상태</b>입니다 — 날짜를 함께 보세요.
       계약해지(🚪)와는 다른 말입니다.</p>
+    ${noneN ? `<p class="setnote" style="margin:0 0 10px">🔴 <b>국세청에 없는 번호 ${noneN}곳</b> —
+      사업자번호가 잘못 적혔거나(오타·OCR) 가짜일 수 있습니다. 막 등록한 사업자는 며칠 동안
+      이렇게 나올 수도 있습니다. 사업자등록증 원본과 번호를 맞춰 보세요.</p>` : ''}
     <div class="ablist">${list.map(x=>`
       <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
           title="${esc(x.name)} 상세를 엽니다">
-        <div class="sk">${esc(x.name || '(이름 없음)')}</div>
-        <div class="sv"><span class="sd ${x.cls}">${esc(x.state)}</span>
+        <div class="sk">${esc(x.name || '(이름 없음)')}${x.cls === 'none' && x.o.bizno ? ` <span class="se">${esc(x.o.bizno)}</span>` : ''}</div>
+        <div class="sv"><span class="sd ${x.cls}">${esc(x.cls === 'none' ? '국세청에 없는 번호' : x.state)}</span>
           <span class="se">${esc(x.at || '날짜 모름')} 확인</span>
           ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
       </div>`).join('')}</div>`;
@@ -31261,7 +31277,7 @@ async function coNtsSweepRun(targets, svc){
   const 나쁜곳 = coNtsBadCount();
   toast(`🏛 국세청 훑기 끝 — ${받음.toLocaleString()}곳 확인`
     + (실패 ? ` · ${실패}묶음 못 받음` : '')
-    + (나쁜곳 ? ` · 폐업·휴업 ${나쁜곳.toLocaleString()}곳` : ' · 폐업·휴업 없음'), 12000);
+    + (나쁜곳 ? ` · 챙길 곳 ${나쁜곳.toLocaleString()}곳(폐업·휴업·없는 번호)` : ' · 폐업·휴업·없는 번호 없음'), 12000);
   coNtsRepaint();
 }
 
