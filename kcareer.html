@@ -5977,6 +5977,8 @@ async function confirmResumeSave(){ if(!_docCtx) return; const {domain,mode,file
   if(mode==='generate'){
     const bytes=await exportEditedHwpx(); if(!bytes){ toast('편집 중인 문서가 없습니다'); return; }
     const blob=new Blob([bytes],{type:'application/vnd.hancom.hwpx'}); genName=`${D.label}_${org||'무제'}_${year}.hwpx`;
+    /* ★ 올린 신청서가 있으면 «해 + 그 이름 + 날짜»로 담는다(대표 지시 2026-09-28) — 편집기 저장·내보내기와 같은 이름 */
+    try{ const 올린=rhUploadName(); if(올린){ let 제목=''; try{ 제목=await rhDocTitle(); }catch(e){} genName=rhSaveName(올린, 제목); } }catch(e){}
     genB64=abToB64(await blob.arrayBuffer());
     saveFileUnified(id,{id,name:genName,ext:'hwpx',size:blob.size,base64:genB64,savedAt:now});
     if(_lastOriginal){ origFileId=id+'_orig'; origName=_lastOriginal.name; origB64=_lastOriginal.b64||'';
@@ -12480,8 +12482,11 @@ async function rhHwpEdOpen(){
   box.innerHTML='<div class="rc-mute" style="padding:22px">한글 편집기를 여는 중… (처음 한 번은 조금 걸립니다)</div>';
   var bytes=await rhComposeBytes();                       /* 친 값·정리가 들어간 것을 연다 */
   if(!bytes){ box.innerHTML='<div class="rc-mute" style="padding:22px">이 형식은 편집기로 못 엽니다 — 한글에서 HWPX 로 저장해 올려주세요</div>'; return; }
+  /* ★ 편집기 「저장」 창에 뜨는 이름이 이것이다 — 「양식」 두 글자만 뜨던 것(대표 화면 2026-09-28).
+     해 + 올린 신청서 이름 + 날짜로 준다(rhSaveName). ⚠ _rhHwpEdFor 는 바탕 이름 그대로 둔다. */
+  var 제목=''; try{ 제목=await rhDocTitle(); }catch(e){}
   try{
-    _rhHwpEd=await _hwpEdCreate(box, bytes, rhCleanName(이름,''));
+    _rhHwpEd=await _hwpEdCreate(box, bytes, rhSaveName(rhUploadName()||이름, 제목));
     _rhHwpEdFor=이름;
     toast('✏️ 한글 편집기 — 입력판·한글로 보기로 나가면 고친 것이 저절로 바탕이 됩니다');
   }catch(e){
@@ -13287,13 +13292,12 @@ function rhHwpState(){
 async function rhHwpOut(){
   var bytes=await rhComposeBytes();
   if(!bytes||!bytes.length){ toast('내보낼 것이 없습니다'); return; }
-  /* ★ 이름은 «서류에서 찾은 제목»이 먼저다 (대표 지시 2026-09-13).
-     못 찾으면 지금까지처럼 올린 파일 이름을 쓴다 — 뒷걸음질하지 않는다. */
-  var name=rhCleanName((_rhDoc&&_rhDoc.name)||'양식','_작성');
-  try{
-    var 제목=await rhDocTitle();
-    if(제목) name=KcareerHwpxTidy.safeName(제목)+'.hwpx';
-  }catch(e){ console.warn('제목 찾기',e); }
+  /* ★ 이름은 «해 + 올린 신청서 이름 + 날짜»다 (대표 지시 2026-09-28 — 2026-09-13 「제목 먼저」를 바꿨다).
+     올린 이름이 뭉뚱그린 말(양식 등)뿐일 때만 «서류에서 찾은 제목»을 쓴다. */
+  var 제목='';
+  try{ 제목=await rhDocTitle(); if(제목 && window.KcareerHwpxTidy) 제목=KcareerHwpxTidy.safeName(제목); }
+  catch(e){ console.warn('제목 찾기',e); }
+  var name=rhSaveName(rhUploadName()||rhCleanName('양식','_작성'), 제목);
   if(window.showSaveFilePicker){
     try{
       var h=await window.showSaveFilePicker({ suggestedName:name,
@@ -13376,6 +13380,36 @@ function rhCleanName(name, 꼬리){
   var base=String(name||'양식').replace(/\.(hwp|hwpx)$/i,'');
   base=base.replace(/(_채움|_날인)+$/g,'');
   return base + (꼬리||'') + '.hwpx';
+}
+/* ★ 저장 이름 = «해 + 올린 신청서 이름 + 날짜» (대표 지시 2026-09-28
+     「업로드했던 지원신청서의 이름을 가지고 와서 0000년 00000 신청서 0000. 00. — 날짜 등으로 저장」)
+   예) 「2026년 [한국기계연구원] 위원 신청서 2026. 09. 28.hwpx」
+   ⚠ 먼저 걷어낸다 — 앞의 해 · 뒤의 날짜 · _채움/_날인/_작성 꼬리. 안 걷으면 이 이름으로 저장한
+     파일을 다시 올려 저장할 때마다 「2026년 2026년 … 2026. 09. 28 2026. 09. 28」로 쌓인다.
+   ⚠ 이름 앞에 해가 있으면(「2025 서산시 …」) 그 해를 쓴다 — 그 서류의 해다. 없으면 올해.
+   ⚠ 이름이 뭉뚱그린 말(양식·서식·document…)뿐이면 서류에서 찾은 제목을 쓴다
+     (대표 화면 2026-09-28: 저장창에 「양식」 두 글자만 떴다). */
+var RH_PLAIN_NAME=/^(양식|서식|문서|원본|무제|서류|document|untitled|새 문서)$/i;
+function rhSaveName(원이름, 제목, 날){
+  var d=(날 instanceof Date)?날:new Date();
+  var 둘=function(n){ return ('0'+n).slice(-2); };
+  var 해=null;
+  var 다듬기=function(s){
+    s=String(s||'').replace(/\.(hwpx?|pdf|docx?)$/i,'');
+    s=s.replace(/(_채움|_날인|_작성|_완성본|_수정)+$/g,'');
+    s=s.replace(/[\s_]*\d{4}\s*[.\-]\s*\d{1,2}(\s*[.\-]\s*\d{1,2})?\s*\.?\s*$/,'');   /* 뒤 날짜 */
+    var m=s.match(/^\s*(\d{4})\s*년?[\s_.]+/);                                      /* 앞 해 */
+    if(m){ if(해==null) 해=+m[1]; s=s.slice(m[0].length); }
+    return s.replace(/[\\/:*?"<>|]/g,' ').replace(/\s+/g,' ').trim();
+  };
+  var 이름=다듬기(원이름);
+  if(!이름 || RH_PLAIN_NAME.test(이름)){ 해=null; 이름=다듬기(제목)||이름||'서류'; }
+  var y=(해>=1990 && 해<=2100)?해:d.getFullYear();
+  return y+'년 '+이름+' '+d.getFullYear()+'. '+둘(d.getMonth()+1)+'. '+둘(d.getDate())+'.hwpx';
+}
+/* 올린 신청서 이름 — «처음 올린 것»이 먼저다(한글에서 고쳐 온 파일은 이미 날짜 이름일 수 있다) */
+function rhUploadName(){
+  return (_rhOrig&&_rhOrig.name)||(_rhBase&&_rhBase.name)||(_rhDoc&&_rhDoc.name)||'';
 }
 async function rhFillByMap(){
   if(!_rhDoc||!_rhDoc.bytes||!_rhMap){ toast('먼저 서식을 올려주세요'); return; }
