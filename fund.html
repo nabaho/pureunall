@@ -4395,9 +4395,33 @@ function _hwpSubValues(f,sites,kind){
   if(kind==='sub_payment') notes.push('항목별 칸은 지원결정금액을 어떻게 나눠 쓸지입니다 — 결정 내용을 보고 적어 주세요'
     +(amt&&amt._total?' (참고: '+yr+'년 복지사업 계획 '+SUB_ROWS.filter(function(r){ return amt[r[0]]; })
       .map(function(r){ return r[0]+' '+K(amt[r[0]])+'원'; }).join(' · ')+')':'')+'. 계좌는 통장을 보고 직접 적어 주세요.');
-  if(kind==='sub_checklist') notes.push('착안사항·제출서류 확인란은 비워 두었습니다 — 서류를 보고 사람이 판단할 일입니다.');
+  /* ★ 착안사항 「특수관계인 해당여부」·「동일기업(공장)내 수개의 공동기금」 — 🔎 특수관계 점검 결과에서(2026-09-29).
+       판단이 «끝난» 때만 적는다: 해당은 곧바로, 비해당은 신호를 다 확인했고 「해당」이 없고 회사마다 확인서를 받았을 때.
+       그 전에는 비워 둔다(지어내지 않는다) — 무엇이 남았는지 안내에 적는다. */
+  var rj=_relJudge(f,sites);
+  V.특수관계=rj.rel; V.동일공장=rj.plant;
+  if(kind==='sub_checklist'){
+    notes.push('착안사항·제출서류 확인란은 비워 두었습니다 — 서류를 보고 사람이 판단할 일입니다.');
+    if(rj.why) notes.push('특수관계: '+rj.why);
+  }
   if(notes.length) V._note=notes.join(' · ');
   return V;
+}
+/* 특수관계 점검 판정 — {rel:'해당'|'비해당'|'', plant:같은 꼴, why:남은 일}. 점검 기록(S._rel)이 이 기금 것일 때만 */
+function _relJudge(f,sites){
+  var fid=S.formFund||S.fundId, R=(S._relFor===fid&&S._rel)?S._rel:null;
+  if(!R) return {rel:'',plant:'',why:'🔎 특수관계 점검 기록을 아직 못 읽었습니다 — 근복지원금 › 특수관계 점검을 먼저 보세요'};
+  var live=(sites||[]).filter(function(s){ return s&&s.status!=='closed'&&s._id; });
+  var RS=R.sig||{}, RC=R.co||{}, sig=relatedScan(f,live);
+  var open=sig.filter(function(g){ return !(RS[_relKey(g.key)]||{}).res; }).length;
+  var yes=sig.filter(function(g){ return (RS[_relKey(g.key)]||{}).res==='yes'; }).length;
+  var hitCo=live.filter(function(s){ var c=RC[s._id]||{}; return ['share','reg','family','invest','group'].some(function(k){ return c[k]==='hit'; }); }).length;
+  var noCert=live.filter(function(s){ return (RC[s._id]||{}).cert!=='ok'; }).length;
+  var rel=(yes||hitCo>=2)?'해당':((!open&&!noCert&&live.length)?'비해당':'');
+  var pHit=live.some(function(s){ return (RC[s._id]||{}).plant==='hit'; }), pAll=live.length&&live.every(function(s){ var v=(RC[s._id]||{}).plant; return v==='ok'||v==='na'; });
+  var plant=pHit?'해당':(pAll?'비해당':'');
+  var left=[]; if(open) left.push('확인 전 신호 '+open+'건'); if(noCert) left.push('확인서 못 받은 곳 '+noCert+'곳');
+  return {rel:rel, plant:plant, why:rel?(rel==='해당'?'특수관계로 남긴 곳이 있어 「해당」으로 적었습니다 — 지원 제외 대상입니다':''):('비워 두었습니다 — '+(left.join(' · ')||'확인할 곳이 없습니다'))};
 }
 /* ★ 2026-09-26 — 채우기를 «한글 XML(HWPX)에서 직접» 한다 (js/pu-hwpx-fill.js).
    대표 「줄칸 간격등 정리가 계속 안된다 … 근본적 해결 … 기존서류와 같이」 → 서식을 원본 한글 틀로 옮기다가,
@@ -8089,7 +8113,12 @@ function _docExtra(kind,f){
   if(!DOC_NEEDS_LEDGER[kind]||!f||f._sample) return Promise.resolve(null);
   var fid=S.formFund, yr=S.year;
   if(!fid) return Promise.resolve(null);
-  return Promise.all([
+  /* 체크리스트는 🔎 특수관계 점검 기록도 읽는다(착안사항 「특수관계인 해당여부」) — 그 화면을 안 열었어도 채워지게 */
+  /* ⚠ 지원금 묶음(ZIP)은 첫 장부 서식 하나로만 _docExtra 를 부른다 — 지원금 쪽이면 다 읽어 둔다 */
+  var relP=(/^sub/.test(kind)&&S._relFor!==fid)
+    ? fbDb.ref(NS+'/related/'+fid).once('value').then(function(sn){ S._relFor=fid; S._rel=sn.val()||{}; }).catch(function(){})
+    : Promise.resolve();
+  return relP.then(function(){ return Promise.all([
     fbDb.ref(NS+'/txns/'+fid+'/'+yr).once('value').then(function(sn){ var v=sn.val()||{};
       return Object.keys(v).map(function(k){ var o=Object.assign({},v[k]); o._id=k; return o; }); }).catch(function(){ return []; }),
     fbDb.ref(NS+'/closing/'+fid+'/'+yr+'/report').once('value').then(function(sn){ return sn.val()||{}; }).catch(function(){ return {}; }),
@@ -8106,7 +8135,7 @@ function _docExtra(kind,f){
     S._docR={fid:fid,yr:yr,R:buildF15(arr,fid,yr,rp,sites,welf),fin:computeFin(arr,fid,yr),
              sy:sy,welf:welf,sites:sites};
     return S._docR;
-  }).catch(function(){ return null; });
+  }); }).catch(function(){ return null; });
 }
 /* 읽어 둔 것이 «이 기금·이 해» 것인가 — 아니면 쓰지 않는다(남의 금액을 공단에 내게 된다) */
 function _docRok(){ var x=S._docR; return (x&&x.fid===S.formFund&&x.yr===S.year)?x:null; }

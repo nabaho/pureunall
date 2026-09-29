@@ -107,3 +107,25 @@ test('배선 — 집 주소 칸에 [🔍](repAddrSearch), 지번은 숨은 칸(_
   assert.match(sv, /\['address_alt','wrep_addr_alt','urep_addr_alt'\]\.forEach/);
   assert.match(gF('_siteDocGrab'), /wrep_addr_alt/, '★ 사진첩·검색을 다녀오는 사이 지번을 잃는다');
 });
+
+test('★★ 체크리스트 「특수관계인 해당여부」 — 끝난 판단만 적는다(셋째 할 일)', () => {
+  const box = {};
+  new Function(['var S={formFund:"F1",fundId:"F1",_relFor:"F1",_rel:null};', gF('_officersOf'), gF('_siteUrep'), gF('_siteWrep'), gF('_relNm'),
+    gF('_relAddrKey'), gF('_relAddrMask'), gF('relatedPeople'), gF('relatedScan'), gF('_relKey'), gF('_relJudge'),
+    'this.j=_relJudge; this.S=S;'].join('\n')).call(box);
+  const sites = [S('a', { name: '가', ceo: '홍길동' }), S('b', { name: '나', ceo: '홍길동' })];
+  box.S._rel = null; box.S._relFor = 'X';
+  assert.equal(box.j({}, sites).rel, '', '점검 기록을 못 읽었는데 적었다');
+  box.S._relFor = 'F1'; box.S._rel = { sig: {}, co: {} };
+  assert.equal(box.j({}, sites).rel, '', '★ 확인 전 신호가 있는데 「비해당」을 적었다');
+  box.S._rel = { sig: { 'ceo:홍길동': { res: 'none' } }, co: { a: { cert: 'ok' }, b: { cert: 'ok', plant: 'ok' } } };
+  const r = box.j({}, sites);
+  assert.equal(r.rel, '비해당'); assert.equal(r.plant, '', '한 곳이라도 같은 공장 칸이 비면 비운다');
+  box.S._rel.sig['ceo:홍길동'].res = 'yes';
+  assert.equal(box.j({}, sites).rel, '해당');
+  box.S._rel = { sig: { 'ceo:홍길동': { res: 'none' } }, co: { a: { share: 'hit', cert: 'ok', plant: 'na' }, b: { invest: 'hit', cert: 'ok', plant: 'ok' } } };
+  const h = box.j({}, sites);
+  assert.equal(h.rel, '해당', '두 곳 이상에 「해당」이 있으면 해당'); assert.equal(h.plant, '비해당');
+  assert.match(gF('_hwpSubValues'), /V\.특수관계=rj\.rel; V\.동일공장=rj\.plant;/);
+  assert.match(gF('_docExtra'), /\/\^sub\/\.test\(kind\)&&S\._relFor!==fid/, '★ 점검 화면을 안 열면 체크리스트가 기록을 못 읽는다');
+});
