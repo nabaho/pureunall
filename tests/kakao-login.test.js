@@ -42,12 +42,15 @@ function makeWorld(seed) {
         once: async () => ({ val: () => { const v = get(p); return v == null ? null : JSON.parse(JSON.stringify(v)); } }),
         update: async (obj) => { for (const k of Object.keys(obj)) set((p ? p + '/' : '') + k, obj[k]); },
         set: async (v) => set(p, v),
+        // 로그인 감시 기록(login_events·systemAlerts)용 — world.pushFails 면 일부러 실패한다
+        push: async (v) => { if (world && world.pushFails) throw new Error('db down'); set(p + '/' + 'k' + (++pushN), v); },
       };
     },
   };
   return { data, database };
 }
 
+let pushN = 0;
 /* 가짜 인증 — 증표 글자가 곧 uid 다 */
 const issued = [];
 const fakeAuth = {
@@ -408,5 +411,53 @@ test('★ 화면 부품 — goLogin({ask}) 은 prompt=login 을 서버에 부탁
   assert.equal(new URL(asked[0]).searchParams.get('prompt'), 'login', '「다시 묻기」를 서버에 안 부탁한다');
   assert.equal(new URL(asked[1]).searchParams.get('prompt'), null);
   assert.equal(new URL(asked[2]).searchParams.get('kind'), 'logout');
+});
+
+/* ── 실패한 카카오 로그인도 «로그인 감시» 에 남는다 (대표 「추천대로」 2026-09-29) ──────────
+   카카오 실패는 서버가 카카오에 직접 물어 안 것이라 믿을 수 있다 — 서버가 바로 적는다. */
+const 기록들 = (key) => Object.values((world.data.login_events || {})[key] || {});
+const 모든기록키 = () => Object.keys(world.data.login_events || {});
+
+test('★★ 연결 안 된 카카오로 들어오려 하면 기록이 남는다 — 회원번호 원문은 안 남는다', async () => {
+  const K = fresh();
+  const r = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
+  assert.equal(r.body.needLink, true);
+  const keys = 모든기록키();
+  assert.equal(keys.length, 1, '★★ 모르는 카카오로 들어오려 한 흔적이 안 남습니다');
+  assert.match(keys[0], /^kakao_[0-9a-f]{16}$/);
+  const ev = 기록들(keys[0])[0];
+  assert.equal(ev.ok, false);
+  assert.equal(ev.code, 'kakao-unlinked');
+  assert.ok(!JSON.stringify(world.data.login_events).includes('111'), '★ 카카오 회원번호 원문이 기록에 남았습니다');
+  assert.equal(world.data.systemAlerts, undefined, '연결 전 새 직원도 이 길을 지난다 — 알림까지 울리면 잔소리가 된다');
+});
+
+test('★★ 퇴사·휴직 계정이 카카오로 들어오려 하면 기록 + 알림', async () => {
+  const K = fresh({ kakao_links: { '333': { uid: 'gone', sid: 'P-900' } } });
+  const r = await call(K.kakaoLoginFinish, { body: { code: 'cC' } });
+  assert.equal(r.status, 403);
+  const ev = 기록들('gone')[0];
+  assert.ok(ev, '★★ 나간 사람이 들어오려 한 흔적이 안 남습니다');
+  assert.equal(ev.code, 'kakao-inactive');
+  const al = Object.values((world.data.systemAlerts || {}).gone || {})[0];
+  assert.ok(al, '★★ 나간 사람이 들어오려 했는데 알림이 없습니다');
+  assert.equal(al.kind, 'security-kakao-inactive');
+  assert.match(al.message, /P-900/, '누구인지(사번) 알림에 없습니다');
+  assert.equal(issued.length, 0, '표를 내줬습니다');
+});
+
+test('★ 성공한 카카오 로그인은 서버가 실패로 적지 않는다(성공 보고는 화면이 증표와 함께 한다)', async () => {
+  const K = fresh({ kakao_links: { '111': { uid: 'staff1', sid: 'P-101' } } });
+  const r = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
+  assert.equal(r.body.ok, true);
+  assert.equal(모든기록키().length, 0, '성공했는데 실패 기록이 남았습니다');
+});
+
+test('★★ 기록이 실패해도 로그인 응답은 그대로 간다', async () => {
+  const K = fresh();
+  world.pushFails = true;
+  const r = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.needLink, true, '★★ 감시 기록이 막혀 로그인 안내가 안 갑니다');
 });
 
