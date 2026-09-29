@@ -27028,7 +27028,12 @@ function coWatchVerdict(s){
   else if(s.pending > 10) out.push('아직 못 보낸 저장 '+s.pending+'건이 밀려 있습니다');
   if(s.renders > 10) out.push('화면을 '+s.renders+'번 다시 그렸습니다 — 저장이 몰려 들어오고 있습니다');
   if(s.builds > 3) out.push('회사 목록을 '+s.builds+'번 다시 조립했습니다 — 한 번이면 됩니다');
-  if(s.blockedMs > 500) out.push('5초 중 '+Math.round(s.blockedMs)+'ms 멈춰 있었습니다');
+  if(s.blockedMs > 500){
+    out.push('5초 중 '+Math.round(s.blockedMs)+'ms 멈춰 있었습니다');
+    /* 🐌 누가 — 멈춘 때만 이름을 댄다(멀쩡할 때 이름을 대면 늘 무언가가 범인처럼 보인다) */
+    const hot = (s.hot || []).slice(0, 3);
+    if(hot.length) out.push('🐌 오래 걸린 곳: ' + hot.map(h => h.name + ' ' + h.ms + 'ms' + (h.n > 1 ? '(' + h.n + '번)' : '')).join(' · '));
+  }
   return out.length ? out : ['눈에 띄는 문제 없음'];
 }
 /* 콘솔은 오류에 파묻힌다(대표 화면 2026-08-16, 5,045건). 문제가 있을 때만 화면에 띄운다.
@@ -27050,9 +27055,39 @@ function coWatchShow(lines){
     + lines.map(m=>'<div>· '+esc(m)+'</div>').join('');
 }
 let _coWatch = null;
+/* ══════ 🐌 «누가» 멈추게 했나 — 5초 동안만 함수마다 초시계 (대표 지시 2026-09-29 「이유 찾아서 근본 해결」) ══
+   「5초 중 607ms 멈춰 있었습니다」만으로는 무엇을 고칠지 모른다 — 짐작으로 고치면 엉뚱한 데를 건드린다
+   (이 저장소가 세 번 겪었다, pu-erp 🐌 이름표). 그래서 진단 5초 동안만 기업정보함의 전역 함수에
+   초시계를 달고 «제 안에서 쓴 시간»(자식 함수 시간을 뺀 것)을 센다. 끝나면 원래 함수로 되돌린다.
+   ⚠ 이름이 co·render·erp·card·dup·tax·pc 로 시작하는 «페이지가 만든» 함수만 — 브라우저 것·진단 자신은 안 건드린다.
+   ⚠ 속성을 단 함수(fn.foo)는 감싸지 않는다 — 감싸면 그 속성이 사라진다. */
+const CO_PROF_RE = /^(co|render|erp|card|dup|tax|pc)[A-Z_]/;
+function coProfStart(){
+  const recs = {}, stack = [], saved = [];
+  Object.keys(window).forEach(function(n){
+    if(!CO_PROF_RE.test(n) || /^coWatch|^coProf/.test(n)) return;
+    let f; try{ f = window[n]; }catch(_){ return; }
+    if(typeof f !== 'function' || Object.keys(f).length || /\[native code\]/.test(Function.prototype.toString.call(f))) return;
+    const r = recs[n] = { n:0, self:0 };
+    const w = function(){
+      const t0 = performance.now(); stack.push(0);
+      try{ return f.apply(this, arguments); }
+      finally{ const d = performance.now() - t0, kid = stack.pop();
+        r.n++; r.self += d - kid; if(stack.length) stack[stack.length-1] += d; }
+    };
+    try{ window[n] = w; saved.push([n, f]); }catch(_){}
+  });
+  return function stop(){
+    saved.forEach(function(p){ try{ window[p[0]] = p[1]; }catch(_){} });
+    return Object.keys(recs).map(k => ({ name:k, n:recs[k].n, ms:Math.round(recs[k].self) }))
+      .filter(x => x.ms >= 20).sort((a,b) => b.ms - a.ms).slice(0, 5);
+  };
+}
 function coWatchStart(){
   if(_coWatch) return;                       /* 이미 보고 있으면 그대로 둔다 */
   _coWatch = { renders:0, builds:0, blockedMs:0 };
+  let profStop = null;
+  try{ profStop = coProfStart(); }catch(_){}
   /* 「지금부터 5초 동안」 몇 번 저장이 나갔는지를 세려면 0에서 시작해야 한다 */
   try{ window.PUResilience && PUResilience.resetCensus && PUResilience.resetCensus(); }catch(_){}
   let obs = null;
@@ -27067,14 +27102,17 @@ function coWatchStart(){
     const q = (window.PUResilience && PUResilience.stats)
       ? PUResilience.stats() : { pending:0, parked:0, writes:0, busiest:[], worst:[] };
     const top = (q.busiest && q.busiest[0]) ? (q.busiest[0].where+' '+q.busiest[0].n.toLocaleString()+'번') : '';
+    let hot = [];
+    try{ hot = profStop ? profStop() : []; }catch(_){}
     const s = { renders:_coWatch.renders, builds:_coWatch.builds, blockedMs:_coWatch.blockedMs,
-                pending:q.pending, parked:q.parked, writes:q.writes||0, busiest:top };
+                pending:q.pending, parked:q.parked, writes:q.writes||0, busiest:top, hot:hot };
     _coWatch = null;
     console.log('🏢 기업 상세 5초 진단 — 다시 그림 '+s.renders+'번 · 회사목록 조립 '+s.builds
       +'번 · 멈춤 '+Math.round(s.blockedMs)+'ms · 저장 보냄 '+s.writes+'번'
       +' · 밀린 저장 '+s.pending+'건 · 거부된 저장 '+s.parked+'건');
     const lines = coWatchVerdict(s);
     lines.forEach(m=>console.log('   → '+m));
+    if(hot.length) console.log('   🐌 오래 걸린 곳(제 안에서 쓴 시간):', hot);
     if(q.busiest && q.busiest.length) console.log('   저장이 나간 곳:', q.busiest);
     if(q.worst && q.worst.length) console.log('   거부된 저장:', q.worst);
     coWatchShow(lines);
