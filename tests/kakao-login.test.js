@@ -404,7 +404,8 @@ test('★★ 서버 — 로그아웃 주소는 카카오 로그아웃으로 가�
 test('★ 화면 부품 — goLogin({ask}) 은 prompt=login 을 서버에 부탁하고, logoutUrl 은 로그아웃 주소를 묻는다', async () => {
   const c = clientWith('https://nabaho.github.io/pureunall/enter.html');
   const asked = [];
-  c.box.fetch = async (u) => { asked.push(u); return { status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x' }) }; };
+  /* ⚠ 2026-09-29: 노란 단추가 로그인 서버를 «미리 깨운다»(?warm=1) — 그 부름은 빼고 센다 */
+  c.box.fetch = async (u) => { if (!/warm=1/.test(u)) asked.push(u); return { status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x' }) }; };
   await c.K.goLogin({ ask: true });
   await c.K.goLogin();
   await c.K.logoutUrl();
