@@ -589,6 +589,12 @@ html.dark .empty{color:var(--text-mute)}
 .ds-pv-kv{display:flex;gap:8px;font-size:12px;padding:2px 0}
 .ds-pv-kv span{color:var(--text-mute);min-width:48px;flex:none}
 .ds-pv-kv b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-pan{font-size:11px;padding:1px 7px;border-radius:10px;background:#fffbeb;color:#854d0e;cursor:pointer;flex:none}
+.ds-old{display:flex;align-items:center;gap:8px;padding:3px 8px 3px 40px;border-bottom:1px dashed var(--border);font-size:11.5px;color:var(--text-mute);white-space:nowrap}
+.ds-old .m{min-width:36px}
+.ds-same.same{color:#854d0e}.ds-same.diff{color:var(--text-mute)}
+.ds-dupbar{display:flex;align-items:center;gap:8px;padding:7px 10px;margin:6px 0;border:1px solid #fde68a;background:#fffbeb;border-radius:8px;color:#854d0e;font-size:12px}
+.ds-dupbar .m{color:var(--text-mute);font-size:11px}
 .ds-pv-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
 #page-resume-hub .rc-h,#page-docbox .rc-h{margin-bottom:6px}
 #page-resume-hub .empty,#page-docbox .empty{padding:12px 0}
@@ -6479,25 +6485,40 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
       +`<span class="m">${g.items.length}건${끝?' · 마지막 '+끝:''}</span><span style="flex:1"></span>`
       +`<span class="m" style="color:${낸===g.items.length?'var(--green)':'var(--text-mute)'}">제출 ${낸}/${g.items.length}</span></div>`;
     if(접힘){ 번호+=g.items.length; return 머리; }
-    return 머리+g.items.map(r=>{ const n=(r.submits||[]).length; 번호++;
-      const T=dsTitleOf(r, D);
+    /* ★ 같은 서류(기관·제목·사람)는 «한 줄» + 판 수 (대표 승인 2026-09-29 목업) — 최신 판만 보이고 이전 판은 펼친다 */
+    const 판들=dsDupClusters(g.items, D);
+    return 머리+판들.map(c=>{ const r=c.list[0]; const n=(r.submits||[]).length; 번호++;
+      const T=c.T;
+      const 판수=c.list.length, 펼침=!!_dsVer[domain+'|'+c.key];
+      const 판표=판수>1?`<span class="ds-pan" title="같은 서류가 ${판수}판 있습니다 — 눌러서 이전 판을 봅니다" onclick="dsVerToggle(event,'${domain}','${_jsAttr(c.key)}')">판 ${판수} ${펼침?'▾':'▸'}</span>`:'';
+      const 이전=(판수>1&&펼침)?c.list.slice(1).map((o,i)=>`<div class="ds-old" data-oldid="${_jsAttr(o.id)}">`
+          +`<span class="m">└ ${판수-1-i}판</span><span>${escapeHtml(_dsDay(o.savedAt))} ${escapeHtml(String(o.savedAt||'').slice(11,16))}</span>`
+          +`<span class="ds-same" data-a="${_jsAttr(r.genFileId||'')}" data-b="${_jsAttr(o.genFileId||'')}">견주는 중…</span>`
+          +((o.submits||[]).length?'<span class="ds-ok">✔ 제출기록 있음 — 정리에서 뺌</span>':'')
+          +`<span style="flex:1"></span><button class="btn sm" title="이 판 보기" onclick="showBig('${o.genFileId}')">📄</button>`
+          +`<button class="btn sm" style="color:#dc2626" title="이 판을 휴지통으로" onclick="delDoc('${domain}','${o.id}',this)">🗑</button></div>`).join(''):'';
       const extraTxt=(D.extra||[]).map(f=>r[f.key]?`${f.label.split('(')[0]}: ${r[f.key]}`:'').filter(Boolean).join(' · ');
       const 옆=[T.사람, r.memo, extraTxt].filter(Boolean).map(escapeHtml).join(' · ');
       const 제출=n?`<span class="ds-ok">✔ ${escapeHtml(_dsShort(r.submits[0].date))}${r.submits[0].method?' '+escapeHtml(r.submits[0].method):''}</span>`:'<span class="ds-nosub">아직</span>';
       return `<div class="card ds-card" data-id="${_jsAttr(r.id)}" data-dsrow="1" onclick="dsRowClick(event,'${domain}','${_jsAttr(r.id)}')">
           <label class="rn-chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="row-chk" value="${_jsAttr(r.id)}" onchange="docSelSync('${domain}')"><span class="ds-no" style="font-weight:700;color:var(--navy);min-width:22px;font-size:12.5px">${번호}</span></label>
-          <span class="t" title="${escapeHtml(r.genName||'')}">${escapeHtml(T.t)}</span><span class="s">${옆}${옆&&(r.downloads||[]).length?' · ':''}${_docDlInline(domain,r)}</span>
+          <span class="t" title="${escapeHtml(r.genName||'')}">${escapeHtml(T.t)}</span>${판표}<span class="s">${옆}${옆&&(r.downloads||[]).length?' · ':''}${_docDlInline(domain,r)}</span>
           <span class="ds-kind">${escapeHtml(r.kind||'-')}</span><span class="ds-day">${escapeHtml(_dsDay(r.savedAt))}</span>${제출}
           <span class="ds-ic">${_cdSrc(r)==='received'
             ? `<button class="btn sm" title="원본 보기" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄</button>`
             : `<button class="btn sm" title="${D.label} 보기" onclick="showBig('${r.genFileId}')">📄</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','gen')" title="내려받기 — 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇</button>`
               + (r.origFileId?`<button class="btn sm" title="원본 양식 보기" onclick="showBig('${r.origFileId}')">📎</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="원본 양식 내려받기 — 기록이 남습니다">⬇</button>`:'')}
           <button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
-        </div>`; }).join('');
+        </div>`+이전; }).join('');
   }).join('');
-  body.innerHTML=allChk+dsBar+`<div class="ds-split" style="--ds-pv:${dsPvWidth()}px"><div class="ds-list">${목록}</div>`
+  const 겹침=dsDupSummary(rows, D);
+  const 겹침줄=겹침.clusters?`<div class="ds-dupbar">⚠ 같은 서류가 겹쳐 있습니다 — ${겹침.clusters}묶음 · 이전 판 ${겹침.old}건`
+    +(겹침.kept?` <span class="m">(제출기록이 있는 ${겹침.kept}건은 정리에서 뺍니다)</span>`:'')
+    +`<span style="flex:1"></span>`+(겹침.cleanable?`<button class="btn sm" onclick="dsDupClean('${domain}',this)">이전 판 한 번에 정리</button>`:'')+`</div>`:'';
+  body.innerHTML=allChk+dsBar+겹침줄+`<div class="ds-split" style="--ds-pv:${dsPvWidth()}px"><div class="ds-list">${목록}</div>`
     +`<div class="ds-gut" title="끌어서 폭을 바꿉니다 · 두 번 누르면 처음 폭" onmousedown="dsGutDown(event)" ondblclick="dsGutReset()"></div>`
     +`<div class="ds-prev" id="dsPrev-${domain}"></div></div>`;
+  _safe(function(){ dsSameCheck(body); });
   _safe(function(){ var 고른=_dsPicked[domain]; if(고른) [].forEach.call(body.querySelectorAll('[data-dsrow]'), function(el){ if(el.getAttribute('data-id')===고른) el.classList.add('pick'); }); dsPrevDraw(domain); });
   _safe(function(){ bindDragSel(body, function(){ docSelSync(domain); }); });
 }
@@ -6545,6 +6566,51 @@ function dsGutDown(ev){
   document.addEventListener('mousemove',움직); document.addEventListener('mouseup',놓음);
 }
 function dsGutReset(){ try{ LS.remove(NS+'ds_pv_w'); }catch(e){} document.querySelectorAll('.ds-split').forEach(function(sp){ sp.style.setProperty('--ds-pv', DS_PV_DEF+'px'); }); }
+/* ── 같은 서류 판 묶기 (대표 승인 2026-09-29 목업) ──
+   같은 서류 = 같은 기관 · 같은 제목 · 같은 사람. 최신 판(맨 앞)만 줄로 보이고 이전 판은 펼친다.
+   ⚠ 제출기록이 있는 판은 «정리»에서 뺀다 — 무엇을 냈는지가 남아야 한다.
+   ⚠ 정리는 휴지통으로(되살릴 수 있게) — 골라 삭제와 같은 길(_docTrashIds). */
+var _dsVer={};
+function dsDupKey(r, T){ return String(r.org||'')+'|'+String(T.t||'').replace(/\s+/g,'')+'|'+String(T.사람||''); }
+function dsDupClusters(items, D){
+  var out=[], 자리={};
+  (items||[]).slice().sort(function(a,b){ return (b.savedAt||'').localeCompare(a.savedAt||''); }).forEach(function(r){
+    var T=dsTitleOf(r, D), k=dsDupKey(r, T);
+    if(자리[k]==null){ 자리[k]=out.length; out.push({ key:k, T:T, list:[r] }); }
+    else out[자리[k]].list.push(r);
+  });
+  return out;
+}
+function dsDupSummary(rows, D){
+  var 묶음={}, s={ clusters:0, old:0, kept:0, cleanable:0, ids:[] };
+  (rows||[]).forEach(function(r){ var k=r.org||'(기관 없음)'; (묶음[k]=묶음[k]||[]).push(r); });
+  Object.keys(묶음).forEach(function(k){ dsDupClusters(묶음[k], D).forEach(function(c){
+    if(c.list.length<2) return;
+    s.clusters++;
+    c.list.slice(1).forEach(function(o){ s.old++; if((o.submits||[]).length) s.kept++; else { s.cleanable++; s.ids.push(o.id); } });
+  }); });
+  return s;
+}
+function dsVerToggle(ev, domain, key){ if(ev) ev.stopPropagation(); var k=domain+'|'+key; _dsVer[k]=!_dsVer[k]; renderDocStore(domain); }
+/* 펼친 판의 «내용 같음/다름» — 파일을 한 글자씩 견준다(이 기기에 있을 때만) */
+function dsSameCheck(body){
+  [].forEach.call((body&&body.querySelectorAll('.ds-same'))||[], function(el){
+    var a=el.getAttribute('data-a'), b=el.getAttribute('data-b');
+    (async function(){
+      var fa=a?(getFile(a)||await getFileAsync(a)):null, fb=b?(getFile(b)||await getFileAsync(b)):null;
+      if(!fa||!fb||!fa.base64||!fb.base64){ el.textContent='견줄 파일이 이 기기에 없습니다'; return; }
+      var 같음=fa.base64===fb.base64;
+      el.textContent=같음?'내용 같음':'내용 다름';
+      el.className='ds-same '+(같음?'same':'diff');
+    })();
+  });
+}
+function dsDupClean(domain, btn){
+  var D=DOMAINS[domain], s=dsDupSummary(get(D.store), D);
+  if(!s.ids.length){ toast('정리할 이전 판이 없습니다'); return; }
+  _docTrashIds(domain, s.ids, btn, '🗑 같은 서류의 이전 판 '+s.ids.length+'건을 정리합니다',
+    '최신 판만 남깁니다'+(s.kept?' · 제출기록이 있는 '+s.kept+'건은 남깁니다':''));
+}
 function dsGrpToggle(domain,k){ var key=domain+'|'+k; _dsFold[key]=!_dsFold[key]; renderDocStore(domain); }
 function dsRowClick(ev,domain,id){
   if(ev && ev.target && ev.target.closest && ev.target.closest('button,input,label,a,select')) return;
@@ -6686,10 +6752,16 @@ async function docSelDl(domain){
   toast('⬇ '+됨+'건 내려받았습니다'+(됨<ids.length?' ('+(ids.length-됨)+'건은 파일이 없어 건너뜀)':'')+' — 기록을 남겼습니다', 5000);
 }
 function docSelDel(domain,btn){
-  var D=DOMAINS[domain]; var ids=docSelIds(domain); if(!ids.length){ toast('고른 것이 없습니다'); return; }
+  var ids=docSelIds(domain); if(!ids.length){ toast('고른 것이 없습니다'); return; }
+  _docTrashIds(domain, ids, btn, null, '');
+}
+/* 여러 건을 휴지통으로 — 한 번 묻고, 되살릴 수 있게. 골라 삭제·이전 판 정리가 같이 쓴다 */
+function _docTrashIds(domain, ids, btn, 제목, 덧말){
+  var D=DOMAINS[domain];
   var 줄들=get(D.store).filter(function(x){ return ids.indexOf(x.id)>=0; });
-  kcAskDelete(btn, { title:'🗑 고른 '+줄들.length+'건을 지웁니다',
-      detail:줄들.slice(0,4).map(function(r){ return escapeHtml(kcTrashLabel(r)); }).join('<br>')
+  if(!줄들.length){ toast('지울 것이 없습니다'); return; }
+  kcAskDelete(btn, { title:제목||('🗑 고른 '+줄들.length+'건을 지웁니다'),
+      detail:(덧말?escapeHtml(덧말)+'<br>':'')+줄들.slice(0,4).map(function(r){ return escapeHtml(kcTrashLabel(r)); }).join('<br>')
         +(줄들.length>4?'<br>… 외 '+(줄들.length-4)+'건':'')
         +'<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다</b>(환경설정 › 🗑 휴지통).' },
     function(){
