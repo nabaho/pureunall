@@ -10,6 +10,9 @@
    ⚠ imgRect·imgClip·imgDim 도 «본래 크기» 기준이다. 찍을 크기로 적으면 역시 잘린다.
    ⚠ treatAsChar="1" 로 글자처럼 붙이면 뒤로 밀려 «종이 밖으로» 나간다.
      0 으로 두고 자리를 잡아 겹친다.
+   ⚠ 그림 참조는 <hc:img>(core 이름칸) 이고 imgDim 바로 뒤, 그 뒤에 <hp:effects/> 가 온다.
+     <hp:img> 로 적으면 한컴 한글이 파일을 «못 연다»(2026-09-29 COM 실측, Open=False).
+     rhwp 로 다시 내보내면 이 꼴로 고쳐져서 그동안 가려져 있었다 — 그 단계가 실패하면 날것이 나간다.
    ⚠ 그림 이름표는 반드시 image1·image2… 여야 한다. 엔진이 «이름 규칙»으로 그림을 찾는다 —
      목록(hpf)에 href 를 바로 적어 줘도 pustamp 같은 이름이면 못 찾고 «깨진 상자»가 그려진다
      (실측: pustamp 붉은 알갱이 19 = 깨진 상자, image1 은 379 = 진짜 도장).
@@ -46,7 +49,8 @@
       + '<hp:imgClip left="0" right="' + ORG + '" top="0" bottom="' + ORG + '"/>'
       + '<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
       + '<hp:imgDim dimwidth="' + ORG + '" dimheight="' + ORG + '"/>'
-      + '<hp:img binaryItemIDRef="' + (o.id || 'image1') + '" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
+      + '<hc:img binaryItemIDRef="' + (o.id || 'image1') + '" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
+      + '<hp:effects></hp:effects>'
       + '<hp:sz width="' + S + '" height="' + S + '" widthRelTo="ABSOLUTE" heightRelTo="ABSOLUTE" protect="0"/>'
       + '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="1"'
       + ' holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP"'

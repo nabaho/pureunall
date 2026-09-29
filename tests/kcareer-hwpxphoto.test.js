@@ -128,3 +128,10 @@ test('★ 앱이 모듈을 싣는다 — 캐시 번호를 붙여서', () => {
   assert.match(src, /js\/kcareer-hwpxphoto\.js\?v=\d+/);
   assert.match(src, /onclick="rhPhotoDoc\(\)"/, '★ 누를 단추가 없습니다');
 });
+
+test('★ 그림 참조는 <hc:img>(core) 이고 imgDim 바로 뒤, 그 뒤에 <hp:effects> — <hp:img> 면 한컴이 못 연다', () => {
+  /* 2026-09-29 한컴 COM 실측: <hp:img> 가 든 HWPX 는 Open=False (도장과 같은 까닭) */
+  const x = P.picXml({ id: 'image3', orgW: 300, orgH: 400, w: 9790, h: 13122 });
+  assert.doesNotMatch(x, /<hp:img[\s/>]/, '★ <hp:img> 는 한컴 한글이 열지 못합니다');
+  assert.match(x, /<hp:imgDim [^>]*\/><hc:img binaryItemIDRef="[^"]+"[^>]*\/><hp:effects><\/hp:effects>/);
+});

@@ -88,7 +88,8 @@
   }
 
   /* 사진 그림 조각 — 도장(picXml)과 같은 짜임, 다만 «가로·세로가 다르다».
-     ⚠ orgSz·imgRect·imgClip·imgDim 은 «본래 크기», curSz·sz 는 «찍을 크기» (도장에서 배운 것). */
+     ⚠ orgSz·imgRect·imgClip·imgDim 은 «본래 크기», curSz·sz 는 «찍을 크기» (도장에서 배운 것).
+     ⚠ 그림 참조는 <hc:img> + <hp:effects/> — <hp:img> 면 한컴 한글이 못 연다(도장 머리말 참고). */
   function picXml(o) {
     o = o || {};
     var OW = PX_TO_HU(o.orgW || 300), OH = PX_TO_HU(o.orgH || 400);
@@ -112,7 +113,8 @@
       + '<hp:imgClip left="0" right="' + OW + '" top="0" bottom="' + OH + '"/>'
       + '<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
       + '<hp:imgDim dimwidth="' + OW + '" dimheight="' + OH + '"/>'
-      + '<hp:img binaryItemIDRef="' + (o.id || 'image1') + '" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
+      + '<hc:img binaryItemIDRef="' + (o.id || 'image1') + '" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
+      + '<hp:effects></hp:effects>'
       + '<hp:sz width="' + W + '" height="' + H + '" widthRelTo="ABSOLUTE" heightRelTo="ABSOLUTE" protect="0"/>'
       + '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="1"'
       + ' holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT"'

@@ -151,3 +151,10 @@ test('★ 그림 이름표는 image+숫자여야 한다 — 엔진이 «이름 �
 test('★ 도장은 문단(칸)의 «오른쪽 끝»에 붙인다 — 왼쪽 기준 고정 거리는 좁은 칸에서 밖으로 나간다', () => {
   assert.match(S.picXml({ id: 'image1', orgPx: 300, showHU: 3400 }), /horzAlign="RIGHT"/);
 });
+
+test('★ 그림 참조는 <hc:img>(core) 이고 imgDim 바로 뒤, 그 뒤에 <hp:effects> — <hp:img> 면 한컴이 못 연다', () => {
+  /* 2026-09-29 한컴 COM 실측: <hp:img> 가 든 HWPX 는 Open=False. 한컴·rhwp 가 내보내는 꼴이 이것이다. */
+  const xml = S.picXml({ id: 'image1', orgPx: 300, showHU: 3400 });
+  assert.doesNotMatch(xml, /<hp:img[\s/>]/, '★ <hp:img> 는 한컴 한글이 열지 못합니다');
+  assert.match(xml, /<hp:imgDim [^>]*\/><hc:img binaryItemIDRef="[^"]+"[^>]*\/><hp:effects><\/hp:effects>/);
+});
