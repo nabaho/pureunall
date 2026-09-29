@@ -2106,6 +2106,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <section class="page-view" id="page-advisory"><div class="page">
         <div class="page-head"><div class="page-title">🏢 자문·고문</div><div class="page-desc">푸른이알피 업체관리에서 가져온 자문·고문 실적 — 해지된 곳도 실적입니다</div></div>
         <div class="toolbar">
+          <!-- ★ 진행 · 종료 탭 (대표 지시 2026-09-29 「진행과 종료를 분리해서 탭으로」) — 수는 advTabsDraw 가 채운다 -->
+          <div class="rh-dtabs" id="advTabs" style="margin:0"></div>
           <input class="tb-input" data-f="q" placeholder="고객사·유형·업태·담당 검색" style="min-width:200px">
           <select class="tb-select" data-f="year"><option value="">전체 연도</option></select>
           <div class="tb-spacer"></div>
@@ -7879,7 +7881,7 @@ const CAREER_CFG={
      ⚠ 「+ 새 자문」을 만들지 말 것 — 원본은 pu-erp 다. 여기서 만들면 두 곳이 어긋난다.
      근로자 수(insured)는 «고객사 이름 없이» 실적을 세기 위한 값이다.
      ⚠ 유형 드롭다운을 두지 않는다 — renderCareer 는 연도만 채워 주므로 빈 드롭다운이 된다. */
-  advisory:{store:'advisory',filter:r=>!r.excluded,qFields:['org','type','bizType','bizCategory','main'],
+  advisory:{store:'advisory',filter:r=>!r.excluded&&advTabHas(r),qFields:['org','type','bizType','bizCategory','main'],
     /* ⚠ 목록은 이름을 그대로 보여 준다 — 가리는 것은 «내보낼 때»뿐이다(회귀검사 있음) */
     exportMask: rows => KcareerAdvSummary.maskRows(rows),
     cols:['ID','유형','고객사','업태·종목','규모','근로자','기간','담당','상태','관리'],
@@ -8274,11 +8276,28 @@ function renderAdvSummary(){
 function _advSumText(){ var el=$('advSumText'); return el?el.textContent:''; }
 function advSumCopy(){ var t=_advSumText(); if(!t){ toast('문장이 없습니다'); return; } navigator.clipboard.writeText(t); toast('복사됨 — 지원서에 붙여 쓰세요'); }
 function advSumInsert(){ var t=_advSumText(); if(!t){ toast('문장이 없습니다'); return; } insertToEditor(t); }
+/* ── 자문·고문 진행 · 종료 탭 (대표 지시 2026-09-29) ──
+   ⚠ 가리는 것은 «목록»뿐이다 — 지원서 문장(advSummary)·CSV 가리기는 전부를 본다(종료한 곳도 실적이다). */
+var ADV_TABS=['진행','종료','전체'];
+function advTab(){ var t=''; try{ t=LS.get(NS+'adv_tab')||''; }catch(e){} return ADV_TABS.indexOf(t)>=0?t:'진행'; }
+function advTabHas(r){ var t=advTab(); return t==='전체' || String(r&&r.status||'')===t; }
+function setAdvTab(t){ if(ADV_TABS.indexOf(t)<0) return; try{ LS.set(NS+'adv_tab',t); }catch(e){} renderCareer('advisory'); }
+function advTabsDraw(){
+  var box=document.getElementById('advTabs'); if(!box) return;
+  var 전부=get('advisory').filter(function(r){ return r && !r.excluded; });
+  var 수={ '진행':0, '종료':0, '전체':전부.length };
+  전부.forEach(function(r){ if(수[r.status]!=null) 수[r.status]++; });
+  var 지금=advTab();
+  box.innerHTML=ADV_TABS.map(function(t){
+    return '<button type="button" class="rh-dtab'+(t===지금?' on':'')+'" onclick="setAdvTab(\''+t+'\')">'+t+' <b>'+수[t]+'</b></button>';
+  }).join('');
+}
 function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   /* 기타비용은 합친 표(비용관리) 안에서 보인다 — 고쳤으면 그쪽도 다시 그린다.
      안 그리면 「저장했는데 화면은 그대로」가 된다. */
   if(name==='etcfee') setTimeout(function(){ renderCareer('meetfee'); },0);
   if(name==='advisory') setTimeout(function(){ try{ renderAdvSummary(); }catch(e){ console.warn('advSummary',e); } },0);
+  if(name==='advisory') _safe(advTabsDraw);
   const sec=document.getElementById('page-'+name); if(!sec) return;
   /* 두 저장소를 한 표에 모은다(비용관리) — 기록은 «옮기지 않는다».
      옮기다 잃는 것이 합치는 이득보다 크다. 어느 저장소에서 왔는지는 _st 로 들고 다닌다. */
