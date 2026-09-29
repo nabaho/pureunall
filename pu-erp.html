@@ -33725,12 +33725,11 @@ function InsuranceSection(){
     ),
     h('div', null,
     h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'7px 10px', marginBottom:'8px' } },
-      h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#1e40af', marginBottom:'3px' } }, '🛡️ 4대보험 요율 안내'),
-      h('div', { style:{ fontSize:'10px', color:'#1e40af', lineHeight:1.3 } },
-        h('div', null, '• 연도별 요율을 관리하여 급여대장·퇴직정산에서 정확한 계산에 사용'),
-        h('div', null, '• 국민연금·건강보험은 보건복지부, 고용·산재는 고용노동부 고시 기준'),
-        h('div', null, '• 월별급여 모듈이 이 설정을 자동 참조합니다')
-      )
+      h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#1e40af', display:'flex', alignItems:'center', gap:'6px' } }, '🛡️ 4대보험 요율',
+        h(InfoPop, { title:'🛡️ 4대보험 요율 안내' },
+          '• 연도별 요율을 관리하여 급여대장·퇴직정산에서 정확한 계산에 씁니다.\n',
+          '• 국민연금·건강보험은 보건복지부, 고용·산재는 고용노동부 고시 기준입니다.\n',
+          '• 월별급여 모듈이 이 설정을 저절로 참조합니다.'))
     ),
     h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'8px' } },
       h('label', { style:{ fontSize:'11px', fontWeight:600, color:'#475569' } }, '연도:'),
@@ -33803,9 +33802,7 @@ function WithholdingTaxSection(){
         style:{ background:'#fef2f2', color:'#dc2626', padding:'3px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', border:'1px solid #fecaca' } }, '기본값 복원')
     ),
     h('div', null,
-    h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginBottom:'5px', lineHeight:1.3 } },
-      '과세급여 기준 · 국세청 간이세액표 · 지방소득세=소득세×10%'
-    ),
+    h('div', { style:{ marginBottom:'5px' } }, h(InfoPop, { title:'간이세액', text:'과세급여 기준 · 국세청 간이세액표 · 지방소득세 = 소득세 × 10%' })),
     h('table', { className:'dt' },
       h('thead', null, h('tr', null,
         h('th', null, '과세급여 구간 (원)'),
@@ -34062,9 +34059,9 @@ function UserWithRateSection(){
       h('div', { style:{ flex:1 } })
     ),
     h('div', null,
-    h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginBottom:'6px' } },
-      '계정·권한·성과% 관리 (성과%는 입금 시 자동 분배)'),
     h('div', { className:'dt-toolbar' },
+      /* 설명은 ⓘ 팝업으로 (대표 지시 2026-09-29 「환경설정 전체 설명은 팝업형태로」, 목업 settings-all-infopop) */
+      h(InfoPop, { title:'👤 사용자', text:'계정·권한·성과%를 관리합니다. 성과%는 입금이 확정될 때 저절로 나눠집니다. 새 직원은 근로자명부에서 등록합니다.' }),
       h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginRight:'4px' }, title:'신규 직원은 근로자명부에서 등록하세요' }, '👤 신규 등록 → 근로자명부'),
       h('input', { type:'search', className:'dt-search', placeholder:'🔍 사번·이름·직책 검색', value:query, onChange:function(e){ setQuery(e.target.value); } }),
       // 필터 토글
@@ -34636,7 +34633,6 @@ function HrMasters(){
   ];
   return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
     h('h3', null, '인사관리기준'),
-    h('div', { className:'desc' }, '사용자·급여항목·최저임금·공휴일·휴가정책·4대보험·간이세액 관리'),
     h('div', { style:{ display:'flex', flexWrap:'nowrap', overflowX:'auto', gap:'4px', marginBottom:'6px', borderBottom:'2px solid #e2e8f0' } },
       TABS.map(function(t, i){
         var on = activeTab === i;
@@ -35209,17 +35205,17 @@ function CaseStageCard(){
       h('span', null, '⚖'),
       h('span', null, '사건 심급·단계'),
       h('span', { style:{ fontWeight:600, fontSize:'12px' } }, '(' + list.length + ')'),
+      // 안내 세 줄은 ⓘ 팝업으로 (대표 지시 2026-09-29)
+      h(InfoPop, { title:'⚖ 사건 심급·단계' },
+        h('div', null, '· 사건 화면의 ⚖ 심급·단계에서 고르는 항목입니다. 기관 계열로 묶어 두었습니다.'),
+        h('div', null, '· 기한 일수는 ', h('b', null, '아직 확인되지 않은 초기값'), '입니다. 확인하신 뒤 ✏ 를 열어 ', h('b', null, '법정 기한 확인함'),
+          ' 을 켜 주세요 — 사건 화면의 「법정 기한 — 확인 후 사용」 표시가 그 단계에서 사라집니다.'),
+        h('div', null, '· 고칠 때는 ✏ 를 누르세요. 적용 유형을 비우면 모든 사건유형에서 고를 수 있습니다.')),
       h('div', { style:{ flex:1 } }),
       h('button', { onClick:reseed, className:'erp-tip', 'data-tip':'⚠️ 기본 단계로 되돌림 — 고친 값이 사라집니다',
         style:{ fontSize:'10.5px', padding:'2px 8px', background:'transparent', color:'#1e40af', border:'1px solid #1e40af', borderRadius:'4px', opacity:.6, cursor:'pointer' } }, '복원')
     ),
     h('div', { style:{ padding:'6px' } },
-      h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginBottom:'6px', lineHeight:1.5 } },
-        h('div', null, '· 사건 화면의 ⚖ 심급·단계에서 고르는 항목입니다. 기관 계열로 묶어 두었습니다.'),
-        h('div', null, '· 기한 일수는 ', h('b', null, '아직 확인되지 않은 초기값'), '입니다. 확인하신 뒤 ✏ 를 열어 ', h('b', null, '법정 기한 확인함'),
-          ' 을 켜 주세요 — 사건 화면의 「법정 기한 — 확인 후 사용」 표시가 그 단계에서 사라집니다.'),
-        h('div', null, '· 고칠 때는 ✏ 를 누르세요. 적용 유형을 비우면 모든 사건유형에서 고를 수 있습니다.')
-      ),
       list.length === 0
         ? h('div', { style:{ color:'#94a3b8', fontSize:'11px', textAlign:'center', padding:'10px' } }, '항목 없음')
         : caseStageGrouped(list).map(function(G){
@@ -35442,20 +35438,8 @@ function BizMasters(){
       h('span', { style:{ fontSize:'11px', color:'#64748b' } }, '예'),
       h('span', { style:{ fontFamily:'monospace', fontWeight:700, color:'#1e40af',
         background:'#eff6ff', padding:'2px 8px', borderRadius:'4px', fontSize:'11.5px' } }, '부해-2026-007'),
-      h('button', { onClick:function(){ setHelpOpen(!helpOpen); },
-        style:{ background:'transparent', border:'none', color:'#2563eb', fontSize:'11px',
-          fontWeight:600, cursor:'pointer', padding:'2px 4px', whiteSpace:'nowrap' } },
-        helpOpen ? '접기 ▴' : '자세히 ▾'),
-      h('div', { style:{ flex:1, minWidth:'8px' } }),
-      h('button', { onClick:runTypeDiag,
-        title:'유형이 안 붙은 자료가 있는지 훑습니다',
-        style:{ background:'#fffbeb', color:'#d97706', border:'1px solid #fde68a',
-          padding:'4px 11px', borderRadius:'6px', fontSize:'11px', fontWeight:700,
-          cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } },
-        '🔍 미설정 찾기')
-    ),
-    helpOpen && h('div', { style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px',
-        padding:'8px 12px', marginBottom:'6px', fontSize:'11px', color:'#475569', lineHeight:1.9 } },
+      /* 자세한 것은 ⓘ 팝업으로 (대표 지시 2026-09-29 「환경설정 전체 설명은 팝업형태로」) — 전에는 「자세히 ▾」 로 펼쳤다 */
+      h(InfoPop, { title:'📋 업무유형 · 관리번호' },
       h('div', null, '• 여기서 만든 유형이 사건·컨설팅·기금·기타사업·업체 화면의 드롭다운 선택지가 됩니다.'),
       h('div', null, '• 각 줄 왼쪽의 ',
         h('span', { style:{ background:'#fffbeb', padding:'1px 5px', borderRadius:'4px', fontWeight:700 } }, '약어'),
@@ -35472,7 +35456,14 @@ function BizMasters(){
             h('span', { style:{ color:'#64748b' } }, s.label),
             h('span', { style:{ fontFamily:'monospace', fontWeight:700, color:'#1e40af',
               background:'#eff6ff', padding:'1px 7px', borderRadius:'4px' } }, s.code));
-        }))
+        }))),
+      h('div', { style:{ flex:1, minWidth:'8px' } }),
+      h('button', { onClick:runTypeDiag,
+        title:'유형이 안 붙은 자료가 있는지 훑습니다',
+        style:{ background:'#fffbeb', color:'#d97706', border:'1px solid #fde68a',
+          padding:'4px 11px', borderRadius:'6px', fontSize:'11px', fontWeight:700,
+          cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } },
+        '🔍 미설정 찾기')
     ),
     h('div', { style:{ marginBottom:'8px' } },
       diag !== null ? (
@@ -35523,7 +35514,10 @@ function PolicyCard(props){
     h('div', {
       style:{ background:props.headBg, color:props.headFg, padding:'7px 12px', fontSize:'12px', fontWeight:700, display:'flex', alignItems:'center', gap:'8px', borderBottom: '1px solid '+props.headFg+'33', userSelect:'none' } },
       h('span', null, props.icon),
-      h('span', null, props.title)
+      h('span', null, props.title),
+      /* info: 제목 옆 ⓘ 설명(늘 보이던 안내문 자리) · right: 오른쪽 끝 짧은 상태 (대표 지시 2026-09-29) */
+      props.info && h(InfoPop, { title:(props.icon ? props.icon + ' ' : '') + props.title }, props.info),
+      props.right && h('span', { style:{ marginLeft:'auto', fontWeight:600, fontSize:'11.5px' } }, props.right)
     ),
     /* ★ pc-body 가 «설정 줄만» 골라 둘씩 놓는다 (대표 지시 2026-09-13
        「나머지 탭도 같이 정리」). 칸이 열여섯인데 한 자리만 고치면 다 적용된다 —
@@ -35951,8 +35945,7 @@ function ExternalStaffMasters(){
   var orgs = Object.keys(byOrg);
 
   return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
-    h('h3', null, '외부협력자'),
-    h('div', { className:'desc' }, '외부 기관(이음센터 등) 협력자 등록 · 캘린더 일정 표시용'),
+    h('h3', null, '외부협력자 ', h(InfoPop, { title:'외부협력자', text:'외부 기관(이음센터 등) 협력자를 등록합니다. 캘린더 일정 표시에 씁니다.' })),
     h('button', { onClick:function(){ setNotifyOpen(true); },
       style:{ marginTop:'8px', background:'#16a34a', color:'#fff', border:0, borderRadius:'6px', padding:'7px 14px', fontSize:'12px', fontWeight:700, cursor:'pointer' } },
       '📱 오늘·내일 근무문자'),
@@ -36155,12 +36148,9 @@ function ActivityLogViewer(){
 
   return h('div', { style:{ padding:'4px 0' } },
     h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', userSelect:'none', marginBottom:'8px', padding:'6px 8px', borderRadius:'6px', border:'1px solid #e2e8f0', background:'#f8fafc' } },
-      h('h3', { style:{ fontSize:'15px', fontWeight:700, color:'#1e293b', margin:0 } }, '📋 활동 로그')
+      h('h3', { style:{ fontSize:'15px', fontWeight:700, color:'#1e293b', margin:0 } }, '📋 활동 로그 ', h(InfoPop, { title:'📋 활동 로그', text:'본인이 본인 일정을 바꾼 것은 기록하지 않습니다. 최근 200건만 보관합니다.' }))
     ),
     h('div', null,
-    h('div', { style:{ marginBottom:'12px' } },
-      h('div', { style:{ fontSize:'11.5px', color:'#94a3b8' } }, '본인이 본인 일정을 변경한 경우는 기록되지 않습니다 · 최근 200건 보관')
-    ),
     // 통계 카드
     h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'10px', marginBottom:'12px' } },
       h('div', { style:{ background:'#f8fafc', borderRadius:'6px', padding:'10px 12px', borderLeft:'3px solid #475569' } },
@@ -36413,11 +36403,10 @@ function LeavePolicySection(){
          (2026-09-02 조사). 이 알림은 «바꾸려 할 때» 멈춰 세우는 자리다. */
     f.basis === 'fiscalYear' && h(PolicyRow, {
       label:'⚠ 아직 적용 안 됨',
-      control: h('div', { style:{ fontSize:'11.5px', lineHeight:1.7, color:'#854d0e',
-          background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 11px' } },
-        h('b', null, '연차 일수는 여전히 «입사일 기준»으로 셈합니다.'), h('br'),
-        '이 설정을 바꿔도 부여 일수·잔여 연차 숫자는 달라지지 않습니다 — ',
-        '회계연도로 정말 바꾸시려면 부여·이월·퇴직정산을 함께 손봐야 하니 먼저 알려 주세요.')
+      control: h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11.5px', color:'#854d0e',
+          background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'5px 10px' } },
+        h('b', null, '연차 일수는 여전히 «입사일 기준»으로 셈합니다.'),
+        h(InfoPop, { title:'⚠ 연차 기준 — 아직 적용 안 됨', text:'이 설정을 바꿔도 부여 일수·잔여 연차 숫자는 달라지지 않습니다. 회계연도로 정말 바꾸시려면 부여·이월·퇴직정산을 함께 손봐야 하니 먼저 알려 주세요.' }))
     }),
     f.basis === 'fiscalYear' && h(PolicyRow, {
       label:'회계연도 시작월',
@@ -36612,10 +36601,12 @@ function SpecialLeavePolicySection(){
           )
         )
       ),
-      h('div', { style:{ marginTop:'8px', fontSize:'10.5px', color:'#94a3b8', lineHeight:'1.6' } },
+      h('div', { style:{ marginTop:'8px', display:'flex', alignItems:'center', gap:'5px', fontSize:'11px', color:'#64748b' } },
+        h(InfoPop, { title:'💡 법정 휴가 안내' },
         '💡 ',h('strong',null,'법정 휴가'),' (출산·배우자출산·난임·유산사산·가족돌봄 등)는 노동법상 의무이며 일수를 줄이면 위반될 수 있습니다.', h('br',null),
         '🟢 ',h('strong',null,'기한(일)'),': 부여일로부터 며칠 안에 사용해야 하는지. 0=무기한.', h('br',null),
-        '⚠️ ',h('strong',null,'2025.2.23 개정 반영'),': 배우자출산 20일 / 난임 6일 / 유산사산 10일 / 미숙아 100일')
+        '⚠️ ',h('strong',null,'2025.2.23 개정 반영'),': 배우자출산 20일 / 난임 6일 / 유산사산 10일 / 미숙아 100일'),
+        '법정 휴가·기한 안내')
     ),
 
     // 편집 모달
@@ -36773,10 +36764,12 @@ function LoaPolicySection(){
           )
         )
       ),
-      h('div', { style:{ marginTop:'8px', fontSize:'10.5px', color:'#94a3b8', lineHeight:'1.6' } },
+      h('div', { style:{ marginTop:'8px', display:'flex', alignItems:'center', gap:'5px', fontSize:'11px', color:'#64748b' } },
+        h(InfoPop, { title:'💡 법정 휴직 안내' },
         '💡 ',h('strong',null,'법정 휴직'),' (육아·가족돌봄·군복무 등)는 노동법상 의무이며 거부할 수 없습니다.', h('br',null),
         '🍼 ',h('strong',null,'분할'),': 같은 자녀 기준 분할 사용 가능 횟수. 0이면 분할 불가.', h('br',null),
-        '⚠️ ',h('strong',null,'2025.2.23 개정'),': 육아휴직 1년+6개월 (3회 분할), 육아기 단축 만 12세 이하 (확대)')
+        '⚠️ ',h('strong',null,'2025.2.23 개정'),': 육아휴직 1년+6개월 (3회 분할), 육아기 단축 만 12세 이하 (확대)'),
+        '법정 휴직·분할 안내')
     ),
 
     editing && h('div', { className:'modal-bg', onClick:function(){setEditing(null);} },
@@ -36899,8 +36892,7 @@ function PensionPolicySection(){
               style:{ width:'120px', textAlign:'right', fontFamily:'monospace' } }),
             h('span', { style:{ fontSize:'11px', color:'#94a3b8' } }, '%')
           ),
-          h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'3px' } },
-            '💡 법정 최저 1/12 = 약 8.33%. 회사 약정으로 더 높게 설정 가능.')
+          h(InfoPop, { title:'퇴직연금 적립률', text:'법정 최저 1/12 = 약 8.33%입니다. 회사 약정으로 더 높게 둘 수 있습니다.' })
         ),
         h('div', { className:'fld' },
           h('label', null, '월별급여 확정 시 자동 적립'),
@@ -36920,10 +36912,12 @@ function PensionPolicySection(){
         h('button', { onClick:save,
           style:{ padding:'6px 14px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'11.5px', fontWeight:700 } }, '💾 저장')
       ),
-      h('div', { style:{ marginTop:'10px', fontSize:'10.5px', color:'#94a3b8', lineHeight:'1.6' } },
+      h('div', { style:{ marginTop:'10px', display:'flex', alignItems:'center', gap:'5px', fontSize:'11px', color:'#64748b' } },
+        h(InfoPop, { title:'🏦 퇴직연금 — DC·DB·미가입' },
         '🏦 ',h('strong',null,'DC형'),'(확정기여): 회사가 매월 적립, 운용 책임은 근로자.', h('br',null),
         '🏛️ ',h('strong',null,'DB형'),'(확정급여): 회사가 운용 책임, 퇴직 시 평균임금×30일×근속.', h('br',null),
-        '⚠️ ',h('strong',null,'미가입'),': 퇴직 시 법정퇴직금 발생 (근로기준법 §34).')
+        '⚠️ ',h('strong',null,'미가입'),': 퇴직 시 법정퇴직금 발생 (근로기준법 §34).'),
+        'DC·DB·미가입 차이')
     )
   );
 }
@@ -36945,10 +36939,10 @@ function AccessPolicySection(){
   function set(k, v){ var next = Object.assign({}, f); next[k] = v; setF(next); dbSet('policy_access', next); }
 
   return h('div', null,
-  h(PolicyCard, { title:'데이터 접근 정책', icon:'🔒', headBg:'#fef2f2', headFg:'#991b1b', collapseId:'pol_access', defaultOpen:false },
-    h('div', { style:{ fontSize:'12px', color:'#64748b', marginBottom:'10px', padding:'8px 12px', background:'#fffbeb', borderRadius:'4px' } },
-      '⚠️ 일반 직원(member)에게 적용되는 권한 제한. admin·admin-delegate는 항상 전체 권한.'
-    ),
+  /* 설명은 ⓘ 팝업으로 (대표 지시 2026-09-29 「환경설정 전체 설명은 팝업형태로」) — 적용 대상은 오른쪽 끝에 짧게 남긴다 */
+  h(PolicyCard, { title:'데이터 접근 정책', icon:'🔒', headBg:'#fef2f2', headFg:'#991b1b', collapseId:'pol_access', defaultOpen:false,
+      right:'일반 직원만 해당',
+      info:'일반 직원(member)에게 적용되는 권한 제한입니다. 관리자·관리자 위임은 늘 전체 권한입니다.\n모든 변경은 바로 저장됩니다.' },
     /* ★ 여덟 줄이 «둘씩» 놓인다 — 감싸는 칸(pc-body)이 알아서 갈라 준다.
        (2026-09-13 아침엔 여기만 따로 감쌌지만, 칸이 열여섯이라 한 자리로 옮겼다) */
     h(PolicyRow, {
@@ -37748,7 +37742,6 @@ function PolicyMasters(){
   ];
   return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
     h('div', null,
-    h('div', { className:'desc' }, '접근권한 정책을 관리합니다. 모든 변경은 즉시 저장됩니다.'),
     h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px', marginBottom:'16px', borderBottom:'2px solid #e2e8f0' } },
       TABS.map(function(t, i){
         var on = activeTab === i;
@@ -38020,11 +38013,11 @@ function SecurityScope(){
 
     // 헤더
     h('div',{style:{marginBottom:'14px'}},
-      h('div',{style:{fontWeight:800,fontSize:'14px',color:'#1e293b',marginBottom:'4px'}},'🔐 메뉴 접근 권한 관리'),
-      h('div',{style:{fontSize:'11px',color:'#64748b',lineHeight:1.7,background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:'8px 12px'}},
-        h('b',null,'기본 정책:'),' 모든 비관리자 = 대시보드 + 사무관리만 접근.',h('br'),
-        h('b',null,'개별 허용:'),' 아래에서 직원별로 인사관리·재무관리 그룹 추가 허용 가능.',h('br'),
-        h('b',null,'저장 방법:'),' 허용/차단 변경 후 반드시 💾 저장 버튼을 눌러야 적용됩니다.')
+      h('div',{style:{fontWeight:800,fontSize:'14px',color:'#1e293b',display:'flex',alignItems:'center',gap:'6px'}},'🔐 메뉴 접근 권한 관리',
+        h(InfoPop,{title:'🔐 메뉴 접근 권한'},
+          h('b',null,'기본 정책:'),' 모든 비관리자 = 대시보드 + 사무관리만 접근.',h('br'),
+          h('b',null,'개별 허용:'),' 아래에서 직원별로 인사관리·재무관리 그룹 추가 허용 가능.',h('br'),
+          h('b',null,'저장 방법:'),' 허용/차단 변경 후 반드시 💾 저장 버튼을 눌러야 적용됩니다.'))
     ),
 
     // ★ 미저장 변경 알림 바
@@ -38688,8 +38681,7 @@ function ReconcileCheck(){
   };
 
   return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
-    h('h3', null, '🔍 데이터 정합성 검사 (Reconciliation)'),
-    h('div', { className:'desc' }, '데이터 일관성·무결성을 5가지 기준으로 검사합니다. 발견된 이상은 [수정] 또는 [무시] 처리 가능합니다.'),
+    h('h3', null, '🔍 데이터 정합성 검사 ', h(InfoPop, { title:'🔍 데이터 정합성 검사', text:'데이터 일관성·무결성을 5가지 기준으로 검사합니다. 발견된 이상은 [수정] 또는 [무시]로 처리합니다.' })),
     h('div', null,
       h('div', { style:{ display:'flex', gap:'10px', alignItems:'center', marginBottom:'14px' } },
         h('button', { onClick:runCheck, disabled:loading,
@@ -38808,12 +38800,11 @@ function DuplicationCriteria(){
     h('div', null,
     h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', padding:'12px 16px', marginBottom:'18px', display:'flex', alignItems:'flex-start', gap:'10px' } },
       h('div', { style:{ flex:1 } },
-        h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#854d0e', marginBottom:'6px' } }, '🔍 중복 감지 기준 설정'),
-        h('div', { style:{ fontSize:'11.5px', color:'#854d0e', lineHeight:1.7 } },
-          h('div', null, '• 계약·업체관리 신규 등록 시 중복 검사에 사용되는 임계값과 피처별 가중치'),
-          h('div', null, '• 합산 점수가 ', h('strong', null, '임계값 이상'), '이면 중복 경고 모달 표시'),
-          h('div', null, '• 사용자가 [별건으로 저장] 선택 시 화이트리스트에 기록되어 이후 검사 제외')
-        )
+        h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#854d0e', display:'flex', alignItems:'center', gap:'6px' } }, '🔍 중복 감지 기준 설정',
+          h(InfoPop, { title:'🔍 중복 감지 기준' },
+            '• 계약·업체관리 신규 등록 때 중복 검사에 쓰는 임계값과 항목별 가중치입니다.', h('br'),
+            '• 합산 점수가 ', h('strong', null, '임계값 이상'), '이면 중복 경고 창이 뜹니다.', h('br'),
+            '• [별건으로 저장]을 고르면 예외 목록에 기록되어 이후 검사에서 빠집니다.'))
       ),
       h('button', { onClick:resetDefaults,
         style:{ background:'#fff', color:'#854d0e', border:'1px solid #fde68a', borderRadius:'4px', padding:'6px 12px', fontSize:'11.5px', fontWeight:600, cursor:'pointer' } }, '↻ 기본값')
@@ -38852,10 +38843,9 @@ function DuplicationCriteria(){
     h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'14px 18px', marginBottom:'18px' } },
       h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e293b', marginBottom:'4px', display:'flex', alignItems:'center', gap:'6px' } },
         h('span', null, '☎️'),
-        h('span', null, '전화번호 매칭 제외 목록 (' + f.phoneExclude.length + ')')
+        h('span', null, '전화번호 매칭 제외 목록 (' + f.phoneExclude.length + ')'),
+        h(InfoPop, { title:'☎️ 전화번호 매칭 제외', text:'대표번호·콜센터처럼 여러 업체가 함께 쓰는 번호는 중복 판단에서 뺍니다.' })
       ),
-      h('div', { style:{ fontSize:'11px', color:'#94a3b8', marginBottom:'10px' } },
-        '대표번호·콜센터 등 여러 업체가 공유할 수 있는 번호는 매칭에서 제외'),
       h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'6px', marginBottom:'10px' } },
         f.phoneExclude.length === 0
           ? h('div', { style:{ color:'#94a3b8', fontSize:'12px', padding:'8px 0' } }, '제외 번호 없음')
@@ -38882,10 +38872,9 @@ function DuplicationCriteria(){
     h('div', { style:{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px', padding:'14px 18px' } },
       h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#166534', marginBottom:'4px', display:'flex', alignItems:'center', gap:'6px' } },
         h('span', null, '✅'),
-        h('span', null, '중복 감지 예외 (화이트리스트) · ' + f.whitelist.length + '쌍')
+        h('span', null, '중복 감지 예외 (화이트리스트) · ' + f.whitelist.length + '쌍'),
+        h(InfoPop, { title:'✅ 중복 감지 예외', text:'[별건으로 저장]을 고르면 저절로 기록되고, 이후 중복 감지에서 빠집니다.' })
       ),
-      h('div', { style:{ fontSize:'11px', color:'#166534', marginBottom:'10px' } },
-        '[별건으로 저장] 선택 시 자동 기록 → 이후 중복 감지에서 제외'),
       f.whitelist.length === 0
         ? h('div', { style:{ color:'#94a3b8', fontSize:'12px', padding:'12px 0', textAlign:'center', background:'#fff', borderRadius:'4px' } },
             '아직 등록된 화이트리스트가 없습니다')
@@ -40055,12 +40044,8 @@ function SystemMapSection(){
     );
   }
 
-  return h(PolicyCard, { title:'시스템 맵 (관리자 전용)', icon:'🗺️', headBg:'#eff6ff', headFg:'#1e40af', collapseId:'sys_map', defaultOpen:false },
-    h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 14px', marginBottom:'14px', fontSize:'11.5px', color:'#1e40af', lineHeight:1.7 } },
-      h('div', null, '• ERP의 데이터 흐름·모듈 구조·저장소 상태를 한 화면에서 확인'),
-      h('div', null, '• 7개 핵심 플로우별 상세 설명 + 실시간 저장소 건수'),
-      h('div', null, '• 문제 발생 시 어떤 플로우·저장소를 점검해야 하는지 빠르게 파악')
-    ),
+  return h(PolicyCard, { title:'시스템 맵 (관리자 전용)', icon:'🗺️', headBg:'#eff6ff', headFg:'#1e40af', collapseId:'sys_map', defaultOpen:false,
+      info:'• ERP의 데이터 흐름·모듈 구조·저장소 상태를 한 화면에서 확인합니다.\n• 7개 핵심 흐름별 상세 설명과 실시간 저장소 건수를 보여 줍니다.\n• 문제가 생기면 어느 흐름·저장소를 점검할지 빠르게 찾습니다.' },
     // 플로우 필터
     h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'6px', marginBottom:'14px' } },
       flows.map(function(fl){
@@ -41837,8 +41822,8 @@ function TrashView(){
             '🗑️ 휴지통이 비어 있습니다.')
         : h('div', null,
             h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' } },
-              h('div', { style:{ fontSize:'11px', color:'#64748b' } },
-                '삭제된 항목은 여기에 보관되며 30일 후 자동 삭제됩니다 (수동 삭제 시 즉시 영구 삭제).'),
+              h('div', { style:{ fontSize:'11px', color:'#64748b', display:'flex', alignItems:'center', gap:'5px' } },
+                '30일 보관', h(InfoPop, { title:'🗑️ 휴지통', text:'지운 항목은 여기에 30일 보관된 뒤 저절로 지워집니다. 여기서 직접 지우면 바로 영구 삭제됩니다.' })),
               h('button', { onClick:emptyAll,
                 style:{ padding:'5px 11px', background:'#dc2626', color:'#fff', border:'none', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer' } },
                 '🗑️ 휴지통 비우기')
@@ -42538,9 +42523,8 @@ function ArchiveManagement(){
   return h('div', null,
     h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px'} },
       h('div', null,
-        h('div', { style:{fontSize:'15px', fontWeight:700, color:'#1e293b'} }, '📦 자료 보관소'),
-        h('div', { style:{fontSize:'11px', color:'#94a3b8', marginTop:'2px'} },
-          '컨설팅·급여·계약·사진 등 NAS 파일 메타데이터 관리 (실제 파일은 NAS에 보관)')
+        h('div', { style:{fontSize:'15px', fontWeight:700, color:'#1e293b', display:'flex', alignItems:'center', gap:'6px'} }, '📦 자료 보관소',
+          h(InfoPop, { title:'📦 자료 보관소', text:'컨설팅·급여·계약·사진 등 NAS 파일의 목록(메타데이터)을 관리합니다. 실제 파일은 NAS에 있습니다.' }))
       ),
       h('button', { onClick:openNew,
         style:{padding:'7px 16px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'12px', fontWeight:700} },
@@ -42553,10 +42537,9 @@ function ArchiveManagement(){
         h('label', { style:{fontSize:'11.5px', color:'#854d0e', fontWeight:600, whiteSpace:'nowrap'} }, '🌐 NAS 기본 URL'),
         h('input', { type:'text', value:nasBase, placeholder:'http://192.168.0.10:5000  또는  https://quickconnect.to/내ID',
           onChange:function(e){persistNasBase(e.target.value);},
-          style:{flex:1, padding:'5px 10px', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'11.5px', fontFamily:'monospace'} })
-      ),
-      h('div', { style:{fontSize:'10.5px', color:'#854d0e', marginTop:'4px', fontStyle:'italic'} },
-        '※ NAS 접속 주소. 각 자료의 nasPath와 합쳐 [열기] 버튼이 동작합니다. (예: http://192.168.0.10:5000/file/컨설팅/A전자/보고서.pdf)')
+          style:{flex:1, padding:'5px 10px', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'11.5px', fontFamily:'monospace'} }),
+        h(InfoPop, { title:'🌐 NAS 기본 URL', text:'NAS 접속 주소입니다. 각 자료의 NAS 경로와 합쳐 [열기] 단추가 동작합니다.\n예: http://192.168.0.10:5000/file/컨설팅/가나상사/보고서.pdf' })
+      )
     ),
 
     // 통계
@@ -42890,7 +42873,7 @@ function OntologyAuditPanel(){
   var typeNames={Contract:'계약',Case:'사건',Project:'사업·컨설팅',Task:'업무',ScheduleEvent:'일정',FinancialTransaction:'입출금',Invoice:'세금계산서',Document:'문서',MediaAsset:'사진',PayrollRecord:'임금기록',Person:'사람',Policy:'규정',Submission:'제출'};
   return h('div',{className:'env-section',style:{maxWidth:'100%'}},
     h('h3',null,'🕸️ 푸른통합 온톨로지 5단계'),
-    h('div',{className:'desc'},'등록된 모든 프로그램의 공통 사전과 안전한 경량 색인을 기준으로 연결 상태를 검사합니다. 메일 본문·사진 원본·전자서명 제출·급여 직원표는 읽지 않으며 원본을 수정하거나 서버에 저장하지 않습니다.'),
+    h('div',{style:{marginTop:'-4px'}},h(InfoPop,{title:'🕸️ 푸른통합 온톨로지',text:'등록된 모든 프로그램의 공통 사전과 안전한 경량 색인을 기준으로 연결 상태를 검사합니다. 메일 본문·사진 원본·전자서명 제출·급여 직원표는 읽지 않으며 원본을 수정하거나 서버에 저장하지 않습니다.'})),
     h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',margin:'12px 0'}},
       h('button',{onClick:run,disabled:busy,style:{padding:'8px 16px',background:'#1e40af',color:'#fff',border:'none',borderRadius:'6px',fontWeight:700,cursor:busy?'wait':'pointer'}},busy?'⏳ 관계 검사 중...':'🔍 관계 전수진단'),
       report&&h('button',{onClick:saveReport,style:{padding:'8px 16px',background:'#fff',color:'#1e40af',border:'1px solid #bfdbfe',borderRadius:'6px',fontWeight:700,cursor:'pointer'}},'⬇ 진단 보고서'),
@@ -42925,12 +42908,12 @@ function OntologyAuditPanel(){
       h('div',{style:{marginTop:'5px',color:'#475569'}},programs.map(function(k){return O.PROGRAMS[k].name;}).join(' · '))),
     h('div',{style:{background:writeIssues.length?'#fffbeb':'#f0fdf4',padding:'9px 12px',borderRadius:'7px',fontSize:'11.5px',color:writeIssues.length?'#854d0e':'#166534',marginBottom:'12px'}},
       h('strong',null,'저장 관문 · 기존 프로그램 관찰 모드'),
-      ' — 현재 화면에서 발견한 온톨로지 저장 위반 '+writeIssues.length+'건. 기존 업무는 막지 않고 기록하며, 새 프로그램은 기본으로 차단합니다.',
+      ' — 현재 화면에서 발견한 온톨로지 저장 위반 '+writeIssues.length+'건 ',h(InfoPop,{title:'저장 관문',text:'기존 업무는 막지 않고 기록만 합니다. 새 프로그램은 기본으로 차단합니다.'}),
       writeIssues.length>0&&h('div',{style:{marginTop:'5px',color:'#854d0e'}},writeIssues.slice(-5).map(function(x){return x.program+' · '+x.path+' · '+x.message;}).join(' / '))),
     companyWriteAudit&&h('div',{style:{background:companyWriteAudit.ok?'#f0fdf4':'#fffbeb',padding:'9px 12px',borderRadius:'7px',fontSize:'11.5px',color:companyWriteAudit.ok?'#166534':'#854d0e',marginBottom:'12px'}},
       h('strong',null,'업체 원자적 저장 전환 준비'),
       ' — 전체 '+companyWriteAudit.total+'건 · 계약 적용 '+companyWriteAudit.contracted+'건 · 이관 대기 '+companyWriteAudit.legacy+'건 · 자동 준비 '+companyWriteAudit.ready.length+'건 · 사람 확인 '+companyWriteAudit.blocked.length+'건 · 중복 ID '+companyWriteAudit.duplicates.length+'건.',
-      h('div',{style:{marginTop:'5px',color:'#475569'}},'현재는 읽기 전용 진단입니다. 기존 업체를 백업·이관한 뒤 업체 저장과 삭제를 수정차수 트랜잭션으로 전환합니다.')),
+      ' ',h(InfoPop,{title:'업체 원자적 저장 전환',text:'현재는 읽기 전용 진단입니다. 기존 업체를 백업·이관한 뒤 업체 저장과 삭제를 수정차수 트랜잭션으로 전환합니다.'})),
     !report&&h('div',{style:{padding:'24px',textAlign:'center',color:'#94a3b8',background:'#f8fafc',borderRadius:'7px',fontSize:'12.5px'}},'진단을 실행하면 ID 누락·중복, 끊어진 업체·담당자·업무·재무 관계를 찾습니다.'),
     report&&h('div',null,
       h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'12px'}},
@@ -43062,9 +43045,10 @@ function CoNumberPanel(){
     });
   }
   return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'18px 20px' } },
-    h('h3', { style:{ fontSize:'14px', fontWeight:800, marginBottom:'4px' } }, '🔢 업체 고유번호'),
-    h('div', { style:{ fontSize:'11.5px', color:'#64748b', marginBottom:'12px' } },
-      '머리(자문·급여·노조·기금·대행)는 업무가 바뀌면 따라 바뀌고, 몸통(다섯 자리)은 절대 안 바뀝니다. 연결과 검색은 몸통만 봅니다.'),
+    h('h3', { style:{ fontSize:'14px', fontWeight:800, marginBottom:'10px' } }, '🔢 업체 고유번호 ',
+      h(InfoPop, { title:'🔢 업체 고유번호' },
+        '머리(자문·급여·노조·기금·대행)는 업무가 바뀌면 따라 바뀌고, 몸통(다섯 자리)은 절대 안 바뀝니다. 연결과 검색은 몸통만 봅니다.\n\n',
+        '번호는 폐업·계약중단에도 줍니다(지난 일도 연결의 일부입니다). 한 번 준 번호는 재사용하지 않습니다 — 합쳐서 없어진 번호도 비워 둡니다.')),
     h('div', { style:{ display:'flex', gap:'7px', flexWrap:'wrap', marginBottom:'12px' } },
       [['번호 있음', numbered.length, '#166534'], ['번호 없음', targets.length, '#d97706'],
        ['겹친 번호', checked.errors.length, '#dc2626'], ['머리 어긋남', checked.warnings.length, '#d97706']
@@ -43089,8 +43073,8 @@ function CoNumberPanel(){
     !targets.length && h('div', { style:{ padding:'14px', background:'#f0fdf4', color:'#166534', borderRadius:'7px',
       fontWeight:700, textAlign:'center', fontSize:'12.5px' } }, '✅ 모든 업체에 고유번호가 있습니다.'),
     preview && h('div', { style:{ overflowX:'auto' } },
-      h('div', { style:{ fontSize:'11.5px', color:'#475569', marginBottom:'6px' } },
-        '오래된 것부터 줍니다 — 다시 돌려도 같은 순서입니다. 몸통은 부여할 때 서버에서 뽑으므로 아래 번호는 보기입니다.'),
+      h('div', { style:{ fontSize:'11.5px', color:'#475569', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px' } },
+        '미리보기 — 번호는 보기입니다', h(InfoPop, { title:'미리보기', text:'오래된 것부터 줍니다 — 다시 돌려도 같은 순서입니다. 몸통은 부여할 때 서버에서 뽑으므로 아래 번호는 보기입니다.' })),
       h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11.5px' } },
         h('tr', null, ['머리', '업체명', '유형', '겸함', '만든 날'].map(function(t){
           return h('th', { key:t, style:{ textAlign:'left', padding:'6px 8px', background:'#f8fafc',
@@ -43107,10 +43091,7 @@ function CoNumberPanel(){
             h('td', { key:'d', style:{ padding:'5px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', color:'#64748b' } },
               (c.createdAt || c.contractStartDate || '').slice(0, 10) || '—')
           ]);
-        }))),
-    h('div', { style:{ fontSize:'11px', color:'#854d0e', background:'#fffbeb', padding:'8px 10px',
-      borderRadius:'6px', marginTop:'12px' } },
-      '번호는 폐업·계약중단에도 줍니다(지난 일도 연결의 일부입니다). 한 번 준 번호는 재사용하지 않습니다 — 합쳐서 없어진 번호도 비워 둡니다.'));
+        }))));
 }
 
 /* ── 사업자번호 칸 점검 (대표 지시 2026-09-03: 「먼저 실제 값을 뽑아 보고 정한다」) ──
@@ -43161,9 +43142,8 @@ function BizNoAuditPanel(){
   (rows || []).forEach(function(r){ counts[r.kind] = (counts[r.kind] || 0) + 1; });
   var picked = (rows || []).filter(function(r){ return r.kind === pick; });
   return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'18px 20px' } },
-    h('h3', { style:{ fontSize:'14px', fontWeight:800, marginBottom:'4px' } }, '🔍 사업자번호 칸 점검'),
-    h('div', { style:{ fontSize:'11.5px', color:'#64748b', marginBottom:'12px' } },
-      '업체의 사업자번호 칸에 «무엇이 들어 있는지»만 갈라 봅니다. 값을 옮기거나 고치지 않습니다.'),
+    h('h3', { style:{ fontSize:'14px', fontWeight:800, marginBottom:'10px' } }, '🔍 사업자번호 칸 점검 ',
+      h(InfoPop, { title:'🔍 사업자번호 칸 점검', text:'업체의 사업자번호 칸에 «무엇이 들어 있는지»만 갈라 봅니다. 값을 옮기거나 고치지 않습니다.\n엑셀로 받아 보시고 정하시면 그때 관리번호를 제 칸으로 옮깁니다.' })),
     h('div', { style:{ display:'flex', gap:'7px', flexWrap:'wrap', marginBottom:'12px' } },
       h('button', { onClick:run, style:{ padding:'8px 16px', background:'#1e40af', color:'#fff', border:'none',
         borderRadius:'6px', fontWeight:700, cursor:'pointer' } }, '🔍 점검하기'),
@@ -43200,10 +43180,7 @@ function BizNoAuditPanel(){
               ]);
             }))),
       picked.length > 200 && h('div', { style:{ padding:'8px', color:'#64748b', fontSize:'11px' } },
-        '화면에는 200곳까지만 그립니다 — 전부는 엑셀로 받으세요.'),
-      h('div', { style:{ fontSize:'11px', color:'#854d0e', background:'#fffbeb', padding:'8px 10px',
-        borderRadius:'6px', marginTop:'10px' } },
-        '이 화면은 아무것도 옮기지 않습니다. 엑셀로 받아 보시고 정하시면 그때 관리번호를 제 칸으로 옮깁니다.')));
+        '화면에는 200곳까지만 그립니다 — 전부는 엑셀로 받으세요.')));
 }
 
 function DataLogMasters(){

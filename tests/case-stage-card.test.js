@@ -169,6 +169,8 @@ function renderCard(stages, savedTypes){
     },
     getCaseStagesAll(){ return stages; },
     BIZ_CASE_STAGE_KEY:'biz_case_stages',
+    // ⓘ 설명 팝업 — 안의 글은 h() 가 texts 로 모은다(2026-09-29 안내문을 ⓘ 로 옮김)
+    InfoPop: function InfoPop(){ return null; },
     h(tag, props){
       const kids = Array.prototype.slice.call(arguments, 2);
       const node = { tag:(typeof tag === 'function' ? (tag.name||'fn') : tag), props:props||{}, kids:kids };
@@ -264,6 +266,8 @@ function renderCardOpen(stages, savedTypes, openCode){
     caseStageColor(k){ return rc.CASE_STAGE_ORGS.find(x => x.v === (k||'')) || { fg:'#475569', bg:'#f1f5f9' }; },
     getCaseStagesAll(){ return stages; },
     BIZ_CASE_STAGE_KEY:'biz_case_stages',
+    // ⓘ 설명 팝업 — 안의 글은 h() 가 texts 로 모은다(2026-09-29 안내문을 ⓘ 로 옮김)
+    InfoPop: function InfoPop(){ return null; },
     h(tag, props){
       const kids = Array.prototype.slice.call(arguments, 2);
       const node = { tag:(typeof tag === 'function' ? (tag.name||'fn') : tag), props:props||{}, kids:kids };
