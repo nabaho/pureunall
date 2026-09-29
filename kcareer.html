@@ -1184,6 +1184,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-hwpxfill.js?v=35"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
+<script src="js/kcareer-hwpxfit.js?v=1"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=20"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
@@ -13317,8 +13318,29 @@ async function rhComposeBytes(){
    포개지지만, 걷은 채 곧바로 저장하면 한글과 웹 편집기가 각자 줄을 다시 잡아 화면이
    달라질 수 있다. 공용 한글 엔진으로 완성본 전체의 줄·쪽 배치를 한 번 다시 계산하고,
    다시 연 파일까지 검사한 뒤 내보낸다. 실패하면 원본 사본을 돌려 문서를 잃지 않는다. */
+/* ★ 채운 글자가 칸보다 길면 장평·크기를 줄여 한 줄에 넣는다 (대표 지시 2026-09-29).
+   ⚠ 줄 배치를 다시 계산하기 «전»이어야 한다 — 바뀐 칸의 표시(줄 정보 없음)가 그때까지만 남는다.
+   ⚠ 실패하면 받은 그대로 돌려준다 — 맞춤 때문에 문서를 잃으면 안 된다. */
+async function rhFitCellsHwpx(u8){
+  if(!window.KcareerHwpxFit) return u8;
+  try{
+    if(typeof JSZip==='undefined') await _ensureJSZip();
+    var zip=await JSZip.loadAsync(u8), hf=zip.file('Contents/header.xml');
+    if(!hf) return u8;
+    var header=await hf.async('string'), n=0;
+    var secs=Object.keys(zip.files).filter(function(f){ return /Contents\/section\d+\.xml$/i.test(f); });
+    for(const f of secs){
+      var r=KcareerHwpxFit.fit(await zip.file(f).async('string'), header);
+      if(r.changed){ zip.file(f, r.section); header=r.header; n+=r.fitted.length; }
+    }
+    if(!n) return u8;
+    zip.file('Contents/header.xml', header);
+    return new Uint8Array(await zip.generateAsync({type:'arraybuffer'}));
+  }catch(e){ console.warn('칸 맞춤',e); return u8; }
+}
 async function rhFinalizeHwpx(bytes){
   var u8=(bytes instanceof Uint8Array)?bytes:new Uint8Array(bytes||0);
+  if(u8.length) u8=await rhFitCellsHwpx(u8);
   if(!u8.length || !window.PureunHwp || typeof PureunHwp.openDoc!=='function') return u8;
   var doc=null, check=null;
   try{
