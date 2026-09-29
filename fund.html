@@ -3150,9 +3150,13 @@ var WREP_STOP=['재직','소속','부서','기간','주소','생년','성명','�
 function _wrepStopRe(){ return '(?:'+WREP_STOP.map(_loose).join('|')+')'; }
 function parseWrepDoc(txt){
   var flat=_flat(txt), o={}, m, STOP=_wrepStopRe();
-  m=flat.match(new RegExp('(?:'+_loose('성명')+'|'+_loose('이름')+')[:：]\\s*([가-힣]{2,5})(?![가-힣])'));
+  /* ★ 사람 칸은 «증명 문구 앞»에서만 읽는다(2026-09-29 실제 과거자료로 확인) — 「위와 같이 재직…증명합니다」 뒤에는
+       «회사» 주소·대표이사가 온다. 거기까지 보면 사람 집 주소 자리에 회사 주소가 들어간다.
+     ★ 쌍점(:)은 없어도 된다 — 표 꼴 재직증명서는 「성 명 | 홍길동」처럼 칸만 나뉘어 쌍점이 없다. */
+  var body=flat.split(new RegExp('(?:'+_loose('위와')+'|'+_loose('상기와')+'|'+_loose('상기인')+')\\s*'))[0]||flat;
+  m=body.match(new RegExp('(?:'+_loose('성명')+'|'+_loose('이름')+')[:：]?\\s*([가-힣]{2,5})(?![가-힣])'));
   if(m) o.wrep_name=m[1];
-  m=flat.match(new RegExp('(?:'+_loose('직위')+'|'+_loose('직급')+'|'+_loose('직책')+')[:：]\\s*(.+?)'
+  m=body.match(new RegExp('(?:'+_loose('직위')+'|'+_loose('직급')+'|'+_loose('직책')+')[:：]?\\s*(.+?)'
     +'(?=\\s*'+STOP+'|$)'));
   if(m){ var t=_cleanBizWord(m[1]); if(t) o.wrep_title=t; }
   m=flat.match(new RegExp(_loose('생년월일')+'[:：]?\\s*(\\d{4})\\s*[년.\\-]\\s*(\\d{1,2})\\s*[월.\\-]\\s*(\\d{1,2})'));
@@ -3167,7 +3171,7 @@ function parseWrepDoc(txt){
   if(m){ var c=_cleanCoName(m[1]); if(c) o.wrep_co=c; }
   /* 집 주소 — 「주소」·「현주소」 이름표 뒤, 다음 이름표 앞까지(2026-09-29 특수관계 점검).
      ⚠ 회사 소재지(「소재지」·「회사 주소」)와 헷갈리지 않게 «사람» 칸 이름표만 본다 — 시·도·군·구가 든 것만 받는다. */
-  m=flat.match(new RegExp('(?:'+_loose('현주소')+'|'+_loose('주소')+')[:：]\\s*(.+?)(?=\\s*'+STOP+'|$)'));
+  m=body.match(new RegExp('(?:'+_loose('현주소')+'|'+_loose('주소')+')[:：]?\\s*(.+?)(?=\\s*'+STOP+'|$)'));
   if(m){ var ad=String(m[1]).replace(/\s+/g,' ').trim(); if(/[가-힣]+(?:시|도|군|구)\s/.test(ad+' ')&&ad.length>=6) o.wrep_addr=ad.slice(0,80); }
   return o;
 }
@@ -10379,6 +10383,121 @@ function pplUrepDoc(sid){
   _siteEditSid=sid||''; _siteDocKeep=null; _siteUrepScope();
   openAlbumPick('dz-siterep','urep');
 }
+/* ══ 📁 재직증명서 여러 장 한꺼번에 읽기 ══ (대표 「순서대로」 2026-09-29 — 특수관계 점검 목업의 단추)
+   과거자료 폴더의 재직증명서(대부분 스캔 PDF, 한 파일에 여러 장이 든 것도 있다)를 한 번에 골라
+   쪽마다 읽고(글이 든 PDF 는 글, 스캔은 한국어 OCR) → 사람을 사업장·역할에 맞춘 뒤 → 확인 표에서 골라 넣는다.
+   ⚠ «빈 칸만» 채운다 — 이미 적어 둔 이름·직위·생년월일·주소는 덮지 않는다(과거 서류라 지금과 다를 수 있다).
+   ⚠ 주민등록번호는 읽지 않는다(parseWrepDoc 가 안 본다). 원본 파일은 올리지 않는다 — 읽은 값만 남긴다.
+   ⚠ 맞추기는 이름 → 회사 차례. 두 곳 이상에 맞으면 고르지 않고 사람에게 묻는다(목록에서 고른다). */
+var WREP_BULK_MAXPG=30, _wrepBulk=null;
+function _pdfPagesText(buf,max){
+  try{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){}
+  return pdfjsLib.getDocument({ isEvalSupported: false, data:_pdfCopy(buf)}).promise.then(function(doc){
+    var n=Math.min(doc.numPages,max), jobs=[];
+    for(var i=1;i<=n;i++) jobs.push(doc.getPage(i).then(function(pg){ return pg.getTextContent().then(function(c){
+      return c.items.map(function(it){ return it.str||''; }).join(' '); }); }));
+    var fin=function(){ try{ doc.destroy(); }catch(e){} };
+    return Promise.all(jobs).then(function(r){ fin(); return {texts:r,total:doc.numPages}; },function(e){ fin(); throw e; });
+  });
+}
+/* 파일 하나 → 쪽마다 글. 스캔 쪽만 OCR 한다(글이 든 쪽은 그대로 — 100% 정확) */
+function _wrepBulkPages(file,onStat){
+  var nm=file.name||'';
+  if(!/\.pdf$/i.test(nm)) return imgCanvas(file,true).then(function(cv){ return ocrCanvases([cv],onStat); })
+    .then(function(t){ return [{label:nm,text:t,ocr:true}]; });
+  return file.arrayBuffer().then(function(ab){ var buf=new Uint8Array(ab);
+    return _pdfPagesText(buf,WREP_BULK_MAXPG).then(function(r){
+      var need=r.texts.some(function(t){ return String(t||'').replace(/\s/g,'').length<40; });
+      if(!need) return r.texts.map(function(t,i){ return {label:nm+(r.texts.length>1?' '+(i+1)+'쪽':''),text:t,ocr:false}; });
+      return pdfPageCanvases(buf,WREP_BULK_MAXPG,true).then(function(cvs){
+        return cvs.reduce(function(p,cv,i){ return p.then(function(acc){
+          if(String(r.texts[i]||'').replace(/\s/g,'').length>=40){ acc.push({label:nm+' '+(i+1)+'쪽',text:r.texts[i],ocr:false}); return acc; }
+          onStat&&onStat(nm+' '+(i+1)+'/'+cvs.length+'쪽 글자 읽는 중…');
+          return ocrCanvases([cv],onStat).then(function(t){ acc.push({label:nm+(cvs.length>1?' '+(i+1)+'쪽':''),text:t,ocr:true}); return acc; });
+        }); }, Promise.resolve([]));
+      });
+    });
+  });
+}
+/* 읽은 한 장 → 어느 사업장의 누구인가 — {sid, side:'w'|'u'|'', why} */
+function _wrepBulkMatch(o,sites){
+  var nm=_relNm(o.wrep_name), co=_coNorm(o.wrep_co||''), live=(sites||[]).filter(function(s){ return s&&s.status!=='closed'; });
+  var hit=function(list,side,why){ return list.length===1?{sid:list[0]._id,side:side,why:why}:(list.length>1?{sid:'',side:'',why:why+' '+list.length+'곳 — 고르세요'}:null); };
+  if(nm){
+    var r=hit(live.filter(function(s){ return _relNm(s.wrep_name)===nm; }),'w','근로자대표 이름이 같음'); if(r) return r;
+    r=hit(live.filter(function(s){ var u=_siteUrep(s); return _relNm(u.name)===nm||String(s.ceo||'').split(/[,，]/).map(_relNm).indexOf(nm)>=0; }),'u','사용자대표·대표자 이름이 같음'); if(r) return r;
+  }
+  if(co){
+    var L=live.filter(function(s){ var c=_coNorm(s.name); return c&&(c===co||c.indexOf(co)>=0||co.indexOf(c)>=0); });
+    if(L.length===1){ var ti=String(o.wrep_title||''); return {sid:L[0]._id, side:/대표/.test(ti)?'u':'w', why:'회사 이름이 같음'+(/대표/.test(ti)?' · 직위가 대표':'')}; }
+    if(L.length>1) return {sid:'',side:'',why:'회사 이름이 '+L.length+'곳과 닮음 — 고르세요'};
+  }
+  return {sid:'',side:'',why:'맞는 사업장을 못 찾음'};
+}
+/* 넣을 칸 — «빈 칸만». 사용자대표가 「대표자와 같음」이면 이름은 안 넣는다(대표자를 따라간다) */
+function _wrepBulkPatch(o,s,side){
+  var p={}, pre=side==='u'?'urep_':'wrep_', u=_siteUrep(s||{});
+  ['name','title','birth','addr'].forEach(function(k){ var v=String(o['wrep_'+k]||'').trim(); if(!v) return;
+    if(side==='u'&&k==='name'&&u.same) return;
+    if(!String((s||{})[pre+k]||'').trim()) p[pre+k]=v; });
+  return p;
+}
+function wrepBulkPick(){
+  var inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='.pdf,.jpg,.jpeg,.png';
+  inp.onchange=function(){ var files=[].slice.call(inp.files||[]); if(files.length) wrepBulkRun(files); };
+  inp.click();
+}
+function wrepBulkRun(files){
+  var fid=S.fundId, sites=_fundSitesId(fid)||[], rows=[], fail=[];
+  showModal('<h2 style="margin:0 0 8px">📁 재직증명서 '+files.length+'개 읽는 중</h2><div id="wbStat" class="muted" style="font-size:12px">준비 중…</div>');
+  var stat=function(t){ var e=$('wbStat'); if(e) e.textContent=t; };
+  files.reduce(function(p,file,fi){ return p.then(function(){
+    stat((fi+1)+'/'+files.length+' · '+file.name);
+    return _wrepBulkPages(file,stat).then(function(pages){ pages.forEach(function(pg){
+      var o=parseWrepDoc(pg.text); if(!o.wrep_name&&!o.wrep_addr) { fail.push(pg.label); return; }
+      var m=_wrepBulkMatch(o,sites); rows.push({label:pg.label,ocr:pg.ocr,o:o,sid:m.sid,side:m.side,why:m.why}); }); })
+      .catch(function(e){ fail.push(file.name+' ('+((e&&e.message)||e)+')'); });
+  }); }, Promise.resolve()).then(function(){
+    if(S.fundId!==fid) return;
+    _wrepBulk={fid:fid,rows:rows,fail:fail}; wrepBulkShow();
+  });
+}
+function wrepBulkShow(){
+  var B=_wrepBulk; if(!B) return;
+  var sites=(_fundSitesId(B.fid)||[]).filter(function(s){ return s&&s.status!=='closed'; }), byId={}; sites.forEach(function(s){ byId[s._id]=s; });
+  var opt=function(sel){ return '<option value="">— 넣지 않음 —</option>'+sites.map(function(s){ return '<option value="'+s._id+'"'+(sel===s._id?' selected':'')+'>'+esc(s.name||'')+'</option>'; }).join(''); };
+  var body=B.rows.map(function(r,i){ var s=byId[r.sid], p=r.sid?_wrepBulkPatch(r.o,s,r.side||'w'):{};
+    return '<tr><td style="font-size:11px">'+esc(r.label)+(r.ocr?' <span class="chip warn" style="font-size:9.5px">OCR</span>':'')+'</td>'
+      +'<td>'+esc(r.o.wrep_name||'—')+'<div class="muted" style="font-size:10.5px">'+esc(r.o.wrep_co||'')+(r.o.wrep_title?' · '+esc(r.o.wrep_title):'')+'</div></td>'
+      +'<td style="font-size:11px">'+(r.o.wrep_addr?esc(_relAddrMask(r.o.wrep_addr)):'<span class="muted">주소 없음</span>')+'</td>'
+      +'<td><select onchange="_wrepBulk.rows['+i+'].sid=this.value;wrepBulkShow()" style="max-width:170px;font-size:11.5px">'+opt(r.sid)+'</select>'
+      +'<div class="muted" style="font-size:10.5px">'+esc(r.why||'')+'</div></td>'
+      +'<td><select onchange="_wrepBulk.rows['+i+'].side=this.value;wrepBulkShow()" style="font-size:11.5px">'
+      +[['w','근로자대표'],['u','사용자대표']].map(function(o){ return '<option value="'+o[0]+'"'+((r.side||'w')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></td>'
+      +'<td style="font-size:11px">'+(Object.keys(p).length?Object.keys(p).map(function(k){ return {name:'이름',title:'직위',birth:'생년월일',addr:'집 주소'}[k.replace(/^[uw]rep_/,'')]; }).join('·')
+        :'<span class="muted">'+(r.sid?'빈 칸 없음':'—')+'</span>')+'</td></tr>'; }).join('');
+  var n=B.rows.filter(function(r){ return r.sid&&Object.keys(_wrepBulkPatch(r.o,byId[r.sid],r.side||'w')).length; }).length;
+  showModal('<div class="row" style="margin:0 0 8px;flex-wrap:wrap"><h2 style="margin:0">📁 재직증명서 '+B.rows.length+'장 읽음</h2>'+hlp('wrep.bulk')
+    +(B.fail.length?'<span class="chip dg" title="'+esc(B.fail.join('\n'))+'">못 읽음 '+B.fail.length+'</span>':'')+'</div>'
+    +'<div style="max-height:56vh;overflow:auto"><table><thead><tr><th>서류</th><th>사람</th><th>집 주소(동까지)</th><th>사업장</th><th>역할</th><th>채울 칸</th></tr></thead><tbody>'
+    +(body||'<tr><td colspan="6" class="muted">읽은 사람이 없습니다</td></tr>')+'</tbody></table></div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px"><button onclick="_wrepBulk=null;closeM()">닫기</button>'
+    +'<button class="primary" onclick="wrepBulkApply()"'+(n?'':' disabled')+'>'+n+'곳 채우기</button></div>',{wide:true});
+}
+function wrepBulkApply(){
+  var B=_wrepBulk; if(!B||B.fid!==S.fundId) return;
+  var sites=_fundSitesId(B.fid)||[], byId={}; sites.forEach(function(s){ byId[s._id]=s; });
+  var up={}, n=0;
+  B.rows.forEach(function(r){ if(!r.sid) return; var cur=Object.assign({},byId[r.sid]||{});
+    Object.keys(up).forEach(function(k){ var q=k.split('/'); if(q[0]===r.sid) cur[q[1]]=up[k]; });      // 같은 사업장에 두 장이면 앞 장이 먼저
+    var p=_wrepBulkPatch(r.o,cur,r.side||'w'); Object.keys(p).forEach(function(k){ up[r.sid+'/'+k]=p[k]; }); if(Object.keys(p).length) n++; });
+  if(!n){ toast('채울 빈 칸이 없습니다','warn'); return; }
+  fbDb.ref(NS+'/sites/'+B.fid).update(up).then(function(){
+    Object.keys(up).forEach(function(k){ var q=k.split('/'); if(S.sites&&S.sites[q[0]]) S.sites[q[0]][q[1]]=up[k]; });
+    _audit(B.fid,'재직증명서 한꺼번에 읽기',n+'곳 · '+Object.keys(up).length+'칸 (빈 칸만)');
+    _wrepBulk=null; closeM(); renderFund(); toast(n+'곳 · '+Object.keys(up).length+'칸을 채웠습니다');
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
 function pplSmeDoc(sid){
   _siteEditSid=sid||''; _siteDocKeep=null; _siteSmeScope();
   openAlbumPick('dz-sitesme','smecert');
@@ -11740,6 +11859,7 @@ function sitesPeopleBody(arr){
     +'<span class="stat"'+(nU<arr.length?' style="color:var(--warn)"':'')+'>사용자대표 '+nU+'/'+arr.length+'</span>'
     +'<span class="stat"'+(nW<arr.length?' style="color:var(--warn)"':'')+'>근로자대표 '+nW+'/'+arr.length+'</span>'
     +'<span style="flex:1"></span>'
+    +'<button onclick="wrepBulkPick()" title="과거자료 폴더의 재직증명서(PDF·사진)를 여러 개 골라 한 번에 읽습니다 — 사람을 사업장에 맞춰 빈 칸(이름·직위·생년월일·집 주소)만 채웁니다">📁 재직증명서 여러 장 읽기</button>'
     +(nU<arr.length
       ? '<button onclick="repSameAll()" title="사용자대표를 «회사 대표자와 같음»으로 한 번에 켭니다 — 이름을 따로 적어 둔 곳은 건드리지 않습니다">👤 사용자대표 = 대표자 (한번에)</button>'
       : '')+hlp('site.reps')+'</div>'
@@ -12140,6 +12260,14 @@ function _fundSites(fid){
   setTimeout(loadAllSites,0);              /* 아직 안 읽었으면 읽어 오고 다시 그린다 */
   return null;
 }
+/* _fundSites 와 같되 사업장 열쇠(_id)를 붙여 준다 — 특수관계 점검·재직증명서 한꺼번에 읽기는 «어느 사업장인가»로
+   묶고 저장한다. ⚠ _fundSites 의 값에는 _id 가 없다(파이어베이스 값 그대로) — 그걸로 묶으면 모두 「undefined」 한 곳이 된다
+   (2026-09-29 #1734 에서 그렇게 나갔다: 시험대에서는 _id 를 손으로 붙여 못 봤다). */
+function _fundSitesId(fid){
+  var m=(S.sitesFor===fid&&S.sites)?S.sites:((_allSites&&_allSites[fid])||null);
+  if(!m){ return _fundSites(fid)?[]:null; }
+  return Object.keys(m).map(function(k){ return Object.assign({_id:k}, m[k]); });
+}
 function setSitePartner(sid,on){
   var _fid=S.fundId;
   fbDb.ref(NS+'/sites/'+_fid+'/'+sid+'/partner').set(on?true:null).then(function(){
@@ -12454,8 +12582,9 @@ function _relAddrKey(a,home){
   return (s.length>=8&&/\d/.test(s))?s:'';
 }
 function _relAddrMask(a){
-  var t=String(a||'').replace(/\([^)]*\)/g,' ').trim().split(/\s+/), out=[];
-  for(var i=0;i<t.length&&out.length<3;i++){ out.push(t[i]); if(/(동|읍|면|리|가)$/.test(t[i])&&i>=1) break; }
+  /* ⚠ 도로명·번지·숫자가 든 조각은 보이지 않는다(2026-09-29 실제 스캔: 「시민로132번길7」까지 보였다) */
+  var t=String(a||'').replace(/\([^)]*\)/g,' ').replace(/,/g,' ').trim().split(/\s+/), out=[];
+  for(var i=0;i<t.length&&out.length<3;i++){ if(/\d/.test(t[i])||/(로|길)$/.test(t[i])) break; out.push(t[i]); if(/(동|읍|면|리|가)$/.test(t[i])&&i>=1) break; }
   return out.join(' ')+(t.length>out.length?' · 이하 가림':'');
 }
 /* 개인사업자 — 사업자등록번호 가운데 두 자리가 81~88 이면 법인이다(국세청 규칙). 모르면 null */
@@ -12535,7 +12664,7 @@ function _relLoad(fid){
     .catch(function(){ if(S._relFor===fid){ S._rel={}; } });
 }
 function relatedPanel(f){
-  var fid=S.fundId, arr=_fundSites(fid);
+  var fid=S.fundId, arr=_fundSitesId(fid);
   if(!arr){ if(S.sitesFor!==fid){ S.sitesFor=fid; fbDb.ref(NS+'/sites/'+fid).once('value').then(function(s){ if(S.sitesFor!==fid) return; S.sites=s.val()||{};
       if(S.view==='fund'&&S.fundId===fid&&S.tab==='subsidy') renderFund(); }).catch(function(){ S.sitesFor=null; }); }
     return '<div class="panel">'+loadingHTML('참여사업장을 읽는 중…')+'</div>'; }
@@ -17255,6 +17384,10 @@ var HELP={
    +'<p><b>기업규모(위 칸)와 다릅니다.</b> 그것은 기업정보함에서 온 값이고, 이것은 <b>확인서에서 읽은</b> 값입니다. 심사에 내는 것은 확인서 쪽입니다.</p>'
    +'<p><b>해마다 새로 뗍니다</b>(보통 4월 1일~다음해 3월 31일). 기간이 지나면 빨간 딱지가 붙습니다 — 지난 확인서를 내면 반려됩니다.</p>'
    +'<p>명부에서 <b>[확인서 지남]</b>으로 거르면 다시 떼야 할 곳만 모아 볼 수 있습니다.</p>'},
+ 'wrep.bulk':{t:'재직증명서 여러 장 읽기',h:'<p>과거자료 폴더의 재직증명서를 <b>한 번에 여러 개</b> 고릅니다(PDF·사진). 한 PDF 에 여러 사람이 든 것도 쪽마다 따로 읽습니다. 글이 든 PDF 는 글을 그대로, 스캔은 한국어 글자 읽기(OCR)로 읽습니다.</p>'
+   +'<p>읽은 사람을 <b>이름 → 회사</b> 차례로 사업장에 맞춥니다. 근로자대표 이름과 같으면 근로자대표, 대표자·사용자대표 이름과 같으면 사용자대표입니다. 두 곳 이상에 맞거나 못 찾으면 표에서 직접 고르세요.</p>'
+   +'<p><b>빈 칸만</b> 채웁니다 — 이미 적어 둔 이름·직위·생년월일·집 주소는 그대로 둡니다(과거 서류라 지금과 다를 수 있습니다). 주민등록번호는 읽지 않고, 원본 파일도 올리지 않습니다. 집 주소는 특수관계 점검에만 씁니다.</p>'
+   +'<p>처음 한 번은 한국어 글자 읽기 도구(약 30MB)를 받습니다 — 그다음부터는 이 PC 에 남아 빨리 읽습니다.</p>'},
  'related.check':{t:'특수관계 사전 점검',h:'<p>참여 사업주 중 <b>둘 이상이 특수관계</b>(법인세법 제2조제12호·시행령 제2조⑤)이면 근로복지공단 지원금을 받지 못합니다. 사업을 <b>분할한 뒤</b> 나뉜 회사끼리 함께 세운 경우도 같습니다(공동근로복지기금 지원사업 운영규정 제7조③).</p>'
    +'<p>특수관계는 겉으로 드러나지 않습니다. 그래서 자료에서 <b>먼저 물어볼 곳</b>을 추립니다 — 같은 대표자 이름 · 같은 집 주소인데 다른 회사 · 한 사람이 두 회사에(생년월일까지 같으면 강하게) · 같은 사무실 주소 · 같은 담당자 연락처.</p>'
    +'<p><b>신호는 판정이 아닙니다.</b> 주주명부(1% 이상 주주)·법인 등기부(임원·분할)·친족(4촌 혈족·3촌 인척·배우자)·출자 30%(직접·2단)·기업집단(계열회사)·같은 공장 안 다른 공동기금을 보고, 신호마다 「관계 없음 / 특수관계 맞음」을, 회사마다 확인표를 남기세요. 회사마다 «특수관계 없음» 확인서를 받아 두는 것이 좋습니다.</p>'
