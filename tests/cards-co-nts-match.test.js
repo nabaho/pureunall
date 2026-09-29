@@ -24,8 +24,8 @@ const { cutFn } = require('./cut-fn');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').split('\r\n').join('\n');
 const 오늘 = '2026-09-28';
-const CO = (key, o) => Object.assign({ key, name:key, bizno:'7508100443', extra:{} }, o || {});
-const 남경 = () => CO('7508100443', { name:'남경테크(주)', extra:{ ceo:'임위빈', openDate:'2016-03-17', company:'남경테크(주)' } });
+const CO = (key, o) => Object.assign({ key, name:key, bizno:'1238100443', extra:{} }, o || {});
+const 가나 = () => CO('1238100443', { name:'가나테크(주)', extra:{ ceo:'홍길동', openDate:'2016-03-17', company:'가나테크(주)' } });
 
 const FNS = ['function coVal(', 'function coSmeDays(', 'function coNtsCeo(', 'function coNtsDay(',
   'function coNtsName(', 'function coNtsNameVariants(', 'function coNtsMatchOf(', 'function coNtsMatchReq(',
@@ -47,7 +47,7 @@ function load(list, extra) {
   return ctx;
 }
 /* 국세청 대역 — 실측한 규칙대로 답한다 (번호·개업일·대표자는 글자 그대로, 상호는 (주)=주식회사·띄어쓰기 무시) */
-const 기록 = { '7508100443': { d:'20160317', p:'임위빈', n:'남경테크(주)' } };
+const 기록 = { '1238100443': { d:'20160317', p:'홍길동', n:'가나테크(주)' } };
 const 상호꼴 = s => String(s).replace(/주식회사|（주）/g, '(주)').replace(/\s/g, '').replace(/\(주\)/g, '') + (/(주식회사|\(주\)|（주）)/.test(s) ? '#법인' : '');
 function 국세청답(b) {
   const r = 기록[b.b_no];
@@ -60,17 +60,17 @@ function 국세청답(b) {
 
 test('★★★ ① 대표자 이름의 띄어쓰기·「외 1명」·공동대표를 다듬는다 — 국세청은 그대로면 틀렸다고 한다', () => {
   const c = load();
-  assert.equal(c.coNtsCeo('임 위빈'), '임위빈');
-  assert.equal(c.coNtsCeo('임위빈 외 1명'), '임위빈');
-  assert.equal(c.coNtsCeo('임위빈, 김철수'), '임위빈', '★ 공동대표는 첫 사람으로 묻는다');
+  assert.equal(c.coNtsCeo('홍 길동'), '홍길동');
+  assert.equal(c.coNtsCeo('홍길동 외 1명'), '홍길동');
+  assert.equal(c.coNtsCeo('홍길동, 김철수'), '홍길동', '★ 공동대표는 첫 사람으로 묻는다');
   assert.equal(c.coNtsCeo(''), '');
 });
 
 test('★★★ ② ㈜는 (주)로 바꾸고, 법인 표시가 없으면 (주)를 붙인 것도 함께 묻는다', () => {
   const c = load();
-  assert.deepEqual(Array.from(c.coNtsNameVariants('㈜남경테크')), ['(주)남경테크']);
-  assert.deepEqual(Array.from(c.coNtsNameVariants('주식회사 남경테크')), ['주식회사 남경테크']);
-  assert.deepEqual(Array.from(c.coNtsNameVariants('남경테크')), ['남경테크', '(주)남경테크'],
+  assert.deepEqual(Array.from(c.coNtsNameVariants('㈜가나테크')), ['(주)가나테크']);
+  assert.deepEqual(Array.from(c.coNtsNameVariants('주식회사 가나테크')), ['주식회사 가나테크']);
+  assert.deepEqual(Array.from(c.coNtsNameVariants('가나테크')), ['가나테크', '(주)가나테크'],
     '★★ 표시가 없는 이름만 보내면 멀쩡한 법인이 「상호 다름」으로 잔뜩 걸린다');
 });
 
@@ -83,41 +83,41 @@ test('★★ 개업일은 여덟 자리로만 보낸다 — 못 읽은 날짜로
 
 test('★★★ 번호·대표자·개업일 셋이 다 있어야 묻는다 — 국세청 필수 칸이다', () => {
   const c = load();
-  assert.equal(c.coNtsMatchReq(CO('a', { extra:{ ceo:'임위빈' } })), null);
-  assert.equal(c.coNtsMatchReq(CO('a', { bizno:'', extra:{ ceo:'임위빈', openDate:'2016-03-17' } })), null);
-  const q = c.coNtsMatchReq(남경());
-  assert.deepEqual(JSON.parse(JSON.stringify(q.core)), { b_no:'7508100443', start_dt:'20160317', p_nm:'임위빈' });
+  assert.equal(c.coNtsMatchReq(CO('a', { extra:{ ceo:'홍길동' } })), null);
+  assert.equal(c.coNtsMatchReq(CO('a', { bizno:'', extra:{ ceo:'홍길동', openDate:'2016-03-17' } })), null);
+  const q = c.coNtsMatchReq(가나());
+  assert.deepEqual(JSON.parse(JSON.stringify(q.core)), { b_no:'1238100443', start_dt:'20160317', p_nm:'홍길동' });
 });
 
 /* ── ③ ④ 답 맞추기 ─────────────────────────────────────────────────── */
 
 test('★★★ ③ 답을 «보낸 값»으로 맞춘다 — 순서를 뒤섞어 와도 제 회사에 앉는다', () => {
-  const 틀린 = CO('9998887776', { bizno:'9998887776', extra:{ ceo:'홍길동', openDate:'2020-01-01' } });
+  const 틀린 = CO('1239887776', { bizno:'1239887776', extra:{ ceo:'홍길동', openDate:'2020-01-01' } });
   const c = load();
-  const reqs = [c.coNtsMatchReq(남경()), c.coNtsMatchReq(틀린)];
+  const reqs = [c.coNtsMatchReq(가나()), c.coNtsMatchReq(틀린)];
   const rows = c.coNtsMatchBody(reqs).businesses.map(국세청답).reverse();
   const got = Object.fromEntries(Array.from(c.coNtsMatchJudge(reqs, rows)).map(h => [h.key, h.match]));
-  assert.deepEqual(got, { '7508100443':'ok', '9998887776':'bad' });
+  assert.deepEqual(got, { '1238100443':'ok', '1239887776':'bad' });
 });
 
 test('★★★ 개업일 하루·대표자 한 글자만 달라도 ✗, 상호만 다르면 △ — 실측 그대로', () => {
   const c = load();
   const 판정 = o => { const q = c.coNtsMatchReq(o); return c.coNtsMatchJudge([q], c.coNtsMatchBody([q]).businesses.map(국세청답))[0].match; };
-  assert.equal(판정(CO('7508100443', { extra:{ ceo:'임위빈', openDate:'2016-03-18', company:'남경테크(주)' } })), 'bad');
-  assert.equal(판정(CO('7508100443', { extra:{ ceo:'임위민', openDate:'2016-03-17', company:'남경테크(주)' } })), 'bad');
-  assert.equal(판정(CO('7508100443', { extra:{ ceo:'임위빈', openDate:'2016-03-17', company:'남경택(주)' } })), 'name');
-  assert.equal(판정(CO('7508100443', { extra:{ ceo:'임 위빈', openDate:'2016-03-17', company:'㈜남경테크' } })), 'ok',
+  assert.equal(판정(CO('1238100443', { extra:{ ceo:'홍길동', openDate:'2016-03-18', company:'가나테크(주)' } })), 'bad');
+  assert.equal(판정(CO('1238100443', { extra:{ ceo:'홍길둥', openDate:'2016-03-17', company:'가나테크(주)' } })), 'bad');
+  assert.equal(판정(CO('1238100443', { extra:{ ceo:'홍길동', openDate:'2016-03-17', company:'가나텍(주)' } })), 'name');
+  assert.equal(판정(CO('1238100443', { extra:{ ceo:'홍 길동', openDate:'2016-03-17', company:'㈜가나테크' } })), 'ok',
     '★★ 우리 쪽 표기 탓(띄어쓰기·㈜)으로 걸리면 안 된다');
-  assert.equal(판정(CO('7508100443', { name:'남경테크', extra:{ ceo:'임위빈', openDate:'2016-03-17' } })), 'ok',
+  assert.equal(판정(CO('1238100443', { name:'가나테크', extra:{ ceo:'홍길동', openDate:'2016-03-17' } })), 'ok',
     '★★ 법인 표시 없는 이름도 (주)를 붙여 맞으면 맞다');
 });
 
 test('★★★ ④ 답이 안 온 회사는 «판정하지 않는다» — 물어본 척 안 한다', () => {
   const c = load();
-  const q = c.coNtsMatchReq(남경());
+  const q = c.coNtsMatchReq(가나());
   assert.equal(c.coNtsMatchJudge([q], []).length, 0);
   /* 핵심 줄은 맞았는데 상호 줄 답이 안 왔다 — 「상호 다름」으로 단정하지 않는다 */
-  const q2 = c.coNtsMatchReq(CO('7508100443', { name:'남경테크', extra:{ ceo:'임위빈', openDate:'2016-03-17' } }));
+  const q2 = c.coNtsMatchReq(CO('1238100443', { name:'가나테크', extra:{ ceo:'홍길동', openDate:'2016-03-17' } }));
   const rows = c.coNtsMatchBody([q2]).businesses.map(국세청답).filter(r => !r.request_param.b_nm);
   assert.equal(c.coNtsMatchJudge([q2], rows).length, 0);
 });
@@ -145,25 +145,25 @@ test('★★ 판정·날짜·«무엇을 견줬나»를 함께 쓴다 — 날짜
 
 test('★★★ ⑥ 견준 뒤 등록증 값을 고치면 옛 판정이 «안 보인다» — 고친 값은 아직 안 견줬다', () => {
   const c = load();
-  const o = 남경();
+  const o = 가나();
   o.extra.ntsMatch = 'bad'; o.extra.ntsMatchAt = 오늘; o.extra.ntsMatchOf = c.coNtsMatchOf(o);
   assert.equal(c.coNtsMatchState(o), 'bad');
   assert.ok(c.coNtsMatchNeeds(o));
-  o.extra.ceo = '임위민';
+  o.extra.ceo = '홍길둥';
   assert.equal(c.coNtsMatchState(o), '', '★★★ 고쳤는데 빨간 딱지가 그대로면 고친 보람이 없다');
   assert.equal(c.coNtsMatchChipHtml(o), '');
 });
 
 test('★★ 딱지 말이 뜻과 맞는다 — ✓ 초록 · ✗ 빨강 · △ 노랑', () => {
   const c = load();
-  const 딱지 = m => { const o = 남경(); o.extra.ntsMatch = m; o.extra.ntsMatchOf = c.coNtsMatchOf(o); return c.coNtsMatchChipHtml(o); };
+  const 딱지 = m => { const o = 가나(); o.extra.ntsMatch = m; o.extra.ntsMatchOf = c.coNtsMatchOf(o); return c.coNtsMatchChipHtml(o); };
   assert.match(딱지('ok'), /✓ 등록증 일치/); assert.match(딱지('ok'), /#166534/);
   assert.match(딱지('bad'), /✗ 대표자·개업일 다름/); assert.match(딱지('bad'), /#991b1b/);
   assert.match(딱지('name'), /△ 상호 다름/); assert.match(딱지('name'), /#854d0e/);
 });
 
 test('★★ 최근 30일 안에 견준 곳은 전체 대조에서 뺀다 · 값이 바뀐 곳은 다시 넣는다', () => {
-  const 최근 = 남경();
+  const 최근 = 가나();
   const c = load([최근]);
   최근.extra.ntsMatch = 'ok'; 최근.extra.ntsMatchAt = '2026-09-20'; 최근.extra.ntsMatchOf = c.coNtsMatchOf(최근);
   assert.equal(c.coNtsMatchTargets(오늘).length, 0);
@@ -174,7 +174,7 @@ test('★★ 최근 30일 안에 견준 곳은 전체 대조에서 뺀다 · 값
 /* ── ⑦ 밖으로 나가는 일 — 실제로 돌린다 ─────────────────────────────── */
 
 function 대조해보기(예스, 열쇠) {
-  const list = [남경()];
+  const list = [가나()];
   const calls = { asked:0, msg:'', fetched:[], wrote:[], toast:[] };
   const c = load(list, {
     PU_CFG: 열쇠 === '' ? {} : { ntsKey:'KEY' },
@@ -211,7 +211,7 @@ test('★★ 「예」면 진위확인으로 묻고 판정을 적는다', async 
   const c = await 대조해보기(true);
   assert.equal(c.fetched.length, 1);
   assert.match(c.fetched[0].url, /\/validate\?serviceKey=/);
-  assert.equal(c.wrote[0]['coInfo/7508100443/ntsMatch'], 'ok');
+  assert.equal(c.wrote[0]['coInfo/1238100443/ntsMatch'], 'ok');
 });
 
 test('★★★ 훑기(상태조회)는 «여전히» 번호만 보낸다 — 대조를 거기 섞지 않았다', () => {
@@ -237,10 +237,10 @@ test('★★★ ⑨ 새 등록증 저장·안 본 회사 열기에 «자동» �
 
 test('★★ 자동 물음은 열쇠가 없으면 «밖으로 안 나간다»', async () => {
   let fetched = 0;
-  const c = load([남경()], { PU_CFG:{}, Store:{ mode:'firebase' }, fetch: () => { fetched++; return Promise.reject(); } });
+  const c = load([가나()], { PU_CFG:{}, Store:{ mode:'firebase' }, fetch: () => { fetched++; return Promise.reject(); } });
   vm.runInContext(['NTS_STATUS_URL'].map(n => SRC.match(new RegExp('^const ' + n + ' = [^\\n]*$', 'm'))[0].replace('const ', 'var ')).join('\n')
     + '\nasync ' + cutFn(SRC, 'function coNtsAutoOne('), c);
-  assert.equal(await c.coNtsAutoOne('7508100443'), null);
+  assert.equal(await c.coNtsAutoOne('1238100443'), null);
   assert.equal(fetched, 0);
 });
 

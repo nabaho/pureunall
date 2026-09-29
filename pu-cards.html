@@ -31456,8 +31456,8 @@ async function coAskNts(key){
    ⚠⚠ 상태조회(번호만 나간다)와 «다른 일»이다 — 여기서는 대표자 이름·개업일·상호가 나간다.
      그래서 전체 대조는 따로 묻고(coNtsMatchAsk), 훑기(coNtsSweepRun)에 섞지 않는다.
 
-   실측 (2026-09-28, 남경테크·충서로 시험)
-   · 개업일 하루(0317→0318)·대표자 한 글자(임위빈→임위민)만 달라도 「확인할 수 없음」
+   실측 (2026-09-28, 실제 거래처 두 곳으로 시험 — 이름은 적지 않는다)
+   · 개업일 하루(0317→0318)·대표자 한 글자만 달라도 「확인할 수 없음」
    · 대표자는 띄어쓰기·「외 1명」이 붙어도 틀린다 → 보내기 전에 다듬는다(coNtsCeo)
    · 상호는 (주)=주식회사, 앞뒤·띄어쓰기를 가리지 않는다. 단 «㈜ 한 글자»는 못 알아보고,
      법인 표시를 «빼면» 틀린다 → ㈜는 (주)로 바꾸고, 표시가 없으면 (주)를 붙인 것도 함께 묻는다.
@@ -31596,8 +31596,9 @@ async function coNtsAutoOne(key){
   }
   if(!Object.keys(upd).length) return null;
   try{ await Store.db.ref(DB_ROOT).update(upd); }catch(_){ return null; }
-  coListBust(); renderCoSoon();
-  if(state.coPick === key) openCoDetailPanel(key, true);
+  /* ⚠ 여기서 coListBust·다시 그리기를 «안» 부른다. 적은 값은 coInfo 구독(loadCoInfo)으로
+     되돌아와 거기서 한 번 조립·그린다 — 여기서 또 부르면 회사 목록을 두 번 조립한다
+     (대표 화면 2026-09-29 「회사 목록을 4번 다시 조립했습니다」). */
   const bits = [];
   if(word) bits.push(coNtsCls(word) === 'none' ? '국세청에 없는 번호' : word);
   if(m) bits.push(m === 'ok' ? '등록증 내용 일치' : m === 'bad' ? '대표자·개업일이 국세청과 다름' : '상호가 국세청과 다름');
@@ -31622,7 +31623,7 @@ function coNtsAutoAfterSave(it){
   const no = digits(it.bizno);
   setTimeout(function(){
     try{
-      coListBust();
+      /* ⚠ coListBust 를 부르지 않는다 — 저장한 등록증은 items 구독이 이미 목록에 넣었다 */
       const o = (coList() || []).find(x => digits(x.bizno || '') === no);
       /* 오늘 이미 묻고 등록증 값도 그대로면 또 묻지 않는다(메모 한 줄 고칠 때마다 나가지 않게) */
       if(!o || (coVal(o, 'ntsAt') === todayYmd() && (coNtsMatchState(o) || !coNtsMatchReq(o)))) return;

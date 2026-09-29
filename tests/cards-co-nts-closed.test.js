@@ -20,7 +20,7 @@ const { cutFn } = require('./cut-fn');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').split('\r\n').join('\n');
 const 오늘 = '2026-09-28';
-const 황산 = (extra) => ({ key:'3128144012', name:'황산건설 (주)', bizno:'3128144012',
+const 가나건설 = (extra) => ({ key:'1238144012', name:'가나건설 (주)', bizno:'1238144012',
   extra: Object.assign({ ntsState:'폐업자', ntsAt:오늘, ntsEndDt:'2022-08-09' }, extra || {}) });
 
 function load(list, extra) {
@@ -55,8 +55,8 @@ test('★★★ ① 국세청 폐업일을 받아 «날짜 꼴»로 적는다 ·
   const c = load();
   assert.equal(c.coNtsEnd({ end_dt:'20220809' }), '2022-08-09');
   assert.equal(c.coNtsEnd({ end_dt:'' }), '');
-  const got = Array.from(c.coNtsMatch([{ key:'가', bizno:'3128144012' }, { key:'나', bizno:'1238620021' }],
-    [{ b_no:'3128144012', b_stt:'폐업자', end_dt:'20220809' }, { b_no:'1238620021', b_stt:'계속사업자', end_dt:'' }]));
+  const got = Array.from(c.coNtsMatch([{ key:'가', bizno:'1238144012' }, { key:'나', bizno:'1238620021' }],
+    [{ b_no:'1238144012', b_stt:'폐업자', end_dt:'20220809' }, { b_no:'1238620021', b_stt:'계속사업자', end_dt:'' }]));
   const upd = c.coNtsWrites(got, 오늘)[0];
   assert.equal(upd['coInfo/가/ntsEndDt'], '2022-08-09');
   assert.ok(!('coInfo/나/ntsEndDt' in upd), '★ 계속사업자에 빈 폐업일 칸을 만들지 않는다');
@@ -64,11 +64,11 @@ test('★★★ ① 국세청 폐업일을 받아 «날짜 꼴»로 적는다 ·
 
 test('★★ 딱지에 폐업일이 보인다 — 「몇 해 전 폐업」이면 번호가 바뀐 것이다', () => {
   const c = load();
-  assert.match(c.coNtsChipHtml(황산()), /폐업자 · 2022-08-09 폐업 · 2026-09-28 확인/);
+  assert.match(c.coNtsChipHtml(가나건설()), /폐업자 · 2022-08-09 폐업 · 2026-09-28 확인/);
 });
 
 test('★★★ ② 폐업일 없이 받아 둔 폐업 줄은 30일 안이어도 «한 번 더» 묻는다', () => {
-  const 옛줄 = 황산({ ntsEndDt:'' }), 새줄 = 황산(), 계속 = { key:'k', bizno:'1238620021', extra:{ ntsState:'계속사업자', ntsAt:오늘 } };
+  const 옛줄 = 가나건설({ ntsEndDt:'' }), 새줄 = 가나건설(), 계속 = { key:'k', bizno:'1238620021', extra:{ ntsState:'계속사업자', ntsAt:오늘 } };
   const c = load([옛줄, 새줄, 계속]);
   assert.deepEqual(Array.from(c.coNtsTargets(오늘)), [옛줄], '★ 날짜를 받은 줄과 계속사업자는 다시 안 묻는다');
 });
@@ -77,54 +77,54 @@ test('★★★ ② 폐업일 없이 받아 둔 폐업 줄은 30일 안이어도
 
 test('★★★ ③ 검산이 안 맞거나 열 자리가 아니면 «국세청에 묻지도 않는다»', async () => {
   for (const v of ['123-45-67890', '31281']) {
-    const c = load([황산()], { prompt: () => v });
-    await c.coNtsNewNoAsk('3128144012');
+    const c = load([가나건설()], { prompt: () => v });
+    await c.coNtsNewNoAsk('1238144012');
     assert.equal(c._fetched.length, 0, v);
     assert.equal(c._saved.length, 0, v);
   }
 });
 
 test('★★★ ③ 새 번호도 폐업이면 «적지 않는다» — 다른 폐업 번호로 폐업을 덮지 않는다', async () => {
-  const c = load([황산()], { prompt: () => '312-81-99999', _답:'폐업자' });
-  await c.coNtsNewNoAsk('3128144012');
+  const c = load([가나건설()], { prompt: () => '123-81-99999', _답:'폐업자' });
+  await c.coNtsNewNoAsk('1238144012');
   assert.equal(c._fetched.length, 1);
   assert.equal(c._saved.length, 0);
   assert.ok(c._toasts.some(t => /적지 않았습니다/.test(t)));
 });
 
 test('★★★ ④ 계속사업자면 적는다 — 적는 칸은 nts* 뿐이고 등록증 번호(bizno)는 안 건드린다', async () => {
-  const c = load([황산()], { prompt: () => '312-81-99999' });
-  await c.coNtsNewNoAsk('3128144012');
+  const c = load([가나건설()], { prompt: () => '123-81-99999' });
+  await c.coNtsNewNoAsk('1238144012');
   assert.equal(c._saved.length, 1);
   const p = c._saved[0].patch;
   assert.deepEqual(Object.keys(p).sort(), ['ntsNewAt', 'ntsNewNo', 'ntsNewState']);
-  assert.equal(p.ntsNewNo, '3128199999');
-  assert.equal(c._saved[0].k, '3128144012', '★★★ 열쇠(옛 번호)는 그대로 — 바꾸면 회사가 둘로 갈린다');
+  assert.equal(p.ntsNewNo, '1238199999');
+  assert.equal(c._saved[0].k, '1238144012', '★★★ 열쇠(옛 번호)는 그대로 — 바꾸면 회사가 둘로 갈린다');
   assert.ok(!/state\.items|Store\.put|\.bizno\s*=/.test(cutFn(SRC, 'function coNtsNewNoAsk(')),
     '★★★ 새 번호 넣기가 등록증 카드를 고치면 안 된다');
 });
 
 test('★★ 「그만두기」를 누르면 아무것도 안 적는다', async () => {
-  const c = load([황산()], { prompt: () => '312-81-99999', confirm: () => false });
-  await c.coNtsNewNoAsk('3128144012');
+  const c = load([가나건설()], { prompt: () => '123-81-99999', confirm: () => false });
+  await c.coNtsNewNoAsk('1238144012');
   assert.equal(c._saved.length, 0);
 });
 
 /* ── ⑤ ⑥ 처리됨 ────────────────────────────────────────────────────── */
 
 test('★★★ ⑤ 「영업 중 확인함」은 그때의 국세청 답(상태|폐업일)과 함께 적는다', () => {
-  const c = load([황산()]);
-  c.coNtsOkMark('3128144012');
+  const c = load([가나건설()]);
+  c.coNtsOkMark('1238144012');
   const p = c._saved[0].patch;
   assert.equal(p.ntsOkAt, 오늘);
   assert.equal(p.ntsOkOf, '폐업자|2022-08-09');
 });
 
 test('★★★ ⑥ 처리한 곳은 목록·거르개에서 빠지고, 국세청 답이 바뀌면 다시 올라온다', () => {
-  const 확인함 = 황산({ ntsOkAt:오늘, ntsOkOf:'폐업자|2022-08-09' });
-  const 새번호 = 황산({ ntsNewNo:'3128199999', ntsNewState:'계속사업자' });
-  const 새번호도폐업 = 황산({ ntsNewNo:'3128199999', ntsNewState:'폐업자' });
-  const 답바뀜 = 황산({ ntsOkAt:'2026-01-01', ntsOkOf:'휴업자|' });
+  const 확인함 = 가나건설({ ntsOkAt:오늘, ntsOkOf:'폐업자|2022-08-09' });
+  const 새번호 = 가나건설({ ntsNewNo:'1238199999', ntsNewState:'계속사업자' });
+  const 새번호도폐업 = 가나건설({ ntsNewNo:'1238199999', ntsNewState:'폐업자' });
+  const 답바뀜 = 가나건설({ ntsOkAt:'2026-01-01', ntsOkOf:'휴업자|' });
   const c = load([확인함, 새번호, 새번호도폐업, 답바뀜]);
   assert.equal(c.coNtsHandled(확인함), 'ok');
   assert.equal(c.coNtsHandled(새번호), 'newno');
@@ -137,8 +137,8 @@ test('★★★ ⑥ 처리한 곳은 목록·거르개에서 빠지고, 국세�
 
 test('★★ 처리한 곳의 딱지는 «무엇으로 처리했는지» 말한다', () => {
   const c = load();
-  assert.match(c.coNtsChipHtml(황산({ ntsNewNo:'3128199999', ntsNewState:'계속사업자' })), /새 번호 312-81-99999 · 계속사업자/);
-  assert.match(c.coNtsChipHtml(황산({ ntsOkAt:오늘, ntsOkBy:'권형하', ntsOkOf:'폐업자|2022-08-09' })), /영업 중 · 2026-09-28 권형하 확인/);
+  assert.match(c.coNtsChipHtml(가나건설({ ntsNewNo:'1238199999', ntsNewState:'계속사업자' })), /새 번호 123-81-99999 · 계속사업자/);
+  assert.match(c.coNtsChipHtml(가나건설({ ntsOkAt:오늘, ntsOkBy:'김담당', ntsOkOf:'폐업자|2022-08-09' })), /영업 중 · 2026-09-28 김담당 확인/);
 });
 
 test('★★ 두 단추가 국세청 창의 줄과 「확인 필요」에 다 있다', () => {
