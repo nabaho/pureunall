@@ -35072,22 +35072,19 @@ function BizTypeCard(props){
 
 // ── 사건 심급·단계 관리 (업무유형 화면의 형제 칸) ──
 // 유형 카드(BizTypeCard)는 [약어 + 이름] 한 줄짜리라 단계에 필요한 칸(기관종류·적용유형·법정기한·확인함)을
-// 억지로 넣으면 업체·컨설팅·기금·기타 카드까지 같이 틀어진다. 그래서 같은 화면 아래에 표 모양 형제 칸으로 뒀다.
-// ── 단계 목록을 계열로 묶어 보여주기 위한 도우미 ──────────────
-// 9개가 한 줄로 늘어서 있으면 지노위와 진정·신고가 구분되지 않는다.
-// 기관 종류(orgKind)는 단계 자체에 저장된 값이라, 사건유형 코드가 바뀌어도 묶음이 흐트러지지 않는다.
+// 억지로 넣으면 업체·컨설팅·기금·기타 카드까지 같이 틀어진다. 그래서 같은 화면 아래에 형제 칸으로 뒀다.
+// ── 세 칸 정리 (대표 지시 2026-09-29 「세로로 노동위 산재 노동청으로 열을 3으로 나눠서」) ──
+// 9줄을 한 줄씩 늘어놓으니 오른쪽 절반이 비고, 「법원」이 행정소송 하나 때문에 따로 떨어져
+// «무엇 다음에 무엇»이 안 보였다. 그래서 세 칸(노동위·산재·노동청)으로 세로로 세우고,
+// 행정소송(법원)은 따로 칸을 두지 않고 노동위·산재 칸 맨 끝에 «함께 쓰는 단계»로 붙인다(자료는 하나).
+// 기관 종류(orgKind)는 단계 자체에 저장된 값이라, 사건유형 코드가 바뀌어도 칸이 흐트러지지 않는다.
 var CASE_STAGE_LINES = [
-  { key:'lrc',   name:'노동위원회 계열',
-    flow:'지노위 → 중노위 → 행정소송',        fg:'#1e40af', bg:'#eff6ff' },
-  { key:'court', name:'법원',
-    flow:'노동위원회·산재 계열의 마지막 단계', fg:'#991b1b', bg:'#fef2f2' },
-  { key:'wc',    name:'산재 계열',
-    flow:'요양신청 → 심사청구 → 재심사청구 → 행정소송', fg:'#166534', bg:'#f0fdf4' },
-  { key:'labor', name:'노동청 계열',
-    flow:'진정·신고 → 조사·수사 → 확정·지급',  fg:'#475569', bg:'#f8fafc' },
-  { key:'',      name:'그 밖의 단계',
-    flow:'',                                  fg:'#475569', bg:'#f8fafc' }
+  { key:'lrc',   name:'노동위원회', tail:'court', fg:'#1e40af', bg:'#eff6ff' },
+  { key:'wc',    name:'산재',       tail:'court', fg:'#166534', bg:'#f0fdf4' },
+  { key:'labor', name:'노동청',     tail:'',      fg:'#475569', bg:'#f8fafc' }
 ];
+// 세 칸 어디에도 안 들어가는 단계(기관 없음·모르는 기관) — 사라지지 않게 칸 아래 한 줄로
+var CASE_STAGE_ETC = { key:'', name:'그 밖의 단계', fg:'#475569', bg:'#f8fafc' };
 // 사건유형 코드를 한글 이름으로. 저장된 유형에 없으면 시드 이름이라도 쓴다 —
 // 화면에 case-dismiss 같은 영문 코드가 나오면 무슨 유형인지 알 수 없다.
 function caseTypeLabel(code, types){
@@ -35113,43 +35110,57 @@ function caseStageDueText(x){
   var from = x.dueFrom === 'result' ? '판정일' : x.dueFrom === 'notice' ? '송달일' : '';
   return from ? (from + ' + ' + d + '일') : (d + '일 (기산 없음)');
 }
-// 계열별로 묶는다. 순서는 CASE_STAGE_LINES 순서, 같은 묶음 안은 sortOrder 순.
+// 세 칸으로 나눈다. 칸 순서는 CASE_STAGE_LINES, 칸 안은 sortOrder 순.
+// 법원 단계는 tail:'court' 인 칸마다 맨 끝에 shared:true 로 붙는다 — 같은 단계를 두 칸이 함께 쓴다.
+// 돌려주는 것: { cols:[{ line, items:[{x, shared}], types, anyAll }], etc:[단계…] }
+//   · 세 칸은 비어 있어도 늘 돌려준다(칸이 사라지면 「+ 추가」 자리도 사라진다)
+//   · types/anyAll 은 그 칸 «고유» 단계만 센다(행정소송의 적용 유형이 노동위 머리에 섞이지 않게)
 function caseStageGrouped(list){
-  var byKey = {};
+  var byKey = { court:[] };
   CASE_STAGE_LINES.forEach(function(L){ byKey[L.key] = []; });
+  var etc = [];
+  function bySort(a, b){ return (a.sortOrder||0)-(b.sortOrder||0); }
   (list || []).forEach(function(x){
     if(!x) return;
     var k = String(x.orgKind || '');
-    if(!(k in byKey)) k = '';                 // 모르는 기관은 '그 밖의 단계'로
-    byKey[k].push(x);
+    if(k && (k in byKey)) byKey[k].push(x);
+    else etc.push(x);                         // 모르는 기관은 '그 밖의 단계'로 — 사라지지 않는다
   });
-  var out = [];
-  CASE_STAGE_LINES.forEach(function(L){
-    var items = byKey[L.key].slice().sort(function(a,b){ return (a.sortOrder||0)-(b.sortOrder||0); });
-    if(items.length === 0) return;            // 빈 묶음은 그리지 않는다
-    // 이 묶음이 어떤 사건유형에 걸리는지 (머리에 읽기용으로만 보여준다)
+  var court = byKey.court.slice().sort(bySort);
+  var cols = CASE_STAGE_LINES.map(function(L){
+    var own = byKey[L.key].slice().sort(bySort);
     var seen = {}, types = [], anyAll = false;
-    items.forEach(function(x){
+    own.forEach(function(x){
       var ft = x.forTypes || [];
       if(ft.length === 0){ anyAll = true; return; }
       ft.forEach(function(c){ if(!seen[c]){ seen[c] = 1; types.push(c); } });
     });
-    out.push({ line:L, items:items, types:types, anyAll:anyAll });
+    var items = own.map(function(x){ return { x:x, shared:false }; });
+    if(L.tail === 'court') court.forEach(function(x){ items.push({ x:x, shared:true }); });
+    return { line:L, items:items, types:types, anyAll:anyAll };
   });
-  return out;
+  return { cols:cols, etc:etc.sort(bySort) };
 }
-window.caseTypeLabel     = caseTypeLabel;
-window.caseTypeMissing   = caseTypeMissing;
-window.caseStageDueText  = caseStageDueText;
-window.caseStageGrouped  = caseStageGrouped;
+// 법정 기한이 있는데 아직 대표가 확인하지 않은 단계
+function caseStageUnverified(list){
+  return (list || []).filter(function(x){
+    return x && !x.hidden && (parseInt(x.dueDays, 10) || 0) > 0 && !x.dueVerified;
+  });
+}
+window.caseTypeLabel       = caseTypeLabel;
+window.caseTypeMissing     = caseTypeMissing;
+window.caseStageDueText    = caseStageDueText;
+window.caseStageGrouped    = caseStageGrouped;
+window.caseStageUnverified = caseStageUnverified;
 
 function CaseStageCard(){
   var st = useState(function(){ return getCaseStagesAll(true); });
   var list = st[0]; var setList = st[1];
   var ni = useState(''); var nameIn = ni[0]; var setNameIn = ni[1];
   var si = useState(''); var shortIn = si[0]; var setShortIn = si[1];
-  var oi = useState('lrc'); var orgIn = oi[0]; var setOrgIn = oi[1];
-  // ✏ 를 누른 단계만 편집 칸을 펼친다 — 아홉 줄이 모두 열려 있으면 무엇이 무엇인지 안 보인다
+  // 「+ 추가」를 누른 칸(기관 종류). 비어 있으면 추가 칸이 닫혀 있다 — 늘 펼쳐 두지 않는다
+  var oi = useState(''); var orgIn = oi[0]; var setOrgIn = oi[1];
+  // 누른 단계만 아래에 편집 칸을 펼친다
   var ec = useState(''); var editCode = ec[0]; var setEditCode = ec[1];
   var caseTypes = (typeof getCaseTypes === 'function') ? (getCaseTypes() || []) : [];
   var smallS = { padding:'3px 6px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11px', fontFamily:'inherit' };
@@ -35178,7 +35189,7 @@ function CaseStageCard(){
     // 대표가 직접 넣은 단계는 본인이 확인한 값이므로 dueVerified:true (시드 숫자만 확인 대기)
     persist(list.concat([{ code:code, name:nm, short:sh, orgKind:orgIn, forTypes:[],
       dueDays:0, dueFrom:'', dueNote:'', dueVerified:true, sortOrder:nextOrder }]));
-    setNameIn(''); setShortIn(''); showToast('추가됨');
+    setNameIn(''); setShortIn(''); setOrgIn(''); setEditCode(code); showToast('추가됨 — 아래에서 기한을 넣으세요');
   }
   function del(code){
     var item = list.find(function(x){ return x.code===code; }) || {};
@@ -35195,172 +35206,211 @@ function CaseStageCard(){
     showConfirm('"'+(item.name||code)+'" 단계를 삭제할까요?\n(쓰는 사건 없음)', { title:'단계 삭제', confirmText:'삭제', danger:true }).then(function(okv){
       if(!okv) return;
       persist(list.filter(function(x){ return x.code !== code; }));
+      setEditCode('');
       showToast('🗑 삭제됨');
     });
   }
-  function reseed(){ persist(BIZ_CASE_STAGE_SEED.slice()); showToast('기본 단계로 복원됨'); }
+  function reseed(){ persist(BIZ_CASE_STAGE_SEED.slice()); setEditCode(''); showToast('기본 단계로 복원됨'); }
+
+  var grouped = caseStageGrouped(list);
+  var unv = caseStageUnverified(list);
+  var editing = editCode ? list.find(function(x){ return x.code === editCode; }) : null;
+
+  // ── 단계 한 줄 (약어 + 이름만) — 누르면 아래 편집 칸이 열린다
+  function stageRow(it, ix, colKey){
+    var x = it.x;
+    var col = caseStageColor(x.orgKind);
+    var open = (editCode === x.code);
+    return h('div', { key:colKey + ':' + x.code,
+      onClick:function(){ setEditCode(open ? '' : x.code); },
+      title: it.shared ? '노동위·산재가 함께 쓰는 단계 — 한 곳에서 고치면 두 칸 모두 바뀝니다' : (open ? '접기' : '눌러서 고치기'),
+      style:{ display:'flex', alignItems:'center', gap:'7px', padding:'6px 9px', borderRadius:'7px', cursor:'pointer',
+        whiteSpace:'nowrap', overflow:'hidden',
+        border: open ? '1px solid #2563eb' : (it.shared ? '1px dashed #cbd5e1' : '1px solid #e2e8f0'),
+        background: open ? '#eff6ff' : '#fff', opacity: x.hidden ? .55 : 1 } },
+      h('span', { style:{ fontSize:'10px', color:'#94a3b8', width:'10px', textAlign:'right', fontFamily:'monospace', flexShrink:0 } }, ix+1),
+      h('span', { style:{ background:col.bg, color:col.fg, fontSize:'10.5px', fontWeight:700, flexShrink:0,
+        padding:'2px 7px', borderRadius:'10px', minWidth:'40px', textAlign:'center' } }, x.short || x.name),
+      h('span', { style:{ fontSize:'12px', fontWeight:600, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis' } }, x.name || x.code),
+      x.hidden ? h('span', { style:{ fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600, flexShrink:0 } }, '숨김') : null
+    );
+  }
+  // ── 단계 사이 ↓ : 앞 단계 결정을 받은 날부터 다음 단계를 신청할 기한
+  function dueGap(x, key){
+    var dd = parseInt(x.dueDays, 10) || 0;
+    var un = (dd > 0 && !x.dueVerified);
+    return h('div', { key:key,
+      className: un ? 'erp-tip' : '',
+      'data-tip': un ? '초기값입니다 — 위 단계를 눌러 「법정 기한 확인함」을 켜 주세요' : '',
+      style:{ display:'flex', alignItems:'center', gap:'6px', padding:'2px 0 2px 20px', fontSize:'11px', whiteSpace:'nowrap',
+        color: dd > 0 ? '#475569' : '#94a3b8' } },
+      h('span', { style:{ color:'#cbd5e1', fontSize:'13px', lineHeight:1 } }, '↓'),
+      h('span', { style:{ fontWeight: dd > 0 ? 600 : 400 } }, caseStageDueText(x)),
+      un ? h('span', { style:{ color:'#d97706', fontWeight:700 } }, '⚠') : null
+    );
+  }
+  function typeChips(G){
+    var L = G.line;
+    return h('span', { style:{ display:'flex', gap:'3px', alignItems:'center', overflow:'hidden', minWidth:0 } },
+      G.anyAll ? h('span', { style:{ fontSize:'10px', background:'#fff', color:L.fg, borderRadius:'8px', padding:'1px 6px', fontWeight:600, whiteSpace:'nowrap' } }, '전체 유형') : null,
+      G.types.map(function(tc){
+        var miss = caseTypeMissing(tc, caseTypes);
+        return h('span', { key:tc,
+          className: miss ? 'erp-tip' : '',
+          'data-tip': miss ? '지금 사건유형 목록에 없는 코드입니다 — 이 유형으로는 걸러지지 않습니다' : '',
+          style:{ fontSize:'10px', background:'#fff', color: miss ? '#d97706' : L.fg,
+            border: miss ? '1px dashed #fbbf24' : '1px solid transparent',
+            borderRadius:'8px', padding:'1px 6px', fontWeight:600, whiteSpace:'nowrap' } },
+          caseTypeLabel(tc, caseTypes) + (miss ? ' ⚠' : ''));
+      })
+    );
+  }
+  function addRow(L){
+    return h('div', { style:{ display:'flex', gap:'4px', alignItems:'center', marginTop:'6px' } },
+      h('input', { type:'text', value:shortIn, onChange:function(e){ setShortIn(e.target.value.slice(0,4)); }, placeholder:'약어', maxLength:4,
+        style:Object.assign({}, smallS, { width:'52px', textAlign:'center' }) }),
+      h('input', { type:'text', value:nameIn, onChange:function(e){ setNameIn(e.target.value); },
+        onKeyDown:function(e){ if(e.key === 'Enter') add(); if(e.key === 'Escape') setOrgIn(''); },
+        placeholder:'새 단계 이름', autoFocus:true,
+        style:Object.assign({}, smallS, { flex:'1 1 80px', minWidth:0 }) }),
+      h('button', { onClick:add,
+        style:{ background:'#2563eb', color:'#fff', padding:'4px 10px', borderRadius:'4px', fontSize:'10.5px', fontWeight:700, border:0, cursor:'pointer', whiteSpace:'nowrap' } }, '추가')
+    );
+  }
 
   return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden', marginTop:'8px' } },
-    h('div', { style:{ background:'#eff6ff', color:'#1e40af', padding:'6px 10px', fontSize:'11.5px', fontWeight:700, display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
+    h('div', { style:{ background:'#eff6ff', color:'#1e40af', padding:'6px 10px', fontSize:'11.5px', fontWeight:700, display:'flex', alignItems:'center', gap:'6px', whiteSpace:'nowrap' } },
       h('span', null, '⚖'),
       h('span', null, '사건 심급·단계'),
       h('span', { style:{ fontWeight:600, fontSize:'12px' } }, '(' + list.length + ')'),
-      // 안내 세 줄은 ⓘ 팝업으로 (대표 지시 2026-09-29)
+      // 안내는 ⓘ 팝업으로 (대표 지시 2026-09-29) — 세 칸 정리에 맞춰 고쳐 적었다
       h(InfoPop, { title:'⚖ 사건 심급·단계' },
-        h('div', null, '· 사건 화면의 ⚖ 심급·단계에서 고르는 항목입니다. 기관 계열로 묶어 두었습니다.'),
-        h('div', null, '· 기한 일수는 ', h('b', null, '아직 확인되지 않은 초기값'), '입니다. 확인하신 뒤 ✏ 를 열어 ', h('b', null, '법정 기한 확인함'),
+        h('div', null, '· 사건 화면의 ⚖ 심급·단계에서 고르는 항목입니다. 노동위원회·산재·노동청 세 칸으로 나눴고, 행정소송은 노동위·산재 칸 끝에 함께 씁니다.'),
+        h('div', null, '· 단계 사이 ↓ 옆은 결정을 받은 날부터 다음 단계를 신청할 기한(달력일)입니다.'),
+        h('div', null, '· 기한 일수는 ', h('b', null, '아직 확인되지 않은 초기값'), '입니다. 단계를 눌러 ', h('b', null, '법정 기한 확인함'),
           ' 을 켜 주세요 — 사건 화면의 「법정 기한 — 확인 후 사용」 표시가 그 단계에서 사라집니다.'),
-        h('div', null, '· 고칠 때는 ✏ 를 누르세요. 적용 유형을 비우면 모든 사건유형에서 고를 수 있습니다.')),
+        h('div', null, '· 고칠 때는 단계를 누르세요. 적용 유형을 비우면 모든 사건유형에서 고를 수 있습니다.')),
       h('div', { style:{ flex:1 } }),
+      unv.length
+        ? h('button', { onClick:function(){ setEditCode(unv[0].code); },
+            className:'erp-tip', 'data-tip':'기한 일수는 아직 확인되지 않은 초기값입니다 — 누르면 첫 단계부터 열립니다. 「법정 기한 확인함」을 켜면 사건 화면의 「법정 기한 — 확인 후 사용」 표시가 사라집니다',
+            style:{ fontSize:'10.5px', padding:'2px 8px', background:'#fffbeb', color:'#d97706', border:'1px solid #fde68a', borderRadius:'4px', fontWeight:700, cursor:'pointer', flexShrink:0 } },
+            '⚠ 기한 ' + unv.length + '개 확인 전')
+        : null,
       h('button', { onClick:reseed, className:'erp-tip', 'data-tip':'⚠️ 기본 단계로 되돌림 — 고친 값이 사라집니다',
-        style:{ fontSize:'10.5px', padding:'2px 8px', background:'transparent', color:'#1e40af', border:'1px solid #1e40af', borderRadius:'4px', opacity:.6, cursor:'pointer' } }, '복원')
+        style:{ fontSize:'10.5px', padding:'2px 8px', background:'transparent', color:'#1e40af', border:'1px solid #1e40af', borderRadius:'4px', opacity:.6, cursor:'pointer', flexShrink:0 } }, '복원')
     ),
-    h('div', { style:{ padding:'6px' } },
-      list.length === 0
-        ? h('div', { style:{ color:'#94a3b8', fontSize:'11px', textAlign:'center', padding:'10px' } }, '항목 없음')
-        : caseStageGrouped(list).map(function(G){
-            var L = G.line;
-            return h('div', { key:L.key||'etc',
-              style:{ border:'1px solid #e2e8f0', borderRadius:'7px', overflow:'hidden', marginBottom:'7px' } },
-              // ── 계열 머리: 이름 · 흐름 · 이 계열이 걸리는 사건유형(읽기용)
-              h('div', { style:{ background:L.bg, color:L.fg, padding:'5px 9px', display:'flex',
-                alignItems:'center', gap:'7px', flexWrap:'wrap', borderBottom:'1px solid #e2e8f0' } },
-                h('span', { style:{ fontSize:'11.5px', fontWeight:700 } }, L.name),
-                h('span', { style:{ fontSize:'10.5px', opacity:.8 } }, '(' + G.items.length + ')'),
-                L.flow ? h('span', { style:{ fontSize:'10.5px', opacity:.8 } }, L.flow) : null,
-                h('div', { style:{ flex:1 } }),
-                h('span', { style:{ display:'flex', gap:'3px', flexWrap:'wrap', alignItems:'center' } },
-                  G.anyAll ? h('span', { style:{ fontSize:'10px', background:'#fff', color:L.fg, borderRadius:'8px', padding:'1px 7px', fontWeight:600 } }, '전체 유형') : null,
-                  G.types.map(function(tc){
-                    var miss = caseTypeMissing(tc, caseTypes);
-                    return h('span', { key:tc,
-                      className: miss ? 'erp-tip' : '',
-                      'data-tip': miss ? '지금 사건유형 목록에 없는 코드입니다 — 이 유형으로는 걸러지지 않습니다' : '',
-                      style:{ fontSize:'10px', background:'#fff', color: miss ? '#d97706' : L.fg,
-                        border: miss ? '1px dashed #fbbf24' : '1px solid transparent',
-                        borderRadius:'8px', padding:'1px 7px', fontWeight:600, whiteSpace:'nowrap' } },
-                      caseTypeLabel(tc, caseTypes) + (miss ? ' ⚠' : ''));
-                  })
-                )
-              ),
-              G.items.map(function(x, ix){
-                var col = caseStageColor(x.orgKind);
-                var open = (editCode === x.code);
-                var dd = parseInt(x.dueDays, 10) || 0;
-                var unv = (dd > 0 && !x.dueVerified);
-                return h('div', { key:x.code,
-                  style:{ borderTop: ix ? '1px solid #f8fafc' : 'none',
-                    background: open ? '#f8fafc' : (x.hidden ? '#f8fafc' : '#fff'),
-                    opacity: x.hidden ? .6 : 1, padding:'5px 9px' } },
-                  // ── 접힌 한 줄
-                  h('div', { style:{ display:'flex', alignItems:'center', gap:'7px', flexWrap:'wrap' } },
-                    h('span', { style:{ fontSize:'10px', color:'#94a3b8', width:'12px', textAlign:'right', fontFamily:'monospace' } }, ix+1),
-                    h('span', { style:{ background:col.bg, color:col.fg, fontSize:'10.5px', fontWeight:700,
-                      padding:'2px 7px', borderRadius:'10px', whiteSpace:'nowrap', minWidth:'40px', textAlign:'center' } }, x.short || x.name),
-                    h('span', { style:{ fontSize:'12px', fontWeight:600, color:'#1e293b', minWidth:'96px' } }, x.name || x.code),
-                    h('span', { style:{ fontSize:'11px', color: dd > 0 ? '#475569' : '#94a3b8', whiteSpace:'nowrap' } },
-                      caseStageDueText(x)),
-                    unv
-                      ? h('span', { className:'erp-tip', 'data-tip':'초기값입니다 — 확인하신 뒤 ✏ 를 열어 「법정 기한 확인함」을 켜 주세요',
-                          style:{ fontSize:'10px', fontWeight:700, color:'#d97706', background:'#fffbeb',
-                            border:'1px solid #fde68a', borderRadius:'8px', padding:'1px 6px', whiteSpace:'nowrap' } }, '확인 필요')
-                      : (dd > 0
-                          ? h('span', { style:{ fontSize:'10px', fontWeight:700, color:'#16a34a', whiteSpace:'nowrap' } }, '확인함')
-                          : null),
-                    x.hidden ? h('span', { style:{ fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } }, '숨김') : null,
-                    h('span', { style:{ flex:1, minWidth:'80px', fontSize:'10.5px', color:'#94a3b8',
-                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, x.dueNote || ''),
-                    h('button', { onClick:function(){ setEditCode(open ? '' : x.code); },
-                      title: open ? '접기' : '고치기',
-                      style:{ background: open ? '#1e40af' : '#f8fafc', color: open ? '#fff' : '#475569',
-                        border:'1px solid ' + (open ? '#1e40af' : '#cbd5e1'), borderRadius:'5px',
-                        width:'22px', height:'22px', fontSize:'11px', cursor:'pointer', flexShrink:0 } }, open ? '▲' : '✏'),
-                    x.hidden
-                      ? h('button', { onClick:function(){ upd(x.code, { hidden:false }); showToast('👁 다시 표시됨'); }, title:'다시 표시',
-                          style:{ background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', borderRadius:'5px', width:'22px', height:'22px', fontSize:'11px', cursor:'pointer', flexShrink:0 } }, '👁')
-                      : h('button', { onClick:function(){ del(x.code); }, title:'삭제',
-                          style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', width:'22px', height:'22px', fontSize:'12px', cursor:'pointer', flexShrink:0 } }, '×')
-                  ),
-                  // ── ✏ 를 눌렀을 때만 열리는 편집 칸
-                  open ? h('div', { style:{ marginTop:'6px', paddingTop:'6px', borderTop:'1px dashed #cbd5e1',
-                    display:'flex', flexDirection:'column', gap:'5px' } },
-                    h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' } },
-                      h('span', { style:{ fontSize:'10.5px', color:'#64748b', fontWeight:600, width:'52px' } }, '이름'),
-                      h('input', { type:'text', value:x.name||'', onChange:function(e){ upd(x.code, { name:e.target.value }); }, placeholder:'단계 이름',
-                        style:Object.assign({}, smallS, { flex:'1 1 140px', minWidth:'110px' }) }),
-                      h('input', { type:'text', value:x.short||'', onChange:function(e){ upd(x.code, { short:e.target.value.slice(0,4) }); }, placeholder:'약어', maxLength:4,
-                        style:Object.assign({}, smallS, { width:'56px', textAlign:'center' }) }),
-                      h('select', { value:x.orgKind||'', onChange:function(e){ upd(x.code, { orgKind:e.target.value }); }, style:smallS },
-                        CASE_STAGE_ORGS.map(function(o){ return h('option', { key:o.v||'none', value:o.v }, o.label); }))
-                    ),
-                    h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' } },
-                      h('span', { style:{ fontSize:'10.5px', color:'#64748b', fontWeight:600, width:'52px' } }, '기한'),
-                      h('select', { value:x.dueFrom||'', onChange:function(e){ upd(x.code, { dueFrom:e.target.value }); }, style:smallS },
-                        h('option', { value:'' }, '기산 없음'),
-                        h('option', { value:'notice' }, '송달일부터'),
-                        h('option', { value:'result' }, '판정일부터')),
-                      h('input', { type:'number', min:0, value:x.dueDays||0,
-                        onChange:function(e){ upd(x.code, { dueDays: parseInt(e.target.value,10) || 0 }); },
-                        style:Object.assign({}, smallS, { width:'58px', textAlign:'right', fontFamily:'monospace' }) }),
-                      h('span', { style:{ fontSize:'10.5px', color:'#64748b' } }, '일'),
-                      h('label', { title:'확인하면 사건 화면의 「법정 기한 — 확인 후 사용」 표시가 사라집니다',
-                        style:{ display:'inline-flex', alignItems:'center', gap:'4px', fontSize:'10.5px', fontWeight:700,
-                          cursor:'pointer', color: x.dueVerified ? '#16a34a' : '#d97706' } },
-                        h('input', { type:'checkbox', checked:!!x.dueVerified,
-                          onChange:function(e){ upd(x.code, { dueVerified:e.target.checked }); },
-                          style:{ margin:0, width:'13px', height:'13px', cursor:'pointer' } }),
-                        h('span', null, '법정 기한 확인함')),
-                      h('span', { style:{ fontSize:'10.5px', color:'#94a3b8' } }, '달력일 기준')
-                    ),
-                    h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' } },
-                      h('span', { style:{ fontSize:'10.5px', color:'#64748b', fontWeight:600, width:'52px' } }, '설명'),
-                      h('input', { type:'text', value:x.dueNote||'', onChange:function(e){ upd(x.code, { dueNote:e.target.value }); },
-                        placeholder:'예: 판정서 송달받은 날부터 10일 이내 재심 신청',
-                        style:Object.assign({}, smallS, { flex:'1 1 240px', minWidth:'160px' }) })
-                    ),
-                    h('div', { style:{ display:'flex', alignItems:'center', gap:'4px', flexWrap:'wrap' } },
-                      h('span', { style:{ fontSize:'10.5px', color:'#64748b', fontWeight:600, width:'52px' } }, '적용 유형'),
-                      (x.forTypes||[]).length === 0
-                        ? h('span', { style:{ fontSize:'10.5px', color:'#94a3b8' } }, '전체 (모든 사건유형에서 고를 수 있음)')
-                        : (x.forTypes||[]).map(function(tc){
-                            var miss = caseTypeMissing(tc, caseTypes);
-                            return h('span', { key:tc,
-                              className: miss ? 'erp-tip' : '',
-                              'data-tip': miss ? '지금 사건유형 목록에 없는 코드입니다 — 이 유형으로는 걸러지지 않습니다' : '',
-                              style:{ display:'inline-flex', alignItems:'center', gap:'3px',
-                                background: miss ? '#fffbeb' : '#eff6ff', color: miss ? '#d97706' : '#1e40af',
-                                border: miss ? '1px dashed #fbbf24' : '1px solid transparent',
-                                fontSize:'10.5px', fontWeight:600, padding:'1px 4px 1px 8px', borderRadius:'10px' } },
-                              h('span', null, caseTypeLabel(tc, caseTypes) + (miss ? ' ⚠' : '')),
-                              h('button', { onClick:function(){ upd(x.code, { forTypes:(x.forTypes||[]).filter(function(v){ return v !== tc; }) }); },
-                                style:{ width:'15px', height:'15px', borderRadius:'50%', border:0, background: miss ? '#fbbf24' : '#60a5fa', color:'#fff', fontSize:'9px', cursor:'pointer' } }, '×'));
-                          }),
-                      h('select', { value:'',
-                        onChange:function(e){ var v = e.target.value; if(!v) return;
-                          if((x.forTypes||[]).indexOf(v) < 0) upd(x.code, { forTypes:(x.forTypes||[]).concat([v]) });
-                          e.target.value = ''; },
-                        style:Object.assign({}, smallS, { fontSize:'10.5px' }) },
-                        h('option', { value:'' }, '+ 유형'),
-                        caseTypes.filter(function(t){ return (x.forTypes||[]).indexOf(t.code) < 0; })
-                          .map(function(t){ return h('option', { key:t.code, value:t.code }, t.name); }))
-                    )
-                  ) : null
-                );
-              })
-            );
-          })
+    // ── 세 칸: 노동위원회 · 산재 · 노동청
+    h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))' } },
+      grouped.cols.map(function(G, ci){
+        var L = G.line;
+        var adding = (orgIn === L.key);
+        return h('div', { key:L.key, style:{ borderLeft: ci ? '1px solid #e2e8f0' : 'none', minWidth:0 } },
+          h('div', { style:{ background:L.bg, color:L.fg, padding:'6px 10px', display:'flex', alignItems:'center', gap:'6px',
+            borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', minWidth:0 } },
+            h('span', { style:{ fontSize:'12.5px', fontWeight:700, flexShrink:0 } }, L.name),
+            typeChips(G),
+            h('div', { style:{ flex:1 } }),
+            h('button', { onClick:function(){ setOrgIn(adding ? '' : L.key); setNameIn(''); setShortIn(''); },
+              style:{ fontSize:'10.5px', fontWeight:700, color:L.fg, background:'transparent', border:0, cursor:'pointer', flexShrink:0, opacity:.8 } },
+              adding ? '닫기' : '+ 추가')
+          ),
+          h('div', { style:{ padding:'8px 10px 10px' } },
+            G.items.length === 0
+              ? h('div', { style:{ color:'#94a3b8', fontSize:'11px', padding:'6px 0' } }, '단계 없음')
+              : G.items.map(function(it, ix){
+                  var last = (ix === G.items.length - 1);
+                  var dd = parseInt(it.x.dueDays, 10) || 0;
+                  return [
+                    stageRow(it, ix, L.key),
+                    (!last || dd > 0) ? dueGap(it.x, L.key + ':gap:' + it.x.code) : null
+                  ];
+                }),
+            adding ? addRow(L) : null
+          )
+        );
+      })
     ),
-    h('div', { style:{ padding:'6px', borderTop:'1px solid #f8fafc', background:'#f8fafc', display:'flex', gap:'4px', flexWrap:'wrap', alignItems:'center' } },
-      h('input', { type:'text', value:shortIn, onChange:function(e){ setShortIn(e.target.value.slice(0,4)); }, placeholder:'약어', maxLength:4,
-        style:Object.assign({}, smallS, { width:'60px', textAlign:'center' }) }),
-      h('input', { type:'text', value:nameIn, onChange:function(e){ setNameIn(e.target.value); },
-        onKeyDown:function(e){ if(e.key === 'Enter') add(); }, placeholder:'새 단계 이름 (예: 재심사청구)',
-        style:Object.assign({}, smallS, { flex:'1 1 160px' }) }),
-      h('select', { value:orgIn, onChange:function(e){ setOrgIn(e.target.value); }, style:smallS },
-        CASE_STAGE_ORGS.map(function(o){ return h('option', { key:o.v||'none', value:o.v }, o.label); })),
-      h('button', { onClick:add,
-        style:{ background:'#2563eb', color:'#fff', padding:'4px 14px', borderRadius:'4px', fontSize:'10.5px', fontWeight:700 } }, '+ 추가')
-    )
+    // ── 세 칸 어디에도 안 드는 단계 (기관 없음) — 사라지지 않게 한 줄로
+    grouped.etc.length
+      ? h('div', { style:{ borderTop:'1px solid #e2e8f0', padding:'6px 10px', display:'flex', alignItems:'center', gap:'6px', whiteSpace:'nowrap', overflow:'hidden' } },
+          h('span', { style:{ fontSize:'11px', fontWeight:700, color:CASE_STAGE_ETC.fg, flexShrink:0 } }, CASE_STAGE_ETC.name),
+          grouped.etc.map(function(x, ix){ return h('span', { key:x.code, style:{ flex:'0 1 180px', minWidth:0 } }, stageRow({ x:x, shared:false }, ix, 'etc')); })
+        )
+      : null,
+    // ── 누른 단계 하나만 아래에 편집 칸
+    editing ? (function(x){
+      var col = caseStageColor(x.orgKind);
+      return h('div', { style:{ borderTop:'2px solid #2563eb', background:'#f8fafc', padding:'8px 10px', display:'flex', flexDirection:'column', gap:'5px' } },
+        h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' } },
+          h('span', { style:{ background:col.bg, color:col.fg, fontSize:'10.5px', fontWeight:700, padding:'2px 7px', borderRadius:'10px' } }, x.short || x.name),
+          h('span', { style:{ fontSize:'10.5px', color:'#64748b', fontWeight:600, width:'40px', textAlign:'right' } }, '이름'),
+          h('input', { type:'text', value:x.name||'', onChange:function(e){ upd(x.code, { name:e.target.value }); }, placeholder:'단계 이름',
+            style:Object.assign({}, smallS, { flex:'1 1 140px', minWidth:'110px' }) }),
+          h('input', { type:'text', value:x.short||'', onChange:function(e){ upd(x.code, { short:e.target.value.slice(0,4) }); }, placeholder:'약어', maxLength:4,
+            style:Object.assign({}, smallS, { width:'56px', textAlign:'center' }) }),
+          h('select', { value:x.orgKind||'', onChange:function(e){ upd(x.code, { orgKind:e.target.value }); }, style:smallS },
+            CASE_STAGE_ORGS.map(function(o){ return h('option', { key:o.v||'none', value:o.v }, o.label); })),
+          h('div', { style:{ flex:1 } }),
+          x.hidden
+            ? h('button', { onClick:function(){ upd(x.code, { hidden:false }); showToast('👁 다시 표시됨'); },
+                style:{ background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', borderRadius:'5px', padding:'3px 9px', fontSize:'10.5px', cursor:'pointer' } }, '👁 다시 표시')
+            : h('button', { onClick:function(){ del(x.code); },
+                style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'5px', padding:'3px 9px', fontSize:'10.5px', cursor:'pointer' } }, '× 삭제'),
+          h('button', { onClick:function(){ setEditCode(''); },
+            style:{ background:'#2563eb', color:'#fff', border:0, borderRadius:'5px', padding:'4px 12px', fontSize:'10.5px', fontWeight:700, cursor:'pointer' } }, '닫기')
+        ),
+        h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' } },
+          h('span', { style:{ fontSize:'10.5px', color:'#64748b', fontWeight:600, width:'96px', textAlign:'right' } }, '다음 단계 기한'),
+          h('select', { value:x.dueFrom||'', onChange:function(e){ upd(x.code, { dueFrom:e.target.value }); }, style:smallS },
+            h('option', { value:'' }, '기산 없음'),
+            h('option', { value:'notice' }, '송달일부터'),
+            h('option', { value:'result' }, '판정일부터')),
+          h('input', { type:'number', min:0, value:x.dueDays||0,
+            onChange:function(e){ upd(x.code, { dueDays: parseInt(e.target.value,10) || 0 }); },
+            style:Object.assign({}, smallS, { width:'58px', textAlign:'right', fontFamily:'monospace' }) }),
+          h('span', { style:{ fontSize:'10.5px', color:'#64748b' } }, '일'),
+          h('label', { title:'확인하면 사건 화면의 「법정 기한 — 확인 후 사용」 표시가 사라집니다',
+            style:{ display:'inline-flex', alignItems:'center', gap:'4px', fontSize:'10.5px', fontWeight:700,
+              cursor:'pointer', color: x.dueVerified ? '#16a34a' : '#d97706' } },
+            h('input', { type:'checkbox', checked:!!x.dueVerified,
+              onChange:function(e){ upd(x.code, { dueVerified:e.target.checked }); },
+              style:{ margin:0, width:'13px', height:'13px', cursor:'pointer' } }),
+            h('span', null, '법정 기한 확인함')),
+          h('span', { style:{ fontSize:'10.5px', color:'#94a3b8' } }, '달력일 기준'),
+          h('input', { type:'text', value:x.dueNote||'', onChange:function(e){ upd(x.code, { dueNote:e.target.value }); },
+            placeholder:'설명 (예: 판정서 송달받은 날부터 10일 이내 재심 신청)',
+            style:Object.assign({}, smallS, { flex:'1 1 240px', minWidth:'160px' }) })
+        ),
+        h('div', { style:{ display:'flex', alignItems:'center', gap:'4px', flexWrap:'wrap' } },
+          h('span', { style:{ fontSize:'10.5px', color:'#64748b', fontWeight:600, width:'96px', textAlign:'right' } }, '적용 유형'),
+          (x.forTypes||[]).length === 0
+            ? h('span', { style:{ fontSize:'10.5px', color:'#94a3b8' } }, '전체 (모든 사건유형에서 고를 수 있음)')
+            : (x.forTypes||[]).map(function(tc){
+                var miss = caseTypeMissing(tc, caseTypes);
+                return h('span', { key:tc,
+                  className: miss ? 'erp-tip' : '',
+                  'data-tip': miss ? '지금 사건유형 목록에 없는 코드입니다 — 이 유형으로는 걸러지지 않습니다' : '',
+                  style:{ display:'inline-flex', alignItems:'center', gap:'3px',
+                    background: miss ? '#fffbeb' : '#eff6ff', color: miss ? '#d97706' : '#1e40af',
+                    border: miss ? '1px dashed #fbbf24' : '1px solid transparent',
+                    fontSize:'10.5px', fontWeight:600, padding:'1px 4px 1px 8px', borderRadius:'10px' } },
+                  h('span', null, caseTypeLabel(tc, caseTypes) + (miss ? ' ⚠' : '')),
+                  h('button', { onClick:function(){ upd(x.code, { forTypes:(x.forTypes||[]).filter(function(v){ return v !== tc; }) }); },
+                    style:{ width:'15px', height:'15px', borderRadius:'50%', border:0, background: miss ? '#fbbf24' : '#60a5fa', color:'#fff', fontSize:'9px', cursor:'pointer' } }, '×'));
+              }),
+          h('select', { value:'',
+            onChange:function(e){ var v = e.target.value; if(!v) return;
+              if((x.forTypes||[]).indexOf(v) < 0) upd(x.code, { forTypes:(x.forTypes||[]).concat([v]) });
+              e.target.value = ''; },
+            style:Object.assign({}, smallS, { fontSize:'10.5px' }) },
+            h('option', { value:'' }, '+ 유형'),
+            caseTypes.filter(function(t){ return (x.forTypes||[]).indexOf(t.code) < 0; })
+              .map(function(t){ return h('option', { key:t.code, value:t.code }, t.name); })),
+          h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', marginLeft:'4px' } }, '비우면 모든 사건유형에서 고를 수 있습니다')
+        )
+      );
+    })(editing) : null
   );
 }
 
