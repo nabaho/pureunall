@@ -91,3 +91,37 @@ test('⑥ 목록 ↔ 미리보기 폭을 마우스로 — 한도가 있고, 기�
   assert.match(SRC, /grid-template-columns:minmax\(0,1fr\) 10px var\(--ds-pv,320px\)/);
   assert.match(SRC, /#dbTools\{[^}]*min-width:0/, '검색 줄이 줄어들지 않으면 화면 밖으로 밀린다');
 });
+
+/* ══ 같은 서류 판 묶기 (대표 승인 2026-09-29 목업) ══ */
+vm.runInContext(SRC.match(/var _dsVer=[^\n]*\n/)[0] + ['function dsDupKey(', 'function dsDupClusters(', 'function dsDupSummary('].map(떼기).join('\n'), ctx);
+const 판줄 = (id, 사람, when, extra) => Object.assign({ id, org: '천안어린이꿈누리터', kind: '일반 이력서',
+  genName: '2027년 천안어린이꿈누리터 제안서 평가위원 후보자 등록 신청서_' + 사람 + ' 2026. 09. 29.hwpx', savedAt: when }, extra || {});
+
+test('⑦ 같은 기관·제목·사람은 한 묶음 — 최신 판이 맨 앞 · 사람이 다르면 다른 서류', () => {
+  ctx.__x = [판줄('a', '권형하', '2026-09-28T10:00'), 판줄('b', '권형하', '2026-09-29T10:00'), 판줄('c', '박한별', '2026-09-29T11:00')];
+  const c = JSON.parse(JSON.stringify(vm.runInContext('dsDupClusters(__x,{})', ctx)));
+  const 권 = c.find((x) => x.T.사람 === '권형하');
+  assert.deepEqual(권.list.map((r) => r.id), ['b', 'a'], '★ 최신 판이 맨 앞이어야 한다');
+  assert.equal(c.length, 2, '★★ 사람이 다르면 같은 서류가 아니다 — 박한별 것을 권형하 판으로 묶으면 지워진다');
+});
+
+test('⑦ 정리 대상 — 이전 판만 · 제출기록이 있는 판은 뺀다', () => {
+  ctx.__x = [판줄('a', '권형하', '2026-09-27T10:00', { submits: [{ date: '2026-09-27', method: '메일' }] }),
+             판줄('b', '권형하', '2026-09-28T10:00'), 판줄('c', '권형하', '2026-09-29T10:00'), 판줄('d', '박한별', '2026-09-29T10:00')];
+  const s = JSON.parse(JSON.stringify(vm.runInContext('dsDupSummary(__x,{})', ctx)));
+  assert.equal(s.clusters, 1);
+  assert.equal(s.old, 2);
+  assert.equal(s.kept, 1, '★★ 제출기록이 있는 판을 지우면 무엇을 냈는지가 사라진다');
+  assert.deepEqual(s.ids, ['b'], '★★★ 최신 판·제출한 판·다른 사람 것은 남아야 한다');
+});
+
+test('⑦ 정리·골라 삭제는 «한 길»(_docTrashIds) — 한 번 묻고 휴지통으로', () => {
+  assert.match(떼기('function dsDupClean('), /_docTrashIds\(domain, s\.ids/);
+  assert.match(떼기('function docSelDel('), /_docTrashIds\(domain, ids/);
+  const fn = 떼기('function _docTrashIds(');
+  assert.match(fn, /kcAskDelete\(/, '묻지 않고 지우면 안 된다');
+  assert.match(fn, /kcTrashPut\(/, '휴지통을 거쳐야 되살릴 수 있다');
+  const 줄 = 떼기('function renderDocStore(');
+  assert.match(줄, /dsDupSummary\(rows, D\)/);
+  assert.match(줄, /판 \$\{판수\} \$\{펼침\?'▾':'▸'\}/);
+});
