@@ -71,6 +71,10 @@
        ⚠ 맨 「우편번호」·「계좌번호」는 넣지 않는다 — 기관 서식에서는 «내는 사람»(강사료·수당 받을
          개인 계좌, 집 주소 우편번호)일 때가 대부분이다. «법인»이라 밝힌 칸만 법인 것으로 본다. */
     { re: /^(법인우편번호|본점우편번호|사무소우편번호|사업장우편번호)$/, key: 'firmZip' },
+    /* ★ 사람 우편번호 (대표 지시 2026-09-29 「주소에 모두 우편번호 필요하다」).
+       맨 「우편번호」는 «주소와 같은 곳»이다 — 서식의 「주소」가 집이면 집 우편번호(fields.zip 이 짝을 맞춘다). */
+    { re: /^(우편번호|우편|자택우편번호|집우편번호|현주소우편번호|주소우편번호)$/, key: 'zip' },
+    { re: /^(회사우편번호|사무실우편번호|직장우편번호|근무지우편번호|근무처우편번호)$/, key: 'zipWork' },
     { re: /^(법인계좌|법인계좌번호|법인통장|법인명의계좌|법인명의계좌번호)$/, key: 'firmAcct' }
   ];
   /* 칸 안에 「자택:______ 직장:______」처럼 라벨과 빈자리가 함께 있는 양식이 많다.
@@ -109,7 +113,7 @@
      ⚠ rrn(주민등록번호)은 «없다» — 사람이 손으로 고를 때만 나간다(secrets). */
   var FIELD_FILL_KEYS = ['name', 'nameHanja', 'nameEng', 'birth', 'gender',
                          'phone', 'phoneWork', 'phoneHome', 'fax',
-                         'email', 'emailWork', 'addr', 'addrWork',
+                         'email', 'emailWork', 'addr', 'addrWork', 'zip', 'zipWork',
                          'org', 'dept', 'title', 'orgTitle', 'license',
                          'military', 'militaryBranch', 'militaryRank', 'militaryPeriod',
                          'veteran', 'disability',

@@ -4812,6 +4812,9 @@ function dbSet(k, v){
        그것은 «읽는 쪽»에서 서버의 껍데기를 접을 때만 옳다. 여기서는 사람이 넣은 줄이다.
      ⚠ 배열만 본다 — leave_grants 처럼 사번으로 묶은 표(객체)는 그대로 둔다.
      ⚠ newJson 을 만들기 «전»이어야 한다 — 뒤면 이 기기 사본에는 번호가 없고 서버에만 있다. */
+  /* 지운 명단 — 합쳐서 없앤 업체는 다시 올리지 않는다(되살림 막기, 2026-09-29, CO_TOMB 머리글).
+     ⚠ 이 기기 사본에서도 함께 빠진다 — 저장 «전» 에 걷으므로 로컬·서버가 같은 목록을 본다. */
+  if(k === 'companies' && Array.isArray(v) && typeof _coTombStrip === 'function') v = _coTombStrip(k, v);
   if(Array.isArray(v) && DIFF_KEYS.indexOf(k) >= 0){
     var _noId = 0;
     v = v.map(function(x){
@@ -5446,7 +5449,9 @@ function _fbOpsApply(arr, ops){
 /* 적어 둔 줄을 서버에 «그 줄만» 보내는 경로들 */
 function _fbOpsUpdates(k, ops, ts){
   var u = {};
-  Object.keys((ops && ops.up) || {}).forEach(function(id){ u['data/' + k + '/v/' + id] = ops.up[id]; });
+  // 못 보낸 변경을 다시 보낼 때도 지운 명단 업체는 올리지 않는다(되살림의 가장 흔한 길이었다 — 9/23 핑퐁)
+  var _tomb = (k === 'companies' && typeof coTombMap === 'function') ? coTombMap() : null;
+  Object.keys((ops && ops.up) || {}).forEach(function(id){ if(_tomb && _tomb[String(id)]) return; u['data/' + k + '/v/' + id] = ops.up[id]; });
   Object.keys((ops && ops.rm) || {}).forEach(function(id){ u['data/' + k + '/v/' + id] = null; });
   u['data/' + k + '/u'] = ts;
   return u;
@@ -6097,6 +6102,8 @@ function _attendLockDateOf(k, id){
 // 1건 추가/수정. 반환 true=저장됨.
 function dbUpsert(k, item){
   if(!item || typeof item.id !== 'string' || !item.id){ console.warn('[dbUpsert] '+k+': id 없는 항목 거부'); return false; }
+  // 지운 명단에 오른 업체는 되살리지 않는다 — 되돌리기는 명단에서 먼저 뺀 뒤 부른다(coMergeUndo)
+  if(k === 'companies' && typeof coIsTomb === 'function' && coIsTomb(item.id)){ console.warn('[지운 명단] ' + item.id + ' — 합쳐서 없앤 업체라 다시 올리지 않습니다'); return false; }
   if(ATTEND_LOCK_TABLES[k]){
     // 새 날짜와 원래 날짜 둘 다 본다 — 잠긴 달에서 빼내는 것도 막아야 한다
     var _d1 = _attendLockDenied(k, item.date);
@@ -6131,6 +6138,8 @@ function dbUpsert(k, item){
 // 1건의 특정 필드만 수정 (상태변경 등). 반환 true=저장됨, false=대상 없음/실패.
 function dbPatch(k, id, fields){
   if(typeof id !== 'string' || !id || !fields){ console.warn('[dbPatch] '+k+': 인자 오류'); return false; }
+  /* 지운 명단 업체의 칸만 고쳐 보내면 서버에 «껍데기» 업체가 되살아난다(칸 경로 쓰기는 없는 줄도 만든다) */
+  if(k === 'companies' && typeof coIsTomb === 'function' && coIsTomb(id)){ console.warn('[지운 명단] ' + id + ' — 합쳐서 없앤 업체라 고치지 않습니다'); return false; }
   if(ATTEND_LOCK_TABLES[k]){
     var _p1 = _attendLockDenied(k, _attendLockDateOf(k, id));
     if(_p1) return _attendLockToast(_p1);
@@ -6204,6 +6213,11 @@ function dbRemove(k, id){
 // 여러 건 추가/수정 — 한 번의 요청에 건별 child 경로로 (통째 교체 없음). 자동생성·엑셀 일괄용.
 function dbUpsertMany(k, items){
   if(!Array.isArray(items) || items.length === 0) return true;
+  // 지운 명단에 오른 업체는 빼고 나머지만 올린다(한 건 때문에 전부를 막지는 않는다)
+  if(k === 'companies' && typeof _coTombStrip === 'function'){
+    items = _coTombStrip(k, items);
+    if(!items.length) return true;
+  }
   if(ATTEND_LOCK_TABLES[k]){
     // 한 건이라도 잠긴 달이면 전부 거부한다 — 일부만 들어가면 어디까지 저장됐는지 알 수 없다
     for(var _i=0; _i<items.length; _i++){
@@ -8335,6 +8349,195 @@ var CompanyRef = {
 // 중복이 생기는 주 경로는 위 registerIfMissing 의 자동 등록(co-auto-*, 사업자번호 없음)이다.
 var CO_MERGE_SKIP = 'co_merge_skip';   // {그룹키: true} — "다른 회사임"으로 표시해 다시 안 묻는 것
 var CO_MERGE_LOG  = 'co_merge_log';    // 되돌리기용 기록 (이 PC에만 — FB_EXCLUDE)
+
+/* ══ 지운 명단 — 합쳐서 없앤 업체는 «되살아나지 않는다» (대표 「추천대로」 2026-09-29, 목업 co-bulk-merge) ══
+   ■ 무엇이 있었나 (2026-09-29 실측)
+     서버 백업을 날짜별로 세니 9/16~9/21 은 업체 376건이었는데 9/23 에 707건이 됐다 —
+     예전에 정리해 둔 옛 업체 330여 건이 «되살아났다»(옛 사본을 가진 기기가 다시 올림).
+     그 뒤 9/29 에 그중 190건이 다시 지워졌다가 되살렸다가 — 「사라졌던 게 계속 나타난다」.
+   ■ 막는 법
+     합쳐서 없앤 업체 번호를 이 명단(서버에 올라가 모든 기기가 같이 본다)에 적는다.
+       · 받을 때: 명단에 있는 업체가 서버에서 오면 이 기기에 들이지 않는다(_fbApplyOne·_fbApplyMany)
+       · 보낼 때: 명단에 있는 업체는 다시 올리지 않는다(dbSet·dbUpsert·dbUpsertMany·dbPatch·못 보낸 변경)
+     되돌리기만 명단에서 먼저 지우고 되살린다.
+   ⚠ 이 함수들은 dbSet 보다 «뒤» 에 정의된다 — 부르는 쪽은 typeof 로 먼저 본다(부팅 초기 안전). */
+var CO_TOMB = 'co_tombstones';        // { 업체id: { at, by, keep } } — 서버에도 올라간다(FB_EXCLUDE 아님)
+function coTombMap(){
+  var m = dbGet(CO_TOMB, {});
+  return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+}
+function coIsTomb(id){ return !!(id && coTombMap()[String(id)]); }
+function coTombAdd(ids, keepId){
+  if(!ids || !ids.length) return;
+  var m = Object.assign({}, coTombMap());
+  var at = new Date().toISOString();
+  var by = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) || '';
+  ids.forEach(function(id){ if(id) m[String(id)] = { at:at, by:by, keep:keepId || '' }; });
+  dbSet(CO_TOMB, m);
+}
+function coTombDel(ids){
+  var m = Object.assign({}, coTombMap()), n = 0;
+  (ids || []).forEach(function(id){ if(m[String(id)]){ delete m[String(id)]; n++; } });
+  if(n) dbSet(CO_TOMB, m);
+}
+/* 이 기기 사본에 남은 «지운 명단» 업체를 걷는다 — 서버의 명단을 한 번 읽어서 (대표 보고 2026-09-29 「여전히 안바꼈다」).
+   ⚠ 첫 받기는 «병합»이라(서버에 없는 이 기기 줄을 그대로 둔다) 서버에서 288건을 지워도
+     이 기기 화면은 563건 그대로였다 — 그 남은 줄이 바로 되살림의 씨앗이었다.
+   ★ 서버에는 아무것도 쓰지 않는다(_fbWriteArr 은 이 기기 사본만). 걷은 줄은 이미 서버에 없다.
+   ★ 이 기기의 명단도 서버 것과 합쳐 둔다 — 그래야 뒤이은 저장(dbSet 등)이 같은 명단으로 거른다. */
+function _coTombPurgeLocal(){
+  try{
+    if(typeof fbDb === 'undefined' || !fbDb) return;
+    fbDb.ref('data/' + CO_TOMB + '/v').once('value').then(function(s){
+      var srv = (s && s.val && s.val()) || {};
+      if(!srv || typeof srv !== 'object' || !Object.keys(srv).length) return;
+      var mine = coTombMap(), miss = Object.keys(srv).filter(function(id){ return !mine[id]; });
+      if(miss.length){
+        var m2 = Object.assign({}, mine); miss.forEach(function(id){ m2[id] = srv[id]; });
+        _fbWriteArr(CO_TOMB, m2, _fbServerU[CO_TOMB]);    // 이 기기 사본만 — 서버에는 이미 있다
+        if(typeof _dbCache !== 'undefined') delete _dbCache[CO_TOMB];
+      }
+      var arr = _fbLocalArr('companies');
+      var next = arr.filter(function(x){ return !(x && x.id != null && srv[String(x.id)]); });
+      if(next.length !== arr.length){
+        _fbWriteArr('companies', next, _fbServerU['companies']);
+        console.warn('[지운 명단] 이 기기에 남아 있던 업체 ' + (arr.length - next.length) + '건을 걷었습니다(서버에는 이미 없음)');
+        try{ showToast('🧹 합쳐서 없앤 업체 ' + (arr.length - next.length) + '건을 이 기기 화면에서도 정리했습니다'); }catch(_t){}
+      }
+    }).catch(function(){});
+  }catch(e){ window._erpErrLog && window._erpErrLog(e); }
+}
+// 업체 목록에서 명단에 오른 것을 걷는다 — 다른 표는 그대로 돌려준다
+function _coTombStrip(k, arr){
+  if(k !== 'companies' || !Array.isArray(arr)) return arr;
+  var m = coTombMap();
+  if(!Object.keys(m).length) return arr;
+  var out = arr.filter(function(x){ return !(x && x.id != null && m[String(x.id)]); });
+  if(out.length !== arr.length) console.warn('[지운 명단] 합쳐서 없앤 업체 ' + (arr.length - out.length) + '건은 다시 올리지 않습니다');
+  return out;
+}
+
+/* ══ 확실한 중복 — 한꺼번에 합치기 (대표 「추천대로」 2026-09-29, 목업 co-bulk-merge) ══
+   「합치기」 와 «똑같은 일»(빈 칸 채우기 · 연결 옮기기 · 보수총액신고 옮기기 · 기록 · 되돌리기)을
+   확실한 쌍에만 한꺼번에 한다. 확실한 쌍 = 두 줄뿐이고, 사업자번호(종사업장 포함)·대표자·주소·전화가
+   «모두 같고 비어 있지 않은» 쌍. 하나라도 다르면 지금처럼 한 쌍씩 본다.
+   ⚠ 사무대행과 섞인 쌍은 coDupGroups 가 이미 뺀다(대표 결정 2026-08-31) — 여기서도 안 합친다. */
+function coSureSame(list){
+  if(!list || list.length !== 2) return false;
+  var a = list[0], b = list[1];
+  var ba = CompanyRef._normBiz(a.bizNo), bb = CompanyRef._normBiz(b.bizNo);
+  if(!ba || ba !== bb || coSubNo(a) !== coSubNo(b)) return false;
+  var ceo = function(x){ return String(x.ceo || '').trim(); };
+  if(!ceo(a) || ceo(a) !== ceo(b)) return false;
+  if(!coHead(a.address) || coHead(a.address) !== coHead(b.address)) return false;
+  var ph = function(x){ return String(x.phone || '').replace(/\D/g, ''); };
+  if(!ph(a) || ph(a) !== ph(b)) return false;
+  return true;
+}
+// 업체별로 연결된 계약·사건·컨설팅 수 (지운 표시는 안 센다)
+function coRefCounts(){
+  var n = {};
+  coRefStores().forEach(function(store){
+    (dbGet(store, []) || []).forEach(function(x){
+      if(x && x.companyId && !x._deleted) n[x.companyId] = (n[x.companyId] || 0) + 1;
+    });
+  });
+  return n;
+}
+function coFilledCount(c){
+  var n = 0;
+  Object.keys(CO_FIELD_LABEL).concat(['createdAt']).forEach(function(f){
+    var v = c[f]; if(v !== undefined && v !== null && v !== '' && v !== 0) n++;
+  });
+  return n;
+}
+/* 남길 쪽 — 살아 있는 것 > 연결 많은 것 > 정보 많이 채워진 것 > 담당 있는 것 > 자동등록 아닌 것 > 먼저 등록된 것.
+   ⚠ 「살아 있는 것」 이 맨 앞 — 한 쌍씩 합치기(coDupGroups)와 같은 까닭(닫힌 업체로 합쳐지면 살아 있는 사업장이 사라진다). */
+function coBulkKeepCmp(ref){
+  return function(a, b){
+    var al = String(a.status||'') === 'active' ? 1 : 0, bl = String(b.status||'') === 'active' ? 1 : 0;
+    if(al !== bl) return bl - al;
+    var ar = ref[a.id] || 0, br = ref[b.id] || 0;
+    if(ar !== br) return br - ar;
+    var af = coFilledCount(a), bf = coFilledCount(b);
+    if(af !== bf) return bf - af;
+    var am = a.managerMain ? 1 : 0, bm = b.managerMain ? 1 : 0;
+    if(am !== bm) return bm - am;
+    var aa = coIsAuto(a) ? 1 : 0, ba = coIsAuto(b) ? 1 : 0;
+    if(aa !== ba) return aa - ba;
+    var ac = String(a.createdAt || '9999'), bc = String(b.createdAt || '9999');
+    return ac.localeCompare(bc);
+  };
+}
+function coBulkWhy(keep, drop, ref){
+  var kr = ref[keep.id] || 0, dr = ref[drop.id] || 0;
+  if((String(keep.status||'') === 'active') !== (String(drop.status||'') === 'active')) return { t:'살아 있는 업체', c:'p1' };
+  if(kr !== dr) return { t:'연결 ' + kr + '건', c:'p1' };
+  if(coFilledCount(keep) !== coFilledCount(drop)) return { t:'정보가 더 많이 채워짐', c:'p2' };
+  return { t:'먼저 등록됨', c:'p3' };
+}
+function coBulkCandidates(groups){
+  var ref = coRefCounts(), used = {}, out = [];
+  (groups || coDupGroups()).forEach(function(g){
+    if(!g || g.conflict || !coSureSame(g.list)) return;
+    var pair = g.list.slice().sort(coBulkKeepCmp(ref));
+    var keep = pair[0], drop = pair[1];
+    // 한 업체가 이름 묶음·번호 묶음 두 곳에 걸릴 수 있다 — 먼저 걸린 쌍만(두 번 손대지 않게)
+    if(used[keep.id] || used[drop.id]) return;
+    used[keep.id] = used[drop.id] = 1;
+    var pv = coMergePreview(keep.id, [drop.id]);
+    if(!pv) return;
+    out.push({ key:g.key, keep:keep, drop:drop, why:coBulkWhy(keep, drop, ref),
+      fill:Object.keys(pv.fill), moves:pv.moves.length });
+  });
+  return out;
+}
+/* 한꺼번에 합친다 — 되돌리기 기록은 «한 묶음» 하나로 남긴다(기록 200칸이 한 번에 밀려 나가지 않게).
+   차례: ① 연결 옮기기(하나라도 실패하면 업체는 안 지우고 멈춤) ② 보수총액신고 ③ 업체 표 한 번에 저장
+         (빈 칸 채우기 + 없앨 것 빼기) ④ 지운 명단 ⑤ 기록 */
+function coMergeApplyMany(pairs){
+  var items = [], moved = 0, failStore = null;
+  (pairs || []).forEach(function(p){
+    if(failStore) return;
+    var pv = coMergePreview(p.keepId, [p.dropId]);
+    if(!pv || !pv.drops.length) return;
+    var undo = { id:'mg-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      at:new Date().toISOString(),
+      by:(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '',
+      keepId:p.keepId, keepName:pv.keep.name, keepBefore:{},
+      dropRecords:pv.drops.map(function(d){ return JSON.parse(JSON.stringify(d)); }),
+      moves:pv.moves.slice(), wageMoves:(pv.wageMoves||[]).slice(), fill:pv.fill };
+    Object.keys(pv.fill).forEach(function(f){ undo.keepBefore[f] = (pv.keep[f] === undefined ? null : pv.keep[f]); });
+    pv.moves.forEach(function(m){
+      if(failStore) return;
+      if(dbPatch(m.store, m.id, { companyId:p.keepId })) moved++; else failStore = m.store;
+    });
+    items.push(undo);
+  });
+  var batch = { id:'mgb-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    at:new Date().toISOString(),
+    by:(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '',
+    batch:items, moved:moved, keepName:'한꺼번에 ' + items.length + '쌍' };
+  if(failStore){
+    batch.partial = true; _coLogPush(batch);
+    showToast('❌ ' + failStore + ' 연결 옮기기 실패 — 업체는 지우지 않고 멈췄습니다. 되돌리기에서 복구하세요');
+    return null;
+  }
+  items.forEach(function(it){ try{ coWageApply(it.keepId, it.wageMoves); }catch(e){ window._erpErrLog && window._erpErrLog(e); } });
+  var fillBy = {}, dropSet = {};
+  items.forEach(function(it){ fillBy[it.keepId] = it.fill; it.dropRecords.forEach(function(d){ dropSet[d.id] = 1; }); });
+  var next = (dbGet('companies', []) || []).filter(function(c){ return !(c && dropSet[c.id]); }).map(function(c){
+    return (c && fillBy[c.id] && Object.keys(fillBy[c.id]).length) ? Object.assign({}, c, fillBy[c.id]) : c;
+  });
+  if(!dbSet('companies', next)){ showToast('❌ 업체 저장 실패 — 합치기를 중단했습니다'); batch.partial = true; _coLogPush(batch); return null; }
+  // 지운 명단 — 쌍마다 따로 쓰지 않고 «한 번» 에 (128쌍이면 128번 올리게 된다)
+  var tm = Object.assign({}, coTombMap()), tAt = new Date().toISOString();
+  var tBy = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.sid) || '';
+  items.forEach(function(it){ it.dropRecords.forEach(function(d){ tm[String(d.id)] = { at:tAt, by:tBy, keep:it.keepId }; }); });
+  dbSet(CO_TOMB, tm);
+  _coLogPush(batch);
+  return batch;
+}
 // 합칠 때 빈 칸을 채워 줄 항목과 화면에 보여 줄 우리말 이름.
 // 여기 있는 것만 채운다. 영문 필드명이 화면에 새어 나가지 않게 이름표를 짝지어 둔다.
 var CO_FIELD_LABEL = {
@@ -8657,6 +8860,8 @@ function coMergeApply(keepId, dropIds){
   var okDel = true;
   dropIds.forEach(function(id){ if(!dbRemove('companies', id)) okDel = false; });
   if(!okDel) showToast('⚠ 일부 업체 삭제 실패 — 업체관리에서 확인해 주세요');
+  // 5) 지운 명단 — 옛 사본을 가진 기기가 다시 올려도 되살아나지 않게 (2026-09-29)
+  coTombAdd(dropIds, keepId);
   undo.moved = moved;
   _coLogPush(undo);
   return undo;
@@ -8675,6 +8880,26 @@ function coMergeUndo(logId){
   var log = dbGet(CO_MERGE_LOG, []) || [];
   var e = log.find(function(x){ return x && x.id === logId; });
   if(!e){ showToast('❌ 기록을 찾을 수 없습니다'); return false; }
+  /* 한꺼번에 합친 묶음(batch) — 쌍마다 아래 한 쌍 되돌리기를 그대로 돈다.
+     ⚠ 지운 명단에서 «먼저» 뺀다: 명단에 남아 있으면 dbUpsert 가 되살리기를 거절한다. */
+  if(Array.isArray(e.batch)){
+    var allDrop = [];
+    e.batch.forEach(function(it){ (it.dropRecords || []).forEach(function(d){ if(d && d.id) allDrop.push(d.id); }); });
+    coTombDel(allDrop);
+    var nCo = 0, nMv = 0;
+    e.batch.forEach(function(it){ _coUndoOne(it); nCo += (it.dropRecords||[]).length; nMv += (it.moves||[]).length; });
+    dbSet(CO_MERGE_LOG, log.filter(function(x){ return x && x.id !== logId; }));
+    showToast('↩ 한꺼번에 합친 것을 되돌렸습니다 — 업체 ' + nCo + '개 복구, 연결 ' + nMv + '건 원복');
+    return true;
+  }
+  coTombDel((e.dropRecords || []).map(function(d){ return d && d.id; }).filter(Boolean));
+  _coUndoOne(e);
+  dbSet(CO_MERGE_LOG, log.filter(function(x){ return x && x.id !== logId; }));
+  showToast('↩ 되돌렸습니다 — 업체 ' + (e.dropRecords||[]).length + '개 복구, 참조 ' + (e.moves||[]).length + '건 원복');
+  return true;
+}
+// 한 쌍 되돌리기의 알맹이 — 기록 지우기·알림은 부르는 쪽이 한다
+function _coUndoOne(e){
   (e.dropRecords || []).forEach(function(rec){ dbUpsert('companies', rec); });
   (e.moves || []).forEach(function(m){ dbPatch(m.store, m.id, { companyId:m.from }); });
   // 보수총액신고 기록 되돌리기 — 옮겨 간 것을 원래 업체로
@@ -8697,9 +8922,6 @@ function coMergeUndo(logId){
     });
     dbPatch('companies', e.keepId, back);
   }
-  dbSet(CO_MERGE_LOG, log.filter(function(x){ return x && x.id !== logId; }));
-  showToast('↩ 되돌렸습니다 — 업체 ' + (e.dropRecords||[]).length + '개 복구, 참조 ' + (e.moves||[]).length + '건 원복');
-  return true;
 }
 
 // ── 이 고침 이전에 합친 건 되살리기 ──
@@ -9058,6 +9280,12 @@ function CoMergeModal(props){
   var kS = useState(''); var keepId = kS[0]; var setKeepId = kS[1];
   var doneS = useState(0); var doneN = doneS[0]; var setDoneN = doneS[1];
   var lastS = useState(null); var last = lastS[0]; var setLast = lastS[1];
+  /* ⚡ 한꺼번에 합치기 (대표 「추천대로」 2026-09-29, 목업 co-bulk-merge) — 목록을 «먼저» 보여 주고,
+     체크한 쌍만 합친다. 목록은 창을 열 때와 합친 뒤에만 다시 센다(연결 수를 세느라 무겁다). */
+  var bcS = useState(function(){ return coBulkCandidates(groups); }); var bulk = bcS[0]; var setBulk = bcS[1];
+  var boS = useState(false); var bulkOpen = boS[0]; var setBulkOpen = boS[1];
+  var bsS = useState({}); var bulkOff = bsS[0]; var setBulkOff = bsS[1];     // 체크를 푼 쌍 {key:true}
+  var blS = useState(null); var lastBulk = blS[0]; var setLastBulk = blS[1];
 
   var g = groups[idx] || null;
   useEffect(function(){ if(g) setKeepId(g.keepId); }, [g && g.key]);
@@ -9068,7 +9296,20 @@ function CoMergeModal(props){
   function refresh(){
     var next = coDupGroups();
     setGroups(next);
+    setBulk(coBulkCandidates(next));
     if(idx >= next.length) setIdx(Math.max(0, next.length - 1));
+  }
+  function doBulk(){
+    var pick = bulk.filter(function(p){ return !bulkOff[p.key]; });
+    if(!pick.length) return;
+    var res = coMergeApplyMany(pick.map(function(p){ return { keepId:p.keep.id, dropId:p.drop.id }; }));
+    if(!res){ refresh(); return; }
+    setLastBulk(res);
+    setDoneN(doneN + res.batch.length);
+    setBulkOpen(false); setBulkOff({});
+    showToast('✅ ' + res.batch.length + '쌍을 합쳤습니다 (연결 ' + (res.moved||0) + '건 옮김)');
+    refresh();
+    if(props.onChanged) props.onChanged();
   }
   function doMerge(){
     if(!g || !keepId) return;
@@ -9106,6 +9347,57 @@ function CoMergeModal(props){
     if(f === 'createdAt') return String(v||'').slice(0,10);
     return v == null ? '' : String(v);
   }
+  /* ⚡ 합치기 «전» 확인 목록 (목업 ②) — 아직 아무것도 안 바뀐다. 한 칸은 한 줄(대표 지시 2026-08-30).
+     체크를 풀면 그 쌍은 건너뛴다. 남길 쪽을 바꾸고 싶으면 체크를 풀고 아래 「하나씩」 에서 고른다. */
+  function bulkView(){
+    var PILL = { p1:{ bg:'#f0fdf4', fg:'#166534', bd:'#bbf7d0' }, p2:{ bg:'#eff6ff', fg:'#1e40af', bd:'#bfdbfe' },
+                 p3:{ bg:'#f8fafc', fg:'#64748b', bd:'#e2e8f0' } };
+    var on = bulk.filter(function(p){ return !bulkOff[p.key]; });
+    var mv = on.reduce(function(s, p){ return s + (p.moves || 0); }, 0);
+    var allOn = on.length === bulk.length;
+    var td = { padding:'6px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', fontSize:'11.5px' };
+    var th = { padding:'6px 8px', background:'#f8fafc', color:'#475569', textAlign:'left', whiteSpace:'nowrap', fontSize:'11px',
+               borderBottom:'1px solid #e2e8f0', position:'sticky', top:0 };
+    function nameCell(c, color, strike){
+      return h('span', { title:c.name, style:{ display:'inline-block', maxWidth:'190px', overflow:'hidden', textOverflow:'ellipsis',
+        verticalAlign:'bottom', color:color, fontWeight:strike ? 400 : 700, textDecoration:strike ? 'line-through' : 'none' } }, c.name);
+    }
+    return h('div', null,
+      h('div', { style:{ fontSize:'13px', fontWeight:800, color:'#1e40af', marginBottom:'8px' } },
+        '⚡ 확실한 중복 ' + bulk.length + '쌍 — 합치기 전에 확인',
+        h('span', { style:{ fontSize:'11.5px', fontWeight:400, color:'#64748b', marginLeft:'8px' } }, '아직 아무것도 바뀌지 않았습니다')),
+      h('div', { style:{ maxHeight:'46vh', overflow:'auto', border:'1px solid #e2e8f0', borderRadius:'8px' } },
+        h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+          h('thead', null, h('tr', null,
+            h('th', { style:th }, h('input', { type:'checkbox', checked:allOn, title:'모두 고르기·풀기',
+              onChange:function(){ if(allOn){ var o = {}; bulk.forEach(function(p){ o[p.key] = true; }); setBulkOff(o); } else setBulkOff({}); } })),
+            h('th', { style:th }, '남길 업체'), h('th', { style:th }, '없앨 업체'), h('th', { style:th }, '남길 쪽을 고른 까닭'),
+            h('th', { style:th }, '채울 빈 칸'), h('th', { style:th }, '옮길 연결'))),
+          h('tbody', null, bulk.map(function(p){
+            var pl = PILL[p.why.c] || PILL.p3;
+            return h('tr', { key:p.key, style:{ opacity: bulkOff[p.key] ? 0.45 : 1 } },
+              h('td', { style:td }, h('input', { type:'checkbox', checked:!bulkOff[p.key], onChange:function(){
+                var o = Object.assign({}, bulkOff); if(o[p.key]) delete o[p.key]; else o[p.key] = true; setBulkOff(o); } })),
+              h('td', { style:td }, nameCell(p.keep, '#166534', false),
+                p.keep.typeCode ? h('span', { style:{ marginLeft:'5px', fontSize:'10px', color:'#64748b' } }, p.keep.typeCode) : null),
+              h('td', { style:td }, nameCell(p.drop, '#991b1b', true)),
+              h('td', { style:td }, h('span', { style:{ fontSize:'10.5px', fontWeight:700, borderRadius:'99px', padding:'1px 7px',
+                background:pl.bg, color:pl.fg, border:'1px solid ' + pl.bd } }, p.why.t)),
+              h('td', { style:td }, p.fill.length ? h('span', { title:p.fill.map(coFieldLabel).join(' · '),
+                style:{ display:'inline-block', maxWidth:'150px', overflow:'hidden', textOverflow:'ellipsis', verticalAlign:'bottom' } },
+                p.fill.map(coFieldLabel).join(' · ')) : h('span', { style:{ color:'#cbd5e1' } }, '—')),
+              h('td', { style:td }, p.moves ? (p.moves + '건') : h('span', { style:{ color:'#cbd5e1' } }, '없음')));
+          }))
+        )
+      ),
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap', marginTop:'10px' } },
+        h('span', { style:{ fontSize:'12px', color:'#475569', flex:'1 1 280px' } },
+          '선택 ', h('b', { style:{ color:'#1e40af' } }, on.length + '쌍'), ' — 업체 ' + on.length + '건이 없어지고, 연결 ',
+          h('b', { style:{ color:'#1e40af' } }, mv + '건'), '이 남길 쪽으로 옮겨집니다 · 기록이 남아 ', h('b', null, '한 번에 되돌릴 수 있습니다')),
+        h('button', { className:'btn-secondary', onClick:function(){ setBulkOpen(false); } }, '취소'),
+        h('button', { className:'btn-primary', disabled:!on.length, onClick:doBulk }, '선택한 ' + on.length + '쌍 합치기'))
+    );
+  }
   // 값이 서로 다른 칸만 색으로 표시한다 — 같은 칸까지 칠하면 눈이 피로하다
   function cellBg(f, c){
     if(!g) return '';
@@ -9134,7 +9426,20 @@ function CoMergeModal(props){
           '사무대행과 업체관리는 «다른 곳»이라 합치지 않습니다 — 사업자번호가 같아도 그렇습니다. ',
           h('span', { style:{ color:'#475569' } }, '(사무대행을 어떻게 다룰지는 따로 정하기로 했습니다)')),
 
-        !groups.length
+        /* ⚡ 확실한 중복 — 한꺼번에 합치기 줄 (목업 ①). 누르면 곧바로 합치지 않고 목록부터 보인다. */
+        !bulkOpen && (bulk.length > 0 || lastBulk) && h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap',
+            background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:'10px', padding:'10px 12px', marginBottom:'12px' } },
+          bulk.length > 0 && h('div', { style:{ flex:'1 1 260px', minWidth:0 } },
+            h('b', { style:{ color:'#1e40af', fontSize:'13px' } }, '⚡ 확실한 중복 ' + bulk.length + '쌍 — 한꺼번에 합치기'),
+            h('div', { style:{ fontSize:'11.5px', color:'#475569' } },
+              '사업자번호 · 대표자 · 주소 · 전화가 ', h('b', null, '모두 같은'), ' 쌍만. 하나라도 다르면 아래에서 하나씩 봅니다.')),
+          bulk.length > 0 && h('button', { className:'btn-primary', onClick:function(){ setBulkOff({}); setBulkOpen(true); } }, '목록 보고 합치기 →'),
+          lastBulk && h('button', { className:'btn-secondary', style:{ marginLeft:'auto', background:'#f8fafc', color:'#475569' },
+            onClick:function(){
+              if(coMergeUndo(lastBulk.id)){ setDoneN(Math.max(0, doneN - (lastBulk.batch||[]).length)); setLastBulk(null); refresh(); if(props.onChanged) props.onChanged(); }
+            } }, '↶ 방금 한꺼번에 합친 것 모두 되돌리기')),
+
+        bulkOpen ? bulkView() : !groups.length
           ? h('div', { style:{ padding:'36px 12px', textAlign:'center', color:'#64748b', fontSize:'13px' } },
               doneN ? '✅ 모두 정리했습니다 — ' + doneN + '건 합침' : '✅ 이름이 겹치는 업체가 없습니다')
           : h('div', null,
@@ -10461,6 +10766,8 @@ function _fbApplyOne(k, id, val){
   /* 삭제표시는 서버에는 남지만 화면 자료는 아니다. 오래된 기기도 이 표시를 받는 즉시
      해당 묶음을 로컬에서 빼므로, 삭제한 자료가 다시 살아나는 일을 막는다. */
   if((typeof _FB_HIDE_DELETED !== "undefined" ? !!_FB_HIDE_DELETED[k] : k === "ledger_batches") && val && val._deleted){ _fbRemoveOne(k, id); return; }
+  /* 지운 명단 — 옛 사본을 가진 기기가 합쳐서 없앤 업체를 다시 올려도 이 기기에는 들이지 않는다(2026-09-29) */
+  if(k === 'companies' && typeof coIsTomb === 'function' && coIsTomb(id)){ _fbRemoveOne(k, id); return; }
   if(!val || typeof val !== 'object') return;
   var arr = _fbLocalArr(k);
   var at = -1;
@@ -10479,8 +10786,11 @@ function _fbApplyMany(k, pending){
     if(arr[i] && arr[i].id != null && pos[String(arr[i].id)] === undefined) pos[String(arr[i].id)] = i;
   }
   var changed = false, 뺄 = Object.create(null);
+  // 지운 명단 — 합쳐서 없앤 업체는 들이지 않고, 이미 있으면 뺀다(_fbApplyOne 과 같은 규칙)
+  var _tomb = (k === 'companies' && typeof coTombMap === 'function') ? coTombMap() : null;
   ids.forEach(function(id){
     var val = pending[id];
+    if(_tomb && _tomb[String(id)]){ if(pos[id] !== undefined){ 뺄[id] = 1; changed = true; } return; }
     if(!val || typeof val !== 'object') return;
     /* 삭제표시 줄은 넣지 않고, 이미 있으면 뺀다(_FB_HIDE_DELETED 머리글) */
     if((typeof _FB_HIDE_DELETED !== "undefined" ? !!_FB_HIDE_DELETED[k] : k === "ledger_batches") && val._deleted){ 뺄[id] = 1; changed = true; return; }
@@ -10595,6 +10905,8 @@ function _fbLiveRecords(k, opts){
       /* 첫 적재가 끝나는 시점 — 위 구독이 이미 받아 둔 것을 쓰므로 새로 안 받는다 */
       vref.once('value', function(snap){
         flush(); hydrating = false;
+        // 업체 — 지운 명단에 오른 것은 이 기기 사본에서도 걷는다(_coTombPurgeLocal 머리글)
+        if(k === 'companies' && typeof _coTombPurgeLocal === 'function') _coTombPurgeLocal();
         /* 서버 전체를 덮지 않고, 빠진 묶음만 복구한다. once 는 같은 구독 자리의 완료
            신호라 별도 한 벌을 내려받지 않는다. */
         var repair = (k === 'ledger_batches') ? _fbRepairLedgerBatches(snap && snap.val && snap.val()) : Promise.resolve(0);

@@ -220,3 +220,67 @@ test('⑨★★ camUpload 가 «돌아가기 전에» 기다린다 — 그리고
   assert.match(bare, /if \(camReturnTo\) await camWaitSettled\(/,
     '★★ 기다림이 «기업정보함에서 온 경우»에만 걸려야 한다 — 사진첩 단독 촬영은 화면에 남으므로 기다릴 까닭이 없다');
 });
+
+/* ══════ camUpload 를 «끝까지» 돌려 본다 — 글자 순서만 보면 기능이 죽어도 통과한다 ══════
+   (2026-09-29 다시 검사하다 찾은 구멍: 기다리는 «사이» 새로 찍은 장이 버려졌다) */
+function 올리기돌리기(opts) {
+  const 기록 = [];
+  let 풀기 = null;
+  const ctx = {
+    console, Promise, Object, URL: { revokeObjectURL() {} },
+    File: function (parts, name) { this.name = name; },
+    camShots: opts.shots, camQuickMode: false, camReturnTo: opts.돌아갈곳 || '', camUpKind: 'doc',
+    CAM_SETTLE_MAX_MS: 90000,
+    $: () => ({ style: {}, disabled: false, textContent: '' }),
+    camSavePref: () => false, saveBlob() {}, camFileName: (t, i) => 'c' + i + '.jpg',
+    shareCardsOut() { 기록.push('공유창'); },
+    renderCamStrip() {},
+    toast: (m) => 기록.push('알림:' + String(m).slice(0, 12)),
+    addFiles: async () => { 기록.push('줄에넣음'); },
+    camWaitSettled: () => new Promise((r) => { 기록.push('기다리기시작'); 풀기 = () => { 기록.push('기다림끝'); r(true); }; }),
+    camDiscard: () => { 기록.push('버림'); ctx.camShots = []; },
+    camGoBack: () => { 기록.push('돌아감'); }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(F.upload, ctx);
+  const 끝 = ctx.camUpload();
+  return { ctx, 기록, 끝, 풀기: () => 풀기 && 풀기() };
+}
+const 한장 = () => ({ blob: {}, url: 'u', ts: 1, sel: true, pairWith: -1 });
+
+test('⑩★★ 기업정보함에서 왔으면 기다림이 «끝난 뒤에야» 돌아간다', async () => {
+  const r = 올리기돌리기({ shots: [한장()], 돌아갈곳: 'pu-cards.html' });
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.ok(r.기록.includes('기다리기시작'), '★★ 기다리지 않는다');
+  assert.ok(!r.기록.includes('돌아감'), '★★ 기다림이 끝나기 «전에» 돌아갔다 — 올리는 도중에 끊긴다');
+  r.풀기();
+  await r.끝;
+  assert.deepEqual(r.기록.filter(x => ['줄에넣음', '기다림끝', '돌아감'].includes(x)),
+    ['줄에넣음', '기다림끝', '돌아감'], '★★ 순서가 틀렸다');
+});
+
+test('⑩-2 ★★ 기다리는 «사이» 새로 찍은 장이 있으면 떠나지 않는다 — 안 그러면 그 장이 버려진다', async () => {
+  const r = 올리기돌리기({ shots: [한장()], 돌아갈곳: 'pu-cards.html' });
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  r.ctx.camShots.push(한장());              // 기다리는 동안 카메라로 한 장 더 찍었다
+  r.풀기();
+  await r.끝;
+  assert.ok(!r.기록.includes('돌아감'),
+    '★★ 새로 찍은 장이 있는데 돌아갔다 — 방금 찍은 명함이 아무 말 없이 사라진다');
+  assert.ok(!r.기록.includes('버림'), '★★ 새로 찍은 장을 버렸다');
+  assert.equal(r.ctx.camShots.length, 1, '★ 새로 찍은 장이 남아 있어야 다시 완료를 눌러 올릴 수 있다');
+  assert.ok(r.기록.some(x => /^알림:/.test(x)), '★ 왜 안 돌아가는지 말해야 한다 — 조용히 머물면 고장인 줄 안다');
+});
+
+test('⑩-3 사진첩 단독 촬영(돌아갈 곳 없음)은 기다리지 않는다 — 화면에 남으니 기다릴 까닭이 없다', async () => {
+  const r = 올리기돌리기({ shots: [한장()], 돌아갈곳: '' });
+  await r.끝;
+  assert.ok(!r.기록.includes('기다리기시작'), '★★ 돌아가지도 않는데 기다렸다 — 괜히 느려진다');
+});
+
+test('⑩-4 올린 것은 리멤버 공유창을 «맨 먼저» 부른다 — 완료를 누른 그 순간이라야 뜬다', async () => {
+  const r = 올리기돌리기({ shots: [한장()], 돌아갈곳: '' });
+  await r.끝;
+  assert.equal(r.기록[0], '공유창',
+    '★★ 공유창이 첫 번째가 아니다 — 무언가를 기다린 뒤에 부르면 「사람이 방금 눌렀다」가 꺼져 조용히 거절당한다');
+});

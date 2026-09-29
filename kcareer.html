@@ -1181,7 +1181,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=35"></script>
+<script src="js/kcareer-hwpxfill.js?v=36"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
@@ -10812,7 +10812,7 @@ const PI_GROUPS=[
     ['phone','휴대폰'],['phoneWork','사무실 전화'],['phoneHome','자택 전화'],
     ['fax','팩스'],['email','개인 이메일'],['emailWork','회사 이메일']]],
   ['주소','지원서는 집을, 위촉 서류는 사무실을 묻는다', [
-    ['addrHome','집 주소'],['addr','사무실 주소']]],
+    ['zipHome','집 우편번호'],['addrHome','집 주소'],['zipWork','사무실 우편번호'],['addr','사무실 주소']]],
   ['일','「푸른노무법인 대표」가 한 칸에 뭉쳐 있었다', [
     ['org','소속'],['dept','부서'],['title','직위'],['license','자격']]],
   /* ★ 병역·보훈·장애 (대표 결정 2026-09-13) — 지원서가 거의 늘 묻는데 담을 데가 없었다.
@@ -10830,6 +10830,9 @@ const PI_FIELDS=PI_GROUPS.reduce((a,g)=>a.concat(g[2]),[]);
    화면에서도 가려 두고 「보기」를 눌러야 보인다 — 어깨너머로 읽히지 않게. */
 const PI_SECRET={rrn:true};
 const PI_WIDE={addr:true,addrHome:true};
+/* ★ 우편번호는 «그 주소 줄 안»에 그린다 (대표 지시 2026-09-29) — 칸을 따로 한 줄씩 쓰면 화면이 길어진다 */
+const PI_ZIP_OF={addrHome:'zipHome', addr:'zipWork'};
+const PI_ZIP_KEYS={zipHome:true, zipWork:true};
 
 /* ⚠ 2026-08-30 이후 USER_INFO 는 «비어 있다»(개인정보를 파일에서 뺐다).
    그래서 되메꿈은 사실상 빈 값이고, 기본정보는 사람이 한 번 넣어야 한다.
@@ -10866,6 +10869,12 @@ function renderPersonal(){ const g=document.getElementById('piGrid'); if(!g) ret
     +`<div class="field-grid">`+fs.map(([k,l])=>{
       const v=String(info[k]||'').replace(/"/g,'&quot;');
       const wide=PI_WIDE[k]?' style="grid-column:1/-1"':'';
+      if(PI_ZIP_KEYS[k]) return '';
+      if(PI_ZIP_OF[k]){ const zk=PI_ZIP_OF[k], zv=String(info[zk]||'').replace(/"/g,'&quot;');
+        return `<div class="field"${wide}><label>${l}</label><div style="display:flex;gap:6px">`
+          +`<input id="pi-${zk}" value="${zv}" placeholder="우편번호" inputmode="numeric" maxlength="7" style="width:96px;flex:none">`
+          +`<button type="button" class="btn sm" onclick="piZipFind('${k}','${zk}')" style="white-space:nowrap" title="적어 둔 주소로 우편번호를 찾습니다 — 맞는 것을 누르면 들어가고 저장됩니다">📮 찾기</button>`
+          +`<input id="pi-${k}" value="${v}" style="flex:1;min-width:0"></div></div>`; }
       /* 한자 성명만 옆에 「漢」 단추 — 한글 IME 한자 키가 안 먹는 칸이라 손으로 넣을 길이 없었다 */
       if(k==='nameHanja') return `<div class="field"><label title="漢 을 눌러 소리마다 고릅니다">${l}</label>`
         +`<div class="hj-row"><input id="pi-${k}" value="${v}" placeholder="예: 權炯河"><button type="button" class="btn hj-btn" onclick="hjOpen()" title="성명을 한자로 고릅니다">漢</button></div>`
@@ -12335,6 +12344,7 @@ var RH_KEYS = [
   ['phone','휴대폰'],['phoneHome','자택 전화'],['phoneWork','사무실 전화'],['fax','팩스'],
   ['email','개인 이메일'],['emailWork','회사 이메일'],
   ['addr','집 주소'],['addrWork','사무실 주소'],
+  ['zip','우편번호(주소와 같은 곳)'],['zipWork','사무실 우편번호'],
   ['org','소속'],['dept','부서'],['title','직위'],
   /* 「소속·직위」를 한 칸에 묶어 묻는 서식이 있다 — 「푸른노무법인 대표」처럼 이어 쓴다 */
   ['orgTitle','소속·직위 (묶음)'],
@@ -15159,6 +15169,19 @@ function kcAddrSearch(prefill, done){
     }).embed(document.getElementById('kcAddrBox'), q.length>=2?{ q:q, autoClose:false }:undefined);
   }catch(e){ 닫기(); toast('⚠ 우편번호 찾기를 열지 못했습니다 — '+String(e&&e.message||e)); }
 }
+/* 기본정보의 📮 찾기 — 집·사무실 주소 줄마다 */
+async function piZipFind(addrKey, zipKey){
+  var a=document.getElementById('pi-'+addrKey), z=document.getElementById('pi-'+zipKey);
+  try{ await _kcLoadPostcode(); }
+  catch(e){ toast('⚠ 우편번호 찾기를 불러오지 못했습니다 — 인터넷을 확인해 주세요', 5000); return; }
+  kcAddrSearch((a&&a.value.trim())||'', function(r){
+    if(!r.zipcode){ toast('우편번호가 비어 있는 결과입니다 — 다른 것을 골라 주세요'); return; }
+    if(z) z.value=r.zipcode;
+    if(a && !a.value.trim() && r.address) a.value=r.address;
+    savePersonalInfo();
+    toast('📮 우편번호 '+r.zipcode+' 을 넣고 저장했습니다');
+  });
+}
 async function firmZipFind(){
   var 칸=function(k){ return document.querySelector('#firmGrid input[data-firm="'+k+'"]'); };
   var a=칸('addr');
@@ -15350,6 +15373,8 @@ function _cvFillData(){
              /* 「현주소」는 집 주소다. 집을 안 적어 두셨으면 지금까지처럼 사무실 주소로 간다 —
                 여기서 비워 버리면 오늘까지 되던 것이 안 되는 뒷걸음질이 된다. */
              addr:집||법인.addr||사무실, addrWork:법인.addr||사무실,
+             /* ★ 우편번호는 «그 주소의 짝»이다 — 집 주소가 나가면 집 우편번호만(사무실 것을 섞지 않는다) (2026-09-29) */
+             zip:집?(info.zipHome||''):(법인.zip||info.zipWork||''), zipWork:법인.zip||info.zipWork||'',
              license:info.license||'',
              org:법인.name||info.org||'', dept:info.dept||'', title:info.title||'',
              /* ★ 「노무법인」 표 — 우리 법인 것. 이알피 회사정보 한 곳에서 온다.
