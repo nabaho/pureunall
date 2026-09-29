@@ -115,7 +115,7 @@ function 세상(opt) {
   };
   ctx.window = ctx; ctx.globalThis = ctx;
   vm.createContext(ctx);
-  vm.runInContext('var _rhFilled=false,_rhColMap=null,_rhStampOn=false,_rhStampDone=false,'
+  vm.runInContext('var _rhFilled=false,_rhColMap=null,_rhStampOn=false,_rhStampDone=false,_rhStampPick=null,'
     + '_rhStampWhy="",_rhDropped=null,_rhPages=null,_rhMode="in",_rhHwpEd=null,_rhEdLeaving=false,'
     + '_rhwp=null,_rhMap=null,_rhPicks={},_rhVals={},_rhListPlan=null,_rhBase=null,_rhDoc=null,'
     + '_rhUndo=null,_rhEdBigWant=true,_rhPhotoOn=false,_rhPhotoDone=false,_rhPhotoWhy="",_rhPhotoNoCell=false,'
@@ -126,6 +126,7 @@ function 세상(opt) {
    'function rhParaFill(', 'function rhOutTail(', 'async function rhOutRefresh(',
    'async function rhTidyZip(', 'function rhTidyReset(', 'async function rhStampDoc(',
    'async function _rhStampPx(', 'async function rhStampZip(', 'function stampFit(',
+   'async function rhStampSpotsNow(', 'function rhStampPickAsk(',
    'function rhCleanName(', 'async function rhPagesOpen(', 'function rhPagesRender(',
    'async function rhPagesApply(', 'async function rhPagesRestore(',
    'async function exportEditedHwpx(', 'function rhSetMode(', 'async function rhHwpEdSave(',
@@ -174,18 +175,36 @@ test('★★ 쪽을 뺀 «뒤»에 찍는다 — 뺄 공고문의 (인)에 찍�
   assert.ok(x.indexOf('<hp:pic') > x.indexOf('지원자'), '도장이 지원서 서명 줄에 안 갔습니다');
 });
 
-test('★★ 한 번 더 누르면 «뺄지» 묻고, 빼면 모든 길에서 빠진다', async () => {
+/* ⚠ 이 서식은 (인) 자리가 둘이다(공고문·지원서) — 한 번 더 누르면 «고르기 창»이 뜬다
+   (대표 승인 2026-09-29 목업). 모두 끄고 찍으면 뺀다 · 취소하면 그대로다. */
+test('★★ 한 번 더 누르면 고르기 창 — 모두 끄면 빼고, 빼면 모든 길에서 빠진다', async () => {
   const ctx = await 올린세상();
   await vm.runInContext('rhStampDoc(true)', ctx);
-  await vm.runInContext('rhStampDoc(false)', ctx);         /* 예 → 뺀다 */
+  ctx.rhStampPickAsk = async () => [];                      /* 모두 끔 → 뺀다 */
+  await vm.runInContext('rhStampDoc(false)', ctx);
   assert.equal(ctx._rhStampOn, false, '도장을 빼지 않았습니다');
+  assert.equal(ctx._rhStampPick, null, '뺐는데 고른 자리가 남았습니다');
   assert.equal(도장수(await 지어(ctx)), 0, '★ 뺐는데 지으면 도로 찍힙니다');
   assert.ok(!/_날인/.test(ctx._rhDoc.name), '뺐는데 이름이 «찍혔다»고 합니다');
-  /* 아니오면 그대로 */
-  const c2 = await 올린세상({ 예: false });
+  /* 취소면 그대로 */
+  const c2 = await 올린세상();
   await vm.runInContext('rhStampDoc(true)', c2);
+  c2.rhStampPickAsk = async () => null;
   await vm.runInContext('rhStampDoc(false)', c2);
-  assert.equal(c2._rhStampOn, true, '「아니오」인데 도장을 뺐습니다');
+  assert.equal(c2._rhStampOn, true, '「취소」인데 도장을 뺐습니다');
+});
+
+test('★★ 두 자리를 다 고르면 두 곳에 찍힌다 · 하나만 고르면 그 한 곳', async () => {
+  const ctx = await 올린세상();
+  ctx.rhStampPickAsk = async (spots) => spots.map((s) => s.key);
+  assert.equal(await vm.runInContext('rhStampDoc(false)', ctx), true);
+  assert.equal(도장수(await 지어(ctx)), 2, '고른 두 곳에 다 찍혀야 합니다');
+  const c2 = await 올린세상();
+  c2.rhStampPickAsk = async (spots) => [spots[spots.length - 1].key];
+  await vm.runInContext('rhStampDoc(false)', c2);
+  const x = await 지어(c2);
+  assert.equal(도장수(x), 1);
+  assert.ok(x.indexOf('<hp:pic') > x.indexOf('지원자'), '고른 «뒤» 자리에 찍혀야 합니다');
 });
 
 test('★★ 자리를 못 찾거나 도장이 없으면 «찍지 않고» 까닭을 말한다 — 표시도 남기지 않는다', async () => {
@@ -336,7 +355,7 @@ test('★ 임시저장에 표시도 담는다 — 안 담으면 이어서 연 �
   const ctx = await 올린세상();
   ctx._rhFilled = true; ctx._rhStampOn = true; ctx._rhPhotoOn = true; ctx._rhTidy.drop = { [SEC]: [0] }; ctx._rhTidy.ph = true;
   const p = JSON.parse(JSON.stringify(vm.runInContext('_rhOutPack()', ctx)));
-  assert.deepEqual(p, { filled: true, colMap: null, stamp: true, photo: true,
+  assert.deepEqual(p, { filled: true, colMap: null, stamp: true, stampPick: null, photo: true,
     tidy: { drop: { [SEC]: [0] }, ph: true, italic: false, rows: false } });
   assert.equal(vm.runInContext('_rhInEd()', ctx), false);
   ctx._rhHwpEd = {}; ctx._rhMode = 'edit';

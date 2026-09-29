@@ -110,6 +110,31 @@
     return { index: end + '</hp:run>'.length };
   }
 
+  /* ★ 자리를 «모두» 찾는다 (대표 지적 2026-09-29 「자동으로 넣어도 잘 안들어간다」).
+     공고문·신청서·서약서가 한 파일에 든 서식은 (인) 자리가 여럿이다 — 실측 3곳.
+     findSpot 은 맨 처음 것만 주어, 찍어야 할 서약서가 아니라 앞쪽 「작성자 (인)」에 찍혔다.
+     돌려주는 것: [{ index, label }] — label 은 그 자리 «앞 글자»(사람이 어느 자리인지 알아보게). */
+  function findSpots(sectionXml) {
+    var s = String(sectionXml || '');
+    var 조각 = 글자조각(s), out = [];
+    if (!조각.length) return out;
+    var 글 = '', 지도 = [], i, j, t;
+    for (i = 0; i < 조각.length; i++) {
+      t = 엔티티풀기(조각[i].text);
+      for (j = 0; j < t.length; j++) { 글 += t[j]; 지도.push(i); }
+    }
+    var re = new RegExp(MARKS.source, 'g'), m, 앞끝 = 0;
+    while ((m = re.exec(글))) {
+      var 끝조각 = 지도[Math.min(m.index + m[0].length - 1, 지도.length - 1)];
+      var end = s.indexOf('</hp:run>', 조각[끝조각].end);
+      if (end < 0) break;
+      var 앞 = 글.slice(Math.max(앞끝, m.index - 28), m.index).replace(/\s+/g, ' ').trim();
+      out.push({ index: end + '</hp:run>'.length, label: (앞 ? 앞 + ' ' : '') + m[0] });
+      앞끝 = m.index + m[0].length;
+    }
+    return out;
+  }
+
   function insertPic(sectionXml, pic, at) {
     var s = String(sectionXml || '');
     if (!at) return s;                    /* 자리가 없으면 문서를 그대로 — 망가뜨리지 않는다 */
@@ -145,7 +170,7 @@
     return 'image999';
   }
 
-  var api = { PX_TO_HU: PX_TO_HU, picXml: picXml, findSpot: findSpot,
+  var api = { PX_TO_HU: PX_TO_HU, picXml: picXml, findSpot: findSpot, findSpots: findSpots,
               insertPic: insertPic, addToManifest: addToManifest, nextImageId: nextImageId };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerHwpStamp = api;
