@@ -556,6 +556,37 @@ html.dark .empty{color:var(--text-mute)}
 .nav-item:hover .ncnt{color:#e2e8f0}
 /* 이력서관리 화면 콤팩트 (양식 가져오기·보관함·편집·증명서 보관함) */
 #page-resume-hub .card,#page-docbox .card{padding:12px;margin-bottom:8px!important}
+/* ── 서류 보관함: 탭+검색 한 줄 · 기관별 묶음 · 오른쪽 미리보기 (대표 승인 2026-09-29 목업 B+C) ── */
+.db-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--border);margin:10px 0 10px}
+.db-top .tabrow{border-bottom:none;margin:0;flex:0 1 auto}
+#dbTools{margin-left:auto;display:flex;align-items:center;min-width:0}
+#dbTools .toolbar{margin:0!important;padding:4px 0;border:0;background:none;box-shadow:none;flex-wrap:wrap;gap:6px}
+#dbTools .toolbar .tb-input{min-width:180px!important}
+.ds-split{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start;margin-top:6px}
+@media(max-width:1000px){ .ds-split{grid-template-columns:1fr} .ds-prev{position:static!important} }
+.ds-grp{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--soft,#f8fafc);border-radius:8px;margin-top:8px;font-weight:700;color:var(--navy);cursor:pointer;font-size:13px;user-select:none}
+.ds-grp .m{font-weight:400;color:var(--text-mute);font-size:11.5px}
+#page-docbox .card.ds-card[data-dsrow]{display:flex;align-items:center;gap:8px;padding:4px 8px!important;margin:0!important;border:0;border-bottom:1px solid var(--border);border-radius:0;box-shadow:none;flex-wrap:nowrap;cursor:pointer;min-height:32px;white-space:nowrap}
+#page-docbox .ds-card[data-dsrow]:hover{background:#f8fafc}
+#page-docbox .ds-card[data-dsrow].pick{background:#eff6ff}
+.ds-card[data-dsrow] .t{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+.ds-card[data-dsrow] .s{color:var(--text-mute);font-size:11px;overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
+.ds-card[data-dsrow] .ds-kind{font-size:11px;padding:1px 6px;border-radius:6px;background:var(--soft,#f8fafc);color:var(--text-mute);margin-left:auto}
+.ds-card[data-dsrow] .ds-day{font-size:11px;color:var(--text-mute);min-width:36px;text-align:right}
+.ds-ok{font-size:11px;color:var(--green,#16a34a);min-width:74px}
+.ds-nosub{font-size:11px;color:var(--text-mute);min-width:74px}
+.ds-ic{display:inline-flex;gap:2px}
+.ds-ic .btn.sm{padding:1px 6px;font-size:12px}
+.ds-prev{position:sticky;top:10px;border:1px solid var(--border);border-radius:10px;background:var(--card,#fff);padding:10px}
+.ds-pv-empty{color:var(--text-mute);font-size:12px;text-align:center;padding:28px 8px;line-height:1.7}
+.ds-pv-img{background:#e2e8f0;border-radius:6px;min-height:120px;max-height:380px;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;margin-bottom:8px}
+.ds-pv-img>span{color:var(--text-mute);font-size:11.5px;padding:40px 6px}
+.ds-pv-img canvas,.ds-pv-img img,.ds-pv-img svg{width:100%!important;height:auto!important;display:block}
+.ds-pv-t{font-weight:700;color:var(--navy);font-size:13.5px;margin-bottom:6px;line-height:1.4}
+.ds-pv-kv{display:flex;gap:8px;font-size:12px;padding:2px 0}
+.ds-pv-kv span{color:var(--text-mute);min-width:48px;flex:none}
+.ds-pv-kv b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-pv-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
 #page-resume-hub .rc-h,#page-docbox .rc-h{margin-bottom:6px}
 #page-resume-hub .empty,#page-docbox .empty{padding:12px 0}
 #page-resume-hub .dropzone,#page-docbox .dropzone{padding:11px 14px}
@@ -1670,10 +1701,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
            ⚠ 칸 id 는 종류마다 그대로 두었다(rs*·pf*·cd*) — renderDocStore 가 그대로 찾는다. -->
       <section class="page-view" id="page-docbox" ondragover="pageDropOver(event,_dbDomain)" ondragleave="pageDropLeave(event)" ondrop="pageDropFile(event,_dbDomain)"><div class="page"><div class="page-drop-overlay" id="ovl-page-docbox"><span>📎 파일을 놓으면 지금 탭의 보관함에 저장됩니다</span></div>
         <h2>서류 보관함</h2><div class="desc">이력서·프로필·경력증명서를 한 곳에서 — 원본 양식과 완성본을 함께 보관</div>
+        <!-- ★ 탭과 검색을 «한 줄»에 (대표 승인 2026-09-29 목업 B) — 검색 줄은 dbToolsMount 가 이리로 옮긴다 -->
+        <div class="db-top">
         <div class="tabrow" id="db-tabrow">
           <button class="tab active" data-db="resume" onclick="dbTab('resume',this)">📄 이력서</button>
           <button class="tab" data-db="profile" onclick="dbTab('profile',this)">👤 프로필</button>
           <button class="tab" data-db="certdoc" onclick="dbTab('certdoc',this)">🏅 경력증명서</button>
+        </div>
+        <div id="dbTools"></div>
         </div>
         <div class="tabpanel active" id="db-resume">
         <div class="toolbar">
@@ -5430,9 +5465,21 @@ function checkFilename(){
    ⚠ 칸 id 는 종류마다 다르게 두었다(rs*·pf*·cd*) — 그래서 renderDocStore 는 손대지 않았고
       숨은 탭을 그려도 서로 덮어쓰지 않는다. */
 var _dbDomain='resume';
+/* 세 보관함의 검색 줄을 탭 옆(#dbTools)으로 옮기고 «지금 탭 것만» 보인다.
+   ⚠ 옮기기만 한다 — 칸 id·단추는 그대로라 검색·추가가 전과 같이 돈다. */
+function dbToolsMount(domain){
+  var box=document.getElementById('dbTools'); if(!box) return;
+  ['resume','profile','certdoc'].forEach(function(d){
+    var D=DOMAINS[d], s=D&&document.getElementById(D.search), tb=s&&s.closest('.toolbar');
+    if(!tb) return;
+    if(tb.parentNode!==box){ tb.setAttribute('data-db',d); box.appendChild(tb); }
+    tb.style.display=(d===domain)?'':'none';
+  });
+}
 function dbTab(domain,btn){
   if(!DOMAINS[domain]) return;
   _dbDomain=domain;
+  _safe(function(){ dbToolsMount(domain); });
   document.querySelectorAll('#page-docbox .tabpanel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('#db-tabrow .tab').forEach(b=>b.classList.remove('active'));
   const panel=document.getElementById('db-'+domain); if(panel) panel.classList.add('active');
@@ -6381,6 +6428,7 @@ async function cdReOcr(id){
 }
 
 function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.getElementById(D.page); if(!sec) return;
+  _safe(function(){ dbToolsMount((typeof _dbDomain!=='undefined'&&_dbDomain)||'resume'); });
   const arr=get(D.store);
   const orgSel=document.getElementById(D.orgFilter); if(!orgSel) return; const cur=orgSel.value;
   const orgs=[...new Set(arr.map(r=>r.org).filter(Boolean))].sort();
@@ -6399,7 +6447,6 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
   }
   if(!rows.length){ body.innerHTML=cdBar+'<div class="empty"><div class="emp-ico">📭</div>보관된 '+D.label+'이(가) 없습니다</div>'; return; }
   if(D.tableView){ body.innerHTML=cdBar+_cdTable(rows,D); return; }
-  const years=[...new Set(rows.map(r=>r.year))].sort().reverse();
   /* ★ № 넘버링 + ㅁ 고르기 (대표 지시 2026-09-28) — 번호는 해를 «통틀어» 이어 센다
      (해마다 1번이 있으면 가리킬 수 없다 — 작성 중 목록과 같은 까닭). 옷은 목록 화면과 같다. */
   let 번호=0;
@@ -6412,25 +6459,116 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
     +'<button class="btn sm" type="button" style="color:var(--red)" onclick="docSelDel(\''+domain+'\',this)">🗑 선택 삭제</button></div>';
   const allChk='<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mute);cursor:pointer;margin-top:6px">'
     +'<input type="checkbox" class="ds-all" onchange="docSelAll(\''+domain+'\',this.checked)"> 전체 선택</label>';
-  body.innerHTML=allChk+dsBar+years.map(y=>{ const items=rows.filter(r=>r.year===y).sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
-    return `<div style="margin-top:16px"><div style="font-weight:700;color:var(--navy);font-size:15px;margin-bottom:8px">${escapeHtml(y)} <span style="font-size:12px;color:var(--text-mute);font-weight:400">(${items.length}건)</span></div>`
-      + items.map(r=>{ const n=(r.submits||[]).length; 번호++;
-        const extraTxt=(D.extra||[]).map(f=>r[f.key]?`${f.label.split('(')[0]}: ${escapeHtml(r[f.key])}`:'').filter(Boolean).join(' · ');
-        return `<div class="card ds-card" data-id="${_jsAttr(r.id)}" style="margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  /* ★ 기관별 묶음 + 오른쪽 미리보기 (대표 승인 2026-09-29 목업 B+C)
+     「일반 이력서 · 제안서 평가위원 후보자」만 적힌 두꺼운 카드로는 무슨 서류인지 알 수 없었다.
+     ⚠ 줄의 이름표(ds-card · ds-no · row-chk · ds-all)는 그대로 둔다 — 고르기·끌어 고르기·선택 내려받기가 그것을 본다.
+     ⚠ № 는 묶음을 «통틀어» 이어 센다. 접힌 묶음도 번호는 센다(펼쳐도 번호가 안 바뀌게). */
+  const 묶음={};
+  rows.forEach(r=>{ const k=r.org||'(기관 없음)'; (묶음[k]=묶음[k]||[]).push(r); });
+  const 차례=Object.keys(묶음).map(k=>({k, items:묶음[k].sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''))}))
+    .sort((x,y)=>(y.items[0].savedAt||'').localeCompare(x.items[0].savedAt||''));
+  if(_dsPicked[domain] && !rows.some(r=>r.id===_dsPicked[domain])) _dsPicked[domain]=null;
+  const 목록=차례.map(g=>{
+    const 접힘=!!_dsFold[domain+'|'+g.k];
+    const 낸=g.items.filter(r=>(r.submits||[]).length).length;
+    const 끝=_dsDay(g.items[0].savedAt);
+    const 머리=`<div class="ds-grp" onclick="dsGrpToggle('${domain}','${_jsAttr(g.k)}')">${접힘?'▸':'▾'} ${escapeHtml(g.k)}`
+      +`<span class="m">${g.items.length}건${끝?' · 마지막 '+끝:''}</span><span style="flex:1"></span>`
+      +`<span class="m" style="color:${낸===g.items.length?'var(--green)':'var(--text-mute)'}">제출 ${낸}/${g.items.length}</span></div>`;
+    if(접힘){ 번호+=g.items.length; return 머리; }
+    return 머리+g.items.map(r=>{ const n=(r.submits||[]).length; 번호++;
+      const T=dsTitleOf(r, D);
+      const extraTxt=(D.extra||[]).map(f=>r[f.key]?`${f.label.split('(')[0]}: ${r[f.key]}`:'').filter(Boolean).join(' · ');
+      const 옆=[T.사람, r.memo, extraTxt].filter(Boolean).map(escapeHtml).join(' · ');
+      const 제출=n?`<span class="ds-ok">✔ ${escapeHtml(_dsShort(r.submits[0].date))}${r.submits[0].method?' '+escapeHtml(r.submits[0].method):''}</span>`:'<span class="ds-nosub">아직</span>';
+      return `<div class="card ds-card" data-id="${_jsAttr(r.id)}" data-dsrow="1" onclick="dsRowClick(event,'${domain}','${_jsAttr(r.id)}')">
           <label class="rn-chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="row-chk" value="${_jsAttr(r.id)}" onchange="docSelSync('${domain}')"><span class="ds-no" style="font-weight:700;color:var(--navy);min-width:22px;font-size:12.5px">${번호}</span></label>
-          <div style="flex:1;min-width:180px"><div style="font-weight:600">${escapeHtml(r.kind||'-')}${r.org?` · ${escapeHtml(r.org)}`:''}</div>
-          ${extraTxt?`<div style="font-size:11px;color:var(--navy);margin-top:2px">${extraTxt}</div>`:''}
-          <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHtml(r.memo||'')}</div>
-          ${_docDlTag(domain,r)}</div>
-          ${_cdSrc(r)==='received'
-            ? `<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄 원본</button>`
-            : `<button class="btn sm" onclick="showBig('${r.genFileId}')" onmouseenter="hoverThumb('${r.genFileId}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📄 ${D.label}</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','gen')" title="내려받기 — 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇</button>`
-              + (r.origFileId?`<button class="btn sm" onclick="showBig('${r.origFileId}')" onmouseenter="hoverThumb('${r.origFileId}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📎 원본</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="원본 양식 내려받기 — 기록이 남습니다">⬇</button>`:'')}
-          <button class="btn sm" onclick="openSubmitLog('${domain}','${r.id}')">🧾 제출기록${n?`(${n})`:''}</button>
-          <button class="btn sm" onclick="delDoc('${domain}','${r.id}',this)" style="color:#dc2626">삭제</button>
-        </div>`; }).join('') + '</div>';
+          <span class="t" title="${escapeHtml(r.genName||'')}">${escapeHtml(T.t)}</span><span class="s">${옆}${옆&&(r.downloads||[]).length?' · ':''}${_docDlInline(domain,r)}</span>
+          <span class="ds-kind">${escapeHtml(r.kind||'-')}</span><span class="ds-day">${escapeHtml(_dsDay(r.savedAt))}</span>${제출}
+          <span class="ds-ic">${_cdSrc(r)==='received'
+            ? `<button class="btn sm" title="원본 보기" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄</button>`
+            : `<button class="btn sm" title="${D.label} 보기" onclick="showBig('${r.genFileId}')">📄</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','gen')" title="내려받기 — 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇</button>`
+              + (r.origFileId?`<button class="btn sm" title="원본 양식 보기" onclick="showBig('${r.origFileId}')">📎</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="원본 양식 내려받기 — 기록이 남습니다">⬇</button>`:'')}
+          <button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
+        </div>`; }).join('');
   }).join('');
+  body.innerHTML=allChk+dsBar+`<div class="ds-split"><div class="ds-list">${목록}</div><div class="ds-prev" id="dsPrev-${domain}"></div></div>`;
+  _safe(function(){ var 고른=_dsPicked[domain]; if(고른) [].forEach.call(body.querySelectorAll('[data-dsrow]'), function(el){ if(el.getAttribute('data-id')===고른) el.classList.add('pick'); }); dsPrevDraw(domain); });
   _safe(function(){ bindDragSel(body, function(){ docSelSync(domain); }); });
+}
+/* ── 서류 보관함 도우미 (대표 승인 2026-09-29 목업 B+C) ── */
+var _dsFold={}, _dsPicked={}, _dsPvTok=0;
+function _dsDay(v){ var t=new Date(v); if(isNaN(t)) return ''; return ('0'+(t.getMonth()+1)).slice(-2)+'.'+('0'+t.getDate()).slice(-2); }
+function _dsShort(v){ var m=String(v||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):String(v||''); }
+/* 줄에 쓸 «무슨 서류인가» — 저장 이름(해년 기관 서류제목_이름 날짜)에서 해·날짜·기관을 걷고 이름을 떼어 낸다.
+   ⚠ 옛 이름(「이력서_기관_2026」)이거나 뭉뚱그린 말(양식 등)이면 원본 양식 이름 → 종류 순으로 물러선다. */
+function dsTitleOf(r, D){
+  var raw=String(r.genName||'');
+  var 옛=/^(이력서|프로필|경력증명서)_[^_]*_\d{4}\.\w+$/.test(raw);
+  var n=raw.replace(/\.(hwpx?|pdf|docx?)$/i,'').replace(/^\s*\d{4}\s*년\s*/,'')
+    .replace(/\s*\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?\s*$/,'').trim();
+  var 사람='', m=n.match(/_([가-힣]{2,4})$/);
+  if(m){ 사람=m[1]; n=n.slice(0,-m[0].length).trim(); }
+  if(r.org && n.indexOf(r.org)===0 && n.length>r.org.length) n=n.slice(r.org.length).trim();
+  var 뭉뚱=/^(양식|서식|문서|원본|무제|서류|document|untitled|새 문서)$/i;
+  if(!n || 옛 || 뭉뚱.test(n)){
+    var o=String(r.origName||'').replace(/\.(hwpx?|pdf|docx?)$/i,'').trim();
+    n=(o && !뭉뚱.test(o))?o:(r.kind||'(이름 없음)');
+  }
+  return { t:n, 사람:사람 };
+}
+function dsGrpToggle(domain,k){ var key=domain+'|'+k; _dsFold[key]=!_dsFold[key]; renderDocStore(domain); }
+function dsRowClick(ev,domain,id){
+  if(ev && ev.target && ev.target.closest && ev.target.closest('button,input,label,a,select')) return;
+  _dsPicked[domain]=id;
+  var body=document.getElementById(DOMAINS[domain].body);
+  if(body) [].forEach.call(body.querySelectorAll('[data-dsrow]'), function(el){ el.classList.toggle('pick', el.getAttribute('data-id')===id); });
+  dsPrevDraw(domain);
+}
+/* 오른쪽 미리보기 — 누른 줄의 첫 장과 정보.
+   ⚠ 한글 엔진은 «누를 때만» 부른다 — 목록을 그릴 때마다 서류를 다 그리면 멎는다.
+   ⚠ 늦게 끝난 옛 그리기가 새 것을 덮지 않게 차례표(_dsPvTok)를 본다. */
+function dsPrevDraw(domain){
+  var D=DOMAINS[domain], box=document.getElementById('dsPrev-'+domain); if(!box) return;
+  var id=_dsPicked[domain], r=id?get(D.store).find(function(x){ return x.id===id; }):null;
+  if(!r){ box.innerHTML='<div class="ds-pv-empty">왼쪽에서 서류를 누르면<br>여기에 첫 장과 정보가 보입니다</div>'; return; }
+  var T=dsTitleOf(r,D), n=(r.submits||[]).length;
+  var 줄=function(k,v){ return v?'<div class="ds-pv-kv"><span>'+k+'</span><b>'+escapeHtml(v)+'</b></div>':''; };
+  var 받은=_cdSrc(r)==='received';
+  box.innerHTML='<div class="ds-pv-img" id="dsPvImg-'+domain+'"><span>불러오는 중…</span></div>'
+    +'<div class="ds-pv-t">'+escapeHtml(T.t)+'</div>'
+    +줄('기관',r.org)+줄('누구',T.사람)+줄('종류',r.kind)+줄('만든 날',(r.savedAt||'').slice(0,10))
+    +줄('원본',r.origName)+줄('파일',r.genName)+줄('메모',r.memo)
+    +'<div class="ds-pv-kv"><span>제출</span><b>'+(n?escapeHtml((r.submits[0].date||'')+' '+(r.submits[0].method||''))+(n>1?' 외 '+(n-1)+'건':''):'아직')+'</b></div>'
+    +_docDlTag(domain,r)
+    +'<div class="ds-pv-btns">'
+    +(받은?'':'<button class="btn sm" onclick="showBig(\''+r.genFileId+'\')">📄 크게 보기</button><button class="btn sm" onclick="docDl(\''+domain+'\',\''+r.id+'\',\'gen\')">⬇ 받기</button>')
+    +(r.origFileId?'<button class="btn sm" onclick="showBig(\''+r.origFileId+'\')">📎 원본</button>':'')
+    +'<button class="btn sm" onclick="openSubmitLog(\''+domain+'\',\''+r.id+'\')">🧾 제출기록'+(n?'('+n+')':'')+'</button>'
+    +'<button class="btn sm" style="color:#dc2626" onclick="delDoc(\''+domain+'\',\''+r.id+'\',this)">삭제</button></div>';
+  var tok=++_dsPvTok, fid=r.genFileId||'';
+  (async function(){
+    var img=document.getElementById('dsPvImg-'+domain);
+    if(!img) return;
+    if(!fid){ img.innerHTML='<span>미리 볼 파일이 없습니다</span>'; return; }
+    var f=getFile(fid)||await getFileAsync(fid);
+    if(tok!==_dsPvTok) return;
+    if(!f||!f.base64){ img.innerHTML='<span>이 기기에 파일이 없습니다</span>'; return; }
+    var ext=String(f.ext||String(f.name||'').split('.').pop()||'').toLowerCase();
+    if(/^(png|jpe?g|gif|webp)$/.test(ext)){ img.innerHTML='<img alt="" src="'+fileURL(fid)+'">'; return; }
+    if(/^(hwp|hwpx)$/.test(ext) && window.PureunHwp && PureunHwp.renderPreview){
+      try{
+        var tmp=document.createElement('div');
+        await PureunHwp.renderPreview(tmp, new Uint8Array(b64ToAb(f.base64)), f.name||('문서.'+ext));
+        if(tok!==_dsPvTok) return;
+        var 첫=tmp.querySelector('canvas,img,svg');
+        img.innerHTML='';
+        if(첫){ 첫.removeAttribute('style'); img.appendChild(첫); } else img.innerHTML='<span>첫 장을 못 그렸습니다</span>';
+      }catch(e){ if(tok===_dsPvTok) img.innerHTML='<span>첫 장을 못 그렸습니다</span>'; }
+      return;
+    }
+    img.innerHTML='<span>'+(ext==='pdf'?'PDF — 「📄 크게 보기」로 봅니다':'미리 보기를 못 하는 형식입니다')+'</span>';
+  })();
 }
 /* ── ⬇ 내려받기 기록 (대표 지시 2026-09-28 「다운받을 경우 내용과 다운받은 날짜등이 저장되어야 한다」) ──
    무엇을(이력서/원본 양식 · 파일 이름 · 종류·기관) «언제» 내려받았는지 그 서류 줄에 남긴다(downloads).
@@ -6443,6 +6581,11 @@ function _docDlTag(domain,r){
   var 때=isNaN(t)?'':(t.getFullYear()+'.'+('0'+(t.getMonth()+1)).slice(-2)+'.'+('0'+t.getDate()).slice(-2)+' '+('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2));
   return '<div style="margin-top:3px"><a href="#" onclick="openDocDlLog(\''+domain+'\',\''+_jsAttr(r.id)+'\');return false"'
     +' style="font-size:11px;color:var(--teal);text-decoration:none">⬇ 내려받음 '+d.length+'회 · 마지막 '+escapeHtml(때)+' ('+escapeHtml(d[0].what||'')+')</a></div>';
+}
+/* 한 줄 목록에 넣는 내려받기 기록 — 줄을 두 줄로 만들지 않는다(글자는 _docDlTag 와 같다) */
+function _docDlInline(domain,r){
+  var h=_docDlTag(domain,r); if(!h) return '';
+  return h.replace(/^<div[^>]*>/,'').replace(/<\/div>$/,'');
 }
 async function docDl(domain,id,which,quiet){
   var D=DOMAINS[domain]; if(!D) return false;
