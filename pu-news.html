@@ -116,6 +116,14 @@ input,select,textarea{font-family:inherit;font-size:14px}
 /* 안내문 탭 — 왼쪽 목록 · 오른쪽 쓰기 (2026-09-23). 폰에서는 위아래로 쌓는다. */
 .notegrid{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px;align-items:start;margin-top:14px}
 @media (max-width:760px){.notegrid{grid-template-columns:1fr}}
+.notedrop{min-height:190px;border:2px dashed var(--line);border-radius:14px;background:#fff;
+  display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;transition:.15s ease}
+.notedrop.drag{border-color:var(--brown);background:var(--brown-soft);transform:translateY(-1px)}
+.notedrop .big{font-size:34px;line-height:1;margin-bottom:10px}.notedrop .ttl{font-size:17px;font-weight:800}
+.notedrop .sub{color:var(--sub);font-size:13px;line-height:1.65;margin-top:7px}
+.notedefault{margin-top:12px}.notedefault h3{display:flex;align-items:center;gap:8px}
+.notedefault .tag{font-size:11px;color:var(--ok);background:#dcfce7;border-radius:99px;padding:3px 8px}
+.notedefault .hint{margin:0 0 9px}.notedefault #ntDefaultPreview{min-height:360px}
 
 /* ★ 담는 법 — 카드 셋을 «한 줄 띠»로 (대표 지시 2026-09-05 「크기 좀 줄여라,
    불필요한 내용 줄이고」). 카드 셋이 세로로 200px 쯤 잡아먹어, 정작 짓는 곳인
@@ -1317,7 +1325,9 @@ function render(){
   if(App.tab==='noaddr'){ 명함읽기(); m.innerHTML = 주소없는곳화면(); }
   if(App.tab==='res')  m.innerHTML = 결과화면();
   if(App.tab==='cfg')  m.innerHTML = 설정화면();
-  /* ⚠ 미리보기는 이제 팝업(크게보기)뿐이다 — 여기서 그릴 것이 없다 */
+  /* 안내문이 하나도 없어도 «보내기 전 실제 모양»을 보여 준다. 빈 화면에서는 무엇을
+     만드는지 판단할 수 없고, 자료 놓는 자리도 찾지 못했다(대표 지시 2026-09-29). */
+  if(App.tab==='note' && !지금안내()) 안내기본미리보기그리기();
   /* ★ 노무사회 서랍은 «떠 있는 창»이다 (대표 지시 2026-09-06
        「검토 내용이 아래로 내려가서 더이상 볼 수가 없다 … 근본적으로 해결」).
      ⚠ 예전에는 꼭지 «위»에 끼워 넣었다. 그것이 제 키를 다 먹고 꼭지 넷을
@@ -3667,8 +3677,54 @@ function 안내문화면(){
     <div class="pad hint">뉴스레터와 «따로» 나갑니다 — 한 건만, 「확인 요청」 모양으로.
       보내는 주소·명단·수신거부는 뉴스레터와 같습니다.</div>
    </div>
-   <div>${x ? 안내편집(x) : '<div class="box"><div class="pad hint">왼쪽에서 안내문을 고르거나 「＋ 새 안내문」을 눌러 주세요.</div></div>'}</div>
+   <div>${x ? 안내편집(x) : 안내빈화면()}</div>
   </div>`;
+}
+
+/* 안내문은 «특별 자료 한 건을 보내는 곳»이다. 누르면 파일창만 뜨는 작은 단추보다,
+   빈 영역 자체를 놓는 자리로 쓴다. dragenter/dragleave 는 자식 사이를 오갈 때도 불리므로
+   relatedTarget 이 안쪽이면 모양을 풀지 않는다. */
+function 안내빈화면(){
+  return `<div class="box">
+    <div class="pad">
+      <div id="ntDrop" class="notedrop" ondragenter="안내끌기(event,true)" ondragover="안내끌기(event,true)"
+        ondragleave="안내끌기(event,false)" ondrop="안내자료놓기(event)">
+        <div><div class="big">📄</div><div class="ttl">특별 안내 자료를 여기에 놓으세요</div>
+        <div class="sub">PPT·PDF·한글·워드·엑셀·사진을 창 안으로 끌어 놓으면<br>업로드한 자료 한 건을 보내는 안내문 초안이 바로 만들어집니다.</div>
+        <label class="btn" style="display:inline-block;cursor:pointer;margin-top:13px">파일을 직접 고르기
+          <input type="file" style="display:none" accept=".pdf,.ppt,.pptx,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+            onchange="자료로안내문(this.files[0]);this.value=''"></label></div>
+      </div>
+    </div>
+   </div>
+   <div class="box notedefault">
+    <h3>보내기 전 기본 디자인 <span class="tag">항상 미리보기</span></h3>
+    <div class="pad"><div class="hint">자료를 아직 올리지 않아도 실제 메일의 기본 모양을 먼저 확인할 수 있습니다.</div>
+      <div id="ntDefaultPreview"></div></div>
+   </div>`;
+}
+
+function 안내끌기(ev, 켬){
+  ev.preventDefault(); ev.stopPropagation();
+  const z = document.getElementById('ntDrop'); if(!z) return;
+  if(!켬 && ev.relatedTarget && z.contains(ev.relatedTarget)) return;
+  z.classList.toggle('drag', !!켬);
+  if(ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
+}
+function 안내자료놓기(ev){
+  ev.preventDefault(); ev.stopPropagation(); 안내끌기(ev,false);
+  const files = ev.dataTransfer && ev.dataTransfer.files;
+  if(!files || !files.length) return toast('파일을 이 상자 안에 놓아 주세요', 6000);
+  if(files.length > 1) toast('안내문 한 건에는 먼저 놓은 자료 1개를 올립니다. 나머지는 초안에서 더 넣을 수 있습니다.', 9000);
+  자료로안내문(files[0]);
+}
+
+function 안내기본미리보기그리기(){
+  const 견본 = Notice.안내짓기({ 제목:'사업장 특별 안내',
+    요점:['보내 드린 자료의 내용을 확인해 주세요','필요한 사항은 담당 노무사에게 회신해 주세요'],
+    본문:'푸른노무법인에서 사업장에 필요한 특별 안내를 보내 드립니다.' },
+    App.설정 || {}, { 날짜:Date.now() });
+  if(견본) 편지창채우기('ntDefaultPreview', Notice.담당채우기(견본.서식, '담당 노무사'));
 }
 
 function 안내편집(x){
