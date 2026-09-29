@@ -10134,6 +10134,8 @@ function _siteDocGrab(){
      쳐 둔 사용자대표·중소기업 값이 «말없이 사라진다». 창이 갈렸다 다시 그려지기 때문이다. */
   UREP_FIELDS.forEach(function(c){ var el=$('su-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
   SME_FIELDS.forEach(function(c){ var el=$('sm-'+c[0]); if(el&&String(el.value||'').trim()) keep[c[0]]=el.value.trim(); });
+  /* 도로명과 짝인 지번(숨은 칸) — 다녀오는 사이 잃지 않게 */
+  [['se-','address_alt'],['sw-','wrep_addr_alt'],['su-','urep_addr_alt']].forEach(function(p){ var el=$(p[0]+p[1]); if(el&&String(el.value||'').trim()) keep[p[1]]=el.value.trim(); });
   if(Object.keys(keep).length) _siteDocKeep=keep;
 }
 /* 재직증명서는 «근로자대표 칸»(sw-)으로 간다 — 사업장 칸(se-)이 아니다.
@@ -11945,12 +11947,26 @@ function _addrStack(prefix,s,onSearchFn){
 }
 /* 사업장 소재지 검색 — 편집창을 겹쳐 띄우지 않는 이 파일의 관례를 따른다
    (openDocConfirm·applyDocFound 와 같은 「걷어두기→닫기→다시 열기」). */
+/* 집 주소 검색 — 사업장 소재지 검색과 같은 「걷어두기→닫기→다시 열기」. 도로명은 칸에, 지번은 _alt 에 */
+function repAddrSearch(pre,f){
+  var cur=$(pre+f);
+  _siteDocGrab(); closeM();
+  openAddressSearch(function(r){
+    var keep=Object.assign({},_siteDocKeep||{});
+    keep[f]=r.roadAddress||r.address; keep[f+'_alt']=(r.roadAddress&&r.jibunAddress)?r.jibunAddress:'';
+    var _sid=_siteEditSid||''; _siteDocKeep=null;
+    editSite(_sid,keep);
+    toast('집 주소를 채워 편집 창을 다시 열었습니다 — 확인 후 [저장]');
+  }, cur?cur.value:'');
+}
 function siteAddrSearch(){
   var cur=$('se-address');
   _siteDocGrab(); closeM();
   openAddressSearch(function(r){
     var keep=Object.assign({},_siteDocKeep||{});
     keep.zipcode=r.zipcode; keep.address=r.address;
+    /* 지번도 곁에 둔다 — 특수관계 점검의 «같은 사무실 주소»가 도로명·지번 두 표기를 같은 곳으로 본다 */
+    keep.address_alt=(r.roadAddress&&r.jibunAddress)?r.jibunAddress:'';
     var _sid=_siteEditSid||''; _siteDocKeep=null;
     editSite(_sid,keep);
     toast('주소를 채워 편집 창을 다시 열었습니다 — 확인 후 [저장]');
@@ -12010,6 +12026,14 @@ function editSite(sid,prefill){
       +(uro?' readonly title="대표자 칸을 따라갑니다 — 체크를 끄면 따로 적을 수 있습니다" style="background:var(--bg);color:var(--sub)"':'')
       +'>';
     var wCell='<input id="sw-'+wc[0]+'" type="'+wc[2]+'" value="'+esc(s[wc[0]]||'')+'">';
+    /* ★ 집 주소 — [🔍]로 고르면 도로명·지번을 «둘 다» 담는다(2026-09-29 특수관계 점검 둘째). 한 사람은 도로명,
+         한 사람은 지번으로 적혀 있어도 같은 집으로 알아보려고. 손으로 고치면 옛 지번은 지운다(어긋나지 않게). */
+    if(uc[0]==='urep_addr'){
+      var ab=function(pre,f){ return '<div style="display:flex;gap:4px">'+(pre==='su-'?uCell:wCell).replace('<input ','<input oninput="var h=$(\''+pre+f+'_alt\');if(h)h.value=\'\'" style="flex:1;min-width:0" ')
+        +'<button type="button" onclick="repAddrSearch(\''+pre+'\',\''+f+'\')" title="주소 검색 — 도로명·지번을 함께 담아 특수관계 점검이 두 표기를 같은 집으로 봅니다" style="padding:0 7px">🔍</button>'
+        +'<input type="hidden" id="'+pre+f+'_alt" value="'+esc(s[f+'_alt']||'')+'"></div>'; };
+      uCell=ab('su-','urep_addr'); wCell=ab('sw-','wrep_addr');
+    }
     return [줄이름,[uCell,wCell]];
   });
   var repTbl2=_repTable(['사용자 대표','근로자 대표'],repRows2);
@@ -12046,7 +12070,7 @@ function editSite(sid,prefill){
          거기서 읽으면 이 창이 값과 함께 다시 열린다 — 돌아오는 길은 그대로다. */
     +'<div id="siteDocOut" style="margin:0 0 10px"></div>'
     +'<div class="secbox"><div class="bh">🏢 기업정보 <span class="d">— 상호·번호·규모 등</span></div>'
-      +'<div class="gridw">'+flds+'<div class="fld full"><label>소재지</label>'+_addrStack('se-',s,'siteAddrSearch')+'</div></div></div>'
+      +'<div class="gridw">'+flds+'<div class="fld full"><label>소재지</label>'+_addrStack('se-',s,'siteAddrSearch')+'<input type="hidden" id="se-address_alt" value="'+esc(s.address_alt||'')+'">'+'</div></div></div>'
     +'<div class="secbox"><div class="bh">👤 대표자 · 담당자 '
       +'<span class="d">— 사업장 실무 담당자입니다(대표자·협의회 위원과 다릅니다)</span></div>'+repTbl1+'</div>'
     /* ★ 사용자대표 — 대표자와 «다른 사람»이다. 협의회에 사용자측으로 나오는 사람. */
@@ -12084,6 +12108,10 @@ function saveSite(sid){
   var _us=$('su-urep_same');
   if(_us&&_us.checked){ obj.urep_same=true; obj.urep_name=''; } else { delete obj.urep_same; }
   SME_FIELDS.forEach(function(c){var el=$('sm-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
+  /* 도로명과 짝인 지번 — 검색으로 고른 것만 남는다. 주소를 손으로 바꿨는데 지번이 그대로면 옛 지번이라 지운다 */
+  [['se-','address'],['sw-','wrep_addr'],['su-','urep_addr']].forEach(function(p){ var el=$(p[0]+p[1]+'_alt'); if(!el) return;
+    var alt=el.value.trim(); if(String(obj[p[1]]||'')!==String(base[p[1]]||'')&&alt===String(base[p[1]+'_alt']||'')) alt='';
+    obj[p[1]+'_alt']=alt; });
   if(!obj.name){ toast('상호를 입력하세요','warn'); return; }
   // 담당자: 기존 contacts 배열 유지하되 대표 담당자 항목만 갱신(없으면 추가)
   var pc=_primaryContact(obj), cv={};
@@ -12106,6 +12134,7 @@ function saveSite(sid){
     /* ⚠ 사용자대표·중소기업 칸도 함께 보낸다(2026-09-29 고침) — 여태 SITE+WREP 만 보내서, 있던 사업장을
          편집 창에서 고치면 사용자대표 이름·직위·「대표자와 같은 사람」 체크·중소기업 칸이 «말없이» 안 저장됐다. */
     SITE_FIELDS.concat(WREP_FIELDS,UREP_FIELDS,SME_FIELDS).forEach(function(c){ if(Object.prototype.hasOwnProperty.call(obj,c[0])) patch[c[0]]=obj[c[0]]; });
+    ['address_alt','wrep_addr_alt','urep_addr_alt'].forEach(function(k){ if(Object.prototype.hasOwnProperty.call(obj,k)) patch[k]=obj[k]||null; });
     patch.urep_same=obj.urep_same?true:null;
     /* ⚠ wrep_doc 은 여기 목록에 없다 — update 는 적힌 칸만 건드리므로 연결이 살아남는다.
        set(전체 덮어쓰기)으로 바꾸면 저장할 때마다 재직증명서 연결이 사라진다. */
@@ -12595,9 +12624,9 @@ function relatedPeople(f,sites){
   (sites||[]).forEach(function(s){ if(!s||s.status==='closed') return; bySid[s._id]=s;
     var u=_siteUrep(s), w=_siteWrep(s);
     String(s.ceo||'').split(/[,，]/).map(_relNm).filter(function(n){ return n.length>=2; }).forEach(function(n){
-      out.push({name:n, birth:u.same?u.birth:'', addr:u.same?String(s.urep_addr||''):'', co:s.name, sid:s._id, role:'대표자'}); });
-    if(!u.same&&_relNm(u.name).length>=2) out.push({name:_relNm(u.name), birth:u.birth, addr:String(s.urep_addr||''), co:s.name, sid:s._id, role:'사용자대표'});
-    if(_relNm(w.name).length>=2) out.push({name:_relNm(w.name), birth:w.birth, addr:String(s.wrep_addr||''), co:s.name, sid:s._id, role:'근로자대표'});
+      out.push({name:n, birth:u.same?u.birth:'', addr:u.same?String(s.urep_addr||''):'', addr2:u.same?String(s.urep_addr_alt||''):'', co:s.name, sid:s._id, role:'대표자'}); });
+    if(!u.same&&_relNm(u.name).length>=2) out.push({name:_relNm(u.name), birth:u.birth, addr:String(s.urep_addr||''), addr2:String(s.urep_addr_alt||''), co:s.name, sid:s._id, role:'사용자대표'});
+    if(_relNm(w.name).length>=2) out.push({name:_relNm(w.name), birth:w.birth, addr:String(s.wrep_addr||''), addr2:String(s.wrep_addr_alt||''), co:s.name, sid:s._id, role:'근로자대표'});
   });
   var sn={}; (sites||[]).forEach(function(s){ if(s&&s.status!=='closed') sn[_relNm(s.name)]=s; });
   _officersOf(f).forEach(function(o){ var s=sn[_relNm(o.company)]; if(!s||_relNm(o.name).length<2) return;
@@ -12608,7 +12637,9 @@ function relatedPeople(f,sites){
 function relatedScan(f,sites){
   var live=(sites||[]).filter(function(s){ return s&&s.status!=='closed'; }), sig=[];
   var nameOf={}; live.forEach(function(s){ nameOf[s._id]=s.name; });
-  var grp=function(list,keyFn){ var m={}; list.forEach(function(x){ var k=keyFn(x); if(!k) return; (m[k]=m[k]||[]).push(x); }); return m; };
+  /* keyFn 이 배열을 주면 «그중 하나라도» 같은 것끼리 묶는다(도로명·지번 두 표기) — 같은 사람이 한 묶음에 두 번 들지 않게 */
+  var grp=function(list,keyFn){ var m={}; list.forEach(function(x){ var ks=keyFn(x); ks=(Array.isArray(ks)?ks:[ks]).filter(Boolean); ks.filter(function(k,i){ return ks.indexOf(k)===i; }).forEach(function(k){ (m[k]=m[k]||[]).push(x); }); }); return m; };
+  var seenG={};
   var uniq=function(a){ return a.filter(function(v,i){ return a.indexOf(v)===i; }); };
   var sk=function(sids){ return uniq(sids).sort().join('+'); };
   var P=relatedPeople(f,live);
@@ -12619,8 +12650,8 @@ function relatedScan(f,sites){
       text:ids.map(function(i){ return nameOf[i]; }).join(' · ')+' — 대표자 '+n,
       why:'한 사람이 두 회사 대표면 경영 지배(제2조⑤ 1호)일 수 있습니다 — 두 회사 등기부의 임원·주주를 보세요'}); });
   /* ② 같은 집 주소인데 다른 회사 */
-  var hm=grp(P.filter(function(p){ return p.addr; }),function(p){ return _relAddrKey(p.addr,true); });
-  Object.keys(hm).forEach(function(k){ var L=hm[k], ids=uniq(L.map(function(p){ return p.sid; })); if(ids.length<2) return;
+  var hm=grp(P.filter(function(p){ return p.addr||p.addr2; }),function(p){ return [_relAddrKey(p.addr,true),_relAddrKey(p.addr2,true)]; });
+  Object.keys(hm).forEach(function(k){ var L=hm[k], ids=uniq(L.map(function(p){ return p.sid; })); if(ids.length<2||seenG['h'+sk(ids)]) return; seenG['h'+sk(ids)]=1;
     var names=uniq(L.map(function(p){ return p.name; })), sur=uniq(names.map(function(n){ return n.charAt(0); }));
     sig.push({key:'home:'+sk(ids), type:'home', level:'hi', sids:ids, sameSur:sur.length===1&&names.length>1, mask:_relAddrMask(L[0].addr),
       text:L.map(function(p){ return p.name+'('+p.co+' '+p.role+')'; }).join(' · ')+' — 집 주소 같음',
@@ -12635,8 +12666,8 @@ function relatedScan(f,sites){
       text:n+' — '+L.map(function(p){ return p.co+' '+p.role; }).join(' · ')+(bs.length===1?' (생년월일도 같음)':' (생년월일 모름)'),
       why:'한 사람이 다른 참여회사의 대표·임원이면 경영 지배 관계일 수 있습니다'}); });
   /* ④ 같은 사무실 주소 */
-  var of=grp(live,function(s){ return _relAddrKey(s.address,false); });
-  Object.keys(of).forEach(function(k){ var ids=of[k].map(function(s){ return s._id; }); if(ids.length<2) return;
+  var of=grp(live,function(s){ return [_relAddrKey(s.address,false),_relAddrKey(s.address_alt,false)]; });
+  Object.keys(of).forEach(function(k){ var ids=uniq(of[k].map(function(s){ return s._id; })); if(ids.length<2||seenG['o'+sk(ids)]) return; seenG['o'+sk(ids)]=1;
     sig.push({key:'office:'+sk(ids), type:'office', level:'warn', sids:ids, mask:_relAddrMask(of[k][0].address),
       text:ids.map(function(i){ return nameOf[i]; }).join(' · ')+' — 같은 사무실 주소',
       why:'한 건물·한 공장이면 출자·친족 관계인 일이 잦습니다. 같은 공장 안에 공동기금이 여럿이면 지원 불가'}); });
