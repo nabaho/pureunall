@@ -133,8 +133,10 @@ test('★ 발급 회사는 «칸이 아니다» — 근로자대표 칸 목록�
 
 test('★ 반영할 때 발급 회사는 «넣지 않는다»', () => {
   const fn = grabFn('applyDocFound');
-  assert.match(fn, /if\(k!=='wrep_co'\) pre\[k\]=_docFound\[k\]/, '발급 회사를 사업장에 넣는다');
-  assert.match(fn, /got=got\.filter\(function\(k\)\{ return k!=='wrep_co'; \}\)/,
+  /* 2026-09-29 사용자대표 재직증명서(urep_co)·중소기업확인서(name)도 «확인용»으로 함께 거른다 */
+  assert.match(fn, /var 확인용=function\(k\)\{ return k==='wrep_co'\|\|k==='urep_co'/, '발급 회사를 사업장에 넣는다');
+  assert.match(fn, /if\(!확인용\(k\)\) pre\[k\]=_docFound\[k\]/, '발급 회사를 사업장에 넣는다');
+  assert.match(fn, /got=got\.filter\(function\(k\)\{ return !확인용\(k\); \}\)/,
     '넣지도 않은 것을 「채웠다」고 센다');
 });
 

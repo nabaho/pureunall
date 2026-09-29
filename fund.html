@@ -607,8 +607,11 @@ var CONTACT_FIELDS=[['name','담당자명','text'],['position','직위','text'],
      사람이 확인하고 넣는 것이 맞다.
    ⚠ SITE_FIELDS 에 섞지 않는다. 그 목록은 엑셀 일괄 가져오기의 «열 차례»이기도 해서,
      사람 칸을 끼워 넣으면 이미 만들어 둔 붙여넣기 자료가 어긋난다. */
+/* ★ 집 주소(2026-09-29 대표 지시 「재직증명서상의 주소가 동일한 사람들이 다른회사의 대표로 있거나 한 경우를
+     모두 검토」) — 특수관계(생계를 함께하는 친족)를 «미리» 짚는 데만 쓴다. 서식에는 넣지 않는다.
+     화면(특수관계 점검)에는 시·구·동까지만 보인다. 사용자대표 쪽에도 «같은 차례»로 둔다. */
 var WREP_FIELDS=[['wrep_name','근로자대표 성명','text'],['wrep_title','직위','text'],
-  ['wrep_mobile','휴대폰','text'],['wrep_birth','생년월일','date']];
+  ['wrep_mobile','휴대폰','text'],['wrep_birth','생년월일','date'],['wrep_addr','집 주소(점검용)','text']];
 /* ── 참여사업장의 «사용자 대표» ── (대표 지시 2026-09-13)
    「회의의 대표자와 사용자대표 근로자대표가 각각 다를수 있다 이부분은 좀 구분해야한다」
 
@@ -625,7 +628,7 @@ var WREP_FIELDS=[['wrep_name','근로자대표 성명','text'],['wrep_title','�
      「사용자대표직위 휴대폰 생년월일, 근로자대표와 같은 순서로 셀이 있어야한다」) —
      두 묶음이 나란히 서는데 칸 차례가 다르면 눈이 매번 다시 읽어야 한다. */
 var UREP_FIELDS=[['urep_name','사용자대표 성명','text'],['urep_title','직위','text'],
-  ['urep_mobile','휴대폰','text'],['urep_birth','생년월일','date']];
+  ['urep_mobile','휴대폰','text'],['urep_birth','생년월일','date'],['urep_addr','집 주소(점검용)','text']];
 /* ── 중소기업확인서 ── (대표 지시 2026-09-13)
    「중소기업확인서도 ocr에서 찾아서 중소기업 여부 체크와 기간도 표시되게」
 
@@ -3143,7 +3146,7 @@ function parseBizReg(txt){
 /* 값이 «어디서 끝나는지»를 다음 이름표로 정한다.
    ⚠ _flat 이 모든 공백을 한 칸으로 줄이므로 「빈칸 두 칸」으로는 못 끊는다 —
      그렇게 만들었다가 직위에 「팀장 생 년 월 일 1985 03 12」가 통째로 들어왔다. */
-var WREP_STOP=['재직','소속','부서','기간','주소','생년','성명','직위','직급','직책','위와','상기','발급','회사','상호'];
+var WREP_STOP=['재직','소속','부서','기간','주소','생년','성명','직위','직급','직책','위와','상기','발급','회사','상호','용도','입사','근무'];
 function _wrepStopRe(){ return '(?:'+WREP_STOP.map(_loose).join('|')+')'; }
 function parseWrepDoc(txt){
   var flat=_flat(txt), o={}, m, STOP=_wrepStopRe();
@@ -3162,11 +3165,22 @@ function parseWrepDoc(txt){
   if(!m) m=flat.match(/((?:주식회사|㈜)\s*[가-힣A-Za-z][가-힣A-Za-z0-9]{1,19})/);
   if(!m) m=flat.match(/(?:^|[\s(])([가-힣][가-힣A-Za-z0-9]{1,19}\s*(?:주식회사|㈜))/);
   if(m){ var c=_cleanCoName(m[1]); if(c) o.wrep_co=c; }
+  /* 집 주소 — 「주소」·「현주소」 이름표 뒤, 다음 이름표 앞까지(2026-09-29 특수관계 점검).
+     ⚠ 회사 소재지(「소재지」·「회사 주소」)와 헷갈리지 않게 «사람» 칸 이름표만 본다 — 시·도·군·구가 든 것만 받는다. */
+  m=flat.match(new RegExp('(?:'+_loose('현주소')+'|'+_loose('주소')+')[:：]\\s*(.+?)(?=\\s*'+STOP+'|$)'));
+  if(m){ var ad=String(m[1]).replace(/\s+/g,' ').trim(); if(/[가-힣]+(?:시|도|군|구)\s/.test(ad+' ')&&ad.length>=6) o.wrep_addr=ad.slice(0,80); }
+  return o;
+}
+/* 사용자대표 재직증명서 — 같은 서류 꼴이라 읽는 법은 같고, 넣을 칸 이름만 urep_ 로 바꾼다 */
+function parseUrepDoc(txt){
+  var w=parseWrepDoc(txt), o={};
+  Object.keys(w).forEach(function(k){ o[k.replace(/^wrep_/,'urep_')]=w[k]; });
   return o;
 }
 var DOC_PARSE={ inka:{label:'고용노동부 설립인가증',fn:parseInka},
                 bizreg:{label:'사업자등록증',fn:parseBizReg},
                 wrep:{label:'근로자대표 재직증명서',fn:parseWrepDoc},
+                urep:{label:'사용자대표 재직증명서',fn:parseUrepDoc},
                 corpreg:{label:'법인 등기사항전부증명서',fn:parseCorpReg},
                 smecert:{label:'중소기업확인서',fn:parseSmeCert},
                 taxid:{label:'고유번호증',fn:parseTaxId},
@@ -9516,10 +9530,12 @@ var _docScope={pre:'fd-', out:'docIntakeOut', fields:null, keep:true};
 function _docScopeFund(){ _docScope={pre:'fd-', out:'docIntakeOut', fields:null, keep:true}; }
 /* 참여사업장 편집 창 갈래인가 — 사업장 칸(se-)과 근로자대표 칸(sw-) 둘 다 그 창 안에 있다.
    한쪽만 보면 재직증명서 갈래가 조용히 기금 칸을 찾는다. */
-function _isSiteScope(){ return _docScope.pre==='se-'||_docScope.pre==='sw-'; }
+/* ⚠ 사업장 편집 창의 네 갈래(사업장·근로자대표·사용자대표·중소기업) «모두» — 빠진 갈래는 판독값이 창이 닫힌 뒤
+     없는 칸(sm-·su-)을 찾다 «말없이» 버려졌다(2026-09-29: 중소기업확인서 판독이 그랬다). */
+function _isSiteScope(){ return ['se-','sw-','su-','sm-'].indexOf(_docScope.pre)>=0; }
 /* 칸 목록에 «없는» 판독값의 이름표 — 읽기는 했지만 어디에도 넣지 않는 값이다.
    확인용으로 보여 주기만 하므로 칸 목록(WREP_FIELDS 등)에 넣으면 안 된다. */
-var DOC_EXTRA_LBL={ wrep_co:'발급 회사 (확인용 — 칸에는 안 들어갑니다)' };
+var DOC_EXTRA_LBL={ wrep_co:'발급 회사 (확인용 — 칸에는 안 들어갑니다)', urep_co:'발급 회사 (확인용 — 칸에는 안 들어갑니다)' };
 function _docLbl(){ var L=Object.assign({},DOC_EXTRA_LBL); (_docScope.fields||FIELDS).forEach(function(c){ L[c[0]]=c[1]; }); return L; }
 /* ── 사진첩에서 서류 골라오기 ──
    원본은 사진첩에 그대로 두고, 기금에는 값 + 참조(주인·연도·id)만 남긴다.
@@ -10083,7 +10099,8 @@ function docZoneLabel(kind){ return ({inka:'설립인가증',corpreg:'법인 등
   /* 참여사업장 몫 — 사진첩 고르기 창의 제목이 된다.
      ⚠ 여기 없으면 제목에 «smecert» 같은 열쇠말이 그대로 뜬다. */
   smecert:'중소기업확인서',
-  wrep:'근로자대표 재직증명서'})[kind]||kind; }
+  wrep:'근로자대표 재직증명서',
+  urep:'사용자대표 재직증명서'})[kind]||kind; }
 /* 드롭존 아래 한 줄 — 사진첩에서 고르기 / 이미 연결된 원본 보기 */
 /* ══ 푸른 기업정보함(기업정보함) 연동 ══
    사업자등록증 카드에 이미 들어 있는 값을 기금 정보로 당겨온다. 다시 칠 이유가 없다.
@@ -10351,6 +10368,16 @@ function siteRepAlbum(){
 function pplRepDoc(sid){
   _siteEditSid=sid||''; _siteDocKeep=null; _siteRepScope();
   openAlbumPick('dz-siterep','wrep','','','',sid);
+}
+/* 사용자대표 재직증명서 — «읽기만» 한다(원본 잇는 자리는 근로자대표 것 하나뿐 — 별지 제7호 첨부는 그쪽).
+   집 주소를 특수관계 점검에 쓰려고 연다(2026-09-29). 넣는 칸은 사용자대표 칸(su-)이다. */
+function _siteUrepScope(){
+  _docScope={pre:'su-', out:'siteDocOut', fields:UREP_FIELDS, keep:false};
+  _docFound={}; _docOcr=false;
+}
+function pplUrepDoc(sid){
+  _siteEditSid=sid||''; _siteDocKeep=null; _siteUrepScope();
+  openAlbumPick('dz-siterep','urep');
 }
 function pplSmeDoc(sid){
   _siteEditSid=sid||''; _siteDocKeep=null; _siteSmeScope();
@@ -11268,8 +11295,9 @@ function applyDocFound(){
     var pre=Object.assign({}, _siteDocKeep||{});
     var got=Object.keys(_docFound).filter(function(k){ return _docFound[k]; });
     /* wrep_co 는 «확인용»이라 칸에 넣지 않는다 — 사업장 상호를 증명서 글자로 덮으면 안 된다 */
-    got.forEach(function(k){ if(k!=='wrep_co') pre[k]=_docFound[k]; });
-    got=got.filter(function(k){ return k!=='wrep_co'; });
+    var 확인용=function(k){ return k==='wrep_co'||k==='urep_co'||(_docScope.pre==='sm-'&&k==='name'); };
+    got.forEach(function(k){ if(!확인용(k)) pre[k]=_docFound[k]; });
+    got=got.filter(function(k){ return !확인용(k); });
     var _sid=_siteEditSid||'';
     _siteDocKeep=null; _docScopeFund();
     editSite(_sid,pre);
@@ -11686,7 +11714,9 @@ function sitesPeopleBody(arr){
         ? '<span title="회사 대표자와 같은 사람으로 켜 두었습니다 — 바꾸려면 상호를 눌러 편집 창에서 체크를 끄세요">'
           +'<span class="chip ok" style="font-size:9.5px">대표자와 같음</span> '+esc(u.name||'—')+'</span> '
         : inp('urep_name',u.name,'성명','86px')+' ')
-      +inp('urep_title',u.title,'직위','78px')+'</td>'
+      +inp('urep_title',u.title,'직위','78px')
+      +' <button onclick="event.stopPropagation();pplUrepDoc(\''+s._id+'\')" style="padding:2px 7px;font-size:11px" '
+      +'title="사용자대표 재직증명서를 사진첩에서 골라 읽습니다 — 직위·생년월일·집 주소(특수관계 점검용)가 채워집니다">📎 재직</button></td>'
       +'<td>'+inp('wrep_name',w.name,'성명','86px')+' '+inp('wrep_title',w.title,'직위','78px')+'</td>'
       /* ★ 서류에서 읽는 길을 여기로 모았다 — 편집 창은 칸만 남기고(대표 지시 2026-09-13),
            읽기는 「그 사업장 한 줄」에서 시작한다. 읽고 나면 편집 창이 값과 함께 열린다. */
@@ -11953,7 +11983,10 @@ function saveSite(sid){
     /* 기존 사업장은 set(전체 덮어쓰기)이 아니라 update(이 화면에서 다룬 항목만)로 저장한다.
        다른 세션이 이 화면에 없는 필드를 고쳐 놨어도 그 값이 지워지지 않게 하기 위함. */
     var patch={contacts:list};
-    SITE_FIELDS.concat(WREP_FIELDS).forEach(function(c){ if(Object.prototype.hasOwnProperty.call(obj,c[0])) patch[c[0]]=obj[c[0]]; });
+    /* ⚠ 사용자대표·중소기업 칸도 함께 보낸다(2026-09-29 고침) — 여태 SITE+WREP 만 보내서, 있던 사업장을
+         편집 창에서 고치면 사용자대표 이름·직위·「대표자와 같은 사람」 체크·중소기업 칸이 «말없이» 안 저장됐다. */
+    SITE_FIELDS.concat(WREP_FIELDS,UREP_FIELDS,SME_FIELDS).forEach(function(c){ if(Object.prototype.hasOwnProperty.call(obj,c[0])) patch[c[0]]=obj[c[0]]; });
+    patch.urep_same=obj.urep_same?true:null;
     /* ⚠ wrep_doc 은 여기 목록에 없다 — update 는 적힌 칸만 건드리므로 연결이 살아남는다.
        set(전체 덮어쓰기)으로 바꾸면 저장할 때마다 재직증명서 연결이 사라진다. */
     if(obj.status) patch.status=obj.status;
