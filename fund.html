@@ -312,6 +312,13 @@
     /* 표 안의 드롭다운이 줄 키를 정한다 — 여기가 낮아지면 스무 줄이 한꺼번에 낮아진다.
        ⚠ 줄마다 style= 로 박혀 있어 !important 가 없으면 안 듣는다. */
     td select{padding:2px 5px!important;font-size:11px!important;max-width:86px!important}
+    /* ★ 2026-09-30 (대표 폰 캡쳐 「컴팩트하게 다시정리」) — 기금명이 또 «한 글자씩» 세로로 쌓였다.
+         주담당 132px·계약관계 122px 이 폰에서도 그대로라 411px 화면에서 기금명 칸이 40px 남짓이었다.
+         폰에서는 번호·주담당·계약관계 폭을 줄이고(이름은 안 접힌다), 기금명 아래 긴 정식 이름 줄은 접는다(.ph). */
+    table.fixcol th.no{width:32px!important;white-space:nowrap}
+    table.fixcol th.mgc{width:54px!important}
+    table.fixcol th.lcc{width:92px!important}
+    table.fixcol td{word-break:keep-all}
     .chip{font-size:10px;padding:1px 6px}
     .stat{font-size:10.5px;padding:2px 8px}
     .tabbar{margin:8px 0 10px}
@@ -1180,7 +1187,7 @@ function fundRow(f,no,mode,showReg){
   var setupB=(f.setup_stage==='설립준비')?' <span class="chip warn" style="font-size:10px">🏗 설립중</span>':'';
   var _gc=fundGovCell(f._id);
   return '<tr onclick="go(\'fund\',\''+f._id+'\')"><td class="no">'+no+'</td>'
-    +'<td style="font-weight:700">'+esc(f.short_name||f.name)+setupB+'<div class="muted" style="font-weight:400;font-size:11.5px">'+esc(f.name||'')+'</div></td>'
+    +'<td style="font-weight:700">'+esc(f.short_name||f.name)+setupB+'<div class="muted ph" style="font-weight:400;font-size:11.5px">'+esc(f.name||'')+'</div></td>'
     /* ⚠ nowrap·말줄임을 쓰지 «않는다» — 이름을 다 적기로 했으므로(대표 지시 2026-09-13)
          칸이 좁으면 «접어서» 보여야 한다. 말줄임으로 잘라 두면 「외 1」과 다를 것이 없다.
          한국말은 낱말째 접는다(keep-all) — break-word 는 「예산군」을 쪼갠다. */
@@ -1257,9 +1264,9 @@ function fundTable(list,edit,mode){
   /* 폭은 «칸 셋»에 맞춘다(64px×3=192 + 여백=204px) — 지자체를 칸마다 나눠 세로로
      맞추므로(govCells), 폭이 칸 크기의 배수여야 넷째가 반쯤 걸쳐 서지 않는다. */
   cols.push(['참여 지자체','ph','252px','참여사업장 소재지에서 셈합니다 — 올리면 몇 곳인지 보입니다']);
-  cols.push(['주담당','','132px'],['부담당','mo','112px'],['대표자','mo','112px'],['정보','ph','104px']);
+  cols.push(['주담당','mgc','132px'],['부담당','mo','112px'],['대표자','mo','112px'],['정보','ph','104px']);
   if(showReg) cols.push(['분류','ph','120px','지역·묶음 분류 — 바꾸면 지역기금↔공동기금으로 옮겨집니다']);
-  cols.push(['계약관계','','122px']);
+  cols.push(['계약관계','lcc','122px']);
   if(mode==='setup') cols.push(['삭제','','92px']);
   return '<div class="tblwrap"><table class="fixcol">'+_headHTML(cols)+'<tbody>'
     +list.map(function(f,i){return fundRow(f,i+1,mode,showReg);}).join('')+'</tbody></table></div>';
