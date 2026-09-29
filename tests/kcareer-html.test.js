@@ -1518,7 +1518,9 @@ test('죽은 화면 page-resume-create 를 되살리지 않는다 — 같은 id 
 test('한글 뷰어는 형식을 못박지 않고 인라인 스타일을 정리한다', () => {
   const dl = funcSource('hwpViewDownload');
   assert.ok(!/'hwpx'\)/.test(dl), "⚠ 형식을 'hwpx'로 못박으면 옛 .hwp가 잘못된 MIME으로 저장됩니다");
-  assert.match(dl, /PureunHwp\.download\(_hwpView\.bytes, _hwpView\.name\)/);
+  /* 이름은 저장 이름 규칙(rhNiceName)으로 바뀔 수 있다 — 지킬 것은 «형식 값을 셋째로 안 넘긴다»이다 */
+  assert.match(dl, /PureunHwp\.download\(_hwpView\.bytes, [^,()]+\)/);
+  assert.doesNotMatch(dl, /PureunHwp\.download\(_hwpView\.bytes, [^)]*,/, '⚠ 형식을 셋째 값으로 넘기지 말 것');
   // renderPreview가 cssText에 덧붙이기(+=)로 넣으므로 닫을 때 지워야 쌓이지 않는다
   assert.match(funcSource('closeHwpView'), /removeAttribute\('style'\)/);
 });
