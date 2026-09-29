@@ -95,9 +95,23 @@
   }
 
   function resolve(user) {
-    if (!user || !user.email) { set(null); return; }
+    if (!user) { set(null); return; }
+    /* 카카오 로그인은 서버가 만든 표(custom token)로 들어온다 — 메일이 비어 있을 수 있다.
+       그때는 표에 적힌 사번(claims.sid)으로 찾는다 (대표 지시 2026-09-29 「모든 앱 상단에 본인의 이름」) */
+    if (!user.email) {
+      set(null);                       // 앞사람 이름이 남아 있지 않게 먼저 비운다
+      if (user.getIdTokenResult) {
+        user.getIdTokenResult().then(function (r) {
+          var sid = normSid(r && r.claims && r.claims.sid);
+          if (sid) finish(sid, '');
+        }).catch(function () { });
+      }
+      return;
+    }
     var email = String(user.email || '');
-    var sid = emailToSid(email);
+    finish(emailToSid(email), email);
+  }
+  function finish(sid, email) {
     // 이메일만으로도 «무언가» 는 바로 보여 준다 — 빈 자리가 뜨는 것보다 낫다
     set({ sid: sid, name: '', title: '', role: '', email: email });
     read('data/user_dir')

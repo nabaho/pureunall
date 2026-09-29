@@ -38,7 +38,7 @@
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-whoami.js?v=1"></script>
+<script src="js/pu-whoami.js?v=2"></script>
 <script src="js/pu-appbar.js?v=14"></script>
 <script>
 (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
@@ -1065,7 +1065,12 @@ firebase.auth().onAuthStateChanged(function(user){
 });
 
 function afterLogin(){
+  /* ★ 머리줄엔 «이름»을 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) — 이름은 공용 부품(PuWhoami)이 찾아 준다. 찾기 전에는 메일을 잠깐 둔다. */
   $('whoami').textContent = App.me.email || '';
+  if (window.PuWhoami && !window.__newsWhoHooked) {
+    window.__newsWhoHooked = true;
+    PuWhoami.onChange(function (me) { if (me && me.name) $('whoami').textContent = me.name + (me.title ? ' ' + me.title : ''); });
+  }
   /* 권한을 «못 읽었을 때»도 열지 않는다 — 못 읽은 것을 권한 있음으로 치면 막는 뜻이 없다 */
   db.ref('uid_roles/' + App.me.uid).once('value')
     .then(s => { App.isAdmin = (s.val()||{}).isAdmin === true; })
