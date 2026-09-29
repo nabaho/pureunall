@@ -67,16 +67,24 @@ test('⑤★ 답은 맨 위 — 검은 로그«보다 앞»에 둔다', () => {
   assert.ok(진단칸 > -1, '★ 「지금 상태」 칸이 없다 — 답이 다시 검은 칸으로 숨는다');
   assert.ok(로그칸 > -1 && 진단칸 < 로그칸,
     '★★ 답이 로그 뒤에 있으면 대표님은 또 스크롤해서 찾으셔야 한다 — 그게 「모르겠다」가 된 자리다');
-  /* 줄바꿈이 살아야 읽힌다 — 한 덩어리로 붙으면 안 읽는다 */
-  const 칸시작 = NAS.lastIndexOf('진단 && h(', 진단칸);
+  /* 줄바꿈이 살아야 읽힌다 — 한 덩어리로 붙으면 안 읽는다.
+     ⚠ 2026-09-29 (대표 지시 「불필요한 설명은 팝업창 형태로만」): 화면에는 «첫 줄»만 두고
+       전문은 ⓘ 팝업(InfoPop)으로 옮겼다. 규칙은 그대로 — 전문이 «줄바꿈을 살린 채» 볼 수 있어야 한다. */
+  const 칸시작 = 칸머리(진단칸);
   assert.ok(칸시작 > -1, '★ 「지금 상태」 칸을 그리는 대목을 못 찾았다');
-  const 칸 = NAS.slice(칸시작, 진단칸 + 200);
-  assert.match(칸, /whiteSpace:\s*'pre-line'/, '★ 여러 줄 안내를 한 줄로 붙이면 아무도 안 읽는다');
+  const 칸 = NAS.slice(칸시작, 진단칸 + 600);
+  assert.match(칸, /InfoPop[^)]*\)\s*,\s*진단\.msg\)|h\(InfoPop,[\s\S]{0,80}진단\.msg/, '★ 안내 전문을 볼 길(ⓘ 팝업)이 없다 — 첫 줄만 남으면 해결 방법을 모른다');
+  const 팝 = cutFn(ERP, 'function InfoPop(');
+  assert.match(팝, /whiteSpace:\s*'pre-line'/, '★ 여러 줄 안내를 한 줄로 붙이면 아무도 안 읽는다');
 });
+// 「지금 상태」 칸을 그리는 대목의 머리 — 예전 꼴(진단 && h()과 지금 꼴(진단 && (function(){) 둘 다
+function 칸머리(진단칸) {
+  return Math.max(NAS.lastIndexOf('진단 && h(', 진단칸), NAS.lastIndexOf('진단 && (function(){', 진단칸));
+}
 
 test('⑥ 됐는지 안 됐는지가 «색»으로도 갈린다', () => {
   const 진단칸 = NAS.indexOf("'지금 상태'");
-  const 칸 = NAS.slice(NAS.lastIndexOf('진단 && h(', 진단칸), 진단칸 + 200);
+  const 칸 = NAS.slice(칸머리(진단칸), 진단칸 + 200);
   assert.match(칸, /진단\.ok === true \? '#f0fdf4'/, '★ 됐을 때 초록');
   assert.match(칸, /'#fef2f2'/, '★ 안 됐을 때 빨강 — 글자만 바뀌면 눈이 넘어간다');
   assert.match(칸, /진단\.ok === null/, '★ «아직 모름»을 «안 됨»과 같은 색으로 칠하면 겁만 준다');

@@ -363,7 +363,7 @@ var BUILD_SEQ = 190;
             try{ if(typeof showToast==='function') showToast('🧹 '+LABEL[k]+' 중복 '+dup+'건 자동 정리됨'); }catch(_t){}
             try{ console.warn('[중복 자동정리] '+k+': '+dup+'건 제거'); }catch(_c){}
           }catch(_e){
-            window.erpAlert && erpAlert('warn', LABEL[k]+'에 중복 데이터 '+dup+'건 발견', '같은 id가 두 번 이상 들어있습니다.', '환경설정 → 시스템 → 데이터 관리 → [중복 데이터 검사 및 제거]에서 정리해 주세요.');
+            window.erpAlert && erpAlert('warn', LABEL[k]+'에 중복 데이터 '+dup+'건 발견', '같은 id가 두 번 이상 들어있습니다.', '환경설정 → 시스템 → 데이터·백업 → 데이터 관리 → [중복 데이터 검사 및 제거]에서 정리해 주세요.');
           }
         }
         /* 1-2) id 없는 기록 — «조용히» 그 표의 동기화를 통째로 망가뜨린다 (2026-09-12)
@@ -421,7 +421,7 @@ var BUILD_SEQ = 190;
           window.erpAlert && erpAlert('warn', LABEL[k]+'에 id 없는 기록 '+_noId+'건',
             '나머지 '+_hasId+'건에는 id 가 있습니다. 이 표는 저장할 때마다 «통째로» 주고받고 있습니다 — 화면이 멈추는 원인입니다.',
             k==='finance_income'
-              ? '아래 단추는 최신 서버 자료에서 내용·금액은 그대로 두고, 빠진 ID만 채웁니다. 걱정되시면 먼저 환경설정 → 시스템 → 💾 JSON 수동 백업에서 사본을 받아 두세요. 복구는 한 번만 전체 저장하고, 그 뒤부터는 변경된 한 건만 저장합니다.'
+              ? '아래 단추는 최신 서버 자료에서 내용·금액은 그대로 두고, 빠진 ID만 채웁니다. 걱정되시면 먼저 환경설정 → 시스템 → 💾 데이터·백업 → JSON 수동 백업에서 사본을 받아 두세요. 복구는 한 번만 전체 저장하고, 그 뒤부터는 변경된 한 건만 저장합니다.'
               : '이 기기 사본이 옛것일 수 있습니다. 아래 단추로 서버 것을 받아 보세요 — 서버에도 같은 껍데기가 있으면 이 알림이 다시 뜹니다.',
             (k==='finance_income' && typeof window.erpRepairFinanceIncomeIds === 'function')
               ? { label:'🛠 ID '+_noId+'건 안전 복구', run:function(){ window.erpRepairFinanceIncomeIds(); } }
@@ -4913,7 +4913,7 @@ function dbSet(k, v){
             var ok2 = false;
             try { ok2 = dbSet(_pk, _pv); } catch(_){}
             try { showToast(ok2 ? '✅ 자동 정리 후 저장 완료 — 화면을 새로고침하면 반영됩니다'
-                                : '❌ 자동 정리 후에도 저장 실패 — 환경설정 → 시스템 → 유실 데이터 검사·복원에서 저장공간을 확인하세요'); } catch(_){}
+                                : '❌ 자동 정리 후에도 저장 실패 — 환경설정 → 시스템 → 데이터·백업 → 유실 검사·복원에서 저장공간을 확인하세요'); } catch(_){}
             if(ok2){ try { window.dispatchEvent(new CustomEvent('pureun-saved', { detail:{ key:_pk, at:Date.now() } })); } catch(_){} }
           };
           try {
@@ -32865,6 +32865,7 @@ function FinanceMasters(){
   if(initFee == null) initFee = 1000;
   var fs = useState(initFee); var bankFee = fs[0]; var setBankFee = fs[1];
   var ts = useState(0); var activeTab = ts[0]; var setActiveTab = ts[1];
+  var pa = useState(false); var aliasOpen = pa[0]; var setAliasOpen = pa[1];
   function saveBankFee(v){
     var n = parseInt(String(v).replace(/[^0-9]/g,''),10) || 0;
     setBankFee(n);
@@ -32878,23 +32879,24 @@ function FinanceMasters(){
   ];
   return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
     h('div', null,
-    h('div', { className:'desc' }, '입금·출금에 사용하는 카테고리와 기본값을 관리합니다.'),
-    // 이체수수료 기본값
-    h('div', { style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'14px 18px', marginBottom:'16px' } },
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'14px', flexWrap:'wrap' } },
-        h('div', { style:{ flex:'0 0 auto' } },
-          h('div', { style:{ fontWeight:700, fontSize:'13px', color:'#1e293b' } }, '🏦 이체수수료 기본값'),
-          h('div', { style:{ fontSize:'11px', color:'#64748b', marginTop:'2px' } }, '출금 등록·급여 일괄확정 시 자동 추가되는 1건당 수수료')
-        ),
-        h('div', { style:{ display:'flex', alignItems:'center', gap:'8px' } },
-          h('input', { type:'text', value:bankFee.toLocaleString(),
-            onChange:function(e){ saveBankFee(e.target.value); },
-            style:{ width:'120px', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'13px', textAlign:'right', fontFamily:'monospace' } }),
-          h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '원')
-        ),
-        h('div', { style:{ fontSize:'11px', color:'#94a3b8' } }, '※ 0원이면 자동 추가 안 함')
-      )
+    /* 한 줄 도구 띠 — 이체수수료 기본값 · 👤 입금자 별칭 관리 (대표 지시 2026-09-29 컴팩트하게).
+       👤 입금자 별칭 관리는 환경설정 › 시스템 맨 위에 있던 것을 «입금 규칙» 곁인 여기로 옮겼다. */
+    h('div', { style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'10px 14px', marginBottom:'14px',
+        display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' } },
+      h('b', { style:{ fontSize:'12.5px', color:'#1e293b' } }, '🏦 이체수수료 기본값'),
+      h(InfoPop, { title:'🏦 이체수수료 기본값', text:'출금 등록·급여 일괄확정 때 저절로 더해지는 1건당 수수료입니다. 0원이면 더하지 않습니다.' }),
+      h('input', { type:'text', value:bankFee.toLocaleString(),
+        onChange:function(e){ saveBankFee(e.target.value); },
+        style:{ width:'110px', padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'12.5px', textAlign:'right', fontFamily:'monospace' } }),
+      h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '원'),
+      h('span', { style:{ flex:1 } }),
+      h('button', { onClick:function(){ setAliasOpen(true); },
+        style:{ padding:'6px 12px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe',
+          borderRadius:'6px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '👤 입금자 별칭 관리'),
+      h(InfoPop, { title:'👤 입금자 별칭 관리',
+        text:'통장 적요가 업체명과 다른 입금(예: 대표 개인 이름으로 들어온 돈)을 한 번 손으로 확정하면, 그 적요 → 업체 짝을 배워 다음부터 저절로 맞춥니다. 여기서 배운 짝을 보고 지울 수 있습니다.' })
     ),
+    aliasOpen && h(PayerAliasModal, { onClose:function(){ setAliasOpen(false); } }),
     h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px', marginBottom:'8px', borderBottom:'2px solid #e2e8f0' } },
       TABS.map(function(t, i){
         var on = activeTab === i;
@@ -35533,15 +35535,38 @@ function PolicyCard(props){
   );
 }
 
+/* ⓘ 설명 팝업 — 화면에는 동그란 「i」 하나만, 누르면 설명이 뜬다 (대표 지시 2026-09-29
+   「불필요한 설명은 팝업창 형태로만 정리」, 목업 settings-system-compact 승인).
+   마우스를 올리면 짧은 글(text)은 바로 보인다(title). 긴 설명은 children 으로 넘긴다. */
+function InfoPop(props){
+  var s = useState(false); var open = s[0]; var setOpen = s[1];
+  var body = props.children || props.text;
+  if(!body) return null;
+  return h('span', { style:{ display:'inline-flex', verticalAlign:'middle' } },
+    h('button', { type:'button', 'aria-label':'설명 보기',
+      title: typeof props.text === 'string' ? props.text : ((props.title || '') + ' — 누르면 설명'),
+      onClick:function(e){ e.stopPropagation(); e.preventDefault(); setOpen(true); },
+      style:{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:'16px', height:'16px',
+        borderRadius:'50%', border:'1px solid #cbd5e1', background:'#f8fafc', color:'#475569',
+        fontSize:'10px', fontWeight:800, lineHeight:1, padding:0, cursor:'pointer', fontFamily:'inherit', flex:'none' } }, 'i'),
+    open && h('div', { className:'modal-bg', onClick:function(e){ if(e.target === e.currentTarget) setOpen(false); } },
+      h('div', { className:'modal', style:{ maxWidth:'460px', width:'92vw' } },
+        h('div', { className:'modal-h' },
+          h('div', { className:'t' }, props.title || '설명'),
+          h('button', { className:'x', onClick:function(){ setOpen(false); } }, '×')),
+        h('div', { className:'modal-b', style:{ fontSize:'12.5px', lineHeight:1.75, whiteSpace:'pre-line', color:'#1e293b' } }, body)))
+  );
+}
 function PolicyRow(props){
   // props: label, hint, control
   /* ★ policy-row 표는 «둘씩 놓아도 되는 줄»이라는 뜻이다 (대표 지시 2026-09-13).
      감싸는 칸(pc-body)이 이 표가 붙은 것만 골라 둘씩 놓는다 — 경고 배너·안내문처럼
-     표가 없는 것은 예전대로 한 줄을 통째로 쓴다. 판단은 css 한 곳에 있다. */
+     표가 없는 것은 예전대로 한 줄을 통째로 쓴다. 판단은 css 한 곳에 있다.
+     ★ 설명(hint)은 이름 옆 ⓘ 로 (대표 지시 2026-09-29) — 칸마다 두세 줄 붙던 회색 글이 화면을 늘였다. */
   return h('div', { className:'policy-row', style:{ display:'grid', gridTemplateColumns:'150px 1fr', gap:'10px', alignItems:'start', padding:'7px 0', borderBottom:'1px solid #f8fafc' } },
-    h('div', null,
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', minWidth:0 } },
       h('div', { style:{ fontSize:'11px', fontWeight:600, color:'#1e293b' } }, props.label),
-      props.hint && h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'1px', lineHeight:1.4 } }, props.hint)
+      props.hint && h(InfoPop, { title: typeof props.label === 'string' ? props.label : '설명', text: props.hint })
     ),
     h('div', null, props.control)
   );
@@ -39076,17 +39101,19 @@ function AppSettingsSection(){
     _isKeyAdmin && h(PolicyRow, {
       label:'OCR Vision 열쇠',
       hint:'사업자등록증 글자 읽기용 — 몫이 Gemini 와 따로입니다(달마다 1,000장)',
-      control: h('div', { style:{ fontSize:'11.5px', color:'#854d0e', background:'#fffbeb',
-          border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 11px', lineHeight:'1.7',
-          maxWidth:'560px' } },
-        h('b', null, '🔒 이제 서버가 들고 있습니다 — 여기 넣지 않습니다.'),
-        h('br'),
-        '전에는 이 칸이 열쇠를 ', h('b', null, '공용 저장소'), '에 담았습니다 — 직원 누구나 읽는 자리라 ',
-        '넣는 순간 새어 나가고 요금은 회사에 붙습니다.',
-        h('br'),
-        '넣으실 때는 대표님 PC 에서 한 줄입니다: ',
-        h('code', { style:{ background:'#fff', border:'1px solid #fde68a', borderRadius:'4px',
-          padding:'1px 5px' } }, 'firebase functions:secrets:set VISION_KEY')
+      /* 딱지 하나 + ⓘ (대표 지시 2026-09-29) — 노란 긴 설명은 팝업으로 */
+      control: h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
+        h('span', { style:{ fontSize:'11.5px', fontWeight:700, color:'#166534', background:'#f0fdf4',
+          border:'1px solid #bbf7d0', borderRadius:'99px', padding:'2px 10px' } }, '🔒 서버가 보관 중'),
+        h(InfoPop, { title:'OCR Vision 열쇠' },
+          h('b', null, '🔒 이제 서버가 들고 있습니다 — 여기 넣지 않습니다.'),
+          h('br'),
+          '전에는 이 칸이 열쇠를 ', h('b', null, '공용 저장소'), '에 담았습니다 — 직원 누구나 읽는 자리라 ',
+          '넣는 순간 새어 나가고 요금은 회사에 붙습니다.',
+          h('br'),
+          '넣으실 때는 대표님 PC 에서 한 줄입니다: ',
+          h('code', { style:{ background:'#fff', border:'1px solid #fde68a', borderRadius:'4px',
+            padding:'1px 5px' } }, 'firebase functions:secrets:set VISION_KEY'))
       )
     }),
     _isKeyAdmin && h(PolicyRow, {
@@ -41452,55 +41479,95 @@ function LostRecordsModal(props){
   );
 }
 
+/* ══ 환경설정 › 시스템 — 한 화면에 짧게 (대표 지시 2026-09-29 「환경설정 화면이 좀 정리가 되었으면
+   … 컴팩트하게 … 불필요한 설명은 팝업창 형태로만」, 목업 settings-system-compact 승인) ══
+   ■ 작은 탭 9개 → 6개. 기능은 하나도 안 뺐다 — 묶었을 뿐이다.
+     · 💾 데이터·백업 = NAS 자동 백업 + JSON 수동 백업 + 데이터 관리 + 🔍 유실 검사·복원(백업끼리 한곳)
+     · 📊 모니터링·헬스 = 모니터링 + 헬스
+     · 🗑️ 전체 리셋은 오른쪽 끝, 빨간 글씨(다른 탭과 같은 무게로 두지 않는다)
+   ■ 맨 위 설명 줄과 도구 단추 두 줄을 걷었다 —
+     · 🔍 유실 데이터 검사·복원 → 「💾 데이터·백업」 안으로
+     · 👤 입금자 별칭 관리 → 「재무관리기준」 탭 안으로(입금 매칭 규칙 곁 — FinanceMasters) */
 function SystemMasters(){
   var ts = useState(0); var activeTab = ts[0]; var setActiveTab = ts[1];
-  var lo = useState(false); var lostOpen = lo[0]; var setLostOpen = lo[1];
-  var pa = useState(false); var aliasOpen = pa[0]; var setAliasOpen = pa[1];
   var TABS = [
     { label:'⚙️ 앱 설정',        comp: AppSettingsSection },
     { label:'🗺️ 시스템 맵',      comp: SystemMapSection },
-    { label:'💾 데이터 관리',    comp: DataManagementSection },
-    { label:'📊 모니터링',       comp: SystemMonitoringSection },
-    { label:'💾 JSON 수동 백업', comp: BackupSection },
-    { label:'🖥️ NAS 자동 백업',  comp: NasBackupSettings },
-    { label:'💚 헬스',           comp: HealthSection },
-    { label:'🔑 비밀번호 변경',  comp: PasswordChangeSection },
-    { label:'🗑️ 전체 리셋',      comp: AdminResetSection, adminOnly: true }
+    { label:'💾 데이터·백업',    comp: DataBackupHub },
+    { label:'📊 모니터링·헬스',  comp: MonitorHealthHub },
+    { label:'🔑 비밀번호',       comp: PasswordChangeSection },
+    { label:'🗑️ 전체 리셋',      comp: AdminResetSection, adminOnly: true, danger: true }
   ];
   return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
     h('div', null,
-    h('div', { className:'desc' }, '앱 설정·JSON 수동 백업·NAS 자동 백업·데이터 관리·모니터링을 관리합니다.'),
-    // ★ 유실 데이터 검사·복원 — 서버 백업과 비교해 사라진 계약·사건·컨설팅·기금·기타사업·업체를 추가 복원
-    h('div', { style:{ marginBottom:'12px' } },
-      h('button', { onClick:function(){ setLostOpen(true); },
-        style:{ padding:'8px 14px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca',
-          borderRadius:'6px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } }, '🔍 유실 데이터 검사·복원'),
-      h('span', { style:{ fontSize:'11px', color:'#64748b', marginLeft:'8px' } }, '서버 백업과 비교해 사라진 데이터를 찾아 선택 복원 (기존 데이터는 건드리지 않음)')
-    ),
-    // ★ 입금자 별칭 관리 — 거래내역 수동 매칭으로 학습된 "적요 → 업체" 관계 확인·삭제
-    h('div', { style:{ marginBottom:'12px' } },
-      h('button', { onClick:function(){ setAliasOpen(true); },
-        style:{ padding:'8px 14px', background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe',
-          borderRadius:'6px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } }, '👤 입금자 별칭 관리'),
-      h('span', { style:{ fontSize:'11px', color:'#64748b', marginLeft:'8px' } }, '적요가 업체명과 다른 입금을 한 번 수동 확정하면 자동 학습 (다음부터 자동 매칭)')
-    ),
-    h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px', marginBottom:'16px', borderBottom:'2px solid #e2e8f0' } },
+    h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px', marginBottom:'14px', borderBottom:'2px solid #e2e8f0', alignItems:'flex-end' } },
       TABS.filter(function(t){ return !t.adminOnly || isAdminByUser(CURRENT_USER); }).map(function(t, i){
         var realIdx = TABS.indexOf(t);
         var on = activeTab === realIdx;
         return h('button', { key:realIdx, onClick: function(){ setActiveTab(realIdx); },
-          style:{ padding:'8px 14px', border:'none',
-            borderBottom: on ? '2px solid #1e40af' : '2px solid transparent',
-            background:'transparent', color: on ? '#1e40af' : '#64748b',
+          style:{ padding:'8px 14px', border:'none', marginLeft: t.danger ? 'auto' : 0,
+            borderBottom: on ? '2px solid ' + (t.danger ? '#991b1b' : '#1e40af') : '2px solid transparent',
+            background:'transparent', color: t.danger ? '#991b1b' : (on ? '#1e40af' : '#64748b'),
             fontWeight: on ? 700 : 500, fontSize:'12.5px', cursor:'pointer',
             marginBottom:'-2px', whiteSpace:'nowrap' } }, t.label);
       })
     ),
-    h(TABS[activeTab] && TABS[activeTab].comp || TABS[0].comp, null),
-    lostOpen && h(LostRecordsModal, { onClose:function(){ setLostOpen(false); } }),
-    aliasOpen && h(PayerAliasModal, { onClose:function(){ setAliasOpen(false); } })
+    h(TABS[activeTab] && TABS[activeTab].comp || TABS[0].comp, null)
     )
   );
+}
+// 탭 안의 작은 갈래 단추 — 「💾 데이터·백업」·「📊 모니터링·헬스」 가 같이 쓴다. items = [{ label, comp }]
+function SysSeg(props){
+  return h('div', { style:{ display:'inline-flex', border:'1px solid #cbd5e1', borderRadius:'8px', overflow:'hidden', marginBottom:'14px', flexWrap:'wrap' } },
+    props.items.map(function(it, i){
+      var on = props.value === i;
+      return h('button', { key:i, type:'button', onClick:function(){ props.onChange(i); },
+        style:{ padding:'6px 13px', border:'none', borderLeft: i ? '1px solid #e2e8f0' : 'none',
+          background: on ? '#1e40af' : '#fff', color: on ? '#fff' : '#475569',
+          fontWeight: on ? 700 : 500, fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit' } }, it.label);
+    }));
+}
+// 🔍 유실 데이터 검사·복원 — 한 줄 + ⓘ, 누르면 창이 뜬다
+function DataBackupLost(){
+  var lo = useState(false); var lostOpen = lo[0]; var setLostOpen = lo[1];
+  return h('div', null,
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', background:'#fff', border:'1px solid #e2e8f0',
+        borderRadius:'10px', padding:'14px 16px' } },
+      h('b', { style:{ fontSize:'13px' } }, '🔍 유실 데이터 검사·복원'),
+      h(InfoPop, { title:'🔍 유실 데이터 검사·복원' },
+        '서버 백업과 지금 자료를 견주어 «백업에는 있는데 지금은 없는» 계약·사건·컨설팅·기금·기타사업·업체를 찾아 줍니다.\n\n'
+        + '• 고른 것만 «더해서» 되살립니다 — 지금 있는 자료는 건드리지 않습니다.\n'
+        + '• ⚠ 예전에 일부러 지운 것도 나올 수 있습니다 — 백업 날짜를 보고 고르십시오.'),
+      h('span', { style:{ flex:1 } }),
+      h('button', { onClick:function(){ setLostOpen(true); },
+        style:{ padding:'7px 14px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca',
+          borderRadius:'6px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } }, '검사 시작')),
+    lostOpen && h(LostRecordsModal, { onClose:function(){ setLostOpen(false); } })
+  );
+}
+/* 💾 데이터·백업 — 백업에 관한 것을 한곳에.
+   ⚠ 갈래는 TABS 와 같은 꼴({ label, comp })로 적는다 — 「안내가 가리킨 화면에 그 단추가 있다」
+     검사(tests/noid-breaks-sync)가 안내 글과 이 이름을 맞춰 본다. */
+function dataBackupSegs(){ return [
+  { label:'🖥️ NAS 자동 백업', comp: NasBackupSettings },
+  { label:'💾 JSON 수동 백업', comp: BackupSection },
+  { label:'🗂 데이터 관리', comp: DataManagementSection },
+  { label:'🔍 유실 검사·복원', comp: DataBackupLost }
+]; }
+function DataBackupHub(){
+  var ss = useState(0); var seg = ss[0]; var setSeg = ss[1];
+  var segs = dataBackupSegs(), it = segs[seg] || segs[0];
+  return h('div', null, h(SysSeg, { value:seg, onChange:setSeg, items:segs }), h(it.comp, null));
+}
+/* 📊 모니터링·헬스 */
+function monitorSegs(){ return [
+  { label:'📊 모니터링', comp: SystemMonitoringSection },
+  { label:'💚 헬스', comp: HealthSection }
+]; }
+function MonitorHealthHub(){
+  var ss = useState(0); var seg = ss[0]; var setSeg = ss[1];
+  var segs = monitorSegs(), it = segs[seg] || segs[0];
+  return h('div', null, h(SysSeg, { value:seg, onChange:setSeg, items:segs }), h(it.comp, null));
 }
 
 function CompanyInfoForm(){
@@ -42139,14 +42206,23 @@ function NasBackupSettings(){
         '🖥️ 시놀로지 NAS 백업 설정',
         busy && h('span', { style:{fontSize:'12px', color:'#64748b', fontWeight:400} }, '⏳ 처리 중...')),
 
-      진단 && h('div', { style:{
-          background: 진단.ok === true ? '#f0fdf4' : 진단.ok === null ? '#f8fafc' : '#fef2f2',
-          border:'2px solid ' + (진단.ok === true ? '#16a34a' : 진단.ok === null ? '#cbd5e1' : '#991b1b'),
-          borderRadius:'10px', padding:'14px 18px', marginBottom:'16px',
-          fontSize:'13.5px', lineHeight:1.75, fontWeight:600, whiteSpace:'pre-line',
-          color: 진단.ok === true ? '#166534' : 진단.ok === null ? '#475569' : '#991b1b' } },
-        h('div', { style:{ fontSize:'12px', fontWeight:800, opacity:.75, marginBottom:'6px' } }, '지금 상태'),
-        진단.msg),
+      /* 「지금 상태」 — 한 줄(첫 줄)만 보이고, 까닭·해결 방법 전문은 ⓘ 팝업으로
+         (대표 지시 2026-09-29 「불필요한 설명은 팝업창 형태로만」 — 빨간 큰 상자가 화면 절반을 먹었다). */
+      진단 && (function(){
+        var 줄 = String(진단.msg || '').split('\n');
+        var 머리 = 줄.shift() || '';
+        var 나머지 = 줄.join('\n').replace(/^\s+/, '');
+        return h('div', { style:{
+            background: 진단.ok === true ? '#f0fdf4' : 진단.ok === null ? '#f8fafc' : '#fef2f2',
+            border:'1px solid ' + (진단.ok === true ? '#bbf7d0' : 진단.ok === null ? '#e2e8f0' : '#fecaca'),
+            borderRadius:'8px', padding:'8px 12px', marginBottom:'14px', display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap',
+            fontSize:'12.5px', fontWeight:700,
+            color: 진단.ok === true ? '#166534' : 진단.ok === null ? '#475569' : '#991b1b' } },
+          h('span', { style:{ fontSize:'11px', fontWeight:800, opacity:.75 } }, '지금 상태'),
+          h('span', { style:{ flex:'1 1 240px', minWidth:0 } }, 머리),
+          나머지 && h(InfoPop, { title:'🖥️ NAS — 지금 상태와 해결 방법' }, 진단.msg),
+          나머지 && h('span', { style:{ fontSize:'11px', fontWeight:600 } }, '해결 방법'));
+      })(),
 
       h('div', { style:{display:'grid', gap:'16px', alignItems:'start',
                         gridTemplateColumns: (window.IS_MOBILE ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)')} },
@@ -42221,14 +42297,15 @@ function NasBackupSettings(){
           var 못돎 = !cfg.host || !cfg.user || !cfg.pass;
           var 탈 = 못돎 || !!(시도 && !시도.ok);
           var 때 = function(ms){ var d = new Date(ms); return d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); };
-          return h('div', { style:{background:탈?'#fef2f2':'#f0fdf4', border:'1px solid '+(탈?'#fecaca':'#bbf7d0'), borderRadius:'8px', padding:'12px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'} },
-          h('span', { style:{fontSize:'18px'} }, 탈 ? '⚠' : '🔄'),
-          h('div', { style:{flex:1, minWidth:'220px'} },
-            h('div', { style:{fontWeight:700, fontSize:'13px', color:탈?'#991b1b':'#166534'} },
+          /* 한 줄 + ⓘ (대표 지시 2026-09-29) — 둘째 줄(언제·까닭·다음 예정)은 팝업으로 옮겼다 */
+          return h('div', { style:{background:탈?'#fef2f2':'#f0fdf4', border:'1px solid '+(탈?'#fecaca':'#bbf7d0'), borderRadius:'8px', padding:'8px 12px', marginBottom:'14px', display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'} },
+          h('span', { style:{fontSize:'14px'} }, 탈 ? '⚠' : '🔄'),
+          h('div', { style:{flex:1, minWidth:'220px', display:'flex', alignItems:'center', gap:'6px'} },
+            h('span', { style:{fontWeight:700, fontSize:'12.5px', color:탈?'#991b1b':'#166534'} },
               못돎 ? '자동 백업이 «꺼져» 있습니다 — 아래 칸이 비어 있어 돌 수가 없습니다'
                    : 탈 ? '자동 백업이 마지막에 실패했습니다 — 지금 나스에 안 올라가고 있습니다'
                         : '주 1회 자동 백업 활성화됨'),
-            h('div', { style:{fontSize:'11.5px', color:탈?'#991b1b':'#16a34a', marginTop:'2px'} },
+            h(InfoPop, { title:'🔄 자동 백업 — 언제·왜', text:
               (function(){
                 var last = localStorage.getItem(NAS_AUTO_KEY);
                 if(못돎) return 'NAS 아이디·비밀번호가 채워지고 「💾 설정 저장」을 누르셔야 주 1회 자동 백업이 돕니다.';
@@ -42239,8 +42316,7 @@ function NasBackupSettings(){
                 var next = new Date(parseInt(last,10) + 7*24*60*60*1000);
                 return '마지막 자동 백업: ' + 때(parseInt(last,10)) +
                        ' | 다음 예정: ' + next.toLocaleDateString('ko-KR');
-              })()
-            )
+              })() })
           ),
           h('button', { onClick:function(){
               nasAutoClear();                      /* ⚠ 물러서기 기록도 함께 푼다 — 안 그러면 눌러도 하루를 쉰다 */
