@@ -39,6 +39,7 @@ function load(over) {
     SRC.match(/^const digits = [^\n]*;$/m)[0],
     cutFn(SRC, 'function coVal('),
     cutFn(SRC, 'function coNtsWord('), cutFn(SRC, 'function coNtsCls('),
+    cutFn(SRC, 'function coNtsEnd('), cutFn(SRC, 'function coNtsOkOf('), cutFn(SRC, 'function coNtsHandled('),
     cutFn(SRC, 'function coNtsChipHtml(')
   ].join('\n'), ctx);
   return ctx;
@@ -134,7 +135,7 @@ function 물어보기(over) {
     /* ⚠ 주소도 «원본에서» 떠 온다 — 베껴 적으면 제품이 주소를 바꿔도 검사는 옛 주소를 본다.
        (안 실었더니 제품이 「못 물어봤습니다」로 조용히 빠져나가 한참 헤맸다.) */
     SRC.match(/^const NTS_STATUS_URL = [^\n]*;$/m)[0].replace('const ', 'var '),
-    cutFn(SRC, 'function coNtsWord('),
+    cutFn(SRC, 'function coNtsWord('), cutFn(SRC, 'function coNtsEnd('),
     /* ⚠ coAskNts 는 `async function` 이다. cutFn 은 「function …」부터 뜨므로
        async 가 떨어져 나가 안에서 await 이 구문 오류가 된다 — 도로 붙여 싣는다. */
     'async ' + cutFn(SRC, 'function coAskNts(')
