@@ -137,7 +137,7 @@ test('mapRecord: consultingType이 있으면 코드표보다 우선한다', () =
   assert.equal(r.rec.agency, '노사발전재단', '수행기관은 코드표에서 그대로 가져온다');
 });
 
-test('buildSyncPlan: puRef 없는 기존 실적에는 붙이고 새로 만들지 않는다', () => {
+test('buildSyncPlan: ★ 같은 업체·같은 해의 기존 실적은 «자동으로 붙이지 않고» 제안으로 둔다', () => {
   const collData = {
     cases: null,
     consultings: { v: {
@@ -151,12 +151,92 @@ test('buildSyncPlan: puRef 없는 기존 실적에는 붙이고 새로 만들지
     { id: 'CN0001', store: 'consult', org: '벼리테크', year: '2026', type: '산업일자리' }
   ];
   const plan = PS.buildSyncPlan(collData, new Set(), UMAP, TYPEMAP, existing);
-  assert.equal(plan.adds.length, 1, '기존에 있는 건은 새로 만들지 않는다');
+  assert.equal(plan.adds.length, 1, '기존에 있을 수 있는 건은 새로 만들지 않는다(중복 방지)');
   assert.equal(plan.adds[0].rec.org, '새로운회사');
-  assert.equal(plan.links.length, 1, '기존 건에는 puRef만 붙인다');
-  assert.equal(plan.links[0].id, 'CN0001');
-  assert.equal(plan.links[0].puRef, 'consultings/k1');
-  assert.equal(plan.links[0].agency, '한국능률협회', '붙일 때 빈 수행기관도 채워준다');
+  // 온톨로지: 이름으로 관계 열쇠를 삼지 않는다 — 사람이 고를 때까지 잇지 않는다
+  assert.equal(plan.links.length, 0, '★ 이름이 같다고 자동으로 붙이면 안 됩니다');
+  assert.equal(plan.suggests.length, 1, '연결 제안으로 남아야 합니다');
+  assert.equal(plan.suggests[0].cands[0].id, 'CN0001');
+  assert.equal(plan.suggests[0].add.rec.agency, '한국능률협회', '연결할 때 채울 수행기관을 함께 들고 있다');
+});
+
+test('buildSyncPlan: ★ 한 업체에 같은 해 두 건이면 후보를 «둘 다» 보여 준다 — 아무 쪽에나 붙지 않는다', () => {
+  const collData = { cases: { v: {
+    a: { id: 'c-a', companyName: '가나상사', title: '부당해고', caseNo: '부해등-2026-001', status: 'closed', closedDate: '2026-03-01' }
+  }, u: 1 } };
+  const existing = [
+    { id: 'CS0001', store: 'case', org: '가나상사', year: '2026', project: '임금체불' },
+    { id: 'CS0002', store: 'case', org: '가나상사', year: '2026', project: '부당해고' }
+  ];
+  const plan = PS.buildSyncPlan(collData, new Set(), UMAP, TYPEMAP, existing);
+  assert.equal(plan.links.length, 0);
+  assert.deepEqual(plan.suggests[0].cands.map((c) => c.id), ['CS0001', 'CS0002']);
+});
+
+test('buildSyncPlan: ★ 영구 id 가 있으면 열쇠는 «cases#id» — 줄 번호가 아니다', () => {
+  const collData = { cases: [
+    { id: 'case-1', companyName: '가나상사', caseNo: '부해등-2026-001', title: 't', closedDate: '2026-01-01' },
+    { id: 'case-2', companyName: '다라전자', caseNo: '산재등-2026-004', title: 't', closedDate: '2026-01-01' }
+  ] };
+  const plan = PS.buildSyncPlan(collData, new Set(), {});
+  assert.deepEqual(plan.adds.map((a) => a.rec.puRef), ['cases#case-1', 'cases#case-2']);
+  const r = plan.adds[1].rec;
+  assert.equal(r.sourceKind, 'case', '온톨로지 sourceKind');
+  assert.equal(r.sourceId, 'case-2', '온톨로지 sourceId = 이알피 영구 id');
+  assert.equal(r.sourceNo, '산재등-2026-004', '관리번호는 보여 주기용으로 따로');
+  assert.equal(r.puRefWeak, undefined);
+  // 이미 id 로 들어온 것은 건너뛴다 — 줄이 밀려도(앞의 것이 지워져도) 같은 건으로 안다
+  const plan2 = PS.buildSyncPlan({ cases: [collData.cases[1]] }, new Set(['cases#case-2']), {});
+  assert.equal(plan2.adds.length, 0, '★ 앞줄이 지워져 줄 번호가 바뀌어도 같은 건이다');
+  assert.equal(plan2.skippedKnown, 1);
+});
+
+test('buildSyncPlan: id 없는 옛 레코드는 줄 번호 열쇠 + 약한 연결 표시', () => {
+  const plan = PS.buildSyncPlan({ cases: [{ companyName: 'E사', title: 't', closedDate: '2025-05-05' }] }, new Set(), {});
+  assert.equal(plan.adds[0].rec.puRef, 'cases/0');
+  assert.equal(plan.adds[0].rec.puRefWeak, true);
+  assert.equal(plan.adds[0].rec.sourceId, '');
+});
+
+test('buildRefMigration: ★ 옛 줄 번호 열쇠를 «그 줄이 아직 같은 건일 때만» 영구 열쇠로 옮긴다', () => {
+  const collData = { cases: { v: [
+    { id: 'c-0', companyName: '가나상사', title: '부당해고', caseNo: '부해등-2026-001' },
+    { id: 'c-1', companyName: '다라전자', title: '임금체불', caseNo: '체불-2026-002' },   // 원래 2번째에 있던 건이 지워져 한 칸 당겨졌다
+    { companyName: '마바건설', title: '산재' }                                          // id 없음
+  ], u: 1 }, consultings: { v: { 'co-9': { id: 'co-9', companyName: '사아', title: '컨설팅' } }, u: 1 } };
+  const recs = [
+    { id: 'CS0001', store: 'case', puRef: 'cases/0', org: '가나상사', project: '부해등-2026-001' },  // 그대로 → 옮김
+    { id: 'CS0002', store: 'case', puRef: 'cases/1', org: '가나상사', project: '산재사건' },          // 그 줄에 다른 업체 → 확인 필요
+    { id: 'CS0003', store: 'case', puRef: 'cases/1', org: '다라전자', project: '다른내용' },          // 업체는 같은데 내용이 다르다 → 확인 필요
+    { id: 'CS0004', store: 'case', puRef: 'cases/7', org: '가나상사' },                              // 그 줄이 없다 → 확인 필요
+    { id: 'CS0005', store: 'case', puRef: 'cases/2', org: '마바건설' },                              // id 없는 줄 → 약한 연결 유지
+    { id: 'CN0001', store: 'consult', puRef: 'consultings/co-9', org: '엉뚱' },                    // 지도 저장, 열쇠 = id → 옮김
+    { id: 'CS0006', store: 'case', puRef: 'cases#c-0', org: '가나상사' }                            // 이미 영구 → 손대지 않음
+  ];
+  const m = PS.buildRefMigration(collData, recs);
+  assert.deepEqual(m.upgrades.map((u) => [u.id, u.puRef]), [['CS0001', 'cases#c-0'], ['CN0001', 'consultings#co-9']]);
+  assert.equal(m.upgrades[0].sourceNo, '부해등-2026-001');
+  assert.equal(m.upgrades[0].sourceId, 'c-0');
+  assert.deepEqual(m.broken.map((b) => b.id), ['CS0002', 'CS0003', 'CS0004'], '★ 어긋난 연결은 자동으로 다른 건에 붙이지 않고 사람에게');
+  assert.equal(m.broken[2].reason, 'gone');
+  assert.deepEqual(m.weak.map((w) => w.id), ['CS0005']);
+});
+
+test('buildRefMigration: ★ 관리번호만 같다고 옮기지 않는다 — 업체가 달라지면 확인 필요', () => {
+  const m = PS.buildRefMigration({ cases: [{ id: 'x', companyName: '다른회사', caseNo: '부해등-2026-001' }] },
+    [{ id: 'CS0001', store: 'case', puRef: 'cases/0', org: '가나상사', project: '부해등-2026-001' }]);
+  assert.equal(m.upgrades.length, 0);
+  assert.equal(m.broken.length, 1);
+});
+
+test('buildNoUpdates: 이알피가 관리번호를 다시 매기면 영구 열쇠로 이어진 건만 따라 고친다', () => {
+  const collData = { consultings: [{ id: 'k1', no: '기술보호-2026-003' }, { no: '기술보호-2026-009' }] };
+  const ups = PS.buildNoUpdates(collData, [
+    { puRef: 'consultings#k1', sourceNo: '기술보호-2026-004' },
+    { puRef: 'consultings/1', sourceNo: '' },                           // 줄 번호 열쇠 — 따라가지 않는다
+    { puRef: 'consultings#k1', sourceNo: '기술보호-2026-004', puRefCheck: 'moved' }
+  ]);
+  assert.deepEqual(ups, [{ puRef: 'consultings#k1', sourceNo: '기술보호-2026-003' }]);
 });
 
 test('mapRecord: 모르는 컬렉션은 null', () => {
@@ -200,9 +280,9 @@ test('buildStatusUpdates: 진행 → 완료로 바뀐 것만 상태를 맞춘다
     consultings: null, funds: null, other_projects: null
   };
   const existing = [
-    { id: 'CS0001', puRef: 'cases/k1', status: '진행', year: '' },
-    { id: 'CS0002', puRef: 'cases/k2', status: '진행', year: '2026' },
-    { id: 'CS0003', puRef: 'cases/k3', status: '완료', year: '2025' },
+    { id: 'CS0001', puRef: 'cases/k1', org: 'A사', status: '진행', year: '' },
+    { id: 'CS0002', puRef: 'cases/k2', org: 'B사', status: '진행', year: '2026' },
+    { id: 'CS0003', puRef: 'cases/k3', org: 'C사', status: '완료', year: '2025' },
     { id: 'CS0004', status: '진행' },                    // 손으로 등록한 건 — puRef 없으면 건드리지 않는다
     { id: 'CS0005', puRef: 'cases/없음', status: '진행' } // pu-erp에서 사라진 건
   ];
@@ -211,6 +291,25 @@ test('buildStatusUpdates: 진행 → 완료로 바뀐 것만 상태를 맞춘다
   assert.equal(ups[0].puRef, 'cases/k1');
   assert.equal(ups[0].status, '완료');
   assert.equal(ups[0].year, '2026', '종료일에서 연도를 채운다');
+});
+
+test('buildStatusUpdates: ★ 줄 번호 열쇠의 그 줄에 «다른 업체»가 와 있으면 상태를 덮지 않는다', () => {
+  // 앞의 사건이 지워져 한 칸 당겨졌다 — 1번 줄은 이제 다른 업체의 끝난 사건이다
+  const collData = { cases: [ { companyName: '다라전자', status: 'closed', closedDate: '2026-05-01' } ] };
+  const ups = PS.buildStatusUpdates(collData, [{ id: 'CS0001', puRef: 'cases/0', org: '가나상사', status: '진행' }]);
+  assert.equal(ups.length, 0, '★ 남의 사건이 끝났다고 내 실적을 완료로 바꾸면 안 됩니다');
+});
+
+test('buildStatusUpdates: 영구 열쇠는 줄이 밀려도 제 건을 찾는다 · 확인 대기 건은 건드리지 않는다', () => {
+  const collData = { cases: [
+    { id: 'c-9', companyName: '다라전자', status: 'active' },
+    { id: 'c-1', companyName: '가나상사', status: 'closed', closedDate: '2026-06-01' }
+  ] };
+  const ups = PS.buildStatusUpdates(collData, [
+    { id: 'CS0001', puRef: 'cases#c-1', org: '가나상사', status: '진행' },
+    { id: 'CS0002', puRef: 'cases#c-1', org: '가나상사', status: '진행', puRefCheck: 'moved' }
+  ]);
+  assert.deepEqual(ups.map((u) => u.puRef + ':' + u.status), ['cases#c-1:완료']);
 });
 
 test('unwrap: pu-erp의 {v,u} 봉투를 벗긴다', () => {

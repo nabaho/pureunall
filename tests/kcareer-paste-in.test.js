@@ -68,6 +68,10 @@ function 세상(store) {
   vm.runInContext(cutFn(CODE, 'function escapeHtml('), ctx);
   vm.runInContext(cutFn(CODE, 'function formatDate('), ctx);
   vm.runInContext(cutFn(CODE, 'function dupKey('), ctx);
+  /* 번호는 kcNextNo 한 곳에서 만든다(휴지통까지 본다, 2026-09-29) */
+  vm.runInContext("var TRASH_STORE='trash';", ctx);
+  vm.runInContext(cutFn(CODE, 'function kcTrashList('), ctx);
+  vm.runInContext(cutFn(CODE, 'function kcNextNo('), ctx);
   vm.runInContext(cutFn(CODE, 'function wiccokId('), ctx);
   /* ⚠ 이름이 겹친다 — 화면 안쪽에도 `function nextId()` 가 하나 더 있다.
      이름만 찾으면 그 «다른» 함수가 잘려 나와 「db is not defined」로 터진다(실측). */

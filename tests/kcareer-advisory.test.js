@@ -134,7 +134,7 @@ test('푸른이알피 봉투를 벗겨야 업체가 보인다', () => {
 test('그동안 해지된 업체는 상태만 맞춘다', () => {
   const ups = S.buildStatusUpdates(
     { companies: { co1: co({ status: 'closed', closedDate: '2026-08-31' }) } },
-    [{ puRef: 'companies/co1', status: '진행', year: '2019' }]);
+    [{ puRef: 'companies/co1', org: '(주)한빛', status: '진행', year: '2019' }]);
   assert.equal(ups.length, 1);
   assert.equal(ups[0].status, '종료');
   assert.equal(ups[0].year, '2019', '⚠ 자문은 시작연도가 실적 연도다 — 해지연도로 덮지 않는다');
@@ -142,7 +142,7 @@ test('그동안 해지된 업체는 상태만 맞춘다', () => {
 
 test('아직 진행 중이면 상태를 건드리지 않는다', () => {
   const ups = S.buildStatusUpdates({ companies: { co1: co() } },
-    [{ puRef: 'companies/co1', status: '진행', year: '2019' }]);
+    [{ puRef: 'companies/co1', org: '(주)한빛', status: '진행', year: '2019' }]);
   assert.equal(ups.length, 0);
 });
 
