@@ -38,6 +38,14 @@ test('★★ 발송 중 서버가 멈춘 줄은 자동 재발송하지 않고 �
   assert.match(보류.error, /확인/);
 });
 
+test('★ 고치기 전에 남은 실패 줄도 정상 대기열 앞에서 치운다', () => {
+  const now = 1_700_000_000_000;
+  const 옛것 = { state: 'failed', at: now - 86400000, error: '옛 실패' };
+  const 치움 = B.parkOldFailure(옛것, now);
+  assert.equal(치움.originalAt, 옛것.at);
+  assert.equal(치움.at, B.PARKED_AT);
+});
+
 test('★★ 예약 발송기가 실패 복구와 굳은 발송 격리를 실제로 사용한다', () => {
   const start = 서버.indexOf('exports.sendScheduledMail');
   const end = 서버.indexOf('\nexports.', start + 10);
@@ -45,6 +53,7 @@ test('★★ 예약 발송기가 실패 복구와 굳은 발송 격리를 실제
   assert.match(body, /MB\.staleSending\(/);
   assert.match(body, /MB\.uncertainDelivery\(/);
   assert.match(body, /MB\.deliveryFailure\(/);
+  assert.match(body, /MB\.parkOldFailure\(/);
 });
 
 test('예약 화면은 실제 15분 주기와 확인 필요 상태를 정확히 말한다', () => {

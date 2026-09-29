@@ -999,6 +999,12 @@ exports.sendScheduledMail = functions
     for (const id of ids) {
       const row = all[id] || {};
       const ref = db.ref(MD.CARDS_ROOT + "/scheduled/" + id);
+      /* 이 고침보다 먼저 생긴 실패 줄도 지난 시각에 남아 있다. 새 실패만 치우면
+         옛 실패 20건이 쌓인 날 다시 같은 막힘이 생기므로 한 번 만나면 함께 치운다. */
+      if (row.state === "failed" && Number(row.at) !== MB.PARKED_AT) {
+        await ref.update(MB.parkOldFailure(row, now));
+        continue;
+      }
       /* 실행 도중 서버가 꺼져 sending 으로 굳은 줄은 정상 대기열을 막지 않게 치운다.
          이미 SMTP 서버가 받았는지 알 수 없으므로 자동 재발송은 하지 않는다 — 중복보다
          «확인 필요»로 남기는 편이 안전하다. */
