@@ -24,9 +24,9 @@ vm.createContext(ctx);
 vm.runInContext(SRC.match(/var _dsFold=[^\n]*\n/)[0] + ['function _dsDay(', 'function _dsShort(', 'function dsTitleOf('].map(떼기).join('\n'), ctx);
 const 제목 = (r) => { ctx.__r = r; return vm.runInContext('dsTitleOf(__r,{})', ctx); };
 
-test('① 저장 이름에서 «무슨 서류인가»를 뽑는다 — 해·날짜·기관을 걷고 이름을 떼어 낸다', () => {
+test('① 저장 이름에서 «무슨 서류인가»를 뽑는다 — 해·날짜를 걷고 이름을 떼어 낸다', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(제목({ org: '천안어린이꿈누리터', genName: '2027년 천안어린이꿈누리터 제안서 평가위원 후보자 등록 신청서_박한별 2026. 09. 29.hwpx' }))),
-    { t: '제안서 평가위원 후보자 등록 신청서', 사람: '박한별' });
+    { t: '천안어린이꿈누리터 제안서 평가위원 후보자 등록 신청서', 사람: '박한별' });
   assert.equal(제목({ org: '법원', genName: '2026년 전문심리위원 신청서 2026. 01. 11.hwpx' }).t, '전문심리위원 신청서');
 });
 
@@ -69,4 +69,25 @@ test('⑤ 검색 줄은 탭 옆(#dbTools)으로 — 지금 탭 것만 보인다'
   assert.match(fn, /tb\.style\.display=\(d===domain\)\?'':'none'/);
   assert.match(떼기('function dbTab('), /dbToolsMount\(domain\)/);
   assert.match(떼기('function renderDocStore('), /dbToolsMount\(/, '탭을 안 눌러도 처음부터 옮겨져야 한다');
+});
+
+test('①-2 실측(2026-09-29) — 기관을 제목에서 떼지 않는다 · 꼬리를 걷는다 · 쪽 소제목은 서류 이름이 아니다', () => {
+  assert.equal(제목({ org: '제안서 평가위원 후보자', genName: '2027년 제안서 평가위원 후보자 등록 신청서 2026. 09. 29.hwpx' }).t,
+    '제안서 평가위원 후보자 등록 신청서', '★★ 기관 칸에 서류 이름을 적어 두면 「등록 신청서」만 남았다');
+  assert.equal(제목({ genName: '양식_채움_날인.hwpx', origName: '양식.hwpx', kind: '일반 이력서' }).t, '일반 이력서', '★ 꼬리를 안 걷으면 「양식_채움_날인」이 제목이 된다');
+  assert.equal(제목({ genName: '2026년 한국기계연구원 1-1. 일반현황_권형하 2026. 09. 28.hwpx', origName: '한국기계연구원 신청서.hwp' }).t, '한국기계연구원 1-1. 일반현황');
+  assert.equal(제목({ genName: '2026년 1-1. 일반현황 2026. 09. 28.hwpx', origName: '한국기계연구원 신청서.hwp' }).t, '한국기계연구원 신청서', '★ 쪽 소제목만 남으면 원본 이름으로 물러선다');
+});
+
+test('⑥ 목록 ↔ 미리보기 폭을 마우스로 — 한도가 있고, 기억하고, 두 번 누르면 처음 폭', () => {
+  vm.runInContext(SRC.match(/var DS_PV_DEF=[^\n]*\n/)[0] + 떼기('function _dsPvClamp('), ctx);
+  const 조임 = (w, t) => { ctx.__w = [w, t]; return vm.runInContext('_dsPvClamp(__w[0],__w[1])', ctx); };
+  assert.equal(조임(100, 1200), 220, '너무 좁히면 미리보기를 못 쓴다');
+  assert.equal(조임(1000, 1200), 720, '너무 넓히면 목록이 사라진다(6할까지)');
+  assert.equal(조임(400, 1200), 400);
+  const fn = 떼기('function dsGutDown(');
+  assert.match(fn, /LS\.set\(NS\+'ds_pv_w'/, '놓을 때 이 기기에 기억한다');
+  assert.match(SRC, /onmousedown="dsGutDown\(event\)" ondblclick="dsGutReset\(\)"/);
+  assert.match(SRC, /grid-template-columns:minmax\(0,1fr\) 10px var\(--ds-pv,320px\)/);
+  assert.match(SRC, /#dbTools\{[^}]*min-width:0/, '검색 줄이 줄어들지 않으면 화면 밖으로 밀린다');
 });

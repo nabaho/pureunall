@@ -559,11 +559,14 @@ html.dark .empty{color:var(--text-mute)}
 /* ── 서류 보관함: 탭+검색 한 줄 · 기관별 묶음 · 오른쪽 미리보기 (대표 승인 2026-09-29 목업 B+C) ── */
 .db-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--border);margin:10px 0 10px}
 .db-top .tabrow{border-bottom:none;margin:0;flex:0 1 auto}
-#dbTools{margin-left:auto;display:flex;align-items:center;min-width:0}
-#dbTools .toolbar{margin:0!important;padding:4px 0;border:0;background:none;box-shadow:none;flex-wrap:wrap;gap:6px}
+#dbTools{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;min-width:0;flex:1 1 360px}
+#dbTools .toolbar{margin:0!important;padding:4px 0;border:0;background:none;box-shadow:none;flex-wrap:wrap;gap:6px;flex:1 1 auto;min-width:0;justify-content:flex-end}
 #dbTools .toolbar .tb-input{min-width:180px!important}
-.ds-split{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start;margin-top:6px}
-@media(max-width:1000px){ .ds-split{grid-template-columns:1fr} .ds-prev{position:static!important} }
+.ds-split{display:grid;grid-template-columns:minmax(0,1fr) 10px var(--ds-pv,320px);gap:0;align-items:start;margin-top:6px;min-width:0}
+.ds-gut{cursor:col-resize;align-self:stretch;min-height:120px;position:relative}
+.ds-gut::after{content:'';position:absolute;left:4px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--border)}
+.ds-gut:hover::after,.ds-gut.drag::after{background:var(--navy)}
+@media(max-width:1000px){ .ds-split{grid-template-columns:1fr} .ds-gut{display:none} .ds-prev{position:static!important} }
 .ds-grp{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--soft,#f8fafc);border-radius:8px;margin-top:8px;font-weight:700;color:var(--navy);cursor:pointer;font-size:13px;user-select:none}
 .ds-grp .m{font-weight:400;color:var(--text-mute);font-size:11.5px}
 #page-docbox .card.ds-card[data-dsrow]{display:flex;align-items:center;gap:8px;padding:4px 8px!important;margin:0!important;border:0;border-bottom:1px solid var(--border);border-radius:0;box-shadow:none;flex-wrap:nowrap;cursor:pointer;min-height:32px;white-space:nowrap}
@@ -6492,7 +6495,9 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
           <button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
         </div>`; }).join('');
   }).join('');
-  body.innerHTML=allChk+dsBar+`<div class="ds-split"><div class="ds-list">${목록}</div><div class="ds-prev" id="dsPrev-${domain}"></div></div>`;
+  body.innerHTML=allChk+dsBar+`<div class="ds-split" style="--ds-pv:${dsPvWidth()}px"><div class="ds-list">${목록}</div>`
+    +`<div class="ds-gut" title="끌어서 폭을 바꿉니다 · 두 번 누르면 처음 폭" onmousedown="dsGutDown(event)" ondblclick="dsGutReset()"></div>`
+    +`<div class="ds-prev" id="dsPrev-${domain}"></div></div>`;
   _safe(function(){ var 고른=_dsPicked[domain]; if(고른) [].forEach.call(body.querySelectorAll('[data-dsrow]'), function(el){ if(el.getAttribute('data-id')===고른) el.classList.add('pick'); }); dsPrevDraw(domain); });
   _safe(function(){ bindDragSel(body, function(){ docSelSync(domain); }); });
 }
@@ -6505,18 +6510,41 @@ function _dsShort(v){ var m=String(v||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})
 function dsTitleOf(r, D){
   var raw=String(r.genName||'');
   var 옛=/^(이력서|프로필|경력증명서)_[^_]*_\d{4}\.\w+$/.test(raw);
-  var n=raw.replace(/\.(hwpx?|pdf|docx?)$/i,'').replace(/^\s*\d{4}\s*년\s*/,'')
-    .replace(/\s*\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?\s*$/,'').trim();
+  var n=raw.replace(/\.(hwpx?|pdf|docx?)$/i,'').replace(/(_채움|_날인|_작성|_완성본|_수정)+$/g,'')
+    .replace(/^\s*\d{4}\s*년\s*/,'').replace(/\s*\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?\s*$/,'')
+    .replace(/(_채움|_날인|_작성|_완성본|_수정)+$/g,'').trim();
   var 사람='', m=n.match(/_([가-힣]{2,4})$/);
   if(m){ 사람=m[1]; n=n.slice(0,-m[0].length).trim(); }
-  if(r.org && n.indexOf(r.org)===0 && n.length>r.org.length) n=n.slice(r.org.length).trim();
+  /* ⚠ 기관 이름을 제목에서 떼지 않는다 — 기관 칸에 「제안서 평가위원 후보자」처럼 서류 이름을 적어 두면
+     「등록 신청서」만 남았다(실측 2026-09-29). 묶음 머리가 기관을 이미 보여 주니 겹쳐도 된다. */
   var 뭉뚱=/^(양식|서식|문서|원본|무제|서류|document|untitled|새 문서)$/i;
-  if(!n || 옛 || 뭉뚱.test(n)){
-    var o=String(r.origName||'').replace(/\.(hwpx?|pdf|docx?)$/i,'').trim();
+  /* 쪽 소제목(「1-1. 일반현황」)은 서류 이름이 아니다 — 새 이름 규칙 전에 저장된 것에 남아 있다 */
+  var 소제목=/^\d+(\s*[-.)]\s*\d+)*[.)]\s/.test(n);
+  if(!n || 옛 || 뭉뚱.test(n) || 소제목){
+    var o=String(r.origName||'').replace(/\.(hwpx?|pdf|docx?)$/i,'').replace(/(_채움|_날인|_작성)+$/g,'').trim();
     n=(o && !뭉뚱.test(o))?o:(r.kind||'(이름 없음)');
   }
   return { t:n, 사람:사람 };
 }
+/* ── 목록 ↔ 미리보기 폭 조절 (대표 지시 2026-09-29 「크기조절할수 있게 해달라 마우스로」) ──
+   가운데 손잡이를 끌면 미리보기 폭이 바뀌고, 이 기기에 기억한다(두 번 누르면 처음 폭).
+   ⚠ 한도를 둔다 — 너무 좁으면 미리보기가 못 쓰게 되고, 너무 넓으면 목록이 사라진다. */
+var DS_PV_DEF=320, DS_PV_MIN=220, DS_PV_MAXR=0.6;
+function dsPvWidth(){ var w=0; try{ w=parseInt(LS.get(NS+'ds_pv_w'),10)||0; }catch(e){} return w>=DS_PV_MIN?w:DS_PV_DEF; }
+function _dsPvClamp(w, total){ var max=Math.max(DS_PV_MIN, Math.round((total||1200)*DS_PV_MAXR)); return Math.max(DS_PV_MIN, Math.min(max, Math.round(w))); }
+function dsGutDown(ev){
+  var gut=ev.currentTarget, split=gut&&gut.parentNode; if(!split) return;
+  ev.preventDefault();
+  var rect=split.getBoundingClientRect(); gut.classList.add('drag');
+  document.body.style.userSelect='none';
+  function 움직(e){ var w=_dsPvClamp(rect.right-e.clientX-5, rect.width);
+    document.querySelectorAll('.ds-split').forEach(function(sp){ sp.style.setProperty('--ds-pv', w+'px'); }); split._w=w; }
+  function 놓음(){ document.removeEventListener('mousemove',움직); document.removeEventListener('mouseup',놓음);
+    gut.classList.remove('drag'); document.body.style.userSelect='';
+    if(split._w){ try{ LS.set(NS+'ds_pv_w', String(split._w)); }catch(e){} } }
+  document.addEventListener('mousemove',움직); document.addEventListener('mouseup',놓음);
+}
+function dsGutReset(){ try{ LS.remove(NS+'ds_pv_w'); }catch(e){} document.querySelectorAll('.ds-split').forEach(function(sp){ sp.style.setProperty('--ds-pv', DS_PV_DEF+'px'); }); }
 function dsGrpToggle(domain,k){ var key=domain+'|'+k; _dsFold[key]=!_dsFold[key]; renderDocStore(domain); }
 function dsRowClick(ev,domain,id){
   if(ev && ev.target && ev.target.closest && ev.target.closest('button,input,label,a,select')) return;
