@@ -142,7 +142,10 @@ test('★★ 처리한 곳의 딱지는 «무엇으로 처리했는지» 말한�
 });
 
 test('★★ 두 단추가 국세청 창의 줄과 「확인 필요」에 다 있다', () => {
-  assert.match(cutFn(SRC, 'function coNtsHtml('), /coNtsFixBtns\(x\.key\)/);
+  /* 2026-09-29: 창의 줄은 갈래마다 «알맞은 단추 하나»(coNtsActBtn) — 두 단추는 확인 필요에 있다 */
+  assert.match(cutFn(SRC, 'function coNtsHtml('), /coNtsActBtn\(x\)/);
+  assert.match(cutFn(SRC, 'function coNtsActBtn('), /coNtsNewNoAsk\(/);
+  assert.match(cutFn(SRC, 'function coNtsActBtn('), /coNtsOkMark\(/);
   assert.match(cutFn(SRC, 'function coNeedHtml('), /coNtsFixBtns\(o\.key\)/);
   const b = load().coNtsFixBtns("가'나");
   assert.match(b, /coNtsNewNoAsk\('가\\'나'\)/, '★ 따옴표가 든 열쇠도 깨지지 않는다');
