@@ -490,7 +490,7 @@ test('★★ ㉔ 목록 열이 «기금명 바로 오른쪽»이고 폭이 못 �
   const fn = grabFn('fundTable');
   const i = fn.indexOf("['기금명','','']"), j = fn.indexOf("'참여 지자체'");
   assert.ok(i >= 0 && j > i, '★ 참여 지자체가 기금명 오른쪽에 없습니다.');
-  assert.ok(fn.indexOf("['주담당','','132px']") > j, '★ 주담당보다 뒤에 있습니다.');
+  assert.ok(fn.indexOf("['주담당','mgc','132px']") > j, '★ 주담당보다 뒤에 있습니다.');
   assert.match(fn, /'참여 지자체','ph','\d+px'/, '★ 폭이 없습니다 — 충남 표와 경기 표의 열이 어긋납니다.');
   assert.match(grabFn('fundRow'), /fundGovCell\(f\._id\)/, '줄에 칸이 안 들어갔습니다.');
 });
