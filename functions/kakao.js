@@ -20,7 +20,37 @@
 const functions = require("firebase-functions/v1");
 const { getAuth } = require("firebase-admin/auth");
 const { getDatabase: getRawDatabase } = require("firebase-admin/database");
+const crypto = require("crypto");
 const OntologyServerWrite = require("./ontology-write-server");
+const LS = require("./login-security");
+
+/* ── 실패한 카카오 로그인을 «로그인 감시» 에 남긴다 (대표 「추천대로」 2026-09-29) ──────────
+   ★ 비밀번호 로그인 실패는 화면이 보고한다(증표가 없어 믿을 수 없는 값이다 — login-security 참고).
+     카카오 실패는 «서버가 카카오에 직접 물어» 알아낸 것이라 믿을 수 있다 — 그래서 여기서 바로 적는다.
+   ① 연결 안 된 카카오 계정  → login_events/kakao_{회원번호 지문} (회원번호 원문은 안 적는다)
+   ② 재직자 아닌 계정(퇴사·휴직) → login_events/{uid} + systemAlerts/{uid} 알림 — 나간 사람이
+      들어오려 한 것은 바로 보여야 한다.
+   ⚠ 기록이 실패해도 로그인 응답은 그대로 간다(감시는 따라다닐 뿐, 문을 막지 않는다).
+   ⚠ 온톨로지 관문(db())을 거치지 않는다 — 업무 자료가 아니라 보안 기록이다(logLoginAttempt 와 같은 길). */
+function kakaoIdKey(kakaoId) {
+  return "kakao_" + crypto.createHash("sha1").update(String(kakaoId)).digest("hex").slice(0, 16);
+}
+async function kakaoFailTrail(req, key, code, alert) {
+  try {
+    const raw = getRawDatabase();
+    const now = Date.now();
+    const ip = LS.lastIp(req.headers && req.headers["x-forwarded-for"]) || String(req.ip || "");
+    const ua = String((req.headers && req.headers["user-agent"]) || "").slice(0, 150);
+    await raw.ref("login_events/" + key).push({ at: now, ok: false, code, via: "kakao", ip, ua, page: "enter.html" });
+    if (alert) {
+      await raw.ref("systemAlerts/" + key).push(Object.assign({
+        createdAt: now, uid: key, page: "enter.html", status: "new", detail: "IP " + (ip || "(모름)") + (ua ? " · " + ua : ""),
+      }, alert));
+    }
+  } catch (e) {
+    console.warn("kakaoFailTrail: 기록 실패", String((e && e.message) || e));
+  }
+}
 
 /* 지문과 같은 도메인·같은 리전 — 바꾸면 이미 연결된 카카오 계정이 전부 무효가 된다. */
 const REGION = "asia-northeast3";
@@ -251,6 +281,7 @@ exports.kakaoLoginFinish = functions
     /* needLink — 화면이 「비밀번호로 한 번 들어오면 곧바로 연결을 권한다」로 이어 가는 표시.
        카카오 회원번호는 싣지 않는다(연결은 로그인 뒤 인가코드를 새로 받아 서버가 다시 확인한다). */
     if (!link || !link.uid) {
+      await kakaoFailTrail(req, kakaoIdKey(kakaoId), "kakao-unlinked", null);
       return res.status(400).json({ ok: false, needLink: true,
         error: "아직 연결되지 않은 카카오 계정입니다. 처음 한 번만 위에서 아이디·비밀번호로 로그인해 주세요 — 로그인하면 카카오 연결을 바로 이어 드립니다" });
     }
@@ -259,6 +290,11 @@ exports.kakaoLoginFinish = functions
     /* 퇴사·휴직 등으로 재직자가 아니면 표를 주지 않는다 — 규칙이 자료는 막지만,
        포털이 「들어온 것처럼」 뜨고 빈 화면이 되면 본인이 까닭을 모른다. */
     if (role.status !== "active") {
+      const sid = String(role.sid || link.sid || "");
+      await kakaoFailTrail(req, pathSafe(link.uid), "kakao-inactive", {
+        kind: "security-kakao-inactive",
+        message: "재직 중이 아닌 계정이 카카오로 로그인하려 했습니다 (" + (sid || "사번 없음") + " · " + (role.status || "상태 없음") + ")",
+      });
       return bad(res, 403, "재직 중인 계정이 아닙니다. 관리자에게 문의해 주세요");
     }
 
