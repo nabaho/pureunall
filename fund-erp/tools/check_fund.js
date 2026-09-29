@@ -379,7 +379,8 @@ ok('업종을 지어내지 않는다', src.includes("'업종':          '',"));
    고유번호증·등기부처럼 스캔으로만 오는 서류는 한 번도 판독되지 않았다.
    실제로 터지는지는 check_pdfbuf.js 가 pdf.js 를 흉내 내 본다. */
 ok('pdf.js 에는 사본을 준다', src.includes('function _pdfCopy(buf){')
-  && (src.match(/data:_pdfCopy\(buf\)/g)||[]).length===2
+  /* 2026-09-29 재직증명서 여러 장 읽기(_pdfPagesText)가 셋째로 사본을 쓴다 — 다 사본이면 된다(아래 줄이 맨 buf 를 막는다) */
+  && (src.match(/data:_pdfCopy\(buf\)/g)||[]).length>=2
   && !/data:buf\}/.test(src));
 /* 걷어내기는 오랫동안 «숫자»만 봤다 — 그래서 변환본에 딸려 온 남의 값 중 한글로 적힌 것과
    「N명」이 그대로 인쇄됐다(contrib 「오백만원정」· bizplan 「일천만원」· sub_welfare_plan 「65명」).
