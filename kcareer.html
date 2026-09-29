@@ -4149,7 +4149,12 @@ function hwpViewDownload(){
   if(!_hwpView){ toast('저장할 문서가 없습니다'); return; }
   /* ⚠ 형식을 'hwpx'로 못박지 말 것 — 보관함의 옛 .hwp(이진 형식)도 이 뷰어로 열린다.
      형식을 비우면 내용에서 hwp/hwpx를 알아서 가려 올바른 MIME으로 저장한다. */
-  PureunHwp.download(_hwpView.bytes, _hwpView.name);
+  /* ★ 지금 작업 중인 서류면 저장 이름 규칙을 쓴다 — 보관함의 다른 서류는 제 이름 그대로 */
+  var 이름=_hwpView.name;
+  var 내것=_rhDoc && _hwpView.name===_rhDoc.name;
+  if(!내것){ PureunHwp.download(_hwpView.bytes, 이름); return; }
+  rhNiceName().then(function(n){ PureunHwp.download(_hwpView.bytes, n||이름); },
+                    function(){ PureunHwp.download(_hwpView.bytes, 이름); });
 }
 /* 뷰어가 이미 그린 A4 캔버스를 그대로 인쇄한다 — 한글 모양 그대로의 PDF가 나온다.
    (인쇄창에서 「PDF로 저장」을 고르면 파일이 된다. 한글 프로그램이 없어도 된다.) */
@@ -6042,7 +6047,7 @@ async function confirmResumeSave(){ if(!_docCtx) return; const {domain,mode,file
     const bytes=await exportEditedHwpx(); if(!bytes){ toast('편집 중인 문서가 없습니다'); return; }
     const blob=new Blob([bytes],{type:'application/vnd.hancom.hwpx'}); genName=`${D.label}_${org||'무제'}_${year}.hwpx`;
     /* ★ 올린 신청서가 있으면 «해 + 그 이름 + 날짜»로 담는다(대표 지시 2026-09-28) — 편집기 저장·내보내기와 같은 이름 */
-    try{ const 올린=rhUploadName(); if(올린){ let 제목=''; try{ 제목=await rhDocTitle(); }catch(e){} genName=rhSaveName(올린, 제목); } }catch(e){}
+    try{ if(rhUploadName()) genName=await rhNiceName(); }catch(e){}
     genB64=abToB64(await blob.arrayBuffer());
     saveFileUnified(id,{id,name:genName,ext:'hwpx',size:blob.size,base64:genB64,savedAt:now});
     if(_lastOriginal){ origFileId=id+'_orig'; origName=_lastOriginal.name; origB64=_lastOriginal.b64||'';
@@ -12158,6 +12163,19 @@ function rhDraftCells(){
   return { done:친것, total:전체 };
 }
 
+/* 작성 중 목록의 «보일 이름»을 나중에 채운다 — 제목·기관을 찾는 데 잠깐 걸려 담기를 붙잡지 않는다 */
+var _rhTitleBusy=false;
+async function rhDraftTitleLater(id){
+  if(_rhTitleBusy || !id) return;
+  _rhTitleBusy=true;
+  try{
+    var n=await rhNiceName();
+    var arr=rhDraftAll(), 바뀜=false;
+    arr.forEach(function(d){ if(d.id===id && n && d.title!==n){ d.title=n; 바뀜=true; } });
+    if(바뀜){ rhDraftPut(arr); rhDraftCheck(); }
+  }catch(e){ console.warn('보일 이름', e); }
+  finally{ _rhTitleBusy=false; }
+}
 function rhDraftSave(){
   if(!_rhDoc || !_rhDoc.bytes) return;
   try{
@@ -12174,8 +12192,11 @@ function rhDraftSave(){
                   cells:c, done:false, madeAt:(있던&&있던.madeAt)||Date.now(),
                   /* ⚠ 한 번 담아 둔 것은 잊지 않는다 — 이번에 못 담았다고 지우면
                      목록이 「원본 없음」이라 잘못 말한다 */
-                  hasBase:원본있나||!!(있던&&있던.hasBase) });
+                  hasBase:원본있나||!!(있던&&있던.hasBase),
+                  /* ★ 보일 이름(저장 이름 규칙) — 「양식.hwpx」만 줄지어 무엇인지 몰랐다(대표 2026-09-29) */
+                  title:(있던&&있던.title)||'' });
     rhDraftPut(arr);
+    rhDraftTitleLater(_rhDraftId);
     rhSaveTag('💾 담김 · '+new Date().toLocaleTimeString('ko-KR').slice(0,8), false);
     _rhSaveFail=0;
     rhDraftCheck();
@@ -12895,9 +12916,10 @@ async function rhHwpEdOpen(){
   if(!bytes){ box.innerHTML='<div class="rc-mute" style="padding:22px">이 형식은 편집기로 못 엽니다 — 한글에서 HWPX 로 저장해 올려주세요</div>'; return; }
   /* ★ 편집기 「저장」 창에 뜨는 이름이 이것이다 — 「양식」 두 글자만 뜨던 것(대표 화면 2026-09-28).
      해 + 올린 신청서 이름 + 날짜로 준다(rhSaveName). ⚠ _rhHwpEdFor 는 바탕 이름 그대로 둔다. */
-  var 제목=''; try{ 제목=await rhDocTitle(); }catch(e){}
+  var 새이름=rhSaveName(rhUploadName()||이름, '');
+  try{ 새이름=await rhNiceName(); }catch(e){}
   try{
-    _rhHwpEd=await _hwpEdCreate(box, bytes, rhSaveName(rhUploadName()||이름, 제목));
+    _rhHwpEd=await _hwpEdCreate(box, bytes, 새이름);
     _rhHwpEdFor=이름;
     toast('✏️ 한글 편집기 — 입력판·한글로 보기로 나가면 고친 것이 저절로 바탕이 됩니다');
   }catch(e){
@@ -13727,10 +13749,8 @@ async function rhHwpOut(){
   if(!bytes||!bytes.length){ toast('내보낼 것이 없습니다'); return; }
   /* ★ 이름은 «해 + 올린 신청서 이름 + 날짜»다 (대표 지시 2026-09-28 — 2026-09-13 「제목 먼저」를 바꿨다).
      올린 이름이 뭉뚱그린 말(양식 등)뿐일 때만 «서류에서 찾은 제목»을 쓴다. */
-  var 제목='';
-  try{ 제목=await rhDocTitle(); if(제목 && window.KcareerHwpxTidy) 제목=KcareerHwpxTidy.safeName(제목); }
-  catch(e){ console.warn('제목 찾기',e); }
-  var name=rhSaveName(rhUploadName()||rhCleanName('양식','_작성'), 제목);
+  var name=rhSaveName(rhUploadName()||rhCleanName('양식','_작성'), '');
+  try{ name=await rhNiceName(); }catch(e){ console.warn('저장 이름',e); }
   if(window.showSaveFilePicker){
     try{
       var h=await window.showSaveFilePicker({ suggestedName:name,
@@ -13814,31 +13834,104 @@ function rhCleanName(name, 꼬리){
   base=base.replace(/(_채움|_날인)+$/g,'');
   return base + (꼬리||'') + '.hwpx';
 }
-/* ★ 저장 이름 = «해 + 올린 신청서 이름 + 날짜» (대표 지시 2026-09-28
-     「업로드했던 지원신청서의 이름을 가지고 와서 0000년 00000 신청서 0000. 00. — 날짜 등으로 저장」)
-   예) 「2026년 [한국기계연구원] 위원 신청서 2026. 09. 28.hwpx」
-   ⚠ 먼저 걷어낸다 — 앞의 해 · 뒤의 날짜 · _채움/_날인/_작성 꼬리. 안 걷으면 이 이름으로 저장한
-     파일을 다시 올려 저장할 때마다 「2026년 2026년 … 2026. 09. 28 2026. 09. 28」로 쌓인다.
-   ⚠ 이름 앞에 해가 있으면(「2025 서산시 …」) 그 해를 쓴다 — 그 서류의 해다. 없으면 올해.
-   ⚠ 이름이 뭉뚱그린 말(양식·서식·document…)뿐이면 서류에서 찾은 제목을 쓴다
-     (대표 화면 2026-09-28: 저장창에 「양식」 두 글자만 떴다). */
+/* ★ 저장 이름 = «해년 기관 서류제목_이름 날짜» (대표 승인 2026-09-29 — 09-28 「해 + 올린 이름 + 날짜」를 넓혔다)
+   예) 「2027년 천안어린이꿈누리터 제안서 평가위원 후보자 등록 신청서_권형하 2026. 09. 29.hwpx」
+   ■ 왜 바꿨나 — 올린 파일 이름이 «공고문»이면 공고문을 뺀 신청서에도 「공고문」이 붙었고,
+     작성 중 목록에는 「양식.hwpx」「양식_채움.hwpx」가 줄지어 무엇이 무엇인지 몰랐다.
+   · 서류제목: «실제로 남은 서류»의 제목(rhDocTitle)이 먼저 · 없으면 올린 이름.
+   · 기관: 서류 끝 「○○장 귀하」에서 찾는다(rhOrgFrom) · 제목에 이미 있으면 안 붙인다.
+   · 이름: 누구 것인지 — 같은 서식을 노무사 셋이 쓸 때 가른다.
+   ⚠ 먼저 걷어낸다 — 앞의 해 · 뒤의 날짜 · _채움/_날인/_작성 꼬리 · 뒤의 «_이름». 안 걷으면
+     이 이름으로 저장한 파일을 다시 올려 저장할 때마다 해·날짜·이름이 쌓인다.
+   ⚠ 이름 앞에 해가 있으면(「2025 서산시 …」) 그 해를 쓴다 — 그 서류의 해다. 없으면 올해. */
 var RH_PLAIN_NAME=/^(양식|서식|문서|원본|무제|서류|document|untitled|새 문서)$/i;
-function rhSaveName(원이름, 제목, 날){
+function rhSaveName(원이름, 제목, 날, 더){
   var d=(날 instanceof Date)?날:new Date();
   var 둘=function(n){ return ('0'+n).slice(-2); };
   var 해=null;
+  더=더||{};
+  var 사람=String(더.사람||'').replace(/\s+/g,'');
   var 다듬기=function(s){
     s=String(s||'').replace(/\.(hwpx?|pdf|docx?)$/i,'');
     s=s.replace(/(_채움|_날인|_작성|_완성본|_수정)+$/g,'');
     s=s.replace(/[\s_]*\d{4}\s*[.\-]\s*\d{1,2}(\s*[.\-]\s*\d{1,2})?\s*\.?\s*$/,'');   /* 뒤 날짜 */
+    if(사람) s=s.replace(new RegExp('_'+사람+'$'),'');
     var m=s.match(/^\s*(\d{4})\s*년?[\s_.]+/);                                      /* 앞 해 */
     if(m){ if(해==null) 해=+m[1]; s=s.slice(m[0].length); }
-    return s.replace(/[\\/:*?"<>|]/g,' ').replace(/\s+/g,' ').trim();
+    return s.replace(/[\/:*?"<>|]/g,' ').replace(/\s+/g,' ').trim();
   };
-  var 이름=다듬기(원이름);
-  if(!이름 || RH_PLAIN_NAME.test(이름)){ 해=null; 이름=다듬기(제목)||이름||'서류'; }
+  var 올린=다듬기(원이름);
+  var 본=다듬기(제목);
+  if(!본) 본=(올린 && !RH_PLAIN_NAME.test(올린))?올린:(올린||'서류');
+  var 기관=String(더.기관||'').replace(/[\/:*?"<>|]/g,' ').trim();
+  if(기관 && 본.replace(/\s+/g,'').indexOf(기관.replace(/\s+/g,''))<0) 본=기관+' '+본;
+  if(사람 && 본.replace(/\s+/g,'').indexOf(사람)<0) 본=본+'_'+사람;
   var y=(해>=1990 && 해<=2100)?해:d.getFullYear();
-  return y+'년 '+이름+' '+d.getFullYear()+'. '+둘(d.getMonth()+1)+'. '+둘(d.getDate())+'.hwpx';
+  return y+'년 '+본+' '+d.getFullYear()+'. '+둘(d.getMonth()+1)+'. '+둘(d.getDate())+'.hwpx';
+}
+/* 서류 끝 「○○장 귀하」에서 기관 이름을 뽑는다. 못 찾으면 ''.
+   「한국기계연구원장」→ 한국기계연구원 · 「천안어린이꿈누리터관장」→ 천안어린이꿈누리터.
+   ⚠ «장»만 떼면 「꿈누리터관」이 되고, 두 글자를 떼면 「한국기계연구」가 된다 —
+     어느 쪽인지는 «귀하 줄이 아닌» 곳(서류 글·올린 이름)에 그 이름이 나오는지로 가린다. */
+function rhOrgFrom(text, hint){
+  var t=String(text||''), re=/([가-힣A-Za-z0-9·]{2,40}?)\s*귀\s*하/g, m, w='';
+  while((m=re.exec(t))) w=m[1];
+  if(!w || !/장$/.test(w)) return '';
+  var 다른글=(t.replace(/[가-힣A-Za-z0-9·]{2,40}?\s*귀\s*하/g,' ')+' '+String(hint||'')).replace(/\s+/g,'');
+  var c1=w.slice(0,-1), c2=/(관장|원장|청장|사장)$/.test(w)?w.slice(0,-2):'';
+  if(다른글.indexOf(c1)>=0) return c1;
+  if(c2 && c2.length>=2 && 다른글.indexOf(c2)>=0) return c2;
+  return c1;
+}
+/* 서류 제목 고르기 — «신청서·지원서…로 끝나는 것»이 먼저다.
+   ⚠ 쪽 제목만 보면 첫 쪽 제목이 표 안에 있는 서식(한국기계연구원 신청서)에서 둘째 쪽 소제목
+     「1-1. 일반현황」을 집었다(실측 2026-09-29). 그래서 서류 글에서 「…」 신청서 꼴도 찾는다. */
+var RH_DOC_WORD=/(신청서|지원서|이력서|계획서|제안서)$/;
+var RH_DOC_SIDE=/(서약서|확인서|동의서|추천서)$/;   /* 붙임 서류 — 본 서류를 못 찾을 때만 */
+function rhPickTitle(titles, text){
+  var ts=(titles||[]).map(function(t){ return String(t||'').replace(/\s+/g,' ').trim(); }).filter(Boolean);
+  var 좋은=ts.filter(function(t){ return RH_DOC_WORD.test(t); })[0];
+  if(좋은) return 좋은;
+  var t=String(text||'');
+  var m=/[「『]([^」』]{2,40})[」』]\s*(신청서|지원서|이력서|계획서|제안서)/.exec(t);
+  if(m) return (m[1]+' '+m[2]).replace(/\s+/g,' ').trim();
+  m=/([가-힣0-9][가-힣0-9 ]{1,30}(신청서|지원서|이력서|계획서))/.exec(t);
+  if(m) return m[1].replace(/\s+/g,' ').trim();
+  var 곁=ts.filter(function(t){ return RH_DOC_SIDE.test(t); })[0];
+  return 곁||ts[0]||'';
+}
+/* 이름에 넣을 조각 — {제목, 기관, 사람}. 기관은 «바탕» 서류 글에서 한 번 찾아 기억한다. */
+var _rhOrgMemo={ key:'', 기관:'' };
+async function rhNameParts(){
+  var 바탕=_rhBase||_rhDoc, 기관='', 글='';
+  var key=바탕?(String(바탕.name||'')+':'+((바탕.bytes&&바탕.bytes.length)||0)):'';
+  if(key && _rhOrgMemo.key===key){ 기관=_rhOrgMemo.기관; 글=_rhOrgMemo.글||''; }
+  else if(바탕 && 바탕.bytes){
+    try{
+      if(typeof JSZip==='undefined') await _ensureJSZip();
+      var zip=await JSZip.loadAsync(바탕.bytes);
+      var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
+      for(const n of names){
+        var x=await zip.file(n).async('string');
+        글+=' '+(x.match(/<hp:t(?:\s[^>]*)?>[\s\S]*?<\/hp:t>/g)||[]).map(function(t){ return t.replace(/<[^>]*>/g,''); }).join('');
+      }
+      기관=rhOrgFrom(글, rhUploadName());
+    }catch(e){ 기관=''; }
+    _rhOrgMemo={ key:key, 기관:기관, 글:글 };
+  }
+  if(!글) 글=_rhOrgMemo.글||'';
+  /* 남은 쪽들의 제목 — 뺀 쪽(공고문 등)은 넣지 않는다 */
+  var 쪽제목=[];
+  try{ (_tdPages||[]).forEach(function(p){ if((_rhTidy.drop[p.sec]||[]).indexOf(p.i)<0){ var k=p.sec+'#'+p.i; 쪽제목.push((_tdTitles[k]!=null?_tdTitles[k]:p.title)||''); } }); }catch(e){}
+  var 제목=rhPickTitle(쪽제목, 글);
+  if(제목 && window.KcareerHwpxTidy) 제목=KcareerHwpxTidy.safeName(제목);
+  var info={}; try{ info=(typeof getProfileInfo==='function'?getProfileInfo():get('profile_info'))||{}; }catch(e){}
+  return { 제목:제목, 기관:기관, 사람:info.name||'' };
+}
+/* 지금 서류의 저장 이름 — 모든 저장 길이 이 한 곳을 부른다 */
+async function rhNiceName(){
+  var p=await rhNameParts();
+  return rhSaveName(rhUploadName()||rhCleanName('양식','_작성'), p.제목, null, p);
 }
 /* 올린 신청서 이름 — «처음 올린 것»이 먼저다(한글에서 고쳐 온 파일은 이미 날짜 이름일 수 있다) */
 function rhUploadName(){
@@ -14718,7 +14811,7 @@ function rhDraftDraw(){
            그래도 줄바꿈은 안 한다: 이름이 길어도 줄을 밀지 않고 …으로 줄이며,
            전체는 title 로 본다(회귀검사가 이 둘을 고정한다). */
         +'<div style="font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'
-        +escapeHtml(d.name||'')+'">'+escapeHtml(d.name||'(이름 없음)')+'</div>'
+        +escapeHtml(d.title||d.name||'')+'">'+escapeHtml(d.title||d.name||'(이름 없음)')+'</div>'
         +(지금?'<div style="font-size:10px;color:var(--teal);font-weight:700">지금 하는 것</div>':'')
         /* ⚠ 원본이 없는 자리는 밝혀 둔다 — 다시 채우면 값이 겹칠 수 있다 */
         +(d.hasBase?'':'<div style="font-size:10px;color:var(--red);font-weight:700"'

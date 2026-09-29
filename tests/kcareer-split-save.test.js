@@ -155,6 +155,8 @@ test('⑪ 내보내기 이름도 «서류에서 찾은 제목»을 쓴다 — �
     for (; i < s.length; i++) { if (s[i] === '{') n++; else if (s[i] === '}') { n--; if (!n) break; } }
     return s.slice(h, i + 1);
   })(CODE, 'async function rhHwpOut(');
-  assert.match(fn, /rhDocTitle\(\)/, '제목을 안 찾습니다');
+  /* 2026-09-29: 제목 찾기는 저장 이름 한 곳(rhNiceName → rhNameParts → rhPickTitle)으로 모였다 */
+  assert.match(fn, /rhNiceName\(\)/, '제목을 안 찾습니다');
+  assert.match(CODE, /async function rhNameParts\(\)\{[\s\S]*?rhPickTitle\(/, '저장 이름이 서류 제목을 안 찾습니다');
   assert.match(fn, /rhCleanName\(/, '못 찾았을 때 물러설 이름이 없습니다');
 });
