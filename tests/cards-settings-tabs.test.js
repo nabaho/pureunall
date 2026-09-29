@@ -1,22 +1,15 @@
-/* ⚙️ 환경설정 — 상위 탭 + 내용 (대표 지시 2026-09-07)
-   「환경설정 다시 정리해달라 너무 정신없다. 탭방식으로 정리해달라 너무 정신없어
-    찾기 힘들다 상위탭 과 내용으로 다시 정리해라」
+/* ⚙️ 환경설정 — 왼쪽 메뉴 + 한 줄 목록 (대표 지시 2026-09-29 「좀더 깔끔하게」 → 목업 → 「네」)
 
-   ■ 오간 길 — 세 번째다. 그 까닭을 여기 적어 둔다.
-     ① 여섯 탭 → 「내부가 통일이 안 되어 있다」 → 결을 맞췄다(#956)
-     ② 목업 검토 → 대표가 「다」(탭을 없애고 한 화면)를 고름 → 만들었다(#970)
-     ③ **써 보니 「너무 정신없다」** → 다시 탭. 서른 개가 한 화면에 서면 비슷한 줄이
-        스물 몇 개라 눈이 훑을 곳을 못 정한다 — 목업에서는 안 보이던 것이다.
-   ★ 목업이 아니라 **써 본 것이 이긴다.** 되돌리는 것을 부끄러워할 일이 아니다.
+   ■ 오간 길 — 네 번째다(여섯 탭 → 한 화면 → 탭 넷 → 왼쪽 메뉴). 까닭은 늘 «같은 것이 여러 번 보이고,
+     눈이 훑을 곳을 못 정한다»였다. ★ 목업이 아니라 «써 본 것»이 이긴다.
 
    ★ 못 박는 것
-     ① 탭은 «넷»이다(자료·정리·이알피·계정·관리). 여섯이던 때는 비슷한 이름이 섞여
-        어디에 뭐가 있는지 못 외웠다.
-     ② 🔔 할 일 띠는 탭 «위»에 늘 있다(대표 결정 「나」). 안 눌러도 보여야 한다.
-     ③ 「정리」 탭에는 여덟 갈래가 «전부» 온다 — 띠는 빠른 길이고 여기가 제 자리다.
-        한쪽에만 두면 「어디 있더라」가 다시 생긴다(그것이 이번 지시의 까닭이다).
-     ④ 칸은 여전히 «자료»(SET_SECTIONS)다 — 검사가 서른 개를 셀 수 있다.
-     ⑤ 하위 화면은 «그것만» 보인다. 모르는 탭 이름이 오면 첫 탭으로 되돌린다.
+     ① 메뉴는 정리 · 자료 · 이알피 | 내 설정 · 관리자(대표만). 직원에게는 넷이다.
+     ② 할 일은 «정리 한 곳» — 맨 위 🔔 띠는 없다(같은 넷이 두 번 나와 헷갈렸다).
+        손볼 것이 있으면 정리로 열리고, 메뉴에 주황 숫자. 없으면 자료로 열린다.
+     ③ 정리에는 갈래가 «전부» 온다 — 손볼 것은 목록, 이상 없는 것은 회색 한 줄, 휴지통은 따로.
+     ④ 칸은 여전히 «자료»(SET_SECTIONS)다 — 갈 곳 22곳이 하나도 안 빠졌는지 센다.
+     ⑤ 하위 화면은 «그것만» 보인다. 모르는 메뉴 이름이 오면 기본 칸으로 되돌린다.
 
      node --test tests/cards-settings-tabs.test.js */
 'use strict';
@@ -32,7 +25,19 @@ const SRC = fs.readFileSync(path.join(ROOT, 'pu-cards.html'), 'utf8').split('\r\
 const SUB_NAMES = ['openDedup', 'openSimilar', 'openMixedFix', 'openNameFix', 'openTrash',
   'openErpNameCheck', 'openClassifyRules', 'openViewManager', 'openMailBlock', 'openCleanupCenter'];
 
-/* 화면을 통째로 떠서 «그린다» — 글자만 찾으면 탭을 지워도 통과한다 */
+/* 함수 몸통 하나를 떠 온다 */
+function fnBody(name) {
+  const i = SRC.indexOf('function ' + name + '(');
+  assert.ok(i >= 0, name + ' 을 못 찾았다');
+  let d = 0;
+  for (let k = SRC.indexOf('{', i); k < SRC.length; k++) {
+    if (SRC[k] === '{') d++;
+    else if (SRC[k] === '}') { d--; if (!d) return SRC.slice(i, k + 1); }
+  }
+  return '';
+}
+
+/* 화면을 통째로 떠서 «그린다» — 글자만 찾으면 메뉴를 지워도 통과한다 */
 function draw(opt) {
   const o = Object.assign({ admin: true, sub: '', tab: 'data', trash: 0, sim: 0 }, opt || {});
   const trash = {};
@@ -55,10 +60,7 @@ function draw(opt) {
     findDupGroups: () => N(0), findSimilarGroups: () => N(o.sim),
     emptyTargets: () => N(0), mojibakeTargets: () => N(0),
     mixedFixList: () => N(0), nameFixList: () => N(0),
-    /* 2026-09-18 — 휴지통은 «열 때» 읽으므로 건수도 이 함수로 묻는다.
-       여기서는 이미 읽어 둔 셈치고 실제 건수를 돌려준다(늦게 읽기는 cards-trash-lazy 가 본다). */
     trashCount: () => Object.keys(trash).length,
-    /* 📋 등록증 → 기업상세 (2026-09-18) — 여기서는 셀 것이 없다 */
     bizFillCount: () => 0,
     classifyPlan: () => ({ targetN: 0 })
   };
@@ -77,141 +79,131 @@ function draw(opt) {
   ctx.html = el.innerHTML;
   return ctx;
 }
-/* 화면에 보이는 단추 이름들 */
-const labels = h => (h.match(/class="setbtn[^"]*"[^>]*>([^<]*)/g) || [])
-  .map(s => s.replace(/^[\s\S]*?>/, '').trim());
+/* 화면에 보이는 줄 이름들 */
+const labels = h => (h.match(/<span class="sl">([^<]*)<\/span>/g) || []).map(s => s.replace(/<[^>]*>/g, '').trim());
 
-/* ── ① 탭 넷 ── */
+/* ── ① 메뉴 ── */
 
-test('★★ 상위 탭이 «넷»이고, 첫 탭은 자료다', () => {
+test('★★ 메뉴는 «정리 · 자료 · 이알피 | 내 설정 · 관리자» — 직원에게는 넷', () => {
   const c = draw();
-  assert.equal(c.SET_TABS.map(t => t.k).join(','), 'data,clean,erp,acct',
-    '★ 탭 목록이 바뀌었다 — 넷(자료·정리·이알피·계정·관리)이어야 한다');
-  assert.equal(c.SET_TABS.length, 4, '★ 탭 수가 넷이 아니다 — 여섯이던 때는 못 외웠다');
+  assert.equal(c.SET_TABS.map(t => t.k).join(','), 'clean,data,erp,me,admin');
   c.SET_TABS.forEach(t => {
-    assert.ok(t.label && t.label.length <= 12, '★ 탭 이름이 길다: ' + t.label);
-    assert.ok(t.hint && t.hint.length <= 24, '★ 탭 말풍선이 없거나 길다: ' + t.k);
+    assert.ok(t.label && t.label.length <= 12, '★ 메뉴 이름이 길다: ' + t.label);
+    assert.ok(t.hint && t.hint.length <= 24, '★ 메뉴 말풍선이 없거나 길다: ' + t.k);
   });
-  assert.match(c.html, /class="settabs"/, '★ 탭 줄을 안 그렸다');
-  /* ⚠ `class="settab` 만 세면 껍데기(`class="settabs"`)까지 하나로 세어 다섯이 된다 */
-  assert.equal((c.html.match(/class="settab(?: on)?"/g) || []).length, 4,
-    '★ 탭 단추가 넷이 아니다');
-  assert.match(c.html, /class="settab on"/, '★ 켜진 탭이 없다 — 어디에 있는지 모른다');
+  assert.equal((c.html.match(/class="setnavbtn(?: on)?"/g) || []).length, 5, '★ 대표 메뉴가 다섯이 아니다');
+  const 직원 = draw({ admin: false });
+  assert.equal((직원.html.match(/class="setnavbtn(?: on)?"/g) || []).length, 4, '★ 직원에게 관리자 메뉴가 보인다');
+  assert.ok(직원.html.indexOf("setSetTab('admin')") < 0);
+  assert.match(c.html, /class="setnavbtn on"/, '★ 켜진 메뉴가 없다 — 어디에 있는지 모른다');
 });
 
-test('★★ 칸마다 «어느 탭»인지 적혀 있고, 그 탭에서만 나온다', () => {
+test('★★★ 맨 위 🔔 띠는 «없다» — 할 일은 정리 한 곳이다 (대표 2026-09-29)', () => {
+  const c = draw({ trash: 41, sim: 105 });
+  assert.ok(c.html.indexOf('지금 손볼 것') < 0 && c.html.indexOf('todorail') < 0, '★ 띠가 되살아났다 — 같은 할 일이 두 번 나온다');
+  assert.ok(c.html.indexOf('class="setstat"') < 0, '★ 숫자 알약 줄이 되살아났다 — 제목 옆 한 줄이면 된다');
+  assert.match(c.html, /class="setst">명함 1 · 사업자 1/, '★ 제목 옆 숫자 한 줄이 없다');
+});
+
+test('★★★ 손볼 것이 있으면 «정리»로 열리고, 없으면 «자료»로 열린다', () => {
+  const 밀림 = draw({ tab: '', sim: 3 });
+  assert.match(밀림.html, /class="setnavbtn on"[^>]*>🧹 정리/, '★ 손볼 것이 있는데 정리로 안 열렸다');
+  const 없음 = draw({ tab: '' });
+  assert.match(없음.html, /class="setnavbtn on"[^>]*>📦 자료/, '★ 손볼 것이 없는데 자료로 안 열렸다');
+  assert.match(fnBody('openSettingsPage'), /state\.setTab=''/, '★ 열 때마다 기본 칸을 다시 골라야 한다');
+});
+
+test('★★ 정리 메뉴에 «주황 숫자» — 0 이면 안 붙는다', () => {
+  const c = draw({ tab: 'data', sim: 105, trash: 41 });
+  assert.match(c.html, /🧹 정리<span class="setnavn">2<\/span>/, '★ 밀린 수가 메뉴에 안 보인다');
+  assert.ok(draw({ tab: 'data' }).html.indexOf('setnavn') < 0, '★ 할 일이 없는데 숫자가 붙었다');
+});
+
+/* ── ② 정리 ── */
+
+test('★★★ 「정리」에 갈래가 «전부» 온다 — 손볼 것은 목록, 이상 없는 것은 회색 한 줄, 휴지통은 따로', () => {
+  const c = draw({ tab: 'clean', sim: 105, trash: 41 });
+  const h = c.html;
+  c.todoAll().forEach(r => assert.ok(h.indexOf(r.label) > 0, '★ 「' + r.label + '」 이 정리에 없다'));
+  assert.match(h, /<span class="sl">유사 후보<\/span><span class="sv todo">105묶음<\/span>/, '★ 손볼 것이 주황 숫자로 안 보인다');
+  assert.match(h, /<span class="sl">휴지통<\/span><span class="sv">41건<\/span>/, '★ 휴지통 줄이 없다');
+  assert.match(h, /class="setok"><b>✓<\/b>[^<]*확실한 중복[^<]*— 이상 없음/, '★ 이상 없는 것이 한 줄로 안 모였다');
+  assert.ok(!/<span class="sl">확실한 중복/.test(h), '★ 이상 없는 것까지 목록 줄로 깔렸다 — 할 일이 묻힌다');
+  const 빈 = draw({ tab: 'clean' }).html;
+  assert.match(빈, /지금 손볼 것이 없습니다/, '★ 할 일이 없을 때 아무 말이 없다 — 고장인지 모른다');
+});
+
+test('★★ 정리의 줄은 «데려가기만» 한다 — 지우는 일을 여기서 바로 실행하지 않는다', () => {
+  const h = draw({ tab: 'clean', sim: 3, trash: 2 }).html;
+  assert.match(h, /onclick="todoGo\('similar'\)"/);
+  assert.match(h, /onclick="todoGo\('trash'\)"/);
+  assert.ok(!/cleanEmpty\(|openMojibakeCleanup\(/.test(h), '★ 정리 줄에서 바로 지운다');
+});
+
+/* ── ③ 칸 ── */
+
+test('★★ 칸마다 «어느 메뉴»인지 적혀 있고, 그 메뉴에서만 나온다', () => {
   const c = draw();
-  const secs = c.SET_SECTIONS();
-  secs.forEach(s => assert.ok(['data', 'erp', 'acct'].indexOf(s.tab) >= 0,
-    '★ 「' + s.t + '」 칸에 탭이 없거나 모르는 탭이다: ' + s.tab));
-  /* 자료 탭에는 이알피·관리자 것이 «안» 나온다 */
-  const data = draw({ tab: 'data' }).html;
-  assert.ok(data.indexOf('자주 쓰는 것') > 0 && data.indexOf('자료 넣고 빼기') > 0);
-  assert.ok(data.indexOf('푸른이알피 연동') < 0, '★ 자료 탭에 이알피 칸이 섞였다');
-  assert.ok(data.indexOf('관리자 · 한 번만') < 0, '★ 자료 탭에 관리자 칸이 섞였다');
-  const erp = draw({ tab: 'erp' }).html;
-  assert.ok(erp.indexOf('푸른이알피 연동') > 0);
-  assert.ok(erp.indexOf('자주 쓰는 것') < 0, '★ 이알피 탭에 자료 칸이 섞였다');
-  const acct = draw({ tab: 'acct' }).html;
-  ['탭 · 계정', '관리자 · 한 번만 하는 일', '위험 구역'].forEach(t =>
-    assert.ok(acct.indexOf(t) > 0, '★ 계정·관리 탭에 「' + t + '」 칸이 없다'));
+  c.SET_SECTIONS().forEach(s => assert.ok(['data', 'erp', 'me', 'admin'].indexOf(s.tab) >= 0,
+    '★ 「' + s.t + '」 칸에 메뉴가 없거나 모르는 메뉴다: ' + s.tab));
+  const data = labels(draw({ tab: 'data' }).html);
+  ['지금 백업', '엑셀로 내보내기', '파일 가져오기', '자료함'].forEach(n => assert.ok(data.indexOf(n) >= 0, '★ 자료에 「' + n + '」 가 없다'));
+  assert.ok(data.indexOf('대표자·담당자 대조') < 0, '★ 자료에 이알피 줄이 섞였다');
+  const erp = labels(draw({ tab: 'erp' }).html);
+  assert.ok(erp.indexOf('대표자·담당자 대조') >= 0 && erp.indexOf('지금 백업') < 0);
+  const me = labels(draw({ tab: 'me' }).html);
+  ['내 탭 관리', '메일 수신거부', 'AI 자동인식', '로그아웃'].forEach(n => assert.ok(me.indexOf(n) >= 0, '★ 내 설정에 「' + n + '」 가 없다'));
+  const admin = labels(draw({ tab: 'admin' }).html);
+  ['반출 기록', '명함 그림 빼기', '전체 비우기 (명함)'].forEach(n => assert.ok(admin.indexOf(n) >= 0, '★ 관리자에 「' + n + '」 가 없다'));
 });
 
-test('★★★ 갈 수 있는 곳이 «한 곳도» 안 빠졌다 — 탭으로 나누다 흘리기 쉽다', () => {
-  /* ⚠ 탭마다 그리므로, 어느 탭에도 안 든 칸은 «영영 안 보인다». 네 탭을 합쳐 센다. */
+test('★★★ 갈 수 있는 곳이 «한 곳도» 안 빠졌다 — 메뉴로 나누다 흘리기 쉽다', () => {
   const c = draw();
   const 전부 = c.SET_SECTIONS().map(s => s.rows.map(r => r.fn)).reduce((a, b) => a.concat(b), []);
-  const 탭에서 = ['data', 'erp', 'acct'].map(k => draw({ tab: k }).html).join('');
-  전부.forEach(fn => assert.ok(탭에서.indexOf(fn) > 0,
-    '★ 「' + fn + '」 이 어느 탭에도 안 나온다 — 영영 못 찾는다'));
+  const 메뉴에서 = ['data', 'erp', 'me', 'admin'].map(k => draw({ tab: k }).html).join('');
+  전부.forEach(fn => assert.ok(메뉴에서.indexOf(fn) > 0, '★ 「' + fn + '」 이 어느 메뉴에도 안 나온다 — 영영 못 찾는다'));
   assert.equal(전부.length, 22, '★ 갈 수 있는 곳이 ' + 전부.length + '개다 (22개여야 한다)');
 });
 
-/* ── ② 띠는 탭 «위» ── */
-
-test('★★★ 🔔 할 일 띠는 탭 «위»에 늘 있다 — 안 눌러도 보여야 한다 (대표 결정 「나」)', () => {
-  const c = draw({ trash: 41, sim: 105 });
-  const 띠 = c.html.indexOf('지금 손볼 것');
-  const 칩 = c.html.indexOf('class="setstat"');
-  const 탭 = c.html.indexOf('class="settabs"');
-  assert.ok(띠 > 0, '★ 띠를 안 그렸다');
-  assert.ok(띠 < 칩 && 칩 < 탭, '★ 차례가 어긋났다 (띠 ' + 띠 + ' · 칩 ' + 칩 + ' · 탭 ' + 탭 + ')');
-  /* 어느 탭에서도 띠가 보인다 — 탭을 옮겨도 밀린 것이 사라지면 안 된다 */
-  ['data', 'clean', 'erp', 'acct'].forEach(k =>
-    assert.ok(draw({ tab: k, trash: 41 }).html.indexOf('지금 손볼 것') > 0,
-      '★ ' + k + ' 탭에서 띠가 사라진다'));
+test('★★ 줄은 «이름 ····· 값 ›» 한 줄 — 설명은 화면에 안 깔고 title 로만', () => {
+  const h = draw({ tab: 'me' }).html;
+  assert.match(h, /<span class="sl">내 탭 관리<\/span><span class="sv">0개<\/span><span class="sc">›<\/span>/);
+  const d = draw({ tab: 'data' }).html;
+  assert.match(d, /title="리멤버 · 구글 · vCard"/, '★ 설명이 title 에 없다');
+  assert.ok(d.indexOf('class="sdesc"') < 0, '★ 설명이 화면에 깔렸다');
 });
 
-test('★★ 「정리」 탭에 «숫자 배지»가 붙는다 — 안 눌러도 밀린 것이 보인다', () => {
-  const c = draw({ trash: 41, sim: 105 });
-  assert.match(c.html, /class="settab[^"]*"[^>]*>🧹 정리 <span class="tbdg">2<\/span>/,
-    '★ 정리 탭에 배지가 없거나 수가 틀렸다');
-  /* 0 이면 배지도 없다 — 늘 켜진 등은 아무것도 못 알린다 */
-  assert.ok(draw().html.indexOf('tbdg') < 0, '★ 할 일이 없는데 배지가 붙었다');
-});
+/* ── ④ 메뉴 누르기 · 하위 화면 ── */
 
-/* ── ③ 정리 탭은 여덟을 «전부» ── */
-
-test('★★★ 「정리」 탭에 갈래가 «전부» 온다 — 한쪽에만 두면 「어디 있더라」가 다시 생긴다', () => {
-  const c = draw({ tab: 'clean', trash: 41, sim: 105 });
-  /* ⚠ 갈래가 늘면 «이 목록만» 고친다 — 아래 개수는 이 목록에서 나온다.
-       숫자를 따로 박아 두었더니 갈래 하나를 늘릴 때마다 두 곳을 고쳐야 했다. */
-  const 이름 = ['확실한 중복', '유사 후보', '빈 명함', '깨진 글자',
-    '전화·주소가 섞임', '이름 칸에 회사명', '규칙으로 한 번에 분류',
-    '기업상세로 안 보낸 등록증', '휴지통'];
-  이름.forEach(n => assert.ok(c.html.indexOf(n) > 0, '★ 「' + n + '」 이 정리 탭에 없다'));
-  /* ⚠ 띠에도 .setbtn 이 있다 — 통째로 세면 띠의 줄까지 함께 세어 부풀어난다.
-       탭 줄 «뒤»(= 그 탭의 내용)만 센다. */
-  const 내용 = c.html.slice(c.html.indexOf('class="settabs"'));
-  assert.equal(내용.split('class="setbtn').length - 1, 이름.length,
-    '★ 정리 탭의 줄 수가 갈래 수와 다르다');
-  /* 숫자가 있는 것은 숫자로, 없는 것은 ✓ 로.
-     ⚠ 통째로 보면 안 된다 — «띠»에도 「유사 후보 105묶음」이 있어, 정리 탭에서
-       숫자를 지워도 초록이 된다(2026-09-07 고장넣기에서 실제로 샜다). */
-  assert.match(내용, /유사 후보[\s\S]{0,120}105묶음/, '★ 숫자를 안 보여 준다');
-  assert.match(내용, /확실한 중복[\s\S]{0,120}✓ 이상 없음/, '★ 이상 없음을 안 보여 준다');
-});
-
-test('★★ 정리 탭의 줄은 «데려가기만» 한다 — 지우는 일을 여기서 바로 실행하지 않는다', () => {
-  const c = draw({ tab: 'clean', trash: 41 });
-  assert.match(c.html, /todoGo\('/, '★ 누르면 갈 곳이 없다');
-  assert.ok(!/cleanEmpty\(|openMojibakeCleanup\(|Store\.(del|hardDel)|wipeAll\(/.test(c.html),
-    '★ 정리 탭에서 바로 지운다 — 여기는 한눈에 보고 «들어가는» 자리다');
-});
-
-/* ── ④ 탭 옮기기 ── */
-
-test('★★ 탭을 누르면 그 탭이 켜지고, 다시 그리고, 하위 화면은 «풀린다»', () => {
+test('★★ 메뉴를 누르면 그 칸이 켜지고, 다시 그리고, 하위 화면은 «풀린다»', () => {
   const c = draw({ tab: 'data', sub: '' });
-  /* ⚠ 「값이 바뀌었나」만 보면 안 된다 — 다시 그리지 않으면 화면은 그대로다.
-       2026-09-07 고장넣기에서 renderSettingsPage 를 떼도 초록이었다.
-       그려 준 글자가 «바뀌는지»까지 본다. */
+  /* ⚠ 「값이 바뀌었나」만 보면 안 된다 — 다시 그리지 않으면 화면은 그대로다 */
   const 전 = c.html;
   c.setSetTab('erp');
   assert.equal(c.state.setTab, 'erp');
-  assert.equal(c.state.setSub, '', '★ 탭을 옮겼는데 하위 화면이 남아 있다');
+  assert.equal(c.state.setSub, '', '★ 메뉴를 옮겼는데 하위 화면이 남아 있다');
   const 후 = c.$('pcSettings').innerHTML;
-  assert.notEqual(후, 전, '★ 탭을 옮겼는데 다시 안 그린다 — 화면이 그대로다');
-  assert.ok(후.indexOf('푸른이알피 연동') > 0, '★ 옮긴 탭의 내용이 안 나온다');
-  /* 하위 화면을 보다가 탭을 누르면 그 탭 목록으로 나와야 한다 */
+  assert.notEqual(후, 전, '★ 메뉴를 옮겼는데 다시 안 그린다 — 화면이 그대로다');
+  assert.ok(후.indexOf('대표자·담당자 대조') > 0, '★ 옮긴 메뉴의 내용이 안 나온다');
   const d = draw({ sub: 'views' });
   d.setSetTab('clean');
-  assert.equal(d.state.setSub, '', '★ 하위 화면에서 탭을 눌렀는데 안 풀린다');
+  assert.equal(d.state.setSub, '', '★ 하위 화면에서 메뉴를 눌렀는데 안 풀린다');
 });
 
-test('★★ 모르는 탭 이름이 오면 «첫 탭»으로 — 빈 화면이 되면 앱이 멈춘 줄 안다', () => {
+test('★★ 모르는 메뉴 이름이 오면 «기본 칸»으로 — 빈 화면이 되면 앱이 멈춘 줄 안다', () => {
   const c = draw({ tab: '없는탭' });
-  assert.ok(c.html.indexOf('자주 쓰는 것') > 0, '★ 빈 화면이 됐다');
-  assert.match(c.html, /class="settab on"/, '★ 켜진 탭이 없다');
+  assert.ok(c.html.indexOf('지금 백업') > 0, '★ 빈 화면이 됐다');
+  assert.match(c.html, /class="setnavbtn on"/, '★ 켜진 메뉴가 없다');
+  /* 직원이 관리자 이름을 들고 와도 기본 칸으로 — 관리자 칸을 그리지 않는다 */
+  const 직원 = draw({ tab: 'admin', admin: false });
+  assert.ok(직원.html.indexOf('wipeAll()') < 0 && 직원.html.indexOf('지금 백업') > 0, '★ 직원에게 관리자 칸이 그려졌다');
 });
-
-/* ── ⑤ 하위 화면 ── */
 
 test('★★ 하위 화면은 «그것만» 보인다 — 목록 밑에 딸려 붙으면 어디 펼쳐졌는지 못 찾는다', () => {
   const c = draw({ sub: 'similar' });
   assert.equal(c._called, 'openSimilar', '★ 엉뚱한 화면을 열었다: ' + c._called);
-  assert.ok(c.html.indexOf('class="settabs"') < 0, '★ 탭 줄이 그대로 딸려 나왔다');
-  assert.ok(c.html.indexOf('class="setsec') < 0, '★ 목록이 그대로 딸려 나왔다');
+  assert.ok(c.html.indexOf('class="setnav"') < 0, '★ 메뉴가 그대로 딸려 나왔다');
+  assert.ok(c.html.indexOf('class="setlist') < 0, '★ 목록이 그대로 딸려 나왔다');
   assert.ok(c.html.indexOf('setInline') > 0, '★ 하위 화면을 담을 자리가 없다');
 });
 
@@ -231,28 +223,15 @@ test('★★ 열 갈래가 «다» 열린다 — 하나만 빠져도 그 화면�
   const keys = ['dedup', 'similar', 'mixed', 'namefix', 'trash',
     'erpname', 'rules', 'views', 'mailblock', 'clean'];
   const got = keys.map(k => draw({ sub: k })._called);
-  got.forEach((v, i) => assert.ok(SUB_NAMES.indexOf(v) >= 0,
-    '★ 「' + keys[i] + '」 을 열 수 없다'));
+  got.forEach((v, i) => assert.ok(SUB_NAMES.indexOf(v) >= 0, '★ 「' + keys[i] + '」 을 열 수 없다'));
   assert.equal(new Set(got).size, keys.length, '★ 두 열쇠가 같은 화면을 연다: ' + got.join(','));
 });
 
-/* ── 줄이 없는 칸·관리자 ── */
+/* ── ⑤ 관리자 ── */
 
-test('★★ 대표가 아니면 관리자 칸이 «통째로» 사라진다 — 빈 제목만 남으면 더 이상하다', () => {
-  const h = draw({ tab: 'acct', admin: false }).html;
-  assert.ok(h.indexOf('관리자 · 한 번만 하는 일') < 0, '★ 직원에게 관리자 칸이 보인다');
-  ['migrateInlineThumbs()', 'openExportLog()', 'openPrivateVault()'].forEach(fn =>
-    assert.ok(h.indexOf(fn) < 0, '★ 직원에게 ' + fn + ' 가 보인다'));
-  /* 그래도 그 탭이 비지는 않는다 — 탭·계정과 위험 구역은 남는다 */
-  assert.ok(h.indexOf('탭 · 계정') > 0, '★ 직원의 계정 탭이 통째로 비었다');
-  assert.ok(h.indexOf('undefined') < 0 && h.indexOf('null') < 0,
-    '★ 빠진 줄이 화면에 글자로 새어 나왔다');
-});
-
-test('★ 「자주 쓰는 것」만 눈에 띈다 — 다 크면 아무것도 안 크다', () => {
-  const c = draw();
-  const hero = c.SET_SECTIONS().filter(s => s.rows.some(r => r.cls === 'hero'));
-  assert.equal(hero.length, 1, '★ hero 가 여러 칸에 흩어져 있다');
-  assert.equal(hero[0].t, '자주 쓰는 것');
-  assert.ok(hero[0].rows.every(r => r.cls === 'hero'), '★ 그 칸 안에서도 결이 다르다');
+test('★★ 대표가 아니면 관리자 칸이 «통째로» 사라진다 — 전체 비우기도 대표만', () => {
+  const 전부 = ['data', 'erp', 'me', 'admin'].map(k => draw({ tab: k, admin: false }).html).join('');
+  ['migrateInlineThumbs()', 'openExportLog()', 'openPrivateVault()', 'wipeAll()'].forEach(fn =>
+    assert.ok(전부.indexOf(fn) < 0, '★ 직원에게 ' + fn + ' 가 보인다'));
+  assert.ok(전부.indexOf('undefined') < 0 && 전부.indexOf('null') < 0, '★ 빠진 줄이 화면에 글자로 새어 나왔다');
 });
