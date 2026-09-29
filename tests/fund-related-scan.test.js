@@ -84,3 +84,26 @@ test('★ 배선 — 근복지원금 맨 앞 칸, 결과는 fund_erp/related 에
   assert.match(SRC, /'related\.check':\{t:'특수관계 사전 점검'/);
   ['relatedScan', 'relatedPeople', 'relatedPanel'].forEach((n) => assert.ok(!/rrn|jumin|주민/.test(gF(n)), n + ' 이 주민번호를 본다'));
 });
+
+test('★★ 도로명·지번 — 한쪽을 [🔍]로 골라 두 표기를 다 담았으면 다른 쪽 표기와도 같은 집으로 본다 (둘째 할 일)', () => {
+  const g = A.scan({}, [
+    S('a', { name: '가나산업', ceo: '홍길동', urep_same: true, urep_addr: '충남 가상시 가상로 12', urep_addr_alt: '충남 가상시 가상동 345-6' }),
+    S('b', { name: '다라식품', ceo: '박대표', wrep_name: '홍순자', wrep_addr: '충청남도 가상시 가상동 345-6' })]);
+  const h = g.filter((x) => x.type === 'home');
+  assert.equal(h.length, 1, '★ 도로명(가)과 지번(나)을 다른 집으로 봤다');
+  const o = A.scan({}, [S('a', { name: '가', ceo: '1', address: '충남 가상시 산단로 22, 3층', address_alt: '충남 가상시 산단동 100' }),
+    S('b', { name: '나', ceo: '2', address: '충남 가상시 산단동 100' })]).filter((x) => x.type === 'office');
+  assert.equal(o.length, 1, '★ 사무실 도로명·지번을 다른 곳으로 봤다');
+  const two = A.scan({}, [S('a', { name: '가', ceo: '1', address: '충남 가상시 산단로 22', address_alt: '충남 가상시 산단동 100' }),
+    S('b', { name: '나', ceo: '2', address: '충남 가상시 산단로 22', address_alt: '충남 가상시 산단동 100' })]).filter((x) => x.type === 'office');
+  assert.equal(two.length, 1, '★ 두 표기 모두 같으면 신호가 두 번 나온다');
+});
+
+test('배선 — 집 주소 칸에 [🔍](repAddrSearch), 지번은 숨은 칸(_alt)으로 담고, 손으로 바꾸면 옛 지번은 지운다', () => {
+  assert.match(gF('repAddrSearch'), /keep\[f\+'_alt'\]=\(r\.roadAddress&&r\.jibunAddress\)\?r\.jibunAddress:''/);
+  assert.match(gF('siteAddrSearch'), /keep\.address_alt=/);
+  const sv = gF('saveSite');
+  assert.match(sv, /alt===String\(base\[p\[1\]\+'_alt'\]\|\|''\)\) alt=''/, '★ 주소를 손으로 바꿨는데 옛 지번이 남는다');
+  assert.match(sv, /\['address_alt','wrep_addr_alt','urep_addr_alt'\]\.forEach/);
+  assert.match(gF('_siteDocGrab'), /wrep_addr_alt/, '★ 사진첩·검색을 다녀오는 사이 지번을 잃는다');
+});
