@@ -83,9 +83,6 @@ function 싣기(w, 이름들) {
   assert.ok(상수, 'KK_USED_KEY·KK_LATER_KEY·KK_LATER_MS 를 못 찾았습니다');
   vm.runInContext(상수[0], w.ctx);
   vm.runInContext("var KK_WANT = 'pu_kakao_want_link';", w.ctx);
-  // «카카오로 들어와 있음» 표시 — 로그인·로그아웃 흐름이 모두 부른다(2026-09-28)
-  vm.runInContext("var KK_SESSION_KEY = 'pu_kakao_session';", w.ctx);
-  if (!이름들.includes('kkNoteSession')) vm.runInContext(함수몸(화면, 'kkNoteSession'), w.ctx);
   이름들.forEach((n) => {
     const 몸 = 함수몸(화면, n);
     assert.ok(몸, 'enter.html 에서 ' + n + ' 을 못 찾았습니다');
@@ -374,54 +371,20 @@ test('⑧ 로그아웃 단추가 이 흐름을 부른다', () => {
   assert.match(화면.slice(at, 화면.indexOf('});', at)), /kkLogoutFlow\(\)/, '★ 로그아웃 단추가 카카오 끊기를 안 부릅니다');
 });
 
-/* ── ⑩ 어느 앱에서 나가든 카카오도 풀린다 (대표 「추천대로」 2026-09-28) ──────────────────
-   앱마다 로그아웃하는 길이 제각각이라, «길목 한 곳»(포털 로그인 화면)에서 막는다.
-   카카오로 들어오면 표시를 남기고, 로그인 화면이 «로그인 안 됨» 으로 떴는데 표시가 있으면
-   카카오 로그아웃을 거쳐 돌아온다. */
-function 정리세상(opt) {
-  const w = 세상({ 저장: opt.저장 || {} });
-  const 일 = [];
-  w.ctx.location = { set href(v) { 일.push('go:' + v); } };
-  w.ctx.window.PuKakao = { logoutUrl: () => { 일.push('ask'); return Promise.resolve(opt.주소 || 'https://kauth.kakao.com/oauth/logout?x'); } };
-  w.ctx.PuKakao = w.ctx.window.PuKakao;
-  if (opt.돌아옴) w.ctx.window.__kkReturning = true;
-  싣기(w, ['_rmBootSplash', 'kkNoteSession', 'kkClearStale']);
-  return { w, 일 };
-}
-
-test('⑩ ★★ 카카오로 들어와 있던 흔적이 있으면 로그인 화면이 카카오 로그아웃을 거쳐 온다', async () => {
-  const k = 정리세상({ 저장: { pu_kakao_session: '1' } });
-  assert.equal(k.w.ctx.kkClearStale(), true, '정리하러 간다고 알려야 스플래시를 안 걷는다');
-  for (let i = 0; i < 4; i++) await 틈();
-  assert.ok(k.일.some((x) => x.startsWith('go:https://kauth.kakao.com/oauth/logout')),
-    '★★ 이알피 등에서 나간 카카오 로그인이 브라우저에 남습니다 — 다음 사람이 노란 단추로 «앞 사람으로» 들어갑니다');
-  assert.equal(k.w.ctx.localStorage._m.pu_kakao_session, undefined, '★ 표시를 안 지워 돌아올 때마다 또 카카오로 튕깁니다');
-  assert.equal(k.w.els['pu-boot-splash'].style.display, 'flex', '로그인 화면이 잠깐 비쳤다 튑니다');
+/* ── ⑩ 로그인 화면은 카카오 «로그아웃» 으로 저절로 가지 않는다 (대표 2026-09-29) ──────────────
+   「로그인 눌렀는데 (카카오) 로그아웃 화면이 나온다」 — 2026-09-28 에 넣은 «길목에서 정리» 가 원인이었다.
+   카카오 로그아웃은 조용히 끝나지 않고 «로그아웃하시겠습니까?» 를 묻는다. 로그인하러 온 사람이 그 질문을 받았다.
+   대표 선택 「바로 들어가게」: 앞 사람 카카오 문제는 ⑦(처음 쓰는 기기면 다시 묻기)과 ⑧(로그아웃 단추)이 맡는다. */
+test('⑩ ★★★ 로그인 화면이 뜰 때 카카오 로그아웃으로 «보내지 않는다»', () => {
+  const 줄 = 'if(!window.__kkReturning) _rmBootSplash();';
+  const at = 화면.indexOf(줄);
+  assert.ok(at > 0, '★ «로그인 안 됨» 자리가 스플래시를 걷어 로그인 화면을 보여야 합니다');
+  const 자리 = 화면.slice(at - 300, at + 300);
+  assert.ok(!/logoutUrl|kauth.kakao.com|location.href/.test(자리),
+    '★★★ 로그인하러 온 사람을 카카오 «로그아웃하시겠습니까?» 화면으로 보냅니다');
+  assert.ok(!/kkClearStale|pu_kakao_session/.test(화면), '★★ 걷어낸 «흔적 정리» 가 되살아났습니다');
 });
 
-test('⑩ ★ 흔적이 없거나, 카카오에서 막 돌아온 참이면 가지 않는다', async () => {
-  const 없음 = 정리세상({});
-  assert.equal(없음.w.ctx.kkClearStale(), false);
-  const 돌아옴 = 정리세상({ 저장: { pu_kakao_session: '1' }, 돌아옴: true });
-  assert.equal(돌아옴.w.ctx.kkClearStale(), false, '★ 카카오로 «들어오는 중» 에 카카오를 끊어 버립니다');
-  await 틈(); await 틈();
-  assert.equal(없음.일.length + 돌아옴.일.length, 0);
+test('⑩ ★ 로그아웃 «단추»는 여전히 카카오까지 끊는다 — 사람이 스스로 나가는 길이다', () => {
+  assert.match(함수몸(화면, 'kkLogoutFlow'), /PuKakao.logoutUrl()/);
 });
-
-test('⑩ ★ 서버가 옛 판이라 «로그인» 주소를 주면 가지 않고 로그인 화면을 보인다', async () => {
-  const k = 정리세상({ 저장: { pu_kakao_session: '1' }, 주소: 'https://kauth.kakao.com/oauth/authorize?x' });
-  k.w.ctx.kkClearStale();
-  for (let i = 0; i < 4; i++) await 틈();
-  assert.ok(!k.일.some((x) => x.startsWith('go:')), '카카오 로그인 화면으로 보냈습니다');
-  assert.equal(k.w.els['pu-boot-splash'].걷힘, true, '스플래시가 안 걷혀 화면이 멎어 보입니다');
-});
-
-test('⑩ ★★ 카카오로 들어오면 표시를 남기고, 로그인 화면의 «로그인 안 됨» 자리가 정리를 부른다', async () => {
-  const w = 복귀세상(true);
-  w.ctx.kkHandleReturn();
-  for (let i = 0; i < 4; i++) await 틈();
-  assert.equal(w.ctx.localStorage._m.pu_kakao_session, '1', '★★ 카카오로 들어왔는데 표시가 없습니다 — 나간 뒤 정리할 길이 없습니다');
-  assert.match(화면, /if\(!window\.__kkReturning && !kkClearStale\(\)\) _rmBootSplash\(\)/,
-    '★★ 로그인 화면이 카카오 흔적을 정리하지 않습니다');
-});
-
