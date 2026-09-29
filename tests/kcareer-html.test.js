@@ -1606,9 +1606,28 @@ test('pu-erp 원본 보기는 읽기 전용이다', () => {
 });
 
 test('동기화 레코드 행에서 pu-erp 원본을 열 수 있다', () => {
-  const src = funcSource('rowActions');
-  assert.match(src, /rec&&rec\.puRef/);
-  assert.match(src, /openPuSource/);
+  // 2026-09-29 목업 안 D — 🔎 단추를 번호 칸의 관리번호(누르면 뜨는 작은 창)로 옮겼다
+  const cell = funcSource('puNoTd');
+  assert.match(cell, /r\.puRef/);
+  assert.match(cell, /puNoPop\(/);
+  assert.match(funcSource('puNoPop'), /openPuSource\(/);
+  // 실적 다섯 칸의 줄이 모두 번호 칸을 쓴다 — 한 곳이라도 빠지면 그 칸에선 원본을 못 연다
+  ['case', 'consult', 'fund', 'etc', 'advisory'].forEach((st) => {
+    assert.match(source, new RegExp("\\$\\{puNoTd\\(r,'" + st + "'\\)\\}"), st + ' 줄이 번호 칸(puNoTd)을 안 씁니다');
+  });
+});
+
+test('★ 실적 줄은 data-rid 로 찾는다 — 칸 글자(관리번호)로 찾으면 줄을 못 연다', () => {
+  assert.match(source, /tr\.getAttribute\('data-rid'\)\|\|\(chip\?chip\.textContent\.trim\(\):''\)/);
+  const n = (source.match(/data-rid="\$\{escapeHtml\(r\.id\)\}"/g) || []).length;
+  assert.ok(n >= 5, '실적 다섯 칸 줄에 data-rid 가 있어야 합니다: ' + n);
+});
+
+test('연결 걸러보기 칩 — 셈은 거르기 전, 「연결 확인」은 있을 때만', () => {
+  const src = funcSource('renderCareer');
+  assert.match(src, /lc\[puLinkKind\(r\)\]\+\+[\s\S]{0,200}?if\(lk\) rows=rows\.filter/, '셈을 먼저 하고 거른다');
+  assert.match(src, /\(lc\.check\|\|lk==='check'\)\?chip\('check'/);
+  assert.match(src, /nofileBar\+linkBar\+pgSel/);
 });
 
 test('fsUndoScan은 scanId가 일치하는 레코드만 지운다', () => {
