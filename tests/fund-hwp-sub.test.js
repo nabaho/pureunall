@@ -20,6 +20,8 @@ const A = (() => {
     gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'), gF('korWon'),
     gF('_officersOf'), gF('_boss'), gF('_dotDate'), gF('_hwpKoDate'), gF('_hwpKoDate2'), gF('_hwpTodayIso'), gF('_dashPhone'),
     gF('_docRok'), gV('SUB_ROWS'), gF('subAmounts'), gV('DOC_NEEDS_LEDGER'), gF('_hwpSubValues'), gV('HWP_TPL_KINDS'),
+    /* 2026-09-29 체크리스트 「특수관계인 해당여부」 — 특수관계 점검 판정을 함께 싣는다 */
+    gF('_siteUrep'), gF('_siteWrep'), gF('_relNm'), gF('_relAddrKey'), gF('_relAddrMask'), gF('relatedPeople'), gF('relatedScan'), gF('_relKey'), gF('_relJudge'),
     'this.sub=_hwpSubValues; this.S=S; this.K=HWP_TPL_KINDS;',
   ].join('\n')).call(box);
   return box;
