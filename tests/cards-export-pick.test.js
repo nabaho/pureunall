@@ -156,6 +156,7 @@ test('★ 내려받기는 환경설정에서 연다 (대표 지시)', () => {
   assert.ok(set.length > 100, 'SET_SECTIONS 를 못 찾았다');
   assert.match(set, /openExportPick\(\)/,
     '★ 환경설정에서 내려받기를 열 수 없다 — 대표 지시로 여기가 «집»이다');
-  assert.match(set, /'자주 쓰는 것'[\s\S]*openExportPick\(\)/,
-    '내려받기가 «자주 쓰는 것» 칸에 없다');
+  /* 2026-09-29: 환경설정이 왼쪽 메뉴 + 한 줄 목록이 됐다 — 내려받기는 «자료 › 내보내기» 칸이다 */
+  assert.match(set, /t:'내보내기'[\s\S]*?openExportPick\(\)/,
+    '내려받기가 «내보내기» 칸에 없다');
 });

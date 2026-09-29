@@ -69,7 +69,8 @@ test('★ 가리키는 곳이 «정말 있다» — 글만 고치고 단추를 �
                           cards.indexOf('function renderSettingsPage(){'));
   assert.match(sub, /trash:openTrash/, '★ 환경설정에서 휴지통을 열 길이 없다');
   /* 반출 기록은 관리자 칸에 있다 */
-  const sec = cards.slice(cards.indexOf("{ t:'관리자 · 한 번만 하는 일'"),
-                          cards.indexOf('] : [] }', cards.indexOf("{ t:'관리자 · 한 번만 하는 일'")));
+  /* 2026-09-29: 관리자는 «탭»이 됐다 — 반출 기록은 그 첫 칸이다 */
+  const at = cards.indexOf("tab:'admin', rows: A ? [");
+  const sec = cards.slice(at, cards.indexOf('] : [] }', at));
   assert.match(sec, /openExportLog\(\)/, '★ 환경설정에서 반출 기록을 열 길이 없다');
 });

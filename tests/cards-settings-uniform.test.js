@@ -87,8 +87,10 @@ test('★★ 팝업(폰 시트)에서는 «예전 그대로»다 — 거기는 �
 test('★ 모든 칸이 «같은 단추»를 쓴다 — 정리 센터도 setbtn 이다', () => {
   const c = fnBody('openCleanupCenter');
   assert.match(c, /class="setbtn"/, '정리 센터가 남의 모양을 쓴다');
+  /* 2026-09-29: 환경설정 목록은 «한 줄 목록»(setRowHtml) 한 벌로 그린다 — 칸마다 따로 만들지 않는다 */
   const page = fnBody('renderSettingsPage');
-  assert.match(page, /class="setbtn \$\{r\.cls\|\|''\}"/, '다른 칸이 남의 모양을 쓴다');
+  assert.match(page, /sec\.rows\.map\(setRowHtml\)/, '다른 칸이 남의 모양을 쓴다');
+  assert.match(fnBody('setRowHtml'), /class="setrow/);
 });
 
 test('★ 격자는 «한 곳»에서만 정한다 — 두 벌이면 탭마다 칸 수가 달라진다', () => {
@@ -138,19 +140,19 @@ test('★ 폰 메뉴의 곁줄은 «모두» msub 다 — 나 혼자 <i> 를 쓰
 
 /* ⚠ 2026-09-05 「다」: 탭 여섯을 «칸» 여섯으로 폈다. 탭마다 있던 설명 한 줄은
      걷어냈다 — 대표 지시 「너무 불필요한 설명 많다」. 칸 제목이 그 몫을 한다. */
-test('★★ 칸은 여섯이고, 차례가 곧 «얼마나 자주 쓰나»다', () => {
+/* 2026-09-29: 왼쪽 메뉴 + 한 줄 목록 (대표 「좀더 깔끔하게」) — 칸이 «메뉴 차례»대로 선다 */
+test('★★ 칸은 메뉴 차례(자료 → 이알피 → 내 설정 → 관리자)대로 선다', () => {
   const c = sections({ isAdmin: true });
-  assert.equal(c.map(s => s.t).join(' / '),
-    '자주 쓰는 것 / 자료 넣고 빼기 / 푸른이알피 연동 / 탭 · 계정 / 관리자 · 한 번만 하는 일'
-    + ' / 위험 구역 — 되돌릴 수 없습니다');
+  assert.equal(c.map(s => s.tab).filter((t, i, a) => a.indexOf(t) === i).join(','), 'data,erp,me,admin');
+  assert.equal(c.filter(s => s.t).map(s => s.t).join(' / '), '내보내기 / 가져오기 / 맞추기 / 정리 · 기록 / 한 번만 하는 일');
 });
 
 test('★★ 대표가 아니면 관리자 칸이 «통째로» 사라진다 — 빈 제목만 남으면 더 이상하다', () => {
   const c = sections({ isAdmin: false });
-  assert.ok(c.every(s => s.t.indexOf('관리자') < 0), '★ 직원에게 관리자 칸이 보인다');
+  assert.ok(c.every(s => s.tab !== 'admin'), '★ 직원에게 관리자 칸이 보인다');
   assert.ok(c.every(s => s.rows.length > 0), '★ 줄이 하나도 없는 빈 칸이 남았다');
   const 있는것 = c.map(s => s.rows.map(r => r.fn).join(',')).join(',');
-  ['migrateInlineThumbs()', 'openExportLog()', 'openPrivateVault()'].forEach(fn =>
+  ['migrateInlineThumbs()', 'openExportLog()', 'openPrivateVault()', 'wipeAll()'].forEach(fn =>
     assert.ok(있는것.indexOf(fn) < 0, '★ 직원에게 ' + fn + ' 가 보인다'));
 });
 
@@ -161,11 +163,12 @@ test('★★ 설명은 «한 줄»이다 — 대표 지시 「너무 불필요�
   }));
 });
 
-test('★★ 「자주 쓰는 것」만 눈에 띈다 — 다 크면 아무것도 안 크다', () => {
+/* 2026-09-29: 강조 단추(hero)를 걷었다 — 색은 둘뿐(손볼 숫자 주황 · 위험 빨강). 설명은 title 로만 */
+test('★★ 색은 둘뿐이다 — 위험한 것만 빨강, 나머지는 결이 같다', () => {
   const c = sections({ isAdmin: true });
-  const hero = c.filter(s => s.rows.some(r => r.cls === 'hero'));
-  assert.equal(hero.length, 1, '★ hero 가 여러 칸에 흩어져 있다');
-  assert.equal(hero[0].t, '자주 쓰는 것');
-  assert.ok(hero[0].rows.every(r => r.cls === 'hero'), '★ 그 칸 안에서도 결이 다르다');
-  assert.ok(decls('.setbtn.hero')['background'], 'hero 규칙이 CSS 에 없다');
+  const 꾸밈 = [].concat(...c.map(s => s.rows)).filter(r => r.cls);
+  assert.deepEqual(꾸밈.map(r => r.fn), ['wipeAll()'], '★ 위험하지 않은 줄에 꾸밈이 붙었다');
+  assert.equal(꾸밈[0].cls, 'danger');
+  assert.equal(decls('.setrow.danger')['color'], '#991b1b');
+  assert.match(fnBody('setRowHtml'), /title="\$\{esc\(r\.desc\|\|''\)\}"/, '★ 설명은 화면이 아니라 title 로만');
 });
