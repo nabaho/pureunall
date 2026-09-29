@@ -162,7 +162,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=1"></script>
+  <script src="js/pu-whoami.js?v=2"></script>
   <script>
   /* 이 앱은 제 상단바에 이미 로그인한 사람을 그린다 — 표를 두 번 띄우지 않는다 (2026-08-16) */
   (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
@@ -1210,8 +1210,20 @@ function buildCurrentUser(sid){
   if(!sid) return null;
   var arr;
   try{ arr = safeParse(localStorage.getItem('pureun_v6_user_accounts'), null); }catch(e){ arr=null; }
-  if(!arr || !Array.isArray(arr)) return null;
-  var u = arr.find(function(x){ return x.sid === sid && (x.status === 'active' || (x.status === 'leave' && x.leaveLoginAllowed === true)); });
+  function _ok(x){ return x && x.sid === sid && (x.status === 'active' || (x.status === 'leave' && x.leaveLoginAllowed === true)); }
+  var u = (arr && Array.isArray(arr)) ? arr.find(_ok) : null;
+  /* ★ 계정 명부(user_accounts)는 «재무 권한자만» 읽힌다. 포털을 거쳐 새 기기로 들어온 일반 직원은
+     이 기기에 그 명부가 없어 「나」를 못 찾고 상단 이름이 비었다
+     (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」).
+     모두가 읽는 공개 명부(user_dir) — 이 기기 사본, 없으면 포털 경유 때 서버에서 읽어 둔 것 — 로 찾는다.
+     ⚠ 읽기만 한다. 계정 명부 자리에 덮어 쓰지 않는다(동기화가 섞인다). */
+  if(!u){
+    var dir = null;
+    try{ dir = safeParse(localStorage.getItem('pureun_v6_user_dir'), null); }catch(e){ dir = null; }
+    if(dir && !Array.isArray(dir) && dir.v !== undefined) dir = dir.v;
+    if(Array.isArray(dir)) u = dir.find(_ok) || null;
+    if(!u && Array.isArray(window.__puSsoDir)) u = window.__puSsoDir.find(_ok) || null;
+  }
   if(!u) return null;
   var isAdmin = (u.role==='admin'||u.role==='admin-delegate'||u.isAdmin===true);
   var isOwner = (u.role==='admin'); // 대표(총괄) — 위임관리인(admin-delegate)·부관리자 제외
@@ -82718,7 +82730,11 @@ function App(){
         _readList('data/user_dir')
           .then(function(dir){ return dir || _readList('data/user_accounts').catch(function(){ return null; }); })
           .catch(function(){ return _readList('data/user_accounts').catch(function(){ return null; }); })
-          .then(function(list){ if(list) _match(list); setSsoWait(false); })
+          .then(function(list){
+            /* 서버에서 읽은 공개 명부를 기억해 둔다 — buildCurrentUser 가 이것으로 이름을 찾는다 */
+            if(list) window.__puSsoDir = list;
+            if(list) _match(list); setSsoWait(false);
+          })
           .catch(function(){ setSsoWait(false); });
       } catch(_){ setSsoWait(false); }
     }
