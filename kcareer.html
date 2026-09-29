@@ -1372,6 +1372,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
             <div id="rhDraftPanel" class="hide" style="border-top:1px dashed var(--border);padding:10px 12px">
               <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:7px">
                 30초마다 저절로 담깁니다. 아무 것이나 눌러 이어서 하세요 — <b>지금 하던 것도 담아 두고</b> 넘어갑니다.
+                · <b>이 PC(이 브라우저) 안에만</b> 담깁니다 — 다른 PC에서는 안 보입니다. 내보낼 것은 「💾 완성본 생성」으로 서류 보관함에 담으세요.
               </div>
               <!-- ★ 고른 것이 있을 때만 나온다 — 목록 화면·휴지통과 «같은 옷»(.sel-bar) -->
               <div class="sel-bar" id="rhDraftSelBar" style="display:none;position:static;margin:0 0 8px">
@@ -1549,6 +1550,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
               <div class="rh-workonly" style="margin-top:10px">
                 <div class="rh-railh">자동 저장</div>
                 <div data-savetag style="font-size:11px;color:var(--text-mute);line-height:1.5">30초마다 저절로 담깁니다</div>
+              </div>
+              <div class="rh-workonly">
+                <!-- ★ 담은 것을 «여는 문» (대표 지적 2026-09-29 「저장이 어디에 되어 있는지 못 찾는다」).
+                     「📂 작성 중」 딱지는 위 줄(#rhUploadBar)에 있어 작업 모드에서 통째로 감춰졌다 —
+                     「📂 작성 중에서 이어서 합니다」라고 말하면서 그 문은 안 보였다.
+                     ⚠ 이 단추를 지우지 말 것. 작업 중에 담은 것을 찾는 길은 여기뿐이다. -->
+                <button class="btn" id="rhDraftRailBtn" style="width:100%;text-align:left;margin-top:6px"
+                        onclick="rhDraftShow()" title="담아 둔 작성 중 서류 목록을 엽니다 — 이 PC(이 브라우저) 안에만 담깁니다">📂 작성 중 서류 보기 <b id="rhDraftNRail">0</b></button>
               </div>
               <!-- 감춰 둔 두 줄로 돌아가는 길 — 기둥 맨 아래 -->
               <div class="rh-workonly" style="margin-top:auto">
@@ -12165,7 +12174,13 @@ async function rhDraftNow(quiet){
     if(bytes && bytes.length) _rhDoc={ name:_rhDoc.name, ext:'hwpx', bytes:new Uint8Array(bytes) };
   }catch(e){ /* 편집기가 아직이면 원본 그대로 담는다 */ }
   rhDraftSave(); rhDraftCheck();
-  if(!quiet) toast('💾 담아 뒀습니다 — 「📂 작성 중」에서 언제든 이어서 합니다');
+  if(!quiet){
+    toast('💾 담아 뒀습니다 — 왼쪽 「📂 작성 중 서류 보기」에서 다시 엽니다 (이 PC 안에만 담깁니다)', 5000);
+    /* 어디를 누르면 되는지 «눈으로» 짚어 준다 — 말만으로는 못 찾았다 */
+    var rb=document.getElementById('rhDraftRailBtn');
+    if(rb){ rb.style.outline='2px solid var(--teal)'; rb.style.outlineOffset='2px';
+      setTimeout(function(){ rb.style.outline=''; rb.style.outlineOffset=''; }, 4000); }
+  }
 }
 
 /* ✕ 치우기 — 편집 중인 서식을 화면에서 내린다.
@@ -14517,12 +14532,23 @@ function rhDraftCheck(){
   var ub=document.getElementById('rhUploadBar'); if(ub) ub.classList.toggle('has-chip', !!all.length);
   if(bar) bar.style.display=all.length?'':'none';
   if(n) n.textContent=String(중.length);
+  var nr=document.getElementById('rhDraftNRail'); if(nr) nr.textContent=String(all.length);
   if(!all.length) rhDraftPanelClose();
   else if(document.getElementById('rhDraftPanel') && !document.getElementById('rhDraftPanel').classList.contains('hide')) rhDraftDraw();
 }
 function rhDraftPanelClose(){
   var p=document.getElementById('rhDraftPanel'); if(p) p.classList.add('hide');
   var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▾';
+}
+/* 기둥의 「📂 작성 중 서류 보기」 — 목록을 «열고» 그 자리로 옮겨 간다.
+   ⚠ 닫혀 있을 때만 여는 것이 아니다: 이미 열려 있어도 화면이 딴 데 있으면 못 본다. */
+function rhDraftShow(){
+  var p=document.getElementById('rhDraftPanel'); if(!p) return;
+  if(!rhDraftAll().length){ toast('아직 담아 둔 서류가 없습니다 — 「💾 작성 중 저장」을 누르면 여기에 쌓입니다', 4000); return; }
+  p.classList.remove('hide');
+  var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▴';
+  rhDraftDraw();
+  try{ p.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){ p.scrollIntoView(); }
 }
 function rhDraftPanelToggle(){
   var p=document.getElementById('rhDraftPanel'); if(!p) return;
