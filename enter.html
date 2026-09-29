@@ -138,7 +138,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
-<script src="js/pu-kakao.js?v=3"></script>
+<script src="js/pu-kakao.js?v=4"></script>
 <script src="js/pu-billing.js?v=11"></script>
 <style>
 :root{
@@ -1690,6 +1690,8 @@ body.portal-mode #moreFab{display:flex;}
         //   사람이 로그아웃 질문을 받게 된다. 앞 사람 카카오 문제는 «처음 쓰는 기기면 다시 묻기»(kkLogin)와
         //   포털 「로그아웃」 단추(kkLogoutFlow)가 맡는다. 대표 선택: 「바로 들어가게」.
         if(!window.__kkReturning) _rmBootSplash();
+        // 카카오를 쓰는 기기면 로그인 서버를 미리 깨워 둔다 — 노란 단추를 누르기 전부터 (2026-09-29)
+        try { if(!window.__kkReturning && localStorage.getItem('pu_kakao_used') === '1' && window.PuKakao && PuKakao.warm) PuKakao.warm(); } catch(_w){}
         if(_persistenceBootError){
           showErr('자동로그인 저장소를 열 수 없습니다. 삼성 인터넷 또는 Chrome에서 다시 로그인해 주세요.');
         }
@@ -1772,6 +1774,8 @@ body.portal-mode #moreFab{display:flex;}
     if(p.error){ kkEndReturn(); kkUnfoldPw(); showErr(p.error); return; }
     if(p.mode === 'login'){
       _freshLogin = true;
+      /* 서버가 표를 만드는 «동안» 이 화면의 DB 연결을 먼저 연다 — 들어가자마자 명부를 읽는다 (2026-09-29) */
+      try { db.ref('.info/connected').once('value'); } catch(_c){}
       PuKakao.loginFinish(p.code).then(function(token){
         return auth.signInWithCustomToken(token);
       }).then(function(cred){

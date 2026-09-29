@@ -263,11 +263,23 @@ exports.kakaoLoginFinish = functions
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") return res.status(204).send("");
+    /* ★ 미리 깨우기 (대표 2026-09-29 「로그인 되는데 좀 빨리 넘어가게」) ──────────────
+       서버 기록: 로그인 한 번에 함수 «안»에서만 1.9~2.5초. 로그인 간격이 길어 매번 새로 뜬
+       함수가 DB 연결부터 맺는다. 노란 단추를 누를 때 화면이 이것을 한 번 부르면, 사람이
+       카카오 화면을 거치는 동안 함수가 깨어나 DB 연결까지 맺어 둔다.
+       ⚠ 아무것도 읽어 주지 않는다 — 없는 자리(_warm) 한 칸을 읽어 연결만 연다. */
+    if (req.method === "GET" && String((req.query && req.query.warm) || "") === "1") {
+      await getRawDatabase().ref("uid_roles/_warm").once("value").catch(() => null);
+      return res.status(204).send("");
+    }
     if (req.method !== "POST") return bad(res, 405, "POST 만 받습니다");
 
     const code = (req.body && req.body.code) || "";
     if (!code) return bad(res, 400, "카카오 인가코드가 없습니다");
 
+    /* DB 연결을 카카오에 묻는 «동안» 맺는다 — 예전에는 카카오 답을 다 받은 뒤에야 시작했다 */
+    const t0 = Date.now();
+    getRawDatabase().ref("uid_roles/_warm").once("value").catch(() => null);
     let kakaoId;
     try {
       const rk = restKeyOf(), cs = clientSecretOf();
@@ -276,8 +288,10 @@ exports.kakaoLoginFinish = functions
     } catch (e) {
       return bad(res, 400, String((e && e.message) || e));
     }
+    const t1 = Date.now();
 
     const link = (await db().ref(DB_LINK + "/" + pathSafe(kakaoId)).once("value")).val();
+    const t2 = Date.now();
     /* needLink — 화면이 「비밀번호로 한 번 들어오면 곧바로 연결을 권한다」로 이어 가는 표시.
        카카오 회원번호는 싣지 않는다(연결은 로그인 뒤 인가코드를 새로 받아 서버가 다시 확인한다). */
     if (!link || !link.uid) {
@@ -298,6 +312,10 @@ exports.kakaoLoginFinish = functions
       return bad(res, 403, "재직 중인 계정이 아닙니다. 관리자에게 문의해 주세요");
     }
 
+    const t3 = Date.now();
     const token = await getAuth().createCustomToken(link.uid, { kakao: true, sid: link.sid || "" });
+    /* 단계별 시간 — 다음에 느리다는 말이 나오면 «어디서»를 기록에서 바로 본다. 사람 정보는 안 적는다. */
+    console.log("[kakaoLoginFinish] 카카오 " + (t1 - t0) + "ms · 연결기록 " + (t2 - t1) + "ms · 재직 "
+      + (t3 - t2) + "ms · 표 " + (Date.now() - t3) + "ms");
     res.json({ ok: true, token });
   });
