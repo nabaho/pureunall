@@ -100,8 +100,10 @@ test('★★ 빈 안내문 화면 전체가 자료 놓는 자리이고 기본 �
     '오른쪽 빈 화면에 파일을 끌어 놓을 수 없다');
   assert.match(화면, /function 안내자료놓기\([^)]+\)[\s\S]*dataTransfer[\s\S]*자료로안내문\(files\[0\]\)/,
     '놓은 파일이 기존의 안전한 올리기 길로 이어지지 않는다');
-  assert.match(화면, /보내기 전 기본 디자인[\s\S]*id="ntDefaultPreview"/,
+  assert.match(화면, /보내기 전 자료 확인[\s\S]*id="ntDefaultPreview"/,
     '자료를 올리기 전에는 메일 디자인을 판단할 수 없다');
-  assert.match(화면, /function 안내기본미리보기그리기\([^)]*\)[\s\S]*Notice\.안내짓기/,
+  assert.match(화면, /function 안내검토미리보기그리기\([^)]*\)[\s\S]*Notice\.안내짓기/,
     '기본 미리보기가 실제 안내문 서식을 쓰지 않는다');
+  assert.match(화면, /id="ntCurrentPreview"/,
+    '자료를 올린 뒤 실제 발송 모양을 확인하는 자리가 없다');
 });
