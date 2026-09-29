@@ -753,7 +753,7 @@ test('puSyncCommit은 스토어별 단일 쓰기와 꼬리표를 지킨다', () 
   assert.match(src, /puRef/);
   assert.match(src, /syncId/);
   // 레코드 반복문 안에서 set() 금지 — 저장은 마지막에 스토어 목록을 돌며 한 번씩
-  const loop = src.slice(src.indexOf('plan.adds.forEach'), src.indexOf('PU_SYNC_STORES.forEach'));
+  const loop = src.slice(src.indexOf('adds.forEach(function(a)'), src.indexOf('PU_SYNC_STORES.forEach'));
   assert.ok(loop.length > 0, 'adds 반복문과 저장 루프가 있어야 합니다');
   assert.ok(!/\bset\(/.test(loop), 'adds 반복문 안에서 set()을 부르면 안 됩니다');
 });
