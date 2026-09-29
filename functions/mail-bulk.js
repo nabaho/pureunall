@@ -92,6 +92,15 @@ function uncertainDelivery(row, now) {
   };
 }
 
+function parkOldFailure(row, now) {
+  const r = row && typeof row === 'object' ? row : {};
+  const t = Number(now) || Date.now();
+  return {
+    originalAt: Number(r.originalAt || r.at) || t,
+    at: PARKED_AT,
+  };
+}
+
 /* 글 안의 {이름}·{회사} 를 그 곳 값으로 바꾼다.
    화면(pu-cards.html mailFill)과 **같은 규칙**이어야 한다 — 미리보기와 실제가 달라지면
    무엇이 나갈지 아무도 모른다. 값이 없으면 빈칸으로 지운다(«{회사}» 가 그대로 나가면 흉하다). */
@@ -305,5 +314,5 @@ module.exports = {
   DRAIN_EVERY_MIN, DRAIN_BATCH, MAX_DELIVERY_ATTEMPTS, RETRY_DELAY_MS, PARKED_AT,
   SENDING_LEASE_MS, 같은사서함도메인,
   fill, cleanTargets, spacingMs, validateBulk, buildQueue, etaText, 보내는주소고르기,
-  deliveryFailure, staleSending, uncertainDelivery,
+  deliveryFailure, staleSending, uncertainDelivery, parkOldFailure,
 };
