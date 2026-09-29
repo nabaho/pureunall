@@ -186,3 +186,36 @@ test('⑤ ★★ 받을 때·못 보낸 변경을 다시 보낼 때도 지운 �
   const ex = (bare.match(/var FB_EXCLUDE = \[([^\]]*)\]/) || [])[1] || '';
   assert.ok(!/co_tomb/.test(ex), '★★ 지운 명단이 이 PC 에만 남습니다 — 다른 기기는 모릅니다');
 });
+
+/* ⑧ 이 기기 사본에 남은 «지운 명단» 업체도 걷는다 (대표 보고 2026-09-29 「여전히 안바꼈다」)
+   첫 받기가 «병합»이라 서버에서 288건을 지워도 그 PC 화면은 563건 그대로였다. */
+test('⑧ ★★ 열 때 서버의 지운 명단을 읽어, 이 기기 사본에 남은 업체를 걷는다 — 서버에는 안 쓴다', async () => {
+  const 저장 = { companies: [{ id: 'keep1', name: '가나상사' }, { id: 'zomb1', name: '홍길동상사' }, { id: 'zomb2', name: '임꺽정' }] };
+  const 서버쓰기 = [];
+  const ctx = {
+    console: { warn() {} }, Object, JSON, String, Array, 알림: [],
+    CO_TOMB: 'co_tombstones', _fbServerU: {}, _dbCache: {},
+    fbDb: {
+      ref: (p) => ({
+        once: () => Promise.resolve({ val: () => (p === 'data/co_tombstones/v' ? { zomb1: { at: 'x' }, zomb2: { at: 'x' } } : null) }),
+        update: (u) => { 서버쓰기.push(u); return Promise.resolve(); }, set: (v) => { 서버쓰기.push(v); return Promise.resolve(); },
+      }),
+    },
+    _fbLocalArr: (k) => (저장[k] || []).slice(),
+    _fbWriteArr: (k, a) => { 저장[k] = a; },
+    dbGet: (k, d) => (k in 저장 ? 저장[k] : d),
+  };
+  ctx.showToast = (m) => ctx.알림.push(m);
+  vm.createContext(ctx);
+  vm.runInContext(cutFn(src, 'function coTombMap(') + '\n' + cutFn(src, 'function _coTombPurgeLocal('), ctx);
+  ctx._coTombPurgeLocal();
+  await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r));
+  assert.deepEqual(저장.companies.map((c) => c.id), ['keep1'], '★★ 이 기기에 남은 되살아난 업체가 그대로 보입니다');
+  assert.ok(저장.co_tombstones && 저장.co_tombstones.zomb1, '★ 이 기기 명단을 서버 것과 안 맞춰, 뒤이은 저장이 되살릴 수 있습니다');
+  assert.equal(서버쓰기.length, 0, '★★ 이 기기 정리가 서버에 썼습니다');
+  const bare = stripJs(src);
+  const at = bare.indexOf("vref.once('value', function(snap){");
+  assert.match(bare.slice(at, at + 400), /k === 'companies' && typeof _coTombPurgeLocal === 'function'\) _coTombPurgeLocal\(\)/,
+    '★★ 업체를 다 받은 뒤 이 기기 정리를 안 부릅니다');
+});
+
