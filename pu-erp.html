@@ -8380,6 +8380,33 @@ function coTombDel(ids){
   (ids || []).forEach(function(id){ if(m[String(id)]){ delete m[String(id)]; n++; } });
   if(n) dbSet(CO_TOMB, m);
 }
+/* 이 기기 사본에 남은 «지운 명단» 업체를 걷는다 — 서버의 명단을 한 번 읽어서 (대표 보고 2026-09-29 「여전히 안바꼈다」).
+   ⚠ 첫 받기는 «병합»이라(서버에 없는 이 기기 줄을 그대로 둔다) 서버에서 288건을 지워도
+     이 기기 화면은 563건 그대로였다 — 그 남은 줄이 바로 되살림의 씨앗이었다.
+   ★ 서버에는 아무것도 쓰지 않는다(_fbWriteArr 은 이 기기 사본만). 걷은 줄은 이미 서버에 없다.
+   ★ 이 기기의 명단도 서버 것과 합쳐 둔다 — 그래야 뒤이은 저장(dbSet 등)이 같은 명단으로 거른다. */
+function _coTombPurgeLocal(){
+  try{
+    if(typeof fbDb === 'undefined' || !fbDb) return;
+    fbDb.ref('data/' + CO_TOMB + '/v').once('value').then(function(s){
+      var srv = (s && s.val && s.val()) || {};
+      if(!srv || typeof srv !== 'object' || !Object.keys(srv).length) return;
+      var mine = coTombMap(), miss = Object.keys(srv).filter(function(id){ return !mine[id]; });
+      if(miss.length){
+        var m2 = Object.assign({}, mine); miss.forEach(function(id){ m2[id] = srv[id]; });
+        _fbWriteArr(CO_TOMB, m2, _fbServerU[CO_TOMB]);    // 이 기기 사본만 — 서버에는 이미 있다
+        if(typeof _dbCache !== 'undefined') delete _dbCache[CO_TOMB];
+      }
+      var arr = _fbLocalArr('companies');
+      var next = arr.filter(function(x){ return !(x && x.id != null && srv[String(x.id)]); });
+      if(next.length !== arr.length){
+        _fbWriteArr('companies', next, _fbServerU['companies']);
+        console.warn('[지운 명단] 이 기기에 남아 있던 업체 ' + (arr.length - next.length) + '건을 걷었습니다(서버에는 이미 없음)');
+        try{ showToast('🧹 합쳐서 없앤 업체 ' + (arr.length - next.length) + '건을 이 기기 화면에서도 정리했습니다'); }catch(_t){}
+      }
+    }).catch(function(){});
+  }catch(e){ window._erpErrLog && window._erpErrLog(e); }
+}
 // 업체 목록에서 명단에 오른 것을 걷는다 — 다른 표는 그대로 돌려준다
 function _coTombStrip(k, arr){
   if(k !== 'companies' || !Array.isArray(arr)) return arr;
@@ -10878,6 +10905,8 @@ function _fbLiveRecords(k, opts){
       /* 첫 적재가 끝나는 시점 — 위 구독이 이미 받아 둔 것을 쓰므로 새로 안 받는다 */
       vref.once('value', function(snap){
         flush(); hydrating = false;
+        // 업체 — 지운 명단에 오른 것은 이 기기 사본에서도 걷는다(_coTombPurgeLocal 머리글)
+        if(k === 'companies' && typeof _coTombPurgeLocal === 'function') _coTombPurgeLocal();
         /* 서버 전체를 덮지 않고, 빠진 묶음만 복구한다. once 는 같은 구독 자리의 완료
            신호라 별도 한 벌을 내려받지 않는다. */
         var repair = (k === 'ledger_batches') ? _fbRepairLedgerBatches(snap && snap.val && snap.val()) : Promise.resolve(0);
