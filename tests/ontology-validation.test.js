@@ -47,7 +47,9 @@ function harness(report){
     todayStr(){return '2026-09-03';},setTimeout(){},showToast(){},
     /* 2026-09-05 4-D — 화면 밖에 둔 값 셋. 이 검사는 «검토 손잡이»만 재므로 빈 값으로 세운다.
        ⚠ 안 세우면 그리는 도중에 멎어, 정작 재려던 것이 아니라 이것 때문에 깨진다. */
-    _ontCurrentGen:'', _ontHeavyRaw:null, _ontIdxAt:0
+    _ontCurrentGen:'', _ontHeavyRaw:null, _ontIdxAt:0,
+    /* 2026-09-29 — 늘 보이던 안내문을 ⓘ 팝업으로 옮겼다. 이 검사는 팝업을 재지 않으니 빈 부품으로 둔다 */
+    InfoPop(){ return null; }
   };
   vm.createContext(context);
   new vm.Script(panel).runInContext(context);
