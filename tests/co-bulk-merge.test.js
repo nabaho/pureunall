@@ -96,7 +96,7 @@ function 쌍세상() {
       CO({ id: 'co-c1', name: '(주)가나상사', email: 'ga@가나.kr' }),
       CO({ id: 'real-2', name: '홍길동상사', bizNo: '123-81-00002', ceo: '임꺽정', phone: '041-222-2222', address: '충남 서산시 나로 2' }),
       CO({ id: 'co-p2', name: '홍길동상사', bizNo: '123-81-00002', ceo: '임꺽정', phone: '041-222-2222', address: '충남 서산시 나로 2', fax: '041-7', email: 'h@h.kr' }),
-      CO({ id: 'solo', name: '다른회사', bizNo: '999-81-00009', ceo: '홍길동', phone: '041-999-9999' }),
+      CO({ id: 'solo', name: '다른회사', bizNo: '123-81-00009', ceo: '홍길동', phone: '041-999-9999' }),
     ],
     contracts: [{ id: 'k1', companyId: 'co-c1' }],
   });
