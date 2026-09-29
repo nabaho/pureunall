@@ -7673,11 +7673,12 @@ function schedBoxHtml(){
   const sel = pickPrune(pickOf('sched'), ids); pickPut('sched', sel);
   const body = rows.length ? rows.map((v,i)=>{
     const p = v.payload||{};
-    const bad = v.state==='failed';
+    const bad = v.state==='failed' || v.state==='uncertain';
+    const 보낼때 = bad ? (v.originalAt || v.at) : v.at;
     return `<tr class="${bad?'bad':''} ${pickOn(sel,v.id)?'pkon':''}">
       <td class="pk"><label><input type="checkbox" ${pickOn(sel,v.id)?'checked':''}
         onchange="pickHit('sched','${v.id}')"><span class="no">${i+1}</span></label></td>
-      <td class="w">${esc(fmtWhen(v.at))}<span>${bad?'보내지 못함':(v.state==='sending'?'보내는 중':'기다리는 중')}</span></td>
+      <td class="w">${esc(fmtWhen(보낼때))}<span>${v.state==='uncertain'?'발송 여부 확인 필요':(bad?'보내지 못함':(v.state==='sending'?'보내는 중':(v.at>Date.now()&&v.at-(v.failedAt||0)<31*60*1000?'다시 시도 대기':'기다리는 중')))}</span></td>
       <td class="b">${esc(staffName(v.by))}</td>
       <td><b>${esc(p.toName||'')}</b><span class="e">${esc(p.to||'')}</span></td>
       <td>${esc(p.subject||'')}<span class="e">${esc((p.matIds||[]).map(id=>(_matMeta[id]||{}).name||'자료').join(' · ')||'첨부 없음')}${
@@ -7701,7 +7702,7 @@ function schedBoxHtml(){
       ${pickHeadBox('sched', ids)}<th>보낼 때</th><th>예약한 사람</th><th>받는 곳</th><th>제목 · 첨부</th><th></th>
     </tr></thead><tbody>${body}</tbody></table>
     <p style="font-size:11.5px;color:#94a3b8;line-height:1.7;margin-top:12px">
-      ※ 서버가 5분마다 살펴 보냅니다 — <b>창을 닫아도 나갑니다.</b> 정한 때보다 최대 5분 늦을 수 있습니다.<br>
+      ※ 서버가 15분마다 살펴 보냅니다 — <b>창을 닫아도 나갑니다.</b> 정한 때보다 최대 15분 늦을 수 있습니다.<br>
       ※ 💻 내 PC 파일은 예약에 담기지 않습니다. 그런 첨부가 있으면 그때 직접 보내 주세요.</p>`;
 }
 function cancelScheduled(id){

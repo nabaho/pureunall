@@ -998,13 +998,22 @@ exports.sendScheduledMail = functions
 
     for (const id of ids) {
       const row = all[id] || {};
+      const ref = db.ref(MD.CARDS_ROOT + "/scheduled/" + id);
+      /* 실행 도중 서버가 꺼져 sending 으로 굳은 줄은 정상 대기열을 막지 않게 치운다.
+         이미 SMTP 서버가 받았는지 알 수 없으므로 자동 재발송은 하지 않는다 — 중복보다
+         «확인 필요»로 남기는 편이 안전하다. */
+      if (MB.staleSending(row, now)) {
+        await ref.update(MB.uncertainDelivery(row, now));
+        failed++;
+        continue;
+      }
       if (row.state && row.state !== "waiting") continue;   // 이미 누가 집어 갔다
 
-      const ref = db.ref(MD.CARDS_ROOT + "/scheduled/" + id);
       // 먼저 찜한다 — 두 번 보내지 않으려고. 이미 남이 찜했으면 건너뛴다.
       const claim = await ref.child("state").transaction((cur) =>
         (cur === "waiting" || cur === null || cur === undefined) ? "sending" : undefined);
       if (!claim.committed) continue;
+      await ref.update({ sendingAt: Date.now(), attemptCount: Number(row.attemptCount) || 0 });
 
       try {
         /* 통이 «다른 주소로 나가고 싶다»고 적어 두었으면 그것을 쓴다 — 뉴스레터가
@@ -1030,12 +1039,13 @@ exports.sendScheduledMail = functions
           await ref.remove();                    // 나갔으니 자리를 비운다
           sent++;
         } else {
-          // ⚠ 지우지 않는다. 왜 못 갔는지 화면에서 보이고, 사람이 고쳐 다시 걸 수 있어야 한다.
-          await ref.update({ state: "failed", error: String(r.error || ""), failedAt: Date.now() });
+          /* 일시 장애는 두 번 더 시도한다. 마지막 실패도 지우지 않되 at 을 먼 훗날로
+             옮겨 다음 정상 메일의 앞길을 막지 않게 한다. */
+          await ref.update(MB.deliveryFailure(row, Date.now(), r.error || "발송 실패"));
           failed++;
         }
       } catch (e) {
-        await ref.update({ state: "failed", error: String((e && e.message) || e), failedAt: Date.now() });
+        await ref.update(MB.deliveryFailure(row, Date.now(), (e && e.message) || e));
         failed++;
       }
     }
