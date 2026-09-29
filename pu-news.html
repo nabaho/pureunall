@@ -121,11 +121,9 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .notedrop.drag{border-color:var(--brown);background:var(--brown-soft);transform:translateY(-1px)}
 .notedrop .dropcopy{display:flex;align-items:center;gap:12px;min-width:0}.notedrop .big{font-size:24px;line-height:1}
 .notedrop .ttl{font-size:14px;font-weight:800}.notedrop .sub{color:var(--sub);font-size:12px;line-height:1.5;margin-top:3px}
-.notedrop .pick{flex:0 0 auto;white-space:nowrap;margin:0}
 .notedefault{margin-top:12px}.notedefault h3{display:flex;align-items:center;gap:8px}
 .notedefault .tag{font-size:11px;color:var(--ok);background:#dcfce7;border-radius:99px;padding:3px 8px}
 .notedefault .hint{margin:0 0 9px}.notedefault #ntDefaultPreview,.notedefault #ntCurrentPreview{min-height:360px}
-@media (max-width:620px){.notedrop{align-items:stretch;flex-direction:column}.notedrop .pick{width:100%;text-align:center}}
 
 /* ★ 담는 법 — 카드 셋을 «한 줄 띠»로 (대표 지시 2026-09-05 「크기 좀 줄여라,
    불필요한 내용 줄이고」). 카드 셋이 세로로 200px 쯤 잡아먹어, 정작 짓는 곳인
@@ -3671,7 +3669,7 @@ function 안내문화면(){
     <div class="pad" style="padding-bottom:6px;display:flex;gap:8px;flex-wrap:wrap">
       <label class="btn pri" style="cursor:pointer${App.올리는중?';opacity:.6;pointer-events:none':''}"
         title="PDF·파워포인트·한글·워드·엑셀·사진 — 올리면 그 자료를 보내는 안내문이 만들어집니다">
-        ${App.올리는중 ? '⏳ 올리는 중…' : '📎 자료로 안내문 만들기'}<input type="file" style="display:none"
+        ${App.올리는중 ? '⏳ 올리는 중…' : '📎 파일 직접 고르기'}<input type="file" style="display:none"
         accept=".pdf,.ppt,.pptx,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
         onchange="자료로안내문(this.files[0]); this.value=''"></label>
       <button class="btn" onclick="새안내문()">＋ 글로 쓰기</button></div>
@@ -3692,10 +3690,7 @@ function 안내빈화면(){
       <div id="ntDrop" class="notedrop" ondragenter="안내끌기(event,true)" ondragover="안내끌기(event,true)"
         ondragleave="안내끌기(event,false)" ondrop="안내자료놓기(event)">
         <div class="dropcopy"><div class="big">📄</div><div><div class="ttl">특별 안내 자료 끌어놓기</div>
-        <div class="sub">PPT·PDF·한글·워드·엑셀·사진 · 놓으면 발송 전 확인 화면이 만들어집니다.</div></div></div>
-        <label class="btn pick" style="cursor:pointer">파일 고르기
-          <input type="file" style="display:none" accept=".pdf,.ppt,.pptx,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-            onchange="자료로안내문(this.files[0]);this.value=''"></label>
+        <div class="sub">PPT·PDF·한글·워드·엑셀·사진 · 놓으면 발송 전 확인 화면이 만들어집니다.<br>직접 고르기는 왼쪽 안내문 상자에서 합니다.</div></div></div>
       </div>
     </div>
    </div>
