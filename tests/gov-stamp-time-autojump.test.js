@@ -26,13 +26,15 @@ function load() {
   };
   vm.runInNewContext(code, { document: doc, String });
   assert.ok(handler, 'input 듣개가 걸리지 않았다');
-  const mk = (id) => (els[id] = {
-    id, value: '', focused: false,
-    // 시 칸만 «시 칸 고르개»에 걸린다
-    matches: (sel) => /\^="mh"/.test(sel) && id.startsWith('mh'),
+  const apply = { focused: false, focus() { this.focused = true; } };
+  const mk = (id, hidden) => (els[id] = {
+    id, value: '', focused: false, offsetParent: hidden ? null : {},
+    // 고르개에 적힌 칸 종류(mh·mm)만 걸린다
+    matches: (sel) => sel.includes('[id^="' + id.slice(0, 2) + '"]'),
+    closest: () => ({ querySelector: () => apply }),
     focus() { this.focused = true; }, select() {},
   });
-  return { handler, mk };
+  return { handler, mk, apply };
 }
 
 test('시 칸에 두 자리 → 짝이 되는 분 칸으로', () => {
@@ -45,14 +47,29 @@ test('시 칸에 두 자리 → 짝이 되는 분 칸으로', () => {
   }
 });
 
-test('한 자리면 그대로 · 분 칸에서는 안 넘어간다', () => {
+test('한 자리면 그대로', () => {
   const { handler, mk } = load();
-  const h = mk('mh0'), m = mk('mm0');
-  h.value = '8';
-  handler({ target: h });
-  assert.ok(!m.focused, '한 자리인데 넘어갔다');
-  const m1 = mk('mm1'), h1 = mk('mh1');
-  m1.value = '48';
-  handler({ target: m1 });
-  assert.ok(!h1.focused && !m1.focused, '분 칸에서 움직였다');
+  const h = mk('mh0'), m = mk('mm0'), h1 = mk('mh1');
+  h.value = '8'; handler({ target: h });
+  m.value = '5'; handler({ target: m });
+  assert.ok(!m.focused && !h1.focused, '한 자리인데 넘어갔다');
+});
+
+test('분 칸 두 자리 → 다음 줄 시 칸', () => {
+  const { handler, mk, apply } = load();
+  const m0 = mk('mm0'), h1 = mk('mh1');
+  m0.value = '55'; handler({ target: m0 });
+  assert.ok(h1.focused, 'mm0 → mh1 로 안 넘어갔다');
+  assert.ok(!apply.focused);
+});
+
+test('다음 줄이 없거나 숨었으면 그 줄 「적용」 단추로', () => {
+  let r = load();
+  const m1 = r.mk('mm1');
+  m1.value = '48'; r.handler({ target: m1 });
+  assert.ok(r.apply.focused, '마지막 줄인데 적용 단추로 안 갔다');
+  r = load();
+  const m0 = r.mk('mm0'), h1 = r.mk('mh1', true);
+  m0.value = '30'; r.handler({ target: m0 });
+  assert.ok(!h1.focused && r.apply.focused, '숨은 줄로 갔다');
 });

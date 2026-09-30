@@ -10359,13 +10359,24 @@ function buildStampExtraSlots(n){
   }
 }
 /* 시 칸에 숫자 두 개를 넣으면 분 칸으로 저절로 넘어간다 (대표 지시 2026-09-30)
-   — 추가 사진 줄(mh2~)은 나중에 생기므로 #spTimes 에 한 번만 걸어 둔다 */
+   — 추가 사진 줄(mh2~)은 나중에 생기므로 #spTimes 에 한 번만 걸어 둔다
+   분 칸도 두 자리면 다음 줄 시 칸으로, 마지막 줄이면 그 줄 「적용」 단추로 (Enter 로 적용).
+   한 장 모드처럼 숨은 줄(offsetParent 없음)은 건너뛴다 */
 document.addEventListener('input',e=>{
   const t=e.target;
-  if(!t||!t.matches||!t.matches('#spTimes input.tminput[id^="mh"]'))return;
+  if(!t||!t.matches||!t.matches('#spTimes input.tminput[id^="mh"], #spTimes input.tminput[id^="mm"]'))return;
   if(String(t.value).length<2)return;
-  const mm=document.getElementById('mm'+t.id.slice(2));
-  if(mm){ mm.focus(); mm.select(); }
+  const n=+t.id.slice(2);
+  if(t.id.startsWith('mh')){
+    const mm=document.getElementById('mm'+n);
+    if(mm){ mm.focus(); mm.select(); }
+    return;
+  }
+  const nh=document.getElementById('mh'+(n+1));
+  if(nh&&nh.offsetParent!==null){ nh.focus(); nh.select(); return; }
+  const row=t.closest&&t.closest('.mt-row');
+  const ab=row&&row.querySelector('.apply-btn');
+  if(ab)ab.focus();
 });
 /* ══════ 사진 등록·수정 — 한 창에서 (대표 지시 2026-08-29) ══════
    지시 넷 —
