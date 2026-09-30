@@ -1092,6 +1092,11 @@ input.kf-in.kf-done{background:#f8fafc;border-bottom:1.5px solid var(--teal);fon
   border-left:1px solid var(--border)}
 #rcEditCard.rh-work.rh-drawer-off>div:last-child{grid-template-columns:1fr}
 /* 기둥 안 작은 이름표와 맞춤 단추 */
+.rh-float-h{display:none}
+#rhDraftPanel.rh-float{position:fixed;z-index:70;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.18);overflow:auto;max-height:70vh}
+#rhDraftPanel.rh-float .rh-float-h{display:flex;align-items:center;gap:10px;position:sticky;top:-10px;background:var(--card);margin:-10px -12px 8px;padding:9px 12px;border-bottom:1px solid var(--border);z-index:1}
+#rhDraftPanel.rh-float .rh-float-h b{white-space:nowrap}
+#rhDraftPanel.rh-float .rh-float-h .m{font-size:11px;color:var(--text-mute);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rh-back{position:relative;display:flex;gap:4px;margin:0 0 4px}
 .rh-back .btn{padding:7px 9px}
 .rh-back-go{flex:1;font-weight:800;background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -1422,6 +1427,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
             </div>
             <!-- 📂 작성 중 목록 — 자리마다 따로 담기고, 아무 때나 오가며 이어 쓴다 -->
             <div id="rhDraftPanel" class="hide" style="border-top:1px dashed var(--border);padding:10px 12px">
+              <!-- ★ 입력 화면에서는 이 목록이 «떠 있는 창»이 된다(대표 승인 2026-09-30 목업 A) — 이 머리는 그때만 보인다 -->
+              <div class="rh-float-h">
+                <b>📂 작성 중 서류</b><span class="m" title="이름을 누르면 지금 것을 담고 그 서류로 바꿉니다 · Esc·바깥을 누르면 닫힙니다">이름을 누르면 지금 것을 담고 그 서류로 바꿉니다 · Esc·바깥을 누르면 닫힙니다</span>
+                <button class="btn sm" type="button" onclick="rhDraftFloatClose()" aria-label="닫기">✕</button>
+              </div>
               <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:7px">
                 30초마다 저절로 담깁니다. 아무 것이나 눌러 이어서 하세요 — <b>지금 하던 것도 담아 두고</b> 넘어갑니다.
                 · <b>이 PC(이 브라우저) 안에만</b> 담깁니다 — 다른 PC에서는 안 보입니다. 내보낼 것은 「💾 완성본 생성」으로 서류 보관함에 담으세요.
@@ -13172,6 +13182,7 @@ function rhWorkSet(on){
   document.body.classList.toggle('rh-work-on', !!on);
   if(on) rhWorkTop(); else document.documentElement.style.removeProperty('--rhTop');
   if(on) _rhJustBack=null;
+  else if(typeof rhDraftFloatClose==='function') rhDraftFloatClose();
   rhApplyFit();
 }
 /* 감춰 둔 「양식 올리기」를 기둥에서 대신 누른다 — 단추를 새로 만들지 않는다.
@@ -15359,10 +15370,51 @@ function rhDraftPanelClose(){
 function rhDraftShow(){
   var p=document.getElementById('rhDraftPanel'); if(!p) return;
   if(!rhDraftAll().length){ toast('아직 담아 둔 서류가 없습니다 — 「💾 작성 중 저장」을 누르면 여기에 쌓입니다', 4000); return; }
+  /* ★ 입력 화면에서는 «떠 있는 창»으로 연다 (대표 지적 2026-09-30 「작성중 서류보기 누르면 계속 위에 나와서
+     편집기능이 계속 아래로 내려간다」 → 목업 A 승인). 문서는 제자리에 둔다.
+     ⚠ 위에 펼치는 옛 길로 되돌리지 말 것 — 펼칠 때마다 문서가 목록 높이만큼 밀려 내려갔다. */
+  if(document.body.classList.contains('rh-work-on')){ rhDraftFloatOpen(); return; }
   p.classList.remove('hide');
   var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▴';
   rhDraftDraw();
   try{ p.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){ p.scrollIntoView(); }
+}
+var _rhFloatBound=false;
+function rhDraftFloatOpen(){
+  var p=document.getElementById('rhDraftPanel'); if(!p) return;
+  p.classList.add('rh-float'); p.classList.remove('hide');
+  var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▴';
+  rhDraftDraw();
+  /* 자리: 기둥 단추 옆, 아래에 붙인다 — 재서 잡는다(기둥 폭은 화면마다 다르다) */
+  var b=document.getElementById('rhDraftRailBtn'), W=window.innerWidth||1200, H=window.innerHeight||800;
+  var r=(b&&b.getBoundingClientRect)?b.getBoundingClientRect():null;
+  /* 폭이 먼저다 — 좁은 창에서 기둥 옆에만 고집하면 표가 짓눌린다. 모자라면 왼쪽으로 당겨 문서 위에 겹친다 */
+  var 폭=Math.min(760, W-24);
+  var left=r&&r.width?Math.round(r.right+10):24;
+  if(left+폭>W-12) left=Math.max(12, W-폭-12);
+  p.style.left=left+'px';
+  p.style.width=폭+'px';
+  p.style.bottom=(r&&r.height?Math.max(8, Math.round(H-r.bottom)):16)+'px';
+  p.style.top='auto';
+  if(!_rhFloatBound){
+    _rhFloatBound=true;
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') rhDraftFloatClose(); });
+    /* 바깥을 누르면 닫는다 — ⚠ 버리기 확인 쪽지(#kcDelPop)·되살리기 알림(#kcUndo)은 «바깥»이 아니다 */
+    document.addEventListener('mousedown', function(e){
+      var q=document.getElementById('rhDraftPanel');
+      if(!q || !q.classList.contains('rh-float')) return;
+      var t=e.target, 안=function(id){ var x=document.getElementById(id); return x && (x===t || x.contains(t)); };
+      if(안('rhDraftPanel') || 안('rhDraftRailBtn') || 안('kcDelPop') || 안('kcUndo')) return;
+      rhDraftFloatClose();
+    }, true);
+  }
+}
+function rhDraftFloatClose(){
+  var p=document.getElementById('rhDraftPanel'); if(!p || !p.classList.contains('rh-float')) return false;
+  p.classList.remove('rh-float'); p.classList.add('hide');
+  p.style.left=p.style.width=p.style.bottom=p.style.top='';
+  var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▾';
+  return true;
 }
 function rhDraftPanelToggle(){
   var p=document.getElementById('rhDraftPanel'); if(!p) return;
@@ -15487,6 +15539,7 @@ function rhDraftTrashSel(btn){
 
 /* ↩ 이어서 — 그 자리를 열고, 친 값·짝 지정도 되살린다 */
 async function rhDraftResume(id){
+  if(typeof rhDraftFloatClose==='function') rhDraftFloatClose();
   var d=rhDraftFind(id); if(!d){ toast('그 자리를 찾지 못했습니다'); rhDraftCheck(); return; }
   var f=await getFileAsync(id);
   /* ⚠ 파일이 없으면 «지우지 않는다» — 옛 코드는 여기서 딱지를 지워, 파일이 다른 기기에
