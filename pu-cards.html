@@ -3949,6 +3949,31 @@ function watchCardMap(ref, assign, settled, denied, seed, opts){
    ⚠ 옛 씨앗(ckpt 없음)은 그대로 읽힌다 — 그때는 예전처럼 통째로 받는다(한 번만). */
 const CARD_CACHE_KEY = 'items-v1';
 const CKPT_BACK_MS = 60*60*1000;        /* 시계 어긋남 여유 — 한 시간 */
+/* ══════ ⏱ 여는 길 — 로그인해서 목록이 설 때까지 «어느 단계가 몇 초»인가 (대표 2026-09-30 「로그인 할 경우 계속 느려지고 있다」) ══
+   10초 진단은 «멈춤»(긴 작업)을 잰다 — 그런데 대표 화면은 멈춤 0ms 였다. 느린 것은 «기다림»(자료가 오는 시간)이다.
+   그래서 단계마다 시각을 찍어 한 줄로 말한다: 페이지 · 로그인 확인 · 사본으로 먼저 그림 · 명함 다 옴 · 이알피 옴.
+   ⚠ 값은 이 창의 performance.now() 기준(페이지를 연 순간 0) · 저장하지 않는다 · 한 번만 찍는다.
+   ⚠ 최상위 let 은 쓰지 않는다 — 이 함수는 스크립트가 다 읽히기 «전»에도 불릴 수 있다(TDZ). */
+function bootMark(k, note){
+  try{
+    const m = window._puBootMarks || (window._puBootMarks = {});
+    if(m[k]) return;
+    m[k] = { t: performance.now(), note: note || '' };
+    if(k === 'auth') setTimeout(function(){ if(!m._done){ m._done = 1; bootReport(); } }, 30000);
+    if(m.items && m.erp && !m._done){ m._done = 1; bootReport(); }
+  }catch(_){}
+}
+function bootReport(){
+  try{
+    const m = window._puBootMarks || {};
+    const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+    const sec = v => (v / 1000).toFixed(1) + '초';
+    const at = k => m[k] ? sec(m[k].t) + (m[k].note ? '(' + m[k].note + ')' : '') : '안 옴';
+    console.log('⏱ 기업정보함 여는 길 — 페이지 ' + (nav ? sec(nav.domContentLoadedEventEnd) : '—')
+      + ' · 로그인 확인 ' + at('auth') + ' · 사본으로 먼저 그림 ' + at('seed')
+      + ' · 명함 다 옴 ' + at('items') + ' · 이알피 옴 ' + at('erp'));
+  }catch(_){}
+}
 function cardCacheGet(cb){
   let done=false; const fin=v=>{ if(!done){ done=true; cb(v); } };
   try{
@@ -4044,6 +4069,7 @@ const Store = {
           /* 명함이 도착한 **뒤에** 마지막 보던 화면으로 옮긴다(대표 지시 2026-08-10).
              먼저 옮기면 빈 화면이 잠깐 보이고, 자료함·보낸 메일은 아직 읽히지도 않았다. */
           if(!Store._itemsReady){
+            bootMark('items', _partial ? '바뀐 것만' : '통째로');
             Store._itemsReady=true; _cardSeedUsed=false; restoreLastScreen();
             if(!Store._idxDone){ setTimeout(backfillIdx, 3000); }
             /* 번호 열쇠 자리 첫 채우기 — 한 번만. 명함이 다 들어온 뒤라야 빠짐없이 찬다. */
@@ -4115,6 +4141,7 @@ const Store = {
       if (firebase.auth){
         firebase.auth().onAuthStateChanged(u=>{
           if (u && u.email){
+            bootMark('auth');
             myEmail=(u.email||'').toLowerCase(); myUid=u.uid||'';
             /* ⚠ loadSharedGKey() 를 뗐다(2026-08-17) — 로그인할 때마다 실시간DB 의
                열쇠를 브라우저로 내려받던 자리다. 이제 열쇠는 서버만 안다. */
@@ -4132,6 +4159,7 @@ const Store = {
             const goSub = (seed, ckpt)=>{
               if(_subKicked) return; _subKicked = true; clearTimeout(_subT);
               if(seed && !Store._itemsReady){
+                bootMark('seed');
                 _cardSeedUsed = true;
                 subscribe(seed, ckpt);
                 restoreLastScreen();       /* 씨앗이 곧 명함이다 — 마지막 화면을 바로 연다 */
@@ -4593,7 +4621,7 @@ const ErpMatch = {
         const n = ErpMatch._norm(co.name); if(n) nameN[n] = (nameN[n]||0) + 1; });
       ErpMatch.nameN = nameN;
       ErpMatch.byBiz=byBiz; ErpMatch.byName=byName; ErpMatch.byTaxEmail=byTaxEmail;
-      ErpMatch.companies=cos; ErpMatch.ready=true;
+      ErpMatch.companies=cos; ErpMatch.ready=true; bootMark('erp');
       if(typeof mbGuessBust==='function') mbGuessBust();   /* 이름표가 바뀌면 훑개도 새로 */
       coListBust();
       try{ render(); }catch(_){}
@@ -27252,7 +27280,8 @@ function coWatchStart(when){
       +' · 밀린 저장 '+s.pending+'건 · 거부된 저장 '+s.parked+'건');
     const lines = coWatchVerdict(s);
     lines.forEach(m=>console.log('   → '+m));
-    if(hot.length) console.log('   🐌 오래 걸린 곳(제 안에서 쓴 시간):', hot);
+    /* ⚠ 배열을 그대로 찍으면 콘솔이 「(5) [{…}]」로 접어 이름이 안 보인다(대표 콘솔 2026-09-30) — 글자로 편다 */
+    if(hot.length) console.log('   🐌 오래 걸린 곳(제 안에서 쓴 시간): ' + hot.map(h => h.name + ' ' + h.ms + 'ms' + (h.n > 1 ? '(' + h.n + '번)' : '')).join(' · ') + ' · 코드 합계 ' + (hot.jsMs || 0) + 'ms');
     if(q.busiest && q.busiest.length) console.log('   저장이 나간 곳:', q.busiest);
     if(q.worst && q.worst.length) console.log('   거부된 저장:', q.worst);
     coWatchShow(lines, 언제);
