@@ -154,7 +154,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=13">
+<link rel="stylesheet" href="css/pu-erp.css?v=14">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -65136,7 +65136,9 @@ function ProjectManagementShared(props){
             })
       )
     : h('div', { ref:_fill9.ref, style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'auto', maxHeight:(_fill9.max || 'calc(100vh - 240px)') } },
-      h('table', { className:'dt' },
+      /* ★ 한 줄 표 (대표 지시 2026-08-30 · 2026-09-30 컨설팅관리 적용) — 칸마다 줄바꿈을 막는다(.proj-1line).
+         관리번호·업체명·담당자·주담당이 두~네 줄로 접혀 줄마다 높이가 몇 배였다(계약금 칸만 텅 비어 넓었다). */
+      h('table', { className:'dt proj-1line' },
         h('thead', null, h('tr', null,
           colVis.no && h('th', { style:{ width:'30px' } }, '#'),
           h('th', { onClick:function(){toggleSort('no');}, style:{ cursor:'pointer', userSelect:'none' } }, '관리번호'+sortIcon('no')),
@@ -65212,7 +65214,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                                   fontSize:'10.5px', padding:'2px 7px', borderRadius:'10px',
                                   fontWeight:700, cursor:'pointer' } },
                           t ? t.name : '⚠️ 미설정')),
-                  colVis.company && h('td', null,
+                  colVis.company && h('td', { className:'proj-co', title:it.companyName || '' },
                     h('span', { onClick:function(){ setDetailModal(it); },
                       style:{ cursor:'pointer', color:'#1e40af', textDecoration:'underline', fontWeight:600 } }, it.companyName || '-')),
                   colVis.bizNo && h('td', { style:{ fontFamily:'monospace', fontSize:'11px' } }, it.bizNo || '-'),
@@ -65226,14 +65228,16 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                     var contacts = it.contacts || [];
                     var primary = contacts.find(function(c){return c.isPrimary;}) || contacts[0];
                     if(!primary || !primary.name) return h('span', { style:{ color:'#cbd5e1' } }, '-');
-                    return h('div', { style:{ fontSize:'11.5px', lineHeight:'1.4' } },
-                      h('div', { style:{ fontWeight:600 } }, primary.name),
-                      primary.phone && h('div', { style:{ color:'#64748b', fontFamily:'monospace', fontSize:'10.5px' } }, primary.phone)
+                    /* 이름·번호를 위아래로 쌓지 않고 한 줄에 나란히 (2026-09-30) */
+                    return h('div', { style:{ fontSize:'11.5px', display:'flex', alignItems:'baseline', gap:'6px', whiteSpace:'nowrap' },
+                        title: primary.name + (primary.phone ? ' · ' + primary.phone : '') },
+                      h('span', { style:{ fontWeight:600 } }, primary.name),
+                      primary.phone && h('span', { style:{ color:'#64748b', fontFamily:'monospace', fontSize:'10.5px' } }, primary.phone)
                     );
                   })()),
                   colVis.mgrMain && h('td', null, it.managerMain ? h('span', { style:{ background:'#eff6ff', color:'#1e40af', fontSize:'11px', padding:'2px 7px', borderRadius:'10px', fontWeight:600 } }, userName(it.managerMain)) : '-'),
                   colVis.mgrSubs && h('td', null, (it.managerSubs||[]).length > 0
-                    ? h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px' } },
+                    ? h('div', { style:{ display:'flex', flexWrap:'nowrap', gap:'4px' } },
                         it.managerSubs.map(function(sid){
                           return h('span', { key:sid, style:{ background:'#eff6ff', color:'#1e40af', fontSize:'10.5px', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } }, userName(sid));
                         }))

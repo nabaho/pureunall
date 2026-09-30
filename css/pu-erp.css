@@ -336,6 +336,12 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* ★★ 컨설팅·기금·기타 표도 «한 줄» (2026-09-30) — 칸마다 줄바꿈을 막는다.
+   표가 넓어지면 옆으로 밀어 본다(이미 overflow:auto). 업체명만 폭을 묶고 … + 말풍선.
+   ⚠ 표 전체 폭을 묶지 말 것 — 칸이 좁아지면 한글이 글자마다 끊겨 세로로 흐른다(업체관리에서 겪었다). */
+.dt.proj-1line th,
+.dt.proj-1line td { white-space: nowrap; }
+.dt.proj-1line td.proj-co { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 /* 담당자·연락처처럼 두 사람을 «나란히» 적는 칸 (2026-09-30) — 위아래로 쌓지 않는다.
    첫 사람은 끝까지 보이게 두고, 둘째가 넘치면 … 로 줄인다. 온값은 td 말풍선에. */
 .dt.co-table td.co-1line .co-pair {
