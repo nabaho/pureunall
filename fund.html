@@ -233,6 +233,11 @@
     border-radius:999px;transition:background .12s,color .12s}
   .seg:hover{background:rgba(255,255,255,.7);color:var(--ink)}
   .segbar .seg.on{background:#fff;color:var(--acc2);font-weight:700;box-shadow:0 1px 2px rgba(16,24,40,.06)}
+  /* 머리줄 폰 판 — PC 는 .hd-m 을 감추고, 폰은 .hd-pc 를 감춘다 */
+  .hd-m{display:none}
+  .hd-tools{display:contents}
+  .hsel{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 6px;font-size:12px;color:var(--ink);max-width:38vw}
+  .ibtn{padding:3px 8px;line-height:1.4}
   /* 도움말 ⓘ — 설명을 화면에 깔지 않고 눌러서 보게 한다 */
   .hbtn{font-size:11px;line-height:1.5;padding:1px 6px;border:1px solid var(--line);background:#fff;border-radius:999px;color:var(--faint);cursor:pointer;flex:none;vertical-align:middle}
   .hbtn:hover{background:var(--acc-soft);color:var(--acc2);border-color:#bfdbfe}
@@ -319,6 +324,26 @@
     table.fixcol th.mgc{width:54px!important}
     table.fixcol th.lcc{width:92px!important}
     table.fixcol td{word-break:keep-all}
+    /* ★ 머리줄 한 줄(대표 선택 2026-09-30 안 B) — 보기·분류는 고르는 상자, 검색은 🔍 를 눌러 펼친다.
+         「정보 채우기」 도구는 아래 줄로 내려가고, 검색칸은 펼쳤을 때만 한 줄을 차지한다. */
+    .hd-pc{display:none!important}
+    select.hd-m,button.hd-m{display:inline-block}
+    #homehead{padding:7px 8px!important}
+    #homehead .row{flex-wrap:wrap}
+    #homehead h1{font-size:14px!important;white-space:nowrap}
+    #homehead .stat{padding:2px 6px}
+    #homehead .row{gap:5px!important}
+    #homehead .hsel{min-width:0;padding:2px 15px 2px 7px;font-size:11.5px;-webkit-appearance:none;appearance:none;
+      background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748b' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 5px center}
+    #homehead .row>button{padding:3px 5px}
+    #homehead .hbtn{display:none}
+    #homehead .stat .hd-m{display:inline}
+    #homehead .hd-tools{display:flex;flex-wrap:wrap;gap:6px;order:9;flex:1 1 100%}
+    #homehead .hd-tools:empty{display:none}
+    #homehead .hd-tools>*{margin-right:0!important}
+    #homehead .hd-tools button{font-size:11.5px;padding:3px 8px}
+    #homehead .search.sq{display:none;order:8}
+    #homehead.qopen .search.sq{display:block;flex:1 1 100%!important;max-width:none!important;min-width:0!important}
     .chip{font-size:10px;padding:1px 6px}
     .stat{font-size:10.5px;padding:2px 8px}
     .tabbar{margin:8px 0 10px}
@@ -1701,6 +1726,19 @@ function homeViewBar(){
       return '<button class="seg'+(S.homeView===x[0]?' on':'')+'" onclick="homeView(\''+x[0]+'\')">'+x[1]+'</button>';
     }).join('')+'</div>';
 }
+function _hdTitle(t){   // 폰은 제목 앞 그림 글자를 뺀다 — 한 줄에 자리가 없다
+  var m=String(t).match(/^([^\w가-힣\s]+)\s+(.+)$/u);
+  return m?'<span class="hd-pc">'+esc(m[1])+' </span>'+esc(m[2]):esc(t);
+}
+function homeViewSel(){
+  return '<select class="hsel hd-m" aria-label="보기" onchange="homeView(this.value)">'+HOME_VIEWS.map(function(x){
+    return '<option value="'+x[0]+'"'+(S.homeView===x[0]?' selected':'')+'>'+x[1]+'</option>'; }).join('')+'</select>';
+}
+function homeSearchToggle(){
+  S.qOpen=!S.qOpen; if(!S.qOpen) S.q='';
+  renderHome();
+  if(S.qOpen){ var e=$('hq'); if(e) try{ e.focus(); }catch(err){} }
+}
 /* 목록 하나에 보기만 갈아끼운다 — 기본정보는 기존 표(하위 그룹 나누기 포함),
    서식 준비·결산은 같은 목록에 열만 바꿔 매트릭스로 */
 /* ══ 분류(지역) ══ 「지역」 칸 하나가 곧 분류다.
@@ -1857,7 +1895,7 @@ function renderHome(){
   var curInc=(S.homeTab==='inc')?0:_curList.filter(function(f){ return !isPast(f)&&!isSetup(f)&&nDone(f)<5; }).length;
   /* 분류(충남·경기…) 조각을 «머리줄에 넣기 전에» 만든다 — 종전에는 아래 본문에서 만들어
      상자가 하나 더 생겼고, 화면 위가 세 줄이 됐다. 한 줄로 모은다(대표 지시). */
-  var _rs=null, _rk=[], regBar='';
+  var _rs=null, _rk=[], regBar='', regSel='';
   if(S.homeTab==='지역공동' && S.homeView==='basic'){
     _rs={}; (G['지역공동']||[]).forEach(function(f){ var r=String(f.region||'').trim()||'(분류 없음)'; (_rs[r]=_rs[r]||[]).push(f); });
     _rk=Object.keys(_rs).sort(function(a,b){ return _rs[b].length-_rs[a].length||a.localeCompare(b,'ko'); });
@@ -1866,6 +1904,9 @@ function renderHome(){
       var _chip=function(k,lbl,n){ return '<button class="seg'+(S.homeReg===k?' on':'')+'" onclick="S.homeReg=\''+esc(k)+'\';renderHome()">'+esc(lbl)+' '+n+'</button>'; };
       regBar='<div class="segbar">'+_chip('','전체',(G['지역공동']||[]).length)
         +_rk.map(function(r){ return _chip(r,r,_rs[r].length); }).join('')+'</div>';
+      regSel='<select class="hsel hd-m" aria-label="분류" onchange="S.homeReg=this.value;renderHome()">'
+        +'<option value="">전체 '+(G['지역공동']||[]).length+'</option>'
+        +_rk.map(function(r){ return '<option value="'+esc(r)+'"'+(S.homeReg===r?' selected':'')+'>'+esc(r)+' '+_rs[r].length+'</option>'; }).join('')+'</select>';
     } else S.homeReg='';
   }
   /* 머리줄 한 줄 — 이름·개수 │ 보기 │ 분류 …… 도구.
@@ -1873,13 +1914,17 @@ function renderHome(){
   var _bar='<span style="width:1px;height:16px;background:var(--line);margin:0 2px"></span>';
   /* 한 줄에 많이 담으므로 좁아지면 «접히게» 둔다 — 안 그러면 화면 밖으로 넘친다(980px에서 확인).
      검색칸도 줄어들 수 있어야 한다(기본 .search 는 min-width 220px 이라 안 줄어든다). */
-  var head=offlineBanner()+'<div class="panel" id="homehead" style="padding:10px 14px"><div class="row" style="gap:8px;flex-wrap:wrap">'
-    +'<h1 style="font-size:17px;margin:0">'+esc(_GL[S.homeTab]||'기금 현황')+'</h1>'
-    +'<span class="stat">'+_curList.length+'</span>'
-    +(curInc?'<span class="stat" style="background:var(--warn-bg);color:var(--warn);border-color:transparent">미완비 '+curInc+'</span>':'')
-    +_bar+homeViewBar()
-    +(regBar?_bar+regBar:'')+hlp('home.view')
+  var _qo=(S.qOpen||S.q)?' qopen':'';
+  /* 폰(≤600px)은 «한 줄» — 보기·분류를 고르는 상자로, 검색은 🔍 를 눌러 펼친다(대표 선택 2026-09-30 안 B).
+     PC 는 그대로 두므로 두 벌을 그려 두고 CSS(.hd-pc/.hd-m)로 가른다. */
+  var head=offlineBanner()+'<div class="panel'+_qo+'" id="homehead" style="padding:10px 14px"><div class="row" style="gap:8px;flex-wrap:wrap">'
+    +'<h1 style="font-size:17px;margin:0">'+_hdTitle(_GL[S.homeTab]||'기금 현황')+'</h1>'
+    +'<span class="stat'+(regSel?' hd-pc':'')+'">'+_curList.length+'</span>'
+    +(curInc?'<span class="stat" style="background:var(--warn-bg);color:var(--warn);border-color:transparent"><span class="hd-pc">미완비 </span><span class="hd-m">⚠ </span>'+curInc+'</span>':'')
+    +'<span class="hd-pc" style="display:contents">'+_bar+homeViewBar()+(regBar?_bar+regBar:'')+'</span>'
+    +homeViewSel()+regSel+hlp('home.view')
     +'<span style="flex:1"></span>'
+    +'<span class="hd-tools">'
     +(edit?'<label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;margin-right:6px"><input type="checkbox"'+(S.homeInc?' checked':'')+' onchange="S.homeInc=this.checked;renderHome()"> 미완비만</label>':'')
     /* 셋(노동청·세무서·등기소)이 «같은 소재지»에서 나오므로 단추도 하나다 —
        종전에는 같은 42개 주소를 세 번 훑고 세 번 확인해야 했다. */
@@ -1888,8 +1933,11 @@ function renderHome(){
     +((edit||S.homeTab==='inc')?'<button onclick="bulkFromCards()" title="기업정보함(사업자등록증)에 있는 법인등록번호·고유번호·소재지를 미완비 기금의 빈 칸에 일괄 채움" style="margin-right:6px">🏢 기업정보함 일괄</button>':'')
     +(edit?'<button class="primary" onclick="importFundsInfo()" title="로컬 프로그램에서 뽑은 기금 기본정보 JSON을 한 번에 반영(빈 칸만 채움)" style="margin-right:6px">📥 기금정보 가져오기</button>':'')
     +(edit?'<button onclick="importSubsidy()" title="과거 폴더에서 뽑은 지원금 신청·결정액·출연금·제출서류 JSON을 한 번에 반영(빈 칸만 채움)" style="margin-right:6px">🎁 지원금 자료 가져오기</button>':'')
-    +'<button class="'+(edit?'primary':'')+'" onclick="S.homeEdit=!S.homeEdit;renderHome()" title="핵심 기본정보(인가번호·설립일 등) 직접 입력">'+(edit?'✓ 입력 종료':'✏️ 정보 채우기')+'</button>'
-    +'<input class="search" style="min-width:150px;max-width:260px;flex:1 1 150px" placeholder="기금명·담당 검색" value="'+esc(S.q||'')+'" oninput="S.q=this.value;renderHome()"></div>'
+    +'</span>'
+    +'<button class="hd-m ibtn" onclick="homeSearchToggle()" title="검색" aria-label="검색">🔍</button>'
+    +'<button class="'+(edit?'primary':'')+'" onclick="S.homeEdit=!S.homeEdit;renderHome()" title="핵심 기본정보(인가번호·설립일 등) 직접 입력" aria-label="'+(edit?'입력 종료':'정보 채우기')+'">'
+      +(edit?'✓<span class="hd-pc"> 입력 종료</span>':'✏️<span class="hd-pc"> 정보 채우기</span>')+'</button>'
+    +'<input class="search sq" id="hq" style="min-width:150px;max-width:260px;flex:1 1 150px" placeholder="기금명·담당 검색" value="'+esc(S.q||'')+'" oninput="S.q=this.value;renderHome()"></div>'
     +(edit?'<p class="muted" style="font-size:11.5px;margin:6px 0 0">칸에 입력하면 자동 저장 · 빨간 테두리=빈 칸 '+hlp('home.fill')+'</p>':'')
     +'</div>';
   // 검색 중이면 묶음 무시하고 결과만(종료기금 포함)
