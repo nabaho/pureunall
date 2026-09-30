@@ -3165,10 +3165,19 @@ body.pc #pcDetail{display:flex}
 .wkbill .b .r .sp{flex:1}
 .wkbill .b .r .dim{font-size:12px;color:#94a3b8}
 .wkbill .b .f{display:flex;gap:6px;padding:9px 13px;border-top:1px solid #e2e8f0}
-.wktbl{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;
+/* ── 머리줄 «틀고정» (대표 지시 2026-09-30 「틀고정」) ──
+   ⚠ 표에 overflow:hidden 을 두지 «않는다» — 그것이 있으면 표 자신이 스크롤 틀이 되어
+     머리줄이 #pcWk 에 못 붙는다(기업 상세·명함 표는 이미 붙어 있고 근로자 표만 빠져 있었다).
+     둥근 모서리는 머리 칸 양 끝에 준다. */
+.wktbl{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border-radius:12px;
   table-layout:fixed;font-size:13px}
 .wktbl th{background:#f8fafc;color:#64748b;font-weight:600;text-align:left;padding:9px 10px;
-  border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  position:sticky;top:0;z-index:2}
+/* #pcWk 는 위 여백이 14px 이다 — top:0 이면 그 틈으로 줄이 비친다. 맨 위 끝에 붙인다 */
+#pcWk .wktbl th{top:-14px}
+.wktbl thead th:first-child{border-top-left-radius:12px}
+.wktbl thead th:last-child{border-top-right-radius:12px}
 .wktbl td{padding:9px 10px;border-bottom:1px solid #f8fafc;color:#475569;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wktbl tbody tr:hover{background:#f8fafc}
