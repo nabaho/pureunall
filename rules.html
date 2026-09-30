@@ -23,6 +23,7 @@
 <script src="js/pu-rules-lawlink.js?v=1"></script>
 <script src="js/pu-rules-lawwatch.js?v=1"></script>
 <script src="js/pu-hwp-keep.js?v=1"></script>
+<script src="js/pu-kordoc-text.js?v=1"></script>
 <script src="js/pu-rules-casebook.js?v=13"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pako.min.js"></script>
@@ -2257,9 +2258,24 @@ function stripCommentary(text){
 }
 let CMT_CUT=0;   // 마지막으로 읽은 원본에서 뗀 해설 칸 수
 const CMT_BY={};  // 원본(key)마다 뗀 해설 칸 수 — 미리보기 머리에 알린다(말없이 떼지 않는다)
-const cmtTag=key=>CMT_BY[key]?" · 해설 칸(작성시 착안사항) "+CMT_BY[key]+"곳 떼고 읽음":"";
-/* 규정관리가 원본을 글로 읽는 길은 모두 여기를 지난다 — 해설판이면 해설 칸을 뗀다 */
-async function readRulesText(buf){ const r=stripCommentary(await extractDocText(buf)); CMT_CUT=r.cut; return r.text; }
+const cmtTag=key=>(READ_VIA[key]==="kordoc"?" · kordoc 로 읽음":"")
+  +(CMT_BY[key]?" · 해설 칸(작성시 착안사항) "+CMT_BY[key]+"곳 떼고 읽음":"");
+const READ_VIA={};  // 원본(key)마다 어느 읽개로 읽었나 — 'kordoc' | '기존'
+let READ_LAST="";
+/* 규정관리가 원본을 글로 읽는 길은 모두 여기를 지난다 (2026-09-30 kordoc)
+   ① 한글·워드는 kordoc 가 먼저 읽는다 — 표를 칸 그대로 받아, 해설판이면 조문 칸만 쓴다.
+   ② kordoc 가 못 읽으면(PDF·RTF·ODT·엔진 실패) 예전 읽개(extractDocText)로 돌아간다.
+   ③ 어느 쪽이든 끝에 stripCommentary 를 한 번 더 지난다 — kordoc 가 표로 못 잡은 해설 줄의 그물. */
+async function readRulesText(buf){
+  let text=null, cut=0;
+  if(window.PuKordocText&&PuKordocText.canRead(buf)){
+    try{ const k=await PuKordocText.read(buf); if(k){ text=k.text; cut=k.commentaryCells; } }
+    catch(e){ console.warn("kordoc 읽기 실패 — 예전 읽개로:",e); }
+  }
+  READ_LAST=text==null?"기존":"kordoc";
+  if(text==null) text=await extractDocText(buf);
+  const r=stripCommentary(text); CMT_CUT=cut+r.cut; return r.text;
+}
 /* ── 취업규칙 본문에서 사업장(회사)명 자동 인식 ──
    ① "이/본 규칙은 ○○○(이하 "회사"라 한다)"  ② 표제 "○○○ 취업규칙"  ③ 법인 접미사 토큰 */
 const CORP_SUFFIX="(?:주식회사|㈜|\\(주\\)|유한회사|유한책임회사|합자회사|합명회사|재단법인|사단법인|의료법인|학교법인|사회복지법인|영농조합법인|협동조합|사회적협동조합)";
@@ -2388,7 +2404,7 @@ async function loadFile(file){
       LJ_LEFT=셈.물음;
     }catch(e){ console.warn("줄 정리 건너뜀:",e); }
     const site=detectSiteName(text);   // 본문에서 사업장명 인식
-    SAMPLES[key]=text; CMT_BY[key]=CMT_CUT; SITE_MAP[key]=(site?"🏢 "+site:"📄 "+name); SITE_BIZNO[key]="";
+    SAMPLES[key]=text; CMT_BY[key]=CMT_CUT; READ_VIA[key]=READ_LAST; SITE_MAP[key]=(site?"🏢 "+site:"📄 "+name); SITE_BIZNO[key]="";
     SITE_FILE[key]=name; SITE_NAME[key]=site;
     if(pdf){ PDF_URLS[key]=URL.createObjectURL(new Blob([buf],{type:"application/pdf"})); }
     else if(buf) HWP_BUFS[key]=buf;
