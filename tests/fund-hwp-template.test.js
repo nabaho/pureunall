@@ -149,7 +149,7 @@ test('위원은 «사람 차례대로» 한 칸씩 — 별지 제7호와 같은 
   assert.equal(V.이사수, '3', '양쪽 수가 같을 때만 「각 N 명」');
   const V2 = API.values(F, SITES.slice(0, 1));
   assert.equal(V2.이사수, '2');
-  const V3 = API.values(Object.assign({}, F, { officers: [] }), SITES.map((s, i) => i ? Object.assign({}, s, { urep_same: false }) : s));
+  const V3 = API.values(Object.assign({}, F, { officers: [] }), SITES.map((s, i) => i ? Object.assign({}, s, { urep_same: false, ceo: '' }) : s));
   assert.equal(V3.이사수, '', '양쪽 수가 다르면 「각 N 명」을 적지 않는다(HTML 회의록과 같다)');
 });
 

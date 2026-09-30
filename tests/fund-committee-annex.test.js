@@ -107,7 +107,7 @@ test('★★ ①-2 사업장에 적은 사용자대표·근로자대표가 그�
   const b = 상자();
   const u = b.prep({}, '사용자측', 사업장들).map((o) => o.name);
   const w = b.prep({}, '근로자측', 사업장들).map((o) => o.name);
-  assert.deepEqual(u, ['사용자가', '김철수'],
+  assert.deepEqual(u, ['사용자가', '김철수', '이영희'],
     '★ 사업장 대표가 서식에 안 들어갑니다 — 명부에 또 옮겨 적어야 합니다.');
   assert.deepEqual(w, ['근로자가', '근로자나']);
   /* 「대표자와 같음」을 켜 둔 곳은 대표자 이름이 들어간다 */
@@ -125,7 +125,7 @@ test('★★ ①-3 안 적은 곳·나간 곳은 «세지 않는다» — 빈 �
      빈 사람을 내놓으면, 이것을 따로 쓰는 다음 자리에서 빈 줄이 생긴다. */
   assert.ok(!b.fromSites(사업장들, '사용자측').some((o) => !o.name),
     '★ 이름 없는 사람을 내놓습니다.');
-  assert.equal(b.fromSites(사업장들, '사용자측').length, 2);
+  assert.equal(b.fromSites(사업장들, '사용자측').length, 3);
   assert.equal(b.fromSites(사업장들, '근로자측').length, 2);
 });
 
@@ -144,7 +144,7 @@ test('★★ ①-4 명부와 사업장에 «다 있는» 사람은 한 번만 �
 test('★★ ①-5 별지에 «어느 사업장 사람»인지 적는다 — 예순 명이면 소속 없이는 못 가린다', () => {
   const ax = 상자().annex({ name: 'x' }, 사업장들);
   assert.ok(ax.indexOf('가나산업') >= 0 && ax.indexOf('다라전자') >= 0, '★ 소속이 빠졌습니다.');
-  assert.match(ax, /근로자측 2명 · 사용자측 2명/, '★ 명수가 틀립니다.');
+  assert.match(ax, /근로자측 2명 · 사용자측 3명/, '★ 명수가 틀립니다.');
 });
 
 test('★★ ①-6 서식을 채우는 자리가 «모두» 사업장을 함께 본다 — 한 곳만 빠져도 그 서식만 비뚤어진다', () => {
@@ -294,4 +294,11 @@ test('★★ ⑪ 「이사 선임 : 각 ○ 명」이 진짜 명수로 찍힌다
   /* 세는 자리가 _prepCommittee 를 쓰는지 — 참여사업장까지 함께 세야 한다 */
   const fill = 코드만(SRC.slice(SRC.indexOf('var nSide=function(side)'), SRC.indexOf('var nSide=function(side)') + 260));
   assert.match(fill, /_prepCommittee\(f,side,sites\)\.length/, '★ 다른 곳에서 따로 셉니다.');
+});
+
+test('★★ ①-7 사용자대표를 안 적은 사업장은 회사 대표자(공동대표면 첫 사람)가 사용자측 위원 — 근로자측은 지어내지 않는다', () => {
+  const b = 상자();
+  const ss = [{ name: '가', ceo: '이계옥,김영진' }, { name: '나', ceo: '박대표', urep_name: '박상무' }, { name: '다', ceo: '' }];
+  assert.deepEqual(b.fromSites(ss, '사용자측').map((o) => o.name), ['이계옥', '박상무']);
+  assert.equal(b.fromSites(ss, '근로자측').length, 0);
 });
