@@ -155,7 +155,10 @@ function 복귀세상(성공) {
       : Promise.reject(Object.assign(new Error('연결되지 않은 카카오 계정입니다'), { needLink: true }))),
   };
   w.ctx.PuKakao = w.ctx.window.PuKakao;
-  w.ctx.auth.signInWithCustomToken = () => Promise.resolve({ user: { email: '', getIdToken: () => Promise.resolve('t') } });
+  w.ctx.firebase = { auth: { Auth: { Persistence: { LOCAL: 'local', SESSION: 'session' } } } };
+  w.ctx.유지 = [];   // setPersistence 가 무엇으로 불렸나 · signIn 보다 먼저인가
+  w.ctx.auth.setPersistence = (m) => { w.ctx.유지.push(m); return Promise.resolve(); };
+  w.ctx.auth.signInWithCustomToken = () => { w.ctx.유지.push('signIn'); return Promise.resolve({ user: { email: '', getIdToken: () => Promise.resolve('t') } }); };
   w.ctx.reportLogin = () => {};
   w.ctx._freshLogin = false;
   w.ctx.window.__kkReturning = true;   // 카카오에서 막 돌아온 참(첫 줄이 세운 표시)
@@ -293,8 +296,10 @@ function 단추세상(opt) {
   const w = 세상(opt);
   const 부탁 = [];
   w.ctx._persistenceReady = Promise.resolve();
-  w.ctx.firebase = { auth: { Auth: { Persistence: { LOCAL: 'local' } } } };
-  w.ctx.auth.setPersistence = () => Promise.resolve();
+  w.ctx.firebase = { auth: { Auth: { Persistence: { LOCAL: 'local', SESSION: 'session' } } } };
+  w.ctx.유지 = [];
+  w.ctx.auth.setPersistence = (m) => { w.ctx.유지.push(m); return Promise.resolve(); };
+  w.els.autoLogin = 요소('autoLogin'); w.els.autoLogin.checked = !!opt.유지켬;
   w.ctx.window.PuKakao = { goLogin: (o) => { 부탁.push(o || {}); return Promise.resolve(); } };
   w.ctx.PuKakao = w.ctx.window.PuKakao;
   w.els.kkLoginBtn = 요소('kkLoginBtn');
@@ -388,3 +393,49 @@ test('⑩ ★★★ 로그인 화면이 뜰 때 카카오 로그아웃으로 «�
 test('⑩ ★ 로그아웃 «단추»는 여전히 카카오까지 끊는다 — 사람이 스스로 나가는 길이다', () => {
   assert.match(함수몸(화면, 'kkLogoutFlow'), /PuKakao.logoutUrl()/);
 });
+
+/* ── ⑪ 「이 기기에서 로그인 유지」 — 카카오·비밀번호 한 칸 (대표 「추천대로」 2026-09-29, 목업 가안) ──
+   전에는 카카오로 들어오면 «늘» 유지였고, 비밀번호의 「자동 로그인」 은 접힌 칸 안에 숨어 있었다.
+   공용 PC 에서 로그아웃을 잊으면 다음 사람이 그대로 들어갔다. */
+test('⑪ ★★ 처음 쓰는 PC 는 꺼짐 · 처음 쓰는 폰은 켬 · 고른 적이 있으면 그대로', () => {
+  const w = 세상({});
+  싣기(w, ['keepDefault']);
+  const PC = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140';
+  const 폰 = 'Mozilla/5.0 (Linux; Android 14; SM-S921N) Mobile Chrome/140';
+  const 아이폰 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148';
+  assert.equal(w.ctx.keepDefault(null, PC), false, '★★ 처음 쓰는 PC 가 로그인 유지로 시작합니다 — 공용 PC 에 남습니다');
+  assert.equal(w.ctx.keepDefault(null, 폰), true, '처음 쓰는 폰이 꺼진 채 시작합니다 — 앱을 닫을 때마다 풀립니다');
+  assert.equal(w.ctx.keepDefault(null, 아이폰), true);
+  assert.equal(w.ctx.keepDefault('1', PC), true, '★ 켜 둔 것을 기억하지 않습니다');
+  assert.equal(w.ctx.keepDefault('0', 폰), false, '★ 끈 것을 기억하지 않습니다');
+});
+
+test('⑪ ★★ 카카오 로그인도 이 칸을 따른다 — 끄면 창을 닫을 때 풀린다(SESSION)', async () => {
+  const 끔 = 단추세상({ 저장: { pu_kakao_used: '1' } });
+  끔.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
+  assert.equal(끔.w.ctx.localStorage._m.pu_portal_auto, '0', '떠나기 전에 고른 것을 안 남깁니다 — 돌아와서 모릅니다');
+  assert.equal(끔.w.ctx.유지[0], 'session');
+  const 켬 = 단추세상({ 저장: { pu_kakao_used: '1' }, 유지켬: true });
+  켬.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
+  assert.equal(켬.w.ctx.localStorage._m.pu_portal_auto, '1');
+  assert.equal(켬.w.ctx.유지[0], 'local');
+});
+
+test('⑪ ★★ 카카오에서 돌아와 표를 받기 «직전» 에 고른 유지 방식을 정한다', async () => {
+  for (const [저장값, 기대] of [['0', 'session'], ['1', 'local'], [undefined, 'session']]) {
+    const w = 복귀세상(true);
+    if (저장값 === undefined) delete w.ctx.localStorage._m.pu_portal_auto; else w.ctx.localStorage._m.pu_portal_auto = 저장값;
+    w.ctx.kkHandleReturn();
+    for (let i = 0; i < 5; i++) await 틈();
+    assert.deepEqual([...w.ctx.유지].slice(0, 2), [기대, 'signIn'],
+      '★★ 「로그인 유지」 가 ' + (저장값 || '없음') + ' 인데 ' + JSON.stringify(w.ctx.유지) + ' — 새 페이지는 기본이 «유지» 라, 표 받기 전에 안 정하면 끈 것이 안 먹습니다');
+  }
+});
+
+test('⑪ ★ 칸은 노란 단추 바로 밑, 접히는 칸 «밖» 에 하나만 있다', () => {
+  const 폼 = 화면.slice(화면.indexOf('id="loginForm"'), 화면.indexOf('</form>', 화면.indexOf('id="loginForm"')));
+  const 카카오 = 폼.indexOf('id="kkLoginBtn"'), 칸 = 폼.indexOf('id="autoLogin"'), 접힘 = 폼.indexOf('id="pwFold"');
+  assert.ok(카카오 >= 0 && 칸 > 카카오 && 칸 < 접힘, '★ 「로그인 유지」 가 접힌 칸 안에 숨었습니다 — 카카오로 들어오는 사람은 못 봅니다');
+  assert.equal((폼.match(/id="autoLogin"/g) || []).length, 1, '칸이 둘이면 서로 어긋납니다');
+});
+
