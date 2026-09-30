@@ -2515,6 +2515,16 @@ td.selcell{cursor:cell}
 .ntstbl td.dt.soon{color:#854d0e}.ntstbl td.dt.none{color:#991b1b}
 .ntstbl td.why{color:#64748b;font-size:12px}
 .ntstbl td.act{text-align:right;overflow:visible}
+/* 🔖 내 탭 관리 표 (2026-09-30) — 폭은 머리칸 style 이 정한다 */
+.ntstbl.vmtbl th:nth-child(n){width:auto}
+.vmsc{font-size:11px;font-weight:700;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:8px;padding:1px 7px}
+.vmtw{font-size:11px;font-weight:800;color:#854d0e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:1px 6px;margin-left:6px}
+.ntstbl td.vmn{text-align:right;font-variant-numeric:tabular-nums}
+.ntstbl td.vmn.zero{color:#d97706;font-weight:800}
+.vmact{display:inline-flex;gap:4px}
+.vmact button{font-size:12px;border:1px solid #e2e8f0;border-radius:6px;padding:1px 7px;color:#64748b;background:#ffffff;cursor:pointer;font-family:inherit}
+.vmact button.del{color:#991b1b;border-color:#fecaca}
+.ntsseg.vmwarn{border-color:#fde68a;background:#fffbeb;color:#854d0e}
 /* 🔗 이알피 이름 대조 표 — 폭은 머리칸의 style 이 정한다(폐업 표의 칸 폭을 안 물려받게) */
 .ntstbl.erpname th:nth-child(n){width:auto}
 .ntstbl.erpname td.miss{color:#d97706;font-weight:700}
@@ -25462,52 +25472,144 @@ function deleteView(id){
   Store.delView(id); toast(`'${v.name}' 탭을 삭제했습니다`);
   if($('dedupBg').classList.contains('open')) setTimeout(function(){_refresh(openViewManager)}, 80);   /* 관리창 열려 있으면 갱신 */
 }
-/* 환경설정 → 내 탭 전체 관리 (한 곳에서 삭제·이름변경) */
+/* 환경설정 → 내 탭 관리 (대표 지시 2026-09-30 「너무 정리가 안되어 있다 … 탭관련 한눈에 보기 쉽게」 → 목업 → 「진행」)
+   ■ 무엇이 나빴나: 탭 이름이 안 보였다(밝은 바탕에 굵은 글씨 색) · 한 탭이 두 줄 · 큰 단추 둘 · 28개가 한 줄로 길게 ·
+     몇 장이 걸리는지, 겹치는 탭이 있는지 알 길이 없었다.
+   ★ «무엇으로 거르는 탭인가»로 묶고, 한 탭 = 한 줄(이름 · 대상 · 조건 · 명함 수 · ↑↓ 이름 삭제).
+   ★ 0장인 탭 · 조건이 같은 탭은 주황으로 알린다.
+   ⚠ 명함 수는 «나중에» 하나씩 센다(vmCountRun) — 28개를 한꺼번에 세면 여는 순간 화면이 멈춘다.
+     세는 기준은 목록과 같은 countMatching 이다(따로 세면 보이는 수와 눌러서 나오는 수가 달라진다). */
+let _vmCounts = {};      /* id → 명함 수. 셀 때마다 새로 */
+let _vmCounting = false;
+let _vmCountedAt = 0;   /* 1분 지나면 다시 센다 — 그 사이 명함이 늘었을 수 있다 */
+let _vmSeg = 'all';
+const VM_GROUPS = [['erp', '이알피 갈래'], ['match', '회사·이름으로 거르기'], ['manual', '직접 담는 탭'], ['etc', '그 밖']];
+function vmGroupOf(v){
+  const f = (v && v.f) || {}, c = f.colFilter || {};
+  if(v && v.manual) return 'manual';
+  if(f.erpFilter) return 'erp';
+  if(c.company || c.name || f.q) return 'match';
+  return 'etc';
+}
+function vmDesc(f){
+  f=f||{}; const c=f.colFilter||{}; const out=[];
+  if(f.q) out.push(`검색 「${f.q}」`);
+  if(f.owner&&f.owner!=='all') out.push('담당 '+f.owner);
+  if(f.region) out.push('지역 '+f.region);
+  if(f.erpFilter) out.push('이알피 '+(ERP_FILTER_LABEL[f.erpFilter]||f.erpFilter));
+  if(f.erpMgr) out.push('담당 '+f.erpMgr);
+  if(c.company) out.push(`회사에 「${c.company}」`);
+  if(c.name) out.push(`이름에 「${c.name}」`);
+  if(c.phone) out.push(`전화에 「${c.phone}」`);
+  if(c.email) out.push(`이메일에 「${c.email}」`);
+  if(f.onlyPhone) out.push('전화있음');
+  if(f.onlyEmail) out.push('이메일있음');
+  if(f.onlyIncomplete) out.push('정보부족만');
+  if(f.onlyPrivate) out.push('개인만');
+  if(f.onlyDup) out.push('중복만');
+  return out.length ? out.join(' · ') : '조건 없음';
+}
+/* 같은 대상·같은 조건의 탭끼리 — 담는 탭은 저마다 다른 칸이라 빼고 본다 */
+function vmTwins(vs){
+  const by = {};
+  vs.forEach(v => { if(v.manual) return;
+    const k = (v.kind||'card') + '|' + (v.scope||'all') + '|' + viewSig(v.f);
+    (by[k] = by[k] || []).push(v); });
+  const out = {};
+  Object.keys(by).forEach(k => { if(by[k].length > 1) by[k].forEach(v => {
+    out[v.id] = by[k].filter(x => x.id !== v.id).map(x => x.name); }); });
+  return out;
+}
+function vmSorted(){
+  return Object.values(state.views||{}).filter(v=>v&&v.id)
+    .sort((a,b)=>((a.kind||'card')===(b.kind||'card') ? (a.order||0)-(b.order||0) : ((a.kind||'card')==='card'?-1:1)));
+}
+function vmScopeName(v){
+  const sc=(v.scope||'all');
+  return sc==='all' ? ((v.kind||'card')==='biz'?'전체 사업자':'전체 명함')
+       : (sc==='' ? '미분류' : ((state.groups[sc]||{}).name || '(삭제된 폴더)'));
+}
+/* 한 탭의 명함 수 — 목록과 같은 잣대(countMatching). 사업자 탭은 잠깐 갈래를 바꿔 센다 */
+function vmCountOne(v){
+  const t = state.tab;
+  try{ state.tab = v.kind || 'card'; return countMatching(v.f); }
+  catch(_){ return null; }
+  finally{ state.tab = t; }
+}
+function vmCountRun(){
+  if(_vmCounting) return;
+  _vmCounting = true; _vmCounts = {};
+  const q = vmSorted();
+  (function step(){
+    const v = q.shift();
+    if(!v){ _vmCounting = false; _vmCountedAt = Date.now(); vmRepaint(); return; }
+    _vmCounts[v.id] = vmCountOne(v);
+    setTimeout(step, 0);                   /* 하나씩 — 화면을 멈추지 않는다 */
+  })();
+}
+/* 환경설정 안(인라인)이면 그 자리에, 팝업이면 팝업에 다시 그린다 */
+function vmRepaint(){
+  if(state.view==='settings' && state.setSub==='views') renderSettingsPage();
+  else if($('dedupBg') && $('dedupBg').classList.contains('open')) openViewManager();
+}
+function vmSegSet(k){ _vmSeg = k; vmRepaint(); }
+/* ↑↓ — 같은 갈래(명함·사업자) 안에서 이웃과 차례를 맞바꾼다 */
+function vmMove(id, dir){
+  const v = (state.views||{})[id]; if(!v) return;
+  const same = vmSorted().filter(x => (x.kind||'card') === (v.kind||'card'));
+  const i = same.findIndex(x => x.id === id), j = i + (dir < 0 ? -1 : 1);
+  if(i < 0 || j < 0 || j >= same.length) return;
+  const a = same[i], b = same[j];
+  let oa = a.order || 0, ob = b.order || 0;
+  if(oa === ob){ ob = oa + (dir < 0 ? -1 : 1); }
+  Store.putView(Object.assign({}, a, { order: ob })); state.views[a.id] = Object.assign({}, a, { order: ob });
+  Store.putView(Object.assign({}, b, { order: oa })); state.views[b.id] = Object.assign({}, b, { order: oa });
+  vmRepaint();
+}
+function vmRename(id){ renameView(id); setTimeout(vmRepaint, 80); }
+function vmDelete(id){ deleteView(id); setTimeout(vmRepaint, 80); }
 function openViewManager(){
-  const vs=Object.values(state.views||{}).filter(v=>v&&v.id)
-            .sort((a,b)=>((a.kind||'card')===(b.kind||'card') ? (a.order||0)-(b.order||0) : ((a.kind||'card')==='card'?-1:1)));
+  const vs = vmSorted();
   if(!vs.length){
     if(_panelTarget==='inline') return showPanel(`<div style="padding:22px;text-align:center;color:var(--sub);font-size:13px;line-height:1.8">
       아직 만들어 둔 탭이 없습니다.<br>목록 화면에서 조건을 걸고 <b>[＋ 탭 추가]</b>를 누르면 여기서 관리할 수 있어요.</div>`);
     $('dedupBg').classList.remove('open');
     return toast('만들어 둔 탭이 없습니다 — 목록 화면에서 [＋ 탭 추가]로 만드세요',5000); }
-  const desc = f => {
-    f=f||{}; const c=f.colFilter||{}; const out=[];
-    if(f.q) out.push(`검색 "${f.q}"`);
-    if(f.group&&f.group!=='all') out.push('폴더 '+((state.groups[f.group]||{}).name||'(삭제된 폴더)'));
-    if(f.owner&&f.owner!=='all') out.push('담당 '+f.owner);
-    if(f.region) out.push('지역 '+f.region);
-    if(f.erpFilter) out.push('ERP '+(ERP_FILTER_LABEL[f.erpFilter]||f.erpFilter));
-    if(f.erpMgr) out.push('담당 '+f.erpMgr);
-    if(c.company) out.push(`회사에 "${c.company}"`);
-    if(c.name) out.push(`이름에 "${c.name}"`);
-    if(c.phone) out.push(`전화에 "${c.phone}"`);
-    if(c.email) out.push(`이메일에 "${c.email}"`);
-    if(f.onlyPhone) out.push('전화있음');
-    if(f.onlyEmail) out.push('이메일있음');
-    if(f.onlyIncomplete) out.push('정보부족만');
-    if(f.onlyPrivate) out.push('개인만');
-    if(f.onlyDup) out.push('중복만');
-    return out.length ? out.join(' · ') : '조건 없음 (전체 보기)';
+  const counted = !_vmCounting && vs.every(v => v.id in _vmCounts) && Date.now() - _vmCountedAt < 60000;
+  if(!counted && !_vmCounting) setTimeout(vmCountRun, 0);
+  const twins = vmTwins(vs);
+  const zero = vs.filter(v => _vmCounts[v.id] === 0);
+  const nCard = vs.filter(v => (v.kind||'card') === 'card').length;
+  const seg = ['all','card','biz','zero','twin'].indexOf(_vmSeg) >= 0 ? _vmSeg : 'all';
+  const pick = v => seg === 'all' ? true : seg === 'card' ? (v.kind||'card') === 'card' : seg === 'biz' ? v.kind === 'biz'
+                  : seg === 'zero' ? _vmCounts[v.id] === 0 : !!twins[v.id];
+  const segBtn = (k, label, n, warn) => `<button class="ntsseg${seg===k?' on':''}${warn && n ? ' vmwarn' : ''}" onclick="vmSegSet('${k}')">${label}<b>${n}</b></button>`;
+  const row = v => {
+    const n = _vmCounts[v.id];
+    const tw = twins[v.id] ? `<span class="vmtw" title="대상·조건이 같은 탭: ${esc(twins[v.id].join(', '))}">조건 같음: ${esc(twins[v.id][0])}</span>` : '';
+    return `<tr>
+      <td class="nm" title="${esc(v.name)}">${esc(v.name)}</td>
+      <td><span class="vmsc">📁 ${esc(vmScopeName(v))}</span></td>
+      <td class="why" title="${esc(v.manual ? '직접 골라 담은 명함' : vmDesc(v.f))}">${esc(v.manual ? '직접 골라 담은 명함' : vmDesc(v.f))}${tw}</td>
+      <td class="vmn${n === 0 ? ' zero' : ''}">${n == null ? '…' : n.toLocaleString()}</td>
+      <td class="act"><span class="vmact">
+        <button onclick="vmMove('${v.id}',-1)" title="위로">↑</button><button onclick="vmMove('${v.id}',1)" title="아래로">↓</button>
+        <button onclick="vmRename('${v.id}')">이름</button><button class="del" onclick="vmDelete('${v.id}')">삭제</button></span></td></tr>`;
   };
-  let h=`<div class="mhead"><b>🔖 내 탭 관리 — ${vs.length}개</b>
-    ${_closeBtn()}</div>
-    <p style="font-size:12.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
-    탭은 <b>보기 조건</b>일 뿐이라, 삭제해도 <b>명함은 그대로</b>입니다. 전 직원이 함께 쓰는 탭이에요.</p>`;
-  vs.forEach(v=>{
-    const sc=(v.scope||'all');
-    const scName = sc==='all' ? ((v.kind||'card')==='biz'?'전체 사업자등록증':'전체 명함')
-                 : (sc==='' ? '미분류' : ((state.groups[sc]||{}).name || '(삭제된 폴더)'));
-    h+=`<div class="ditem" style="align-items:center"><div class="v">
-      <b>🔖 ${esc(v.name)}</b> <span style="font-size:11px;color:var(--sub)">${(v.kind||'card')==='biz'?'사업자':'명함'}</span>
-      <span style="font-size:11px;color:#1e40af;background:#f8fafc;border:1px solid #bfdbfe;border-radius:8px;padding:1px 7px;margin-left:4px">📁 ${esc(scName)}</span><br>
-      <span style="font-size:12px;color:var(--sub)">${esc(desc(v.f))}</span></div>
-      <div style="display:flex;gap:6px;flex:none;margin-left:8px">
-        <button class="btn ghost" style="padding:7px 12px" onclick="renameView('${v.id}');setTimeout(function(){_refresh(openViewManager)},80)">이름</button>
-        <button class="btn ghost" style="padding:7px 12px;color:#dc2626" onclick="deleteView('${v.id}')">삭제</button>
-      </div></div>`;
-  });
-  showPanel(h);
+  const shown = vs.filter(pick);
+  const body = VM_GROUPS.map(([g, label]) => {
+    const rows = shown.filter(v => vmGroupOf(v) === g);
+    if(!rows.length) return '';
+    return `<div class="setg" style="margin-top:12px">${label} · ${rows.length}</div>
+      <div class="ntswrap" style="max-height:none"><table class="ntstbl vmtbl"><thead><tr>
+        <th style="width:22%">탭 이름</th><th style="width:16%">대상</th><th>조건</th><th style="width:8%;text-align:right">${seg==='biz'?'사업자':'명함'}</th><th style="width:170px"></th>
+      </tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
+  }).join('');
+  showPanel(`<div class="mhead"><b>🔖 내 탭 관리</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 8px">전 직원이 함께 쓰는 탭입니다 · 지워도 명함은 그대로입니다${_vmCounting ? ' · 명함 수를 세는 중…' : ''}</p>
+    <div class="ntsbar">${segBtn('all','전체',vs.length)}${segBtn('card','명함',nCard)}${segBtn('biz','사업자',vs.length-nCard)}${
+      segBtn('zero','0장인 탭', counted ? zero.length : '…', true)}${segBtn('twin','조건이 같은 탭',Object.keys(twins).length, true)}</div>
+    ${body || '<p class="cpnone" style="padding:16px 2px">여기에 해당하는 탭이 없습니다 👍</p>'}`);
 }
 /* 탭은 '지금 보고 있는 폴더(대시보드)'에 소속 — 그 폴더에서만 보인다. 각 탭에 인원수 표시 */
 /* 지금 폴더는 그대로 두고 탭·검색·필터만 모두 푼다.
