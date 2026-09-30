@@ -8636,9 +8636,15 @@ try{
   function doAutoLogout(){
     saveBeforeLogout();
     try{
-      try{ firebase.auth().signOut(); }catch(_){}
+      var _so=null;
+      try{ _so=firebase.auth().signOut(); }catch(_){}
       var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:#f8fafc;z-index:2147483647;'; document.body.appendChild(ov);
-      setTimeout(function(){ location.replace('enter.html?v='+now()); }, 200);
+      /* ★ 로그아웃이 «끝난 뒤에» 포털로 간다 (2026-09-30). 전에는 시작만 하고 0.2초 뒤에 떠났다 —
+         덜 끝난 채 포털이 열리면 포털은 남은 로그인을 보고 다시 들여보냈다(「로그아웃된 것 같다가 앱으로 넘어간다」).
+         3초 안에 안 끝나면 그래도 간다(멎어 보이면 안 된다). */
+      var _go=false; function _leave(){ if(_go) return; _go=true; setTimeout(function(){ location.replace('enter.html?v='+now()); }, 200); }
+      if(_so && _so.then) _so.then(_leave, _leave); else _leave();
+      setTimeout(_leave, 3000);
     }catch(_){ location.replace('enter.html'); }
   }
   function showWarn(remMs){
