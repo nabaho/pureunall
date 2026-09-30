@@ -34757,7 +34757,9 @@ var BIZ_CASE_STAGE_SEED = [
     dueVerified:false, sortOrder:50 },
   { code:'wc-rereview',  name:'재심사청구', short:'재심', orgKind:'wc',
     forTypes:['case-injury'],
-    dueDays:90, dueFrom:'notice', dueNote:'',
+    /* 재심사 재결은 행정심판 재결로 본다(산재보험법 제111조②) → 행정소송법 제20조①:
+       재결서 정본을 송달받은 날부터 90일. 대표 지시 2026-09-30 「재심사 넣어라」 */
+    dueDays:90, dueFrom:'notice', dueNote:'재결서 정본을 송달받은 날부터 90일 이내 행정소송 (행정소송법 제20조·산재보험법 제111조)',
     dueVerified:false, sortOrder:60 },
   { code:'labor-report', name:'진정·신고', short:'진정', orgKind:'labor',
     forTypes:['case-wage','case-subsidy'],
@@ -34785,12 +34787,34 @@ function caseStageColor(orgKind){
   return o || CASE_STAGE_ORGS[CASE_STAGE_ORGS.length-1];
 }
 // 저장된 단계 목록 — 없으면 시드로 채운다 (getKindTypes 와 같은 방식)
+/* 시드에 «나중에» 채운 설명을 이미 저장된 목록에도 한 번만 옮긴다 (2026-09-30 재심사청구).
+   시드는 목록이 비었을 때만 쓰이므로, 고치기만 하면 이미 저장된 대표 화면엔 안 닿는다.
+   ⚠ 빈 칸만 채운다 — 대표가 적은 설명은 덮지 않는다.
+   ⚠ 한 번 채운 단계엔 seedNoteV 를 남긴다 — 대표가 일부러 비우면 다시 살아나지 않게. */
+var CASE_STAGE_SEED_NOTE_V = 1;
+function caseStageFillSeedNotes(arr){
+  if(!Array.isArray(arr)) return arr;
+  var changed = false;
+  var out = arr.map(function(x){
+    if(!x || !x.code || (x.seedNoteV||0) >= CASE_STAGE_SEED_NOTE_V) return x;
+    var s = BIZ_CASE_STAGE_SEED.find(function(y){ return y.code === x.code; });
+    if(!s || !s.dueNote) return x;
+    changed = true;
+    var y = Object.assign({}, x, { seedNoteV: CASE_STAGE_SEED_NOTE_V });
+    if(!String(x.dueNote||'').trim()) y.dueNote = s.dueNote;
+    return y;
+  });
+  if(changed) dbSet(BIZ_CASE_STAGE_KEY, out);
+  return changed ? out : arr;
+}
+window.caseStageFillSeedNotes = caseStageFillSeedNotes;
 function getCaseStagesAll(includeHidden){
   var arr = dbGet(BIZ_CASE_STAGE_KEY, null);
   if(!arr || !Array.isArray(arr) || arr.length === 0){
     dbSet(BIZ_CASE_STAGE_KEY, BIZ_CASE_STAGE_SEED);
     arr = BIZ_CASE_STAGE_SEED;
   }
+  arr = caseStageFillSeedNotes(arr);
   var out = arr.filter(function(x){ return x && x.code; });
   if(!includeHidden) out = out.filter(function(x){ return !x.hidden; });
   return out.slice().sort(function(a,b){ return (a.sortOrder||0)-(b.sortOrder||0); });
