@@ -299,8 +299,11 @@ ok('helpers 가 window 에 노출돼 있다',
    peCount('window.contactRole = contactRole;') === 1
    && peCount('window.mergeCompanyContacts = mergeCompanyContacts;') === 1
    && peCount('window._normPersonKey = _normPersonKey;') === 1);
+/* 2026-09-30 한 줄 정리 — 업체관리 표의 담당자 칸은 who(c) 하나로 이름·직책을 만든다(contactRole(c)).
+   ⚠ 몇 번 쓰였나를 못 박지 않는다 — 규칙은 «직책은 contactRole 로 읽는다»다. */
 ok('업체관리 표의 직책도 contactRole 로 읽는다',
-   peCount('contactRole(primary)') === 2 && peCount('contactRole(second)') === 2);
+   /function who\(c\)\{[^}]*contactRole\(c\)/.test(pe) && peCount('who(primary)') >= 1 && peCount('who(second)') >= 1
+   && peCount('contactRole(primary)') >= 1 && peCount('contactRole(second)') >= 1);
 /* ⚠ 2026-08-26 다시 겨눔 — 개수를 못 박고 있었다.
    지켜야 할 규칙은 「직책은 contactRole 로 읽는다」이지 «몇 번 쓰였나»가 아니다.
    새로 읽는 자리가 생길 때마다(계약창 접힘 줄 등) 이 검사가 «까닭 없이» 빨개졌다. */
