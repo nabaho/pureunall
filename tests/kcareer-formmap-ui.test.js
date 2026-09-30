@@ -206,7 +206,8 @@ test('머리를 한 줄 줄였다 — 모드 단추가 편집 줄 안에 있다 
   /* 「편집」 딱지만 있던 줄과 모드 줄이 따로 있어 머리가 세 줄이었다.
      딱지는 뺀다 — 단추가 이미 무슨 화면인지 말해 준다. */
   const at = source.indexOf('class="rc-bar"');
-  const bar = source.slice(at, at + 1800);
+  /* ⚠ 글자 수로 자르지 않는다 — 기둥에 단추가 늘 때마다 깨졌다. 편집 줄의 단추 묶음(rc-actions) 앞까지 본다 */
+  const bar = source.slice(at, source.indexOf('class="rc-actions"', at));
   assert.ok(bar.indexOf('id="kfModes"') > 0, '모드 단추가 편집 줄 안에 있어야 합니다');
   assert.equal((source.match(/id="kfModes"/g) || []).length, 1, '모드 줄이 둘이면 안 됩니다');
 });
