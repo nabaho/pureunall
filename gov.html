@@ -169,7 +169,7 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <script src="js/gov-career.js?v=1"></script>
 <script src="js/gov-g2b.js?v=3"></script>
-<script src="js/gov-alio.js?v=1"></script>
+<script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
 <script>
 /* ⚠ 경력관리와 «같은 파이어베이스 집»이다. 설정값은 공개용 웹 키다(규칙이 지킨다). */
@@ -193,7 +193,7 @@ function lsSet(k,v){ try{ localStorage.setItem(NS+k,v); }catch(e){} }
 function keyData(){ return lsGet('key_data'); }
 function keyBiz(){ return lsGet('key_biz'); }
 function openKeys(){
-  var a=prompt('공공데이터포털 인증키 (나라장터·알리오 겸용)\n\n⚠ 「일반 인증키(Decoding)」를 넣으세요.\n\n발급: data.go.kr → 로그인 → 활용신청', keyData());
+  var a=prompt('공공데이터포털 인증키 (나라장터·알리오가 «같은 열쇠»를 씁니다)\n\n⚠ 「일반 인증키(Decoding)」를 넣으세요.\n⚠ 열쇠는 하나지만 «활용신청은 둘 다» 따로 해야 합니다 —\n   나라장터(15129394) · 공공기관 채용정보(15125273, 알리오)\n\n발급: data.go.kr → 로그인 → 활용신청', keyData());
   if(a!==null) lsSet('key_data', a.trim());
   var b=prompt('기업마당 인증키 (crtfcKey — 따로 발급)\n\n발급: bizinfo.go.kr → 정책정보 개방', keyBiz());
   if(b!==null) lsSet('key_biz', b.trim());
@@ -231,9 +231,13 @@ function readyNote(){
   var a=keyData(), b=keyBiz();
   if(a||b){ if(!get('feed').length) note('아직 받은 공고가 없습니다 — <b>🔄 새로 받기</b>를 눌러 주세요'); else note(''); return; }
   note('🔑 <b>인증키가 아직 없습니다.</b> 준비는 다 돼 있고 열쇠만 꽂으면 됩니다.<br>'
-    +'① <a href="https://www.data.go.kr/data/15129394/openapi.do" target="_blank" rel="noopener">공공데이터포털</a> 로그인 → <b>활용신청</b> (나라장터·알리오 겸용)<br>'
+    +'<b>열쇠는 두 개, 신청은 세 번</b>입니다.<br>'
+    +'① 공공데이터포털에 로그인해 <b>둘 다</b> 활용신청 — 열쇠는 하나지만 <b>신청은 따로</b>입니다<br>'
+    +'&nbsp;&nbsp;&nbsp;· <a href="https://www.data.go.kr/data/15129394/openapi.do" target="_blank" rel="noopener">조달청_나라장터 입찰공고정보서비스</a><br>'
+    +'&nbsp;&nbsp;&nbsp;· <a href="https://www.data.go.kr/data/15125273/openapi.do" target="_blank" rel="noopener">재정경제부_공공기관 채용정보 조회서비스</a> (알리오)<br>'
     +'&nbsp;&nbsp;&nbsp;⚠ 열쇠를 두 벌 줍니다 — <b>일반 인증키(Decoding)</b> 쪽을 넣으세요<br>'
     +'② <a href="https://www.bizinfo.go.kr/apiDetail.do?id=bizinfoApi" target="_blank" rel="noopener">기업마당</a> 에서 따로 하나 더<br>'
+    +'&nbsp;&nbsp;&nbsp;<b>시스템 URL</b> 칸에는 <code>https://nabaho.github.io/pureunall/gov.html</code><br>'
     +'③ 위 <b>🔑 인증키</b>를 눌러 넣고 → <b>🔄 새로 받기</b>');
 }
 function nextId(buf){ var n=1, mk=function(){ return 'G'+String(n).padStart(4,'0'); };

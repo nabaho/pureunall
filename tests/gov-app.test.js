@@ -60,10 +60,14 @@ test('★ 하루 1,000회 제한을 지킨다 — 화면 열 때마다 부르지
   assert.match(m[0], /lsGet\('last'\)/, '마지막으로 받은 날을 기억해야 합니다');
 });
 
-test('★ 인증키가 둘이라는 것을 화면이 밝힌다', () => {
+test('★★ 인증키가 둘·신청이 셋이라는 것을 화면이 밝힌다', () => {
+  // ⚠ 공공데이터포털은 열쇠가 계정당 «하나»지만 활용신청은 API «마다» 따로다.
+  //    하나만 신청하면 열쇠가 맞아도 알리오는 계속 0건이다 — 화면이 이것을 말해야 한다.
   const m = src.match(/function readyNote\([\s\S]*?\n\}/);
   assert.ok(m);
-  assert.match(m[0], /data\.go\.kr\/data\/15129394/, '나라장터·알리오 겸용 발급 주소');
+  assert.match(m[0], /data\.go\.kr\/data\/15129394/, '나라장터 활용신청 주소');
+  assert.match(m[0], /data\.go\.kr\/data\/15125273/, '알리오 활용신청 주소 — 따로 신청해야 합니다');
+  assert.match(m[0], /신청은 따로/, '열쇠 하나로 되는 줄 알면 알리오만 0건이 됩니다');
   assert.match(m[0], /bizinfo\.go\.kr/, '기업마당은 따로 받아야 합니다');
   assert.match(m[0], /Decoding/, '어느 열쇠인지 밝혀야 합니다');
 });
@@ -179,8 +183,12 @@ test('★ 찾는 말 칩이 그려지고 「교육」은 없다', () => {
 test('★ 인증키가 없으면 받는 방법을 화면에 적는다', () => {
   const r = runApp({ feed: [] });
   r.api.readyNote();
-  assert.match(r.el('note').innerHTML, /인증키가 아직 없습니다/);
-  assert.match(r.el('note').innerHTML, /Decoding/);
+  const h = r.el('note').innerHTML;
+  assert.match(h, /인증키가 아직 없습니다/);
+  assert.match(h, /Decoding/);
+  assert.match(h, /15129394/, '나라장터 신청 자리');
+  assert.match(h, /15125273/, '알리오 신청 자리 — 빠지면 그쪽만 0건이 됩니다');
+  assert.match(h, /nabaho\.github\.io\/pureunall\/gov\.html/, '기업마당이 묻는 시스템 URL');
 });
 
 /* ═══════ 신청 재료 탭 (2026-09-10, 대표 승인 「안 A · 접이식」 + 수행실적) ═══════ */
