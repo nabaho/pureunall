@@ -1218,7 +1218,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=39"></script>
+<script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
@@ -1226,7 +1226,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
-<script src="js/kcareer-pusync.js?v=4"></script>
+<script src="js/kcareer-pusync.js?v=5"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
      판독 층은 지우개가 없으면 글자 판독을 아예 막는다(그대로 보내면 주민번호가 AI 로 나간다).
@@ -8089,7 +8089,7 @@ const CAREER_CFG={
       <td onclick="event.stopPropagation()"><button class="btn sm" onclick="feeConsentDoc('etcfee','${r.id}')" title="수령인에게 받을 개인정보 동의서를 자동으로 만듭니다">📨 동의서</button>${rowActions(r.id,'etcfee',r.content,p)}</td></tr>`},
 };
 /* ===== 실적 번호 칸 — 이알피 관리번호를 앞에 (대표 결정 2026-09-29, 목업 안 D) =====
-   사람이 알아보는 번호는 이알피 관리번호(산재등-2026-004)다. CS0034 는 «내 실적 몇 번째»라
+   사람이 알아보는 번호는 이알피 관리번호(산재등-2026-901)다. CS0034 는 «내 실적 몇 번째»라
    이알피 어디에도 없어 대조할 수 없었다. 그래서 칸에는 관리번호를 보이고, 누르면 작은 창에
    연결 상태·이알피 현재 값·경력관리 번호를 모은다(줄 끝의 🔎 단추를 이리로 옮겼다).
    ⚠ 줄을 찾는 열쇠는 <tr data-rid> 다 — 칸 글자(관리번호)로 찾으면 안 된다. 번호는 다시 매겨진다.
