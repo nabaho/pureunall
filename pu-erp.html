@@ -13459,6 +13459,65 @@ function Header(props){
 
 // ============ 통합 검색 (사건·컨설팅·업체·기금·기타) ============
 // 각 모듈에서 호출: var initialQuery = useGlobalSearchFocus();
+/* ── 다른 앱이 «이 한 건을 열어 달라»고 보낸 것 (대표 지시 2026-09-30, 메일함 📁) ──
+   메일함의 「📁 컨설팅 · 담당」을 누르면 pu-erp.html?open=consulting:<id>#menu=biz/consulting 로 온다.
+   ★ 주소로 받는다 — localStorage 쪽지로 받으면 «열린 이알피 창 전부»가 듣고 함께
+     움직인다(쓰던 화면까지 튄다). 주소는 그 창 하나에만 간다.
+   ⚠ 읽자마자 주소에서 지운다 — 남겨 두면 새로고침할 때마다 그 건이 다시 뜬다.
+   ⚠ 사건·컨설팅만 받는다. 모르는 갈래는 버린다 — 엉뚱한 화면에서 창이 뜨지 않게. */
+var ERP_OPEN_KINDS = { case:'biz/case', consulting:'biz/consulting' };
+var ERP_OPEN_TTL = 60 * 1000;
+function erpOpenRecFromUrl(search, now){
+  var m = /[?&]open=(case|consulting):([^&#]+)/.exec(String(search || ''));
+  if(!m) return null;
+  var id = '';
+  try { id = decodeURIComponent(m[2]); } catch(_){ return null; }
+  if(!id) return null;
+  return { kind:m[1], id:id, at:now };
+}
+function erpStripOpenParam(search){
+  var s = String(search || '').replace(/^\?/, '');
+  var rest = s.split('&').filter(function(p){ return p && !/^(open|opent)=/.test(p); });
+  return rest.length ? '?' + rest.join('&') : '';
+}
+var ERP_OPEN_REC = null;
+(function(){
+  try {
+    ERP_OPEN_REC = erpOpenRecFromUrl(location.search, Date.now());
+    if(ERP_OPEN_REC && window.history && window.history.replaceState)
+      window.history.replaceState(null, '', location.pathname + erpStripOpenParam(location.search) + location.hash);
+  } catch(_){ ERP_OPEN_REC = null; }
+})();
+/* 그 목록에서 «그 한 건» — 지운 것은 안 연다 */
+function erpFindOpenRec(list, want){
+  if(!want || !want.id) return null;
+  return (list || []).find(function(x){ return x && String(x.id) === String(want.id) && !x._deleted; }) || null;
+}
+/* 사건관리·컨설팅관리가 부른다 — 받은 건이 이 화면 갈래면 상세 창을 연다.
+   ⚠ 목록이 늦게 올 수 있다(서버에서 막 받는 중) — 목록이 바뀔 때마다 다시 본다.
+   ⚠ 끝내 못 찾으면 한 번 알리고 버린다 — 조용히 넘어가면 「눌렀는데 아무 일도 없다」가 된다. */
+function useErpOpenRec(kind, list, open){
+  useEffect(function(){
+    var want = ERP_OPEN_REC;
+    if(!want || want.kind !== kind) return;
+    var t = setTimeout(function(){
+      if(ERP_OPEN_REC !== want) return;
+      ERP_OPEN_REC = null;
+      if(typeof showToast==='function') showToast('⚠️ 메일함에서 연 그 건을 찾지 못했습니다 — 지워졌거나 볼 권한이 없습니다', 8000);
+    }, 8000);
+    return function(){ clearTimeout(t); };
+  }, [kind]);
+  useEffect(function(){
+    var want = ERP_OPEN_REC;
+    if(!want || want.kind !== kind) return;
+    if(Date.now() - want.at > ERP_OPEN_TTL){ ERP_OPEN_REC = null; return; }
+    var hit = erpFindOpenRec(list, want);
+    if(!hit) return;
+    ERP_OPEN_REC = null;
+    open(hit);
+  }, [kind, list]);
+}
+
 function useGlobalSearchFocus(){
   var s = useState('');
   var initial = s[0]; var setInitial = s[1];
@@ -30133,6 +30192,8 @@ function CaseManagement(props){
   var thisYM = selYM;
   var m = useState(null); var modal = m[0]; var setModal = m[1];
   var dt = useState(null); var detailModal = dt[0]; var setDetailModal = dt[1];
+  /* 메일함 📁 에서 «이 한 건»을 열어 달라고 왔으면 (2026-09-30) */
+  useErpOpenRec('case', cases, setDetailModal);
   var cm2 = useState(null); var companyModal = cm2[0]; var setCompanyModal = cm2[1];
   var sb = useState({ key:'', dir:'asc' }); var sortBy = sb[0]; var setSortBy = sb[1];
   var ctx = useState(null); var ctxMenu = ctx[0]; var setCtxMenu = ctx[1];   // 우클릭 메뉴
@@ -64375,6 +64436,8 @@ function ProjectManagementShared(props){
   var thisYM = selYM;
   var em = useState(null); var editModal = em[0]; var setEditModal = em[1];
   var dt = useState(null); var detailModal = dt[0]; var setDetailModal = dt[1];
+  /* 메일함 📁 에서 «이 한 건»을 열어 달라고 왔으면 (2026-09-30) — 컨설팅만 받는다(기금·기타는 ERP_OPEN_KINDS 에 없다) */
+  useErpOpenRec(props.sourceKind, items, setDetailModal);
   var cmS = useState(null); var closeModal = cmS[0]; var setCloseModal = cmS[1];
   var sb = usePersistedState('proj_'+props.sourceKind+'_sort', { key:'', dir:'asc' }); var sortBy = sb[0]; var setSortBy = sb[1];
   var ctx = useState(null); var ctxMenu = ctx[0]; var setCtxMenu = ctx[1];
