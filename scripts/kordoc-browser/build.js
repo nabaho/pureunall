@@ -76,9 +76,15 @@ const stubs = {
   }
 };
 
+/* 파일째 개인정보 가림(redactDocument) — kordoc 가 공개 목록에는 안 올렸지만 dist 안에 있다(CLI 가 쓴다).
+   조각 이름에 판마다 바뀌는 꼬리(redact-doc-XXXX.js)가 붙어 있어 찾아서 꺼낸다. 없으면 멈춘다 —
+   서고 개인정보 가림(2026-09-30 ②)이 이것 없이는 원본 파일을 못 가린다. */
+const REDACT = fs.readdirSync(DIST).find(f => /^redact-doc-[A-Z0-9]+\.js$/.test(f));
+if (!REDACT) { console.error('✗ kordoc dist 에 redact-doc-*.js 가 없다 — 판이 바뀌어 파일 가림이 옮겨졌는지 볼 것'); process.exit(1); }
+
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 esbuild.build({
-  stdin: { contents: "export * from 'kordoc';", resolveDir: HERE, loader: 'js' },
+  stdin: { contents: "export * from 'kordoc';\nexport { redactDocument } from './node_modules/kordoc/dist/" + REDACT + "';", resolveDir: HERE, loader: 'js' },
   bundle: true, format: 'esm', platform: 'browser', minify: true, legalComments: 'none',
   outfile: OUT,
   plugins: [stubs],
