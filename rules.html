@@ -20,6 +20,7 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-rules-history.js?v=3"></script>
+<script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/pu-rules-lawlink.js?v=1"></script>
 <script src="js/pu-rules-lawwatch.js?v=1"></script>
 <script src="js/pu-hwp-keep.js?v=1"></script>
@@ -305,6 +306,33 @@ select,input[type=date]{font-family:inherit;font-size:13px;height:36px;padding:0
 .lw-btn{height:26px;padding:0 10px;border-radius:7px;border:1px solid #1e40af;background:#1e40af;color:#f8fafc;font-size:12px;cursor:pointer;white-space:nowrap}
 .lw-empty{padding:18px 12px;color:var(--sub);font-size:12.5px;line-height:1.7}
 .lw-note{margin-top:10px;color:var(--sub);font-size:11.5px;line-height:1.7}
+/* ── 두 파일 견주기 (2026-09-30 목업 ③ 신구대조) ── */
+.fc-modal{max-width:1200px}
+.fc-files{display:grid;grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr);align-items:center;margin-bottom:12px}
+.fc-f{border:1px dashed #94a3b8;border-radius:12px;padding:10px 14px;background:#f8fafc;min-width:0;cursor:pointer}
+.fc-f.on{border-style:solid;border-color:#bfdbfe;background:#eff6ff}
+.fc-f .k{font-size:11px;color:#475569}
+.fc-f b{display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-f small{color:#475569}
+.fc-arr{text-align:center;color:#94a3b8;font-size:18px}
+.fc-sum{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.fc-s{padding:6px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;min-width:96px;cursor:pointer}
+.fc-s .n{font-size:18px;font-weight:800}.fc-s .l{font-size:12px;color:#475569}
+.fc-s.a{border-color:#bfdbfe;background:#eff6ff}.fc-s.a .n{color:#1e40af}
+.fc-s.i{border-color:#bbf7d0;background:#f0fdf4}.fc-s.i .n{color:#166534}
+.fc-s.d{border-color:#fecaca;background:#fef2f2}.fc-s.d .n{color:#991b1b}
+.fc-s.w{border-color:#fde68a;background:#fffbeb}.fc-s.w .n{color:#854d0e}
+.fc-s.on{outline:2px solid #2563eb}
+.fc-warn{margin-bottom:8px;padding:6px 12px;border-radius:9px;background:#fffbeb;border:1px solid #fde68a;color:#854d0e;font-size:12.5px}
+.fc-tbl td{vertical-align:top;line-height:1.7;font-size:12.5px;white-space:pre-wrap;word-break:break-word}
+.fc-tbl td.k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-kind{font-size:11px;padding:1px 7px;border-radius:7px;font-weight:700;margin-right:4px}
+.fc-kind.a{background:#eff6ff;color:#1e40af}.fc-kind.i{background:#f0fdf4;color:#166534}.fc-kind.d{background:#fef2f2;color:#991b1b}.fc-kind.w{background:#fffbeb;color:#854d0e}.fc-kind.s{background:#f8fafc;color:#475569}
+.fc-tbl del{background:#fef2f2;color:#991b1b}
+.fc-tbl ins{background:#f0fdf4;color:#166534;text-decoration:none;border-bottom:2px solid #4ade80}
+.fc-none{color:#94a3b8}
+.fc-flag{margin-top:4px;font-size:11.5px;color:#854d0e;white-space:normal}
+.fc-flag.old{color:#475569}
 /* ── 원본 살려 고치기 창 (목업 ③) ── */
 .kp-modal{max-width:1180px}
 .kp-steps{display:flex;gap:0;padding:8px 22px;border-bottom:1px solid var(--line);background:#f8fafc;flex-wrap:wrap}
@@ -829,6 +857,7 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
       <button class="hbtn" id="open-arch">📁 보관함 <span id="arch-cnt"></span></button>
       <button class="hbtn" id="open-arts" title="보관된 모든 사업장 취업규칙을 조문 단위로 찾아 나란히 비교합니다">🔎 조문 검색</button>
       <button class="hbtn" id="open-cb" title="10년치 취업규칙을 사업장·회차별로 담아 두는 서고 — 직원 전체가 봅니다">🗄 서고</button>
+      <button class="hbtn" id="open-fc" title="옛 규칙 파일과 새 규칙 파일을 조 단위로 견줍니다 — 두 파일 모두 브라우저 안에서만 읽습니다">📑 두 파일 견주기</button>
       <button class="hbtn" id="open-help" title="저장·권한·HWP 처리·미리보기에 대한 안내">ⓘ 이 화면 안내</button>
     </div>
 
@@ -1445,6 +1474,33 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
       「개정안 만들기」는 새 회차를 여는 데까지만 합니다 — 저장·확정은 노무사가 합니다.</div>
   </div>
   <div class="foot"><button class="btn ghost" data-close>닫기</button></div>
+</div></div>
+
+<!-- 두 파일 견주기 — 옛 규칙 파일 ↔ 새 규칙 파일을 조 단위로 (2026-09-30 목업 ③).
+     ⚠ 두 파일 모두 브라우저 안에서만 읽는다. 올리지도 보관하지도 않는다 —
+       「새 회차 만들기」를 누를 때만 옛 파일이 보통 올리기와 같은 길로 규정관리에 들어간다. -->
+<div class="overlay" id="ov-fc"><div class="modal fc-modal">
+  <h2>📑 두 파일 견주기 <span class="tag" style="font-size:12px;color:var(--mute);font-weight:400">조 번호·제목으로 짝을 지어 봅니다</span><span class="x" data-close>×</span></h2>
+  <div class="body">
+    <div class="fc-files">
+      <div class="fc-f" id="fc-old" data-fcpick="old"></div>
+      <div class="fc-arr">→</div>
+      <div class="fc-f" id="fc-now" data-fcpick="now"></div>
+    </div>
+    <input type="file" id="fc-in-old" accept=".hwp,.hwpx,.docx,.odt,.rtf,.pdf,.txt" style="display:none">
+    <input type="file" id="fc-in-now" accept=".hwp,.hwpx,.docx,.odt,.rtf,.pdf,.txt" style="display:none">
+    <div class="fc-sum" id="fc-sum"></div>
+    <div id="fc-warn"></div>
+    <div style="max-height:52vh;overflow:auto">
+      <table class="arch fc-tbl" style="table-layout:fixed"><thead><tr>
+        <th style="width:170px">조</th><th>옛 글</th><th>새 글</th></tr></thead>
+        <tbody id="fc-body"></tbody></table>
+    </div>
+  </div>
+  <div class="foot"><span class="muted" id="fc-note" style="font-size:11.5px;margin-right:auto">새 조는 앞 조 뒤에 끼운 것으로 봅니다</span>
+    <button class="btn ghost" id="fc-hwp" disabled>신구대조표 한글로 받기</button>
+    <button class="btn" id="fc-rev" disabled>이 차이로 새 회차 만들기 →</button>
+    <button class="btn ghost" data-close>닫기</button></div>
 </div></div>
 
 <!-- 조문 검색 — 보관된 모든 사업장 취업규칙을 조문 단위로 찾아 나란히 비교 -->
@@ -7693,6 +7749,150 @@ document.addEventListener("click",e=>{
 });
 $("open-arch").addEventListener("click",()=>{renderArch("");$("ov-arch").classList.add("on");});
 $("arch-q").addEventListener("input",e=>renderArch(e.target.value));
+
+/* ══════ 📑 두 파일 견주기 (2026-09-30 목업 ③ — 대표 승인 「추천대로」) ══════
+   옛 파일(지금 신고된 것) ↔ 새 파일(회사가 고쳐 온 것)을 조 단위로 견준다.
+   짝짓기·낱말 차이·새 회차 계획은 PuRulesFileCmp 가 한다 — 여기는 읽고 그리고 잇기만.
+   ★ 바뀐 조·새 조에만 검토 기준을 돌려 «위반 의심»을 곁에 단다. 옛 글에도 있던 것은 흐리게.
+   ★ 「이 차이로 새 회차 만들기」 — 옛 파일을 «보통 올리기와 같은 길»(loadFile)로 원본 삼아 검토를 돌리고,
+     새 글을 개정안으로 건다. 그러면 신구대조표·신고서·「원본 모양 그대로」까지 그대로 이어진다.
+   ⚠ 파일은 브라우저 안에서만 읽는다(readRulesText). 견주기만 할 때는 어디에도 올리지 않는다. */
+const FC={old:null,now:null,rows:[],counts:null,flags:null,filt:"달라진"};
+const FC_KIND_CLS={"바뀜":"a","새 조":"i","없어짐":"d","번호 바뀜":"w","같음":"s"};
+async function fcRead(f){
+  const ext=f.name.toLowerCase().split(".").pop(), raw=await f.arrayBuffer();
+  let text, via="글";
+  if(ext==="txt"){ try{ text=new TextDecoder("utf-8",{fatal:true}).decode(raw); }catch(_){ text=new TextDecoder("euc-kr").decode(raw); } }
+  else{ text=await readRulesText(raw.slice(0)); via=READ_LAST; }
+  /* 올리기(loadFile)와 같게 낱말 한가운데서 끊긴 줄을 잇는다 — 안 그러면 새 회차의 조와 어긋난다 */
+  try{ const 줄표=lineJoinMarks(text,ljStd()), 셈=lineJoinCount(줄표); if(셈.붙임||셈.띄움)text=lineJoinApply(text,줄표); }catch(e){}
+  const arts=parseArticles(text);
+  if(!arts.length)throw new Error("조(제1조…)를 찾지 못했습니다.");
+  return {file:f,name:f.name,arts,via};
+}
+function fcBox(side){
+  const d=FC[side], el=$("fc-"+side);
+  el.className="fc-f"+(d?" on":"");
+  el.innerHTML=`<div class="k">${side==="old"?"옛 파일 (지금 신고된 것)":"새 파일 (회사가 고쳐 온 것)"}</div>`
+    +(d?`<b>📄 ${escapeH(d.name)}</b><small>조 ${d.arts.length}개 · ${d.via==="kordoc"?"kordoc 로 읽음":"읽음"} · 눌러서 바꾸기</small>`
+       :`<b>📄 눌러서 파일 고르기</b><small>HWP · HWPX · DOCX · PDF · TXT</small>`);
+}
+function fcRun(){
+  fcBox("old"); fcBox("now");
+  if(!FC.old||!FC.now){
+    FC.rows=[]; FC.counts=null; FC.flags=null;
+    $("fc-sum").innerHTML=""; $("fc-warn").innerHTML="";
+    $("fc-body").innerHTML='<tr><td colspan="3" class="empty">두 파일을 고르면 조 단위로 견줍니다.</td></tr>';
+    fcBtns(); return;
+  }
+  const c=PuRulesFileCmp.compare(FC.old.arts,FC.now.arts);
+  FC.rows=c.rows; FC.counts=c.counts;
+  /* 검토 기준은 지금 화면의 규모·조건·기준일 그대로 — 본 검토와 같은 잣대 */
+  const size=$("size").value, asof=$("asof").value;
+  const conds=new Set([...document.querySelectorAll(".conds input:checked")].map(x=>x.value));
+  FC.flags=PuRulesFileCmp.flag(FC.rows,evaluate(FC.old.arts,size,conds,asof),evaluate(FC.now.arts,size,conds,asof));
+  fcRender();
+}
+function fcSeg(segs,keep){
+  return segs.filter(g=>g.t==="="||g.t===keep).map(g=>g.t==="="?escapeH(g.s):
+    (keep==="-"?"<del>"+escapeH(g.s)+"</del>":"<ins>"+escapeH(g.s)+"</ins>")).join("");
+}
+function fcRowHtml(r){
+  const t=r.now||r.old, B=PuRulesFileCmp.bodyOf;
+  const lab=(r.old&&r.now&&r.old.label!==r.now.label?r.old.label+" → "+r.now.label:t.label)+(t.title?"("+t.title+")":"");
+  let o, n;
+  if(r.kind==="바뀜"){ const segs=PuRulesFileCmp.wordDiff(B(r.old),B(r.now)); o=fcSeg(segs,"-"); n=fcSeg(segs,"+"); }
+  else{ o=r.old?escapeH(B(r.old)):'<span class="fc-none">(없음)</span>'; n=r.now?escapeH(B(r.now)):'<span class="fc-none">(없음)</span>'; }
+  if(r.kind==="번호 바뀜")n+='<div class="fc-flag old">글은 같고 번호만 바뀜</div>';
+  (r.flags||[]).forEach(g=>{ n+=`<div class="fc-flag${g.was?" old":""}">⚠ 검토 ${escapeH(g.id)} ${escapeH(g.name)} — ${escapeH(g.law)} 위반 의심${g.was?" · 옛 글에도 있던 것":""}</div>`; });
+  return `<tr><td class="k" title="${escapeH(r.kind+" "+lab)}"><span class="fc-kind ${FC_KIND_CLS[r.kind]}">${r.kind}</span><b>${escapeH(lab)}</b></td><td>${o}</td><td>${n}</td></tr>`;
+}
+function fcRender(){
+  const c=FC.counts, n=FC.rows.length, diff=n-c["같음"]-c["번호 바뀜"];   /* 번호만 밀린 조는 따로 — 한 조만 빠져도 뒤가 다 밀려 «글이 바뀐 것»을 덮는다 */
+  const S=[["바뀜","a","바뀐 조"],["새 조","i","새 조"],["없어짐","d","없어진 조"],["번호 바뀜","w","번호가 바뀐 조"],["같음","","같음"],["달라진","","글이 달라진 것"],["","","모두"]];
+  $("fc-sum").innerHTML=S.map(([k,cls,l])=>{
+    const v=k==="달라진"?diff:(k===""?n:c[k]);
+    return `<div class="fc-s ${cls}${FC.filt===k?" on":""}" data-fcf="${k}"><div class="n">${v}</div><div class="l">${l}</div></div>`; }).join("");
+  const f=FC.flags;
+  $("fc-warn").innerHTML=f&&f.total?`<div class="fc-warn">⚠ 법에 어긋날 수 있는 바뀜 <b>${f.fresh}</b>건`
+    +(f.total>f.fresh?` (옛 글에도 있던 것 ${f.total-f.fresh}건 더)`:"")+` — 바뀐 조·새 조에만 검토 기준을 돌린 것입니다. 판단은 노무사가 합니다.</div>`:"";
+  const rows=FC.filt==="달라진"?FC.rows.filter(r=>r.kind!=="같음"&&r.kind!=="번호 바뀜"):(FC.filt?FC.rows.filter(r=>r.kind===FC.filt):FC.rows);
+  $("fc-body").innerHTML=rows.length?rows.map(fcRowHtml).join(""):'<tr><td colspan="3" class="empty">해당하는 조가 없습니다.</td></tr>';
+  $("fc-sum").querySelectorAll("[data-fcf]").forEach(b=>b.onclick=()=>{ FC.filt=b.dataset.fcf; fcRender(); });
+  fcBtns();
+}
+function fcBtns(){
+  const any=!!(FC.counts&&FC.rows.length-FC.counts["같음"]>0);
+  $("fc-hwp").disabled=!any; $("fc-rev").disabled=!any||!!READONLY;
+}
+function fcHwp(){
+  const rows=PuRulesFileCmp.daejoRows(FC.rows);
+  if(!rows.length){ alert("달라진 조가 없습니다."); return; }
+  const headers=["조","옛 글","새 글","비고"], sub=FC.old.name+" → "+FC.now.name;
+  const base="신구대조표_"+FC.now.name.replace(/\.[^.]+$/,"").replace(/[()\s—\/\\:*?"<>|]/gu,"");
+  try{
+    HWPX.setPage({landscape:PAGE_LAND});
+    HWPX.download(HWPX.docTitle("취업규칙 신구대조표")+HWPX.docSub(sub)+HWPX.spacer()
+      +HWPX.tablePara([headers].concat(rows),HWPX.cols([1.45,3.05,3.05,1.6])),base+".hwpx");
+  }catch(e){ console.warn("hwpx 생성 실패 — RTF(.doc) 폴백:",e);
+    dlDoc(rtfTableDoc("취업규칙 신구대조표",sub,headers,rows,[2000,3800,3800,1800]),base+".doc"); }
+}
+/* 새 회차 계획을 편집 모델에 건다 — 옛 조는 새 글로(개정), 새 조는 앞 짝 조 뒤에(신설), 없어진 조는 삭제 제안.
+   ⚠ 결정은 비워 둔다 — 조문 검토·편집 화면에서 노무사가 한 건씩 본다(표준규칙 반영 sdApply 와 같다) */
+function fcApplyPlan(p,src){
+  const why="회사 새 파일("+src+") 반영"; let a=0,b=0,d=0;
+  p.amend.forEach(x=>{
+    const it=CUR_ITEMS.find(i=>i.id==="art_"+x.label); if(!it)return;
+    it.after=x.text; it.sug=x.text; it.suggested=true;
+    if(x.retitle&&x.title){ it.title=x.title; it.label=x.label+" ("+x.title+")"; }
+    it.reason=(it.reason?it.reason+" / ":"")+why+(x.flags.length?" · 검토 "+x.flags.map(g=>g.id).join("·")+" 위반 의심":"");
+    delete it.decision; delete it.paraPick; a++;
+  });
+  p.del.forEach(label=>{
+    const it=CUR_ITEMS.find(i=>i.id==="art_"+label); if(!it)return;
+    it.del=true; it.reason=(it.reason?it.reason+" / ":"")+"회사 새 파일에서 빠짐"; d++;
+  });
+  p.ins.forEach(x=>{
+    const id="fc_"+x.label; if(CUR_ITEMS.some(i=>i.id===id))return;
+    const at=x.after&&CUR_ITEMS.some(i=>i.id==="art_"+x.after)?"art_"+x.after:"__start__";
+    CUR_ITEMS.push({id,title:x.title||x.label,label:"",num:null,sub:null,insertAfter:at,rec:at,
+      before:"신설",after:x.text,orig:"",reason:why+" — 새 파일 "+x.label,
+      suggested:true,del:false,sug:x.text,grade:"B",optIn:true});
+    b++;
+  });
+  return {a,b,d};
+}
+async function fcRevision(){
+  if(READONLY){ alert("열람 전용입니다 — 담당자만 새 회차를 만들 수 있습니다."); return; }
+  const p=PuRulesFileCmp.plan(FC.rows);
+  if(!p.amend.length&&!p.ins.length&&!p.del.length){ alert("달라진 조가 없습니다 — 번호만 바뀐 것은 개정 방식에 따라 다시 매깁니다."); return; }
+  if(!confirm(`옛 파일 「${FC.old.name}」을 원본으로 열고, 새 파일 글을 개정안으로 겁니다.\n`
+    +` · 바뀐 조 ${p.amend.length}건 (개정)\n · 새 조 ${p.ins.length}건 (신설)\n · 없어진 조 ${p.del.length}건 (삭제 제안)\n\n`
+    +"번호만 바뀐 조는 넣지 않습니다 — 번호는 개정 방식에 따라 다시 매깁니다.\n계속할까요?"))return;
+  const before=siteSel.value;
+  await loadFile(FC.old.file);                       // 보통 올리기와 같은 길 — 보관함·원본 미리보기까지
+  if(siteSel.value===before||!SAMPLES[siteSel.value])return;   // 사람이 취소했거나 못 읽었다
+  run();
+  const n=fcApplyPlan(p,FC.now.name);
+  $("ov-fc").classList.remove("on");
+  setDaejoView("changed"); renderFindings(); saveWorkState();
+  openEditor();
+  alert(`새 회차를 열었습니다 — 원본은 「${FC.old.name}」.\n · 개정 ${n.a}건 · 신설 ${n.b}건 · 삭제 제안 ${n.d}건\n\n`
+    +(FC.counts["번호 바뀜"]?"새 파일은 번호를 다시 매겼습니다("+FC.counts["번호 바뀜"]+"개 조) — 번호까지 같게 하려면 개정 방식을 「전부개정」으로 고르세요.\n\n":"")
+    +"조문 검토·편집 화면에서 한 건씩 확인하세요. 저장·확정은 노무사가 합니다.");
+}
+async function fcPick(side,f){
+  try{ FC[side]=await fcRead(f); }
+  catch(e){ alert("파일을 읽지 못했습니다: "+(e.message||e)); return; }
+  FC.filt="달라진"; fcRun();
+}
+["old","now"].forEach(side=>{
+  $("fc-"+side).addEventListener("click",()=>$("fc-in-"+side).click());
+  $("fc-in-"+side).addEventListener("change",e=>{ const f=e.target.files[0]; e.target.value=""; if(f)fcPick(side,f); });
+});
+$("fc-hwp").addEventListener("click",fcHwp);
+$("fc-rev").addEventListener("click",fcRevision);
+$("open-fc").addEventListener("click",()=>{ fcRun(); $("ov-fc").classList.add("on"); });
 
 /* ══════ 📜 이력 — 사업장별 제정·개정 회차 ══════
    보관함이 「지금 무엇을 해야 하나」라면, 이력은 「무엇이 언제 어떻게 바뀌었나」다.
