@@ -36,12 +36,17 @@ ok('★ 머리칸 거르개는 깔때기 단추로 그려진다',
 /* ── CSS ── */
 ok('업태 폭 92px',  /co-biz-col \{ max-width: 92px; \}/.test(css));
 ok('종목 폭 132px', /co-biz-cat \{ max-width: 132px; \}/.test(css));
-ok('★ 줄바꿈을 허용한다 (그래야 폭이 지켜진다)', /white-space: normal;/.test(css));
-ok('★ 두 줄까지만 보인다 (15px × 2 = 30px)',
-   /line-height: 15px;/.test(css) && /max-height: 30px;/.test(css));
-ok('넘치는 세 번째 줄은 숨긴다', /overflow: hidden;/.test(css));
-ok('긴 단어도 접는다', /word-break: break-word;/.test(css));
-ok('위 정렬 — 한 줄·두 줄이 섞여도 흔들리지 않게', /vertical-align: top;/.test(css));
+/* ★★ 2026-09-30 «두 줄까지» → «한 줄» (대표 지시 2026-08-30 「넓을 경우 2줄로 절대 만들지 마라」).
+   「제조,도매,서비스」 한 칸이 두 줄이 되면 그 줄 전체 높이가 배가 된다. */
+const bizRule = (css.match(/\.dt td\.co-biz-col,\s*\.dt td\.co-biz-cat,[^{]*\{[^}]*\}/) || [''])[0];
+ok('★★ 업태·종목은 한 줄 — 줄바꿈을 막는다', /white-space:\s*nowrap/.test(bizRule));
+ok('★★ 넘치면 … 로 자른다', /text-overflow:\s*ellipsis/.test(bizRule) && /overflow:\s*hidden/.test(bizRule));
+ok('★ 안쪽 co-edit-cell 에도 건다 — td 에만 걸면 그 안의 div 가 줄을 내린다',
+   /td\.co-biz-col \.co-edit-cell/.test(bizRule) && /td\.co-biz-cat \.co-edit-cell/.test(bizRule));
+ok('★★ 두 줄 허용이 돌아오지 않았다', !/max-height:\s*30px/.test(bizRule) && !/white-space:\s*normal/.test(bizRule));
+ok('★ 잘린 값은 말풍선에 — 안쪽 칸 title 이 td title 을 덮으므로 tipTitle 로 넘긴다',
+   (pe.match(/renderCell\(co, 'bizType', co\.bizType, \{ tipTitle: coTip\(co\.bizType\) \}\)/g) || []).length === 2
+   && (pe.match(/renderCell\(co, 'bizCategory', co\.bizCategory, \{ tipTitle: coTip\(co\.bizCategory\) \}\)/g) || []).length === 2);
 
 /* 폭을 줄인 것이 맞는지 — 종전 minWidth(80/90)보다 크더라도 max 로 상한이 생겼는지가 핵심 */
 ok('★ 상한(max-width)이 생겼다 (종전엔 하한만 있어 한없이 늘어났다)',

@@ -154,7 +154,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=12">
+<link rel="stylesheet" href="css/pu-erp.css?v=13">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -25505,7 +25505,8 @@ try {
      ⚠ 폭만 넓히면 값이 길어지는 날 다시 두 줄이 된다 — .co-1line 이 «줄바꿈 자체»를 막는다. */
 var COMPANY_TABLE_WIDTHS = {
   suboffice:[32,32,76,220,76,100,82,110,70,230,72,72,72,72,72,84,52,60],
-  full:[32,32,76,221,60,72,80,95,70,100,70,55,55,65,65,200,80,90,72,48,55,85,72,78,80,48,55]
+  /* 담당자 80→100 · 연락처 90→108 (2026-09-30): 「010-1111-2222」 고정폭 90px + 여백 16 — 모자라 두 줄로 흘렀다 */
+  full:[32,32,76,221,60,72,80,95,70,100,70,55,55,65,65,200,100,108,72,48,55,85,72,78,80,48,55]
 };
 function coTableColgroup(kind){
   return h('colgroup', null, COMPANY_TABLE_WIDTHS[kind].map(function(width,i){
@@ -25527,6 +25528,9 @@ function coCeoTip(co){
   return both ? both + ' — 더블클릭으로 편집' : '더블클릭으로 편집';
 }
 try { window.coCeoTip = coCeoTip; } catch(_){ }
+/* 한 줄로 잘리는 칸의 말풍선 — 온값을 먼저, 편집 안내는 뒤에 (2026-09-30) */
+function coTip(v){ var t = String(v == null ? '' : v).trim(); return t ? t + ' — 더블클릭으로 편집' : '더블클릭으로 편집'; }
+try { window.coTip = coTip; } catch(_){ }
 
 function CompanyManagement(){
   var _fill1 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 240px)
@@ -27300,8 +27304,8 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                     arvBadge(co, 'companies', refreshCompanies)),
                     h('td', null, renderMgrCell(co, mgrOptions)),
                     h('td', null, renderCell(co, 'bizNo', co.bizNo, {})),
-                    h('td', { className:'co-biz-col', title:co.bizType||'' }, renderCell(co, 'bizType', co.bizType, {})),
-                    h('td', { className:'co-biz-cat', title:co.bizCategory||'' }, renderCell(co, 'bizCategory', co.bizCategory, {})),
+                    h('td', { className:'co-biz-col', title:co.bizType||'' }, renderCell(co, 'bizType', co.bizType, { tipTitle: coTip(co.bizType) })),
+                    h('td', { className:'co-biz-cat', title:co.bizCategory||'' }, renderCell(co, 'bizCategory', co.bizCategory, { tipTitle: coTip(co.bizCategory) })),
                     /* ★ 대표자도 «한 줄»이다 — 두 사람이면 옆에 나란히 둔다(위아래로 쌓지 않는다).
                        넘치면 … 로 자르고 온이름은 말풍선에 남긴다. */
                     h('td', { className:'co-1line' }, co.ceo2
@@ -27310,7 +27314,8 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                           h('span', { style:{ color:'#cbd5e1' } }, '·'),
                           renderCell(co, 'ceo2', co.ceo2, { tipTitle: coCeoTip(co) }))
                       : renderCell(co, 'ceo', co.ceo, { tipTitle: coCeoTip(co) })),
-                    h('td', null, renderCell(co, 'address', co.address, {})),
+                    /* 주소도 한 줄 — 넘치면 … , 온주소는 말풍선 (2026-09-30) */
+                    h('td', { className:'co-1line', title:co.address||'' }, renderCell(co, 'address', co.address, { tipTitle: coTip(co.address) })),
                     h('td', { style:{ background:'#f0fdf4' } }, wageCell(co, 'filed')),
                     h('td', { style:{ background:'#f0fdf4' } }, wageCell(co, 'taxReq')),
                     h('td', { style:{ background:'#f0fdf4' } }, wageCell(co, 'taxReply')),
@@ -27366,8 +27371,10 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                   // 주담당 [계약고유]
                   h('td', { className:'contract-only' }, renderMgrCell(co, mgrOptions)),
                   // 부담당 (인라인 토글)
-                  h('td', { style:{ fontSize:'10.5px' } },
-                    h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px' } },
+                  /* 부담당도 한 줄 — 둘 넘게 붙으면 줄을 내리지 않고 … (2026-09-30) */
+                  h('td', { style:{ fontSize:'10.5px' },
+                      title:users.filter(function(u){ return u.sid !== co.managerMain && (co.managerSubs||[]).indexOf(u.sid) >= 0; }).map(function(u){ return u.name; }).join(' · ') || undefined },
+                    h('div', { style:{ display:'flex', flexWrap:'nowrap', gap:'4px', overflow:'hidden', whiteSpace:'nowrap' } },
                       users.filter(function(u){return u.sid !== co.managerMain;}).map(function(u){
                         var on = (co.managerSubs||[]).indexOf(u.sid) >= 0;
                         if(!on) return null;
@@ -27389,9 +27396,9 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                   // 사업자번호
                   h('td', null, renderCell(co, 'bizNo', co.bizNo, {})),
                   // 업태
-                  h('td', { className:'co-biz-col', title:co.bizType||'' }, renderCell(co, 'bizType', co.bizType, {})),
+                  h('td', { className:'co-biz-col', title:co.bizType||'' }, renderCell(co, 'bizType', co.bizType, { tipTitle: coTip(co.bizType) })),
                   // 종목
-                  h('td', { className:'co-biz-cat', title:co.bizCategory||'' }, renderCell(co, 'bizCategory', co.bizCategory, {})),
+                  h('td', { className:'co-biz-cat', title:co.bizCategory||'' }, renderCell(co, 'bizCategory', co.bizCategory, { tipTitle: coTip(co.bizCategory) })),
                   /* 대표자 (2명까지) — ★ 둘이어도 «한 줄»이다. 위아래로 쌓으면
                      그 한 줄 때문에 표 전체가 두 배로 길어진다(대표 지시 2026-08-30).
                      넘치면 … 로 자르고 온이름은 말풍선에 남긴다. */
@@ -27418,36 +27425,40 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                     return renderCell(co, 'zipcode', zip || '', {});
                   })()),
                   // 주소 (별도 컬럼) - 우편번호 패턴 제거 후 표시 (편집 시 우편번호 분리 효과)
-                  h('td', null, (function(){
+                  /* ★ 한 줄 (대표 지시 2026-08-30 · 2026-09-30 적용) — 주소가 두 줄로 접혀 줄마다 높이가 배가 됐다.
+                     넘치면 … 로 자르고 온주소는 말풍선에 남긴다. */
+                  h('td', { className:'co-1line', title:(co.address||'').replace(/^\s*[\(\[]?\d{5,6}[\)\]]?\s*/, '') }, (function(){
                     var addr = (co.address||'').replace(/^\s*[\(\[]?\d{5,6}[\)\]]?\s*/, '');
-                    return renderCell(co, 'address', addr, {});
+                    return renderCell(co, 'address', addr, { tipTitle: coTip(addr) });
                   })()),
                   // 담당자 (2명까지: 대표 + 다음)
                   // 기업정보함 딥링크(📇)는 뺐다 — 줄마다 붙어 표가 어수선했다.
                   // 기업정보함에서 찾는 일은 계약·업체 편집창의 [📇 기업정보함] 에서 한다
-                  h('td', null, (function(){
+                  /* ★★ 담당자·연락처도 «한 줄» (대표 지시 2026-08-30 · 2026-09-30 적용).
+                     두 사람을 위아래로 쌓아 줄마다 높이가 배가 됐다 — 이제 나란히 두고(.co-pair),
+                     넘치면 둘째가 … 로 줄어든다. 두 사람 모두 td 말풍선에서 읽는다.
+                     ⚠ 담당자·연락처는 «같은 차례»로 맞춘다 — 첫째 이름 옆 번호가 첫째 번호다. */
+                  (function(){
                     var cs = co.contacts || [];
-                    if(cs.length === 0){
-                      return renderCell(co, 'primaryContactName', co.primaryContactName, {});
-                    }
-                    var primary = cs.find(function(x){return x.isPrimary;}) || cs[0];
-                    var second = cs.find(function(x){return x !== primary;});
-                    return h('div', { style:{ fontSize:'11.5px', lineHeight:'1.4' } },
-                      h('div', null, primary ? (primary.name + (contactRole(primary) ? ' (' + contactRole(primary) + ')' : '')) : '-'),
-                      second && h('div', { style:{ color:'#64748b' } }, second.name + (contactRole(second) ? ' (' + contactRole(second) + ')' : ''))
-                    );
-                  })()),
-                  // 연락처 (2명까지)
-                  h('td', null, (function(){
-                    var cs = co.contacts || [];
-                    if(cs.length === 0) return renderCell(co, 'primaryContactPhone', co.primaryContactPhone, {});
-                    var primary = cs.find(function(x){return x.isPrimary;}) || cs[0];
-                    var second = cs.find(function(x){return x !== primary;});
-                    return h('div', { style:{ fontSize:'11.5px', fontFamily:'monospace', lineHeight:'1.4' } },
-                      h('div', null, (primary && primary.phone) || '-'),
-                      second && second.phone && h('div', { style:{ color:'#64748b' } }, second.phone)
-                    );
-                  })()),
+                    var primary = cs.length ? (cs.find(function(x){return x.isPrimary;}) || cs[0]) : null;
+                    var second = cs.length ? cs.find(function(x){return x !== primary;}) : null;
+                    function who(c){ return c ? (c.name + (contactRole(c) ? ' (' + contactRole(c) + ')' : '')) : ''; }
+                    var nameTip = [who(primary), who(second)].filter(Boolean).join(' · ');
+                    var phoneTip = [primary && primary.phone, second && second.phone].filter(Boolean).join(' · ');
+                    return [
+                      h('td', { key:'ct-n', className:'co-1line', title:nameTip || undefined }, !cs.length
+                        ? renderCell(co, 'primaryContactName', co.primaryContactName, {})
+                        : h('div', { className:'co-pair', style:{ fontSize:'11.5px' } },
+                            h('span', null, who(primary) || '-'),
+                            second && h('span', null, who(second)))),
+                      // 연락처 (2명까지 — 나란히)
+                      h('td', { key:'ct-p', className:'co-1line', title:phoneTip || undefined }, !cs.length
+                        ? renderCell(co, 'primaryContactPhone', co.primaryContactPhone, {})
+                        : h('div', { className:'co-pair', style:{ fontSize:'11.5px', fontFamily:'monospace' } },
+                            h('span', null, (primary && primary.phone) || '-'),
+                            second && second.phone && h('span', null, second.phone)))
+                    ];
+                  })(),
                   // 세금계산서 발급일 [계약고유]
                   h('td', { className:'contract-only' }, renderCell(co, 'taxInvoiceIssueDay', co.taxInvoiceIssueDay, {})),
                   // CMS 자동이체 여부

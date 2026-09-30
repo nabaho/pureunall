@@ -273,22 +273,23 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   padding-left: 4px;
   padding-right: 4px;
 }
-/* 업체관리 업태·종목 — 내용이 길어 칸이 한없이 넓어졌다.
-   폭을 묶고 두 줄까지만 보이게 한다 (줄높이 15px × 2 = 30px).
-   -webkit-box 대신 max-height 로 자르므로 표 배치가 깨지지 않는다.
-   전체 값은 셀 title 로 볼 수 있고, 더블클릭하면 그대로 편집된다. */
+/* 업체관리 업태·종목 — 내용이 길어 칸이 한없이 넓어졌다. 폭을 묶는다.
+   ★★ 한 줄이다 (대표 지시 2026-08-30 「넓을 경우 2줄로 절대 만들지 마라」 · 2026-09-30 적용).
+     예전엔 «두 줄까지» 보이게 했는데, 「제조,도매,서비스」 한 칸이 두 줄이 되면
+     그 줄 전체가 두 배로 높아졌다. 넘치면 … 로 자르고 온값은 셀 title(말풍선)에 남는다.
+     더블클릭하면 그대로 편집된다.
+   ⚠ 안쪽 co-edit-cell 에도 건다 — td 에만 걸면 그 안의 div 가 그대로 줄을 내린다. */
 .dt th.co-biz-col,
 .dt td.co-biz-col { max-width: 92px; }
 .dt th.co-biz-cat,
 .dt td.co-biz-cat { max-width: 132px; }
 .dt td.co-biz-col,
-.dt td.co-biz-cat {
-  white-space: normal;
-  word-break: break-word;
-  line-height: 15px;
-  max-height: 30px;
+.dt td.co-biz-cat,
+.dt td.co-biz-col .co-edit-cell,
+.dt td.co-biz-cat .co-edit-cell {
+  white-space: nowrap;
   overflow: hidden;
-  vertical-align: top;
+  text-overflow: ellipsis;
 }
 /* ★★ 환경설정 — 「한 화면에 모두」 (대표 지시 2026-09-13)
    ①「콤팩트하게 한 화면에 모두 정렬되게 해라. 아래로 안 나오게, 좌우로 배치해도 된다」
@@ -335,6 +336,21 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 담당자·연락처처럼 두 사람을 «나란히» 적는 칸 (2026-09-30) — 위아래로 쌓지 않는다.
+   첫 사람은 끝까지 보이게 두고, 둘째가 넘치면 … 로 줄인다. 온값은 td 말풍선에. */
+.dt.co-table td.co-1line .co-pair {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dt.co-table td.co-1line .co-pair > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dt.co-table td.co-1line .co-pair > span:first-child { flex-shrink: 0; max-width: 100%; }
+.dt.co-table td.co-1line .co-pair > span + span { color: #64748b; min-width: 0; }
 .dt-row-btn { padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; min-height: unset !important; line-height: 1.2; }
 .dt-row-btn.edit { background: #dbeafe; color: #1d4ed8; }
 .dt-row-btn.edit:hover { background: #bfdbfe; }
