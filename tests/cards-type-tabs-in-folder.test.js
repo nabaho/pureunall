@@ -204,7 +204,8 @@ test('★★ 탭을 저장소에서 지우지 «않는다» — 씨앗은 다시
   assert.equal(Object.keys(c.state.views).length, 6, '★ 탭이 사라졌다');
   assert.equal(c._put, undefined, '★ 그리는 중에 탭을 고쳐 썼다');
   /* 「내 탭 관리」는 화면에서 안 보이는 탭까지 «모두» 보여야 한다 */
-  const mgr = fnBody('openViewManager');
+  /* 2026-09-30: 탭 목록 뽑기가 vmSorted 로 옮겨 갔다(내 탭 관리 정리) — 둘을 함께 본다 */
+  const mgr = fnBody('openViewManager') + fnBody('vmSorted');
   assert.match(mgr, /filter\(v=>v&&v\.id\)/, '★ 내 탭 관리가 탭을 걸러 낸다 — 관리할 자리가 없어진다');
   assert.ok(!/scope\|\|'all'\)===/.test(mgr), '★ 내 탭 관리가 폴더로 거른다');
 });
