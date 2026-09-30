@@ -2515,6 +2515,9 @@ td.selcell{cursor:cell}
 .ntstbl td.dt.soon{color:#854d0e}.ntstbl td.dt.none{color:#991b1b}
 .ntstbl td.why{color:#64748b;font-size:12px}
 .ntstbl td.act{text-align:right;overflow:visible}
+/* 🔗 이알피 이름 대조 표 — 폭은 머리칸의 style 이 정한다(폐업 표의 칸 폭을 안 물려받게) */
+.ntstbl.erpname th:nth-child(n){width:auto}
+.ntstbl.erpname td.miss{color:#d97706;font-weight:700}
 .ntsact{font-size:11.5px;font-weight:800;border:1px solid #cbd5e1;color:#1e293b;background:#ffffff;
   border-radius:7px;padding:3px 9px;white-space:nowrap;cursor:pointer}
 .ntsact.pri{background:#2563eb;border-color:#2563eb;color:#ffffff}
@@ -15100,31 +15103,83 @@ function ignoreSimilar(csv){
   _simIgnoreSave(set); toast('이 묶음을 무시했습니다'); _refresh(openSimilar);
 }
 
-/* ════════════ 🔗 ERP 대표자·담당자 대조 (업체관리에 있는데 기업정보함에 없는 이름 찾기) ════════════ */
+/* ════════════ 🔗 ERP 대표자·담당자 대조 (업체관리에 있는데 기업정보함에 없는 이름 찾기) ════════════
+   ■ 2026-09-30 대표 「이런 데이터 어떻게 하는게 좋은가?」 → 목업 → 「진행」
+     259곳이 떴는데 대부분 «문제가 아니었다»:
+       ① 같은 사람을 세 번 셌다 — 이알피는 담당자를 세 곳(contacts · primaryContactName · contactName)에 둔다
+       ② 「사무실」·「담당자」 같은 사람 아닌 글자도 사람으로 셌다
+       ③ 명함이 0장인 회사가 거의 전부였다 — 이름이 틀린 게 아니라 명함을 아직 안 받은 곳
+     그래서 셋으로 가른다: 손볼 곳(명함은 있는데 이름이 없다) · 명함 아직 없음 · 이알피 이름 칸에 직함.
+   ⚠ 이알피 자료는 «읽기만» 한다 — 이름 칸의 직함은 이알피에서 고칠 목록으로만 보여 준다.
+   ⚠ 이름 견주기는 ErpMatch._nameHit 그대로(앞부분이 같으면 같은 사람 — 「홍길동이사」=「홍길동」). */
+const ERP_TITLE_RE = /(대표이사|대표자|대표|부회장|회장|부사장|사장|전무이사|전무|상무이사|상무|이사|본부장|센터장|실장|원장|국장|소장|부장|차장|과장|팀장|대리|주임|사원|매니저|담당자|담당|님)$/;
+const ERP_NOT_PERSON = /^(사무실|담당자|담당|대표|대표자|경리|총무|인사|회계|관리자|관리|없음|미정|미상|직원|본사|공장|\-+|\.+)$/;
+/* 이알피 이름 한 칸 → 사람 이름들. 「이상섭대표 , 남유라주임」처럼 한 칸에 둘이 든 것도 가른다 */
+function erpNamePeople(raw){
+  return String(raw == null ? '' : raw).split(/[,，/·]/).map(function(p){
+    const t = p.replace(/\([^)]*\)/g, '').replace(/\s+/g, '');
+    let n = t, titled = false;
+    for(let i = 0; i < 3 && ERP_TITLE_RE.test(n) && n.replace(ERP_TITLE_RE, '').length >= 2; i++){ n = n.replace(ERP_TITLE_RE, ''); titled = true; }
+    return { raw: p.trim(), name: n, titled: titled, person: !!n && !ERP_NOT_PERSON.test(n) && !ERP_NOT_PERSON.test(t) };
+  }).filter(function(x){ return x.raw; });
+}
+/* 한 회사의 이알피 사람들 — 같은 사람은 한 번만(대표가 담당보다 앞선다) */
+function erpCoPeople(co){
+  const src = [];
+  if(co.ceo)  src.push(['대표', co.ceo]);
+  if(co.ceo2) src.push(['대표', co.ceo2]);
+  ((co.contacts || []).map(function(c){ return c && c.name; })).concat([co.primaryContactName, co.contactName])
+    .filter(Boolean).forEach(function(nm){ src.push(['담당', nm]); });
+  const seen = {}, people = [], odd = [];
+  src.forEach(function(s){
+    erpNamePeople(s[1]).forEach(function(p){
+      if(p.titled || !p.person) odd.push(p.raw);
+      if(!p.person) return;
+      const k = ErpMatch._norm(p.name);
+      if(!k || seen[k]) return;
+      seen[k] = 1; people.push({ role: s[0], name: p.name, key: k });
+    });
+  });
+  return { people: people, odd: odd.filter(function(v, i, a){ return a.indexOf(v) === i; }) };
+}
 function findErpNameMismatch(){
   if(!ErpMatch.ready || !ErpMatch.companies) return null;
   const cards=Object.values(state.items).filter(it=>it&&it.kind==='card'&&it.name);
   const cardsByCo={};
   cards.forEach(it=>{ const k=ErpMatch._norm(it.company); if(k) (cardsByCo[k]=cardsByCo[k]||[]).push(it); });
-  const rows=[];
+  const fix = [], none = [], titled = [];
   ErpMatch.companies.forEach(co=>{
     if(!co) return;
-    const erpNames=[];
-    if(co.ceo)  erpNames.push({role:'대표자', name:co.ceo});
-    if(co.ceo2) erpNames.push({role:'대표자2', name:co.ceo2});
-    [ ...((co.contacts||[]).map(c=>c&&c.name)), co.primaryContactName, co.contactName ]
-      .filter(Boolean).forEach(nm=>erpNames.push({role:'담당자', name:nm}));
-    if(!erpNames.length) return;
+    const pp = erpCoPeople(co);
+    const base = { company:co.name||'(회사명없음)', bizNo:co.bizNo||'' };
+    if(pp.odd.length) titled.push(Object.assign({ odd: pp.odd }, base));
+    if(!pp.people.length) return;
     let coCards=(cardsByCo[ErpMatch._norm(co.name)]||[]).slice();
     const bd=ErpMatch._digits(co.bizNo);
     if(bd.length>=10) cards.forEach(it=>{ if(ErpMatch._digits(it.bizno)===bd && coCards.indexOf(it)<0) coCards.push(it); });
     const cardNames=coCards.map(it=>ErpMatch._norm(it.name)).filter(Boolean);
-    const missing=erpNames.filter(en=>{ const nn=ErpMatch._norm(en.name); if(!nn) return false;
-      return !cardNames.some(cn=>ErpMatch._nameHit(cn,nn)); });
-    if(missing.length) rows.push({ company:co.name||'(회사명없음)', bizNo:co.bizNo||'',
-      missing:missing.map(m=>m.role+': '+m.name), haveCards:coCards.length });
+    const missing=pp.people.filter(p=>!cardNames.some(cn=>ErpMatch._nameHit(cn,p.key)));
+    if(!missing.length) return;
+    const row = Object.assign({ missing: missing.map(m=>m.role+' '+m.name),
+      have: coCards.map(it=>it.name).filter((v,i,a)=>a.indexOf(v)===i), haveCards: coCards.length }, base);
+    (coCards.length ? fix : none).push(row);
   });
-  return rows;
+  return { fix: fix, none: none, titled: titled };
+}
+let _erpNameSeg = 'fix';
+let _erpNameInfo = false;
+/* ⚠ 환경설정 안(인라인)에서 열렸으면 그 자리에 다시 그린다 — openErpNameCheck 를 그냥 부르면 팝업으로 뜬다 */
+function erpNameRepaint(){ if(state.view==='settings' && state.setSub==='erpname') renderSettingsPage(); else openErpNameCheck(); }
+function erpNameSegSet(k){ _erpNameSeg = k; erpNameRepaint(); }
+function erpNameInfoToggle(){ _erpNameInfo = !_erpNameInfo; erpNameRepaint(); }
+/* 표의 한 줄에서 기업 상세로 — 사업자번호가 먼저, 없으면 이름으로 찾는다 */
+function erpNameOpenCo(bizNo, name){
+  const bd = digits(bizNo || ''), nn = ErpMatch._norm(name || '');
+  const o = (coList() || []).find(x => bd.length >= 10 && digits(x.bizno || '') === bd)
+         || (coList() || []).find(x => nn && ErpMatch._norm(x.name) === nn);
+  if(!o) return toast('기업정보함에 이 회사가 아직 없습니다 — 사업자등록증이나 명함을 먼저 올려 주세요', 7000);
+  closeSettingsPage(); openCoPage();
+  state.coPick = ''; pickCo(o.key);
 }
 function openErpNameCheck(){
   const msg=(t)=>{ if(_panelTarget==='inline') return showPanel(
@@ -15132,23 +15187,44 @@ function openErpNameCheck(){
     toast(t,5000); };
   if(Store.mode!=='firebase') return msg('ERP 연결(Firebase) 상태에서만 대조할 수 있습니다');
   if(!ErpMatch.ready) return msg('ERP 업체관리 데이터를 불러오는 중입니다. 잠시 후 다시 눌러 주세요.');
-  const rows=findErpNameMismatch();
-  if(!rows) return msg('ERP 데이터를 아직 못 읽었습니다. 잠시 후 다시 시도하세요.');
-  if(!rows.length) return msg('✅ 불일치 없음 — ERP 대표자·담당자가 모두 기업정보함에 있습니다');
-  rows.sort((a,b)=>b.missing.length-a.missing.length);
-  let h=`<div class="mhead"><b>🔗 ERP 대표자·담당자 대조 — ${rows.length}개 회사</b>
-    ${_closeBtn()}</div>
-    <p style="font-size:12.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
-    푸른이알피 업체관리엔 <b>등록돼 있는데 기업정보함엔 없는</b> 대표자·담당자예요. 명함을 추가하거나 이름 철자를 맞추면 연결됩니다.</p>`;
-  rows.slice(0,200).forEach(r=>{
-    h+=`<div class="ditem"><div class="v"><b>${esc(r.company)}</b>${r.bizNo?` <span style="color:var(--sub);font-size:11px">${esc(fmtBizno(r.bizNo))}</span>`:''}<br>
-      <span style="color:var(--orange);font-size:12.5px">기업정보함에 없음 — ${esc(r.missing.join(', '))}</span>
-      <span style="color:var(--sub);font-size:11.5px"> · 이 회사 명함 ${r.haveCards}장</span></div></div>`;
-  });
-  if(rows.length>200) h+=`<p style="color:var(--sub);font-size:12px;padding:8px 2px">…외 ${rows.length-200}개 회사</p>`;
-  showPanel(h);
+  const r=findErpNameMismatch();
+  if(!r) return msg('ERP 데이터를 아직 못 읽었습니다. 잠시 후 다시 시도하세요.');
+  if(!r.fix.length && !r.none.length && !r.titled.length) return msg('✅ 불일치 없음 — ERP 대표자·담당자가 모두 기업정보함에 있습니다');
+  r.fix.sort((a,b)=>b.missing.length-a.missing.length || String(a.company).localeCompare(String(b.company),'ko'));
+  r.none.sort((a,b)=>String(a.company).localeCompare(String(b.company),'ko'));
+  r.titled.sort((a,b)=>String(a.company).localeCompare(String(b.company),'ko'));
+  const seg = r[_erpNameSeg] ? _erpNameSeg : 'fix';
+  const segBtn = (k, label, n) => `<button class="ntsseg${seg===k?' on':''}" onclick="erpNameSegSet('${k}')">${label}<b>${n}</b></button>`;
+  const open = x => `onclick="erpNameOpenCo('${esc(String(x.bizNo).replace(/'/g,"\\'"))}','${esc(String(x.company).replace(/'/g,"\\'"))}')"`;
+  const cell = v => `<td title="${esc(v)}">${esc(v)}</td>`;
+  let rows = '';
+  if(seg === 'titled'){
+    rows = `<thead><tr><th style="width:34%">회사</th><th style="width:18%">사업자번호</th><th>이알피 이름 칸</th></tr></thead><tbody>`
+      + r.titled.slice(0, 300).map(x => `<tr ${open(x)}><td class="nm">${esc(x.company)}</td><td class="why">${esc(x.bizNo ? fmtBizno(x.bizNo) : '')}</td>${cell(x.odd.join(' · '))}</tr>`).join('');
+  } else {
+    const list = r[seg];
+    rows = `<thead><tr><th style="width:26%">회사</th><th style="width:15%">사업자번호</th><th style="width:30%">이알피에만 있는 사람</th><th>${seg==='fix'?'받아 둔 명함':''}</th></tr></thead><tbody>`
+      + list.slice(0, 300).map(x => `<tr ${open(x)}><td class="nm">${esc(x.company)}</td><td class="why">${esc(x.bizNo ? fmtBizno(x.bizNo) : '')}</td>`
+        + `<td class="miss" title="${esc(x.missing.join(' · '))}">${esc(x.missing.join(' · '))}</td>`
+        + (seg==='fix' ? cell(x.have.join(' · ')) : '<td></td>') + `</tr>`).join('');
+  }
+  const cnt = seg==='titled' ? r.titled.length : r[seg].length;
+  const more = cnt > 300 ? `<p class="setnote" style="padding:8px 2px">…외 ${(cnt-300).toLocaleString()}곳</p>` : '';
+  const why = { fix:'명함은 있는데 이알피의 이 사람이 그 명함들에 없습니다 — 명함을 더 받거나 이름을 맞추면 이어집니다',
+                none:'이름이 틀린 게 아니라 명함을 아직 안 받은 곳입니다',
+                titled:'이알피 이름 칸에 직함·사람 아닌 글자가 든 곳입니다 — 이알피 업체관리에서 고칩니다(여기서는 안 고칩니다)' }[seg];
+  showPanel(`<div class="mhead"><b>🔗 이알피 대표자·담당자 대조
+      <span class="ntsi" onclick="erpNameInfoToggle()" title="어떻게 견주는지 봅니다">i</span></b>${_closeBtn()}</div>
+    ${_erpNameInfo ? `<div class="ntspop"><b>이렇게 견줍니다</b>
+      <div>· 같은 사람은 한 번만 셉니다(담당자 목록 · 주 담당 · 담당자명이 겹쳐도)</div>
+      <div>· 직함은 떼고 견줍니다 — 「홍길동이사」·「홍길동 대표」 = 홍길동</div>
+      <div>· 「사무실」·「담당자」처럼 사람이 아닌 글자는 세지 않습니다</div>
+      <div>· 손볼 곳 = 명함은 있는데 이알피의 이름이 그 명함들에 없는 회사</div></div>` : ''}
+    <div class="ntsbar">${segBtn('fix','손볼 곳',r.fix.length)}${segBtn('none','명함 아직 없음',r.none.length)}${segBtn('titled','이알피 이름 칸에 직함',r.titled.length)}</div>
+    <p class="setnote" style="margin:0 0 8px">${esc(why)}</p>
+    ${cnt ? `<div class="ntswrap"><table class="ntstbl erpname">${rows}</tbody></table></div>${more}`
+          : '<p class="cpnone" style="padding:16px 2px">여기에 해당하는 곳이 없습니다 👍</p>'}`);
 }
-
 /* ════════════ 📤 엑셀 내보내기 ════════════ */
 /* ══════ 내려받기 — 셋 중 «고른 것»만 (대표 지시 2026-08-29) ══════
    「명함 사업자 기업상세 각각 다운 받을 수 있게 해달라」 · 「내려받는건 환경설정에서」
