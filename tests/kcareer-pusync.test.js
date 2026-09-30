@@ -176,14 +176,14 @@ test('buildSyncPlan: ★ 한 업체에 같은 해 두 건이면 후보를 «둘 
 test('buildSyncPlan: ★ 영구 id 가 있으면 열쇠는 «cases#id» — 줄 번호가 아니다', () => {
   const collData = { cases: [
     { id: 'case-1', companyName: '가나상사', caseNo: '부해등-2026-001', title: 't', closedDate: '2026-01-01' },
-    { id: 'case-2', companyName: '다라전자', caseNo: '산재등-2026-004', title: 't', closedDate: '2026-01-01' }
+    { id: 'case-2', companyName: '다라전자', caseNo: '산재등-2026-901', title: 't', closedDate: '2026-01-01' }
   ] };
   const plan = PS.buildSyncPlan(collData, new Set(), {});
   assert.deepEqual(plan.adds.map((a) => a.rec.puRef), ['cases#case-1', 'cases#case-2']);
   const r = plan.adds[1].rec;
   assert.equal(r.sourceKind, 'case', '온톨로지 sourceKind');
   assert.equal(r.sourceId, 'case-2', '온톨로지 sourceId = 이알피 영구 id');
-  assert.equal(r.sourceNo, '산재등-2026-004', '관리번호는 보여 주기용으로 따로');
+  assert.equal(r.sourceNo, '산재등-2026-901', '관리번호는 보여 주기용으로 따로');
   assert.equal(r.puRefWeak, undefined);
   // 이미 id 로 들어온 것은 건너뛴다 — 줄이 밀려도(앞의 것이 지워져도) 같은 건으로 안다
   const plan2 = PS.buildSyncPlan({ cases: [collData.cases[1]] }, new Set(['cases#case-2']), {});
@@ -230,13 +230,13 @@ test('buildRefMigration: ★ 관리번호만 같다고 옮기지 않는다 — �
 });
 
 test('buildNoUpdates: 이알피가 관리번호를 다시 매기면 영구 열쇠로 이어진 건만 따라 고친다', () => {
-  const collData = { consultings: [{ id: 'k1', no: '기술보호-2026-003' }, { no: '기술보호-2026-009' }] };
+  const collData = { consultings: [{ id: 'k1', no: '기술보호-2026-901' }, { no: '기술보호-2026-909' }] };
   const ups = PS.buildNoUpdates(collData, [
-    { puRef: 'consultings#k1', sourceNo: '기술보호-2026-004' },
+    { puRef: 'consultings#k1', sourceNo: '기술보호-2026-902' },
     { puRef: 'consultings/1', sourceNo: '' },                           // 줄 번호 열쇠 — 따라가지 않는다
-    { puRef: 'consultings#k1', sourceNo: '기술보호-2026-004', puRefCheck: 'moved' }
+    { puRef: 'consultings#k1', sourceNo: '기술보호-2026-902', puRefCheck: 'moved' }
   ]);
-  assert.deepEqual(ups, [{ puRef: 'consultings#k1', sourceNo: '기술보호-2026-003' }]);
+  assert.deepEqual(ups, [{ puRef: 'consultings#k1', sourceNo: '기술보호-2026-901' }]);
 });
 
 test('mapRecord: 모르는 컬렉션은 null', () => {
