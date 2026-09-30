@@ -19167,8 +19167,10 @@ function mbWorkTag(v, wide){
   const w0 = mbWhoOfRow(v);
   const mgrs = mbWorkMgrs(ws);
   const tip = ws.map(w=>`${MB_WORK_KIND[w.kind]} · ${w.co}${w.title?' · '+w.title:''} · 담당 ${mbWhoLive(w.mgr)||'없음'}`).join('\n')
-    + `\n누르면 푸른이알피 ${MB_WORK_KIND[ws[0].kind]}관리가 열립니다`;
-  const go = `event.stopPropagation();mbWorkGo('${ws[0].kind==='case'?'case':'consulting'}')`;
+    + (ws.length > 1 ? `\n누르면 어느 건을 열지 고릅니다` : `\n누르면 푸른이알피에서 이 ${MB_WORK_KIND[ws[0].kind]} 한 건이 열립니다`);
+  /* ⚠ 건 번호를 단추 글자에 싣지 않는다 — 누를 때 주소로 다시 찾는다(mbGuessLink 와 같은 까닭) */
+  const em = String((v&&v.e)||'').trim().toLowerCase();
+  const go = `event.stopPropagation();mbWorkPick('${esc(em)}',event)`;
   /* 그 건 담당의 칸에서 보면 — 업체 담당이 따로 있다는 것을 밝힌다 */
   const me = id.charAt(0)===MB_WHO_P ? id.slice(1) : '';
   if(me && w0 && me !== w0 && mgrs.indexOf(me) >= 0)
@@ -19179,11 +19181,33 @@ function mbWorkTag(v, wide){
   const more = wide && ws.length === 1 && ws[0].title ? ' — ' + ws[0].title : '';
   return `<span class="dm-work" onclick="${go}" title="${esc(tip)}">📁 ${esc(label + who + more)}</span>`;
 }
-/* 이알피 그 메뉴로 — 창은 공용 층이 고른다(한 앱 한 창).
+/* 📁 을 눌렀을 때 — 건이 하나면 바로, 여럿이면 고르게 (대표 지시 2026-09-30 「1번」) */
+function mbWorkPick(em, ev){
+  const ws = mbWorkOfRow({ e: String(em||'') });
+  if(!ws.length) return toast('진행 중인 사건·컨설팅이 이제 없습니다 — 끝났거나 담당자 이메일이 바뀌었습니다', 7000);
+  if(ws.length === 1) return mbWorkGo(ws[0]);
+  const m = $('folderMenu'); if(!m) return mbWorkGo(ws[0]);
+  m.innerHTML = `<div class="fmhead">어느 건을 열까요 <span>진행 중 ${ws.length}건</span></div>`
+    + ws.map((w, i)=>`<div class="fmi" onclick="closeFolderMenu();mbWorkGoAt('${esc(em)}',${i})">📁 ${
+        esc(MB_WORK_KIND[w.kind] + ' · ' + w.co + (w.title ? ' · ' + w.title : ''))}<small>담당 ${
+        esc(mbWhoLive(w.mgr) || '없음')}</small></div>`).join('');
+  mbPlaceMenu(m, ev);
+}
+function mbWorkGoAt(em, i){
+  const w = mbWorkOfRow({ e: String(em||'') })[Number(i)];
+  if(w) mbWorkGo(w);
+}
+/* 이알피 «그 한 건»으로 — 창은 공용 층이 고른다(한 앱 한 창).
    ⚠ 「계약 등록」과 같은 결로 «따로 이름 붙은 창»을 쓴다 — 보던 이알피 화면을 덮지 않는다.
-   ⚠ 이알피에는 아직 «한 건을 바로 여는» 주소가 없다 — 그 메뉴까지 간다. */
-function mbWorkGo(kind){
-  const url = 'pu-erp.html#menu=' + (kind === 'case' ? 'biz/case' : 'biz/consulting');
+   ★ 건 번호는 주소의 ?open= 으로 넘긴다. 받는 쪽은 pu-erp.html 의 erpOpenRecFromUrl.
+     ⚠ localStorage 쪽지로 넘기지 않는다 — 쪽지는 «열린 이알피 창 전부»가 듣고 함께
+       움직인다(쓰던 화면까지 튄다). 주소는 그 창 하나에만 간다.
+     ⚠ opent(시각)를 함께 붙인다 — 같은 건을 두 번 누르면 주소가 같아 창이 안 움직인다. */
+function mbWorkGo(w){
+  if(!w) return;
+  const kind = w.kind === 'case' ? 'case' : 'consulting';
+  const url = 'pu-erp.html' + (w.id ? '?open=' + kind + ':' + encodeURIComponent(w.id) + '&opent=' + Date.now() : '')
+    + '#menu=' + (kind === 'case' ? 'biz/case' : 'biz/consulting');
   if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(url, '사무관리 보기');
   else location.href = url;
 }

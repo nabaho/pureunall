@@ -164,7 +164,8 @@ test('★★★ 딱지 — 업체 담당과 다르면 건 담당 이름을 함�
   const h = c.mbWorkTag({ e: 'office@ganasa.co.kr' });
   assert.match(h, /📁 컨설팅 · 권형하/);
   assert.match(h, /class="dm-work"/);
-  assert.match(h, /mbWorkGo\('consulting'\)/, '★★ 눌러도 이알피로 안 갑니다');
+  assert.match(h, /mbWorkPick\('office@ganasa\.co\.kr',event\)/, '★★ 눌러도 이알피로 안 갑니다');
+  assert.doesNotMatch(h, /onclick="[^"]*c1/, '★ 건 번호를 단추 글자에 실었습니다 — 누를 때 다시 찾아야 합니다');
   const c2 = box({ recs: [CONS({ email: 'hong@naver.com' })] });
   const h2 = c2.mbWorkTag({ e: 'hong@naver.com' });
   assert.match(h2, /📁 컨설팅</, '★ 담당이 같은데 이름을 또 적습니다');
@@ -212,6 +213,58 @@ test('★★ 이알피 원장은 읽기만 — 새로 읽는 자리도 없다(�
   assert.doesNotMatch(body, /firebase|\.ref\(/, '★★ 메일함이 이알피 원장을 건드립니다');
   assert.match(strip(sliceFn(app, 'function mbBizSubsLoad(')), /_mbWork = mbWorkBuild\(/);
   assert.match(strip(sliceFn(app, 'function mbWorkGo(')), /PuAppBar\.goApp\(/, '★ 창을 공용 층 밖에서 엽니다');
+});
+
+/* ══════ 📁 을 누르면 «그 한 건»이 열린다 (대표 지시 2026-09-30 「1번」) ══════ */
+function gobox(recs) {
+  const c = box({ recs });
+  const went = [];
+  c.PuAppBar = { goApp: (u, p) => went.push(u + ' | ' + p) };
+  c.window = c;
+  c.encodeURIComponent = encodeURIComponent;
+  c.Date = { now: () => 1700000000000 };
+  c.toast = (t) => went.push('toast ' + t);
+  c.$ = () => c._menu;
+  c._menu = { innerHTML: '' };
+  c.mbPlaceMenu = () => went.push('menu');
+  c.closeFolderMenu = () => {};
+  ['mbWorkPick', 'mbWorkGoAt', 'mbWorkGo'].forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), c));
+  return { c, went };
+}
+
+test('★★★ 건이 하나면 그 건의 번호를 실어 이알피를 연다 — 메뉴가 아니라 «그 한 건»', () => {
+  const { c, went } = gobox([CONS({ id: 'cons 7/가', email: 'hong@naver.com' })]);
+  c.mbWorkPick('hong@naver.com', {});
+  assert.equal(went.length, 1);
+  assert.match(went[0], /^pu-erp\.html\?open=consulting:cons%207%2F%EA%B0%80&opent=\d+#menu=biz\/consulting \| /,
+    '★★★ 건 번호가 주소에 안 실렸습니다 — 목록까지만 갑니다');
+  const s = gobox([{ _kind: 'case', id: 's9', status: 'open', managerMain: 'P-002', email: 'lee@naver.com' }]);
+  s.c.mbWorkPick('lee@naver.com', {});
+  assert.match(s.went[0], /\?open=case:s9&opent=\d+#menu=biz\/case/);
+});
+
+test('★★ 번호 없는 옛 건은 메뉴까지만 — 빈 번호로 열라고 하지 않는다', () => {
+  const { c, went } = gobox([CONS({ id: '', email: 'hong@naver.com' })]);
+  c.mbWorkPick('hong@naver.com', {});
+  assert.match(went[0], /^pu-erp\.html#menu=biz\/consulting/);
+});
+
+test('★★★ 건이 여럿이면 «고르게» 한다 — 고른 그 건이 열린다', () => {
+  const { c, went } = gobox([CONS({ id: 'c1', email: 'hong@naver.com' }),
+    { _kind: 'case', id: 's2', status: 'open', managerMain: 'P-002', email: 'hong@naver.com', companyName: '가나상사', title: '부당해고' }]);
+  c.mbWorkPick('hong@naver.com', {});
+  assert.deepEqual(went.slice(), ['menu'], '★★★ 여럿인데 고르지도 않고 하나를 엽니다');
+  assert.match(c._menu.innerHTML, /성과급 설계/);
+  assert.match(c._menu.innerHTML, /부당해고/);
+  assert.match(c._menu.innerHTML, /mbWorkGoAt\('hong@naver\.com',1\)/);
+  c.mbWorkGoAt('hong@naver.com', 1);
+  assert.match(went[1], /\?open=case:s2&/, '★★ 고른 것과 다른 건이 열립니다');
+});
+
+test('★★ 그 사이에 건이 끝났으면 알린다 — 눌렀는데 아무 일도 없게 두지 않는다', () => {
+  const { c, went } = gobox([]);
+  c.mbWorkPick('hong@naver.com', {});
+  assert.match(went[0], /^toast /);
 });
 
 /* ══════ 🏢 제목 속 업체 ══════ */
