@@ -1607,7 +1607,8 @@ test('pu-erp 원본 보기는 읽기 전용이다', () => {
 
 test('동기화 레코드 행에서 pu-erp 원본을 열 수 있다', () => {
   // 2026-09-29 목업 안 D — 🔎 단추를 번호 칸의 관리번호(누르면 뜨는 작은 창)로 옮겼다
-  const cell = funcSource('puNoTd');
+  assert.match(funcSource('puNoTd'), /puNoInner\(/);
+  const cell = funcSource('puNoInner');   // 표(td)와 외부기관 격자가 함께 쓰는 안쪽 (2026-09-30)
   assert.match(cell, /r\.puRef/);
   assert.match(cell, /puNoPop\(/);
   assert.match(funcSource('puNoPop'), /openPuSource\(/);

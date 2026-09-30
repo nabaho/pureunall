@@ -414,7 +414,7 @@ body.kc-staff .kc-staff-note{display:flex}
   background:#fff;color:var(--text-sub);cursor:pointer;white-space:nowrap;font-weight:600}
 .puag-kind:hover{background:var(--hover)}
 .puag-kind.on{background:var(--navy);border-color:var(--navy);color:#fff}
-.pa-row{display:grid;grid-template-columns:34px 58px 52px minmax(120px,220px) minmax(140px,1fr) 74px 32px;
+.pa-row{display:grid;grid-template-columns:34px 128px 58px 52px minmax(120px,220px) minmax(140px,1fr) 74px 32px;
   gap:8px;align-items:center;font-size:12px;padding:5px 0;border-top:1px solid var(--border-soft)}
 .pa-row>*{min-width:0}
 .pa-c{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -424,7 +424,7 @@ body.kc-staff .kc-staff-note{display:flex}
   border-top:none;padding-bottom:3px}
 .pa-head .pa-n{color:inherit}
 @media(max-width:900px){
-  .pa-row{grid-template-columns:28px 52px 46px minmax(90px,1fr) minmax(90px,1fr) 60px 26px;gap:6px}
+  .pa-row{grid-template-columns:28px 104px 52px 46px minmax(90px,1fr) minmax(90px,1fr) 60px 26px;gap:6px}
 }
 .dt thead th:first-child{border-top-left-radius:12px}
 .dt thead th:last-child{border-top-right-radius:12px}
@@ -4882,7 +4882,7 @@ function renderPuAgency(){
          칸이 안 맞으니 세로로 훑어 읽을 수가 없었다. 열 너비를 못 박아 줄을 세운다.
          ⚠ 연도 내림차순 — 연도가 «없는» 줄은 맨 뒤로. 전에는 「-」가 맨 위에 몰려 있었다. */
       + '<div class="pa-row pa-head">'
-      + '<span class="pa-n">№</span><span>유형</span><span>연도</span><span>고객사</span>'
+      + '<span class="pa-n">№</span><span>번호</span><span>유형</span><span>연도</span><span>고객사</span>'
       + '<span>' + (by==='agency' ? '사업명' : by==='project' ? '수행기관' : '수행기관 · 사업명') + '</span><span>담당자</span><span></span></div>'
       + g.rows.slice().sort(_paOrder).map(function(r,i){
           /* ★ 외부기관 실적도 «경력관리와 같이» 원본을 오른쪽에서 본다
@@ -4899,6 +4899,8 @@ function renderPuAgency(){
                      + ' title="눌러서 열기 — 원본이 있으면 오른쪽에 함께 보입니다"' : '')
             + '>'
             + '<span class="pa-n">' + (i+1) + '</span>'
+            /* ★ 이알피 관리번호 (2026-09-30) — 실적 표와 같은 번호 칸·같은 작은 창(puNoPop) */
+            + '<span class="pa-c">' + puNoInner(r, r._store) + '</span>'
             + '<span><span class="tag navy">' + r._label + '</span></span>'
             + '<span class="pa-y">' + escapeHtml(r.year||'-') + '</span>'
             + '<strong class="pa-c" title="' + escapeHtml(r.org||'') + '">' + escapeHtml(r.org||'-') + '</strong>'
@@ -8076,16 +8078,18 @@ function puNoLabel(r){
   if(r.puRef && typeof KcareerPuSync!=='undefined' && KcareerPuSync.fromCaseNo(r.project||'')) return String(r.project);
   return '';
 }
-function puNoTd(r, store){
+/* 번호 칸의 «안쪽» — 실적 표(td)와 외부기관 실적 격자(span)가 함께 쓴다 (2026-09-30) */
+function puNoInner(r, store){
+  if(!r || !r.puRef) return '<span class="id-chip">'+escapeHtml(r&&r.id)+'</span>';
   var no = puNoLabel(r);
-  if(!r || !r.puRef) return '<td><span class="id-chip">'+escapeHtml(r&&r.id)+'</span></td>';
-  var bad = !!r.puRefCheck;
-  return '<td style="white-space:nowrap" onclick="event.stopPropagation()">'
-    + '<a href="#" onclick="puNoPop(event,\''+_jsAttr(store)+'\',\''+_jsAttr(r.id)+'\');return false"'
+  return '<a href="#" onclick="event.stopPropagation();puNoPop(event,\''+_jsAttr(store)+'\',\''+_jsAttr(r.id)+'\');return false"'
     + ' title="눌러서 이알피 연결 보기" style="font-family:Consolas,monospace;font-weight:700;color:var(--navy);text-decoration:underline;text-underline-offset:2px">'
     + escapeHtml(no || r.id) + '</a>'
-    + (bad ? ' <span style="color:var(--amber);font-weight:700" title="이알피 연결이 어긋났습니다 — 눌러서 확인">⚠</span>' : '')
-    + '</td>';
+    + (r.puRefCheck ? ' <span style="color:var(--amber);font-weight:700" title="이알피 연결이 어긋났습니다 — 눌러서 확인">⚠</span>' : '');
+}
+function puNoTd(r, store){
+  if(!r || !r.puRef) return '<td>'+puNoInner(r, store)+'</td>';
+  return '<td style="white-space:nowrap" onclick="event.stopPropagation()">'+puNoInner(r, store)+'</td>';
 }
 /* 관리번호를 누르면 뜨는 작은 창 — 읽기만 한다 */
 function puNoPop(ev, store, id){
