@@ -317,3 +317,13 @@ test('★★ 머리줄에도 «전체 선택» 체크칸이 있다', () => {
   assert.match(머리, /rhDraftSelAll\(this\.checked\)/);
   assert.match(머리, /class="rownum-h"/, '목록 화면과 같은 옷을 입습니다');
 });
+
+test('★★ 이름을 눌러도 «이어서»와 같다 — 지금 열린 것은 빼고 (대표 지시 2026-09-30)', () => {
+  const m = 그리기무대(자리넷, 'rh_draft_2');
+  const 칸들 = [...m.html.matchAll(/<div style="font-size:12px;font-weight:700;color:var\(--navy\)[^>]*>/g)].map((x) => x[0]);
+  assert.equal(칸들.length, 4);
+  const 누름 = 칸들.filter((t) => /onclick="rhDraftResume\('rh_draft_\d+'\)"/.test(t));
+  assert.equal(누름.length, 3, '지금 열린 자리 하나만 빼고 이름을 누를 수 있어야 합니다');
+  assert.ok(!칸들.some((t) => /rhDraftResume\('rh_draft_2'\)/.test(t)), '지금 열린 것을 다시 열면 하던 것이 덮입니다');
+  assert.ok(누름.every((t) => /cursor:pointer/.test(t)));
+});
