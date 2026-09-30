@@ -23,7 +23,7 @@
 <script src="js/pu-rules-lawlink.js?v=1"></script>
 <script src="js/pu-rules-lawwatch.js?v=1"></script>
 <script src="js/pu-hwp-keep.js?v=1"></script>
-<script src="js/pu-kordoc-text.js?v=1"></script>
+<script src="js/pu-kordoc-text.js?v=2"></script>
 <script src="js/pu-rules-casebook.js?v=13"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pako.min.js"></script>
@@ -1266,6 +1266,8 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
       보관함은 「내 담당 + 남의 완료본」만 보이지만, 서고는 <b>사례집</b>이라 다른 담당자의 사업장 규정까지 모든 직원이 열어 봅니다.
       <br><span style="font-size:11.5px">공개해도 되는 자료인지 보고 올리십시오. 잘못 올린 회차는 목록에서 지울 수 있습니다.</span>
     </div>
+    <!-- 개인정보 가림 — 파일을 읽은 뒤에만 뜬다(목업 ② 2026-09-30) -->
+    <div id="cb-pii" style="display:none;margin-bottom:10px;padding:11px 14px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe"></div>
     <div id="cb-drop" style="border:2px dashed #cbd5e1;border-radius:12px;padding:22px 14px;text-align:center;background:#f8fafc;margin-bottom:10px">
       <div style="font-size:14px;font-weight:700;color:var(--sub)">📁 폴더를 이 자리에 떨어뜨리세요</div>
       <div class="muted" style="font-size:11.5px;margin-top:4px">10년치를 한꺼번에 넣어도 됩니다 — 끊기면 같은 폴더를 다시 떨어뜨리면 이어서 올라갑니다.</div>
@@ -1295,14 +1297,14 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
         <button class="stbtn" id="cb-apply">한 번에 적용</button>
         <span class="muted" style="font-size:11px">수백 건을 한 줄씩 고칠 수는 없습니다.</span>
       </div>
-      <table class="arch"><thead><tr><th>파일</th><th style="width:150px">사업장</th><th style="width:74px">연도</th><th style="width:112px">종류</th><th style="width:96px">못 가린 것</th></tr></thead>
+      <table class="arch"><thead><tr><th>파일</th><th style="width:150px">사업장</th><th style="width:74px">연도</th><th style="width:112px">종류</th><th style="width:96px">못 가린 것</th><th style="width:120px">개인정보</th></tr></thead>
       <tbody id="cb-need-body"></tbody></table>
     </div>
 
     <div id="cb-ok-wrap" style="display:none;margin-bottom:10px">
       <button class="stbtn" id="cb-ok-toggle">✓ 가려진 <span id="cb-ok-cnt"></span> — 펼치기</button>
       <div id="cb-ok-box" style="display:none;margin-top:8px;max-height:38vh;overflow:auto">
-        <table class="arch"><thead><tr><th>파일</th><th style="width:150px">사업장</th><th style="width:74px">연도</th><th style="width:112px">종류</th><th style="width:96px">가린 근거</th></tr></thead>
+        <table class="arch"><thead><tr><th>파일</th><th style="width:150px">사업장</th><th style="width:74px">연도</th><th style="width:112px">종류</th><th style="width:96px">가린 근거</th><th style="width:120px">개인정보</th></tr></thead>
         <tbody id="cb-ok-body"></tbody></table>
       </div>
     </div>
@@ -6037,7 +6039,11 @@ function cbRowHtml(r,i,editable){
   return `<tr><td title="${escapeH(r.path||r.name)}" style="font-size:11.5px">${escapeH(cbShort(r.path||r.name))}</td>`
     +`<td>${inp("site",r.site,"100%")}</td><td>${inp("year",r.year,"100%")}</td>`
     +`<td>${editable?cbRoleSel(r.role,i):escapeH(CB_ROLE_KO[r.role]||"—")}</td>`
-    +`<td style="font-size:11px;color:${r.need?"#854d0e":"var(--mute)"}">${escapeH(r.need?(r.why||[]).join("·"):(r.how||"—"))}</td></tr>`;
+    +`<td style="font-size:11px;color:${r.need?"#854d0e":"var(--mute)"}">${escapeH(r.need?(r.why||[]).join("·"):(r.how||"—"))}</td>`
+    +`<td>${cbPiiTag(r,i)}</td></tr>`
+    +(CB_PII.open[i]&&r.pii&&r.pii.total?`<tr><td colspan="6" style="background:#fffbeb;color:#854d0e;font-size:11.5px;line-height:1.8">찾은 곳 — ${
+      r.pii.samples.map(s=>`<code style="background:#f8fafc;border:1px solid #fde68a;border-radius:5px;padding:0 5px;color:#1e293b">${escapeH(s.masked)}</code>`).join(" ")}${
+      r.pii.total>r.pii.samples.length?` 외 ${r.pii.total-r.pii.samples.length}곳`:""} · 가린 뒤 다시 읽음 → 남은 것 <b>${r.pii.residual}건</b></td></tr>`:"");
 }
 /* 한 줄을 고치면 그 줄만 다시 판정한다 — 다른 줄의 사람 손질을 덮지 않게 */
 function cbRecheck(r){
@@ -6045,7 +6051,74 @@ function cbRecheck(r){
   if(!r.site)why.push("사업장");
   if(!r.year)why.push("연도");
   if(!r.role)why.push("서류종류");
+  /* 개인정보를 가렸는데 남았거나, 살피다 실패했으면 올리지 않는다 — «0건일 때만 올린다» */
+  if(CB_PII.on&&r.pii&&(r.pii.error||r.pii.residual>0))why.push("개인정보 남음");
   r.why=why; r.need=why.length>0;
+}
+/* ══════ 서고 개인정보 가림 (2026-09-30 · 목업 ② 승인 「추천대로」) ══════
+   서고는 직원 전체가 본다. 올리기 전에 kordoc 가 «브라우저 안에서» 주민·계좌·전화 등을 찾아 가린다.
+   · 한글(.hwp·.hwpx): 파일째 서식 그대로 가리고, 가린 파일을 다시 읽어 남은 것이 0건일 때만 올린다
+   · PDF·워드 등: 파일째 가리는 기능이 없다 — 글만 가리고 원본 파일은 담지 않는다(대표 결정)
+   · 원래 번호는 화면에도 기록에도 안 남긴다(보고에는 가린 모양만 온다)
+   ⚠ 서고가 비어 있어(2026-09-30 실측 0건) 「이미 있는 것 훑어 가리기」 는 만들지 않았다 — 앞으로 올리는 것이 모두 여기를 지난다. */
+const CB_PII={on:true,groups:null,busy:false,open:{}};
+function cbPiiGroups(){ if(!CB_PII.groups) CB_PII.groups=PuKordocText.PII_GROUPS.filter(g=>g.on).map(g=>g.key); return CB_PII.groups; }
+function cbPiiTag(r,i){
+  if(!CB_PII.on) return `<span class="muted" style="font-size:11px">가림 끔</span>`;
+  const p=r.pii;
+  if(!p) return `<span class="muted" style="font-size:11px">살피는 중…</span>`;
+  if(p.error) return `<span class="badge" style="background:#fef2f2;color:#991b1b" title="${escapeH(p.error)}">못 살핌</span>`;
+  if(!p.total) return `<span class="badge" style="background:#f0fdf4;color:#166534">없음</span>`;
+  const how=p.fileOk?(p.residual?"남은 것 "+p.residual+"건":"파일째 가림"):"글만 가림 · 원본 안 담음";
+  return `<span class="badge" data-pii="${i}" style="background:#fef2f2;color:#991b1b;cursor:pointer" title="${escapeH(how)} — 눌러서 찾은 곳 보기">${escapeH(PuKordocText.countLabel(p.count))}</span>`;
+}
+function cbPiiRender(){
+  const box=$("cb-pii"); if(!box) return;
+  if(!CB_ROWS.length||!window.PuKordocText){ box.style.display="none"; return; }
+  box.style.display="block";
+  const hit=CB_ROWS.filter(r=>r.pii&&r.pii.total), n=hit.reduce((a,r)=>a+r.pii.total,0);
+  const on=cbPiiGroups();
+  box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <b style="font-size:13px;color:#1e40af">🕶 ${CB_PII.busy?"개인정보를 살피는 중…":(n?`개인정보를 찾았습니다 — 파일 ${hit.length}개에서 ${n}곳`:"개인정보를 찾지 못했습니다")}</b>
+      <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-weight:700;color:#1e40af;cursor:pointer">
+        <input type="checkbox" id="cb-pii-on" ${CB_PII.on?"checked":""}> 가리고 올리기</label></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${PuKordocText.PII_GROUPS.map(g=>
+      `<span class="stbtn${on.indexOf(g.key)>=0?" on-adopt":""}" data-pii-g="${g.key}" style="font-size:11.5px;padding:2px 10px;cursor:pointer">${escapeH(g.label)}${g.why&&on.indexOf(g.key)<0?` <span class="muted">— ${escapeH(g.why)}</span>`:""}</span>`).join("")}</div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.7">원본 한글 파일(.hwp·.hwpx)도 <b>서식 그대로</b> 가려서 담습니다 — 본문 글·검색 색인·원본 파일 셋 다.
+      PDF·워드는 파일째 가리는 기능이 없어 <b>글만 가리고 원본 파일은 담지 않습니다.</b> 원래 번호는 화면에도 기록에도 남기지 않습니다.</div>`;
+  $("cb-pii-on").onchange=e=>{ CB_PII.on=e.target.checked; CB_ROWS.forEach(cbRecheck); cbRender(); };
+  box.querySelectorAll("[data-pii-g]").forEach(el=>el.onclick=()=>{
+    if(CB_PII.busy) return;
+    const k=el.dataset.piiG, g=cbPiiGroups(), at=g.indexOf(k);
+    if(at>=0) g.splice(at,1); else g.push(k);
+    cbPiiScan(CB_ROWS);                                   // 규칙이 바뀌면 다시 가린다
+  });
+}
+/* 줄마다 가려 본다 — 파일 손잡이(r.f)로 바이트를 다시 읽는다. 원본(r.f·r.text)은 그대로 두고 r.pii 에만 적는다 */
+async function cbPiiScan(rows){
+  if(!window.PuKordocText) return;
+  CB_PII.busy=true; rows.forEach(r=>{ delete r.pii; }); cbRender();
+  const prog=$("cb-prog"); prog.style.display="block";
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    prog.innerHTML=`개인정보 살피는 중 <b>${i+1}</b> / ${rows.length} — ${escapeH(r.name||"")}`;
+    try{
+      const buf=r.f?await r.f.arrayBuffer():new ArrayBuffer(0);
+      r.pii=await PuKordocText.redactFile(buf,r.text||"",cbPiiGroups());
+    }catch(e){ console.warn("개인정보 살피기 실패:",r.name,e); r.pii={error:String(e&&e.message||e).slice(0,120),total:0}; }
+    if(i%3===2)await new Promise(res=>setTimeout(res,0));
+  }
+  prog.style.display="none";
+  CB_PII.busy=false; CB_PII.open={};
+  rows.forEach(cbRecheck); cbRender();
+}
+/* 올릴 때 — 가린 글·가린 파일로 바꾼 사본을 올린다(목록의 원본 줄은 건드리지 않는다) */
+function cbPiiRow(r){
+  if(!CB_PII.on||!r.pii||!r.pii.total) return r;
+  const x=Object.assign({},r,{text:r.pii.text,head:String(r.pii.text||"").slice(0,4000)});
+  x.f=r.pii.data?new File([r.pii.data],r.name,{type:(r.f&&r.f.type)||""}):null;   // 한글이 아니면 원본을 안 담는다
+  x.piiHeld=!r.pii.data;
+  return x;
 }
 function cbRender(){
   const sp=CB.splitReady(CB_ROWS);
@@ -6062,7 +6135,10 @@ function cbRender(){
     ?folds.map(f=>`<option value="${escapeH(f)}">${escapeH(f)} (${CB_ROWS.filter(r=>r.folder===f).length}건)</option>`).join("")
     :`<option value="">— 폴더 없음 —</option>`;
   $("cb-erp-list").innerHTML=ERP_COS.slice(0,900).map(c=>`<option value="${escapeH(c.name||"")}">`).join("");
-  $("cb-go").disabled=!sp.ready.length;
+  $("cb-go").disabled=!sp.ready.length||CB_PII.busy;   // 개인정보를 살피는 동안은 못 올린다
+  cbPiiRender();
+  $("cb-need-body").querySelectorAll("[data-pii]").forEach(el=>el.onclick=()=>{ CB_PII.open[el.dataset.pii]=!CB_PII.open[el.dataset.pii]; cbRender(); });
+  $("cb-ok-body").querySelectorAll("[data-pii]").forEach(el=>el.onclick=()=>{ CB_PII.open[el.dataset.pii]=!CB_PII.open[el.dataset.pii]; cbRender(); });
   $("cb-go").textContent=sp.ready.length?`서고에 올리기 (${sp.ready.length}건)`:"서고에 올리기";
   $("cb-foot").textContent=CB_ROWS.length
     ?`${CB_ROWS.length}건 읽음 — ${sp.ready.length}건 올릴 수 있고 ${sp.need.length}건은 확인이 필요합니다.`:"";
@@ -6208,6 +6284,7 @@ async function cbRead(files){
   prog.style.display="none";
   CB_FAIL=[]; $("cb-fail-wrap").style.display="none";
   cbRender();
+  await cbPiiScan(rows);   // 올리기 전에 개인정보를 가려 본다 — 끝날 때까지 올리기 단추는 잠긴다
 }
 
 /* ── 올리기 ────────────────────────────────────────────────────────
@@ -6425,6 +6502,10 @@ async function cbOcrSee(revId,role){
 }
 async function cbUpload(rows){
   if(!FBDB||!FBUSER){ alert("로그인 후 이용하세요."); return; }
+  if(CB_PII.busy){ alert("개인정보를 살피는 중입니다 — 끝난 뒤 올리세요."); return; }
+  /* 개인정보 — 가린 글·가린 파일로 바꾼 사본을 올린다. 한글이 아닌 파일은 원본을 안 담는다 */
+  rows=rows.map(cbPiiRow);
+  const 가림=rows.filter(r=>r.pii&&r.pii.total&&CB_PII.on).length, 원본뺌=rows.filter(r=>r.piiHeld).length;
   const prog=$("cb-prog"); prog.style.display="block";
   prog.innerHTML="서고에 이미 있는 것을 살펴보는 중…";
 
@@ -6525,6 +6606,7 @@ async function cbUpload(rows){
        「내가 올린 것이 은행에 들어갔나」를 확인할 길이 없다. */
     +(은행?`\n문안 은행에 조문 ${은행}개 적립 (개정본만)`:"")
     +(원본?`\n원본 파일 ${원본}건 창고에 담음`:"")
+    +(가림?`\n개인정보 가림 ${가림}건`+(원본뺌?` (그 가운데 한글이 아닌 ${원본뺌}건은 글만 가리고 원본 파일은 안 담음)`:""):"")
     /* ⚠ 못 담았으면 «몇 건인지·왜인지» 말한다 — 조용히 빠지면 나중에 원본을 찾다가 없다 */
     +(원본실패?`\n원본 ${원본실패}건은 못 담았습니다\n${CB_ORIG_WHY}`:"")
     +(fails.length?"\n\n「실패한 것만 다시 시도」로 이어서 올릴 수 있습니다.":""));
