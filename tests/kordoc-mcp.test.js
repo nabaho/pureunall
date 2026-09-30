@@ -32,7 +32,11 @@ test('ⓑⓒ 바깥 통신을 막고, 읽을 폴더를 묶을 자리가 있다',
   assert.match(String(env.KORDOC_ROOT || ''), /\$\{KORDOC_ROOT/, '읽을 폴더를 묶는 자리가 없습니다');
 });
 
-test('앱(배포되는 js/·html)은 kordoc 을 부르지 않는다', () => {
+/* 2026-09-30 대표 「순서대로 모두」 — 규정관리가 kordoc 로 원본을 읽게 됐다. 지키는 뜻은 그대로다:
+   «문서는 브라우저 밖으로 안 나간다». 그래서 앱이 kordoc 을 쓰는 길은 «저장소에 넣은 브라우저 묶음»
+   (vendor/kordoc, 오프라인 스위치를 켜고 묶음) 하나뿐이고, 서버·MCP·인터넷(npm·CDN)으로 부르는 길은 막는다.
+   묶음이 읽는 동안 인터넷에 한 번도 안 닿는 것은 tests/kordoc-text.test.js 가 진짜로 읽혀 지켜본다. */
+test('앱은 kordoc 을 «브라우저 안 묶음» 으로만 쓴다 — 서버·MCP·인터넷으로 부르지 않는다', () => {
   const root = path.join(__dirname, '..');
   const hits = [];
   /* 주석은 뺀다 — js/pu-ocr-kr.js 는 kordoc 의 OCR 핵심을 브라우저로 «옮겨 온» 것이라 출처(MIT)를 주석에 적는다.
@@ -45,5 +49,14 @@ test('앱(배포되는 js/·html)은 kordoc 을 부르지 않는다', () => {
   };
   scan(root);
   scan(path.join(root, 'js'));
-  assert.deepEqual(hits, [], '앱 파일이 kordoc 을 부릅니다 — 문서가 브라우저 밖으로 나갈 길이 생깁니다');
+  const read = (f) => code(fs.readFileSync(fs.existsSync(path.join(root, f)) ? path.join(root, f) : path.join(root, 'js', f), 'utf8'));
+  /* 서버·MCP·인터넷으로 부르는 꼴 — 이것이 나오면 문서가 밖으로 나갈 길이 생긴다 */
+  const OUTSIDE = /(https?:)?\/\/[^"'\s]*kordoc|npx[^"'\n]*kordoc|kordoc@\d|kordoc-mcp|registry\.npmjs|mcpServers/i;
+  hits.forEach((f) => assert.doesNotMatch(read(f), OUTSIDE, '★ ' + f + ' 이 kordoc 을 브라우저 밖(서버·MCP·인터넷)으로 부릅니다'));
+  /* 묶음을 싣는 곳은 한 곳 — js/pu-kordoc-text.js 가 저장소의 vendor/kordoc 만 싣는다 */
+  hits.filter((f) => f !== 'pu-kordoc-text.js').forEach((f) =>
+    assert.doesNotMatch(read(f), /kordoc\.browser|import\([^)]*kordoc/i, '★ ' + f + ' 이 kordoc 묶음을 따로 싣습니다 — PuKordocText 로만'));
+  if (hits.includes('pu-kordoc-text.js')) {
+    assert.match(read('pu-kordoc-text.js'), /SRC = 'vendor\/kordoc\/kordoc\.browser\.min\.js/, '★ 저장소 밖의 kordoc 을 싣습니다');
+  }
 });

@@ -72,7 +72,10 @@ test('규정관리가 원본을 글로 읽는 길은 모두 해설 떼기를 지
   const bare = html.replace(/\/\*[\s\S]*?\*\//g, ' ');
   const raw = [...bare.matchAll(/await extractDocText\(/g)].length;
   assert.equal(raw, 1, '★ 해설을 안 떼고 읽는 길이 있다 — readRulesText 를 쓸 것');
-  assert.match(bare, /async function readRulesText\(buf\)\{ const r=stripCommentary\(await extractDocText\(buf\)\)/);
+  /* 읽는 길 끝에서 반드시 해설 떼기를 지난다(2026-09-30 부터 kordoc 가 먼저 읽고, 못 읽으면 예전 읽개) */
+  const rd = bare.slice(bare.indexOf('async function readRulesText(buf){'), bare.indexOf('async function readRulesText(buf){') + 900);
+  assert.match(rd, /stripCommentary\(text\)/, '★ 읽은 글이 해설 떼기를 안 지난다');
+  assert.match(rd, /await extractDocText\(buf\)/, '예전 읽개로 돌아가는 길');
   assert.ok([...bare.matchAll(/await readRulesText\(/g)].length >= 5);
   /* 보관함에서 다시 여는 두 길 — 예전에 해설이 섞인 채 담긴 원문도 뗀다 */
   assert.ok([...bare.matchAll(/const c=stripCommentary\(o\.text\|\|""\); SAMPLES\[key\]=c\.text;/g)].length >= 2);
