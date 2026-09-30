@@ -10358,6 +10358,15 @@ function buildStampExtraSlots(n){
     }
   }
 }
+/* 시 칸에 숫자 두 개를 넣으면 분 칸으로 저절로 넘어간다 (대표 지시 2026-09-30)
+   — 추가 사진 줄(mh2~)은 나중에 생기므로 #spTimes 에 한 번만 걸어 둔다 */
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(!t||!t.matches||!t.matches('#spTimes input.tminput[id^="mh"]'))return;
+  if(String(t.value).length<2)return;
+  const mm=document.getElementById('mm'+t.id.slice(2));
+  if(mm){ mm.focus(); mm.select(); }
+});
 /* ══════ 사진 등록·수정 — 한 창에서 (대표 지시 2026-08-29) ══════
    지시 넷 —
    ① 타임스탬프 창에서도 사진첩에서 가져올 수 있게
