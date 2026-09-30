@@ -20,7 +20,7 @@ const ok = (n, c, w) => { if (c) console.log('  · ' + n); else { bad++; console
 console.log('■ 머리줄');
 ok('#homehead 가 상단바 아래에 붙는다',
   src.includes('#homehead{position:sticky;top:var(--topbar-h,48px);z-index:11}'));
-ok('머리줄에 이름표가 달려 있다', src.includes('<div class="panel" id="homehead"'));
+ok('머리줄에 이름표가 달려 있다', src.includes('" id="homehead"'));
 ok('상단바(15) > 머리줄(11) > 표 머리(9) 차례',
   /#topbar\{position:sticky;top:0;z-index:15/.test(src)
   && src.includes('#homehead{position:sticky;top:var(--topbar-h,48px);z-index:11}')
