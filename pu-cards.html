@@ -25665,6 +25665,8 @@ function showPanel(html){
 let _panelWide = false;
 function showWidePanel(html){ _panelWide = true; showPanel(html); }
 function setSub(s){ state.setSub=s||''; renderSettingsPage(); }
+/* 환경설정 «한 단계 뒤로» — 하위 화면이면 목록으로, 목록이면 원래 화면으로(Esc 가 부른다) */
+function settingsBack(){ if(state.setSub) setSub(''); else closeSettingsPage(); }
 /* 정리 작업 뒤 화면 갱신 — 환경설정 안이면 인라인을 다시 그리고, 목록에서면 팝업을 다시 연다 */
 /* ⚠ 정리를 하고 나면 «다시 센다» — 안 버리면 방금 치운 것이 띠에 그대로 떠 있다.
      이 한 줄이 정리하는 «모든 길»을 덮는다 — 어느 화면이든 끝나면 여기로 온다. */
@@ -27029,16 +27031,19 @@ function coWatchVerdict(s){
   if(s.renders > 10) out.push('화면을 '+s.renders+'번 다시 그렸습니다 — 저장이 몰려 들어오고 있습니다');
   if(s.builds > 3) out.push('회사 목록을 '+s.builds+'번 다시 조립했습니다 — 한 번이면 됩니다');
   if(s.blockedMs > 500){
-    out.push('5초 중 '+Math.round(s.blockedMs)+'ms 멈춰 있었습니다');
+    out.push((s.secs||5)+'초 중 '+Math.round(s.blockedMs)+'ms 멈춰 있었습니다');
     /* 🐌 누가 — 멈춘 때만 이름을 댄다(멀쩡할 때 이름을 대면 늘 무언가가 범인처럼 보인다) */
     const hot = (s.hot || []).slice(0, 3);
     if(hot.length) out.push('🐌 오래 걸린 곳: ' + hot.map(h => h.name + ' ' + h.ms + 'ms' + (h.n > 1 ? '(' + h.n + '번)' : '')).join(' · '));
+    /* 함수에 안 잡힌 나머지 — 브라우저가 화면을 배치·그린 시간(큰 목록을 통째로 새로 그릴 때 크다) */
+    const 밖 = Math.round(s.blockedMs - (s.jsMs || 0));
+    if(s.hot && 밖 > 200) out.push('🖼 코드 밖(화면 배치·그리기) 약 ' + 밖 + 'ms');
   }
   return out.length ? out : ['눈에 띄는 문제 없음'];
 }
 /* 콘솔은 오류에 파묻힌다(대표 화면 2026-08-16, 5,045건). 문제가 있을 때만 화면에 띄운다.
    ⚠ 멀쩡할 때는 아무것도 안 띄운다 — 늘 떠 있는 알림은 곧 안 보게 된다. */
-function coWatchShow(lines){
+function coWatchShow(lines, when){
   if(!lines.length || lines[0]==='눈에 띄는 문제 없음') return;
   let box = $('coWatchBox');
   if(!box){
@@ -27049,7 +27054,7 @@ function coWatchShow(lines){
       + 'box-shadow:0 8px 28px rgba(20,30,50,.16);font-size:12.5px;line-height:1.65;color:#854d0e';
     document.body.appendChild(box);
   }
-  box.innerHTML = '<b style="color:#854d0e">🏢 기업 상세가 느린 까닭</b>'
+  box.innerHTML = '<b style="color:#854d0e">🏢 '+esc(when === '처음 뜰 때' ? '기업정보함이 처음 뜰 때 느린 까닭' : '기업 상세가 느린 까닭')+'</b>'
     + '<button style="float:right;border:none;background:none;cursor:pointer;font-size:14px;color:#d97706"'
     + ' onclick="this.parentNode.remove()" title="닫기">✕</button>'
     + lines.map(m=>'<div>· '+esc(m)+'</div>').join('');
@@ -27059,9 +27064,12 @@ let _coWatch = null;
    「5초 중 607ms 멈춰 있었습니다」만으로는 무엇을 고칠지 모른다 — 짐작으로 고치면 엉뚱한 데를 건드린다
    (이 저장소가 세 번 겪었다, pu-erp 🐌 이름표). 그래서 진단 5초 동안만 기업정보함의 전역 함수에
    초시계를 달고 «제 안에서 쓴 시간»(자식 함수 시간을 뺀 것)을 센다. 끝나면 원래 함수로 되돌린다.
-   ⚠ 이름이 co·render·erp·card·dup·tax·pc 로 시작하는 «페이지가 만든» 함수만 — 브라우저 것·진단 자신은 안 건드린다.
-   ⚠ 속성을 단 함수(fn.foo)는 감싸지 않는다 — 감싸면 그 속성이 사라진다. */
-const CO_PROF_RE = /^(co|render|erp|card|dup|tax|pc)[A-Z_]/;
+   ⚠ «페이지가 만든» 전역 함수 전부 — 브라우저 것·진단 자신·대문자로 시작하는 것(생성자)은 안 건드린다.
+     (2026-09-30 대표 콘솔: 멈춤 771ms 동안 회사목록 조립 0번 — 범인이 co·render 밖에 있을 수 있다)
+   ⚠ 속성을 단 함수(fn.foo)는 감싸지 않는다 — 감싸면 그 속성이 사라진다.
+   ⚠ 함수가 끝난 «뒤» 브라우저가 화면을 배치·그리는 시간은 어느 함수에도 안 잡힌다 —
+     그래서 멈춤에서 코드 시간을 뺀 나머지를 «코드 밖(화면 배치·그리기)»으로 따로 말한다. */
+const CO_PROF_RE = /^[a-z_$][\w$]*$/;
 function coProfStart(){
   const recs = {}, stack = [], saved = [];
   Object.keys(window).forEach(function(n){
@@ -27079,12 +27087,17 @@ function coProfStart(){
   });
   return function stop(){
     saved.forEach(function(p){ try{ window[p[0]] = p[1]; }catch(_){} });
-    return Object.keys(recs).map(k => ({ name:k, n:recs[k].n, ms:Math.round(recs[k].self) }))
-      .filter(x => x.ms >= 20).sort((a,b) => b.ms - a.ms).slice(0, 5);
+    const all = Object.keys(recs).map(k => ({ name:k, n:recs[k].n, ms:Math.round(recs[k].self) }));
+    const hot = all.filter(x => x.ms >= 20).sort((a,b) => b.ms - a.ms).slice(0, 5);
+    hot.jsMs = all.reduce((t, x) => t + x.ms, 0);
+    return hot;
   };
 }
-function coWatchStart(){
+/* when: 「처음 뜰 때」(로그인 직후) · 「기업 상세」 — 대표 「로그인 할 경우 계속 느려지고 있다」(2026-09-30).
+   처음 뜰 때는 명함·회사정보가 몇 초에 걸쳐 들어오므로 더 길게(10초) 본다. */
+function coWatchStart(when){
   if(_coWatch) return;                       /* 이미 보고 있으면 그대로 둔다 */
+  const 언제 = when || '기업 상세', 초 = 언제 === '처음 뜰 때' ? 10 : 5;
   _coWatch = { renders:0, builds:0, blockedMs:0 };
   let profStop = null;
   try{ profStop = coProfStart(); }catch(_){}
@@ -27105,9 +27118,10 @@ function coWatchStart(){
     let hot = [];
     try{ hot = profStop ? profStop() : []; }catch(_){}
     const s = { renders:_coWatch.renders, builds:_coWatch.builds, blockedMs:_coWatch.blockedMs,
-                pending:q.pending, parked:q.parked, writes:q.writes||0, busiest:top, hot:hot };
+                pending:q.pending, parked:q.parked, writes:q.writes||0, busiest:top, hot:hot,
+                jsMs: (hot && hot.jsMs) || 0, secs: 초 };
     _coWatch = null;
-    console.log('🏢 기업 상세 5초 진단 — 다시 그림 '+s.renders+'번 · 회사목록 조립 '+s.builds
+    console.log('🏢 '+언제+' '+초+'초 진단 — 다시 그림 '+s.renders+'번 · 회사목록 조립 '+s.builds
       +'번 · 멈춤 '+Math.round(s.blockedMs)+'ms · 저장 보냄 '+s.writes+'번'
       +' · 밀린 저장 '+s.pending+'건 · 거부된 저장 '+s.parked+'건');
     const lines = coWatchVerdict(s);
@@ -27115,9 +27129,11 @@ function coWatchStart(){
     if(hot.length) console.log('   🐌 오래 걸린 곳(제 안에서 쓴 시간):', hot);
     if(q.busiest && q.busiest.length) console.log('   저장이 나간 곳:', q.busiest);
     if(q.worst && q.worst.length) console.log('   거부된 저장:', q.worst);
-    coWatchShow(lines);
-  }, 5000);
+    coWatchShow(lines, 언제);
+  }, 초 * 1000);
 }
+/* 처음 뜰 때(로그인 직후)도 한 번 본다 — 명함·회사정보가 들어오며 멈추는 자리를 이름으로 댄다 */
+window.addEventListener('load', function(){ try{ coWatchStart('처음 뜰 때'); }catch(_){} });
 function pickCo(k){ if(state.coPick===k){ state.coPick=''; closePcDetail(); return; } state.coPick = k; openCoDetailPanel(k); }
 
 /* ══════ 세금계산서 발급처를 푸른이알피 업체에 채운다 (대표 지시 2026-08-30) ══════
@@ -34917,6 +34933,12 @@ document.addEventListener('keydown', e=>{
        걸 닫는다"는 토글로 오인해 아무 반응이 없었다. closePcDetail() 로 coPick 도
        함께 비운다(다른 상세 패널을 닫을 땐 coPick 이 이미 비어 있어 해가 없다). */
   if(e.key==='Escape'){
+    /* ⚙️ 환경설정에서 Esc = 한 단계 뒤로 (대표 지시 2026-09-30 「환경설정에서 esc 누르면 뒤로가기」)
+       하위 화면 → 환경설정 목록 → 원래 목록. ⚠ 열린 창·패널이 있으면 그것부터 닫는다(아래 그대로).
+       ⚠ 입력칸에 글자를 쓰는 중이면 안 간다 — 붙여 넣던 명단이 날아간다. */
+    const anyOpen = document.querySelector('.modalbg.open') || ($('pcDetail') && $('pcDetail').classList.contains('open'));
+    const 쓰는중 = typing && document.activeElement && String(document.activeElement.value || '').length > 0;
+    if(state.view === 'settings' && !anyOpen && !쓰는중){ e.preventDefault(); settingsBack(); return; }
     closePcDetail();
     ['menuBg','folderDlgBg','groupSheetBg','detailBg','dupBg'].forEach(id=>{ const el=$(id); if(el) el.classList.remove('open'); });
     closeFolderMenu(); closeColMenu();
