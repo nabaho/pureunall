@@ -64434,44 +64434,53 @@ function ClinicDayCards(props){
   var fy = clinicFyRange(app.fiscalYearStart || '01-01', todayYMD(), fyOff);
   var r = clinicDayCards(props.items, dbGet('contracts', []), types, fy, consTypeDayFee);
   var people = Object.keys(r.by).map(function(k){ return r.by[k]; })
-    .sort(function(a, b){ return (b.days - a.days) || (b.planDays - a.planDays) || (b.cnt - a.cnt); });
+    /* «모두 몇 건»(수행 + 예정)이 많은 사람부터 — 같으면 일수 */
+    .sort(function(a, b){ return ((b.cnt + b.planCnt) - (a.cnt + a.planCnt)) || (b.days - a.days); });
   if(!people.length && fyOff === 0) return null;
   var picked = props.pickedSid && props.pickedType && clinicCodes.indexOf(props.pickedType) >= 0 ? props.pickedSid : '';
   var fyLabel = fy.year + ' 회계연도' + (fy.start.slice(5) === '01-01' ? '' : ' (' + fy.start + ' ~ ' + fy.end + ')');
-  function card(key, name, s, isTotal){
-    var on = isTotal ? false : picked === s.sid;
-    return h('div', { key:key,
-      onClick:function(){ if(isTotal) props.onPick('', ''); else props.onPick(on ? '' : s.sid, on ? '' : clinicCodes[0]); },
-      title: isTotal ? '거르개 풀기' : (on ? '다시 누르면 풀립니다' : name + ' 의 현장클리닉만 보기')
-        + (s.est ? '\n≈ ' + s.est + '건은 일수가 안 적혀 잔금 ÷ 1일 단가로 추정했습니다' : ''),
-      style:{ border:'1px solid ' + (on ? '#1e40af' : (isTotal ? '#bbf7d0' : '#e2e8f0')), borderRadius:'10px',
-        background: on ? '#eff6ff' : (isTotal ? '#f0fdf4' : '#fff'), padding:'8px 12px', textAlign:'center',
-        cursor:'pointer', minWidth:'108px', flex:'0 0 auto' } },
-      h('div', { style:{ fontSize:'11.5px', color:'#64748b', whiteSpace:'nowrap' } }, name),
-      h('div', { style:{ fontSize:'24px', fontWeight:800, color:'#166534', lineHeight:1.15, whiteSpace:'nowrap' } },
-        s.days, h('span', { style:{ fontSize:'13px', fontWeight:700 } }, '일'),
-        s.est ? h('span', { style:{ fontSize:'11px', color:'#d97706', fontWeight:700, marginLeft:'2px' } }, '≈') : null),
-      h('div', { style:{ fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap' } },
-        s.cnt + '건' + (s.planCnt ? ' · 예정 ' + s.planCnt + '건' + (s.planDays ? '(' + s.planDays + '일)' : '') : '')));
+  /* ★ 한 줄 칩 (대표 지시 2026-10-01 「셀이 너무 크다 얇게 한 줄로」 · 목업 안 A).
+     컨설팅관리에 들어와 있으면 «수행 중» — 큰 글씨는 «모두 몇 건»(수행 + 예정), 곁에 일수·예정.
+     설명·추정(≈)은 칩에서 빼고 말풍선에만 둔다 — 한 줄을 지키려고. */
+  function tip(s, name, isTotal, on){
+    var lines = [];
+    lines.push((isTotal ? '전체' : name) + ' · ' + fyLabel);
+    lines.push('수행 ' + s.cnt + '건(컨설팅관리) · ' + s.days + '일');
+    if(s.planCnt) lines.push('예정 ' + s.planCnt + '건(계약관리, 이관 전)' + (s.planDays ? ' · ' + s.planDays + '일' : ''));
+    if(s.est) lines.push('≈ ' + s.est + '건은 일수가 안 적혀 잔금 ÷ 1일 단가로 셈');
+    lines.push(isTotal ? '누르면 거르개를 풉니다' : (on ? '다시 누르면 풀립니다' : '누르면 이 사람 현장클리닉만'));
+    return lines.join('\n');
   }
-  return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'10px 12px', marginBottom:'10px' } },
-    h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', whiteSpace:'nowrap' } },
-      h('span', { style:{ fontSize:'13px', fontWeight:700, color:'#166534' } }, '🏥 현장클리닉'),
-      h('span', { style:{ fontSize:'12px', color:'#64748b' } }, fyLabel + ' · 주담당 기준 · 시작일'),
-      h('div', { style:{ flex:1 } }),
-      h('button', { onClick:function(){ setFyOff(fyOff - 1); }, title:'지난 회계연도',
-        style:{ border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', padding:'1px 8px', cursor:'pointer', color:'#475569' } }, '◀'),
-      fyOff !== 0 && h('button', { onClick:function(){ setFyOff(0); }, title:'올해 회계연도로',
-        style:{ border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', padding:'1px 8px', cursor:'pointer', color:'#475569', fontSize:'11px' } }, '올해'),
-      fyOff < 0 && h('button', { onClick:function(){ setFyOff(fyOff + 1); }, title:'다음 회계연도',
-        style:{ border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', padding:'1px 8px', cursor:'pointer', color:'#475569' } }, '▶')),
+  function chip(key, name, s, isTotal){
+    var on = isTotal ? false : picked === s.sid;
+    var all = s.cnt + s.planCnt;
+    return h('span', { key:key, title: tip(s, name, isTotal, on),
+      onClick:function(){ if(isTotal) props.onPick('', ''); else props.onPick(on ? '' : s.sid, on ? '' : clinicCodes[0]); },
+      style:{ display:'inline-flex', alignItems:'baseline', gap:'4px', padding:'1px 9px', lineHeight:'20px',
+        border:'1px solid ' + (on ? '#1e40af' : (isTotal ? '#bbf7d0' : '#e2e8f0')), borderRadius:'12px',
+        background: on ? '#1e40af' : (isTotal ? '#f0fdf4' : '#fff'), color: on ? '#fff' : '#1e293b',
+        cursor:'pointer', flex:'0 0 auto', whiteSpace:'nowrap', fontSize:'12px' } },
+      h('span', null, name),
+      h('b', { style:{ color: on ? '#fff' : '#1e40af', fontSize:'13px' } }, all + '건'),
+      isTotal
+        ? h('span', { style:{ color: on ? '#fff' : '#166534', fontWeight:700 } }, '· 수행 ' + s.cnt + ' · ' + s.days + '일')
+        : h('span', { style:{ color: on ? '#fff' : '#166534', fontWeight:700 } }, s.days + '일'),
+      s.planCnt ? h('span', { style:{ color: on ? '#fff' : '#d97706', fontSize:'11px', fontWeight:700 } }, (isTotal ? '+예정 ' : '예정 ') + s.planCnt) : null);
+  }
+  var navS = { border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', padding:'0 7px', cursor:'pointer', color:'#475569', flex:'0 0 auto', lineHeight:'20px' };
+  return h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', background:'#fff', border:'1px solid #e2e8f0',
+      borderRadius:'8px', padding:'5px 10px', marginBottom:'8px', whiteSpace:'nowrap', overflowX:'auto' } },
+    h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#166534', flex:'0 0 auto' },
+      title:'주담당 기준 · 계약 시작일 · 컨설팅관리에 들어온 건 = 수행 / 계약관리 이관 전 = 예정' }, '🏥 현장클리닉'),
+    h('span', { style:{ fontSize:'11.5px', color:'#64748b', flex:'0 0 auto' } }, fyLabel),
+    h('span', { style:{ width:'1px', height:'18px', background:'#e2e8f0', flex:'0 0 auto' } }),
     people.length
-      ? h('div', { style:{ display:'flex', gap:'8px', overflowX:'auto', paddingBottom:'2px' } },
-          card('total', '전체', r.total, true),
-          people.map(function(s){ return card(s.sid, props.userName(s.sid), s, false); }))
-      : h('div', { style:{ fontSize:'12px', color:'#94a3b8', padding:'6px 0' } }, '이 회계연도에는 현장클리닉이 없습니다'),
-    h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'6px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
-      '큰 숫자 = 컨설팅관리에 들어온 일수 · 예정 = 계약관리에서 아직 이관 전인 계약의 일수 · ≈ = 일수가 비어 잔금으로 추정'));
+      ? [chip('total', '전체', r.total, true)].concat(people.map(function(s){ return chip(s.sid, props.userName(s.sid), s, false); }))
+      : h('span', { style:{ fontSize:'12px', color:'#94a3b8' } }, '이 회계연도에는 현장클리닉이 없습니다'),
+    h('span', { style:{ flex:1 } }),
+    fyOff < 0 && h('button', { onClick:function(){ setFyOff(fyOff + 1); }, title:'다음 회계연도', style:navS }, '▶'),
+    fyOff !== 0 && h('button', { onClick:function(){ setFyOff(0); }, title:'올해 회계연도로', style:Object.assign({}, navS, { fontSize:'11px' }) }, '올해'),
+    h('button', { onClick:function(){ setFyOff(fyOff - 1); }, title:'지난 회계연도', style:navS }, '◀'));
 }
 
 function ConsultingManagement(props){
