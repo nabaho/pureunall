@@ -93,3 +93,19 @@ test('화면: 컨설팅관리에만 카드가 붙고, 카드는 셈 함수 하�
   assert.match(cutFn('function ClinicDayCards('), /clinicDayCards\(props\.items, dbGet\('contracts', \[\]\), types, fy, consTypeDayFee\)/);
   assert.match(cutFn('function ClinicDayCards('), /app\.fiscalYearStart/, '회계연도는 앱 설정에서');
 });
+
+/* 2026-10-01 「셀이 너무 크다 얇게 한 줄로 · 컨설팅관리에 들어와 있으면 수행」 — 목업 안 A */
+test('★★ 한 줄 띠 — 큰 카드(24px 숫자·세 줄)가 돌아오지 않는다', () => {
+  const ui = cutFn('function ClinicDayCards(');
+  assert.doesNotMatch(ui, /fontSize:'24px'/, '★★ 큰 숫자 카드가 돌아왔습니다 — 표를 아래로 밀어냅니다');
+  assert.match(ui, /whiteSpace:'nowrap', overflowX:'auto'/, '★ 띠는 한 줄 + 넘치면 옆으로');
+  assert.doesNotMatch(ui, /큰 숫자 = 컨설팅관리에 들어온 일수/, '★ 늘 떠 있는 설명 줄은 말풍선으로 옮겼다');
+});
+test('★★ 큰 글씨는 «모두 몇 건» = 수행(컨설팅관리) + 예정(계약관리)', () => {
+  const ui = cutFn('function ClinicDayCards(');
+  assert.match(ui, /var all = s\.cnt \+ s\.planCnt;/);
+  assert.match(ui, /all \+ '건'/);
+  assert.match(ui, /\(b\.cnt \+ b\.planCnt\) - \(a\.cnt \+ a\.planCnt\)/, '많이 맡은 사람부터');
+  // 셈: P-2 는 수행 1 + 예정 1 = 2건
+  assert.equal(R.by['P-2'].cnt + R.by['P-2'].planCnt, 2);
+});
