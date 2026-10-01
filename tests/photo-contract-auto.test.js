@@ -142,11 +142,17 @@ test('★★★ 계약 중복 판정도 «한 함수»다', () => {
   assert.match(why, /erpContractDupBlock\(/);
 });
 
+/* 중복 판정은 erpSameCompany 를 함께 쓴다 (2026-10-01) — 셋을 같이 싣는다 */
+function dupCtx(){
+  const ctx = {}; vm.createContext(ctx);
+  ['function erpCoAddrKey(', 'function erpSameCompany(', 'function erpContractDupBlock('].forEach(function (h) {
+    vm.runInContext(cutFn(ERP, h) || '', ctx);
+  });
+  return ctx;
+}
+
 test('★★★ 유형이 «겹칠 때만» 막는다 — 자문과 컨설팅은 함께 있을 수 있다', () => {
-  const fn = cutFn(ERP, 'function erpContractDupBlock(') || '';
-  const ctx = { };
-  vm.createContext(ctx);
-  vm.runInContext(fn, ctx);
+  const ctx = dupCtx();
   const 계약 = [{ id:'c1', contractNo:'2026-1', companyName:'가나상사',
                   kinds:['consulting'], status:'consult' }];
   const 겹침 = ctx.erpContractDupBlock({ company:{ name:'가나상사' }, kinds:['consulting'] }, 계약);
@@ -156,8 +162,7 @@ test('★★★ 유형이 «겹칠 때만» 막는다 — 자문과 컨설팅은
 });
 
 test('★★★ 끝난 계약·지운 계약은 «중복이 아니다»', () => {
-  const fn = cutFn(ERP, 'function erpContractDupBlock(') || '';
-  const ctx = {}; vm.createContext(ctx); vm.runInContext(fn, ctx);
+  const ctx = dupCtx();
   const 폼 = { company:{ name:'가나상사' }, kinds:['consulting'] };
   ['closed', 'cancelled'].forEach(function (st) {
     assert.equal(ctx.erpContractDupBlock(폼,
@@ -167,6 +172,27 @@ test('★★★ 끝난 계약·지운 계약은 «중복이 아니다»', () => 
   assert.equal(ctx.erpContractDupBlock(폼,
     [{ id:'c1', companyName:'가나상사', kinds:['consulting'], status:'consult', _deleted:true }]).length, 0,
     '★★★ 휴지통에 넣은 계약이 새 계약을 막습니다');
+});
+
+test('★★★ 이름이 달라도 주소·대표자가 «둘 다» 같으면 묻는다 — 간판 이름과 법인 이름 (건의 2026-10-01)', () => {
+  const ctx = dupCtx();
+  const 기존 = [{ id:'c1', companyName:'가나호텔', kinds:['case'], status:'transferred',
+    company:{ name:'가나호텔', address:'충청남도 천안시 동남구 가나로 1 (가나동)', ceo:'홍길동' } }];
+  const 같음 = ctx.erpContractDupBlock({ company:{ name:'주식회사 가나관리단', address:'충청남도 천안시 동남구 가나로 1', ceo:'홍 길동' }, kinds:['case'] }, 기존);
+  assert.equal(같음.length, 1, '★★★ 주소·대표자가 같은데 안 걸렸습니다 — 같은 회사가 이름만 달리 두 번 들어갑니다');
+  const 대표만 = ctx.erpContractDupBlock({ company:{ name:'다라상사', address:'서울특별시 중구 다라로 9', ceo:'홍길동' }, kinds:['case'] }, 기존);
+  assert.equal(대표만.length, 0, '★★ 대표자 이름만 같은 남의 회사는 엮지 않는다');
+  const 주소만 = ctx.erpContractDupBlock({ company:{ name:'마바상사', address:'충청남도 천안시 동남구 가나로 1', ceo:'임꺽정' }, kinds:['case'] }, 기존);
+  assert.equal(주소만.length, 0, '★★ 같은 건물의 다른 회사는 엮지 않는다');
+});
+
+test('★★★ 저장 중복창이 쓰는 이름(newKinds2)이 «선언돼» 있다 — 빠지면 저장이 멈춘다 (건의 2026-10-01)', () => {
+  const body = stripComments(ERP);
+  const use = body.indexOf('newKinds2.forEach');
+  const decl = body.lastIndexOf('var newKinds2', use);
+  assert.ok(use > 0, '쓰는 자리를 못 찾았습니다');
+  assert.ok(decl > 0 && use - decl < 20000, '★★★ newKinds2 를 쓰는데 선언이 없습니다 — 같은 회사 계약이 있을 때 저장이 오류로 멈춥니다');
+  assert.match(body, /var dupCs = allContracts\.filter\(function\(c\)\{[^]{0,200}?erpSameCompany\(f, c\)/, '★ 보여 줄 목록도 같은 잣대(erpSameCompany)');
 });
 
 test('★★ 사업자번호는 «열 자리»일 때만 견준다 — 토막으로 남을 엮지 않는다', () => {

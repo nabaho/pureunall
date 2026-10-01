@@ -18311,23 +18311,58 @@ function erpBiznoClash(form, cos){
   }) || null;
 }
 
+/* «같은 회사일 수 있다» — 계약 중복을 «물어볼» 잣대 (확정이 아니다, 사람에게 묻는다).
+   ① 사업자번호가 같다 ② 회사명이 같다
+   ③ ★ 주소와 대표자가 «둘 다» 같다 (2026-10-01 건의 박한별)
+      「가나호텔」(간판 이름·사업자번호 없음)와 「주식회사 가나관리단」(법인 이름)이
+      같은 회사인데 이름이 달라 중복 검사를 그냥 지나 계약·사건이 둘씩 생겼다.
+      둘은 주소·대표자가 같았다 — 간판 이름과 법인 이름이 다른 회사는 흔하다(호텔·병원·프랜차이즈).
+   ⚠ 이것으로 업체 ID 를 채우지 않는다(온톨로지: 이름·주소로 관계 열쇠를 삼지 않는다).
+     저장 전에 «혹시 같은 건?»을 보여 주는 데만 쓴다. */
+function erpCoAddrKey(s){ return String(s || '').replace(/\([^)]*\)/g, '').replace(/[\s,.\-·]/g, ''); }
+function erpSameCompany(form, c){
+  var co = (form && form.company) || {};
+  var nm = String(co.name || '').trim();
+  var biz = String(co.bizNo || '').replace(/\D/g,'');
+  var cco = (c && c.company) || {};
+  var cBiz = String((c.bizNo || cco.bizNo) || '').replace(/\D/g,'');
+  var cName = String((c.companyName || cco.name) || '').trim();
+  if(biz && biz.length >= 8 && cBiz === biz) return true;
+  if(nm && nm.length >= 2 && cName === nm) return true;
+  var ad = erpCoAddrKey(co.address), cad = erpCoAddrKey(cco.address);
+  var ceo = String(co.ceo || '').replace(/\s/g,''), cceo = String(cco.ceo || c.ceo || '').replace(/\s/g,'');
+  return ad.length >= 8 && ad === cad && ceo.length >= 2 && ceo === cceo;
+}
 /* #C 같은 회사에 «유형이 겹치는» 진행 중 계약이 있나.
    ⚠ 유형이 안 겹치면 다른 일이다(자문과 컨설팅은 함께 있을 수 있다) — 안 막는다. */
 function erpContractDupBlock(form, contracts){
   var co = (form && form.company) || {};
-  var nm = String(co.name || '').trim();
-  var biz = String(co.bizNo || '').replace(/\D/g,'');
-  if(!nm && !biz) return [];
+  if(!String(co.name || '').trim() && !String(co.bizNo || '').replace(/\D/g,'') && !erpCoAddrKey(co.address)) return [];
   var kinds = (form && form.kinds) || [];
   return (contracts || []).filter(function(c){
     if(!c || c._deleted) return false;
     if(c.status === 'closed' || c.status === 'cancelled') return false;
-    var cBiz = String((c.bizNo || (c.company && c.company.bizNo)) || '').replace(/\D/g,'');
-    var cName = String((c.companyName || (c.company && c.company.name)) || '').trim();
-    var same = (biz && biz.length >= 8 && cBiz === biz) || (nm && nm.length >= 2 && cName === nm);
-    if(!same) return false;
+    if(!erpSameCompany(form, c)) return false;
     return (c.kinds || []).some(function(k){ return kinds.indexOf(k) >= 0; });
   });
+}
+
+/* 직원이 «지우기»를 눌렀을 때 — 막고 끝내지 않고 «할 일»을 알려 준다 (건의 2026-10-01 박한별)
+   「중복이라 하나 지우려는데 관리자가 아니면 삭제할 수 없다고 나온다」 — 이관된 계약은 종료관리에 있고,
+   거기 지우기가 「관리자만 삭제 가능합니다」 한 줄로 끝났다. 직원은 무엇을 해야 할지 몰랐다.
+   ⚠ 문턱은 그대로다 — 지우기는 총괄관리자만(대표 승인 2026-08-23, 계약에 입금·성과·정산이 매달린다).
+   ⚠ 직원이 관리자 전달함(data/handoff_notes)에 바로 쓰는 길은 없다 — 서버 규칙이 «받는 사람·관리자»만 쓴다.
+     그래서 직원 모두가 이미 쓰는 💬 건의함으로 안내한다. */
+function erpAskAdminDelete(storageKey, id, label){
+  var r = (storageKey && id) ? ((dbGet(storageKey, []) || []).find(function(x){ return x && x.id === id; }) || {}) : {};
+  var nm = String(label || ((r.contractNo || r.caseNo || r.no || '') + ' ' + (r.companyName || '')).trim() || '이 기록');
+  var moved = !!(r.transferredTo || r.status === 'transferred');
+  return popConfirm('🗑 삭제는 대표님(총괄관리자)만 할 수 있습니다.\n\n'
+    + '중복으로 잘못 들어간 것이면 💬 건의함에 이렇게 남겨 주세요:\n\n'
+    + '   「' + nm + ' — 중복이라 삭제 요청」\n\n'
+    + (moved ? '⚠ 사건·컨설팅으로 이관된 계약이면 «이관된 건의 번호»도 함께 적어 주세요 — 둘 다 정리해야 합니다.\n\n' : '')
+    + '대표님이 휴지통으로 옮깁니다(30일 안에 되살릴 수 있습니다).',
+    { okText:'알겠습니다', cancelText:'닫기', danger:false });
 }
 
 /* ══════ 「새 계약」 쪽지 — 다른 화면이 계약 창을 «채워서 열어 달라»고 남긴 것 ══════
@@ -19607,16 +19642,18 @@ function ContractModal(props){
     if(!props.cur){
       var nm = (f.company.name||'').trim();
       var bizD = (f.company.bizNo||'').replace(/\D/g,'');
-      if(nm || bizD){
+      if(nm || bizD || erpCoAddrKey(f.company.address)){
         var allContracts = dbGet('contracts', []) || [];
+        /* 보여 줄 목록도 «같은 잣대»(erpSameCompany) — 판정과 목록이 다른 잣대를 보면
+           「중복이 있다」고 묻는데 목록이 비는 일이 생긴다. */
         var dupCs = allContracts.filter(function(c){
+          if(!c || c._deleted) return false;
           if(c.status === 'closed' || c.status === 'cancelled') return false;
-          var cBiz = ((c.bizNo || (c.company && c.company.bizNo))||'').replace(/\D/g,'');
-          var cName = ((c.companyName || (c.company && c.company.name))||'').trim();
-          if(bizD && bizD.length >= 8 && cBiz === bizD) return true;
-          if(nm && nm.length >= 2 && cName === nm) return true;
-          return false;
+          return erpSameCompany(f, c);
         });
+        /* ★ 이 줄이 2026-09-19(9fcee3d7) 에 빠져 «같은 회사·같은 종류 계약이 있을 때» 저장이
+             「newKinds2 is not defined」로 멈췄다(건의 2026-10-01 박한별). 아래 [지금 작성 중] 카드가 쓴다. */
+        var newKinds2 = f.kinds || [];
         if(dupCs.length > 0){
           /* 계약유형 겹침 여부 — ⚠ 판정은 erpContractDupBlock 하나가 한다.
              자동 등록(사진첩 요청)이 «멈추는 잣대»가 바로 이것이라, 여기서 따로 세면
@@ -19671,6 +19708,13 @@ function ContractModal(props){
             Object.assign(head.style, { fontWeight:'700', color:'#991b1b', marginBottom:'8px', fontSize:'12.5px' });
             head.textContent = '⚠️ 같은 사업장에 같은 종류 계약이 ' + dupCs.length + '건 있습니다';
             wrap.appendChild(head);
+            /* 이름이 다른데 걸린 것(주소·대표자가 같아서)이 있으면 «왜 묻는지»를 한 줄로 */
+            if(_dupTop.some(function(r){ var cn = String(r.c.companyName || (r.c.company && r.c.company.name) || '').trim(); return cn && cn !== nm; })){
+              var why = document.createElement('div');
+              Object.assign(why.style, { fontSize:'11.5px', color:'#854d0e', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'5px 8px', marginBottom:'8px' });
+              why.textContent = '※ 이름은 다르지만 주소·대표자가 같은 계약입니다 — 간판 이름과 법인 이름이 다른 «같은 회사»일 수 있습니다. 같은 건이면 「취소」 후 기존 계약을 쓰세요.';
+              wrap.appendChild(why);
+            }
 
             var fold = document.createElement('div');
             Object.assign(fold.style, { fontSize:'10.5px', color:'#64748b', marginBottom:'4px', fontWeight:'700' });
@@ -23535,7 +23579,8 @@ function ContractManagement(props){
      ⚠ 새 규칙을 만드는 게 아니라, 이미 있는 안전한 길을 여기서도 쓰는 것이다.
        TrashBin.remove 는 _deleted 딱지만 붙인다 — 목록은 그 딱지를 걸러 낸다. */
   async function del(id){
-    if(!CURRENT_USER || !CURRENT_USER.isAdmin){ showToast('총괄관리자만 삭제할 수 있습니다'); return; }
+    /* 관리자만 지운다 — 직원에게는 막고 끝내지 않고 «할 일»을 알려 준다(erpAskAdminDelete) */
+    if(!CURRENT_USER || !CURRENT_USER.isAdmin){ erpAskAdminDelete('contracts', id); return; }
     var c = dbGet('contracts', []).find(function(x){ return x.id === id; })
          || contracts.find(function(x){ return x.id === id; });
     if(!c){ showToast('그 계약을 찾지 못했습니다'); return; }
@@ -65929,7 +65974,7 @@ function ClosedManagement(){
 
   // 휴지통 삭제 헬퍼 (관리자만)
   async function softDelete(storageKey, id, displayName){
-    if(!CURRENT_USER || !CURRENT_USER.isAdmin){ showToast('관리자만 삭제 가능합니다'); return; }
+    if(!CURRENT_USER || !CURRENT_USER.isAdmin){ erpAskAdminDelete(storageKey, id, displayName); return; }
     var reason = prompt('"'+displayName+'" 을(를) 휴지통으로 이동합니다.\n\n사유를 입력하세요 (감사로그용):');
     if(!reason) return;
     if(!(await popConfirm('"'+displayName+'"\n\n→ 휴지통으로 이동 (환경설정 → 휴지통에서 복원/영구삭제 가능)\n→ 30일 후 자동 영구 삭제'))) return;
