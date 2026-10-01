@@ -18245,12 +18245,48 @@ async function erpAskDeferCompanyLink(form){
        ⚠ 여기서는 «연결 보류»를 권하지 않는다 — 고쳐야 할 잘못을 보류로 덮게 된다
          (tests/contract-defer-company-link.test.js ②). 검증 함수는 그대로 막는다. */
 async function erpAskCompanyLink(form){
-  form = await erpAskDeferCompanyLink(form);
   var O = window.PuOntology;
   if(!form || !O || typeof O.validateCompanyLink !== 'function') return form;
   var cos = dbGet('companies', []);
   var f0 = erpDropDeadCoLink(form, cos);
   var ck = O.validateCompanyLink(f0, cos);
+  /* ★ 업체를 안 골랐을 때 (대표 지시 2026-10-01 「특이사항이 있을 경우 다시 선택하게 하고,
+       유사 특이사항이 없을 경우 저장될 수 있게」) — 묻는 것은 «헷갈릴 때»뿐이다.
+       ① 사업자번호 10자리가 업체관리에 «딱 하나» → 그 업체로 저절로 잇는다(companyLinkAutoMatch —
+          온톨로지가 정한 유일한 자동 연결 규칙. 이름으로는 잇지 않는다)
+       ② 같은 사업자번호·같은 이름의 업체가 «하나도 없다» → 새 회사다. 묻지 않고 「연결 보류」로 저장
+          (보류는 업체 ID 를 «안 채우는» 쪽이라 기계가 골라도 위험하지 않다 — 사진첩 자동 등록과 같은 판단)
+       ③ 비슷한 업체가 있다 → 그때만 묻는다. Esc·닫기는 «업체 고르기»(안전한 쪽)
+     ⚠ 이름이 같다는 이유로 업체 ID 를 채우지 않는다 — ③에서 사람이 고른다. */
+  if(ck.code === 'company_selection_required' && f0.clientType !== 'worker' && f0.companyLinkStatus !== 'pending'){
+    var am = (typeof O.companyLinkAutoMatch === 'function') ? O.companyLinkAutoMatch(f0, cos) : null;
+    if(am && am.ok && am.companyId){
+      var t0 = (cos || []).find(function(x){ return x && !x._deleted && String(x.id) === String(am.companyId); }) || {};
+      showToast('✓ 사업자번호로 업체 자동 연결 — ' + (t0.name || am.companyName || ''));
+      f0 = Object.assign({}, f0, { companyId:am.companyId, companyLinkStatus:'',
+        company:Object.assign({}, f0.company || {}, { companyId:am.companyId }) });
+      form = f0;
+      ck = O.validateCompanyLink(f0, cos);   // 이름이 다르면 아래 «이름 맞추기»로 이어진다
+    } else {
+      var 보류 = erpDeferCoLinkIfNew(f0);
+      var cands = (typeof O.companyLinkCandidates === 'function') ? O.companyLinkCandidates(f0, cos, '') : [];
+      if(보류 && !cands.length){
+        showToast('업체관리에 없는 새 회사 — 「연결 보류」로 저장합니다(업체정보에는 쓰지 않습니다)');
+        return 보류;
+      }
+      if(보류 && cands.length){
+        var nm0 = String((f0.company && f0.company.name) || f0.companyName || '').trim();
+        var 새업체 = await popConfirm('「' + (nm0 || '이 업체') + '」와 비슷한 업체가 업체관리에 있습니다:\n\n'
+          + cands.slice(0, 3).map(function(c){ return '  · ' + c.name + (c.bizNo ? ' (' + c.bizNo + ')' : ''); }).join('\n')
+          + (cands.length > 3 ? '\n  · …외 ' + (cands.length - 3) + '곳' : '') + '\n\n'
+          + '· 같은 회사면 「업체 고르기」 → 기업정보 탭 맨 위 「업체 연결 확인」에서 고르세요.\n'
+          + '· 다른 회사면 「다른 회사 — 새 업체로 저장」(연결 보류로 저장합니다).',
+          { okText:'다른 회사 — 새 업체로 저장', cancelText:'업체 고르기', danger:false });
+        return 새업체 ? 보류 : form;
+      }
+      return form;
+    }
+  }
   if(ck.ok || ck.code === 'company_selection_required') return form;
   var co = f0.company || {};
   var nm = String(co.name || f0.companyName || '').trim();
@@ -20449,6 +20485,44 @@ function ContractModal(props){
             : null
         );
       })(),
+      /* 🔗 업체 연결 — 기업정보 탭 «맨 위»(기업정보함 띠 바로 아래) (대표 지시 2026-10-01
+         「캡쳐 2를 기업정보 바로 아래 둬라」).
+         ⚠ 2026-09-18 에는 «회사정보 뒤»로 내렸었다(「검증부터 하라고 한다」로 읽힌다). 그 뒤
+           직원이 담당자·일지까지 다 쓰고 저장하면 «맨 아래 이 상자» 때문에 기업정보로 되돌아갔다 —
+           고칠 자리가 눈에 안 띄었다. 대표가 차례를 다시 정했다: 업체부터 고르고 나머지를 쓴다. */
+      // 6-1단계: 사업자번호가 하나와 정확히 일치하면 자동 연결하고, 예외만 사람이 확인한다.
+      companyLinkCheck&&companyLinkCheck.ok&&companyLinkCheck.status==='linked'&&!companyLinkManualOpen
+      ? h('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',marginBottom:'12px',border:'1px solid #bbf7d0',borderRadius:'6px',background:'#f0fdf4'}},
+          h('strong',{style:{fontSize:'12px',color:'#166534'}},'✓ 업체 자동 확인'),
+          h('span',{style:{fontSize:'11px',color:'#475569',flex:'1'}},((f.company||{}).name||f.companyName||'')+' · '+((f.company||{}).bizNo||f.bizNo||'')),
+          h('button',{type:'button',onClick:function(){setCompanyLinkManualOpen(true);},style:{padding:'4px 8px',border:'1px solid #bbf7d0',borderRadius:'4px',background:'#fff',color:'#166534',fontSize:'11px',cursor:'pointer'}},'변경'))
+      : h('div',{style:{padding:'10px',marginBottom:'12px',border:'1px solid #bfdbfe',borderRadius:'6px',background:'#eff6ff'}},
+        /* 설명 두 줄 중 «늘 떠 있던» 한 줄을 말풍선으로 옮겼다 (대표 지시 2026-09-18).
+           아래 상태 줄은 그때그때 달라지므로 그대로 둔다 — 그건 잔소리가 아니라 답이다. */
+        h('strong',{style:{fontSize:'12px',color:'#1e40af'}},'업체 연결 확인'),
+        h('span',{style:{fontSize:'11px',color:'#64748b',marginLeft:'4px',cursor:'help'},
+          title:'사업자번호가 하나의 업체와 정확히 일치하면 자동 연결합니다.\n이름만 같거나 중복되면 직접 확인해야 합니다.'},'ⓘ'),
+        h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'7px'}},
+          h('input',{type:'search',value:companyLinkQuery,onChange:function(e){setCompanyLinkQuery(e.target.value);},placeholder:'업체명·사업자번호·ID 검색',style:{flex:'1',minWidth:'170px',padding:'6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}}),
+          h('select',{value:f.companyId||(f.company||{}).companyId||'',onChange:function(e){chooseCompanyLink(e.target.value);},style:{flex:'2',minWidth:'220px',padding:'6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}},
+            h('option',{value:''},'업체 선택 — 선택 시 회사명·사업자번호 반영'),
+            companyLinkChoices.map(function(x){return h('option',{key:x.id,value:x.id},x.name+' · '+(x.bizNo||'번호 없음')+' · '+x.id);}))),
+        h('label',{style:{display:'block',fontSize:'11px',color:'#475569',marginTop:'7px'}},h('input',{type:'checkbox',checked:f.companyLinkStatus==='pending',onChange:function(e){deferCompanyLink(e.target.checked);}}),' 신규·미확정 업체: 연결 보류 (업체정보에 쓰지 않음)'),
+        /* ★ 후보가 «하나뿐»이면 누르면 끝나는 단추 — 고르개를 뒤질 까닭이 없다 */
+        companyLinkOnly && h('button',{type:'button',onClick:function(){chooseCompanyLink(companyLinkOnly.id);},
+          style:{marginTop:'7px',width:'100%',padding:'7px',border:'1px solid #2563eb',borderRadius:'5px',
+                 background:'#2563eb',color:'#fff',fontSize:'12px',fontWeight:700,cursor:'pointer'}},
+          '✓ 「'+companyLinkOnly.name+'」 로 연결'),
+        /* ★ 아직 아무것도 «안 하신» 때는 혼내지 않는다 — 붉은 글씨는 잘못했을 때만.
+           처음부터 경고가 떠 있으면 「계속 검증하라고 한다」로 읽힌다(대표 말씀). */
+        h('div',{style:{fontSize:'11px',marginTop:'5px',
+            color:!companyLinkTouched?'#64748b':(companyLinkCheck&&companyLinkCheck.ok?'#166534':'#d97706')}},
+          !companyLinkEngine ? '검증 모듈을 불러오지 못했습니다.'
+          : !companyLinkTouched ? '업체를 고르면 회사명·사업자번호가 저절로 채워집니다. 새 업체면 아래 「연결 보류」를 켜세요.'
+          : (!companyLinkPicked && f.companyLinkStatus!=='pending' && companyLinkChoices.length)
+            ? ('찾았습니다 — 위 고르개에서 골라 주세요 ('+companyLinkChoices.length+'곳)')
+            : (companyLinkCheck?companyLinkCheck.message:'')),
+        ),
       // 회사 정보 섹션 (worker 단독이 아닐 때)
       showCompany && h('div', null,
         // 명함 + 사업자등록증 드롭존
@@ -21073,44 +21147,6 @@ function ContractModal(props){
       )  // 회사정보 내용 wrapper 닫기
       ),  // showCompany 닫기
 
-      /* 🔗 업체 연결 — 회사정보 «뒤»에 둔다 (대표 지시 2026-09-18 「화면 정리」).
-         맨 위에 있었더니 회사명 칸을 보기도 전에 파란 상자 네 줄을 지나야 했다.
-         차례가 거꾸로였다 — 회사명을 쳐야 후보가 나오고, 그다음이 고르기다.
-         ⚠ 위로 되돌리지 말 것. 「검증부터 하라고 한다」로 읽힌다(대표 말씀). */
-      // 6-1단계: 사업자번호가 하나와 정확히 일치하면 자동 연결하고, 예외만 사람이 확인한다.
-      companyLinkCheck&&companyLinkCheck.ok&&companyLinkCheck.status==='linked'&&!companyLinkManualOpen
-      ? h('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',marginBottom:'12px',border:'1px solid #bbf7d0',borderRadius:'6px',background:'#f0fdf4'}},
-          h('strong',{style:{fontSize:'12px',color:'#166534'}},'✓ 업체 자동 확인'),
-          h('span',{style:{fontSize:'11px',color:'#475569',flex:'1'}},((f.company||{}).name||f.companyName||'')+' · '+((f.company||{}).bizNo||f.bizNo||'')),
-          h('button',{type:'button',onClick:function(){setCompanyLinkManualOpen(true);},style:{padding:'4px 8px',border:'1px solid #bbf7d0',borderRadius:'4px',background:'#fff',color:'#166534',fontSize:'11px',cursor:'pointer'}},'변경'))
-      : h('div',{style:{padding:'10px',marginBottom:'12px',border:'1px solid #bfdbfe',borderRadius:'6px',background:'#eff6ff'}},
-        /* 설명 두 줄 중 «늘 떠 있던» 한 줄을 말풍선으로 옮겼다 (대표 지시 2026-09-18).
-           아래 상태 줄은 그때그때 달라지므로 그대로 둔다 — 그건 잔소리가 아니라 답이다. */
-        h('strong',{style:{fontSize:'12px',color:'#1e40af'}},'업체 연결 확인'),
-        h('span',{style:{fontSize:'11px',color:'#64748b',marginLeft:'4px',cursor:'help'},
-          title:'사업자번호가 하나의 업체와 정확히 일치하면 자동 연결합니다.\n이름만 같거나 중복되면 직접 확인해야 합니다.'},'ⓘ'),
-        h('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'7px'}},
-          h('input',{type:'search',value:companyLinkQuery,onChange:function(e){setCompanyLinkQuery(e.target.value);},placeholder:'업체명·사업자번호·ID 검색',style:{flex:'1',minWidth:'170px',padding:'6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}}),
-          h('select',{value:f.companyId||(f.company||{}).companyId||'',onChange:function(e){chooseCompanyLink(e.target.value);},style:{flex:'2',minWidth:'220px',padding:'6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}},
-            h('option',{value:''},'업체 선택 — 선택 시 회사명·사업자번호 반영'),
-            companyLinkChoices.map(function(x){return h('option',{key:x.id,value:x.id},x.name+' · '+(x.bizNo||'번호 없음')+' · '+x.id);}))),
-        h('label',{style:{display:'block',fontSize:'11px',color:'#475569',marginTop:'7px'}},h('input',{type:'checkbox',checked:f.companyLinkStatus==='pending',onChange:function(e){deferCompanyLink(e.target.checked);}}),' 신규·미확정 업체: 연결 보류 (업체정보에 쓰지 않음)'),
-        /* ★ 후보가 «하나뿐»이면 누르면 끝나는 단추 — 고르개를 뒤질 까닭이 없다 */
-        companyLinkOnly && h('button',{type:'button',onClick:function(){chooseCompanyLink(companyLinkOnly.id);},
-          style:{marginTop:'7px',width:'100%',padding:'7px',border:'1px solid #2563eb',borderRadius:'5px',
-                 background:'#2563eb',color:'#fff',fontSize:'12px',fontWeight:700,cursor:'pointer'}},
-          '✓ 「'+companyLinkOnly.name+'」 로 연결'),
-        /* ★ 아직 아무것도 «안 하신» 때는 혼내지 않는다 — 붉은 글씨는 잘못했을 때만.
-           처음부터 경고가 떠 있으면 「계속 검증하라고 한다」로 읽힌다(대표 말씀). */
-        h('div',{style:{fontSize:'11px',marginTop:'5px',
-            color:!companyLinkTouched?'#64748b':(companyLinkCheck&&companyLinkCheck.ok?'#166534':'#d97706')}},
-          !companyLinkEngine ? '검증 모듈을 불러오지 못했습니다.'
-          : !companyLinkTouched ? '업체를 고르면 회사명·사업자번호가 저절로 채워집니다. 새 업체면 아래 「연결 보류」를 켜세요.'
-          : (!companyLinkPicked && f.companyLinkStatus!=='pending' && companyLinkChoices.length)
-            ? ('찾았습니다 — 위 고르개에서 골라 주세요 ('+companyLinkChoices.length+'곳)')
-            : (companyLinkCheck?companyLinkCheck.message:'')),
-        ),
-
       // 기업담당자 (다중)
       h('div', { style:{ display:'flex', alignItems:'center', borderBottom:'1px solid #e2e8f0', paddingBottom:'4px', marginTop:'14px', marginBottom:'8px' } },
         h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b', flex:1 } }, '👤 기업담당자 (' + (f.company.contacts||[]).length + ')'),
@@ -21576,14 +21612,15 @@ function ContractModal(props){
       h('div', { className:'pu-g6' },
       sec6('📅 언제', '계약서를 읽는 차례대로 — 날짜가 금액 뒤에 있었다'),
       fldn6(
-        h(KoreanDatePicker, { value:f.signDate, onChange:setSimple('signDate'), title:'계약일' })),
+        h(KoreanDatePicker, { value:f.signDate, onChange:setSimple('signDate'), title:'계약일', placeholder:'계약일', style:{ width:'100%', minWidth:0, padding:'7px 8px', borderRadius:'5px', fontSize:'11.5px', gap:'4px' } })),
       fldn6(
-        h(KoreanDatePicker, { value:f.startDate || '', onChange:setSimple('startDate'), title:'계약 시작일' })),
+        h(KoreanDatePicker, { value:f.startDate || '', onChange:setSimple('startDate'), title:'계약 시작일', placeholder:'시작일', style:{ width:'100%', minWidth:0, padding:'7px 8px', borderRadius:'5px', fontSize:'11.5px', gap:'4px' } })),
       fldn6(
-        h(KoreanDatePicker, { value:f.endDate || '', onChange:setSimple('endDate'), title:'계약 종료일' })),
+        h(KoreanDatePicker, { value:f.endDate || '', onChange:setSimple('endDate'), title:'계약 종료일', placeholder:'종료일', style:{ width:'100%', minWidth:0, padding:'7px 8px', borderRadius:'5px', fontSize:'11.5px', gap:'4px' } })),
+      /* 상태는 두 칸 — 날짜 셋 + 상태 둘 = 여섯 칸이 «아래 입금 줄»과 같은 격자로 맞는다 (2026-10-01) */
       fldn6(
-        h('select', { value:f.status, onChange:setSimple('status') },
-          CONTRACT_STATUS.map(function(s){ return h('option', { key:s.v, value:s.v }, s.icon + ' ' + s.label); }))),
+        h('select', { value:f.status, onChange:setSimple('status'), title:'진행 상태' },
+          CONTRACT_STATUS.map(function(s){ return h('option', { key:s.v, value:s.v }, s.icon + ' ' + s.label); })), 2),
       sec6('💰 입금 · 접속'),
       /* 입금자(예금주) — 통장 적요가 업체명과 다를 때 적어 두면 거래내역 자동매칭이
          이 이름으로도 대조한다. 이름이라 한 칸으로는 좁아 두 칸을 쓴다. */
