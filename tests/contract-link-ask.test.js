@@ -29,6 +29,7 @@ function box(companies, answer) {
     console, JSON, Object, Array, String, Number, Date, Math, RegExp, parseInt,
     dbGet: (k, d) => (k === 'companies' ? companies : d),
     popConfirm: async (msg, opt) => { asked.push({ msg: String(msg), ok: opt && opt.okText }); return answer; },
+    showToast: (m) => asked.push({ toast: String(m) }),
     _asked: asked
   };
   ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx;
@@ -83,12 +84,34 @@ test('③ ★★ 사업자번호가 어긋나면 «연결 보류»로 덮지 않
   assert.ok(!/연결 보류로 저장/.test(c._asked[0].ok || ''), '★★ 보류로 저장하라는 단추가 있으면 안 됩니다');
 });
 
-test('④ 업체를 못 고른 새 회사 → 지금까지처럼 「연결 보류로 저장」을 묻는다', async () => {
-  const c = box(COS, true);
+/* 2026-10-01 대표 지시 「특이사항이 있을 경우 다시 선택하게 하고, 유사 특이사항이 없을 경우 저장될 수 있게」 */
+test('④ ★★ 비슷한 업체가 «하나도 없는» 새 회사 → 묻지 않고 「연결 보류」로 저장된다', async () => {
+  const c = box(COS, false);   // 물으면 «고르기»로 답하게 해 둬도
   const out = await c.erpAskCompanyLink({ company: { name: '다라상사' }, companyName: '다라상사' });
   assert.equal(out.companyLinkStatus, 'pending');
   assert.equal(out.companyId, '');
+  assert.equal(c.PuOntology.validateCompanyLink(out, COS).ok, true, '그대로 저장된다 — 기업정보로 안 튕긴다');
+  assert.equal(c._asked.filter((x) => x.msg).length, 0, '★★ 헷갈릴 것이 없는데 물었습니다');
+});
+
+test('④ ★★ 비슷한 업체(같은 이름)가 있으면 그때만 묻는다 — Esc·닫기는 «업체 고르기»', async () => {
+  const cos = [{ id: 'co-7', name: '마바상사', bizNo: '' }];
+  const ask = box(cos, false);
+  const kept = await ask.erpAskCompanyLink({ company: { name: '마바상사' }, companyName: '마바상사' });
+  assert.notEqual(kept.companyLinkStatus, 'pending', '닫으면 보류로 넘기지 않는다');
+  assert.equal(kept.companyId || '', '', '★★ 이름이 같다고 업체를 채우지 않는다');
+  assert.match(ask._asked[0].msg, /마바상사/, '비슷한 업체를 보여 준다');
+  const yes = box(cos, true);
+  const out = await yes.erpAskCompanyLink({ company: { name: '마바상사' }, companyName: '마바상사' });
+  assert.equal(out.companyLinkStatus, 'pending', '「다른 회사 — 새 업체로 저장」이면 보류로 저장');
+});
+
+test('④ 사업자번호 10자리가 업체관리에 «딱 하나»면 저절로 잇는다(온톨로지 자동 연결 규칙)', async () => {
+  const c = box(COS, false);
+  const out = await c.erpAskCompanyLink({ company: { name: '주식회사 가나관리단', bizNo: '1234567891' }, companyName: '주식회사 가나관리단' });
+  assert.equal(out.companyId, 'co-1');
   assert.equal(c.PuOntology.validateCompanyLink(out, COS).ok, true);
+  assert.equal(c._asked.filter((x) => x.msg).length, 0);
 });
 
 test('멀쩡하면 묻지 않는다', async () => {
