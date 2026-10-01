@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const Module = require('module');
+const crypto = require('crypto');
 
 const ROOT = path.join(__dirname, '..');
 const log = [];
@@ -24,6 +25,11 @@ const log = [];
 function world(seed) {
   const data = JSON.parse(JSON.stringify(seed));
   const get = p => p.split('/').filter(Boolean).reduce((c, k) => (c == null ? null : c[k]), data);
+  const set = (p, v) => {
+    const ps = p.split('/').filter(Boolean); let c = data;
+    for (let i = 0; i < ps.length - 1; i++) c = c[ps[i]] || (c[ps[i]] = {});
+    if (v === null) delete c[ps[ps.length - 1]]; else c[ps[ps.length - 1]] = v;
+  };
   return {
     data,
     database: {
@@ -33,6 +39,11 @@ function world(seed) {
           update: async () => { log.push('write:' + p); },
           push: async () => { log.push('write:' + p); },
           set: async () => { log.push('write:' + p); },
+          transaction: async fn => {
+            const before = get(p); const next = fn(before == null ? null : before);
+            if (next === undefined) return { committed: false };
+            set(p, next); log.push('write:' + p); return { committed: true };
+          },
         };
       },
     },
@@ -62,8 +73,21 @@ global.fetch = async (url, opts) => {
 process.env.KAKAO_REST_KEY = '0123456789abcdef0123456789abcdef';
 process.env.KAKAO_CLIENT_SECRET = 'FakeSecretForTests1234567890';
 
+function signedState(mode, at = Date.now()) {
+  const payload = mode + '.' + at + '.' + crypto.randomBytes(24).toString('base64url');
+  return payload + '.' + crypto.createHmac('sha256', process.env.KAKAO_CLIENT_SECRET)
+    .update(payload).digest('base64url');
+}
+function shapedState(mode = 'login') {
+  return mode + '.1700000000000.' + 'A'.repeat(32) + '.' + 'B'.repeat(43);
+}
+
 function call(h, method, query, body) {
   return new Promise(resolve => {
+    body = Object.assign({}, body || {});
+    if (body.code && !body.state) {
+      body.state = signedState('login');
+    }
     const req = { method, headers: { origin: 'https://nabaho.github.io' }, body: body || {}, query: query || {} };
     const res = { _s: 200, set() {}, status(s) { this._s = s; return this; },
       json(j) { resolve({ status: this._s, body: j }); }, send() { resolve({ status: this._s }); } };
@@ -115,7 +139,7 @@ function loadClient() {
     location: { href: 'https://nabaho.github.io/pureunall/enter.html' }, Date, JSON, Promise, URL,
     crypto: { getRandomValues: a => a },
     fetch: (url, o) => { calls.push({ url, o }); return String(url).indexOf('kakaoAuthUrl') >= 0
-      ? Promise.resolve({ status: 200, text: () => Promise.resolve('{"ok":true,"url":"https://kauth.kakao.com/oauth/authorize?x"}') })
+      ? Promise.resolve({ status: 200, text: () => Promise.resolve(JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/oauth/authorize?x', state: shapedState() })) })
       : Promise.resolve({ status: 204 }); } };
   ctx.window = ctx;
   vm.createContext(ctx);
