@@ -66,6 +66,8 @@ async function runSave(options={}){
     props:{cur:form,onSave:async()=>{calls.contract++;if(options.reject)throw new Error('저장 실패');if(options.afterSave)options.afterSave(companies);return options.accepted!==false;}},
     window:{PuOntology:O,PuPhotoStore:{markUsed(){calls.photos++;return Promise.resolve();}}},
     erpGuardEdit:async()=>true,showToast(){},setTab(){},
+    /* 저장 길이 업체 연결을 «묻는다»(2026-10-01 erpAskCompanyLink) — 「업체 다시 고르기」로 답한다 */
+    popConfirm:async()=>false,
     dbGet:(key,seed)=>key==='companies'?companies:key==='user_dir'?[{sid:'P1',status:'active'}]:key==='contracts'?[form]:seed,
     dbSet:(key,value)=>{calls.writes.push({key,value:JSON.parse(JSON.stringify(value))});return true;},
     localStorage:{removeItem(){calls.draft++;}},savedRef:{value:false},DRAFT_KEY:'test-draft',
