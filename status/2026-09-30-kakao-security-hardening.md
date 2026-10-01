@@ -14,9 +14,10 @@
 
 ## 검사
 
-- 카카오 집중 검사: `node --test tests/kakao-login.test.js tests/kakao-login-fast.test.js tests/kakao-first-login.test.js` — 58개 통과.
-- 전체 검사: `node --test tests/*.test.js functions/*.test.js` — 변경 전 마지막 전수 실행 20,764개 통과(실패 0, 의도된 skip 51). 동시 연결 검사 1개를 추가한 뒤 최종 전수 검사를 다시 실행한다.
+- 카카오 집중 검사: `node --test tests/kakao-login.test.js tests/kakao-login-fast.test.js tests/kakao-first-login.test.js` — 62개 통과.
+- 전체 검사: `node --test tests/*.test.js functions/*.test.js` — 20,797개 통과(실패 0, 의도된 skip 51).
 - 새로 겨눈 구멍: 위조·재사용·만료 state, 로그인/연결 용도 바꾸기, 오래된 세션, 카카오 세션 재연결, 회원번호 원문 노출, 같은 직원·같은 카카오의 동시 연결.
+- 돌연변이 4회 전부 걸림: state 만료 검사 제거, 최근 본인확인 검사 제거, 직원별 동시연결 잠금 제거, 회원번호 원문 재노출.
 
 ## 배포 순서
 
