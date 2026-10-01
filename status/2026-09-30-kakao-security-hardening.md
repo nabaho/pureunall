@@ -22,3 +22,10 @@
 ## 배포 순서
 
 옛 화면은 `state`를 보내지 않고 새 화면은 서버 발급 `state`를 요구하므로 한쪽만 먼저 올리면 잠깐 로그인이 끊긴다. 먼저 옛·새 화면을 함께 받는 전환용 함수를 올리고, Pages에서 `v=5`가 확인된 뒤 엄격한 최종 함수를 올린다.
+
+## 2026-10-01 운영 반영 완료
+
+- 전환용 `kakaoAuthUrl`·`kakaoLink`·`kakaoUnlink`·`kakaoLoginFinish` 네 함수를 먼저 배포했다.
+- PR #1783 병합, Pages 배포 성공 뒤 운영 `enter.html`이 `pu-kakao.js?v=5`를 내리고 실제 JS가 서버 발급 state를 보내는 것을 확인했다.
+- 옛 화면 호환을 제거한 엄격한 네 함수를 다시 배포했다.
+- 운영 스모크 검사: 서명 state 발급 정상, `Cache-Control: no-store`, state 없는 로그인 400 차단, 비로그인 연결 401 차단, 옛 32자리 state 비활성화.
