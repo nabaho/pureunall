@@ -10799,6 +10799,8 @@ function _peArr(v){
   if(v&&!Array.isArray(v)&&typeof v==='object') v=Object.keys(v).map(function(k){return v[k];});
   return Array.isArray(v)?v.filter(Boolean):null;
 }
+/* 이알피 휴지통에 든 것(_deleted)을 뺀 «살아 있는» 줄만 */
+function _peLive(a){ return Array.isArray(a)?a.filter(function(x){ return x && !x._deleted; }):a; }
 // 이름 해석용 sid→이름 (퇴직자 포함 — loadStaff는 재직자만 주므로 따로 읽는다)
 /* 사번 → 이름 표를 «정말로» 만들어 냈는가.
    ★ 2026-09-05 대표 보고: 사무장(A-001) 「내 업무」에 부담당 업무가 한 건도 안 나왔다.
@@ -10840,8 +10842,10 @@ function peLoadAll(){
       /* 업체 명단은 업체 잇기용으로 이미 읽어 두었다(coSrc) — 같은 자리를 두 번 읽지 않는다 */
       if(d[0]==='companies'&&coSrc&&coSrc.length) return Promise.resolve([d[0],coSrc]);
       return fbDb.ref('data/'+PE_KEYS[d[0]]+'/v').once('value')
-        .then(function(s){ return [d[0],_peArr(s.val())]; })
-        .catch(function(){ return [d[0],_ls(PE_KEYS[d[0]])]; });   // 권한/네트워크 실패 → 캐시 폴백
+        /* ★ 휴지통에 든 것(_deleted)은 뺀다 (2026-10-01) — 이알피에서 중복 사건을 휴지통으로 보냈는데
+             업무관리에는 그대로 «진행중»으로 남았다. 이알피 휴지통은 딱지만 붙이고 지우지 않는다(TrashBin). */
+        .then(function(s){ return [d[0],_peLive(_peArr(s.val()))]; })
+        .catch(function(){ return [d[0],_peLive(_ls(PE_KEYS[d[0]]))]; });   // 권한/네트워크 실패 → 캐시 폴백
     }));
   }).then(function(rows){
     rows.forEach(function(r){ if(r[1]) peMaster[r[0]]=r[1]; });
