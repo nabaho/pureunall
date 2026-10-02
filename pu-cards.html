@@ -4195,7 +4195,10 @@ const Store = {
                  ⑶ 통째로 받은 지 사흘이 넘었다(스스로 낫기)  ⑷ 지운 자국을 못 읽었다
                ⚠ 「지운 자국」을 먼저 걷고 나서 구독한다. 안 걷으면 남이 지운 명함이
                  이 기기에만 유령으로 남는다(씨앗에는 아직 있다).
-               ⚠ 자국 읽기가 늦어도 문이 잠기지 않게 800ms 만 기다린다 — 넘으면 통째로. */
+               ⚠ 자국 읽기가 늦어도 문이 잠기지 않게 3초만 기다린다 — 넘으면 통째로.
+                 ⚠ 800ms 였다가 3초로 늘렸다 (대표 크롬 실측 2026-10-02): 막 연결된 직후라 첫 대답이
+                   800ms 를 넘겨, 자국 1건을 못 기다리고 3MB 를 통째로 받았다(명함 다 옴 5.5초).
+                   통째로 받는 데 1~4초가 드니 3초를 기다리는 편이 늘 낫다. */
             cardCacheGet(snap=>{
               if(_subKicked) return;
               if(!snap){ goSub(null); return; }
@@ -4205,7 +4208,7 @@ const Store = {
               if(_needFull){ _lastFullAt = Date.now(); console.log('[명함] 사흘에 한 번 통째로 받습니다(스스로 낫기)'); goSub(_seed); return; }   /* 씨앗은 그리되 통째로 받는다 */
               let _tombDone = false;
               const _tombT = setTimeout(()=>{ if(!_tombDone){ _tombDone = true; _lastFullAt = Date.now();
-                console.log('[명함] 지운 자국을 800ms 안에 못 읽어 통째로 받습니다'); goSub(_seed); } }, 800);
+                console.log('[명함] 지운 자국을 3초 안에 못 읽어 통째로 받습니다'); goSub(_seed); } }, 3000);
               this.db.ref(DB_ROOT+TOMB).orderByValue().startAt(_ckpt).once('value').then(s=>{
                 if(_tombDone) return; _tombDone = true; clearTimeout(_tombT);
                 const gone = s.val() || {};
