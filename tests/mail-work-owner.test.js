@@ -45,7 +45,7 @@ function box(o) {
     mbWhoIndex: () => ({ byAddr: o.byAddr || {}, byDom: {}, coAddr: o.coAddr || {} }),
   };
   vm.createContext(ctx);
-  ['mbWhoLive', 'mbWhoWhy', 'mbWorkLive', 'mbWorkBuild', 'mbWorkMgrOfAddr', 'mbWorkOfRow',
+  ['mbWhoLive', 'mbWhoWhy','mbWhoWhyOf', 'mbWorkLive', 'mbWorkBuild', 'mbWorkMgrOfAddr', 'mbWorkOfRow',
     'mbWorkMgrs', 'mbWorkTag', 'mbSubsOfRow', 'mbCoNameOf']
     .forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   vm.runInContext("var MB_WORK_KIND = { case:'사건', consulting:'컨설팅' };", ctx);

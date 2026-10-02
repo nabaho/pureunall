@@ -62,7 +62,7 @@ function run(opt){
   ctx.mbMemoOf = () => ctx._memo;
   vm.createContext(ctx);
   /* mbWhoWhy ①-3(사건·컨설팅 주소)도 «진짜»를 싣는다 — 자료가 없으면(_mbWork=null) 아무 일도 안 한다 */
-  ['mbWhoLive','mbWhoWhy','mbWorkMgrOfAddr','mbSentTo','mbSentBox','mbSentWho','mbSentTally',
+  ['mbWhoLive','mbWhoWhy','mbWhoWhyOf','mbWorkMgrOfAddr','mbSentTo','mbSentBox','mbSentWho','mbSentTally',
    'mbSentWhoList','mbSentGapList','mbSentPick','mbSentWhoLineHtml','mbSentGapHtml']
     .forEach(n => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   return ctx;
