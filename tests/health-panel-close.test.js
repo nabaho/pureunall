@@ -59,7 +59,7 @@ console.log('\n■ 아는 것이 없으면 아무것도 안 띄운다');
 t('★ 「아는 열린 건수」를 따로 둔다 (모를 때는 null)',
   /var knownOpen = null;/.test(src), true);
 t('★ 모름도 0건과 똑같이 감춘다 — 이것이 «회색 단추가 안 없어지던» 까닭이다',
-  /if \(!isAdminUser \|\| !\(knownOpen > 0\)\) \{ badge\.hidden = true; return; \}/.test(src), true);
+  /if \(!isAdminUser\) \{ badge\.hidden = true; return; \}[\s\S]{0,500}?if \(!\(knownOpen > 0\)\) \{ badge\.hidden = true; return; \}/.test(src), true);
 /* 「!== 0」 으로 적으면 모름(null)일 때 또 뜬다 — 처음 문제로 되돌아간다.
    조용한 회색 단추(HEALTH_QUIET)도 함께 사라져야 한다. */
 t('★ 조용한 회색 단추를 아예 두지 않는다', /HEALTH_QUIET/.test(src), false);
@@ -89,14 +89,20 @@ t('★ 밖에서 부를 수 있게 열어 둔다', /openAdminPanel: showAdminPan
 t('★ 단추가 없어도 열린다 — 부르는 쪽이 app 을 안 줘도 스스로 찾는다',
   /app = app \|\| activeApp\(\);/.test(src), true);
 t('★ 결과를 돌려준다 — 부르는 쪽이 「불러오는 중」 을 끝낼 수 있다',
-  /return app\.database\(\)\.ref\('systemAlerts'\)\.once\('value'\)/.test(src), true);
+  /return readAdminAlerts\(app\)\.then\(function \(alertsSnapshot\)/.test(src), true);
 
 console.log('\n■ 세어 본 뒤에는 색이 뜻을 갖는다');
 t('★ 열어 보면 그 수를 기억한다', /knownOpen = adminAlerts\.length;/.test(src), true);
 t('★ 한 건 처리할 때마다 단추도 함께 내린다',
   /knownOpen = left;\s*\n\s*paintAdminBadge\(/.test(src), true);
 t('★ 못 읽었으면 «0» 이 아니라 «모름» 으로 되돌린다 — 0 으로 적으면 진짜 장애가 조용해진다',
-  /knownOpen = null;\s*\n\s*window\.alert\('장애 알림을 불러오지 못했습니다/.test(src), true);
+  /knownOpen = null;\s*\n\s*adminLoadFailed = true;/.test(src), true);
+t('★ 조회 실패를 업무를 막는 브라우저 경고창으로 띄우지 않는다',
+  /window\.alert\('장애 알림을 불러오지 못했습니다/.test(src), false);
+t('★ 실패 상태에서 같은 단추로 다시 시도할 수 있다',
+  /장애 알림 불러오기 실패 — 다시/.test(src), true);
+t('★ 직접 누른 단추의 거절은 받아 줘서 장애가 다시 기록되는 순환을 막는다',
+  /badge\.onclick = function \(\) \{ showAdminPanel\(app\)\.catch\(function \(\) \{\}\); \};/.test(src), true);
 
 /* ══ 포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄 ══
    화면 왼쪽 아래에 늘 떠 있던 단추를 치웠으니(위 참조), 평소에 들여다볼 문이

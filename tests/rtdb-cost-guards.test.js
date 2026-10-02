@@ -53,7 +53,8 @@ test('사진첩 부팅은 휴지통 원본을 자동 스캔하지 않는다', ()
 test('장애 알림은 전체 루트 실시간 value 구독을 하지 않는다', () => {
   const health = read('js/pu-health.js');
   assert.doesNotMatch(health, /ref\('systemAlerts'\)\.on\('value'/);
-  assert.match(health, /function showAdminPanel[\s\S]*ref\('systemAlerts'\)\.once\('value'/);
+  assert.match(health, /function readAdminAlerts[\s\S]*ref\('systemAlerts'\)\.once\('value'/);
+  assert.match(health, /function showAdminPanel[\s\S]*return readAdminAlerts\(app\)/);
 });
 
 test('접속자 현황은 항목 단위로 받고 백그라운드 하트비트를 멈춘다', () => {
