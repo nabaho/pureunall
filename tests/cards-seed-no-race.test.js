@@ -50,6 +50,14 @@ test('★★★ ② 열렸으면 3초까지 · 안 열리면 400ms — 실제로
 });
 
 test('★★ ③ 통째로 받는 길마다 까닭을 남긴다', () => {
-  assert.match(SRC, /console\.log\('\[명함\] 지운 자국을 800ms 안에 못 읽어 통째로 받습니다'\)/);
+  assert.match(SRC, /console\.log\('\[명함\] 지운 자국을 3초 안에 못 읽어 통째로 받습니다'\)/);
   assert.match(SRC, /console\.log\('\[명함\] 사흘에 한 번 통째로 받습니다\(스스로 낫기\)'\)/);
+});
+
+test('★★★ ④ 지운 자국은 3초까지 기다린다 — 800ms 로는 막 연결된 직후 늘 졌다', () => {
+  const i = SRC.indexOf('const _tombT = setTimeout(');
+  const seg = SRC.slice(i, i + 400);
+  const ms = Number((seg.match(/\}, (\d+)\);/) || [])[1]);
+  assert.ok(ms >= 2000, '★★★ 지운 자국 1건을 못 기다리고 3MB 를 통째로 받는다: ' + ms + 'ms');
+  assert.ok(ms <= 5000, '★ 너무 오래 기다리면 사본도 늦게 그린다: ' + ms + 'ms');
 });
