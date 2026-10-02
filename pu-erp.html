@@ -55006,9 +55006,12 @@ function IncomeCompanyTab(){
     if(ok) refreshIncomes();
     return ok;
   }
+  /* ⚠ isPaid·paidInfo 와 «같은 잣대»(advisoryYm 먼저, 없으면 입금일의 달)로 찾는다 (2026-10-02 입금관리 멈춤).
+     예전엔 입금일의 달로만 찾아서, 9월 자문료가 10월 1일에 들어오면(advisoryYm 2026-09)
+     isPaid 는 「9월 받음」인데 getItem 은 못 찾아 item.date 에서 화면 전체가 멈췄다. */
   function getItem(name,month){
     var ym=selYear+'-'+('0'+month).slice(-2);
-    return incomes.find(function(i){return i.companyName===name&&i.sourceKind==='company'&&(i.date||'').slice(0,7)===ym;});
+    return incomes.find(function(i){return i.companyName===name&&i.sourceKind==='company'&&((i.advisoryYm||(i.date||'').slice(0,7))===ym);});
   }
 
   /* kind — 안 주면 자문료 (CMS 나누기에서 해지 업체 종류를 넘겨준다) */
@@ -56075,7 +56078,7 @@ function IncomeCompanyTab(){
                     } : undefined,
                     title: nicesDragActive && !paid
                       ? '🏦 여기에 놓으면 ' + co.name + ' ' + m + '월 나이스빌 CMS 확정'
-                      : paid
+                      : paid && item
                         ? (item.date||'').slice(5).replace('-','/') + ' 입금확인' + (item.note?' | '+item.note:'')
                         : co.isCMS && co.cmsPayDay
                           ? '🏦 CMS 자동이체 예정일: ' + m + '월 ' + co.cmsPayDay + '일 (클릭하여 확정)'
