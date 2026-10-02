@@ -1224,6 +1224,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-ontology.js?v=40"></script>
+<script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=4"></script>
@@ -15777,6 +15778,9 @@ function _kcLoadPostcode(){
 }
 /* 찾을 말 다듬기 — 괄호 안 건물명·층·호는 빼야 잘 걸린다(이알피와 같은 다듬기) */
 function kcAddrQuery(a){
+  /* «시·군 + 도로명 + 번호»가 있으면 그것만 — 틀린 구 이름을 통째 넣으면 엉뚱한 동네가 맨 위에 온다
+     (2026-10-02, js/pu-addr.js 머리말). 공용 파일이 없을 때만 예전 다듬기. */
+  if(typeof window!=='undefined'&&window.PuAddr) return window.PuAddr.query(a);
   return String(a||'').replace(/\([^)]*\)/g,' ').replace(/\s*\d+층.*$/,' ').replace(/\s*[\d-]+호.*$/,' ')
     .replace(/\s+/g,' ').trim();
 }
