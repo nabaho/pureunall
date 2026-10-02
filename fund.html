@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=40"></script>
+<script src="js/pu-addr.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -1048,7 +1049,10 @@ function openAddressSearch(onComplete,prefill){
   ov.onclick=function(e){ if(e.target===ov) cleanup(); };
 
   /* 미리 찾을 말 다듬기 — 괄호 안 건물명·층/호는 빼야 검색이 잘 걸린다 */
-  var q=String(prefill||'').replace(/\([^)]*\)/g,' ').replace(/\s*\d+층.*$/,' ').replace(/\s*[\d-]+호.*$/,' ').replace(/\s+/g,' ').trim();
+  /* ⚠ «시·군 + 도로명 + 번호»만 넣는다 — 틀린 구 이름을 통째 넣으면 엉뚱한 동네가 맨 위에 온다
+     (2026-10-02 한 회사, js/pu-addr.js 머리말) */
+  var PA=(typeof window!=='undefined'&&window.PuAddr)||null;
+  var q=PA?PA.query(prefill):String(prefill||'').replace(/\([^)]*\)/g,' ').replace(/\s*\d+층.*$/,' ').replace(/\s*[\d-]+호.*$/,' ').replace(/\s+/g,' ').trim();
   try{
     new daum.Postcode({
       oncomplete:function(data){
@@ -1056,8 +1060,16 @@ function openAddressSearch(onComplete,prefill){
         if(data.buildingName&&data.apartment==='Y') addr+=' ('+data.buildingName+')';
         var r={zipcode:data.zonecode||'',address:addr,roadAddress:data.roadAddress||'',jibunAddress:data.jibunAddress||''};
         cleanup();
-        try{ onComplete&&onComplete(r); }
-        catch(e){ toast('주소 반영 중 오류: '+(e&&e.message||e),'err'); }
+        function put(){ try{ onComplete&&onComplete(r); }
+          catch(e){ toast('주소 반영 중 오류: '+(e&&e.message||e),'err'); } }
+        /* 적어 둔 것과 도로명·번호가 다르면 한 번 묻는다 — 소리 없이 다른 동네가 들어가지 않게 */
+        var had=PA?PA.key(prefill):'', got=PA?PA.key(r.roadAddress||r.address):'';
+        if(had&&got&&had!==got&&typeof confirmM==='function'){
+          confirmM('적어 두신 주소와 다른 곳입니다.\n\n적어 둔 것: '+had+'\n고른 것: '+got+'\n\n이 주소로 바꿀까요?',{ok:'바꾸기'})
+            .then(function(ok){ if(ok) put(); else openAddressSearch(onComplete,prefill); });
+          return;
+        }
+        put();
       },
       width:'100%', height:'100%'
     }).embed(body, q.length>=2?{q:q,autoClose:false}:undefined);

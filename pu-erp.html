@@ -185,6 +185,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
 <script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-cokey.js?v=1"></script>
+<script src="js/pu-addr.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=1"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
@@ -1509,8 +1510,12 @@ function openAddressSearch(onComplete, prefill){
     setTimeout(function(){ openAddressSearch(onComplete, prefill); }, 50);
   };
 
-  // 미리 찾을 말 다듬기 — 괄호 안 건물명·층/호는 빼야 검색이 잘 걸린다
-  var pfQ = String(prefill || '')
+  // 미리 찾을 말 다듬기 — «시·군 + 도로명 + 번호»만 (js/pu-addr.js)
+  /* ⚠★ 통째로 넣지 않는다 (대표 제보 2026-10-02 한 회사). 사진 판독이 «있지 않은 구»로
+     틀린 주소를 통째로 넣으면 다음 주소검색이 엉뚱한 다른 동네를 맨 위에
+     올렸고, 그걸 누르자 그대로 들어갔다. «시 + 도로명 + 번호»면 바른 한 곳만 나온다. */
+  var PA = (typeof window !== 'undefined' && window.PuAddr) || null;
+  var pfQ = PA ? PA.query(prefill) : String(prefill || '')
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\s*\d+층.*$/, ' ')
     .replace(/\s*[\d-]+호.*$/, ' ')
@@ -1538,6 +1543,18 @@ function openAddressSearch(onComplete, prefill){
             roadAddress: data.roadAddress || '',
             jibunAddress: data.jibunAddress || ''
           };
+          /* ★ 적어 둔 주소와 «도로명·번호»가 다르면 바로 넣지 않고 묻는다.
+             한 회사 때는 맨 위 줄을 누르자 다른 동네 주소가 소리 없이 들어갔다.
+             이사·본점 주소일 수도 있으니 막지는 않는다 — 사람이 정한다. */
+          var _had = PA ? PA.key(prefill) : '';
+          var _got = PA ? PA.key(selectedResult.roadAddress || selectedResult.address) : '';
+          if(_had && _got && _had !== _got
+             && !confirm('적어 두신 주소와 다른 곳입니다.\n\n적어 둔 것: ' + _had + '\n고른 것:   ' + _got
+                         + '\n\n이 주소로 바꿀까요?\n(「취소」를 누르면 다시 고릅니다)')){
+            cleanup();
+            setTimeout(function(){ openAddressSearch(onComplete, prefill); }, 50);
+            return;
+          }
           // 결과 선택(클릭) 시 즉시 적용·저장
           try{
             if(typeof onComplete === 'function') onComplete(selectedResult);
