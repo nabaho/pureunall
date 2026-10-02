@@ -4186,7 +4186,7 @@ function _hwpInkaValues(f,sites){
   var b=_boss(f), gong=(f.fund_type||'공동')!=='사내';
   var V={기금명:String(f.name||''), 전화:String(f.phone||''), 기금소재지:String(f.address||''),
     대표자:String(b.name||f.chairman||''), 대표자생년월일:String(b.birth||''), 대표자주소:String(b.addr||''),
-    대표자직책:String(b.title||(f.chairman?'이사장':'')),
+    대표자직책:String(b.title||''),        /* 사업장 직책(작성방법 1) — 모르면 밑줄. _fundFill 이 사업장 칸에서 채운다 */
     사내표:gong?'[  ]':'[ V]', 공동표:gong?'[ V]':'[  ]',
     신청일:_hwpKoDate(_hwpTodayIso(),['        ','       ']), 관할노동청:String(f.labor_office||'')};
   /* 위원 격자 세 줄 — 넘치면 첫 칸에 「별지 명단과 같음」만(HTML fillCommittee 와 같다).
@@ -4580,8 +4580,50 @@ function _hwpRelayout(doc){
 }
 /* 서식마다 «표지 이름 → 값»을 내는 함수. 값은 HTML 서식이 쓰던 같은 셈에서 온다. 틀이 늘면 여기 는다 */
 function _hwpValuesFor(kind,f,sites){
-  var fn=HWP_TPL_VALUES[kind]||_hwpTplValues;
-  return fn(f||{},sites||[],kind);                     // kind — 여러 서식이 한 값 함수를 쓸 때 서식별 안내를 가르려고
+  var fn=HWP_TPL_VALUES[kind]||_hwpTplValues, x=_fundFill(f||{},sites||[]);
+  var V=fn(x.f,sites||[],kind);                        // kind — 여러 서식이 한 값 함수를 쓸 때 서식별 안내를 가르려고
+  if(x.notes.length&&V&&typeof V==='object') V._note=[V._note,'끌어온 값: '+x.notes.join(', ')].filter(Boolean).join(' · ');
+  return V;
+}
+/* ★ 비어 있는 기금 칸을 «이미 있는 자료»로 메운다 (2026-10-02 대표 「순서대로 모두」 — 서식 완전 자동화 ①②)
+   ─ 소재지·전화: ★대표사업장의 것(사무국이 대표회사 안에 있는 것이 보통) — 대표사업장이 없으면 안 메운다
+   ─ 관할 노동청·등기소·세무서: 소재지 주소로 정해진다(_addrParts 표)
+   ─ 이사장 생년월일·주소·직책: 그 사람이 참여사업장의 사용자대표(또는 대표자)면 그 칸에서. 직책은 «사업장 직책»이다
+     (별지 제7호 작성방법 1: 「직책란 … 사업 또는 사업장에서의 직책」 — 옛 제출본도 「대표이사」로 냈다)
+   ⚠ 원본(f)은 건드리지 않는다 — 사본을 돌려준다. 이미 적힌 값은 그대로다. 메운 칸은 notes 로 알린다(서식 안내 줄). */
+function _fundFill(f,sites){
+  var g=Object.assign({},f||{}), notes=[], live=(sites||[]).filter(function(s){ return s&&s.status!=='closed'; });
+  var blank=function(k){ return !String(g[k]==null?'':g[k]).trim(); };
+  var lead=_leadSite(live);
+  if(lead){
+    if(blank('address')&&String(lead.address||'').trim()){ g.address=String(lead.address).trim(); notes.push('소재지(대표사업장)'); }
+    var ph=String(lead.phone||'').trim()||((lead.contacts||[]).filter(function(c){ return c&&c.phone; })[0]||{}).phone||'';
+    if(blank('phone')&&String(ph).trim()){ g.phone=String(ph).trim(); notes.push('전화(대표사업장)'); }
+  }
+  [['labor_office',guessLabor,'관할 노동청'],['registry_office',guessRegistry,'등기소'],['tax_office',guessTax,'세무서']].forEach(function(o){
+    if(!blank(o[0])||blank('address')) return;
+    var v=''; try{ v=o[1](g.address)||''; }catch(e){}
+    if(v){ g[o[0]]=v; notes.push(o[2]+'(소재지로)'); }
+  });
+  var offs=_officersOf(g), i=-1;
+  offs.forEach(function(o,k){ if(i<0&&/이사장/.test(o.role||'')) i=k; });
+  var boss=i>=0?offs[i]:(String(g.chairman||'').trim()?{role:'이사장',name:String(g.chairman).trim()}:null);
+  if(boss&&_relNm(boss.name)){
+    var hit=live.filter(function(s){ var u=_siteUrep(s), ceo=String(s.ceo||'').split(/[,，]/).map(_relNm);
+      var who=(u.same||!u.name)?ceo:[_relNm(u.name)];        /* 「대표자와 같음」·빈 사용자대표면 대표자(공동대표 낱낱) */
+      return who.indexOf(_relNm(boss.name))>=0; })[0];
+    var b2=Object.assign({},boss), got=[];
+    /* 직책: 명부에 적은 것 → 기금 정보 › 설립의 「대표자 직책」(rep_position) → 사업장 사용자대표 직위 */
+    if(!String(b2.title||'').trim()&&String(g.rep_position||'').trim()) b2.title=String(g.rep_position).trim();
+    if(hit){
+      if(!String(b2.birth||'').trim()&&String(hit.urep_birth||'').trim()){ b2.birth=hit.urep_birth; got.push('생년월일'); }
+      if(!String(b2.addr||'').trim()&&String(hit.urep_addr||'').trim()){ b2.addr=hit.urep_addr; got.push('주소'); }
+      if(!String(b2.title||'').trim()&&String(hit.urep_title||'').trim()){ b2.title=hit.urep_title; got.push('직책'); }
+      if(got.length) notes.push('대표자 '+got.join('·')+'('+String(hit.name||'').trim()+')');
+    }
+    if(JSON.stringify(b2)!==JSON.stringify(boss)) g.officers=i>=0?offs.map(function(o,k){ return k===i?b2:o; }):[b2].concat(offs);
+  }
+  return {f:g, notes:notes};
 }
 /* 틀 채우기 — 결과는 HWPX 바이트(한글이 바로 연다). 채운 문단만 줄을 새로 나눈다 */
 function hwpTplFill(kind,f,sites){
@@ -17006,6 +17048,8 @@ function parseBank(rows){
      (D공동 2024 지출대장 56건이 일자·적요를 통째로 잃었다). */
   function find(cells){col.kind=[];for(var c=0;c<cells.length;c++){var v=String(cells[c]||'').replace(/\s+/g,'');
     if(/날짜|거래일|일자|일시/.test(v)&&col.date==null)col.date=c;
+    /* 사람이 만든 장부는 월·일을 따로 적는다(「번호|월|일|항목|…」 — 연도는 제목 줄 「2023년 …」에 있다) */
+    if(v==='월'&&col.mon==null)col.mon=c; if(v==='일'&&col.day==null)col.day=c;
     /* '세부내역'·'업체명'은 은행이 아니라 사람이 적은 대장의 머리글이다.
        설명 열이 둘 이상이면 첫 열만 적요로 쓰고 **나머지는 버리지 않고 성격 힌트로 모은다** —
        L공동은 적요가 'BZ뱅크'(수단)뿐이고 실제 상대방('(주)라온소프트')이 '내용' 열에 있어
@@ -17044,6 +17088,8 @@ function parseBank(rows){
   if(hi<0) for(var i3=0;i3<lim;i3++){ col={}; find(rows[i3]||[]);
     if((col.dep!=null||col.wd!=null)&&col.date!=null&&col.memo!=null){ hi=i3; break; } }
   if(hi<0) return null;
+  /* 월·일 칸만 있는 장부의 연도 — 머리글 위 제목 줄에서 찾는다. 못 찾으면 날짜를 지어내지 않는다 */
+  var titleYr=''; if(col.date==null&&col.mon!=null&&col.day!=null){ for(var ty=0;ty<=hi;ty++){ var tm=(rows[ty]||[]).join(' ').match(/(20\d{2})\s*년/); if(tm){ titleYr=tm[1]; break; } } }
   function normDate(s){ var t=String(s||'').replace(/\s+/g,' ').trim();
     var m=t.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
     if(m) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
@@ -17062,6 +17108,10 @@ function parseBank(rows){
   var out=[], lastDate='';
   for(var r=hi+1;r<rows.length;r++){ var row=rows[r]; if(!row)continue;
     var date=col.date!=null?normDate(row[col.date]):'';
+    if(col.date==null&&titleYr){ var mo=+String(row[col.mon]||'').replace(/\D/g,''), dy=+String(row[col.day]||'').replace(/\D/g,'');
+      if(mo>=1&&mo<=12&&dy>=1&&dy<=31) date=titleYr+'-'+('0'+mo).slice(-2)+'-'+('0'+dy).slice(-2); }
+    /* 「이월」 줄은 거래가 아니다 — 전기에서 넘어온 잔액이라 입금으로 읽으면 수입이 부푼다 */
+    if(row.some(function(x){ return /^(전기|전월|전년도?)?\s*이월$/.test(String(x||'').trim()); })) continue;
     /* 사람이 적은 대장은 같은 날 여러 건을 적을 때 일자를 첫 줄에만 쓴다 — 빈 칸은 위 일자를 잇는다.
        통장 파일은 모든 줄에 일자가 있어 영향이 없다. */
     if(/^\d{4}-\d{2}-\d{2}$/.test(date)) lastDate=date; else if(!date) date=lastDate;
