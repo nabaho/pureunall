@@ -185,7 +185,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
 <script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-cokey.js?v=1"></script>
-<script src="js/pu-addr.js?v=1"></script>
+<script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=1"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
@@ -9102,6 +9102,68 @@ function coLinkSkip(rows){
 }
 
 // ============ 업체 연결 화면 ============
+/* 📍 기업정보함과 주소가 다른 업체 (목업 C, 대표 승인 2026-10-02)
+   ★ 견주는 잣대는 계약 창과 같다(erpAddrMismatch) — 두 자리가 다른 말을 하면 안 된다.
+   ★ 「이대로 둠」은 그 업체에 «그때의 주소»를 적어 둔다(addrKeep). 주소가 또 바뀌면 다시 묻는다.
+   ⚠ 색인(1.36MB)은 업체관리를 연다고 받지 «않는다» — 이미 받았을 때만 세고,
+     아니면 「주소 대조」를 누른 그때 받는다(watchPucardsIndexByChild 머리말 「쓸 때 받는다」). */
+function coAddrMismatchList(list){
+  return (list || []).filter(function(co){
+    return co && !co._deleted && co.addrKeep !== co.address && !!erpAddrMismatch(co);
+  }).map(function(co){ return { co: co, pc: erpAddrMismatch(co) }; });
+}
+function coAddrIdxLoaded(){ try { return Object.keys(_pcIdx).length > 0; } catch(_){ return false; } }
+function CoAddrModal(props){
+  useEscClose(props.onClose);
+  usePucardsIdxReady();
+  var tS = useState(0); var bump = function(){ tS[1](function(n){ return n + 1; }); if(props.onChanged) props.onChanged(); };
+  var rows = coAddrMismatchList(dbGet('companies', []));
+  function save(co, patch, msg){
+    if(!dbUpsert('companies', Object.assign({}, co, patch))){ showToast('❌ 업체 저장 실패'); return; }
+    showToast(msg); bump();
+  }
+  function toPc(r){
+    openAddressSearch(function(a){
+      if(!a || (!a.zipcode && !a.address)){ showToast(ADDR_NONE_MSG); return; }
+      save(r.co, { zipcode: a.zipcode, address: a.address }, '📍 ' + (r.co.name || '') + ' — ' + a.address);
+    }, r.pc.ad);
+  }
+  var td = { padding:'6px 8px', borderBottom:'1px solid #f8fafc', fontSize:'12px', whiteSpace:'nowrap',
+             overflow:'hidden', textOverflow:'ellipsis', maxWidth:0 };
+  var bs = { padding:'3px 9px', border:'1px solid #cbd5e1', borderRadius:'4px', background:'#fff', color:'#475569',
+             fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', marginLeft:'4px' };
+  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target===e.currentTarget) props.onClose(); } },
+    h('div', { className:'modal', style:{ maxWidth:'980px', width:'96vw' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '📍 기업정보함과 주소가 다른 업체 ',
+          h('span', { style:{ fontSize:'12px', color:'#64748b', fontWeight:400 } }, rows.length + '곳'),
+          h('span', { style:{ marginLeft:'6px', fontSize:'12px', color:'#64748b', cursor:'help', fontWeight:400 },
+            title:'같은 사업자번호의 기업정보함 사업자등록증 주소와 도로명·번호가 다른 업체입니다.\n'
+              + '「충남」과 「충청남도」처럼 표기만 다른 것은 같은 곳으로 봅니다.\n'
+              + '「기업정보함 주소로」는 그 주소로 검색을 열어 우편번호까지 채워 업체에 저장합니다.\n'
+              + '이사했거나 본점·사업장이 달라 맞는 것이면 「이대로 둠」 — 주소가 또 바뀌면 다시 묻습니다.\n'
+              + '등록증 쪽이 틀렸으면(판독 오타) 기업정보함에서 고치세요.' }, 'ⓘ')),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ maxHeight:'72vh', overflowY:'auto' } },
+        !coAddrIdxLoaded() ? h('div', { style:{ padding:'20px', color:'#64748b', fontSize:'12.5px' } }, '기업정보함 목록을 받는 중…')
+        : !rows.length ? h('div', { style:{ padding:'20px', color:'#166534', fontSize:'12.5px' } }, '✓ 주소가 다른 업체가 없습니다')
+        : h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
+            h('colgroup', null, h('col', { style:{ width:'18%' } }), h('col', { style:{ width:'31%' } }),
+              h('col', { style:{ width:'31%' } }), h('col', { style:{ width:'20%' } })),
+            h('thead', null, h('tr', null, ['업체', '이알피 주소', '기업정보함 등록증 주소', ''].map(function(t){
+              return h('th', { key:t, style:{ textAlign:'left', padding:'6px 8px', fontSize:'11px', color:'#64748b',
+                borderBottom:'1px solid #e2e8f0', position:'sticky', top:0, background:'#fff' } }, t); }))),
+            h('tbody', null, rows.map(function(r){
+              return h('tr', { key:r.co.id },
+                h('td', { style:Object.assign({}, td, { fontWeight:600 }), title:r.co.name }, r.co.name || '(이름 없음)'),
+                h('td', { style:td, title:r.co.address }, r.co.address),
+                h('td', { style:Object.assign({}, td, { color:'#854d0e' }), title:r.pc.ad }, r.pc.ad),
+                h('td', { style:Object.assign({}, td, { textAlign:'right', maxWidth:'none' }) },
+                  h('button', { type:'button', style:bs, onClick:function(){ toPc(r); } }, '기업정보함 주소로'),
+                  h('button', { type:'button', style:bs,
+                    onClick:function(){ save(r.co, { addrKeep: r.co.address }, '이대로 둡니다 — ' + (r.co.name || '')); } }, '이대로 둠')));
+            }))))));
+}
 function CoLinkModal(props){
   useEscClose(props.onClose);
   var cS = useState(function(){ return coLinkCandidates(); });
@@ -14071,6 +14133,7 @@ var RESET_VIEW_TIP = '첫 화면 기본값으로 (상태·유형·담당·정렬
 // 업체관리 툴바 — 모바일/PC 두 줄에서 같은 설명을 쓴다
 var CO_MERGE_TIP = '같은 이름으로 따로 등록된 업체를 한 쌍씩 확인하고 합칩니다';
 var CO_SUBOFFICE_FIX_TIP = '합치면서 사무대행 표시가 딸려오지 않은 업체를 사무대행 탭에 되살립니다';
+var CO_ADDR_TIP = '기업정보함 사업자등록증과 주소(도로명·번호)가 다른 업체를 한 곳씩 봅니다';
 var CO_LINK_TIP = '이름으로만 이어진 계약·사건·컨설팅·기금·기타에 업체 ID를 붙입니다';
 var CO_VAT_ALL_TIP = '월 자문료를 모두 부가세 포함으로 지정합니다 (미확정은 금액 변화 없음)';
 
@@ -15022,6 +15085,36 @@ function pcToContact(x, primary, pcId){
 window.pcToContact = pcToContact;
 // 기업정보함 색인을 회사 단위로 묶는다 — 회사 자동완성(pcCompanyRows)과 '기업정보함에서 회사 찾기' 모달이 함께 쓴다.
 // 키는 회사명 정규화값(pcNormCo), 값은 { name, biz, bizId, cards[], cardIds[] }
+/* 📍 기업정보함 사업자등록증 주소 — «사업자번호»로 찾는다 (대표 지시 2026-10-02 「반드시 연결이 제대로」)
+   ⚠ 이름으로 찾지 않는다 — 같은 이름 다른 회사가 있다(js/pu-cokey.js 머리말).
+   ⚠ 색인이 바뀌면(pucards-idx) 표를 다시 만든다 — 한 장 고친 것도 따라온다. */
+var _pcBizAd = null;
+try { window.addEventListener('pucards-idx', function(){ _pcBizAd = null; }); } catch(_){}
+function pcBizAddrByNo(bizNo){
+  var d = String(bizNo || '').replace(/\D/g, '');
+  if(d.length !== 10) return null;
+  if(!_pcBizAd){
+    var map = {}, idx = (typeof window !== 'undefined' && window.pucardsIdx) || {};
+    Object.keys(idx).forEach(function(id){
+      var r = idx[id];
+      if(!r || r.k !== 'biz' || !r.ad) return;
+      var b = String(r.bz || '').replace(/\D/g, '');
+      if(b.length === 10 && !map[b]) map[b] = { ad: r.ad, name: r.c || '', id: id };
+    });
+    if(Object.keys(idx).length) _pcBizAd = map;   // 아직 빈 색인이면 담아 두지 않는다
+    else return null;
+  }
+  return _pcBizAd[d] || null;
+}
+/* 이 회사 주소가 기업정보함 등록증과 «다른 곳»인가 → 등록증 줄 또는 null.
+   도·구 표기만 다른 것(충남/충청남도)은 같은 곳이다 — 도로명·번호로 본다(js/pu-addr.js). */
+function erpAddrMismatch(co){
+  var PA = (typeof window !== 'undefined' && window.PuAddr) || null;
+  if(!PA || !co || !String(co.address || '').trim()) return null;
+  var pc = pcBizAddrByNo(co.bizNo);
+  if(!pc) return null;
+  return PA.same(co.address, pc.ad) === false ? pc : null;
+}
 function pcGroupCompanies(){
   var groups = {};
   var idx = (typeof window !== 'undefined' && window.pucardsIdx) || null;
@@ -18752,6 +18845,10 @@ function ContractModal(props){
   /* 🔑 사업자번호로 찾아 둔 기업정보함 기업상세 (온톨로지 1걸음, 2026-09-18).
      {key, v} 또는 null. 번호가 «검산을 통과할 때만» 한 번 읽는다. */
   var cik = useState(null); var coInfoHit = cik[0]; var setCoInfoHit = cik[1];
+  /* 📍 주소가 기업정보함 등록증과 다른지 보려면 색인이 있어야 한다 — 창을 열 때 받아 둔다.
+     「이대로 둠」을 누른 주소(문자열)를 기억한다 — 주소를 또 바꾸면 다시 견준다. */
+  usePucardsIdxReady();
+  var akp = useState(''); var addrKeep = akp[0]; var setAddrKeep = akp[1];
   var hrw = useState(false); var hideRetiredWk = hrw[0]; var setHideRetiredWk = hrw[1];  // 근로자: 재직자만 보기
   /* 👷 근로자 정보함에서 가져오기 (대표 지시 2026-09-02) — 사건 창과 «같은 창»을 쓴다.
      ⚠ 담기는 줄 모양만 다르다(계약 창은 f.company.workers · 주민번호·직책·입사일 칸). */
@@ -21067,7 +21164,37 @@ function ContractModal(props){
             h('input', { type:'text', value:f.company.address, onChange:setCompanyField('address'), onKeyDown:onAddrEnter,
               placeholder:'사업장 주소',
               style:{ flex:1, padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'12.5px', fontFamily:'inherit' } })
-          ));
+          ),
+          /* ⚠ 기업정보함 사업자등록증과 «다른 곳»이면 한 줄로 알린다 (목업 A, 대표 승인 2026-10-02).
+             막지는 않는다 — 이사·본점일 수 있다. 「기업정보함 주소로」는 그 주소로 «검색»을
+             열어 우편번호까지 함께 채운다(글자만 베끼면 우편번호가 비고 판독 오타도 따라온다). */
+          (function(){
+            var mis = erpAddrMismatch(f.company);
+            if(!mis || addrKeep === f.company.address) return null;
+            var bs = { padding:'2px 9px', border:'1px solid #fbbf24', borderRadius:'4px', background:'#fff',
+                       color:'#854d0e', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 };
+            return h('div', { className:'erp-addr-mis',
+                style:{ display:'flex', alignItems:'center', gap:'6px', marginTop:'6px', padding:'5px 9px',
+                  border:'1px solid #fde68a', background:'#fffbeb', borderRadius:'6px', fontSize:'11.5px', color:'#854d0e',
+                  whiteSpace:'nowrap', overflow:'hidden' } },
+              h('span', { style:{ overflow:'hidden', textOverflow:'ellipsis', flex:1, minWidth:0 }, title: mis.ad },
+                '⚠ 기업정보함 주소와 다릅니다 · ' + mis.ad),
+              h('button', { type:'button', style:bs,
+                onClick:function(){
+                  openAddressSearch(function(r){
+                    if(!r || (!r.zipcode && !r.address)){ showToast(ADDR_NONE_MSG); return; }
+                    setF(function(prev){ return Object.assign({}, prev, {
+                      company: Object.assign({}, prev.company, { zipcode: r.zipcode, address: r.address }) }); });
+                    showToast(ADDR_OK_MSG + (r.zipcode||'') + ' ' + r.address);
+                  }, mis.ad);
+                } }, '기업정보함 주소로'),
+              h('button', { type:'button', style:bs, onClick:function(){ setAddrKeep(f.company.address); } }, '이대로 둠'),
+              h('span', { style:{ cursor:'help', color:'#d97706' },
+                title:'같은 사업자번호의 기업정보함 사업자등록증 주소와 도로명·번호가 다릅니다.\n'
+                  + '「충남」과 「충청남도」처럼 표기만 다른 것은 같은 곳으로 봅니다.\n'
+                  + '이사했거나 본점·사업장이 다르면 「이대로 둠」을 누르세요.\n'
+                  + '「기업정보함 주소로」는 그 주소로 검색을 열어 우편번호까지 채웁니다.' }, 'ⓘ'));
+          })());
       })(),
       /* 본사주소도 «검색 칸»으로 (대표 지시 2026-09-19 「본사주소도 사업장주소와 같이
          셀검색 셀로」 → 2026-09-21 「본사주소도 같은 형태로해라 셀 검색 셀로」로
@@ -26335,6 +26462,15 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   var lkcS = useState(function(){ try{ return coLinkCount(); }
     catch(e){ console.warn('[업체연결] 집계 실패', e); return 0; } });
   var linkCount = lkcS[0]; var setLinkCount = lkcS[1];
+  // 📍 기업정보함과 주소가 다른 업체 — 색인을 이미 받았을 때만 센다(받게 만들지 않는다)
+  var adoS = useState(false); var addrOpen = adoS[0]; var setAddrOpen = adoS[1];
+  var adtS = useState(0);
+  useEffect(function(){
+    function on(){ adtS[1](function(n){ return n + 1; }); }
+    window.addEventListener('pucards-idx', on);
+    return function(){ window.removeEventListener('pucards-idx', on); };
+  }, []);
+  var addrMisN = coAddrIdxLoaded() ? coAddrMismatchList(companies).length : -1;   // -1 = 아직 모름
   function recountDup(){
     try{ setDupCount(coDupGroups().length); }
     catch(e){ console.warn('[중복정리] 집계 실패', e); setDupCount(0); }
@@ -27144,6 +27280,11 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
             style:{ padding:'9px 12px', background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe',
               borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
             '🔗 업체 연결 ' + linkCount),
+          addrMisN !== 0 && h('button', { onClick:function(){ setAddrOpen(true); },
+            className:'erp-tip', 'data-tip':CO_ADDR_TIP,
+            style:{ padding:'9px 12px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a',
+              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
+            addrMisN > 0 ? '📍 주소 다름 ' + addrMisN : '📍 주소 대조'),
           vatPend.total > 0 && h('button', { onClick:doVatAll,
             className:'erp-tip', 'data-tip':CO_VAT_ALL_TIP,
             style:{ padding:'9px 12px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe',
@@ -27342,6 +27483,13 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', cursor:'pointer',
           whiteSpace:'nowrap', marginRight:'6px' } },
         '🔗 업체 연결 ' + linkCount),
+      // 기업정보함과 주소가 다른 업체 — 다 정리하면 사라진다(아직 안 셌으면 「주소 대조」)
+      addrMisN !== 0 && h('button', { onClick:function(){ setAddrOpen(true); },
+        className:'erp-tip', 'data-tip':CO_ADDR_TIP,
+        style:{ padding:'6px 12px', fontSize:'11.5px', fontWeight:700, borderRadius:'5px',
+          background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a', cursor:'pointer',
+          whiteSpace:'nowrap', marginRight:'6px' } },
+        addrMisN > 0 ? '📍 주소 다름 ' + addrMisN : '📍 주소 대조'),
       // 월 자문료 부가세 = 포함 일괄 지정. 다 지정되면 사라진다.
       vatPend.total > 0 && h('button', { onClick:doVatAll,
         className:'erp-tip', 'data-tip':CO_VAT_ALL_TIP,
@@ -28036,6 +28184,10 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
       onClose: function(){ setMergeOpen(false); refreshCompanies(); recountDup(); }
     }),
     // 업체 연결(ID 백필) 모달
+    addrOpen && h(CoAddrModal, {
+      onChanged: function(){ refreshCompanies(); },
+      onClose: function(){ setAddrOpen(false); refreshCompanies(); }
+    }),
     linkOpen && h(CoLinkModal, {
       onChanged: function(){ recountDup(); },
       onClose: function(){ setLinkOpen(false); refreshCompanies(); recountDup(); }

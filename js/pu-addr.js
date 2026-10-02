@@ -62,7 +62,28 @@
     return ka === kb;
   }
 
-  var api = { clean: clean, road: road, key: key, city: city, query: query, same: same };
+  /* 구가 있는 시 — «있지 않은 구»를 잡는다(사진 판독이 「서북구」를 「서구」로 읽는 따위).
+     ⚠ 여기 없는 시는 판단하지 않는다(모름 = 빈 글자). 틀린 경고보다 경고 없음이 낫다.
+     ⚠ 행정구역이 바뀌면 고친다 — 2026-10 기준(화성시 4구 신설 반영). */
+  var GU = {
+    '천안시': ['동남구', '서북구'], '청주시': ['상당구', '서원구', '흥덕구', '청원구'],
+    '수원시': ['장안구', '권선구', '팔달구', '영통구'], '성남시': ['수정구', '중원구', '분당구'],
+    '안양시': ['만안구', '동안구'], '안산시': ['상록구', '단원구'], '고양시': ['덕양구', '일산동구', '일산서구'],
+    '용인시': ['처인구', '기흥구', '수지구'], '부천시': ['원미구', '소사구', '오정구'],
+    '화성시': ['만세구', '효행구', '병점구', '동탄구'], '전주시': ['완산구', '덕진구'],
+    '포항시': ['남구', '북구'], '창원시': ['의창구', '성산구', '마산합포구', '마산회원구', '진해구']
+  };
+  /* 「천안시 서구」 → '천안시 서구' (있지 않은 구) · 맞거나 모르면 '' */
+  function badGu(s) {
+    var toks = clean(s).split(' ');
+    for (var i = 0; i < toks.length - 1; i++) {
+      var g = GU[toks[i]];
+      if (g && /구$/.test(toks[i + 1]) && g.indexOf(toks[i + 1]) < 0) return toks[i] + ' ' + toks[i + 1];
+    }
+    return '';
+  }
+
+  var api = { clean: clean, road: road, key: key, city: city, query: query, same: same, badGu: badGu };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuAddr = api;
 })(typeof window !== 'undefined' ? window : this);

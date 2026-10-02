@@ -43,3 +43,11 @@ test('★★★ ③ 이알피·기금 주소 검색이 이 잣대를 쓰고, 다
     assert.match(fn, /openAddressSearch\(onComplete, ?prefill\)/, '★ ' + f + ' 「아니요」를 누르면 다시 고르게 해야 한다');
   }
 });
+
+test('★★★ ④ 있지 않은 구 이름을 잡는다 · 모르는 시는 판단하지 않는다', () => {
+  assert.equal(A.badGu('충청남도 천안시 서구 다라읍 마바1길 27'), '천안시 서구');
+  assert.equal(A.badGu('충남 천안시 서북구 다라읍 마바1길 27'), '', '★ 맞는 구를 틀렸다고 했다');
+  assert.equal(A.badGu('경기도 수원시 영동구 사아로 3'), '수원시 영동구');
+  assert.equal(A.badGu('가나시 서구 마바로 1'), '', '★ 모르는 시를 판단했다 — 틀린 경고보다 경고 없음이 낫다');
+  assert.equal(A.badGu(''), '');
+});
