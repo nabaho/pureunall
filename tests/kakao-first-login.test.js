@@ -189,13 +189,15 @@ test('⑨ ★★ 카카오에서 돌아오면 로그인 화면 대신 「카카�
   assert.equal(w.ctx.window.__kkReturning, true);
 });
 
-test('⑨ 그냥 열었을 때(로그인 기록 없음)는 로그인 화면 그대로다', () => {
+test('⑨ ★★ 그냥 열어도 인증 확인 전에는 로그인 화면을 가린다', () => {
   const w = 첫줄세상('');
-  assert.notEqual(w.els['pu-boot-splash'].style.display, 'flex');
+  assert.equal(w.els['pu-boot-splash'].style.display, 'flex',
+    '★★ Firebase가 남은 로그인을 확인하기 전에 로그인 폼이 먼저 보이면, 곧 포털로 넘어갈 때 로그아웃된 것처럼 깜빡입니다');
   assert.notEqual(w.ctx.window.__kkReturning, true);
-  /* 취소하고 돌아온 것(error)도 로그인 화면이어야 한다 — 기다릴 것이 없다 */
+  /* 취소하고 돌아온 것도 Firebase의 실제 로그인 상태를 확인한 뒤 폼을 보여야 한다. */
   const 취소 = 첫줄세상('?error=access_denied&state=BBB');
-  assert.notEqual(취소.els['pu-boot-msg'].style.display, 'block');
+  assert.equal(취소.els['pu-boot-splash'].style.display, 'flex');
+  assert.notEqual(취소.ctx.window.__kkReturning, true);
 });
 
 test('⑨ ★★ «아직 로그인 전» 신호가 와도 카카오 확인 중이면 스플래시를 걷지 않는다', () => {
