@@ -3980,12 +3980,14 @@ function bootReport(){
       + ' · 명함 다 옴 ' + at('items') + ' · 이알피 옴 ' + at('erp'));
   }catch(_){}
 }
-function cardCacheGet(cb){
+/* onOpen — 저장소가 «열렸다»는 신호. 열렸으면 사본은 곧 온다(부르는 쪽이 더 기다린다). */
+function cardCacheGet(cb, onOpen){
   let done=false; const fin=v=>{ if(!done){ done=true; cb(v); } };
   try{
     const rq = indexedDB.open('pu-cards-cache', 1);
     rq.onupgradeneeded = e=>{ e.target.result.createObjectStore('kv'); };
     rq.onsuccess = e=>{
+      try{ if(onOpen) onOpen(); }catch(_){ }
       try{
         const db = e.target.result;
         const g = db.transaction('kv','readonly').objectStore('kv').get(CARD_CACHE_KEY);
@@ -4171,7 +4173,22 @@ const Store = {
                 restoreLastScreen();       /* 씨앗이 곧 명함이다 — 마지막 화면을 바로 연다 */
               } else subscribe();
             };
-            _subT = setTimeout(()=>goSub(null), 400);
+            /* ★★ 사본을 «시간 다툼»으로 놓치지 않는다 (대표 크롬 실측 2026-10-02).
+               사본이 있는데도 세 번 내리 「사본으로 먼저 그림: 안 옴 · 명함 다 옴(통째로)」였다.
+               사본 읽기는 25ms 인데, 로그인 직후 화면이 바빠 그 답이 차례를 못 받는 사이
+               400ms 타이머가 먼저 울려 3MB 를 통째로 받았다 — 명함이 늘수록 더 자주 진다.
+               ⚠ 그래서 저장소가 «열렸으면» 3초까지 기다린다. 안 열리면(사생활 모드 등)
+                 예전처럼 400ms 뒤 그냥 시작한다 — 사본이 없다고 문이 잠기면 안 된다. */
+            let _cacheOpen = false;
+            const _subStart = Date.now();
+            const _giveUp = ()=>{
+              if(_subKicked) return;
+              if(_cacheOpen && Date.now() - _subStart < 3000){ _subT = setTimeout(_giveUp, 250); return; }
+              console.log('[명함] 사본을 ' + (Date.now() - _subStart) + 'ms 안에 못 읽어 통째로 받습니다'
+                + (_cacheOpen ? '' : ' (저장소가 안 열림)'));
+              goSub(null);
+            };
+            _subT = setTimeout(_giveUp, 400);
             /* ★★ 씨앗이 싱싱하면 «바뀐 것만» 받는다 (대표 지시 2026-09-18) ────────────
                ⚠ 통째로 받는 길로 물러서는 때를 넉넉히 둔다 — 조용히 틀리느니 조금 더 받는다:
                  ⑴ 씨앗이 없다(첫 로그인)            ⑵ 옛 씨앗이라 ckpt 가 없다
@@ -4185,9 +4202,10 @@ const Store = {
               const _seed = snap.items, _ckpt = Number(snap.ckpt)||0;
               _lastFullAt = Number(snap.fullAt)||0;
               const _needFull = !_ckpt || !_lastFullAt || (Date.now() - _lastFullAt) > FULL_EVERY_MS;
-              if(_needFull){ _lastFullAt = Date.now(); goSub(_seed); return; }   /* 씨앗은 그리되 통째로 받는다 */
+              if(_needFull){ _lastFullAt = Date.now(); console.log('[명함] 사흘에 한 번 통째로 받습니다(스스로 낫기)'); goSub(_seed); return; }   /* 씨앗은 그리되 통째로 받는다 */
               let _tombDone = false;
-              const _tombT = setTimeout(()=>{ if(!_tombDone){ _tombDone = true; _lastFullAt = Date.now(); goSub(_seed); } }, 800);
+              const _tombT = setTimeout(()=>{ if(!_tombDone){ _tombDone = true; _lastFullAt = Date.now();
+                console.log('[명함] 지운 자국을 800ms 안에 못 읽어 통째로 받습니다'); goSub(_seed); } }, 800);
               this.db.ref(DB_ROOT+TOMB).orderByValue().startAt(_ckpt).once('value').then(s=>{
                 if(_tombDone) return; _tombDone = true; clearTimeout(_tombT);
                 const gone = s.val() || {};
@@ -4199,7 +4217,7 @@ const Store = {
                 if(_tombDone) return; _tombDone = true; clearTimeout(_tombT);
                 _lastFullAt = Date.now(); goSub(_seed);      /* 자국을 못 읽으면 통째로 — 조용히 틀리지 않는다 */
               });
-            });
+            }, ()=>{ _cacheOpen = true; });
             /* ── 메일 문으로 들어왔으면 «지금» 연다 (대표 보고 2026-08-29 「로그인이 늦다」) ──
                ⚠ 마지막 화면 복원(restoreLastScreen)은 기업정보함 명함이 «다 도착한 뒤»에
                  돈다(아래 subscribe 의 items 구독이 부른다). 명함은 실측 2.9MB 라, 메일
