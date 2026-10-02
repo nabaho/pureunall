@@ -10,6 +10,7 @@
   var boundApps = [];
   var flushing = false;
   var adminAlerts = [];
+  var adminLoadFailed = false;
 
   function safeText(value, max) {
     return String(value == null ? '' : value).replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').slice(0, max || 700);
@@ -164,7 +165,15 @@
        — monitorAdmin 이 hidden=false 로 덮어써 0건인데도 다시 뜨는 식이다.
        ★ knownOpen > 0 «만» 띄운다. null(모름)도 0 과 똑같이 감춘다 —
          !== 0 으로 적으면 모름일 때 또 떠서 처음 문제로 되돌아간다. */
-    if (!isAdminUser || !(knownOpen > 0)) { badge.hidden = true; return; }
+    if (!isAdminUser) { badge.hidden = true; return; }
+    if (adminLoadFailed) {
+      badge.hidden = false;
+      badge.style.cssText = HEALTH_ALARM;
+      badge.textContent = '장애 알림 불러오기 실패 — 다시';
+      badge.title = '일시적인 통신 오류입니다. 다시 눌러 주세요.';
+      return;
+    }
+    if (!(knownOpen > 0)) { badge.hidden = true; return; }
     badge.hidden = false;
     badge.style.cssText = HEALTH_ALARM;
     badge.textContent = '⚠ 장애 알림 ' + knownOpen;
@@ -178,7 +187,10 @@
       badge.id = 'pu-health-admin-badge';
       badge.type = 'button';
       badge.hidden = true;
-      badge.onclick = function () { showAdminPanel(app); };
+      /* 직접 누른 단추는 화면에서 실패 상태를 보여 준다. 여기서 거절을 받아 주지
+         않으면 전역 unhandledrejection 감시기가 이 조회 실패를 새 장애로 다시 적어
+         같은 알림이 계속 늘어나는 순환이 생긴다. */
+      badge.onclick = function () { showAdminPanel(app).catch(function () {}); };
       window.document.body.appendChild(badge);
     }
     paintAdminBadge(badge);
@@ -188,6 +200,33 @@
   /* 장애 이력은 오래될수록 커진다. 관리자 탭마다 전체 루트를 실시간 구독하면
      오류 한 건이 생길 때마다 과거 이력까지 다시 내려온다. 평소에는 읽지 않고,
      총괄관리자가 단추를 눌렀을 때 한 번만 최근 미처리 목록을 가져온다. */
+  function waitForRetry() {
+    return new Promise(function (resolve) { window.setTimeout(resolve, 180); });
+  }
+
+  /* 로그인 직후에는 화면은 먼저 열렸지만 RTDB 인증 토큰 전달이나 연결 복구가
+     아직 끝나지 않아 첫 읽기만 실패할 수 있다. 토큰을 한 번 새로 받고 연결을
+     깨운 뒤 딱 한 번만 재시도한다. 권한 오류도 무한 반복하지 않는다. */
+  function readAdminAlerts(app) {
+    function readOnce() { return app.database().ref('systemAlerts').once('value'); }
+    return readOnce().catch(function (firstError) {
+      var refresh = Promise.resolve();
+      try {
+        var user = app.auth().currentUser;
+        if (user && typeof user.getIdToken === 'function') {
+          refresh = Promise.resolve(user.getIdToken(true)).catch(function () {});
+        }
+      } catch (_) {}
+      try {
+        var db = app.database();
+        if (db && typeof db.goOnline === 'function') db.goOnline();
+      } catch (_) {}
+      return refresh.then(waitForRetry).then(readOnce).catch(function (retryError) {
+        throw retryError || firstError;
+      });
+    });
+  }
+
   function showAdminPanel(app) {
     app = app || activeApp();
     if (!app) return Promise.resolve(false);
@@ -196,19 +235,29 @@
     badge.textContent = '장애 알림 불러오는 중…';
     /* ★ 결과를 돌려준다 — 포털 [⚙ 설정] 의 「시스템 장애 알림」 줄이 이걸 기다렸다가
        제 단추에 「불러오는 중…」 을 띄운다. 안 돌려주면 부르는 쪽이 끝을 모른다. */
-    return app.database().ref('systemAlerts').once('value').then(function (alertsSnapshot) {
+    return readAdminAlerts(app).then(function (alertsSnapshot) {
       adminAlerts = flattenAlerts(alertsSnapshot.val());
       knownOpen = adminAlerts.length;      // 이제 «안다» — 색이 뜻을 갖는다
+      adminLoadFailed = false;
       renderAdminPanel(app);
-    }).catch(function () {
+      return knownOpen;
+    }).catch(function (error) {
       /* 못 읽었으면 «모르는 것»이지 «없는 것»이 아니다 — 0 으로 적어 두면
          진짜 장애가 있어도 조용해진다. 모름(null)으로 되돌린다. */
       knownOpen = null;
-      window.alert('장애 알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
-    }).then(function () {
+      adminLoadFailed = true;
+      if (window.console && typeof window.console.warn === 'function') {
+        window.console.warn('[PUHealth] 장애 알림 조회 실패:', safeText(error && (error.code || error.message) || error, 160));
+      }
+      throw error;
+    }).then(function (result) {
       badge.disabled = false;
       paintAdminBadge(badge);
-      return knownOpen;
+      return result;
+    }, function (error) {
+      badge.disabled = false;
+      paintAdminBadge(badge);
+      return Promise.reject(error);
     });
   }
 
@@ -307,6 +356,6 @@
 
   /* openAdminPanel — 늘 떠 있는 단추 없이도 관리자가 들여다볼 수 있는 유일한 문.
      포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄이 이것을 부른다. */
-  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _flattenAlerts: flattenAlerts, _isNoise: isNoise };
+  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _readAdminAlerts: readAdminAlerts, _flattenAlerts: flattenAlerts, _isNoise: isNoise };
   install();
 })(typeof window !== 'undefined' ? window : null);
