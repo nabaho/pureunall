@@ -336,3 +336,20 @@ test('★★★ 저절로 잇지 않는다 — 누르면 확인을 거쳐 mbCoSe
   assert.match(tag, /mbGuessChipGo\(/);
   assert.doesNotMatch(tag, /mbCoSet\(/, '★★★ 그리기만 해도 이어 버립니다');
 });
+
+test('★★ 메일 한 통에 업체를 «한 번»만 찾는다 — 부담당 길이 찾은 것을 건 찾기에 넘긴다', () => {
+  /* 대표 화면 2026-10-02 「mbWhoKey 871,624번」 — 같은 업체를 두 번씩 찾고 있었다 */
+  const c = box({ recs: [CONS({ companyId: 'co-gana' })], coOf: { 'office@ganasa.co.kr': '가나상사' } });
+  let n = 0;
+  const real = c.mbCoOf;
+  c.mbCoOf = (e) => { n++; return real(e); };
+  const subs = Array.prototype.slice.call(c.mbSubsOfRow({ e: 'office@ganasa.co.kr' }, null));
+  assert.deepEqual(subs, ['권형하'], '(대조) 건 담당은 그대로 함께 본다');
+  /* 부담당 길(업체·이름 한 번씩) + 메일 담당(mbWhoWhy) 한 번 = 셋. 건 찾기가 또 찾으면 넷이 된다 */
+  assert.ok(n <= 3, '★★ 업체를 ' + n + '번 찾습니다 — 건 찾기가 다시 찾고 있습니다');
+  /* 건 찾기에 업체를 넘기면 «한 번도» 안 찾는다 — 없다(null)고 넘겨도 마찬가지 */
+  n = 0;
+  assert.equal(c.mbWorkOfRow({ e: 'office@ganasa.co.kr' }, null, GANA).length, 1);
+  assert.equal(c.mbWorkOfRow({ e: 'office@ganasa.co.kr' }, null, null).length, 0);
+  assert.equal(n, 0, '★★ 넘겨 준 업체를 두고 다시 찾습니다');
+});
