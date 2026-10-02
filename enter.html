@@ -872,38 +872,31 @@ body.portal-mode #moreFab{display:flex;}
 </style>
 </head>
 <body>
-<div id="pu-boot-splash" style="display:none;position:fixed;inset:0;z-index:2147483000;background:#f8fafc;align-items:center;justify-content:center;flex-direction:column;gap:14px">
+<div id="pu-boot-splash" role="status" aria-live="polite" style="display:flex;position:fixed;inset:0;z-index:2147483000;background:#f8fafc;align-items:center;justify-content:center;flex-direction:column;gap:14px">
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
-  <!-- 카카오에서 돌아온 직후에만 보인다 — 서버가 카카오에 확인하는 몇 초 동안 «무엇을 기다리는지» 말한다 -->
-  <div id="pu-boot-msg" style="display:none;font-size:14px;font-weight:600;color:#475569;font-family:sans-serif">💬 카카오로 로그인하는 중…</div>
+  <!-- Firebase가 남은 로그인을 확인하기 전에는 로그인 폼을 절대 먼저 보이지 않는다.
+       확인 결과가 미로그인이면 onAuthStateChanged가 이 가림막을 걷고 로그인 폼을 보여 준다. -->
+  <div id="pu-boot-msg" style="display:block;font-size:14px;font-weight:600;color:#475569;font-family:sans-serif">로그인 상태 확인 중…</div>
 </div>
 <script>
-/* 앱에서 포털로 돌아올 때: 로그인돼 있을 것으로 기대되면(힌트) 로그인 화면 대신 스플래시 표시
-   → Firebase 인증 확인 후 포털 타일이 뜨면 제거 (로그인 화면 번쩍임 방지) */
+/* 인증 상태를 알기 전에는 늘 스플래시를 표시한다.
+   저장소 힌트는 지워지거나 탭마다 달라질 수 있어 «로그인 폼이 먼저 보이는가»의 잣대가 될 수 없다.
+   → 미로그인이 확정되면 로그인 폼, 로그인돼 있으면 포털 타일을 다 그린 뒤 제거한다. */
 (function(){
-  var hint=false;
-  try {
-    // 같은 탭(세션) 힌트 + 기기 힌트(localStorage: 자동로그인 설정·직전 로그인 성공)
-    // → 새 탭/브라우저 재시작으로 sessionStorage가 비어도 로그인 화면 번쩍임 방지
-    hint = sessionStorage.getItem('pu_auth_hint')==='1'
-        || !!sessionStorage.getItem('pureun_v6_session_sid')
-        || localStorage.getItem('pu_auth_hint')==='1'
-        || localStorage.getItem('pu_portal_auto')==='1';
-  } catch(e){}
+  var s=document.getElementById('pu-boot-splash');
+  var m=document.getElementById('pu-boot-msg');
+  if(s) s.style.display='flex';
+  if(m) m.style.display='block';
   /* ★ 카카오에서 막 돌아온 참(주소에 code·state)이면 로그인 화면을 보이지 않는다 (대표 보고 2026-09-28
      「로그인 했는데도 계속 이렇게 나오다가 화면으로 넘어간다」). 서버가 카카오에 확인하는 몇 초 동안
      로그인 화면이 떠 있으면 «실패했나» 로 보인다. 끝나면 포털이 스플래시를 걷고, 실패하면
      kkHandleReturn 이 걷는다. 서버가 잠에서 깨는 데 오래 걸릴 수 있어 안전망은 20초다. */
   var kk = /[?&]code=/.test(location.search) && /[?&]state=/.test(location.search);
   if(kk){
-    hint = true;
     window.__kkReturning = true;
-    var m=document.getElementById('pu-boot-msg'); if(m) m.style.display='block';
+    if(m) m.textContent='💬 카카오로 로그인하는 중…';
   }
-  if(hint){
-    var s=document.getElementById('pu-boot-splash'); if(s) s.style.display='flex';
-    setTimeout(function(){ var s2=document.getElementById('pu-boot-splash'); if(s2) s2.remove(); }, kk ? 20000 : 8000); // 안전망
-  }
+  setTimeout(function(){ var s2=document.getElementById('pu-boot-splash'); if(s2) s2.remove(); }, kk ? 20000 : 8000); // 인증 SDK가 멎어도 로그인 길은 다시 연다
 })();
 </script>
 <div class="mesh"></div>
