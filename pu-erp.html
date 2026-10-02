@@ -14634,31 +14634,51 @@ function clinicIsType(code, types){
   var t = (types || []).find(function(x){ return x && x.code === code; });
   return !!t && consNameKey(t.name) === '현장클리닉';
 }
+/* 금액으로 일수 짐작 (2026-10-02 대표 보고 「7건이면 21일일 수 있는데 왜 15일인가」)
+   ★ 실측: 현장클리닉 23건 중 22건이 일수 칸이 비어 금액으로만 셌는데, 셋 꼴에서 «0일»이 됐다.
+     ① 잔금 1,150,000원 — 3×385,000(=1,155,000)과 5,000원 차이라 «딱 떨어지지 않아» 버렸다
+     ② 잔금 1,155,000원인데 「부가세 포함」이 꺼져 있다 — 1,155,000÷350,000 이 안 떨어졌다
+        (금액은 부가세가 든 값인데 칸만 안 켠 것 — 흔한 입력 습관이다)
+   → 부가세 «든 값·안 든 값» 둘 다 대 보고, 정수에서 2% 안쪽이면 그 일수로 본다.
+     켜 둔 쪽(부가세 포함 여부)을 먼저 본다. 어느 쪽도 안 맞으면 짐작하지 않는다(0). */
+function clinicFeeDays(fee, dayFee, vatIncluded){
+  var f = parseInt(dayFee, 10) || 0, v = parseInt(fee, 10) || 0;
+  if(f <= 0 || v <= 0) return 0;
+  var units = vatIncluded ? [f * 1.1, f] : [f, f * 1.1];
+  for(var i = 0; i < units.length; i++){
+    var q = v / units[i], r = Math.round(q);
+    if(r >= 1 && Math.abs(q - r) <= 0.02) return r;
+  }
+  return 0;
+}
 function clinicDaysOf(rec, dayFee){
-  if(!rec) return { days:0, est:false };
+  if(!rec) return { days:0, est:false, feeDays:0 };
+  var fee = rec.balanceFee != null ? rec.balanceFee : rec.successFee;
+  var feeDays = clinicFeeDays(fee, dayFee, !!rec.balanceFeeVatIncluded);
   var d = parseInt(rec.consultDays, 10) || 0;
-  if(d > 0) return { days:d, est:false };
+  if(d > 0) return { days:d, est:false, feeDays:feeDays };
   d = parseInt(rec.dayCalc && rec.dayCalc.days, 10) || 0;
-  if(d > 0) return { days:d, est:false };
-  var f = parseInt(dayFee, 10) || 0;
-  var fee = parseInt(rec.balanceFee != null ? rec.balanceFee : rec.successFee, 10) || 0;
-  if(f <= 0 || fee <= 0) return { days:0, est:false };
-  var net = rec.balanceFeeVatIncluded ? Math.round(fee / 1.1) : fee;
-  if(net % f !== 0) return { days:0, est:false };
-  return { days: net / f, est:true };
+  if(d > 0) return { days:d, est:false, feeDays:feeDays };
+  return { days:feeDays, est:feeDays > 0, feeDays:feeDays };
 }
 var CLINIC_PLAN_STATUS = ['consult','review','negotiate','confirmed','signed','progress'];
 function clinicDayCards(items, contracts, types, fy, dayFeeOf){
   var out = { total:{ days:0, cnt:0, est:0, planDays:0, planCnt:0 }, by:{} };
   if(!fy) return out;
   function inFy(d){ d = String(d || '').slice(0, 10); return !!d && d >= fy.start && d <= fy.end; }
-  function slot(sid){ return out.by[sid] || (out.by[sid] = { sid:sid, days:0, cnt:0, est:0, planDays:0, planCnt:0 }); }
+  /* done = 끝난 건(컨설팅관리 표에는 안 나오고 「📦 종료 보기」에 나온다) · odd = 일수와 금액이 안 맞는 건 · zero = 일수를 못 셈 */
+  function slot(sid){ return out.by[sid] || (out.by[sid] = { sid:sid, days:0, cnt:0, est:0, planDays:0, planCnt:0, done:0, odd:[], zero:[] }); }
+  out.total.done = 0; out.total.odd = []; out.total.zero = [];
   (items || []).forEach(function(c){
     if(!c || c._deleted || !c.managerMain) return;
     if(!clinicIsType(c.typeCode, types) || !inFy(c.startDate)) return;
     var r = clinicDaysOf(c, dayFeeOf ? dayFeeOf(c.typeCode) : 0), s = slot(c.managerMain);
     s.cnt++; s.days += r.days; if(r.est) s.est++;
     out.total.cnt++; out.total.days += r.days; if(r.est) out.total.est++;
+    if(c.status === 'closed'){ s.done++; out.total.done++; }
+    /* 적힌 일수와 금액이 말하는 일수가 다르면 알린다 — 어느 쪽이 맞는지는 사람이 본다(고치지 않는다) */
+    if(!r.est && r.feeDays && r.feeDays !== r.days){ var o = { no:c.no || c.id, days:r.days, feeDays:r.feeDays }; s.odd.push(o); out.total.odd.push(o); }
+    if(!r.days){ s.zero.push(c.no || c.id); out.total.zero.push(c.no || c.id); }
   });
   (contracts || []).forEach(function(k){
     if(!k || k._deleted || !k.managerMain || k.transferredTo) return;
@@ -64578,7 +64598,10 @@ function ClinicDayCards(props){
     lines.push((isTotal ? '전체' : name) + ' · ' + fyLabel);
     lines.push('수행 ' + s.cnt + '건(컨설팅관리) · ' + s.days + '일');
     if(s.planCnt) lines.push('예정 ' + s.planCnt + '건(계약관리, 이관 전)' + (s.planDays ? ' · ' + s.planDays + '일' : ''));
-    if(s.est) lines.push('≈ ' + s.est + '건은 일수가 안 적혀 잔금 ÷ 1일 단가로 셈');
+    if(s.est) lines.push('≈ ' + s.est + '건은 일수가 안 적혀 잔금으로 셈(1일 35만 원·부가세 포함 38.5만 원)');
+    if(s.done) lines.push('📦 끝난 ' + s.done + '건은 아래 표가 아니라 「📦 종료 보기」에 있습니다');
+    if(s.odd && s.odd.length) lines.push('⚠ 일수와 금액이 다른 건: ' + s.odd.map(function(o){ return o.no + '(' + o.days + '일 · 금액은 ' + o.feeDays + '일)'; }).join(', '));
+    if(s.zero && s.zero.length) lines.push('⚠ 일수를 못 센 건: ' + s.zero.join(', ') + ' — 일수를 적어 주세요');
     lines.push(isTotal ? '누르면 거르개를 풉니다' : (on ? '다시 누르면 풀립니다' : '누르면 이 사람 현장클리닉만'));
     return lines.join('\n');
   }
@@ -65096,7 +65119,9 @@ function ProjectManagementShared(props){
       items: items, types: types, userName: userName,
       pickedSid: mgrFilter !== 'all' ? mgrFilter : '', pickedType: typeFilter !== 'all' ? typeFilter : '',
       /* 수행 일수에는 종료된 건도 든다 — 누르면 상태 거르개를 «전체»로, 풀면 기본(종료 제외)으로 */
-      onPick: function(sid, code){ setMgrFilter(sid || 'all'); setTypeFilter(code || 'all'); setStatusFilter(sid ? 'all' : 'open'); }
+      /* ⚠ 상태 거르개는 건드리지 않는다 — 끝난 건은 이 표에 원래 안 나온다(「📦 종료 보기」).
+         2026-10-01 판은 'all' 로 바꿨는데, 고르개에 없는 값이라 상태 칸이 빈칸으로 보였다. */
+      onPick: function(sid, code){ setMgrFilter(sid || 'all'); setTypeFilter(code || 'all'); }
     }),
     // 툴바 — 모바일 compact / PC 기존
     window.innerWidth <= 768

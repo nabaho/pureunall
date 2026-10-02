@@ -17,7 +17,7 @@ function cutFn(head) {
 const ctx = { console, Object, Array, String, JSON, Math, Date, parseInt, window: {} };
 vm.createContext(ctx);
 ['function consNameKey(', 'function clinicFyRange(', 'function clinicIsType(',
- 'function clinicDaysOf(', 'function clinicDayCards('].forEach((h) => vm.runInContext(cutFn(h), ctx));
+ 'function clinicFeeDays(', 'function clinicDaysOf(', 'function clinicDayCards('].forEach((h) => vm.runInContext(cutFn(h), ctx));
 vm.runInContext("var CLINIC_PLAN_STATUS = ['consult','review','negotiate','confirmed','signed','progress'];", ctx);
 
 const TYPES = [
@@ -25,6 +25,8 @@ const TYPES = [
   { code: 'consulting-x2', name: '기술보호' }
 ];
 const fee = (code) => (code === 'consulting-x1' ? 350000 : 0);
+/* 일수·추정 여부만 견준다 (feeDays 는 따로 본다) */
+const DE = (r) => ({ days: r.days, est: r.est });
 const FY26 = ctx.clinicFyRange('01-01', '2026-09-30', 0);
 
 test('회계연도: 01-01 이면 달력 해', () => {
@@ -44,11 +46,11 @@ test('현장클리닉 알아보기 — 코드가 그때그때 지어져도 이�
   assert.equal(ctx.clinicIsType('c9', [{ code: 'c9', name: '현장 클리닉 컨설팅' }]), true);
 });
 test('일수: 적힌 값 → dayCalc → 잔금 ÷ 단가 «추정»(나누어 떨어질 때만)', () => {
-  assert.deepEqual({ ...ctx.clinicDaysOf({ consultDays: 3 }, 350000) }, { days: 3, est: false });
-  assert.deepEqual({ ...ctx.clinicDaysOf({ dayCalc: { days: 2 } }, 350000) }, { days: 2, est: false });
-  assert.deepEqual({ ...ctx.clinicDaysOf({ balanceFee: 1155000, balanceFeeVatIncluded: true }, 350000) }, { days: 3, est: true });
-  assert.deepEqual({ ...ctx.clinicDaysOf({ balanceFee: 700000 }, 350000) }, { days: 2, est: true });
-  assert.deepEqual({ ...ctx.clinicDaysOf({ balanceFee: 500000 }, 350000) }, { days: 0, est: false }, '★ 억지 숫자를 만들지 않는다');
+  assert.deepEqual(DE(ctx.clinicDaysOf({ consultDays: 3 }, 350000)), { days: 3, est: false });
+  assert.deepEqual(DE(ctx.clinicDaysOf({ dayCalc: { days: 2 } }, 350000)), { days: 2, est: false });
+  assert.deepEqual(DE(ctx.clinicDaysOf({ balanceFee: 1155000, balanceFeeVatIncluded: true }, 350000)), { days: 3, est: true });
+  assert.deepEqual(DE(ctx.clinicDaysOf({ balanceFee: 700000 }, 350000)), { days: 2, est: true });
+  assert.deepEqual(DE(ctx.clinicDaysOf({ balanceFee: 500000 }, 350000)), { days: 0, est: false }, '★ 억지 숫자를 만들지 않는다');
 });
 
 const ITEMS = [
@@ -108,4 +110,30 @@ test('★★ 큰 글씨는 «모두 몇 건» = 수행(컨설팅관리) + 예정
   assert.match(ui, /\(b\.cnt \+ b\.planCnt\) - \(a\.cnt \+ a\.planCnt\)/, '많이 맡은 사람부터');
   // 셈: P-2 는 수행 1 + 예정 1 = 2건
   assert.equal(R.by['P-2'].cnt + R.by['P-2'].planCnt, 2);
+});
+
+/* 2026-10-02 대표 보고 「7건이면 21일일 수 있는데 왜 15일인가」 — 실제 자료의 세 꼴 (번호는 가짜) */
+test('★★ 잔금 1,150,000원(5천 원 덜) — 3일로 본다(0일로 버리지 않는다)', () => {
+  assert.equal(ctx.clinicDaysOf({ balanceFee: 1150000, balanceFeeVatIncluded: true }, 350000).days, 3);
+});
+test('★★ 1,155,000원인데 「부가세 포함」이 꺼져 있어도 3일 — 금액은 부가세가 든 값이다', () => {
+  const r = ctx.clinicDaysOf({ balanceFee: 1155000, balanceFeeVatIncluded: false }, 350000);
+  assert.equal(r.days, 3); assert.equal(r.est, true);
+});
+test('부가세 없이 1,050,000원·포함 770,000원도 맞게', () => {
+  assert.equal(ctx.clinicDaysOf({ balanceFee: 1050000 }, 350000).days, 3);
+  assert.equal(ctx.clinicDaysOf({ balanceFee: 770000, balanceFeeVatIncluded: true }, 350000).days, 2);
+});
+test('★ 적힌 일수가 금액과 다르면 적힌 대로 세되 «어긋남»으로 알린다(고치지 않는다)', () => {
+  const items = [{ id: 'z', no: '현클-2026-901', typeCode: 'consulting-x1', managerMain: 'P-9', startDate: '2026-09-14', consultDays: 2, balanceFee: 1155000, balanceFeeVatIncluded: true }];
+  const r = ctx.clinicDayCards(items, [], TYPES, FY26, fee);
+  assert.equal(r.by['P-9'].days, 2);
+  assert.equal(r.by['P-9'].odd.length, 1);
+  assert.equal(r.by['P-9'].odd[0].feeDays, 3);
+});
+test('끝난 건 수를 따로 센다 — 표에는 안 나오고 「📦 종료 보기」에 있다', () => {
+  assert.equal(R.by['P-1'].done, 1);
+});
+test('★ 사람을 눌러도 상태 거르개는 그대로 — 고르개에 없는 값(all)을 넣지 않는다', () => {
+  assert.equal(src.indexOf("setStatusFilter(sid ? 'all'"), -1);
 });
