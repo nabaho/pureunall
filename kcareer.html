@@ -582,9 +582,11 @@ html.dark .empty{color:var(--text-mute)}
 .ds-ic .btn.sm{padding:1px 6px;font-size:12px}
 .ds-prev{position:sticky;top:10px;border:1px solid var(--border);border-radius:10px;background:var(--card,#fff);padding:10px}
 .ds-pv-empty{color:var(--text-mute);font-size:12px;text-align:center;padding:28px 8px;line-height:1.7}
-.ds-pv-img{background:#e2e8f0;border-radius:6px;min-height:120px;max-height:380px;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;margin-bottom:8px}
-.ds-pv-img>span{color:var(--text-mute);font-size:11.5px;padding:40px 6px}
-.ds-pv-img canvas,.ds-pv-img img,.ds-pv-img svg{width:100%!important;height:auto!important;display:block}
+.ds-pv-img{background:#e2e8f0;border-radius:6px;min-height:120px;max-height:max(320px,calc(100vh - 400px));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:6px;margin-bottom:8px;cursor:grab;position:relative}
+.ds-pv-img.drag{cursor:grabbing;user-select:none}
+.ds-pv-pg{position:sticky;top:0;align-self:flex-end;font-size:10.5px;padding:1px 7px;border-radius:9px;background:var(--navy);color:#fff;z-index:1;margin-bottom:-22px}
+.ds-pv-img>span:not(.ds-pv-pg){color:var(--text-mute);font-size:11.5px;padding:40px 6px;text-align:center}
+.ds-pv-img canvas,.ds-pv-img img,.ds-pv-img svg{width:100%!important;height:auto!important;display:block;flex:none;background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.18)}
 .ds-pv-t{font-weight:700;color:var(--navy);font-size:13.5px;margin-bottom:6px;line-height:1.4}
 .ds-pv-kv{display:flex;gap:8px;font-size:12px;padding:2px 0}
 .ds-pv-kv span{color:var(--text-mute);min-width:48px;flex:none}
@@ -6785,10 +6787,25 @@ function dsRowClick(ev,domain,id){
 /* 오른쪽 미리보기 — 누른 줄의 첫 장과 정보.
    ⚠ 한글 엔진은 «누를 때만» 부른다 — 목록을 그릴 때마다 서류를 다 그리면 멎는다.
    ⚠ 늦게 끝난 옛 그리기가 새 것을 덮지 않게 차례표(_dsPvTok)를 본다. */
+/* 미리보기를 손으로 «끌어서» 내린다 — 휠이 없는 터치패드·펜에서도 끝까지 보게.
+   ⚠ 조금 움직인 것은 끌기가 아니다(3px) — 그림을 누르기만 해도 화면이 튀면 안 된다. */
+var _dsDrag=null, _dsDragBound=false;
+function dsPvDragWire(el){
+  if(!el || el._dsDrag) return; el._dsDrag=1;
+  el.addEventListener('mousedown', function(e){ if(e.button!==0) return; _dsDrag={ el:el, y0:e.clientY, t0:el.scrollTop }; });
+  /* ⚠ 문서 쪽 손잡이는 «한 번만» — 미리보기를 다시 그릴 때마다 붙이면 쌓인다 */
+  if(_dsDragBound) return; _dsDragBound=true;
+  document.addEventListener('mousemove', function(e){
+    var d=_dsDrag; if(!d) return;
+    var dy=e.clientY-d.y0; if(Math.abs(dy)<3 && !d.el.classList.contains('drag')) return;
+    d.el.classList.add('drag'); d.el.scrollTop=d.t0-dy; e.preventDefault();
+  });
+  document.addEventListener('mouseup', function(){ if(_dsDrag){ _dsDrag.el.classList.remove('drag'); _dsDrag=null; } });
+}
 function dsPrevDraw(domain){
   var D=DOMAINS[domain], box=document.getElementById('dsPrev-'+domain); if(!box) return;
   var id=_dsPicked[domain], r=id?get(D.store).find(function(x){ return x.id===id; }):null;
-  if(!r){ box.innerHTML='<div class="ds-pv-empty">왼쪽에서 서류를 누르면<br>여기에 첫 장과 정보가 보입니다</div>'; return; }
+  if(!r){ box.innerHTML='<div class="ds-pv-empty">왼쪽에서 서류를 누르면<br>여기에 서류와 정보가 보입니다 · 끌어 내려 끝까지 봅니다</div>'; return; }
   var T=dsTitleOf(r,D), n=(r.submits||[]).length;
   var 줄=function(k,v){ return v?'<div class="ds-pv-kv"><span>'+k+'</span><b>'+escapeHtml(v)+'</b></div>':''; };
   var 받은=_cdSrc(r)==='received';
@@ -6818,9 +6835,15 @@ function dsPrevDraw(domain){
         var tmp=document.createElement('div');
         await PureunHwp.renderPreview(tmp, new Uint8Array(b64ToAb(f.base64)), f.name||('문서.'+ext));
         if(tok!==_dsPvTok) return;
-        var 첫=tmp.querySelector('canvas,img,svg');
+        /* ★ 모든 쪽을 잇달아 붙인다 — 끌어 내리거나 휠을 굴려 끝까지 본다
+           (대표 지시 2026-10-02 「미리보기 화면 드레그 내려서 어떻게 되었는지 확인할 수 있게 해라」).
+           ⚠ 첫 장만 두던 옛 방식으로 되돌리지 말 것 — 채운 결과는 둘째 쪽부터가 많다. */
+        var 쪽=[].slice.call(tmp.querySelectorAll('canvas,img,svg'));
         img.innerHTML='';
-        if(첫){ 첫.removeAttribute('style'); img.appendChild(첫); } else img.innerHTML='<span>첫 장을 못 그렸습니다</span>';
+        if(!쪽.length){ img.innerHTML='<span>첫 장을 못 그렸습니다</span>'; return; }
+        if(쪽.length>1){ var 표=document.createElement('span'); 표.className='ds-pv-pg'; 표.textContent=쪽.length+'쪽 · 끌어 내려 보기'; img.appendChild(표); }
+        쪽.forEach(function(c){ c.removeAttribute('style'); img.appendChild(c); });
+        dsPvDragWire(img);
       }catch(e){ if(tok===_dsPvTok) img.innerHTML='<span>첫 장을 못 그렸습니다</span>'; }
       return;
     }
