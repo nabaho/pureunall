@@ -19710,18 +19710,44 @@ function mbNeedSlugs(id){
 }
 
 /* ── 이 칸에 몇 통 들어 있나 ── (왼쪽 줄 끝의 숫자·안 읽은 수) */
-function mbBinCount(bin){
-  let loaded = 0, un = 0;
+/* ⚡ 모든 칸의 셈을 «한 번에» 한다 (대표 화면 2026-10-02 「계속 나오는데 근본적인 해결 안되나」)
+   ★ 예전에는 칸 «하나마다» 받아 둔 메일 전부(2,250통)를 처음부터 훑었다. 칸이 21개라
+     한 번 그릴 때 4만 7천 번, 처음 뜰 때 16번 다시 그리며 75만 번이 됐다
+     (「mbPutOf 756,685번 · mbBinCount 336번」). 이제 그릴 때마다 «한 번»만 훑어
+     칸마다·폴더마다 몫을 나눠 담아 두고, 칸은 그 표에서 꺼내기만 한다.
+   ⚠ 셈은 «예전과 글자 하나까지» 같다 — 옮긴 메일은 옮긴 칸, 안 옮긴 메일은 이어진 폴더.
+   ⚠ 표는 그리는 동안만 산다(mbMemoOf) — 두 그리개가 그리기 «전에» 비운다. */
+function mbBinTally(){
+  const m = mbMemoOf();
+  if(m.binTally) return m.binTally;
+  const put = _mbPut||{};
+  const byBin = {}, bySlug = {};          /* 옮긴 것은 칸으로 · 안 옮긴 것은 제 폴더로 */
   Object.keys(_mbMsgs||{}).forEach(slug=>{
     const box = _mbMsgs[slug]||{};
     Object.keys(box).forEach(uid=>{
       const v = box[uid]; if(!v) return;
-      const put = mbPutOf(slug+':'+uid);
-      const mine = put ? (put===bin.id) : (!!bin.link && slug===bin.link);
-      if(!mine) return;
-      loaded++; if(!Number(v.r||0)) un++;
+      const p = String(put[slug+':'+uid] || '');
+      const t = p ? (byBin[p] = byBin[p] || { n:0, un:0 })
+                  : (bySlug[slug] = bySlug[slug] || { n:0, un:0 });
+      t.n++; if(!Number(v.r||0)) t.un++;
     });
   });
+  /* 쪽지(_mbPut)는 폴더 통수에서 빼고 더할 몫 — 폴더별·칸별·(폴더,칸)별로 한 번 센다 */
+  const putFrom = {}, putTo = {}, putPair = {};
+  Object.keys(put).forEach(k=>{
+    const at = k.lastIndexOf(':'); if(at <= 0) return;
+    const slug = k.slice(0, at), to = put[k];
+    putFrom[slug] = (putFrom[slug]||0) + 1;
+    if(typeof to !== 'string') return;    /* 예전 셈은 글자로만 견줬다(=== bin.id) */
+    putTo[to] = (putTo[to]||0) + 1;
+    const pk = slug + '\n' + to; putPair[pk] = (putPair[pk]||0) + 1;
+  });
+  return (m.binTally = { byBin, bySlug, putFrom, putTo, putPair });
+}
+function mbBinCount(bin){
+  const T = mbBinTally();
+  const mine = T.byBin[bin.id], left = bin.link ? T.bySlug[bin.link] : null;
+  const un = (mine ? mine.un : 0) + (left ? left.un : 0);
   /* ── 통수는 «읽어 온 것»으로 세면 안 된다 (2026-08-27) ──
      ⚠ 예전에는 폴더를 안 읽었을 때만 서버 셈을 쓰고, 읽고 나면 «읽어 온 것»을 세었다.
        그래서 「1.자문사답변 404」가 그 칸을 «누르는 순간 100» 으로 줄었다. 한 통도
@@ -19730,14 +19756,10 @@ function mbBinCount(bin){
        더하면 된다. 쪽지(_mbPut)는 한 쪽만 받아 오는 것이 아니라 «통째로» 있으므로
        이 셈은 얼마나 읽어 왔는지와 상관없이 늘 같다. */
   const f = bin.link ? mbFolderBy(bin.link) : null;
-  const put = _mbPut||{};
-  let out = 0, into = 0;
-  Object.keys(put).forEach(k=>{
-    const at = k.lastIndexOf(':'); if(at <= 0) return;
-    const slug = k.slice(0, at);
-    if(bin.link && slug === bin.link){ if(put[k] !== bin.id) out++; return; }
-    if(put[k] === bin.id) into++;
-  });
+  /* 이어진 폴더에서 «밖으로» 옮긴 것 · 딴 폴더에서 «이 칸으로» 들어온 것 */
+  const stay = bin.link ? (T.putPair[bin.link + '\n' + bin.id] || 0) : 0;
+  const out = bin.link ? (T.putFrom[bin.link] || 0) - stay : 0;
+  const into = (T.putTo[bin.id] || 0) - stay;
   const n = f ? Math.max(0, Number(f.total||0) - out + into) : into;
   /* ⚠ 안 읽은 수는 이렇게 셀 수 없다 — 읽었는지는 줄마다 봐야 안다. 아직 그 폴더를
      안 읽어 왔으면 서버가 적어 둔 값을, 읽어 왔으면 그중에서 센다. 안 읽은 메일은
@@ -27411,12 +27433,28 @@ function coProfStart(){
 }
 /* when: 「처음 뜰 때」(로그인 직후) · 「기업 상세」 — 대표 「로그인 할 경우 계속 느려지고 있다」(2026-09-30).
    처음 뜰 때는 명함·회사정보가 몇 초에 걸쳐 들어오므로 더 길게(10초) 본다. */
+/* ⚠★ 초시계는 «늘» 달지 않는다 (대표 화면 2026-10-02 「계속 나오는데 근본적인 해결 안되나」)
+   초시계를 단 함수는 부를 때마다 시각을 두 번 재고 쌓개를 오르내린다 — 잰 값으로 한 번에
+   6배쯤 느려진다(mbWhoKey 66만 번: 그냥 11ms · 초시계 68ms). 처음 10초 동안 함수가 수백만 번
+   불리므로, «재는 일 자체»가 직원 모두의 첫 화면을 멈추게 하고 그 멈춤을 다시 알림으로 띄웠다.
+   ★ 그래서 멈춤은 늘 재되(가벼운 longtask 관찰), 함수 이름은 «멈췄던 다음 한 번»만 잰다.
+     · 주소에 ?prof=1 → 그 자리에서 잰다(고치는 사람이 바로 볼 때)
+     · 지난번에 멈췄다(pucards_prof_next) → 이번에 한 번 재고 표를 지운다 */
+const CO_PROF_NEXT = 'pucards_prof_next';
+function coProfWanted(search, store){
+  if(/[?&]prof=1(?:&|$)/.test(String(search||''))) return true;
+  let on = false;
+  try{ on = !!(store && store.getItem(CO_PROF_NEXT)); if(on) store.removeItem(CO_PROF_NEXT); }catch(_){ on = false; }
+  return on;
+}
 function coWatchStart(when){
   if(_coWatch) return;                       /* 이미 보고 있으면 그대로 둔다 */
   const 언제 = when || '기업 상세', 초 = 언제 === '처음 뜰 때' ? 10 : 5;
   _coWatch = { renders:0, builds:0, blockedMs:0 };
-  let profStop = null;
-  try{ profStop = coProfStart(); }catch(_){}
+  let profStop = null, ls = null;
+  try{ ls = window.localStorage; }catch(_){ ls = null; }
+  const 잼 = coProfWanted(location.search, ls);
+  if(잼){ try{ profStop = coProfStart(); }catch(_){} }
   /* 「지금부터 5초 동안」 몇 번 저장이 나갔는지를 세려면 0에서 시작해야 한다 */
   try{ window.PUResilience && PUResilience.resetCensus && PUResilience.resetCensus(); }catch(_){}
   let obs = null;
@@ -27440,7 +27478,13 @@ function coWatchStart(when){
     console.log('🏢 '+언제+' '+초+'초 진단 — 다시 그림 '+s.renders+'번 · 회사목록 조립 '+s.builds
       +'번 · 멈춤 '+Math.round(s.blockedMs)+'ms · 저장 보냄 '+s.writes+'번'
       +' · 밀린 저장 '+s.pending+'건 · 거부된 저장 '+s.parked+'건');
-    const lines = coWatchVerdict(s);
+    /* 이름 없이 「멈췄다」만 띄우면 고칠 데를 모른다 — 이번엔 표만 남기고 다음 한 번 이름을 잰다.
+       ⚠ 저장 폭주·밀린 저장 같은 «다른» 알림은 그대로 띄운다(초시계와 상관없다). */
+    if(!잼 && s.blockedMs > 500){
+      try{ ls && ls.setItem(CO_PROF_NEXT, '1'); }catch(_){}
+      console.log('   → 멈춤 ' + Math.round(s.blockedMs) + 'ms — 다음에 열 때 한 번 원인을 이름으로 잽니다');
+    }
+    const lines = coWatchVerdict(잼 ? s : Object.assign({}, s, { blockedMs: 0 }));
     lines.forEach(m=>console.log('   → '+m));
     /* ⚠ 배열을 그대로 찍으면 콘솔이 「(5) [{…}]」로 접어 이름이 안 보인다(대표 콘솔 2026-09-30) — 글자로 편다 */
     if(hot.length) console.log('   🐌 오래 걸린 곳(제 안에서 쓴 시간): ' + hot.map(h => h.name + ' ' + h.ms + 'ms' + (h.n > 1 ? '(' + h.n + '번)' : '')).join(' · ') + ' · 코드 합계 ' + (hot.jsMs || 0) + 'ms');
