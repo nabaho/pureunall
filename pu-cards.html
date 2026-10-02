@@ -21782,7 +21782,7 @@ function mbPickMode(){
 function mbMobileHtml(){
   /* ⚠ 읽는 화면은 PC 것을 그대로 쓴다 — 그래서 «미리보기 창»도 함께 달아야 한다.
        PC 쪽에만 달면 폰에서 [👁 미리보기]를 눌러도 아무 일이 안 일어난다. */
-  if(state.mbOpen) return mbReadHtml() + mbPvHtml();
+  if(state.mbOpen) return mbReadHtml() + mbPvHtml() + mbNewHtml();   /* PC 와 같은 창 둘 — mbReadPopsHtml */
   const rows = mbVisibleRows();
   const sel = pickOf('mbox');
   const nPick = pickList(sel, rows.map(v=>v._key)).length;
@@ -22215,11 +22215,18 @@ function mbPagerHtml(){
 function mbBoxHtml(){
   if(!state.mbOpen) return mbListHtml();
   const m = mbViewMode();
-  if(m === 'list') return mbReadHtml();
+  /* ⚠ 「목록만」은 목록(mbListHtml)을 «안» 그린다 — 그런데 읽는 화면에서 여는 창
+       (👁 첨부 미리보기 · ❓ 처음 보는 주소 등록)은 목록 아래에 붙어 있었다. 그래서
+       단추를 눌러도 창이 그려질 자리가 없어 «아무 일도 안 일어났다»
+       (대표 보고 2026-10-02 「미리보기 작동안한다」). 여기서 함께 붙인다.
+       나눠 보기는 목록을 그리므로 거기 붙은 것이 그대로 뜬다 — 두 번 붙이지 않는다. */
+  if(m === 'list') return mbReadHtml() + mbReadPopsHtml();
   return `<div class="dm-split ${esc(m)}">
     <div class="lst">${mbListHtml()}</div>
     <div class="rd">${mbReadHtml()}</div></div>`;
 }
+/* 읽는 화면에서 여는 창 — 목록을 안 그리는 「목록만」에서도 떠야 한다(mbBoxHtml) */
+function mbReadPopsHtml(){ return mbPvHtml() + mbNewHtml(); }
 function mbListHtml(){
   const rows = mbVisibleRows();
   const sel = pickOf('mbox');
