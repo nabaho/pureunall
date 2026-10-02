@@ -17441,7 +17441,22 @@ let _mbWhoMsg = null;     /* {메일열쇠: 담당자이름} — 메일 한 통�
 
 /* 이메일을 실시간DB 열쇠로 — 점을 못 쓴다.
    ⚠ 포털(enter.html sgEmailKey)과 «같은 규칙»이어야 한다. 규칙이 갈리면 한쪽이 못 찾는다. */
-function mbWhoKey(s){ return String(s||'').toLowerCase().replace(/[.#$\[\]/]/g, ','); }
+/* ⚡ 답을 기억해 둔다 (대표 화면 2026-10-02 「10초 중 676ms 멈춤 · mbWhoKey 70ms(186,969번)」).
+   메일 7천여 통을 그릴 때마다 같은 주소를 수십 번씩 바꿨다. 같은 글자는 늘 같은 답이라
+   기억해 둔 답은 «낡을 수가 없다» — 오래 사는 캐시를 두지 않는다는 규칙(mbMemoOf)과 다르지 않다.
+   ⚠ 끝없이 커지지 않게 5만 개에서 비운다(주소·메일열쇠를 다 합쳐도 그보다 적다).
+   ⚠ 기억 상자는 함수에 붙인다 — 함수 하나만 떼어 돌려도(검사) 그대로 산다. */
+function mbWhoKey(s){
+  const C = mbWhoKey._c || (mbWhoKey._c = new Map());
+  const k = String(s||'');
+  let v = C.get(k);
+  if(v === undefined){
+    v = k.toLowerCase().replace(/[.#$\[\]/]/g, ',');
+    if(C.size >= 50000) C.clear();
+    C.set(k, v);
+  }
+  return v;
+}
 function mbDomOf(email){
   const e = String(email||'').toLowerCase();
   const at = e.lastIndexOf('@');
@@ -17522,7 +17537,16 @@ function mbSpamWhy(v){
   if(mbBadLocal(e)) why.push('주소가 규약에 안 맞습니다');
   return why.join(' · ');
 }
-function mbIsSpam(v){ return !!mbSpamWhy(v); }
+/* ⚡ 한 번 그리는 동안 같은 메일을 두세 번 판정했다(목록 거르기 · 안 읽은 셈 · 걸린 줄) —
+   mbSpamWhy 32ms(15,056번). 그리는 «동안»만 사는 셈에 담는다 — 그리기가 시작되면 버린다. */
+function mbIsSpam(v){
+  if(!v || typeof v !== 'object') return !!mbSpamWhy(v);
+  const m = mbMemoOf();
+  const w = m.spamWhy || (m.spamWhy = new WeakMap());
+  let r = w.get(v);
+  if(r === undefined){ r = mbSpamWhy(v); w.set(v, r); }
+  return !!r;
+}
 /* 지금 손에 든 것 가운데 걸린 것 — 알림 줄과 셈이 «같은 값»을 쓰게 한다 */
 function mbSpamRows(){
   const m = mbMemoOf();
@@ -17710,7 +17734,9 @@ function mbWhoIndex(){
 /* ⚠ 그리는 동안의 셈도 함께 버린다 — 오래 사는 것만 지우면 «이번 그리기»는 옛 표를
      그대로 쓴다(담당자를 바꿨는데 화면이 안 바뀐다). */
 function mbWhoBust(){ _mbWhoIdx = null; const m0 = mbMemoOf();
-  delete m0.tally; delete m0.sentTally; delete m0.sentTallyFor; }
+  delete m0.tally; delete m0.sentTally; delete m0.sentTallyFor;
+  /* 담당자·스팸 판정 셈도 버린다(2026-10-02) — 사람이 바꾼 것이 그 자리에서 보여야 한다 */
+  delete m0.whoWhy; delete m0.whoWhyIdx; delete m0.spamWhy; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    자문이 끝난 업체 — 따로 모은다 (대표 지시 2026-08-26)
@@ -18501,6 +18527,23 @@ function mbWhoWhy(em0, idx0){
   const em = String(em0||'').trim().toLowerCase();
   const none = { who:'', why:'' };
   if(!em) return none;
+  /* ⚡ 한 번 그리는 동안 «주소 하나에 한 번» (대표 화면 2026-10-02 「10초 중 676ms 멈춤」).
+     탭 숫자·사람 칩·목록·자문종료 칸이 메일 7천여 통마다 이 판정을 «따로따로» 다시 했다 —
+     같은 주소를 몇 번이고. 그리는 동안만 사는 셈(mbMemoOf)에 담는다. 그리기가 시작되면 버린다.
+     ⚠ 담은 것은 «색인 한 판»에 묶는다 — 색인이 새로 만들어지면(명함이 흘러 들어오면) 버린다.
+     ⚠ 넘겨받은 색인(idx0)이 있으면 mbWhoIndex 를 «또 부르지 않는다» — 줄마다 부르면
+       그것이 다시 메일 수만큼 늘어난다(tests/mail-dash-speed.test.js). */
+  const idxNow = idx0 || mbWhoIndex();
+  const memo = (typeof mbMemoOf === 'function') ? mbMemoOf() : null;
+  if(memo && memo.whoWhyIdx !== idxNow){ memo.whoWhy = new Map(); memo.whoWhyIdx = idxNow; }
+  const hit = memo && memo.whoWhy.get(em);
+  if(hit) return hit;
+  const r = mbWhoWhyOf(em, idxNow, none);
+  if(memo) memo.whoWhy.set(em, r);
+  return r;
+}
+/* 위 판정의 «속» — 한 주소의 담당자와 그 까닭. 셈에 담는 것은 바깥(mbWhoWhy)이 한다. */
+function mbWhoWhyOf(em, idx0, none){
   const set = _mbOwner || {};
   const byHand = mbWhoLive(set[mbWhoKey(em)]);
   if(byHand) return { who:byHand, why:'hand' };           /* ① 사람이 정한 주소 */
