@@ -145,7 +145,52 @@
     return { rows: rows, noKey: noKey, ctRows: ctRows, count: count };
   }
 
-  var API = { build: build, people: people, samePeople: samePeople };
+  /* ── 빈칸 채우기 (대표 지시 2026-10-03 「빈칸채우기 해라」) ─────────────────
+     업체 쪽이 «비었고» 등록증엔 있는 칸만 등록증 값으로 채운다. 상호는 안 채운다(비는 일이 없다).
+     ⚠ 저장 «직전»의 업체 목록(fresh)으로 다시 본다 — 창을 연 뒤 누가 그 칸을 적었으면 건너뛴다.
+       한 번 띄운 화면의 옛 값을 믿고 덮으면, 그사이 사람이 적은 값이 사라진다.
+     ⚠ 되돌리기도 «내가 넣은 값 그대로»인 칸만 비운다 — 그 뒤 사람이 고친 칸은 안 건드린다. */
+  var FILL = [['ceo', 'ceo', 'ceo'], ['addr', 'address', 'ad'], ['tel', 'phone', 'ct']];   // [판정칸, 업체칸, 등록증칸]
+  function fillRecs(rows, fresh) {
+    var byId = {};
+    (fresh || []).forEach(function (co) { if (co && co.id) byId[co.id] = co; });
+    var recs = [], undo = [], cells = 0;
+    (rows || []).forEach(function (x) {
+      var cur = x && x.co && byId[x.co.id];
+      if (!cur || cur._deleted) return;
+      var patch = {}, put = {};
+      FILL.forEach(function (m) {
+        if (x.f[m[0]] !== 'empty') return;
+        var v = str(x.cert[m[2]]);
+        if (!v || str(cur[m[1]])) return;
+        patch[m[1]] = v; put[m[1]] = v;
+      });
+      var n = Object.keys(patch).length;
+      if (!n) return;
+      cells += n;
+      recs.push(Object.assign({}, cur, patch));
+      undo.push({ id: cur.id, put: put });
+    });
+    return { recs: recs, undo: undo, cells: cells };
+  }
+  function undoRecs(undo, fresh) {
+    var byId = {};
+    (fresh || []).forEach(function (co) { if (co && co.id) byId[co.id] = co; });
+    var recs = [], cells = 0;
+    (undo || []).forEach(function (u) {
+      var cur = byId[u.id];
+      if (!cur) return;
+      var back = {};
+      Object.keys(u.put || {}).forEach(function (k) { if (str(cur[k]) === u.put[k]) back[k] = ''; });
+      var n = Object.keys(back).length;
+      if (!n) return;
+      cells += n;
+      recs.push(Object.assign({}, cur, back));
+    });
+    return { recs: recs, cells: cells };
+  }
+
+  var API = { build: build, people: people, samePeople: samePeople, fillRecs: fillRecs, undoRecs: undoRecs };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.PuCoMismatch = API;
 })(typeof window !== 'undefined' ? window : this);

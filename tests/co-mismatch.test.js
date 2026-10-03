@@ -9,7 +9,9 @@
    ⑤ 업체만 비었고 등록증엔 있으면 «빈칸»(다름과 따로).
    ⑥ 주소는 화면이 넘겨준 잣대(PuAddr.same) 그대로 — 「📍 주소 대조」와 같은 말을 한다.
    ⑦ 이관·종료된 계약의 옛 사본은 안 본다. 진행 중 계약의 사본만.
-   ⑧ 이 창은 «읽기만» — 저장하는 부름이 하나도 없다. */
+   ⑧ 이 창이 저장하는 것은 «빈칸 채우기» 하나 — props.onFill(=coUpsertMany) 한 길로만, 직접 저장 부름은 없다.
+   ⑨ 빈칸 채우기(대표 지시 2026-10-03 「빈칸채우기 해라」)는 «저장 직전에도 비어 있는» 칸만 채우고,
+      되돌리기는 «넣은 값 그대로»인 칸만 비운다 — 그사이 사람이 적은 값을 덮지 않는다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -147,12 +149,53 @@ function fnSrc(name) {
   return HTML.slice(at, i + 1).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"])\/\/[^\n]*/g, '$1');
 }
 
-test('★★ 이 창은 읽기만 — 저장·고치기 부름이 하나도 없다', () => {
+test('★★ 창은 직접 저장하지 않는다 — 저장은 props.onFill 한 길, 업체관리가 coUpsertMany 로 잇는다', () => {
   const src = fnSrc('CoMismatchModal') + fnSrc('coMismatchBuild');
   for (const w of ['dbUpsert', 'dbSet', 'dbPatch', 'dbDel', 'coUpsertMany', '.update(', '.set(', '.remove(', '.push(', 'transaction(']) {
     const hit = w === '.push(' ? /\.ref\([^)]*\)\.push\(/.test(src) : src.includes(w);
-    assert.ok(!hit, '읽기만 하는 창에 「' + w + '」 가 있다');
+    assert.ok(!hit, '창 안에 직접 저장하는 「' + w + '」 가 있다');
   }
+  /* props.onFill 에 넘기는 것은 fillRecs / undoRecs 가 만든 recs 뿐 */
+  const calls = src.match(/props\.onFill\(([^)]*)\)/g) || [];
+  assert.ok(calls.length >= 2, '채우기·되돌리기가 props.onFill 을 안 쓴다');
+  calls.forEach((c) => assert.match(c, /props\.onFill\((plan|u)\.recs\)/, '판정 파일이 만든 것이 아닌 것을 저장한다: ' + c));
+  /* 계산은 «저장 직전»의 업체 목록으로 — 창을 띄운 때의 옛 목록이 아니다 */
+  assert.match(fnSrc('doFill'), /fillRecs\(rows,\s*dbGet\('companies'/, '채우기가 저장 직전 목록으로 다시 계산하지 않는다');
+  assert.match(fnSrc('undoFill'), /undoRecs\([^,]+,\s*dbGet\('companies'/, '되돌리기가 저장 직전 목록으로 다시 보지 않는다');
+  assert.match(fnSrc('CompanyManagement'), /onFill\s*:\s*function\(recs\)\{\s*return coUpsertMany\(recs\);/, '업체관리가 저장 길을 coUpsertMany 로 안 잇는다');
+});
+
+test('★★ 빈칸 채우기 — 저장 직전에도 빈 칸만, 등록증 값으로, 상호는 안 채운다', () => {
+  const co = { id: 'e', name: '가나상사', bizNo: B1 };
+  const r = run([co], [{ c: '가나상사', bz: B1, ceo: '홍길동', ad: '서울특별시 마포구 월드컵로 1', ct: '02-123-4567' }]);
+  const fresh = [{ id: 'e', name: '가나상사', bizNo: B1, ceo: '', address: '', phone: '010-9999-0000', memo: '그대로' }];
+  const p = M.fillRecs(r.rows, fresh);
+  assert.equal(p.recs.length, 1);
+  assert.equal(p.recs[0].ceo, '홍길동');
+  assert.equal(p.recs[0].address, '서울특별시 마포구 월드컵로 1');
+  assert.equal(p.recs[0].phone, '010-9999-0000', '그사이 사람이 적은 전화를 덮었다');
+  assert.equal(p.recs[0].memo, '그대로', '다른 칸을 잃었다(업체 전체를 넘겨야 한다)');
+  assert.equal(p.cells, 2);
+  assert.deepEqual(p.undo, [{ id: 'e', put: { ceo: '홍길동', address: '서울특별시 마포구 월드컵로 1' } }]);
+  /* 다른(diff) 칸은 채우기가 건드리지 않는다 */
+  const r2 = run([{ id: 'd', name: '다라', bizNo: B2, ceo: '김철수' }], [{ c: '다라', bz: B2, ceo: '최나래' }]);
+  assert.equal(M.fillRecs(r2.rows, [{ id: 'd', name: '다라', bizNo: B2, ceo: '김철수' }]).recs.length, 0, '다른 값을 등록증 값으로 덮었다');
+  /* 판정 때 «다름»이던 칸은, 그사이 누가 비웠어도 채우기가 넣지 않는다 — 사람은 그 줄을 «다름»으로 봤다 */
+  assert.equal(M.fillRecs(r2.rows, [{ id: 'd', name: '다라', bizNo: B2, ceo: '' }]).recs.length, 0, '«다름»으로 보인 칸을 빈칸처럼 채웠다');
+  /* 지운 업체·없어진 업체는 건너뛴다 */
+  assert.equal(M.fillRecs(r.rows, [Object.assign({}, fresh[0], { _deleted: true })]).recs.length, 0);
+  assert.equal(M.fillRecs(r.rows, []).recs.length, 0);
+});
+
+test('★ 되돌리기 — 넣은 값 그대로인 칸만 비우고, 그사이 고친 칸은 둔다', () => {
+  const undo = [{ id: 'e', put: { ceo: '홍길동', address: '서울특별시 마포구 월드컵로 1' } }];
+  const u = M.undoRecs(undo, [{ id: 'e', name: '가나상사', ceo: '홍길동', address: '부산광역시 해운대구 센텀로 3', memo: '그대로' }]);
+  assert.equal(u.recs.length, 1);
+  assert.equal(u.recs[0].ceo, '');
+  assert.equal(u.recs[0].address, '부산광역시 해운대구 센텀로 3', '그사이 사람이 고친 주소를 지웠다');
+  assert.equal(u.recs[0].memo, '그대로');
+  assert.equal(u.cells, 1);
+  assert.equal(M.undoRecs(undo, [{ id: 'e', ceo: '김철수', address: 'x' }]).recs.length, 0);
 });
 
 test('★ 판정은 공용 파일 한 곳 — 화면이 열쇠·주소 잣대를 넘겨 쓴다', () => {
