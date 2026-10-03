@@ -15854,8 +15854,32 @@ function pcSideRestoreTop(){
   if(b) b.scrollTop = (_pcSideTop.key === now) ? _pcSideTop.top : 0;
   _pcSideTop.key = now;
 }
+/* ⚡ 옆줄 그리기 — 몰려오면 «끝에 한 번» (대표 지시 2026-10-03 「또 느리게 자꾸 뜬다 근본적으로 해결해라」)
+   대표 크롬 실측: 메일 창을 열고 0.4초 사이에 옆줄을 «다섯 번» 통째로 다시 그렸다(78·24·17·26ms).
+   메일 2천 통을 담당자·칸별로 다시 세는 비싼 그리기다. 부르는 길이 49곳이라 길마다 묶으면
+   하나를 빠뜨리고(#1820 뒤에도 남았다), 새 길이 생기면 또 샌다 — 그래서 «함수 자신»이 묶는다.
+   ★ 첫 번째는 바로 그린다(누른 것은 바로 보인다) · 120ms 안에 또 오면 모아 두었다 끝에 한 번.
+   ⚠ 밀린 그리기는 반드시 일어난다(건너뛰지 않는다) — 늦어도 120ms 다. 숨은 창에서도 시간으로 깬다. */
+const PC_SIDE_GAP = 120;
+let _pcSideAt = 0, _pcSideT = null;
+function pcSideBurst(){
+  const now = Date.now();
+  if(_pcSideT) return true;                                  /* 끝 한 번이 이미 잡혀 있다 */
+  const gap = now - _pcSideAt;
+  if(gap >= 0 && gap < PC_SIDE_GAP){
+    /* ⚠ 표시를 «먼저» 걸고, 끝 한 번은 시각을 비워 «반드시» 그린다 — 예약이 그 자리에서
+       바로 돌아도(검사의 흉내 등) 자기 자신을 끝없이 다시 부르지 않는다. */
+    _pcSideT = true;
+    const t = setTimeout(()=>{ _pcSideT = null; _pcSideAt = 0; renderPCSide(); }, PC_SIDE_GAP - gap);
+    if(_pcSideT) _pcSideT = t || true;
+    return true;
+  }
+  _pcSideAt = now;
+  return false;
+}
 function renderPCSide(){
   mbMemoClear();   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
+  if(typeof pcSideBurst === 'function' && pcSideBurst()) return;   /* ⚡ 몰려오면 끝에 한 번 */
   pcSideKeepTop();   /* 갈아 끼우기 «전»에 읽어 둔다 — 끼우면 그 칸은 사라진다 */
   /* 개인 폴더가 열려 있으면 그 명함도 함께 센다 — 대표 눈에는 한 목록이어야 한다 */
   const all = Object.values(allItems());
