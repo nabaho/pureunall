@@ -7871,7 +7871,12 @@ function openSentBox(){ state.view='mail'; state.mailSent=true; render();
 function closeMailPage(){ state.view='list'; render(); }
 function renderMailPage(){
   mbMemoClear();   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
-  if(state.view === 'cnt') return renderCntPage();   /* 📥 연락처 정리는 기업정보함 화면이다 — 같은 칸(#pcMail)에 그린다 */   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
+  if(state.view === 'cnt') return renderCntPage();   /* 📥 연락처 정리는 기업정보함 화면이다 — 같은 칸(#pcMail)에 그린다 */
+  /* ★ 메일 화면이 아니면 그리지 않는다 (2026-10-03 Codex 가 시작한 고침을 이어받음 — 대표 「다른 방에서 하던 것 계속」).
+     메일 조회는 늦게 끝난다 — 그 사이 명함 목록으로 돌아갔는데 «다 받았다» 고 그리면
+     폰에서는 명함 목록(#list) 위에 메일함이 덮이고, PC 에서는 숨은 메일을 헛되이 센다.
+     부르는 자리가 쉰 곳이 넘어 하나하나 막을 수 없다 — 그리는 쪽이 스스로 본다. */
+  if(state.view !== 'mail') return;
   mbAutoFill();    /* 받아 온 줄이 없으면 «스스로» 받아 온다 (대표 보고 2026-08-30) */
   mbSeenLoad();    /* 「누가 봤나」는 한 번만 읽어 온다 (두 번째부터는 그 자리에서 돌아온다) */
   mbBizSubsLoad(); /* 사무관리 건의 부담당도 한 번만 — 앱이 이미 읽는 자료를 그대로 쓴다 */
@@ -7906,6 +7911,7 @@ function renderMailPage(){
    메일에 손댈 때마다 두 곳을 고쳐야 하고, 언젠가 한쪽만 고친다.
    위에 「‹ 목록 · 쓰기 · 보낸 · 예약」 한 줄만 얹는다. PC 는 옆줄이 그 일을 한다. */
 function renderMailMobile(){
+  if(state.view !== 'mail') return;   /* 명함 목록(#list)을 메일로 덮지 않는다 — renderMailPage 머리 참고 */
   const el=$('list'); if(!el) return;
   const tab=(fn,lb,on)=>`<button class="mmtab${on?' on':''}" onclick="${fn}">${lb}</button>`;
   /* ★ 메일함은 폰에서 «앱과 같은 차림»으로 화면을 통째로 쓴다(대표 화면 2026-08-24).
@@ -17662,15 +17668,24 @@ function mbBinRuleMap(){
 function mbRuleBinOf(v){
   const em = String((v&&v.e)||'').trim().toLowerCase();
   if(!em) return '';
+  /* ⚡ 한 번 그리는 동안 «주소마다 한 번»만 센다 (2026-10-03 Codex 가 시작한 고침을 이어받음 — 대표 「다른 방에서 하던 것 계속」).
+     같은 주소 메일이 수십 통이라 mbWhoKey 를 통마다 두 번씩 불렀다(대표 화면 「mbWhoKey 155,962번」).
+     기억은 mbMemo 에 둔다 — 그리기가 시작될 때마다 버려지므로 규칙을 바꾸면 다음 그리기에 바로 맞는다.
+     ⚠ 열쇠는 «주소 글자»다 — v 는 mbWhoTally 가 같은 임시 객체를 다시 쓰므로 객체로 기억하면 틀린다. */
+  const memo = mbMemoOf();
+  const cache = memo.ruleBin || (memo.ruleBin = new Map());
+  if(cache.has(em)) return cache.get(em);
   const m = _mbBinRule || mbBinRuleMap();
   const one = m[mbWhoKey(em)];
-  if(one && mbBinBy(one)) return String(one);
+  let found = '';
+  if(one && mbBinBy(one)) found = String(one);
   const d = mbDomOf(em);
-  if(d){
+  if(!found && d){
     const dd = m[mbWhoKey('@' + d)];
-    if(dd && mbBinBy(dd)) return String(dd);
+    if(dd && mbBinBy(dd)) found = String(dd);
   }
-  return '';
+  cache.set(em, found);
+  return found;
 }
 /* 이 메일이 «지금 어느 칸에 있나» — 한 곳에서만 정한다.
    ⚠ 목록을 거르는 곳(mbRowFits)과 화면에 적는 곳(mbBinOfRow)이 «같은 답»을 봐야 한다.
