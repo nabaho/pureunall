@@ -63,7 +63,7 @@ button{font:inherit;cursor:pointer}
 .rmode a:not(.on):hover{background:#eff6ff}
 @media(max-width:1100px){.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
 .top .r{margin-left:auto;display:flex;align-items:center;gap:10px;color:#475569;font-size:12px}
-#lib{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;overflow:hidden;position:relative;min-height:300px}
+#lib{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;position:relative;min-height:300px}
 #lib .msg{padding:60px 20px;text-align:center;color:#475569}
 .run{display:flex;align-items:center;gap:18px;padding:10px 20px;border-bottom:1px solid #e2e8f0;background:#ffffff;flex-wrap:wrap}
 .run .k{color:#475569;font-size:12px;white-space:nowrap}.run .k b{color:#1e293b}.run .v{font-weight:800;font-size:15px;margin-left:4px}
@@ -141,7 +141,7 @@ button{font:inherit;cursor:pointer}
 .pick .pf{display:flex;justify-content:flex-end}
 .busy{position:absolute;right:16px;bottom:12px;background:#1e293b;color:#ffffff;border-radius:8px;padding:6px 12px;font-size:12px}
 /* ── 「📚 조별 문안」 (목업 2 승인본) — 칸은 한 줄, 넘치면 … 과 title ── */
-#topics{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;overflow:hidden;min-height:300px}
+#topics{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;min-height:300px}
 #topics .msg{padding:60px 20px;text-align:center;color:#475569}
 #topics .tpx{display:grid;grid-template-columns:260px minmax(0,1fr)}
 #topics .left{border-right:1px solid #e2e8f0;background:#ffffff;position:sticky;top:52px;align-self:start;max-height:calc(100vh - 64px);overflow-y:auto;padding-bottom:12px}
@@ -178,6 +178,27 @@ button{font:inherit;cursor:pointer}
 #topics .who .w{margin-left:auto;flex-shrink:0}
 @media (max-width:900px){#topics .tpx{grid-template-columns:1fr}#topics .left{position:static;max-height:40vh;border-right:0;border-bottom:1px solid #e2e8f0}}
 @media (max-width:900px){.wrap.two{grid-template-columns:1fr}.side{position:static;max-height:none;border-left:0;border-top:1px solid #e2e8f0}}
+/* ── 틀 고정 (대표 지시 2026-10-04 「틀고정」·「대시보드 고정」) ──
+   엑셀의 틀 고정처럼: 위쪽(모으기 요약·거르개·표 머리)과 📚 의 조 주제 목록은 «서 있고»,
+   목록·오른쪽 칸만 «제 상자 안에서» 스크롤한다.
+   ⚠ 바깥 상자(#lib·#topics)에 overflow:hidden 을 두면 안쪽 sticky 가 «통째로» 죽는다 —
+     hidden 은 스크롤 상자를 만들어 sticky 가 그 안(움직이지 않는 곳)에 붙기 때문이다.
+     둥근 모서리는 overflow:clip 으로 지킨다(스크롤 상자를 만들지 않는다).
+   ⚠ 높이는 «머리줄 아래 남은 화면»이다 — 머리줄 높이(--toph)는 아래 스크립트가 재서 넣는다.
+   폰(900px 이하)은 예전처럼 한 줄로 내려 쓴다(좁은 화면에 상자 둘을 겹치면 오히려 못 본다). */
+#lib,#topics{overflow:clip}
+@media (min-width:901px){
+  #lib,#topics{display:flex;flex-direction:column;height:calc(100vh - var(--toph,53px) - 36px);min-height:420px}
+  #lib>.run,#lib>.flt,#lib>.bulk{flex:0 0 auto}
+  #lib>.wrap{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+  #lib>.wrap.two{grid-template-columns:minmax(0,1fr) 420px}
+  #lib .tbl{overflow:auto;min-height:0}
+  #lib .lib th{position:sticky;top:0;z-index:2}
+  #lib .side{position:static;max-height:none;min-height:0;overflow:auto}
+  #topics>.tpx{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr)}
+  #topics .left{position:static;max-height:none;min-height:0;align-self:stretch}
+  #topics .main{overflow-y:auto;min-height:0}
+}
 </style>
 </head>
 <body>
@@ -190,6 +211,8 @@ button{font:inherit;cursor:pointer}
   <nav class="rmode" aria-label="취업규칙 갈래"><a href="rules.html" title="사업장 규칙 넣기 → 비교 → 고치기 → 신구대조표·신고서류">✏️<span class="rm-t"> 검토·개정</span></a><a href="rules-v2.html#topics" title="조 주제별로 «같은 글끼리» 묶은 문안">📚<span class="rm-t"> 조별 문안</span></a><a href="rules-v2.html#lib" class="on" aria-current="page" title="메일로 모은 취업규칙 자료(가린 사본)">📥<span class="rm-t"> 모은 자료</span></a></nav>
   <span class="r"><span id="whoslot"></span><span id="appslot"></span></span>
 </div>
+<script>/* 틀 고정 — 머리줄 높이를 재서 아래 상자 높이에 쓴다(머리줄이 두 줄이 되는 폭에서도 맞게) */
+(function(){function fit(){var t=document.querySelector(".top");if(t)document.documentElement.style.setProperty("--toph",t.offsetHeight+"px");}fit();window.addEventListener("resize",fit);window.addEventListener("load",fit);})();</script>
 <div id="lib"><div class="msg">불러오는 중…</div></div>
 <div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
