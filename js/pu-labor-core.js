@@ -770,45 +770,100 @@
        → 표를 **불러서 찾아 쓴다**. 표가 없으면 조용히 0으로 두지 않고
          '표 없음'으로 알린다. 틀린 세금을 조용히 내는 것이 가장 나쁘다.
 
-     표 모양(engine/build_simpletax.js 가 국세청 파일에서 만든다):
-       { 연도:'2026', 자녀공제:{...}, rows:[ {min, max, tax:[1인,2인,…,11인]} ] }
+     표 모양(내장 표 js/pu-simpletax.js 는 engine/build_simpletax_pdf.py 가 법제처
+     별표2 PDF 에서, 직접 올리는 표는 engine/build_simpletax.js 가 CSV 에서 만든다):
+       { 시행:'2026-03-01', 개정, 자녀공제:{one,two,extra}, 초과:{기준,기준세액,구간},
+         rows:[ {min, max, tax:[1인,2인,…,11인]} ] }
        min·max = 월 급여액(비과세 제외) 구간, tax[i] = 공제대상가족 (i+1)명 세액 */
 
-  /* 8세 이상 20세 이하 자녀 공제 (국세청 고시) —
-     1명 12,500원 · 2명 29,160원 · 3명 이상 29,160원 + 2명 초과 1명당 25,000원.
+  /* 8세 이상 20세 이하 자녀 공제 — 별표2 제3호. **표마다 금액이 다르다.**
+       2024.2.29 개정판: 1명 12,500 · 2명 29,160 · 3명↑ 29,160 + 1명당 25,000
+       2026.2.27 개정판: 1명 20,830 · 2명 45,830 · 3명↑ 45,830 + 1명당 33,330
+     그래서 표에 실린 금액(table.자녀공제)을 먼저 쓰고, 표에 없을 때만 아래
+     기본값(현행 2026년판)을 쓴다. 옛 표로 계산하는 달에 새 공제를 빼면
+     세금이 덜 걷혀 연말정산에서 근로자가 토해 낸다.
      ⚠ 표에서 **빼는** 금액이다(음수가 되면 0). */
-  var CHILD_CREDIT = { one: 12500, two: 29160, extra: 25000 };
-  function childCredit(n) {
+  var CHILD_CREDIT = { one: 20830, two: 45830, extra: 33330 };
+  function childCredit(n, table) {
     var c = Math.max(0, Math.floor(num(n)));
     if (c <= 0) return 0;
-    if (c === 1) return CHILD_CREDIT.one;
-    if (c === 2) return CHILD_CREDIT.two;
-    return CHILD_CREDIT.two + CHILD_CREDIT.extra * (c - 2);
+    var cc = (table && table.자녀공제 && table.자녀공제.one != null) ? table.자녀공제 : CHILD_CREDIT;
+    if (c === 1) return num(cc.one);
+    if (c === 2) return num(cc.two);
+    return num(cc.two) + num(cc.extra) * (c - 2);
+  }
+
+  /* 가족 칸 고르기 — 별표2 제4호: 공제대상가족이 11명을 넘으면
+       11명 세액 − (10명 세액 − 11명 세액) × 11명을 넘는 가족 수
+     (음수면 0). 칸이 11개가 아닌 표(직접 올린 표)는 마지막 칸을 쓴다 —
+     없는 칸을 0으로 읽으면 세금이 0이 되어 조용히 틀린다. */
+  function famTax(arr, fam) {
+    if (!arr || !arr.length) return null;
+    if (fam > 11 && arr.length === 11 && arr[9] != null && arr[10] != null) {
+      return Math.max(0, num(arr[10]) - (num(arr[9]) - num(arr[10])) * (fam - 11));
+    }
+    var v = arr[Math.min(fam, arr.length) - 1];
+    return (v == null) ? null : num(v);
+  }
+
+  /* 급여 달에 맞는 표 고르기 — 표마다 「시행」일이 있다(예: 2026-03-01 지급분부터).
+     기준일 = 지급일(있으면) 아니면 그 달 말일. 시행일이 기준일 이전인 표 중
+     가장 최근 것을 고른다. 맞는 표가 없으면 null — 옛 달에 새 표를 쓰지 않는다.
+     month 는 'YYYY-MM' 꼴(화면이 시트 이름을 이 꼴로 바꿔서 넘긴다). */
+  function pickSimpleTaxTable(tables, month, payDate) {
+    if (!tables || !tables.length) return null;
+    var ref = null;
+    if (payDate && /^\d{4}-\d{2}-\d{2}$/.test(String(payDate))) ref = String(payDate);
+    else {
+      var m = String(month || '').match(/^(\d{4})-(\d{1,2})$/);
+      if (!m) return null;
+      var y = Number(m[1]), mo = Number(m[2]);
+      if (mo < 1 || mo > 12) return null;
+      ref = fmt(Date.UTC(y, mo, 0));          // 그 달 말일
+    }
+    var best = null;
+    tables.forEach(function (t) {
+      if (!t || !t.시행 || !t.rows || !t.rows.length) return;
+      if (String(t.시행) <= ref && (!best || String(t.시행) > String(best.시행))) best = t;
+    });
+    return best;
   }
 
   /* 표에서 그 급여·가족수의 세액을 찾는다.
-     ⚠ 표의 구간은 "이상~미만"이다. 마지막 구간은 상한이 없다(max 생략). */
+     ⚠ 표의 구간은 "이상~미만"이다.
+     법제처 별표2 로 만든 표(table.초과 있음)는 1,000만원에서 끝나고, 그 위는
+     별표의 산식으로 계산한다:
+       1,000만원 정확히 → 1,000만원 줄 세액
+       1,000만원 초과   → 1,000만원 줄 세액 + 가산액 + (급여 − 구간 시작) × 곱 × 율
+     (예: 1,400만원 이하 = + (초과액 × 98% × 35%) + 25,000원)
+     직접 올린 표(초과 없음)는 마지막 구간이 상한 없음으로 끝난다. */
   function lookupSimpleTax(table, monthlyTaxable, familyCount) {
     if (!table || !table.rows || !table.rows.length) return null;
     var pay = num(monthlyTaxable);
     var fam = Math.max(1, Math.floor(num(familyCount) || 1));
     var rows = table.rows;
-    /* 표의 하한(106만원 안팎)보다 급여가 적으면 **세액 0원이 정답**이다 —
-       간이세액표는 세액이 생기는 급여부터 시작한다. 이걸 '표없음'으로 두면
+    /* 표의 하한보다 급여가 적으면 **세액 0원이 정답**이다 —
+       간이세액표는 세액이 생기는 급여 근처부터 시작한다. 이걸 '표없음'으로 두면
        단시간·일용 근로자마다 경고가 떠서, 정작 진짜 문제가 묻힌다. */
     if (pay < num(rows[0].min)) return 0;
+    var X = table.초과;
+    if (X && X.기준세액 && X.구간 && pay >= num(X.기준)) {
+      var t10 = famTax(X.기준세액, fam);
+      if (t10 == null) return null;
+      if (pay === num(X.기준)) return t10;
+      for (var k = 0; k < X.구간.length; k++) {
+        var g = X.구간[k];
+        var hiG = (g.이하 == null) ? Infinity : num(g.이하);
+        if (pay > num(g.초과) && pay <= hiG) {
+          return t10 + num(g.가산) + (pay - num(g.초과)) * num(g.곱 == null ? 1 : g.곱) * num(g.율);
+        }
+      }
+      return null;
+    }
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       var lo = num(r.min), hi = (r.max == null) ? Infinity : num(r.max);
-      if (pay >= lo && pay < hi) {
-        var arr = r.tax || [];
-        if (!arr.length) return null;
-        /* 표의 가족수 칸이 모자라면 **마지막 칸**을 쓴다(11인 초과).
-           없는 칸을 0으로 읽으면 세금이 0이 되어 조용히 틀린다. */
-        var idx = Math.min(fam, arr.length) - 1;
-        var v = arr[idx];
-        return (v == null) ? null : num(v);
-      }
+      if (pay >= lo && pay < hi) return famTax(r.tax, fam);
     }
     return null;      // 표 범위를 벗어남(급여가 표 상한 초과 등)
   }
@@ -826,7 +881,7 @@
         안내: '근로소득 간이세액표가 없어 소득세를 계산하지 못했습니다 — 표를 올리거나 대장의 소득세 값을 넣으세요.'
       };
     }
-    var 자녀 = childCredit(o.자녀수);
+    var 자녀 = childCredit(o.자녀수, o.table);
     var 비율 = num(o.비율 || 100) / 100;
     if (!(비율 > 0)) 비율 = 1;
     /* 자녀공제를 먼저 빼고 비율을 적용한다(국세청 예시 순서: 표값 − 자녀공제). */
@@ -834,7 +889,7 @@
     return {
       소득세: 소득세, 지방소득세: localIncomeTax(소득세),
       표값: base, 자녀공제: 자녀, 비율: num(o.비율 || 100),
-      상태: 'ok', 출처: '간이세액표' + (o.table && o.table.연도 ? '(' + o.table.연도 + ')' : ''),
+      상태: 'ok', 출처: '간이세액표' + (o.table && o.table.개정 ? '(' + o.table.개정 + ' 개정)' : (o.table && o.table.연도 ? '(' + o.table.연도 + ')' : '')),
       근거: '간이세액표 ' + base.toLocaleString() + '원'
         + (자녀 ? ' − 자녀공제 ' + 자녀.toLocaleString() + '원' : '')
         + (비율 !== 1 ? ' × ' + num(o.비율) + '%' : '')
@@ -952,7 +1007,7 @@
     // 급여
     insuranceEmployee: insuranceEmployee, localIncomeTax: localIncomeTax,
     // 간이세액표
-    CHILD_CREDIT: CHILD_CREDIT, childCredit: childCredit,
+    CHILD_CREDIT: CHILD_CREDIT, childCredit: childCredit, pickSimpleTaxTable: pickSimpleTaxTable,
     lookupSimpleTax: lookupSimpleTax, withholdingTax: withholdingTax,
     monthlyPayroll: monthlyPayroll
   };
