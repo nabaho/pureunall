@@ -134,8 +134,8 @@ function runApp(seed) {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');   // 부팅은 빼고 함수만 싣는다
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
-    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,'
-    + 'setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
+    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,pullAll,PAGE_MAX,'
+    + 'setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store };
 }
 
@@ -355,4 +355,49 @@ test('★★ 출처 되살리기를 실제로 돌린다', () => {
   assert.deepEqual(f.map((x) => x.src || ''), ['나라장터', '알리오', '', '나라장터'],
     '모르는 것은 비워 두고, 이미 있는 출처는 건드리지 않습니다');
   assert.equal(r.api.srcBackfill(), 0, '두 번 돌려도 더 바뀌지 않습니다');
+});
+
+/* ───────── ★ 쪽을 끝까지 넘긴다 (2026-10-03 실측: 3,077건 중 999건만 보고 있었다) ───────── */
+
+function pagedApp(total, per, failAt) {
+  const r = runApp({ feed: [] });
+  const calls = [];
+  const parse = (j) => j;                      /* 가짜 응답이 곧 풀린 꼴이다 */
+  const urlOf = (p) => p;
+  const fake = async (p) => {
+    calls.push(p);
+    if (failAt === p) throw new Error('net');
+    const from = (p - 1) * per, n = Math.max(0, Math.min(per, total - from));
+    return { ok: true, total, rows: Array.from({ length: n }, (_, i) => ({ no: String(from + i) })) };
+  };
+  r.api.setPull(fake);
+  return { r, calls, run: (max) => r.api.pullAll('나라장터', urlOf, parse, max) };
+}
+
+test('★★ 첫 쪽에서 멈추지 않는다 — 전체를 다 받는다', async () => {
+  const t = pagedApp(3077, 999);
+  const out = await t.run(8);
+  assert.equal(out.rows.length, 3077, '3,077건을 다 받아야 합니다');
+  assert.deepEqual(t.calls, [1, 2, 3, 4], '필요한 만큼만 부릅니다(하루 1,000회 제한)');
+  assert.equal(out.errs.length, 0, '다 받았으면 아무 말도 없어야 합니다');
+});
+
+test('★ 뚜껑에 걸려 다 못 받으면 «그렇다고 말한다» — 조용히 자르지 않는다', async () => {
+  const t = pagedApp(5000, 999);
+  const out = await t.run(2);
+  assert.equal(out.rows.length, 1998);
+  assert.match(out.errs.join(), /5000건 중 1998건만/);
+});
+
+test('★ 중간 쪽이 실패해도 받은 것은 버리지 않고, 몇 쪽에서 끊겼는지 말한다', async () => {
+  const t = pagedApp(3077, 999, 3);
+  const out = await t.run(8);
+  assert.equal(out.rows.length, 1998);
+  assert.match(out.errs.join(), /3쪽/);
+});
+
+test('★ 뚜껑은 하루 제한 안에 있다', () => {
+  const r = runApp({ feed: [] });
+  assert.ok(r.api.PAGE_MAX.g2b * 1 + r.api.PAGE_MAX.alio <= 50, '하루 한 번에 50회를 넘게 부르면 안 됩니다');
+  assert.ok(r.api.PAGE_MAX.g2b >= 4 && r.api.PAGE_MAX.alio >= 6, '실측 7일치(3,077·525)를 덮어야 합니다');
 });

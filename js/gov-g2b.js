@@ -101,13 +101,27 @@
   }
 
   /* ── 낱말 걸러내기 ──
-     공고명에서 찾는다. 띄어쓰기를 지우고 봐야 「일터 혁신」도 걸린다. */
+     공고명에서 찾는다.
+     ⚠★ 띄어쓰기를 «통째로» 지우고 찾지 말 것 (2026-10-03 실측 3,077건) —
+        「선거물품 보관창고 용역」이 「창고용역」이 되어 «고용»으로 걸렸다(단어 사이에 걸림).
+        → 세 글자 이상 낱말만 사이 띄어쓰기를 봐준다(「일터 혁신」은 여전히 걸린다).
+          두 글자 낱말은 «붙어 있을 때만» 걸린다.
+     ⚠ 낱말이 «다른 단어 속»에 든 것도 실측으로 걸렀다 — FALSE_IN 에만 적는다.
+        「공공디자인사업」 → «인사»(3건). 짐작으로 늘리지 말고 «실측한 것만» 더한다. */
+  var FALSE_IN = ['디자인사'];
+
+  function esc(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
   function matched(row, kws) {
-    var nm = s(row && row.nm).replace(/\s+/g, '');
+    var nm = s(row && row.nm);
+    FALSE_IN.forEach(function (w) { nm = nm.split(w).join(' '); });
     var list = (kws && kws.length) ? kws : KEYWORDS_DEFAULT;
     return list.filter(function (k) {
       var t = String(k || '').replace(/\s+/g, '');
-      return t && nm.indexOf(t) >= 0;
+      if (!t) return false;
+      if (t.length < 3) return nm.indexOf(t) >= 0;
+      var re = new RegExp(t.split('').map(esc).join('\\s*'));
+      return re.test(nm);
     });
   }
 
