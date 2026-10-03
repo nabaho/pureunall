@@ -44,3 +44,20 @@ test('③ 끌면 내려간다 · 살짝 누른 것은 끌기가 아니다 · 문
   const b = 칸(); ctx.b = b; vm.runInContext('dsPvDragWire(b)', ctx);
   assert.equal(붙임, 2, '★ 다시 그릴 때마다 문서 손잡이가 쌓이면 끌기가 무거워진다');
 });
+
+/* ── 정보는 두 줄 (대표 지적 2026-10-03 「아래 설명내용 너무 많은 공간 차지한다」) ── */
+test('④ 정보는 두 줄 — 제목·제출 한 줄, 기관·종류·날짜 한 줄 · 나머지는 ⓘ 안에 접힌다', () => {
+  const f = 떼기('function dsPrevDraw(');
+  assert.match(f, /class="ds-pv-hd"/);
+  assert.match(f, /class="ds-pv-meta"/);
+  assert.match(f, /class="ds-pv-more"[^>]*hidden/, '원본·파일·메모는 처음에 접혀 있어야 합니다');
+  assert.match(f, /ⓘ 자세히/);
+  const 접힘 = f.slice(f.indexOf('ds-pv-more'), f.indexOf('ds-pv-btns'));
+  assert.match(접힘, /줄\('원본'/);
+  assert.match(접힘, /줄\('파일'/);
+  const 머리 = f.slice(0, f.indexOf('ds-pv-more'));
+  assert.doesNotMatch(머리, /줄\('기관'|줄\('종류'|줄\('만든 날'/, '★ 한 칸에 한 줄씩 세로로 쌓으면 미리보기 자리를 반이나 먹는다');
+  for (const k of ['ds-pv-t', 'ds-pv-meta']) {
+    assert.match(SRC.match(new RegExp('\.' + k + '\{[^}]*\}'))[0], /white-space:nowrap/, k + ' 는 한 줄');
+  }
+});
