@@ -109,3 +109,15 @@ test('ⓓ 보관함 사본이 없는 옛 한글 첨부를 알아본다', () => {
     originals: [{ fileId: 'f', name: 'a.hwp', attId: 'a1' }] };
   assert.deepStrictEqual(plain(F.orphanInline(fm)).map(a => a.id), ['a2']);
 });
+
+test('ⓔ 문서관리 배선 — hwpFind·hwpMark 를 넘기고, 원본 형식 그대로 낸다', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'docs-esign.html'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(html, /<script src="js\/pu-hwp-mark\.js\?v=\d+"><\/script>/, 'pu-hwp-mark.js 를 싣지 않습니다');
+  assert.match(html, /hwpFind: formHwpFind, hwpMark: formHwpMark/, 'host 에 hwpFind·hwpMark 가 없습니다');
+  const fn = html.slice(html.indexOf('async function formHwpMark('), html.indexOf('\n}\n', html.indexOf('async function formHwpMark(')));
+  assert.match(fn, /PuHwpMark\.apply\(/, '엔진 조작을 PuHwpMark 로 하지 않습니다');
+  assert.match(fn, /formRelayout\(doc, \[[^\]]*\], fmt\)/, '바꾼 문단만 줄 다시 나누지 않습니다');
+  assert.match(fn, /doc\.free\(\)/, '문서를 닫지 않습니다(메모리)');
+  const rl = html.slice(html.indexOf('async function formRelayout('), html.indexOf('\n}\n', html.indexOf('async function formRelayout(')));
+  assert.match(rl, /fmt === 'hwpx' \? d2\.exportHwpx\(\) : d2\.exportHwp\(\)/, '.hwpx 를 .hwp 로 바꿔 냅니다');
+});
