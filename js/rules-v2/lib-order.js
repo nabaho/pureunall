@@ -30,24 +30,36 @@
     });
     return list.sort(function (a, b) { return Number(b.mail.date || 0) - Number(a.mail.date || 0); });
   }
-  function ym(ms) { var d = new Date(ms); return 'r' + d.getUTCFullYear() + ('0' + (d.getUTCMonth() + 1)).slice(-2); }
+  // 회차 이름의 연월은 한국 시간 기준 — 한국은 서머타임이 없어 +9시간이면 된다 (UTC 로 보면 1일 새벽 메일이 전달로 밀린다)
+  function ym(ms) { var d = new Date(ms + 9 * 36e5); return 'r' + d.getUTCFullYear() + ('0' + (d.getUTCMonth() + 1)).slice(-2); }
+  var UNDATED = 'r000000';
   function roundsOf(items) {
     var s = items.slice().sort(function (a, b) { return a.date - b.date || (a.id < b.id ? -1 : 1); });
-    var auto = [], cur = null, last = 0;
+    var auto = [], cur = null, last = 0, undated = [];
     s.filter(function (it) { return !it.round; }).forEach(function (it) {
-      if (!cur || (last && it.date - last > GAP) || cur.closed) { cur = { roundKey: ym(it.date), items: [] }; auto.push(cur); }
+      // 날짜를 모르는 것은 간격 셈에 끼우지 않는다 — 다음 회차를 삼키거나 1970년 회차를 만든다
+      if (!it.date) { undated.push(it); return; }
+      // 신고서는 회차를 닫는다. 단, 같은 메일에 딸린 다른 첨부는 그 회차에 남긴다
+      var closedHere = cur && cur.closed && mailKey(it) !== cur.closeMail;
+      if (!cur || (last && it.date - last > GAP) || closedHere) { cur = { items: [] }; auto.push(cur); }
       cur.items.push(it); last = it.date;
-      if (it.kind === '신고서') cur.closed = true;
+      if (it.kind === '신고서' && !cur.closed) { cur.closed = true; cur.closeMail = mailKey(it); }
     });
+    // 자동 회차의 이름은 한 사업장 안에서 겹치지 않게 — 같은 달에 신고서 뒤 새 회차가 열려도 따로 둔다 (r202601, r202601b …)
     var byKey = {};
-    auto.forEach(function (r) { byKey[r.roundKey] = byKey[r.roundKey] || { roundKey: r.roundKey, items: [] };
-      byKey[r.roundKey].items = byKey[r.roundKey].items.concat(r.items); });
-    // 사람이 고른 회차가 자동 셈을 이긴다
+    auto.forEach(function (r) {
+      var base = ym(r.items[0].date), key = base, n = 0;
+      while (byKey[key]) { n++; key = base + String.fromCharCode(97 + n); }
+      byKey[key] = { roundKey: key, items: r.items };
+    });
+    if (undated.length) { byKey[UNDATED] = { roundKey: UNDATED, items: undated }; }
+    // 사람이 고른 회차가 자동 셈을 이긴다 — 이미 있는 이름(접미 포함)에는 합친다
     s.filter(function (it) { return it.round; }).forEach(function (it) {
       byKey[it.round] = byKey[it.round] || { roundKey: it.round, items: [] }; byKey[it.round].items.push(it); });
+    function first(r) { return r.items[0].date || Infinity; }
     return Object.keys(byKey).map(function (k) {
       byKey[k].items.sort(function (a, b) { return a.date - b.date || (a.id < b.id ? -1 : 1); }); return byKey[k];
-    }).sort(function (a, b) { return a.items[0].date - b.items[0].date; });
+    }).sort(function (a, b) { var x = first(a), y = first(b); return x === y ? 0 : (x < y ? -1 : 1); });
   }
   function versionsOf(round) {
     var rules = round.items.filter(function (it) { return it.kind === '규칙본문' && it.status === '담김'; });
@@ -68,10 +80,11 @@
       var before = vs.filter(function (it) { return it.date <= report.date; }).pop();
       if (before) add(before.id, R_REPORT);
     }
-    vs.forEach(function (it) { if (/최종|신고용|확정/.test(it.name)) add(it.id, R_NAME); });
-    var agreeDays = round.items.filter(function (it) { return it.kind === '동의서'; }).map(function (it) { return it.date; });
+    vs.forEach(function (it) { if (/최종|신고용/.test(it.name)) add(it.id, R_NAME); });
+    // 「동의서와 같은 메일」 — 날짜가 가깝다는 것이 아니라 같은 메일 한 통이어야 한다
+    var agreeMails = round.items.filter(function (it) { return it.kind === '동의서'; }).map(mailKey);
     vs.forEach(function (it) {
-      if (agreeDays.some(function (d) { return Math.abs(d - it.date) <= 864e5 * 2; })) add(it.id, R_AGREE);
+      if (agreeMails.indexOf(mailKey(it)) >= 0) add(it.id, R_AGREE);
     });
     return out;
   }
