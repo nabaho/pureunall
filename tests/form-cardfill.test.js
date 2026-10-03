@@ -223,3 +223,24 @@ test('ⓒ 문서관리는 ERP 업체관리와 기업정보함을 함께 읽고 �
   assert.match(forms, /CF\.searchContacts\(/, '기업정보함 담당자 검색을 실제로 부르지 않습니다');
   assert.match(forms, /찾는 명함이 없습니다 — 오른쪽 빈칸에 직접 적으세요/, '검색 결과가 없을 때 직접 입력 안내가 없습니다');
 });
+
+/* 2026-10-03 — 6종 엑셀 틀 검증 중 발견: 표지가 있는 틀에서도 이름표 짐작이 돌아
+   「소 재 지」 병합 칸 안쪽(E12 등)에 값이 더 들어갔다. */
+const XL_SHEET = (cells, merges) => '<worksheet><sheetData><row r="1">' + cells + '</row></sheetData>'
+  + (merges ? '<mergeCells count="1"><mergeCell ref="' + merges + '"/></mergeCells>' : '') + '</worksheet>';
+test('ⓓ 엑셀 — 표지가 하나라도 있으면 이름표 옆 빈칸을 짐작해 채우지 않는다', () => {
+  const sheet = XL_SHEET('<c r="A1" t="inlineStr"><is><t>주소</t></is></c><c r="B1" s="1"/>'
+    + '<c r="C1" t="inlineStr"><is><t>{{회사명}}</t></is></c>');
+  const r = CF.xlsxFillParts(['xl/worksheets/sheet1.xml'], [sheet], { 회사명: '가나상사', 주소: '천안시 가나로 1' });
+  assert.ok(r.xmls[0].includes('가나상사'), '표지는 채운다');
+  assert.ok(!r.xmls[0].includes('가나로'), '표지가 있는 틀에서 이름표 짐작으로 주소를 넣었다');
+  assert.deepStrictEqual(CF.xlsxMarkersParts(['xl/worksheets/sheet1.xml'], [sheet]), ['회사명']);
+});
+test('ⓓ 엑셀 — 표지 없는 옛 틀은 여전히 이름표로 채우되, 병합 칸 안쪽에는 안 쓴다', () => {
+  const inner = XL_SHEET('<c r="A1" t="inlineStr"><is><t>주소</t></is></c><c r="B1" s="1"/>', 'A1:C1');
+  const r1 = CF.xlsxFillParts(['xl/worksheets/sheet1.xml'], [inner], { 주소: '천안시 가나로 1' });
+  assert.ok(!r1.xmls[0].includes('가나로'), 'B1 은 이름표 병합(A1:C1) 안쪽 — 쓰면 안 보이는 값이 남는다');
+  const free = XL_SHEET('<c r="A1" t="inlineStr"><is><t>주소</t></is></c><c r="B1" s="1"/>');
+  const r2 = CF.xlsxFillParts(['xl/worksheets/sheet1.xml'], [free], { 주소: '천안시 가나로 1' });
+  assert.ok(r2.xmls[0].includes('가나로'), '병합이 아니면 예전처럼 채운다');
+});
