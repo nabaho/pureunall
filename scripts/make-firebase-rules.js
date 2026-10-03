@@ -827,7 +827,16 @@ rules.paydata = {
      기록을 고칠 수 있으면 기록이 아니다. */
   access_log:  { '.read': `auth != null && ${ADMIN}`, $id: { '.write': `(${LOGIN}) && !data.exists()` } },
   handoff_log: { '.read': `auth != null && ${ADMIN}`, $id: { '.write': `(${LOGIN}) && !data.exists()` } },
-  maillog:  { '.read': LOGIN, '.write': false },
+  /* maillog 의 '.indexOn' at — 입퇴사 화면이 «최근 90일»만 받는다(orderByChild('at').startAt).
+     색인이 없으면 파이어베이스가 통째로 내려받아 브라우저에서 거른다 — 줄이려던 것이 도리어 다 받는 길이 된다. */
+  maillog:  { '.read': LOGIN, '.write': false, '.indexOn': ['at'] },
+  /* 입퇴사 할 일 (대표 승인 2026-10-03 ㉠) — 사람이 «누른 것»만 적힌다.
+     hrtask = 할 일의 상태(처리함·고친 이름/날짜) · mailkind = 사람이 확정한 꼬리표.
+     ★ 읽는 사람은 maillog 와 «같다»(LOGIN = 재직 직원) — 이름은 이미 maillog 제목에 실려 있다.
+       더 넓히지도 좁히지도 않는다: 좁히면 같이 맡은 사람이 처리 완료를 못 누르고,
+       넓히면 메일 제목보다 넓게 퍼진다. 누가 눌렀는지는 칸마다 updatedBy 로 남는다. */
+  hrtask:   { '.read': LOGIN, '.write': LOGIN },
+  mailkind: { '.read': LOGIN, '.write': LOGIN },
   mailconf: { '.read': LOGIN, '.write': ADMIN },
   mailseen: { '.read': false, '.write': false }
 };

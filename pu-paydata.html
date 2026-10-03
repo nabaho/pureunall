@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=40"></script>
+<script src="js/pu-ontology.js?v=41"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -31,6 +31,7 @@
 <script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-paydata-store.js?v=10"></script>
+<script src="js/pu-hr-intake.js?v=1"></script>
 <!-- ?v= 는 판독기 판 번호(READ_VERSION)와 **같이 올린다**(2026-08-15).
      ⚠ 사진첩만 올리고 여기를 빠뜨리면, 같은 브라우저 안에서 사진첩은 새 판독기·
        급여데이터함은 캐시에 묵은 옛 판독기로 갈린다 — 같은 서류를 두 앱이 다르게
@@ -265,6 +266,46 @@ main{flex:1;min-width:0;padding:16px 20px;max-width:1240px;margin:0}
 .crow .own{font-size:9.5px;color:var(--sub);background:var(--paper);border-radius:99px;padding:1px 5px;
   max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .crow .cnt{font-size:10.5px;color:var(--sub)}
+/* ── 입퇴사 할 일 (대표 승인 2026-10-03 ㉠) — 한 줄 = 한 건, 넘치면 … 로 자른다 ── */
+.hrp{flex:0 0 auto;font-size:10px;font-weight:700;border-radius:5px;padding:0 5px;white-space:nowrap}
+.hrp.in{background:#f0fdf4;color:#166534}
+.hrp.out{background:#fef2f2;color:#991b1b}
+.hrp.due{background:#fffbeb;color:#d97706}
+.hrp.due.late{background:#fef2f2;color:#dc2626}
+.hrcard{padding:8px 12px;margin-bottom:10px}
+.hrhead{display:flex;gap:10px;align-items:baseline;margin-bottom:4px;white-space:nowrap}
+.hrhead b{font-size:13.5px}
+.hrsub{font-size:11.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis}
+.hrrow,.hrmail{display:flex;align-items:center;gap:8px;padding:6px 2px;border-top:1px solid var(--line);
+  font-size:12.5px;white-space:nowrap}
+.hrrow .hrnm{flex:0 0 130px;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.hrrow .hrdt{flex:0 0 100px;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--sub)}
+.hrdue{color:#d97706;font-weight:700;font-size:12px}
+.hrdue.late{color:#dc2626}
+.hrdone{color:#166534;font-size:12px}
+.hrrow.isdone{opacity:.7}
+.hracts{margin-left:auto;display:flex;gap:4px}
+.hrg{font-style:normal;font-size:9.5px;color:#d97706;background:#fffbeb;border-radius:4px;padding:0 4px;margin-left:4px}
+.hrmute{color:#94a3b8;font-size:11.5px}
+.hrnone{font-size:12px;color:var(--sub);padding:6px 2px}
+.hrmail .hrwhen{flex:0 0 78px;color:var(--sub);font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
+.hrmail .hrfrom{flex:0 0 90px;color:var(--sub);overflow:hidden;text-overflow:ellipsis}
+.hrmail .hrsubj{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.hrtags{flex:0 0 auto;display:flex;gap:4px;align-items:center}
+.hrt{font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 6px}
+.hrt.in{background:#f0fdf4;color:#166534}
+.hrt.out{background:#fef2f2;color:#991b1b}
+.hrt.pay{background:#eff6ff;color:#1e40af}
+.hrt.ask{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}
+.hrq{display:inline-flex;gap:4px;align-items:center;background:#fffbeb;color:#d97706;border-radius:99px;
+  padding:1px 3px 1px 8px;font-size:11px}
+.btn.hrk.on{background:#1e40af;color:#ffffff;border-color:#1e40af}
+.btn.hrfix{padding:0 6px}
+.hrpeek{font-size:12px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;
+  padding:6px 10px;margin:2px 0 6px;white-space:normal}
+.hrpeek div{color:var(--sub);margin-top:2px}
+.hrbanner{background:#fffbeb;border:1px solid #fde68a;color:#854d0e;border-radius:8px;padding:7px 10px;
+  font-size:12.5px;margin:8px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crow .share{opacity:0;font-size:11px;color:var(--navy);padding:1px 3px;border-radius:5px}
 .crow:hover .share{opacity:1}
 .crow .share:hover{background:#e2e8f0}
@@ -787,6 +828,10 @@ const App = {
      없으면 창 하나로 뜬다. */
   valueFix: null,
   sideReason: null, shareCtx: null, sharedBanner: null,
+  /* 입퇴사 할 일 (대표 승인 2026-10-03 ㉠) — hrLog 는 null 로 시작한다(아직 안 읽음 ≠ 비었음).
+     hrKind = 사람이 확정한 꼬리표, hrState = 할 일의 상태(처리함·고친 이름/날짜).
+     hrRev 는 셈을 다시 할 때를 알리는 번호, hrOpenMail 은 펼쳐 본 메일, hrPick 은 꼬리표 고르는 중인 메일. */
+  hrLog: null, hrKind: {}, hrState: {}, hrRev: 0, hrShowDone: false, hrOpenMail: '', hrPick: null,
 
   go(screen, o) {
     // 사업장을 바꿔 들어가면 남의 폴더가 골라진 채로 남지 않게 되돌린다 —
@@ -962,8 +1007,11 @@ function loadSites() {
     const myUid = (App.me && App.me.uid) || '';
     App.myOrder = (owners[myUid] && owners[myUid].order) || [];
     App.render();
+    /* 메일함 「📋 급여데이터함」 에서 건너왔으면 그 사업장을 연다 — 한 번만 */
+    if (!App._coLinkDone) { App._coLinkDone = true; openCoFromUrl(); }
   });
   refreshShares();
+  loadHr();
 }
 
 /* 도착 칸만 다시 읽는다 — 업체·귀속월·종류·장수만 담긴 얇은 칸이라 가볍다.
@@ -1104,9 +1152,19 @@ function sideViewModel(ctx) {
       n: mine.filter(c => coArrivedAt(arr[c.id], slot) >= ctx.todayStart).length },
     { key: 'shared', label: '공유받음', n: Object.keys(ctx.shares || {}).length }
   ];
+  /* 📋 입퇴사 할 일 (대표 승인 2026-10-03 ㉠) — 숫자는 «안 끝난 사람 수»다(사업장 수가 아니다).
+     사무대행 사업장도 센다 — 급여 명단 밖이어도 입퇴사 신고는 우리 일이다.
+     ⚠ 사흘 안에 기한이 오는 것이 있으면 노랗게 — 그날 봐야 할 것이다. */
+  const hrBy = ctx.hrBy || {};
+  const hrPool = (ctx.allCompanies && ctx.allCompanies.length) ? ctx.allCompanies : cos;
+  const hrN = c => { const x = hrBy[c.id]; return x ? x.in + x.out : 0; };
+  const hrMine = hrPool.filter(c => hrN(c) && S.isMyCompany(c, ctx.myEmail));
+  views.splice(3, 0, { key: 'hr', label: '📋 입퇴사 할 일', n: hrMine.reduce((n, c) => n + hrN(c), 0),
+    warn: hrMine.some(c => hrBy[c.id].left !== null && hrBy[c.id].left <= 3) });
   if (ctx.isAdmin) {
     views.push({ key: 'all', label: '전체 사업장', n: cos.length });
     views.push({ key: 'alllate', label: '전체 미도착', n: cos.filter(c => cnt(c) === 0).length, warn: true });
+    views.push({ key: 'allhr', label: '📋 전체 입퇴사', n: hrPool.reduce((n, c) => n + hrN(c), 0) });
     views.push({ key: 'noman', label: '담당 없음', n: roster.unassigned.length, bad: true });
   }
 
@@ -1161,12 +1219,16 @@ function sideListModel(view, ctx, opt) {
   const roster = S.managerRoster(cos, ctx.dir, ctx.owners);
   const cnt = c => companyDocCount(arr[c.id] || {}, slot);
   const isMine = c => S.isMyCompany(c, ctx.myEmail);
+  /* 입퇴사 보기는 사무대행 사업장까지 본다 — 담당 이름도 그 명단에서 찾아야 빈칸이 안 된다 */
+  const hrView = view === 'hr' || view === 'allhr';
+  const hrPool = (ctx.allCompanies && ctx.allCompanies.length) ? ctx.allCompanies : cos;
+  const ownerRoster = hrView ? S.managerRoster(hrPool, ctx.dir, ctx.owners) : roster;
 
   /* 업체마다 담당자 이름(보여 줄 것)과 **주담당의 uid**(그 사람 자리를 열 때
      쓸 것)를 챙긴다. uid 가 없으면 그 사람은 급여데이터함에 들어온 적이 없어
      자리 자체가 없다 — 눌러도 안내만 띄운다. */
   const ownerOf = {}, mainOf = {};
-  roster.people.forEach(p => p.companies.forEach(c => {
+  ownerRoster.people.forEach(p => p.companies.forEach(c => {
     ownerOf[c.id] = ownerOf[c.id] ? ownerOf[c.id] + ', ' + p.name : p.name;
     if (String(c.managerMain || '') === p.sid) mainOf[c.id] = p;
   }));
@@ -1174,11 +1236,18 @@ function sideListModel(view, ctx, opt) {
   /* 관리자가 아니면 자기 것 말고는 못 본다. 화면에 단추를 안 그려도 앞서 고른
      보기가 상태에 남아 있을 수 있으니 **계산 층에서 한 번 더** 막는다. */
   let v = String(view || 'mine');
-  const adminOnly = { all: 1, alllate: 1, noman: 1 };
+  const adminOnly = { all: 1, alllate: 1, noman: 1, allhr: 1 };
   if (!ctx.isAdmin && (adminOnly[v] || v.indexOf('p:') === 0)) v = 'mine';
 
-  let list = [], title = '내 담당 사업장', canOrder = false, showOwner = false;
+  let list = [], title = '내 담당 사업장', canOrder = false, showOwner = false, hrSort = false;
+  const hrBy = ctx.hrBy || {};
   if (v === 'mine') { list = cos.filter(isMine); canOrder = true; }
+  else if (v === 'hr' || v === 'allhr') {
+    /* 안 끝난 입퇴사가 있는 곳만 — 기한이 이른 곳부터 */
+    list = hrPool.filter(c => hrBy[c.id] && (hrBy[c.id].in + hrBy[c.id].out) && (v === 'allhr' || isMine(c)));
+    title = v === 'hr' ? '입퇴사 할 일' : '전체 입퇴사';
+    showOwner = v === 'allhr'; hrSort = true;
+  }
   else if (v === 'late') { list = cos.filter(c => isMine(c) && cnt(c) === 0); title = '아직 안 온 곳'; }
   else if (v === 'today') {
     list = cos.filter(c => isMine(c) && coArrivedAt(arr[c.id], slot) >= ctx.todayStart);
@@ -1242,7 +1311,8 @@ function sideListModel(view, ctx, opt) {
       vals: Number((slot && node[slot] && node[slot].vals) || 0),
       kinds: kindsOf(c.id),
       owner: ownerOf[c.id] || '', mine: isMine(c),
-      ownerUid: mainP ? mainP.uid : '', ownerName: mainP ? mainP.name : '' };
+      ownerUid: mainP ? mainP.uid : '', ownerName: mainP ? mainP.name : '',
+      hr: hrBy[c.id] || null };
   });
 
   const counts = { all: rows.length,
@@ -1264,7 +1334,9 @@ function sideListModel(view, ctx, opt) {
   /* 내가 끌어 놓은 순서가 있으면 그것이 이긴다 — 없으면 자료 온 곳 먼저
      (대표 결정). 순서를 정해 뒀는데 자료 하나 들어올 때마다 자리가 흐트러지면
      애써 끌어 놓은 뜻이 없다. */
-  if (canOrder && (opt.order || []).length) rows = S.applyOrder(rows, opt.order);
+  const hrLeft = r => (r.hr && r.hr.left !== null) ? r.hr.left : 1e9;
+  if (hrSort) rows.sort((a, b) => hrLeft(a) - hrLeft(b));
+  else if (canOrder && (opt.order || []).length) rows = S.applyOrder(rows, opt.order);
   else rows.sort((a, b) => (b.arrived ? 1 : 0) - (a.arrived ? 1 : 0));
 
   return { view: v, title: title, rows: rows, canOrder: canOrder, showOwner: showOwner,
@@ -2238,6 +2310,21 @@ function screenMail() {
           : '')
         + '<button class="btn sm" onclick="ensureMail(true)">↻ 다시 읽기</button></span>'
     + '</div></div>';
+
+  /* 공용 칸에 쌓이는 까닭을 «사람 이름»으로 (대표 승인 2026-10-03 목업 ③) — 관리자에게만.
+     담당자가 이 함을 한 번도 안 열면 그 사람 자리가 없어 메일이 여기 남는다(30일 실측 46통).
+     기술 문제가 아니라 그 사람이 «한 번 열기»로 풀린다 — 그래서 누구인지가 곧 할 일이다. */
+  if (S.amAdmin() && rows.length) {
+    const away = {};
+    rows.forEach(r => { if (r.ownerAway && r.ownerName) away[r.ownerName] = (away[r.ownerName] || 0) + 1; });
+    const names = Object.keys(away).sort((a, b) => away[b] - away[a]);
+    if (names.length) {
+      const n = names.reduce((s, k) => s + away[k], 0);
+      h += '<div class="hrbanner" title="그 담당자가 급여데이터함에 한 번 로그인한 뒤 「🔁 다시 갈라 보내기」를 누르면 그 사람 칸으로 갑니다">'
+        + '⚠ 공용 칸 ' + n + '건 — 담당자가 이 함을 아직 안 열어 자리가 없습니다: '
+        + names.map(k => esc(k) + ' ' + away[k]).join(' · ') + ' → 한 번 열면 「🔁 다시 갈라 보내기」로 내려갑니다</div>';
+    }
+  }
 
   if (App.mail === null) return h + '<div class="card"><div class="empty">읽는 중입니다…</div></div>';
   if (!rows.length) {
@@ -3535,6 +3622,9 @@ function screenDrawer() {
     + ' oninput="App.query=this.value;App.render()"></div>';
 
   h += '</div>';   // .stickhead 끝 — 여기까지가 붙어 있는 머리다
+
+  /* 📋 입퇴사 할 일 · ✉ 이번 달 메일 (대표 승인 2026-10-03 ㉠) — 말할 것이 없으면 안 그린다 */
+  if (typeof hrCardHtml === 'function') h += hrCardHtml(App.companyId);
 
   /* 함께 맡은 업체라고 알려 준다 — 안 알리면 남의 이름이 붙은 줄을 보고
      「왜 남의 자료가 내 서랍에 있지」 하게 된다(대표 지시 2026-08-17). */
@@ -4902,8 +4992,269 @@ function sideCtx() {
     myEmail: (App.me && App.me.email) || '', myUid: (App.me && App.me.uid) || '',
     month: App.month || thisMonth(), now: now,
     todayStart: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(),
-    isAdmin: S.amAdmin()
+    isAdmin: S.amAdmin(),
+    /* 입퇴사 — 사무대행 사업장(급여 명단 밖)도 입퇴사 신고는 우리 일이라 «전체 명단»에서 찾는다 */
+    /* ⚠ 함수 있나부터 본다 — 검사들은 이 화면의 함수를 «잘라» 돌려서 입퇴사 층이 없을 수 있다 */
+    allCompanies: App.allCompanies, hrBy: (typeof hrModel === 'function') ? hrModel().by : {}
   };
+}
+
+/* ══════ 입퇴사 할 일 — 메일 속 입사·퇴사를 사업장 줄로 (대표 승인 2026-10-03 ㉠) ══════
+   셈은 js/pu-hr-intake.js 한 곳에 있다. 여기는 읽어 오기·그리기·사람 손길 적기뿐이다.
+   ⚠ 화면을 여는 것만으로는 아무것도 안 쓴다 — 할 일은 메일에서 매번 다시 센다.
+     적는 것은 사람이 누른 것(처리 완료·되돌리기·이름/날짜 고침·꼬리표 확정)뿐이다.
+   ⚠ 급여관리에 자동으로 넣지 않는다. 주민번호는 안 뽑는다. 신고를 대신 내지 않는다. */
+const HR = window.PuHrIntake;
+/* 메일 기록은 «최근 90일»만 읽는다 — 시작일부터 다 읽으면 한 해 뒤 수천 줄을 화면마다 받는다.
+   ⚠ 기한이 석 달 넘게 지난 4대보험 신고가 «할 일»로 남아 있을 리는 없다(그 전에 처리됐거나
+     이미 과태료 문제다). 그래서 창 밖으로 밀려나는 것은 받아들인다. */
+const HR_WINDOW_DAYS = 90;
+function loadHr() {
+  if (!HR) return Promise.resolve();
+  const since = Math.max(HR.START_MS, Date.now() - HR_WINDOW_DAYS * 864e5);
+  return Promise.all([
+    db.ref('paydata/maillog').orderByChild('at').startAt(since).once('value').then(s => s.val() || {}),
+    db.ref('paydata/mailkind').once('value').then(s => s.val() || {}),
+    db.ref('paydata/hrtask').once('value').then(s => s.val() || {})
+  ]).then(([log, kinds, state]) => {
+    App.hrLog = log; App.hrKind = kinds; App.hrState = state; App.hrRev++;
+    App.render();
+  }).catch(e => {
+    console.warn('[입퇴사]', e && e.code);
+    if (!App.hrLog) { App.hrLog = {}; App.hrRev++; App.render(); }
+  });
+}
+window.loadHr = loadHr;
+
+let _hrMemo = { rev: -1, tasks: [], by: {} };
+function hrModel() {
+  if (!HR || !App.hrLog) return { tasks: [], by: {}, ready: false };
+  if (_hrMemo.rev !== App.hrRev) {
+    const tasks = HR.tasksOf(App.hrLog, App.hrKind, App.hrState, Date.now());
+    _hrMemo = { rev: App.hrRev, tasks: tasks, by: HR.byCompany(tasks) };
+  }
+  return { tasks: _hrMemo.tasks, by: _hrMemo.by, ready: true };
+}
+
+function hrCompany(coId) {
+  return (App.allCompanies || []).filter(c => c && c.id === coId)[0]
+    || (App.companies || []).filter(c => c && c.id === coId)[0] || null;
+}
+/* 손을 댈 수 있는 사람 — 그 사업장 주·부담당과 총괄관리자. 나머지는 보기만 한다. */
+function hrCan(coId) {
+  if (S.amAdmin()) return true;
+  const c = hrCompany(coId);
+  return !!(c && S.isMyCompany(c, (App.me && App.me.email) || ''));
+}
+function hrWho() { return App.myName || (App.me && App.me.email) || ''; }
+
+/* 할 일 상태 적기 — 거래(transaction)로 «서버 최신 판» 위에 얹는다.
+   ⚠ 찬 자리에서는 cur 가 null 로 먼저 온다 — 그때도 값을 돌려줘야 서버에 묻는다
+     (접으면 묻지도 않고 끝난다). 진짜 값이 있으면 파이어베이스가 그 값으로 한 번 더 부른다.
+   ⚠ committed 를 보고 그린다. 접혔을 때 다시 하기를 걸지 않는다. */
+function hrWrite(t, patch) {
+  const now = Date.now(), who = hrWho();
+  return db.ref('paydata/hrtask/' + t.id).transaction(cur => {
+    const r = cur || { id: t.id, entityType: 'Task', schemaVersion: 1, createdAt: now, createdBy: who, revision: 0,
+      kind: t.kind, companyId: t.companyId, relation: 'raisedBy', sourceKind: 'paydata_maillog', sourceId: t.mailKey };
+    Object.assign(r, patch, { updatedAt: now, updatedBy: who, revision: (Number(r.revision) || 0) + 1 });
+    return r;
+  }).then(res => {
+    if (!res.committed) { alert('저장하지 못했습니다 — 잠시 뒤 다시 눌러 주세요'); return; }
+    App.hrState[t.id] = res.snapshot.val(); App.hrRev++; App.render();
+  }).catch(e => alert('저장하지 못했습니다 — ' + (e.code || e.message)));
+}
+function hrTask(id) { return hrModel().tasks.filter(t => t.id === id)[0] || null; }
+
+function hrDone(id) {
+  const t = hrTask(id); if (!t || !hrCan(t.companyId)) return;
+  hrWrite(t, { doneAt: Date.now(), doneBy: hrWho() });
+}
+function hrUndo(id) {
+  const t = hrTask(id); if (!t || !hrCan(t.companyId)) return;
+  hrWrite(t, { doneAt: null, doneBy: null });
+}
+function hrEditName(id) {
+  const t = hrTask(id); if (!t || !hrCan(t.companyId)) return;
+  const v = prompt('이름 (여럿이면 · 로 띄워 적으세요)', t.name || '');
+  if (v === null) return;
+  hrWrite(t, { name: String(v).trim().slice(0, 60) });
+}
+function hrEditDate(id) {
+  const t = hrTask(id); if (!t || !hrCan(t.companyId)) return;
+  const v = prompt((t.kind === 'out' ? '퇴사일' : '입사일') + ' (예: 2026-10-01) — 지우면 메일 받은 날로 셉니다', t.date || '');
+  if (v === null) return;
+  const s = String(v).trim();
+  if (s && !/^20\d{2}-\d{2}-\d{2}$/.test(s)) { alert('2026-10-01 꼴로 적어 주세요'); return; }
+  hrWrite(t, { date: s || null });
+}
+window.hrDone = hrDone; window.hrUndo = hrUndo; window.hrEditName = hrEditName; window.hrEditDate = hrEditDate;
+
+/* 꼬리표 확정 — 「맞음」은 짐작을 그대로, 「바꾸기」는 고른 것으로.
+   ⚠ 글자('in,out' · '')로 적는다 — 파이어베이스는 빈 배열을 버려 「해당 없음」이 되살아난다. */
+function hrConfirm(key, kinds) {
+  const r = (App.hrLog || {})[key]; if (!r || !hrCan(r.companyId)) return;
+  const now = Date.now(), who = hrWho(), text = HR.kindsText(kinds);
+  db.ref('paydata/mailkind/' + key).transaction(cur => {
+    const o = cur || { id: key, entityType: 'Message', schemaVersion: 1, createdAt: now, createdBy: who, revision: 0,
+      companyId: r.companyId || '', sourceKind: 'paydata_maillog', sourceId: key };
+    Object.assign(o, { kinds: text, updatedAt: now, updatedBy: who, revision: (Number(o.revision) || 0) + 1 });
+    return o;
+  }).then(res => {
+    if (!res.committed) { alert('저장하지 못했습니다 — 잠시 뒤 다시 눌러 주세요'); return; }
+    App.hrKind[key] = res.snapshot.val(); App.hrPick = null; App.hrRev++; App.render();
+  }).catch(e => alert('저장하지 못했습니다 — ' + (e.code || e.message)));
+}
+function hrAccept(key) {
+  const m = HR.finalKinds((App.hrLog || {})[key] || {}, null);
+  hrConfirm(key, m.kinds);
+}
+function hrPickStart(key) {
+  const m = HR.finalKinds((App.hrLog || {})[key] || {}, App.hrKind[key]);
+  App.hrPick = { key: key, kinds: m.kinds.slice() }; App.render();
+}
+function hrPickToggle(k) {
+  const p = App.hrPick; if (!p) return;
+  const i = p.kinds.indexOf(k);
+  if (i >= 0) p.kinds.splice(i, 1); else p.kinds.push(k);
+  App.render();
+}
+function hrPickSave() { const p = App.hrPick; if (p) hrConfirm(p.key, p.kinds); }
+function hrPickCancel() { App.hrPick = null; App.render(); }
+function hrToggleMail(key) { App.hrOpenMail = App.hrOpenMail === key ? '' : key; App.render(); }
+function hrToggleDone() { App.hrShowDone = !App.hrShowDone; App.render(); }
+window.hrAccept = hrAccept; window.hrPickStart = hrPickStart; window.hrPickToggle = hrPickToggle;
+window.hrPickSave = hrPickSave; window.hrPickCancel = hrPickCancel;
+window.hrToggleMail = hrToggleMail; window.hrToggleDone = hrToggleDone;
+
+/* 「D-3」 — 오늘이면 D-day, 지났으면 「3일 지남」 */
+function hrLeftText(left) {
+  if (left === null || left === undefined) return '';
+  if (left < 0) return (-left) + '일 지남';
+  return left === 0 ? 'D-day' : 'D-' + left;
+}
+function hrMd(ymd) { return ymd ? Number(ymd.slice(5, 7)) + '/' + Number(ymd.slice(8, 10)) : ''; }
+
+/* 사업장 줄의 꼬리 — 「입사 1 · 퇴사 2 · D-2」. 기한이 일주일 넘게 남았으면 D 는 안 그린다(줄만 먹는다). */
+function hrPillsHtml(h) {
+  if (!h || !(h.in + h.out)) return '';
+  let s = '';
+  if (h.in) s += '<span class="hrp in" title="입사 — 취득 신고할 사람">입사 ' + h.in + '</span>';
+  if (h.out) s += '<span class="hrp out" title="퇴사 — 상실 신고할 사람">퇴사 ' + h.out + '</span>';
+  if (h.left !== null && h.left <= 7) {
+    s += '<span class="hrp due' + (h.left < 0 ? ' late' : '') + '" title="가장 이른 신고 기한(건강보험 14일)까지">'
+      + esc(hrLeftText(h.left)) + '</span>';
+  }
+  return s;
+}
+
+/* 서랍 맨 위 — 그 사업장의 입퇴사 할 일 + 이번 달 들어온 메일 */
+function hrCardHtml(coId) {
+  if (!HR || !coId) return '';
+  const M = hrModel();
+  if (!M.ready) return '';
+  const can = hrCan(coId);
+  const all = M.tasks.filter(t => t.companyId === coId);
+  const open = all.filter(t => !t.done), done = all.filter(t => t.done);
+  const mon = App.month || thisMonth();
+  const y = Number(String(mon).slice(0, 4)), mo = Number(String(mon).slice(5, 7));
+  const from = new Date(y, mo - 1, 1).getTime(), to = new Date(y, mo, 1).getTime();
+  /* 이번 달 메일 + «아직 안 정한 짐작»은 달과 상관없이 — 9/30 에 온 「그만둔다고 합니다」가
+     10월 화면에서 사라지면 아무도 「맞음」을 안 누른다(시험 화면에서 잡았다 2026-10-03). */
+  const mails = HR.mailsOf(App.hrLog, App.hrKind, coId, 0, 0)
+    .filter(m => (m.at >= from && m.at < to) || (m.guess.length && !m.byHand));
+  if (!all.length && !mails.length) return '';     // 말할 것이 없으면 자리도 안 먹는다
+
+  let h = '';
+  if (all.length) {
+    h += '<div class="card hrcard"><div class="hrhead"><b>📋 입퇴사 할 일</b>'
+      + '<span class="hrsub">처리하면 닫힙니다' + (done.length
+        ? ' · <a href="javascript:void 0" onclick="hrToggleDone()">끝난 것 ' + done.length + (App.hrShowDone ? ' 접기' : ' 보기') + '</a>' : '')
+      + '</span></div>';
+    const rows = open.concat(App.hrShowDone ? done : []);
+    if (!open.length && !App.hrShowDone) h += '<div class="hrnone">남은 할 일이 없습니다.</div>';
+    h += rows.map(t => {
+      const tip = '건강보험 ' + t.due.health + ' 까지(14일 이내) · 고용·연금 ' + t.due.monthly + ' 까지(다음 달 15일)';
+      const dueTxt = t.done
+        ? '<span class="hrdone">✓ ' + esc(hrMd(HR.ymdOf(t.doneAt))) + ' 처리 · ' + esc(t.doneBy) + '</span>'
+        : '<span class="hrdue' + (t.left < 0 ? ' late' : '') + '" title="' + esc(tip) + '">⏰ '
+          + (t.kind === 'out' ? '상실신고 ' : '취득신고 ') + esc(hrMd(t.due.first)) + ' (' + esc(hrLeftText(t.left)) + ')</span>';
+      const nm = t.name
+        ? esc(t.name) + (t.nameGuess ? '<i class="hrg" title="메일에서 뽑은 제안입니다 — 틀리면 고치세요">제안</i>' : '')
+        : '<span class="hrmute">이름 —</span>';
+      const dt = t.date
+        ? (t.kind === 'out' ? '퇴사 ' : '입사 ') + esc(hrMd(t.date)) + (t.dateGuess ? '<i class="hrg">제안</i>' : '')
+        : '<span class="hrmute" title="메일에 날짜가 없어 받은 날로 기한을 셉니다">받은 날 기준</span>';
+      let r = '<div class="hrrow' + (t.done ? ' isdone' : '') + '">'
+        + '<span class="hrp ' + t.kind + '">' + esc(t.label) + '</span>'
+        + '<span class="hrnm"' + (can ? ' onclick="hrEditName(\'' + jsq(t.id) + '\')" title="눌러서 고치기"' : '') + '>' + nm + '</span>'
+        + '<span class="hrdt"' + (can ? ' onclick="hrEditDate(\'' + jsq(t.id) + '\')" title="눌러서 고치기"' : '') + '>' + dt + '</span>'
+        + dueTxt
+        + (t.replies ? '<span class="hrmute" title="같은 건으로 더 온 메일">답장 ' + t.replies + '</span>' : '')
+        + '<span class="hracts"><button class="btn sm" onclick="hrToggleMail(\'' + jsq(t.mailKey) + '\')">메일 보기</button>'
+        + (can ? (t.done
+          ? '<button class="btn sm" onclick="hrUndo(\'' + jsq(t.id) + '\')">되돌리기</button>'
+          : '<button class="btn sm pri" onclick="hrDone(\'' + jsq(t.id) + '\')">처리 완료</button>') : '')
+        + '</span></div>';
+      if (App.hrOpenMail === t.mailKey) r += hrMailPeekHtml(t.mailKey);
+      return r;
+    }).join('');
+    h += '</div>';
+  }
+
+  if (mails.length) {
+    h += '<div class="card hrcard"><div class="hrhead"><b>✉ 이번 달 들어온 메일 · 안 정한 짐작</b>'
+      + '<span class="hrsub">꼬리표: 급여자료 · 입사 · 퇴사 · 확인요청 — 「짐작」은 한 번 눌러 확정</span></div>';
+    h += mails.slice(0, 12).map(m => {
+      const picking = App.hrPick && App.hrPick.key === m.key;
+      let tags = '';
+      if (picking) {
+        tags = HR.KINDS.map(k => '<button class="btn sm hrk' + (App.hrPick.kinds.indexOf(k.key) >= 0 ? ' on' : '')
+          + '" onclick="hrPickToggle(\'' + k.key + '\')">' + esc(k.label) + '</button>').join('')
+          + '<button class="btn sm pri" onclick="hrPickSave()">저장</button>'
+          + '<button class="btn sm" onclick="hrPickCancel()">취소</button>';
+      } else {
+        const sure = m.kinds.filter(k => m.guess.indexOf(k) < 0);
+        tags = sure.map(k => '<span class="hrt ' + k + '">' + esc(HR.LABEL[k]) + '</span>').join('')
+          + (m.guess.length
+            ? '<span class="hrq">🤖 짐작: ' + esc(m.guess.map(k => HR.LABEL[k]).join('+'))
+              + (can ? '<button class="btn sm pri" onclick="hrAccept(\'' + jsq(m.key) + '\')">맞음</button>' : '') + '</span>'
+            : '')
+          + (can ? '<button class="btn sm hrfix" onclick="hrPickStart(\'' + jsq(m.key) + '\')" title="꼬리표 바꾸기">✎</button>' : '');
+      }
+      const r = '<div class="hrmail"><span class="hrwhen">' + esc(fmtWhen(m.at, Date.now())) + '</span>'
+        + '<span class="hrfrom" title="' + esc(m.from) + '">' + esc(m.from.replace(/@.*/, '')) + '</span>'
+        + '<span class="hrsubj" onclick="hrToggleMail(\'' + jsq(m.key) + '\')" title="눌러서 본문 앞부분 보기">' + esc(m.subject || '(제목 없음)')
+        + (m.atts ? ' <span class="hrmute">📎' + m.atts + '</span>' : '') + '</span>'
+        + '<span class="hrtags">' + tags + '</span></div>';
+      return r + (App.hrOpenMail === m.key ? hrMailPeekHtml(m.key) : '');
+    }).join('');
+    if (mails.length > 12) h += '<div class="hrmute" style="padding:6px 2px">… ' + (mails.length - 12) + '통 더 — 달을 바꾸거나 메일함에서 보세요</div>';
+    h += '</div>';
+  }
+  return h;
+}
+
+/* 메일 한 통 펼쳐 보기 — 서버가 남긴 «앞 160자»까지만. 원문은 메일함에 있다. */
+function hrMailPeekHtml(key) {
+  const r = (App.hrLog || {})[key]; if (!r) return '';
+  return '<div class="hrpeek"><b>' + esc(r.subject || '(제목 없음)') + '</b> · ' + esc(r.from || '')
+    + ' · ' + esc(fmtWhen(r.at, Date.now())) + '<div>' + esc(r.preview || '(본문 없음)') + '</div></div>';
+}
+
+/* 메일함 「📋 급여데이터함」 에서 건너오면 그 사업장을 연다 — 목록에서 누른 것과 같은 길로
+   (남의 사업장이면 지금처럼 사유를 묻는다). 모르는 번호면 아무것도 안 한다. */
+function openCoFromUrl() {
+  let id = '';
+  try { id = new URLSearchParams(location.search).get('co') || ''; } catch (_) { return; }
+  if (!id) return;
+  const c = hrCompany(id);
+  if (!c) return;
+  if (S.isMyCompany(c, (App.me && App.me.email) || '')) { sideOpenCompany('', '', c.id, c.name, true); return; }
+  const roster = S.managerRoster(App.allCompanies || [], App.dir, App.owners);
+  let main = null;
+  roster.people.forEach(p => p.companies.forEach(x => { if (x.id === c.id && String(c.managerMain || '') === p.sid) main = p; }));
+  openColCompany(c.id, c.name, false, main ? main.uid : '', main ? main.name : '');
 }
 
 function viewBarHtml() {
@@ -4918,8 +5269,8 @@ function viewBarHtml() {
 
   /* 「내 일」 넷은 모두에게, 「전체」 셋은 관리자에게만 — 계산 층이 이미 갈라
      돌려주므로 여기서는 자리만 나눈다(mine/late/today/shared 다음이 전체다). */
-  const mineViews = m.views.filter(v => ['mine', 'late', 'today', 'shared'].indexOf(v.key) >= 0);
-  const allViews = m.views.filter(v => ['all', 'alllate', 'noman'].indexOf(v.key) >= 0);
+  const mineViews = m.views.filter(v => ['mine', 'late', 'today', 'hr', 'shared'].indexOf(v.key) >= 0);
+  const allViews = m.views.filter(v => ['all', 'alllate', 'allhr', 'noman'].indexOf(v.key) >= 0);
 
   let h = '<div class="ctitle">내 일</div>' + mineViews.map(row).join('');
   if (allViews.length) h += '<div class="ctitle">전체</div>' + allViews.map(row).join('');
@@ -5020,6 +5371,7 @@ function colListHtml() {
          표까지 됨(파랑) · 담김(초록) · 대기(노랑) · 미도착(회색). 뜻은 얹으면 나온다. */
       + (function (s) { return '<span class="dot ' + s.key + '" title="' + esc(s.label) + '"></span>'; })(siteState(r))
       + '<span class="nm">' + esc(r.name) + '</span>'
+      + (typeof hrPillsHtml === 'function' ? hrPillsHtml(r.hr) : '')
       + (m.showOwner && r.owner ? '<span class="own" title="' + esc(r.owner) + '">' + esc(r.owner) + '</span>' : '')
       + '<span class="cnt">' + r.count + '</span>'
       + (r.mine ? '<span class="share" onclick="event.stopPropagation();openShare(\'' + jsq(r.id) + '\',\''
