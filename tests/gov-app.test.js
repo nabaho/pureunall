@@ -413,11 +413,13 @@ test('★★ 이미 받은 줄에도 새 규칙을 댄다 — 사람이 손댄 �
     { id: 'G1', src: '나라장터', no: 'R1-000', nm: 'KDB AI 거버넌스 수립 컨설팅', type: '새 공고' },
     { id: 'G2', src: '나라장터', no: 'R2-000', nm: '2026년 직원 근무평정 대행 용역', type: '새 공고' },
     { id: 'G3', src: '나라장터', no: 'R3-000', nm: '동남권 LNG벙커링 사업 자문 및 컨설팅 용역', type: '관심' },
-    { id: 'G4', src: '알리오', no: '305684', nm: '한전KPS(주)여수사업처 단기노무원 모집', type: '새 공고' }
+    { id: 'G4', src: '알리오', no: '305684', nm: '한전KPS(주)여수사업처 단기노무원 모집', type: '새 공고' },
+    { id: 'G5', src: '나라장터', no: 'R5-000', nm: '고용노동부 중부청 인천고용센터 관용차량 임차', type: '지나감' },
+    { id: 'G6', src: '나라장터', no: 'R6-000', nm: '특허기술 사업화 전략 컨설팅 용역', type: '지원함' }
   ] });
-  assert.equal(r.api.rejudge(), 2);
+  assert.equal(r.api.rejudge(), 3, '「지나감」도 기계가 정한 것이라 새 규칙을 댄다(실측: 관용차 임차가 남아 보였다)');
   const f = JSON.parse(r.store.gov3_feed);
-  assert.deepEqual(f.map((x) => !!x.hidden), [true, false, false, true]);
+  assert.deepEqual(f.map((x) => !!x.hidden), [true, false, false, true, true, false], '지원함은 사람이 정한 것 — 건드리지 않는다');
   assert.equal(f[2].type, '관심', '관심 표시한 것은 그대로');
   assert.ok(f[0].ruleOut, '규칙이 숨긴 것임을 남긴다');
   assert.equal(r.api.rejudge(), 0, '두 번 돌려도 더 바뀌지 않는다');
