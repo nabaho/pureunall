@@ -111,7 +111,7 @@ test('목록 체크·아래 막대·세트 고르기', () => {
 
 test('문서관리가 묶음 압축 함수를 양식 화면에 넘긴다 — 브라우저 안에서만 묶는다', () => {
   const html = fs.readFileSync(path.join(R, 'docs-esign.html'), 'utf8');
-  assert.match(html, /zip: formZip \}\)/, '★ host.zip 이 연결되지 않아 묶음 받기가 늘 실패합니다');
+  assert.match(html, /zip: formZip[,\s}]/,'★ host.zip 이 연결되지 않아 묶음 받기가 늘 실패합니다');
   const fn = cutFn(stripJs(html), 'async function formZip(');
   assert.match(fn, /_esignLoadJsZip\(\)/);
   assert.ok(!/fetch\(|db\.ref|\.set\(|\.push\(/.test(fn), '채운 파일을 어디로도 보내면 안 됩니다');

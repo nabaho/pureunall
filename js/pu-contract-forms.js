@@ -567,6 +567,10 @@
     + '.pcf-muted{color:#94a3b8}'
     /* 채워서 받기 창 */
     + '.pcf-fcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px}'
+    + '.pcf-prop{border:1px solid #bfdbfe;background:#f8fbff;border-radius:8px;padding:8px 10px;margin-bottom:10px}'
+    + '.pcf-seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden}'
+    + '.pcf-seg button{border:0;background:#fff;padding:5px 10px;font:inherit;font-size:12.5px;cursor:pointer}'
+    + '.pcf-seg button.on{background:#1e293b;color:#fff}'
     + '.pcf-fcols input[type=search],.pcf-frow input{width:100%;padding:6px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:12.5px;font-family:inherit}'
     + '.pcf-fh{font-size:12px;color:#64748b;font-weight:700;margin:10px 0 4px}'
     + '.pcf-fl{display:flex;flex-direction:column;gap:2px;margin-top:4px;max-height:180px;overflow:auto}'
@@ -830,7 +834,10 @@
       var srcs = hwpSources(fm);
       return { fm: fm, srcs: srcs, src: srcs[0] || null, hwp: null, text: CF.markersIn(fm.body), err: '' };
     });
-    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0 };
+    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0,
+      pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' } };
+    try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
+    var propBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var bg = el('div', { 'class': 'pcf-mbg' });
     function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
     function onKey(e) { if (e.key === 'Escape') close(); }
@@ -850,6 +857,12 @@
     function values() {
       var co = st.co ? Object.assign({}, st.coX, st.co) : {};
       var V = CF.valuesFrom({ co: co, contact: st.contact, worker: st.worker });
+      if (st.pv.on) {
+        var me = host.me ? host.me() : null;
+        var P = CF.proposalValues(V, { orgType: st.pv.orgType, amount: st.pv.amount, vat: st.pv.vat,
+          staffName: me && me.name, staffTel: st.pv.tel });
+        Object.keys(P).forEach(function (k) { V[k] = P[k]; });
+      }
       Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });
       return V;
     }
@@ -861,9 +874,42 @@
     function allMarkers() {
       return bundleMarkers(items.map(function (it) { return { name: it.fm.name || '양식', markers: markersOf(it) }; }));
     }
+    /* 제안서 칸 — 받는 곳 종류·금액·부가세·연락처 (설계 2026-09-29 §5). valBox 와 따로 그려야
+       금액을 칠 때 커서가 안 사라진다(drawVals 는 valBox 만 다시 그린다). */
+    function seg(opts, cur, fn) {
+      return el('span', { 'class': 'pcf-seg', role: 'group' }, opts.map(function (o) {
+        return el('button', { type: 'button', 'class': cur === o.v ? 'on' : '', 'aria-pressed': cur === o.v ? 'true' : 'false', text: o.t,
+          onclick: function () { fn(o.v); drawProp(); drawVals(); } });
+      }));
+    }
+    function drawProp() {
+      propBox.innerHTML = '';
+      propBox.hidden = !st.pv.on;
+      if (!st.pv.on) return;
+      var amt = el('input', { type: 'text', inputmode: 'numeric', placeholder: '예: 5,000,000', 'aria-label': '견적 금액' });
+      amt.value = st.pv.amount;
+      amt.addEventListener('input', function () { st.pv.amount = amt.value; drawVals(); });
+      var tel = el('input', { type: 'text', placeholder: '041-556-0035', 'aria-label': '노무사 연락처' });
+      tel.value = st.pv.tel;
+      tel.addEventListener('input', function () {
+        st.pv.tel = tel.value; drawVals();
+        try { w.localStorage.setItem('pcf-staff-tel', tel.value); } catch (e) {}
+      });
+      propBox.appendChild(el('div', { 'class': 'pcf-fh', text: '제안서 — 받는 곳 종류와 견적' }));
+      propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '받는 곳' }),
+        seg([{ v: 'co', t: '기업' }, { v: 'org', t: '기관·지자체' }], st.pv.orgType, function (v) { st.pv.orgType = v; })]));
+      propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '견적 금액' }), amt]));
+      propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '부가세' }),
+        seg([{ v: 'incl', t: '부가세 포함' }, { v: 'excl', t: '별도(10%)' }], st.pv.vat, function (v) { st.pv.vat = v; })]));
+      propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '노무사 연락처' }), tel]));
+      propBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '⚠ 원본의 「비용 산출 내역」 표와 금액이 다르면, 받은 뒤 한글에서 고치거나 빼세요.' }));
+    }
     function drawVals() {
       valBox.innerHTML = '';
-      var V = values(), ks = allMarkers();
+      var ks = allMarkers();
+      var wantProp = ks.some(function (x) { return CF.PROPOSAL_KEYS.indexOf(x.key) >= 0; });
+      if (wantProp !== st.pv.on) { st.pv.on = wantProp; drawProp(); }
+      var V = values();
       if (!ks.length) { valBox.appendChild(el('div', { 'class': 'pcf-muted', text: one ? '이 양식에는 채울 자리가 없습니다' : '이 양식들에는 채울 자리가 없습니다' })); return; }
       var blank = ks.filter(function (x) { return !V[x.key]; }).length;
       valBox.appendChild(el('div', { 'class': 'pcf-fh', text: '채울 자리 ' + ks.length + '곳' + (one ? '' : ' (양식 ' + items.length + '개 합쳐서)') + (blank ? ' · 빈 칸 ' + blank + '곳' : '') + ' — 고칠 수 있습니다' }));
@@ -1115,7 +1161,7 @@
             el('div', { 'class': 'pcf-fh', text: '② 담당자 — 기업정보함에서 찾아오기' }), ctQ, ctBox,
             el('div', { 'class': 'pcf-fh', text: '③ 근로자 본인 — 명함에서 찾기 또는 직접 적기' }), wkQ, wkList
           ]),
-          valBox
+          el('div', null, [propBox, valBox])
         ]),
         note, prevBox
       ]),
