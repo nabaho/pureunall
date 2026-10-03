@@ -77,7 +77,7 @@ test('★★ 「교육」은 낱말에 없다', () => {
   // 「평생교육진흥원 직원 채용」 오탐이었다 — 되살리지 말 것.
   const G = require('../js/gov-g2b.js');
   assert.ok(G.KEYWORDS_DEFAULT.indexOf('교육') < 0);
-  assert.deepEqual(G.KEYWORDS_DEFAULT, ['노무', '인사', '고용', '임금', '컨설팅', '일터혁신', '노사']);
+  assert.ok(G.KEYWORDS_DEFAULT.indexOf('위험성평가') >= 0, '대표 결정 2026-10-03 「위험성평가 넣는다」');
 });
 
 test('★ 마감이 지나도 관심 표시한 것은 건드리지 않는다', () => {
@@ -134,7 +134,7 @@ function runApp(seed) {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');   // 부팅은 빼고 함수만 싣는다
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
-    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,pullAll,PAGE_MAX,'
+    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store };
 }
@@ -400,4 +400,23 @@ test('★ 뚜껑은 하루 제한 안에 있다', () => {
   const r = runApp({ feed: [] });
   assert.ok(r.api.PAGE_MAX.g2b * 1 + r.api.PAGE_MAX.alio <= 50, '하루 한 번에 50회를 넘게 부르면 안 됩니다');
   assert.ok(r.api.PAGE_MAX.g2b >= 4 && r.api.PAGE_MAX.alio >= 6, '실측 7일치(3,077·525)를 덮어야 합니다');
+});
+
+test('★★ 이미 받은 줄에도 새 규칙을 댄다 — 사람이 손댄 줄은 건드리지 않는다', () => {
+  const r = runApp({ feed: [
+    { id: 'G1', src: '나라장터', no: 'R1-000', nm: 'KDB AI 거버넌스 수립 컨설팅', type: '새 공고' },
+    { id: 'G2', src: '나라장터', no: 'R2-000', nm: '2026년 직원 근무평정 대행 용역', type: '새 공고' },
+    { id: 'G3', src: '나라장터', no: 'R3-000', nm: '동남권 LNG벙커링 사업 자문 및 컨설팅 용역', type: '관심' },
+    { id: 'G4', src: '알리오', no: '305684', nm: '한전KPS(주)여수사업처 단기노무원 모집', type: '새 공고' }
+  ] });
+  assert.equal(r.api.rejudge(), 2);
+  const f = JSON.parse(r.store.gov3_feed);
+  assert.deepEqual(f.map((x) => !!x.hidden), [true, false, false, true]);
+  assert.equal(f[2].type, '관심', '관심 표시한 것은 그대로');
+  assert.ok(f[0].ruleOut, '규칙이 숨긴 것임을 남긴다');
+  assert.equal(r.api.rejudge(), 0, '두 번 돌려도 더 바뀌지 않는다');
+});
+
+test('★ 로그인 뒤 불러온 다음에 규칙을 댄다', () => {
+  assert.ok(src.indexOf('await cloudPull(); srcBackfill(); rejudge();') >= 0);
 });

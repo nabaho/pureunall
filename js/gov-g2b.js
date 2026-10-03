@@ -21,7 +21,29 @@
        «전부» 「평생교육진흥원 직원 채용」·「교육재단 계약직」 오탐이었다 —
        노무 관련은 한 건도 없었다. 어느 출처에 붙여도 같은 일이 난다.
      늘리기는 쉽지만 넓히면 잡음이 수백 건이다. 좁게 시작해 늘린다. */
-  var KEYWORDS_DEFAULT = ['노무', '인사', '고용', '임금', '컨설팅', '일터혁신', '노사'];
+  /* 찾는 말 — 대표 결정 2026-10-03 「제안대로 바꾼다」·「위험성평가 넣는다」.
+     ⚠ 「교육」은 넣지 않는다(2026-09-06 대표 지시 — 평생교육진흥원 직원채용 오탐).
+     뒤 셋(인사·고용·컨설팅)은 «약한 말»이다 — WEAK 참조. */
+  var KEYWORDS_DEFAULT = ['노무', '노사', '임금', '일터혁신', '조직진단', '직무분석', '근무평정',
+                          '평가체계', '취업규칙', '직장내괴롭힘', '위험성평가', '인사', '고용', '컨설팅'];
+
+  /* ── 걸러내기 규칙 (대표 결정 2026-10-03, 실측 7일치 3,602건) ──
+     옛 방식(낱말이 «하나라도» 있으면 걸림)은 53건 중 42건이 잡음이었다 —
+     「컨설팅」이 LNG·AI·특허·마케팅까지, 「고용」이 고용노동부 «관용차 임차»까지 걸렸다.
+     새 방식은 9건이고 9건 모두 쓸 만했다(조직진단·근무평정 대행처럼 놓치던 것이 들어왔다).
+     ① 약한 말(WEAK)은 «업무 분야 말(FIELD)»이 함께 있을 때만 걸린다.
+     ② 기관 이름(ORG)에 든 낱말은 지우고 본다 — 「한국고용정보원 회계감사」는 고용 일이 아니다.
+     ③ 빼는 말(DROP)이 있으면 걸지 않는다.
+     ⚠ 세 목록은 «실측한 것만» 더한다. 짐작으로 늘리면 놓치는 공고가 생긴다. */
+  var WEAK = ['인사', '고용', '컨설팅'];
+  var FIELD = ['인사', '노무', '노사', '조직', '직무', '근무', '보상', '임금', '안전보건', '위험성', '고객만족', '제도'];
+  var DROP = ['단기노무원', '관용차', '차량', '임차', '회계감사', '유지관리', '홍보', '시스템', '플랫폼',
+              '청년인턴', '공무직', '시설정비', '파견대행', '해외연수'];
+  var ORG = ['고용노동부', '고용노동청', '고용센터', '한국고용정보원', '장애인고용공단', '인사혁신처',
+             '보훈특별고용', '노사발전재단'];
+  /* 알리오는 «직원 채용» 창구다 — 실측 525건 거의 전부. 대표 결정 「위원·고문 위촉만 본다」. */
+  var ALIO_NEED = /위원|고문|자문/;
+  var ALIO_NOT = /채용|직원|위촉직|위촉연구|연구위원|연구직|인턴|기간제|근로자|연수연구/;
 
   /* ── 인증키 함정 ──
      공공데이터포털은 열쇠를 «두 벌» 준다: Encoding(%2B…) 과 Decoding(+…).
@@ -170,13 +192,30 @@
     return '';
   }
 
+  /* 공고 하나를 거를지 정한다 — merge 가 이것만 쓴다. 걸리면 걸린 낱말 목록, 아니면 []. */
+  function judge(row, kws) {
+    row = row || {};
+    var t = s(row.nm);
+    if (row.src === '알리오') {
+      if (!ALIO_NEED.test(t) || ALIO_NOT.test(t)) return [];
+      return [t.match(ALIO_NEED)[0]];
+    }
+    ORG.forEach(function (o) { t = t.split(o).join(' '); });
+    if (DROP.some(function (d) { return t.indexOf(d) >= 0; })) return [];
+    var hits = matched({ nm: t }, kws);
+    if (!hits.length) return [];
+    if (hits.some(function (k) { return WEAK.indexOf(k) < 0; })) return hits;
+    var field = FIELD.filter(function (f) { return hits.indexOf(f) < 0; });
+    return matched({ nm: t }, field).length ? hits : [];
+  }
+
   function merge(existing, incoming, kws, today) {
     var have = {};
     (existing || []).forEach(function (r) { if (r && r.no) have[r.no] = 1; });
     var adds = [], skipped = 0, unmatched = 0;
     (incoming || []).forEach(function (r) {
       if (!r || !r.no) return;
-      var hit = matched(r, kws);
+      var hit = judge(r, kws);
       if (!hit.length) { unmatched++; return; }
       if (have[r.no]) { skipped++; return; }
       have[r.no] = 1;
@@ -197,7 +236,7 @@
 
   var api = { BASE: BASE, KEYWORDS_DEFAULT: KEYWORDS_DEFAULT, encKey: encKey,
               buildUrl: buildUrl, parse: parse, matched: matched, dday: dday, merge: merge,
-              guessSrc: guessSrc,
+              guessSrc: guessSrc, judge: judge,
               toggleKw: toggleKw };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovG2b = api;
