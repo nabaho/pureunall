@@ -112,7 +112,8 @@
   }
 
   // HTML 배열 → 각 1페이지 PDF (pu-erp buildPayslipPdfBase64 패턴: 화면 밖 렌더 → html2canvas → jsPDF)
-  async function htmlPagesToPdf(htmlArray, fileName) {
+  /* opts.bytes — 내려받지 않고 바이트(Uint8Array)로 돌려준다(묶음 .zip 에 넣을 때, 2026-10-03) */
+  async function htmlPagesToPdf(htmlArray, fileName, opts) {
     if (!IS_BROWSER) throw new Error('브라우저 전용');
     var pdf = new jspdf.jsPDF({ unit: 'pt', format: 'a4' }); // 595 x 842pt
     for (var i = 0; i < htmlArray.length; i++) {
@@ -126,11 +127,12 @@
       if (i > 0) pdf.addPage();
       pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', (595 - imgW) / 2, 0, imgW, imgH);
     }
+    if (opts && opts.bytes) return new Uint8Array(pdf.output('arraybuffer'));
     pdf.save(fileName);
   }
 
   // 진정인 연명부 XLSX
-  function downloadRosterXlsx(persons, caseMeta) {
+  function downloadRosterXlsx(persons, caseMeta, opts) {
     var rows = persons.map(function (p, i) {
       return { '순번': i + 1, '성명': p.name, '주민등록번호': p.idNo, '연락처': p.phone,
         '주소': p.addr, '입사일': p.joinDate || '', '퇴사일': p.leaveDate || '', '입금계좌': p.bank };
@@ -139,11 +141,12 @@
     ws['!cols'] = [{wch:5},{wch:10},{wch:16},{wch:15},{wch:40},{wch:11},{wch:11},{wch:24}];
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '진정인 연명부');
+    if (opts && opts.bytes) return new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
     XLSX.writeFile(wb, ((caseMeta && caseMeta.title) || '사건') + '_진정인연명부.xlsx');
   }
 
   // 체불/체당금 정리 XLSX — 기존 소액체당금 정리 엑셀 열 구조(개인정보 + 월별 체불 + 퇴직금 + 합계)
-  function downloadArrearsXlsx(persons, arrearsMap, caseMeta) {
+  function downloadArrearsXlsx(persons, arrearsMap, caseMeta, opts) {
     var rows = persons.map(function (p, i) {
       var a = (arrearsMap && arrearsMap[p._subId]) || {};
       var m1 = +a.month1 || 0, m2 = +a.month2 || 0, m3 = +a.month3 || 0, sev = +a.severance || 0;
@@ -155,14 +158,56 @@
     var ws = XLSX.utils.json_to_sheet(rows);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '체불임금정리');
+    if (opts && opts.bytes) return new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
     XLSX.writeFile(wb, ((caseMeta && caseMeta.title) || '사건') + '_체불임금정리.xlsx');
+  }
+
+  /* ── 진행판(3-B)·내는 모양(3-C) 도우미 (서식 묶음 설계 2026-09-28 상황 3) ── 순수 함수 */
+  function arrearsTotal(a) {
+    a = a || {};
+    return (+a.month1 || 0) + (+a.month2 || 0) + (+a.month3 || 0) + (+a.severance || 0);
+  }
+  /* 사람마다 «빠진 것» — 근로자가 안 적어도 되는 칸(입사일·퇴사일)과 노무사가 적는 체불내역. 0원도 «빠짐» */
+  function personGaps(p, a) {
+    p = p || {};
+    var out = [];
+    if (!String(p.addr || '').trim()) out.push('주소');
+    if (!String(p.bank || '').trim()) out.push('계좌');
+    if (!String(p.joinDate || '').trim()) out.push('입사일');
+    if (!String(p.leaveDate || '').trim()) out.push('퇴사일');
+    if (!arrearsTotal(a)) out.push('체불내역');
+    return out;
+  }
+  function progressSummary(people, arrearsMap) {
+    var s = { total: 0, confirmed: 0, hold: 0, pending: 0, error: 0, noArrears: 0, noLeave: 0, ready: 0 };
+    (people || []).forEach(function (p) {
+      s.total++;
+      var st = p._reviewState || 'pending';
+      if (s[st] != null) s[st]++;
+      if (st === 'error') return;
+      var g = personGaps(p, (arrearsMap || {})[p._subId]);
+      if (g.indexOf('체불내역') >= 0) s.noArrears++;
+      if (g.indexOf('퇴사일') >= 0) s.noLeave++;
+      if (st === 'confirmed' && !g.length) s.ready++;
+    });
+    return s;
+  }
+  /* 사람별 폴더 이름 — 「01_홍길동」. 같은 이름은 뒤에 (2) — 서로 덮어쓰지 않게 */
+  function folderNames(people) {
+    var seen = {};
+    return (people || []).map(function (p, i) {
+      var n = String((p && p.name) || '').replace(/[\\/:*?"<>|]/g, '_').trim() || '사람';
+      seen[n] = (seen[n] || 0) + 1;
+      return ('0' + (i + 1)).slice(-2) + '_' + n + (seen[n] > 1 ? '(' + seen[n] + ')' : '');
+    });
   }
 
   var api = {
     fmtIdNo: fmtIdNo, validateIdNo: validateIdNo, maskIdNo: maskIdNo,
     fillVars: fillVars, ESIGN_FORMS: ESIGN_FORMS, esc: esc,
     buildDelegationHtml: buildDelegationHtml, buildConsentHtml: buildConsentHtml,
-    htmlPagesToPdf: htmlPagesToPdf, downloadRosterXlsx: downloadRosterXlsx, downloadArrearsXlsx: downloadArrearsXlsx
+    htmlPagesToPdf: htmlPagesToPdf, downloadRosterXlsx: downloadRosterXlsx, downloadArrearsXlsx: downloadArrearsXlsx,
+    arrearsTotal: arrearsTotal, personGaps: personGaps, progressSummary: progressSummary, folderNames: folderNames
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.EsignDocs = api;
