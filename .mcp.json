@@ -7,14 +7,53 @@
     "korean-law": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "korean-law-mcp"],
-      "env": { "LAW_OC": "${LAW_OC:-}" }
+      "args": [
+        "-y",
+        "korean-law-mcp"
+      ],
+      "env": {
+        "LAW_OC": "${LAW_OC:-}"
+      }
     },
     "kordoc": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "kordoc@4.12.0", "mcp"],
-      "env": { "KORDOC_OFFLINE": "1", "KORDOC_ROOT": "${KORDOC_ROOT:-}" }
+      "args": [
+        "-y",
+        "kordoc@4.12.0",
+        "mcp"
+      ],
+      "env": {
+        "KORDOC_OFFLINE": "1",
+        "KORDOC_ROOT": "${KORDOC_ROOT:-}"
+      }
+    },
+    "korean-stats": {
+      "type": "http",
+      "url": "https://mcp.gomdori.app/stats"
+    },
+    "archhub": {
+      "type": "http",
+      "url": "https://mcp.gomdori.app/archhub"
+    },
+    "korean-patent": {
+      "type": "http",
+      "url": "https://mcp.gomdori.app/patent"
+    },
+    "schoolinfo": {
+      "type": "http",
+      "url": "https://mcp.gomdori.app/school"
+    },
+    "korean-dart": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "korean-dart-mcp@0.10.1"
+      ],
+      "env": {
+        "DART_API_KEY": "${DART_API_KEY:-}"
+      }
     }
   }
 }
