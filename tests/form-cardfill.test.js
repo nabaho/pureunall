@@ -283,3 +283,37 @@ test('ⓔ 견적 — 포함이면 합계=금액, 별도면 ×1.1 반올림', () 
 test('ⓔ PROPOSAL_KEYS 는 9개 자리', () => {
   assert.deepStrictEqual(CF.PROPOSAL_KEYS, ['수신자', '참조', '호칭', '송부일자', '담당노무사', '노무사연락처', '견적금액', '부가세', '비용합계']);
 });
+
+/* 2026-10-03 기금 제안서 PR3 — 메일 기본값·보낸 기록 (설계 2026-09-29 §7) */
+test('ⓕ 메일 기본값 — 담당자·대표 메일, 제목·본문 틀', () => {
+  const V = Object.assign(CF.valuesFrom({ co: { c: '가나상사(주)', e: 'ceo@example.com' }, contact: { n: '박담당', ti: '과장', d: '총무팀', e: 'park@example.com' } }),
+    { 수신자: '가나상사(주)', 참조: '총무팀 박담당 과장님', 호칭: '귀사', 담당노무사: '홍길동', 노무사연락처: '041-556-0035' });
+  const m = CF.mailDefaults(V, '공동근로복지기금 제안서 및 견적서');
+  assert.deepStrictEqual(m.to.map(x => x.v), ['park@example.com', 'ceo@example.com']);
+  assert.match(m.to[0].label, /담당자 메일 · 박담당/);
+  assert.strictEqual(m.subject, '[푸른노무법인] 공동근로복지기금 제안서 및 견적서 — 가나상사(주)');
+  assert.match(m.body, /^총무팀 박담당 과장님, 안녕하십니까\./);
+  assert.match(m.body, /푸른노무법인 홍길동 노무사입니다/);
+  assert.match(m.body, /귀사의 공동근로복지기금 설립과 관련하여/);
+  assert.match(m.body, /홍길동 드림 · 041-556-0035$/);
+});
+test('ⓕ 메일 기본값 — 참조가 「-」면 수신자, 같은 메일은 한 번, 회사 없으면 제목 꼬리 없음', () => {
+  const V = { 수신자: '가나도청 노동정책과 홍길동 주무관님', 참조: '-', 담당자이메일: 'a@example.com', 대표이메일: 'a@example.com' };
+  const m = CF.mailDefaults(V, '제안서');
+  assert.deepStrictEqual(m.to.map(x => x.v), ['a@example.com']);
+  assert.strictEqual(m.subject, '[푸른노무법인] 제안서');
+  assert.match(m.body, /^가나도청 노동정책과 홍길동 주무관님, 안녕하십니까\./);
+});
+test('ⓕ 보낸 기록 열쇠 — 사업자번호 숫자와 이름 열쇠 둘 다(업무관리가 둘 다 읽는다)', () => {
+  assert.deepStrictEqual(CF.sentKeys({ bz: '123-45-67890', c: '가나상사(주)' }, { 회사명: '가나상사(주)' }), ['1234567890', 'n' + CF.coNorm('가나상사(주)')]);
+  assert.deepStrictEqual(CF.sentKeys({ c: '가나상사' }, {}), ['n' + CF.coNorm('가나상사')]);
+  assert.deepStrictEqual(CF.sentKeys({}, {}), []);
+});
+test('ⓕ 보낸 기록 한 줄 — 받는 주소는 남기지 않는다', () => {
+  const r = CF.sentRecord({ at: 5, by: 'p001@pureun.kr', kind: '제안서', names: ['a.hwp', '', 'a.pdf'], who: '박담당', to: 'park@example.com', cc: 'x@example.com' });
+  assert.deepStrictEqual(r, { at: 5, by: 'p001@pureun.kr', kind: '제안서', names: ['a.hwp', 'a.pdf'], card: '', who: '박담당' });
+  assert.ok(JSON.stringify(r).indexOf('@example.com') < 0);
+  assert.strictEqual(CF.SENT_KIND_OF('제안서·견적서'), '제안서');
+  assert.strictEqual(CF.SENT_KIND_OF('계약서'), '계약서');
+  assert.strictEqual(CF.SENT_KIND_OF(''), '계약서');
+});
