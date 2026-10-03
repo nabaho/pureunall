@@ -200,7 +200,8 @@ test('★★ 남이 적은 건 제목은 걸러 넣는다', () => {
 });
 
 test('★★ 목록 줄과 읽는 화면 «둘 다»에 붙는다 · 한 줄(넘치면 …)', () => {
-  assert.match(app, /\$\{mbWhoTag\(v\)\}\s*\$\{mbWorkTag\(v\)\}/, '★★ 목록 줄에 딱지가 없습니다');
+  assert.match(app, /function mbTagParts\([\s\S]{0,600}mbWhoTag\(v\),\s*mbWorkTag\(v\)/, '★★ 목록 줄에 딱지가 없습니다');
+  assert.match(app, /\$\{mbTagColsHtml\(tagCols, i\)\}/);
   assert.match(app, /\$\{mbWorkTag\(v, true\)\}/, '★★ 읽는 화면에 딱지가 없습니다');
   const css = (app.match(/\.dm-work\{[^}]*\}/) || [''])[0];
   assert.match(css, /white-space:nowrap/);

@@ -795,6 +795,13 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .mn-find input{font-family:inherit;font-size:12.5px;border:1px solid #cbd5e1;border-radius:4px;padding:4px 8px;width:200px}
 .mn-find .em{font-size:12px;color:#94a3b8}
 .mn-foot{font-size:12.5px;color:#64748b;margin-top:14px}
+/* 🔎 담당 점검 (2026-10-03) */
+.mg-old{flex:none;text-decoration:line-through;color:#94a3b8}
+.mg-ar{flex:none;color:#64748b}
+.mg-new{flex:none;color:#1e40af;font-weight:700}
+.mg-new.none,.mg-ret{flex:none;color:#991b1b;font-weight:700}
+.mg-cnt{flex:none;color:#64748b;font-size:12px}
+.dm-f .nu.mgwarn{color:#854d0e;font-weight:700}
 .mn-foot a{color:#2563eb}
 /* 📥 연락처 정리 (대표 승인 목업 v2 2026-10-03) — 한 칸 한 줄 · 맨 앞 ☐·# */
 .cn{padding:14px 18px 40px}
@@ -1222,6 +1229,19 @@ table.mstab2 tr:last-child td{border-bottom:none}
    ⚠ 왼쪽 정렬이다. 오른쪽 정렬로 두면 이름 길이에 따라 시작점이 또 흔들린다. */
 .dm-row .box{flex:none;width:124px;font-size:12px;color:#94a3b8;padding-right:12px;
   text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 오른쪽 딱지 열 — 갈래마다 너비를 정한다(대표 승인 목업 2026-10-03). 넘치면 「…」 */
+.dm-c{flex:none;display:flex;align-items:center;gap:4px;overflow:hidden;white-space:nowrap}
+.dm-c > *{margin-right:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.dm-c-who{width:136px}
+.dm-c-work{width:160px}
+.dm-c-hrk{width:96px}
+.dm-c-hrgo{width:84px}
+.dm-c-inq{width:96px}
+.dm-c-open{width:110px}
+.dm-c-seen{width:110px}
+.dm-c-from{width:140px}
+.dm-c-box{width:124px}
+.dm-c + .dm-c{margin-left:6px}
 .dm-row .at{flex:none;width:112px;text-align:right;color:#64748b;font-size:13.5px;
   padding-right:4px;white-space:nowrap}
 /* 안 읽은 것은 굵게 — 다음메일과 같다 */
@@ -7897,6 +7917,8 @@ function renderMailPage(){
                 : state.mailSent==='who' ? whoPageHtml()
                 /* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) */
                 : state.mailSent==='mnew' ? cntHtml()
+                /* 🔎 담당 점검 (대표 승인 목업 2026-10-03) */
+                : state.mailSent==='mgr' ? mgrHtml()
                 : state.mailSent==='set' ? mailSetHtml()
                 : state.mailSent==='inbox' ? inboxBoxHtml()
                 /* 사업장별로 오간 것 — 받은·보낸을 한 줄기로 (2026-08-30) */
@@ -20834,6 +20856,14 @@ function mailSideHtml(){
       <span class="nm">메일에서 온 연락처</span>
       ${mnN ? `<span class="nu">${mnN}</span>` : ''}
       <span class="fmenu ghost">⋮</span></div>`;
+    /* 🔎 담당 점검 — 이알피 담당이 바뀌었거나 빈 곳 (2026-10-03). 수가 있으면 호박색 */
+    const mgN = mgrCount();
+    h += `<div class="dm-f sub ${state.mailSent==='mgr'?'on':''}" onclick="openMgrPage()"
+      title="이알피 담당이 바뀌었거나 비었거나 퇴사자인 곳, 손으로 정한 담당이 이알피와 다른 곳">
+      <span class="ic">🔎</span><span class="grip ghost">⋮⋮</span>
+      <span class="nm">담당 점검</span>
+      ${mgN ? `<span class="nu mgwarn">${mgN}</span>` : ''}
+      <span class="fmenu ghost">⋮</span></div>`;
   }
   if(openMine && dash === 'topic'){
     /* ── 숨겨 둔 칸 — 되돌릴 자리 ──
@@ -22660,6 +22690,41 @@ function mbHrCoId(em){
   const rec = mbCoRec(mbCoValName(v));
   return rec && rec.id ? String(rec.id) : '';
 }
+/* ══ 목록 오른쪽 딱지 열 (대표 지시 2026-10-03 「캡쳐2 부분 열을 정리해달라」 · 목업 승인) ══
+   ★ 예전에는 딱지를 길이대로 이어 붙여 줄마다 자리가 들쭉날쭉했다. 갈래마다 «열»을 정해
+     같은 갈래는 같은 세로줄에 선다. 그 쪽(100통)에 한 번도 안 나오는 갈래는 자리도 안 잡는다 —
+     빈 열이 줄마다 자리만 먹으면 제목 칸이 쓸데없이 좁아진다.
+   ⚠ 순서·이름은 여기 한 곳. 너비는 CSS(.dm-c-○○) 한 곳.
+   ⚠ 급여데이터함 딱지(mbHrTag)는 «갈래»와 «📋 데이터함»을 함께 내놓는다 — 두 열로 가른다.
+     그 함수는 다른 일(입퇴사 할 일)의 것이라 손대지 않고, 내놓은 것을 잘라 쓴다. */
+const MB_TAG_SLOTS = ['who', 'work', 'hrk', 'hrgo', 'inq', 'open', 'seen', 'from', 'box'];
+function mbTagParts(v){
+  const hr = (typeof mbHrTag === 'function') ? String(mbHrTag(v) || '') : '';
+  const cut = hr.indexOf('<span class="dm-hr go"');
+  return [
+    mbWhoTag(v),
+    mbWorkTag(v),
+    cut < 0 ? hr : hr.slice(0, cut),
+    cut < 0 ? '' : hr.slice(cut),
+    (typeof mnewInqTag === 'function') ? mnewInqTag(v) : '',
+    mbOpenTag(v),
+    mbSeenTag(v),
+    mbFromTag(v),
+    (mbNow()==='*all' || mbNow()==='*tome') ? `<span class="box">${esc(v._box||'')}</span>` : ''
+  ].map(x=>String(x || ''));
+}
+/* 이 쪽의 줄마다 딱지를 한 번 뽑고, 어느 열이 «쓰이는지» 센다 */
+function mbTagCols(rows){
+  const parts = (rows || []).map(mbTagParts);
+  const used = MB_TAG_SLOTS.map((_, j)=>parts.some(p=>p[j].trim() !== ''));
+  return { parts:parts, used:used };
+}
+/* 줄 하나의 열들 — 쓰이는 열은 비어 있어도 자리를 지킨다(그래야 세로줄이 맞는다) */
+function mbTagColsHtml(t, i){
+  const p = (t && t.parts && t.parts[i]) || [];
+  return MB_TAG_SLOTS.map((k, j)=> (t && t.used[j])
+    ? `<span class="dm-c dm-c-${k}">${p[j] || ''}</span>` : '').join('');
+}
 function mbHrTag(v){
   /* ⚠ window 를 직접 짚지 않는다 — 검사 몇은 window 없는 상자에서 이 목록을 그린다 */
   const H = (typeof PuHrIntake !== 'undefined') ? PuHrIntake : null;
@@ -22845,6 +22910,8 @@ function mbListHtml(){
   const pre = mbPreviewOn();   /* 한 번만 묻는다 — 줄마다 물으면 만 번이다 */
   /* 🚫 걸린 줄은 「보기」를 눌렀을 때만 목록에 섞여 있다 — 그때 «왜 걸렸는지»를 함께 그린다 */
   const spamOpen = !!state.mbSpamShow && mbSpamOn();
+  /* ⚡ 오른쪽 딱지 열 — 갈래마다 자리를 정해 세로로 가지런히 (대표 승인 목업 2026-10-03) */
+  const tagCols = mbTagCols(rows);
   const body = rows.length ? rows.map((v,i)=>{
     const why = spamOpen ? mbSpamWhy(v) : '';
     return `
@@ -22887,15 +22954,8 @@ function mbListHtml(){
       ${why ? `<span class="dm-why" title="이 두 가지는 실제 메일 6,334통에 대 보았고 멀쩡한 것은 하나도 안 걸렸습니다">${esc(why)}</span>
         <button class="dm-notspam" onclick="event.stopPropagation();mbNotSpam('${esc(String(v.e||''))}')"
           title="이 주소는 다시는 안 걸립니다 — 전 직원에게 함께 적용됩니다">스팸 아님</button>` : ''}
-      ${mbWhoTag(v)}
-      ${mbWorkTag(v)}
-      ${/* 검사들은 이 줄 그리개만 «잘라» 돌린다 — 함수가 없으면 건너뛴다 */''}
-      ${typeof mbHrTag === 'function' ? mbHrTag(v) : ''}
-      ${typeof mnewInqTag === 'function' ? mnewInqTag(v) : ''}
-      ${mbOpenTag(v)}
-      ${mbSeenTag(v)}
-      ${mbFromTag(v)}
-      ${(mbNow()==='*all'||mbNow()==='*tome')?`<span class="box">${esc(v._box||'')}</span>`:''}
+      ${/* 딱지는 갈래마다 자리가 정해진 열에 선다 — 무엇이 어느 열인지는 MB_TAG_SLOTS 한 곳 */''}
+      ${mbTagColsHtml(tagCols, i)}
       <span class="at">${mbTime(v.d)}</span>
     </div>`; }).join('')
     : `<div class="dm-none">${
@@ -23660,7 +23720,9 @@ async function mnewAutoFill(){
 let _mnewTick = null;
 function mnewTickStart(){
   if(_mnewTick || typeof setInterval !== 'function') return;
-  const go = ()=>{ if(state.view==='mail' && state.isAdmin) mnewLogLoad(mnewAutoFill); };
+  const go = ()=>{ if(state.view==='mail' && state.isAdmin){ mnewLogLoad(mnewAutoFill); mgrLoad(mgrWatchRun); } };
+  /* 🔎 담당 점검 기록은 누구나 «읽어» 둔다 — 옆줄 수가 맞게. 견주어 적는 것은 관리자만(위 go) */
+  mgrLoad(()=>{ if(state.view==='mail') mbDrawSoon(); });
   _mnewTick = setInterval(go, 60000);
   setTimeout(go, 8000);
 }
@@ -24137,6 +24199,217 @@ async function cntBulk(act){
     toast('↩ ' + recs.length + '곳을 되돌렸습니다', 6000);
   }
   renderPCSide(); cntRepaint();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   🔎 담당 점검 — 담당이 잘못 바뀌었거나 빈 것을 잡는 내부 체크 (대표 승인 목업 2026-10-03)
+   ══════════════════════════════════════════════════════════════════════════
+   「담당자가 지정되었는데 잘못 되거나 변경할 경우 검토할 수 있게 해라 … 푸른이알피에서 담당자
+    변경을 하지만 혹시라도 잘못 변경되거나 안되는 경우 … 내부체크시스템 만들어라」
+
+   ★ 이알피 업체 기록에는 담당 «변경 이력»이 없다(실측 2026-10-03: 377곳 중 0곳).
+     그래서 메일함이 «마지막으로 본 담당»을 config/mgrSeen/{업체 id} 에 적어 두고,
+     다음에 다르면 config/mgrChange/{업체 id} 에 「전 → 새」를 남긴다. 사람이 「확인」하면 ack.
+   ⚠ 적는 일은 «관리자 PC 한 곳»에서만(📥 저절로 채우기와 같은 시계) — 여러 PC 가 같은 기준을
+     동시에 고치면 바뀐 것을 서로 지운다. 보는 것은 누구나.
+   ⚠ 처음 켜는 날은 «지금 담당»을 적어 두기만 한다 — 그 전 것을 모르니 바뀐 것으로 잡지 않는다.
+   ⚠ 이알피 담당을 «고치지» 않는다. 찾아서 보여 주고 이알피로 데려다 준다.
+   ⚠ 업체는 열쇠(id)로 본다 — 이름은 보여 줄 때만 쓴다. */
+let _mgrSeen = null, _mgrChange = null, _mgrKeep = null, _mgrBusy = false, _mgrLoading = false;
+const MGR_KEY_OK = /^[^.#$\[\]\/]+$/;      /* DB 열쇠로 못 쓰는 글자가 든 id 는 건너뛴다 */
+function mgrLoad(cb){
+  if(_mgrSeen !== null && _mgrChange !== null && _mgrKeep !== null){ if(cb) cb(); return; }
+  if(typeof Store==='undefined' || Store.mode!=='firebase'){ _mgrSeen = {}; _mgrChange = {}; _mgrKeep = {}; if(cb) cb(); return; }
+  if(_mgrLoading) return;
+  _mgrLoading = true;
+  const db = firebase.database();
+  Promise.all(['mgrSeen', 'mgrChange', 'mgrKeep'].map(k=>db.ref(DB_ROOT + '/config/' + k).once('value')))
+    .then(([a, b, c])=>{ _mgrSeen = a.val() || {}; _mgrChange = b.val() || {}; _mgrKeep = c.val() || {}; })
+    .catch(()=>{})
+    .then(()=>{ _mgrLoading = false; if(_mgrSeen !== null && cb) cb(); });
+}
+function mgrLiveCos(){
+  const cos = (typeof ErpMatch!=='undefined' && ErpMatch.companies) || [];
+  return cos.filter(c=>c && c.id && MGR_KEY_OK.test(String(c.id))
+    && !/closed|terminated|inactive/.test(String(c.status||'')));
+}
+function mgrName(sid){
+  const s = String(sid||''); if(!s) return '';
+  return String(((typeof ErpMatch!=='undefined' && ErpMatch.nameBySid) || {})[s] || s);
+}
+/* 지난번 본 담당 ↔ 지금 — 새 기준과 바뀐 것 (순수 로직, 검사 대상)
+   ⚠ 기준이 비어 있으면(처음) 바뀐 것을 안 낸다. 기준에 없던 새 업체도 «바뀐 것»이 아니다. */
+function mgrDiff(seen, cos, now){
+  const s0 = seen || {};
+  const first = !Object.keys(s0).length;
+  const next = {}, changes = [];
+  (cos || []).forEach(c=>{
+    const id = String(c.id), m = String(c.managerMain || '');
+    next[id] = m;
+    if(first || !Object.prototype.hasOwnProperty.call(s0, id)) return;
+    if(String(s0[id] || '') !== m)
+      changes.push({ co:id, coName:String(c.name||''), from:String(s0[id]||''), to:m, at:now });
+  });
+  return { first:first, next:next, changes:changes };
+}
+/* 관리자 PC — 기준과 견주어 바뀐 것을 남긴다 */
+async function mgrWatchRun(){
+  if(_mgrBusy || !state.isAdmin) return;
+  if(typeof ErpMatch==='undefined' || !ErpMatch.ready) return;
+  if(_mgrSeen === null || _mgrChange === null) return mgrLoad(mgrWatchRun);
+  _mgrBusy = true;
+  let n = 0;
+  try{
+    const d = mgrDiff(_mgrSeen, mgrLiveCos(), Date.now());
+    const up = {};
+    Object.keys(d.next).forEach(id=>{ if(_mgrSeen[id] !== d.next[id]) up[DB_ROOT + '/config/mgrSeen/' + id] = d.next[id]; });
+    d.changes.forEach(ch=>{
+      const prev = _mgrChange[ch.co];
+      /* 확인 안 한 것이 또 바뀌면 «처음 담당»을 그대로 둔다 — 전→새 가 한눈에 보이게 */
+      const from = (prev && !prev.ack) ? String(prev.from || '') : ch.from;
+      if(from === ch.to){                        /* 원래대로 돌아왔다 — 줄을 지운다 */
+        if(prev){ up[DB_ROOT + '/config/mgrChange/' + ch.co] = null; delete _mgrChange[ch.co]; }
+        return;
+      }
+      const rec = { co:ch.co, coName:ch.coName, from:from, to:ch.to, at:ch.at };
+      _mgrChange[ch.co] = rec; up[DB_ROOT + '/config/mgrChange/' + ch.co] = rec; n++;
+    });
+    if(Object.keys(up).length){
+      await firebase.database().ref().update(up);
+      Object.keys(d.next).forEach(id=>{ _mgrSeen[id] = d.next[id]; });
+    }
+  }catch(e){ console.warn('[담당 점검]', (e&&e.message)||e); }
+  finally{ _mgrBusy = false; }
+  if(n){
+    toast('🔎 이알피에서 담당이 바뀐 업체 ' + n + '곳 — 「담당 점검」에서 확인해 주세요', 10000);
+    if(state.view==='mail') mbDrawSoon();
+  }
+}
+/* 최근 30일 업체별 메일 통수 — 업체 «이름»(다듬은 것)으로 묶는다. 보여 주는 셈일 뿐 잇는 열쇠가 아니다. */
+function mgrMailCount(){
+  const m = mbMemoOf();
+  if(m.mgrCnt) return m.mgrCnt;
+  const out = {}, cut = Date.now() - 30 * 86400000, idx = mbWhoIndex();
+  Object.keys(_mbMsgs||{}).forEach(slug=>{
+    if(slug === MB_OLD_ID || !mbGotFolder(mbFolderBy(slug))) return;
+    const box = _mbMsgs[slug] || {};
+    Object.keys(box).forEach(uid=>{
+      const v = box[uid]; if(!v || Number(v.d||0) < cut) return;
+      const e = String(v.e||'').trim().toLowerCase(); if(!e) return;
+      const k = ErpMatch._norm(mbCoNameOf(e, idx)); if(k) out[k] = (out[k]||0) + 1;
+    });
+  });
+  return (m.mgrCnt = out);
+}
+/* 넷 — 바뀐 것 · 퇴사자 · 빈 담당(메일 오는 곳) · 손으로 정한 것이 이알피와 다름 */
+function mgrRows(){
+  const m = mbMemoOf();
+  if(m.mgrRows) return m.mgrRows;
+  const ready = (typeof ErpMatch!=='undefined' && ErpMatch.ready);
+  const cnt = ready ? mgrMailCount() : {};
+  const changes = Object.keys(_mgrChange||{}).map(k=>_mgrChange[k])
+    .filter(x=>x && !x.ack).sort((a,b)=>Number(b.at||0) - Number(a.at||0));
+  const retired = [], empty = [], hand = [];
+  if(ready){
+    mgrLiveCos().forEach(c=>{
+      const nm = mgrName(c.managerMain), n = cnt[ErpMatch._norm(c.name)] || 0;
+      if(nm && mbRetired(nm)) retired.push({ co:c, name:nm, n:n });
+      else if(!String(c.managerMain||'') && n > 0) empty.push({ co:c, n:n });
+    });
+    const own = _mbOwner || {}, keep = _mgrKeep || {};
+    Object.keys(own).forEach(k=>{
+      if(keep[k] || k.charAt(0) === '@') return;          /* 도메인으로 정한 것은 업체 하나가 아니다 */
+      const em = k.replace(/,/g, '.');
+      const coName = mbCoNameOf(em);
+      const rec = coName ? mbCoRec(coName) : null;
+      const erp = (rec && rec.main && !rec.left) ? mbWhoLive(rec.main) : '';
+      if(erp && erp !== String(own[k])) hand.push({ key:k, em:em, hand:String(own[k]), erp:erp, coName:coName });
+    });
+  }
+  return (m.mgrRows = { changes:changes, retired:retired, empty:empty, hand:hand });
+}
+function mgrCount(){
+  const r = mgrRows();
+  return r.changes.length + r.retired.length + r.empty.length + r.hand.length;
+}
+/* ── 사람이 누르는 것 ── */
+function mgrAck(co){
+  const rec = (_mgrChange||{})[co]; if(!rec) return;
+  rec.ack = Date.now(); rec.ackBy = String(myEmail||'');
+  mbMemoClear(); renderPCSide(); renderMailPage();
+  if(typeof Store==='undefined' || Store.mode!=='firebase') return;
+  firebase.database().ref(DB_ROOT + '/config/mgrChange/' + co).update({ ack:rec.ack, ackBy:rec.ackBy })
+    .then(()=>toast('✔ 확인했습니다 — ' + (rec.coName||''), 5000))
+    .catch(e=>{ delete rec.ack; delete rec.ackBy; renderPCSide(); renderMailPage();
+      toast('적지 못했습니다 — ' + ((e&&e.message)||e), 8000); });
+}
+function mgrErp(){
+  const url = 'pu-erp.html#menu=biz/company';
+  if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(url, '사무관리 보기'); else location.href = url;
+}
+/* 손으로 정한 담당을 지우고 이알피를 따른다 — 지우는 길은 mbWhoSet 하나 */
+function mgrFollowErp(key){
+  const r = mgrRows().hand.filter(x=>x.key === key)[0]; if(!r) return;
+  if(!confirm(r.em + ' 에 손으로 정한 「' + r.hand + '」 을 지웁니다.\n앞으로는 이알피 담당 「' + r.erp + '」 에게 갑니다.')) return;
+  mbWhoSet(r.em, '');
+}
+function mgrKeepIt(key){
+  _mgrKeep = _mgrKeep || {};
+  _mgrKeep[key] = 1;
+  mbMemoClear(); renderPCSide(); renderMailPage();
+  if(typeof Store!=='undefined' && Store.mode==='firebase')
+    firebase.database().ref(DB_ROOT + '/config/mgrKeep/' + key).set(1).catch(()=>{});
+}
+/* ── 화면 ── */
+function openMgrPage(){
+  state.view='mail'; state.mailSent='mgr'; state.mbOpen=null;
+  render();
+  try{ $('pcMain').scrollTop=0; }catch(_){}
+  mgrLoad(()=>{ if(state.mailSent==='mgr') mbDrawSoon(); });
+  const go = ()=>{
+    const need = mbFolders().filter(f=>mbGotFolder(f) && !_mbMsgs[f.slug]).map(f=>f.slug);
+    if(!need.length) return;
+    let left = need.length;
+    need.forEach(sl=>loadMailBox(sl, mbPageSize(), ()=>{ if(!--left && state.mailSent==='mgr') mbDrawSoon(); }));
+  };
+  if(_mbFolders===null) loadMailFolders(go); else go();
+}
+function mgrHtml(){
+  const r = mgrRows();
+  const day = t => { const d = new Date(Number(t||0)); return isNaN(d) ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
+  const none = '<div class="mn-none">없습니다</div>';
+  let h = `<div class="mn-head"><b>🔎 담당 점검</b>
+    <span>이알피 담당이 바뀌었거나 비었거나 퇴사자인 곳 · 손으로 정한 담당이 이알피와 다른 곳 — 고치는 것은 이알피에서 합니다</span></div>`;
+  if(_mgrSeen !== null && !Object.keys(_mgrSeen).length)
+    h += `<div class="mn-none">처음 켜는 날입니다 — 지금 담당을 적어 두고, 다음에 바뀌면 여기 잡힙니다${state.isAdmin ? '' : '(대표님 PC 에서 적습니다)'}</div>`;
+  h += `<div class="mn-sec">🔄 이알피에서 담당이 바뀐 업체 <small>지난번과 다릅니다 — 맞게 바뀐 것이면 「확인」, 아니면 이알피에서 고치십시오</small></div>`;
+  h += r.changes.length ? r.changes.map((x, i)=>{
+    const n = (typeof ErpMatch!=='undefined' && ErpMatch.ready) ? (mgrMailCount()[ErpMatch._norm(x.coName)] || 0) : 0;
+    const to = mgrName(x.to);
+    return `<div class="mn-r"><span class="mn-no">${i+1}</span>
+      <span class="nm" title="${esc(x.coName)}">${esc(x.coName)}</span>
+      <span class="mg-old">${esc(mgrName(x.from) || '(비어 있음)')}</span><span class="mg-ar">→</span>
+      <span class="mg-new${to ? '' : ' none'}">${esc(to || '(비어 있음)')}</span>
+      <span class="mg-cnt">${day(x.at)} 알아챔${n ? ' · 최근 30일 메일 ' + n + '통' : ''}</span><span class="sj"></span>
+      <button class="pri" onclick="mgrAck('${esc(x.co)}')">확인</button>
+      <button onclick="mgrErp()">이알피에서 보기</button></div>`; }).join('') : none;
+  h += `<div class="mn-sec">⚠ 담당이 퇴사자인 업체 <small>메일이 갈 사람이 없습니다 — 이어받을 사람을 정하면 한 번에 넘어갑니다</small></div>`;
+  h += r.retired.length ? r.retired.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
+      <span class="nm" title="${esc(x.co.name)}">${esc(x.co.name)}</span><span class="mg-ret">${esc(x.name)}</span>
+      <span class="mg-cnt">${x.n ? '최근 30일 메일 ' + x.n + '통' : '최근 30일 메일 없음'}</span><span class="sj"></span>
+      <button class="pri" onclick="openWhoPage('succ')">이어받기 정하기</button></div>`).join('') : none;
+  h += `<div class="mn-sec">⚠ 담당이 비어 있는데 메일이 오는 업체 <small>최근 30일 메일이 있는 곳만</small></div>`;
+  h += r.empty.length ? r.empty.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
+      <span class="nm" title="${esc(x.co.name)}">${esc(x.co.name)}</span>
+      <span class="mg-cnt">최근 30일 메일 ${x.n}통 · 모두 「담당 모름」</span><span class="sj"></span>
+      <button class="pri" onclick="mgrErp()">이알피에서 담당 정하기</button></div>`).join('') : none;
+  h += `<div class="mn-sec">✋ 손으로 정한 담당이 이알피와 다릅니다 <small>주소에 «이 사람»이라고 박아 둔 것 — 업체 담당이 바뀌어도 메일은 옛사람에게 갑니다</small></div>`;
+  h += r.hand.length ? r.hand.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
+      <span class="em" title="${esc(x.em)}">${esc(x.em)}</span>
+      <span class="mg-cnt">손으로: <b>${esc(x.hand)}</b> · 이알피: <b>${esc(x.erp)}</b> (${esc(x.coName)})</span><span class="sj"></span>
+      <button class="pri" onclick="mgrFollowErp('${esc(x.key)}')">이알피 따르기</button>
+      <button onclick="mgrKeepIt('${esc(x.key)}')">그대로 두기</button></div>`).join('') : none;
+  return `<div class="mn">${h}</div>`;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

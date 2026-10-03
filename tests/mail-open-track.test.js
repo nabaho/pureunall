@@ -213,7 +213,9 @@ test('★★ 새로 지은 이름이 «한 번만» 선언돼 있다', () => {
     const c = (bare.match(new RegExp('function\\s+' + n + '\\s*\\(', 'g')) || []).length;
     assert.equal(c, 1, n + ' 이 ' + c + '번 선언돼 있습니다');
   });
-  assert.match(bare, /\$\{mbOpenTag\(v\)\}/, '목록이 이 딱지를 안 그립니다');
+  /* 목록은 딱지를 «열»에 세운다(mbTagParts → mbTagColsHtml, 2026-10-03) */
+  assert.match(bare, /function mbTagParts\([\s\S]{0,900}mbOpenTag\(v\)/, '목록이 이 딱지를 안 그립니다');
+  assert.match(bare, /\$\{mbTagColsHtml\(tagCols, i\)\}/, '목록이 딱지 열을 안 그립니다');
 });
 
 /* ══════ ⑤ 끄고 켜는 스위치 (대표 지시 2026-09-07) ══════════════════════════

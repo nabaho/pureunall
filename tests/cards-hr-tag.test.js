@@ -79,7 +79,10 @@ test('★ 같은 잣대 — 메일함 꼬리표는 PuHrIntake 의 판정을 그�
 });
 
 test('★ 이어져 있다 — 목록 줄·스크립트·한 창 규칙', () => {
-  assert.match(code(HTML), /\$\{typeof mbHrTag === 'function' \? mbHrTag\(v\) : ''\}/);
+  /* 목록은 딱지를 «열»에 세운다(mbTagParts → mbTagColsHtml, 2026-10-03) — 그 안에서 이 딱지를 부른다.
+     함수가 없는 상자(잘라 돌리는 검사)에서도 안 죽게 typeof 로 감싼 채다. */
+  assert.match(code(HTML), /\(typeof mbHrTag === 'function'\) \? String\(mbHrTag\(v\) \|\| ''\) : ''/);
+  assert.match(code(HTML), /\$\{mbTagColsHtml\(tagCols, i\)\}/);
   assert.match(HTML, /js\/pu-hr-intake\.js\?v=\d+/);
   const go = code(cut('mbHrGo'));
   assert.match(go, /PuAppBar\.goApp\(/);
