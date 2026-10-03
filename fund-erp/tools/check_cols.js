@@ -28,7 +28,7 @@ function gF(n){const i=src.indexOf('function '+n+'(');if(i<0)throw Error('없음
   for(let k=src.indexOf('{',i);k<src.length;k++){if(src[k]==='{')d++;else if(src[k]==='}'){d--;if(!d)return src.slice(i,k+1);}}}
 global.esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 global.fundRow = () => '<tr><td>x</td></tr>';   // 몸통은 여기서 볼 것이 아니다
-(0, eval)([gF('_headHTML'), gF('fundTable')].join('\n'));
+(0, eval)([gF('_headHTML'), gF('fundTable'), gF('grp')].join('\n'));   // grp — 참여 지자체 칸을 지역기금 목록에만 세운다
 
 let bad = 0;
 const ok = (n, c, w) => { if (c) console.log('  · ' + n); else { bad++; console.log('  ✗ ' + n + (w ? '  — ' + w : '')); } };
@@ -43,8 +43,8 @@ const heads = html => {
 };
 
 /* 지역기금은 전부 공동이라 두 묶음의 칸 목록이 같아야 한다 */
-const 충남 = heads(fundTable([{ fund_type:'공동' }], false, ''));
-const 경기 = heads(fundTable([{ fund_type:'공동' }], false, ''));
+const 충남 = heads(fundTable([{ fund_type:'공동', region:'충남' }], false, ''));
+const 경기 = heads(fundTable([{ fund_type:'공동', region:'경기' }], false, ''));
 
 console.log('■ 묶음 사이에 열이 맞나');
 ok('칸 수가 같다', 충남.length === 경기.length, 충남.length + ' vs ' + 경기.length);

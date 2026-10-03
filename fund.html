@@ -10225,7 +10225,11 @@ function openScan(kind){
   if(!photoStoreReady()){ toast('사진첩과 연결되지 않았습니다','err'); return; }
   showModal('<div class="row" style="margin:0 0 8px"><h2 style="margin:0">'+esc(docZoneLabel(kind))+' 원본</h2>'
     +'<span class="muted" style="font-size:11.5px">'+esc(r.year)+'년 · 연결 '+esc(r.at||'')+'</span>'
-    +'<span style="flex:1"></span><button onclick="unlinkScan(\''+kind+'\')" style="color:var(--danger)">연결 해제</button></div>'
+    +'<span style="flex:1"></span>'
+    /* 원본 파일이 함께 담겨 있으면 받는 길 — 주소에 토큰이 붙어 있어 창고 규칙과 무관하게 열린다(사진첩과 같은 방식) */
+    +(r.orig&&r.orig.url?'<a class="btn" href="'+esc(r.orig.url)+'" target="_blank" rel="noopener" title="'+esc((r.orig.name||'원본')+' — 넣을 때의 파일 그대로(여러 쪽 전부)')+'" '
+      +'style="padding:4px 10px;border:1px solid var(--line);border-radius:7px;text-decoration:none;font-size:12.5px">⬇ 원본 파일</a>':'')
+    +'<button onclick="unlinkScan(\''+kind+'\')" style="color:var(--danger)">연결 해제</button></div>'
     +'<div id="scanBody" style="text-align:center">'+loadingHTML('사진첩에서 불러오는 중…')+'</div>');
   _loadScanInto(r);
 }
@@ -11470,19 +11474,30 @@ function _fitCanvas(src,w,h){
 function _keepDocOriginal(kind,file,fid){
   if(!photoStoreReady()||!PuPhotoStore.savePhoto||!PuPhotoStore.newId)
     return Promise.reject(new Error('사진첩과 연결되지 않았습니다'));
-  var f=funds[fid]||{}, now=Date.now();
-  return _docToImage(file).then(function(im){
+  var f=funds[fid]||{}, now=Date.now(), orig=null;
+  /* ★ 원본 파일도 «그대로» 보관한다 (대표 지시 2026-10-03 「원본보관도 가능하게」).
+       사진첩 그림은 PDF 첫 쪽뿐이다 — 등기부·정관처럼 여러 쪽인 서류는 나머지가 사라졌다.
+       파일 창고에 원래 파일(PDF·한글·그림)을 올리고, 사진(meta.doc.orig)과 기금 연결(scans) 양쪽에 적는다 —
+       사진첩 보기에서도, 기금 화면 [보기]에서도 «원본 파일 받기»가 된다.
+     ⚠ 원본 담기가 실패해도 그림 보관은 계속한다 — 대신 조용히 넘어가지 않고 알린다. */
+  var origP=(PuPhotoStore.putOriginal?PuPhotoStore.putOriginal(PuPhotoStore.newId(),PuPhotoStore.yearOf(now),file,file.name||docZoneLabel(kind))
+    :Promise.reject(new Error('원본 보관 길이 없습니다')))
+    .then(function(o){ orig=o; },function(e){ toast('원본 파일은 못 담았습니다(첫 쪽 그림만 보관): '+((e&&e.message)||e),'warn'); });
+  return origP.then(function(){ return _docToImage(file); }).then(function(im){
     var id=PuPhotoStore.newId();
-    return PuPhotoStore.savePhoto({ id:id, full:im.full, thumb:im.thumb,
-      meta:{ upAt:now, takenAt:now, kind:docZoneLabel(kind),
+    var meta={ upAt:now, takenAt:now, kind:docZoneLabel(kind),
              /* 제목에 서류 이름과 기금 이름을 담는다 —
                 다음에 [🔎 찾기]가 이 사진을 스스로 찾아낸다(docFindScore). */
              company:(f.short_name||f.name||''),
              note:docZoneLabel(kind)+' · '+(f.short_name||f.name||''),
-             byName:(S.user||'') }
-    }).then(function(){ return { id:id, year:PuPhotoStore.yearOf(now) }; });
+             byName:(S.user||'') };
+    if(orig) meta.doc={ name:(file.name||''), orig:orig };     // ⚠ 실시간DB 는 undefined 칸을 거부한다 — 있을 때만 단다
+    return PuPhotoStore.savePhoto({ id:id, full:im.full, thumb:im.thumb, meta:meta })
+      .then(function(){ return { id:id, year:PuPhotoStore.yearOf(now) }; });
   }).then(function(r){
-    saveScanRef(fid,kind,{owner:(PuPhotoStore.myUid&&PuPhotoStore.myUid())||'',year:r.year,id:r.id});
+    var ref={owner:(PuPhotoStore.myUid&&PuPhotoStore.myUid())||'',year:r.year,id:r.id};
+    if(orig) ref.orig={ name:orig.name||'', url:orig.url||'', size:orig.size||0, key:orig.key||'', year:orig.year||'' };
+    saveScanRef(fid,kind,ref);
     return r;
   });
 }
