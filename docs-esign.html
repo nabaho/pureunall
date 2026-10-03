@@ -176,7 +176,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=8"></script>
-<script src="js/pu-contract-forms.js?v=16"></script>
+<script src="js/pu-contract-forms.js?v=17"></script>
 <script src="js/pu-photo-store.js?v=31"></script>
 <script src="js/pu-office-store.js?v=5"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
@@ -489,13 +489,19 @@ function formVList(v) {
   if (v && v.v !== undefined) v = v.v;
   return Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }).filter(Boolean) : []);
 }
-async function formContract(id) {
+/* 계약 자료 — 계약·업체·직원 명부를 «읽기만». 1분 안에는 한 번 읽은 것을 같이 쓴다(계약 여러 건 채우기에서 건마다 다시 읽지 않게). */
+var _formCtData = null, _formCtAt = 0;
+async function formContractData(fresh) {
+  if (!fresh && _formCtData && Date.now() - _formCtAt < 60000) return _formCtData;
   var got = await Promise.all(['data/contracts', 'data/companies', 'data/user_dir'].map(function (p) {
     return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; });
   }));
-  var cs = formVList(got[0]), cos = formVList(got[1]), users = formVList(got[2]);
-  var c = cs.filter(function (x) { return String(x.id) === String(id); })[0];
-  if (!c) throw new Error('계약을 찾지 못했습니다 — 지워졌거나 아직 저장 전일 수 있습니다');
+  _formCtData = { cs: formVList(got[0]), cos: formVList(got[1]), users: formVList(got[2]) };
+  _formCtAt = Date.now();
+  return _formCtData;
+}
+function formContractInfo(c, data) {
+  var cos = data.cos, users = data.users;
   var nb = function (s) { return String(s || '').replace(/\D/g, '').slice(0, 10); };
   var nn = function (s) { return String(s || '').replace(/\(주\)|㈜|주식회사|\s/g, '').toLowerCase(); };
   var find = function (it) {
@@ -512,6 +518,20 @@ async function formContract(id) {
   return { id: c.id, contractNo: c.contractNo || '', kinds: c.kinds || (c.kind ? [c.kind] : []),
     typeCode: (c.typeCodes && c.typeCodes['company']) || c.typeCode || '', caseName: caseName,
     vals: vals, coKey: PuFormCardFill.sentKeys({ bz: vals.사업자번호, c: vals.회사명 }, {})[0] || '' };
+}
+async function formContract(id) {
+  var data = await formContractData();
+  var c = data.cs.filter(function (x) { return String(x.id) === String(id); })[0];
+  if (!c) throw new Error('계약을 찾지 못했습니다 — 지워졌거나 아직 저장 전일 수 있습니다');
+  return formContractInfo(c, data);
+}
+/* 📦 계약 여러 건 — 고를 목록(가벼운 칸만). 늘 새로 읽는다(창을 열 때 한 번) */
+async function formContractList() {
+  var data = await formContractData(true);
+  return data.cs.filter(function (c) { return c && c.id; }).map(function (c) {
+    return { id: c.id, contractNo: c.contractNo || '', companyName: c.companyName || (c.company && c.company.name) || '',
+      kinds: c.kinds || (c.kind ? [c.kind] : []), status: c.status || '', signDate: c.signDate || '' };
+  });
 }
 /* 묶음 채우기 — 채운 파일들을 .zip 하나로 (브라우저 안에서만 묶는다. 채운 값은 서버로 안 간다) */
 async function formZip(files) {
@@ -548,7 +568,7 @@ function showPane(name) {
   if (!curUser) return;
   if (name === 'forms' && !formsMounted) {
     formsMounted = true;
-    formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), contract: contractFromHash(), contractLoad: formContract,
+    formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
       cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
       mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep }, me: function () { return window.PuWhoami && PuWhoami.get(); } });

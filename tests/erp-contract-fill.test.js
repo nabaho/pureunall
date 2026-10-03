@@ -28,7 +28,7 @@ test('ⓐ 이알피 — 계약서 출력 창에 「📦 문서관리에서 묶�
   assert.match(s, /'docs-esign\.html#forms:contract=' \+ encodeURIComponent\(contract\.id\)/);
 });
 test('ⓑ 문서관리 — 계약을 읽어 PuContractVars 로, 열쇠를 양식 번호로 착각하지 않는다', () => {
-  const f = cutFn(stripJs(DOCS), 'async function formContract(');
+  const f = cutFn(stripJs(DOCS), 'function formContractInfo(') + cutFn(stripJs(DOCS), 'async function formContractData(');
   assert.match(f, /PuContractVars\.contractVars\(/);
   assert.match(f, /'data\/contracts'/);
   assert.match(f, /'data\/user_dir'/);
@@ -88,7 +88,7 @@ test('ⓒ 사건유형 번호 → 이름이 이알피 BIZ_CASE_SEED 와 같은 �
   const pairs = {}; seed.replace(/code:'([^']+)'[^}]*name:'([^']+)'/g, (a, c, n) => { pairs[c] = n; return a; });
   assert.ok(Object.keys(pairs).length >= 13, '이알피 사건유형 시드를 못 읽었습니다');
   assert.deepStrictEqual(out(P.CASE_CODES), pairs);
-  const f = cutFn(stripJs(DOCS), 'async function formContract(');
+  const f = cutFn(stripJs(DOCS), 'function formContractInfo(') + cutFn(stripJs(DOCS), 'async function formContractData(');
   assert.ok(!/biz_case_types/.test(f), '사건유형 표를 읽습니다 — 규칙에 이름 없는 자리');
   assert.match(f, /c\.caseType \|\| PuContractForms\.CASE_CODES\[caseCode\]/);
 });
