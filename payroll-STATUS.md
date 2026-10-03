@@ -140,6 +140,10 @@ git rebase origin/main && git push origin <작업브랜치>:main   # main 은 pu
   답: 숫자 API 는 없음(법령 API 는 PDF 링크만) → PDF 를 숫자표로 바꿔 내장. 바꾸다 발견: **자녀공제가 2026.3.1부터 20,830/45,830/+33,330 으로 올랐다**(코어는 옛 12,500/29,160 이었음),
   1,000만원 초과는 별표 산식, 가족 11명 초과는 제4호 규칙. 새 파일 `js/pu-simpletax.js`·`engine/build_simpletax_pdf.py`. 검사 labor-core 166·labor-screens 123 통과(일부러 망가뜨려 걸리는 것 확인).
   남은 것: 법령 API 로 별표2 공포일자 감시(바뀌면 알림) · 2024년판 표 내장(2026년 3월 이전 달용).
+- 2026-10-03: **간이세액표 개정 감시** — `.github/workflows/simpletax-watch.yml`(매일 06:00) + `engine/simpletax_watch.js`.
+  법제처 `lawService target=law ID=003956`(시행령 전문 XML)의 **별표2 본문 첫 줄 「<개정 YYYY. M. D.>」**만 본다 — 시행령 공포일자는 다른 조문 때문에도 바뀌어 헛알림.
+  법이 새것이면 `simpletax-watch` 알림 글(GitHub 이슈) 생성 → 급여관리 설정 카드·근태 미리보기에 빨간 경고(공개 저장소라 api.github.com 직접 읽음).
+  표를 갈면 다음 감시 때 글이 저절로 닫히고 경고도 사라짐. 못 읽으면 작업이 빨간불(끝 코드 2). ai-ready 안 붙임(시행일은 사람이 부칙 확인). 검사 `tests/simpletax-watch.test.js` 43건.
 - 2026-09-13: **회사 한 장(허브) + 담당자 잇기** — 대표 지시 「푸른이알피 담당자별로 급여관리
   모든 부분 연결. 담당자별 정리 → 기업별 근태·휴가·퇴직·명세서를 하나의 플로어로」.
   새로 만든 것: `js/pu-site-staff.js`(사업장↔업체 잇기·담당 읽기) · `tests/site-staff-match.test.js`(11건) ·

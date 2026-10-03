@@ -1423,6 +1423,7 @@ function screenCards(){
   /* 내장 표(법제처 별표2 그대로)가 먼저다. 직접 올린 표는 내장 표가 덮지 않는
      옛 달(2026년 3월 이전 등)에만 쓰인다. */
   var bt=(typeof PuSimpleTax!=='undefined'&&PuSimpleTax.tables)||[];
+  h+=taxWatchBanner();
   h+='<div style="margin-top:10px;font-size:12.5px">'+(bt.length
     ? bt.map(function(t){return '<span class="badge ok">간이세액표 내장</span> '+esc(t.근거||'')+' · <b>'+esc(t.시행)+' 지급분부터</b> · 구간 '+t.rows.length+'개';}).join('<br>')
     : '<span class="badge warn">내장 간이세액표 없음</span> js/pu-simpletax.js 를 불러오지 못했습니다');
@@ -2054,6 +2055,41 @@ function builtinTaxSince() {
   var B = (typeof PuSimpleTax !== 'undefined' && PuSimpleTax.tables) || [];
   return B.map(function (t) { return t.시행; }).sort()[0] || null;
 }
+/* 간이세액표 개정 알림 — GitHub 감시(.github/workflows/simpletax-watch.yml)가 매일 새벽
+   법제처 별표2 개정일을 내장 표와 비교해, 법이 더 새것이면 「simpletax-watch」 알림 글을
+   연다(표를 갈면 저절로 닫힌다). 열린 글이 있으면 소득세를 다루는 화면에 경고를 띄운다.
+   ⚠ 못 읽어도(망·요청 한도) 조용히 넘어간다 — 알림 글·메일이 1차 길이고 이건 덧붙임이다.
+   ⚠ 글 제목·주소는 밖에서 온 값이라 글자를 이스케이프하고, 주소는 이 저장소 알림 글만 받는다. */
+var TAX_WATCH_URL = 'https://api.github.com/repos/nabaho/pureunall/issues?labels=simpletax-watch&state=open&per_page=5';
+var TAX_WATCH = { done: false, busy: false, items: [] };
+function taxWatchItems(arr) {
+  return (Array.isArray(arr) ? arr : []).filter(function (x) {
+    return x && !x.pull_request && /^https:\/\/github\.com\/nabaho\/pureunall\/issues\/\d+$/.test(String(x.html_url || ''));
+  }).map(function (x) { return { title: String(x.title || ''), url: String(x.html_url) }; });
+}
+function loadTaxWatch() {
+  if (TAX_WATCH.done || TAX_WATCH.busy || typeof fetch !== 'function') return;
+  TAX_WATCH.busy = true;
+  fetch(TAX_WATCH_URL, { headers: { Accept: 'application/vnd.github+json' } })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (arr) {
+      TAX_WATCH.items = taxWatchItems(arr);
+      TAX_WATCH.done = true; TAX_WATCH.busy = false;
+      if (TAX_WATCH.items.length && (App.screen === 'cards' || App.screen === 'attend')) render();
+    })
+    .catch(function () { TAX_WATCH.done = true; TAX_WATCH.busy = false; });
+}
+function taxWatchBanner() {
+  loadTaxWatch();
+  if (!TAX_WATCH.items.length) return '';
+  var t = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  return '<div class="note" style="border-left:3px solid var(--bad);margin:10px 0">' +
+    '⚠ <b>법제처에서 근로소득 간이세액표가 새로 개정됐습니다.</b> 내장 표를 갈기 전까지 ' +
+    '새 시행일 이후 달의 소득세는 <b>옛 표로 계산</b>됩니다 — 확정·신고 전에 확인하세요.' +
+    TAX_WATCH.items.map(function (x) {
+      return '<br>· <a href="' + x.url + '" target="_blank" rel="noopener">' + t(x.title) + '</a>';
+    }).join('') + '</div>';
+}
 /* 월 이름에서 '몇 월'인지 — 달력 격자를 그리려면 필요하다.
    ⚠ 실제 시트 이름은 '3월'·'2026-03'·'23년 7월'·'25.05 새별반찬' 로 섞여 온다. */
 function laborMonthNum(month) {
@@ -2313,6 +2349,7 @@ function screenAttend() {
   var mwY = laborYearOfMonth(App.month);
   var mwH = minWageOf(mwY);
   h2 += '<h2 style="margin:18px 0 8px;font-size:15px">근태 반영 급여 미리보기</h2>';
+  h2 += taxWatchBanner();
   if (TT && TT.시행) h2 += '<div style="font-size:12px;color:var(--sub);margin:-4px 0 8px">소득세: ' +
     esc(TT.근거 || '근로소득 간이세액표') + ' · ' + esc(TT.시행) + ' 지급분부터</div>';
   if (!TT) h2 += '<div class="note" style="border-left:3px solid var(--warn)">' +
