@@ -189,6 +189,40 @@
     };
   }
 
+  /* ── ✉ 메일 기본값 · 보낸 기록 (설계 2026-09-29 §7) ── 저장하지 않는 기본값이다. 창에서 고친다. */
+  function mailDefaults(V, formName) {
+    V = V || {};
+    var to = [], seen = {};
+    function add(v, label) { v = String(v || '').trim(); if (!v || seen[v.toLowerCase()]) return; seen[v.toLowerCase()] = 1; to.push({ v: v, label: label + ' · ' + v }); }
+    add(V.담당자이메일, '담당자 메일' + (V.담당자 ? ' · ' + V.담당자 : ''));
+    add(V.대표이메일, '대표 메일');
+    var co = String(V.회사명 || '').trim();
+    var dear = (V.참조 && V.참조 !== '-') ? V.참조 : (V.수신자 || '담당자');
+    var staff = String(V.담당노무사 || '').trim();
+    var body = [dear + ', 안녕하십니까.',
+      '푸른노무법인 ' + (staff ? staff + ' ' : '') + '노무사입니다.', '',
+      (V.호칭 || '귀사') + '의 공동근로복지기금 설립과 관련하여 ' + String(formName || '제안서 및 견적서') + '를 보내드립니다.',
+      '검토하시고 궁금하신 점은 편하게 연락 주십시오.', '',
+      '푸른노무법인 ' + (staff ? staff + ' ' : '') + '드림' + (V.노무사연락처 ? ' · ' + V.노무사연락처 : '')].join('\n');
+    return { to: to, subject: '[푸른노무법인] ' + String(formName || '서류') + (co ? ' — ' + co : ''), body: body };
+  }
+  /* 기업정보함 「보낸 서류」 열쇠 — 사업자번호 숫자(10자리 이상)와 이름 열쇠 둘 다.
+     업무관리(work.html)는 두 열쇠를 다 읽고 같은 at 은 한 번만 보인다. */
+  function sentKeys(row, V) {
+    row = row || {}; V = V || {};
+    var out = [], d = digits(row.bz || V.사업자번호 || ''), nm = coNorm(V.회사명 || row.c || '');
+    if (d.length >= 10) out.push(d);
+    if (nm) out.push('n' + nm);
+    return out.filter(function (k, i) { return out.indexOf(k) === i; });
+  }
+  /* 보낸 기록 한 줄 — ⚠ 받는 주소는 남기지 않는다(기업정보함 보낸 서류와 같은 원칙) */
+  function sentRecord(o) {
+    o = o || {};
+    return { at: Number(o.at) || 0, by: String(o.by || ''), kind: String(o.kind || '그 밖'),
+      names: (o.names || []).map(function (v) { return String(v || ''); }).filter(Boolean), card: '', who: String(o.who || '').trim() };
+  }
+  function SENT_KIND_OF(group) { return group === '제안서·견적서' ? '제안서' : '계약서'; }
+
   var RE = /\x7b\x7b([^\x7b\x7d\n]{1,30})\x7d\x7d/g;
   /* 글자 본문에 든 표지 이름(나온 차례, 겹침 없이) */
   function markersIn(text) {
@@ -375,7 +409,8 @@
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
     stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
     xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate,
-    proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate
+    proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate,
+    mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;
