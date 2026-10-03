@@ -4,8 +4,11 @@
      숫자·낱말이 하나라도 다르면 다른 글 — 「15일」과 「12일」을 한 덩어리로 묶으면 위반을 덮는다. */
 (function (root) {
   'use strict';
-  var HEAD_RE = /^[ \t]*제\s*(\d+)\s*조(?:\s*의\s*(\d+))?\s*(?:[(（]([^)）\n]{1,40})[)）])?/gm;
-  var STRIP_HEAD = /^\s*제\s*\d+\s*조(?:\s*의\s*\d+)?\s*(?:[(（][^)）\n]{0,40}[)）])?\s*/;
+  // ⚠ 조 번호 바로 뒤에 조사(에·의·을…)·「제」·쉼표가 오면 머리가 아니라 «상호참조»다.
+  //   줄이 접혀 「제5조에 따라 …」 가 줄 머리에 오면 새 조로 오인해 앞 조를 자르고 진짜 제5조를 덮어쓴다.
+  var NOT_REF = '(?![에의을를과와로은는이가도및제,，·、])';
+  var HEAD_RE = new RegExp('^[ \\t]*제\\s*(\\d+)\\s*조(?:\\s*의\\s*(\\d+))?' + NOT_REF + '\\s*(?:[(（]([^)）\\n]{1,40})[)）])?', 'gm');
+  var STRIP_HEAD = new RegExp('^\\s*제\\s*\\d+\\s*조(?:\\s*의\\s*\\d+)?' + NOT_REF + '\\s*(?:[(（][^)）\\n]{0,40}[)）])?\\s*');
   var CHAPTER_RE = /^[ \t]*(제\s*\d+\s*장[^\n]*)$/;
   var SYN = { '연차휴가': '연차유급휴가', '연차': '연차유급휴가', '휴게시간': '휴게', '정년퇴직': '정년' };
 
@@ -50,18 +53,30 @@
     return out;
   }
   function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  // 토큰 뒤 조사는 받침 때문에 갈린다(사원은/근로자는, 가나상사는/나다물산은) — 한 모양으로 맞춘다.
+  // 뒤에 한글이 이어지면 조사가 아니라 낱말의 일부(은행·이다)이므로 건드리지 않는다.
+  function josa(t, tag) {
+    var T = esc(tag);
+    return t.replace(new RegExp(T + '(은|는)(?![가-힣])', 'g'), tag + '는')
+      .replace(new RegExp(T + '(이|가)(?![가-힣])', 'g'), tag + '가')
+      .replace(new RegExp(T + '(을|를)(?![가-힣])', 'g'), tag + '를')
+      .replace(new RegExp(T + '(과|와)(?![가-힣])', 'g'), tag + '와');
+  }
+  // 회사 이름 — (주)·㈜·주식회사·유한회사와 띄어쓰기를 걷어 낸 뒤 두 글자 이상일 때만 쓴다.
+  function coCore(name) {
+    return str(name).replace(/\(\s*[주유]\s*\)|[㈜㈲]|주식회사|유한회사|유한책임회사/g, '').replace(/\s+/g, '');
+  }
   function normText(body, coName) {
     var t = str(body).replace(STRIP_HEAD, '').replace(/\s+/g, ' ').trim();
-    var co = str(coName).trim();
-    if (co.length >= 2) t = t.replace(new RegExp(esc(co), 'g'), '{회사}');
-    t = t.replace(/사원|근로자|직원|종업원/g, '{근로자}');
-    t = t.replace(/\{근로자\}(은|는)/g, '{근로자}는').replace(/\{근로자\}(이|가)(?![가-힣])/g, '{근로자}가')
-      .replace(/\{근로자\}(을|를)/g, '{근로자}를').replace(/\{근로자\}(과|와)/g, '{근로자}와');
+    var co = coCore(coName);
+    if (co.length >= 2) t = josa(t.replace(new RegExp(esc(co), 'g'), '{회사}'), '{회사}');
+    // 호칭은 복합어(사원증·근로자대표) 안의 것도 일부러 한꺼번에 맞춘다 — 같은 글 판정은 호칭 차이를 무시하는 규칙이다.
+    t = josa(t.replace(/사원|근로자|직원|종업원/g, '{근로자}'), '{근로자}');
     return t;
   }
   function normKey(body, coName) { return normText(body, coName).replace(/\s+/g, ''); }
   function groupVariants(entries) {
-    var map = {}, list = [];
+    var map = Object.create(null), list = [];   // 열쇠가 「constructor」 같아도 안전하게
     (entries || []).forEach(function (e) {
       var k = normKey(e.body, e.companyName);
       if (!map[k]) { map[k] = { key: k, text: '', members: [], finals: 0, last: 0 }; list.push(map[k]); }
