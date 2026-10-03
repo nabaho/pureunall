@@ -106,6 +106,7 @@ test('출처를 표에 밝힌다', () => {
 /* ───────── 실제로 그려지는가 (가짜 화면에서 돌려 본다) ───────── */
 
 function runApp(seed) {
+  const hooks = {};
   const els = {};
   function el(id) {
     if (!els[id]) els[id] = { id, innerHTML: '', textContent: '', value: '',
@@ -128,15 +129,16 @@ function runApp(seed) {
     GovBizinfo: require('../js/gov-bizinfo.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort=()=>{}; this.signal=null; },
-    URL: { createObjectURL: () => 'blob:x' }, Blob: function(){}
+    URL: { createObjectURL: () => 'blob:x' }, Blob: function(parts){ if(hooks.blob) hooks.blob(parts); }
   };
   ctx.window = ctx;
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');   // 부팅은 빼고 함수만 싣는다
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
-    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,rejudge,pullAll,PAGE_MAX,'
+    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,rejudge,pullAll,PAGE_MAX,matGo,matPageTo,matTog,matSelPage,matSelAll,matSelClear,matList,'
+    + 'feedTog,feedSelAll,feedBulk,expCsv,'
     + 'setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
-  return { api: ctx.__api, el, store };
+  return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
 
 test('★ 공고 줄이 실제로 그려진다', () => {
@@ -264,18 +266,21 @@ test('★★ 창고를 «콕 집어» 읽는다 — 노드를 통째로 읽지 �
   assert.ok(r.db.seen.every((p) => p.indexOf('_secrets') < 0));
 });
 
-test('★ 갈래 여섯이 실제로 그려진다', async () => {
+test('★ 갈래 여섯이 «단추»로 있고 누르면 그 갈래만 보인다', async () => {
+  // 대표 지시 2026-10-03 「너무 많은 내용으로 정리되어 있다 구분 좀 하고」
   const r = await runMat();
   const h = r.el('matBox').innerHTML;
   ['학력', '자격 · 수료', '위촉 · 위원 경력', '표창 · 포상', '자문 · 고문', '수행 실적']
-    .forEach((n) => assert.ok(h.indexOf(n) >= 0, n + ' 갈래가 없습니다'));
-  assert.match(h, /영남대학교/);
-  assert.match(h, /공인노무사/);
-  assert.match(h, /일터혁신 상생컨설팅/);
+    .forEach((n) => assert.ok(h.indexOf(n) >= 0, n + ' 갈래 단추가 없습니다'));
+  r.api.matGo('edu');  assert.match(r.el('matBox').innerHTML, /영남대학교/);
+  assert.ok(r.el('matBox').innerHTML.indexOf('공인노무사') < 0, '다른 갈래 내용이 같이 보이면 «구분»이 아닙니다');
+  r.api.matGo('cert'); assert.match(r.el('matBox').innerHTML, /공인노무사/);
+  r.api.matGo('perf'); assert.match(r.el('matBox').innerHTML, /일터혁신 상생컨설팅/);
 });
 
 test('★ 위촉·위원은 「지금 맡고 있는 것만」이 기본이다', async () => {
   const r = await runMat();
+  r.api.matGo('wiccok');
   assert.match(r.el('matBox').innerHTML, /충청남도경제진흥원/);
   assert.ok(r.el('matBox').innerHTML.indexOf('NCS 컨설턴트') < 0,
     '끝난 위촉이 기본 목록에 보입니다 — 197건이 다 나오면 못 읽습니다');
@@ -285,6 +290,7 @@ test('★ 위촉·위원은 「지금 맡고 있는 것만」이 기본이다', 
 
 test('★★ 자문 목록에는 이름이 그대로 있다 — 대표님이 알아보셔야 한다', async () => {
   const r = await runMat();
+  r.api.matGo('advisory');
   assert.match(r.el('matBox').innerHTML, /○○정밀주식회사/);
 });
 
@@ -419,4 +425,139 @@ test('★★ 이미 받은 줄에도 새 규칙을 댄다 — 사람이 손댄 �
 
 test('★ 로그인 뒤 불러온 다음에 규칙을 댄다', () => {
   assert.ok(src.indexOf('await cloudPull(); srcBackfill(); rejudge();') >= 0);
+});
+
+/* ═══════ 신청 재료 — 50건씩 · ㅁ · № (대표 지시 2026-10-03) ═══════ */
+
+async function bigMat(n) {
+  const r = runApp({ feed: [] });
+  const rows = Array.from({ length: n }, (_, i) => ({ year: '2024' /* 실적은 해 내림차순으로 줄 선다 — 해를 같게 두어 순서를 못박는다 */, project: '과제' + (i + 1),
+    org: '고객' + (i + 1), status: '완료' }));
+  const map = { 'kcareer/U9/ls/consult': JSON.stringify(rows) };
+  r.api.setFb(fakeDb(map), 'U9');
+  await r.api.matPull();
+  r.api.matGo('perf');
+  return r;
+}
+const rowCount = (h) => (h.match(/class="row-chk"/g) || []).length;
+
+test('★★ 한 쪽에 50건만 — 나머지는 쪽을 넘겨 본다', async () => {
+  const r = await bigMat(120);
+  const h = r.el('matBox').innerHTML;
+  assert.equal(rowCount(h), 50, '한 쪽 50건');
+  assert.match(h, /1–50 \/ 120건/);
+  assert.match(h, /matPageTo\(2\)/, '3쪽까지 있어야 합니다');
+  r.api.matPageTo(2);
+  assert.equal(rowCount(r.el('matBox').innerHTML), 20, '마지막 쪽은 남은 20건');
+  assert.match(r.el('matBox').innerHTML, /101–120 \/ 120건/);
+});
+
+test('★★ 번호는 갈래 전체로 이어 센다 — 둘째 쪽은 51번부터', async () => {
+  const r = await bigMat(120);
+  r.api.matPageTo(1);
+  const h = r.el('matBox').innerHTML;
+  assert.match(h, /<td class="rn">51<\/td>/);
+  assert.match(h, /<td class="rn">100<\/td>/);
+  assert.ok(h.indexOf('<td class="rn">1</td>') < 0);
+});
+
+test('★★ ㅁ 로 고르면 복사·CSV 는 «고른 것만» — 단추 글자도 그렇게 바뀐다', async () => {
+  const r = await bigMat(120);
+  assert.match(r.el('matBox').innerHTML, /전체 120건/);
+  r.api.matTog(0, true); r.api.matTog(2, true);
+  const h = r.el('matBox').innerHTML;
+  assert.match(h, /고른 2건/, '무엇이 나가는지 단추가 말해야 합니다');
+  assert.match(h, /class="sel-bar"/);
+  const out = r.api.matRowsFor('perf');
+  assert.equal(out.length, 2);
+  assert.deepEqual(out.map((x) => x.project), ['과제1', '과제3']);
+  assert.match(r.api.matText('perf'), /과제1/);
+  assert.ok(r.api.matText('perf').indexOf('과제2') < 0);
+});
+
+test('★ 머리 ㅁ 는 «이 쪽»만 고르고 끈다', async () => {
+  const r = await bigMat(120);
+  r.api.matPageTo(1); r.api.matSelPage(true);
+  assert.equal(r.api.matRowsFor('perf').length, 50);
+  assert.equal(r.api.matRowsFor('perf')[0].project, '과제51');
+  r.api.matSelPage(false);
+  assert.equal(r.api.matRowsFor('perf').length, 120, '다 끄면 다시 전부');
+});
+
+test('★ 갈래마다 고른 것을 따로 기억한다 — 다른 갈래로 새지 않는다', async () => {
+  const r = await bigMat(120);
+  r.api.matTog(0, true);
+  r.api.matGo('edu');
+  assert.ok(r.el('matBox').innerHTML.indexOf('class="sel-bar"') < 0);
+  r.api.matGo('perf');
+  assert.match(r.el('matBox').innerHTML, /고른 1건/);
+});
+
+test('★★ 자문은 고른 것만 내보내도 «가려서» 나간다', async () => {
+  const r = await runMat();
+  r.api.matGo('advisory'); r.api.matTog(0, true);
+  const out = r.api.matRowsFor('advisory');
+  assert.equal(out.length, 1);
+  assert.ok(String(out[0].org).indexOf('정밀') < 0, '고른 것이라도 이름이 나가면 안 됩니다');
+  assert.ok(r.api.matText('advisory').indexOf('정밀') < 0);
+});
+
+test('★ 「지금 맡고 있는 것만」을 바꾸면 고른 것을 놓는다 — 번호가 다른 줄을 가리킨다', async () => {
+  const r = await runMat();
+  r.api.matGo('wiccok'); r.api.matTog(0, true);
+  r.api.matLiveTog();
+  assert.ok(r.el('matBox').innerHTML.indexOf('class="sel-bar"') < 0);
+});
+
+/* ═══════ 공고 모아보기 — ㅁ · № (대표 지시 2026-10-03) ═══════ */
+
+const FEED3 = [
+  { id: 'G1', src: '나라장터', no: 'R1-000', nm: '근무평정 대행 용역', type: '새 공고' },
+  { id: 'G2', src: '나라장터', no: 'R2-000', nm: '조직진단 용역', type: '새 공고' },
+  { id: 'G3', src: '알리오', no: '9', nm: '인사위원회 외부위원 공개모집', type: '관심' }
+];
+
+test('★★ 공고 줄마다 ㅁ 와 № 가 있다', () => {
+  const r = runApp({ feed: FEED3 });
+  r.api.draw();
+  const h = r.el('tb').innerHTML;
+  assert.equal(rowCount(h), 3);
+  assert.match(h, /<td class="rn">1<\/td>/);
+  assert.match(h, /<td class="rn">3<\/td>/);
+  assert.match(src, /<th class="chk"><input type="checkbox" id="fSelAll"/, '머리에 전체 고르기');
+  assert.match(src, /<th class="rn">№<\/th><th>출처<\/th>/);
+});
+
+test('★★ 고른 공고를 한꺼번에 관심으로 — 이미 관심인 것은 그대로', () => {
+  const r = runApp({ feed: FEED3 });
+  r.api.draw();
+  r.api.feedTog('G1', true); r.api.feedTog('G3', true);
+  assert.match(r.el('feedSel').innerHTML, /2건/);
+  r.api.feedBulk('star');
+  const f = JSON.parse(r.store.gov3_feed);
+  assert.deepEqual(f.map((x) => x.type), ['관심', '새 공고', '관심']);
+  assert.equal(r.el('feedSel').innerHTML, '', '하고 나면 고른 것을 놓는다');
+});
+
+test('★ 고른 것만 CSV 로 — 고르지 않은 것은 안 나간다', () => {
+  const r = runApp({ feed: FEED3 });
+  let blobText = '';
+  r.api.draw();
+  r.api.feedTog('G2', true);
+  // expCsv 는 Blob 을 만든다 — 가짜 Blob 이 받은 글을 본다
+  const ctxBlob = function (parts) { blobText = parts.join(''); };
+  r.setBlob(ctxBlob);
+  r.api.expCsv(true);
+  assert.match(blobText, /조직진단 용역/);
+  assert.ok(blobText.indexOf('근무평정') < 0);
+});
+
+test('★ 거르개로 안 보이게 된 줄은 고른 것에서 빠진다', () => {
+  const r = runApp({ feed: FEED3 });
+  r.api.draw();
+  r.api.feedSelAll(true);
+  assert.match(r.el('feedSel').innerHTML, /3건/);
+  r.el('fSrc').value = '알리오';
+  r.api.draw();
+  assert.match(r.el('feedSel').innerHTML, /1건/, '안 보이는 것이 함께 숨겨지면 안 됩니다');
 });
