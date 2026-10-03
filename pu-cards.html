@@ -23864,13 +23864,41 @@ async function erpFillContact(o){
     phone:String(t.phone||'').trim(), bizPhone:'', fax:'', email:em,
     addedFrom: String(t.from||'mail'), addedBy: String(u.email||''), addedAt: Date.now(),
     isPrimary: (t.mode === 'replace' || !arr.filter(c=>c.isPrimary && !c.left).length) });
-  /* 대표 담당자 거울 칸 — «빈 칸만» 채운다 */
+  /* ══════ 대표 담당자 거울 칸 — «빈 칸만», 그리고 «한 사람»이어야 한다 ══════
+     ⚠ 이 셋(이름·이메일·전화)은 «한 사람»을 가리킨다. 그런데 칸마다 따로 「비었으면
+       채운다」로만 보면, 이름 칸에 이미 다른 사람이 있는데 이메일만 채워 넣는다.
+       그러면 한 줄이 «두 사람»을 섞어 적게 된다.
+
+     ⚠ 실제로 그렇게 됐다 (대표 검토 2026-10-03, 업체 한 곳 — 이름은 안 적는다)
+         대표담당 이름   홍길동 부장           ← 원래 있던 값 (그 회사 사람)
+         대표담당 전화   010-0000-0000        ← 원래 있던 값 (그 회사 사람)
+         대표담당 이메일  kim@darataxcpa.kr    ← 메일에서 새로 채운 값 (세무사무실 사람)
+       이름·전화는 그 회사 사람인데 이메일만 세무사무실 것이라, 한 사람처럼 보이는데 아니다.
+       그 업체는 세무사무실 전용 칸(taxOfficeName·taxEmail)이 따로 비어 있었다 —
+       거기로 갈 것이 대표담당 줄로 샌 것이다.
+
+     ★ 그래서 이름 칸이 «이미 다른 사람»이면 거울 칸을 아예 안 건드린다.
+       잃는 것은 없다 — 담당자 목록(contacts)에는 그대로 들어간다. 거울 칸은 «요약»일 뿐이다.
+     ⚠ 이름을 견주는 잣대를 새로 만들지 않는다 — ErpMatch._norm + _nameHit 을 쓴다.
+       그 둘은 이미 사람 이름에 쓰이고 있고(isContact), 「유석주이사」처럼 직책이 붙은
+       표기를 같은 사람으로 본다. 두 벌로 두면 한쪽만 고쳐진다.
+     ⚠ 들어오는 이름이 «없으면» 같은 사람인지 알 길이 없다 — 그때도 안 건드린다.
+       모르면서 붙이는 것이 이번에 생긴 일이다.
+     ⚠ 「이 사람으로 바꾼다」(mode==='replace')는 사람이 또렷이 고른 길이라 그대로 덮는다. */
   const blank = x => x===undefined || x===null || String(x).trim()==='';
+  const nrm = s => (typeof ErpMatch!=='undefined' && ErpMatch._norm)
+    ? ErpMatch._norm(s) : String(s||'').toLowerCase().replace(/\s/g,'');
+  const hit = (a,b) => (typeof ErpMatch!=='undefined' && ErpMatch._nameHit)
+    ? ErpMatch._nameHit(a,b) : (!!a && !!b && (a===b || a.indexOf(b)===0 || b.indexOf(a)===0));
+  const curNm = String(cur.primaryContactName||'').trim();
+  const newNm = String(t.name||'').trim();
+  /* 거울 칸을 채워도 되는가 — 이름 칸이 비었거나, 들어오는 사람이 «그 사람»일 때만 */
+  const samePerson = blank(curNm) || (!!newNm && hit(nrm(curNm), nrm(newNm)));
   const patch = { contacts:arr, updatedAt:Date.now() };
-  if(t.mode === 'replace' || blank(cur.primaryContactEmail)){
+  if(t.mode === 'replace' || (blank(cur.primaryContactEmail) && samePerson)){
     patch.primaryContactEmail = em;
-    if(String(t.name||'').trim() && blank(cur.primaryContactName))
-      patch.primaryContactName = String(t.name).trim();
+    if(newNm && blank(cur.primaryContactName))
+      patch.primaryContactName = newNm;
     if(String(t.phone||'').trim() && blank(cur.primaryContactPhone))
       patch.primaryContactPhone = String(t.phone).trim();
   }
