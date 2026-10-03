@@ -148,14 +148,14 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=41"></script>
+<script src="js/pu-ontology.js?v=43"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
      ⚠ pu-appbar 를 빼면 오른쪽 「즐겨찾기」 손잡이가 아예 안 뜬다.
      ⚠ pu-back 은 «싣기만» 하면 없는 것과 같다 — 아래에서 guard 로 «등록»해야 한다. -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=14"></script>
+<script src="js/pu-appbar.js?v=15"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script>
 <!-- 상단에 «로그인한 사람 이름» — 머리줄 #who 자리에 그린다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) -->
@@ -170,7 +170,7 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
      두 벌이 되면 한쪽만 고쳐져 고객사 이름이 새는 날이 온다. -->
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <script src="js/gov-career.js?v=1"></script>
-<script src="js/gov-g2b.js?v=3"></script>
+<script src="js/gov-g2b.js?v=4"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
 <script>
@@ -337,6 +337,13 @@ function toForm(id){
   var t=String(h.a[h.i].nm||'').slice(0,80);
   location.href='kcareer.html?go=form&t='+encodeURIComponent(t);
 }
+/* 출처가 빠진 채 담긴 옛 줄을 되살린다(2026-10-03 첫 실사용 32건). 멱등 — 있으면 건드리지 않는다. */
+function srcBackfill(){
+  var a=get('feed'), n=0;
+  a.forEach(function(r){ if(r && !r.src){ var g=GovG2b.guessSrc(r.no); if(g){ r.src=g; n++; } } });
+  if(n) set('feed',a);
+  return n;
+}
 function open2(id){ var h=find(id); if(h&&h.a[h.i].url) window.open(h.a[h.i].url,'_blank','noopener'); }
 function expCsv(){
   var rows=get('feed').filter(function(r){ return r&&!r.hidden; });
@@ -391,8 +398,21 @@ function cloudPush(){
   clearTimeout(_pushT);
   _pushT=setTimeout(function(){
     try{ fbDb.ref('gov/'+fbUid).set({ feed:get('feed'), kw:lsGet('kw'),
-      key_data:keyData(), key_biz:keyBiz(), last:lsGet('last'), at:Date.now() }).catch(function(){}); }catch(e){}
+      key_data:keyData(), key_biz:keyBiz(), last:lsGet('last'), at:Date.now() })
+      .then(function(){ _cloudFail=0; })
+      .catch(function(e){ cloudFailSay('저장', e); }); }catch(e){ cloudFailSay('저장', e); }
   },1200);
+}
+/* ⚠★ 클라우드가 막히면 «조용히» 넘기지 않는다 (2026-10-03).
+   앱이 생긴 날부터 gov/ 에 보안규칙이 없어 저장·불러오기가 통째로 막혀 있었는데
+   .catch(function(){}) 가 삼켜 아무도 몰랐다 — 다른 브라우저에서 넣은 인증키가 안 넘어왔다.
+   알림은 «처음 한 번»만(1.2초마다 뜨면 일을 못 한다). 다시 되면 표시를 놓는다. */
+var _cloudFail=0;
+function cloudFailSay(what, e){
+  _cloudFail++;
+  if(_cloudFail>1) return;
+  var why=(e && /permission/i.test(String(e.code||e.message||e))) ? '권한이 막혀 있습니다' : '인터넷을 확인해 주세요';
+  toast('⚠ 클라우드 '+what+' 실패 — '+why+'. 이 기기에만 담겼습니다');
 }
 async function cloudPull(){
   if(!fbDb||!fbUid) return;
@@ -403,7 +423,7 @@ async function cloudPull(){
     if(v.key_data && !keyData()) lsSet('key_data', v.key_data);
     if(v.key_biz && !keyBiz()) lsSet('key_biz', v.key_biz);
     if(v.last && !lsGet('last')) lsSet('last', v.last);
-  }catch(e){}
+  }catch(e){ cloudFailSay('불러오기', e); }
 }
 
 /* ═══ 신청 재료 — 경력관리에서 «읽기만» 한다 ═══
@@ -603,7 +623,7 @@ function boot(){
     var r=await whoAmI(u);
     if(!r.ok){ applyLock('lock', r.why); return; }
     applyLock('ok');
-    await cloudPull(); drawKw(); draw(); readyNote(); auto();
+    await cloudPull(); srcBackfill(); drawKw(); draw(); readyNote(); auto();
     /* 마지막으로 보던 문을 다시 연다 — 재료 탭이면 그때 받아온다(setTab 이 부른다) */
     setTab(lsGet('tab')==='mat' ? 'mat' : 'feed');
   });

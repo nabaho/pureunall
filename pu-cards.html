@@ -35,13 +35,13 @@
   if(i) i.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>\uD83D\uDCE7</text></svg>";
 }catch(e){} })();
 </script>
-<script src="js/pu-hwp-engine.js?v=16"></script>
+<script src="js/pu-hwp-engine.js?v=18"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=41"></script>
+<script src="js/pu-ontology.js?v=43"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
 <script src="js/pu-company-write.js?v=1"></script>
@@ -766,7 +766,18 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .mn-r.off{color:#94a3b8}
 .mn-r .nm{flex:none;width:96px;overflow:hidden;text-overflow:ellipsis;color:#1e293b}
 .mn-r .em{flex:none;width:190px;overflow:hidden;text-overflow:ellipsis;color:#64748b;font-size:12px}
-.mn-r .sj{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mn-r .sj{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:#475569}
+/* ☐ 네모·번호 (2026-10-03) — 번호는 갈래마다 1부터 */
+.mn-ck{flex:none;width:15px;height:15px;margin:0;cursor:pointer;accent-color:#2563eb}
+.mn-ck0{flex:none;width:15px}
+.mn-no{flex:none;width:22px;text-align:right;color:#94a3b8;font-size:12px;font-variant-numeric:tabular-nums}
+.mn-r.on{background:#eff6ff}
+.mn-sec .mn-ck{vertical-align:-2px;margin-right:8px}
+.mn-bulk{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:4px;background:#eff6ff;
+  border:1px solid #bfdbfe;border-radius:6px;font-size:13px;color:#1e40af}
+.mn-bulk button{font-family:inherit;font-size:12px;border:1px solid #bfdbfe;background:#ffffff;color:#1e40af;
+  border-radius:4px;padding:3px 10px;cursor:pointer}
+.mn-bulk button:hover{background:#bfdbfe}
 .mn-r .dt{flex:none;color:#94a3b8;font-size:12px}
 .mn-r button,.mn-find button{flex:none;font-family:inherit;font-size:12px;border:1px solid #cbd5e1;background:#ffffff;
   color:#475569;border-radius:4px;padding:3px 9px;cursor:pointer}
@@ -979,8 +990,6 @@ body.mailview #pu-backup-admin-button{display:none!important}
    ⚠ auto-fit 이라 창이 좁으면 저절로 한 줄로 돌아간다. */
 .msin{display:grid;grid-template-columns:repeat(auto-fit,minmax(390px,1fr));
   gap:0 20px;align-items:start}
-.msec h4{font-size:13.5px;margin:0 0 4px;color:#1e293b;padding-bottom:5px;
-  border-bottom:1px solid #e2e8f0}
 /* ── 📦 지난 메일 (대표 지시 2026-09-06) ──
    ⚠ 두 칸으로 갈리는 .msin 안이지만 이 덩이는 «한 칸을 다 쓴다» — 표가 들어가서
      반 칸에 넣으면 줄이 접힌다(grid-column:1/-1). */
@@ -1895,17 +1904,11 @@ table.sbox.tight td.none{padding:26px 8px}
 /* 선택한 탭 내용 — 버튼을 2열로 */
 .setpanel{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px;align-items:start}
 .setnote{grid-column:1/-1;font-size:12px;color:#94a3b8;line-height:1.6;margin:0 2px 4px}
-.setcard{break-inside:avoid;-webkit-column-break-inside:avoid;display:inline-block;width:100%;
-  background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 12px 5px;margin:0 0 12px;
-  box-shadow:0 1px 6px rgba(20,30,60,.04)}
-.setcard h3{margin:0 0 8px;font-size:13px;color:#1e293b;display:flex;align-items:center;gap:6px;font-weight:800}
 .setbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#f8fafc;border:1px solid #e2e8f0;
   border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:13px;font-weight:600;color:#1e293b;cursor:pointer;font-family:inherit}
 .setbtn:hover{background:#f8fafc;border-color:#bfdbfe}
 .setbtn .sdesc{margin-left:auto;font-size:11px;color:#94a3b8;font-weight:500;white-space:nowrap;
   min-width:0;overflow:hidden;text-overflow:ellipsis}   /* 2026-08-23: 긴 설명이 칸 밖으로 새 나갔다 */
-.setcard.danger{border-color:#fecaca;background:#f8fafc}
-.setcard.danger h3{color:#dc2626}
 .setbtn.danger{background:#fff;border-color:#fecaca;color:#dc2626}
 .setbtn.danger:hover{background:#e2e8f0;border-color:#f87171}
 .sidetab{display:flex;gap:5px;margin:8px 0 12px}
@@ -1914,13 +1917,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .sidetab button.on{background:#1e293b;color:#fff;border-color:#1e40af}
 .sidetab button span{font-size:11px;background:#1e40af;color:#bfdbfe;border-radius:99px;padding:1px 7px;font-weight:700}
 .sidetab button.on span{background:#1e40af;color:#fff}
-/* 셋으로 늘어나 한 줄이 좁아졌다. 이름과 숫자를 **위아래로 쌓는다** —
-   옆으로 붙이면 「사 / 업자」처럼 이름이 두 줄로 접혀 지저분했다(대표 지시 2026-08-10). */
-.sidetab3 button{flex-direction:column;gap:3px;padding:9px 2px 8px;font-size:12.5px;line-height:1.2}
-.sidetab3 button span{background:none;color:#60a5fa;padding:0;font-size:15px;font-weight:800;line-height:1.1}
-.sidetab3 button.on span{background:none;color:#fff}
-/* 숫자 자리가 비는 갈래(메일)도 높이를 맞춘다 — 안 맞추면 단추 하나만 짧아 삐뚤어 보인다 */
-.sidetab3 button i{font-style:normal;font-size:15px;font-weight:800;line-height:1.1;visibility:hidden}
 /* ── 갈래를 한 줄씩 세로로 (대표 지시 2026-08-12) ──
    옆으로 셋을 붙이니 칸이 좁아 이름이 접혔고, 갈래를 더 늘릴 자리도 없었다.
    한 줄씩 두면 이름·숫자가 넉넉하고 갈래를 더해도 모양이 안 무너진다. */
@@ -1961,12 +1957,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .coselbar button:hover{background:#eff6ff}
 .coselbar .comore{border-color:#d97706;color:#854d0e;background:#f8fafc}
 .coselbar .comore:hover{background:#fffbeb}
-/* 삭제 — 옆 단추들과 «다르게» 보여야 한다. 같은 회색이면 손이 미끄러진다.
-   ⚠ 반드시 .coselbar 안으로 한정한다 — 밖에 두면 다른 화면의 같은 이름까지 물든다. */
-.coselbar .codel{border-color:#fecaca;color:#991b1b;background:#fff}
-.coselbar .codel:hover{background:#f8fafc}
-.coselbar .coclear{border-color:#fecaca;color:#dc2626;background:#fff;margin-left:auto}
-.coselbar .coclear:hover{background:#e2e8f0}
 /* ★ 2026-08-31 정리 — 겉 단추를 넷으로 줄이면서 들어온 둘.
    가름선과 ✕(선택 해제). ✕ 는 «끄는» 것이라 다른 단추와 나란히 두지 않고 선 뒤에 세운다. */
 .coselbar .cosep{width:1px;height:18px;background:#bfdbfe;flex:none;margin:0 2px}
@@ -1999,9 +1989,6 @@ table.sbox.tight td.none{padding:26px 8px}
 /* ⚠ 폴더 안의 ＃탭 모양(#pcSide .coftab/.coftabadd)은 없앴다 — 탭은 이제 옆줄이 아니라
      윗줄(#pcErpTabs)에 명함·사업자의 탭 칩과 «같은 모양»으로 나온다(대표 지시 2026-08-17). */
 /* 기업 상세 나눠 보기 — 「몇 개씩」 칸과 쪽 옮기기 (명함 표의 #pcPageSize·#pcPager 와 같은 결) */
-.copgbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 8px;font-size:12.5px;color:#64748b}
-.copgbar .cnt b{color:#1e40af}
-.copgbar .sp{flex:1}
 .copgsize{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:5px 9px;
   font-family:inherit;font-size:12.5px;color:#1e293b;cursor:pointer}
 /* ── 기업 상세: 표만 구르고 쪽넘김은 화면에 붙는다 (대표 지시 2026-08-26) ──
@@ -2049,9 +2036,6 @@ table.sbox.tight td.none{padding:26px 8px}
   border:1px solid #fde68a;border-radius:9px;padding:1px 8px;font-weight:700;cursor:pointer;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 #pcCo td.cofd{white-space:nowrap;overflow:hidden}
-.coq{width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13.5px;font-family:inherit;margin:0 0 12px}
-.coq:focus{outline:0;border-color:#1e40af}
-.colist{border:1px solid #e2e8f0;border-radius:11px;background:#fff;overflow:hidden}
 /* 기업정보함 목록과 같은 결 — 한 줄에 한 회사, 왼쪽에 네모와 번호 */
 .cotbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:11px;table-layout:fixed}
 .cotbl thead th.cosort{cursor:pointer;user-select:none}
@@ -2135,10 +2119,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .corow .bits i.miss{background:#fef2f2;color:#991b1b;border-radius:7px;padding:2px 7px;
   display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .corow .mgr{margin-left:auto;font-size:11.5px;color:#64748b;white-space:nowrap}
-.codet{border:1px solid #e2e8f0;border-radius:11px;background:#fff;padding:6px 13px 13px}
-.codet .h{display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid #f8fafc;margin-bottom:6px}
-.codet .h b{font-size:16px;color:#1e293b}
-.codet .h .ty{font-size:11px;background:#e2e8f0;color:#1e40af;border:1px solid #bfdbfe;border-radius:9px;padding:1px 8px}
 .cof{display:flex;gap:12px;padding:7px 2px;border-bottom:1px solid #f8fafc;font-size:13.5px;align-items:flex-start}
 .cof:last-child{border-bottom:0}
 .cof span{flex:0 0 116px;color:#64748b;font-size:12.5px;padding-top:1px}
@@ -2263,20 +2243,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .pcitem.dropover{outline:2px dashed #60a5fa}
 .pchintside{font-size:11.5px;color:#60a5fa;line-height:1.7;padding:4px 8px}
 #pcMain{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
-/* 오른쪽 분류 패널 — 왼쪽과 같은 240px, 더 연한 색 */
-#pcRight{width:240px;flex-shrink:0;background:#f8fafc;color:#1e293b;border-left:1px solid #e2e8f0;overflow-y:auto;padding:18px 14px}
-#pcRight .rsec{font-size:11.5px;color:#64748b;letter-spacing:1px;margin:4px 4px 10px;font-weight:700}
-#pcRight .radd{display:flex;gap:6px;margin-bottom:12px}
-#pcRight .radd input{flex:1;min-width:0;padding:8px 10px;border:1px solid #bfdbfe;border-radius:8px;background:#fff;font-size:13px}
-#pcRight .radd button{flex-shrink:0;background:#1e40af;color:#fff;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700}
-#pcRight .ritem{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;font-size:13.5px;cursor:pointer;background:#fff;border:1px solid #e2e8f0;margin-bottom:6px}
-#pcRight .ritem:hover{border-color:#60a5fa;background:#f8fafc}
-#pcRight .ritem.on{background:#bfdbfe;border-color:#60a5fa;font-weight:700;color:#1e293b}
-#pcRight .ritem .cnt{margin-left:auto;font-size:11.5px;color:#94a3b8}
-#pcRight .ritem .edit{margin-left:6px;font-size:12px;color:#60a5fa;padding:2px 5px;border-radius:6px}
-#pcRight .ritem .edit:hover{background:#e2e8f0;color:#1e40af}
-#pcRight .ritem.dropover{outline:2px dashed #2563eb;background:#bfdbfe}
-#pcRight .rhint{font-size:11.5px;color:#60a5fa;line-height:1.7;padding:6px 4px}
 #pcTop{display:flex;gap:12px;padding:16px 24px;background:#fff;border-bottom:1px solid #f8fafc;align-items:center}
 /* 오른쪽 끝 묶음 — margin-left:auto 로 밀어 붙인다. 검색칸이 8cm 로 고정이라
    가운데 남는 자리를 이 묶음이 먹지 않게 flex 로 늘리지 않는다. */
@@ -2301,7 +2267,6 @@ table.sbox.tight td.none{padding:26px 8px}
 #pcSearch:focus{outline:none;border-color:#1e293b;background-color:#fff}
 .pcbtn-primary{background:#1e293b;color:#fff;border-radius:12px;padding:11px 18px;font-size:13.5px;font-weight:600}
 .pcbtn-primary:hover{background:#1e293b}
-.pcbtn-ghost{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;font-size:15px;color:#64748b}
 /* 상단 한 줄: 제목 · 탭 · 도구 (좁으면 뒤쪽 도구부터 다음 줄로 내려감) */
 /* ── 머리줄 키는 «데이터 한 줄»과 같다 (대표 지시 2026-08-29) ──
    "사업분류 박스 행 위아래 넓다 줄여달라" → "데이터 넣은 크기하고 같게 해라"
@@ -2347,7 +2312,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .bulkmove{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;cursor:pointer}
 .bulkmove em{display:block;color:#94a3b8;font-size:12.5px;font-style:normal}
 #pcPageSize{border:1px solid #e2e8f0;border-radius:11px;padding:8px 10px;font-size:13px;color:#1e293b;background:#fff;cursor:pointer}
-.pchint{font-size:12.5px;color:#94a3b8;padding:6px 22px 10px}
 /* 선택 도구 — 목록을 밀지 않게 화면 아래에 띄운다 (대표 승인 2026-08-08).
    예전에는 표 위에 한 줄이 끼어들어, 방금 고른 줄이 아래로 밀려 눈에서 사라졌다.
    자주 쓰는 넷만 겉에 두고 나머지는 ⋯ 안에 넣는다 — 특히 삭제를 「선택 해제」
@@ -2362,7 +2326,6 @@ table.sbox.tight td.none{padding:26px 8px}
 #pcSel .bar button{flex:none;border:1px solid #e2e8f0;background:#fff;border-radius:9px;
   padding:6px 11px;font-size:12.5px;font-weight:600;color:#1e293b;white-space:nowrap}
 #pcSel .bar button:hover{background:#f8fafc;border-color:#bfdbfe}
-#pcSel .bar button.red{color:#dc2626;border-color:#fecaca}
 #pcSel .bar button.icon{border:none;padding:6px 9px;font-size:15px;color:#94a3b8}
 #pcSel .bar button.icon:hover{background:#f8fafc;color:#1e293b}
 #pcTableWrap{flex:1;overflow:auto;padding:0 22px 26px}
@@ -2832,10 +2795,7 @@ body.pc #pcDetail{display:flex}
 .pkbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 10px;padding:8px 11px;
   border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;font-size:12.5px;color:#64748b}
 .pkbar.on{border-color:#bfdbfe;background:#f8fafc}
-.pkbar .pkall{display:flex;align-items:center;gap:6px;font-weight:700;color:#1e293b;cursor:pointer}
-.pkbar .pkall input{width:15px;height:15px;margin:0;cursor:pointer}
 .pkbar .pkn{color:#1e40af;font-weight:700}
-.pkbar .pkhint{color:#94a3b8;font-size:11.5px}
 .pkbar button{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:6px 11px;
   font-size:12px;font-weight:700;color:#1e293b;cursor:pointer;font-family:inherit}
 .pkbar button:hover{background:#f8fafc}
@@ -2889,18 +2849,8 @@ body.pc #pcDetail{display:flex}
 #pcDetail .pdacts button:hover{background:#e2e8f0;color:#1e40af;border-color:#bfdbfe}
 #pcDetail .pdacts button.danger{color:#dc2626}
 #pcDetail .pdmemo{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:11px;font-size:13px;color:#475569;white-space:pre-wrap;line-height:1.6}
-/* ★ 최종 전체 리뷰(2026-08-16) I5 — 밝은 바탕(#f8fafc)인데 글자색을 안 정해 두면
-   기본 팔레트(--ink:#f8fafc, 어두운 화면용)를 그대로 물려받아 **흰 바탕에 흰 글씨**가 된다.
-   폰에는 body.pc .modal 같은 밝은 테마 덮기가 없어 이알피 이력 칸이 통째로 안 보였다.
-   칸 자체에 어두운 색을 정해 제목 span(font-weight:700)과 .erphist-fee 가 물려받게 한다
-   — .erphist-meta/.erphist-brief 는 제 색이 있어 그대로다. */
-.erphist-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:#1e293b}
-.erphist-badge{background:#f8fafc;color:#1e40af;font-size:10.5px;padding:1px 7px;border-radius:6px}
-.erphist-meta{font-size:11.5px;color:#94a3b8;margin-top:4px}
-.erphist-fee{font-size:13px;margin-top:6px;font-weight:700}
-.erphist-brief{font-size:12.5px;color:#475569;margin-top:4px}
 /* ══════ 이 회사에서 한 일 — 깔때기·정렬 (대표 승인 목업 2026-08-24) ══════
-   ⚠ 위 .erphist-card 와 같은 까닭으로 **글자색을 반드시 정한다** — 안 정하면 폰에서
+   ⚠ **글자색을 반드시 정한다**(최종 전체 리뷰 2026-08-16 I5) — 밝은 바탕인데 안 정하면 폰에서
      어두운 팔레트를 물려받아 흰 바탕에 흰 글씨가 된다(2026-08-16 에 겪은 그 일).
    ⚠ 금액은 tabular-nums 로 자릿수를 고정한다. 안 하면 위아래 숫자가 어긋나 눈으로
      견줄 수 없다 — 이 칸의 존재 이유가 「얼마였나」를 보는 것이다. */
@@ -3067,12 +3017,6 @@ body.pc #pcDetail{display:flex}
 #cardsLogin .cl-mark{width:44px;height:44px;border-radius:12px;background:#1e293b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
 #cardsLogin .cl-name{font-size:18px;font-weight:800;color:#1e293b}
 #cardsLogin .cl-sub{font-size:12px;color:#94a3b8;margin-top:2px}
-#cardsLogin .cl-field{margin-bottom:14px}
-#cardsLogin .cl-field label{display:block;font-size:12.5px;color:#64748b;margin-bottom:6px}
-#cardsLogin .cl-field input{width:100%;padding:11px 14px;border:1px solid #e2e8f0;border-radius:11px;font-size:14px;box-sizing:border-box}
-#cardsLogin .cl-field input:focus{outline:none;border-color:#1e293b}
-#cardsLogin .cl-remember{display:flex;align-items:center;gap:7px;font-size:13px;color:#64748b;margin-bottom:16px;cursor:pointer}
-#cardsLogin .cl-err{background:#e2e8f0;color:#dc2626;font-size:13px;padding:9px 12px;border-radius:10px;margin-bottom:12px}
 #cardsLogin .cl-btn{width:100%;padding:13px;background:#1e293b;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
 #cardsLogin .cl-btn:hover{background:#1e293b}
 #cardsLogin .cl-btn:disabled{opacity:.6;cursor:default}
@@ -3094,9 +3038,6 @@ body.pc #pcDetail{display:flex}
 .sm-sinfo{flex:1;min-width:0}
 .sm-sinfo .n{font-size:14px;font-weight:600;color:#1e293b}
 .sm-sinfo .f{font-size:12px;color:#94a3b8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sm-up{font-size:12px;color:#1e40af;border:1px solid #bfdbfe;border-radius:8px;padding:6px 11px;cursor:pointer;background:#fff;white-space:nowrap;flex-shrink:0}
-.sm-up:hover{background:#e2e8f0}
-.sm-hold{display:flex;align-items:center;gap:8px;padding:12px;border:1px dashed #cbd5e1;border-radius:10px;margin-bottom:16px;color:#94a3b8;font-size:13px}
 .sm-to{display:flex;gap:8px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 12px;margin-bottom:16px;font-size:13px;color:#64748b}
 .sm-send{width:100%;padding:13px;background:#1e293b;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
 .sm-send:hover{background:#1e293b}
@@ -3233,6 +3174,27 @@ body.pc #pcDetail{display:flex}
 .cerp-ch{margin:6px 0 0 18px;font-size:12px;line-height:1.7}
 .cerp-warn{font-size:12px;color:#854d0e;line-height:1.7;background:#fffbeb;
   border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-bottom:8px}
+/* 🔗 「이 회사가 맞나요?」 (2026-10-03) — ⚠ 이 창은 어두운 바탕이다. 글자는 화면 변수로 */
+.cerp-dim{font-size:11.5px;color:var(--sub);font-weight:400;margin-left:4px}
+.cerp-mini{padding:5px 10px;font-size:12px;white-space:nowrap;flex:none!important;width:auto!important}
+.cerp-cand{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;
+  padding:8px 10px;margin-bottom:6px}
+.cerp-cand.top{border-color:var(--orange)}
+.cerp-cn{flex:1;min-width:0;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cerp-cn > div{white-space:normal}
+.cerp-why{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:1px 8px;margin:3px 4px 0 0;
+  background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;white-space:nowrap}
+.cerp-why.weak{background:transparent;color:var(--sub);border-color:var(--line)}
+.cerp-acts{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+.cerp-who{font-size:13px;color:var(--ink);border:1px solid var(--orange);border-radius:10px;padding:9px 12px;
+  margin-bottom:8px;line-height:1.7}
+.cerp-who .cerp-mini{margin-left:6px}
+.cerp-sib{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink);margin:0 0 10px;cursor:pointer}
+.cerp-fix{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.cerp-fix label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--sub);flex:1;min-width:150px}
+.cerp-fix input{font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;
+  background:transparent;color:var(--ink)}
+.cpin{margin-right:4px;cursor:help}
 /* ══════ 👷 근로자 정보함 (대표 지시 2026-09-01) ══════
    ⚠ 표 한 칸은 «한 줄»이다 — 자리가 넓어도 두 줄로 만들지 않는다. 넘치면 …로 자른다.
    ⚠ 빈 값(0·없음)은 그리지 않는다 — 화면에 «없다»가 쌓이면 있는 것이 안 보인다. */
@@ -3328,7 +3290,7 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=14"></script>
+  <script src="js/pu-appbar.js?v=15"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -3902,7 +3864,7 @@ function backfillIdx(){
   }catch(_){}
 }
 
-const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', erpMgr:'', sort:'date', sortKey:null, sortDir:'desc', page:0, pageSize:100, selMode:false, sel:{}, collapsed:{}, colFilter:{}, hiddenCols:{}, colW:{}, colOrder:{}, onlyPhone:false, onlyEmail:false, onlyDup:false, onlyIncomplete:false, onlyPrivate:false, unlocked:{}, items:{}, groups:{}, trash:{}, views:{}, rules:{}, mailBlock:{},
+const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', erpMgr:'', sort:'date', sortKey:null, sortDir:'desc', page:0, pageSize:100, selMode:false, sel:{}, colFilter:{}, hiddenCols:{}, colW:{}, colOrder:{}, onlyPhone:false, onlyEmail:false, onlyDup:false, onlyIncomplete:false, onlyPrivate:false, unlocked:{}, items:{}, groups:{}, trash:{}, views:{}, rules:{}, mailBlock:{},
   isAdmin:false, privOpen:false, priv:{items:{},groups:{},trash:{}},
   /* 자료함 — 찾는 말·메일틀 갈래는 화면에만 쓰고 저장하지 않는다.
      sendLog 는 명함을 열 때만 그 명함 것을 읽어 담는다. */
@@ -3915,7 +3877,7 @@ const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', e
   coPage:0, coPageSize:200, coFTab:'',
   /* 👷 근로자 정보함 (대표 지시 2026-09-01) — 기업 상세와 같은 «화면» 방식이다.
      wkFolder 는 옆줄 갈래(''·group·case·doc), wkQ 는 이 화면의 찾기말. */
-  wkQ:'', wkPick:'', wkFolder:'', wkPage:0,
+  wkQ:'', wkFolder:'', wkPage:0,
   /* wkCase 는 지금 고른 «사건 탭»의 사건 열쇠(빈 값이면 전체), wkTabDone 은
      🚪 끝난 사건 탭을 펼쳐 뒀는지. 둘 다 화면에만 쓰고 저장하지 않는다. */
   wkCase:'', wkTabDone:false,
@@ -6841,7 +6803,7 @@ async function postAutoMail(payload){
    ⚠ 지금 «쓰는» 것은 「자료」 하나다 — 자료함에서 1:1 로 보낸 것.
      나머지는 3걸음(전 사업장 배포)이 쓴다. 그래도 갈래를 «지금부터» 적어 둔다 —
      나중에 붙이면 이미 쌓인 기록마다 사람이 다시 매겨야 한다(설계안 ②). */
-const SENT_KINDS = ['자료', '취업규칙', '근로계약서', '연차', '임금', '4대보험', '그 밖'];
+const SENT_KINDS = ['자료', '제안서', '계약서', '취업규칙', '근로계약서', '연차', '임금', '4대보험', '그 밖'];
 function sentKindOf(v){
   const t = String(v == null ? '' : v).trim();
   return SENT_KINDS.indexOf(t) >= 0 ? t : '그 밖';
@@ -7535,7 +7497,7 @@ function mgTableHtml(b){
   return h;
 }
 
-function mgFit(el){ el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
+function mgFit(el){ heFit(el); }   /* 같은 일 — 규칙은 heFit 한 곳에 둔다 */
 function mgFitAll(){ const b=$('mgedBody'); if(b) b.querySelectorAll('textarea').forEach(mgFit); }
 
 /* 화면을 다시 그리지 않는다 — 그리면 글 쓰던 자리를 잃는다 */
@@ -11231,49 +11193,6 @@ window.pucardsMoveThumbs = async function(){
   } finally { _quiet = false; render(); }
 };
 
-/* ── 한 번만 실행: 이미 쌓인 원본 사진을 800px 로 줄인다 ──
-   원본은 1600px 로 담겨 있어 장당 약 0.4MB × 4,400장 ≈ 1.7GB — 무료 저장 한도(1GB)를 이것 하나로 넘긴다.
-   파일 창고를 못 쓰는 계정이라(신규 버킷은 유료 전용) 줄이는 것 말고는 길이 없다.
-   ⚠ 화질은 되돌릴 수 없다. 한 장씩 받아 다시 만들어 덮어쓴다.
-   이미 800px 이하면 건드리지 않으므로 중간에 끊겨도 다시 실행하면 이어서 한다. */
-window.pucardsShrinkPhotos = async function(){
-  if(Store.mode!=='firebase'){ console.log('실시간 공유 모드에서만 됩니다'); return; }
-  /* 되돌릴 수 없는 작업이라 한 번 묻는다.
-     유료(Blaze)로 올려 사진을 파일 창고로 옮길 생각이면 **깎을 이유가 없다** —
-     창고로 가면 원본 화질 그대로 옮길 수 있다. 그 전에 깎으면 원본이 영영 사라진다. */
-  const yes = confirm(
-    '명함 사진을 800px(사업자등록증은 1400px)로 줄입니다.\n\n' +
-    '⚠ 화질은 되돌릴 수 없습니다. 원본 1600px 이 사라집니다.\n\n' +
-    '유료 요금제로 올려 파일 창고를 쓸 계획이라면 지금 줄이지 마세요 —\n' +
-    '창고로 옮기면 원본 화질 그대로 용량 문제가 해결됩니다.\n\n' +
-    '그래도 지금 줄이시겠습니까?');
-  if(!yes){ console.log('취소했습니다 — 사진은 그대로입니다.'); return; }
-  const ids = [];
-  Object.keys(state.items).forEach(id=>{ ids.push(id); ids.push(id+'_b'); });
-  console.log(`[기업정보함] 사진 줄이기 시작 — 확인할 자리 ${ids.length}곳. 오래 걸립니다(수 분). 창을 닫지 마세요.`);
-  let looked=0, shrunk=0, before=0, after=0, err=0;
-  for(const pid of ids){
-    looked++;
-    try{
-      const snap = await Store.db.ref(`${DB_ROOT}/photos/${pid}`).once('value');
-      const cur = snap.val();
-      if(!cur) continue;
-      const small = await shrinkForStore(cur, photoKeepMax(pid));   /* 사업자등록증은 덜 줄인다 */
-      if(small.length >= cur.length) continue;          /* 이미 작다 — 쓰지 않는다 */
-      await Store.db.ref(`${DB_ROOT}/photos/${pid}`).set(small);
-      Store.photoCache[pid] = small;
-      shrunk++; before += cur.length; after += small.length;
-    }catch(e){ err++; }
-    if(looked % 200 === 0){
-      console.log(`  ${looked} / ${ids.length} 확인 · ${shrunk}장 줄임 · ` +
-        `${(before/1048576).toFixed(0)}MB → ${(after/1048576).toFixed(0)}MB`);
-      toast(`사진 줄이는 중… ${looked}/${ids.length}`, 4000);
-    }
-  }
-  const saved = ((before-after)/1048576).toFixed(0);
-  console.log(`[기업정보함] 끝 — ${shrunk}장을 줄여 약 ${saved}MB 를 비웠습니다.` + (err?` (실패 ${err}건)`:''));
-  toast(`사진 ${shrunk}장 줄임 — 약 ${saved}MB 비움`);
-};
 
 /* ── ✎ 일괄 선택 모드 ── */
 /* ⚠ Task 5 리뷰(2026-08-15) — #subbar 의 「✎ 편집」 단추는 기업 상세 화면에서도
@@ -11987,12 +11906,6 @@ function enhance(dataUrl){
 const PHOTO_KEEP_MAX = 800;         // 명함
 const PHOTO_KEEP_MAX_DOC = 1400;    // 사업자등록증 등 A4 서류
 const PHOTO_KEEP_Q = 0.8;
-/* 그 사진이 붙은 항목이 사업자등록증이면 큰 쪽을 쓴다. id 뒤의 '_b'(뒷면)는 떼고 본다. */
-function photoKeepMax(photoId){
-  const base = String(photoId||'').replace(/_b$/, '');
-  const it = (typeof state !== 'undefined' && state.items) ? state.items[base] : null;
-  return (it && it.kind === 'biz') ? PHOTO_KEEP_MAX_DOC : PHOTO_KEEP_MAX;
-}
 function shrinkForStore(dataUrl, max){
   const MAX = max || PHOTO_KEEP_MAX;
   return new Promise(res=>{
@@ -12323,6 +12236,9 @@ async function saveEditor(){
     fav: editing.id ? !!state.items[editing.id]?.fav : false,
     createdAt: editing.id ? (state.items[editing.id]?.createdAt||Date.now()) : Date.now() };
   fields.forEach(([k])=> it[k]=$('f_'+k).value.trim());
+  /* ⚠ 확정한 업체 열쇠(erpCoId)를 넘겨받는다 — 이 저장은 명함을 «새로 지어» 통째로 덮는다(set).
+       안 넘기면 ✏ 한 번 고칠 때마다 「이 회사가 맞나요?」에서 정한 것이 조용히 사라진다(2026-10-03). */
+  if (editing.id && state.items[editing.id] && state.items[editing.id].erpCoId) it.erpCoId = state.items[editing.id].erpCoId;
   /* 둘째 칸을 규칙에 태운다 — 메인은 위 칸, 나머지는 mobileMore·emailMore.
      ⚠ 빈 값·겹친 값은 여기서 걷힌다. 색인(idxRecord)이 이 칸을 그대로 담아
        푸른이알피로 간다. */
@@ -13116,19 +13032,240 @@ function cardErpBizOf(it, items){
   return Object.keys(nums).length === 1 ? hits[0] : null;
 }
 
+/* ══════ 🔗 명함에 회사 이름이 틀렸을 때 — 「이 회사가 맞나요?」 (대표 지시 2026-10-03 · 목업 「추천대로」) ══════
+   「자문 또는 기타 급여등의 업체인데 명함 저장이 잘못되거나 다른회사이름으로 되어 있어
+    이런회사를 관리회사로 등록 하려고 하는데」
+
+   ■ 무엇이 문제였나
+     「🏢 업체관리에 올리기」는 «명함에 적힌 이름 그대로» 업체관리를 찾았다. 이름이 틀리면
+     이미 있는 거래처를 못 찾고 «틀린 이름으로 업체가 하나 더» 생기거나(같은 회사가 두 줄),
+     이름이 비슷한 «엉뚱한 업체»에 담당자가 붙었다.
+   ■ 그래서 창 맨 위에서 먼저 «어느 회사인지» 고르게 한다. 고르면 명함에 그 업체 열쇠
+     (erpCoId)를 적는다. 기업정보함의 회사 찾기(ErpMatch.match)는 «이미» 이것을 맨 먼저
+     본다 — 그래서 담당 배지·유형·「업체관리」 폴더·🚪 종료 표시가 «저절로» 맞는 회사를 따라간다.
+   ■ 대표 결정(「추천대로」)
+     ㉮ 명함에 적힌 이름은 «그대로» 두고 잇기만 한다 — 받은 명함 글자를 안 지운다.
+     ㉯ 같은 이름으로 적힌 다른 명함도 «함께» 잇는다(켜 둔 채로 연다).
+   ⚠ 후보는 «이름보다» 사업자번호·메일 주소 뒷부분·회사 전화를 먼저 믿는다 — 이름은 틀릴 수
+     있어서 이 창이 생긴 것이다. 무료 메일(네이버·지메일…)은 회사를 가리키지 않아 안 쓴다
+     (메일함의 MB_PUB_DOM 을 «그대로» 쓴다 — 목록을 두 벌 만들지 않는다).
+   ⚠ 세무사무실 메일(taxEmail)은 «안 본다» — 한 사무실이 여러 업체를 맡는다.
+   ⚠ 사람이 «어느 회사인지» 정했을 때만 명함에 열쇠를 적는다. 고르지 않고 올리면 예전 그대로
+     (번호 → 이름) 찾고, 명함에는 아무것도 안 적는다. */
+let _cardErpPin = '';      /* 고른 업체 id (업체관리 data/companies) */
+let _cardErpFix = null;    /* ✏ 업체관리에 없는 회사 — 진짜 상호·번호로 새로 올린다 */
+let _cardErpCands = [];    /* 창을 열 때 한 번 센 후보 */
+
+/* 업체관리에서 «이 명함의 회사일 것 같은» 곳 — 까닭과 함께, 믿을 만한 차례로.
+   recs = ErpMatch.byId 의 값들(이미 손에 든 것 — 새로 받아오는 것이 없다) */
+function cardErpCandidates(it, recs){
+  if(!it || !recs || !recs.length) return [];      /* 업체관리를 아직 못 읽었으면 셀 것이 없다 */
+  const dig = v => String(v == null ? '' : v).replace(/\D/g, '');
+  const dom = v => mbDomOf(String(v == null ? '' : v).trim().toLowerCase());
+  const pub = d => !d || MB_PUB_DOM.indexOf(d) >= 0 || d === 'pureun.kr';
+  const more = Array.isArray(it.emailMore) ? it.emailMore
+    : (it.emailMore ? String(it.emailMore).split(/[,;\s]+/) : []);
+  const myDoms = {};
+  [it.email].concat(more).forEach(e => { const d = dom(e); if(!pub(d)) myDoms[d] = 1; });
+  const myTels = {};
+  [it.companyTel, it.tel].forEach(t => { const d = dig(t); if(d.length >= 8) myTels[d] = 1; });
+  const myBiz = erpNormBiz(it.bizno);
+  const myName = erpNormName(it.company);
+  const out = [];
+  (recs || []).forEach(r => {
+    if(!r || !r.id) return;
+    const why = []; let score = 0;
+    if(myBiz && erpNormBiz(r.bizNo) === myBiz){ score += 100; why.push('🔢 같은 사업자번호'); }
+    const rd = {};
+    [r.email, r.taxInvoiceEmail].concat((r.people || []).map(p => p && p.email))
+      .forEach(e => { const d = dom(e); if(d) rd[d] = 1; });
+    const hit = Object.keys(myDoms).filter(d => rd[d])[0];
+    if(hit){ score += 60; why.push('✉ 같은 메일 주소 @' + hit); }
+    const rt = {};
+    [r.phone].concat((r.people || []).map(p => p && p.bizPhone))
+      .forEach(t => { const d = dig(t); if(d.length >= 8) rt[d] = 1; });
+    if(Object.keys(myTels).some(t => rt[t])){ score += 40; why.push('☎ 같은 회사 전화'); }
+    const rn = erpNormName(r.company || r.coName);
+    if(myName && rn){
+      if(rn === myName){ score += 30; why.push('같은 이름'); }
+      else if(Math.min(rn.length, myName.length) >= 3 && (rn.indexOf(myName) >= 0 || myName.indexOf(rn) >= 0)){
+        score += 15; why.push('이름이 비슷함');
+      }
+    }
+    if(score > 0) out.push({ rec: r, score: score, why: why });
+  });
+  out.sort((a, b) => b.score - a.score
+    || String(a.rec.company || '').localeCompare(String(b.rec.company || ''), 'ko'));
+  return out.slice(0, 5);
+}
+
+/* 같은 이름으로 적힌 다른 명함 — ㉯ 함께 잇는다.
+   ⚠ 이미 «다른» 업체로 확정된 명함은 안 건드린다 — 사람이 정한 것을 덮지 않는다.
+   ⚠ 회사 열쇠 다듬개(_norm)를 그대로 쓴다 — 새 다듬개를 만들지 않는다. */
+function cardErpSiblings(it, items){
+  const nm = _norm((it && it.company) || '');
+  if(!nm) return [];
+  return Object.keys(items || {}).filter(k => {
+    const x = items[k];
+    return x && k !== String(it.id) && x.kind === 'card' && !x._deletedAt && !x.erpCoId
+      && _norm(x.company || '') === nm;
+  });
+}
+
+/* 사람이 고른 것으로 «어느 업체에 붙일지»를 정한다. cardErpFind 와 같은 꼴을 돌려준다.
+   pin: 고른 업체 id · who: ✏ 바로잡은 {name, bizNo} */
+function cardErpTarget(list, it, biz, pin, who){
+  if(pin){
+    const cur = (list || []).filter(c => c && !c._deleted && String(c.id) === String(pin))[0];
+    if(!cur) return { stop: '고른 업체가 업체관리에 없습니다 — 그사이 지워졌을 수 있습니다. 「다시 고르기」로 골라 주세요' };
+    return { cur: cur, pinned: true };
+  }
+  /* ✏ 바로잡은 상호·번호로 «한 번 더» 찾는다 — 있으면 새로 안 만들고 거기에 잇는다 */
+  if(who) return cardErpFind(list, { company: who.name, bizno: who.bizNo }, null);
+  return cardErpFind(list, it, biz);
+}
+
+/* 명함(들)에 업체 열쇠를 적는다 — 그 두 칸만(erpCoId·updatedAt).
+   ⚠ updatedAt 을 함께 올린다 — 「바뀐 것만」 구독이 이 고침을 보게 (2026-09-18 결) */
+function cardErpPinCards(ids, coId){
+  const now = Date.now(), upd = {}, done = [];
+  (ids || []).forEach(id => {
+    if(!state.items[id]) return;
+    const R = Store._rootOf ? Store._rootOf(id) : DB_ROOT;
+    upd[R + '/items/' + id + '/erpCoId'] = coId ? String(coId) : null;
+    upd[R + '/items/' + id + '/updatedAt'] = now;
+    done.push(id);
+  });
+  if(!done.length) return Promise.resolve(0);
+  return Store.db.ref().update(upd).then(() => {
+    done.forEach(id => { const x = state.items[id]; if(!x) return;
+      if(coId) x.erpCoId = String(coId); else delete x.erpCoId; x.updatedAt = now; });
+    return done.length;
+  });
+}
+
+/* 창 맨 위 — 「이 회사가 맞나요?」. 고르는 동안 아래 양식(유형·주담당)은 그대로 둔다. */
+function cardErpWhoHtml(it, m, biz){
+  const id = esc(String(it.id || ''));
+  const byId = (typeof ErpMatch !== 'undefined' && ErpMatch.byId) || {};
+  const items = (typeof state !== 'undefined' && state.items) || {};
+  const fb = v => { const d = erpNormBiz(v); return d ? d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5) : ''; };
+  const meta = r => [fb(r.bizNo) || '사업자번호 없음', r.type || '', r.main ? '주담당 ' + r.main : '']
+    .filter(Boolean).map(esc).join(' · ') + (r.left ? ' · 🚪 끝난 업체' : '');
+  const whereOf = r => r === undefined
+    ? '푸른이알피 업체관리를 아직 못 읽었습니다 — 올릴 때 사업자번호로 다시 찾습니다.'
+    : !r
+    ? '푸른이알피 업체관리에 <b>없는</b> 회사입니다. 「업체관리에 올리기」를 누르면 새로 생깁니다.'
+    : r.left
+    ? `업체관리에 <b>끝난 업체</b>로 있습니다 (${esc(r.company || '')} · ${esc(r.type || '유형 없음')}).<br>`
+      + '「업체관리에 올리기」를 누르면 묻고 나서 다시 일하는 업체로 돌립니다.'
+    : `업체관리에 <b>${esc(r.company || '')}</b> (${esc(r.type || '유형 없음')}) 로 이미 있습니다.<br>`
+      + '새로 만들지 않고 그 업체에 이어 붙입니다 — 빈 칸과 담당자만 더합니다.';
+  const sib = cardErpSiblings(it, items);
+  const sibBox = sib.length
+    ? `<label class="cerp-sib"><input type="checkbox" id="cardErpSib" checked>
+        같은 이름(「${esc(it.company || '')}」)으로 적힌 다른 명함 <b>${sib.length}장</b>도 함께 잇기</label>` : '';
+  const keep = `<div class="cerp-note">명함에 적힌 이름 「${esc(it.company || '')}」 은 <b>그대로</b> 둡니다 —
+      회사는 업체 열쇠로 이어져, 이름이 달라도 안 끊깁니다.</div>`;
+
+  /* ① 골랐다 */
+  const r = _cardErpPin ? byId[String(_cardErpPin)] : null;
+  if(r){
+    return `<div class="cerp-who on">🔗 <b>${esc(r.company || '')}</b> <span class="cerp-dim">${meta(r)}</span> 로 잇습니다
+        <button class="btn ghost cerp-mini" onclick="cardErpRepick('${id}')">다시 고르기</button></div>
+      ${keep}${sibBox}
+      <div class="cerp-where">${whereOf(r)}</div>`;
+  }
+  /* ② ✏ 업체관리에 없는 회사 — 진짜 상호·번호로 */
+  if(_cardErpFix){
+    /* ⚠ 상호는 명함의 (틀린) 이름으로 «미리 안 채운다» — 그대로 누르면 틀린 이름으로 업체가 생긴다.
+         이 길은 이름이 틀렸을 때 오는 곳이다. 명함 이름은 칸 안의 안내 글자로만 보인다.
+       ⚠ 사업자등록증 상호도 안 쓴다 — 그 등록증은 명함의 «그 이름»으로 찾은 것이라 같은 이름이다. */
+    const nm0 = '';
+    const bz0 = it.bizno || (biz && biz.bizno) || '';
+    return `<div class="cerp-q">✏ 진짜 회사 정보로 새로 올리기
+        <button class="btn ghost cerp-mini" onclick="cardErpRepick('${id}')">← 후보로</button></div>
+      <div class="cerp-fix"><label>상호 <input id="cardErpFixName" value="${esc(nm0)}" placeholder="진짜 상호 (명함에는 「${esc(it.company || '')}」)"></label>
+        <label>사업자번호 <input id="cardErpFixBiz" value="${esc(bz0)}" placeholder="000-00-00000"></label></div>
+      ${keep}${sibBox}
+      <div class="cerp-where">업체관리에 <b>새로</b> 올립니다 — 위 상호·사업자번호로 만듭니다.<br>
+        같은 번호의 업체가 이미 있으면 <b>새로 안 만들고</b> 거기에 잇습니다.</div>`;
+  }
+  /* ③ 아직 안 골랐다 — 후보를 까닭과 함께 */
+  const rows = (_cardErpCands || []).map((c, i) => {
+    const why = c.why.map(w => `<span class="cerp-why${/같은 이름|비슷/.test(w) ? ' weak' : ''}">${esc(w)}</span>`).join('');
+    return `<div class="cerp-cand${i === 0 ? ' top' : ''}"><div class="cerp-cn"><b>${esc(c.rec.company || '')}</b>
+        <span class="cerp-dim">${meta(c.rec)}</span><div>${why}</div></div>
+      <button class="btn ghost cerp-mini" onclick="cardErpChoose('${id}','${esc(String(c.rec.id).replace(/'/g, "\\'"))}')">이 회사예요</button></div>`;
+  }).join('');
+  const bizNo = String(it.bizno || (biz && biz.bizno) || '');
+  return `<div class="cerp-q">이 명함의 회사가 맞나요? <span class="cerp-dim">명함에 적힌 이름 「${esc(it.company || '')}」</span></div>
+    ${rows || '<div class="cerp-note">업체관리에서 이 회사일 것 같은 곳을 못 찾았습니다.</div>'}
+    <div class="cerp-acts"><button class="btn ghost cerp-mini" onclick="cardErpSearchOpen('${id}')">🔍 업체관리에서 직접 찾기</button>
+      <button class="btn ghost cerp-mini" onclick="cardErpFixStart('${id}')">✏ 업체관리에 없는 회사예요</button></div>
+    <div id="cardErpQBox"></div>
+    <div class="cerp-where">${(_cardErpCands || []).length ? '<b>고르지 않고</b> 올리면 — 명함에 적힌 이름으로 찾습니다.<br>' : ''}${whereOf(m)}</div>
+    ${bizNo ? '' : `<div class="cerp-warn">⚠ 사업자번호가 없습니다. 번호 없이 올리면
+      나중에 같은 회사가 업체관리에 두 줄이 될 수 있습니다.</div>`}`;
+}
+function cardErpWhoPaint(id){
+  const it = state.items[id]; const el = $('cardErpWho');
+  if(!it || !el || String(id) !== _cardErpId) return;
+  const m = ErpMatch.ready ? ErpMatch.match(it) : undefined;
+  el.innerHTML = cardErpWhoHtml(it, m, cardErpBizOf(it, state.items));
+}
+function cardErpChoose(id, coId){ if(String(id) !== _cardErpId) return;
+  _cardErpPin = String(coId || ''); _cardErpFix = null; cardErpWhoPaint(id); }
+function cardErpRepick(id){ if(String(id) !== _cardErpId) return;
+  _cardErpPin = ''; _cardErpFix = null; cardErpWhoPaint(id); }
+function cardErpFixStart(id){ if(String(id) !== _cardErpId) return;
+  _cardErpPin = ''; _cardErpFix = {}; cardErpWhoPaint(id); }
+/* 명함 목록 회사 칸의 🔗 — 확정한 업체 이름이 명함에 적힌 이름과 «다를 때만» 보인다.
+   같으면 굳이 안 그린다(칸이 좁다). 무엇으로 확정됐는지는 마우스를 올리면 나온다. */
+function cardPinMark(it){
+  if(!it || !it.erpCoId || typeof ErpMatch === 'undefined' || !ErpMatch.byId) return '';
+  const r = ErpMatch.byId[String(it.erpCoId)];
+  if(!r) return '';
+  const nm = r.company || r.coName || '';
+  if(_norm(nm) === _norm(it.company || '')) return '';
+  const d = erpNormBiz(r.bizNo);
+  const tip = '푸른이알피 업체 「' + nm + '」' + (d ? ' (' + d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5) + ')' : '')
+    + ' 로 확정됨 — 명함에 적힌 이름은 그대로 둡니다';
+  return `<span class="cpin" title="${esc(tip)}">🔗</span>`;
+}
+/* 🔍 직접 찾기 — 기업 상세의 「업체 고르기」와 «같은» 찾개(coErpSearch)를 쓴다 */
+function cardErpSearchOpen(id){
+  const box = $('cardErpQBox'); if(!box || String(id) !== _cardErpId) return;
+  box.innerHTML = `<input id="cardErpQ" class="cerp-sel" placeholder="상호 또는 사업자번호"
+      oninput="cardErpSearch('${esc(String(id))}')"><div id="cardErpQR"></div>`;
+  const q = $('cardErpQ'); if(q) q.focus();
+}
+function cardErpSearch(id){
+  const q = $('cardErpQ'), out = $('cardErpQR'); if(!q || !out || String(id) !== _cardErpId) return;
+  const hits = coErpSearch(ErpMatch.companies || [], q.value, 8);
+  const byId = ErpMatch.byId || {};
+  out.innerHTML = hits.length ? hits.map(co => {
+    const r = byId[String(co.id)] || {};
+    return `<div class="cerp-cand"><div class="cerp-cn"><b>${esc(co.name || '')}</b>
+        <span class="cerp-dim">${esc(erpNormBiz(co.bizNo) || '사업자번호 없음')}${r.type ? ' · ' + esc(r.type) : ''}${r.main ? ' · ' + esc(r.main) : ''}</span></div>
+      <button class="btn ghost cerp-mini" onclick="cardErpChoose('${esc(String(id))}','${esc(String(co.id).replace(/'/g, "\\'"))}')">이 회사예요</button></div>`;
+  }).join('') : `<div class="cerp-note">${q.value.trim() ? '맞는 업체가 없습니다 — 상호 일부나 사업자번호로 찾아 보세요' : '상호나 사업자번호를 쳐 주세요'}</div>`;
+}
+
 /* 계약 창에 넘길 쪽지 — 값이 있는 칸만 싣는다.
    ⚠ 빈 글자를 실으면 받는 쪽이 「이미 채워진 칸」으로 읽어 빈 칸이 영영 안 채워진다.
    ⚠ 명함의 전화·팩스·메일은 «그 사람» 것이다 — 회사 칸이 아니라 담당자 줄로 보낸다.
      회사 칸에는 회사 대표번호·회사 팩스·회사 주소만 간다. */
-function cardErpSeed(it, picked, biz, now){
+function cardErpSeed(it, picked, biz, now, who){
   const types = CARD_ERP_TYPES.filter(t => (picked || []).indexOf(t) >= 0);
   if(!it || !types.length) return null;
   const s = v => String(v == null ? '' : v).trim();
   const b = biz || {};
   const co = {};
   const put = (k, v) => { const x = s(v); if(x) co[k] = x; };
-  put('name', it.company);
-  put('bizNo', it.bizno || b.bizno);
+  /* 고른 회사(who)가 있으면 그 상호·번호다 — 명함에 적힌 이름은 틀렸을 수 있다(2026-10-03) */
+  put('name', (who && who.name) || it.company);
+  put('bizNo', (who && who.bizNo) || it.bizno || b.bizno);
   put('ceo', b.ceo);
   put('phone', it.companyTel || b.companyTel);
   put('fax', it.companyFax || b.companyFax);
@@ -13147,19 +13284,11 @@ function cardErpSeed(it, picked, biz, now){
 }
 
 /* 고르는 창. m = ErpMatch.match(it) (못 읽었으면 undefined), biz = cardErpBizOf 결과,
-   staff = ErpMatch.staff (주담당 고르개) */
+   staff = ErpMatch.staff (주담당 고르개)
+   ⚠ 맨 위(#cardErpWho)는 «어느 회사인지»(2026-10-03) — 고르면 그 자리만 다시 그린다.
+     아래 양식(유형·주담당)을 통째로 다시 그리면 이미 고른 칸이 지워진다. */
 function cardErpHtml(it, m, biz, staff){
   const id = esc(String(it.id || ''));
-  const bizNo = String(it.bizno || (biz && biz.bizno) || '');
-  const where = m === undefined
-    ? '푸른이알피 업체관리를 아직 못 읽었습니다 — 올릴 때 사업자번호로 다시 찾습니다.'
-    : !m
-    ? '푸른이알피 업체관리에 <b>없는</b> 회사입니다. 「업체관리에 올리기」를 누르면 새로 생깁니다.'
-    : m.left
-    ? `업체관리에 <b>끝난 업체</b>로 있습니다 (${esc(m.company || '')} · ${esc(m.type || '유형 없음')}).<br>`
-      + '「업체관리에 올리기」를 누르면 묻고 나서 다시 일하는 업체로 돌립니다.'
-    : `업체관리에 <b>${esc(m.company || '')}</b> (${esc(m.type || '유형 없음')}) 로 이미 있습니다.<br>`
-      + '새로 만들지 않고 그 업체에 이어 붙입니다 — 빈 칸과 담당자만 더합니다.';
   const boxes = CARD_ERP_TYPES.map(t =>
     `<label class="cerp-t"><input type="checkbox" name="cardErpT" value="${esc(t)}"> ${esc(t)}</label>`).join('');
   const people = cardErpStaffOpts(staff).map(u =>
@@ -13167,15 +13296,13 @@ function cardErpHtml(it, m, biz, staff){
   return `
     <div class="mhead"><b>🏢 푸른이알피로 — ${esc(it.company || '')}</b>
       <button class="iconbtn" onclick="closeCardErp()">✕</button></div>
-    <div class="cerp-where">${where}</div>
+    <div id="cardErpWho">${cardErpWhoHtml(it, m, biz)}</div>
     <div class="cerp-q">무엇으로 맡기로 했나요?</div>
     <div class="cerp-ts">${boxes}</div>
     <div class="cerp-note">업체관리는 한 회사에 유형을 <b>하나</b>만 둡니다. 여럿 고르시면 첫째를 유형으로 하고,
       나머지는 메모에 적어 둡니다.</div>
     <div class="cerp-q">주담당</div>
     <select id="cardErpSid" class="cerp-sel"><option value="">— 나중에 정합니다 —</option>${people}</select>
-    ${bizNo ? '' : `<div class="cerp-warn">⚠ 사업자번호가 없습니다. 번호 없이 올리면
-      나중에 같은 회사가 업체관리에 두 줄이 될 수 있습니다.</div>`}
     <div class="cerp-note">「🏢 업체관리에 올리기」를 누르면 회사와 담당자가 푸른이알피 업체관리에 <b>바로</b> 올라가고,
       업체관리를 보는 모든 곳(업무관리·뉴스레터·메일함·급여관리 등)에 나타납니다.
       자문료·계약기간은 그다음 계약 창에서 넣습니다.</div>
@@ -13191,21 +13318,57 @@ function sendToErp(id){
   if(!it.company) return toast('회사명이 없어 푸른이알피로 보낼 수 없습니다 — 먼저 회사를 적어 주세요', 6000);
   _cardErpId = String(id);
   _cardErpPicked = [];
+  /* 「이 회사가 맞나요?」 — 열 때 한 번 센다. 이미 확정해 둔 명함이면 그 업체를 고른 채로 연다 */
+  const byId = ErpMatch.byId || {};
+  _cardErpFix = null;
+  _cardErpPin = (it.erpCoId && byId[String(it.erpCoId)]) ? String(it.erpCoId) : '';
+  _cardErpCands = cardErpCandidates(it, Object.keys(byId).map(k => byId[k]));
   const m = ErpMatch.ready ? ErpMatch.match(it) : undefined;
   $('cardErpM').innerHTML = cardErpHtml(it, m, cardErpBizOf(it, state.items), ErpMatch.staff);
   $('cardErpBg').classList.add('open');
 }
-function closeCardErp(){ $('cardErpBg').classList.remove('open'); _cardErpId = ''; }
+function closeCardErp(){ $('cardErpBg').classList.remove('open'); _cardErpId = ''; _cardErpPin = ''; _cardErpFix = null; }
+
+/* 고른 회사(또는 ✏ 바로잡은 것)를 쪽지·저장에 쓸 꼴로 — 없으면 null(예전 그대로) */
+function cardErpWho(){
+  /* 올린 «뒤» — 바로잡은 칸은 이미 창에서 사라졌다. 올린 결과를 그대로 쓴다 */
+  if(_cardErpFix && _cardErpFix.done) return { name: _cardErpFix.name || '', bizNo: _cardErpFix.bizNo || '', id: _cardErpFix.id || '' };
+  if(_cardErpPin){
+    const r = (ErpMatch.byId || {})[String(_cardErpPin)];
+    return r ? { name: r.company || r.coName || '', bizNo: r.bizNo || '', id: String(_cardErpPin) } : null;
+  }
+  if(_cardErpFix){
+    const n = document.getElementById('cardErpFixName'), b = document.getElementById('cardErpFixBiz');
+    return { name: String((n && n.value) || '').trim(), bizNo: String((b && b.value) || '').trim(), id: '' };
+  }
+  return null;
+}
+/* 고른 회사와 «번호가 맞는» 사업자등록증만 쓴다 — 명함의 틀린 이름으로 찾은 등록증은
+   «남의 회사» 것일 수 있다(대표자·주소·업태가 엉뚱한 업체 빈 칸에 들어간다). */
+function cardErpBizFor(it, who){
+  const b = cardErpBizOf(it, state.items);
+  if(!who) return b;
+  return (b && erpNormBiz(b.bizno) && erpNormBiz(b.bizno) === erpNormBiz(who.bizNo)) ? b : null;
+}
 function cardErpGo(id){
   const it = state.items[id]; if(!it || String(id) !== _cardErpId) return;
   /* 올린 뒤 창에는 고르개가 없다 — 올릴 때 고른 것을 쓴다 */
   let picked = Array.from(document.querySelectorAll('#cardErpM input[name="cardErpT"]:checked')).map(x => x.value);
   if(!picked.length) picked = _cardErpPicked.slice();
   if(!picked.length) return toast('자문·급여·노조·기금 가운데 하나를 골라 주세요', 5000);
-  const seed = cardErpSeed(it, picked, cardErpBizOf(it, state.items), Date.now());
+  const who = cardErpWho();
+  if(who && !who.name) return toast('상호를 적어 주세요', 5000);
+  const seed = cardErpSeed(it, picked, cardErpBizFor(it, who), Date.now(), who);
   if(!seed) return toast('보낼 내용을 만들지 못했습니다', 5000);
   try{ localStorage.setItem(CARD_ERP_SEED_KEY, JSON.stringify(seed)); }
   catch(e){ return toast('푸른이알피로 넘기지 못했습니다: ' + ((e && e.message) || e), 7000); }
+  /* 이미 있는 업체를 «골랐으면» 명함에도 적어 둔다(사람이 정한 것이다). 바로잡아 새로 가는
+     길은 업체가 아직 없어 못 적는다 — 계약 창에서 생긴 뒤 다시 열면 후보 맨 위에 뜬다. */
+  if(who && who.id){
+    const sib = document.getElementById('cardErpSib');
+    const ids = [String(it.id)].concat(sib && sib.checked ? cardErpSiblings(it, state.items) : []);
+    cardErpPinCards(ids, who.id).catch(e => toast('명함에 업체를 적지 못했습니다: ' + ((e && e.message) || e), 7000));
+  }
   closeCardErp();
   /* 사진첩의 「계약 등록」과 «같은 창»을 쓴다 — 보던 푸른이알피 화면(쓰던 창)을 덮지 않는다 */
   const url = 'pu-erp.html#menu=biz/contract';
@@ -13283,7 +13446,8 @@ function cardErpNewRec(it, biz, picked, opt){
   return {
     id: 'co-' + Number(o.now).toString(36) + Math.random().toString(36).slice(2, 7),
     entityType: 'Organization',
-    name: s(it.company), bizNo: s(it.bizno || b.bizno), ceo: s(b.ceo),
+    /* ✏ 바로잡았으면(o.who) 그 상호·번호다 — 명함에 적힌 이름은 그대로 두고 (2026-10-03) */
+    name: s((o.who && o.who.name) || it.company), bizNo: s((o.who && o.who.bizNo) || it.bizno || b.bizno), ceo: s(b.ceo),
     address: s(it.companyAddr || b.address), phone: s(it.companyTel || b.companyTel),
     fax: s(it.companyFax || b.companyFax), email: '',
     bizType: s(b.bizType), bizCategory: s(b.bizItem),
@@ -13379,9 +13543,26 @@ async function cardErpSync(id){
   const W = window.PuCompanyWrite;
   if(Store.mode !== 'firebase' || !W || typeof W.save !== 'function')
     return toast('업체관리에 쓸 수 없습니다 — 로그인·연결을 확인해 주세요', 7000);
+  /* 사람이 «어느 회사인지» 정했나 — 안 정했으면 who 는 null 이고 예전 그대로 찾는다 */
+  const who = cardErpWho();
+  if(who && !who.name) return toast('상호를 적어 주세요', 5000);
+  /* ⚠ 다시 그리기 전에 읽어 둔다 — 올린 뒤 창(cardErpDone)이 이 칸을 지운다 */
+  const sibEl = document.getElementById('cardErpSib');
+  const withSib = !!(sibEl && sibEl.checked);
+  /* 고르지 않았는데 «번호·메일·전화가 맞는» 다른 업체가 있으면 한 번 묻는다 —
+     그대로 두면 이름으로 찾아 새 업체가 하나 더 생길 수 있다(이 창이 생긴 까닭). */
+  if(!who){
+    const m0 = ErpMatch.ready ? ErpMatch.match(it) : null;
+    const strong = (_cardErpCands || []).filter(c => c.score >= 40 && !(m0 && String(m0.id) === String(c.rec.id)));
+    if(strong.length && !confirm('업체관리에 이 회사일 것 같은 곳이 있습니다 — 「' + (strong[0].rec.company || '')
+      + '」 (' + strong[0].why.join(' · ') + ')\n\n고르지 않고 명함에 적힌 이름 그대로 올릴까요?\n'
+      + '같은 회사면 「취소」를 누르고 위에서 「이 회사예요」를 눌러 주세요.')) return;
+  }
   const sidEl = document.getElementById('cardErpSid');
   const sid = String((sidEl && sidEl.value) || '');
-  const biz = cardErpBizOf(it, state.items);
+  /* ⚠ 등록증은 «여기 한 번» 거른다 — 고른 업체(who)의 번호와 맞는 것만. 명함의 틀린 이름으로
+       찾은 등록증은 남의 회사 것이라 대표자·주소·업태가 엉뚱한 업체 빈 칸에 들어간다. */
+  let biz = cardErpBizFor(it, who);
   const u = firebase.auth().currentUser;
   const by = (u && u.email) || '';
   const db = firebase.database();
@@ -13395,14 +13576,31 @@ async function cardErpSync(id){
   if(Array.isArray(raw)) return toast('업체관리 자료가 옛 꼴(배열)이라 여기서 쓰지 않습니다 — 계약 창으로 올려 주세요', 8000);
   const obj = (raw && typeof raw === 'object') ? raw : {};
   const list = Object.keys(obj).map(k => obj[k]).filter(Boolean);
-  const found = cardErpFind(list, it, biz);
+  const found = cardErpTarget(list, it, biz, who && who.id, who && !who.id ? who : null);
   if(found.stop){
     if(found.toContract && confirm('⚠ ' + found.stop + '\n\n계약 창을 열까요? (계약 창에서 업체를 직접 고를 수 있습니다)')) cardErpGo(id);
     else if(!found.toContract) toast(found.stop, 9000);
     return;
   }
+  /* 고른 업체와 명함의 사업자번호가 «둘 다 있는데 다르면» 한 번 묻는다 — 잘못 골랐을 수 있다 */
+  if(found.pinned){
+    const a = erpNormBiz(it.bizno), b = erpNormBiz(found.cur.bizNo);
+    if(a && b && a !== b && !confirm('명함의 사업자번호(' + it.bizno + ')와 고른 업체 「' + (found.cur.name || '')
+      + '」의 번호(' + found.cur.bizNo + ')가 다릅니다.\n\n그래도 이 업체로 이을까요?')) return;
+  }
   const now = Date.now();
-  const opt = { now: now, by: by, sid: sid };
+  const opt = { now: now, by: by, sid: sid, who: who };
+  /* 사람이 «어느 회사인지» 정했으면 명함(과 같은 이름 명함)에 그 업체 열쇠를 적는다.
+     ⚠ 업체관리 쓰기가 끝난 «뒤»에만 — 안 올라간 업체를 가리키면 안 된다. */
+  const pinTo = async (co) => {
+    const coId = co && co.id;
+    if(!who || !coId) return 0;
+    /* 올린 뒤 「📋 계약 창 열기」가 바로잡은 칸 없이도 이 업체를 쓰게 기억해 둔다 */
+    _cardErpFix = { done: true, id: String(coId), name: co.name || '', bizNo: co.bizNo || '' }; _cardErpPin = '';
+    const ids = [String(it.id)].concat(withSib ? cardErpSiblings(it, state.items) : []);
+    try{ return await cardErpPinCards(ids, coId); }
+    catch(e){ toast('업체관리에는 올렸지만 명함에 업체를 적지 못했습니다: ' + ((e && e.message) || e), 9000); return 0; }
+  };
   let rec, prev = null, changes, warn = [];
   if(found.cur){
     const cur = found.cur;
@@ -13413,13 +13611,15 @@ async function cardErpSync(id){
     const m = cardErpMerge(cur, it, biz, picked, opt);
     if(m.same){
       _cardErpPicked = picked;
-      cardErpDone(it, cur, [], m.warn, false);
+      const n0 = await pinTo(cur);
+      cardErpDone(it, cur, [], m.warn, false, n0);
       return;
     }
     if(m.revive && !confirm('「' + (cur.name || '') + '」 는 업체관리에 «끝난 업체»로 있습니다.\n\n다시 일하는 업체로 돌릴까요?')) return;
     rec = m.rec; prev = cur; changes = m.changes; warn = m.warn;
   } else {
-    if(!erpNormBiz(it.bizno || (biz && biz.bizno)) && !confirm('⚠ 사업자번호 없이 업체관리에 새로 올립니다.\n\n'
+    const bz = (who && who.bizNo) || it.bizno || (biz && biz.bizno);
+    if(!erpNormBiz(bz) && !confirm('⚠ 사업자번호 없이 업체관리에 새로 올립니다.\n\n'
       + '나중에 같은 회사가 번호와 함께 들어오면 두 줄이 될 수 있습니다. 그래도 올릴까요?')) return;
     rec = cardErpNewRec(it, biz, picked, opt);
     changes = ['새 업체'];
@@ -13433,11 +13633,12 @@ async function cardErpSync(id){
     return toast('업체관리에 올리지 못했습니다: ' + ((e && e.message) || e), 9000);
   }
   _cardErpPicked = picked;
+  const pinned = await pinTo(rec);
   if(typeof ErpMatch !== 'undefined' && ErpMatch.load) ErpMatch.load();   // 명함이 「업체관리」 폴더로 간다
-  cardErpDone(it, rec, changes, warn, !prev);
+  cardErpDone(it, rec, changes, warn, !prev, pinned);
 }
 /* 올린 뒤 창 — 무엇이 바뀌었는지, 어디에 퍼지는지, 다음에 할 일 */
-function cardErpDone(it, co, changes, warn, made){
+function cardErpDone(it, co, changes, warn, made, pinned){
   const id = esc(String(it.id || ''));
   const lines = (changes || []).map(x => `<li>${esc(x)}</li>`).join('');
   const warns = (warn || []).map(x => `<div class="cerp-warn">⚠ ${esc(x)}</div>`).join('');
@@ -13448,6 +13649,8 @@ function cardErpDone(it, co, changes, warn, made){
         ? (made ? '업체관리에 <b>새로 올렸습니다</b>' : '업체관리의 그 업체에 <b>이어 붙였습니다</b>')
           + ` — 「${esc(co.typeCode || '')}」 탭<ul class="cerp-ch">${lines}</ul>`
         : '업체관리에 <b>이미 다 들어 있습니다</b> — 바꾼 것이 없습니다.' }</div>
+    ${pinned ? `<div class="cerp-who on">🔗 명함 <b>${pinned}장</b>을 이 업체로 확정했습니다 —
+      명함에 적힌 이름은 그대로 두고, 담당·유형·폴더는 이 업체를 따라갑니다.</div>` : ''}
     ${warns}
     <div class="cerp-note">업체관리를 보는 곳 — 푸른이알피·업무관리·뉴스레터·메일함·급여관리·급여데이터함·
       취업규칙·문서관리(서식 채우기)에 이 회사와 담당자가 나타납니다(열려 있는 화면은 곧 다시 읽습니다).<br>
@@ -13457,7 +13660,6 @@ function cardErpDone(it, co, changes, warn, made){
       <button class="btn ghost" onclick="closeCardErp()">닫기</button>
       <button class="btn primary" onclick="cardErpGo('${id}')">📋 계약 창 열기 (자문료·기간)</button></div>`;
 }
-
 /* ════════════ 설정 ════════════
    ⚠ 2026-08-17 — **AI 열쇠 입력칸을 없앴다.** 열쇠는 서버가 든다.
      칸을 남겨 두면 직원이 다시 열쇠를 브라우저(·실시간DB)에 넣게 되고,
@@ -23366,15 +23568,22 @@ async function erpUnfillContact(coId, email){
   if(typeof ErpMatch!=='undefined' && ErpMatch.load) ErpMatch.load();
   return { ok:true, removed:true };
 }
+/* 하나 되돌리기 — 묻지 않는다(묻는 것은 부르는 쪽). 성공하면 true */
+async function mnewUndoOne(key){
+  const rec = (_mnewAutoLog||{})[key];
+  if(!rec || rec.undone) return false;
+  const r = await erpUnfillContact(rec.co, rec.em);
+  if(!r.ok) throw new Error(r.why || '되돌리지 못했습니다');
+  rec.undone = Date.now();
+  await firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + key + '/undone').set(rec.undone);
+  return true;
+}
 async function mnewUndo(key, quiet){
   const rec = (_mnewAutoLog||{})[key];
   if(!rec || rec.undone) return;
   if(!quiet && !confirm(`「${rec.coName}」 담당자에서 ${rec.em} 을 뺍니다.\n\n저절로 채운 줄만 뺍니다 — 사람이 넣은 것은 그대로 둡니다.\n이 주소는 다시 저절로 채우지 않습니다.`)) return;
   try{
-    const r = await erpUnfillContact(rec.co, rec.em);
-    if(!r.ok) return toast(r.why, 8000);
-    rec.undone = Date.now();
-    await firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + key + '/undone').set(rec.undone);
+    try{ await mnewUndoOne(key); }catch(e){ return toast((e&&e.message)||String(e), 8000); }
     mnewBust(); mbNewBust();
     if(quiet) return;
     toast('↩ 되돌렸습니다 — ' + rec.em, 6000);
@@ -23472,14 +23681,87 @@ function mnewCount(){
 function mnewLsCount(){
   try{ const n = Number(localStorage.getItem(MNEW_CNT_LS) || 0); return n > 0 ? n : 0; }catch(_){ return 0; }
 }
+/* ── ☐ 골라서 한꺼번에 (대표 지시 2026-10-03 「왼쪽에 ㅁ 와 넘버링」) ──
+   ⚠ 고른 것은 이 창에만 산다(state) — 저장하지 않는다. 화면을 다시 그려도 그대로 남는다.
+   ⚠ 한꺼번에 할 수 있는 것은 «되돌릴 수 있는» 둘뿐이다 — 넘어가기(점검에서 되살림)·되돌리기.
+     업체 잇기는 줄마다 업체가 달라 한꺼번에 하지 않는다. */
+function mnewPicked(){ return state.mnewPick || (state.mnewPick = {}); }
+function mnewPick(key){
+  const p = mnewPicked();
+  if(p[key]) delete p[key]; else p[key] = 1;
+  renderMailPage();
+}
+/* 한 갈래를 통째로 — 다 골라져 있으면 푼다 */
+function mnewPickAll(sec){
+  const keys = mnewSecKeys(sec);
+  const p = mnewPicked();
+  const all = keys.length && keys.every(k=>p[k]);
+  keys.forEach(k=>{ if(all) delete p[k]; else p[k] = 1; });
+  renderMailPage();
+}
+function mnewPickClear(){ state.mnewPick = {}; renderMailPage(); }
+function mnewAutoList(){
+  const log = _mnewAutoLog || {};
+  return Object.keys(log).map(k=>Object.assign({ key:k }, log[k]))
+    .filter(x=>x && x.added).sort((a,b)=>Number(b.at||0) - Number(a.at||0)).slice(0, 30);
+}
+function mnewSecKeys(sec){
+  if(sec === 'auto') return mnewAutoList().filter(x=>!x.undone).map(x=>x.key);
+  return mnewRows().filter(r=>r.kind === sec).map(r=>r.key);
+}
+/* 고른 것 가운데 «넘어갈 수 있는 것»(답장한 상대·신규 문의) · «되돌릴 수 있는 것»(저절로 채운 것) */
+function mnewPickedSplit(){
+  const p = mnewPicked();
+  const rows = mnewRows().filter(r=>p[r.key] && r.kind !== 'dom');
+  const auto = mnewAutoList().filter(x=>p[x.key] && !x.undone);
+  return { rows:rows, auto:auto };
+}
+/* 넘어가기 — 한 번에 적고 한 번만 알린다(줄마다 알리면 스무 번 뜬다) */
+function mnewBulkSkip(){
+  const rows = mnewPickedSplit().rows;
+  if(!rows.length) return toast('넘어갈 줄을 고르지 않았습니다');
+  if(!confirm(rows.length + '곳을 넘어갑니다 — 다시 안 나옵니다(전 직원 공용).\n「🔎 메일함 점검 → 👤 처음 보는 주소」에서 되살릴 수 있습니다.')) return;
+  const set = mbNewSkipSet(), up = {};
+  rows.forEach(r=>{ set[r.key] = 1; up[DB_ROOT + '/config/mailNewSkip/' + r.key] = 1; });
+  if(typeof Store!=='undefined' && Store.mode==='firebase') firebase.database().ref().update(up).catch(()=>{});
+  rows.forEach(r=>{ delete mnewPicked()[r.key]; });
+  mnewBust(); mbNewBust();
+  toast(rows.length + '곳을 넘어갔습니다', 6000);
+  renderPCSide(); renderMailPage();
+}
+/* 되돌리기 — 한 번 묻고 차례로(같은 업체를 동시에 쓰면 한쪽이 사라진다) */
+async function mnewBulkUndo(){
+  const auto = mnewPickedSplit().auto;
+  if(!auto.length) return toast('되돌릴 줄을 고르지 않았습니다');
+  if(!confirm(auto.length + '곳을 업체 담당자에서 뺍니다.\n\n저절로 채운 줄만 뺍니다 — 사람이 넣은 것은 그대로 둡니다.\n이 주소들은 다시 저절로 채우지 않습니다.')) return;
+  let done = 0, fail = 0;
+  for(const x of auto){
+    try{ if(await mnewUndoOne(x.key)) done++; else fail++; }catch(_){ fail++; }
+    delete mnewPicked()[x.key];
+  }
+  mnewBust(); mbNewBust();
+  toast('↩ ' + done + '곳을 되돌렸습니다' + (fail ? ' · ' + fail + '곳은 못 했습니다(다시 눌러 주세요)' : ''), 8000);
+  renderPCSide(); renderMailPage();
+}
+/* 줄 맨 앞 — 네모와 번호 */
+function mnewCkHtml(key, n){
+  const on = !!mnewPicked()[key];
+  return `<input type="checkbox" class="mn-ck" ${on ? 'checked' : ''} onclick="mnewPick('${esc(key)}')"
+    title="골라서 한꺼번에 넘어가기·되돌리기"><span class="mn-no">${n}</span>`;
+}
+/* 갈래 머리 맨 앞 — 그 갈래 통째로 */
+function mnewSecCkHtml(sec){
+  const keys = mnewSecKeys(sec);
+  if(!keys.length) return '';
+  const p = mnewPicked(), on = keys.every(k=>p[k]);
+  return `<input type="checkbox" class="mn-ck" ${on ? 'checked' : ''} onclick="mnewPickAll('${sec}')" title="이 갈래 모두 고르기">`;
+}
 function mnewHtml(){
   const rows = mnewRows();
-  const log = _mnewAutoLog || {};
-  const auto = Object.keys(log).map(k=>Object.assign({ key:k }, log[k]))
-    .filter(x=>x && x.added).sort((a,b)=>Number(b.at||0) - Number(a.at||0)).slice(0, 30);
+  const auto = mnewAutoList();
   const day = t => { const d = new Date(Number(t||0)); return isNaN(d) ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
   const Q = state.mnewQ || {};
-  const line = (r, acts) => `<div class="mn-r">
+  const line = (r, n, acts) => `<div class="mn-r${mnewPicked()[r.key] ? ' on' : ''}">${mnewCkHtml(r.key, n)}
     <span class="nm" title="${esc((r.name ? r.name + ' · ' : '') + r.em)}">${esc(r.name || r.em.split('@')[0])}</span>
     <span class="em" title="${esc(r.em)}">${esc(r.em)}</span>
     ${acts.pre || ''}
@@ -23496,8 +23778,15 @@ function mnewHtml(){
     <button onclick="mbNewNo('${esc(r.em)}');mnewBust()" title="다시 안 나옵니다(전 직원 공용)">넘어가기</button>`;
   let h = `<div class="mn-head"><b>📥 메일에서 온 연락처</b>
     <span>스팸·광고·공공기관·기계발신은 빼고, 우리가 답장한 상대 · 회사 도메인이 같은 곳 · 문의 메일만 모았습니다</span></div>`;
-  h += `<div class="mn-sec">✔ 저절로 채웠습니다 <small>회사 도메인이 업체 한 곳과 같아 그 업체 담당자 칸에 — 빈 칸만, 있는 값은 안 덮음${state.isAdmin ? '' : ' · 대표님 PC 에서 채웁니다'}</small></div>`;
-  h += auto.length ? auto.map(x=>`<div class="mn-r${x.undone ? ' off' : ''}">
+  /* ☐ 고른 것이 있을 때만 — 할 수 있는 것만 단추로 */
+  const pk = mnewPickedSplit(), pn = pk.rows.length + pk.auto.length;
+  if(pn) h += `<div class="mn-bulk"><b>${pn}개 고름</b>
+    ${pk.rows.length ? `<button onclick="mnewBulkSkip()">넘어가기 ${pk.rows.length}</button>` : ''}
+    ${pk.auto.length ? `<button onclick="mnewBulkUndo()">되돌리기 ${pk.auto.length}</button>` : ''}
+    <button onclick="mnewPickClear()">고르기 풀기</button></div>`;
+  h += `<div class="mn-sec">${mnewSecCkHtml('auto')}✔ 저절로 채웠습니다 <small>회사 도메인이 업체 한 곳과 같아 그 업체 담당자 칸에 — 빈 칸만, 있는 값은 안 덮음${state.isAdmin ? '' : ' · 대표님 PC 에서 채웁니다'}</small></div>`;
+  h += auto.length ? auto.map((x, i)=>`<div class="mn-r${x.undone ? ' off' : ''}${mnewPicked()[x.key] ? ' on' : ''}">
+      ${x.undone ? `<span class="mn-ck0"></span><span class="mn-no">${i+1}</span>` : mnewCkHtml(x.key, i+1)}
       <span class="nm" title="${esc(x.name)}">${esc(x.name || String(x.em).split('@')[0])}</span>
       <span class="em" title="${esc(x.em)}">${esc(x.em)}</span>
       <span class="mn-got">${x.undone ? '↩ 되돌림' : '✔ ' + esc(x.coName) + ' 담당자'}</span>
@@ -23507,23 +23796,22 @@ function mnewHtml(){
   const waitDom = rows.filter(r=>r.kind === 'dom');
   if(waitDom.length) h += `<div class="mn-none">채울 차례 ${waitDom.length}곳 — ${state.isAdmin ? '곧 저절로 채웁니다' : '대표님 PC 에서 메일 창이 열리면 채웁니다'}</div>`;
   const rep = rows.filter(r=>r.kind === 'replied');
-  h += `<div class="mn-sec">📇 답장한 상대 — 어느 업체인지 골라 주세요 <small>우리가 답장·발송한 주소라 스팸이 아닙니다</small></div>`;
-  h += rep.length ? rep.map(r=>line(r, {
+  h += `<div class="mn-sec">${mnewSecCkHtml('replied')}📇 답장한 상대 — 어느 업체인지 골라 주세요 <small>우리가 답장·발송한 주소라 스팸이 아닙니다</small></div>`;
+  h += rep.length ? rep.map((r, i)=>line(r, i+1, {
       pre: r.co ? `<span class="mn-gs" title="${esc(r.why)}으로 짚었습니다 — 짐작이라 누르셔야 잇습니다">${esc(r.why)}: ${esc(r.co.name||'')}</span>`
                 : '<span class="mn-gs none">짚이는 업체 없음</span>',
       btn: (r.co ? `<button class="pri" onclick="mnewLink('${esc(r.key)}','${esc(String(r.co.id))}')">${esc(r.co.name||'')}에 잇기</button>` : '')
         + `<button onclick="mnewFindToggle('${esc(r.key)}')">${r.co ? '다른 업체…' : '업체 찾기…'}</button>` + common(r)
     }) + findBox(r)).join('') : '<div class="mn-none">없습니다</div>';
   const inq = rows.filter(r=>r.kind === 'inq');
-  h += `<div class="mn-sec">🆕 신규 문의 — 아직 답장 안 함 <small>처음 보는 주소 · 제목에 문의·상담·견적·의뢰 · 답장하면 위로 옮겨 갑니다</small></div>`;
-  h += inq.length ? inq.map(r=>line(r, {
+  h += `<div class="mn-sec">${mnewSecCkHtml('inq')}🆕 신규 문의 — 아직 답장 안 함 <small>처음 보는 주소 · 제목에 문의·상담·견적·의뢰 · 답장하면 위로 옮겨 갑니다</small></div>`;
+  h += inq.length ? inq.map((r, i)=>line(r, i+1, {
       btn: `<button class="pri" onclick="mnewOpenMail('${esc(r.key)}')">메일 열기</button>` + common(r)
     })).join('') : '<div class="mn-none">없습니다</div>';
   h += `<div class="mn-foot">위 세 갈래에 안 걸린 나머지(한 번만 온 개인 주소 등)는
     <a href="javascript:void(0)" onclick="openMailBox('*all');mbCheckOpen('new')">🔎 메일함 점검 → 👤 처음 보는 주소</a>에서 훑으십시오.</div>`;
   return `<div class="mn">${h}</div>`;
 }
-
 /* ══════════════════════════════════════════════════════════════════════════
    📥 연락처 정리 — 기업정보함 안의 화면 (대표 승인 목업 v2 2026-10-03)
    ══════════════════════════════════════════════════════════════════════════
@@ -24019,13 +24307,41 @@ async function erpFillContact(o){
     phone:String(t.phone||'').trim(), bizPhone:'', fax:'', email:em,
     addedFrom: String(t.from||'mail'), addedBy: String(u.email||''), addedAt: Date.now(),
     isPrimary: (t.mode === 'replace' || !arr.filter(c=>c.isPrimary && !c.left).length) });
-  /* 대표 담당자 거울 칸 — «빈 칸만» 채운다 */
+  /* ══════ 대표 담당자 거울 칸 — «빈 칸만», 그리고 «한 사람»이어야 한다 ══════
+     ⚠ 이 셋(이름·이메일·전화)은 «한 사람»을 가리킨다. 그런데 칸마다 따로 「비었으면
+       채운다」로만 보면, 이름 칸에 이미 다른 사람이 있는데 이메일만 채워 넣는다.
+       그러면 한 줄이 «두 사람»을 섞어 적게 된다.
+
+     ⚠ 실제로 그렇게 됐다 (대표 검토 2026-10-03, 업체 한 곳 — 이름은 안 적는다)
+         대표담당 이름   홍길동 부장           ← 원래 있던 값 (그 회사 사람)
+         대표담당 전화   010-0000-0000        ← 원래 있던 값 (그 회사 사람)
+         대표담당 이메일  kim@darataxcpa.kr    ← 메일에서 새로 채운 값 (세무사무실 사람)
+       이름·전화는 그 회사 사람인데 이메일만 세무사무실 것이라, 한 사람처럼 보이는데 아니다.
+       그 업체는 세무사무실 전용 칸(taxOfficeName·taxEmail)이 따로 비어 있었다 —
+       거기로 갈 것이 대표담당 줄로 샌 것이다.
+
+     ★ 그래서 이름 칸이 «이미 다른 사람»이면 거울 칸을 아예 안 건드린다.
+       잃는 것은 없다 — 담당자 목록(contacts)에는 그대로 들어간다. 거울 칸은 «요약»일 뿐이다.
+     ⚠ 이름을 견주는 잣대를 새로 만들지 않는다 — ErpMatch._norm + _nameHit 을 쓴다.
+       그 둘은 이미 사람 이름에 쓰이고 있고(isContact), 「유석주이사」처럼 직책이 붙은
+       표기를 같은 사람으로 본다. 두 벌로 두면 한쪽만 고쳐진다.
+     ⚠ 들어오는 이름이 «없으면» 같은 사람인지 알 길이 없다 — 그때도 안 건드린다.
+       모르면서 붙이는 것이 이번에 생긴 일이다.
+     ⚠ 「이 사람으로 바꾼다」(mode==='replace')는 사람이 또렷이 고른 길이라 그대로 덮는다. */
   const blank = x => x===undefined || x===null || String(x).trim()==='';
+  const nrm = s => (typeof ErpMatch!=='undefined' && ErpMatch._norm)
+    ? ErpMatch._norm(s) : String(s||'').toLowerCase().replace(/\s/g,'');
+  const hit = (a,b) => (typeof ErpMatch!=='undefined' && ErpMatch._nameHit)
+    ? ErpMatch._nameHit(a,b) : (!!a && !!b && (a===b || a.indexOf(b)===0 || b.indexOf(a)===0));
+  const curNm = String(cur.primaryContactName||'').trim();
+  const newNm = String(t.name||'').trim();
+  /* 거울 칸을 채워도 되는가 — 이름 칸이 비었거나, 들어오는 사람이 «그 사람»일 때만 */
+  const samePerson = blank(curNm) || (!!newNm && hit(nrm(curNm), nrm(newNm)));
   const patch = { contacts:arr, updatedAt:Date.now() };
-  if(t.mode === 'replace' || blank(cur.primaryContactEmail)){
+  if(t.mode === 'replace' || (blank(cur.primaryContactEmail) && samePerson)){
     patch.primaryContactEmail = em;
-    if(String(t.name||'').trim() && blank(cur.primaryContactName))
-      patch.primaryContactName = String(t.name).trim();
+    if(newNm && blank(cur.primaryContactName))
+      patch.primaryContactName = newNm;
     if(String(t.phone||'').trim() && blank(cur.primaryContactPhone))
       patch.primaryContactPhone = String(t.phone).trim();
   }
@@ -25609,8 +25925,6 @@ function loadColPrefs(){
     if(p.colOrder) state.colOrder=p.colOrder;
   }catch(e){}
 }
-function toggleCollapse(id){ state.collapsed[id]=!state.collapsed[id]; render(); }
-
 /* 새 폴더 만들기 — 메일함식 팝업 (부모 지정 가능) */
 function openFolderDialog(parent){
   $('folderDlg').innerHTML = `
@@ -25627,7 +25941,6 @@ function openFolderDialog(parent){
 function confirmNewFolder(parent){
   const name=$('newFolderName').value.trim(); if(!name) return toast('폴더 이름을 입력하세요');
   Store.putGroup({id:uid(), name, parent:parent||'', kind:state.tab, order:Date.now()});
-  if(parent) state.collapsed[parent]=false;
   $('folderDlgBg').classList.remove('open');
   toast('폴더를 만들었습니다');
 }
@@ -26087,7 +26400,7 @@ function renderPCTable(){
                         it.name ? esc(it.name)
                         : (it.company ? `<span style="color:#166534" title="사람 이름 없이 기관·상호로 등록된 명함">🏢 ${esc(it.company)}</span>`
                                       : `<span style="color:#cbd5e1">(이름 없음)</span>`)}</td>`,
-    company:    it => `<td class="co col-company" ondblclick="startCellEdit(event,'${it.id}','company')">${esc(it.company||'')}</td>`,
+    company:    it => `<td class="co col-company" ondblclick="startCellEdit(event,'${it.id}','company')">${cardPinMark(it)}${esc(it.company||'')}</td>`,
     title:      it => `<td class="col-title" ondblclick="startCellEdit(event,'${it.id}','title')">${esc([it.title,it.dept].filter(Boolean).join('·'))}</td>`,
     mobile:     it => `<td class="col-mobile" ondblclick="startCellEdit(event,'${it.id}','mobile')">${esc(it.mobile||'')}</td>`,
     companyTel: it => `<td class="col-companyTel" ondblclick="startCellEdit(event,'${it.id}','companyTel')">${esc(it.companyTel||it.tel||'')}</td>`,
@@ -34805,7 +35118,7 @@ const WK_DOC_ICON = { idcard:'🪪', resident:'📃', mandate:'✍', consent:'�
   wcontract:'📝' };
 
 function enterWkView(){
-  state.view='wk'; state.wkPick=''; state.wkPage=0;
+  state.view='wk'; state.wkPage=0;
   _wkRrnOpen = {};                       /* 화면을 나서면 드러낸 주민번호는 다시 가려진다 */
   render();
   loadWkInfo();
@@ -35067,7 +35380,6 @@ function wkDetailHtml(p){
 
 function openWkDetail(key){
   const p = wkList().filter(x=>x.key===key)[0]; if(!p) return;
-  state.wkPick = key;
   $('pcDetail').innerHTML = `
     <div class="pdhead"><span class="ttl">👷 ${esc(p.name)}</span>
       <button class="x" onclick="closeWkDetail()">✕</button></div>
@@ -35075,7 +35387,7 @@ function openWkDetail(key){
   $('pcDetail').classList.add('open');
   const ov=$('pcDetailOverlay'); if(ov) ov.style.display='block';
 }
-function closeWkDetail(){ state.wkPick=''; closeDetail(); }
+function closeWkDetail(){ closeDetail(); }
 
 function wkHeadHtml(){
   const n = wkVisible().length;

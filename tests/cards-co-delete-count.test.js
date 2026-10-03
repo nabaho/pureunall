@@ -188,14 +188,22 @@ test('삭제 단추가 「명함·등록증이 지워진다」고 딱지에 적�
   assert.match(HTML, /title="고른 회사의 명함·사업자등록증을 휴지통으로 보냅니다/);
 });
 
-test('삭제 단추가 다른 단추와 다르게 보인다', () => {
-  assert.ok(HTML.includes('.codel{'), '같은 회색이면 손이 미끄러진다');
+test('삭제가 다른 줄과 다르게 보인다 — «손이 닿는 그 자리»가 빨갛다', () => {
   /* 2026-08-30 색을 팔레트로 줄이며 #a50e0e 가 사라졌다. 지켜야 할 것은 «어떤 빨강»이
-     아니라 「삭제가 빨간 계열이라 다른 단추와 갈라진다」는 것이다 (CLAUDE.md). */
+     아니라 「삭제가 빨간 계열이라 다른 단추와 갈라진다」는 것이다 (CLAUDE.md).
+     ⚠ 2026-09-27 다시 겨눔: 삭제는 도구줄 단추가 아니라 ⋯ 메뉴 줄로 옮겨졌다
+       (2026-08-31 겉 단추를 넷으로 줄임). 예전에는 도구줄의 .codel 모양 규칙이
+       «있는지»만 봤다 — 단추가 그 이름표를 떼어 간 뒤에도 초록이었다(헛돌았다).
+       그래서 «실제 삭제 줄»이 빨간 이름표를 다는지, 그 이름표가 빨간지를 함께 본다. */
   const P = require('./lib-palette.js');
-  const codel = (HTML.match(/\.codel\{([^}]*)\}/) || [])[1] || '';
-  assert.ok(P.colorsIn(codel).some(P.isRed),
-    '삭제 단추에 빨간 계열이 없다 — 손이 미끄러진다: ' + codel);
+  const at = HTML.indexOf('function openCoSelMore(');
+  assert.ok(at > 0, '⋯ 메뉴를 찾지 못했다');
+  const menu = HTML.slice(at, HTML.indexOf('\n}', at));
+  assert.match(menu, /class="fmi danger"[^>]*coDelSel\(\)/,
+    '★ 삭제 줄이 빨간 이름표(danger)를 안 단다 — 옆 줄과 같은 색이면 손이 미끄러진다');
+  const rule = (HTML.match(/#folderMenu \.fmi\.danger\{([^}]*)\}/) || [])[1] || '';
+  assert.ok(P.colorsIn(rule).some(P.isRed),
+    '★ 메뉴의 삭제 줄에 빨간 계열이 없다 — 손이 미끄러진다: ' + rule);
 });
 
 /* ── 개수 보기 ── */

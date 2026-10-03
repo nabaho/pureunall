@@ -88,9 +88,9 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- Daum 우편번호 서비스 (무료, 가입 불필요) -->
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
-<script src="js/pu-hwp-engine.js?v=16"></script>
+<script src="js/pu-hwp-engine.js?v=18"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=11"></script>
+<script src="js/pu-contract-forms.js?v=13"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -158,7 +158,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=14"></script>
+  <script src="js/pu-appbar.js?v=15"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -183,7 +183,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-billing.js?v=11"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=41"></script>
+<script src="js/pu-ontology.js?v=43"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
@@ -194,6 +194,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 기업정보함 → 업체관리 담당자 메일 (대표 요청 2026-08-27).
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=1"></script>
+<script src="js/pu-co-mismatch.js?v=2"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
@@ -8329,10 +8330,13 @@ var CompanyRef = {
     }
     return null;
   },
-  // 업체 ID 부여(미부여 항목에 companyId 자동 채우기) — 1회성 마이그레이션 도우미
+  // 업체 ID 부여(미부여 항목에 companyId 자동 채우기)
+  // ⚠ «업체 번호·사업자번호»로만 붙인다 — 이름으로는 붙이지 않는다(대표 지시 2026-10-03 2단계).
+  //   예전에는 findCompany 의 이름 단계까지 써서, 새 사건마다 이름이 같은 «첫» 업체(종료 보관함 포함)의
+  //   번호와 사업자번호가 말없이 붙었다. 이름만 맞는 사건은 「🔗 업체 연결」에 올라가 사람이 확정한다.
   attachId: function(item){
     if(!item || item.companyId) return item;
-    var co = this.findCompany(item);
+    var co = this.findCompany({ companyId:item.companyId, sourceId:item.sourceId, bizNo:item.bizNo });
     if(co){
       item.companyId = co.id;
       if(!item.bizNo && co.bizNo) item.bizNo = co.bizNo;
@@ -8996,6 +9000,39 @@ function coRepairSubRole(){
   return { total:items.length, companies:nCo, wage:nWage, names:items.map(function(x){ return x.name; }) };
 }
 
+/* 보수총액 엑셀 한 줄 → 사무대행 업체 (대표 지시 2026-10-03 「이름으로 잇는 길 막기」)
+   ⚠ 사업자번호가 «먼저»다. 예전에는 이름을 먼저 봐서, 같은 이름의 다른 업체가 그 줄을 가져갔다.
+   ⚠ 이름은 «딱 하나»일 때만 — 둘 이상이면 건너뛰고(amb) 화면이 몇 줄 건너뛰었는지 알린다. */
+function coWageRowMatch(agents, nm, bz){
+  var digits = function(x){ return String(x||'').replace(/[^0-9]/g,''); };
+  var norm = function(x){ return String(x||'').replace(/\s|\(주\)|㈜|주식회사/g,'').toLowerCase(); };
+  var bz10 = digits(bz).slice(0,10);
+  if(bz10.length >= 10){
+    var byBiz = (agents||[]).filter(function(c){ return digits(c && c.bizNo).slice(0,10) === bz10; });
+    if(byBiz.length) return { co: byBiz[0], amb: false };
+  }
+  nm = String(nm||'').trim();
+  if(!nm) return { co: null, amb: false };
+  var same = (agents||[]).filter(function(c){ return c && ((c.name||'').trim() === nm || norm(c.name) === norm(nm)); });
+  return same.length === 1 ? { co: same[0], amb: false } : { co: null, amb: same.length > 1 };
+}
+/* 기업정보함 색인에서 «회사 이름 → 사업자등록증» 표 (계약창 명함 고르기의 사업자번호 미리 채우기용)
+   ⚠ 같은 이름의 등록증이 «다른 사업자번호»로 둘 이상이면 그 이름은 비운다(amb) — 예전에는 «마지막» 것을 써서
+     사람을 고르면 남의 사업자번호가 미리 채워지고, 그 번호로 업체까지 이어졌다(이름 → 번호 → 업체).
+     같은 번호의 등록증이 여러 장인 것은 같은 회사라 괜찮다. */
+function pcBizByName(idx, normFn){
+  var by = {}, idOf = {}, amb = {};
+  Object.keys(idx || {}).forEach(function(id){
+    var r = idx[id];
+    if(!r || r.k !== 'biz' || !r.c) return;
+    var n = normFn(r.c); if(!n) return;
+    var d = String(r.bz||'').replace(/\D/g,'').slice(0,10);
+    if(!by[n]){ by[n] = r; idOf[n] = id; return; }
+    if(String(by[n].bz||'').replace(/\D/g,'').slice(0,10) !== d) amb[n] = true;
+  });
+  Object.keys(amb).forEach(function(n){ delete by[n]; delete idOf[n]; });
+  return { by: by, idOf: idOf, amb: amb };
+}
 // ============ 업체 연결 (ID 백필) ============
 // 업체관리에 있는 회사인데 계약·사건·컨설팅·기금·기타가 이름으로만 이어져 있는 것에
 // 업체 ID를 붙인다. 이름이 바뀌어도 안 끊기게 하는 작업.
@@ -9163,6 +9200,213 @@ function CoAddrModal(props){
                   h('button', { type:'button', style:bs,
                     onClick:function(){ save(r.co, { addrKeep: r.co.address }, '이대로 둡니다 — ' + (r.co.name || '')); } }, '이대로 둠')));
             }))))));
+}
+/* 🔍 업체 정보 대조 (대표 지시 2026-10-03 「근본적으로」 → 1단계, 목업 승인 「진행」)
+   ★ 저장은 «빈칸 채우기» 하나뿐이다(대표 지시 2026-10-03 「빈칸채우기 해라」) — 업체 쪽이 비었고
+     등록증엔 있는 대표자·주소·대표전화만, props.onFill(=업체관리의 coUpsertMany)로 넣는다.
+     «다른» 값은 이 창에서 고치지 않는다 — 「업체 열기」(업체 상세)·「🔗 업체 연결」로 보낸다.
+   ★ 판정은 js/pu-co-mismatch.js 한 곳(검사가 그 파일을 돌린다). 짝은 사업자번호로만.
+   ⚠ 색인(1.36MB)은 이 창을 «열 때» 받는다(usePucardsIdxReady) — 업체관리를 연다고 받지 않는다. */
+var CO_MIS_TIP = '업체관리 · 기업정보함 사업자등록증 · 진행 중 계약에 적힌 회사 정보가 서로 다른 곳을 모아 봅니다(업체 쪽 빈칸은 등록증 값으로 채울 수 있습니다)';
+var CO_MIS_FIELD = { name:'상호', ceo:'대표자', addr:'주소', tel:'대표전화', contact:'담당자' };
+function coMismatchBuild(){
+  var M = window.PuCoMismatch, K = window.PuCoKey, PA = window.PuAddr;
+  if(!M || !K || !PA || !coAddrIdxLoaded()) return null;
+  return M.build(dbGet('companies', []) || [], dbGet('contracts', []) || [], window.pucardsIdx || {},
+    { keyOf:K.key, looksLikeBizNo:K.looksLikeBizNo, normName:pcNormCo, addrSame:PA.same });
+}
+function CoMismatchModal(props){
+  useEscClose(props.onClose);
+  usePucardsIdxReady();
+  var tabS = useState('all'); var tab = tabS[0]; var setTab = tabS[1];
+  var openS = useState(''); var openId = openS[0]; var setOpenId = openS[1];
+  var tkS = useState(0); var bump = function(){ tkS[1](function(n){ return n + 1; }); };
+  var lfS = useState(null); var lastFill = lfS[0]; var setLastFill = lfS[1];
+  var r = coMismatchBuild();
+  /* 빈칸 채우기 — 계산은 PuCoMismatch.fillRecs(저장 직전 목록으로 다시 본다), 저장은 props.onFill 하나 */
+  function doFill(rows){
+    var M = window.PuCoMismatch;
+    var plan = M.fillRecs(rows, dbGet('companies', []) || []);
+    if(!plan.recs.length){ showToast('채울 빈칸이 없습니다 — 그사이 다른 사람이 적었을 수 있습니다'); bump(); return; }
+    if(rows.length > 1 && !confirm('업체 ' + plan.recs.length + '곳의 빈칸 ' + plan.cells + '칸을 기업정보함 사업자등록증 값으로 채웁니다.\n\n'
+      + '이미 적힌 칸은 건드리지 않습니다. 이 창에서 바로 되돌릴 수 있습니다.')) return;
+    if(!props.onFill || !props.onFill(plan.recs)) return;
+    setLastFill(plan);
+    showToast('📥 빈칸 ' + plan.cells + '칸을 채웠습니다 (' + plan.recs.length + '곳)');
+    bump();
+  }
+  function undoFill(){
+    if(!lastFill) return;
+    var u = window.PuCoMismatch.undoRecs(lastFill.undo, dbGet('companies', []) || []);
+    if(u.recs.length && (!props.onFill || !props.onFill(u.recs))) return;
+    setLastFill(null);
+    showToast('↩ ' + u.cells + '칸을 되돌렸습니다' + (u.cells < lastFill.cells ? ' — 그사이 고친 칸은 그대로 두었습니다' : ''));
+    bump();
+  }
+  var td = { padding:'6px 8px', borderBottom:'1px solid #f8fafc', fontSize:'12px', whiteSpace:'nowrap',
+             overflow:'hidden', textOverflow:'ellipsis', maxWidth:0 };
+  var th = { textAlign:'left', padding:'6px 8px', fontSize:'11px', color:'#64748b', borderBottom:'1px solid #e2e8f0',
+             position:'sticky', top:0, background:'#fff', whiteSpace:'nowrap' };
+  var bs = { padding:'3px 9px', border:'1px solid #cbd5e1', borderRadius:'4px', background:'#fff', color:'#1e40af',
+             fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', marginLeft:'4px' };
+  var none = function(t){ return h('span', { style:{ color:'#94a3b8' } }, t); };
+  function tag(kind, text){
+    var red = kind === 'diff';
+    return h('span', { key:text, style:{ display:'inline-block', borderRadius:'4px', padding:'0 6px', marginRight:'4px',
+      fontSize:'11px', fontWeight:700, background: red ? '#fef2f2' : '#fffbeb', color: red ? '#991b1b' : '#854d0e',
+      border:'1px solid ' + (red ? '#fecaca' : '#fde68a') } }, text);
+  }
+  function chip(key, label, n, red){
+    var on = tab === key;
+    return h('button', { key:key, type:'button', onClick:function(){ setTab(key); setOpenId(''); },
+      style:{ padding:'4px 11px', borderRadius:'14px', fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap',
+        border:'1px solid ' + (on ? '#1e293b' : '#e2e8f0'), background: on ? '#1e293b' : '#fff',
+        color: on ? '#fff' : '#1e293b', fontWeight: on ? 700 : 400 } },
+      label + ' ', h('b', { style:{ color: on ? '#fff' : (red ? '#991b1b' : '#854d0e') } }, n));
+  }
+  function openCo(co){ props.onClose(); if(props.onOpenCo) props.onOpenCo(co); }
+  function openCards(x){
+    try { PuAppBar.goApp('pu-cards.html?sso=1&q=' + encodeURIComponent(x.cert.c || x.cert.bz || '')); } catch(e){}
+  }
+  var mineOf = function(co, f){ return f === 'name' ? co.name : f === 'ceo' ? [co.ceo, co.ceo2].filter(Boolean).join(', ')
+    : f === 'addr' ? co.address : co.phone; };
+  var certOf = function(c, f){ return f === 'name' ? c.c : f === 'ceo' ? c.ceo : f === 'addr' ? c.ad : c.ct; };
+  var empty = function(t){ return h('div', { style:{ padding:'20px', color:'#166534', fontSize:'12.5px' } }, t); };
+  var table = function(cols, rows){
+    return h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
+      h('thead', null, h('tr', null, cols.map(function(t, i){ return h('th', { key:i, style:th }, t); }))),
+      h('tbody', null, rows));
+  };
+  var body;
+  if(!r){
+    body = h('div', { style:{ padding:'20px', color:'#64748b', fontSize:'12.5px' } }, '기업정보함 목록을 받는 중…');
+  } else if(tab === 'nokey'){
+    body = !r.noKey.length ? empty('✓ 모든 업체가 사업자번호로 이어집니다')
+      : table(['업체', '사업자번호', '까닭', ''], r.noKey.map(function(x){
+          return h('tr', { key:x.co.id },
+            h('td', { style:Object.assign({}, td, { fontWeight:600 }), title:x.co.name }, x.co.name || '(이름 없음)'),
+            h('td', { style:td }, x.co.bizNo || '—'),
+            h('td', { style:td }, tag('empty', x.why === 'bad' ? '번호 검산 틀림 — 한 자리 오타일 수 있음' : '사업자번호 없음')),
+            h('td', { style:Object.assign({}, td, { textAlign:'right', maxWidth:'none' }) },
+              h('button', { type:'button', style:bs, onClick:function(){ openCo(x.co); } }, '업체 열기')));
+        }));
+  } else if(tab === 'ct'){
+    body = !r.ctRows.length ? empty('✓ 진행 중 계약의 회사 정보가 업체관리와 같습니다')
+      : table(['계약', '업체', '다른 칸', '계약에 적힌 값', '업체관리 값', ''], r.ctRows.map(function(x){
+          var cc = x.ct.company || {};
+          var val = function(fromCt, f){
+            if(f === 'contact') return fromCt ? (((cc.contacts || [])[0] || {}).name || '') : (x.co.primaryContactName || '');
+            if(f === 'ceo') return fromCt ? (cc.ceo || '') : mineOf(x.co, 'ceo');
+            var o = fromCt ? cc : x.co;
+            return f === 'addr' ? (o.address || '') : (o.phone || '');
+          };
+          var a = x.diffs.map(function(f){ return CO_MIS_FIELD[f] + ': ' + val(true, f); }).join(' · ');
+          var b = x.diffs.map(function(f){ return CO_MIS_FIELD[f] + ': ' + val(false, f); }).join(' · ');
+          return h('tr', { key:x.ct.id },
+            h('td', { style:td }, x.ct.contractNo || ''),
+            h('td', { style:Object.assign({}, td, { fontWeight:600 }), title:x.co.name }, x.co.name || ''),
+            h('td', { style:td }, x.diffs.map(function(f){ return tag('diff', CO_MIS_FIELD[f]); })),
+            h('td', { style:td, title:a }, a),
+            h('td', { style:td, title:b }, b),
+            h('td', { style:Object.assign({}, td, { textAlign:'right', maxWidth:'none' }) },
+              h('button', { type:'button', style:bs, onClick:function(){ openCo(x.co); } }, '업체 열기')));
+        }));
+  } else {
+    var list = r.rows.filter(function(x){
+      if(tab === 'all') return x.diffs.length > 0;
+      if(tab === 'empty') return x.empties.length > 0;
+      if(tab === 'near') return x.near;
+      return x.f[tab] === 'diff';
+    });
+    var fillAll = tab === 'empty' && list.length ? window.PuCoMismatch.fillRecs(list, dbGet('companies', []) || []) : null;
+    body = !list.length ? empty('✓ 해당하는 업체가 없습니다')
+      : h('div', null,
+      fillAll && fillAll.recs.length ? h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 14px',
+          borderBottom:'1px solid #e2e8f0', fontSize:'12px', color:'#64748b' } },
+        h('button', { type:'button', onClick:function(){ doFill(list); },
+          style:{ padding:'5px 12px', borderRadius:'5px', border:'1px solid #bbf7d0', background:'#f0fdf4', color:'#166534',
+            fontSize:'12px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
+          '📥 빈칸 모두 채우기 (' + fillAll.recs.length + '곳 ' + fillAll.cells + '칸)'),
+        h('span', { style:{ whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
+          '대표자·주소·대표전화 중 업체 쪽이 빈 칸만 등록증 값으로 넣습니다 — 적힌 칸은 안 건드립니다')) : null,
+      h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
+        h('colgroup', null, h('col', { style:{ width:'28px' } }), h('col', { style:{ width:'20%' } }), h('col', { style:{ width:'20%' } }),
+          h('col', null), h('col', null), h('col', { style:{ width:'150px' } })),
+        h('thead', null, h('tr', null, ['', '업체', '어긋난 칸', '업체관리', '사업자등록증(기업정보함)', ''].map(function(t, i){ return h('th', { key:i, style:th }, t); }))),
+        h('tbody', null, list.reduce(function(acc, x){
+          var first = x.diffs.concat(x.empties).concat(x.near ? ['name'] : [])[0];
+          var isOpen = openId === x.co.id;
+          acc.push(h('tr', { key:x.co.id, style:{ cursor:'pointer', background: isOpen ? '#f8fafc' : undefined },
+              onClick:function(){ setOpenId(isOpen ? '' : x.co.id); } },
+            h('td', { style:Object.assign({}, td, { color:'#94a3b8', padding:'6px 4px 6px 10px', textOverflow:'clip' }) }, isOpen ? '▾' : '▸'),
+            h('td', { style:Object.assign({}, td, { fontWeight:600 }), title:x.co.name }, x.co.name || '(이름 없음)'),
+            h('td', { style:td },
+              x.diffs.map(function(f){ return tag('diff', CO_MIS_FIELD[f]); }),
+              x.empties.map(function(f){ return tag('empty', CO_MIS_FIELD[f] + ' 빈칸'); }),
+              x.near ? tag('empty', '상호 표기') : null),
+            h('td', { style:td, title:mineOf(x.co, first) || '' }, mineOf(x.co, first) || none('(비어 있음)')),
+            h('td', { style:td, title:certOf(x.cert, first) || '' }, certOf(x.cert, first) || ''),
+            h('td', { style:Object.assign({}, td, { textAlign:'right', maxWidth:'none' }), onClick:function(e){ e.stopPropagation(); } },
+              h('button', { type:'button', style:bs, onClick:function(){ openCo(x.co); } }, '업체 열기'),
+              tab === 'empty'
+                ? h('button', { type:'button', style:Object.assign({}, bs, { color:'#166534', borderColor:'#bbf7d0' }), onClick:function(){ doFill([x]); } }, '채우기')
+                : h('button', { type:'button', style:bs, onClick:function(){ openCards(x); } }, '등록증'))));
+          if(isOpen){
+            acc.push(h('tr', { key:x.co.id + '-d' }, h('td', { colSpan:6, style:{ padding:'4px 8px 10px 30px', background:'#f8fafc' } },
+              h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
+                h('thead', null, h('tr', null, ['칸', '업체관리', '사업자등록증(기업정보함)', '판정'].map(function(t, i){
+                  return h('th', { key:i, style:Object.assign({}, th, { background:'#f8fafc', position:'static' }) }, t); }))),
+                h('tbody', null, ['name', 'ceo', 'addr', 'tel'].map(function(f){
+                  var j = x.f[f];
+                  var verdict = j === 'diff' ? h('span', { style:{ color:'#991b1b', fontWeight:700 } }, '다름')
+                    : j === 'empty' ? h('span', { style:{ color:'#854d0e', fontWeight:700 } }, '업체 쪽 빈칸')
+                    : j === 'near' ? h('span', { style:{ color:'#854d0e', fontWeight:700 } }, '표기만 다름')
+                    : h('span', { style:{ color:'#166534' } }, '같음');
+                  return h('tr', { key:f },
+                    h('td', { style:Object.assign({}, td, { width:'70px', maxWidth:'none', color:'#64748b' }) }, CO_MIS_FIELD[f]),
+                    h('td', { style:td, title:mineOf(x.co, f) || '' }, mineOf(x.co, f) || none('—')),
+                    h('td', { style:td, title:certOf(x.cert, f) || '' }, certOf(x.cert, f) || none('—')),
+                    h('td', { style:Object.assign({}, td, { width:'90px', maxWidth:'none' }) }, verdict));
+                }))),
+              x.certN > 1 ? h('div', { style:{ fontSize:'11px', color:'#64748b', marginTop:'4px' } },
+                '이 번호의 등록증이 ' + x.certN + '장 있습니다 — 「📍 주소 대조」와 같은 한 장과 견줬습니다') : null)));
+          }
+          return acc;
+        }, []))));
+  }
+  var c = r ? r.count : null;
+  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target===e.currentTarget) props.onClose(); } },
+    h('div', { className:'modal', style:{ maxWidth:'1080px', width:'96vw' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '🔍 업체 정보 대조 ',
+          h('span', { style:{ marginLeft:'6px', fontSize:'11px', fontWeight:700, color:'#166534', background:'#f0fdf4',
+            border:'1px solid #bbf7d0', borderRadius:'10px', padding:'1px 8px' } }, '다른 값은 안 고침 · 빈칸만 채움'),
+          h('span', { style:{ marginLeft:'6px', fontSize:'12px', color:'#64748b', cursor:'help', fontWeight:400 },
+            title:'업체관리와 기업정보함 사업자등록증을 «사업자번호»로 짝지어 상호·대표자·주소·대표전화를 견줍니다.\n'
+              + '이름으로는 짝짓지 않습니다 — 번호가 없거나 틀린 업체는 「번호로 못 잇는 업체」에 따로 모읍니다.\n'
+              + '주소는 「📍 주소 대조」와 같은 잣대(도로명·번호)로 봅니다. ㈜·주식회사 같은 표기 차이는 같다고 봅니다.\n'
+              + '이 창이 저장하는 것은 「업체 쪽 빈칸」 채우기 하나뿐입니다(대표자·주소·대표전화, 적힌 칸은 안 건드림).\n'
+              + '값이 «다른» 칸은 「업체 열기」로 업체 상세에 가서 고치세요.' }, 'ⓘ')),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      c && h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', padding:'8px 14px', borderBottom:'1px solid #e2e8f0', background:'#f8fafc' } },
+        chip('all', '어긋난 업체', c.diff, true),
+        chip('ceo', '대표자 다름', c.ceo, true),
+        chip('addr', '주소 다름', c.addr, true),
+        chip('name', '상호 다름', c.name, true),
+        chip('tel', '대표전화 다름', c.tel, true),
+        chip('empty', '업체 쪽 빈칸', r.rows.filter(function(x){ return x.empties.length; }).length, false),
+        chip('near', '상호 표기만 다름', c.near, false),
+        chip('nokey', '번호로 못 잇는 업체', c.noKey, false),
+        chip('ct', '계약 사본 다름', c.contract, true),
+        props.linkCount > 0 && h('button', { type:'button', onClick:function(){ props.onClose(); if(props.onOpenLink) props.onOpenLink(); },
+          style:{ padding:'4px 11px', borderRadius:'14px', fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap',
+            border:'1px solid #bfdbfe', background:'#eff6ff', color:'#2563eb' } }, '🔗 이름으로만 이어진 기록 ' + props.linkCount + ' →'),
+        lastFill && h('button', { type:'button', onClick:undoFill,
+          style:{ marginLeft:'auto', padding:'4px 11px', borderRadius:'14px', fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap',
+            border:'1px solid #cbd5e1', background:'#fff', color:'#475569', fontWeight:700 } }, '↩ 방금 채운 ' + lastFill.cells + '칸 되돌리기')),
+      h('div', { className:'modal-b', style:{ maxHeight:'68vh', overflowY:'auto', padding:0 } }, body),
+      c && h('div', { style:{ padding:'6px 14px', fontSize:'11px', color:'#64748b', borderTop:'1px solid #e2e8f0' } },
+        '등록증과 짝지어진 업체 ' + c.paired + '곳 · 등록증이 기업정보함에 없는 업체 ' + c.noCert + '곳')));
 }
 function CoLinkModal(props){
   useEscClose(props.onClose);
@@ -14853,8 +15097,8 @@ function searchPastCompanies(query){
     // 직급(직책)이 role 한 칸에만 들어가, 업체관리 담당자칸(position)에서 빈칸으로 보였다.
     function toContact(x, primary, srcId){ return pcToContact(x, primary, srcId); }
     // 회사별 사업자등록증 레코드(대표·사업자번호 보강용)
-    var bizByCo = {};
-    ids.forEach(function(k){ var r=idx[k]; if(r && r.k==='biz' && r.c){ bizByCo[normCo(r.c)] = r; } });
+    // ⚠ 같은 이름에 사업자번호가 다른 등록증이 둘 이상이면 그 이름은 비운다(pcBizByName)
+    var bizByCo = pcBizByName(idx, normCo).by;
     var added = 0;
     for(var i=0;i<ids.length && added<50;i++){
       var r = idx[ids[i]]; if(!r) continue;
@@ -15406,11 +15650,8 @@ function pcPersonRows(q){
     var ql = String(q||'').toLowerCase();
     if(ql.length < 2) return out;
     // 회사별 사업자등록증 — 사람을 골라도 회사 정보를 같이 채우려고 미리 모은다
-    var bizByCo = {}, bizIdByCo = {};
-    Object.keys(idx).forEach(function(id){
-      var r = idx[id];
-      if(r && r.k === 'biz' && r.c){ bizByCo[pcNormCo(r.c)] = r; bizIdByCo[pcNormCo(r.c)] = id; }
-    });
+    // ⚠ 같은 이름에 사업자번호가 다른 등록증이 둘 이상이면 그 이름은 비운다(pcBizByName)
+    var _pbn = pcBizByName(idx, pcNormCo), bizByCo = _pbn.by, bizIdByCo = _pbn.idOf;
     Object.keys(idx).forEach(function(id){
       var r = idx[id];
       if(!r || r.k === 'biz') return;
@@ -26017,21 +26258,15 @@ function CompanyManagement(){
         function fmtv(x){ var s=String(x||'').trim(); return s.replace(' 00:00:00',''); }
         var a = dbGet('wage_reports', {}) || {};
         var next = Object.assign({}, a[wageYear] || {});
-        var matched=0;
+        var matched=0, ambN=0;
         for(var r=hi+1;r<data.length;r++){
           var row=data[r]; if(!row||!row.length) continue;
           var nm=cName>=0?String(row[cName]||'').trim():'';
           var bz=cBiz>=0?String(row[cBiz]||'').trim():'';
           if(!nm && !bz) continue;
-          var bzD=digits(bz), bz10=bzD.slice(0,10);
-          var co=agents.find(function(c){
-            if(nm && (c.name||'').trim()===nm) return true;
-            if(nm && norm(c.name)===norm(nm)) return true;
-            var cD=digits(c.bizNo);
-            if(bz10.length>=10 && cD.slice(0,10)===bz10) return true;
-            if(bzD.length>=10 && cD===bzD) return true;
-            return false;
-          });
+          var mt=coWageRowMatch(agents, nm, bz);
+          if(mt.amb) ambN++;
+          var co=mt.co;
           if(!co) continue;
           var cur=Object.assign({}, next[co.id]||{});
           if(cFiled>=0) cur.filed=fmtv(row[cFiled]);
@@ -26043,7 +26278,8 @@ function CompanyManagement(){
           next[co.id]=cur; matched++;
         }
         a[wageYear]=next; dbSet('wage_reports', a); setWageRep(next);
-        showToast('📤 '+wageYear+'년 '+matched+'개 업체 반영됨');
+        showToast('📤 '+wageYear+'년 '+matched+'개 업체 반영됨'
+          + (ambN ? ' — 같은 이름 업체가 둘 이상이라 '+ambN+'줄은 건너뜀(사업자번호 칸을 채우면 잡힙니다)' : ''));
       } catch(err){ showToast('가져오기 실패: '+(err&&err.message)); }
       e.target.value='';
     };
@@ -26464,6 +26700,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   var linkCount = lkcS[0]; var setLinkCount = lkcS[1];
   // 📍 기업정보함과 주소가 다른 업체 — 색인을 이미 받았을 때만 센다(받게 만들지 않는다)
   var adoS = useState(false); var addrOpen = adoS[0]; var setAddrOpen = adoS[1];
+  var misS = useState(false); var misOpen = misS[0]; var setMisOpen = misS[1];   // 🔍 업체 정보 대조(읽기만)
   var adtS = useState(0);
   useEffect(function(){
     function on(){ adtS[1](function(n){ return n + 1; }); }
@@ -27280,6 +27517,11 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
             style:{ padding:'9px 12px', background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe',
               borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
             '🔗 업체 연결 ' + linkCount),
+          h('button', { onClick:function(){ setMisOpen(true); },
+            className:'erp-tip', 'data-tip':CO_MIS_TIP,
+            style:{ padding:'9px 12px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe',
+              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
+            '🔍 정보 대조'),
           addrMisN !== 0 && h('button', { onClick:function(){ setAddrOpen(true); },
             className:'erp-tip', 'data-tip':CO_ADDR_TIP,
             style:{ padding:'9px 12px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a',
@@ -27484,6 +27726,12 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           whiteSpace:'nowrap', marginRight:'6px' } },
         '🔗 업체 연결 ' + linkCount),
       // 기업정보함과 주소가 다른 업체 — 다 정리하면 사라진다(아직 안 셌으면 「주소 대조」)
+      h('button', { onClick:function(){ setMisOpen(true); },
+        className:'erp-tip', 'data-tip':CO_MIS_TIP,
+        style:{ padding:'6px 12px', fontSize:'11.5px', fontWeight:700, borderRadius:'5px',
+          background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', cursor:'pointer',
+          whiteSpace:'nowrap', marginRight:'6px' } },
+        '🔍 정보 대조'),
       addrMisN !== 0 && h('button', { onClick:function(){ setAddrOpen(true); },
         className:'erp-tip', 'data-tip':CO_ADDR_TIP,
         style:{ padding:'6px 12px', fontSize:'11.5px', fontWeight:700, borderRadius:'5px',
@@ -28184,6 +28432,13 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
       onClose: function(){ setMergeOpen(false); refreshCompanies(); recountDup(); }
     }),
     // 업체 연결(ID 백필) 모달
+    misOpen && h(CoMismatchModal, {
+      linkCount: linkCount,
+      onOpenCo: function(co){ setDetailModal(co); },
+      onOpenLink: function(){ setLinkOpen(true); },
+      onFill: function(recs){ return coUpsertMany(recs); },
+      onClose: function(){ setMisOpen(false); }
+    }),
     addrOpen && h(CoAddrModal, {
       onChanged: function(){ refreshCompanies(); },
       onClose: function(){ setAddrOpen(false); refreshCompanies(); }
@@ -37601,7 +37856,7 @@ function openContractHwpAttachment(att){
   var modal=document.createElement('div'); modal.className='modal'; modal.style.cssText='width:min(900px,96vw);max-height:94vh;display:flex;flex-direction:column';
   var head=document.createElement('div'); head.className='modal-h';
   var title=document.createElement('div'); title.className='t'; title.textContent='📕 한글 열기 · '+(att.name||'첨부파일');
-  var close=document.createElement('button'); close.className='x'; close.textContent='×'; close.onclick=function(){overlay.remove();};
+  var close=document.createElement('button'); close.className='x'; close.textContent='×'; close.onclick=function(){shut();};
   head.appendChild(title); head.appendChild(close);
   var body=document.createElement('div'); body.className='modal-b'; body.style.cssText='flex:1;overflow:auto;background:#e2e8f0';
   var host=document.createElement('div'); host.id='contractHwpEditor'; host.className='erp-hwp-preview';
@@ -37609,10 +37864,12 @@ function openContractHwpAttachment(att){
   var foot=document.createElement('div'); foot.className='modal-f contract-hwp-actions';
   var save=document.createElement('button'); save.className='btn-secondary'; save.textContent='원본 저장';
   save.onclick=function(){PureunHwp.download(buf,att.name);};
-  var done=document.createElement('button'); done.className='btn-primary'; done.textContent='닫기'; done.onclick=function(){overlay.remove();};
+  /* 닫을 때 편집기가 브라우저에 남긴 서류(복구본·최근 문서·이력)를 비운다 — 다른 회사 계약서가 「문서 복구」 창으로 끼어들지 않게(PureunHwp.clearStudioStores) */
+  var shut=function(){ overlay.remove(); try{ PureunHwp.clearStudioStores(); }catch(e){} };
+  var done=document.createElement('button'); done.className='btn-primary'; done.textContent='닫기'; done.onclick=function(){shut();};
   foot.appendChild(save); foot.appendChild(done);
   modal.appendChild(head); modal.appendChild(body); modal.appendChild(foot); overlay.appendChild(modal); document.body.appendChild(overlay);
-  overlay.onclick=function(e){if(e.target===overlay) overlay.remove();};
+  overlay.onclick=function(e){if(e.target===overlay) shut();};
 
   PureunHwp.createEditor('#contractHwpEditor',buf,att.name)
     .catch(function(){ return PureunHwp.renderPreview(host,buf,att.name); })

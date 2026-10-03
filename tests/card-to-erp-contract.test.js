@@ -310,7 +310,12 @@ function cards(extra) {
     cutFn(CARDS, 'function cardErpMerge('), cutFn(CARDS, 'function cardErpStaffOpts('),
     cutFn(CARDS, 'async function cardErpSync('), cutFn(CARDS, 'function cardErpDone('),
     cutFn(CARDS, 'function cardErpSeed('), cutFn(CARDS, 'function cardErpHtml('),
-    'var _cardErpId = ""; var _cardErpPicked = [];',
+    'var _cardErpId = ""; var _cardErpPicked = []; var _cardErpPin = ""; var _cardErpFix = null; var _cardErpCands = [];',
+    /* 2026-10-03 「이 회사가 맞나요?」 — 창·계약 창이 이 도우미들을 부른다 */
+    cutFn(CARDS, 'function cardErpCandidates('), cutFn(CARDS, 'function cardErpSiblings('),
+    cutFn(CARDS, 'function cardErpTarget('), cutFn(CARDS, 'function cardErpPinCards('),
+    cutFn(CARDS, 'function cardErpWhoHtml('), cutFn(CARDS, 'function cardErpWho('),
+    cutFn(CARDS, 'function cardErpBizFor('),
     cutFn(CARDS, 'function sendToErp('), cutFn(CARDS, 'function closeCardErp('),
     cutFn(CARDS, 'function cardErpGo(')].join('\n'), ctx);
   return { ctx, calls };

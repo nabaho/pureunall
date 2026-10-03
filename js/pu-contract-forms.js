@@ -861,9 +861,11 @@
       return { fm: fm, srcs: srcs, src: srcs[0] || null, hwp: null, text: CF.markersIn(fm.body), err: '' };
     });
     var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0,
-      pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' } };
+      pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' }, edited: null,
+      wi: { on: false, task: '', wtask: '', vat: 'excl', ext: 'agree', succ: 'fixed', succAmt: '' } };
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
     var propBox = el('div', { 'class': 'pcf-prop', hidden: true });
+    var caseBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var bg = el('div', { 'class': 'pcf-mbg' });
     function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
     function onKey(e) { if (e.key === 'Escape') close(); }
@@ -888,6 +890,10 @@
         var P = CF.proposalValues(V, { orgType: st.pv.orgType, amount: st.pv.amount, vat: st.pv.vat,
           staffName: me && me.name, staffTel: st.pv.tel });
         Object.keys(P).forEach(function (k) { V[k] = P[k]; });
+      }
+      if (st.wi.on && CF.caseValues) {
+        var Cv = CF.caseValues(st.wi);
+        Object.keys(Cv).forEach(function (k) { if (Cv[k]) V[k] = Cv[k]; });
       }
       Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });
       return V;
@@ -930,11 +936,49 @@
       propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '노무사 연락처' }), tel]));
       propBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '⚠ 원본의 「비용 산출 내역」 표와 금액이 다르면, 받은 뒤 한글에서 고치거나 빼세요.' }));
     }
+    /* 위임계약서 칸 — 위임사무·위임내용 고르기 · 부가세 · 기간 연장 · 성공보수 (설계 2026-10-03 §2.2·2.3, 목업 승인).
+       표지가 있는 칸만 보인다. 고르면 그 칸의 손댄 값(edits)을 지워 고른 문장이 들어가게 한다. */
+    function drawCase(ks) {
+      caseBox.innerHTML = '';
+      caseBox.hidden = !st.wi.on;
+      if (!st.wi.on) return;
+      var has = {}; (ks || allMarkers()).forEach(function (x) { has[x.key] = 1; });
+      function pick(keys, fn) { return function (v) { fn(v); clearEdits(keys); drawCase(); drawVals(); }; }
+      caseBox.appendChild(el('div', { 'class': 'pcf-fh', text: '위임계약 — 고르면 아래 칸에 문장이 들어갑니다' }));
+      if (has['위임분야'] || has['위임사무']) {
+        var sel = el('select', { 'aria-label': '위임사무', onchange: function () { pick(['위임분야', '위임사무'], function (v) { st.wi.task = v; })(sel.value); } },
+          [el('option', { value: '', text: '— 고르세요 —' })].concat(CF.CASE_TASKS.map(function (t) { return el('option', { value: t.v, text: t.t }); })));
+        sel.value = st.wi.task;
+        caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '위임사무' }), sel]));
+        if (st.wi.task === 'own') caseBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '아래 「위임분야」·「위임사무」 칸에 직접 적으세요 — 위임분야는 「…과 관련하여」 앞에 들어갑니다.' }));
+      }
+      if (has['위임내용']) {
+        var ws = el('select', { 'aria-label': '위임내용', onchange: function () { pick(['위임내용'], function (v) { st.wi.wtask = v; })(ws.value); } },
+          [el('option', { value: '', text: '— 고르세요 —' })].concat(CF.WORKER_TASKS.map(function (t) { return el('option', { value: t.v, text: t.t }); })));
+        ws.value = st.wi.wtask;
+        caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '위임내용' }), ws]));
+      }
+      if (has['부가세처리']) caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '부가세' }),
+        seg([{ v: 'excl', t: '별도' }, { v: 'incl', t: '포함' }], st.wi.vat, pick(['부가세처리', '성공보수'], function (v) { st.wi.vat = v; }))]));
+      if (has['기간연장']) caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '기간 연장' }),
+        seg([{ v: 'agree', t: '당사자 합의로 연장' }, { v: 'auto', t: '끝날 때까지 자동 연장' }], st.wi.ext, pick(['기간연장'], function (v) { st.wi.ext = v; }))]));
+      if (has['성공보수']) {
+        var amt = el('input', { type: 'text', placeholder: st.wi.succ === 'rate' ? '예: 10' : '예: 3,000,000', 'aria-label': '성공보수' });
+        amt.value = st.wi.succAmt;
+        amt.addEventListener('input', function () { st.wi.succAmt = amt.value; clearEdits(['성공보수']); drawVals(); });
+        caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '성공보수' }),
+          el('div', null, [seg([{ v: 'fixed', t: '정액(원)' }, { v: 'rate', t: '정률(%)' }], st.wi.succ, pick(['성공보수'], function (v) { st.wi.succ = v; })), amt])]));
+      }
+    }
     function drawVals() {
       valBox.innerHTML = '';
+      if (st.edited) valBox.appendChild(el('div', { 'class': 'pcf-fnote' }, ['✏ 손본 문서를 받기·메일에 씁니다 — 아래 값을 바꿔도 손본 문서에는 들어가지 않습니다. ',
+        el('button', { type: 'button', 'class': 'pcf-b', text: '손본 것 버리기', onclick: function () { st.edited = null; drawVals(); } })]));
       var ks = allMarkers();
       var wantProp = ks.some(function (x) { return CF.PROPOSAL_KEYS.indexOf(x.key) >= 0; });
       if (wantProp !== st.pv.on) { st.pv.on = wantProp; drawProp(); }
+      var wantCase = !!CF.CASE_KEYS && ks.some(function (x) { return CF.CASE_KEYS.indexOf(x.key) >= 0; });
+      if (wantCase !== st.wi.on) { st.wi.on = wantCase; drawCase(ks); }
       var V = values();
       if (!ks.length) { valBox.appendChild(el('div', { 'class': 'pcf-muted', text: one ? '이 양식에는 채울 자리가 없습니다' : '이 양식들에는 채울 자리가 없습니다' })); return; }
       var blank = ks.filter(function (x) { return !V[x.key]; }).length;
@@ -1088,6 +1132,8 @@
     }
     /* 한 양식 채우기 → { bytes, ext, unknown, relayoutFailed }. 원본이 없거나 asText 면 채운 본문(.txt) */
     function fillOne(it, asText) {
+      /* 손본 문서가 있으면 그것을 쓴다(양식 하나일 때만 — 손보기 단추도 그때만 뜬다) */
+      if (one && st.edited && !asText) return Promise.resolve({ bytes: st.edited.bytes, ext: st.edited.ext, unknown: [] });
       var V = values();
       if (!it.src || asText) return Promise.resolve({ bytes: textBytes(CF.fillText(it.fm.body, V)), ext: '.txt', unknown: [] });
       if (!it.hwp) return Promise.reject(new Error(nameOf(it) + ': ' + (it.state === 'fail' ? '원본을 찾지 못했습니다' : '원본을 아직 읽는 중입니다')));
@@ -1122,6 +1168,33 @@
         prevBox.hidden = false; prevBox.innerHTML = '';
         return host.hwpShow(prevBox, r.bytes, outName(it));
       }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
+    /* ✏ 한글처럼 손보기 (설계 2026-09-29 §6) — 지금 값으로 채운 문서를 편집기로. 다 고치면 받기·메일이 그것을 쓴다 */
+    function doEdit() {
+      var it = items[0];
+      if (busy || !it.src || isXl(it) || !host.hwpEdit) return;
+      if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다'; return; }
+      busy = true; refresh(); note.textContent = '채우는 중…';
+      var base = st.edited ? Promise.resolve({ bytes: st.edited.bytes, ext: st.edited.ext }) : fillOne(it);
+      base.then(function (r) {
+        note.textContent = '';
+        return host.hwpEdit(r.bytes, outName(it)).then(function (b) {
+          busy = false; refresh();
+          if (b) { st.edited = { bytes: b, ext: extOf(it) }; drawVals(); toast('✏ 손본 문서를 받기·메일에 씁니다'); }
+        });
+      }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
+    /* ✉ 메일로 보내기 (설계 §7) — 채운(손본) 파일을 들고 확인 창으로. 보내는 일은 그 창의 「✉ 보내기」에서만 */
+    function doMail() {
+      var it = items[0];
+      if (busy) return;
+      if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다'; return; }
+      busy = true; refresh(); note.textContent = '채우는 중…';
+      fillOne(it, it.state === 'fail').then(function (r) {
+        busy = false; refresh(); note.textContent = '';
+        openSend({ fm: it.fm, V: values(), row: st.co || {}, bytes: r.bytes, name: outName(it).replace(/\.[^.]+$/, '') + r.ext,
+          isHwp: !!it.src && !isXl(it) && r.ext !== '.txt' }, host);
+      }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
     function doDownload() {
       if (busy) return;
@@ -1187,7 +1260,7 @@
             el('div', { 'class': 'pcf-fh', text: '② 담당자 — 기업정보함에서 찾아오기' }), ctQ, ctBox,
             el('div', { 'class': 'pcf-fh', text: '③ 근로자 본인 — 명함에서 찾기 또는 직접 적기' }), wkQ, wkList
           ]),
-          el('div', null, [propBox, valBox])
+          el('div', null, [propBox, caseBox, valBox])
         ]),
         note, prevBox
       ]),
@@ -1196,6 +1269,8 @@
         one && fm0.body ? el('button', { type: 'button', 'class': 'pcf-b', text: '본문 복사', onclick: copyText }) : null,
         pickSel,
         btnPrev = el('button', { type: 'button', 'class': 'pcf-b', onclick: doPreview }),
+        (one && items[0].src && !isXl(items[0]) && host.hwpEdit) ? el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 한글처럼 손보기', onclick: doEdit }) : null,
+        (one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff', text: '✉ 메일로 보내기 →', onclick: doMail }) : null,
         btnDown = (one && !items[0].src) ? null : el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', onclick: doDownload })
       ])
     ]);
@@ -1211,6 +1286,110 @@
     drawContacts(); drawVals();
     refresh(); loadAll();
     setTimeout(function () { coQ.focus(); }, 0);
+  }
+
+  /* ✉ 메일로 보내기 확인 창 (설계 2026-09-29 §7) — 「✉ 보내기」를 눌러야만 나간다.
+     o = { fm, V, row, bytes, name, isHwp }. 보낸 뒤: 보낸 서류 기록(받는 주소 없음) + (선택) 기업별 서류에 사본.
+     ⚠ db 를 직접 만지지 않는다 — host.mail 이 한다(tests/form-cardfill.test.js 의 «채우기 창은 쓰지 않는다» 규칙). */
+  function openSend(o, host) {
+    var CF = w.PuFormCardFill, V = o.V || {}, d = CF.mailDefaults(V, o.fm.name || '서류');
+    var MAX = 18 * 1024 * 1024, busy = false, mode = 'auto';
+    ensureCss();
+    var bg = el('div', { 'class': 'pcf-mbg', style: 'z-index:10001' });
+    function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
+    function onKey(e) { if (e.key === 'Escape' && !busy) close(); }
+    document.addEventListener('keydown', onKey);
+    var toSel = el('select', { 'aria-label': '받는 사람' }, d.to.map(function (x) { return el('option', { value: x.v, text: x.label }); })
+      .concat([el('option', { value: '', text: '직접 적기…' })]));
+    var toIn = el('input', { type: 'email', placeholder: '받는 메일 주소', 'aria-label': '받는 메일 주소', hidden: d.to.length > 0 });
+    toSel.addEventListener('change', function () { toIn.hidden = !!toSel.value; if (!toSel.value) toIn.focus(); });
+    var ccIn = el('input', { type: 'text', placeholder: '(선택) 참조 메일', 'aria-label': '참조 메일' });
+    var subIn = el('input', { type: 'text', 'aria-label': '제목' }); subIn.value = d.subject;
+    var bodyIn = el('textarea', { 'aria-label': '본문', rows: 9, style: 'width:100%;font:inherit;font-size:12.5px;margin-top:6px' }); bodyIn.value = d.body;
+    var pdfCk = el('input', { type: 'checkbox', checked: !!o.isHwp, disabled: !o.isHwp, 'aria-label': 'PDF도 붙이기' });
+    var keepCk = el('input', { type: 'checkbox', checked: true, 'aria-label': '사본 보관' });
+    var note = el('div', { 'class': 'pcf-fnote' });
+    var btnSend = el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff;font-weight:700', text: '✉ 보내기', onclick: send });
+    function toAddr() { return String(toSel.value || toIn.value || '').trim(); }
+    function pdfName() { return o.name.replace(/\.[^.]+$/, '') + '.pdf'; }
+    function files() {
+      var out = [{ name: o.name, bytes: o.bytes }];
+      if (!pdfCk.checked) return Promise.resolve(out);
+      note.textContent = 'PDF 만드는 중…';
+      return host.hwpPdf(o.bytes, o.name).then(function (b) { out.push({ name: pdfName(), bytes: b }); return out; });
+    }
+    function after(fs, how) {
+      var kind = CF.SENT_KIND_OF(o.fm.groupName || '');
+      /* ⚠ 메일은 이미 나갔다 — 기록·보관이 실패해도(동기 throw 포함) «보내기 실패»로 보이면 안 된다(다시 눌러 두 번 간다) */
+      var jobs = [function () { return host.mail.record(o.row, V, { kind: kind, names: fs.map(function (f) { return f.name; }), who: V.담당자 || '' }); }];
+      if (keepCk.checked) jobs.push(function () { return host.mail.keep(V, { name: o.name, size: o.bytes.length, type: '', bytes: o.bytes }, '[보냄] ' + (o.fm.name || '서류')); });
+      return Promise.all(jobs.map(function (fn) { return Promise.resolve().then(fn).then(function () { return ''; }, function (e) { return (e && e.message) || String(e); }); }))
+        .then(function (errs) {
+          errs = errs.filter(Boolean);
+          toast(how + (errs.length ? ' — ⚠ 기록 저장 일부 실패: ' + errs[0] : ' — 보낸 서류에 기록했습니다'));
+        });
+    }
+    function viaMailto(fs) {
+      fs.forEach(function (f) {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([f.bytes])); a.download = f.name;
+        document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      });
+      w.location.href = 'mailto:' + encodeURIComponent(toAddr()) + '?subject=' + encodeURIComponent(subIn.value) + '&body=' + encodeURIComponent(bodyIn.value);
+      note.textContent = '메일 창을 열었습니다 — 내려받은 파일을 손으로 붙여 보내 주세요.';
+      if (w.confirm('메일 창에서 보내셨으면 「보낸 서류」에 기록을 남길까요?')) return after(fs, '기록했습니다');
+      return Promise.resolve();
+    }
+    function send() {
+      if (busy) return;
+      var to = toAddr();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { note.textContent = '⚠ 받는 메일 주소를 확인하세요'; return; }
+      if (!subIn.value.trim() || !bodyIn.value.trim()) { note.textContent = '⚠ 제목과 본문을 적어 주세요'; return; }
+      busy = true; btnSend.disabled = true;
+      var failed = false;
+      files().then(function (fs) {
+        var total = fs.reduce(function (n, f) { return n + f.bytes.length; }, 0);
+        if (total > MAX) {
+          if (fs.length > 1 && w.confirm('첨부가 18MB를 넘습니다. PDF 를 빼고 보낼까요?')) fs = fs.slice(0, 1);
+          else throw new Error('첨부가 18MB를 넘어 보낼 수 없습니다');
+        }
+        if (mode !== 'auto') return viaMailto(fs);
+        note.textContent = '보내는 중…';
+        return host.mail.send({ to: to, cc: ccIn.value.trim(), subject: subIn.value.trim(), body: bodyIn.value, toName: V.담당자 || V.수신자 || '' }, fs)
+          .then(function () { return after(fs, '✉ 보냈습니다'); }, function (e) {
+            failed = true;
+            note.textContent = '⚠ 보내지 못했습니다 — ' + ((e && e.message) || e);
+            if (w.confirm('메일 서버로 보내지 못했습니다:\n' + ((e && e.message) || e) + '\n\n파일을 내려받고 메일 창으로 보낼까요?')) return viaMailto(fs);
+            throw e;
+          });
+      }).then(function () { busy = false; close(); }, function (e) {
+        busy = false; btnSend.disabled = false;
+        if (!failed) note.textContent = '⚠ ' + ((e && e.message) || e);
+      });
+    }
+    var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '메일로 보내기', style: 'width:760px' }, [
+      el('div', { 'class': 'pcf-mh' }, [el('span', { text: '✉ 메일로 보내기 — ' + (V.회사명 || '') }),
+        el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: function () { if (!busy) close(); } })]),
+      el('div', { 'class': 'pcf-mb' }, [
+        el('label', { 'class': 'pcf-frow' }, [el('span', { text: '받는 사람' }), el('div', null, [toSel, toIn])]),
+        el('label', { 'class': 'pcf-frow' }, [el('span', { text: '참조' }), ccIn]),
+        el('label', { 'class': 'pcf-frow' }, [el('span', { text: '제목' }), subIn]),
+        bodyIn,
+        el('div', { 'class': 'pcf-fh', text: '첨부' }),
+        el('div', { 'class': 'pcf-muted', text: '📄 ' + o.name + ' · ' + Math.max(1, Math.round(o.bytes.length / 1024)) + ' KB' }),
+        el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:6px;align-items:center' }, [pdfCk, '📕 같은 내용 PDF도 붙이기 (한글 없는 곳용 · 그림 PDF)']),
+        el('div', { 'class': 'pcf-fh', text: '보낸 뒤' }),
+        el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:6px;align-items:center' }, [keepCk, '보낸 사본을 기업별 서류 › ' + (V.회사명 || '(회사명 없음)') + ' 에 보관']),
+        el('div', { 'class': 'pcf-muted', text: '✔ 기업정보함 「보낸 서류」에 기록합니다 (언제·누가·무슨 서류 — 받는 주소는 남기지 않음)' }),
+        note]),
+      el('div', { 'class': 'pcf-mf' }, [
+        el('span', { 'class': 'pcf-muted', style: 'margin-right:auto', text: '「✉ 보내기」를 누르기 전엔 아무것도 나가지 않습니다.' }),
+        el('button', { type: 'button', 'class': 'pcf-b', text: '취소', onclick: function () { if (!busy) close(); } }), btnSend])
+    ]);
+    bg.appendChild(m); document.body.appendChild(bg);
+    host.mail.mode().then(function (md) {
+      mode = md;
+      if (md !== 'auto') { btnSend.textContent = '⬇ 파일 받고 메일 창 열기'; note.textContent = '회사 메일 자동 발송이 꺼져 있습니다 — 파일을 받아 메일 창에서 붙여 보냅니다.'; }
+    });
   }
 
   /* ══ 양식 관리 화면 — host: { db, track?, tree?, selected?, onSelect?, archive?, downloadOriginal? } ══

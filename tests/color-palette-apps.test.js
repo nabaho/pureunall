@@ -36,6 +36,7 @@ const DONE = [
   ['pu-cards.html', '기업정보함'],
   ['pu-photos.html', '푸른사진첩'],
   ['rules.html', '취업규칙'],
+  ['rules-v2.html', '취업규칙(새)'],
   ['enter.html', '푸른포털'],
   ['fund.html', '근로복지기금'],
   ['pu-paydata.html', '급여데이터함'],

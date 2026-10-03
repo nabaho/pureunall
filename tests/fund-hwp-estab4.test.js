@@ -22,6 +22,7 @@ const A = (() => {
     gF('_officersOf'), gF('_boss'), gF('_siteWrep'), gF('_siteUrep'), gF('_isCommittee'), gF('_siteCommittee'), gF('_prepCommittee'),
     gF('_cmSeeAnnex'), gF('estabSites'), gF('siteContribOf'), gF('_docRok'), gF('siteContribNow'), gF('partyNames'), gF('partyJoin'),
     gF('_dotDate'), gF('_hwpKoDate'), gF('_hwpTodayIso'), gF('_hwpSignRows'),
+    gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmPairRows'), gF('_hwpInkaAnnexValues'),
     gF('_hwpInkaValues'), gF('_hwpAgreementValues'), gF('_hwpCharterValues'), gF('_hwpContribValues'),
     gV('HWP_TPL_KINDS'), gV('HWP_TPL_STRICT'), gF('_dkKeyOf'), gF('_hwpTplKey'), gF('_hwpTplFits'),
     gS('GRID_BLANK'), gF('_hwpCharterSaneValues'),
@@ -63,7 +64,27 @@ test('★★ 위원이 격자(3줄)를 넘치면 첫 칸에 「별지 명단과 
   const v = A.inka(F, many);
   assert.equal(v.근측1성명, '별지 명단과 같음');
   assert.equal(v.근측2성명, ' '); assert.equal(v.근측1생년월일, ' ');
-  assert.match(v._note, /근로자측 위원 4명/);
+  assert.match(v._note, /근로자측 4명/);
+  /* 2026-10-03 별지는 인가신청서 «다음 쪽»에 — 넣을지(참/거짓)와 명단을 같은 값에 싣는다 */
+  assert.equal(v.별지명단, true, '★ 넘치는데 별지를 안 붙인다');
+  /* 2026-10-03 A안 — 사업장마다 한 줄(근로자측 왼쪽·사용자측 오른쪽): 네 회사 → 네 줄, 여덟 사람 */
+  assert.equal(v.위원.length, 4, '★ 사업장마다 한 줄이 아니다');
+  assert.deepEqual(v.위원.map((r) => [r.소속, r.근성명, r.사성명]), [1, 2, 3, 4].map((i) => ['회사' + i, '근로' + i, '대표' + i]),
+    '★ 같은 회사의 근로자측·사용자측이 한 줄에 마주 보지 않는다');
+});
+
+test('★★ 지역공동기금은 위원이 적어도 늘 별지 — 격자에는 「별지 명단과 같음」, 명단은 다음 쪽', () => {
+  const one = [{ _id: 'm1', name: '회사1', ceo: '대표1', wrep_name: '근로1', urep_same: true }];
+  const region = Object.assign({}, F, { fund_type: '공동', region: '○○' });
+  const v = A.inka(region, one);
+  assert.equal(v.별지명단, true, '★ 지역공동기금인데 별지를 안 붙인다(대표 지시 2026-10-03)');
+  assert.equal(v.근측1성명, '별지 명단과 같음');
+  assert.ok(v.위원.some((r) => r.근성명 === '근로1'));
+  const plain = Object.assign({}, F, { fund_type: '공동', region: '' });
+  const w = A.inka(plain, one);
+  assert.equal(w.별지명단, false, '지역이 아닌 공동기금은 격자에 들어가면 별지 없이');
+  assert.notEqual(w.근측1성명, '별지 명단과 같음');
+  assert.deepEqual(w.위원, [], '별지를 안 붙이면 명단 값도 비운다');
 });
 
 test('설립합의서 — 참여회사 이어 쓰기·회의일(본문과 끝 날짜가 같은 날)·위원 수는 양쪽이 같을 때만·서명은 회사마다', () => {
@@ -128,28 +149,39 @@ test('★★ 출연확인서 — 사업장마다 한 장, 금액은 siteContribN
 });
 
 /* ── [별지] 설립준비위원회 위원 명단 — 한글로도 (2026-09-27 「계속」) ── */
-test('★ 별지 명단 — 측마다 번호를 새로(관청이 측별로 센다), 모르는 칸은 빈칸, 인원수', () => {
+test('★ 별지 명단 — 사업장마다 한 줄, 근로자측 왼쪽·사용자측 오른쪽(2026-10-03 A안), 모르는 칸은 빈칸, 인원수', () => {
   const box = {};
   new Function(['var S={year:2026};', gS('COMMITTEE_ROWS'), gF('_officersOf'), gF('_boss'), gF('_siteWrep'), gF('_siteUrep'),
-    gF('_isCommittee'), gF('_siteCommittee'), gF('_prepCommittee'), gF('estabSites'), gF('_hwpInkaAnnexValues'),
-    'this.ax=_hwpInkaAnnexValues;'].join('\n')).call(box);
+    gF('_isCommittee'), gF('_siteCommittee'), gF('_prepCommittee'), gF('estabSites'), gF('_cmPairRows'), gF('_hwpInkaAnnexValues'),
+    'this.ax=_hwpInkaAnnexValues; this.pair=_cmPairRows;'].join(String.fromCharCode(10))).call(box);
   const v = box.ax(F, SITES);
   assert.equal(v.기금명, F.name);
-  const w = v.위원.filter((r, i, a) => i < a.findIndex((x) => x.구분 === '사용자측'));
-  assert.equal(w[0].구분, '근로자측'); assert.equal(w[0].순번, '1');
-  const u0 = v.위원.find((x) => x.구분 === '사용자측');
-  assert.equal(u0.순번, '1', '사용자측도 1부터');
-  assert.equal(v.근로자측수, String(w.length));
-  assert.ok(v.위원.every((r) => typeof r.생년월일 === 'string' && r.생년월일.length > 0), '빈 값은 밑줄이 아니라 빈칸(" ")');
+  assert.deepEqual(v.위원.map((r) => r.순번), v.위원.map((r, i) => String(i + 1)), '번호는 줄마다 1부터');
+  const 가나 = v.위원.find((r) => /가나기계/.test(r.소속));
+  assert.ok(가나 && 가나.근성명 === '박근로' && 가나.사성명 === '김대표', '★ 같은 회사가 한 줄에 마주 보지 않는다: ' + JSON.stringify(가나));
+  assert.ok(v.위원.every((r) => ['소속', '근성명', '근생년월일', '근직책', '사성명', '사생년월일', '사직책'].every((k) => typeof r[k] === 'string' && r[k].length > 0)),
+    '빈 값은 밑줄이 아니라 빈칸(" ")');
   assert.ok(!('번호' in v.위원[0]), '엔진이 매기는 {{번호}}(전체 차례)와 겹치지 않게 순번');
+  /* 짝짓기 — (주)·㈜·주식회사·빈칸은 같은 회사, 한쪽뿐이면 반대편 빈칸, 한 회사 두 사람은 줄을 더 연다, 소속 없는 사람끼리는 순서대로 */
+  const f = { prep_committee: [
+    { side: '근로자측', name: '홍길동', company: '(주)가나' }, { side: '근로자측', name: '김철수', company: '다라' },
+    { side: '근로자측', name: '최민수', company: '다라' }, { side: '근로자측', name: '무소속근' },
+    { side: '사용자측', name: '이담당', company: '가나 주식회사' }, { side: '사용자측', name: '박영희', company: '다라' },
+    { side: '사용자측', name: '정수진', company: '마바' }, { side: '사용자측', name: '무소속사' }] };
+  const rows = box.pair(f, []).map((r) => [r.co, r.w && r.w.name, r.u && r.u.name]);
+  assert.deepEqual(rows, [['(주)가나', '홍길동', '이담당'], ['다라', '김철수', '박영희'], ['다라', '최민수', undefined],
+    ['', '무소속근', '무소속사'], ['마바', undefined, '정수진']]);
+  assert.equal(box.ax(f, []).근로자측수, '4'); assert.equal(box.ax(f, []).사용자측수, '4');
 });
 
 test('★ 별지 배선 — 인가신청서 미리보기의 [⬇ 별지 명단] · 묶음 ZIP 에 인가신청서 바로 뒤', () => {
   const sp = gF('hwpSidePreview');
-  assert.match(sp, /kind==='inka'&&\(S\._hwpTplHas\|\|\{\}\)\.inka_annex&&_cmAnnexNeeded\(f,S\._hwpSideSites\|\|\[\]\)/);
+  /* 2026-10-03 인가신청서 틀 안에 별지가 들어간 뒤로는(r.opts.별지명단) 따로 받는 단추·따로 넣는 파일이 없다 —
+     같은 명단이 두 번 나간다. 옛 틀(별지가 없는 것)일 때만 따로 */
+  assert.match(sp, /kind==='inka'&&!\('별지명단' in \(r\.opts\|\|\{\}\)\)&&\(S\._hwpTplHas\|\|\{\}\)\.inka_annex&&_cmAnnexNeeded\(f,S\._hwpSideSites\|\|\[\]\)/);
   assert.match(sp, /hwpAnnexDownload\(\)/);
   const bu = gF('estabBundleHwp');
-  assert.match(bu, /u\.d\[0\]==='inka'&&\(S\._hwpTplHas\|\|\{\}\)\.inka_annex&&_cmAnnexNeeded\(f,sites\)/);
+  assert.match(bu, /u\.d\[0\]==='inka'&&!\('별지명단' in \(res\.opts\|\|\{\}\)\)&&\(S\._hwpTplHas\|\|\{\}\)\.inka_annex&&_cmAnnexNeeded\(f,sites\)/);
   assert.match(bu, /-1\. \[별지\] 설립준비위원회 위원 명단\.hwpx/);
   assert.match(gF('hwpAnnexDownload'), /hwpTplFill\('inka_annex',f,sites\)/);
 });

@@ -214,3 +214,30 @@ test('빈 낱말은 받지 않는다', () => {
 
 
 
+
+/* ───────── ★ 출처를 데려간다 (2026-10-03 첫 실사용) ───────── */
+
+test('★★ 합칠 때 출처(src)를 잃지 않는다 — 잃으면 출처 칸이 비고 거르개도 안 먹는다', () => {
+  // 실측 2026-10-03: 받은 32건이 전부 출처 칸이 비어 있었다.
+  const inc = [
+    { src: '알리오', no: '305665', nm: '노무 고문 위촉', inst: '○○공단' },
+    { src: '기업마당', no: 'PBLN_000000000080236', nm: '노무 컨설팅 지원', inst: '○○진흥원' }
+  ];
+  const m = G.merge([], inc, ['노무'], '2026-10-03');
+  assert.deepEqual(m.adds.map((r) => r.src), ['알리오', '기업마당']);
+});
+
+test('★ 나라장터에서 읽은 줄은 출처가 「나라장터」다', () => {
+  const r = G.parse({ response: { header: { resultCode: '00' }, body: { totalCount: 1,
+    items: [{ bidNtceNo: 'R26BK01749015', bidNtceOrd: '000', bidNtceNm: '노무자문 용역' }] } } });
+  assert.equal(r.rows[0].src, '나라장터');
+  assert.equal(G.merge([], r.rows, ['노무'], '2026-10-03').adds[0].src, '나라장터');
+});
+
+test('★ 출처가 빠진 옛 줄은 번호 모양으로 되살린다 — 모르면 지어내지 않는다', () => {
+  assert.equal(G.guessSrc('R26BK01749015-000'), '나라장터');
+  assert.equal(G.guessSrc('305665'), '알리오');
+  assert.equal(G.guessSrc('PBLN_000000000080236'), '기업마당');
+  assert.equal(G.guessSrc('알수없음'), '', '모르는 모양에 출처를 붙이면 안 됩니다');
+  assert.equal(G.guessSrc(''), '');
+});

@@ -51,7 +51,6 @@
        cdnBase 를 빈 값으로 두면 사본만 쓴다 — CDN 이 응답을 물고 늘어지는 망을 위한 탈출구. */
     cdnBase: 'https://cdn.jsdelivr.net/npm/@rhwp/core',
     coreUrl: 'vendor/rhwp-core/rhwp.js',
-    editorUrl: 'https://esm.sh/@rhwp/editor',
     maxFileBytes: 100 * 1024 * 1024,
     maxCanvasPixels: 32 * 1024 * 1024
   };
@@ -213,16 +212,63 @@
     });
   }
 
+  /* ⚠★ 2026-10-03 「서류가 남의 주소로 간다」 — 편집기는 «저장소 안» 것만 쓴다.
+     예전 기본값은 esm.sh 의 @rhwp/editor 를 studioUrl 없이 불렀다 → studio 기본 주소
+     https://edwardkim.github.io/rhwp/ 로 문서를 통째로 보냈다(기금관리가 2026-09-21 에 고친 것과 같은 결함).
+     이 길을 탄 곳: 문서관리 집단체불 「한글로 채워 보기」(근로자 주민번호·계좌가 든 문서), 이알피 계약서 첨부 편집기.
+     그래서 주소를 설정(localStorage·PUREUN_HWP_CONFIG·extra)으로도 바꾸지 못하게 박는다.
+     .hwp 는 편집기가 못 읽어 엔진으로 .hwpx 로 바꿔 넣는다(경력관리 _rhToHwpx 와 같은 길).
+     tests/hwp-engine-local-editor.test.js 가 지킨다. */
+  var LOCAL_EDITOR = 'vendor/rhwp-editor/index.js';
+  var LOCAL_STUDIO = 'vendor/rhwp-studio/index.html';
+  /* ⚠★ 2026-10-03 「문서 복구」 창 막기 — 모든 앱 공용(대표 지시 「다른앱 복구창 막아라」).
+     편집기(rhwp-studio)는 쓰는 중인 문서를 브라우저(IndexedDB)에 자동 저장했다가, 다음에 «아무» 문서나
+     열면 「저장되지 않은 문서 복구본이 있습니다」를 띄운다 — [복구]하면 지금 연 서류 대신 «다른 문서»
+     (다른 기금·다른 근로자·다른 회사 계약서)가 들어온다. 「최근 문서」(20개)·「문서 이력」(문서 내용 24벌)도
+     같은 종류라 셋 다 편집기를 열기 «전»과 닫은 «뒤»에 비운다. 한 창 안의 되돌리기·이력은 그대로 된다.
+     ⚠ 「끼워 넣기 모드」(?chrome=embed)는 복구 창은 끄지만 인쇄·PDF로 인쇄·문서 비교까지 없애서 안 쓴다.
+     ⚠ 다른 탭이 저장소를 잡고 있으면 브라우저가 지우기를 미룬다 — 1.5초 넘게 기다리지 않는다.
+     기금관리(fund.html _hwpClearStudioStores, #1841)가 먼저 고쳤고 그것과 같은 셋을 지운다.
+     tests/hwp-engine-no-recovery.test.js 가 지킨다. */
+  var STUDIO_DBS = ['rhwpStudioAutosave', 'rhwpStudioRecent', 'rhwpStudioDocHistory'];
+  function clearStudioStores() {
+    var idb = global.indexedDB;
+    if (!idb || typeof idb.deleteDatabase !== 'function') return Promise.resolve();
+    return Promise.all(STUDIO_DBS.map(function (n) {
+      return new Promise(function (res) {
+        var done = false, fin = function () { if (!done) { done = true; res(); } };
+        try { var r = idb.deleteDatabase(n); r.onsuccess = fin; r.onerror = fin; r.onblocked = fin; } catch (_) { fin(); }
+        global.setTimeout(fin, 1500);
+      });
+    }));
+  }
+  /* 편집기를 닫을 때(destroy)도 비우게 감싼다 — 닫은 뒤 서류가 브라우저에 남지 않게 */
+  function withClearOnDestroy(editor) {
+    if (editor && typeof editor.destroy === 'function' && !editor._puClearWrapped) {
+      var orig = editor.destroy;
+      editor.destroy = function () { try { return orig.apply(editor, arguments); } finally { clearStudioStores(); } };
+      editor._puClearWrapped = true;
+    }
+    return editor;
+  }
   function createEditor(selector, input, fileName, extra) {
     var meta = validate(input, fileName, extra);
-    var cfg = config(extra);
-    if (!cfg.editorUrl) return Promise.reject(new Error('고급 편집기 주소가 설정되지 않았습니다.'));
-    return dynamicImport(cfg.editorUrl).then(function (mod) {
-      if (!mod || typeof mod.createEditor !== 'function') throw new Error('편집기 모듈을 불러오지 못했습니다.');
-      return mod.createEditor(selector);
-    }).then(function (editor) {
-      return Promise.resolve(editor.loadFile(input, meta.fileName)).then(function (loaded) {
-        return { editor: editor, result: loaded, meta: meta };
+    var bytes = bytesOf(input);
+    var ready = meta.format === 'hwpx' ? Promise.resolve({ bytes: bytes, name: meta.fileName })
+      : openDoc(bytes, meta.fileName).then(function (doc) {
+        try { return { bytes: new Uint8Array(doc.exportHwpx()), name: meta.fileName.replace(/\.hwp$/i, '') + '.hwpx' }; }
+        finally { try { doc.free(); } catch (_) {} }
+      });
+    return ready.then(function (src) {
+      return clearStudioStores().then(function () { return dynamicImport(new URL(LOCAL_EDITOR, baseHref()).href); }).then(function (mod) {
+        if (!mod || typeof mod.createEditor !== 'function') throw new Error('편집기 모듈을 불러오지 못했습니다.');
+        return mod.createEditor(selector, { studioUrl: LOCAL_STUDIO, renderer: 'canvas2d', width: '100%', height: '100%' });
+      }).then(function (editor) {
+        withClearOnDestroy(editor);
+        var ab = src.bytes.buffer.slice(src.bytes.byteOffset, src.bytes.byteOffset + src.bytes.byteLength);
+        return Promise.resolve(editor.loadFile(ab, src.name)).then(function (loaded) {
+          return { editor: editor, result: loaded, meta: meta };
+        });
       });
     });
   }
@@ -259,6 +305,8 @@
     openDoc: openDoc,
     renderPreview: renderPreview,
     createEditor: createEditor,
+    clearStudioStores: clearStudioStores,
+    withClearOnDestroy: withClearOnDestroy,
     exportFrom: exportFrom,
     download: download
   };

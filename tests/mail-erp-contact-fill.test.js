@@ -28,6 +28,22 @@ const app = fs.readFileSync(path.join(root, 'pu-cards.html'), 'utf8');
 const code = app.replace(/\/\*[\s\S]*?\*\//g, ' ');
 const flush = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
 
+/* 이름을 견주는 «진짜 잣대»를 앱에서 떼어 온다 (2026-10-03).
+   ⚠ 여기 옮겨 적으면 그 사본이 낡는다 — 앱이 바뀌어도 검사는 옛 잣대로 통과한다.
+     erpFillContact 가 쓰는 바로 그 두 개를 그대로 태운다. */
+/* _nameHit 은 중괄호만 있어 공용 자르개로 깔끔히 떼어진다 */
+const REAL_HIT = vm.runInNewContext('(function ' + sliceFn(app, '_nameHit(a,b){') + ')');
+/* ⚠ _norm 은 정규식 안에 중괄호·따옴표가 들어 있어(`[\s\-_.,·・()[\]{}'"]`) 중괄호를
+     세는 자르개가 못 센다. 그래서 «이웃 함수(_digits)»로 끝을 잡는다 — 줄 수나 생김새가
+     아니라 «다음에 오는 이름»에 기대므로, 안을 고쳐도 안 깨진다. */
+const REAL_NORM = (() => {
+  const a = app.indexOf('_norm(s){');
+  const b = app.indexOf('_digits(s){', a);
+  if (a < 0 || b < a) throw new Error('_norm 을 떼지 못했습니다');
+  const src = app.slice(a, b).replace(/,\s*$/, '');
+  return vm.runInNewContext('(function ' + src + ')');
+})();
+
 /* 진짜 erpFillContact 를 태운다 — 가짜 실시간DB 로 «무엇이 적히는지»를 본다 */
 function boot(o) {
   const opt = o || {};
@@ -36,7 +52,8 @@ function boot(o) {
   const ctx = {
     Object, String, Number, Array, JSON, Date, Math, Promise, console,
     toast(){}, mbWhoBust(){}, mbCardsRevBump(){}, renderPCSide(){}, renderMailPage(){},
-    ErpMatch: { load(){}, companies: cos, _norm: (s)=>String(s||'').replace(/\s/g,'') },
+    /* ⚠ _norm·_nameHit 은 «앱에서 떼어 온 진짜»다 — 흉내 내면 규칙이 두 벌이 된다 */
+    ErpMatch: { load(){}, companies: cos, _norm: REAL_NORM, _nameHit: REAL_HIT },
     firebase: {
       auth: () => ({ currentUser: opt.noUser ? null : { email: 'me@pureun.kr' } }),
       database: () => ({
@@ -83,16 +100,72 @@ test('★★ 대표 담당자 «메일»이 적혀 있으면 안 덮는다', asy
   assert.equal(w.contacts.length, 1, '담당자 줄은 늘어야 합니다');
 });
 
-test('★★ 메일 칸은 비었는데 «이름»만 적혀 있으면 — 메일만 채우고 이름은 안 덮는다', async () => {
-  /* ⚠ 앞 검사만으로는 이 자리를 «밟지 못한다» — 메일이 이미 있으면 이름 줄까지 통째로
-       건너뛰기 때문이다. 그래서 이름 보호를 떼어내도 그냥 지나갔다(이빨 확인이 잡음). */
-  const c = boot({ companies: [{ id:'co1', name:'맘스터치', contacts:[],
-    primaryContactEmail:'', primaryContactName:'옛담당', primaryContactPhone:'010-1111-2222' }] });
-  await c.erpFillContact({ coId:'co1', email:'new@momstouch.co.kr', name:'새담당', phone:'010-9999-8888' });
+/* ══════ ③-2 거울 칸 셋은 «한 사람»이다 (대표 검토 2026-10-03) ══════
+   ⚠ 무엇이었나 — 칸마다 따로 「비었으면 채운다」로만 보니, 이름 칸에 이미 다른 사람이
+     있는데 이메일만 채워 넣었다. 그러면 한 줄이 «두 사람»을 섞어 적는다.
+   ⚠ 실제로 그렇게 됐다(업체 한 곳 — 이름은 안 적는다): 대표담당 이름·전화는 그 회사
+     사람인데 이메일만 «세무사무실» 사람 것이 되었다. 한 사람처럼 보이는데 아니다.
+   ⚠ 아래 보기는 모두 «가짜»다 — 홍길동·가나상사(tests/no-real-client-data.test.js 가 지킨다).
+   ★ 그래서 이름 칸이 «이미 다른 사람»이면 거울 칸을 아예 안 건드린다.
+     담당자 목록(contacts)에는 그대로 들어가므로 잃는 것이 없다. */
+
+test('★★★ 이름 칸이 «다른 사람»이면 메일도 안 채운다 — 한 줄이 두 사람을 섞으면 안 된다', async () => {
+  /* 대표 화면에서 실제로 난 «모양»을 그대로 넣어 본다 — 값은 가짜다 */
+  const c = boot({ companies: [{ id:'co1', name:'가나상사', contacts:[],
+    primaryContactEmail:'', primaryContactName:'홍길동 부장', primaryContactPhone:'010-0000-0000' }] });
+  const r = await c.erpFillContact({ coId:'co1', email:'kim@darataxcpa.kr',
+    name:'세무법인다라 김영희 팀장', from:'mail-new' });
   const w = written(c);
-  assert.equal(w.primaryContactEmail, 'new@momstouch.co.kr', '빈 메일 칸을 안 채웠습니다');
-  assert.equal(w.primaryContactName, '옛담당', '적혀 있던 대표 이름을 덮었습니다');
+  assert.equal(r.added, true, '담당자 줄에는 들어가야 합니다 — 잃는 것이 없어야 고침이 성립합니다');
+  assert.equal(w.contacts.length, 1, '담당자 목록에 안 들어갔습니다');
+  assert.ok(!('primaryContactEmail' in w) || !w.primaryContactEmail,
+    '★★★ 「홍길동 부장」 옆에 남의 메일을 붙였습니다: ' + w.primaryContactEmail);
+  assert.equal(w.primaryContactName, '홍길동 부장', '적혀 있던 대표 이름을 덮었습니다');
+  assert.equal(w.primaryContactPhone, '010-0000-0000', '적혀 있던 전화를 덮었습니다');
+});
+
+test('★★ 같은 사람이면 «빈 메일 칸을 채운다» — 고치면서 막아 버리면 안 된다', async () => {
+  const c = boot({ companies: [{ id:'co1', name:'맘스터치', contacts:[],
+    primaryContactEmail:'', primaryContactName:'김민수', primaryContactPhone:'010-1111-2222' }] });
+  await c.erpFillContact({ coId:'co1', email:'kim@momstouch.co.kr', name:'김민수', phone:'010-9999-8888' });
+  const w = written(c);
+  assert.equal(w.primaryContactEmail, 'kim@momstouch.co.kr', '★★ 같은 사람인데 안 채웠습니다');
+  assert.equal(w.primaryContactName, '김민수', '적혀 있던 이름을 덮었습니다');
   assert.equal(w.primaryContactPhone, '010-1111-2222', '적혀 있던 전화를 덮었습니다');
+});
+
+test('★★ 직책이 붙어도 «같은 사람»으로 본다 — 「김민수」와 「김민수 부장」', async () => {
+  const c = boot({ companies: [{ id:'co1', name:'맘스터치', contacts:[],
+    primaryContactEmail:'', primaryContactName:'김민수 부장' }] });
+  await c.erpFillContact({ coId:'co1', email:'kim@momstouch.co.kr', name:'김민수' });
+  assert.equal(written(c).primaryContactEmail, 'kim@momstouch.co.kr',
+    '★★ 직책 한 글자 때문에 같은 사람을 딴 사람으로 봤습니다');
+});
+
+test('★★ 들어오는 이름이 «없으면» 안 채운다 — 모르면서 붙이는 것이 이번 일이었다', async () => {
+  const c = boot({ companies: [{ id:'co1', name:'맘스터치', contacts:[],
+    primaryContactEmail:'', primaryContactName:'홍길동 부장' }] });
+  await c.erpFillContact({ coId:'co1', email:'nobody@elsewhere.co.kr' });
+  const w = written(c);
+  assert.ok(!w.primaryContactEmail, '★★ 누구인지도 모르면서 대표담당 메일로 올렸습니다');
+  assert.equal(w.contacts.length, 1, '담당자 목록에는 들어가야 합니다');
+});
+
+test('★ 이름 칸이 «비어 있으면» 예전처럼 채운다', async () => {
+  const c = boot({ companies: [{ id:'co1', name:'맘스터치', contacts:[],
+    primaryContactEmail:'', primaryContactName:'' }] });
+  await c.erpFillContact({ coId:'co1', email:'kim@momstouch.co.kr', name:'김민수' });
+  const w = written(c);
+  assert.equal(w.primaryContactEmail, 'kim@momstouch.co.kr');
+  assert.equal(w.primaryContactName, '김민수');
+});
+
+test('★★ 「이 사람으로 바꾼다」(replace)는 그대로 덮는다 — 사람이 또렷이 고른 길이다', async () => {
+  const c = boot({ companies: [{ id:'co1', name:'맘스터치', contacts:[],
+    primaryContactEmail:'old@x.kr', primaryContactName:'옛담당' }] });
+  await c.erpFillContact({ coId:'co1', email:'new@momstouch.co.kr', name:'새담당', mode:'replace' });
+  const w = written(c);
+  assert.equal(w.primaryContactEmail, 'new@momstouch.co.kr', '★★ 사람이 고른 것까지 막았습니다');
 });
 
 test('★ 비어 있으면 «채운다» — 안 채우면 이 일을 한 보람이 없다', async () => {

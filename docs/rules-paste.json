@@ -1239,6 +1239,12 @@
         ".write": "auth != null && auth.uid === $uid"
       }
     },
+    "gov": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
     "kcareer_pub": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('sid').exists() && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
@@ -1398,6 +1404,43 @@
       "lawwatch": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".write": false
+      },
+      "library": {
+        "docs": {
+          ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+          ".write": false
+        },
+        "text": {
+          ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+          ".write": false
+        },
+        "run": {
+          ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+          ".write": false
+        },
+        "seen": {
+          ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+          ".write": false
+        },
+        "human": {
+          ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+          "$id": {
+            ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && newData.exists()",
+            ".validate": "newData.hasChildren(['id','entityType','revision']) && newData.child('id').isString() && newData.child('id').val() === $id && newData.child('revision').isNumber() && newData.child('entityType').val() === 'RulesDocument'"
+          }
+        },
+        "rounds": {
+          ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+          "$id": {
+            ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && newData.exists()",
+            ".validate": "newData.hasChildren(['id','entityType','revision']) && newData.child('id').isString() && newData.child('id').val() === $id && newData.child('revision').isNumber() && newData.child('entityType').val() === 'RulesRound'"
+          }
+        },
+        "ask": {
+          "$id": {
+            ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+          }
+        }
       },
       "casebook": {
         "index": {
@@ -1677,7 +1720,10 @@
             ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)"
           },
           "path": {
-            ".validate": "newData.isString() && newData.val().beginsWith('pu_docs/originals/' + $id + '/')"
+            ".validate": "newData.isString() && (newData.val().beginsWith('pu_docs/originals/' + $id + '/') || (newData.parent().child('secret').val() === true && newData.val().beginsWith('pu_docs/secret/' + $id + '/')))"
+          },
+          "secret": {
+            ".validate": "newData.isBoolean() && newData.val() === true"
           },
           "at": {
             ".validate": "newData.isNumber()"
@@ -1691,7 +1737,7 @@
           "from": {
             ".validate": "newData.hasChild('kind')",
             "kind": {
-              ".validate": "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo'"
+              ".validate": "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder'"
             },
             "$f": {
               ".validate": "newData.isString() && newData.val().length <= 200"
@@ -1718,6 +1764,12 @@
           "n": {
             ".validate": "newData.isNumber() && newData.val() >= 0"
           },
+          "r": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "bz": {
+            ".validate": "newData.isString() && newData.val().length <= 12"
+          },
           "lastAt": {
             ".validate": "newData.isNumber()"
           },
@@ -1725,6 +1777,65 @@
             ".validate": false
           }
         }
+      },
+      "co_recs": {
+        "$k": {
+          "$d": {
+            ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+            ".validate": "newData.hasChildren(['kind','src','at','by'])",
+            "date": {
+              ".validate": "newData.isString() && newData.val().length <= 10"
+            },
+            "kind": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "amount": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "payDay": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "tax": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "edi": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "staff": {
+              ".validate": "newData.isString() && newData.val().length <= 30"
+            },
+            "contact": {
+              ".validate": "newData.isString() && newData.val().length <= 80"
+            },
+            "bizNo": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "note": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            },
+            "docId": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "src": {
+              ".validate": "newData.val() === 'import' || newData.val() === 'manual' || newData.val() === 'folder'"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "by": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "byName": {
+              ".validate": "newData.isString() && newData.val().length <= 60"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      },
+      "secret_log": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
       },
       "co_docs": {
         "$k": {
@@ -1741,7 +1852,10 @@
               ".validate": "newData.isString() && newData.val().length <= 10"
             },
             "src": {
-              ".validate": "newData.val() === 'photo' || newData.val() === 'upload'"
+              ".validate": "newData.val() === 'photo' || newData.val() === 'upload' || newData.val() === 'folder'"
+            },
+            "secret": {
+              ".validate": "newData.isBoolean() && newData.val() === true"
             },
             "at": {
               ".validate": "newData.isNumber()"

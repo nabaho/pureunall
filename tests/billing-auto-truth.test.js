@@ -48,15 +48,18 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
      2026-09-11 지역뉴스 검토후보 수집(아침 7:10)이 늘어 아홉이 됐다.
      2026-09-26 취업규칙 법 개정 확인(새벽 6:00, rulesLawWatch)이 늘어 열이 됐다.
      2026-09-27 메일 열기 따뜻하게 두기(업무 시간 3분마다, mailKeepWarm)가 늘어 열하나가 됐다 —
-       대표 지시 「메일을 열면 늦게 나온다 — 완전히 고쳐라」. 업무 시간에만 돌아 아래 292 에는 안 넣고
+       대표 지시 「메일을 열면 늦게 나온다 — 완전히 고쳐라」. 업무 시간에만 돌아 아래 293 에는 안 넣고
        화면에 «따로» 적었다.
      2026-09-27 거래처 뉴스레터 금요일 준비(오후 1:00, weeklyNewsletterPrepare)가 늘어 열둘이 됐다 —
        대표 지시 「매주 금요일 13시에 자동으로 기사와 내용을 정리해서 저장하고 월요일에 자동으로
        보낼수 있게」. ★ AI 로 기사·한마디를 정리하므로 «비용이 드는» 자동이다 — 그래서 화면에
-       「(AI 정리)」를 붙여 적었다. 주 1회라 아래 292 에는 안 넣는다.
+       「(AI 정리)」를 붙여 적었다. 주 1회라 아래 293 에는 안 넣는다.
+     2026-10-03 취업규칙 모으기(새벽 5:00, collectRulesMail)가 늘어 열셋이 됐다 —
+       메일함의 취업규칙 첨부를 가려 rules_mgmt/library 에 담는다. 하루 한 번이라 아래 293 에 +1.
+       (관리자 신호 collectRulesMailAsk 는 DB 신호라 스케줄이 아니다 — 안 센다.)
      화면 문구도 같이 고쳤다. 다음에 또 늘면 여기와 화면을 함께 고쳐야 한다. */
   const all = (FIDX + FSYNC).match(/\.pubsub\.schedule\(/g) || [];
-  assert.strictEqual(all.length, 12, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  assert.strictEqual(all.length, 13, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
@@ -77,6 +80,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
     '지역뉴스 자동수집 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.rulesLawWatch') >= 0 && ENTER.indexOf('취업규칙 법 개정 확인 하루 한 번') >= 0,
     '취업규칙 법 개정 확인 일정이 화면 설명에 없습니다');
+  assert.ok(FIDX.indexOf('exports.collectRulesMail ') >= 0 && ENTER.indexOf('취업규칙 모으기 하루 한 번') >= 0,
+    '취업규칙 모으기 일정이 화면 설명에 없습니다');
 });
 
 test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에만 돈다', () => {
@@ -90,7 +95,7 @@ test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에�
 });
 
 test('★★ 뉴스레터 금요일 준비는 «하루 셈에 안 든다» — 금요일에만 돈다', () => {
-  /* 이것이 날마다로 바뀌면 화면의 「하루 292번」이 조용히 틀려지고, AI 비용도 일곱 배가 된다.
+  /* 이것이 날마다로 바뀌면 화면의 「하루 293번」이 조용히 틀려지고, AI 비용도 일곱 배가 된다.
      ⚠ 본문을 «다음 exports. 앞»까지로 자른다 — 고정 길이로 자르면 다음 함수까지 넘쳐 헛통과한다. */
   const i = FIDX.indexOf('exports.weeklyNewsletterPrepare');
   assert.ok(i >= 0, 'weeklyNewsletterPrepare 를 못 찾음');
@@ -133,11 +138,11 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const pay = scheduleOf(FIDX, 'receivePaydataMail');
   const sync = scheduleOf(FSYNC, 'syncMailbox');
   const perDay = Math.round(1440 / send) + Math.round(1440 / pay) + Math.round(1440 / sync)
-    + 4;   // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인 — 각 하루 한 번
+    + 5;   // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·취업규칙 모으기 — 각 하루 한 번
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
-  assert.strictEqual(perDay, 292, '셈이 바뀌었다');
-  assert.ok(ENTER.indexOf('하루 <b>292번</b>') >= 0, '뜻풀이에 하루 횟수가 없거나 틀렸다');
-  assert.ok(ENTER.indexOf('하루 292번, 밤낮 같이 돕니다') >= 0, '줄 설명에 하루 횟수가 없거나 틀렸다');
+  assert.strictEqual(perDay, 293, '셈이 바뀌었다');
+  assert.ok(ENTER.indexOf('하루 <b>293번</b>') >= 0, '뜻풀이에 하루 횟수가 없거나 틀렸다');
+  assert.ok(ENTER.indexOf('하루 293번, 밤낮 같이 돕니다') >= 0, '줄 설명에 하루 횟수가 없거나 틀렸다');
 });
 
 test('★★ 옛 «틀린» 숫자가 어디에도 안 남아 있다', () => {

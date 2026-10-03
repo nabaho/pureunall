@@ -134,7 +134,7 @@ function runApp(seed) {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');   // 부팅은 빼고 함수만 싣는다
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
-    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,'
+    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,'
     + 'setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   return { api: ctx.__api, el, store };
 }
@@ -334,4 +334,25 @@ test('★★ 클라우드가 비었으면 «☁ 저장을 한 번 누르시라»
 
 test('★ 재료 탭을 처음 열면 저절로 받아온다 — 빈 화면을 내놓지 않는다', () => {
   assert.match(src, /if\(t==='mat' *&& *!_mat\) *matPull\(\);/);
+});
+
+test('★ 출처가 빠진 옛 줄을 부팅 때 되살린다 — 두 번 돌려도 같다', () => {
+  assert.match(src, /await cloudPull\(\); srcBackfill\(\);/, '로그인 뒤 불러온 다음에 되살려야 합니다');
+  const m = src.match(/function srcBackfill\(\)\{[\s\S]*?\n\}/);
+  assert.ok(m);
+  assert.match(m[0], /if\(r && !r\.src\)/, '이미 출처가 있는 줄은 건드리지 않습니다');
+});
+
+test('★★ 출처 되살리기를 실제로 돌린다', () => {
+  const r = runApp({ feed: [
+    { id: 'G1', no: 'R26BK01749015-000', nm: '가' },
+    { id: 'G2', no: '305665', nm: '나' },
+    { id: 'G3', no: '모름', nm: '다' },
+    { id: 'G4', no: '305666', nm: '라', src: '나라장터' }
+  ] });
+  assert.equal(r.api.srcBackfill(), 2, '되살린 수를 정확히 세야 합니다');
+  const f = JSON.parse(r.store.gov3_feed);
+  assert.deepEqual(f.map((x) => x.src || ''), ['나라장터', '알리오', '', '나라장터'],
+    '모르는 것은 비워 두고, 이미 있는 출처는 건드리지 않습니다');
+  assert.equal(r.api.srcBackfill(), 0, '두 번 돌려도 더 바뀌지 않습니다');
 });

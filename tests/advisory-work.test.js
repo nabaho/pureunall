@@ -285,7 +285,7 @@ function payBox(co, u2n){
   vm.runInContext(
     'var coSrc=' + JSON.stringify(co) + ';\n'
     + 'var _peU2N=' + JSON.stringify(u2n || {}) + ';\n'
-    + grab('_payKey') + '\n' + grab('payMgrOf'), b);
+    + grab('_payKey') + '\n' + grab('payCoOf') + '\n' + grab('payMgrOf'), b);
   return b;
 }
 const 업체목록 = [{ id: 'co-7', name: '㈜가나전자', managerMain: 'P-004' }];
@@ -312,6 +312,37 @@ test('★★ 못 찾으면 비운다 — 아무나 넣으면 «남의 업무»�
 
 test('★★ 이름표를 못 읽었으면 넣지 않는다 — 사번만 있으면 화면에서 못 알아본다', () => {
   assert.equal(payBox(업체목록, {}).payMgrOf('㈜가나전자'), null);
+});
+
+/* 대표 지시 2026-10-03 「이름으로 잇는 길 막기」 — 급여데이터함 사업장엔 이름밖에 없어 «하나로 정해질 때만» 잇는다.
+   이 집은 같은 회사를 자문·급여·기금마다 한 줄씩 둔다 — 첫 줄을 집으면 자문 담당이 급여 업무를 받는다. */
+test('★★ 같은 이름이 자문·급여 두 줄이면 «급여» 줄의 담당', () => {
+  const g = payBox([
+    { id: 'co-1', name: '㈜가나전자', typeCode: '자문', managerMain: 'P-001' },
+    { id: 'co-2', name: '가나전자', typeCode: '급여', managerMain: 'P-004' },
+  ], { 'P-001': '홍길동', 'P-004': '김혜민' }).payMgrOf('(주)가나전자');
+  assert.equal(g && g.co_id, 'co-2', '첫 줄(자문)을 집었다');
+});
+
+test('★★ 어느 쪽인지 못 정하면 비운다 — 급여 줄이 둘이거나, 급여 줄 없이 여럿이면', () => {
+  const u = { 'P-001': '홍길동', 'P-004': '김혜민' };
+  assert.equal(payBox([
+    { id: 'a', name: '가나전자', typeCode: '급여', managerMain: 'P-001' },
+    { id: 'b', name: '가나전자', typeCode: '급여', managerMain: 'P-004' },
+  ], u).payMgrOf('가나전자'), null, '급여 줄이 둘인데 하나를 집었다');
+  assert.equal(payBox([
+    { id: 'a', name: '가나전자', typeCode: '자문', managerMain: 'P-001' },
+    { id: 'b', name: '가나전자', typeCode: '기금', managerMain: 'P-004' },
+  ], u).payMgrOf('가나전자'), null, '급여 줄도 없는데 첫 줄을 집었다');
+});
+
+test('★ 종료·지운 줄은 고르지 않는다', () => {
+  const g = payBox([
+    { id: 'old', name: '가나전자', status: 'closed', managerMain: 'P-001' },
+    { id: 'del', name: '가나전자', _deleted: true, managerMain: 'P-001' },
+    { id: 'now', name: '가나전자', status: 'active', managerMain: 'P-004' },
+  ], { 'P-001': '홍길동', 'P-004': '김혜민' }).payMgrOf('가나전자');
+  assert.equal(g && g.co_id, 'now');
 });
 
 test('업체에 담당이 안 적혀 있으면 비운다', () => {

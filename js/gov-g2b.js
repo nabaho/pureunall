@@ -87,6 +87,7 @@
   function norm(it) {
     it = it || {};
     return {
+      src:   '나라장터',
       no:    s(it.bidNtceNo) + (s(it.bidNtceOrd) ? '-' + s(it.bidNtceOrd) : ''),
       nm:    s(it.bidNtceNm),
       inst:  s(it.dminsttNm) || s(it.ntceInsttNm),      /* 수요기관을 먼저 */
@@ -144,6 +145,17 @@
   /* ── 이미 받은 것과 합치기 ──
      ⚠ 새로 «만들기»만 한다. 이미 있는 줄은 손대지 않는다 —
        대표가 ⭐관심을 켜 두거나 메모를 적어 뒀을 수 있다. */
+  /* 번호 모양으로 출처를 짐작한다 — 출처가 빠진 채 담긴 옛 줄을 되살릴 때만 쓴다.
+     나라장터 R26BK01749015-000 · 기업마당 PBLN_000000000080236 · 알리오 305665(숫자만).
+     ⚠ 모르는 모양은 «빈 글자»다 — 지어내지 않는다. */
+  function guessSrc(no) {
+    var t = s(no);
+    if (/^PBLN_/i.test(t)) return '기업마당';
+    if (/^\d+$/.test(t)) return '알리오';
+    if (/^[A-Z]\d{2}[A-Z]{2}\d+/.test(t) || /-\d{2,3}$/.test(t)) return '나라장터';
+    return '';
+  }
+
   function merge(existing, incoming, kws, today) {
     var have = {};
     (existing || []).forEach(function (r) { if (r && r.no) have[r.no] = 1; });
@@ -154,7 +166,10 @@
       if (!hit.length) { unmatched++; return; }
       if (have[r.no]) { skipped++; return; }
       have[r.no] = 1;
+      /* ⚠★ 출처(src)를 «반드시» 데려간다 — 빠뜨려 2026-10-03 첫 실사용 32건이 전부
+         출처 칸이 비고 「전체 출처」 거르개도 안 먹었다(실측). */
       adds.push({
+        src: r.src || guessSrc(r.no),
         no: r.no, nm: r.nm, org: r.inst, ntce: r.ntce,
         openDt: r.openDt, closeDt: r.closeDt, prc: r.prc, mthd: r.mthd, url: r.url,
         kw: hit.join(','),
@@ -168,6 +183,7 @@
 
   var api = { BASE: BASE, KEYWORDS_DEFAULT: KEYWORDS_DEFAULT, encKey: encKey,
               buildUrl: buildUrl, parse: parse, matched: matched, dday: dday, merge: merge,
+              guessSrc: guessSrc,
               toggleKw: toggleKw };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovG2b = api;

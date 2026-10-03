@@ -379,6 +379,40 @@
     return up;
   }
 
+  /* ══════ 기계가 넣은 것을 확인 대기로 되돌리기 (대표 결정 2026-10-03 「ㄴ」) ══════
+     서버가 «확실하다»고 보고 바로 서랍에 넣은 자료(auto)가 틀렸을 때 쓴다.
+     서랍에서 빼고 · 도착 표시도 내리고 · 확인 대기로 돌린다 — **한 묶음**으로.
+     따로 쓰면 「서랍에서는 빠졌는데 도착은 그대로」가 된다(trashUpdate 와 같은 원칙).
+     ⚠ 창고 파일은 그대로다(자리만 옮긴다). ⚠ 누가 언제 되돌렸는지 남긴다 —
+       같은 꼴이 자꾸 틀리면 잣대를 고쳐야 하는데, 그때 이 기록을 본다.
+     ⚠ 사람이 넣은 것(auto 아님)에는 안 쓴다 — 그것은 휴지통이나 다시 고르기다. */
+  function undoAutoUpdate(id, rec, owner) {
+    if (!id || !rec) throw new Error('되돌릴 자료를 찾을 수 없습니다');
+    if (!rec.auto) throw new Error('기계가 넣은 자료가 아닙니다');
+    var slot = String(rec.month || KEEP);
+    var back = {};
+    /* 화면이 붙인 표(_by·_id 처럼 밑줄로 시작하는 것)는 담지 않는다 — 저장된 것이 아니다 */
+    Object.keys(rec).forEach(function (k) { if (k.charAt(0) !== '_') back[k] = rec[k]; });
+    delete back.auto; delete back.filedAt; delete back.filedBy; delete back.sweptAt;
+    delete back.expired; delete back.id;
+    /* 확인 대기 칸은 귀속월을 '2026-09' 꼴로 적는다(서랍 칸 열쇠 '202609' 가 아니다) —
+       되돌린 줄을 사람이 다시 넣을 때 화면 짐작과 같은 꼴이어야 한다. */
+    back.month = slot === KEEP ? '' : (slot.slice(0, 4) + '-' + slot.slice(4, 6));
+    back.undoneAt = Date.now();
+    back.undoneBy = deps.uid || '';
+    var up = {};
+    up[pendingPath(id, owner)] = back;
+    up[itemPath(slot, id, owner)] = null;
+    if (rec.companyId && rec.kind) {
+      up[arrivalPath(rec.companyId, slot) + '/' + rec.kind + '/' + id] = null;
+    }
+    return up;
+  }
+
+  function undoAuto(id, rec, owner) {
+    return deps.db.ref().update(undoAutoUpdate(id, rec, owner)).then(function () { return true; });
+  }
+
   /* 대기 칸 자료를 휴지통으로 (2026-08-15 — 골라서 한꺼번에).
      ⚠ trashUpdate 를 그대로 쓰면 안 된다. 그것은 **서랍** 자료를 지우는 것이라
      items/<칸> 을 비우는데, 대기 칸 자료는 거기 있지도 않다 — pending 자리는
@@ -577,6 +611,18 @@
      ⚠ 이 일은 서버만 할 수 있다 — 콘솔 규칙이 **남의 자리 쓰기**를 막는다.
      ⚠ 총괄관리자만. 서버가 다시 한 번 확인한다. */
   function regroupShared() { return callFn('regroupPaydataShared', '다시 갈라 보내지 못했습니다'); }
+
+  /* ── 쌓인 것 정리 (대표 결정 2026-10-03 「ㄴ」) ──
+     이미 확인 대기·공용 칸에 쌓인 것에 «확실한 것은 바로 서랍» 잣대를 한 번 댄다.
+     같은 서버 문(regroupPaydataShared)을 쓴다 — 새 함수는 공개 호출 권한을 따로 열어야 한다.
+     ⚠ apply 가 true 가 아니면 서버는 **아무것도 안 쓰고** 계획만 돌려준다(미리 보기).
+     ⚠ 총괄관리자만 — 서버가 다시 확인한다.
+     ⚠ 이름에 sweep·auto·purge 를 쓰지 않는다 — 자동 삭제처럼 읽혀 휴지통 검사가 막는다.
+       이것은 지우는 일이 아니라 «서랍에 넣는» 일이다. */
+  function settleQueued(apply) {
+    return callFn('regroupPaydataShared', '쌓인 것을 정리하지 못했습니다',
+      { action: 'settle', apply: apply === true });
+  }
 
   /* ── 잘못 온 자료를 다른 사람에게 넘기기 (대표 지시 2026-08-29) ──
      ⚠ 이 일도 서버만 할 수 있다 — 콘솔 규칙이 **남의 자리 쓰기**를 막는다.
@@ -1449,7 +1495,7 @@
     var ow = owners || {};
     Object.keys(ow).forEach(function (uid) {
       var o = ow[uid] || {};
-      if (o.email) byEmail[String(o.email).toLowerCase()] = { uid: uid, name: String(o.name || '') };
+      if (o.email) byEmail[String(o.email).toLowerCase()] = { uid: uid, name: String(o.name || ''), here: isHere(o) };
     });
 
     var bySid = {}, order = [], unassigned = [];
@@ -1474,7 +1520,10 @@
                그 사람 업체까지 같이 사라진다. */
             name: names[sid] || (own && own.name) || sid,
             uid: own ? own.uid : '',
-            away: !own,
+            /* 자리(uid)는 있어도 «들어온 것»은 아닐 수 있다 — 서버가 계정으로 자리를
+               찾아 적어 둔 줄(2026-10-03)은 lastAt 이 없다. 자리를 알아야 관리자가 그
+               서랍을 열 수 있고, 들어왔는지는 따로 연한 이름으로 알려 준다. */
+            away: !own || !own.here,
             /* ⚠ 담당자 칸에 **사번이 아닌 값**이 든 업체가 실제로 있다 —
                2026-08-17 확인: 「김보람(박은비)」 가 13곳의 주담당에 글자로 적혀
                있었다. 사번이 아니면 이메일을 만들 수 없어 어느 계정과도 이어지지
@@ -1626,6 +1675,13 @@
     up[ownerPath(deps.uid)] = rec;
     return deps.db.ref().update(up).catch(function (e) { console.warn('[담당자 명단]', e && e.code); });
   }
+
+  /* 이 사람이 급여데이터함에 «정말 들어온» 적이 있나.
+     owners 줄은 둘이다 — 본인이 들어와 적은 줄(touchOwner, lastAt 있음)과
+     서버가 로그인 계정으로 자리를 찾아 적은 줄(addedBy:'server', lastAt 없음).
+     뒤의 것은 자리는 있지만 아무도 안 연다 — 손으로 넘기거나 공유할 사람으로 고르면
+     그 자료는 아무도 안 보는 곳에 떨어진다(갈라 보내기와 같은 규칙). */
+  function isHere(o) { return !!(o && Number(o.lastAt || 0) > 0); }
 
   function listOwners() {
     if (!deps.db) return Promise.resolve({});
@@ -1830,6 +1886,10 @@
     mailConfPath: mailConfPath,
     pullMailNow: pullMailNow,
     regroupShared: regroupShared,
+    settleQueued: settleQueued,
+    undoAutoUpdate: undoAutoUpdate,
+    undoAuto: undoAuto,
+    isHere: isHere,
     handItem: handItem,
     listMailConf: listMailConf,
     setMailScanInbox: setMailScanInbox,

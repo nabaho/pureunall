@@ -20,6 +20,10 @@
 /* 화면(js/pu-paydata-store.js)과 **같은 값**이어야 한다. 한쪽만 고치면
    메일로는 들어오는데 손으로는 못 올리는(또는 그 반대) 일이 생긴다. */
 const UPLOAD_MAX = 25 * 1024 * 1024;
+const KST_MS = 9 * 60 * 60 * 1000;      // 한국 시각 — 서버는 UTC 로 돈다
+/* 「급여」와 함께 있어야 급여대장으로 보는 말 / 있으면 안 보는 말 (tagFor 참고) */
+const PAY_DATA_RE = /확정|예정|기초|자료|내역|지급/;
+const PAY_ASK_RE = /수정|요청|문의|변경|정정/;
 const BAD_EXT = ['exe', 'js', 'html', 'htm', 'bat', 'cmd', 'sh', 'com', 'scr', 'vbs', 'jar'];
 
 const EMAIL_RE = /[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"']{2,}/;
@@ -636,6 +640,29 @@ function tagFor(o, company) {
     const yd = text.match(/(?:^|\D)([2-3]\d)[.\-_](\d{1,2})\s*월/);
     if (yd) m = [yd[0], '20' + yd[1], yd[2]];
   }
+  /* 두 자리 해 + 달인데 「월」이 없는 것 — 「26.08 법인일용직(가나점).xlsx」
+     (2026-10-03 쌓인 자료에서 찾음). 달을 01~12 두 자리로만 받고, 뒤에 숫자·점이
+     또 붙으면(날짜의 일) 안 본다. */
+  if (!m) {
+    const y2 = text.match(/(?:^|\D)([2-3]\d)[.\-_](0[1-9]|1[0-2])(?![\d.\-_])/);
+    if (y2) m = [y2[0], '20' + y2[1], y2[2]];
+  }
+  /* 해가 없는 「9월 근태」 — **받은 날**로 해를 정한다(2026-10-03).
+     받은 달보다 두 달 넘게 앞이면 지난해로 본다: 1월에 받은 「12월」은 지난해 12월.
+     ⚠ 받은 시각(o.at)이 없으면 짐작하지 않는다 — 해를 지어내면 남의 해 서랍에 들어간다.
+     ⚠ 앞이 점·숫자면 안 본다 — 「1.5월분」의 5 는 달이 아니다. */
+  if (!m && o.at) {
+    const nm = text.match(/(?:^|[^\d.\-_])(\d{1,2})\s*월/);
+    const got = nm ? parseInt(nm[1], 10) : 0;
+    if (got >= 1 && got <= 12) {
+      /* ⚠ 한국 시각으로 센다 — 서버는 UTC 라, 10/1 새벽에 받은 메일이 9월로 잡힌다.
+         화면(guessTag)도 같은 셈을 한다. */
+      const d = new Date(Number(o.at) + KST_MS);
+      let y = d.getUTCFullYear();
+      if (got > d.getUTCMonth() + 2) y -= 1;
+      m = [nm[0], String(y), String(got)];
+    }
+  }
   if (m) {
     const mo = parseInt(m[2], 10);
     if (mo >= 1 && mo <= 12) month = m[1] + '-' + (mo < 10 ? '0' : '') + mo;
@@ -646,6 +673,13 @@ function tagFor(o, company) {
   else if (/명세서|이체|신고|취득|상실/.test(text)) kind = 'output';
   else if (/급여대장|노임|임금대장|대장/.test(text)) kind = 'ledger';
   else if (/근태|출근|출역|근무|시간/.test(text)) kind = 'attend';
+  /* 「급여」 + 자료를 뜻하는 말 — 「26.07월 가나공장_급여확정」·「9월 급여 기초자료」
+     (대표 승인 2026-10-03 목업 ③). ⚠ 「급여」 «하나만»으로는 안 잡는다 — 「8월급여수정
+     요청」 같은 부탁 메일까지 대장으로 잡힌다(2026-08 에 그래서 일부러 비워 둔 것).
+     그래서 자료 말이 함께 있어야 하고, 부탁·고침 말이 있으면 안 잡는다.
+     ⚠ **맨 뒤에** 본다 — 「급여명세서」는 우리 산출물, 「급여 근태」는 근태가 먼저다.
+     ⚠ 화면 guessTag 와 같아야 한다(PAY_DATA_RE·PAY_ASK_RE 를 똑같이 쓴다). */
+  else if (/급여/.test(text) && PAY_DATA_RE.test(text) && !PAY_ASK_RE.test(text)) kind = 'ledger';
 
   return {
     companyId: company ? String(company.id || '') : '',
@@ -687,9 +721,11 @@ function routeFor(o, index, owners, box, companies) {
      ⚠ 업체를 찾기 **전에** 답한다: 사람이 손으로 옮긴 것이 자동보다 세다. */
   const byBox = seatFromBox(box, owners);
   if (byBox) {
+    const p = companyOf(o, index, companies);
     return {
       seat: byBox, shared: false, byBox: true, why: '',
-      tag: tagFor(o, companyOf(o, index, companies).co)
+      how: p.co ? p.how : '',
+      tag: tagFor(o, p.co)
     };
   }
 
@@ -724,10 +760,255 @@ function routeFor(o, index, owners, box, companies) {
   const seat = seatFor(co, owners);
   if (!seat) {
     const sid = String(co.managerMain || '');
-    return { seat: '', shared: true, tag: tag, byBox: false,
+    return { seat: '', shared: true, tag: tag, byBox: false, how: pick.how,
       why: sid ? '주담당이 아직 급여데이터함에 들어온 적이 없음' : '업체관리에 주담당이 없음' };
   }
-  return { seat: seat, shared: false, tag: tag, why: found, byBox: false };
+  return { seat: seat, shared: false, tag: tag, why: found, byBox: false, how: pick.how };
+}
+
+/* ══════ 확실한 것은 확인 없이 서랍으로 (대표 결정 2026-10-03 「ㄴ」) ══════
+   메일은 담당자 「확인 대기」까지는 저절로 갔다. 그런데 거기서 **사람이 한 장씩**
+   넣어야 도착이 찍혔고, 넣은 것이 0장이었다 — 456건이 쌓이고 113곳이 다 「미도착」.
+
+   다섯 잣대를 **모두** 통과한 것만 바로 넣는다. 하나라도 걸리면 지금처럼 확인 대기다.
+   잘못 넣느니 **안 넣는 쪽으로** 기운다 — 잘못 넣으면 틀린 서랍에 들어가고 아무도
+   모르지만, 안 넣으면 확인 대기에 보인다.
+   ⚠ 사업장은 **주소로** 안 것만 믿는다(addr · addr+text). 주소를 모르고 제목에서만
+     찾은 것(text)은 짐작이라 사람이 본다.
+   ⚠ 돌려주는 why 는 사람이 읽는 말이다 — 확인 대기에 남은 까닭으로 화면에 쓴다. */
+const SURE_KINDS = ['contract', 'attend', 'ledger', 'output'];
+const BLANK_FORM_RE = /양식|서식|견본|샘플|sample/i;
+
+/* 귀속월이 받은 날에서 얼마나 떨어졌나 — 앞으로 두 달, 뒤로 열두 달까지만 믿는다.
+   ⚠ 한국 시각으로 센다(tagFor 와 같다). */
+function monthGap(month, at) {
+  const m = String(month || '').match(/^(\d{4})-(\d{2})$/);
+  if (!m || !at) return null;
+  const d = new Date(Number(at) + KST_MS);
+  return (d.getUTCFullYear() - Number(m[1])) * 12 + (d.getUTCMonth() + 1 - Number(m[2]));
+}
+
+function sureFor(o, route) {
+  o = o || {}; route = route || {};
+  const tag = route.tag || {};
+  if (o.body) return { ok: false, why: '메일 본문 — 자료 파일이 아님' };
+  if (!route.seat) return { ok: false, why: route.why || '담당자 자리를 모름' };
+  if (!tag.companyId) return { ok: false, why: '사업장을 모름' };
+  if (route.how !== 'addr' && route.how !== 'addr+text') {
+    return { ok: false, why: '사업장을 주소가 아니라 제목으로 짐작함' };
+  }
+  if (SURE_KINDS.indexOf(tag.kind) < 0) return { ok: false, why: '종류를 모름' };
+  if (BLANK_FORM_RE.test(String(o.filename || ''))) return { ok: false, why: '빈 양식으로 보임' };
+  if (tag.kind !== 'contract') {
+    const gap = monthGap(tag.month, o.at);
+    if (gap == null) return { ok: false, why: '귀속월을 모름' };
+    if (gap > 12 || gap < -2) return { ok: false, why: '귀속월이 받은 날과 너무 멂' };
+  }
+  return { ok: true, why: '' };
+}
+
+/* 서랍 칸 열쇠 — 화면(pu-paydata-store slotOf)과 **같아야** 한다.
+   근로계약서는 달과 무관한 keep 칸, 나머지는 '202609' 꼴. */
+function drawerSlotOf(kind, month) {
+  if (kind === 'contract') return 'keep';
+  const m = String(month || '').match(/^(\d{4})-(\d{1,2})$/);
+  if (!m) return '';
+  const mo = parseInt(m[2], 10);
+  return mo >= 1 && mo <= 12 ? m[1] + (mo < 10 ? '0' : '') + mo : '';
+}
+
+/* 서랍에 바로 넣을 묶음 — 자료 한 줄 + 도착 표시. **한 묶음**으로 쓴다
+   (따로 쓰면 「자료는 있는데 도착 표시가 없다」가 된다 — 화면 drawerUpdate 와 같은 원칙).
+   줄 모양은 화면 itemRecord 와 같고, 기계가 넣었다는 표(auto)를 단다 —
+   서랍에서 🤖 로 보이고 「틀림 — 확인 대기로」로 되돌릴 수 있게.
+   ⚠ 도착 칸에는 **시각 숫자만** 넣는다 — 전 직원이 읽는 칸이고 파일 이름에는
+     근로자 성명이 흔히 들어 있다. */
+function drawerWriteFor(paydataRoot, seat, id, o) {
+  o = o || {};
+  const tag = o.tag || {};
+  const slot = drawerSlotOf(tag.kind, tag.month);
+  if (!seat || !id || !slot || !tag.companyId || !tag.kind) return null;
+  const at = Number(o.at || 0);
+  const rec = pendingRecordFor(o);
+  rec.month = slot;
+  rec.filedAt = at;
+  rec.filedBy = '';                 // 사람이 아니라 서버가 넣었다
+  rec.auto = true;
+  const up = {};
+  up[paydataRoot + '/u/' + seat + '/items/' + slot + '/' + id] = rec;
+  const arr = paydataRoot + '/arrivals/' + tag.companyId + '/' + slot;
+  up[arr + '/' + tag.kind + '/' + id] = at;
+  up[arr + '/last'] = at;
+  return { slot: slot, up: up };
+}
+
+/* ══════ 아직 급여데이터함을 안 연 담당자도 자리를 찾는다 (2026-10-03) ══════
+   서버는 owners(급여데이터함에 한 번 들어온 사람)로만 자리를 알았다. 그래서 한 번도
+   안 연 담당자의 사업장 메일은 전부 공용 칸에 쌓였다(김보람 몫 80건).
+   이제 **로그인 계정**으로 그 사람 자리를 찾는다. 찾은 사람은 owners 에 «서버가 적은
+   줄»로 남긴다 — 관리자 화면이 그 자리를 열 수 있어야 하기 때문이다.
+   ⚠ lastAt 은 **안 적는다.** 화면은 lastAt 이 없으면 「아직 안 들어옴」(연한 이름)으로
+     보고, 넘기기·공유 받을 사람 목록에서도 뺀다. 본인이 들어오면 화면이 그 줄을 통째로
+     새로 써서(touchOwner) 보통 줄이 된다.
+   돌려주는 것: 찾아야 할 사번들 — 실제 계정 찾기는 부르는 쪽(index.js)이 한다. */
+function missingSeatSids(companies, owners) {
+  const have = {};
+  Object.keys(owners || {}).forEach(function (uid) {
+    const e = normEmail((owners[uid] || {}).email);
+    if (e) have[e] = 1;
+  });
+  const out = [], seen = {};
+  coList(companies).forEach(function (co) {
+    const sid = String((co && co.managerMain) || '').trim();
+    /* 사번 꼴이 아니면(「김보람(박은비)」처럼 글자로 적힌 것) 계정을 만들 수 없다.
+       ⚠ 화면 SID_RE(pu-paydata-store)와 같은 꼴이다. */
+    if (!/^[A-Za-z]-?\d{2,3}$/.test(sid)) return;
+    const e = sidToEmail(sid);
+    if (have[e] || seen[e]) return;
+    seen[e] = 1;
+    out.push(sid);
+  });
+  return out;
+}
+
+/* ══════ 이미 쌓인 것을 같은 잣대로 한 번 (대표 결정 2026-10-03) ══════
+   새 규칙은 **앞으로 오는 메일**에만 걸린다. 그런데 이미 456건이 확인 대기·공용 칸에
+   쌓여 있다 — 그것들에 같은 다섯 잣대를 한 번 댄다.
+
+   ⚠ **순수 함수**다 — 무엇을 쓸지 «계획»만 만든다. 미리 보기(쓰지 않음)와 넣기가
+     같은 계획을 쓴다. 미리 본 것과 실제로 넣는 것이 달라지면 안 된다.
+   ⚠ 이미 **사람 자리에 있는 것은 그 자리에 둔다.** 지금 규칙으로 다른 사람이 나와도
+     옮기지 않는다 — 누가 손으로 넘긴 것(handPaydataItem)일 수 있다. 서랍에 넣을지만 본다.
+   ⚠ 공용 칸 것은 자리를 찾으면 그 사람에게 간다(확실하면 서랍, 아니면 그 사람 확인 대기).
+   ⚠ 메일 본문(.txt)은 늘 그대로 둔다 — 읽을 글이다.
+   ⚠ 같은 파일(사업장·칸·종류·이름·크기가 같음)은 **한 장만** 넣는다 — 「RE:」 메일에
+     같은 첨부가 다시 붙어 온다. 둘 다 넣으면 「2장 도착」이 되어 숫자가 거짓말을 한다.
+
+   sharedBox: { id: 줄 } · seatBoxes: { uid: { id: 줄 } }
+   돌려주는 것: { up, rows, counts } — rows 는 미리 보기 표(넣을 것), counts 는 셈. */
+function isBodyRec(rec) {
+  return /^text\/plain/i.test(String((rec && rec.mime) || ''))
+    && /\.txt$/i.test(String((rec && rec.filename) || ''));
+}
+
+function settlePlan(root, sharedBox, seatBoxes, index, owners, companies, now) {
+  const up = {}, rows = [];
+  const counts = { looked: 0, filed: 0, toSeat: 0, left: 0, body: 0, dup: 0, whys: {}, seats: {}, companies: 0 };
+  const seenFile = {}, cos = {};
+  const lastOf = {};          // 도착 칸의 last 는 여럿 중 가장 늦은 것
+  const nowAt = Number(now || Date.now());
+
+  function leftWhy(w) { counts.left++; counts.whys[w] = (counts.whys[w] || 0) + 1; }
+
+  function one(id, rec, fromPath, keepSeat) {
+    counts.looked++;
+    const r = rec || {};
+    if (isBodyRec(r)) { counts.body++; return; }
+    const got = (r.mailFrom || r.mailSubject)
+      ? { from: String(r.mailFrom || ''), subject: String(r.mailSubject || '') }
+      : mailFromNote(r.note);
+    const route = routeFor({ from: got.from, subject: got.subject,
+      filename: String(r.filename || ''), at: Number(r.at || 0) }, index, owners, '', companies);
+    const seat = keepSeat || route.seat;
+    const sure = sureFor({ filename: r.filename, at: r.at },
+      Object.assign({}, route, { seat: seat }));
+    const o = { filename: r.filename, file: r.file, mime: r.mime, bytes: r.bytes,
+      at: Number(r.at || 0), mailFrom: got.from, mailSubject: got.subject, tag: route.tag };
+
+    if (sure.ok) {
+      const tag = route.tag || {};
+      const fkey = [tag.companyId, drawerSlotOf(tag.kind, tag.month), tag.kind,
+        String(r.filename || ''), Number(r.bytes || 0)].join('|');
+      if (seenFile[fkey]) {
+        counts.dup++;
+        leftWhy('같은 파일이 이미 서랍에 들어감');
+        return;
+      }
+      const w = drawerWriteFor(root, seat, id, o);
+      if (w) {
+        seenFile[fkey] = 1;
+        Object.keys(w.up).forEach(function (k) {
+          if (/\/last$/.test(k)) lastOf[k] = Math.max(lastOf[k] || 0, Number(w.up[k] || 0));
+          else up[k] = w.up[k];
+        });
+        const item = up[root + '/u/' + seat + '/items/' + w.slot + '/' + id];
+        if (item) item.sweptAt = nowAt;
+        up[fromPath] = null;
+        counts.filed++;
+        counts.seats[seat] = (counts.seats[seat] || 0) + 1;
+        cos[tag.companyId] = 1;
+        rows.push({ id: id, seat: seat, companyName: tag.companyName || '', kind: tag.kind,
+          slot: w.slot, filename: String(r.filename || ''), at: Number(r.at || 0) });
+        return;
+      }
+    }
+    /* 서랍에는 못 넣는다. 공용 칸 것인데 자리를 찾았으면 그 사람 확인 대기로. */
+    if (!keepSeat && route.seat) {
+      const tag = route.tag || {};
+      up[root + '/u/' + route.seat + '/pending/' + id] = Object.assign({}, r, {
+        companyId: String(tag.companyId || r.companyId || ''),
+        companyName: String(tag.companyName || r.companyName || ''),
+        month: String(tag.month || r.month || ''),
+        kind: String(tag.kind || r.kind || ''),
+        why: '', routedAt: nowAt, routedBy: 'sweep'
+      });
+      up[fromPath] = null;
+      counts.toSeat++;
+      leftWhy(sure.why || '확인이 필요함');
+      return;
+    }
+    leftWhy(sure.why || route.why || '확인이 필요함');
+  }
+
+  Object.keys(sharedBox || {}).forEach(function (id) {
+    one(id, sharedBox[id], root + '/pending_shared/' + id, '');
+  });
+  Object.keys(seatBoxes || {}).forEach(function (uid) {
+    const box = seatBoxes[uid] || {};
+    Object.keys(box).forEach(function (id) {
+      one(id, box[id], root + '/u/' + uid + '/pending/' + id, uid);
+    });
+  });
+  Object.keys(lastOf).forEach(function (k) { up[k] = lastOf[k]; });
+  counts.companies = Object.keys(cos).length;
+  return { up: up, rows: rows, counts: counts };
+}
+
+/* 계획(up)을 조각으로 나눈다 — 자료 한 건의 자리들은 **같은 조각**에.
+   자리 끝이 자료 번호인 것(서랍·확인 대기·공용 칸·도착 한 칸)은 번호로 묶고,
+   도착 칸의 last 처럼 번호가 없는 것은 맨 끝 조각에 모은다(가장 늦은 시각 하나라
+   어느 조각에 들어가든 같은 값이다). */
+function settleChunks(up, size) {
+  const n = Math.max(1, Number(size) || 50);
+  const byId = {}, order = [], rest = {};
+  Object.keys(up || {}).forEach(function (k) {
+    if (/\/last$/.test(k)) { rest[k] = up[k]; return; }
+    const m = k.match(/\/(?:pending_shared|pending|items\/[^/]+|arrivals\/[^/]+\/[^/]+\/[^/]+)\/([^/]+)$/);
+    if (!m) { rest[k] = up[k]; return; }
+    if (!byId[m[1]]) { byId[m[1]] = {}; order.push(m[1]); }
+    byId[m[1]][k] = up[k];
+  });
+  const out = [];
+  for (let i = 0; i < order.length; i += n) {
+    const c = {};
+    order.slice(i, i + n).forEach(function (id) { Object.assign(c, byId[id]); });
+    out.push(c);
+  }
+  if (Object.keys(rest).length) out.push(rest);
+  return out;
+}
+
+/* 직원 명부에서 사번의 이름 — 서버가 적는 owners 줄에 넣는다. 없으면 빈칸. */
+function dirNameOf(roster, sid) {
+  let list = (roster && typeof roster === 'object' && roster.v !== undefined) ? roster.v : roster;
+  if (list && !Array.isArray(list) && typeof list === 'object') {
+    list = Object.keys(list).map(function (k) { return list[k]; });
+  }
+  const want = String(sid || '').toLowerCase().replace(/-/g, '');
+  const hit = (Array.isArray(list) ? list : []).filter(function (x) {
+    return x && String(x.sid || '').toLowerCase().replace(/-/g, '') === want;
+  })[0];
+  return hit ? String(hit.name || '') : '';
 }
 
 /* 담당자 대기 칸에 넣을 줄. 사람이 담은 줄과 모양이 같아야 그 화면이 그대로 그린다 —
@@ -795,5 +1076,9 @@ module.exports = {
   seatFromBox,
   mailKey,
   mailLogRecord, MAIL_PREVIEW,
-  extOf, okAttachment, sharedPendingRecord, pendingRecordFor, mailNoteOf
+  extOf, okAttachment, sharedPendingRecord, pendingRecordFor, mailNoteOf,
+  /* 확실한 것은 바로 서랍으로 (2026-10-03) */
+  sureFor, drawerSlotOf, drawerWriteFor, monthGap, missingSeatSids, dirNameOf,
+  settlePlan, settleChunks, isBodyRec,
+  SURE_KINDS, BLANK_FORM_RE, KST_MS, PAY_DATA_RE, PAY_ASK_RE
 };

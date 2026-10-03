@@ -18,7 +18,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=41"></script>
+<script src="js/pu-ontology.js?v=43"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -274,6 +274,18 @@
   /* 사람이 이은 줄 — 기계가 정한 것과 구별한다 */
   .ml1 .hd1{flex:0 0 auto;font-size:10px;font-weight:800;color:var(--acc2);
     border:1px solid #bfdbfe;border-radius:4px;padding:0 4px}
+  /* 「고를 것」의 단서 — 고르는 일을 대신하지 않고 왜 그럴듯한지만 적는다 */
+  .alpk{display:flex;flex-direction:column;gap:5px}
+  .alpb{display:flex;align-items:center;gap:6px;flex-wrap:wrap;text-align:left;width:100%;
+    font-size:11.5px;padding:5px 9px;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel);cursor:pointer;color:var(--ink)}
+  .alpb:hover{border-color:var(--acc);background:#eff6ff}
+  .alpb .nm{font-weight:700}
+  /* 단서가 붙은 줄만 테두리를 살짝 세운다 — 「이것이 답이다」가 아니라 「먼저 보라」다 */
+  .alpb.hit{border-color:#bfdbfe}
+  .alpb.no{color:var(--sub);font-weight:400}
+  .alh{font-size:10px;font-weight:700;color:var(--acc2);background:#eff6ff;
+    border-radius:4px;padding:0 5px;white-space:nowrap}
   /* ── 📬 이어 줄 메일 ──────────────────────────────────────────── */
   .mlktabs{display:flex;gap:6px;align-items:center;margin:10px 0 9px;flex-wrap:wrap}
   .mlktab{font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:2px 10px;
@@ -1097,7 +1109,7 @@
   }
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=14"></script>
+  <script src="js/pu-appbar.js?v=15"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -4944,13 +4956,22 @@ function payItemOf(site){
    ⚠ 못 찾으면 예전처럼 비워 둔다. 아무나 넣으면 «남의 업무»가 된다.
    ⚠ 이름표(사번→이름)를 못 읽었으면 넣지 않는다 — 사번만 있으면 화면에서 못 알아본다.
      읽을 수 있는 사람이 한 번 열면 그때 채워진다(_peU2NKnown 과 같은 결). */
-function payMgrOf(site){
+/* ⚠ 급여데이터함의 사업장에는 이름밖에 없다 — 그래서 «하나로 정해질 때만» 잇는다(대표 지시 2026-10-03 2단계).
+     예전에는 이름이 같은 «첫» 업체를 집었다. 이 집은 같은 회사를 자문·급여·기금마다 한 줄씩 두므로
+     첫 줄이 «자문» 줄이면 자문 담당이 급여 업무를 받았다. 종료·지운 줄도 가리지 않았다.
+     → 살아 있는 같은 이름 줄이 하나면 그것, 여럿이면 «급여» 줄이 딱 하나일 때만. 아니면 비운다(담당 미지정). */
+function payCoOf(site){
   var n=_payKey(site);
   if(!n||!coSrc||!coSrc.length) return null;
-  var hit=null;
-  coSrc.forEach(function(c){
-    if(!hit&&c&&_payKey(c.name||c.companyName)===n) hit=c;
+  var live=coSrc.filter(function(c){
+    return c&&!c._deleted&&String(c.status||'')!=='closed'&&_payKey(c.name||c.companyName)===n;
   });
+  if(live.length===1) return live[0];
+  var pay=live.filter(function(c){ return String(c.typeCode||'')==='급여'; });
+  return pay.length===1?pay[0]:null;
+}
+function payMgrOf(site){
+  var hit=payCoOf(site);
   if(!hit) return null;
   var sid=String(hit.managerMain||'');
   var nm=(sid&&_peU2N&&_peU2N[sid])||'';
@@ -5245,7 +5266,8 @@ function alCalRows(mon,evs,schs){
     /* 푸른캘린더가 넣은 미팅은 설명에 「푸른 담당: 이름」이 있다 */
     cand=alCatNarrow(alNarrow(cand,'',s+'\n'+String(r.description||'')),s);
     out.push({src:safeKey('g|'+r.id), ck:[], kind:'cal', sk:'gcal', sid:String(r.id), d:String(r.date),
-      t:alCalLine(r.allDay?'':r.time,s), cand:cand});
+      /* 만든이를 함께 담는다 — 「고를 것」에서 단서로만 쓴다(자동으로 안 고른다) */
+      by:alSidByMail(r.creator), t:alCalLine(r.allDay?'':r.time,s), cand:cand});
   });
   (schs||[]).forEach(function(x){
     if(!x||x._deleted||!x.id||!alIn(x.date,mon)) return;
@@ -5253,7 +5275,7 @@ function alCalRows(mon,evs,schs){
     var cand=alCoHits(s,its,names); if(!cand.length) return;
     cand=alCatNarrow(alNarrow(cand,String(x.sid||''),s+'\n'+String(x.note||'')),s);
     out.push({src:safeKey('c|'+x.id), ck:[], kind:'cal', sk:'schedule', sid:String(x.id), d:String(x.date),
-      t:alCalLine(x.time,s), cand:cand});
+      by:String(x.sid||''), t:alCalLine(x.time,s), cand:cand});
   });
   return out;
 }
@@ -5283,7 +5305,8 @@ function alWrite(wk,rows,al){
       logs.push([id,lid,log]); n++;
     }else if(!was){
       var c={}; r.cand.slice(0,AL_AMB_MAX).forEach(function(i){ c[i]=1; });
-      put[src]={amb:c, d:r.d, t:r.t, k:r.kind, sourceKind:r.sk||'', sourceId:String(r.sid||''), at:now};
+      put[src]={amb:c, d:r.d, t:r.t, k:r.kind, sourceKind:r.sk||'', sourceId:String(r.sid||''),
+        by:String(r.by||''), at:now};
     }
   });
   Object.keys(put).forEach(function(s){ up[NS+'/autolog/'+wk+'/'+s]=put[s]; });
@@ -5367,6 +5390,35 @@ function alSoon(tries){
   alRun();
 }
 
+/* ══════ 구글 계정(만든이) ↔ 직원 — 푸른캘린더와 «같은» 표를 본다 (2026-10-03) ══════
+   ⚠ 열쇠 셈법을 «그대로» 옮겨 왔다(pu-cal.html gcalMailKey). 실시간DB 열쇠에는 점을
+     못 쓰므로 쉼표로 바꿔 담겨 있다. 셈이 다르면 이어 둔 사람을 못 찾아, 화면에는
+     같은 사람인데 단서가 조용히 안 뜬다.
+   ⚠ 직원 명부에는 구글 주소가 «없다»(로그인아이디는 사번@… 꼴) — 이 표가 없으면
+     만든이를 사람과 이을 길이 아예 없다. 실측 2026-10-03: 12명 모두 이어져 있었다.
+   ⚠⚠ 이것을 «자동으로 붙이는 잣대»로 쓰지 않는다. 일정을 만든 사람과 그 일의 담당은
+     다를 수 있다. 실측 2026-10-03 「📅 1630 일신정밀(일터)」 — 김혜민이 만들었고
+     후보는 ㈜일신정밀[자문](김혜민)과 ㈜일신정밀[일터상생혁신컨설팅](권형하) 둘이었다.
+     만든이만 보면 앞엣것인데, 제목의 「(일터)」는 뒤엣것을 가리킨다.
+     ⚠ 그 「일터」는 두 글자라 제목 단서(MLK_MIN_MATCH 자 이상)로는 «안 잡힌다» —
+       그래서 화면이 둘을 나란히 보여 주고 사람이 고른다. 단서는 «먼저 보라»는 뜻이지
+       «이것이 답이다»가 아니다. */
+var alMailSid=null;
+function alMailKey(m){ return String(m||'').trim().toLowerCase().replace(/[.#$\[\]\/]/g,','); }
+function alSidByMail(mail){
+  var k=alMailKey(mail); if(!k||!alMailSid) return '';
+  var v=alMailSid[k];
+  return (v&&typeof v==='object')?String(v.sid||''):String(v||'');
+}
+function alMailSidLoad(){
+  if(alMailSid) return Promise.resolve(alMailSid);
+  if(typeof fbDb==='undefined'||!fbDb){ alMailSid={}; return Promise.resolve(alMailSid); }
+  return fbDb.ref('data/gcal_mail_sid').once('value')
+    .then(function(s){ var v=s.val(); alMailSid=(v&&v.v!==undefined)?(v.v||{}):(v||{}); return alMailSid; })
+    /* 못 읽어도 조용히 넘어간다 — 단서가 하나 줄 뿐 고르는 일은 그대로 된다 */
+    .catch(function(){ alMailSid={}; return alMailSid; });
+}
+
 /* ── 화면: 자동 담김 표시 · 고를 것 ── */
 function alTook(src){
   var hit=null;
@@ -5392,24 +5444,106 @@ function alAmbList(){
   });
   return out.sort(function(x,y){ return String(y.a.d||'').localeCompare(String(x.a.d||'')); });
 }
+/* 이 후보가 «왜 그럴듯한가» — 짧은 단서들. 고르는 일을 대신하지 않는다.
+   ⚠ 단서가 없다고 아닌 것이 아니다. 그래서 «없음»을 적지 않는다 — 적으면
+     단서 없는 쪽이 틀린 것처럼 보인다.
+   ⚠ 단서 하나가 하나를 가리켜도 «자동으로 안 고른다». 실측에서 만든이 단서가
+     제목 단서와 어긋난 일이 있었다(일신정밀). 어긋나면 둘 다 보여 주고 사람이 고른다. */
+function alHints(x,id){
+  var it=items[id]; if(!it) return [];
+  var out=[], t=String((x&&x.a&&x.a.t)||'');
+  /* ㉠ 이 일정을 만든 사람이 이 업무 담당인가 */
+  var by=String((x&&x.a&&x.a.by)||'');
+  if(by&&isOf(it,{sid:by})){
+    var who=(_peU2N&&_peU2N[by])||'';
+    out.push({t:'만든이'+(who?' '+who:''), why:'이 일정을 만든 사람이 이 업무 담당입니다'});
+  }
+  /* ㉡ 제목에 업무명 조각이 있는가 — 「1000 가야엔지니어링(비즈니스지원단)」 */
+  var hay=_koOnly(t);
+  var ko=_koOnly(String(it.title||'')+String(it.ptype||''));
+  for(var len=ko.length;len>=MLK_MIN_MATCH;len--){
+    var found='';
+    for(var p=0;p+len<=ko.length;p++){ if(hay.indexOf(ko.slice(p,p+len))>=0){ found=ko.slice(p,p+len); break; } }
+    if(found){ out.push({t:'제목에 「'+found+'」', why:'업무명과 '+found.length+'자가 겹칩니다'}); break; }
+  }
+  /* ㉢ 담당자 이름이 글에 나오는가 — 「가야엔지니어링 오전-최」 */
+  var nms=[(it.mgr_main||{}).name].concat(mgrSubNames(it)).filter(function(v){ return v&&String(v).length>=2; });
+  for(var i=0;i<nms.length;i++){ if(t.indexOf(nms[i])>=0){
+    out.push({t:'글에 「'+nms[i]+'」', why:'이 업무 담당자 이름이 글에 있습니다'}); break; } }
+  /* ㉣ 보낸이가 이 업체 주소인가 — 메일일 때만 */
+  if(String((x&&x.a&&x.a.sourceKind)||'')==='mail'){
+    var m=null, sid=String((x&&x.a&&x.a.sourceId)||'');
+    (mailSrc||[]).forEach(function(z){ if(!m&&String(z._k||'')===sid) m=z; });
+    if(m){
+      var k=null; try{ k=mailKeysOf(Object.assign({_id:id},it)); }catch(e){}
+      var a=_mailAddr(m.from);
+      if(k&&a&&k.mails[a]) out.push({t:'보낸이가 이 업체 주소',why:'이 업무 업체의 담당자 주소에서 왔습니다'});
+      else if(k&&a){ var d=a.slice(a.indexOf('@')+1); if(d&&k.doms[d])
+        out.push({t:'보낸이가 이 회사 도메인',why:'이 업무 업체의 회사 도메인에서 왔습니다'}); }
+    }
+  }
+  return out;
+}
+/* ★★ 유형을 «반드시» 보여 준다. 예전에는 title||cat 만 적어, 한 회사의 업무 셋이
+   화면에 「가야엔지니어링 · 컨설팅 · 김혜민」으로 «똑같이» 나왔다 — 고를 수가 없다
+   (실측 2026-10-03: 고를 것 19건 가운데 그런 묶음이 여럿이었다).
+   itemName 은 업무 요약 › 업무명 › 유형 차례로 고른다 — 서랍·목록이 쓰는 그 이름이다. */
 function alItemName(it){
-  return String(it.company||'')+' · '+String(it.title||it.cat||'')
+  var nm=itemName(it)||String(it.cat||'');
+  var cat=String(it.cat||'');
+  return String(it.company||'')+' · '+nm
+    +((cat&&cat!==nm)?' ['+cat+']':'')
     +((it.mgr_main&&it.mgr_main.name)?' · '+it.mgr_main.name:'');
+}
+/* 한 묶음 안에서 «똑같이 보이는» 후보가 있으면 그것들에만 관리번호를 붙인다.
+   ⚠ 실측 2026-10-03: 「노사발전재단 · 이음센터 [기타사업] · 권형하」 둘이 화면에
+     글자 하나 다르지 않게 나왔다 — 회사도 유형도 담당도 같다. 번호 말고는 가를 것이 없다.
+   ⚠ 늘 붙이지는 않는다. 번호는 길고 평소에 안 쓰는 정보라 줄만 시끄러워진다. */
+function alNames(ids){
+  /* 가를 것을 차례로 덧붙인다 — 이름 → 관리번호 → 등록일.
+     ⚠ 번호까지 같은 «진짜 중복»이 있다(실측: 노사발전재단 이음센터 둘 다
+       이음센터-2026-001, 7/27 · 9/17 등록). 거기서 멈추면 고를 수가 없다. */
+  var add=[function(it){ return String(it.no||''); },
+           function(it){ return String(it.created_at||'').slice(0,10); }];
+  var out={};
+  ids.forEach(function(id){ out[id]=alItemName(items[id]); });
+  for(var a=0;a<add.length;a++){
+    var cnt={};
+    ids.forEach(function(id){ cnt[out[id]]=(cnt[out[id]]||0)+1; });
+    var dup=ids.filter(function(id){ return cnt[out[id]]>1; });
+    if(!dup.length) break;
+    dup.forEach(function(id){
+      var v=add[a](items[id]||{});
+      if(v) out[id]=out[id]+' · '+v;
+    });
+  }
+  return out;
 }
 function alPickModal(){
   var L=alAmbList();
   if(!L.length){ closeM(); toast('고를 것이 없습니다'); return; }
+  /* 계정 표는 한 번만 받아 둔다 — 받고 나면 단서가 하나 더 붙으므로 다시 그린다 */
+  if(!alMailSid){ alMailSidLoad().then(function(){ if($('modal')) alPickModal(); }); }
   showModal('<h2 style="margin:0 0 6px">🔗 어느 업무인지 골라 주세요'+hlp('al')+'</h2>'
-    +'<p class="muted" style="font-size:12px;margin:0 0 10px">지난주 메일·일정 가운데 기계가 확신하지 못해 기록에 넣지 않은 것입니다.</p>'
+    +'<p class="muted" style="font-size:12px;margin:0 0 10px">지난주 메일·일정 가운데 기계가 확신하지 못해 기록에 넣지 않은 것입니다.'
+    +' 옆의 <span class="alh">단서</span>는 «그럴듯한 까닭»일 뿐입니다 — 고르는 것은 담당자입니다.</p>'
     +L.map(function(x){
       var w=escJ(x.wk), s=escJ(x.src);
+      /* 단서가 붙은 후보를 위로 — 고르는 눈이 먼저 닿는 자리다.
+         ⚠ 차례만 바꾼다. 위에 있다고 고른 것이 아니다. */
+      var ids=x.ids.slice().sort(function(a,b){ return alHints(x,b).length-alHints(x,a).length; });
+      var nms=alNames(ids);
       return '<div style="border-top:1px solid var(--line);padding:8px 0">'
         +'<div style="font-size:12.5px;margin-bottom:5px"><span class="muted">'+esc(md(x.a.d||''))+'</span> '+esc(x.a.t||'')+'</div>'
-        +'<div class="row" style="flex-wrap:wrap;gap:5px">'
-        +x.ids.map(function(id){
-          return '<button style="font-size:11.5px" onclick="alPick(\''+w+'\',\''+s+'\',\''+escJ(id)+'\')">'+esc(alItemName(items[id]))+'</button>';
+        +'<div class="alpk">'
+        +ids.map(function(id){
+          var hs=alHints(x,id);
+          return '<button class="alpb'+(hs.length?' hit':'')+'" onclick="alPick(\''+w+'\',\''+s+'\',\''+escJ(id)+'\')">'
+            +'<span class="nm">'+esc(nms[id])+'</span>'
+            +hs.map(function(h){ return '<span class="alh" title="'+esc(h.why)+'">'+esc(h.t)+'</span>'; }).join('')
+            +'</button>';
         }).join('')
-        +'<button style="font-size:11.5px;color:var(--sub)" onclick="alPick(\''+w+'\',\''+s+'\',\'\')">업무 아님</button>'
+        +'<button class="alpb no" onclick="alPick(\''+w+'\',\''+s+'\',\'\')">업무 아님</button>'
         +'</div></div>';
     }).join('')
     +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');

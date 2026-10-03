@@ -946,6 +946,14 @@ rules.newsletter = { '.read': `auth != null && ${ADMIN}`, '.write': `auth != nul
 rules.ilabor = { '.read': `auth != null && ${ADMIN}`, '.write': false };
 rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
 
+/* ══ 정부사업신청(gov.html) — 대표 «개인» 자리 (2026-10-03) ═══════════════
+   공고 목록·찾는 말·인증키 둘(공공데이터포털·기업마당)을 담는다.
+   ⚠★ 규칙이 «아예 없어서» 앱이 만들어진 날(09-05)부터 저장·불러오기가 «조용히» 막혀 있었다
+      (cloudPush/cloudPull 이 .catch 로 삼켰다). 그래서 한 브라우저에서 넣은 인증키가
+      다른 브라우저로 안 넘어왔다 — 실측 permission_denied at /gov/{uid}.
+   ⚠ 읽기·쓰기 모두 «본인만» — 인증키가 들어 있다. 관리자에게도 열지 않는다(kcareer 와 같은 집 모양). */
+rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
+
 /* ══ 경력관리 «직원 공개용 사본» ═══════════════════════════════════════
    대표 지시 2026-09-02: 「경력관리 이부분만 다른 직원들이 볼 수 있게」 → 방식 「나」 승인.
 
@@ -1056,6 +1064,27 @@ rules.rules_mgmt = {
      그래서 읽기는 규정관리를 쓰는 직원 전부(LOGIN), 쓰기는 «아무도» 못 한다
      (관리자 SDK 는 규칙을 건너뛰므로 서버만 쓴다). 화면이 고칠 까닭이 없다. */
   lawwatch: { '.read': LOGIN, '.write': false },
+
+  /* ── 모은 자료(취업규칙 새로 짓기 ①) ─ 2026-10-03 · 설계 §4-3·§4-10 ─────────────
+     서버(collectRulesMail)가 메일에서 가린 사본만 담는다. 원본은 담지 않는다.
+     · docs·text·run — 가린 것뿐이라 직원 전체가 읽는다(서고와 같은 범위). 쓰기는 서버만.
+     · seen — 어느 메일을 봤나(메일 열쇠). 관리자만 읽는다.
+     · human·rounds — 사람이 고치는 칸(사업장 확정·갈래·회차·★최종본). 새 앱 관문(enforce)이
+       id·entityType·revision 을 갖춘 레코드로만 저장한다 — 규칙도 그것을 본다.
+       ⚠ 지우기(newData 없음)는 막는다 — 물리 삭제 금지 원칙이고, .validate 는 지울 때 안 돈다.
+         지워진 회차 한 줄이 ★최종본 표시를 조용히 없앤다. 지움 표시(_deleted)로만 남긴다.
+     · ask — 관리자 「지금 더 모으기」 신호(데이터베이스 트리거가 받는다). */
+  library: {
+    docs: { '.read': LOGIN, '.write': false },
+    text: { '.read': LOGIN, '.write': false },
+    run:  { '.read': LOGIN, '.write': false },
+    seen: { '.read': `auth != null && ${ADMIN}`, '.write': false },
+    human:  { '.read': LOGIN, $id: { '.write': `${LOGIN} && newData.exists()`,
+      '.validate': "newData.hasChildren(['id','entityType','revision']) && newData.child('id').isString() && newData.child('id').val() === $id && newData.child('revision').isNumber() && newData.child('entityType').val() === 'RulesDocument'" } },
+    rounds: { '.read': LOGIN, $id: { '.write': `${LOGIN} && newData.exists()`,
+      '.validate': "newData.hasChildren(['id','entityType','revision']) && newData.child('id').isString() && newData.child('id').val() === $id && newData.child('revision').isNumber() && newData.child('entityType').val() === 'RulesRound'" } },
+    ask: { $id: { '.write': `auth != null && ${ADMIN}` } },
+  },
 
   /* ── 서고(사례집) ─ 2026-09-07 · 설계서 §3·§6 ───────────────────────────
      ⚠ 보관함과 «일부러» 갈리는 자리다. 보관함은 「내 것 + 남의 완료본」인데
@@ -1253,13 +1282,15 @@ rules.pu_docs = {
     size:   { '.validate': 'newData.isNumber() && newData.val() > 0 && newData.val() < 26214400' },
     type:   { '.validate': 'newData.isString() && newData.val().length <= 120' },
     sha256: { '.validate': 'newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)' },
-    path:   { '.validate': "newData.isString() && newData.val().beginsWith('pu_docs/originals/' + $id + '/')" },
+    path:   { '.validate': "newData.isString() && (newData.val().beginsWith('pu_docs/originals/' + $id + '/') || (newData.parent().child('secret').val() === true && newData.val().beginsWith('pu_docs/secret/' + $id + '/')))" },
+    /* 🔒 서명본 (2026-10-03 §3.1) — 창고 pu_docs/secret/… 는 아무도 직접 못 읽고, 서버 함수 puDocSecret 이 총괄관리자에게만 내준다 */
+    secret: { '.validate': 'newData.isBoolean() && newData.val() === true' },
     at:     { '.validate': 'newData.isNumber()' },
     by:     { '.validate': 'newData.val() === auth.uid' },
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     from:   {
       '.validate': "newData.hasChild('kind')",
-      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo'" },
+      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder'" },
       $f:   { '.validate': 'newData.isString() && newData.val().length <= 200' }
     },
     $other: { '.validate': false }
@@ -1274,16 +1305,43 @@ rules.pu_docs = {
     '.validate': "newData.hasChildren(['name','n'])",
     name:   { '.validate': 'newData.isString() && newData.val().length <= 120' },
     n:      { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    r:      { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    bz:     { '.validate': 'newData.isString() && newData.val().length <= 12' },
     lastAt: { '.validate': 'newData.isNumber()' },
     $other: { '.validate': false }
   } },
+  /* 계약 기록 (2026-10-03 설계 「계약서류 표준·기록」 §3) — 파일 없는 줄. 엑셀 업체명단 가져오기·손으로 적기.
+     재직 직원이 읽고 쓴다(co_docs 와 같은 결). 칸 이름·길이를 묶는다. */
+  co_recs: { $k: { $d: {
+    '.write': LOGIN,
+    '.validate': "newData.hasChildren(['kind','src','at','by'])",
+    date:    { '.validate': 'newData.isString() && newData.val().length <= 10' },
+    kind:    { '.validate': 'newData.isString() && newData.val().length <= 20' },
+    amount:  { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    payDay:  { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    tax:     { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    edi:     { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    staff:   { '.validate': 'newData.isString() && newData.val().length <= 30' },
+    contact: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    bizNo:   { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    note:    { '.validate': 'newData.isString() && newData.val().length <= 200' },
+    docId:   { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    src:     { '.validate': "newData.val() === 'import' || newData.val() === 'manual' || newData.val() === 'folder'" },
+    at:      { '.validate': 'newData.isNumber()' },
+    by:      { '.validate': 'newData.val() === auth.uid' },
+    byName:  { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    $other:  { '.validate': false }
+  } } },
+  /* 🔒 서명본을 누가 언제 열었나 — 서버(관리자 SDK)만 쓴다. 총괄관리자만 읽는다 */
+  secret_log: { '.read': ADMIN },
   co_docs: { $k: { $d: {
     '.write': LOGIN,
     '.validate': "newData.hasChildren(['fileId','title','src','at','by'])",
     fileId: { '.validate': "newData.isString() && root.child('pu_docs/originals').child(newData.val()).exists()" },
     title:  { '.validate': 'newData.isString() && newData.val().length <= 120' },
     date:   { '.validate': 'newData.isString() && newData.val().length <= 10' },
-    src:    { '.validate': "newData.val() === 'photo' || newData.val() === 'upload'" },
+    src:    { '.validate': "newData.val() === 'photo' || newData.val() === 'upload' || newData.val() === 'folder'" },
+    secret: { '.validate': 'newData.isBoolean() && newData.val() === true' },
     at:     { '.validate': 'newData.isNumber()' },
     by:     { '.validate': 'newData.val() === auth.uid' },
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },

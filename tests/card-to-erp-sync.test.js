@@ -68,8 +68,11 @@ const PARTS = [
     'function cardErpFind(', 'function cardErpNewRec(', 'function cardErpNoteLine(', 'function cardErpMerge(',
     'function cardErpStaffOpts(', 'async function cardErpSync(', 'function cardErpDone(',
     'function cardErpSeed(', 'function cardErpHtml(', 'function sendToErp(', 'function closeCardErp(',
-    'function cardErpGo('].map((d) => cutFn(CARDS, d)),
-  'var _cardErpId = ""; var _cardErpPicked = [];'
+    'function cardErpGo(',
+    /* 2026-10-03 「이 회사가 맞나요?」 — 창·올리기가 이 도우미들을 부른다 */
+    'function cardErpCandidates(', 'function cardErpSiblings(', 'function cardErpTarget(',
+    'function cardErpPinCards(', 'function cardErpWhoHtml(', 'function cardErpWho(', 'function cardErpBizFor('].map((d) => cutFn(CARDS, d)),
+  'var _cardErpId = ""; var _cardErpPicked = []; var _cardErpPin = ""; var _cardErpFix = null; var _cardErpCands = [];'
 ].join('\n');
 
 const CARD = { id: 'c1', kind: 'card', name: '김철수', company: '(주)가온', title: '과장', dept: '인사팀',

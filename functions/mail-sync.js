@@ -1986,3 +1986,8 @@ module.exports.runSync = runSync;
 module.exports.withFolder = withFolder;
 module.exports.ROOT = ROOT;
 module.exports.CHUNK = CHUNK;
+/* 취업규칙 모으기(functions/rules-collect-mail.js)가 «같은 손»으로 첨부를 받으려고 내보낸다.
+   ⚠ 새로 짓지 않는다 — 조각 이름·크기 상한·DELE 없음이 여기 한 곳에서 지켜진다. */
+module.exports.popOpen = popOpen;
+module.exports.drain = drain;
+module.exports.ATT_MAX = ATT_MAX;

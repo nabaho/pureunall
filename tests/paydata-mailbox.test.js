@@ -25,7 +25,8 @@ const COS = [
     email: 'acct@nbb.kr' }
 ];
 const DIR = [{ sid: 'p-001', name: '김보람' }, { sid: 'p-002', name: '박은비' }];
-const OWNERS = { U1: { name: '김보람', email: 'p001@pureun.kr' } };
+/* 들어온 사람의 줄에는 늘 lastAt 이 있다(touchOwner) — 서버가 자리만 적은 줄과 가른다(2026-10-03) */
+const OWNERS = { U1: { name: '김보람', email: 'p001@pureun.kr', lastAt: 1 } };
 
 function load(app) {
   const sandbox = { window: {}, console, Date, document: { getElementById: () => null } };

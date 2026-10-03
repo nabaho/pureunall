@@ -85,7 +85,7 @@
    ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
 try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 </script>
-<script src="js/pu-appbar.js?v=14"></script>
+<script src="js/pu-appbar.js?v=15"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script>
 </head>
@@ -156,7 +156,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=41"></script>
+<script src="js/pu-ontology.js?v=43"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=5"></script>
@@ -170,15 +170,17 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/utils.js?v=2"></script>
 <script src="js/esign-crypto.js?v=1"></script>
 <script src="js/esign-docs.js?v=1"></script>
-<script src="js/pu-hwp-engine.js?v=16"></script>
+<script src="js/pu-hwp-engine.js?v=18"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=6"></script>
-<script src="js/pu-contract-forms.js?v=11"></script>
+<script src="js/pu-form-cardfill.js?v=8"></script>
+<script src="js/pu-contract-forms.js?v=13"></script>
 <script src="js/pu-photo-store.js?v=31"></script>
-<script src="js/pu-office-store.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=1"></script>
+<script src="js/pu-office-store.js?v=5"></script>
+<script src="js/pu-doc-file.js?v=36"></script>
+<script src="js/pu-co-roster.js?v=2"></script>
+<script src="js/pu-office-docs.js?v=4"></script>
 <script>
 'use strict';
 var FB_CONFIG = {
@@ -221,7 +223,9 @@ firebase.auth().onAuthStateChanged(function (u) {
   curUser = u;
   /* 원본 보관함 — 서면함·서고 원본과 같은 창고(pureun-erp-hrphotos). 창고가 없어도 양식 화면은 돈다 */
   try { docBucket = firebase.app().storage('gs://pureun-erp-hrphotos'); } catch (e) { docBucket = null; }
-  PuOfficeStore.init({ db: db, storage: docBucket, uid: u.uid, name: u.email.split('@')[0] });
+  PuOfficeStore.init({ db: db, storage: docBucket, uid: u.uid, name: u.email.split('@')[0], secretFetch: fetchSecretDoc });
+  /* ✉ 메일 첨부 — ⚠ storage 를 넘기지 않는다(기본 기업정보함 창고 pureun-erp-photos 라야 서버가 첨부를 찾는다) */
+  if (window.PuDocFile) PuDocFile.init({ db: db });
   if (window.PuPhotoStore) {
     PuPhotoStore.init({ db: db, storage: docBucket, auth: firebase.auth() });
     photosReady = PuPhotoStore.signIn(u.uid, u.email, u.email.split('@')[0]).catch(function () {});
@@ -255,12 +259,27 @@ function formFromHash() {
   if (h.indexOf('#forms:') !== 0) return null;
   try { return decodeURIComponent(h.slice(7)) || null; } catch (e) { return null; }
 }
+/* 🔒 서명본 받기 — 서버 함수 puDocSecret 이 총괄관리자인지 보고 파일을 내준다(설계 2026-10-03 §3.1).
+   토큰·서명 주소를 만들지 않는다 — 받은 바이트는 이 창 안에서만 쓴다. */
+function fetchSecretDoc(fileId) {
+  var u = firebase.auth().currentUser;
+  if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  return u.getIdToken().then(function (tok) {
+    return fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/puDocSecret', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify({ fileId: fileId }) });
+  }).then(function (r) {
+    if (r.ok) return r.blob();
+    return r.json().catch(function () { return {}; }).then(function (j) { throw new Error(j.error || ('서명본을 열지 못했습니다 (' + r.status + ')')); });
+  });
+}
 function archiveOriginal(file, from) { return trackedWrite(PuOfficeStore.putOriginal(file, from)); }
 function downloadOriginal(fileId, name) {
   return PuOfficeStore.download(fileId, name).catch(function (e) { showToast('내려받지 못했습니다 — ' + ((e && e.message) || e)); });
 }
 function officeHost() {
   return { store: PuOfficeStore, photos: window.PuPhotoStore || null, photosReady: photosReady, uid: curUser ? curUser.uid : '',
+    cards: formCards(),  /* 엑셀 명단 가져오기 — 이알피 업체·기업정보함과 맞춰 보기(읽기만) */
     download: downloadOriginal, attKey: PuContractForms.attKey,
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
@@ -358,6 +377,92 @@ async function formHwpMark(bytes, name, find, to, which) {
   try { doc.free(); } catch (e) {}
   return { bytes: new Uint8Array(out), count: r.count, failed: r.failed };
 }
+/* ✏ 한글처럼 손보기 (설계 §6) — 저장소 안 편집기만(tests/fund-hwp-no-external-editor 와 같은 원칙).
+   .hwp 는 엔진으로 .hwpx 로 바꿔 열고, 다 고치면 «원본 형식»으로 돌려준다. 취소하면 null. */
+function formHwpEdit(bytes, name) {
+  var fmt = formHwpFmt(name);
+  return new Promise(function (resolve) {
+    var ed = null, done = false;
+    var bg = document.createElement('div');
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:100000;display:flex;flex-direction:column;padding:min(14px,2vw)';
+    bg.innerHTML = '<div style="display:flex;align-items:center;gap:8px;background:#fff;padding:9px 12px;border-radius:9px 9px 0 0;flex-wrap:wrap">'
+      + '<b style="font-size:14px">✏ 한글처럼 손보기</b><span style="font-size:11.5px;color:#64748b">저장소 안 편집기 · 서류는 브라우저 밖으로 나가지 않습니다</span><span style="flex:1"></span>'
+      + '<button type="button" data-k="ok" style="background:#166534;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-weight:700">✔ 다 고쳤습니다</button>'
+      + '<button type="button" data-k="no" style="border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:6px 12px">취소</button></div>'
+      + '<div data-k="host" style="flex:1;min-height:0;background:#fff"></div>'
+      + '<div data-k="stat" style="background:#1e293b;color:#f0fdf4;font-size:11px;padding:5px 12px;border-radius:0 0 9px 9px">편집기를 여는 중… (처음 한 번은 조금 걸립니다)</div>';
+    document.body.appendChild(bg);
+    var stat = bg.querySelector('[data-k="stat"]');
+    /* 닫은 뒤 편집기가 브라우저에 남긴 서류(복구본·최근 문서·이력)를 비운다 — PureunHwp.clearStudioStores 참고 */
+    function finish(v) { if (done) return; done = true; try { if (ed && ed.destroy) ed.destroy(); } catch (e) {} bg.remove(); try { PureunHwp.clearStudioStores(); } catch (e) {} resolve(v); }
+    bg.querySelector('[data-k="no"]').onclick = function () { finish(null); };
+    bg.querySelector('[data-k="ok"]').onclick = function () {
+      if (!ed) { finish(null); return; }
+      stat.textContent = '저장하는 중…';
+      Promise.resolve(fmt === 'hwpx' ? ed.exportHwpx() : ed.exportHwp()).then(function (out) {
+        if (!out || !(out.byteLength || out.length)) throw new Error('받아온 것이 비었습니다');
+        finish(new Uint8Array(out));
+      }).catch(function (e) { stat.textContent = '⚠ 저장하지 못했습니다 — ' + ((e && e.message) || e); });
+    };
+    (async function () {
+      var hx = bytes;
+      if (fmt !== 'hwpx') { var d = await PureunHwp.openDoc(bytes, name); try { hx = new Uint8Array(d.exportHwpx()); } finally { try { d.free(); } catch (e) {} } }
+      /* ⚠ 띄우기 «전»에 비운다 — 편집기가 시작하자마자 복구본을 찾아 「문서 복구」 창을 띄운다(다른 근로자 서류가 들어온다) */
+      await PureunHwp.clearStudioStores();
+      var mod = await import('./vendor/rhwp-editor/index.js');
+      ed = await mod.createEditor(bg.querySelector('[data-k="host"]'), { studioUrl: 'vendor/rhwp-studio/index.html', renderer: 'canvas2d', width: '100%', height: '100%' });
+      await ed.loadFile(hx.buffer.slice(hx.byteOffset, hx.byteOffset + hx.byteLength), String(name || '문서').replace(/\.hwp$/i, '.hwpx'));
+      stat.textContent = '한글처럼 고치세요 — 다 고치면 「✔ 다 고쳤습니다」';
+    })().catch(function (e) { stat.textContent = '⚠ 편집기를 열지 못했습니다 — ' + ((e && e.message) || e) + ' · 「취소」 후 ⬇ 받기로 한글에서 고쳐 주세요'; });
+  });
+}
+/* 📕 PDF (설계 §7) — 화면 밖에서 쪽마다 그려 jsPDF 로. 그림 PDF(글자 복사 안 됨) */
+async function formHwpPdf(bytes, name) {
+  if (!window.jspdf) throw new Error('PDF 도구를 불러오지 못했습니다');
+  var host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px';
+  document.body.appendChild(host);
+  try {
+    await PureunHwp.renderPreview(host, bytes, name);
+    var cvs = host.querySelectorAll('canvas');
+    if (!cvs.length) throw new Error('쪽을 그리지 못했습니다');
+    var pdf = null;
+    for (var i = 0; i < cvs.length; i++) {
+      var c = cvs[i], land = c.width > c.height;
+      if (!pdf) pdf = new window.jspdf.jsPDF({ orientation: land ? 'l' : 'p', unit: 'pt', format: 'a4' });
+      else pdf.addPage('a4', land ? 'l' : 'p');
+      var pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+      var sc = Math.min(pw / c.width, ph / c.height), cw = c.width * sc, ch = c.height * sc;
+      pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', (pw - cw) / 2, (ph - ch) / 2, cw, ch);
+    }
+    return new Uint8Array(pdf.output('arraybuffer'));
+  } finally { host.remove(); }
+}
+/* ✉ 메일 (설계 §7) — 기업정보함·사진첩과 «같은 서버»(sendMaterialMail). 첨부는 기업정보함 창고 mailout 으로. */
+function formMailMode() {
+  return db.ref('pucards/config/matMail/mode').once('value').then(function (sn) { return sn.val() === 'auto' ? 'auto' : 'mailto'; }, function () { return 'mailto'; });
+}
+async function formMailSend(p, files) {
+  var up = [];
+  for (var i = 0; i < files.length; i++) up.push(await PuDocFile.putMailFile(new Blob([files[i].bytes]), files[i].name));
+  return PuDocFile.sendMail({ to: p.to, cc: p.cc || '', subject: p.subject, body: p.body, toName: p.toName || '',
+    files: up.map(function (f) { return { name: f.name, path: f.path }; }), cardId: '' });
+}
+/* 보낸 기록 — 기업정보함 「보낸 서류」. 받는 주소는 남기지 않는다. 열쇠마다 같은 at(업무관리가 겹침을 지운다) */
+function formMailRecord(row, V, o) {
+  var keys = PuFormCardFill.sentKeys(row, V), at = Date.now();
+  var rec = PuFormCardFill.sentRecord({ at: at, by: (curUser && curUser.email) || '', kind: o.kind, names: o.names, who: o.who });
+  return Promise.all(keys.map(function (k) { return trackedWrite(db.ref('pucards/sentDocs/' + k).push(rec)); })).then(function () { return keys.length; });
+}
+/* 보낸 사본 — 기업별 서류. 규칙 안의 값만(kind:'co', src:'upload') */
+function formMailKeep(V, file, title) {
+  var coName = String(V.회사명 || '').trim();
+  if (!coName) return Promise.reject(new Error('회사명이 없어 기업별 서류에 담지 못했습니다'));
+  return trackedWrite(PuOfficeStore.putOriginal(file, { kind: 'co', coKey: PuOfficeStore.coKey(coName), coName: coName })).then(function (r) {
+    var d = new Date(), ymd = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    return trackedWrite(PuOfficeStore.addCoDoc({ coName: coName, fileId: r.fileId, title: title, date: ymd, src: 'upload' }));
+  });
+}
 /* 묶음 채우기 — 채운 파일들을 .zip 하나로 (브라우저 안에서만 묶는다. 채운 값은 서버로 안 간다) */
 async function formZip(files) {
   var JSZ = await _esignLoadJsZip();
@@ -395,7 +500,8 @@ function showPane(name) {
     formsMounted = true;
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(),
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
-      cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, me: function () { return window.PuWhoami && PuWhoami.get(); } });
+      cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
+      mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep }, me: function () { return window.PuWhoami && PuWhoami.get(); } });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
