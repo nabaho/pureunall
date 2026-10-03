@@ -1284,6 +1284,14 @@
     bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
     document.body.appendChild(bg);
     drawContacts(); drawVals();
+    /* 기업정보함 「📨 제안서 보내기」로 왔으면 그 회사를 골라 둔다 (설계 2026-09-29 §8).
+       ⚠ «회사» 줄만 — 사람(명함·담당자) 줄도 같은 회사 이름을 가져 먼저 걸리면 회사 칸이 비뚤어진다. */
+    if (host.propose) withRows(function (rows) {
+      if (st.co) return;
+      var r = rows.filter(function (x) { return (x.k === 'biz' || x.k === 'erp' || x.k === 'card-co') && CF.sentKeys(x, {}).indexOf(host.propose) >= 0; })[0];
+      if (r) pickCo(r);
+      else note.textContent = '기업정보함에서 고른 회사를 업체 목록에서 찾지 못했습니다 — 위 ① 에서 찾아 고르세요';
+    });
     refresh(); loadAll();
     setTimeout(function () { coQ.focus(); }, 0);
   }
@@ -1406,6 +1414,16 @@
 
     function loadView() { try { return localStorage.getItem('pcf_view') === 'card' ? 'card' : 'list'; } catch (_) { return 'list'; } }
     function saveView() { try { localStorage.setItem('pcf_view', S.view); } catch (_) {} }
+    /* 기업정보함 「📨 제안서 보내기」로 왔을 때 (설계 2026-09-29 §8) — 기금관리 › 제안서·견적서 로 가고,
+       제안서가 하나면 채우기 창을 바로 연다(회사는 openFill 이 host.propose 로 골라 둔다). 처음 한 번만. */
+    function openPropose() {
+      S.kind = 'fund'; S.side = 'all'; S.grp = PROPOSAL_GROUP; S.q = '';
+      var list = filterForms(S.forms, { kind: 'fund', grp: PROPOSAL_GROUP });
+      if (!list.length) { drawTree(); drawMain(); toast('기금관리 › 제안서·견적서 양식이 아직 없습니다 — 먼저 원본을 올려 주세요'); return; }
+      select(list[0].id);
+      if (list.length === 1) openFill([list[0]], host);
+      else toast('보낼 제안서를 고르고 「📝 찾아서 채우기」를 누르세요 — 회사는 골라 둡니다');
+    }
     function cur() { return S.sel ? S.forms.filter(function (x) { return x.id === S.sel; })[0] || null : null; }
     function curKind() { return S.kind; }
     function shown() { return filterForms(S.forms, { kind: S.kind, side: S.side, grp: S.grp, q: S.q }); }
@@ -1424,6 +1442,7 @@
         /* 고른 것이 없으면 첫 양식을 «보여만» 준다 — host 에 알리지 않는다(다른 칸을 보는 중이면 끌려온다) */
         else { var f0 = shown()[0]; S.sel = f0 ? f0.id : null; }
         drawTree(); drawMain();
+        if (host.propose && !S.proposed) { S.proposed = true; openPropose(); }
         /* 세트는 따로 받는다 — 못 받아도 양식 화면은 그대로 쓴다(기본 세트만 보인다) */
         db.ref(PATH_SETS).once('value').then(function (s) { S.sets = setsOf(s.val()); drawMain(); }, function () {});
       }).catch(function (e) { S.err = (e && e.message) || String(e); drawTree(); drawMain(); });
