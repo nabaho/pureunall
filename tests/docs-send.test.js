@@ -42,3 +42,28 @@ test('ⓔ host 배선', () => {
   assert.match(H, /hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,/);
   assert.match(H, /mail: \{ mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep \}/);
 });
+
+const CFJ = fs.readFileSync(path.join(R, 'js/pu-contract-forms.js'), 'utf8').replace(/\r\n/g, '\n');
+const { stripJs } = require('./strip-comments');
+const { cutFn } = require('./cut-fn');
+test('ⓕ 채우기 창 — 손보기·메일 단추는 «양식 하나»일 때만, 손본 것이 받기·메일에 쓰인다', () => {
+  const f = cutFn(stripJs(CFJ), 'function openFill(');
+  assert.match(f, /host\.hwpEdit\(/);
+  assert.match(f, /openSend\(/);
+  assert.match(f, /one && host\.mail/, '묶음 채우기에도 메일 단추가 뜹니다');
+  assert.match(f, /st\.edited/, '손본 바이트를 쓰지 않습니다');
+});
+test('ⓖ 보내기 창 — 누를 때만 보내고, 잠그고, 성공 뒤에만 기록·보관, 서버가 안 되면 메일 창', () => {
+  const s = cutFn(stripJs(CFJ), 'function openSend(');
+  assert.match(s, /CF\.mailDefaults\(/);
+  const iSend = s.indexOf('host.mail.send('), iRec = s.indexOf('host.mail.record(');
+  assert.ok(iSend > 0 && iRec > 0, '보내기·기록이 없습니다');
+  const sendFn = cutFn(s, 'function send(');
+  assert.ok(sendFn.indexOf('host.mail.send(') < sendFn.indexOf('after(fs'), '보내기 전에 기록합니다');
+  assert.match(s, /if \(busy\) return;/, '두 번 누르기를 막지 않습니다');
+  assert.match(s, /mailto:/, '서버를 못 쓸 때 메일 창으로 물러나지 않습니다');
+  assert.match(s, /18 \* 1024 \* 1024/, '크기 한도를 보지 않습니다');
+  assert.match(s, /host\.hwpPdf\(/);
+  assert.match(s, /host\.mail\.keep\(/);
+  assert.ok(!/db\.ref|changeForms/.test(s), '보내기 창이 db 를 직접 만집니다 — host 를 거칠 것');
+});
