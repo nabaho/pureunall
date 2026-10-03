@@ -67,9 +67,9 @@ const API = (() => {
     grabFn('partyNames'), grabFn('partyJoin'), grabFn('useRate'),
     grabDecl('FTYPE_PAIRS'), grabDecl('FTYPE_GONG_ONLY'),
     grabDecl('HWP_TPL_KINDS'), grabLine('HWP_TPL_BLANK'), grabLine('HWP_TPL_MAXLIST'),
-    grabLine('HWP_MK_OPEN'), grabFn('_hwpMk'),
+    grabLine('HWP_MK_OPEN'), grabLine('HWP_FLOW_MARK'), grabFn('_hwpMk'),
     grabFn('_hwpTplBase'), grabFn('_bytesToB64'), grabFn('_b64ToBytes'),
-    grabFn('_hwpTplValues'), grabFn('_hwpTypeRules'), grabFn('_hwpFillXml'),
+    grabFn('_hwpTplValues'), grabFn('_hwpTypeRules'), grabFn('_hwpParaAlign'), grabFn('_hwpTblFlow'), grabFn('_hwpFillXml'),
     grabFn('_hwpStripLinesegs'),
     'this.base=_hwpTplBase; this.toB64=_bytesToB64; this.fromB64=_b64ToBytes; this.values=_hwpTplValues;',
     'this.rules=_hwpTypeRules; this.fillXml=_hwpFillXml; this.strip=_hwpStripLinesegs;',
@@ -247,7 +247,8 @@ test('_hwpStripLinesegs — (AI 고치기의 줄 다시 나누기가 쓴다) 줄
 test('★ 틀 채우기는 HWPX(XML)에서 한다 — 표 안의 표까지 닿게(rhwp 찾기·바꾸기는 겹친 표를 못 봤다)', () => {
   const fill = grabFn('hwpTplFill');
   assert.match(fill, /_hwpTplBytes\(t\)/);
-  assert.match(fill, /_hwpxEach\(hx,function\(x\)\{ return _hwpFillXml\(x,V,from,to,kind\); \}\)/);
+  /* 2026-09-27 header.xml(문단 정렬)을 함께 넘긴다 — 반복 묶음이 든 표를 풀 때 원래 가운데 정렬을 지키려고 */
+  assert.match(fill, /_hwpxEach\(hx,function\(x,h\)\{ return _hwpFillXml\(x,V,from,to,kind,h\); \}\)/);
   assert.doesNotMatch(fill, /replaceAll/, 'rhwp 의 replaceAll 길로 돌아가지 않는다');
   assert.match(grabFn('_hwpTplBytes'), /exportHwpx\(\)/, '옛 .hwp 틀도 HWPX 로 바꿔 같은 길을 탄다');
 });
