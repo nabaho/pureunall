@@ -1303,9 +1303,33 @@ rules.pu_docs = {
     '.validate': "newData.hasChildren(['name','n'])",
     name:   { '.validate': 'newData.isString() && newData.val().length <= 120' },
     n:      { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    r:      { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    bz:     { '.validate': 'newData.isString() && newData.val().length <= 12' },
     lastAt: { '.validate': 'newData.isNumber()' },
     $other: { '.validate': false }
   } },
+  /* 계약 기록 (2026-10-03 설계 「계약서류 표준·기록」 §3) — 파일 없는 줄. 엑셀 업체명단 가져오기·손으로 적기.
+     재직 직원이 읽고 쓴다(co_docs 와 같은 결). 칸 이름·길이를 묶는다. */
+  co_recs: { $k: { $d: {
+    '.write': LOGIN,
+    '.validate': "newData.hasChildren(['kind','src','at','by'])",
+    date:    { '.validate': 'newData.isString() && newData.val().length <= 10' },
+    kind:    { '.validate': 'newData.isString() && newData.val().length <= 20' },
+    amount:  { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    payDay:  { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    tax:     { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    edi:     { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    staff:   { '.validate': 'newData.isString() && newData.val().length <= 30' },
+    contact: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    bizNo:   { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    note:    { '.validate': 'newData.isString() && newData.val().length <= 200' },
+    docId:   { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    src:     { '.validate': "newData.val() === 'import' || newData.val() === 'manual'" },
+    at:      { '.validate': 'newData.isNumber()' },
+    by:      { '.validate': 'newData.val() === auth.uid' },
+    byName:  { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    $other:  { '.validate': false }
+  } } },
   co_docs: { $k: { $d: {
     '.write': LOGIN,
     '.validate': "newData.hasChildren(['fileId','title','src','at','by'])",

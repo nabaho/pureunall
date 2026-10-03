@@ -1761,11 +1761,73 @@
           "n": {
             ".validate": "newData.isNumber() && newData.val() >= 0"
           },
+          "r": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "bz": {
+            ".validate": "newData.isString() && newData.val().length <= 12"
+          },
           "lastAt": {
             ".validate": "newData.isNumber()"
           },
           "$other": {
             ".validate": false
+          }
+        }
+      },
+      "co_recs": {
+        "$k": {
+          "$d": {
+            ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+            ".validate": "newData.hasChildren(['kind','src','at','by'])",
+            "date": {
+              ".validate": "newData.isString() && newData.val().length <= 10"
+            },
+            "kind": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "amount": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "payDay": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "tax": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "edi": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "staff": {
+              ".validate": "newData.isString() && newData.val().length <= 30"
+            },
+            "contact": {
+              ".validate": "newData.isString() && newData.val().length <= 80"
+            },
+            "bizNo": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "note": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            },
+            "docId": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "src": {
+              ".validate": "newData.val() === 'import' || newData.val() === 'manual'"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "by": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "byName": {
+              ".validate": "newData.isString() && newData.val().length <= 60"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         }
       },
