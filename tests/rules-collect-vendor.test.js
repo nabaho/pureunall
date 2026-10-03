@@ -7,11 +7,14 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const R = path.join(__dirname, '..');
 const sha = (p) => crypto.createHash('sha256').update(fs.readFileSync(path.join(R, p))).digest('hex');
+/* 가림 규칙(.js)은 «글»이라 줄끝만 다를 수 있다(윈도 CRLF ↔ 저장소 LF) — 줄끝을 맞춰 견준다.
+   묶음·고지문은 양쪽 다 -text 라 바이트 그대로 견준다. */
+const shaText = (p) => crypto.createHash('sha256').update(fs.readFileSync(path.join(R, p), 'utf8').replace(/\r\n/g, '\n')).digest('hex');
 
 test('서버 사본이 원본과 같은 바이트다', () => {
   assert.equal(sha('functions/vendor/kordoc/kordoc.browser.min.mjs'), sha('vendor/kordoc/kordoc.browser.min.js'),
     '★ 묶음이 갈라졌다 — node scripts/sync-functions-kordoc.js');
-  assert.equal(sha('functions/vendor/kordoc/pu-kordoc-text.js'), sha('js/pu-kordoc-text.js'),
+  assert.equal(shaText('functions/vendor/kordoc/pu-kordoc-text.js'), shaText('js/pu-kordoc-text.js'),
     '★ 가림 규칙이 갈라졌다 — node scripts/sync-functions-kordoc.js');
   assert.equal(sha('functions/vendor/kordoc/LICENSE'), sha('vendor/kordoc/LICENSE'),
     '★ 고지문이 갈라졌다 — node scripts/sync-functions-kordoc.js');

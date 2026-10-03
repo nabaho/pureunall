@@ -11,7 +11,16 @@ const OUT = path.join(R, 'functions', 'vendor', 'kordoc');
 fs.mkdirSync(OUT, { recursive: true });
 [['vendor/kordoc/kordoc.browser.min.js', 'kordoc.browser.min.mjs'],
  ['vendor/kordoc/LICENSE', 'LICENSE'],
- ['js/pu-kordoc-text.js', 'pu-kordoc-text.js']].forEach(([from, to]) => {
-  fs.copyFileSync(path.join(R, from), path.join(OUT, to));
+ ['js/pu-kordoc-text.js', 'pu-kordoc-text.js', 'lf']].forEach(([from, to, eol]) => {
+  /* ⚠ 가림 규칙(.js)은 줄끝을 LF 로 맞춰 쓴다 (2026-10-03).
+     원본 js/pu-kordoc-text.js 는 «글 파일»이라 윈도에서는 CRLF 로 풀리고 저장소에는 LF 로 담긴다.
+     사본 자리(functions/vendor/kordoc/**)는 -text 라 풀린 바이트 그대로 담긴다 — 윈도에서 그냥
+     베끼면 사본만 CRLF 로 담겨, 리눅스(CI)에서 「같은 바이트」 검사가 갈라졌다(PR #1845 첫 빨강).
+     묶음·고지문은 원본도 -text 라 바이트 그대로 베낀다. */
+  if (eol === 'lf') {
+    fs.writeFileSync(path.join(OUT, to), fs.readFileSync(path.join(R, from), 'utf8').replace(/\r\n/g, '\n'));
+  } else {
+    fs.copyFileSync(path.join(R, from), path.join(OUT, to));
+  }
   console.log('복사:', from, '→ functions/vendor/kordoc/' + to);
 });
