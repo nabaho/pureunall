@@ -84,6 +84,8 @@ function load(over){
       database: () => ({ ref: dbRef }) },
     fetch: () => Promise.resolve({ json: () => Promise.resolve({ ok:true }) })
   };
+  /* 자료가 들어와 다시 그리기(mbDrawSoon)는 앱에서는 120ms 묶개다 — 여기서는 «바로» 그린 셈으로 본다 */
+  ctx.mbDrawSoon = () => { ctx.renderPCSide(); ctx.renderMailPage(); };
   vm.createContext(ctx);
   vm.runInContext(cut('const ErpMatch = {', '\nfunction autoFolderFlush('), ctx);
   vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
