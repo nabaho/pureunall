@@ -422,11 +422,11 @@ function srcBackfill(){
   return n;
 }
 /* 새 걸러내기 규칙(2026-10-03 대표 결정)을 «이미 받은» 줄에도 댄다.
-   ⚠ 사람이 손댄 줄(관심·지원함)과 이미 숨긴 줄은 건드리지 않는다 — 기계가 넣은 「새 공고」만.
+   ⚠ 사람이 손댄 줄(관심·지원함)과 이미 숨긴 줄은 건드리지 않는다 — 기계가 정한 「새 공고」·「지나감」만.
    ⚠ 지우지 않고 숨긴다(🚫 와 같은 표시 + ruleOut). 멱등. */
 function rejudge(){
   var a=get('feed'), n=0, kw=kws();
-  a.forEach(function(r){ if(!r||r.hidden||r.type!=='새 공고') return;
+  a.forEach(function(r){ if(!r||r.hidden||r.type==='관심'||r.type==='지원함') return;   /* 「지나감」도 기계가 정한 것이다 */
     if(!GovG2b.judge(r,kw).length){ r.hidden=true; r.ruleOut=true; n++; } });
   if(n){ set('feed',a); toast('새 걸러내기 규칙에 맞지 않는 '+n+'건을 숨겼습니다'); }
   return n;
