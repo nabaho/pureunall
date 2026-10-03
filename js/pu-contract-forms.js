@@ -489,6 +489,11 @@
     });
   }
 
+  function dataUrlOf(u8) {
+    var s = '', CH = 0x8000;
+    for (var i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+    return 'data:application/octet-stream;base64,' + btoa(s);
+  }
   function bytesOfDataUrl(dataUrl) {
     var b64 = String(dataUrl || '').split(',')[1] || '';
     var bin = atob(b64), u = new Uint8Array(bin.length);
@@ -585,6 +590,9 @@
     + '.pcf-muted{color:#94a3b8}'
     /* 채워서 받기 창 */
     + '.pcf-fcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px}'
+    + '.pcf-mk-hits{max-height:180px;overflow:auto;margin:4px 0 8px}'
+    + '.pcf-mk-hit{font-size:12px;padding:2px 0;color:#334155}'
+    + '.pcf-mk-hit mark{background:#fde68a}'
     + '.pcf-prop{border:1px solid #bfdbfe;background:#f8fbff;border-radius:8px;padding:8px 10px;margin-bottom:10px}'
     + '.pcf-seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden}'
     + '.pcf-seg button{border:0;background:#fff;padding:5px 10px;font:inherit;font-size:12.5px;cursor:pointer}'
@@ -1329,6 +1337,139 @@
         return list;
       }).then(function () { toast(added ? ('체당금 양식 ' + added + '개 추가') : '체당금 양식 갱신'); }).catch(function () {});
     }
+    /* ✏ 바꿀 자리 만들기 (설계 2026-09-29 §4) — 원본 글자를 찾아 {{표시}} / 고친 글자로.
+       작업은 «바이트 사본» 위에서만 — 저장하기 전엔 양식도 원본도 그대로다. 되돌리기는 이 창 안에서만. */
+    function openMark(fm) {
+      var M = w.PuHwpMark, src = hwpSources(fm).filter(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); })[0];
+      if (!M || !src || !host.hwpMark) { toast('한글 원본이 있어야 바꿀 자리를 만들 수 있습니다'); return; }
+      ensureCss();
+      var name = src.name, stack = [], cur = null, done = [], hits = [], busy = false;
+      var bg = el('div', { 'class': 'pcf-mbg' });
+      function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
+      function onKey(e) { if (e.key === 'Escape' && !busy) close(); }
+      document.addEventListener('keydown', onKey);
+      var findIn = el('input', { type: 'text', placeholder: '원본에서 찾을 글자 (예: ○○도 노동국 … 팀장님)', 'aria-label': '찾을 글자' });
+      var modeMk = el('input', { type: 'radio', name: 'pcf-mk-mode', checked: true, 'aria-label': '표시로 바꾸기' });
+      var modeTx = el('input', { type: 'radio', name: 'pcf-mk-mode', 'aria-label': '글자로 바꾸기' });
+      var mkIn = el('input', { type: 'text', placeholder: '표시 이름 (예: 수신자)', 'aria-label': '표시 이름' });
+      var txIn = el('input', { type: 'text', placeholder: '바꿀 글자 (오탈자 고치기)', 'aria-label': '바꿀 글자' });
+      var whichSel = el('select', { 'aria-label': '어느 자리' });
+      var hitBox = el('div', { 'class': 'pcf-mk-hits' });
+      var doneBox = el('div');
+      var prev = el('div', { 'class': 'pcf-fprev' });
+      var note = el('div', { 'class': 'pcf-fnote' });
+      var btnDo = el('button', { type: 'button', 'class': 'pcf-b b', text: '바꾸기', onclick: doReplace });
+      var btnUndo = el('button', { type: 'button', 'class': 'pcf-b', text: '↩ 마지막 것 되돌리기', onclick: undo });
+      var btnSave = el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff', text: '새 원본으로 저장', onclick: saveNew });
+      var chips = el('div', { 'class': 'pcf-crow', style: 'margin:2px 0 8px' }, M.COMMON.map(function (k) {
+        return el('button', { type: 'button', 'class': 'pcf-chip', text: k, onclick: function () { mkIn.value = k; modeMk.checked = true; sync(); } });
+      }));
+      function target() { return modeMk.checked ? M.markName(mkIn.value) : String(txIn.value || ''); }
+      function sync() {
+        btnUndo.disabled = busy || !stack.length;
+        btnSave.disabled = busy || !done.length;
+        btnDo.disabled = busy || !hits.length || !target();
+      }
+      function show() { prev.innerHTML = ''; if (host.hwpShow && cur) host.hwpShow(prev, cur, name); }
+      function drawDone() {
+        doneBox.innerHTML = '';
+        if (!done.length) return;
+        doneBox.appendChild(el('div', { 'class': 'pcf-fh', text: '이번에 바꾼 것 (' + done.length + ')' }));
+        done.forEach(function (d) { doneBox.appendChild(el('div', { 'class': 'pcf-muted', text: '「' + d.find + '」 → ' + d.to + ' · ' + d.n + '곳' })); });
+      }
+      var findT = null;
+      function find() {
+        var q = findIn.value;
+        hitBox.innerHTML = ''; whichSel.innerHTML = ''; hits = []; sync();
+        if (!q.trim() || !cur) return;
+        host.hwpFind(cur, name, q).then(function (hs) {
+          if (findIn.value !== q) return;
+          hits = hs;
+          if (!hs.length) { hitBox.appendChild(el('div', { 'class': 'pcf-muted', text: '찾지 못했습니다 — 띄어쓰기까지 같아야 합니다' })); sync(); return; }
+          hitBox.appendChild(el('div', { 'class': 'pcf-fh', text: '✔ ' + hs.length + '곳 찾음' }));
+          hs.forEach(function (h, i) {
+            hitBox.appendChild(el('div', { 'class': 'pcf-mk-hit' }, [el('b', { text: (i + 1) + '. ' }), '…' + h.before,
+              el('mark', { text: q }), h.after + '…', h.cell ? el('small', { text: ' (표 칸)' }) : null]));
+          });
+          whichSel.appendChild(el('option', { value: 'all', text: '모두 (' + hs.length + '곳)' }));
+          if (hs.length > 1) hs.forEach(function (h, i) { whichSel.appendChild(el('option', { value: String(i), text: '이 곳만 — ' + (i + 1) + '/' + hs.length })); });
+          sync();
+        }, function (e) { note.textContent = '⚠ 찾지 못했습니다 — ' + ((e && e.message) || e); });
+      }
+      findIn.addEventListener('input', function () { clearTimeout(findT); findT = setTimeout(find, 250); });
+      [mkIn, txIn].forEach(function (x) { x.addEventListener('input', sync); });
+      [modeMk, modeTx].forEach(function (x) { x.addEventListener('change', sync); });
+      function doReplace() {
+        var q = findIn.value, to = target(), which = whichSel.value === 'all' ? 'all' : +whichSel.value;
+        if (!q || !to || busy) return;
+        busy = true; sync(); note.textContent = '바꾸는 중…';
+        host.hwpMark(cur, name, q, to, which).then(function (r) {
+          busy = false;
+          if (!r.count) { note.textContent = '⚠ 바꾸지 못했습니다' + (r.failed ? ' (' + r.failed + '곳 실패)' : ''); sync(); return; }
+          stack.push(cur); cur = r.bytes;
+          done.push({ find: q, to: to, n: r.count });
+          note.textContent = '✔ ' + r.count + '곳 바꿈' + (r.failed ? ' · ⚠ ' + r.failed + '곳은 못 바꿈(표 속 표일 수 있음)' : '');
+          drawDone(); show(); find();
+        }, function (e) { busy = false; note.textContent = '⚠ ' + ((e && e.message) || e); sync(); });
+      }
+      function undo() {
+        if (!stack.length || busy) return;
+        cur = stack.pop(); done.pop(); note.textContent = '↩ 되돌렸습니다'; drawDone(); show(); find();
+      }
+      /* 새 원본으로 저장 — ① 보관함 사본이 없는 옛 한글 첨부를 먼저 보관함에 ② 새 파일을 보관함에 ③ 양식을 거래로 고친다 */
+      function saveNew() {
+        if (!done.length || busy) return;
+        if (!host.archive) { toast('원본 보관함이 연결되지 않았습니다'); return; }
+        busy = true; sync(); note.textContent = '저장하는 중…';
+        var from = { kind: 'form', formId: fm.id, formName: fm.name || '', formKind: fm.kind };
+        var olds = orphanInline(fm);
+        Promise.all(olds.map(function (a) {
+          var b = bytesOfDataUrl(a.data || a.dataUrl);
+          return host.archive({ name: a.name, size: b.length, type: '', bytes: b }, from).then(function (r) {
+            if (!r || !r.fileId) throw new Error('옛 원본을 보관함에 올리지 못했습니다');
+            return { fileId: r.fileId, name: a.name, size: b.length, attId: a.id };
+          });
+        })).then(function (oldEntries) {
+          return host.archive({ name: name, size: cur.length, type: '', bytes: cur }, from).then(function (r) {
+            if (!r || !r.fileId) throw new Error('새 원본을 보관함에 올리지 못했습니다');
+            var small = cur.length <= ATTACH_MAX;
+            var nu = { fileId: r.fileId, name: name, size: cur.length, attId: small ? newId('at-') : '', data: small ? dataUrlOf(cur) : '' };
+            return change(function (list) {
+              return list.map(function (x) {
+                if (x.id !== fm.id) return x;
+                var keep = JSON.parse(JSON.stringify(x));
+                keep.originals = (Array.isArray(keep.originals) ? keep.originals : []).concat(oldEntries);
+                return withNewOriginal(keep, nu);
+              });
+            }, '✔ 새 원본으로 저장했습니다 — 이전 원본은 보관함에 남아 있습니다');
+          });
+        }).then(function () { busy = false; close(); }, function (e) {
+          busy = false; note.textContent = '⚠ 저장하지 못했습니다 — ' + ((e && e.message) || e) + ' (양식은 그대로입니다)'; sync();
+        });
+      }
+      var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '바꿀 자리 만들기', style: 'width:1040px' }, [
+        el('div', { 'class': 'pcf-mh' }, [el('span', { text: '✏ 바꿀 자리 만들기 · ' + (fm.name || '') }),
+          el('small', { style: 'font-weight:400;color:#64748b;margin-right:8px', text: '원본: ' + name }),
+          el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: function () { if (!busy) close(); } })]),
+        el('div', { 'class': 'pcf-mb' }, [el('div', { 'class': 'pcf-fcols' }, [
+          el('div', null, [
+            el('div', { 'class': 'pcf-fh', text: '① 원본에서 찾을 글자' }), findIn, hitBox,
+            el('div', { 'class': 'pcf-fh', text: '② 무엇으로 바꿀까요' }),
+            el('label', { 'class': 'pcf-frow' }, [el('span', null, [modeMk, ' 표시']), mkIn]), chips,
+            el('label', { 'class': 'pcf-frow' }, [el('span', null, [modeTx, ' 글자']), txIn]),
+            el('label', { 'class': 'pcf-frow' }, [el('span', { text: '③ 어느 자리' }), whichSel]),
+            el('div', { style: 'display:flex;gap:6px;margin:6px 0' }, [btnDo, btnUndo]),
+            note, doneBox]),
+          prev])]),
+        el('div', { 'class': 'pcf-mf' }, [
+          el('span', { 'class': 'pcf-muted', style: 'margin-right:auto', text: '저장하면 새 원본이 되고, 이전 원본은 🗄 원본 보관함에 남습니다.' }),
+          el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: function () { if (!busy) close(); } }), btnSave])
+      ]);
+      bg.appendChild(m); document.body.appendChild(bg);
+      note.textContent = '원본을 여는 중…'; busy = true; sync();
+      host.hwpBytes(src).then(function (u8) { cur = u8; busy = false; note.textContent = ''; show(); sync(); findIn.focus(); },
+        function (e) { busy = false; note.textContent = '⚠ 원본을 열지 못했습니다 — ' + ((e && e.message) || e); sync(); });
+    }
     function quickUpload(kind, files) {
       var arr = Array.prototype.slice.call(files || []);
       if (!arr.length) return;
@@ -1418,6 +1559,8 @@
         el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' + k.label + ' · ' }), fm.name]),
         strip,
         host.cards ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다.', text: '📝 찾아서 채우기', onclick: function () { openFill([fm], host); } }) : null,
+        (host.hwpMark && hwpSources(fm).some(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); }))
+          ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1d4ed8', title: '원본 글자를 찾아 표시나 고친 글자로 바꿉니다. 이전 원본은 보관함에 남습니다.', text: '✏ 바꿀 자리 만들기', onclick: function () { openMark(fm); } }) : null,
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '수정', onclick: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } }),
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', text: '복제', onclick: function () { copy(fm); } }),
         el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#dc2626', text: '삭제', onclick: function () { del(fm); } })

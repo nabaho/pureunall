@@ -121,3 +121,23 @@ test('ⓔ 문서관리 배선 — hwpFind·hwpMark 를 넘기고, 원본 형식 
   const rl = html.slice(html.indexOf('async function formRelayout('), html.indexOf('\n}\n', html.indexOf('async function formRelayout(')));
   assert.match(rl, /fmt === 'hwpx' \? d2\.exportHwpx\(\) : d2\.exportHwp\(\)/, '.hwpx 를 .hwp 로 바꿔 냅니다');
 });
+
+test('ⓕ 화면 — 바꿀 자리 만들기 창: 찾기·표시/글자·이 곳만·되돌리기·저장, 저장 전 옛 첨부 보관', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js/pu-contract-forms.js'), 'utf8').replace(/\r\n/g, '\n');
+  const { stripJs } = require('./strip-comments');
+  const { cutFn } = require('./cut-fn');
+  const f = cutFn(stripJs(src), 'function openMark(');
+  assert.match(f, /host\.hwpFind\(/, '찾기를 하지 않습니다');
+  assert.match(f, /host\.hwpMark\(/, '바꾸기를 하지 않습니다');
+  assert.match(f, /PuHwpMark|M\.COMMON/, '자주 쓰는 자리 칩이 없습니다');
+  assert.match(f, /이 곳만/, '여러 곳일 때 「이 곳만」 고르기가 없습니다');
+  assert.match(f, /되돌리기/, '되돌리기가 없습니다');
+  assert.match(f, /새 원본으로 저장/, '저장 단추가 없습니다');
+  const sv = cutFn(f, 'function saveNew(');
+  const iOrphan = sv.indexOf('orphanInline('), iChange = sv.indexOf('change(');
+  assert.ok(iOrphan >= 0 && iChange > iOrphan, '옛 첨부를 보관함에 올리기 «전에» 양식을 바꿉니다 — 옛 원본이 사라집니다');
+  assert.match(sv, /withNewOriginal\(/, '새 원본 규칙(withNewOriginal)을 쓰지 않습니다');
+  assert.ok(!/\.set\(/.test(f), '양식 목록을 .set( 으로 덮습니다 — changeForms 거래만');
+  const tools = cutFn(stripJs(src), 'function toolbar(');
+  assert.match(tools, /바꿀 자리 만들기/, '도구줄에 단추가 없습니다');
+});
