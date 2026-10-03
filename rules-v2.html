@@ -13,8 +13,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-ontology.js?v=43"></script>
-<!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다. 새 앱이라 data-mode 를 안 단다(= 강제) -->
-<script src="js/pu-ontology-write.js?v=4"></script>
+<!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
+     data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
+     rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
+<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=5"></script>
@@ -119,11 +121,11 @@ button{font:inherit;cursor:pointer}
 <div class="top">
   <div class="logo">규</div><b style="font-size:16px">취업규칙</b>
   <div class="tabs"><span class="tab soon" title="다음 단계(덩어리 ③)에서 짓습니다">🏢 사업장 (준비 중)</span><span class="tab on">📥 모은 자료</span></div>
-  <span class="r"><a class="btn sm" href="rules.html">옛 규정관리</a><span id="appslot"></span></span>
+  <span class="r"><span id="whoslot"></span><a class="btn sm" href="rules.html">옛 규정관리</a><span id="appslot"></span></span>
 </div>
 <div id="lib"><div class="msg">불러오는 중…</div></div>
 
-<script src="js/pu-appbar.js?v=14"></script>
+<script src="js/pu-appbar.js?v=15"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
 <script src="js/pu-authsync.js?v=2"></script>
 <script src="js/pu-whoami.js?v=2"></script>
@@ -287,6 +289,8 @@ try {
   libMsg('초기화 실패: ' + e.message);
 }
 </script>
+<script>/* 「지금 로그인한 사람」은 머리줄 자리에 — 안 알려 주면 부품이 떠 있는 표를 따로 띄워 겹친다 */
+try { PuWhoami.mount('#whoslot'); } catch (e) {}</script>
 <script>try { PuAppBar.mount('#appslot', { current: 'rulesv2' }); } catch (e) {}</script>
 <script>try { PuBack.guard(function () { return false; }); } catch (e) {}</script>
 </body>
