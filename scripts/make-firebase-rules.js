@@ -1065,6 +1065,25 @@ rules.rules_mgmt = {
      (관리자 SDK 는 규칙을 건너뛰므로 서버만 쓴다). 화면이 고칠 까닭이 없다. */
   lawwatch: { '.read': LOGIN, '.write': false },
 
+  /* ── 모은 자료(취업규칙 새로 짓기 ①) ─ 2026-10-03 · 설계 §4-3·§4-10 ─────────────
+     서버(collectRulesMail)가 메일에서 가린 사본만 담는다. 원본은 담지 않는다.
+     · docs·text·run — 가린 것뿐이라 직원 전체가 읽는다(서고와 같은 범위). 쓰기는 서버만.
+     · seen — 어느 메일을 봤나(메일 열쇠). 관리자만 읽는다.
+     · human·rounds — 사람이 고치는 칸(사업장 확정·갈래·회차·★최종본). 새 앱 관문(enforce)이
+       id·entityType·revision 을 갖춘 레코드로만 저장한다 — 규칙도 그것을 본다.
+     · ask — 관리자 「지금 더 모으기」 신호(데이터베이스 트리거가 받는다). */
+  library: {
+    docs: { '.read': LOGIN, '.write': false },
+    text: { '.read': LOGIN, '.write': false },
+    run:  { '.read': LOGIN, '.write': false },
+    seen: { '.read': `auth != null && ${ADMIN}`, '.write': false },
+    human:  { '.read': LOGIN, $id: { '.write': LOGIN,
+      '.validate': "newData.hasChildren(['id','entityType','revision']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'RulesDocument'" } },
+    rounds: { '.read': LOGIN, $id: { '.write': LOGIN,
+      '.validate': "newData.hasChildren(['id','entityType','revision']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'RulesRound'" } },
+    ask: { $id: { '.write': `auth != null && ${ADMIN}` } },
+  },
+
   /* ── 서고(사례집) ─ 2026-09-07 · 설계서 §3·§6 ───────────────────────────
      ⚠ 보관함과 «일부러» 갈리는 자리다. 보관함은 「내 것 + 남의 완료본」인데
        서고는 «직원 전체가 남의 사업장까지» 본다 — 사례집이 목적이라 맞다.
