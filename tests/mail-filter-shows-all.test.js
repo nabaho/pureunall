@@ -99,7 +99,7 @@ test('★★★ 메일 문으로 처음 들어오면 «전체메일»이다', ()
   vm.createContext(ctx);
   vm.runInContext(["var MAIL_WHO_TABS = ['succ','addr','end','notco'];",
     sliceFn(app, 'function mailToFromUrl('), sliceFn(app, 'function mailCoFromUrl('),
-    sliceFn(app, 'function mailWhoFromUrl('), sliceFn(app, 'function urlWantsMail('),
+    sliceFn(app, 'function mailWhoFromUrl('), sliceFn(app, 'function mailMnewFromUrl('), sliceFn(app, 'function urlWantsMail('),
     sliceFn(app, 'function restoreLastScreen(')].join('\n'), ctx);
   ctx.restoreLastScreen();
   assert.equal(held.box, '*all',
