@@ -18,9 +18,10 @@ const CB = require(path.join(__dirname, '..', 'js', 'pu-rules-casebook.js'));
    ★ 그래서 ㉠ 정규식을 `\r?\n` 으로 두고 ㉡ 못 찾으면 «까닭»을 적는다.
      읽는 자리가 둘이라 한 군데로 모았다 — 한쪽만 고치고 다른 쪽을 두는 일이 없게. */
 function 규칙집() {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'rules.html'), 'utf8');
+  // 규칙집은 2026-10-04 부터 js/pu-rules-criteria.js 한 벌이다(rules.html 은 그것을 받아 쓴다)
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-rules-criteria.js'), 'utf8');
   const m = src.match(/const RULES = (\[[\s\S]*?\]);\r?\n/);
-  assert.ok(m, 'rules.html 에서 규칙집(const RULES)을 못 찾았습니다 — 이름이 바뀌었는지 보세요'
+  assert.ok(m, 'js/pu-rules-criteria.js 에서 규칙집(const RULES)을 못 찾았습니다 — 이름이 바뀌었는지 보세요'
     + '(줄끝은 CRLF·LF 둘 다 맞춥니다).');
   return JSON.parse(m[1]);
 }

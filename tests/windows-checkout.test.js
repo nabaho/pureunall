@@ -61,9 +61,10 @@ test('★★ 「;\\n」 을 정규식에 쓰는 검사는 줄끝을 고른다', 
 });
 
 test('★ 실제로 이 컴퓨터에서 규칙집을 찾을 수 있다 — 줄끝이 무엇이든', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'rules.html'), 'utf8').replace(/\r\n/g, '\n');
+  // 규칙집은 2026-10-04 부터 js/pu-rules-criteria.js 한 벌이다(rules.html 은 그것을 받아 쓴다)
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'pu-rules-criteria.js'), 'utf8').replace(/\r\n/g, '\n');
   const m = src.match(/const RULES = (\[[\s\S]*?\]);\n/);
-  assert.ok(m, '규칙집을 못 찾았습니다 — 줄끝을 고른 뒤에도 못 찾으면 규칙집이 정말 바뀐 것입니다');
+  assert.ok(m, 'js/pu-rules-criteria.js 에서 규칙집을 못 찾았습니다 — 줄끝을 고른 뒤에도 못 찾으면 규칙집이 정말 바뀐 것입니다');
   const rules = JSON.parse(m[1]);
   assert.ok(rules.length > 50, '규칙집이 너무 짧습니다: ' + rules.length);
 });

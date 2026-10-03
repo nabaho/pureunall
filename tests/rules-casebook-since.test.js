@@ -91,7 +91,8 @@ test('규칙집이 비어도 터지지 않는다', () => {
 /* ── 진짜 규칙집으로 한 번 돌려 본다 ─────────────────────────────── */
 
 test('★★ 실제 규칙집에서 «2022년 회차 뒤로 시행된 것»이 실제로 있다 — 이 기능의 존재 이유다', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'rules.html'), 'utf8').replace(/\r\n/g, '\n');
+  // 규칙집은 2026-10-04 부터 js/pu-rules-criteria.js 한 벌이다(rules.html 은 그것을 받아 쓴다)
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-rules-criteria.js'), 'utf8').replace(/\r\n/g, '\n');
   const m = src.match(/const RULES = (\[[\s\S]*?\]);\n/);
   assert.ok(m, '규칙집을 못 찾았습니다');
   const d = CB.datedRules(JSON.parse(m[1]));
@@ -102,7 +103,7 @@ test('★★ 실제 규칙집에서 «2022년 회차 뒤로 시행된 것»이 �
 });
 
 test('★ 오래된 회차일수록 «그 뒤 시행된 것»이 많거나 같다 — 셈이 거꾸로 가면 안 된다', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'rules.html'), 'utf8').replace(/\r\n/g, '\n');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-rules-criteria.js'), 'utf8').replace(/\r\n/g, '\n');
   const d = CB.datedRules(JSON.parse(src.match(/const RULES = (\[[\s\S]*?\]);\n/)[1]));
   let 앞 = Infinity;
   ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'].forEach(y => {

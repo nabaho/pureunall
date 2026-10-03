@@ -3,16 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>취업규칙(새)</title>
+<title>취업규칙</title>
 <!-- 취업규칙 새로 짓기 ① — 「📥 모은 자료」 (설계 docs/superpowers/specs/2026-10-03-취업규칙-새로짓기-design.md)
      서버(collectRulesMail)가 매일 새벽 메일함에서 취업규칙 첨부를 골라 «개인정보를 가린 사본만» 담는다.
      이 화면은 그것을 보고, 사람이 사업장을 잇고 회차마다 ★최종본을 정한다.
-     ⚠ 옛 규정관리(rules.html)와 «나란히» 둔다 — 옛 앱의 자리는 건드리지 않는다. -->
+     ⚠ 옛 규정관리(rules.html)와 «나란히» 둔다 — 옛 앱의 자리는 건드리지 않는다.
+     2026-10-04 두 앱 합치기 — 포털 타일은 「취업규칙」(rules.html) 하나다. 이 화면은 그 앱의
+     📚 조별 문안(#topics)·📥 모은 자료(#lib) 갈래이고, 머리줄 세 갈래 단추로 들어온다. -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=43"></script>
+<script src="js/pu-ontology.js?v=45"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -21,21 +23,45 @@
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
+<script>
+/* 화면 가르기 — 주소가 #topics 면 「📚 조별 문안」, 아니면(빈 것·#lib) 「📥 모은 자료」.
+   ⚠ 이 손잡이는 pu-back.js «앞»에 단다 — 뒤로가기(popstate)를 공통 층보다 먼저 받아야
+     「이 걸음은 우리 화면 바꾸기였다」는 깃발(__puBackNav)을 세울 수 있다.
+     안 세우면 공통 층이 「열린 층 없음」으로 읽고 앱을 통째로 나간다.
+   ⚠ 깃발은 «화면이 실제로 바뀔 때만» 세운다 — 조건 없이 세우면 앱을 영영 못 나간다. */
+window.RV2_MODE = function (h) { return String(h || '') === '#topics' ? 'topics' : 'lib'; };
+window.addEventListener('popstate', function () {
+  if (window.__rv2Mode && window.RV2_MODE(location.hash) !== window.__rv2Mode) window.__puBackNav = true;
+  if (window.rv2Route) window.rv2Route();
+});
+window.addEventListener('hashchange', function () { if (window.rv2Route) window.rv2Route(); });
+</script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-kordoc-text.js?v=2"></script>
 <script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/rules-v2/lib-order.js?v=1"></script>
-<script src="js/rules-v2/store.js?v=1"></script>
+<script src="js/rules-v2/store.js?v=2"></script>
 <script src="js/rules-v2/view-library.js?v=2"></script>
+<!-- 「📚 조별 문안」 — 검토 기준은 규정관리와 «같은 한 벌»(pu-rules-criteria.js), 주제 차례는 표준취업규칙(std_2026.js) -->
+<script src="js/pu-rules-criteria.js?v=1"></script>
+<script src="std_2026.js?v=2"></script>
+<script src="js/rules-v2/lib-topics.js?v=1"></script>
+<script src="js/rules-v2/text-cache.js?v=1"></script>
+<script src="js/rules-v2/view-topics.js?v=3"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans KR",system-ui,sans-serif;background:#e2e8f0;color:#1e293b;font-size:13px}
 button{font:inherit;cursor:pointer}
 .top{display:flex;align-items:center;gap:14px;padding:10px 20px;border-bottom:1px solid #e2e8f0;background:#ffffff;position:sticky;top:0;z-index:5}
-.logo{width:30px;height:30px;border-radius:8px;background:#1e40af;color:#ffffff;display:grid;place-items:center;font-weight:800}
-.tabs{display:flex;gap:4px;margin-left:18px}
-.tab{padding:6px 14px;border-radius:9px;color:#475569;white-space:nowrap;border:0;background:none}
-.tab.on{background:#eff6ff;color:#1e40af;font-weight:700}.tab.soon{color:#64748b;cursor:default}
+.logo{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:#1e40af;color:#ffffff;display:grid;place-items:center;font-weight:800}
+/* 세 갈래 단추 — rules.html 의 .rmode 와 «같은 모양»으로 둔다(두 앱 합치기 2026-10-04).
+   좁으면 이름을 접고 그림만 — 이름은 title 에 있다. */
+.rmode{display:inline-flex;flex:0 0 auto;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#ffffff;margin-left:10px}
+.rmode a{padding:5px 12px;font-size:12.5px;color:#475569;white-space:nowrap;text-decoration:none}
+.rmode a+a{border-left:1px solid #cbd5e1}
+.rmode a.on{background:#1e40af;color:#ffffff;font-weight:700}
+.rmode a:not(.on):hover{background:#eff6ff}
+@media(max-width:1100px){.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
 .top .r{margin-left:auto;display:flex;align-items:center;gap:10px;color:#475569;font-size:12px}
 #lib{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;overflow:hidden;position:relative;min-height:300px}
 #lib .msg{padding:60px 20px;text-align:center;color:#475569}
@@ -114,18 +140,60 @@ button{font:inherit;cursor:pointer}
 .pick .co:hover{border-color:#bfdbfe;background:#eff6ff}
 .pick .pf{display:flex;justify-content:flex-end}
 .busy{position:absolute;right:16px;bottom:12px;background:#1e293b;color:#ffffff;border-radius:8px;padding:6px 12px;font-size:12px}
-@media (max-width:900px){.wrap.two{grid-template-columns:1fr}.side{position:static;max-height:none;border-left:0;border-top:1px solid #e2e8f0}.tabs{margin-left:4px}}
+/* ── 「📚 조별 문안」 (목업 2 승인본) — 칸은 한 줄, 넘치면 … 과 title ── */
+#topics{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;overflow:hidden;min-height:300px}
+#topics .msg{padding:60px 20px;text-align:center;color:#475569}
+#topics .tpx{display:grid;grid-template-columns:260px minmax(0,1fr)}
+#topics .left{border-right:1px solid #e2e8f0;background:#ffffff;position:sticky;top:52px;align-self:start;max-height:calc(100vh - 64px);overflow-y:auto;padding-bottom:12px}
+#topics .tq{display:block;width:calc(100% - 24px);margin:12px;height:34px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;background:#ffffff;color:#1e293b;font:inherit}
+#topics .ch{padding:8px 16px 4px;font-size:11.5px;color:#475569;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#topics .tp{display:flex;align-items:center;width:100%;padding:6px 16px 6px 22px;gap:6px;white-space:nowrap;border:0;background:none;color:#1e293b;text-align:left}
+#topics .tp span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+#topics .tp i{font-style:normal;margin-left:auto;color:#475569;font-size:12px}
+#topics .tp:hover{background:#f8fafc}
+#topics .tp.on{background:#eff6ff;color:#1e40af;font-weight:700;box-shadow:inset -3px 0 0 #2563eb}
+#topics .none{padding:14px 16px;color:#475569}
+#topics .main{padding:16px 22px;min-width:0}
+#topics .head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;white-space:nowrap}
+#topics .head h2{margin:0;font-size:18px;overflow:hidden;text-overflow:ellipsis}
+#topics .head small{color:#475569}
+#topics .lead{color:#475569;font-size:12.5px;margin-bottom:14px}
+#topics .fail{margin-bottom:10px;padding:6px 10px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#854d0e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#topics .card{background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:12px;overflow:hidden}
+#topics .card.top1{border-color:#bbf7d0}
+#topics .ch2{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #e2e8f0;white-space:nowrap;min-width:0}
+#topics .ch2 b{font-size:14px}
+#topics .ch2 .n{color:#475569}
+#topics .ch2 .fin{font-size:11px;padding:1px 8px;border-radius:8px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;font-weight:700}
+#topics .ch2 .diff{font-size:11px;padding:1px 8px;border-radius:8px;background:#fffbeb;color:#854d0e;border:1px solid #fde68a;font-weight:700;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#topics .ch2 .r{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+#topics .btn{height:26px;padding:0 10px;border-radius:8px;background:#ffffff;font-size:12px}
+#topics .txt{padding:10px 14px;line-height:1.85;white-space:pre-wrap;font-size:12.5px}
+#topics ins{background:#fde68a;text-decoration:none;border-radius:2px;padding:0 1px}
+#topics del{background:#fecaca;color:#991b1b;border-radius:2px;padding:0 1px}
+#topics .warn{padding:0 14px 10px;color:#991b1b;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#topics .who{border-top:1px dashed #e2e8f0;padding:6px 14px 10px;font-size:12px;color:#475569}
+#topics .who div{display:flex;gap:10px;padding:3px 0;white-space:nowrap}
+#topics .who div span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+#topics .who .w{margin-left:auto;flex-shrink:0}
+@media (max-width:900px){#topics .tpx{grid-template-columns:1fr}#topics .left{position:static;max-height:40vh;border-right:0;border-bottom:1px solid #e2e8f0}}
+@media (max-width:900px){.wrap.two{grid-template-columns:1fr}.side{position:static;max-height:none;border-left:0;border-top:1px solid #e2e8f0}}
 </style>
 </head>
 <body>
 <div class="top">
-  <div class="logo">규</div><b style="font-size:16px">취업규칙</b>
-  <div class="tabs"><span class="tab soon" title="다음 단계(덩어리 ③)에서 짓습니다">🏢 사업장 (준비 중)</span><span class="tab on">📥 모은 자료</span></div>
-  <span class="r"><span id="whoslot"></span><a class="btn sm" href="rules.html">옛 규정관리</a><span id="appslot"></span></span>
+  <div class="logo">규</div><b style="font-size:16px;white-space:nowrap">취업규칙</b>
+  <!-- 세 갈래 단추 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
+       ✏️ 검토·개정은 rules.html 로 «같은 창»에서 간다. 📚·📥 는 이 파일 안 갈래라 주소 해시만 바꾼다(아래 rv2Route).
+       ⚠ rules.html 머리줄에 «같은 단추»가 있다 — 한쪽만 고치면 오가다 단추가 바뀐다
+         (tests/rules-merge.test.js 가 두 벌을 견준다). 켜짐(on)은 rv2Route 가 주소를 따라 다시 단다. -->
+  <nav class="rmode" aria-label="취업규칙 갈래"><a href="rules.html" title="사업장 규칙 넣기 → 비교 → 고치기 → 신구대조표·신고서류">✏️<span class="rm-t"> 검토·개정</span></a><a href="rules-v2.html#topics" title="조 주제별로 «같은 글끼리» 묶은 문안">📚<span class="rm-t"> 조별 문안</span></a><a href="rules-v2.html#lib" class="on" aria-current="page" title="메일로 모은 취업규칙 자료(가린 사본)">📥<span class="rm-t"> 모은 자료</span></a></nav>
+  <span class="r"><span id="whoslot"></span><span id="appslot"></span></span>
 </div>
 <div id="lib"><div class="msg">불러오는 중…</div></div>
+<div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
-<script src="js/pu-appbar.js?v=15"></script>
+<script src="js/pu-appbar.js?v=16"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
 <script src="js/pu-authsync.js?v=2"></script>
 <script src="js/pu-whoami.js?v=2"></script>
@@ -134,7 +202,8 @@ button{font:inherit;cursor:pointer}
 <script>
 /* 「준비중」 — 포털 타일의 준비중 딱지와 «짝»이다(주소를 직접 친 사람도 막는다).
    ⚠ 역할을 모르는 동안에는 안 씌운다 — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
-try { PuGate.soonUnlessAdmin('취업규칙(새)'); } catch (_) {}
+/* 이름은 포털 타일과 같게 — 「취업규칙」 타일 하나(두 앱 합치기 2026-10-04), rules.html 도 같은 이름 */
+try { PuGate.soonUnlessAdmin('취업규칙'); } catch (_) {}
 </script>
 <script>
 var FB_CONFIG = {apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',storageBucket:'pureun-erp.firebasestorage.app',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -157,6 +226,8 @@ function busy(t, p) {
   });
 }
 function reload() {
+  // 📚 조별 문안의 모델은 이 저장 «전»의 자료다 — 낡았다고 표시해 두면 다음에 #topics 로 들어올 때 새로 셈한다
+  if (typeof topicsCtl !== 'undefined' && topicsCtl) topicsCtl.markDirty();
   return busy('읽는 중…', S.load()).then(function (d) {
     ST.data = d;
     ST.picked.forEach(function (id) { if (!d.docs[id] || d.docs[id].status === '보류') ST.picked.delete(id); });
@@ -263,9 +334,47 @@ var H = {
   }
 };
 
+/* ── 두 화면 가르기 (손잡이는 머리의 RV2_MODE·popstate 와 짝) ──
+   「📚 조별 문안」은 처음 열 때 한 번만 꽂는다 — 글을 받고 모델을 셈하는 일은 그때 한 번뿐이다. */
+var $topics = document.getElementById('topics'), topicsCtl = null, FIX_LOAD = null;
+function rv2Route() {
+  var mode = window.RV2_MODE(location.hash);
+  window.__rv2Mode = mode;
+  $lib.style.display = mode === 'topics' ? 'none' : '';
+  $topics.style.display = mode === 'topics' ? '' : 'none';
+  /* 세 갈래 단추의 켜짐 — 이 파일 안 갈래(📚·📥)만 켤 수 있다. ✏️ 는 rules.html 에서만 켜진다 */
+  document.querySelectorAll('.top .rmode a').forEach(function (a) {
+    var on = a.getAttribute('href') === 'rules-v2.html#' + mode;
+    a.classList.toggle('on', on);
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+  if (mode === 'topics' && S && topicsCtl) topicsCtl.enter();   // 📥 에서 저장한 게 있으면 새로 셈한다(없으면 그대로)
+  if (mode === 'topics' && S && !topicsCtl) {
+    topicsCtl = PuRulesV2TopicsView.mount($topics, { S: S, cache: PuRulesV2TextCache.make(window.indexedDB),
+      companies: ST.companies, stdText: (window.STD_2026 || {}).text || '', loadFix: FIX_LOAD });
+  }
+}
+window.rv2Route = rv2Route;
+/* 갈래 단추를 누르면 같은 창에서 주소만 바꾼다(pushState — 뒤로가기로 돌아온다).
+   ⚠ 주소창 글자 이동(<a href="#…"> 그대로)은 popstate 를 쏘아 공통 뒤로가기 층이 앱을 나가려 든다.
+   ⚠ ✏️ 검토·개정(rules.html)은 다른 파일이다 — 가로채지 않고 그냥 간다(같은 창, 기록 한 걸음). */
+var RV2_SELF = 'rules-v2.html#';
+document.querySelector('.top .rmode').addEventListener('click', function (ev) {
+  var a = ev.target.closest && ev.target.closest('a[href]');
+  if (!a || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) return;
+  var href = a.getAttribute('href');
+  if (href.indexOf(RV2_SELF) !== 0) return;
+  ev.preventDefault();
+  var hash = href.slice(RV2_SELF.length - 1);
+  if (window.RV2_MODE(hash) !== window.__rv2Mode) history.pushState(null, '', hash);
+  rv2Route();
+});
+rv2Route();
+
 function boot(store, o) {
   S = store; ST.isAdmin = o.isAdmin; ST.companies = o.companies;
   reload().catch(function (e) { libMsg('모은 자료를 못 읽었습니다: ' + ((e && e.message) || e)); });
+  rv2Route();
 }
 
 try {
@@ -279,6 +388,11 @@ try {
       return db.ref('data/companies').once('value').then(function (c) {
         /* ⚠ 업체는 id 로 «고른다» — 이름은 거르는 데만 쓴다 */
         var list = PuRulesV2Lib.companyList(c.val());
+        /* 사람이 고친 조문 연결(규정관리 rules.html 의 MFIX 와 같은 자리) — 조별 문안의 위반 판정에 넘긴다.
+           못 읽으면 교정 없이 판정한다(화면을 막지 않는다). */
+        FIX_LOAD = function () {
+          return db.ref('rules_mgmt/matchfix').once('value').then(function (s) { return s.val() || {}; }, function () { return {}; });
+        };
         var store = PuRulesV2Store.make({ db: db, gateway: gw, companies: function () { return list; },
           actor: function () { return role.sid || u.uid; }, now: function () { return Date.now(); } });
         boot(store, { isAdmin: role.isAdmin === true, companies: list });
@@ -291,7 +405,7 @@ try {
 </script>
 <script>/* 「지금 로그인한 사람」은 머리줄 자리에 — 안 알려 주면 부품이 떠 있는 표를 따로 띄워 겹친다 */
 try { PuWhoami.mount('#whoslot'); } catch (e) {}</script>
-<script>try { PuAppBar.mount('#appslot', { current: 'rulesv2' }); } catch (e) {}</script>
+<script>try { PuAppBar.mount('#appslot', { current: 'rules' }); } catch (e) {}</script>
 <script>try { PuBack.guard(function () { return false; }); } catch (e) {}</script>
 </body>
 </html>

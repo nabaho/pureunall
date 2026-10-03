@@ -14,8 +14,11 @@ const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'rules.html'), 'utf8');
 const bare = s => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 function rules() {
-  const at = html.indexOf('const RULES = ');
-  return JSON.parse(html.slice(at + 'const RULES = '.length, html.indexOf('\n', at)).replace(/;\s*$/, ''));
+  // 규칙집은 2026-10-04 부터 js/pu-rules-criteria.js 한 벌이다(rules.html 은 그것을 받아 쓴다)
+  const s = fs.readFileSync(path.join(root, 'js', 'pu-rules-criteria.js'), 'utf8');
+  const at = s.indexOf('const RULES = ');
+  assert.ok(at > 0, '검토 기준(js/pu-rules-criteria.js)에서 검토 규칙(RULES)을 찾지 못했습니다');
+  return JSON.parse(s.slice(at + 'const RULES = '.length, s.indexOf('\n', at)).replace(/;\s*$/, ''));
 }
 const R = rules();
 /* 실제 사건 모양 — 2026-06-09 근로기준법 개정(제54조는 부칙 단서로 6개월 뒤 시행) */

@@ -25,6 +25,30 @@
           .then(function (v) { return { docs: v[0] || {}, human: v[1] || {}, rounds: v[2] || {}, run: v[3] || null }; });
       },
       text: function (id) { return val(LIB + '/text/' + id).then(function (t) { return t == null ? '' : String(t); }); },
+      // 가린 글 여럿 받기 — docs={id:doc}. 브라우저 칸(cache)에 같은 판(v)이 있으면 받지 않는다.
+      // 한 번에 6개씩, 하나가 실패해도 나머지는 계속(실패 id 는 failed 로 알린다).
+      texts: function (docs, cache, onProgress) {
+        var ids = Object.keys(docs || {}), out = {}, failed = [], next = 0, done = 0, total = ids.length;
+        function tick() { done++; if (onProgress) { try { onProgress(done, total); } catch (e) { /* 알림 실패는 무시 */ } } }
+        function one(id) {
+          var d = docs[id] || {}, v = String(d.updatedAt || d.createdAt || '');
+          var look = cache ? cache.get(id).catch(function () { return null; }) : Promise.resolve(null);
+          return look.then(function (hit) {
+            if (hit && hit.v === v) { out[id] = hit.text; return; }
+            return S.text(id).then(function (t) {
+              out[id] = t;
+              if (cache) return cache.put(id, v, t).catch(function () { /* 칸 실패는 무시 */ });
+            });
+          }).catch(function () { failed.push(id); }).then(tick);
+        }
+        function worker() {
+          if (next >= total) return Promise.resolve();
+          return one(ids[next++]).then(worker);
+        }
+        var workers = [];
+        for (var i = 0; i < Math.min(6, total); i++) workers.push(worker());
+        return Promise.all(workers).then(function () { return { texts: out, failed: failed }; });
+      },
       linkCompany: function (ids, companyId) {
         var chk = root.PuOntology.validateCompanyLink({ companyId: companyId }, o.companies());
         if (!chk.ok) return Promise.reject(new Error(chk.message));
