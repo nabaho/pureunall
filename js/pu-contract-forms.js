@@ -470,6 +470,24 @@
     if (attId) o.attId = attId;
     return o;
   }
+  /* 바꿀 자리 만들기 «새 원본으로 저장» (설계 2026-09-29 §4) — 양식이 새 파일을 쓰게 한다.
+     ⚠ 옛 원본은 지우지 않는다: originals 목록 뒤에 남고(보관함에서 받을 수 있다), 채우기는 맨 앞 것을 쓴다
+       (hwpSources 는 첨부 → originals 순, 같은 이름은 앞 것만). 받은 양식은 고치지 않고 사본을 돌려준다. */
+  function withNewOriginal(form, nu) {
+    var f = JSON.parse(JSON.stringify(form || {}));
+    var entry = { fileId: nu.fileId, name: nu.name, size: nu.size };
+    if (nu.data && nu.attId) entry.attId = nu.attId;
+    f.attachments = (nu.data && nu.attId) ? [{ id: nu.attId, name: nu.name, size: nu.size, type: '', data: nu.data }] : [];
+    f.originals = [entry].concat((Array.isArray(f.originals) ? f.originals : []).filter(function (o) { return o && o.fileId !== nu.fileId; }));
+    return f;
+  }
+  /* 보관함 사본이 없는 한글 첨부 — 새 원본으로 바꾸기 «전에» 보관함에 먼저 올려야 옛 원본이 사라지지 않는다 */
+  function orphanInline(form) {
+    var o = (form && Array.isArray(form.originals)) ? form.originals : [];
+    return ((form && form.attachments) || []).filter(function (a) {
+      return /\.(hwp|hwpx)$/i.test(a.name || '') && (a.data || a.dataUrl) && !o.some(function (x) { return x.attId && x.attId === a.id; });
+    });
+  }
 
   function bytesOfDataUrl(dataUrl) {
     var b64 = String(dataUrl || '').split(',')[1] || '';
@@ -1666,7 +1684,7 @@
     bundleFileNames: bundleFileNames,
     zipName: zipName,
     splitVars: splitVars,
-    attKey: attKey,
+    attKey: attKey, withNewOriginal: withNewOriginal, orphanInline: orphanInline,
     loadForms: loadForms,
     linkOriginal: linkOriginal,
     ATTACH_MAX: ATTACH_MAX,

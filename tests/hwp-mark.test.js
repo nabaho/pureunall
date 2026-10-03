@@ -75,3 +75,37 @@ test('ⓒ 표시 이름 다듬기', () => {
   assert.strictEqual(M.markName('가'.repeat(31)), '');
   assert.ok(M.COMMON.indexOf('수신자') >= 0 && M.COMMON.indexOf('위임사무') >= 0);
 });
+
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+function loadForms() {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js/pu-contract-forms.js'), 'utf8');
+  const box = { console, Date, Math, JSON, Promise, Object, Array, String, Number, Error, setTimeout, clearTimeout };
+  box.window = box; vm.createContext(box); vm.runInContext(src, box);
+  return box.PuContractForms;
+}
+const plain = (v) => JSON.parse(JSON.stringify(v));
+test('ⓓ 새 원본 — 1MB 이하면 첨부를 새 것 하나로, 보관함 목록은 새 것이 맨 앞', () => {
+  const F = loadForms();
+  const fm = { id: 'fp-1', name: '제안서', attachments: [{ id: 'at-old', name: 'v7.hwp', size: 10, data: 'data:,old' }],
+    originals: [{ fileId: 'f-old', name: 'v7.hwp', size: 10, attId: 'at-old' }] };
+  const out = plain(F.withNewOriginal(fm, { fileId: 'f-new', name: 'v7.hwp', size: 12, data: 'data:,new', attId: 'at-new' }));
+  assert.deepStrictEqual(out.attachments, [{ id: 'at-new', name: 'v7.hwp', size: 12, type: '', data: 'data:,new' }]);
+  assert.deepStrictEqual(out.originals.map(o => o.fileId), ['f-new', 'f-old'], '옛 원본은 보관함 목록에 남는다');
+  assert.strictEqual(out.originals[0].attId, 'at-new');
+  assert.strictEqual(fm.attachments[0].id, 'at-old', '받은 양식을 고치지 않는다(사본)');
+});
+test('ⓓ 새 원본 — 1MB 넘으면 첨부는 비우고 보관함 것만 쓴다', () => {
+  const F = loadForms();
+  const out = plain(F.withNewOriginal({ id: 'x', attachments: [{ id: 'a', name: 'v.hwp', data: 'd' }], originals: [] },
+    { fileId: 'f2', name: 'v.hwp', size: 2e6 }));
+  assert.deepStrictEqual(out.attachments, []);
+  assert.deepStrictEqual(out.originals, [{ fileId: 'f2', name: 'v.hwp', size: 2e6 }]);
+});
+test('ⓓ 보관함 사본이 없는 옛 한글 첨부를 알아본다', () => {
+  const F = loadForms();
+  const fm = { attachments: [{ id: 'a1', name: 'a.hwp', data: 'd' }, { id: 'a2', name: 'b.hwp', data: 'd' }, { id: 'a3', name: 'c.pdf', data: 'd' }],
+    originals: [{ fileId: 'f', name: 'a.hwp', attId: 'a1' }] };
+  assert.deepStrictEqual(plain(F.orphanInline(fm)).map(a => a.id), ['a2']);
+});
