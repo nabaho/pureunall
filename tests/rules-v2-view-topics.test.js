@@ -146,7 +146,40 @@ test('⑤ 「쓴 회사」 — 회사(id 로 찾은 이름) · 조 · ★최종�
   assert.doesNotMatch(h, /다라기계/, '미확정 문서의 회사 이름을 지어내지 않는다');
   m.byTopic[K].flatMap((g) => g.members).filter((e) => !e.companyId)
     .forEach((e) => assert.equal(e.companyName, '', '미확정은 회사 이름이 비어 있어야 한다(같은 글 판정에 남의 이름을 쓰지 않게)'));
-  assert.match(h, /data-act="who"[^>]*>쓴 회사 \d+곳 ▾/);
+  // 단추는 곳(회사)과 건(펼친 줄 수)을 함께 — 곳보다 줄이 많아도 헷갈리지 않게
+  const lab = h.match(/data-act="who"[^>]*>쓴 회사 (\d+)곳 · (\d+)건 ▾/);
+  assert.ok(lab, '펼침 단추에 곳과 건이 함께');
+  assert.equal(+lab[2], (h.split('class="who"')[1].match(/<div title=/g) || []).length, '건 = 펼친 줄 수');
+});
+
+/* 따로 쓰는 작은 자료 — 한 주제만 */
+function mini(texts, human, rounds) {
+  const docs = {}; Object.keys(texts).forEach((id, i) => { docs[id] = D(id, 10 + i); });
+  return V.model({ docs, human: human || {}, rounds: rounds || {} }, texts, COS.concat([{ id: 'co7', name: '마바상사' },
+    { id: 'co8', name: '바사물산' }, { id: 'co9', name: '사아전자' }]), STD, TODAY, CR);
+}
+
+test('③ 덩어리 차례는 «곳»(회사) 수 — 한 회사의 판 여럿이 회사 여럿을 앞서지 않는다', () => {
+  const X = '제7조(휴게) {호칭}의 휴게시간은 낮 12시부터 1시간으로 한다.';
+  const Y = '제7조(휴게) {호칭}의 휴게시간은 낮 12시 30분부터 1시간으로 한다.';
+  const t = (s) => s.replace('{호칭}', '사원');
+  // X: 한 회사(co7)의 판 셋 — 3건 1곳. Y: 회사 둘 — 2건 2곳. 최종본 없음. 최근은 X 가 더 늦다
+  const m = mini({ y1: t(Y), y2: t(Y), x1: t(X), x2: t(X), x3: t(X) },
+    { x1: linked('co7'), x2: linked('co7'), x3: linked('co7'), y1: linked('co8'), y2: linked('co9') });
+  const gs = m.byTopic['휴게'];
+  assert.equal(gs.length, 2);
+  assert.match(gs[0].text, /12시 30분/, '회사 둘이 쓴 글이 회사 하나의 판 셋보다 위');
+  for (let i = 1; i < gs.length; i++) {
+    assert.ok(gs[i - 1].finals > gs[i].finals || (gs[i - 1].finals === gs[i].finals && gs[i - 1].places >= gs[i].places));
+  }
+});
+
+test('④ 위반 의심은 «이 조»의 기준만 — 맞게 쓴 출산전후휴가 조에 다른 조의 기준을 달지 않는다', () => {
+  const ok = '제40조(출산전후휴가) ① 회사는 임신 중인 여성 사원에게 출산 전과 출산 후를 통하여 90일(미숙아를 출산한 경우 100일)의'
+    + ' 출산전후휴가를 준다. 다만, 임신 중인 여성 사원이 1일 2시간의 근로시간 단축을 신청하는 경우 이를 허용한다.';
+  const m = mini({ b1: ok }, { b1: linked('co7') });
+  const h = V.topicHtml(m, '출산전후휴가', new Set());
+  assert.doesNotMatch(h, /class="warn"/, '맞게 쓴 조인데 다른 조(임신기 근로시간 단축 등)의 기준이 붙었다');
 });
 
 test('⑥ 회사 이름·조 제목은 글자로만 — 꺾쇠가 태그가 되면 안 된다', () => {
@@ -178,16 +211,18 @@ test('⑦ 모델은 한 번만 — 주제를 바꾸고 펼쳐도 다시 셈하�
       const ids = Object.keys(docs);
       assert.ok(!ids.includes('dx') && !ids.includes('dh'), '규칙 본문·담김만 받는다');
       ids.forEach((id, i) => onProgress(i + 1, ids.length));
+      seen = el.innerHTML;   // 받는 동안의 알림
       const t = {}; ids.filter((id) => id !== 'd3').forEach((id) => { t[id] = TEXTS[id]; });
       return Promise.resolve({ texts: t, failed: ['d3'] });
     },
   };
   const el = { innerHTML: '' };
+  let seen = '';
   try {
     const ctl = V.mount(el, { S, cache: null, companies: COS, stdText: STD, today: TODAY, criteria: crit,
       loadFix: () => Promise.resolve({ B5: { pin: {} } }) });
-    assert.match(el.innerHTML, /글 읽는 중/);
     await ctl.ready;
+    assert.match(seen, /글 읽는 중 \d+\/\d+/, '받는 동안 진행을 보인다');
     assert.equal(n, 1);
     assert.deepEqual(Object.keys(fixGot || {}), ['B5'], '교정 기억을 판정에 넘긴다');
     assert.match(el.innerHTML, /글을 못 읽은 문서 1건/);
@@ -196,6 +231,17 @@ test('⑦ 모델은 한 번만 — 주제를 바꾸고 펼쳐도 다시 셈하�
     assert.match(el.innerHTML, /<h2>연차유급휴가<\/h2>/);
     assert.match(el.innerHTML, /class="who"/);
   } finally { V.model = real; }
+});
+
+test('⑦ 자료를 아직 못 받았을 때는 「불러오는 중」 — 「글 읽는 중 0/0」 이 아니다', async () => {
+  let go;
+  const S = { load: () => new Promise((r) => { go = r; }), texts: () => Promise.resolve({ texts: TEXTS, failed: [] }) };
+  const el = { innerHTML: '' };
+  const ctl = V.mount(el, { S, companies: COS, stdText: STD, today: TODAY, criteria: { evaluate: CR.evaluate, useMatchFix() {} } });
+  assert.match(el.innerHTML, /불러오는 중/);
+  assert.doesNotMatch(el.innerHTML, /글 읽는 중 0\/0/);
+  go(DATA); await ctl.ready;
+  assert.ok(ctl.state.M);
 });
 
 test('⑦ 교정 기억을 못 읽어도 화면은 선다', async () => {

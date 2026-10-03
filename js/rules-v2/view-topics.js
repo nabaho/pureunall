@@ -99,7 +99,10 @@
 
     var byTopic = Object.create(null);
     topics.forEach(function (t) {
-      byTopic[t.key] = T().groupVariants(byKey[t.key]).map(function (g) { g.places = places(g.members); return g; });
+      // ★ 덩어리 차례는 «곳»(회사) 수로 — groupVariants 는 문서(조) 수로 세므로, 한 회사의 판 셋이
+      //   회사 둘을 앞서게 된다. 보이는 «N곳»과 같은 잣대로 다시 줄 세운다(★최종본 → 곳 → 최근).
+      byTopic[t.key] = T().groupVariants(byKey[t.key]).map(function (g) { g.places = places(g.members); return g; })
+        .sort(function (a, b) { return b.finals - a.finals || b.places - a.places || b.last - a.last; });
     });
     return { topics: topics, byTopic: byTopic, docs: docs, today: today || todayKst(), criteria: criteria || CR(), prepared: Object.create(null) };
   }
@@ -113,7 +116,14 @@
     var rep = g.members[0], body = String(rep.body || '');
     var art = { label: rep.label, title: rep.title, body: body, bodyNs: body.replace(/\s+/g, '') };
     try {
-      return C.evaluate([art], SIZE, new Set(), M.today).filter(function (f) { return f.status === '위반의심' && f.loc === rep.label; });
+      // ⚠ 한 조짜리 문서라 loc 는 늘 이 조다 — 그것만으로는 «다른 조의 기준»(출산전후휴가 조에 임신기 근로시간 단축)이 붙는다.
+      //   기준의 낱말(규칙집의 낱말 넓히기 그대로)이 이 조의 «제목»에 있을 때만 이 조의 기준으로 본다.
+      var tNs = String(rep.title || '').replace(/\s+/g, '');
+      return C.evaluate([art], SIZE, new Set(), M.today).filter(function (f) {
+        if (f.status !== '위반의심' || f.loc !== rep.label) return false;
+        var ks = C.expandKw ? C.expandKw(f.rule.keywords || []) : (f.rule.keywords || []);
+        return ks.some(function (k) { k = String(k || '').replace(/\s+/g, ''); return k && tNs.indexOf(k) >= 0; });
+      });
     } catch (e) { return []; }
   }
   /* 그 주제를 처음 열 때 한 번 — 아래 덩어리 견주기와 위반 판정을 모델에 담아 둔다 */
@@ -179,7 +189,7 @@
         + (diff ? '<span class="diff" title="' + esc(diff) + '">' + esc(diff) + '</span>' : '')
         + '<span class="r"><button class="btn" data-act="copy" data-k="' + esc(key) + '" data-g="' + i + '"'
         + ' title="이 문안을 복사합니다 — 회사 이름·호칭은 {회사}·{근로자} 자리표시로 들어 있으니 붙여 넣은 뒤 바꾸세요">📋 복사</button>'
-        + '<button class="btn" data-act="who" data-k="' + esc(key) + '" data-g="' + i + '">쓴 회사 ' + g.places + '곳 ' + (on ? '▾' : '▸') + '</button></span></div>'
+        + '<button class="btn" data-act="who" data-k="' + esc(key) + '" data-g="' + i + '" title="곳 = 회사 수(미확정 문서는 한 건이 한 곳) · 건 = 펼치면 보이는 조 줄 수">쓴 회사 ' + g.places + '곳 · ' + g.members.length + '건 ' + (on ? '▾' : '▸') + '</button></span></div>'
         + '<div class="txt">' + (i ? diffHtml(g.segs) : esc(lines(g.text))) + '</div>'
         + warnHtml(g)
         + (on ? whoHtml(g) : '')
@@ -201,12 +211,14 @@
      ctx: { S, cache, companies, stdText, criteria?, loadFix?:()=>Promise(fix), today? }
      돌려주는 것: { ready, select(key), search(q), toggle(key,gi), state } — 검사가 손잡이로 쓴다 */
   function mount(el, ctx) {
-    var st = { M: null, sel: '', q: '', open: new Set(), failed: [], done: 0, total: 0, err: '' };
+    var st = { M: null, sel: '', q: '', open: new Set(), failed: [], done: 0, total: 0, loaded: false, err: '' };
     var C = ctx.criteria || CR();
 
     function part(role) { return el.querySelector ? el.querySelector('[data-role="' + role + '"]') : null; }
     function msgHtml() {
       if (st.err) return '<div class="msg">' + esc(st.err) + '</div>';
+      // 자료 목록을 받기 전(또는 받을 글이 아직 없을 때)은 «몇 개 중 몇 개»가 뜻이 없다
+      if (!st.loaded || !st.total) return '<div class="msg">불러오는 중…</div>';
       return '<div class="msg">글 읽는 중 ' + st.done + '/' + st.total + '</div>';
     }
     function mainHtml() {
@@ -254,7 +266,7 @@
       O().merge(data.docs || {}, data.human || {}).forEach(function (it) {
         if (it.kind === '규칙본문' && it.status === '담김') docs[it.id] = it.doc;
       });
-      st.total = Object.keys(docs).length; drawAll();
+      st.loaded = true; st.total = Object.keys(docs).length; drawAll();
       return ctx.S.texts(docs, ctx.cache, function (n, m) { st.done = n; st.total = m; if (!st.M) drawAll(); }).then(function (r) {
         st.failed = r.failed || [];
         st.M = api.model(data, r.texts, ctx.companies, ctx.stdText, ctx.today, C);   // ★ 한 번만
