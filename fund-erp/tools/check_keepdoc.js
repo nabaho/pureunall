@@ -30,7 +30,10 @@ global.PuPhotoStore = {
   yearOf: (ms) => String(new Date(ms).getFullYear()),
   myUid: () => 'U-1',
   savePhoto: (p) => { saved = p; return Promise.resolve(true); },
+  /* 원본 파일(PDF 그대로) — 2026-10-03 「원본보관도 가능하게」 */
+  putOriginal: (key, year, blob, name) => Promise.resolve({ key, year, url: 'https://x/orig?token=1', name, size: 3 }),
 };
+global.toast = () => {};
 /* 그림 만들기는 브라우저 것이라 여기서는 결과만 흉내 낸다 —
    여기서 볼 것은 «무엇을 사진첩에 담고 무엇을 잇는가»다. */
 global._docToImage = () => Promise.resolve({ full: 'data:image/jpeg;base64,AAA', thumb: 'data:image/jpeg;base64,BBB' });
@@ -54,6 +57,8 @@ _keepDocOriginal('inka', { name: '인가증.pdf' }, 'X').then((r) => {
   ok('같은 서류 자리에', linked.kind === 'inka', linked.kind);
   ok('사진첩의 그 사진을 가리킨다', linked.ref.id === 'PH-1', linked.ref);
   ok('주인도 함께 적는다 (남의 자리 사진도 열리게)', linked.ref.owner === 'U-1', linked.ref.owner);
+  ok('원본 파일(여러 쪽 전부)도 함께 잇는다', !!(linked.ref.orig && linked.ref.orig.url), linked.ref.orig);
+  ok('사진첩 사진에도 원본을 단다(meta.doc.orig)', !!(m.doc && m.doc.orig && m.doc.orig.url), m.doc);
 
   console.log('\n■ 배선');
   /* 사진첩에서 온 파일은 이미 이어져 있다 — 두 번 넣으면 사진첩에 사본이 쌓인다 */
