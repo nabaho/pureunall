@@ -194,7 +194,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 기업정보함 → 업체관리 담당자 메일 (대표 요청 2026-08-27).
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=1"></script>
-<script src="js/pu-co-mismatch.js?v=1"></script>
+<script src="js/pu-co-mismatch.js?v=2"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
@@ -9166,11 +9166,12 @@ function CoAddrModal(props){
             }))))));
 }
 /* 🔍 업체 정보 대조 (대표 지시 2026-10-03 「근본적으로」 → 1단계, 목업 승인 「진행」)
-   ★ «읽기만» 한다 — 이 창에는 저장 단추가 하나도 없다. 고치는 곳은 「업체 열기」(업체 상세)·
-     「🔗 업체 연결」 — 이미 있는 자리로 보낸다. 두 벌의 고치는 길을 만들지 않는다.
+   ★ 저장은 «빈칸 채우기» 하나뿐이다(대표 지시 2026-10-03 「빈칸채우기 해라」) — 업체 쪽이 비었고
+     등록증엔 있는 대표자·주소·대표전화만, props.onFill(=업체관리의 coUpsertMany)로 넣는다.
+     «다른» 값은 이 창에서 고치지 않는다 — 「업체 열기」(업체 상세)·「🔗 업체 연결」로 보낸다.
    ★ 판정은 js/pu-co-mismatch.js 한 곳(검사가 그 파일을 돌린다). 짝은 사업자번호로만.
    ⚠ 색인(1.36MB)은 이 창을 «열 때» 받는다(usePucardsIdxReady) — 업체관리를 연다고 받지 않는다. */
-var CO_MIS_TIP = '업체관리 · 기업정보함 사업자등록증 · 진행 중 계약에 적힌 회사 정보가 서로 다른 곳을 모아 봅니다(읽기만)';
+var CO_MIS_TIP = '업체관리 · 기업정보함 사업자등록증 · 진행 중 계약에 적힌 회사 정보가 서로 다른 곳을 모아 봅니다(업체 쪽 빈칸은 등록증 값으로 채울 수 있습니다)';
 var CO_MIS_FIELD = { name:'상호', ceo:'대표자', addr:'주소', tel:'대표전화', contact:'담당자' };
 function coMismatchBuild(){
   var M = window.PuCoMismatch, K = window.PuCoKey, PA = window.PuAddr;
@@ -9183,7 +9184,29 @@ function CoMismatchModal(props){
   usePucardsIdxReady();
   var tabS = useState('all'); var tab = tabS[0]; var setTab = tabS[1];
   var openS = useState(''); var openId = openS[0]; var setOpenId = openS[1];
+  var tkS = useState(0); var bump = function(){ tkS[1](function(n){ return n + 1; }); };
+  var lfS = useState(null); var lastFill = lfS[0]; var setLastFill = lfS[1];
   var r = coMismatchBuild();
+  /* 빈칸 채우기 — 계산은 PuCoMismatch.fillRecs(저장 직전 목록으로 다시 본다), 저장은 props.onFill 하나 */
+  function doFill(rows){
+    var M = window.PuCoMismatch;
+    var plan = M.fillRecs(rows, dbGet('companies', []) || []);
+    if(!plan.recs.length){ showToast('채울 빈칸이 없습니다 — 그사이 다른 사람이 적었을 수 있습니다'); bump(); return; }
+    if(rows.length > 1 && !confirm('업체 ' + plan.recs.length + '곳의 빈칸 ' + plan.cells + '칸을 기업정보함 사업자등록증 값으로 채웁니다.\n\n'
+      + '이미 적힌 칸은 건드리지 않습니다. 이 창에서 바로 되돌릴 수 있습니다.')) return;
+    if(!props.onFill || !props.onFill(plan.recs)) return;
+    setLastFill(plan);
+    showToast('📥 빈칸 ' + plan.cells + '칸을 채웠습니다 (' + plan.recs.length + '곳)');
+    bump();
+  }
+  function undoFill(){
+    if(!lastFill) return;
+    var u = window.PuCoMismatch.undoRecs(lastFill.undo, dbGet('companies', []) || []);
+    if(u.recs.length && (!props.onFill || !props.onFill(u.recs))) return;
+    setLastFill(null);
+    showToast('↩ ' + u.cells + '칸을 되돌렸습니다' + (u.cells < lastFill.cells ? ' — 그사이 고친 칸은 그대로 두었습니다' : ''));
+    bump();
+  }
   var td = { padding:'6px 8px', borderBottom:'1px solid #f8fafc', fontSize:'12px', whiteSpace:'nowrap',
              overflow:'hidden', textOverflow:'ellipsis', maxWidth:0 };
   var th = { textAlign:'left', padding:'6px 8px', fontSize:'11px', color:'#64748b', borderBottom:'1px solid #e2e8f0',
@@ -9259,8 +9282,18 @@ function CoMismatchModal(props){
       if(tab === 'near') return x.near;
       return x.f[tab] === 'diff';
     });
+    var fillAll = tab === 'empty' && list.length ? window.PuCoMismatch.fillRecs(list, dbGet('companies', []) || []) : null;
     body = !list.length ? empty('✓ 해당하는 업체가 없습니다')
-      : h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
+      : h('div', null,
+      fillAll && fillAll.recs.length ? h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 14px',
+          borderBottom:'1px solid #e2e8f0', fontSize:'12px', color:'#64748b' } },
+        h('button', { type:'button', onClick:function(){ doFill(list); },
+          style:{ padding:'5px 12px', borderRadius:'5px', border:'1px solid #bbf7d0', background:'#f0fdf4', color:'#166534',
+            fontSize:'12px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
+          '📥 빈칸 모두 채우기 (' + fillAll.recs.length + '곳 ' + fillAll.cells + '칸)'),
+        h('span', { style:{ whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
+          '대표자·주소·대표전화 중 업체 쪽이 빈 칸만 등록증 값으로 넣습니다 — 적힌 칸은 안 건드립니다')) : null,
+      h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
         h('colgroup', null, h('col', { style:{ width:'28px' } }), h('col', { style:{ width:'20%' } }), h('col', { style:{ width:'20%' } }),
           h('col', null), h('col', null), h('col', { style:{ width:'150px' } })),
         h('thead', null, h('tr', null, ['', '업체', '어긋난 칸', '업체관리', '사업자등록증(기업정보함)', ''].map(function(t, i){ return h('th', { key:i, style:th }, t); }))),
@@ -9279,7 +9312,9 @@ function CoMismatchModal(props){
             h('td', { style:td, title:certOf(x.cert, first) || '' }, certOf(x.cert, first) || ''),
             h('td', { style:Object.assign({}, td, { textAlign:'right', maxWidth:'none' }), onClick:function(e){ e.stopPropagation(); } },
               h('button', { type:'button', style:bs, onClick:function(){ openCo(x.co); } }, '업체 열기'),
-              h('button', { type:'button', style:bs, onClick:function(){ openCards(x); } }, '등록증'))));
+              tab === 'empty'
+                ? h('button', { type:'button', style:Object.assign({}, bs, { color:'#166534', borderColor:'#bbf7d0' }), onClick:function(){ doFill([x]); } }, '채우기')
+                : h('button', { type:'button', style:bs, onClick:function(){ openCards(x); } }, '등록증'))));
           if(isOpen){
             acc.push(h('tr', { key:x.co.id + '-d' }, h('td', { colSpan:6, style:{ padding:'4px 8px 10px 30px', background:'#f8fafc' } },
               h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
@@ -9301,7 +9336,7 @@ function CoMismatchModal(props){
                 '이 번호의 등록증이 ' + x.certN + '장 있습니다 — 「📍 주소 대조」와 같은 한 장과 견줬습니다') : null)));
           }
           return acc;
-        }, [])));
+        }, []))));
   }
   var c = r ? r.count : null;
   return h('div', { className:'modal-bg', onClick:function(e){ if(e.target===e.currentTarget) props.onClose(); } },
@@ -9309,12 +9344,13 @@ function CoMismatchModal(props){
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, '🔍 업체 정보 대조 ',
           h('span', { style:{ marginLeft:'6px', fontSize:'11px', fontWeight:700, color:'#166534', background:'#f0fdf4',
-            border:'1px solid #bbf7d0', borderRadius:'10px', padding:'1px 8px' } }, '읽기만 · 고치지 않음'),
+            border:'1px solid #bbf7d0', borderRadius:'10px', padding:'1px 8px' } }, '다른 값은 안 고침 · 빈칸만 채움'),
           h('span', { style:{ marginLeft:'6px', fontSize:'12px', color:'#64748b', cursor:'help', fontWeight:400 },
             title:'업체관리와 기업정보함 사업자등록증을 «사업자번호»로 짝지어 상호·대표자·주소·대표전화를 견줍니다.\n'
               + '이름으로는 짝짓지 않습니다 — 번호가 없거나 틀린 업체는 「번호로 못 잇는 업체」에 따로 모읍니다.\n'
               + '주소는 「📍 주소 대조」와 같은 잣대(도로명·번호)로 봅니다. ㈜·주식회사 같은 표기 차이는 같다고 봅니다.\n'
-              + '이 창에서는 아무것도 바뀌지 않습니다. 「업체 열기」로 업체 상세에 가서 고치세요.' }, 'ⓘ')),
+              + '이 창이 저장하는 것은 「업체 쪽 빈칸」 채우기 하나뿐입니다(대표자·주소·대표전화, 적힌 칸은 안 건드림).\n'
+              + '값이 «다른» 칸은 「업체 열기」로 업체 상세에 가서 고치세요.' }, 'ⓘ')),
         h('button', { className:'x', onClick:props.onClose }, '×')),
       c && h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', padding:'8px 14px', borderBottom:'1px solid #e2e8f0', background:'#f8fafc' } },
         chip('all', '어긋난 업체', c.diff, true),
@@ -9328,7 +9364,10 @@ function CoMismatchModal(props){
         chip('ct', '계약 사본 다름', c.contract, true),
         props.linkCount > 0 && h('button', { type:'button', onClick:function(){ props.onClose(); if(props.onOpenLink) props.onOpenLink(); },
           style:{ padding:'4px 11px', borderRadius:'14px', fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap',
-            border:'1px solid #bfdbfe', background:'#eff6ff', color:'#2563eb' } }, '🔗 이름으로만 이어진 기록 ' + props.linkCount + ' →')),
+            border:'1px solid #bfdbfe', background:'#eff6ff', color:'#2563eb' } }, '🔗 이름으로만 이어진 기록 ' + props.linkCount + ' →'),
+        lastFill && h('button', { type:'button', onClick:undoFill,
+          style:{ marginLeft:'auto', padding:'4px 11px', borderRadius:'14px', fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap',
+            border:'1px solid #cbd5e1', background:'#fff', color:'#475569', fontWeight:700 } }, '↩ 방금 채운 ' + lastFill.cells + '칸 되돌리기')),
       h('div', { className:'modal-b', style:{ maxHeight:'68vh', overflowY:'auto', padding:0 } }, body),
       c && h('div', { style:{ padding:'6px 14px', fontSize:'11px', color:'#64748b', borderTop:'1px solid #e2e8f0' } },
         '등록증과 짝지어진 업체 ' + c.paired + '곳 · 등록증이 기업정보함에 없는 업체 ' + c.noCert + '곳')));
@@ -28369,6 +28408,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
       linkCount: linkCount,
       onOpenCo: function(co){ setDetailModal(co); },
       onOpenLink: function(){ setLinkOpen(true); },
+      onFill: function(recs){ return coUpsertMany(recs); },
       onClose: function(){ setMisOpen(false); }
     }),
     addrOpen && h(CoAddrModal, {
