@@ -137,7 +137,7 @@
     /* 취업규칙(새) — 옛 규정관리(rules)와 «나란히» 둔다(설계 §3-1). 옛 앱의 자리(chwieop·rules_mgmt 일부)는 건드리지 않는다.
        화면이 쓰는 칸은 사람 칸 셋뿐이다(서류 human · 회차 rounds · 요청 ask).
        ⚠ library/docs·text·seen·run 은 «서버 칸»이다 — 화면이 쓰겠다고 선언하지 말 것(규칙도 막는다). */
-    rulesv2:{ name:'취업규칙(새)', file:'rules-v2.html', portal:false, /* ⚠ 임시 — 포털 타일은 Task 10 에서 단다. 그때 이 줄을 «지운다» */ primaryRoots:['rules_mgmt/library'], sharedRoots:['data/companies','data/user_dir'],
+    rulesv2:{ name:'취업규칙(새)', file:'rules-v2.html', primaryRoots:['rules_mgmt/library'], sharedRoots:['data/companies','data/user_dir'],
       entityTypes:['RulesDocument','RulesRound','Organization','Task'],
       writeContracts:[{path:'rules_mgmt/library/human/{id}',entityType:'RulesDocument'},
                       {path:'rules_mgmt/library/rounds/{id}',entityType:'RulesRound'},
