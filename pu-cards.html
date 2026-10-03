@@ -16122,6 +16122,23 @@ function pcSideBurst(){
   _pcSideAt = now;
   return false;
 }
+/* ⚡ 명함 표도 같은 규칙 (대표 크롬 실측 2026-10-03 저녁: 옆줄을 묶은 뒤 남은 범인 —
+   처음 10초에 명함 표 5번 · listItems 8번 · coList 4번, 멈춤 858ms). 명함·이알피·폴더·탭이
+   따로따로 도착할 때마다 6천여 장 표를 통째로 다시 걸렀다. 첫 번째는 바로, 120ms 안은 끝에 한 번. */
+let _pcTableAt = 0, _pcTableT = null;
+function pcTableBurst(){
+  const now = Date.now();
+  if(_pcTableT) return true;
+  const gap = now - _pcTableAt;
+  if(gap >= 0 && gap < PC_SIDE_GAP){
+    _pcTableT = true;
+    const t = setTimeout(()=>{ _pcTableT = null; _pcTableAt = 0; renderPCTable(); }, PC_SIDE_GAP - gap);
+    if(_pcTableT) _pcTableT = t || true;
+    return true;
+  }
+  _pcTableAt = now;
+  return false;
+}
 function renderPCSide(){
   mbMemoClear();   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
   if(typeof pcSideBurst === 'function' && pcSideBurst()) return;   /* ⚡ 몰려오면 끝에 한 번 */
@@ -26283,6 +26300,7 @@ function tdOf(TD, k, it){
   return '<td class="col-' + k + '"></td>';
 }
 function renderPCTable(){
+  if(typeof pcTableBurst === 'function' && pcTableBurst()) return;   /* ⚡ 몰려오면 끝에 한 번 */
   const isCard = state.tab==='card';
   const items = listItems();
   /* ⚠중복 표시 — **정리 팝업과 같은 함수**로 판정한다.
