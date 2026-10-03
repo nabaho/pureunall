@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -12,17 +12,19 @@
 <!-- ⑤ 서고 원본 파일 — 기존 창고(pureun-erp-hrphotos)에 담는다. 설계서 §3-⑤ -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=38"></script>
+<script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-rules-history.js?v=3"></script>
+<script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/pu-rules-lawlink.js?v=1"></script>
 <script src="js/pu-rules-lawwatch.js?v=1"></script>
 <script src="js/pu-hwp-keep.js?v=1"></script>
+<script src="js/pu-kordoc-text.js?v=2"></script>
 <script src="js/pu-rules-casebook.js?v=13"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pako.min.js"></script>
@@ -304,6 +306,33 @@ select,input[type=date]{font-family:inherit;font-size:13px;height:36px;padding:0
 .lw-btn{height:26px;padding:0 10px;border-radius:7px;border:1px solid #1e40af;background:#1e40af;color:#f8fafc;font-size:12px;cursor:pointer;white-space:nowrap}
 .lw-empty{padding:18px 12px;color:var(--sub);font-size:12.5px;line-height:1.7}
 .lw-note{margin-top:10px;color:var(--sub);font-size:11.5px;line-height:1.7}
+/* ── 두 파일 견주기 (2026-09-30 목업 ③ 신구대조) ── */
+.fc-modal{max-width:1200px}
+.fc-files{display:grid;grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr);align-items:center;margin-bottom:12px}
+.fc-f{border:1px dashed #94a3b8;border-radius:12px;padding:10px 14px;background:#f8fafc;min-width:0;cursor:pointer}
+.fc-f.on{border-style:solid;border-color:#bfdbfe;background:#eff6ff}
+.fc-f .k{font-size:11px;color:#475569}
+.fc-f b{display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-f small{color:#475569}
+.fc-arr{text-align:center;color:#94a3b8;font-size:18px}
+.fc-sum{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.fc-s{padding:6px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;min-width:96px;cursor:pointer}
+.fc-s .n{font-size:18px;font-weight:800}.fc-s .l{font-size:12px;color:#475569}
+.fc-s.a{border-color:#bfdbfe;background:#eff6ff}.fc-s.a .n{color:#1e40af}
+.fc-s.i{border-color:#bbf7d0;background:#f0fdf4}.fc-s.i .n{color:#166534}
+.fc-s.d{border-color:#fecaca;background:#fef2f2}.fc-s.d .n{color:#991b1b}
+.fc-s.w{border-color:#fde68a;background:#fffbeb}.fc-s.w .n{color:#854d0e}
+.fc-s.on{outline:2px solid #2563eb}
+.fc-warn{margin-bottom:8px;padding:6px 12px;border-radius:9px;background:#fffbeb;border:1px solid #fde68a;color:#854d0e;font-size:12.5px}
+.fc-tbl td{vertical-align:top;line-height:1.7;font-size:12.5px;white-space:pre-wrap;word-break:break-word}
+.fc-tbl td.k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-kind{font-size:11px;padding:1px 7px;border-radius:7px;font-weight:700;margin-right:4px}
+.fc-kind.a{background:#eff6ff;color:#1e40af}.fc-kind.i{background:#f0fdf4;color:#166534}.fc-kind.d{background:#fef2f2;color:#991b1b}.fc-kind.w{background:#fffbeb;color:#854d0e}.fc-kind.s{background:#f8fafc;color:#475569}
+.fc-tbl del{background:#fef2f2;color:#991b1b}
+.fc-tbl ins{background:#f0fdf4;color:#166534;text-decoration:none;border-bottom:2px solid #4ade80}
+.fc-none{color:#94a3b8}
+.fc-flag{margin-top:4px;font-size:11.5px;color:#854d0e;white-space:normal}
+.fc-flag.old{color:#475569}
 /* ── 원본 살려 고치기 창 (목업 ③) ── */
 .kp-modal{max-width:1180px}
 .kp-steps{display:flex;gap:0;padding:8px 22px;border-bottom:1px solid var(--line);background:#f8fafc;flex-wrap:wrap}
@@ -776,7 +805,7 @@ table.daejo td.dj2{padding:0}
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=1"></script>
+  <script src="js/pu-whoami.js?v=2"></script>
 <script>
 /* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
    포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
@@ -828,6 +857,7 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
       <button class="hbtn" id="open-arch">📁 보관함 <span id="arch-cnt"></span></button>
       <button class="hbtn" id="open-arts" title="보관된 모든 사업장 취업규칙을 조문 단위로 찾아 나란히 비교합니다">🔎 조문 검색</button>
       <button class="hbtn" id="open-cb" title="10년치 취업규칙을 사업장·회차별로 담아 두는 서고 — 직원 전체가 봅니다">🗄 서고</button>
+      <button class="hbtn" id="open-fc" title="옛 규칙 파일과 새 규칙 파일을 조 단위로 견줍니다 — 두 파일 모두 브라우저 안에서만 읽습니다">📑 두 파일 견주기</button>
       <button class="hbtn" id="open-help" title="저장·권한·HWP 처리·미리보기에 대한 안내">ⓘ 이 화면 안내</button>
     </div>
 
@@ -1265,6 +1295,8 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
       보관함은 「내 담당 + 남의 완료본」만 보이지만, 서고는 <b>사례집</b>이라 다른 담당자의 사업장 규정까지 모든 직원이 열어 봅니다.
       <br><span style="font-size:11.5px">공개해도 되는 자료인지 보고 올리십시오. 잘못 올린 회차는 목록에서 지울 수 있습니다.</span>
     </div>
+    <!-- 개인정보 가림 — 파일을 읽은 뒤에만 뜬다(목업 ② 2026-09-30) -->
+    <div id="cb-pii" style="display:none;margin-bottom:10px;padding:11px 14px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe"></div>
     <div id="cb-drop" style="border:2px dashed #cbd5e1;border-radius:12px;padding:22px 14px;text-align:center;background:#f8fafc;margin-bottom:10px">
       <div style="font-size:14px;font-weight:700;color:var(--sub)">📁 폴더를 이 자리에 떨어뜨리세요</div>
       <div class="muted" style="font-size:11.5px;margin-top:4px">10년치를 한꺼번에 넣어도 됩니다 — 끊기면 같은 폴더를 다시 떨어뜨리면 이어서 올라갑니다.</div>
@@ -1294,14 +1326,14 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
         <button class="stbtn" id="cb-apply">한 번에 적용</button>
         <span class="muted" style="font-size:11px">수백 건을 한 줄씩 고칠 수는 없습니다.</span>
       </div>
-      <table class="arch"><thead><tr><th>파일</th><th style="width:150px">사업장</th><th style="width:74px">연도</th><th style="width:112px">종류</th><th style="width:96px">못 가린 것</th></tr></thead>
+      <table class="arch"><thead><tr><th>파일</th><th style="width:150px">사업장</th><th style="width:74px">연도</th><th style="width:112px">종류</th><th style="width:96px">못 가린 것</th><th style="width:120px">개인정보</th></tr></thead>
       <tbody id="cb-need-body"></tbody></table>
     </div>
 
     <div id="cb-ok-wrap" style="display:none;margin-bottom:10px">
       <button class="stbtn" id="cb-ok-toggle">✓ 가려진 <span id="cb-ok-cnt"></span> — 펼치기</button>
       <div id="cb-ok-box" style="display:none;margin-top:8px;max-height:38vh;overflow:auto">
-        <table class="arch"><thead><tr><th>파일</th><th style="width:150px">사업장</th><th style="width:74px">연도</th><th style="width:112px">종류</th><th style="width:96px">가린 근거</th></tr></thead>
+        <table class="arch"><thead><tr><th>파일</th><th style="width:150px">사업장</th><th style="width:74px">연도</th><th style="width:112px">종류</th><th style="width:96px">가린 근거</th><th style="width:120px">개인정보</th></tr></thead>
         <tbody id="cb-ok-body"></tbody></table>
       </div>
     </div>
@@ -1442,6 +1474,33 @@ try { PuGate.soonUnlessAdmin('취업규칙 관리'); } catch(_){}
       「개정안 만들기」는 새 회차를 여는 데까지만 합니다 — 저장·확정은 노무사가 합니다.</div>
   </div>
   <div class="foot"><button class="btn ghost" data-close>닫기</button></div>
+</div></div>
+
+<!-- 두 파일 견주기 — 옛 규칙 파일 ↔ 새 규칙 파일을 조 단위로 (2026-09-30 목업 ③).
+     ⚠ 두 파일 모두 브라우저 안에서만 읽는다. 올리지도 보관하지도 않는다 —
+       「새 회차 만들기」를 누를 때만 옛 파일이 보통 올리기와 같은 길로 규정관리에 들어간다. -->
+<div class="overlay" id="ov-fc"><div class="modal fc-modal">
+  <h2>📑 두 파일 견주기 <span class="tag" style="font-size:12px;color:var(--mute);font-weight:400">조 번호·제목으로 짝을 지어 봅니다</span><span class="x" data-close>×</span></h2>
+  <div class="body">
+    <div class="fc-files">
+      <div class="fc-f" id="fc-old" data-fcpick="old"></div>
+      <div class="fc-arr">→</div>
+      <div class="fc-f" id="fc-now" data-fcpick="now"></div>
+    </div>
+    <input type="file" id="fc-in-old" accept=".hwp,.hwpx,.docx,.odt,.rtf,.pdf,.txt" style="display:none">
+    <input type="file" id="fc-in-now" accept=".hwp,.hwpx,.docx,.odt,.rtf,.pdf,.txt" style="display:none">
+    <div class="fc-sum" id="fc-sum"></div>
+    <div id="fc-warn"></div>
+    <div style="max-height:52vh;overflow:auto">
+      <table class="arch fc-tbl" style="table-layout:fixed"><thead><tr>
+        <th style="width:170px">조</th><th>옛 글</th><th>새 글</th></tr></thead>
+        <tbody id="fc-body"></tbody></table>
+    </div>
+  </div>
+  <div class="foot"><span class="muted" id="fc-note" style="font-size:11.5px;margin-right:auto">새 조는 앞 조 뒤에 끼운 것으로 봅니다</span>
+    <button class="btn ghost" id="fc-hwp" disabled>신구대조표 한글로 받기</button>
+    <button class="btn" id="fc-rev" disabled>이 차이로 새 회차 만들기 →</button>
+    <button class="btn ghost" data-close>닫기</button></div>
 </div></div>
 
 <!-- 조문 검색 — 보관된 모든 사업장 취업규칙을 조문 단위로 찾아 나란히 비교 -->
@@ -2257,9 +2316,24 @@ function stripCommentary(text){
 }
 let CMT_CUT=0;   // 마지막으로 읽은 원본에서 뗀 해설 칸 수
 const CMT_BY={};  // 원본(key)마다 뗀 해설 칸 수 — 미리보기 머리에 알린다(말없이 떼지 않는다)
-const cmtTag=key=>CMT_BY[key]?" · 해설 칸(작성시 착안사항) "+CMT_BY[key]+"곳 떼고 읽음":"";
-/* 규정관리가 원본을 글로 읽는 길은 모두 여기를 지난다 — 해설판이면 해설 칸을 뗀다 */
-async function readRulesText(buf){ const r=stripCommentary(await extractDocText(buf)); CMT_CUT=r.cut; return r.text; }
+const cmtTag=key=>(READ_VIA[key]==="kordoc"?" · kordoc 로 읽음":"")
+  +(CMT_BY[key]?" · 해설 칸(작성시 착안사항) "+CMT_BY[key]+"곳 떼고 읽음":"");
+const READ_VIA={};  // 원본(key)마다 어느 읽개로 읽었나 — 'kordoc' | '기존'
+let READ_LAST="";
+/* 규정관리가 원본을 글로 읽는 길은 모두 여기를 지난다 (2026-09-30 kordoc)
+   ① 한글·워드는 kordoc 가 먼저 읽는다 — 표를 칸 그대로 받아, 해설판이면 조문 칸만 쓴다.
+   ② kordoc 가 못 읽으면(PDF·RTF·ODT·엔진 실패) 예전 읽개(extractDocText)로 돌아간다.
+   ③ 어느 쪽이든 끝에 stripCommentary 를 한 번 더 지난다 — kordoc 가 표로 못 잡은 해설 줄의 그물. */
+async function readRulesText(buf){
+  let text=null, cut=0;
+  if(window.PuKordocText&&PuKordocText.canRead(buf)){
+    try{ const k=await PuKordocText.read(buf); if(k){ text=k.text; cut=k.commentaryCells; } }
+    catch(e){ console.warn("kordoc 읽기 실패 — 예전 읽개로:",e); }
+  }
+  READ_LAST=text==null?"기존":"kordoc";
+  if(text==null) text=await extractDocText(buf);
+  const r=stripCommentary(text); CMT_CUT=cut+r.cut; return r.text;
+}
 /* ── 취업규칙 본문에서 사업장(회사)명 자동 인식 ──
    ① "이/본 규칙은 ○○○(이하 "회사"라 한다)"  ② 표제 "○○○ 취업규칙"  ③ 법인 접미사 토큰 */
 const CORP_SUFFIX="(?:주식회사|㈜|\\(주\\)|유한회사|유한책임회사|합자회사|합명회사|재단법인|사단법인|의료법인|학교법인|사회복지법인|영농조합법인|협동조합|사회적협동조합)";
@@ -2388,7 +2462,7 @@ async function loadFile(file){
       LJ_LEFT=셈.물음;
     }catch(e){ console.warn("줄 정리 건너뜀:",e); }
     const site=detectSiteName(text);   // 본문에서 사업장명 인식
-    SAMPLES[key]=text; CMT_BY[key]=CMT_CUT; SITE_MAP[key]=(site?"🏢 "+site:"📄 "+name); SITE_BIZNO[key]="";
+    SAMPLES[key]=text; CMT_BY[key]=CMT_CUT; READ_VIA[key]=READ_LAST; SITE_MAP[key]=(site?"🏢 "+site:"📄 "+name); SITE_BIZNO[key]="";
     SITE_FILE[key]=name; SITE_NAME[key]=site;
     if(pdf){ PDF_URLS[key]=URL.createObjectURL(new Blob([buf],{type:"application/pdf"})); }
     else if(buf) HWP_BUFS[key]=buf;
@@ -6021,7 +6095,11 @@ function cbRowHtml(r,i,editable){
   return `<tr><td title="${escapeH(r.path||r.name)}" style="font-size:11.5px">${escapeH(cbShort(r.path||r.name))}</td>`
     +`<td>${inp("site",r.site,"100%")}</td><td>${inp("year",r.year,"100%")}</td>`
     +`<td>${editable?cbRoleSel(r.role,i):escapeH(CB_ROLE_KO[r.role]||"—")}</td>`
-    +`<td style="font-size:11px;color:${r.need?"#854d0e":"var(--mute)"}">${escapeH(r.need?(r.why||[]).join("·"):(r.how||"—"))}</td></tr>`;
+    +`<td style="font-size:11px;color:${r.need?"#854d0e":"var(--mute)"}">${escapeH(r.need?(r.why||[]).join("·"):(r.how||"—"))}</td>`
+    +`<td>${cbPiiTag(r,i)}</td></tr>`
+    +(CB_PII.open[i]&&r.pii&&r.pii.total?`<tr><td colspan="6" style="background:#fffbeb;color:#854d0e;font-size:11.5px;line-height:1.8">찾은 곳 — ${
+      r.pii.samples.map(s=>`<code style="background:#f8fafc;border:1px solid #fde68a;border-radius:5px;padding:0 5px;color:#1e293b">${escapeH(s.masked)}</code>`).join(" ")}${
+      r.pii.total>r.pii.samples.length?` 외 ${r.pii.total-r.pii.samples.length}곳`:""} · 가린 뒤 다시 읽음 → 남은 것 <b>${r.pii.residual}건</b></td></tr>`:"");
 }
 /* 한 줄을 고치면 그 줄만 다시 판정한다 — 다른 줄의 사람 손질을 덮지 않게 */
 function cbRecheck(r){
@@ -6029,7 +6107,74 @@ function cbRecheck(r){
   if(!r.site)why.push("사업장");
   if(!r.year)why.push("연도");
   if(!r.role)why.push("서류종류");
+  /* 개인정보를 가렸는데 남았거나, 살피다 실패했으면 올리지 않는다 — «0건일 때만 올린다» */
+  if(CB_PII.on&&r.pii&&(r.pii.error||r.pii.residual>0))why.push("개인정보 남음");
   r.why=why; r.need=why.length>0;
+}
+/* ══════ 서고 개인정보 가림 (2026-09-30 · 목업 ② 승인 「추천대로」) ══════
+   서고는 직원 전체가 본다. 올리기 전에 kordoc 가 «브라우저 안에서» 주민·계좌·전화 등을 찾아 가린다.
+   · 한글(.hwp·.hwpx): 파일째 서식 그대로 가리고, 가린 파일을 다시 읽어 남은 것이 0건일 때만 올린다
+   · PDF·워드 등: 파일째 가리는 기능이 없다 — 글만 가리고 원본 파일은 담지 않는다(대표 결정)
+   · 원래 번호는 화면에도 기록에도 안 남긴다(보고에는 가린 모양만 온다)
+   ⚠ 서고가 비어 있어(2026-09-30 실측 0건) 「이미 있는 것 훑어 가리기」 는 만들지 않았다 — 앞으로 올리는 것이 모두 여기를 지난다. */
+const CB_PII={on:true,groups:null,busy:false,open:{}};
+function cbPiiGroups(){ if(!CB_PII.groups) CB_PII.groups=PuKordocText.PII_GROUPS.filter(g=>g.on).map(g=>g.key); return CB_PII.groups; }
+function cbPiiTag(r,i){
+  if(!CB_PII.on) return `<span class="muted" style="font-size:11px">가림 끔</span>`;
+  const p=r.pii;
+  if(!p) return `<span class="muted" style="font-size:11px">살피는 중…</span>`;
+  if(p.error) return `<span class="badge" style="background:#fef2f2;color:#991b1b" title="${escapeH(p.error)}">못 살핌</span>`;
+  if(!p.total) return `<span class="badge" style="background:#f0fdf4;color:#166534">없음</span>`;
+  const how=p.fileOk?(p.residual?"남은 것 "+p.residual+"건":"파일째 가림"):"글만 가림 · 원본 안 담음";
+  return `<span class="badge" data-pii="${i}" style="background:#fef2f2;color:#991b1b;cursor:pointer" title="${escapeH(how)} — 눌러서 찾은 곳 보기">${escapeH(PuKordocText.countLabel(p.count))}</span>`;
+}
+function cbPiiRender(){
+  const box=$("cb-pii"); if(!box) return;
+  if(!CB_ROWS.length||!window.PuKordocText){ box.style.display="none"; return; }
+  box.style.display="block";
+  const hit=CB_ROWS.filter(r=>r.pii&&r.pii.total), n=hit.reduce((a,r)=>a+r.pii.total,0);
+  const on=cbPiiGroups();
+  box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <b style="font-size:13px;color:#1e40af">🕶 ${CB_PII.busy?"개인정보를 살피는 중…":(n?`개인정보를 찾았습니다 — 파일 ${hit.length}개에서 ${n}곳`:"개인정보를 찾지 못했습니다")}</b>
+      <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-weight:700;color:#1e40af;cursor:pointer">
+        <input type="checkbox" id="cb-pii-on" ${CB_PII.on?"checked":""}> 가리고 올리기</label></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${PuKordocText.PII_GROUPS.map(g=>
+      `<span class="stbtn${on.indexOf(g.key)>=0?" on-adopt":""}" data-pii-g="${g.key}" style="font-size:11.5px;padding:2px 10px;cursor:pointer">${escapeH(g.label)}${g.why&&on.indexOf(g.key)<0?` <span class="muted">— ${escapeH(g.why)}</span>`:""}</span>`).join("")}</div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.7">원본 한글 파일(.hwp·.hwpx)도 <b>서식 그대로</b> 가려서 담습니다 — 본문 글·검색 색인·원본 파일 셋 다.
+      PDF·워드는 파일째 가리는 기능이 없어 <b>글만 가리고 원본 파일은 담지 않습니다.</b> 원래 번호는 화면에도 기록에도 남기지 않습니다.</div>`;
+  $("cb-pii-on").onchange=e=>{ CB_PII.on=e.target.checked; CB_ROWS.forEach(cbRecheck); cbRender(); };
+  box.querySelectorAll("[data-pii-g]").forEach(el=>el.onclick=()=>{
+    if(CB_PII.busy) return;
+    const k=el.dataset.piiG, g=cbPiiGroups(), at=g.indexOf(k);
+    if(at>=0) g.splice(at,1); else g.push(k);
+    cbPiiScan(CB_ROWS);                                   // 규칙이 바뀌면 다시 가린다
+  });
+}
+/* 줄마다 가려 본다 — 파일 손잡이(r.f)로 바이트를 다시 읽는다. 원본(r.f·r.text)은 그대로 두고 r.pii 에만 적는다 */
+async function cbPiiScan(rows){
+  if(!window.PuKordocText) return;
+  CB_PII.busy=true; rows.forEach(r=>{ delete r.pii; }); cbRender();
+  const prog=$("cb-prog"); prog.style.display="block";
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    prog.innerHTML=`개인정보 살피는 중 <b>${i+1}</b> / ${rows.length} — ${escapeH(r.name||"")}`;
+    try{
+      const buf=r.f?await r.f.arrayBuffer():new ArrayBuffer(0);
+      r.pii=await PuKordocText.redactFile(buf,r.text||"",cbPiiGroups());
+    }catch(e){ console.warn("개인정보 살피기 실패:",r.name,e); r.pii={error:String(e&&e.message||e).slice(0,120),total:0}; }
+    if(i%3===2)await new Promise(res=>setTimeout(res,0));
+  }
+  prog.style.display="none";
+  CB_PII.busy=false; CB_PII.open={};
+  rows.forEach(cbRecheck); cbRender();
+}
+/* 올릴 때 — 가린 글·가린 파일로 바꾼 사본을 올린다(목록의 원본 줄은 건드리지 않는다) */
+function cbPiiRow(r){
+  if(!CB_PII.on||!r.pii||!r.pii.total) return r;
+  const x=Object.assign({},r,{text:r.pii.text,head:String(r.pii.text||"").slice(0,4000)});
+  x.f=r.pii.data?new File([r.pii.data],r.name,{type:(r.f&&r.f.type)||""}):null;   // 한글이 아니면 원본을 안 담는다
+  x.piiHeld=!r.pii.data;
+  return x;
 }
 function cbRender(){
   const sp=CB.splitReady(CB_ROWS);
@@ -6046,7 +6191,10 @@ function cbRender(){
     ?folds.map(f=>`<option value="${escapeH(f)}">${escapeH(f)} (${CB_ROWS.filter(r=>r.folder===f).length}건)</option>`).join("")
     :`<option value="">— 폴더 없음 —</option>`;
   $("cb-erp-list").innerHTML=ERP_COS.slice(0,900).map(c=>`<option value="${escapeH(c.name||"")}">`).join("");
-  $("cb-go").disabled=!sp.ready.length;
+  $("cb-go").disabled=!sp.ready.length||CB_PII.busy;   // 개인정보를 살피는 동안은 못 올린다
+  cbPiiRender();
+  $("cb-need-body").querySelectorAll("[data-pii]").forEach(el=>el.onclick=()=>{ CB_PII.open[el.dataset.pii]=!CB_PII.open[el.dataset.pii]; cbRender(); });
+  $("cb-ok-body").querySelectorAll("[data-pii]").forEach(el=>el.onclick=()=>{ CB_PII.open[el.dataset.pii]=!CB_PII.open[el.dataset.pii]; cbRender(); });
   $("cb-go").textContent=sp.ready.length?`서고에 올리기 (${sp.ready.length}건)`:"서고에 올리기";
   $("cb-foot").textContent=CB_ROWS.length
     ?`${CB_ROWS.length}건 읽음 — ${sp.ready.length}건 올릴 수 있고 ${sp.need.length}건은 확인이 필요합니다.`:"";
@@ -6192,6 +6340,7 @@ async function cbRead(files){
   prog.style.display="none";
   CB_FAIL=[]; $("cb-fail-wrap").style.display="none";
   cbRender();
+  await cbPiiScan(rows);   // 올리기 전에 개인정보를 가려 본다 — 끝날 때까지 올리기 단추는 잠긴다
 }
 
 /* ── 올리기 ────────────────────────────────────────────────────────
@@ -6409,6 +6558,10 @@ async function cbOcrSee(revId,role){
 }
 async function cbUpload(rows){
   if(!FBDB||!FBUSER){ alert("로그인 후 이용하세요."); return; }
+  if(CB_PII.busy){ alert("개인정보를 살피는 중입니다 — 끝난 뒤 올리세요."); return; }
+  /* 개인정보 — 가린 글·가린 파일로 바꾼 사본을 올린다. 한글이 아닌 파일은 원본을 안 담는다 */
+  rows=rows.map(cbPiiRow);
+  const 가림=rows.filter(r=>r.pii&&r.pii.total&&CB_PII.on).length, 원본뺌=rows.filter(r=>r.piiHeld).length;
   const prog=$("cb-prog"); prog.style.display="block";
   prog.innerHTML="서고에 이미 있는 것을 살펴보는 중…";
 
@@ -6509,6 +6662,7 @@ async function cbUpload(rows){
        「내가 올린 것이 은행에 들어갔나」를 확인할 길이 없다. */
     +(은행?`\n문안 은행에 조문 ${은행}개 적립 (개정본만)`:"")
     +(원본?`\n원본 파일 ${원본}건 창고에 담음`:"")
+    +(가림?`\n개인정보 가림 ${가림}건`+(원본뺌?` (그 가운데 한글이 아닌 ${원본뺌}건은 글만 가리고 원본 파일은 안 담음)`:""):"")
     /* ⚠ 못 담았으면 «몇 건인지·왜인지» 말한다 — 조용히 빠지면 나중에 원본을 찾다가 없다 */
     +(원본실패?`\n원본 ${원본실패}건은 못 담았습니다\n${CB_ORIG_WHY}`:"")
     +(fails.length?"\n\n「실패한 것만 다시 시도」로 이어서 올릴 수 있습니다.":""));
@@ -7596,6 +7750,150 @@ document.addEventListener("click",e=>{
 $("open-arch").addEventListener("click",()=>{renderArch("");$("ov-arch").classList.add("on");});
 $("arch-q").addEventListener("input",e=>renderArch(e.target.value));
 
+/* ══════ 📑 두 파일 견주기 (2026-09-30 목업 ③ — 대표 승인 「추천대로」) ══════
+   옛 파일(지금 신고된 것) ↔ 새 파일(회사가 고쳐 온 것)을 조 단위로 견준다.
+   짝짓기·낱말 차이·새 회차 계획은 PuRulesFileCmp 가 한다 — 여기는 읽고 그리고 잇기만.
+   ★ 바뀐 조·새 조에만 검토 기준을 돌려 «위반 의심»을 곁에 단다. 옛 글에도 있던 것은 흐리게.
+   ★ 「이 차이로 새 회차 만들기」 — 옛 파일을 «보통 올리기와 같은 길»(loadFile)로 원본 삼아 검토를 돌리고,
+     새 글을 개정안으로 건다. 그러면 신구대조표·신고서·「원본 모양 그대로」까지 그대로 이어진다.
+   ⚠ 파일은 브라우저 안에서만 읽는다(readRulesText). 견주기만 할 때는 어디에도 올리지 않는다. */
+const FC={old:null,now:null,rows:[],counts:null,flags:null,filt:"달라진"};
+const FC_KIND_CLS={"바뀜":"a","새 조":"i","없어짐":"d","번호 바뀜":"w","같음":"s"};
+async function fcRead(f){
+  const ext=f.name.toLowerCase().split(".").pop(), raw=await f.arrayBuffer();
+  let text, via="글";
+  if(ext==="txt"){ try{ text=new TextDecoder("utf-8",{fatal:true}).decode(raw); }catch(_){ text=new TextDecoder("euc-kr").decode(raw); } }
+  else{ text=await readRulesText(raw.slice(0)); via=READ_LAST; }
+  /* 올리기(loadFile)와 같게 낱말 한가운데서 끊긴 줄을 잇는다 — 안 그러면 새 회차의 조와 어긋난다 */
+  try{ const 줄표=lineJoinMarks(text,ljStd()), 셈=lineJoinCount(줄표); if(셈.붙임||셈.띄움)text=lineJoinApply(text,줄표); }catch(e){}
+  const arts=parseArticles(text);
+  if(!arts.length)throw new Error("조(제1조…)를 찾지 못했습니다.");
+  return {file:f,name:f.name,arts,via};
+}
+function fcBox(side){
+  const d=FC[side], el=$("fc-"+side);
+  el.className="fc-f"+(d?" on":"");
+  el.innerHTML=`<div class="k">${side==="old"?"옛 파일 (지금 신고된 것)":"새 파일 (회사가 고쳐 온 것)"}</div>`
+    +(d?`<b>📄 ${escapeH(d.name)}</b><small>조 ${d.arts.length}개 · ${d.via==="kordoc"?"kordoc 로 읽음":"읽음"} · 눌러서 바꾸기</small>`
+       :`<b>📄 눌러서 파일 고르기</b><small>HWP · HWPX · DOCX · PDF · TXT</small>`);
+}
+function fcRun(){
+  fcBox("old"); fcBox("now");
+  if(!FC.old||!FC.now){
+    FC.rows=[]; FC.counts=null; FC.flags=null;
+    $("fc-sum").innerHTML=""; $("fc-warn").innerHTML="";
+    $("fc-body").innerHTML='<tr><td colspan="3" class="empty">두 파일을 고르면 조 단위로 견줍니다.</td></tr>';
+    fcBtns(); return;
+  }
+  const c=PuRulesFileCmp.compare(FC.old.arts,FC.now.arts);
+  FC.rows=c.rows; FC.counts=c.counts;
+  /* 검토 기준은 지금 화면의 규모·조건·기준일 그대로 — 본 검토와 같은 잣대 */
+  const size=$("size").value, asof=$("asof").value;
+  const conds=new Set([...document.querySelectorAll(".conds input:checked")].map(x=>x.value));
+  FC.flags=PuRulesFileCmp.flag(FC.rows,evaluate(FC.old.arts,size,conds,asof),evaluate(FC.now.arts,size,conds,asof));
+  fcRender();
+}
+function fcSeg(segs,keep){
+  return segs.filter(g=>g.t==="="||g.t===keep).map(g=>g.t==="="?escapeH(g.s):
+    (keep==="-"?"<del>"+escapeH(g.s)+"</del>":"<ins>"+escapeH(g.s)+"</ins>")).join("");
+}
+function fcRowHtml(r){
+  const t=r.now||r.old, B=PuRulesFileCmp.bodyOf;
+  const lab=(r.old&&r.now&&r.old.label!==r.now.label?r.old.label+" → "+r.now.label:t.label)+(t.title?"("+t.title+")":"");
+  let o, n;
+  if(r.kind==="바뀜"){ const segs=PuRulesFileCmp.wordDiff(B(r.old),B(r.now)); o=fcSeg(segs,"-"); n=fcSeg(segs,"+"); }
+  else{ o=r.old?escapeH(B(r.old)):'<span class="fc-none">(없음)</span>'; n=r.now?escapeH(B(r.now)):'<span class="fc-none">(없음)</span>'; }
+  if(r.kind==="번호 바뀜")n+='<div class="fc-flag old">글은 같고 번호만 바뀜</div>';
+  (r.flags||[]).forEach(g=>{ n+=`<div class="fc-flag${g.was?" old":""}">⚠ 검토 ${escapeH(g.id)} ${escapeH(g.name)} — ${escapeH(g.law)} 위반 의심${g.was?" · 옛 글에도 있던 것":""}</div>`; });
+  return `<tr><td class="k" title="${escapeH(r.kind+" "+lab)}"><span class="fc-kind ${FC_KIND_CLS[r.kind]}">${r.kind}</span><b>${escapeH(lab)}</b></td><td>${o}</td><td>${n}</td></tr>`;
+}
+function fcRender(){
+  const c=FC.counts, n=FC.rows.length, diff=n-c["같음"]-c["번호 바뀜"];   /* 번호만 밀린 조는 따로 — 한 조만 빠져도 뒤가 다 밀려 «글이 바뀐 것»을 덮는다 */
+  const S=[["바뀜","a","바뀐 조"],["새 조","i","새 조"],["없어짐","d","없어진 조"],["번호 바뀜","w","번호가 바뀐 조"],["같음","","같음"],["달라진","","글이 달라진 것"],["","","모두"]];
+  $("fc-sum").innerHTML=S.map(([k,cls,l])=>{
+    const v=k==="달라진"?diff:(k===""?n:c[k]);
+    return `<div class="fc-s ${cls}${FC.filt===k?" on":""}" data-fcf="${k}"><div class="n">${v}</div><div class="l">${l}</div></div>`; }).join("");
+  const f=FC.flags;
+  $("fc-warn").innerHTML=f&&f.total?`<div class="fc-warn">⚠ 법에 어긋날 수 있는 바뀜 <b>${f.fresh}</b>건`
+    +(f.total>f.fresh?` (옛 글에도 있던 것 ${f.total-f.fresh}건 더)`:"")+` — 바뀐 조·새 조에만 검토 기준을 돌린 것입니다. 판단은 노무사가 합니다.</div>`:"";
+  const rows=FC.filt==="달라진"?FC.rows.filter(r=>r.kind!=="같음"&&r.kind!=="번호 바뀜"):(FC.filt?FC.rows.filter(r=>r.kind===FC.filt):FC.rows);
+  $("fc-body").innerHTML=rows.length?rows.map(fcRowHtml).join(""):'<tr><td colspan="3" class="empty">해당하는 조가 없습니다.</td></tr>';
+  $("fc-sum").querySelectorAll("[data-fcf]").forEach(b=>b.onclick=()=>{ FC.filt=b.dataset.fcf; fcRender(); });
+  fcBtns();
+}
+function fcBtns(){
+  const any=!!(FC.counts&&FC.rows.length-FC.counts["같음"]>0);
+  $("fc-hwp").disabled=!any; $("fc-rev").disabled=!any||!!READONLY;
+}
+function fcHwp(){
+  const rows=PuRulesFileCmp.daejoRows(FC.rows);
+  if(!rows.length){ alert("달라진 조가 없습니다."); return; }
+  const headers=["조","옛 글","새 글","비고"], sub=FC.old.name+" → "+FC.now.name;
+  const base="신구대조표_"+FC.now.name.replace(/\.[^.]+$/,"").replace(/[()\s—\/\\:*?"<>|]/gu,"");
+  try{
+    HWPX.setPage({landscape:PAGE_LAND});
+    HWPX.download(HWPX.docTitle("취업규칙 신구대조표")+HWPX.docSub(sub)+HWPX.spacer()
+      +HWPX.tablePara([headers].concat(rows),HWPX.cols([1.45,3.05,3.05,1.6])),base+".hwpx");
+  }catch(e){ console.warn("hwpx 생성 실패 — RTF(.doc) 폴백:",e);
+    dlDoc(rtfTableDoc("취업규칙 신구대조표",sub,headers,rows,[2000,3800,3800,1800]),base+".doc"); }
+}
+/* 새 회차 계획을 편집 모델에 건다 — 옛 조는 새 글로(개정), 새 조는 앞 짝 조 뒤에(신설), 없어진 조는 삭제 제안.
+   ⚠ 결정은 비워 둔다 — 조문 검토·편집 화면에서 노무사가 한 건씩 본다(표준규칙 반영 sdApply 와 같다) */
+function fcApplyPlan(p,src){
+  const why="회사 새 파일("+src+") 반영"; let a=0,b=0,d=0;
+  p.amend.forEach(x=>{
+    const it=CUR_ITEMS.find(i=>i.id==="art_"+x.label); if(!it)return;
+    it.after=x.text; it.sug=x.text; it.suggested=true;
+    if(x.retitle&&x.title){ it.title=x.title; it.label=x.label+" ("+x.title+")"; }
+    it.reason=(it.reason?it.reason+" / ":"")+why+(x.flags.length?" · 검토 "+x.flags.map(g=>g.id).join("·")+" 위반 의심":"");
+    delete it.decision; delete it.paraPick; a++;
+  });
+  p.del.forEach(label=>{
+    const it=CUR_ITEMS.find(i=>i.id==="art_"+label); if(!it)return;
+    it.del=true; it.reason=(it.reason?it.reason+" / ":"")+"회사 새 파일에서 빠짐"; d++;
+  });
+  p.ins.forEach(x=>{
+    const id="fc_"+x.label; if(CUR_ITEMS.some(i=>i.id===id))return;
+    const at=x.after&&CUR_ITEMS.some(i=>i.id==="art_"+x.after)?"art_"+x.after:"__start__";
+    CUR_ITEMS.push({id,title:x.title||x.label,label:"",num:null,sub:null,insertAfter:at,rec:at,
+      before:"신설",after:x.text,orig:"",reason:why+" — 새 파일 "+x.label,
+      suggested:true,del:false,sug:x.text,grade:"B",optIn:true});
+    b++;
+  });
+  return {a,b,d};
+}
+async function fcRevision(){
+  if(READONLY){ alert("열람 전용입니다 — 담당자만 새 회차를 만들 수 있습니다."); return; }
+  const p=PuRulesFileCmp.plan(FC.rows);
+  if(!p.amend.length&&!p.ins.length&&!p.del.length){ alert("달라진 조가 없습니다 — 번호만 바뀐 것은 개정 방식에 따라 다시 매깁니다."); return; }
+  if(!confirm(`옛 파일 「${FC.old.name}」을 원본으로 열고, 새 파일 글을 개정안으로 겁니다.\n`
+    +` · 바뀐 조 ${p.amend.length}건 (개정)\n · 새 조 ${p.ins.length}건 (신설)\n · 없어진 조 ${p.del.length}건 (삭제 제안)\n\n`
+    +"번호만 바뀐 조는 넣지 않습니다 — 번호는 개정 방식에 따라 다시 매깁니다.\n계속할까요?"))return;
+  const before=siteSel.value;
+  await loadFile(FC.old.file);                       // 보통 올리기와 같은 길 — 보관함·원본 미리보기까지
+  if(siteSel.value===before||!SAMPLES[siteSel.value])return;   // 사람이 취소했거나 못 읽었다
+  run();
+  const n=fcApplyPlan(p,FC.now.name);
+  $("ov-fc").classList.remove("on");
+  setDaejoView("changed"); renderFindings(); saveWorkState();
+  openEditor();
+  alert(`새 회차를 열었습니다 — 원본은 「${FC.old.name}」.\n · 개정 ${n.a}건 · 신설 ${n.b}건 · 삭제 제안 ${n.d}건\n\n`
+    +(FC.counts["번호 바뀜"]?"새 파일은 번호를 다시 매겼습니다("+FC.counts["번호 바뀜"]+"개 조) — 번호까지 같게 하려면 개정 방식을 「전부개정」으로 고르세요.\n\n":"")
+    +"조문 검토·편집 화면에서 한 건씩 확인하세요. 저장·확정은 노무사가 합니다.");
+}
+async function fcPick(side,f){
+  try{ FC[side]=await fcRead(f); }
+  catch(e){ alert("파일을 읽지 못했습니다: "+(e.message||e)); return; }
+  FC.filt="달라진"; fcRun();
+}
+["old","now"].forEach(side=>{
+  $("fc-"+side).addEventListener("click",()=>$("fc-in-"+side).click());
+  $("fc-in-"+side).addEventListener("change",e=>{ const f=e.target.files[0]; e.target.value=""; if(f)fcPick(side,f); });
+});
+$("fc-hwp").addEventListener("click",fcHwp);
+$("fc-rev").addEventListener("click",fcRevision);
+$("open-fc").addEventListener("click",()=>{ fcRun(); $("ov-fc").classList.add("on"); });
+
 /* ══════ 📜 이력 — 사업장별 제정·개정 회차 ══════
    보관함이 「지금 무엇을 해야 하나」라면, 이력은 「무엇이 언제 어떻게 바뀌었나」다.
    확정된 회차(완료본)만 본다 — 작업중인 것은 아직 일어난 일이 아니다.
@@ -8620,9 +8918,15 @@ try{
   function doAutoLogout(){
     saveBeforeLogout();
     try{
-      try{ firebase.auth().signOut(); }catch(_){}
+      var _so=null;
+      try{ _so=firebase.auth().signOut(); }catch(_){}
       var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:#f8fafc;z-index:2147483647;'; document.body.appendChild(ov);
-      setTimeout(function(){ location.replace('enter.html?v='+now()); }, 200);
+      /* ★ 로그아웃이 «끝난 뒤에» 포털로 간다 (2026-09-30). 전에는 시작만 하고 0.2초 뒤에 떠났다 —
+         덜 끝난 채 포털이 열리면 포털은 남은 로그인을 보고 다시 들여보냈다(「로그아웃된 것 같다가 앱으로 넘어간다」).
+         3초 안에 안 끝나면 그래도 간다(멎어 보이면 안 된다). */
+      var _go=false; function _leave(){ if(_go) return; _go=true; setTimeout(function(){ location.replace('enter.html?v='+now()); }, 200); }
+      if(_so && _so.then) _so.then(_leave, _leave); else _leave();
+      setTimeout(_leave, 3000);
     }catch(_){ location.replace('enter.html'); }
   }
   function showWarn(remMs){

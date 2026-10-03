@@ -753,7 +753,7 @@ test('puSyncCommit은 스토어별 단일 쓰기와 꼬리표를 지킨다', () 
   assert.match(src, /puRef/);
   assert.match(src, /syncId/);
   // 레코드 반복문 안에서 set() 금지 — 저장은 마지막에 스토어 목록을 돌며 한 번씩
-  const loop = src.slice(src.indexOf('plan.adds.forEach'), src.indexOf('PU_SYNC_STORES.forEach'));
+  const loop = src.slice(src.indexOf('adds.forEach(function(a)'), src.indexOf('PU_SYNC_STORES.forEach'));
   assert.ok(loop.length > 0, 'adds 반복문과 저장 루프가 있어야 합니다');
   assert.ok(!/\bset\(/.test(loop), 'adds 반복문 안에서 set()을 부르면 안 됩니다');
 });
@@ -1518,7 +1518,9 @@ test('죽은 화면 page-resume-create 를 되살리지 않는다 — 같은 id 
 test('한글 뷰어는 형식을 못박지 않고 인라인 스타일을 정리한다', () => {
   const dl = funcSource('hwpViewDownload');
   assert.ok(!/'hwpx'\)/.test(dl), "⚠ 형식을 'hwpx'로 못박으면 옛 .hwp가 잘못된 MIME으로 저장됩니다");
-  assert.match(dl, /PureunHwp\.download\(_hwpView\.bytes, _hwpView\.name\)/);
+  /* 이름은 저장 이름 규칙(rhNiceName)으로 바뀔 수 있다 — 지킬 것은 «형식 값을 셋째로 안 넘긴다»이다 */
+  assert.match(dl, /PureunHwp\.download\(_hwpView\.bytes, [^,()]+\)/);
+  assert.doesNotMatch(dl, /PureunHwp\.download\(_hwpView\.bytes, [^)]*,/, '⚠ 형식을 셋째 값으로 넘기지 말 것');
   // renderPreview가 cssText에 덧붙이기(+=)로 넣으므로 닫을 때 지워야 쌓이지 않는다
   assert.match(funcSource('closeHwpView'), /removeAttribute\('style'\)/);
 });
@@ -1604,9 +1606,29 @@ test('pu-erp 원본 보기는 읽기 전용이다', () => {
 });
 
 test('동기화 레코드 행에서 pu-erp 원본을 열 수 있다', () => {
-  const src = funcSource('rowActions');
-  assert.match(src, /rec&&rec\.puRef/);
-  assert.match(src, /openPuSource/);
+  // 2026-09-29 목업 안 D — 🔎 단추를 번호 칸의 관리번호(누르면 뜨는 작은 창)로 옮겼다
+  assert.match(funcSource('puNoTd'), /puNoInner\(/);
+  const cell = funcSource('puNoInner');   // 표(td)와 외부기관 격자가 함께 쓰는 안쪽 (2026-09-30)
+  assert.match(cell, /r\.puRef/);
+  assert.match(cell, /puNoPop\(/);
+  assert.match(funcSource('puNoPop'), /openPuSource\(/);
+  // 실적 다섯 칸의 줄이 모두 번호 칸을 쓴다 — 한 곳이라도 빠지면 그 칸에선 원본을 못 연다
+  ['case', 'consult', 'fund', 'etc', 'advisory'].forEach((st) => {
+    assert.match(source, new RegExp("\\$\\{puNoTd\\(r,'" + st + "'\\)\\}"), st + ' 줄이 번호 칸(puNoTd)을 안 씁니다');
+  });
+});
+
+test('★ 실적 줄은 data-rid 로 찾는다 — 칸 글자(관리번호)로 찾으면 줄을 못 연다', () => {
+  assert.match(source, /tr\.getAttribute\('data-rid'\)\|\|\(chip\?chip\.textContent\.trim\(\):''\)/);
+  const n = (source.match(/data-rid="\$\{escapeHtml\(r\.id\)\}"/g) || []).length;
+  assert.ok(n >= 5, '실적 다섯 칸 줄에 data-rid 가 있어야 합니다: ' + n);
+});
+
+test('연결 걸러보기 칩 — 셈은 거르기 전, 「연결 확인」은 있을 때만', () => {
+  const src = funcSource('renderCareer');
+  assert.match(src, /lc\[puLinkKind\(r\)\]\+\+[\s\S]{0,200}?if\(lk\) rows=rows\.filter/, '셈을 먼저 하고 거른다');
+  assert.match(src, /\(lc\.check\|\|lk==='check'\)\?chip\('check'/);
+  assert.match(src, /nofileBar\+linkBar\+pgSel/);
 });
 
 test('fsUndoScan은 scanId가 일치하는 레코드만 지운다', () => {

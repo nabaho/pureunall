@@ -68,7 +68,7 @@
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
 <!-- 「준비중」 판단에 «지금 로그인한 사람의 역할»이 필요하다 (2026-09-23) -->
-<script src="js/pu-whoami.js?v=1"></script>
+<script src="js/pu-whoami.js?v=2"></script>
 <!-- ⚠ 이 화면은 머리줄 #whoami 를 «스스로» 채운다(loadAll 안). 자리를 안 알려 주면
      부품이 떠 있는 표를 따로 그려 그 위에 겹친다 — 다른 셋(급여데이터함·급여관리·
      취업규칙)과 같은 길로 「그리지 말라」고 한다. tests/whoami-mount.test.js 가 지킨다. -->
@@ -86,6 +86,8 @@
 try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 </script>
 <script src="js/pu-appbar.js?v=14"></script>
+<!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
+<script src="js/pu-active.js?v=1"></script>
 </head>
 <body>
 <div class="top">
@@ -154,10 +156,10 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=38"></script>
+<script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
@@ -223,7 +225,13 @@ firebase.auth().onAuthStateChanged(function (u) {
     PuPhotoStore.init({ db: db, storage: docBucket, auth: firebase.auth() });
     photosReady = PuPhotoStore.signIn(u.uid, u.email, u.email.split('@')[0]).catch(function () {});
   }
+  /* ★ 머리줄엔 «이름»을 — 아이디(p001)만으로는 누구인지 모른다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」).
+     이름은 공용 부품(PuWhoami)이 공개 명부에서 찾아 준다. 찾기 전에는 아이디를 잠깐 둔다. */
   $('whoami').textContent = u.email.split('@')[0];
+  if (window.PuWhoami && !window.__docsWhoHooked) {
+    window.__docsWhoHooked = true;
+    PuWhoami.onChange(function (me) { if (me && me.name) $('whoami').textContent = me.name + (me.title ? ' ' + me.title : ''); });
+  }
   loadCases();
   showPane(paneFromHash());
 });

@@ -138,7 +138,8 @@ Codex·Copilot 은 **이 파일(CLAUDE.md)을 안 읽는다.** 그것들이 읽�
   개인정보를 화면에 안 찍고 채우는 `secure_fill.py` 가 주민번호 서식용이다.
   출처·판·쓰는 법은 `.claude/skills/hwpx/푸른-메모.md`.
   한 번만: `python3 -m pip install python-hwpx lxml --break-system-packages`
-- `.mcp.json` — 인사(HRMCP)·법령(korean-law) MCP 연결. 법령은 `LAW_OC` 가 있어야 산다.
+- `.mcp.json` — 인사(HRMCP)·법령(korean-law)·문서(kordoc)·통계·건축·특허·공시(DART) MCP 연결. 법령은 `LAW_OC`, 공시는 `DART_API_KEY`(무료) 가 있어야 산다. 통계·건축·특허는 열쇠 없는 원격(mcp.gomdori.app).
+  ⚠ 원격 넷은 «남의 서버»다 — 질문에 고객 이름·주민번호를 넣지 말 것(운영자가 볼 수 있다).
 - 앱 쪽 짝은 `js/pu-form-fill.js` — **브라우저에서** 원본 서식의 `{{토큰}}` 만 바꾼다.
   주민번호가 서버로 안 가야 해서 이 일은 화면 안에서 끝낸다.
   설계와 다음 단계는 `docs/한글서식함-설계.md`.

@@ -115,7 +115,7 @@ GitHub Pages 는 저장소를 통째로 올리므로, 여기 없는 새 폴더�
 |---|---|
 | 한글(.hwp/.hwpx) 변환·양식 채우기 | `.claude/skills/hwpx/scripts/` (`convert_hwp.py`·`fill_hwpx.py`·`secure_fill.py`) |
 | 브라우저에서 서식 채우기(주민번호가 서버로 안 간다) | `js/pu-form-fill.js` · `js/pu-form-auto.js` |
-| 인사(HRMCP)·법령(korean-law) MCP | `.mcp.json` (법령은 `LAW_OC` 필요) |
+| 법령·문서·통계·건축·특허·공시·인사 MCP | `.mcp.json` (법령 `LAW_OC`·공시 `DART_API_KEY` 필요, 나머지 열쇠 없는 원격 — 질문에 개인정보 금지) |
 | 화면 실측(폰 411px) | `playwright-core` + `/opt/pw-browsers/chromium-*/chrome-linux/chrome` |
 
 한 번만: `python3 -m pip install python-hwpx lxml --break-system-packages`

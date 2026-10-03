@@ -41,12 +41,12 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=38"></script>
+<script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
 <script src="js/pu-company-write.js?v=1"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
@@ -69,6 +69,7 @@
 <!-- 🔑 회사 열쇠(사업자번호) — 푸른이알피와 «같은 파일»을 쓴다.
      각자 셈하면 같은 회사가 둘로 갈린다. -->
 <script src="js/pu-cokey.js?v=1"></script>
+<script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
@@ -1764,41 +1765,45 @@ table.sbox.tight td.none{padding:26px 8px}
 .setback{display:inline-flex;align-items:center;gap:6px;background:#e2e8f0;border:1px solid #e2e8f0;color:#1e293b;
   border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px}
 .setback:hover{background:#e2e8f0}
-/* 현황: 큰 상자 대신 한 줄 알약 */
-.setstat{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
-.setstat>div{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:5px 13px;display:flex;align-items:baseline;gap:6px}
-.setstat b{font-size:14px;color:#1e293b;font-weight:800}
-.setstat span{font-size:11.5px;color:#94a3b8}
-/* ── 상위 탭 줄 (대표 지시 2026-09-07 「탭방식으로 정리해달라」) ──
-   2026-09-05 에 탭을 걷어냈다가 써 보고 되돌린 자리다. 까닭은 SET_TABS 머리글에 있다.
-   ⚠ 탭은 «넷»이다. 여섯이던 때는 비슷한 이름이 섞여 못 외웠다. */
-.settabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:2px solid #e2e8f0;margin:4px 0 14px}
-.settab{padding:9px 16px;font-size:13px;font-weight:700;color:#64748b;background:none;border:none;
-  border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit;
-  white-space:nowrap;border-radius:8px 8px 0 0;display:inline-flex;align-items:center;gap:4px}
-.settab:hover{background:#f8fafc;color:#1e293b}
-.settab.on{color:#1e40af;border-bottom-color:#1e40af;background:#f8fafc}
-/* 탭 이름 옆 숫자 — 안 눌러도 할 일이 있는지 보인다 */
-.settab .tbdg{font-size:10.5px;font-weight:800;background:#dc2626;color:#ffffff;
-  border-radius:999px;padding:2px 6px}
-/* ── 섹션 제목 ── */
-.setsec{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:#1e40af;
-  margin:18px 2px 8px;padding-bottom:5px;border-bottom:1px solid #e2e8f0}
-.setsec:first-of-type{margin-top:2px}
-.setsec.dg{color:#dc2626;border-bottom-color:#fecaca}
-/* 자주 쓰는 것 — 매주 쓰는 것과 한 번 하는 일이 같은 크기면 매번 눈으로 찾는다 */
-.setbtn.hero{background:#eff6ff;border-color:#bfdbfe;color:#1e40af;font-size:13.5px}
-.setbtn.hero:hover{background:#f8fafc;border-color:#60a5fa}
-/* ── 🔔 지금 손볼 것 띠 (대표 결정 2026-09-05) ──
-   할 일이 «있을 때만» 뜬다. 늘 떠 있으면 배경이 되어 아무도 안 본다. */
-.todorail{border:1px solid #fde68a;background:#fffbeb;border-radius:11px;
-  padding:11px 12px;margin-bottom:13px}
-.tr-t{font-size:12px;font-weight:800;color:#d97706;margin-bottom:8px;
-  display:flex;align-items:center;gap:7px}
-.tr-t span{font-weight:500;color:#64748b}
-.todorail .setbtn{background:#ffffff;border-color:#fde68a}
-.todorail .setbtn:hover{border-color:#fbbf24}
-.setbtn .sdesc.todo{color:#d97706;font-weight:700}
+/* ── ⚙️ 환경설정 — 왼쪽 메뉴 + 한 줄 목록 (대표 지시 2026-09-29 「좀더 깔끔하게」) ──
+   휴대폰 「설정」 화면의 결. 색은 둘뿐 — 손볼 숫자는 주황(#d97706), 위험한 것은 빨강(#991b1b).
+   ⚠ 줄은 «한 줄»이다 — 넘치면 … (CLAUDE.md 표 한 칸 규칙). 설명은 title 로만. */
+.sethd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.sethd .setback{margin-bottom:0}
+.sethd h2{margin:0;font-size:17px;color:#1e293b}
+.setst{font-size:12px;color:#94a3b8;white-space:nowrap}
+.setbody{display:grid;grid-template-columns:190px minmax(0,1fr);background:#ffffff;border:1px solid #e2e8f0;
+  border-radius:14px;overflow:hidden;min-height:360px}
+.setnav{border-right:1px solid #e2e8f0;padding:10px;background:#ffffff}
+.setnavbtn{display:flex;align-items:center;gap:8px;width:100%;border:none;background:none;font-family:inherit;
+  font-size:14px;font-weight:600;color:#1e293b;padding:9px 10px;border-radius:9px;cursor:pointer;text-align:left;white-space:nowrap}
+.setnavbtn:hover{background:#f8fafc}
+.setnavbtn.on{background:#eff6ff;color:#1e40af}
+.setnavn{margin-left:auto;font-size:12px;font-weight:800;color:#d97706}
+.setnavsep{height:1px;background:#e2e8f0;margin:8px 4px}
+.setmain{padding:16px 20px;min-width:0}
+.setg{font-size:12px;color:#94a3b8;font-weight:600;margin:0 0 6px 4px}
+.setlist{border:1px solid #e2e8f0;border-radius:12px;margin-bottom:16px;overflow:hidden;background:#ffffff}
+.setrow{display:flex;align-items:center;gap:12px;width:100%;border:none;background:none;font-family:inherit;
+  padding:11px 14px;font-size:14px;color:#1e293b;cursor:pointer;text-align:left;white-space:nowrap}
+.setrow+.setrow{border-top:1px solid #e2e8f0}
+.setrow:hover{background:#f8fafc}
+.setrow .sl{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.setrow .sv{margin-left:auto;color:#94a3b8;font-size:13px;flex:none}
+.setrow .sv.todo{color:#d97706;font-weight:800}
+.setrow .sc{color:#94a3b8;font-size:15px;flex:none}
+.setrow:not(:has(.sv)) .sc{margin-left:auto}
+.setrow.danger{color:#991b1b}
+.setok{font-size:13px;color:#64748b;margin:2px 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.setok b{color:#166534}
+@media(max-width:760px){
+  .setbody{grid-template-columns:1fr}
+  .setnav{border-right:none;border-bottom:1px solid #e2e8f0;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+  .setnav::-webkit-scrollbar{display:none}
+  .setnavbtn{width:auto}
+  .setnavsep{display:none}
+  .setmain{padding:14px 12px}
+}
 
 /* 선택한 탭 내용 — 버튼을 2열로 */
 .setpanel{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px;align-items:start}
@@ -2482,6 +2487,55 @@ td.selcell{cursor:cell}
 .contsrun button{margin-left:auto;font-size:12px;font-weight:700;color:#991b1b;background:#ffffff;
   border:1px solid #fecaca;border-radius:8px;padding:4px 12px;cursor:pointer}
 .contsrun button:hover{background:#991b1b;color:#ffffff}
+/* ── 🏛 폐업·휴업 사업장 창 — 표 한 장 (2026-09-29). ⚠ 칸은 «한 줄», 넘치면 … + title ── */
+.ntsbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.ntssp{flex:1}
+.ntsseg{font-size:12.5px;font-weight:700;border:1px solid #e2e8f0;border-radius:8px;padding:4px 10px;
+  color:#64748b;background:#ffffff;white-space:nowrap;cursor:pointer}
+.ntsseg b{color:#1e293b;margin-left:4px}
+.ntsseg.on{background:#1e293b;border-color:#1e293b;color:#ffffff}.ntsseg.on b{color:#ffffff}
+.ntstool{font-size:12px;font-weight:700;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;
+  border-radius:8px;padding:4px 10px;white-space:nowrap;cursor:pointer}
+.ntstool:disabled{opacity:.45;cursor:default}
+.ntsdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;box-sizing:border-box}
+.ntsi{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+  border:1px solid #cbd5e1;font-size:11px;font-weight:800;color:#475569;margin-left:6px;cursor:pointer;vertical-align:middle;font-style:normal}
+.ntspop{border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:9px 12px;margin:0 0 10px;
+  font-size:12.5px;line-height:1.75;color:#1e293b}
+.ntspop>div b{display:inline-block;min-width:96px}
+.ntspop p{margin:6px 0 0;padding-top:6px;border-top:1px dashed #e2e8f0;color:#64748b;font-size:11.5px;line-height:1.55}
+.ntswrap{max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:9px}
+.ntstbl{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+.ntstbl th{position:sticky;top:0;background:#f8fafc;font-size:11.5px;color:#64748b;font-weight:700;text-align:left;
+  padding:7px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+.ntstbl td{padding:7px 8px;border-bottom:1px solid #f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1e293b}
+.ntstbl tr{cursor:pointer}.ntstbl tbody tr:hover{background:#f8fafc}
+.ntstbl th:nth-child(1){width:30%}.ntstbl th:nth-child(2){width:14%}.ntstbl th:nth-child(3){width:15%}
+.ntstbl th:nth-child(4){width:19%}.ntstbl th:nth-child(5){width:9%}.ntstbl th:nth-child(6){width:13%}
+.ntstbl td.nm{font-weight:700}.ntstbl td.nm .se{font-weight:400;color:#991b1b;font-size:11.5px}
+.ntstbl td.dt.soon{color:#854d0e}.ntstbl td.dt.none{color:#991b1b}
+.ntstbl td.why{color:#64748b;font-size:12px}
+.ntstbl td.act{text-align:right;overflow:visible}
+/* 🔖 내 탭 관리 표 (2026-09-30) — 폭은 머리칸 style 이 정한다 */
+.ntstbl.vmtbl th:nth-child(n){width:auto}
+.vmsc{font-size:11px;font-weight:700;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:8px;padding:1px 7px}
+.vmtw{font-size:11px;font-weight:800;color:#854d0e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:1px 6px;margin-left:6px}
+.ntstbl td.vmn{text-align:right;font-variant-numeric:tabular-nums}
+.ntstbl td.vmn.zero{color:#d97706;font-weight:800}
+.vmact{display:inline-flex;gap:4px}
+.vmact button{font-size:12px;border:1px solid #e2e8f0;border-radius:6px;padding:1px 7px;color:#64748b;background:#ffffff;cursor:pointer;font-family:inherit}
+.vmact button.del{color:#991b1b;border-color:#fecaca}
+.ntsseg.vmwarn{border-color:#fde68a;background:#fffbeb;color:#854d0e}
+/* 🔗 이알피 이름 대조 표 — 폭은 머리칸의 style 이 정한다(폐업 표의 칸 폭을 안 물려받게) */
+.ntstbl.erpname th:nth-child(n){width:auto}
+.ntstbl.erpname td.miss{color:#d97706;font-weight:700}
+.ntsact{font-size:11.5px;font-weight:800;border:1px solid #cbd5e1;color:#1e293b;background:#ffffff;
+  border-radius:7px;padding:3px 9px;white-space:nowrap;cursor:pointer}
+.ntsact.pri{background:#2563eb;border-color:#2563eb;color:#ffffff}
+.ntsclose{width:100%;border-collapse:collapse;font-size:13px}
+.ntsclose td{padding:8px 6px;border-bottom:1px solid #f8fafc;white-space:nowrap;color:#1e293b}
+.ntsclose td.ic{width:28px}.ntsclose td.v{text-align:right;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.ntsclose td.b{width:1%;text-align:right}.ntsclose .why{color:#64748b;font-size:12px}
 /* 👤 담당 · 📝 메모 — 사람이 «직접 적는» 자리 (2026-09-12).
    ⚠ ✎ 는 「업체관리가 아니라 우리가 적은 값」이라는 표다 — 색만으로 구별하면 흑백
      인쇄·색약에서 사라진다. */
@@ -2671,6 +2725,11 @@ body.pc #pcDetail{display:flex}
 #pcDetail .cogrid .pdrow{gap:8px}
 #pcDetail .cogrid .pdrow .k{width:97px;white-space:nowrap}
 #pcDetail .pdrow .v{flex:1;color:#1e293b;word-break:break-all}
+/* 📍 주소 확인 (목업 B, 2026-10-02) — 경고는 팔레트의 주황 */
+.addrchk{display:inline-block;margin-left:6px;padding:0 7px;border-radius:4px;background:#fffbeb;color:#854d0e;border:1px solid #fde68a;font-size:11px;white-space:nowrap;cursor:help}
+.addrfix{margin-left:6px;padding:1px 8px;border:1px solid #fbbf24;border-radius:4px;background:#fff;color:#854d0e;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.addrcard{margin-top:3px;font-size:11.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.addrcard.diff{color:#854d0e}
 #pcDetail .pdrow .v a{color:#2563eb;text-decoration:none}
 /* 값이 어디서 왔는지 (4순위) — 값보다 «작고 옅게». 눈에 먼저 드는 건 값이어야 한다 */
 /* ── 출처는 «한 줄을 먹지 않는다» (대표 화면 2026-08-31) ─────────────────────
@@ -3122,10 +3181,19 @@ body.pc #pcDetail{display:flex}
 .wkbill .b .r .sp{flex:1}
 .wkbill .b .r .dim{font-size:12px;color:#94a3b8}
 .wkbill .b .f{display:flex;gap:6px;padding:9px 13px;border-top:1px solid #e2e8f0}
-.wktbl{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;
+/* ── 머리줄 «틀고정» (대표 지시 2026-09-30 「틀고정」) ──
+   ⚠ 표에 overflow:hidden 을 두지 «않는다» — 그것이 있으면 표 자신이 스크롤 틀이 되어
+     머리줄이 #pcWk 에 못 붙는다(기업 상세·명함 표는 이미 붙어 있고 근로자 표만 빠져 있었다).
+     둥근 모서리는 머리 칸 양 끝에 준다. */
+.wktbl{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border-radius:12px;
   table-layout:fixed;font-size:13px}
 .wktbl th{background:#f8fafc;color:#64748b;font-weight:600;text-align:left;padding:9px 10px;
-  border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  position:sticky;top:0;z-index:2}
+/* #pcWk 는 위 여백이 14px 이다 — top:0 이면 그 틈으로 줄이 비친다. 맨 위 끝에 붙인다 */
+#pcWk .wktbl th{top:-14px}
+.wktbl thead th:first-child{border-top-left-radius:12px}
+.wktbl thead th:last-child{border-top-right-radius:12px}
 .wktbl td{padding:9px 10px;border-bottom:1px solid #f8fafc;color:#475569;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wktbl tbody tr:hover{background:#f8fafc}
@@ -3177,7 +3245,7 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=1"></script>
+  <script src="js/pu-whoami.js?v=2"></script>
 <script>
 /* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
    ⚠★★ 이 파일은 «두 프로그램»이다 — 기업정보함(pu-cards.html)과
@@ -3887,12 +3955,39 @@ function watchCardMap(ref, assign, settled, denied, seed, opts){
    ⚠ 옛 씨앗(ckpt 없음)은 그대로 읽힌다 — 그때는 예전처럼 통째로 받는다(한 번만). */
 const CARD_CACHE_KEY = 'items-v1';
 const CKPT_BACK_MS = 60*60*1000;        /* 시계 어긋남 여유 — 한 시간 */
-function cardCacheGet(cb){
+/* ══════ ⏱ 여는 길 — 로그인해서 목록이 설 때까지 «어느 단계가 몇 초»인가 (대표 2026-09-30 「로그인 할 경우 계속 느려지고 있다」) ══
+   10초 진단은 «멈춤»(긴 작업)을 잰다 — 그런데 대표 화면은 멈춤 0ms 였다. 느린 것은 «기다림»(자료가 오는 시간)이다.
+   그래서 단계마다 시각을 찍어 한 줄로 말한다: 페이지 · 로그인 확인 · 사본으로 먼저 그림 · 명함 다 옴 · 이알피 옴.
+   ⚠ 값은 이 창의 performance.now() 기준(페이지를 연 순간 0) · 저장하지 않는다 · 한 번만 찍는다.
+   ⚠ 최상위 let 은 쓰지 않는다 — 이 함수는 스크립트가 다 읽히기 «전»에도 불릴 수 있다(TDZ). */
+function bootMark(k, note){
+  try{
+    const m = window._puBootMarks || (window._puBootMarks = {});
+    if(m[k]) return;
+    m[k] = { t: performance.now(), note: note || '' };
+    if(k === 'auth') setTimeout(function(){ if(!m._done){ m._done = 1; bootReport(); } }, 30000);
+    if(m.items && m.erp && !m._done){ m._done = 1; bootReport(); }
+  }catch(_){}
+}
+function bootReport(){
+  try{
+    const m = window._puBootMarks || {};
+    const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+    const sec = v => (v / 1000).toFixed(1) + '초';
+    const at = k => m[k] ? sec(m[k].t) + (m[k].note ? '(' + m[k].note + ')' : '') : '안 옴';
+    console.log('⏱ 기업정보함 여는 길 — 페이지 ' + (nav ? sec(nav.domContentLoadedEventEnd) : '—')
+      + ' · 로그인 확인 ' + at('auth') + ' · 사본으로 먼저 그림 ' + at('seed')
+      + ' · 명함 다 옴 ' + at('items') + ' · 이알피 옴 ' + at('erp'));
+  }catch(_){}
+}
+/* onOpen — 저장소가 «열렸다»는 신호. 열렸으면 사본은 곧 온다(부르는 쪽이 더 기다린다). */
+function cardCacheGet(cb, onOpen){
   let done=false; const fin=v=>{ if(!done){ done=true; cb(v); } };
   try{
     const rq = indexedDB.open('pu-cards-cache', 1);
     rq.onupgradeneeded = e=>{ e.target.result.createObjectStore('kv'); };
     rq.onsuccess = e=>{
+      try{ if(onOpen) onOpen(); }catch(_){ }
       try{
         const db = e.target.result;
         const g = db.transaction('kv','readonly').objectStore('kv').get(CARD_CACHE_KEY);
@@ -3982,6 +4077,7 @@ const Store = {
           /* 명함이 도착한 **뒤에** 마지막 보던 화면으로 옮긴다(대표 지시 2026-08-10).
              먼저 옮기면 빈 화면이 잠깐 보이고, 자료함·보낸 메일은 아직 읽히지도 않았다. */
           if(!Store._itemsReady){
+            bootMark('items', _partial ? '바뀐 것만' : '통째로');
             Store._itemsReady=true; _cardSeedUsed=false; restoreLastScreen();
             if(!Store._idxDone){ setTimeout(backfillIdx, 3000); }
             /* 번호 열쇠 자리 첫 채우기 — 한 번만. 명함이 다 들어온 뒤라야 빠짐없이 찬다. */
@@ -4053,6 +4149,7 @@ const Store = {
       if (firebase.auth){
         firebase.auth().onAuthStateChanged(u=>{
           if (u && u.email){
+            bootMark('auth');
             myEmail=(u.email||'').toLowerCase(); myUid=u.uid||'';
             /* ⚠ loadSharedGKey() 를 뗐다(2026-08-17) — 로그인할 때마다 실시간DB 의
                열쇠를 브라우저로 내려받던 자리다. 이제 열쇠는 서버만 안다. */
@@ -4070,28 +4167,48 @@ const Store = {
             const goSub = (seed, ckpt)=>{
               if(_subKicked) return; _subKicked = true; clearTimeout(_subT);
               if(seed && !Store._itemsReady){
+                bootMark('seed');
                 _cardSeedUsed = true;
                 subscribe(seed, ckpt);
                 restoreLastScreen();       /* 씨앗이 곧 명함이다 — 마지막 화면을 바로 연다 */
               } else subscribe();
             };
-            _subT = setTimeout(()=>goSub(null), 400);
+            /* ★★ 사본을 «시간 다툼»으로 놓치지 않는다 (대표 크롬 실측 2026-10-02).
+               사본이 있는데도 세 번 내리 「사본으로 먼저 그림: 안 옴 · 명함 다 옴(통째로)」였다.
+               사본 읽기는 25ms 인데, 로그인 직후 화면이 바빠 그 답이 차례를 못 받는 사이
+               400ms 타이머가 먼저 울려 3MB 를 통째로 받았다 — 명함이 늘수록 더 자주 진다.
+               ⚠ 그래서 저장소가 «열렸으면» 3초까지 기다린다. 안 열리면(사생활 모드 등)
+                 예전처럼 400ms 뒤 그냥 시작한다 — 사본이 없다고 문이 잠기면 안 된다. */
+            let _cacheOpen = false;
+            const _subStart = Date.now();
+            const _giveUp = ()=>{
+              if(_subKicked) return;
+              if(_cacheOpen && Date.now() - _subStart < 3000){ _subT = setTimeout(_giveUp, 250); return; }
+              console.log('[명함] 사본을 ' + (Date.now() - _subStart) + 'ms 안에 못 읽어 통째로 받습니다'
+                + (_cacheOpen ? '' : ' (저장소가 안 열림)'));
+              goSub(null);
+            };
+            _subT = setTimeout(_giveUp, 400);
             /* ★★ 씨앗이 싱싱하면 «바뀐 것만» 받는다 (대표 지시 2026-09-18) ────────────
                ⚠ 통째로 받는 길로 물러서는 때를 넉넉히 둔다 — 조용히 틀리느니 조금 더 받는다:
                  ⑴ 씨앗이 없다(첫 로그인)            ⑵ 옛 씨앗이라 ckpt 가 없다
                  ⑶ 통째로 받은 지 사흘이 넘었다(스스로 낫기)  ⑷ 지운 자국을 못 읽었다
                ⚠ 「지운 자국」을 먼저 걷고 나서 구독한다. 안 걷으면 남이 지운 명함이
                  이 기기에만 유령으로 남는다(씨앗에는 아직 있다).
-               ⚠ 자국 읽기가 늦어도 문이 잠기지 않게 800ms 만 기다린다 — 넘으면 통째로. */
+               ⚠ 자국 읽기가 늦어도 문이 잠기지 않게 3초만 기다린다 — 넘으면 통째로.
+                 ⚠ 800ms 였다가 3초로 늘렸다 (대표 크롬 실측 2026-10-02): 막 연결된 직후라 첫 대답이
+                   800ms 를 넘겨, 자국 1건을 못 기다리고 3MB 를 통째로 받았다(명함 다 옴 5.5초).
+                   통째로 받는 데 1~4초가 드니 3초를 기다리는 편이 늘 낫다. */
             cardCacheGet(snap=>{
               if(_subKicked) return;
               if(!snap){ goSub(null); return; }
               const _seed = snap.items, _ckpt = Number(snap.ckpt)||0;
               _lastFullAt = Number(snap.fullAt)||0;
               const _needFull = !_ckpt || !_lastFullAt || (Date.now() - _lastFullAt) > FULL_EVERY_MS;
-              if(_needFull){ _lastFullAt = Date.now(); goSub(_seed); return; }   /* 씨앗은 그리되 통째로 받는다 */
+              if(_needFull){ _lastFullAt = Date.now(); console.log('[명함] 사흘에 한 번 통째로 받습니다(스스로 낫기)'); goSub(_seed); return; }   /* 씨앗은 그리되 통째로 받는다 */
               let _tombDone = false;
-              const _tombT = setTimeout(()=>{ if(!_tombDone){ _tombDone = true; _lastFullAt = Date.now(); goSub(_seed); } }, 800);
+              const _tombT = setTimeout(()=>{ if(!_tombDone){ _tombDone = true; _lastFullAt = Date.now();
+                console.log('[명함] 지운 자국을 3초 안에 못 읽어 통째로 받습니다'); goSub(_seed); } }, 3000);
               this.db.ref(DB_ROOT+TOMB).orderByValue().startAt(_ckpt).once('value').then(s=>{
                 if(_tombDone) return; _tombDone = true; clearTimeout(_tombT);
                 const gone = s.val() || {};
@@ -4103,7 +4220,7 @@ const Store = {
                 if(_tombDone) return; _tombDone = true; clearTimeout(_tombT);
                 _lastFullAt = Date.now(); goSub(_seed);      /* 자국을 못 읽으면 통째로 — 조용히 틀리지 않는다 */
               });
-            });
+            }, ()=>{ _cacheOpen = true; });
             /* ── 메일 문으로 들어왔으면 «지금» 연다 (대표 보고 2026-08-29 「로그인이 늦다」) ──
                ⚠ 마지막 화면 복원(restoreLastScreen)은 기업정보함 명함이 «다 도착한 뒤»에
                  돈다(아래 subscribe 의 items 구독이 부른다). 명함은 실측 2.9MB 라, 메일
@@ -4531,7 +4648,7 @@ const ErpMatch = {
         const n = ErpMatch._norm(co.name); if(n) nameN[n] = (nameN[n]||0) + 1; });
       ErpMatch.nameN = nameN;
       ErpMatch.byBiz=byBiz; ErpMatch.byName=byName; ErpMatch.byTaxEmail=byTaxEmail;
-      ErpMatch.companies=cos; ErpMatch.ready=true;
+      ErpMatch.companies=cos; ErpMatch.ready=true; bootMark('erp');
       if(typeof mbGuessBust==='function') mbGuessBust();   /* 이름표가 바뀌면 훑개도 새로 */
       coListBust();
       try{ render(); }catch(_){}
@@ -7637,11 +7754,12 @@ function schedBoxHtml(){
   const sel = pickPrune(pickOf('sched'), ids); pickPut('sched', sel);
   const body = rows.length ? rows.map((v,i)=>{
     const p = v.payload||{};
-    const bad = v.state==='failed';
+    const bad = v.state==='failed' || v.state==='uncertain';
+    const 보낼때 = bad ? (v.originalAt || v.at) : v.at;
     return `<tr class="${bad?'bad':''} ${pickOn(sel,v.id)?'pkon':''}">
       <td class="pk"><label><input type="checkbox" ${pickOn(sel,v.id)?'checked':''}
         onchange="pickHit('sched','${v.id}')"><span class="no">${i+1}</span></label></td>
-      <td class="w">${esc(fmtWhen(v.at))}<span>${bad?'보내지 못함':(v.state==='sending'?'보내는 중':'기다리는 중')}</span></td>
+      <td class="w">${esc(fmtWhen(보낼때))}<span>${v.state==='uncertain'?'발송 여부 확인 필요':(bad?'보내지 못함':(v.state==='sending'?'보내는 중':(v.at>Date.now()&&v.at-(v.failedAt||0)<31*60*1000?'다시 시도 대기':'기다리는 중')))}</span></td>
       <td class="b">${esc(staffName(v.by))}</td>
       <td><b>${esc(p.toName||'')}</b><span class="e">${esc(p.to||'')}</span></td>
       <td>${esc(p.subject||'')}<span class="e">${esc((p.matIds||[]).map(id=>(_matMeta[id]||{}).name||'자료').join(' · ')||'첨부 없음')}${
@@ -7665,7 +7783,7 @@ function schedBoxHtml(){
       ${pickHeadBox('sched', ids)}<th>보낼 때</th><th>예약한 사람</th><th>받는 곳</th><th>제목 · 첨부</th><th></th>
     </tr></thead><tbody>${body}</tbody></table>
     <p style="font-size:11.5px;color:#94a3b8;line-height:1.7;margin-top:12px">
-      ※ 서버가 5분마다 살펴 보냅니다 — <b>창을 닫아도 나갑니다.</b> 정한 때보다 최대 5분 늦을 수 있습니다.<br>
+      ※ 서버가 15분마다 살펴 보냅니다 — <b>창을 닫아도 나갑니다.</b> 정한 때보다 최대 15분 늦을 수 있습니다.<br>
       ※ 💻 내 PC 파일은 예약에 담기지 않습니다. 그런 첨부가 있으면 그때 직접 보내 주세요.</p>`;
 }
 function cancelScheduled(id){
@@ -10266,12 +10384,21 @@ function listItems(kind){
         default: return '';
       }
     };
-    result.sort((a,b)=>{ const x=val(a),y=val(b);
+    /* ⚡ 견줄 값을 «먼저 한 번» 뽑고, 한국어 정렬기는 하나만 만들어 쓴다 (대표 화면 2026-10-02
+       「처음 뜰 때 느린 까닭 · listItems」). 예전에는 명함 6천여 장을 견줄 때마다 val() 을
+       두 번(담당 열이면 ErpMatch.mgrs 까지) 부르고, localeCompare(…,'ko') 가 견줄 때마다
+       정렬기를 새로 만들었다 — 8만 번. ⚠ 순서는 «글자 하나까지» 같다(같은 규칙·안정 정렬). */
+    const ko = listItems._ko || (listItems._ko = new Intl.Collator('ko'));
+    const keyed = result.map(it=>({ it, v:val(it) }));
+    keyed.sort((a,b)=>{ const x=a.v,y=b.v;
       if (typeof x==='number') return (x-y)*dir;
-      return String(x).localeCompare(String(y),'ko')*dir; });
+      return ko.compare(String(x), String(y))*dir; });
+    for (let i = 0; i < keyed.length; i++) result[i] = keyed[i].it;
   }
-  else if (state.sort==='name')
-    result.sort((a,b)=>String(a.name||a.company||'').localeCompare(String(b.name||b.company||''),'ko'));
+  else if (state.sort==='name'){
+    const ko = listItems._ko || (listItems._ko = new Intl.Collator('ko'));
+    result.sort((a,b)=>ko.compare(String(a.name||a.company||''), String(b.name||b.company||'')));
+  }
   else result.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   return result;
 }
@@ -12305,6 +12432,7 @@ function openDetail(id, backCo){
       if (k==='email') v=`<a href="#" onclick="openMailWindow('${it.id}');return false" title="딴 창에서 메일을 씁니다 — 보던 화면은 그대로 남습니다">${v}</a>`;
     /* 둘째 번호·이메일이 있으면 메인 아래에 흐리게 (대표 지시 2026-09-08) */
     if (k==='mobile' || k==='email') v += pcMoreLine(it, k);
+    v += addrNoteHtml(it, k);
     return `<div class="ditem"><div class="k">${label}</div><div class="v">${v}</div></div>`;
   }).join('');
   const gname = it.group && state.groups[it.group] ? state.groups[it.group].name : '미분류';
@@ -12477,6 +12605,84 @@ function coBackStep(){
 }
 
 /* ── PC 오른쪽 상세 패널 (리멤버식) ── */
+/* ══════ 📍 주소 확인 · 바로잡기 (목업 B, 대표 승인 2026-10-02) ══════════════════
+   「기업정보함과 이알피 주소가 다르다」의 뿌리는 «사진 판독»이었다:
+   사업자등록증의 「서북구」를 「서구」로 읽었고, 그 주소로 이알피가 검색하자 다른 동네가 들어갔다.
+   ★ 보여 주는 것 둘
+     ① 있지 않은 구 이름이면 「구 이름 확인」 + 「주소 검색으로 바로잡기」
+     ② 사업자등록증이면 같은 회사 명함의 회사 주소와 «같은 곳인가»를 한 줄로
+   ★ 같은 곳인가는 도로명·번호로 본다(js/pu-addr.js — 이알피와 같은 잣대).
+   ⚠ 명함은 사업자번호가 같으면 그것을, 없으면 «이름이 같은» 명함을 본다 — 이것은 보여 주기만
+     하고 아무것도 잇거나 고치지 않는다(이름으로 잇지 않는다는 규칙은 그대로다). */
+const ADDR_KEY_OF = { biz:'address', card:'companyAddr' };
+function addrCardOf(it){
+  const b = digits(it.bizno), n = _norm(it.company);
+  let byName = '';
+  for (const x of Object.values(state.items || {})){
+    if (!x || x.kind !== 'card' || !x.companyAddr) continue;
+    if (b.length === 10 && digits(x.bizno) === b) return x.companyAddr;
+    if (!byName && n && _norm(x.company) === n) byName = x.companyAddr;
+  }
+  return byName;
+}
+function addrNoteHtml(it, k){
+  const PA = window.PuAddr;
+  if (!PA || !it || ADDR_KEY_OF[it.kind] !== k || !it[k]) return '';
+  let h = '';
+  const bad = PA.badGu(it[k]);
+  if (bad) h += `<span class="addrchk" title="「${esc(bad)}」는 없는 구 이름입니다 — 사진을 글자로 읽다 틀렸을 수 있습니다.&#10;이 주소로 다른 곳(푸른이알피 등)이 검색하면 엉뚱한 동네가 나옵니다.">구 이름 확인</span>`
+     + `<button type="button" class="addrfix" onclick="addrFixOpen('${it.id}')" title="주소 검색에서 바른 주소를 골라 고칩니다">주소 검색으로 바로잡기</button>`;
+  if (it.kind === 'biz'){
+    const c = addrCardOf(it);
+    const same = c ? PA.same(it[k], c) : null;
+    if (c && same !== null) h += `<div class="addrcard ${same?'':'diff'}" title="${esc(c)}">명함 주소 · ${esc(c)} — ${same?'같은 곳 ✓':'다른 곳'}</div>`;
+  }
+  return h;
+}
+const PC_POSTCODE_SRC = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+function pcLoadPostcode(){
+  if (window.daum && daum.Postcode) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const sc = document.createElement('script'); sc.src = PC_POSTCODE_SRC;
+    sc.onload = () => (window.daum && daum.Postcode) ? res() : rej(new Error('비었습니다'));
+    sc.onerror = () => rej(new Error('못 불러왔습니다'));
+    document.head.appendChild(sc);
+  });
+}
+/* 주소 검색 창 — 이알피 openAddressSearch 와 같은 규칙:
+   «시·군 + 도로명 + 번호»로 미리 찾고, 고른 곳의 도로명·번호가 다르면 한 번 묻는다. */
+function addrFixOpen(id){
+  const it = state.items[id], PA = window.PuAddr;
+  if (!it || !PA) return;
+  const k = ADDR_KEY_OF[it.kind]; const before = it[k] || '';
+  pcLoadPostcode().then(() => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML = '<div style="background:#fff;width:min(480px,100%);height:min(600px,90vh);border-radius:10px;overflow:hidden;display:flex;flex-direction:column">'
+      + '<div style="padding:9px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;font-size:13px;font-weight:700;color:#1e293b">🔍 주소 바로잡기'
+      + '<button type="button" data-x style="margin-left:auto;border:0;background:none;font-size:16px;cursor:pointer;color:#64748b">✕</button></div>'
+      + '<div data-b style="flex:1;min-height:0"></div></div>';
+    const close = () => { try { ov.remove(); } catch(_){} };
+    ov.addEventListener('click', e => { if (e.target === ov || e.target.hasAttribute('data-x')) close(); });
+    document.body.appendChild(ov);
+    new daum.Postcode({
+      oncomplete(d){
+        const a = d.roadAddress || d.jibunAddress || d.address || '';
+        close();
+        if (!a) return;
+        const had = PA.key(before), got = PA.key(a);
+        if (had && got && had !== got
+            && !confirm('적어 둔 주소와 다른 곳입니다.\n\n적어 둔 것: ' + had + '\n고른 것:   ' + got
+                        + '\n\n이 주소로 바꿀까요?\n(「취소」를 누르면 다시 고릅니다)'))
+          return addrFixOpen(id);
+        it[k] = a; Store.put(it);
+        toast('📍 주소를 고쳤습니다 — ' + a, 4000);
+        openDetail(id);
+      },
+      width:'100%', height:'100%'
+    }).embed(ov.querySelector('[data-b]'), { q: PA.query(before), autoClose:false });
+  }).catch(() => toast('주소 검색을 불러오지 못했습니다 — 인터넷 연결을 확인해 주세요', 5000));
+}
 function openPcDetail(id, backCo){
   const it=state.items[id]; if(!it) return;
   /* 폰과 같다 — 사진을 기다리지 않고 먼저 띄운다(대표 보고 2026-08-15) */
@@ -12496,6 +12702,7 @@ function openPcDetail(id, backCo){
       if (k==='email') v=`<a href="#" onclick="openMailWindow('${it.id}');return false" title="딴 창에서 메일을 씁니다 — 보던 화면은 그대로 남습니다">${v}</a>`;
     /* 폰 상세와 «같은 줄»을 붙인다 — 한쪽에만 있으면 화면에 따라 둘째가 사라진다 */
     if (k==='mobile' || k==='email') v += pcMoreLine(it, k);
+    v += addrNoteHtml(it, k);
     return `<div class="pdrow ${WIDE_ROW[k]?'wide':''}"><div class="k">${label}</div><div class="v">${v}</div></div>`;
   }).join('');
   const gname = it.group && state.groups[it.group] ? state.groups[it.group].name : '미분류';
@@ -15059,31 +15266,83 @@ function ignoreSimilar(csv){
   _simIgnoreSave(set); toast('이 묶음을 무시했습니다'); _refresh(openSimilar);
 }
 
-/* ════════════ 🔗 ERP 대표자·담당자 대조 (업체관리에 있는데 기업정보함에 없는 이름 찾기) ════════════ */
+/* ════════════ 🔗 ERP 대표자·담당자 대조 (업체관리에 있는데 기업정보함에 없는 이름 찾기) ════════════
+   ■ 2026-09-30 대표 「이런 데이터 어떻게 하는게 좋은가?」 → 목업 → 「진행」
+     259곳이 떴는데 대부분 «문제가 아니었다»:
+       ① 같은 사람을 세 번 셌다 — 이알피는 담당자를 세 곳(contacts · primaryContactName · contactName)에 둔다
+       ② 「사무실」·「담당자」 같은 사람 아닌 글자도 사람으로 셌다
+       ③ 명함이 0장인 회사가 거의 전부였다 — 이름이 틀린 게 아니라 명함을 아직 안 받은 곳
+     그래서 셋으로 가른다: 손볼 곳(명함은 있는데 이름이 없다) · 명함 아직 없음 · 이알피 이름 칸에 직함.
+   ⚠ 이알피 자료는 «읽기만» 한다 — 이름 칸의 직함은 이알피에서 고칠 목록으로만 보여 준다.
+   ⚠ 이름 견주기는 ErpMatch._nameHit 그대로(앞부분이 같으면 같은 사람 — 「홍길동이사」=「홍길동」). */
+const ERP_TITLE_RE = /(대표이사|대표자|대표|부회장|회장|부사장|사장|전무이사|전무|상무이사|상무|이사|본부장|센터장|실장|원장|국장|소장|부장|차장|과장|팀장|대리|주임|사원|매니저|담당자|담당|님)$/;
+const ERP_NOT_PERSON = /^(사무실|담당자|담당|대표|대표자|경리|총무|인사|회계|관리자|관리|없음|미정|미상|직원|본사|공장|\-+|\.+)$/;
+/* 이알피 이름 한 칸 → 사람 이름들. 「이상섭대표 , 남유라주임」처럼 한 칸에 둘이 든 것도 가른다 */
+function erpNamePeople(raw){
+  return String(raw == null ? '' : raw).split(/[,，/·]/).map(function(p){
+    const t = p.replace(/\([^)]*\)/g, '').replace(/\s+/g, '');
+    let n = t, titled = false;
+    for(let i = 0; i < 3 && ERP_TITLE_RE.test(n) && n.replace(ERP_TITLE_RE, '').length >= 2; i++){ n = n.replace(ERP_TITLE_RE, ''); titled = true; }
+    return { raw: p.trim(), name: n, titled: titled, person: !!n && !ERP_NOT_PERSON.test(n) && !ERP_NOT_PERSON.test(t) };
+  }).filter(function(x){ return x.raw; });
+}
+/* 한 회사의 이알피 사람들 — 같은 사람은 한 번만(대표가 담당보다 앞선다) */
+function erpCoPeople(co){
+  const src = [];
+  if(co.ceo)  src.push(['대표', co.ceo]);
+  if(co.ceo2) src.push(['대표', co.ceo2]);
+  ((co.contacts || []).map(function(c){ return c && c.name; })).concat([co.primaryContactName, co.contactName])
+    .filter(Boolean).forEach(function(nm){ src.push(['담당', nm]); });
+  const seen = {}, people = [], odd = [];
+  src.forEach(function(s){
+    erpNamePeople(s[1]).forEach(function(p){
+      if(p.titled || !p.person) odd.push(p.raw);
+      if(!p.person) return;
+      const k = ErpMatch._norm(p.name);
+      if(!k || seen[k]) return;
+      seen[k] = 1; people.push({ role: s[0], name: p.name, key: k });
+    });
+  });
+  return { people: people, odd: odd.filter(function(v, i, a){ return a.indexOf(v) === i; }) };
+}
 function findErpNameMismatch(){
   if(!ErpMatch.ready || !ErpMatch.companies) return null;
   const cards=Object.values(state.items).filter(it=>it&&it.kind==='card'&&it.name);
   const cardsByCo={};
   cards.forEach(it=>{ const k=ErpMatch._norm(it.company); if(k) (cardsByCo[k]=cardsByCo[k]||[]).push(it); });
-  const rows=[];
+  const fix = [], none = [], titled = [];
   ErpMatch.companies.forEach(co=>{
     if(!co) return;
-    const erpNames=[];
-    if(co.ceo)  erpNames.push({role:'대표자', name:co.ceo});
-    if(co.ceo2) erpNames.push({role:'대표자2', name:co.ceo2});
-    [ ...((co.contacts||[]).map(c=>c&&c.name)), co.primaryContactName, co.contactName ]
-      .filter(Boolean).forEach(nm=>erpNames.push({role:'담당자', name:nm}));
-    if(!erpNames.length) return;
+    const pp = erpCoPeople(co);
+    const base = { company:co.name||'(회사명없음)', bizNo:co.bizNo||'' };
+    if(pp.odd.length) titled.push(Object.assign({ odd: pp.odd }, base));
+    if(!pp.people.length) return;
     let coCards=(cardsByCo[ErpMatch._norm(co.name)]||[]).slice();
     const bd=ErpMatch._digits(co.bizNo);
     if(bd.length>=10) cards.forEach(it=>{ if(ErpMatch._digits(it.bizno)===bd && coCards.indexOf(it)<0) coCards.push(it); });
     const cardNames=coCards.map(it=>ErpMatch._norm(it.name)).filter(Boolean);
-    const missing=erpNames.filter(en=>{ const nn=ErpMatch._norm(en.name); if(!nn) return false;
-      return !cardNames.some(cn=>ErpMatch._nameHit(cn,nn)); });
-    if(missing.length) rows.push({ company:co.name||'(회사명없음)', bizNo:co.bizNo||'',
-      missing:missing.map(m=>m.role+': '+m.name), haveCards:coCards.length });
+    const missing=pp.people.filter(p=>!cardNames.some(cn=>ErpMatch._nameHit(cn,p.key)));
+    if(!missing.length) return;
+    const row = Object.assign({ missing: missing.map(m=>m.role+' '+m.name),
+      have: coCards.map(it=>it.name).filter((v,i,a)=>a.indexOf(v)===i), haveCards: coCards.length }, base);
+    (coCards.length ? fix : none).push(row);
   });
-  return rows;
+  return { fix: fix, none: none, titled: titled };
+}
+let _erpNameSeg = 'fix';
+let _erpNameInfo = false;
+/* ⚠ 환경설정 안(인라인)에서 열렸으면 그 자리에 다시 그린다 — openErpNameCheck 를 그냥 부르면 팝업으로 뜬다 */
+function erpNameRepaint(){ if(state.view==='settings' && state.setSub==='erpname') renderSettingsPage(); else openErpNameCheck(); }
+function erpNameSegSet(k){ _erpNameSeg = k; erpNameRepaint(); }
+function erpNameInfoToggle(){ _erpNameInfo = !_erpNameInfo; erpNameRepaint(); }
+/* 표의 한 줄에서 기업 상세로 — 사업자번호가 먼저, 없으면 이름으로 찾는다 */
+function erpNameOpenCo(bizNo, name){
+  const bd = digits(bizNo || ''), nn = ErpMatch._norm(name || '');
+  const o = (coList() || []).find(x => bd.length >= 10 && digits(x.bizno || '') === bd)
+         || (coList() || []).find(x => nn && ErpMatch._norm(x.name) === nn);
+  if(!o) return toast('기업정보함에 이 회사가 아직 없습니다 — 사업자등록증이나 명함을 먼저 올려 주세요', 7000);
+  closeSettingsPage(); openCoPage();
+  state.coPick = ''; pickCo(o.key);
 }
 function openErpNameCheck(){
   const msg=(t)=>{ if(_panelTarget==='inline') return showPanel(
@@ -15091,23 +15350,44 @@ function openErpNameCheck(){
     toast(t,5000); };
   if(Store.mode!=='firebase') return msg('ERP 연결(Firebase) 상태에서만 대조할 수 있습니다');
   if(!ErpMatch.ready) return msg('ERP 업체관리 데이터를 불러오는 중입니다. 잠시 후 다시 눌러 주세요.');
-  const rows=findErpNameMismatch();
-  if(!rows) return msg('ERP 데이터를 아직 못 읽었습니다. 잠시 후 다시 시도하세요.');
-  if(!rows.length) return msg('✅ 불일치 없음 — ERP 대표자·담당자가 모두 기업정보함에 있습니다');
-  rows.sort((a,b)=>b.missing.length-a.missing.length);
-  let h=`<div class="mhead"><b>🔗 ERP 대표자·담당자 대조 — ${rows.length}개 회사</b>
-    ${_closeBtn()}</div>
-    <p style="font-size:12.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
-    푸른이알피 업체관리엔 <b>등록돼 있는데 기업정보함엔 없는</b> 대표자·담당자예요. 명함을 추가하거나 이름 철자를 맞추면 연결됩니다.</p>`;
-  rows.slice(0,200).forEach(r=>{
-    h+=`<div class="ditem"><div class="v"><b>${esc(r.company)}</b>${r.bizNo?` <span style="color:var(--sub);font-size:11px">${esc(fmtBizno(r.bizNo))}</span>`:''}<br>
-      <span style="color:var(--orange);font-size:12.5px">기업정보함에 없음 — ${esc(r.missing.join(', '))}</span>
-      <span style="color:var(--sub);font-size:11.5px"> · 이 회사 명함 ${r.haveCards}장</span></div></div>`;
-  });
-  if(rows.length>200) h+=`<p style="color:var(--sub);font-size:12px;padding:8px 2px">…외 ${rows.length-200}개 회사</p>`;
-  showPanel(h);
+  const r=findErpNameMismatch();
+  if(!r) return msg('ERP 데이터를 아직 못 읽었습니다. 잠시 후 다시 시도하세요.');
+  if(!r.fix.length && !r.none.length && !r.titled.length) return msg('✅ 불일치 없음 — ERP 대표자·담당자가 모두 기업정보함에 있습니다');
+  r.fix.sort((a,b)=>b.missing.length-a.missing.length || String(a.company).localeCompare(String(b.company),'ko'));
+  r.none.sort((a,b)=>String(a.company).localeCompare(String(b.company),'ko'));
+  r.titled.sort((a,b)=>String(a.company).localeCompare(String(b.company),'ko'));
+  const seg = r[_erpNameSeg] ? _erpNameSeg : 'fix';
+  const segBtn = (k, label, n) => `<button class="ntsseg${seg===k?' on':''}" onclick="erpNameSegSet('${k}')">${label}<b>${n}</b></button>`;
+  const open = x => `onclick="erpNameOpenCo('${esc(String(x.bizNo).replace(/'/g,"\\'"))}','${esc(String(x.company).replace(/'/g,"\\'"))}')"`;
+  const cell = v => `<td title="${esc(v)}">${esc(v)}</td>`;
+  let rows = '';
+  if(seg === 'titled'){
+    rows = `<thead><tr><th style="width:34%">회사</th><th style="width:18%">사업자번호</th><th>이알피 이름 칸</th></tr></thead><tbody>`
+      + r.titled.slice(0, 300).map(x => `<tr ${open(x)}><td class="nm">${esc(x.company)}</td><td class="why">${esc(x.bizNo ? fmtBizno(x.bizNo) : '')}</td>${cell(x.odd.join(' · '))}</tr>`).join('');
+  } else {
+    const list = r[seg];
+    rows = `<thead><tr><th style="width:26%">회사</th><th style="width:15%">사업자번호</th><th style="width:30%">이알피에만 있는 사람</th><th>${seg==='fix'?'받아 둔 명함':''}</th></tr></thead><tbody>`
+      + list.slice(0, 300).map(x => `<tr ${open(x)}><td class="nm">${esc(x.company)}</td><td class="why">${esc(x.bizNo ? fmtBizno(x.bizNo) : '')}</td>`
+        + `<td class="miss" title="${esc(x.missing.join(' · '))}">${esc(x.missing.join(' · '))}</td>`
+        + (seg==='fix' ? cell(x.have.join(' · ')) : '<td></td>') + `</tr>`).join('');
+  }
+  const cnt = seg==='titled' ? r.titled.length : r[seg].length;
+  const more = cnt > 300 ? `<p class="setnote" style="padding:8px 2px">…외 ${(cnt-300).toLocaleString()}곳</p>` : '';
+  const why = { fix:'명함은 있는데 이알피의 이 사람이 그 명함들에 없습니다 — 명함을 더 받거나 이름을 맞추면 이어집니다',
+                none:'이름이 틀린 게 아니라 명함을 아직 안 받은 곳입니다',
+                titled:'이알피 이름 칸에 직함·사람 아닌 글자가 든 곳입니다 — 이알피 업체관리에서 고칩니다(여기서는 안 고칩니다)' }[seg];
+  showPanel(`<div class="mhead"><b>🔗 이알피 대표자·담당자 대조
+      <span class="ntsi" onclick="erpNameInfoToggle()" title="어떻게 견주는지 봅니다">i</span></b>${_closeBtn()}</div>
+    ${_erpNameInfo ? `<div class="ntspop"><b>이렇게 견줍니다</b>
+      <div>· 같은 사람은 한 번만 셉니다(담당자 목록 · 주 담당 · 담당자명이 겹쳐도)</div>
+      <div>· 직함은 떼고 견줍니다 — 「홍길동이사」·「홍길동 대표」 = 홍길동</div>
+      <div>· 「사무실」·「담당자」처럼 사람이 아닌 글자는 세지 않습니다</div>
+      <div>· 손볼 곳 = 명함은 있는데 이알피의 이름이 그 명함들에 없는 회사</div></div>` : ''}
+    <div class="ntsbar">${segBtn('fix','손볼 곳',r.fix.length)}${segBtn('none','명함 아직 없음',r.none.length)}${segBtn('titled','이알피 이름 칸에 직함',r.titled.length)}</div>
+    <p class="setnote" style="margin:0 0 8px">${esc(why)}</p>
+    ${cnt ? `<div class="ntswrap"><table class="ntstbl erpname">${rows}</tbody></table></div>${more}`
+          : '<p class="cpnone" style="padding:16px 2px">여기에 해당하는 곳이 없습니다 👍</p>'}`);
 }
-
 /* ════════════ 📤 엑셀 내보내기 ════════════ */
 /* ══════ 내려받기 — 셋 중 «고른 것»만 (대표 지시 2026-08-29) ══════
    「명함 사업자 기업상세 각각 다운 받을 수 있게 해달라」 · 「내려받는건 환경설정에서」
@@ -17191,7 +17471,22 @@ let _mbWhoMsg = null;     /* {메일열쇠: 담당자이름} — 메일 한 통�
 
 /* 이메일을 실시간DB 열쇠로 — 점을 못 쓴다.
    ⚠ 포털(enter.html sgEmailKey)과 «같은 규칙»이어야 한다. 규칙이 갈리면 한쪽이 못 찾는다. */
-function mbWhoKey(s){ return String(s||'').toLowerCase().replace(/[.#$\[\]/]/g, ','); }
+/* ⚡ 답을 기억해 둔다 (대표 화면 2026-10-02 「10초 중 676ms 멈춤 · mbWhoKey 70ms(186,969번)」).
+   메일 7천여 통을 그릴 때마다 같은 주소를 수십 번씩 바꿨다. 같은 글자는 늘 같은 답이라
+   기억해 둔 답은 «낡을 수가 없다» — 오래 사는 캐시를 두지 않는다는 규칙(mbMemoOf)과 다르지 않다.
+   ⚠ 끝없이 커지지 않게 5만 개에서 비운다(주소·메일열쇠를 다 합쳐도 그보다 적다).
+   ⚠ 기억 상자는 함수에 붙인다 — 함수 하나만 떼어 돌려도(검사) 그대로 산다. */
+function mbWhoKey(s){
+  const C = mbWhoKey._c || (mbWhoKey._c = new Map());
+  const k = String(s||'');
+  let v = C.get(k);
+  if(v === undefined){
+    v = k.toLowerCase().replace(/[.#$\[\]/]/g, ',');
+    if(C.size >= 50000) C.clear();
+    C.set(k, v);
+  }
+  return v;
+}
 function mbDomOf(email){
   const e = String(email||'').toLowerCase();
   const at = e.lastIndexOf('@');
@@ -17272,7 +17567,16 @@ function mbSpamWhy(v){
   if(mbBadLocal(e)) why.push('주소가 규약에 안 맞습니다');
   return why.join(' · ');
 }
-function mbIsSpam(v){ return !!mbSpamWhy(v); }
+/* ⚡ 한 번 그리는 동안 같은 메일을 두세 번 판정했다(목록 거르기 · 안 읽은 셈 · 걸린 줄) —
+   mbSpamWhy 32ms(15,056번). 그리는 «동안»만 사는 셈에 담는다 — 그리기가 시작되면 버린다. */
+function mbIsSpam(v){
+  if(!v || typeof v !== 'object') return !!mbSpamWhy(v);
+  const m = mbMemoOf();
+  const w = m.spamWhy || (m.spamWhy = new WeakMap());
+  let r = w.get(v);
+  if(r === undefined){ r = mbSpamWhy(v); w.set(v, r); }
+  return !!r;
+}
 /* 지금 손에 든 것 가운데 걸린 것 — 알림 줄과 셈이 «같은 값»을 쓰게 한다 */
 function mbSpamRows(){
   const m = mbMemoOf();
@@ -17460,7 +17764,9 @@ function mbWhoIndex(){
 /* ⚠ 그리는 동안의 셈도 함께 버린다 — 오래 사는 것만 지우면 «이번 그리기»는 옛 표를
      그대로 쓴다(담당자를 바꿨는데 화면이 안 바뀐다). */
 function mbWhoBust(){ _mbWhoIdx = null; const m0 = mbMemoOf();
-  delete m0.tally; delete m0.sentTally; delete m0.sentTallyFor; }
+  delete m0.tally; delete m0.sentTally; delete m0.sentTallyFor;
+  /* 담당자·스팸 판정 셈도 버린다(2026-10-02) — 사람이 바꾼 것이 그 자리에서 보여야 한다 */
+  delete m0.whoWhy; delete m0.whoWhyIdx; delete m0.spamWhy; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    자문이 끝난 업체 — 따로 모은다 (대표 지시 2026-08-26)
@@ -18251,6 +18557,23 @@ function mbWhoWhy(em0, idx0){
   const em = String(em0||'').trim().toLowerCase();
   const none = { who:'', why:'' };
   if(!em) return none;
+  /* ⚡ 한 번 그리는 동안 «주소 하나에 한 번» (대표 화면 2026-10-02 「10초 중 676ms 멈춤」).
+     탭 숫자·사람 칩·목록·자문종료 칸이 메일 7천여 통마다 이 판정을 «따로따로» 다시 했다 —
+     같은 주소를 몇 번이고. 그리는 동안만 사는 셈(mbMemoOf)에 담는다. 그리기가 시작되면 버린다.
+     ⚠ 담은 것은 «색인 한 판»에 묶는다 — 색인이 새로 만들어지면(명함이 흘러 들어오면) 버린다.
+     ⚠ 넘겨받은 색인(idx0)이 있으면 mbWhoIndex 를 «또 부르지 않는다» — 줄마다 부르면
+       그것이 다시 메일 수만큼 늘어난다(tests/mail-dash-speed.test.js). */
+  const idxNow = idx0 || mbWhoIndex();
+  const memo = (typeof mbMemoOf === 'function') ? mbMemoOf() : null;
+  if(memo && memo.whoWhyIdx !== idxNow){ memo.whoWhy = new Map(); memo.whoWhyIdx = idxNow; }
+  const hit = memo && memo.whoWhy.get(em);
+  if(hit) return hit;
+  const r = mbWhoWhyOf(em, idxNow, none);
+  if(memo) memo.whoWhy.set(em, r);
+  return r;
+}
+/* 위 판정의 «속» — 한 주소의 담당자와 그 까닭. 셈에 담는 것은 바깥(mbWhoWhy)이 한다. */
+function mbWhoWhyOf(em, idx0, none){
   const set = _mbOwner || {};
   const byHand = mbWhoLive(set[mbWhoKey(em)]);
   if(byHand) return { who:byHand, why:'hand' };           /* ① 사람이 정한 주소 */
@@ -18920,7 +19243,9 @@ function mbSubsOfRow(v, idx0){
        부담당과 «같은 길»이라 세는 곳(mbWhoTally)·거르는 곳(mbRowFits)이 저절로 맞는다.
        ⚠ 메일 담당(w)은 뺀다 — 주소로 잡힌 건(①-3)은 업체가 없어 main 이 비어 있다.
          안 빼면 한 사람 칸에 같은 메일이 두 번 세어진다. 건이 걸린 줄에서만 묻는다. */
-    const ws = mbWorkOfRow(v, idx0);
+    /* ⚠ 업체는 «위에서 찾은 것»을 넘긴다 — 메일 한 통마다 같은 업체를 두 번 찾으면
+         그것이 곧 느림이다(대표 화면 2026-10-02 「mbWhoKey 871,624번」). */
+    const ws = mbWorkOfRow(v, idx0, rec || null);
     if(ws.length){
       const w = mbWhoOfRow(v, idx0);
       mbWorkMgrs(ws).forEach(n=>{
@@ -19005,14 +19330,19 @@ function mbWorkMgrOfAddr(em){
   return ms.length === 1 ? ms[0] : '';
 }
 /* 이 메일에 걸린 진행 중인 건 «모두» — 주소로 + 업체로(id·사업자번호) */
-function mbWorkOfRow(v, idx0){
+/* ⚠ rec0 — 부르는 쪽이 «이미 찾은» 업체(없으면 null). 넘기면 다시 안 찾는다(mbSubsOfRow).
+     안 넘기면(undefined) 여기서 찾는다 — 딱지·누를 때처럼 한 통만 볼 때. */
+function mbWorkOfRow(v, idx0, rec0){
   if(!_mbWork) return [];
   const em = String((v&&v.e)||'').trim().toLowerCase();
   if(!em) return [];
-  const out = (_mbWork.byAddr[em] || []).slice();
+  const hit = _mbWork.byAddr[em];
+  /* 업체로 이어진 건이 하나도 없으면 업체를 찾을 까닭이 없다 */
+  if(!_mbWork.byCo.size) return hit ? hit.slice() : [];
+  const out = (hit || []).slice();
   /* 업체는 mbSubsOfRow 와 «같은 길»로 찾는다 — 사람이 이은 자문사가 먼저 */
-  let rec = mbCoRec(mbCoOf(em));
-  if(!rec){
+  let rec = rec0 !== undefined ? rec0 : mbCoRec(mbCoOf(em));
+  if(rec0 === undefined && !rec){
     const idx = idx0 || mbWhoIndex();
     const co = (idx.coAddr||{})[em];
     rec = co ? mbCoRec(co) : null;
@@ -19041,8 +19371,10 @@ function mbWorkTag(v, wide){
   const w0 = mbWhoOfRow(v);
   const mgrs = mbWorkMgrs(ws);
   const tip = ws.map(w=>`${MB_WORK_KIND[w.kind]} · ${w.co}${w.title?' · '+w.title:''} · 담당 ${mbWhoLive(w.mgr)||'없음'}`).join('\n')
-    + `\n누르면 푸른이알피 ${MB_WORK_KIND[ws[0].kind]}관리가 열립니다`;
-  const go = `event.stopPropagation();mbWorkGo('${ws[0].kind==='case'?'case':'consulting'}')`;
+    + (ws.length > 1 ? `\n누르면 어느 건을 열지 고릅니다` : `\n누르면 푸른이알피에서 이 ${MB_WORK_KIND[ws[0].kind]} 한 건이 열립니다`);
+  /* ⚠ 건 번호를 단추 글자에 싣지 않는다 — 누를 때 주소로 다시 찾는다(mbGuessLink 와 같은 까닭) */
+  const em = String((v&&v.e)||'').trim().toLowerCase();
+  const go = `event.stopPropagation();mbWorkPick('${esc(em)}',event)`;
   /* 그 건 담당의 칸에서 보면 — 업체 담당이 따로 있다는 것을 밝힌다 */
   const me = id.charAt(0)===MB_WHO_P ? id.slice(1) : '';
   if(me && w0 && me !== w0 && mgrs.indexOf(me) >= 0)
@@ -19053,11 +19385,33 @@ function mbWorkTag(v, wide){
   const more = wide && ws.length === 1 && ws[0].title ? ' — ' + ws[0].title : '';
   return `<span class="dm-work" onclick="${go}" title="${esc(tip)}">📁 ${esc(label + who + more)}</span>`;
 }
-/* 이알피 그 메뉴로 — 창은 공용 층이 고른다(한 앱 한 창).
+/* 📁 을 눌렀을 때 — 건이 하나면 바로, 여럿이면 고르게 (대표 지시 2026-09-30 「1번」) */
+function mbWorkPick(em, ev){
+  const ws = mbWorkOfRow({ e: String(em||'') });
+  if(!ws.length) return toast('진행 중인 사건·컨설팅이 이제 없습니다 — 끝났거나 담당자 이메일이 바뀌었습니다', 7000);
+  if(ws.length === 1) return mbWorkGo(ws[0]);
+  const m = $('folderMenu'); if(!m) return mbWorkGo(ws[0]);
+  m.innerHTML = `<div class="fmhead">어느 건을 열까요 <span>진행 중 ${ws.length}건</span></div>`
+    + ws.map((w, i)=>`<div class="fmi" onclick="closeFolderMenu();mbWorkGoAt('${esc(em)}',${i})">📁 ${
+        esc(MB_WORK_KIND[w.kind] + ' · ' + w.co + (w.title ? ' · ' + w.title : ''))}<small>담당 ${
+        esc(mbWhoLive(w.mgr) || '없음')}</small></div>`).join('');
+  mbPlaceMenu(m, ev);
+}
+function mbWorkGoAt(em, i){
+  const w = mbWorkOfRow({ e: String(em||'') })[Number(i)];
+  if(w) mbWorkGo(w);
+}
+/* 이알피 «그 한 건»으로 — 창은 공용 층이 고른다(한 앱 한 창).
    ⚠ 「계약 등록」과 같은 결로 «따로 이름 붙은 창»을 쓴다 — 보던 이알피 화면을 덮지 않는다.
-   ⚠ 이알피에는 아직 «한 건을 바로 여는» 주소가 없다 — 그 메뉴까지 간다. */
-function mbWorkGo(kind){
-  const url = 'pu-erp.html#menu=' + (kind === 'case' ? 'biz/case' : 'biz/consulting');
+   ★ 건 번호는 주소의 ?open= 으로 넘긴다. 받는 쪽은 pu-erp.html 의 erpOpenRecFromUrl.
+     ⚠ localStorage 쪽지로 넘기지 않는다 — 쪽지는 «열린 이알피 창 전부»가 듣고 함께
+       움직인다(쓰던 화면까지 튄다). 주소는 그 창 하나에만 간다.
+     ⚠ opent(시각)를 함께 붙인다 — 같은 건을 두 번 누르면 주소가 같아 창이 안 움직인다. */
+function mbWorkGo(w){
+  if(!w) return;
+  const kind = w.kind === 'case' ? 'case' : 'consulting';
+  const url = 'pu-erp.html' + (w.id ? '?open=' + kind + ':' + encodeURIComponent(w.id) + '&opent=' + Date.now() : '')
+    + '#menu=' + (kind === 'case' ? 'biz/case' : 'biz/consulting');
   if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(url, '사무관리 보기');
   else location.href = url;
 }
@@ -19377,18 +19731,44 @@ function mbNeedSlugs(id){
 }
 
 /* ── 이 칸에 몇 통 들어 있나 ── (왼쪽 줄 끝의 숫자·안 읽은 수) */
-function mbBinCount(bin){
-  let loaded = 0, un = 0;
+/* ⚡ 모든 칸의 셈을 «한 번에» 한다 (대표 화면 2026-10-02 「계속 나오는데 근본적인 해결 안되나」)
+   ★ 예전에는 칸 «하나마다» 받아 둔 메일 전부(2,250통)를 처음부터 훑었다. 칸이 21개라
+     한 번 그릴 때 4만 7천 번, 처음 뜰 때 16번 다시 그리며 75만 번이 됐다
+     (「mbPutOf 756,685번 · mbBinCount 336번」). 이제 그릴 때마다 «한 번»만 훑어
+     칸마다·폴더마다 몫을 나눠 담아 두고, 칸은 그 표에서 꺼내기만 한다.
+   ⚠ 셈은 «예전과 글자 하나까지» 같다 — 옮긴 메일은 옮긴 칸, 안 옮긴 메일은 이어진 폴더.
+   ⚠ 표는 그리는 동안만 산다(mbMemoOf) — 두 그리개가 그리기 «전에» 비운다. */
+function mbBinTally(){
+  const m = mbMemoOf();
+  if(m.binTally) return m.binTally;
+  const put = _mbPut||{};
+  const byBin = {}, bySlug = {};          /* 옮긴 것은 칸으로 · 안 옮긴 것은 제 폴더로 */
   Object.keys(_mbMsgs||{}).forEach(slug=>{
     const box = _mbMsgs[slug]||{};
     Object.keys(box).forEach(uid=>{
       const v = box[uid]; if(!v) return;
-      const put = mbPutOf(slug+':'+uid);
-      const mine = put ? (put===bin.id) : (!!bin.link && slug===bin.link);
-      if(!mine) return;
-      loaded++; if(!Number(v.r||0)) un++;
+      const p = String(put[slug+':'+uid] || '');
+      const t = p ? (byBin[p] = byBin[p] || { n:0, un:0 })
+                  : (bySlug[slug] = bySlug[slug] || { n:0, un:0 });
+      t.n++; if(!Number(v.r||0)) t.un++;
     });
   });
+  /* 쪽지(_mbPut)는 폴더 통수에서 빼고 더할 몫 — 폴더별·칸별·(폴더,칸)별로 한 번 센다 */
+  const putFrom = {}, putTo = {}, putPair = {};
+  Object.keys(put).forEach(k=>{
+    const at = k.lastIndexOf(':'); if(at <= 0) return;
+    const slug = k.slice(0, at), to = put[k];
+    putFrom[slug] = (putFrom[slug]||0) + 1;
+    if(typeof to !== 'string') return;    /* 예전 셈은 글자로만 견줬다(=== bin.id) */
+    putTo[to] = (putTo[to]||0) + 1;
+    const pk = slug + '\n' + to; putPair[pk] = (putPair[pk]||0) + 1;
+  });
+  return (m.binTally = { byBin, bySlug, putFrom, putTo, putPair });
+}
+function mbBinCount(bin){
+  const T = mbBinTally();
+  const mine = T.byBin[bin.id], left = bin.link ? T.bySlug[bin.link] : null;
+  const un = (mine ? mine.un : 0) + (left ? left.un : 0);
   /* ── 통수는 «읽어 온 것»으로 세면 안 된다 (2026-08-27) ──
      ⚠ 예전에는 폴더를 안 읽었을 때만 서버 셈을 쓰고, 읽고 나면 «읽어 온 것»을 세었다.
        그래서 「1.자문사답변 404」가 그 칸을 «누르는 순간 100» 으로 줄었다. 한 통도
@@ -19397,14 +19777,10 @@ function mbBinCount(bin){
        더하면 된다. 쪽지(_mbPut)는 한 쪽만 받아 오는 것이 아니라 «통째로» 있으므로
        이 셈은 얼마나 읽어 왔는지와 상관없이 늘 같다. */
   const f = bin.link ? mbFolderBy(bin.link) : null;
-  const put = _mbPut||{};
-  let out = 0, into = 0;
-  Object.keys(put).forEach(k=>{
-    const at = k.lastIndexOf(':'); if(at <= 0) return;
-    const slug = k.slice(0, at);
-    if(bin.link && slug === bin.link){ if(put[k] !== bin.id) out++; return; }
-    if(put[k] === bin.id) into++;
-  });
+  /* 이어진 폴더에서 «밖으로» 옮긴 것 · 딴 폴더에서 «이 칸으로» 들어온 것 */
+  const stay = bin.link ? (T.putPair[bin.link + '\n' + bin.id] || 0) : 0;
+  const out = bin.link ? (T.putFrom[bin.link] || 0) - stay : 0;
+  const into = (T.putTo[bin.id] || 0) - stay;
   const n = f ? Math.max(0, Number(f.total||0) - out + into) : into;
   /* ⚠ 안 읽은 수는 이렇게 셀 수 없다 — 읽었는지는 줄마다 봐야 안다. 아직 그 폴더를
      안 읽어 왔으면 서버가 적어 둔 값을, 읽어 왔으면 그중에서 센다. 안 읽은 메일은
@@ -21508,7 +21884,7 @@ function mbPickMode(){
 function mbMobileHtml(){
   /* ⚠ 읽는 화면은 PC 것을 그대로 쓴다 — 그래서 «미리보기 창»도 함께 달아야 한다.
        PC 쪽에만 달면 폰에서 [👁 미리보기]를 눌러도 아무 일이 안 일어난다. */
-  if(state.mbOpen) return mbReadHtml() + mbPvHtml();
+  if(state.mbOpen) return mbReadHtml() + mbPvHtml() + mbNewHtml();   /* PC 와 같은 창 둘 — mbReadPopsHtml */
   const rows = mbVisibleRows();
   const sel = pickOf('mbox');
   const nPick = pickList(sel, rows.map(v=>v._key)).length;
@@ -21941,11 +22317,18 @@ function mbPagerHtml(){
 function mbBoxHtml(){
   if(!state.mbOpen) return mbListHtml();
   const m = mbViewMode();
-  if(m === 'list') return mbReadHtml();
+  /* ⚠ 「목록만」은 목록(mbListHtml)을 «안» 그린다 — 그런데 읽는 화면에서 여는 창
+       (👁 첨부 미리보기 · ❓ 처음 보는 주소 등록)은 목록 아래에 붙어 있었다. 그래서
+       단추를 눌러도 창이 그려질 자리가 없어 «아무 일도 안 일어났다»
+       (대표 보고 2026-10-02 「미리보기 작동안한다」). 여기서 함께 붙인다.
+       나눠 보기는 목록을 그리므로 거기 붙은 것이 그대로 뜬다 — 두 번 붙이지 않는다. */
+  if(m === 'list') return mbReadHtml() + mbReadPopsHtml();
   return `<div class="dm-split ${esc(m)}">
     <div class="lst">${mbListHtml()}</div>
     <div class="rd">${mbReadHtml()}</div></div>`;
 }
+/* 읽는 화면에서 여는 창 — 목록을 안 그리는 「목록만」에서도 떠야 한다(mbBoxHtml) */
+function mbReadPopsHtml(){ return mbPvHtml() + mbNewHtml(); }
 function mbListHtml(){
   const rows = mbVisibleRows();
   const sel = pickOf('mbox');
@@ -25312,52 +25695,144 @@ function deleteView(id){
   Store.delView(id); toast(`'${v.name}' 탭을 삭제했습니다`);
   if($('dedupBg').classList.contains('open')) setTimeout(function(){_refresh(openViewManager)}, 80);   /* 관리창 열려 있으면 갱신 */
 }
-/* 환경설정 → 내 탭 전체 관리 (한 곳에서 삭제·이름변경) */
+/* 환경설정 → 내 탭 관리 (대표 지시 2026-09-30 「너무 정리가 안되어 있다 … 탭관련 한눈에 보기 쉽게」 → 목업 → 「진행」)
+   ■ 무엇이 나빴나: 탭 이름이 안 보였다(밝은 바탕에 굵은 글씨 색) · 한 탭이 두 줄 · 큰 단추 둘 · 28개가 한 줄로 길게 ·
+     몇 장이 걸리는지, 겹치는 탭이 있는지 알 길이 없었다.
+   ★ «무엇으로 거르는 탭인가»로 묶고, 한 탭 = 한 줄(이름 · 대상 · 조건 · 명함 수 · ↑↓ 이름 삭제).
+   ★ 0장인 탭 · 조건이 같은 탭은 주황으로 알린다.
+   ⚠ 명함 수는 «나중에» 하나씩 센다(vmCountRun) — 28개를 한꺼번에 세면 여는 순간 화면이 멈춘다.
+     세는 기준은 목록과 같은 countMatching 이다(따로 세면 보이는 수와 눌러서 나오는 수가 달라진다). */
+let _vmCounts = {};      /* id → 명함 수. 셀 때마다 새로 */
+let _vmCounting = false;
+let _vmCountedAt = 0;   /* 1분 지나면 다시 센다 — 그 사이 명함이 늘었을 수 있다 */
+let _vmSeg = 'all';
+const VM_GROUPS = [['erp', '이알피 갈래'], ['match', '회사·이름으로 거르기'], ['manual', '직접 담는 탭'], ['etc', '그 밖']];
+function vmGroupOf(v){
+  const f = (v && v.f) || {}, c = f.colFilter || {};
+  if(v && v.manual) return 'manual';
+  if(f.erpFilter) return 'erp';
+  if(c.company || c.name || f.q) return 'match';
+  return 'etc';
+}
+function vmDesc(f){
+  f=f||{}; const c=f.colFilter||{}; const out=[];
+  if(f.q) out.push(`검색 「${f.q}」`);
+  if(f.owner&&f.owner!=='all') out.push('담당 '+f.owner);
+  if(f.region) out.push('지역 '+f.region);
+  if(f.erpFilter) out.push('이알피 '+(ERP_FILTER_LABEL[f.erpFilter]||f.erpFilter));
+  if(f.erpMgr) out.push('담당 '+f.erpMgr);
+  if(c.company) out.push(`회사에 「${c.company}」`);
+  if(c.name) out.push(`이름에 「${c.name}」`);
+  if(c.phone) out.push(`전화에 「${c.phone}」`);
+  if(c.email) out.push(`이메일에 「${c.email}」`);
+  if(f.onlyPhone) out.push('전화있음');
+  if(f.onlyEmail) out.push('이메일있음');
+  if(f.onlyIncomplete) out.push('정보부족만');
+  if(f.onlyPrivate) out.push('개인만');
+  if(f.onlyDup) out.push('중복만');
+  return out.length ? out.join(' · ') : '조건 없음';
+}
+/* 같은 대상·같은 조건의 탭끼리 — 담는 탭은 저마다 다른 칸이라 빼고 본다 */
+function vmTwins(vs){
+  const by = {};
+  vs.forEach(v => { if(v.manual) return;
+    const k = (v.kind||'card') + '|' + (v.scope||'all') + '|' + viewSig(v.f);
+    (by[k] = by[k] || []).push(v); });
+  const out = {};
+  Object.keys(by).forEach(k => { if(by[k].length > 1) by[k].forEach(v => {
+    out[v.id] = by[k].filter(x => x.id !== v.id).map(x => x.name); }); });
+  return out;
+}
+function vmSorted(){
+  return Object.values(state.views||{}).filter(v=>v&&v.id)
+    .sort((a,b)=>((a.kind||'card')===(b.kind||'card') ? (a.order||0)-(b.order||0) : ((a.kind||'card')==='card'?-1:1)));
+}
+function vmScopeName(v){
+  const sc=(v.scope||'all');
+  return sc==='all' ? ((v.kind||'card')==='biz'?'전체 사업자':'전체 명함')
+       : (sc==='' ? '미분류' : ((state.groups[sc]||{}).name || '(삭제된 폴더)'));
+}
+/* 한 탭의 명함 수 — 목록과 같은 잣대(countMatching). 사업자 탭은 잠깐 갈래를 바꿔 센다 */
+function vmCountOne(v){
+  const t = state.tab;
+  try{ state.tab = v.kind || 'card'; return countMatching(v.f); }
+  catch(_){ return null; }
+  finally{ state.tab = t; }
+}
+function vmCountRun(){
+  if(_vmCounting) return;
+  _vmCounting = true; _vmCounts = {};
+  const q = vmSorted();
+  (function step(){
+    const v = q.shift();
+    if(!v){ _vmCounting = false; _vmCountedAt = Date.now(); vmRepaint(); return; }
+    _vmCounts[v.id] = vmCountOne(v);
+    setTimeout(step, 0);                   /* 하나씩 — 화면을 멈추지 않는다 */
+  })();
+}
+/* 환경설정 안(인라인)이면 그 자리에, 팝업이면 팝업에 다시 그린다 */
+function vmRepaint(){
+  if(state.view==='settings' && state.setSub==='views') renderSettingsPage();
+  else if($('dedupBg') && $('dedupBg').classList.contains('open')) openViewManager();
+}
+function vmSegSet(k){ _vmSeg = k; vmRepaint(); }
+/* ↑↓ — 같은 갈래(명함·사업자) 안에서 이웃과 차례를 맞바꾼다 */
+function vmMove(id, dir){
+  const v = (state.views||{})[id]; if(!v) return;
+  const same = vmSorted().filter(x => (x.kind||'card') === (v.kind||'card'));
+  const i = same.findIndex(x => x.id === id), j = i + (dir < 0 ? -1 : 1);
+  if(i < 0 || j < 0 || j >= same.length) return;
+  const a = same[i], b = same[j];
+  let oa = a.order || 0, ob = b.order || 0;
+  if(oa === ob){ ob = oa + (dir < 0 ? -1 : 1); }
+  Store.putView(Object.assign({}, a, { order: ob })); state.views[a.id] = Object.assign({}, a, { order: ob });
+  Store.putView(Object.assign({}, b, { order: oa })); state.views[b.id] = Object.assign({}, b, { order: oa });
+  vmRepaint();
+}
+function vmRename(id){ renameView(id); setTimeout(vmRepaint, 80); }
+function vmDelete(id){ deleteView(id); setTimeout(vmRepaint, 80); }
 function openViewManager(){
-  const vs=Object.values(state.views||{}).filter(v=>v&&v.id)
-            .sort((a,b)=>((a.kind||'card')===(b.kind||'card') ? (a.order||0)-(b.order||0) : ((a.kind||'card')==='card'?-1:1)));
+  const vs = vmSorted();
   if(!vs.length){
     if(_panelTarget==='inline') return showPanel(`<div style="padding:22px;text-align:center;color:var(--sub);font-size:13px;line-height:1.8">
       아직 만들어 둔 탭이 없습니다.<br>목록 화면에서 조건을 걸고 <b>[＋ 탭 추가]</b>를 누르면 여기서 관리할 수 있어요.</div>`);
     $('dedupBg').classList.remove('open');
     return toast('만들어 둔 탭이 없습니다 — 목록 화면에서 [＋ 탭 추가]로 만드세요',5000); }
-  const desc = f => {
-    f=f||{}; const c=f.colFilter||{}; const out=[];
-    if(f.q) out.push(`검색 "${f.q}"`);
-    if(f.group&&f.group!=='all') out.push('폴더 '+((state.groups[f.group]||{}).name||'(삭제된 폴더)'));
-    if(f.owner&&f.owner!=='all') out.push('담당 '+f.owner);
-    if(f.region) out.push('지역 '+f.region);
-    if(f.erpFilter) out.push('ERP '+(ERP_FILTER_LABEL[f.erpFilter]||f.erpFilter));
-    if(f.erpMgr) out.push('담당 '+f.erpMgr);
-    if(c.company) out.push(`회사에 "${c.company}"`);
-    if(c.name) out.push(`이름에 "${c.name}"`);
-    if(c.phone) out.push(`전화에 "${c.phone}"`);
-    if(c.email) out.push(`이메일에 "${c.email}"`);
-    if(f.onlyPhone) out.push('전화있음');
-    if(f.onlyEmail) out.push('이메일있음');
-    if(f.onlyIncomplete) out.push('정보부족만');
-    if(f.onlyPrivate) out.push('개인만');
-    if(f.onlyDup) out.push('중복만');
-    return out.length ? out.join(' · ') : '조건 없음 (전체 보기)';
+  const counted = !_vmCounting && vs.every(v => v.id in _vmCounts) && Date.now() - _vmCountedAt < 60000;
+  if(!counted && !_vmCounting) setTimeout(vmCountRun, 0);
+  const twins = vmTwins(vs);
+  const zero = vs.filter(v => _vmCounts[v.id] === 0);
+  const nCard = vs.filter(v => (v.kind||'card') === 'card').length;
+  const seg = ['all','card','biz','zero','twin'].indexOf(_vmSeg) >= 0 ? _vmSeg : 'all';
+  const pick = v => seg === 'all' ? true : seg === 'card' ? (v.kind||'card') === 'card' : seg === 'biz' ? v.kind === 'biz'
+                  : seg === 'zero' ? _vmCounts[v.id] === 0 : !!twins[v.id];
+  const segBtn = (k, label, n, warn) => `<button class="ntsseg${seg===k?' on':''}${warn && n ? ' vmwarn' : ''}" onclick="vmSegSet('${k}')">${label}<b>${n}</b></button>`;
+  const row = v => {
+    const n = _vmCounts[v.id];
+    const tw = twins[v.id] ? `<span class="vmtw" title="대상·조건이 같은 탭: ${esc(twins[v.id].join(', '))}">조건 같음: ${esc(twins[v.id][0])}</span>` : '';
+    return `<tr>
+      <td class="nm" title="${esc(v.name)}">${esc(v.name)}</td>
+      <td><span class="vmsc">📁 ${esc(vmScopeName(v))}</span></td>
+      <td class="why" title="${esc(v.manual ? '직접 골라 담은 명함' : vmDesc(v.f))}">${esc(v.manual ? '직접 골라 담은 명함' : vmDesc(v.f))}${tw}</td>
+      <td class="vmn${n === 0 ? ' zero' : ''}">${n == null ? '…' : n.toLocaleString()}</td>
+      <td class="act"><span class="vmact">
+        <button onclick="vmMove('${v.id}',-1)" title="위로">↑</button><button onclick="vmMove('${v.id}',1)" title="아래로">↓</button>
+        <button onclick="vmRename('${v.id}')">이름</button><button class="del" onclick="vmDelete('${v.id}')">삭제</button></span></td></tr>`;
   };
-  let h=`<div class="mhead"><b>🔖 내 탭 관리 — ${vs.length}개</b>
-    ${_closeBtn()}</div>
-    <p style="font-size:12.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
-    탭은 <b>보기 조건</b>일 뿐이라, 삭제해도 <b>명함은 그대로</b>입니다. 전 직원이 함께 쓰는 탭이에요.</p>`;
-  vs.forEach(v=>{
-    const sc=(v.scope||'all');
-    const scName = sc==='all' ? ((v.kind||'card')==='biz'?'전체 사업자등록증':'전체 명함')
-                 : (sc==='' ? '미분류' : ((state.groups[sc]||{}).name || '(삭제된 폴더)'));
-    h+=`<div class="ditem" style="align-items:center"><div class="v">
-      <b>🔖 ${esc(v.name)}</b> <span style="font-size:11px;color:var(--sub)">${(v.kind||'card')==='biz'?'사업자':'명함'}</span>
-      <span style="font-size:11px;color:#1e40af;background:#f8fafc;border:1px solid #bfdbfe;border-radius:8px;padding:1px 7px;margin-left:4px">📁 ${esc(scName)}</span><br>
-      <span style="font-size:12px;color:var(--sub)">${esc(desc(v.f))}</span></div>
-      <div style="display:flex;gap:6px;flex:none;margin-left:8px">
-        <button class="btn ghost" style="padding:7px 12px" onclick="renameView('${v.id}');setTimeout(function(){_refresh(openViewManager)},80)">이름</button>
-        <button class="btn ghost" style="padding:7px 12px;color:#dc2626" onclick="deleteView('${v.id}')">삭제</button>
-      </div></div>`;
-  });
-  showPanel(h);
+  const shown = vs.filter(pick);
+  const body = VM_GROUPS.map(([g, label]) => {
+    const rows = shown.filter(v => vmGroupOf(v) === g);
+    if(!rows.length) return '';
+    return `<div class="setg" style="margin-top:12px">${label} · ${rows.length}</div>
+      <div class="ntswrap" style="max-height:none"><table class="ntstbl vmtbl"><thead><tr>
+        <th style="width:22%">탭 이름</th><th style="width:16%">대상</th><th>조건</th><th style="width:8%;text-align:right">${seg==='biz'?'사업자':'명함'}</th><th style="width:170px"></th>
+      </tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
+  }).join('');
+  showPanel(`<div class="mhead"><b>🔖 내 탭 관리</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 8px">전 직원이 함께 쓰는 탭입니다 · 지워도 명함은 그대로입니다${_vmCounting ? ' · 명함 수를 세는 중…' : ''}</p>
+    <div class="ntsbar">${segBtn('all','전체',vs.length)}${segBtn('card','명함',nCard)}${segBtn('biz','사업자',vs.length-nCard)}${
+      segBtn('zero','0장인 탭', counted ? zero.length : '…', true)}${segBtn('twin','조건이 같은 탭',Object.keys(twins).length, true)}</div>
+    ${body || '<p class="cpnone" style="padding:16px 2px">여기에 해당하는 탭이 없습니다 👍</p>'}`);
 }
 /* 탭은 '지금 보고 있는 폴더(대시보드)'에 소속 — 그 폴더에서만 보인다. 각 탭에 인원수 표시 */
 /* 지금 폴더는 그대로 두고 탭·검색·필터만 모두 푼다.
@@ -25539,6 +26014,8 @@ function showPanel(html){
 let _panelWide = false;
 function showWidePanel(html){ _panelWide = true; showPanel(html); }
 function setSub(s){ state.setSub=s||''; renderSettingsPage(); }
+/* 환경설정 «한 단계 뒤로» — 하위 화면이면 목록으로, 목록이면 원래 화면으로(Esc 가 부른다) */
+function settingsBack(){ if(state.setSub) setSub(''); else closeSettingsPage(); }
 /* 정리 작업 뒤 화면 갱신 — 환경설정 안이면 인라인을 다시 그리고, 목록에서면 팝업을 다시 연다 */
 /* ⚠ 정리를 하고 나면 «다시 센다» — 안 버리면 방금 치운 것이 띠에 그대로 떠 있다.
      이 한 줄이 정리하는 «모든 길»을 덮는다 — 어느 화면이든 끝나면 여기로 온다. */
@@ -26234,110 +26711,89 @@ function todoList(){ return todoAll().filter(r=>r.n > 0); }
      했는데, 탭을 없애며 setSub(sub||'') 로 두었더니 sub 가 빈 것은 목록으로
      돌아와 «아무 일도 안 일어난» 것처럼 보였다. */
 function todoGo(sub){ setSub(sub || 'clean'); }
-function todoRailHtml(){
-  const rows = todoList();
-  if(!rows.length){
-    return `<p class="setnote" style="color:var(--green);margin:0 0 13px">
-      ✓ 지금 손볼 것이 없습니다</p>`;
-  }
-  return `<div class="todorail">
-    <div class="tr-t">🔔 지금 손볼 것 <span>${rows.length}가지</span></div>
-    <div class="setpanel">${rows.map(r=>`<button class="setbtn"
-      onclick="todoGo('${esc(r.sub)}')">${r.icon} ${esc(r.label)}
-      <span class="sdesc todo">${r.n.toLocaleString()}${esc(r.unit)}</span></button>`).join('')}</div>
-  </div>`;
-}
+/* ══════ ⚙️ 환경설정 — 왼쪽 메뉴 + 한 줄 목록 (대표 지시 2026-09-29 「좀더 깔끔하게」 → 목업 → 「네」) ══════
+   「환경설정을 좀 더 깔끔하게 정리해달라. 현재는 너무 보기 혼란스럽다」
 
-/* ══════ ⚙️ 환경설정 — 탭을 없애고 «한 화면» (대표 결정 2026-09-05 「다」= 목업 ㉰) ══════
-   「좀 직관적이고 쉽게 볼 수 있게」
-
-   여섯 탭에 서른 개를 나눠 두었더니 «어디에 있더라»로 탭을 다 눌러 보게 됐다.
-   서른 개는 스크롤 한 번이면 다 보인다 — 탭을 없애고 섹션으로 세운다.
-
-   ★ 섹션을 «자료»로 둔다. 화면을 손으로 이어 붙이면 옮기다 하나가 조용히 빠지는데,
-     자료로 두면 검사가 「서른 개가 다 있나」를 셀 수 있다.
-   ★ 차례가 곧 «얼마나 자주 쓰나»다 — 자주 쓰는 것이 맨 위, 한 번만 하는 일이 아래,
-     되돌릴 수 없는 것이 맨 아래.
-   ⚠ 하위 화면(내 탭 관리·대조 결과·휴지통…)을 열면 «그것만» 보인다 — 「← 환경설정으로」
-     로 돌아온다. 목록 밑에 붙이면 어디에 펼쳐졌는지 못 찾는다.
-   ⚠ 「정리」는 섹션이 «둘»로 갈렸다 — 숫자가 있는 것은 맨 위 띠로, 이상 없는 것은
-     「더 손볼 것」으로. 그래서 정리 탭이 통째로 없어졌다. */
-/* ══════ ⚙️ 환경설정 — 상위 탭 + 내용 (대표 지시 2026-09-07) ══════
-   「너무 정신없다 … 찾기 힘들다 상위탭 과 내용으로 다시 정리해라」
-
-   ■ 오간 길 — 세 번째다. 그 까닭을 적어 둔다.
-     ① 여섯 탭 → 「내부가 통일이 안 되어 있다」 → 결을 맞췄다(#956)
-     ② 목업 검토 → 대표가 「다」(탭을 없애고 한 화면)를 고름 → 만들었다(#970)
-     ③ **써 보니 「너무 정신없다」** → 다시 탭. 서른 개가 한 화면에 서면 비슷한 줄이
-        스물 몇 개라 눈이 훑을 곳을 못 정한다 — 목업에서는 안 보이던 것이다.
-   ★ 목업이 아니라 **써 본 것이 이긴다.** 되돌리는 것을 부끄러워할 일이 아니다.
-   ★ 다만 ②에서 얻은 것은 «지킨다» —
-     · 🔔 할 일 띠는 탭 «위»에 늘 있다(대표 결정 「나」). 안 눌러도 보여야 한다.
-     · 칸을 자료(SET_SECTIONS)로 둔다 — 검사가 서른 개를 셀 수 있다.
-     · 결(.setbtn·hero)과 「값은 안 채운다」류 짧은 설명도 그대로다.
-
-   ⚠ 탭은 «넷»이다. 여섯이던 때는 「데이터/정리/이알피/탭·자료/계정·AI/위험 구역」이라
-     비슷한 이름이 섞여 어디에 뭐가 있는지 못 외웠다. 넷은 서로 안 겹치게 갈랐다.
-   ⚠ 정리 탭에는 여덟 갈래가 «전부» 온다(숫자 있는 것도). 띠는 «빠른 길»이고
-     정리 탭이 «제 자리»다 — 정리하러 왔으면 한 곳만 보면 되게. */
+   ■ 오간 길 — 네 번째다(여섯 탭 → 한 화면 → 탭 넷 → 이것). 까닭은 늘 «같은 것이 여러 번 보이고,
+     눈이 훑을 곳을 못 정한다»였다. 이번에는 꾸밈을 뺐다(휴대폰 「설정」 화면의 결):
+     · 왼쪽 메뉴 다섯 줄 — 정리 · 자료 · 이알피 | 내 설정 · 관리자(대표만)
+     · 오른쪽은 한 줄 목록 — 「이름 ····· 값 ›」. 긴 설명은 title(마우스를 올리면)으로만
+     · 색은 둘뿐 — 손볼 숫자는 주황, 위험한 것은 빨강
+   ★ 할 일은 «정리 한 곳»에만 — 맨 위 🔔 띠를 없앴다. 같은 넷이 띠와 탭에 두 번 나와 헷갈렸다.
+     대신 손볼 것이 있으면 환경설정이 «정리»로 열리고, 메뉴에 주황 숫자가 붙는다.
+   ★ 칸은 여전히 «자료»(SET_SECTIONS)다 — 검사가 갈 곳을 하나도 안 흘렸는지 센다.
+   ⚠ 「계정·관리」를 «내 설정»(누구나)과 «관리자»(대표만)로 갈랐다. 전체 비우기는 관리자로 —
+     직원 화면에서 명함 전체를 지울 단추가 사라진다(대표 확인 2026-09-29). */
 const SET_TABS = [
-  { k:'data',  label:'📦 자료',      hint:'백업 · 내보내기 · 가져오기' },
-  { k:'clean', label:'🧹 정리',      hint:'중복 · 빈 명함 · 휴지통' },
-  { k:'erp',   label:'🔗 이알피',    hint:'푸른이알피와 맞추기' },
-  { k:'acct',  label:'⚙ 계정 · 관리', hint:'내 탭 · AI · 관리자' }
+  { k:'clean', label:'🧹 정리',   hint:'중복 · 빈 명함 · 휴지통' },
+  { k:'data',  label:'📦 자료',   hint:'백업 · 내보내기 · 가져오기' },
+  { k:'erp',   label:'🔗 이알피', hint:'푸른이알피와 맞추기' },
+  { k:'me',    label:'👤 내 설정', hint:'내 탭 · 메일 · AI', gap:true },
+  { k:'admin', label:'🔒 관리자', hint:'대표만 — 기록 · 한 번만 하는 일', admin:true }
 ];
-function setSetTab(k){ state.setTab = String(k||'data'); state.setSub=''; renderSettingsPage(); }
+function setTabsFor(){ return SET_TABS.filter(t => !t.admin || state.isAdmin); }
+/* 열 때 어느 칸인가 — 손볼 것이 있으면 정리, 없으면 자료. 모르는 이름도 여기로 */
+function setTabNow(){
+  const k = String(state.setTab || '');
+  if(setTabsFor().some(t => t.k === k)) return k;
+  return todoList().length ? 'clean' : 'data';
+}
+function setSetTab(k){ state.setTab = String(k||''); state.setSub=''; renderSettingsPage(); }
 
 function SET_SECTIONS(){
   const A = state.isAdmin;
   const aiOn = aiReady();
-  /* ⚠ 이름을 «만드는 것»으로 짓는다 — 이 한 줄이 .setbtn 하나가 된다.
-     한 글자 이름(B)으로 두면 다음 사람이 무엇인지 되짚어야 한다. */
-  const setbtn = (fn,icon,label,desc,cls)=>({ fn, icon, label, desc: desc||'', cls: cls||'' });
+  /* ⚠ 이름을 «만드는 것»으로 짓는다 — 이 한 줄이 목록 한 줄(.setrow)이 된다.
+     desc 는 화면에 안 깐다(title) · val 은 «지금 값»이라 오른쪽에 보인다 */
+  const setbtn = (fn,icon,label,desc,cls,val)=>({ fn, icon, label, desc: desc||'', cls: cls||'', val: val||'' });
   return [
-    { t:'자주 쓰는 것', tab:'data', rows:[
-      setbtn('backupNow()','💾','지금 백업','JSON 저장','hero'),
-      setbtn('openExportPick()','📤','엑셀로 내보내기','명함 · 사업자 · 기업 상세','hero'),
-      setbtn('openMatPage()','📎','자료함','회사소개서 · 계약서','hero')
+    { t:'내보내기', tab:'data', rows:[
+      setbtn('backupNow()','💾','지금 백업','JSON 파일로 저장'),
+      setbtn('openExportPick()','📤','엑셀로 내보내기','명함 · 사업자 · 기업 상세'),
+      setbtn('printList()','🖨','인쇄 / PDF','지금 보이는 목록')
     ]},
-    { t:'자료 넣고 빼기', tab:'data', rows:[
-      setbtn('importInput.click()','📥','파일 가져오기','리멤버·구글·vCard'),
-      setbtn('restoreInput.click()','📂','백업 복원','JSON 불러오기'),
-      setbtn('printList()','🖨','인쇄 / PDF','현재 목록')
+    { t:'가져오기', tab:'data', rows:[
+      setbtn('importInput.click()','📥','파일 가져오기','리멤버 · 구글 · vCard'),
+      setbtn('restoreInput.click()','📂','백업 복원','JSON 백업 불러오기')
     ]},
-    { t:'푸른이알피 연동', tab:'erp', rows:[
-      setbtn(`setSub('erpname')`,'🔗','대표자·담당자 대조','ERP에만 있는 이름'),
+    { t:'', tab:'data', rows:[
+      setbtn('openMatPage()','📎','자료함','회사소개서 · 계약서')
+    ]},
+    { t:'맞추기', tab:'erp', rows:[
+      setbtn(`setSub('erpname')`,'🔗','대표자·담당자 대조','이알피에만 있는 이름'),
+      setbtn('openCardFillCo()','🏢','회사 빠진 명함 채우기','사업자번호로 찾아서')
+    ]},
+    { t:'정리 · 기록', tab:'erp', rows:[
       setbtn('openErpClosedTidy()','🏚','종료업체 명함 정리','업체퇴사 폴더로'),
-      setbtn('openCardFillCo()','🏢','회사 빠진 명함 채우기','사업자번호로 찾아서'),
       setbtn('openCoDupDocs()','🧹','같은 서류 정리','두 번 들어온 기록을 휴지통으로'),
-      setbtn('rebuildIdxAll()','🔄','검색목록 다시 만들기','팩스·업태 등 새 항목 채우기'),
       setbtn('openCoSentBatch()','📤','서류 배포 기록','전 사업장에 보낸 서류를 한 번에')
     ]},
-    { t:'탭 · 계정', tab:'acct', rows:[
-      setbtn(`setSub('views')`,'🔖','내 탭 관리',`${Object.keys(state.views||{}).length}개`),
-      setbtn('openSettings()','🤖','AI 키 설정',aiOn?'켜짐':'꺼짐'),
-      setbtn(`setSub('mailblock')`,'🚫','메일 수신거부 관리',`${Object.keys(state.mailBlock||{}).length}명`),
-      A ? setbtn('openPrivateVault()','🔒','개인 폴더', state.privOpen?'열림':'잠김') : null,
+    { t:'', tab:'me', rows:[
+      setbtn(`setSub('views')`,'🔖','내 탭 관리','','',`${Object.keys(state.views||{}).length}개`),
+      A ? setbtn('openPrivateVault()','🔒','개인 폴더','대표만','',state.privOpen?'열림':'잠김') : null,
+      setbtn(`setSub('mailblock')`,'🚫','메일 수신거부','','',`${Object.keys(state.mailBlock||{}).length}명`),
+      setbtn('openSettings()','🤖','AI 자동인식','','',aiOn?'켜짐':'꺼짐')
+    ]},
+    { t:'', tab:'me', rows:[
       setbtn('doLogoutCards()','🔓','로그아웃','')
     ]},
-    /* ⚠ 한 번 하면 끝나는 일 — 매주 쓰는 것과 «같은 자리»에 두면 매번 눈으로 걸러야 한다.
-         모두 관리자만 보므로, 대표가 아니면 이 칸이 통째로 사라진다. */
-    { t:'관리자 · 한 번만 하는 일', tab:'acct', rows: A ? [
-      /* ⚠ 「명함 그림 빼기」가 이 칸의 «맨 앞»이다 (2026-08-23 대표: 「썸내일 어딘지
-           모르겠다 찾아달라」 — 두 번 찾다 못 찾으셨다). 뒤에 두면 좁은 창에서
-           둘째 줄로 밀린다. */
-      setbtn('migrateInlineThumbs()','🖼','명함 그림 빼기','여는 속도 개선'),
+    { t:'', tab:'admin', rows: A ? [
       setbtn('openExportLog()','🧾','반출 기록','누가 무엇을 내려받았나'),
+      setbtn('rebuildIdxAll()','🔄','검색목록 다시 만들기','팩스 · 업태 등 새 항목 채우기')
+    ] : [] },
+    /* ⚠ 「명함 그림 빼기」가 이 칸의 «맨 앞»이다 (2026-08-23 대표: 「썸내일 어딘지 모르겠다」) */
+    { t:'한 번만 하는 일', tab:'admin', rows: A ? [
+      setbtn('migrateInlineThumbs()','🖼','명함 그림 빼기','여는 속도 개선'),
       setbtn('pucardsMovePhotosToStorage()','☁','사진 창고로 옮기기','실시간DB 비우기 · 요금 절약'),
       setbtn('migrateLockedFolders()','📦','옛 잠금 폴더 옮기기','대표 전용 창고로')
     ] : [] },
-    { t:'위험 구역 — 되돌릴 수 없습니다', tab:'acct', danger:true, rows:[
-      setbtn('wipeAll()','🗑',`전체 비우기 (${state.tab==='biz'?'사업자등록증':'명함'} 탭)`,'복구 불가','danger')
-    ]}
+    { t:'', tab:'admin', danger:true, rows: A ? [
+      setbtn('wipeAll()','🗑',`전체 비우기 (${state.tab==='biz'?'사업자등록증':'명함'})`,'되돌릴 수 없습니다','danger')
+    ] : [] }
   ].map(sec=>Object.assign({}, sec, { rows: (sec.rows||[]).filter(Boolean) }))
    .filter(sec=>sec.rows.length);
 }
-function openSettingsPage(){ state.view='settings'; render();
+function openSettingsPage(){ state.view='settings'; state.setTab=''; state.setSub=''; render();
   try{ document.getElementById('pcMain').scrollTop=0; }catch(_){} }
 function closeSettingsPage(){ state.view='list'; render(); }
 /* 하위 화면을 열면 «그것만» 보인다 — 목록 밑에 붙이면 어디에 펼쳐졌는지 못 찾는다.
@@ -26347,23 +26803,29 @@ function settingsSub(){
            trash:openTrash, erpname:openErpNameCheck, rules:openClassifyRules,
            views:openViewManager, mailblock:openMailBlock, clean:openCleanupCenter };
 }
+/* 목록 한 줄 — 「이름 ····· 값 ›」. 설명은 title 로만 */
+function setRowHtml(r){
+  return `<button class="setrow${r.cls ? ' ' + r.cls : ''}" onclick="${r.fn}" title="${esc(r.desc||'')}">`
+    + `<span class="sl">${esc(r.label)}</span>`
+    + (r.val ? `<span class="sv${r.todo ? ' todo' : ''}">${esc(r.val)}</span>` : '')
+    + `<span class="sc">›</span></button>`;
+}
+function setGroupHtml(t, rows){
+  return (t ? `<div class="setg">${esc(t)}</div>` : '') + `<div class="setlist">${rows.join('')}</div>`;
+}
 function renderSettingsPage(){
   const el=$('pcSettings'); if(!el) return;
   const all=Object.values(state.items||{});
   const cardN=all.filter(i=>i&&i.kind==='card').length;
   const bizN =all.filter(i=>i&&i.kind==='biz').length;
-  const viewN=Object.keys(state.views||{}).length;
   const folderN=Object.keys(state.groups||{}).length;
-  const aiOn=aiReady();   // 2026-08-17: 「열쇠가 있나」가 아니라 「로그인했나」 — 열쇠는 서버가 든다
   const live=Store.mode==='firebase';
-  const stat=(n,label)=>`<div><b>${typeof n==='number'?n.toLocaleString():n}</b><span>${label}</span></div>`;
-  const btn=r=>`<button class="setbtn ${r.cls||''}" onclick="${r.fn}">${r.icon} ${esc(r.label)}
-    ${r.desc?`<span class="sdesc">${esc(r.desc)}</span>`:''}</button>`;
   const head = `
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="sethd">
       <button class="setback" onclick="closeSettingsPage()">← 목록으로</button>
-      <h2 style="margin:0 0 10px;font-size:17px;color:#1e293b">⚙️ 환경설정</h2>
-      <span style="margin:0 0 10px;font-size:12px;color:#94a3b8">${live?'🟢 전 직원 실시간 공유 중':'🟠 데모 모드 — 이 기기에만 저장'}</span>
+      <h2>⚙️ 환경설정</h2>
+      <span class="setst">명함 ${cardN.toLocaleString()} · 사업자 ${bizN.toLocaleString()} · 폴더 ${folderN.toLocaleString()} · ${
+        live?'🟢 실시간 공유':'🟠 데모 — 이 기기에만'}</span>
     </div>`;
 
   /* ── 하위 화면 — «그것만» 그린다 ── */
@@ -26381,45 +26843,33 @@ function renderSettingsPage(){
   }
   if(sub){ state.setSub=''; }        /* 모르는 이름이면 목록으로 되돌린다 */
 
-  /* ── 상위 탭 + 내용 ── */
-  const cur = SET_TABS.some(t=>t.k===state.setTab) ? state.setTab : 'data';
-  const secHtml = (t, rows, danger) => `
-    <div class="setsec ${danger?'dg':''}">${esc(t)}</div>
-    <div class="setpanel">${rows.join('')}</div>`;
-
-  /* 탭 줄 — 「정리」에는 «할 일 수»를 배지로 붙인다(안 눌러도 밀린 것이 보인다).
-     ⚠ 0 이면 배지를 안 만든다 — 늘 켜진 등은 아무것도 못 알린다. */
+  const cur = setTabNow();
   const 밀림 = todoList().length;
-  const tabs = `<div class="settabs">${SET_TABS.map(t=>{
-    const on = t.k===cur, dg = t.k==='acct';
-    return `<button class="settab${on?' on':''}" onclick="setSetTab('${t.k}')"
-      title="${esc(t.hint)}">${esc(t.label)}${
-        t.k==='clean' && 밀림 ? ` <span class="tbdg">${밀림}</span>` : ''}</button>`;
-  }).join('')}</div>`;
-
-  /* 「정리」 탭 — 여덟 갈래가 «전부» 온다. 숫자가 있으면 숫자로, 없으면 ✓ 로.
-     ⚠ 띠와 겹치는 것을 «일부러» 둔다: 띠는 빠른 길이고 여기가 제 자리다.
-       한쪽에만 두면 「어디 있더라」가 다시 생긴다 — 그것이 이번 지시의 까닭이다. */
-  const cleanRows = () => todoAll().map(r=>`<button class="setbtn"
-      onclick="todoGo('${esc(r.sub)}')">${r.icon} ${esc(r.label)}
-      <span class="sdesc" style="${r.n ? 'color:var(--orange);font-weight:700' : 'color:var(--green)'}">${
-        r.n ? r.n.toLocaleString()+esc(r.unit) : '✓ 이상 없음'}</span></button>`);
+  /* 왼쪽 메뉴 — 정리에 «손볼 것 수»를 주황으로. 0 이면 안 붙인다(늘 켜진 등은 아무것도 못 알린다) */
+  const nav = `<nav class="setnav">${setTabsFor().map(t=>
+      (t.gap ? '<div class="setnavsep"></div>' : '')
+      + `<button class="setnavbtn${t.k===cur?' on':''}" onclick="setSetTab('${t.k}')" title="${esc(t.hint)}">${esc(t.label)}${
+          t.k==='clean' && 밀림 ? `<span class="setnavn">${밀림}</span>` : ''}</button>`).join('')}</nav>`;
 
   let body = '';
   if(cur === 'clean'){
-    body = secHtml('정리할 것 — 여덟 갈래', cleanRows());
+    /* 정리 — 손볼 것만 목록으로, 휴지통은 따로 한 줄, 이상 없는 것은 회색 한 줄.
+       ⚠ 줄은 «데려가기만» 한다(todoGo) — 지우는 일을 여기서 바로 실행하지 않는다. */
+    const rows = todoAll();
+    const todo = rows.filter(r => r.sub !== 'trash' && r.n > 0);
+    const clean = rows.filter(r => r.sub !== 'trash' && !(r.n > 0));
+    const trash = rows.find(r => r.sub === 'trash');
+    const asRow = r => setRowHtml({ fn:`todoGo('${esc(r.sub)}')`, label:r.label,
+      val: r.n > 0 ? r.n.toLocaleString() + r.unit : '', todo: r.n > 0 });
+    body = (todo.length ? setGroupHtml('손볼 것', todo.map(asRow)) : `<p class="setok">✓ 지금 손볼 것이 없습니다</p>`)
+      + (trash ? setGroupHtml('', [setRowHtml({ fn:`todoGo('trash')`, label:'휴지통',
+          val: trash.n > 0 ? trash.n.toLocaleString() + trash.unit : '30일 보관', desc:'지운 것은 30일 동안 되살릴 수 있습니다' })]) : '')
+      + (clean.length && todo.length ? `<p class="setok"><b>✓</b> ${clean.map(r => esc(r.label)).join(' · ')} — 이상 없음</p>` : '');
   } else {
     body = SET_SECTIONS().filter(sec=>(sec.tab||'data')===cur)
-      .map(sec=>secHtml(sec.t, sec.rows.map(btn), sec.danger)).join('');
+      .map(sec=>setGroupHtml(sec.t, sec.rows.map(setRowHtml))).join('');
   }
-  el.innerHTML = head
-    + todoRailHtml()
-    + `<div class="setstat">
-        ${stat(cardN,'명함')}${stat(bizN,'사업자')}${stat(folderN,'폴더')}${stat(viewN,'탭')}
-        ${stat(aiOn?'🟢':'🔴','AI 자동인식')}
-      </div>`
-    + tabs
-    + body;
+  el.innerHTML = head + `<div class="setbody">${nav}<div class="setmain">${body}</div></div>`;
 }
 /* ── 검색칸: 글자가 있을 때만 ✕ 를 보이고, 누르면 한 번에 지운다 ──
    예전에는 백스페이스로 하나씩 지워야 했다.
@@ -26874,8 +27324,18 @@ function coListBuild(){
        때 쓰는 칸이라(ErpMatch), 숫자를 넣으면 숫자 이름을 가진 엉뚱한 업체와 맞는다.
        보여줄 이름은 coDisplayName 이 따로 만든다.
      ⚠ 이름도 번호도 없으면 여전히 안 남긴다 — 가리킬 것이 없는 빈 줄이다. */
-  return Object.values(by).filter(o=>o.name || o.bizno)
-    .sort((a,b)=>String(coDisplayName(a)).localeCompare(String(coDisplayName(b)),'ko'));
+  /* ⚡ 보여 줄 이름을 «먼저 한 번» 만들고, 한국어 정렬기는 하나만 만들어 쓴다 (대표 화면
+     2026-10-02 「coListBuild 73ms」). 예전에는 4천여 곳을 견줄 때마다 coDisplayName 을 두 번
+     부르고 localeCompare(…,'ko') 가 정렬기를 새로 만들었다 — 5만 번.
+     ⚠ 순서는 «글자 하나까지» 같다(같은 규칙·안정 정렬).
+     ⚠ 정렬기는 이 함수에 붙인다 — 검사들이 이 함수만 떠서 돌린다(위 _coStamp 주석). */
+  const ko = coListBuild._ko || (coListBuild._ko = new Intl.Collator('ko'));
+  const list = Object.values(by).filter(o=>o.name || o.bizno);
+  if(list.length < 2) return list;      /* 견줄 것이 없으면 이름도 안 만든다 — 예전과 같다 */
+  return list
+    .map(o=>({ o, n:String(coDisplayName(o)) }))
+    .sort((a,b)=>ko.compare(a.n, b.n))
+    .map(x=>x.o);
 }
 /* 회사 줄에 «보여줄» 이름. 상호가 있으면 상호, 없으면 사업자번호다.
    ⚠ o.name 과 갈라 둔 까닭은 위 주석에 있다 — 여기 값을 name 에 되돌려 넣지 말 것. */
@@ -26929,12 +27389,20 @@ function coWatchVerdict(s){
   else if(s.pending > 10) out.push('아직 못 보낸 저장 '+s.pending+'건이 밀려 있습니다');
   if(s.renders > 10) out.push('화면을 '+s.renders+'번 다시 그렸습니다 — 저장이 몰려 들어오고 있습니다');
   if(s.builds > 3) out.push('회사 목록을 '+s.builds+'번 다시 조립했습니다 — 한 번이면 됩니다');
-  if(s.blockedMs > 500) out.push('5초 중 '+Math.round(s.blockedMs)+'ms 멈춰 있었습니다');
+  if(s.blockedMs > 500){
+    out.push((s.secs||5)+'초 중 '+Math.round(s.blockedMs)+'ms 멈춰 있었습니다');
+    /* 🐌 누가 — 멈춘 때만 이름을 댄다(멀쩡할 때 이름을 대면 늘 무언가가 범인처럼 보인다) */
+    const hot = (s.hot || []).slice(0, 3);
+    if(hot.length) out.push('🐌 오래 걸린 곳: ' + hot.map(h => h.name + ' ' + h.ms + 'ms' + (h.n > 1 ? '(' + h.n + '번)' : '')).join(' · '));
+    /* 함수에 안 잡힌 나머지 — 브라우저가 화면을 배치·그린 시간(큰 목록을 통째로 새로 그릴 때 크다) */
+    const 밖 = Math.round(s.blockedMs - (s.jsMs || 0));
+    if(s.hot && 밖 > 200) out.push('🖼 코드 밖(화면 배치·그리기) 약 ' + 밖 + 'ms');
+  }
   return out.length ? out : ['눈에 띄는 문제 없음'];
 }
 /* 콘솔은 오류에 파묻힌다(대표 화면 2026-08-16, 5,045건). 문제가 있을 때만 화면에 띄운다.
    ⚠ 멀쩡할 때는 아무것도 안 띄운다 — 늘 떠 있는 알림은 곧 안 보게 된다. */
-function coWatchShow(lines){
+function coWatchShow(lines, when){
   if(!lines.length || lines[0]==='눈에 띄는 문제 없음') return;
   let box = $('coWatchBox');
   if(!box){
@@ -26945,15 +27413,69 @@ function coWatchShow(lines){
       + 'box-shadow:0 8px 28px rgba(20,30,50,.16);font-size:12.5px;line-height:1.65;color:#854d0e';
     document.body.appendChild(box);
   }
-  box.innerHTML = '<b style="color:#854d0e">🏢 기업 상세가 느린 까닭</b>'
+  box.innerHTML = '<b style="color:#854d0e">🏢 '+esc(when === '처음 뜰 때' ? '기업정보함이 처음 뜰 때 느린 까닭' : '기업 상세가 느린 까닭')+'</b>'
     + '<button style="float:right;border:none;background:none;cursor:pointer;font-size:14px;color:#d97706"'
     + ' onclick="this.parentNode.remove()" title="닫기">✕</button>'
     + lines.map(m=>'<div>· '+esc(m)+'</div>').join('');
 }
 let _coWatch = null;
-function coWatchStart(){
+/* ══════ 🐌 «누가» 멈추게 했나 — 5초 동안만 함수마다 초시계 (대표 지시 2026-09-29 「이유 찾아서 근본 해결」) ══
+   「5초 중 607ms 멈춰 있었습니다」만으로는 무엇을 고칠지 모른다 — 짐작으로 고치면 엉뚱한 데를 건드린다
+   (이 저장소가 세 번 겪었다, pu-erp 🐌 이름표). 그래서 진단 5초 동안만 기업정보함의 전역 함수에
+   초시계를 달고 «제 안에서 쓴 시간»(자식 함수 시간을 뺀 것)을 센다. 끝나면 원래 함수로 되돌린다.
+   ⚠ «페이지가 만든» 전역 함수 전부 — 브라우저 것·진단 자신·대문자로 시작하는 것(생성자)은 안 건드린다.
+     (2026-09-30 대표 콘솔: 멈춤 771ms 동안 회사목록 조립 0번 — 범인이 co·render 밖에 있을 수 있다)
+   ⚠ 속성을 단 함수(fn.foo)는 감싸지 않는다 — 감싸면 그 속성이 사라진다.
+   ⚠ 함수가 끝난 «뒤» 브라우저가 화면을 배치·그리는 시간은 어느 함수에도 안 잡힌다 —
+     그래서 멈춤에서 코드 시간을 뺀 나머지를 «코드 밖(화면 배치·그리기)»으로 따로 말한다. */
+const CO_PROF_RE = /^[a-z_$][\w$]*$/;
+function coProfStart(){
+  const recs = {}, stack = [], saved = [];
+  Object.keys(window).forEach(function(n){
+    if(!CO_PROF_RE.test(n) || /^coWatch|^coProf/.test(n)) return;
+    let f; try{ f = window[n]; }catch(_){ return; }
+    if(typeof f !== 'function' || Object.keys(f).length || /\[native code\]/.test(Function.prototype.toString.call(f))) return;
+    const r = recs[n] = { n:0, self:0 };
+    const w = function(){
+      const t0 = performance.now(); stack.push(0);
+      try{ return f.apply(this, arguments); }
+      finally{ const d = performance.now() - t0, kid = stack.pop();
+        r.n++; r.self += d - kid; if(stack.length) stack[stack.length-1] += d; }
+    };
+    try{ window[n] = w; saved.push([n, f]); }catch(_){}
+  });
+  return function stop(){
+    saved.forEach(function(p){ try{ window[p[0]] = p[1]; }catch(_){} });
+    const all = Object.keys(recs).map(k => ({ name:k, n:recs[k].n, ms:Math.round(recs[k].self) }));
+    const hot = all.filter(x => x.ms >= 20).sort((a,b) => b.ms - a.ms).slice(0, 5);
+    hot.jsMs = all.reduce((t, x) => t + x.ms, 0);
+    return hot;
+  };
+}
+/* when: 「처음 뜰 때」(로그인 직후) · 「기업 상세」 — 대표 「로그인 할 경우 계속 느려지고 있다」(2026-09-30).
+   처음 뜰 때는 명함·회사정보가 몇 초에 걸쳐 들어오므로 더 길게(10초) 본다. */
+/* ⚠★ 초시계는 «늘» 달지 않는다 (대표 화면 2026-10-02 「계속 나오는데 근본적인 해결 안되나」)
+   초시계를 단 함수는 부를 때마다 시각을 두 번 재고 쌓개를 오르내린다 — 잰 값으로 한 번에
+   6배쯤 느려진다(mbWhoKey 66만 번: 그냥 11ms · 초시계 68ms). 처음 10초 동안 함수가 수백만 번
+   불리므로, «재는 일 자체»가 직원 모두의 첫 화면을 멈추게 하고 그 멈춤을 다시 알림으로 띄웠다.
+   ★ 그래서 멈춤은 늘 재되(가벼운 longtask 관찰), 함수 이름은 «멈췄던 다음 한 번»만 잰다.
+     · 주소에 ?prof=1 → 그 자리에서 잰다(고치는 사람이 바로 볼 때)
+     · 지난번에 멈췄다(pucards_prof_next) → 이번에 한 번 재고 표를 지운다 */
+const CO_PROF_NEXT = 'pucards_prof_next';
+function coProfWanted(search, store){
+  if(/[?&]prof=1(?:&|$)/.test(String(search||''))) return true;
+  let on = false;
+  try{ on = !!(store && store.getItem(CO_PROF_NEXT)); if(on) store.removeItem(CO_PROF_NEXT); }catch(_){ on = false; }
+  return on;
+}
+function coWatchStart(when){
   if(_coWatch) return;                       /* 이미 보고 있으면 그대로 둔다 */
+  const 언제 = when || '기업 상세', 초 = 언제 === '처음 뜰 때' ? 10 : 5;
   _coWatch = { renders:0, builds:0, blockedMs:0 };
+  let profStop = null, ls = null;
+  try{ ls = window.localStorage; }catch(_){ ls = null; }
+  const 잼 = coProfWanted(location.search, ls);
+  if(잼){ try{ profStop = coProfStart(); }catch(_){} }
   /* 「지금부터 5초 동안」 몇 번 저장이 나갔는지를 세려면 0에서 시작해야 한다 */
   try{ window.PUResilience && PUResilience.resetCensus && PUResilience.resetCensus(); }catch(_){}
   let obs = null;
@@ -26968,19 +27490,32 @@ function coWatchStart(){
     const q = (window.PUResilience && PUResilience.stats)
       ? PUResilience.stats() : { pending:0, parked:0, writes:0, busiest:[], worst:[] };
     const top = (q.busiest && q.busiest[0]) ? (q.busiest[0].where+' '+q.busiest[0].n.toLocaleString()+'번') : '';
+    let hot = [];
+    try{ hot = profStop ? profStop() : []; }catch(_){}
     const s = { renders:_coWatch.renders, builds:_coWatch.builds, blockedMs:_coWatch.blockedMs,
-                pending:q.pending, parked:q.parked, writes:q.writes||0, busiest:top };
+                pending:q.pending, parked:q.parked, writes:q.writes||0, busiest:top, hot:hot,
+                jsMs: (hot && hot.jsMs) || 0, secs: 초 };
     _coWatch = null;
-    console.log('🏢 기업 상세 5초 진단 — 다시 그림 '+s.renders+'번 · 회사목록 조립 '+s.builds
+    console.log('🏢 '+언제+' '+초+'초 진단 — 다시 그림 '+s.renders+'번 · 회사목록 조립 '+s.builds
       +'번 · 멈춤 '+Math.round(s.blockedMs)+'ms · 저장 보냄 '+s.writes+'번'
       +' · 밀린 저장 '+s.pending+'건 · 거부된 저장 '+s.parked+'건');
-    const lines = coWatchVerdict(s);
+    /* 이름 없이 「멈췄다」만 띄우면 고칠 데를 모른다 — 이번엔 표만 남기고 다음 한 번 이름을 잰다.
+       ⚠ 저장 폭주·밀린 저장 같은 «다른» 알림은 그대로 띄운다(초시계와 상관없다). */
+    if(!잼 && s.blockedMs > 500){
+      try{ ls && ls.setItem(CO_PROF_NEXT, '1'); }catch(_){}
+      console.log('   → 멈춤 ' + Math.round(s.blockedMs) + 'ms — 다음에 열 때 한 번 원인을 이름으로 잽니다');
+    }
+    const lines = coWatchVerdict(잼 ? s : Object.assign({}, s, { blockedMs: 0 }));
     lines.forEach(m=>console.log('   → '+m));
+    /* ⚠ 배열을 그대로 찍으면 콘솔이 「(5) [{…}]」로 접어 이름이 안 보인다(대표 콘솔 2026-09-30) — 글자로 편다 */
+    if(hot.length) console.log('   🐌 오래 걸린 곳(제 안에서 쓴 시간): ' + hot.map(h => h.name + ' ' + h.ms + 'ms' + (h.n > 1 ? '(' + h.n + '번)' : '')).join(' · ') + ' · 코드 합계 ' + (hot.jsMs || 0) + 'ms');
     if(q.busiest && q.busiest.length) console.log('   저장이 나간 곳:', q.busiest);
     if(q.worst && q.worst.length) console.log('   거부된 저장:', q.worst);
-    coWatchShow(lines);
-  }, 5000);
+    coWatchShow(lines, 언제);
+  }, 초 * 1000);
 }
+/* 처음 뜰 때(로그인 직후)도 한 번 본다 — 명함·회사정보가 들어오며 멈추는 자리를 이름으로 댄다 */
+window.addEventListener('load', function(){ try{ coWatchStart('처음 뜰 때'); }catch(_){} });
 function pickCo(k){ if(state.coPick===k){ state.coPick=''; closePcDetail(); return; } state.coPick = k; openCoDetailPanel(k); }
 
 /* ══════ 세금계산서 발급처를 푸른이알피 업체에 채운다 (대표 지시 2026-08-30) ══════
@@ -31318,6 +31853,73 @@ function coNtsCls(word){
   if(w.indexOf('등록되지 않은') >= 0) return 'none';
   return 'dim';                     /* 그 밖의 알 수 없는 답 — 좋지도 나쁘지도 않다 */
 }
+/* ══════ 폐업으로 나왔는데 «실제로는 영업 중»일 때 (대표 지시 2026-09-28 「폐업자가 아닌데도 폐업으로 있으면」) ══
+   국세청은 «번호»로만 답한다. 영업 중인 곳이 폐업으로 나오면 대개 우리 번호가 옛것이다
+   (개인→법인 전환·이전으로 새 번호가 났다 · 등록증을 잘못 읽었다 · 옛 등록증만 있다).
+   국세청 이 기능은 «이름으로 못 찾는다» — 새 번호는 사람이 받아 와야 한다.
+   ① 🔢 새 번호 넣기 — 그 자리에서 국세청에 묻고 «계속사업자일 때만» 적는다(ntsNewNo).
+      ⚠ 사업자등록증 카드의 번호는 «안 바꾼다». 사진에 옛 번호가 찍혀 있고, 그 번호가
+        회사를 묶는 열쇠라 바꾸면 한 회사가 둘로 갈린다. 새 등록증이 오면 그때 올린다.
+   ② ✓ 영업 중 확인함 — 사람이 확인했다고 적는다(ntsOkAt·ntsOkBy).
+      ★ «그때의 국세청 답»(ntsOkOf = 상태|폐업일)과 함께 적는다. 다음 훑기에서 답이 그대로면
+        계속 빠져 있고, 답이 바뀌면 다시 올라온다 — 사람의 확인이 새 사실을 덮지 않게. */
+function coNtsEnd(row){
+  const d = digits((row && row.end_dt) || '');
+  return d.length === 8 ? d.slice(0,4) + '-' + d.slice(4,6) + '-' + d.slice(6) : '';
+}
+function coNtsOkOf(o){ return coVal(o, 'ntsState') + '|' + coVal(o, 'ntsEndDt'); }
+function coNtsHandled(o){
+  if(coVal(o, 'ntsNewNo') && coNtsCls(coVal(o, 'ntsNewState')) === 'ok') return 'newno';
+  if(coVal(o, 'ntsOkAt') && coVal(o, 'ntsOkOf') === coNtsOkOf(o)) return 'ok';
+  /* 🧹 폐업 정리(2026-09-29) — 이것도 «그때의 답»과 함께다. 답이 바뀌면 다시 올라온다 */
+  if(coVal(o, 'ntsDoneAt') && coVal(o, 'ntsDoneOf') === coNtsOkOf(o)) return 'done';
+  return '';
+}
+function coNtsFixBtns(key){
+  const k = esc(String(key).replace(/'/g,"\\'"));
+  return `<button class="conbask" onclick="event.stopPropagation();coNtsNewNoAsk('${k}')"
+      title="바뀐 사업자번호를 넣으면 국세청에 바로 물어봅니다 — 등록증 카드의 번호는 안 바뀝니다">🔢 새 번호 넣기</button>
+    <button class="conbask" onclick="event.stopPropagation();coNtsOkMark('${k}')"
+      title="영업 중인 것을 사람이 확인했다고 적습니다 — 국세청 답이 바뀌면 다시 올라옵니다">✓ 영업 중 확인함</button>`;
+}
+async function coNtsNewNoAsk(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  const svc = String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim();
+  if(!svc){ toast('국세청 조회 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」를 넣어 주세요(공공데이터포털, 무료)', 10000); return; }
+  const v = prompt(`「${o.name || ''}」의 새 사업자번호\n(지금 번호 ${o.bizno || '없음'} — 이 번호는 그대로 둡니다)`, '');
+  if(v == null) return;
+  const no = digits(v);
+  if(no.length !== 10){ toast('사업자번호는 숫자 열 자리입니다', 6000); return; }
+  if(!bizNoOk(no)){ toast('검산이 안 맞는 번호입니다 — 한 글자씩 다시 봐 주세요', 7000); return; }
+  if(no === digits(o.bizno || '')){ toast('지금 번호와 같습니다 — 바뀐 번호를 넣어 주세요', 6000); return; }
+  toast('국세청에 물어보는 중…', 3000);
+  let word = '';
+  try{
+    const r = await fetch(NTS_STATUS_URL + encodeURIComponent(svc), { method:'POST',
+      headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ b_no:[no] }) });
+    if(!r.ok) throw new Error('응답 ' + r.status);
+    const j = await r.json();
+    word = coNtsWord(j && j.data && j.data[0]);
+  }catch(e){ toast('국세청에 못 물어봤습니다 — ' + ((e && e.message) || '연결을 확인해 주세요'), 8000); return; }
+  if(!word){ toast('국세청이 아무 말도 주지 않았습니다 — 번호를 다시 확인해 주세요', 7000); return; }
+  /* ⚠ 새 번호도 계속사업자가 아니면 «적지 않는다» — 적으면 다른 폐업 번호로 폐업을 덮는 셈이다 */
+  if(coNtsCls(word) !== 'ok'){
+    toast(`🏛 새 번호 ${no}: 국세청 「${coNtsCls(word) === 'none' ? '국세청에 없는 번호' : word}」 — 적지 않았습니다`, 9000); return;
+  }
+  if(!confirm(`🏛 새 번호 ${no.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3')} — 국세청 「${word}」\n\n이 번호를 기업정보에 적어 두고 「확인 필요」에서 뺄까요?\n(사업자등록증 카드의 번호는 그대로입니다)`)) return;
+  coSaveInfoPatch(k, { ntsNewNo: no, ntsNewState: word, ntsNewAt: todayYmd() }, `🏛 새 번호 ${no} — 계속사업자로 적어 두었습니다`);
+}
+function coNtsOkMark(key){
+  const k = String(key || '');
+  const o = (coList() || []).find(x => x.key === k); if(!o) return;
+  if(!confirm(`「${o.name || ''}」이 영업 중인 것을 확인했다고 적습니다.\n\n`
+    + `· 「확인 필요」와 국세청 목록에서 빠집니다\n`
+    + `· 다음 훑기에서 국세청 답이 바뀌면 다시 올라옵니다\n\n계속할까요?`)) return;
+  let me = '';
+  try{ const w = window.PuWhoami && PuWhoami.get && PuWhoami.get(); me = (w && w.name) || ''; }catch(_){}
+  coSaveInfoPatch(k, { ntsOkAt: todayYmd(), ntsOkBy: me, ntsOkOf: coNtsOkOf(o) }, '🏛 영업 중으로 확인했다고 적었습니다');
+}
 function coNtsChipHtml(o){
   /* 사업자번호가 없으면 물어볼 길이 없다 — 눌러도 안 되는 단추를 두지 않는다 */
   if(!o || digits(o.bizno || '').length < 10) return '';
@@ -31331,8 +31933,26 @@ function coNtsChipHtml(o){
                   '':'#64748b;background:#f8fafc;border-color:#e2e8f0' }[coNtsCls(word)];
   /* 국세청 원문(「국세청에 등록되지 않은 사업자등록번호입니다.」)은 딱지에 넣기엔 길다 — 뜻만 짧게 */
   const 말 = coNtsCls(word) === 'none' ? '국세청에 없는 번호' : word;
+  const end = coNtsCls(word) === 'gone' ? coVal(o, 'ntsEndDt') : '';
+  const 처리 = coNtsHandled(o);
+  if(처리){
+    /* 사람이 처리한 곳 — 무엇으로 처리했는지를 말한다. 누르면 옛 번호를 다시 묻는다 */
+    const nn = coVal(o, 'ntsNewNo');
+    const t = 처리 === 'newno'
+      ? `🏛 새 번호 ${esc(nn.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3'))} · ${esc(coVal(o, 'ntsNewState'))}`
+      : 처리 === 'done'
+      ? `🧹 폐업 정리 · ${esc(coVal(o, 'ntsDoneAt'))}${coVal(o, 'ntsDoneBy') ? ' ' + esc(coVal(o, 'ntsDoneBy')) : ''}`
+      : `🏛 영업 중 · ${esc(coVal(o, 'ntsOkAt'))}${coVal(o, 'ntsOkBy') ? ' ' + esc(coVal(o, 'ntsOkBy')) : ''} 확인`;
+    const c2 = 처리 === 'newno' ? '#1e40af;background:#eff6ff;border-color:#bfdbfe'
+             : 처리 === 'done'  ? '#64748b;background:#f8fafc;border-color:#e2e8f0'
+                                : '#166534;background:#f0fdf4;border-color:#bbf7d0';
+    return `<span onclick="event.stopPropagation();coAskNts('${key}')"
+      title="국세청은 옛 번호(${esc(o.bizno || '')})를 「${esc(말)}」이라 했습니다 — 사람이 처리했습니다. 눌러서 옛 번호를 다시 확인합니다"
+      style="cursor:pointer;font-size:11px;font-weight:700;
+      border:1px solid;border-radius:9px;padding:1px 8px;white-space:nowrap;color:${c2}">${t}</span>`;
+  }
   const 글 = word
-    ? `🏛 ${esc(말)}${at ? ` · ${esc(at)} 확인` : ''}`
+    ? `🏛 ${esc(말)}${end ? ` · ${esc(end)} 폐업` : ''}${at ? ` · ${esc(at)} 확인` : ''}`
     : '🏛 국세청 확인';
   return `<span onclick="event.stopPropagation();coAskNts('${key}')"
     title="${word ? '국세청에 물어본 그때의 상태입니다 — 눌러서 다시 확인합니다'
@@ -31364,7 +31984,9 @@ async function coAskNts(key){
   }
   const word = coNtsWord(row);
   if(!word){ toast('국세청이 아무 말도 주지 않았습니다 — 번호를 다시 확인해 주세요', 7000); return; }
-  coSaveInfoPatch(k, { ntsState: word, ntsAt: todayYmd() }, `🏛 국세청 「${word}」 — 오늘 확인했습니다`);
+  const patch = { ntsState: word, ntsAt: todayYmd() };
+  const end = coNtsEnd(row); if(end) patch.ntsEndDt = end;
+  coSaveInfoPatch(k, patch, `🏛 국세청 「${word}」${end ? ' (' + end + ' 폐업)' : ''} — 오늘 확인했습니다`);
 }
 
 /* ══════ 🧾 등록증 대조 — 국세청 «진위확인»(/validate) (대표 지시 2026-09-28 「자동으로 검토하고 확인하고 처리」) ══
@@ -31374,8 +31996,8 @@ async function coAskNts(key){
    ⚠⚠ 상태조회(번호만 나간다)와 «다른 일»이다 — 여기서는 대표자 이름·개업일·상호가 나간다.
      그래서 전체 대조는 따로 묻고(coNtsMatchAsk), 훑기(coNtsSweepRun)에 섞지 않는다.
 
-   실측 (2026-09-28, 남경테크·충서로 시험)
-   · 개업일 하루(0317→0318)·대표자 한 글자(임위빈→임위민)만 달라도 「확인할 수 없음」
+   실측 (2026-09-28, 실제 거래처 두 곳으로 시험 — 이름은 적지 않는다)
+   · 개업일 하루(0317→0318)·대표자 한 글자만 달라도 「확인할 수 없음」
    · 대표자는 띄어쓰기·「외 1명」이 붙어도 틀린다 → 보내기 전에 다듬는다(coNtsCeo)
    · 상호는 (주)=주식회사, 앞뒤·띄어쓰기를 가리지 않는다. 단 «㈜ 한 글자»는 못 알아보고,
      법인 표시를 «빼면» 틀린다 → ㈜는 (주)로 바꾸고, 표시가 없으면 (주)를 붙인 것도 함께 묻는다.
@@ -31495,7 +32117,9 @@ async function coNtsAutoOne(key){
   try{
     const r = await fetch(NTS_STATUS_URL + encodeURIComponent(svc), { method:'POST',
       headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ b_no:[no] }) });
-    if(r.ok){ const j = await r.json(); word = coNtsWord(j && j.data && j.data[0]); }
+    if(r.ok){ const j = await r.json(); const row = j && j.data && j.data[0];
+      word = coNtsWord(row); const end = coNtsEnd(row);
+      if(word && end) upd['coInfo/' + key + '/ntsEndDt'] = end; }
   }catch(_){}
   if(word){ upd['coInfo/' + key + '/ntsState'] = word; upd['coInfo/' + key + '/ntsAt'] = day; }
   const q = coNtsMatchReq(o);
@@ -31512,8 +32136,9 @@ async function coNtsAutoOne(key){
   }
   if(!Object.keys(upd).length) return null;
   try{ await Store.db.ref(DB_ROOT).update(upd); }catch(_){ return null; }
-  coListBust(); renderCoSoon();
-  if(state.coPick === key) openCoDetailPanel(key, true);
+  /* ⚠ 여기서 coListBust·다시 그리기를 «안» 부른다. 적은 값은 coInfo 구독(loadCoInfo)으로
+     되돌아와 거기서 한 번 조립·그린다 — 여기서 또 부르면 회사 목록을 두 번 조립한다
+     (대표 화면 2026-09-29 「회사 목록을 4번 다시 조립했습니다」). */
   const bits = [];
   if(word) bits.push(coNtsCls(word) === 'none' ? '국세청에 없는 번호' : word);
   if(m) bits.push(m === 'ok' ? '등록증 내용 일치' : m === 'bad' ? '대표자·개업일이 국세청과 다름' : '상호가 국세청과 다름');
@@ -31538,7 +32163,7 @@ function coNtsAutoAfterSave(it){
   const no = digits(it.bizno);
   setTimeout(function(){
     try{
-      coListBust();
+      /* ⚠ coListBust 를 부르지 않는다 — 저장한 등록증은 items 구독이 이미 목록에 넣었다 */
       const o = (coList() || []).find(x => digits(x.bizno || '') === no);
       /* 오늘 이미 묻고 등록증 값도 그대로면 또 묻지 않는다(메모 한 줄 고칠 때마다 나가지 않게) */
       if(!o || (coVal(o, 'ntsAt') === todayYmd() && (coNtsMatchState(o) || !coNtsMatchReq(o)))) return;
@@ -31645,6 +32270,8 @@ function coNtsTargets(now){
     if(digits(o.bizno || '').length < 10) return false;
     const at = coVal(o, 'ntsAt');
     if(!at) return true;                       /* 한 번도 안 물어봤다 */
+    /* 폐업인데 폐업일이 없다 — 2026-09-28 전에 받아 둔 줄이다. 날짜를 받으러 한 번 더 묻는다 */
+    if(coNtsCls(coVal(o, 'ntsState')) === 'gone' && !coVal(o, 'ntsEndDt')) return true;
     const d = coSmeDays(at, today);
     if(d == null) return true;                 /* 날짜를 못 읽었다 — 다시 묻는다 */
     return (-d) >= NTS_SKIP_DAYS;
@@ -31673,7 +32300,8 @@ function coNtsMatch(chunk, rows){
     const no = digits((r && r.b_no) || '');
     const word = coNtsWord(r);
     if(!no || !word || !byNo[no]) return;
-    byNo[no].forEach(function(k){ out.push({ key:k, state:word }); });
+    const end = coNtsEnd(r);
+    byNo[no].forEach(function(k){ const h = { key:k, state:word }; if(end) h.end = end; out.push(h); });
   });
   return out;
 }
@@ -31686,6 +32314,8 @@ function coNtsWrites(hits, day, chunk){
     hits.slice(i, i + size).forEach(function(h){
       upd['coInfo/' + h.key + '/ntsState'] = h.state;
       upd['coInfo/' + h.key + '/ntsAt'] = day;
+      /* 폐업일 — 국세청이 줄 때만 적는다. 몇 해 전이면 대개 «번호가 바뀐 것»이라 사람이 판단할 근거다 */
+      if(h.end) upd['coInfo/' + h.key + '/ntsEndDt'] = h.end;
     });
     out.push(upd);
   }
@@ -31695,7 +32325,7 @@ function coNtsWrites(hits, day, chunk){
 function coNtsBadList(){
   return (coList() || []).filter(function(o){
     const c = coNtsCls(coVal(o, 'ntsState'));
-    return c === 'gone' || c === 'none' || c === 'soon';
+    return (c === 'gone' || c === 'none' || c === 'soon') && !coNtsHandled(o);
   }).map(function(o){
     return { o:o, key:o.key, name:o.name || '', state:coVal(o, 'ntsState'),
              at:coVal(o, 'ntsAt'), cls:coNtsCls(coVal(o, 'ntsState')) };
@@ -31709,7 +32339,7 @@ function coNtsBadList(){
 function coNtsBadCount(){ return coNtsBadList().length; }
 function coNtsNeeds(o){
   const c = coNtsCls(coVal(o, 'ntsState'));
-  return c === 'gone' || c === 'none' || c === 'soon';
+  return (c === 'gone' || c === 'none' || c === 'soon') && !coNtsHandled(o);
 }
 /* 목록 위 알림 띠 — 0곳이면 «아예 안 띄운다»(확인서·계약 띠와 같은 규칙) */
 function coNtsBarHtml(){
@@ -31726,39 +32356,191 @@ function coNtsBarHtml(){
       🏛 국세청 ${bits}<em>— 눌러서 보기</em></div>`;
 }
 function openCoNts(){ showPanel(coNtsHtml()); }
+/* ══════ 🏛 폐업·휴업 사업장 창 — 표 한 장 (대표 지시 2026-09-29 「좀더 깔끔하게 … 설명은 간단히 한번에」) ══
+   ★ 한 회사 = 한 줄. 설명은 화면에 깔지 않고 ⓘ 풀이 한 장에 모은다(대표 규칙: 설명은 ⓘ, 화면은 컴팩트).
+   ★ 갈래(coNtsGuess)는 «그럴 것 같다»까지만 — 정리는 사람이 한 곳씩 누른다. 아무것도 지우지 않는다. */
+let _coNtsSeg = '';
+let _coNtsInfo = false;
+const NTS_GUESS = { moved:['번호 바뀐 듯','#d97706'], misread:['잘못 읽은 듯','#2563eb'],
+                    real:['실제 폐업','#94a3b8'], unknown:['모름','#e2e8f0'] };
+function coNtsYmd8(v){
+  if(typeof v === 'number' && v > 0){ const t = new Date(v);
+    return t.getFullYear() + String(t.getMonth()+1).padStart(2,'0') + String(t.getDate()).padStart(2,'0'); }
+  const d = digits(v); return d.length >= 8 ? d.slice(0, 8) : '';
+}
+/* 갈래 — 위에서부터 먼저 맞는 것.
+   ① 잘못 읽은 듯: 국세청에 없는 번호 · 등록증 발급일이 폐업일보다 뒤(있을 수 없다) · 대조 ✗
+   ② 번호 바뀐 듯: 폐업일 «뒤에도» 우리와 오간 흔적(계약 기간·명함·등록증이 폐업 뒤)
+   ③ 실제 폐업: 대조 ✓(이 번호가 그 회사가 맞다) + 흔적 없음
+   ④ 모름: 그 밖(휴업 · 폐업일 모름 · 대조 전)
+   ⚠ «오늘»을 받는다 — 안에서 new Date() 를 부르면 검사가 해마다 달라진다. */
+function coNtsGuess(o, now){
+  const cls = coNtsCls(coVal(o, 'ntsState'));
+  if(cls === 'none') return { g:'misread', why:'국세청에 없는 번호' };
+  if(cls === 'soon') return { g:'unknown', why:'휴업' };
+  if(cls !== 'gone') return { g:'unknown', why:'' };
+  const end = digits(coVal(o, 'ntsEndDt'));
+  const issue = coNtsYmd8(coVal(o, 'issueDate'));
+  if(end && issue && issue > end) return { g:'misread', why:'등록증 ' + issue.slice(0,4) + ' 발급' };
+  const m = coNtsMatchState(o);
+  if(m === 'bad') return { g:'misread', why:'등록증 대조 ✗' };
+  if(end){
+    const p = (typeof erpContractPeriod === 'function') ? erpContractPeriod(o.erp, now == null ? todayYmd() : now) : null;
+    if(p && p.to && coNtsYmd8(p.to) > end && !(o.erp && o.erp.left)) return { g:'moved', why:'폐업 뒤 계약 중' };
+    const late = (o.cards || []).concat(o.bizs || []).filter(it => it && coNtsYmd8(it.createdAt) > end).length;
+    if(late) return { g:'moved', why:'폐업 뒤 받은 명함·서류 ' + late };
+  }
+  if(m === 'ok') return { g:'real', why:'대조 ✓ · 흔적 없음' };
+  if(!end) return { g:'unknown', why:'폐업일 모름 — 훑기 한 번 더' };
+  return { g:'unknown', why: coNtsMatchReq(o) ? '대조 전' : '대표자·개업일 없음' };
+}
+function coNtsSegSet(g){ _coNtsSeg = g; coNtsRepaint(); }
+function coNtsInfoToggle(){ _coNtsInfo = !_coNtsInfo; coNtsRepaint(); }
+function coNtsDot(g){ const c = (NTS_GUESS[g] || NTS_GUESS.unknown)[1];
+  return `<i class="ntsdot" style="background:${c}${g === 'unknown' ? ';border:1px solid #94a3b8' : ''}"></i>`; }
+function coNtsInfoHtml(){
+  return `<div class="ntspop"><b>갈래는 이렇게 나눕니다</b>
+    <div>${coNtsDot('moved')}<b>번호 바뀐 듯</b> 폐업 뒤에도 계약·명함·서류가 있음 → 🔢 새 번호</div>
+    <div>${coNtsDot('misread')}<b>잘못 읽은 듯</b> 없는 번호 · 등록증이 폐업보다 뒤 · 대조 ✗ → 사진 보고 고치기</div>
+    <div>${coNtsDot('real')}<b>실제 폐업</b> 대조 ✓ · 폐업 뒤 흔적 없음 → 🧹 정리</div>
+    <div>${coNtsDot('unknown')}<b>모름</b> 휴업 · 대조 전 → 🧾 대조부터</div>
+    <p>국세청은 «물어본 그때»의 번호 상태만 답합니다(막 등록한 사업자는 며칠 «없는 번호»로 나올 수 있습니다).
+      기계는 «그럴 것 같다»까지만 — 정리는 사람이 누르고, 아무것도 지우지 않습니다.</p></div>`;
+}
+function coNtsActBtn(x){
+  const k = esc(String(x.key).replace(/'/g,"\\'"));
+  const b = (on, t, tip) => `<button class="ntsact" onclick="event.stopPropagation();${on}" title="${tip}">${t}</button>`;
+  if(x.g === 'moved') return b(`coNtsNewNoAsk('${k}')`, '🔢 새 번호', '바뀐 사업자번호를 넣으면 국세청에 바로 물어봅니다');
+  if(x.g === 'misread'){
+    const bid = (x.o.bizs && x.o.bizs[0] && x.o.bizs[0].id) || '';
+    return bid ? b(`dedupBg.classList.remove('open');coNtsFixOpen('${esc(String(bid).replace(/'/g,"\\'"))}')`, '번호 고치기', '등록증 사진을 보고 번호를 고칩니다')
+               : b(`coNtsNewNoAsk('${k}')`, '🔢 새 번호', '바뀐 사업자번호를 넣으면 국세청에 바로 물어봅니다');
+  }
+  if(x.g === 'real') return `<button class="ntsact pri" onclick="event.stopPropagation();coNtsCloseOpen('${k}')" title="받을 돈·하던 일·기금을 보고 정리합니다">🧹 정리</button>`;
+  return b(`coNtsOkMark('${k}')`, '✓ 영업 중', '영업 중인 것을 사람이 확인했다고 적습니다');
+}
 function coNtsHtml(){
-  const list = coNtsBadList();
-  const 남은 = coNtsTargets().length;
+  const today = todayYmd();
+  const list = coNtsBadList().map(x => Object.assign(x, coNtsGuess(x.o, today)));
+  const 남은 = coNtsTargets().length, 대조남은 = coNtsMatchTargets().length;
+  const cnt = { moved:0, misread:0, real:0, unknown:0 };
+  list.forEach(x => { cnt[x.g]++; });
   /* ⚠ 도는 «동안»에는 진행과 「그만」만 보인다. 이 자리가 없으면 그만둘 길이 아예 없다
      (2026-09-13: 그만두는 함수를 만들어 놓고 «누를 자리»를 안 만들어 검사가 잡았다). */
-  const 훑기 = _coNtsRun
+  const run = _coNtsRun
     ? `<div class="contsrun"><b>🏛 국세청에 묻는 중 ${_coNtsRun.i}/${_coNtsRun.n}</b>
         <span>지금까지 ${Number(_coNtsRun.got||0).toLocaleString()}곳${
           _coNtsRun.fail ? ` · ${_coNtsRun.fail}묶음 못 받음` : ''}</span>
         <button onclick="coNtsSweepStop()" title="그때까지 받은 것은 남습니다">그만</button></div>`
-    : `<p class="setnote" style="margin:0 0 10px">아직 안 물어봤거나 물어본 지
-      <b>${NTS_SKIP_DAYS}일</b>이 넘은 곳이 <b>${남은.toLocaleString()}곳</b> 있습니다.
-      ${남은 ? `<button class="conbask" onclick="coNtsSweepAsk()"
-        title="사업자번호를 국세청에 보내 상태를 받아 옵니다">🏛 전체 훑기</button>` : ''}</p>`;
-  const 대조 = coNtsMatchPartHtml();
-  if(!list.length) return `<div class="mhead"><b>🏛 국세청 사업자 상태</b>${_closeBtn()}</div>
-    ${훑기}${대조}<p class="cpnone" style="padding:16px 2px">폐업·휴업·국세청에 없는 번호로 나온 곳이 없습니다 👍</p>`;
-  const noneN = list.filter(x => x.cls === 'none').length;
-  return `<div class="mhead"><b>🏛 국세청 — 챙길 곳 ${list.length}곳</b>${_closeBtn()}</div>
-    ${훑기}${대조}
-    <p class="setnote" style="margin:0 0 10px">⚠ <b>물어본 «그때»의 상태</b>입니다 — 날짜를 함께 보세요.
-      계약해지(🚪)와는 다른 말입니다.</p>
-    ${noneN ? `<p class="setnote" style="margin:0 0 10px">🔴 <b>국세청에 없는 번호 ${noneN}곳</b> —
-      사업자번호가 잘못 적혔거나(오타·OCR) 가짜일 수 있습니다. 막 등록한 사업자는 며칠 동안
-      이렇게 나올 수도 있습니다. 사업자등록증 원본과 번호를 맞춰 보세요.</p>` : ''}
-    <div class="ablist">${list.map(x=>`
-      <div class="cosmerow" onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')"
-          title="${esc(x.name)} 상세를 엽니다">
-        <div class="sk">${esc(x.name || '(이름 없음)')}${x.cls === 'none' && x.o.bizno ? ` <span class="se">${esc(x.o.bizno)}</span>` : ''}</div>
-        <div class="sv"><span class="sd ${x.cls}">${esc(x.cls === 'none' ? '국세청에 없는 번호' : x.state)}</span>
-          <span class="se">${esc(x.at || '날짜 모름')} 확인</span>
-          ${x.o.erp && x.o.erp.main ? `<span class="sm">${esc(x.o.erp.main)}</span>` : ''}</div>
-      </div>`).join('')}</div>`;
+    : (typeof _coNtsMatchRun !== 'undefined' && _coNtsMatchRun ? coNtsMatchPartHtml() : '');
+  const seg = (g, label, n) => `<button class="ntsseg${_coNtsSeg === g ? ' on' : ''}" onclick="coNtsSegSet('${g}')">${
+      g ? coNtsDot(g) : ''}${label}<b>${n}</b></button>`;
+  const tools = run ? '' : `<span class="ntssp"></span>
+      <button class="ntstool" onclick="coNtsSweepAsk()" ${남은 ? '' : 'disabled'}
+        title="사업자번호만 국세청에 보내 상태를 받아 옵니다 — 아직 안 물어봤거나 ${NTS_SKIP_DAYS}일이 넘은 곳 ${남은}곳">🏛 훑기${남은 ? ' ' + 남은 : ''}</button>
+      <button class="ntstool" onclick="coNtsMatchAsk()" ${대조남은 ? '' : 'disabled'}
+        title="대표자·개업일·상호가 국세청 기록과 맞는지 견줍니다 — 아직 안 견준 곳 ${대조남은}곳">🧾 대조${대조남은 ? ' ' + 대조남은 : ''}</button>`;
+  const head = `<div class="mhead"><b>🏛 폐업·휴업 사업장 ${list.length}곳
+      <span class="ntsi" onclick="coNtsInfoToggle()" title="갈래를 어떻게 나누는지 봅니다">i</span></b>${_closeBtn()}</div>
+    ${_coNtsInfo ? coNtsInfoHtml() : ''}${run}`;
+  if(!list.length) return head + `<div class="ntsbar">${tools}</div>
+    <p class="cpnone" style="padding:16px 2px">폐업·휴업·국세청에 없는 번호로 나온 곳이 없습니다 👍</p>`;
+  const rows = list.filter(x => !_coNtsSeg || x.g === _coNtsSeg);
+  const endOf = x => x.cls === 'gone' ? (coVal(x.o, 'ntsEndDt') || '폐업일 모름') : x.cls === 'soon' ? '휴업' : '없는 번호';
+  return head + `<div class="ntsbar">${seg('', '전체', list.length)}${seg('moved', '번호 바뀐 듯', cnt.moved)}${
+      seg('misread', '잘못 읽은 듯', cnt.misread)}${seg('real', '실제 폐업', cnt.real)}${seg('unknown', '모름', cnt.unknown)}${tools}</div>
+    <div class="ntswrap"><table class="ntstbl"><thead><tr><th>상호</th><th>폐업일</th><th>갈래</th><th>근거</th><th>담당</th><th></th></tr></thead><tbody>${
+      rows.map(x => `<tr onclick="dedupBg.classList.remove('open');pickCo('${esc(String(x.key).replace(/'/g,"\\'"))}')" title="${esc(x.name)} 상세를 엽니다 · ${esc(x.at || '날짜 모름')} 확인">
+        <td class="nm">${esc(x.name || '(이름 없음)')}${x.cls === 'none' && x.o.bizno ? ` <span class="se">${esc(x.o.bizno)}</span>` : ''}</td>
+        <td class="dt${x.cls === 'gone' ? '' : ' ' + x.cls}">${esc(endOf(x))}</td>
+        <td>${coNtsDot(x.g)}${esc(NTS_GUESS[x.g][0])}</td>
+        <td class="why">${esc(x.why || '—')}</td>
+        <td class="why">${esc((x.o.erp && x.o.erp.main) || '')}</td>
+        <td class="act">${coNtsActBtn(x)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+/* ══════ 🧹 폐업 정리 — 네 줄 보고 단추 둘 ══════
+   ⚠ 받을 돈은 여기서 «셈하지 않는다». 미수 판단은 이알피 미수금관리 한 곳이 한다
+     (xxxPaid·unpaidClosed 규칙이 거기 있다) — 여기서 따로 세면 두 앱이 다른 금액을 말한다.
+   ⚠ 하던 일·기금은 이알피 이력(loadErpCaseCons, 읽기만)에서 센다.
+   ⚠ 「계약해지까지」는 이미 있는 계약해지(coTerminatePlan·coTerminate)를 그대로 부른다. */
+function coNtsCloseFacts(o, data){
+  const recs = data ? erpHistRecsFor(data, o.bizno, o.name).filter(erpHistVisible).map(r => erpHistRow(r, _erpHistTypes)) : [];
+  const open = recs.filter(r => r.stat === 'run' || r.stat === 'wait');
+  const fund = recs.some(r => r.kind === 'fund');
+  const mails = (o.cards || []).filter(it => it && !it.noMail && (it.email || it.emailMore)).length;
+  return { known: !!data, open: open.length, openNames: open.slice(0, 2).map(r => r.name).filter(Boolean),
+           fund, mails, erp: !!o.erp, left: !!(o.erp && o.erp.left) };
+}
+function coNtsCloseId(key){ return 'ntsClose_' + String(key).replace(/[^\w]/g, '_'); }
+function coNtsCloseOpen(key){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  showPanel(coNtsCloseHtml(o, null));
+  /* ⚠ 늦게 온 답을 «다른 창» 위에 그리지 않는다 — 그 사이 창을 닫았거나 다른 회사를 열었으면 버린다 */
+  loadErpCaseCons(data => {
+    const cur = (coList() || []).find(x => x.key === key);
+    if(cur && $(coNtsCloseId(key))) showPanel(coNtsCloseHtml(cur, data || {}));
+  });
+}
+function coNtsGoBtn(url, name){
+  return `<button class="ntsact" onclick="event.stopPropagation();coNtsGo('${url}','${name}')">${name}</button>`;
+}
+function coNtsGo(url, name){
+  if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(url, name); else location.href = url;
+}
+function coNtsCloseHtml(o, data){
+  const f = coNtsCloseFacts(o, data);
+  const k = esc(String(o.key).replace(/'/g,"\\'"));
+  const row = (i, t, v, btn) => `<tr><td class="ic">${i}</td><td>${t}</td><td class="v">${v}</td><td class="b">${btn || ''}</td></tr>`;
+  const 읽는중 = data ? '' : '<span class="why">읽는 중…</span>';
+  return `<div class="mhead" id="${coNtsCloseId(o.key)}"><b>🧹 ${esc(o.name || '')} 정리</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 8px">${esc(coVal(o, 'ntsEndDt') || '폐업일 모름')} 폐업 · ${
+      f.erp ? (f.left ? '이미 계약해지(🚪)' : '업체관리: 계약 중') : '업체관리에 없음'}</p>
+    <table class="ntsclose">
+      ${row('💰', '받을 돈', '<span class="why">이알피가 셉니다</span>', coNtsGoBtn('pu-erp.html#menu=fin/recv', '미수금관리'))}
+      ${row('📂', '하던 일', 읽는중 || (f.open ? `<b>${f.open}건</b> <span class="why">${esc(f.openNames.join(' · '))}</span>` : '없음'),
+            f.open ? coNtsGoBtn('pu-erp.html#menu=biz/case', '이알피') : '')}
+      ${row('🏦', '근로복지기금', 읽는중 || (f.fund ? '<b>있음 — 기금 정리(해산) 검토</b>' : '없음'),
+            f.fund ? coNtsGoBtn('fund.html', '기금관리') : '')}
+      ${row('✉️', '단체 메일', f.mails ? `받는 중 ${f.mails}명` : '없음',
+            f.mails ? `<button class="ntsact" onclick="coNtsNoMail('${k}')" title="이 회사 명함을 단체 발송에서 뺍니다 — 한 곳에 보내는 메일은 그대로 됩니다">빼기</button>` : '')}
+    </table>
+    <div class="ntsbar" style="margin-top:12px"><span class="ntssp"></span>
+      <button class="ntsact" onclick="coNtsDone('${k}','tag')" title="🧹 폐업 정리 딱지만 붙이고 목록에서 뺍니다">딱지만</button>
+      ${f.erp && !f.left ? `<button class="ntsact pri" onclick="coNtsDone('${k}','terminate')" title="업체관리 → 종료 · 계약해지 폴더 · 🚪 딱지 (담당자는 퇴사로 안 만듭니다)">🚪 계약해지까지</button>` : ''}
+    </div>`;
+}
+/* 단체 메일에서 빼기 — 명함마다 수신거부(noMail). 기업정보함 자기 자료(items)다.
+   ⚠ 한 장씩 저장하지 않는다 — 모아서 update 한 번 */
+function coNtsNoMail(key){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  const cards = (o.cards || []).filter(it => it && it.id && !it.noMail && (it.email || it.emailMore));
+  if(!cards.length) return;
+  if(!confirm(`「${o.name || ''}」 명함 ${cards.length}장을 단체 발송에서 뺍니다.\n한 곳에 보내는 메일은 그대로 됩니다.\n\n계속할까요?`)) return;
+  if(Store.mode !== 'firebase'){ cards.forEach(it => { it.noMail = true; Store.put(it); }); return; }
+  const upd = {}, now = Date.now();
+  cards.forEach(it => { upd['items/' + it.id + '/noMail'] = true; upd['items/' + it.id + '/updatedAt'] = now; });
+  Store.db.ref(DB_ROOT).update(upd).then(() => {
+    toast(`🚫 명함 ${cards.length}장을 단체 발송에서 뺐습니다`, 6000);
+    if($(coNtsCloseId(key))) coNtsCloseOpen(key);
+  }).catch(e => toast('바꾸지 못했습니다 — ' + ((e && e.message) || ''), 7000));
+}
+/* 정리했다고 적는다 — «그때의 국세청 답»과 함께(답이 바뀌면 다시 올라온다, coNtsHandled) */
+async function coNtsDone(key, how){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  let me = '';
+  try{ const w = window.PuWhoami && PuWhoami.get && PuWhoami.get(); me = (w && w.name) || ''; }catch(_){}
+  if(how === 'terminate'){
+    const p = coTerminatePlan([key], true);
+    if(!p.rows.length) return toast('계약해지로 바꿀 수 없는 곳입니다 — 업체관리에 없거나 이미 해지입니다', 8000);
+    if(!confirm(`「${o.name || ''}」을 폐업으로 정리하고 계약해지합니다.\n\n`
+      + `· 푸른이알피 업체관리 상태 → 종료\n· 계약해지 폴더로 옮기고 🚪 딱지\n`
+      + `· 담당자는 퇴사로 만들지 않습니다 · 아무것도 지우지 않습니다\n\n계속할까요?`)) return;
+    try{ await coTerminate(p, true, me); }
+    catch(e){ return toast('❌ 계약해지하지 못했습니다: ' + ((e && e.message) || ''), 9000); }
+  } else if(!confirm(`「${o.name || ''}」에 🧹 폐업 정리 딱지를 붙이고 목록에서 뺍니다.\n아무것도 지우지 않습니다.\n\n계속할까요?`)) return;
+  dedupBg.classList.remove('open');
+  coSaveInfoPatch(key, { ntsDoneAt: todayYmd(), ntsDoneBy: me, ntsDoneHow: how, ntsDoneOf: coNtsOkOf(o) },
+    how === 'terminate' ? '🧹 폐업 정리 · 🚪 계약해지했습니다' : '🧹 폐업 정리 딱지를 붙였습니다');
 }
 /* ── 훑기 — 묻고, 자르고, 모아 쓰고, 그만둘 수 있다 ─────────────────────── */
 let _coNtsStop = false;
@@ -32709,8 +33491,11 @@ function coNeedHtml(o){
   if(linkBad) body += coErpPinHtml(o);
   if(ntsSt){
     const w = coVal(o, 'ntsState');
+    const endTxt = coNtsCls(w) === 'gone' && coVal(o, 'ntsEndDt') ? ' · ' + coVal(o, 'ntsEndDt') + ' 폐업' : '';
     body += `<div class="coneed"><span>🏛</span>
-      <span class="t">국세청: ${esc(coNtsCls(w) === 'none' ? '국세청에 없는 번호' : w)} (${esc(coVal(o, 'ntsAt') || '날짜 모름')} 확인)</span>
+      <span class="t">국세청: ${esc(coNtsCls(w) === 'none' ? '국세청에 없는 번호' : w)}${esc(endTxt)} (${esc(coVal(o, 'ntsAt') || '날짜 모름')} 확인)</span>
+      ${coNtsFixBtns(o.key)}
+      ${coNtsCls(w) === 'gone' ? `<button onclick="coNtsCloseOpen('${key}')" title="받을 돈·하던 일·기금을 보고 정리합니다">🧹 정리</button>` : ''}
       <button onclick="coAskNts('${key}')" title="국세청에 다시 물어봅니다">다시 확인</button></div>`;
   }
   if(ntsM === 'bad' || ntsM === 'name'){
@@ -34530,6 +35315,12 @@ document.addEventListener('keydown', e=>{
        걸 닫는다"는 토글로 오인해 아무 반응이 없었다. closePcDetail() 로 coPick 도
        함께 비운다(다른 상세 패널을 닫을 땐 coPick 이 이미 비어 있어 해가 없다). */
   if(e.key==='Escape'){
+    /* ⚙️ 환경설정에서 Esc = 한 단계 뒤로 (대표 지시 2026-09-30 「환경설정에서 esc 누르면 뒤로가기」)
+       하위 화면 → 환경설정 목록 → 원래 목록. ⚠ 열린 창·패널이 있으면 그것부터 닫는다(아래 그대로).
+       ⚠ 입력칸에 글자를 쓰는 중이면 안 간다 — 붙여 넣던 명단이 날아간다. */
+    const anyOpen = document.querySelector('.modalbg.open') || ($('pcDetail') && $('pcDetail').classList.contains('open'));
+    const 쓰는중 = typing && document.activeElement && String(document.activeElement.value || '').length > 0;
+    if(state.view === 'settings' && !anyOpen && !쓰는중){ e.preventDefault(); settingsBack(); return; }
     closePcDetail();
     ['menuBg','folderDlgBg','groupSheetBg','detailBg','dupBg'].forEach(id=>{ const el=$(id); if(el) el.classList.remove('open'); });
     closeFolderMenu(); closeColMenu();
@@ -34561,9 +35352,15 @@ document.addEventListener('keydown', e=>{
   function fmt(ms){ if(ms<0)ms=0; var s=Math.floor(ms/1000); return ('0'+Math.floor(s/60)).slice(-2)+':'+('0'+(s%60)).slice(-2); }
   function doAutoLogout(){
     try{
-      try{ firebase.auth().signOut(); }catch(_){}
+      var _so=null;
+      try{ _so=firebase.auth().signOut(); }catch(_){}
       var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:#f8fafc;z-index:2147483647;'; document.body.appendChild(ov);
-      setTimeout(function(){ location.replace('enter.html?v='+now()); }, 200);
+      /* ★ 로그아웃이 «끝난 뒤에» 포털로 간다 (2026-09-30). 전에는 시작만 하고 0.2초 뒤에 떠났다 —
+         덜 끝난 채 포털이 열리면 포털은 남은 로그인을 보고 다시 들여보냈다(「로그아웃된 것 같다가 앱으로 넘어간다」).
+         3초 안에 안 끝나면 그래도 간다(멎어 보이면 안 된다). */
+      var _go=false; function _leave(){ if(_go) return; _go=true; setTimeout(function(){ location.replace('enter.html?v='+now()); }, 200); }
+      if(_so && _so.then) _so.then(_leave, _leave); else _leave();
+      setTimeout(_leave, 3000);
     }catch(_){ location.replace('enter.html'); }
   }
   function showWarn(remMs){

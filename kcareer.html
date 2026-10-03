@@ -414,7 +414,7 @@ body.kc-staff .kc-staff-note{display:flex}
   background:#fff;color:var(--text-sub);cursor:pointer;white-space:nowrap;font-weight:600}
 .puag-kind:hover{background:var(--hover)}
 .puag-kind.on{background:var(--navy);border-color:var(--navy);color:#fff}
-.pa-row{display:grid;grid-template-columns:34px 58px 52px minmax(120px,220px) minmax(140px,1fr) 74px 32px;
+.pa-row{display:grid;grid-template-columns:34px 128px 58px 52px minmax(120px,220px) minmax(140px,1fr) 74px 32px;
   gap:8px;align-items:center;font-size:12px;padding:5px 0;border-top:1px solid var(--border-soft)}
 .pa-row>*{min-width:0}
 .pa-c{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -424,7 +424,7 @@ body.kc-staff .kc-staff-note{display:flex}
   border-top:none;padding-bottom:3px}
 .pa-head .pa-n{color:inherit}
 @media(max-width:900px){
-  .pa-row{grid-template-columns:28px 52px 46px minmax(90px,1fr) minmax(90px,1fr) 60px 26px;gap:6px}
+  .pa-row{grid-template-columns:28px 104px 52px 46px minmax(90px,1fr) minmax(90px,1fr) 60px 26px;gap:6px}
 }
 .dt thead th:first-child{border-top-left-radius:12px}
 .dt thead th:last-child{border-top-right-radius:12px}
@@ -556,6 +556,54 @@ html.dark .empty{color:var(--text-mute)}
 .nav-item:hover .ncnt{color:#e2e8f0}
 /* 이력서관리 화면 콤팩트 (양식 가져오기·보관함·편집·증명서 보관함) */
 #page-resume-hub .card,#page-docbox .card{padding:12px;margin-bottom:8px!important}
+/* ── 서류 보관함: 탭+검색 한 줄 · 기관별 묶음 · 오른쪽 미리보기 (대표 승인 2026-09-29 목업 B+C) ── */
+.db-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--border);margin:10px 0 10px}
+.db-top .tabrow{border-bottom:none;margin:0;flex:0 1 auto}
+#dbTools{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;min-width:0;flex:1 1 360px}
+#dbTools .toolbar{margin:0!important;padding:4px 0;border:0;background:none;box-shadow:none;flex-wrap:wrap;gap:6px;flex:1 1 auto;min-width:0;justify-content:flex-end}
+#dbTools .toolbar .tb-input{min-width:180px!important}
+.ds-split{display:grid;grid-template-columns:minmax(0,1fr) 10px var(--ds-pv,320px);gap:0;align-items:start;margin-top:6px;min-width:0}
+.ds-gut{cursor:col-resize;align-self:stretch;min-height:120px;position:relative}
+.ds-gut::after{content:'';position:absolute;left:4px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--border)}
+.ds-gut:hover::after,.ds-gut.drag::after{background:var(--navy)}
+@media(max-width:1000px){ .ds-split{grid-template-columns:1fr} .ds-gut{display:none} .ds-prev{position:static!important} }
+.ds-grp{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--soft,#f8fafc);border-radius:8px;margin-top:8px;font-weight:700;color:var(--navy);cursor:pointer;font-size:13px;user-select:none}
+.ds-grp .m{font-weight:400;color:var(--text-mute);font-size:11.5px}
+#page-docbox .card.ds-card[data-dsrow]{display:flex;align-items:center;gap:8px;padding:4px 8px!important;margin:0!important;border:0;border-bottom:1px solid var(--border);border-radius:0;box-shadow:none;flex-wrap:nowrap;cursor:pointer;min-height:32px;white-space:nowrap}
+#page-docbox .ds-card[data-dsrow]:hover{background:#f8fafc}
+#page-docbox .ds-card[data-dsrow].pick{background:#eff6ff}
+.ds-card[data-dsrow] .t{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+.ds-card[data-dsrow] .s{color:var(--text-mute);font-size:11px;overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
+.ds-card[data-dsrow] .ds-kind{font-size:11px;padding:1px 6px;border-radius:6px;background:var(--soft,#f8fafc);color:var(--text-mute);margin-left:auto}
+.ds-card[data-dsrow] .ds-day{font-size:11px;color:var(--text-mute);min-width:36px;text-align:right}
+.ds-ok{font-size:11px;color:var(--green,#16a34a);min-width:74px}
+.ds-nosub{font-size:11px;color:var(--text-mute);min-width:74px}
+.ds-ic{display:inline-flex;gap:2px}
+.ds-ic .btn.sm{padding:1px 6px;font-size:12px}
+.ds-prev{position:sticky;top:10px;border:1px solid var(--border);border-radius:10px;background:var(--card,#fff);padding:10px}
+.ds-pv-empty{color:var(--text-mute);font-size:12px;text-align:center;padding:28px 8px;line-height:1.7}
+.ds-pv-img{background:#e2e8f0;border-radius:6px;min-height:120px;max-height:max(320px,calc(100vh - 400px));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:6px;margin-bottom:8px;cursor:grab;position:relative}
+.ds-pv-img.drag{cursor:grabbing;user-select:none}
+.ds-pv-pg{position:sticky;top:0;align-self:flex-end;font-size:10.5px;padding:1px 7px;border-radius:9px;background:var(--navy);color:#fff;z-index:1;margin-bottom:-22px}
+.ds-pv-img>span:not(.ds-pv-pg){color:var(--text-mute);font-size:11.5px;padding:40px 6px;text-align:center}
+.ds-pv-img canvas,.ds-pv-img img,.ds-pv-img svg{width:100%!important;height:auto!important;display:block;flex:none;background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.18)}
+.ds-pv-hd{display:flex;align-items:baseline;gap:8px}
+.ds-pv-t{font-weight:700;color:var(--navy);font-size:13.5px;line-height:1.4;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ds-pv-sub{font-size:11px;color:var(--text-mute);flex:none}
+.ds-pv-sub.on{color:var(--teal);font-weight:700}
+.ds-pv-more{margin-top:6px;padding:6px 8px;border:1px solid var(--border);border-radius:6px}
+.ds-pv-more[hidden]{display:none}
+.ds-pv-kv{display:flex;gap:8px;font-size:12px;padding:2px 0}
+.ds-pv-kv span{color:var(--text-mute);min-width:48px;flex:none}
+.ds-pv-kv b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-pan{font-size:11px;padding:1px 7px;border-radius:10px;background:#fffbeb;color:#854d0e;cursor:pointer;flex:none}
+.ds-old{display:flex;align-items:center;gap:8px;padding:3px 8px 3px 40px;border-bottom:1px dashed var(--border);font-size:11.5px;color:var(--text-mute);white-space:nowrap}
+.ds-old .m{min-width:36px}
+.ds-same.same{color:#854d0e}.ds-same.diff{color:var(--text-mute)}
+.ds-dupbar{display:flex;align-items:center;gap:8px;padding:7px 10px;margin:6px 0;border:1px solid #fde68a;background:#fffbeb;border-radius:8px;color:#854d0e;font-size:12px}
+.ds-dupbar .m{color:var(--text-mute);font-size:11px}
+.ds-pv-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.ds-pv-btns .btn.sm{padding:2px 8px}
 #page-resume-hub .rc-h,#page-docbox .rc-h{margin-bottom:6px}
 #page-resume-hub .empty,#page-docbox .empty{padding:12px 0}
 #page-resume-hub .dropzone,#page-docbox .dropzone{padding:11px 14px}
@@ -1052,6 +1100,22 @@ input.kf-in.kf-done{background:#f8fafc;border-bottom:1.5px solid var(--teal);fon
   border-left:1px solid var(--border)}
 #rcEditCard.rh-work.rh-drawer-off>div:last-child{grid-template-columns:1fr}
 /* 기둥 안 작은 이름표와 맞춤 단추 */
+.rh-float-h{display:none}
+#rhDraftPanel.rh-float{position:fixed;z-index:70;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.18);overflow:auto;max-height:70vh}
+#rhDraftPanel.rh-float .rh-float-h{display:flex;align-items:center;gap:10px;position:sticky;top:-10px;background:var(--card);margin:-10px -12px 8px;padding:9px 12px;border-bottom:1px solid var(--border);z-index:1}
+#rhDraftPanel.rh-float .rh-float-h b{white-space:nowrap}
+#rhDraftPanel.rh-float .rh-float-h .m{font-size:11px;color:var(--text-mute);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rh-back{position:relative;display:flex;gap:4px;margin:0 0 4px}
+.rh-back .btn{padding:7px 9px}
+.rh-back-go{flex:1;font-weight:800;background:var(--navy);color:#fff;border-color:var(--navy)}
+.rh-back-arw{background:var(--navy);color:#fff;border-color:var(--navy)}
+.rh-back-menu{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:60;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px;display:flex;flex-direction:column;box-shadow:0 6px 18px rgba(15,23,42,.12)}
+.rh-back-menu[hidden]{display:none}
+.rh-back-menu button{background:none;border:0;text-align:left;padding:7px 8px;border-radius:6px;font-size:12px;cursor:pointer;color:var(--text)}
+.rh-back-menu button:hover{background:var(--bg)}
+.rh-back-menu .m{font-size:10.5px;color:var(--text-mute)}
+.rh-back-menu .rh-back-drop{color:var(--red)}
+.rh-back-when{font-size:10.5px;color:var(--text-mute);padding:2px 8px 5px}
 .rh-railh{font-size:10.5px;font-weight:800;color:var(--text-mute);letter-spacing:.5px;margin:8px 0 3px}
 .rh-fitrow{display:flex;gap:3px}
 .rh-fitrow button{flex:1;font-size:11px;padding:5px 2px;border:1px solid var(--border);
@@ -1072,6 +1136,7 @@ body.rh-ed-on .rh-noed{display:none!important}
    없애는 것이 아니라 감추는 것이다: 기둥의 「⤢ 작업 모드 끄기」로 언제든 돌아온다. */
 body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 .rh-dtabs{display:flex;gap:4px;margin-bottom:8px;align-items:center}
+.rh-dname:hover{text-decoration:underline}
 .rh-dtab{font-size:11.5px;padding:5px 10px;border:1px solid var(--border);border-radius:7px;
   background:var(--soft);color:var(--text-mute);cursor:pointer;font-family:inherit}
 .rh-dtab.on{background:#fff;color:var(--navy);font-weight:700;border-color:var(--teal)}
@@ -1166,30 +1231,31 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=38"></script>
+<script src="js/pu-ontology.js?v=40"></script>
+<script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
-<script src="js/kcareer-pusync.js?v=3"></script>
+<script src="js/kcareer-pusync.js?v=5"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
      판독 층은 지우개가 없으면 글자 판독을 아예 막는다(그대로 보내면 주민번호가 AI 로 나간다).
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=35"></script>
+<script src="js/kcareer-hwpxfill.js?v=36"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=20"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
-<script src="js/kcareer-hwpstamp.js?v=6"></script>
-<script src="js/kcareer-hwpxphoto.js?v=1"></script>
+<script src="js/kcareer-hwpstamp.js?v=7"></script>
+<script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
@@ -1216,10 +1282,12 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <script src="js/pu-appbar.js?v=14"></script>
+  <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
+  <script src="js/pu-active.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-whoami.js?v=1"></script>
+  <script src="js/pu-whoami.js?v=2"></script>
   <script>
     /* 머리줄 안의 자리를 쓴다 — 안 알려 주면 pu-whoami 가 화면 오른쪽 위에
        «떠 있는 딱지»를 만들어 안내글·머리줄을 덮는다(대표 화면에서 그랬다). */
@@ -1370,6 +1438,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
             </div>
             <!-- 📂 작성 중 목록 — 자리마다 따로 담기고, 아무 때나 오가며 이어 쓴다 -->
             <div id="rhDraftPanel" class="hide" style="border-top:1px dashed var(--border);padding:10px 12px">
+              <!-- ★ 입력 화면에서는 이 목록이 «떠 있는 창»이 된다(대표 승인 2026-09-30 목업 A) — 이 머리는 그때만 보인다 -->
+              <div class="rh-float-h">
+                <b>📂 작성 중 서류</b><span class="m" title="이름을 누르면 지금 것을 담고 그 서류로 바꿉니다 · Esc·바깥을 누르면 닫힙니다">이름을 누르면 지금 것을 담고 그 서류로 바꿉니다 · Esc·바깥을 누르면 닫힙니다</span>
+                <button class="btn sm" type="button" onclick="rhDraftFloatClose()" aria-label="닫기">✕</button>
+              </div>
               <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:7px">
                 30초마다 저절로 담깁니다. 아무 것이나 눌러 이어서 하세요 — <b>지금 하던 것도 담아 두고</b> 넘어갑니다.
                 · <b>이 PC(이 브라우저) 안에만</b> 담깁니다 — 다른 PC에서는 안 보입니다. 내보낼 것은 「💾 완성본 생성」으로 서류 보관함에 담으세요.
@@ -1492,6 +1565,18 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                    머리가 세 줄이 됐다(대표 지적 2026-08-29). 딱지는 뺀다: 단추가 이미 말해 준다. -->
               <!-- ★ 작업 모드에서만 보이는 «보기 맞춤» — 여기가 A4 를 통째로 보이게 하는 자리다 -->
               <div class="rh-workonly">
+                <!-- ★ ← 목록으로 (대표 승인 2026-09-30 목업) — 입력하다가 다른 서류를 보러 «빠져나가는 길»이 없었다.
+                     그냥 누르면 담고 나간다. ▾ 안에만 「저장 안 하고 나가기」(한 번 묻는다).
+                     ⚠ 한글 편집 중에도 보여야 한다 — rh-noed 안에 넣지 말 것. -->
+                <div class="rh-back" id="rhBackWrap">
+                  <button class="btn rh-back-go" onclick="rhBackToList('save')" title="지금 것을 작성 중에 담고 서식 목록으로 돌아갑니다 — 마우스 뒤로 버튼·Alt+← 도 같습니다">← 목록으로</button>
+                  <button class="btn rh-back-arw" onclick="rhBackMenu(event)" aria-label="나가는 방법 고르기" title="나가는 방법 고르기">▾</button>
+                  <div class="rh-back-menu" id="rhBackMenu" hidden>
+                    <button onclick="rhBackToList('save')">💾 저장하고 나가기 <span class="m">(기본)</span></button>
+                    <button class="rh-back-drop" onclick="rhBackAskDrop(this)">↩ 저장 안 하고 나가기</button>
+                    <div class="rh-back-when" id="rhBackWhen"></div>
+                  </div>
+                </div>
                 <!-- ⚠ «보기 맞춤»은 한글 편집 중에 감춘다(rh-noed) — 눌러도 숨은 입력판만 움직인다.
                      편집기는 제 확대·쪽 넘김이 있다(대표 승인 2026-09-27 목업). -->
                 <div class="rh-noed">
@@ -1670,10 +1755,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
            ⚠ 칸 id 는 종류마다 그대로 두었다(rs*·pf*·cd*) — renderDocStore 가 그대로 찾는다. -->
       <section class="page-view" id="page-docbox" ondragover="pageDropOver(event,_dbDomain)" ondragleave="pageDropLeave(event)" ondrop="pageDropFile(event,_dbDomain)"><div class="page"><div class="page-drop-overlay" id="ovl-page-docbox"><span>📎 파일을 놓으면 지금 탭의 보관함에 저장됩니다</span></div>
         <h2>서류 보관함</h2><div class="desc">이력서·프로필·경력증명서를 한 곳에서 — 원본 양식과 완성본을 함께 보관</div>
+        <!-- ★ 탭과 검색을 «한 줄»에 (대표 승인 2026-09-29 목업 B) — 검색 줄은 dbToolsMount 가 이리로 옮긴다 -->
+        <div class="db-top">
         <div class="tabrow" id="db-tabrow">
           <button class="tab active" data-db="resume" onclick="dbTab('resume',this)">📄 이력서</button>
           <button class="tab" data-db="profile" onclick="dbTab('profile',this)">👤 프로필</button>
           <button class="tab" data-db="certdoc" onclick="dbTab('certdoc',this)">🏅 경력증명서</button>
+        </div>
+        <div id="dbTools"></div>
         </div>
         <div class="tabpanel active" id="db-resume">
         <div class="toolbar">
@@ -2062,6 +2151,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <section class="page-view" id="page-advisory"><div class="page">
         <div class="page-head"><div class="page-title">🏢 자문·고문</div><div class="page-desc">푸른이알피 업체관리에서 가져온 자문·고문 실적 — 해지된 곳도 실적입니다</div></div>
         <div class="toolbar">
+          <!-- ★ 진행 · 종료 탭 (대표 지시 2026-09-29 「진행과 종료를 분리해서 탭으로」) — 수는 advTabsDraw 가 채운다 -->
+          <div class="rh-dtabs" id="advTabs" style="margin:0"></div>
           <input class="tb-input" data-f="q" placeholder="고객사·유형·업태·담당 검색" style="min-width:200px">
           <select class="tb-select" data-f="year"><option value="">전체 연도</option></select>
           <div class="tb-spacer"></div>
@@ -3785,16 +3876,9 @@ function fsCommitScan(){
 
   /* ID는 버퍼를 기준으로 만든다.
      기존 wiccokId/nextId는 localStorage를 직접 보므로, 묶어 쓰는 동안에는 같은 ID가 계속 나온다. */
-  function _bufIdWiccok(type, year){
-    var pre = type + (year || '') + '-', k = 1;
-    while(buf.wiccok.some(function(x){ return x.id === pre + String(k).padStart(3,'0'); })) k++;
-    return pre + String(k).padStart(3,'0');
-  }
-  function _bufIdSeq(prefix, store){
-    var k = 1, mk = function(){ return prefix + String(k).padStart(4,'0'); };
-    while(buf[store].some(function(x){ return x.id === mk(); })) k++;
-    return mk();
-  }
+  /* 한 번 쓴 번호는 다시 주지 않는다 — kcNextNo(휴지통까지 본다) */
+  function _bufIdWiccok(type, year){ return kcNextNo(type + (year || '') + '-', 3, 'wiccok', buf.wiccok); }
+  function _bufIdSeq(prefix, store){ return kcNextNo(prefix, 4, store, buf[store]); }
 
   /* 1) 🟢 승격 → 기존 목록.
      먼저 원본 없는 기존 레코드에 붙여보고, 없을 때만 새로 만든다(중복 방지). */
@@ -4149,7 +4233,12 @@ function hwpViewDownload(){
   if(!_hwpView){ toast('저장할 문서가 없습니다'); return; }
   /* ⚠ 형식을 'hwpx'로 못박지 말 것 — 보관함의 옛 .hwp(이진 형식)도 이 뷰어로 열린다.
      형식을 비우면 내용에서 hwp/hwpx를 알아서 가려 올바른 MIME으로 저장한다. */
-  PureunHwp.download(_hwpView.bytes, _hwpView.name);
+  /* ★ 지금 작업 중인 서류면 저장 이름 규칙을 쓴다 — 보관함의 다른 서류는 제 이름 그대로 */
+  var 이름=_hwpView.name;
+  var 내것=_rhDoc && _hwpView.name===_rhDoc.name;
+  if(!내것){ PureunHwp.download(_hwpView.bytes, 이름); return; }
+  rhNiceName().then(function(n){ PureunHwp.download(_hwpView.bytes, n||이름); },
+                    function(){ PureunHwp.download(_hwpView.bytes, 이름); });
 }
 /* 뷰어가 이미 그린 A4 캔버스를 그대로 인쇄한다 — 한글 모양 그대로의 PDF가 나온다.
    (인쇄창에서 「PDF로 저장」을 고르면 파일이 된다. 한글 프로그램이 없어도 된다.) */
@@ -4473,18 +4562,44 @@ async function _puFetchPlan(){
     for(var ak in typeMap){ (typeMap[ak] || []).forEach(function(t){ if(t && t.agency) ags[t.agency] = 1; }); }
     LS.set(NS + 'pu_type_agencies', JSON.stringify(Object.keys(ags)));
   }catch(e){}
-  /* puRef 없는 기존 실적(시드 등)에 붙여 중복을 막기 위해 함께 넘긴다 */
+  /* ① 옛 줄 번호 열쇠('cases/3')를 영구 열쇠('cases#id')로 옮길 목록 — 읽기만 한다.
+       실제로 바꾸는 것은 puSyncCommit 한 곳이다(되돌리기·동시 동기화 경합을 한 자리에서 막으려고). */
+  var mine = [];
+  PU_SYNC_STORES.forEach(function(st){ get(st).forEach(function(r){ if(r && r.puRef) mine.push(Object.assign({ store:st }, r)); }); });
+  var mig = KcareerPuSync.buildRefMigration(collData, mine);
+  var upBy = {}, badBy = {};
+  mig.upgrades.forEach(function(u){ upBy[u.store + '|' + u.id] = u; });
+  mig.broken.forEach(function(b){ badBy[b.store + '|' + b.id] = b; });
+  /* 옮긴 뒤의 모습으로 본다 — 상태·관리번호 갱신과 «아는 열쇠»가 새 열쇠를 쓰게 */
+  var after = mine.map(function(r){
+    var u = upBy[r.store + '|' + r.id], b = badBy[r.store + '|' + r.id];
+    if(u) return Object.assign({}, r, { puRef:u.puRef, puRefCheck:'' });
+    if(b) return Object.assign({}, r, { puRefCheck:b.reason });
+    return r;
+  });
+  var known = _puKnownRefs();
+  mig.upgrades.forEach(function(u){ known.add(u.puRef); });
+  /* ② 이어지지 않은 실적(시드 등)과 «연결이 어긋난» 실적 — 연결 제안의 후보.
+       ⚠ 이름이 같다고 자동으로 붙이지 않는다. 미리보기에서 사람이 고른다. */
   var existing = [];
   PU_SYNC_STORES.forEach(function(st){
-    get(st).forEach(function(r){ if(r && !r.puRef) existing.push({ id:r.id, store:st, org:r.org, year:r.year, type:r.type }); });
+    get(st).forEach(function(r){
+      if(!r) return;
+      var bad = r.puRefCheck || badBy[st + '|' + r.id];
+      if(r.puRef && !bad) return;
+      existing.push({ id:r.id, store:st, org:r.org, year:r.year, type:r.type, project:r.project||'' });
+    });
   });
-  var plan = KcareerPuSync.buildSyncPlan(collData, _puKnownRefs(), userMap || {}, typeMap, existing);
+  var plan = KcareerPuSync.buildSyncPlan(collData, known, userMap || {}, typeMap, existing);
   /* 이미 가져온 건 중 pu-erp에서 종료된 것 — 상태·연도만 맞춘다 */
-  var mine = [];
-  PU_SYNC_STORES.forEach(function(k){ get(k).forEach(function(r){ if(r && r.puRef) mine.push(r); }); });
-  var ups = KcareerPuSync.buildStatusUpdates(collData, mine);
-  return { syncId: 'PS' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Date.now()).slice(-4), plan: plan, statusUps: ups };
+  var ups = KcareerPuSync.buildStatusUpdates(collData, after);
+  /* 관리번호는 이름표라 이알피에서 다시 매겨질 수 있다 — 영구 열쇠로 이어진 건만 따라 고친다 */
+  var noUps = KcareerPuSync.buildNoUpdates(collData, after);
+  return { syncId: 'PS' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Date.now()).slice(-4),
+           plan: plan, statusUps: ups, mig: mig, noUps: noUps, picks: {} };
 }
+/* 연결 제안 한 줄의 선택 — '' 보류(기본) · 'add' 새 실적 · 'L|store|id' 그 실적에 연결 */
+function puSuggestPick(i, v){ if(_puSyncCtx) _puSyncCtx.picks[i] = v; }
 
 async function puSyncNow(){
   if(typeof fbDb === 'undefined' || !fbDb){ toast('클라우드 로그인 후 사용하세요'); return; }
@@ -4498,6 +4613,48 @@ async function puSyncNow(){
   }catch(e){ console.warn('puSyncNow', e); toast('동기화 실패 — 로그인·권한을 확인하세요'); }
 }
 
+/* 옛 연결 옮기기·어긋난 연결 알림 (온톨로지 검토 2026-09-29) */
+function _puMigNote(ctx){
+  var m = ctx && ctx.mig; if(!m) return '';
+  var h = '';
+  if(m.upgrades.length) h += '<div style="margin-top:6px;color:var(--teal)">🔒 옛 연결 <b>' + m.upgrades.length + '건</b>을 이알피 영구 번호로 옮깁니다 — 이알피에서 줄이 밀려도 제 건을 찾습니다</div>';
+  if(m.broken.length){
+    h += '<div style="margin-top:6px;color:var(--amber)">⚠ 연결이 어긋난 실적 <b>' + m.broken.length + '건</b> — 이알피의 그 자리에 다른 건이 와 있거나 사라졌습니다. '
+      + '상태 자동 갱신을 멈추고 «확인 필요»로 표시합니다(아래 연결 제안에서 제 건을 고를 수 있습니다).</div>'
+      + m.broken.slice(0, 20).map(function(b){
+          var r = (get(b.store) || []).find(function(x){ return x && x.id === b.id; }) || {};
+          return '<div style="font-size:11.5px;color:var(--text-mute);padding:2px 0 2px 14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+            + escapeHtml(b.id) + ' · ' + escapeHtml(r.org || '-') + ' · ' + escapeHtml(r.project || '') + (b.reason === 'gone' ? ' (이알피에서 사라짐)' : '') + '</div>';
+        }).join('');
+  }
+  if(ctx.noUps && ctx.noUps.length) h += '<div style="margin-top:6px;color:var(--text-mute)">🏷 이알피에서 관리번호가 바뀐 <b>' + ctx.noUps.length + '건</b>을 따라 고칩니다</div>';
+  return h;
+}
+/* 연결 제안 — 이름이 같다고 자동으로 붙이지 않는다. 사람이 한 줄씩 고른다(기본은 보류). */
+function _puSuggestHtml(ctx){
+  var s = (ctx && ctx.plan && ctx.plan.suggests) || [];
+  if(!s.length) return '';
+  var LABEL = { case:'사건', consult:'컨설팅', fund:'기금', etc:'기타', advisory:'자문·고문' };
+  return '<div style="font-size:12px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px">'
+    + '<div style="font-weight:700;margin-bottom:4px">🔗 같은 건일 수 있는 것 ' + s.length + '건 — 골라 주세요</div>'
+    + '<div style="color:var(--text-mute);margin-bottom:6px">업체와 연도가 같은 실적이 이미 있습니다. 같은 건이면 «연결», 다른 건이면 «새로 추가». 고르지 않으면 이번엔 넘기고 다음 동기화 때 다시 묻습니다.</div>'
+    + s.map(function(g, i){
+        var r = g.add.rec, cur = (ctx.picks && ctx.picks[i]) || '';
+        var opts = '<option value=""' + (cur === '' ? ' selected' : '') + '>보류</option>'
+          + '<option value="add"' + (cur === 'add' ? ' selected' : '') + '>새 실적으로 추가</option>'
+          + g.cands.map(function(c){
+              var v = 'L|' + c.store + '|' + c.id;
+              return '<option value="' + escapeHtml(v) + '"' + (cur === v ? ' selected' : '') + '>' + escapeHtml(c.id + ' · ' + (c.project || c.org || '') + ' 에 연결') + '</option>';
+            }).join('');
+        return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--border-soft);white-space:nowrap">'
+          + '<span class="tag navy">' + escapeHtml(LABEL[g.add.store] || '') + '</span>'
+          + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis"><b>' + escapeHtml(r.org || '-') + '</b> · '
+          + escapeHtml(r.sourceNo || r.project || '') + ' <span style="color:var(--text-mute)">(' + escapeHtml(r.year || '-') + ')</span></span>'
+          + '<select onchange="puSuggestPick(' + i + ',this.value)" style="font-size:12px;max-width:260px">' + opts + '</select></div>';
+      }).join('')
+    + '</div>';
+}
+
 function renderPuSyncPreview(){
   if(!_puSyncCtx) return;
   var p = _puSyncCtx.plan;
@@ -4508,7 +4665,9 @@ function renderPuSyncPreview(){
     + ((p.links && p.links.length) ? '<div style="margin-top:6px;color:var(--teal)">🔗 기존 실적 <b>' + p.links.length + '건</b>은 같은 건으로 보아 <b>새로 만들지 않고 연결</b>합니다(중복 방지)</div>' : '')
     + '<div style="color:var(--text-mute);margin-top:4px">진행 중인 건도 상태를 달아 함께 가져옵니다 — pu-erp에서 종료 처리하면 다음 동기화 때 상태가 맞춰집니다. 불필요한 건은 목록에서 배제하세요.</div>'
     + ((_puSyncCtx.statusUps && _puSyncCtx.statusUps.length) ? '<div style="margin-top:6px;color:var(--teal)">↻ 이미 있는 실적 <b>' + _puSyncCtx.statusUps.length + '건</b>이 그동안 종료돼 <b>완료</b>로 바뀝니다</div>' : '')
+    + _puMigNote(_puSyncCtx)
     + '</div>'
+    + _puSuggestHtml(_puSyncCtx)
     + '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
     + PU_SYNC_STORES.map(function(k){ return '<div class="card" style="flex:1;min-width:80px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--navy)">' + p.counts[k] + '</div><div style="font-size:11px;color:var(--text-mute)">' + LABEL[k] + '</div></div>'; }).join('')
     + '</div>'
@@ -4531,13 +4690,43 @@ function puSyncCommit(){
      스토어 목록을 도는 반복문은 이 함수에서 맨 끝의 저장 한 곳뿐이어야 한다(정적 테스트가 지킴). */
   var buf = { case: get('case'), consult: get('consult'), fund: get('fund'), etc: get('etc'), advisory: get('advisory') };
   var PREFIX = { case:'CS', consult:'CN', fund:'FD', etc:'ET', advisory:'AD' };
-  function bufId(store){
-    var k = 1, mk = function(){ return PREFIX[store] + String(k).padStart(4,'0'); };
-    while(buf[store].some(function(x){ return x.id === mk(); })) k++;
-    return mk();
-  }
+  function bufId(store){ return kcNextNo(PREFIX[store], 4, store, buf[store]); }   /* 한 번 쓴 번호는 다시 주지 않는다 */
+  function findRec(store, id){ return (buf[store] || []).find(function(x){ return x && x.id === id; }); }
+
+  /* ① 옛 줄 번호 열쇠 → 영구 열쇠. 그사이 누가 먼저 바꿨으면(열쇠가 달라졌으면) 손대지 않는다 */
+  var mig = _puSyncCtx.mig || { upgrades:[], broken:[] }, migN = 0, badN = 0;
+  mig.upgrades.forEach(function(u){
+    var r = findRec(u.store, u.id);
+    if(!r || r.puRef !== u.oldRef) return;
+    r.puRef = u.puRef; r.sourceKind = u.sourceKind; r.sourceId = u.sourceId;
+    if(u.sourceNo) r.sourceNo = u.sourceNo;
+    delete r.puRefWeak; delete r.puRefCheck; delete r.puRefCheckAt;
+    migN++;
+  });
+  /* 어긋난 연결은 지우지 않는다 — «확인 필요» 표시만 달아 상태 자동 갱신을 멈춘다 */
+  mig.broken.forEach(function(b){
+    var r = findRec(b.store, b.id);
+    if(!r || r.puRef !== b.oldRef || r.puRefCheck) return;
+    r.puRefCheck = b.reason; r.puRefCheckAt = new Date().toISOString();
+    badN++;
+  });
+
+  /* ② 연결 제안 — 사람이 고른 것만. 고르지 않은 것(보류)은 이번엔 넘긴다 */
+  var picks = _puSyncCtx.picks || {}, heldN = 0, adds = plan.adds.slice(), links = (plan.links || []).slice();
+  (plan.suggests || []).forEach(function(g, i){
+    var v = picks[i] || '';
+    if(v === 'add'){ adds.push(g.add); return; }
+    var p = /^L\|([^|]+)\|(.+)$/.exec(v);
+    if(!p){ heldN++; return; }
+    var r = g.add.rec;
+    links.push({ store:p[1], id:p[2], puRef:r.puRef, agency:r.agency || '', type:r.type || '', main:r.main || '',
+                 status:r.status || '', sourceKind:r.sourceKind || '', sourceId:r.sourceId || '', sourceNo:r.sourceNo || '',
+                 weak:!!r.puRefWeak });
+  });
+
   var known = _puKnownRefs();          /* 등록 이중클릭·자동 동기화와의 경합 대비 재확인 */
-  plan.adds.forEach(function(a){
+  mig.upgrades.forEach(function(u){ known.add(u.puRef); });
+  adds.forEach(function(a){
     if(known.has(a.rec.puRef)) return;
     known.add(a.rec.puRef);
     var rec = Object.assign({}, a.rec, {
@@ -4550,11 +4739,18 @@ function puSyncCommit(){
   /* puRef 없던 기존 실적(시드 등)에 puRef만 붙인다 — 새 줄을 만들지 않아 중복이 안 생긴다.
      빈 유형·수행기관·담당도 이때 채워준다(값이 있으면 손대지 않는다). */
   var linkN = 0;
-  (plan.links || []).forEach(function(L){
+  links.forEach(function(L){
     var arr = buf[L.store]; if(!arr) return;
     var r = arr.find(function(x){ return x.id === L.id; });
-    if(!r || r.puRef) return;
+    /* 이미 제대로 이어진 건에는 붙이지 않는다 — «확인 필요» 건만 새 연결로 바꿀 수 있다 */
+    if(!r || (r.puRef && !r.puRefCheck)) return;
+    if(known.has(L.puRef)) return;     /* 같은 이알피 건을 두 실적에 붙이지 않는다 */
+    known.add(L.puRef);
+    if(r.puRef) r.oldPuRef = r.puRef;  /* 어긋났던 옛 열쇠는 되돌리기용으로 남긴다 */
     r.puRef = L.puRef; r.linkedSyncId = syncId;
+    r.sourceKind = L.sourceKind; r.sourceId = L.sourceId; if(L.sourceNo) r.sourceNo = L.sourceNo;
+    if(L.weak) r.puRefWeak = true; else delete r.puRefWeak;
+    delete r.puRefCheck; delete r.puRefCheckAt;
     if(!r.type && L.type) r.type = L.type;
     if(!r.agency && L.agency) r.agency = L.agency;
     if(!r.main && L.main) r.main = L.main;
@@ -4567,11 +4763,17 @@ function puSyncCommit(){
   (_puSyncCtx.statusUps || []).forEach(function(u){ upMap[u.puRef] = u; });
   PU_SYNC_STORES.forEach(function(k){
     buf[k].forEach(function(r){
-      var u = r.puRef && upMap[r.puRef];
+      var u = r.puRef && !r.puRefCheck && upMap[r.puRef];   /* 확인 대기 건은 덮지 않는다 */
       if(!u) return;
       r.status = u.status; if(u.year) r.year = u.year;
       upN++;
     });
+  });
+  /* 관리번호(이름표) 따라 고치기 — 영구 열쇠로 이어진 건만 */
+  var noMap = {};
+  (_puSyncCtx.noUps || []).forEach(function(u){ noMap[u.puRef] = u.sourceNo; });
+  PU_SYNC_STORES.forEach(function(k){
+    buf[k].forEach(function(r){ if(r.puRef && noMap[r.puRef] && !r.puRefCheck) r.sourceNo = noMap[r.puRef]; });
   });
 
   PU_SYNC_STORES.forEach(function(k){ set(k, buf[k]); });
@@ -4579,7 +4781,10 @@ function puSyncCommit(){
   LS.set(NS + 'pu_sync_last_id', syncId);
   closePuSync();
   PU_SYNC_STORES.forEach(function(k){ try{ if(CAREER_CFG[k]) renderCareer(k); }catch(e){} });
-  toast('✅ 실적 ' + n + '건 들어옴' + (linkN ? ' · 기존 ' + linkN + '건에 연결' : '') + (upN ? ' · ' + upN + '건 완료로 갱신' : '') + ' — 불필요한 건은 행의 배제 버튼으로 정리하세요');
+  toast('✅ 실적 ' + n + '건 들어옴' + (linkN ? ' · 기존 ' + linkN + '건에 연결' : '') + (upN ? ' · ' + upN + '건 완료로 갱신' : '')
+    + (migN ? ' · 옛 연결 ' + migN + '건 영구 번호로' : '') + (badN ? ' · ⚠ 연결 확인 필요 ' + badN + '건' : '')
+    + (heldN ? ' · 🔗 같은 건 확인 ' + heldN + '건은 🔄 실적 동기화에서 골라 주세요' : '')
+    + ' — 불필요한 건은 행의 배제 버튼으로 정리하세요');
 }
 
 /* ===== 동기화 되돌리기 — 그 동기화가 만든 레코드만(배제된 것 포함) 삭제 ===== */
@@ -4591,7 +4796,12 @@ function puUndoSync(syncId){
     var cut = db.length - left.length, det = 0;
     /* 시드 등 기존 실적에 붙였던 것은 지우지 않고 puRef만 뗀다 */
     left.forEach(function(r){
-      if(r.linkedSyncId === syncId){ delete r.puRef; delete r.linkedSyncId; det++; }
+      if(r.linkedSyncId === syncId){
+        delete r.puRef; delete r.linkedSyncId; delete r.sourceKind; delete r.sourceId; delete r.puRefWeak;
+        /* 어긋났던 연결을 고쳐 붙였던 것이면 옛 열쇠와 «확인 필요»로 되돌린다 */
+        if(r.oldPuRef){ r.puRef = r.oldPuRef; r.puRefCheck = 'moved'; delete r.oldPuRef; }
+        det++;
+      }
     });
     total += cut;
     if(cut || det) set(k, left);
@@ -4716,7 +4926,7 @@ function renderPuAgency(){
          칸이 안 맞으니 세로로 훑어 읽을 수가 없었다. 열 너비를 못 박아 줄을 세운다.
          ⚠ 연도 내림차순 — 연도가 «없는» 줄은 맨 뒤로. 전에는 「-」가 맨 위에 몰려 있었다. */
       + '<div class="pa-row pa-head">'
-      + '<span class="pa-n">№</span><span>유형</span><span>연도</span><span>고객사</span>'
+      + '<span class="pa-n">№</span><span>번호</span><span>유형</span><span>연도</span><span>고객사</span>'
       + '<span>' + (by==='agency' ? '사업명' : by==='project' ? '수행기관' : '수행기관 · 사업명') + '</span><span>담당자</span><span></span></div>'
       + g.rows.slice().sort(_paOrder).map(function(r,i){
           /* ★ 외부기관 실적도 «경력관리와 같이» 원본을 오른쪽에서 본다
@@ -4733,6 +4943,8 @@ function renderPuAgency(){
                      + ' title="눌러서 열기 — 원본이 있으면 오른쪽에 함께 보입니다"' : '')
             + '>'
             + '<span class="pa-n">' + (i+1) + '</span>'
+            /* ★ 이알피 관리번호 (2026-09-30) — 실적 표와 같은 번호 칸·같은 작은 창(puNoPop) */
+            + '<span class="pa-c">' + puNoInner(r, r._store) + '</span>'
             + '<span><span class="tag navy">' + r._label + '</span></span>'
             + '<span class="pa-y">' + escapeHtml(r.year||'-') + '</span>'
             + '<strong class="pa-c" title="' + escapeHtml(r.org||'') + '">' + escapeHtml(r.org||'-') + '</strong>'
@@ -4824,11 +5036,20 @@ function closeCertLink(){ $('modalCertLink').classList.remove('open'); }
 async function openPuSource(puRef){
   if(typeof fbDb === 'undefined' || !fbDb){ toast('클라우드 로그인 후 사용하세요'); return; }
   try{
-    /* puRef는 '컬렉션/키'. pu-erp 실제 경로는 data/{컬렉션}/v/{키} (봉투 안) */
-    var seg = String(puRef).split('/');
-    var s = await fbDb.ref('data/' + seg[0] + '/v/' + seg.slice(1).join('/')).once('value');
-    var v = s.val();
-    if(!v){ var s2 = await fbDb.ref('data/' + puRef).once('value'); v = s2.val(); }   /* 봉투 없는 옛 형태 대비 */
+    var v = null;
+    if(KcareerPuSync.isIdRef(puRef)){
+      /* 영구 열쇠 '컬렉션#id' — 이알피는 배열로도, id 지도로도 저장한다. 컬렉션을 읽어 id 로 찾는다 */
+      var p = String(puRef).split('#'), coll = p[0], rid = p.slice(1).join('#');
+      var sc = await fbDb.ref('data/' + coll).once('value');
+      var all = KcareerPuSync.unwrap(sc.val()) || {};
+      Object.keys(all).some(function(k){ var c = all[k]; if(c && String(c.id) === rid){ v = c; return true; } return false; });
+    } else {
+      /* 옛 줄 번호 열쇠 '컬렉션/키'. pu-erp 실제 경로는 data/{컬렉션}/v/{키} (봉투 안) */
+      var seg = String(puRef).split('/');
+      var s = await fbDb.ref('data/' + seg[0] + '/v/' + seg.slice(1).join('/')).once('value');
+      v = s.val();
+      if(!v){ var s2 = await fbDb.ref('data/' + puRef).once('value'); v = s2.val(); }   /* 봉투 없는 옛 형태 대비 */
+    }
     if(!v){ toast('pu-erp에서 이 건을 찾을 수 없습니다 (삭제되었을 수 있음)'); return; }
     var KEY_LABEL = { companyName:'고객사', title:'내용', caseType:'사건유형', consultingType:'컨설팅유형',
       fundType:'기금유형', programName:'사업명', status:'상태', closedDate:'종료일', endDate:'예정일', managerMain:'주담당' };
@@ -4851,7 +5072,11 @@ async function puSyncAuto(){
     if(last === today) return;                              /* 오늘 이미 했다 */
     var ctx = await _puFetchPlan();
     /* 새로 들어올 게 없어도 상태 갱신할 게 있으면 진행한다 */
-    if(!ctx || (!ctx.plan.adds.length && !(ctx.statusUps||[]).length)){ LS.set(NS + 'pu_sync_last', new Date().toISOString()); return; }
+    /* 옛 연결 옮기기·어긋난 연결 표시·관리번호 고치기도 «할 일»이다. 연결 제안은 조용히 넘긴다(사람이 골라야 한다) */
+    var mg = ctx && ctx.mig;
+    var work = ctx && (ctx.plan.adds.length || (ctx.statusUps||[]).length || (ctx.noUps||[]).length
+      || (mg && (mg.upgrades.length || mg.broken.length)));
+    if(!work){ LS.set(NS + 'pu_sync_last', new Date().toISOString()); return; }
     if(!LS.get(NS + 'pu_sync_last_id')){                    /* 첫 실행 → 미리보기 */
       /* ★ 물어봤다는 것을 «띄우는 순간» 적는다 (대표 보고 2026-08-17
            "위촉장 관련 팝업 계속 나오는 것 안 나오게").
@@ -5425,9 +5650,21 @@ function checkFilename(){
    ⚠ 칸 id 는 종류마다 다르게 두었다(rs*·pf*·cd*) — 그래서 renderDocStore 는 손대지 않았고
       숨은 탭을 그려도 서로 덮어쓰지 않는다. */
 var _dbDomain='resume';
+/* 세 보관함의 검색 줄을 탭 옆(#dbTools)으로 옮기고 «지금 탭 것만» 보인다.
+   ⚠ 옮기기만 한다 — 칸 id·단추는 그대로라 검색·추가가 전과 같이 돈다. */
+function dbToolsMount(domain){
+  var box=document.getElementById('dbTools'); if(!box) return;
+  ['resume','profile','certdoc'].forEach(function(d){
+    var D=DOMAINS[d], s=D&&document.getElementById(D.search), tb=s&&s.closest('.toolbar');
+    if(!tb) return;
+    if(tb.parentNode!==box){ tb.setAttribute('data-db',d); box.appendChild(tb); }
+    tb.style.display=(d===domain)?'':'none';
+  });
+}
 function dbTab(domain,btn){
   if(!DOMAINS[domain]) return;
   _dbDomain=domain;
+  _safe(function(){ dbToolsMount(domain); });
   document.querySelectorAll('#page-docbox .tabpanel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('#db-tabrow .tab').forEach(b=>b.classList.remove('active'));
   const panel=document.getElementById('db-'+domain); if(panel) panel.classList.add('active');
@@ -6042,7 +6279,7 @@ async function confirmResumeSave(){ if(!_docCtx) return; const {domain,mode,file
     const bytes=await exportEditedHwpx(); if(!bytes){ toast('편집 중인 문서가 없습니다'); return; }
     const blob=new Blob([bytes],{type:'application/vnd.hancom.hwpx'}); genName=`${D.label}_${org||'무제'}_${year}.hwpx`;
     /* ★ 올린 신청서가 있으면 «해 + 그 이름 + 날짜»로 담는다(대표 지시 2026-09-28) — 편집기 저장·내보내기와 같은 이름 */
-    try{ const 올린=rhUploadName(); if(올린){ let 제목=''; try{ 제목=await rhDocTitle(); }catch(e){} genName=rhSaveName(올린, 제목); } }catch(e){}
+    try{ if(rhUploadName()) genName=await rhNiceName(); }catch(e){}
     genB64=abToB64(await blob.arrayBuffer());
     saveFileUnified(id,{id,name:genName,ext:'hwpx',size:blob.size,base64:genB64,savedAt:now});
     if(_lastOriginal){ origFileId=id+'_orig'; origName=_lastOriginal.name; origB64=_lastOriginal.b64||'';
@@ -6251,12 +6488,7 @@ function closeCdScan(){ $('modalCdScan').classList.remove('open'); _cdScanCtx = 
 function cdScanCommit(){
   if(!_cdScanCtx){ toast('스캔 결과가 없습니다'); return; }
   var c = _cdScanCtx, db = get('certdoc'), n = 0, att = 0;
-  var seq = 1;
-  function nextId(){
-    var mk = function(){ return 'CD' + String(seq).padStart(4,'0'); };
-    while(db.some(function(x){ return x.id === mk(); })) seq++;
-    return mk();
-  }
+  function nextId(){ return kcNextNo('CD', 4, 'certdoc', db); }   /* 한 번 쓴 번호는 다시 주지 않는다 */
   /* 외부기관은 항상, 본인 것은 체크했을 때만 저장한다 */
   var rows = c.ext.concat(c.pickOwn ? c.own : []);
   rows.forEach(function(a){
@@ -6376,6 +6608,7 @@ async function cdReOcr(id){
 }
 
 function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.getElementById(D.page); if(!sec) return;
+  _safe(function(){ dbToolsMount((typeof _dbDomain!=='undefined'&&_dbDomain)||'resume'); });
   const arr=get(D.store);
   const orgSel=document.getElementById(D.orgFilter); if(!orgSel) return; const cur=orgSel.value;
   const orgs=[...new Set(arr.map(r=>r.org).filter(Boolean))].sort();
@@ -6394,7 +6627,6 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
   }
   if(!rows.length){ body.innerHTML=cdBar+'<div class="empty"><div class="emp-ico">📭</div>보관된 '+D.label+'이(가) 없습니다</div>'; return; }
   if(D.tableView){ body.innerHTML=cdBar+_cdTable(rows,D); return; }
-  const years=[...new Set(rows.map(r=>r.year))].sort().reverse();
   /* ★ № 넘버링 + ㅁ 고르기 (대표 지시 2026-09-28) — 번호는 해를 «통틀어» 이어 센다
      (해마다 1번이 있으면 가리킬 수 없다 — 작성 중 목록과 같은 까닭). 옷은 목록 화면과 같다. */
   let 번호=0;
@@ -6407,25 +6639,234 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
     +'<button class="btn sm" type="button" style="color:var(--red)" onclick="docSelDel(\''+domain+'\',this)">🗑 선택 삭제</button></div>';
   const allChk='<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mute);cursor:pointer;margin-top:6px">'
     +'<input type="checkbox" class="ds-all" onchange="docSelAll(\''+domain+'\',this.checked)"> 전체 선택</label>';
-  body.innerHTML=allChk+dsBar+years.map(y=>{ const items=rows.filter(r=>r.year===y).sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
-    return `<div style="margin-top:16px"><div style="font-weight:700;color:var(--navy);font-size:15px;margin-bottom:8px">${escapeHtml(y)} <span style="font-size:12px;color:var(--text-mute);font-weight:400">(${items.length}건)</span></div>`
-      + items.map(r=>{ const n=(r.submits||[]).length; 번호++;
-        const extraTxt=(D.extra||[]).map(f=>r[f.key]?`${f.label.split('(')[0]}: ${escapeHtml(r[f.key])}`:'').filter(Boolean).join(' · ');
-        return `<div class="card ds-card" data-id="${_jsAttr(r.id)}" style="margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  /* ★ 기관별 묶음 + 오른쪽 미리보기 (대표 승인 2026-09-29 목업 B+C)
+     「일반 이력서 · 제안서 평가위원 후보자」만 적힌 두꺼운 카드로는 무슨 서류인지 알 수 없었다.
+     ⚠ 줄의 이름표(ds-card · ds-no · row-chk · ds-all)는 그대로 둔다 — 고르기·끌어 고르기·선택 내려받기가 그것을 본다.
+     ⚠ № 는 묶음을 «통틀어» 이어 센다. 접힌 묶음도 번호는 센다(펼쳐도 번호가 안 바뀌게). */
+  const 묶음={};
+  rows.forEach(r=>{ const k=r.org||'(기관 없음)'; (묶음[k]=묶음[k]||[]).push(r); });
+  const 차례=Object.keys(묶음).map(k=>({k, items:묶음[k].sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''))}))
+    .sort((x,y)=>(y.items[0].savedAt||'').localeCompare(x.items[0].savedAt||''));
+  if(_dsPicked[domain] && !rows.some(r=>r.id===_dsPicked[domain])) _dsPicked[domain]=null;
+  const 목록=차례.map(g=>{
+    const 접힘=!!_dsFold[domain+'|'+g.k];
+    const 낸=g.items.filter(r=>(r.submits||[]).length).length;
+    const 끝=_dsDay(g.items[0].savedAt);
+    const 머리=`<div class="ds-grp" onclick="dsGrpToggle('${domain}','${_jsAttr(g.k)}')">${접힘?'▸':'▾'} ${escapeHtml(g.k)}`
+      +`<span class="m">${g.items.length}건${끝?' · 마지막 '+끝:''}</span><span style="flex:1"></span>`
+      +`<span class="m" style="color:${낸===g.items.length?'var(--green)':'var(--text-mute)'}">제출 ${낸}/${g.items.length}</span></div>`;
+    if(접힘){ 번호+=g.items.length; return 머리; }
+    /* ★ 같은 서류(기관·제목·사람)는 «한 줄» + 판 수 (대표 승인 2026-09-29 목업) — 최신 판만 보이고 이전 판은 펼친다 */
+    const 판들=dsDupClusters(g.items, D);
+    return 머리+판들.map(c=>{ const r=c.list[0]; const n=(r.submits||[]).length; 번호++;
+      const T=c.T;
+      const 판수=c.list.length, 펼침=!!_dsVer[domain+'|'+c.key];
+      const 판표=판수>1?`<span class="ds-pan" title="같은 서류가 ${판수}판 있습니다 — 눌러서 이전 판을 봅니다" onclick="dsVerToggle(event,'${domain}','${_jsAttr(c.key)}')">판 ${판수} ${펼침?'▾':'▸'}</span>`:'';
+      const 이전=(판수>1&&펼침)?c.list.slice(1).map((o,i)=>`<div class="ds-old" data-oldid="${_jsAttr(o.id)}">`
+          +`<span class="m">└ ${판수-1-i}판</span><span>${escapeHtml(_dsDay(o.savedAt))} ${escapeHtml(String(o.savedAt||'').slice(11,16))}</span>`
+          +`<span class="ds-same" data-a="${_jsAttr(r.genFileId||'')}" data-b="${_jsAttr(o.genFileId||'')}">견주는 중…</span>`
+          +((o.submits||[]).length?'<span class="ds-ok">✔ 제출기록 있음 — 정리에서 뺌</span>':'')
+          +`<span style="flex:1"></span><button class="btn sm" title="이 판 보기" onclick="showBig('${o.genFileId}')">📄</button>`
+          +`<button class="btn sm" style="color:#dc2626" title="이 판을 휴지통으로" onclick="delDoc('${domain}','${o.id}',this)">🗑</button></div>`).join(''):'';
+      const extraTxt=(D.extra||[]).map(f=>r[f.key]?`${f.label.split('(')[0]}: ${r[f.key]}`:'').filter(Boolean).join(' · ');
+      const 옆=[T.사람, r.memo, extraTxt].filter(Boolean).map(escapeHtml).join(' · ');
+      const 제출=n?`<span class="ds-ok">✔ ${escapeHtml(_dsShort(r.submits[0].date))}${r.submits[0].method?' '+escapeHtml(r.submits[0].method):''}</span>`:'<span class="ds-nosub">아직</span>';
+      return `<div class="card ds-card" data-id="${_jsAttr(r.id)}" data-dsrow="1" onclick="dsRowClick(event,'${domain}','${_jsAttr(r.id)}')">
           <label class="rn-chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="row-chk" value="${_jsAttr(r.id)}" onchange="docSelSync('${domain}')"><span class="ds-no" style="font-weight:700;color:var(--navy);min-width:22px;font-size:12.5px">${번호}</span></label>
-          <div style="flex:1;min-width:180px"><div style="font-weight:600">${escapeHtml(r.kind||'-')}${r.org?` · ${escapeHtml(r.org)}`:''}</div>
-          ${extraTxt?`<div style="font-size:11px;color:var(--navy);margin-top:2px">${extraTxt}</div>`:''}
-          <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHtml(r.memo||'')}</div>
-          ${_docDlTag(domain,r)}</div>
-          ${_cdSrc(r)==='received'
-            ? `<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄 원본</button>`
-            : `<button class="btn sm" onclick="showBig('${r.genFileId}')" onmouseenter="hoverThumb('${r.genFileId}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📄 ${D.label}</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','gen')" title="내려받기 — 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇</button>`
-              + (r.origFileId?`<button class="btn sm" onclick="showBig('${r.origFileId}')" onmouseenter="hoverThumb('${r.origFileId}',event)" onmousemove="moveThumb(event)" onmouseleave="hideThumb()">📎 원본</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="원본 양식 내려받기 — 기록이 남습니다">⬇</button>`:'')}
-          <button class="btn sm" onclick="openSubmitLog('${domain}','${r.id}')">🧾 제출기록${n?`(${n})`:''}</button>
-          <button class="btn sm" onclick="delDoc('${domain}','${r.id}',this)" style="color:#dc2626">삭제</button>
-        </div>`; }).join('') + '</div>';
+          <span class="t" title="${escapeHtml(r.genName||'')}">${escapeHtml(T.t)}</span>${판표}<span class="s">${옆}${옆&&(r.downloads||[]).length?' · ':''}${_docDlInline(domain,r)}</span>
+          <span class="ds-kind">${escapeHtml(r.kind||'-')}</span><span class="ds-day">${escapeHtml(_dsDay(r.savedAt))}</span>${제출}
+          <span class="ds-ic">${_cdSrc(r)==='received'
+            ? `<button class="btn sm" title="원본 보기" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄</button>`
+            : `<button class="btn sm" title="${D.label} 보기" onclick="showBig('${r.genFileId}')">📄</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','gen')" title="내려받기 — 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇</button>`
+              + (r.origFileId?`<button class="btn sm" title="원본 양식 보기" onclick="showBig('${r.origFileId}')">📎</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="원본 양식 내려받기 — 기록이 남습니다">⬇</button>`:'')}
+          <button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
+        </div>`+이전; }).join('');
   }).join('');
+  const 겹침=dsDupSummary(rows, D);
+  const 겹침줄=겹침.clusters?`<div class="ds-dupbar">⚠ 같은 서류가 겹쳐 있습니다 — ${겹침.clusters}묶음 · 이전 판 ${겹침.old}건`
+    +(겹침.kept?` <span class="m">(제출기록이 있는 ${겹침.kept}건은 정리에서 뺍니다)</span>`:'')
+    +`<span style="flex:1"></span>`+(겹침.cleanable?`<button class="btn sm" onclick="dsDupClean('${domain}',this)">이전 판 한 번에 정리</button>`:'')+`</div>`:'';
+  body.innerHTML=allChk+dsBar+겹침줄+`<div class="ds-split" style="--ds-pv:${dsPvWidth()}px"><div class="ds-list">${목록}</div>`
+    +`<div class="ds-gut" title="끌어서 폭을 바꿉니다 · 두 번 누르면 처음 폭" onmousedown="dsGutDown(event)" ondblclick="dsGutReset()"></div>`
+    +`<div class="ds-prev" id="dsPrev-${domain}"></div></div>`;
+  _safe(function(){ dsSameCheck(body); });
+  _safe(function(){ var 고른=_dsPicked[domain]; if(고른) [].forEach.call(body.querySelectorAll('[data-dsrow]'), function(el){ if(el.getAttribute('data-id')===고른) el.classList.add('pick'); }); dsPrevDraw(domain); });
   _safe(function(){ bindDragSel(body, function(){ docSelSync(domain); }); });
+}
+/* ── 서류 보관함 도우미 (대표 승인 2026-09-29 목업 B+C) ── */
+var _dsFold={}, _dsPicked={}, _dsPvTok=0;
+function _dsDay(v){ var t=new Date(v); if(isNaN(t)) return ''; return ('0'+(t.getMonth()+1)).slice(-2)+'.'+('0'+t.getDate()).slice(-2); }
+function _dsShort(v){ var m=String(v||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):String(v||''); }
+/* 줄에 쓸 «무슨 서류인가» — 저장 이름(해년 기관 서류제목_이름 날짜)에서 해·날짜·기관을 걷고 이름을 떼어 낸다.
+   ⚠ 옛 이름(「이력서_기관_2026」)이거나 뭉뚱그린 말(양식 등)이면 원본 양식 이름 → 종류 순으로 물러선다. */
+function dsTitleOf(r, D){
+  var raw=String(r.genName||'');
+  var 옛=/^(이력서|프로필|경력증명서)_[^_]*_\d{4}\.\w+$/.test(raw);
+  var n=raw.replace(/\.(hwpx?|pdf|docx?)$/i,'').replace(/(_채움|_날인|_작성|_완성본|_수정)+$/g,'')
+    .replace(/^\s*\d{4}\s*년\s*/,'').replace(/\s*\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?\s*$/,'')
+    .replace(/(_채움|_날인|_작성|_완성본|_수정)+$/g,'').trim();
+  var 사람='', m=n.match(/_([가-힣]{2,4})$/);
+  if(m){ 사람=m[1]; n=n.slice(0,-m[0].length).trim(); }
+  /* ⚠ 기관 이름을 제목에서 떼지 않는다 — 기관 칸에 「제안서 평가위원 후보자」처럼 서류 이름을 적어 두면
+     「등록 신청서」만 남았다(실측 2026-09-29). 묶음 머리가 기관을 이미 보여 주니 겹쳐도 된다. */
+  var 뭉뚱=/^(양식|서식|문서|원본|무제|서류|document|untitled|새 문서)$/i;
+  /* 쪽 소제목(「1-1. 일반현황」)은 서류 이름이 아니다 — 새 이름 규칙 전에 저장된 것에 남아 있다 */
+  var 소제목=/^\d+(\s*[-.)]\s*\d+)*[.)]\s/.test(n);
+  if(!n || 옛 || 뭉뚱.test(n) || 소제목){
+    var o=String(r.origName||'').replace(/\.(hwpx?|pdf|docx?)$/i,'').replace(/(_채움|_날인|_작성)+$/g,'').trim();
+    n=(o && !뭉뚱.test(o))?o:(r.kind||'(이름 없음)');
+  }
+  return { t:n, 사람:사람 };
+}
+/* ── 목록 ↔ 미리보기 폭 조절 (대표 지시 2026-09-29 「크기조절할수 있게 해달라 마우스로」) ──
+   가운데 손잡이를 끌면 미리보기 폭이 바뀌고, 이 기기에 기억한다(두 번 누르면 처음 폭).
+   ⚠ 한도를 둔다 — 너무 좁으면 미리보기가 못 쓰게 되고, 너무 넓으면 목록이 사라진다. */
+var DS_PV_DEF=320, DS_PV_MIN=220, DS_PV_MAXR=0.6;
+function dsPvWidth(){ var w=0; try{ w=parseInt(LS.get(NS+'ds_pv_w'),10)||0; }catch(e){} return w>=DS_PV_MIN?w:DS_PV_DEF; }
+function _dsPvClamp(w, total){ var max=Math.max(DS_PV_MIN, Math.round((total||1200)*DS_PV_MAXR)); return Math.max(DS_PV_MIN, Math.min(max, Math.round(w))); }
+function dsGutDown(ev){
+  var gut=ev.currentTarget, split=gut&&gut.parentNode; if(!split) return;
+  ev.preventDefault();
+  var rect=split.getBoundingClientRect(); gut.classList.add('drag');
+  document.body.style.userSelect='none';
+  function 움직(e){ var w=_dsPvClamp(rect.right-e.clientX-5, rect.width);
+    document.querySelectorAll('.ds-split').forEach(function(sp){ sp.style.setProperty('--ds-pv', w+'px'); }); split._w=w; }
+  function 놓음(){ document.removeEventListener('mousemove',움직); document.removeEventListener('mouseup',놓음);
+    gut.classList.remove('drag'); document.body.style.userSelect='';
+    if(split._w){ try{ LS.set(NS+'ds_pv_w', String(split._w)); }catch(e){} } }
+  document.addEventListener('mousemove',움직); document.addEventListener('mouseup',놓음);
+}
+function dsGutReset(){ try{ LS.remove(NS+'ds_pv_w'); }catch(e){} document.querySelectorAll('.ds-split').forEach(function(sp){ sp.style.setProperty('--ds-pv', DS_PV_DEF+'px'); }); }
+/* ── 같은 서류 판 묶기 (대표 승인 2026-09-29 목업) ──
+   같은 서류 = 같은 기관 · 같은 제목 · 같은 사람. 최신 판(맨 앞)만 줄로 보이고 이전 판은 펼친다.
+   ⚠ 제출기록이 있는 판은 «정리»에서 뺀다 — 무엇을 냈는지가 남아야 한다.
+   ⚠ 정리는 휴지통으로(되살릴 수 있게) — 골라 삭제와 같은 길(_docTrashIds). */
+var _dsVer={};
+function dsDupKey(r, T){ return String(r.org||'')+'|'+String(T.t||'').replace(/\s+/g,'')+'|'+String(T.사람||''); }
+function dsDupClusters(items, D){
+  var out=[], 자리={};
+  (items||[]).slice().sort(function(a,b){ return (b.savedAt||'').localeCompare(a.savedAt||''); }).forEach(function(r){
+    var T=dsTitleOf(r, D), k=dsDupKey(r, T);
+    if(자리[k]==null){ 자리[k]=out.length; out.push({ key:k, T:T, list:[r] }); }
+    else out[자리[k]].list.push(r);
+  });
+  return out;
+}
+function dsDupSummary(rows, D){
+  var 묶음={}, s={ clusters:0, old:0, kept:0, cleanable:0, ids:[] };
+  (rows||[]).forEach(function(r){ var k=r.org||'(기관 없음)'; (묶음[k]=묶음[k]||[]).push(r); });
+  Object.keys(묶음).forEach(function(k){ dsDupClusters(묶음[k], D).forEach(function(c){
+    if(c.list.length<2) return;
+    s.clusters++;
+    c.list.slice(1).forEach(function(o){ s.old++; if((o.submits||[]).length) s.kept++; else { s.cleanable++; s.ids.push(o.id); } });
+  }); });
+  return s;
+}
+function dsVerToggle(ev, domain, key){ if(ev) ev.stopPropagation(); var k=domain+'|'+key; _dsVer[k]=!_dsVer[k]; renderDocStore(domain); }
+/* 펼친 판의 «내용 같음/다름» — 파일을 한 글자씩 견준다(이 기기에 있을 때만) */
+function dsSameCheck(body){
+  [].forEach.call((body&&body.querySelectorAll('.ds-same'))||[], function(el){
+    var a=el.getAttribute('data-a'), b=el.getAttribute('data-b');
+    (async function(){
+      var fa=a?(getFile(a)||await getFileAsync(a)):null, fb=b?(getFile(b)||await getFileAsync(b)):null;
+      if(!fa||!fb||!fa.base64||!fb.base64){ el.textContent='견줄 파일이 이 기기에 없습니다'; return; }
+      var 같음=fa.base64===fb.base64;
+      el.textContent=같음?'내용 같음':'내용 다름';
+      el.className='ds-same '+(같음?'same':'diff');
+    })();
+  });
+}
+function dsDupClean(domain, btn){
+  var D=DOMAINS[domain], s=dsDupSummary(get(D.store), D);
+  if(!s.ids.length){ toast('정리할 이전 판이 없습니다'); return; }
+  _docTrashIds(domain, s.ids, btn, '🗑 같은 서류의 이전 판 '+s.ids.length+'건을 정리합니다',
+    '최신 판만 남깁니다'+(s.kept?' · 제출기록이 있는 '+s.kept+'건은 남깁니다':''));
+}
+function dsGrpToggle(domain,k){ var key=domain+'|'+k; _dsFold[key]=!_dsFold[key]; renderDocStore(domain); }
+function dsRowClick(ev,domain,id){
+  if(ev && ev.target && ev.target.closest && ev.target.closest('button,input,label,a,select')) return;
+  _dsPicked[domain]=id;
+  var body=document.getElementById(DOMAINS[domain].body);
+  if(body) [].forEach.call(body.querySelectorAll('[data-dsrow]'), function(el){ el.classList.toggle('pick', el.getAttribute('data-id')===id); });
+  dsPrevDraw(domain);
+}
+/* 오른쪽 미리보기 — 누른 줄의 첫 장과 정보.
+   ⚠ 한글 엔진은 «누를 때만» 부른다 — 목록을 그릴 때마다 서류를 다 그리면 멎는다.
+   ⚠ 늦게 끝난 옛 그리기가 새 것을 덮지 않게 차례표(_dsPvTok)를 본다. */
+/* 미리보기를 손으로 «끌어서» 내린다 — 휠이 없는 터치패드·펜에서도 끝까지 보게.
+   ⚠ 조금 움직인 것은 끌기가 아니다(3px) — 그림을 누르기만 해도 화면이 튀면 안 된다. */
+var _dsDrag=null, _dsDragBound=false;
+function dsPvDragWire(el){
+  if(!el || el._dsDrag) return; el._dsDrag=1;
+  el.addEventListener('mousedown', function(e){ if(e.button!==0) return; _dsDrag={ el:el, y0:e.clientY, t0:el.scrollTop }; });
+  /* ⚠ 문서 쪽 손잡이는 «한 번만» — 미리보기를 다시 그릴 때마다 붙이면 쌓인다 */
+  if(_dsDragBound) return; _dsDragBound=true;
+  document.addEventListener('mousemove', function(e){
+    var d=_dsDrag; if(!d) return;
+    var dy=e.clientY-d.y0; if(Math.abs(dy)<3 && !d.el.classList.contains('drag')) return;
+    d.el.classList.add('drag'); d.el.scrollTop=d.t0-dy; e.preventDefault();
+  });
+  document.addEventListener('mouseup', function(){ if(_dsDrag){ _dsDrag.el.classList.remove('drag'); _dsDrag=null; } });
+}
+function dsPvMoreToggle(domain, btn){
+  var m=document.getElementById('dsPvMore-'+domain); if(!m) return;
+  m.hidden=!m.hidden; if(btn) btn.classList.toggle('on', !m.hidden);
+}
+function dsPrevDraw(domain){
+  var D=DOMAINS[domain], box=document.getElementById('dsPrev-'+domain); if(!box) return;
+  var id=_dsPicked[domain], r=id?get(D.store).find(function(x){ return x.id===id; }):null;
+  if(!r){ box.innerHTML='<div class="ds-pv-empty">왼쪽에서 서류를 누르면<br>여기에 서류와 정보가 보입니다 · 끌어 내려 끝까지 봅니다</div>'; return; }
+  var T=dsTitleOf(r,D), n=(r.submits||[]).length;
+  var 줄=function(k,v){ return v?'<div class="ds-pv-kv"><span>'+k+'</span><b>'+escapeHtml(v)+'</b></div>':''; };
+  var 받은=_cdSrc(r)==='received';
+  box.innerHTML='<div class="ds-pv-img" id="dsPvImg-'+domain+'"><span>불러오는 중…</span></div>'
+    /* ★ 정보는 «한 줄» + 단추 «한 줄» (대표 지적 2026-10-03 「불필요하게 너무 많은 줄을 차지」 → 목업 B 승인).
+       제목 · 날짜 · 제출. 기관은 왼쪽 목록이 이미 묶어 보여 준다 — 기관·종류·원본·파일·메모·받은 기록은 ⓘ 안에.
+       ⚠ 한 칸에 한 줄씩 세로로 쌓던 옛 모양(9줄)으로 되돌리지 말 것 — 미리보기 자리를 반이나 먹었다. */
+    +'<div class="ds-pv-hd"><div class="ds-pv-t" title="'+escapeHtml(T.t)+'">'+escapeHtml(T.t)+'</div>'
+    +'<span class="ds-pv-sub">'+escapeHtml(_dsDay(r.savedAt))+'</span>'
+    +'<span class="ds-pv-sub'+(n?' on':'')+'">'+(n?'제출 '+escapeHtml(r.submits[0].date||'')+(n>1?' 외 '+(n-1):''):'제출 아직')+'</span></div>'
+    +'<div class="ds-pv-more" id="dsPvMore-'+domain+'" hidden>'
+    +줄('기관',r.org)+줄('누구',T.사람)+줄('종류',(r.kind&&r.kind!==T.t)?r.kind:'')+줄('만든 날',(r.savedAt||'').slice(0,10))
+    +줄('원본',r.origName)+줄('파일',r.genName)+줄('메모',r.memo)
+    +(n?'<div class="ds-pv-kv"><span>제출</span><b>'+escapeHtml((r.submits[0].date||'')+' '+(r.submits[0].method||''))+(n>1?' 외 '+(n-1)+'건':'')+'</b></div>':'')
+    +_docDlTag(domain,r)+'</div>'
+    +'<div class="ds-pv-btns">'
+    /* 단추 글자는 짧게 — 한 줄에 다 들어가게. 무엇인지는 title 로 */
+    +(받은?'':'<button class="btn sm" title="크게 보기" onclick="showBig(\''+r.genFileId+'\')">📄 크게</button><button class="btn sm" title="내려받기" onclick="docDl(\''+domain+'\',\''+r.id+'\',\'gen\')">⬇ 받기</button>')
+    +(r.origFileId?'<button class="btn sm" title="처음 받은 원본 양식" onclick="showBig(\''+r.origFileId+'\')">📎 원본</button>':'')
+    +'<button class="btn sm" title="제출기록" onclick="openSubmitLog(\''+domain+'\',\''+r.id+'\')">🧾 제출'+(n?'('+n+')':'')+'</button>'
+    +'<button class="btn sm" style="color:#dc2626" title="휴지통으로" onclick="delDoc(\''+domain+'\',\''+r.id+'\',this)">삭제</button>'
+    +'<button class="btn sm" title="기관·종류·원본·파일 이름·메모·내려받은 기록" aria-label="자세히" onclick="dsPvMoreToggle(\''+domain+'\',this)">ⓘ</button></div>';
+  var tok=++_dsPvTok, fid=r.genFileId||'';
+  (async function(){
+    var img=document.getElementById('dsPvImg-'+domain);
+    if(!img) return;
+    if(!fid){ img.innerHTML='<span>미리 볼 파일이 없습니다</span>'; return; }
+    var f=getFile(fid)||await getFileAsync(fid);
+    if(tok!==_dsPvTok) return;
+    if(!f||!f.base64){ img.innerHTML='<span>이 기기에 파일이 없습니다</span>'; return; }
+    var ext=String(f.ext||String(f.name||'').split('.').pop()||'').toLowerCase();
+    if(/^(png|jpe?g|gif|webp)$/.test(ext)){ img.innerHTML='<img alt="" src="'+fileURL(fid)+'">'; return; }
+    if(/^(hwp|hwpx)$/.test(ext) && window.PureunHwp && PureunHwp.renderPreview){
+      try{
+        var tmp=document.createElement('div');
+        await PureunHwp.renderPreview(tmp, new Uint8Array(b64ToAb(f.base64)), f.name||('문서.'+ext));
+        if(tok!==_dsPvTok) return;
+        /* ★ 모든 쪽을 잇달아 붙인다 — 끌어 내리거나 휠을 굴려 끝까지 본다
+           (대표 지시 2026-10-02 「미리보기 화면 드레그 내려서 어떻게 되었는지 확인할 수 있게 해라」).
+           ⚠ 첫 장만 두던 옛 방식으로 되돌리지 말 것 — 채운 결과는 둘째 쪽부터가 많다. */
+        var 쪽=[].slice.call(tmp.querySelectorAll('canvas,img,svg'));
+        img.innerHTML='';
+        if(!쪽.length){ img.innerHTML='<span>첫 장을 못 그렸습니다</span>'; return; }
+        if(쪽.length>1){ var 표=document.createElement('span'); 표.className='ds-pv-pg'; 표.textContent=쪽.length+'쪽 · 끌어 내려 보기'; img.appendChild(표); }
+        쪽.forEach(function(c){ c.removeAttribute('style'); img.appendChild(c); });
+        dsPvDragWire(img);
+      }catch(e){ if(tok===_dsPvTok) img.innerHTML='<span>첫 장을 못 그렸습니다</span>'; }
+      return;
+    }
+    img.innerHTML='<span>'+(ext==='pdf'?'PDF — 「📄 크게 보기」로 봅니다':'미리 보기를 못 하는 형식입니다')+'</span>';
+  })();
 }
 /* ── ⬇ 내려받기 기록 (대표 지시 2026-09-28 「다운받을 경우 내용과 다운받은 날짜등이 저장되어야 한다」) ──
    무엇을(이력서/원본 양식 · 파일 이름 · 종류·기관) «언제» 내려받았는지 그 서류 줄에 남긴다(downloads).
@@ -6438,6 +6879,11 @@ function _docDlTag(domain,r){
   var 때=isNaN(t)?'':(t.getFullYear()+'.'+('0'+(t.getMonth()+1)).slice(-2)+'.'+('0'+t.getDate()).slice(-2)+' '+('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2));
   return '<div style="margin-top:3px"><a href="#" onclick="openDocDlLog(\''+domain+'\',\''+_jsAttr(r.id)+'\');return false"'
     +' style="font-size:11px;color:var(--teal);text-decoration:none">⬇ 내려받음 '+d.length+'회 · 마지막 '+escapeHtml(때)+' ('+escapeHtml(d[0].what||'')+')</a></div>';
+}
+/* 한 줄 목록에 넣는 내려받기 기록 — 줄을 두 줄로 만들지 않는다(글자는 _docDlTag 와 같다) */
+function _docDlInline(domain,r){
+  var h=_docDlTag(domain,r); if(!h) return '';
+  return h.replace(/^<div[^>]*>/,'').replace(/<\/div>$/,'');
 }
 async function docDl(domain,id,which,quiet){
   var D=DOMAINS[domain]; if(!D) return false;
@@ -6510,10 +6956,16 @@ async function docSelDl(domain){
   toast('⬇ '+됨+'건 내려받았습니다'+(됨<ids.length?' ('+(ids.length-됨)+'건은 파일이 없어 건너뜀)':'')+' — 기록을 남겼습니다', 5000);
 }
 function docSelDel(domain,btn){
-  var D=DOMAINS[domain]; var ids=docSelIds(domain); if(!ids.length){ toast('고른 것이 없습니다'); return; }
+  var ids=docSelIds(domain); if(!ids.length){ toast('고른 것이 없습니다'); return; }
+  _docTrashIds(domain, ids, btn, null, '');
+}
+/* 여러 건을 휴지통으로 — 한 번 묻고, 되살릴 수 있게. 골라 삭제·이전 판 정리가 같이 쓴다 */
+function _docTrashIds(domain, ids, btn, 제목, 덧말){
+  var D=DOMAINS[domain];
   var 줄들=get(D.store).filter(function(x){ return ids.indexOf(x.id)>=0; });
-  kcAskDelete(btn, { title:'🗑 고른 '+줄들.length+'건을 지웁니다',
-      detail:줄들.slice(0,4).map(function(r){ return escapeHtml(kcTrashLabel(r)); }).join('<br>')
+  if(!줄들.length){ toast('지울 것이 없습니다'); return; }
+  kcAskDelete(btn, { title:제목||('🗑 고른 '+줄들.length+'건을 지웁니다'),
+      detail:(덧말?escapeHtml(덧말)+'<br>':'')+줄들.slice(0,4).map(function(r){ return escapeHtml(kcTrashLabel(r)); }).join('<br>')
         +(줄들.length>4?'<br>… 외 '+(줄들.length-4)+'건':'')
         +'<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다</b>(환경설정 › 🗑 휴지통).' },
     function(){
@@ -7620,8 +8072,8 @@ const CAREER_CFG={
       <td>${workOnJob(r)?'<span class="tag teal">재직</span>':'<span class="tag amber">퇴직</span>'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'work',r.org,p,r)}</td></tr>`},
   consult:{store:'consult',filter:r=>!_isExternal(r)&&!r.excluded,qFields:['org','project','agency','main'],
-    cols:['ID','유형','고객사','과제','수행기관','담당','연도','상태','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><span class="tag navy">${r.type||'-'}</span></td>
+    cols:['번호','유형','고객사','과제','수행기관','담당','연도','상태','관리'],
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'consult')}<td><span class="tag navy">${r.type||'-'}</span></td>
       <td><strong>${r.org||'-'}</strong></td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
       <td style="font-size:11px">${r.agency||'-'}</td><td>${r.main||'-'}</td><td>${r.year||'-'}</td>
       <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td>
@@ -7631,11 +8083,11 @@ const CAREER_CFG={
      ⚠ 「+ 새 자문」을 만들지 말 것 — 원본은 pu-erp 다. 여기서 만들면 두 곳이 어긋난다.
      근로자 수(insured)는 «고객사 이름 없이» 실적을 세기 위한 값이다.
      ⚠ 유형 드롭다운을 두지 않는다 — renderCareer 는 연도만 채워 주므로 빈 드롭다운이 된다. */
-  advisory:{store:'advisory',filter:r=>!r.excluded,qFields:['org','type','bizType','bizCategory','main'],
+  advisory:{store:'advisory',filter:r=>!r.excluded&&advTabHas(r),qFields:['org','type','bizType','bizCategory','main'],
     /* ⚠ 목록은 이름을 그대로 보여 준다 — 가리는 것은 «내보낼 때»뿐이다(회귀검사 있음) */
     exportMask: rows => KcareerAdvSummary.maskRows(rows),
-    cols:['ID','유형','고객사','업태·종목','규모','근로자','기간','담당','상태','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><span class="tag navy">${r.type||'-'}</span></td>
+    cols:['번호','유형','고객사','업태·종목','규모','근로자','기간','담당','상태','관리'],
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'advisory')}<td><span class="tag navy">${r.type||'-'}</span></td>
       <td><strong>${r.org||'-'}</strong></td><td style="font-size:11px">${[r.bizType,r.bizCategory].filter(Boolean).join(' · ')||'-'}</td>
       <td style="font-size:11px">${r.size||'-'}</td><td style="text-align:right">${r.insured?Number(r.insured).toLocaleString():'-'}</td>
       <td style="font-size:11px;white-space:nowrap">${r.period||'-'}</td><td>${r.main||'-'}</td>
@@ -7648,22 +8100,22 @@ const CAREER_CFG={
       <td>${r.duration?r.duration+'h':'-'}</td><td>${r.year||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'lecture',r.topic,p)}</td></tr>`},
   case:{store:'case',filter:r=>!_isExternal(r)&&!r.excluded,qFields:['org','project','type'],
-    cols:['ID','유형','의뢰인/사업장','사건내용','담당','상태','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><span class="tag navy">${r.type||'-'}</span></td>
+    cols:['번호','유형','의뢰인/사업장','사건내용','담당','상태','연도','관리'],
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'case')}<td><span class="tag navy">${r.type||'-'}</span></td>
       <td><strong>${r.org||'-'}</strong></td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
       <td style="white-space:nowrap">${escapeHtml(r.main||'-')}</td>
       <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td><td>${r.year||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'case',r.org,p,r)}</td></tr>`},
   fund:{store:'fund',filter:r=>!_isExternal(r)&&!r.excluded,qFields:['org','project','main'],
-    cols:['ID','기업/기금','내용','담당','상태','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td>
+    cols:['번호','기업/기금','내용','담당','상태','연도','관리'],
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'fund')}
       <td><strong>${r.org||'-'}</strong></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
       <td style="white-space:nowrap">${escapeHtml(r.main||'-')}</td>
       <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td><td>${r.year||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'fund',r.org,p,r)}</td></tr>`},
   etc:{store:'etc',filter:r=>!_isExternal(r)&&!r.excluded,qFields:['org','project','type','main'],
-    cols:['ID','유형','기관/고객','내용','담당','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td>${r.type||'-'}</td>
+    cols:['번호','유형','기관/고객','내용','담당','연도','관리'],
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'etc')}<td>${r.type||'-'}</td>
       <td><strong>${r.org||'-'}</strong></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
       <td style="white-space:nowrap">${escapeHtml(r.main||'-')}</td><td>${r.year||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'etc',r.org,p,r)}</td></tr>`},
@@ -7690,6 +8142,76 @@ const CAREER_CFG={
       <td style="text-align:right">${r.amt?Number(r.amt).toLocaleString('ko-KR')+'원':'-'}</td><td>${r.org||'-'}</td>
       <td onclick="event.stopPropagation()"><button class="btn sm" onclick="feeConsentDoc('etcfee','${r.id}')" title="수령인에게 받을 개인정보 동의서를 자동으로 만듭니다">📨 동의서</button>${rowActions(r.id,'etcfee',r.content,p)}</td></tr>`},
 };
+/* ===== 실적 번호 칸 — 이알피 관리번호를 앞에 (대표 결정 2026-09-29, 목업 안 D) =====
+   사람이 알아보는 번호는 이알피 관리번호(산재등-2026-901)다. CS0034 는 «내 실적 몇 번째»라
+   이알피 어디에도 없어 대조할 수 없었다. 그래서 칸에는 관리번호를 보이고, 누르면 작은 창에
+   연결 상태·이알피 현재 값·경력관리 번호를 모은다(줄 끝의 🔎 단추를 이리로 옮겼다).
+   ⚠ 줄을 찾는 열쇠는 <tr data-rid> 다 — 칸 글자(관리번호)로 찾으면 안 된다. 번호는 다시 매겨진다.
+   ⚠ 이알피와 안 이어진 옛 기록(손으로 넣은 것)은 예전처럼 CS 번호를 보인다. */
+function puNoLabel(r){
+  if(!r) return '';
+  if(r.sourceNo) return String(r.sourceNo);
+  /* 옮겨 적기 전의 옛 실적 — 사건내용 칸에 관리번호가 들어 있던 것 */
+  if(r.puRef && typeof KcareerPuSync!=='undefined' && KcareerPuSync.fromCaseNo(r.project||'')) return String(r.project);
+  return '';
+}
+/* 번호 칸의 «안쪽» — 실적 표(td)와 외부기관 실적 격자(span)가 함께 쓴다 (2026-09-30) */
+function puNoInner(r, store){
+  if(!r || !r.puRef) return '<span class="id-chip">'+escapeHtml(r&&r.id)+'</span>';
+  var no = puNoLabel(r);
+  return '<a href="#" onclick="event.stopPropagation();puNoPop(event,\''+_jsAttr(store)+'\',\''+_jsAttr(r.id)+'\');return false"'
+    + ' title="눌러서 이알피 연결 보기" style="font-family:Consolas,monospace;font-weight:700;color:var(--navy);text-decoration:underline;text-underline-offset:2px">'
+    + escapeHtml(no || r.id) + '</a>'
+    + (r.puRefCheck ? ' <span style="color:var(--amber);font-weight:700" title="이알피 연결이 어긋났습니다 — 눌러서 확인">⚠</span>' : '');
+}
+function puNoTd(r, store){
+  if(!r || !r.puRef) return '<td>'+puNoInner(r, store)+'</td>';
+  return '<td style="white-space:nowrap" onclick="event.stopPropagation()">'+puNoInner(r, store)+'</td>';
+}
+/* 관리번호를 누르면 뜨는 작은 창 — 읽기만 한다 */
+function puNoPop(ev, store, id){
+  if(ev) ev.stopPropagation();
+  var r = (get(store)||[]).find(function(x){ return x && x.id === id; });
+  if(!r) return;
+  var old = document.getElementById('puNoPop'); if(old) old.remove();
+  var KIND = { case:'이알피 사건', consulting:'이알피 컨설팅', fund:'이알피 기금', other:'이알피 기타사업', company:'이알피 업체(자문)' };
+  var state = r.puRefCheck
+    ? '<div style="color:var(--amber);font-weight:700">⚠ 연결 확인 필요</div><div style="color:var(--text-mute)">'
+      + (r.puRefCheck==='gone' ? '이알피에서 이 건이 사라졌습니다.' : '이알피의 그 자리에 다른 건이 와 있습니다.')
+      + ' 상태 자동 갱신을 멈춰 두었습니다.</div>'
+    : (r.puRefWeak
+      ? '<div style="color:var(--text-mute)">🔗 이알피와 이어짐 <b>(옛 방식)</b> — 이알피 쪽에 영구 번호가 없어 업체가 같을 때만 상태를 맞춥니다</div>'
+      : (KcareerPuSync.isIdRef(r.puRef)
+        ? '<div style="color:var(--teal)">🔗 이알피와 이어짐 <b>(영구 번호)</b></div>'
+        : '<div style="color:var(--text-mute)">🔗 이알피와 이어짐 — 다음 동기화 때 영구 번호로 옮깁니다</div>'));
+  var no = puNoLabel(r);
+  var el = document.createElement('div');
+  el.id = 'puNoPop';
+  el.style.cssText = 'position:absolute;z-index:3000;background:var(--card,#fff);color:var(--text);border:1px solid var(--border);border-radius:8px;'
+    + 'box-shadow:0 8px 24px rgba(15,23,42,.18);padding:10px 12px;width:300px;font-size:12px;line-height:1.7';
+  el.innerHTML = '<div style="font-weight:700;color:var(--navy)">' + escapeHtml(no || '(관리번호 없음)') + ' <span style="font-weight:400;color:var(--text-mute)">· ' + escapeHtml(KIND[r.sourceKind] || '이알피') + '</span></div>'
+    + state
+    + '<div>경력관리 번호 <span class="id-chip">' + escapeHtml(r.id) + '</span></div>'
+    + '<div style="display:flex;gap:6px;margin-top:8px">'
+    + '<button class="btn sm" onclick="document.getElementById(\'puNoPop\').remove();openPuSource(\'' + _jsAttr(r.puRef) + '\')">🔎 이알피 현재 값</button>'
+    + (r.puRefCheck ? '<button class="btn sm" style="color:var(--amber)" onclick="document.getElementById(\'puNoPop\').remove();puSyncNow()">🔄 동기화에서 제 건 고르기</button>' : '')
+    + '</div>';
+  document.body.appendChild(el);
+  var a = ev && ev.target && ev.target.getBoundingClientRect ? ev.target.getBoundingClientRect() : { left:20, bottom:80 };
+  var left = Math.min(a.left + window.scrollX, window.scrollX + document.documentElement.clientWidth - 316);
+  el.style.left = Math.max(8, left) + 'px';
+  el.style.top = (a.bottom + window.scrollY + 4) + 'px';
+  setTimeout(function(){
+    function off(e){ if(!el.contains(e.target)){ el.remove(); document.removeEventListener('mousedown', off, true); document.removeEventListener('keydown', esc, true); } }
+    function esc(e){ if(e.key === 'Escape'){ el.remove(); document.removeEventListener('mousedown', off, true); document.removeEventListener('keydown', esc, true); } }
+    document.addEventListener('mousedown', off, true); document.addEventListener('keydown', esc, true);
+  }, 0);
+}
+/* ===== 연결 걸러보기 칩 (목업 안 E) — 🔗 이알피 / ⚠ 연결 확인 / ✎ 손으로 ===== */
+var _linkOnly = {};
+function puLinkKind(r){ return !r.puRef ? 'hand' : (r.puRefCheck ? 'check' : 'pu'); }
+function toggleLinkOnly(name, k){ _linkOnly[name] = (_linkOnly[name] === k) ? '' : k; renderCareer(name); }
+
 /* rec를 넘기면 로컬 폴더 참조(src:'fs') 레코드도 원본 있는 것으로 판정한다.
    fs 레코드는 base64가 없으므로 다운로드·원본삭제 대신 '원본 열기'만 준다. */
 function rowActions(id,store,label,page,rec){ const isFs=!!(rec&&rec.src==='fs'&&rec.relPath), has=rec?hasOriginal(rec):fileExists(id), L=(label||'').replace(/['"]/g,'');
@@ -7711,7 +8233,7 @@ function rowActions(id,store,label,page,rec){ const isFs=!!(rec&&rec.src==='fs'&
     (isFs?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" onclick="openLocalOriginal('${_jsAttr(rec.relPath)}')" title="폴더에서 바로 열기">📄 원본</button>`
       :has?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" style="background:var(--teal);color:#fff;border-color:var(--teal)" onclick="downloadToFolder('${id}','${store}','${_jsAttr((rec&&rec.type)||'')}',_dlRec('${store}','${id}'))" title="서류 폴더의 제자리에 저장 (안 되면 내려받기 폴더로)">⬇ 저장</button><button class="btn sm" onclick="deleteAttach('${id}','${page}',this)" title="원본만 삭제 후 재업로드" style="color:var(--red);font-size:11px">🗑원본</button>`
         :`<button class="btn sm" onclick="attachRec('${id}','${store}','${page}')">📎 첨부</button>`)+
-    (rec&&rec.puRef?`<button class="btn sm" onclick="openPuSource('${_jsAttr(rec.puRef)}')" title="pu-erp 현재 값 보기">🔎</button>`:'')+
+    /* 🔎(이알피 현재 값)는 번호 칸의 관리번호를 누르면 뜨는 창으로 옮겼다 — puNoPop */
     (rec&&rec.src==='pu'?`<button class="btn sm" onclick="puExclude('${store}','${id}','${page}')" title="목록에서 숨김 (복원 가능)" style="color:#d97706">🚫 배제</button>`:'')+
     `<button class="btn sm" onclick="memoRec('${store}','${id}','${page}')">💬</button>`+
     `<button class="btn sm" style="color:#fff;background:var(--red);border-color:var(--red)" onclick="delRec('${store}','${id}','${page}',this)">🗑 삭제</button></span>`;
@@ -8026,11 +8548,28 @@ function renderAdvSummary(){
 function _advSumText(){ var el=$('advSumText'); return el?el.textContent:''; }
 function advSumCopy(){ var t=_advSumText(); if(!t){ toast('문장이 없습니다'); return; } navigator.clipboard.writeText(t); toast('복사됨 — 지원서에 붙여 쓰세요'); }
 function advSumInsert(){ var t=_advSumText(); if(!t){ toast('문장이 없습니다'); return; } insertToEditor(t); }
+/* ── 자문·고문 진행 · 종료 탭 (대표 지시 2026-09-29) ──
+   ⚠ 가리는 것은 «목록»뿐이다 — 지원서 문장(advSummary)·CSV 가리기는 전부를 본다(종료한 곳도 실적이다). */
+var ADV_TABS=['진행','종료','전체'];
+function advTab(){ var t=''; try{ t=LS.get(NS+'adv_tab')||''; }catch(e){} return ADV_TABS.indexOf(t)>=0?t:'진행'; }
+function advTabHas(r){ var t=advTab(); return t==='전체' || String(r&&r.status||'')===t; }
+function setAdvTab(t){ if(ADV_TABS.indexOf(t)<0) return; try{ LS.set(NS+'adv_tab',t); }catch(e){} renderCareer('advisory'); }
+function advTabsDraw(){
+  var box=document.getElementById('advTabs'); if(!box) return;
+  var 전부=get('advisory').filter(function(r){ return r && !r.excluded; });
+  var 수={ '진행':0, '종료':0, '전체':전부.length };
+  전부.forEach(function(r){ if(수[r.status]!=null) 수[r.status]++; });
+  var 지금=advTab();
+  box.innerHTML=ADV_TABS.map(function(t){
+    return '<button type="button" class="rh-dtab'+(t===지금?' on':'')+'" onclick="setAdvTab(\''+t+'\')">'+t+' <b>'+수[t]+'</b></button>';
+  }).join('');
+}
 function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   /* 기타비용은 합친 표(비용관리) 안에서 보인다 — 고쳤으면 그쪽도 다시 그린다.
      안 그리면 「저장했는데 화면은 그대로」가 된다. */
   if(name==='etcfee') setTimeout(function(){ renderCareer('meetfee'); },0);
   if(name==='advisory') setTimeout(function(){ try{ renderAdvSummary(); }catch(e){ console.warn('advSummary',e); } },0);
+  if(name==='advisory') _safe(advTabsDraw);
   const sec=document.getElementById('page-'+name); if(!sec) return;
   /* 두 저장소를 한 표에 모은다(비용관리) — 기록은 «옮기지 않는다».
      옮기다 잃는 것이 합치는 이득보다 크다. 어느 저장소에서 왔는지는 _st 로 들고 다닌다. */
@@ -8063,6 +8602,20 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   else { rows.sort((a,b)=>(b.issueDate||b.date||b.year||'').localeCompare(a.issueDate||a.date||a.year||'')); }
   const missingCount=rows.filter(function(r){ return !hasOriginal(r); }).length;
   if(_noFileOnly[name]) rows=rows.filter(function(r){ return !hasOriginal(r); });
+  /* 연결 걸러보기 칩 (목업 안 E, 2026-09-29) — 실적 다섯 칸에만. 셈은 «거르기 전» 줄로 */
+  let linkBar='';
+  if(typeof PU_SYNC_STORES!=='undefined' && PU_SYNC_STORES.indexOf(cfg.store)>=0){
+    const lc={pu:0,check:0,hand:0}; rows.forEach(function(r){ lc[puLinkKind(r)]++; });
+    const lk=_linkOnly[name]||'';
+    if(lk) rows=rows.filter(function(r){ return puLinkKind(r)===lk; });
+    const chip=function(k,lab,tip){
+      const warm=(k==='check'&&lc.check&&lk!==k)?' style="border-color:#fde68a;background:#fffbeb;color:var(--amber);font-weight:700"':'';
+      return '<button type="button" class="nofile-btn'+(lk===k?' active':'')+'" onclick="toggleLinkOnly(\''+name+'\',\''+k+'\')" title="'+tip+'"'+warm+'>'+lab+' '+lc[k]+'</button>'; };
+    /* ⚠ 「연결 확인」은 있을 때만 — 0 인 칩이 늘 떠 있으면 잔소리다 */
+    linkBar='<div class="nofile-bar" style="gap:4px">'+chip('pu','🔗 이알피','이알피와 이어진 실적만')
+      +((lc.check||lk==='check')?chip('check','⚠ 연결 확인','이알피 연결이 어긋난 실적만 — 관리번호를 눌러 확인'):'')
+      +chip('hand','✎ 손으로','이알피와 안 이어진(직접 넣은) 기록만')+'</div>';
+  }
   /* ⚠ 전체 건수를 절대 숨기지 말 것 — 필터가 걸린 줄 모르고 「자료가 사라졌다」로 읽힌다.
      실제로 위촉장 197건이 79건(원본 없는 것만)으로 보여 유실로 오인한 일이 있었다.
      필터가 걸려 있으면 「전체 197건 · 지금 79건」처럼 둘 다 보여준다. */
@@ -8070,7 +8623,7 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   if(cntEl){
     const narrowed=(rows.length!==data.length);
     cntEl.textContent=narrowed?('전체 '+data.length+'건 · 지금 '+rows.length+'건'):(data.length+'건');
-    cntEl.title=narrowed?'검색·연도·유형·원본없음 필터가 걸려 있어 일부만 보입니다':'';
+    cntEl.title=narrowed?'검색·연도·유형·원본없음·연결 필터가 걸려 있어 일부만 보입니다':'';
     cntEl.style.color=narrowed?'var(--red)':'';
     cntEl.style.fontWeight=narrowed?'700':'';
   }
@@ -8101,7 +8654,7 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   const limit=pageViewCount(raw, pageStepOf(name), rows.length);
   const view=rows.slice(0,limit);
   const label=(typeof FORM_DEFS!=='undefined'&&FORM_DEFS[name]&&FORM_DEFS[name].title)||'항목';
-  if(!rows.length){ _tbExtra(sec, nofileBar); _ocrToToolbar(sec); _stickyTop(sec); box.innerHTML=(_noFileOnly[name]?'<div class="empty"><div class="emp-ico">✅</div>미첨부 항목이 없습니다 — 모든 원본이 첨부되어 있습니다.</div>':'<div class="empty"><div class="emp-ico">📭</div>아직 등록된 '+label+'이(가) 없습니다.<br><span style="font-size:12px">상단 <b>＋ 새 '+label+'</b> 버튼으로 첫 항목을 등록하세요.</span></div>')+exBar; return; }
+  if(!rows.length){ _tbExtra(sec, nofileBar+linkBar); _ocrToToolbar(sec); _stickyTop(sec); box.innerHTML=(_noFileOnly[name]?'<div class="empty"><div class="emp-ico">✅</div>미첨부 항목이 없습니다 — 모든 원본이 첨부되어 있습니다.</div>':'<div class="empty"><div class="emp-ico">📭</div>아직 등록된 '+label+'이(가) 없습니다.<br><span style="font-size:12px">상단 <b>＋ 새 '+label+'</b> 버튼으로 첫 항목을 등록하세요.</span></div>')+exBar; return; }
   /* 툴바 한 줄에 들어가도록 짧게 — 「표시 개수 … 79건 중 20건 표시」는 너무 길었다 */
   /* ⚠ 「전체」를 고르면 수백 행을 다 그려 느려진다 — 고를 수는 있게 두되 그렇다고 밝힌다 */
   const pgSel='<div class="pglimit-bar" style="justify-content:flex-end;margin:0">표시 <select class="tb-select" onchange="setPageLimit(\''+name+'\',parseInt(this.value,10))">'+[20,50,100,200].map(function(n){ return '<option value="'+n+'"'+(raw===n?' selected':'')+'>'+n+'</option>'; }).join('')+'<option value="-1"'+(raw<0?' selected':'')+'>전체(느림)</option></select>'
@@ -8112,7 +8665,7 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
      ⚠ 끝까지 내려간 사람은 위 툴바로 되돌아가지 않는다. 그래서 «끝에» 둔다. */
   const moreBar=moreRowsBar(name, raw, limit, rows.length);
   /* 원본없음 필터·표시개수는 툴바 한 줄로 올린다 — 표 위에 줄이 쌓이지 않게 */
-  _tbExtra(sec, nofileBar+pgSel);
+  _tbExtra(sec, nofileBar+linkBar+pgSel);
   _ocrToToolbar(sec);            /* OCR 자동등록 상자도 툴바 안 칩으로 — 한 줄 */
   /* 선택 체크 — 넘버 옆에 □. 모든 목록 화면이 이 한 곳에서 같이 만들어진다. */
   const selBar='<div class="sel-bar" id="selbar-'+name+'" style="display:none">'
@@ -8135,7 +8688,9 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   /* ⚠ 합친 표(비용관리)에서는 줄마다 «온 곳»이 다르다. 그걸 잃으면 기타비용 기록을
      고칠 때 회의비용 쪽에 새로 저장돼 원본이 남고 사본이 생긴다. */
   var _stOf={}; data.forEach(function(r){ _stOf[r.id]=r._st||cfg.store; });
-  box.querySelectorAll('tbody tr').forEach(tr=>{ const chip=tr.querySelector('.id-chip'); if(!chip) return; const rid=chip.textContent.trim();
+  box.querySelectorAll('tbody tr').forEach(tr=>{ const chip=tr.querySelector('.id-chip');
+    /* 줄 열쇠는 data-rid 먼저 — 실적 칸은 관리번호를 보이고 CS 번호 칩이 없다(puNoTd) */
+    const rid=tr.getAttribute('data-rid')||(chip?chip.textContent.trim():''); if(!rid) return;
     const rst=_stOf[rid]||cfg.store;
     tr.addEventListener('dragover',e=>{ e.preventDefault(); tr.style.boxShadow='inset 0 0 0 2px var(--teal)'; });
     tr.addEventListener('dragleave',()=>{ tr.style.boxShadow=''; });
@@ -8143,7 +8698,7 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
     tr.style.cursor='pointer';
     tr.addEventListener('click',e=>{ if(e.target.closest('button,a,input,select,textarea,.btn,.id-chip')) return; openEditDrawer(rst, rid); }); });
   if(cfg.stores) renderFeeChips(sec, data, tp);
-  if(_flashId){ box.querySelectorAll('tbody tr').forEach(tr=>{ if(tr.textContent.indexOf(_flashId)>=0) tr.classList.add('row-flash'); }); _flashId=null; }
+  if(_flashId){ box.querySelectorAll('tbody tr').forEach(tr=>{ if(tr.getAttribute('data-rid')===_flashId||tr.textContent.indexOf(_flashId)>=0) tr.classList.add('row-flash'); }); _flashId=null; }
 }
 var _flashId=null, _pageLimit={}, _pageStep={};
 var _noFileOnly={}, _sortState={};
@@ -8269,6 +8824,58 @@ function _showShortcutHelp(){ let d=document.getElementById('kbHelp'); if(d){ d.
    +[['Esc','열린 창·서랍 닫기'],['Ctrl + S','편집 중인 항목 저장'],['Ctrl + K  /  /','전체검색 열기'],['N','현재 목록에 새 항목'],['?','이 도움말 열기/닫기']].map(function(a){return '<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--border)"><kbd style="background:var(--hover);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;font-family:monospace">'+a[0]+'</kbd><span style="font-size:13px">'+a[1]+'</span></div>';}).join('')
    +'<div style="text-align:right;margin-top:14px"><button class="btn sm" onclick="document.getElementById(\'kbHelp\').remove()">닫기</button></div></div>';
   d.onclick=function(e){ if(e.target===d) d.remove(); }; document.body.appendChild(d); }
+/* ── 팝업은 Esc · 바깥 클릭으로 닫힌다 (대표 지시 2026-09-29 「esc 나 다른 클릭 하면 사라지게」) ──
+   ⚠ «그 창의 닫기»를 부른다 — 클래스만 떼면 한글 편집기처럼 숨은 채 계속 도는 것이 남는다.
+   ⚠ 한글 서식 창에서 고치는 중이면 닫지 않는다 — 고친 것이 사라진다(그만두기·다 고쳤습니다로).
+   ⚠ 입력칸이 많은 창은 바깥 클릭으로는 안 닫는다 — 칸 밖을 한 번 잘못 누르면 친 것이 날아간다(Esc 는 된다). */
+var KC_MODAL_NO_BACKDROP={ modalBulk:1, modalPaste:1 };   /* 등록 창(modalForm)은 전부터 스스로 바깥 클릭에 닫힌다 */
+var _kcModalOpenAt={};
+function _kcModalCloser(ov){
+  var id=ov.id;
+  if(id==='modalForm' && typeof closeForm==='function') return closeForm;
+  if(id==='modalHwpView' && typeof closeHwpView==='function') return closeHwpView;
+  if(id==='modalSearch' && typeof closeSearch==='function') return closeSearch;
+  if(id==='imgModal' && typeof closeBig==='function') return closeBig;
+  var btn=[].slice.call(ov.querySelectorAll('button')).filter(function(b){
+    return b.offsetParent!==null && /^\s*(닫기|취소|✕|×)\s*$/.test(b.textContent||'');
+  })[0];
+  if(btn) return function(){ btn.click(); };
+  return function(){ ov.classList.remove('open'); };
+}
+function _kcModalBusy(ov){
+  if(ov.id==='modalHwpView'){
+    var ed=document.getElementById('hwpViewFootEdit');
+    if(ed && ed.style.display!=='none'){ toast('한글로 고치는 중입니다 — 「↩ 그만두기」나 「✔ 다 고쳤습니다」를 눌러 주세요'); return true; }
+  }
+  return false;
+}
+function kcCloseTopModal(){
+  var open=[].slice.call(document.querySelectorAll('.modal-ov.open'));
+  if(!open.length) return false;
+  open.sort(function(a,b){ return (_kcModalOpenAt[a.id]||0)-(_kcModalOpenAt[b.id]||0); });
+  var ov=open[open.length-1];
+  if(_kcModalBusy(ov)) return true;
+  _kcModalCloser(ov)();
+  return true;
+}
+function kcModalWire(){
+  [].slice.call(document.querySelectorAll('.modal-ov')).forEach(function(ov){
+    if(ov._kcWired) return; ov._kcWired=true;
+    new MutationObserver(function(){ if(ov.classList.contains('open')) _kcModalOpenAt[ov.id]=Date.now(); })
+      .observe(ov,{ attributes:true, attributeFilter:['class'] });
+    if(KC_MODAL_NO_BACKDROP[ov.id]) return;
+    /* 누름과 뗌이 «둘 다» 바깥이어야 닫는다 — 안에서 글자를 끌어 고르다 밖에서 떼면 닫히면 안 된다 */
+    var 밖에서눌림=false;
+    ov.addEventListener('mousedown', function(e){ 밖에서눌림=(e.target===ov); });
+    ov.addEventListener('click', function(e){
+      if(e.target!==ov || !밖에서눌림) return;
+      밖에서눌림=false;
+      if(_kcModalBusy(ov)) return;
+      _kcModalCloser(ov)();
+    });
+  });
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', kcModalWire); else kcModalWire();
 document.addEventListener('keydown', function(e){
   const tag=(e.target&&e.target.tagName)||''; const typing=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(e.target&&e.target.isContentEditable));
   const fm=document.getElementById('modalForm'); const formOpen=fm&&fm.classList.contains('open');
@@ -8278,6 +8885,7 @@ document.addEventListener('keydown', function(e){
     const ms=document.getElementById('modalSearch'); if(ms&&ms.classList.contains('open')){ closeSearch(); e.preventDefault(); return; }
     const im=document.getElementById('imgModal'); if(im&&im.classList.contains('open')){ closeBig(); e.preventDefault(); return; }
     const pp=document.getElementById('cvPalettePop'); if(pp&&pp.style.display&&pp.style.display!=='none'){ pp.style.display='none'; e.preventDefault(); return; }
+    if(kcCloseTopModal()){ e.preventDefault(); return; }
     return; }
   if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')){ if(formOpen){ e.preventDefault(); saveForm(); } return; }
   if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){ e.preventDefault(); openSearch(); return; }
@@ -9968,8 +10576,26 @@ const PAGE_OCR_PROMPT={
      ⚠ 대표 «개인»의 주민등록번호를 묻지 않는다 — 등기부에는 임원 주민번호가 적혀 있지만 법인정보에 쓸 데가 없다. */
   firm_doc:`이 법인 서류(사업자등록증·법인등기사항증명서·통장사본·법인인감증명서 등)를 꼼꼼히 읽고 JSON으로만 답하세요. 번호는 숫자 하나도 틀리지 않게 그대로.\n{"kind":"사업자등록증/법인등기부/통장사본/인감증명서/기타 중 하나","name":"법인명(상호) 전체","ceo":"대표자 이름","corpNo":"법인등록번호(여섯 자리-일곱 자리)","bizNo":"사업자등록번호(세 자리-두 자리-다섯 자리)","estDate":"설립일·개업연월일 YYYY.MM.DD","capital":"자본금(적힌 그대로, 예: 3000만원)","zip":"우편번호(적혀 있을 때만)","addr":"본점·사업장 소재지 전체","tel":"전화","fax":"팩스","email":"이메일","bank":"통장사본이면 은행명","acctNo":"통장사본이면 계좌번호 전체","acctHolder":"통장사본이면 예금주"}\n※ 등기부에 적힌 임원 «개인»의 번호는 옮기지 마세요. 문서에 없는 항목은 빈 문자열. 지어내지 마세요. JSON만.`
 };
-function wiccokId(type,year){ const db=get('wiccok'),pre=type+year+'-'; let n=1; while(db.some(r=>r.id===pre+String(n).padStart(3,'0'))) n++; return pre+String(n).padStart(3,'0'); }
-function nextId(prefix,store){ const db=get(store); let n=1; const mk=()=>prefix+String(n).padStart(4,'0'); while(db.some(r=>r.id===mk())) n++; return mk(); }
+/* ===== 새 번호는 «한 번 쓴 번호를 다시 주지 않는다» (온톨로지 검토 2026-09-29) =====
+   예전엔 비어 있는 가장 작은 번호부터 채웠다 — CS0012 를 지우면 다음 새 실적이 CS0012 를 받았다.
+   ⚠ 첨부 원본은 «레코드 번호»로 찾는다(fileExists(r.id)). 번호를 다시 주면 휴지통에 든 옛 건의
+     원본이 새 건에 붙어 보인다. 그래서 «지금 목록 + 휴지통»에서 가장 큰 번호의 다음을 준다.
+   ⚠ 휴지통이 30일 뒤 비워지면 그 번호는 다시 나올 수 있다 — 그때는 원본도 함께 지워진 뒤다.
+   extra: 아직 저장 안 한 묶음(buf) — 한 번에 여러 건을 만들 때 같은 번호가 두 번 나오지 않게. */
+function kcNextNo(pre, width, store, extra){
+  var max=0, re=new RegExp('^'+String(pre).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(\\d+)$');
+  function see(id){ var m=re.exec(String(id||'')); if(m) max=Math.max(max, parseInt(m[1],10)||0); }
+  (get(store)||[]).forEach(function(r){ if(r) see(r.id); });
+  (extra||[]).forEach(function(r){ if(r) see(r.id); });
+  kcTrashList().forEach(function(e){
+    if(!e) return;
+    if(e.store===store && e.rec) see(e.rec.id);
+    (e.files||[]).forEach(see);
+  });
+  return pre+String(max+1).padStart(width,'0');
+}
+function wiccokId(type,year){ return kcNextNo(type+year+'-', 3, 'wiccok'); }
+function nextId(prefix,store){ return kcNextNo(prefix, 4, store); }
 function quickParseFilename(fname,page){ const y=(fname.match(/(20\d{2})/)||[])[1]||String(new Date().getFullYear());
   const clean=fname.replace(/\.(pdf|hwp|hwpx|jpg|jpeg|png)$/i,'').replace(/20\d{2}/g,'').replace(/[()\[\]._\-]/g,' ').trim();
   if(page==='wiccok') return {org:clean.slice(0,30),titleVal:'',year:y,issueDate:'',period:''};
@@ -10754,7 +11380,7 @@ const PI_GROUPS=[
     ['phone','휴대폰'],['phoneWork','사무실 전화'],['phoneHome','자택 전화'],
     ['fax','팩스'],['email','개인 이메일'],['emailWork','회사 이메일']]],
   ['주소','지원서는 집을, 위촉 서류는 사무실을 묻는다', [
-    ['addrHome','집 주소'],['addr','사무실 주소']]],
+    ['zipHome','집 우편번호'],['addrHome','집 주소'],['zipWork','사무실 우편번호'],['addr','사무실 주소']]],
   ['일','「푸른노무법인 대표」가 한 칸에 뭉쳐 있었다', [
     ['org','소속'],['dept','부서'],['title','직위'],['license','자격']]],
   /* ★ 병역·보훈·장애 (대표 결정 2026-09-13) — 지원서가 거의 늘 묻는데 담을 데가 없었다.
@@ -10772,6 +11398,9 @@ const PI_FIELDS=PI_GROUPS.reduce((a,g)=>a.concat(g[2]),[]);
    화면에서도 가려 두고 「보기」를 눌러야 보인다 — 어깨너머로 읽히지 않게. */
 const PI_SECRET={rrn:true};
 const PI_WIDE={addr:true,addrHome:true};
+/* ★ 우편번호는 «그 주소 줄 안»에 그린다 (대표 지시 2026-09-29) — 칸을 따로 한 줄씩 쓰면 화면이 길어진다 */
+const PI_ZIP_OF={addrHome:'zipHome', addr:'zipWork'};
+const PI_ZIP_KEYS={zipHome:true, zipWork:true};
 
 /* ⚠ 2026-08-30 이후 USER_INFO 는 «비어 있다»(개인정보를 파일에서 뺐다).
    그래서 되메꿈은 사실상 빈 값이고, 기본정보는 사람이 한 번 넣어야 한다.
@@ -10808,6 +11437,12 @@ function renderPersonal(){ const g=document.getElementById('piGrid'); if(!g) ret
     +`<div class="field-grid">`+fs.map(([k,l])=>{
       const v=String(info[k]||'').replace(/"/g,'&quot;');
       const wide=PI_WIDE[k]?' style="grid-column:1/-1"':'';
+      if(PI_ZIP_KEYS[k]) return '';
+      if(PI_ZIP_OF[k]){ const zk=PI_ZIP_OF[k], zv=String(info[zk]||'').replace(/"/g,'&quot;');
+        return `<div class="field"${wide}><label>${l}</label><div style="display:flex;gap:6px">`
+          +`<input id="pi-${zk}" value="${zv}" placeholder="우편번호" inputmode="numeric" maxlength="7" style="width:96px;flex:none">`
+          +`<button type="button" class="btn sm" onclick="piZipFind('${k}','${zk}')" style="white-space:nowrap" title="적어 둔 주소로 우편번호를 찾습니다 — 맞는 것을 누르면 들어가고 저장됩니다">📮 찾기</button>`
+          +`<input id="pi-${k}" value="${v}" style="flex:1;min-width:0"></div></div>`; }
       /* 한자 성명만 옆에 「漢」 단추 — 한글 IME 한자 키가 안 먹는 칸이라 손으로 넣을 길이 없었다 */
       if(k==='nameHanja') return `<div class="field"><label title="漢 을 눌러 소리마다 고릅니다">${l}</label>`
         +`<div class="hj-row"><input id="pi-${k}" value="${v}" placeholder="예: 權炯河"><button type="button" class="btn hj-btn" onclick="hjOpen()" title="성명을 한자로 고릅니다">漢</button></div>`
@@ -12105,6 +12740,19 @@ function rhDraftCells(){
   return { done:친것, total:전체 };
 }
 
+/* 작성 중 목록의 «보일 이름»을 나중에 채운다 — 제목·기관을 찾는 데 잠깐 걸려 담기를 붙잡지 않는다 */
+var _rhTitleBusy=false;
+async function rhDraftTitleLater(id){
+  if(_rhTitleBusy || !id) return;
+  _rhTitleBusy=true;
+  try{
+    var n=await rhNiceName();
+    var arr=rhDraftAll(), 바뀜=false;
+    arr.forEach(function(d){ if(d.id===id && n && d.title!==n){ d.title=n; 바뀜=true; } });
+    if(바뀜){ rhDraftPut(arr); rhDraftCheck(); }
+  }catch(e){ console.warn('보일 이름', e); }
+  finally{ _rhTitleBusy=false; }
+}
 function rhDraftSave(){
   if(!_rhDoc || !_rhDoc.bytes) return;
   try{
@@ -12121,8 +12769,11 @@ function rhDraftSave(){
                   cells:c, done:false, madeAt:(있던&&있던.madeAt)||Date.now(),
                   /* ⚠ 한 번 담아 둔 것은 잊지 않는다 — 이번에 못 담았다고 지우면
                      목록이 「원본 없음」이라 잘못 말한다 */
-                  hasBase:원본있나||!!(있던&&있던.hasBase) });
+                  hasBase:원본있나||!!(있던&&있던.hasBase),
+                  /* ★ 보일 이름(저장 이름 규칙) — 「양식.hwpx」만 줄지어 무엇인지 몰랐다(대표 2026-09-29) */
+                  title:(있던&&있던.title)||'' });
     rhDraftPut(arr);
+    rhDraftTitleLater(_rhDraftId);
     rhSaveTag('💾 담김 · '+new Date().toLocaleTimeString('ko-KR').slice(0,8), false);
     _rhSaveFail=0;
     rhDraftCheck();
@@ -12195,15 +12846,19 @@ async function rhDraftNow(quiet){
 /* ✕ 치우기 — 편집 중인 서식을 화면에서 내린다.
    ⚠ 담아 둔 것은 «지우지 않는다». 치우는 것과 버리는 것은 다르다 —
      치웠다가 「↩ 이어서」로 돌아올 수 있어야 마음 놓고 치운다. */
-async function rhCloseDoc(){
-  if(!_rhDoc || !_rhDoc.bytes){ toast('열려 있는 서식이 없습니다'); return; }
-  if(!confirm('화면에서 치울까요?\n\n지금까지 친 것은 담아 두고 치웁니다 — 「↩ 이어서」로 돌아올 수 있습니다.')) return;
-  await rhDraftNow();
+/* o: { silent:묻지 않고 조용히 · nosave:담지 않고 치운다(← 목록으로 — 담기는 그쪽이 먼저 했거나, 저장 안 하고 나가기) } */
+async function rhCloseDoc(o){
+  o=o||{};
+  if(!_rhDoc || !_rhDoc.bytes){ if(!o.silent) toast('열려 있는 서식이 없습니다'); return; }
+  if(!o.silent && !confirm('화면에서 치울까요?\n\n지금까지 친 것은 담아 두고 치웁니다 — 「↩ 이어서」로 돌아올 수 있습니다.')) return;
+  if(!o.nosave) await rhDraftNow();
   try{ closeHwpView(); }catch(e){}
   if(typeof rhHwpEdClose==='function') rhHwpEdClose();
   _rhDoc=null; _rhMap=null; _rhPicks={}; _rhVals={}; _rhUndo=null; _rcFileName='';
   var card=document.getElementById('rcEditCard'); if(card){ card.style.display='none'; card.classList.remove('rh-doc','rh-wide'); }
   document.body.classList.remove('rh-doc-on'); document.body.style.overflow='';
+  /* ⚠ 작업 모드도 푼다 — 안 풀면 위 줄(양식 올리기·작성 중)이 감춰진 채 남아 «돌아갈 곳»이 안 보인다 */
+  try{ rhWorkSet(false); }catch(e){}
   var ed=document.getElementById('rhwpEditor'); if(ed) ed.innerHTML='';
   _rhBase=null; _rhListPlan=null; _rhVals={};
   /* ★ 치웠으니 «지금 자리»를 놓는다 — 안 놓으면 다음에 올린 양식이 치운 자리를 덮는다.
@@ -12211,7 +12866,65 @@ async function rhCloseDoc(){
   _rhDraftId=null;
   var msg=document.getElementById('rcEditorMsg'); if(msg){ msg.style.display=''; msg.textContent='양식을 업로드하면 미리보기가 나타납니다'; }
   rhUndoBtn(); rhDraftCheck();
-  toast('치웠습니다 — 담아 둔 것은 그대로입니다');
+  if(!o.silent) toast('치웠습니다 — 담아 둔 것은 그대로입니다');
+}
+
+/* ── ← 목록으로 (대표 승인 2026-09-30 목업) ──
+   ① 그냥 누르면: 담고 → 치우고 → 작성 중 목록을 연다(방금 쓰던 줄에 「방금 담음」).
+   ② ▾ › 저장 안 하고 나가기: 한 번 묻고, 담지 않고 치운다 — 마지막으로 담은 것은 목록에 남는다.
+   ③ 브라우저 뒤로(마우스 뒤로 버튼·Alt+←)도 ①과 같다 — 전에는 경력관리 밖으로 나가 버렸다.
+   ⚠ 뒤로 가기를 받으려고 작업 모드에 들어갈 때 발자국(history) 하나를 남긴다(rhWorkSet). */
+var _rhJustBack=null, _rhBackBound=false;
+function _rhLastSaved(id){
+  var k=(id===undefined)?_rhDraftId:id, d=null;
+  if(!k) return null;
+  try{ d=rhDraftAll().filter(function(x){ return x.id===k; })[0]||null; }catch(e){}
+  return d;
+}
+function rhBackMenuClose(){ var m=document.getElementById('rhBackMenu'); if(m) m.hidden=true; }
+function rhBackMenu(ev){
+  if(ev) ev.stopPropagation();
+  var m=document.getElementById('rhBackMenu'); if(!m) return;
+  var 열기=m.hidden; m.hidden=!열기;
+  if(!열기) return;
+  var d=_rhLastSaved(), w=document.getElementById('rhBackWhen');
+  if(w) w.textContent=d?('마지막으로 담은 때: '+_rhWhen(d.at)):'아직 한 번도 담지 않았습니다';
+  if(!_rhBackBound){
+    _rhBackBound=true;
+    document.addEventListener('click', function(e){ var b=document.getElementById('rhBackWrap'); if(b && !b.contains(e.target)) rhBackMenuClose(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') rhBackMenuClose(); });
+  }
+}
+function rhBackAskDrop(btn){
+  var d=_rhLastSaved();
+  kcAskDelete(btn, { title:'저장 안 하고 나갈까요?', yes:'버리고 나가기',
+    detail: d ? escapeHtml(_rhWhen(d.at))+' 담은 상태로 돌아갑니다 — 그 뒤에 친 것은 사라집니다.'
+              : '한 번도 담지 않았습니다 — 나가면 이 서식은 작성 중 목록에 남지 않습니다.' },
+    function(){ return rhBackToList('drop'); });
+}
+async function rhBackToList(how){
+  rhBackMenuClose();
+  if(!rhEditing()) return;
+  var drop=(how==='drop');
+  if(!drop) await rhDraftNow(true);
+  var id=_rhDraftId;
+  /* ⚠ 담기는 위에서 «한 번» 했다 — 치우기에서 또 담지 않는다(두 번 담으면 수 MB 를 두 번 내보낸다) */
+  await rhCloseDoc({ silent:true, nosave:true });
+  _rhJustBack=_rhLastSaved(id)?id:null;
+  var p=document.getElementById('rhDraftPanel');
+  if(p && rhDraftAll().length){ p.classList.remove('hide'); var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▴'; }
+  rhDraftDraw();
+  try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){}
+  toast(drop?'저장 안 하고 나왔습니다 — 마지막으로 담은 것은 목록에 그대로 있습니다'
+            :'담아 두고 나왔습니다 — 다른 서류는 이름을 누르면 바로 들어갑니다', 4000);
+}
+/* 브라우저 뒤로 = 「← 목록으로」 — 공용 뒤로가기(js/pu-back.js)의 파수꾼으로 단다.
+   ⚠★ history.pushState/popstate 를 따로 굴리지 말 것 — pu-back.js 가 이미 걸음을 심고 popstate 를 받는다.
+     따로 굴렸더니 둘이 겹쳐 뒤로 한 번에 경력관리 «밖»으로 나갔다(2026-09-30 시험). */
+function rhBackGuard(){
+  if(!rhEditing()) return false;
+  rhBackToList('save');
+  return true;
 }
 
 /* 편집 화면을 창 전체로 — 한글 편집기 아래가 잘려 안 보이던 것 */
@@ -12261,6 +12974,7 @@ var RH_KEYS = [
   ['phone','휴대폰'],['phoneHome','자택 전화'],['phoneWork','사무실 전화'],['fax','팩스'],
   ['email','개인 이메일'],['emailWork','회사 이메일'],
   ['addr','집 주소'],['addrWork','사무실 주소'],
+  ['zip','우편번호(주소와 같은 곳)'],['zipWork','사무실 우편번호'],
   ['org','소속'],['dept','부서'],['title','직위'],
   /* 「소속·직위」를 한 칸에 묶어 묻는 서식이 있다 — 「푸른노무법인 대표」처럼 이어 쓴다 */
   ['orgTitle','소속·직위 (묶음)'],
@@ -12511,6 +13225,8 @@ function rhWorkSet(on){
   card.classList.toggle('rh-work', !!on);
   document.body.classList.toggle('rh-work-on', !!on);
   if(on) rhWorkTop(); else document.documentElement.style.removeProperty('--rhTop');
+  if(on) _rhJustBack=null;
+  else if(typeof rhDraftFloatClose==='function') rhDraftFloatClose();
   rhApplyFit();
 }
 /* 감춰 둔 「양식 올리기」를 기둥에서 대신 누른다 — 단추를 새로 만들지 않는다.
@@ -12842,9 +13558,10 @@ async function rhHwpEdOpen(){
   if(!bytes){ box.innerHTML='<div class="rc-mute" style="padding:22px">이 형식은 편집기로 못 엽니다 — 한글에서 HWPX 로 저장해 올려주세요</div>'; return; }
   /* ★ 편집기 「저장」 창에 뜨는 이름이 이것이다 — 「양식」 두 글자만 뜨던 것(대표 화면 2026-09-28).
      해 + 올린 신청서 이름 + 날짜로 준다(rhSaveName). ⚠ _rhHwpEdFor 는 바탕 이름 그대로 둔다. */
-  var 제목=''; try{ 제목=await rhDocTitle(); }catch(e){}
+  var 새이름=rhSaveName(rhUploadName()||이름, '');
+  try{ 새이름=await rhNiceName(); }catch(e){}
   try{
-    _rhHwpEd=await _hwpEdCreate(box, bytes, rhSaveName(rhUploadName()||이름, 제목));
+    _rhHwpEd=await _hwpEdCreate(box, bytes, 새이름);
     _rhHwpEdFor=이름;
     toast('✏️ 한글 편집기 — 입력판·한글로 보기로 나가면 고친 것이 저절로 바탕이 됩니다');
   }catch(e){
@@ -13674,10 +14391,8 @@ async function rhHwpOut(){
   if(!bytes||!bytes.length){ toast('내보낼 것이 없습니다'); return; }
   /* ★ 이름은 «해 + 올린 신청서 이름 + 날짜»다 (대표 지시 2026-09-28 — 2026-09-13 「제목 먼저」를 바꿨다).
      올린 이름이 뭉뚱그린 말(양식 등)뿐일 때만 «서류에서 찾은 제목»을 쓴다. */
-  var 제목='';
-  try{ 제목=await rhDocTitle(); if(제목 && window.KcareerHwpxTidy) 제목=KcareerHwpxTidy.safeName(제목); }
-  catch(e){ console.warn('제목 찾기',e); }
-  var name=rhSaveName(rhUploadName()||rhCleanName('양식','_작성'), 제목);
+  var name=rhSaveName(rhUploadName()||rhCleanName('양식','_작성'), '');
+  try{ name=await rhNiceName(); }catch(e){ console.warn('저장 이름',e); }
   if(window.showSaveFilePicker){
     try{
       var h=await window.showSaveFilePicker({ suggestedName:name,
@@ -13761,31 +14476,104 @@ function rhCleanName(name, 꼬리){
   base=base.replace(/(_채움|_날인)+$/g,'');
   return base + (꼬리||'') + '.hwpx';
 }
-/* ★ 저장 이름 = «해 + 올린 신청서 이름 + 날짜» (대표 지시 2026-09-28
-     「업로드했던 지원신청서의 이름을 가지고 와서 0000년 00000 신청서 0000. 00. — 날짜 등으로 저장」)
-   예) 「2026년 [한국기계연구원] 위원 신청서 2026. 09. 28.hwpx」
-   ⚠ 먼저 걷어낸다 — 앞의 해 · 뒤의 날짜 · _채움/_날인/_작성 꼬리. 안 걷으면 이 이름으로 저장한
-     파일을 다시 올려 저장할 때마다 「2026년 2026년 … 2026. 09. 28 2026. 09. 28」로 쌓인다.
-   ⚠ 이름 앞에 해가 있으면(「2025 서산시 …」) 그 해를 쓴다 — 그 서류의 해다. 없으면 올해.
-   ⚠ 이름이 뭉뚱그린 말(양식·서식·document…)뿐이면 서류에서 찾은 제목을 쓴다
-     (대표 화면 2026-09-28: 저장창에 「양식」 두 글자만 떴다). */
+/* ★ 저장 이름 = «해년 기관 서류제목_이름 날짜» (대표 승인 2026-09-29 — 09-28 「해 + 올린 이름 + 날짜」를 넓혔다)
+   예) 「2027년 천안어린이꿈누리터 제안서 평가위원 후보자 등록 신청서_권형하 2026. 09. 29.hwpx」
+   ■ 왜 바꿨나 — 올린 파일 이름이 «공고문»이면 공고문을 뺀 신청서에도 「공고문」이 붙었고,
+     작성 중 목록에는 「양식.hwpx」「양식_채움.hwpx」가 줄지어 무엇이 무엇인지 몰랐다.
+   · 서류제목: «실제로 남은 서류»의 제목(rhDocTitle)이 먼저 · 없으면 올린 이름.
+   · 기관: 서류 끝 「○○장 귀하」에서 찾는다(rhOrgFrom) · 제목에 이미 있으면 안 붙인다.
+   · 이름: 누구 것인지 — 같은 서식을 노무사 셋이 쓸 때 가른다.
+   ⚠ 먼저 걷어낸다 — 앞의 해 · 뒤의 날짜 · _채움/_날인/_작성 꼬리 · 뒤의 «_이름». 안 걷으면
+     이 이름으로 저장한 파일을 다시 올려 저장할 때마다 해·날짜·이름이 쌓인다.
+   ⚠ 이름 앞에 해가 있으면(「2025 서산시 …」) 그 해를 쓴다 — 그 서류의 해다. 없으면 올해. */
 var RH_PLAIN_NAME=/^(양식|서식|문서|원본|무제|서류|document|untitled|새 문서)$/i;
-function rhSaveName(원이름, 제목, 날){
+function rhSaveName(원이름, 제목, 날, 더){
   var d=(날 instanceof Date)?날:new Date();
   var 둘=function(n){ return ('0'+n).slice(-2); };
   var 해=null;
+  더=더||{};
+  var 사람=String(더.사람||'').replace(/\s+/g,'');
   var 다듬기=function(s){
     s=String(s||'').replace(/\.(hwpx?|pdf|docx?)$/i,'');
     s=s.replace(/(_채움|_날인|_작성|_완성본|_수정)+$/g,'');
     s=s.replace(/[\s_]*\d{4}\s*[.\-]\s*\d{1,2}(\s*[.\-]\s*\d{1,2})?\s*\.?\s*$/,'');   /* 뒤 날짜 */
+    if(사람) s=s.replace(new RegExp('_'+사람+'$'),'');
     var m=s.match(/^\s*(\d{4})\s*년?[\s_.]+/);                                      /* 앞 해 */
     if(m){ if(해==null) 해=+m[1]; s=s.slice(m[0].length); }
-    return s.replace(/[\\/:*?"<>|]/g,' ').replace(/\s+/g,' ').trim();
+    return s.replace(/[\/:*?"<>|]/g,' ').replace(/\s+/g,' ').trim();
   };
-  var 이름=다듬기(원이름);
-  if(!이름 || RH_PLAIN_NAME.test(이름)){ 해=null; 이름=다듬기(제목)||이름||'서류'; }
+  var 올린=다듬기(원이름);
+  var 본=다듬기(제목);
+  if(!본) 본=(올린 && !RH_PLAIN_NAME.test(올린))?올린:(올린||'서류');
+  var 기관=String(더.기관||'').replace(/[\/:*?"<>|]/g,' ').trim();
+  if(기관 && 본.replace(/\s+/g,'').indexOf(기관.replace(/\s+/g,''))<0) 본=기관+' '+본;
+  if(사람 && 본.replace(/\s+/g,'').indexOf(사람)<0) 본=본+'_'+사람;
   var y=(해>=1990 && 해<=2100)?해:d.getFullYear();
-  return y+'년 '+이름+' '+d.getFullYear()+'. '+둘(d.getMonth()+1)+'. '+둘(d.getDate())+'.hwpx';
+  return y+'년 '+본+' '+d.getFullYear()+'. '+둘(d.getMonth()+1)+'. '+둘(d.getDate())+'.hwpx';
+}
+/* 서류 끝 「○○장 귀하」에서 기관 이름을 뽑는다. 못 찾으면 ''.
+   「한국기계연구원장」→ 한국기계연구원 · 「천안어린이꿈누리터관장」→ 천안어린이꿈누리터.
+   ⚠ «장»만 떼면 「꿈누리터관」이 되고, 두 글자를 떼면 「한국기계연구」가 된다 —
+     어느 쪽인지는 «귀하 줄이 아닌» 곳(서류 글·올린 이름)에 그 이름이 나오는지로 가린다. */
+function rhOrgFrom(text, hint){
+  var t=String(text||''), re=/([가-힣A-Za-z0-9·]{2,40}?)\s*귀\s*하/g, m, w='';
+  while((m=re.exec(t))) w=m[1];
+  if(!w || !/장$/.test(w)) return '';
+  var 다른글=(t.replace(/[가-힣A-Za-z0-9·]{2,40}?\s*귀\s*하/g,' ')+' '+String(hint||'')).replace(/\s+/g,'');
+  var c1=w.slice(0,-1), c2=/(관장|원장|청장|사장)$/.test(w)?w.slice(0,-2):'';
+  if(다른글.indexOf(c1)>=0) return c1;
+  if(c2 && c2.length>=2 && 다른글.indexOf(c2)>=0) return c2;
+  return c1;
+}
+/* 서류 제목 고르기 — «신청서·지원서…로 끝나는 것»이 먼저다.
+   ⚠ 쪽 제목만 보면 첫 쪽 제목이 표 안에 있는 서식(한국기계연구원 신청서)에서 둘째 쪽 소제목
+     「1-1. 일반현황」을 집었다(실측 2026-09-29). 그래서 서류 글에서 「…」 신청서 꼴도 찾는다. */
+var RH_DOC_WORD=/(신청서|지원서|이력서|계획서|제안서)$/;
+var RH_DOC_SIDE=/(서약서|확인서|동의서|추천서)$/;   /* 붙임 서류 — 본 서류를 못 찾을 때만 */
+function rhPickTitle(titles, text){
+  var ts=(titles||[]).map(function(t){ return String(t||'').replace(/\s+/g,' ').trim(); }).filter(Boolean);
+  var 좋은=ts.filter(function(t){ return RH_DOC_WORD.test(t); })[0];
+  if(좋은) return 좋은;
+  var t=String(text||'');
+  var m=/[「『]([^」』]{2,40})[」』]\s*(신청서|지원서|이력서|계획서|제안서)/.exec(t);
+  if(m) return (m[1]+' '+m[2]).replace(/\s+/g,' ').trim();
+  m=/([가-힣0-9][가-힣0-9 ]{1,30}(신청서|지원서|이력서|계획서))/.exec(t);
+  if(m) return m[1].replace(/\s+/g,' ').trim();
+  var 곁=ts.filter(function(t){ return RH_DOC_SIDE.test(t); })[0];
+  return 곁||ts[0]||'';
+}
+/* 이름에 넣을 조각 — {제목, 기관, 사람}. 기관은 «바탕» 서류 글에서 한 번 찾아 기억한다. */
+var _rhOrgMemo={ key:'', 기관:'' };
+async function rhNameParts(){
+  var 바탕=_rhBase||_rhDoc, 기관='', 글='';
+  var key=바탕?(String(바탕.name||'')+':'+((바탕.bytes&&바탕.bytes.length)||0)):'';
+  if(key && _rhOrgMemo.key===key){ 기관=_rhOrgMemo.기관; 글=_rhOrgMemo.글||''; }
+  else if(바탕 && 바탕.bytes){
+    try{
+      if(typeof JSZip==='undefined') await _ensureJSZip();
+      var zip=await JSZip.loadAsync(바탕.bytes);
+      var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
+      for(const n of names){
+        var x=await zip.file(n).async('string');
+        글+=' '+(x.match(/<hp:t(?:\s[^>]*)?>[\s\S]*?<\/hp:t>/g)||[]).map(function(t){ return t.replace(/<[^>]*>/g,''); }).join('');
+      }
+      기관=rhOrgFrom(글, rhUploadName());
+    }catch(e){ 기관=''; }
+    _rhOrgMemo={ key:key, 기관:기관, 글:글 };
+  }
+  if(!글) 글=_rhOrgMemo.글||'';
+  /* 남은 쪽들의 제목 — 뺀 쪽(공고문 등)은 넣지 않는다 */
+  var 쪽제목=[];
+  try{ (_tdPages||[]).forEach(function(p){ if((_rhTidy.drop[p.sec]||[]).indexOf(p.i)<0){ var k=p.sec+'#'+p.i; 쪽제목.push((_tdTitles[k]!=null?_tdTitles[k]:p.title)||''); } }); }catch(e){}
+  var 제목=rhPickTitle(쪽제목, 글);
+  if(제목 && window.KcareerHwpxTidy) 제목=KcareerHwpxTidy.safeName(제목);
+  var info={}; try{ info=(typeof getProfileInfo==='function'?getProfileInfo():get('profile_info'))||{}; }catch(e){}
+  return { 제목:제목, 기관:기관, 사람:info.name||'' };
+}
+/* 지금 서류의 저장 이름 — 모든 저장 길이 이 한 곳을 부른다 */
+async function rhNiceName(){
+  var p=await rhNameParts();
+  return rhSaveName(rhUploadName()||rhCleanName('양식','_작성'), p.제목, null, p);
 }
 /* 올린 신청서 이름 — «처음 올린 것»이 먼저다(한글에서 고쳐 온 파일은 이미 날짜 이름일 수 있다) */
 function rhUploadName(){
@@ -14626,10 +15414,51 @@ function rhDraftPanelClose(){
 function rhDraftShow(){
   var p=document.getElementById('rhDraftPanel'); if(!p) return;
   if(!rhDraftAll().length){ toast('아직 담아 둔 서류가 없습니다 — 「💾 작성 중 저장」을 누르면 여기에 쌓입니다', 4000); return; }
+  /* ★ 입력 화면에서는 «떠 있는 창»으로 연다 (대표 지적 2026-09-30 「작성중 서류보기 누르면 계속 위에 나와서
+     편집기능이 계속 아래로 내려간다」 → 목업 A 승인). 문서는 제자리에 둔다.
+     ⚠ 위에 펼치는 옛 길로 되돌리지 말 것 — 펼칠 때마다 문서가 목록 높이만큼 밀려 내려갔다. */
+  if(document.body.classList.contains('rh-work-on')){ rhDraftFloatOpen(); return; }
   p.classList.remove('hide');
   var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▴';
   rhDraftDraw();
   try{ p.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){ p.scrollIntoView(); }
+}
+var _rhFloatBound=false;
+function rhDraftFloatOpen(){
+  var p=document.getElementById('rhDraftPanel'); if(!p) return;
+  p.classList.add('rh-float'); p.classList.remove('hide');
+  var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▴';
+  rhDraftDraw();
+  /* 자리: 기둥 단추 옆, 아래에 붙인다 — 재서 잡는다(기둥 폭은 화면마다 다르다) */
+  var b=document.getElementById('rhDraftRailBtn'), W=window.innerWidth||1200, H=window.innerHeight||800;
+  var r=(b&&b.getBoundingClientRect)?b.getBoundingClientRect():null;
+  /* 폭이 먼저다 — 좁은 창에서 기둥 옆에만 고집하면 표가 짓눌린다. 모자라면 왼쪽으로 당겨 문서 위에 겹친다 */
+  var 폭=Math.min(760, W-24);
+  var left=r&&r.width?Math.round(r.right+10):24;
+  if(left+폭>W-12) left=Math.max(12, W-폭-12);
+  p.style.left=left+'px';
+  p.style.width=폭+'px';
+  p.style.bottom=(r&&r.height?Math.max(8, Math.round(H-r.bottom)):16)+'px';
+  p.style.top='auto';
+  if(!_rhFloatBound){
+    _rhFloatBound=true;
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') rhDraftFloatClose(); });
+    /* 바깥을 누르면 닫는다 — ⚠ 버리기 확인 쪽지(#kcDelPop)·되살리기 알림(#kcUndo)은 «바깥»이 아니다 */
+    document.addEventListener('mousedown', function(e){
+      var q=document.getElementById('rhDraftPanel');
+      if(!q || !q.classList.contains('rh-float')) return;
+      var t=e.target, 안=function(id){ var x=document.getElementById(id); return x && (x===t || x.contains(t)); };
+      if(안('rhDraftPanel') || 안('rhDraftRailBtn') || 안('kcDelPop') || 안('kcUndo')) return;
+      rhDraftFloatClose();
+    }, true);
+  }
+}
+function rhDraftFloatClose(){
+  var p=document.getElementById('rhDraftPanel'); if(!p || !p.classList.contains('rh-float')) return false;
+  p.classList.remove('rh-float'); p.classList.add('hide');
+  p.style.left=p.style.width=p.style.bottom=p.style.top='';
+  var a=document.getElementById('rhDraftArw'); if(a) a.textContent='▾';
+  return true;
 }
 function rhDraftPanelToggle(){
   var p=document.getElementById('rhDraftPanel'); if(!p) return;
@@ -14653,9 +15482,10 @@ function rhDraftDraw(){
   var 번호=0;
   var 줄=function(d, 지난것){
     var 지금=(d.id===_rhDraftId);
+    var 방금=(!지금 && typeof _rhJustBack!=='undefined' && d.id===_rhJustBack);
     var c=d.cells||{};
     번호++;
-    return '<tr'+(지금?' style="background:#f0fdf4"':'')+'>'
+    return '<tr'+((지금||방금)?' style="background:#f0fdf4"':'')+'>'
       /* ㅁ 체크 + № — 목록 화면·휴지통과 «같은 옷»(.rownum · .rn-chk · .row-chk) */
       +'<td class="rownum" style="padding:6px 7px;border-top:1px solid var(--border)">'
         +'<label class="rn-chk"><input type="checkbox" class="row-chk" data-id="'+_jsAttr(d.id)+'"'
@@ -14664,9 +15494,12 @@ function rhDraftDraw(){
         /* ⚠ 이름은 «한 줄로 길게» — 남는 폭을 다 쓴다(대표 지시 2026-09-18).
            그래도 줄바꿈은 안 한다: 이름이 길어도 줄을 밀지 않고 …으로 줄이며,
            전체는 title 로 본다(회귀검사가 이 둘을 고정한다). */
-        +'<div style="font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'
-        +escapeHtml(d.name||'')+'">'+escapeHtml(d.name||'(이름 없음)')+'</div>'
+        /* ★ 이름을 눌러도 «이어서»와 같다(대표 지시 2026-09-30) — 지금 열린 것은 누를 게 없다 */
+        +'<div style="font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+        +(지금?'':';cursor:pointer" class="rh-dname" onclick="rhDraftResume(\''+_jsAttr(d.id)+'\')')+'" title="'
+        +escapeHtml(d.title||d.name||'')+(지금?'':' — 눌러서 '+(지난것?'열기':'이어서'))+'">'+escapeHtml(d.title||d.name||'(이름 없음)')+'</div>'
         +(지금?'<div style="font-size:10px;color:var(--teal);font-weight:700">지금 하는 것</div>':'')
+        +(방금?'<div style="font-size:10px;color:var(--teal);font-weight:700">방금 담음 — 이름을 누르면 다시 들어갑니다</div>':'')
         /* ⚠ 원본이 없는 자리는 밝혀 둔다 — 다시 채우면 값이 겹칠 수 있다 */
         +(d.hasBase?'':'<div style="font-size:10px;color:var(--red);font-weight:700"'
           +' title="처음 올린 원본이 이 자리에 없습니다 — 다시 채우면 값이 겹쳐 적힐 수 있습니다">⚠ 원본 없음</div>')
@@ -14750,6 +15583,7 @@ function rhDraftTrashSel(btn){
 
 /* ↩ 이어서 — 그 자리를 열고, 친 값·짝 지정도 되살린다 */
 async function rhDraftResume(id){
+  if(typeof rhDraftFloatClose==='function') rhDraftFloatClose();
   var d=rhDraftFind(id); if(!d){ toast('그 자리를 찾지 못했습니다'); rhDraftCheck(); return; }
   var f=await getFileAsync(id);
   /* ⚠ 파일이 없으면 «지우지 않는다» — 옛 코드는 여기서 딱지를 지워, 파일이 다른 기기에
@@ -14985,6 +15819,9 @@ function _kcLoadPostcode(){
 }
 /* 찾을 말 다듬기 — 괄호 안 건물명·층·호는 빼야 잘 걸린다(이알피와 같은 다듬기) */
 function kcAddrQuery(a){
+  /* «시·군 + 도로명 + 번호»가 있으면 그것만 — 틀린 구 이름을 통째 넣으면 엉뚱한 동네가 맨 위에 온다
+     (2026-10-02, js/pu-addr.js 머리말). 공용 파일이 없을 때만 예전 다듬기. */
+  if(typeof window!=='undefined'&&window.PuAddr) return window.PuAddr.query(a);
   return String(a||'').replace(/\([^)]*\)/g,' ').replace(/\s*\d+층.*$/,' ').replace(/\s*[\d-]+호.*$/,' ')
     .replace(/\s+/g,' ').trim();
 }
@@ -15012,6 +15849,19 @@ function kcAddrSearch(prefill, done){
       width:'100%', height:'100%'
     }).embed(document.getElementById('kcAddrBox'), q.length>=2?{ q:q, autoClose:false }:undefined);
   }catch(e){ 닫기(); toast('⚠ 우편번호 찾기를 열지 못했습니다 — '+String(e&&e.message||e)); }
+}
+/* 기본정보의 📮 찾기 — 집·사무실 주소 줄마다 */
+async function piZipFind(addrKey, zipKey){
+  var a=document.getElementById('pi-'+addrKey), z=document.getElementById('pi-'+zipKey);
+  try{ await _kcLoadPostcode(); }
+  catch(e){ toast('⚠ 우편번호 찾기를 불러오지 못했습니다 — 인터넷을 확인해 주세요', 5000); return; }
+  kcAddrSearch((a&&a.value.trim())||'', function(r){
+    if(!r.zipcode){ toast('우편번호가 비어 있는 결과입니다 — 다른 것을 골라 주세요'); return; }
+    if(z) z.value=r.zipcode;
+    if(a && !a.value.trim() && r.address) a.value=r.address;
+    savePersonalInfo();
+    toast('📮 우편번호 '+r.zipcode+' 을 넣고 저장했습니다');
+  });
 }
 async function firmZipFind(){
   var 칸=function(k){ return document.querySelector('#firmGrid input[data-firm="'+k+'"]'); };
@@ -15204,6 +16054,8 @@ function _cvFillData(){
              /* 「현주소」는 집 주소다. 집을 안 적어 두셨으면 지금까지처럼 사무실 주소로 간다 —
                 여기서 비워 버리면 오늘까지 되던 것이 안 되는 뒷걸음질이 된다. */
              addr:집||법인.addr||사무실, addrWork:법인.addr||사무실,
+             /* ★ 우편번호는 «그 주소의 짝»이다 — 집 주소가 나가면 집 우편번호만(사무실 것을 섞지 않는다) (2026-09-29) */
+             zip:집?(info.zipHome||''):(법인.zip||info.zipWork||''), zipWork:법인.zip||info.zipWork||'',
              license:info.license||'',
              org:법인.name||info.org||'', dept:info.dept||'', title:info.title||'',
              /* ★ 「노무법인」 표 — 우리 법인 것. 이알피 회사정보 한 곳에서 온다.
@@ -17074,6 +17926,7 @@ _safe(()=>setTimeout(()=>{ initNavDrag(); initTabScroll(); initSideResize(); },1
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
 <script src="js/pu-back.js?v=2"></script>
-<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<script>try{ PuBack.guard(function(){ return rhBackGuard(); });   /* 먼저 단 것이 나중에 물린다 — 떠 있는 창을 먼저 닫고, 그다음 서식에서 나간다 */
+  PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

@@ -32,12 +32,16 @@ function load(list) {
   vm.createContext(ctx);
   vm.runInContext([
     SRC.match(/^const NTS_SKIP_DAYS = [^\n]*$/m)[0].replace('const ', 'var '),
-    'var _coNtsRun = null, _coNtsMatchRun = null;',
+    'var _coNtsRun = null, _coNtsMatchRun = null, _coNtsSeg = "", _coNtsInfo = false;',
+    /* 2026-09-29: 창이 표 한 장이 됐다 — 갈래(coNtsGuess)·ⓘ 풀이·줄 단추도 «진짜»를 싣는다 */
+    SRC.match(/^const NTS_GUESS = [\s\S]*?\};$/m)[0].replace('const ', 'var '),
+    ...['function coNtsYmd8(', 'function coNtsGuess(', 'function coNtsDot(', 'function coNtsInfoHtml(',
+      'function coNtsActBtn('].map((d) => cutFn(SRC, d)),
     /* 2026-09-28: 창 안에 🧾 등록증 대조 칸이 붙었다 — «진짜»를 싣는다 */
     ...['function coNtsCeo(', 'function coNtsDay(', 'function coNtsName(', 'function coNtsNameVariants(',
       'function coNtsMatchOf(', 'function coNtsMatchReq(', 'function coNtsMatchState(',
       'function coNtsMatchTargets(', 'function coNtsMatchPartHtml('].map((d) => cutFn(SRC, d)),
-    ...['function coVal(', 'function coSmeDays(', 'function coNtsWord(', 'function coNtsCls(',
+    ...['function coVal(', 'function coSmeDays(', 'function coNtsWord(', 'function coNtsCls(', 'function coNtsEnd(', 'function coNtsOkOf(', 'function coNtsHandled(', 'function coNtsFixBtns(',
       'function coNtsTargets(', 'function coNtsBadList(', 'function coNtsBadCount(', 'function coNtsNeeds(',
       'function coNtsBarHtml(', 'function coNtsHtml(', 'function coNtsChipHtml('].map((d) => cutFn(SRC, d))
   ].join('\n'), ctx);
@@ -78,12 +82,17 @@ test('② 띠가 없는 번호를 따로 센다', () => {
 test('③ 창이 번호를 보여 주고 무엇을 할지 말한다 · 국세청 원문 대신 짧은 말', () => {
   const c = load(LIST);
   const h = c.coNtsHtml();
-  assert.match(h, /국세청에 없는 번호 1곳/, '★★ 몇 곳인지 말해야 합니다');
-  assert.match(h, /원본과 번호를 맞춰/, '★ 무엇을 하면 되는지 말해야 합니다');
-  assert.match(h, /막 등록한 사업자/, '★ 새 사업자일 수도 있다고 말하지 않으면 멀쩡한 곳을 가짜로 봅니다');
+  /* 2026-09-29: 창이 표 한 장이 됐다(대표 지시 「깔끔하게 · 설명은 한번에」) — 규칙은 그대로 본다 */
+  assert.match(h, /폐업·휴업 사업장 3곳/, '★★ 몇 곳인지 말해야 합니다');
+  assert.match(h, /잘못 읽은 듯<b>1<\/b>/, '★★ 없는 번호는 «잘못 읽은 듯» 갈래로 센다');
+  assert.match(h, /<td class="dt none">없는 번호<\/td>/);
   assert.match(h, /없는곳 <span class="se">1234567891<\/span>/, '★★ 번호가 보여야 틀린 번호를 찾아 고칩니다');
-  assert.match(h, /<span class="sd none">국세청에 없는 번호<\/span>/);
   assert.ok(!/폐업곳 <span class="se">/.test(h), '폐업 줄에는 번호를 안 붙인다(번호는 맞다)');
+  assert.ok(!/막 등록한 사업자/.test(h), '★ 설명은 화면에 깔지 않는다 — ⓘ 를 눌러야 뜬다');
+  vm.runInContext('_coNtsInfo = true;', c);
+  const hi = c.coNtsHtml();
+  assert.match(hi, /사진 보고 고치기/, '★ 무엇을 하면 되는지 말해야 합니다');
+  assert.match(hi, /막 등록한 사업자/, '★ 새 사업자일 수도 있다고 말하지 않으면 멀쩡한 곳을 가짜로 봅니다');
   const empty = load([CO('계속곳', '1238120012', '계속사업자')]).coNtsHtml();
   assert.match(empty, /국세청에 없는 번호로 나온 곳이 없습니다/);
 });

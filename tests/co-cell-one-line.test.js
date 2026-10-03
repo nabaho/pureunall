@@ -151,3 +151,39 @@ test('CSS 를 고쳤으니 캐시 번호가 올라가 있다', () => {
   assert.ok(Number(m[1]) >= 6,   // 검사고정-허용: 이 변경이 들어간 판
     '★★ 캐시 번호를 안 올리면 브라우저가 «옛 스타일»을 써서 화면은 그대로 두 줄입니다');
 });
+
+/* ══════ ⑥ 주소·담당자·연락처·부담당도 한 줄 (2026-09-30) ══════
+   대표 화면(업체관리 161건)에서 이 넷이 두 줄로 접혀 한 화면에 10줄 남짓만 보였다. */
+test('★★ 주소 칸은 두 표 모두 한 줄 규칙 + 온주소 말풍선', () => {
+  const n = (bare.match(/h\('td',\s*\{\s*className:'co-1line',\s*title:[^}]*\}[^]{0,200}?renderCell\(co,\s*'address',[^)]*tipTitle:\s*coTip\(/g) || []).length;
+  assert.ok(n >= 2, '★★ 주소 칸(전체·사무대행)에 한 줄 규칙·말풍선이 붙어야 합니다 — ' + n);
+});
+test('★★ 담당자·연락처는 둘을 위아래로 쌓지 않고 나란히(co-pair)', () => {
+  const seg = bare.slice(bare.indexOf("key:'ct-n'"), bare.indexOf("key:'ct-p'") + 600);
+  assert.ok(seg.length > 100, '담당자·연락처 칸을 못 찾았습니다');
+  assert.equal((seg.match(/className:'co-pair'/g) || []).length, 2, '★★ 두 칸 모두 나란히 둬야 합니다');
+  assert.doesNotMatch(seg, /h\('div',\s*\{\s*style:\{\s*color:'#64748b'/, '★★ 둘째 사람을 아랫줄 div 로 내렸습니다');
+  assert.match(css, /td\.co-1line \.co-pair \{[^}]*white-space:\s*nowrap/, '★ co-pair 가 줄바꿈을 막아야 합니다');
+});
+test('★ 연락처 칸이 전화번호 한 개를 담는다 — 고정폭 13자 + 여백', () => {
+  const w = widths();
+  assert.ok(w.full[17] >= 106, // 검사고정-허용: 「010-1111-2222」 고정폭 11.5px 약 90px + td 여백 16
+    '★ 연락처 칸이 좁아 번호가 두 줄로 흐릅니다 (지금 ' + w.full[17] + 'px)');
+});
+test('★ 부담당 칩도 줄을 내리지 않는다', () => {
+  assert.match(bare, /flexWrap:'nowrap', gap:'4px', overflow:'hidden', whiteSpace:'nowrap'/);
+  assert.doesNotMatch(bare, /users\.filter\(function\(u\)\{return u\.sid !== co\.managerMain;\}\)[^]{0,10}$/);
+});
+
+/* ══════ ⑦ 컨설팅·기금·기타 표도 한 줄 (2026-09-30) ══════
+   캡처: 관리번호 「현 / 클-2026- / 014」, 주담당 「박 / 재 / 원」 처럼 세로로 흘렀다. */
+test('★★ 컨설팅·기금·기타 표는 칸마다 줄바꿈을 막는다(.proj-1line)', () => {
+  assert.match(bare, /h\('table',\s*\{\s*className:'dt proj-1line'\s*\}/, '★★ 표에 한 줄 규칙이 없습니다');
+  assert.match(css, /\.dt\.proj-1line th,\s*\.dt\.proj-1line td\s*\{[^}]*white-space:\s*nowrap/, '★★ CSS 가 줄바꿈을 막아야 합니다');
+  assert.match(css, /\.dt\.proj-1line td\.proj-co\s*\{[^}]*text-overflow:\s*ellipsis/, '★ 긴 업체명은 … 로');
+  assert.match(bare, /className:'proj-co', title:it\.companyName/, '★ 잘린 업체명은 말풍선에');
+});
+test('★ 컨설팅 담당자 칸 — 이름과 번호를 위아래로 쌓지 않는다', () => {
+  assert.doesNotMatch(bare, /h\('div', \{ style:\{ fontWeight:600 \} \}, primary\.name\)/, '★★ 이름을 따로 한 줄(div)로 내렸습니다');
+  assert.match(bare, /h\('span', \{ style:\{ fontWeight:600 \} \}, primary\.name\)/);
+});

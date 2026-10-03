@@ -30,10 +30,17 @@ test('★ 줄을 «격자»로 그린다 — flex 면 고객사 길이에 따라
     '옛 flex 줄이 남아 있습니다');
 });
 
-test('열 일곱 칸이 머리줄과 «같은 격자»를 쓴다 — 다르면 이름표가 어긋난다', () => {
+test('열 여덟 칸이 머리줄과 «같은 격자»를 쓴다 — 다르면 이름표가 어긋난다', () => {
   const r = (css.match(/\.pa-row\{[^}]*grid-template-columns:([^;]*);/) || [])[1];
   assert.ok(r, '열 정의를 찾지 못했습니다');
-  assert.equal(r.trim().split(/\s+(?![^(]*\))/).length, 7, '№·유형·연도·고객사·사업명·담당자·출처 일곱 칸');
+  /* 2026-09-30 이알피 관리번호 칸이 둘째에 들어와 여덟 칸 */
+  const n = r.trim().split(/\s+(?![^(]*\))/).length;
+  assert.equal(n, 8, '№·번호·유형·연도·고객사·사업명·담당자·출처 여덟 칸');
+  // 머리줄 이름표 수 = 격자 칸 수 (하나라도 다르면 이름표가 한 칸씩 밀린다)
+  const head = (bare.match(/<span class="pa-n">№<\/span>[^\n]*\n[^\n]*<span><\/span><\/div>'/) || [''])[0];
+  assert.equal((head.match(/<span/g) || []).length, n, '머리줄 이름표 수가 격자 칸 수와 달라 이름표가 밀립니다');
+  assert.match(cutFn(bare, 'function renderPuAgency('), /puNoInner\(r, r\._store\)/,
+    '★ 외부기관 줄도 실적 표와 같은 번호 칸(puNoInner)을 쓴다');
   /* 머리줄은 같은 .pa-row 를 쓰고 꾸밈만 덧댄다 — 따로 만들면 언젠가 어긋난다 */
   assert.match(bare, /class="pa-row pa-head"/);
   assert.ok((css.match(/\.pa-head\{[^}]*grid-template-columns/) || []).length === 0,

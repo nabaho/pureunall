@@ -20,6 +20,8 @@ const A = (() => {
     gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'), gF('korWon'),
     gF('_officersOf'), gF('_boss'), gF('_dotDate'), gF('_hwpKoDate'), gF('_hwpKoDate2'), gF('_hwpTodayIso'), gF('_dashPhone'),
     gF('_docRok'), gV('SUB_ROWS'), gF('subAmounts'), gV('DOC_NEEDS_LEDGER'), gF('_hwpSubValues'), gV('HWP_TPL_KINDS'),
+    /* 2026-09-29 체크리스트 「특수관계인 해당여부」 — 특수관계 점검 판정을 함께 싣는다 */
+    gF('_siteUrep'), gF('_siteWrep'), gF('_relNm'), gF('_relAddrKey'), gF('_relAddrMask'), gF('relatedPeople'), gF('relatedScan'), gF('_relKey'), gF('_relJudge'),
     'this.sub=_hwpSubValues; this.S=S; this.K=HWP_TPL_KINDS;',
   ].join('\n')).call(box);
   return box;
@@ -43,7 +45,7 @@ test('여덟 다 한글 틀 목록에 있고 값 함수는 _hwpSubValues', () =>
   ['sub_required', 'subsidy', 'sub_welfare_plan', 'sub_assets', 'sub_payment', 'sub_checklist', 'sub_contrib', 'sub_oath'].forEach((k) => {
     assert.equal(A.K[k], '공동', k); assert.match(VAL, new RegExp(k + ':_hwpSubValues[,}]'), k);
   });
-  assert.match(SRC, /return fn\(f\|\|\{\},sites\|\|\[\],kind\)/, '값 함수에 서식 종류를 넘긴다(서식별 안내)');
+  assert.match(SRC, /fn\(x\.f,sites\|\|\[\],kind\)/, '값 함수에 서식 종류를 넘긴다(서식별 안내)');
 });
 
 test('★ 복지사업계획서 — 대부는 빼고, 개요 표는 원본처럼 천원 단위, 세부계획은 사업마다', () => {

@@ -40,10 +40,11 @@ function judge(row, opts){
     _mbFolders: o.folders || { 'INBOX-x': { kind:'inbox' }, 'Sent Messages-x': { kind:'sent' },
       'Drafts-x': { kind:'drafts' }, '내게쓴편지함-x': { kind:'tome' }, '예약편지함-x': { kind:'sched' } },
     _mbCo: o.co || {}, _mbWhoMsg: o.whoMsg || {},
-    _mbNotSpam: o.notSpam || {}, _mbSpamOff: o.off === true };
+    _mbNotSpam: o.notSpam || {}, _mbSpamOff: o.off === true, _mbMemo: null };
   vm.createContext(ctx);
   vm.runInContext(bare.match(/const MB_SENT_KINDS = [^\n]*/)[0], ctx);
-  ['mbWhoKey','mbDomOf','mbFolderBy','mbSpamOn','mbBrokenText','mbBadLocal','mbSpamWhy','mbIsSpam']
+  /* mbIsSpam 은 한 번 그리는 동안의 셈(mbMemoOf)에 판정을 담는다 (2026-10-02) */
+  ['mbMemoOf','mbWhoKey','mbDomOf','mbFolderBy','mbSpamOn','mbBrokenText','mbBadLocal','mbSpamWhy','mbIsSpam']
     .forEach(n=>vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   return { why: ctx.mbSpamWhy(row), is: ctx.mbIsSpam(row) };
 }

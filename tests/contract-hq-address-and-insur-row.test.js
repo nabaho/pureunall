@@ -67,8 +67,9 @@ test('본사주소 — 우편번호 칸이 실제로 생겼다(사업장주소�
 test('업종·규모 옆에 4대보험 가입자수 두 칸이 «같은 줄»로 붙었다', () => {
   const 시작 = RAW.indexOf("sec6('🏭 업종 · 규모 · 4대보험 가입자수'");
   assert.ok(시작 > 0, '합쳐진 제목(🏭 업종 · 규모 · 4대보험 가입자수)을 못 찾았습니다 — 한 줄로 합치지 않았습니다.');
-  const 끝 = RAW.indexOf('🔗 업체 연결', 시작);
-  assert.ok(끝 > 시작, '뒤이은 자리(🔗 업체 연결)를 못 찾았습니다.');
+  /* 뒤이은 자리 — 2026-10-01 「🔗 업체 연결」 상자가 기업정보 맨 위로 올라가 이제 «기업담당자»가 뒤에 온다 */
+  const 끝 = RAW.indexOf('// 기업담당자 (다중)', 시작);
+  assert.ok(끝 > 시작, '뒤이은 자리(기업담당자)를 못 찾았습니다.');
   const 한줄 = RAW.slice(시작, 끝);
 
   ['bizType', 'bizCategory', 'companySize', 'employmentInsuredCount', 'injuryInsuredCount'].forEach((필드) => {

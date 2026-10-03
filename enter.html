@@ -132,13 +132,13 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
-<script src="js/pu-kakao.js?v=3"></script>
+<script src="js/pu-kakao.js?v=5"></script>
 <script src="js/pu-billing.js?v=11"></script>
 <style>
 :root{
@@ -872,38 +872,31 @@ body.portal-mode #moreFab{display:flex;}
 </style>
 </head>
 <body>
-<div id="pu-boot-splash" style="display:none;position:fixed;inset:0;z-index:2147483000;background:#f8fafc;align-items:center;justify-content:center;flex-direction:column;gap:14px">
+<div id="pu-boot-splash" role="status" aria-live="polite" style="display:flex;position:fixed;inset:0;z-index:2147483000;background:#f8fafc;align-items:center;justify-content:center;flex-direction:column;gap:14px">
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
-  <!-- 카카오에서 돌아온 직후에만 보인다 — 서버가 카카오에 확인하는 몇 초 동안 «무엇을 기다리는지» 말한다 -->
-  <div id="pu-boot-msg" style="display:none;font-size:14px;font-weight:600;color:#475569;font-family:sans-serif">💬 카카오로 로그인하는 중…</div>
+  <!-- Firebase가 남은 로그인을 확인하기 전에는 로그인 폼을 절대 먼저 보이지 않는다.
+       확인 결과가 미로그인이면 onAuthStateChanged가 이 가림막을 걷고 로그인 폼을 보여 준다. -->
+  <div id="pu-boot-msg" style="display:block;font-size:14px;font-weight:600;color:#475569;font-family:sans-serif">로그인 상태 확인 중…</div>
 </div>
 <script>
-/* 앱에서 포털로 돌아올 때: 로그인돼 있을 것으로 기대되면(힌트) 로그인 화면 대신 스플래시 표시
-   → Firebase 인증 확인 후 포털 타일이 뜨면 제거 (로그인 화면 번쩍임 방지) */
+/* 인증 상태를 알기 전에는 늘 스플래시를 표시한다.
+   저장소 힌트는 지워지거나 탭마다 달라질 수 있어 «로그인 폼이 먼저 보이는가»의 잣대가 될 수 없다.
+   → 미로그인이 확정되면 로그인 폼, 로그인돼 있으면 포털 타일을 다 그린 뒤 제거한다. */
 (function(){
-  var hint=false;
-  try {
-    // 같은 탭(세션) 힌트 + 기기 힌트(localStorage: 자동로그인 설정·직전 로그인 성공)
-    // → 새 탭/브라우저 재시작으로 sessionStorage가 비어도 로그인 화면 번쩍임 방지
-    hint = sessionStorage.getItem('pu_auth_hint')==='1'
-        || !!sessionStorage.getItem('pureun_v6_session_sid')
-        || localStorage.getItem('pu_auth_hint')==='1'
-        || localStorage.getItem('pu_portal_auto')==='1';
-  } catch(e){}
+  var s=document.getElementById('pu-boot-splash');
+  var m=document.getElementById('pu-boot-msg');
+  if(s) s.style.display='flex';
+  if(m) m.style.display='block';
   /* ★ 카카오에서 막 돌아온 참(주소에 code·state)이면 로그인 화면을 보이지 않는다 (대표 보고 2026-09-28
      「로그인 했는데도 계속 이렇게 나오다가 화면으로 넘어간다」). 서버가 카카오에 확인하는 몇 초 동안
      로그인 화면이 떠 있으면 «실패했나» 로 보인다. 끝나면 포털이 스플래시를 걷고, 실패하면
      kkHandleReturn 이 걷는다. 서버가 잠에서 깨는 데 오래 걸릴 수 있어 안전망은 20초다. */
   var kk = /[?&]code=/.test(location.search) && /[?&]state=/.test(location.search);
   if(kk){
-    hint = true;
     window.__kkReturning = true;
-    var m=document.getElementById('pu-boot-msg'); if(m) m.style.display='block';
+    if(m) m.textContent='💬 카카오로 로그인하는 중…';
   }
-  if(hint){
-    var s=document.getElementById('pu-boot-splash'); if(s) s.style.display='flex';
-    setTimeout(function(){ var s2=document.getElementById('pu-boot-splash'); if(s2) s2.remove(); }, kk ? 20000 : 8000); // 안전망
-  }
+  setTimeout(function(){ var s2=document.getElementById('pu-boot-splash'); if(s2) s2.remove(); }, kk ? 20000 : 8000); // 인증 SDK가 멎어도 로그인 길은 다시 연다
 })();
 </script>
 <div class="mesh"></div>
@@ -958,6 +951,17 @@ body.portal-mode #moreFab{display:flex;}
              카카오로 가능하게 모두 바꿔라」) — 비밀번호 칸 아래에 있으면 아무도 안 누른다. -->
       <button class="btn" id="kkLoginBtn" type="button"
         style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:0;background:#FEE500;color:#191919;">💬 카카오로 로그인</button>
+      <!-- 🔒 이 기기에서 로그인 유지 — 카카오·비밀번호 «둘 다» 이 한 칸을 따른다
+           (대표 「추천대로」 2026-09-29, 목업 kakao-keep-login 가안).
+           ★ 전에는 「자동 로그인」 이 접힌 칸 안에 숨어 있었고, 카카오는 그 칸을 안 보고 «늘» 유지했다 —
+             공용 PC 에서 로그아웃을 잊으면 다음 사람이 그대로 들어갔다.
+           ★ 끄면 창(브라우저)을 닫는 순간 로그아웃. 처음 쓰는 PC 는 꺼진 채, 처음 쓰는 폰은 켜진 채
+             시작하고(아래 줄), 그 뒤로는 마지막에 고른 대로 기억한다(pu_portal_auto).
+           ⚠ id 는 예전 그대로 autoLogin — 비밀번호 로그인·유휴 타이머가 이 이름을 본다. -->
+      <div class="ck" style="justify-content:center;margin-top:10px;font-size:13px;color:var(--sub);">
+        <label><input type="checkbox" id="autoLogin"> 이 기기에서 로그인 유지</label>
+      </div>
+      <div id="keepHint" style="text-align:center;font-size:.72rem;margin-top:3px;color:#64748b;"></div>
       <!-- 지문·간편 로그인 — 이 기기에 등록해 둔 사람에게만 보인다(등록 전에는 감춘다).
            ⚠ 「지문」만 적지 않는다: 휴대폰 설정에 따라 얼굴·잠금번호가 뜬다.
            비밀번호가 필요 없는 길이라 카카오처럼 접힌 칸 «밖» 에 둔다. -->
@@ -990,7 +994,7 @@ body.portal-mode #moreFab{display:flex;}
       <div class="row">
         <div class="ck">
           <label><input type="checkbox" id="saveId"> 아이디 저장</label>
-          <label><input type="checkbox" id="autoLogin"> 자동 로그인</label>
+          <!-- 「자동 로그인」 은 노란 단추 밑 「이 기기에서 로그인 유지」 로 옮겼다(2026-09-29) -->
         </div>
         <a href="#" id="pwChangeLink" style="font-size:.78rem;color:#1e40af;font-weight:600;text-decoration:none;">비밀번호 변경 ↗</a>
       </div>
@@ -1596,9 +1600,29 @@ body.portal-mode #moreFab{display:flex;}
       var lastId = localStorage.getItem('pu_portal_last_id') || '';
       if(lastId){ $('loginId').value = lastId; $('saveId').checked = true; }
     }
-    // 자동 로그인 체크 상태 복원
-    if(localStorage.getItem('pu_portal_auto') === '1'){ $('autoLogin').checked = true; }
+    // 「이 기기에서 로그인 유지」 복원 — 고른 적이 있으면 그대로, 처음이면 기기에 따라(keepDefault)
+    $('autoLogin').checked = keepDefault(localStorage.getItem('pu_portal_auto'), navigator.userAgent);
   } catch(e){}
+  keepHintPaint();
+  if($('autoLogin')) $('autoLogin').addEventListener('change', keepHintPaint);
+
+  /* 처음 이 칸을 볼 때 켜 둘지 (대표 「추천대로」 2026-09-29, 목업 가안)
+       · 고른 적이 있으면('1'·'0') 그대로
+       · 처음 쓰는 폰 → 켬(대개 내 폰) · 처음 쓰는 PC → 끔(공용 PC 일 수 있다)
+     ⚠ 판단 재료를 인자로 받는다 — 저장소·브라우저를 몰라도 검사가 그대로 돌려 본다. */
+  function keepDefault(saved, ua){
+    if(saved === '1') return true;
+    if(saved === '0') return false;
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(String(ua || ''));
+  }
+  // 칸 밑 한 줄 — 지금 고른 것이 무슨 뜻인지(끄면 창을 닫을 때 풀린다)
+  function keepHintPaint(){
+    var cb = $('autoLogin'), el = $('keepHint');
+    if(!cb || !el) return;
+    el.textContent = cb.checked ? '창을 닫아도 로그인이 남습니다'
+                                : '창을 닫으면 저절로 로그아웃됩니다 — 내 PC 면 켜 두세요';
+    el.style.color = cb.checked ? '#64748b' : '#854d0e';   // 팔레트 «주의» 글자색
+  }
 
   // 브라우저를 다시 열었을 때도 저장된 Firebase 세션을 LOCAL 방식으로 복원한다.
   // 다른 통합 앱이 같은 인증 저장소를 사용하므로, 인증 상태를 관찰하기 전에 먼저 맞춘다.
@@ -1685,8 +1709,13 @@ body.portal-mode #moreFab{display:flex;}
         // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시
         try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
         // 카카오 확인 중에는 «아직 로그인 전» 이 당연하다 — 여기서 걷으면 로그인 화면이 드러난다.
-        // 다른 앱에서 나간 카카오 사용자의 흔적이 있으면 카카오 쪽부터 정리하러 간다(kkClearStale).
-        if(!window.__kkReturning && !kkClearStale()) _rmBootSplash();
+        // ⚠ 여기서 카카오 로그아웃으로 «보내지 않는다» (대표 2026-09-29 「로그인 눌렀는데 로그아웃 화면이 나온다」).
+        //   카카오 로그아웃은 조용히 끝나지 않고 «로그아웃하시겠습니까?» 를 묻는 화면이다 — 로그인하러 온
+        //   사람이 로그아웃 질문을 받게 된다. 앞 사람 카카오 문제는 «처음 쓰는 기기면 다시 묻기»(kkLogin)와
+        //   포털 「로그아웃」 단추(kkLogoutFlow)가 맡는다. 대표 선택: 「바로 들어가게」.
+        if(!window.__kkReturning) _rmBootSplash();
+        // 카카오를 쓰는 기기면 로그인 서버를 미리 깨워 둔다 — 노란 단추를 누르기 전부터 (2026-09-29)
+        try { if(!window.__kkReturning && localStorage.getItem('pu_kakao_used') === '1' && window.PuKakao && PuKakao.warm) PuKakao.warm(); } catch(_w){}
         if(_persistenceBootError){
           showErr('자동로그인 저장소를 열 수 없습니다. 삼성 인터넷 또는 Chrome에서 다시 로그인해 주세요.');
         }
@@ -1742,8 +1771,13 @@ body.portal-mode #moreFab{display:flex;}
     var btn = $('kkLoginBtn');
     if(btn) btn.disabled = true;
     showErr('');
+    /* 「이 기기에서 로그인 유지」 를 카카오도 따른다 (2026-09-29) — 전에는 무조건 유지(LOCAL)였다.
+       ⚠ 여기서 고른 값을 «기록만» 해 둔다: 화면이 카카오로 떠났다 돌아오면 새 페이지라, 여기서 정한
+         유지 방식은 사라진다. 실제로 정하는 곳은 돌아온 뒤 표를 받기 직전(kkHandleReturn)이다. */
+    var keep = !!($('autoLogin') && $('autoLogin').checked);
+    try { localStorage.setItem('pu_portal_auto', keep ? '1' : '0'); } catch(e){}
     _persistenceReady.then(function(){
-      return auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      return auth.setPersistence(keep ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
     }).then(function(){
       /* ★ 처음 쓰는 기기(카카오로 들어온 적 없음)면 카카오가 «다시 묻게» 한다 (2026-09-28 대표 「추천대로」).
            공용 PC 에 남의 카카오 로그인이 남아 있으면 그대로 그 사람으로 들어가 버린다.
@@ -1769,12 +1803,19 @@ body.portal-mode #moreFab{display:flex;}
     if(p.error){ kkEndReturn(); kkUnfoldPw(); showErr(p.error); return; }
     if(p.mode === 'login'){
       _freshLogin = true;
+      /* 서버가 표를 만드는 «동안» 이 화면의 DB 연결을 먼저 연다 — 들어가자마자 명부를 읽는다 (2026-09-29) */
+      try { db.ref('.info/connected').once('value'); } catch(_c){}
       PuKakao.loginFinish(p.code).then(function(token){
-        return auth.signInWithCustomToken(token);
+        /* 떠나기 전에 고른 「로그인 유지」 대로 — 끈 채 들어오면 창을 닫는 순간 풀린다.
+           ⚠ 못 읽으면 «유지 안 함(SESSION)» 쪽 — 공용 PC 에 로그인이 남는 쪽보다 안전하다. */
+        var keep = false;
+        try { keep = localStorage.getItem('pu_portal_auto') === '1'; } catch(e){}
+        return auth.setPersistence(keep ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION)
+          .catch(function(){})
+          .then(function(){ return auth.signInWithCustomToken(token); });
       }).then(function(cred){
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
         kkMarkUsed();
-        kkNoteSession(true);            // 이 기기에 «카카오로 들어와 있음» — 어디서 나가든 로그인 화면이 카카오를 정리한다
         try {
           cred.user.getIdToken().then(function(tok){ reportLogin(cred.user.email || '', true, '', tok); }).catch(function(){});
         } catch(e){}
@@ -1821,7 +1862,7 @@ body.portal-mode #moreFab{display:flex;}
     if(!u) return;
     db.ref('uid_kakao/' + u.uid).once('value').then(function(s){
       var v = s.val();
-      if(v && v.kakaoId) return;
+      if(v && (v.linked === true || v.kakaoId)) return;
       if(!confirm('방금 누르신 카카오 계정을 이 계정에 연결할까요?\n\n연결하면 다음부터는 노란 「카카오로 로그인」 단추 하나로 들어옵니다.')) return;
       kkStartLink();
     }).catch(function(){});
@@ -1836,38 +1877,6 @@ body.portal-mode #moreFab{display:flex;}
   var KK_LATER_MS = 7 * 24 * 60 * 60 * 1000;     // 「나중에」 → 7일 동안 안 뜬다 (목업대로)
   function kkMarkUsed(){ try { localStorage.setItem(KK_USED_KEY, '1'); } catch(e){} }
 
-  /* ── 어느 앱에서 나가든 카카오도 풀린다 (대표 「추천대로」 2026-09-28) ─────────────────────
-     로그아웃하는 길이 앱마다 제각각이다(15개 앱 · 20곳 남짓, 60분 자동 로그아웃 포함). 하나하나
-     고치면 반드시 빠진다. 그래서 «길목 한 곳» — 포털 로그인 화면 — 에서 막는다:
-       다음 사람이 노란 단추를 누르려면 이 화면을 반드시 거친다.
-     ① 카카오로 들어오면 이 기기에 표시(KK_SESSION_KEY)를 남긴다.
-     ② 로그인 화면이 «로그인 안 됨» 으로 떴는데 그 표시가 남아 있으면 → 앞 사람이 어딘가에서
-        나갔고 카카오 쪽 로그인은 브라우저에 남아 있을 수 있다 → 카카오 로그아웃을 거쳐 돌아온다.
-     ⚠ 표시는 가기 «전에» 지운다 — 카카오 쪽이 오류를 내도 되풀이해 튕기지 않게(한 번만 간다).
-     ⚠ 카카오에서 막 돌아온 참(__kkReturning)이면 안 간다 — 그건 «들어오는 중» 이다. */
-  var KK_SESSION_KEY = 'pu_kakao_session';
-  function kkNoteSession(on){
-    try { if(on) localStorage.setItem(KK_SESSION_KEY, '1'); else localStorage.removeItem(KK_SESSION_KEY); } catch(e){}
-  }
-  function kkClearStale(){
-    var f = false;
-    try { f = localStorage.getItem(KK_SESSION_KEY) === '1'; } catch(e){}
-    if(!f || window.__kkReturning || !window.PuKakao || !PuKakao.logoutUrl) return false;
-    kkNoteSession(false);
-    // 로그인 화면이 잠깐 비쳤다 튀지 않게 스플래시로 가리고 까닭을 적는다
-    var s = $('pu-boot-splash'), m = $('pu-boot-msg');
-    if(s) s.style.display = 'flex';
-    if(m){ m.textContent = '🔒 앞서 쓴 카카오 로그인을 정리하는 중…'; m.style.display = 'block'; }
-    var done = false;
-    var t = setTimeout(function(){ if(!done){ done = true; _rmBootSplash(); } }, 4000);
-    PuKakao.logoutUrl().then(function(url){
-      if(done) return; done = true; clearTimeout(t);
-      // 카카오 «로그아웃» 주소일 때만 간다(옛 서버는 로그인 주소를 돌려준다 — kkLogoutFlow 와 같은 막이)
-      if(!/^https:\/\/kauth\.kakao\.com\/oauth\/logout\?/.test(String(url || ''))) return _rmBootSplash();
-      location.href = url;
-    }).catch(function(){ if(!done){ done = true; clearTimeout(t); _rmBootSplash(); } });
-    return true;
-  }
   function kkUnfoldPw(){
     var f = $('pwFold'), b = $('pwFoldBtn');
     if(f) f.style.display = '';
@@ -1887,7 +1896,7 @@ body.portal-mode #moreFab{display:flex;}
     if(kkLaterActive(sid, Date.now())) return;
     db.ref('uid_kakao/' + u.uid).once('value').then(function(s){
       var v = s.val();
-      if(v && v.kakaoId){ kkMarkUsed(); return; }   // 이미 이었다 — 다른 기기에서 이었어도 이 기기도 카카오 먼저로
+      if(v && (v.linked === true || v.kakaoId)){ kkMarkUsed(); return; }   // 이미 이었다 — 다른 기기에서 이었어도 이 기기도 카카오 먼저로
       row.style.display = 'flex';
     }).catch(function(){});                          // 못 읽으면 조용히 안 띄운다 — 권유일 뿐이다
     if(row._kkBound) return;
@@ -1913,7 +1922,7 @@ body.portal-mode #moreFab{display:flex;}
     body.innerHTML = '<p style="color:#94a3b8;font-size:.82rem;margin:0">불러오는 중…</p>';
     db.ref('uid_kakao/' + uid).once('value').then(function(snap){
       var v = snap.val();
-      var linked = !!(v && v.kakaoId);
+      var linked = !!(v && (v.linked === true || v.kakaoId));
       body.innerHTML =
         '<div class="cfg-tool" style="margin-bottom:0">'
         + '<div><b>💬 카카오 로그인</b><span>'
@@ -2540,13 +2549,6 @@ body.portal-mode #moreFab{display:flex;}
     try { pkSetupRegister(mySid, name); } catch(e){}
     try { kkAfterLogin(); } catch(e){}
     try { kkSetupRegRow(mySid); } catch(e){}
-    /* 이번 판 전에 이미 카카오로 들어와 있던 사람은 표시가 없다 — 표(kakao:true)를 보고 남긴다.
-       비밀번호로 들어온 사람이면 지운다(남의 흔적으로 다음 로그인 화면이 괜히 카카오에 가지 않게). */
-    try {
-      auth.currentUser && auth.currentUser.getIdTokenResult().then(function(r){
-        kkNoteSession(!!(r && r.claims && r.claims.kakao === true));
-      }).catch(function(){});
-    } catch(e){}
     try { billStart(role); } catch(e){}   // 💳 사용액 — 관리자일 때만 안이 돈다
     var title = acct ? (acct.title || '') : '';
     /* ★ 이름 옆에 «사번» 을 함께 적는다 (2026-08-10 제보의 핵심 고침).
@@ -3486,9 +3488,6 @@ body.portal-mode #moreFab{display:flex;}
           /* ⚠ 카카오 «로그아웃» 주소일 때만 간다 — 서버가 아직 옛 판이면 kind 를 모르고 «로그인» 주소를
              돌려준다. 그리로 가면 로그아웃 누른 사람이 카카오 로그인 화면에 서게 된다. */
           if(!/^https:\/\/kauth\.kakao\.com\/oauth\/logout\?/.test(String(url || ''))) return location.reload();
-          /* 지금 카카오까지 끊으러 가므로, 돌아온 로그인 화면이 한 번 더 가지 않게 표시를 지운다.
-             ⚠ 여기서만 지운다 — 주소를 못 받아 그냥 새로 열면 표시가 남아, 로그인 화면이 대신 정리하러 간다. */
-          kkNoteSession(false);
           location.href = url;
         }).catch(function(){ if(!done){ done = true; clearTimeout(t); location.reload(); } });
       });

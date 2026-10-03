@@ -51,8 +51,9 @@ test('① 사용자대표 칸이 근로자대표와 «같은 차례»다 — 나
   /* 대표 지시 2026-09-14: 「사용자대표직위 휴대폰 생년월일, 근로자대표와 같은 순서로 셀이 있어야한다」 */
   const b = load([grabDecl('UREP_FIELDS'), grabDecl('WREP_FIELDS'),
     'this.U=UREP_FIELDS; this.W=WREP_FIELDS;']);
+  /* 2026-09-29 집 주소(특수관계 점검용)를 양쪽에 «같은 자리»로 더했다 */
   assert.deepEqual(b.U.map((c) => c[0]),
-    ['urep_name', 'urep_title', 'urep_mobile', 'urep_birth']);
+    ['urep_name', 'urep_title', 'urep_mobile', 'urep_birth', 'urep_addr']);
   /* 「앞가지만 빼면 같은 차례」인지 — 한쪽에만 칸을 더하면 여기서 걸린다 */
   const 꼬리 = (F, p) => F.map((c) => c[0].replace(p, ''));
   assert.deepEqual(꼬리(b.U, 'urep_'), 꼬리(b.W, 'wrep_'),

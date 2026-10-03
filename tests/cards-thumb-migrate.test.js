@@ -532,12 +532,13 @@ test('썸네일 단추가 대표 전용 칸의 맨 앞에 있다', () => {
   /* ⚠ 2026-09-05: 탭을 없애고 한 화면이 되면서 「관리자 · 한 번만 하는 일」 칸이 됐다.
        (개인 폴더는 「탭 · 계정」 칸으로 옮겼다 — 날마다 여닫는 것이라 관리자 일과 다르다.)
        규칙은 그대로다: 썸네일이 그 칸의 «맨 앞»이어야 좁은 창에서 안 밀린다. */
-  const p = cut("{ t:'관리자 · 한 번만 하는 일'", "] : [] }");
+  /* 2026-09-29: 관리자 탭의 «한 번만 하는 일» 칸이 됐다(반출 기록은 그 위 칸) — 규칙은 그대로다 */
+  const p = cut("{ t:'한 번만 하는 일'", "] : [] }");
   const thumb  = p.indexOf('migrateInlineThumbs()');
-  const log    = p.indexOf('openExportLog()');
+  const photos = p.indexOf('pucardsMovePhotosToStorage()');
   const locked = p.indexOf('migrateLockedFolders()');
-  assert.ok(thumb > 0 && log > 0 && locked > 0, '세 단추가 다 있어야 한다');
-  assert.ok(thumb < log,    '반출 기록보다 뒤에 있으면 둘째 줄로 밀린다');
+  assert.ok(thumb > 0 && photos > 0 && locked > 0, '세 단추가 다 있어야 한다');
+  assert.ok(thumb < photos, '사진 창고보다 뒤에 있으면 찾기 어렵다');
   assert.ok(thumb < locked, '옛 잠금 폴더보다 뒤에 있으면 둘째 줄로 밀린다');
 });
 

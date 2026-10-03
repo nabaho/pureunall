@@ -23,12 +23,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=38"></script>
+<script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-paydata-store.js?v=10"></script>
 <!-- ?v= 는 판독기 판 번호(READ_VERSION)와 **같이 올린다**(2026-08-15).
@@ -49,10 +49,12 @@
 <!-- 긋기·사본 만들기 — 사진첩과 나눠 쓴다(2026-08-17 「안 1」) -->
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
 <script src="js/pu-appbar.js?v=14"></script>
+<!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
+<script src="js/pu-active.js?v=1"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-authsync.js?v=2"></script>
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-<script src="js/pu-whoami.js?v=1"></script>
+<script src="js/pu-whoami.js?v=2"></script>
 <script>
 /* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
    포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는

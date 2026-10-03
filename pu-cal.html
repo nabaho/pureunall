@@ -16,11 +16,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=38"></script>
+<script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
@@ -85,7 +85,11 @@
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#cbd5e1;margin-right:5px}
   .dot.on{background:#16a34a}
   /* 내 동그라미 — 구글처럼 이름 첫 글자. 초록 점 = 서버와 이어짐. 누르면 메일·로그아웃 창 */
-  .avawrap{position:relative;flex-shrink:0}
+  .avawrap{position:relative;flex-shrink:0;display:inline-flex;align-items:center;gap:7px}
+  /* 로그인한 사람 이름 — 누르면 동그라미와 같은 창이 뜬다. 길면 … */
+  #meName{font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;max-width:120px;
+    overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  #meName:empty{display:none}
   #me{width:32px;height:32px;border-radius:50%;border:none;background:#7986cb;color:#ffffff;font-weight:700;
     font-size:13px;cursor:pointer;font-family:inherit;position:relative;padding:0}
   #me::after{content:"";position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
@@ -647,6 +651,7 @@
   <button class="themebtn" id="rotToggle" title="화면 회전 — 자동 회전·세로 고정">🔄 자동 회전</button>
   <span id="appslot"></span>
   <span class="avawrap">
+    <span id="meName" data-avatar="1"></span>
     <button id="me" data-avatar="1" title="내 계정">·</button>
     <div class="avamenu" id="avamenu" hidden>
       <div class="who"><span id="whoName"></span><span id="conn"><span class="dot"></span><span class="t">연결 중…</span></span></div>
@@ -830,7 +835,10 @@ var TABS = [
 
 /* 이 앱이 읽는 칸. 이알피가 주인이고 우리는 빌려 읽는다(온톨로지 sharedRoots).
    ⚠ 필요한 것만 읽는다 — 안 쓰는 큰 표를 받으면 요금과 깜빡임이 늘어난다. */
-var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff','holidays','staff_colors',
+/* ★ user_accounts 는 «재무 권한자만» 읽힌다(보안규칙 finOnly). 그래서 일반 직원은 명부를 못 읽어
+   「못 읽은 자료: user_accounts」 띠가 뜨고, 머리에 이름 대신 메일 첫 글자만 떴다 (대표 보고 2026-09-29).
+   모두가 읽는 공개 명부(user_dir)를 함께 받아 그것으로 사람을 찾는다. */
+var KEYS = ['user_accounts','user_dir','attendance_records','my_schedules','external_staff','holidays','staff_colors',
             'locked_attend_months','ieum_members','ieum_notes',
             /* 구글 만든이 메일 → 사번. 이것이 있어야 구글 일정이 «그 사람 색»으로 칠해진다 */
             'gcal_mail_sid',
@@ -845,15 +853,26 @@ var KEYS = ['user_accounts','attendance_records','my_schedules','external_staff'
    배열만 받으면 지도로 왔을 때 조용히 빈 목록이 되고 화면에 이름 대신 사번(S001)이 뜬다 —
    틀린 화면이 아니라 «맞는 척하는» 화면이라 더 나쁘다. 그래서 두 꼴을 다 받는다. */
 /* 명부 전부 — 그만둔 사람까지. «이름을 찾을 때»만 쓴다. */
+/* ⚠ 도우미를 함수 «안»에 둔다 — 검사가 이 함수만 떼어 돌린다. */
 function allUsers(){
-  var v = D.user_accounts;
-  var list = Array.isArray(v) ? v
-    : (v && typeof v === "object") ? Object.keys(v).map(function(k){
-        var u = v[k];
-        return (u && typeof u === "object") ? (u.sid ? u : Object.assign({ sid:k }, u)) : null;
-      })
-    : [];
-  return list.filter(function(u){ return u && u.sid; });
+  function 펴기(v){
+    var list = Array.isArray(v) ? v
+      : (v && typeof v === "object") ? Object.keys(v).map(function(k){
+          var u = v[k];
+          return (u && typeof u === "object") ? (u.sid ? u : Object.assign({ sid:k }, u)) : null;
+        })
+      : [];
+    return list.filter(function(u){ return u && u.sid; });
+  }
+  /* 사번 모양 맞추기 — P-001 과 P001 을 같은 사람으로 (pu-whoami 와 같은 규칙) */
+  function 꼴(v){ return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  /* 계정 명부(재무 권한자만 읽힘)가 먼저, 거기 없는 사번은 공개 명부(user_dir)로 채운다 */
+  var acc = 펴기(D.user_accounts);
+  var dir = 펴기(D.user_dir);
+  if(!dir.length) return acc;
+  var 있음 = {};
+  acc.forEach(function(u){ 있음[꼴(u.sid)] = 1; });
+  return acc.concat(dir.filter(function(u){ return !있음[꼴(u.sid)]; }));
 }
 /* ★ 현직만 — 칩·고르는 목록은 «반드시» 이것을 쓴다 (이알피 getActiveUsers 와 같은 기준).
    ⚠ 2026-09-18 대표 화면에서 사람 칩이 «서른셋» 나왔다. 명부 32명 가운데 현직은
@@ -3834,14 +3853,26 @@ function start(user){
   setConn(true, '연결됨');
   PuCalRead.readMany(KEYS).then(function(r){
     D = r.data; FAILED = r.failed;
+    /* 재무 권한이 없어 계정 명부를 못 읽은 것은 «고장»이 아니다 — 공개 명부로 사람을 찾았으면 띠를 띄우지 않는다 */
+    if(FAILED.user_accounts && !FAILED.user_dir && D.user_dir && typeof D.user_dir === 'object'
+       && Object.keys(D.user_dir).length) delete FAILED.user_accounts;
+    /* 공개 명부만 읽혔으면 거기엔 uid·메일이 없다 — 로그인 메일(p001@pureun.kr)의 사번으로 찾는다 */
     ME = (function(){
-      var us = users();
-      for(var i=0;i<us.length;i++){ if(us[i].uid===user.uid || us[i].email===user.email) return us[i]; }
+      var us = users(), i;
+      for(i=0;i<us.length;i++){ if(us[i].uid===user.uid || (us[i].email && us[i].email===user.email)) return us[i]; }
+      var m = String(user.email || '').toLowerCase().match(/^([a-z]+)(\d+)@/);
+      var want = m ? (m[1] + m[2]).toUpperCase() : '';
+      if(!want) return null;
+      var all = allUsers();
+      for(i=0;i<all.length;i++){ if(String(all[i].sid).toUpperCase().replace(/[^A-Z0-9]/g, '') === want) return all[i]; }
       return null;
     })();
     /* 구글처럼 이름 첫 글자 동그라미 — 이름·직함·메일은 누르면 뜨는 창에 (예전엔 머리줄에 늘 떠 있었다) */
     var 이름 = (ME && ME.name) || (user.email || '?');
     $('me').textContent = String(이름).slice(0, 1);
+    /* ★ 동그라미만으로는 누구인지 모른다 — 이름을 글자로 옆에 둔다 (대표 지시 2026-09-29) */
+    var 이름칸 = $('meName');
+    if(이름칸){ 이름칸.textContent = ME ? ((ME.name || ME.sid) + (ME.title ? ' ' + ME.title : '')) : ''; 이름칸.title = 이름; }
     $('me').title = 이름 + (user.email ? ' · ' + user.email : '');
     $('whoName').innerHTML = '<b>' + esc(ME ? (ME.name||'') : '')
       + (ME ? '<span class="role">'+esc(ME.role||ME.position||'')+'</span>' : '') + '</b>'
@@ -3877,6 +3908,8 @@ try{
 }
 </script>
 <script src="js/pu-appbar.js?v=14"></script>
+<!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
+<script src="js/pu-active.js?v=1"></script>
 <script>try{
   /* 대표 지시 2026-09-27 「즐겨찾기도 앱으로 바꿔라」 — 공용 단추(pu-appbar.js)는 그대로 두고
      이 앱에 붙은 단추의 글자만 바꾼다(공용을 고치면 15개 앱이 함께 바뀐다). */

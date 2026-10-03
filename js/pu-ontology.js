@@ -22,6 +22,11 @@
       /* 취업규칙 검토의 두 끝 (2026-09-26) — 우리 검토 기준 92개와, 그것이 기대는 법 조문.
          둘 다 업무 기록이 아니라 «참고표» 다(js/pu-rules-lawlink.js). 저장 자리가 없다. */
       ReviewCriterion:'검토 기준', LegalProvision:'법령 조문',
+      /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
+         ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
+           이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
+         ⚠ 관리번호는 이름표라 이알피에서 다시 매겨질 수 있다 — 열쇠로 쓰지 않고 sourceNo 로 보여만 준다. */
+      CareerRecord:'경력 실적',
       /* ⚠ 업무 자료가 아니다 — 「그 사람이 어느 탭·어느 달을 보고 있었나」뿐이다.
          관계 색인에 넣지 않는다(푸른 캘린더의 읽기 어댑터가 in_app 인 까닭). */
       ViewState:'보던 자리'
@@ -33,7 +38,8 @@
       projectFor:['Project','Organization'],
       assignedTo:['Contract|Case|Project|Task|ScheduleEvent','Person'],
       assists:['Contract|Case|Project|Task','Person'],
-      derivedFrom:['Organization|Contract|Case|Project|Task|Document|Submission','Contract|Case|Project|Document'],
+      /* CareerRecord → Case|Project|Organization : 경력 실적은 사건·사업, 자문 실적은 업체에서 나온다 */
+      derivedFrom:['Organization|Contract|Case|Project|Task|Document|Submission|CareerRecord','Contract|Case|Project|Document|Organization'],
       paidFor:['FinancialTransaction','Contract|Case|Project|Organization'],
       invoicedTo:['Invoice','Organization'],
       scheduledFor:['ScheduleEvent','Organization|Contract|Case|Project|Person'],

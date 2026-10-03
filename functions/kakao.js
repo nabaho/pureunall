@@ -57,8 +57,13 @@ const REGION = "asia-northeast3";
 const ORIGIN = "https://nabaho.github.io";
 const REDIRECT_URI = ORIGIN + "/pureunall/enter.html";
 
-const DB_LINK = "kakao_links";   // {kakaoId} = { uid, sid, at } — 서버만 읽는다(누구 것인지 드러나면 안 됨)
-const DB_UID = "uid_kakao";      // {uid} = { kakaoId, at } — 본인·관리자가 「연결됨」 표시로 읽는다
+const DB_LINK = "kakao_links";   // {카카오번호 지문} = { uid, sid, at } — 서버만 읽는다
+const DB_UID = "uid_kakao";      // {uid} = { linked, linkKey, sid, at } — 본인·관리자에게 연결 여부만 보인다
+const DB_STATE = "kakao_states"; // {state지문} = { at } — 사용을 마친 OAuth 요청표(서버 전용)
+const DB_LOCK = "kakao_link_locks"; // 같은 직원이 두 카카오를 동시에 잇지 못하게 하는 짧은 잠금
+const STATE_TTL_MS = 10 * 60 * 1000;
+const RECENT_AUTH_SEC = 10 * 60;
+const LINK_LOCK_TTL_MS = 30 * 1000;
 
 function db() { return OntologyServerWrite.wrapDatabase(getRawDatabase(), { program: "kakao" }); }
 
@@ -70,6 +75,7 @@ function setCors(req, res) {
   }
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  res.set("Cache-Control", "no-store");
 }
 
 function bad(res, code, msg) { res.status(code).json({ ok: false, error: msg }); }
@@ -80,11 +86,70 @@ async function requireUser(req) {
   const h = String(req.headers.authorization || "");
   const m = h.match(/^Bearer\s+(.+)$/i);
   if (!m) return null;
-  try { return await getAuth().verifyIdToken(m[1]); } catch (e) { return null; }
+  try { return await getAuth().verifyIdToken(m[1], true); } catch (e) { return null; }
+}
+
+/* 카카오 «연결»은 오래 남은 세션이나 카카오 로그인 세션으로 하지 않는다.
+   비밀번호/패스키로 방금 본인 확인을 한 뒤 10분 안에서만 허용한다. 카카오 세션으로
+   다른 카카오를 덮어 연결할 수 있으면, 잠깐 열린 PC가 영구 로그인 수단이 된다. */
+function primaryRecentlyVerified(user, nowSec) {
+  if (!user) return false;
+  const byPassword = user.firebase && user.firebase.sign_in_provider === "password";
+  const byPasskey = user.passkey === true;
+  const authAt = Number(user.auth_time || 0);
+  const now = Number(nowSec || Math.floor(Date.now() / 1000));
+  return (byPassword || byPasskey) && authAt > 0 && now - authAt >= 0 && now - authAt <= RECENT_AUTH_SEC;
 }
 
 function pathSafe(s) {
   return String(s || "").replace(/[.#$/[\]]/g, "_").slice(0, 200);
+}
+
+function stateKey(state) {
+  return crypto.createHash("sha256").update(String(state || "")).digest("hex");
+}
+function kakaoLinkKey(kakaoId) {
+  return "k_" + crypto.createHash("sha256").update("pureun-kakao:" + String(kakaoId || "")).digest("hex");
+}
+function issueState(mode, secret) {
+  const at = Date.now();
+  const payload = mode + "." + at + "." + crypto.randomBytes(24).toString("base64url");
+  const sig = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
+  return payload + "." + sig;
+}
+/* state 발급 때는 DB 에 쓰지 않는다 — 공개 로그인 단추를 자동 호출해 빈 표를 무한히
+   쌓는 공격을 막는다. 서버 비밀값으로 서명하고, 실제 code 교환 때만 「사용함」 한 줄을
+   transaction 으로 만든다. 같은 state 를 두 요청이 동시에 보내도 첫 요청만 성공한다. */
+async function takeState(state, mode, secret) {
+  const raw = String(state || "");
+  const parts = raw.split(".");
+  if (parts.length !== 4 || parts[0] !== mode || !/^\d{13}$/.test(parts[1])
+      || !/^[A-Za-z0-9_-]{30,40}$/.test(parts[2]) || !/^[A-Za-z0-9_-]{40,50}$/.test(parts[3]) || !secret) return false;
+  const payload = parts.slice(0, 3).join(".");
+  const expected = crypto.createHmac("sha256", secret).update(payload).digest();
+  let got;
+  try { got = Buffer.from(parts[3], "base64url"); } catch (_) { return false; }
+  if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return false;
+  const age = Date.now() - Number(parts[1]);
+  if (age < 0 || age > STATE_TTL_MS) return false;
+  const ref = getRawDatabase().ref(DB_STATE + "/" + stateKey(raw));
+  const result = await ref.transaction((cur) => cur ? undefined : { at: Date.now() }, undefined, false);
+  return !!(result && result.committed === true);
+}
+
+async function acquireLinkLock(uid) {
+  const token = crypto.randomBytes(16).toString("hex");
+  const ref = getRawDatabase().ref(DB_LOCK + "/" + pathSafe(uid));
+  const now = Date.now();
+  const result = await ref.transaction((cur) => {
+    if (cur && Number(cur.at || 0) + LINK_LOCK_TTL_MS > now) return;
+    return { token, at: now };
+  }, undefined, false);
+  return result && result.committed === true ? { ref, token } : null;
+}
+async function releaseLinkLock(lock) {
+  if (!lock) return;
+  await lock.ref.transaction((cur) => cur && cur.token === lock.token ? null : undefined, undefined, false);
 }
 
 /* 관리자인가 — 보안규칙의 MGR(isAdmin || isSubAdmin)과 같은 잣대다(남의 연결 끊기에 쓴다). */
@@ -148,12 +213,12 @@ async function kakaoIdFromCode(code, restKey, clientSecret) {
      화면을 다시 배포하지 않고 서버 비밀값만 바꾸면 되게. */
 exports.kakaoAuthUrl = functions
   .region(REGION)
-  .runWith({ secrets: ["KAKAO_REST_KEY"] })
+  .runWith({ secrets: ["KAKAO_REST_KEY", "KAKAO_CLIENT_SECRET"] })
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") return res.status(204).send("");
-    const restKey = restKeyOf();
-    if (!restKey) return bad(res, 500, KEY_BAD);
+    const restKey = restKeyOf(), clientSecret = clientSecretOf();
+    if (!restKey || !clientSecret) return bad(res, 500, KEY_BAD);
     /* ★ 「로그아웃」 주소 — 포털 로그아웃이 «이 브라우저의 카카오» 도 함께 끊게 (2026-09-28 대표 「추천대로」).
        ⚠ 끊지 않으면: 공용 PC 에서 홍길동이 카카오로 들어왔다 포털만 로그아웃하면, 카카오 쪽 로그인이
          브라우저에 남아 다음 사람(임꺽정)이 노란 단추를 누르는 순간 «홍길동으로» 들어간다.
@@ -164,7 +229,8 @@ exports.kakaoAuthUrl = functions
         + "?client_id=" + encodeURIComponent(restKey)
         + "&logout_redirect_uri=" + encodeURIComponent(REDIRECT_URI) });
     }
-    const state = String((req.query && req.query.state) || "");
+    const mode = String((req.query && req.query.mode) || "") === "link" ? "link" : "login";
+    const state = issueState(mode, clientSecret);
     /* ★ 처음 쓰는 기기에서는 카카오가 «늘 다시 묻게» 한다(prompt=login) — 브라우저에 누군가의
        카카오 로그인이 남아 있어도 그대로 통과하지 않는다. 값은 'login' 하나만 받는다(다른 것은 버린다). */
     const prompt = String((req.query && req.query.prompt) || "") === "login";
@@ -174,7 +240,7 @@ exports.kakaoAuthUrl = functions
       + "&response_type=code"
       + (prompt ? "&prompt=login" : "")
       + (state ? "&state=" + encodeURIComponent(state) : "");
-    res.json({ ok: true, url });
+    res.json({ ok: true, url, state });
   });
 
 /* ── ② 카카오 연결 — 이미 로그인한 사람만 ─────────────────────────────────── */
@@ -188,8 +254,16 @@ exports.kakaoLink = functions
     const user = await requireUser(req);
     if (!user) return bad(res, 401, "먼저 아이디·비밀번호로 로그인해 주세요");
 
+    if (!primaryRecentlyVerified(user)) {
+      return bad(res, 401, "보안을 위해 로그아웃한 뒤 아이디·비밀번호 또는 패스키로 다시 로그인해 연결해 주세요");
+    }
+
     const code = (req.body && req.body.code) || "";
+    const state = (req.body && req.body.state) || "";
     if (!code) return bad(res, 400, "카카오 인가코드가 없습니다");
+    const rk = restKeyOf(), cs = clientSecretOf();
+    if (!rk || !cs) return bad(res, 500, KEY_BAD);
+    if (!await takeState(state, "link", cs)) return bad(res, 400, "카카오 연결 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
 
     /* ⚠ 등록된 재직자만 — 익명 로그인(sign.html 등도 쓴다) 증표로 연결을 만들지 못하게. */
     const role = await roleOf(user.uid);
@@ -197,34 +271,55 @@ exports.kakaoLink = functions
 
     let kakaoId;
     try {
-      const rk = restKeyOf(), cs = clientSecretOf();
-      if (!rk || !cs) return bad(res, 500, KEY_BAD);
       kakaoId = await kakaoIdFromCode(code, rk, cs);
     } catch (e) {
       return bad(res, 400, String((e && e.message) || e));
     }
 
-    const linkKey = pathSafe(kakaoId);
-    const existing = (await db().ref(DB_LINK + "/" + linkKey).once("value")).val();
-    if (existing && existing.uid && existing.uid !== user.uid) {
-      return bad(res, 409, "이 카카오 계정은 이미 다른 직원 계정에 연결돼 있습니다");
-    }
+    /* 한 직원이 두 창에서 서로 다른 카카오를 거의 동시에 연결하면, 카카오별 transaction
+       둘은 모두 성공해 한 직원에게 로그인 길이 두 개 생긴다. 직원별 짧은 잠금도 함께 둔다. */
+    const lock = await acquireLinkLock(user.uid);
+    if (!lock) return bad(res, 409, "다른 카카오 연결을 처리 중입니다 — 잠시 뒤 다시 눌러 주세요");
+    try {
+      const linkKey = kakaoLinkKey(kakaoId);
+      /* 예전 판은 회원번호 원문을 경로로 썼다. 새 판은 지문만 쓰되, 기존 연결은 로그인·재연결
+         시 자연스럽게 새 자리로 옮긴다. */
+      const legacyKey = pathSafe(kakaoId);
+      const modernRef = db().ref(DB_LINK + "/" + linkKey);
+      const existing = (await modernRef.once("value")).val()
+        || (await db().ref(DB_LINK + "/" + legacyKey).once("value")).val();
+      if (existing && existing.uid && existing.uid !== user.uid) {
+        return bad(res, 409, "이 카카오 계정은 이미 다른 직원 계정에 연결돼 있습니다");
+      }
 
-    /* 사번은 화면이 보낸 값이 아니라 명부(uid_roles)에서 꺼낸다 — 관리자 현황 표에
-       「누구 것인지」로 보이는 값이라, 화면이 남의 사번을 적어 보내면 안 된다. */
-    const sid = pathSafe(role.sid || "");
-    const updates = {
-      [DB_LINK + "/" + linkKey]: { uid: user.uid, sid: sid, at: Date.now() },
-      [DB_UID + "/" + pathSafe(user.uid)]: { kakaoId, sid: sid, at: Date.now() },
-    };
-    /* ⚠ 다른 카카오 계정으로 «바꿔» 연결하면 옛 카카오 계정의 길을 지운다 —
-       안 지우면 옛 카카오로도 계속 이 직원 계정에 들어온다(끊기 단추는 새 것만 끊는다). */
-    const prev = (await db().ref(DB_UID + "/" + pathSafe(user.uid)).once("value")).val();
-    if (prev && prev.kakaoId && pathSafe(prev.kakaoId) !== linkKey) {
-      updates[DB_LINK + "/" + pathSafe(prev.kakaoId)] = null;
+      /* 사번은 화면이 보낸 값이 아니라 명부(uid_roles)에서 꺼낸다 — 관리자 현황 표에
+         「누구 것인지」로 보이는 값이라, 화면이 남의 사번을 적어 보내면 안 된다. */
+      const sid = pathSafe(role.sid || "");
+      /* 같은 카카오를 두 사람이 거의 동시에 연결해도 한 사람만 차지한다. 읽고 나서 쓰는
+         두 걸음이면 둘 다 「비었음」을 보고 마지막 사람이 앞사람을 덮을 수 있다. */
+      let occupiedBy = "";
+      const reserved = await modernRef.transaction((cur) => {
+        if (cur && cur.uid && cur.uid !== user.uid) { occupiedBy = cur.uid; return; }
+        return { uid: user.uid, sid, at: Date.now() };
+      }, undefined, false);
+      if (!reserved || reserved.committed !== true || occupiedBy) {
+        return bad(res, 409, "이 카카오 계정은 이미 다른 직원 계정에 연결돼 있습니다");
+      }
+      const updates = {
+        [DB_LINK + "/" + linkKey]: { uid: user.uid, sid: sid, at: Date.now() },
+        [DB_UID + "/" + pathSafe(user.uid)]: { linked: true, linkKey, sid: sid, at: Date.now() },
+      };
+      /* ⚠ 다른 카카오 계정으로 «바꿔» 연결하면 옛 카카오 계정의 길을 지운다 —
+         안 지우면 옛 카카오로도 계속 이 직원 계정에 들어온다(끊기 단추는 새 것만 끊는다). */
+      const prev = (await db().ref(DB_UID + "/" + pathSafe(user.uid)).once("value")).val();
+      if (legacyKey !== linkKey) updates[DB_LINK + "/" + legacyKey] = null;
+      if (prev && prev.linkKey && prev.linkKey !== linkKey) updates[DB_LINK + "/" + pathSafe(prev.linkKey)] = null;
+      if (prev && prev.kakaoId && pathSafe(prev.kakaoId) !== linkKey) updates[DB_LINK + "/" + pathSafe(prev.kakaoId)] = null;
+      await db().ref().update(updates);
+      res.json({ ok: true });
+    } finally {
+      await releaseLinkLock(lock).catch((e) => console.warn("kakaoLink: 잠금 해제 실패", String((e && e.message) || e)));
     }
-    await db().ref().update(updates);
-    res.json({ ok: true });
   });
 
 /* ── ③ 카카오 연결 끊기 ─────────────────────────────────────────────────────
@@ -251,7 +346,8 @@ exports.kakaoUnlink = functions.region(REGION).https.onRequest(async (req, res) 
   const uidKey = pathSafe(targetUid);
   const cur = (await db().ref(DB_UID + "/" + uidKey).once("value")).val();
   const updates = { [DB_UID + "/" + uidKey]: null };
-  if (cur && cur.kakaoId) updates[DB_LINK + "/" + pathSafe(cur.kakaoId)] = null;
+  if (cur && cur.linkKey) updates[DB_LINK + "/" + pathSafe(cur.linkKey)] = null;
+  if (cur && cur.kakaoId) updates[DB_LINK + "/" + pathSafe(cur.kakaoId)] = null; // 옛 판 정리
   await db().ref().update(updates);
   res.json({ ok: true });
 });
@@ -263,27 +359,56 @@ exports.kakaoLoginFinish = functions
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") return res.status(204).send("");
+    /* ★ 미리 깨우기 (대표 2026-09-29 「로그인 되는데 좀 빨리 넘어가게」) ──────────────
+       서버 기록: 로그인 한 번에 함수 «안»에서만 1.9~2.5초. 로그인 간격이 길어 매번 새로 뜬
+       함수가 DB 연결부터 맺는다. 노란 단추를 누를 때 화면이 이것을 한 번 부르면, 사람이
+       카카오 화면을 거치는 동안 함수가 깨어나 DB 연결까지 맺어 둔다.
+       ⚠ 아무것도 읽어 주지 않는다 — 없는 자리(_warm) 한 칸을 읽어 연결만 연다. */
+    if (req.method === "GET" && String((req.query && req.query.warm) || "") === "1") {
+      await getRawDatabase().ref("uid_roles/_warm").once("value").catch(() => null);
+      return res.status(204).send("");
+    }
     if (req.method !== "POST") return bad(res, 405, "POST 만 받습니다");
 
     const code = (req.body && req.body.code) || "";
+    const state = (req.body && req.body.state) || "";
     if (!code) return bad(res, 400, "카카오 인가코드가 없습니다");
+    const rk = restKeyOf(), cs = clientSecretOf();
+    if (!rk || !cs) return bad(res, 500, KEY_BAD);
+    if (!await takeState(state, "login", cs)) return bad(res, 400, "카카오 로그인 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
 
+    /* DB 연결을 카카오에 묻는 «동안» 맺는다 — 예전에는 카카오 답을 다 받은 뒤에야 시작했다 */
+    const t0 = Date.now();
+    getRawDatabase().ref("uid_roles/_warm").once("value").catch(() => null);
     let kakaoId;
     try {
-      const rk = restKeyOf(), cs = clientSecretOf();
-      if (!rk || !cs) return bad(res, 500, KEY_BAD);
       kakaoId = await kakaoIdFromCode(code, rk, cs);
     } catch (e) {
       return bad(res, 400, String((e && e.message) || e));
     }
+    const t1 = Date.now();
 
-    const link = (await db().ref(DB_LINK + "/" + pathSafe(kakaoId)).once("value")).val();
+    const linkKey = kakaoLinkKey(kakaoId);
+    const legacyKey = pathSafe(kakaoId);
+    const modern = (await db().ref(DB_LINK + "/" + linkKey).once("value")).val();
+    const legacy = modern ? null : (await db().ref(DB_LINK + "/" + legacyKey).once("value")).val();
+    const link = modern || legacy;
+    const t2 = Date.now();
     /* needLink — 화면이 「비밀번호로 한 번 들어오면 곧바로 연결을 권한다」로 이어 가는 표시.
        카카오 회원번호는 싣지 않는다(연결은 로그인 뒤 인가코드를 새로 받아 서버가 다시 확인한다). */
     if (!link || !link.uid) {
       await kakaoFailTrail(req, kakaoIdKey(kakaoId), "kakao-unlinked", null);
       return res.status(400).json({ ok: false, needLink: true,
         error: "아직 연결되지 않은 카카오 계정입니다. 처음 한 번만 위에서 아이디·비밀번호로 로그인해 주세요 — 로그인하면 카카오 연결을 바로 이어 드립니다" });
+    }
+
+    /* 기존 회원번호 원문 경로·표시는 성공한 로그인 때 지문 형태로 조용히 이관한다. */
+    if (legacy && legacyKey !== linkKey) {
+      await db().ref().update({
+        [DB_LINK + "/" + linkKey]: legacy,
+        [DB_LINK + "/" + legacyKey]: null,
+        [DB_UID + "/" + pathSafe(legacy.uid)]: { linked: true, linkKey, sid: legacy.sid || "", at: legacy.at || Date.now() },
+      });
     }
 
     const role = await roleOf(link.uid);
@@ -298,6 +423,10 @@ exports.kakaoLoginFinish = functions
       return bad(res, 403, "재직 중인 계정이 아닙니다. 관리자에게 문의해 주세요");
     }
 
+    const t3 = Date.now();
     const token = await getAuth().createCustomToken(link.uid, { kakao: true, sid: link.sid || "" });
+    /* 단계별 시간 — 다음에 느리다는 말이 나오면 «어디서»를 기록에서 바로 본다. 사람 정보는 안 적는다. */
+    console.log("[kakaoLoginFinish] 카카오 " + (t1 - t0) + "ms · 연결기록 " + (t2 - t1) + "ms · 재직 "
+      + (t3 - t2) + "ms · 표 " + (Date.now() - t3) + "ms");
     res.json({ ok: true, token });
   });

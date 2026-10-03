@@ -183,3 +183,33 @@ test('★★ 새로 지은 이름이 «한 번만» 선언돼 있다', () => {
     assert.equal(c, 1, n + ' 이 ' + c + '번 선언돼 있습니다 — 겹치면 뒤엣것이 조용히 이깁니다');
   });
 });
+
+/* ══════ 읽는 화면에서 연 창은 «어느 보기에서든» 뜬다 (대표 보고 2026-10-02 「미리보기 작동안한다」) ══════
+   「목록만」 보기는 메일을 열면 목록을 안 그리는데, 미리보기 창은 목록 아래에 붙어 있었다.
+   그래서 👁 를 눌러도 창이 그려질 자리가 없었다. 글자로만 「어딘가에 있다」를 보던 검사가
+   이것을 못 잡았다 — 그래서 «실제로 그려서» 센다. */
+test('★★★ 메일을 연 채로 👁·❓ 창이 «보기마다 꼭 한 번» 그려진다', () => {
+  const bareList = sliceFn(app, 'function mbListHtml(').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const inList = { pv: /\$\{mbPvHtml\(\)\}/.test(bareList), nw: /\$\{mbNewHtml\(\)\}/.test(bareList) };
+  ['list', 'right', 'bottom'].forEach((mode) => {
+    const ctx = {
+      String, state: { mbOpen: { slug: 'IN', uid: '1' } },
+      esc: (s) => String(s),
+      mbViewMode: () => mode,
+      mbReadHtml: () => '[READ]',
+      mbPvHtml: () => '[PV]',
+      mbNewHtml: () => '[NEW]',
+    };
+    /* 목록은 «진짜 목록이 붙이는 것»만 붙인다 — 목록 쪽을 고쳐도 이 검사가 따라간다 */
+    ctx.mbListHtml = () => '[LIST]' + (inList.pv ? ctx.mbPvHtml() : '') + (inList.nw ? ctx.mbNewHtml() : '');
+    vm.createContext(ctx);
+    ['mbReadPopsHtml', 'mbBoxHtml'].forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
+    const out = ctx.mbBoxHtml();
+    assert.equal((out.match(/\[PV\]/g) || []).length, 1, '★★★ 「' + mode + '」 보기에서 미리보기 창이 ' + ((out.match(/\[PV\]/g) || []).length) + '번 그려집니다');
+    assert.equal((out.match(/\[NEW\]/g) || []).length, 1, '★★ 「' + mode + '」 보기에서 「처음 보는 주소」 등록 창이 안 뜹니다');
+  });
+});
+test('★★ 폰도 «같은 두 창»을 그린다', () => {
+  const m = sliceFn(app, 'function mbMobileHtml(').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.match(m, /mbReadHtml\(\)\s*\+\s*mbPvHtml\(\)\s*\+\s*mbNewHtml\(\)/, '★★ 폰에서 「처음 보는 주소」 등록 창이 안 뜹니다');
+});

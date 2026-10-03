@@ -139,7 +139,8 @@ if (!JSDOM) {
 console.log('\n■ 저장해도 연결이 살아남나');
 const ss = gF('saveSite');
 ok('근로자대표를 담는다', /WREP_FIELDS\.forEach/.test(ss));
-ok('고칠 때도 담는다', /SITE_FIELDS\.concat\(WREP_FIELDS\)/.test(ss), ss.slice(0, 300));
+/* 2026-09-29 사용자대표·중소기업 칸도 함께 보낸다(concat(WREP_FIELDS,UREP_FIELDS,SME_FIELDS)) — 근로자대표가 들어 있으면 된다 */
+ok('고칠 때도 담는다', /SITE_FIELDS\.concat\(WREP_FIELDS[,)]/.test(ss), ss.slice(0, 300));
 /* set(전체 덮어쓰기)으로 바꾸면 저장할 때마다 재직증명서 연결이 사라진다 */
 ok('있는 사업장은 update 로 고친다', /sites\/'\+_fid\+'\/'\+sid\)\.update\(patch\)/.test(ss), ss.slice(-400));
 ok('고칠 칸 목록에 wrep_doc 을 넣지 않는다 (연결이 안 지워진다)', !/patch\.wrep_doc|'wrep_doc'/.test(ss));

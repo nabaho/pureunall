@@ -45,6 +45,62 @@ const MAX_SPACING_SEC = 600;
 const DRAIN_EVERY_MIN = 15;
 const DRAIN_BATCH = 20;
 
+/* 예약 발송 실패 복구.
+   일시적인 다음메일·통신 오류는 두 번 더 시도한다. 그래도 안 되면 기록은 남기되
+   먼 훗날 자리로 치워 둔다. 실패 줄을 지난 시각에 그대로 두면 orderByChild("at")의
+   맨 앞 20칸을 계속 차지해, 그 뒤의 정상 메일이 영원히 발송되지 않는다. */
+const MAX_DELIVERY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 30 * 60 * 1000;
+const PARKED_AT = Date.UTC(9999, 0, 1);
+const SENDING_LEASE_MS = 20 * 60 * 1000;
+
+function deliveryFailure(row, now, error) {
+  const r = row && typeof row === 'object' ? row : {};
+  const t = Number(now) || Date.now();
+  const attempt = Math.max(0, Number(r.attemptCount) || 0) + 1;
+  const common = {
+    attemptCount: attempt,
+    error: String(error == null ? '' : error).slice(0, 500),
+    failedAt: t,
+    sendingAt: null,
+  };
+  if (attempt < MAX_DELIVERY_ATTEMPTS) {
+    return Object.assign(common, { state: 'waiting', at: t + RETRY_DELAY_MS, retryAt: t + RETRY_DELAY_MS });
+  }
+  return Object.assign(common, {
+    state: 'failed', originalAt: Number(r.originalAt || r.at) || t, at: PARKED_AT,
+  });
+}
+
+function staleSending(row, now) {
+  const r = row && typeof row === 'object' ? row : {};
+  if (r.state !== 'sending') return false;
+  const began = Number(r.sendingAt) || 0;
+  return !began || (Number(now) - began) > SENDING_LEASE_MS;
+}
+
+function uncertainDelivery(row, now) {
+  const r = row && typeof row === 'object' ? row : {};
+  const t = Number(now) || Date.now();
+  return {
+    state: 'uncertain',
+    error: '발송 중 실행이 중단되어 실제 발송 여부를 확인해야 합니다.',
+    failedAt: t,
+    originalAt: Number(r.originalAt || r.at) || t,
+    at: PARKED_AT,
+    sendingAt: null,
+  };
+}
+
+function parkOldFailure(row, now) {
+  const r = row && typeof row === 'object' ? row : {};
+  const t = Number(now) || Date.now();
+  return {
+    originalAt: Number(r.originalAt || r.at) || t,
+    at: PARKED_AT,
+  };
+}
+
 /* 글 안의 {이름}·{회사} 를 그 곳 값으로 바꾼다.
    화면(pu-cards.html mailFill)과 **같은 규칙**이어야 한다 — 미리보기와 실제가 달라지면
    무엇이 나갈지 아무도 모른다. 값이 없으면 빈칸으로 지운다(«{회사}» 가 그대로 나가면 흉하다). */
@@ -255,6 +311,8 @@ function etaText(n, gapMs) {
 
 module.exports = {
   MAX_BULK, DEFAULT_SPACING_SEC, MIN_SPACING_SEC, MAX_SPACING_SEC,
-  DRAIN_EVERY_MIN, DRAIN_BATCH, 같은사서함도메인,
+  DRAIN_EVERY_MIN, DRAIN_BATCH, MAX_DELIVERY_ATTEMPTS, RETRY_DELAY_MS, PARKED_AT,
+  SENDING_LEASE_MS, 같은사서함도메인,
   fill, cleanTargets, spacingMs, validateBulk, buildQueue, etaText, 보내는주소고르기,
+  deliveryFailure, staleSending, uncertainDelivery, parkOldFailure,
 };

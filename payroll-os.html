@@ -13,10 +13,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=38"></script>
+<script src="js/pu-ontology.js?v=40"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=4"></script>
+<script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
@@ -137,12 +137,14 @@ h1{font-size:20px;margin-bottom:4px}.sub{color:var(--sub);font-size:13px;margin-
 </style>
 <!-- 프로그램 사이 이동 (공용 앱바) — 문서관리와 함께 이 앱에만 빠져 있었다(2026-08-13) -->
 <script src="js/pu-appbar.js?v=14"></script>
+<!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
+<script src="js/pu-active.js?v=1"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-authsync.js?v=2"></script>
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-<script src="js/pu-whoami.js?v=1"></script>
+<script src="js/pu-whoami.js?v=2"></script>
 <script>
 /* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
    포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
@@ -232,10 +234,20 @@ function doLogout(){ firebase.auth().signOut().then(function(){ location.reload(
 
 function afterLogin(){
   document.getElementById('gate').style.display='none';
+  /* ★ 머리줄엔 «이름»을 — 메일만으로는 누구인지 한눈에 안 보인다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」).
+     이름은 공용 부품(PuWhoami)이 공개 명부에서 찾아 준다. 찾기 전에는 메일을 잠깐 둔다. */
+  var whoRole='';
+  function drawWho(){
+    var m=window.PuWhoami&&PuWhoami.get();
+    var nm=(m&&m.name)?(m.name+(m.title?' '+m.title:'')):(me.email||'');
+    document.getElementById('whoami').textContent=nm+(whoRole?' · '+whoRole:'');
+  }
+  drawWho();
+  if(window.PuWhoami&&!window.__payWhoHooked){ window.__payWhoHooked=true; PuWhoami.onChange(function(){ drawWho(); }); }
   fbDb.ref('uid_roles/'+me.uid).once('value').then(function(s){
-    var r=s.val()||{}; var role=r.isAdmin?'관리자':(r.fin?'재무/급여':'일반');
-    document.getElementById('whoami').textContent=(me.email||'')+' · '+role;
-  }).catch(function(){ document.getElementById('whoami').textContent=me.email||''; });
+    var r=s.val()||{}; whoRole=r.isAdmin?'관리자':(r.fin?'재무/급여':'일반');
+    drawWho();
+  }).catch(function(){ drawWho(); });
   /* ⚠ 예전에는 payroll_os **전체**를 한 번에 읽고, 같은 자리에 구독까지 걸었다.
      파일럿 3곳(342KB)일 때는 티가 안 났지만 70곳이면 7MB다 — **열 때마다 14MB**
      (한 번 읽고 구독 첫 값으로 또 한 번), 그리고 누가 확정을 한 번 누를 때마다

@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const Module = require('module');
+const crypto = require('crypto');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -42,6 +43,11 @@ function makeWorld(seed) {
         once: async () => ({ val: () => { const v = get(p); return v == null ? null : JSON.parse(JSON.stringify(v)); } }),
         update: async (obj) => { for (const k of Object.keys(obj)) set((p ? p + '/' : '') + k, obj[k]); },
         set: async (v) => set(p, v),
+        transaction: async (fn) => {
+          const before = get(p); const next = fn(before == null ? null : JSON.parse(JSON.stringify(before)));
+          if (next === undefined) return { committed: false, snapshot: { val: () => before } };
+          set(p, next); return { committed: true, snapshot: { val: () => next } };
+        },
         // 로그인 감시 기록(login_events·systemAlerts)용 — world.pushFails 면 일부러 실패한다
         push: async (v) => { if (world && world.pushFails) throw new Error('db down'); set(p + '/' + 'k' + (++pushN), v); },
       };
@@ -54,7 +60,16 @@ let pushN = 0;
 /* 가짜 인증 — 증표 글자가 곧 uid 다 */
 const issued = [];
 const fakeAuth = {
-  verifyIdToken: async (tok) => { if (!tok || tok === 'bad') throw new Error('bad'); return { uid: tok }; },
+  verifyIdToken: async (tok) => {
+    if (!tok || tok === 'bad') throw new Error('bad');
+    const bits = String(tok).split(':'); const tag = bits[1] || '';
+    return {
+      uid: bits[0],
+      auth_time: Math.floor(Date.now() / 1000) - (tag === 'old' ? 3600 : 0),
+      firebase: { sign_in_provider: tag === 'kakao' ? 'custom' : 'password' },
+      kakao: tag === 'kakao',
+    };
+  },
   createCustomToken: async (uid, claims) => { issued.push({ uid, claims }); return 'CT:' + uid; },
 };
 
@@ -93,8 +108,23 @@ global.fetch = async (url, opts) => {
 process.env.KAKAO_REST_KEY = '0123456789abcdef0123456789abcdef';   // 가짜 — 모양만 진짜 키와 같다
 process.env.KAKAO_CLIENT_SECRET = 'FakeSecretForTests1234567890';
 
+function signedState(mode, at = Date.now()) {
+  const payload = mode + '.' + at + '.' + crypto.randomBytes(24).toString('base64url');
+  return payload + '.' + crypto.createHmac('sha256', process.env.KAKAO_CLIENT_SECRET)
+    .update(payload).digest('base64url');
+}
+function shapedState(mode = 'login', fill = 'A') {
+  return mode + '.1700000000000.' + fill.repeat(32) + '.' + fill.repeat(43);
+}
+
 function call(handler, { token, body } = {}) {
   return new Promise((resolve) => {
+    body = Object.assign({}, body || {});
+    /* 대부분의 기능 검사는 OAuth 앞걸음 자체가 대상이 아니다. 실제 서버가 발급한 것과
+       같은 1회용 표를 준비하고, 별도 보안 검사에서 발급·재사용·만료를 직접 겨눈다. */
+    if (body.code && !body.state) {
+      body.state = signedState(token ? 'link' : 'login');
+    }
     const req = { method: 'POST', headers: { origin: 'https://nabaho.github.io', authorization: token ? 'Bearer ' + token : '' }, body: body || {}, query: {} };
     const res = {
       _s: 200, set() {}, status(s) { this._s = s; return this; },
@@ -127,7 +157,9 @@ test('★ 연결하면 카카오로 그 직원 계정에 들어온다 (사번은
   const r1 = await call(K.kakaoLink, { token: 'staff1', body: { code: 'cA', sid: 'P-999-가짜' } });
   assert.equal(r1.body.ok, true);
   assert.equal(world.data.uid_kakao.staff1.sid, 'P-101', '화면이 보낸 사번을 그대로 적었다');
-  assert.equal(world.data.kakao_links['111'].uid, 'staff1');
+  assert.equal(world.data.uid_kakao.staff1.linked, true);
+  assert.ok(!world.data.uid_kakao.staff1.kakaoId, '화면이 읽는 표에 카카오 회원번호 원문이 남았다');
+  assert.equal(world.data.kakao_links[world.data.uid_kakao.staff1.linkKey].uid, 'staff1');
   const r2 = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
   assert.equal(r2.body.ok, true);
   assert.deepEqual(issued[0], { uid: 'staff1', claims: { kakao: true, sid: 'P-101' } });
@@ -166,10 +198,22 @@ test('★ 재직자가 아니면(익명·퇴사) 연결도 로그인도 안 된�
 test('★★ 다른 카카오로 바꿔 연결하면 옛 카카오로는 더 못 들어온다', async () => {
   const K = fresh();
   await call(K.kakaoLink, { token: 'staff1', body: { code: 'cA' } });
+  const firstKey = world.data.uid_kakao.staff1.linkKey;
   await call(K.kakaoLink, { token: 'staff1', body: { code: 'cB' } });
-  assert.equal(world.data.kakao_links['111'], undefined, '옛 카카오 길이 남았다');
+  assert.equal(world.data.kakao_links[firstKey], undefined, '옛 카카오 길이 남았다');
   assert.equal((await call(K.kakaoLoginFinish, { body: { code: 'cA' } })).status, 400);
   assert.equal((await call(K.kakaoLoginFinish, { body: { code: 'cB' } })).body.ok, true);
+});
+
+test('★★ 같은 직원이 두 창에서 다른 카카오를 동시에 연결해도 로그인 길은 하나뿐이다', async () => {
+  const K = fresh();
+  const results = await Promise.all([
+    call(K.kakaoLink, { token: 'staff1', body: { code: 'cA' } }),
+    call(K.kakaoLink, { token: 'staff1', body: { code: 'cB' } }),
+  ]);
+  assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+  const mine = Object.values(world.data.kakao_links || {}).filter((v) => v && v.uid === 'staff1');
+  assert.equal(mine.length, 1, '동시 연결 뒤 카카오 로그인 길이 둘 남았다');
 });
 
 test('남의 직원에 이미 붙은 카카오는 연결 못 한다', async () => {
@@ -238,7 +282,7 @@ function clientWith(href, stored) {
     },
     crypto: { getRandomValues: (a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 37 + 11) & 255; return a; } },
     location: { href }, history: { replaceState() {} },
-    fetch: async () => ({ status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x' }) }),
+    fetch: async () => ({ status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x', state: shapedState() }) }),
   };
   box.window = box;
   vm.createContext(box);
@@ -255,14 +299,53 @@ test('★★ 화면 — 내가 보낸 state 와 다르면 code 를 서버로 넘
   assert.ok(p.error && !p.code, '남이 만든 복귀 주소를 받아들였다');
 });
 
-test('★ 화면 — 카카오로 보낼 때 state 는 맞히기 어려운 값이다(모드 이름이 아니다)', async () => {
+test('★ 화면 — 서버가 준 state 를 그대로 보관하고 mode 만 서버에 부탁한다', async () => {
   const c = clientWith('https://nabaho.github.io/pureunall/enter.html');
   let asked = '';
-  c.box.fetch = async (u) => { asked = u; return { status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x' }) }; };
+  const state = shapedState('link', 'S');
+  c.box.fetch = async (u) => { asked = u; return { status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x', state }) }; };
   await c.K.goLink('P-101');
-  const sent = new URL(asked).searchParams.get('state');
-  assert.ok(sent && sent.length >= 16 && !/^(link|login)$/.test(sent), 'state 가 뻔한 값이다: ' + sent);
-  assert.equal(JSON.parse(c.store.pu_kakao_state).nonce, sent);
+  assert.equal(new URL(asked).searchParams.get('mode'), 'link');
+  assert.equal(new URL(asked).searchParams.get('state'), null, '화면이 state 를 만들어 서버에 강요한다');
+  assert.equal(JSON.parse(c.store.pu_kakao_state).nonce, state);
+});
+
+test('★★ 서버 — state 는 서버가 발급하고 한 번만 쓸 수 있으며 용도가 바뀌지 않는다', async () => {
+  const K = fresh();
+  const issuedState = await authUrl(K, { mode: 'login' });
+  const state = issuedState.body.state;
+  assert.match(state, /^login\.\d{13}\.[A-Za-z0-9_-]{32}\.[A-Za-z0-9_-]{43}$/);
+  assert.equal(new URL(issuedState.body.url).searchParams.get('state'), state);
+  const first = await call(K.kakaoLoginFinish, { body: { code: 'cA', state } });
+  assert.equal(first.body.needLink, true, '처음 요청이 state 문턱을 못 넘었다');
+  const replay = await call(K.kakaoLoginFinish, { body: { code: 'cA', state } });
+  assert.match(replay.body.error, /이미 사용|만료/, '한 번 쓴 state 를 다시 받았다');
+
+  const loginState = (await authUrl(K, { mode: 'login' })).body.state;
+  const wrongMode = await call(K.kakaoLink, { token: 'staff1', body: { code: 'cA', state: loginState } });
+  assert.match(wrongMode.body.error, /이미 사용|만료/, '로그인용 state 로 계정 연결을 했다');
+});
+
+test('★★ 서버 — 만료된 state 와 오래된 세션·카카오 세션으로는 계정을 연결하지 않는다', async () => {
+  const K = fresh();
+  const state = signedState('link', Date.now() - 11 * 60 * 1000);
+  const expired = await call(K.kakaoLink, { token: 'staff1', body: { code: 'cA', state } });
+  assert.match(expired.body.error, /이미 사용|만료/);
+  assert.equal((await call(K.kakaoLink, { token: 'staff1:old', body: { code: 'cA' } })).status, 401);
+  assert.equal((await call(K.kakaoLink, { token: 'staff1:kakao', body: { code: 'cA' } })).status, 401);
+});
+
+test('★★ 화면 — 복귀 state 를 code 와 함께 서버에 보내고 한 번 보낸 뒤 지운다', async () => {
+  const state = shapedState('login', 'R');
+  const c = clientWith('https://nabaho.github.io/pureunall/enter.html?code=C1&state=' + state,
+    { pu_kakao_state: JSON.stringify({ mode: 'login', sid: '', nonce: state }) });
+  const bodies = [];
+  c.box.fetch = async (u, o) => { bodies.push(JSON.parse(o.body)); return { status: 200, text: async () => '{"ok":true,"token":"T"}' }; };
+  assert.equal(c.K.pending().code, 'C1');
+  await c.K.loginFinish('C1');
+  assert.deepEqual(JSON.parse(JSON.stringify(bodies[0])), { code: 'C1', state });
+  await c.K.loginFinish('C1');
+  assert.equal(bodies[1].state, '', '같은 state 를 화면이 다시 보냈다');
 });
 
 /* ── 노란 단추가 «아직 연결 안 됨» 이면 → 비밀번호로 들어오자마자 연결을 권한다 ──
@@ -404,7 +487,8 @@ test('★★ 서버 — 로그아웃 주소는 카카오 로그아웃으로 가�
 test('★ 화면 부품 — goLogin({ask}) 은 prompt=login 을 서버에 부탁하고, logoutUrl 은 로그아웃 주소를 묻는다', async () => {
   const c = clientWith('https://nabaho.github.io/pureunall/enter.html');
   const asked = [];
-  c.box.fetch = async (u) => { asked.push(u); return { status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x' }) }; };
+  /* ⚠ 2026-09-29: 노란 단추가 로그인 서버를 «미리 깨운다»(?warm=1) — 그 부름은 빼고 센다 */
+  c.box.fetch = async (u) => { if (!/warm=1/.test(u)) asked.push(u); return { status: 200, text: async () => JSON.stringify({ ok: true, url: 'https://kauth.kakao.com/x', state: shapedState('login', 'T') }) }; };
   await c.K.goLogin({ ask: true });
   await c.K.goLogin();
   await c.K.logoutUrl();
