@@ -276,6 +276,12 @@
     border:1px solid #bfdbfe;border-radius:4px;padding:0 4px}
   /* 「고를 것」의 단서 — 고르는 일을 대신하지 않고 왜 그럴듯한지만 적는다 */
   .alpk{display:flex;flex-direction:column;gap:5px}
+  /* 🔗 고를 것 — □·# 와 한꺼번에 단추 */
+  .alsb{display:flex;align-items:center;gap:10px;padding:6px 0 8px;font-size:12px}
+  .alsb label{display:flex;align-items:center;gap:4px;cursor:pointer}
+  .alsb .alpb{width:auto;margin-left:auto}
+  .alck{vertical-align:-2px;margin:0 6px 0 0}
+  .aln{display:inline-block;min-width:20px;color:var(--faint);font-size:11px;font-variant-numeric:tabular-nums}
   .alpb{display:flex;align-items:center;gap:6px;flex-wrap:wrap;text-align:left;width:100%;
     font-size:11.5px;padding:5px 9px;border:1px solid var(--line);border-radius:8px;
     background:var(--panel);cursor:pointer;color:var(--ink)}
@@ -5530,17 +5536,31 @@ function alPickModal(){
   if(!L.length){ closeM(); toast('고를 것이 없습니다'); return; }
   /* 계정 표는 한 번만 받아 둔다 — 받고 나면 단서가 하나 더 붙으므로 다시 그린다 */
   if(!alMailSid){ alMailSidLoad().then(function(){ if($('modal')) alPickModal(); }); }
+  /* □·# (대표 지시 2026-10-03 「ㅁ 와 넘버링 항상 해라」) — 한 주에 스무 건이 넘게 쌓인다.
+     «업무 아님»을 하나씩 누르게 두면 안 고른다. 고른 것만 한꺼번에 치운다.
+     ⚠ 한꺼번에 하는 것은 «업무 아님» 뿐이다 — 업무를 고르는 것은 줄마다 다르므로 한꺼번에 못 한다.
+     ⚠ 사라진 줄(남이 먼저 골랐다)은 고른 것에서 저절로 빠진다. */
+  var live={};
+  L.forEach(function(x){ live[alSelKey(x.wk,x.src)]=1; });
+  Object.keys(alSel).forEach(function(k){ if(!live[k]) delete alSel[k]; });
+  var nSel=Object.keys(alSel).length, all=nSel&&nSel===L.length;
   showModal('<h2 style="margin:0 0 6px">🔗 어느 업무인지 골라 주세요'+hlp('al')+'</h2>'
     +'<p class="muted" style="font-size:12px;margin:0 0 10px">지난주 메일·일정 가운데 기계가 확신하지 못해 기록에 넣지 않은 것입니다.'
     +' 옆의 <span class="alh">단서</span>는 «그럴듯한 까닭»일 뿐입니다 — 고르는 것은 담당자입니다.</p>'
-    +L.map(function(x){
-      var w=escJ(x.wk), s=escJ(x.src);
+    +'<div class="alsb"><label><input type="checkbox"'+(all?' checked':'')+' onchange="alSelAll(this.checked)"> 모두</label>'
+    +'<span class="muted" id="al-nsel">'+(nSel?nSel+'건 골랐습니다':L.length+'건')+'</span>'
+    +'<button class="alpb no" onclick="alNoneSel()">고른 것 업무 아님</button></div>'
+    +L.map(function(x,i){
+      var w=escJ(x.wk), s=escJ(x.src), k=alSelKey(x.wk,x.src);
       /* 단서가 붙은 후보를 위로 — 고르는 눈이 먼저 닿는 자리다.
          ⚠ 차례만 바꾼다. 위에 있다고 고른 것이 아니다. */
       var ids=x.ids.slice().sort(function(a,b){ return alHints(x,b).length-alHints(x,a).length; });
       var nms=alNames(ids);
       return '<div style="border-top:1px solid var(--line);padding:8px 0">'
-        +'<div style="font-size:12.5px;margin-bottom:5px"><span class="muted">'+esc(md(x.a.d||''))+'</span> '+esc(x.a.t||'')+'</div>'
+        +'<div style="font-size:12.5px;margin-bottom:5px">'
+        +'<input type="checkbox" class="alck"'+(alSel[k]?' checked':'')+' onchange="alSelOne(\''+escJ(k)+'\',this.checked)">'
+        +'<span class="aln">'+(i+1)+'</span>'
+        +'<span class="muted">'+esc(md(x.a.d||''))+'</span> '+esc(x.a.t||'')+'</div>'
         +'<div class="alpk">'
         +ids.map(function(id){
           var hs=alHints(x,id);
@@ -5553,6 +5573,43 @@ function alPickModal(){
         +'</div></div>';
     }).join('')
     +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');
+}
+/* 고른 것 — 열쇠는 「주~원천」. 주 열쇠(2026-W40)에는 ~ 가 없어 첫 ~ 에서 가른다 */
+var alSel={};
+function alSelKey(wk,src){ return wk+'~'+src; }
+function alSelOne(k,on){
+  if(on) alSel[k]=1; else delete alSel[k];
+  /* 다시 그리지 않는다 — 긴 목록에서 누를 때마다 맨 위로 튀면 못 쓴다 */
+  var n=Object.keys(alSel).length, el=$('al-nsel');
+  if(el) el.textContent=n?n+'건 골랐습니다':alAmbList().length+'건';
+}
+function alSelAll(on){
+  alSel={};
+  if(on) alAmbList().forEach(function(x){ alSel[alSelKey(x.wk,x.src)]=1; });
+  alPickModal();
+}
+/* 고른 것을 한꺼번에 「업무 아님」 — 한 번에 적는다(반만 적히는 일이 없다).
+   ⚠ 그사이 남이 먼저 정한 줄은 건너뛴다 — 정해진 것을 「아님」으로 덮으면 안 된다. */
+function alNoneSel(){
+  var ks=Object.keys(alSel);
+  if(!ks.length){ toast('먼저 □ 를 골라 주세요','warn'); return; }
+  var who=_mlkWho(), up={}, put=[];
+  ks.forEach(function(k){
+    var i=k.indexOf('~'), wk=k.slice(0,i), src=k.slice(i+1);
+    var a=(alBox[wk]||{})[src];
+    if(!a||!a.amb) return;
+    var rec={none:1, d:a.d||'', sourceKind:a.sourceKind||'', sourceId:a.sourceId||'',
+      at:who.at, by:who.by, byName:who.byName};
+    up[NS+'/autolog/'+wk+'/'+src]=rec; put.push([wk,src,rec]);
+  });
+  if(!put.length){ alSel={}; toast('이미 다 정해졌습니다','warn'); alPickModal(); return; }
+  fbDb.ref().update(up).then(function(){
+    put.forEach(function(p){ if(!alBox[p[0]]) alBox[p[0]]={}; alBox[p[0]][p[1]]=p[2]; });
+    alSel={};
+    toast(put.length+'건 업무 아님으로 두었습니다 — 다시 묻지 않습니다');
+    if(alAmbList().length) alPickModal(); else closeM();
+    route();
+  }).catch(function(e){ toast('실패: '+e.message,'err'); });
 }
 function alPick(wk,src,id){
   var al=alBox[wk]||{}, a=al[src];
