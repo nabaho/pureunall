@@ -502,6 +502,9 @@
      열을 둘로 나눠 두면 이 주 기록이 0인 주에 넓은 열 하나가 통째로 빈칸이 된다. */
   .wklog.cur .d{color:var(--acc2);font-weight:700}
   .wklog.old{color:var(--faint)}
+  /* 🔗 자동 줄 — 사람이 쓴 기록보다 한 걸음 물러 보인다 */
+  .wklog.al,.fe.al .tx{color:var(--faint)}
+  .wklog.al .by{color:var(--faint);border:1px solid #e2e8f0}
   .wklog.old .d{color:var(--faint);font-weight:600}
   .wklog.stale{color:var(--warn)}
   .wklog.stale .d{color:var(--warn);font-weight:700}
@@ -1376,6 +1379,8 @@ function start(){
        ⚠ 못 읽어도(콘솔 규칙 없음) 조용히 지나간다 — 고장이 아니다. */
     coLoad().then(mailLoad).then(function(){
       if(mailSrc&&mailSrc.length){ route(); if(S.drawerId) renderDrawer(); }
+      /* 🔗 지난주 메일·일정 → 기록. 업체 이름표·메일이 손에 들어온 «뒤에» 돈다 */
+      setTimeout(function(){ alSoon(0); }, 1500);
     }).catch(function(){});
     /* 진행 메모는 업무 항목 안에 이미 들어 있다(엔진이 내려보낸 pe_notes).
        사람 이름만 있으면 누가 쓴 것인지 적을 수 있다. */
@@ -3857,7 +3862,7 @@ function dCmRowHTML(r,id,up){
     ck:(c?'mailUnsee(\''+escJ(ck)+'\')':''),
     ckTip:(c?'담은 표시를 지웁니다 (기록은 그대로 남습니다)':'이미 지난 일입니다 — 치울 것이 없습니다'),
     take:(c?'<span class="took">✎ 담김</span>'
-           :'<span class="take" onclick="cmTake(\''+escJ(id)+'\',\''+escJ(ck)+'\')" '
+           :alTookHTML(ck,id)||'<span class="take" onclick="cmTake(\''+escJ(id)+'\',\''+escJ(ck)+'\')" '
              +'title="'+esc('그날 기록에 한 줄로 남깁니다: '+cmLogLine(r))+'">✎ 기록에</span>'),
     foot:(c?'✎ 기록에 담김 · '+esc(c.byName||'')+' '+esc(String(c.at||'').slice(5,10))
             +' · 왼쪽 네모를 다시 누르면 되돌립니다(기록은 그대로 남습니다)'
@@ -3982,8 +3987,9 @@ function dMailRowHTML(m,id,up){
     body:String(m.preview||'').slice(0,240),
     ck:(c?'mailUnsee(\''+escJ(k)+'\')':'mailSee(\''+escJ(id)+'\',\''+escJ(k)+'\',0)'),
     ckTip:(c?'확인 표시를 지웁니다 (기록은 그대로 남습니다)':'기록할 것은 없지만 봤다고 표시합니다'),
+    /* 🔗 지난주 모으기가 이미 이 업무 기록에 넣었으면 [✎ 기록에]를 안 낸다 — 누르면 두 줄이 된다 */
     take:(c?'<span class="took">'+(c.log?'✎ 담김':'✓ 확인')+'</span>'
-           :'<span class="take" onclick="mailSee(\''+escJ(id)+'\',\''+escJ(k)+'\',1)" '
+           :alTookHTML(safeKey('a|'+k),id)||'<span class="take" onclick="mailSee(\''+escJ(id)+'\',\''+escJ(k)+'\',1)" '
              +'title="'+esc('주간 기록에 한 줄로 남깁니다: '+mailLogLine(m))+'">✎ 기록에</span>'),
     foot:(c?(c.log?'✎ 기록에 담김':'✓ 확인함')+' · '+esc(c.byName||'')+' '+esc(String(c.at||'').slice(5,10))
             +' · 왼쪽 네모를 다시 누르면 되돌립니다(기록은 그대로 남습니다)'
@@ -4003,7 +4009,8 @@ function dSentRowHTML(r,id,up){
     ck:(c?'mailUnsee(\''+escJ(ck)+'\')':''),
     ckTip:(c?'담은 표시를 지웁니다 (기록은 그대로 남습니다)':'보낸 것은 이미 한 일이라 치울 것이 없습니다'),
     take:(c?'<span class="took">✎ 담김</span>'
-           :'<span class="take" onclick="sentTake(\''+escJ(id)+'\',\''+escJ(ck)+'\')" '
+           :alTookHTML(safeKey('s|'+String(r.batch||r.card||'')+'@'+Number(r.at||0)),id)
+            ||'<span class="take" onclick="sentTake(\''+escJ(id)+'\',\''+escJ(ck)+'\')" '
              +'title="'+esc('주간 기록에 한 줄로 남깁니다: '+sentLogLine(r))+'">✎ 기록에</span>'),
     foot:(c?'✎ 기록에 담김 · '+esc(c.byName||'')+' '+esc(String(c.at||'').slice(5,10))
           :'받는 사람의 메일 주소는 보여 주지 않습니다 — 전 직원이 보는 자리입니다.') });
@@ -4772,17 +4779,442 @@ function paySync(){
     return n;
   }, function(){ _payBusy=false; return 0; });
 }
+/* ══════════════════════════════════════════════════════════════════════
+   🔗 지난주 메일·일정을 업무 기록에 «저절로» (대표 지시 2026-10-03)
+   ══════════════════════════════════════════════════════════════════════
+   "푸른캘린더에서 진행하고 있는 업무와 메일함에서 주고 받던 업무등에 대한 부분 전체를
+    연결해서 주간단위로 자동으로 연결시켜 줄수 있나?"
+   → 「기록에 자동으로 적기(권장)」 → 목업 → 「진행」.
+
+   ★ 무엇을 — 지난주(월~일) 동안의
+       ✉ 받은 메일        paydata/maillog        (이미 업무에 붙는 그 잣대 — mailHit·maillink)
+       ✉📤 사업장별 요약  pucards/coMail/{열쇠}  (푸른메일함이 간추린 받음·보냄)
+       📤 보낸 서류       pucards/sentDocs/{열쇠}
+       📅 일정            data/gcal_archive      (구글 공용 달력 — 푸른캘린더가 그리는 바로 그것)
+                          data/my_schedules      (구글에 못 넣은 우리 표 일정)
+     을 업무마다 모아 «그 날» 칸에 한 줄씩 적는다. 이름표는 「자동」이다.
+   ★ 언제 — 월요일 아침 6시 뒤 «누구든» 업무관리를 처음 열 때. 구글 보관함이 새벽 3시에
+     지난주를 다 베낀 뒤다. 서버 함수도 새 규칙도 없다 — paySync 처럼 화면이 돈다.
+     한 사람이 열면 모두가 본다. 그 뒤로 열 때마다는 «받은 메일»만 다시 본다 —
+     「이어 줄 메일」에서 나중에 이어 준 통이 지난 2주 안이면 그때 들어간다.
+
+   ⚠ 예전에는 메일을 저절로 적지 «않았다»(setStatus 위 주석). 걱정이 둘이었다 —
+     ① 같은 줄이 쌓인다 → 줄 번호를 «원천에서» 만든다(AL_ + 원천 열쇠). 두 사람이 함께
+        열어도 같은 자리에 같은 것을 쓴다. 한 번 본 원천은 autolog 에 남아 다시 안 적는다.
+     ② 안 한 일을 한 것처럼 남는다 → 광고·대량·반송·「업무 아님」은 넣지 않고(mlkWhyOut),
+        줄에 「자동」 이름표를 단다. 사람이 쓴 «마지막 기록»(last)도, 「기록 없음」 셈도 안 바꾼다.
+   ⚠ 받은 메일 목록은 서버가 500통만 남긴다(MAIL_LOG_KEEP). 그래서 «보여 주기»가 아니라
+     «적어 두기»다 — 대표 선택.
+   ⚠★ 어느 업무인지 기계가 확신 못 하면 «붙이지 않는다». 남의 사업장에 붙어도 아무도 모른다.
+     같은 회사 업무가 둘 이상인데 담당자로도 못 가르면, 한 일정에 회사가 둘 걸리면
+     「고를 것」으로 두고 담당자에게 묻는다(alPickModal).
+     일정은 회사 이름이 «통째로» 제목에 있을 때만 잇는다(MLK_MIN_MATCH 자 이상) —
+     「이어 줄 메일」의 조각 맞추기(mlkSuggest)는 사람이 확인하는 제안이라 여기 쓰지 않는다.
+   ⚠ ✕ 로 지운 자동 줄은 autolog 에 「아님」으로 남는다 — 다음에 되살아나지 않는다.
+   ⚠ 근태(연차·출장·이음 근무)와 🔒 나만 보기 일정은 안 본다. 고객 업무가 아니다.
+
+   autolog/{주}/{원천} = {item, lid, d, …}   적었다
+                        {none:1, by, at, …}   사람이 「아님」 — 다시 안 붙인다
+                        {amb:{업무:1…}, d, t}  고를 것 — 사람이 고르면 위 둘 중 하나가 된다
+   autoweek/{주}       = {at, by, n}           그 주를 «통째로» 한 번 돌았다(사업장별 자료·일정까지) */
+var AL_HOUR=6;          // 월요일 이 시각 뒤에 지난주를 본다 — 보관함은 새벽 3시에 돈다
+var AL_WEEKS=2;         // 지난주와 그 앞 주 — 「이어 줄 메일」에서 늦게 이어 준 통을 받는 너비
+var AL_AMB_MAX=8;       // 고를 것에 올리는 업무 수의 끝 — 그보다 많으면 고르는 일이 아니다
+var alBox={};           // {주: autolog/{주}} — 고를 것·자동 담김 표시가 여기서 읽는다
+var _alBusy=false;
+
+/* 돌아볼 주들의 월요일 — [지난주, 그 앞 주]. 월요일 새벽(6시 전)이면 한 주 더 앞에서 센다 */
+function alWeeks(now){
+  now=now||new Date();
+  var mon=mondayOf(now);
+  if(now.getTime()<mon.getTime()+AL_HOUR*3600e3) mon=addDays(mon,-7);
+  var out=[];
+  for(var i=1;i<=AL_WEEKS;i++) out.push(addDays(mon,-7*i));
+  return out;
+}
+function alIn(d,mon){
+  d=String(d||'').slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) && d>=ymd(mon) && d<=ymd(addDays(mon,6));
+}
+/* 그 주에 살아 있던 업무 — 진행 중이거나, 그 주 이후에 끝낸 것.
+   ⚠ 지난주 수요일에 끝낸 업무도 월·화 메일은 그 업무 것이다. */
+function alItems(mon){
+  var from=ymd(mon);
+  return allItems().filter(function(it){
+    return it.state!=='done'||String(it.done_date||'')>=from;
+  });
+}
+/* 받은 메일이 이 업무에 «확실히» 붙는가 — mailHit 에서 «짧은 이름 제목 짐작»만 뺀다.
+   ⚠ 두 글자 이름(「가나」)은 아무 제목에나 걸린다. 화면 서랍에서는 보여 주고 사람이
+     거르지만, 저절로 적을 때는 그 판단을 해 줄 사람이 없다.
+   ⚠ 회사 이름표(companyName)가 «통째로» 같은 것은 짐작이 아니라 살린다. */
+function alMailSure(k,m){
+  if(!mailHit(k,m)) return false;
+  if(k.name&&k.name.length>=MLK_MIN_MATCH) return true;
+  if(k.name&&m.companyName&&_normCo(String(m.companyName))===k.name) return true;
+  return mailHit({coid:k.coid,name:'',mails:k.mails,doms:k.doms},m);
+}
+/* 후보가 여럿이면 담당자로 가른다 — 사번이 맞는 것 하나, 아니면 글에 이름이 나오는 것 하나.
+   ⚠ 하나로 안 좁혀지면 그대로 돌려준다(→ 고를 것). 아무거나 고르지 않는다. */
+function alNarrow(ids,sid,text){
+  if(ids.length<2) return ids;
+  if(sid){
+    var bySid=ids.filter(function(id){ return items[id]&&isOf(items[id],{sid:sid}); });
+    if(bySid.length===1) return bySid;
+  }
+  var t=String(text||'');
+  var byName=ids.filter(function(id){
+    var it=items[id]; if(!it) return false;
+    return [(it.mgr_main||{}).name].concat(mgrSubNames(it))
+      .some(function(n){ return n&&String(n).length>=2&&t.indexOf(n)>=0; });
+  });
+  return byName.length===1?byName:ids;
+}
+/* 같은 회사 업무가 여럿일 때 «제목의 낱말»로 업무 갈래를 가른다 — 실측(2026-10-03 미리 셈)에서
+   고를 것 마흔여섯 가운데 대부분이 「한 회사에 급여·컨설팅 업무가 함께 있다」였다.
+   ⚠ 받은 메일 수집함은 급여 전용이 «아니다» — 컨설팅 협약·괴롭힘 조사·구제신청 메일도 온다.
+     그래서 「급여 업무로 몬다」가 아니라 «제목이 말하는 갈래» 하나만 남을 때만 고른다.
+   ⚠ 낱말은 여기 한 곳에만 둔다. 갈래가 하나로 안 좁혀지면(둘 다 걸리거나 아무것도 안 걸리면)
+     그대로 돌려준다(→ 고를 것). */
+var AL_CAT_WORDS=[
+  ['급여', /급여|근태|출근|출퇴근|근무상황|일용|4대\s*보험|사대보험|취득|상실|원천징수|명세서|퇴직금|퇴사자|입사자|연말정산|스케줄/],
+  ['컨설팅', /컨설팅|지원단|일터혁신|혁신지원|보고서|협약|중진공|노사발전|상생/],
+  ['사건', /구제신청|부당|괴롭힘|진정|사건|고충/]
+];
+/* 보낸 주소 하나가 두 회사에 걸려 있을 때(같은 사무장·세무사무소) — 제목이 «한 회사만» 부르면 그 회사.
+   실측: 「대성피앤티도장_자문계약서 송부의 건」이 대성피앤티·제일산업 둘에 걸렸다.
+   ⚠ 회사 이름은 «통째로»(MLK_MIN_MATCH 자 이상) 나와야 한다. 둘 다 나오면(「정일제지,신화제지」) 그대로 둔다. */
+function alCoNarrow(ids,text){
+  if(ids.length<2) return ids;
+  var hay=_normCo(text), cos={};
+  ids.forEach(function(id){
+    var n=_normCo((items[id]||{}).company||'');
+    if(n.length>=MLK_MIN_MATCH&&hay.indexOf(n)>=0) (cos[n]=cos[n]||[]).push(id);
+  });
+  var ns=Object.keys(cos);
+  return ns.length===1?cos[ns[0]]:ids;
+}
+function alCatNarrow(ids,text){
+  if(ids.length<2) return ids;
+  var t=String(text||''), hit=AL_CAT_WORDS.filter(function(w){ return w[1].test(t); });
+  if(hit.length!==1) return ids;
+  var cat=hit[0][0];
+  var same=ids.filter(function(id){
+    var it=items[id]; if(!it) return false;
+    return it.cat===cat||(cat==='급여'&&!!it.pay_site);
+  });
+  return same.length===1?same:ids;
+}
+
+/* ── 원천 줄 하나 = {src, ck:[담기 표시 열쇠], kind, sk, sid, d, t, cand:[업무]} ── */
+function alMailRows(mon){
+  var out=[]; if(!mailSrc) return out;
+  var its=alItems(mon), keys=its.map(function(it){ return mailKeysOf(it); });
+  mailSrc.forEach(function(m){
+    var d=cmDay(m.at); if(!alIn(d,mon)) return;
+    var k=mailKey(m); if(!k) return;
+    var L=maillink&&maillink[k], cand=[];
+    if(L&&L.none) return;
+    /* ★ 사람이 이은 것이 먼저다 — 광고 표가 붙었어도 사람이 이었으면 그 업무 것이다 */
+    if(L&&L.item){ if(items[L.item]) cand=[String(L.item)]; }
+    else{
+      if(mlkWhyOut(m)) return;
+      its.forEach(function(it,i){ if(alMailSure(keys[i],m)) cand.push(it._id); });
+      cand=alCatNarrow(alCoNarrow(cand,String(m.subject||'')),String(m.subject||''));
+    }
+    if(!cand.length) return;
+    out.push({src:safeKey('a|'+k), ck:[k], kind:'mail', sk:'mail', sid:k, d:d, t:mailLogLine(m), cand:cand});
+  });
+  return out;
+}
+/* 사업장 열쇠 → 그 사업장의 업무들. 열쇠가 둘(사업자번호·이름)이면 둘 다 같은 업무를 가리킨다 */
+function alGroups(mon){
+  var g={};
+  alItems(mon).forEach(function(it){
+    coKeysOf(it).forEach(function(k){
+      if(!k) return;
+      var a=g[k]||(g[k]=[]);
+      if(a.indexOf(it._id)<0) a.push(it._id);
+    });
+  });
+  return g;
+}
+function alAddCand(o,ids){ ids.forEach(function(id){ if(o.cand.indexOf(id)<0) o.cand.push(id); }); }
+function alCoRows(mon,groups){
+  var by={}, known={};
+  /* 받은 메일 수집함에 있는 통은 그쪽(a|)이 맡는다 — 같은 메일이 두 줄로 들어가면 안 된다
+     (cmDedup 과 같은 잣대: 날짜 + 받음 + 한 줄) */
+  (mailSrc||[]).forEach(function(m){ known[cmMatchKey(cmDay(m.at),'in',mailBrief(m))]=1; });
+  Object.keys(groups).forEach(function(k){
+    ((cmSrc[k]&&cmSrc[k].rows)||[]).forEach(function(r){
+      if(!r||!Number(r.at)) return;
+      var d=String(r.d||cmDay(r.at)).slice(0,10); if(!alIn(d,mon)) return;
+      if(r.g) return;                 // 회사 이름으로 «짐작해» 이은 줄 — 확실하지 않다
+      if(r.io!=='out'&&known[cmMatchKey(r.d,'in',r.s)]) return;
+      var src=cmKey(r);
+      var o=by[src]||(by[src]={src:src, ck:[src], kind:'mail', sk:'coMail',
+        sid:String(r.io||'in')+'|'+Number(r.at), d:d, t:cmLogLine(r), cand:[]});
+      alAddCand(o,groups[k]);
+    });
+  });
+  return Object.keys(by).map(function(s){ var o=by[s]; o.cand=alCatNarrow(o.cand,o.t); return o; });
+}
+function alSentRows(mon,groups){
+  var by={};
+  Object.keys(groups).forEach(function(k){
+    (sentSrc[k]||[]).forEach(function(r){
+      var d=cmDay(r.at); if(!alIn(d,mon)) return;
+      /* 두 열쇠에 같은 것이 있다 — sentFor 와 같이 «묶음·명함 + 시각»으로 하나로 센다 */
+      var raw=String(r.batch||r.card||'')+'@'+Number(r.at||0), src=safeKey('s|'+raw);
+      var o=by[src]||(by[src]={src:src, ck:[], kind:'mail', sk:'sentDoc', sid:raw, d:d, t:sentLogLine(r), cand:[]});
+      var c=sentKey(r); if(o.ck.indexOf(c)<0) o.ck.push(c);
+      alAddCand(o,groups[k]);
+    });
+  });
+  return Object.keys(by).map(function(s){ var o=by[s]; o.cand=alCatNarrow(o.cand,o.t); return o; });
+}
+/* 일정 제목에 «통째로» 나오는 회사의 업무들.
+   ⚠ 긴 이름 속의 짧은 이름은 버린다 — 「가나정밀공업 미팅」은 「가나정밀」 것이 아니다. */
+function alCoHits(text,its,names){
+  var hay=_normCo(text), hit={};
+  if(!hay) return [];
+  its.forEach(function(it,i){
+    var n=names[i];
+    if(n.length>=MLK_MIN_MATCH&&hay.indexOf(n)>=0) (hit[n]=hit[n]||[]).push(it._id);
+  });
+  var ns=Object.keys(hit);
+  ns=ns.filter(function(n){ return !ns.some(function(o){ return o!==n&&o.indexOf(n)>=0; }); });
+  var out=[];
+  ns.forEach(function(n){ hit[n].forEach(function(id){ if(out.indexOf(id)<0) out.push(id); }); });
+  return out;
+}
+/* ⚠ 제목에 시각을 이미 적어 둔 일정(「1500 일터 중간보고」)에는 시각을 또 붙이지 않는다.
+     실측(2026-10-03): 그런 일정의 구글 시각이 제목과 달랐다(「02:30 1500 …」) — 사람들은
+     제목의 시각을 본다. 두 시각을 나란히 적으면 어느 것이 맞는지 모른다. */
+function alCalLine(hm,s){
+  hm=String(hm||'').slice(0,5);
+  s=String(s||'');
+  if(/^\s*\d{3,4}(?!\d)|\d{1,2}:\d{2}|\d{1,2}시/.test(s)) hm='';
+  return '📅 '+(hm&&hm!=='00:00'?hm+' ':'')+(s.length>60?s.slice(0,60)+'…':s);
+}
+/* ⚠ 장소(주소)로는 안 잇는다 — 건물 이름이 남의 회사 이름일 수 있다. 제목만 본다. */
+function alCalRows(mon,evs,schs){
+  var its=alItems(mon), names=its.map(function(it){ return _normCo(it.company||''); }), out=[];
+  (evs||[]).forEach(function(r){
+    if(!r||r.googleDeleted||!alIn(r.date,mon)) return;     // 구글에서 지운 일정 — 안 한 일이다
+    var s=String(r.summary||'').trim(); if(!s) return;
+    var cand=alCoHits(s,its,names); if(!cand.length) return;
+    /* 푸른캘린더가 넣은 미팅은 설명에 「푸른 담당: 이름」이 있다 */
+    cand=alCatNarrow(alNarrow(cand,'',s+'\n'+String(r.description||'')),s);
+    out.push({src:safeKey('g|'+r.id), ck:[], kind:'cal', sk:'gcal', sid:String(r.id), d:String(r.date),
+      t:alCalLine(r.allDay?'':r.time,s), cand:cand});
+  });
+  (schs||[]).forEach(function(x){
+    if(!x||x._deleted||!x.id||!alIn(x.date,mon)) return;
+    var s=String(x.title||'').trim(); if(!s) return;
+    var cand=alCoHits(s,its,names); if(!cand.length) return;
+    cand=alCatNarrow(alNarrow(cand,String(x.sid||''),s+'\n'+String(x.note||'')),s);
+    out.push({src:safeKey('c|'+x.id), ck:[], kind:'cal', sk:'schedule', sid:String(x.id), d:String(x.date),
+      t:alCalLine(x.time,s), cand:cand});
+  });
+  return out;
+}
+
+/* ── 적기 ── */
+function alLogOf(r,wk,now){
+  return {d:r.d, t:r.t, by:'auto', byName:'자동', at:now, k:r.kind, auto:1,
+    src:r.src, aw:wk, sourceKind:r.sk||'', sourceId:String(r.sid||'')};
+}
+function alCachePut(wk,id,lid,log){
+  if(wkCache[wk]){ if(!wkCache[wk][id]) wkCache[wk][id]={}; wkCache[wk][id][lid]=log; }
+  if(itemLogsCache[id]) itemLogsCache[id][lid]=Object.assign({w:wk},log);
+}
+function alWrite(wk,rows,al){
+  var y=weekYear(wk), now=new Date().toISOString(), up={}, put={}, logs=[], n=0;
+  rows.forEach(function(r){
+    var src=r.src, was=al[src]||put[src];
+    /* 이미 본 원천 — 다만 「고를 것」이었는데 이제 하나로 정해졌으면(사람이 메일을 이었다) 적는다 */
+    if(was&&!(was.amb&&r.cand.length===1)) return;
+    /* 사람이 이미 [✎ 기록에]로 담았다 — 같은 줄을 또 넣지 않는다 */
+    if((r.ck||[]).some(function(c){ var x=mailchk&&mailchk[c]; return x&&x.log; })) return;
+    if(r.cand.length===1){
+      var id=r.cand[0], lid='AL_'+src, log=alLogOf(r,wk,now);
+      up[NS+'/logs/'+y+'/'+wk+'/'+id+'/'+lid]=log;
+      up[NS+'/itemlogs/'+id+'/'+lid]=Object.assign({w:wk},log);
+      put[src]={item:id, lid:lid, d:r.d, sourceKind:r.sk||'', sourceId:String(r.sid||''), at:now};
+      logs.push([id,lid,log]); n++;
+    }else if(!was){
+      var c={}; r.cand.slice(0,AL_AMB_MAX).forEach(function(i){ c[i]=1; });
+      put[src]={amb:c, d:r.d, t:r.t, k:r.kind, sourceKind:r.sk||'', sourceId:String(r.sid||''), at:now};
+    }
+  });
+  Object.keys(put).forEach(function(s){ up[NS+'/autolog/'+wk+'/'+s]=put[s]; });
+  if(!Object.keys(up).length) return Promise.resolve(0);
+  return fbDb.ref().update(up).then(function(){
+    Object.keys(put).forEach(function(s){ al[s]=put[s]; });
+    alBox[wk]=al;
+    logs.forEach(function(x){ alCachePut(wk,x[0],x[1],x[2]); });
+    return n;
+  });
+}
+/* 사업장별 자료는 사업장마다 한 칸씩 읽는다 — 한꺼번에 수백 개를 쏘지 않게 마흔씩 */
+function alChunks(keys,fn){
+  var p=Promise.resolve();
+  for(var i=0;i<keys.length;i+=40){
+    (function(part){ p=p.then(function(){ return fn(part); }); })(keys.slice(i,i+40));
+  }
+  return p;
+}
+/* 그 주의 구글 일정 — 보관함에서 «그 주만» 받는다(date 색인). 통째(약 7MB)로 안 받는다.
+   ⚠ 못 읽으면 실패로 돌려준다 — 그래야 「통째로 돌았다」 표를 안 남기고 다음에 다시 돈다. */
+function alEvents(mon){
+  return fbDb.ref('data/gcal_archive').orderByChild('date')
+    .startAt(ymd(mon)).endAt(ymd(addDays(mon,6))).once('value')
+    .then(function(s){ var v=s.val()||{}; return Object.keys(v).map(function(k){ return v[k]; }); });
+}
+function alFull(mon){
+  var groups=alGroups(mon), keys=Object.keys(groups);
+  return Promise.all([
+    alChunks(keys,function(ks){ return Promise.all([cmLoad(ks),sentLoad(ks)]); }),
+    alEvents(mon),
+    calLoadSrc().catch(function(){ return null; })
+  ]).then(function(r){
+    return alCoRows(mon,groups).concat(alSentRows(mon,groups), alCalRows(mon,r[1],calSrc.sch||[]));
+  });
+}
+function alWeekOnce(mon){
+  var wk=weekKeyOf(mon);
+  return Promise.all([
+    fbDb.ref(NS+'/autolog/'+wk).once('value').then(function(s){ return s.val()||{}; }),
+    fbDb.ref(NS+'/autoweek/'+wk).once('value').then(function(s){ return s.val(); })
+  ]).then(function(r){
+    var al=r[0], done=r[1];
+    alBox[wk]=al;
+    var rows=alMailRows(mon);
+    if(done) return alWrite(wk,rows,al);      // 통째로는 이미 돌았다 — 늦게 이어 준 메일만
+    return alFull(mon).then(function(more){
+      return alWrite(wk,rows.concat(more),al).then(function(n){
+        /* 그 주 «한 칸»만 적는다 — 읽은 것을 고쳐 되쓰는 것이 아니다(둘이 함께 적어도 같은 표) */
+        var who=_mlkWho(), up={};
+        up[NS+'/autoweek/'+wk]={at:who.at, by:who.by, byName:who.byName, n:n};
+        return fbDb.ref().update(up).then(function(){ return n; });
+      });
+    });
+  });
+}
+/* 한 바퀴 — 조용히 돈다(토스트를 띄우지 않는다). 업무·메일이 아직 안 왔으면 조금 뒤 다시 */
+function alRun(){
+  if(_alBusy||typeof fbDb==='undefined'||!fbDb) return Promise.resolve(0);
+  _alBusy=true;
+  var total=0;
+  return alWeeks().reduce(function(p,mon){
+    return p.then(function(){ return alWeekOnce(mon).then(function(n){ total+=n; }); });
+  },Promise.resolve()).then(function(){
+    _alBusy=false;
+    if(total) route();
+    return total;
+  },function(e){
+    _alBusy=false;
+    console.warn('[자동 연결] 이번에는 건너뜀 —',(e&&e.message)||e);
+    return 0;
+  });
+}
+function alSoon(tries){
+  tries=tries||0;
+  /* 업무 목록·메일 수집함·담기 표시가 다 와야 «이미 담은 것»을 안다 */
+  if(!Object.keys(items||{}).length||!mailSrc||!mailchk){
+    if(tries<10) setTimeout(function(){ alSoon(tries+1); },3000);
+    return;
+  }
+  alRun();
+}
+
+/* ── 화면: 자동 담김 표시 · 고를 것 ── */
+function alTook(src){
+  var hit=null;
+  Object.keys(alBox).forEach(function(wk){ var a=(alBox[wk]||{})[src]; if(a&&a.item&&!hit) hit=a; });
+  return hit;
+}
+function alTookHTML(src,id){
+  var a=alTook(src);
+  if(!a||String(a.item)!==String(id||'')) return '';
+  return '<span class="took" title="지난주 메일·일정을 모으면서 이 업무 기록에 저절로 넣었습니다">✎ 자동 담김</span>';
+}
+function alAmbList(){
+  var out=[];
+  Object.keys(alBox).forEach(function(wk){
+    var al=alBox[wk]||{};
+    Object.keys(al).forEach(function(src){
+      var a=al[src]; if(!a||!a.amb) return;
+      var ids=Object.keys(a.amb).filter(function(id){ return items[id]; });
+      if(!ids.length) return;
+      if(!ids.some(function(id){ return isMine(items[id]); })) return;   // 내 업무가 걸린 것만
+      out.push({wk:wk, src:src, a:a, ids:ids});
+    });
+  });
+  return out.sort(function(x,y){ return String(y.a.d||'').localeCompare(String(x.a.d||'')); });
+}
+function alItemName(it){
+  return String(it.company||'')+' · '+String(it.title||it.cat||'')
+    +((it.mgr_main&&it.mgr_main.name)?' · '+it.mgr_main.name:'');
+}
+function alPickModal(){
+  var L=alAmbList();
+  if(!L.length){ closeM(); toast('고를 것이 없습니다'); return; }
+  showModal('<h2 style="margin:0 0 6px">🔗 어느 업무인지 골라 주세요'+hlp('al')+'</h2>'
+    +'<p class="muted" style="font-size:12px;margin:0 0 10px">지난주 메일·일정 가운데 기계가 확신하지 못해 기록에 넣지 않은 것입니다.</p>'
+    +L.map(function(x){
+      var w=escJ(x.wk), s=escJ(x.src);
+      return '<div style="border-top:1px solid var(--line);padding:8px 0">'
+        +'<div style="font-size:12.5px;margin-bottom:5px"><span class="muted">'+esc(md(x.a.d||''))+'</span> '+esc(x.a.t||'')+'</div>'
+        +'<div class="row" style="flex-wrap:wrap;gap:5px">'
+        +x.ids.map(function(id){
+          return '<button style="font-size:11.5px" onclick="alPick(\''+w+'\',\''+s+'\',\''+escJ(id)+'\')">'+esc(alItemName(items[id]))+'</button>';
+        }).join('')
+        +'<button style="font-size:11.5px;color:var(--sub)" onclick="alPick(\''+w+'\',\''+s+'\',\'\')">업무 아님</button>'
+        +'</div></div>';
+    }).join('')
+    +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');
+}
+function alPick(wk,src,id){
+  var al=alBox[wk]||{}, a=al[src];
+  if(!a||!a.amb){ toast('이미 정해졌습니다','warn'); alPickModal(); return; }
+  if(id&&!a.amb[id]) return;
+  var who=_mlkWho(), up={}, rec, log=null, lid='AL_'+src;
+  var base={d:a.d||'', sourceKind:a.sourceKind||'', sourceId:a.sourceId||'',
+    at:who.at, by:who.by, byName:who.byName};
+  if(!id) rec=Object.assign({none:1},base);
+  else{
+    rec=Object.assign({item:id, lid:lid},base);
+    log={d:a.d||'', t:a.t||'', by:'auto', byName:'자동', at:who.at, k:a.k||'mail', auto:1,
+      src:src, aw:wk, sourceKind:a.sourceKind||'', sourceId:a.sourceId||'', pick_by:who.byName};
+    up[NS+'/logs/'+weekYear(wk)+'/'+wk+'/'+id+'/'+lid]=log;
+    up[NS+'/itemlogs/'+id+'/'+lid]=Object.assign({w:wk},log);
+  }
+  up[NS+'/autolog/'+wk+'/'+src]=rec;
+  fbDb.ref().update(up).then(function(){
+    al[src]=rec; alBox[wk]=al;
+    if(log) alCachePut(wk,id,lid,log);
+    toast(id?'기록에 넣었습니다':'업무 아님으로 두었습니다 — 다시 묻지 않습니다');
+    if(alAmbList().length) alPickModal(); else closeM();
+    route();
+  }).catch(function(e){ toast('실패: '+e.message,'err'); });
+}
 // 기록을 고치거나 지울 수 있는 사람 — 쓴 본인과 대표
-function canLog(l){
+// ⚠ 자동 줄(🔗 alWrite)은 쓴 사람이 없다 — 그 업무 담당자와 대표가 고치고 지운다.
+//   잘못 붙은 줄을 떼는 것이 담당자 몫이라, 본인 것만 지우게 두면 아무도 못 뗀다.
+function canLog(l,itemId){
   if(!l) return false;
+  if(l.auto) return isAdmin()||!!(itemId&&items[itemId]&&isMine(items[itemId]));
   return isAdmin()||l.by===(S.me&&S.me.sid)||l.byName===(S.me&&S.me.name);
 }
 // 기록 줄에 붙는 ✎ ✕ (표의 주간 칸·드로어 공통)
 function logBtns(itemId,l){
-  if(!canLog(l)) return '';
+  if(!canLog(l,itemId)) return '';
   var a=escJ(itemId), b=escJ(l._id||'');
   // 체크가 만든 기록은 체크를 풀면 되므로 여기서 또 옮길 필요가 없다
-  return (l.k!=='step'?'<span class="lgx" onclick="event.stopPropagation();logToPlan(\''+a+'\',\''+b+'\')" '
+  // 자동 줄은 이미 일어난 메일·일정이라 「할 일로 옮기기」가 뜻이 없다
+  return (l.k!=='step'&&!l.auto?'<span class="lgx" onclick="event.stopPropagation();logToPlan(\''+a+'\',\''+b+'\')" '
       +'title="아직 안 한 일이었다면 — 할 일로 옮깁니다">↑</span>':'')
     +'<span class="lgx" onclick="event.stopPropagation();editLog(\''+a+'\',\''+b+'\')" title="이 기록 고치기">✎</span>'
     +'<span class="lgx dl" onclick="event.stopPropagation();delLog(\''+a+'\',\''+b+'\')" title="이 기록 지우기">✕</span>';
@@ -4794,7 +5226,7 @@ function editLog(itemId,lid){
   loadItemLogs(itemId).then(function(){
     var l=(itemLogsCache[itemId]||{})[lid];
     if(!l){ toast('기록을 찾을 수 없습니다','warn'); return; }
-    if(!canLog(l)){ toast('본인이 쓴 기록만 고칠 수 있습니다','warn'); return; }
+    if(!canLog(l,itemId)){ toast('본인이 쓴 기록만 고칠 수 있습니다','warn'); return; }
     showModal('<h2 style="margin:0 0 6px">✎ 기록 고치기</h2>'
       +'<p class="muted" style="font-size:12px;margin:0 0 11px">'
       +esc((items[itemId]&&(items[itemId].company||items[itemId].title))||'')
@@ -4825,6 +5257,8 @@ function saveLogEdit(itemId,lid){
   var base={d:d,t:t,by:l.by||'',byName:l.byName||'',at:l.at||new Date().toISOString(),
     ed_at:new Date().toISOString(),ed_by:(S.me&&S.me.name)||''};
   if(l.k) base.k=l.k;
+  /* 자동 줄은 고쳐도 자동 줄이다 — 원천 열쇠를 잃으면 지울 때 「아님」을 못 남겨 다음 주에 되살아난다 */
+  ['auto','src','aw','sourceKind','sourceId','pick_by'].forEach(function(f){ if(l[f]!=null) base[f]=l[f]; });
   var up={};
   up[NS+'/itemlogs/'+itemId+'/'+lid]=Object.assign({w:newWk},base);
   if(oldWk&&oldWk!==newWk) up[NS+'/logs/'+weekYear(oldWk)+'/'+oldWk+'/'+itemId+'/'+lid]=null;
@@ -4857,11 +5291,20 @@ function delLog(itemId,lid){
 }
 function _delLog(itemId,lid){
   var l=(itemLogsCache[itemId]||{})[lid]; var wk=l&&l.w;
-  if(l&&!canLog(l)){ toast('본인이 쓴 기록만 지울 수 있습니다','warn'); return; }
+  if(l&&!canLog(l,itemId)){ toast('본인이 쓴 기록만 지울 수 있습니다','warn'); return; }
   var up={};
   up[NS+'/itemlogs/'+itemId+'/'+lid]=null;
   if(wk) up[NS+'/logs/'+weekYear(wk)+'/'+wk+'/'+itemId+'/'+lid]=null;
+  /* 자동 줄을 지우면 「이 업무 것 아님」으로 남긴다 — 안 남기면 다음에 돌 때 되살아난다 */
+  var aw=l&&l.auto&&l.src&&(l.aw||wk), anone=null;
+  if(aw){
+    var who=_mlkWho();
+    anone={none:1, d:l.d||'', item:String(itemId), sourceKind:l.sourceKind||'', sourceId:l.sourceId||'',
+      at:who.at, by:who.by, byName:who.byName};
+    up[NS+'/autolog/'+aw+'/'+l.src]=anone;
+  }
   fbDb.ref().update(up).then(function(){
+    if(anone){ if(!alBox[aw]) alBox[aw]={}; alBox[aw][l.src]=anone; }
     if(itemLogsCache[itemId]) delete itemLogsCache[itemId][lid];
     if(wk&&wkCache[wk]&&wkCache[wk][itemId]) delete wkCache[wk][itemId][lid];
     return refreshLast(itemId);
@@ -4884,7 +5327,8 @@ function patchItem(id,obj){
 function focusCounts(){
   var v=viewer(), mine=viewOpen(), wk=weekKeyOf(S.week), today=todayStr();
   var due=mine.filter(function(it){var n=dday(itemDue(it));return n!==null&&n<=7;});
-  var nolog=mine.filter(function(it){return countsLog(it)&&wkLogsOf(it._id,wk).length===0;});
+  /* 자동 줄(🔗)은 세지 않는다 — 「기록 없음」은 «사람이» 아무것도 안 적었다는 뜻이다 */
+  var nolog=mine.filter(function(it){return countsLog(it)&&!wkLogsOf(it._id,wk).some(function(l){ return !l.auto; });});
   var next=mine.filter(function(it){return it.next&&it.next.date&&it.next.date<=today;});
   var done=allItems().filter(function(it){return it.state==='done'&&isOf(it,v)&&it.done_date&&inWeek(it.done_date,S.week);});
   return {due:due,nolog:nolog,next:next,done:done};
@@ -5107,6 +5551,12 @@ function renderMy(){
     t:'업무 칸이 비어 <b>무슨 일인지 알 수 없는</b> 업무 <b>'+nb+'건</b>',
     s:'푸른이알피에 유형·업무명·업무 요약이 모두 비어 있어서입니다.',
     a:[['한 번에 적기 →','briefFillModal()']]});
+  /* 🔗 지난주 메일·일정 가운데 어느 업무인지 기계가 못 정한 것 — 내 업무가 걸린 것만 */
+  var nal=self?alAmbList().length:0;
+  if(nal) todos.push({ic:'🔗',
+    t:'지난주 메일·일정 중 <b>어느 업무인지 고를 것 '+nal+'건</b>',
+    s:'기계가 확신하지 못해 기록에 넣지 않았습니다.',
+    a:[['고르기 →','alPickModal()']]});
   // 푸른이알피에 주담당인데 아직 업무시트에 없는 건 → 1차 연결 안내 (기준일 이전 백로그)
   var unl=peMineUnlinked();
   if(unl&&unl.length){
@@ -5527,7 +5977,7 @@ function rowHTML(it,no,rowIdx){
   var logs=wkLogsOf(it._id);
   // 공동 작업이 보이도록, 내가 아닌 사람이 쓴 기록에는 작성자를 붙인다
   var logHtml=logs.map(function(l){
-    return '<div class="wklog"><span class="d">'+esc(md(l.d))+'</span>'+esc(l.t)
+    return '<div class="wklog'+(l.auto?' al':'')+'"><span class="d">'+esc(md(l.d))+'</span>'+esc(l.t)
       +(l.byName&&l.byName!==(S.me&&S.me.name)?' <span class="by">'+esc(l.byName)+'</span>':'')
       +(l.ed_at?' <span class="ed" title="'+esc((l.ed_by||'')+' '+String(l.ed_at).slice(0,10)+' 수정')+'">(수정)</span>':'')
       +(l.k==='ho'?' 🔄':'')+logBtns(it._id,l)+'</div>'; }).join('');
@@ -5680,7 +6130,7 @@ function wkCellHTML(it,logs,rowIdx){
         return '<div class="wkc'+(d===today?' td':'')+(d===S.calDay?' pick':'')+'">'+mk
           +ps.map(function(s){ return planRowHTML(it,s); }).join('')
           +ls.map(function(l){
-              return '<div class="wklog">'+esc(l.t)
+              return '<div class="wklog'+(l.auto?' al':'')+'">'+esc(l.t)
                 +(l.byName&&l.byName!==(S.me&&S.me.name)?' <span class="by">'+esc(l.byName)+'</span>':'')
                 +(l.ed_at?' <span class="ed" title="'+esc((l.ed_by||'')+' '+String(l.ed_at).slice(0,10)+' 수정')+'">(수정)</span>':'')
                 +(l.k==='ho'?' 🔄':'')+logBtns(it._id,l)+'</div>';
@@ -6068,9 +6518,10 @@ function dLogBoxHTML(id,logs){
       if(l.w!==lastWk){ lastWk=l.w;
         var mo=mondayOfKey(l.w); var lab=(l.w===curWk)?'이번 주 · '+weekLabel(mo).split('· ')[1]:weekLabel(mo);
         h+='<div class="wksep">'+esc(lab)+'</div>'; }
-      var late=l.at&&l.d&&l.at.slice(0,10)>l.d?' <span class="by">(보완 '+esc(md(l.at.slice(0,10)))+' 입력)</span>':'';
-      var canDel=canLog(l);
-      h+='<div class="fe'+(l.k==='ho'?' hov':'')+'"><span class="dt">'+esc(md(l.d))+'</span>'
+      /* 자동 줄은 늘 «뒤에» 적힌다(다음 주 월요일) — 「보완 입력」이라 하면 거짓이다 */
+      var late=!l.auto&&l.at&&l.d&&l.at.slice(0,10)>l.d?' <span class="by">(보완 '+esc(md(l.at.slice(0,10)))+' 입력)</span>':'';
+      var canDel=canLog(l,id);
+      h+='<div class="fe'+(l.k==='ho'?' hov':'')+(l.auto?' al':'')+'"><span class="dt">'+esc(md(l.d))+'</span>'
         +'<span class="tx">'+(l.k==='ho'?'🔄 ':'')+esc(l.t)
         +(l.byName&&l.byName!==(S.me&&S.me.name)?'<span class="by">'+esc(l.byName)+'</span>':'')+late
         +(l.ed_at?'<span class="by" title="'+esc((l.ed_by||'')+' '+String(l.ed_at).slice(0,10)+' 수정')+'">(수정)</span>':'')
@@ -8370,6 +8821,12 @@ function tplModal(id){
    않는 글이 화면의 절반을 먹었다. 제목 옆 ⓘ에 넣고 누를 때만 보여준다.
    (오류·주의는 예외 — 그건 눈에 띄어야 하므로 화면에 그대로 둔다) */
 var HELP={
+  al:'매주 월요일 아침, 지난주에 오간 <b>메일·보낸 서류</b>와 <b>푸른캘린더 일정</b>을 업무마다 모아 '
+    +'그 날 기록에 한 줄씩 넣습니다. 이름표는 <b>자동</b>입니다.<br><br>'
+    +'어느 업무인지 <b>확실할 때만</b> 넣습니다 — 같은 회사 업무가 여럿이거나 일정 제목에 회사가 둘 나오면 '
+    +'여기서 담당자에게 묻습니다.<br>'
+    +'일정은 <b>제목에 회사 이름이 통째로</b> 있을 때만 잇습니다. 연차·출장·이음 근무와 🔒 나만 보기 일정은 넣지 않습니다.<br><br>'
+    +'잘못 들어간 줄은 ✕ 로 지우세요 — <b>다시 들어오지 않습니다.</b> 「업무 아님」도 같습니다.',
   pd:'사업장이 보내와 <b>급여데이터함</b>에 담긴 자료입니다 — 이번 달과 앞의 두 달을 보여 줍니다.<br>'
     +'「이 사업장 이번 달 자료 아직 안 왔나?」를 여기서 바로 알 수 있습니다.<br><br>'
     +'<b>보기만 합니다.</b> 자료를 열거나 내려받는 것은 급여데이터함에서 하세요. '

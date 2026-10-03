@@ -692,10 +692,12 @@ setTimeout(function () {
    할 일 알림(노트·빈 칸·미연결)은 한 번 처리하면 끝나는 것이라 칩으로 접었고,
    상태 알림(지난 주 열람·걸러 보기)은 「왜 목록이 이렇게 보이는가」라 줄로 남겼다. */
 const RM = grab('renderMy');
-ok('할 일 알림 셋은 줄로 그리지 않는다 (칩으로 모은다)', (function () {
-  // 셋 다 todos.push 로 모여야 한다 — 하나라도 h+= 로 남으면 그 줄이 화면을 민다
+/* 2026-10-03 — 넷째가 들어왔다: 🔗 지난주 메일·일정 가운데 «어느 업무인지 고를 것».
+   이것도 한 번 고르면 끝나는 일이라 같은 칩으로 모은다(줄로 깔지 않는다). */
+ok('할 일 알림 넷은 줄로 그리지 않는다 (칩으로 모은다)', (function () {
+  // 넷 다 todos.push 로 모여야 한다 — 하나라도 h+= 로 남으면 그 줄이 화면을 민다
   const n = (RM.match(/todos\.push\(/g) || []).length;
-  return n === 3 && RM.indexOf('warnChip(todos)') > 0;
+  return n === 4 && RM.indexOf('warnChip(todos)') > 0;
 })());
 ok('상태 알림은 줄로 남는다 (안 보이면 왜 이렇게 보이는지 모른다)',
   /if\(!isCurWeek\(\)\)\{\s*\n?\s*h\+='<div class="histbanner">/.test(RM)

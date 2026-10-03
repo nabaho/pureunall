@@ -276,7 +276,9 @@ ok('내가 쓴 기록만 고칠 수 있다',
 S.admin = true;
 ok('대표는 남의 기록도 고칠 수 있다', canLog({ by: 'P-001', byName: '권형하' }) === true);
 S.admin = false;
-ok('고칠 수 없으면 버튼을 아예 안 그린다', grab('logBtns').indexOf("if(!canLog(l)) return '';") > 0);
+/* 2026-10-03 — canLog 가 업무 번호를 함께 받는다: 🔗 자동 줄은 «쓴 사람»이 없어
+   그 업무 담당자가 지운다(tests/work-weekly-autolink.test.js). 막는 자리는 그대로다. */
+ok('고칠 수 없으면 버튼을 아예 안 그린다', grab('logBtns').indexOf("if(!canLog(l,itemId)) return '';") > 0);
 ok('날짜를 바꾸면 옛 주차에서 지우고 새 주차에 넣는다 (주차가 달라질 수 있다)', (function () {
   const f = grab('saveLogEdit');
   return f.indexOf('if(oldWk&&oldWk!==newWk)') > 0        // 옛 주차 경로를 null 로
