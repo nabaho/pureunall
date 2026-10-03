@@ -28,15 +28,34 @@ function 세상(통) {
 }
 const 올해 = String(new Date().getFullYear());
 
-test('① 메뉴 — 한눈에가 첫 자리 · 셋이 한 묶음', () => {
+test('① 메뉴 셋 — 서류 만들기 · 저장 서류 · 한눈에 차례 (대표 지시 2026-10-03)', () => {
   const m = SRC.match(/\{g:'회의·비용관리', items:\[([^\n]*)\]\},/);
   assert.ok(m);
   const ids = [...m[1].matchAll(/\['(page-[a-z]+)'/g)].map((x) => x[1]);
-  assert.equal(ids[0], 'page-feedash', '상위를 누르면 첫 화면이 열린다 — 한눈에가 메인');
-  assert.ok(ids.includes('page-meetfee') && ids.includes('page-feesettle'));
-  assert.ok(SRC.indexOf('id="page-feedash"') > 0 && SRC.indexOf('id="page-feesettle"') > 0);
+  assert.deepEqual(ids, ['page-feedoc', 'page-feebox', 'page-feedash'], '★ 대표가 정한 차례입니다');
+  /* 목록·정산은 옆줄에서 빠졌지만 «한눈에 안의 탭»으로 산다 — 그 이름으로 오면 그 탭이 열린다 */
+  assert.match(SRC, /FEE_DASH_TAB=\{'page-meetfee':'list','page-feesettle':'settle'\}/);
+  assert.match(떼기('function nav_to('), /if\(FEE_DASH_TAB\[id\]\)\{ _feeTab=FEE_DASH_TAB\[id\]; id='page-feedash'/);
+  assert.ok(SRC.indexOf('id="page-feedash"') > 0 && SRC.indexOf('id="page-feesettle"') > 0 && SRC.indexOf('id="page-meetfee"') > 0);
   assert.match(SRC, /if\(id==='page-feedash'\) _safe\(renderFeeDash\)/);
-  assert.match(SRC, /if\(id==='page-feesettle'\) _safe\(renderFeeSettle\)/);
+});
+
+test('① 한눈에 — 숫자 카드는 늘 위, 아래만 탭(요약·목록·정산) · 목록·정산 화면을 탭 칸으로 옮겨 온다', () => {
+  for (const id of ['feeDashKpi', 'feeDashTabs', 'feePaneSum', 'feePaneList', 'feePaneSettle']) assert.ok(SRC.indexOf('id="' + id + '"') > 0, id);
+  const m = 떼기('function feeDashMount(');
+  assert.match(m, /\['page-meetfee','feePaneList'\]/);
+  assert.match(m, /\['page-feesettle','feePaneSettle'\]/);
+  const t = 떼기('function feeDashTab(');
+  assert.match(t, /renderCareer\('meetfee'\)/, '목록 탭은 비용 목록 그리기를 그대로 쓴다');
+  assert.match(t, /renderFeeSettle\(\)/);
+  assert.match(SRC, /#feePaneList>\.page-view,#feePaneSettle>\.page-view\{display:block\}/, '옮겨 온 화면은 탭 칸 안에서 보여야 한다');
+});
+
+test('④-2 정산 — 줄을 누르면 그 곳의 건이 바로 아래 펼쳐진다 · 계좌 없음 → 넣기', () => {
+  const r = 떼기('function renderFeeSettle(');
+  assert.match(r, /onclick="feeSettleToggle\(/, '줄을 누르면 목록으로 넘어가지 않고 펼친다');
+  assert.match(r, /class="fs-sub r" onclick="feeOpen\(/, '펼친 건을 누르면 그 건이 열린다');
+  assert.match(r, /feeSettleAcct\(event/);
 });
 
 test('② 두 통을 읽기만 — 어느 통에서 왔는지 들고 다닌다', () => {

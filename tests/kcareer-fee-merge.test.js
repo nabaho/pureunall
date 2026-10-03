@@ -27,9 +27,10 @@ test('기타비용을 고치면 합친 표도 다시 그린다 — 안 그리면
   assert.match(bare, /if\(name==='etcfee'\)[\s\S]{0,120}renderCareer\('meetfee'\)/);
 });
 
-test('사이드바 — 비용 «목록»은 하나다(기타비용 화면을 따로 두지 않는다)', () => {
-  /* ★ 2026-10-03 한눈에·정산이 곁에 붙었다 — 목록이 하나인 것은 그대로다 */
-  assert.match(bare, /\{g:'회의·비용관리', items:\[.{0,80}\['page-meetfee','[^']*비용[^']*'\]/);
+test('비용 «목록»은 하나다 — 한눈에의 목록 탭으로 간다(기타비용 화면을 따로 두지 않는다)', () => {
+  /* ★ 2026-10-03 메뉴 셋 정리 — 비용 목록은 옆줄이 아니라 «한눈에 안의 탭»이다. 그 이름으로 가도 길을 잃지 않는다 */
+  assert.match(bare, /FEE_DASH_TAB=\{'page-meetfee':'list'/);
+  assert.ok(source.indexOf('id="page-meetfee"') > 0, '목록 화면 자체는 살아 있어야 합니다');
   assert.doesNotMatch(bare, /\['page-etcfee','기타비용신청'\]/);
 });
 
