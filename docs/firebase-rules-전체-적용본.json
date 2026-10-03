@@ -1425,15 +1425,15 @@
         "human": {
           ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
           "$id": {
-            ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
-            ".validate": "newData.hasChildren(['id','entityType','revision']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'RulesDocument'"
+            ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && newData.exists()",
+            ".validate": "newData.hasChildren(['id','entityType','revision']) && newData.child('id').isString() && newData.child('id').val() === $id && newData.child('revision').isNumber() && newData.child('entityType').val() === 'RulesDocument'"
           }
         },
         "rounds": {
           ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
           "$id": {
-            ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
-            ".validate": "newData.hasChildren(['id','entityType','revision']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'RulesRound'"
+            ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && newData.exists()",
+            ".validate": "newData.hasChildren(['id','entityType','revision']) && newData.child('id').isString() && newData.child('id').val() === $id && newData.child('revision').isNumber() && newData.child('entityType').val() === 'RulesRound'"
           }
         },
         "ask": {

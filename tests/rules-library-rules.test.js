@@ -29,11 +29,30 @@ test('사람 칸(human·rounds)은 재직 직원이 관문 칸을 갖춰서만',
   [['human', 'RulesDocument'], ['rounds', 'RulesRound']].forEach(([k, type]) => {
     const rec = { id: 'rd_1', entityType: type, revision: 2, schemaVersion: 3, contractVersion: 1 };
     const w = L()[k].$id['.write'], v = L()[k].$id['.validate'];
-    assert.equal(ev(w, { auth: auth('staffUid') }), true);
-    assert.equal(ev(w, { auth: auth('retiredUid') }), false);
+    assert.equal(ev(w, { auth: auth('staffUid'), newData: rec }), true);
+    assert.equal(ev(w, { auth: auth('retiredUid'), newData: rec }), false);
     assert.equal(ev(v, { newData: rec, $id: 'rd_1' }), true);
     assert.equal(ev(v, { newData: { companyId: 'x' }, $id: 'rd_1' }), false, '관문 칸 없는 쓰기');
     assert.equal(ev(v, { newData: Object.assign({}, rec, { id: 'rd_2' }), $id: 'rd_1' }), false, 'id 가 자리와 다르다');
+  });
+});
+
+test('사람 칸은 «지울 수» 없다 — 물리 삭제 금지(★최종본이 조용히 사라진다)', () => {
+  ['human', 'rounds'].forEach((k) => {
+    const w = L()[k].$id['.write'];
+    assert.equal(ev(w, { auth: auth('staffUid'), newData: null }), false, k + ' 삭제(null)');
+    assert.equal(ev(w, { auth: auth('staffUid') }), false, k + ' 삭제(undefined)');
+    assert.equal(ev(w, { auth: auth('staffUid'), newData: { id: 'x' } }), true, k + ' 쓰기는 된다');
+  });
+});
+
+test('사람 칸 칸 종류 — revision 은 숫자, id 는 글자', () => {
+  [['human', 'RulesDocument'], ['rounds', 'RulesRound']].forEach(([k, type]) => {
+    const v = L()[k].$id['.validate'];
+    const rec = { id: 'rd_1', entityType: type, revision: 2 };
+    assert.equal(ev(v, { newData: rec, $id: 'rd_1' }), true);
+    assert.equal(ev(v, { newData: Object.assign({}, rec, { revision: '2' }), $id: 'rd_1' }), false, k + ' revision 글자');
+    assert.equal(ev(v, { newData: Object.assign({}, rec, { id: 7 }), $id: '7' }), false, k + ' id 숫자');
   });
 });
 
