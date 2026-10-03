@@ -17733,12 +17733,14 @@ function mbRuleBinOf(v){
    ⚠ 목록을 거르는 곳(mbRowFits)과 화면에 적는 곳(mbBinOfRow)이 «같은 답»을 봐야 한다.
      예전에는 둘이 따로 셈해서, 한쪽만 고치면 「목록에는 있는데 딱지는 다른 칸」이 됐다. */
 function mbBinIdOfRow(v){
+  /* ⚡ 그리는 동안 메일 한 통에 한 번 (2026-10-03 — 칸 옮길 때 15,000번이었다). 줄이 한 벌이 되어야 맞는다(mbAllRows). */
+  const _m = (v && typeof v === 'object' && !v._reuse && typeof mbMemoOf === 'function') ? mbMemoOf() : null;
+  const _w = _m && (_m.binOf || (_m.binOf = new WeakMap()));
+  if(_w && _w.has(v)) return _w.get(v);
   const put = mbPutOf(v._key);
-  if(put) return put;
-  const r = mbRuleBinOf(v);
-  if(r) return r;
-  const b = mbBinOfFolder(v._slug);
-  return b ? b.id : '';
+  const id = put || mbRuleBinOf(v) || ((b => b ? b.id : '')(mbBinOfFolder(v._slug)));
+  if(_w) _w.set(v, id);
+  return id;
 }
 /* 규칙을 정한다·지운다 — 화면을 먼저 고치고, 저장이 실패하면 되돌린다 */
 function mbRuleSet(email, binId, byDomain){
@@ -17973,7 +17975,7 @@ function mbSpamWhy(v){
 /* ⚡ 한 번 그리는 동안 같은 메일을 두세 번 판정했다(목록 거르기 · 안 읽은 셈 · 걸린 줄) —
    mbSpamWhy 32ms(15,056번). 그리는 «동안»만 사는 셈에 담는다 — 그리기가 시작되면 버린다. */
 function mbIsSpam(v){
-  if(!v || typeof v !== 'object') return !!mbSpamWhy(v);
+  if(!v || typeof v !== 'object' || v._reuse) return !!mbSpamWhy(v);   /* 돌려 쓰는 객체는 기억하지 않는다 */
   const m = mbMemoOf();
   const w = m.spamWhy || (m.spamWhy = new WeakMap());
   let r = w.get(v);
@@ -18169,7 +18171,8 @@ function mbWhoIndex(){
 function mbWhoBust(){ _mbWhoIdx = null; const m0 = mbMemoOf();
   delete m0.tally; delete m0.sentTally; delete m0.sentTallyFor;
   /* 담당자·스팸 판정 셈도 버린다(2026-10-02) — 사람이 바꾼 것이 그 자리에서 보여야 한다 */
-  delete m0.whoWhy; delete m0.whoWhyIdx; delete m0.spamWhy; }
+  delete m0.whoWhy; delete m0.whoWhyIdx; delete m0.spamWhy;
+  delete m0.allRows; delete m0.binOf; }   /* 담당자·분류가 바뀌면 줄 모음·분류 칸 판정도 새로 */
 
 /* ══════════════════════════════════════════════════════════════════════════
    자문이 끝난 업체 — 따로 모은다 (대표 지시 2026-08-26)
@@ -19075,7 +19078,7 @@ function mbSentTally(){
   const cnt = {}, un = {}, gap = {};
   let n = 0, none = 0, noneUn = 0;
   const idx = mbWhoIndex();                    /* 표는 «여기서 한 번»만 찾는다 */
-  const v = { t:'', _key:'' };                 /* 돌려 쓰는 한 개 — 줄마다 만들면 만 개다 */
+  const v = { t:'', _key:'', _reuse:1 };       /* 돌려 쓰는 한 개 — 줄마다 만들면 만 개다 (_reuse: 기억하는 셈 건너뜀) */
   const box = (_mbMsgs || {})[slug] || {};
   Object.keys(box).forEach(uid=>{
     const row = box[uid]; if(!row) return;
@@ -19952,7 +19955,9 @@ function mbWhoTally(){
   const other = { n:0, un:0 };
   const off = { n:0, un:0 };        /* 사람 안 붙임 — 자문종료와 같은 결의 «따로 칸» */
   const idx = mbWhoIndex();                       /* 표는 «여기서 한 번»만 찾는다 */
-  const v = { e:'', r:0, _slug:'', _key:'' };      /* 돌려 쓰는 한 개 */
+  /* ⚠ _reuse — 내용만 바꿔 «돌려 쓰는» 한 개라, 객체를 열쇠로 기억하는 셈(mbBinIdOfRow·mbIsSpam)이
+     첫 메일 답을 모든 메일에 주지 않게 표시한다(2026-10-03). */
+  const v = { e:'', r:0, _slug:'', _key:'', _reuse:1 };      /* 돌려 쓰는 한 개 */
   Object.keys(_mbMsgs||{}).forEach(slug=>{
     const box = _mbMsgs[slug]||{};
     Object.keys(box).forEach(uid=>{
@@ -20266,6 +20271,15 @@ function mbBoxName(id){
    ⚠ 그리는 곳과 「모두 고르기」가 **같은 함수**를 봐야 개수가 어긋나지 않는다. */
 function mbAllRows(){
   const id = mbNow();
+  /* ⚡ 한 번 그리는 동안 «한 벌»만 (대표 지시 2026-10-03 「메일창 확인」 — 대표 크롬 실측).
+     칸을 옮길 때 이 함수가 6번 불려 메일 1,887통을 «새 줄»로 매번 다시 만들었다 —
+     줄이 늘 새것이라 스팸·분류 칸 판정을 담아 둔 셈(WeakMap)도 한 번도 안 맞았다
+     (스팸 판정 7,500번 · 분류 칸 규칙 15,000번 · 칸 옮기기 139ms).
+     그리는 동안만 사는 셈(mbMemoOf)에 칸마다 한 벌 — 그리기가 시작되면 버린다.
+     ⚠ 건네는 것은 «배열 사본»이다 — 받는 쪽이 거르거나 줄 세워도 담아 둔 것이 안 바뀐다. */
+  const _m = (typeof mbMemoOf === 'function') ? mbMemoOf() : null;
+  const _c = _m && (_m.allRows || (_m.allRows = {}));
+  if(_c && _c[id]) return _c[id].slice();
   const out = [];
   const push = (slug)=>{
     const box = _mbMsgs[slug]||{};
@@ -20293,7 +20307,9 @@ function mbAllRows(){
     rows = rows.filter(v=>me && String(v.e||'').toLowerCase()===me
                          && String(v.t||'').toLowerCase().indexOf(me)>=0);
   }
-  return rows.sort((a,b)=>Number(b.d||0)-Number(a.d||0) || Number(b.u||0)-Number(a.u||0));
+  rows.sort((a,b)=>Number(b.d||0)-Number(a.d||0) || Number(b.u||0)-Number(a.u||0));
+  if(_c) _c[id] = rows;
+  return _c ? rows.slice() : rows;
 }
 
 /* ⚠ 여기 「갈래 나누기」(청구서·쇼핑·소셜·프로모션)가 있었다 — 제목의 낱말로 짚어
