@@ -44,7 +44,9 @@ const COS = [
   { id: 'c5', name: '새힘기업', managerMain: '', managerSubs: [] }
 ];
 const DIR = [{ sid: 'p-001', name: '김대표' }, { sid: 'p-002', name: '박노무' }];
-const OWNERS = { U1: { name: '김대표', email: 'p001@pureun.kr' } };
+/* 들어온 사람의 줄에는 늘 lastAt 이 있다(touchOwner 가 적는다) — 2026-10-03 부터
+   서버가 lastAt 없이 «자리만» 적어 두는 줄이 생겨, 들어왔는지를 lastAt 으로 가른다. */
+const OWNERS = { U1: { name: '김대표', email: 'p001@pureun.kr', lastAt: 1 } };
 
 /* 도착 칸 — c1 은 어제, c2 는 오늘. c3·c4·c5 는 아직 안 왔다 */
 const ARR = {
