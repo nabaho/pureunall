@@ -83,3 +83,9 @@ test('③ 회의·비용관리 옆줄 — 같은 화면을 빌려 쓰고, 비용
   assert.match(SRC, /<option value="feedoc">/);
   assert.ok(SRC.indexOf('id="db-feedoc"') > 0 && /KC_DOC_STORES=\[[^\]]*'feedoc'/.test(bare), '다른 PC 에서도 열려야 합니다');
 });
+
+test('회의·비용관리 › 서류 만들기에는 빠른 이력서 탭이 없다 — 머물러 있었으면 기관 양식 채우기로 (대표 지시 2026-10-03)', () => {
+  assert.match(SRC, /#page-resume-hub\[data-nav-as="page-feedoc"\] #rh-tabrow \.tab\[data-tab="dm-quick"\]\{display:none\}/);
+  assert.match(SRC, /if\(id==='page-feedoc' && b && b\.dataset\.tab==='dm-quick'\) b=document\.querySelector\('#rh-tabrow \.tab\[data-tab="rh-edit"\]'\)/);
+  assert.doesNotMatch(SRC, /#page-resume-hub:not\(\[data-nav-as[^\]]*\]\)[^{]*dm-quick[^{]*\{display:none\}/, '이력서관리 문에서는 그대로 보여야 한다');
+});
