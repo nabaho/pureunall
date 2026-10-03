@@ -1163,6 +1163,17 @@ input.kf-in.kf-done{background:#f8fafc;border-bottom:1.5px solid var(--teal);fon
 #rhDraftPanel.rh-float .rh-float-h{display:flex;align-items:center;gap:10px;position:sticky;top:-10px;background:var(--card);margin:-10px -12px 8px;padding:9px 12px;border-bottom:1px solid var(--border);z-index:1}
 #rhDraftPanel.rh-float .rh-float-h b{white-space:nowrap}
 #rhDraftPanel.rh-float .rh-float-h .m{font-size:11px;color:var(--text-mute);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.at-bar{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.at-sum{font-size:12px;color:var(--text-mute)}
+.at-body{max-height:62vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.at-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.at-tbl th{position:sticky;top:0;background:var(--card);font-size:11px;color:var(--text-mute);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.at-tbl td{padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis}
+.at-tbl tr.drag-over td{border-top:2px solid var(--ink)}
+.at-tbl .hand{cursor:grab;color:var(--text-mute)}
+.at-no{display:inline-block;min-width:52px;text-align:center;padding:1px 7px;border-radius:9px;background:#eff6ff;color:#1e40af;font-size:11px;font-weight:700}
+.at-ok{color:var(--teal);font-size:11px}.at-warn{color:#854d0e;font-size:11px}.at-miss{color:var(--red);font-weight:700}
+.at-sub td{color:var(--text-mute)}
 .rh-back{position:relative;display:flex;gap:4px;margin:0 0 4px}
 .rh-back .btn{padding:7px 9px}
 .rh-back-go{flex:1;font-weight:800;background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -1309,6 +1320,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
+<!-- 📎 첨부서류 만들기의 셈(표 읽기·짝 후보·번호) — 화면·파일은 kcareer.html 이 만진다 -->
+<script src="js/kcareer-attach.js?v=1"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=20"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
@@ -1680,6 +1693,9 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                      어느 것을 눌러야 할지 알 수 없다. **이 둘을 되살리지 말 것.** -->
                 <button class="btn" id="rcSaveBtn">💾 완성본 생성</button>
                 <button class="btn" onclick="rhDraftNow()" title="현재 입력과 한글 편집 내용을 작성 중 서류로 저장합니다 — 나중에 📂 작성 중에서 이어서 입력할 수 있습니다">💾 작성 중 저장</button>
+                <!-- ★ 📎 첨부서류 만들기 (대표 승인 2026-10-03 목업) — 신청서 실적 표의 줄마다 경력·실적 기록의 원본을 붙여
+                     첨부 1, 2, 3 … 번호를 매기고 PDF 한 파일(맨 앞 목록표 + 장마다 머리표)로 만든다 -->
+                <button class="btn" onclick="rhAttachOpen()" title="실적 표의 줄마다 증빙(위촉장·계약서·표창장)을 붙여 번호를 매기고 PDF 한 파일로 만듭니다">📎 첨부서류 만들기</button>
                 <button class="btn" id="rcDocxSaveBtn" style="display:none" onclick="exportDocxFile()">💾 DOCX 저장</button>
                 <details class="rh-more rh-noed">
                   <summary>추가 작업</summary>
@@ -2601,6 +2617,23 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   </div>
 </div>
 <!-- 🖋 도장 찍을 자리 고르기 (대표 승인 2026-09-29 목업) — (인) 자리가 둘 이상일 때만 뜬다 -->
+<div class="modal-ov" id="modalAttach">
+  <div class="modal" style="width:min(1080px,96vw)">
+    <div class="modal-h">📎 첨부서류 만들기 — 짝짓기 · 번호</div>
+    <div class="modal-b">
+      <div class="at-bar">
+        <button class="btn sm" type="button" onclick="rhAttachAll(true)">☑ 전체</button>
+        <button class="btn sm" type="button" onclick="rhAttachAll(false)">☐ 해제</button>
+        <button class="btn sm" type="button" onclick="rhAttachOnlySure()" title="기관·기간이 다 맞는 것만 남깁니다">기관·기간 맞는 것만</button>
+        <span style="flex:1"></span><span id="atSum" class="at-sum"></span>
+      </div>
+      <div id="atBody" class="at-body"></div>
+      <input type="file" id="atFile" accept=".pdf,.hwp,.hwpx,.jpg,.jpeg,.png" style="display:none">
+    </div>
+    <div class="modal-foot"><button class="btn" type="button" onclick="document.getElementById('modalAttach').classList.remove('open')">닫기</button>
+      <button class="btn primary" type="button" id="atMake" onclick="rhAttachBuild()">📎 PDF 한 파일로 만들기</button></div>
+  </div>
+</div>
 <div class="modal-ov" id="modalStampPick">
   <div class="modal" style="width:480px">
     <div class="modal-h">🖋 도장 찍을 자리 고르기</div>
@@ -13304,6 +13337,199 @@ async function rhCloseDoc(o){
   var msg=document.getElementById('rcEditorMsg'); if(msg){ msg.style.display=''; msg.textContent='양식을 업로드하면 미리보기가 나타납니다'; }
   rhUndoBtn(); rhDraftCheck();
   if(!o.silent) toast('치웠습니다 — 담아 둔 것은 그대로입니다');
+}
+
+/* ── 📎 첨부서류 만들기 (대표 승인 2026-10-03 목업) ──
+   ① 지금 서류의 표에서 「기관」 칸이 있는 표의 줄을 읽는다(KcareerAttach — 셈은 거기서)
+   ② 줄마다 원본 파일이 있는 경력·실적 기록을 후보로 띄운다 — ⚠ 이름만으로 저절로 붙이지 않는다
+   ③ 고른 것에 첨부 1, 2, 3 … (끌어서 차례를 바꾸면 다시 매긴다)
+   ④ PDF 한 파일 — 맨 앞 목록표 + 장마다 오른쪽 위 머리표, 서류 보관함에 그 신청서 곁으로 담는다
+   ⚠ 한글 글자를 PDF 글꼴로 넣지 않는다(한글 글꼴을 통째로 실으면 수 MB) — 목록표·머리표는 «그림»으로 그린다. */
+var _att=null;
+var ATT_PAGE_LABEL={wiccok:'위촉장',award:'표창',license:'자격증',complete:'수료증',edu:'학력',work:'기업경력',
+  consult:'컨설팅',case:'사건',fund:'기금',lecture:'강의',etc:'기타실적',advisory:'자문·고문',submission:'제출서류'};
+function _attRecName(r, page){
+  var 종=r.type||r.kind||ATT_PAGE_LABEL[page]||'증빙';
+  var 이름=r.titleVal||r.title||r.name||r.content||r.role||'';
+  return String(종+(이름?' '+이름:'')).replace(/\s+/g,' ').trim();
+}
+function _attFileName(r){ return r.fname||r.genName||r.origName||(r.relPath?String(r.relPath).split('/').pop():'')||'원본'; }
+async function rhAttachOpen(){
+  if(!_rhDoc||!_rhDoc.bytes){ toast('먼저 신청서를 올려 주세요'); return; }
+  if(!window.KcareerAttach){ toast('첨부서류 도구를 못 불러왔습니다 — 새로 고침(Ctrl+F5) 해 주세요'); return; }
+  toast('⏳ 실적 표를 읽는 중…');
+  var bytes=null; try{ bytes=await exportEditedHwpx(); }catch(e){}
+  if(!bytes||!bytes.length) bytes=_rhDoc.bytes;
+  var 표=[];
+  try{
+    await _loadJSZip();
+    var zip=await JSZip.loadAsync(bytes);
+    var 이름=Object.keys(zip.files).filter(function(n){ return /^Contents\/section\d+\.xml$/i.test(n); }).sort();
+    for(var i=0;i<이름.length;i++) 표=표.concat(KcareerAttach.readTables(await zip.file(이름[i]).async('string')));
+  }catch(e){ toast('표를 못 읽었습니다 — 한글(HWPX) 서식에서만 됩니다'); return; }
+  var 줄=KcareerAttach.pickRows(표);
+  if(!줄.length){ toast('「기관」 칸이 있는 실적 표를 못 찾았습니다', 4000); return; }
+  /* 붙일 수 있는 것 = 원본 파일이 있는 경력·실적 기록. 만든 서류(보관함)는 빼고 */
+  var recs=allRecords().filter(function(x){ return x && x.r && x.page!=='docbox' && x.page!=='feebox' && hasOriginal(x.r); });
+  var items=[];
+  줄.forEach(function(row, k){
+    var cs=KcareerAttach.candidates(row, recs);
+    if(!cs.length){ items.push({ row:k, miss:true, on:false }); return; }
+    cs.forEach(function(c){ items.push({ row:k, r:c.r, page:c.page, on:!!c.먼저, 기간맞음:c.기간맞음 }); });
+  });
+  _att={ rows:줄, items:items };
+  rhAttachDraw();
+  document.getElementById('modalAttach').classList.add('open');
+}
+function rhAttachDraw(){
+  var body=document.getElementById('atBody'); if(!body||!_att) return;
+  KcareerAttach.number(_att.items);
+  var 앞줄=-1;
+  var html='<table class="at-tbl"><thead><tr><th>☐</th><th>#</th><th></th><th>첨부번호</th><th>신청서 표 줄</th><th>붙일 증빙</th><th>짝</th></tr></thead><tbody>';
+  _att.items.forEach(function(it, i){
+    var row=_att.rows[it.row], 새줄=(it.row!==앞줄); 앞줄=it.row;
+    var 줄글=새줄?escapeHtml([row.period,row.org,row.content].filter(Boolean).join(' · ')):'<span style="color:var(--text-mute)">〃</span>';
+    var 증빙, 짝;
+    if(it.file){ 증빙='📄 '+escapeHtml(it.file.name)+' <span class="at-ok">(직접 넣음)</span>'; 짝='<span class="at-ok">직접 넣음</span>'; }
+    else if(it.miss){ 증빙='<span class="at-miss">증빙 없음</span> <button class="btn sm" type="button" onclick="rhAttachPutFile('+i+')">＋ 파일 넣기</button>'; 짝='-'; }
+    else { 증빙='📄 '+escapeHtml(_attRecName(it.r,it.page))+' <span style="color:var(--text-mute)">· '+escapeHtml(_attFileName(it.r))+'</span>';
+      /* 한 줄에 후보가 여럿인데 아무것도 안 골랐으면 «고르라»고 말한다 — 다 맞아 보여도 사람이 정한다 */
+      var 같은줄=_att.items.filter(function(y){ return y.row===it.row && y.r; });
+      짝=(같은줄.length>1 && !같은줄.some(function(y){ return y.on; }))?'<span class="at-warn">후보 '+같은줄.length+' — 골라 주세요</span>':it.기간맞음===true?'<span class="at-ok">기관·기간 맞음</span>':(it.기간맞음===false?'<span class="at-warn">기간 다름 — 확인</span>':'<span class="at-warn">기관만 맞음 — 확인</span>'); }
+    html+='<tr draggable="true" data-i="'+i+'" class="'+(새줄?'':'at-sub')+'">'
+      +'<td><input type="checkbox" '+(it.on?'checked':'')+(it.miss&&!it.file?' disabled':'')+' onchange="rhAttachOn('+i+',this.checked)"></td>'
+      +'<td>'+(i+1)+'</td><td class="hand" title="끌어서 차례 바꾸기">⋮⋮</td>'
+      +'<td>'+(it.on?'<span class="at-no">'+escapeHtml(it.label)+'</span>':'<span style="color:var(--text-mute)">—</span>')+'</td>'
+      +'<td title="'+escapeHtml(row.text)+'">'+줄글+'</td><td>'+증빙+'</td><td>'+짝+'</td></tr>';
+  });
+  body.innerHTML=html+'</tbody></table>';
+  var 고른=_att.items.filter(function(x){ return x.on; }).length;
+  var 없음=_att.rows.filter(function(r,k){ return !_att.items.some(function(x){ return x.row===k && (x.r||x.file); }); }).length;
+  /* 짝 확인 필요 = 후보가 있는데 하나도 안 고른 줄 + 기간이 다르거나 모르는 채 고른 것 */
+  var 확인=_att.rows.filter(function(r,k){ var c=_att.items.filter(function(x){ return x.row===k && x.r; });
+    return c.length && (!c.some(function(x){ return x.on; }) || c.some(function(x){ return x.on && x.기간맞음!==true; })); }).length;
+  var sum=document.getElementById('atSum'); if(sum) sum.textContent='표 줄 '+_att.rows.length+' · 고른 증빙 '+고른+' · 증빙 없음 '+없음+' · 짝 확인 필요 '+확인;
+  /* 끌어서 차례 바꾸기 — 놓인 자리 «앞»으로 옮긴다 */
+  var 잡은=null;
+  body.querySelectorAll('tr[data-i]').forEach(function(tr){
+    tr.addEventListener('dragstart', function(){ 잡은=Number(tr.dataset.i); });
+    tr.addEventListener('dragover', function(e){ e.preventDefault(); tr.classList.add('drag-over'); });
+    tr.addEventListener('dragleave', function(){ tr.classList.remove('drag-over'); });
+    tr.addEventListener('drop', function(e){ e.preventDefault(); tr.classList.remove('drag-over');
+      var to=Number(tr.dataset.i); if(잡은==null||잡은===to) return;
+      var x=_att.items.splice(잡은,1)[0]; _att.items.splice(잡은<to?to-1:to,0,x); 잡은=null; rhAttachDraw(); });
+  });
+}
+function rhAttachOn(i, on){ if(_att&&_att.items[i]){ _att.items[i].on=!!on; rhAttachDraw(); } }
+function rhAttachAll(on){ if(!_att) return; _att.items.forEach(function(x){ if(x.r||x.file) x.on=!!on; }); rhAttachDraw(); }
+function rhAttachOnlySure(){ if(!_att) return; _att.items.forEach(function(x){ x.on=!!(x.file||(x.r&&x.기간맞음===true)); }); rhAttachDraw(); }
+function rhAttachPutFile(i){
+  var inp=document.getElementById('atFile'); if(!inp) return;
+  inp.value=''; inp.onchange=function(){ var f=inp.files&&inp.files[0]; if(!f||!_att) return;
+    _att.items[i].file=f; _att.items[i].miss=false; _att.items[i].on=true; rhAttachDraw(); };
+  inp.click();
+}
+/* 글자를 그림으로 — 목록표·머리표 */
+function _attStamp(text){
+  var c=document.createElement('canvas'), g=c.getContext('2d'), f='bold 34px "Malgun Gothic","Apple SD Gothic Neo",sans-serif';
+  g.font=f; var w=Math.ceil(g.measureText(text).width)+36; c.width=w; c.height=60;
+  g.fillStyle='#ffffff'; g.fillRect(0,0,w,60); g.strokeStyle='#000000'; g.lineWidth=4; g.strokeRect(2,2,w-4,56);
+  g.font=f; g.fillStyle='#000000'; g.textBaseline='middle'; g.fillText(text,18,31);
+  return c;
+}
+function _attListPages(rows){
+  var out=[], W=1240, H=1754, 줄높이=58, 위=260, 한장=Math.floor((H-위-120)/줄높이);
+  var cols=[[100,'번호',80],[180,'서류',470],[660,'기관',300],[970,'기간',180]];   /* 오른끝 1150 = 쪽 폭 1240 − 여백 90 */
+  var fit=function(g,t,w){ t=String(t||''); if(g.measureText(t).width<=w) return t; while(t.length>1 && g.measureText(t+'…').width>w) t=t.slice(0,-1); return t+'…'; };
+  for(var s0=0; s0<Math.max(1,rows.length); s0+=한장){
+    var c=document.createElement('canvas'); c.width=W; c.height=H; var g=c.getContext('2d');
+    g.fillStyle='#ffffff'; g.fillRect(0,0,W,H); g.fillStyle='#000000'; g.textBaseline='middle';
+    g.font='bold 52px "Malgun Gothic","Apple SD Gothic Neo",sans-serif'; g.textAlign='center';
+    g.fillText(s0?'첨부서류 목록 (계속)':'첨부서류 목록', W/2, 150); g.textAlign='left';
+    g.lineWidth=3; g.strokeStyle='#000000';
+    g.font='bold 30px "Malgun Gothic","Apple SD Gothic Neo",sans-serif';
+    g.beginPath(); g.moveTo(90,위-줄높이/2-4); g.lineTo(W-90,위-줄높이/2-4); g.stroke();
+    cols.forEach(function(k){ g.fillText(k[1], k[0], 위); });
+    g.beginPath(); g.moveTo(90,위+줄높이/2); g.lineTo(W-90,위+줄높이/2); g.stroke();
+    g.font='28px "Malgun Gothic","Apple SD Gothic Neo",sans-serif'; g.lineWidth=1;
+    rows.slice(s0, s0+한장).forEach(function(r, j){
+      var y=위+줄높이*(j+1);
+      [r.no, r.name, r.org, r.period].forEach(function(v, k){ g.fillText(fit(g, v, cols[k][2]-14), cols[k][0], y); });
+      g.beginPath(); g.moveTo(90,y+줄높이/2); g.lineTo(W-90,y+줄높이/2); g.stroke();
+    });
+    out.push(c);
+  }
+  return out;
+}
+async function _attPngOf(canvas){ return new Uint8Array(await (await fetch(canvas.toDataURL('image/png'))).arrayBuffer()); }
+async function _attJpgOf(canvas){ return new Uint8Array(await (await fetch(canvas.toDataURL('image/jpeg',0.86))).arrayBuffer()); }
+async function rhAttachBuild(){
+  if(!_att) return;
+  var 고른=_att.items.filter(function(x){ return x.on && (x.r||x.file); });
+  if(!고른.length){ toast('붙일 증빙을 하나 이상 골라 주세요'); return; }
+  var btn=document.getElementById('atMake'); if(btn){ btn.disabled=true; btn.textContent='⏳ 만드는 중…'; }
+  var 못=[];
+  try{
+    await _loadPdfLib();
+    var P=PDFLib, out=await P.PDFDocument.create(), A4=[595.28,841.89];
+    /* 목록표 — 맨 앞 */
+    var 목록=고른.map(function(x){ var row=_att.rows[x.row];
+      return { no:x.no, name:x.file?x.file.name.replace(/\.[^.]+$/,''):_attRecName(x.r,x.page), org:(x.r&&x.r.org)||row.org||'', period:row.period||'' }; });
+    var 목록쪽=_attListPages(목록);
+    for(var a=0;a<목록쪽.length;a++){ var im=await out.embedPng(await _attPngOf(목록쪽[a])); var pg=out.addPage(A4); pg.drawImage(im,{x:0,y:0,width:A4[0],height:A4[1]}); }
+    for(var i=0;i<고른.length;i++){
+      var x=고른[i], 이름, 확장, 바이트, f=null;
+      try{
+        if(x.file){ 이름=x.file.name; 바이트=new Uint8Array(await x.file.arrayBuffer()); }
+        else { f=await recFileAsync(x.r); if(!f||!f.base64) throw new Error('이 기기에 원본이 없습니다'); 이름=f.name||_attFileName(x.r); 바이트=new Uint8Array(b64ToAb(f.base64)); }
+        확장=String((x.file?'':(f&&f.ext))||String(이름).split('.').pop()||'').toLowerCase();
+        var 쪽들=[];   /* 이 증빙에서 나온 쪽(PDFPage) */
+        if(확장==='pdf'){
+          var src=await P.PDFDocument.load(바이트,{ignoreEncryption:true});
+          var cp=await out.copyPages(src, src.getPageIndices()); cp.forEach(function(p){ out.addPage(p); 쪽들.push(p); });
+        } else if(/^(jpe?g|png)$/.test(확장)){
+          var img=/png/.test(확장)?await out.embedPng(바이트):await out.embedJpg(바이트);
+          var p1=out.addPage(A4), sc=Math.min((A4[0]-60)/img.width,(A4[1]-90)/img.height,1.5);
+          p1.drawImage(img,{x:(A4[0]-img.width*sc)/2,y:(A4[1]-60-img.height*sc),width:img.width*sc,height:img.height*sc}); 쪽들.push(p1);
+        } else if(/^(hwp|hwpx)$/.test(확장) && window.PureunHwp && PureunHwp.renderPreview){
+          var tmp=document.createElement('div');
+          await PureunHwp.renderPreview(tmp, 바이트, 이름);
+          var cvs=[].slice.call(tmp.querySelectorAll('canvas'));
+          if(!cvs.length) throw new Error('한글 쪽을 못 그렸습니다');
+          for(var k=0;k<cvs.length;k++){ var jm=await out.embedJpg(await _attJpgOf(cvs[k])); var p2=out.addPage(A4); p2.drawImage(jm,{x:0,y:0,width:A4[0],height:A4[1]}); 쪽들.push(p2); }
+        } else throw new Error('붙일 수 없는 형식입니다('+확장+')');
+        /* 머리표 — 장마다 오른쪽 위 */
+        for(var q=0;q<쪽들.length;q++){
+          var 글=x.label+(쪽들.length>1?' ('+(q+1)+'/'+쪽들.length+')':'');
+          var st=await out.embedPng(await _attPngOf(_attStamp(글)));
+          var pw=쪽들[q].getWidth(), ph=쪽들[q].getHeight(), sw=Math.min(130, st.width*0.3), sh=sw*st.height/st.width;
+          쪽들[q].drawImage(st,{x:pw-sw-22,y:ph-sh-18,width:sw,height:sh});
+        }
+      }catch(e){ console.warn('첨부', x, e); 못.push(x.label+' — '+((e&&e.message)||'못 붙였습니다')); }
+    }
+    var pdf=await out.save();
+    /* 서류 보관함에 — 그 신청서 곁(같은 기관·같은 이름 바탕)으로 */
+    var domain=(typeof rhSaveDomain==='function')?rhSaveDomain():'resume', D=DOMAINS[domain];
+    var 바탕='첨부서류'; try{ 바탕=String(await rhNiceName()).replace(/\.(hwpx?|pdf)$/i,''); }catch(e){}
+    var 이름=바탕+'_첨부서류.pdf', id=domain+'_'+Date.now(), now=new Date().toISOString(), b64=abToB64(pdf.buffer||pdf);
+    saveFileUnified(id,{id:id,name:이름,ext:'pdf',size:pdf.length,base64:b64,savedAt:now});
+    var stp=''; try{ stp=await kcFormUpload(id,b64,'pdf'); }catch(e){}
+    var 기관=''; try{ 기관=(await rhNameParts()).기관||''; }catch(e){}
+    var entry={id:id,kind:'첨부서류',year:String(new Date().getFullYear()),org:기관,memo:'첨부 '+(고른.length-못.length)+'건',
+      genFileId:id,genName:이름,origFileId:null,origName:null,submits:[],savedAt:now};
+    if(stp) entry.genStPath=stp;
+    var arr=get(D.store); arr.unshift(entry); set(D.store,arr);
+    _safe(function(){ renderDocStore(domain); });
+    document.getElementById('modalAttach').classList.remove('open');
+    openPdfBlob(pdf, 이름);
+    toast(못.length?('📎 만들었습니다 — 못 붙인 것 '+못.length+'건: '+못.join(' / ')):('📎 첨부서류 '+고른.length+'건을 PDF 한 파일로 만들어 서류 보관함에 담았습니다'), 못.length?9000:5000);
+  }catch(e){ console.error(e); toast('첨부서류 만들기 실패: '+((e&&e.message)||e)); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='📎 PDF 한 파일로 만들기'; } }
+}
+function openPdfBlob(bytes, name){
+  var url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+  var w=window.open(url,'_blank'); if(!w){ var a=document.createElement('a'); a.href=url; a.download=name||'첨부서류.pdf'; a.click(); }
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 120000);
 }
 
 /* ── ← 목록으로 (대표 승인 2026-09-30 목업) ──
