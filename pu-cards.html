@@ -72,6 +72,9 @@
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
+<!-- 메일 첨부 → 기업별 계약서 (2026-10-03) — 문서관리와 같은 원본 보관함·같은 짐작 규칙 -->
+<script src="js/pu-office-store.js?v=5"></script>
+<script src="js/pu-co-roster.js?v=2"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
@@ -24713,7 +24716,9 @@ function mbReadHtml(){
               : `<button class="peek off" disabled
             title="이 종류는 브라우저가 못 그립니다 — 내려받아 여시거나 급여데이터함으로 담으십시오">미리보기 없음</button>`}
         <button class="topay" onclick="mbAttToPay(${i})"
-          title="급여데이터함 «대기 칸»으로 담습니다 — 사업장·귀속월은 거기서 고르십니다">→ 급여데이터함</button></span>`;
+          title="급여데이터함 «대기 칸»으로 담습니다 — 사업장·귀속월은 거기서 고르십니다">→ 급여데이터함</button>
+        <button class="topay" onclick="mbAttToCo(${i})"
+          title="받은 계약서·서명본을 그 회사 «기업별 계약서»에 🔒 서명본으로 담습니다 — 회사·종류·날짜는 확인 창에서 고르십니다">→ 기업별 계약서</button></span>`;
     }).join('')}</div>` : ''}
     ${/* ⚠ 여기 있던 「🖼 바깥에서 오는 그림 N개를 막았습니다 · 그림 보기」 띠를
          2026-09-06 에 없앴다 — 대표 지시 「자꾸 나온다」. 되살리지 말 것.
@@ -25101,6 +25106,7 @@ function mbPvHtml(){
         <button onclick="mbPvPage(1)" ${p.page>=p.pages?'disabled':''}>▶</button></span>` : '';
   const foot = `<footer>${pager}<span class="sp"></span>
     <button onclick="mbAttToPay(${p.i})">→ 급여데이터함</button>
+    <button onclick="mbAttToCo(${p.i})">→ 기업별 계약서</button>
     <button class="pri" onclick="mbAtt(${p.i})">📥 내려받기</button>
     <button onclick="mbPvClose()">닫기</button></footer>`;
   let stage;
@@ -25138,6 +25144,118 @@ function mbPvHtml(){
      문은 닫기 어렵다. 서버가 대신 담는다(mailAttToPaydata).
    ⚠ 보낸이·제목을 함께 보낸다 — 서버가 그것으로 «누구 자리»인지 짚는다.
      못 짚으면 공용 대기 칸에 남고, 그 까닭(why)도 함께 알려 준다. */
+/* ══ 메일 첨부 → 기업별 계약서 (설계 2026-10-03-계약서류-표준-기록 §3 (다), 대표 「추천대로」 2026-10-03) ══
+   받은 계약서·서명본을 그 회사 «기업별 계약서»에 담는다(문서관리 › 기업별 계약서와 같은 자리).
+   ⚠ 서버를 새로 두지 않는다 — 내려받기와 «같은 길»(mbAttReq)로 이 창에 가져와, 원본 보관함(🔒 서명본 자리)에 올린다.
+   ⚠ 회사·종류·날짜는 «짐작해 채우고 사람이 확인»한다(급여데이터함 단추와 같은 원칙 — 틀린 자리에 들어가도 모른다).
+   ⚠ 메일 제목은 계약 기록에 옮겨 적지 않는다 — 고객 메일 내용이 직원 공용 기록으로 새지 않게. */
+let _mbOffInit = false;
+/* 원본 보관함 기록의 «어디서 왔나»(pu_docs/originals/…/from.kind) — 규칙이 허용하는 값('form'|'co'|'photo') 중 «회사 서류».
+   ⚠ 기업정보함 명함 항목의 kind 와는 다른 칸이다(명함 항목에 새 kind 를 만들지 않는다 — tests/cards-co-info.test.js). */
+const MB_ARC_FROM_CO = 'co';
+function mbOfficeStore(){
+  if(!window.PuOfficeStore) throw new Error('원본 보관함 도구를 불러오지 못했습니다');
+  if(!_mbOffInit){
+    const u = firebase.auth().currentUser;
+    if(!u) throw new Error('로그인이 필요합니다');
+    /* 문서관리(docs-esign)와 «같은 창고» — 서명본 자리 pu_docs/secret 도 그 안에 있다 */
+    PuOfficeStore.init({ db: firebase.database(), storage: firebase.app().storage('gs://pureun-erp-hrphotos'),
+      uid: u.uid, name: String(u.email||'').split('@')[0] });
+    _mbOffInit = true;
+  }
+  return PuOfficeStore;
+}
+/* 첨부 하나의 바이트 — 내려받기(mbAtt)와 같은 서버 길 */
+function mbAttFetch(o, i, a){
+  const u = firebase.auth().currentUser;
+  if(!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  const req = mbAttReq(o, i, a);
+  return u.getIdToken()
+    .then(tok=>fetch(MB_FN+req.fn, { method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
+      body: JSON.stringify(req.body) }))
+    .then(r=>r.json().catch(()=>({})))
+    .then(j=>{
+      if(!j.ok) throw new Error(j.error||'첨부를 가져오지 못했습니다');
+      const bin = atob(j.b64||''), buf = new Uint8Array(bin.length);
+      for(let k=0;k<bin.length;k++) buf[k]=bin.charCodeAt(k);
+      return { name: String(j.name||a.name||'첨부'), mime: String(j.mime||''), bytes: buf };
+    });
+}
+function mbYmd(ms){
+  const d = new Date(Number(ms)||Date.now());
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+/* 확인 창 — 회사(보낸 사람으로 짐작)·종류(파일 이름으로 짐작)·날짜(메일 날짜)·🔒 서명본·계약 기록 한 줄 */
+function mbAttToCo(i){
+  const o = state.mbOpen||{}; const a = (o.atts||[])[i]; if(!a) return;
+  if(!window.PuOfficeStore || !window.PuCoRoster) return toast('원본 보관함 도구를 불러오지 못했습니다 — 새로고침해 주세요', 8000);
+  const v = mbOneRow(o.slug, o.uid) || {};
+  const em = String(v.e||'').trim().toLowerCase();
+  const co = mbCoNameOf(em);
+  const guess = PuCoRoster.guessKind(a.name||'');
+  const kinds = PuCoRoster.KINDS || ['기타'];
+  const bg = document.createElement('div');
+  bg.className = 'mbcobg';
+  bg.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const names = (typeof mbCoNames==='function' ? mbCoNames() : []).slice(0, 500);
+  bg.innerHTML = `<div role="dialog" aria-label="기업별 계약서에 담기" style="background:#fff;border-radius:12px;max-width:440px;width:100%;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:13.5px">
+    <b style="font-size:15px">🏢 기업별 계약서에 담기</b>
+    <div style="color:#64748b;font-size:12px;margin:4px 0 10px;word-break:break-all">📎 ${esc(a.name||'첨부')}</div>
+    <label style="display:block;margin:6px 0">회사 <input id="mbcoName" list="mbcoList" value="${esc(co)}" placeholder="회사 이름" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px"></label>
+    <datalist id="mbcoList">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+    <div style="display:flex;gap:8px">
+      <label style="flex:1">종류 <select id="mbcoKind" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px">${kinds.map(k=>`<option ${k===(guess||'기타')?'selected':''}>${esc(k)}</option>`).join('')}</select></label>
+      <label style="flex:1">날짜 <input id="mbcoDate" type="date" value="${mbYmd(v.d)}" style="width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:6px"></label>
+    </div>
+    ${guess ? '' : '<div style="color:#d97706;font-size:12px;margin-top:6px">⚠ 파일 이름으로는 우리 계약서류인지 모르겠습니다(고객사 직원 서류일 수 있음) — 맞는지 확인해 주세요</div>'}
+    <label style="display:flex;gap:6px;align-items:center;margin-top:10px"><input id="mbcoSecret" type="checkbox" checked> 🔒 서명본으로 (대표·관리자만 열 수 있음)</label>
+    <label style="display:flex;gap:6px;align-items:center;margin-top:4px"><input id="mbcoRec" type="checkbox" checked> 「계약 기록」에도 한 줄</label>
+    <div id="mbcoNote" style="font-size:12px;color:#64748b;min-height:16px;margin-top:8px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button type="button" id="mbcoNo" class="btn ghost">취소</button>
+      <button type="button" id="mbcoGo" class="btn primary">담기</button>
+    </div></div>`;
+  document.body.appendChild(bg);
+  const $q = id => bg.querySelector('#'+id);
+  let busy = false;
+  const close = () => { if(!busy) bg.remove(); };
+  $q('mbcoNo').onclick = close;
+  bg.addEventListener('click', e => { if(e.target === bg) close(); });
+  $q('mbcoGo').onclick = () => {
+    if(busy) return;
+    const p = { co: $q('mbcoName').value.trim(), kind: $q('mbcoKind').value, date: $q('mbcoDate').value,
+      secret: $q('mbcoSecret').checked, rec: $q('mbcoRec').checked };
+    if(!p.co){ $q('mbcoNote').textContent = '⚠ 회사를 적어 주세요'; return; }
+    busy = true; $q('mbcoGo').disabled = true; $q('mbcoNote').textContent = '첨부를 가져와 담는 중…';
+    mbAttToCoSave(o, i, a, p).then(msg => { busy = false; bg.remove(); toast(msg, 9000); },
+      e => { busy = false; $q('mbcoGo').disabled = false; $q('mbcoNote').textContent = '⚠ ' + ((e&&e.message)||e); });
+  };
+  $q('mbcoName').focus();
+}
+/* 담기 — ① 첨부 가져오기 ② 원본 보관함(기본 🔒) ③ 그 회사 기업별 계약서 카드(같은 파일이 있으면 건너뜀) ④ 계약 기록 한 줄 */
+function mbAttToCoSave(o, i, a, p){
+  let store;
+  try { store = mbOfficeStore(); } catch(e){ return Promise.reject(e); }
+  const key = store.coKey(p.co);
+  return mbAttFetch(o, i, a).then(f =>
+    store.putOriginal({ name: f.name, size: f.bytes.length, type: f.mime, bytes: f.bytes }, { kind: MB_ARC_FROM_CO, coKey: key, coName: p.co }, { secret: !!p.secret })
+      .then(r => store.listCoDocs(key).then(have => {
+        const dup = (have||[]).filter(d => d && d.fileId === r.fileId)[0];
+        if(dup) return { docId: dup.id || '', dup: true, name: f.name };
+        return store.addCoDoc({ coName: p.co, fileId: r.fileId, title: '[메일] ' + f.name, date: p.date, src: 'upload', secret: !!p.secret })
+          .then(d => ({ docId: d.docId, dup: false, name: f.name }));
+      }))
+  ).then(x => {
+    if(x.dup) return '이미 「' + p.co + '」 기업별 계약서에 있는 파일입니다 — 다시 담지 않았습니다';
+    const done = '🏢 「' + p.co + '」 기업별 계약서에 담았습니다' + (p.secret ? ' (🔒 서명본)' : '');
+    if(!p.rec) return done;
+    return store.importCoRecs([{ coName: p.co, date: p.date, kind: p.kind, src: 'manual', docId: x.docId, note: '메일 첨부에서' }])
+      .then(r => done + (r && r.added ? ' · 계약 기록 한 줄' : ' · 같은 날짜·종류 계약 기록이 이미 있어 기록은 건너뜀'),
+            e => done + ' · ⚠ 계약 기록은 못 남김: ' + ((e&&e.message)||e));
+  });
+}
+
 function mbAttToPay(i){
   const o = state.mbOpen||{}; const a = (o.atts||[])[i]; if(!a) return;
   const v = mbOneRow(o.slug, o.uid) || {};
