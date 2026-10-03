@@ -52,7 +52,7 @@ function box(o) {
     set: async (v) => { ctx.writes.push({ p, v }); },
     once: async () => ({ val: () => null }) }) }) };
   vm.createContext(ctx);
-  vm.runInContext("var _mgrSeen = null, _mgrChange = null, _mgrKeep = null, _mgrBusy = false, _mgrLoading = false;", ctx);
+  vm.runInContext("var _mgrSeen = null, _mgrChange = null, _mgrKeep = null, _mgrBusy = false, _mgrLoading = false; var _mgrReqs = " + JSON.stringify(o.reqs || []) + ";", ctx);
   const m = app.match(/^const MGR_KEY_OK = [^\n]*;/m); assert.ok(m);
   vm.runInContext(m[0].replace(/^const /, 'var '), ctx);
   ['mgrLoad', 'mgrLiveCos', 'mgrName', 'mgrDiff', 'mgrMailCount', 'mgrRows', 'mgrCount', 'mgrAck']
@@ -165,4 +165,25 @@ test('★★ 급여데이터함 딱지는 «갈래»와 «📋 데이터함» �
   const m = app.match(/^const MB_TAG_SLOTS = \[([^\]]*)\]/m);
   m[1].replace(/'/g, '').split(',').map((x) => x.trim()).forEach((k) =>
     assert.match(app, new RegExp('\\.dm-c-' + k + '\\{width:\\d+px\\}'), '★★ 「' + k + '」 열의 너비가 없습니다 — 세로줄이 안 맞습니다'));
+});
+
+/* ══════ 이알피 승인제와 이어짐 (2026-10-03) ══════ */
+test('★★ 승인 기다리는 이알피 요청도 함께 센다', () => {
+  const c = box({ seen: {}, reqs: [{ id: 'r1', coId: 'co1', coName: '가나상사', from: 'P-002', to: 'P-001', by: 'P-003', byName: '김보람', at: D, status: 'wait' }] });
+  const r = plain(c.mgrRows());
+  assert.equal(r.pending.length, 1, '★★ 이알피에서 기다리는 요청이 안 보입니다');
+  assert.equal(c.mgrCount(), 2, '퇴사자 1 · 빈 담당 0(메일 없음) · 요청 1');
+});
+
+test('★★ 바뀐 것에 «누가 바꿨는지» — 이알피 이력의 마지막 줄이 그 바꿈이면', () => {
+  const cos = COS();
+  cos[0].managerMain = 'P-001';
+  cos[0].mgrHistory = [{ at: D, from: 'P-002', to: 'P-001', reqByName: '김보람', okByName: '권형하' }];
+  cos[1].managerMain = 'P-001';
+  cos[1].mgrHistory = [{ at: D, from: 'P-009', to: 'P-009' }];
+  const c = box({ cos });
+  const d = plain(c.mgrDiff({ co1: 'P-002', co2: 'P-002' }, c.mgrLiveCos(), D));
+  const byCo = {}; d.changes.forEach((x) => { byCo[x.co] = x; });
+  assert.equal(byCo.co1.by, '김보람 요청 · 권형하 승인', '★★ 누가 바꿨는지 안 적습니다');
+  assert.equal(byCo.co2.by, undefined, '★ 다른 바꿈의 이력을 갖다 붙입니다');
 });
