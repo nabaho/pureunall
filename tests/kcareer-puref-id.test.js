@@ -222,3 +222,42 @@ test('★★ 읽을 때 자문·고문 정리 목록을 만든다 — 이알피 
   assert.match(f, /KcareerPuSync\.buildAdvisoryPrune\(collData, get\('advisory'\), typeMap\)/);
   assert.match(f, /return \{ advPrune: advPrune,/);
 });
+
+/* ═══ 정리가 «실제로 돌게» — 미리보기·저절로 도는 동기화 (2026-10-03 실측: 대표 화면에 여전히 672) ═══ */
+
+test('★★ 미리보기가 몇 건을 왜 휴지통으로 보내는지 «누르기 전에» 밝힌다', () => {
+  const ctx = vm.createContext({ escapeHtml: (x) => String(x) });
+  vm.runInContext(cutFn(CODE, 'function _puAdvNote('), ctx);
+  const h = ctx._puAdvNote({ advPrune: { liveAdvisory: 197,
+    drop: [{ id: 'A', reason: '자문이 아닌 업체(급여)' }, { id: 'B', reason: '자문이 아닌 업체(급여)' }, { id: 'C', reason: '이알피에 없는 업체(옛 번호·겹친 줄)' }],
+    retype: [{ id: 'D', type: '자문' }] } });
+  assert.match(h, /<b>3건<\/b>을 휴지통으로/);
+  assert.match(h, /자문 업체 <b>197곳<\/b>/);
+  assert.match(h, /자문이 아닌 업체\(급여\) 2건/, '까닭별로 센다');
+  assert.match(h, /이알피에 없는 업체\(옛 번호·겹친 줄\) 1건/);
+  assert.match(h, /휴지통에서 30일 안에 되살립니다/);
+  assert.match(h, /<b>1건<\/b>의 종류를 맞춥니다/);
+  assert.equal(ctx._puAdvNote({ advPrune: { drop: [], retype: [] } }), '', '할 것이 없으면 아무 말도 안 한다');
+});
+
+test('★★ 미리보기에 그 알림이 실린다', () => {
+  assert.match(cutFn(CODE, 'function renderPuSyncPreview('), /_puMigNote\(_puSyncCtx\)\n?\s*\+ _puAdvNote\(_puSyncCtx\)/);
+});
+
+test('★★ 저절로 도는 동기화도 «정리할 것»을 할 일로 센다 — 새 실적이 없는 날에도 정리가 돈다', () => {
+  const f = cutFn(CODE, 'async function puSyncAuto(');
+  assert.match(f, /var ap = ctx && ctx\.advPrune;/);
+  assert.match(f, /\|\| \(ap && \(ap\.drop\.length \|\| ap\.retype\.length\)\)\);/);
+});
+
+test('★ 저절로 도는 동기화를 실제로 돌려 본다 — 정리할 것만 있어도 등록까지 간다', async () => {
+  const store = { advisory: [{ id: 'AD0001', type: '급여', org: '급여사', puRef: 'companies#co-pay-1' }], trash: [] };
+  const ctx = sandbox(store);
+  ctx.LS = { _v: { 'kc_pu_sync_last_id': 'PS0' }, get(k) { return this._v[k] || ''; }, set(k, v) { this._v[k] = v; } };
+  ctx._puFetchPlan = async () => ({ syncId: 'PS9', plan: { adds: [], links: [], suggests: [] }, statusUps: [], noUps: [],
+    mig: { upgrades: [], broken: [] }, picks: {}, advPrune: { liveAdvisory: 197, drop: [{ id: 'AD0001', reason: '자문이 아닌 업체(급여)' }], retype: [] } });
+  vm.runInContext(cutFn(CODE, 'async function puSyncAuto('), ctx);
+  await ctx.puSyncAuto();
+  assert.equal(store.advisory.length, 0, '정리가 돌지 않았습니다');
+  assert.equal(store.trash.filter((e) => e.store === 'advisory').length, 1);
+});
