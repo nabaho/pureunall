@@ -26,6 +26,9 @@
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
          ⚠ 관리번호는 이름표라 이알피에서 다시 매겨질 수 있다 — 열쇠로 쓰지 않고 sourceNo 로 보여만 준다. */
+      /* 취업규칙 새로 짓기 ① (2026-10-03) — 메일에서 모아 가린 취업규칙 서류와, 사업장의 개정 «회차».
+         회차 레코드가 ★최종본(finalDocId) 하나를 갖는다 — 「회차에 하나」가 저절로 지켜진다. */
+      RulesDocument:'취업규칙 서류', RulesRound:'취업규칙 회차',
       CareerRecord:'경력 실적',
       /* ⚠ 업무 자료가 아니다 — 「그 사람이 어느 탭·어느 달을 보고 있었나」뿐이다.
          관계 색인에 넣지 않는다(푸른 캘린더의 읽기 어댑터가 in_app 인 까닭). */
@@ -131,6 +134,14 @@
       entityTypes:['Organization','Person','Project','FinancialTransaction','Document'] },
     rules:{ name:'취업규칙 관리', file:'rules.html', primaryRoots:['chwieop','rules_mgmt'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Policy','Document','ReviewCriterion','LegalProvision'] },
+    /* 취업규칙(새) — 옛 규정관리(rules)와 «나란히» 둔다(설계 §3-1). 옛 앱의 자리(chwieop·rules_mgmt 일부)는 건드리지 않는다.
+       화면이 쓰는 칸은 사람 칸 셋뿐이다(서류 human · 회차 rounds · 요청 ask).
+       ⚠ library/docs·text·seen·run 은 «서버 칸»이다 — 화면이 쓰겠다고 선언하지 말 것(규칙도 막는다). */
+    rulesv2:{ name:'취업규칙(새)', file:'rules-v2.html', portal:false, /* ⚠ 임시 — 포털 타일은 Task 10 에서 단다. 그때 이 줄을 «지운다» */ primaryRoots:['rules_mgmt/library'], sharedRoots:['data/companies','data/user_dir'],
+      entityTypes:['RulesDocument','RulesRound','Organization','Task'],
+      writeContracts:[{path:'rules_mgmt/library/human/{id}',entityType:'RulesDocument'},
+                      {path:'rules_mgmt/library/rounds/{id}',entityType:'RulesRound'},
+                      {path:'rules_mgmt/library/ask/{id}',entityType:'Task'}] },
     docs:{ name:'문서관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs'],
       /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피)
          2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
@@ -365,6 +376,9 @@
          캘린더가 제 업무 자료를 갖게 되면(1걸음-나 저장 붙이기) 그때 다시 본다. */
     cal_view:{program:'cal',strategy:'in_app',path:'data/cal_view',parser:'coverage',
       gives:'보던 탭·거르개 (업무 자료 아님 — 일정·근태는 erp_core 가 읽는다)'},
+    /* 취업규칙(새) — 가려진 글이라도 «고객사 규칙 원문»이다. 통합 진단에 넣지 않는다(그 앱 안에서만 본다). */
+    rulesv2_core:{program:'rulesv2',strategy:'in_app',path:'rules_mgmt/library',parser:'coverage',
+      gives:'취업규칙 서류·회차 (고객사 규칙 원문 — 통합 진단에서 읽지 않는다)'},
     fund_core:{program:'fund',strategy:'local',path:'data/funds',parser:'erp'},
     work_items:{program:'work',strategy:'remote',path:'work_erp/items',parser:'workItems'},
     career_counts:{program:'career',strategy:'remote',path:'kcareer/{uid}/counts',parser:'coverage'},
