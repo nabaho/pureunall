@@ -170,7 +170,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/utils.js?v=2"></script>
 <script src="js/esign-crypto.js?v=1"></script>
 <script src="js/esign-docs.js?v=1"></script>
-<script src="js/pu-hwp-engine.js?v=17"></script>
+<script src="js/pu-hwp-engine.js?v=18"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
@@ -377,7 +377,8 @@ function formHwpEdit(bytes, name) {
       + '<div data-k="stat" style="background:#1e293b;color:#f0fdf4;font-size:11px;padding:5px 12px;border-radius:0 0 9px 9px">편집기를 여는 중… (처음 한 번은 조금 걸립니다)</div>';
     document.body.appendChild(bg);
     var stat = bg.querySelector('[data-k="stat"]');
-    function finish(v) { if (done) return; done = true; try { if (ed && ed.destroy) ed.destroy(); } catch (e) {} bg.remove(); resolve(v); }
+    /* 닫은 뒤 편집기가 브라우저에 남긴 서류(복구본·최근 문서·이력)를 비운다 — PureunHwp.clearStudioStores 참고 */
+    function finish(v) { if (done) return; done = true; try { if (ed && ed.destroy) ed.destroy(); } catch (e) {} bg.remove(); try { PureunHwp.clearStudioStores(); } catch (e) {} resolve(v); }
     bg.querySelector('[data-k="no"]').onclick = function () { finish(null); };
     bg.querySelector('[data-k="ok"]').onclick = function () {
       if (!ed) { finish(null); return; }
@@ -390,6 +391,8 @@ function formHwpEdit(bytes, name) {
     (async function () {
       var hx = bytes;
       if (fmt !== 'hwpx') { var d = await PureunHwp.openDoc(bytes, name); try { hx = new Uint8Array(d.exportHwpx()); } finally { try { d.free(); } catch (e) {} } }
+      /* ⚠ 띄우기 «전»에 비운다 — 편집기가 시작하자마자 복구본을 찾아 「문서 복구」 창을 띄운다(다른 근로자 서류가 들어온다) */
+      await PureunHwp.clearStudioStores();
       var mod = await import('./vendor/rhwp-editor/index.js');
       ed = await mod.createEditor(bg.querySelector('[data-k="host"]'), { studioUrl: 'vendor/rhwp-studio/index.html', renderer: 'canvas2d', width: '100%', height: '100%' });
       await ed.loadFile(hx.buffer.slice(hx.byteOffset, hx.byteOffset + hx.byteLength), String(name || '문서').replace(/\.hwp$/i, '.hwpx'));

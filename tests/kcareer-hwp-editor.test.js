@@ -210,7 +210,8 @@ test('⑩★★ 편집기가 브라우저에 남긴 서류를 지운다 — 다�
        그대로 두면 다음 사람이 앞사람 것을 복구창으로 받는다. */
   assert.match(CODE, /function _hwpEdForget\(/, '★ 지우는 길이 없습니다');
   const fn = cutFn(CODE, 'function _hwpEdForget(');
-  ['rhwpStudioAutosave', 'rhwpStudioRecent'].forEach((n) => {
+  /* 2026-10-03 rhwpStudioDocHistory(문서 이력 — 문서 내용 24벌)도 — 기금관리 #1841 과 같은 셋 */
+  ['rhwpStudioAutosave', 'rhwpStudioRecent', 'rhwpStudioDocHistory'].forEach((n) => {
     assert.ok(fn.indexOf(n) >= 0, '★ ' + n + ' 을 안 지웁니다 — 서류가 이 PC 에 남습니다');
   });
   assert.match(fn, /deleteDatabase\(/, '★ 지우지 않고 읽기만 합니다');

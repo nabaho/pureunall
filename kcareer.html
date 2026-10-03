@@ -1262,7 +1262,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   @page{size:A4;margin:14mm}
 }
 </style>
-<script src="js/pu-hwp-engine.js?v=17"></script>
+<script src="js/pu-hwp-engine.js?v=18"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -13666,7 +13666,8 @@ function rhSetMode(m){
    ⚠ 이 함수를 빼지 말 것 — 빼면 조용히 다시 쌓인다. 검사 ⑩ 이 막는다. */
 function _hwpEdForget(){
   try{
-    ['rhwpStudioAutosave','rhwpStudioRecent'].forEach(function(n){
+    /* 2026-10-03 「문서 이력」(rhwpStudioDocHistory — 문서 내용 24벌)도 같은 종류라 함께 지운다(대표 「다른앱 복구창 막아라」) */
+    ['rhwpStudioAutosave','rhwpStudioRecent','rhwpStudioDocHistory'].forEach(function(n){
       try{ indexedDB.deleteDatabase(n); }catch(e){}
     });
   }catch(e){}
