@@ -57,7 +57,11 @@
            고객사 근로자는 사건(cases)의 workers 안에 있고, 사건은 이미 업체에 붙는다.
          ⚠ 관계어를 하나만 만든다 — Employment 와 PayrollRecord 를 갈라 두 개를
            만들면 사전에 말만 늘고 쓰는 자리는 같다. */
-      recordedFor:['Employment|PayrollRecord','Person']
+      recordedFor:['Employment|PayrollRecord','Person'],
+      /* 업무 → 그 업무를 낳은 연락 (2026-10-03 급여데이터함 「입퇴사 할 일」).
+         메일 속 「입사자 ○○」가 취득신고 할 일이 된다 — 그 할 일이 «어느 메일에서 왔나».
+         ⚠ derivedFrom 은 목적어가 계약·사건·문서라 연락(Message)을 못 가리켰다. */
+      raisedBy:['Task','Message']
     }
   };
 
@@ -134,8 +138,9 @@
       entityTypes:['Organization','Person','Case','Document','Submission'] },
     payroll:{ name:'급여관리', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Employment','PayrollRecord','Document'] },
+    /* Task — 「입퇴사 할 일」(paydata/hrtask, 2026-10-03). 메일에서 매번 다시 세고 «사람이 누른 상태»만 적는다. */
     paydata:{ name:'급여데이터함', file:'pu-paydata.html', primaryRoots:['paydata'],
-      entityTypes:['Organization','Person','PayrollRecord','Document','Message'] },
+      entityTypes:['Organization','Person','PayrollRecord','Document','Message','Task'] },
     home:{ name:'홈페이지 관리', file:'pu-home.html', primaryRoots:['homepage'], sharedRoots:['kcareer/{uid}/ls'],
       entityTypes:['Person','Organization','Document'] },
     /* 뉴스레터 관리 — 주간뉴스레터를 짓고 보낸다.
@@ -324,7 +329,8 @@
     transferredTo:'업무 인계 — 인계 기록에 영구 ID가 아직 없다',
     fulfills:'계약 이행 — 어떤 일이 계약을 채웠는지 기준이 없다',
     supersedes:'개정 관계 — 취업규칙 대조표를 통합 화면에서 읽지 않는다',
-    groundedIn:'검토 기준→법 조문 — 연결표는 js/pu-rules-lawlink.js 에 있다. 관계 색인(ontology/v1)이 아직 꺼져 있어 색인에는 안 넣는다'
+    groundedIn:'검토 기준→법 조문 — 연결표는 js/pu-rules-lawlink.js 에 있다. 관계 색인(ontology/v1)이 아직 꺼져 있어 색인에는 안 넣는다',
+    raisedBy:'할 일→그것을 낳은 메일 — 급여데이터함 paydata/hrtask 의 sourceId 가 paydata/maillog 열쇠를 가리킨다. 관계 색인(ontology/v1)이 아직 꺼져 있어 색인에는 안 넣는다'
   };
 
   var STORE_TYPES = {

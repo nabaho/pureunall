@@ -62,17 +62,23 @@ function ctx(isAdmin) {
 
 /* ══════ 첫 칸 — 보기 목록 ══════ */
 
+/* ⚠ 보기 목록을 글자 그대로 박지 않는다(2026-10-03 「📋 입퇴사 할 일」 이 붙으며 깨졌다).
+   지키는 규칙은 둘이다 — 담당자에게 «전체» 보기가 안 새는가, 관리자에게는 붙는가. */
+const ADMIN_VIEWS = ['all', 'alllate', 'allhr', 'noman'];
 test('★ 담당자에게는 「내 일」 보기만 나온다', () => {
   const M = load();
-  const v = M.sideViewModel(ctx(false));
-  assert.equal(v.views.map(x => x.key).join(','), 'mine,late,today,shared');
-  assert.equal(v.people.length, 0, '담당자에게는 남의 명단을 세우지 않는다');
+  const keys = M.sideViewModel(ctx(false)).views.map(x => x.key);
+  ['mine', 'late', 'today', 'hr', 'shared'].forEach(k => assert.ok(keys.includes(k), k + ' 가 있어야 한다'));
+  ADMIN_VIEWS.forEach(k => assert.ok(!keys.includes(k), k + ' 는 담당자에게 안 보인다'));
+  assert.equal(M.sideViewModel(ctx(false)).people.length, 0, '담당자에게는 남의 명단을 세우지 않는다');
 });
 
 test('★ 관리자에게만 전체 보기와 담당자 명단이 붙는다', () => {
   const M = load();
   const v = M.sideViewModel(ctx(true));
-  assert.equal(v.views.map(x => x.key).join(','), 'mine,late,today,shared,all,alllate,noman');
+  const keys = v.views.map(x => x.key);
+  ADMIN_VIEWS.forEach(k => assert.ok(keys.includes(k), k + ' 가 관리자에게 붙어야 한다'));
+  assert.ok(keys.indexOf('mine') < keys.indexOf('all'), '「내 일」이 «전체» 보다 먼저');
   assert.equal(v.people.length, 2);
 });
 
