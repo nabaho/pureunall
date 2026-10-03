@@ -212,9 +212,12 @@ test('★★★ 이름으로는 저절로 안 잇는다 — 잇기는 사람이 
 });
 
 test('★★ 메일 창·기업정보함 «둘 다»에서 들어간다 · 주소로도 온다', () => {
-  assert.match(app, /: state\.mailSent==='mnew' \? mnewHtml\(\)/, '★★ 메일 창이 이 화면을 안 그립니다');
+  /* ⚠ 2026-10-03 대표 지시 「메일연락처 클릭하니 메일함으로 갔다」 → 목업 v2 「진행」:
+       기업정보함 옆줄은 «이 창»의 📥 연락처 정리(openCntPage)를 열고, 메일 창도 «같은 화면»(cntHtml)을 그린다.
+       (tests/cards-contact-sort.test.js 가 그 화면을 자세히 본다) */
+  assert.match(app, /: state\.mailSent==='mnew' \? cntHtml\(\)/, '★★ 메일 창이 이 화면을 안 그립니다');
   assert.match(app, /onclick="openMnewPage\(\)"[\s\S]{0,300}메일에서 온 연락처/, '★★ 메일 창 옆줄에 자리가 없습니다');
-  assert.match(app, /onclick="openMnewWindow\(\)"[^>]*>📥<em>메일 연락처<\/em>/, '★★ 기업정보함 옆줄에 자리가 없습니다');
+  assert.match(app, /onclick="openCntPage\(\)"[^>]*>📥<em>연락처 정리<\/em>/, '★★ 기업정보함 옆줄에 자리가 없습니다');
   assert.match(strip(sliceFn(app, 'function openMnewWindow(')), /view=mail&mail=mnew/);
   const ctx = { String, RegExp };
   vm.createContext(ctx);

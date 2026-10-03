@@ -782,6 +782,48 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .mn-find .em{font-size:12px;color:#94a3b8}
 .mn-foot{font-size:12.5px;color:#64748b;margin-top:14px}
 .mn-foot a{color:#2563eb}
+/* 📥 연락처 정리 (대표 승인 목업 v2 2026-10-03) — 한 칸 한 줄 · 맨 앞 ☐·# */
+.cn{padding:14px 18px 40px}
+.cn-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cn-head b{font-size:17px;color:#1e293b}
+.cn-i{cursor:help;color:#94a3b8;font-size:13px}
+.cn-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.cn-card{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;font-family:inherit;cursor:pointer;
+  background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px}
+.cn-card.on{border:2px solid #2563eb;padding:8px 11px;background:#eff6ff}
+.cn-card .l{font-size:12px;color:#64748b}
+.cn-card b{font-size:21px;color:#1e293b}
+.cn-card .s{font-size:11px;color:#94a3b8}
+.cn-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#64748b;margin-bottom:8px}
+.cn .go{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;white-space:nowrap;
+  border-radius:4px;padding:1px 8px;font-size:12px}
+.cn .go.co{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
+.cn .go.cd{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.cn .go.no{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}
+.cn a.go{cursor:pointer;text-decoration:none}
+.cn a.go:hover{border-color:#2563eb}
+.cn-auto{font-size:10.5px;color:#94a3b8}
+.cn-bulk{display:flex;align-items:center;gap:6px;padding:6px 10px;margin-bottom:6px;background:#f8fafc;border:1px solid #e2e8f0;
+  border-radius:6px;font-size:12.5px;color:#1e293b}
+.cn-bulk button,.cn-t button{font-family:inherit;font-size:12px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;
+  border-radius:4px;padding:3px 9px;cursor:pointer;white-space:nowrap}
+.cn-bulk button:hover,.cn-t button:hover{border-color:#2563eb;color:#2563eb}
+.cn-t button.pri{background:#1e40af;border-color:#1e40af;color:#ffffff;max-width:170px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.cn-t{width:100%;border-collapse:collapse;table-layout:fixed;background:#ffffff;border:1px solid #e2e8f0;font-size:13px}
+.cn-t th{text-align:left;font-weight:400;font-size:11.5px;color:#64748b;background:#f8fafc;padding:6px 6px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+.cn-t td{padding:0 6px;height:36px;border-top:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cn-t col.ck{width:30px} .cn-t col.no{width:36px} .cn-t col.nm{width:120px} .cn-t col.em{width:210px}
+.cn-t col.sg{width:150px} .cn-t col.act{width:300px} .cn-t col.dt{width:60px} .cn-t col.bk{width:120px}
+.cn-t td.no{color:#94a3b8;font-size:12px} .cn-t td.nm{color:#1e293b;font-weight:600}
+.cn-t td.em{color:#64748b;font-size:12px} .cn-t td.sj{color:#475569} .cn-t td.dt{color:#94a3b8;font-size:12px}
+.cn-t td.sg{color:#854d0e;font-size:12px} .cn-t td.sg.none{color:#94a3b8}
+.cn-t td.act{text-align:right}
+.cn-t tr.grp td{height:30px;background:#f8fafc;color:#475569;font-size:12px;font-weight:600}
+.cn-t tr.off td{color:#94a3b8}
+.cn-t tr.cn-find td{background:#f8fafc;height:40px}
+.cn-t tr.cn-find input{font-family:inherit;font-size:12.5px;border:1px solid #cbd5e1;border-radius:4px;padding:4px 8px;width:200px}
+.cn-none{color:#64748b;font-size:12.5px}
+@media (max-width:1100px){ .cn-t col.em{width:0} .cn-t td.em,.cn-t th:nth-child(4){font-size:0} }
 
 /* ── 숨겨 둔 칸 되돌리는 자리 (대표 지시 2026-08-26) ──
    ⚠ 되돌릴 길이 없으면 아무도 숨기기를 못 누른다. 숨기기와 «같은 화면»에 둔다. */
@@ -7867,6 +7909,7 @@ function openSentBox(){ state.view='mail'; state.mailSent=true; render();
 function closeMailPage(){ state.view='list'; render(); }
 function renderMailPage(){
   mbMemoClear();   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
+  if(state.view === 'cnt') return renderCntPage();   /* 📥 연락처 정리는 기업정보함 화면이다 — 같은 칸(#pcMail)에 그린다 */   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
   mbAutoFill();    /* 받아 온 줄이 없으면 «스스로» 받아 온다 (대표 보고 2026-08-30) */
   mbSeenLoad();    /* 「누가 봤나」는 한 번만 읽어 온다 (두 번째부터는 그 자리에서 돌아온다) */
   mbBizSubsLoad(); /* 사무관리 건의 부담당도 한 번만 — 앱이 이미 읽는 자료를 그대로 쓴다 */
@@ -7883,7 +7926,7 @@ function renderMailPage(){
   el.innerHTML = (state.mailSent==='box' ? mbBoxHtml()
                 : state.mailSent==='who' ? whoPageHtml()
                 /* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) */
-                : state.mailSent==='mnew' ? mnewHtml()
+                : state.mailSent==='mnew' ? cntHtml()
                 : state.mailSent==='set' ? mailSetHtml()
                 : state.mailSent==='inbox' ? inboxBoxHtml()
                 /* 사업장별로 오간 것 — 받은·보낸을 한 줄기로 (2026-08-30) */
@@ -15941,7 +15984,7 @@ function renderPCSide(){
     <button class="${onWk?'on':''}" onclick="openWkPage()" title="사건과 사진첩 서류를 «사람»으로 모아 봅니다 — 집단 진정은 한 줄로 접힙니다">👷<em>근로자</em><span>${wkCountLabel()}</span></button>
     ${/* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) — 메일 «앱 창»의 그 화면으로 연다.
          수는 메일 창이 마지막에 센 값이다(이 창에는 메일이 없다). */''}
-    <button onclick="openMnewWindow()" title="메일에서 처음 온 상대 — 답장한 상대 · 회사 도메인이 같은 곳 · 신규 문의. 메일 창에서 열립니다">📥<em>메일 연락처</em><span>${mnewLsCount() ? mnewLsCount().toLocaleString() : ''}</span></button>
+    <button class="${state.view==='cnt'?'on':''}" onclick="openCntPage()" title="메일에서 처음 온 상대를 업체 담당자 · 명함으로 정리합니다 — 이 창에서 열립니다">📥<em>연락처 정리</em><span>${mnewLsCount() ? mnewLsCount().toLocaleString() : ''}</span></button>
   </div></div>`;
   /* ⚠ 갈래 줄의 끝(`</div></div>`)이 .pcside-top 까지 «같이» 닫는다. 메일 창은 위에서
      이미 갈라져 나갔으므로 여기서는 갈래 줄이 늘 그려진다 — 따로 닫을 일이 없다. */
@@ -17119,7 +17162,7 @@ function mbEnsureFolders(){
   _mbBusyFolders = true;
   loadMailFolders(()=>{
     _mbBusyFolders = false;
-    if(state.view==='mail' || state.view==='mat') mbDrawSoon();
+    if(state.view==='mail' || state.view==='mat' || state.view==='cnt') mbDrawSoon();
   });
 }
 
@@ -23323,16 +23366,17 @@ async function erpUnfillContact(coId, email){
   if(typeof ErpMatch!=='undefined' && ErpMatch.load) ErpMatch.load();
   return { ok:true, removed:true };
 }
-async function mnewUndo(key){
+async function mnewUndo(key, quiet){
   const rec = (_mnewAutoLog||{})[key];
   if(!rec || rec.undone) return;
-  if(!confirm(`「${rec.coName}」 담당자에서 ${rec.em} 을 뺍니다.\n\n저절로 채운 줄만 뺍니다 — 사람이 넣은 것은 그대로 둡니다.\n이 주소는 다시 저절로 채우지 않습니다.`)) return;
+  if(!quiet && !confirm(`「${rec.coName}」 담당자에서 ${rec.em} 을 뺍니다.\n\n저절로 채운 줄만 뺍니다 — 사람이 넣은 것은 그대로 둡니다.\n이 주소는 다시 저절로 채우지 않습니다.`)) return;
   try{
     const r = await erpUnfillContact(rec.co, rec.em);
     if(!r.ok) return toast(r.why, 8000);
     rec.undone = Date.now();
     await firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + key + '/undone').set(rec.undone);
     mnewBust(); mbNewBust();
+    if(quiet) return;
     toast('↩ 되돌렸습니다 — ' + rec.em, 6000);
     renderPCSide(); renderMailPage();
   }catch(e){ toast('되돌리지 못했습니다 — ' + ((e&&e.message)||e), 9000); }
@@ -23347,6 +23391,14 @@ async function mnewLink(key, coId){
   try{
     const res = await erpFillContact({ coId:co.id, email:r.em, name:r.name, from:'mail-new' });
     if(!res.ok) return toast(res.why, 8000);
+    /* 📥 「정리한 것」에 남긴다 — 저절로 채운 것과 «같은 자리»(config/mailAutoFill), how:'link' 로 갈라 둔다.
+       ⚠ 실제로 넣었을 때만(added) — 이미 있던 주소면 우리가 한 일이 아니라 되돌리면 남의 것을 뺀다. */
+    if(res.added){
+      const rec = { em:r.em, co:String(co.id), coName:String(co.name||''), name:r.name, subj:String(r.subj||'').slice(0, 80),
+        at:Date.now(), by:String(myEmail||''), added:true, how:'link' };
+      (_mnewAutoLog || (_mnewAutoLog = {}))[r.key] = rec;
+      try{ firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + r.key).set(rec); }catch(_){ }
+    }
     mnewBust(); mbNewBust();
     toast('🏢 「' + (co.name||'') + '」 담당자로 이었습니다 — ' + r.em, 8000);
     renderPCSide(); renderMailPage();
@@ -23470,6 +23522,206 @@ function mnewHtml(){
   h += `<div class="mn-foot">위 세 갈래에 안 걸린 나머지(한 번만 온 개인 주소 등)는
     <a href="javascript:void(0)" onclick="openMailBox('*all');mbCheckOpen('new')">🔎 메일함 점검 → 👤 처음 보는 주소</a>에서 훑으십시오.</div>`;
   return `<div class="mn">${h}</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   📥 연락처 정리 — 기업정보함 안의 화면 (대표 승인 목업 v2 2026-10-03)
+   ══════════════════════════════════════════════════════════════════════════
+   「메일연락처 클릭하니 메일함으로 갔다 … ㅁ 와 넘버링 항상 해라 … 어디에 보관되어 있는지
+    확인이 어렵다」 → 목업 → 「좀더 보기 쉽고 직관적이게」 → v2 → 「진행」.
+   ★ 기업정보함 옆줄 「📥 연락처 정리」를 누르면 «이 창» 가운데에 열린다 — 메일 창으로 안 간다.
+     메일함 옆줄의 「메일에서 온 연락처」도 «같은 화면»을 그린다(두 벌이면 한쪽만 고쳐진다).
+   ★ 세 갈래 — 정리할 것(아직 저장 안 됨) · 정리한 것(어디에 들어갔나) · 넘어간 것(다시 살리기)
+   ★ 맨 앞 ☐ · # (대표 지시: 목록에는 늘) · 고르면 위에 일괄 단추
+   ★ 「어디에 보관되어 있나」의 답 — 정리한 것의 «들어간 곳» 한 칸:
+       🏢 이알피 업체관리 › 업체 › 담당자  = config/mailAutoFill 기록(저절로·잇기 모두)
+       📇 기업정보함 › 명함               = 메모가 「메일에서 — 」로 시작하는 명함
+       🙈 넘어간 것                       = config/mailNewSkip
+   ⚠ 새 저장소를 만들지 않는다 — 셋 다 이미 있는 자리다.
+   ⚠ 여러 장 「명함으로」는 저장 창 없이 바로 만든다(물어본 뒤) — 한 장씩이면 지금처럼 창을 연다. */
+function cntTodo(){ return mnewRows(); }
+function cntDone(){
+  const out = [], log = _mnewAutoLog || {};
+  Object.keys(log).forEach(k=>{
+    const x = log[k]; if(!x || !x.added) return;
+    out.push({ key:k, go:'co', em:String(x.em||''), name:String(x.name||''), coId:String(x.co||''),
+      coName:String(x.coName||''), at:Number(x.at||0), undone:!!x.undone, how:x.how || 'auto' });
+  });
+  Object.values(state.items || {}).forEach(it=>{
+    if(!it || it.kind !== 'card' || !/^메일에서 — /.test(String(it.memo||''))) return;
+    out.push({ key:'c:' + it.id, go:'card', em:String(it.email||''), name:String(it.name||it.company||''),
+      cardId:it.id, at:Number(it.createdAt||0) });
+  });
+  return out.sort((a,b)=>b.at - a.at);
+}
+function cntSkips(){
+  const s = mbNewSkipSet();
+  return Object.keys(s).filter(k=>s[k]).map(k=>({ key:k, em:k.replace(/,/g, '.') }));
+}
+function cntLoading(){
+  return _mbFolders === null || !Object.keys(_mbMsgs || {}).length;
+}
+function cntHtml(){
+  const tab = state.cntTab || 'todo', sel = state.cntSel || (state.cntSel = {});
+  const busy = cntLoading();
+  const todo = busy ? [] : cntTodo(), done = cntDone(), skip = cntSkips();
+  const day = t => { const d = new Date(Number(t||0)); return isNaN(d) || !t ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
+  const card = (t, ic, label, n, sub) => `<button class="cn-card${tab===t?' on':''}" onclick="cntTabSet('${t}')">
+      <span class="l">${ic} ${label}</span><b>${busy && t==='todo' ? '…' : n.toLocaleString()}</b><span class="s">${sub}</span></button>`;
+  let h = `<div class="cn-head"><b>📥 연락처 정리</b><span class="cn-i" title="메일함에서 처음 온 상대를 모았습니다 — 스팸·광고·공공기관·기계발신은 뺐습니다.&#10;정리할 것은 아직 아무 데도 저장되지 않았습니다. 단추를 누르면 그 자리에 들어갑니다.&#10;들어간 곳은 「정리한 것」에서 보고, 되돌릴 수 있습니다.">ⓘ</span></div>`;
+  h += `<div class="cn-cards">${card('todo','📥','정리할 것',todo.length,'아직 저장 안 됨')}${card('done','✅','정리한 것',done.filter(x=>!x.undone).length,'업체·명함에 들어감')}${card('skip','🙈','넘어간 것',skip.length,'다시 안 물음')}</div>`;
+  h += `<div class="cn-legend">보낼 곳 <span class="go co">🏢 업체 담당자 · 이알피 업체관리</span><span class="go cd">📇 명함 · 기업정보함</span><span class="go no">🙈 넘어가기</span></div>`;
+  const list = tab === 'todo' ? todo : tab === 'done' ? done : skip;
+  const keys = list.map(r=>r.key);
+  const nSel = keys.filter(k=>sel[k]).length;
+  if(nSel) h += `<div class="cn-bulk">☑ ${nSel}개 선택 ${
+      tab === 'todo' ? `<button onclick="cntBulk('card')">📇 명함으로</button><button onclick="cntBulk('skip')">🙈 넘어가기</button>`
+    : tab === 'skip' ? `<button onclick="cntBulk('unskip')">↩ 다시 살리기</button>`
+    : `<button onclick="cntBulk('undo')">↩ 되돌리기</button>`}<button onclick="cntSelAll(false)">선택 풀기</button></div>`;
+  const allOn = keys.length && nSel === keys.length;
+  const th = cols => `<tr><th class="ck"><input type="checkbox" ${allOn?'checked':''} onchange="cntSelAll(this.checked)" title="모두 고르기"></th><th class="no">#</th>${cols}</tr>`;
+  const ck = k => `<td class="ck"><input type="checkbox" ${sel[k]?'checked':''} onchange="cntSel('${esc(k)}',this.checked)"></td>`;
+  const Q = state.mnewQ || {};
+  let n = 0;
+  if(tab === 'todo'){
+    const line = r => {
+      const k = esc(r.key);
+      const sug = r.co ? `<td class="sg" title="${esc(r.why)}으로 짚었습니다 — 짐작이라 누르셔야 잇습니다">${esc(r.why)}: ${esc(r.co.name||'')}</td>`
+                       : `<td class="sg none">${r.kind === 'inq' ? '신규 문의' : '모름'}</td>`;
+      const act = (r.co ? `<button class="pri" onclick="mnewLink('${k}','${esc(String(r.co.id))}')" title="이알피 업체관리 «${esc(r.co.name||'')}» 담당자 칸에 넣습니다">🏢 ${esc(r.co.name||'')}에 잇기</button>
+            <button onclick="mnewFindToggle('${k}')">다른 업체</button>`
+          : `<button onclick="mnewFindToggle('${k}')">🔍 업체 찾기</button>`)
+        + (r.kind === 'inq' ? `<button onclick="cntOpenMail('${k}')" title="메일 열기">✉</button>` : '')
+        + `<button onclick="mnewCard('${k}')" title="명함으로 — 기업정보함 명함 입력 창을 채워서 엽니다">📇</button>
+           <button onclick="cntSkip('${k}')" title="넘어가기 — 다시 안 묻습니다(전 직원 공용)">🙈</button>`;
+      let row = `<tr>${ck(r.key)}<td class="no">${++n}</td><td class="nm" title="${esc(r.name || r.em)}">${esc(r.name || r.em.split('@')[0])}</td>
+        <td class="em" title="${esc(r.em)}">${esc(r.em)}</td><td class="sj" title="${esc(r.subj||'')}">${day(r.last)} · ${esc(r.subj || '(제목 없음)')}</td>${sug}<td class="act">${act}</td></tr>`;
+      if(Q[r.key] !== undefined) row += `<tr class="cn-find"><td colspan="7"><input value="${esc(Q[r.key])}" placeholder="업체 이름 두 글자 이상"
+          oninput="mnewFind('${k}', this.value)"> <span id="mnf-${k}">${mnewHitsHtml(r.key, Q[r.key])}</span></td></tr>`;
+      return row;
+    };
+    const hint = todo.filter(r=>r.co), none = todo.filter(r=>!r.co);
+    h += `<table class="cn-t todo"><colgroup><col class="ck"><col class="no"><col class="nm"><col class="em"><col><col class="sg"><col class="act"></colgroup>`
+      + th('<th>보낸 사람</th><th>이메일</th><th>최근 메일</th><th>짚이는 업체</th><th></th>')
+      + (busy ? '<tr><td colspan="7" class="cn-none">메일을 읽는 중입니다…</td></tr>' : '')
+      + (hint.length ? `<tr class="grp"><td colspan="7">💡 업체가 짚이는 것 ${hint.length} — 맞으면 「잇기」만 누르세요</td></tr>` + hint.map(line).join('') : '')
+      + (none.length ? `<tr class="grp"><td colspan="7">❔ 업체를 모르는 것 ${none.length} — 찾아서 잇거나 명함으로</td></tr>` + none.map(line).join('') : '')
+      + (!busy && !todo.length ? '<tr><td colspan="7" class="cn-none">다 정리했습니다</td></tr>' : '')
+      + '</table>';
+  } else if(tab === 'done'){
+    const where = x => x.go === 'card'
+      ? `<a class="go cd" onclick="cntGo('${esc(x.key)}')" title="그 명함을 엽니다">📇 기업정보함 › 명함 › ${esc(x.name || x.em)} ↗</a>`
+      : x.undone ? '<span class="go no">↩ 되돌림</span>'
+      : `<a class="go co" onclick="cntGo('${esc(x.key)}')" title="그 회사를 엽니다">🏢 이알피 업체관리 › ${esc(x.coName)} › 담당자 ↗</a>${x.how === 'auto' ? ' <small class="cn-auto" title="회사 도메인이 업체 한 곳과 같아 저절로 채웠습니다">저절로</small>' : ''}`;
+    h += `<table class="cn-t done"><colgroup><col class="ck"><col class="no"><col class="nm"><col class="em"><col><col class="dt"><col class="bk"></colgroup>`
+      + th('<th>이름</th><th>이메일</th><th>들어간 곳</th><th>날짜</th><th></th>')
+      + done.map(x=>`<tr${x.undone ? ' class="off"' : ''}>${ck(x.key)}<td class="no">${++n}</td><td class="nm" title="${esc(x.name)}">${esc(x.name || x.em.split('@')[0])}</td>
+          <td class="em" title="${esc(x.em)}">${esc(x.em)}</td><td class="wh">${where(x)}</td><td class="dt">${day(x.at)}</td>
+          <td class="act">${x.go === 'co' && !x.undone ? `<button onclick="mnewUndo('${esc(x.key)}')">↩ 되돌리기</button>` : ''}</td></tr>`).join('')
+      + (done.length ? '' : '<tr><td colspan="7" class="cn-none">아직 없습니다</td></tr>') + '</table>';
+  } else {
+    h += `<table class="cn-t skip"><colgroup><col class="ck"><col class="no"><col><col class="bk"></colgroup>`
+      + th('<th>이메일</th><th></th>')
+      + skip.map(x=>`<tr>${ck(x.key)}<td class="no">${++n}</td><td class="em" title="${esc(x.em)}">${esc(x.em)}</td>
+          <td class="act"><button onclick="cntUnskip('${esc(x.key)}')">↩ 다시 살리기</button></td></tr>`).join('')
+      + (skip.length ? '' : '<tr><td colspan="4" class="cn-none">없습니다</td></tr>') + '</table>';
+  }
+  return `<div class="cn">${h}</div>`;
+}
+function renderCntPage(){
+  const el = $('pcMail'); if(!el) return;
+  mbMemoClear();
+  mnewTickStart();     /* 회사 도메인이 같은 곳 저절로 채우기 — 관리자 PC 에서만 (메일 화면과 같은 길) */
+  try{ if(!cntLoading()) mnewCount(); }catch(_){ }   /* 옆줄 숫자(📥 연락처 정리)가 실제 남은 수를 따라가게 */
+  const top = el.scrollTop;
+  el.innerHTML = cntHtml();
+  el.scrollTop = top;
+}
+/* 기업정보함 옆줄에서 — 이 창 가운데에 연다. 폰은 예전처럼 메일 쪽 화면으로. */
+function openCntPage(){
+  if(!document.body.classList.contains('pc')) return openMnewPage();
+  state.view = 'cnt'; state.cntTab = state.cntTab || 'todo'; state.cntSel = {}; state.mbOpen = null;
+  render();
+  try{ $('pcMail').scrollTop = 0; }catch(_){}
+  const again = ()=>{ if(state.view === 'cnt') mbDrawSoon(); };
+  mnewLogLoad(again);
+  try{ mbEnsureBins(again); }catch(_){}
+  const go = ()=>{
+    const need = mbFolders().filter(f=>(mbGotFolder(f) || f.kind === 'sent') && !_mbMsgs[f.slug]).map(f=>f.slug);
+    if(!need.length) return again();
+    let left = need.length;
+    need.forEach(s=>loadMailBox(s, mbPageSize(), ()=>{ if(!--left) again(); }));
+  };
+  if(_mbFolders === null) loadMailFolders(go); else go();
+}
+function cntRepaint(){ if(state.view === 'cnt') renderCntPage(); else renderMailPage(); }
+function cntTabSet(t){ state.cntTab = t; state.cntSel = {}; cntRepaint(); }
+function cntSel(k, on){ const s = state.cntSel || (state.cntSel = {}); if(on) s[k] = 1; else delete s[k]; cntRepaint(); }
+function cntSelAll(on){
+  const tab = state.cntTab || 'todo';
+  const list = tab === 'todo' ? cntTodo() : tab === 'done' ? cntDone() : cntSkips();
+  state.cntSel = {};
+  if(on) list.forEach(r=>{ state.cntSel[r.key] = 1; });
+  cntRepaint();
+}
+function cntSkip(key){ const r = mnewRow(key); if(!r) return; delete (state.cntSel||{})[key]; mbNewNo(r.em); mnewBust(); cntRepaint(); }
+function cntUnskip(key, quiet){
+  delete mbNewSkipSet()[key];
+  if(typeof Store!=='undefined' && Store.mode==='firebase')
+    firebase.database().ref(DB_ROOT + '/config/mailNewSkip/' + key).remove().catch(()=>{});
+  delete (state.cntSel||{})[key];
+  mbNewBust(); mnewBust();
+  if(!quiet){ toast('↩ 다시 묻습니다 — ' + key.replace(/,/g, '.')); cntRepaint(); }
+}
+function cntOpenMail(key){
+  if(state.view === 'cnt'){ state.view = 'mail'; state.mailSent = 'mnew'; render(); }
+  mnewOpenMail(key);
+}
+/* 「들어간 곳 ↗」 — 명함이면 그 명함, 업체면 기업정보함의 그 회사(이알피와 이어진 곳), 없으면 이알피 업체관리 */
+function cntGo(key){
+  if(String(key).indexOf('c:') === 0) return openDetail(String(key).slice(2));
+  const rec = (_mnewAutoLog || {})[key]; if(!rec) return;
+  const o = coList().find(x=>x && x.erp && String(x.erp.id) === String(rec.co));
+  if(o){ openCoPage(); pickCo(o.key); return; }
+  const url = 'pu-erp.html#menu=biz/company';
+  if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(url, '업체관리'); else location.href = url;
+}
+async function cntBulk(act){
+  const sel = state.cntSel || {};
+  const keys = Object.keys(sel).filter(k=>sel[k]);
+  if(!keys.length) return;
+  if(act === 'skip'){
+    const rows = keys.map(mnewRow).filter(Boolean);
+    rows.forEach(r=>{
+      const k = mbWhoKey(r.em); mbNewSkipSet()[k] = 1;
+      if(typeof Store!=='undefined' && Store.mode==='firebase')
+        firebase.database().ref(DB_ROOT + '/config/mailNewSkip/' + k).set(1).catch(()=>{});
+    });
+    mbNewBust(); mnewBust(); state.cntSel = {};
+    toast('🙈 ' + rows.length + '곳을 넘겼습니다 — 「넘어간 것」에서 다시 살릴 수 있습니다', 6000);
+  } else if(act === 'card'){
+    const rows = keys.map(mnewRow).filter(Boolean);
+    if(!rows.length) return;
+    if(!confirm(rows.length + '명을 기업정보함 명함으로 바로 만듭니다.\n\n이름·이메일·(도메인이 같은 업체면) 회사 이름을 채웁니다.\n메모에 「메일에서 — 제목」을 남겨 「정리한 것」에 나옵니다.')) return;
+    const now = Date.now();
+    rows.forEach((r, i)=>Store.put({ id:uid(), kind:'card', group:'', thumb:'', thumb2:'', fav:false, createdAt:now + i,
+      name:String(r.name||''), email:r.em, company:(r.co && r.why === '도메인') ? String(r.co.name||'') : '',
+      memo:'메일에서 — ' + String(r.subj||'').slice(0, 80) }));
+    mbNewBust(); mnewBust(); state.cntSel = {};
+    toast('📇 ' + rows.length + '장을 명함으로 만들었습니다 — 「정리한 것」에 있습니다', 7000);
+  } else if(act === 'unskip'){
+    keys.forEach(k=>cntUnskip(k, true));
+    state.cntSel = {};
+    toast('↩ ' + keys.length + '곳을 다시 묻습니다', 6000);
+  } else if(act === 'undo'){
+    const recs = keys.filter(k=>(_mnewAutoLog||{})[k] && !_mnewAutoLog[k].undone);
+    if(!recs.length) return toast('되돌릴 «업체 담당자» 줄을 고르세요 — 명함은 명함에서 지웁니다', 6000);
+    if(!confirm(recs.length + '곳을 그 업체 담당자에서 뺍니다.\n이 주소들은 다시 저절로 채우지 않습니다.')) return;
+    for(const k of recs){ try{ await mnewUndo(k, true); }catch(_){ } }
+    state.cntSel = {};
+    toast('↩ ' + recs.length + '곳을 되돌렸습니다', 6000);
+  }
+  renderPCSide(); cntRepaint();
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -27407,9 +27659,10 @@ function renderPC(){
   const isCo  = state.view==='co';
   const isWk  = state.view==='wk';        /* 👷 근로자 정보함 (2026-09-01) */
   const isMail = state.view==='mail';
+  const isCnt = state.view==='cnt';      /* 📥 연락처 정리 — 기업정보함 옆줄 그대로, 가운데만 #pcMail 칸을 빌린다 */
   /* 설정·자료함·메일 화면일 때는 목록 UI를 숨기고 그 화면만 */
   ['pcFilters','pcSel','pcTableWrap','pcPager'].forEach(id=>{
-    const e=$(id); if(e) e.style.display = (isSet||isMat||isMail||isCo||isWk) ? 'none' : '';
+    const e=$(id); if(e) e.style.display = (isSet||isMat||isMail||isCo||isWk||isCnt) ? 'none' : '';
   });
   /* 머리줄(#pcHead)만은 기업 상세에서도 남긴다 — 그 안에 탭 줄(#pcErpTabs)이 들어 있고,
      대표 지시 2026-08-17 로 기업 상세의 ＃탭도 명함·사업자와 «같은 그 자리»에 나온다.
@@ -27422,17 +27675,18 @@ function renderPC(){
        정작 처음 들어온 화면에서는 닿지 않았다. 이유가 사라진 규칙이라 걷어낸다. */
   const hd=$('pcHead');
   if(hd){
-    hd.style.display = (isSet||isMat||isMail) ? 'none' : '';
+    hd.style.display = (isSet||isMat||isMail||isCnt) ? 'none' : '';
     /* 근로자 정보함도 명함 목록 도구(제목·보기)를 접는다 — 그쪽 것이라 여기서는 뜻이 없다 */
     if(hd.classList) hd.classList.toggle('cohead', isCo||isWk);
   }
   const st=$('pcSettings'); if(st) st.style.display = isSet ? 'block' : 'none';
   const mt=$('pcMat');      if(mt) mt.style.display = isMat ? 'block' : 'none';
   const ml=$('pcMail');     if(ml) ml.style.display = isMail ? 'block' : 'none';
+  if(ml && isCnt) ml.style.display = 'block';   /* 📥 연락처 정리도 이 칸에 그린다 */
   /* 메일 창에서는 옆줄·머리줄이 «다음메일함 차림»이 된다 (대표 지시 2026-08-24).
      클래스 하나로 갈라 둔다 — 명함 창의 남색 옆줄은 그대로여야 한다. */
   const rt=$('pcRoot'); if(rt&&rt.classList) rt.classList.toggle('mailmode', isMail||isMat);
-  if(isMail||isMat) mbEnsureFolders();   /* 메일 창에 들어오면 폴더 목록을 한 번 가져온다 */
+  if(isMail||isMat||isCnt) mbEnsureFolders();   /* 메일 창에 들어오면 폴더 목록을 한 번 가져온다 */
   if(isMail) mbEnsureBins();             /* 푸른 분류 칸과 «옮긴 것» 쪽지도 한 번만 */
   /* ⚠ 'block' 이 아니라 'flex' 다 (대표 보고 2026-08-27 「아래로 내려가지 않는다」).
      #pcCo 는 .cosplit 로 «구르는 칸(.cobody) + 안 구르는 바닥(.cofoot)»으로 갈라져 있고
@@ -27453,6 +27707,7 @@ function renderPC(){
   if(!isCo) syncPcSearchFor('list');
   if(isSet){ renderSettingsPage(); return; }
   if(isMat){ renderMatPage(); return; }
+  if(isCnt){ renderCntPage(); return; }
   if(isMail){ renderMailPage(); return; }
   if(isCo){ renderErpTabs(); renderCoPage(); return; }
   /* ⚠ 2026-09-05 고침 — 여기서 renderErpTabs 를 «안 불렀다». 그래서 명함 화면에서
@@ -35660,7 +35915,7 @@ const renderSoon   = makeBurstRunner(_soonTick, () => { try{ render(); }catch(_)
    ⚠ 그릴 때 화면이 여전히 메일(또는 자료함)인지 다시 본다 — 그 사이 딴 화면으로 갔으면 안 그린다. */
 const MB_DRAW_GAP = 120;
 const mbDrawSoon = makeBurstRunner(fn => setTimeout(fn, MB_DRAW_GAP), () => {
-  try{ if(state.view==='mail' || state.view==='mat'){ renderPCSide(); renderMailPage(); } }catch(_){}
+  try{ if(state.view==='mail' || state.view==='mat' || state.view==='cnt'){ renderPCSide(); renderMailPage(); } }catch(_){}
 });
 const renderCoSoon = makeBurstRunner(_soonTick, () => { try{ renderCoAny(); }catch(_){} });
 /* 폰 기업 상세 카드 목록 — 명함 목록(renderList)과 같은 .row/.rowmain/.nm/.l1/.l2
