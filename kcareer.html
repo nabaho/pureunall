@@ -888,6 +888,10 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
    큰 제목·설명이 세 번째 중복이었다. 목록 화면과 같은 규칙으로 숨긴다. */
 #page-resume-hub>.page>h2,#page-resume-hub>.page>.desc,
 #page-docbox>.page>h2,#page-docbox>.page>.desc{display:none}
+/* ★ 보관함은 «들어온 문»의 탭만 보인다 (2026-10-03) — 회의·비용관리로 오면 비용 서류만,
+   이력서관리로 오면 비용 서류는 숨는다. 이름표는 nav_to 가 단다(data-nav-as). */
+#page-docbox[data-nav-as="page-feebox"] #db-tabrow .tab:not([data-db="feedoc"]),
+#page-docbox:not([data-nav-as="page-feebox"]) #db-tabrow .tab[data-db="feedoc"]{display:none}
 /* ★★ 환경설정 틀고정 — 탭줄과 도구 줄이 위에 붙는다 (대표 지시 2026-09-13 「캡쳐1 틀고정」)
    휴지통이 130건이라 내려 보다 보면 «무엇을 보고 있는지»도, 되살리기 단추도 사라졌다.
    ⚠ .main 이 스크롤 상자다(overflow-y:auto) — sticky 는 그 안에서만 논다.
@@ -1288,7 +1292,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=36"></script>
+<script src="js/kcareer-hwpxfill.js?v=37"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
@@ -1300,7 +1304,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
-<script src="js/kcareer-slotai.js?v=5"></script>
+<script src="js/kcareer-slotai.js?v=6"></script>
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
@@ -1458,6 +1462,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
               <input type="file" id="rcFile" accept=".pdf,.hwp,.hwpx,.docx" style="display:none">
               <select class="tb-select" id="rhModeSel" onchange="rhSetDomain(this.value)" title="어느 보관함에 저장할지">
                 <option value="resume">📄 이력서로 저장</option><option value="profile">👤 프로필로 저장</option>
+                <!-- 회의·비용관리 › ✍️ 서류 만들기로 들어오면 이것이 골라진다(nav_to) -->
+                <option value="feedoc">🧾 비용 서류로 저장</option>
               </select>
               <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-mute)">
                 <input type="checkbox" id="rcSaveLib" title="올린 양식을 양식 보관함에도 함께 담습니다"> 보관함에도
@@ -1802,6 +1808,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="tab active" data-db="resume" onclick="dbTab('resume',this)">📄 이력서</button>
           <button class="tab" data-db="profile" onclick="dbTab('profile',this)">👤 프로필</button>
           <button class="tab" data-db="certdoc" onclick="dbTab('certdoc',this)">🏅 경력증명서</button>
+          <!-- 회의·비용관리 › 📁 비용 서류로 들어왔을 때만 보인다(이력서관리 보관함에는 안 섞인다) -->
+          <button class="tab" data-db="feedoc" onclick="dbTab('feedoc',this)">🧾 비용 서류</button>
         </div>
         <div id="dbTools"></div>
         </div>
@@ -1900,6 +1908,16 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           </div>
           <div id="cdBody"></div>
         </div>        </div>
+        <div class="tabpanel" id="db-feedoc">
+        <div class="toolbar">
+          <input class="tb-input" id="fdSearch" placeholder="종류·기관·메모 검색" style="min-width:200px">
+          <select class="tb-select" id="fdOrgFilter"><option value="">전체 기관</option></select>
+          <div class="tb-spacer"></div>
+          <span class="cnt" id="fdCnt" style="font-size:11px;color:var(--text-mute)"></span>
+          <button class="btn" type="button" onclick="navTile('page-feedoc')" title="기관이 보낸 한글 서식에 내 정보·계좌·도장을 채웁니다">✍️ 서식 채우기</button>
+          <button class="btn primary" id="fdAddExisting">+ 받은 서류 추가</button>
+        </div>
+        <div id="fdBody"></div>        </div>
       </div></section>
       <section class="page-view" id="page-meetfee" ondragover="pageDropOver(event,'meetfee')" ondragleave="pageDropLeave(event)" ondrop="pageDropFile(event,'meetfee')"><div class="page"><div class="page-drop-overlay" id="ovl-page-meetfee"><span>📎 영수증·증빙을 놓으면 OCR 자동 등록</span></div>
         <div class="page-head"><div class="page-title">🧾 비용관리</div><div class="page-desc">회의·출장·식대·교통·기타 — 모든 비용 신청·기록</div></div>
@@ -3314,7 +3332,7 @@ function loadSeed(){
   var owner=(typeof kcOwnerState!=='function') || kcOwnerState()==='owner';
   if(!LS.get(NS+'_seeded')){
     if(owner) Object.keys(map).forEach(k=>{ if(SEED[k]) set(map[k], SEED[k]); });
-    ['license','complete','award','edu','fund','etc','meetfee','etcfee','resume','profile','certdoc','personal','account','id_docs','gallery','submission'].forEach(k=>{ if(!LS.get(NS+k)) set(k,[]); });
+    ['license','complete','award','edu','fund','etc','meetfee','etcfee','resume','profile','certdoc','feedoc','personal','account','id_docs','gallery','submission'].forEach(k=>{ if(!LS.get(NS+k)) set(k,[]); });
     if(owner) LS.set(NS+'_seeded','1');
   }
 }
@@ -3413,7 +3431,7 @@ function _kcFormMime(ext){
    ⚠ 받은 서류(스캔·첨부)와 신분증·통장사본은 «여기 없다» — 일부러다.
      그것들은 공용 첨부 길(saveAttach)로 들어오며, 신분증은 어떤 경우에도 창고에 올리지 않는다.
    ⚠ 새 보관함이 창고를 쓰게 되면 «여기에» 더한다. 따로 데려오는 길을 만들지 말 것. */
-var KC_DOC_STORES=['resume','profile','certdoc'];
+var KC_DOC_STORES=['resume','profile','certdoc','feedoc'];
 function _kcCloudRowOf(id){
   var 줄=(get('cvforms')||[]).filter(function(x){ return x && x.id===id && x.stPath; })[0];
   if(줄) return { stPath:줄.stPath, name:줄.name||'양식', ext:줄.ext||'hwpx', savedAt:줄.savedAt };
@@ -5203,7 +5221,7 @@ let NAV=[
      ⚠ 기록은 옮기지 않았다. page-etcfee 는 남겨 두어 옛 기록을 그 화면으로 고칠 수 있다. */
   /* ★ 한눈에 · 정산 (대표 지시 2026-10-03 「회의비용관리도 대시보드 탭 메인등을 만들어라」 → 목업 A+C 승인).
      「한눈에」가 첫 자리 — 상위를 누르면 첫 화면이 열린다(navPick). 기록은 그대로 meetfee·etcfee 두 통이다. */
-  {g:'회의·비용관리', items:[['page-feedash','📊 한눈에'],['page-meetfee','🧾 비용 목록'],['page-feesettle','💰 정산']]},
+  {g:'회의·비용관리', items:[['page-feedash','📊 한눈에'],['page-meetfee','🧾 비용 목록'],['page-feesettle','💰 정산'],['page-feedoc','✍️ 서류 만들기'],['page-feebox','📁 비용 서류']]},
   {g:'경력관리', items:[['page-wiccok','위촉장'],['page-license','자격증'],['page-complete','수료증'],['page-award','표창 및 포상'],['page-edu','학력'],['page-work','기업경력']]},
   {g:'실적관리', items:[['page-case','사건실적'],['page-consult','컨설팅실적'],['page-fund','기금실적'],['page-lecture','강의실적'],['page-etc','기타실적'],['page-advisory','자문·고문'],['page-puagency','외부기관 실적'],['page-submission','제출서류']]},
   {g:null, items:[['page-settings','환경설정']]},
@@ -5217,6 +5235,13 @@ function setNavState(s){ LS.set(NS+'nav_state', JSON.stringify(s)); navSyncPush(
 function favState(){ try{ return JSON.parse(LS.get(NS+'favs')||'[]'); }catch(e){ return []; } }
 function setFavState(a){ LS.set(NS+'favs', JSON.stringify(a)); navSyncPush(); }
 function navInfo(id){ for(const g of NAV) for(const [i,l] of g.items) if(i===id) return {label:l,grp:g.g}; return {label:id,grp:null}; }
+/* ★ 회의·비용관리의 「서류 만들기 · 비용 서류」는 «이력서관리와 같은 화면»을 빌려 쓴다
+   (대표 지시 2026-10-03 「이력서 관리처럼 — 이력서 관리와 같게 하면 된다」 → 목업 안 A 승인).
+   화면을 베끼면 두 벌이 되어 한쪽만 고쳐진다 — 그래서 «같은 화면에 다른 이름»을 붙인다.
+   ⚠ 같은 화면 id 를 NAV 두 그룹에 넣지 말 것 — navInfo 가 첫 그룹만 돌려주어 옆줄이 이력서관리로 튄다.
+   ⚠ 빌려 쓰는 동안 화면에는 data-nav-as 가 붙는다 — «지금 어느 이름으로 보고 있나»는 curNavId 로 읽는다. */
+var NAV_ALIAS={'page-feedoc':'page-resume-hub','page-feebox':'page-docbox'};
+function curNavId(){ var s=document.querySelector('.page-view.active'); return s?((s.dataset&&s.dataset.navAs)||s.id):'page-home'; }
 /* 알림. ms 를 주면 그만큼 보여 준다 (안 주면 1.8초)
    ⚠ 전에는 둘째 값을 통째로 버렸다. 그런데 아홉 자리가 toast(글, 5000~6000) 으로
      부르고 있었다 — 긴 안내를 천천히 읽게 하려는 것인데, 늘 1.8초에 사라져서
@@ -5483,7 +5508,7 @@ function buildNav(){
      ⚠ 여기서 안 부르면 지우기 칸이 영영 안 뜬다 — 만든 메뉴를 못 지운다. */
   if(typeof renderNavAddList==='function') _safe(renderNavAddList);
   if(typeof applyPerfAccess==='function') _safe(applyPerfAccess); /* 메뉴 재생성 후에도 권한 반영 */
-  syncGroupUI((document.querySelector('.page-view.active')||{}).id||'page-home');
+  syncGroupUI(curNavId());
 }
 function renderGroupTabs(g,activeId){ const gt=document.getElementById('groupTabs'); if(!gt) return;
   if(!NAV.find(x=>x.g===g)){ gt.innerHTML=''; return; }
@@ -5528,7 +5553,10 @@ function nav_to(id,label,grp){
   /* 환경설정은 관리자(대표)만 진입 가능 */
   if(id==='page-settings' && typeof _me!=='undefined' && _me.resolved && !_me.isAdmin){ toast('🔒 환경설정은 관리자만 사용할 수 있습니다'); return; }
   document.querySelectorAll('.page-view').forEach(s=>s.classList.remove('active'));
-  const sec=document.getElementById(id); if(sec) sec.classList.add('active');
+  /* 빌려 쓰는 이름이면 «진짜 화면»을 켜고 이름표만 단다(NAV_ALIAS) */
+  const real=NAV_ALIAS[id]||id;
+  const sec=document.getElementById(real); if(sec){ sec.classList.add('active');
+    if(real!==id) sec.dataset.navAs=id; else delete sec.dataset.navAs; }
   /* 옆줄의 「지금 이 화면」 표시는 syncGroupUI 가 단다(이 함수 끝에서 부른다) —
      두 곳에서 달면 옆줄을 다시 그렸을 때 한쪽만 맞는다 */
   const t=document.getElementById('tbTitle'), c=document.getElementById('tbCrumb');
@@ -5538,11 +5566,17 @@ function nav_to(id,label,grp){
   const nm=id.slice(5); if(typeof CAREER_CFG!=='undefined'&&CAREER_CFG[nm]) renderCareer(nm);
   /* ⚠ 이사(rhDraftMigrate)를 «목록 세우기보다 먼저» 한다 — 안 그러면 옛 한 자리에
      들어 있던 «지금 하던 작업»이 목록에 안 보인다(대표 PC 에 실제로 하나 있다). */
-  if(id==='page-resume-hub'){ _safe(function(){ rhDraftMigrate().then(function(){ _safe(rhDraftCheck); }); });
-    _safe(()=>initResumeHub()); _safe(()=>rhDraftCheck()); _safe(()=>rhAutoSaveStart()); }
+  if(real==='page-resume-hub'){ _safe(function(){ rhDraftMigrate().then(function(){ _safe(rhDraftCheck); }); });
+    _safe(()=>initResumeHub()); _safe(()=>rhDraftCheck()); _safe(()=>rhAutoSaveStart());
+    /* ★ 어느 문으로 들어왔나에 따라 «담을 보관함»을 맞춘다 — 회의·비용관리면 비용 서류,
+       이력서관리면 (비용 서류로 맞춰져 있던 것을) 이력서로 되돌린다. 프로필은 사람이 고른 것이라 둔다. */
+    _safe(function(){ var ms=document.getElementById('rhModeSel'); if(!ms) return;
+      var 맞출=(id==='page-feedoc')?'feedoc':(ms.value==='feedoc'?'resume':'');
+      if(맞출 && ms.value!==맞출){ ms.value=맞출; rhSetDomain(맞출); } }); }
   /* 허브는 «지금 켜져 있는 탭»을 다시 그린다 — 빠른 이력서·올리기 줄이 여기서 맞춰진다 */
-  if(id==='page-resume-hub') _safe(function(){ var b=document.querySelector('#rh-tabrow .tab.active'); if(b) rhTab(b.dataset.tab,b); });
-  if(id==='page-docbox') _safe(function(){ dbTab(_dbDomain); });
+  if(real==='page-resume-hub') _safe(function(){ var b=document.querySelector('#rh-tabrow .tab.active'); if(b) rhTab(b.dataset.tab,b); });
+  /* 비용 서류는 보관함의 한 탭이다 — 들어온 문에 맞는 탭만 보인다(CSS data-nav-as) */
+  if(real==='page-docbox') _safe(function(){ dbTab(id==='page-feebox'?'feedoc':(_dbDomain==='feedoc'?'resume':_dbDomain)); });
   if(id==='page-feedash') _safe(renderFeeDash);
   if(id==='page-feesettle') _safe(renderFeeSettle);
   if(id==='page-profile' && typeof renderDocStore==='function') renderDocStore('profile');
@@ -5646,7 +5680,8 @@ function renderHomeTiles(){ const box=document.getElementById('homeTiles'); if(!
       /* 「서류 만들기」는 셀 것이 없고, 「서류 보관함」은 세 종류를 합쳐 센다 */
       let cnt=null; const _g=(k)=>((typeof get==='function'?get(k):[])||[]).length;
       if(id==='page-docbox') cnt=_g('resume')+_g('profile')+_g('certdoc');
-      else if(id!=='page-resume-hub') cnt=_g(id.slice(5));
+      else if(id==='page-feebox') cnt=_g('feedoc');
+      else if(!(id in NAV_ALIAS) && id!=='page-resume-hub') cnt=_g(id.slice(5));
       html+='<div onclick="navTile(\''+id+'\')" style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:7px 10px;background:var(--card);display:flex;align-items:center;justify-content:space-between;gap:6px" onmouseover="this.style.borderColor=\'var(--teal)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
         +'<span style="font-size:12.5px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(label)+'</span>'
         +(cnt!=null?'<span class="tile-n" style="font-size:12px;font-weight:700;color:var(--teal);background:var(--soft);border-radius:20px;padding:1px 8px;min-width:22px;text-align:center">'+cnt+'</span>':'<span class="tile-new" style="font-size:11px;color:var(--text-mute);white-space:nowrap">＋ 생성</span>')
@@ -5718,7 +5753,7 @@ var _dbDomain='resume';
    ⚠ 옮기기만 한다 — 칸 id·단추는 그대로라 검색·추가가 전과 같이 돈다. */
 function dbToolsMount(domain){
   var box=document.getElementById('dbTools'); if(!box) return;
-  ['resume','profile','certdoc'].forEach(function(d){
+  Object.keys(DOMAINS).forEach(function(d){
     var D=DOMAINS[d], s=D&&document.getElementById(D.search), tb=s&&s.closest('.toolbar');
     if(!tb) return;
     if(tb.parentNode!==box){ tb.setAttribute('data-db',d); box.appendChild(tb); }
@@ -5758,13 +5793,19 @@ function rhTab(tabId, btn){
   if(tabId==='dm-quick'){ _safe(cvPvUI); _safe(function(){ if(cvPvActive()) cvPvRender(); }); }
 }
 function rhSetDomain(domain){
+  if(!DOMAINS[domain]) domain='resume';
   _rhDomain=domain;
   const lbl=document.getElementById('rh-domain-label');
-  if(lbl) lbl.textContent=domain==='resume'?'이력서 모드':'프로필 모드';
+  if(lbl) lbl.textContent=DOMAINS[domain].label+' 모드';
   const genBtn=document.getElementById('rhGenBtn');
-  if(genBtn){ genBtn.textContent='📄 완성본 '+(domain==='resume'?'이력서':'프로필')+' 생성'; genBtn.onclick=()=>generateFilledHWP(domain); }
-  _safe(()=>initDocCreate(domain));
+  if(genBtn){ genBtn.textContent='📄 완성본 '+DOMAINS[domain].label+' 생성'; genBtn.onclick=()=>generateFilledHWP(domain); }
+  /* ⚠ 이 화면의 칸(rc*)을 같이 쓰는 종류(비용 서류)는 다시 걸지 않는다 — 걸면 올리기·채우기가
+       그 종류 이름으로 묶여 «이력서»로 돌아와도 풀리지 않는다. 담을 곳은 rhSaveDomain 이 누를 때 읽는다. */
+  if(DOMAINS[domain].create!==DOMAINS.resume.create) _safe(()=>initDocCreate(domain));
 }
+/* 「💾 완성본 생성」이 담을 보관함 — 올리기 줄의 고르개(rhModeSel)를 «누르는 그 순간» 읽는다.
+   ⚠ 전에는 화면을 열 때 이력서로 묶어 두어, 「👤 프로필로 저장」을 골라도 이력서 보관함에 담겼다. */
+function rhSaveDomain(){ var v=(document.getElementById('rhModeSel')||{}).value; return (v&&DOMAINS[v])?v:'resume'; }
 /* ⚠ renderRhDocList 를 되살리지 말 것 — 보관함을 그리는 코드는 renderDocStore «하나»다.
    전에는 같은 자료를 두 코드가 서로 다른 모양으로 그렸고, 저장해도 한쪽이 갱신되지 않아
    「저장했는데 보관함에 안 보인다」가 됐다. 화면을 합쳤으니 그릴 곳도 하나다. */
@@ -5979,9 +6020,17 @@ const DOMAINS={
     extra:[{key:'issuer',label:'발급기관(증명해준 곳)'},{key:'usage',label:'용도·제출처'},{key:'coverage',label:'증명 기간(경력기간)'}],
     create:{drop:'cdDrop',file:'cdFile',saveLib:'cdSaveLib',editor:'#rhwpCertEditor',msg:'cdEditorMsg',fillBtn:'cdFillBtn',fillPanel:'cdFillPanel',saveBtn:'cdSaveBtn'}}
 };
+/* ★ 비용 서류 — 회의·비용관리에서 채운 수당 신청서·동의서 (대표 지시 2026-10-03, 목업 안 A).
+   ⚠ 만드는 칸(create)은 «이력서 서류 만들기와 같은 것»을 쓴다 — 같은 화면을 빌려 쓰기 때문이다.
+     따로 칸을 만들면 편집기가 두 벌이 되어 도장·한글 편집·작성 중 저장이 한쪽에만 붙는다.
+   ⚠ 보관 칸 id 는 따로다(fd*) — 같게 두면 숨은 탭을 그릴 때 서로 덮어쓴다(renderDocStore). */
+DOMAINS.feedoc={store:'feedoc', kindKey:'feedoc_kinds', label:'비용 서류', page:'page-docbox',
+  search:'fdSearch', orgFilter:'fdOrgFilter', cnt:'fdCnt', body:'fdBody', addExisting:'fdAddExisting',
+  create:DOMAINS.resume.create};
 const KIND_DEFAULTS={ resume:['일반 이력서','경력기술서','자기소개서','위원·위촉 제출용','입찰·제안용','정부지원사업용','기타'],
   profile:['전문분야 프로필','약력','자기소개','기관 제출용','기타'],
-  certdoc:['경력증명서','재직증명서','위촉증명','용역수행확인','기타'] };
+  certdoc:['경력증명서','재직증명서','위촉증명','용역수행확인','기타'],
+  feedoc:['수당 지급 신청서','개인정보 동의서','지급조서·영수증','참석 확인서','기타'] };
 function kindsOf(d){ const k=DOMAINS[d].kindKey; const a=get(k); if(a&&a.length) return a; set(k,KIND_DEFAULTS[d].slice()); return KIND_DEFAULTS[d].slice(); }
 const SUBMIT_METHOD_DEFAULTS=['메일','팩스','등기','방문','온라인'];
 function submitMethods(){ const a=get('submit_methods'); if(a&&a.length) return a; set('submit_methods',SUBMIT_METHOD_DEFAULTS.slice()); return SUBMIT_METHOD_DEFAULTS.slice(); }
@@ -7096,7 +7145,7 @@ function initDocCreate(domain){ const cfg=DOMAINS[domain].create; const drop=doc
     });
   }
   const fillBtn=document.getElementById(cfg.fillBtn); if(fillBtn) fillBtn.onclick=()=>toggleFillPanel(domain);
-  const saveBtn=document.getElementById(cfg.saveBtn); if(saveBtn) saveBtn.onclick=()=>openDocSaveModal(domain,'generate');
+  const saveBtn=document.getElementById(cfg.saveBtn); if(saveBtn) saveBtn.onclick=()=>openDocSaveModal(cfg===DOMAINS.resume.create?rhSaveDomain():domain,'generate');
   renderFormLib();
 }
 
@@ -7588,7 +7637,8 @@ function initSideResize(){
 /* ===== 이력서·프로필·증명서·실적·비용 페이지 드래그-드롭 저장 ===== */
 var _docQueue=[], _docQueueDomain=null;
 function pageDropOver(e,domain){ e.preventDefault(); e.stopPropagation();
-  const secId='page-'+(domain==='resume'?'resume-store':domain);
+  /* ⚠ 보관함 종류는 화면이 page-docbox 하나다 — 옛 이름(page-resume-store)으로 찾으면 덮개가 안 뜬다 */
+  const secId=(typeof DOMAINS!=='undefined'&&DOMAINS[domain])?DOMAINS[domain].page:('page-'+domain);
   const ov=document.getElementById('ovl-'+secId); if(ov) ov.classList.add('show'); }
 function pageDropLeave(e){ setTimeout(function(){ document.querySelectorAll('.page-drop-overlay.show').forEach(function(o){o.classList.remove('show');}); },150); }
 function pageDropFile(e,domain){ e.preventDefault(); e.stopPropagation();
@@ -9378,7 +9428,10 @@ function allRecords(){ var out=[];
   get('wiccok').forEach(function(r){ out.push({r:r,page:(r.type==='표창'||r.type==='포상')?'award':'wiccok'}); });
   get('cert').forEach(function(r){ out.push({r:r,page:/수료|이수/.test(r.title||'')?'complete':'license'}); });
   ['edu','consult','lecture','case','fund','etc','meetfee','etcfee'].forEach(function(k){ get(k).forEach(function(r){ out.push({r:r,page:k}); }); });
-  ['resume','profile','certdoc'].forEach(function(k){ get(k).forEach(function(r){ out.push({r:r,page:(k==='resume')?'resume-store':k}); }); });
+  /* ⚠ 세 종류는 한 화면(서류 보관함)이다 — 옛 이름(resume-store·profile·certdoc 화면)으로 가면 빈 화면이 뜬다 */
+  ['resume','profile','certdoc'].forEach(function(k){ get(k).forEach(function(r){ out.push({r:r,page:'docbox'}); }); });
+  /* 비용 서류는 회의·비용관리 쪽 문으로 연다 — 이력서관리 보관함에는 그 탭이 안 보인다 */
+  get('feedoc').forEach(function(r){ out.push({r:r,page:'feebox'}); });
   return out; }
 var _gsF=['org','title','titleVal','topic','project','content','kind','memo','note','school','name','agency','main','usage','issuer','coverage'];
 function openSearch(){ document.getElementById('gsInput').value=''; document.getElementById('gsResults').innerHTML='<div class="empty" style="padding:14px">검색어를 입력하세요</div>'; document.getElementById('modalSearch').classList.add('open'); setTimeout(function(){document.getElementById('gsInput').focus();},50); }
@@ -9689,7 +9742,7 @@ function renderTrash(){
    ⚠ 내용(label)에는 「표창」이라는 낱말이 없다(수여 사유만 적힌다) — 종류를 따로 보여
      주지 않으면 130줄에서 표창 7건을 눈으로 골라낼 수가 없다. */
 var TRASH_KIND={wiccok:'위촉·표창', cert:'자격·수료', edu:'학력', work:'기업경력',
-  certdoc:'경력증명서', resume:'이력서', profile:'프로필', consult:'컨설팅', 'case':'사건',
+  certdoc:'경력증명서', resume:'이력서', profile:'프로필', feedoc:'비용 서류', consult:'컨설팅', 'case':'사건',
   fund:'기금', etc:'기타실적', lecture:'강의', meetfee:'회의비', etcfee:'기타비용',
   submission:'제출서류', personal:'개인서류', account:'계좌', id_docs:'신분증',
   gallery:'사진', stamps:'도장', cvforms:'이력서 양식'};
@@ -13270,6 +13323,8 @@ var RH_KEYS = [
   /* ★ 설립일·자본금 (2026-09-28) — 서식이 낯설어 사전이 못 알아볼 때 손으로 짚는 길 */
   ['firmEst','법인 설립일'],['firmCapital','법인 자본금'],
   ['firmZip','법인 우편번호'],['firmAcct','법인 계좌'],
+  /* ★ 내 개인 계좌 — 수당·강사료 신청서의 입금계좌 칸 (대표 지시 2026-10-03) */
+  ['bank','은행(내 계좌)'],['acctNo','계좌번호(내 계좌)'],['acctHolder','예금주'],['acct','입금계좌 (묶음)'],
   /* ★ 주민등록번호는 «이 목록에서 골랐을 때만» 들어간다 — 자동 채우기는 건드리지 않는다.
      골라야 나가므로 목록 맨 끝에 두고, 고를 때 무슨 값인지 알도록 이름을 그대로 적는다. */
   ['rrn','주민등록번호 🔒']
@@ -14435,6 +14490,9 @@ function rhParaFill(xml, data){
   if(!window.KcareerHwpxFill || !KcareerHwpxFill.fillParagraphs) return { xml:xml, fields:[] };
   var rep={ fields:[] };
   var after=KcareerHwpxFill.fillParagraphs(xml, (data&&data.fields)||{}, rep);
+  /* ★ 개인정보 동의란 □ → ■ (대표 지시 2026-10-03 「동의 □ 가 있으면 동의란에 체크」).
+     표 안·밖을 모두 본다. 어느 말의 네모인지 가를 수 없으면 손대지 않는다(tickConsent). */
+  if(typeof KcareerHwpxFill.tickConsent==='function') after=KcareerHwpxFill.tickConsent(after, rep);
   return { xml:after, fields:rep.fields||[] };
 }
 /* 보이는 문서의 이름 꼬리 — 무엇이 얹혔는지 이름이 말한다 */
@@ -16268,6 +16326,22 @@ function _isLangCert(r){
   if(String(r.grade||'').trim()) return true;
   return /(TOEIC|TOEFL|TEPS|OPIc|IELTS|JLPT|JPT|HSK|DELF|DALF|DELE|TOPIK|G-?TELP|FLEX|토익|토플|텝스|오픽|아이엘츠|지텔프|토픽|일본어능력시험|한어수평고시)/i.test(String(r.title||''));
 }
+/* 서식에 넣을 «내 계좌» 하나 — 환경설정 › 계좌정보에서 고른다.
+   예금주가 «나»(또는 비어 있음)인 첫 계좌. 번호가 없는 줄은 건너뛴다.
+   ⚠ 남의 이름 계좌(가족 등)는 넣지 않는다 — 수당은 본인 명의로 받는다. 그것뿐이면 비워 둔다
+     (빈 칸은 사람이 보고 채우지만, 엉뚱한 계좌는 그대로 나가 돈이 남에게 간다). */
+function _cvMyAcct(myName){
+  var arr=((typeof get==='function'?get('account'):[])||[]).filter(function(a){ return a&&String(a.number||'').trim(); });
+  var 나=String(myName||'').replace(/\s/g,'');
+  return arr.find(function(a){ var h=String(a.holder||'').replace(/\s/g,''); return !h||!나||h===나; })||null;
+}
+/* 서식 칸 넷(은행·계좌번호·예금주·묶음)으로 편다. 예금주를 안 적어 두었으면 내 이름이다(내 계좌 목록이므로). */
+function _cvMyAcctFields(myName){
+  var a=_cvMyAcct(myName); if(!a) return {};
+  var 주=String(a.holder||'').trim()||String(myName||'').trim();
+  return { bank:a.bank||'', acctNo:a.number||'', acctHolder:주,
+           acct:[a.bank||'', a.number||''].filter(Boolean).join(' ')+(주?' ('+주+')':'') };
+}
 function _cvFillData(){
   const info=(typeof getProfileInfo==='function'?getProfileInfo():get('profile_info'))||{};
   /* ★ 사무소에 관한 칸은 «이알피가 이긴다» (대표 결정 2026-09-13).
@@ -16319,6 +16393,8 @@ function _cvFillData(){
      ⚠ 옛 자료를 위해 아래로 «흘려 준다» — 갈라 담기 전에는 phone 하나에만 값이 있었다.
        그때 값이 사무실 번호였다면 _piMigrate 가 이미 phoneWork 로 옮겨 두었다. */
   var 집=String(info.addrHome||'').trim(), 사무실=String(info.addr||'').trim();
+  /* ★ 내 개인 계좌 (2026-10-03) — 고르는 잣대는 _cvMyAcct 한 곳 */
+  var 계좌=(typeof _cvMyAcctFields==='function'?_cvMyAcctFields(info.name):null)||{};
   return {
     fields:{ name:info.name||'', nameHanja:info.nameHanja||'', nameEng:info.nameEng||'',
              birth:info.birth||'', gender:info.gender||'',
@@ -16345,6 +16421,8 @@ function _cvFillData(){
              /* 법인 우편번호·계좌 (2026-09-28) — 계좌는 「은행 번호 (예금주)」 한 줄로 */
              firmZip:법인.zip||'',
              firmAcct:[법인.bank||'', 법인.acctNo||''].filter(Boolean).join(' ')+(법인.acctNo&&법인.acctHolder?' ('+법인.acctHolder+')':''),
+             /* 내 개인 계좌 — 법인 계좌와 섞지 않는다(수당은 «내» 계좌로 받는다) */
+             bank:계좌.bank||'', acctNo:계좌.acctNo||'', acctHolder:계좌.acctHolder||'', acct:계좌.acct||'',
              /* ★ 「소속·직위」처럼 «둘을 묶어» 묻는 칸이 있다 — 사람이 쓰듯 이어 쓴다.
                 ⚠ 한쪽만 넣으면 서류에 직위가 빠진 채로 나간다.
                 ⚠ 하나만 있으면 그 하나만 — 「푸른노무법인 」처럼 꼬리가 남으면 안 된다. */
@@ -18121,7 +18199,7 @@ _safe(function(){
   });
   if(n){ set('wiccok',a); console.log('유형 '+n+'건을 탭에 맞게 다듬었습니다'); }
 });
-_safe(loadSeed); _safe(_cdNormalize); _safe(_tplMerge); _safe(_puBackfill); _safe(loadCustomNav); _safe(buildNav); _safe(initTabs); _safe(()=>initDocCreate('resume')); _safe(()=>initDocStore('resume')); _safe(()=>initDocCreate('profile')); _safe(()=>initDocStore('profile')); _safe(()=>initDocCreate('certdoc')); _safe(()=>initDocStore('certdoc')); _safe(bindCareer); _safe(initApiTab); _safe(initSettings); _safe(seedStamps); _safe(fbInit);
+_safe(loadSeed); _safe(_cdNormalize); _safe(_tplMerge); _safe(_puBackfill); _safe(loadCustomNav); _safe(buildNav); _safe(initTabs); _safe(()=>initDocCreate('resume')); _safe(()=>initDocStore('resume')); _safe(()=>initDocCreate('profile')); _safe(()=>initDocStore('profile')); _safe(()=>initDocCreate('certdoc')); _safe(()=>initDocStore('certdoc')); _safe(()=>initDocStore('feedoc')); _safe(bindCareer); _safe(initApiTab); _safe(initSettings); _safe(seedStamps); _safe(fbInit);
 /* ⚠ checkBackupReminder는 만들어만 놓고 아무도 부르지 않아 백업 재촉이 한 번도 안 떴다.
    그래서 마지막 백업이 두 달 넘도록 아무도 몰랐다 — 반드시 부팅 때 부른다. */
 _safe(checkBackupReminder);

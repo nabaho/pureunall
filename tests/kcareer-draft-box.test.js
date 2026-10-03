@@ -151,7 +151,8 @@ test('★ 부르는 손잡이가 «실제로 있는 것»이다 — 없는 이�
 });
 
 test('화면에 들어올 때 «이사부터» 한다 — 옛 한 자리에 든 작업이 목록에 안 보이면 안 된다', () => {
-  const at = CODE.indexOf("id==='page-resume-hub'");
+  /* ⚠ 화면을 «진짜 화면 이름»(real)으로 볼 수도 있다 — 회의·비용관리가 같은 화면을 빌려 쓴다(2026-10-03) */
+  const at = CODE.search(/(?:id|real)==='page-resume-hub'\)\{/);
   assert.notEqual(at, -1);
   const 줄 = CODE.slice(at, at + 320);
   assert.match(줄, /rhDraftMigrate\(\)/, '이사를 안 합니다 — 대표 PC 의 하던 작업이 사라집니다');

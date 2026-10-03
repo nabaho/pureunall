@@ -75,7 +75,15 @@
        맨 「우편번호」는 «주소와 같은 곳»이다 — 서식의 「주소」가 집이면 집 우편번호(fields.zip 이 짝을 맞춘다). */
     { re: /^(우편번호|우편|자택우편번호|집우편번호|현주소우편번호|주소우편번호)$/, key: 'zip' },
     { re: /^(회사우편번호|사무실우편번호|직장우편번호|근무지우편번호|근무처우편번호)$/, key: 'zipWork' },
-    { re: /^(법인계좌|법인계좌번호|법인통장|법인명의계좌|법인명의계좌번호)$/, key: 'firmAcct' }
+    { re: /^(법인계좌|법인계좌번호|법인통장|법인명의계좌|법인명의계좌번호)$/, key: 'firmAcct' },
+    /* ★ 내 «개인» 계좌 (대표 지시 2026-10-03 「회의·비용관리도 이력서처럼 — 내 개인 계좌」).
+       수당·강사료 지급 신청서의 입금계좌 칸이다. 값은 환경설정 › 계좌정보에서 온다.
+       ⚠ 법인 계좌는 위 firmAcct 다 — «법인»이라 밝힌 칸만 그쪽으로 간다.
+       ⚠ 맨 「계좌」·「입금계좌」는 한 칸에 «은행 번호 (예금주)»를 다 적는 자리다(acct). */
+    { re: /^(은행|은행명|거래은행|입금은행|금융기관|금융기관명|은행지점|은행지점명|은행명지점명)$/, key: 'bank' },
+    { re: /^(계좌번호|입금계좌번호|지급계좌번호|본인계좌번호|통장번호|통장계좌번호)$/, key: 'acctNo' },
+    { re: /^(예금주|예금주명|예금주성명|계좌주|통장명의|계좌명의)$/, key: 'acctHolder' },
+    { re: /^(계좌|입금계좌|지급계좌|수령계좌|계좌정보|입금계좌정보|지급계좌정보|본인계좌|본인명의계좌|은행계좌|은행및계좌번호|은행명및계좌번호|입금처)$/, key: 'acct' }
   ];
   /* 칸 안에 「자택:______ 직장:______」처럼 라벨과 빈자리가 함께 있는 양식이 많다.
      이런 자리는 라벨 바로 뒤(밑줄·공백)를 값으로 바꾼다. */
@@ -86,6 +94,8 @@
     { re: /기관명/, key: 'org' }, { re: /부서명/, key: 'dept' }, { re: /직위/, key: 'title' },
     /* ⚠ 짧은 말은 «긴 말 뒤»에 둔다 — 같은 열쇠는 먼저 걸린 것만 쓰므로,
        「부서명 :」이 있는 칸에서 짧은 「부서」가 먼저 걸리면 라벨 뒤를 못 찾는다. */
+    /* 「은행명 : ____ 계좌번호 : ____ 예금주 : ____」 — 한 칸에 셋을 적는 입금계좌 칸 */
+    { re: /은행명?/, key: 'bank' }, { re: /계좌번호/, key: 'acctNo' }, { re: /예금주/, key: 'acctHolder' },
     { re: /소속/, key: 'org' }, { re: /부서/, key: 'dept' }, { re: /직급/, key: 'title' },
     { re: /연락처/, key: 'phone' }, { re: /자격/, key: 'license' },
     { re: /한글/, key: 'name' }, { re: /한자/, key: 'nameHanja' },
@@ -119,7 +129,9 @@
                          'veteran', 'disability',
                          /* 우리 법인 것 — 이알피 법인정보에서 온다 */
                          'firmName', 'firmCeo', 'firmCorpNo', 'firmBizNo', 'firmEst', 'firmCapital',
-                         'firmZip', 'firmAcct'];
+                         'firmZip', 'firmAcct',
+                         /* 내 개인 계좌 — 환경설정 › 계좌정보에서 온다(2026-10-03) */
+                         'bank', 'acctNo', 'acctHolder', 'acct'];
 
   var COL_LABELS = [
     { re: /^(기간|연도|년도|재직기간|재학기간|활동기간|기간근무년수|근무기간|수행기간|위촉기간|참여기간|교육기간|근무연월|활동연도|기간년월)$/, key: 'period' },
@@ -1187,6 +1199,150 @@
     return out.replace(/\u0000TBL(\d+)\u0000/g, function (m, n) { return 표[Number(n)]; });
   }
 
+  /* ═══ 개인정보 동의 □ 에 표시 (대표 지시 2026-10-03) ═══════════════════════
+     「만약 개인정보 동의 □ 가 있으면 이 부분도 자동으로 동의란에 체크 표시하는 것도 해달라」
+     기관이 보낸 수당 신청서·위원 신청서 끝에는 거의 늘 동의란이 있다 —
+       「동의함 □   동의하지 않음 □」 · 「□ 동의함  □ 미동의」 · 표 칸으로 「동의함 | □ | 미동의 | □」
+     ■ 하는 일: «동의하는 쪽» 네모 하나만 ■ 로 칠한다. 글자는 한 자도 바꾸지 않는다.
+     ⚠★ 틀리게 칠하면 «동의하지 않음»에 표시한 서류가 나간다 — 되돌릴 수 없다. 그래서:
+        ① 네모가 «어느 말의 것인지»(앞 말인가 뒷말인가) 가를 수 없으면 손대지 않는다
+        ② 「않·아니·미동의·거부·철회」가 붙은 말의 네모는 절대 안 칠한다
+        ③ 이미 누가 칠해 둔 동의란(■·☑)이 있으면 그 줄은 그대로 둔다
+        ④ 마케팅·광고·홍보 동의는 칠하지 않는다 — 수당 받는 데 필요 없는 동의다
+     ⚠ ■ 를 쓴다 — 한글 글꼴에 늘 있는 글자다(☑ 는 글꼴에 따라 빈 네모로 찍힌다). */
+  var CONSENT_TICK = '■';
+  var CONSENT_BOX = /[□☐▢❏]/;
+  var CONSENT_DONE = /[■☑☒▣✔✓]/;
+  var CONSENT_NO = /(않|아니|미동의|비동의|부동의|불동의|거부|철회|반대|안\s*함)/;
+  var CONSENT_SKIP = /(마케팅|광고|홍보|이벤트)/;
+  function 맨글(s) { return String(s || '').replace(/[\s　:：()（）\[\]［］,，\/·.。\-–—_]/g, ''); }
+  function 말머리같나(s) { var t = String(s || '').trim(); return /[?？:：]$/.test(t) || 맨글(t).length > 14; }
+  function 엔티티풀기(s) {
+    return String(s || '').replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&');
+  }
+  /* 이 말이 «동의하는 쪽»인가 — 문단 전체(물음)도 함께 본다(「동의하십니까? □ 예 □ 아니오」) */
+  function 동의쪽(label, 문단) {
+    /* ⚠ 「동의서」는 «서류 이름»이다 — 제출서류 목록의 「□ 개인정보 동의서」는 동의란이 아니다 */
+    var L = String(label || '');
+    if (CONSENT_NO.test(L)) return false;
+    if (/동의(?!서)/.test(L)) return true;
+    return /^(예|네)$/.test(맨글(L)) && /동의(?!서)/.test(문단 || '');
+  }
+  function tickConsent(xml, report) {
+    var s = String(xml || '');
+    if (!CONSENT_BOX.test(s) && s.indexOf('ㅁ') < 0) return s;
+    /* ① 글자 조각을 «가장 안쪽 문단»에 매단다 — 표 칸 안 문단은 바깥 문단과 따로 센다 */
+    var 문단들 = [], 쌓임 = [], m;
+    var re = /<hp:p\b[^>]*\/>|<hp:p\b[^>]*>|<\/hp:p>|(<hp:t(?:\s[^>]*)?>)([\s\S]*?)(<\/hp:t>)/g;
+    while ((m = re.exec(s))) {
+      var t = m[0];
+      if (m[1] === undefined) {
+        if (/^<\/hp:p>/.test(t)) { 쌓임.pop(); continue; }
+        if (/\/>$/.test(t)) continue;
+        문단들.push({ 조각: [] }); 쌓임.push(문단들.length - 1); continue;
+      }
+      if (!쌓임.length) continue;
+      문단들[쌓임[쌓임.length - 1]].조각.push({ at: m.index + m[1].length, inner: m[2] });
+    }
+    /* ② 문단마다 «글 · 네모» 차례로 편다 */
+    문단들.forEach(function (p) {
+      var 토막 = [], 글 = '';
+      p.조각.forEach(function (c) {
+        var inTag = false;
+        for (var i = 0; i < c.inner.length; i++) {
+          var ch = c.inner[i];
+          if (ch === '<') inTag = true;
+          if (inTag) { if (ch === '>') inTag = false; continue; }
+          var 앞 = c.inner[i - 1] || ' ', 뒤 = c.inner[i + 1] || ' ';
+          var 홀로ㅁ = ch === 'ㅁ' && /[\s　(（\[]/.test(앞) && /[\s　)）\]<]/.test(뒤);
+          if (CONSENT_BOX.test(ch) || 홀로ㅁ) { 토막.push({ 글: 글 }); 토막.push({ 네모: true, at: c.at + i }); 글 = ''; continue; }
+          /* 칠한 표시 — 문단 첫 글자(■ 글머리)는 표시가 아니다 */
+          if (CONSENT_DONE.test(ch) && (토막.length || 맨글(엔티티풀기(글)))) { 토막.push({ 글: 글 }); 토막.push({ 네모: true, 칠함: true }); 글 = ''; continue; }
+          글 += ch;
+        }
+      });
+      토막.push({ 글: 글 });
+      p.글들 = []; p.네모들 = [];
+      토막.forEach(function (x) { if (x.네모) p.네모들.push(x); else p.글들.push(엔티티풀기(x.글)); });
+      p.전문 = p.글들.join(' ');
+      p.몫 = !p.네모들.length ? (맨글(p.전문) ? (맨글(p.전문).length <= 15 ? '말' : '글') : '빈')
+        : (p.글들.every(function (g) { return !맨글(g); }) ? (p.네모들.length === 1 ? '네모' : '글') : '섞임');
+    });
+    var 칠할 = [];
+    function 정하기(네모, 말, 문단) {
+      if (네모.칠함 || 네모.at == null) return;
+      if (동의쪽(말, 문단)) 칠할.push(네모.at);
+    }
+    /* ③ 한 문단 안에 네모와 말이 섞인 경우 — 네모가 «앞 말»의 것인지 «뒷말»의 것인지 가른다 */
+    문단들.forEach(function (p) {
+      if (p.몫 !== '섞임') return;
+      if (CONSENT_SKIP.test(p.전문)) return;
+      if (p.네모들.some(function (x) { return x.칠함; })) return;
+      var 앞 = p.글들[0], 끝 = p.글들[p.글들.length - 1];
+      var 앞있다 = !!맨글(앞), 끝있다 = !!맨글(끝), 뒤말 = null;
+      if (끝있다 && !앞있다) 뒤말 = true;
+      else if (앞있다 && !끝있다) 뒤말 = false;
+      else if (앞있다 && 끝있다) {
+        if (말머리같나(앞) && !말머리같나(끝)) 뒤말 = true;
+        else if (말머리같나(끝) && !말머리같나(앞)) 뒤말 = false;
+      }
+      if (뒤말 === null) return;   /* 가를 수 없다 — 안 칠한다 */
+      /* 네모에 붙은 «한 마디»만 본다 — 앞 문장의 「동의하지 않을 권리가…」가 딸려 와 막히지 않게 */
+      p.네모들.forEach(function (x, k) {
+        정하기(x, 뒤말 ? String(p.글들[k + 1]).split(/[.?!？。]/)[0]
+                       : String(p.글들[k]).split(/[.?!？。:：]/).pop(), p.전문);
+      });
+    });
+    /* ④ 표 칸으로 나뉜 경우 — 「동의함 | □ | 미동의 | □」 · 「□ | 동의함 | □ | 미동의」
+       말·네모 칸이 번갈아 «짝수»로 이어질 때만 본다. 홀수면 머리 칸이 끼었는지 가를 수 없다. */
+    /* ⚠ 앞뒤에 짧은 칸(「구분」 등)이 붙어 있으면 짝이 한 칸씩 밀려 보일 수 있다 —
+         네모를 모두 품는 «번갈이 창»을 전부 세워 보고, 창마다 답이 같을 때만 칠한다. */
+    var 줄 = [];
+    function 창답(a, b) {
+      var 첫 = 줄[a].몫;
+      for (var i = a; i < b; i++) if (줄[i].몫 !== (((i - a) % 2 === 0) ? 첫 : (첫 === '말' ? '네모' : '말'))) return null;
+      var 전부 = 줄.slice(a, b).map(function (p) { return p.전문; }).join(' '), 답 = [];
+      for (var j = a; j < b; j += 2) {
+        var 말 = 첫 === '말' ? 줄[j] : 줄[j + 1], 네 = 첫 === '말' ? 줄[j + 1] : 줄[j];
+        if (네.네모들[0].at != null && 동의쪽(말.전문, 전부)) 답.push(네.네모들[0].at);
+      }
+      return 답;
+    }
+    function 줄보기() {
+      var 네자리 = [];
+      줄.forEach(function (p, i) { if (p.몫 === '네모') 네자리.push(i); });
+      var 전부 = 줄.map(function (p) { return p.전문; }).join(' ');
+      if (네자리.length && !CONSENT_SKIP.test(전부)
+          && !줄.some(function (p) { return p.몫 === '네모' && p.네모들[0].칠함; })) {
+        var lo = 네자리[0], hi = 네자리[네자리.length - 1], 답들 = [];
+        for (var a = 0; a <= lo; a++) for (var b = hi + 1; b <= 줄.length; b++) {
+          if ((b - a) % 2) continue;
+          var d = 창답(a, b); if (d) 답들.push(JSON.stringify(d.sort()));
+        }
+        if (답들.length && 답들.every(function (x) { return x === 답들[0]; })) {
+          JSON.parse(답들[0]).forEach(function (at) { 칠할.push(at); });
+        }
+      }
+      줄 = [];
+    }
+    문단들.forEach(function (p) {
+      if (p.몫 === '빈') return;
+      if (p.몫 === '말' || p.몫 === '네모') { 줄.push(p); return; }
+      줄보기();
+    });
+    줄보기();
+    if (!칠할.length) return s;
+    /* ⑤ 뒤에서부터 바꾼다 — 앞을 바꾸면 뒤 자리가 밀린다(한 글자를 한 글자로 바꾸니 안 밀리지만 습관으로) */
+    칠할.sort(function (a, b) { return b - a; });
+    var out = s;
+    칠할.forEach(function (at) {
+      out = out.slice(0, at) + CONSENT_TICK + out.slice(at + 1);
+      if (report && report.fields) report.fields.push({ key: 'consent', value: CONSENT_TICK + ' 동의' });
+    });
+    return out;
+  }
+
   /* ===== 입구 =====
      data = { fields:{name,birth,gender,phone,email,addr,license,org},
               edu:[{period,school,major}], career:[{period,org,role}] } */
@@ -1242,6 +1398,8 @@
       return fillInCell(tc, fields || {}, rep, {});
     },
     fillParagraphs: fillParagraphs, paraText: paraText,
+    /* 개인정보 동의란 □ → ■ — 채우기·짓는 길(rhParaFill)이 같이 쓴다 */
+    tickConsent: tickConsent,
     /* 칸 지도(kcareer-formmap.js)가 «같은 자»를 쓰도록 내보낸다 —
        따로 만들면 두 곳의 셈이 어긋나 「지도에는 있는데 안 채워지는 칸」이 생긴다 */
     splitRows: splitRows, splitCells: splitCells, eachTable: eachTable, normLabel: normLabel,
