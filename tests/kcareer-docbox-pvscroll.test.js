@@ -57,3 +57,24 @@ test('④ 정보는 한 줄 — 제목·날짜·제출 · 나머지는 ⓘ 안�
   assert.match(f, /dsPvMoreToggle\(/);
   assert.match(SRC.match(/\.ds-pv-t\{[^}]*\}/)[0], /white-space:nowrap/, '제목은 한 줄');
 });
+
+/* ── 맨 아래까지 (대표 지시 2026-10-03 「화면이 아래로 더 내려와서 맨 밑까지 화면이 나오게 해라」) ── */
+test('⑤ 미리보기 칸은 창 맨 아래(아래 탭줄 위)까지 늘린다 — 재서 맞춘다', () => {
+  const 그림 = { style: {}, getBoundingClientRect: () => ({ top: 200, bottom: 520 }) };
+  const 상자 = { getBoundingClientRect: () => ({ bottom: 580 }) };
+  const 탭 = { offsetParent: {}, getBoundingClientRect: () => ({ top: 840, height: 60 }) };
+  const ctx = {
+    window: { innerHeight: 900, addEventListener: () => {} },
+    document: { getElementById: (id) => ({ 'dsPvImg-resume': 그림, 'dsPrev-resume': 상자, groupTabs: 탭 })[id] || null, querySelectorAll: () => [] },
+    requestAnimationFrame: () => 0, cancelAnimationFrame: () => {},
+  };
+  vm.createContext(ctx);
+  vm.runInContext(SRC.match(/var _dsFitBound=false, _dsFitRaf=0;/)[0] + 떼기('function dsPvFit('), ctx);
+  vm.runInContext("dsPvFit('resume')", ctx);
+  /* 900 − 위끝 200 − 아래 정보·단추 60 − 탭줄 60 − 여백 12 = 568 */
+  assert.equal(그림.style.height, '568px');
+  ctx.window.innerHeight = 500;
+  vm.runInContext("dsPvFit('resume')", ctx);
+  assert.equal(그림.style.height, '320px', '너무 작아지지는 않는다');
+  assert.match(떼기('function dsPrevDraw('), /dsPvFit\(domain\)/, '그릴 때마다 맞춘다');
+});
