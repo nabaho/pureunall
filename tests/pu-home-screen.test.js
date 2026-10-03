@@ -1026,7 +1026,10 @@ test('★ 쪽 안내에 「대조 기준 저장」만으로는 안 바뀌고 「
   const h = ctx.pageEdit(ctx.App.draft);
   assert.match(h, /대조 기준 저장만으로는/, '저장만으로는 딱지가 안 바뀐다는 말이 없습니다');
   assert.match(h, /한 번 더 눌러야/, '홈페이지 다시 확인을 «한 번 더» 눌러야 한다는 말이 없습니다');
-  assert.match(h, /홈페이지 다시 확인.*한 번 더|한 번 더.*홈페이지 다시 확인|「같음」으로 바뀝니다/,
+  /* ⚠ 단추 이름은 2026-10-03 에 「홈페이지 다시 확인」→「대조」로 맞췄다(머리띠 단추가 이미 「대조」).
+       지키는 것은 «그 단추를 한 번 더 누르라»는 말이 있는가다. */
+  const 단추 = '(?:홈페이지 다시 확인|<b>대조</b>|「대조」)';
+  assert.match(h, new RegExp(단추 + '[\\s\\S]*한 번 더|한 번 더[\\s\\S]*' + 단추 + '|「같음」으로 바뀝니다'),
     '한 번 더 눌러야 「같음」으로 바뀐다는 결론이 없습니다');
 });
 
@@ -1206,7 +1209,7 @@ test('★ 홈페이지를 아직 안 읽었으면 «빈 줄»이 아니라 그 �
   run(ctx, fnSource('pagePasteWhy') + '\n' + fnSource('stamp') + '\n' + fnSource('canDetachPage') + '\n'
     + fnSource('noteOneLine') + '\n' + fnSource('readPageBtn') + '\n' + fnSource('pageFrameDoc') + '\n' + fnSource('runSep') + '\n' + fnSource('runKey') + '\n' + fnSource('runOfKey') + '\n' + fnSource('pageLinesHtml') + '\n' + fnSource('pageEdit'));
   const h = ctx.pageEdit(ctx.App.draft);
-  assert.match(h, /홈페이지 다시 확인/, '어떻게 하면 줄 모양으로 보이는지 안 적혀 있습니다');
+  assert.match(h, /「대조」|<b>대조<\/b>/, '어떻게 하면 줄 모양으로 보이는지 안 적혀 있습니다');
   assert.equal(numbersIn(h).length, 0, '못 읽은 것을 빈 줄로 지어내 보여 줬습니다');
 });
 
@@ -2556,7 +2559,9 @@ test('★ 편집칸 머리 띠가 퇴사를 알리고, «내리는 방법»을 �
                       [{ name: '박성수', leftAt: '2026-06-30' }]);
   const h = ctx.memberEdit(ctx.App.draft);
   assert.ok(h.indexOf('2026-06-30') >= 0, '언제 퇴사했는지 편집칸에 안 보입니다');
-  assert.match(h, /비공개/, '내리는 방법이 안 적혀 있습니다');
+  /* 2026-09-14 부터 내리는 곳은 «휴지통»이다(이 게시판에 비공개 자리가 없다) — 화면도 그렇게 말한다 */
+  assert.match(h, /휴지통/, '내리는 방법이 안 적혀 있습니다');
+  assert.doesNotMatch(h, /비공개로/, '★ 아직 「비공개로」라고 합니다 — 실제로는 휴지통으로 옮깁니다');
   assert.match(h, /삭제가 아니라|삭제하지/, '삭제가 아니라는 말이 없습니다 — 지우면 되살리기 어렵습니다');
   assert.match(h, /되살릴/, '잘못 내렸을 때 되살릴 수 있다는 말이 없습니다');
 });
@@ -2568,7 +2573,7 @@ test('★ 확인 전에는 홈페이지에 «아직 있다»고 단정하지 않
   assert.ok(h1.indexOf('2026-06-30') >= 0, '명부 딱지는 확인 전에도 보여야 합니다');
   assert.ok(h1.indexOf('아직 올라가 있습니다') < 0,
     '홈페이지를 안 읽었는데 아직 올라가 있다고 단정했습니다 — 명부 딱지가 대조 딱지 흉내를 냈습니다');
-  assert.match(h1, /홈페이지 다시 확인/, '올라가 있는지 어떻게 알 수 있는지 안 적혀 있습니다');
+  assert.match(h1, /「대조」|<b>대조<\/b>/, '올라가 있는지 어떻게 알 수 있는지 안 적혀 있습니다');
 
   const 내려감 = bandBox({ name: '박성수', srl: '193', careers: [] },
                         [{ name: '박성수', leftAt: '2026-06-30' }],
@@ -2772,10 +2777,14 @@ test('★ 내리는 단추는 «내릴 것(퇴사)»일 때만 보인다 — 늘
       + fnSource('memberBandHtml') + '\n' + noConst(constLine('MEMBER_KINDS')) + '\n' + fnSource('memberKind') + '\n' + fnSource('memberEdit'));
     return ctx.memberEdit(ctx.App.draft);
   };
-  assert.match(그리기('toRemove'), /비공개/, '★ 내릴 사람인데 내리는 길이 없다');
-  assert.doesNotMatch(그리기('same'), /copyPrivate/,
+  /* ⚠ 2026-10-03 — 예전에는 「copyPrivate 가 없는가」를 봤다. 단추가 2026-09-13 에
+       한사람내리기 로 바뀐 뒤로는 그 이름이 아예 없어서, 단추가 «늘» 보여도 통과했다.
+       단추가 실제로 부르는 것을 본다. */
+  const 내리는단추 = /onclick="한사람내리기\(/;
+  assert.match(그리기('toRemove'), 내리는단추, '★ 내릴 사람인데 내리는 길이 없다');
+  assert.doesNotMatch(그리기('same'), 내리는단추,
     '★ 내릴 것이 아닌데 내리는 단추가 보인다 — 잘못 누르면 재직자가 사라진다');
-  assert.doesNotMatch(그리기(null), /copyPrivate/,
+  assert.doesNotMatch(그리기(null), 내리는단추,
     '★ 대조도 안 했는데 내리라고 한다');
 });
 

@@ -102,7 +102,9 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   box-shadow:0 1px 2px rgba(31,34,51,.04)}
 
 /* ── 상단 고정 (머리띠 + 갈래 탭) ── */
-.top{position:sticky;top:0;z-index:5;flex:none;background:#fff;border-bottom:1px solid var(--line)}
+/* ⚠ 층은 편집칸의 붙은 머리(.stick z5·폰 z6)보다 «위»라야 한다 — 같으면 뒤에 오는 붙은
+     머리가 위 띠의 ⋯ 펼침을 덮는다(2026-10-03 실측). 덧창(40)보다는 아래다. */
+.top{position:sticky;top:0;z-index:8;flex:none;background:#fff;border-bottom:1px solid var(--line)}
 .appbar{display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap}
 .appbar .ttl{font-weight:800;font-size:16px;letter-spacing:-.2px}
 .appbar .when{font-size:12.5px;color:var(--faint)}
@@ -124,7 +126,11 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   display:flex;flex-direction:column;gap:6px;padding:8px;white-space:nowrap;
   background:var(--card);border:1px solid var(--line);border-radius:9px;
   box-shadow:0 8px 24px rgba(15,23,42,.14)}
+/* ⚠ 위 띠의 ⋯ 는 «아래로» 편다. 위로 펴면 틀(.app) 밖으로 나가 잘려, 안에 든 단추를
+     아무도 못 눌렀다(2026-10-03 실측: 칸 위끝이 틀 위끝보다 81px 위). */
+.appbar .morebox{bottom:auto;top:calc(100% + 6px)}
 .appbar select{border:1px solid #cbd5e1;border-radius:8px;padding:4px 8px;font-size:12.5px;font-family:inherit}
+.morebox label.sub{display:flex;align-items:center;gap:6px}
 
 /* ── 왼쪽 기둥: 대시보드 카드(위) + 할 일(아래) ──
    ★ 갈래를 «탭»에서 «카드»로 바꿨다 (4차 지시, 목업 v6b). 탭은 숫자 하나(항목 수)만
@@ -183,7 +189,10 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .job .h .cnt{margin-left:auto;color:var(--bad);flex:none}
 .job.warn .h .cnt{color:var(--warn)}
 .job.info .h .cnt{color:var(--info)}
-.job .who{font-size:12px;color:var(--sub);margin-top:1px;line-height:1.55;word-break:break-word}
+/* ★ 설명은 «한 줄»에서 자른다 (2026-10-03 정리안 ⑤) — 세 줄로 흘러 할 일 둘이 기둥을 다 먹었다.
+     전문은 마우스를 올리면(title) 보이고, 방법은 아래 「어떻게 하면 되나」에 접혀 있다. */
+.job .who{font-size:12px;color:var(--sub);margin-top:1px;line-height:1.55;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .job .go{margin-top:5px;display:flex;gap:5px;flex-wrap:wrap}
 .job details{margin-top:4px}
 .job summary{cursor:pointer;font-size:11.5px;color:var(--sub);font-weight:700}
@@ -222,9 +231,6 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   width:20px;height:13px;line-height:1;font-size:8px;padding:0;cursor:pointer}
 .ob:hover:not([disabled]){border-color:var(--navy);color:var(--navy)}
 .ob[disabled]{opacity:.25;cursor:default}
-/* 「일반직원 수정」 — 걸러 보기가 아니라 «탭»이다. 딱지 줄 오른끝에 떼어 두고 결을 달리한다 */
-.chip.staff{margin-left:auto;border-style:dashed;font-weight:700}
-.chip.staff.on{border-style:solid}
 .chip .c{opacity:.65;margin-left:3px}
 /* 이름으로 찾기 — 업체가 수백 개라 찾을 길이 없으면 회사별로 고를 수 없다 */
 .chips .find{flex:1;min-width:120px;border:1px solid #cbd5e1;border-radius:8px;padding:4px 9px;
@@ -278,6 +284,14 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .list .lh{flex:none;display:flex;align-items:center;gap:8px;padding:8px 14px;
   border-bottom:1px solid var(--line);background:#fff;font-size:12.5px;color:var(--sub)}
 .list .lh b{color:var(--ink)}
+/* 「구성원 | 일반직원 수정」 두 갈래 탭 — 목록 머리 한 줄 안에 선다 */
+.lseg{display:inline-flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;white-space:nowrap}
+.lseg button{border:0;border-right:1px solid #cbd5e1;background:#fff;color:var(--sub);font:inherit;
+  font-size:12px;font-weight:800;padding:3px 10px;cursor:pointer}
+.lseg button:last-child{border-right:0}
+.lseg button.on{background:var(--navy);color:#fff}
+.lseg button.on b{color:#fff}
+.lseg .c{opacity:.75;margin-left:3px;font-weight:700}
 .list .lh .hot{color:var(--bad)}
 /* 목록만 구른다 — 목록을 굴려도 편집칸은 가만히 있다 */
 .list .sc{flex:1;min-height:0;overflow-y:auto}
@@ -689,7 +703,13 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   border-radius:10px;padding:9px 16px;font-size:13px;z-index:70;display:none}
 
 /* 창이 좁아지면 기둥과 목록을 먼저 줄인다 — 편집칸을 줄이면 경력 줄이 잘린다 */
-@media(max-width:1400px){ .list{width:340px} .rail{width:246px} }
+@media(max-width:1400px){ .list{width:340px} .rail{width:246px}
+  /* 목록이 340px 로 줄면 머리·딱지 줄이 다시 두 줄로 넘친다(1366px 실측) — 숨만 좁힌다 */
+  .list .lh{gap:5px;padding-inline:11px}
+  .lseg button{padding:3px 7px}
+  .list .lh .btn.sm{padding-inline:6px}
+  .chips{gap:4px;padding-inline:11px}
+  .chip{padding:2px 7px} }
 
 /* 좁은 화면(폰)에서는 붙박이를 풀고 위아래로 세운다 — 창이 낮으면 붙박이가 더 답답하다 */
 @media(max-width:900px){
@@ -1891,7 +1911,7 @@ window.쪽아래로 = 쪽아래로;
 function refuseIfPageConfigUnread() {
   if (!App.pageConfigUnread) return false;
   say('쪽 목록을 못 읽었습니다',
-    '「홈페이지 다시 확인」이 아니라 화면을 <b>새로 고쳐(F5)</b> 목록을 먼저 읽어야 합니다 — '
+    '「대조」가 아니라 화면을 <b>새로 고쳐(F5)</b> 목록을 먼저 읽어야 합니다 — '
     + '지금 저장하면 사장님이 저장해 두신 설정이 지워집니다.');
   return true;
 }
@@ -1937,7 +1957,7 @@ async function addPage() {
     await savePageConfig(next);
     App.group = 'work'; App.pick = mid;
     loadDraft(); App.render();
-    toast('「' + label + '」(/' + mid + ')을 목록에 넣었습니다. 「홈페이지 다시 확인」을 누르면 읽어 옵니다.');
+    toast('「' + label + '」(/' + mid + ')을 목록에 넣었습니다. 「대조」를 누르면 읽어 옵니다.');
   } catch (e) {
     await say('쪽 목록을 저장하지 못했습니다', esc((e && e.message) || e));
   }
@@ -2122,7 +2142,7 @@ function pageRows(group) {
          비어 있어 「다시 확인 전」이라고 거꾸로 적었었다 — 그래서 status 를 먼저 본다. */
     const note = (s.status === 'unknown') ? ' · 홈페이지에서 못 읽음'
       : (s.status === 'noBase') ? ' · 기준 없음 — 홈페이지에서 읽어온 내용을 기준으로 삼으십시오'
-      : (p.text ? '' : ' · 아직 내용 없음 (홈페이지 다시 확인 전)');
+      : (p.text ? '' : ' · 아직 내용 없음 (대조 전)');
     return {
       key: mid, name: PAGE_LABEL[mid] || mid,
       desc: '/' + mid + note,
@@ -2528,7 +2548,7 @@ function markChanged(kind, key) {
       App.saveErr = '딱지를 「안 올라감」으로 내린 것을 저장하지 못했습니다'
         + (e && e.code ? '(' + e.code + ')' : '')
         + ' — 이 화면에만 바뀌어 보이고, 다른 사람 화면에는 아직 「같음」으로 보입니다. '
-        + '「홈페이지 다시 확인」을 눌러 다시 맞춰 주십시오.';
+        + '「대조」를 눌러 다시 맞춰 주십시오.';
       App.render();
     });
   }
@@ -2712,8 +2732,8 @@ async function writeKeepOnSite(key, mark) {
     App.members[key] = Object.assign({}, next, { updatedAt: Date.now(), updatedBy: currentUserName() });
     App.render();
     toast(mark
-      ? '홈페이지에 남기기로 표시했습니다. 「홈페이지 다시 확인」을 누르면 퇴사 딱지를 달지 않습니다.'
-      : '예외를 풀었습니다. 「홈페이지 다시 확인」을 누르면 퇴사 판정을 다시 받습니다.');
+      ? '홈페이지에 남기기로 표시했습니다. 「대조」를 누르면 퇴사 딱지를 달지 않습니다.'
+      : '예외를 풀었습니다. 「대조」를 누르면 퇴사 판정을 다시 받습니다.');
   } catch (e) {
     await say('표시를 저장하지 못했습니다', esc((e && e.message) || e));
   }
@@ -2747,7 +2767,7 @@ async function keepOnSiteClear() {
   const d = App.draft;
   if (!d || d.kind !== 'member') return;
   const yes = await askYes('「홈페이지에 남기기」 예외를 풀까요?',
-    '풀면 다음 「홈페이지 다시 확인」에서 명부대로 퇴사 판정을 다시 받습니다.', '예외 풀기');
+    '풀면 다음 「대조」에서 명부대로 퇴사 판정을 다시 받습니다.', '예외 풀기');
   if (!yes) return;
   await writeKeepOnSite(d.key, null);
 }
@@ -3061,7 +3081,7 @@ function openPaste() {
     + ' <span class="sub">— 위 칸들이 저절로 채워집니다</span></li>'
     + '<li>「이대로 저장할까요?」에 <b>확인</b>을 누른다'
     + ' <span class="sub">(무엇을 채웠는지 보여주고 «물어본 뒤에» 저장합니다)</span></li>'
-    + '<li>통합시스템으로 돌아와 <b>홈페이지 다시 확인</b></li>'
+    + '<li>통합시스템으로 돌아와 <b>대조</b></li>'
     + '</ol><div class="sub" style="margin-top:5px">4번까지 하면 딱지가 「안 올라감」에서 「같음」으로 바뀝니다. '
     + '안 바뀌면 등록이 안 된 것입니다.</div>'
     + '<div class="sub" style="margin-top:6px">단추를 아직 안 넣으셨으면 '
@@ -3317,7 +3337,7 @@ async function 한사람내리기(key) {
   const 못함 = ((답 && 답.못찾은것) || []).filter(t => /비공개/.test(String(t)));
   if (!못함.length && 답 && 답.ok && (답.저장됨 || !(답.바뀐것 || []).length)) {
     await say('내렸습니다',
-      esc(이름) + ' 님 글을 <b>비공개</b>로 바꿨습니다.'
+      esc(이름) + ' 님 글을 홈페이지 <b>휴지통</b>으로 옮겼습니다 — 되살릴 수 있습니다.'
       + ((답.바뀐것 || []).length ? '' : ' <span class="sub">(이미 내려가 있었습니다)</span>'));
     checkHomepage();
     return;
@@ -3394,13 +3414,19 @@ function 사진칸Html(d) {
   const 올린것 = (App.올린사진 || {})[d.key];
   return '<div class="two photorow">'
     /* 끌어다 놓기 — 파일 고르개는 작고 눌러 들어가는 걸음이 길다 (대표 지시 2026-09-14) */
-    + '<div class="inl pdrop" style="flex:0 0 auto"'
+    /* ★ 안내를 «한 문장»으로 (2026-10-03 정리안 ⑥) — 「끌어다 놓아도 됩니다」와
+         「고르면 미리 보여 드리고…」가 두 칸에 따로 있었다. 고르기 전에는 이 칸 하나만 선다. */
+    + '<div class="inl pdrop" style="' + (고른것 || 올린것 ? 'flex:0 0 auto' : 'flex:1') + '"'
     + ' ondragover="사진끌기(event)" ondragleave="사진끌기끝(event)" ondrop="사진놓기(event)">'
     + '<b>얼굴 사진'
     + '<span class="tip" title="지금 홈페이지의 «메인 이미지» 칸으로 바로 갑니다 — 저장과 다른 길입니다">?</span></b>'
     + '<input type="file" accept="image/jpeg,image/png,image/webp" class="pf"'
     + ' onchange="사진고르기(this)">'
-    + '<span class="sub dropsay">여기로 끌어다 놓아도 됩니다</span></div>'
+    + '<span class="sub dropsay">'
+    /* ⚠ 고르기 전 안내에 «단추 이름»을 적지 않는다 — 아직 없는 단추를 찾게 된다. */
+    + (고른것 || 올린것 ? '끌어다 놓아도 됩니다'
+       : '끌어다 놓아도 됩니다 — 미리 보여 드리고, 한 번 더 눌러야 올라갑니다')
+    + '</span></div>'
     + (고른것
         ? '<div class="inl" style="flex:0 0 auto">'
           + '<img class="pthumb" src="' + esc(고른것.미리) + '" alt="고른 사진"'
@@ -3417,8 +3443,7 @@ function 사진칸Html(d) {
             + '<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="'
             + esc(PuHomeExport.ORIGIN) + '/people">홈페이지에서 보기</a>'
             + '</div>'
-          : '<div class="inl" style="flex:1"><span class="sub">'
-            + '고르면 미리 보여 드리고, 누르셔야 홈페이지에 올라갑니다.</span></div>')
+          : '')
     + '</div>';
 }
 
@@ -4738,11 +4763,8 @@ function appbarHtml() {
        가리켰다. 헷갈린 것은 단추가 많아서가 아니라 «어느 것이 무엇에 대한 것인지»가
        안 적혀 있어서였다. 위는 화면 전체, 아래(.eft)는 고른 사람 하나다. */
     + '<span class="tag">이 화면 전체</span>'
-    + '<label class="sub">줄 모양 '
-    + '<select onchange="setLineFormat(this.value)">'
-    + '<option value="plain"' + (App.lineFormat === 'plain' ? ' selected' : '') + '>줄바꿈만 (기본)</option>'
-    + '<option value="div"' + (App.lineFormat === 'div' ? ' selected' : '') + '>줄마다 감싸기</option>'
-    + '</select></label>'
+    /* ★ 「줄 모양」은 ⋯ 안에 있다 (2026-10-03 정리안 ①) — 한 번 정하면 거의 안 바꾸는 설정이라
+         늘 자리를 차지할 까닭이 없다. */
     /* ★ 미리보기 — 기본은 접힘. 켜면 편집칸 오른쪽에 붙는다(대표 결정 2026-09-02 ㉮) */
     + '<button class="btn' + (App.preview ? ' on' : '') + '" onclick="togglePreview()"'
     + ' title="고치는 대로 홈페이지에 어떻게 보이는지 옆에서 보여 드립니다">'
@@ -4788,6 +4810,11 @@ function appbarHtml() {
     + '<span class="sep"></span>'
     + '<details class="more"><summary class="btn" title="가끔 쓰는 것들">⋯</summary>'
     + '<div class="morebox">'
+    + '<label class="sub">줄 모양 '
+    + '<select onchange="setLineFormat(this.value)">'
+    + '<option value="plain"' + (App.lineFormat === 'plain' ? ' selected' : '') + '>줄바꿈만 (기본)</option>'
+    + '<option value="div"' + (App.lineFormat === 'div' ? ' selected' : '') + '>줄마다 감싸기</option>'
+    + '</select></label>'
     + '<button class="btn" onclick="openFillSetup()"'
     + ' title="지금 홈페이지를 관리자 화면에 안 들어가고 고치는 단추입니다 — 한 번만 넣으면 됩니다">'
     + '⚙ 채우기 단추 넣기</button>'
@@ -4847,7 +4874,10 @@ function seeBtns(list, filterKey) {
 function jobCard(j) {
   return '<div class="job ' + (j.cls || '') + '">'
     + '<div class="h">' + j.t + (j.n ? '<span class="cnt">' + j.n + '</span>' : '') + '</div>'
-    + (j.who ? '<div class="who">' + j.who + '</div>' : '')
+    /* ⚠ 따옴표를 바꿀 때 정규식(/…"…/)을 쓰지 말 것 — 검사가 함수를 떼어 오는 셈이
+         정규식 속 따옴표를 글자의 시작으로 읽어 마흔 개가 한꺼번에 깨졌다(2026-10-03). */
+    + (j.who ? '<div class="who" title="' + String(j.who).replace(/<[^>]*>/g, '').split('"').join('&quot;')
+               + '">' + j.who + '</div>' : '')
     + (j.go ? '<div class="go">' + j.go + '</div>' : '')
     + (j.why ? '<details><summary>' + esc(j.whyTitle || '어떻게 하면 되나')
                + '</summary><p>' + j.why + '</p></details>' : '')
@@ -4953,7 +4983,7 @@ function jobsOf() {
     add({ cls: '', t: '고쳤는데 아직 홈페이지에 안 올라간 것', n: pending.length,
       who: someNames(pending), go: seeBtns(pending, 'pending'),
       why: '구성원은 <b>붙여넣을 내용 복사</b> → 홈페이지 편집 화면에 붙여넣기. '
-         + '쪽은 홈페이지 관리자 화면에서 직접 고치십시오. 그 뒤 <b>홈페이지 다시 확인</b>을 '
+         + '쪽은 홈페이지 관리자 화면에서 직접 고치십시오. 그 뒤 <b>대조</b>를 '
          + '누르면 딱지가 「같음」으로 바뀝니다.' });
   }
   const toAdd = rowsWith(r => r.status === 'toAdd');
@@ -4977,7 +5007,7 @@ function jobsOf() {
   if (unknown.length) {
     add({ cls: 'warn', t: '홈페이지에서 못 읽은 쪽', n: unknown.length, who: someNames(unknown),
       why: '그 쪽은 지난 결과를 그대로 두었습니다 — 자료가 바뀐 것이 아닙니다. '
-         + '잠시 뒤 <b>홈페이지 다시 확인</b>을 다시 눌러 보십시오.' });
+         + '잠시 뒤 <b>대조</b>를 다시 눌러 보십시오.' });
   }
 
   /* ── 알리기만 하는 것 ── */
@@ -5004,9 +5034,9 @@ function jobsOf() {
   /* ── 아직 대조를 안 눌렀다 ── */
   if (!App.check) {
     add({ cls: 'info', t: '홈페이지와 아직 대조하지 않았습니다',
-      who: '대조 딱지는 「홈페이지 다시 확인」을 누를 때만 붙습니다',
+      who: '대조 딱지는 「대조」를 누를 때만 붙습니다',
       go: '<button class="btn pri sm" onclick="checkHomepage()"'
-          + (App.checking ? ' disabled' : '') + '>' + (App.checking ? '확인 중…' : '홈페이지 다시 확인')
+          + (App.checking ? ' disabled' : '') + '>' + (App.checking ? '확인 중…' : '대조')
           + '</button>' });
   }
   return jobs;
@@ -5315,11 +5345,13 @@ function chipsHtml() {
   if (s.kept) defs.push({ k: 'kept', label: '남김', n: s.kept });
   /* 노무사 / 직원 — 홈페이지 구성원 쪽이 그 둘로 나뉘어 있다(대표 지시 2026-09-02).
      ⚠ 한쪽이 0명이면 딱지를 안 낸다 — 눌러 봐야 빈 화면인 딱지는 자리만 먹는다. */
+  /* ★ 둘 다 있을 때만 낸다 (2026-10-03 정리안 ③) — 직원이 0명이면 「노무사 9」는 눌러도
+       전체와 같은 화면이다. 그런 딱지가 딱지 줄을 두 줄로 밀었다. */
   if (App.group === 'members') {
-    MEMBER_KINDS.forEach(mk => {
-      const n = all.filter(r => r.mkind === mk.key).length;
-      if (n) defs.push({ k: 'kind:' + mk.key, label: mk.label, n: n });
-    });
+    const 갈래수 = MEMBER_KINDS.map(mk => ({ mk, n: all.filter(r => r.mkind === mk.key).length }));
+    if (갈래수.filter(x => x.n).length > 1) {
+      갈래수.forEach(x => { if (x.n) defs.push({ k: 'kind:' + x.mk.key, label: x.mk.label, n: x.n }); });
+    }
   }
   /* 자문사 — 「올림/안 올림/표시 안 함」으로 걸러 본다. 대조 딱지는 아예 없다(못 한다). */
   if (App.group === 'partner') {
@@ -5344,10 +5376,22 @@ function chipsHtml() {
     /* ★ 「같음」은 만들지 않는다 (대표 결정 2026-09-02 ㉯) — 딱지 여섯이 두 줄로 넘쳤다.
        손댈 것이 없는 줄은 「전체」에서 보시면 된다. 되살리려면 딱지를 더 줄일 길을
        함께 가져올 것 — 그냥 되살리면 두 줄로 돌아간다. */
-    ['pending', 'toAdd', 'toRemove', 'liveOnly', 'done'].forEach(st => {
+    /* ★ 「안 올라감·새로 올릴 것·내릴 것·홈페이지에만」은 따로 내지 않는다 (2026-10-03
+         정리안 ③). 넷 다 «손댈 것»에 이미 들어 있는 같은 줄이다(needsAttentionRow) —
+         같은 사람을 딱지 둘로 세워 딱지 줄만 두 줄로 넘쳤다. 어느 쪽인지는 줄의 딱지가 말한다.
+       ★ 「내려감」은 남긴다 — 기본 목록에서 «뺀» 줄을 볼 길은 이것뿐이다. */
+    ['done'].forEach(st => {
       const n = all.filter(r => r.status === st).length;
       if (n) defs.push({ k: st, label: STATUS_TEXT[st], n: n });
     });
+  }
+  /* ★ 할 일 카드의 「보기」는 위에서 뺀 딱지(안 올라감·내릴 것 …)로도 거른다.
+       그때는 그 딱지를 «켜진 채» 보여 준다 — 안 보이면 줄이 왜 줄었는지도, 어떻게 푸는지도
+       알 수 없다. 누르면 풀린다(App.filt 는 같은 것을 다시 누르면 푼다). */
+  if (App.filter && App.filter !== 'staff' && STATUS_TEXT[App.filter]
+      && !defs.some(d => d.k === App.filter)) {
+    defs.push({ k: App.filter, label: STATUS_TEXT[App.filter],
+                n: all.filter(r => r.status === App.filter).length });
   }
   /* ⚠ 딱지 줄은 «여기서» 만든다 — defs 가 다 찬 뒤다. 앞에서 만들면 자문사의
        「거래 종료·사무대행·아직 안 고름」과 대조 딱지가 빠진다(2026-09-14 검사가 잡았다). */
@@ -5355,18 +5399,13 @@ function chipsHtml() {
     '<button class="chip' + (App.filter === d.k ? ' on' : '') + '"'
     + ' onclick="App.filt(\'' + esc(d.k) + '\')">' + esc(pillShort(d.label))
     + '<span class="c">' + d.n + '</span></button>');
-  /* ★ 「일반직원 수정」 탭 (대표 지시 2026-09-14). 사무장·사무직은 게시판 글이 아니라
-       쪽에 박힌 글자라 구성원 줄로는 못 세운다 — 그래서 같은 딱지 줄에 «탭»으로 둔다.
+  /* ★ 「일반직원 수정」 탭은 목록 머리(listCountHtml)에 있다 (2026-10-03 정리안 ②).
+       여기 딱지 줄 끝에 두었더니 딱지 줄이 두 줄로 넘쳤다. 다시 여기로 가져오지 말 것.
        ⚠ 다른 화면(주요업무)으로 넘기지 말 것. 「어디서 고치나」를 찾다 몇 달 헤매셨다. */
-  if (App.group === 'members') {
-    딱지들.push('<button class="chip staff' + (App.filter === 'staff' ? ' on' : '') + '"'
-      + ' onclick="직원탭열기()" title="사무장·사무직 이름과 직급 — 쪽 글자를 줄마다 고칩니다">'
-      + '일반직원 수정</button>');
-  }
   return '<div class="chips">' + 딱지들.join('')
     + (App.group === 'partner'
         ? '<span class="sub">홈페이지는 로고 «그림»이라 대조를 못 합니다 — 올림 표시는 사람이 합니다</span>'
-        : (App.check ? '' : '<span class="sub">확인을 누르면 대조 딱지로도 걸러집니다</span>'))
+        : (App.check ? '' : '<span class="sub">「대조」를 눌러야 홈페이지와 견줍니다</span>'))
     + '</div>';
 }
 
@@ -5376,18 +5415,26 @@ function chipsHtml() {
 function listCountHtml() {
   const all = rowsOf(App.group), rows = visibleRows(App.group);
   if (App.group === 'members') {
-    if (App.filter === 'staff') {
-      return '<b>일반직원</b> <span class="sub">· 사무장·사무직 — 쪽에 박힌 글자를 줄마다 고칩니다</span>';
-    }
+    /* ★ 「구성원 | 일반직원 수정」 두 갈래 탭 (2026-10-03 정리안 ②, 대표 승인).
+         일반직원 탭이 딱지 줄 끝에 붙어 딱지 줄을 두 줄로 밀었다 — 걸러 보기가 아니라
+         «탭»이므로 목록 머리가 제자리다. 여전히 구성원 소개 «안»이다(2026-09-14 지시).
+       ★ 셈(퇴사·뺀 수·걸러서)은 탭에 마우스를 올리면 보인다 — 머리를 한 줄로 두려고. */
     // 명부상 퇴사가 몇 명인지 — 「남김」으로 둔 사람도 명부상 퇴사자다
     const left = all.filter(r => r.roster && r.roster.kind === 'left').length;
     /* ★ 기본에서 뺀 수를 «말한다» (2026-09-14). 조용히 빼면 아홉 명이 일곱 줄로 보여
        사람이 목록을 의심한다 — 자문사에서 「거래 종료 101곳은 뺐음」이라 적는 것과 같다. */
     const 내려간수 = all.filter(r => r.status === 'done').length;
-    return '구성원 <b>' + all.length + '명</b>' + (left ? ' · <b class="hot">퇴사 ' + left + '</b>' : '')
-      + (내려간수 && !App.filter
-          ? ' <span class="sub">· 내려간 ' + 내려간수 + '명은 뺐음</span>' : '')
-      + (App.filter ? ' <span class="sub">· 걸러서 ' + rows.length + '건</span>' : '');
+    const 직원탭 = App.filter === 'staff';
+    const 셈 = ['구성원 ' + all.length + '명', left ? '명부상 퇴사 ' + left : '',
+      내려간수 && !App.filter ? '내려간 ' + 내려간수 + '명은 뺐음' : '',
+      App.filter && !직원탭 ? '걸러서 ' + rows.length + '건' : ''].filter(Boolean).join(' · ');
+    return '<span class="lseg">'
+      + '<button class="' + (직원탭 ? '' : 'on') + '" onclick="App.filt(\'\')" title="' + esc(셈) + '">'
+      + '구성원 <b>' + all.length + '</b>'
+      + (App.filter && !직원탭 ? '<span class="c">· ' + rows.length + '</span>' : '') + '</button>'
+      + '<button class="' + (직원탭 ? 'on' : '') + '" onclick="직원탭열기()"'
+      + ' title="사무장·사무직 이름과 직급 — 쪽 글자를 줄마다 고칩니다">일반직원 수정</button>'
+      + '</span>';
   }
   if (App.group === 'work') {
     return '관리 중인 쪽 <b>' + all.length + '개</b>'
@@ -5419,7 +5466,7 @@ function listHtml() {
     + (App.group === 'members'
         ? '<button class="btn sm" onclick="사진여럿열기()"'
           + ' title="사진 여러 장을 한 번에 올립니다 — 파일 이름으로 주인을 찾아 드립니다">'
-          + '📷 사진 여러 장</button>'
+          + '📷 여러 장</button>'
         : '')
     + (App.group === 'work' ? '<button class="btn sm" onclick="addPage()">＋ 쪽 추가</button>' : '')
     /* ★ 자문사는 여기서 회사를 «만들지 않는다». 이름·업종·거래 여부는 푸른ERP 업체관리에서
@@ -5520,8 +5567,12 @@ function rowsHtml() {
       + '<span class="tags">' + rosterPillHtml(r)
       /* ★ 「안 올림」이면 대조 딱지 자리에 그것을 적는다 — 안 올릴 사람에게
          「새로 올릴 것」이 붙어 있으면 할 일인 줄 읽는다. 딱지를 셋 두면 너무 넓다. */
+      /* ★ 「같음」이면 딱지를 안 단다 (2026-10-03 정리안 ④). 아홉 줄 중 다섯에 같은 회색
+           딱지가 붙어 정작 「안 올라감」·「남김」이 묻혔다. 딱지 줄에서 「같음」을 뺀 것
+           (2026-09-02 ㉯)과 같은 까닭이다 — «다를 때만» 말한다. */
       + (r.offSite ? '<span class="pill unposted">안 올림</span>'
          : (r.noStatusPill ? postedPillHtml(r)
+         : r.status === 'same' ? ''
          : '<span class="pill ' + (r.status || 'none') + '">'
            + esc(r.status ? pillShort(STATUS_TEXT[r.status] || r.status) : '확인 전') + '</span>'))
       + '</span></div>';
@@ -5603,7 +5654,7 @@ function 미리보기HTML() {
   if (!mid) return { why: '왼쪽 목록에서 쪽을 하나 고르십시오.' };
   const 지금쪽 = App.pageHtml[mid];
   if (!지금쪽) return { mid: mid, why: '이 쪽을 아직 안 읽었습니다.\n'
-    + '편집칸의 「이 쪽 읽어오기」(또는 머리띠의 「홈페이지 다시 확인」)를 누르십시오.' };
+    + '편집칸의 「이 쪽 읽어오기」(또는 머리띠의 「대조」)를 누르십시오.' };
   if (App.previewMode === 'now') return { mid: mid, 바탕: 쪽바탕(mid), html: 지금쪽, 지금: true };
   /* ★ pageFixList 를 쓴다 — 여기가 «몇 번째»(n)와 «모두 몇 군데»(of)를
      실어 보내는 자리다. 지우개(PuSitePage.고칠줄)는 글자만 넘기므로
@@ -5868,7 +5919,7 @@ async function copyPrivate(key) {
     + '<li>즐겨찾기의 <b>★ 푸른ERP 채우기</b>를 누른다'
     + ' <span class="sub">— 「비공개로 바꿀까요?」를 묻고, 확인하시면 바꿉니다</span></li>'
     + '<li>「이대로 저장할까요?」에 <b>확인</b> <span class="sub">(저장해야 홈페이지에서 내려갑니다)</span></li>'
-    + '<li>통합시스템으로 돌아와 <b>홈페이지 다시 확인</b></li>'
+    + '<li>통합시스템으로 돌아와 <b>대조</b></li>'
     + '</ol><div class="sub" style="margin-top:5px">'
     + '단추가 아직 없으면 한 번만 넣으십시오 — <button class="btn sm" onclick="openFillSetup()">⚙ 채우기 단추 넣기</button> '
     + '비공개로 바꾸는 자리를 못 찾으면 <b>아무것도 하지 않고 멈춥니다</b> — 엉뚱한 것을 건드리지 않기 위해서입니다.</div></div>';
@@ -5894,7 +5945,7 @@ function memberBandHtml(d, rec) {
       + '<span class="sm">' + esc(kept.by || '(표시한 사람 모름)') + ' · '
       + esc(kept.at || '(날짜 모름)')
       + ' · 명부에 퇴사로 찍혀 있어도 「내릴 것(퇴사)」 딱지를 달지 않고 내용 대조만 합니다. '
-      + '예외를 풀면 다음 「홈페이지 다시 확인」에서 퇴사 판정을 다시 받습니다.</span></div>';
+      + '예외를 풀면 다음 「대조」에서 퇴사 판정을 다시 받습니다.</span></div>';
   }
 
   if (mark && mark.kind === 'left' && !kept) {
@@ -5905,11 +5956,11 @@ function memberBandHtml(d, rec) {
       + '<b>푸른ERP 명부: ' + esc(mark.label + (mark.leftAt ? ' ' + mark.leftAt : '')) + '</b> · '
       + (내려감 ? '홈페이지에서도 <b>내려간 것으로 확인</b>됐습니다.'
          : (st.status ? '홈페이지에는 <b>아직 올라가 있습니다</b>.'
-            : '홈페이지에 올라가 있는지는 <b>「홈페이지 다시 확인」</b>을 눌러야 알 수 있습니다.'))
+            : '홈페이지에 올라가 있는지는 <b>「대조」</b>를 눌러야 알 수 있습니다.'))
       + '<br><span class="sm">'
       + (내려감 ? '더 하실 일은 없습니다. 이름이 다른 쪽에 남아 있으면 위 안내 띠로 알려 드립니다.'
-         : '내리시려면 아래 <b>「홈페이지에서 비공개로」</b>를 누르십시오 — '
-           + '<b>삭제가 아니라 감추는 것</b>이라 잘못 내렸어도 되살릴 수 있습니다.')
+         : '내리시려면 아래 ⋯ 의 <b>「지금 홈페이지에서 내리기」</b>를 누르십시오 — '
+           + '<b>삭제가 아니라 휴지통</b>이라 잘못 내렸어도 되살릴 수 있습니다.')
       + '</span></div>';
   }
 
@@ -6152,8 +6203,10 @@ function memberEdit(d) {
     /* ★ 2026-09-13 — 누르면 «바로» 내린다. 전에는 다섯 걸음짜리 안내가 떴다.
          손으로 하는 길(copyPrivate)은 서버가 막혔을 때 그 자리에서 물어보고 연다. */
     더보기.push('<button class="btn rm" onclick="한사람내리기(\'' + esc(d.key) + '\')"'
-      + ' title="누르면 바로 비공개로 바꿉니다 — 지우지 않습니다">'
-      + '지금 홈페이지에서 비공개로</button>');
+      /* ★ 「비공개로」가 아니라 «휴지통»이라 적는다 (2026-10-03) — 이 게시판에는 비공개 자리가
+           없어 서버가 휴지통으로 옮긴다(2026-09-14). 확인 창은 맞게 말하는데 단추만 옛말이었다. */
+      + ' title="홈페이지 휴지통으로 옮깁니다 — 지우지 않습니다, 되살릴 수 있습니다">'
+      + '지금 홈페이지에서 내리기 (휴지통)</button>');
   }
 
   h += '<div class="eft">'
@@ -7037,7 +7090,7 @@ async function copyPageFix(mid) {
     + '<li>즐겨찾기의 <b>★ 푸른ERP 쪽 채우기</b>를 누른다'
     + ' <span class="sub">— 고친 줄만 저절로 바뀝니다</span></li>'
     + '<li>눈으로 확인하고 <b>저장</b>을 누른다 <span class="sub">(저장은 사람이 합니다)</span></li>'
-    + '<li>통합시스템으로 돌아와 <b>이 쪽 다시 읽기</b> → <b>대조 기준 저장</b> → <b>홈페이지 다시 확인</b></li>'
+    + '<li>통합시스템으로 돌아와 <b>이 쪽 다시 읽기</b> → <b>대조 기준 저장</b> → <b>대조</b></li>'
     + '</ol><div class="sub" style="margin-top:5px">'
     + '단추가 아직 없으면 한 번만 넣으십시오 — <button class="btn sm" onclick="openFillSetup()">⚙ 채우기 단추 넣기</button> '
     + '원래 글을 못 찾은 줄은 <b>건너뛰고 무엇을 건너뛰었는지 알려 줍니다</b> — '
@@ -7060,7 +7113,7 @@ function pageLinesHtml(mid) {
       + '<span style="flex:1"></span>' + readPageBtn(mid, '이 쪽 읽어오기') + '</label>'
       + '<div class="note1 plain"><div>'
       + '홈페이지에 <b>어떻게 보이는지</b> 보시려면 위 <b>이 쪽 읽어오기</b>(또는 머리띠의 '
-      + '<b>홈페이지 다시 확인</b>)를 누르십시오.</div></div></div>';
+      + '<b>대조</b>)를 누르십시오.</div></div></div>';
   }
   if (!lines.length) {
     return '<div class="fld"><label>홈페이지 화면 — 본문 줄을 못 찾았습니다'
@@ -7192,7 +7245,7 @@ async function splitByLive() {
   const lines = (App.pageLines || {})[d.key];
   if (!Array.isArray(lines) || !lines.length) {
     await say('아직 홈페이지를 읽지 않았습니다',
-      '위 「홈페이지 다시 확인」을 누르면 홈페이지에서 읽어온 «줄 모양»으로 나눠 드립니다. '
+      '위 「대조」를 누르면 홈페이지에서 읽어온 «줄 모양»으로 나눠 드립니다. '
       + '없는 줄을 지어내 나누지는 않습니다 — 엉뚱한 데서 끊으면 확인이 더 어려워집니다.');
     return;
   }
@@ -7260,9 +7313,9 @@ function pageEdit(d) {
     + '<li>위 <b>홈페이지 화면</b> 칸에서 <b>고칠 줄을 그 자리에서 고친다</b> → '
     + '<b>홈페이지에 채우기용 복사</b> → 홈페이지 편집 화면에서 <b>★ 푸른ERP 쪽 채우기</b> → <b>저장</b>'
     + ' <span class="sub">(홈페이지 관리자 화면에서 직접 고치셔도 됩니다)</span></li>'
-    + '<li>돌아와 <b>홈페이지 다시 확인</b> → 딱지가 「안 올라감」으로 바뀝니다</li>'
+    + '<li>돌아와 <b>대조</b> → 딱지가 「안 올라감」으로 바뀝니다</li>'
     + '<li>바꾼 내용을 그대로 두려면 <b>대조 기준 글자</b>를 홈페이지와 맞춘 뒤 <b>대조 기준 저장</b> — '
-    + '<b>대조 기준 저장만으로는 딱지가 바뀌지 않습니다.</b> 그 뒤 <b>홈페이지 다시 확인</b>을 '
+    + '<b>대조 기준 저장만으로는 딱지가 바뀌지 않습니다.</b> 그 뒤 <b>대조</b>를 '
     + '한 번 더 눌러야 「같음」이 됩니다</li>'
     + '</ol></div></details>';
 
@@ -7300,12 +7353,13 @@ function legendHtml() {
     + '<summary style="font-size:11.5px">딱지 뜻 보기</summary><div class="w">'
     + '<span class="pill rm">퇴사 (명부)</span> <span class="pill ask">명부에 없음</span> '
     + '<span class="pill keep">남김</span> ← 명부만 보고 붙습니다 (화면을 열면 바로)<br>'
-    + ['same', 'pending', 'toAdd', 'toRemove', 'liveOnly', 'done']
+    + ['pending', 'toAdd', 'toRemove', 'liveOnly', 'done']
         .map(s => '<span class="pill ' + s + '">' + esc(STATUS_TEXT[s]) + '</span>').join(' ')
-    + ' ← 「홈페이지 다시 확인」을 누를 때만 새로 붙습니다</div></details>'
-    + '<span class="sub">대조 딱지는 <b>확인을 누를 때만</b> 새로 붙습니다 — 저절로 돌지 않습니다.</span>'
-    + '<span style="flex:1"></span>'
-    + '<span class="sub">홈페이지는 자동으로 바뀌지 않습니다 — 붙여넣기 한 번은 사람이 합니다.</span>'
+    + ' ← 「대조」를 누를 때만 새로 붙습니다 — 저절로 돌지 않습니다.<br>'
+    + '홈페이지와 같으면 딱지를 붙이지 않습니다.</div></details>'
+    /* ★ 2026-10-03 정리안 ⑦ — 「홈페이지는 자동으로 바뀌지 않습니다 — 붙여넣기 한 번은 사람이
+         합니다」를 걷었다. 2026-09-13 부터 「지금 홈페이지에 고치기」가 서버로 «바로» 고친다 —
+         늘 보이는 자리에 틀린 말이 떠 있었다. 대조 안내는 위 접기 안으로 옮겼다. */
     + '</div>';
 }
 </script>

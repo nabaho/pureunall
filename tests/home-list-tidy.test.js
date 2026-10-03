@@ -126,7 +126,57 @@ test('★ 목록 머리가 «뺐다»고 말한다 — 조용히 빼면 목록�
   const ctx = 줄상자(아홉);
   const 머리 = ctx.listCountHtml();
   assert.match(머리, /내려간 2명은 뺐음/, '뺀 것을 안 알립니다: ' + 머리);
-  assert.match(머리, /구성원 <b>5명<\/b>/, '전체 사람 수는 그대로 말해야 합니다');
+  /* ⚠ 2026-10-03 — 머리가 「구성원 | 일반직원 수정」 탭이 되며 「5명」이 「5」가 됐다.
+       지키는 것은 «전체 수를 말하나»이지 꾸밈(<b>·명)이 아니다. */
+  assert.match(머리, /구성원\D{0,12}5(?!\d)/, '전체 사람 수는 그대로 말해야 합니다');
+});
+
+/* ══════ 줄의 회색 「같음」 딱지를 뺀다 (2026-10-03 정리안 ④) ══════ */
+test('★★ 줄에는 «다를 때만» 딱지가 붙는다 — 같은 줄에 회색 「같음」을 달지 않는다', () => {
+  const ctx = 줄상자(아홉);
+  Object.assign(ctx, { App: Object.assign(ctx.App, { pick: '' }), joinOnce: (a) => a.filter(Boolean).join(' · '),
+    rosterPillHtml: () => '', postedPillHtml: () => '' });
+  ctx.STATUS_TEXT.same = '같음';
+  vm.runInContext(fnSource('rowsHtml'), ctx);
+  const h = ctx.rowsHtml();
+  const 줄 = h.split('<div class="r ').slice(1);
+  const 권 = 줄.find(s => s.indexOf('권형하') >= 0), 성 = 줄.find(s => s.indexOf('성춘향') >= 0);
+  assert.ok(권 && 성, '줄을 못 그렸습니다');
+  assert.ok(권.indexOf('class="pill') < 0, '★★ 같은 줄에 딱지를 답니다 — 다른 줄의 딱지가 묻힙니다');
+  assert.match(성, /class="pill toRemove"/, '★★ 다른 줄의 딱지까지 사라졌습니다');
+});
+
+/* ══════ 딱지 줄을 한 줄로 (2026-10-03 정리안 ③, 대표 승인) ══════
+   딱지 여덟이 두 줄로 넘쳤다. 같은 사람을 두 번 세는 딱지와, 눌러도 전체와 같은 딱지를 뺀다.
+   ⚠ 빼더라도 «볼 길»은 남긴다 — 할 일 카드의 「보기」가 그 걸러 보기를 쓴다. */
+const 딱지들 = (h) => [...h.matchAll(/onclick="App\.filt\('([^']*)'\)"/g)].map(m => m[1]);
+
+test('★★ 「손댈 것」에 이미 든 대조 딱지(내릴 것 등)는 따로 안 낸다 — 「내려감」은 남긴다', () => {
+  const ctx = 줄상자(아홉);
+  const 있음 = 딱지들(ctx.chipsHtml());
+  assert.ok(있음.indexOf('toRemove') < 0,
+    '★★ 「내릴 것」 딱지를 또 냅니다 — 손댈 것과 같은 사람을 두 번 세워 딱지 줄이 넘칩니다');
+  assert.ok(있음.indexOf('done') >= 0,
+    '★★ 「내려감」 딱지가 없습니다 — 기본에서 뺀 사람을 볼 길이 사라집니다');
+});
+
+test('★★ 할 일 카드가 건 걸러 보기는 «켜진 채» 보인다 — 왜 줄었는지·어떻게 푸는지', () => {
+  const ctx = 줄상자(아홉);
+  ctx.App.filter = 'toRemove';
+  const h = ctx.chipsHtml();
+  assert.match(h, /class="chip on" onclick="App\.filt\('toRemove'\)"/,
+    '★★ 걸러 놓고 그 딱지를 안 보입니다 — 줄이 왜 하나뿐인지, 어떻게 푸는지 알 수 없습니다');
+});
+
+test('★★ 노무사·직원 딱지는 «둘 다 있을 때만» 낸다 — 하나뿐이면 눌러도 전체와 같다', () => {
+  const ctx = 줄상자(아홉);
+  ctx.MEMBER_KINDS = [{ key: 'nomu', label: '노무사' }, { key: 'staff', label: '직원' }];
+  assert.ok(!딱지들(ctx.chipsHtml()).some(k => k.indexOf('kind:') === 0),
+    '★★ 직원이 0명인데 「노무사」 딱지를 냅니다 — 전체와 같은 화면입니다');
+  const 섞임 = 줄상자(아홉.concat([{ key: '400', name: '김직원', status: 'same', mkind: 'staff' }]));
+  섞임.MEMBER_KINDS = ctx.MEMBER_KINDS;
+  const 갈래 = 딱지들(섞임.chipsHtml()).filter(k => k.indexOf('kind:') === 0);
+  assert.deepEqual(갈래.sort(), ['kind:nomu', 'kind:staff'], '★ 둘 다 있는데 갈래 딱지가 없습니다');
 });
 
 /* ══════ ② 주요업무 차례 바꾸기 ══════ */

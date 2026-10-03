@@ -102,8 +102,10 @@ test('★⑤ 담당 업무를 경력사항 붙여넣기에 섞지 않는다', ()
 });
 
 test('⑥ 갈래로 걸러 볼 수 있다', () => {
-  assert.match(src, /k: 'kind:' \+ mk\.key/, '갈래 딱지를 안 만듭니다');
+  assert.match(src, /k: 'kind:' \+ [\w.]*key/, '갈래 딱지를 안 만듭니다');
   assert.match(src, /f\.indexOf\('kind:'\) === 0/, '갈래 딱지를 눌러도 안 걸러집니다');
-  /* 한쪽이 0명이면 딱지를 안 낸다 — 눌러 봐야 빈 화면인 딱지는 자리만 먹는다 */
-  assert.match(src, /if \(n\) defs\.push\(\{ k: 'kind:'/, '0명짜리 딱지도 냅니다');
+  /* 한쪽이 0명이면 딱지를 안 낸다 — 눌러 봐야 빈 화면인 딱지는 자리만 먹는다.
+     ⚠ 2026-10-03 — 「둘 다 있을 때만」으로 더 좁혔다. «실제로 돌려» 보는 검사는
+       tests/home-list-tidy.test.js 「노무사·직원 딱지는 둘 다 있을 때만」에 있다. */
+  assert.match(src, /if \([\w.]*\bn\) defs\.push\(\{ k: 'kind:'/, '0명짜리 딱지도 냅니다');
 });
