@@ -60,3 +60,16 @@ test('앱은 kordoc 을 «브라우저 안 묶음» 으로만 쓴다 — 서버�
     assert.match(read('pu-kordoc-text.js'), /SRC = 'vendor\/kordoc\/kordoc\.browser\.min\.js/, '★ 저장소 밖의 kordoc 을 싣습니다');
   }
 });
+
+/* 2026-10-03 설계 §4-2 — 원칙이 «가리기 전 원본은 서버 메모리에서만, 저장되는 것은 가린 것뿐» 으로 넓어졌다.
+   서버에서 kordoc 를 부르는 자리는 functions/rules-collect-redact.js «하나»뿐이고, 저장소 사본만 싣는다. */
+test('서버에서 kordoc 를 부르는 곳은 rules-collect-redact.js 하나 — 저장소 사본만', () => {
+  const dir = path.join(__dirname, '..', 'functions');
+  const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\'"])\/\/.*$/gm, '$1');
+  const hits = fs.readdirSync(dir).filter((f) => /\.js$/.test(f) && /kordoc/i.test(code(fs.readFileSync(path.join(dir, f), 'utf8'))));
+  assert.deepEqual(hits, ['rules-collect-redact.js'], '★ 다른 서버 파일이 kordoc 를 부른다: ' + hits.join(','));
+  const src = code(fs.readFileSync(path.join(dir, 'rules-collect-redact.js'), 'utf8'));
+  /* 묶음 사본은 .mjs — .js 는 모듈 형식 추측 경고가 난다(Task 1 결정) */
+  assert.match(src, /vendor', 'kordoc', 'kordoc\.browser\.min\.mjs'/);
+  assert.doesNotMatch(src, /require\(['"]kordoc['"]\)|import\(['"]kordoc['"]\)|https?:\/\//, '★ 저장소 밖 kordoc');
+});
