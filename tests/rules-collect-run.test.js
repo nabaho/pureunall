@@ -197,3 +197,29 @@ test('큰 첨부가 이미 보류로 있어도 seen.docs 에는 그 id 가 들�
   await C.run(base(db, bucket, { limit: 1, fetchAtts: fa }));
   assert.deepEqual(db.store.rules_mgmt.library.seen[key].docs, [id]);
 });
+
+/* ★★★ 취업규칙 서류가 아닌 첨부는 «글을 담지 않는다» (2026-10-03 첫 회차 실측)
+   본문에 「취업규칙」 이 든 메일이면 첨부를 다 받는데, 첫 회차 47건 가운데 23건이 「기타」였다 —
+   대부분 징계 통지서·징계위원회 회의록·의결서(근로자 이름이 그대로 든 인사 기록)였다.
+   이름은 가리지 않기로 한 것이라(헛잡기) 그 글이 재직 직원 전체가 읽는 자리에 앉았다.
+   → 갈래가 「기타」면 보류 줄(까닭만)로 남기고 글·파일은 아무것도 안 담는다. */
+test('★★★ 갈래가 「기타」인 첨부는 글을 담지 않는다 — 징계 기록 같은 것이 직원 전체에 열린다', async () => {
+  const mail = JSON.parse(JSON.stringify(MAIL));
+  mail.mailbox.msgs['INBOX-4a1e411c'] = { 20: { s: '징계위원회 관련 — 취업규칙 제30조에 따라', d: 4000, e: 'hr@gana.co.kr', a: 1 } };
+  const db = fakeDb(mail), bucket = fakeBucket();
+  const doc = H.build(H.para('징계위원회 회의록') + H.para('대상자 홍길동 — 무단결근 3일'));
+  const sum = await C.run(base(db, bucket, { fetchAtts: async () => [{ name: '1. 징계위원회 회의록 (홍길동).hwpx', data: doc }] }));
+  const lib = db.store.rules_mgmt.library;
+  const d = Object.values(lib.docs)[0];
+  assert.equal(sum.stored, 0, '★★★ 취업규칙 서류가 아닌데 담았다');
+  assert.equal(sum.held, 1);
+  assert.equal(d.status, '보류');
+  assert.equal(d.kind, '기타');
+  assert.match(d.holdWhy, /취업규칙 서류가 아님/);
+  assert.equal((lib.text || {})[d.id], undefined, '★★★ 글을 담았다');
+  assert.equal(d.file, null);
+  assert.equal(d.textLen, 0);
+  assert.ok(!JSON.stringify(db.store.rules_mgmt).includes('무단결근'), '★★★ 본문 글자가 어딘가 남았다');
+  assert.deepEqual(Object.keys(bucket.files), []);
+  assert.ok(lib.seen['i_INBOX-4a1e411c_20'], '본 메일로 적어야 다음에 다시 안 받는다');
+});
