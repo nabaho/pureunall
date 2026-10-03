@@ -18,7 +18,7 @@ test('ⓐ 편집기 — 저장소 안 rhwp-editor + 우리 studio, 원본 형식
   assert.ok(!/esm\.sh\/@rhwp|edwardkim\.github\.io/.test(H), '남의 주소 편집기를 부릅니다');
 });
 test('ⓑ 메일 — PuDocFile 을 storage 없이 init, 같은 서버 sendMail, 첨부는 putMailFile', () => {
-  assert.match(H, /<script src="js\/pu-doc-file\.js\?v=36"><\/script>/);
+  assert.match(H, /<script src="js\/pu-doc-file\.js\?v=\d+"><\/script>/);
   assert.match(H, /PuDocFile\.init\(\{ db: db \}\)/, 'storage 를 넘기면 첨부가 다른 창고로 가서 빠진 채 나갑니다');
   const s = fnOf('async function formMailSend(');
   assert.match(s, /PuDocFile\.putMailFile\(/);

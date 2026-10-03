@@ -223,7 +223,7 @@ firebase.auth().onAuthStateChanged(function (u) {
   /* 원본 보관함 — 서면함·서고 원본과 같은 창고(pureun-erp-hrphotos). 창고가 없어도 양식 화면은 돈다 */
   try { docBucket = firebase.app().storage('gs://pureun-erp-hrphotos'); } catch (e) { docBucket = null; }
   PuOfficeStore.init({ db: db, storage: docBucket, uid: u.uid, name: u.email.split('@')[0] });
-  /* ✉ 메일 첨부 — ⚠ storage 를 넘기지 않는다(기본 명함첩 창고 pureun-erp-photos 라야 서버가 첨부를 찾는다) */
+  /* ✉ 메일 첨부 — ⚠ storage 를 넘기지 않는다(기본 기업정보함 창고 pureun-erp-photos 라야 서버가 첨부를 찾는다) */
   if (window.PuDocFile) PuDocFile.init({ db: db });
   if (window.PuPhotoStore) {
     PuPhotoStore.init({ db: db, storage: docBucket, auth: firebase.auth() });
@@ -419,7 +419,7 @@ async function formHwpPdf(bytes, name) {
     return new Uint8Array(pdf.output('arraybuffer'));
   } finally { host.remove(); }
 }
-/* ✉ 메일 (설계 §7) — 명함첩·사진첩과 «같은 서버»(sendMaterialMail). 첨부는 명함첩 창고 mailout 으로. */
+/* ✉ 메일 (설계 §7) — 기업정보함·사진첩과 «같은 서버»(sendMaterialMail). 첨부는 기업정보함 창고 mailout 으로. */
 function formMailMode() {
   return db.ref('pucards/config/matMail/mode').once('value').then(function (sn) { return sn.val() === 'auto' ? 'auto' : 'mailto'; }, function () { return 'mailto'; });
 }
