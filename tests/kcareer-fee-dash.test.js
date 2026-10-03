@@ -21,7 +21,8 @@ function 떼기(머리) {
 function 세상(통) {
   const ctx = { get: (k) => 통[k] || [], Date, Number, isFinite, String, Object, Math };
   vm.createContext(ctx);
-  vm.runInContext(['function feeAll(', 'function _feeAmt(', 'function _feeYear(', 'function _feeMon(', 'function feeMissing(',
+  vm.runInContext(['function feeAll(', 'function _feeAmt(', 'function _feeYMD(', 'function _feeYear(', 'function _feeMon(',
+    'function _feeKey(', 'function _feeDay(', 'function _feeThisMonth(', 'function feeMonthSum(', 'function feeMissing(',
     'function _feeInWhen(', 'function feeSettleGroups('].map(떼기).join('\n'), ctx);
   return ctx;
 }
