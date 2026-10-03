@@ -51,7 +51,6 @@
        cdnBase 를 빈 값으로 두면 사본만 쓴다 — CDN 이 응답을 물고 늘어지는 망을 위한 탈출구. */
     cdnBase: 'https://cdn.jsdelivr.net/npm/@rhwp/core',
     coreUrl: 'vendor/rhwp-core/rhwp.js',
-    editorUrl: 'https://esm.sh/@rhwp/editor',
     maxFileBytes: 100 * 1024 * 1024,
     maxCanvasPixels: 32 * 1024 * 1024
   };
@@ -213,16 +212,32 @@
     });
   }
 
+  /* ⚠★ 2026-10-03 「서류가 남의 주소로 간다」 — 편집기는 «저장소 안» 것만 쓴다.
+     예전 기본값은 esm.sh 의 @rhwp/editor 를 studioUrl 없이 불렀다 → studio 기본 주소
+     https://edwardkim.github.io/rhwp/ 로 문서를 통째로 보냈다(기금관리가 2026-09-21 에 고친 것과 같은 결함).
+     이 길을 탄 곳: 문서관리 집단체불 「한글로 채워 보기」(근로자 주민번호·계좌가 든 문서), 이알피 계약서 첨부 편집기.
+     그래서 주소를 설정(localStorage·PUREUN_HWP_CONFIG·extra)으로도 바꾸지 못하게 박는다.
+     .hwp 는 편집기가 못 읽어 엔진으로 .hwpx 로 바꿔 넣는다(경력관리 _rhToHwpx 와 같은 길).
+     tests/hwp-engine-local-editor.test.js 가 지킨다. */
+  var LOCAL_EDITOR = 'vendor/rhwp-editor/index.js';
+  var LOCAL_STUDIO = 'vendor/rhwp-studio/index.html';
   function createEditor(selector, input, fileName, extra) {
     var meta = validate(input, fileName, extra);
-    var cfg = config(extra);
-    if (!cfg.editorUrl) return Promise.reject(new Error('고급 편집기 주소가 설정되지 않았습니다.'));
-    return dynamicImport(cfg.editorUrl).then(function (mod) {
-      if (!mod || typeof mod.createEditor !== 'function') throw new Error('편집기 모듈을 불러오지 못했습니다.');
-      return mod.createEditor(selector);
-    }).then(function (editor) {
-      return Promise.resolve(editor.loadFile(input, meta.fileName)).then(function (loaded) {
-        return { editor: editor, result: loaded, meta: meta };
+    var bytes = bytesOf(input);
+    var ready = meta.format === 'hwpx' ? Promise.resolve({ bytes: bytes, name: meta.fileName })
+      : openDoc(bytes, meta.fileName).then(function (doc) {
+        try { return { bytes: new Uint8Array(doc.exportHwpx()), name: meta.fileName.replace(/\.hwp$/i, '') + '.hwpx' }; }
+        finally { try { doc.free(); } catch (_) {} }
+      });
+    return ready.then(function (src) {
+      return dynamicImport(new URL(LOCAL_EDITOR, baseHref()).href).then(function (mod) {
+        if (!mod || typeof mod.createEditor !== 'function') throw new Error('편집기 모듈을 불러오지 못했습니다.');
+        return mod.createEditor(selector, { studioUrl: LOCAL_STUDIO, renderer: 'canvas2d', width: '100%', height: '100%' });
+      }).then(function (editor) {
+        var ab = src.bytes.buffer.slice(src.bytes.byteOffset, src.bytes.byteOffset + src.bytes.byteLength);
+        return Promise.resolve(editor.loadFile(ab, src.name)).then(function (loaded) {
+          return { editor: editor, result: loaded, meta: meta };
+        });
       });
     });
   }

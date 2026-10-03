@@ -51,7 +51,10 @@ test('★★ 편집기가 없어도 「완성본 생성」이 막히지 않는�
   assert.match(fn, /_rhDoc && _rhDoc\.bytes/, '그것마저 안 되면 지금 문서라도 줍니다');
 });
 
-test('★ 공용 모듈(js/pu-hwp-engine.js)은 건드리지 않았다 — 다른 앱이 함께 쓴다', () => {
-  const eng = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-hwp-engine.js'), 'utf8');
-  assert.match(eng, /editorUrl/, '공용 모듈에는 그대로 남아 있어야 합니다(부르지 않을 뿐)');
+/* 2026-10-03 바뀜 — 예전엔 «공용 모듈은 그대로»(editorUrl 이 남아 있어야 함)를 지켰다. 그 PR 의 범위를 지키려던
+   것이었는데, 그 사이 문서관리·이알피가 그 공용 길(esm.sh + studioUrl 없음)로 서류를 밖으로 보내고 있었다.
+   이제는 공용 모듈 자체가 저장소 안 편집기만 부른다(tests/hwp-engine-local-editor.test.js). */
+test('★ 공용 모듈(js/pu-hwp-engine.js)도 남의 편집기 주소를 부르지 않는다', () => {
+  const eng = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-hwp-engine.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.ok(!/esm\.sh|edwardkim\.github\.io/.test(eng), '공용 모듈이 남의 주소로 편집기를 부릅니다');
 });

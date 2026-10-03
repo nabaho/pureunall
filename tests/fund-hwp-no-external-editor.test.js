@@ -68,9 +68,12 @@ test('★★ 편집기·저장(exportFrom)·닫기는 그대로 이어진다 —
   assert.match(close, /_hwpEditor\.destroy\(\)/, '★ 닫을 때 편집기를 안 치웁니다 — iframe 이 남습니다.');
 });
 
-test('★ 공용 모듈(js/pu-hwp-engine.js)은 건드리지 않았다 — 다른 앱이 함께 쓴다', () => {
-  const eng = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-hwp-engine.js'), 'utf8');
-  assert.match(eng, /editorUrl/, '★ 공용 모듈은 그대로 남아 있어야 합니다(fund.html 이 이제 그 길을 안 부를 뿐).');
+/* 2026-10-03 바뀜 — 예전엔 «공용 모듈은 그대로»(editorUrl 이 남아 있어야 함)를 지켰다. 그 PR 의 범위를 지키려던
+   것이었는데, 그 사이 문서관리·이알피가 그 공용 길(esm.sh + studioUrl 없음)로 서류를 밖으로 보내고 있었다.
+   이제는 공용 모듈 자체가 저장소 안 편집기만 부른다(tests/hwp-engine-local-editor.test.js). */
+test('★ 공용 모듈(js/pu-hwp-engine.js)도 남의 편집기 주소를 부르지 않는다', () => {
+  const eng = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-hwp-engine.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.ok(!/esm\.sh|edwardkim\.github\.io/.test(eng), '공용 모듈이 남의 주소로 편집기를 부릅니다');
 });
 
 test('★ vendor/rhwp-editor·vendor/rhwp-studio 가 실제로 저장소에 있다', () => {
