@@ -44,7 +44,7 @@ test('★ 기금 짝짓기가 기금관리 청구 화면과 «글자 그대로»
 /* ── 상자 ── */
 
 const FUNDS = {
-  F1: { name: '충남1호 공동근로복지기금', short_name: '충남1호', tax_id_no: '311-82-00001',
+  F1: { name: '충남1호 공동근로복지기금', short_name: '충남1호', tax_id_no: '123-82-00001',
     years: { 2025: { subsidy: { request_amount: '12,000,000', decided_amount: 9000000, paid_date: '2025-06-10' } },
              2026: { subsidy: { request_amount: 12000000 } } } },
   F2: { name: '충남2호 공동근로복지기금', short_name: '충남2호' },
@@ -89,7 +89,7 @@ test('★ 업무관리에서 만든 기금 업무(계약 없음)는 기금 이�
 });
 
 test('푸른이알피 계약의 고유번호·수동 지정으로 맞으면 «이름으로 이은 것»이라 하지 않는다', async () => {
-  const byNo = box({ pe: { id: 'P1', companyName: '엉뚱한 이름', bizNo: '3118200001' } });
+  const byNo = box({ pe: { id: 'P1', companyName: '엉뚱한 이름', bizNo: '1238200001' } });
   await open(byNo, { cat: '기금', ref: { type: 'fund', id: 'P1' } });
   const m = byNo.fdFundOf({ cat: '기금', ref: { type: 'fund', id: 'P1' } });
   assert.equal(m.fid, 'F1'); assert.equal(m.guess, false);
