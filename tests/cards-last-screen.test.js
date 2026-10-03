@@ -76,7 +76,7 @@ function boot(who) {
   ctx.String = String;
   /* MAIL_WHO_TABS 는 최상위 const 라 컨텍스트 값이 되지 않는다 — var 로 바꿔 싣는다 */
   vm.runInContext("var MAIL_WHO_TABS = ['succ','addr','end','notco'];", ctx);
-  ['lastScreenKey', 'mailToFromUrl', 'mailCoFromUrl', 'mailWhoFromUrl', 'urlWantsMail', 'composeTouched', 'saveLastScreen', 'restoreLastScreen']
+  ['lastScreenKey', 'mailToFromUrl', 'mailCoFromUrl', 'mailWhoFromUrl', 'mailMnewFromUrl', 'urlWantsMail', 'composeTouched', 'saveLastScreen', 'restoreLastScreen']
     .forEach(n => vm.runInContext(fn(n), ctx));
   return ctx;
 }

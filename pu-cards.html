@@ -746,6 +746,42 @@ body.mailview #pu-backup-admin-button{display:none!important}
   white-space:nowrap;cursor:pointer}
 .dm-guess:hover{background:#fde68a}
 .dm-guess b{font-weight:700}
+/* 🆕 신규 문의? — 처음 보는 주소의 문의 메일(2026-10-03). «확인이 필요하다»는 호박색 */
+.dm-newq{flex:none;font-size:10.5px;font-weight:700;color:#854d0e;background:#fffbeb;border:1px solid #fde68a;
+  border-radius:3px;padding:1px 6px;margin-right:8px;white-space:nowrap;cursor:pointer}
+.dm-newq:hover{background:#fde68a}
+/* 📥 메일에서 온 연락처 — 한 칸은 한 줄(넘치면 …, 전부는 마우스를 올리면) */
+.mn{padding:14px 18px 40px}
+.mn-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.mn-head b{font-size:17px;color:#1e293b}
+.mn-head span{font-size:12.5px;color:#64748b}
+.mn-sec{font-size:12.5px;font-weight:700;color:#475569;padding:8px 10px;margin-top:12px;background:#f8fafc;
+  border:1px solid #e2e8f0;border-radius:6px 6px 0 0}
+.mn-sec{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mn-sec small{font-weight:400;color:#94a3b8;margin-left:6px}
+/* 좁은 창에서는 주소 칸을 접는다 — 단추가 오른쪽으로 밀려 나가지 않게(주소는 이름에 마우스를 올리면) */
+@media (max-width:1100px){ .mn-r .em{display:none} .mn-find{padding-left:10px} }
+.mn-r{display:flex;align-items:center;gap:8px;height:38px;padding:0 10px;border:1px solid #e2e8f0;border-top:0;
+  font-size:13px;white-space:nowrap;background:#ffffff}
+.mn-r.off{color:#94a3b8}
+.mn-r .nm{flex:none;width:96px;overflow:hidden;text-overflow:ellipsis;color:#1e293b}
+.mn-r .em{flex:none;width:190px;overflow:hidden;text-overflow:ellipsis;color:#64748b;font-size:12px}
+.mn-r .sj{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mn-r .dt{flex:none;color:#94a3b8;font-size:12px}
+.mn-r button,.mn-find button{flex:none;font-family:inherit;font-size:12px;border:1px solid #cbd5e1;background:#ffffff;
+  color:#475569;border-radius:4px;padding:3px 9px;cursor:pointer}
+.mn-r button:hover,.mn-find button:hover{border-color:#2563eb;color:#2563eb}
+.mn-r button.pri{background:#1e40af;border-color:#1e40af;color:#ffffff}
+.mn-got{flex:none;font-size:10.5px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:3px;padding:1px 6px}
+.mn-gs{flex:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#854d0e}
+.mn-gs.none{color:#94a3b8}
+.mn-none{font-size:12.5px;color:#64748b;padding:8px 10px;border:1px solid #e2e8f0;border-top:0;background:#ffffff}
+.mn-find{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px 8px 114px;border:1px solid #e2e8f0;
+  border-top:0;background:#f8fafc}
+.mn-find input{font-family:inherit;font-size:12.5px;border:1px solid #cbd5e1;border-radius:4px;padding:4px 8px;width:200px}
+.mn-find .em{font-size:12px;color:#94a3b8}
+.mn-foot{font-size:12.5px;color:#64748b;margin-top:14px}
+.mn-foot a{color:#2563eb}
 
 /* ── 숨겨 둔 칸 되돌리는 자리 (대표 지시 2026-08-26) ──
    ⚠ 되돌릴 길이 없으면 아무도 숨기기를 못 누른다. 숨기기와 «같은 화면»에 둔다. */
@@ -7833,6 +7869,7 @@ function renderMailPage(){
   mbAutoFill();    /* 받아 온 줄이 없으면 «스스로» 받아 온다 (대표 보고 2026-08-30) */
   mbSeenLoad();    /* 「누가 봤나」는 한 번만 읽어 온다 (두 번째부터는 그 자리에서 돌아온다) */
   mbBizSubsLoad(); /* 사무관리 건의 부담당도 한 번만 — 앱이 이미 읽는 자료를 그대로 쓴다 */
+  mnewTickStart(); /* 📥 회사 도메인이 같은 곳 저절로 채우기 — 관리자 PC 에서만, 1분마다 한 번 */
   /* ⚠ 메일 칸(#pcMail)은 PC 전용 틀(#pcRoot) 안에 있어 폰에서는 아예 안 그려졌다 —
      그래서 폰에는 메일 화면 자체가 없었다(대표 지시 2026-08-20 "폰에서도 쓰게").
      폰은 목록 자리(#list)에 그린다 — 「기업 상세」가 이미 쓰는 방식이라 새 틀이 필요 없다. */
@@ -7844,6 +7881,8 @@ function renderMailPage(){
      'box' 는 다음메일함을 비추는 목록이다 — 2026-08-24 에 더했다. */
   el.innerHTML = (state.mailSent==='box' ? mbBoxHtml()
                 : state.mailSent==='who' ? whoPageHtml()
+                /* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) */
+                : state.mailSent==='mnew' ? mnewHtml()
                 : state.mailSent==='set' ? mailSetHtml()
                 : state.mailSent==='inbox' ? inboxBoxHtml()
                 /* 사업장별로 오간 것 — 받은·보낸을 한 줄기로 (2026-08-30) */
@@ -10520,6 +10559,12 @@ function mailCoFromUrl(search){
   if(String(p.get('mail') || '').trim() !== 'co') return null;
   return String(p.get('co') || '').trim();
 }
+/* 주소가 「📥 메일에서 온 연락처」를 가리키나 (순수 로직, 검사 대상) */
+function mailMnewFromUrl(search){
+  let s = search;
+  if(s === undefined){ try{ s = location.search; }catch(_){ s = ''; } }
+  return /(^|[?&])mail=mnew(&|$)/.test(String(s || ''));
+}
 function urlWantsMail(){
   try{ return /(^|[?&])view=mail(&|$)/.test(location.search); }catch(_){ return false; }
 }
@@ -10599,6 +10644,8 @@ function restoreLastScreen(){
        ⚠ 위 mailCoFromUrl «뒤»에 둔다 — ?mail=co 는 사업장 갈래가 먼저 받는다. */
     const _wt = mailWhoFromUrl();
     if(_wt){ openWhoPage(_wt); return; }
+    /* ★ 기업정보함의 「📥 메일 연락처」로 건너온 길 (?view=mail&mail=mnew) */
+    if(mailMnewFromUrl()){ openMnewPage(); return; }
     /* ★★ 처음 들어오면 «전체메일»이다 (대표 지시 2026-09-18
          「메일 로그인해서 처음 들어오면 전체 메일로 들어오게 해서 메일이 들어왔는지
           확인할 수 있게 해달라」).
@@ -15867,6 +15914,9 @@ function renderPCSide(){
     ${/* 👷 근로자 정보함 (대표 지시 2026-09-01) — 회사가 아니라 «사람»을 가운데 놓는다.
          개수는 wkList() 한 곳에서 센다 — 옆줄과 목록이 따로 세면 두 숫자가 어긋난다. */''}
     <button class="${onWk?'on':''}" onclick="openWkPage()" title="사건과 사진첩 서류를 «사람»으로 모아 봅니다 — 집단 진정은 한 줄로 접힙니다">👷<em>근로자</em><span>${wkCountLabel()}</span></button>
+    ${/* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) — 메일 «앱 창»의 그 화면으로 연다.
+         수는 메일 창이 마지막에 센 값이다(이 창에는 메일이 없다). */''}
+    <button onclick="openMnewWindow()" title="메일에서 처음 온 상대 — 답장한 상대 · 회사 도메인이 같은 곳 · 신규 문의. 메일 창에서 열립니다">📥<em>메일 연락처</em><span>${mnewLsCount() ? mnewLsCount().toLocaleString() : ''}</span></button>
   </div></div>`;
   /* ⚠ 갈래 줄의 끝(`</div></div>`)이 .pcside-top 까지 «같이» 닫는다. 메일 창은 위에서
      이미 갈라져 나갔으므로 여기서는 갈래 줄이 늘 그려진다 — 따로 닫을 일이 없다. */
@@ -20379,6 +20429,14 @@ function mailSideHtml(){
       <span class="ic">🔗</span><span class="grip ghost">⋮⋮</span>
       <span class="nm">자문사 이메일 잇기</span>
       <span class="fmenu ghost">⋮</span></div>`;
+    /* 📥 메일에서 온 연락처 — 답장한 상대 · 회사 도메인이 같은 곳 · 신규 문의 (2026-10-03) */
+    const mnN = mnewCount();
+    h += `<div class="dm-f sub ${state.mailSent==='mnew'?'on':''}" onclick="openMnewPage()"
+      title="처음 보는 상대 가운데 스팸이 아닌 것 — 우리가 답장한 상대 · 회사 도메인이 같은 곳 · 문의 메일">
+      <span class="ic">📥</span><span class="grip ghost">⋮⋮</span>
+      <span class="nm">메일에서 온 연락처</span>
+      ${mnN ? `<span class="nu">${mnN}</span>` : ''}
+      <span class="fmenu ghost">⋮</span></div>`;
   }
   if(openMine && dash === 'topic'){
     /* ── 숨겨 둔 칸 — 되돌릴 자리 ──
@@ -22436,6 +22494,7 @@ function mbListHtml(){
       ${mbWorkTag(v)}
       ${/* 검사들은 이 줄 그리개만 «잘라» 돌린다 — 함수가 없으면 건너뛴다 */''}
       ${typeof mbHrTag === 'function' ? mbHrTag(v) : ''}
+      ${typeof mnewInqTag === 'function' ? mnewInqTag(v) : ''}
       ${mbOpenTag(v)}
       ${mbSeenTag(v)}
       ${mbFromTag(v)}
@@ -23021,6 +23080,371 @@ function mbNewNo(email){
   mbNewBust();                       /* 넘어간 줄을 목록에서 바로 뺀다 */
   toast('이 주소는 다시 묻지 않습니다');
   renderMailPage();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03)
+   ══════════════════════════════════════════════════════════════════════════
+   「메일함에 스팸이 아닌 새로운 메일이 들어올 경우 거래처 또는 신규고객일 수 있다 …
+    자동으로 기업정보함으로 연결해서 보낼수 있을까? 어떻게 해야 스펨과 문제 없이」
+
+   ★ 실측 2026-10-03 (최근 90일 받은 업무 메일 1,737통 · 보낸 주소 421곳)
+       이미 아는 주소 176 · 공공기관 57 · 기계발신 29 · 광고만 9 →
+       ② 회사 도메인이 업체 «한 곳»과 같음 15 · ① 우리가 답장한 상대 50 ·
+       ③ 문의·상담·견적·의뢰 제목인데 아직 답장 안 함 23 · 나머지는 ④(메일함 점검)
+   ★ 스팸과 안 섞이는 까닭
+     · 다음메일 스팸편지함은 처음부터 안 가져온다
+     · 광고·소셜·쇼핑·프로모션·카페·청구서 칸, 숨긴 칸, 우리 「스팸」 판정 줄은 안 센다
+     · 공공기관·기계발신·우리 직원·이미 아는 주소·「넘어가기」는 mbNewAskable 이 뺀다
+     · ① 의 잣대는 «우리가 답장·발송한 주소»다 — 스팸에는 아무도 답장하지 않는다
+       (실측: 답장한 상대 50곳 가운데 스팸 0)
+   ⚠ 이름(제목 속 업체명)으로는 «저절로» 잇지 않는다 — 단추로 권하기만 한다(온톨로지 규칙).
+   ⚠ 업체를 새로 «만들지» 않는다 — 업체는 업체관리의 일이다(사업자번호·계약 규칙).
+   ⚠ ② 저절로 채우기는 «관리자 PC 한 곳»에서만 돈다 — 두 PC 가 같은 업체를 동시에 고치면
+     한쪽이 사라진다(erpFillContact 는 업체 한 건을 통째로 쓴다). 무엇을 채웠는지는
+     config/mailAutoFill 에 남기고, 거기서 «되돌리기» 한다. 되돌린 주소는 다시 안 채운다. */
+const MNEW_INQ = /문의|상담|견적|의뢰/;
+const MNEW_AD = /광고|소셜|쇼핑|프로모션|카페|청구서/;
+const MNEW_CNT_LS = 'pucards_mnew_n';       /* 기업정보함 옆줄에 보일 수 — 메일 창이 적는다 */
+const MNEW_AUTO_MAX = 10;                   /* 한 번에 저절로 채우는 수 — 많으면 다음 차례에 */
+let _mnewLs = null, _mnewSig = '';
+let _mnewAutoLog = null;                    /* {열쇠: {em, co, coName, name, at, added, undone}} */
+
+/* 우리가 «보낸» 상대 — 보낸메일함 줄의 받는 사람(t) 전부.
+   ⚠ 그리는 동안만 산다(mbMemoOf) — 새로 보낸 메일이 곧바로 셈에 든다. */
+function mnewSentTo(){
+  const m = mbMemoOf();
+  if(m.mnewSent) return m.mnewSent;
+  const out = {};
+  Object.keys(_mbMsgs||{}).forEach(slug=>{
+    const f = mbFolderBy(slug);
+    if(!f || f.kind !== 'sent') return;
+    const box = _mbMsgs[slug] || {};
+    Object.keys(box).forEach(uid=>{
+      const v = box[uid]; if(!v) return;
+      (String(v.t||'').toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || [])
+        .forEach(e=>{ out[e] = 1; });
+    });
+  });
+  return (m.mnewSent = out);
+}
+/* 이 칸의 메일은 «세지 않는다» — 광고 갈래·숨긴 칸 */
+function mnewSkipFolder(slug){
+  const f = mbFolderBy(slug);
+  if(!mbGotFolder(f)) return true;
+  if(MNEW_AD.test(String(f.name||f.path||''))) return true;
+  try{ if(mbHidden(slug)) return true; }catch(_){ }
+  return false;
+}
+/* 회사 도메인이 업체관리의 업체 «한 곳»과만 같은가 — 그 업체 기록, 아니면 null.
+   ⚠ 무료메일·공공기관 도메인은 안 본다. 둘 이상이면 안 짚는다(그룹사·세무사무소). */
+function mnewDomCo(em, byDom){
+  const d = mbDomOf(em);
+  if(!d || MB_PUB_DOM.indexOf(d) >= 0 || MB_PUB_TAIL.test(d)) return null;
+  const set = byDom[d];
+  if(!set || set.ids.length !== 1) return null;
+  return set.co;
+}
+function mnewDomTable(){
+  const by = {};
+  const cos = (typeof ErpMatch!=='undefined' && ErpMatch.companies) || [];
+  cos.forEach(co=>{
+    if(!co || !co.id || /closed|terminated|inactive/.test(String(co.status||''))) return;
+    [co.email, co.primaryContactEmail].concat((co.contacts||[]).map(c=>c && c.email)).forEach(e=>{
+      const d = mbDomOf(String(e||'').trim().toLowerCase()); if(!d) return;
+      const t = by[d] || (by[d] = { ids:[], co:null });
+      if(t.ids.indexOf(String(co.id)) < 0){ t.ids.push(String(co.id)); t.co = co; }
+    });
+  });
+  return by;
+}
+/* 목록 — 주소 하나에 한 줄. 갈래: dom(② 저절로 채울 것) · replied(①) · inq(③).
+   ⚠ «담아 둔다» — 업체 수 × 주소 수라 그릴 때마다 돌리면 느리다. 메일 수·업체 수·
+     넘어가기·이음이 바뀌면 다시 센다(서명 _mnewSig). */
+function mnewRows(){
+  let n = 0;
+  Object.keys(_mbMsgs||{}).forEach(s=>{ n += Object.keys(_mbMsgs[s]||{}).length; });
+  const cos = (typeof ErpMatch!=='undefined' && ErpMatch.companies) || [];
+  const sig = [n, cos.length, Object.keys(mbNewSkipSet()).length, Object.keys(_mbCo||{}).length,
+    Object.keys(_mbOwner||{}).length, Object.keys(_mnewAutoLog||{}).length].join('|');
+  if(_mnewLs && sig === _mnewSig) return _mnewLs;
+  const cut = Date.now() - MB_NEW_DAYS * 86400000;
+  const per = {};
+  Object.keys(_mbMsgs||{}).forEach(slug=>{
+    if(slug === MB_OLD_ID || mnewSkipFolder(slug)) return;
+    const box = _mbMsgs[slug] || {};
+    Object.keys(box).forEach(uid=>{
+      const v = box[uid]; if(!v || !v.d || Number(v.d) < cut) return;
+      const e = String(v.e||'').trim().toLowerCase();
+      if(e.indexOf('@') < 1) return;
+      const r = Object.assign({ _slug:slug, _key:slug+':'+uid }, v);
+      if(mbIsSpam(r)) return;                            /* 우리 「스팸」 판정 줄 */
+      const g = per[e] || (per[e] = { em:e, n:0, last:0, name:'', subj:'', slug:'', uid:'', inq:false, hay:'' });
+      g.n++;
+      if(MNEW_INQ.test(String(v.s||''))) g.inq = true;
+      if(g.hay.length < 400) g.hay += ' ' + String(v.s||'') + ' ' + String(v.f||'');
+      if(Number(v.d) > g.last){ g.last = Number(v.d); g.name = String(v.f||'').trim();
+        g.subj = String(v.s||''); g.slug = slug; g.uid = String(uid); }
+    });
+  });
+  const sent = mnewSentTo(), byDom = mnewDomTable(), log = _mnewAutoLog || {};
+  const rows = [];
+  Object.keys(per).forEach(e=>{
+    if(!mbNewAskable(e)) return;
+    const key = mbWhoKey(e);
+    if(log[key]) return;                                 /* 이미 채웠거나 되돌린 주소 */
+    const g = per[e];
+    const dco = mnewDomCo(e, byDom);
+    const replied = !!sent[e];
+    const kind = dco ? 'dom' : replied ? 'replied' : g.inq ? 'inq' : '';
+    if(!kind) return;                                    /* 나머지는 ④ 메일함 점검에서 */
+    const hit = dco ? { co:dco, why:'도메인' } : mbNewCoOf(e, g.hay);
+    rows.push({ key:key, em:e, kind:kind, name:g.name, n:g.n, last:g.last, subj:g.subj,
+      slug:g.slug, uid:g.uid, replied:replied, co: hit ? hit.co : null, why: hit ? hit.why : '' });
+  });
+  rows.sort((a,b)=> b.last - a.last);
+  _mnewSig = sig;
+  return (_mnewLs = rows);
+}
+function mnewBust(){ _mnewLs = null; _mnewSig = ''; }
+/* ③ 줄 딱지 — 처음 보는 주소 · 아직 답장 안 함 · 제목에 문의·상담·견적·의뢰 */
+function mnewInqTag(v){
+  const id = mbNow();
+  if(id.charAt(0)===MB_RAW_P || mbSentBox(id)) return '';
+  const e = String((v&&v.e)||'').trim().toLowerCase();
+  if(!e || !MNEW_INQ.test(String((v&&v.s)||''))) return '';
+  const m = mbMemoOf();
+  const by = m.mnewBy || (m.mnewBy = mnewRows().reduce((o,r)=>{ o[r.em] = r; return o; }, {}));
+  const r = by[e];
+  if(!r || r.kind !== 'inq') return '';
+  return `<span class="dm-newq" onclick="event.stopPropagation();openMnewPage()"
+    title="처음 보는 주소 · 아직 답장 안 함 · 제목에 문의·상담·견적·의뢰 — 새 고객일 수 있습니다.
+누르면 「📥 메일에서 온 연락처」로 갑니다">🆕 신규 문의?</span>`;
+}
+
+/* ── ② 저절로 채우기 — 관리자 PC 에서, 메일 창이 열려 있는 동안 ── */
+function mnewLogLoad(cb){
+  if(_mnewAutoLog !== null){ cb && cb(); return; }
+  if(typeof Store==='undefined' || Store.mode!=='firebase'){ _mnewAutoLog = {}; cb && cb(); return; }
+  firebase.database().ref(DB_ROOT + '/config/mailAutoFill').once('value')
+    .then(s=>{ _mnewAutoLog = s.val() || {}; mnewBust(); cb && cb(); })
+    .catch(()=>{ _mnewAutoLog = null; });
+}
+let _mnewAutoBusy = false;
+async function mnewAutoFill(){
+  if(_mnewAutoBusy || !state.isAdmin) return;
+  if(typeof ErpMatch==='undefined' || !ErpMatch.ready || _mbFolders===null || _mnewAutoLog===null) return;
+  const todo = mnewRows().filter(r=>r.kind === 'dom' && r.co && r.co.id).slice(0, MNEW_AUTO_MAX);
+  if(!todo.length) return;
+  _mnewAutoBusy = true;
+  let added = 0;
+  try{
+    /* ⚠ 한 건씩 차례로 — 같은 업체를 두 번 동시에 쓰면 한쪽이 사라진다 */
+    for(const r of todo){
+      const rec = { em:r.em, co:String(r.co.id), coName:String(r.co.name||''), name:r.name,
+        subj:String(r.subj||'').slice(0, 80), at:Date.now(), by:String(myEmail||'') };
+      let res = null;
+      try{ res = await erpFillContact({ coId:r.co.id, email:r.em, name:r.name, from:'mail-auto' }); }
+      catch(e){ res = { ok:false, why:(e&&e.message)||String(e) }; }
+      if(!res || !res.ok) continue;                      /* 실패는 적지 않는다 — 다음 차례에 다시 */
+      rec.added = !!res.added;
+      _mnewAutoLog[r.key] = rec;
+      try{ await firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + r.key).set(rec); }catch(_){ }
+      if(res.added) added++;
+    }
+  }finally{ _mnewAutoBusy = false; }
+  mnewBust(); mbNewBust();
+  if(added){
+    toast('📥 회사 도메인이 같은 ' + added + '곳을 그 업체 담당자에 채웠습니다 — 「메일에서 온 연락처」에서 되돌릴 수 있습니다', 9000);
+    if(state.view==='mail'){ renderPCSide(); renderMailPage(); }
+  }
+}
+/* 메일 창이 떠 있는 동안 1분마다 한 번 본다 — 그리기 안에서 부르지 않는다(그리기는 쓰는 자리가 아니다) */
+let _mnewTick = null;
+function mnewTickStart(){
+  if(_mnewTick || typeof setInterval !== 'function') return;
+  const go = ()=>{ if(state.view==='mail' && state.isAdmin) mnewLogLoad(mnewAutoFill); };
+  _mnewTick = setInterval(go, 60000);
+  setTimeout(go, 8000);
+}
+/* 저절로 채운 것을 «되돌린다» — 그 주소로 우리가 넣은 담당자 줄만 뺀다.
+   ⚠ 사람이 따로 넣은 줄(addedFrom 이 다른 것)은 건드리지 않는다.
+   ⚠ 기록은 지우지 않고 undone 으로 남긴다 — 지우면 다음 차례에 또 채운다. */
+async function erpUnfillContact(coId, email){
+  const em = String(email||'').trim().toLowerCase();
+  const db = firebase.database();
+  const wrap = (await db.ref('data/companies').once('value')).val();
+  const rawv = (wrap && wrap.v !== undefined) ? wrap.v : wrap;
+  const isObj = rawv && !Array.isArray(rawv) && typeof rawv === 'object';
+  const list = Array.isArray(rawv) ? rawv.filter(Boolean)
+             : (isObj ? Object.keys(rawv).map(k=>rawv[k]).filter(Boolean) : []);
+  const cur = list.filter(c=>c && String(c.id)===String(coId))[0];
+  if(!cur) return { ok:false, why:'그 업체를 찾지 못했습니다' };
+  const before = (cur.contacts||[]).length;
+  const contacts = (cur.contacts||[]).filter(c=>!(c && String(c.email||'').trim().toLowerCase()===em
+    && String(c.addedFrom||'')==='mail-auto'));
+  if(contacts.length === before) return { ok:true, removed:false };
+  const merged = Object.assign({}, cur, { contacts:contacts, updatedAt:Date.now() });
+  if(String(cur.primaryContactEmail||'').trim().toLowerCase() === em){
+    merged.primaryContactEmail = '';
+    const still = contacts.filter(c=>c && c.isPrimary && !c.left)[0];
+    if(!still) merged.primaryContactName = '';
+  }
+  const up = {};
+  if(isObj) up['data/companies/v/' + cur.id] = merged;
+  else up['data/companies/v/' + list.indexOf(cur)] = merged;
+  await db.ref().update(up);
+  mbWhoBust(); mbCardsRevBump();
+  if(typeof ErpMatch!=='undefined' && ErpMatch.load) ErpMatch.load();
+  return { ok:true, removed:true };
+}
+async function mnewUndo(key){
+  const rec = (_mnewAutoLog||{})[key];
+  if(!rec || rec.undone) return;
+  if(!confirm(`「${rec.coName}」 담당자에서 ${rec.em} 을 뺍니다.\n\n저절로 채운 줄만 뺍니다 — 사람이 넣은 것은 그대로 둡니다.\n이 주소는 다시 저절로 채우지 않습니다.`)) return;
+  try{
+    const r = await erpUnfillContact(rec.co, rec.em);
+    if(!r.ok) return toast(r.why, 8000);
+    rec.undone = Date.now();
+    await firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + key + '/undone').set(rec.undone);
+    mnewBust(); mbNewBust();
+    toast('↩ 되돌렸습니다 — ' + rec.em, 6000);
+    renderPCSide(); renderMailPage();
+  }catch(e){ toast('되돌리지 못했습니다 — ' + ((e&&e.message)||e), 9000); }
+}
+
+/* ── 사람이 누르는 것 — ① 업체에 잇기 · 명함으로 · 넘어가기 ── */
+function mnewRow(key){ return mnewRows().filter(r=>r.key === key)[0] || null; }
+async function mnewLink(key, coId){
+  const r = mnewRow(key); if(!r) return;
+  const co = ((typeof ErpMatch!=='undefined' && ErpMatch.companies) || []).filter(c=>c && String(c.id)===String(coId))[0];
+  if(!co) return toast('그 업체를 찾지 못했습니다');
+  try{
+    const res = await erpFillContact({ coId:co.id, email:r.em, name:r.name, from:'mail-new' });
+    if(!res.ok) return toast(res.why, 8000);
+    mnewBust(); mbNewBust();
+    toast('🏢 「' + (co.name||'') + '」 담당자로 이었습니다 — ' + r.em, 8000);
+    renderPCSide(); renderMailPage();
+  }catch(e){ toast('잇지 못했습니다 — ' + ((e&&e.message)||e), 9000); }
+}
+/* 업체 찾기 칸 — 열고 닫기 */
+function mnewFindToggle(key){
+  state.mnewQ = state.mnewQ || {};
+  if(state.mnewQ[key] === undefined) state.mnewQ[key] = ''; else delete state.mnewQ[key];
+  renderMailPage();
+}
+/* ⚠ 칠 때마다 화면을 통째로 다시 그리지 않는다 — 그리면 찾기 칸이 커서를 잃는다.
+     후보 자리만 갈아 끼운다. */
+function mnewFind(key, q){
+  state.mnewQ = state.mnewQ || {};
+  state.mnewQ[key] = String(q||'');
+  const el = document.getElementById('mnf-' + key);
+  if(el) el.innerHTML = mnewHitsHtml(key, state.mnewQ[key]); else renderMailPage();
+}
+function mnewHitsHtml(key, q){
+  const hits = mbNewHits(q);
+  return hits.map(c=>`<button onclick="mnewLink('${esc(key)}','${esc(String(c.id))}')">${esc(c.name)}</button>`).join('')
+    + (String(q||'').trim().length >= 2 && !hits.length ? '<span class="em">찾지 못했습니다 — 업체관리에서 먼저 만들어 주십시오</span>' : '');
+}
+/* 명함으로 — 기업정보함 «직접 입력» 창을 채워서 연다. 저장은 사람이 누른다(같은 저장 길). */
+function mnewCard(key){
+  const r = mnewRow(key); if(!r) return;
+  state.tab = 'card';
+  openEditor(null, null, { name:r.name, email:r.em,
+    company: (r.co && r.why === '도메인') ? String(r.co.name||'') : '',
+    memo: '메일에서 — ' + String(r.subj||'').slice(0, 80) });
+}
+function mnewOpenMail(key){
+  const r = mnewRow(key); if(!r || !r.slug) return;
+  mbOpenMsg(r.slug, r.uid);
+}
+
+/* ── 화면 ── */
+function openMnewPage(){
+  state.view='mail'; state.mailSent='mnew'; state.mbOpen=null;
+  render();
+  try{ $('pcMain').scrollTop=0; }catch(_){}
+  mnewLogLoad(()=>{ if(state.mailSent==='mnew') renderMailPage(); });
+  /* 받은 칸과 보낸메일함을 읽어 와야 센다 — 안 읽은 것만, 한 번씩 */
+  const go = ()=>{
+    const need = mbFolders().filter(f=>(mbGotFolder(f) || f.kind === 'sent') && !_mbMsgs[f.slug]).map(f=>f.slug);
+    if(!need.length) return;
+    let left = need.length;
+    need.forEach(s=>loadMailBox(s, mbPageSize(), ()=>{
+      if(--left) return;
+      if(state.mailSent==='mnew'){ renderPCSide(); renderMailPage(); }
+    }));
+  };
+  if(_mbFolders===null) loadMailFolders(go); else go();
+}
+/* 기업정보함에서 — 메일 «앱 창»의 이 화면으로(퇴사자 이어받기와 같은 창) */
+function openMnewWindow(){
+  let w = null;
+  try{ w = window.open('pu-cards.html?view=mail&mail=mnew', MAIL_APP_WIN); }catch(_){}
+  if(!w) return toast('팝업이 막혀 열 수 없습니다 — 이 사이트의 팝업을 허용해 주세요', 8000);
+  try{ w.focus(); }catch(_){}
+}
+function mnewCount(){
+  const rows = mnewRows();
+  const log = _mnewAutoLog || {}, week = Date.now() - 7 * 86400000;
+  const auto = Object.keys(log).filter(k=>log[k] && log[k].added && !log[k].undone && Number(log[k].at||0) > week).length;
+  const n = rows.filter(r=>r.kind !== 'dom').length + auto;
+  try{ localStorage.setItem(MNEW_CNT_LS, String(n)); }catch(_){ }
+  return n;
+}
+function mnewLsCount(){
+  try{ const n = Number(localStorage.getItem(MNEW_CNT_LS) || 0); return n > 0 ? n : 0; }catch(_){ return 0; }
+}
+function mnewHtml(){
+  const rows = mnewRows();
+  const log = _mnewAutoLog || {};
+  const auto = Object.keys(log).map(k=>Object.assign({ key:k }, log[k]))
+    .filter(x=>x && x.added).sort((a,b)=>Number(b.at||0) - Number(a.at||0)).slice(0, 30);
+  const day = t => { const d = new Date(Number(t||0)); return isNaN(d) ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
+  const Q = state.mnewQ || {};
+  const line = (r, acts) => `<div class="mn-r">
+    <span class="nm" title="${esc((r.name ? r.name + ' · ' : '') + r.em)}">${esc(r.name || r.em.split('@')[0])}</span>
+    <span class="em" title="${esc(r.em)}">${esc(r.em)}</span>
+    ${acts.pre || ''}
+    <span class="sj" title="${esc(r.subj)}">${esc(r.subj || '(제목 없음)')}</span>
+    <span class="dt">${day(r.last)}</span>${acts.btn}</div>`;
+  const findBox = r => {
+    const q = Q[r.key];
+    if(q === undefined) return '';
+    return `<div class="mn-find"><input value="${esc(q)}" placeholder="업체 이름 두 글자 이상"
+        oninput="mnewFind('${esc(r.key)}', this.value)">
+      <span id="mnf-${esc(r.key)}">${mnewHitsHtml(r.key, q)}</span></div>`;
+  };
+  const common = r => `<button onclick="mnewCard('${esc(r.key)}')" title="기업정보함 명함 «직접 입력» 창을 채워서 엽니다 — 저장은 직접 누르십니다">명함으로</button>
+    <button onclick="mbNewNo('${esc(r.em)}');mnewBust()" title="다시 안 나옵니다(전 직원 공용)">넘어가기</button>`;
+  let h = `<div class="mn-head"><b>📥 메일에서 온 연락처</b>
+    <span>스팸·광고·공공기관·기계발신은 빼고, 우리가 답장한 상대 · 회사 도메인이 같은 곳 · 문의 메일만 모았습니다</span></div>`;
+  h += `<div class="mn-sec">✔ 저절로 채웠습니다 <small>회사 도메인이 업체 한 곳과 같아 그 업체 담당자 칸에 — 빈 칸만, 있는 값은 안 덮음${state.isAdmin ? '' : ' · 대표님 PC 에서 채웁니다'}</small></div>`;
+  h += auto.length ? auto.map(x=>`<div class="mn-r${x.undone ? ' off' : ''}">
+      <span class="nm" title="${esc(x.name)}">${esc(x.name || String(x.em).split('@')[0])}</span>
+      <span class="em" title="${esc(x.em)}">${esc(x.em)}</span>
+      <span class="mn-got">${x.undone ? '↩ 되돌림' : '✔ ' + esc(x.coName) + ' 담당자'}</span>
+      <span class="sj" title="${esc(x.subj||'')}">${esc(x.subj||'')}</span><span class="dt">${day(x.at)}</span>
+      ${x.undone ? '' : `<button onclick="mnewUndo('${esc(x.key)}')">되돌리기</button>`}</div>`).join('')
+    : '<div class="mn-none">아직 없습니다</div>';
+  const waitDom = rows.filter(r=>r.kind === 'dom');
+  if(waitDom.length) h += `<div class="mn-none">채울 차례 ${waitDom.length}곳 — ${state.isAdmin ? '곧 저절로 채웁니다' : '대표님 PC 에서 메일 창이 열리면 채웁니다'}</div>`;
+  const rep = rows.filter(r=>r.kind === 'replied');
+  h += `<div class="mn-sec">📇 답장한 상대 — 어느 업체인지 골라 주세요 <small>우리가 답장·발송한 주소라 스팸이 아닙니다</small></div>`;
+  h += rep.length ? rep.map(r=>line(r, {
+      pre: r.co ? `<span class="mn-gs" title="${esc(r.why)}으로 짚었습니다 — 짐작이라 누르셔야 잇습니다">${esc(r.why)}: ${esc(r.co.name||'')}</span>`
+                : '<span class="mn-gs none">짚이는 업체 없음</span>',
+      btn: (r.co ? `<button class="pri" onclick="mnewLink('${esc(r.key)}','${esc(String(r.co.id))}')">${esc(r.co.name||'')}에 잇기</button>` : '')
+        + `<button onclick="mnewFindToggle('${esc(r.key)}')">${r.co ? '다른 업체…' : '업체 찾기…'}</button>` + common(r)
+    }) + findBox(r)).join('') : '<div class="mn-none">없습니다</div>';
+  const inq = rows.filter(r=>r.kind === 'inq');
+  h += `<div class="mn-sec">🆕 신규 문의 — 아직 답장 안 함 <small>처음 보는 주소 · 제목에 문의·상담·견적·의뢰 · 답장하면 위로 옮겨 갑니다</small></div>`;
+  h += inq.length ? inq.map(r=>line(r, {
+      btn: `<button class="pri" onclick="mnewOpenMail('${esc(r.key)}')">메일 열기</button>` + common(r)
+    })).join('') : '<div class="mn-none">없습니다</div>';
+  h += `<div class="mn-foot">위 세 갈래에 안 걸린 나머지(한 번만 온 개인 주소 등)는
+    <a href="javascript:void(0)" onclick="openMailBox('*all');mbCheckOpen('new')">🔎 메일함 점검 → 👤 처음 보는 주소</a>에서 훑으십시오.</div>`;
+  return `<div class="mn">${h}</div>`;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

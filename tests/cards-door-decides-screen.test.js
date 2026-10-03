@@ -55,7 +55,7 @@ function boot(who, search) {
   vm.createContext(ctx);
   vm.runInContext(app.match(/const LASTV_PREFIX = [^\n]*/)[0], ctx);
   vm.runInContext("var _lastScreenSig = ''; var _lastScreenDone = false; var MAIL_WHO_TABS = ['succ','addr','end','notco'];", ctx);
-  ['lastScreenKey', 'mailToFromUrl', 'mailCoFromUrl', 'mailWhoFromUrl', 'urlWantsMail', 'composeTouched', 'saveLastScreen', 'restoreLastScreen']
+  ['lastScreenKey', 'mailToFromUrl', 'mailCoFromUrl', 'mailWhoFromUrl', 'mailMnewFromUrl', 'urlWantsMail', 'composeTouched', 'saveLastScreen', 'restoreLastScreen']
     .forEach(n => vm.runInContext(fn(n), ctx));
   return ctx;
 }

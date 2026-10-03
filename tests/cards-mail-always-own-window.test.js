@@ -165,7 +165,7 @@ function runDoor(opt) {
   };
   vm.createContext(ctx);
   vm.runInContext(["var MAIL_WHO_TABS = ['succ','addr','end','notco'];",
-    fnBody('mailToFromUrl'), fnBody('mailCoFromUrl'), fnBody('mailWhoFromUrl'),
+    fnBody('mailToFromUrl'), fnBody('mailCoFromUrl'), fnBody('mailWhoFromUrl'), fnBody('mailMnewFromUrl'),
     /* ⚠ 2026-09-27 — to= 갈래가 mailComposeOpen 한 곳으로 모였다(떠 있는 창도 같은 길을 쓴다).
          지킬 것은 «어느 길로 여느냐»이지 그 코드가 restoreLastScreen 안에 «글자로» 있느냐가 아니다. */
     fnBody('urlWantsMail'), fnBody('mailComposeOpen'), fnBody('restoreLastScreen')].join('\n'), ctx);
@@ -210,7 +210,7 @@ test('★★ to= 가 없으면 예전대로 «받은메일함»이다 — 빈 �
     };
     vm.createContext(ctx2);
     vm.runInContext(["var MAIL_WHO_TABS = ['succ','addr','end','notco'];",
-      fnBody('mailToFromUrl'), fnBody('mailCoFromUrl'), fnBody('mailWhoFromUrl'),
+      fnBody('mailToFromUrl'), fnBody('mailCoFromUrl'), fnBody('mailWhoFromUrl'), fnBody('mailMnewFromUrl'),
       fnBody('urlWantsMail'), fnBody('mailComposeOpen'), fnBody('restoreLastScreen')].join('\n'), ctx2);
     ctx2.restoreLastScreen();
     return ctx2;
