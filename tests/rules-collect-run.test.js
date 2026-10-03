@@ -136,3 +136,64 @@ test('너무 큰 첨부는 보류', async () => {
   assert.equal(d.status, '보류');
   assert.match(d.holdWhy, /20MB/);
 });
+
+/* ── 고침 1회차: 중간에 터진 메일의 문서를 다음 메일이 「이미 있다」며 겹침으로 세면 영영 사라진다 ── */
+const ruleDoc = (tag) => ({ name: '가나상사_취업규칙' + tag + '.hwpx', data: gana('별표 ' + tag) });
+test('★ 첫 메일이 중간에 터져도, 같은 파일이 붙은 다음 메일이 그 문서를 잃게 하지 않는다', async () => {
+  const A = ruleDoc('A'), B = ruleDoc('B');
+  const BYMAIL = { 'i_INBOX-4a1e411c_12': [A, B], 'i_INBOX-4a1e411c_11': [A] };
+  const db = fakeDb(MAIL);
+  let saves = 0, healthy = false;
+  const files = {};
+  const bucket = { files, file: (name) => ({ save: async (data) => {
+    saves++;
+    if (!healthy && saves === 2) throw Object.assign(new Error('창고 끊김'), { code: 'EPIPE' });   // 첫 메일의 둘째 첨부에서만
+    files[name] = Buffer.from(data);
+  } }) };
+  const opts = (extra) => base(db, bucket, Object.assign({ fetchAtts: async (m) => BYMAIL[m.mailKey] || [] }, extra || {}));
+  const s1 = await C.run(opts({ limit: 2 }));
+  const lib = db.store.rules_mgmt.library;
+  assert.equal(s1.retry, 1);
+  assert.equal(lib.seen['i_INBOX-4a1e411c_12'], undefined, '터진 메일은 seen 에 안 적는다');
+  const idA = Object.keys(lib.docs).find((id) => lib.docs[id].name.includes('규칙A'));
+  Object.values(lib.seen).forEach((sn) => (sn.docs || []).forEach((id) => assert.ok(lib.docs[id], '★ seen 이 가리키는 문서가 없다: ' + id)));
+  assert.ok(idA && lib.docs[idA].status === '담김', '둘째 메일이 A 를 담았어야');
+  healthy = true;
+  await C.run(opts({ limit: 60 }));
+  const names = Object.values(db.store.rules_mgmt.library.docs).map((d) => d.name).sort();
+  assert.ok(names.some((n) => n.includes('규칙B')), '다시 돌리면 B 도 담긴다');
+  assert.ok(db.store.rules_mgmt.library.seen['i_INBOX-4a1e411c_12'], '다시 돌려 이제 본 것으로 적힌다');
+});
+
+test('오류에는 이름표만 — 메시지(글 조각 인용 가능)는 담지 않는다', async () => {
+  const db = fakeDb(MAIL), bucket = fakeBucket();
+  const s = await C.run(base(db, bucket, { fetchAtts: async () => { throw new Error('본문 인용 900101-1234567'); } }));
+  assert.ok(!JSON.stringify(db.store.rules_mgmt).includes('900101'), '★ 오류 메시지가 DB 에 남았다');
+  assert.ok(!JSON.stringify(s).includes('900101'));
+  assert.ok(s.errors.length >= 1);
+});
+
+test('메일 하나의 DB 쓰기가 터져도 회차 기록은 남고 그 메일은 다시 시도로 센다', async () => {
+  const db = fakeDb(MAIL), bucket = fakeBucket();
+  const realRef = db.ref;
+  db.ref = (p) => {
+    const r = realRef(p);
+    if (!p) return { ...r, update: async (obj) => { if (Object.keys(obj).some((k) => k.includes('/seen/'))) throw Object.assign(new Error('쓰기 실패'), { code: 'EDB' }); return r.update(obj); } };
+    return r;
+  };
+  const s = await C.run(base(db, bucket, { limit: 1 }));
+  assert.equal(s.retry, 1);
+  assert.equal(s.stored, 0, '쓰이지 않은 것은 담음으로 세지 않는다');
+  assert.ok(db.store.rules_mgmt.library.run, '회차 기록은 쓰인다');
+});
+
+test('큰 첨부가 이미 보류로 있어도 seen.docs 에는 그 id 가 들어간다', async () => {
+  const db = fakeDb(MAIL), bucket = fakeBucket();
+  const fa = async () => [{ name: '큰취업규칙.hwp', tooBig: true }];
+  await C.run(base(db, bucket, { limit: 1, fetchAtts: fa }));
+  const lib = db.store.rules_mgmt.library;
+  const key = Object.keys(lib.seen)[0], id = Object.keys(lib.docs)[0];
+  delete lib.seen[key];   // 같은 메일을 다시 보게 한다(문서는 이미 있음)
+  await C.run(base(db, bucket, { limit: 1, fetchAtts: fa }));
+  assert.deepEqual(db.store.rules_mgmt.library.seen[key].docs, [id]);
+});

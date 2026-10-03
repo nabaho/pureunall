@@ -20,6 +20,8 @@ function isRetry(e) {
   if (e.status === 404 || e.status === 413) return false;
   return true;   // 연결 끊김·시간 초과·모르는 실패 — 다음 회차에 다시
 }
+/* 오류는 «이름표»만 남긴다 — 파서·창고 메시지가 글 조각을 인용할 수 있어 e.message 는 담지 않는다 */
+function errTag(e) { return String((e && (e.code || e.name)) || '오류').slice(0, 40); }
 function docRecord(o) {
   return Object.assign({
     id: o.id, entityType: 'RulesDocument', schemaVersion: 1, contractVersion: o.cv,
@@ -45,12 +47,19 @@ async function run(o) {
     sum.mails++;
     const up = {};
     const ids = [];
+    /* ★ 이 메일에서 «새로 정한 것»은 DB 에 쓰기가 성공한 뒤에야 have·sum 에 합친다.
+       먼저 합쳐 두면, 중간에 터져 버려진 문서를 다음 메일이 「이미 있다」며 겹침으로 세고
+       seen 에만 적어 — 그 문서는 영영 안 담긴다. */
+    const staged = {};
+    const c = { stored: 0, held: 0, dup: 0 };
+    const has = (id) => have[id] || staged[id];
     let atts;
     try { atts = await o.fetchAtts(m); }
     catch (e) {
-      if (isRetry(e)) { sum.retry++; sum.errors.push(String((e && e.message) || e).slice(0, 80)); continue; }
-      up[LIB + '/seen/' + m.mailKey] = { at: o.now(), docs: [], why: e.status === 404 ? '없어짐' : '너무 큼' };
-      await db.ref().update(up);
+      if (isRetry(e)) { sum.retry++; sum.errors.push(errTag(e)); continue; }
+      try {
+        await db.ref().update({ [LIB + '/seen/' + m.mailKey]: { at: o.now(), docs: [], why: e.status === 404 ? '없어짐' : '너무 큼' } });
+      } catch (e2) { sum.retry++; sum.errors.push(errTag(e2)); }
       continue;
     }
     const cand = P.companyCandOf(m, coIndex, domIndex);
@@ -66,24 +75,25 @@ async function run(o) {
           companyId: null, companyLinkStatus: 'pending' };
         if (a.tooBig) {
           const id = 'rd_big_' + crypto.createHash('sha256').update(m.mailKey + '|' + a.name).digest('hex').slice(0, 20);
-          if (!have[id]) {
+          if (!has(id)) {
             up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
               { kind: P.kindOf(a.name, ''), sha: '', file: null, textLen: 0, pii: { count: {}, residual: 0 },
                 status: '보류', holdWhy: '20MB 넘음 — 메일에서 직접' }) });
-            have[id] = 1; sum.held++; ids.push(id);
+            staged[id] = 1; c.held++;
           }
+          ids.push(id);
           continue;
         }
         const sha = crypto.createHash('sha256').update(a.data).digest('hex');
         const id = P.docIdOf(sha);
-        if (have[id]) { sum.dup++; ids.push(id); continue; }
+        if (has(id)) { c.dup++; ids.push(id); continue; }
         const r = await X.redactOne(a.data, ext);   // impl(셋째 칸)은 검사 전용 — 여기서는 안 넘긴다
         if (!r.ok) {
           /* 무슨 까닭이든 ok:false 는 똑같이 보류 — 글·파일 아무것도 안 담는다 */
           up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
             { kind: P.kindOf(a.name, ''), sha, file: null, textLen: 0, pii: { count: r.count || {}, residual: 0 },
               status: '보류', holdWhy: r.holdWhy }) });
-          have[id] = 1; sum.held++; ids.push(id);
+          staged[id] = 1; c.held++; ids.push(id);
           continue;
         }
         const kind = P.kindOf(a.name, r.text);
@@ -97,15 +107,18 @@ async function run(o) {
         up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
           { kind, sha, file, textLen: r.text.length,
             pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '' }) });
-        have[id] = 1; sum.stored++; ids.push(id);
+        staged[id] = 1; c.stored++; ids.push(id);
       }
+      up[LIB + '/seen/' + m.mailKey] = { at: o.now(), docs: ids, why: ids.length ? '' : '첨부 없음' };
+      await db.ref().update(up);
     } catch (e) {
-      /* 창고·가리기 도중 터짐 — 이 메일은 seen 에 안 적고 다음 회차에 다시. 회차 전체를 죽이지 않는다 */
-      sum.retry++; sum.errors.push(String((e && e.message) || e).slice(0, 80));
+      /* 창고·가리기·DB 쓰기 도중 터짐 — staged 는 버리고, seen 에 안 적어 다음 회차에 다시.
+         회차 전체를 죽이지 않는다(run 기록·zeroStreak 는 계속 쓴다) */
+      sum.retry++; sum.errors.push(errTag(e));
       continue;
     }
-    up[LIB + '/seen/' + m.mailKey] = { at: o.now(), docs: ids, why: ids.length ? '' : '첨부 없음' };
-    await db.ref().update(up);
+    Object.assign(have, staged);
+    sum.stored += c.stored; sum.held += c.held; sum.dup += c.dup;
   }
   sum.errors = sum.errors.slice(0, 10);
   /* 설계 §4-5 — 「담음 0, 오류 있음」이 사흘 이어지면 관리자에게 알린다(부르는 쪽이 systemAlerts 에 쓴다) */
@@ -116,4 +129,4 @@ async function run(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, isRetry, LIB, FILE_KINDS };
+module.exports = { run, isRetry, errTag, LIB, FILE_KINDS };
