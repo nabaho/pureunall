@@ -43,4 +43,44 @@ test('PDF 는 보류, 못 읽는 것도 보류 — 담을 것을 돌려주지 �
 test('마지막 그물 — 가린 글에 주민번호 꼴이 남으면 보류', async () => {
   assert.ok(X.RAW_RE.test('주민 ' + RRN));
   assert.ok(!X.RAW_RE.test('주민 900101-●●●●●●●'));
+  assert.ok(X.RAW_RE.test('A900101-1234567'), '★ 글자에 붙은 번호도 잡아야');
+  assert.ok(X.RAW_RE.test('번호900101-1234567입니다'));
+  assert.ok(!X.RAW_RE.test('1900101-12345678'), '숫자에 붙은 더 긴 수는 번호가 아니다');
+});
+
+/* 닫는 쪽 가지 — 가림 엔진을 가짜로 바꿔 결정적으로 본다. 어느 가지든 ok:false, 담을 글·파일을 돌려주지 않는다 */
+const fake = (red, text) => ({
+  read: async () => ({ text: text || '제1조 가나상사 규칙 본문 길이를 충분히 채운 글' }),
+  redactFile: async () => Object.assign({ fileOk: true, total: 0, count: {}, residual: 0, unscanned: 0, data: null, text: '깨끗한 글' }, red),
+});
+const held = (r, re) => {
+  assert.equal(r.ok, false);
+  assert.match(r.holdWhy, re);
+  assert.equal(r.text, undefined, '★ 보류인데 글을 돌려준다');
+  assert.equal(r.data, undefined, '★ 보류인데 파일을 돌려준다');
+};
+const SRC = Buffer.from('원본');
+
+test('닫는 쪽 — 가린 뒤에도 남으면 보류', async () => {
+  held(await X.redactOne(SRC, 'hwpx', fake({ total: 1, count: { rrn: 1 }, residual: 2, data: new Uint8Array(3) })), /남음/);
+});
+test('닫는 쪽 — 검사 못 한 부분이 있으면 보류(찾은 것이 0이어도)', async () => {
+  held(await X.redactOne(SRC, 'hwpx', fake({ total: 0, unscanned: 1 })), /검사 못 한/);
+  held(await X.redactOne(SRC, 'docx', fake({ fileOk: false, total: 0, unscanned: 3 })), /검사 못 한/);
+});
+test('닫는 쪽 — 가린 글에 주민번호 꼴이 남으면 보류', async () => {
+  held(await X.redactOne(SRC, 'hwpx', fake({ total: 1, count: { rrn: 1 }, data: new Uint8Array(3), text: '주민 ' + RRN })), /주민번호 꼴/);
+});
+test('닫는 쪽 — 찾았는데 가린 파일이 없으면 보류(원본을 내보내지 않는다)', async () => {
+  held(await X.redactOne(SRC, 'hwpx', fake({ total: 2, count: { rrn: 2 }, data: null })), /가린 파일/);
+});
+test('닫는 쪽 — 가림 엔진이 던지거나 글을 못 읽어도 보류', async () => {
+  const boom = { read: async () => ({ text: '충분히 긴 본문' }), redactFile: async () => { throw new Error('x'); } };
+  held(await X.redactOne(SRC, 'hwpx', boom), /실패/);
+  held(await X.redactOne(SRC, 'hwpx', { read: async () => null, redactFile: async () => ({}) }), /읽지 못/);
+});
+test('열린 쪽 — 모두 깨끗하면 담는다(가짜 엔진)', async () => {
+  const r = await X.redactOne(SRC, 'docx', fake({ fileOk: false, total: 0 }));
+  assert.equal(r.ok, true);
+  assert.equal(r.data, null);
 });

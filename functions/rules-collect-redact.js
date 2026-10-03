@@ -15,19 +15,24 @@ function load() {
   return ready;
 }
 /* 마지막 그물 — 주민·외국인번호 꼴(앞 6자리-뒤 7자리, 뒤 첫 자리 1~8). 가린 것(●)은 안 걸린다 */
-const RAW_RE = /\b\d{6}\s*-\s*[1-8]\d{6}\b/;
+/* \b 를 쓰지 않는다 — 앞뒤가 글자(A900101-1234567)에 붙어 있으면 \b 는 못 잡는다. 숫자만 아니면 걸리게 한다 */
+const RAW_RE = /(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/;
 
-async function redactOne(buf, ext) {
+/* impl 은 «검사 전용» 이음매 — 실제 호출은 넘기지 않는다(기본 T). 닫는 쪽 가지를 결정적으로 시험하려는 것뿐 */
+async function redactOne(buf, ext, impl) {
+  const U = impl || T;
   if (ext === 'pdf') return { ok: false, holdWhy: 'PDF — 아직 못 읽음', count: {}, total: 0 };
-  await load();
+  if (!impl) await load();
   const bytes = new Uint8Array(buf);
   let read = null;
-  try { read = await T.read(bytes); } catch (_) { read = null; }
+  try { read = await U.read(bytes); } catch (_) { read = null; }
   if (!read || !read.text) return { ok: false, holdWhy: '글을 읽지 못함', count: {}, total: 0 };
   let r;
-  try { r = await T.redactFile(bytes, read.text); }
+  try { r = await U.redactFile(bytes, read.text); }
   catch (_) { return { ok: false, holdWhy: '가리다 실패함', count: {}, total: 0 }; }
   if (r.residual > 0) return { ok: false, holdWhy: '가린 뒤에도 남음 ' + r.residual, count: r.count, total: r.total };
+  /* 못 훑은 글이 있으면 «남은 것이 없다» 를 믿을 수 없다 — 찾은 것이 0이어도 원본을 내보내지 않는다 */
+  if (r.unscanned > 0) return { ok: false, holdWhy: '검사 못 한 부분 있음 ' + r.unscanned, count: r.count, total: r.total };
   if (RAW_RE.test(r.text)) return { ok: false, holdWhy: '가린 글에 주민번호 꼴이 남음', count: r.count, total: r.total };
   const isHwp = ext === 'hwp' || ext === 'hwpx';
   /* 찾았는데 가린 파일을 못 받았으면 원본을 내보낼 수 없다 — 보류 */

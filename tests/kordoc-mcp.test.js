@@ -65,8 +65,8 @@ test('앱은 kordoc 을 «브라우저 안 묶음» 으로만 쓴다 — 서버�
    서버에서 kordoc 를 부르는 자리는 functions/rules-collect-redact.js «하나»뿐이고, 저장소 사본만 싣는다. */
 test('서버에서 kordoc 를 부르는 곳은 rules-collect-redact.js 하나 — 저장소 사본만', () => {
   const dir = path.join(__dirname, '..', 'functions');
-  const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\'"])\/\/.*$/gm, '$1');
-  const hits = fs.readdirSync(dir).filter((f) => /\.js$/.test(f) && /kordoc/i.test(code(fs.readFileSync(path.join(dir, f), 'utf8'))));
+  const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\'"])\/\/.*$/gm, '$1');
+  const hits = fs.readdirSync(dir).filter((f) => /\.m?js$/.test(f) && /kordoc/i.test(code(fs.readFileSync(path.join(dir, f), 'utf8'))));
   assert.deepEqual(hits, ['rules-collect-redact.js'], '★ 다른 서버 파일이 kordoc 를 부른다: ' + hits.join(','));
   const src = code(fs.readFileSync(path.join(dir, 'rules-collect-redact.js'), 'utf8'));
   /* 묶음 사본은 .mjs — .js 는 모듈 형식 추측 경고가 난다(Task 1 결정) */
