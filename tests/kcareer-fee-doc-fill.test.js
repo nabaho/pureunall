@@ -85,9 +85,10 @@ test('③ 회의·비용관리 옆줄 — 같은 화면을 빌려 쓰고, 비용
 });
 
 test('회의·비용관리 › 서류 만들기에는 빠른 이력서 탭이 없다 — 머물러 있었으면 기관 양식 채우기로 (대표 지시 2026-10-03)', () => {
-  assert.match(SRC, /#page-resume-hub\[data-nav-as="page-feedoc"\] #rh-tabrow \.tab\[data-tab="dm-quick"\]\{display:none\}/);
+  /* ★ 빠른 이력서·PDF 편집 둘 다 없다(대표 지시 2026-10-03 「pdf 편집 빼라」) — 기관 양식 채우기 하나만 */
+  assert.match(SRC, /#page-resume-hub\[data-nav-as="page-feedoc"\] #rh-tabrow \.tab:not\(\[data-tab="rh-edit"\]\)\{display:none\}/);
   const 나 = SRC.slice(SRC.indexOf('function nav_to('));
-  const 옮김 = 나.indexOf(".tab.active[data-tab=\"dm-quick\"]"), 다시 = 나.indexOf("var b=document.querySelector('#rh-tabrow .tab.active'); if(b) rhTab(");
+  const 옮김 = 나.indexOf(".tab.active:not([data-tab=\"rh-edit\"])"), 다시 = 나.indexOf("var b=document.querySelector('#rh-tabrow .tab.active'); if(b) rhTab(");
   assert.ok(옮김 > 0 && 다시 > 옮김, '★ 빠른 이력서에서 «먼저» 옮겨 두고 그다음에 켜진 탭을 다시 그려야 한다');
   assert.doesNotMatch(SRC, /#page-resume-hub:not\(\[data-nav-as[^\]]*\]\)[^{]*dm-quick[^{]*\{display:none\}/, '이력서관리 문에서는 그대로 보여야 한다');
 });

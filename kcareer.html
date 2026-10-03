@@ -901,8 +901,8 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
 #page-docbox>.page>h2,#page-docbox>.page>.desc{display:none}
 /* ★ 보관함은 «들어온 문»의 탭만 보인다 (2026-10-03) — 회의·비용관리로 오면 비용 서류만,
    이력서관리로 오면 비용 서류는 숨는다. 이름표는 nav_to 가 단다(data-nav-as). */
-/* 회의·비용관리 › 서류 만들기에는 빠른 이력서 탭이 없다 (대표 지시 2026-10-03) */
-#page-resume-hub[data-nav-as="page-feedoc"] #rh-tabrow .tab[data-tab="dm-quick"]{display:none}
+/* 회의·비용관리 › 서류 만들기에는 빠른 이력서·PDF 편집 탭이 없다 (대표 지시 2026-10-03) — 기관 양식 채우기 하나 */
+#page-resume-hub[data-nav-as="page-feedoc"] #rh-tabrow .tab:not([data-tab="rh-edit"]){display:none}
 #page-docbox[data-nav-as="page-feebox"] #db-tabrow .tab:not([data-db="feedoc"]),
 #page-docbox:not([data-nav-as="page-feebox"]) #db-tabrow .tab[data-db="feedoc"]{display:none}
 /* ★★ 환경설정 틀고정 — 탭줄과 도구 줄이 위에 붙는다 (대표 지시 2026-09-13 「캡쳐1 틀고정」)
@@ -5640,7 +5640,7 @@ function nav_to(id,label,grp){
   /* ★ 회의·비용관리 문에는 빠른 이력서가 없다(대표 지시 2026-10-03 「회의 비용관리에 빠른이력서는 필요없다」).
      그 탭에 머물러 있었으면 «먼저» 기관 양식 채우기로 옮겨 둔다 — 숨긴 탭이 켜진 채 빈 화면이 뜨면 안 된다.
      (바로 아래 줄이 «켜진 탭»을 다시 그린다) */
-  if(id==='page-feedoc') _safe(function(){ var q=document.querySelector('#rh-tabrow .tab.active[data-tab="dm-quick"]');
+  if(id==='page-feedoc') _safe(function(){ var q=document.querySelector('#rh-tabrow .tab.active:not([data-tab="rh-edit"])');   /* 빠른 이력서·PDF 편집 */
     if(q){ q.classList.remove('active'); var e=document.querySelector('#rh-tabrow .tab[data-tab="rh-edit"]'); if(e) e.classList.add('active'); } });
   if(real==='page-resume-hub') _safe(function(){ var b=document.querySelector('#rh-tabrow .tab.active'); if(b) rhTab(b.dataset.tab,b); });
   /* 비용 서류는 보관함의 한 탭이다 — 들어온 문에 맞는 탭만 보인다(CSS data-nav-as) */
