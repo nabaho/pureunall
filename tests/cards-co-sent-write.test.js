@@ -264,3 +264,10 @@ test('★ 명함 기록을 «지우거나 옮기지» 않는다 — 옮기다 �
   assert.match(m, /logSentToCompany\(cardId, rec\)/, '회사에도 남겨야 한다');
   assert.ok(!/\.remove\(/.test(m), '옛 기록을 지운다');
 });
+
+test('문서관리에서 보낸 제안서·계약서도 보낸 서류 종류로 보인다 (2026-10-03)', () => {
+  const m = /const SENT_KINDS = \[([^\]]*)\]/.exec(SRC);
+  assert.ok(m, 'SENT_KINDS 가 없습니다');
+  assert.ok(m[1].includes("'제안서'") && m[1].includes("'계약서'"), '제안서·계약서 종류가 없습니다');
+  assert.ok(m[1].indexOf("'그 밖'") > m[1].indexOf("'계약서'"), '「그 밖」은 맨 끝이어야 합니다');
+});

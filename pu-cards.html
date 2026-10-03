@@ -6798,7 +6798,7 @@ async function postAutoMail(payload){
    ⚠ 지금 «쓰는» 것은 「자료」 하나다 — 자료함에서 1:1 로 보낸 것.
      나머지는 3걸음(전 사업장 배포)이 쓴다. 그래도 갈래를 «지금부터» 적어 둔다 —
      나중에 붙이면 이미 쌓인 기록마다 사람이 다시 매겨야 한다(설계안 ②). */
-const SENT_KINDS = ['자료', '취업규칙', '근로계약서', '연차', '임금', '4대보험', '그 밖'];
+const SENT_KINDS = ['자료', '제안서', '계약서', '취업규칙', '근로계약서', '연차', '임금', '4대보험', '그 밖'];
 function sentKindOf(v){
   const t = String(v == null ? '' : v).trim();
   return SENT_KINDS.indexOf(t) >= 0 ? t : '그 밖';
