@@ -3259,7 +3259,13 @@ function mailLoad(){
   if(mailSrc) return Promise.resolve(mailSrc);
   if(_mailT) return _mailT;
   if(typeof fbDb==='undefined'||!fbDb){ mailSrc=[]; return Promise.resolve(mailSrc); }
-  _mailT=fbDb.ref(MAILLOG_PATH).limitToLast(MAIL_MAX).once('value')
+  /* ★ «받은 때» 순으로 마지막 MAIL_MAX 통 (2026-10-03 고침).
+     ⚠⚠ 전에는 limitToLast 만 걸었다 — 그러면 «열쇠» 순 마지막 300통이다. 그런데 열쇠는
+       Message-ID 를 다듬은 것이라 시간과 아무 상관이 없다. 실측: 488통 중 진짜 최근 300통과
+       겹친 것이 181통, 9.14~9.27 메일 120통 중 67통만 왔다 — 서랍·「이어 줄 메일」·주간 자동
+       기록이 최근 메일의 사십 퍼센트를 조용히 못 보고 있었다.
+     ⚠ 서버 규칙에 at 색인이 있다(paydata/maillog .indexOn at) — 서버가 골라 보낸다. */
+  _mailT=fbDb.ref(MAILLOG_PATH).orderByChild('at').limitToLast(MAIL_MAX).once('value')
     .then(function(s){
       var v=s.val()||{};
       mailSrc=Object.keys(v).map(function(k){ var o=v[k]||{}; o._k=k; return o; })
