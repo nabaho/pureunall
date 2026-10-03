@@ -439,6 +439,34 @@
       return ('0' + (i + 1)).slice(-2) + '_' + (fileSafe(it.name).slice(0, 40) || '양식') + (tail ? '_' + tail : '') + (it.ext || '');
     });
   }
+  /* 계약 여러 건 묶음 — 계약마다 폴더 이름 「01_C-2026-001_가나상사」 */
+  function contractFolder(info, i) {
+    info = info || {};
+    var no = fileSafe(info.contractNo || info.id || '').slice(0, 30), co = fileSafe((info.vals || {}).회사명 || '').slice(0, 30);
+    return ('0' + (i + 1)).slice(-2) + '_' + [no || '계약', co].filter(Boolean).join('_');
+  }
+  /* 계약 값 → 채울 값 — 기업정보함 채우기와 같은 기본값(오늘·우편주소 등) 위에 계약 값(빈 값은 덮지 않는다) */
+  function contractValues(info) {
+    var CF = w.PuFormCardFill, v = (info && info.vals) || {};
+    var V = CF.valuesFrom({ co: { c: v.회사명, bz: v.사업자번호, ceo: v.대표자, ad: v.주소, ct: v.대표전화, cfx: v.대표팩스, e: v.대표이메일,
+      bt: v.업태, bi: v.종목, cno: v.법인등록번호, sme: v.규모 }, contact: { n: v.담당자, m: v.담당자연락처, e: v.담당자이메일 } });
+    Object.keys(v).forEach(function (k) { if (v[k] != null && v[k] !== '') V[k] = v[k]; });
+    return V;
+  }
+  function bomText(s) {
+    var b = new TextEncoder().encode(s), o = new Uint8Array(b.length + 3);
+    o[0] = 0xEF; o[1] = 0xBB; o[2] = 0xBF; o.set(b, 3);
+    return o;
+  }
+  /* 양식 하나를 값 V 로 채운다(창 없이) — 채우기 창 fillOne 과 같은 길: 원본 → 표지 읽기 → 채우기, 원본이 없으면 본문(.txt) */
+  function fillFormOnce(fm, V, host) {
+    var CF = w.PuFormCardFill, src = hwpSources(fm)[0];
+    if (!src || !host.hwpBytes || !host.hwpFill || !host.hwpMarkers) return Promise.resolve({ bytes: bomText(CF.fillText(fm.body, V)), ext: '.txt', unknown: [] });
+    var xl = /\.xlsx$/i.test(src.name || '');
+    return host.hwpBytes(src).then(function (u8) {
+      return host.hwpMarkers(u8, src.name).then(function (ks) { return host.hwpFill(u8, src.name, CF.hwpValues(ks || [], V)); });
+    }).then(function (r) { return { bytes: r.bytes, ext: xl ? '.xlsx' : '.hwp', unknown: r.unknown || [] }; });
+  }
   function zipName(title, V) {
     var head = fileSafe(title).replace(/^\.+/, '').slice(0, 40), tail = whoTail(V);
     return (head || '서식묶음') + (tail ? '_' + tail : '') + '.zip';
@@ -619,6 +647,10 @@
     + '.pcf-muted{color:#94a3b8}'
     /* 채워서 받기 창 */
     + '.pcf-fcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px}'
+    + '.pcf-ct-list{max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px}'
+    + '.pcf-ct-row{display:grid;grid-template-columns:28px 32px 130px minmax(0,1fr) 110px 92px minmax(0,1fr);gap:6px;align-items:center;padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:12.5px;cursor:pointer}'
+    + '.pcf-ct-head{position:sticky;top:0;background:#f8fafc;cursor:default}'
+    + '.pcf-ct-bad{color:#b91c1c}'
     + '.pcf-mk-hits{max-height:180px;overflow:auto;margin:4px 0 8px}'
     + '.pcf-mk-hit{font-size:12px;padding:2px 0;color:#334155}'
     + '.pcf-mk-hit mark{background:#fde68a}'
@@ -1459,6 +1491,110 @@
        제안서가 하나면 채우기 창을 바로 연다(회사는 openFill 이 host.propose 로 골라 둔다). 처음 한 번만. */
     /* 이알피 「📦 문서관리에서 묶음 채우기」로 왔을 때 (설계 2026-10-03 §4) — 계약을 읽어 값(PuContractVars)을 host.contractCtx 에 두고,
        이알피 계약서 출력과 같은 규칙으로 양식을 체크해 아래 묶음 막대를 띄운다. 채우기는 사람이 막대를 눌러서. */
+    /* 📦 계약 여러 건 (서식 묶음 설계 2026-09-28 상황 1-C) — 이알피 계약을 골라, 계약마다 이알피와 같은 규칙으로 양식을 골라
+       같은 한 벌 값으로 채워 .zip 하나(계약마다 폴더)로 받는다. 하나씩 차례로 — 한 건이 실패해도 나머지는 계속.
+       ⚠ db 를 만지지 않는다(읽기는 host). 메일·보낸 기록은 없다(내려받기만) — 보낼 때는 계약 하나씩 「📦 문서관리에서 묶음 채우기」로. */
+    function openContracts() {
+      if (!host.contractList || !host.contractLoad) return;
+      ensureCss();
+      var list = [], picked = {}, busy = false, onlySigned = true, result = null;
+      var bg = el('div', { 'class': 'pcf-mbg' });
+      function close() { if (busy) return; document.removeEventListener('keydown', onKey); bg.remove(); }
+      function onKey(e) { if (e.key === 'Escape') close(); }
+      document.addEventListener('keydown', onKey);
+      var q = el('input', { type: 'search', placeholder: '계약번호·회사 찾기', 'aria-label': '계약 찾기' });
+      var signedCk = el('input', { type: 'checkbox', checked: true, 'aria-label': '서명된 계약만' });
+      var box = el('div', { 'class': 'pcf-ct-list' });
+      var note = el('div', { 'class': 'pcf-fnote' });
+      var btnGo = el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff;font-weight:700', onclick: run });
+      function shownList() {
+        var qq = q.value.trim().toLowerCase();
+        return list.filter(function (c) {
+          if (onlySigned && c.status !== 'signed') return false;
+          return !qq || (c.contractNo + ' ' + c.companyName).toLowerCase().indexOf(qq) >= 0;
+        });
+      }
+      function count() { return Object.keys(picked).filter(function (k) { return picked[k]; }).length; }
+      function sync() { var n = count(); btnGo.textContent = n ? '📦 ' + n + '건 채워서 받기 (.zip)' : '계약을 고르세요'; btnGo.disabled = busy || !n; }
+      function draw() {
+        box.innerHTML = '';
+        var rows = shownList();
+        var allOn = rows.length > 0 && rows.every(function (c) { return picked[c.id]; });
+        var head = el('label', { 'class': 'pcf-ct-row pcf-ct-head' }, [el('input', { type: 'checkbox', checked: allOn, 'aria-label': '보이는 계약 모두',
+          onchange: function (e) { rows.forEach(function (c) { picked[c.id] = e.target.checked; }); draw(); } }), el('b', { text: '#' }),
+          el('b', { text: '계약번호' }), el('b', { text: '회사' }), el('b', { text: '종류' }), el('b', { text: '계약일' }), el('b', { text: '결과' })]);
+        box.appendChild(head);
+        if (!rows.length) { box.appendChild(el('div', { 'class': 'pcf-muted', style: 'padding:10px', text: list.length ? '찾는 계약이 없습니다' : '계약을 읽는 중…' })); sync(); return; }
+        rows.forEach(function (c, i) {
+          var r = result && result[c.id];
+          box.appendChild(el('label', { 'class': 'pcf-ct-row' }, [
+            el('input', { type: 'checkbox', checked: !!picked[c.id], disabled: busy, onchange: function (e) { picked[c.id] = e.target.checked; sync(); } }),
+            el('span', { text: String(i + 1) }), el('span', { text: c.contractNo || '(번호 없음)' }), el('span', { text: c.companyName || '' }),
+            el('span', { text: (c.kinds || []).map(function (k) { var x = KINDS.filter(function (y) { return y.v === k; })[0]; return x ? x.label : k; }).join('·') }),
+            el('span', { text: c.signDate || '' }),
+            el('span', { 'class': r && r.err ? 'pcf-ct-bad' : '', text: r ? (r.err ? '⚠ ' + r.err : r.n != null ? '✔ ' + r.n + '개' : r.state || '') : '' })]));
+        });
+        sync();
+      }
+      q.addEventListener('input', draw);
+      signedCk.addEventListener('change', function () { onlySigned = signedCk.checked; draw(); });
+      function run() {
+        if (busy) return;
+        var ids = list.filter(function (c) { return picked[c.id]; }).map(function (c) { return c.id; });
+        if (!ids.length || !host.zip) return;
+        busy = true; result = {}; draw();
+        var files = [], made = 0, fails = 0;
+        ids.reduce(function (p, id, i) {
+          return p.then(function () {
+            result[id] = { state: '채우는 중…' }; draw();
+            note.textContent = '채우는 중… (' + (i + 1) + '/' + ids.length + ')';
+            return host.contractLoad(id).then(function (info) {
+              var pick = contractPick(S.forms, info), fms = pick.map(function (fid) { return S.forms.filter(function (f) { return f.id === fid; })[0]; }).filter(Boolean);
+              if (!fms.length) throw new Error('이 계약 종류의 양식이 없습니다');
+              var V = contractValues(info), folder = contractFolder(info, i), outs = [];
+              return fms.reduce(function (q2, fm) {
+                return q2.then(function () {
+                  return fillFormOnce(fm, V, host).catch(function () { return { bytes: bomText(w.PuFormCardFill.fillText(fm.body, V)), ext: '.txt', unknown: [] }; })
+                    .then(function (r) { outs.push({ fm: fm, r: r }); });
+                });
+              }, Promise.resolve()).then(function () {
+                var names = bundleFileNames(outs.map(function (o) { return { name: o.fm.name, ext: o.r.ext }; }), V);
+                outs.forEach(function (o, k) { files.push({ name: folder + '/' + names[k], bytes: o.r.bytes }); });
+                made++; result[id] = { n: outs.length };
+              });
+            }).catch(function (e) { fails++; result[id] = { err: (e && e.message) || String(e) }; });
+          });
+        }, Promise.resolve()).then(function () {
+          draw();
+          if (!files.length) { busy = false; sync(); note.textContent = '⚠ 채운 서류가 없습니다'; return; }
+          note.textContent = '묶는 중…';
+          return host.zip(files).then(function (zb) {
+            var d = new Date(), ymd = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+            var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([zb], { type: 'application/zip' }));
+            a.download = '계약 묶음 ' + made + '건_' + ymd + '.zip'; document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+            busy = false; sync(); draw();
+            note.textContent = '✔ ' + made + '건 · 서류 ' + files.length + '개를 받았습니다' + (fails ? ' · ⚠ ' + fails + '건은 못 채움(줄 끝 까닭)' : '');
+          });
+        }).catch(function (e) { busy = false; sync(); note.textContent = '⚠ ' + ((e && e.message) || e); });
+      }
+      var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '계약 여러 건 채우기', style: 'width:900px' }, [
+        el('div', { 'class': 'pcf-mh' }, [el('span', { text: '📦 계약 여러 건 — 계약마다 서류 묶음을 채워 .zip 하나로' }),
+          el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })]),
+        el('div', { 'class': 'pcf-mb' }, [
+          el('div', { style: 'display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap' }, [q,
+            el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:4px;align-items:center' }, [signedCk, '서명된 계약만'])]),
+          box,
+          el('div', { 'class': 'pcf-muted', style: 'margin-top:6px', text: '계약마다 이알피 「계약서 출력」과 같은 규칙으로 양식을 고르고, 계약 자료(번호·날짜·금액·기간·담당)로 채웁니다. 메일은 계약 하나씩 이알피에서 「📦 문서관리에서 묶음 채우기」로.' }),
+          note]),
+        el('div', { 'class': 'pcf-mf' }, [el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }), btnGo])
+      ]);
+      bg.appendChild(m); document.body.appendChild(bg);
+      draw();
+      host.contractList().then(function (ls) {
+        list = ls.sort(function (x, y) { return String(y.signDate).localeCompare(String(x.signDate)); }); draw();
+      }, function (e) { note.textContent = '⚠ 이알피 계약을 읽지 못했습니다 — ' + ((e && e.message) || e); });
+    }
     function openContract() {
       if (!host.contractLoad) return;
       toast('이알피 계약 자료를 읽는 중…');
@@ -1879,6 +2015,7 @@
         chip('목록', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
         chip('카드', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })]));
       row.push(el('span', { 'class': 'pcf-tools' }, [
+        host.contractList ? el('button', { type: 'button', 'class': 'pcf-b', title: '이알피 계약 여러 건을 골라 계약마다 서류 묶음을 채워 .zip 하나로 받습니다', text: '📦 계약 여러 건', onclick: openContracts }) : null,
         uploadBtn(kind),
         el('button', { type: 'button', 'class': 'pcf-b b', text: '+ 양식 추가', onclick: function () { modal({ kind: kind, onSave: save }); } })]));
       return el('div', { 'class': 'pcf-fbar' }, [el('div', { 'class': 'pcf-crow' }, row)]);
@@ -2074,7 +2211,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
+    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf,
     filterForms: filterForms,
