@@ -59,3 +59,8 @@ test('★★ ④ 평소 1초 넘게 멈추면 다음에 한 번 잰다 — 그�
   const q = run(''); q.lt(300); q.fire();
   assert.equal(q.logs.length, 0, '★ 조금 멈춘 것까지 떠든다');
 });
+
+test('★★ 접속 시간대 기록(presence_hours)은 받지 않는다 · 쓸 때 이름표', () => {
+  assert.match(SRC, /var FB_EXCLUDE = \[[^\]]*'presence_hours'[^\]]*\];/, '★★ 한 시간에 한 번 내가 쓴 한 칸 때문에 화면 전체를 다시 그린다');
+  assert.match(SRC, /fbDb\.ref\('data\/presence_hours\/' \+ ym[^\n]*\n\s*try\{ if\(window\.erpBlameMark\) window\.erpBlameMark\('접속 시간대 기록', _t0\); \}/, '★ 쓰는 길에 이름표가 없다');
+});

@@ -2211,7 +2211,9 @@ function _markPresenceHour(sid, name){
     _whoHourKey = mark;
     /* ⚠ data/$other 아래에 둔다 — 직원이 읽고 쓸 수 있는 자리라 규칙을 안 고쳐도 된다.
        billing 아래는 «쓰기 금지» 라 여기에 못 쓴다(서버만 쓴다). */
+    var _t0 = performance.now();
     fbDb.ref('data/presence_hours/' + ym + '/' + hk + '/' + sid).set(name || sid).catch(function(){});
+    try{ if(window.erpBlameMark) window.erpBlameMark('접속 시간대 기록', _t0); }catch(_){}   /* 🐢 멈춤 줄에 이름이 찍히게 */
   }catch(e){}
 }
 function _schedulePresencePublish(){
@@ -2664,7 +2666,10 @@ function fbSeedAllowed(){ return !fbDb || _fbSynced; }  // 오프라인이거나
    받는다 — 새 이름이 생기면 저절로 포함되게 만들어 두었다. 전달함은 표가 아니라 사람별 쪽지함이라
    그 길로 들어오면 온 직원이 남의 쪽지까지 매번 내려받는다. 여기 넣으면 fbShouldSync 가 걸러 준다.
    전달함은 자기 몫만 따로 구독한다(_handoffWatch). */
-var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes'];
+var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes','presence_hours'];
+/* ⚠ presence_hours — 접속 시간대 기록(포털 「누가 일했나」가 서버에서 직접 읽는다). 이알피 화면은 안 읽는다.
+   받으면 한 시간에 한 번 내가 쓴 한 칸 때문에 그 표 전체가 «바뀜»으로 돌아와 화면 전체를 다시 그렸다
+   (대표 지시 2026-10-03 「이알피도 확인」). 쓰는 길(_markPresenceHour)은 그대로 — 받지만 않는다. */
 function fbShouldSync(k){
   if(!k) return false;
   for(var i=0; i<FB_EXCLUDE.length; i++){ if(k.indexOf(FB_EXCLUDE[i])===0) return false; }
