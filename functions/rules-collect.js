@@ -97,6 +97,18 @@ async function run(o) {
           continue;
         }
         const kind = P.kindOf(a.name, r.text);
+        /* ★★★ 취업규칙 서류가 아니면 «글을 담지 않는다» (2026-10-03 첫 회차 실측).
+           본문에 「취업규칙」 이 든 메일이면 첨부를 다 받으므로, 징계 통지서·회의록처럼
+           근로자 이름이 그대로 든 인사 기록이 섞여 들어왔다(47건 중 23건이 「기타」).
+           이름은 가리지 않기로 했으므로(헛잡기) 담는 순간 재직 직원 전체에 열린다.
+           → 보류 줄(까닭·셈만). 틀리게 갈랐으면 원본은 메일함에 있다. */
+        if (kind === '기타') {
+          up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
+            { kind, sha, file: null, textLen: 0, pii: { count: r.count || {}, residual: 0 },
+              status: '보류', holdWhy: '취업규칙 서류가 아님(갈래 「기타」) — 담지 않음' }) });
+          staged[id] = 1; c.held++; ids.push(id);
+          continue;
+        }
         let file = null;
         if (r.data && FILE_KINDS.indexOf(kind) >= 0) {
           const p = 'rules_lib/' + id + '.' + ext;
