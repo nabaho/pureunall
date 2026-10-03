@@ -38,7 +38,7 @@ function 상자() {
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
     grabFn('_siteWrep'), grabFn('_siteUrep'),
     grabFn('_isCommittee'), grabFn('_siteCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
-    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('committeeAnnexHTML'),
+    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('_cmPairRows'), grabFn('committeeAnnexHTML'),
     'this.prep=_prepCommittee; this.over=_cmOver; this.need=_cmAnnexNeeded;',
     'this.see=_cmSeeAnnex; this.annex=committeeAnnexHTML; this.ROWS=COMMITTEE_ROWS;',
     'this.fromSites=_siteCommittee; this.urep=_siteUrep;'
@@ -148,7 +148,7 @@ test('★★ ①-4 명부와 사업장에 «다 있는» 사람은 한 번만 �
 test('★★ ①-5 별지에 «어느 사업장 사람»인지 적는다 — 예순 명이면 소속 없이는 못 가린다', () => {
   const ax = 상자().annex({ name: 'x' }, 사업장들);
   assert.ok(ax.indexOf('가나산업') >= 0 && ax.indexOf('다라전자') >= 0, '★ 소속이 빠졌습니다.');
-  assert.match(ax, /근로자측 2명 · 사용자측 3명/, '★ 명수가 틀립니다.');
+  assert.ok(ax.includes("계</td><td class='center' colspan='3'>2명</td><td class='center' colspan='3'>3명<"), '★ 명수가 틀립니다.');
 });
 
 test('★★ ①-6 서식을 채우는 자리가 «모두» 사업장을 함께 본다 — 한 곳만 빠져도 그 서식만 비뚤어진다', () => {
@@ -172,12 +172,15 @@ test('★★ ④ 별지에 «한 사람도 빠짐없이» 나온다 — 여기�
   const ax = 상자().annex(많은기금);
   assert.ok(ax.includes('>노0<') && ax.includes('>노61<'), '★ 근로자측 끝 사람이 빠졌습니다.');
   assert.ok(ax.includes('>사0<') && ax.includes('>사57<'), '★ 사용자측 끝 사람이 빠졌습니다.');
-  const n = (ax.match(/<tr>/g) || []).length - 1;              // 머리줄 제외
-  assert.equal(n, 120, '★ 별지에 ' + n + '줄뿐입니다 — 120명이어야 합니다.');
-  /* 측마다 번호를 새로 매긴다 — 관청이 측별로 센다 */
-  assert.match(ax, /<td class='center'>근로자측<\/td><td class='center'>1<\/td>/, '★ 번호를 측마다 안 매깁니다.');
-  assert.match(ax, /<td class='center'>사용자측<\/td><td class='center'>1<\/td>/, '★ 사용자측 번호가 이어집니다.');
-  assert.match(ax, /근로자측 62명 · 사용자측 58명/, '★ 몇 명인지 적지 않습니다.');
+  /* 2026-10-03 A안 — 사업장마다 한 줄, 근로자측 왼쪽·사용자측 오른쪽.
+     이 가짜 기금은 근로자측이 모두 가나산업, 사용자측이 모두 다라전자라 마주 볼 짝이 없다 → 사람마다 한 줄(120줄) */
+  const n = (ax.match(/<tr>/g) || []).length - 3;              // 머리줄 둘·계 줄 제외
+  assert.equal(n, 120, '★ 별지에 ' + n + '줄뿐입니다 — 짝이 없으면 사람마다 한 줄이어야 합니다.');
+  const 첫줄 = ax.slice(ax.indexOf("<tr><td class='center'>1</td>")).split('</tr>')[0];
+  assert.ok(첫줄.includes('>가나산업<') && 첫줄.includes('>노0<') && 첫줄.endsWith('<td></td><td></td><td></td>'),
+    '★ 근로자측은 왼쪽, 짝이 없는 오른쪽은 빈칸이어야 합니다: ' + 첫줄);
+  assert.ok(ax.includes("<th colspan='3'>근로자측 위원</th><th colspan='3'>사용자측 위원</th>"), '★ 근로자측 왼쪽·사용자측 오른쪽이 아닙니다.');
+  assert.ok(ax.includes(">62명</td><td class='center' colspan='3'>58명<"), '★ 몇 명인지 적지 않습니다.');
   assert.ok(ax.indexOf('가짜공동근로복지기금') >= 0, '★ 어느 기금의 명단인지 안 적었습니다.');
 });
 
@@ -212,7 +215,7 @@ function 격자채우기(f) {
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
     grabFn('_siteWrep'), grabFn('_siteUrep'),
     grabFn('_isCommittee'), grabFn('_siteCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
-    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('committeeAnnexHTML'),
+    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('_cmPairRows'), grabFn('committeeAnnexHTML'),
     grabFn('fillCommittee'),
     'fillCommittee(root,f,(f&&f._sites)||[]);'
   ].join('\n')).call(box, doc, root, f);

@@ -35,7 +35,7 @@ global.esc = v => String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<
 /* 2026-09-14: 위원이 예순을 넘는 일이 흔하다 — 격자(세 줄)를 넘으면 이름을 별지로 뺀다.
    ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
 (0, eval)((/var COMMITTEE_ROWS=\d+;/.exec(src) || ['var COMMITTEE_ROWS=0;'])[0]);
-['_cmOver', '_cmAnnexNeeded', '_cmToAnnex', 'isRegionFund', '_cmSeeAnnex', 'committeeAnnexHTML'].forEach((n) => (0, eval)(gF(n)));
+['_cmOver', '_cmAnnexNeeded', '_cmToAnnex', 'isRegionFund', '_cmSeeAnnex', '_cmPairRows', 'committeeAnnexHTML'].forEach((n) => (0, eval)(gF(n)));
 (0, eval)(gF('_siteWrep'));
 
 const F = { name: '가나공동근로복지기금', chairman: '홍길동', fund_type: '공동',
@@ -77,7 +77,7 @@ ok('앞장에는 「별지 명단과 같음」과 명수만', /별지 명단과 
   const 줄수 = (ax.match(/<tr>/g) || []).length - 1;          // 머리줄 제외
   ok('별지에는 예순두 명이 «전부» 나온다', 줄수 >= 62, String(줄수));
   ok('별지에 첫 사람과 끝 사람이 다 있다', ax.includes('>노0<') && ax.includes('>노61<'));
-  ok('별지가 몇 명인지 적는다', /근로자측 62명/.test(ax));
+  ok('별지가 몇 명인지 적는다', />62명</.test(ax));
 })();
 ok('명부가 없어도 안 터진다', (function () { try { return _prepCommittee({}, '근로자측').length === 0; } catch (e) { return false; } })());
 

@@ -44,7 +44,7 @@ global.funds = {};
  /* 2026-09-14: 위원이 격자(세 줄)보다 많으면 이름을 별지로 뺀다 — 그 길도 실어야 채움이 돈다.
     ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
  (/var COMMITTEE_ROWS=\d+;/.exec(src) || [''])[0],
- gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmSeeAnnex'), gF('committeeAnnexHTML'),
+ gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmSeeAnnex'), gF('_cmPairRows'), gF('committeeAnnexHTML'),
  /* 2026-09-20: 확인서 한 장의 모양(제목·가운데 배치·회사이름·날인 자리)을 하나로 모았다 */
  gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dotDate'), gF('contribCertHTML'), gF('fillContribDoc'), gF('fillChecklistDoc'),
   gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'), gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'),
