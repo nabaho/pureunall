@@ -1,0 +1,93 @@
+name: Simpletax watch
+
+# 근로소득 간이세액표(소득세법 시행령 별표2) 개정 감시
+# ─────────────────────────────────────────────
+# 급여관리는 간이세액표를 앱에 내장한다(js/pu-simpletax.js — 숫자 API 가 없어서).
+# 법이 바뀌었는데 내장 표가 옛것이면 소득세가 조용히 틀린다. 그래서 매일 새벽
+# 법제처 현행 시행령의 별표2 개정일을 내장 표와 비교해:
+#   · 법이 더 새것  → 「simpletax-watch」 알림 글을 연다(같은 개정일 글이 있으면 다시 안 연다)
+#   · 같아졌으면    → 열린 알림 글을 닫는다(표를 갈았다는 뜻)
+#   · 못 읽었으면   → 이 작업이 빨간불로 끝난다(창구·모양이 바뀜 — 사람이 봐야 함)
+# 급여관리 화면(payroll-os.html)은 열린 알림 글이 있으면 빨간 경고를 띄운다.
+# ⚠ 알림 글에 ai-ready 표를 달지 않는다 — 자동 구현이 돌면 시행일(부칙)을 사람이
+#   확인하지 않은 표가 들어갈 수 있다.
+
+on:
+  schedule:
+    - cron: '0 21 * * *'        # 매일 06:00 (한국 시각)
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'engine/simpletax_watch.js'
+      - '.github/workflows/simpletax-watch.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: simpletax-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: 법제처 별표2 개정일 비교
+        id: w
+        run: node engine/simpletax_watch.js
+
+      # PR 에서는 법제처에 닿는지·비교가 되는지만 본다(알림 글은 건드리지 않는다).
+      - name: 개정 알림 글 열기
+        if: github.event_name != 'pull_request' && steps.w.outputs.state == 'newer'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAW_REV: ${{ steps.w.outputs.law_rev }}
+          BUILT_REV: ${{ steps.w.outputs.built_rev }}
+          PDF: ${{ steps.w.outputs.pdf }}
+        run: |
+          gh label create simpletax-watch --color B60205 --description "간이세액표 개정 감시" 2>/dev/null || true
+          TITLE="간이세액표 개정 감지 — 별표2 개정 ${LAW_REV} (내장 표 ${BUILT_REV})"
+          if gh issue list --label simpletax-watch --state open --json title --jq '.[].title' | grep -qF "개정 ${LAW_REV}"; then
+            echo "이미 열린 알림 글이 있습니다 — 다시 열지 않습니다"; exit 0
+          fi
+          cat > body.md <<EOF
+          법제처 현행 **소득세법 시행령 [별표2] 근로소득 간이세액표**가 **${LAW_REV}** 에 개정되었습니다.
+          급여관리에 내장된 표는 **${BUILT_REV}** 개정판입니다. 표를 갈기 전까지 새 시행일 이후 달의 소득세가 옛 표로 계산됩니다.
+
+          ### 할 일
+          1. 별표2 PDF 내려받기: ${PDF}
+          2. **부칙에서 시행일 확인**(예: 「○○년 3월 1일 이후 원천징수하는 분부터」) — PDF 에는 시행일이 없다
+          3. \`python engine/build_simpletax_pdf.py <별표2.pdf> --시행 YYYY-MM-DD\`
+          4. 자녀공제·검산 기준점(월 350만·가족 4명 등)을 새 표로 확인하고 \`tests/labor-core.test.js\` 의 내장 표 검사를 고친다
+          5. \`payroll-os.html\` 의 \`pu-simpletax.js?v=\` 를 올리고 PR
+
+          표를 갈아 합치면 다음 감시 때 이 글은 저절로 닫히고, 급여관리 화면의 경고도 사라집니다.
+          (자동 감시: .github/workflows/simpletax-watch.yml)
+          EOF
+          gh issue create --title "$TITLE" --label simpletax-watch --body-file body.md
+
+      - name: 표를 갈았으면 알림 글 닫기
+        if: github.event_name != 'pull_request' && steps.w.outputs.state == 'same'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAW_REV: ${{ steps.w.outputs.law_rev }}
+        run: |
+          for n in $(gh issue list --label simpletax-watch --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "내장 간이세액표가 법제처 현행(별표2 개정 ${LAW_REV})과 같아져 닫습니다."
+          done
+
+      - name: 법제처가 내장 표보다 옛것 — 이상
+        if: steps.w.outputs.state == 'older'
+        env:
+          LAW_REV: ${{ steps.w.outputs.law_rev }}
+          BUILT_REV: ${{ steps.w.outputs.built_rev }}
+        run: |
+          echo "::warning::법제처 현행 별표2(${LAW_REV})가 내장 표(${BUILT_REV})보다 옛것입니다 — 시행 전 표를 넣었는지 확인하세요"
