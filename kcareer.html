@@ -1909,6 +1909,9 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
         <div class="toolbar">
           <input class="tb-input" data-f="q" placeholder="내용·지출처 검색" style="min-width:200px">
           <select class="tb-select" data-f="year"><option value="">전체 연도</option></select>
+          <!-- ★ 월 고르개 (대표 결정 2026-10-03 「가」) — 한눈에의 「이번 달」·월별 막대를 누르면 «그 달»로 오게 한다.
+               ⚠ 거르는 규칙은 renderCareer 한 곳이다(careerMonthOK). 일자는 점·줄표가 섞여 있어 _feeYMD 로만 읽는다. -->
+          <select class="tb-select" data-f="month"><option value="">전체 월</option><option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option><option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option></select>
           <select class="tb-select" data-f="type"><option value="">전체 구분</option><option>회의</option><option>출장</option><option>식대</option><option>교통</option><option>기타</option></select>
           <div class="tb-spacer"></div>
           <span class="cnt" style="font-size:11px;color:var(--text-mute)"></span>
@@ -8681,8 +8684,10 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
     const cur=yrSel.value; yrSel.innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option${y===cur?' selected':''}>${y}</option>`).join(''); }
   const q=(sec.querySelector('[data-f="q"]')?.value||'').toLowerCase();
   const yr=yrSel?yrSel.value:'', tp=sec.querySelector('[data-f="type"]')?.value||'';
+  const mo=sec.querySelector('[data-f="month"]')?.value||'';   /* 월 고르개는 비용 목록에만 있다 — 없으면 늘 빈 값 */
   let rows=data.filter(r=>{ if(q&&!cfg.qFields.some(f=>(r[f]||'').toLowerCase().includes(q))) return false;
-    if(yr&&(r.year||(r.issueDate||r.date||'').slice(0,4))!==yr) return false; if(tp&&r.type!==tp) return false; return true; });
+    if(yr&&(r.year||(r.issueDate||r.date||'').slice(0,4))!==yr) return false; if(tp&&r.type!==tp) return false;
+    if(!careerMonthOK(r, mo)) return false; return true; });
   const ss=_sortState[name];
   if(ss){ const keyed=rows.map(function(r){ return {r:r, k:_cellText(cfg.row(r,name),ss.col)}; });
     keyed.sort(function(a,b){ const xa=a.k,xb=b.k; const sa=xa.replace(/[,\s원]/g,''), sb=xb.replace(/[,\s원]/g,'');
@@ -12649,6 +12654,14 @@ function _feeMon(r){ var p=_feeYMD(r&&r.date); return p?p.y+'-'+p.m:''; }       
 /* 줄 세우기·«마지막»을 견주는 열쇠 — 모양이 달라도 같은 차례가 된다. 읽을 수 없으면 맨 끝 */
 function _feeKey(r){ var p=_feeYMD(r&&r.date); return p?p.y+p.m+(p.d||'00'):''; }
 function _feeDay(r){ var p=_feeYMD(r&&r.date); return p?p.y+'.'+p.m+'.'+(p.d||'00'):String((r&&r.date)||''); }  /* 「2026.09.18」 */
+/* 비용 목록의 «월» 거르개 규칙 — renderCareer 가 부른다(거르는 규칙은 이 한 곳).
+   mo 는 고르개 값(「1」~「12」, 비면 거르지 않음). 일자를 읽을 수 없는 건은 월을 고르면 «빠진다» —
+   어느 달인지 모르는 건을 아무 달에나 끼우지 않는다. */
+function careerMonthOK(r, mo){
+  if(!mo) return true;
+  var p=_feeYMD(r&&(r.issueDate||r.date));
+  return !!p && Number(p.m)===Number(mo);
+}
 function _feeThisMonth(d){ d=d||new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
 function feeMonthSum(all, ym){ return all.filter(function(r){ return _feeMon(r)===ym; }).reduce(function(a,r){ return a+_feeAmt(r); },0); }
 function _won(n){ return Math.round(n).toLocaleString('ko-KR')+'원'; }
@@ -12671,7 +12684,7 @@ function feeGo(o){
   navTile('page-meetfee');
   var sec=document.getElementById('page-meetfee'); if(!sec) return;
   var put=function(f,v){ var el=sec.querySelector('[data-f="'+f+'"]'); if(el) el.value=v||''; };
-  put('q', o.q); put('type', o.type); put('year', o.year);
+  put('q', o.q); put('type', o.type); put('year', o.year); put('month', o.month);
   renderCareer('meetfee');
 }
 function _feeDashYear(all){
@@ -12694,7 +12707,7 @@ function renderFeeDash(){
   var Y=_jsAttr(yr||'');
   var html='<div class="fd-kpis">'
     +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+Y+'\'})"><div class="l">'+(yr?yr+'년 합계':'전체 합계')+'</div><div class="v">'+_won(합)+'</div></button>'
-    +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+d.getFullYear()+'\'})"><div class="l">이번 달 ('+(d.getMonth()+1)+'월)</div><div class="v">'+_won(이달합)+'</div></button>'
+    +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+d.getFullYear()+'\',month:'+(d.getMonth()+1)+'})"><div class="l">이번 달 ('+(d.getMonth()+1)+'월)</div><div class="v">'+_won(이달합)+'</div></button>'
     +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+Y+'\'})"><div class="l">건수</div><div class="v">'+rows.length+'건</div></button>'
     +'<button type="button" class="fd-kpi'+(빠짐.length?' warn':'')+'" onclick="document.getElementById(\'fdMiss\').scrollIntoView({behavior:\'smooth\',block:\'center\'})"><div class="l">확인할 것</div><div class="v">'+빠짐.length+'건</div></button>'
     +'</div>';
@@ -12709,7 +12722,7 @@ function renderFeeDash(){
   all.forEach(function(r){ var m=_feeMon(r); if(m.slice(0,4)===my){ var k=Number(m.slice(5,7)); if(k>=1&&k<=12) 달[k-1]+=_feeAmt(r); } });   /* _feeMon 은 늘 「YYYY-MM」 */
   var 큰달=Math.max.apply(null, 달.concat([1]));
   var 월=달.map(function(v,i){ var now=(my===String(d.getFullYear()) && i===d.getMonth());
-    return '<button type="button" class="'+(now?'now':'')+'" title="'+my+'년 '+(i+1)+'월 '+_won(v)+'" onclick="feeGo({year:\''+my+'\'})"><i style="height:'+Math.round(v/큰달*100)+'%"></i></button>'; }).join('');
+    return '<button type="button" class="'+(now?'now':'')+'" title="'+my+'년 '+(i+1)+'월 '+_won(v)+'" onclick="feeGo({year:\''+my+'\',month:'+(i+1)+'})"><i style="height:'+Math.round(v/큰달*100)+'%"></i></button>'; }).join('');
   var 월글=달.map(function(v,i){ return '<span>'+(i+1)+'</span>'; }).join('');
   html+='<div class="fd-two"><div class="fd-box"><h4>구분별</h4>'+막대+'</div>'
     +'<div class="fd-box"><h4>월별 <span style="font-weight:400;font-size:11px;color:var(--text-mute)">'+my+'년</span></h4><div class="fd-months">'+월+'</div><div class="fd-mlab">'+월글+'</div></div></div>';
