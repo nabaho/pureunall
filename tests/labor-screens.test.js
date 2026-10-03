@@ -80,7 +80,7 @@ ok('window 에 노출됨', /window\.importTaxTable\s*=/.test(H));
 ok('tax_table 키로 저장한다', /dbSet\('tax_table'/.test(H));
 ok('올릴 때 모양을 검사한다(rows 없으면 거부)', /rows 가 없습니다/.test(H));
 ok('마지막 구간 상한을 검사한다(높은 급여 누락 방지)', /마지막 구간에 상한이 있습니다/.test(H));
-ok('표 없으면 화면이 알린다', /간이세액표가 없어 소득세를 계산하지 못합니다/.test(H));
+ok('표 없으면 화면이 알린다', /맞는 간이세액표가 없어 소득세를 계산하지 못합니다/.test(H));
 
 section('근태 → 급여 미리보기');
 ok('미리보기 표가 있다', H.indexOf('근태 반영 급여 미리보기') > -1);
@@ -89,8 +89,8 @@ ok('간이세액표를 코어에 넘긴다', /간이세액표: TT/.test(SCR));
 ok('최저임금 연도값을 코어에 넘긴다', /최저임금시급: mwH/.test(SCR));
 /* 자녀공제 금액은 코어에만 있어야 한다. 화면 설명문은 "12,500"(쉼표)으로 적으므로
    쉼표 없는 숫자로 찾으면 계산식이 박힌 경우만 걸린다. */
-ok('화면에 자녀공제 금액을 계산식으로 박지 않았다', !/\b12500\b|\b29160\b/.test(SCR));
-ok('코어에 자녀공제 금액이 있다', /12500/.test(CORE) && /29160/.test(CORE));
+ok('화면에 자녀공제 금액을 계산식으로 박지 않았다', !/\b12500\b|\b29160\b|\b20830\b|\b45830\b|\b33330\b/.test(SCR));
+ok('코어에 현행(2026.2.27 개정) 자녀공제 금액이 있다', /20830/.test(CORE) && /45830/.test(CORE) && /33330/.test(CORE));
 ok('코어가 국세청 산식을 추정하지 않는다고 밝힌다', /산식을 짓지 않는다|산식을 공개하지 않는다/.test(CORE));
 
 
@@ -128,7 +128,9 @@ const grabFn = (name) => {
 };
 const laborYear = () => '2026';
 eval(grabFn('laborYearOfMonth'));
+eval(grabFn('laborYearExplicit'));
 eval(grabFn('laborMonthNum'));
+eval(grabFn('laborYm'));
 eq("'2026-03' → 2026년", laborYearOfMonth('2026-03'), '2026');
 eq("'2026-03' → 3월", laborMonthNum('2026-03'), 3);
 eq("'3월' → 3월", laborMonthNum('3월'), 3);
@@ -141,6 +143,29 @@ eq("'25.05 새별반찬' → 2025년", laborYearOfMonth('25.05 새별반찬'), '
 eq("'25.12' → 12월", laborMonthNum('25.12'), 12);
 eq('13월 같은 헛값은 안 받는다', laborMonthNum('25.13'), null);
 eq("'23년 7월 사계절찬' → 7월", laborMonthNum('23년 7월 사계절찬'), 7);
+
+/* 간이세액표 고르기 — 화면의 taxTableFor 를 **실제로 돌린다**(글자만 찾으면
+   기능을 꺼 버려도 통과한다). 내장 표는 2026-03-01 지급분부터다. */
+section('간이세액표 고르기 — 내장 표(법제처 별표2) 우선, 옛 달은 올린 표');
+eq("'2026-03' → '2026-03'", laborYm('2026-03'), '2026-03');
+eq("'25.05 새별반찬' → '2025-05'", laborYm('25.05 새별반찬'), '2025-05');
+eq("'3월'(연도 없음) → null — 올해로 메워 표를 고르지 않는다", laborYm('3월'), null);
+const PuSimpleTax = require(path.join(ROOT, 'js', 'pu-simpletax.js'));
+const LC = require(path.join(ROOT, 'js', 'pu-labor-core.js'));
+let FAKE_DB = {};
+const dbGet = function (k, d) { return (k in FAKE_DB) ? FAKE_DB[k] : d; };
+eval(grabFn('taxTableFor'));
+eval(grabFn('builtinTaxSince'));
+eq('2026년 4월 → 내장 2026년판', (taxTableFor('2026-04') || {}).시행, '2026-03-01');
+eq('2025년 5월·올린 표 없음 → null(소득세 미계산으로 알림)', taxTableFor('25.05 새별반찬'), null);
+FAKE_DB = { tax_table: { 연도: '2025', rows: [{ min: 0, max: null, tax: [1] }] } };
+eq('2025년 5월·올린 표 있음 → 올린 표', (taxTableFor('25.05 새별반찬') || {}).연도, '2025');
+eq('2026년 4월은 올린 표가 있어도 내장 표가 이긴다', (taxTableFor('2026-04') || {}).시행, '2026-03-01');
+eq('내장 표 시작일', builtinTaxSince(), '2026-03-01');
+ok('내장 표 스크립트를 불러온다', /<script src="js\/pu-simpletax\.js\?v=\d+"><\/script>/.test(H));
+ok('미리보기는 달에 맞는 표를 쓴다(taxTableFor)', SCR.indexOf('taxTableFor(App.month)') > -1);
+ok('미리보기가 올린 표만 통째로 쓰지 않는다', SCR.indexOf("var TT = dbGet('tax_table'") < 0);
+ok('표 고르기는 코어가 한다(LC.pickSimpleTaxTable)', H.indexOf('LC.pickSimpleTaxTable(') > -1);
 
 
 /* 발송·내보내기 코드 블록만 떼어 본다 — 노동법 화면 블록보다 앞에 있다 */
