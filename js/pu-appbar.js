@@ -48,8 +48,9 @@
     { key: 'photos',  name: '사진첩',       icon: '🖼️', url: 'pu-photos.html',      desc: '사진·서류' },
     { key: 'paydata', name: '급여데이터함',  icon: '💼', url: 'pu-paydata.html',     desc: '급여자료 사업장별' },
     { key: 'fund',    name: '기금관리',     icon: '🏦', url: 'fund.html',           desc: '근로복지기금 운영' },
-    { key: 'rules',   name: '취업규칙 관리', icon: '📋', url: 'rules.html',          desc: '작성·검토·개정·신고' },
-    { key: 'rulesv2', name: '취업규칙(새)',  icon: '📥', url: 'rules-v2.html',       desc: '메일로 모은 자료' },
+    /* 취업규칙은 한 줄 — 조별 문안·모은 자료(rules-v2.html)는 앱 머리줄의 세 갈래 단추로 간다
+       (두 앱 합치기 2026-10-04). 포털 타일과 짝이다. */
+    { key: 'rules',   name: '취업규칙',      icon: '📋', url: 'rules.html',          desc: '작성·검토·개정·신고' },
     { key: 'docs',    name: '문서관리',     icon: '📄', url: 'docs-esign.html',     desc: '사건 위임장 · 계약서 양식' },
     { key: 'payroll', name: '급여관리',     icon: '💰', url: 'payroll-os.html',     desc: '급여 아웃소싱' },
     { key: 'home',    name: '홈페이지 관리', icon: '🌐', url: 'pu-home.html',        desc: '구성원·주요업무 글', adminOnly: true },

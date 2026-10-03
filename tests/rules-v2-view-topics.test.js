@@ -278,8 +278,12 @@ test('⑧ 주소 #topics 는 조별 문안, 그 밖은 모은 자료 — 같은 
   assert.ok(HTML.indexOf("addEventListener('popstate'") < HTML.indexOf('js/pu-back.js'));
   assert.match(head[1], /__puBackNav = true/);
   assert.match(head[1], /addEventListener\('hashchange'/);
-  // 갈래 자리 하나(다음 과제가 바꿀 곳) — 두 화면 길이 있다
-  assert.match(HTML, /id="modeslot"[^>]*>[\s\S]*?href="#lib"[\s\S]*?href="#topics"/);
+  // 갈래 자리 하나 — 세 갈래 단추(Task 5)에 이 파일의 두 화면 길이 다 있다
+  //   (두 화면이 같은 단추를 드는지는 tests/rules-merge.test.js 가 본다)
+  const nav = HTML.match(/<nav class="rmode"[^>]*>([\s\S]*?)<\/nav>/);
+  assert.ok(nav, '머리줄에 갈래 단추가 있어야 한다');
+  assert.match(nav[1], /href="rules-v2\.html#lib"/);
+  assert.match(nav[1], /href="rules-v2\.html#topics"/);
 });
 
 test('⑧ 화면의 인라인 스크립트는 모두 구문이 맞다', () => {

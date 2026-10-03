@@ -27,9 +27,11 @@ const { stripJs } = require('./strip-comments');
 const R = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');
 const GATE = R('js/pu-gate.js');
 const 잠글앱 = {
-  'rules.html': '취업규칙 관리', 'payroll-os.html': '급여관리',
+  /* 취업규칙은 «한 앱 두 파일»(두 앱 합치기 2026-10-04) — 타일은 하나라도 문은 두 파일에 다 단다.
+     한 파일만 달면 그 파일 주소를 직접 친 사람에게 열린다. */
+  'rules.html': '취업규칙', 'payroll-os.html': '급여관리',
   'docs-esign.html': '문서관리', 'pu-paydata.html': '급여데이터함',
-  'pu-cards.html': '푸른 메일', 'rules-v2.html': '취업규칙(새)'
+  'pu-cards.html': '푸른 메일', 'rules-v2.html': '취업규칙'
 };
 
 test('①★★ 다섯 앱이 모두 문을 단다 — 하나라도 빠지면 그 앱은 주소로 열린다', () => {

@@ -1,6 +1,8 @@
 /* 취업규칙(새) 온톨로지 등록 — Task 7.
    새 프로그램은 포털에 걸리기 «전에» 사전·등록부에 있어야 하고, 쓰는 자리를 스스로 선언해야 한다
-   (선언 없이는 관문이 enforce 로 저장을 거절한다). 포털 APPS 줄은 앱 파일이 생기는 Task 10 에서 건다. */
+   (선언 없이는 관문이 enforce 로 저장을 거절한다). 포털 APPS 줄은 앱 파일이 생기는 Task 10 에서 걸었다가,
+   두 앱 합치기(2026-10-04)로 다시 걷었다 — 타일은 rules 하나, 이 앱은 portal:false 로 «등록만» 남는다
+   (tests/rules-merge.test.js). */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const O = require('../js/pu-ontology.js');
