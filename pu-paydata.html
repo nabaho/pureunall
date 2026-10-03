@@ -30,7 +30,7 @@
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
-<script src="js/pu-paydata-store.js?v=10"></script>
+<script src="js/pu-paydata-store.js?v=11"></script>
 <script src="js/pu-hr-intake.js?v=1"></script>
 <!-- ?v= 는 판독기 판 번호(READ_VERSION)와 **같이 올린다**(2026-08-15).
      ⚠ 사진첩만 올리고 여기를 빠뜨리면, 같은 브라우저 안에서 사진첩은 새 판독기·
@@ -431,6 +431,20 @@ h1{font-size:18px;margin-bottom:4px}
 .fxr select,.fxr input{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;
   padding:6px 9px;font-size:13px;font-family:inherit}
 .fxa{display:flex;gap:6px;margin-top:12px}
+/* 쌓인 것 정리 미리 보기 (2026-10-03) — 넣을 것이 수백 줄이라 창 안에서 굴린다.
+   ⚠ 한 줄은 한 줄이다 — 파일 이름이 길면 «…» 로 자르고 전문은 title 에 둔다. */
+.fxbox.sweepbox{width:720px}
+.sweepbox .fxr label{flex-basis:112px;white-space:nowrap}
+.sweepbox .fxr span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sweepwhy{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--sub);margin:2px 0 10px}
+.sweeplist{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.sweeprow{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line);
+  font-size:12.5px;white-space:nowrap}
+.sweeprow:last-child{border-bottom:none}
+.sweeprow b{flex:0 0 150px;overflow:hidden;text-overflow:ellipsis}
+.sweeprow .tg{font-size:11px;background:var(--paper);color:var(--sub);border-radius:99px;padding:1px 7px;
+  flex:0 0 auto;min-width:62px;text-align:center}
+.sweeprow .fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
 .fxerr{background:#e2e8f0;color:var(--bad);border-radius:8px;padding:8px 10px;
   font-size:12px;margin-top:8px}
 .fxn{font-size:11.5px;color:var(--sub);margin-top:9px}
@@ -487,6 +501,10 @@ h1{font-size:18px;margin-bottom:4px}
 #findBar .dfind:focus{outline:none;border-color:var(--navy)}
 
 .expbadge{font-size:11.5px;color:var(--warn);font-weight:700;white-space:nowrap}
+/* 기계가 넣은 것 (대표 결정 2026-10-03 「ㄴ」) — 사람이 넣은 것과 눈으로 갈린다.
+   ⚠ 새 색을 만들지 않는다 — 팔레트 검사가 막는다. 있는 navy·paper 만 쓴다. */
+.autobadge{font-size:11px;color:var(--navy);background:var(--paper);border-radius:99px;
+  padding:1px 7px;white-space:nowrap;cursor:help;font-weight:600}
 /* ── 함께 맡은 업체 (대표 지시 2026-08-17) ──
    누가 담았는지, 그리고 내가 못 고치는 줄이 어느 것인지. */
 .bywho{font-size:10.5px;background:var(--paper);color:var(--sub);border-radius:99px;
@@ -877,7 +895,8 @@ const App = {
     else { m.innerHTML = '<div class="card"><div class="empty">아직 만들지 않은 화면입니다.</div></div>'; }
     m.innerHTML += staffPickerHtml() + sideReasonHtml() + shareModalHtml() + valueFixModalHtml()
       + fixHtml()           // 막힌 자리를 이 줄에서 잇는 서랍 (2026-08-27)
-      + handHtml();         // 잘못 온 자료를 넘기는 서랍 (2026-08-29)
+      + handHtml()          // 잘못 온 자료를 넘기는 서랍 (2026-08-29)
+      + sweepHtml();        // 쌓인 것 정리 — 미리 보기 (2026-10-03)
     /* 2중 대시보드 — 첫 칸(보기·담당자)과 둘째 칸(사업장 목록).
        접었으면 첫 칸은 CSS 로 숨기고 단추 방향만 뒤집는다. */
     const vb = $('viewbar'); if (vb) vb.innerHTML = App.sideFold ? '' : viewBarHtml();
@@ -1285,7 +1304,15 @@ function sideListModel(view, ctx, opt) {
   const pendBy = {};
   const pendBox = ctx.pending || {}, pendFix = ctx.pendTag || {};
   Object.keys(pendBox).forEach(id => {
-    const t = Object.assign(guessTag(pendBox[id], cos), pendFix[id] || {});
+    /* 차례는 확인 대기 화면(pendTagOf)과 같다 — 사람이 고친 것 > 줄에 적힌 것 > 짐작.
+       ⚠ 예전에는 줄에 적힌 것(서버가 주소로 알아낸 사업장)을 건너뛰고 파일 이름만
+         다시 짐작해, 서버가 「가나상사」로 보낸 것이 이름에 업체가 없으면 아무 줄에도
+         안 붙었다 — 그 사업장은 「미도착」으로 보였다. */
+    const rec = pendBox[id] || {}, said = {};
+    ['companyId', 'companyName', 'month', 'kind'].forEach(k => {
+      if (rec[k] != null && String(rec[k]) !== '') said[k] = String(rec[k]);
+    });
+    const t = Object.assign(guessTag(rec, cos), said, pendFix[id] || {});
     if (!t.companyId) return;
     const ms = S.monthKey(t.month);
     if (ms && slot && ms !== slot) return;
@@ -1599,6 +1626,24 @@ function guessTag(rec, companies) {
     const yd = text.match(/(?:^|\D)([2-3]\d)[.\-_](\d{1,2})\s*월/);
     if (yd) m = [yd[0], '20' + yd[1], yd[2]];
   }
+  /* 「월」 없는 두 자리 해 + 달 — 「26.08 일용직(가나점).xlsx」 (2026-10-03).
+     ⚠ 서버 tagFor 와 **같아야** 한다 — tests/paydata-autofile.test.js 가 견준다. */
+  if (!m) {
+    const y2 = text.match(/(?:^|\D)([2-3]\d)[.\-_](0[1-9]|1[0-2])(?![\d.\-_])/);
+    if (y2) m = [y2[0], '20' + y2[1], y2[2]];
+  }
+  /* 해 없는 「9월 근태」 — 받은 날(rec.at)로 해를 정한다. 받은 달보다 두 달 넘게
+     앞이면 지난해. 한국 시각으로 센다(서버와 같은 셈 — 서버는 UTC 로 돈다). */
+  if (!m && rec && rec.at) {
+    const nm = text.match(/(?:^|[^\d.\-_])(\d{1,2})\s*월/);
+    const got = nm ? parseInt(nm[1], 10) : 0;
+    if (got >= 1 && got <= 12) {
+      const d = new Date(Number(rec.at) + 9 * 3600000);
+      let y = d.getUTCFullYear();
+      if (got > d.getUTCMonth() + 2) y -= 1;
+      m = [nm[0], String(y), String(got)];
+    }
+  }
   if (m) {
     const mo = parseInt(m[2], 10);
     if (mo >= 1 && mo <= 12) month = m[1] + '-' + (mo < 10 ? '0' : '') + mo;
@@ -1609,6 +1654,10 @@ function guessTag(rec, companies) {
   else if (/명세서|이체|신고|취득|상실/.test(text)) kind = 'output';
   else if (/급여대장|노임|임금대장|대장/.test(text)) kind = 'ledger';
   else if (/근태|출근|출역|근무|시간/.test(text)) kind = 'attend';
+  /* 「급여」 + 자료 말(급여확정·급여 기초자료) — 맨 뒤에 본다. 서버 tagFor 와 같다.
+     ⚠ 「급여」 하나만으로는 안 잡는다 — 「8월급여수정 요청」이 대장이 되면 안 된다. */
+  else if (/급여/.test(text) && /확정|예정|기초|자료|내역|지급/.test(text)
+    && !/수정|요청|문의|변경|정정/.test(text)) kind = 'ledger';
 
   return { companyId: hit ? hit.id : '', companyName: hit ? hit.name : '', month: month, kind: kind };
 }
@@ -2287,6 +2336,91 @@ function regroupShared() {
 }
 window.regroupShared = regroupShared;
 
+/* ══════ 쌓인 것 정리 (대표 결정 2026-10-03 「ㄴ」) ══════
+   이미 확인 대기·공용 칸에 쌓인 자료에 «확실한 것은 바로 서랍» 잣대를 한 번 댄다.
+   ⚠ 두 걸음이다 — ① 미리 보기(서버가 아무것도 안 쓰고 계획만 돌려준다)
+     ② 「넣기」를 한 번 더 눌러야 실제로 들어간다. 수백 건이 한 번에 움직이는 일이라
+     무엇이 어디로 가는지 먼저 봐야 한다.
+   ⚠ 미리 본 것과 넣는 것은 서버의 **같은 계획 함수**(settlePlan)가 만든다 —
+     그 사이 새 메일이 오면 숫자가 조금 달라질 수 있어, 넣은 뒤 실제 숫자를 다시 알린다. */
+const SWEEP_KIND = { contract: '근로계약서', attend: '근태', ledger: '급여대장', output: '우리 산출물' };
+
+function sweepPreview() {
+  if (App.sweepBusy || !S.amAdmin()) return;
+  App.sweepBusy = true; App.render();
+  return S.settleQueued(false).then(r => {
+    App.sweepBusy = false;
+    App.sweep = r;
+    App.render();
+  }).catch(e => {
+    App.sweepBusy = false; App.render();
+    alert('살펴보지 못했습니다 — ' + (e.code || e.message));
+  });
+}
+window.sweepPreview = sweepPreview;
+
+function sweepClose() { App.sweep = null; App.render(); }
+window.sweepClose = sweepClose;
+
+function sweepApply() {
+  const p = App.sweep;
+  if (!p || App.sweepBusy) return;
+  const c = p.counts || {};
+  if (!confirm(Number(c.filed || 0) + '건을 서랍에 넣고 도착을 찍습니다.'
+    + (c.toSeat ? '\n공용 칸 ' + c.toSeat + '건은 담당자 확인 대기로 내려갑니다.' : '')
+    + '\n\n파일은 옮기지도 지우지도 않습니다. 틀린 것은 서랍에서 「틀림 — 확인 대기로」로 되돌릴 수 있습니다.')) return;
+  App.sweepBusy = true; App.render();
+  return S.settleQueued(true).then(r => {
+    App.sweepBusy = false; App.sweep = null;
+    const k = (r && r.counts) || {};
+    return Promise.all([ensureMail(true), refreshArrivals()]).then(() => {
+      alert(Number(k.filed || 0) + '건을 서랍에 넣었습니다 — 도착이 찍힌 사업장 ' + Number(k.companies || 0) + '곳.'
+        + (k.toSeat ? '\n공용 칸 ' + k.toSeat + '건은 담당자 확인 대기로 내려갔습니다.' : '')
+        + (k.left ? '\n확인 대기에 남은 것 ' + k.left + '건 — 사람이 봐야 합니다.' : ''));
+    });
+  }).catch(e => {
+    App.sweepBusy = false; App.render();
+    alert('넣지 못했습니다 — ' + (e.code || e.message) + '\n\n하나도 안 들어갔거나 일부만 들어갔을 수 있습니다. 다시 「🧹 쌓인 것 정리」로 확인해 주세요.');
+  });
+}
+window.sweepApply = sweepApply;
+
+function sweepHtml() {
+  const p = App.sweep;
+  if (!p) return '';
+  const c = p.counts || {}, names = p.names || {};
+  const whys = Object.keys(c.whys || {}).sort((a, b) => c.whys[b] - c.whys[a]);
+  const who = Object.keys(c.seats || {}).sort((a, b) => c.seats[b] - c.seats[a])
+    .map(u => esc(names[u] || u) + ' ' + c.seats[u]).join(' · ');
+  const rows = (p.rows || []).slice().sort((a, b) =>
+    String(a.companyName).localeCompare(String(b.companyName), 'ko') || (b.at - a.at));
+  const slotLabel = s => s === 'keep' ? '—' : (String(s).slice(0, 4) + '-' + String(s).slice(4, 6));
+  return '<div class="fxbg" onclick="sweepClose()"></div>'
+    + '<div class="fxbox sweepbox">'
+    + '<div class="fxh">🧹 쌓인 것 정리 — 미리 보기<button class="btn sm" onclick="sweepClose()">닫기</button></div>'
+    + '<div class="fxr"><label>본 것</label><b>' + Number(c.looked || 0) + '건</b></div>'
+    + '<div class="fxr"><label>바로 서랍으로</label><b>' + Number(c.filed || 0) + '건</b>'
+    + '<span class="sub" style="margin:0">도착이 찍힐 사업장 ' + Number(c.companies || 0) + '곳</span></div>'
+    + (who ? '<div class="fxr"><label>누구 서랍에</label><span>' + who + '</span></div>' : '')
+    + (c.toSeat ? '<div class="fxr"><label>공용 칸 →</label><span>담당자 확인 대기로 ' + c.toSeat + '건</span></div>' : '')
+    + '<div class="fxr"><label>확인 대기에 남음</label><b>' + Number(c.left || 0) + '건</b>'
+    + '<span class="sub" style="margin:0">메일 본문 ' + Number(c.body || 0) + '건은 그대로 둡니다</span></div>'
+    + (whys.length ? '<div class="sweepwhy">' + whys.map(w => '<span>' + esc(w) + ' <b>' + c.whys[w] + '</b></span>').join('') + '</div>' : '')
+    + (rows.length
+      ? '<div class="sweeplist">' + rows.map(r =>
+        '<div class="sweeprow"><b>' + esc(r.companyName || '') + '</b>'
+        + '<span class="tg">' + esc(SWEEP_KIND[r.kind] || r.kind) + '</span>'
+        + '<span class="tg">' + esc(slotLabel(r.slot)) + '</span>'
+        + '<span class="fn" title="' + esc(r.filename) + '">' + esc(r.filename) + '</span></div>').join('')
+        + '</div>'
+      : '<div class="empty">바로 넣을 것이 없습니다.</div>')
+    + '<div class="fxa">'
+    + '<button class="btn pri"' + ((App.sweepBusy || !c.filed && !c.toSeat) ? ' disabled' : '') + ' onclick="sweepApply()">'
+    + (App.sweepBusy ? '넣는 중…' : '넣기') + '</button>'
+    + '<button class="btn" onclick="sweepClose()">그만두기</button></div>'
+    + '</div>';
+}
+
 function screenMail() {
   const rows = mailRows(App.mail, mailCtx());
   const ids = rows.map(r => r.id);
@@ -2307,6 +2441,10 @@ function screenMail() {
             + ' title="업체관리에 주소를 넣은 뒤 누르십시오 — 지금 규칙으로 다시 갈라 각 담당자 칸으로 보냅니다"'
             + ' onclick="regroupShared()">'
             + (App.regrouping ? '갈라 보내는 중…' : '🔁 다시 갈라 보내기') + '</button>'
+            /* 쌓인 것 정리 (대표 결정 2026-10-03 「ㄴ」) — 먼저 미리 보기만 한다 */
+            + '<button class="btn sm"' + (App.sweepBusy ? ' disabled' : '')
+            + ' title="이미 쌓인 확인 대기·공용 칸 자료 가운데 확실한 것을 서랍에 넣습니다 — 먼저 목록만 보여 드립니다"'
+            + ' onclick="sweepPreview()">' + (App.sweepBusy ? '살펴보는 중…' : '🧹 쌓인 것 정리') + '</button>'
           : '')
         + '<button class="btn sm" onclick="ensureMail(true)">↻ 다시 읽기</button></span>'
     + '</div></div>';
@@ -2573,6 +2711,8 @@ function handHtml() {
      아무도 안 열어 사라진 것과 같다(갈라 보내기와 같은 규칙). */
   const here = Object.keys(App.owners || {})
     .filter(uid => uid !== App.viewingUid)
+    /* 서버가 계정으로 자리만 찾아 둔 사람(2026-10-03)은 아직 안 들어온 사람이다 */
+    .filter(uid => S.isHere(App.owners[uid]))
     .map(uid => ({ uid: uid, name: ownerNameOf(uid) }))
     .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko'));
   const n = f.ids.length;
@@ -3574,6 +3714,9 @@ function screenDrawer() {
     + (at >= 0 ? (at + 1) + ' / ' + vlist.rows.length + ' · ' : '')
     + (meRow && meRow.owner ? '담당 ' + esc(meRow.owner) + ' · ' : '')
     + model.rows.length + '건'
+    /* 기계가 넣은 것이 몇 장인지(대표 결정 2026-10-03 「ㄴ」) — 한 장도 없으면 안 그린다 */
+    + (function () { const n = model.rows.filter(r => r.auto).length;
+      return n ? ' · <span class="autobadge" title="서버가 «확실하다»고 보고 확인 없이 바로 넣은 것입니다">🤖 저절로 ' + n + '장</span>' : ''; })()
     + (App.folderPick !== 'all' ? ' 중 이 폴더 ' + foldered.length + '건' : '')
     + (App.query ? ' · 찾은 것 ' + rows.length + '건' : '')
     + '</span>'
@@ -3657,6 +3800,7 @@ function screenDrawer() {
     + '<b style="flex:1;cursor:pointer" onclick="openViewer(\'' + esc(r.id) + '\')">'
     + esc(r.filename || '(이름 없음)') + '</b>'
     + (r.expired ? '<span class="expbadge">지난 것</span>' : '')
+    + (r.auto ? '<span class="autobadge" title="메일에서 서버가 바로 넣었습니다 — 틀렸으면 「틀림 — 확인 대기로」">🤖</span>' : '')
     /* 누가 담았는지 — 함께 맡은 업체에서는 줄마다 다르다. 내 것은 굳이 안 적는다
        (모두 내 것인 보통 업체에서 줄마다 「내가 담음」이 붙으면 눈만 시끄럽다). */
     + (r._by && r._by !== (seatNow() || S.myUid())
@@ -3668,6 +3812,8 @@ function screenDrawer() {
         + ' onchange="assignFolder(\'' + esc(r.id) + '\',this.value)">'
         + folderOpts.replace('value="' + esc(r.folder || '') + '"', 'value="' + esc(r.folder || '') + '" selected')
         + '</select>'
+        + (r.auto ? '<button class="btn" onclick="event.stopPropagation();undoAutoRow(\'' + esc(r.id) + '\')"'
+          + ' title="서랍에서 빼고 도착 표시도 내려 확인 대기로 돌립니다 — 파일은 지워지지 않습니다">틀림 — 확인 대기로</button>' : '')
         + '<button class="btn" onclick="event.stopPropagation();toTrash(\'' + esc(r.id) + '\')" title="휴지통으로">🗑</button>'
       /* ⚠ 남의 줄에서도 단추를 **숨기지 않고 연하게** 둔다 — 안 보이면 「왜 나만
          안 되지」가 아니라 「이 화면이 고장났나」가 된다. 얹으면 까닭이 나온다. */
@@ -4761,6 +4907,29 @@ function toTrash(id) {
 }
 window.toTrash = toTrash;
 
+/* ── 기계가 넣은 것이 틀렸을 때 (대표 결정 2026-10-03 「ㄴ」) ──
+   서랍에서 빼고 도착 표시도 내려 확인 대기로 돌린다(묶음은 S.undoAutoUpdate 한 곳).
+   파일은 그대로다 — 휴지통과 다르다(지운 게 아니라 «다시 보자»다). */
+function undoAutoRow(id) {
+  const rec = findRow(id);
+  if (!rec || !rec.auto) return;
+  if (!canEditRow(rec)) {
+    alert(byName(rec._by) + ' 님 자리의 자료라 여기서는 못 되돌립니다.');
+    return;
+  }
+  if (!confirm('이 자료를 서랍에서 빼서 확인 대기로 돌릴까요?\n\n도착 표시도 함께 내려갑니다. 파일은 지워지지 않습니다.')) return;
+  const seat = App.viewingUid;
+  db.ref().update(S.undoAutoUpdate(id, rec, seat)).then(() => {
+    if (App.itemsKeep && App.itemsKeep[id]) delete App.itemsKeep[id];
+    if (App.itemsMonth && App.itemsMonth[id]) delete App.itemsMonth[id];
+    refreshArrivals(rec.companyId, rec.month);   // 그 자료의 칸만(근로계약서는 keep)
+    S.listMyPending(seat).then(p => { if (seatSame(seat)) { App.pending = p; App.render(); } })
+      .catch(e => console.warn('[대기 칸]', e && e.code));
+    App.render();
+  }).catch(e => alert('되돌리지 못했습니다 — ' + (e.code || e.message)));
+}
+window.undoAutoRow = undoAutoRow;
+
 function ensureTrash() {
   const seat = seatNow();
   return S.listTrash(seat).then(v => { if (!seatSame(seat)) return; App.trash = v; App.render(); })
@@ -5574,6 +5743,7 @@ function shareModalHtml() {
   const myUid = (App.me && App.me.uid) || '';
   const list = Object.keys(App.owners || {})
     .filter(uid => uid !== myUid)
+    .filter(uid => S.isHere(App.owners[uid]))   // 아직 안 들어온 사람에게는 공유해도 아무도 안 본다
     .map(uid => Object.assign({ uid: uid }, App.owners[uid]))
     .filter(o => !q || String(o.name || '').toLowerCase().indexOf(q) >= 0)
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko'));

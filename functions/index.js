@@ -1644,11 +1644,46 @@ async function payMailKnownList(db) {
   const ownSnap = await db.ref(PAYDATA_ROOT + "/owners").once("value").catch(() => null);
   const index = MR.buildCompanyIndex(cos);
   const owners = (ownSnap && ownSnap.val()) || {};
+  /* 아직 급여데이터함을 안 연 주담당도 로그인 계정으로 자리를 찾는다(2026-10-03).
+     ⚠ 못 찾아도 그냥 지나간다 — 그 사람 몫은 예전처럼 공용 칸에 남는다. */
+  await payMailAddMissingSeats(db, cos, dirSnap && dirSnap.val(), owners);
   /* 업체 배열도 함께 담는다 — 주소로 못 가릴 때 **제목에서** 사업장을 찾는 데 쓴다
      (회계사무소 한 주소가 여러 사업장에 걸린다, 대표 요청 2026-08-24).
      같은 읽기로 만들어 두지 않으면 메일 한 통마다 다시 읽어 요금이 된다. */
   payMailKnownCache = { at: now, list: list, index: index, owners: owners, cos: MR.coList(cos) };
   return list;
+}
+
+/* ── 아직 급여데이터함을 안 연 주담당의 자리 (2026-10-03) ──
+   서버는 owners(한 번 들어온 사람)로만 자리를 알아, 한 번도 안 연 담당자의 사업장
+   메일은 모두 공용 칸에 쌓였다(김보람 몫 80건). 로그인 계정으로 자리(uid)를 찾고,
+   owners 에 «서버가 적은 줄»을 남긴다 — 관리자 화면이 그 자리를 열 수 있어야 한다.
+   ⚠ lastAt 은 안 적는다 — 화면은 그것이 없으면 「아직 안 들어옴」으로 본다.
+   ⚠ 이미 있는 줄은 건드리지 않는다(사람이 들어와 적은 줄을 덮으면 안 된다).
+   ⚠ owners 는 받은 객체를 **그 자리에서** 늘린다 — 부르는 쪽 캐시가 바로 쓴다. */
+async function payMailAddMissingSeats(db, cos, dir, owners) {
+  const sids = MR.missingSeatSids(cos, owners);
+  if (!sids.length) return 0;
+  const up = {};
+  let found = 0;
+  for (const sid of sids) {
+    const email = MR.sidToEmail(sid);
+    let user = null;
+    try { user = await getAuth().getUserByEmail(email); } catch (_) { user = null; }
+    if (!user || !user.uid || owners[user.uid]) continue;
+    const rec = { email: email, name: MR.dirNameOf(dir, sid) || sid,
+      addedBy: "server", addedAt: Date.now() };
+    owners[user.uid] = rec;
+    up[PAYDATA_ROOT + "/owners/" + user.uid] = rec;
+    found++;
+  }
+  if (found) {
+    await db.ref().update(up).catch(function (e) {
+      console.warn("receivePaydataMail 담당자 자리 적기 실패:", String((e && e.message) || e));
+    });
+    console.log("receivePaydataMail 아직 안 들어온 담당자 자리를 찾음:", found);
+  }
+  return found;
 }
 
 /* 메일 본문을 창고에 .txt 로 담고 대기 칸에 한 줄 적는다 (대표 결정 2026-08-23).
@@ -1663,13 +1698,15 @@ async function payMailStoreBody(db, bucket, text, mail) {
   await bucket.file(where).save(buf, { contentType: "text/plain; charset=utf-8", resumable: false });
 
   const name = MR.bodyFilename(mail.subject);
+  const at = Date.now();
+  /* ⚠ 본문은 **늘 확인 대기**다 — 읽을 글이지 서랍에 넣을 자료가 아니다(sureFor 를 안 부른다). */
   const route = MR.routeFor(
-    { from: mail.from, subject: mail.subject, filename: name },
+    { from: mail.from, subject: mail.subject, filename: name, at: at },
     payMailKnownCache.index, payMailKnownCache.owners, mail.box, payMailKnownCache.cos);
   const common = {
     filename: name, file: where,
     mime: "text/plain", bytes: buf.length,
-    at: Date.now(), mailFrom: mail.from, mailSubject: mail.subject, tag: route.tag,
+    at: at, mailFrom: mail.from, mailSubject: mail.subject, tag: route.tag,
   };
   const up = {};
   if (route.shared) {
@@ -1692,24 +1729,31 @@ async function payMailStoreOne(db, bucket, att, mail) {
     contentType: att.contentType || "application/octet-stream",
     resumable: false,
   });
+  const at = Date.now();
   const route = MR.routeFor(
-    { from: mail.from, subject: mail.subject, filename: att.filename },
+    { from: mail.from, subject: mail.subject, filename: att.filename, at: at },
     payMailKnownCache.index, payMailKnownCache.owners, mail.box, payMailKnownCache.cos);
 
   const common = {
     filename: att.filename, file: where,
     mime: att.contentType || "", bytes: att.size || (att.content && att.content.length) || 0,
-    at: Date.now(), mailFrom: mail.from, mailSubject: mail.subject, tag: route.tag,
+    at: at, mailFrom: mail.from, mailSubject: mail.subject, tag: route.tag,
   };
+  /* 확실하면 확인 대기를 건너뛰고 바로 서랍 + 도착 (대표 결정 2026-10-03 「ㄴ」).
+     하나라도 걸리면 지금처럼 확인 대기 — 까닭은 sureFor 가 말한다. */
+  const sure = MR.sureFor({ filename: att.filename, at: at }, route);
+  const drawer = sure.ok ? MR.drawerWriteFor(PAYDATA_ROOT, route.seat, id, common) : null;
   const up = {};
-  if (route.shared) {
+  if (drawer) {
+    Object.assign(up, drawer.up);
+  } else if (route.shared) {
     up[PAYDATA_ROOT + "/pending_shared/" + id] =
       MR.sharedPendingRecord(Object.assign({ why: route.why }, common));
   } else {
     up[PAYDATA_ROOT + "/u/" + route.seat + "/pending/" + id] = MR.pendingRecordFor(common);
   }
   await db.ref().update(up);
-  return { id: id, seat: route.seat, shared: route.shared, why: route.why };
+  return { id: id, seat: route.seat, shared: route.shared, why: route.why, filed: !!drawer };
 }
 
 /* 메일 한 회차 — 30분마다 도는 것과 사람이 누르는 「지금 가져오기」가 **함께** 쓴다.
@@ -1749,6 +1793,7 @@ async function runPaydataMailOnce() {
     let took = 0, skipped = 0, unknown = 0;
     /* 갈린 것·공용에 남은 것을 따로 센다 — 「왜 아무도 안 받나」를 로그만 보고 알아야 한다. */
     let routed = 0, shared = 0;
+    let filed = 0;     // 그중 확인 대기를 건너뛰고 바로 서랍으로 간 것 (2026-10-03)
     const whys = {};
     /* ⚠ 돌려줄 셈은 **try 밖에** 둔다. 예전에는 try 안에서 만든 boxes·inbox 를
        try 를 나온 뒤 return 에서 썼다 — 담기가 다 끝난 회차마다 반드시
@@ -1949,6 +1994,7 @@ async function runPaydataMailOnce() {
                로그만 보고 알 수 있어야 한다. */
             if (r && r.shared) { shared++; whys[r.why] = (whys[r.why] || 0) + 1; }
             else routed++;
+            if (r && r.filed) filed++;          // 확인 대기를 건너뛰고 바로 서랍으로 간 것
             took++; tookHere++;
             if (r) { hereSeat = r.seat || hereSeat; hereShared = !!r.shared; hereWhy = r.why || hereWhy; }
           } catch (e) {
@@ -1997,14 +2043,14 @@ async function runPaydataMailOnce() {
       await payMailWriteLog(db, logRows);
       scanned.looked = inbox.length;
       scanned.took = took; scanned.skipped = skipped; scanned.unknown = unknown;
-      scanned.routed = routed; scanned.shared = shared;
+      scanned.routed = routed; scanned.shared = shared; scanned.filed = filed;
       console.log("receivePaydataMail",
-        { boxes: boxes, looked: inbox.length, took, skipped, unknown, routed, shared, whys });
+        { boxes: boxes, looked: inbox.length, took, skipped, unknown, routed, shared, filed, whys });
       /* 앱이 「마지막에 언제·어느 폴더를 봤나」를 보여 줄 수 있게 적어 둔다 —
          이것이 없으면 자료가 안 들어올 때 사람이 확인할 데가 로그뿐이다. */
       await db.ref(PAYDATA_ROOT + "/mailconf/lastScan").set({
         at: Date.now(), boxes: boxes, looked: inbox.length,
-        took: took, routed: routed, shared: shared, unknown: unknown
+        took: took, routed: routed, shared: shared, unknown: unknown, filed: filed
       }).catch(function () { /* 적지 못해도 받는 일은 이미 끝났다 */ });
     } catch (e) {
       console.error("receivePaydataMail 실패:", String((e && e.message) || e));
@@ -2070,6 +2116,45 @@ exports.pullPaydataMail = functions
   });
 
 
+/* ══════ 쌓인 것 정리 (대표 결정 2026-10-03 「ㄴ」) ══════
+   이미 확인 대기·공용 칸에 쌓인 것에 «확실한 것은 바로 서랍» 잣대를 한 번 댄다.
+   ⚠ 「다시 갈라 보내기」(regroupPaydataShared)와 **같은 문**으로 들어온다 — 새 함수를
+     만들면 공개 호출 권한을 따로 열어야 한다. 그 문이 총괄관리자만 들인다.
+   ⚠ apply 가 true 가 아니면 **아무것도 안 쓰고** 계획(셈과 넣을 목록)만 돌려준다 —
+     수백 건이 한 번에 움직이는 일이라 사람이 먼저 보고 한 번 더 눌러야 넣는다.
+   ⚠ 계획은 MR.settlePlan 한 곳이 만든다 — 미리 본 것과 넣는 것이 달라지지 않게. */
+async function paydataSettle(db, body, res) {
+  try {
+    payMailKnownCache.at = 0;              // 방금 넣은 주소·새로 찾은 자리가 보이게
+    await payMailKnownList(db);
+    const owners = payMailKnownCache.owners || {};
+    const sharedSnap = await db.ref(PAYDATA_ROOT + "/pending_shared").once("value");
+    const seatBoxes = {};
+    for (const uid of Object.keys(owners)) {
+      const s = await db.ref(PAYDATA_ROOT + "/u/" + uid + "/pending").once("value");
+      const v = s && s.val();
+      if (v && typeof v === "object") seatBoxes[uid] = v;
+    }
+    const plan = MR.settlePlan(PAYDATA_ROOT, (sharedSnap && sharedSnap.val()) || {},
+      seatBoxes, payMailKnownCache.index, owners, payMailKnownCache.cos, Date.now());
+    const names = {};
+    Object.keys(owners).forEach(function (u) { names[u] = String((owners[u] || {}).name || ""); });
+    if (body.apply === true) {
+      /* 나눠 쓴다 — 한 번에 수천 자리를 쓰면 하나만 막혀도 전부가 안 들어간다.
+         ⚠ 자료 한 건의 자리들(서랍·도착·원래 칸 지우기)은 «같은 조각»에 둔다.
+           갈라지면 「서랍엔 있는데 확인 대기에도 있다」가 된다. */
+      const chunks = MR.settleChunks(plan.up, 50);
+      for (const chunk of chunks) await db.ref().update(chunk);
+      console.log("paydataSettle", plan.counts);
+    }
+    res.json({ ok: true, applied: body.apply === true, counts: plan.counts,
+      names: names, rows: plan.rows.slice(0, 400) });
+  } catch (e) {
+    console.error("paydataSettle 실패:", String((e && e.message) || e));
+    res.status(500).json({ ok: false, error: String((e && e.message) || e) });
+  }
+}
+
 /* ══════ 공용 칸을 지금 규칙으로 다시 갈라 보내기 (대표 요청 2026-08-25) ══════
    배달은 메일을 **받을 때 한 번만** 한다. 그래서 업체관리에 주소를 나중에 넣어도
    이미 공용 칸에 떨어진 것은 영원히 그대로였다 — 52건이 「업체관리에 없는 주소」로
@@ -2101,6 +2186,9 @@ exports.regroupPaydataShared = functions
     }
 
     const db = getDatabase();
+    /* 쌓인 것 정리(2026-10-03)는 같은 문으로 들어온다 — 아래 paydataSettle 참고 */
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    if (body.action === "settle") { await paydataSettle(db, body, res); return; }
     try {
       payMailKnownCache.at = 0;             // 방금 넣은 주소가 보이게 새로 읽는다
       await payMailKnownList(db);
@@ -2203,7 +2291,9 @@ exports.handPaydataItem = functions
       /* 받는 사람이 이 함에 들어와 있는가 — 안 들어온 자리에 두면 사라진 것과 같다 */
       if (to) {
         const own = await db.ref(PAYDATA_ROOT + "/owners/" + to).once("value");
-        if (!own || !own.val()) {
+        /* ⚠ lastAt 까지 본다 — 서버가 적어 둔 줄(아직 안 들어온 주담당, 2026-10-03)은
+           있어도 «들어온 것»이 아니다. 아무도 안 여는 자리로 손으로 넘기면 안 된다. */
+        if (!own || !own.val() || !Number((own.val() || {}).lastAt || 0)) {
           res.status(400).json({ ok: false, error: "그 분은 아직 급여데이터함에 들어온 적이 없습니다 — 한 번 열어야 자리가 생깁니다." });
           return;
         }
