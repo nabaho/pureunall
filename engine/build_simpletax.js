@@ -88,11 +88,20 @@ function build(csvPath, year) {
      급여가 「표없음」이 되어 세금이 0으로 빠진다. */
   rows[rows.length - 1].max = null;
 
+  /* 자녀공제는 표 개정판마다 다르다(별표2 제3호) — 코어가 table.자녀공제 를 쓴다.
+       2024.2.29 개정판: 12,500 / 29,160 / +25,000
+       2026.2.27 개정판: 20,830 / 45,830 / +33,330 (2026.3.1 지급분부터)
+     ⚠ 2026년 1~2월 급여용 표라면 연도를 2025 로 넣어 옛 공제를 싣는다.
+     (2026년 3월 이후는 앱에 내장된 표 js/pu-simpletax.js 가 쓰이므로 올릴 필요 없다) */
+  const y = Number(year || new Date().getFullYear());
+  const 자녀공제 = (y >= 2026)
+    ? { one: 20830, two: 45830, extra: 33330 }
+    : { one: 12500, two: 29160, extra: 25000 };
   return {
-    연도: String(year || new Date().getFullYear()),
+    연도: String(y),
     출처: '국세청 근로소득 간이세액표',
     만든날: new Date().toISOString().slice(0, 10),
-    자녀공제: { '1명': 12500, '2명': 29160, '3명이상': '29160 + 2명초과 1명당 25000' },
+    자녀공제: 자녀공제,
     구간수: rows.length,
     가족칸: rows[0].tax.length,
     rows: rows
