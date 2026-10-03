@@ -1720,7 +1720,10 @@
             ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)"
           },
           "path": {
-            ".validate": "newData.isString() && newData.val().beginsWith('pu_docs/originals/' + $id + '/')"
+            ".validate": "newData.isString() && (newData.val().beginsWith('pu_docs/originals/' + $id + '/') || (newData.parent().child('secret').val() === true && newData.val().beginsWith('pu_docs/secret/' + $id + '/')))"
+          },
+          "secret": {
+            ".validate": "newData.isBoolean() && newData.val() === true"
           },
           "at": {
             ".validate": "newData.isNumber()"
@@ -1734,7 +1737,7 @@
           "from": {
             ".validate": "newData.hasChild('kind')",
             "kind": {
-              ".validate": "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo'"
+              ".validate": "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder'"
             },
             "$f": {
               ".validate": "newData.isString() && newData.val().length <= 200"
@@ -1814,7 +1817,7 @@
               ".validate": "newData.isString() && newData.val().length <= 40"
             },
             "src": {
-              ".validate": "newData.val() === 'import' || newData.val() === 'manual'"
+              ".validate": "newData.val() === 'import' || newData.val() === 'manual' || newData.val() === 'folder'"
             },
             "at": {
               ".validate": "newData.isNumber()"
@@ -1831,6 +1834,9 @@
           }
         }
       },
+      "secret_log": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      },
       "co_docs": {
         "$k": {
           "$d": {
@@ -1846,7 +1852,10 @@
               ".validate": "newData.isString() && newData.val().length <= 10"
             },
             "src": {
-              ".validate": "newData.val() === 'photo' || newData.val() === 'upload'"
+              ".validate": "newData.val() === 'photo' || newData.val() === 'upload' || newData.val() === 'folder'"
+            },
+            "secret": {
+              ".validate": "newData.isBoolean() && newData.val() === true"
             },
             "at": {
               ".validate": "newData.isNumber()"

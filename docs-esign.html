@@ -177,10 +177,10 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-form-cardfill.js?v=8"></script>
 <script src="js/pu-contract-forms.js?v=13"></script>
 <script src="js/pu-photo-store.js?v=31"></script>
-<script src="js/pu-office-store.js?v=3"></script>
+<script src="js/pu-office-store.js?v=4"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
 <script src="js/pu-co-roster.js?v=1"></script>
-<script src="js/pu-office-docs.js?v=2"></script>
+<script src="js/pu-office-docs.js?v=3"></script>
 <script>
 'use strict';
 var FB_CONFIG = {
@@ -223,7 +223,7 @@ firebase.auth().onAuthStateChanged(function (u) {
   curUser = u;
   /* 원본 보관함 — 서면함·서고 원본과 같은 창고(pureun-erp-hrphotos). 창고가 없어도 양식 화면은 돈다 */
   try { docBucket = firebase.app().storage('gs://pureun-erp-hrphotos'); } catch (e) { docBucket = null; }
-  PuOfficeStore.init({ db: db, storage: docBucket, uid: u.uid, name: u.email.split('@')[0] });
+  PuOfficeStore.init({ db: db, storage: docBucket, uid: u.uid, name: u.email.split('@')[0], secretFetch: fetchSecretDoc });
   /* ✉ 메일 첨부 — ⚠ storage 를 넘기지 않는다(기본 기업정보함 창고 pureun-erp-photos 라야 서버가 첨부를 찾는다) */
   if (window.PuDocFile) PuDocFile.init({ db: db });
   if (window.PuPhotoStore) {
@@ -258,6 +258,20 @@ function formFromHash() {
   var h = location.hash;
   if (h.indexOf('#forms:') !== 0) return null;
   try { return decodeURIComponent(h.slice(7)) || null; } catch (e) { return null; }
+}
+/* 🔒 서명본 받기 — 서버 함수 puDocSecret 이 총괄관리자인지 보고 파일을 내준다(설계 2026-10-03 §3.1).
+   토큰·서명 주소를 만들지 않는다 — 받은 바이트는 이 창 안에서만 쓴다. */
+function fetchSecretDoc(fileId) {
+  var u = firebase.auth().currentUser;
+  if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  return u.getIdToken().then(function (tok) {
+    return fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/puDocSecret', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify({ fileId: fileId }) });
+  }).then(function (r) {
+    if (r.ok) return r.blob();
+    return r.json().catch(function () { return {}; }).then(function (j) { throw new Error(j.error || ('서명본을 열지 못했습니다 (' + r.status + ')')); });
+  });
 }
 function archiveOriginal(file, from) { return trackedWrite(PuOfficeStore.putOriginal(file, from)); }
 function downloadOriginal(fileId, name) {

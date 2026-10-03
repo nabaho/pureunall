@@ -269,7 +269,8 @@
     /* fileId → {rec,url} 을 마운트 동안 캐시한다 — 다시 그릴 때마다 getOriginal+getDownloadURL 을 되풀이하지 않는다.
        단, 실패는 캐시하지 않는다 — 한 번 어긋난 요청 때문에 마운트가 살아 있는 내내 썸네일이 죽으면 안 된다. */
     var urlCache = {};
-    function urlFor(fileId) {
+    function urlFor(fileId, secret) {
+      if (secret) return Promise.resolve({ rec: null, url: null, secret: true });
       if (!urlCache[fileId]) {
         urlCache[fileId] = store.getOriginal(fileId).then(function (r) {
           if (!r) return { rec: null, url: null };
@@ -527,6 +528,21 @@
           } })
         ];
       });
+      if (d.secret) {
+        view.textContent = '';
+        var openBtn = el('button', { type: 'button', 'class': 'pod-b p', text: '🔒 서명본 열기 (대표·관리자)', onclick: function () {
+          openBtn.disabled = true; openBtn.textContent = '여는 중…';
+          store.secretBlob(d.fileId).then(function (blob) {
+            var url = w.URL.createObjectURL(blob); view.textContent = '';
+            if (/^image\//.test(blob.type)) view.appendChild(el('img', { src: url, alt: d.title || '', style: 'max-width:100%;max-height:60vh' }));
+            else if (/pdf/.test(blob.type)) view.appendChild(el('iframe', { src: url, title: d.title || 'PDF', style: 'width:100%;height:60vh;border:none' }));
+            else view.appendChild(el('div', { style: 'text-align:center;color:#475569' }, [el('div', { style: 'font-size:36px', text: '📄' }), el('div', { text: '미리보기가 없는 종류입니다 — [📥 내려받기]로 여세요' })]));
+          }, function (e) { view.textContent = msg(e); });
+        } });
+        view.appendChild(el('div', { style: 'text-align:center;color:#475569' }, [el('div', { style: 'font-size:36px', text: '🔒' }),
+          el('div', { style: 'margin:6px 0 10px', text: '서명본입니다 — 대표·관리자만 열 수 있습니다(연 기록이 남습니다).' }), openBtn]));
+        return;
+      }
       urlFor(d.fileId).then(function (u) {
         rec = u.rec;
         if (!u.rec) { view.textContent = '보관함에서 파일을 찾지 못했습니다'; return; }
@@ -567,9 +583,12 @@
       var grid = el('div', { 'class': 'pod-grid' });
       S.docs.forEach(function (d) {
         var th = el('div', { 'class': 'pod-th', text: d.src === 'photo' ? '🖼' : '📄' });
+        if (d.secret) th.textContent = '🔒';
         grid.appendChild(el('button', { type: 'button', 'class': 'pod-card', onclick: function () { openDoc(d); } }, [th,
           el('div', { 'class': 'pod-cm' }, [el('b', { title: d.title, text: d.title || '계약서' }),
-            el('span', null, [d.date || '날짜 없음', el('span', { 'class': 'pod-tag ' + (d.src === 'photo' ? 'ph' : 'up'), text: d.src === 'photo' ? '사진첩' : '업로드' })])])]));
+            el('span', null, [d.date || '날짜 없음', el('span', { 'class': 'pod-tag ' + (d.src === 'photo' ? 'ph' : 'up'), text: d.src === 'photo' ? '사진첩' : d.src === 'folder' ? 'PC 폴더' : '업로드' }),
+              d.secret ? el('span', { 'class': 'pod-tag', title: '서명본 — 대표·관리자만 엽니다', text: '🔒 서명본' }) : null])])]));
+        if (d.secret) return;
         urlFor(d.fileId).then(function (u) {
           if (!u.rec || !isImg(u.rec.name)) return;
           th.textContent = ''; th.appendChild(el('img', { src: u.url, alt: '', loading: 'lazy' }));

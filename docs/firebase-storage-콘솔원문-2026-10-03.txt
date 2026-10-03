@@ -238,6 +238,19 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // ── 문서관리 🔒 서명본 ── 2026-10-03 추가 (설계 2026-10-03-계약서류-표준-기록 §3.1) · 창고 pureun-erp-hrphotos
+    //    서명본·EDI 위임장에는 대표자 주민번호(일부)·계좌가 들어 있다 — 대표·관리자만 연다.
+    //    ★ 창고 규칙은 «관리자인가»를 못 본다(실시간DB 를 못 읽는다). 그래서 읽기는 «아무도» 못 하고(false),
+    //      서버 함수 puDocSecret(관리자 SDK)이 uid_roles 로 총괄관리자인지 본 뒤 파일을 내준다(뉴스레터 사진과 같은 길).
+    //    ★★ «새로 쓰기만» — 원본 보관함과 같다.
+    match /pu_docs/secret/{fileId}/{file} {
+      allow read:   if false;
+      allow create: if isStaff()
+                    && request.resource != null
+                    && request.resource.size < 25 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
     // ── 경력관리 기관 양식 보관함 (2026-09-21 추가) · 창고 pureun-erp-hrphotos ──
     //    여태 양식 «목록»만 서버로 가고 «파일»은 그 PC 의 브라우저에만 있었습니다.
     //    그래서 다른 PC 로 로그인하면 양식 딱지는 보이는데 「원본을 찾을 수 없습니다」가

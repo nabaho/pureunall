@@ -1282,13 +1282,15 @@ rules.pu_docs = {
     size:   { '.validate': 'newData.isNumber() && newData.val() > 0 && newData.val() < 26214400' },
     type:   { '.validate': 'newData.isString() && newData.val().length <= 120' },
     sha256: { '.validate': 'newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)' },
-    path:   { '.validate': "newData.isString() && newData.val().beginsWith('pu_docs/originals/' + $id + '/')" },
+    path:   { '.validate': "newData.isString() && (newData.val().beginsWith('pu_docs/originals/' + $id + '/') || (newData.parent().child('secret').val() === true && newData.val().beginsWith('pu_docs/secret/' + $id + '/')))" },
+    /* 🔒 서명본 (2026-10-03 §3.1) — 창고 pu_docs/secret/… 는 아무도 직접 못 읽고, 서버 함수 puDocSecret 이 총괄관리자에게만 내준다 */
+    secret: { '.validate': 'newData.isBoolean() && newData.val() === true' },
     at:     { '.validate': 'newData.isNumber()' },
     by:     { '.validate': 'newData.val() === auth.uid' },
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     from:   {
       '.validate': "newData.hasChild('kind')",
-      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo'" },
+      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder'" },
       $f:   { '.validate': 'newData.isString() && newData.val().length <= 200' }
     },
     $other: { '.validate': false }
@@ -1324,19 +1326,22 @@ rules.pu_docs = {
     bizNo:   { '.validate': 'newData.isString() && newData.val().length <= 12' },
     note:    { '.validate': 'newData.isString() && newData.val().length <= 200' },
     docId:   { '.validate': 'newData.isString() && newData.val().length <= 40' },
-    src:     { '.validate': "newData.val() === 'import' || newData.val() === 'manual'" },
+    src:     { '.validate': "newData.val() === 'import' || newData.val() === 'manual' || newData.val() === 'folder'" },
     at:      { '.validate': 'newData.isNumber()' },
     by:      { '.validate': 'newData.val() === auth.uid' },
     byName:  { '.validate': 'newData.isString() && newData.val().length <= 60' },
     $other:  { '.validate': false }
   } } },
+  /* 🔒 서명본을 누가 언제 열었나 — 서버(관리자 SDK)만 쓴다. 총괄관리자만 읽는다 */
+  secret_log: { '.read': ADMIN },
   co_docs: { $k: { $d: {
     '.write': LOGIN,
     '.validate': "newData.hasChildren(['fileId','title','src','at','by'])",
     fileId: { '.validate': "newData.isString() && root.child('pu_docs/originals').child(newData.val()).exists()" },
     title:  { '.validate': 'newData.isString() && newData.val().length <= 120' },
     date:   { '.validate': 'newData.isString() && newData.val().length <= 10' },
-    src:    { '.validate': "newData.val() === 'photo' || newData.val() === 'upload'" },
+    src:    { '.validate': "newData.val() === 'photo' || newData.val() === 'upload' || newData.val() === 'folder'" },
+    secret: { '.validate': 'newData.isBoolean() && newData.val() === true' },
     at:     { '.validate': 'newData.isNumber()' },
     by:     { '.validate': 'newData.val() === auth.uid' },
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
