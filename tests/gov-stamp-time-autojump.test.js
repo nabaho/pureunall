@@ -50,7 +50,7 @@ test('시 칸에 두 자리 → 짝이 되는 분 칸으로', () => {
 test('한 자리면 그대로', () => {
   const { handler, mk } = load();
   const h = mk('mh0'), m = mk('mm0'), h1 = mk('mh1');
-  h.value = '8'; handler({ target: h });
+  h.value = '1'; handler({ target: h });   // 1·2 는 두 자리가 될 수 있다
   m.value = '5'; handler({ target: m });
   assert.ok(!m.focused && !h1.focused, '한 자리인데 넘어갔다');
 });
@@ -72,4 +72,28 @@ test('다음 줄이 없거나 숨었으면 그 줄 「적용」 단추로', () =
   const m0 = r.mk('mm0'), h1 = r.mk('mh1', true);
   m0.value = '30'; r.handler({ target: m0 });
   assert.ok(!h1.focused && r.apply.focused, '숨은 줄로 갔다');
+});
+
+test('두 자리가 될 수 없는 첫 숫자는 한 자리에서 넘긴다 (시 3~9 · 분 6~9)', () => {
+  const { handler, mk, apply } = load();
+  const h = mk('mh0'), m = mk('mm0');
+  h.value = '9'; handler({ target: h, inputType: 'insertText' });
+  assert.ok(m.focused, '시 9 인데 분 칸으로 안 넘어갔다');
+  const h2 = mk('mh0'), m2 = mk('mm0');
+  h2.value = '2'; handler({ target: h2, inputType: 'insertText' });
+  assert.ok(!m2.focused, '시 2 는 20~23 이 될 수 있는데 넘어갔다');
+  m2.value = '7'; handler({ target: m2, inputType: 'insertText' });
+  assert.ok(apply.focused, '분 7 인데 안 넘어갔다');
+  const r = load(); const m3 = r.mk('mm0');
+  m3.value = '5'; r.handler({ target: m3, inputType: 'insertText' });
+  assert.ok(!r.apply.focused, '분 5 는 50~59 가 될 수 있는데 넘어갔다');
+});
+
+test('지울 때는 넘어가지 않는다', () => {
+  const { handler, mk } = load();
+  const h = mk('mh0'), m = mk('mm0');
+  h.value = '14'; handler({ target: h, inputType: 'deleteContentBackward' });
+  assert.ok(!m.focused, '지웠는데 넘어갔다');
+  h.value = '14'; handler({ target: h, inputType: 'insertText' });
+  assert.ok(m.focused, '칠 때는 넘어가야 한다');
 });
