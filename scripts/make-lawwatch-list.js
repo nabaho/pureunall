@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* 법 개정 감시 목록 만들개 — js/pu-rules-lawlink.js(연결표) + rules.html(검토 규칙) → functions/rules-lawwatch-laws.json
+/* 법 개정 감시 목록 만들개 — js/pu-rules-lawlink.js(연결표) + js/pu-rules-criteria.js(검토 규칙) → functions/rules-lawwatch-laws.json
 
    왜 따로 옮기나: 서버 함수는 functions/ 폴더만 올라간다. 저장소 뿌리의 js/ 를 못 부른다.
    그렇다고 서버에 목록을 «손으로» 따로 적으면, 규칙이 새 조를 가리키게 됐을 때 서버만 모른다.
@@ -15,10 +15,12 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'functions', 'rules-lawwatch-laws.json');
 
+/* 규칙집은 2026-10-04 부터 js/pu-rules-criteria.js 한 벌이다(rules.html 은 그것을 받아 쓴다).
+   글자로 읽는 것은 그대로 둔다 — 이 만들개는 화면 코드를 «실행»하지 않고 자료 한 줄만 읽는다. */
 function rulesFromHtml() {
-  const s = fs.readFileSync(path.join(ROOT, 'rules.html'), 'utf8');
+  const s = fs.readFileSync(path.join(ROOT, 'js', 'pu-rules-criteria.js'), 'utf8');
   const at = s.indexOf('const RULES = ');
-  if (at < 0) throw new Error('rules.html 에서 검토 규칙(RULES)을 찾지 못했습니다');
+  if (at < 0) throw new Error('js/pu-rules-criteria.js 에서 검토 규칙(RULES)을 찾지 못했습니다');
   return JSON.parse(s.slice(at + 'const RULES = '.length, s.indexOf('\n', at)).replace(/;\s*$/, ''));
 }
 

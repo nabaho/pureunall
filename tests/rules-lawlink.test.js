@@ -13,9 +13,10 @@ const O = require('../js/pu-ontology.js');
 
 const root = path.join(__dirname, '..');
 function rules(){
-  const s = fs.readFileSync(path.join(root, 'rules.html'), 'utf8');
+  // 규칙집은 2026-10-04 부터 js/pu-rules-criteria.js 한 벌이다(rules.html 은 그것을 받아 쓴다)
+  const s = fs.readFileSync(path.join(root, 'js', 'pu-rules-criteria.js'), 'utf8');
   const at = s.indexOf('const RULES = ');
-  assert.ok(at > 0, '규정관리에서 검토 규칙(RULES)을 찾지 못했습니다');
+  assert.ok(at > 0, '검토 기준(js/pu-rules-criteria.js)에서 검토 규칙(RULES)을 찾지 못했습니다');
   return JSON.parse(s.slice(at + 'const RULES = '.length, s.indexOf('\n', at)).replace(/;\s*$/, ''));
 }
 
