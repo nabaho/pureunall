@@ -149,6 +149,8 @@
     });
   }
   function isSecret(rec) { return !!(rec && rec.secret); }
+  /* 이미 보관함에 있는 파일인지(해시) — 폴더 가져오기 미리 보기용 */
+  function hasHash(h) { needDb(); return deps.db.ref(ROOT + '/hash/' + h).once('value').then(function (s) { return !!s.val(); }); }
   /* 🔒 서명본 바이트 — 서버가 총괄관리자인지 보고 내준다. 아니면 서버가 거절(403) */
   function secretBlob(fileId) {
     if (!deps.secretFetch) return Promise.reject(new Error('🔒 서명본을 여는 길이 연결되지 않았습니다'));
@@ -326,7 +328,7 @@
     coKey: coKey, okDocFile: okDocFile, safeFileName: safeFileName, sha256Hex: sha256Hex,
     dataUrlToBytes: dataUrlToBytes, originalRecord: originalRecord, isDenied: isDenied,
     init: init, putOriginal: putOriginal, getOriginal: getOriginal, listOriginals: listOriginals,
-    fileUrl: fileUrl, download: download, isSecret: isSecret, secretBlob: secretBlob, saveBlob: saveBlob,
+    fileUrl: fileUrl, download: download, isSecret: isSecret, secretBlob: secretBlob, saveBlob: saveBlob, hasHash: hasHash,
     addCoDoc: addCoDoc, updateCoDoc: updateCoDoc, unlinkCoDoc: unlinkCoDoc,
     listCo: listCo, listCoDocs: listCoDocs, probe: probe,
     keepCo: keepCo, recRecord: recRecord, listCoRecs: listCoRecs, importCoRecs: importCoRecs, updateCoRec: updateCoRec, removeCoRec: removeCoRec

@@ -138,3 +138,32 @@ test('ⓓ 배선·규칙 — 문서관리가 명단 모듈을 싣고, 규칙에 
   assert.match(gen, /co_recs: \{ \$k: \{ \$d: \{/);
   assert.match(gen, /src:\s+\{ '\.validate': "newData\.val\(\) === 'import' \|\| newData\.val\(\) === 'manual'( \|\| newData\.val\(\) === 'folder')?" \}/);
 });
+
+test('ⓔ PC 폴더 — 우리 계약서류만 고르고(직원 자료는 뺌), 회사·종류·날짜를 짐작한다', () => {
+  assert.equal(R.guessKind('자문계약서-가나시험상사.hwp'), '자문');
+  assert.equal(R.guessKind('고문계약서[2015년-가나].hwp'), '자문');
+  assert.equal(R.guessKind('가나-cms.pdf'), 'CMS');
+  assert.equal(R.guessKind('국민연금 EDI 업무대행 신청서.hwp'), 'EDI');
+  assert.equal(R.guessKind('컨설팅계약서.hwp'), '컨설팅');
+  assert.equal(R.guessKind('위임장(중노위).hwp'), '사건');
+  ['근로계약서-가나.hwp', '가나-급여대장-급여내역서 2016.03.08.xls', '연봉계약서.xlsx', '퇴직금중간정산신청서.hwp', '비밀유지서약서.hwp', '촉탁계약서.jpg']
+    .forEach((n) => assert.equal(R.guessKind(n), '', n + ' 는 고객사 직원 자료라 빼야 한다'));
+  assert.equal(R.coFromPath('10. 자문사관리/1.자문관리/1.가나시험상사/자문계약서.hwp'), '가나시험상사');
+  assert.equal(R.coFromPath('10. 자문사관리/0.종료자문사/3.다라테스트(안양)/기본서류/자문계약서.hwp'), '다라테스트', '번호·지역 괄호·흔한 폴더를 건너뛴다');
+  assert.equal(R.coFromPath('x/마바테스트/충남2016부해123/위임장3-마바테스트.hwp'), '마바테스트', '사건번호 폴더는 회사가 아니다');
+  assert.equal(R.coFromPath('10. 자문사관리/00자문사cms/권형하노무사사무소CMS/사아테스트-cms.pdf'), '사아테스트', '폴더가 흔하면 파일 이름에서');
+  assert.deepEqual(R.guessDate('자문계약서_251016.hwp'), { date: '2025-10-16', from: 'name' });
+  assert.deepEqual(R.guessDate('견적서20080731.xls'), { date: '2008-07-31', from: 'name' });
+  assert.equal(R.guessDate('자문계약서.hwp', new Date(2023, 3, 19).getTime()).from, 'file');
+  const rows = R.folderRows([{ name: '근로계약서-가나.hwp', path: 'a/가나/근로계약서-가나.hwp' }, { name: '자문계약서.hwp', path: 'a/가나시험상사/자문계약서.hwp' }]);
+  assert.deepEqual(rows.map((r) => r.ours), [false, true]);
+});
+
+test('ⓔ 폴더 가져오기 배선 — 기본 🔒 서명본, 같은 파일은 다시 안 올림, 기록에 파일을 잇는다', () => {
+  const docs = read('js/pu-office-docs.js');
+  assert.match(docs, /function openFolderImport\(/);
+  assert.match(docs, /secretCb = el\('input', \{ type: 'checkbox', checked: true \}\)/, '기본이 서명본이어야 한다');
+  assert.match(docs, /store\.putOriginal\([\s\S]{0,200}\{ secret: secret \}\)/);
+  assert.match(docs, /src: 'folder', docId: d\.docId/);
+  assert.match(docs, /store\.hasHash/);
+});

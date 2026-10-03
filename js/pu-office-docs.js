@@ -505,6 +505,125 @@
         });
     }
 
+    /* ── 📂 PC 폴더 가져오기 (설계 2026-10-03 §3 (나), 목업 승인) ──
+       폴더를 끌어다 놓거나 고르면 파일 이름·폴더 이름으로 «우리와 맺은 계약서류»만 고르고 회사·종류·날짜를 짐작한다(PuCoRoster.folderRows).
+       고객사 직원 자료(근로계약서·급여대장 등)는 기본으로 뺀다. 기본은 🔒 서명본으로 올린다(대표·관리자만 연다).
+       같은 파일(해시)은 원본 보관함에 다시 올리지 않는다. 올린 파일은 그 회사의 계약 기록에도 한 줄씩 붙는다. */
+    function walkEntry(entry, prefix, out) {
+      return new Promise(function (res) {
+        if (entry.isFile) { entry.file(function (f) { out.push({ file: f, path: prefix + f.name }); res(); }, function () { res(); }); return; }
+        if (!entry.isDirectory) { res(); return; }
+        var rd = entry.createReader(), all = [];
+        (function more() {
+          rd.readEntries(function (ents) {
+            if (!ents.length) { Promise.all(all.map(function (e) { return walkEntry(e, prefix + entry.name + '/', out); })).then(function () { res(); }); return; }
+            all = all.concat(Array.prototype.slice.call(ents)); more();
+          }, function () { res(); });
+        })();
+      });
+    }
+    function openFolderImport() {
+      var R = w.PuCoRoster;
+      if (!R || !R.folderRows) { toast('폴더 읽기 도구를 불러오지 못했습니다'); return; }
+      var st = { rows: [], files: [], on: {}, dup: {}, showOthers: false, busy: false };
+      var dirIn = el('input', { type: 'file', multiple: true, webkitdirectory: true, style: 'display:none' });
+      var drop = el('label', { 'class': 'pod-note', style: 'display:block;text-align:center;cursor:pointer;border-style:dashed' },
+        ['📂 폴더를 여기에 끌어다 놓거나 눌러서 고르세요 · 예: 바탕 화면\\10. 자문사관리', dirIn]);
+      var secretCb = el('input', { type: 'checkbox', checked: true });
+      var info = el('div', { style: 'font-size:12px;color:#64748b;margin:8px 0' });
+      var box = el('div', { 'class': 'pod-imp', hidden: true });
+      var go = null;
+      function picked() { return st.rows.filter(function (r, i) { return st.on[i] && !st.dup[i]; }); }
+      function syncGo() { if (go && !st.busy) { var n = picked().length; go.disabled = !n; go.textContent = n ? '선택 ' + n + '개 올리기' : '올릴 파일을 고르세요'; } }
+      function drawRows() {
+        box.innerHTML = ''; box.hidden = !st.rows.length;
+        var idx = st.rows.map(function (r, i) { return i; }).filter(function (i) { return st.showOthers || st.rows[i].ours; });
+        var all = el('input', { type: 'checkbox', 'aria-label': '모두 고르기', checked: idx.length && idx.every(function (i) { return st.on[i] || st.dup[i]; }) });
+        all.addEventListener('change', function () { idx.forEach(function (i) { if (!st.dup[i]) st.on[i] = all.checked; }); drawRows(); syncGo(); });
+        var tb = el('tbody');
+        idx.forEach(function (i, n) {
+          var r = st.rows[i];
+          var cb = el('input', { type: 'checkbox', 'aria-label': r.name, checked: !!st.on[i], disabled: !!st.dup[i] });
+          cb.addEventListener('change', function () { st.on[i] = cb.checked; syncGo(); });
+          var coIn = el('input', { type: 'text', list: 'pod-cos', value: r.co, placeholder: '회사 이름', style: 'width:150px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px' });
+          coIn.addEventListener('input', function () { r.co = coIn.value.trim(); });
+          var kSel = el('select', { style: 'font-size:12px;padding:2px 4px' }, KINDS.map(function (k) { return el('option', { value: k, text: k }); })); kSel.value = r.kind;
+          kSel.addEventListener('change', function () { r.kind = kSel.value; });
+          var dIn = el('input', { type: 'date', value: r.date, style: 'font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:5px' });
+          dIn.addEventListener('change', function () { r.date = dIn.value; r.dateFrom = 'name'; });
+          tb.appendChild(el('tr', null, [el('td', null, [cb]), el('td', { text: String(n + 1) }),
+            el('td', { title: r.path, text: r.name }), el('td', null, [coIn]), el('td', null, [kSel]),
+            el('td', { title: r.dateFrom === 'file' ? '파일 이름에 날짜가 없어 파일 날짜로 짐작했습니다' : '' }, [dIn, r.dateFrom === 'file' ? el('span', { 'class': 'new', text: ' 파일날짜' }) : null]),
+            el('td', { 'class': st.dup[i] ? 'dup' : r.ours ? 'ok' : 'new', text: st.dup[i] ? '이미 보관함에 있음' : r.ours ? '새 파일' : '계약서류 아님(뺌)' })]));
+        });
+        box.appendChild(el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', null, [all]), el('th', { text: '#' }), el('th', { text: '파일' }),
+          el('th', { text: '회사' }), el('th', { text: '종류' }), el('th', { text: '계약일' }), el('th', { text: '상태' })])]), tb]));
+      }
+      function take(list) {
+        var ok = list.filter(function (x) { return store.okDocFile(x.file.name, x.file.size).ok; });
+        st.files = ok; st.rows = R.folderRows(ok.map(function (x) { return { name: x.file.name, size: x.file.size, lastModified: x.file.lastModified, path: x.path }; }));
+        st.on = {}; st.dup = {};
+        st.rows.forEach(function (r, i) { st.on[i] = r.ours; });
+        var ours = st.rows.filter(function (r) { return r.ours; }).length;
+        info.innerHTML = '';
+        info.appendChild(el('span', { text: list.length + '개 파일 중 계약서류 ' + ours + '개를 골랐습니다 · 근로계약서·급여대장 등 ' + (st.rows.length - ours) + '개는 뺐습니다 ' }));
+        info.appendChild(el('button', { type: 'button', 'class': 'pod-b', text: st.showOthers ? '뺀 것 숨기기' : '뺀 것 보기', onclick: function () { st.showOthers = !st.showOthers; take(list); } }));
+        drawRows(); syncGo();
+        /* 이미 보관함에 있는지 — 고른 것만 해시로 본다(넷씩) */
+        var todo = st.rows.map(function (r, i) { return i; }).filter(function (i) { return st.rows[i].ours; }), k = 0;
+        function next() {
+          if (k >= todo.length) return Promise.resolve();
+          var i = todo[k++];
+          return readBytes(st.files[i].file).then(function (u8) { return store.sha256Hex(u8); })
+            .then(function (h) { return store.hasHash ? store.hasHash(h) : false; })
+            .then(function (have) { if (have) { st.dup[i] = true; st.on[i] = false; } }, function () {})
+            .then(next);
+        }
+        Promise.all([next(), next(), next(), next()]).then(function () { if (!st.busy) { drawRows(); syncGo(); } });
+      }
+      dirIn.addEventListener('change', function () {
+        take(Array.prototype.map.call(dirIn.files || [], function (f) { return { file: f, path: f.webkitRelativePath || f.name }; }));
+      });
+      drop.addEventListener('dragover', function (e) { e.preventDefault(); });
+      drop.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var items = Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.items) || []), out = [];
+        Promise.all(items.map(function (it) { var en = it.webkitGetAsEntry && it.webkitGetAsEntry(); return en ? walkEntry(en, '', out) : Promise.resolve(); }))
+          .then(function () { take(out); });
+      });
+      modalShell('📂 PC 폴더 가져오기 — 기업별 계약서', [drop,
+        el('label', { style: 'display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px;color:#854d0e' },
+          [secretCb, '🔒 서명본으로 올림 — 목록 줄(회사·종류·날짜)은 직원 모두 보고, 파일 열기는 대표·관리자만']),
+        info, box, coList()],
+        function (close) {
+          go = el('button', { type: 'button', 'class': 'pod-b p', text: '올릴 파일을 고르세요', disabled: true, onclick: function () {
+            var list = st.rows.map(function (r, i) { return i; }).filter(function (i) { return st.on[i] && !st.dup[i]; });
+            var noCo = list.filter(function (i) { return !st.rows[i].co; });
+            if (noCo.length) { toast('회사 이름이 빈 줄이 ' + noCo.length + '개 있습니다 — 적거나 빼 주세요'); return; }
+            st.busy = true; go.disabled = true;
+            var done = 0, reused = 0, fail = 0, secret = secretCb.checked;
+            list.reduce(function (p, i) {
+              return p.then(function () {
+                var r = st.rows[i], f = st.files[i].file;
+                go.textContent = '올리는 중… ' + (done + 1) + '/' + list.length;
+                return readBytes(f).then(function (bytes) {
+                  return store.putOriginal({ name: f.name, size: f.size, type: f.type || '', bytes: bytes },
+                    { kind: 'folder', coKey: store.coKey(r.co), coName: r.co, path: String(r.path).slice(0, 200) }, { secret: secret });
+                }).then(function (o) {
+                  if (o.reused) reused++;
+                  return store.addCoDoc({ coName: r.co, fileId: o.fileId, title: r.name.replace(/\.[^.]+$/, ''), date: r.date, src: 'folder', secret: secret });
+                }).then(function (d) {
+                  return store.importCoRecs([{ coName: r.co, date: r.date, kind: r.kind, src: 'folder', docId: d.docId }]);
+                }).then(function () { done++; }, function (e) { fail++; done++; if (fail === 1) toast('❌ ' + r.name + ' — ' + msg(e)); });
+              });
+            }, Promise.resolve()).then(function () {
+              close(); toast('✅ ' + (done - fail) + '개 올렸습니다' + (reused ? ' (이미 있던 파일 ' + reused + '개는 다시 안 올림)' : '') + (fail ? ' · 실패 ' + fail + '개' : '')); load(true);
+            });
+          } });
+          return [el('button', { type: 'button', 'class': 'pod-b', text: '닫기', onclick: close }), go];
+        });
+    }
+
     /* ── 큰 보기 ── */
     function openDoc(d) {
       var key = S.sel;
@@ -559,6 +678,7 @@
       var wrap = el('div', { 'class': 'pod' });
       wrap.appendChild(el('div', { 'class': 'pod-bar' }, [el('b', { text: '🏢 기업별 계약서' }),
         el('button', { type: 'button', 'class': 'pod-b', text: '📥 엑셀 명단 가져오기', title: '「업체명단」 시트가 있는 엑셀에서 계약 기록을 가져옵니다', onclick: openRosterImport }),
+        el('button', { type: 'button', 'class': 'pod-b', text: '📂 PC 폴더 가져오기', title: '회사별 폴더에서 계약서류만 골라 올립니다(기본 🔒 서명본)', onclick: openFolderImport }),
         el('button', { type: 'button', 'class': 'pod-b g', text: '🖼 사진첩에서 가져오기', onclick: openPhotoImport }),
         el('button', { type: 'button', 'class': 'pod-b p', text: '📎 업로드', onclick: openUpload })]));
       if (S.denied) { wrap.appendChild(deniedBanner()); root.appendChild(wrap); return; }
@@ -615,7 +735,7 @@
               el('td', { text: r.date || '날짜 없음' }), el('td', null, [el('span', { 'class': 'pod-kd', text: r.kind || '기타' })]),
               el('td', { 'class': 'amt', text: won(r.amount) || '—' }),
               el('td', { text: [r.payDay ? '매월 ' + String(r.payDay).replace(/일$/, '') + '일' : '', r.edi ? 'EDI ' + r.edi : ''].filter(Boolean).join(' · ') || '—' }),
-              el('td', { text: r.staff || '' }), el('td', { 'class': 'muted', text: r.src === 'import' ? '엑셀 명단' : '손으로' })]));
+              el('td', { text: r.staff || '' }), el('td', { 'class': 'muted', text: r.src === 'import' ? '엑셀 명단' : r.src === 'folder' ? 'PC 폴더' : '손으로' })]));
           });
           recBox.appendChild(el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', null, [allCb]), el('th', { text: '#' }), el('th', { text: '계약일' }),
             el('th', { text: '종류' }), el('th', { text: '금액' }), el('th', { text: '지급일·EDI' }), el('th', { text: '담당' }), el('th', { text: '출처' })])]), tb]));
