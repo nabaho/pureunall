@@ -87,3 +87,13 @@ test('ⓓ 화면 — 문서관리가 서버 길을 넘기고, 카드·큰 보기
   assert.match(docs, /if \(d\.secret\) return;/, '서명본 카드에서 주소를 만들려 하면 안 된다');
   assert.match(docs, /store\.secretBlob\(d\.fileId\)/);
 });
+test('ⓓ 사진첩에서 가져오기도 기본 🔒 서명본 — 사진첩의 보호가 풀리지 않게 (2026-10-03)', () => {
+  const docs = read('js/pu-office-docs.js').replace(/\r\n/g, '\n');
+  const a = docs.indexOf('function openPhotoImport('), b = docs.indexOf('function walkEntry(');
+  assert.ok(a > 0 && b > a);
+  const f = docs.slice(a, b);
+  assert.match(f, /var secretCb = el\('input', \{ type: 'checkbox', checked: true \}\);/);
+  assert.match(f, /\{ kind: 'photo',[^\n]*\}, \{ secret: secret \}\)/, '창고에 올릴 때 secret 을 넘겨야 한다');
+  assert.match(f, /src: 'photo', secret: secret/, '기업별 서류 줄에도 🔒 표시');
+  assert.doesNotMatch(f, /가져온 것은 전 직원이 봅니다/);
+});

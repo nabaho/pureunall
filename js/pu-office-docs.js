@@ -326,7 +326,9 @@
       });
     }
 
-    /* ── 사진첩에서 가져오기 ── */
+    /* ── 사진첩에서 가져오기 ──
+       ⚠ 2026-10-03 사진첩의 보호(서버 경유·열람 기록)를 지키려고 기본은 🔒 서명본(대표·관리자만 연다) —
+       PC 폴더·메일 첨부와 같은 기본값. 끄면 예전처럼 전 직원이 연다. */
     function openPhotoImport() {
       var photos = host.photos;
       if (!photos) { toast('사진첩을 불러오지 못했습니다'); return; }
@@ -334,10 +336,13 @@
       var coIn = el('input', { type: 'text', list: 'pod-cos', placeholder: '회사 이름' });
       var tIn = el('input', { type: 'text', placeholder: '예: 자문계약서' });
       var dIn = el('input', { type: 'date' });
+      var secretCb = el('input', { type: 'checkbox', checked: true });
       var pick = null;
       var close = modalShell('사진첩에서 가져오기 — 내 사진첩의 «계약서»', [
-        el('div', { style: 'font-size:12px;color:#64748b;margin-bottom:8px', text: '사진첩 원본은 그대로 두고, 사본을 원본 보관함에 담아 회사에 붙입니다. 가져온 것은 전 직원이 봅니다.' }),
-        grid, el('label', { text: '회사 *' }), coIn, coList(), el('label', { text: '제목' }), tIn, el('label', { text: '계약일' }), dIn
+        el('div', { style: 'font-size:12px;color:#64748b;margin-bottom:8px', text: '사진첩 원본은 그대로 두고, 사본을 원본 보관함에 담아 회사에 붙입니다.' }),
+        grid, el('label', { text: '회사 *' }), coIn, coList(), el('label', { text: '제목' }), tIn, el('label', { text: '계약일' }), dIn,
+        el('label', { style: 'display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px;color:#854d0e' },
+          [secretCb, '🔒 서명본으로 가져옴 — 목록 줄(회사·제목·날짜)은 직원 모두 보고, 파일 열기는 대표·관리자만'])
       ], function (cl) {
         var go = el('button', { type: 'button', 'class': 'pod-b p', text: '가져오기', onclick: function () {
           if (!pick) { toast('사진을 고르세요'); return; }
@@ -345,17 +350,17 @@
           if (!co) { toast('회사 이름을 넣으세요'); coIn.focus(); return; }
           if (pick.imported && !w.confirm('이미 가져온 사진입니다. 한 번 더 붙일까요?')) return;
           go.disabled = true; go.textContent = '가져오는 중…';
-          var it = pick;
+          var it = pick, secret = secretCb.checked;
           photos.loadFull(it.year, it.id).then(function (dataUrl) {
             var bytes = store.dataUrlToBytes(dataUrl);
             var type = (/^data:([^;,]+)/.exec(dataUrl) || [])[1] || 'image/jpeg';
             var ext = type === 'image/png' ? '.png' : (type === 'image/heic' ? '.heic' : '.jpg');
             var title = tIn.value.trim() || it.title;
             return store.putOriginal({ name: store.safeFileName(title) + ext, size: bytes.length, type: type, bytes: bytes },
-              { kind: 'photo', owner: String(host.uid || ''), year: String(it.year), photoId: String(it.id), coKey: store.coKey(co), coName: co })
-              .then(function (r) { return store.addCoDoc({ coName: co, fileId: r.fileId, title: title, date: dIn.value, src: 'photo' }); });
+              { kind: 'photo', owner: String(host.uid || ''), year: String(it.year), photoId: String(it.id), coKey: store.coKey(co), coName: co }, { secret: secret })
+              .then(function (r) { return store.addCoDoc({ coName: co, fileId: r.fileId, title: title, date: dIn.value, src: 'photo', secret: secret }); });
           }).then(function (r) {
-            cl(); toast('✅ ' + co + ' 에 가져왔습니다'); S.sel = r.coKey; load(true);
+            cl(); toast('✅ ' + co + ' 에 가져왔습니다' + (secret ? ' (🔒 서명본)' : '')); S.sel = r.coKey; load(true);
           }).catch(function (e) { go.disabled = false; go.textContent = '가져오기'; toast('❌ 가져오지 못했습니다 — ' + msg(e)); });
         } });
         return [el('button', { type: 'button', 'class': 'pod-b', text: '취소', onclick: cl }), go];
