@@ -244,3 +244,42 @@ test('ⓓ 엑셀 — 표지 없는 옛 틀은 여전히 이름표로 채우되, 
   const r2 = CF.xlsxFillParts(['xl/worksheets/sheet1.xml'], [free], { 주소: '천안시 가나로 1' });
   assert.ok(r2.xmls[0].includes('가나로'), '병합이 아니면 예전처럼 채운다');
 });
+
+/* 2026-10-03 기금 제안서 PR1 — 제안서 자동 값 (설계 2026-09-29 §5). 가짜 이름만 쓴다. */
+test('ⓔ 제안서 값 — 기업: 수신자=회사명, 참조=부서 이름 직급님, 호칭=귀사', () => {
+  const V = CF.valuesFrom({ co: { c: '가나상사(주)' }, contact: { n: '박담당', ti: '과장', d: '총무팀' } });
+  const P = CF.proposalValues(V, { orgType: 'co', amount: '', vat: 'incl', staffName: '홍길동', today: new Date(2026, 8, 29) });
+  assert.strictEqual(P.수신자, '가나상사(주)');
+  assert.strictEqual(P.참조, '총무팀 박담당 과장님');
+  assert.strictEqual(P.호칭, '귀사');
+  assert.strictEqual(P.송부일자, '2026. 9. 29. (화)');
+  assert.strictEqual(P.담당노무사, '홍길동');
+  assert.strictEqual(P.노무사연락처, '041-556-0035');
+  assert.strictEqual(P.견적금액, ''); assert.strictEqual(P.비용합계, '');
+});
+test('ⓔ 제안서 값 — 기관: 수신자에 부서·이름·직급님, 참조는 -, 호칭=귀 기관', () => {
+  const V = CF.valuesFrom({ co: { c: '가나도청' }, contact: { n: '홍길동', ti: '주무관', d: '노동정책과' } });
+  const P = CF.proposalValues(V, { orgType: 'org', today: new Date(2026, 9, 3) });
+  assert.strictEqual(P.수신자, '가나도청 노동정책과 홍길동 주무관님');
+  assert.strictEqual(P.참조, '-');
+  assert.strictEqual(P.호칭, '귀 기관');
+  assert.strictEqual(P.송부일자, '2026. 10. 3. (토)');
+});
+test('ⓔ 제안서 값 — 담당자를 모르면 참조는 「담당자」, 기관 수신자는 회사명만', () => {
+  const V = CF.valuesFrom({ co: { c: '가나상사(주)' } });
+  assert.strictEqual(CF.proposalValues(V, { orgType: 'co' }).참조, '담당자');
+  assert.strictEqual(CF.proposalValues(V, { orgType: 'org' }).수신자, '가나상사(주)');
+});
+test('ⓔ 견적 — 포함이면 합계=금액, 별도면 ×1.1 반올림', () => {
+  const V = CF.valuesFrom({});
+  const a = CF.proposalValues(V, { amount: '5,000,000', vat: 'incl' });
+  assert.deepStrictEqual([a.견적금액, a.부가세, a.비용합계], ['5,000,000원', '포함', '5,000,000원']);
+  const b = CF.proposalValues(V, { amount: '1000000', vat: 'excl' });
+  assert.deepStrictEqual([b.견적금액, b.부가세, b.비용합계], ['1,000,000원', '10% 별도', '1,100,000원']);
+  const c = CF.proposalValues(V, { amount: '333,333', vat: 'excl' });
+  assert.strictEqual(c.비용합계, '366,666원');
+  assert.strictEqual(CF.proposalValues(V, { amount: '가나', vat: 'excl' }).견적금액, '');
+});
+test('ⓔ PROPOSAL_KEYS 는 9개 자리', () => {
+  assert.deepStrictEqual(CF.PROPOSAL_KEYS, ['수신자', '참조', '호칭', '송부일자', '담당노무사', '노무사연락처', '견적금액', '부가세', '비용합계']);
+});

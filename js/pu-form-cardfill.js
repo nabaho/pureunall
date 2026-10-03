@@ -163,6 +163,32 @@
     return V;
   }
 
+  /* ── 제안서·견적서 자동 값 (설계 2026-09-29 §5) — 받는 곳 종류(기업/기관)·금액·부가세로 만든다.
+     ⚠ 저장하지 않는다. 창에서 고칠 수 있고, 고친 값이 이긴다(openFill 의 edits). */
+  var PROPOSAL_KEYS = ['수신자', '참조', '호칭', '송부일자', '담당노무사', '노무사연락처', '견적금액', '부가세', '비용합계'];
+  var WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+  function sendDate(d) { d = d || new Date(); return d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '. (' + WEEK[d.getDay()] + ')'; }
+  function won(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원'; }
+  function proposalValues(V, o) {
+    V = V || {}; o = o || {};
+    var org = o.orgType === 'org';
+    var person = [V.담당자부서, V.담당자, V.담당자직급].filter(Boolean).join(' ');
+    var n = String(o.amount == null ? '' : o.amount).replace(/[,\s원]/g, '');
+    var amt = /^\d{1,13}$/.test(n) ? +n : null;
+    var total = amt == null ? null : (o.vat === 'excl' ? Math.round(amt * 1.1) : amt);
+    return {
+      수신자: org ? [V.회사명, person].filter(Boolean).join(' ') + (V.담당자 ? '님' : '') : String(V.회사명 || ''),
+      참조: org ? '-' : (V.담당자 ? person + '님' : '담당자'),
+      호칭: org ? '귀 기관' : '귀사',
+      송부일자: sendDate(o.today),
+      담당노무사: String(o.staffName || ''),
+      노무사연락처: String(o.staffTel || '041-556-0035'),
+      견적금액: amt == null ? '' : won(amt),
+      부가세: amt == null ? '' : (o.vat === 'excl' ? '10% 별도' : '포함'),
+      비용합계: total == null ? '' : won(total)
+    };
+  }
+
   var RE = /\x7b\x7b([^\x7b\x7d\n]{1,30})\x7d\x7d/g;
   /* 글자 본문에 든 표지 이름(나온 차례, 겹침 없이) */
   function markersIn(text) {
@@ -348,7 +374,8 @@
     searchPeople: searchPeople, searchContacts: searchContacts,
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
     stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
-    xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate
+    xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate,
+    proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;
