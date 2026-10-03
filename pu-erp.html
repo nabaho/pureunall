@@ -175,6 +175,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 </div>
 <div id="root"></div>
 <script src="js/utils.js?v=2"></script>
+<script src="js/pu-contract-vars.js?v=1"></script>
 <script src="js/pu-work-core.js?v=1"></script>
 <script src="js/pu-case-due.js?v=2"></script>
 <script src="js/pu-gcal-auth.js?v=8"></script>
@@ -37924,132 +37925,18 @@ function getContractForms(){
 
 // ============ 계약 데이터 → 변수 치환 ============
 function fillContractVars(template, contract){
-  var c = contract || {};
-  var co = Object.assign({}, c.company || {});
-  // 계약추가 폼에 없는 항목(납부일·4대보험 관리번호)은 업체관리에서 사업자번호로 보강
-  var _bizKey = (co.bizNo || '').replace(/\D/g, '').slice(0, 10);
-  if(_bizKey.length === 10){
-    var _matches = (dbGet('companies', []) || []).filter(function(x){ return (x.bizNo || '').replace(/\D/g, '').slice(0, 10) === _bizKey; });
-    var _coRec = _matches.find(function(x){ return x.status !== 'suboffice'; }) || _matches[0];
-    if(_coRec){
-      ['taxInvoicePaymentDay','cmsPayDay','pensionNo','healthNo','employmentNo','injuryNo','corpRegNo','ceoBirth','ceoGender'].forEach(function(k){
-        if(!co[k] && _coRec[k]) co[k] = _coRec[k];
-      });
-    }
-  }
-  // 업체관리(companies) 레코드 병합 — 폼 스냅샷에 없는 필드(4대보험 관리번호·납부일 등)를
-  // companyId 연결로 보강. 계약에 입력된 값(스냅샷) 우선, 비어있으면 업체관리 값 사용.
-  try {
-    if (typeof CompanyRef !== 'undefined' && CompanyRef.findCompany) {
-      var _dbCo = CompanyRef.findCompany({
-        companyId: c.companyId || co.companyId,
-        bizNo: c.bizNo || co.bizNo,
-        companyName: c.companyName || co.name
-      });
-      if (_dbCo) {
-        var _merged = Object.assign({}, _dbCo);
-        Object.keys(co).forEach(function(k){
-          var v = co[k];
-          if (v !== '' && v != null && !(Array.isArray(v) && v.length === 0)) _merged[k] = v;
-        });
-        co = _merged;
-      }
-    }
-  } catch(e){}
-  // 주담당자 contact (다중 중 isPrimary)
-  var primaryContact = (co.contacts || []).find(function(x){ return x.isPrimary; }) || (co.contacts || [])[0] || {};
-  // 사용자 이름 매핑
-  var users = dbGet('user_accounts', USERS_SEED);
-  function uName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : ''; }
-  // 성공보수
-  var successFeeStr = '';
-  if(c.successFee){
-    successFeeStr = c.successFeeType === 'percent'
-      ? c.successFee + '%'
-      : (c.successFee).toLocaleString() + '원';
-  }
-  // 계약금액 합계
-  var totalAmount = 0;
-  var kindsArr = c.kinds || (c.kind ? [c.kind] : []);
-  if(c.amounts){
-    kindsArr.forEach(function(kv){ totalAmount += (c.amounts[kv] || 0); });
-  } else {
-    totalAmount = c.contractAmount || 0;
-  }
-
-  // 근로자 정보
-  var workers = co.workers || [];
-  var primaryWorker = workers.find(function(w){ return w.isPrimary; }) || workers[0] || {};
-  // 주민번호 마스킹 - 951212-1****** (앞6 + 뒤1자리만 표시)
-  function maskRRN(rrn){
-    if(!rrn) return '';
-    var clean = String(rrn).replace(/\s/g, '');
-    if(clean.length < 8) return clean;
-    var parts = clean.split('-');
-    if(parts.length === 2 && parts[0].length === 6){
-      return parts[0] + '-' + (parts[1][0] || '') + '******';
-    }
-    // 13자리 연속
-    return clean.slice(0,6) + '-' + (clean[6] || '') + '******';
-  }
-  var workerNamesAll = workers.map(function(w){ return w.name; }).filter(function(x){return x;}).join(', ');
-  var workerDetailLines = workers.map(function(w, i){
-    return (i+1) + '. ' + (w.name||'') + (w.position?' ('+w.position+')':'')
-      + (w.address?' / 주소: '+w.address:'')
-      + (w.phone?' / 연락처: '+w.phone:'')
-      + (w.rrn?' / 주민번호: '+maskRRN(w.rrn):'');
-  }).join('\n');
-
-  var map = {
-    '{{회사명}}':      co.name || c.companyName || '',
-    '{{사업자번호}}':  co.bizNo || c.bizNo || '',
-    '{{대표자}}':      co.ceo || '',
-    '{{주소}}':        co.address || '',
-    '{{우편번호}}':    co.zipcode || '',
-    '{{대표전화}}':    co.phone || '',
-    '{{대표팩스}}':    co.fax || '',
-    '{{대표이메일}}':  co.email || '',
-    '{{업태}}':        co.bizType || '',
-    '{{종목}}':        co.bizCategory || '',
-    '{{규모}}':        co.companySize || '',
-    '{{고용가입자수}}':String(co.employmentInsuredCount || 0),
-    '{{산재가입자수}}':String(co.injuryInsuredCount || 0),
-    '{{담당자}}':      primaryContact.name || '',
-    '{{담당자연락처}}':primaryContact.phone || '',
-    '{{담당자이메일}}':primaryContact.email || '',
-    '{{계약번호}}':    c.contractNo || '',
-    '{{계약일}}':      c.signDate || '',
-    '{{계약시작일}}':  c.startDate || '',
-    '{{계약종료일}}':  c.endDate || '',
-    '{{계약기간}}':    (c.startDate && c.endDate) ? (c.startDate + ' ~ ' + c.endDate) : (c.signDate || ''),
-    '{{부가세처리}}':  c.vatType === 'inclusive' ? '부가세 포함' : '부가세 별도',
-    '{{납부일}}':      co.taxInvoicePaymentDay || co.cmsPayDay || '',
-    '{{국민연금관리번호}}': co.pensionNo || '',
-    '{{건강보험번호}}': co.healthNo || '',
-    '{{고용보험번호}}': co.employmentNo || '',
-    '{{산재관리번호}}': co.injuryNo || '',
-    '{{법인등록번호}}': co.corpRegNo || '',
-    '{{대표생년월일}}': co.ceoBirth || '',
-    '{{대표자전체}}':   co.ceo2 ? ((co.ceo||'') + ', ' + co.ceo2) : (co.ceo || ''),
-    '{{대표주민번호}}': (function(){ var _d=(co.ceoBirth||'').replace(/\D/g,''); var _ymd = _d.length>=8 ? _d.slice(2,8) : (_d.length===6 ? _d : ''); return (_ymd && co.ceoGender) ? (_ymd + '-' + co.ceoGender + '******') : ''; })(),
-    '{{계약금액}}':    totalAmount.toLocaleString(),
-    '{{계약금액한글}}': numToKorMoney(totalAmount),
-    '{{성공보수}}':    successFeeStr,
-    '{{주담당}}':      uName(c.managerMain),
-    '{{부담당}}':      (c.managerSubs || []).map(uName).filter(function(x){return x;}).join(', '),
-    '{{오늘날짜}}':    todayYMD(),
-    // 근로자
-    '{{근로자수}}':     String(workers.length),
-    '{{근로자이름}}':   primaryWorker.name || '',
-    '{{근로자명단}}':   workerNamesAll,
-    '{{근로자주민}}':   maskRRN(primaryWorker.rrn || ''),
-    '{{근로자주소}}':   primaryWorker.address || '',
-    '{{근로자연락처}}': primaryWorker.phone || '',
-    '{{근로자상세}}':   workerDetailLines
-  };
+  /* 계약 자료 → 채울 값은 js/pu-contract-vars.js «한 곳»에서 셈한다 (2026-10-03 — 문서관리 「📦 서류 묶음 채우기」와 같은 한 벌).
+     예전 이 자리의 계산을 그대로 옮겼다(tests/contract-vars.test.js 가 옮기기 전 값과 견준다). */
+  var m = PuContractVars.contractVars(contract, {
+    findCompany: (typeof CompanyRef !== 'undefined' && CompanyRef.findCompany) ? function(it){ return CompanyRef.findCompany(it); } : null,
+    companies: dbGet('companies', []) || [],
+    users: dbGet('user_accounts', USERS_SEED),
+    korMoney: numToKorMoney,
+    today: todayYMD()
+  });
   var result = template || '';
-  Object.keys(map).forEach(function(k){
-    result = result.split(k).join(map[k]);
+  Object.keys(m).forEach(function(k){
+    result = result.split('{{' + k + '}}').join(m[k]);
   });
   return result;
 }
