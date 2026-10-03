@@ -69,7 +69,7 @@ const baseTop = ['uid_roles','sid_roles','data','payroll_os','fund_erp','work_er
 /* ② 있어도 되는 것 — 다른 작업에서 일부러 늘린 노드.
    ★ 최상위를 일부러 늘렸다면 여기에 적어라. 적지 않으면 아래 검사가 막는다
      (실수로 늘어난 것을 잡는 덫이라 자동으로 넘기지 않는다) */
-const allowTop = ['systemAlerts','systemBackups','systemBackupsIndex','systemRestoreLog',
+const allowTop = ['gov' /* 정부사업신청 대표 개인 자리 — 2026-10-03 */,'systemAlerts','systemBackups','systemBackupsIndex','systemRestoreLog',
   /* 2026-09-27 푸른 캘린더 «나만 보기» 일정 — 본인만 읽고 쓴다(data 아래는 재무 권한자가 다 읽어서 안 된다) */
   'cal_private',
   /* 2026-09-06 정부컨설팅 「이어는 두되 일정관리에서 진행할지는 따로」 스위치(대표 지시).

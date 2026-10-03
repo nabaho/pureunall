@@ -946,6 +946,14 @@ rules.newsletter = { '.read': `auth != null && ${ADMIN}`, '.write': `auth != nul
 rules.ilabor = { '.read': `auth != null && ${ADMIN}`, '.write': false };
 rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
 
+/* ══ 정부사업신청(gov.html) — 대표 «개인» 자리 (2026-10-03) ═══════════════
+   공고 목록·찾는 말·인증키 둘(공공데이터포털·기업마당)을 담는다.
+   ⚠★ 규칙이 «아예 없어서» 앱이 만들어진 날(09-05)부터 저장·불러오기가 «조용히» 막혀 있었다
+      (cloudPush/cloudPull 이 .catch 로 삼켰다). 그래서 한 브라우저에서 넣은 인증키가
+      다른 브라우저로 안 넘어왔다 — 실측 permission_denied at /gov/{uid}.
+   ⚠ 읽기·쓰기 모두 «본인만» — 인증키가 들어 있다. 관리자에게도 열지 않는다(kcareer 와 같은 집 모양). */
+rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
+
 /* ══ 경력관리 «직원 공개용 사본» ═══════════════════════════════════════
    대표 지시 2026-09-02: 「경력관리 이부분만 다른 직원들이 볼 수 있게」 → 방식 「나」 승인.
 
