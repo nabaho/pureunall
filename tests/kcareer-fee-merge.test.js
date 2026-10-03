@@ -27,8 +27,9 @@ test('기타비용을 고치면 합친 표도 다시 그린다 — 안 그리면
   assert.match(bare, /if\(name==='etcfee'\)[\s\S]{0,120}renderCareer\('meetfee'\)/);
 });
 
-test('사이드바 메뉴가 하나로 줄었다', () => {
-  assert.match(bare, /\{g:'회의·비용관리', items:\[\['page-meetfee','비용관리'\]\]\}/);
+test('사이드바 — 비용 «목록»은 하나다(기타비용 화면을 따로 두지 않는다)', () => {
+  /* ★ 2026-10-03 한눈에·정산이 곁에 붙었다 — 목록이 하나인 것은 그대로다 */
+  assert.match(bare, /\{g:'회의·비용관리', items:\[.{0,80}\['page-meetfee','[^']*비용[^']*'\]/);
   assert.doesNotMatch(bare, /\['page-etcfee','기타비용신청'\]/);
 });
 
