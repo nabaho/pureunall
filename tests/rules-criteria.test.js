@@ -13,7 +13,8 @@ const FIX = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'rules-c
 // 표준취업규칙 조 쪼개기는 rules.html 과 같은 parseArticles 를 써야 견줄 수 있다 — 떼기 전 그것을 검사도 쓴다
 const { parseArticles, STD_TEXT } = require('./lib-rules-std.js');
 
-const 줄이기 = (f) => ({ id: f.rule.id, status: f.status, loc: f.loc, note: f.note });
+// hit(연결된 조문)도 견준다 — 값비교는 loc 을 판정식이 찾은 조문으로 바꾸므로 loc 만 보면 hit 가 움직여도 모른다
+const 줄이기 = (f) => ({ id: f.rule.id, status: f.status, loc: f.loc, hit: f.hit && f.hit.label, note: f.note });
 
 test('판정이 떼기 전과 같다 — 규모 넷', () => {
   const arts = parseArticles(STD_TEXT);

@@ -241,6 +241,7 @@
   function ensure(rules) {
     if (rules && rules !== builtFrom) { built = build(rules); builtFrom = rules; }
     if (!built) {
+      // RULES 는 rules.html 이 js/pu-rules-criteria.js 에서 받아 둔 전역 const 다(2026-10-04 떼어 냄)
       var R = (typeof RULES !== 'undefined' && RULES) || root.RULES;
       if (R) { built = build(R); builtFrom = R; }
     }
