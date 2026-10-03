@@ -1221,17 +1221,17 @@ function fundGovCell(fid){
   var g=govShort(Object.keys(m).map(function(k){ return m[k]; }));
   return {t:(g.n?govCells(g.names):'<span class="muted">'+esc(g.text)+'</span>'), title:g.title};
 }
-function fundRow(f,no,mode,showReg){
+function fundRow(f,no,mode,showReg,showGov){
   var n=nDone(f); var chip=n===5?'<span class="chip ok">정보 완비</span>':n>=3?'<span class="chip warn">정보 '+n+'/5</span>':'<span class="chip dg">정보 '+n+'/5</span>';
   var subn=mgrSubNames(f);
   var setupB=(f.setup_stage==='설립준비')?' <span class="chip warn" style="font-size:10px">🏗 설립중</span>':'';
-  var _gc=fundGovCell(f._id);
+  var _gc=grp(f)==='지역공동'?fundGovCell(f._id):{t:'<span class="muted">—</span>',title:''};
   return '<tr onclick="go(\'fund\',\''+f._id+'\')"><td class="no">'+no+'</td>'
     +'<td style="font-weight:700">'+esc(f.short_name||f.name)+setupB+'<div class="muted ph" style="font-weight:400;font-size:11.5px">'+esc(f.name||'')+'</div></td>'
     /* ⚠ nowrap·말줄임을 쓰지 «않는다» — 이름을 다 적기로 했으므로(대표 지시 2026-09-13)
          칸이 좁으면 «접어서» 보여야 한다. 말줄임으로 잘라 두면 「외 1」과 다를 것이 없다.
          한국말은 낱말째 접는다(keep-all) — break-word 는 「예산군」을 쪼갠다. */
-    +'<td class="ph" style="white-space:nowrap;line-height:1.35" title="'+esc(_gc.title)+'">'+_gc.t+'</td>'
+    +(showGov===false?'':'<td class="ph" style="white-space:nowrap;line-height:1.35" title="'+esc(_gc.title)+'">'+_gc.t+'</td>')
     /* 이름은 «안 접는다» — 「김혜민」이 석 줄로 쌓이면 줄 키가 그만큼 는다(폰 실측) */
     +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td>'
     +'<td class="muted mo">'+(subn?esc(subn):'—')+'</td>'
@@ -1244,14 +1244,14 @@ function fundRow(f,no,mode,showReg){
     +(mode==='setup'?'<td onclick="event.stopPropagation()"><button onclick="trashFund(\''+f._id+'\')" title="삭제 보관함으로 이동(복원 가능)" style="padding:3px 9px;color:var(--danger)">🗑</button></td>':'')
     +'</tr>';
 }
-function fundEditRow(f,no){   // 정보 채우기 모드 — 핵심 6필드 인라인 입력(옛 기금 대장 기능 흡수)
+function fundEditRow(f,no,showGov){   // 정보 채우기 모드 — 핵심 6필드 인라인 입력(옛 기금 대장 기능 흡수)
   var tds=LED_COLS.map(function(c){
     return '<td><input value="'+esc(f[c[0]]||'')+'" type="'+c[2]+'" onchange="patchFund(\''+f._id+'\',\''+c[0]+'\',this.value)" style="width:'+(c[0]==='address'?'190':'115')+'px;padding:3px 6px;border:1px solid '+(f[c[0]]?'#cbd5e1':'#f87171')+';border-radius:5px;font-size:12px"></td>';
   }).join('');
   var n=nDone(f),chip=n===5?'ok':n>=3?'warn':'dg';
-  var g=fundGovCell(f._id);
+  var g=grp(f)==='지역공동'?fundGovCell(f._id):{t:'<span class="muted">—</span>',title:''};
   return '<tr><td class="no">'+no+'</td><td style="font-weight:700">'+esc(f.short_name||f.name)+'</td>'
-    +'<td class="ph" style="white-space:nowrap;line-height:1.35" title="'+esc(g.title)+'">'+g.t+'</td>'+tds
+    +(showGov===false?'':'<td class="ph" style="white-space:nowrap;line-height:1.35" title="'+esc(g.title)+'">'+g.t+'</td>')+tds
     +'<td><span class="chip '+chip+'" id="lc-'+f._id+'">'+n+'/5</span></td></tr>';
 }
 /* 칸 목록 하나에서 «머리와 폭»을 함께 만든다 — 따로 적으면 언젠가 어긋난다.
@@ -1273,10 +1273,11 @@ function fundTable(list,edit,mode){
          여기서 인가번호·대표자를 줄줄이 채우는데, 어느 지자체 기금인지 보이지 않으면
          열여섯 줄 가운데 어느 것이 어디인지 매번 다시 짚어야 한다.
        ⚠ 기금명 «바로 오른쪽»에 둔다 — 목록 표와 같은 자리여야 눈이 안 옮겨 다닌다. */
+    var showGovE=list.some(function(f){ return grp(f)==='지역공동'; });
     return '<div class="tblwrap"><table><thead><tr><th>번호</th><th>기금명</th>'
-      +'<th class="ph" style="width:252px" title="참여사업장 소재지에서 셈합니다">참여 지자체</th>'
+      +(showGovE?'<th class="ph" style="width:252px" title="참여사업장 소재지에서 셈합니다">참여 지자체</th>':'')
       +LED_COLS.map(function(c){return '<th>'+c[1]+'</th>';}).join('')+'<th>완성도</th></tr></thead><tbody>'
-      +list.map(function(f,i){return fundEditRow(f,i+1);}).join('')+'</tbody></table></div>';
+      +list.map(function(f,i){return fundEditRow(f,i+1,showGovE);}).join('')+'</tbody></table></div>';
   }
   if(mode==='trash'){
     return '<div class="tblwrap"><table><thead><tr><th>번호</th><th>기금명</th><th>삭제일</th><th class="mo">삭제자</th><th class="mo">상태</th><th>복원·삭제</th></tr></thead><tbody>'
@@ -1303,13 +1304,15 @@ function fundTable(list,edit,mode){
        표마다 제 내용에 맞춰 칸을 잡아 위아래 열이 어긋난다(이 표가 fixcol 인 까닭). */
   /* 폭은 «칸 셋»에 맞춘다(64px×3=192 + 여백=204px) — 지자체를 칸마다 나눠 세로로
      맞추므로(govCells), 폭이 칸 크기의 배수여야 넷째가 반쯤 걸쳐 서지 않는다. */
-  cols.push(['참여 지자체','ph','252px','참여사업장 소재지에서 셈합니다 — 올리면 몇 곳인지 보입니다']);
+  /* 공동기금·사내기금에는 참여 지자체가 없다(대표 지시 2026-10-03) — 지역기금이 하나라도 있는 목록에만 칸을 세운다 */
+  var showGov=list.some(function(f){ return grp(f)==='지역공동'; });
+  if(showGov) cols.push(['참여 지자체','ph','252px','참여사업장 소재지에서 셈합니다 — 올리면 몇 곳인지 보입니다']);
   cols.push(['주담당','mgc','132px'],['부담당','mo','112px'],['대표자','mo','112px'],['정보','ph','104px']);
   if(showReg) cols.push(['분류','ph','120px','지역·묶음 분류 — 바꾸면 지역기금↔공동기금으로 옮겨집니다']);
   cols.push(['계약관계','lcc','122px']);
   if(mode==='setup') cols.push(['삭제','','92px']);
   return '<div class="tblwrap"><table class="fixcol">'+_headHTML(cols)+'<tbody>'
-    +list.map(function(f,i){return fundRow(f,i+1,mode,showReg);}).join('')+'</tbody></table></div>';
+    +list.map(function(f,i){return fundRow(f,i+1,mode,showReg,showGov);}).join('')+'</tbody></table></div>';
 }
 // 푸른이알피 재직자 명단 — Firebase data/user_accounts/v (pu-erp와 공유). 재직(active)만.
 var _staffCache=null;
@@ -17088,6 +17091,18 @@ function parseBank(rows){
   if(hi<0) for(var i3=0;i3<lim;i3++){ col={}; find(rows[i3]||[]);
     if((col.dep!=null||col.wd!=null)&&col.date!=null&&col.memo!=null){ hi=i3; break; } }
   if(hi<0) return null;
+  /* 날짜 칸 머리글이 «비어» 있는 통장(나래 2025 「 | 출금 | 입금 | 잔액 | 내용」) — 아래 줄들이 날짜로 차 있는 칸을 날짜 칸으로 본다.
+     ⚠ 머리글이 빈 칸만 본다. 이름 있는 칸을 날짜로 바꿔 읽지 않는다 */
+  if(col.date==null&&col.mon==null){
+    var hr=rows[hi]||[];
+    for(var dc=0;dc<hr.length&&col.date==null;dc++){
+      if(String(hr[dc]||'').trim()) continue;
+      var tot=0, hit=0;
+      for(var dr=hi+1;dr<Math.min(rows.length,hi+11);dr++){ var dv=String((rows[dr]||[])[dc]||'').trim(); if(!dv) continue; tot++;
+        if(/^(\d{4}|\d{2})[-.\/]\s*\d{1,2}[-.\/]\s*\d{1,2}/.test(dv)) hit++; }
+      if(tot&&hit*2>tot) col.date=dc;
+    }
+  }
   /* 월·일 칸만 있는 장부의 연도 — 머리글 위 제목 줄에서 찾는다. 못 찾으면 날짜를 지어내지 않는다 */
   var titleYr=''; if(col.date==null&&col.mon!=null&&col.day!=null){ for(var ty=0;ty<=hi;ty++){ var tm=(rows[ty]||[]).join(' ').match(/(20\d{2})\s*년/); if(tm){ titleYr=tm[1]; break; } } }
   function normDate(s){ var t=String(s||'').replace(/\s+/g,' ').trim();
