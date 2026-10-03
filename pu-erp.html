@@ -56223,6 +56223,7 @@ function IncomeCompanyTab(){
         h('colgroup',null,
           h('col',{style:{width:'24px'}}),
           h('col',{style:{width:'110px'}}),
+          h('col',{style:{width:'34px'}}),  // 구분(자문·급여…)
           h('col',{style:{width:'28px'}}),  // 주담당
           h('col',{style:{width:'28px'}}),  // 부담당
           h('col',{style:{width:'22px'}}),  // 세금발급일
@@ -56235,6 +56236,7 @@ function IncomeCompanyTab(){
           h('tr',{style:{background:'#f8fafc',borderBottom:'2px solid #e2e8f0',position:'sticky',top:0,zIndex:2}},
             h('th',{style:{padding:'4px 2px',textAlign:'center',color:'#94a3b8',fontWeight:400}},'#'),
             h('th',{style:{padding:'4px 5px',textAlign:'left',fontWeight:600}},'사업장'),
+            h('th',{style:{padding:'4px 2px',textAlign:'center',fontWeight:600}},'구분'),
             h('th',{style:{padding:'4px 2px',textAlign:'center',fontWeight:600}},'주담당'),
             h('th',{style:{padding:'4px 2px',textAlign:'center',fontWeight:600}},'부담당'),
             h('th',{style:{padding:'4px 2px',textAlign:'center',fontWeight:600}},'세금발급일'),
@@ -56261,19 +56263,18 @@ function IncomeCompanyTab(){
         ),
         h('tbody',null,
           SOURCE_LIST.length===0
-            ?h('tr',null,h('td',{colSpan:19,style:{textAlign:'center',color:'#94a3b8',padding:'40px'}},curTab.label+' 업체가 없습니다'))
+            ?h('tr',null,h('td',{colSpan:21,style:{textAlign:'center',color:'#94a3b8',padding:'40px'}},curTab.label+' 업체가 없습니다'))
             :SOURCE_LIST.map(function(co,idx){
               var paidCnt=MONTHS.filter(function(m){return isPaid(co.name,m);}).length;
               var tcColor=TYPE_COLOR[co.typeCode]||'#64748b';
               return h('tr',{key:co.name,style:{background:paidCnt===0&&co.fee>0?'#fffbeb':'',borderBottom:'1px solid #f8fafc'}},
                 h('td',{style:{textAlign:'center',color:'#94a3b8',padding:'2px 2px',fontSize:'10px'}},idx+1),
-                h('td',{style:{padding:'2px 5px'}},
-                    h('div',{style:{display:'flex',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
-                  h('span',{style:{fontWeight:600,fontSize:'10.5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},co.name),
-                  h('span',{style:{fontSize:'8.5px',color:tcColor}},
-                    (typeTab==='all'?(TYPE_LABEL[co.typeCode]||co.typeCode)+' · ':'')
-                    +(co.fee?(co.fee).toLocaleString()+'원 · ':'')+(co.isCMS?'🏦CMS · '+co.payDay:co.payDay?'납부 '+co.payDay:''))
-                )),
+                /* 사업장 칸에는 «이름만» (대표 지시 2026-10-03 「이름 옆에 자문·금액·입금일이 두 번 있다 — 빼라」).
+                   금액은 「입금액」, 자동이체일은 「CMS」, 납부일은 입금액 옆에 이미 있다 — 같은 것을 두 번 그리지 않는다.
+                   업체 종류(자문·급여…)만 따로 칸이 없어서 「구분」 칸을 새로 둔다. */
+                h('td',{title:co.name,style:{padding:'2px 5px',fontWeight:600,fontSize:'10.5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},co.name),
+                h('td',{style:{textAlign:'center',padding:'2px 2px',fontSize:'10px',fontWeight:600,color:tcColor,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},
+                  TYPE_LABEL[co.typeCode]||co.typeCode||'-'),
                 h('td',{style:{textAlign:'center',padding:'2px 2px',fontSize:'10px',fontWeight:600,color:'#1e40af'}},co.mainName),
                 h('td',{style:{textAlign:'center',padding:'2px 2px',fontSize:'10.5px',color:'#64748b'}},co.subNames||'-'),
                 h('td',{style:{textAlign:'center',padding:'2px 2px',fontSize:'10.5px',color:'#475569'}},co.issueDay?co.issueDay+'일':'-'),
