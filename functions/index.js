@@ -6045,3 +6045,46 @@ exports.logLoginAttempt = functions
 
     res.status(200).json({ ok: true });
   });
+
+/* ══ 문서관리 🔒 서명본 열기 — puDocSecret (설계 2026-10-03-계약서류-표준-기록 §3.1, 대표 「추천대로」) ══
+   서명본·EDI 위임장에는 대표자 주민번호(일부)·계좌가 들어 있다 — 대표·관리자만 연다.
+   창고 규칙은 «관리자인가»를 못 본다. 그래서 창고 pu_docs/secret/… 는 읽기 false 이고,
+   이 함수가 uid_roles 로 총괄관리자인지 본 뒤 «파일 바이트»를 직접 내준다.
+   ⚠ 토큰 주소·서명 주소를 만들지 않는다 — 주소가 한 번 새면 누구나 연다(사진첩 서류와 같은 원칙).
+   ⚠ 누가·언제·무엇을 열었나 pu_docs/secret_log 에 남긴다(총괄관리자만 읽는다). */
+exports.puDocSecret = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "512MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    res.set("Access-Control-Expose-Headers", "X-File-Name");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let me;
+    try { me = await requireStaff(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const fileId = String((req.body && req.body.fileId) || "");
+    if (!/^[-_A-Za-z0-9]{10,40}$/.test(fileId)) { res.status(400).json({ ok: false, error: "파일 번호가 올바르지 않습니다." }); return; }
+    const db = getDatabase();
+    try {
+      const roleSnap = await db.ref("uid_roles/" + me.uid).once("value");
+      if (((roleSnap && roleSnap.val()) || {}).isAdmin !== true) {
+        res.status(403).json({ ok: false, error: "🔒 서명본은 대표·관리자만 열 수 있습니다." });
+        return;
+      }
+      const rec = (await db.ref("pu_docs/originals/" + fileId).once("value")).val();
+      if (!rec || rec.secret !== true || String(rec.path || "").indexOf("pu_docs/secret/" + fileId + "/") !== 0) {
+        res.status(404).json({ ok: false, error: "서명본 보관함에 없는 파일입니다." });
+        return;
+      }
+      const [buf] = await getStorage().bucket(PHOTO_BUCKET).file(rec.path).download();
+      await db.ref("pu_docs/secret_log").push({ fileId: fileId, by: me.uid, at: Date.now() });
+      res.set("Cache-Control", "no-store");
+      res.set("Content-Type", String(rec.type || "application/octet-stream"));
+      res.set("X-File-Name", encodeURIComponent(String(rec.name || "file")));
+      res.status(200).send(buf);
+    } catch (e) {
+      console.error("puDocSecret", fileId, String((e && e.message) || e));
+      res.status(500).json({ ok: false, error: "서명본을 열지 못했습니다." });
+    }
+  });

@@ -136,5 +136,5 @@ test('ⓓ 배선·규칙 — 문서관리가 명단 모듈을 싣고, 규칙에 
   assert.match(docs, /c\.n > 0 \|\| c\.r > 0/, '기록만 있는 회사도 목록에 나와야 합니다');
   const gen = read('scripts/make-firebase-rules.js');
   assert.match(gen, /co_recs: \{ \$k: \{ \$d: \{/);
-  assert.match(gen, /src:\s+\{ '\.validate': "newData\.val\(\) === 'import' \|\| newData\.val\(\) === 'manual'" \}/);
+  assert.match(gen, /src:\s+\{ '\.validate': "newData\.val\(\) === 'import' \|\| newData\.val\(\) === 'manual'( \|\| newData\.val\(\) === 'folder')?" \}/);
 });

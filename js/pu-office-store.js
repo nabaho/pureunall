@@ -75,24 +75,30 @@
   }
   function originalRecord(o) {
     return clean({ name: o.name, size: o.size, type: o.type || '', sha256: o.sha256, path: o.path,
-      at: o.at, by: o.by, byName: clampStr(o.byName || '', 60), from: clampFrom(o.from) });
+      at: o.at, by: o.by, byName: clampStr(o.byName || '', 60), from: clampFrom(o.from), secret: o.secret ? true : undefined });
   }
   function isDenied(e) {
     var s = String((e && (e.code || '')) + ' ' + (e && e.message || ''));
     return /permission[_ ]denied|storage\/unauthorized/i.test(s);
   }
 
-  var deps = { db: null, storage: null, uid: '', name: '' };
+  var deps = { db: null, storage: null, uid: '', name: '', secretFetch: null };
   function init(o) {
     o = o || {};
     deps.db = o.db || null;
     deps.storage = o.storage || null;
     deps.uid = o.uid || '';
     deps.name = o.name || '';
+    /* 🔒 서명본 받기 — 서버 함수 puDocSecret(총괄관리자만)을 부르는 길을 화면이 넘긴다 (설계 2026-10-03 §3.1) */
+    deps.secretFetch = typeof o.secretFetch === 'function' ? o.secretFetch : null;
   }
   function needDb() { if (!deps.db) throw new Error('실시간DB가 연결되지 않았습니다'); }
 
-  function putOriginal(file, from) {
+  /* opts.secret — 🔒 서명본: 창고 pu_docs/secret/… (창고 규칙이 «아무도 직접 못 읽음»), 기록에 secret:true.
+     여는 길은 서버 함수뿐이다(secretBlob). ⚠ 같은 파일이 이미 보통 자리에 있으면 그것을 다시 쓴다(해시) —
+     이미 직원에게 열려 있던 파일이라 새로 막을 것이 없다. */
+  function putOriginal(file, from, opts) {
+    var secret = !!(opts && opts.secret);
     var chk = okDocFile(file && file.name, file && file.size);
     if (!chk.ok) return Promise.reject(new Error(chk.why));
     if (!deps.storage) return Promise.reject(new Error('파일 창고가 연결되지 않았습니다'));
@@ -103,12 +109,12 @@
         var have = s.val();
         if (have) return { fileId: have, sha256: h, reused: true };
         var fileId = deps.db.ref(ROOT + '/originals').push().key;
-        var p = ROOT + '/originals/' + fileId + '/' + safeFileName(file.name);
+        var p = ROOT + (secret ? '/secret/' : '/originals/') + fileId + '/' + safeFileName(file.name);
         return deps.storage.ref(p).put(file.bytes, { contentType: file.type || 'application/octet-stream' })
           .then(function () {
             return deps.db.ref(ROOT + '/originals/' + fileId).set(originalRecord({
               name: String(file.name).slice(0, 200), size: file.size, type: String(file.type || '').slice(0, 120),
-              sha256: h, path: p, at: Date.now(), by: deps.uid, byName: deps.name, from: from }));
+              sha256: h, path: p, at: Date.now(), by: deps.uid, byName: deps.name, from: from, secret: secret }));
           })
           .then(function () {
             return deps.db.ref(ROOT + '/hash/' + h).set(fileId).then(function () {
@@ -142,15 +148,29 @@
         .sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
     });
   }
+  function isSecret(rec) { return !!(rec && rec.secret); }
+  /* 🔒 서명본 바이트 — 서버가 총괄관리자인지 보고 내준다. 아니면 서버가 거절(403) */
+  function secretBlob(fileId) {
+    if (!deps.secretFetch) return Promise.reject(new Error('🔒 서명본을 여는 길이 연결되지 않았습니다'));
+    return deps.secretFetch(fileId);
+  }
   function fileUrl(rec) {
+    if (isSecret(rec)) return Promise.reject(Object.assign(new Error('🔒 서명본은 대표·관리자만 열 수 있습니다'), { code: 'secret' }));
     if (!deps.storage) return Promise.reject(new Error('파일 창고가 연결되지 않았습니다'));
     return deps.storage.ref(rec.path).getDownloadURL();
   }
   /* 이름을 살려 내려받는다 — 다른 출처 주소에는 download 속성이 안 먹어서 한 번 받아 둔다.
      못 받으면(CORS 등) 새 창으로 연다. */
+  function saveBlob(blob, name) {
+    var a = w.document.createElement('a');
+    a.href = w.URL.createObjectURL(blob); a.download = name || 'file';
+    w.document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { w.URL.revokeObjectURL(a.href); }, 5000);
+  }
   function download(fileId, name) {
     return getOriginal(fileId).then(function (rec) {
       if (!rec) throw new Error('보관함에 없는 파일입니다');
+      if (isSecret(rec)) return secretBlob(fileId).then(function (b) { saveBlob(b, name || rec.name); });
       return fileUrl(rec).then(function (url) {
         return w.fetch(url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
           .then(function (blob) {
@@ -175,7 +195,7 @@
      src: 'import'(엑셀 명단) | 'manual'(손으로). 지워도 파일(co_docs·originals)은 그대로. */
   var REC_KEYS = ['date', 'kind', 'amount', 'payDay', 'tax', 'edi', 'staff', 'contact', 'bizNo', 'note', 'docId'];
   function recRecord(o) {
-    var r = { src: o.src === 'import' ? 'import' : 'manual', at: Date.now(), by: deps.uid, byName: clampStr(deps.name, 60) };
+    var r = { src: o.src === 'import' || o.src === 'folder' ? o.src : 'manual', at: Date.now(), by: deps.uid, byName: clampStr(deps.name, 60) };
     REC_KEYS.forEach(function (k) {
       var v = o[k];
       if (v == null || v === '') return;
@@ -254,7 +274,8 @@
     var ref = deps.db.ref(ROOT + '/co_docs/' + key).push();
     var docId = ref.key;
     return ref.set(clean({ fileId: o.fileId, title: String(o.title || '계약서').slice(0, 120), date: String(o.date || '').slice(0, 10),
-      src: o.src === 'photo' ? 'photo' : 'upload', at: Date.now(), by: deps.uid, byName: clampStr(deps.name, 60) }))
+      src: o.src === 'photo' ? 'photo' : o.src === 'folder' ? 'folder' : 'upload', at: Date.now(), by: deps.uid, byName: clampStr(deps.name, 60),
+      secret: o.secret ? true : undefined }))
       .then(function () {
         return deps.db.ref(ROOT + '/co/' + key).transaction(function (cur) {
           return keepCo(cur, { name: (cur && cur.name) || name.slice(0, 120), n: ((cur && cur.n) || 0) + 1, lastAt: Date.now() });
@@ -305,7 +326,7 @@
     coKey: coKey, okDocFile: okDocFile, safeFileName: safeFileName, sha256Hex: sha256Hex,
     dataUrlToBytes: dataUrlToBytes, originalRecord: originalRecord, isDenied: isDenied,
     init: init, putOriginal: putOriginal, getOriginal: getOriginal, listOriginals: listOriginals,
-    fileUrl: fileUrl, download: download,
+    fileUrl: fileUrl, download: download, isSecret: isSecret, secretBlob: secretBlob, saveBlob: saveBlob,
     addCoDoc: addCoDoc, updateCoDoc: updateCoDoc, unlinkCoDoc: unlinkCoDoc,
     listCo: listCo, listCoDocs: listCoDocs, probe: probe,
     keepCo: keepCo, recRecord: recRecord, listCoRecs: listCoRecs, importCoRecs: importCoRecs, updateCoRec: updateCoRec, removeCoRec: removeCoRec
