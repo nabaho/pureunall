@@ -2730,7 +2730,9 @@ var FB_ALL_SYNC_KEYS = [
      폰에는 영영 안 보였다(대표 지적 2026-08-20 "피시에서 즐겨찾기한거 왜 동기화 안 되나").
      ⚠ 사람 것을 «한 자리»에 모은다({sid:[메뉴]}) — 열쇠를 사람마다 만들면
        동기화 목록이 직원 수만큼 늘어나고, 새 직원이 들어올 때마다 코드를 고쳐야 한다. */
-  'ui_pins'
+  'ui_pins',
+  /* 🔐 업체 주담당 변경 요청 (대표 승인 목업 2026-10-03) — 관리자 화면에 띠가 뜨려면 이 목록에 있어야 한다 */
+  'co_mgr_requests'
 ];
 // App Check reCAPTCHA v3 사이트키 — Firebase 콘솔에서 발급 후 따옴표 안에 붙여넣기 (비어있으면 비활성, 동작에 영향 없음)
 var FB_APPCHECK_KEY = '6Ldu1hEtAAAAABB9lH9EMEyd7uBLEy9H5HxJoua_';
@@ -26205,6 +26207,253 @@ try { window.coCeoTip = coCeoTip; } catch(_){ }
 function coTip(v){ var t = String(v == null ? '' : v).trim(); return t ? t + ' — 더블클릭으로 편집' : '더블클릭으로 편집'; }
 try { window.coTip = coTip; } catch(_){ }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   🔐 업체 주담당 «변경 승인» (대표 승인 목업 2026-10-03)
+   ══════════════════════════════════════════════════════════════════════════
+   「자꾸바꾸면 나중에 혼란이 있을 수 있는데 … 바꾸기 전에 이알피에서 먼저 수정승인 받게 할 수 있나」
+   → 고르신 것: 승인제 + 잦은 변경 경고 · 승인은 «관리자 전원»(isAdmin·isSubAdmin).
+
+   ★ 직원이 «이미 담당이 있는» 업체의 주담당을 바꾸면 바로 안 바뀌고 data/co_mgr_requests 에
+     요청으로 남는다. 관리자가 승인하면 그때 바뀐다. 관리자는 바로 바꾼다(경고는 똑같이 본다).
+   ★ 바뀔 때마다 업체에 mgrHistory 를 남긴다 — 이알피 업체 기록에는 이력이 «없었다»
+     (실측 2026-10-03: 377곳 중 0곳). 오늘부터 쌓인다.
+   ⚠ 첫 지정(담당 없음 → 누구)은 «바꿈»이 아니다 — 바로 되고 이력만 남는다.
+   ⚠ 이것은 «일하는 순서»의 문이다 — 보안 자물쇠가 아니다. 업체 자료 자체는 예전처럼 직원이 쓸 수 있다.
+   ⚠ 업체를 고치는 길은 넷이다 — 수정 창 · 표의 주담당 칸(두 번 눌러 고르기·✕) · 「주담당 배정」(여럿) ·
+     급여담당자 엑셀. 넷 모두 coMgrNeedsOk 하나로 가른다(길마다 따로 셈하면 한쪽이 샌다). */
+var CO_MGR_REQ_KEY = 'co_mgr_requests';
+var CO_MGR_HOT_DAYS = 90;
+function coMgrCanDirect(u){
+  u = u || (typeof CURRENT_USER !== 'undefined' ? CURRENT_USER : null);
+  return !!(u && (u.isAdmin || u.isSubAdmin));
+}
+/* 이 바꿈이 승인을 거쳐야 하나 */
+function coMgrNeedsOk(fromSid, toSid, u){
+  var a = String(fromSid || ''), b = String(toSid || '');
+  if(a === b) return false;
+  if(!a) return false;                         /* 첫 지정은 바꿈이 아니다 */
+  return !coMgrCanDirect(u);
+}
+function coMgrName(sid){
+  var s = String(sid || ''); if(!s) return '';
+  var all = [].concat(dbGet('user_dir', []) || [], dbGet('user_accounts', []) || []);
+  for(var i = 0; i < all.length; i++){ var x = all[i]; if(x && x.sid === s && x.name) return String(x.name); }
+  return s;
+}
+/* 이력 한 줄을 더한 새 배열 — 50줄까지만 둔다 */
+function coMgrHistAdd(co, toSid, extra){
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) || {};
+  var e = Object.assign({ at: Date.now(), from: String((co && co.managerMain) || ''), to: String(toSid || ''),
+    by: String(me.sid || ''), byName: String(me.name || '') }, extra || {});
+  return (((co && co.mgrHistory) || []).concat([e])).slice(-50);
+}
+/* 최근 N일에 담당이 바뀐 줄들 */
+function coMgrRecent(co, days, now){
+  var cut = (now || Date.now()) - (days || CO_MGR_HOT_DAYS) * 86400000;
+  return ((co && co.mgrHistory) || []).filter(function(x){
+    return x && Number(x.at || 0) >= cut && String(x.from || '') && String(x.from || '') !== String(x.to || '');
+  });
+}
+function coMgrDay(t){ var d = new Date(Number(t || 0)); return isNaN(d) ? '' : (d.getMonth() + 1) + '-' + d.getDate(); }
+function coMgrHotText(list){
+  return '최근 ' + CO_MGR_HOT_DAYS + '일에 담당이 ' + list.length + '번 바뀌었습니다 — '
+    + list.map(function(x){ return coMgrDay(x.at) + ' ' + (coMgrName(x.from) || '(없음)') + '→' + (coMgrName(x.to) || '(비움)'); }).join(' · ');
+}
+function coMgrReqs(){ var a = dbGet(CO_MGR_REQ_KEY, []); return Array.isArray(a) ? a.filter(Boolean) : []; }
+function coMgrPending(coId){
+  var id = String(coId || '');
+  return coMgrReqs().filter(function(r){ return r.coId === id && r.status === 'wait'; })[0] || null;
+}
+function coMgrPendingAll(){
+  return coMgrReqs().filter(function(r){ return r.status === 'wait'; })
+    .sort(function(a, b){ return Number(b.at || 0) - Number(a.at || 0); });
+}
+/* 요청을 남긴다 — 같은 업체에 기다리는 요청이 있으면 그것을 고쳐 쓴다(두 줄로 쌓지 않는다) */
+function coMgrRequest(co, toSid, reason, batch){
+  if(!co || !co.id) return null;
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) || {};
+  var prev = coMgrPending(co.id);
+  var rec = { id: prev ? prev.id : uid('cmr'), coId: String(co.id), coName: String(co.name || co.companyName || ''),
+    from: String(co.managerMain || ''), to: String(toSid || ''), reason: String(reason || '').slice(0, 200),
+    by: String(me.sid || ''), byName: String(me.name || ''), at: Date.now(), status: 'wait', batch: String(batch || '') };
+  return dbUpsert(CO_MGR_REQ_KEY, rec) ? rec : null;
+}
+/* 진행 중 사건·컨설팅 가운데 담당이 «바뀔 사람과 다른» 것 — 「그 건 담당은 그대로」를 알리려고 */
+function coMgrOpenWorks(co, toSid){
+  if(!co) return [];
+  var biz = String(co.bizNo || '').replace(/\D/g, '');
+  var out = [];
+  [['cases', '사건'], ['consultings', '컨설팅']].forEach(function(p){
+    (dbGet(p[0], []) || []).forEach(function(w){
+      if(!w || w._deleted || w.closedDate) return;
+      if(/^(closed|done|complete|cancel)/.test(String(w.status || ''))) return;
+      var same = (w.companyId && String(w.companyId) === String(co.id))
+        || (biz.length === 10 && String(w.bizNo || '').replace(/\D/g, '') === biz);
+      if(!same || !w.managerMain || String(w.managerMain) === String(toSid || '')) return;
+      out.push({ kind: p[1], title: String(w.title || w.typeName || w.programName || ''), mgr: String(w.managerMain) });
+    });
+  });
+  return out;
+}
+/* 수정 창 — 주담당을 바꾸면 그 아래에 «무엇이 함께 바뀌는지»를 바로 보여 준다 */
+function coMgrWarnBox(orig, f, onReason){
+  var from = String((orig && orig.managerMain) || ''), to = String((f && f.managerMain) || '');
+  if(from === to || !from) return null;
+  var ask = coMgrNeedsOk(from, to);
+  var hot = coMgrRecent(orig);
+  var works = coMgrOpenWorks(orig, to);
+  var items = [];
+  items.push(to ? '이 업체 메일은 ' + (ask ? '승인되면 ' : '이제 ') + coMgrName(to) + ' 칸으로 갑니다 (메일함 담당자 칸)'
+                : '이 업체 메일이 「담당 모름」으로 갑니다');
+  if(works.length) items.push('진행 중 ' + works.map(function(w){ return w.kind + (w.title ? '(' + w.title + ')' : ''); }).join(', ')
+    + '의 담당은 그대로 ' + works.map(function(w){ return coMgrName(w.mgr); }).filter(function(v, i, a){ return a.indexOf(v) === i; }).join(', ')
+    + '입니다 — 함께 바꿀지는 그 건에서 정하십시오');
+  if(ask) items.push('그 사이에는 지금 담당 ' + coMgrName(from) + ' 그대로입니다');
+  items.push('바꾼 사람·때가 업체 「담당 이력」과 메일함 「🔎 담당 점검」에 남습니다');
+  var amber = { background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 10px', fontSize:'12px', color:'#854d0e' };
+  var red = { background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'6px', padding:'8px 10px', fontSize:'12px', color:'#991b1b', marginTop:'6px' };
+  return h('div', { className:'co-mgr-warn' },
+    h('div', { style: amber },
+      h('b', null, (ask ? '⏳ 담당 변경은 관리자 승인 뒤 반영됩니다 — ' : '⚠ 주담당이 바뀝니다 — ')
+        + coMgrName(from) + ' → ' + (coMgrName(to) || '(비움)')),
+      h('ul', { style:{ margin:'4px 0 0', paddingLeft:'18px', color:'#475569' } },
+        items.map(function(t, i){ return h('li', { key:i }, t); }))),
+    hot.length ? h('div', { style: red }, h('b', null, '⚠ '), coMgrHotText(hot) + '. 또 바꾸면 메일·업무가 헷갈릴 수 있습니다.') : null,
+    !to ? h('div', { style: red }, h('b', null, '⚠ 주담당을 비웁니다'), ' — 자문이 끝난 업체면 비우지 말고 종료 처리를 하십시오.') : null,
+    ask ? h('input', { value:(f && f._mgrReason) || '', onChange:onReason, maxLength:200,
+      placeholder:'까닭 (선택) — 예: 컨설팅을 맡게 되어 자문도 함께',
+      style:{ marginTop:'6px', width:'100%', boxSizing:'border-box' } }) : null);
+}
+/* 관리자 — 승인·반려. 승인하면 업체를 바꾸고 이력을 남기고, 요청한 사람에게 알린다. */
+function coMgrDecide(req, ok, note){
+  if(!req) return false;
+  if(!coMgrCanDirect()){ showToast('관리자만 승인할 수 있습니다'); return false; }
+  var me = CURRENT_USER || {};
+  var co = (dbGet('companies', []) || []).filter(function(c){ return c && c.id === req.coId; })[0];
+  if(ok){
+    if(!co){ showToast('❌ 그 업체를 찾지 못했습니다'); return false; }
+    if(String(co.managerMain || '') !== String(req.from || '')
+      && !confirm('요청한 뒤에 이 업체 담당이 이미 바뀌었습니다.\n\n요청 때: ' + (coMgrName(req.from) || '(없음)')
+        + '\n지금: ' + (coMgrName(co.managerMain) || '(없음)') + '\n바꿀 사람: ' + (coMgrName(req.to) || '(비움)') + '\n\n그래도 승인할까요?')) return false;
+    var patch = { managerMain: req.to, managerMainName: coMgrName(req.to),
+      mgrHistory: coMgrHistAdd(co, req.to, { req: req.id, reqBy: req.by, reqByName: req.byName,
+        okBy: String(me.sid || ''), okByName: String(me.name || '') }) };
+    if(!dbPatch('companies', co.id, patch)){ showToast('❌ 저장 실패'); return false; }
+  }
+  dbUpsert(CO_MGR_REQ_KEY, Object.assign({}, req, { status: ok ? 'ok' : 'no', decidedBy: String(me.sid || ''),
+    decidedByName: String(me.name || ''), decidedAt: Date.now(), note: String(note || '').slice(0, 200) }));
+  if(req.by && req.by !== me.sid && typeof handoffSend === 'function' && typeof fbDb !== 'undefined' && fbDb){
+    handoffSend({ toSid: req.by, toName: req.byName, k: 'companies', id: req.coId, label: req.coName },
+      (ok ? '✅ 담당 변경 승인 — ' : '↩ 담당 변경 반려 — ') + req.coName + ' ' + (coMgrName(req.from) || '(없음)')
+        + ' → ' + (coMgrName(req.to) || '(비움)') + (note ? ' · ' + note : '')).catch(function(){});
+  }
+  showToast(ok ? '✅ 승인했습니다 — ' + req.coName : '↩ 반려했습니다 — ' + req.coName, 5000);
+  return true;
+}
+/* 요청한 사람(또는 관리자)이 거둔다 */
+function coMgrCancel(req){
+  if(!req) return false;
+  var me = CURRENT_USER || {};
+  if(req.by !== me.sid && !coMgrCanDirect()){ showToast('요청한 사람만 거둘 수 있습니다'); return false; }
+  dbUpsert(CO_MGR_REQ_KEY, Object.assign({}, req, { status: 'cancel', decidedBy: String(me.sid || ''),
+    decidedByName: String(me.name || ''), decidedAt: Date.now() }));
+  showToast('요청을 거뒀습니다 — ' + req.coName, 4000);
+  return true;
+}
+/* 업체관리 맨 위 띠 — 관리자는 «기다리는 요청 전부», 직원은 «내 요청» */
+function coMgrBanner(onOpen){
+  var all = coMgrPendingAll();
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) || {};
+  var admin = coMgrCanDirect();
+  var n = admin ? all.length : all.filter(function(r){ return r.by === me.sid; }).length;
+  if(!n) return null;
+  return h('div', { className:'co-mgr-bar', style:{ display:'flex', alignItems:'center', gap:'10px', background:'#fffbeb',
+      border:'1px solid #fde68a', borderRadius:'8px', padding:'8px 12px', margin:'0 0 10px', fontSize:'13px', color:'#854d0e' } },
+    h('span', null, '⏳ ', h('b', null, (admin ? '담당 변경 요청 ' : '내 담당 변경 요청 ') + n + '건'),
+      admin ? '이 승인을 기다립니다' : ' — 관리자 승인을 기다립니다'),
+    h('span', { style:{ flex:1 } }),
+    h('button', { onClick:onOpen, style:{ background:'#1e40af', color:'#ffffff', border:'1px solid #1e40af',
+      borderRadius:'6px', padding:'4px 12px', cursor:'pointer', fontSize:'12.5px' } }, admin ? '검토하기' : '보기'));
+}
+/* 요청 목록 창 */
+function CoMgrReqModal(props){
+  useEscClose(props.onClose);
+  var tk = useState(0); var setTick = tk[1];
+  var me = CURRENT_USER || {};
+  var admin = coMgrCanDirect();
+  var list = coMgrPendingAll().filter(function(r){ return admin || r.by === me.sid; });
+  var cos = {}; (dbGet('companies', []) || []).forEach(function(c){ if(c && c.id) cos[c.id] = c; });
+  function done(){ setTick(function(x){ return x + 1; }); if(props.onChange) props.onChange(); }
+  var cell = function(w, extra){ return Object.assign({ flex:'none', width:w, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }, extra || {}); };
+  return h('div', { className:'modal-bg', onClick:props.onClose },
+    h('div', { className:'modal', style:{ maxWidth:'920px', width:'96vw' }, onClick:function(e){ e.stopPropagation(); } },
+      h('div', { className:'modal-h' }, h('div', { className:'t' }, '⏳ 업체 담당 변경 요청'),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ padding:'10px 14px' } },
+        !list.length ? h('div', { style:{ color:'#64748b', fontSize:'13px', padding:'14px', textAlign:'center' } }, '기다리는 요청이 없습니다')
+        : list.map(function(r, i){
+            var hot = coMgrRecent(cos[r.coId]);
+            return h('div', { key:r.id, className:'co-mgr-row', style:{ display:'flex', alignItems:'center', gap:'10px', height:'40px',
+                borderTop: i ? '1px solid #e2e8f0' : 'none', fontSize:'13px', whiteSpace:'nowrap' } },
+              h('span', { style:cell('20px', { color:'#94a3b8', textAlign:'right', fontSize:'12px' }) }, i + 1),
+              h('span', { style:cell('130px'), title:r.coName }, r.coName),
+              h('span', { style:cell('190px') },
+                h('span', { style:{ textDecoration:'line-through', color:'#94a3b8' } }, coMgrName(r.from) || '(없음)'), ' → ',
+                h('b', { style:{ color: r.to ? '#1e40af' : '#991b1b' } }, coMgrName(r.to) || '(비움)')),
+              h('span', { style:cell('120px', { color:'#64748b', fontSize:'12px' }) }, (r.byName || r.by) + ' · ' + coMgrDay(r.at)),
+              h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', color:'#475569' },
+                  title:(r.reason || '') + (hot.length ? '\n' + coMgrHotText(hot) : '') },
+                r.reason || '', hot.length ? h('b', { style:{ color:'#991b1b', fontSize:'11px', marginLeft:'6px' } }, '· ' + CO_MGR_HOT_DAYS + '일에 ' + hot.length + '번 바뀜') : null),
+              admin ? h('button', { className:'btn-primary', style:{ padding:'3px 12px' },
+                onClick:function(){ if(coMgrDecide(r, true)) done(); } }, '승인') : null,
+              admin ? h('button', { className:'btn-secondary', style:{ padding:'3px 12px', color:'#991b1b' },
+                onClick:function(){ var why = prompt('반려 까닭 (선택) — 요청한 사람에게 알림으로 갑니다', ''); if(why === null) return; if(coMgrDecide(r, false, why)) done(); } }, '반려') : null,
+              (!admin || r.by === me.sid) ? h('button', { className:'btn-secondary', style:{ padding:'3px 12px' },
+                onClick:function(){ if(coMgrCancel(r)) done(); } }, '거두기') : null);
+          })),
+      h('div', { className:'modal-f' },
+        h('div', { style:{ marginRight:'auto', fontSize:'11.5px', color:'#64748b' } },
+          admin ? '승인하면 업체 담당이 바로 바뀌고, 요청한 사람에게 알림이 갑니다' : '관리자가 승인하면 바뀝니다 — 그 사이에는 지금 담당 그대로입니다'),
+        h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'))));
+}
+/* 업체 상세 — 「담당 이력」과 기다리는 요청 */
+function coMgrHistBox(co, onChange){
+  if(!co) return null;
+  var hist = (co.mgrHistory || []).slice().reverse();
+  var pend = coMgrPending(co.id);
+  if(!hist.length && !pend) return null;
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) || {};
+  var row = function(k, a, b, c){
+    return h('div', { key:k, style:{ display:'flex', gap:'10px', fontSize:'11.5px', padding:'3px 0', whiteSpace:'nowrap', borderTop:'1px solid #e2e8f0' } },
+      h('span', { style:{ flex:'none', width:'46px', color:'#64748b' } }, a),
+      h('span', { style:{ flex:'none', width:'170px', overflow:'hidden', textOverflow:'ellipsis' } }, b),
+      h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', color:'#64748b' } }, c));
+  };
+  return h('div', { className:'co-mgr-hist', style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'4px', padding:'8px 12px' } },
+    h('div', { style:{ fontWeight:700, fontSize:'11.5px', color:'#475569', marginBottom:'4px' } }, '👤 담당 이력'),
+    pend ? h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', fontSize:'11.5px', color:'#854d0e', background:'#fffbeb',
+        border:'1px solid #fde68a', borderRadius:'4px', padding:'4px 8px', margin:'2px 0 4px' } },
+      h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } },
+        '⏳ 담당 변경 요청 중 — ' + (coMgrName(pend.from) || '(없음)') + ' → ' + (coMgrName(pend.to) || '(비움)') + ' (' + (pend.byName || pend.by) + ' · ' + coMgrDay(pend.at) + ')'),
+      coMgrCanDirect() ? h('button', { className:'btn-primary', style:{ padding:'1px 10px', fontSize:'11px' },
+        onClick:function(){ if(coMgrDecide(pend, true) && onChange) onChange(); } }, '승인') : null,
+      (pend.by === me.sid || coMgrCanDirect()) ? h('button', { className:'btn-secondary', style:{ padding:'1px 10px', fontSize:'11px' },
+        onClick:function(){ if(coMgrCancel(pend) && onChange) onChange(); } }, '거두기') : null) : null,
+    hist.map(function(x, i){
+      return row(i, coMgrDay(x.at),
+        (coMgrName(x.from) || '(없음)') + ' → ' + (coMgrName(x.to) || '(비움)'),
+        (x.reqByName ? x.reqByName + ' 요청 · ' + (x.okByName || '') + ' 승인' : (x.byName || x.by || '') + (x.from ? ' 바꿈' : ' 지정')));
+    }));
+}
+/* 표의 주담당 칸 옆 — 기다리는 요청이 있으면 ⏳ */
+function coMgrPendTag(co){
+  var p = co ? coMgrPending(co.id) : null;
+  if(!p) return null;
+  return h('span', { className:'erp-tip',
+    'data-tip':'담당 변경 요청 중 — ' + (coMgrName(p.from) || '(없음)') + ' → ' + (coMgrName(p.to) || '(비움)') + '\n' + (p.byName || p.by) + ' · ' + coMgrDay(p.at) + '\n관리자가 승인하면 바뀝니다',
+    style:{ flexShrink:0, fontSize:'10.5px', color:'#854d0e', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'3px', padding:'0 4px' } }, '⏳');
+}
+
 function CompanyManagement(){
   var _fill1 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 240px)
   var existing = dbGet('companies', null);
@@ -26416,8 +26665,20 @@ function CompanyManagement(){
     var w = X.writes(items, companies, { taxSafe: pcxPlan.safe });
     if(!w.length){ showToast('바뀌는 것이 없습니다'); setPcxPlan(null); return; }
     var byId = {}; companies.forEach(function(c){ if(c && c.id) byId[c.id] = c; });
-    var recs = w.map(function(x){ return Object.assign({}, byId[x.id], x.patch); });
+    /* 🔐 주담당이 바뀌는 줄 — 관리자가 아니면 그 칸만 빼고 요청으로(나머지 칸은 넣는다) */
+    var _batch = uid('cmb'), _asked = 0;
+    var recs = w.map(function(x){
+      var base = byId[x.id] || {}, p = Object.assign({}, x.patch);
+      if(p.managerMain !== undefined && String(p.managerMain||'') !== String(base.managerMain||'')){
+        if(coMgrNeedsOk(base.managerMain, p.managerMain)){
+          if(coMgrRequest(base, p.managerMain, '급여담당자 엑셀', _batch)) _asked++;
+          delete p.managerMain; delete p.managerMainName;
+        } else p.mgrHistory = coMgrHistAdd(base, p.managerMain, { via:'급여담당자 엑셀' });
+      }
+      return Object.assign({}, base, p);
+    });
     if(!coUpsertMany(recs)) return;
+    if(_asked) setTimeout(function(){ showToast('⏳ 주담당이 바뀌는 ' + _asked + '곳은 요청으로 보냈습니다 — 관리자가 승인하면 바뀝니다', 7000); }, 600);
     showToast('📥 업체관리에 넣었습니다: ' + w.length + '곳');
     setPcxPlan(null);
   }
@@ -26764,13 +27025,24 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   function toggleSel(id){ setSelIds(function(prev){ var n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; }); }
   function selectAll(){ setSelIds(new Set(pg.paged.map(function(c){return c.id;}))); }
   function clearSel(){ setSelIds(new Set()); }
+  /* 🔐 담당 변경 요청 창 — 업체관리 맨 위 띠에서 연다 */
+  var _cmrS = useState(false); var mgrReqOpen = _cmrS[0]; var setMgrReqOpen = _cmrS[1];
   function applyBulkMgr(sid){
     if(!sid) return;
     var u = users.find(function(u){return u.sid===sid;});
-    var _chg = companies.filter(function(co){ return selIds.has(co.id); })
-      .map(function(co){ return Object.assign({}, co, { managerMain: sid, managerMainName: u?u.name:sid }); });
-    if(!coUpsertMany(_chg)) return;
-    showToast('✅ ' + selIds.size + '개 업체에 ' + (u?u.name:sid) + ' 배정됨');
+    /* 🔐 이미 담당이 있는 업체를 «다른 사람»으로 바꾸는 것은 승인 길로(coMgrNeedsOk) — 한 묶음으로 */
+    var _batch = uid('cmb'), _asked = 0;
+    var _chg = [];
+    companies.filter(function(co){ return selIds.has(co.id); }).forEach(function(co){
+      if(String(co.managerMain||'') === String(sid)) return;
+      if(coMgrNeedsOk(co.managerMain, sid)){ if(coMgrRequest(co, sid, '', _batch)) _asked++; return; }
+      _chg.push(Object.assign({}, co, { managerMain: sid, managerMainName: u?u.name:sid, mgrHistory: coMgrHistAdd(co, sid) }));
+    });
+    if(_chg.length && !coUpsertMany(_chg)) return;
+    showToast((_chg.length ? '✅ ' + _chg.length + '개 업체에 ' + (u?u.name:sid) + ' 배정됨' : '')
+      + (_asked ? (_chg.length ? ' · ' : '') + '⏳ ' + _asked + '곳은 담당 변경 요청 — 관리자가 승인하면 바뀝니다' : '')
+      || '바뀌는 것이 없습니다', 6000);
+    if(_asked) refreshCompanies();
     clearSel(); setBulkMgrModal(null);
   }
   /* 컬럼 표시/숨김 — 로그인 사용자별 저장(Firebase 동기화), 컬럼 개별 토글.
@@ -27020,6 +27292,17 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     }
     var _coF = dbGet('companies', []).find(function(co){ return co.id === editing.id; });
     if(!_coF){ showToast('❌ 대상 업체 없음 — 새로고침 후 다시 시도'); cancelEdit(); return; }
+    /* 🔐 주담당은 «승인» 길로 — 관리자가 아니면 요청만 남긴다 · 관리자는 바로 바꾸고 이력을 남긴다 */
+    if(editing.field === 'managerMain' && String(_coF.managerMain||'') !== String(nextVal||'')){
+      var _hot = coMgrRecent(_coF);
+      if(_hot.length && !confirm('⚠ ' + coMgrHotText(_hot) + '\n또 바꾸면 메일·업무가 헷갈릴 수 있습니다.\n\n그래도 ' + (coMgrNeedsOk(_coF.managerMain, nextVal) ? '요청할까요?' : '바꿀까요?'))){ cancelEdit(); return; }
+      if(coMgrNeedsOk(_coF.managerMain, nextVal)){
+        if(coMgrRequest(_coF, nextVal, '', '')) showToast('⏳ 담당 변경을 요청했습니다 — 관리자가 승인하면 바뀝니다', 6000);
+        cancelEdit(); refreshCompanies(); return;
+      }
+      if(!coPatch(editing.id, { managerMain: nextVal, mgrHistory: coMgrHistAdd(_coF, nextVal) })){ cancelEdit(); return; }
+      cancelEdit(); return;
+    }
     var _p = {}; _p[editing.field] = nextVal;
     if(!coPatch(editing.id, _p)){ cancelEdit(); return; }
     var changedCo = Object.assign({}, _coF, _p);
@@ -27418,12 +27701,18 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
         style:{ cursor:'cell', fontSize:'11.5px', fontWeight:600,
           color: badSid ? '#991b1b' : '#1e293b' } },
         (badSid ? '⚠ ' : '') + mgrName),
+      coMgrPendTag(co),
       h('button', { title:'주담당 비우기',
         onClick:async function(e){
           e.stopPropagation();
           var coName = co.name||co.companyName||'이 업체';
           if(!(await popConfirm('「'+coName+'」 업체의 주담당 「'+mgrName+'」 을(를) 삭제할까요?'))) return;
-          coPatch(co.id, { managerMain:'' });
+          /* 🔐 비우는 것도 바꿈이다 — 관리자가 아니면 요청으로 */
+          if(coMgrNeedsOk(co.managerMain, '')){
+            if(coMgrRequest(co, '', '', '')) showToast('⏳ 주담당 비우기를 요청했습니다 — 관리자가 승인하면 비워집니다', 6000);
+            refreshCompanies(); return;
+          }
+          coPatch(co.id, { managerMain:'', mgrHistory: coMgrHistAdd(co, '') });
           showToast('🗑 삭제됨 · 「'+coName+'」 주담당 「'+mgrName+'」 해제', 3000);
         },
         style:{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:'11px', padding:'0 2px', lineHeight:1, flexShrink:0 }
@@ -27488,6 +27777,9 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           border:'1px solid '+(monthOnly?'#1e40af':'#cbd5e1'), borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600 } },
         monthOnly ? '✓ 이번 달만' : '📅 이번 달만')
     }),
+    /* 🔐 담당 변경 요청 — 관리자는 기다리는 것 전부, 직원은 내 것 */
+    coMgrBanner(function(){ setMgrReqOpen(true); }),
+    mgrReqOpen && h(CoMgrReqModal, { onClose:function(){ setMgrReqOpen(false); }, onChange: refreshCompanies }),
     // 통합 필터 — 모바일 compact / PC 기존
     window.innerWidth <= 768
     ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px' } },
@@ -28229,8 +28521,22 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
         /* 내가 보는 동안 남이 이 업체를 고쳤으면 먼저 물어본다.
            업체는 여러 사람이 함께 만지는 자료라 조용히 덮으면 안 된다. */
         if(!(await erpGuardEdit('companies', form, editModal))) return;
+        /* 🔐 주담당 — 관리자가 아니면 «요청»만 남기고 담당은 그대로 저장한다(다른 칸은 바로 저장) */
+        var _mgrAsked = false;
+        form = Object.assign({}, form);
+        var _mgrWhy = form._mgrReason; delete form._mgrReason;
+        if(String(editModal.managerMain||'') !== String(form.managerMain||'')){
+          if(coMgrNeedsOk(editModal.managerMain, form.managerMain)){
+            _mgrAsked = !!coMgrRequest(editModal, form.managerMain, _mgrWhy, '');
+            form.managerMain = editModal.managerMain || '';
+            if(editModal.managerMainName !== undefined) form.managerMainName = editModal.managerMainName;
+          } else {
+            form.mgrHistory = coMgrHistAdd(editModal, form.managerMain);
+          }
+        }
         coUpsert(form);
         setEditModal(null);
+        if(_mgrAsked) setTimeout(function(){ showToast('⏳ 담당 변경을 요청했습니다 — 관리자가 승인하면 바뀝니다', 6000); }, 400);
         // 계약관리 일괄 동기화 (회사정보 필드 모두)
         var fields = ['name','bizNo','ceo','ceo2','zipcode','address','phone','fax','email',
           'bizType','bizCategory','companySize','employmentInsuredCount','injuryInsuredCount',
@@ -29563,6 +29869,8 @@ function CompanyEditModal(props){
                 }).map(function(u){
                   return h('option', { key:u.sid, value:u.sid }, u.name);
                 })))),
+          /* 🔐 주담당을 바꾸면 «무엇이 함께 바뀌는지»·승인 여부·잦은 변경 경고 (대표 승인 목업 2026-10-03) */
+          (function(){ var _w = coMgrWarnBox(props.cur, f, set('_mgrReason')); return _w ? fld4('담당 변경', _w, 4) : null; })(),
           /* 특이사항 — 여기 있었다(회사정보 상자 뒤 홀로). 담당자 바로 아래로 옮겼다
              (대표 지시 2026-09-19 목업 승인) — 「누가 맡았고 무엇을 적어 뒀나」가 한 상자에 온다. */
           fld4('특이사항',
@@ -30022,6 +30330,8 @@ function CompanyDetailModal(props){
           !oa.loading && !oa.err && h('div', { style:{ fontSize:'10px', color:'#cbd5e1', marginTop:'4px' } },
             '보기만 합니다 · 사업자번호 › 업체 ID › 이름 순으로 찾습니다')
         ),
+        /* 🔐 담당 이력 · 기다리는 요청 (대표 승인 목업 2026-10-03) — 승인·거두기 뒤에는 창을 닫는다(목록이 새로 그려진다) */
+        coMgrHistBox(co, props.onClose),
         // 비고
         co.note && h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'4px', padding:'8px 12px', fontSize:'11.5px', color:'#854d0e' } },
           h('div', { style:{ fontWeight:700, marginBottom:'2px' } }, '특이사항'),

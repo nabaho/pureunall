@@ -24216,6 +24216,7 @@ async function cntBulk(act){
    ⚠ 이알피 담당을 «고치지» 않는다. 찾아서 보여 주고 이알피로 데려다 준다.
    ⚠ 업체는 열쇠(id)로 본다 — 이름은 보여 줄 때만 쓴다. */
 let _mgrSeen = null, _mgrChange = null, _mgrKeep = null, _mgrBusy = false, _mgrLoading = false;
+let _mgrReqs = [];      /* 이알피 «담당 변경 요청»(data/co_mgr_requests) — 승인 기다리는 것만 보여 준다 */
 const MGR_KEY_OK = /^[^.#$\[\]\/]+$/;      /* DB 열쇠로 못 쓰는 글자가 든 id 는 건너뛴다 */
 function mgrLoad(cb){
   if(_mgrSeen !== null && _mgrChange !== null && _mgrKeep !== null){ if(cb) cb(); return; }
@@ -24223,8 +24224,11 @@ function mgrLoad(cb){
   if(_mgrLoading) return;
   _mgrLoading = true;
   const db = firebase.database();
-  Promise.all(['mgrSeen', 'mgrChange', 'mgrKeep'].map(k=>db.ref(DB_ROOT + '/config/' + k).once('value')))
-    .then(([a, b, c])=>{ _mgrSeen = a.val() || {}; _mgrChange = b.val() || {}; _mgrKeep = c.val() || {}; })
+  Promise.all(['mgrSeen', 'mgrChange', 'mgrKeep'].map(k=>db.ref(DB_ROOT + '/config/' + k).once('value'))
+      .concat([db.ref('data/co_mgr_requests').once('value').catch(()=>null)]))
+    .then(([a, b, c, r])=>{ _mgrSeen = a.val() || {}; _mgrChange = b.val() || {}; _mgrKeep = c.val() || {};
+      const w = r && r.val ? r.val() : null, v = (w && w.v !== undefined) ? w.v : w;
+      _mgrReqs = (Array.isArray(v) ? v : Object.values(v || {})).filter(x=>x && x.status === 'wait'); })
     .catch(()=>{})
     .then(()=>{ _mgrLoading = false; if(_mgrSeen !== null && cb) cb(); });
 }
@@ -24247,8 +24251,16 @@ function mgrDiff(seen, cos, now){
     const id = String(c.id), m = String(c.managerMain || '');
     next[id] = m;
     if(first || !Object.prototype.hasOwnProperty.call(s0, id)) return;
-    if(String(s0[id] || '') !== m)
-      changes.push({ co:id, coName:String(c.name||''), from:String(s0[id]||''), to:m, at:now });
+    if(String(s0[id] || '') !== m){
+      /* 이알피가 남긴 이력의 마지막 줄이 «이 바꿈»이면 누가 했는지 함께 적는다(2026-10-03 승인제) */
+      const last = (Array.isArray(c.mgrHistory) ? c.mgrHistory : []).slice(-1)[0];
+      const by = (last && String(last.to || '') === m)
+        ? (last.okByName ? String(last.reqByName || '') + ' 요청 · ' + String(last.okByName) + ' 승인' : String(last.byName || ''))
+        : '';
+      const ch = { co:id, coName:String(c.name||''), from:String(s0[id]||''), to:m, at:now };
+      if(by) ch.by = by;
+      changes.push(ch);
+    }
   });
   return { first:first, next:next, changes:changes };
 }
@@ -24272,6 +24284,7 @@ async function mgrWatchRun(){
         return;
       }
       const rec = { co:ch.co, coName:ch.coName, from:from, to:ch.to, at:ch.at };
+      if(ch.by) rec.by = ch.by;
       _mgrChange[ch.co] = rec; up[DB_ROOT + '/config/mgrChange/' + ch.co] = rec; n++;
     });
     if(Object.keys(up).length){
@@ -24326,11 +24339,12 @@ function mgrRows(){
       if(erp && erp !== String(own[k])) hand.push({ key:k, em:em, hand:String(own[k]), erp:erp, coName:coName });
     });
   }
-  return (m.mgrRows = { changes:changes, retired:retired, empty:empty, hand:hand });
+  const pending = (_mgrReqs || []).slice().sort((a,b)=>Number(b.at||0) - Number(a.at||0));
+  return (m.mgrRows = { changes:changes, retired:retired, empty:empty, hand:hand, pending:pending });
 }
 function mgrCount(){
   const r = mgrRows();
-  return r.changes.length + r.retired.length + r.empty.length + r.hand.length;
+  return r.changes.length + r.retired.length + r.empty.length + r.hand.length + (r.pending || []).length;
 }
 /* ── 사람이 누르는 것 ── */
 function mgrAck(co){
@@ -24390,9 +24404,16 @@ function mgrHtml(){
       <span class="nm" title="${esc(x.coName)}">${esc(x.coName)}</span>
       <span class="mg-old">${esc(mgrName(x.from) || '(비어 있음)')}</span><span class="mg-ar">→</span>
       <span class="mg-new${to ? '' : ' none'}">${esc(to || '(비어 있음)')}</span>
-      <span class="mg-cnt">${day(x.at)} 알아챔${n ? ' · 최근 30일 메일 ' + n + '통' : ''}</span><span class="sj"></span>
+      <span class="mg-cnt">${day(x.at)} 알아챔${x.by ? ' · ' + esc(x.by) : ''}${n ? ' · 최근 30일 메일 ' + n + '통' : ''}</span><span class="sj"></span>
       <button class="pri" onclick="mgrAck('${esc(x.co)}')">확인</button>
       <button onclick="mgrErp()">이알피에서 보기</button></div>`; }).join('') : none;
+  h += `<div class="mn-sec">⏳ 승인 기다리는 담당 변경 <small>이알피 업체관리에서 직원이 요청한 것 — 관리자가 업체관리 맨 위 띠에서 승인합니다</small></div>`;
+  h += (r.pending || []).length ? r.pending.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
+      <span class="nm" title="${esc(x.coName)}">${esc(x.coName)}</span>
+      <span class="mg-old">${esc(mgrName(x.from) || '(없음)')}</span><span class="mg-ar">→</span>
+      <span class="mg-new${x.to ? '' : ' none'}">${esc(mgrName(x.to) || '(비움)')}</span>
+      <span class="mg-cnt">${esc(x.byName || x.by || '')} · ${day(x.at)}${x.reason ? ' · ' + esc(x.reason) : ''}</span><span class="sj"></span>
+      <button onclick="mgrErp()">이알피에서 보기</button></div>`).join('') : none;
   h += `<div class="mn-sec">⚠ 담당이 퇴사자인 업체 <small>메일이 갈 사람이 없습니다 — 이어받을 사람을 정하면 한 번에 넘어갑니다</small></div>`;
   h += r.retired.length ? r.retired.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
       <span class="nm" title="${esc(x.co.name)}">${esc(x.co.name)}</span><span class="mg-ret">${esc(x.name)}</span>
