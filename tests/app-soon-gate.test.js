@@ -29,7 +29,7 @@ const GATE = R('js/pu-gate.js');
 const 잠글앱 = {
   'rules.html': '취업규칙 관리', 'payroll-os.html': '급여관리',
   'docs-esign.html': '문서관리', 'pu-paydata.html': '급여데이터함',
-  'pu-cards.html': '푸른 메일'
+  'pu-cards.html': '푸른 메일', 'rules-v2.html': '취업규칙(새)'
 };
 
 test('①★★ 다섯 앱이 모두 문을 단다 — 하나라도 빠지면 그 앱은 주소로 열린다', () => {

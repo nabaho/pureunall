@@ -5683,7 +5683,7 @@ exports.hanaMessageBridge = functions
 
    실제 코드는 mail-sync.js 에 있다. index.js 를 더 키우지 않기 위해서다.
    총괄관리자만 볼 수 있다(함수 안에서 uid_roles 로 다시 따진다). */
-const MSYNC = require("./mail-sync")({
+const MAIL_DEPS = {
   functions, getDatabase, getAuth, MD, MAIL_REGION,
   setCors, requireStaff, mailUserAsync, mailPass,
   /* 메일 첨부를 급여데이터함 대기 칸으로 — 서버가 «스스로 훑을 때»와 같은 길이다.
@@ -5694,7 +5694,8 @@ const MSYNC = require("./mail-sync")({
     await payMailKnownList(db);
     return payMailStoreOne(db, getStorage().bucket(PAYDATA_BUCKET), att, mail);
   },
-});
+};
+const MSYNC = require("./mail-sync")(MAIL_DEPS);
 exports.syncMailbox = MSYNC.syncMailbox;
 exports.pullMailbox = MSYNC.pullMailbox;
 exports.readMailMessage = MSYNC.readMailMessage;
@@ -5726,6 +5727,39 @@ exports.sweepDeletedMail = MGONE.sweepDeletedMail;
 const GARCH = require("./gcal-archive")({ functions, getDatabase, MAIL_REGION,
   contractVersion: OntologyServerWrite.CONTRACT_VERSION, schemaVersion: 3 });
 exports.gcalArchiveDaily = GARCH.gcalArchiveDaily;
+
+/* ══ 취업규칙 모으기 (2026-10-03 설계 docs/superpowers/specs/2026-10-03-취업규칙-새로짓기-design.md §4) ══
+   메일함의 취업규칙 첨부를 가려 rules_mgmt/library 에 담는다. 원본은 이 함수 메모리에서만 산다.
+   ⚠ 매일 한 번 + 관리자 신호(ask) — 둘 다 한 몸통. 한 번에 60통, 7분 넘으면 멈춘다.
+   ⚠ 메일은 읽기만 한다(MAIL_DEPS 를 메일 동기화와 «같은 것»으로 쓴다 — 계정·비밀번호가 한 곳). */
+const RulesCollect = require("./rules-collect");
+const RulesCollectMail = require("./rules-collect-mail");
+async function rulesCollectOnce(reason) {
+  const sum = await RulesCollect.run({
+    db: getDatabase(), bucket: getStorage().bucket(PHOTO_BUCKET), now: () => Date.now(),
+    limit: 60, budgetMs: 7 * 60 * 1000, contractVersion: OntologyServerWrite.CONTRACT_VERSION,
+    fetchAtts: RulesCollectMail.makeFetchAtts(MAIL_DEPS),
+    log: (s) => console.log("[취업규칙 모으기]", reason, s),
+  });
+  if (sum.alert) {
+    /* 설계 §4-5 — 사흘째 하나도 못 담았다. 관리자에게 한 줄 (칸은 로그인 알림과 같게: kind·message) */
+    const roles = (await getDatabase().ref("uid_roles").once("value")).val() || {};
+    await Promise.all(Object.keys(roles).filter((u) => roles[u] && roles[u].isAdmin === true && roles[u].status !== "resigned").map((u) =>
+      getDatabase().ref("systemAlerts/" + u).push({ createdAt: Date.now(), kind: "rulesCollect",
+        message: "취업규칙 모으기가 사흘째 하나도 못 담았습니다" + ((sum.errors || []).length ? " (" + sum.errors.slice(0, 3).join(" / ") + ")" : "") })));
+  }
+  return sum;
+}
+exports.collectRulesMail = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .pubsub.schedule("every day 05:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => { await rulesCollectOnce("매일"); return null; });
+exports.collectRulesMailAsk = functions
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .database.ref("/rules_mgmt/library/ask/{id}")
+  .onCreate(async () => { await rulesCollectOnce("관리자"); return null; });
 
 /* ══════════════════════════════════════════════════════════════════════════
    📬 열람 확인 — 보낸 메일의 «보이지 않는 1×1 그림»이 불리는 자리 (대표 결정 2026-09-06)
