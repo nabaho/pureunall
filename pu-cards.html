@@ -17733,14 +17733,51 @@ function mbRuleBinOf(v){
    ⚠ 목록을 거르는 곳(mbRowFits)과 화면에 적는 곳(mbBinOfRow)이 «같은 답»을 봐야 한다.
      예전에는 둘이 따로 셈해서, 한쪽만 고치면 「목록에는 있는데 딱지는 다른 칸」이 됐다. */
 function mbBinIdOfRow(v){
-  /* ⚡ 그리는 동안 메일 한 통에 한 번 (2026-10-03 — 칸 옮길 때 15,000번이었다). 줄이 한 벌이 되어야 맞는다(mbAllRows). */
-  const _m = (v && typeof v === 'object' && !v._reuse && typeof mbMemoOf === 'function') ? mbMemoOf() : null;
-  const _w = _m && (_m.binOf || (_m.binOf = new WeakMap()));
-  if(_w && _w.has(v)) return _w.get(v);
+  const k = (typeof mbJudgeKey === 'function') ? mbJudgeKey(v) : null;
+  const J = k && (typeof mbJudge === 'function') ? mbJudge() : null;
+  if(J && J.bin.has(k)) return J.bin.get(k);
   const put = mbPutOf(v._key);
   const id = put || mbRuleBinOf(v) || ((b => b ? b.id : '')(mbBinOfFolder(v._slug)));
-  if(_w) _w.set(v, id);
+  if(J) J.bin.set(k, id);
   return id;
+}
+/* ══════ ⚡ 판정 기억 — 그리기를 «넘어» 산다 (대표 지시 2026-10-03 「메일창 확인」 → 「진행」) ══════
+   대표 크롬 실측: 메일 창을 처음 열면 10초 동안 목록을 7번 다시 그리고, 그때마다 2천 통을 처음부터
+   다시 판정했다(스팸 1.5만 번 · 분류 칸 2.8만 번). 칸 목록·설정·보낸메일함이 따로따로 도착하기 때문이다.
+   ★ 스팸인가·어느 분류 칸인가는 «메일 원본»(서버에서 받아 둔 그 한 통 — _mbMsgs[칸][번호])과
+     «설정»으로만 정해진다. 그래서
+       · 열쇠는 원본 객체다(줄 사본은 _src 로 원본을 가리킨다) — 메일을 새로 받아 오면 원본이 새것이라 저절로 새로 판정
+       · 설정은 «글자 서명»으로 견준다 — 옮긴 쪽지·분류 규칙·한 통에 박은 담당자·자문사 잇기·스팸 아님·
+         거르기 끔·분류 칸·폴더 갈래. 서명이 다르면 기억을 통째로 버린다.
+   ⚠ 「고친 자리마다 번호 올리기」로 하지 않는다 — 고치는 곳이 열 군데가 넘어 하나만 빠뜨려도
+     화면이 조용히 틀린다(그런 고장은 화면만 봐서는 못 찾는다). 서명은 빠뜨릴 수가 없다.
+   ⚠ 읽음(r) 같은 «자주 바뀌는 값»은 판정에 안 쓴다 — 그래서 서명에도 없다(폴더의 안 읽은 수도 뺀다).
+   ⚠ 서명은 한 번 그리는 동안 한 번만 만든다(mbMemoOf) — 그리기가 시작되면 다시 견준다. */
+let _mbJudge = null;
+function mbJudgeKey(v){
+  if(!v || typeof v !== 'object') return null;
+  if(v._src && typeof v._src === 'object') return v._src;
+  return v._reuse ? null : v;        /* 돌려 쓰는 객체가 원본을 안 가리키면 기억하지 않는다 */
+}
+function mbJudgeSig(){
+  const kv = o => {
+    if(!o) return '-';
+    let out = '';
+    for(const k in o){ const x = o[k]; out += k + '=' + (x && typeof x === 'object' ? JSON.stringify(x) : String(x)) + ';'; }
+    return out;
+  };
+  let fd = '';
+  for(const k in (_mbFolders || {})){ const f = _mbFolders[k] || {}; fd += k + '=' + (f.kind||'') + '/' + (f.path||'') + ';'; }
+  return [typeof _mbPut !== 'undefined' ? kv(_mbPut) : '', typeof _mbBinRule !== 'undefined' ? kv(_mbBinRule) : '',
+    kv(_mbWhoMsg), kv(_mbCo), kv(_mbNotSpam), String(_mbSpamOff),
+    typeof _mbBins !== 'undefined' ? kv(_mbBins) : '', fd].join('|');
+}
+function mbJudge(){
+  const m = mbMemoOf();
+  if(m.judge) return m.judge;
+  const sig = mbJudgeSig();
+  if(!_mbJudge || _mbJudge.sig !== sig) _mbJudge = { sig: sig, spam: new WeakMap(), bin: new WeakMap() };
+  return (m.judge = _mbJudge);
 }
 /* 규칙을 정한다·지운다 — 화면을 먼저 고치고, 저장이 실패하면 되돌린다 */
 function mbRuleSet(email, binId, byDomain){
@@ -17975,11 +18012,11 @@ function mbSpamWhy(v){
 /* ⚡ 한 번 그리는 동안 같은 메일을 두세 번 판정했다(목록 거르기 · 안 읽은 셈 · 걸린 줄) —
    mbSpamWhy 32ms(15,056번). 그리는 «동안»만 사는 셈에 담는다 — 그리기가 시작되면 버린다. */
 function mbIsSpam(v){
-  if(!v || typeof v !== 'object' || v._reuse) return !!mbSpamWhy(v);   /* 돌려 쓰는 객체는 기억하지 않는다 */
-  const m = mbMemoOf();
-  const w = m.spamWhy || (m.spamWhy = new WeakMap());
-  let r = w.get(v);
-  if(r === undefined){ r = mbSpamWhy(v); w.set(v, r); }
+  const k = (typeof mbJudgeKey === 'function') ? mbJudgeKey(v) : null;
+  const J = k && (typeof mbJudge === 'function') ? mbJudge() : null;
+  if(!J) return !!mbSpamWhy(v);
+  let r = J.spam.get(k);
+  if(r === undefined){ r = mbSpamWhy(v); J.spam.set(k, r); }
   return !!r;
 }
 /* 지금 손에 든 것 가운데 걸린 것 — 알림 줄과 셈이 «같은 값»을 쓰게 한다 */
@@ -18172,7 +18209,7 @@ function mbWhoBust(){ _mbWhoIdx = null; const m0 = mbMemoOf();
   delete m0.tally; delete m0.sentTally; delete m0.sentTallyFor;
   /* 담당자·스팸 판정 셈도 버린다(2026-10-02) — 사람이 바꾼 것이 그 자리에서 보여야 한다 */
   delete m0.whoWhy; delete m0.whoWhyIdx; delete m0.spamWhy;
-  delete m0.allRows; delete m0.binOf; }   /* 담당자·분류가 바뀌면 줄 모음·분류 칸 판정도 새로 */
+  delete m0.allRows; delete m0.binOf; delete m0.judge; }   /* 담당자·분류가 바뀌면 줄 모음·분류 칸 판정도 새로 */
 
 /* ══════════════════════════════════════════════════════════════════════════
    자문이 끝난 업체 — 따로 모은다 (대표 지시 2026-08-26)
@@ -19962,7 +19999,7 @@ function mbWhoTally(){
     const box = _mbMsgs[slug]||{};
     Object.keys(box).forEach(uid=>{
       const row = box[uid]; if(!row) return;
-      v.e = row.e; v.r = row.r; v._slug = slug; v._key = slug + ':' + uid;
+      v.e = row.e; v.r = row.r; v._slug = slug; v._key = slug + ':' + uid; v._src = row;   /* 원본을 가리켜 판정 기억을 함께 쓴다 */
       if(!mbWhoScope(v)) return;
       const unread = !Number(row.r||0);
       if(mbEndedOfRow(v, idx)){ ended.n++; if(unread) ended.un++; return; }
@@ -20286,7 +20323,7 @@ function mbAllRows(){
     const f = mbFolderBy(slug)||{};
     Object.keys(box).forEach(uid=>{
       const v = box[uid]; if(!v) return;
-      out.push(Object.assign({}, v, { _slug:slug, _box:mbFolderLabel(f), _key:slug+':'+uid }));
+      out.push(Object.assign({}, v, { _slug:slug, _box:mbFolderLabel(f), _key:slug+':'+uid, _src:v }));   /* _src: 원본 — 판정 기억의 열쇠 */
     });
   };
   /* ⚠ 우리 칸은 «여러 폴더»에서 옮겨 온 것이 섞인다 — 읽어 둔 폴더를 다 훑은 뒤
@@ -23537,7 +23574,7 @@ function mnewRows(){
       const v = box[uid]; if(!v || !v.d || Number(v.d) < cut) return;
       const e = String(v.e||'').trim().toLowerCase();
       if(e.indexOf('@') < 1) return;
-      const r = Object.assign({ _slug:slug, _key:slug+':'+uid }, v);
+      const r = Object.assign({ _slug:slug, _key:slug+':'+uid, _src:v }, v);
       if(mbIsSpam(r)) return;                            /* 우리 「스팸」 판정 줄 */
       const g = per[e] || (per[e] = { em:e, n:0, last:0, name:'', subj:'', slug:'', uid:'', inq:false, hay:'' });
       g.n++;
