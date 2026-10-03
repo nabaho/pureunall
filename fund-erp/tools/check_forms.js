@@ -56,7 +56,7 @@ global.funds = {};
  /* 2026-09-14: 위원이 격자(세 줄)보다 많으면 이름을 별지로 뺀다 — 그 길도 실어야 채움이 돈다.
     ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
  (/var COMMITTEE_ROWS=\d+;/.exec(src) || [''])[0],
- gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmSeeAnnex'), gF('committeeAnnexHTML'),
+ gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmSeeAnnex'), gF('committeeAnnexHTML'),
  gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
   /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10) — 위와 같은 까닭이다.
      ⚠ gV 는 {·[ 로 시작하는 값만 잡는다. 글자 하나짜리 상수는 줄째로 꺼낸다. */
