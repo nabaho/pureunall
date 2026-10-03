@@ -587,7 +587,13 @@ html.dark .empty{color:var(--text-mute)}
 .ds-pv-pg{position:sticky;top:0;align-self:flex-end;font-size:10.5px;padding:1px 7px;border-radius:9px;background:var(--navy);color:#fff;z-index:1;margin-bottom:-22px}
 .ds-pv-img>span:not(.ds-pv-pg){color:var(--text-mute);font-size:11.5px;padding:40px 6px;text-align:center}
 .ds-pv-img canvas,.ds-pv-img img,.ds-pv-img svg{width:100%!important;height:auto!important;display:block;flex:none;background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.18)}
-.ds-pv-t{font-weight:700;color:var(--navy);font-size:13.5px;margin-bottom:6px;line-height:1.4}
+.ds-pv-hd{display:flex;align-items:baseline;gap:8px}
+.ds-pv-t{font-weight:700;color:var(--navy);font-size:13.5px;line-height:1.4;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ds-pv-sub{font-size:11px;color:var(--text-mute);flex:none}
+.ds-pv-sub.on{color:var(--teal);font-weight:700}
+.ds-pv-meta{font-size:11.5px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.ds-pv-more{margin-top:6px;padding:6px 8px;border:1px solid var(--border);border-radius:6px}
+.ds-pv-more[hidden]{display:none}
 .ds-pv-kv{display:flex;gap:8px;font-size:12px;padding:2px 0}
 .ds-pv-kv span{color:var(--text-mute);min-width:48px;flex:none}
 .ds-pv-kv b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -597,7 +603,7 @@ html.dark .empty{color:var(--text-mute)}
 .ds-same.same{color:#854d0e}.ds-same.diff{color:var(--text-mute)}
 .ds-dupbar{display:flex;align-items:center;gap:8px;padding:7px 10px;margin:6px 0;border:1px solid #fde68a;background:#fffbeb;border-radius:8px;color:#854d0e;font-size:12px}
 .ds-dupbar .m{color:var(--text-mute);font-size:11px}
-.ds-pv-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.ds-pv-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
 #page-resume-hub .rc-h,#page-docbox .rc-h{margin-bottom:6px}
 #page-resume-hub .empty,#page-docbox .empty{padding:12px 0}
 #page-resume-hub .dropzone,#page-docbox .dropzone{padding:11px 14px}
@@ -6802,6 +6808,10 @@ function dsPvDragWire(el){
   });
   document.addEventListener('mouseup', function(){ if(_dsDrag){ _dsDrag.el.classList.remove('drag'); _dsDrag=null; } });
 }
+function dsPvMoreToggle(domain, btn){
+  var m=document.getElementById('dsPvMore-'+domain); if(!m) return;
+  m.hidden=!m.hidden; if(btn) btn.classList.toggle('on', !m.hidden);
+}
 function dsPrevDraw(domain){
   var D=DOMAINS[domain], box=document.getElementById('dsPrev-'+domain); if(!box) return;
   var id=_dsPicked[domain], r=id?get(D.store).find(function(x){ return x.id===id; }):null;
@@ -6810,16 +6820,23 @@ function dsPrevDraw(domain){
   var 줄=function(k,v){ return v?'<div class="ds-pv-kv"><span>'+k+'</span><b>'+escapeHtml(v)+'</b></div>':''; };
   var 받은=_cdSrc(r)==='received';
   box.innerHTML='<div class="ds-pv-img" id="dsPvImg-'+domain+'"><span>불러오는 중…</span></div>'
-    +'<div class="ds-pv-t">'+escapeHtml(T.t)+'</div>'
-    +줄('기관',r.org)+줄('누구',T.사람)+줄('종류',r.kind)+줄('만든 날',(r.savedAt||'').slice(0,10))
+    /* ★ 정보는 «두 줄»로 (대표 지적 2026-10-03 「아래 설명내용 너무 많은 공간 차지한다」).
+       제목+제출 한 줄 · 기관·종류·날짜·받은 횟수 한 줄. 원본·파일·메모·받은 기록은 ⓘ 를 눌러야 펼친다.
+       ⚠ 한 칸에 한 줄씩 세로로 쌓던 옛 모양으로 되돌리지 말 것 — 미리보기 자리를 반이나 먹었다. */
+    +'<div class="ds-pv-hd"><div class="ds-pv-t" title="'+escapeHtml(T.t)+'">'+escapeHtml(T.t)+'</div>'
+    +'<span class="ds-pv-sub'+(n?' on':'')+'">'+(n?'제출 '+escapeHtml(r.submits[0].date||'')+(n>1?' 외 '+(n-1):''):'제출 아직')+'</span></div>'
+    +'<div class="ds-pv-meta">'+[r.org, T.사람, (r.kind&&r.kind!==T.t)?r.kind:'', (r.savedAt||'').slice(0,10).replace(/-/g,'.'),
+        (r.downloads&&r.downloads.length)?'⬇ '+r.downloads.length+'회':''].filter(Boolean).map(escapeHtml).join(' · ')+'</div>'
+    +'<div class="ds-pv-more" id="dsPvMore-'+domain+'" hidden>'
     +줄('원본',r.origName)+줄('파일',r.genName)+줄('메모',r.memo)
-    +'<div class="ds-pv-kv"><span>제출</span><b>'+(n?escapeHtml((r.submits[0].date||'')+' '+(r.submits[0].method||''))+(n>1?' 외 '+(n-1)+'건':''):'아직')+'</b></div>'
-    +_docDlTag(domain,r)
+    +(n?'<div class="ds-pv-kv"><span>제출</span><b>'+escapeHtml((r.submits[0].date||'')+' '+(r.submits[0].method||''))+(n>1?' 외 '+(n-1)+'건':'')+'</b></div>':'')
+    +_docDlTag(domain,r)+'</div>'
     +'<div class="ds-pv-btns">'
     +(받은?'':'<button class="btn sm" onclick="showBig(\''+r.genFileId+'\')">📄 크게 보기</button><button class="btn sm" onclick="docDl(\''+domain+'\',\''+r.id+'\',\'gen\')">⬇ 받기</button>')
     +(r.origFileId?'<button class="btn sm" onclick="showBig(\''+r.origFileId+'\')">📎 원본</button>':'')
     +'<button class="btn sm" onclick="openSubmitLog(\''+domain+'\',\''+r.id+'\')">🧾 제출기록'+(n?'('+n+')':'')+'</button>'
-    +'<button class="btn sm" style="color:#dc2626" onclick="delDoc(\''+domain+'\',\''+r.id+'\',this)">삭제</button></div>';
+    +'<button class="btn sm" style="color:#dc2626" onclick="delDoc(\''+domain+'\',\''+r.id+'\',this)">삭제</button>'
+    +'<button class="btn sm" title="원본·파일 이름·메모·내려받은 기록" onclick="dsPvMoreToggle(\''+domain+'\',this)">ⓘ 자세히</button></div>';
   var tok=++_dsPvTok, fid=r.genFileId||'';
   (async function(){
     var img=document.getElementById('dsPvImg-'+domain);
