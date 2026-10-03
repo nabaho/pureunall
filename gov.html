@@ -170,7 +170,7 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
      두 벌이 되면 한쪽만 고쳐져 고객사 이름이 새는 날이 온다. -->
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <script src="js/gov-career.js?v=1"></script>
-<script src="js/gov-g2b.js?v=4"></script>
+<script src="js/gov-g2b.js?v=5"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
 <script>
@@ -250,6 +250,25 @@ async function pull(url){
   try{ var r=await fetch(url,{signal:c.signal}); return await r.json(); }
   finally{ clearTimeout(t); }
 }
+/* ═══ 쪽을 «끝까지» 넘겨 받는다 (2026-10-03) ═══
+   ⚠★ 첫 쪽만 받고 있었다 — 실측 7일치 나라장터 3,077건 중 999건, 알리오 525건 중 100건만 봤다.
+      나라장터 3분의 2·알리오 5분의 4는 «낱말에 걸리는지 보지도 못하고» 버려졌다.
+   ⚠ 뚜껑(PAGE_MAX)을 둔다 — 하루 1,000회 제한이 있다. 실측 하루 10회 안팎이라 넉넉하다.
+   ⚠ 뚜껑에 걸려 다 못 받으면 «그렇다고 말한다» — 조용히 자르면 또 같은 일이 된다. */
+var PAGE_MAX={g2b:8, alio:10};
+async function pullAll(name, urlOf, parse, max){
+  var rows=[], errs=[], total=0;
+  for(var p=1;p<=max;p++){
+    var o;
+    try{ o=parse(await pull(urlOf(p))); }
+    catch(e){ errs.push(name+': 받지 못했습니다'+(p>1?' ('+p+'쪽)':'')); break; }
+    if(!o.ok){ errs.push(name+': '+o.err); break; }
+    rows=rows.concat(o.rows); total=o.total||rows.length;
+    if(!o.rows.length || rows.length>=total) break;
+    if(p===max) errs.push(name+': '+total+'건 중 '+rows.length+'건만 받았습니다(쪽 뚜껑)');
+  }
+  return {rows:rows, errs:errs, total:total};
+}
 async function fetchAll(){
   var kd=keyData(), kb=keyBiz();
   if(!kd && !kb){ readyNote(); toast('인증키를 먼저 넣어 주세요'); return; }
@@ -258,12 +277,12 @@ async function fetchAll(){
   var buf=get('feed'), got=[], errs=[];
   var to=new Date(), from=new Date(Date.now()-7*86400000);
   if(kd){
-    try{ var o=GovG2b.parse(await pull(GovG2b.buildUrl({key:kd,from:from,to:to,page:1,rows:999})));
-      if(o.ok) got=got.concat(o.rows); else errs.push('나라장터: '+o.err); }
-    catch(e){ errs.push('나라장터: 받지 못했습니다'); }
-    try{ var a=GovAlio.parse(await pull(GovAlio.buildUrl({key:kd,page:1,rows:100,ongoingOnly:true})));
-      if(a.ok) got=got.concat(a.rows); else errs.push('알리오: '+a.err); }
-    catch(e){ errs.push('알리오: 받지 못했습니다'); }
+    var g=await pullAll('나라장터', function(p){ return GovG2b.buildUrl({key:kd,from:from,to:to,page:p,rows:999}); },
+                        GovG2b.parse, PAGE_MAX.g2b);
+    got=got.concat(g.rows); errs=errs.concat(g.errs);
+    var a=await pullAll('알리오', function(p){ return GovAlio.buildUrl({key:kd,page:p,rows:100,ongoingOnly:true}); },
+                        GovAlio.parse, PAGE_MAX.alio);
+    got=got.concat(a.rows); errs=errs.concat(a.errs);
   }
   if(kb){
     for(var i=0;i<GovBizinfo.FIELDS_DEFAULT.length;i++){

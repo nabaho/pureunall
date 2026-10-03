@@ -50,3 +50,34 @@ test('★★ ③ 함수 자신이 묶는다 — 그리기 맨 앞에서 거른�
   assert.match(cutFn(SRC, 'function renderPCSide('),
     /^function renderPCSide\(\)\{\s*mbMemoClear\(\);[^\n]*\n\s*if\(typeof pcSideBurst === 'function' && pcSideBurst\(\)\) return;/);
 });
+
+test('★★ 예약이 그 자리에서 바로 돌아도 자기 자신을 끝없이 부르지 않는다', () => {
+  let n = 0;
+  const ctx = { Date: { now: () => 5000 }, setTimeout: fn => { fn(); return 0; } };
+  vm.createContext(ctx);
+  vm.runInContext([
+    SRC.match(/^const PC_SIDE_GAP = \d+;$/m)[0].replace('const', 'var'),
+    'var _pcSideAt = 0, _pcSideT = null;', cutFn(SRC, 'function pcSideBurst('),
+    'function renderPCSide(){ if(pcSideBurst()) return; _n(); }'].join('\n'), ctx);
+  ctx._n = () => n++;
+  ctx.renderPCSide(); ctx.renderPCSide();
+  assert.equal(n, 2, '★ 바로 도는 예약에서 그리기를 놓쳤거나 겹쳤다');
+});
+
+test('★★★ 명함 표도 같은 규칙 — 몰려온 다섯 번은 «바로 + 끝에 한 번»', () => {
+  let now = 1000; const q = []; const drawn = [];
+  const ctx = { Date: { now: () => now }, setTimeout: (fn, ms) => { q.push([now + ms, fn]); return q.length; } };
+  vm.createContext(ctx);
+  vm.runInContext([
+    SRC.match(/^const PC_SIDE_GAP = \d+;$/m)[0].replace('const', 'var'),
+    'var _pcTableAt = 0, _pcTableT = null;', cutFn(SRC, 'function pcTableBurst('),
+    'function renderPCTable(){ if(pcTableBurst()) return; _d(Date.now()); }'].join('\n'), ctx);
+  ctx._d = t => drawn.push(t);
+  ctx.renderPCTable();
+  for (let i = 0; i < 4; i++) { now += 20; ctx.renderPCTable(); }
+  assert.equal(drawn.length, 1, '★★★ 몰려온 것을 그때마다 다 그렸다');
+  now += 200; q.sort((a, b) => a[0] - b[0]); while (q.length && q[0][0] <= now) q.shift()[1]();
+  assert.equal(drawn.length, 2, '★★★ 밀린 표 그리기를 건너뛰었다');
+  assert.match(cutFn(SRC, 'function renderPCTable('),
+    /^function renderPCTable\(\)\{\s*if\(typeof pcTableBurst === 'function' && pcTableBurst\(\)\) return;/, '★ 표 그리기 맨 앞에서 안 거른다');
+});

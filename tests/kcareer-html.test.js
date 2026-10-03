@@ -1464,9 +1464,12 @@ test('★ 보관함은 한 화면 세 탭이다 — 종류가 늘어도 화면�
     assert.ok(source.indexOf('id="' + id + '"') > 0, id + ' 탭이 있어야 합니다');
   });
   // 세 종류가 «같은 화면»을 가리켜야 한 곳에서 그려진다
+  /* ⚠ 개수를 박지 않는다 — 종류가 늘어도(2026-10-03 비용 서류) «모두 한 화면»이면 맞다 */
   const dm = source.slice(source.indexOf('const DOMAINS={'), source.indexOf('const KIND_DEFAULTS'));
-  assert.equal((dm.match(/page:'page-docbox'/g) || []).length, 3,
-    '이력서·프로필·증명서가 모두 page-docbox 를 가리켜야 합니다');
+  const 종류 = (dm.match(/\{store:'/g) || []).length;
+  assert.ok(종류 >= 3, '보관함 종류를 못 찾았습니다 — 이 검사를 손봐야 합니다');
+  assert.equal((dm.match(/page:'page-docbox'/g) || []).length, 종류,
+    '보관함 종류가 모두 page-docbox 를 가리켜야 합니다 — 화면을 새로 만들면 둘로 갈라집니다');
   /* ⚠ 칸 id 는 종류마다 달라야 한다(rs*·pf*·cd*) — 같게 만들면 숨은 탭을 그릴 때
      서로 덮어써서 목록이 뒤섞인다. renderDocStore 를 손대지 않은 이유이기도 하다. */
   ['rsBody', 'pfBody', 'cdBody'].forEach((id) => {

@@ -349,7 +349,10 @@ test('★★ 어학 시험 가르기(_isLangCert) — 성적이 있거나 시험
   assert.equal(fn({ title: '토익 스피킹', grade: '' }), true);
   assert.equal(fn({ title: '무슨 시험', grade: '850' }), true, '성적이 적혀 있으면 어학입니다');
   assert.equal(fn({ title: '영어교육지도사' }), false, '★ 「영어」가 든 자격을 어학으로 봅니다');
-  const cv = app.slice(app.indexOf('function _cvFillData('), app.indexOf('function _cvFillData(') + 6000);
+  /* ⚠ 「앞 N자」 창으로 자르지 않는다 — 칸이 늘면 뒤쪽이 창 밖으로 밀린다(2026-10-03 계좌 칸을 더하자 실제로 밀렸다).
+     다음 함수 머리까지 «함수 하나»를 통째로 본다. */
+  const 시작 = app.indexOf('function _cvFillData(');
+  const cv = app.slice(시작, app.indexOf('\nasync function ', 시작));
   assert.match(cv, /const 어학목록=_자격\.filter\(_isLangCert\)/, '어학 목록이 가르개를 안 씁니다');
   assert.match(cv, /const 자격목록=_자격\.filter\(function\(r\)\{ return !_isLangCert\(r\); \}\)/,
     '★★ 토익이 자격 표와 어학 표에 두 번 적힙니다');
