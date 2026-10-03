@@ -173,8 +173,9 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
+<script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=6"></script>
-<script src="js/pu-contract-forms.js?v=10"></script>
+<script src="js/pu-contract-forms.js?v=11"></script>
 <script src="js/pu-photo-store.js?v=31"></script>
 <script src="js/pu-office-store.js?v=2"></script>
 <script src="js/pu-office-docs.js?v=1"></script>
@@ -310,7 +311,7 @@ async function formHwpMarkers(bytes, name) {
   try { return Object.keys(EsignHwpTpl.markersOf(doc)); } finally { try { doc.free(); } catch (e) {} }
 }
 /* 줄 다시 나누기 — «값을 넣은 문단만» (PuFormCardFill.stripLinesegsFor). 전체를 걷으면 꽉 찬 서식이 넘친다. */
-async function formRelayout(doc, vals) {
+async function formRelayout(doc, vals, fmt) {
   var hx = doc.exportHwpx();
   var JSZ = await _esignLoadJsZip();
   var zip = await JSZ.loadAsync(hx);
@@ -320,7 +321,7 @@ async function formRelayout(doc, vals) {
   }));
   var bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: 'application/hwp+zip' });
   var d2 = await PureunHwp.openDoc(bytes, 'relayout.hwpx');
-  try { d2.reflowLinesegs(); return d2.exportHwp(); } finally { try { d2.free(); } catch (e) {} }
+  try { d2.reflowLinesegs(); return fmt === 'hwpx' ? d2.exportHwpx() : d2.exportHwp(); } finally { try { d2.free(); } catch (e) {} }
 }
 async function formHwpFill(bytes, name, V) {
   if (formIsXlsx(name)) {
@@ -337,6 +338,25 @@ async function formHwpFill(bytes, name, V) {
   catch (e) { r.bytes = doc.exportHwp(); r.relayoutFailed = true; }
   try { doc.free(); } catch (e) {}
   return r;
+}
+/* ✏ 바꿀 자리 만들기 (설계 2026-09-29 §4) — «바이트 → 바이트». 문서를 열고·고치고·닫는다(상태 없음).
+   원본 형식 그대로 낸다(.hwp→.hwp, .hwpx→.hwpx). 바꾼 문단만 줄 다시 나누기. */
+function formHwpFmt(name) { return /\.hwpx$/i.test(name || '') ? 'hwpx' : 'hwp'; }
+async function formHwpFind(bytes, name, find) {
+  var doc = await PureunHwp.openDoc(bytes, name);
+  try { return PuHwpMark.hitsOf(doc, find).map(function (h) { return { i: h.i, before: h.before, after: h.after, cell: !!h.cell }; }); }
+  finally { try { doc.free(); } catch (e) {} }
+}
+async function formHwpMark(bytes, name, find, to, which) {
+  var fmt = formHwpFmt(name);
+  var doc = await PureunHwp.openDoc(bytes, name), r;
+  try { r = PuHwpMark.apply(doc, find, to, which); } catch (e) { try { doc.free(); } catch (e2) {} throw e; }
+  if (!r.count) { try { doc.free(); } catch (e) {} return { bytes: bytes, count: 0, failed: r.failed }; }
+  var out;
+  try { out = await formRelayout(doc, [to], fmt); }
+  catch (e) { out = fmt === 'hwpx' ? doc.exportHwpx() : doc.exportHwp(); }
+  try { doc.free(); } catch (e) {}
+  return { bytes: new Uint8Array(out), count: r.count, failed: r.failed };
 }
 /* 묶음 채우기 — 채운 파일들을 .zip 하나로 (브라우저 안에서만 묶는다. 채운 값은 서버로 안 간다) */
 async function formZip(files) {
@@ -375,7 +395,7 @@ function showPane(name) {
     formsMounted = true;
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(),
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
-      cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, me: function () { return window.PuWhoami && PuWhoami.get(); } });
+      cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, me: function () { return window.PuWhoami && PuWhoami.get(); } });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
