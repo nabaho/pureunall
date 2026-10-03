@@ -72,3 +72,25 @@ test('★★ ④ 사람이 담당자·스팸을 바꾸면(mbWhoBust) 담아 둔 
   const bust = cutFn(SRC, 'function mbWhoBust(');
   for (const k of ['whoWhy', 'whoWhyIdx', 'spamWhy']) assert.match(bust, new RegExp('delete m0\.' + k + ';'), '★ ' + k + ' 를 안 버린다 — 바꾼 것이 안 보인다');
 });
+
+test('★★★ ⑤ 메일 줄 모음(mbAllRows)은 그리는 동안 한 벌 · 받는 쪽은 사본을 받는다 (2026-10-03 메일창 확인)', () => {
+  const f = cutFn(SRC, 'function mbAllRows(');
+  assert.match(f, /if\(_c && _c\[id\]\) return _c\[id\]\.slice\(\);/, '★★★ 그릴 때마다 1,887통을 새 줄로 또 만든다');
+  assert.match(f, /return _c \? rows\.slice\(\) : rows;/, '★ 담아 둔 배열을 그대로 건넨다 — 받는 쪽이 줄 세우면 바뀐다');
+});
+
+test('★★★ ⑥ 돌려 쓰는 객체(_reuse)는 기억하지 않는다 — 첫 메일 답이 모든 메일에 가면 안 된다', () => {
+  let n = 0;
+  const ctx = { WeakMap, _mbMemo: null, mbPutOf: () => '', mbRuleBinOf: v => (n++, v.e === 'a' ? 'A' : 'B'), mbBinOfFolder: () => null };
+  vm.createContext(ctx);
+  vm.runInContext([cutFn(SRC, 'function mbMemoOf('), cutFn(SRC, 'function mbBinIdOfRow(')].join('\n'), ctx);
+  const v = { e: 'a', _reuse: 1 };
+  assert.equal(ctx.mbBinIdOfRow(v), 'A'); v.e = 'b';
+  assert.equal(ctx.mbBinIdOfRow(v), 'B', '★★★ 돌려 쓰는 객체에 첫 답을 또 줬다 — 담당자 셈이 통째로 틀린다');
+  const w = { e: 'a' }; ctx.mbBinIdOfRow(w); ctx.mbBinIdOfRow(w);
+  assert.equal(n, 3, '★ 보통 줄은 한 번만 판정해야 한다');
+  for (const src of [SRC.match(/const v = \{ e:'', r:0, _slug:'', _key:'', _reuse:1 \};/), SRC.match(/const v = \{ t:'', _key:'', _reuse:1 \};/)])
+    assert.ok(src, '★★ 담당자 셈의 돌려 쓰는 객체에 _reuse 표시가 없다');
+  assert.match(cutFn(SRC, 'function mbIsSpam('), /v\._reuse\) return !!mbSpamWhy\(v\);/);
+  assert.match(cutFn(SRC, 'function mbWhoBust('), /delete m0\.allRows; delete m0\.binOf;/, '★ 담당자·분류가 바뀌어도 옛 줄 모음을 쓴다');
+});
