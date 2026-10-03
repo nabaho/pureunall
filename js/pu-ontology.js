@@ -132,7 +132,7 @@
       entityTypes:['Person','Organization','Document','MediaAsset','Task'] },
     fund:{ name:'기금관리', file:'fund.html', primaryRoots:['data/funds'], sharedRoots:['data/finance_income','pucards/idx','pucards/coInfo'],
       entityTypes:['Organization','Person','Project','FinancialTransaction','Document'] },
-    rules:{ name:'취업규칙 관리', file:'rules.html', primaryRoots:['chwieop','rules_mgmt'], sharedRoots:['data/user_dir'],
+    rules:{ name:'취업규칙', file:'rules.html', primaryRoots:['chwieop','rules_mgmt'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Policy','Document','ReviewCriterion','LegalProvision'] },
     /* 취업규칙(새) — 옛 규정관리(rules)와 «나란히» 둔다(설계 §3-1). 옛 앱의 자리(chwieop·rules_mgmt 일부)는 건드리지 않는다.
        화면이 쓰는 칸은 사람 칸 셋뿐이다(서류 human · 회차 rounds · 요청 ask).

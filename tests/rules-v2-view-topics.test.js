@@ -255,6 +255,60 @@ test('⑦ 교정 기억을 못 읽어도 화면은 선다', async () => {
   assert.doesNotMatch(el.innerHTML, /못 만들었습니다/);
 });
 
+test('⑦ 📥 에서 저장했다는 표시(markDirty)가 있어야만, 다시 들어올 때 모델을 새로 셈한다 · 고른 주제는 지킨다', async () => {
+  const real = V.model;
+  let n = 0;
+  V.model = function () { n++; return real.apply(this, arguments); };
+  let loads = 0, 받은글 = 0;
+  const S = {
+    load: () => { loads++; return Promise.resolve(DATA); },
+    texts: (docs) => { 받은글++; return Promise.resolve({ texts: TEXTS, failed: [] }); },
+  };
+  const el = { innerHTML: '' };
+  try {
+    const ctl = V.mount(el, { S, companies: COS, stdText: STD, today: TODAY, criteria: { evaluate: CR.evaluate, useMatchFix() {} } });
+    await ctl.ready;
+    ctl.select('동호회');
+    assert.equal(n, 1);
+    // 표시가 없으면 다시 들어와도 셈하지 않는다(📚 → 📥 → 📚 만 오간 경우)
+    await ctl.enter(); await ctl.enter();
+    assert.equal(n, 1, '표시가 없는데 모델을 다시 셈했다');
+    assert.equal(loads, 1);
+    // 📥 에서 저장 → 표시 → 다시 들어오면 «한 번» 새로 셈한다
+    ctl.markDirty();
+    await ctl.enter();
+    assert.equal(n, 2, '저장 표시가 있는데 모델을 다시 셈하지 않았다 — 낡은 문안이 보인다');
+    assert.equal(ctl.state.sel, '동호회', '다시 셈해도 사람이 고른 주제는 그대로여야 한다');
+    // 표시는 한 번 쓰면 꺼진다
+    await ctl.enter();
+    assert.equal(n, 2);
+    // 새로 셈한 자료가 화면에 간다 — 저장으로 회사가 지워진 자료
+    ctl.markDirty();
+    const 바뀐 = JSON.parse(JSON.stringify(DATA)); 바뀐.human.d4 = { companyId: 'co1', companyLinkStatus: 'linked' };
+    S.load = () => Promise.resolve(바뀐);
+    await ctl.enter();
+    assert.equal(n, 3);
+    assert.ok(ctl.state.M.byTopic[K].some((g) => g.members.some((m) => m.docId === 'd4' && m.companyId === 'co1')), '새 자료가 모델에 안 들어갔다');
+  } finally { V.model = real; }
+});
+
+test('⑦ 다시 셈하다 실패하면 옛 화면을 두고 다음 진입에서 또 시도한다', async () => {
+  let fail = false;
+  const S = { load: () => (fail ? Promise.reject(new Error('끊김')) : Promise.resolve(DATA)), texts: () => Promise.resolve({ texts: TEXTS, failed: [] }) };
+  const el = { innerHTML: '' };
+  const ctl = V.mount(el, { S, companies: COS, stdText: STD, today: TODAY, criteria: { evaluate: CR.evaluate, useMatchFix() {} } });
+  await ctl.ready;
+  const 옛 = ctl.state.M;
+  ctl.markDirty(); fail = true;
+  await ctl.enter();
+  assert.equal(ctl.state.M, 옛, '실패했는데 옛 모델이 사라졌다');
+  assert.doesNotMatch(el.innerHTML, /못 만들었습니다/, '다시 셈 실패가 화면을 에러 글로 갈아엎었다');
+  assert.equal(ctl.state.dirty, true, '실패 뒤에도 표시가 남아 있어야 다음에 또 시도한다');
+  fail = false;
+  await ctl.enter();
+  assert.notEqual(ctl.state.M, 옛, '다음 진입에서 새로 셈해야 한다');
+});
+
 /* ── 화면 머리 ── */
 const RAW = fs.readFileSync(path.join(__dirname, '../rules-v2.html'), 'utf8');
 const HTML = stripComments(RAW);
@@ -262,6 +316,14 @@ const HTML = stripComments(RAW);
 test('⑧ 새 js 는 캐시 번호를 달고 싣는다', () => {
   ['js/pu-rules-criteria.js', 'std_2026.js', 'js/rules-v2/lib-topics.js', 'js/rules-v2/text-cache.js', 'js/rules-v2/view-topics.js']
     .forEach((f) => assert.match(HTML, new RegExp('<script src="' + f.replace(/[.\/]/g, '\\$&') + '\\?v=\\d+"></script>'), f));
+});
+
+test('⑧ 📥 에서 저장(reload)하면 조별 문안에 표시하고, #topics 로 들어올 때 새로 셈하게 한다', () => {
+  const rel = HTML.match(/function reload\(\) \{[\s\S]*?\n\}/);
+  assert.ok(rel, 'reload 함수가 있어야 한다');
+  assert.match(rel[0], /topicsCtl\.markDirty\(\)/, '★ 저장 뒤 다시 읽기(reload)가 조별 문안에 낡았다고 알리지 않는다');
+  const route = HTML.match(/function rv2Route\(\) \{[\s\S]*?\n\}/);
+  assert.ok(route && /topicsCtl\.enter\(\)/.test(route[0]), '★ #topics 에 들어올 때 enter() 로 다시 셈할 길이 없다');
 });
 
 test('⑧ 주소 #topics 는 조별 문안, 그 밖은 모은 자료 — 같은 창, 뒤로가기는 깃발을 든다', () => {

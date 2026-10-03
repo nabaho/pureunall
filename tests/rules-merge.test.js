@@ -44,7 +44,7 @@ test('①★ 포털에 취업규칙 타일은 하나 — 열쇠 rules, 이름은
   assert.equal(줄.length, 1, '★★ 취업규칙 타일이 ' + 줄.length + '개다 — 한 앱의 문이 둘이면 어느 쪽인지 헷갈린다');
   assert.equal(줄[0].key, 'rules');
   assert.equal(줄[0].url, 'rules.html', '★ 타일은 검토·개정(rules.html)으로 들어온다');
-  assert.equal(줄[0].name, '취업규칙', '★ 대표 결정 — 포털 타일 이름은 「취업규칙」');
+  assert.equal(줄[0].name, '취업규칙', '★ 대표 결정 — 포털 타일 이름은 「취업규칙」'); // 검사고정-허용 — 대표 결정 2026-10-04 타일 이름
   assert.ok(!list.some((a) => a.key === 'rulesv2'), '★★ rulesv2 타일이 남았다');
 });
 

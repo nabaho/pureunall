@@ -14,7 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=44"></script>
+<script src="js/pu-ontology.js?v=45"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -47,7 +47,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="std_2026.js?v=2"></script>
 <script src="js/rules-v2/lib-topics.js?v=1"></script>
 <script src="js/rules-v2/text-cache.js?v=1"></script>
-<script src="js/rules-v2/view-topics.js?v=2"></script>
+<script src="js/rules-v2/view-topics.js?v=3"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans KR",system-ui,sans-serif;background:#e2e8f0;color:#1e293b;font-size:13px}
@@ -226,6 +226,8 @@ function busy(t, p) {
   });
 }
 function reload() {
+  // 📚 조별 문안의 모델은 이 저장 «전»의 자료다 — 낡았다고 표시해 두면 다음에 #topics 로 들어올 때 새로 셈한다
+  if (typeof topicsCtl !== 'undefined' && topicsCtl) topicsCtl.markDirty();
   return busy('읽는 중…', S.load()).then(function (d) {
     ST.data = d;
     ST.picked.forEach(function (id) { if (!d.docs[id] || d.docs[id].status === '보류') ST.picked.delete(id); });
@@ -346,6 +348,7 @@ function rv2Route() {
     a.classList.toggle('on', on);
     if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
+  if (mode === 'topics' && S && topicsCtl) topicsCtl.enter();   // 📥 에서 저장한 게 있으면 새로 셈한다(없으면 그대로)
   if (mode === 'topics' && S && !topicsCtl) {
     topicsCtl = PuRulesV2TopicsView.mount($topics, { S: S, cache: PuRulesV2TextCache.make(window.indexedDB),
       companies: ST.companies, stdText: (window.STD_2026 || {}).text || '', loadFix: FIX_LOAD });

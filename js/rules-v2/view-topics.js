@@ -10,6 +10,7 @@
    ★ 지키는 것
      · 가린 글만 — 이 화면은 S.texts 가 준 «가린 글» 말고는 받지 않는다(이름이 든 원문은 없다).
      · 모델은 한 번만 — 글을 다 받은 뒤 한 번 셈하고, 주제를 바꿔도 다시 셈하지 않는다.
+       단, 📥 에서 저장했다는 표시(markDirty)가 있으면 다시 들어올 때(enter) «한 번 더» 셈한다 — 글은 text-cache 에서 온다.
        (덩어리 견주기·위반 판정은 그 주제를 처음 열 때 한 번 하고 모델에 담아 둔다)
      · 한 줄 칸 — 주제·덩어리 머리·쓴 회사 줄·경고 줄은 넘치면 … 이고 title 에 전문.
      · 회사는 id 로 이름을 찾는다 — 사업장 미확정은 이름을 «지어내지 않고» 「(미확정)」. */
@@ -211,7 +212,7 @@
      ctx: { S, cache, companies, stdText, criteria?, loadFix?:()=>Promise(fix), today? }
      돌려주는 것: { ready, select(key), search(q), toggle(key,gi), state } — 검사가 손잡이로 쓴다 */
   function mount(el, ctx) {
-    var st = { M: null, sel: '', q: '', open: new Set(), failed: [], done: 0, total: 0, loaded: false, err: '' };
+    var st = { M: null, sel: '', q: '', open: new Set(), failed: [], done: 0, total: 0, loaded: false, err: '', dirty: false };
     var C = ctx.criteria || CR();
 
     function part(role) { return el.querySelector ? el.querySelector('[data-role="' + role + '"]') : null; }
@@ -259,21 +260,35 @@
     drawAll();
     // 사람이 고친 조문 연결(교정 기억) — 규정관리와 같은 판정이 되게 한 번 읽어 넘긴다. 못 읽으면 교정 없이.
     var fix = (ctx.loadFix ? Promise.resolve().then(ctx.loadFix) : Promise.resolve({})).then(function (f) { return f || {}; }, function () { return {}; });
-    api2.ready = Promise.all([ctx.S.load(), fix]).then(function (v) {
-      var data = v[0] || {}, f = v[1];
-      if (C && C.useMatchFix) C.useMatchFix(function () { return f; });
-      var docs = {};
-      O().merge(data.docs || {}, data.human || {}).forEach(function (it) {
-        if (it.kind === '규칙본문' && it.status === '담김') docs[it.id] = it.doc;
+    // 모델을 만든다(처음 한 번 + 📥 에서 저장한 뒤 다시 들어올 때). 글은 text-cache 에 남아 있어 다시 받지 않는다.
+    function build(first) {
+      return Promise.all([ctx.S.load(), fix]).then(function (v) {
+        var data = v[0] || {}, f = v[1];
+        if (C && C.useMatchFix) C.useMatchFix(function () { return f; });
+        var docs = {};
+        O().merge(data.docs || {}, data.human || {}).forEach(function (it) {
+          if (it.kind === '규칙본문' && it.status === '담김') docs[it.id] = it.doc;
+        });
+        if (first) { st.loaded = true; st.total = Object.keys(docs).length; drawAll(); }
+        return ctx.S.texts(docs, ctx.cache, function (n, m) { if (first) { st.done = n; st.total = m; if (!st.M) drawAll(); } }).then(function (r) {
+          st.failed = r.failed || [];
+          var keep = st.sel;
+          st.M = api.model(data, r.texts, ctx.companies, ctx.stdText, ctx.today, C);   // ★ 한 번만(저장 표시가 없으면 다시 셈하지 않는다)
+          st.sel = st.M.topics.some(function (t) { return t.key === keep; }) ? keep : (st.M.topics.length ? st.M.topics[0].key : '');
+          draw();
+        });
       });
-      st.loaded = true; st.total = Object.keys(docs).length; drawAll();
-      return ctx.S.texts(docs, ctx.cache, function (n, m) { st.done = n; st.total = m; if (!st.M) drawAll(); }).then(function (r) {
-        st.failed = r.failed || [];
-        st.M = api.model(data, r.texts, ctx.companies, ctx.stdText, ctx.today, C);   // ★ 한 번만
-        st.sel = st.M.topics.length ? st.M.topics[0].key : '';
-        drawAll();
-      });
-    }).catch(function (e) { st.err = '조별 문안을 못 만들었습니다: ' + ((e && e.message) || e); drawAll(); });
+    }
+    api2.ready = build(true).catch(function (e) { st.err = '조별 문안을 못 만들었습니다: ' + ((e && e.message) || e); drawAll(); });
+    // 📥 에서 사업장·★최종본·갈래·회차를 저장하면 이 모델은 낡았다 — 표시만 해 두고, 다시 들어올 때 새로 셈한다
+    api2.markDirty = function () { st.dirty = true; };
+    api2.enter = function () {
+      if (!st.dirty) return api2.ready;
+      st.dirty = false;
+      // 다시 셈하다 실패하면 옛 화면을 그대로 두고 다음 진입에서 또 시도한다(화면을 에러 글로 갈아엎지 않는다)
+      api2.ready = api2.ready.then(function () { return build(false); }).catch(function () { st.dirty = true; });
+      return api2.ready;
+    };
     return api2;
   }
 

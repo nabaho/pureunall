@@ -2,7 +2,9 @@
    떼기 전 코드로 만든 고정 자료(tests/fixtures/rules-criteria-golden.json)와 견준다.
    고정 자료는 «사람이 고친 조문 연결(교정 기억)»이 비어 있을 때의 판정이다.
    교정 기억(pin/ban) 길은 따로 고정 자료(rules-criteria-fix.json)로 지킨다 —
-   그 길이 끊기면 사람이 📌 지정한 조문이 말없이 무시된다. */
+   그 길이 끊기면 사람이 📌 지정한 조문이 말없이 무시된다.
+   ★ 규칙집(RULES)을 «일부러» 고쳐 이 검사가 깨지면:  node scripts/make-rules-criteria-golden.js
+     로 두 고정 자료를 다시 만들고, git diff tests/fixtures 로 바뀐 판정을 확인한 뒤 커밋 글에 까닭을 적는다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -21,7 +23,7 @@ test('판정이 떼기 전과 같다 — 규모 넷', () => {
   assert.ok(G.length >= 4, '고정 자료가 비었다');
   G.forEach((g) => {
     const got = C.evaluate(arts, g.size, new Set(), '2026-10-01').map(줄이기);
-    assert.deepEqual(got, g.results, '★ 규모 ' + g.size + ' 판정이 바뀌었다');
+    assert.deepEqual(got, g.results, '★ 규모 ' + g.size + ' 판정이 바뀌었다'); // 검사고정-허용 — 판정을 «한 글자도» 안 바꾸고 옮겼다는 증거라 값 그대로 견준다(규칙집을 일부러 고치면 다시 만들개로 갱신)
   });
 });
 
@@ -34,7 +36,7 @@ test('교정 기억(pin/ban)이 떼기 전처럼 판정을 바꾼다 — useMatc
     FIX.expect.forEach((e) => {
       const f = got.find((x) => x.rule.id === e.id);
       assert.ok(f, e.id + ' 판정이 없다');
-      assert.deepEqual(줄이기(f), e, '★ 교정 기억이 걸린 ' + e.id + ' 판정이 떼기 전과 다르다');
+      assert.deepEqual(줄이기(f), e, '★ 교정 기억이 걸린 ' + e.id + ' 판정이 떼기 전과 다르다'); // 검사고정-허용 — 교정 기억 길이 옛 판정을 그대로 내는지 지키는 값(규칙집을 일부러 고치면 다시 만들개로 갱신)
       // 고정 자료가 «교정 없음»과 같으면 이 검사는 아무것도 안 지킨다 — 실제로 갈라지는지 본다
       assert.notDeepEqual(e, 기본.find((x) => x.id === e.id), e.id + ' 의 교정 고정 자료가 교정 없는 판정과 같다 — 이빨이 없다');
     });
@@ -43,7 +45,7 @@ test('교정 기억(pin/ban)이 떼기 전처럼 판정을 바꾼다 — useMatc
   }
   // 되돌린 뒤엔 교정 없는 판정으로 돌아온다(읽개가 값을 붙잡아 두지 않는다)
   const back = C.evaluate(arts, FIX.size, new Set(), FIX.asof).map(줄이기);
-  assert.deepEqual(back, 기본);
+  assert.deepEqual(back, 기본); // 검사고정-허용 — 되돌린 뒤엔 교정 없는 고정 자료와 같아야 한다
 });
 
 test('rules.html 은 새 파일을 싣고, 정의를 두 벌 두지 않는다', () => {
