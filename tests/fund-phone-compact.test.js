@@ -164,7 +164,7 @@ test('★ 지역기금 목록 — 정보·분류를 머리와 몸통에서 «함
   assert.match(표, /\['분류','ph'/, '분류 머리를 안 접었습니다');
   assert.match(표, /\['부담당','mo'/, '부담당을 좁은 화면에서 안 접었습니다');
   assert.match(표, /\['대표자','mo'/, '대표자를 좁은 화면에서 안 접었습니다');
-  const 줄 = 덩어리('function fundRow(f,no,mode,showReg){');
+  const 줄 = 덩어리('function fundRow(f,no,mode,showReg,showGov){');
   assert.match(줄, /<td class="ph">'\+chip\+'<\/td>/, '★ 머리만 접고 몸통은 그대로입니다 — 값이 옆으로 밀립니다');
   assert.match(줄, /<td class="ph" onclick="event\.stopPropagation\(\)">'\+\(f\.fund_type/,
     '★ 분류 몸통을 안 접었습니다');
@@ -178,14 +178,14 @@ test('★ 지역기금 목록 — 머리와 몸통이 «같은 칸»을 접는�
       for (let q = src.indexOf('{', k); q < src.length; q++) {
         if (src[q] === '{') d++; else if (src[q] === '}') { d--; if (!d) return src.slice(k, q + 1); } } };
     const box = {};
-    new Function('esc', 'fundRow', g('_headHTML') + g('fundTable') + 'this.t = fundTable;')
+    new Function('esc', 'fundRow', g('_headHTML') + g('fundTable') + "function grp(f){return f.fund_type==='사내'?'사내':(f.region?'지역공동':'개별공동');} this.t = fundTable;")
       .call(box, (v) => String(v == null ? '' : v), () => '');
     /* 몸통(fundRow) 소스에는 «설립중에만» 나오는 삭제 칸도 들어 있다 —
        같은 조건으로 견주려면 머리도 설립중으로 만든다. */
-    return box.t([{ fund_type: '공동' }], false, 'setup');
+    return box.t([{ fund_type: '공동', region: '충남' }], false, 'setup');
   })();
   const 머리 = 머리HTML.slice(머리HTML.indexOf('<thead>'), 머리HTML.indexOf('</thead>'));
-  const 몸통 = 덩어리('function fundRow(f,no,mode,showReg){');
+  const 몸통 = 덩어리('function fundRow(f,no,mode,showReg,showGov){');
 
   const h = 접힘표(머리, 'th');
   const b = 접힘표(몸통, 'td');
@@ -198,9 +198,24 @@ test('★ 지역기금 목록 — 머리와 몸통이 «같은 칸»을 접는�
 });
 
 test('주담당 이름은 접지 않는다 — 「김혜민」이 석 줄로 쌓이면 줄 키가 그만큼 는다', () => {
-  const 줄 = 덩어리('function fundRow(f,no,mode,showReg){');
+  const 줄 = 덩어리('function fundRow(f,no,mode,showReg,showGov){');
   const m = /<td style="([^"]*)">'\+esc\(mgrMainName\(f\)/.exec(줄);
   assert.ok(m, '주담당 칸을 못 찾았습니다');
   assert.match(m[1], /white-space:nowrap/,
     '★ 이름이 글자 단위로 접히면 폰에서 줄마다 두세 줄씩 늘어납니다');
+});
+
+test('★ 공동기금·사내기금만 있는 목록에는 «참여 지자체» 칸이 없다(대표 지시 2026-10-03)', () => {
+  const g = (n) => { const k = src.indexOf('function ' + n + '('); let d = 0;
+    for (let q = src.indexOf('{', k); q < src.length; q++) {
+      if (src[q] === '{') d++; else if (src[q] === '}') { d--; if (!d) return src.slice(k, q + 1); } } };
+  const box = {};
+  new Function('esc', 'fundRow', 'fundEditRow', g('_headHTML') + g('fundTable')
+    + "var LED_COLS=[]; function grp(f){return f.fund_type==='사내'?'사내':(f.region?'지역공동':'개별공동');} this.t = fundTable;")
+    .call(box, (v) => String(v == null ? '' : v), () => '', () => '');
+  assert.doesNotMatch(box.t([{ fund_type: '공동' }, { fund_type: '사내' }], false, ''), /참여 지자체/);
+  assert.doesNotMatch(box.t([{ fund_type: '공동' }], true, ''), /참여 지자체/, '정보 채우기 표도');
+  assert.match(box.t([{ fund_type: '공동', region: '충남' }, { fund_type: '사내' }], false, ''), /참여 지자체/, '지역기금이 섞이면 칸을 둔다');
+  const 줄 = g('fundRow');
+  assert.match(줄, /grp\(f\)==='지역공동'\?fundGovCell/, '섞인 목록에서 공동·사내 줄은 지자체를 셈하지 않고 「—」');
 });

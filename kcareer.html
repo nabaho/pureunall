@@ -6795,6 +6795,31 @@ function dsRowClick(ev,domain,id){
    ⚠ 늦게 끝난 옛 그리기가 새 것을 덮지 않게 차례표(_dsPvTok)를 본다. */
 /* 미리보기를 손으로 «끌어서» 내린다 — 휠이 없는 터치패드·펜에서도 끝까지 보게.
    ⚠ 조금 움직인 것은 끌기가 아니다(3px) — 그림을 누르기만 해도 화면이 튀면 안 된다. */
+/* ★ 미리보기 칸을 창 «맨 아래»까지 늘린다 (대표 지시 2026-10-03 「화면이 아래로 더 내려와서 맨 밑까지 화면이 나오게 해라」).
+   CSS 한 줄(100vh - 고정값)로는 못 맞춘다 — 칸이 화면 어디서 시작하는지(위 목록·스크롤)에 따라 남는 높이가 다르다.
+   그래서 «재서» 맞춘다: 창 높이 − 칸 위끝 − 아래 정보·단추 − 아래 탭줄(#groupTabs).
+   ⚠ 너무 작아지지는 않게(320px) — 그때는 화면을 내려 본다. */
+var _dsFitBound=false, _dsFitRaf=0;
+function dsPvFit(domain){
+  var img=document.getElementById('dsPvImg-'+domain); if(!img || !img.getBoundingClientRect) return;
+  var box=document.getElementById('dsPrev-'+domain);
+  var top=img.getBoundingClientRect().top;
+  var 아래=0;
+  if(box){ var br=box.getBoundingClientRect(); 아래=Math.max(0, br.bottom-img.getBoundingClientRect().bottom); }
+  var 탭=document.getElementById('groupTabs'), 탭높이=0;
+  if(탭 && 탭.offsetParent!==null){ var tr=탭.getBoundingClientRect(); if(tr.height) 탭높이=Math.max(0, (window.innerHeight||0)-tr.top); }
+  var h=Math.round((window.innerHeight||800)-Math.max(0,top)-아래-탭높이-12);
+  img.style.height=Math.max(320, h)+'px';
+  img.style.maxHeight='none';
+  if(!_dsFitBound){
+    _dsFitBound=true;
+    var 다시=function(){ cancelAnimationFrame(_dsFitRaf); _dsFitRaf=requestAnimationFrame(function(){
+      document.querySelectorAll('[id^="dsPvImg-"]').forEach(function(el){ dsPvFit(el.id.slice(8)); }); }); };
+    window.addEventListener('resize', 다시);
+    /* ⚠ 미리보기 칸 «안»을 굴리는 것은 빼고 — 그건 높이와 상관없다 */
+    window.addEventListener('scroll', function(e){ var t=e&&e.target; if(t && t.classList && t.classList.contains('ds-pv-img')) return; 다시(); }, true);
+  }
+}
 var _dsDrag=null, _dsDragBound=false;
 function dsPvDragWire(el){
   if(!el || el._dsDrag) return; el._dsDrag=1;
@@ -6838,6 +6863,7 @@ function dsPrevDraw(domain){
     +'<button class="btn sm" title="제출기록" onclick="openSubmitLog(\''+domain+'\',\''+r.id+'\')">🧾 제출'+(n?'('+n+')':'')+'</button>'
     +'<button class="btn sm" style="color:#dc2626" title="휴지통으로" onclick="delDoc(\''+domain+'\',\''+r.id+'\',this)">삭제</button>'
     +'<button class="btn sm" title="기관·종류·원본·파일 이름·메모·내려받은 기록" aria-label="자세히" onclick="dsPvMoreToggle(\''+domain+'\',this)">ⓘ</button></div>';
+  dsPvFit(domain);
   var tok=++_dsPvTok, fid=r.genFileId||'';
   (async function(){
     var img=document.getElementById('dsPvImg-'+domain);

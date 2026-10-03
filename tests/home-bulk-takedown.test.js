@@ -32,6 +32,16 @@ function fnSource(name) {
   assert.fail(name + ' 의 끝을 찾지 못했습니다');
 }
 
+/* 진짜 부품(js/pu-home-diff.js)을 그대로 싣는다 — 베끼면 본체가 바뀌어도 옛 규칙을 지킨다 */
+const 남기기규칙 = (() => {
+  const box = { window: {} };
+  vm.createContext(box);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-home-diff.js'), 'utf8'), box);
+  const D = box.PuHomeDiff || box.window.PuHomeDiff;
+  assert.ok(D && D.keepOnSiteReason, 'PuHomeDiff.keepOnSiteReason 을 못 실었습니다');
+  return D;
+})();
+
 /* 가짜 서버를 놓고 «실제로 돌려» 본다 */
 function 상자(옵) {
   const o = Object.assign({ 예: true, 답: null, 사람: [
@@ -41,16 +51,19 @@ function 상자(옵) {
   ] }, 옵 || {});
   const 보낸것 = [];
   const members = {}, chk = {};
-  o.사람.forEach(p => { members[p.key] = { name: p.name, srl: p.srl };
+  o.사람.forEach(p => { members[p.key] = Object.assign({ name: p.name, srl: p.srl },
+                                                     p.keep ? { keepOnSite: { why: p.keep } } : {});
                         chk[p.key] = { status: p.status }; });
   const ctx = {
     console: { warn() {}, log() {} },
     esc: (s) => String(s == null ? '' : s),
+    /* 「남기기」 판정은 부품(PuHomeDiff)의 것과 같은 규칙 — 사유(why)가 있어야 예외다 */
+    PuHomeDiff: 남기기규칙,
     App: { members: members, check: { members: chk }, filt() {} },
     checkHomepage() { 보낸것.push({ 무엇: 'checkHomepage' }); },
-    말한것: [], 마지막몸말: '',
-    say(t, b) { ctx.말한것.push(String(t)); ctx.마지막몸말 = String(b || ''); return Promise.resolve(); },
-    askYes(t, b) { ctx.말한것.push(String(t)); ctx.마지막몸말 = String(b || ''); return Promise.resolve(o.예); },
+    말한것: [], 마지막몸말: '', 몸말들: [],
+    say(t, b) { ctx.말한것.push(String(t)); ctx.마지막몸말 = String(b || ''); ctx.몸말들.push(ctx.마지막몸말); return Promise.resolve(); },
+    askYes(t, b) { ctx.말한것.push(String(t)); ctx.마지막몸말 = String(b || ''); ctx.몸말들.push(ctx.마지막몸말); return Promise.resolve(o.예); },
     서버에게물어보기(방식, srl, 고칠것) {
       보낸것.push({ 방식: 방식, srl: srl, 고칠것: 고칠것 });
       const 답 = typeof o.답 === 'function' ? o.답(srl) : o.답;
@@ -60,8 +73,8 @@ function 상자(옵) {
     }
   };
   vm.createContext(ctx);
-  vm.runInContext([fnSource('살펴본것글자'), fnSource('내릴사람들'),
-    fnSource('퇴사자한번에내리기')].join('\n'), ctx);
+  vm.runInContext([fnSource('살펴본것글자'), fnSource('keptOf'), fnSource('srlConflict'),
+    fnSource('내릴사람갈래'), fnSource('내릴사람들'), fnSource('퇴사자한번에내리기')].join('\n'), ctx);
   return { ctx, 보낸것 };
 }
 
@@ -149,6 +162,45 @@ test('내릴 사람이 없으면 서버를 아예 안 부른다', async () => {
   assert.deepEqual(보낸것, []);
 });
 
+/* ══════ 2026-10-03 검토 ① — 「남기기」로 둔 사람이 휴지통으로 갔다 ══════
+   대조 결과는 «그때» 찍힌 것이다. 대조 → 「퇴사 경고 끄기」(남기기) → 대조 없이 「한 번에 내리기」
+   순서면, 결과에는 아직 「내릴 것」이 남아 있어 그분 글이 휴지통으로 갔다. */
+test('★★★ 「남기기」로 둔 사람은 한 번에 내리기에서 «빠진다» — 결과가 지난 것이어도', async () => {
+  const { ctx, 보낸것 } = 상자({ 예: true, 사람: [
+    { key: 'a', name: '홍길동', srl: 101, status: 'toRemove' },
+    { key: 'b', name: '김지사', srl: 102, status: 'toRemove', keep: '세종지사장 — 고용관계 아님' }
+  ] });
+  assert.deepEqual(밖으로(ctx.내릴사람들()).map(x => x.name), ['홍길동'],
+    '★★★ 남기기로 둔 사람을 내릴 사람에 넣었습니다 — 지사장 글이 휴지통으로 갑니다');
+  await ctx.퇴사자한번에내리기();
+  assert.deepEqual(보낸것.filter(x => x.방식 === '쓰기').map(x => x.srl), [101],
+    '★★★ 남기기로 둔 사람에게 내리기를 보냈습니다');
+});
+
+test('★★ 건너뛴 사람과 «까닭»을 묻는 창에 적는다 — 왜 빠졌는지 알아야 한다', async () => {
+  const { ctx } = 상자({ 예: false, 사람: [
+    { key: 'a', name: '홍길동', srl: 101, status: 'toRemove' },
+    { key: 'b', name: '김지사', srl: 102, status: 'toRemove', keep: '지사장' },
+    { key: 'c', name: '이몽룡', srl: 0, status: 'toRemove' }
+  ] });
+  await ctx.퇴사자한번에내리기();
+  assert.match(ctx.마지막몸말, /김지사[^<]*남기기/, '★★ 남기기라서 빠진 사람을 안 알립니다');
+  assert.match(ctx.마지막몸말, /이몽룡[^<]*글 번호가 없어/, '★ 글 번호가 없어 빠진 사람을 안 알립니다');
+});
+
+test('★★★ 같은 글 번호를 다른 사람도 쓰면 «안 보낸다» — 남의 글이 휴지통으로 간다', async () => {
+  const { ctx, 보낸것 } = 상자({ 예: true, 사람: [
+    { key: 'a', name: '홍길동', srl: 101, status: 'toRemove' },
+    { key: 'b', name: '김서방', srl: 205, status: 'toRemove' },
+    { key: 'c', name: '박재직', srl: 205, status: 'same' }
+  ] });
+  await ctx.퇴사자한번에내리기();
+  assert.deepEqual(보낸것.filter(x => x.방식 === '쓰기').map(x => x.srl), [101],
+    '★★★ 글 번호가 겹치는 사람에게 내리기를 보냈습니다 — 재직자 글이 내려갈 수 있습니다');
+  assert.match(ctx.몸말들.join(' '), /김서방[^<]*같은 글 번호/,
+    '★ 왜 김서방이 빠졌는지 안 알렸습니다');
+});
+
 test('끝나면 대조를 다시 돌려 딱지를 새로 붙인다', async () => {
   const { ctx, 보낸것 } = 상자({ 예: true });
   await ctx.퇴사자한번에내리기();
@@ -158,12 +210,15 @@ test('끝나면 대조를 다시 돌려 딱지를 새로 붙인다', async () =>
 
 /* ── 한 사람만 내리기 ── 전에는 다섯 걸음짜리 안내가 떴다 ─────────────── */
 function 한사람상자(옵) {
-  const o = Object.assign({ 예: true, 답: null, srl: 193, 손으로: false }, 옵 || {});
+  const o = Object.assign({ 예: true, 답: null, srl: 193, 손으로: false, keep: '', 겹침: false }, 옵 || {});
   const 한것 = [];
+  const members = { a: Object.assign({ name: '홍길동', srl: o.srl }, o.keep ? { keepOnSite: { why: o.keep } } : {}) };
+  if (o.겹침) members.z = { name: '박재직', srl: o.srl };
   const ctx = {
     console: { warn() {}, log() {} },
     esc: (s) => String(s == null ? '' : s),
-    App: { members: { a: { name: '홍길동', srl: o.srl } } },
+    PuHomeDiff: 남기기규칙,
+    App: { members: members },
     checkHomepage() { 한것.push({ 무엇: 'checkHomepage' }); },
     copyPrivate(k) { 한것.push({ 무엇: '손으로', key: k }); },
     물은것: [],
@@ -180,9 +235,22 @@ function 한사람상자(옵) {
     }
   };
   vm.createContext(ctx);
-  vm.runInContext(fnSource('한사람내리기'), ctx);
+  vm.runInContext([fnSource('keptOf'), fnSource('srlConflict'), fnSource('한사람내리기')].join('\n'), ctx);
   return { ctx, 한것 };
 }
+
+test('★★★ 한 사람 내리기도 «남기기»면 안 보낸다 — 단추를 감춘 것만으로 막지 않는다', async () => {
+  const { ctx, 한것 } = 한사람상자({ keep: '세종지사장' });
+  await ctx.한사람내리기('a');
+  assert.deepEqual(한것, [], '★★★ 남기기로 둔 사람을 서버로 보냈습니다');
+  assert.ok(ctx.물은것.some(t => /내리지 않았습니다/.test(t)), '★ 왜 안 내렸는지 안 알렸습니다');
+});
+
+test('★★★ 한 사람 내리기도 글 번호가 겹치면 안 보낸다', async () => {
+  const { ctx, 한것 } = 한사람상자({ 겹침: true });
+  await ctx.한사람내리기('a');
+  assert.deepEqual(한것, [], '★★★ 다른 사람과 겹치는 글 번호로 내리기를 보냈습니다');
+});
 
 test('★ 한 사람 내리기는 «안내»가 아니라 바로 서버로 간다', async () => {
   const { ctx, 한것 } = 한사람상자();

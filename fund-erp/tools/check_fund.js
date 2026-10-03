@@ -441,7 +441,8 @@ ok('옮겨 가면 어디로 갔는지 알린다', src.includes('before=grp(f)') 
 ok('사내기금에는 분류를 안 붙인다', src.includes("(f.fund_type==='사내'?'<span class=\"muted\">—</span>':regSelect(f))"));
 /* 유형이 섞인 목록(종료기금·설립중)에서 머리와 몸통 칸 수가 어긋나면 값이 옆으로 밀린다 */
 ok('분류 칸 유무는 표가 한 번에 정한다', src.includes('var showReg=list.some(')
-  && src.includes('fundRow(f,i+1,mode,showReg)') && src.includes('function fundRow(f,no,mode,showReg)'));
+  && src.includes('fundRow(f,i+1,mode,showReg,showGov)') && src.includes('function fundRow(f,no,mode,showReg,showGov)')
+  && src.includes("var showGov=list.some(function(f){ return grp(f)==='지역공동'; });"));
 
 ok('지역기금을 분류로 한 겹 더 나눈다', src.includes("if(S.homeTab==='지역공동' && S.homeView==='basic'){")
   && src.includes("S.homeReg=") && src.includes("_chip('','전체',(G['지역공동']||[]).length)"));

@@ -84,11 +84,17 @@ test('②★★ 오래 걸린 대조가 «그 사이 찍힌 딱지»를 지우�
   assert.ok(본문.length > 0, '★★ 대조 마무리가 트랜잭션이 아니다 — 통째 set 이면 그 사이 것을 지운다');
   const 몸통 = 화살표(본문, 'cur =>');
   const next = { at: 1000, members: {}, pages: { p1: { status: 'same' } } };
+  /* ⚠ 2026-10-03 — 「시각을 견주는」 판(e.at > next.at)은 두 군데서 샜다:
+       next.at 이 대조가 «끝난 뒤» 찍혀 읽는 동안 찍힌 딱지를 지웠고, 남의 PC 시계가 늦어도 지웠다.
+       이제는 «대조가 시작할 때 본 딱지(본것)»와 똑같은 것만 덮는다 — 시계와 상관없다. */
+  const 본것 = { 'pages/p9': 500, 'pages/p7': 300 };
   const 지금서버 = { pages: {
     p1: { status: 'pending', at: 1500 },      // 대조가 시작한 «뒤»에 찍혔다
-    p9: { status: 'pending', at: 500 }        // 대조가 시작하기 «전» — 대조 결과가 이긴다
+    p9: { status: 'pending', at: 500 },       // 대조가 시작할 때 «이미 보던» 것 — 대조 결과가 이긴다
+    p8: { status: 'pending', at: 900 },       // 시작 뒤에 찍혔는데 그 PC 시계가 늦다
+    p7: { status: 'pending', at: 1200 }       // 보던 칸인데 읽는 동안 «다시» 찍혔다
   } };
-  const ctx = { Object, next, cur: 지금서버, console };
+  const ctx = { Object, next, cur: 지금서버, 본것, console };
   vm.createContext(ctx);
   const out = vm.runInContext('(' + 몸통 + ')(cur)', ctx);
   assert.equal(out.pages.p1.status, 'pending',
@@ -96,6 +102,20 @@ test('②★★ 오래 걸린 대조가 «그 사이 찍힌 딱지»를 지우�
     '  안 올린 글이 「같음」으로 보이면 사람은 올린 줄 안다');
   assert.equal(out.pages.p9, undefined,
     '★ 대조 «전»에 찍힌 것까지 살리면 대조가 아무 소용이 없다');
+  assert.equal((out.pages.p8 || {}).status, 'pending',
+    '★★ 남의 PC 시계가 늦다고 그 사이 찍힌 딱지를 지웠다 — 시각으로 견주면 이렇게 샌다');
+  assert.equal((out.pages.p7 || {}).status, 'pending',
+    '★★ 읽는 동안 «다시» 찍힌 딱지를 지웠다');
+});
+
+test('②-2★★ 「시작할 때 본 딱지」는 홈페이지를 «읽기 전»에 잡는다', () => {
+  /* 끝난 뒤에 잡으면 읽는 동안 찍힌 것이 «본 것»에 섞여 다시 지워진다(전에 시각이 그랬다). */
+  const fn = stripJs(cutFn(HOME, 'async function checkHomepage('));
+  const 잡음 = fn.indexOf('본딱지(App.check)');
+  const 첫읽기 = fn.indexOf('await ask(');
+  assert.ok(잡음 > 0, '★★ 대조가 시작할 때 본 딱지를 안 잡는다');
+  assert.ok(첫읽기 > 0 && 잡음 < 첫읽기, '★★ 본 딱지를 홈페이지를 읽은 «뒤»에 잡는다');
+  assert.match(fn, /applyStatus\([^)]*시작\)/, '★★ 잡은 것을 마무리(applyStatus)에 안 넘긴다');
 });
 
 /* ══ rules — 문안은행 총계 ══ */

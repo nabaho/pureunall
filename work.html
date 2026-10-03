@@ -218,6 +218,22 @@
   .ml1{display:flex;align-items:center;gap:7px;padding:4px 11px;font-size:12.5px;
     position:relative;border-bottom:1px solid var(--bg);white-space:nowrap}
   .ml1:hover{background:var(--bg)}
+  /* 🚩 서랍의 현장 방문 줄 — 색은 「내 현장 방문」 표의 표지와 같은 뜻으로 */
+  .ml1.vd1{cursor:pointer}
+  .ml1.vd1 .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .ml1.vd1 .vdw{color:var(--faint);font-size:11.5px}
+  .ml1.vd1 .vdgo{color:var(--acc);font-size:11px;flex:0 0 auto}
+  .vdp{flex:0 0 auto;font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 6px}
+  .vdp.ok{background:#f0fdf4;color:#166534}.vdp.no{background:#fef2f2;color:#991b1b}
+  .vdp.un{background:#e2e8f0;color:#475569}.vdp.up{background:#eff6ff;color:#1e40af}
+  .vdp.of{background:#fffbeb;color:#854d0e}
+  .vdguess{font-size:11px;color:var(--warn);padding:3px 11px 4px}
+  /* 🏦 서랍의 기금 진행 — 해마다 한 줄, 적힌 것만 칩으로 */
+  .fdy{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:5px 11px;border-bottom:1px solid var(--bg);font-size:12px}
+  .fdyy{font-weight:700;margin-right:4px;font-variant-numeric:tabular-nums}
+  .fdc{font-size:10.5px;border-radius:5px;padding:1px 6px;background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+  .fdc.ok{background:#f0fdf4;color:#166534;border-color:transparent}
+  .fdgo{color:var(--acc);cursor:pointer;margin-left:6px}
   .ml1 .ck{flex:0 0 auto;width:13px;height:13px;border:1.5px solid var(--faint);
     border-radius:4px;cursor:pointer;position:relative}
   .ml1 .ck:hover{border-color:var(--acc)}
@@ -3748,6 +3764,228 @@ function dPayDataHTML(it){
     +'</div></div>';
   return dFold('pd',head,body,!rows.length);
 }
+/* ══════════════════════════════════════════════════════════════════════
+   🚩 서랍에 현장 방문 (대표 지시 2026-10-03 「다음」 → 목업 → 「진행」)
+   ══════════════════════════════════════════════════════════════════════
+   연결 지도(docs/업무관리-연결현황-2026-09-10.md) ② — 정부사업일정 자료는 이미 읽고 있었다
+   (visLoad — 「🚩 내 현장 방문」 화면과 달력 「현장」 칸). 그런데 업무를 열어도
+   «그 사업장에 언제 갔다 왔는지»가 안 나왔다.
+
+   ★ 사업장 맞추기 — 실측(2026-10-03, 살아 있는 컨설팅 사업장 41곳)
+       번호로   20곳  scal_cos.erpId = 업무 ref.id(푸른이알피 컨설팅) · scal_cos.co_id = 업무 co_id
+       이름으로 16곳  번호가 없다 — «통째로 같은» 상호만. 상자에 「이름으로 이은 것」을 적는다
+       없음      5곳  상자가 안 뜬다
+     번호로 맞은 것이 하나라도 있으면 이름으로는 더 찾지 않는다 — 확실한 것 옆에 짐작을 섞지 않는다.
+   ⚠ 보기만 한다. 고치기·사진 넣기는 정부사업일정에서(visGo). 같은 일을 두 곳에서 하면 어긋난다.
+   ⚠ 사진 셈은 「내 현장 방문」과 «같은 잣대»(visPhotoMap·visSince) — 「기록 없음」은 «안 넣었다»가 아니다.
+   ⚠ 자료는 한 번만 받는다(visLoad 캐시). 못 읽으면(권한) 다시 조르지 않고 상자를 안 그린다. */
+var VD_MAX=6;            // 서랍에 보이는 방문 줄 수 — 그보다 많으면 「내 현장 방문」에서 본다
+var _vdTried=false;
+function vdNeed(){ return !_vdTried && !(VIS.scheds&&VIS.log); }
+function vdLoad(){
+  _vdTried=true;
+  return visLoad().catch(function(){});
+}
+/* 이 업무의 정부사업일정 사업장들 → {ids:[사업장 번호], guess:이름으로만 이었나} */
+function vdCosFor(it){
+  if(!it) return {ids:[],guess:false};
+  var cos=visRows(VIS.cos), ref=it.ref||{};
+  var byId=cos.filter(function(c){
+    if(!c||!c.id) return false;
+    if(ref.type==='consulting'&&ref.id&&c.erpId&&String(c.erpId)===String(ref.id)) return true;
+    return !!(it.co_id&&c.co_id&&String(c.co_id)===String(it.co_id));
+  });
+  if(byId.length) return {ids:byId.map(function(c){ return c.id; }),guess:false};
+  var nm=_normCo(it.company||'');
+  if(nm.length<2) return {ids:[],guess:false};
+  var byName=cos.filter(function(c){
+    return c&&c.id&&!c.deleted&&!c.mergedInto&&_normCo(c.name||'')===nm;
+  });
+  return {ids:byName.map(function(c){ return c.id; }),guess:byName.length>0};
+}
+/* 그 사업장들의 방문 — 최근(앞으로 잡힌 것 포함) 것부터 */
+function vdRows(it){
+  if(!VIS.scheds) return null;                       // 아직 안 읽었다 — 「없음」과 섞지 않는다
+  var m=vdCosFor(it), want={};
+  m.ids.forEach(function(id){ want[id]=1; });
+  var seen={};
+  var rows=visRows(VIS.scheds).filter(function(s){
+    if(!s||!s.id||!s.date||!want[s.coId]||seen[s.id]) return false;
+    seen[s.id]=1; return true;
+  }).sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  return {rows:rows, guess:m.guess, any:m.ids.length>0};
+}
+function vdPill(t,cls){ return '<span class="vdp '+cls+'">'+esc(t)+'</span>'; }
+function vdRowHTML(s,byS,since,today){
+  var ty=visName(VIS.types,s.typeId), field=s.isField!==false, b=byS[s.id];
+  var names=visAttIds(s).map(function(g){ return visName(VIS.gstaff,g); }).filter(Boolean);
+  var tag;
+  if(String(s.date)>today) tag=vdPill('예정','up');
+  else if(!field) tag=vdPill('사무실','of');
+  else if(b&&b.n) tag=vdPill('사진 '+b.n+'장','ok');
+  else if(!since||String(s.date)<since) tag=vdPill('기록 없음','un');   // 사진 이력을 보기 전 방문
+  else tag=vdPill('증빙 없음','no');
+  return '<div class="ml1 vd1" onclick="visGo(\''+escJ(s.id)+'\')" title="정부사업일정에서 이 일정을 엽니다">'
+    +'<span class="mlkwho">'+esc(md(s.date))+'</span>'
+    +'<span class="tx">'+esc((ty||'방문')+' '+(s.round||0)+'회차')
+    +(names.length?'<span class="vdw"> · '+esc(names.join('·'))+'</span>':'')+'</span>'
+    +tag+'<span class="vdgo">열기 ↗</span></div>';
+}
+function dVisitsHTML(it){
+  var r=vdRows(it);
+  if(!r||!r.any) return '';                // 못 읽었거나 짝이 없다 — 상자를 안 그린다
+  var today=visToday(), since=visSince(), byS=visPhotoMap(S.me||{});
+  var past=r.rows.filter(function(s){ return String(s.date)<=today; });
+  var right=past.length?('최근 '+md(past[0].date)+' · '+(past[0].round||0)+'회차'):'아직 없음';
+  var head=dFoldHead('🚩','현장 방문',right);
+  var body='<div class="dbox mlbox"><div class="bh">🚩 현장 방문'+hlp('vd')
+    +'<span class="r">'+esc(right)+'</span></div><div class="bb">'
+    +(r.guess?'<div class="vdguess">회사 이름으로 이은 것입니다 — 정부사업일정에 업체 번호가 없습니다</div>':'')
+    +(r.rows.length
+      ? r.rows.slice(0,VD_MAX).map(function(s){ return vdRowHTML(s,byS,since,today); }).join('')
+        +(r.rows.length>VD_MAX?'<div class="kbempty">그 앞으로 '+(r.rows.length-VD_MAX)+'번 더 — 「🚩 내 현장 방문」에서 봅니다</div>':'')
+      : '<div class="kbempty">이 사업장에 잡힌 방문이 아직 없습니다.</div>')
+    +'</div></div>';
+  return dFold('vd',head,body,!r.rows.length);
+}
+/* ══════════════════════════════════════════════════════════════════════
+   🏦 기금 업무 서랍에 기금 진행 (대표 지시 2026-10-03 「다음」 → 목업 → 「진행」)
+   ══════════════════════════════════════════════════════════════════════
+   연결 지도 ③. 기금 «계약»은 업무로 있는데, 실제 결산 일은 기금관리(fund.html)에서 하고
+   그 진행이 여기 안 보였다.
+
+   ★ 보여 주는 것 — 기금관리에 «적힌 값 그대로» (올해·작년)
+       장부   fund_erp/txns/{기금}/{연도}           거래 수 · 승인 전(approved 가 아닌 것)
+       월마감 fund_erp/closing/{기금}/{연도}/months  끝낸 달 수
+       결산   fund_erp/closing/{기금}/{연도}.locked  확정했나(locked_at)
+       지원금 fund_erp/funds/{기금}/years/{연도}/subsidy  신청액·결정액·교부일·집행액
+   ⚠ 「단계」를 짐작해 붙이지 않는다(연결 지도 ③ 주의). 「결산 70%」 같은 것은 틀려도 아무도 모른다.
+
+   ★ 기금 짝짓기 — 기금관리 청구 화면(linkPuerp)과 «같은 규칙»을 «글자 그대로» 옮겼다.
+       ① 수동 지정(puerp_link) ② 고유번호 ③ 기금 이름 완전일치 ④ 부분일치(후보 하나일 때만)
+     실측(2026-10-03): 기금 업무 17건 중 14건은 업무관리에서 직접 만들어 푸른이알피 계약이 없다 —
+     그때는 업무의 상호로 ③④ 를 탄다. 이름으로 이은 것은 상자에 그렇게 적는다.
+   ⚠⚠ fdLinkPuerp·_mkey·_dg10 은 fund.html 의 linkPuerp·_mkey·_dg10 과 같아야 한다
+     (tests/work-drawer-fund.test.js 가 두 쪽을 맞대 본다). 한쪽만 고치면 청구 화면과 서랍이
+     서로 다른 기금을 가리킨다 — 그 잘못은 조용하다.
+   ⚠ 보기만 한다 · 기금 업무를 열 때만 읽는다 · 못 읽으면 다시 조르지 않는다. */
+var FD_ROOT='fund_erp';
+var fdFunds=null, fdLink=null, _fdTried=false, fdBox={}, _fdT={};
+function _mkey(s){ return String(s||'').replace(/\(주\)|㈜|주식회사|사단법인|재단법인|유한회사/g,'')
+  .replace(/공동근로복지기금|사내근로복지기금|근로복지기금/g,'').replace(/[\s\-·_()\[\]]/g,'').toLowerCase(); }
+function _dg10(s){ return String(s||'').replace(/\D/g,''); }
+function fdTrashed(f){ return !!(f&&f.deleted); }
+function fdLinkPuerp(p,link){
+  var man=(link||{})[p.id]; if(man) return man==='__none__'?null:(fdFunds[man]?man:null);
+  var ids=Object.keys(fdFunds).filter(function(k){return !fdTrashed(fdFunds[k]);});
+  // 기금은 사업자등록번호가 아니라 **고유번호(tax_id_no)**로 계산서를 받는다(법인등록번호도 대비).
+  var bz=_dg10(p.bizNo);
+  if(bz.length>=10){
+    var h=ids.filter(function(k){ var f=fdFunds[k];
+      return _dg10(f.tax_id_no)===bz||_dg10(f.biz_no)===bz||_dg10(f.corp_reg_no)===bz; })[0];
+    if(h) return h; }
+  var pk=_mkey(p.companyName||p.name); if(pk.length<2) return null;
+  var exact=ids.filter(function(k){ return _mkey(fdFunds[k].name)===pk||_mkey(fdFunds[k].short_name)===pk; })[0];
+  if(exact) return exact;
+  var part=ids.filter(function(k){ var a=_mkey(fdFunds[k].name),b=_mkey(fdFunds[k].short_name);
+    return (a&&a.length>1&&(a.indexOf(pk)>=0||pk.indexOf(a)>=0))||(b&&b.length>1&&(b.indexOf(pk)>=0||pk.indexOf(b)>=0)); });
+  return part.length===1?part[0]:null;   // 후보가 둘 이상이면 자동 연결하지 않고 사용자에게 맡긴다
+}
+function fdIsFund(it){ return !!(it&&(it.cat==='기금'||(it.ref&&it.ref.type==='fund'))); }
+/* 이 업무의 기금 → {fid, guess:이름으로만 이었나}
+   ⚠ 푸른이알피 계약이 있으면 그 계약으로(번호·수동 지정이 먼저 듣는다), 없으면 업무 상호로. */
+function fdFundOf(it){
+  if(!fdIsFund(it)||!fdFunds) return {fid:null,guess:false};
+  var p=null; try{ p=peRec(it); }catch(e){}
+  var src=p||{id:'',companyName:it.company||'',bizNo:''};
+  var fid=fdLinkPuerp(src,p?fdLink:{});
+  if(!fid) return {fid:null,guess:false};
+  var sure=!!(p&&(((fdLink||{})[p.id]===fid)||(_dg10(p.bizNo).length>=10&&[fdFunds[fid].tax_id_no,fdFunds[fid].biz_no,fdFunds[fid].corp_reg_no]
+    .some(function(v){ return _dg10(v)===_dg10(p.bizNo); }))));
+  return {fid:fid,guess:!sure};
+}
+function fdYears(){ var y=new Date().getFullYear(); return [y,y-1]; }
+function fdNeed(it){
+  if(!fdIsFund(it)) return false;
+  if(!fdFunds) return !_fdTried;
+  var fid=fdFundOf(it).fid;
+  return !!(fid&&!fdBox[fid]&&!_fdT[fid]);
+}
+function fdLoad(it){
+  if(typeof fbDb==='undefined'||!fbDb) return Promise.resolve();
+  if(!fdFunds){
+    _fdTried=true;
+    return Promise.all([
+      fbDb.ref(FD_ROOT+'/funds').once('value').then(function(s){ return s.val()||{}; }),
+      fbDb.ref(FD_ROOT+'/puerp_link').once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return {}; })
+    ]).then(function(r){ fdFunds=r[0]; fdLink=r[1]; }, function(){ /* 권한이 없다 — 상자를 안 그린다 */ });
+  }
+  var fid=fdFundOf(it).fid;
+  if(!fid||fdBox[fid]||_fdT[fid]) return Promise.resolve();
+  _fdT[fid]=1;
+  var ys=fdYears();
+  return Promise.all([fbDb.ref(FD_ROOT+'/closing/'+fid).once('value').then(function(s){ return s.val()||{}; })]
+    .concat(ys.map(function(y){
+      return fbDb.ref(FD_ROOT+'/txns/'+fid+'/'+y).once('value').then(function(s){
+        var v=s.val()||{}, n=0, un=0;
+        Object.keys(v).forEach(function(k){ if(v[k]&&typeof v[k]==='object'){ n++; if(!v[k].approved) un++; } });
+        return {n:n,un:un};
+      });
+    }))).then(function(r){
+      var t={}; ys.forEach(function(y,i){ t[y]=r[i+1]; });
+      fdBox[fid]={closing:r[0],txns:t}; _fdT[fid]=0;
+    }, function(){ fdBox[fid]={closing:{},txns:{},err:1}; _fdT[fid]=0; });
+}
+function fdMoney(v){
+  var n=Number(String(v==null?'':v).replace(/[^\d.-]/g,''));
+  if(!v||!isFinite(n)||!n) return '';
+  return n>=10000?Math.round(n/10000).toLocaleString()+'만':n.toLocaleString()+'원';
+}
+function fdChip(t,cls){ return '<span class="fdc'+(cls?' '+cls:'')+'">'+esc(t)+'</span>'; }
+/* 한 해 — 적힌 것만 칩으로. 아무것도 없으면 그렇다고 한 칩 */
+function fdYearHTML(fid,y){
+  var b=fdBox[fid]||{}, tx=(b.txns||{})[y]||{n:0,un:0}, cl=(b.closing||{})[y]||{};
+  var su=((((fdFunds||{})[fid]||{}).years||{})[y]||{}).subsidy||{};
+  var mon=Object.keys(cl.months||{}).filter(function(k){ return cl.months[k]; }).length;
+  var c=[];
+  if(tx.n) c.push(fdChip('장부 '+tx.n+'건'+(tx.un?' · 승인 전 '+tx.un:''),tx.un?'':'ok'));
+  if(mon) c.push(fdChip('월마감 '+mon+'/12'));
+  if(cl.locked) c.push(fdChip('결산 확정'+(cl.locked_at?' '+md(String(cl.locked_at).slice(0,10)):''),'ok'));
+  else if(tx.n) c.push(fdChip('결산 작성 전'));
+  var rq=fdMoney(su.request_amount), dc=fdMoney(su.decided_amount), sp=fdMoney(su.spent_amount);
+  if(rq) c.push(fdChip('지원금 신청 '+rq));
+  if(dc) c.push(fdChip('결정 '+dc,'ok'));
+  if(su.paid_date) c.push(fdChip('교부 '+md(String(su.paid_date).slice(0,10)),'ok'));
+  if(sp) c.push(fdChip('집행 '+sp));
+  return '<div class="fdy"><span class="fdyy">'+y+'</span>'
+    +(c.length?c.join(''):'<span class="fdc">아직 적힌 것 없음</span>')+'</div>';
+}
+/* 머리 — 가장 최근에 «무엇이라도» 적힌 해의 결산 상태 */
+function fdHeadRight(fid){
+  var b=fdBox[fid]||{}, ys=fdYears();
+  for(var i=0;i<ys.length;i++){
+    var y=ys[i], cl=(b.closing||{})[y]||{}, tx=(b.txns||{})[y]||{};
+    if(cl.locked) return y+' 결산 확정';
+    if(tx.n) return y+' 결산 작성 전';
+  }
+  return '장부 없음';
+}
+function fdGo(){
+  try{ PuAppBar.goApp('fund.html'); }catch(e){ location.href='fund.html'; }
+}
+function dFundHTML(it){
+  if(!fdIsFund(it)||!fdFunds) return '';
+  var m=fdFundOf(it);
+  if(!m.fid||!fdBox[m.fid]||fdBox[m.fid].err) return '';   // 짝이 없거나 아직·못 읽었다
+  var f=fdFunds[m.fid]||{}, right=fdHeadRight(m.fid);
+  return '<div class="dbox mlbox"><div class="bh">🏦 기금 진행'+hlp('fd')
+    +'<span class="r">'+esc(right)
+    +' <span class="fdgo" onclick="event.stopPropagation();fdGo()" title="기금관리를 엽니다 — 거기서 '
+    +esc(f.short_name||f.name||'')+' 을(를) 고르세요">기금관리 ↗</span></span></div><div class="bb">'
+    +(m.guess?'<div class="vdguess">기금 이름으로 이은 것입니다 — '+esc(f.short_name||f.name||'')+'</div>':'')
+    +fdYears().map(function(y){ return fdYearHTML(m.fid,y); }).join('')
+    +'</div></div>';
+}
 
 var CO_MAIL_ROOT='pucards/coMail';
 var cmSrc={}, _cmT={};
@@ -6566,6 +6804,10 @@ function renderDrawer(){
   /* 급여데이터함 도착 칸 — 여기도 «그 업체 한 칸»만 읽는다 (열쇠는 co_id) */
   var _pk=pdNeed(String((items[S.drawerId]||{}).co_id||''));
   if(_pk.length) pdLoad(_pk).then(function(){ if(S.drawerId) renderDrawer(); });
+  /* 🚩 정부사업일정 — 「내 현장 방문」과 같은 자료를 한 번만 받는다(못 받아도 다시 조르지 않는다) */
+  if(vdNeed()) vdLoad().then(function(){ if(S.drawerId) renderDrawer(); });
+  /* 🏦 기금 업무일 때만 — 기금 목록 한 번, 그 기금의 두 해 장부·결산 한 번 */
+  if(fdNeed(items[S.drawerId])) fdLoad(items[S.drawerId]).then(function(){ if(S.drawerId) renderDrawer(); });
   var it=items[S.drawerId]; if(!it){ closeDrawer(); return; }
   var id=S.drawerId;
   var logs=itemLogsCache[id];
@@ -6597,6 +6839,10 @@ function renderDrawer(){
   /* 📥 받은 자료 — 메일 «바로 아래»다. 둘 다 「무엇이 들어왔나」라서 붙여 둔다.
      메일로 온 것은 위에, 급여데이터함에 담긴 것은 아래에. */
   h+=dPayDataHTML(it);
+  /* 🚩 현장 방문 — 「무엇이 들어왔나」 다음에 「우리가 언제 갔나」 */
+  h+=dVisitsHTML(it);
+  /* 🏦 기금 진행 — 기금 업무에서만 뜬다 */
+  h+=dFundHTML(it);
   h+=dFold('vo',dFoldHead('🎤','말로 기록','말하면 AI 가 정리합니다'),
            dVoiceHTML(id,it), VO.id!==id);
   h+=dFold('st',dFoldHead('✅','진행 단계','아직 없음'),
@@ -8821,6 +9067,17 @@ function tplModal(id){
    않는 글이 화면의 절반을 먹었다. 제목 옆 ⓘ에 넣고 누를 때만 보여준다.
    (오류·주의는 예외 — 그건 눈에 띄어야 하므로 화면에 그대로 둔다) */
 var HELP={
+  fd:'이 기금의 <b>기금관리</b> 진행입니다 — 올해와 작년을 보여 줍니다.<br>'
+    +'장부 거래 수(승인 전), 월마감, 결산 확정, 지원금 신청·결정·교부·집행을 <b>적힌 그대로</b> 옮깁니다. '
+    +'단계를 짐작해 붙이지 않습니다.<br><br>'
+    +'고치기·승인·결산은 <b>기금관리</b>에서 합니다 — 여기서는 보기만 합니다. '
+    +'기금관리에는 한 기금으로 곧바로 가는 주소가 없어, 열고 나서 그 기금을 고르셔야 합니다.<br><br>'
+    +'기금 짝짓기는 기금관리 청구 화면과 같은 규칙입니다(수동 지정 → 고유번호 → 기금 이름).',
+  vd:'이 사업장의 <b>정부사업일정 방문</b>입니다 — 최근 것부터 보여 줍니다.<br>'
+    +'줄을 누르면 정부사업일정의 그 일정이 열립니다. <b>고치기·사진 넣기는 거기서</b> 합니다 — 여기서는 보기만 합니다.<br><br>'
+    +'<b>증빙 없음</b>은 지난 현장 방문인데 사진이 없는 것입니다. '
+    +'<b>기록 없음</b>은 «안 넣었다»가 아닙니다 — 사진 이력을 함께 보기 시작하기 전 방문이라 여기서는 알 수 없습니다.<br><br>'
+    +'정부사업일정에 <b>업체 번호</b>가 있으면 번호로, 없으면 <b>회사 이름이 똑같을 때만</b> 잇습니다.',
   al:'매주 월요일 아침, 지난주에 오간 <b>메일·보낸 서류</b>와 <b>푸른캘린더 일정</b>을 업무마다 모아 '
     +'그 날 기록에 한 줄씩 넣습니다. 이름표는 <b>자동</b>입니다.<br><br>'
     +'어느 업무인지 <b>확실할 때만</b> 넣습니다 — 같은 회사 업무가 여럿이거나 일정 제목에 회사가 둘 나오면 '

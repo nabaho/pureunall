@@ -20,7 +20,8 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/pu-labor-core.js?v=3"></script>
+<script src="js/pu-labor-core.js?v=4"></script>
+<script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-site-staff.js?v=1"></script>
 <script src="js/pu-hwp-engine.js?v=17"></script>
 <script src="hwpx_gen.js?v=14"></script>
@@ -1419,10 +1420,17 @@ function screenCards(){
   /* 간이세액표 — 없으면 소득세를 계산할 수 없다(국세청이 산식을 공개하지 않아
      표 자체가 법적 기준이다). 그래서 있는지 없는지를 눈에 보이게 둔다. */
   h+=' <button class="btn sec" onclick="importTaxTable()">간이세액표(JSON) 가져오기</button>';
+  /* 내장 표(법제처 별표2 그대로)가 먼저다. 직접 올린 표는 내장 표가 덮지 않는
+     옛 달(2026년 3월 이전 등)에만 쓰인다. */
+  var bt=(typeof PuSimpleTax!=='undefined'&&PuSimpleTax.tables)||[];
+  h+=taxWatchBanner();
+  h+='<div style="margin-top:10px;font-size:12.5px">'+(bt.length
+    ? bt.map(function(t){return '<span class="badge ok">간이세액표 내장</span> '+esc(t.근거||'')+' · <b>'+esc(t.시행)+' 지급분부터</b> · 구간 '+t.rows.length+'개';}).join('<br>')
+    : '<span class="badge warn">내장 간이세액표 없음</span> js/pu-simpletax.js 를 불러오지 못했습니다');
   var tt=dbGet('tax_table',null);
-  h+='<div style="margin-top:10px;font-size:12.5px">'+(tt&&tt.rows&&tt.rows.length
-    ? '<span class="badge ok">간이세액표 있음</span> '+(tt.연도||'')+'년 · 구간 '+tt.rows.length+'개 · 가족 칸 '+((tt.rows[0].tax||[]).length)+'개'
-    : '<span class="badge warn">간이세액표 없음</span> 소득세는 대장 값만 씁니다 — <code>node engine/build_simpletax.js</code> 로 만든 JSON을 올리세요')+'</div>';
+  h+='<br>'+(tt&&tt.rows&&tt.rows.length
+    ? '<span class="badge">직접 올린 표</span> '+(tt.연도||'')+'년 · 구간 '+tt.rows.length+'개 — 내장 표가 없는 달에만 씁니다'
+    : '<span style="color:var(--sub)">직접 올린 표 없음 — '+esc(builtinTaxSince()||'')+' 이전 달 소득세는 대장 값만 씁니다</span>')+'</div>';
   if(!cards.length){ h+='<div class="empty" style="margin-top:14px">서버에 자료 없음. 위 버튼으로 site_cards.json 올리면 저장됩니다.</div>'; return h; }
   /* 아직 안 채운 곳이 몇 곳인지 먼저 말한다 — 46곳을 눈으로 훑게 두지 않는다. */
   var vs=cardsView(), empty=vs.filter(function(v){return !v.급여일;}).length;
@@ -2012,6 +2020,11 @@ function derivedAttend(site, month, name, P) {
 /* 월 이름에서 연도 뽑기 — '2026-03'·'3월'·'23년 7월' 모두 온다.
    ⚠ 연도를 못 찾으면 올해로 본다(최저임금·공휴일 연도가 어긋나면 값이 틀린다). */
 function laborYearOfMonth(month) {
+  return laborYearExplicit(month) || laborYear();
+}
+/* 월 이름에 **적혀 있는** 연도만 — 못 찾으면 null(올해로 메우지 않는다).
+   간이세액표처럼 「몇 년 몇 월부터」가 갈리는 곳은 추정한 연도를 쓰면 안 된다. */
+function laborYearExplicit(month) {
   var m = String(month || '').match(/(20\d{2})/);
   if (m) return m[1];
   var m2 = String(month || '').match(/^(\d{2})년/);
@@ -2020,7 +2033,62 @@ function laborYearOfMonth(month) {
      이걸 놓치면 최저임금·공휴일 연도가 올해로 잡혀 과거 달 계산이 틀린다. */
   var m3 = String(month || '').match(/(?:^|[^\d])(\d{2})[.\-\/](\d{1,2})(?!\d)/);
   if (m3 && Number(m3[2]) >= 1 && Number(m3[2]) <= 12) return '20' + m3[1];
-  return laborYear();
+  return null;
+}
+/* 'YYYY-MM' — 연도·월이 둘 다 적혀 있을 때만. */
+function laborYm(month) {
+  var y = laborYearExplicit(month), mn = laborMonthNum(month);
+  return (y && mn) ? y + '-' + (mn < 10 ? '0' : '') + mn : null;
+}
+/* 이 달 소득세에 쓸 간이세액표.
+   ① 내장 표(js/pu-simpletax.js — 법제처 별표2 그대로) 중 그 달에 시행 중인 것
+   ② 없으면(2026년 3월 이전 등) 설정 카드에서 직접 올린 표
+   ③ 그것도 없으면 null → 소득세 미계산으로 알린다(추정하지 않는다). */
+function taxTableFor(month) {
+  var B = (typeof PuSimpleTax !== 'undefined' && PuSimpleTax.tables) || [];
+  var ym = laborYm(month);
+  var t = (ym && LC) ? LC.pickSimpleTaxTable(B, ym) : null;
+  return t || dbGet('tax_table', null);
+}
+/* 내장 표 중 가장 이른 시행일 — 「이 날 이전 달은 표를 올려야 한다」를 알릴 때 쓴다. */
+function builtinTaxSince() {
+  var B = (typeof PuSimpleTax !== 'undefined' && PuSimpleTax.tables) || [];
+  return B.map(function (t) { return t.시행; }).sort()[0] || null;
+}
+/* 간이세액표 개정 알림 — GitHub 감시(.github/workflows/simpletax-watch.yml)가 매일 새벽
+   법제처 별표2 개정일을 내장 표와 비교해, 법이 더 새것이면 「simpletax-watch」 알림 글을
+   연다(표를 갈면 저절로 닫힌다). 열린 글이 있으면 소득세를 다루는 화면에 경고를 띄운다.
+   ⚠ 못 읽어도(망·요청 한도) 조용히 넘어간다 — 알림 글·메일이 1차 길이고 이건 덧붙임이다.
+   ⚠ 글 제목·주소는 밖에서 온 값이라 글자를 이스케이프하고, 주소는 이 저장소 알림 글만 받는다. */
+var TAX_WATCH_URL = 'https://api.github.com/repos/nabaho/pureunall/issues?labels=simpletax-watch&state=open&per_page=5';
+var TAX_WATCH = { done: false, busy: false, items: [] };
+function taxWatchItems(arr) {
+  return (Array.isArray(arr) ? arr : []).filter(function (x) {
+    return x && !x.pull_request && /^https:\/\/github\.com\/nabaho\/pureunall\/issues\/\d+$/.test(String(x.html_url || ''));
+  }).map(function (x) { return { title: String(x.title || ''), url: String(x.html_url) }; });
+}
+function loadTaxWatch() {
+  if (TAX_WATCH.done || TAX_WATCH.busy || typeof fetch !== 'function') return;
+  TAX_WATCH.busy = true;
+  fetch(TAX_WATCH_URL, { headers: { Accept: 'application/vnd.github+json' } })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (arr) {
+      TAX_WATCH.items = taxWatchItems(arr);
+      TAX_WATCH.done = true; TAX_WATCH.busy = false;
+      if (TAX_WATCH.items.length && (App.screen === 'cards' || App.screen === 'attend')) render();
+    })
+    .catch(function () { TAX_WATCH.done = true; TAX_WATCH.busy = false; });
+}
+function taxWatchBanner() {
+  loadTaxWatch();
+  if (!TAX_WATCH.items.length) return '';
+  var t = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  return '<div class="note" style="border-left:3px solid var(--bad);margin:10px 0">' +
+    '⚠ <b>법제처에서 근로소득 간이세액표가 새로 개정됐습니다.</b> 내장 표를 갈기 전까지 ' +
+    '새 시행일 이후 달의 소득세는 <b>옛 표로 계산</b>됩니다 — 확정·신고 전에 확인하세요.' +
+    TAX_WATCH.items.map(function (x) {
+      return '<br>· <a href="' + x.url + '" target="_blank" rel="noopener">' + t(x.title) + '</a>';
+    }).join('') + '</div>';
 }
 /* 월 이름에서 '몇 월'인지 — 달력 격자를 그리려면 필요하다.
    ⚠ 실제 시트 이름은 '3월'·'2026-03'·'23년 7월'·'25.05 새별반찬' 로 섞여 온다. */
@@ -2276,12 +2344,17 @@ function screenAttend() {
      여기서 고리가 이어진다: 근태 → 법정수당 → 4대보험·소득세 → 실수령.
      계산은 전부 코어(LC.monthlyPayroll)가 한다. 화면은 표만 그린다.
      ⚠ 확정이 아니라 **미리보기**다. 급여 확정은 급여 처리 화면에서 사람이 한다. */
-  var TT = dbGet('tax_table', null);
-  var mwY = String((App.month || '').match(/\d{4}/) ? (App.month.match(/\d{4}/))[0] : laborYear());
+  var TT = taxTableFor(App.month);
+  /* '25.05 늘봄반찬' 같은 두 자리 연도 시트도 그 해 최저임금으로 본다. */
+  var mwY = laborYearOfMonth(App.month);
   var mwH = minWageOf(mwY);
   h2 += '<h2 style="margin:18px 0 8px;font-size:15px">근태 반영 급여 미리보기</h2>';
+  h2 += taxWatchBanner();
+  if (TT && TT.시행) h2 += '<div style="font-size:12px;color:var(--sub);margin:-4px 0 8px">소득세: ' +
+    esc(TT.근거 || '근로소득 간이세액표') + ' · ' + esc(TT.시행) + ' 지급분부터</div>';
   if (!TT) h2 += '<div class="note" style="border-left:3px solid var(--warn)">' +
-    '<b>간이세액표가 없어 소득세를 계산하지 못합니다.</b> 설정 카드 화면의 [간이세액표 가져오기]로 올리세요. ' +
+    '<b>이 달(' + esc(App.month || '') + ')에 맞는 간이세액표가 없어 소득세를 계산하지 못합니다.</b> ' +
+    '내장 표는 ' + esc(builtinTaxSince() || '-') + ' 지급분부터 적용됩니다. 그 전 달은 설정 카드 화면의 [간이세액표 가져오기]로 그때 표를 올리세요. ' +
     '국세청이 세액 산출 산식을 공개하지 않으므로 <b>표 자체가 법적 기준</b>입니다 — 추정으로 대신하지 않습니다.</div>';
   h2 += '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">' +
     '<tr style="background:var(--paper)">' +
