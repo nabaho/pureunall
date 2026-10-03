@@ -26,18 +26,33 @@ test('★★★ ① mbWhoKey — 예전과 같은 답 · 기억 상자는 5만 �
   assert.ok(ctx.mbWhoKey._c.size <= 50000, '★ 기억 상자가 끝없이 커진다');
 });
 
-test('★★★ ② mbIsSpam — 그리는 동안 한 번만 · 새로 그리면 다시', () => {
+/* ② 판정 기억은 그리기를 «넘어» 산다 — 설정 서명이 같으면 이어 쓰고, 다르면 버린다 (2026-10-03 메일창 확인 → 진행) */
+function judgeCtx(over) {
   let n = 0;
-  const ctx = { WeakMap, _mbMemo: null, mbSpamWhy: v => { n++; return v.bad ? '까닭' : ''; } };
+  const ctx = Object.assign({ WeakMap, JSON, String, Object, _mbMemo: null, _mbJudge: null,
+    _mbPut: {}, _mbBinRule: {}, _mbWhoMsg: {}, _mbCo: {}, _mbNotSpam: {}, _mbSpamOff: false, _mbBins: {}, _mbFolders: { IN: { kind: 'inbox', path: 'INBOX' } },
+    mbSpamWhy: v => { n++; return v.bad ? '까닭' : ''; } }, over || {});
   vm.createContext(ctx);
   vm.runInContext(['function mbMemoClear(){ _mbMemo = null; }', cutFn(SRC, 'function mbMemoOf('),
+    cutFn(SRC, 'function mbJudgeKey('), cutFn(SRC, 'function mbJudgeSig('), cutFn(SRC, 'function mbJudge('),
     cutFn(SRC, 'function mbIsSpam(')].join('\n'), ctx);
+  ctx._n = () => n;
+  return ctx;
+}
+test('★★★ ② mbIsSpam — 설정이 같으면 다시 그려도 이어 쓰고, 설정을 고치면 다시 판정', () => {
+  const c = judgeCtx();
   const a = { bad: true }, b = { bad: false };
-  assert.equal(ctx.mbIsSpam(a), true); assert.equal(ctx.mbIsSpam(b), false);
-  ctx.mbIsSpam(a); ctx.mbIsSpam(b); ctx.mbIsSpam(a);
-  assert.equal(n, 2, '★★★ 한 번 그리는 동안 같은 메일을 또 판정했다');
-  a.bad = false; ctx.mbMemoClear();
-  assert.equal(ctx.mbIsSpam(a), false, '★★★ 새로 그렸는데 옛 판정이 남았다 — 「스팸 아님」이 안 듣는다');
+  assert.equal(c.mbIsSpam(a), true); assert.equal(c.mbIsSpam(b), false);
+  c.mbIsSpam(a); c.mbIsSpam(b);
+  assert.equal(c._n(), 2, '★★★ 한 번 그리는 동안 같은 메일을 또 판정했다');
+  c.mbMemoClear(); c.mbIsSpam(a); c.mbIsSpam(b);
+  assert.equal(c._n(), 2, '★★★ 설정이 그대로인데 새로 그릴 때마다 다시 판정했다 — 그것이 처음 열 때 느린 뿌리다');
+  c.mbIsSpam({ _src: a, _reuse: 1 });
+  assert.equal(c._n(), 2, '★ 원본을 가리키는 줄 사본은 원본의 판정을 같이 써야 한다');
+  c._mbNotSpam['x@y,kr'] = 1;                      /* 「스팸 아님」을 그 자리에서 고쳤다 */
+  c.mbMemoClear(); a.bad = false; 
+  assert.equal(c.mbIsSpam(a), false, '★★★ 설정을 고쳤는데 옛 판정을 썼다 — 「스팸 아님」이 안 듣는다');
+  assert.equal(c._n(), 3);
   assert.match(SRC, /mbMemoClear\(\);\s+\/\* 그리는 «동안»만 사는 셈을 버린다/, '★ 그리기 시작에 셈을 버리는 자리가 없다');
 });
 
@@ -79,18 +94,23 @@ test('★★★ ⑤ 메일 줄 모음(mbAllRows)은 그리는 동안 한 벌 · 
   assert.match(f, /return _c \? rows\.slice\(\) : rows;/, '★ 담아 둔 배열을 그대로 건넨다 — 받는 쪽이 줄 세우면 바뀐다');
 });
 
-test('★★★ ⑥ 돌려 쓰는 객체(_reuse)는 기억하지 않는다 — 첫 메일 답이 모든 메일에 가면 안 된다', () => {
+test('★★★ ⑥ 돌려 쓰는 객체는 원본(_src)을 가리킬 때만 기억한다 — 첫 메일 답이 모든 메일에 가면 안 된다', () => {
   let n = 0;
-  const ctx = { WeakMap, _mbMemo: null, mbPutOf: () => '', mbRuleBinOf: v => (n++, v.e === 'a' ? 'A' : 'B'), mbBinOfFolder: () => null };
+  const ctx = { WeakMap, JSON, String, Object, _mbMemo: null, _mbJudge: null, _mbPut: {}, _mbBinRule: {}, _mbWhoMsg: {}, _mbCo: {}, _mbNotSpam: {},
+    _mbSpamOff: false, _mbBins: {}, _mbFolders: {},
+    mbPutOf: () => '', mbRuleBinOf: v => (n++, v.e === 'a' ? 'A' : 'B'), mbBinOfFolder: () => null };
   vm.createContext(ctx);
-  vm.runInContext([cutFn(SRC, 'function mbMemoOf('), cutFn(SRC, 'function mbBinIdOfRow(')].join('\n'), ctx);
+  vm.runInContext(['function mbMemoClear(){ _mbMemo = null; }', cutFn(SRC, 'function mbMemoOf('), cutFn(SRC, 'function mbJudgeKey('),
+    cutFn(SRC, 'function mbJudgeSig('), cutFn(SRC, 'function mbJudge('), cutFn(SRC, 'function mbBinIdOfRow(')].join('\n'), ctx);
   const v = { e: 'a', _reuse: 1 };
   assert.equal(ctx.mbBinIdOfRow(v), 'A'); v.e = 'b';
-  assert.equal(ctx.mbBinIdOfRow(v), 'B', '★★★ 돌려 쓰는 객체에 첫 답을 또 줬다 — 담당자 셈이 통째로 틀린다');
-  const w = { e: 'a' }; ctx.mbBinIdOfRow(w); ctx.mbBinIdOfRow(w);
-  assert.equal(n, 3, '★ 보통 줄은 한 번만 판정해야 한다');
-  for (const src of [SRC.match(/const v = \{ e:'', r:0, _slug:'', _key:'', _reuse:1 \};/), SRC.match(/const v = \{ t:'', _key:'', _reuse:1 \};/)])
-    assert.ok(src, '★★ 담당자 셈의 돌려 쓰는 객체에 _reuse 표시가 없다');
-  assert.match(cutFn(SRC, 'function mbIsSpam('), /v\._reuse\) return !!mbSpamWhy\(v\);/);
-  assert.match(cutFn(SRC, 'function mbWhoBust('), /delete m0\.allRows; delete m0\.binOf;/, '★ 담당자·분류가 바뀌어도 옛 줄 모음을 쓴다');
+  assert.equal(ctx.mbBinIdOfRow(v), 'B', '★★★ 원본 없이 돌려 쓰는 객체에 첫 답을 또 줬다 — 담당자 셈이 통째로 틀린다');
+  const ra = { e: 'a' }, rb = { e: 'b' };
+  v.e = 'a'; v._src = ra; assert.equal(ctx.mbBinIdOfRow(v), 'A');
+  v.e = 'b'; v._src = rb; assert.equal(ctx.mbBinIdOfRow(v), 'B', '★★★ 원본이 바뀌었는데 앞 메일 답을 줬다');
+  const before = n; ctx.mbMemoClear(); ctx.mbBinIdOfRow({ _src: ra, e: 'a' });
+  assert.equal(n, before, '★ 같은 원본은 다시 그려도 한 번만 판정');
+  assert.ok(SRC.includes("v.e = row.e; v.r = row.r; v._slug = slug; v._key = slug + ':' + uid; v._src = row;"), '★★ 담당자 셈이 원본을 안 가리킨다');
+  assert.ok(SRC.includes("_key:slug+':'+uid, _src:v }));"), '★★ 메일 줄 모음이 원본을 안 가리킨다');
+  assert.ok(cutFn(SRC, 'function mbWhoBust(').includes('delete m0.judge;'), '★ 담당자·분류가 바뀌어도 그리는 동안의 판정 서명을 붙든다');
 });
