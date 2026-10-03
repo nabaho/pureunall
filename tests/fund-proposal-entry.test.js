@@ -45,6 +45,7 @@ test('ⓑ 양식 화면 — 처음 한 번 기금관리 › 제안서·견적서
 test('ⓒ 채우기 창 — host.propose 열쇠로 «회사» 줄만 골라 둔다', () => {
   const f = cutFn(stripJs(CFJ), 'function openFill(');
   assert.match(f, /host\.propose/);
-  assert.match(f, /CF\.sentKeys\(x, \{\}\)\.indexOf\(host\.propose\)/);
+  assert.match(f, /var preKey = host\.propose \|\|/);
+  assert.match(f, /CF\.sentKeys\(x, \{\}\)\.indexOf\(preKey\)/);
   assert.match(f, /x\.k === 'biz' \|\| x\.k === 'erp' \|\| x\.k === 'card-co'/);
 });

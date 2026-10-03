@@ -168,6 +168,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
 <script src="js/utils.js?v=2"></script>
+<script src="js/pu-contract-vars.js?v=1"></script>
 <script src="js/esign-crypto.js?v=1"></script>
 <script src="js/esign-docs.js?v=1"></script>
 <script src="js/pu-hwp-engine.js?v=18"></script>
@@ -175,7 +176,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=8"></script>
-<script src="js/pu-contract-forms.js?v=15"></script>
+<script src="js/pu-contract-forms.js?v=16"></script>
 <script src="js/pu-photo-store.js?v=31"></script>
 <script src="js/pu-office-store.js?v=5"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
@@ -260,10 +261,17 @@ function proposeFromHash() {
   if (h.indexOf(p) !== 0) return '';
   try { return decodeURIComponent(h.slice(p.length)); } catch (e) { return ''; }
 }
+/* 이알피 「📦 문서관리에서 묶음 채우기」 (설계 2026-10-03 §4) — #forms:contract={계약 id}. 금액·이름은 주소에 싣지 않는다 */
+function contractFromHash() {
+  var h = location.hash, p = '#forms:contract=';
+  if (h.indexOf(p) !== 0) return '';
+  try { return decodeURIComponent(h.slice(p.length)); } catch (e) { return ''; }
+}
 function formFromHash() {
   var h = location.hash;
   if (h.indexOf('#forms:') !== 0) return null;
   if (h.indexOf('#forms:propose=') === 0) return null;   // 기업정보함 「📨 제안서 보내기」 — 양식 번호가 아니다
+  if (h.indexOf('#forms:contract=') === 0) return null;  // 이알피 「📦 문서관리에서 묶음 채우기」 — 계약 번호다
   try { return decodeURIComponent(h.slice(7)) || null; } catch (e) { return null; }
 }
 /* 🔒 서명본 받기 — 서버 함수 puDocSecret 이 총괄관리자인지 보고 파일을 내준다(설계 2026-10-03 §3.1).
@@ -475,6 +483,36 @@ function formMailKeep(V, file, title) {
     return trackedWrite(PuOfficeStore.addCoDoc({ coName: coName, fileId: r.fileId, title: title, date: ymd, src: 'upload' }));
   });
 }
+/* 이알피 계약 → 서류 묶음 (설계 2026-10-03-계약서류-표준-기록 §4) — 계약을 «읽기만» 하고, 값은 이알피와 같은 한 벌(PuContractVars)로.
+   업체 찾기는 이알피 CompanyRef.findCompany 와 같은 차례(ID > 사업자번호 > 이름). 직원 이름은 공개 명부 user_dir. */
+function formVList(v) {
+  if (v && v.v !== undefined) v = v.v;
+  return Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }).filter(Boolean) : []);
+}
+async function formContract(id) {
+  var got = await Promise.all(['data/contracts', 'data/companies', 'data/user_dir'].map(function (p) {
+    return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; });
+  }));
+  var cs = formVList(got[0]), cos = formVList(got[1]), users = formVList(got[2]);
+  var c = cs.filter(function (x) { return String(x.id) === String(id); })[0];
+  if (!c) throw new Error('계약을 찾지 못했습니다 — 지워졌거나 아직 저장 전일 수 있습니다');
+  var nb = function (s) { return String(s || '').replace(/\D/g, '').slice(0, 10); };
+  var nn = function (s) { return String(s || '').replace(/\(주\)|㈜|주식회사|\s/g, '').toLowerCase(); };
+  var find = function (it) {
+    if (it.companyId) { var a = cos.filter(function (x) { return x.id === it.companyId; })[0]; if (a) return a; }
+    if (nb(it.bizNo)) { var b = cos.filter(function (x) { return nb(x.bizNo) === nb(it.bizNo); })[0]; if (b) return b; }
+    if (nn(it.companyName)) { var n = cos.filter(function (x) { return nn(x.name) === nn(it.companyName); })[0]; if (n) return n; }
+    return null;
+  };
+  var d = new Date(), today = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  var vals = PuContractVars.contractVars(c, { findCompany: find, companies: cos, users: users.map(function (u) { return { sid: u.sid, name: u.name }; }),
+    korMoney: window.numToKorMoney, today: today });
+  var caseCode = (c.typeCodes && c.typeCodes['case']) || '';
+  var caseName = c.caseType || PuContractForms.CASE_CODES[caseCode] || '';
+  return { id: c.id, contractNo: c.contractNo || '', kinds: c.kinds || (c.kind ? [c.kind] : []),
+    typeCode: (c.typeCodes && c.typeCodes['company']) || c.typeCode || '', caseName: caseName,
+    vals: vals, coKey: PuFormCardFill.sentKeys({ bz: vals.사업자번호, c: vals.회사명 }, {})[0] || '' };
+}
 /* 묶음 채우기 — 채운 파일들을 .zip 하나로 (브라우저 안에서만 묶는다. 채운 값은 서버로 안 간다) */
 async function formZip(files) {
   var JSZ = await _esignLoadJsZip();
@@ -510,7 +548,7 @@ function showPane(name) {
   if (!curUser) return;
   if (name === 'forms' && !formsMounted) {
     formsMounted = true;
-    formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(),
+    formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), contract: contractFromHash(), contractLoad: formContract,
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
       cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
       mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep }, me: function () { return window.PuWhoami && PuWhoami.get(); } });
