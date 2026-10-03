@@ -1166,7 +1166,8 @@
       fillOne(it).then(function (r) {
         refresh(); warnOf([r]);
         prevBox.hidden = false; prevBox.innerHTML = '';
-        return host.hwpShow(prevBox, r.bytes, outName(it));
+        /* 미리보기는 «다시 나누기 전» 사본(preview, .hwpx)으로 — 그림 엔진이 바르게 그린다 */
+        return host.hwpShow(prevBox, r.preview || r.bytes, r.preview ? outName(it).replace(/\.[^.]+$/, '') + '.hwpx' : outName(it));
       }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
     /* ✏ 한글처럼 손보기 (설계 2026-09-29 §6) — 지금 값으로 채운 문서를 편집기로. 다 고치면 받기·메일이 그것을 쓴다 */
@@ -1192,7 +1193,7 @@
       busy = true; refresh(); note.textContent = '채우는 중…';
       fillOne(it, it.state === 'fail').then(function (r) {
         busy = false; refresh(); note.textContent = '';
-        openSend({ fm: it.fm, V: values(), row: st.co || {}, bytes: r.bytes, name: outName(it).replace(/\.[^.]+$/, '') + r.ext,
+        openSend({ fm: it.fm, V: values(), row: st.co || {}, bytes: r.bytes, pdfSrc: r.preview || null, name: outName(it).replace(/\.[^.]+$/, '') + r.ext,
           isHwp: !!it.src && !isXl(it) && r.ext !== '.txt' }, host);
       }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
@@ -1324,7 +1325,8 @@
       var out = [{ name: o.name, bytes: o.bytes }];
       if (!pdfCk.checked) return Promise.resolve(out);
       note.textContent = 'PDF 만드는 중…';
-      return host.hwpPdf(o.bytes, o.name).then(function (b) { out.push({ name: pdfName(), bytes: b }); return out; });
+      /* PDF 는 «다시 나누기 전» 사본으로 그린다(있으면) — 한글 프로그램에서 보이는 모양과 같다 */
+      return host.hwpPdf(o.pdfSrc || o.bytes, o.pdfSrc ? o.name.replace(/\.[^.]+$/, '') + '.hwpx' : o.name).then(function (b) { out.push({ name: pdfName(), bytes: b }); return out; });
     }
     function after(fs, how) {
       var kind = CF.SENT_KIND_OF(o.fm.groupName || '');
