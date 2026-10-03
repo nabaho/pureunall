@@ -136,7 +136,7 @@ function runApp(seed) {
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');   // 부팅은 빼고 함수만 싣는다
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,rejudge,pullAll,PAGE_MAX,matGo,matPageTo,matTog,matSelPage,matSelAll,matSelClear,matList,'
-    + 'feedTog,feedSelAll,feedBulk,expCsv,'
+    + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,matPer,matRowClick,'
     + 'setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -162,9 +162,11 @@ test('★ 공고가 없으면 «없다»고 말한다 — 빈 표로 두지 않�
 });
 
 test('★ 숨긴 것은 목록에 안 나온다', () => {
-  const r = runApp({ feed: [{ id: 'G1', src: '알리오', nm: '가', hidden: true }] });
+  const r = runApp({ feed: [{ id: 'G1', src: '알리오', nm: '가나다라공고', hidden: true }] });
   r.api.draw();
-  assert.match(r.el('tb').innerHTML, /아직 받은 공고가 없습니다/);
+  const h = r.el('tb').innerHTML;
+  assert.ok(h.indexOf('가나다라공고') < 0, '숨긴 것이 보입니다');
+  assert.match(h, /숨긴 1건/, '«없다»가 아니라 숨긴 것이 있다고 말해야 합니다 — 과거 자료는 남아 있다');
 });
 
 test('★ 마감일을 모르면 «-» 로 둔다 — D-0 으로 속이지 않는다', () => {
@@ -562,4 +564,98 @@ test('★ 거르개로 안 보이게 된 줄은 고른 것에서 빠진다', () 
   r.el('fSrc').value = '알리오';
   r.api.draw();
   assert.match(r.el('feedSel').innerHTML, /1건/, '안 보이는 것이 함께 숨겨지면 안 됩니다');
+});
+
+/* ═══════ 몇 건씩 · 과거 남기기 · 넓게 한 줄 · 팝업 (대표 지시 2026-10-03) ═══════ */
+
+const many = (n) => Array.from({ length: n }, (_, i) => ({ id: 'G' + (i + 1), src: '나라장터',
+  no: 'R' + (i + 1) + '-000', nm: '노무 공고 ' + (i + 1), org: '기관' + (i % 3), type: '새 공고',
+  savedAt: '2026-10-0' + (1 + (i % 3)) + 'T09:00:00Z' }));
+
+test('★★ 공고는 기본 50건씩 — 20·100·전체로 바꿀 수 있다', () => {
+  const r = runApp({ feed: many(120) });
+  r.api.draw();
+  assert.equal(rowCount(r.el('tb').innerHTML), 50, '기본은 50건');
+  assert.match(r.el('perBox').innerHTML, /<option value="50" selected>50건/);
+  assert.match(r.el('feedPager').innerHTML, /1–50 \/ 120건/);
+  r.api.feedPer(20); assert.equal(rowCount(r.el('tb').innerHTML), 20);
+  r.api.feedPer(0);  assert.equal(rowCount(r.el('tb').innerHTML), 120, '「전체」는 한 쪽에 다');
+  assert.equal(r.el('feedPager').innerHTML, '', '한 쪽이면 쪽 단추가 없다');
+  r.api.feedPer(50); r.api.feedPageTo(2);
+  assert.match(r.el('tb').innerHTML, /<td class="rn">101<\/td>/, '번호는 이어 센다');
+});
+
+test('★★ 숨긴 것은 지우지 않고 «숨긴 것»에서 다시 본다', () => {
+  const f = many(3); f[1].hidden = true; f[1].ruleOut = true;
+  const r = runApp({ feed: f });
+  r.api.draw();
+  assert.equal(rowCount(r.el('tb').innerHTML), 2);
+  assert.match(r.el('cnt').textContent, /숨김 1건/, '숨긴 것이 있다고 말한다');
+  r.el('fSt').value = '__hidden'; r.api.draw();
+  assert.equal(rowCount(r.el('tb').innerHTML), 1);
+  assert.match(r.el('tb').innerHTML, /숨김·규칙/);
+  r.el('fSt').value = '__all'; r.api.draw();
+  assert.equal(rowCount(r.el('tb').innerHTML), 3, '모두 = 숨긴 것 포함');
+});
+
+test('★★ 되살리면 규칙이 다시 숨기지 않는다', () => {
+  const f = many(1); f[0].nm = 'KDB AI 거버넌스 수립 컨설팅'; f[0].hidden = true; f[0].ruleOut = true;
+  const r = runApp({ feed: f });
+  r.api.unhide('G1');
+  assert.equal(r.api.rejudge(), 0, '되살렸는데 또 사라지면 안 됩니다');
+  assert.equal(JSON.parse(r.store.gov3_feed)[0].hidden, false);
+});
+
+test('★★ 줄을 누르면 팝업 — 상세와 «비교»(같은 공고의 다른 차수 · 같은 기관의 다른 공고)', () => {
+  const f = [
+    { id: 'G1', src: '나라장터', no: 'R26BK01745083-001', nm: '공정위험성평가 컨설팅(재공고)', org: '한국지역난방공사', prc: 19990000, type: '새 공고' },
+    { id: 'G2', src: '나라장터', no: 'R26BK01745083-000', nm: '공정위험성평가 컨설팅', org: '한국지역난방공사', prc: 18000000, type: '지나감' },
+    { id: 'G3', src: '나라장터', no: 'R26BK01700000-000', nm: '작년 노무 컨설팅', org: '한국지역난방공사', type: '새 공고', hidden: true },
+    { id: 'G4', src: '나라장터', no: 'R9-000', nm: '남의 기관', org: '다른곳', type: '새 공고' }
+  ];
+  const r = runApp({ feed: f });
+  r.api.draw();
+  r.api.feedRowClick({ target: { closest: () => null } }, 'G1');
+  assert.equal(r.el('pop').className, 'pop on', '팝업이 떠야 합니다');
+  const h = r.el('popBody').innerHTML;
+  assert.match(h, /R26BK01745083-001/, '상세에 공고번호');
+  assert.match(h, /같은 공고의 다른 차수/);
+  // 이전 차수는 «차수» 칸에 있어야 한다 — 같은 기관 칸에만 있으면 재공고인지 알 수 없다
+  const i1 = h.indexOf('같은 공고의 다른 차수'), i2 = h.indexOf('같은 기관의 다른 공고');
+  assert.ok(i1 >= 0 && i2 > i1);
+  assert.match(h.slice(i1, i2), /공정위험성평가 컨설팅<\/td>/, '이전 차수(-000)가 «차수» 비교 표에');
+  assert.ok(h.slice(i2).indexOf('공정위험성평가 컨설팅</td>') < 0, '같은 것을 두 표에 겹쳐 싣지 않는다');
+  assert.match(h, /1,800만원/, '금액을 견줄 수 있어야 합니다');
+  assert.match(h, /작년 노무 컨설팅/, '같은 기관의 숨긴 것도 비교에 — 과거 자료');
+  assert.ok(h.indexOf('남의 기관') < 0);
+  r.api.popClose();
+  assert.equal(r.el('pop').className, 'pop');
+});
+
+test('★ ㅁ·단추를 누른 것은 팝업을 띄우지 않는다', () => {
+  const r = runApp({ feed: many(1) });
+  r.api.draw();
+  r.api.feedRowClick({ target: { closest: (sel) => (sel.indexOf('input') >= 0 ? {} : null) } }, 'G1');
+  assert.notEqual(r.el('pop').className, 'pop on');
+});
+
+test('★★ 넓게 · 한 줄 — 폭 제한을 풀고 긴 칸은 줄여 title 로 전체를 본다', () => {
+  assert.match(src, /\.wrap\{max-width:none/, '좌우를 다 쓴다');
+  assert.ok(src.indexOf('.wrap{max-width:1180px') < 0);
+  assert.match(src, /#pgFeed td,#pgMat td\{white-space:nowrap/, '한 줄');
+  const r = runApp({ feed: many(1) });
+  r.api.draw();
+  assert.match(r.el('tb').innerHTML, /<td class="nm" title="노무 공고 1">/, '줄인 이름은 title 로');
+  assert.ok(r.el('tb').innerHTML.indexOf('<div class="sub">') < 0, '두 번째 줄(번호)을 두지 않는다');
+});
+
+test('★ 신청 재료도 몇 건씩 볼지 고르고, 줄을 누르면 팝업', async () => {
+  const r = await bigMat(120);
+  assert.equal(rowCount(r.el('matBox').innerHTML), 50);
+  r.api.matPer(100); assert.equal(rowCount(r.el('matBox').innerHTML), 100);
+  r.api.matPer(0);   assert.equal(rowCount(r.el('matBox').innerHTML), 120);
+  r.api.matRowClick({ target: { closest: () => null } }, 2);
+  assert.equal(r.el('pop').className, 'pop on');
+  assert.match(r.el('popBody').innerHTML, /과제3/);
+  assert.match(r.el('popTtl').textContent, /3번/);
 });

@@ -35,7 +35,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-
 .btn:hover{background:var(--bg)}
 .btn.primary{background:var(--navy);color:#FFFFFF;border-color:var(--navy)}
 .btn.sm{padding:3px 8px;font-size:11.5px}
-.wrap{max-width:1180px;margin:0 auto;padding:14px 16px 60px}
+/* 대표 지시 2026-10-03 「좌우 넓게 한줄로 길게 최대 활용」 — 폭 제한을 풀었다 */
+.wrap{max-width:none;margin:0 auto;padding:14px 18px 60px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
 .tag{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px;white-space:nowrap}
 .tag.navy{background:var(--bg);color:var(--navy);border:1px solid var(--border)}
@@ -92,6 +93,28 @@ tr.sel-on td.rn{color:var(--navy);font-weight:700}
 .pager{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .pager .btn.on{background:var(--navy);border-color:var(--navy);color:#FFFFFF}
 .pager .btn[disabled]{opacity:.4;cursor:default}
+/* 한 줄 표 — 긴 칸은 … 으로 줄이고 title 로 전체(＋팝업). max-width:0 은 표 칸 줄임표 요령이다 */
+#pgFeed table,#pgMat table{width:100%}
+#pgFeed td,#pgMat td{white-space:nowrap;vertical-align:middle}
+td.nm{width:42%;max-width:0;overflow:hidden;text-overflow:ellipsis}
+td.og{width:15%;max-width:0;overflow:hidden;text-overflow:ellipsis}
+td.dt{font-size:12px;color:var(--text-mute)}
+td.act{white-space:nowrap}
+.kwt{font-size:11px;color:var(--text-mute);margin-left:5px;font-weight:400}
+tr.fr,tr.mr{cursor:pointer}
+tr.fr:hover td,tr.mr:hover td{background:var(--bg)}
+tr.gone td{opacity:.62}
+/* 팝업 */
+.pop{position:fixed;inset:0;z-index:9000;display:none;align-items:flex-start;justify-content:center;
+  padding:40px 16px;overflow:auto;background:rgba(15,23,42,.45)}
+.pop.on{display:flex}
+.pop-box{background:var(--card);border-radius:12px;width:100%;max-width:1000px;padding:14px 18px 18px;
+  box-shadow:0 12px 40px rgba(15,23,42,.25)}
+.pop-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:15px;color:var(--navy)}
+table.kv th{width:120px;background:none;white-space:nowrap;vertical-align:top}
+table.kv td{white-space:normal;word-break:break-all}
+.pop-sub{font-weight:700;color:var(--navy);margin:12px 0 6px}
+table.cmp td{white-space:nowrap}
 #lock{position:fixed;inset:0;z-index:9999;background:var(--bg);display:none;
   align-items:center;justify-content:center;padding:20px}
 #lock .box{max-width:420px;text-align:center}
@@ -128,9 +151,11 @@ tr.sel-on td.rn{color:var(--navy);font-weight:700}
       <select id="fSrc" onchange="draw()"><option value="">전체 출처</option>
         <option>나라장터</option><option>알리오</option><option>기업마당</option></select>
       <select id="fSt" onchange="draw()"><option value="">전체 상태</option>
-        <option>새 공고</option><option>관심</option><option>지원함</option><option>지나감</option></select>
+        <option>새 공고</option><option>관심</option><option>지원함</option><option>지나감</option>
+        <option value="__hidden">🙈 숨긴 것</option><option value="__all">모두 (숨긴 것 포함)</option></select>
       <div class="sp"></div>
       <span id="cnt" class="sub"></span>
+      <span id="perBox"></span>
       <button class="btn" onclick="fetchAll()">🔄 새로 받기</button>
       <button class="btn" onclick="expCsv()">📤 CSV</button>
     </div>
@@ -138,10 +163,11 @@ tr.sel-on td.rn{color:var(--navy);font-weight:700}
     <div id="note" style="font-size:12.5px;margin-bottom:9px"></div>
     <div id="feedSel"></div>
     <div class="scroll"><table>
-      <thead><tr><th class="chk"><input type="checkbox" id="fSelAll" title="보이는 것 모두" onchange="feedSelAll(this.checked)"></th><th class="rn">№</th><th>출처</th><th>상태</th><th>공고명</th><th>기관</th><th>마감</th>
+      <thead><tr><th class="chk"><input type="checkbox" id="fSelAll" title="보이는 것 모두" onchange="feedSelAll(this.checked)"></th><th class="rn">№</th><th>출처</th><th>상태</th><th>공고명</th><th>기관</th><th>받은 날</th><th>마감</th>
         <th style="text-align:right">남음</th><th style="text-align:right">추정가격</th><th>관리</th></tr></thead>
       <tbody id="tb"></tbody>
     </table></div>
+    <div id="feedPager"></div>
   </div>
 </div>
 
@@ -157,6 +183,11 @@ tr.sel-on td.rn{color:var(--navy);font-weight:700}
   </div>
   <div id="matBox"></div>
 </div>
+
+<div id="pop" class="pop" onclick="if(event.target===this)popClose()"><div class="pop-box">
+  <div class="pop-head"><b id="popTtl"></b><div class="sp"></div><button class="btn sm" onclick="popClose()">✕ 닫기</button></div>
+  <div id="popBody"></div>
+</div></div>
 
 <div id="lock"><div class="box">
   <div style="font-size:17px;font-weight:700;margin-bottom:10px">대표 전용 화면입니다</div>
@@ -336,74 +367,175 @@ function dchip(r){ var d=(typeof r.dday==='number')?r.dday:GovG2b.dday(r.closeDt
   if(d==null) return '<span class="sub">-</span>';
   if(d<0) return '<span class="tag">지남</span>';
   return '<span class="tag '+(d<=7?'red':'teal')+'">D-'+Math.round(d)+'</span>'; }
-/* 공고 목록 — 대표 지시 2026-10-03 「공고 모아보기도 ㅁ와 넘버링 해라」.
+/* 공고 목록 — 대표 지시 2026-10-03
+   ① 「ㅁ와 넘버링」 ② 「몇건씩 볼수 있게」(20·50·100·전체, 기본 50)
+   ③ 「과거 데이터도 삭제 하지 말고 남기고 비교할 수 있게」 — 아무것도 지우지 않는다(숨김뿐).
+      상태 거르개에 「숨긴 것」·「모두(숨긴 것 포함)」 + 「받은 날」 칸 + 팝업의 «비교» 표.
+   ④ 「좌우 넓게 한줄로 길게」 — 줄마다 한 줄, 긴 이름은 … 으로 줄이고 title 로 전체를 본다.
+   ⑤ 「클릭하면 팝업」 — 줄을 누르면 상세 창(ㅁ·단추를 누른 것은 빼고).
    ⚠ 고른 것은 «id»로 기억한다(줄 순서는 거르개·새로 받기로 바뀐다).
    ⚠ 거르개로 안 보이게 된 줄은 고른 것에서 뺀다 — 보이지도 않는 것이 함께 숨겨지면 안 된다. */
-var _feedSel={};
+var _feedSel={}, _feedPage=0;
+var PER_OPTS=[20,50,100,0];                     /* 0 = 전체 */
+function perOf(key){ var v=parseInt(lsGet(key),10); return PER_OPTS.indexOf(v)>=0 ? v : 50; }
+function perSel(key, onch){
+  var cur=perOf(key);
+  return '<label class="sml">표시 <select onchange="'+onch+'(this.value)">'
+    + PER_OPTS.map(function(n){ return '<option value="'+n+'"'+(n===cur?' selected':'')+'>'+(n?n+'건':'전체')+'</option>'; }).join('')
+    + '</select></label>';
+}
+function feedPer(v){ lsSet('per', String(v)); _feedPage=0; draw(); }
+function feedPageTo(p){ _feedPage=p; draw(); }
+
 function feedVisible(){
   var q=($('q').value||'').toLowerCase(), fs=$('fSrc').value, ft=$('fSt').value;
-  var all=get('feed').filter(function(r){ return r && !r.hidden; });
-  var rows=all.filter(function(r){
+  var every=get('feed').filter(function(r){ return !!r; });
+  var base=every.filter(function(r){
+    if(ft==='__hidden') return !!r.hidden;
+    if(ft==='__all') return true;
+    return !r.hidden; });
+  var rows=base.filter(function(r){
     if(fs && r.src!==fs) return false;
-    if(ft && r.type!==ft) return false;
+    if(ft && ft.charAt(0)!=='_' && r.type!==ft) return false;
     if(q && [r.nm,r.org,r.ntce,r.kw].join(' ').toLowerCase().indexOf(q)<0) return false;
     return true; });
-  return {all:all, rows:rows};
+  return {every:every, all:every.filter(function(r){ return !r.hidden; }), rows:rows};
+}
+function _pager(p, pages, from, shown, n, fn){
+  if(pages<=1) return '';
+  var h='<div class="pager"><button class="btn sm" '+(p<=0?'disabled':'')+' onclick="'+fn+'('+(p-1)+')">◀</button>';
+  for(var i=0;i<pages;i++) h+='<button class="btn sm'+(i===p?' on':'')+'" onclick="'+fn+'('+i+')">'+(i+1)+'</button>';
+  return h+'<button class="btn sm" '+(p>=pages-1?'disabled':'')+' onclick="'+fn+'('+(p+1)+')">▶</button>'
+    +'<span class="sml">'+(from+1)+'–'+(from+shown)+' / '+n+'건</span></div>';
 }
 function draw(){
   var v=feedVisible(), all=v.all, rows=v.rows;
   var vis={}; rows.forEach(function(r){ vis[r.id]=1; });
   Object.keys(_feedSel).forEach(function(id){ if(!vis[id]) delete _feedSel[id]; });
-  var sn=Object.keys(_feedSel).length;
-  $('cnt').textContent='전체 '+all.length+'건'+(rows.length!==all.length?' · 지금 '+rows.length+'건':'');
+  var sn=Object.keys(_feedSel).length, hiddenN=v.every.length-all.length;
+  $('cnt').textContent='전체 '+all.length+'건'+(rows.length!==all.length?' · 지금 '+rows.length+'건':'')
+    +(hiddenN?' · 숨김 '+hiddenN+'건':'');
+  var pb=$('perBox'); if(pb) pb.innerHTML=perSel('per','feedPer');
+  var per=perOf('per'), n=rows.length;
+  var pages=per?Math.max(1,Math.ceil(n/per)):1, p=Math.min(_feedPage,pages-1); _feedPage=p;
+  var from=per?p*per:0, page=per?rows.slice(from,from+per):rows;
   var bar=$('feedSel');
   if(bar) bar.innerHTML = sn ? ('<div class="sel-bar">✔ <b>'+sn+'건</b> 선택'
       +' <button class="btn sm" onclick="feedBulk(\'star\')">★ 관심</button>'
       +' <button class="btn sm" onclick="feedBulk(\'hide\')">🚫 숨기기</button>'
+      +' <button class="btn sm" onclick="feedBulk(\'unhide\')">↩ 되살리기</button>'
       +' <button class="btn sm" onclick="expCsv(true)">📤 고른 것 CSV</button>'
       +' <button class="btn sm" onclick="feedSelAll(false)">선택 해제</button></div>') : '';
-  var sa=$('fSelAll'); if(sa) sa.checked = rows.length>0 && rows.every(function(r){ return _feedSel[r.id]; });
-  $('tb').innerHTML = rows.length ? rows.map(function(r,i){ var on=!!_feedSel[r.id];
-    return '<tr'+(on?' class="sel-on"':'')+'>'
-      +'<td class="chk"><input type="checkbox" class="row-chk" '+(on?'checked':'')+' onchange="feedTog(\''+esc(r.id)+'\',this.checked)"></td>'
-      +'<td class="rn">'+(i+1)+'</td>'
+  var sa=$('fSelAll'); if(sa) sa.checked = page.length>0 && page.every(function(r){ return _feedSel[r.id]; });
+  $('tb').innerHTML = page.length ? page.map(function(r,i){ var on=!!_feedSel[r.id], id=esc(r.id);
+    var st=r.hidden ? '<span class="tag red">'+(r.ruleOut?'숨김·규칙':'숨김')+'</span>'
+      : '<span class="tag '+(r.type==='관심'?'teal':(r.type==='지나감'?'':'navy'))+'">'+esc(r.type||'-')+'</span>';
+    return '<tr class="fr'+(on?' sel-on':'')+(r.hidden?' gone':'')+'" onclick="feedRowClick(event,\''+id+'\')">'
+      +'<td class="chk"><input type="checkbox" class="row-chk" '+(on?'checked':'')+' onchange="feedTog(\''+id+'\',this.checked)"></td>'
+      +'<td class="rn">'+(from+i+1)+'</td>'
       +'<td><span class="tag navy">'+esc(r.src||'-')+'</span></td>'
-      +'<td><span class="tag '+(r.type==='관심'?'teal':(r.type==='지나감'?'':'navy'))+'">'+esc(r.type||'-')+'</span></td>'
-      +'<td><b>'+esc(r.nm||'-')+'</b><div class="sub">'+esc(r.no||'')+(r.kw?' · '+esc(r.kw):'')+'</div></td>'
-      +'<td>'+esc(r.org||'-')+'</td>'
-      +'<td style="white-space:nowrap">'+esc((r.closeDt||'-').slice(0,16))+'</td>'
+      +'<td>'+st+'</td>'
+      +'<td class="nm" title="'+esc(r.nm||'')+'"><b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+'</td>'
+      +'<td class="og" title="'+esc(r.org||'')+'">'+esc(r.org||'-')+'</td>'
+      +'<td class="dt">'+esc((r.savedAt||'').slice(0,10)||'-')+'</td>'
+      +'<td class="dt">'+esc((r.closeDt||'-').slice(0,16))+'</td>'
       +'<td style="text-align:right">'+dchip(r)+'</td>'
-      +'<td style="text-align:right;white-space:nowrap">'+(r.prc?Math.round(r.prc/10000).toLocaleString()+'만원':'-')+'</td>'
-      +'<td style="white-space:nowrap">'
-        +'<button class="btn sm" onclick="star(\''+esc(r.id)+'\')">'+(r.type==='관심'?'★':'☆')+'</button> '
-        +(r.url?'<button class="btn sm" onclick="open2(\''+esc(r.id)+'\')">🔗</button> ':'')
-        +'<button class="btn sm" title="서식 채우기 — 경력관리에서 열립니다" onclick="toForm(\''+esc(r.id)+'\')">📝</button> '
-        +'<button class="btn sm" onclick="hide(\''+esc(r.id)+'\')">🚫</button></td></tr>';
-  }).join('') : '<tr><td colspan="10" class="empty">'+(all.length?'걸리는 공고가 없습니다 — 조건을 넓혀 보세요':'아직 받은 공고가 없습니다')+'</td></tr>';
+      +'<td style="text-align:right">'+(r.prc?Math.round(r.prc/10000).toLocaleString()+'만원':'-')+'</td>'
+      +'<td class="act">'
+        +'<button class="btn sm" onclick="star(\''+id+'\')">'+(r.type==='관심'?'★':'☆')+'</button> '
+        +(r.url?'<button class="btn sm" onclick="open2(\''+id+'\')">🔗</button> ':'')
+        +'<button class="btn sm" title="서식 채우기 — 경력관리에서 열립니다" onclick="toForm(\''+id+'\')">📝</button> '
+        +(r.hidden ? '<button class="btn sm" title="되살리기" onclick="unhide(\''+id+'\')">↩</button>'
+                   : '<button class="btn sm" onclick="hide(\''+id+'\')">🚫</button>')+'</td></tr>';
+  }).join('') : '<tr><td colspan="11" class="empty">'+(!v.every.length?'아직 받은 공고가 없습니다':(!all.length&&$('fSt').value.charAt(0)!=='_'?'보이는 공고가 없습니다 — 숨긴 '+hiddenN+'건은 상태 「🙈 숨긴 것」에서 봅니다':'걸리는 공고가 없습니다 — 조건을 넓혀 보세요'))+'</td></tr>';
+  var pg=$('feedPager'); if(pg) pg.innerHTML=_pager(p, pages, from, page.length, n, 'feedPageTo');
 }
 function feedTog(id,on){ if(on) _feedSel[id]=1; else delete _feedSel[id]; draw(); }
+/* 머리 ㅁ — «이 쪽에 보이는 것»만 고른다(다른 쪽은 그대로) */
 function feedSelAll(on){
-  _feedSel={};
-  if(on) feedVisible().rows.forEach(function(r){ _feedSel[r.id]=1; });
+  if(!on){ _feedSel={}; draw(); return; }
+  var v=feedVisible().rows, per=perOf('per'), from=per?_feedPage*per:0;
+  (per?v.slice(from,from+per):v).forEach(function(r){ _feedSel[r.id]=1; });
   draw();
 }
 /* 고른 것을 한꺼번에 — 관심은 «켜기»만(섞여 있어도 끄지 않는다), 숨기기는 세고 묻는다 */
 function feedBulk(what){
   var ids=Object.keys(_feedSel); if(!ids.length) return;
   var a=get('feed'), n=0;
-  if(what==='hide' && !confirm('고른 '+ids.length+'건을 숨길까요?\n숨긴 공고는 목록·CSV 에 나오지 않습니다.')) return;
+  if(what==='hide' && !confirm('고른 '+ids.length+'건을 숨길까요?\n지우지 않습니다 — 상태 「숨긴 것」에서 언제든 되살립니다.')) return;
   a.forEach(function(r){ if(!r||!_feedSel[r.id]) return;
     if(what==='star' && r.type!=='관심'){ r.type='관심'; n++; }
-    if(what==='hide' && !r.hidden){ r.hidden=true; n++; } });
+    if(what==='hide' && !r.hidden){ r.hidden=true; n++; }
+    if(what==='unhide' && r.hidden){ r.hidden=false; r.ruleOut=false; r.keep=true; n++; } });
   _feedSel={};
   set('feed',a); draw();
-  toast(what==='star' ? n+'건을 관심으로 표시했습니다' : n+'건을 숨겼습니다 — CSV 에도 안 나갑니다');
+  toast(what==='star' ? n+'건을 관심으로 표시했습니다'
+      : what==='unhide' ? n+'건을 되살렸습니다 — 규칙이 다시 숨기지 않습니다'
+      : n+'건을 숨겼습니다 — 「숨긴 것」에서 되살립니다');
 }
+/* ⚠ 되살린 줄은 keep — 다음에 rejudge 가 다시 숨기면 «되살렸는데 또 사라졌다»가 된다 */
+function unhide(id){ var h=find(id); if(!h) return;
+  var r=h.a[h.i]; r.hidden=false; r.ruleOut=false; r.keep=true; set('feed',h.a); draw(); popClose();
+  toast('되살렸습니다'); }
+
+/* ═══ 팝업 — 줄을 누르면 상세 + «비교» ═══
+   비교 둘: ⑴ 같은 공고의 다른 차수(번호 앞부분이 같다 — 재공고·정정)
+            ⑵ 같은 기관의 다른 공고(숨긴 것·지난 것까지 «모두» — 과거와 견주라고 남겨 둔 것이다) */
+function feedRowClick(e,id){
+  var t=e&&e.target; if(t && t.closest && t.closest('input,button,a,select,label')) return;
+  feedPop(id);
+}
+function _kv(k,v){ return v==null||v==='' ? '' : '<tr><th>'+esc(k)+'</th><td>'+v+'</td></tr>'; }
+function _won(p){ return p?Math.round(p/10000).toLocaleString()+'만원':'-'; }
+function feedPop(id){
+  var h=find(id); if(!h) return; var r=h.a[h.i], every=h.a.filter(Boolean);
+  var base=String(r.no||'').replace(/-\d+$/,'');
+  var same=every.filter(function(x){ return x.id!==r.id && base && String(x.no||'').replace(/-\d+$/,'')===base; });
+  var org=every.filter(function(x){ return x.id!==r.id && r.org && x.org===r.org && same.indexOf(x)<0; });
+  var cmp=function(list, title){
+    if(!list.length) return '<div class="sml" style="margin:6px 0 12px">'+esc(title)+' — 없습니다</div>';
+    return '<div class="pop-sub">'+esc(title)+' <span class="sml">'+list.length+'건</span></div>'
+      +'<div class="scroll"><table class="cmp"><thead><tr><th>받은 날</th><th>공고명</th><th>마감</th><th style="text-align:right">추정가격</th><th>상태</th></tr></thead><tbody>'
+      +list.map(function(x){ return '<tr onclick="feedPop(\''+esc(x.id)+'\')" style="cursor:pointer">'
+        +'<td class="dt">'+esc((x.savedAt||'').slice(0,10)||'-')+'</td><td class="nm" title="'+esc(x.nm||'')+'">'+esc(x.nm||'-')+'</td>'
+        +'<td class="dt">'+esc((x.closeDt||'-').slice(0,16))+'</td><td style="text-align:right">'+_won(x.prc)+'</td>'
+        +'<td>'+(x.hidden?'<span class="tag red">숨김</span>':esc(x.type||'-'))+'</td></tr>'; }).join('')
+      +'</tbody></table></div>';
+  };
+  var body='<table class="kv">'
+    +_kv('공고명','<b>'+esc(r.nm||'-')+'</b>')
+    +_kv('출처',esc(r.src||'-'))+_kv('공고번호',esc(r.no||''))
+    +_kv('기관',esc(r.org||''))+(r.ntce&&r.ntce!==r.org?_kv('공고기관',esc(r.ntce)):'')
+    +_kv('상태',(r.hidden?'<span class="tag red">'+(r.ruleOut?'숨김 · 걸러내기 규칙':'숨김')+'</span> ':'')+esc(r.type||''))
+    +_kv('걸린 낱말',esc(r.kw||''))
+    +_kv('공고일',esc((r.openDt||'').slice(0,16)))+_kv('마감',esc((r.closeDt||'').slice(0,16))+' '+dchip(r))
+    +_kv('추정가격',r.prc?_won(r.prc)+' <span class="sml">('+Number(r.prc).toLocaleString()+'원)</span>':'')
+    +_kv('계약방법',esc(r.mthd||''))+_kv('받은 날',esc((r.savedAt||'').slice(0,16).replace('T',' ')))
+    +'</table>'
+    +'<div class="bar" style="margin:12px 0">'
+    +'<button class="btn sm" onclick="star(\''+esc(r.id)+'\');feedPop(\''+esc(r.id)+'\')">'+(r.type==='관심'?'★ 관심 끄기':'☆ 관심')+'</button>'
+    +(r.url?'<button class="btn sm" onclick="open2(\''+esc(r.id)+'\')">🔗 원문 공고</button>':'')
+    +'<button class="btn sm" onclick="toForm(\''+esc(r.id)+'\')">📝 서식 채우기</button>'
+    +(r.hidden?'<button class="btn sm" onclick="unhide(\''+esc(r.id)+'\')">↩ 되살리기</button>'
+              :'<button class="btn sm" onclick="hide(\''+esc(r.id)+'\');popClose()">🚫 숨기기</button>')
+    +'</div>'
+    +cmp(same,'같은 공고의 다른 차수 (재공고·정정)')
+    +cmp(org,'같은 기관의 다른 공고 (지난 것·숨긴 것 포함)');
+  popOpen('📋 공고 상세', body);
+}
+
+/* 팝업 틀 하나 — 공고·신청 재료가 같이 쓴다 */
+function popOpen(title, html){
+  $('popTtl').textContent=title; $('popBody').innerHTML=html;
+  $('pop').className='pop on';
+}
+function popClose(){ var p=$('pop'); if(p) p.className='pop'; }
+try{ document.addEventListener('keydown', function(e){ if(e.key==='Escape') popClose(); }); }catch(e){}
 function find(id){ var a=get('feed'); for(var i=0;i<a.length;i++) if(a[i].id===id) return {a:a,i:i}; return null; }
 function star(id){ var h=find(id); if(!h) return;
   h.a[h.i].type=(h.a[h.i].type==='관심')?'새 공고':'관심'; set('feed',h.a); draw(); }
 function hide(id){ var h=find(id); if(!h) return;
-  h.a[h.i].hidden=true; set('feed',h.a); draw(); toast('숨겼습니다 — CSV 에도 안 나갑니다'); }
+  h.a[h.i].hidden=true; set('feed',h.a); draw(); toast('숨겼습니다 — 지우지 않습니다. 상태 「숨긴 것」에서 되살립니다'); }
 /* ═══ 서식 채우기 — «경력관리로 넘긴다» (대표 승인 2026-09-10) ═══
    ⚠★ 여기에 서식 채우기 화면을 «짓지 말 것». 그 화면은 경력관리에 이미 있고
       함수 60개 + 한글 엔진 7MB 짜리다. 두 곳에 두면 한쪽만 고쳐져 어느 쪽이
@@ -426,14 +558,14 @@ function srcBackfill(){
    ⚠ 지우지 않고 숨긴다(🚫 와 같은 표시 + ruleOut). 멱등. */
 function rejudge(){
   var a=get('feed'), n=0, kw=kws();
-  a.forEach(function(r){ if(!r||r.hidden||r.type==='관심'||r.type==='지원함') return;   /* 「지나감」도 기계가 정한 것이다 */
+  a.forEach(function(r){ if(!r||r.hidden||r.keep||r.type==='관심'||r.type==='지원함') return;   /* 「지나감」도 기계가 정한 것이다 */
     if(!GovG2b.judge(r,kw).length){ r.hidden=true; r.ruleOut=true; n++; } });
   if(n){ set('feed',a); toast('새 걸러내기 규칙에 맞지 않는 '+n+'건을 숨겼습니다'); }
   return n;
 }
 function open2(id){ var h=find(id); if(h&&h.a[h.i].url) window.open(h.a[h.i].url,'_blank','noopener'); }
 function expCsv(only){
-  var rows=get('feed').filter(function(r){ return r&&!r.hidden&&(!only||_feedSel[r.id]); });
+  var rows=get('feed').filter(function(r){ return r&&(only?_feedSel[r.id]:!r.hidden); });
   if(!rows.length){ toast('내보낼 것이 없습니다'); return; }
   var keys=['src','type','no','nm','org','openDt','closeDt','prc','mthd','kw','url'];
   var csv=[keys.join(',')].concat(rows.map(function(r){
@@ -571,7 +703,9 @@ async function matPull(){
    «갈래 단추로 하나씩» 보이고, 한 쪽 50건 · 줄마다 ㅁ · № 를 둔다.
    ⚠ 고른 것이 있으면 📋·📤 는 «고른 것만», 없으면 그 갈래 «전부» — 화면이 어느 쪽인지 밝힌다.
    ⚠★ 자문·고문은 고른 것이든 전부든 «반드시» 가려서 나간다(GovCareer 를 거친다). */
-var MAT_PER=50;
+var MAT_PER=50;   /* 기본 — 대표가 「표시」로 바꾸면 그 값(matPerN) */
+function matPerN(){ var v=perOf('mper'); return v||100000; }
+function matPer(v){ lsSet('mper', String(v)); _matPage={}; matDraw(); }
 var MAT_KINDS=[
   {k:'edu',      icon:'🎓', nm:'학력'},
   {k:'cert',     icon:'📜', nm:'자격 · 수료'},
@@ -614,7 +748,7 @@ function matPageTo(p){ _matPage[_matKind]=p; matDraw(); }
 function matTog(i,on){ var s=_matSel[_matKind]=_matSel[_matKind]||{}; if(on) s[i]=1; else delete s[i]; matDraw(); }
 function matSelPage(on){
   var k=_matKind, a=matList(k), p=_matPage[k]||0, s=_matSel[k]=_matSel[k]||{};
-  for(var i=p*MAT_PER;i<Math.min(a.length,(p+1)*MAT_PER);i++){ if(on) s[i]=1; else delete s[i]; }
+  for(var i=p*matPerN();i<Math.min(a.length,(p+1)*matPerN());i++){ if(on) s[i]=1; else delete s[i]; }
   matDraw();
 }
 function matSelAll(){ var k=_matKind, s=_matSel[k]={}; matList(k).forEach(function(r,i){ s[i]=1; }); matDraw(); }
@@ -656,8 +790,8 @@ function matDraw(){
   if(!MAT_KINDS.some(function(x){ return x.k===k; })) k=_matKind='edu';
   var info=MAT_KINDS.filter(function(x){ return x.k===k; })[0];
   var all=matList(k), n=all.length, sel=_matSel[k]||{}, sn=matSelN(k);
-  var pages=Math.max(1,Math.ceil(n/MAT_PER)), p=Math.min(_matPage[k]||0,pages-1); _matPage[k]=p;
-  var from=p*MAT_PER, rows=all.slice(from, from+MAT_PER);
+  var pages=Math.max(1,Math.ceil(n/matPerN())), p=Math.min(_matPage[k]||0,pages-1); _matPage[k]=p;
+  var from=p*matPerN(), rows=all.slice(from, from+matPerN());
   var pageAll=rows.length && rows.every(function(r,i){ return sel[from+i]; });
   var h='';
 
@@ -674,7 +808,7 @@ function matDraw(){
     +(k==='wiccok' ? '<label class="sml"><input type="checkbox" '+(_matLive?'checked':'')
         +' onchange="matLiveTog()"> 지금 맡고 있는 것만</label>' : '')
     +(k==='advisory' ? ' <span class="tag red">내보낼 때 이름 가림</span>' : '')
-    +'<div class="sp"></div>'
+    +'<div class="sp"></div>'+perSel('mper','matPer')+' '
     +'<button class="btn sm" onclick="matCopy(\''+k+'\')">📋 복사 · '+tgt+'</button> '
     +'<button class="btn sm" onclick="matCsv(\''+k+'\')">📤 CSV · '+tgt+'</button>'
     +'</div>';
@@ -698,7 +832,7 @@ function matDraw(){
     +C.h.map(function(c){ return '<th>'+esc(c)+'</th>'; }).join('')
     +'</tr></thead><tbody>'
     +rows.map(function(r,i){ var gi=from+i, on=!!sel[gi];
-        return '<tr'+(on?' class="sel-on"':'')+'>'
+        return '<tr class="mr'+(on?' sel-on':'')+'" onclick="matRowClick(event,'+gi+')">'
           +'<td class="chk"><input type="checkbox" class="row-chk" '+(on?'checked':'')+' onchange="matTog('+gi+',this.checked)"></td>'
           +'<td class="rn">'+(gi+1)+'</td>'
           +C.c(r).map(_td).join('')+'</tr>'; }).join('')
@@ -713,6 +847,22 @@ function matDraw(){
   }
   h+='</div>';
   $('matBox').innerHTML=h;
+}
+
+/* 줄을 누르면 그 줄의 칸을 모두 보여 준다 — 표에선 잘린 긴 글자를 여기서 다 읽는다 */
+var MAT_LABEL={period:'기간',school:'학교명',major:'학과·전공',degree:'학위',graduated:'졸업구분',
+  title:'이름·내용',org:'기관',date:'날짜',num:'번호',duration:'시간',role:'직책',issuer:'발급·위촉인',
+  issueDate:'발급일',start:'시작',end:'종료',year:'연도',state:'상태',type:'유형',bizType:'업태',
+  bizCategory:'종목',size:'규모',insured:'근로자 수',status:'상태',kind:'갈래',project:'사업·과제',
+  agency:'수행기관',main:'담당',dept:'부서'};
+function matRowClick(e,gi){
+  var t=e&&e.target; if(t && t.closest && t.closest('input,button,a,select,label')) return;
+  var r=matList(_matKind)[gi]; if(!r) return;
+  var info=MAT_KINDS.filter(function(x){ return x.k===_matKind; })[0];
+  var rows=Object.keys(r).filter(function(k){ return k.charAt(0)!=='_' && r[k]!=='' && r[k]!=null; })
+    .map(function(k){ return _kv(MAT_LABEL[k]||k, esc(String(r[k]))); }).join('');
+  popOpen(info.icon+' '+info.nm+' · '+(gi+1)+'번', '<table class="kv">'+rows+'</table>'
+    +(_matKind==='advisory'?'<div class="warn" style="margin-top:10px">⚠ 이 창에는 이름이 보이지만, 복사·CSV 로 나갈 때는 가려집니다.</div>':''));
 }
 
 /* ── 내보내기 ──
