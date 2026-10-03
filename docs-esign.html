@@ -170,7 +170,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/utils.js?v=2"></script>
 <script src="js/pu-contract-vars.js?v=1"></script>
 <script src="js/esign-crypto.js?v=1"></script>
-<script src="js/esign-docs.js?v=1"></script>
+<script src="js/esign-docs.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=18"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
@@ -748,7 +748,9 @@ async function openCase(caseId) {
     return;
   }
   curCaseId = caseId;
+  selSubs = null;
   await refreshSubs();
+  await loadArrearsCache();
   $('viewList').style.display = 'none';
   $('viewDetail').style.display = 'block';
   renderDetail();
@@ -774,6 +776,9 @@ async function refreshSubs() {
 }
 
 var RS_LABEL = { pending: '⏳ 대기', confirmed: '✅ 확인', hold: '⚠ 보류', error: '❌ 오류' };
+/* 진행판(3-B, 서식 묶음 설계 2026-09-28 상황 3) — 고른 사람. null 이면 «확인(✅)된 사람» 기본(서류 일괄 생성이 쓰던 기준) */
+var selSubs = null;
+function isPicked(d) { return selSubs ? !!selSubs[d._subId] : d._reviewState === 'confirmed'; }
 
 function renderDetail() {
   var m = (casesCache[curCaseId] || {}).meta || {};
@@ -788,16 +793,29 @@ function renderDetail() {
     + '<button class="btn btn-sub" onclick="shareCase(curCaseId)">🔗 링크</button>'
     + '<span id="detailActions"></span>' // Task 11·12가 버튼 추가
     + '</div>'
-    + '<table><thead><tr><th>#</th><th>성명</th><th>주민등록번호</th><th>연락처</th><th>제출일시</th><th>상태</th><th></th></tr></thead><tbody>'
+    + (function () {
+      /* 진행판 요약 — 상태별 수와 빈 칸 수. 「서류로 낼 수 있음」 = 확인(✅) + 빠진 것 없음 */
+      var s = EsignDocs.progressSummary(decrypted, arrearsCache);
+      return '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;margin:0 0 10px;color:#475569">'
+        + '<span>제출 <b>' + s.total + '</b></span><span>✅ 확인 <b>' + s.confirmed + '</b></span><span>⚠ 보류 <b>' + s.hold + '</b></span>'
+        + '<span>⏳ 대기 <b>' + s.pending + '</b></span>' + (s.error ? '<span>❌ 오류 <b>' + s.error + '</b></span>' : '')
+        + '<span style="color:' + (s.noArrears ? '#d97706' : '#64748b') + '">체불내역 빈 <b>' + s.noArrears + '</b></span>'
+        + '<span style="color:' + (s.noLeave ? '#d97706' : '#64748b') + '">퇴사일 빈 <b>' + s.noLeave + '</b></span>'
+        + '<span style="color:#166534">서류로 낼 수 있음 <b>' + s.ready + '</b></span></div>';
+    })()
+    + '<table><thead><tr><th><input type="checkbox" id="selAll" title="모두 고르기"></th><th>#</th><th>성명</th><th>주민등록번호</th><th>연락처</th><th>제출일시</th><th>상태</th><th>빠진 것</th><th></th></tr></thead><tbody>'
     + decrypted.map(function (d, i) {
       var dup = d.idNo && cnt[d.idNo] > 1 ? ' <span class="badge" style="background:#fffbeb;color:#854d0e">중복</span>' : '';
+      var gaps = d._reviewState === 'error' ? [] : EsignDocs.personGaps(d, arrearsCache[d._subId]);
       return '<tr>'
+        + '<td>' + (d._reviewState === 'error' ? '' : '<input type="checkbox" class="selPerson" data-sub="' + EsignDocs.esc(d._subId) + '"' + (isPicked(d) ? ' checked' : '') + '>') + '</td>'
         + '<td>' + (i + 1) + '</td>'
         + '<td style="font-weight:700">' + EsignDocs.esc(d.name) + dup + '</td>'
         + '<td class="rrnCell" data-full="' + EsignDocs.esc(d.idNo || '') + '" style="cursor:pointer" title="클릭하면 전체 표시">' + EsignDocs.esc(EsignDocs.maskIdNo(d.idNo)) + '</td>'
         + '<td>' + EsignDocs.esc(d.phone || '') + '</td>'
         + '<td>' + (d._submittedAt ? new Date(d._submittedAt).toLocaleString('ko-KR') : '') + '</td>'
         + '<td><a href="javascript:void(0)" onclick="cycleReview(\'' + d._subId + '\')">' + EsignDocs.esc(RS_LABEL[d._reviewState] || d._reviewState) + '</a></td>'
+        + '<td style="font-size:12px;color:' + (gaps.length ? '#d97706' : '#166534') + '">' + (gaps.length ? EsignDocs.esc(gaps.join('·')) : (d._reviewState === 'error' ? '' : '✔')) + '</td>'
         + '<td><button class="btn btn-sub" onclick="showPerson(\'' + d._subId + '\')">상세</button> '
         + '<button class="btn btn-danger" onclick="delSub(\'' + d._subId + '\')">삭제</button></td>'
         + '</tr>';
@@ -807,6 +825,19 @@ function renderDetail() {
   $('viewDetail').querySelectorAll('.rrnCell').forEach(function (td) {
     td.onclick = function () { this.textContent = this.dataset.full; };
   });
+  /* 고르기 — 처음 손대는 순간 지금 보이는 체크를 그대로 옮겨 적는다(기본 «확인된 사람»이 갑자기 풀리지 않게) */
+  function takeSel() {
+    if (selSubs) return;
+    selSubs = {};
+    decrypted.forEach(function (d) { if (isPickedDefault(d)) selSubs[d._subId] = true; });
+  }
+  function isPickedDefault(d) { return d._reviewState === 'confirmed'; }
+  var boxes = $('viewDetail').querySelectorAll('.selPerson');
+  boxes.forEach(function (cb) { cb.onchange = function () { takeSel(); selSubs[this.dataset.sub] = this.checked; syncAll(); }; });
+  var all = $('selAll');
+  function syncAll() { if (all) all.checked = boxes.length > 0 && Array.prototype.every.call(boxes, function (b) { return b.checked; }); }
+  if (all) all.onchange = function () { takeSel(); var on = all.checked; boxes.forEach(function (b) { b.checked = on; selSubs[b.dataset.sub] = on; }); };
+  syncAll();
   if (typeof renderDetailActions === 'function') renderDetailActions(); // Task 11·12
 }
 function closeDetail() {
@@ -874,6 +905,11 @@ function delSub(subId) {
 
 // ── 체불내역 입력 (근로자에게 받지 않고 노무사가 입력 — 설계 §8.1) ──
 var arrearsCache = {};
+/* 진행판이 «빠진 것»을 보려면 체불내역이 있어야 한다 — 사건을 열 때 한 번 읽는다(once) */
+async function loadArrearsCache() {
+  try { var snap = await db.ref('esign/cases/' + curCaseId + '/arrears').once('value'); arrearsCache = snap.val() || {}; }
+  catch (e) { arrearsCache = {}; }
+}
 
 function renderDetailActions() {
   var m = (casesCache[curCaseId] || {}).meta || {};
@@ -1046,11 +1082,12 @@ async function tplDownloadZip() {
     var JSZ = await _esignLoadJsZip();
     var zip = new JSZ();
     var unknownAll = {}, relayoutFailN = 0;
+    var fnames = EsignDocs.folderNames(people);   // 같은 이름 두 사람이 서로 덮어쓰지 않게 — 01_홍길동, 03_홍길동(2)
     for (var i = 0; i < people.length; i++) {
       var r = await _esignFillOne(record, meta, people[i]);
       r.unknown.forEach(function (k) { unknownAll[k] = 1; });
       if (r.relayoutFailed) relayoutFailN++;
-      zip.file(_esignSafeName(people[i].name) + '.hwp', r.bytes);
+      zip.file(fnames[i] + '.hwp', r.bytes);
     }
     var blob = await zip.generateAsync({ type: 'blob' });
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -1129,33 +1166,127 @@ async function openCaseHwp() {
   catch (e) { $('caseHwpStatus').textContent = e.message || '한글 원본 보관함을 열지 못했습니다.'; }
 }
 
-// 서류 4종 생성 — 확인(confirmed)된 제출만 (없으면 오류 제외 전체)
+// 서류 4종 생성 — 이제 «내는 모양 고르기»(3-C, 서식 묶음 설계 2026-09-28 상황 3). 고른 사람만(표의 ☐, 기본 확인된 사람)
 async function genDocs() {
+  var pool = exportPeople();
+  if (!pool.length) { showToast('표에서 서류로 낼 사람을 고르세요 (기본: ✅ 확인된 사람)'); return; }
+  openExportPicker(pool);
+}
+/* 낼 사람 — 표에서 고른 사람(오류 줄 제외). 아무도 안 골랐고 고르기를 손댄 적도 없으면 확인된 사람 */
+function exportPeople() {
+  return decrypted.filter(function (d) { return d._reviewState !== 'error' && (selSubs ? !!selSubs[d._subId] : d._reviewState === 'confirmed'); });
+}
+function openExportPicker(pool) {
   var m = (casesCache[curCaseId] || {}).meta || {};
-  var pool = decrypted.filter(function (d) { return d._reviewState === 'confirmed'; });
-  if (!pool.length) pool = decrypted.filter(function (d) { return d._reviewState !== 'error'; });
-  if (!pool.length) { showToast('생성할 제출이 없습니다'); return; }
-  try {
-    showToast('서류 생성 중… (' + pool.length + '명)');
-    // 최신 체불내역 로드
-    var snap = await db.ref('esign/cases/' + curCaseId + '/arrears').once('value');
-    arrearsCache = snap.val() || {};
-    // ① 개인별 위임장 PDF (전원 1파일, 1인 1페이지)
-    await EsignDocs.htmlPagesToPdf(
-      pool.map(function (d) { return EsignDocs.buildDelegationHtml(d, m); }),
-      (m.title || '사건') + '_위임장.pdf');
-    // ② 개인정보 동의서 PDF
-    await EsignDocs.htmlPagesToPdf(
-      pool.map(function (d) { return EsignDocs.buildConsentHtml(d, m); }),
-      (m.title || '사건') + '_개인정보동의서.pdf');
-    // ③ 진정인 연명부 XLSX
-    EsignDocs.downloadRosterXlsx(pool, m);
-    // ④ 체불/체당금 정리 XLSX
-    EsignDocs.downloadArrearsXlsx(pool, arrearsCache, m);
-    showToast('✅ 서류 4종 다운로드 완료');
-  } catch (e) {
-    showToast('서류 생성 실패 — 다시 시도해 주세요');
+  var bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  var gapN = pool.filter(function (d) { return EsignDocs.personGaps(d, arrearsCache[d._subId]).length; }).length;
+  bg.innerHTML = '<div class="modal" role="dialog" aria-label="서류 일괄 생성" style="max-width:540px">'
+    + '<b style="font-size:15px">📑 서류 일괄 생성 — ' + EsignDocs.esc(m.title || '') + '</b>'
+    + '<div style="font-size:12.5px;color:#64748b;margin:4px 0 10px">고른 ' + pool.length + '명' + (gapN ? ' · <span style="color:#d97706">빠진 것 있는 사람 ' + gapN + '명(빈 칸은 밑줄로 나옵니다)</span>' : '') + '</div>'
+    + '<div style="font-weight:700;font-size:13px;margin:6px 0">내는 모양</div>'
+    + '<label style="display:block;margin:3px 0"><input type="radio" name="xShape" value="person" checked> 사람별 폴더 — 사람마다 위임장·동의서(·채운 한글 원본)</label>'
+    + '<label style="display:block;margin:3px 0"><input type="radio" name="xShape" value="merged"> 양식별 합본 PDF — 위임장 전원 한 파일, 동의서 전원 한 파일(·한글 원본 전원 한 파일)</label>'
+    + '<label style="display:block;margin:3px 0"><input type="radio" name="xShape" value="both"> 둘 다</label>'
+    + '<div style="font-weight:700;font-size:13px;margin:10px 0 6px">함께 넣기</div>'
+    + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xRoster" checked> 진정인 연명부 (엑셀)</label>'
+    + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xArrears" checked> 체불임금 정리 (엑셀)</label>'
+    + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xHwp"> 이 사건 한글 원본을 사람마다 채워 넣기 <span style="color:#64748b">(📄 한글 원본을 이 PC 에 등록한 경우)</span></label>'
+    + '<div id="xNote" style="font-size:12px;color:#64748b;min-height:16px;margin-top:8px"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn btn-sub" id="xNo">취소</button><button class="btn btn-pri" id="xGo">📦 .zip 하나로 받기</button></div></div>';
+  document.body.appendChild(bg);
+  var $x = function (id) { return bg.querySelector('#' + id); };
+  var busy = false;
+  $x('xNo').onclick = function () { if (!busy) bg.remove(); };
+  PureunHwpStore.get('esign-case', curCaseId).then(function (rec) {
+    var cb = $x('xHwp');
+    if (!rec) { cb.disabled = true; cb.parentNode.style.color = '#94a3b8'; } else cb.checked = true;
+  }, function () { $x('xHwp').disabled = true; });
+  $x('xGo').onclick = function () {
+    if (busy) return;
+    busy = true; $x('xGo').disabled = true;
+    var shape = (bg.querySelector('input[name="xShape"]:checked') || {}).value || 'person';
+    runExport(pool, { shape: shape, roster: $x('xRoster').checked, arrears: $x('xArrears').checked, hwp: $x('xHwp').checked && !$x('xHwp').disabled },
+      function (t) { $x('xNote').textContent = t; })
+      .then(function (msg) { busy = false; bg.remove(); showToast(msg); },
+        function (e) { busy = false; $x('xGo').disabled = false; $x('xNote').textContent = '⚠ ' + ((e && e.message) || e); });
+  };
+}
+/* 묶음 만들기 — .zip 하나. 사람별 폴더 / 양식별 합본 / 둘 다 + 연명부·체불내역. 하나씩 차례로(그림·한글 엔진 메모리).
+   ⚠ 채운 서류는 이 브라우저 안에서만 만들고 내려받는다 — 서버로 보내지 않는다(주민번호가 든 서류). */
+async function runExport(pool, o, say) {
+  var m = (casesCache[curCaseId] || {}).meta || {};
+  say = say || function () {};
+  var shape = o.shape;
+  await loadArrearsCache();
+  var JSZ = await _esignLoadJsZip();
+  var zip = new JSZ();
+  var title = _esignSafeName(m.title || '사건');
+  var record = o.hwp ? await PureunHwpStore.get('esign-case', curCaseId) : null;
+  var folders = EsignDocs.folderNames(pool);
+  var hwpOut = [], unknownAll = {};
+  if (record) {
+    for (var i = 0; i < pool.length; i++) {
+      say('한글 원본 채우는 중… (' + (i + 1) + '/' + pool.length + ')');
+      var r = await _esignFillOne(record, m, pool[i]);
+      r.unknown.forEach(function (k) { unknownAll[k] = 1; });
+      hwpOut.push(r.bytes);
+    }
   }
+  if (shape === 'person' || shape === 'both') {
+    for (var j = 0; j < pool.length; j++) {
+      say('사람별 서류 만드는 중… (' + (j + 1) + '/' + pool.length + ')');
+      var d = pool[j], dir = (shape === 'both' ? '사람별/' : '') + folders[j] + '/';
+      zip.file(dir + '위임장.pdf', await EsignDocs.htmlPagesToPdf([EsignDocs.buildDelegationHtml(d, m)], '', { bytes: true }));
+      zip.file(dir + '개인정보동의서.pdf', await EsignDocs.htmlPagesToPdf([EsignDocs.buildConsentHtml(d, m)], '', { bytes: true }));
+      if (hwpOut[j]) zip.file(dir + '한글원본_' + folders[j].replace(/^\d+_/, '') + '.hwp', hwpOut[j]);
+    }
+  }
+  if (shape === 'merged' || shape === 'both') {
+    var mdir = shape === 'both' ? '양식별 합본/' : '';
+    say('위임장 합본 만드는 중…');
+    zip.file(mdir + '위임장_전원(' + pool.length + '명).pdf', await EsignDocs.htmlPagesToPdf(pool.map(function (d) { return EsignDocs.buildDelegationHtml(d, m); }), '', { bytes: true }));
+    say('동의서 합본 만드는 중…');
+    zip.file(mdir + '개인정보동의서_전원(' + pool.length + '명).pdf', await EsignDocs.htmlPagesToPdf(pool.map(function (d) { return EsignDocs.buildConsentHtml(d, m); }), '', { bytes: true }));
+    if (hwpOut.length) {
+      say('한글 원본 합본 PDF 만드는 중…');
+      zip.file(mdir + '한글원본_전원(' + pool.length + '명).pdf', await _esignHwpMergedPdf(hwpOut));
+    }
+  }
+  if (o.roster) zip.file('진정인연명부.xlsx', EsignDocs.downloadRosterXlsx(pool, m, { bytes: true }));
+  if (o.arrears) zip.file('체불임금정리.xlsx', EsignDocs.downloadArrearsXlsx(pool, arrearsCache, m, { bytes: true }));
+  say('묶는 중…');
+  var blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = title + '_서류묶음(' + pool.length + '명).zip';
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  var unk = Object.keys(unknownAll);
+  return '✅ ' + pool.length + '명 서류 묶음을 받았습니다' + (unk.length ? ' · 한글 원본의 모르는 표지 ' + unk.length + '가지: ' + unk.slice(0, 5).join(', ') + (unk.length > 5 ? ' 외' : '') : '');
+}
+/* 채운 한글 원본 여러 벌 → PDF 하나(그림 PDF). 화면 밖에서 쪽마다 그린다 — 한 벌씩 차례로 */
+async function _esignHwpMergedPdf(list) {
+  if (!window.jspdf) throw new Error('PDF 도구를 불러오지 못했습니다');
+  var pdf = null;
+  for (var i = 0; i < list.length; i++) {
+    var host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px';
+    document.body.appendChild(host);
+    try {
+      await PureunHwp.renderPreview(host, list[i], 'p' + i + '.hwp');
+      var cvs = host.querySelectorAll('canvas');
+      for (var k = 0; k < cvs.length; k++) {
+        var c = cvs[k], land = c.width > c.height;
+        if (!pdf) pdf = new window.jspdf.jsPDF({ orientation: land ? 'l' : 'p', unit: 'pt', format: 'a4' });
+        else pdf.addPage('a4', land ? 'l' : 'p');
+        var pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+        var sc = Math.min(pw / c.width, ph / c.height), cw = c.width * sc, ch = c.height * sc;
+        pdf.addImage(c.toDataURL('image/jpeg', 0.9), 'JPEG', (pw - cw) / 2, (ph - ch) / 2, cw, ch);
+      }
+    } finally { host.remove(); }
+  }
+  if (!pdf) throw new Error('한글 원본 쪽을 그리지 못했습니다');
+  return new Uint8Array(pdf.output('arraybuffer'));
 }
 
 // 사건 마감 (신규 제출 차단 — RTDB 규칙의 status==='active' 조건)
@@ -1249,6 +1380,7 @@ async function openArrears() {
     await trackedWrite(db.ref('esign/cases/' + curCaseId + '/arrears').update(out));
     arrearsCache = out;
     bg.remove();
+    renderDetail();
     showToast('✅ 체불내역이 저장되었습니다');
   };
 }
