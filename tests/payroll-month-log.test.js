@@ -72,7 +72,7 @@ function makeBox(opts){
        coSrc(업체 명단)·_peU2N(사번→이름)은 앱이 이미 들고 있는 것이라 흉내만 낸다. */
     + 'var coSrc=' + JSON.stringify(opts.co || null) + ';\n'
     + 'var _peU2N=' + JSON.stringify(opts.u2n || {}) + ';\n'
-    + grab('payMgrOf') + '\n' + grab('payMakeItem') + '\n' + grab('payPutLine') + '\n'
+    + grab('payCoOf') + '\n' + grab('payMgrOf') + '\n' + grab('payMakeItem') + '\n' + grab('payPutLine') + '\n'
     + 'var _payBusy=false;\n' + grab('paySync') + '\n'
     + 'this.load=payLoad; this.roll=payRoll; this.line=payLine; this.itemOf=payItemOf;'
     + 'this.make=payMakeItem; this.put=payPutLine; this.sync=paySync;', box);

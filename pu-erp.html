@@ -8330,10 +8330,13 @@ var CompanyRef = {
     }
     return null;
   },
-  // 업체 ID 부여(미부여 항목에 companyId 자동 채우기) — 1회성 마이그레이션 도우미
+  // 업체 ID 부여(미부여 항목에 companyId 자동 채우기)
+  // ⚠ «업체 번호·사업자번호»로만 붙인다 — 이름으로는 붙이지 않는다(대표 지시 2026-10-03 2단계).
+  //   예전에는 findCompany 의 이름 단계까지 써서, 새 사건마다 이름이 같은 «첫» 업체(종료 보관함 포함)의
+  //   번호와 사업자번호가 말없이 붙었다. 이름만 맞는 사건은 「🔗 업체 연결」에 올라가 사람이 확정한다.
   attachId: function(item){
     if(!item || item.companyId) return item;
-    var co = this.findCompany(item);
+    var co = this.findCompany({ companyId:item.companyId, sourceId:item.sourceId, bizNo:item.bizNo });
     if(co){
       item.companyId = co.id;
       if(!item.bizNo && co.bizNo) item.bizNo = co.bizNo;
@@ -8997,6 +9000,39 @@ function coRepairSubRole(){
   return { total:items.length, companies:nCo, wage:nWage, names:items.map(function(x){ return x.name; }) };
 }
 
+/* 보수총액 엑셀 한 줄 → 사무대행 업체 (대표 지시 2026-10-03 「이름으로 잇는 길 막기」)
+   ⚠ 사업자번호가 «먼저»다. 예전에는 이름을 먼저 봐서, 같은 이름의 다른 업체가 그 줄을 가져갔다.
+   ⚠ 이름은 «딱 하나»일 때만 — 둘 이상이면 건너뛰고(amb) 화면이 몇 줄 건너뛰었는지 알린다. */
+function coWageRowMatch(agents, nm, bz){
+  var digits = function(x){ return String(x||'').replace(/[^0-9]/g,''); };
+  var norm = function(x){ return String(x||'').replace(/\s|\(주\)|㈜|주식회사/g,'').toLowerCase(); };
+  var bz10 = digits(bz).slice(0,10);
+  if(bz10.length >= 10){
+    var byBiz = (agents||[]).filter(function(c){ return digits(c && c.bizNo).slice(0,10) === bz10; });
+    if(byBiz.length) return { co: byBiz[0], amb: false };
+  }
+  nm = String(nm||'').trim();
+  if(!nm) return { co: null, amb: false };
+  var same = (agents||[]).filter(function(c){ return c && ((c.name||'').trim() === nm || norm(c.name) === norm(nm)); });
+  return same.length === 1 ? { co: same[0], amb: false } : { co: null, amb: same.length > 1 };
+}
+/* 기업정보함 색인에서 «회사 이름 → 사업자등록증» 표 (계약창 명함 고르기의 사업자번호 미리 채우기용)
+   ⚠ 같은 이름의 등록증이 «다른 사업자번호»로 둘 이상이면 그 이름은 비운다(amb) — 예전에는 «마지막» 것을 써서
+     사람을 고르면 남의 사업자번호가 미리 채워지고, 그 번호로 업체까지 이어졌다(이름 → 번호 → 업체).
+     같은 번호의 등록증이 여러 장인 것은 같은 회사라 괜찮다. */
+function pcBizByName(idx, normFn){
+  var by = {}, idOf = {}, amb = {};
+  Object.keys(idx || {}).forEach(function(id){
+    var r = idx[id];
+    if(!r || r.k !== 'biz' || !r.c) return;
+    var n = normFn(r.c); if(!n) return;
+    var d = String(r.bz||'').replace(/\D/g,'').slice(0,10);
+    if(!by[n]){ by[n] = r; idOf[n] = id; return; }
+    if(String(by[n].bz||'').replace(/\D/g,'').slice(0,10) !== d) amb[n] = true;
+  });
+  Object.keys(amb).forEach(function(n){ delete by[n]; delete idOf[n]; });
+  return { by: by, idOf: idOf, amb: amb };
+}
 // ============ 업체 연결 (ID 백필) ============
 // 업체관리에 있는 회사인데 계약·사건·컨설팅·기금·기타가 이름으로만 이어져 있는 것에
 // 업체 ID를 붙인다. 이름이 바뀌어도 안 끊기게 하는 작업.
@@ -15061,8 +15097,8 @@ function searchPastCompanies(query){
     // 직급(직책)이 role 한 칸에만 들어가, 업체관리 담당자칸(position)에서 빈칸으로 보였다.
     function toContact(x, primary, srcId){ return pcToContact(x, primary, srcId); }
     // 회사별 사업자등록증 레코드(대표·사업자번호 보강용)
-    var bizByCo = {};
-    ids.forEach(function(k){ var r=idx[k]; if(r && r.k==='biz' && r.c){ bizByCo[normCo(r.c)] = r; } });
+    // ⚠ 같은 이름에 사업자번호가 다른 등록증이 둘 이상이면 그 이름은 비운다(pcBizByName)
+    var bizByCo = pcBizByName(idx, normCo).by;
     var added = 0;
     for(var i=0;i<ids.length && added<50;i++){
       var r = idx[ids[i]]; if(!r) continue;
@@ -15614,11 +15650,8 @@ function pcPersonRows(q){
     var ql = String(q||'').toLowerCase();
     if(ql.length < 2) return out;
     // 회사별 사업자등록증 — 사람을 골라도 회사 정보를 같이 채우려고 미리 모은다
-    var bizByCo = {}, bizIdByCo = {};
-    Object.keys(idx).forEach(function(id){
-      var r = idx[id];
-      if(r && r.k === 'biz' && r.c){ bizByCo[pcNormCo(r.c)] = r; bizIdByCo[pcNormCo(r.c)] = id; }
-    });
+    // ⚠ 같은 이름에 사업자번호가 다른 등록증이 둘 이상이면 그 이름은 비운다(pcBizByName)
+    var _pbn = pcBizByName(idx, pcNormCo), bizByCo = _pbn.by, bizIdByCo = _pbn.idOf;
     Object.keys(idx).forEach(function(id){
       var r = idx[id];
       if(!r || r.k === 'biz') return;
@@ -26225,21 +26258,15 @@ function CompanyManagement(){
         function fmtv(x){ var s=String(x||'').trim(); return s.replace(' 00:00:00',''); }
         var a = dbGet('wage_reports', {}) || {};
         var next = Object.assign({}, a[wageYear] || {});
-        var matched=0;
+        var matched=0, ambN=0;
         for(var r=hi+1;r<data.length;r++){
           var row=data[r]; if(!row||!row.length) continue;
           var nm=cName>=0?String(row[cName]||'').trim():'';
           var bz=cBiz>=0?String(row[cBiz]||'').trim():'';
           if(!nm && !bz) continue;
-          var bzD=digits(bz), bz10=bzD.slice(0,10);
-          var co=agents.find(function(c){
-            if(nm && (c.name||'').trim()===nm) return true;
-            if(nm && norm(c.name)===norm(nm)) return true;
-            var cD=digits(c.bizNo);
-            if(bz10.length>=10 && cD.slice(0,10)===bz10) return true;
-            if(bzD.length>=10 && cD===bzD) return true;
-            return false;
-          });
+          var mt=coWageRowMatch(agents, nm, bz);
+          if(mt.amb) ambN++;
+          var co=mt.co;
           if(!co) continue;
           var cur=Object.assign({}, next[co.id]||{});
           if(cFiled>=0) cur.filed=fmtv(row[cFiled]);
@@ -26251,7 +26278,8 @@ function CompanyManagement(){
           next[co.id]=cur; matched++;
         }
         a[wageYear]=next; dbSet('wage_reports', a); setWageRep(next);
-        showToast('📤 '+wageYear+'년 '+matched+'개 업체 반영됨');
+        showToast('📤 '+wageYear+'년 '+matched+'개 업체 반영됨'
+          + (ambN ? ' — 같은 이름 업체가 둘 이상이라 '+ambN+'줄은 건너뜀(사업자번호 칸을 채우면 잡힙니다)' : ''));
       } catch(err){ showToast('가져오기 실패: '+(err&&err.message)); }
       e.target.value='';
     };
