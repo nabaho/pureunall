@@ -317,3 +317,32 @@ test('ⓕ 보낸 기록 한 줄 — 받는 주소는 남기지 않는다', () =>
   assert.strictEqual(CF.SENT_KIND_OF('계약서'), '계약서');
   assert.strictEqual(CF.SENT_KIND_OF(''), '계약서');
 });
+
+test('ⓑ 위임계약서 고르기 값 — 위임사무·위임내용·부가세·기간 연장·성공보수 (설계 2026-10-03 §2.2·2.3)', () => {
+  const v = CF.caseValues({ task: 'harass', wtask: 'arrears', vat: 'excl', ext: 'auto', succ: 'rate', succAmt: '10' });
+  assert.equal(v.위임분야, '직장 내 괴롭힘 대응');
+  assert.equal(v.위임사무, '1. 직장 내 괴롭힘 대응에 관한 일체의 사항');
+  assert.match(v.위임내용, /^미지급임금 및 퇴직금 체불/);
+  assert.equal(v.부가세처리, '부가세 별도');
+  assert.match(v.기간연장, /자동 연장/);
+  assert.equal(v.성공보수, '총 수령금액의 10%(부가세 별도)');
+  const f = CF.caseValues({ vat: 'incl', succ: 'fixed', succAmt: '3,000,000' });
+  assert.equal(f.성공보수, '금 3,000,000원(부가세 포함)');
+  assert.match(f.기간연장, /합의로 위 기간을 연장/, '기본은 당사자 합의로 연장');
+  assert.equal(f.위임분야, '', '고르지 않으면 비운다(지어내지 않는다)');
+  /* 「…과 관련하여」 앞에 들어가므로 받침 있는 말로 끝나야 한다 */
+  CF.CASE_TASKS.filter((t) => t.area).forEach((t) => {
+    const c = t.area.charCodeAt(t.area.length - 1) - 0xAC00;
+    assert.ok(c >= 0 && c % 28 !== 0, t.area + ' 은 받침이 없어 「…과」가 어색합니다');
+  });
+  CF.CASE_KEYS.forEach((k) => assert.ok(k in v, k + ' 를 값 함수가 모릅니다'));
+});
+
+test('ⓒ 위임계약 칸 배선 — 표지가 있으면 고르기 칸이 열리고, 고른 값은 손댄 값보다 앞서지 않는다', () => {
+  const forms = read('js/pu-contract-forms.js');
+  assert.match(forms, /function drawCase\(/, '위임계약 고르기 칸이 없습니다');
+  assert.match(forms, /CF\.CASE_KEYS\.indexOf\(x\.key\)/, '표지로 칸을 여닫지 않습니다');
+  const vi = forms.indexOf('CF.caseValues(st.wi)'), ei = forms.indexOf("Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });");
+  assert.ok(vi > 0 && ei > vi, '사람이 고친 값(edits)이 고르기 값보다 나중에 와야 합니다');
+  assert.match(forms, /\[propBox, caseBox, valBox\]/);
+});

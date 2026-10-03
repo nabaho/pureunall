@@ -861,9 +861,11 @@
       return { fm: fm, srcs: srcs, src: srcs[0] || null, hwp: null, text: CF.markersIn(fm.body), err: '' };
     });
     var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0,
-      pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' }, edited: null };
+      pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' }, edited: null,
+      wi: { on: false, task: '', wtask: '', vat: 'excl', ext: 'agree', succ: 'fixed', succAmt: '' } };
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
     var propBox = el('div', { 'class': 'pcf-prop', hidden: true });
+    var caseBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var bg = el('div', { 'class': 'pcf-mbg' });
     function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
     function onKey(e) { if (e.key === 'Escape') close(); }
@@ -888,6 +890,10 @@
         var P = CF.proposalValues(V, { orgType: st.pv.orgType, amount: st.pv.amount, vat: st.pv.vat,
           staffName: me && me.name, staffTel: st.pv.tel });
         Object.keys(P).forEach(function (k) { V[k] = P[k]; });
+      }
+      if (st.wi.on && CF.caseValues) {
+        var Cv = CF.caseValues(st.wi);
+        Object.keys(Cv).forEach(function (k) { if (Cv[k]) V[k] = Cv[k]; });
       }
       Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });
       return V;
@@ -930,6 +936,40 @@
       propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '노무사 연락처' }), tel]));
       propBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '⚠ 원본의 「비용 산출 내역」 표와 금액이 다르면, 받은 뒤 한글에서 고치거나 빼세요.' }));
     }
+    /* 위임계약서 칸 — 위임사무·위임내용 고르기 · 부가세 · 기간 연장 · 성공보수 (설계 2026-10-03 §2.2·2.3, 목업 승인).
+       표지가 있는 칸만 보인다. 고르면 그 칸의 손댄 값(edits)을 지워 고른 문장이 들어가게 한다. */
+    function drawCase(ks) {
+      caseBox.innerHTML = '';
+      caseBox.hidden = !st.wi.on;
+      if (!st.wi.on) return;
+      var has = {}; (ks || allMarkers()).forEach(function (x) { has[x.key] = 1; });
+      function pick(keys, fn) { return function (v) { fn(v); clearEdits(keys); drawCase(); drawVals(); }; }
+      caseBox.appendChild(el('div', { 'class': 'pcf-fh', text: '위임계약 — 고르면 아래 칸에 문장이 들어갑니다' }));
+      if (has['위임분야'] || has['위임사무']) {
+        var sel = el('select', { 'aria-label': '위임사무', onchange: function () { pick(['위임분야', '위임사무'], function (v) { st.wi.task = v; })(sel.value); } },
+          [el('option', { value: '', text: '— 고르세요 —' })].concat(CF.CASE_TASKS.map(function (t) { return el('option', { value: t.v, text: t.t }); })));
+        sel.value = st.wi.task;
+        caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '위임사무' }), sel]));
+        if (st.wi.task === 'own') caseBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '아래 「위임분야」·「위임사무」 칸에 직접 적으세요 — 위임분야는 「…과 관련하여」 앞에 들어갑니다.' }));
+      }
+      if (has['위임내용']) {
+        var ws = el('select', { 'aria-label': '위임내용', onchange: function () { pick(['위임내용'], function (v) { st.wi.wtask = v; })(ws.value); } },
+          [el('option', { value: '', text: '— 고르세요 —' })].concat(CF.WORKER_TASKS.map(function (t) { return el('option', { value: t.v, text: t.t }); })));
+        ws.value = st.wi.wtask;
+        caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '위임내용' }), ws]));
+      }
+      if (has['부가세처리']) caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '부가세' }),
+        seg([{ v: 'excl', t: '별도' }, { v: 'incl', t: '포함' }], st.wi.vat, pick(['부가세처리', '성공보수'], function (v) { st.wi.vat = v; }))]));
+      if (has['기간연장']) caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '기간 연장' }),
+        seg([{ v: 'agree', t: '당사자 합의로 연장' }, { v: 'auto', t: '끝날 때까지 자동 연장' }], st.wi.ext, pick(['기간연장'], function (v) { st.wi.ext = v; }))]));
+      if (has['성공보수']) {
+        var amt = el('input', { type: 'text', placeholder: st.wi.succ === 'rate' ? '예: 10' : '예: 3,000,000', 'aria-label': '성공보수' });
+        amt.value = st.wi.succAmt;
+        amt.addEventListener('input', function () { st.wi.succAmt = amt.value; clearEdits(['성공보수']); drawVals(); });
+        caseBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '성공보수' }),
+          el('div', null, [seg([{ v: 'fixed', t: '정액(원)' }, { v: 'rate', t: '정률(%)' }], st.wi.succ, pick(['성공보수'], function (v) { st.wi.succ = v; })), amt])]));
+      }
+    }
     function drawVals() {
       valBox.innerHTML = '';
       if (st.edited) valBox.appendChild(el('div', { 'class': 'pcf-fnote' }, ['✏ 손본 문서를 받기·메일에 씁니다 — 아래 값을 바꿔도 손본 문서에는 들어가지 않습니다. ',
@@ -937,6 +977,8 @@
       var ks = allMarkers();
       var wantProp = ks.some(function (x) { return CF.PROPOSAL_KEYS.indexOf(x.key) >= 0; });
       if (wantProp !== st.pv.on) { st.pv.on = wantProp; drawProp(); }
+      var wantCase = !!CF.CASE_KEYS && ks.some(function (x) { return CF.CASE_KEYS.indexOf(x.key) >= 0; });
+      if (wantCase !== st.wi.on) { st.wi.on = wantCase; drawCase(ks); }
       var V = values();
       if (!ks.length) { valBox.appendChild(el('div', { 'class': 'pcf-muted', text: one ? '이 양식에는 채울 자리가 없습니다' : '이 양식들에는 채울 자리가 없습니다' })); return; }
       var blank = ks.filter(function (x) { return !V[x.key]; }).length;
@@ -1218,7 +1260,7 @@
             el('div', { 'class': 'pcf-fh', text: '② 담당자 — 기업정보함에서 찾아오기' }), ctQ, ctBox,
             el('div', { 'class': 'pcf-fh', text: '③ 근로자 본인 — 명함에서 찾기 또는 직접 적기' }), wkQ, wkList
           ]),
-          el('div', null, [propBox, valBox])
+          el('div', null, [propBox, caseBox, valBox])
         ]),
         note, prevBox
       ]),
