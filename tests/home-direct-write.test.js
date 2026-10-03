@@ -59,10 +59,19 @@ function 상자(옵) {
     }
   };
   vm.createContext(ctx);
-  vm.runInContext([fnSource('바뀔것글자'), fnSource('걸린것글자'),
+  if (o.겹침) { ctx.App.draft.key = 'a'; ctx.App.members = { a: { name: '홍길동', srl: o.srl }, z: { name: '박재직', srl: o.srl } }; }
+  vm.runInContext([fnSource('srlConflict'), fnSource('바뀔것글자'), fnSource('걸린것글자'),
     fnSource('홈페이지바로고치기')].join('\n'), ctx);
   return { ctx, 부른것 };
 }
+
+/* 2026-10-03 검토 ⑦ — 단추를 그릴 때만 잠그면 모자란다(글 번호 칸을 고쳐도 다시 안 그린다) */
+test('★★★ 글 번호를 다른 사람도 쓰면 «보기»조차 안 보낸다 — 남의 글을 덮는다', async () => {
+  const { ctx, 부른것 } = 상자({ 겹침: true });
+  await ctx.홈페이지바로고치기();
+  assert.deepEqual(부른것, [], '★★★ 글 번호가 겹치는데 서버로 보냈습니다');
+  assert.ok(ctx.말한것.some(t => /고치지 않았습니다/.test(t)), '★ 왜 안 고쳤는지 안 알렸습니다');
+});
 
 test('「예」 하기 전에는 «보기»만 나간다 — 쓰기는 안 나간다', async () => {
   const { ctx, 부른것 } = 상자({ 예: false });

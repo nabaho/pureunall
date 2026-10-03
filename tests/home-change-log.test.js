@@ -45,7 +45,7 @@ function 덩어리상수(이름) {
 function 상자() {
   const ctx = { window: {}, JSON, String, Array, Object, Number, Boolean };
   vm.createContext(ctx);
-  vm.runInContext(덩어리상수('LOG_FIELD') + '\n' + 함수('histTs') + '\n'
+  vm.runInContext(한줄상수('MEMBER_KINDS') + '\n' + 덩어리상수('LOG_FIELD') + '\n' + 함수('histTs') + '\n'
     + 함수('logVal') + '\n' + 함수('logDiff') + '\n' + 함수('logRowsOf'), ctx);
   return ctx;
 }
@@ -98,6 +98,15 @@ test('★ true/false 를 «말»로 바꾼다', () => {
   const d = ctx.logDiff({ offSite: false }, { offSite: true });
   assert.deepEqual([d[0].전, d[0].후], ['넣기', '빼기'],
     '★ true/false 가 그대로 떠서 무슨 말인지 모릅니다');
+});
+
+test('★★ 구분(노무사↔직원)이 바뀌면 기록에 뜬다 — 자료 칸 이름은 kind 다', () => {
+  /* 2026-10-03 검토 ④ — 기록 칸 이름을 화면 초안 이름(mkind)으로 적어 두어, 저장된 자료(kind)의
+     바뀜이 한 번도 안 떴다. */
+  const ctx = 상자();
+  const d = ctx.logDiff({ name: '홍길동', kind: 'labor' }, { name: '홍길동', kind: 'staff' });
+  assert.equal(d.length, 1, '★★ 노무사→직원으로 바꿨는데 기록에 안 뜹니다');
+  assert.deepEqual([d[0].전, d[0].후], ['노무사', '직원'], '★ 자료 값(labor·staff)이 그대로 뜹니다');
 });
 
 /* ══════ ③ 목록은 줄 수만 보지 않는다 ══════ */

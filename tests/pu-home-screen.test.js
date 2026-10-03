@@ -324,7 +324,7 @@ test('★ 로그인 토큰을 못 얻으면 «메시지를 띄운다» — 단�
   ctx.App = { checking: false, checkMsg: '', checkBad: false, render() {} };
   ctx.firebase = { auth: () => ({ currentUser: { getIdToken() { throw new Error('토큰 실패'); } } }) };
   ctx.toast = () => {};
-  run(ctx, fnSource('checkFailText') + '\n' + fnSource('showCheckFailed') + '\n' + fnSource('checkHomepage'));
+  run(ctx, fnSource('checkFailText') + '\n' + fnSource('showCheckFailed') + '\n' + fnSource('본딱지') + '\n' + fnSource('checkHomepage'));
   await ctx.checkHomepage();
   assert.ok(ctx.App.checkMsg, '아무 메시지도 안 떴습니다 — 사장님은 눌렀는데 안 눌린 줄 압니다');
   assert.equal(ctx.App.checkBad, true);
@@ -1305,7 +1305,7 @@ test('★ 「홈페이지 다시 확인」이 줄 목록도 함께 채운다 (�
   };
   run(ctx, constSource('PAGE_IDS') + '\n' + constLine('READ_HOMEPAGE_URL') + '\n'
     + fnSource('todayString') + '\n' + fnSource('applyStatus') + '\n' + fnSource('keepPageHtml') + '\n'
-    + fnSource('checkFailText') + '\n' + fnSource('showCheckFailed') + '\n' + fnSource('checkHomepage'));
+    + fnSource('checkFailText') + '\n' + fnSource('showCheckFailed') + '\n' + fnSource('본딱지') + '\n' + fnSource('checkHomepage'));
   await ctx.checkHomepage();
 
   const lines = plain(ctx.App.pageLines);
@@ -1494,6 +1494,7 @@ function loadAllBox(dbRef) {
     + noConst(constLine('PARTNER_PATH')) + '\n' + noConst(constLine('PARTNER_LOGO_PATH')) + '\n' + fnSource('companiesFrom') + '\n'
     + fnSource('partnerMark') + '\n' + noConst(constLine('POSTED_TEXT')) + '\n'
     + fnSource('postedOf') + '\n' + fnSource('partnerRows') + '\n'
+    + fnSource('이어쓰기되살리기') + '\n'
     + fnSource('loadAll') + '\n'
     + expose('PAGE_IDS') + expose('PAGE_LABEL') + expose('DEFAULT_PAGES'));
   return ctx;
@@ -1676,12 +1677,41 @@ test('★ 되돌리기도 「남기기」 표시를 지우지 않는다', async 
   };
   run(ctx, fnSource('todayString') + '\n' + fnSource('currentUserName') + '\n' + fnSource('histStamp') + '\n'
     + fnSource('saveRecord') + '\n' + noConst(constLine('MEMBER_KINDS')) + '\n' + fnSource('memberKind') + '\n' + fnSource('loadDraft') + '\n' + fnSource('markChanged') + '\n'
-    + fnSource('restoreFrom'));
+    + fnSource('restoredMember') + '\n' + fnSource('restoreFrom'));
   await ctx.restoreFrom('320', '1755300000000-aaaaaa');
   assert.equal(ctx.saved.length, 1, '되살리지 못했습니다');
   const rec = plain(ctx.saved[0].value);
   assert.equal(rec.careers.length, 1, '옛 내용으로 되살아나지 않았습니다');
   assert.ok(rec.keepOnSite, '되돌리기 한 번에 예외가 사라졌습니다');
+});
+
+/* ★ 2026-10-03 검토 ② — 되살리기가 여섯 칸만 새로 지어 통째로 덮어, 담당 업무·구분·
+     「새 홈페이지에서 빼기」가 사라졌다. «진짜 함수»를 돌려 칸마다 본다. */
+test('★★ 되돌리기 — 내용(담당 업무·구분 포함)은 «그때 것», 사람이 정한 것·모르는 칸은 «지금 것»', () => {
+  const ctx = vm.createContext({});
+  run(ctx, fnSource('restoredMember'));
+  const 지금 = { name: '홍길동', position1: '대표', position2: '공인노무사', srl: '190',
+    careers: ['現 지금 경력'], duties: ['지금 업무'], kind: 'labor', offSite: true,
+    keepOnSite: { why: '지사장' }, photoNote: '모르는 칸', updatedAt: 5, updatedBy: '누구' };
+  const 그때 = { name: '홍길동', position1: '', position2: '공인노무사', srl: '190',
+    careers: ['前 그때 경력'], duties: ['그때 업무'], kind: 'staff', offSite: false };
+  const r = plain(ctx.restoredMember(지금, 그때));
+  assert.deepEqual(r.careers, ['前 그때 경력'], '경력이 그때 것으로 안 돌아왔습니다');
+  assert.deepEqual(r.duties, ['그때 업무'], '★★ 담당 업무가 그때 것으로 안 돌아왔습니다(전에는 통째로 사라졌다)');
+  assert.equal(r.kind, 'staff', '★ 구분이 그때 것으로 안 돌아왔습니다');
+  assert.equal(r.offSite, true, '★★ 「새 홈페이지에서 빼기」가 되살리기 한 번에 풀렸습니다 — 사람이 정한 것입니다');
+  assert.ok(r.keepOnSite, '★★ 남기기 표시가 사라졌습니다');
+  assert.equal(r.photoNote, '모르는 칸', '★★ 되살리기가 모르는 칸을 지웠습니다');
+  assert.ok(!('updatedAt' in r) && !('updatedBy' in r), '수정 시각은 저장이 새로 찍어야 합니다');
+
+  /* 담당 업무 칸이 «생기기 전» 판이면 지금 업무를 지우지 않는다 */
+  const 옛판 = { name: '홍길동', srl: '190', careers: ['前 옛 경력'] };
+  const r2 = plain(ctx.restoredMember(지금, 옛판));
+  assert.deepEqual(r2.duties, ['지금 업무'], '★ 칸이 생기기 전 판으로 되돌렸다고 지금 업무를 지웠습니다');
+  assert.equal(r2.kind, 'labor');
+  /* 경력은 처음부터 있던 칸 — 그때 판에 없으면 «비어 있었다»(실시간DB 는 빈 배열을 안 남긴다) */
+  const r3 = plain(ctx.restoredMember(지금, { name: '홍길동' }));
+  assert.deepEqual(r3.careers, [], '그때 비어 있던 경력을 지금 것으로 남겼습니다');
 });
 
 test('★ 목록에 「남김」 표시와 사유가 보인다 — 왜 퇴사 경고가 없는지 알 수 있다', () => {
@@ -2766,11 +2796,13 @@ test('★ 「어느 칸이 다른가」는 대조가 담아 준 자료를 그대
    ★ 그렇다고 늘 보이면 안 된다 — 잘못 누르면 재직자가 홈페이지에서 사라진다. */
 
 test('★ 내리는 단추는 «내릴 것(퇴사)»일 때만 보인다 — 늘 보이면 잘못 누른다', () => {
-  const 그리기 = status => {
+  const 그리기 = (status, 남김) => {
     const ctx = pageBox();
     ctx.App = { draft: { kind: 'member', key: 'a', srl: '193', name: '박성수',
                          position1: '', position2: '공인노무사', careers: ['現 가'], intro: '' },
-                members: { a: { name: '박성수', srl: '193' } }, staff: [], lineFormat: 'plain',
+                members: { a: Object.assign({ name: '박성수', srl: '193' },
+                                            남김 ? { keepOnSite: { why: 남김 } } : {}) },
+                staff: [], lineFormat: 'plain',
                 check: status ? { members: { a: { status: status } } } : null, dirty: false };
     run(ctx, fnSource('todayString') + '\n' + fnSource('riskReport') + '\n' + fnSource('srlConflict') + '\n'
       + fnSource('keptOf') + '\n' + fnSource('rosterMarkOf') + '\n' + fnSource('stamp') + '\n'
@@ -2786,6 +2818,9 @@ test('★ 내리는 단추는 «내릴 것(퇴사)»일 때만 보인다 — 늘
     '★ 내릴 것이 아닌데 내리는 단추가 보인다 — 잘못 누르면 재직자가 사라진다');
   assert.doesNotMatch(그리기(null), 내리는단추,
     '★ 대조도 안 했는데 내리라고 한다');
+  /* 2026-10-03 검토 ① — 대조 결과가 남기기 «전»에 찍힌 것이면 「내릴 것」이 남아 있다 */
+  assert.doesNotMatch(그리기('toRemove', '세종지사장'), 내리는단추,
+    '★★ 남기기로 둔 사람에게 내리는 단추가 보인다 — 지난 대조 결과를 그대로 믿었다');
 });
 
 test('★ 내리기 쪽지는 «그 사람 글 번호»를 담는다 — 엉뚱한 글을 내리지 않게', async () => {
