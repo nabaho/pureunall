@@ -78,6 +78,9 @@ const FNS = [
   'alWeeks', 'alIn', 'alItems', 'alMailSure', 'alNarrow', 'alCoNarrow', 'alCatNarrow', 'alMailRows', 'alGroups', 'alAddCand',
   'alCoRows', 'alSentRows', 'alCoHits', 'alCalLine', 'alCalRows', 'alLogOf', 'alCachePut', 'alWrite',
   'alChunks', 'alEvents', 'alFull', 'alWeekOnce', 'alRun', 'alTook', 'alTookHTML', 'alAmbList',
+  /* 2026-10-03 — 일정에 «만든이»를 함께 담는다(「고를 것」의 단서로만 쓴다).
+     후보를 좁히는 데는 안 쓴다 — 그것은 tests/work-autolog-hint.test.js 가 돌려서 지킨다. */
+  'alMailKey', 'alSidByMail', 'alHints', 'alNames',
   'alItemName', 'alPick', 'alPickModal'
 ];
 const VARS = [
