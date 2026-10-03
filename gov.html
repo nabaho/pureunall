@@ -170,7 +170,7 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
      두 벌이 되면 한쪽만 고쳐져 고객사 이름이 새는 날이 온다. -->
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <script src="js/gov-career.js?v=1"></script>
-<script src="js/gov-g2b.js?v=5"></script>
+<script src="js/gov-g2b.js?v=6"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
 <script>
@@ -361,6 +361,16 @@ function srcBackfill(){
   var a=get('feed'), n=0;
   a.forEach(function(r){ if(r && !r.src){ var g=GovG2b.guessSrc(r.no); if(g){ r.src=g; n++; } } });
   if(n) set('feed',a);
+  return n;
+}
+/* 새 걸러내기 규칙(2026-10-03 대표 결정)을 «이미 받은» 줄에도 댄다.
+   ⚠ 사람이 손댄 줄(관심·지원함)과 이미 숨긴 줄은 건드리지 않는다 — 기계가 넣은 「새 공고」만.
+   ⚠ 지우지 않고 숨긴다(🚫 와 같은 표시 + ruleOut). 멱등. */
+function rejudge(){
+  var a=get('feed'), n=0, kw=kws();
+  a.forEach(function(r){ if(!r||r.hidden||r.type!=='새 공고') return;
+    if(!GovG2b.judge(r,kw).length){ r.hidden=true; r.ruleOut=true; n++; } });
+  if(n){ set('feed',a); toast('새 걸러내기 규칙에 맞지 않는 '+n+'건을 숨겼습니다'); }
   return n;
 }
 function open2(id){ var h=find(id); if(h&&h.a[h.i].url) window.open(h.a[h.i].url,'_blank','noopener'); }
@@ -642,7 +652,7 @@ function boot(){
     var r=await whoAmI(u);
     if(!r.ok){ applyLock('lock', r.why); return; }
     applyLock('ok');
-    await cloudPull(); srcBackfill(); drawKw(); draw(); readyNote(); auto();
+    await cloudPull(); srcBackfill(); rejudge(); drawKw(); draw(); readyNote(); auto();
     /* 마지막으로 보던 문을 다시 연다 — 재료 탭이면 그때 받아온다(setTab 이 부른다) */
     setTab(lsGet('tab')==='mat' ? 'mat' : 'feed');
   });
