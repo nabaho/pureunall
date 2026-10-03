@@ -163,6 +163,89 @@
     });
   }
 
+  /* co/{열쇠} 를 고칠 때 계약 기록 수(r)·사업자번호(bz)를 떨어뜨리지 않는다 */
+  function keepCo(cur, next) {
+    if (cur && cur.r != null && next.r == null) next.r = cur.r;
+    if (cur && cur.bz && !next.bz) next.bz = cur.bz;
+    return next;
+  }
+
+  /* ══ 계약 기록 (설계 2026-10-03 §3) — 파일 없는 줄: 언제·무슨 계약·얼마·지급일·EDI ══
+     pu_docs/co_recs/{열쇠}/{id} = { date, kind, amount, payDay, tax, edi, staff, contact, bizNo, note, docId, src, at, by, byName }
+     src: 'import'(엑셀 명단) | 'manual'(손으로). 지워도 파일(co_docs·originals)은 그대로. */
+  var REC_KEYS = ['date', 'kind', 'amount', 'payDay', 'tax', 'edi', 'staff', 'contact', 'bizNo', 'note', 'docId'];
+  function recRecord(o) {
+    var r = { src: o.src === 'import' ? 'import' : 'manual', at: Date.now(), by: deps.uid, byName: clampStr(deps.name, 60) };
+    REC_KEYS.forEach(function (k) {
+      var v = o[k];
+      if (v == null || v === '') return;
+      if (k === 'amount') { v = Math.round(+v); if (!isFinite(v) || v < 0) return; }
+      else v = String(v).slice(0, k === 'note' ? 200 : k === 'contact' ? 80 : k === 'kind' ? 20 : k === 'staff' ? 30 : 12);
+      r[k] = v;
+    });
+    if (!r.kind) r.kind = '기타';
+    return r;
+  }
+  function listCoRecs(key) {
+    needDb();
+    return deps.db.ref(ROOT + '/co_recs/' + key).once('value').then(function (s) {
+      var v = s.val() || {};
+      return Object.keys(v).map(function (id) { var d = v[id]; d.id = id; return d; })
+        .sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')) || (b.at || 0) - (a.at || 0); });
+    });
+  }
+  /* 여러 줄 한 번에 — rows: [{coName, bizNo?, date, kind, …}]. 같은 회사·계약일·종류가 이미 있으면 건너뛴다.
+     onProgress(i, n) 로 진행을 알린다. 반환 { added, skipped, cos } */
+  function importCoRecs(rows, onProgress) {
+    needDb();
+    var by = {};
+    (rows || []).forEach(function (r) {
+      var key = coKey(r.coName); if (!key) return;
+      (by[key] = by[key] || { name: String(r.coName).trim().slice(0, 120), bz: '', rows: [] }).rows.push(r);
+      if (r.bizNo && !by[key].bz) by[key].bz = String(r.bizNo).slice(0, 12);
+    });
+    var keys = Object.keys(by), done = 0, added = 0, skipped = 0;
+    return keys.reduce(function (p, key) {
+      return p.then(function () {
+        var g = by[key];
+        return listCoRecs(key).then(function (have) {
+          var seen = {}; have.forEach(function (h) { seen[(h.date || '-') + '|' + (h.kind || '-')] = 1; });
+          var up = {}, n = 0;
+          g.rows.forEach(function (r) {
+            var rec = recRecord(r), sig = (rec.date || '-') + '|' + rec.kind;
+            if (seen[sig]) { skipped++; return; }
+            seen[sig] = 1; n++;
+            up[deps.db.ref(ROOT + '/co_recs/' + key).push().key] = rec;
+          });
+          if (!n) return;
+          return deps.db.ref(ROOT + '/co_recs/' + key).update(up).then(function () {
+            added += n;
+            return deps.db.ref(ROOT + '/co/' + key).transaction(function (cur) {
+              return clean(keepCo(cur, { name: (cur && cur.name) || g.name, n: (cur && cur.n) || 0, r: ((cur && cur.r) || 0) + n,
+                bz: (cur && cur.bz) || g.bz || undefined, lastAt: Date.now() }));
+            });
+          });
+        }).then(function () { done++; if (onProgress) onProgress(done, keys.length); });
+      });
+    }, Promise.resolve()).then(function () { return { added: added, skipped: skipped, cos: keys.length }; });
+  }
+  function updateCoRec(key, id, patch) {
+    needDb();
+    var cur = {}; REC_KEYS.forEach(function (k) { if (k in patch) cur[k] = patch[k]; });
+    var r = recRecord(Object.assign({ src: 'manual' }, cur)), out = {};
+    REC_KEYS.forEach(function (k) { if (k in patch) out[k] = r[k] == null ? null : r[k]; });
+    return deps.db.ref(ROOT + '/co_recs/' + key + '/' + id).update(out);
+  }
+  function removeCoRec(key, id) {
+    needDb();
+    return deps.db.ref(ROOT + '/co_recs/' + key + '/' + id).remove().then(function () {
+      return deps.db.ref(ROOT + '/co/' + key).transaction(function (cur) {
+        if (!cur) return cur;
+        return keepCo(cur, { name: cur.name, n: cur.n || 0, r: Math.max(0, (cur.r || 0) - 1), lastAt: cur.lastAt || Date.now() });
+      });
+    });
+  }
+
   function addCoDoc(o) {
     needDb();
     var name = String((o && o.coName) || '').trim();
@@ -174,7 +257,7 @@
       src: o.src === 'photo' ? 'photo' : 'upload', at: Date.now(), by: deps.uid, byName: clampStr(deps.name, 60) }))
       .then(function () {
         return deps.db.ref(ROOT + '/co/' + key).transaction(function (cur) {
-          return { name: (cur && cur.name) || name.slice(0, 120), n: ((cur && cur.n) || 0) + 1, lastAt: Date.now() };
+          return keepCo(cur, { name: (cur && cur.name) || name.slice(0, 120), n: ((cur && cur.n) || 0) + 1, lastAt: Date.now() });
         });
       })
       .then(function () { return { coKey: key, docId: docId }; });
@@ -190,7 +273,7 @@
     return deps.db.ref(ROOT + '/co_docs/' + key + '/' + docId).remove().then(function () {
       return deps.db.ref(ROOT + '/co/' + key).transaction(function (cur) {
         if (!cur) return cur;
-        return { name: cur.name, n: Math.max(0, (cur.n || 0) - 1), lastAt: cur.lastAt || Date.now() };
+        return keepCo(cur, { name: cur.name, n: Math.max(0, (cur.n || 0) - 1), lastAt: cur.lastAt || Date.now() });
       });
     });
   }
@@ -198,7 +281,7 @@
     needDb();
     return deps.db.ref(ROOT + '/co').once('value').then(function (s) {
       var v = s.val() || {};
-      return Object.keys(v).map(function (k) { return { key: k, name: v[k].name || k, n: v[k].n || 0, lastAt: v[k].lastAt || 0 }; })
+      return Object.keys(v).map(function (k) { return { key: k, name: v[k].name || k, n: v[k].n || 0, r: v[k].r || 0, bz: v[k].bz || '', lastAt: v[k].lastAt || 0 }; })
         .sort(function (a, b) { return a.name.localeCompare(b.name); });
     });
   }
@@ -224,6 +307,7 @@
     init: init, putOriginal: putOriginal, getOriginal: getOriginal, listOriginals: listOriginals,
     fileUrl: fileUrl, download: download,
     addCoDoc: addCoDoc, updateCoDoc: updateCoDoc, unlinkCoDoc: unlinkCoDoc,
-    listCo: listCo, listCoDocs: listCoDocs, probe: probe
+    listCo: listCo, listCoDocs: listCoDocs, probe: probe,
+    keepCo: keepCo, recRecord: recRecord, listCoRecs: listCoRecs, importCoRecs: importCoRecs, updateCoRec: updateCoRec, removeCoRec: removeCoRec
   };
 })(typeof window !== 'undefined' ? window : this);
