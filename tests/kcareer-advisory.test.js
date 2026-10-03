@@ -85,8 +85,13 @@ test('진행 중인 곳은 기간이 열려 있다', () => {
 });
 
 test('유형 코드표가 없으면 유형을 지어내지 않는다', () => {
-  const r = S.mapRecord('companies', 'co1', co(), USERMAP, {}).rec;
+  // 코드가 '자문'이면 코드표 없이도 자문인 줄 안다 — 그래도 «이름»은 지어내지 않는다
+  const r = S.mapRecord('companies', 'co1', co({ typeCode: '자문' }), USERMAP, {}).rec;
   assert.equal(r.type, '', '모르면 비워 둔다 — 틀린 유형을 넣으면 안 된다');
+});
+
+test('★ 코드표가 없고 코드도 모르면 «받지 않는다» — 자문인지 알 수 없다', () => {
+  assert.equal(S.mapRecord('companies', 'co1', co(), USERMAP, {}), null);
 });
 
 test('담당 사번을 못 찾으면 사번을 그대로 보여 준다', () => {
@@ -206,4 +211,77 @@ test('puUndoSync 가 자문 실적도 되돌린다', () => {
   vm.runInNewContext(funcSource('puUndoSync') + '\npuUndoSync("PS1");', ctx);
   assert.deepEqual(store.advisory.map((r) => r.id), ['AD0001', 'AD0002']);
   assert.equal(store.advisory.find((r) => r.id === 'AD0001').puRef, undefined);
+});
+
+/* ───────── ★★ 자문·고문 고객만 (대표 지시 2026-10-03 「672 고쳐」) ─────────
+   실측: 업체관리 377곳 = 자문 197 · 급여 171 · 기금 7 · 노조 2.
+   종류를 안 가려 급여 고객까지 «자문 실적»으로 들어와 신청 재료에 672개사가 나왔다. */
+
+const SEEDMAP = { company: [{ code: '자문', short: '자문', name: '자문' }, { code: '급여', short: '급여', name: '급여' },
+  { code: '노조', short: '노조', name: '노조' }, { code: '기금', short: '기금', name: '기금' }] };
+
+test('★★ 급여·기금·노조 고객은 자문 실적으로 들어오지 않는다', () => {
+  ['급여', '기금', '노조', '사무대행'].forEach((t) => {
+    assert.equal(S.mapRecord('companies', 'c', co({ typeCode: t }), USERMAP, SEEDMAP), null, t + ' 고객이 들어왔습니다');
+  });
+  assert.ok(S.mapRecord('companies', 'c', co({ typeCode: '자문' }), USERMAP, SEEDMAP));
+});
+
+test('★ 종류 코드를 바꿔 써도 이름에 «자문·고문»이 들면 받는다', () => {
+  assert.ok(S.isAdvisoryCompany(co({ typeCode: 'company-adv' }), TYPEMAP));
+  assert.ok(S.isAdvisoryCompany(co({ typeCode: 'x9' }), { company: [{ code: 'x9', name: '노무고문' }] }));
+  assert.equal(S.isAdvisoryCompany(co({ typeCode: 'company-cons' }), TYPEMAP), false);
+  assert.equal(S.isAdvisoryCompany(co({ typeCodes: { company: '급여' }, typeCode: '' }), SEEDMAP), false);
+  assert.ok(S.isAdvisoryCompany(co({ typeCodes: { company: '자문' }, typeCode: '' }), SEEDMAP));
+});
+
+test('★★ 동기화 계획에도 자문 고객만 들어간다', () => {
+  const data = { companies: { a: co({ id: 'A', typeCode: '자문', name: '가' }), b: co({ id: 'B', typeCode: '급여', name: '나' }) } };
+  const plan = S.buildSyncPlan(data, [], USERMAP, SEEDMAP, []);
+  assert.equal(plan.counts.advisory, 1);
+  assert.deepEqual(plan.adds.map((m) => m.rec.org), ['가']);
+});
+
+/* ───────── 이미 들어온 줄 정리 ───────── */
+
+const LIVE = { companies: {
+  'co-adv-1': co({ id: 'co-adv-1', typeCode: '자문', name: '자문사' }),
+  'co-adv-2': co({ id: 'co-adv-2', typeCode: '자문', name: '종류바뀐곳' }),
+  'co-pay-1': co({ id: 'co-pay-1', typeCode: '급여', name: '급여사' })
+} };
+const ROWS = [
+  { id: 'AD1', type: '자문', org: '자문사', puRef: 'companies#co-adv-1' },
+  { id: 'AD2', type: '급여', org: '종류바뀐곳', puRef: 'companies#co-adv-2' },
+  { id: 'AD3', type: '급여', org: '급여사', puRef: 'companies#co-pay-1' },
+  { id: 'AD4', type: '자문', org: '자문사', puRef: 'companies/co-s97' },
+  { id: 'AD5', type: '자문', org: '손으로 넣음' }
+];
+
+test('★★ 자문 업체와 이어진 줄만 남기고 나머지는 골라낸다', () => {
+  const p = S.buildAdvisoryPrune(LIVE, ROWS, SEEDMAP);
+  assert.deepEqual(p.drop.map((d) => d.id).sort(), ['AD3', 'AD4']);
+  assert.match(p.drop.find((d) => d.id === 'AD3').reason, /자문이 아닌 업체\(급여\)/);
+  assert.match(p.drop.find((d) => d.id === 'AD4').reason, /이알피에 없는/);
+});
+
+test('★ 이알피에서 종류만 자문으로 바뀐 줄은 지우지 않고 종류를 맞춘다', () => {
+  const p = S.buildAdvisoryPrune(LIVE, ROWS, SEEDMAP);
+  assert.deepEqual(p.retype, [{ id: 'AD2', type: '자문' }]);
+});
+
+test('★★ 손으로 넣은 줄(puRef 없음)은 건드리지 않는다', () => {
+  const p = S.buildAdvisoryPrune(LIVE, ROWS, SEEDMAP);
+  assert.ok(p.drop.every((d) => d.id !== 'AD5'));
+});
+
+test('★★ 이알피를 못 읽었거나 자문 업체가 0곳이면 «아무것도» 빼지 않는다', () => {
+  assert.deepEqual(S.buildAdvisoryPrune(null, ROWS, SEEDMAP).drop, []);
+  assert.deepEqual(S.buildAdvisoryPrune({ companies: {} }, ROWS, SEEDMAP).drop, []);
+  assert.deepEqual(S.buildAdvisoryPrune({ companies: { p: co({ typeCode: '급여' }) } }, ROWS, SEEDMAP).drop, [],
+    '자문이 한 곳도 없다 = 읽기가 잘못됐다고 본다');
+});
+
+test('★ pu-erp 봉투({v,u})로 와도 읽는다', () => {
+  const p = S.buildAdvisoryPrune({ companies: { v: LIVE.companies, u: 1 } }, ROWS, SEEDMAP);
+  assert.equal(p.drop.length, 2);
 });

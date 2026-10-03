@@ -144,10 +144,25 @@
     };
   }
 
+  /* ===== 업체 중 «자문·고문» 고객만 ===== (2026-10-03 대표 지시 「672 고쳐」)
+     ⚠★ 업체관리(companies)에는 자문만 있는 것이 아니다 — 실측 377곳 = 자문 197 · 급여 171 · 기금 7 · 노조 2.
+        종류를 안 가려 «급여 고객»까지 자문·고문 실적으로 들어왔다(신청 재료에 672개사).
+        지원서에 «자문 실적»으로 나가면 사실과 다르다 → 종류가 자문인 업체만 받는다.
+     ⚠ 잣대는 이 함수 «한 곳» — 가져오기(mapRecord)와 정리(buildAdvisoryPrune)가 같이 쓴다.
+     ⚠ 종류 코드는 '자문'(pu-erp COMPANY_TYPE_SEED). 코드표에서 이름을 바꿔 써도 알아보게
+        이름·줄임말에 「자문」「고문」이 들면 받는다. 모르는 종류는 «받지 않는다». */
+  function isAdvisoryCompany(c, typeMap) {
+    if (!c) return false;
+    var code = typeCodeOf('companies', c);
+    if (code === '자문') return true;
+    var t = lookupType('companies', c, typeMap);
+    return !!(t && /자문|고문/.test(String(t.name || '') + String(t.short || '')));
+  }
+
   function mapRecord(coll, key, c, userMap, typeMap) {
     var m = COLL_MAP[coll];
     if (!m || !c) return null;
-    if (m.kind === 'company') return mapCompany(key, c, userMap, typeMap);
+    if (m.kind === 'company') return isAdvisoryCompany(c, typeMap) ? mapCompany(key, c, userMap, typeMap) : null;
     var sid = mainSid(c);
     var dateRaw = c.closedDate || c.endDate || '';
     var proj = pick(c, m.proj);
@@ -209,6 +224,39 @@
      새로 만들지도, 붙이지도 않고 «연결 제안(suggests)»으로 둔다 — 사람이 미리보기에서
      「이 실적에 연결 / 새로 추가 / 보류」 중 하나를 고른다(중복 방지 — 실사용에서 컨설팅 17건이 겹쳤다).
      plan.links 는 비어서 나온다 — 사람이 고른 것을 화면이 채운다. */
+  /* ===== 자문·고문 창고 정리 =====
+     이미 들어온 줄 중 «지금 이알피의 자문 업체»와 이어지지 않은 것을 골라낸다.
+     ⚠★ 이알피를 못 읽었거나 자문 업체가 0곳이면 «아무것도 빼지 않는다» — 읽기 실패로 실적이 통째로 사라지면 안 된다.
+     ⚠ 손으로 넣은 줄(puRef 없음)은 건드리지 않는다.
+     ⚠ 빼는 것은 부르는 쪽이 «휴지통»으로 보낸다(지우지 않는다).
+     돌려주는 것: drop [{id, reason}] · retype [{id, type}] (이알피에서 종류만 자문으로 바뀐 줄) */
+  function buildAdvisoryPrune(collData, rows, typeMap) {
+    var out = { drop: [], retype: [], liveAdvisory: 0 };
+    var v = unwrap(collData ? collData.companies : null);
+    if (!v || typeof v !== 'object') return out;
+    var live = {};                                        /* ref → 업체 */
+    Object.keys(v).forEach(function (key) {
+      var c = v[key]; if (!c) return;
+      live['companies/' + key] = c;
+      var id = _idOf(c); if (id) live['companies#' + id] = c;
+      if (isAdvisoryCompany(c, typeMap)) out.liveAdvisory++;
+    });
+    if (!out.liveAdvisory) return out;
+    var t = (typeMap && typeMap.company) || [];
+    var advName = (t.filter(function (x) { return x && String(x.code) === '자문'; })[0] || {}).name || '자문';
+    (rows || []).forEach(function (r) {
+      if (!r || !r.puRef || String(r.puRef).indexOf('companies') !== 0) return;
+      var c = live[r.puRef];
+      if (!c) { out.drop.push({ id: r.id, reason: '이알피에 없는 업체(옛 번호·겹친 줄)' }); return; }
+      if (!isAdvisoryCompany(c, typeMap)) {
+        out.drop.push({ id: r.id, reason: '자문이 아닌 업체(' + (typeCodeOf('companies', c) || '종류 모름') + ')' });
+        return;
+      }
+      if (r.type !== advName) out.retype.push({ id: r.id, type: advName });
+    });
+    return out;
+  }
+
   function buildSyncPlan(collData, existingRefs, userMap, typeMap, existingRecords) {
     var known = (existingRefs instanceof Set) ? existingRefs : new Set(existingRefs || []);
     var pool = (existingRecords || []).slice();
@@ -350,7 +398,8 @@
   var api = { isClosed: isClosed, isCoClosed: isCoClosed, mapRecord: mapRecord, buildSyncPlan: buildSyncPlan,
               buildStatusUpdates: buildStatusUpdates, unwrap: unwrap, fromCaseNo: fromCaseNo,
               refOf: refOf, isIdRef: isIdRef, sourceNoOf: sourceNoOf,
-              buildRefMigration: buildRefMigration, buildNoUpdates: buildNoUpdates };
+              buildRefMigration: buildRefMigration, buildNoUpdates: buildNoUpdates,
+              isAdvisoryCompany: isAdvisoryCompany, buildAdvisoryPrune: buildAdvisoryPrune };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerPuSync = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

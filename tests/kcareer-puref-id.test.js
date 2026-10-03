@@ -38,7 +38,7 @@ function sandbox(store) {
   vm.createContext(ctx);
   vm.runInContext("var TRASH_STORE='trash';", ctx);
   vm.runInContext("var PU_SYNC_STORES=['case','consult','fund','etc','advisory'];", ctx);
-  ['function kcTrashList(', 'function kcNextNo(', 'function nextId(prefix,store)',
+  ['function kcTrashList(', 'function kcTrashLabel(', 'function kcTrashFileIds(', 'function kcNextNo(', 'function nextId(prefix,store)',
    'function _puKnownRefs(', 'function puSyncCommit(', 'function puUndoSync('].forEach((h) => vm.runInContext(cutFn(CODE, h), ctx));
   return ctx;
 }
@@ -158,4 +158,67 @@ test('② 어긋났던 실적에 제 건을 다시 고르면 확인 표시가 �
   r = rec(store, 'CS0002');
   assert.equal(r.puRef, 'cases/1', '되돌리면 옛 열쇠로');
   assert.equal(r.puRefCheck, 'moved', '다시 확인 필요로');
+});
+
+/* ═══ 자문·고문 정리 (대표 지시 2026-10-03 「672 고쳐」) — 실제로 돌려 본다 ═══ */
+function advCtx(drop, retype) {
+  const store = {
+    advisory: [
+      { id: 'AD0001', type: '자문', org: '자문사', puRef: 'companies#co-adv-1' },
+      { id: 'AD0002', type: '급여', org: '급여사', puRef: 'companies#co-pay-1' },
+      { id: 'AD0003', type: '자문', org: '자문사', puRef: 'companies/co-s97' },
+      { id: 'AD0004', type: '급여', org: '종류바뀐곳', puRef: 'companies#co-adv-2' }
+    ],
+    trash: [{ tid: 'Told', store: 'case', rec: { id: 'CS0099' } }]
+  };
+  const ctx = sandbox(store);
+  let sets = 0; const orig = ctx.set;
+  ctx.set = (k, v) => { if (k === 'trash') sets++; return orig(k, v); };
+  ctx._puSyncCtx = { syncId: 'PS9', plan: { adds: [], links: [], suggests: [] }, statusUps: [], noUps: [],
+    mig: { upgrades: [], broken: [] }, picks: {},
+    advPrune: { drop: drop, retype: retype || [] } };
+  return { ctx, store, sets: () => sets };
+}
+
+test('★★ 자문이 아닌 줄·겹친 줄은 «휴지통»으로 — 지우지 않는다', () => {
+  const t = advCtx([{ id: 'AD0002', reason: '자문이 아닌 업체(급여)' }, { id: 'AD0003', reason: '이알피에 없는 업체(옛 번호·겹친 줄)' }]);
+  t.ctx.puSyncCommit();
+  assert.equal(JSON.stringify(t.store.advisory.map((r) => r.id).sort()), JSON.stringify(['AD0001', 'AD0004']));
+  const moved = t.store.trash.filter((e) => e.store === 'advisory');
+  assert.equal(JSON.stringify(moved.map((e) => e.rec.id).sort()), JSON.stringify(['AD0002', 'AD0003']), '휴지통에서 되살릴 수 있어야 합니다');
+  assert.match(moved[0].what, /자문·고문 정리/);
+  assert.ok(t.store.trash.some((e) => e.tid === 'Told'), '원래 휴지통에 있던 것을 지우면 안 됩니다');
+});
+
+test('★★ 수백 건이어도 휴지통에는 «한 번만» 쓴다 — 한 건씩 쓰면 화면이 멎는다', () => {
+  const t = advCtx([{ id: 'AD0002', reason: 'x' }, { id: 'AD0003', reason: 'y' }]);
+  t.ctx.puSyncCommit();
+  assert.equal(t.sets(), 1);
+});
+
+test('★ 종류만 자문으로 바뀐 줄은 지우지 않고 종류를 맞춘다', () => {
+  const t = advCtx([], [{ id: 'AD0004', type: '자문' }]);
+  t.ctx.puSyncCommit();
+  assert.equal(t.store.advisory.find((r) => r.id === 'AD0004').type, '자문');
+  assert.equal(t.store.advisory.length, 4);
+});
+
+test('★ 몇 건을 휴지통으로 보냈는지·어디서 되살리는지 말한다', () => {
+  const t = advCtx([{ id: 'AD0002', reason: 'x' }]);
+  t.ctx.puSyncCommit();
+  assert.match(t.ctx._toasts.join(' '), /자문·고문이 아닌 업체 1건을 휴지통으로/);
+  assert.match(t.ctx._toasts.join(' '), /휴지통에서 되살립니다/);
+});
+
+test('★ 정리할 것이 없으면 휴지통을 건드리지 않는다', () => {
+  const t = advCtx([]);
+  t.ctx.puSyncCommit();
+  assert.equal(t.sets(), 0);
+  assert.equal(t.store.advisory.length, 4);
+});
+
+test('★★ 읽을 때 자문·고문 정리 목록을 만든다 — 이알피 업체·코드표를 함께 넘긴다', () => {
+  const f = cutFn(CODE, 'async function _puFetchPlan(');
+  assert.match(f, /KcareerPuSync\.buildAdvisoryPrune\(collData, get\('advisory'\), typeMap\)/);
+  assert.match(f, /return \{ advPrune: advPrune,/);
 });
