@@ -83,6 +83,8 @@ function load(over){
       database: () => ({ ref: dbRef })
     }
   };
+  /* 자료가 들어와 다시 그리기(mbDrawSoon)는 앱에서는 120ms 묶개다 — 여기서는 «바로» 그린 셈으로 본다 */
+  ctx.mbDrawSoon = () => { ctx.renderPCSide(); ctx.renderMailPage(); };
   vm.createContext(ctx);
   vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
   ctx._held = held;

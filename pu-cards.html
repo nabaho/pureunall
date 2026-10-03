@@ -4696,7 +4696,8 @@ const ErpMatch = {
       ErpMatch.companies=cos; ErpMatch.ready=true; bootMark('erp');
       if(typeof mbGuessBust==='function') mbGuessBust();   /* 이름표가 바뀌면 훑개도 새로 */
       coListBust();
-      try{ render(); }catch(_){}
+      /* ⚡ 메일 창이면 묶어서 그린다 — 처음 열 때 다른 도착과 한 번에(mbDrawSoon 머리글) */
+      try{ if(state.view==='mail' && typeof mbDrawSoon==='function') mbDrawSoon(); else render(); }catch(_){}
       /* 자문사 폴더 자동 분류 — 명함 데이터가 늦게 로드될 수 있어 4초 뒤 한 번 더(멱등) */
       ErpMatch.autoFolder();
       setTimeout(()=>ErpMatch.autoFolder(), 4000);
@@ -16346,7 +16347,7 @@ function mbOldStateLoad(){
   firebase.database().ref('mailbox/old/state').once('value')
     .then(s=>{ _mbOldState = s.val() || {}; })
     .catch(e=>{ console.warn('[지난 메일]', (e&&e.message)||e); _mbOldState = {}; })
-    .then(()=>{ _mbOldStateBusy = false; renderPCSide(); renderMailPage(); });
+    .then(()=>{ _mbOldStateBusy = false; mbDrawSoon(); });
 }
 
 const MB_OLD_DAY = 86400000;
@@ -17035,7 +17036,7 @@ function mbSeedApply(s){
      새 값이 오면 «그 자리에서» 바꿔 넣는다(loadMailFolders·mbEnsureBins·loadMailBox 가 그렇게 한다). */
 function mbSeedRefresh(){
   if(!_mbSeeded) return;
-  const again = ()=>{ if(state.view==='mail'){ renderPCSide(); renderMailPage(); } };
+  const again = ()=>{ if(state.view==='mail') mbDrawSoon(); };
   let left = 3;
   const fin = ()=>{
     if(--left) return;
@@ -17063,7 +17064,7 @@ function mbFillNeed(id){
   let left = need.length;
   need.forEach(s=>loadMailBox(s, mbPageSize(), ()=>{
     if(--left) return;
-    if(state.view==='mail' && state.mailSent==='box'){ renderPCSide(); renderMailPage(); }
+    if(state.view==='mail' && state.mailSent==='box') mbDrawSoon();
     mbSeedSaveSoon();
   }));
   return true;
@@ -17094,7 +17095,7 @@ function mbEnsureFolders(){
   _mbBusyFolders = true;
   loadMailFolders(()=>{
     _mbBusyFolders = false;
-    if(state.view==='mail' || state.view==='mat'){ renderPCSide(); renderMailPage(); }
+    if(state.view==='mail' || state.view==='mat') mbDrawSoon();
   });
 }
 
@@ -17276,7 +17277,7 @@ function mbEnsureBins(cb){
   }).then(()=>{
     _mbBinsBusy = false;
     if(cb) cb();
-    if(state.view==='mail'){ renderPCSide(); renderMailPage(); }
+    if(state.view==='mail') mbDrawSoon();
   });
 }
 
@@ -17363,7 +17364,7 @@ function mbBinRuleMap(){
   _mbBinRule = {};
   if(typeof Store!=='undefined' && Store.mode==='firebase'){
     firebase.database().ref(DB_ROOT+'/config/mailBinRule').once('value')
-      .then(s=>{ _mbBinRule = s.val()||{}; renderPCSide(); renderMailPage(); })
+      .then(s=>{ _mbBinRule = s.val()||{}; mbDrawSoon(); })
       .catch(()=>{});
   }
   return _mbBinRule;
@@ -19257,7 +19258,7 @@ function mbBizSubsLoad(){
     _mbWork = mbWorkBuild(m, nameBySid,
       (typeof ErpMatch!=='undefined' && ErpMatch.byId) || {},
       (typeof ErpMatch!=='undefined' && ErpMatch.byBiz) || {});
-    if(state.view==='mail'){ mbWhoBust(); renderPCSide(); renderMailPage(); }
+    if(state.view==='mail'){ mbWhoBust(); mbDrawSoon(); }
   });
 }
 /* 이 주소의 회사 이름 — 사람이 이은 자문사가 먼저, 없으면 기업정보함이 아는 이름 */
@@ -19560,12 +19561,12 @@ function mbSeenLoad(){
   _mbSeen = {};
   if(typeof Store==='undefined' || Store.mode!=='firebase') { _mbSeenSolo = {}; return; }
   firebase.database().ref(DB_ROOT + '/' + MB_SEEN_CO).once('value')
-    .then(s=>{ _mbSeen = s.val()||{}; if(state.view==='mail') renderMailPage(); })
+    .then(s=>{ _mbSeen = s.val()||{}; if(state.view==='mail') mbDrawSoon(); })
     .catch(()=>{});
   if(!state.isAdmin){ _mbSeenSolo = {}; return; }
   _mbSeenSolo = {};
   firebase.database().ref(MB_SEEN_SOLO).once('value')
-    .then(s=>{ _mbSeenSolo = s.val()||{}; if(state.view==='mail') renderMailPage(); })
+    .then(s=>{ _mbSeenSolo = s.val()||{}; if(state.view==='mail') mbDrawSoon(); })
     .catch(()=>{ _mbSeenNoRule = true; });
 }
 
@@ -21683,7 +21684,7 @@ function mbAutoFill(){
   _mbFilling += need.length;
   need.forEach(x=>loadMailBox(x, mbPageSize(), ()=>{
     if(--_mbFilling > 0) return;
-    if(state.view==='mail' && state.mailSent==='box'){ renderPCSide(); renderMailPage(); }
+    if(state.view==='mail' && state.mailSent==='box') mbDrawSoon();
   }));
 }
 /* 지금 이 칸을 «받아 오는 중»인가 — 빈 화면에 무슨 말을 할지 가른다.
@@ -21746,7 +21747,7 @@ function openMailBox(id){
   let left = need.length;
   need.forEach(s=>loadMailBox(s, mbPageSize(), ()=>{
     if(--left) return;
-    if(state.view==='mail' && state.mailSent==='box'){ renderPCSide(); renderMailPage(); }
+    if(state.view==='mail' && state.mailSent==='box') mbDrawSoon();
     mbSeedSaveSoon();          /* 📬 다음에 창을 열 때 이것으로 먼저 그린다 */
   }));
 }
@@ -35625,6 +35626,18 @@ const _soonTick = fn => {
 };
 /* 실시간으로 들어온 것 때문에 다시 그릴 때만 이것을 쓴다 */
 const renderSoon   = makeBurstRunner(_soonTick, () => { try{ render(); }catch(_){} });
+/* ⚡ 메일 창 — 자료가 «들어와서» 다시 그릴 때는 120ms 에 한 번으로 묶는다
+   (대표 지시 2026-10-03 「1번」 — 「느린 까닭」의 남은 뿌리).
+   ★ 처음 열 때 폴더·분류·규칙·씨앗 새로고침·사무관리 부담당·봤음 기록·이알피 업체가 «따로따로»
+     도착하며 그때마다 옆줄과 목록을 통째로 다시 그렸다(대표 화면 「mbBinCount 336번」 = 옆줄 16번).
+     한 프레임(16ms) 묶개(renderSoon)로는 못 묶는다 — 도착이 수십~수백 ms 씩 벌어져 온다.
+   ⚠ 사람이 누른 것은 «묶지 않는다» — 그건 바로 보여야 한다. 이것은 도착 자리에서만 부른다.
+   ⚠ 밀린 그리기는 반드시 일어난다(건너뛰지 않는다) — 늦어도 120ms 다.
+   ⚠ 그릴 때 화면이 여전히 메일(또는 자료함)인지 다시 본다 — 그 사이 딴 화면으로 갔으면 안 그린다. */
+const MB_DRAW_GAP = 120;
+const mbDrawSoon = makeBurstRunner(fn => setTimeout(fn, MB_DRAW_GAP), () => {
+  try{ if(state.view==='mail' || state.view==='mat'){ renderPCSide(); renderMailPage(); } }catch(_){}
+});
 const renderCoSoon = makeBurstRunner(_soonTick, () => { try{ renderCoAny(); }catch(_){} });
 /* 폰 기업 상세 카드 목록 — 명함 목록(renderList)과 같은 .row/.rowmain/.nm/.l1/.l2
    클래스를 그대로 쓴다(대표가 고른 A안: 카드 목록 + 전체화면 상세, 2026-08-15).
