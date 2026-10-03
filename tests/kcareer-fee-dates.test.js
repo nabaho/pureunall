@@ -155,6 +155,49 @@ test('⑥ 새 화면 CSS — 어두운 판에서 글자·막대가 안 묻히고
   assert.match(SRC, /#feeSettleBody\{[^}]*overflow-x:auto/, '★ 정산 표를 옆으로 밀 길이 없습니다 — 폰에서 입금계좌 칸이 잘립니다');
 });
 
+/* ── 월 고르개 (대표 결정 2026-10-03 「가」) — 「이번 달」·월별 막대를 누르면 «그 달»로 온다 ── */
+test('⑦ 월 고르개 규칙 — 어떤 일자 모양이든 그 달만 남고, 읽을 수 없는 건은 빠진다', () => {
+  const ctx = { Number, String };
+  vm.createContext(ctx);
+  vm.runInContext(['function _feeYMD(', 'function careerMonthOK('].map(떼기).join('\n'), ctx);
+  const ok = (date, mo) => vm.runInContext(`careerMonthOK({date:${JSON.stringify(date)}}, ${JSON.stringify(mo)})`, ctx);
+  ['2026.09.18', '2026-09-18', '2026/9/8', '20260918', '2026년 9월 18일', '2026.09'].forEach((s) =>
+    assert.equal(ok(s, '9'), true, '★ 「' + s + '」가 9월 거르개를 못 통과합니다 — 점 모양 건이 빠지던 바로 그 버그입니다'));
+  assert.equal(ok('2026.10.01', '9'), false, '다른 달이 새어 들어옵니다');
+  assert.equal(ok('2026.09.18', ''), true, '월을 안 골랐으면 거르지 않는다');
+  assert.equal(ok('', '9'), false, '★ 일자가 빈 건이 9월에 끼어듭니다 — 어느 달인지 모르는 건은 빠져야 합니다');
+  assert.equal(ok('미정', '9'), false);
+  assert.equal(ok('2026.09.18', 9), true, '숫자로 넘겨도(고르개 값이 글자라) 같다');
+  /* issueDate 가 있는 다른 목록(위촉장 등)도 같은 규칙을 쓴다 */
+  assert.equal(vm.runInContext("careerMonthOK({issueDate:'2026.03.02'}, '3')", ctx), true);
+});
+
+test('⑦-2 비용 목록에 월 고르개가 있고 renderCareer 가 그 한 곳으로 거른다', () => {
+  const 쪽 = SRC.slice(SRC.indexOf('id="page-meetfee"'), SRC.indexOf('id="page-feedash"'));
+  assert.match(쪽, /data-f="month"/, '★ 비용 목록에 월 고르개가 없습니다 — 이번 달·월 막대를 눌러도 갈 곳이 없습니다');
+  assert.equal((쪽.match(/<option value="\d+">\d+월<\/option>/g) || []).length, 12, '1월~12월 열두 칸이어야 합니다');
+  const 거르개 = 떼기('function renderCareer(');
+  assert.match(거르개, /careerMonthOK\(r,\s*mo\)/, '★ renderCareer 가 월 규칙(careerMonthOK)을 안 씁니다 — 목록이 안 걸러집니다');
+  assert.match(떼기('function feeGo('), /put\('month',\s*o\.month\)/,
+    '★ feeGo 가 월을 고르개에 안 넣습니다 — 눌러도 한 해 전체가 뜹니다');
+});
+
+test('⑦-3 한눈에 — 「이번 달」·월 막대는 «그 달»로 보내고, 합계·건수는 월을 비운다', () => {
+  const html = 한눈에그리기({
+    meetfee: [{ id: 'MF0001', date: '2026.10.05', year: '2026', type: '회의', content: 'a', amt: '300000', org: '홍길동' },
+              { id: 'MF0002', date: '2026.09.18', year: '2026', type: '회의', content: 'b', amt: '1600000', org: '홍길동' }]
+  }, 고정시계(2026, 9, 20));
+  const 눌림 = (라벨) => { const m = html.match(new RegExp('onclick="(feeGo\\([^"]*\\))"><div class="l">' + 라벨)); assert.ok(m, 라벨 + ' 칸을 못 찾습니다'); return m[1]; };
+  assert.match(눌림('이번 달'), /year:'2026',month:10/, '★ 「이번 달」이 10월로 안 갑니다 — 한 해 전체로 갑니다');
+  assert.doesNotMatch(눌림('2026년 합계'), /month/, '합계는 월을 비워야 합니다(안 비우면 이전에 고른 달이 남습니다)');
+  assert.doesNotMatch(눌림('건수'), /month/);
+  /* 월별 막대 — 9월 막대는 month:9, 10월 막대는 month:10 */
+  const 막대 = [...html.matchAll(/title="(2026년 (\d+)월 [^"]*)" onclick="(feeGo\([^"]*\))"/g)];
+  assert.equal(막대.length, 12, '월별 막대가 열두 개여야 합니다');
+  막대.forEach((m) => assert.match(m[3], new RegExp('month:' + Number(m[2]) + '\\}'),
+    '★ ' + m[2] + '월 막대가 그 달로 안 갑니다: ' + m[3]));
+});
+
 test('④ 옆줄 숫자는 목록이 모으는 «두 통»을 다 센다', () => {
   const 마디 = 떼기('function navCount(');
   const ctx = {
