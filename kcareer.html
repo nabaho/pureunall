@@ -610,6 +610,17 @@ html.dark .empty{color:var(--text-mute)}
 /* 「구분」 칩 — 회의비용·기타비용을 한 화면으로 합치고 여기서 가른다(2026-08-29) */
 .fee-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .fd-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.fd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:2px 0 12px}
+.fd-tabs button{border:0;background:none;padding:8px 16px;font-size:13px;color:var(--text-mute);border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1px}
+.fd-tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:800}
+.fd-tabs button b{font-weight:600;margin-left:4px;color:var(--text-mute)}
+.fd-pane{display:none}.fd-pane.on{display:block}
+/* 옮겨 온 화면(비용 목록·정산)은 «탭 칸 안»에서 늘 보인다 — 제 머리(제목)는 한눈에 머리와 겹치니 숨긴다 */
+#feePaneList>.page-view,#feePaneSettle>.page-view{display:block}
+#feePaneList .page,#feePaneSettle .page{padding:0;max-width:none;margin:0}
+#feePaneList .page-head,#feePaneSettle .page-title{display:none}
+.fs-sub td{background:var(--soft);font-size:12px;color:var(--text-sub)}
+.fs-sub tr:hover td{background:var(--soft)}
 .fd-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .fd-kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:left}
 /* ⚠ 글자·막대에는 var(--ink) — var(--navy) 는 어두운 판에서도 «짙은 남색 그대로»라 어두운 바탕 위에서 안 보인다
@@ -1944,7 +1955,12 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
         <div class="fd-head"><div class="page-title">📊 회의·비용 한눈에</div>
           <select class="tb-select" id="feeDashYear" onchange="renderFeeDash()" title="볼 해"></select>
           <span style="flex:1"></span><button class="btn primary" onclick="feeNew()">+ 새 신청</button></div>
-        <div id="feeDashBody"></div>
+        <!-- ★ 숫자 카드는 늘 보이고 아래만 탭으로 바뀐다(목업 A). 목록·정산 화면은 feeDashMount 가 이 칸들로 옮겨 온다 -->
+        <div id="feeDashKpi"></div>
+        <div class="fd-tabs" id="feeDashTabs"></div>
+        <div class="fd-pane" id="feePaneSum"><div id="feeDashBody"></div></div>
+        <div class="fd-pane" id="feePaneList"></div>
+        <div class="fd-pane" id="feePaneSettle"></div>
       </div></section>
       <!-- 💰 정산 (목업 C) — 지출처·수령인별로 건수·합계, 동의서를 만들었나·입금계좌가 있나 -->
       <section class="page-view" id="page-feesettle"><div class="page">
@@ -5221,7 +5237,10 @@ let NAV=[
      ⚠ 기록은 옮기지 않았다. page-etcfee 는 남겨 두어 옛 기록을 그 화면으로 고칠 수 있다. */
   /* ★ 한눈에 · 정산 (대표 지시 2026-10-03 「회의비용관리도 대시보드 탭 메인등을 만들어라」 → 목업 A+C 승인).
      「한눈에」가 첫 자리 — 상위를 누르면 첫 화면이 열린다(navPick). 기록은 그대로 meetfee·etcfee 두 통이다. */
-  {g:'회의·비용관리', items:[['page-feedash','📊 한눈에'],['page-meetfee','🧾 비용 목록'],['page-feesettle','💰 정산'],['page-feedoc','✍️ 서류 만들기'],['page-feebox','📁 비용 서류']]},
+  /* ★ 메뉴 셋으로 정리 (대표 지시 2026-10-03 「대시보드 정리필요 — 서류만들기·저장서류·한눈에 순서」 → 목업 A).
+     비용 목록·정산은 «한눈에 안의 탭»이다 — 옆줄에서 뺐지만 화면(page-meetfee·page-feesettle)은 그대로 살아 있고,
+     그 이름으로 가면 한눈에의 그 탭이 열린다(FEE_DASH_TAB). */
+  {g:'회의·비용관리', items:[['page-feedoc','✍️ 서류 만들기'],['page-feebox','📁 저장 서류'],['page-feedash','📊 한눈에']]},
   {g:'경력관리', items:[['page-wiccok','위촉장'],['page-license','자격증'],['page-complete','수료증'],['page-award','표창 및 포상'],['page-edu','학력'],['page-work','기업경력']]},
   {g:'실적관리', items:[['page-case','사건실적'],['page-consult','컨설팅실적'],['page-fund','기금실적'],['page-lecture','강의실적'],['page-etc','기타실적'],['page-advisory','자문·고문'],['page-puagency','외부기관 실적'],['page-submission','제출서류']]},
   {g:null, items:[['page-settings','환경설정']]},
@@ -5543,7 +5562,11 @@ function syncGroupUI(id){ const inf=(typeof navInfo==='function')?navInfo(id):{g
     if(on) document.documentElement.style.setProperty('--gtabH', Math.round(gt.getBoundingClientRect().height)+'px');
   });
 }
+/* 비용 목록·정산은 한눈에 안의 탭이다 — 옛 이름(전체검색·홈 타일·feeGo)으로 와도 길을 잃지 않게 */
+var FEE_DASH_TAB={'page-meetfee':'list','page-feesettle':'settle'};
+var _feeTab='sum';
 function nav_to(id,label,grp){
+  if(FEE_DASH_TAB[id]){ _feeTab=FEE_DASH_TAB[id]; id='page-feedash'; label=navInfo(id).label; grp=navInfo(id).grp; }
   /* 대표 전용 — 잠겨 있으면 어느 화면으로도 옮기지 않는다.
      ⚠ 직원 보기('staff')일 때는 «경력관리 다섯 화면»만 열어 준다(대표 지시 2026-09-02).
        여기를 안 막으면 홈 타일·전체검색으로 실적·비용·개인정보에 그대로 들어간다. */
@@ -5578,7 +5601,6 @@ function nav_to(id,label,grp){
   /* 비용 서류는 보관함의 한 탭이다 — 들어온 문에 맞는 탭만 보인다(CSS data-nav-as) */
   if(real==='page-docbox') _safe(function(){ dbTab(id==='page-feebox'?'feedoc':(_dbDomain==='feedoc'?'resume':_dbDomain)); });
   if(id==='page-feedash') _safe(renderFeeDash);
-  if(id==='page-feesettle') _safe(renderFeeSettle);
   if(id==='page-profile' && typeof renderDocStore==='function') renderDocStore('profile');
   if(id==='page-certdoc' && typeof renderDocStore==='function') renderDocStore('certdoc');
   if(id==='page-settings'){ _safe(renderPersonal); _safe(renderAccounts); _safe(initIDSecurity); _safe(renderPubBox);
@@ -12728,7 +12750,7 @@ function feeMissing(r){
 }
 function feeOpen(st, id){ if(typeof openEditDrawer==='function') openEditDrawer(st, id); }
 function feeNew(){
-  navTile('page-meetfee');
+  navTile('page-meetfee');   /* = 한눈에 › 목록 탭(FEE_DASH_TAB) */
   var b=document.querySelector('#page-meetfee [data-act="new"]'); if(b) b.click();
 }
 /* 비용 목록으로 가서 그 조건으로 거른다 — 목록의 고르개를 움직인다(거르는 규칙은 한 곳) */
@@ -12750,6 +12772,25 @@ function _feeDashYear(all){
     sel.dataset.set='1'; }
   return cur;
 }
+/* 목록·정산 화면을 한눈에의 탭 칸으로 옮긴다 — 화면 id 는 그대로라 거르기·그리기 코드가 그대로 돈다 */
+function feeDashMount(){
+  [['page-meetfee','feePaneList'],['page-feesettle','feePaneSettle']].forEach(function(p){
+    var sec=document.getElementById(p[0]), box=document.getElementById(p[1]);
+    if(sec && box && sec.parentNode!==box) box.appendChild(sec);
+  });
+}
+function feeDashTab(t){
+  _feeTab=(t==='list'||t==='settle')?t:'sum';
+  feeDashMount();
+  [['sum','feePaneSum'],['list','feePaneList'],['settle','feePaneSettle']].forEach(function(p){
+    var el=document.getElementById(p[1]); if(el) el.classList.toggle('on', p[0]===_feeTab); });
+  var all=feeAll(), gs=feeSettleGroups(all, _feeSettleWhen);
+  var tb=document.getElementById('feeDashTabs');
+  if(tb) tb.innerHTML=[['sum','요약',''],['list','목록',all.length],['settle','정산',gs.length+'곳']].map(function(o){
+    return '<button type="button" class="'+(o[0]===_feeTab?'on':'')+'" onclick="feeDashTab(\''+o[0]+'\')">'+o[1]+(o[2]!==''?'<b>'+o[2]+'</b>':'')+'</button>'; }).join('');
+  if(_feeTab==='list') renderCareer('meetfee');
+  if(_feeTab==='settle') renderFeeSettle();
+}
 function renderFeeDash(){
   var body=document.getElementById('feeDashBody'); if(!body) return;
   var all=feeAll(), yr=_feeDashYear(all);
@@ -12762,8 +12803,10 @@ function renderFeeDash(){
     +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+Y+'\'})"><div class="l">'+(yr?yr+'년 합계':'전체 합계')+'</div><div class="v">'+_won(합)+'</div></button>'
     +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+d.getFullYear()+'\',month:'+(d.getMonth()+1)+'})"><div class="l">이번 달 ('+(d.getMonth()+1)+'월)</div><div class="v">'+_won(이달합)+'</div></button>'
     +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+Y+'\'})"><div class="l">건수</div><div class="v">'+rows.length+'건</div></button>'
-    +'<button type="button" class="fd-kpi'+(빠짐.length?' warn':'')+'" onclick="document.getElementById(\'fdMiss\').scrollIntoView({behavior:\'smooth\',block:\'center\'})"><div class="l">확인할 것</div><div class="v">'+빠짐.length+'건</div></button>'
+    +'<button type="button" class="fd-kpi'+(빠짐.length?' warn':'')+'" onclick="feeDashTab(\'sum\');document.getElementById(\'fdMiss\').scrollIntoView({behavior:\'smooth\',block:\'center\'})"><div class="l">확인할 것</div><div class="v">'+빠짐.length+'건</div></button>'
     +'</div>';
+  /* 숫자 카드는 탭 위 칸에 — 어느 탭에서든 보인다 */
+  var kpi=document.getElementById('feeDashKpi'); if(kpi){ kpi.innerHTML=html; html=''; }
   /* 구분별 */
   var 구분={}; rows.forEach(function(r){ var k=FEE_KINDS.indexOf(r.type)>=0?r.type:'기타'; 구분[k]=(구분[k]||0)+_feeAmt(r); });
   var 큰=Math.max.apply(null, FEE_KINDS.map(function(k){ return 구분[k]||0; }).concat([1]));
@@ -12794,6 +12837,7 @@ function renderFeeDash(){
     +(최근.length?최근.map(function(r){ return 줄(r, 날(r)+'<span class="tag navy">'+escapeHtml(r.type||'기타')+'</span>'); }).join(''):'<div class="fd-empty">아직 기록이 없습니다 — 「+ 새 신청」으로 넣으세요</div>')
     +'</div></div>';
   body.innerHTML=html;
+  if(typeof feeDashTab==='function') feeDashTab(_feeTab);
 }
 /* 💰 정산 — 지출처·수령인별 */
 var _feeSettleWhen='year';
@@ -12818,6 +12862,16 @@ function feeSettleGroups(all, w){
   });
   return Object.keys(g).map(function(k){ return g[k]; }).sort(function(a,b){ return b.sum-a.sum; });
 }
+var _feeOpenWho={};
+function feeSettleToggle(who){ _feeOpenWho[who]=!_feeOpenWho[who]; renderFeeSettle(); }
+/* 입금계좌 넣기 — 그 곳의 가장 최근 건을 연다(계좌 칸이 거기 있다) */
+function feeSettleAcct(ev, who){
+  if(ev) ev.stopPropagation();
+  var x=feeSettleGroups(feeAll(), _feeSettleWhen).find(function(z){ return z.who===who; });
+  if(!x || !x.rows.length) return;
+  var r=x.rows.slice().sort(function(a,b){ return _feeKey(b).localeCompare(_feeKey(a)); })[0];
+  feeOpen(r._st, r.id);
+}
 function feeSettleConsent(ev, who){
   if(ev) ev.stopPropagation();
   var gs=feeSettleGroups(feeAll(), _feeSettleWhen), x=gs.find(function(z){ return z.who===who; });
@@ -12839,13 +12893,21 @@ function renderFeeSettle(){
     +gs.map(function(x){
       var 없음=(x.who==='(지출처 없음)');
       var W=_jsAttr(x.who);
-      return '<tr class="r" onclick="feeGo({q:\''+(없음?'':W)+'\'})" title="이 곳의 건만 비용 목록으로">'
-        +'<td>'+(없음?'<span class="fd-miss">'+escapeHtml(x.who)+'</span>':'<b>'+escapeHtml(x.who)+'</b>')+'</td>'
+      var 펼침=!!_feeOpenWho[x.who];
+      /* ★ 줄을 누르면 그 곳의 건이 «바로 아래»에 펼쳐진다 — 목록으로 넘어가지 않는다(목업 A) */
+      var 속=펼침?x.rows.slice().sort(function(a,b){ return _feeKey(b).localeCompare(_feeKey(a)); }).map(function(r){
+        return '<tr class="fs-sub r" onclick="feeOpen(\''+r._st+'\',\''+_jsAttr(r.id)+'\')" title="이 건 열기"><td style="padding-left:28px">└ '+escapeHtml(_feeDay(r))
+          +' · '+escapeHtml(r.type||'기타')+' · <span title="'+escapeHtml(r.content||'')+'">'+escapeHtml(r.content||'(내용 없음)')+'</span></td>'
+          +'<td></td><td class="n">'+(_feeAmt(r)?_won(_feeAmt(r)):'-')+'</td><td colspan="3" style="color:var(--amber)">'+escapeHtml(feeMissing(r).join(' · '))+'</td></tr>'; }).join('')
+        +'<tr class="fs-sub"><td colspan="6" style="padding-left:28px"><a href="#" onclick="feeGo({q:\''+(없음?'':W)+'\'});return false">🧾 목록 탭에서 이 곳만 보기</a></td></tr>':'';
+      return '<tr class="r" onclick="feeSettleToggle(\''+W+'\')" title="눌러서 이 곳의 건 펼치기">'
+        +'<td>'+(펼침?'▾ ':'▸ ')+(없음?'<span class="fd-miss">'+escapeHtml(x.who)+'</span>':'<b>'+escapeHtml(x.who)+'</b>')+'</td>'
         +'<td class="n">'+x.n+'</td><td class="n">'+_won(x.sum)+'</td>'
         +'<td style="color:var(--text-mute)">'+escapeHtml(x.last)+'</td>'
         +'<td>'+(없음?'-':(x.consent?'<span class="fs-pill" title="만든 날 — 받았는지는 따로 확인">만듦 '+escapeHtml(x.consent.slice(5,10).replace('-','.'))+'</span>'
             :'<button class="btn sm" onclick="feeSettleConsent(event,\''+W+'\')" title="가장 최근 건으로 동의서를 만듭니다">📨 만들기</button>'))+'</td>'
-        +'<td>'+(없음?'-':'<span class="fs-pill'+(x.acct?'':' no')+'">'+(x.acct?'있음':'없음')+'</span>')+'</td></tr>';
+        +'<td>'+(없음?'-':(x.acct?'<span class="fs-pill">있음</span>'
+            :'<button class="btn sm" onclick="feeSettleAcct(event,\''+W+'\')" title="가장 최근 건을 열어 입금계좌를 넣습니다">없음 → 넣기</button>'))+'</td></tr>'+속;
     }).join('')+'</tbody></table>';
 }
 
