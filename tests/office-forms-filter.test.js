@@ -136,3 +136,31 @@ test('★★ 목록·종이는 화면 높이에 맞추고 안에서 스크롤 �
   assert.match(fit, /innerWidth\s*<=\s*700/, '휴대폰(세로로 쌓는 화면)까지 높이를 묶습니다');
   assert.match(CF, /\.pcf-cols \.pcf-sheetwrap\{[^}]*overflow-y:auto/, '종이 칸이 안에서 스크롤되지 않습니다');
 });
+
+/* 2026-10-03 기금 제안서 PR1 — 기금관리 안의 두 묶음 (설계 2026-09-29 §3) */
+const FUND = [
+  { id: 'fm-5', kind: 'fund', name: '공동근로복지기금 설립지원 계약서', body: '{{회사명}}' },
+  { id: 'p1', kind: 'fund', name: '공동근로복지기금 제안서 및 견적서', groupName: '제안서·견적서', body: '' },
+  { id: 'c1', kind: 'company', name: '자문계약서', body: '' }
+];
+test('ⓔ 기금관리 — 묶음 없는 기금 양식은 「계약서」, 제안서 묶음은 따로 거른다', () => {
+  const P = loadCF();
+  assert.deepStrictEqual(out(P.FUND_GROUPS), ['계약서', '제안서·견적서']);
+  assert.strictEqual(P.PROPOSAL_GROUP, '제안서·견적서');
+  assert.deepStrictEqual(out(P.filterForms(FUND, { kind: 'fund', grp: '제안서·견적서' }).map(f => f.id)), ['p1']);
+  assert.deepStrictEqual(out(P.filterForms(FUND, { kind: 'fund', grp: '계약서' }).map(f => f.id)), ['fm-5']);
+  assert.deepStrictEqual(out(P.filterForms(FUND, { kind: 'fund', grp: 'all' }).map(f => f.id)), ['fm-5', 'p1']);
+});
+test('ⓔ 기금관리 칩 — 두 묶음이 늘 같은 순서로, 0개여도 보인다', () => {
+  const P = loadCF();
+  assert.deepStrictEqual(out(P.facetCounts(FUND, 'fund').groups), [{ name: '계약서', count: 1 }, { name: '제안서·견적서', count: 1 }]);
+  assert.deepStrictEqual(out(P.facetCounts([FUND[0]], 'fund').groups), [{ name: '계약서', count: 1 }, { name: '제안서·견적서', count: 0 }]);
+  assert.deepStrictEqual(out(P.facetCounts(FUND, 'company').groups), [], '다른 종류에는 묶음 칩이 없다');
+});
+test('ⓔ 화면 — 기금관리에서도 묶음 칩 줄과 수정 창 묶음 칸이 뜬다', () => {
+  const bar = cutFn(stripJs(CF), 'function filterBar(');
+  assert.match(bar, /kind === 'fund'/, '기금관리 칩 줄이 없습니다');
+  const md = cutFn(stripJs(CF), 'function openModal(');
+  assert.match(md, /f\.kind === 'fund'/, '기금 양식 수정 창에 묶음 칸이 없습니다');
+  assert.match(md, /FUND_GROUPS\.map/, '묶음 고르기 목록이 FUND_GROUPS 가 아닙니다');
+});

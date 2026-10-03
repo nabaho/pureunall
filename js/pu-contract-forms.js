@@ -294,6 +294,11 @@
   var CASE_TYPES = ['인사', '부해등', '체불', '체당금', '산재등', '산안', '노사', '지원', '교육', '조사', '행심', '징계', '기타'];
   var SIDES = [{ v: 'worker', label: '근로자측' }, { v: 'employer', label: '사용자측' }, { v: 'both', label: '공통' }];
   var NO_GROUP = '(미지정)';
+  /* 기금관리 안의 묶음 (설계 2026-09-29 §3) — 이알피 계약서 출력은 「제안서·견적서」를 자동 체크하지 않는다(pu-erp.html).
+     ⚠ 글자 하나까지 이알피와 같아야 한다(가운뎃점 U+00B7). */
+  var FUND_GROUPS = ['계약서', '제안서·견적서'];
+  var PROPOSAL_GROUP = FUND_GROUPS[1];
+  function hasGroups(kind) { return kind === 'case' || kind === 'fund'; }
   /* 측 — 사건계약에만. 적힌 값이 먼저, 없으면 본문 칸으로 짐작한다(근로자 칸이 있으면 근로자측:
      근로자측 양식도 상대 회사 {{회사명}} 을 적는 일이 흔하다). */
   function sideOf(f) {
@@ -304,25 +309,29 @@
     if (/\{\{(회사명|대표자)\}\}/.test(b)) return 'employer';
     return 'both';
   }
-  function groupOf(f) { return (f && String(f.groupName || '').trim()) || NO_GROUP; }
-  function groupRank(g) {
-    var i = CASE_TYPES.indexOf(g);
+  function groupOf(f) {
+    var g = (f && String(f.groupName || '').trim()) || '';
+    if (g) return g;
+    return f && f.kind === 'fund' ? FUND_GROUPS[0] : NO_GROUP;   // 기금: 묶음이 없으면 계약서(시드 fm-5)
+  }
+  function groupRank(g, kind) {
+    var list = kind === 'fund' ? FUND_GROUPS : CASE_TYPES, i = list.indexOf(g);
     return i >= 0 ? i : (g === NO_GROUP ? 1000 : 500);
   }
   /* o = { kind, side?:'all'|'worker'|'employer'|'both', grp?:'all'|이름, q?:검색어 } */
   function filterForms(forms, o) {
     o = o || {};
     var q = String(o.q || '').trim().toLowerCase();
-    var isCase = o.kind === 'case';
+    var isCase = o.kind === 'case', grouped = hasGroups(o.kind);
     return (forms || []).filter(function (f) {
       if (f.kind !== o.kind) return false;
       if (isCase && o.side && o.side !== 'all' && sideOf(f) !== o.side) return false;
-      if (isCase && o.grp && o.grp !== 'all' && groupOf(f) !== o.grp) return false;
+      if (grouped && o.grp && o.grp !== 'all' && groupOf(f) !== o.grp) return false;
       if (q && String(f.name || '').toLowerCase().indexOf(q) < 0) return false;
       return true;
     }).sort(function (a, b) {
-      if (isCase) {
-        var ga = groupOf(a), gb = groupOf(b), d = groupRank(ga) - groupRank(gb);
+      if (grouped) {
+        var ga = groupOf(a), gb = groupOf(b), d = groupRank(ga, o.kind) - groupRank(gb, o.kind);
         if (d) return d;
         if (ga !== gb) return ga.localeCompare(gb);
       }
@@ -334,15 +343,16 @@
     var list = (forms || []).filter(function (f) { return f.kind === kind; });
     var sides = { all: list.length, worker: 0, employer: 0, both: 0 };
     var by = {};
+    if (kind === 'fund') FUND_GROUPS.forEach(function (g) { by[g] = 0; });   // 0개 묶음도 칩으로 보인다
     list.forEach(function (f) {
       var s = sideOf(f);
       if (s) sides[s]++;
-      if (kind !== 'case') return;
-      if (side && side !== 'all' && s !== side) return;
+      if (!hasGroups(kind)) return;
+      if (kind === 'case' && side && side !== 'all' && s !== side) return;
       var g = groupOf(f);
       by[g] = (by[g] || 0) + 1;
     });
-    var groups = Object.keys(by).sort(function (a, b) { return (groupRank(a) - groupRank(b)) || a.localeCompare(b); })
+    var groups = Object.keys(by).sort(function (a, b) { return (groupRank(a, kind) - groupRank(b, kind)) || a.localeCompare(b); })
       .map(function (g) { return { name: g, count: by[g] }; });
     return { sides: sides, groups: groups };
   }
@@ -667,6 +677,11 @@
         return el('label', { style: 'display:inline-flex;align-items:center;gap:4px;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12.5px;cursor:pointer' }, [r, s.label]);
       }).concat(sideTouched ? [] : [el('span', { style: 'font-size:11.5px;color:#64748b', text: '지금은 본문 칸으로 짐작한 값입니다 — 누르면 정해집니다' })]));
     }
+    if (f.kind === 'fund') {
+      /* 기금관리 묶음 — 「제안서·견적서」는 이알피 계약서 출력이 자동 체크하지 않는다 */
+      grpIn = el('select', { 'aria-label': '묶음' }, FUND_GROUPS.map(function (g) { return el('option', { value: g, text: g }); }));
+      grpIn.value = groupOf(f);
+    }
     var onIn = el('input', { type: 'checkbox' }); onIn.checked = f.enabled !== false;
     var bodyIn = el('textarea', { placeholder: '예시:\n━━━━━━━━━━━━━━━━━━━━\n        사건위임계약서\n━━━━━━━━━━━━━━━━━━━━\n\n위임인: {{회사명}} (대표 {{대표자}})\n계약금액: {{계약금액}}원' });
     bodyIn.value = f.body || '';
@@ -751,8 +766,8 @@
       el('div', { 'class': 'pcf-mb' }, [
         el('div', { style: 'display:grid;grid-template-columns:' + (grpIn ? '1fr 180px' : '1fr') + ';gap:10px' }, [
           el('div', null, [el('label', { 'class': 'l', text: '양식 이름 *' }), nameIn]),
-          grpIn ? el('div', null, [el('label', { 'class': 'l', text: '사건유형 (이알피 사건유형과 같은 이름)' }), grpIn,
-            el('datalist', { id: 'pcf-case-groups' }, CASE_TYPES.map(function (g) { return el('option', { value: g }); }))]) : null
+          grpIn ? el('div', null, [el('label', { 'class': 'l', text: f.kind === 'fund' ? '묶음' : '사건유형 (이알피 사건유형과 같은 이름)' }), grpIn,
+            f.kind === 'case' ? el('datalist', { id: 'pcf-case-groups' }, CASE_TYPES.map(function (g) { return el('option', { value: g }); })) : null]) : null
         ]),
         sideBox ? el('div', null, [el('label', { 'class': 'l', text: '측 (누가 의뢰하는 계약인가)' }), sideBox]) : null,
         el('label', { style: 'display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:10px;font-size:12.5px' }, [onIn, '활성 (계약서 출력 때 고를 수 있음)']),
@@ -1384,6 +1399,13 @@
             return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
           }))));
       }
+      if (kind === 'fund') {
+        var ff = facetCounts(S.forms, 'fund');
+        row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '묶음' },
+          [chip('전체 ' + ff.sides.all, S.grp === 'all', function () { setFilter({ grp: 'all' }); })].concat(ff.groups.map(function (g) {
+            return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
+          }))));
+      }
       var q = el('input', { type: 'search', 'class': 'pcf-q', placeholder: '양식 이름 찾기', 'aria-label': '양식 이름 찾기', value: S.q });
       /* 글자를 칠 때마다 본문만 다시 그린다 — 칩 줄까지 그리면 찾기 칸 커서가 사라진다 */
       q.addEventListener('input', function () { S.q = q.value; drawBody(); });
@@ -1587,7 +1609,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    CASE_TYPES: CASE_TYPES,
+    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf,
     filterForms: filterForms,
