@@ -490,10 +490,10 @@ function formVList(v) {
   return Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }).filter(Boolean) : []);
 }
 async function formContract(id) {
-  var got = await Promise.all(['data/contracts', 'data/companies', 'data/user_dir', 'data/biz_case_types'].map(function (p) {
+  var got = await Promise.all(['data/contracts', 'data/companies', 'data/user_dir'].map(function (p) {
     return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; });
   }));
-  var cs = formVList(got[0]), cos = formVList(got[1]), users = formVList(got[2]), ctypes = formVList(got[3]);
+  var cs = formVList(got[0]), cos = formVList(got[1]), users = formVList(got[2]);
   var c = cs.filter(function (x) { return String(x.id) === String(id); })[0];
   if (!c) throw new Error('계약을 찾지 못했습니다 — 지워졌거나 아직 저장 전일 수 있습니다');
   var nb = function (s) { return String(s || '').replace(/\D/g, '').slice(0, 10); };
@@ -508,9 +508,9 @@ async function formContract(id) {
   var vals = PuContractVars.contractVars(c, { findCompany: find, companies: cos, users: users.map(function (u) { return { sid: u.sid, name: u.name }; }),
     korMoney: window.numToKorMoney, today: today });
   var caseCode = (c.typeCodes && c.typeCodes['case']) || '';
-  var ct = ctypes.filter(function (t) { return t.code === caseCode; })[0];
+  var caseName = c.caseType || PuContractForms.CASE_CODES[caseCode] || '';
   return { id: c.id, contractNo: c.contractNo || '', kinds: c.kinds || (c.kind ? [c.kind] : []),
-    typeCode: (c.typeCodes && c.typeCodes['company']) || c.typeCode || '', caseName: ct ? ct.name : '',
+    typeCode: (c.typeCodes && c.typeCodes['company']) || c.typeCode || '', caseName: caseName,
     vals: vals, coKey: PuFormCardFill.sentKeys({ bz: vals.사업자번호, c: vals.회사명 }, {})[0] || '' };
 }
 /* 묶음 채우기 — 채운 파일들을 .zip 하나로 (브라우저 안에서만 묶는다. 채운 값은 서버로 안 간다) */

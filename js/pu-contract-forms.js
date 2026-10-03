@@ -302,6 +302,11 @@
      이알피 「계약서 출력」 자동 체크(pu-erp.html initSelMap)와 «같은 규칙»: 업체 자문·급여는 묶음 번호, 사건은 사건유형 이름,
      나머지는 그 종류 전부. 제안서·견적서 묶음과 꺼진 양식은 고르지 않는다.
      ⚠ 묶음 번호는 이알피와 글자가 같아야 한다(tests/erp-contract-fill.test.js 가 견준다). */
+  /* 사건유형 번호 → 이름 — 이알피 BIZ_CASE_SEED 와 «같은 글자»(tests/erp-contract-fill.test.js 가 견준다).
+     문서관리는 이알피 사건유형 표(data/biz_case_types)를 읽지 않는다 — 계약에 적힌 caseType 이 먼저, 없으면 이 표. */
+  var CASE_CODES = { 'case-hr': '인사', 'case-dismiss': '부해등', 'case-wage': '체불', 'case-subsidy': '체당금', 'case-injury': '산재등',
+    'case-safety': '산안', 'case-relation': '노사', 'case-support': '지원', 'case-edu': '교육', 'case-investigate': '조사',
+    'case-admin': '행심', 'case-discipline': '징계', 'case-other': '기타' };
   var CONTRACT_SETS = { advisory: ['fm-pr-advisory', 'fm-pr-cms'], payroll: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms'] };
   function contractPick(forms, info) {
     info = info || {};
@@ -2069,7 +2074,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
+    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf,
     filterForms: filterForms,

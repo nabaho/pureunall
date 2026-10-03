@@ -81,3 +81,14 @@ test('ⓔ 화면 — 계약 자료 쓰는 중 칩(✕ 로 풀기), 처음 한 �
   assert.match(bar, /host\.contractCtx/);
   assert.match(bar, /host\.contractCtx = null/);
 });
+
+test('ⓒ 사건유형 번호 → 이름이 이알피 BIZ_CASE_SEED 와 같은 글자, 문서관리는 사건유형 표를 읽지 않는다', () => {
+  const P = loadCF();
+  const seed = ERP.slice(ERP.indexOf('var BIZ_CASE_SEED = ['), ERP.indexOf('];', ERP.indexOf('var BIZ_CASE_SEED = [')));
+  const pairs = {}; seed.replace(/code:'([^']+)'[^}]*name:'([^']+)'/g, (a, c, n) => { pairs[c] = n; return a; });
+  assert.ok(Object.keys(pairs).length >= 13, '이알피 사건유형 시드를 못 읽었습니다');
+  assert.deepStrictEqual(out(P.CASE_CODES), pairs);
+  const f = cutFn(stripJs(DOCS), 'async function formContract(');
+  assert.ok(!/biz_case_types/.test(f), '사건유형 표를 읽습니다 — 규칙에 이름 없는 자리');
+  assert.match(f, /c\.caseType \|\| PuContractForms\.CASE_CODES\[caseCode\]/);
+});
