@@ -366,7 +366,10 @@ function cmRowBox(chk){
   vm.createContext(b);
   vm.runInContext(grab(W, 'cmKey') + '\n' + grab(W, 'cmChk') + '\n' + grab(W, 'cmWhen') + '\n'
     + grab(W, 'cmLogLine') + '\n' + grab(W, '_mlDay') + '\n'
-    + grab(W, 'mlRowHTML') + '\n' + grab(W, 'dCmRowHTML'), b);
+    + grab(W, 'mlRowHTML') + '\n'
+    /* 2026-10-03 — [✎ 기록에]가 «🔗 자동 담김»을 먼저 본다. 빈 표면 예전과 같다 */
+    + 'var alBox={};\n' + grab(W, 'alTook') + '\n' + grab(W, 'alTookHTML') + '\n'
+    + grab(W, 'dCmRowHTML'), b);
   return b;
 }
 /* 마우스를 올려야 보이는 곳(.mlpop)을 뺀 «줄 위에 늘 보이는» 부분 */

@@ -223,7 +223,8 @@ test('★ 나머지는 예전대로 다 센다', () => {
 });
 
 test('★★ 「내 업무」 미기록에서 뺀다', () => {
-  assert.match(W, /var nolog=mine\.filter\(function\(it\)\{return countsLog\(it\)&&wkLogsOf\(it\._id,wk\)\.length===0;\}\);/);
+  /* 2026-10-03 — 🔗 자동 줄은 «사람이 안 적었다»를 가리지 않게 빼고 센다. countsLog 로 거르는 것은 그대로다. */
+  assert.match(W, /var nolog=mine\.filter\(function\(it\)\{return countsLog\(it\)&&!wkLogsOf\(it\._id,wk\)\.some\(function\(l\)\{ return !l\.auto; \}\);\}\);/);
 });
 
 test('★★ 「팀 전체」 미기록·2주\\+ 방치에서 뺀다', () => {
