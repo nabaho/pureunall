@@ -5599,11 +5599,12 @@ function nav_to(id,label,grp){
       var 맞출=(id==='page-feedoc')?'feedoc':(ms.value==='feedoc'?'resume':'');
       if(맞출 && ms.value!==맞출){ ms.value=맞출; rhSetDomain(맞출); } }); }
   /* 허브는 «지금 켜져 있는 탭»을 다시 그린다 — 빠른 이력서·올리기 줄이 여기서 맞춰진다 */
-  if(real==='page-resume-hub') _safe(function(){ var b=document.querySelector('#rh-tabrow .tab.active');
-    /* ★ 회의·비용관리 문에는 빠른 이력서가 없다(대표 지시 2026-10-03 「회의 비용관리에 빠른이력서는 필요없다」).
-       그 탭에 머물러 있었으면 기관 양식 채우기로 돌린다 — 숨긴 탭이 켜진 채 빈 화면이 뜨면 안 된다. */
-    if(id==='page-feedoc' && b && b.dataset.tab==='dm-quick') b=document.querySelector('#rh-tabrow .tab[data-tab="rh-edit"]');
-    if(b) rhTab(b.dataset.tab,b); });
+  /* ★ 회의·비용관리 문에는 빠른 이력서가 없다(대표 지시 2026-10-03 「회의 비용관리에 빠른이력서는 필요없다」).
+     그 탭에 머물러 있었으면 «먼저» 기관 양식 채우기로 옮겨 둔다 — 숨긴 탭이 켜진 채 빈 화면이 뜨면 안 된다.
+     (바로 아래 줄이 «켜진 탭»을 다시 그린다) */
+  if(id==='page-feedoc') _safe(function(){ var q=document.querySelector('#rh-tabrow .tab.active[data-tab="dm-quick"]');
+    if(q){ q.classList.remove('active'); var e=document.querySelector('#rh-tabrow .tab[data-tab="rh-edit"]'); if(e) e.classList.add('active'); } });
+  if(real==='page-resume-hub') _safe(function(){ var b=document.querySelector('#rh-tabrow .tab.active'); if(b) rhTab(b.dataset.tab,b); });
   /* 비용 서류는 보관함의 한 탭이다 — 들어온 문에 맞는 탭만 보인다(CSS data-nav-as) */
   if(real==='page-docbox') _safe(function(){ dbTab(id==='page-feebox'?'feedoc':(_dbDomain==='feedoc'?'resume':_dbDomain)); });
   if(id==='page-feedash') _safe(renderFeeDash);
